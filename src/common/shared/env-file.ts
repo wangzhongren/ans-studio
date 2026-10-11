@@ -14,8 +14,12 @@
 //     **保留注释、空行、未知键、原有顺序与格式**——**绝不重写整份文件**（未命中的行逐字节不变）。
 //  2. **credential 不回显**：错误信息**只含键名与路径、绝不含值**（`envError` 再对入参值做
 //     redact 兜底）；`loadEnvFileInto` 只回报**键名**（`applied: string[]`），不含值。
-//  3. **原子写**：`atomicWriteText` 在**同目录**写临时文件 → `fsync` → `rename` 覆盖目标，
-//     避免半写坏掉 `.env`（rename 覆盖是原子的；同目录规避跨设备 `EXDEV`）。
+//  3. **原子写**：`atomicWriteText` 复用**跨角色共享**的原子写原语 `atomicWrite`
+//     （`src/common/shared/atomic-write.ts`，**单一来源**）——同目录临时文件 → `fsync` → `rename`
+//     覆盖目标，避免半写坏掉 `.env`（rename 覆盖是原子的；同目录规避跨设备 `EXDEV`）。
+//     该原语对 rename 的 **Windows 瞬时 `EPERM`**（实时防护/索引器短暂持有目标句柄）做**有界重试**
+//     （见 `atomic-write.ts::renameReplacingExisting`）；Pi适配器的 `fs-write.ts` 有同源写法，
+//     共享原语的抽取消除了这一处「§6 逼出的第二份镜像」。
 //  4. **失败显式**：读取/写入失败（权限/磁盘/目录不存在）**抛错**，不静默。
 //  5. **单一来源**：本模块是**全仓唯一**的 `.env` 读写实现（消费方只读导入，不复制第二份）。
 //
@@ -29,8 +33,11 @@
 //
 // 行文依据：设计稿 `docs/design/2026-10-11_design_v1-full-implementation.md` §11.2/§11.4。
 
-import { readFile, open, rename, rm } from "node:fs/promises";
-import path from "node:path";
+import { readFile } from "node:fs/promises";
+
+// 跨角色共享原子写原语（**单一来源**，属主：项目管理）——同目录 temp + `fsync` + `rename` 覆盖目标，
+// 并对 rename 的 Windows 瞬时 `EPERM` 做**有界重试**。抽取自本模块与 Pi适配器 `fs-write.ts` 的同源写法。
+import { atomicWrite } from "./atomic-write.ts";
 
 /** `.env` 键值对（值已去引号/去内联注释；重复键后者胜）。 */
 export type EnvMap = Record<string, string>;
@@ -325,34 +332,14 @@ export function mergeEnvText(original: string, updates: EnvMap): string {
 /**
  * **原子写**：在**同目录**写临时文件 → `fsync` → `rename` 覆盖目标（设计 §11.4）。
  * 失败时清理临时文件并**抛错**；目标文件在 `rename` 成功前**不被触碰**（半写不可能）。
+ *
+ * **实现**：委托**跨角色共享**原语 `atomicWrite`（`src/common/shared/atomic-write.ts`，**单一来源**）——
+ * 该原语除同目录 temp+`fsync`+`rename` 外，还对 rename 的 **Windows 瞬时 `EPERM`** 做**有界重试**
+ * （仅瞬时码、≤20 次、次数间只 `setImmediate` 让出事件循环）。本函数仅保留 TEXT 语义（UTF-8）的薄封装，
+ * **签名与行为不变**（T28 消费方只读导入此名）。
  */
 export async function atomicWriteText(filePath: string, text: string): Promise<void> {
-  const dir = path.dirname(filePath);
-  const base = path.basename(filePath);
-  const tmp = path.join(dir, `.${base}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-  let handle: Awaited<ReturnType<typeof open>> | undefined;
-  try {
-    handle = await open(tmp, "w");
-    await handle.writeFile(text, "utf8");
-    await handle.sync();
-    await handle.close();
-    handle = undefined;
-    await rename(tmp, filePath);
-  } catch (err) {
-    if (handle) {
-      try {
-        await handle.close();
-      } catch {
-        /* 清理尽力而为 */
-      }
-    }
-    try {
-      await rm(tmp, { force: true });
-    } catch {
-      /* 清理尽力而为 */
-    }
-    throw err;
-  }
+  await atomicWrite(filePath, text);
 }
 
 /** 读取 `.env` → 键值对。任何读取失败（含不存在/权限/磁盘）**明确抛错**（设计 §11.4）。 */

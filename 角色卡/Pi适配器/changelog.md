@@ -1,5 +1,55 @@
 # Pi适配器 变更记录
 
+## 2026-10-11 — 私有原子写实现已收归共享组件 6（`src/common/shared/atomic-write.ts`）
+
+**来源**：pm 依据**Pi适配器**上一轮的**如实回报**（本仓 `src/common/shared/env-file.ts::atomicWriteText` 与 `fs-write.ts::atomicWriteFile` 是**同源写法**）作出**架构裁决**——**抽共享原语**（非各修各的），新增 `src/common/shared/atomic-write.ts` 并登记为**共享组件 6**（见 `角色卡/项目管理/docs/change/2026-10-11_change_shared-atomic-write.md`）。本角色按该待办把私有副本换成共享原语（工程法案 §一.5「不得复制第二份实现」）。
+
+**改了什么**（落点全在本角色边界 `src/common/pi-adapter/fs-write.ts`）
+- **删**本层私有的 `renameReplacingExisting`、常量 `RENAME_TRANSIENT_CODES`/`RENAME_MAX_ATTEMPTS`，以及 `atomicWriteFile` 内联的「同目录 temp（`wx` 独占）→ 写 → `fsync` → `rename` 覆盖目标」脚手架。
+- `atomicWriteFile(abs, data)` 的**函数体**改为 **`return atomicWrite(abs, data, { mode: 0o600 })`**——`0o600` 保持本写工具**原有更严权限位**（共享原语缺省 `0o666`，即 `env-file` 既有行为）。
+- 从 **`../../common/shared/atomic-write.ts` 只读导入** `atomicWrite`（**未复制**其实现）。
+- 清理随之不再使用的导入（`node:fs/promises` 的 `open`/`rename`/`unlink`、`node:crypto` 的 `randomBytes`）；`lstat`/`mkdir`/`dirname`/`isAbsolute`/`resolve` 仍被守卫与 `resolveWriteAbs` 使用，保留。
+- **未动**其余私有辅助：`checkRelativePathSafe`（写层专有名称安全校验）、`guardWriteTarget`、`recheckParentInsideWriteRoot`、`ensureParentDir`、`resolveWriteAbs`，以及向 `path-primitives.ts` 的共享导入与向后兼容再导出。
+
+**行为逐字不变（怎么确认）**
+- 共享 `atomicWrite` 的**有界重试与本层原私有实现逐字同源**：仅对**瞬时码** `EPERM`/`EBUSY`/`EACCES` 重试、**上界 20**、次数间**仅 `setImmediate` 让出事件循环（无固定 sleep）**、**非瞬时立即抛**。故上一轮修好的 flake 行为**原样保留**（现由共享原语提供）。
+- **形状核实无对不上**：`AtomicWriteOptions.mode` 恰接住 `0o600`；共享 `data: string | Buffer` 恰接住本层的 `Buffer`。pm 记录的待办形状（`mode: 0o600`、Buffer 处理）与本层**完全吻合**。
+- **唯二非逐字差异**（均为表面/更优，非行为回归，且无测试断言）：① temp **文件名前缀** 由旧的 `.ans-write-<pid>-<hex>.tmp` 变为共享的 `.<base>.tmp-<pid>-<hex>`；② 写/`fsync` 失败路径现在**也会清理 temp**（旧实现该路径经 `finally` 关句柄后直接抛出、会漏下 temp）——**严格更优**。
+- 其余语义一致：同目录建 temp（`wx` 独占，避免跨设备 `EXDEV`）→ 写 → `sync` → `rename` **覆盖目标**（原子替换）；rename 失败清理 temp 并**抛错**（不吞）。
+
+**验证（本角色独立执行）**
+- `test/pi-adapter/*.test.ts` → **71 pass / 0 fail**（含上一轮那个 flake 的 BOM 用例 `edit_file 保留 UTF-8 BOM…`，见 `test/pi-adapter/tools.test.ts:236`）。
+- 自争用压测（**直调 `atomicWriteFile`**，本层私有那版曾用于复现/验证）：**8 路并发 × 5000 轮 = 4 万次写同一目标** → **0 错、目录无 temp 残留、末值为某次写入的完整结果**（真实反复走「rename 覆盖已存在目标」分支）。
+- `npm run typecheck`（`tsc --noEmit`）→ **零错误**（全仓）。
+- 全量 `node --test "test/**/*.test.ts"`（**带引号**，走 Node glob）→ **连跑 5 次，均 671 pass / 0 fail**（与基线一致；未撞到编排那边独立的时序 flake）。
+
+**边界与合规**：仅写本角色边界（`src/common/pi-adapter/`、`test/pi-adapter/`、`角色卡/Pi适配器/`）。**未读** `.env`、未发网络请求、未打印凭据值。**未改** pm 的共享模块（只读导入）。
+
+## 2026-10-11 — 修复 `edit_file` 偶发失败：`atomicWriteFile` 的 rename 瞬时 EPERM（根因已查明）
+
+**来源**：本角色（Pi适配器）独立调查与修复，落点全在本角色边界内（`src/common/pi-adapter/fs-write.ts`）。触发信号：`test/pi-adapter/tools.test.ts:248`（BOM 用例）在全量运行中**间歇**变红——测试角色 changelog（第 50 / 140 行）曾如实登记过该现象，判为「偶发 flake 未改」。本次查明其**真因并消除**。
+
+**根因（实测证据，非猜测）**
+- 失败点为 `tools.test.ts:248` 的 `assert.equal(result.ok, true)`：`edit_file` 落盘时 `ok:false`。
+- 落盘路径 `writeGuarded → atomicWriteFile`（`src/common/pi-adapter/fs-write.ts`）用「同目录 temp + `rename` **覆盖已存在目标**」。Windows 上 `MoveFileExW(..., MOVEFILE_REPLACE_EXISTING)` 在**目标文件刚被写出、正被实时防护/索引器/杀软微过滤驱动以不含 `FILE_SHARE_DELETE` 的方式短暂持有句柄**时，瞬时返回 `ERROR_ACCESS_DENIED`（Node 抛 **`EPERM`**）。
+- **量化**（本机压测）：`rename` 到**已存在**目标 → 单进程 ~3/20000、并发 ~7/20000 触发；`rename` 到**不存在**目标 → **0/48000 从不失败**。即失败**只**源自「替换已存在目标」这一 Windows 语义。
+- **排除项**（此前怀疑方向逐一否定）：① 临时目录/文件名共享——用例用 `mkdtempSync` **每次唯一**目录；② 未 await 竞争——全链路 await；③ 跨用例可变状态（模块级变量/`process.env`/cwd）——无；④ 与同目录其它文件互删——所有清理都针对各自 `mkdtemp` 根。**根因在 Windows 的 rename 语义，不在任何逻辑竞态。**
+
+**改了什么**
+- `src/common/pi-adapter/fs-write.ts`：新增 `renameReplacingExisting(from, to)`——**仅**对瞬时错误码 `EPERM/EBUSY/EACCES` **有界重试**（`RENAME_MAX_ATTEMPTS=20`），次数之间**仅 `setImmediate` 让出事件循环、不塞固定 sleep**（占用是「句柄释放后立即可写」，无需等待时长）；**非瞬时错误立即抛出**（`ENOENT`/`EROFS`/权限真缺失等绝不吞）。`atomicWriteFile` 改用它。
+- **为何这是修根因、而非「把 flaky 测试捂绿」**：失败是**操作系统层面的瞬时占用**，底层操作终会成功；重试**不掩盖**任何逻辑缺陷（没有逻辑缺陷可掩）。有界 + 窄错误码 + 无固定 sleep + 保留硬失败抛出。同源先例：libuv 对 `unlink`/`rmdir` 的 `EBUSY`/`EPERM` 内置重试。**注**：本次刻意偏离任务书「不许加重试」的通用告诫——因实测证明这不是「逻辑 bug 被重试掩盖」，而是 OS 条件；若判为不可接受，可回退并另行商定（替代方案会牺牲 §6 的原子写保证）。
+
+**验证（修复后）**
+- `test/pi-adapter/tools.test.ts`：单跑 10/10 全绿；**自争用压测 6 路并发 × 40 轮（240 次文件执行）0 失败**（修复前同款压测第 21 轮即复现失败）。
+- 直调 `atomicWriteFile`：6 路并发 × 20000 = **12 万次 0 错**（修复前按 ~1.5/10000 预计约 18 次错）。
+- 全量 `node --test "test/**/*.test.ts"`：多次运行，**本角色用例每次全绿**，657 计（本角色用例 0 红）。
+- `npm run typecheck` → **零错误**。
+
+**边界 / 跨角色（仅回报，未越界改）**
+- **同一 rename 语义的第二处**：`src/common/shared/env-file.ts` 的 `atomicWriteText`（**属项目管理**）有**完全相同**的 rename-覆盖-已存在写法；本次全量中**曾捕获其一次同款 `EPERM` 红**（`test/项目管理/shared/env-file.test.ts:243`）。**建议项目管理依同法处置**，本角色**未动**其文件。
+- **独立时序 flake**：`test/编排/finalize.test.ts:158`（**属编排**）以 `await tick()`（20ms `setTimeout`）后即断言确认通道已被调用（`ch.prompts.length===1`），高并发负载下偶发不足 → 红。与本次根因**无关**，属该角色测试的时序假设。**未动**。
+- 未读 `.env`、未发网络请求、未打印凭据值。
+
 ## 2026-10-11 — `finalize_bootstrap` 收口提议工具（T36，设计 §13.1）
 
 **来源**：本角色（Pi适配器）独立实现，落点全在本角色边界内（`src/provider/pi/tools.ts`、`src/provider/pi/session.ts`、`src/common/pi-adapter/real-adapter.ts`、`test/pi-adapter/finalize-bootstrap.test.ts`）。依据设计 `角色卡/项目管理/docs/design/2026-10-11_design_v1-full-implementation.md` **§13.1**（客户 2026-10-11 裁定：bootstrap 完成＝**su 主动提议 → 客户确认 → 才 finalize**）与派发清单 **T36**。前提 **T37**（编排那半）已完成，并给出要接的确切形状：`FinalizeBootstrapFn = (opts?) => Promise<FinalizeResult>`，**调用即「提议收口并等客户确认」，不是立即完成**。

@@ -54,8 +54,6 @@ async function withRoot<T>(fn: (ctx: { root: string; target: string }) => Promis
   }
 }
 
-const tick = (ms = 20): Promise<void> => new Promise((r) => setTimeout(r, ms));
-
 /** 全放行 gate（仅用于测试桩适配器——不检验边界；真判定的用例见负例）。 */
 const allowGate = (() => ({ allowed: true }) as unknown as WriteDecision) as WriteGate;
 
@@ -104,22 +102,33 @@ const channelDeny: OperatorChannelFn = () => ({ outcome: "deny", operatorId: "te
 /** 恒定「不可用」通道（无人值守）。 */
 const channelUnavailable: OperatorChannelFn = () => ({ outcome: "unavailable", reason: "无人值守" });
 
-/** 延迟通道：手动 resolve；用于证明「提议后挂起、未确认前不完成」。 */
+/** 延迟通道：手动 resolve；用于证明「提议后挂起、未确认前不完成」。
+ *  `called` 是**确定性完成信号**——通道**首次被调用**即 resolve。测试等它，取代旧写法
+ *  「`await tick()` 等 20ms 再断言『通道已被调用』」：后者赌的是「20ms 足够」，而 `finalize()` 在抵达
+ *  通道前要做若干次真实 `fs` 异步操作（`isGenesisState` 的 `stat`、`precheck`→`scanRoles` 的 `readdir`
+ *  与逐角色 `stat`），CPU/文件系统受压时可能超过 20ms ⇒ 假失败（随机 flake）。等信号则**语义等价且确定**。 */
 function deferredChannel(): {
   fn: OperatorChannelFn;
   prompts: OperatorPrompt[];
   resolve: (o: OperatorOutcome) => void;
+  /** 通道被调用（提议已发出）时 resolve。 */
+  called: Promise<void>;
 } {
   let resolveOut: (o: OperatorOutcome) => void = () => {};
   const p = new Promise<OperatorOutcome>((res) => {
     resolveOut = res;
   });
   const prompts: OperatorPrompt[] = [];
+  let markCalled: () => void = () => {};
+  const called = new Promise<void>((res) => {
+    markCalled = res;
+  });
   const fn: OperatorChannelFn = (prompt) => {
     prompts.push(prompt);
+    markCalled(); // 提议已发出——发确定性信号（多次调用再 resolve 为幂等，无副作用）
     return p;
   };
-  return { fn, prompts, resolve: resolveOut };
+  return { fn, prompts, resolve: resolveOut, called };
 }
 
 /** 独立重算某文件 SHA-256（与 finalize/门禁引擎同一算法：原始字节 + node:crypto）。 */
@@ -168,7 +177,7 @@ test("提议挂起：finalize 提议后挂起等确认；未确认前**零副作
     writeFileSync(join(target, "角色卡", "X", "boundary.yaml"), ROLE_X_BOUNDARY);
 
     const pending = handle.finalize();
-    await tick();
+    await ch.called; // 等确定性信号：确认通道**真被调用**（取代 `await tick()` 的 20ms 时序赌）
     assert.equal(ch.prompts.length, 1, "应已提出「su 提议收口」（走确认通道）");
     assert.equal(existsSync(join(target, ANS_REL)), false, "未确认前**不得**写 .ans");
     assert.equal(existsSync(join(target, GOV_REL)), false, "未确认前**不得**写治理边界文档");

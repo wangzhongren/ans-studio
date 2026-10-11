@@ -73,7 +73,30 @@
 
 ---
 
+## 组件 6：共享原子写原语（`atomic-write`）—— 可靠性相关，单一来源
+
+| 字段 | 说明 |
+| --- | --- |
+| **名称与用途** | 跨角色共享**原子写**原语：同目录临时文件 → 写 → `fsync` → `rename` **覆盖目标**（`atomicWrite`），并对其中的 rename 做 Windows **瞬时 `EPERM`** 的**有界重试**（`renameReplacingExisting` / 重试核心 `retryOnTransient`）。解决的问题：本项目多处需要原子落盘（本仓至少 `env-file` 与 **Pi适配器** `fs-write.ts` 两处），而 Windows 上「rename **覆盖已存在**目标」会因**实时防护/索引器/杀软微过滤驱动短暂持有目标句柄（不含 `FILE_SHARE_DELETE`）**而**瞬时**返回 `ERROR_ACCESS_DENIED`（Node 报 `EPERM`）；若各处各自处置，这段**非平凡且可靠性强相关**的重试即成为 §6 逼出的**第二份镜像**（工程法案 §一.5「不得复制第二份」）。度量（Pi适配器实测）：覆盖**已存在**目标 → 单进程 ~3/20000、并发 ~7/20000；覆盖**不存在**目标 → **0/48000**（对照组干净 ⇒ 非逻辑 bug，是 OS 层瞬时占用）。 |
+| **代码与公共入口** | 代码：`src/common/shared/atomic-write.ts`。导出：`atomicWrite(filePath, data, options?)`（`data: string \| Buffer`；`options: AtomicWriteOptions = { mode?, tmpPrefix? }`，缺省 `mode=0o666`，即 env-file 既有行为）、`renameReplacingExisting(from, to)`、`retryOnTransient(op, maxAttempts?)`；常量 `RENAME_TRANSIENT_CODES`（`EPERM`/`EBUSY`/`EACCES`）、`RENAME_MAX_ATTEMPTS`（=20）；类型 `AtomicWriteOptions`。 |
+| **属主与消费方** | **属主/维护者：项目管理**。**消费方**：**`env-file.ts`**（本模块消费方；`atomicWriteText` 已改为委托 `atomicWrite`）、**Pi适配器**（`src/common/pi-adapter/fs-write.ts::atomicWriteFile`，**待改导入**——见下「变更影响」）。**均为只读导入**，不得复制第二份。 |
+| **契约与示例** | `atomicWrite(filePath, data, options?)`：`string` 按 UTF-8 写出、`Buffer` 按字节；同目录规避跨设备 `EXDEV`；失败**清理 temp 并抛错**，目标在 `rename` 成功前**不被触碰**（半写不可能）；`open(tmp,"wx",mode)` 独占建 temp、名含 `pid`+`randomBytes` 防撞。`renameReplacingExisting(from,to)`＝`retryOnTransient(() => rename(from,to))`。`retryOnTransient`：**仅**瞬时码重试、**有界**、次数间**仅 `setImmediate` 让出事件循环（无固定 sleep、无忙等）**、非瞬时**立即抛**、达上界**照抛**。示例：<br>`await atomicWrite("/p/.env", text);`<br>`await atomicWrite(abs, buf, { mode: 0o600 }); // Pi适配器字节语义 + 更严权限`<br>**边界（不做）**：**不做治理判定**（那是门禁引擎 `resolveWrite` 的事）、**不做写入层名称安全**（`checkRelativePathSafe` 留 Pi适配器——门禁无对应物，非镜像）、**不构造/不解析**内容（纯字节/文本落盘）。 |
+| **测试与变更影响** | 测试：`test/项目管理/shared/atomic-write.test.ts`（**13 例**）：**确定性注入**（直测 `retryOnTransient`——瞬时 `EPERM` 5 次后第 6 次成功、`EBUSY`/`EACCES` 同集合、非瞬时（`ENOENT`/`EISDIR`/`EROFS`/`EXDEV`/无 code）**立即抛不重试**、**有界**耗尽即抛、上界-1 次成功即返回、**让出事件循环**由「外部 immediate 恰插在两次尝试之间」钉死）；`atomicWrite` 写 string/Buffer、覆盖已存在目标、目录不存在即抛且不建目录、无 temp 残留；`renameReplacingExisting` 覆盖成功；**并发自争用**（8 路 × 250 轮同一目标）全部成功、无残留；且 `env-file.test.ts` **+1 例**同类并发（8 路 × 150 轮）。**变更影响**：本组件抽取后，**Pi适配器（后续任务）须删 `fs-write.ts` 私有 `renameReplacingExisting`/常量/内联 temp+rename，改 `atomicWriteFile(abs,data)` 为 `atomicWrite(abs, data, { mode: 0o600 })` 并从 `../../common/shared/atomic-write.ts` 只读导入**；**完成前处于「两处并存窗口」**（两处 rename-重试语义**逐字同源**、行为不分叉）。**注**：`env-file.ts` 的 `atomicWriteText` **保留导出**（消费方 T28 只读导入此名、`test/测试/t29-*` 亦引用），仅**实现体**改委托本原语；共享原语**未**使用 `atomicWriteText` 之名（避免与 `t29-pi-config-roundtrip.test.ts` 的「`.env` 符号只在 env-file.ts 定义」扫描冲突）。 |
+
+---
+
 ## 变更（本文件）
+
+- 2026-10-11：登记 **组件 6 `atomic-write`**（跨角色共享原子写原语，Windows rename 瞬时 `EPERM` 的**单一来源**处置）。
+  由本轮（pm）建：`src/common/shared/atomic-write.ts`，导出 `atomicWrite`/`renameReplacingExisting`/
+  `retryOnTransient` + 常量 `RENAME_TRANSIENT_CODES`/`RENAME_MAX_ATTEMPTS` + 类型 `AtomicWriteOptions`。
+  **来历**：**Pi适配器**先诊断并修复其 `fs-write.ts::atomicWriteFile` 的 rename 瞬时 `EPERM`（有界重试），
+  **如实回报**本仓同源写法即 `src/common/shared/env-file.ts::atomicWriteText`（本轮全量中真捕获过一次同款红）；
+  据「不得复制第二份实现」收敛为单一来源。**`env-file.ts` 已改导入**（`atomicWriteText` 实现体委托 `atomicWrite`，
+  签名/行为不变）；**Pi适配器改导入为后续任务**（本任务只回报、未动其文件）。属主 pm，消费方 `env-file`/Pi适配器
+  **只读导入**。测试：`test/项目管理/shared/atomic-write.test.ts`（13 例）+ `env-file.test.ts`（+1 例）；
+  本组 95 pass/0 fail；全量 671 pass/0 fail；typecheck 零错。
+  依据：工程法案 `docs/project-rules.md` §一.5；技能 `references/shared-directories.md`；`角色卡/Pi适配器/changelog.md`。
 
 - 2026-10-11：登记 **组件 5 `env-file`**（`.env` 读写模块，设计 **§11**）。
   由 **T26** 建：`src/common/shared/env-file.ts`，导出 `parseEnvFile`/`mergeEnvText`/`atomicWriteText`/

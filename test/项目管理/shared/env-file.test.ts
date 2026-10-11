@@ -251,6 +251,26 @@ test("④ saveEnvFile 新建 / 覆盖均原子落盘，且无 temp 残留", asyn
   });
 });
 
+test("④ 并发自争用：多路 atomicWriteText 反复覆盖同一目标，全部成功、无 temp 残留（瞬时 EPERM 由共享原语有界重试兜住）", async () => {
+  // Windows 上「rename 覆盖已存在目标」会偶发**瞬时** EPERM（实时防护/索引器短暂持有句柄）。
+  // 本用例以多路并发反复覆盖**同一目标**去真实经历该分支——若原语未做有界重试，会硬失败（Promise.all 抛）
+  // 或留下 temp 残留。**注**：该压测只钉「无硬失败」，不（也不可能稳定地）断言「发生了多少次重试」；
+  // 「瞬时错确实被重试兜住」的**确定性证据**见 `test/项目管理/shared/atomic-write.test.ts::retryOnTransient` 注入用例。
+  await withTmpDir(async (dir) => {
+    const target = path.join(dir, ".env");
+    const LANES = 8;
+    const ROUNDS = 150;
+    for (let r = 0; r < ROUNDS; r++) {
+      await Promise.all(
+        Array.from({ length: LANES }, (_, i) => atomicWriteText(target, `LANE=${i}\n# round ${r}\n`)),
+      );
+    }
+    const final = await readFile(target, "utf8");
+    assert.match(final, /^LANE=\d+\n# round \d+\n$/, "最终内容须为某次写入的完整结果（非半写）");
+    assert.deepEqual(await readdir(dir), [".env"], "争用后不得有 temp 残留");
+  });
+});
+
 // ---- ⑤ 失败显式：不损坏原文件、不静默 ----
 
 test("⑤ 目标目录不存在 → saveEnvFile 抛错（显式），不创建任何文件", async () => {

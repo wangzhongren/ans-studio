@@ -13,9 +13,15 @@
 //    两套各自维护的镜像，保证「gate 认为在根内」与「写入层认为在根内」**逐字同源**（设计 §6.2）。
 //    `checkRelativePathSafe` 是**写层专有**的名称安全校验（门禁无对应物），**保留**在本文件。
 
-import { lstat, mkdir, open, rename, unlink } from "node:fs/promises";
-import { randomBytes } from "node:crypto";
+import { lstat, mkdir } from "node:fs/promises";
 import { dirname, isAbsolute, resolve } from "node:path";
+
+// —— 跨角色共享**原子写**原语（**单一来源**，属主：项目管理）——
+// 「同目录 temp → 写 → fsync → rename 覆盖目标」及其 **Windows rename 瞬时 EPERM 的有界重试**已收敛为
+// 共享组件 6 `src/common/shared/atomic-write.ts`（工程法案 §一.5「不得复制第二份」）；本层只读导入。
+// 本层此前私有的 `renameReplacingExisting`/`RENAME_TRANSIENT_CODES`/`RENAME_MAX_ATTEMPTS` 与内联
+// temp+rename 脚手架**已删除**——同一算法现由共享原语提供，消除该镜像。
+import { atomicWrite } from "../../common/shared/atomic-write.ts";
 
 // —— 跨角色共享路径原语（**单一来源**，属主：项目管理）——
 // 词法规范化与真实路径解析**整体搬迁**至 `src/common/shared/path-primitives.ts`（T23）；本层只读导入。
@@ -124,25 +130,15 @@ export async function ensureParentDir(parentAbs: string): Promise<void> {
 }
 
 /**
- * 原子写：在**同一目录**内建临时文件 → 写入并 fsync → rename 覆盖目标。
- * rename 在同目录内是原子替换（Windows 亦替换已存在文件）。失败时清理临时文件。
+ * 原子写：委托**跨角色共享**原语 {@link atomicWrite}（`src/common/shared/atomic-write.ts`，共享组件 6）。
+ *
+ * **逐字保持既有行为**：同目录 temp（`wx` 独占）→ 写 → `fsync` → `rename` 覆盖目标；失败清理 temp 并抛错。
+ * 传 `{ mode: 0o600 }` 以**保持本写工具原有的更严权限位**（共享原语缺省 `0o666`，即 `env-file` 既有行为）。
+ * rename 的**瞬时 `EPERM`**（Windows 实时防护等）由共享原语的**有界重试**处置——其算法与本层原私有实现
+ * **逐字同源**（仅瞬时码、≤20 次、只 `setImmediate` 让出、非瞬时立即抛）；本层**不再自持**该实现。
  */
 export async function atomicWriteFile(abs: string, data: Buffer): Promise<void> {
-  const parent = dirname(abs);
-  const tmp = resolve(parent, `.ans-write-${process.pid}-${randomBytes(8).toString("hex")}.tmp`);
-  const handle = await open(tmp, "wx", 0o600);
-  try {
-    await handle.writeFile(data);
-    await handle.sync();
-  } finally {
-    await handle.close();
-  }
-  try {
-    await rename(tmp, abs);
-  } catch (err) {
-    await unlink(tmp).catch(() => undefined);
-    throw err;
-  }
+  return atomicWrite(abs, data, { mode: 0o600 });
 }
 
 /** 把工具参数里的目标路径解析为绝对路径（写根基准）——纯词法，不碰文件系统。 */
