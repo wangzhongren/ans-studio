@@ -1,0 +1,44 @@
+# Pi 适配器边界 —— Section 1 唯一写入白名单
+# 未列路径默认只读。超出下列文件的业务源码须先由 ANS Governance 更新本文件并经客户确认。
+# 提供方层只实现对接口径，不承载路径判定逻辑；Pi SDK 版本与依赖声明归装配角色。
+role: Pi适配器
+entries:
+  - kind: file
+    path: src/provider/pi/session.ts
+    purpose: 会话建立与生命周期封装
+  - kind: file
+    path: src/provider/pi/tools.ts
+    purpose: 受治理工具注册与 tool_call 钩子
+  - kind: directory
+    path: src/common/pi-adapter/
+    purpose: 本角色私有辅助代码
+  - kind: directory
+    path: test/pi-adapter/
+    purpose: 本角色的单元与层契约测试及夹具
+  - kind: file
+    path: 角色卡/Pi适配器/feature-map.md
+    purpose: 功能导航
+  - kind: file
+    path: 角色卡/Pi适配器/memo.md
+    purpose: 本角色工作备忘录
+  - kind: file
+    path: 角色卡/Pi适配器/changelog.md
+    purpose: 本角色治理变更记录
+  - kind: file
+    path: 角色卡/Pi适配器/functional-description.md
+    purpose: 模块笔记与代码位置
+  - kind: file
+    path: 角色卡/Pi适配器/api-spec.md
+    purpose: 实现报告
+  - kind: directory
+    path: 角色卡/Pi适配器/docs/design/
+    purpose: 设计记录
+  - kind: directory
+    path: 角色卡/Pi适配器/docs/feature/
+    purpose: 本角色功能的稳定说明与流程图
+  - kind: directory
+    path: 角色卡/Pi适配器/docs/change/
+    purpose: 变更记录
+  - kind: directory
+    path: 角色卡/Pi适配器/docs/fix/
+    purpose: 修复记录

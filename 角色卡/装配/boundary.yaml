@@ -1,0 +1,70 @@
+# 装配边界 —— Section 1 唯一写入白名单
+# 未列路径默认只读。新增构建/配置文件或改动归属须先由 ANS Governance 更新本文件并经客户确认。
+# 入口只持接口层句柄，不导入服务层或提供方层对象。
+role: 装配
+entries:
+  - kind: file
+    path: src/index.ts
+    purpose: CLI 根入口与层间接线
+  - kind: file
+    path: bin/ans.js
+    purpose: 可执行入口脚本
+  - kind: file
+    path: package.json
+    purpose: 包定义、依赖与脚本
+  - kind: file
+    path: package-lock.json
+    purpose: npm install 自动生成的依赖锁定文件
+  - kind: file
+    path: tsconfig.json
+    purpose: TypeScript 编译配置
+  - kind: file
+    path: README.md
+    purpose: 安装与使用说明
+  - kind: file
+    path: .env
+    purpose: 本地环境配置，含 Pi 凭据；不入库
+  - kind: file
+    path: .env.example
+    purpose: 环境变量示例，只含占位符，可入库
+  - kind: file
+    path: .gitignore
+    purpose: 忽略规则（node_modules/、.env 等）
+  - kind: directory
+    path: src/common/装配/
+    purpose: 本角色私有辅助代码
+  - kind: directory
+    path: test/装配/
+    purpose: 本角色的启动冒烟与接线测试及夹具
+  - kind: file
+    path: 角色卡/装配/feature-map.md
+    purpose: 功能导航
+  - kind: file
+    path: 角色卡/装配/memo.md
+    purpose: 本角色工作备忘录
+  - kind: file
+    path: 角色卡/装配/changelog.md
+    purpose: 本角色治理变更记录
+  - kind: file
+    path: 角色卡/装配/functional-description.md
+    purpose: 模块笔记与代码位置
+  - kind: file
+    path: 角色卡/装配/api-spec.md
+    purpose: 装配说明与实现报告
+  - kind: directory
+    path: 角色卡/装配/docs/design/
+    purpose: 设计记录
+  - kind: directory
+    path: 角色卡/装配/docs/feature/
+    purpose: 本角色功能的稳定说明与流程图
+  - kind: directory
+    path: 角色卡/装配/docs/change/
+    purpose: 变更记录
+  - kind: directory
+    path: 角色卡/装配/docs/fix/
+    purpose: 修复记录
+  - kind: conditional-directory
+    path: .ans/
+    condition: project-init
+    root: project
+    purpose: 项目初始化产物（.ans/project.json：角色表、治理边界与接受证据的 SHA-256 pin）

@@ -1,0 +1,52 @@
+# 编排边界 —— Section 1 唯一写入白名单
+# 未列路径默认只读。超出下列文件的业务源码须先由 ANS Governance 更新本文件并经客户确认。
+role: 编排
+entries:
+  - kind: file
+    path: src/interface/cli/run.ts
+    purpose: ans role run 命令的解析与输出
+  - kind: file
+    path: src/interface/cli/govern.ts
+    purpose: ans govern 命令的解析与输出
+  - kind: file
+    path: src/pipeline/orchestration/run-role.ts
+    purpose: 普通角色会话的编排
+  - kind: file
+    path: src/pipeline/orchestration/govern-session.ts
+    purpose: 治理 bootstrap 会话的编排
+  - kind: file
+    path: src/pipeline/orchestration/pm-reviewer.ts
+    purpose: (b) 第二闸的真实接线：把命令原文交 pm 角色判读并取回复原文
+  - kind: directory
+    path: src/common/编排/
+    purpose: 本角色私有辅助代码
+  - kind: directory
+    path: test/编排/
+    purpose: 本角色的单元与层契约测试及夹具
+  - kind: file
+    path: 角色卡/编排/feature-map.md
+    purpose: 功能导航
+  - kind: file
+    path: 角色卡/编排/memo.md
+    purpose: 本角色工作备忘录
+  - kind: file
+    path: 角色卡/编排/changelog.md
+    purpose: 本角色治理变更记录
+  - kind: file
+    path: 角色卡/编排/functional-description.md
+    purpose: 模块笔记与代码位置
+  - kind: file
+    path: 角色卡/编排/api-spec.md
+    purpose: 实现报告
+  - kind: directory
+    path: 角色卡/编排/docs/design/
+    purpose: 设计记录
+  - kind: directory
+    path: 角色卡/编排/docs/feature/
+    purpose: 本角色功能的稳定说明与流程图
+  - kind: directory
+    path: 角色卡/编排/docs/change/
+    purpose: 变更记录
+  - kind: directory
+    path: 角色卡/编排/docs/fix/
+    purpose: 修复记录

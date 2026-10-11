@@ -1,0 +1,56 @@
+# 门禁引擎边界 —— Section 1 唯一写入白名单
+# 未列路径默认只读。超出下列文件的业务源码须先由 ANS Governance 更新本文件并经客户确认。
+# src/model/ 的三个文件是跨层共享类型，本角色是唯一主属主；其他角色只读引用。
+role: 门禁引擎
+entries:
+  - kind: file
+    path: src/model/boundary.ts
+    purpose: 边界条目与 Section 1 的共享类型
+  - kind: file
+    path: src/model/role.ts
+    purpose: 角色与来源的共享类型
+  - kind: file
+    path: src/model/decision.ts
+    purpose: 写入判定结果的共享类型
+  - kind: file
+    path: src/service/boundary/resolve-boundary.ts
+    purpose: 双来源边界解析（含项目覆盖）
+  - kind: file
+    path: src/service/role/resolve-role.ts
+    purpose: 双来源角色解析
+  - kind: file
+    path: src/service/gate/resolve-write.ts
+    purpose: 路径判定
+  - kind: directory
+    path: src/common/门禁引擎/
+    purpose: 本角色私有辅助代码
+  - kind: directory
+    path: test/门禁引擎/
+    purpose: 本角色的单元与层契约测试及夹具
+  - kind: file
+    path: 角色卡/门禁引擎/feature-map.md
+    purpose: 功能导航
+  - kind: file
+    path: 角色卡/门禁引擎/memo.md
+    purpose: 本角色工作备忘录
+  - kind: file
+    path: 角色卡/门禁引擎/changelog.md
+    purpose: 本角色治理变更记录
+  - kind: file
+    path: 角色卡/门禁引擎/functional-description.md
+    purpose: 模块笔记与代码位置
+  - kind: file
+    path: 角色卡/门禁引擎/api-spec.md
+    purpose: 实现报告
+  - kind: directory
+    path: 角色卡/门禁引擎/docs/design/
+    purpose: 设计记录
+  - kind: directory
+    path: 角色卡/门禁引擎/docs/feature/
+    purpose: 本角色功能的稳定说明与流程图
+  - kind: directory
+    path: 角色卡/门禁引擎/docs/change/
+    purpose: 变更记录
+  - kind: directory
+    path: 角色卡/门禁引擎/docs/fix/
+    purpose: 修复记录

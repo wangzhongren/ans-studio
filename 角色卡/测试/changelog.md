@@ -1,0 +1,408 @@
+# 测试 变更记录
+
+## 2026-10-11 — 按新语义修 finalize 断言：收口需客户确认（fail-closed）
+
+**来源**：客户裁定 **bootstrap 完成方式 =「su 主动提议 → 客户确认 → 完成」**（原话：「完成 bootstrap 应该是 su 主动觉得差不多了，来完成」+「当然需要客户确认了」）。编排（T37）据此改造 `src/common/编排/finalize.ts::finalize()`：**不再「被调用即完成」**，而是**构造提议、经客户确认通道挂起**；**通道缺省/不可用/超时/拒绝 → 不完成**（fail-closed）。确认通道**复用 shell 闸 (a) 的 `OperatorChannelFn`**（形状单一来源 `src/provider/pi/session.ts`），提议是**一种 `OperatorPrompt`**——**不造第二套确认机制**。编排未越界改本角色文件，如实把结论交回本角色收口。边界：只写 `test/测试/` 与 `角色卡/测试/`。**只读**：`src/common/编排/finalize.ts`、`src/provider/pi/session.ts`、`src/pipeline/orchestration/govern-session.ts`。
+
+### 1) 失效断言（改前，先实测）
+
+本角色 `test/测试/t9-block1-bootstrap.test.ts` 第 6 节 finalize 正例（`test` 声明于 **339** 行）按**旧语义**断言——调 `handle.finalize()` 即期望完成：
+
+```ts
+const res = await handle.finalize();
+assert.equal(res.ok, true, `finalize 应成功：${res.reason ?? ""}`);
+```
+
+实测确切失败位置——
+- `node --test test/测试/t9-block1-bootstrap.test.ts` → **9 pass / 1 fail**；`AssertionError [ERR_ASSERTION]: finalize 应成功：收口未获确认：未接入客户确认通道（无人值守？）——不完成（fail-closed）；su 可继续工作或稍后再提议`，`actual: false` / `expected: true`，抛在 **`t9-block1-bootstrap.test.ts:357:10`**。
+- 该用例**未注入** `operatorChannel`，故新语义下 `confirm()` 判为 `unavailable` → `mkResult("unavailable", …)` → **不完成**——**正是 fail-closed 的预期**，非 bug。
+
+### 2) 改法（按新语义改写为**两条**：负例 + 正例）
+
+第 6 节由「一条按旧语义的正例」改写为：
+
+- **① 未确认 → 不完成 + 零副作用**（原旧断言的位置）：su 经创世边界建出角色（**不写**治理边界文档，以便断言它未被写）→ **不注入** `operatorChannel`（模拟「未接入客户确认通道」）→ `handle.finalize()` 断言 `ok:false`、`status==="unavailable"`、`message` 匹配 `/未获确认|未接入客户确认通道|fail-closed/`；**零副作用**：`.ans/`、`.ans/project.json`、`角色卡/governance-boundary.yaml`、`docs/bootstrap-manifest.md` **逐一断言不存在**、`wrote` 为空。
+- **② 确认通过 → 完成**（新增正例）：同样 su 建角色 → **注入 allow 确认通道替身** `(prompt) => ({ outcome: "allow", operatorId: "test-客户" })`（**形状 = shell 闸 (a) 的 `OperatorChannelFn`**，提议是 `OperatorPrompt`）→ `handle.finalize()` 断言 `ok:true`、`status==="completed"`；并断言提议**确经该通道**提出（`cwd===项目根`、带 `command`/`argv`/`toolCallId`）；写出 **治理边界文档（内容 === `renderGovernanceBoundaryDoc()`）+ `.ans/project.json` + `docs/bootstrap-manifest.md`**；pin 覆盖 `[角色卡/governance-boundary.yaml, 角色卡/新角色/boundary.yaml]` 且**由我自己用 `node:crypto` 独立重算 SHA-256 逐条比对一致**；`acceptance.source` 含 `operator:test-客户`；该 `.ans` 经装配载入器 `loadEffectiveConfig` 验为 **pin-backed accepted**、`resolveRole("新角色")` 无 `parseError`。
+
+新增值导入 `renderGovernanceBoundaryDoc`（`src/common/编排/finalize.ts`）与类型 `OperatorChannelFn`/`OperatorPrompt`（`src/provider/pi/session.ts`）——**只读引用**，符合本角色边界。第 7 节「拿掉授权 → 被门禁拒」负例**不变**（仍绿：门禁前置预检在提议前即拒，未打扰客户）。
+
+### 3) 扫全仓：有无别处仍在按旧语义断言 `finalize`
+
+- `test/编排/finalize.test.ts`、`test/编排/genesis-finalize-reach.test.ts`（**编排**角色）：**已是**新语义——均注入 `operatorChannel`（allow/deny/unavailable 各色）后断言 `completed`/`declined`/`unavailable`，**无需改动**，且全绿。
+- `test/桌面应用/finalize-wiring.test.ts`（**桌面应用**角色，非本角色）：**:156** 与 **:190** 两条用例在**未接任何确认通道**下仍断 `manager.finalizeBootstrap()` `ok:true` ——**同属旧语义**（`finalizeBootstrap` 经 `SessionManager` 未透传 `OperatorChannelFn` ⇒ 实得 `unavailable`）。**这正是全量剩余的那 2 处失败**，属桌面角色（已排给它）——**未动**（本角色边界不含 `test/桌面应用/`）。
+- 其余命中均为设计文档 / `memo` / `changelog` 说明文字，非断言。
+
+**未改任何非本角色文件**（如实回报）。
+
+### 4) 验证（本角色独立执行）
+
+- `node --test test/测试/t9-block1-bootstrap.test.ts` → **11 pass / 0 fail**（改前 9/1；本文件 10→11 例，净 +1）。
+- `node --test test/测试/*.test.ts` → **99 pass / 0 fail**（改前 98/1）。
+- `npm run typecheck` → **零错误**。
+- 全量 `node --test "test/**/*.test.ts"`（**带引号**走 Node glob，三层路径）→ **610 总 / 608 通过 / 2 失败**（改前 **609 总 / 606 通过 / 3 失败**）。剩余 **2 处**失败**均在** `test/桌面应用/finalize-wiring.test.ts:156`、`:190`（桌面角色，非本角色、未动）。
+
+## 2026-10-11 — 修一处因「空项目不再报 warning」而失效的断言（空项目是正常状态）
+
+**来源**：客户指出「**项目没有角色卡的时候也不用有错误提示啊，这个是正常的**」。门禁引擎据此改 `src/service/role/resolve-role.ts::listProject`：**无角色目录**时**不再推那条 warning**（返回值其余不变——仍返回 `[内置 su] + hasRoles:false + primaryRoleId:{内置 su id}`）；**所有真异常的 warning 全部保留**（缺 `role-card.md` / 缺 `boundary.yaml` / 读取失败 / 边界解析失败 / 角色重复 /「有目录却无有效角色」）。门禁引擎**未越界改本角色文件**，把结论交回本角色收口。边界：只写 `test/测试/` 与 `角色卡/测试/`。**只读**：`src/service/role/resolve-role.ts`。
+
+### 1) 失效断言（改前，先实测）
+
+本角色 `test/测试/t9-block1-bootstrap.test.ts` 的「空文件夹」用例（`test` 声明于 **122** 行）仍在断言空项目**应**给出 warning：
+
+```ts
+assert.ok(
+  listing.warnings.some((w) => w.includes("bootstrap") || w.includes("无角色目录")),
+  `应给出「尚未 bootstrap」类 warning，实得：${JSON.stringify(listing.warnings)}`,
+);
+```
+
+实测确切失败位置 ——
+- `node --test test/测试/t9-block1-bootstrap.test.ts` → **9 pass / 1 fail**；失败即本用例，`test at test\测试\t9-block1-bootstrap.test.ts:122:1`，`AssertionError [ERR_ASSERTION] … 应给出「尚未 bootstrap」类 warning，实得：[]`，抛在 **`t9-block1-bootstrap.test.ts:133:10`**（`actual: false` / `expected: true`）。
+- 只读核对新行为（`listProject`，`src/service/role/resolve-role.ts:106-221`）：空项目 `foundRoots.length===0` ⇒ 第 215 行的「有目录却无有效角色」汇总**也不触发** ⇒ 返回 `{ warnings: [], hasRoles:false, primaryRoleId: BUILT_IN_GOVERNANCE_ROLE_ID, roles:[内置 su] }`。与本用例其余正面断言（`hasRoles:false` / `primaryRoleId:"su"` / `roles.length===1` / 内置 su 带 `cardText`）一致。
+
+### 2) 改法：反向守卫（**不删行**）
+
+把该 `assert.ok` 改为**断言没有 warning**——留着守卫比删掉更有价值（它不会再长回来）：
+
+```ts
+assert.deepEqual(listing.warnings, [], `空项目不应有任何 warning（空项目是正常状态），实得：${JSON.stringify(listing.warnings)}`);
+assert.ok(
+  !listing.warnings.some((w) => /无角色目录|尚未 bootstrap/.test(w)),
+  `空项目不得再出现「无角色目录 / 尚未 bootstrap」类 warning，实得：${JSON.stringify(listing.warnings)}`,
+);
+```
+
+并改写上方注释：说明客户 2026-10-11 裁定「**空项目是正常状态**（尚未 bootstrap 的初始态）、不该报警」，且**真异常 warning 全部保留**。写法与 `test/门禁引擎/list-project.test.ts`（门禁引擎角色）同款**反向守卫**。**未**改动其余断言语义。
+
+### 3) 扫全仓：有无别处仍在断言那条 warning
+
+**无。** 全仓 `无角色目录|尚未 bootstrap|warnings.some` 命中里，除本处（已改）外 ——
+- `test/门禁引擎/list-project.test.ts`（**门禁引擎**角色，非本角色）：**已是**反向守卫 `!w.some(w => /无角色目录/.test(w))`，无需改动；
+- `test/桌面应用/interface.test.ts:275 / :328`（**桌面应用**角色，非本角色）：`warnings: ["项目根下无角色目录"]` 仅是喂给 `listProjectFn` 的**桩输入**（构造 mock `ProjectListing` 测桌面**透传**），**并不断言**真实 `listProject` 产出该 warning ⇒ 不受影响；
+- 其余命中均为设计文档 / `memo`/`changelog` 说明文字，非断言。
+
+**未改任何非本角色文件**（如实回报）。
+
+### 4) 验证（本角色独立执行）
+
+- `node --test test/测试/*.test.ts` → **98 pass / 0 fail**（改前 97 / 1）。
+- `npm run typecheck` → **零错误**。
+- 全量 `node --test "test/**/*.test.ts"`（**带引号**走 Node glob，三层路径）→ **598 pass / 0 fail**（连跑 4 次均全绿）。
+- 观察（如实登记，非本改动引入）：全量首跑曾**偶发**一次 `test/pi-adapter/tools.test.ts:248`（`edit_file` 保留 UTF-8 BOM 用例）失败；单跑该文件 3/3 通过、其后全量 3/3 全绿 ⇒ 判为**偶发 flake**，与本次改动无关（异角色文件、异路径）。未改该文件。
+
+## 2026-10-11 — 修一处因拆除「只读」徽标而失效的断言（su 不再标只读）
+
+**来源**：客户裁定**拆掉 su 上的「只读」标记**（原话：「su 不该是只读…一直可以聊天」）——依据其早定的「**门禁静默执行、拒绝内联显示在聊天流里**」；「只读」徽标是后加的、偏离了那条，故拆除。桌面应用（他角色）随之**删除** `RoleView.readOnly`、`isReadOnlyRole` 及相关呈现与样式。桌面未改本角色文件（`test/测试/t9-block1-bootstrap.test.ts` 在本角色边界内），把结论交回本角色收口。边界：只写 `test/测试/` 与 `角色卡/测试/`。**只读**：`app/desktop/interface.ts`。
+
+### 1) 失效断言（改前，先实测）
+
+本角色 `test/测试/t9-block1-bootstrap.test.ts:138` 仍在读已删字段：
+
+```ts
+assert.equal(listing.roles[0].readOnly, false, "未 bootstrap 的 su 能写治理产物，不得标只读");
+```
+
+实测确切报错位置——
+- `npm run typecheck` → `test/测试/t9-block1-bootstrap.test.ts(138,33): error TS2339: Property 'readOnly' does not exist on type 'RoleView'.`（**1 处**）
+- `node --test test/测试/*.test.ts` → **97 pass / 1 fail**；失败即本用例，`AssertionError … 未 bootstrap 的 su 能写治理产物，不得标只读`，`actual: undefined` / `expected: false`（读到的字段已是 `undefined`）。
+- `RoleView`（`app/desktop/interface.ts:49`）现无 `readOnly` 字段（确认：只剩 `roleId/cardPath/boundaryPath/cardText/boundary/builtIn/changelog/docs`）。
+
+### 2) 改法：反向守卫（**不删行**）
+
+把该行改为**断言该字段不存在**——留着守卫比删掉更有价值（它不会再长回来）：
+
+```ts
+assert.equal("readOnly" in listing.roles[0], false, "su 不应再带 readOnly 字段（只读徽标已移除）");
+```
+
+并改写上方注释：说明客户 2026-10-11 裁定移除「只读」徽标（它偏离了「门禁静默执行、拒绝内联显示在聊天流里」的原模型；su 本就一直能聊天/写治理产物）。写法与 `test/桌面应用/interface.test.ts`、`su-effective-boundary.test.ts` 的**反向守卫**同款（`assert.equal("readOnly" in r, false, …)`），**一致性**：全仓同一条纪律。**未**改动其余断言语义。
+
+### 3) 扫全仓：有无别处仍在读被删的 `readOnly`
+
+**无。** 全仓 `\.readOnly|readOnly\b` 命中里，除本处（已改）外——
+- `test/桌面应用/`（`interface.test.ts` / `su-effective-boundary.test.ts`）已是**反向守卫**（断言字段不存在），无需改动；
+- `src/common/门禁引擎/classify-shell.ts`、`src/model/decision.ts`、`test/门禁引擎/classify-shell.test.ts`、`test/测试/t9-block3-pin-shell.test.ts` 等的 `readOnly` 是 **`ShellRules.readOnly`**（shell 命令分类的**只读程序白名单**数组），**与被删的 `RoleView.readOnly` 无关**，不动。
+
+**未改任何非本角色文件**（如实回报）。
+
+### 4) 验证（本角色独立执行）
+
+- `node --test test/测试/*.test.ts` → **98 pass / 0 fail**（改前 97 / 1）。
+- `node --test "test/**/*.test.ts"`（带引号走 Node glob，三层路径）→ **598 pass / 0 fail**（基线 599，−1 是桌面删了 1 条纯 `isReadOnlyRole` 用例；本改动未增减用例数，仅改 1 行断言）。
+- `npm run typecheck` → **零错误**（原 1 处已消除）。
+
+## 2026-10-11 — T35 用户入口验收：重写 t9-block1（su 不预建 · 从用户入口出发）
+
+**任务**：T35（设计 §12.6/§12.7）。**两件**：① 重写旧验收 `test/测试/t9-block1-bootstrap.test.ts`（其前提「固定 7 角色骨架」已被客户「不预建，全由 su 对话决定」否定）；② 验收**从用户入口出发**。基线：全量 **572 总 / 570 通过 / 2 失败** + **1 处 typecheck 错**（三处全在本文件旧版）。边界：只写 `test/测试/` 与 `角色卡/测试/`。**只读**：`src/service/gate/resolve-write.ts`、`src/common/门禁引擎/governance-seed.ts`、`app/desktop/{project,session,interface}.ts`。
+
+### 0) 旧版为何是红的（三处，全在本文件）
+
+- **typecheck 错**（`:90`）：用 **T32 已退役的 `bootstrap` 选项**（`openGovernanceSession` 不再接收）——`TS2353`。
+- **2 失败**：断言「固定 7 角色骨架落盘」（`角色卡/{项目管理,编排,…}/…`）——**客户已定「不预建」**，该前提被推翻，`openGovernanceSession` 现按 §12.4 不再预建骨架。
+
+### 1) 改写形态（不是修修补补）
+
+`t9-block1-bootstrap.test.ts` **整体重写**为 §12.6 的**新形态**：**su 不预建**——它**直接写出**角色；`openGovernanceSession` **不预先创建** `角色卡/`/`docs/`/`.ans/`；角色是 su（经创世边界）**写出来的**。共 **10 例**（旧版 6 例），系统临时目录、用完清理、**不写仓库**。
+
+### 2) 从**用户入口**出发：沿哪条链验（本次方法要求）
+
+T9 结论「未发现自证与实际不符」是实话，但**验错了对象**——验的是编排的 `openGovernanceSession`，**没验桌面那条链**。故本文件沿**桌面实际会走的那条链**：
+
+**导入空文件夹（IPC `createDesktopInterface`）→ `listProject`（门禁引擎）→ 构造 `ProjectConfig`（`buildProjectConfig`）→ `openSession` → 真实 `openRoleSession` 构造 gate → 开门禁判定**。
+
+gate 从**注入的适配器工厂缝**（`createDemoAdapterFn`）捕获——**不是**直接调 `resolveWrite` 了事；`ProjectConfig` 也从真实 `openRoleSession` 入参捕获（证明「未 bootstrap 带 `genesisBootstrap`、有角色不带」确由桌面链产出）。**不跳过中间层**。
+
+### 3) 各确定性项的**实际**结果
+
+- **空文件夹**：IPC `listProject` **不抛错**，返回内置 `su` + `hasRoles:false` + `primaryRoleId:"su"`（roles 仅 1 条、builtIn、不标只读）；根不存在/是文件**仍抛错**（真错误不伪装）。
+- **创世边界**：su 的 gate **放行** `角色卡/<任意新角色>/{role-card.md,boundary.yaml,memo.md}`、`角色卡/governance-boundary.yaml`、`docs/…`、`.ans/project.json`；**拒绝** `src/**`、`README.md`、`package.json`、`app/…` 及**项目根外的绝对路径**。
+- **切回**：项目一有角色（`hasRoles:true`）→ 桌面**不再设** `genesisBootstrap`（键不出现）→ su 回内置未接受边界 →**拒一切写**（含 `docs/`）。角色 R 是**经创世 gate 由 su 真实写出**的（`buildGovernedTools` 落盘），故「有角色」确系 su 所为。
+- **自终止**：写出只含 `docs/` 的项目边界并 pin 后，`resolveBoundarySection` 的**项目覆盖**先命中（条目只剩 1 条）→ 原本可写的 `角色卡/Y/…` **写不了**，`docs/` 仍可写（对照）——**genesisBootstrap 刻意残留亦无效**（结构性自终止成立）。
+- **旧形态退场**：空项目 + 空脚本 → `openGovernanceSession` 后 `角色卡/`、`docs/`、`.ans/` **均不存在**（引擎不预建）；且创世下 `handle.scope === undefined`（§12.2，不造 `writeSet`）。
+- **新形态**：su 直接写出的角色**真实落盘、字节相等**；越界写 `src/evil.ts` **写前被拒且零副作用**（不建父目录）；`listProject` 枚举到新角色。
+
+### 4) finalize —— **pin 由我独立重算比对** + 载入器验真
+
+- **正例**：创世项目 → `openGovernanceSession` → su 写出角色三件套 + 项目治理边界 → `handle.finalize()` **真的写出** `.ans/project.json` 与 `docs/bootstrap-manifest.md`；pin 覆盖「项目治理边界 + 各角色 `boundary.yaml`」。
+  - **独立重算**：**我自己**用 `node:crypto` 对原始字节求 SHA-256 逐条比对——**全部一致**（未采信实现方断言）。
+  - **载入器验真**：该 `.ans` 经**装配的载入器** `loadEffectiveConfig` 载入 → `source.kind==="ans"`、`acceptance.accepted===true`、`pinPaths>=2`；`resolveRole("新角色")` 边界 **accepted、无 parseError**（pin 校验通过）。
+  - 留痕列出 `角色卡/新角色/{role-card,boundary,memo}.md`、`角色卡/governance-boundary.yaml`、`.ans/project.json`。
+- **负例（不绕门）**：**把授权拿掉**（项目治理边界文档在、但 `acceptance` 未接受）→ `finalize()` **被门禁拒**（`/门禁拒绝|未被接受|F6/`）且 **零副作用**（`.ans/` 未创建、`wrote` 为空）——证明 finalize 的写同样经 `resolveWrite`，**不是凭代码身份绕门**。
+
+### 5) 有无发现实现方**自证与实际不符**
+
+**没有发现谎报。** 被验主张（创世有界、切回、结构性自终止、finalize 过门且 pin 可验）均经独立构造复现通过。**但发现一处端到端缺口**（如实登记，非谎报）：**桌面路径未接 `finalize`**——`app/desktop/` 无任何 `finalize` 调用，故从**用户入口**走完「su 建角色」后，`.ans/project.json`（pin）与 `docs/bootstrap-manifest.md` **不会自动写出**（编排文档明说「多轮消费者（桌面 su 聊天）应自行调 `handle.finalize()`」，桌面未调）。**已如实报告**，接线与否交协调方/客户定（T33 的「取舍交客户」亦未定）。
+
+### 6) 「客户须手工验」的步骤（真实模型建角色那条，本机不可自动验收）
+
+「su **真的据对话**决定并建出角色」需**真实模型轮次**（凭据 + 已配置 provider + `ANS_PI_CONTEXT_WINDOW` 必填），按项目操作约束**须客户本人运行**——**不列入自动验收**。建议：（撰写于 `t9-block1-bootstrap.test.ts` 顶部 `CLIENT_MANUAL_STEPS` 常量）
+
+> ① 桌面导入**空文件夹**（无 `角色卡/`、无 `.ans/`）→ 左树显示 su + 「尚未 bootstrap」提示；② `.env` 配 `ANS_PI_BASE_URL/MODEL/PROVIDER/CONTEXT_WINDOW` + `ANTHROPIC_AUTH_TOKEN`；③ 选 pi，点 su，**用自然语言**说明要建哪些角色；④ 断言 su 真的 `write_file` 写出 `角色卡/<角色>/{role-card.md,boundary.yaml,memo.md}`、且越界写（`src/**`）写前被拒；⑤ 断言写完后左树随 su 建角色**长出**对应角色。
+
+### 7) 验证（本角色独立执行）
+
+- `node --test test/测试/*.test.ts` → **98 pass / 0 fail**（改前 94）。
+- `node --test "test/**/*.test.ts"`（带引号走 Node glob，三层路径）→ **576 pass / 0 fail**（改前 576 总/2 失败；本文件 6→10 例，净 +4）。
+- `npm run typecheck` → **零错误**（本文件旧版 1 处 `bootstrap` 选项错已消除）。
+
+### 8) 范围/限制（如实照录）
+
+- 桌面 **shell 闸 V1 不 arm**、**pi 路径会真写入**（demo 只判不写）、**`ans init` 已废**——既有范围，非本次目标。
+- 本文件**未**触发真实模型；`(b)` pm 审读真实模型行为不属本块。
+
+## 2026-10-11 — T29 独立验收：Pi 配置往返与写入纪律
+
+**任务**：T29（独立验收「桌面 Pi 配置界面 → 保存 `.env`」的**配置往返**与**写入纪律**）。**独立性**是要害——不重跑实现方的自证，由本角色**自写**用例验证**主张**。基线：全量 **533 通过 / 0 失败**、`npm run typecheck` **零错误**。边界：只写 `test/测试/` 与 `角色卡/测试/`。方案：设计 §11（`2026-10-11_design_v1-full-implementation.md`）。**只读**：`src/common/shared/env-file.ts`、`app/desktop/pi-config.ts`、`src/common/pi-adapter/provider-config.ts`。
+
+**隔离红线**：全程只碰系统临时目录（`os.tmpdir()` 下 `mkdtemp`），**绝不读写仓库根真实 `.env`**；用完即清理，仓库不留文件。
+
+### 1) 新增文件（2 个，共 21 例，自搭临时 `.env`、不复用他角色夹具）
+
+- **`test/测试/t29-pi-config-roundtrip.test.ts`（8 例）** 配置往返 + 单一来源/签名纪律：
+  - 自写一组 Pi 配置（含哨兵 token）到临时 `.env` → `loadPiEnv` 载入 → 进程 env 拿到**正确值（含 token）**；`LoadEnvResult` 只含键名、**不含值**（`JSON.stringify` 不含 token）。
+  - **配置到达适配器**：载入后 `resolvePiProviderConfig({}, env)` 成功构造——baseUrl/modelId/**contextWindow（"131072"→number）**/providerId 正确、`apiKeyEnvVar==="ANTHROPIC_AUTH_TOKEN"`；构造结果不含 token 值。
+  - **保存后重载**：改 modelId+contextWindow → `savePiConfig` → 同一 env **立即**生效 + **另开** env 从盘重载生效（确认真落盘）+ 适配器构造取到新值。
+  - **单一来源**：**自己遍历** `src/`+`app/` 的 `.ts`，确认 `parseEnvFile`/`mergeEnvText`/`atomicWriteText`/`readEnvFile`/`saveEnvFile`/`loadEnvFileInto`**只在** `env-file.ts` 定义；桌面 `pi-config.ts`/`main.ts` 只从共享模块导入。
+  - **签名未扩**：`resolvePiProviderConfig.length===2`、`createPiAdapterFactory.length===2`（方案 §11.3 裁定不扩签名）。
+- **`test/测试/t29-write-discipline.test.ts`（13 例）** 写入纪律逐条独立：
+  - ①**只改相关键**——**自己做字节级比对**（除目标行外挖掉后两份文件 `===`；行数不变；恰 1 行变化且为目标键行，其值等于**我独立算出**的期望）；注释/空行/未知键/无关键原样在。
+  - ②**键不存在→追加**（前文逐字节不变、追加在末尾、沿用原行尾符；CRLF 原文追加 CRLF）、**已存在→就地替换**（键名/`=`/两侧空白/引号风格/内联注释均保留）。
+  - ③**特殊字符**（`=`、空格、`"`、`'`、`#`、反斜杠、首尾空白、tab、URL 查询串）写后读回**逐字一致**（经 `parse` 与经 `loadEnvFileInto` 两路）。
+  - ④**原子性**——写入后目录内**只有 `.env`**（无 temp 残留）、内容为完整合并结果（非半写）；`atomicWriteText` 直调覆盖原子。
+  - ⑤**失败路径**——目标目录不存在 → `savePiConfig` `{ok:false,error}` 且**不建目录**、`saveEnvFile` 抛错、`readEnvFile` 抛错（对照 `loadEnvFileInto` 对 ENOENT 不抛=「无 `.env`」）；**目标是目录** → 抛错且**目录未被替换/损坏**（marker 原样）。
+  - ⑥**不回显**——哨兵 token **只进 env**；成功/失败**回报**、**错误文本**、**面板视图**（机密键 value 恒 `""`、只给 `isSet`）一律不含其值；非面板键被忽略、**不越界落盘**。
+
+### 2) 独立复核结论（我自做，非照抄实现方断言）
+
+- **配置往返**：载入值（含 token）正确、**能成功构造 `PiProviderConfig`**、保存后重载新值生效——三者独立跑通。
+- **写入纪律**：逐条通过；**字节级比对由本文件自做**（含"挖掉目标行后整体 `===`"与"独立算期望行"两法），实现方对"只改相关键/保留其余"的主张**与实际相符**。
+- **有无发现实现方自证与实际不符**：**没有**。
+- **额外对抗性探针**（一次性脚本，未入库）：未命中行含**行尾空白/制表符/缩进**时仍逐字节保留；值内 tab 经双引号 quote 后读回逐字一致——均符合主张。
+
+### 3) 验证（本角色独立执行）
+
+- `node --test test/测试/*.test.ts` → **94 pass / 0 fail**。
+- `node --test "test/**/*.test.ts"`（带引号走 Node glob，三层路径）→ **554 pass / 0 fail**（基线 533 + 本次 21）。
+- `npm run typecheck` → **零错误**。
+
+### 4) 「验证不到的东西」（如实标注）
+
+- **真实模型轮次本机不可自动验收**（凭据命令须客户本人运行）：故"保存配置后**真实 pi 会话能跑通**"**只验证到「配置能正确到达适配器构造」**（`resolvePiProviderConfig` 成功产出 `PiProviderConfig`），**未验证真实模型/网络调用**。
+- 既有范围边界（非本次目标，如实照录）：桌面 **shell 闸 V1 不 arm**、**pi 路径会真写入**（demo 路径不写=S2 二期）、**`ans init` 已废**（作未知命令非 0）。
+- 原子写的 **fsync / rename 原子性本身**无法在单进程内直接观测半写；以"无 temp 残留 + 内容完整"为可观测代理。
+
+## 2026-10-11 — T9 独立跨角色总验收
+
+**任务**：T9（独立跨角色总验收）。**独立性**是要害——不重跑实现方的自证，由本角色**自写**跨角色端到端验收，验证**主张**（越界写在发生之前被拒）而非仅验证实现。基线：全量 460 通过 / 0 失败、typecheck 零错误。边界：只写 `test/测试/` 与 `角色卡/测试/`。
+
+### 1) 新增文件（3 个，共 32 例，自搭场景、不复用他角色夹具）
+
+- **`test/测试/t9-block1-bootstrap.test.ts`（6 例）** 块1 bootstrap/创建权：
+  - 空目录 → `listProject` **不抛错**，返回内置 `su` + `hasRoles:false` + `primaryRoleId:"su"`；项目根不存在/是文件 → **仍抛错**（真错误，不伪装成空项目）。
+  - 有界创世：经**唯一治理会话引擎** `openGovernanceSession`（`bootstrap` 选项，替身 adapter 无真实模型）在全新项目写出治理产物——7 角色 `role-card.md`/`boundary.yaml`/`memo.md`、`角色卡/governance-boundary.yaml`、`docs/bootstrap-manifest.md`、`.ans/project.json`；逐条校验 pin 与实际 SHA-256 一致、治理边界本身被 pin 覆盖；`listProject` 枚举到 7 项目角色 + su。
+  - 与 su 对话建角色：用**共享载入器** `loadEffectiveConfig` 从 `.ans` 载入生效配置（非手拼），再经同一引擎新增 `角色卡/新角色/`（替身写 role-card/boundary/memo）；写集内文件**真实落盘且字节相等**，越界写 `src/evil.ts` **写前被拒且零副作用**；`listProject` 枚举到新角色。
+  - 负例（边界）：创世授权下写 `src/`/`README.md`/`任意文件.txt`/`package.json`/`app/…` → **一律写前被拒**。
+  - 负例（自终止）：先证**纯创世**下 `角色卡/Y/role-card.md` 可写；写出只含 `docs/` 的项目边界文档并 pin 后，**原本可写的 `角色卡/Y/…` 写不了了**（`genesisBootstrap` 刻意残留，证明自终止是**结构性**的）；对照 `docs/` 仍可写。
+- **`test/测试/t9-block2-write-landing.test.ts`（10 例）** 块2 写入真正落盘：
+  - 允许写 → 盘上**字节等于** content（含非 ASCII，UTF-8 原始字节）；目录条目覆盖子路径 → `mkdir -p` 出父目录；`edit_file` 命中 → 回写等于预期；未命中 → `ok:false` 且文件不变。
+  - 拒绝写 → 文件不存在、父目录不建；对已存在但越界的文件 `edit_file` → **内容与 mtime 不变**（零副作用）。
+  - 负例：gate 抛错 → **任何副作用之前** fail-closed，无文件/目录产生；junction **逃逸出写根** → 写层拒绝且**链接目标未被触碰**（gate 故意放行，证明写层纵深防御生效）。
+  - 第二边界（§3.8）：gate 放行**写根之外（skill 根）**的写 → **写层仍拒**、无文件产生。
+  - 同源：行为——gate 收到的 abs === 文件落盘路径；静态——`fs-write.ts` 与 `门禁引擎/paths.ts` 均引 `shared/path-primitives.ts`，且两处均不再自持 `normalizeLexical` 实现。
+- **`test/测试/t9-block3-pin-shell.test.ts`（16 例）** 块3 pin/调度/V3：
+  - pin：匹配→accepted 且 `src/a.ts` 可写；**篡改边界文件致 hash 失配 → 未接受 → 拒一切写**；`.ans` 存在但 `accepted:true` **无 pin** → 载入方置未接受（`downgradeReason`）→ 拒写；**无 `.ans`** → 回退内置（未接受）仍拒写（F6）。
+  - 调度/审计（boundary 级）：pm 边界覆盖 `docs/scheduling/`；审计 `docs/audit/shell-gate.jsonl` 声明 `shell-gate` 才放行，**缺条件 → 写前拒**。
+  - V3 三层链：`(c)` 白名单放行 **且 (b)/(a) 未被调用**；`(c)` 硬拒 → 拒绝、终结，**且 (b)/(a) 未被调用**（(b)/(a) 桩**本会放行**，证明硬地板不可翻案）；`(c)` review → `(b)` 放行/拒绝即终结；`(b)` 拿不准/无会话/超时/JSON 非法 → 升 `(a)`；`(a)` 超时/不可用 → 拒绝；(c)-only 未接 (b)/(a) → review 默认拒绝。
+  - fail-closed 退路：规则集加载失败 → **整条拒绝**（含白名单命令 `ls`，证明绝不「没规则就放行」）；`classifyShell` 版本未知 → deny；**未 arm → `run_shell` 根本不注册**；`run_shell` 只在恰好 `allow:true` 时执行；`shellKillSwitch` 未 arm block。
+
+### 2) 独立验收结论
+
+- **未发现实现方自证与实际不符之处。** 三块关键主张（越界写写前被拒、创世有界且自终止、硬地板不可翻案、未 arm 不注册、fail-closed 只往更严退）均经独立构造复现通过。
+- 一处**待记的既文档化行为**（非不符）：`listProject` 只枚举**同时具备 `role-card.md` 与 `boundary.yaml`** 的角色目录（缺一则记 warning 跳过）。故「与 su 对话建角色」须写全套骨架方可被左树枚举——建角色用例据此写 role-card/boundary/memo 三件。
+- `test/测试/` 与全量套件均**全绿、零跳过**；`npm run typecheck` 零错误。
+
+### 3) 如实记录的「验证不到的东西」
+
+- **真实模型轮次本机不可自动验收**（凭据命令须客户本人运行）：`(b)` pm 审读的**真实效果**、真实模型驱动的 su 对话，**只验证了接线形状与失败时的 fail-closed，未验证真实模型行为**（本文件对 (b) 用桩）。
+- **桌面 shell 闸 V1 不 arm**（客户已定）：桌面的操作者通道**建了但未被消费**——是**范围**，非缺陷。
+- **桌面 pi 路径会真写入**（客户已定，受门禁约束）；demo 路径只判不写。
+- **`ans init` 已废除**，建项目只有 su 对话一条路。
+- **本机限制**：Windows 无开发者模式/管理员权限 → 无法创建**文件符号链接**（`symlinkSync` 直接 EPERM），故设计 §5.1「目标本身是符号链接 → 拒绝」子用例**本机不可自动验收**；其安全属性（绝不写链接之外）已由可用的 **junction 逃逸**用例覆盖。
+
+### 4) 验证（本角色独立执行）
+
+- `node --test test/测试/*.test.ts` → **73 pass / 0 fail / 0 skip**（改前 41 + 本次 32）。
+- `node --test "test/**/*.test.ts"`（带引号走 Node glob，三层路径）→ **492 pass / 0 fail / 0 skip**（基线 460 + 本次 32）。
+- `npm run typecheck` → **零错误**。
+- 桌面 e2e：`ANS_E2E_OUTDIR=<系统临时目录> node_modules/.bin/electron test/桌面应用/e2e/main.mjs` → 退出 0，`report.txt` 关键检查点：`PRIMARY_ROLE_ID=su`、`DEFAULT_SELECTED_ROLE=su`、`SU_IS_FIRST=true`、`NO_MODAL_AFTER_IMPORT/ROLE_CLICK/MESSAGES/RESUME=true`、`BOOTSTRAP_NOTICE_SHOWN=true`（空项目、非错误样式）、`REFRESH_*=true`、`HANDBACK_CARD_PRESENT=true`/`HANDBACK_NOT_MIRROR=true`/`HANDBACK_STATUS_OK=true`、`MIRROR_CARD_PRESENT=true`/`MIRROR_HAS_FROM=true`/`MIRROR_STATUS_BLOCKED=true`、`OLD_GENERAL_CLAIM_PRESENT=false`、`E2E_DONE=1`。**未开任何真实 pi 会话**（e2e 全程 demo）；跑完 Electron 自行退出（无残留进程）、临时目录已清理，仓库无残留文件。
+
+## 2026-10-11 — 修正 `test/测试/f7-symlink.test.ts` 的 2 处 typecheck 错误（字面量漏标注）
+
+**来源**：仓库装入 `typescript`，`npm run typecheck`（`tsc --noEmit`）成为真门；全仓 11 处错误中 2 处落在本角色文件 `test/测试/f7-symlink.test.ts` 的 58 / 64 行。
+
+### 1) 错误是什么
+
+两条错误**同源**，均为 `TS2345`：传给 `resolveWrite(...)`（第 2 形参类型 `BoundarySection1`，见 `src/service/gate/resolve-write.ts`）的实参类型不匹配——
+
+```
+Argument of type '{ entries: { root: string; path: string; kind: string; purpose: string; }[]; ... }'
+is not assignable to parameter of type 'BoundarySection1'.
+  Types of property 'root' are incompatible. Type 'string' is not assignable to type 'Root'.
+```
+
+根因：测试里 `const boundary = { entries: [{ root: "project", path: "src", kind: "directory", purpose: "t" }], … }` **未标注类型**，对象字面量的属性被**拓宽**为 `string`；而 `Root = "skill" | "project"`、`kind: EntryKind`。`string` 不能赋给 `Root` / `EntryKind`。
+
+### 2) 判定：是生产代码的类型问题吗
+
+**不是。** `src/model/boundary.ts` 的 `Root` / `BoundaryEntry` / `BoundarySection1` 定义本身正确、自洽；`resolveWrite` 的形参收窄也是对的（它就该收窄到 `BoundarySection1`）。错误**只在测试一侧**：构造夹具时漏了类型标注，让字面量被拓宽。故按真实语义**在测试里补标注**，不越界改 `src/`。
+
+### 3) 改法（只看本角色文件）
+
+- 新增 `import type { BoundarySection1 } from "../../src/model/boundary.ts";`（只读引用类型，符合本角色边界）。
+- `const boundary = {` → `const boundary: BoundarySection1 = {`。标注后 `root` / `kind` 按字面量上下文归一到 `Root` / `EntryKind`，两条错误一并消失。
+- 与仓库既有约定一致（同款：`test/门禁引擎/built-in-section-equivalence.test.ts`、`test/编排/shell-gate.test.ts`、`test/桌面应用/interface.test.ts` 均以 `BoundarySection1` 标注边界字面量）。
+- **未使用 `as any` / `as unknown as` / `@ts-ignore` / `@ts-expect-error` 等压制手段**；未改任何断言与用例语义。
+
+### 4) 验证（本角色独立执行）
+
+- `npm run typecheck`：过滤 `f7-symlink` **无输出**（本角色 2 处错误归零）；全仓其余 9 处错误均属他角色/生产文件，**未动**。
+- `node --test test/测试/*.test.ts` → **41 pass / 0 fail**。
+- `node --test "test/**/*.test.ts"`（带引号走 Node glob）→ **445 pass / 0 fail / 0 skip**。
+
+
+## 2026-10-11 — 移除因 `ans init` 命令废除而失效的断言
+
+**来源**：客户废除 `ans init` 命令（改为「导入空文件夹 → 与内置治理角色 su 对话 → su 建角色」）。编排（T16）删除 `src/interface/cli/init.ts` 整个文件，装配把 `cli-parse` 的 init 分支移除——`init` 现归 **`unknown`** 命令（`src/common/装配/cli-parse.ts`，`parseInvocation` 无 init 分支 → 落到末尾 `{kind:"unknown", message:"未知命令：init"}`；`src/index.ts` 的 `case "unknown"` 返回 2）。编排为只读方，改的是它自己边界内的文件；本角色的 `test/测试/real-entry.test.ts` 在测试边界内，故由本角色收口。
+
+### 1) 失效断言（改前）
+
+`test/测试/real-entry.test.ts` 有两条 init 用例：
+
+- 「真实入口:ans init <临时目录> 以 0 结束并生成骨架」——断言 `status === 0` 且生成 `.ans/project.json` / `docs/bootstrap-manifest.md`。**这是全量套件中的那 1 个失败**（改前 445 pass / 1 fail）。
+- 「真实入口:ans init 无目录参数以 2 结束(用法错误)」——断言 `===2`。**恰好仍通过**（未知命令也是 2），但**名称与理由已不成立**：不再是「缺目录参数」，而是「命令不存在」。
+
+### 2) 独立实测（不照抄编排结论）
+
+- `node bin/ans.js init`（无参）→ **退出码 2**，stderr：`错误：未知命令：init` + 帮助文本（`USAGE`）。
+- `node bin/ans.js init <临时目录>` → **退出码 2**，stderr 同上 `错误：未知命令：init`；临时目录**保持为空**（`.ans/`、`docs/` 均未生成）。
+
+实测与编排结论**完全一致**（0 期望已失效、骨架不再生成；无参 2 亦确认）。编排提到的两点均复现。
+
+### 3) 改后断言（`test/测试/real-entry.test.ts`）
+
+- **删除**正例「ans init <临时目录> 以 0 结束并生成骨架」：`ans init` 已不存在，为一条不存在的命令保留断言只会让人以为它还在（采纳编排倾向）。
+- 把「无目录参数以 2」**改名为**「真实入口:ans init 已废除(作为未知命令以非 0 结束,且不再生成骨架)」，并改为：
+  - 无参：断言 `status !== 0` **且** stderr 含 `/未知命令/`（钉住**真实原因**：命令不存在 → 归 unknown）。
+  - 带目录：断言 `status !== 0` 且**不生成骨架**（`.ans/project.json` 与 `docs/` 均不存在）——保留正例被删后仍值得回归的那一点（防骨架生成器被误复活）。
+- **不把「2」当 init 的契约**：只断「非 0」+ 原因，不写死具体码。2 只是 `index.ts` 的 `case "unknown"` 这条既有分支的返回值，已由上方 `FAIL_CASES` 的「未知命令」用例覆盖。
+- 两条用例**净合一**：全量用例总数由 446（445 pass + 1 fail）降为 445。
+
+### 4) 验证（本角色独立执行）
+
+- `node --test test/测试/*.test.ts` → **41 pass / 0 fail**。
+- `node --test "test/**/*.test.ts"`（带引号走 Node glob，覆盖三层路径）→ **445 pass / 0 fail**（改前 445 pass / 1 fail；那 1 处即本条，已消除）。
+- 扫全 `test/`：**本角色文件外**仍有几处提及 `ans init`，但**均非断言其旧行为、无需改动**：`test/装配/cli-parse.test.ts`（断言 `parseInvocation(["init"]).kind === "unknown"`，即**新**正确行为）、`test/编排/bootstrap.test.ts`（断言 `init.ts` 不存在、命令面已删，即**新**正确行为）、`test/编排/govern.test.ts` 与 `test/门禁引擎/cold-start-genesis.test.ts`（仅注释）。**未改任何非本角色文件**（回报编排）。
+
+## 2026-10-11 — 修正因 `ans govern` 契约变更而失效的退出码断言，并据契约判定放宽「非 0」
+
+**来源**：编排角色把 `ans govern` 从占位改为**真治理会话**（`src/interface/cli/govern.ts` + `src/pipeline/orchestration/govern-session.ts`）——现在接收装配注入的 `ConfigInjection`、走真实 Pi 适配器（缺省 `createPiAdapterFactory`，无 demo 回退）。编排未改本角色文件（`test/测试/real-entry.test.ts` 在本角色边界内），把结论交回本角色收口。
+
+### 1) 失效断言（改前）
+
+`test/测试/real-entry.test.ts` 的失败路径用例 `{name:"govern 无配置通道", argv:["govern"], code:2}` 断言 `===2`。这是占位时代「govern 无配置通道 → 用法错误 2」的断言；真治理会话后 govern **有**配置通道，失败原因已改为「真实 Pi 适配器缺 provider 配置」。
+
+### 2) 独立实测（不照抄编排结论）
+
+- `node bin/ans.js govern`（无参）→ 退出码 **1**（非 2）。stderr：
+  `ans govern 会话失败：缺少 base URL：请通过 opts.baseUrl 或环境变量 ANS_PI_BASE_URL 显式提供。为避免把凭据发往未知端点，这里不会回落到任何默认 base URL。`
+  （另有两行 stdout 的会话信息，无凭据值打印。）
+- 实测与编排结论一致。**逐条复核了原用例中其余 7 条**：`未知角色 / 缺角色 id / 缺 --task / --task 缺值 / 多余参数 / 未知命令 / 未知 role 子命令` 无参实测**均为 2**（用法错误）。
+
+### 3) 契约判定（这是本改动的核心判断）
+
+退出码约定见 `src/common/编排/exit-codes.ts`：0=成功；2=用法/参数错误；1=运行时失败。判断「具体码是否属契约」的准绳 = **它是否只由 argv 决定（输入驱动、确定）**：
+
+- **具体码 2 属稳定契约**：仅由 argv 决定，同一非法 argv 在任何环境都得 2（未知角色/未知参数/多余参数/缺少必需参数）。→ **保留逐条 `===2`**，不放宽。
+- **具体码 1 不属稳定契约（至少此处）**：`ans govern` 无参的失败**依赖运行时/环境**——取决于真实 Pi 适配器所需 provider 配置（`ANS_PI_BASE_URL` 等）是否存在；同一 argv 在不同环境可能得到不同码。断言其具体码即**过度约束**（每次环境/上游行为一变就连带失败，这正是本次与上次 `init` 同类失效的根因）。→ **放宽为只断言「非 0」**。
+- 两类都保留「**必须非 0**」：失败路径绝不静默成功。
+
+据此**只放宽 govern 这一条**，其余 7 条用法错误仍断言具体码 2。这是**有原则的放宽**，不是为变绿而无原则放宽。
+
+### 4) 改后断言（`test/测试/real-entry.test.ts`）
+
+- 失败路径数组类型由 `code: number` 改为 `code?: number`；循环内**仅当给出 `code` 时才断言 `===code`**，恒断言 `!==0`。
+- 用例改名：`govern 无配置通道` → **`govern 缺真实 Pi 适配器 provider 配置（ANS_PI_BASE_URL 等未设）`**（如实反映真实原因），并去掉其 `code`（只断非 0）。
+- 顶部加注释块，写明上述契约判定依据。
+
+### 5) 验证（本角色独立执行）
+
+- `node --test test/测试/*.test.ts` → **42 pass / 0 fail**。
+- `node --test "test/**/*.test.ts"`（带引号走 Node glob）→ **357 pass / 0 fail**（改前 356 pass / 1 fail；本改动未增减用例数，仅改 1 条断言与名称）。
+- 扫全 `test/`：无其他因 `govern`/`init` 行为变更而失效的断言。`test/编排/govern.test.ts` 对 `governCommand(argv, undefined)`→`EXIT_USAGE` 的断言是**注入缺失的确定性用法错误**（非环境依赖），仍成立；`test/装配/entry.test.ts` 的 pi 无凭据用例本就只断「非 0」，模式正确。
+
+## 2026-10-11 — 修正因 `ans init` 契约变更而失效的退出码断言
+
+**来源**：编排角色把 `ans init` 从占位命令改为**真实骨架生成器**（`src/interface/cli/init.ts` + `src/common/编排/bootstrap.ts`）。新行为：`ans init <目标目录> [--force]`；**无目录参数属用法错误**（`parseInitArgs` → `errors.length > 0` → `EXIT_USAGE`）。编排未改本角色文件（`test/测试/real-entry.test.ts` 在本角色边界内），把结论交回本角色收口。
+
+### 1) 失效断言（改前）
+
+`test/测试/real-entry.test.ts` 原用例「真实入口:help/doctor/init 以 0 结束」断言 `runCli(["init"]).status === 0`——这是占位命令时代的断言，与新契约矛盾（全量套件中的那 1 个失败）。
+
+### 2) 独立实测（不照抄编排结论）
+
+- `node bin/ans.js init`（无参）→ **退出码 2**，stderr：`错误：缺少目标目录` + 用法行。
+- `node bin/ans.js init <临时空目录>` → **退出码 0**，stdout 打印 `# Bootstrap 创建清单（创世例外，设计 §2.4）`，并生成 `.ans/`、`docs/`、`角色卡/`（含 `.ans/project.json` 与 `docs/bootstrap-manifest.md`）；临时目录已清理，仓库无残留。
+
+实测与编排结论一致，采纳其建议。
+
+### 3) 改后断言（`test/测试/real-entry.test.ts`）
+
+- 拆分原用例：「真实入口:help/doctor 以 0 结束」（仅 `--help`/`doctor`）。
+- 新增「真实入口:ans init 无目录参数以 2 结束（用法错误）」：断言 `status !== 0` 且 `status === 2`。
+- 新增正例「真实入口:ans init <临时目录> 以 0 结束并生成骨架」：`mkdtempSync(join(tmpdir(), "ans-init-"))` 建临时目录 → 断言 `status === 0`、stdout 含创建清单、`.ans/project.json` 与 `docs/bootstrap-manifest.md` 存在；`try/finally` + `rmSync(dir, {recursive:true, force:true})` 保证清理（沿用 `test/门禁引擎/*` 既有临时目录模式）。
+
+### 4) 验证（本角色独立执行）
+
+- `node --test test/测试/*.test.ts` → **42 pass / 0 fail**。
+- `node --test test/*/*.test.ts`（全量）→ **328 pass / 0 fail**（改前 325 pass / 1 fail；本改动拆 1 用例为 3，净 +2）。
+- 扫全 `test/`：无其他因 `init` 行为变更而失效的退出码断言。`test/装配/cli-parse.test.ts:47` 断言 `parseInvocation(["init"])` 的**解析形状**（`{ kind:"init", argv:[] }`），非退出码，不受影响，未改。

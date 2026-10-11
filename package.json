@@ -1,0 +1,30 @@
+{
+  "name": "ans-cli",
+  "version": "1.0.0",
+  "private": true,
+  "description": "受治理会话链路 CLI（v1 原型）：解析角色/边界 -> 受治理工具集 -> 写入前拦截。",
+  "type": "module",
+  "bin": {
+    "ans": "bin/ans.js"
+  },
+  "main": "app/main.ts",
+  "engines": {
+    "node": ">=23.6"
+  },
+  "scripts": {
+    "start": "node bin/ans.js",
+    "doctor": "node bin/ans.js doctor",
+    "demo": "node bin/ans.js role run 编排 --task T-1",
+    "app": "electron app/main.ts",
+    "test:assembly": "node --test \"test/装配/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@earendil-works/pi-coding-agent": "1.1.0",
+    "yaml": "2.9.0"
+  },
+  "devDependencies": {
+    "electron": "44.7.0",
+    "typescript": "^7.0.2"
+  }
+}

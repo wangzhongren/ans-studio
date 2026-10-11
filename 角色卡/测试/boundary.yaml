@@ -1,0 +1,32 @@
+# 测试边界 —— Section 1 唯一写入白名单
+# 未列路径默认只读。新增测试目录、改动归属或增删逐条列出的路径，须先由 ANS Governance 更新本文件并经客户确认。
+# 测试辅助代码不得被产品代码引用。
+role: 测试
+entries:
+  - kind: directory
+    path: test/测试/
+    purpose: 跨角色联调、完整流程与回归用例，及其夹具与测试辅助代码
+  - kind: file
+    path: 角色卡/测试/feature-map.md
+    purpose: 功能导航
+  - kind: file
+    path: 角色卡/测试/memo.md
+    purpose: 本角色工作备忘录
+  - kind: file
+    path: 角色卡/测试/changelog.md
+    purpose: 本角色治理变更记录
+  - kind: file
+    path: 角色卡/测试/functional-description.md
+    purpose: 模块笔记与代码位置
+  - kind: directory
+    path: 角色卡/测试/docs/design/
+    purpose: 测试方案
+  - kind: directory
+    path: 角色卡/测试/docs/feature/
+    purpose: 测试相关的稳定说明与流程图
+  - kind: directory
+    path: 角色卡/测试/docs/change/
+    purpose: 变更记录
+  - kind: directory
+    path: 角色卡/测试/docs/fix/
+    purpose: 修复记录与问题记录

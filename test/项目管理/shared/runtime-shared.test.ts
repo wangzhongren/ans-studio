@@ -1,0 +1,66 @@
+// test/项目管理/shared/runtime-shared.test.ts
+// 项目管理：对共享运行时原语 `src/common/shared/runtime-shared.ts` 的行为验证，并核对其与
+// 各消费方**旧本地副本**在收敛窗口期内取值一致（`RuntimeKind` / `PI_CREDENTIAL_ENV_VARS` /
+// `resolveSkillRoot`）。
+//
+// 隶属：共享组件测试（pm 属主）。
+
+import assert from "node:assert/strict";
+import os from "node:os";
+import path from "node:path";
+import { test } from "node:test";
+
+import {
+  RUNTIME_KINDS,
+  DEFAULT_RUNTIME,
+  PI_CREDENTIAL_ENV_VARS,
+  resolveSkillRoot,
+} from "../../../src/common/shared/runtime-shared.ts";
+
+// 消费方旧副本（只读导入，用于一致性核对；改为从 shared 导入并删本地归 T21/T22/T24）。
+import { RUNTIME_KINDS as 编排RUNTIME_KINDS } from "../../../src/common/编排/args.ts";
+import {
+  RUNTIME_VALUES,
+  DEFAULT_RUNTIME as 装配DEFAULT_RUNTIME,
+  PI_CREDENTIAL_ENV_VARS as 装配PI_CREDENTIAL_ENV_VARS,
+} from "../../../src/common/装配/runtime.ts";
+import { PI_CREDENTIAL_ENV_VARS as piPI_CREDENTIAL_ENV_VARS } from "../../../src/provider/pi/tools.ts";
+import { resolveSkillRoot as 桌面ResolveSkillRoot } from "../../../app/desktop/project.ts";
+
+test("RuntimeKind 取值单一来源：shared 与编排旧副本一致", () => {
+  assert.deepEqual([...RUNTIME_KINDS], [...编排RUNTIME_KINDS]);
+  assert.deepEqual([...RUNTIME_KINDS], ["demo", "pi"]);
+});
+
+test("RuntimeKind 取值单一来源：shared 与装配旧副本（RUNTIME_VALUES / DEFAULT_RUNTIME）一致", () => {
+  assert.deepEqual([...RUNTIME_KINDS], [...RUNTIME_VALUES]);
+  assert.equal(DEFAULT_RUNTIME, 装配DEFAULT_RUNTIME);
+  assert.equal(DEFAULT_RUNTIME, "demo");
+});
+
+test("PI_CREDENTIAL_ENV_VARS：shared 与装配、Pi适配器两处旧副本**逐条相同**（安全相关，不得分叉）", () => {
+  assert.deepEqual([...PI_CREDENTIAL_ENV_VARS], [...装配PI_CREDENTIAL_ENV_VARS]);
+  assert.deepEqual([...PI_CREDENTIAL_ENV_VARS], [...piPI_CREDENTIAL_ENV_VARS]);
+  assert.ok(PI_CREDENTIAL_ENV_VARS.length > 0);
+  // 名单本身固定（任一处改动都应同时触发本断言失败，提醒核对剥离点）。
+  assert.deepEqual(
+    [...PI_CREDENTIAL_ENV_VARS],
+    ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "OPENAI_API_KEY", "GEMINI_API_KEY", "PI_API_KEY"],
+  );
+});
+
+test("resolveSkillRoot：优先 ANS_SKILL_ROOT（取非空值）", () => {
+  assert.equal(resolveSkillRoot({ ANS_SKILL_ROOT: "/x/skill" }), "/x/skill");
+});
+
+test("resolveSkillRoot：缺省回退默认技能目录，且与桌面旧副本同值", () => {
+  const expectedTail = path.join(".claude", "skills", "ans-governed-construction");
+  assert.equal(resolveSkillRoot({}), path.join(os.homedir(), expectedTail));
+  assert.match(resolveSkillRoot({}), /ans-governed-construction$/);
+  assert.equal(resolveSkillRoot({}), 桌面ResolveSkillRoot({}));
+});
+
+test("resolveSkillRoot：空串视为未设置（回退默认），与桌面旧副本同值", () => {
+  assert.equal(resolveSkillRoot({ ANS_SKILL_ROOT: "" }), 桌面ResolveSkillRoot({ ANS_SKILL_ROOT: "" }));
+  assert.match(resolveSkillRoot({ ANS_SKILL_ROOT: "" }), /ans-governed-construction$/);
+});

@@ -1,0 +1,54 @@
+# 项目管理边界 —— Section 1 唯一写入白名单
+# 未列路径默认只读。新增目录、改动归属或增删逐条列出的路径，须先由 ANS Governance 更新本文件并经客户确认。
+role: 项目管理
+entries:
+  - kind: directory
+    path: src/common/shared/
+    purpose: 跨角色共享组件
+  - kind: directory
+    path: test/项目管理/shared/
+    purpose: 共享组件的单元测试与夹具
+  - kind: file
+    path: 角色卡/项目管理/feature-map.md
+    purpose: 功能导航
+  - kind: file
+    path: 角色卡/项目管理/memo.md
+    purpose: 本角色工作备忘录
+  - kind: file
+    path: 角色卡/项目管理/changelog.md
+    purpose: 本角色治理变更记录
+  - kind: file
+    path: 角色卡/项目管理/functional-description.md
+    purpose: 模块笔记与代码位置
+  - kind: file
+    path: 角色卡/项目管理/api-spec.md
+    purpose: 共享组件实现报告
+  - kind: file
+    path: 角色卡/项目管理/docs/architecture.md
+    purpose: 整体架构与角色协作
+  - kind: directory
+    path: 角色卡/项目管理/docs/architecture/
+    purpose: 架构细分文档，含 shared-components.md
+  - kind: file
+    path: 角色卡/项目管理/docs/project-rules.md
+    purpose: 全项目唯一工程法案
+  - kind: directory
+    path: 角色卡/项目管理/docs/meetings/
+    purpose: 会议纪要
+  - kind: directory
+    path: 角色卡/项目管理/docs/design/
+    purpose: 设计记录与跨角色对接设计
+  - kind: directory
+    path: 角色卡/项目管理/docs/change/
+    purpose: 变更记录
+  - kind: directory
+    path: 角色卡/项目管理/docs/fix/
+    purpose: 修复记录
+  - kind: directory
+    path: docs/scheduling/
+    purpose: 任务调度记录（内容由 task_ops 写入）
+  - kind: conditional-directory
+    path: docs/audit/
+    condition: shell-gate
+    root: project
+    purpose: shell 闸的放行/拒绝审计留痕（shell-gate.jsonl）
