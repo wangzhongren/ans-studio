@@ -1,5 +1,38 @@
 # 装配 变更记录
 
+## 2026-10-11 — 更新 README 至当今状态（客户指出并放行）
+
+客户指出「readme.MD 没有更新」，`README.md` 已严重过时。本任务逐条**按代码核实后重写** README，并补定位与新增章节。
+不照抄旧 README（过时）、也不照抄简报（同样可能有错）——**凡核实后与简报不符，如实纠正并回报**。
+
+- **重写依据（实读）**：`package.json` scripts、`src/index.ts`（命令面）、`src/interface/cli/{run,govern}.ts`、
+  `app/{main.ts,desktop/*}`、七个角色 `boundary.yaml`、`src/pipeline/orchestration/govern-session.ts`、
+  `src/common/编排/{finalize,shell-gate}.ts`、`src/common/门禁引擎/classify-shell.ts`、设计文档
+  `角色卡/项目管理/docs/design/2026-10-11_design_v1-full-implementation.md`、以及既有 changelog。
+- **新 README 结构**：①`ANS 是什么`（role-first/RFSG × Pi，三点逐字取自技能 README，`ANS` 是名字非缩写）
+  ②`这是什么`（核心主张 + 分层：入口→Interface→Pipeline→Service→Provider）
+  ③`快速开始`（桌面主推路径 / CLI / **两道门**）④`Pi 配置`（面板键、从哪填、CLI 怎么读）
+  ⑤`角色链`（su 对话式 bootstrap、收口需确认、每轮 settle 自动重 pin、回交）
+  ⑥`命令表`（删 `ans init`）⑦`目录与职责`（**全 7 角色** + `src/common/shared/` 共享组件）
+  ⑧`安全与凭据` ⑨`已知范围外 / 未验证`。
+- **删掉的不成立说法**：`ans govern`「最小占位链路」→ 已是**真治理会话**且**接受目标目录**；
+  「真实 Pi 适配器**尚未真实跑通**」→ 改为如实（此前已跑通一次、此后改动多、**未再复验**，标「未验证」）；
+  「不产生 `docs/scheduling/` 记录（F3 偏离）」→ 该偏离已被取代，删去该段与整节「契约 §7 演示输出」；
+  「免 `npm install`」→ **不成立**（运行需 `yaml`，Pi 路径需 Pi SDK）；旧「桌面应用（Electron）」那节只讲
+  怎么跑起来 → 改为讲**产品本身**（工作台：导入 / su 对话 / 收口确认 / Pi 设置 / 角色资料栏）。
+- **核实后纠正旧 README 与简报**：①项目**全 7 个角色**（多「桌面应用」）——但 `src/index.ts` 的
+  **内嵌演示配置确为 6 角色**（`DEMO_ROLES` 不含桌面应用，`test/装配/config.test.ts` 亦如此断言）；
+  故旧 README 两处「六角色」描述的是**演示配置**、**并不算错**（简报称两处都应改 7，实为只有
+  「项目角色数」那层需讲成 7）。②shell 闸三层链**已实现**，但**默认入口未 arm**：桌面 V1 刻意不注入
+  `ShellGate`（`DESKTOP_SHELL_GATE_ARMED === false`），**CLI 入口当前亦未注入**——故写「未注入即
+  `run_shell` 不注册」，**不夸大成「已 arm」**。
+- **顺带修（本角色文件、纯文案）**：`src/index.ts` 的 `USAGE` 里 `ans govern [...]  治理 bootstrap 会话（占位链路）`
+  与首行「（v1 原型）」仍陈旧——改为**真治理会话**、**接受目标目录**的描述。**无行为改动**（无测试断言该文案；
+  `test/测试/real-entry.test.ts` 仅断言 govern 用法错误的**退出码**）。
+- **验证（两道门）**：`node --test "test/**/*.test.ts"`（**必须带引号**）→ **621 tests / 621 pass / 0 fail**；
+  `npm run typecheck` → **0 错**。`test/装配/` 内**无**断言 README 内容的用例（grep 确认），无需同步。
+- **未读 `.env`、未发真实网络请求、未打印任何凭据值**。来源：客户「readme.MD 没有更新」+ 协调方补充定位（role-first × Pi）。
+
 ## 2026-10-11 — T34：`ans govern <目标目录>` 的 `projectRoot` 真正生效（缺目录即明确报错）
 
 派发任务 T34（设计 §12.3/§12.7）。原 `ans govern` **不取目标目录**——只在装配注入的 project

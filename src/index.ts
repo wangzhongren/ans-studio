@@ -218,11 +218,11 @@ export interface RunRoleDeps {
   scope: TaskScope;
 }
 
-const USAGE = `ans —— 受治理会话链路 CLI（v1 原型）
+const USAGE = `ans —— 受治理会话链路 CLI（v1）
 
 用法：
   ans role run <角色> --task <任务>   运行一个受治理角色会话（演示：ans role run 编排 --task T-1）
-  ans govern [...]                   治理 bootstrap 会话（占位链路）
+  ans govern [<目录>] [--task <任务>] [--role <角色id>]…   真治理会话：对目标目录发起 bootstrap（缺省 = ans-cli 自身）
   ans doctor                         打印装配自检与内嵌演示配置（无需其余角色落盘）
   ans help                           显示本帮助
 
