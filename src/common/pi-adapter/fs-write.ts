@@ -135,7 +135,8 @@ export async function ensureParentDir(parentAbs: string): Promise<void> {
  * **逐字保持既有行为**：同目录 temp（`wx` 独占）→ 写 → `fsync` → `rename` 覆盖目标；失败清理 temp 并抛错。
  * 传 `{ mode: 0o600 }` 以**保持本写工具原有的更严权限位**（共享原语缺省 `0o666`，即 `env-file` 既有行为）。
  * rename 的**瞬时 `EPERM`**（Windows 实时防护等）由共享原语的**有界重试**处置——其算法与本层原私有实现
- * **逐字同源**（仅瞬时码、≤20 次、只 `setImmediate` 让出、非瞬时立即抛）；本层**不再自持**该实现。
+ * **同源**（仅瞬时码、只 `setImmediate` 让出、非瞬时立即抛）；上界为共享常量 `RENAME_MAX_ATTEMPTS`＝**200**
+ * （本层原私有实现为 20，共享侧已依实测尾部上调至 200）；本层**不再自持**该实现。
  */
 export async function atomicWriteFile(abs: string, data: Buffer): Promise<void> {
   return atomicWrite(abs, data, { mode: 0o600 });

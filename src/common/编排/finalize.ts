@@ -58,7 +58,14 @@ import path from "node:path";
 
 import type { BoundarySection1, PinEntry } from "../../model/boundary.ts";
 import type { WriteDecision } from "../../model/decision.ts";
-import type { OperatorChannelFn, OperatorOutcome, OperatorPrompt } from "../../provider/pi/session.ts";
+import type {
+  OperatorChannelFn,
+  OperatorOutcome,
+  OperatorPrompt,
+  FinalizeStatus,
+  FinalizeResult,
+  FinalizeBootstrapFn,
+} from "../../provider/pi/session.ts";
 import { resolveWrite } from "../../service/gate/resolve-write.ts";
 import { toPosix } from "../shared/path-primitives.ts";
 import { ansProjectPath } from "../shared/config-loader.ts";
@@ -124,44 +131,19 @@ export interface FinalizeInput {
   writeGovernanceBoundaryDoc?: boolean;
 }
 
-/** 收口的结果状态（给 su / 界面的反馈；§13.1）。 */
-export type FinalizeStatus =
-  | "completed" // 客户确认通过且写出成功
-  | "declined" // 客户拒绝
-  | "unavailable" // 确认通道不可用 / 未接 / 超时 → fail-closed
-  | "not-genesis" // 非创世态 → 拒绝（不是静默）
-  | "nothing-to-pin" // 无可 pin 之物 → 拒绝
-  | "blocked"; // 未 settle / 门禁拒 / 其他失败
+// —————————————— 收口形状：单一来源 = §4 冻结契约家（收敛，去镜像） ——————————————
+//
+// 三型 `FinalizeStatus` / `FinalizeResult` / `FinalizeBootstrapFn` 的**唯一来源**是 §4 冻结契约家
+// `src/provider/pi/session.ts`（Pi适配器 T36 已**逐字**落于彼处；其「提议收口、等客户确认」语义与守卫
+// 即据之）。此前本模块**自定义了同一份形状** ⇒ **一份契约、两处定义**（本项目一路在收敛的那类镜像：
+// 前两例为 operator 三型、凭据常量 `atomicWrite`）。
+//
+// 依硬规矩「**不得有第二份实现**」与 **T20→T21 先例**（operator 三型逐字入冻结契约家、编排改为**导入 +
+// 再导出**），本模块**删除本地三型定义**，改**从 session.ts 导入**（见文件顶部 import），并**再导出**以
+// 维持本模块既有公开面（**消费方零改动**）。**形状逐字一致**——由**结构类型**保证 `FinalizeBootstrapFn`
+// 仍可注入 Pi适配器的 `finalize_bootstrap` 工具；**零行为变化**。
 
-/** finalize 的结果。 */
-export interface FinalizeResult {
-  ok: boolean; // === (status === "completed")
-  /** 语义状态（T37 新增；旧消费方可不看，保持向后兼容）。 */
-  status?: FinalizeStatus;
-  /** 给 su / 界面的反馈文案（T37 新增；成功与失败都有）。 */
-  message?: string;
-  /** `ok:false` 时的原因（= message；兼容旧消费方）。 */
-  reason?: string;
-  /** 实际写出的项目相对路径（`ok:true` 时非空）。 */
-  wrote: string[];
-  /** 写入 `.ans` 的 pin 列表（逐文件 SHA-256）。 */
-  pins: PinEntry[];
-  /** 被 pin 的角色 id（按目录名排序）。 */
-  roles: string[];
-  /** `.ans/project.json` 的项目相对路径。 */
-  projectJsonRel: string;
-  /** 留痕文件的项目相对路径。 */
-  manifestRel: string;
-}
-
-/**
- * **finalize 能力**（注入给 Pi 适配器 `finalize_bootstrap` 工具的**确切形状**，T36）：
- * 调用即「**提议收口并挂起等客户确认**」（**不是**「立即完成」）。返回给模型/界面的反馈见 `FinalizeResult`。
- *   - `ok:true`（status `completed`）→ 客户确认通过且写出成功；
- *   - `ok:false` → 见 `status`：`declined`（拒绝）/ `unavailable`（通道不可用/超时）/ `not-genesis` /
- *     `nothing-to-pin` / `blocked`。**su 据 `message` 决定继续工作或稍后再提议**。
- */
-export type FinalizeBootstrapFn = (opts?: { acceptanceSource?: string; now?: () => Date }) => Promise<FinalizeResult>;
+export type { FinalizeStatus, FinalizeResult, FinalizeBootstrapFn };
 
 /**
  * **会话侧 finalize 能力**（守卫 + 提议 + 确认 + 落盘）——把「非创世态 → 拒 / 未 settle → 拒 /

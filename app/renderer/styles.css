@@ -619,6 +619,20 @@ details.sys-denied[open] summary { padding-bottom: 6px; margin-bottom: 6px; bord
 .pi-status.is-warn { color: var(--danger); }
 .pi-status.is-err { color: var(--danger); }
 
+/* 「高级」（可折叠）：默认收起——可选字段不占主视线。等宽只留给键名，说明用无衬线。 */
+.pi-advanced { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 8px; }
+.pi-advanced-sum {
+  display: flex; align-items: center; gap: 6px;
+  cursor: pointer; list-style: none; user-select: none;
+  font-size: 11.5px; color: var(--text-2);
+}
+.pi-advanced-sum::-webkit-details-marker { display: none; }
+.pi-advanced-chev { flex: 0 0 auto; color: var(--text-3); transition: transform 0.12s ease; }
+.pi-advanced[open] .pi-advanced-chev { transform: rotate(90deg); }
+.pi-advanced-label { letter-spacing: 0.02em; }
+.pi-advanced-body { margin-top: 9px; display: grid; gap: 9px; }
+.pi-advanced-hint { margin: 0; font-size: 11.5px; line-height: 1.5; color: var(--text-3); }
+
 .composer-row { display: flex; align-items: flex-end; gap: 8px; }
 .composer textarea {
   flex: 1 1 auto;

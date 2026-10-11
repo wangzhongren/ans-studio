@@ -435,15 +435,21 @@
   }
 
   // —————— Pi 配置面板（设计 §11/T28）：设置 pi 运行时配置 → 保存到仓库根 .env ——————
-  // 与主进程 pi-config.ts 的 PI_PANEL_KEYS 一致；token 为机密：**值永不回显**（主进程只给 isSet 布尔、
-  // 恒返回空 value），此处字段恒为 password 型、只示「已设置/未设置」。界面**不作任何判定**（掩码/读写
-  // 全在主进程侧经共享 env-file 模块，单一来源）。
+  // 与主进程 pi-config.ts 的 PI_PANEL_KEYS 一致：**3 项必填**（端点 / 模型 / token）+ **1 项可选**（上下文窗口，
+  // 收进「高级」、可留空）。token 为机密：**值永不回显**（主进程只给 isSet 布尔、恒返回空 value），此处字段
+  // 恒为 password 型、只示「已设置/未设置」。界面**不作任何判定**（掩码/读写全在主进程侧经共享 env-file 模块，
+  // 单一来源）。**`ANS_PI_PROVIDER` 不在面板里**（代码里有默认值 ans-gateway、是内部标签，客户 2026-10-11 裁定移除）。
   var PI_KEYS = [
     "ANTHROPIC_AUTH_TOKEN",
     "ANS_PI_BASE_URL",
     "ANS_PI_MODEL",
-    "ANS_PI_PROVIDER",
     "ANS_PI_CONTEXT_WINDOW",
+  ];
+  // 必填键（3 项）——缺任一才「配置不全、会被拒」；`ANS_PI_CONTEXT_WINDOW` 可选，缺失不算缺（留空 = 保守默认）。
+  var PI_REQUIRED_KEYS = [
+    "ANTHROPIC_AUTH_TOKEN",
+    "ANS_PI_BASE_URL",
+    "ANS_PI_MODEL",
   ];
   var piView = null; // 最近一次 getPiConfig 结果（供「已设置/未设置」与缺项告警）
 
@@ -487,10 +493,13 @@
     });
   }
 
-  /** 选 pi 但配置不全 → 明确告警（fail-closed 的补救入口提示）；齐备则如实示「已齐备」。 */
+  /** 选 pi 但**必填**不全 → 明确告警（fail-closed 的补救入口提示）；必填齐备则如实示「已齐备」。
+   *  可选的上下文窗口（「高级」）留空不算缺——缺失时 Pi适配器用保守默认，不会硬失败。 */
   function renderPiConfigWarning() {
     if (!piView || !piView.fields) { setPiStatus("", ""); return; }
-    var missing = piView.fields.filter(function (f) { return !f.isSet; }).map(function (f) { return f.key; });
+    var missing = piView.fields
+      .filter(function (f) { return PI_REQUIRED_KEYS.indexOf(f.key) >= 0 && !f.isSet; })
+      .map(function (f) { return f.key; });
     if (missing.length) {
       setPiStatus("Pi 配置不完整，缺：" + missing.join("、") + "——选 pi 开会话会被拒（fail-closed），请补齐后保存。", "warn");
     } else {

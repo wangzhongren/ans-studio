@@ -142,12 +142,30 @@ test("T20：handback 事件被呈现为「回交 su」卡片；su 会话开着�
 
 // ————————————————— T28：Pi 配置面板（设计 §11） —————————————————
 
-test("T28：Pi 配置面板存在——5 项字段、token 为掩码（password）、保存/切换展开齐备", () => {
-  // 面板容器与 5 个字段（键名与 pi-config 的 PI_PANEL_KEYS 一致）。
+test("T28：Pi 配置面板存在——3 项必填 + 1 项「高级」（可折叠、可留空）；provider 不在面板；token 掩码", () => {
+  // 面板容器。
   assert.ok(INDEX.includes('id="pi-panel"'), "index.html 应有 Pi 配置面板 #pi-panel");
-  for (const key of ["ANTHROPIC_AUTH_TOKEN", "ANS_PI_BASE_URL", "ANS_PI_MODEL", "ANS_PI_PROVIDER", "ANS_PI_CONTEXT_WINDOW"]) {
-    assert.ok(INDEX.includes('id="pi-inp-' + key + '"'), "应有字段 #pi-inp-" + key);
+  // **3 项必填**字段（端点 / 模型 / token）。
+  for (const key of ["ANTHROPIC_AUTH_TOKEN", "ANS_PI_BASE_URL", "ANS_PI_MODEL"]) {
+    assert.ok(INDEX.includes('id="pi-inp-' + key + '"'), "应有必填字段 #pi-inp-" + key);
   }
+  // 可选字段 `ANS_PI_CONTEXT_WINDOW` 仍在，但收进「高级」（可折叠、可留空）——不占主视线。
+  assert.ok(INDEX.includes('id="pi-inp-ANS_PI_CONTEXT_WINDOW"'), "应有可选字段 #pi-inp-ANS_PI_CONTEXT_WINDOW");
+  assert.ok(INDEX.includes('class="pi-advanced"'), "应有「高级」可折叠容器 .pi-advanced");
+  const advStart = INDEX.indexOf('class="pi-advanced"');
+  const cwPos = INDEX.indexOf('id="pi-inp-ANS_PI_CONTEXT_WINDOW"');
+  const advEnd = INDEX.indexOf("</details>", advStart);
+  assert.ok(advStart >= 0 && cwPos > advStart && cwPos < advEnd, "上下文窗口字段应在「高级」容器内");
+  // 「高级」里那一行说明（一句话）：留空 = 用默认值（偏保守：压缩会提前触发，不会炸会话）。
+  assert.ok(INDEX.includes("留空 = 用默认值"), "「高级」里应有一行「留空 = 用默认值…」说明");
+  assert.ok(INDEX.includes("压缩会提前触发"), "该说明应点出「偏保守：压缩会提前触发，不会炸会话」");
+  // 反向守卫：`ANS_PI_PROVIDER` **不再占一个输入框**（它已从面板移除；中间不再是用户该做的决定）。
+  assert.ok(!INDEX.includes('id="pi-inp-ANS_PI_PROVIDER"'), "provider 不该有输入框");
+  assert.ok(!INDEX.includes(">ANS_PI_PROVIDER<"), "provider 键名不该作为面板字段标签出现");
+  // 渲染侧 PI_KEYS 与主进程一致：4 项（3 必填 + 1 可选），且**不含** provider。
+  assert.ok(RENDERER.includes('"ANS_PI_CONTEXT_WINDOW"'), "渲染侧面板键应含 CONTEXT_WINDOW");
+  assert.ok(!/"ANS_PI_PROVIDER"/.test(RENDERER), "渲染侧面板键集合不该含 PROVIDER");
+  assert.ok(RENDERER.includes("PI_REQUIRED_KEYS"), "渲染侧应区分必填键（缺才告警）");
   assert.ok(INDEX.includes('id="btn-pi-settings"'), "应有「Pi 设置」按钮");
   assert.ok(INDEX.includes('id="pi-save"'), "应有保存按钮 #pi-save");
   // token 字段默认掩码（type=password）——值以掩码显示、默认不回显。
@@ -165,6 +183,7 @@ test("T28：Pi 配置面板存在——5 项字段、token 为掩码（password�
   assert.ok(MAIN.includes("loadEnvFileInto"), "主进程启动应用 loadEnvFileInto(process.env, .env) 补 --env-file");
   // 样式钩子。
   assert.ok(STYLES.includes(".pi-panel") && STYLES.includes(".pi-input") && STYLES.includes(".pi-status"), "styles.css 应有面板样式");
+  assert.ok(STYLES.includes(".pi-advanced"), "styles.css 应有「高级」可折叠样式");
 });
 
 // ————————————————— T36：创世 finalize「完成 bootstrap」入口 —————————————————

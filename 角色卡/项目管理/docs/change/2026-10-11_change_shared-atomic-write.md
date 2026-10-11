@@ -6,7 +6,7 @@
 
 **架构裁决（本任务重点）＝ 抽共享原语**（而非各修各的）。理由：
 1. 两处是**同一算法**——「同目录 temp → 写 → `fsync` → `rename` 覆盖目标」逐步骤一致，仅**数据形态**（`string` vs `Buffer`）与**临时文件名/权限位**等**表面差异**；差异**不**构成各自实现的技术理由。
-2. 需收敛的核心不是「temp+rename」（那是常识），而是其中**非平凡且可靠性强相关**的**有界重试**（仅瞬时码 `EPERM/EBUSY/EACCES`、≤20 次、次数间只 `setImmediate` 让出事件循环、非瞬时立即抛）。这段逻辑若各自维护，正是 §6 逼出的**镜像**——一旦一处修正，另一处即变**陈旧第二实现**。
+2. 需收敛的核心不是「temp+rename」（那是常识），而是其中**非平凡且可靠性强相关**的**有界重试**（仅瞬时码 `EPERM/EBUSY/EACCES`、≤20 次（**后经实测上调为 200**）、次数间只 `setImmediate` 让出事件循环、非瞬时立即抛）。这段逻辑若各自维护，正是 §6 逼出的**镜像**——一旦一处修正，另一处即变**陈旧第二实现**。
 3. 与本项目**既定的收敛实践**一致（此前已把 `config-loader`/`path-primitives`/`runtime-shared`/`argv-primitives`/`env-file` 五处镜像收敛到 `src/common/shared/`）。
 
 **做了什么**
@@ -14,7 +14,7 @@
   - `atomicWrite(filePath: string, data: string | Buffer, options?: AtomicWriteOptions): Promise<void>` —— 同目录 temp + `fsync` + `rename` 覆盖目标（**同时服务文本 `.env` 与字节写工具**）；失败清理 temp 并抛错。
   - `renameReplacingExisting(from, to): Promise<void>` —— **有界重试**的 rename（覆盖已存在目标），专治 Windows 瞬时 `EPERM`。
   - `retryOnTransient(op, maxAttempts?): Promise<void>` —— 通用「**仅瞬时码、有界、只让出事件循环**」重试核心。
-  - 常量 `RENAME_TRANSIENT_CODES`（`EPERM/EBUSY/EACCES`）、`RENAME_MAX_ATTEMPTS`（20）；类型 `AtomicWriteOptions`（`mode?`/`tmpPrefix?`）。
+  - 常量 `RENAME_TRANSIENT_CODES`（`EPERM/EBUSY/EACCES`）、`RENAME_MAX_ATTEMPTS`（**此处记为 20；后经实测上调为 200**，见 `2026-10-11_change_atomic-write-bound-raised.md`）；类型 `AtomicWriteOptions`（`mode?`/`tmpPrefix?`）。
 - 改 `src/common/shared/env-file.ts`：`atomicWriteText(filePath, text)` 的**实现体**改为委托 `atomicWrite(filePath, text)`——**签名与行为不变**（消费方 T28 只读导入此名）；移除本文件内联的 temp/rename 代码与此前仅它使用的 `open`/`rename`/`rm`/`path` 导入。
 - 登记 `docs/architecture/shared-components.md` **组件 6（atomic-write）** + 本文件变更段。
 - 更新工程法案 `docs/project-rules.md` §一.5：共享组件清单补为现行**六个**；补记 atomic-write 的消费方与「Pi适配器须改导入」的收敛动作。

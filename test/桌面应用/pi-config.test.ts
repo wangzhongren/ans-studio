@@ -20,6 +20,7 @@ import path from "node:path";
 
 import {
   PI_PANEL_KEYS,
+  PI_REQUIRED_KEYS,
   getPiConfig,
   savePiConfig,
   loadPiEnv,
@@ -39,14 +40,21 @@ function makeTempEnv(initial?: string): { dir: string; envPath: string; cleanup:
   return { dir, envPath, cleanup: () => fs.rmSync(dir, { recursive: true, force: true }) };
 }
 
-test("面板键恰为 5 项（含机密 token + 客户起点 CONTEXT_WINDOW）；默认路径为仓库根 .env", () => {
+test("面板键恰为 3+1（必填 token/端点/模型 + 可选 CONTEXT_WINDOW）；provider 不在面板里；默认路径为仓库根 .env", () => {
+  // 客户 2026-10-11：其实不是 5 个，真正必须你填的是 3 个 —— 端点 / 模型 / token（必填）+ 上下文窗口（可选）。
   assert.deepEqual(PI_PANEL_KEYS, [
     "ANTHROPIC_AUTH_TOKEN",
     "ANS_PI_BASE_URL",
     "ANS_PI_MODEL",
-    "ANS_PI_PROVIDER",
     "ANS_PI_CONTEXT_WINDOW",
   ]);
+  // 反向守卫：`ANS_PI_PROVIDER` **不在**面板键集合里（它在代码里有默认值 ans-gateway、是内部标签，
+  // 不是用户该做的决定；底层仍支持该环境变量，只是不再占一个输入框）。
+  assert.ok(!PI_PANEL_KEYS.includes("ANS_PI_PROVIDER"), "provider 绝不进面板键集合");
+  // 必填键恰为 3 项，且都是面板键；CONTEXT_WINDOW 是可选（不在必填列）。
+  assert.deepEqual(PI_REQUIRED_KEYS, ["ANTHROPIC_AUTH_TOKEN", "ANS_PI_BASE_URL", "ANS_PI_MODEL"]);
+  assert.ok(PI_REQUIRED_KEYS.every((k) => PI_PANEL_KEYS.includes(k)), "必填键应含于面板键集合");
+  assert.ok(!PI_REQUIRED_KEYS.includes("ANS_PI_CONTEXT_WINDOW"), "上下文窗口是可选，不在必填列");
   // 默认路径指向仓库根（app/desktop 上两级）下的 .env——与 CLI `--env-file=.env` 同一文件。
   assert.equal(path.basename(resolveRepoEnvPath()), ".env");
   assert.ok(resolveRepoEnvPath().endsWith(path.join("ans-cli", ".env")));
@@ -99,10 +107,14 @@ test("掩码：getPiConfig 对机密键恒返空 value，只给 isSet；非机�
     // 未设置的键：isSet=false、value 空。
     assert.equal(byKey.ANS_PI_BASE_URL.isSet, false);
     assert.equal(byKey.ANS_PI_BASE_URL.value, "");
+    // 反向守卫：`.env` 里**有** ANS_PI_PROVIDER（下面夹具就写了它），但它**不出现在面板字段里**——
+    // 面板不再暴露 provider（内部标签、有默认值）。
+    assert.equal(byKey.ANS_PI_PROVIDER, undefined, "provider 不出现在面板字段里（即便 .env 有它）");
     // 哨兵 token 绝不出现在序列化后的整个视图里。
     assert.ok(!JSON.stringify(view).includes(SENTINEL_TOKEN), "token 绝不出现在面板视图里");
-    // 缺项判定只给键名。
-    assert.deepEqual(missingPiKeys(view).sort(), ["ANS_PI_BASE_URL", "ANS_PI_CONTEXT_WINDOW"].sort());
+    // 缺项判定只给**必填**键名：token/model 已设，端点未设 → 仅 ANS_PI_BASE_URL；
+    // 可选的 ANS_PI_CONTEXT_WINDOW 缺失**不**计入（留空 = 保守默认，不算配置不全）。
+    assert.deepEqual(missingPiKeys(view).sort(), ["ANS_PI_BASE_URL"]);
   } finally {
     t.cleanup();
   }
@@ -181,6 +193,29 @@ test("保存：缺键追加到末尾（含机密键），且面板键过滤掉�
     // 重载后 env 带新值（机密键亦进 env）。
     assert.equal(env.ANS_PI_BASE_URL, "https://b.test");
     assert.equal(env.ANTHROPIC_AUTH_TOKEN, SENTINEL_TOKEN);
+  } finally {
+    t.cleanup();
+  }
+});
+
+test("保存：ANS_PI_PROVIDER 不再被写——即便提交它也被过滤；已存在的那行原样保留（只改相关键）", async () => {
+  // 客户 2026-10-11：provider 从面板移除。保存只改面板键；provider 已不在面板键集合里。
+  const original = ["ANS_PI_MODEL=m", "ANS_PI_PROVIDER=ans-gateway", ""].join("\n");
+  const t = makeTempEnv(original);
+  try {
+    const env: Record<string, string | undefined> = {};
+    const res = await savePiConfig({
+      envPath: t.envPath,
+      // 混入 provider（旧面板键）——必须被过滤，绝不改动/重写它。
+      updates: { ANS_PI_MODEL: "changed", ANS_PI_PROVIDER: "should-not-write" },
+      env,
+    });
+    assert.equal(res.ok, true);
+    assert.deepEqual(res.appliedKeys, ["ANS_PI_MODEL"], "provider 不在面板键 → 被过滤，不计入 applied");
+    const after = fs.readFileSync(t.envPath, "utf8");
+    assert.ok(after.includes("ANS_PI_PROVIDER=ans-gateway"), "已存在的 provider 行原样保留（未被动过）");
+    assert.ok(!after.includes("should-not-write"), "提交的 provider 值绝不写入 .env");
+    assert.ok(after.includes("ANS_PI_MODEL=changed"));
   } finally {
     t.cleanup();
   }

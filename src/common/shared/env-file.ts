@@ -335,7 +335,7 @@ export function mergeEnvText(original: string, updates: EnvMap): string {
  *
  * **实现**：委托**跨角色共享**原语 `atomicWrite`（`src/common/shared/atomic-write.ts`，**单一来源**）——
  * 该原语除同目录 temp+`fsync`+`rename` 外，还对 rename 的 **Windows 瞬时 `EPERM`** 做**有界重试**
- * （仅瞬时码、≤20 次、次数间只 `setImmediate` 让出事件循环）。本函数仅保留 TEXT 语义（UTF-8）的薄封装，
+ * （仅瞬时码、有上界 `RENAME_MAX_ATTEMPTS`、次数间只 `setImmediate` 让出事件循环）。本函数仅保留 TEXT 语义（UTF-8）的薄封装，
  * **签名与行为不变**（T28 消费方只读导入此名）。
  */
 export async function atomicWriteText(filePath: string, text: string): Promise<void> {

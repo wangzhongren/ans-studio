@@ -1,5 +1,49 @@
 # 桌面应用 变更记录
 
+## 2026-10-11 — Pi 面板瘦身：5 项 → 3 项必填 + 1 项「高级」（客户：「这个 pi 为啥需要配置 5 个呢」——其实不是 5 个）
+
+**来源**：**客户提问**「这个 pi 为啥需要配置 5 个呢」——结论：**其实不是 5 个，真正必须你填的是 3 个**。据此把面板从 5 项改为 **3 项必填 + 1 项可选（收进「高级」）**。**属本角色边界内**（`app/`、`test/桌面应用/`、`角色卡/桌面应用/`）。
+
+### 1) 面板项（`app/renderer/index.html` + `renderer.js` + `styles.css`）
+
+| 项 | 处理 |
+|---|---|
+| `ANS_PI_BASE_URL`（端点） | **保留，必填**——被红线逼出：拒绝回落任何默认端点，故必须显式给。 |
+| `ANS_PI_MODEL`（模型） | **保留，必填**。 |
+| `ANTHROPIC_AUTH_TOKEN`（token） | **保留，必填，掩码**（`type=password`、值不回显、只示「已设置/未设置」）。 |
+| `ANS_PI_PROVIDER` | **从面板去掉**——代码里**有默认值**（`ans-gateway`）、是**内部标签**、**不是用户该做的决定**；底层仍支持该环境变量，只是不再占输入框。 |
+| `ANS_PI_CONTEXT_WINDOW` | **收进「高级」（可折叠）且可留空**——Pi适配器并行改（见下），从「必填」改「可选 + 保守默认」，缺失不再硬失败。 |
+
+- **「高级」那一行说明**（`index.html`，一句话）：**「留空 = 用默认值（偏保守：压缩会提前触发，不会炸会话）；知道确切值就填。」** 落点 `<details class="pi-advanced">`（默认**收起**；`styles.css` 加 `.pi-advanced` 系列——沿用既有令牌、浅色近单色、只有一枚旋转 chevron）。
+- **视觉方向不变**（浅色、近单色、极简；圆角只给交互元素）。
+
+### 2) 键集合跟着收（`app/desktop/pi-config.ts`）
+
+- `PI_PANEL_KEYS`：**5 → 4**（`ANTHROPIC_AUTH_TOKEN` / `ANS_PI_BASE_URL` / `ANS_PI_MODEL` / `ANS_PI_CONTEXT_WINDOW`）——`getPiConfig` / `savePiConfig` 的**可写键集合随之收**，`ANS_PI_PROVIDER` **不再被写**。
+- **新增 `PI_REQUIRED_KEYS`**（3 项必填）；`missingPiKeys` 改为**只数必填**——上下文窗口可选，缺失**不算**「配置不全」。`renderer.js` 同步引入 `PI_REQUIRED_KEYS`，`renderPiConfigWarning` **只按必填告警**（避免把可选缺失误报成「会被拒」）。
+- **`.env` 里已有的 `ANS_PI_PROVIDER` 那一行未被动**——保存只改面板键、逐行替换命中键，其余**逐字节保留**（写纪律一字未动）；掩码/不预填/原子写/只改相关键**全保持不变**。
+
+### 3) 与 Pi适配器新语义对齐（`src/common/pi-adapter/provider-config.ts`——**只读，未动**）
+
+Pi适配器**并行**已把 `contextWindow` 从「必填、缺失硬失败」改为**可选 + 保守默认**（`DEFAULT_PI_CONTEXT_WINDOW = 32768`，缺失回落默认、只有**非法值**才抛错）。本面板的「留空 = 不下发该键」正是**喂给它**的路径：留空 → `.env` 无该键 → 适配器回落保守默认（阈值 32768−16384=16384，压缩会提前触发，**不会炸会话**）。**两侧语义逐点一致**，本角色**未**越界改适配器、也**未**把 `contextWindow` 改回必填。
+
+### 4) 守卫（证明「`provider` 不在面板里」）
+
+- **单测** `test/桌面应用/pi-config.test.ts`：面板键断言改 **3+1**；**反向断言** `!PI_PANEL_KEYS.includes("ANS_PI_PROVIDER")`；`getPiConfig` 视图**不含** `ANS_PI_PROVIDER` 字段（即便 `.env` 有它）；新增「保存时提交 `ANS_PI_PROVIDER` 也被过滤、**已存在的那行原样保留**」用例。
+- **渲染侧不变式** `test/桌面应用/renderer.test.ts`：`index.html` **无** `#pi-inp-ANS_PI_PROVIDER`、无 `>ANS_PI_PROVIDER<` 标签；`renderer.js` 键集合**不含** `"ANS_PI_PROVIDER"`、**含** `ANS_PI_CONTEXT_WINDOW` 与 `PI_REQUIRED_KEYS`；`styles.css` 含 `.pi-advanced`；`index.html` 的上下文窗口字段**在 `.pi-advanced` 容器内**且含那一行说明。
+- **e2e** `test/桌面应用/e2e/main.mjs`：新增 DOM 守卫 `PI_KEYS_ARE_FOUR` / `PI_NO_PROVIDER_FIELD` / `PI_ADVANCED_PRESENT` / `PI_ADVANCED_COLLAPSED_BY_DEFAULT` / `PI_CONTEXT_WINDOW_IN_ADVANCED` / `PI_ADVANCED_HINT_LEAVE_BLANK` / `PI_TEMP_ENV_NO_PROVIDER` / `PI_TEMP_ENV_OMITS_EMPTY_CONTEXT_WINDOW`。
+
+### 测试与验证（本角色独立执行）
+
+- **单测** `node --test test/桌面应用/*.test.ts` → **95 pass / 0 fail**。
+- **`npm run typecheck`**（`tsc --noEmit`）→ **全仓零错误**。
+- **全量** `node --test "test/**/*.test.ts"` → **673 pass / 2 fail**（跑测期间 Pi适配器**并发**更新了其 `provider-config.test.ts`，其先前的 2 条「缺失即抛错」旧语义红已随之转绿；总数波动属多角色并发）——**2 红全在本角色边界外，均未越界改、如实回报**：
+  - `test/测试/t29-pi-config-roundtrip.test.ts:75`（**测试角色**：把「`loadPiEnv` 结果 == `PI_PANEL_KEYS`」当断言——provider 已不在面板键，需去掉该耦合）。
+  - `test/测试/t29-write-discipline.test.ts:157`（**测试角色**：写入纪律用例把 `ANS_PI_PROVIDER` 当**可写面板键**——它已不在面板键集合，需去掉该用例项）。
+  - **两条皆本改动的跨角色后果**（provider 不再可写），需测试角色更新其 T29；**本角色未越界改**。
+- **旁注（本角色边界外、未改、如实回报）**：`README.md`（第 79–83 行）与 `角色卡/项目管理/docs/design/2026-10-11_design_v1-full-implementation.md`（第 715 行）仍把 `ANS_PI_PROVIDER` 列为**面板键**、并把 `ANS_PI_CONTEXT_WINDOW` 描述为「**必填，无默认值**」——二者**现在都过时**（provider 已移出面板；上下文窗口已改为可选 + 保守默认）。属他角色/根文档，需协调方同步。
+- **e2e**（真实 Electron 44.7.0，`ANS_E2E_OUTDIR`=Windows 临时目录）退出码 0、`E2E_DONE=1`，**新增守卫全真**、**既有检查点全过**、截图确认面板 3 框 + 收起「高级」（`09-pi-panel.png`）、保存后 token 仍掩码且不回显（`10-pi-saved.png`）、**无残留 Electron**；真实 `.env` 指纹（size=488 / mtime=1791706923 / SHA-256 `75aee37f…39655`）**逐字节不变**。
+
 ## 2026-10-11 — T38：接上 bootstrap 收口的确认面（客户裁定：su 提议 → 客户确认 → 完成）
 
 **来源**：设计 §13/§13.4（**完成方式重定**——客户 2026-10-11：「完成 bootstrap 应该是 **su 主动觉得差不多了来完成**；后面 su 可以动态增加和修改」+「当然需要客户确认了」）+ 派发清单 **T38**。**依赖已验证**：编排 **T37** 已把 `finalize()` 从「**调用即完成**」改为「**提议收口 → 挂起等客户确认 → 恰好 `allow` 才落盘**」（经注入的 `operatorChannel`；通道缺省/不可用/超时〔默认 120s〕/拒绝 → **不完成**）。**属本角色边界内**（`app/`、`test/桌面应用/`、`角色卡/桌面应用/`）。

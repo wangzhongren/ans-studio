@@ -40,15 +40,22 @@ import {
 } from "../../src/common/shared/env-file.ts";
 
 /**
- * 面板纳入的键（设计 §11.2）——机密 `ANTHROPIC_AUTH_TOKEN`（掩码）+ 非机密
- * `ANS_PI_BASE_URL` / `ANS_PI_MODEL` / `ANS_PI_PROVIDER` / `ANS_PI_CONTEXT_WINDOW`（客户起点正是
- * `ANS_PI_CONTEXT_WINDOW` 要手查手填）。**只允许写这些键**（写纪律：只改相关键；不越界写任意键）。
+ * 面板纳入的键（设计 §11.2）——**3 项必填 + 1 项可选（「高级」）**：
+ *  · 必填：`ANTHROPIC_AUTH_TOKEN`（**机密，掩码**）、`ANS_PI_BASE_URL`（**必需**——拒绝回落任何默认端点，
+ *    故必须显式给）、`ANS_PI_MODEL`；
+ *  · 可选（收进「高级」、**可留空**）：`ANS_PI_CONTEXT_WINDOW`（客户起点正是它要手查手填；Pi适配器已改为
+ *    **可选 + 保守默认**，留空 = 不下发该键，缺失不再硬失败）。
+ *
+ * **`ANS_PI_PROVIDER` 不在面板里**（客户 2026-10-11 裁定）：它在代码里**有默认值**（`ans-gateway`）、是
+ * **内部标签**，不是用户该做的决定。底层仍支持该环境变量（`resolvePiProviderConfig` 照读），**只是不再占
+ * 一个输入框**——故它**不在**下面这组里，保存时也**不写**它（已在 `.env` 里的那一行原样保留，见写纪律）。
+ *
+ * **只允许写这些键**（写纪律：只改相关键；不越界写任意键）。
  */
 export const PI_PANEL_KEYS: readonly string[] = [
   "ANTHROPIC_AUTH_TOKEN",
   "ANS_PI_BASE_URL",
   "ANS_PI_MODEL",
-  "ANS_PI_PROVIDER",
   "ANS_PI_CONTEXT_WINDOW",
 ];
 
@@ -182,7 +189,21 @@ export async function loadPiEnv(
   return loadEnvFileInto(env, envPath);
 }
 
-/** 面板所有键里「未设置」的键名（供界面「选 pi 但配置不全 → 明确告警」用；**不含任何值**）。 */
+/**
+ * 面板里的**必填键**（3 项）——端点 / 模型 / token。缺失任一 → 选 pi 开会话会被拒（fail-closed）。
+ * `ANS_PI_CONTEXT_WINDOW` **不在**此列（它是「高级」里的**可选**项：留空 = Pi适配器用保守默认，不下发该键，
+ * 不会硬失败），故它缺失**不算**「配置不全」。
+ */
+export const PI_REQUIRED_KEYS: readonly string[] = [
+  "ANTHROPIC_AUTH_TOKEN",
+  "ANS_PI_BASE_URL",
+  "ANS_PI_MODEL",
+];
+
+/**
+ * 面板里**必填键**中「未设置」的键名（供界面「选 pi 但配置不全 → 会被拒」告警用；**不含任何值**）。
+ * 只数必填键——可选的 `ANS_PI_CONTEXT_WINDOW` 缺失**不**在此列（留空是合法的默认路径）。
+ */
 export function missingPiKeys(view: PiConfigView): string[] {
-  return view.fields.filter((f) => !f.isSet).map((f) => f.key);
+  return view.fields.filter((f) => PI_REQUIRED_KEYS.includes(f.key) && !f.isSet).map((f) => f.key);
 }

@@ -95,6 +95,8 @@
             <button id="pi-close" class="btn btn-ghost btn-mini" type="button">收起</button>
           </div>
           <p class="pi-panel-hint">保存写入<strong>仓库根 .env</strong>（已 gitignore、不入库）。只修改下面的键，文件其余内容原样保留；保存后下一会话即用新值。</p>
+          <!-- 面板字段：**3 项必填**（端点 / 模型 / token）。`ANS_PI_PROVIDER` 已按客户裁定从面板移除——
+               它在代码里有默认值（ans-gateway）、是内部标签，不是用户该做的决定；`.env` 里已有的那行原样保留。 -->
           <div class="pi-fields">
             <label class="pi-field" for="pi-inp-ANTHROPIC_AUTH_TOKEN">
               <span class="pi-field-label">ANTHROPIC_AUTH_TOKEN <span class="pi-secret-tag">机密</span></span>
@@ -111,15 +113,22 @@
               <span class="pi-field-label">ANS_PI_MODEL</span>
               <input id="pi-inp-ANS_PI_MODEL" class="pi-input" type="text" autocomplete="off" spellcheck="false" />
             </label>
-            <label class="pi-field" for="pi-inp-ANS_PI_PROVIDER">
-              <span class="pi-field-label">ANS_PI_PROVIDER</span>
-              <input id="pi-inp-ANS_PI_PROVIDER" class="pi-input" type="text" autocomplete="off" spellcheck="false" />
-            </label>
-            <label class="pi-field" for="pi-inp-ANS_PI_CONTEXT_WINDOW">
-              <span class="pi-field-label">ANS_PI_CONTEXT_WINDOW</span>
-              <input id="pi-inp-ANS_PI_CONTEXT_WINDOW" class="pi-input" type="text" autocomplete="off" spellcheck="false" />
-            </label>
           </div>
+          <!-- 「高级」（可折叠）：收起，别啰嗦。`ANS_PI_CONTEXT_WINDOW` **可留空**——留空即不下发该键，
+               Pi适配器用**保守默认**（压缩会提前触发，不会炸会话）；知道确切值就填。 -->
+          <details class="pi-advanced">
+            <summary class="pi-advanced-sum">
+              <svg class="pi-advanced-chev" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+              <span class="pi-advanced-label">高级</span>
+            </summary>
+            <div class="pi-advanced-body">
+              <p class="pi-advanced-hint">留空 = 用默认值（偏保守：压缩会提前触发，不会炸会话）；知道确切值就填。</p>
+              <label class="pi-field" for="pi-inp-ANS_PI_CONTEXT_WINDOW">
+                <span class="pi-field-label">ANS_PI_CONTEXT_WINDOW</span>
+                <input id="pi-inp-ANS_PI_CONTEXT_WINDOW" class="pi-input" type="text" autocomplete="off" spellcheck="false" />
+              </label>
+            </div>
+          </details>
           <div class="pi-actions">
             <button id="pi-save" class="btn btn-primary btn-mini" type="button">保存到 .env</button>
             <span id="pi-status" class="pi-status"></span>

@@ -1,5 +1,22 @@
 # 编排 变更记录
 
+## 2026-10-11 — 去镜像：`FinalizeStatus` / `FinalizeResult` / `FinalizeBootstrapFn` 收归冻结契约家（单一来源）
+
+**来源**：Pi适配器核查后派发，本角色**核实并执行**。此前三型由本角色定义在**私有** `src/common/编排/finalize.ts`，而 §4 冻结契约家 `src/provider/pi/session.ts`（Pi适配器 T36）**已逐字**声明同一份 ⇒ **一份契约、两处定义**——本项目一路在收敛的那类镜像（前两例为 operator 三型（T20→T21）、凭据常量 `atomicWrite`）。
+
+**`src/common/编排/finalize.ts`**
+- **删除**本地 `FinalizeStatus` / `FinalizeResult` / `FinalizeBootstrapFn` 三处定义；改为**从 `../../provider/pi/session.ts` 导入**（并入既有的 `OperatorChannelFn` / `OperatorPrompt` / `OperatorOutcome` import 块），并 `export type { FinalizeStatus, FinalizeResult, FinalizeBootstrapFn }` **再导出**以**维持本模块既有公开面（消费方零改动）**。
+- 模块内用法（`SessionFinalizer`、`createFinalizeProposer` 返回型、`precheck`/`mkResult` 的 `FinalizeStatus`）**逐字不变**——只改来源。`FinalizeInput`（编排私有**输入**形状，非契约）**保留**，不在契约家、不属本次收敛对象。
+
+**`src/pipeline/orchestration/{run-role,govern-session}.ts`**
+- `type FinalizeResult` 的导入源由 `../../common/编排/finalize.ts` **改指** `../../provider/pi/session.ts`（唯一来源）；从 finalize.ts 的 import 中删去该类型项。
+
+**为何「导入 + 再导出」而非只删**：同 T20→T21 先例——再导出**不产生第二份定义**（仍是单一来源），且令本模块公开面稳定、**不迫使任何消费方改导入**（桌面 `FinalizeResult` 本就自 `RoleSessionHandle["finalize"]` 派生，不受影响）。
+
+**形状逐字一致、零行为变化**：普通结构类型，`FinalizeBootstrapFn` 仍可注入 Pi适配器 `finalize_bootstrap` 工具（结构类型保证）；无任何运行期差异。**未发现形状/依赖对不上的地方**。
+
+**结果**：`test/编排/` **139/139**；`npm run typecheck` **零错误**；全量 `node --test "test/**/*.test.ts"`（带引号、走 Node glob）**677 通过 / 0 失败**（**未撞到**项目管理在查的 `test/项目管理/shared/atomic-write.test.ts` 并发 flake）。
+
 ## 2026-10-11 — 修 `test/编排/finalize.test.ts` 的时序 flake：等**确定性信号**（确认通道被调用），不再赌固定 20ms
 
 **来源**：Pi适配器在查另一处 flake 时**顺带如实回报**（**未动**本角色文件）——`test/编排/finalize.test.ts:158`「提议挂起」用例 `await tick()`（20ms）后即断言「确认通道已被调用」，是一个**独立于其根因**的时序 flake。落点在本角色边界内（`test/编排/finalize.test.ts`）。

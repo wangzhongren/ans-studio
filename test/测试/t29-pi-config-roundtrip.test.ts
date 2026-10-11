@@ -26,7 +26,7 @@ import {
   loadEnvFileInto,
   readEnvFile,
 } from "../../src/common/shared/env-file.ts";
-import { resolvePiProviderConfig } from "../../src/common/pi-adapter/provider-config.ts";
+import { resolvePiProviderConfig, DEFAULT_PI_CONTEXT_WINDOW } from "../../src/common/pi-adapter/provider-config.ts";
 import { createPiAdapterFactory } from "../../src/pipeline/orchestration/run-role.ts";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -72,7 +72,29 @@ test("T29 往返：临时 .env 载入后，进程 env 拿到正确值（含 toke
 
     // 回报结构：路径正确，applied 只需键名、**不含值**。
     assert.equal(res.path, t.envPath);
-    assert.deepEqual([...res.applied].sort(), [...PI_PANEL_KEYS].sort());
+    // applied = **文件里实际载入的全部键名**（含非面板键 `ANS_PI_PROVIDER`——它仍是被读取的环境变量，
+    // 只是自 2026-10-11 起**不再占面板输入框**，故**不能**再拿它去等 `PI_PANEL_KEYS`）。
+    assert.deepEqual(
+      [...res.applied].sort(),
+      [
+        "ANTHROPIC_AUTH_TOKEN",
+        "ANS_PI_BASE_URL",
+        "ANS_PI_CONTEXT_WINDOW",
+        "ANS_PI_MODEL",
+        "ANS_PI_PROVIDER",
+      ].sort(),
+    );
+    // 面板键集合（单一来源 = `pi-config.ts` 的 `PI_PANEL_KEYS`）：**3 必填 + 1 可选 = 4**。
+    assert.deepEqual(
+      [...PI_PANEL_KEYS].sort(),
+      ["ANTHROPIC_AUTH_TOKEN", "ANS_PI_BASE_URL", "ANS_PI_CONTEXT_WINDOW", "ANS_PI_MODEL"].sort(),
+    );
+    // 反向守卫：`ANS_PI_PROVIDER` **不在**面板键里（代码里有默认值 `ans-gateway`，是内部标签、非用户该填）。
+    // 用反向守卫（断言它**不在**）而非删行——防它悄悄长回面板。
+    assert.ok(
+      !PI_PANEL_KEYS.includes("ANS_PI_PROVIDER"),
+      "ANS_PI_PROVIDER 不应出现在面板键里（内部标识、有代码默认值）",
+    );
     assert.ok(!JSON.stringify(res).includes(SENTINEL_TOKEN), "LoadEnvResult 不得回显 token 值");
   } finally {
     t.cleanup();
@@ -99,6 +121,38 @@ test("T29 往返：载入后 resolvePiProviderConfig 成功构造（baseUrl/mode
     assert.equal(cfg.providerId, "ans-gateway");
     assert.equal(cfg.apiKeyEnvVar, "ANTHROPIC_AUTH_TOKEN");
     // 凭据只检查存在性，绝不回显——构造结果里没有 token 值。
+    assert.ok(!JSON.stringify(cfg).includes(SENTINEL_TOKEN), "构造结果不得含 token 值");
+  } finally {
+    t.cleanup();
+  }
+});
+
+// —————————————————————— 2b) 上下文窗口可选（新语义）：缺失 → 不硬失败，回落保守默认值 ——————————————
+//
+// 客户 2026-10-11 裁定：`ANS_PI_CONTEXT_WINDOW` 从「必填」改为**可选**（面板里收进「高级」、**可留空**）。
+// 留空 = **不下发该键**，Pi适配器回落**保守默认值**（不抛错，只在日志/事件流给可见提示）。
+// 用**反向守卫**：断言「缺失**不抛错**」且取到默认值——防「必填」旧语义长回来。
+
+test("T29 往返：ANS_PI_CONTEXT_WINDOW 缺失 → 不硬失败，采用保守默认值（新语义）", async () => {
+  // 刻意**不写** context window：模拟「高级项留空」。
+  const t = makeTempEnv(
+    [
+      `ANTHROPIC_AUTH_TOKEN="${SENTINEL_TOKEN}"`,
+      "ANS_PI_BASE_URL=https://gw.example.test/v1",
+      "ANS_PI_MODEL=test-model-42",
+      "",
+    ].join("\n"),
+  );
+  try {
+    const env: Record<string, string | undefined> = {};
+    await loadEnvFileInto(env, t.envPath);
+    assert.equal(env["ANS_PI_CONTEXT_WINDOW"], undefined, "本夹具刻意不含 context window");
+
+    // 缺失**不应抛错**（旧语义会硬失败）。
+    const cfg = resolvePiProviderConfig({}, env);
+    assert.equal(cfg.contextWindow, DEFAULT_PI_CONTEXT_WINDOW, "缺失应回落到保守默认值");
+    assert.equal(DEFAULT_PI_CONTEXT_WINDOW, 32768, "保守默认值应钉死为 32768（勿被悄悄改动）");
+    assert.equal(cfg.contextWindowSource, "default", "来源应如实标注为 default（供适配器给可见提示）");
     assert.ok(!JSON.stringify(cfg).includes(SENTINEL_TOKEN), "构造结果不得含 token 值");
   } finally {
     t.cleanup();

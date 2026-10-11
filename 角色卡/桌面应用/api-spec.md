@@ -86,11 +86,11 @@ npm run app            # = electron app/main.ts（Electron 44 自带 Node 24.21�
 **前提**：桌面 pi 路径此前不可达（`app` 脚本无 `--env-file` ⇒ 进程 `process.env` 无 `ANS_PI_*`/token；桌面亦无通道把配置交给适配器，设计裁定**不扩** `createPiAdapterFactory` 签名）。本面板补上该缺口。
 
 - **启动载入**：`app/main.ts` 在 `app.whenReady()` 里 `await loadEnvFileInto(process.env, resolveRepoEnvPath())`——**补 Electron 缺失的 `--env-file`**（只回报**键名**，绝不打印值）。此后 `resolvePiProviderConfig(opts, process.env)` **原样复用**（单一来源，无第二份读取逻辑）。
-- **面板键**（5 项）：`ANTHROPIC_AUTH_TOKEN`（**机密，掩码**）+ `ANS_PI_BASE_URL` / `ANS_PI_MODEL` / `ANS_PI_PROVIDER` / `ANS_PI_CONTEXT_WINDOW`。
+- **面板键**（**3 项必填 + 1 项「高级」可选**）：必填 `ANTHROPIC_AUTH_TOKEN`（**机密，掩码**）/ `ANS_PI_BASE_URL`（拒绝回落默认端点，故必须显式给）/ `ANS_PI_MODEL`；可选 `ANS_PI_CONTEXT_WINDOW`（收进**可折叠的「高级」**、**可留空**——留空 = 不下发该键，Pi适配器回落**保守默认** `DEFAULT_PI_CONTEXT_WINDOW=32768`，缺失不再硬失败）。**`ANS_PI_PROVIDER` 不在面板里**（客户 2026-10-11：它在代码里有默认值 `ans-gateway`、是内部标签、不是用户该做的决定；底层仍支持该环境变量，只是不再占输入框、`savePiConfig` 也不写它；`.env` 里**已有**的那行原样保留）。必填键集合 = `PI_REQUIRED_KEYS`（3 项）；`missingPiKeys`/界面告警**只数必填**。
 - **落点**：`app/desktop/pi-config.ts` 为**逻辑唯一落点**，只读导入 pm 属主的共享 `src/common/shared/env-file.ts`（`getPiConfig` 用 `readEnvFile`+`isSecretKey`；`savePiConfig` 用 `saveEnvFile`+`loadEnvFileInto`）——**未复制 `.env` 读写实现**。
 - **凭据纪律**：`getPiConfig` 对机密键**恒返空 `value`**、只给 `isSet`（值绝不外发到渲染进程）；保存/读取回报**只含键名**；错误文本由共享模块 redact、本模块再兜底。
 - **注入点**：`DesktopDeps.envFilePath`（默认仓库根 `.env`；**测试/e2e 必须传系统临时目录假路径**）、`DesktopDeps.piConfigEnv`（保存后重载目标，默认 `process.env`）。
-- **UI**：**「Pi 设置」按钮在**中栏横栏右侧（客户 2026-10-11 裁定去掉运行时选择器后，入口从输入区上移到横栏）+ 可收起面板 `#pi-panel`；token 字段 `type=password`、可显式「显示」；缺项时状态行明确告警。
+- **UI**：**「Pi 设置」按钮在**中栏横栏右侧（客户 2026-10-11 裁定去掉运行时选择器后，入口从输入区上移到横栏）+ 可收起面板 `#pi-panel`；token 字段 `type=password`、可显式「显示」；**3 项必填**字段 + 可折叠的「高级」（`<details class="pi-advanced">`，内含可选的 `ANS_PI_CONTEXT_WINDOW` 与一行说明「留空 = 用默认值（偏保守：压缩会提前触发，不会炸会话）；知道确切值就填」）；**必填缺项**时状态行明确告警（可选缺失不算缺）。
 
 ## 创世 finalize（「完成 bootstrap」，设计 §12.5 / T36）
 
@@ -109,7 +109,7 @@ npm run app            # = electron app/main.ts（Electron 44 自带 Node 24.21�
 - `app/desktop/session.ts`：`SessionManager`、`SessionOpenRequest`、`OpenResult`、`EffectiveConfigInfo`、`SendResult`、`StopResult`、`RuntimeKind`、**`BootstrapState`、`FinalizeResult`**（`FinalizeResult` 从编排公开句柄类型派生）。`SessionManager` 增 `bootstrapState()` / `finalizeBootstrap()`。
 - `app/desktop/chat-adapter.ts`：`createChatDemoAdapter`、`firstProjectFilePath`。
 - `app/desktop/project.ts`：`buildProjectConfig`、`readRoleDocsIndex`、`resolveSkillRoot`。
-- `app/desktop/pi-config.ts`：`PI_PANEL_KEYS`、`resolveRepoEnvPath`、`getPiConfig`、`savePiConfig`、`loadPiEnv`、`missingPiKeys`（及类型 `PiConfigView` / `PiConfigField` / `PiConfigSaveResult`）——**只读导入**共享 `env-file`，**无第二份 `.env` 实现**。
+- `app/desktop/pi-config.ts`：`PI_PANEL_KEYS`（4 键：3 必填 + 1 可选）、`PI_REQUIRED_KEYS`（3 必填）、`resolveRepoEnvPath`、`getPiConfig`、`savePiConfig`、`loadPiEnv`、`missingPiKeys`（只数必填）（及类型 `PiConfigView` / `PiConfigField` / `PiConfigSaveResult`）——**只读导入**共享 `env-file`，**无第二份 `.env` 实现**。
 - `app/desktop/interface.ts` 的 `DesktopInterface` 增 `getPiConfig()` / `savePiConfig({updates})`；`DesktopDeps` 增 `envFilePath?` / `piConfigEnv?`。
 - `app/desktop/interface.ts` 的 `DesktopInterface` 增 **`getBootstrapState()` / `finalizeBootstrap()`**（T36，创世 finalize 入口）；`DesktopDeps.openRoleSessionFn` 入参增可选 `genesisFinalize?`。
 

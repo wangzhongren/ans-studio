@@ -31,7 +31,12 @@ import type { WriteGate, RoleSession, RuntimeAdapter, SessionEvent, ShellGate, F
 import { buildGovernedTools, SHELL_TOOL_NAME, shellKillSwitch } from "../../provider/pi/tools.ts";
 import { formatDenialMessage } from "./format-denial.ts";
 import { createEventQueue } from "./event-queue.ts";
-import { resolvePiProviderConfig, type PiProviderConfig, type PiProviderConfigInput } from "./provider-config.ts";
+import {
+  resolvePiProviderConfig,
+  renderContextWindowNotice,
+  type PiProviderConfig,
+  type PiProviderConfigInput,
+} from "./provider-config.ts";
 import { ANS_SETTINGS_OVERRIDES } from "./settings.ts";
 import { createStageLogger, type StageLogger } from "./logger.ts";
 import {
@@ -82,10 +87,11 @@ export async function buildExplicitRuntime(
 
   // 改写模型的 id / baseUrl / provider / contextWindow，指向客户代理。
   //
-  // contextWindow **必须**改写：模板是 claude 的 1,000,000，与网关上的真实模型无关。
-  // 沿用模板值则 pi 的自动压缩阈值（contextWindow - reserveTokens）永远够不着，会话会先吃到
-  // 服务端的超长报错，而不是优雅压缩。cfg.contextWindow 现为**必需字段**
-  // （provider-config.ts 缺失即 fail-closed），故此处无条件覆盖，不再有 "template" 回落。
+  // contextWindow **必须**落到我们解析出的具体值：模板是 claude 的 1,000,000，与网关上的真实模型无关。
+  // 沿用模板值则 pi 的自动压缩阈值（contextWindow - reserveTokens）永远够不着，会话会先吃到服务端的
+  // 超长报错，而不是优雅压缩。cfg.contextWindow 恒为**具体数**——显式值 / 环境变量 / 保守默认
+  // DEFAULT_PI_CONTEXT_WINDOW 三者之一（provider-config.ts 解析；缺失回落到保守默认，不再硬失败），
+  // 故此处**无条件**覆盖，没有 "template" 回落。
   const model = {
     ...templateModel,
     id: cfg.modelId,
@@ -125,10 +131,10 @@ export async function buildExplicitRuntime(
     throw new Error("安全护栏：baseUrl 指向 api.anthropic.com，已中止以避免把凭据发往默认端点。");
   }
 
-  // —— 安全护栏：配置的 contextWindow 必须确实落到运行时模型上 ——
+  // —— 安全护栏：解析出的 contextWindow（含保守默认）必须确实落到运行时模型，不得回落到模板的 1,000,000 ——
   if (selected.contextWindow !== cfg.contextWindow) {
     throw new Error(
-      `安全护栏：配置的 contextWindow（${cfg.contextWindow}）未落到运行时模型（${String(selected.contextWindow)}），已中止。`,
+      `安全护栏：解析出的 contextWindow（${cfg.contextWindow}）未落到运行时模型（${String(selected.contextWindow)}），已中止。`,
     );
   }
 
@@ -434,6 +440,10 @@ export function createRealPiRuntimeAdapter(opts: RealPiAdapterOptions): RuntimeA
       const cfg = opts.config ?? resolvePiProviderConfig(opts, process.env);
       log.trace(`构造单步时限=${constructMs}ms，prompt 时限=${promptMs}ms`);
 
+      // 上下文窗口缺失时**不再硬失败**：采用保守默认值，并给出**可见**提示（日志 + 事件流，见下）。
+      const contextWindowNotice = renderContextWindowNotice(cfg.contextWindowSource, cfg.contextWindow);
+      if (contextWindowNotice !== undefined) log.stage(contextWindowNotice);
+
       // 分段进度：加载 Pi 包。
       log.stage("加载 Pi 包…");
       const { createAgentSession, DefaultResourceLoader, SessionManager, SettingsManager } = await withTimeout(
@@ -450,7 +460,7 @@ export function createRealPiRuntimeAdapter(opts: RealPiAdapterOptions): RuntimeA
         "构造显式 provider",
       );
       log.trace(`provider=${cfg.providerId} model=${cfg.modelId} baseUrl=${cfg.baseUrl}`);
-      log.trace(`contextWindow=${String(model.contextWindow)}（必需项，来自 ANS_PI_CONTEXT_WINDOW）`);
+      log.trace(`contextWindow=${String(model.contextWindow)}（来源：${cfg.contextWindowSource}）`);
 
       // 环境封闭：固定的 in-memory settings manager，绝不读 ~/.pi/agent/ 或 <项目>/.pi/ 的设置文件。
       // 不传则 SDK 会回落 SettingsManager.create（sdk.js:76 / resource-loader.js:243）。见 settings.ts。
@@ -458,6 +468,8 @@ export function createRealPiRuntimeAdapter(opts: RealPiAdapterOptions): RuntimeA
 
       const queue = createEventQueue<SessionEvent>();
       const emit = (event: SessionEvent): void => queue.push(event);
+      // 缺失上下文窗口的可见提示也进入事件流，确保界面/用户看得到（不只留在日志里）。
+      if (contextWindowNotice !== undefined) emit({ kind: "message", summary: contextWindowNotice });
 
       // shell 能力是否 arm：注入 ShellGate 即 arm。它同时决定 run_shell 是否注册（§7.5.1）
       // 与扩展层 kill-switch 的判据（§7.5.4）——不再是「token 兜底」。

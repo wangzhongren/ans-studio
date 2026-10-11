@@ -1,5 +1,66 @@
 # 装配 变更记录
 
+## 2026-10-11 — 改准 README「两道门」用例数（621 → 677），并全核数字类陈述
+
+上一轮同步 README「Pi 配置」节时，本角色**如实报出**一处不在当时范围内的过时：`README.md:71`
+的「**621 用例、621 通过**」与实际不符。本任务处理它，并连同**同类过时数字 / 事实陈述**一并核。
+
+- **实测（以实测为准，不照抄简报给的 677）**：`node --test "test/**/*.test.ts"`（**必须带引号**，
+  走 Node 原生 glob、覆盖三层测试路径）→ **677 tests / 677 pass / 0 fail**。**连跑 3 次，三次皆
+  677/677/0、稳定**——**未撞到**项目管理正在查的并发 flake（`test/项目管理/shared/atomic-write.test.ts`，
+  仅全量并发下偶发挂），**观测到的波动 = 0**；未动该文件。
+- **改动（唯一一处）**：`README.md:71` 注释 `全量测试：621 用例、621 通过` → **`677 用例、677 通过`**。
+- **数字类全核（实读比对，逐条列结论）**：
+  - `README:137` **全项目 7 个角色** —— 实测 `角色卡/` 下 **7** 个目录（项目管理/编排/门禁引擎/Pi适配器/
+    桌面应用/测试/装配），与正文表 7 行**一致**。**准**，未动。
+  - `README:35` **Node ≥ 23.6（本机 v24.11.1）** —— 实测 `node --version` = **v24.11.1**、`package.json`
+    `engines.node` = **`>=23.6`**。**准**，未动。
+  - `README:79` **3 项必填 + 1 项可选** —— 实读 `app/desktop/pi-config.ts`：`PI_PANEL_KEYS` = **4**、
+    `PI_REQUIRED_KEYS` = **3**（可选者为 `ANS_PI_CONTEXT_WINDOW`）。**准**，未动。
+  - `README:84-85` **默认 32768、reserveTokens 16384** —— 实读 `src/common/pi-adapter/provider-config.ts`：
+    `DEFAULT_PI_CONTEXT_WINDOW = 32768`；`settings.ts` `reserveTokens = 16384`。**准**，未动。
+  - `README:37` 依赖 `yaml` / `@earendil-works/pi-coding-agent`（桌面 devDependency `electron`）——
+    实读 `package.json` dependencies/devDependencies。**准**，未动。
+  - **未发现**其他过时数字或事实陈述（无「角色数 / 命令 / 路径 / 能力有无」类过时）。
+- **未改**：`README` 除第 71 行外一字未动；未碰任何他角色文件；未读 `.env`、未发真实网络请求、未打印凭据值。
+- **验证（两道门，改后复跑）**：`node --test "test/**/*.test.ts"` → **677 / 677 / 0**；
+  `npm run typecheck` → **0 错**。来源：派发任务「处理上一轮报出的 README 过时用例数」。
+
+## 2026-10-11 — 同步 README「Pi 配置」节 + `.env.example` 到桌面面板新语义（5→4：3 必填 + 1 可选）
+
+客户问「这个 pi 为啥需要配置 5 个呢」→ 桌面应用据此改了「Pi 设置」面板（属**桌面角色**：`app/`、`test/桌面应用/`），
+`README.md` 的「Pi 配置」节随之**过时**（仍把 `ANS_PI_PROVIDER` 列为面板键、把 `ANS_PI_CONTEXT_WINDOW` 写成
+「必填、无默认值」）。本角色据**代码核实**同步 README 该节与对应的 `.env.example`（均在装配边界内）。
+**不照抄简报——凡核实后不符者如实纠正。**
+
+- **核实（实读，只读）**：
+  - `app/desktop/pi-config.ts`：`PI_PANEL_KEYS` = **4 键**（`ANTHROPIC_AUTH_TOKEN` / `ANS_PI_BASE_URL` /
+    `ANS_PI_MODEL` / `ANS_PI_CONTEXT_WINDOW`）；`PI_REQUIRED_KEYS` = **3 键**（token / base URL / model）。
+    `ANS_PI_PROVIDER` **不在**面板键集合、保存时**不写**它。
+  - `src/common/pi-adapter/provider-config.ts`：`DEFAULT_PI_CONTEXT_WINDOW = 32768`；`contextWindow` **可选**
+    （优先级：显式 > 环境变量 > 保守默认），缺失**不硬失败**、回落 32768，`renderContextWindowNotice` 产出可见提示；
+    非法值（0 / 负 / 非数）**仍明确失败**。`ANS_PI_PROVIDER` **仍被读取**（`resolvePiProviderConfig`，缺省 `ans-gateway`）。
+- **README「Pi 配置」节改后要点**：**3 项必填 + 1 项可选（收在「高级」）**——必填 = `ANTHROPIC_AUTH_TOKEN`（掩码）/
+  `ANS_PI_BASE_URL`（拒回落默认端点）/ `ANS_PI_MODEL`；可选 = `ANS_PI_CONTEXT_WINDOW`（**可留空**，留空 = 不下发该键、
+  Pi适配器回落**保守默认 `32768`**，缺失不硬失败、只在日志与事件流提示，填了就覆盖）；**`ANS_PI_PROVIDER` 不进面板**
+  （代码有默认 `ans-gateway`、是**内部标签**；底层仍支持该环境变量，`.env` 里已有那行原样保留）。附一句默认值理由
+  （须**严格大于** `reserveTokens` 16384，否则压缩阈值 ≤ 0 而退化；宁可偏小不可偏大）。「从哪填」段补一句：
+  `ANS_PI_CONTEXT_WINDOW` 收在可折叠「高级」、可留空。
+- **`.env.example`（本角色边界）同步**：Pi provider 段标题由泛指的「无默认值；缺失即明确失败」收窄为**端点/模型**的性质；
+  `ANS_PI_CONTEXT_WINDOW` 注释由「**必填，无默认值**」改为「**可选**：留空 = 保守默认 32768、缺失不硬失败」；
+  `ANS_PI_PROVIDER` 注明是**内部标签、不在面板**、底层仍支持该环境变量。
+- **别处描述 Pi 配置/面板的核对**：
+  - `README.md` 第 56 行「**Pi 设置**：右上「Pi 设置」面板填 Pi 配置并保存到 `.env`」——**仍准确**，未动。
+  - `角色卡/项目管理/docs/design/2026-10-11_design_v1-full-implementation.md` 第 715 行**仍把 `ANS_PI_PROVIDER`
+    列为面板键**——**非本角色边界（pm 属主），未动、如实回报**，需 pm 同步（桌面角色 changelog 亦有同条旁注）。
+  - 本角色 `角色卡/装配/{memo,changelog}.md` 里的历史 Pi 记录属**既往事实**，不回改。
+- **测试同步**：`test/装配/` **无**断言 README / `.env.example` 内容的用例（grep 确认：仅读边界 YAML 与自建临时文件），**无需同步**。
+- **验证（两道门）**：`npm run typecheck` → **0 错**；`node --test "test/**/*.test.ts"`（**带引号**）→ **675 tests /
+  673 pass / 2 fail**；**本角色 `test/装配/` 49 pass / 0 fail**。2 红在 `test/测试/t29-pi-config-roundtrip.test.ts:75`
+  与 `test/测试/t29-write-discipline.test.ts:151`（**测试角色**：因桌面把 `ANS_PI_PROVIDER` 移出 `PI_PANEL_KEYS` 而失效的旧断言，
+  已排该角色修复）——**落我边界之外、未动、如实回报**。**未读 `.env`、未发真实网络请求、未打印任何凭据值**。
+  来源：客户提问 + 协调方定位。
+
 ## 2026-10-11 — T42：如实登记「V1 shell 闸未接线」（两个入口；只加说明与注释，零行为改动）
 
 派发任务 T42。背景：shell 闸三层链——**(c) 确定性硬地板 → (b) pm 审读 → (a) 客户确认**——**已实现、已测试、

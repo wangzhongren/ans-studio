@@ -474,10 +474,17 @@ async function run() {
   await wc().executeJavaScript("window.__ansRenderer.openPiPanel()");
   await sleep(400);
   const panel = await wc().executeJavaScript(
-    "(() => { const p=document.getElementById('pi-panel'); const keys=window.__ansRenderer.piKeys; return { open: !!(p && !p.hidden), fieldCount: keys.filter(k=>!!document.getElementById('pi-inp-'+k)).length, tokenType: (document.getElementById('pi-inp-ANTHROPIC_AUTH_TOKEN')||{}).type, hasSaveBtn: !!document.getElementById('pi-save') }; })()",
+    "(() => { const p=document.getElementById('pi-panel'); const keys=window.__ansRenderer.piKeys; const adv=document.querySelector('#pi-panel .pi-advanced'); const cw=document.getElementById('pi-inp-ANS_PI_CONTEXT_WINDOW'); return { open: !!(p && !p.hidden), fieldCount: keys.filter(k=>!!document.getElementById('pi-inp-'+k)).length, keyCount: keys.length, hasProvider: !!document.getElementById('pi-inp-ANS_PI_PROVIDER'), tokenType: (document.getElementById('pi-inp-ANTHROPIC_AUTH_TOKEN')||{}).type, hasSaveBtn: !!document.getElementById('pi-save'), adv: !!adv, advOpen: !!(adv && adv.open), cwInAdv: !!(adv && cw && adv.contains(cw)), hint: (document.querySelector('#pi-panel .pi-advanced-hint')||{}).textContent||'' }; })()",
   );
   log("PI_PANEL_OPEN=" + panel.open);
   log("PI_FIELD_COUNT=" + panel.fieldCount);
+  // 客户 2026-10-11：面板 3 项必填 + 1 项可选（共 4 键），provider 不再占输入框。
+  log("PI_KEYS_ARE_FOUR=" + (panel.keyCount === 4));
+  log("PI_NO_PROVIDER_FIELD=" + (!panel.hasProvider));
+  log("PI_ADVANCED_PRESENT=" + panel.adv);
+  log("PI_ADVANCED_COLLAPSED_BY_DEFAULT=" + (panel.adv === true && panel.advOpen === false));
+  log("PI_CONTEXT_WINDOW_IN_ADVANCED=" + panel.cwInAdv);
+  log("PI_ADVANCED_HINT_LEAVE_BLANK=" + panel.hint.includes("留空 = 用默认值"));
   log("PI_TOKEN_MASKED=" + (panel.tokenType === "password"));
   log("PI_HAS_SAVE_BTN=" + panel.hasSaveBtn);
   const piPathShown = await wc().executeJavaScript("document.getElementById('pi-panel-path').textContent");
@@ -496,6 +503,9 @@ async function run() {
   log("PI_TEMP_ENV_WRITTEN=" + tmpEnvText.includes("ANS_PI_MODEL=e2e-model"));
   log("PI_TEMP_ENV_HAS_BASE_URL=" + tmpEnvText.includes("ANS_PI_BASE_URL=https://e2e.test/v1"));
   log("PI_TEMP_ENV_HAS_TOKEN=" + tmpEnvText.includes("E2E-TOKEN-SENTINEL"));
+  // provider 不在面板键 → 绝不写入；上下文窗口留空（原本未设）→ 不下发该键（跳过，不凭空造空键）。
+  log("PI_TEMP_ENV_NO_PROVIDER=" + (!tmpEnvText.includes("ANS_PI_PROVIDER")));
+  log("PI_TEMP_ENV_OMITS_EMPTY_CONTEXT_WINDOW=" + (!tmpEnvText.includes("ANS_PI_CONTEXT_WINDOW")));
   const afterSave = await wc().executeJavaScript(
     "(() => { const t=document.getElementById('pi-inp-ANTHROPIC_AUTH_TOKEN'); return { type: t.type, value: t.value, placeholder: t.placeholder }; })()",
   );

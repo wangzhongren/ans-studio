@@ -1,5 +1,33 @@
 # 测试 变更记录
 
+## 2026-10-11 — 按新语义改 Pi 面板断言：面板键 5→4（3 必填 + 1 可选）、`ANS_PI_PROVIDER` 移出面板（转反向守卫）、`ANS_PI_CONTEXT_WINDOW` 改可选
+
+**来源**：客户就桌面 Pi 设置面板给新裁定（原话：「**这个 pi 为啥需要配置 5 个呢**」——真正必须的只有 **3 个**）。桌面应用据此改 `app/desktop/pi-config.ts`（**只读**）：面板键集合 `PI_PANEL_KEYS` 由 5 → **4**（3 必填 `ANTHROPIC_AUTH_TOKEN`/`ANS_PI_BASE_URL`/`ANS_PI_MODEL` + 1 可选 `ANS_PI_CONTEXT_WINDOW`）；`ANS_PI_PROVIDER` **移出面板**（代码里有默认值 `ans-gateway`、是内部标签，非用户该填）；`ANS_PI_CONTEXT_WINDOW` 从「必填」改「**可选 + 保守默认**」（Pi适配器 `src/common/pi-adapter/provider-config.ts` 定的默认值 `DEFAULT_PI_CONTEXT_WINDOW = 32768`；缺失**不硬失败**，只在日志/事件流提示）。桌面如实回报本角色两处按**旧语义**断言已红（**未动本角色文件**）。边界：只写 `test/测试/` 与 `角色卡/测试/`。**只读**：`app/desktop/pi-config.ts`、`src/common/pi-adapter/provider-config.ts`。
+
+### 1) 两处失效断言（改前，已实测）
+
+- `test/测试/t29-pi-config-roundtrip.test.ts:75`：`assert.deepEqual([...res.applied].sort(), [...PI_PANEL_KEYS].sort())`——把「**载入结果（文件里实际载入的全部键名）**」当「**面板键集合**」等起来。夹具 `.env` 含 `ANS_PI_PROVIDER`，故 `res.applied` 有 5 键、`PI_PANEL_KEYS` 只有 4 键 → 差异 `+ANS_PI_PROVIDER`。
+- `test/测试/t29-write-discipline.test.ts:157`：在「特殊字符写后读回」用例里把 `["ANS_PI_PROVIDER", "  padded both ends  "]` 当作**可写的面板键**提交给 `savePiConfig`。provider 已不是面板键 → 被过滤 → 读回 `undefined`，报 `ANS_PI_PROVIDER 经 parse 读回须逐字一致` 失败。
+
+### 2) 改法
+
+- **roundtrip:75**：拆成三条——(a) `res.applied` 等**文件里实际载入的全部键名**（5 键，含 `ANS_PI_PROVIDER`——它仍是被读取的环境变量，只是不再占面板输入框）；(b) `PI_PANEL_KEYS` 等 **3+1 = 4** 键（以代码里的导出为准）；(c) **反向守卫** `!PI_PANEL_KEYS.includes("ANS_PI_PROVIDER")`。**未删行**——反向守卫比删掉更能防它长回来。
+- **write-discipline:157**：把该用例的 provider 项**换成面板键**（`ANS_PI_CONTEXT_WINDOW`，仍验「首尾空白」的字节保真）；**另起一条**反向守卫用例 `ANS_PI_PROVIDER 不是面板键——提交被忽略`：结构化断言 `!PI_PANEL_KEYS.includes("ANS_PI_PROVIDER")` + 行为断言（提交 `{ANS_PI_PROVIDER:"should-not-write", ANS_PI_MODEL:"ok"}` → `appliedKeys==["ANS_PI_MODEL"]`、值不落盘、**已在 `.env` 的 provider 行原样保留**）。导入 `PI_PANEL_KEYS`。
+- **contextWindow 新语义**：本角色原**无**「必填」断言；**新增**一条守卫 `t29-pi-config-roundtrip.test.ts` 第 2b 节——放入**不含** `ANS_PI_CONTEXT_WINDOW` 的 `.env` → `resolvePiProviderConfig` **不抛错**、`contextWindow===DEFAULT_PI_CONTEXT_WINDOW(32768)`、`contextWindowSource==="default"`（钉死默认值，防被人悄悄改动）。
+- **`test/测试/t9-block1-bootstrap.test.ts`**：同属本角色目录，两处**陈述**（非断言）按旧语义写着 `ANS_PI_CONTEXT_WINDOW（必填）` 且把 `ANS_PI_PROVIDER` 列入需配置项——按新语义订正（BASE_URL/MODEL 必填、CONTEXT_WINDOW **可选**、删 provider）。该 `CLIENT_MANUAL_STEPS` 常量未被别处引用。
+
+### 3) 「旧断言是否揭示了新语义的问题」——**否**
+
+两处旧断言都只是**偶然耦合**：`res.applied == PI_PANEL_KEYS` 成立，仅因旧 `.env` 夹具恰好只含面板键（现在多了 provider 行，两者才分岔）；provider 在旧面板里可写，仅因当时它算一个面板键。新语义本身**自洽且已被行为验证**：provider 移出面板后**仍**由 `resolvePiProviderConfig` 从 env 照读（`cfg.providerId==="ans-gateway"`，roundtrip 用例仍绿）、其 `.env` 行**原样保留**；contextWindow 缺失回落保守默认**不硬失败**、非法值**仍**明确失败（Pi适配器已验）。**未发现新语义的问题**。
+
+### 4) 扫全仓：别处有无同类旧断言
+
+扫全 `test/`（含本角色外）：`ANS_PI_PROVIDER` / `PI_PANEL_KEYS` / `PI_REQUIRED_KEYS` / `contextWindow` 命中的**桌面角色**（`test/桌面应用/pi-config.test.ts`、`renderer.test.ts`、`e2e/main.mjs`）与 **Pi适配器角色**（`test/pi-adapter/provider-config.test.ts`）**均已迁到新语义**（含反向守卫：`!PI_PANEL_KEYS.includes("ANS_PI_PROVIDER")`、`PI_REQUIRED_KEYS` 不含 context window、缺失→默认 32768 不抛错）——**无遗留旧断言**。其余命中（`test/项目管理/shared/env-file.test.ts` 把 `ANS_PI_CONTEXT_WINDOW` 当**样例数据**、`test/pi-adapter/real-adapter.*` 显式传 `contextWindow: 131072`）**非**「必填/provider 面板键」断言，不受影响。**未改任何非本角色文件**。
+
+### 5) 结果
+
+`node --test test/测试/*.test.ts` → **105 pass / 0 fail**（原 103；+2 新增守卫）。`npm run typecheck` → **零错误**。全量 `node --test "test/**/*.test.ts"`（带引号走 Node glob）→ **677 pass / 0 fail**（基线 **673 通过 / 2 失败** = 675 总，那 2 处即本条，**已消除**；+2 新增 = 677）。**未遇**并行编排收归三类型引起的红。
+
 ## 2026-10-11 — 按新语义改 shell 闸 (c) 判定断言：rm 改判 risky（必过 (b) 且 b 放行后仍必过 (a)）；sh -c 仍硬拒
 
 **来源**：客户就 **shell 闸 (c) 的判定**给新裁定，**部分推翻**「危险即硬拒终结」（原话：**pm 不是终审，客户才是**）。门禁引擎（T40 `src/common/门禁引擎/classify-shell.ts`）+ 编排（T41 `src/common/编排/shell-gate.ts`）已落地：`ShellClass` 四态 `"allow" | "deny" | "risky" | "review"`；`rm`/`dd`/`sed -i`/`git` 写子命令等从硬拒**改判 `risky`**；`sh -c`/`eval`/`node -e`/`awk` **仍硬拒**（命令藏在 string 里，客户看原文看不懂、兜不住，§14.4）。次序表（§14.2）：`risky`→(b)；**b 判放行仍须过 (a)**；b 判拒即终结、**不打扰 (a)**；(a) 拒绝/超时/不可用 → 拒绝；(b)/(a) 均未接 → 拒（fail-closed）。两角色如实回报**未越界改本角色文件**，点名 `test/测试/t9-block3-pin-shell.test.ts:248` 的 `rm -rf build` 硬拒断言已成为失败项（**正是 fail-closed 语义变更的预期，非 bug**）。边界：只写 `test/测试/` 与 `角色卡/测试/`。**只读**：`src/model/decision.ts`、`src/common/门禁引擎/classify-shell.ts`、`src/common/编排/shell-gate.ts`、`src/provider/pi/session.ts`。

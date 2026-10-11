@@ -19,7 +19,7 @@ import {
   FINALIZE_BOOTSTRAP_TOOL_NAME,
   type ToolDefinition,
 } from "../../src/provider/pi/tools.ts";
-import type { FinalizeBootstrapFn, FinalizeResult } from "../../src/provider/pi/session.ts";
+import type { FinalizeBootstrapFn, FinalizeResult, FinalizeStatus } from "../../src/provider/pi/session.ts";
 import type { WriteDecision } from "../../src/model/decision.ts";
 
 // —————————————————————— 夹具 ——————————————————————
@@ -179,4 +179,20 @@ test("不写盘：工具层不产生任何文件系统变化（即便 writeRoot 
     assert.deepEqual(readdirSync(dir), [], "工具层调用后盘上应无任何新文件/目录");
     assert.equal(existsSync(join(dir, ".ans")), false, "工具层不得创建 .ans/");
   });
+});
+
+// —————————————————————— 5. 冻结契约家（§4）导出这些型：可导入、可用 ——————————————————————
+//
+// `FinalizeStatus` / `FinalizeResult` / `FinalizeBootstrapFn` 的**单一来源**是 §4 冻结契约家
+// `src/provider/pi/session.ts`（同 T20 的 operator 三型先例）。本用例把「可从这里导入并使用」
+// 钉死：这是一个**类型层**契约，编译期（`npm run typecheck`）能捕获形状漂移；运行期证明导入路径成立。
+test("FinalizeStatus / FinalizeResult / FinalizeBootstrapFn 可从冻结契约家 session.ts 导入并使用", async () => {
+  const status: FinalizeStatus = "completed";
+  const r: FinalizeResult = result({ ok: true, status, message: "已收口" });
+  const fn: FinalizeBootstrapFn = async () => r;
+
+  const out = await fn();
+  assert.equal(out.status, "completed");
+  assert.equal(out.ok, true);
+  assert.equal(out.message, "已收口");
 });

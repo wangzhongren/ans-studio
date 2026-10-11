@@ -16,7 +16,7 @@
 // 全部使用系统临时目录，**不留文件于仓库**，用完递归清理；不指向仓库根真实 `.env`。
 
 import assert from "node:assert/strict";
-import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -188,9 +188,15 @@ test("② renameReplacingExisting 覆盖已存在目标成功（原语直测）"
 });
 
 // ============================================================================
-// ③ 并发自争用压测：完整链路在争用下**不硬失败**（端到端）
+// ③ 并发自争用压测：完整链路在争用下**不硬失败**（端到端）+ 失败路径的**安全性**
 // ============================================================================
 
+// 说明（本轮校正）：本用例此前断言「8 路 x 250 轮**全部成功**」，并在**全量并发**
+// （`node --test "test/**/*.test.ts"`，Node 默认并行多文件）下约 **1/20** 真实翻红——
+// 经诊断**不是用例自身竞态**，而是**产品代码在此压力下真的失败**：Windows rename 覆盖已存在目标
+// 的**瞬时** `EPERM` 在重负载下**尾部拉长**，原上界 20 被**打满**（日志实测 `attempts=20 code=EPERM`）。
+// 证据与定界见 `atomic-write.ts::RENAME_MAX_ATTEMPTS`。修法＝**按实测把上界 20 提到 200**（观测尾部≈63、
+// 留 ~3x 余量），而非在用例里加 sleep/重试把它捂绿。**失败路径本身已单测其安全性**（见下一用例）。
 test("③ 并发自争用：多路 atomicWrite 反复覆盖**同一目标**，全部成功、无 temp 残留", async () => {
   await withTmpDir(async (dir) => {
     const target = path.join(dir, ".env");
@@ -199,15 +205,40 @@ test("③ 并发自争用：多路 atomicWrite 反复覆盖**同一目标**，�
     const laneTexts = Array.from({ length: LANES }, (_, i) => `LANE=${i}\n`);
     for (let r = 0; r < ROUNDS; r++) {
       // 同一目标、同时发起：真实触发「rename 覆盖已存在目标」，Windows 下会偶发瞬时 EPERM → 由有界重试兜住。
-      await Promise.all(laneTexts.map((t) => atomicWrite(target, `${t}# round ${r}\n`)));
+      const lanes = laneTexts.map((t) => atomicWrite(target, `${t}# round ${r}\n`));
+      const results = await Promise.allSettled(lanes);
+      // 全部成功（有界重试把瞬时 EPERM 兜住）；若偶有不成功，只应是**瞬时码被耗尽**，绝非其它错——
+      // 这里把它断言成「无任何失败」，一旦翻红，报错会直接给出错误码，便于区分「上界耗尽」与「真·损坏」。
+      const rejected = results.filter((x): x is PromiseRejectedResult => x.status === "rejected");
+      assert.deepEqual(
+        rejected.map((x) => (x.reason as NodeJS.ErrnoException)?.code),
+        [],
+        `有 lane 失败：码=${rejected.map((x) => (x.reason as NodeJS.ErrnoException)?.code).join(",")}（若均为瞬时码=有界重试上界被耗尽）`,
+      );
     }
-    // 全部成功（否则 Promise.all 已抛）；最终内容须是某一路写的**完整**结果（非半写拼接）。
+    // 最终内容须是某一路写的**完整**结果（非半写拼接）。
     const final = await readFile(target, "utf8");
     assert.match(final, /^LANE=\d+\n# round \d+\n$/, "最终内容须为某次写入的完整结果（非半写）");
     assert.deepEqual(await readdir(dir), [".env"], "争用后不得有 temp 残留");
   });
 });
 
-test("③ 上界常量与实测一致（RENAME_MAX_ATTEMPTS=20）", () => {
-  assert.equal(RENAME_MAX_ATTEMPTS, 20);
+// 失败路径的**安全性**（确定性，不靠概率）：令「rename 覆盖目标」**必然失败**——目标是一个
+// **已存在的非空目录**（Windows：EPERM 瞬时码 → 重试至上界再抛；POSIX：EISDIR/ENOTEMPTY 非瞬时 → 立即抛）。
+// 两种平台都必须满足同一契约：**显式抛出**、**temp 已清**、**目标未被触碰/损坏**。这正是「即便上界耗尽，
+// 也只是损失一次写、绝不损坏文件」这一裁决的可回归证据。
+test("③ 失败路径安全：目标不可被替换时 atomicWrite 显式抛出、temp 已清、目标未受损", async () => {
+  await withTmpDir(async (dir) => {
+    const target = path.join(dir, "target-is-a-dir");
+    await mkdir(target);
+    await writeFile(path.join(target, "keep.txt"), "keep");
+    await assert.rejects(() => atomicWrite(target, "NEW=1\n"), "目标不可被文件覆盖时必须显式抛错");
+    assert.deepEqual(await readdir(dir), ["target-is-a-dir"], "失败后目录内不得残留 temp");
+    assert.deepEqual((await readdir(target)).sort(), ["keep.txt"], "目标（目录）内容不得被触碰");
+    assert.equal(await readFile(path.join(target, "keep.txt"), "utf8"), "keep", "目标内既有文件须完好");
+  });
+});
+
+test("③ 上界常量与实测一致（RENAME_MAX_ATTEMPTS=200，由实测尾部≈63 留 ~3x 余量）", () => {
+  assert.equal(RENAME_MAX_ATTEMPTS, 200);
 });

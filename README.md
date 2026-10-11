@@ -68,7 +68,7 @@ node bin/ans.js --help
 ### 两道门（交付前必过）
 
 ```bash
-node --test "test/**/*.test.ts"   # 全量测试：621 用例、621 通过（引号必须带——走 Node 原生 glob，覆盖三层测试路径）
+node --test "test/**/*.test.ts"   # 全量测试：677 用例、677 通过（引号必须带——走 Node 原生 glob，覆盖三层测试路径）
 npm run typecheck                 # tsc --noEmit，零类型错误
 ```
 
@@ -76,16 +76,23 @@ npm run typecheck                 # tsc --noEmit，零类型错误
 
 ## Pi 配置
 
-**需要哪几项**（桌面面板键 == `.env` 键名）：
+**需要哪几项**（桌面面板键 == `.env` 键名；**3 项必填 + 1 项可选，收在「高级」里**）：
 
-- 凭据（机密）：`ANTHROPIC_AUTH_TOKEN`
-- 非机密：`ANS_PI_BASE_URL`、`ANS_PI_MODEL`、`ANS_PI_PROVIDER`（缺省 `ans-gateway`）、
-  `ANS_PI_CONTEXT_WINDOW`（**必填，无默认值**——缺失即明确失败，绝不回落到模板值）。
+- **必填**——凭据（机密）：`ANTHROPIC_AUTH_TOKEN`（掩码）；
+  非机密：`ANS_PI_BASE_URL`（**拒绝回落任何默认端点**，故必须显式给）、`ANS_PI_MODEL`。
+- **可选、可留空**：`ANS_PI_CONTEXT_WINDOW`——**可选 + 保守默认**：留空 = 不下发该键，Pi适配器回落到
+  默认 **`32768`**（缺失**不硬失败**，只在日志与事件流给一条可见提示）；知道确切值可用它覆盖。取 32768 是
+  因为它须**严格大于** Pi 压缩的 `reserveTokens`（16384），否则压缩阈值 ≤ 0、几乎每轮都触发而退化；且宁可
+  偏小（压缩提前，良性）不可偏大（窗口设大使长会话炸掉）。
+- **`ANS_PI_PROVIDER` 不在面板里**：它在代码里**有默认值**（`ans-gateway`）、是**内部标签**，不是用户该做的
+  决定；底层**仍支持该环境变量**（`resolvePiProviderConfig` 照读），只是不再占一个输入框——保存面板时也不写它
+  （`.env` 里已有的那行原样保留）。
 
 **从哪填**：
 
 - **桌面**：右上「Pi 设置」面板 → **保存到仓库根 `.env`**。只改面板键、**保留注释与未知键**、原子写；
-  token 字段掩码且**绝不回显**（只示「已设置 / 未设置」）；保存后即时重载，**下一会话生效**。
+  token 字段掩码且**绝不回显**（只示「已设置 / 未设置」）；`ANS_PI_CONTEXT_WINDOW` 收在可折叠的「高级」里、
+  **可留空**（留空 = 用保守默认）；保存后即时重载，**下一会话生效**。
 - 桌面**启动时**会把仓库根 `.env` 载入 `process.env`（补上 Electron 进程缺失的 `--env-file`），
   之后 `resolvePiProviderConfig(opts, process.env)` 原样复用（单一来源，无第二份读取逻辑）。
 

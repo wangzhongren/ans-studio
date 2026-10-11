@@ -11,7 +11,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { savePiConfig, getPiConfig } from "../../app/desktop/pi-config.ts";
+import { savePiConfig, getPiConfig, PI_PANEL_KEYS } from "../../app/desktop/pi-config.ts";
 import {
   saveEnvFile,
   readEnvFile,
@@ -154,7 +154,7 @@ test("T29 纪律③：值含 = 空格 引号 # 反斜杠 → 写后读回逐字�
     const env: Record<string, string | undefined> = {};
     const cases: Array<[string, string]> = [
       ["ANS_PI_MODEL", 'a=b c"d\'e#f\\g'],       // = 空格 " ' # \
-      ["ANS_PI_PROVIDER", "  padded both ends  "], // 首尾空白
+      ["ANS_PI_CONTEXT_WINDOW", "  padded both ends  "], // 首尾空白（本段只验写入/读回的字节保真，不校验取值合法性）
       ["ANTHROPIC_AUTH_TOKEN", `${SENTINEL_TOKEN}=x#y"z'\\`], // token 也走同一路径
       ["ANS_PI_BASE_URL", "https://h.test/p?a=b=c&d=e"], // URL 查询串（含 =&）
     ];
@@ -174,6 +174,36 @@ test("T29 纪律③：值含 = 空格 引号 # 反斜杠 → 写后读回逐字�
     }
     // 回报与错误文本不得回显哨兵 token 值。
     assert.ok(!JSON.stringify(r).includes(SENTINEL_TOKEN), "savePiConfig 回报不得含 token 值");
+  } finally {
+    t.cleanup();
+  }
+});
+
+// —————————————————————— 3b) 反向守卫：ANS_PI_PROVIDER 不再是面板键 ——————————————————————
+//
+// 客户 2026-10-11 裁定：`ANS_PI_PROVIDER` **从面板移出**——它在代码里**有默认值**（`ans-gateway`）、是
+// **内部标签**，不是用户该做的决定。故它**不在** PI_PANEL_KEYS：即便提交它也**不被采纳、不落盘**；
+// 已在 `.env` 里的那一行**原样保留**（写纪律：只改相关键）。
+// 用**反向守卫**（断言它**不在**面板键里、提交被忽略）而非删行——防它悄悄长回面板。
+
+test("T29 纪律③：ANS_PI_PROVIDER 不是面板键——提交被忽略（不采纳、不落盘、已存在行原样保留）", async () => {
+  const t = makeTempDir();
+  try {
+    // 结构化反向守卫：面板键集合里**没有** provider。
+    assert.ok(!PI_PANEL_KEYS.includes("ANS_PI_PROVIDER"), "ANS_PI_PROVIDER 不应在面板键里");
+    // 行为反向守卫：即便提交 provider，也不被采纳、不落盘。
+    writeEnv(t.envPath, "KEEP=1\nexport ANS_PI_PROVIDER=ans-gateway\n");
+    const env: Record<string, string | undefined> = {};
+    const r = await savePiConfig({
+      envPath: t.envPath,
+      updates: { ANS_PI_PROVIDER: "should-not-write", ANS_PI_MODEL: "ok" },
+      env,
+    });
+    assert.equal(r.ok, true, r.error ?? "");
+    assert.deepEqual(r.appliedKeys, ["ANS_PI_MODEL"], "provider 提交不得被采纳");
+    const after = fs.readFileSync(t.envPath, "utf8");
+    assert.ok(!after.includes("should-not-write"), "provider 提交的值不得落盘");
+    assert.equal(after, "KEEP=1\nexport ANS_PI_PROVIDER=ans-gateway\nANS_PI_MODEL=ok\n", "已存在的 provider 行原样保留");
   } finally {
     t.cleanup();
   }

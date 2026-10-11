@@ -28,6 +28,7 @@ import type {
   WriteGate,
   ShellGate,
   OperatorChannelFn,
+  FinalizeResult,
 } from "../../provider/pi/session.ts";
 import { createPiRuntimeAdapter } from "../../provider/pi/session.ts";
 import { formatEvent } from "../../common/编排/output.ts";
@@ -37,7 +38,6 @@ import {
   createSessionFinalizer,
   repinIfBootstrapped,
   DEFAULT_GOVERNANCE_BOUNDARY_REL,
-  type FinalizeResult,
   type SessionFinalizer,
 } from "../../common/编排/finalize.ts";
 import type { RuntimeKind } from "../../common/编排/args.ts";

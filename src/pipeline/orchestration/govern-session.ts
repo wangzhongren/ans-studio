@@ -33,7 +33,7 @@
 import type { ProjectConfig } from "../../model/role.ts";
 import type { TaskScope } from "../../model/decision.ts";
 import type { Acceptance, BoundarySection1 } from "../../model/boundary.ts";
-import type { OperatorChannelFn, RuntimeAdapter, SessionEvent, WriteGate } from "../../provider/pi/session.ts";
+import type { OperatorChannelFn, RuntimeAdapter, SessionEvent, WriteGate, FinalizeResult } from "../../provider/pi/session.ts";
 import { openRoleSession } from "./run-role.ts";
 import { listProject, resolveRole } from "../../service/role/resolve-role.ts";
 import { formatEvent } from "../../common/编排/output.ts";
@@ -44,7 +44,6 @@ import {
   createSessionFinalizer,
   DEFAULT_GOVERNANCE_BOUNDARY_REL,
   repinIfBootstrapped,
-  type FinalizeResult,
 } from "../../common/编排/finalize.ts";
 
 /** 角色目录名（与 `listProject` 口径一致：项目角色的目录 `角色卡/<id>/`）。 */

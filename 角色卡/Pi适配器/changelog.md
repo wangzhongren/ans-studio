@@ -1,5 +1,53 @@
 # Pi适配器 变更记录
 
+## 2026-10-11 — 注释更正：共享原子写上界 20 → 200（仅注释，无行为变更）
+
+**来源**：pm 已把共享原语 `src/common/shared/atomic-write.ts` 的重试上界由 **20 改为 200**（pm 属主；先复现并发 flake、定性「上界被打满」、并用证据证明「耗尽时 temp 已清、目标文件完好、只损失一次写入」，故取实测尾部 ~63 的约 3× 作裕量）。pm 如实回报：本角色 `src/common/pi-adapter/fs-write.ts:138` 的注释**仍写「≤20 次」**；该文件**已委托共享原语、无第二实现**，**仅注释陈旧**，需改为 200。
+
+**改了什么**（落点仅本角色边界 `src/common/pi-adapter/fs-write.ts`，**纯注释**）
+- `atomicWriteFile` 的文档注释：`≤20 次` → 与共享常量一致的上界 **200**；并顺带把同句里已不再成立的「**逐字同源**」更正为「**同源**」（上界已在共享侧由 20 上调为 200，故与本层原私有实现**不再「逐字」相同**），并明确登记「本层原私有实现为 20、共享侧已上调」。
+- **无任何行为改动**：`atomicWriteFile` 函数体仍为 `return atomicWrite(abs, data, { mode: 0o600 })`；未新增/改动任何重试逻辑、瞬时码集合或上界常量。
+
+**核实：本文件确无第二份重试实现**
+- `fs-write.ts` 只 `import { atomicWrite } from "../../common/shared/atomic-write.ts"`。此前私有的 `renameReplacingExisting` / `RENAME_TRANSIENT_CODES` / `RENAME_MAX_ATTEMPTS` 与内联 temp+rename 脚手架**已于上一轮删除**（见下文「私有原子写实现已收归共享组件 6」节）。`atomicWriteFile` 是共享原语的**薄封装**——不含重试循环、不持瞬时码集合、不持上界常量。重试的**唯一来源**是共享原语。
+
+**其他写着旧上界处（核查结论）**
+- 本角色边界内其余出现「≤20 / 20 次 / 上界 20 / `RENAME_MAX_ATTEMPTS=20`」的地方，**均在 `changelog.md` / `memo.md` 的历史条目里**（记录当时的事实：下文「修复 `edit_file` 偶发失败」与「私有原子写实现已收归共享组件 6」两节）——按「不回改历史」**保持原样**；本小节即为其现状说明。
+- `test/pi-adapter/`、`src/provider/pi/` 内**无**提及旧上界处（grep 无命中）。
+
+**验证（本角色执行）**
+- `node --test test/pi-adapter/*.test.ts` → **74 pass / 0 fail / 0 skipped**。
+- `npm run typecheck`（`tsc --noEmit`）→ **零错误**（全仓）。
+- 全量 `node --test "test/**/*.test.ts"`（**带引号**，走 Node glob）→ **678 pass / 0 fail**（与基线一致）。
+- **未读** `.env`、**未发**网络请求、**未打印**凭据值。
+
+**边界**：仅改本角色 Section 1 内文件（`src/common/pi-adapter/fs-write.ts`、`角色卡/Pi适配器/memo.md`、`角色卡/Pi适配器/changelog.md`）。共享原语 `src/common/shared/atomic-write.ts` **只读**（确认新上界＝200）。
+
+## 2026-10-11 — contextWindow 由「必填」改回「可选 + 保守默认」（默认 32768）；Finalize 两型收归冻结契约家
+
+**来源**：本角色（Pi适配器）独立实现，落点全在本角色边界内（`src/common/pi-adapter/provider-config.ts`、`src/common/pi-adapter/real-adapter.ts`、`test/pi-adapter/`）。**客户反馈**：`contextWindow` 原为**必填**，逼用户跑去服务商那儿手查自己模型的窗口大小——把负担转嫁给了用户；改回**可选 + 保守默认**。任务 2 为**消除一处 §6 镜像**。
+
+**任务 1：contextWindow 可选 + 保守默认**
+- `provider-config.ts`：新增导出常量 `DEFAULT_PI_CONTEXT_WINDOW = 32768`（附完整论证）；`PiProviderConfig` 新增 `contextWindowSource: "explicit" | "env" | "default"`；`parseContextWindow` 改为返回 `{ value, source }`；`resolvePiProviderConfig` **删除**「缺 contextWindow 即抛错」分支（改注释说明 baseUrl/modelId/凭据仍 fail-closed、contextWindow 为例外），缺失时回落到默认值并如实标注来源。
+- **默认为何取 32768（「保守」＝宁可小、不可大）**：两个方向的代价**不对称**——默认偏**小** → 自动压缩阈值（`contextWindow − reserveTokens`）**提前**到达 → 最多多压几次，**良性**；默认偏**大** → 阈值够不着、压缩**永不触发** → 长会话先吃**服务端超长报错**、**会话炸掉**（正是 anthropic 模板 1,000,000 的问题）。且 **不能 ≤ 16384**：Pi 压缩的 `reserveTokens` 被钉为 16384（`settings.ts` 的 `ANS_SETTINGS_OVERRIDES`，等同 Pi 内置缺省）；若 `contextWindow ≤ 16384`，则阈值 `contextWindow − reserveTokens ≤ 0`，`shouldCompact`（`dist/core/compaction/compaction.js:173`，判 `contextTokens > contextWindow − reserveTokens`）会**几乎每轮都触发**——退化、抖动，不是「良性」。**32768** 使阈值 = 32768 − 16384 = **16384**（切实为正、有工作余量），且 32k 是当下网关所服务指令模型的**事实下限**方向，故对绝大多数模型都**不会超过其真实窗口**；比模板值 1,000,000 小约 30 倍，压缩终于会真正发生。
+- **可见提示（不硬失败）**：新增导出 `renderContextWindowNotice(source, value)`——**仅** `source === "default"` 时返回文案（告知「已用保守默认值 32768 tokens」以及「如何用 `ANS_PI_CONTEXT_WINDOW` / `opts.contextWindow` 覆盖」）；非默认来源返回 `undefined`（不打扰用户）。`real-adapter.ts` 的 `bindRole` 把它**同时**打进 `log.stage` 与**事件流**（`emit({ kind: "message", summary: notice })`），确保界面/用户看得到。
+- **护栏调整（`buildExplicitRuntime`）**：断言 `selected.contextWindow === cfg.contextWindow` **保留**（`cfg.contextWindow` 恒为**具体数**——显式 / 环境变量 / 保守默认三者之一），仅把注释与错误文案由「配置的 contextWindow / 必需字段」改为「**解析出的** contextWindow（含保守默认）」——不再对着一个已不存在的「必填」语义报警。
+- **覆盖路径与非法值不变**：`ANS_PI_CONTEXT_WINDOW` 与 `opts.contextWindow` 两条覆盖路径仍在，优先级**不变**（显式 > 环境变量 > 默认）；**非法值（0 / 负数 / 非数）仍明确失败**（`assertContextWindow` 抛错）。
+
+**任务 2：FinalizeBootstrapFn / FinalizeResult 收归冻结契约家**
+- **核实结论**：`src/provider/pi/session.ts`（§4 冻结契约家）**已含** `FinalizeStatus` / `FinalizeResult` / `FinalizeBootstrapFn`（T36 已落；形状与编排私有 `src/common/编排/finalize.ts` **逐字一致**，已逐字段比对）。本角色**无**另立副本 ⇒ **无同名冲突**，故**未再添加**（避免制造第二份）。
+- 新增一条**类型层**用例（`test/pi-adapter/finalize-bootstrap.test.ts`）：从 `session.ts` 导入这三个型并构造/使用，钉死「类型可用、可从这里导入」。
+- **（供编排，未越界改）编排需要改成**：`src/common/编排/finalize.ts` **删除**本地 `FinalizeStatus` / `FinalizeResult` / `FinalizeBootstrapFn` 定义，改为 `import type { FinalizeStatus, FinalizeResult, FinalizeBootstrapFn } from "../../provider/pi/session.ts"`（并按需 `export type { ... }` 维持其既有公开面）；`src/pipeline/orchestration/run-role.ts` 与 `govern-session.ts` 里 `type FinalizeResult` 的导入源改指向 `session.ts`。形状逐字一致、结构类型保证可注入，**应零行为变化**（同 T20→T21 收敛 operator 三型）。
+
+**验证（本角色执行）**
+- `node --test test/pi-adapter/*.test.ts` → **74 pass / 0 fail / 0 skipped**（较前 71 净 **+3**：provider-config +2、finalize-bootstrap +1）。
+- `npm run typecheck`（`tsc --noEmit`）→ **零错误**（全仓）。
+- 全量 `node --test "test/**/*.test.ts"`（**带引号**、走 Node glob）→ **673 pass / 2 fail / 675 计**。**2 处红均在他人边界**：`test/测试/t29-pi-config-roundtrip.test.ts:75` 与 `test/测试/t29-write-discipline.test.ts:151`（归**测试**角色）——均因**桌面角色正在并行改** Pi 设置面板（把 `ANS_PI_PROVIDER` **移出** `PI_PANEL_KEYS`）导致 `loadPiEnv.applied` / `savePiConfig` 与测试的旧断言不一致，**与本角色改动无关**（本角色文件不在其调用链上；`resolvePiProviderConfig.length` 仍为 2，签名未变）。
+- **未读** `.env`、**未发**任何网络请求、**未打印**任何凭据值。
+
+**边界 / 跨角色（未越界改）**
+- 只改本角色 Section 1 内文件。**未动**编排 `src/common/编排/finalize.ts`（**只读确认形状**）、`test/测试/`、`test/桌面应用/`、`app/desktop/`。
+
 ## 2026-10-11 — 私有原子写实现已收归共享组件 6（`src/common/shared/atomic-write.ts`）
 
 **来源**：pm 依据**Pi适配器**上一轮的**如实回报**（本仓 `src/common/shared/env-file.ts::atomicWriteText` 与 `fs-write.ts::atomicWriteFile` 是**同源写法**）作出**架构裁决**——**抽共享原语**（非各修各的），新增 `src/common/shared/atomic-write.ts` 并登记为**共享组件 6**（见 `角色卡/项目管理/docs/change/2026-10-11_change_shared-atomic-write.md`）。本角色按该待办把私有副本换成共享原语（工程法案 §一.5「不得复制第二份实现」）。
