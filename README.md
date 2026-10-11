@@ -157,12 +157,15 @@ node --env-file=.env bin/ans.js role run 编排 --task T-1 --runtime pi
 ## 已知范围外 / 未验证
 
 - **多任务派发引擎**（pm 产出派发计划 → 编排按拓扑序逐条开会话）：**二期，不在 V1**。
-  V1 只到「单角色受治理会话真落盘 + bootstrap / 创建权 + `.ans` pin + shell 闸」；「调度权归 pm」
+  V1 只到「单角色受治理会话真落盘 + bootstrap / 创建权 + `.ans` pin + shell 闸（三层链已实现，但 V1 两个入口均未接线，见下）」；「调度权归 pm」
   在 V1 只落到**纸面归属 + 使用约定**，不实现、不演示多任务派发。
-- **桌面 shell 闸 V1 不 arm**：`run_shell` **仅在被注入 `ShellGate` 时才注册**（能力缺席 = 最强的 fail-closed）。
-  三层链——**(c) 确定性硬地板 → (b) pm 模型审读 → (a) 操作者确认**——**已实现并经测试**；
-  但是否 arm 是显式的策略开关：桌面 V1 **刻意不注入** `ShellGate`，CLI 入口当前也未注入
-  （故 `run_shell` 不在默认工具集内）。
+- **shell 闸三层链已实现并测试，但 V1 两个入口均未接线**：`run_shell` **仅在会话构造路径注入 `ShellGate`
+  时才注册**（能力缺席 = 最强的 fail-closed）。三层链——**(c) 确定性硬地板 → (b) pm 模型审读 → (a) 操作者确认**
+  ——**已实现并经测试**，但 V1 **两个入口都不注入** `ShellGate`：**桌面刻意不 arm**
+  （`DESKTOP_SHELL_GATE_ARMED === false`，理由见 `app/desktop/operator-channel.ts`），**CLI 入口从未注入**
+  （`src/index.ts` 的 `buildRoleRunDeps` 对任一 runtime 都不注入）。因此**模型在任何入口都没有 shell 能力**，
+  这条链**当前不影响任何运行时行为**。这是**客户确认的 V1 范围**（V1 无 OS 沙箱，`run_shell` 起的子进程写入
+  **不受 `resolveWrite` 约束**，arm 风险大）——不是缺陷、不是欠账；将来启用需**新的裁定**，**不会自行生效**。
 - **真实模型轮次本机不可自动验收**：su「据对话决定并建出角色」、su 是否 / 如何提议收口等
   **模型行为**，须**客户本人**用真实凭据 + 已配 provider 运行；自动化测试覆盖的是**确定性部分**
   （门禁判定、fail-closed 各退路、pin 刷新等）。

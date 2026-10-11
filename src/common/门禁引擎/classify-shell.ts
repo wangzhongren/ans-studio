@@ -1,11 +1,12 @@
 // 门禁引擎：V3 shell 命令级闸 (c) —— 确定性规则/白名单引擎（纯函数，无副作用）
 //
-// 冻结契约（设计 §7.2/§7.4）：`classifyShell(argv, rules) => "allow" | "deny" | "review"`。
+// 冻结契约（设计 §7.2/§7.4/§14）：`classifyShell(argv, rules) => "allow" | "deny" | "risky" | "review"`。
 // 判据是「这条命令是否被允许执行」，**不是**「路径是否在边界内」——shell 里的 `echo x > 路径`
 // 不经过 resolveWrite（§7.1），故这道闸的判据与路径判定正交。
 //
-// 三态（§7.3）：白名单命中 → allow；硬拒命中 → deny（绝对否决，不可被 (b)/(a) 翻案）；
-//             都不命中 → review（交 (b) pm 审读 → (a) 操作者）。
+// 四态（§7.3 → §14.1 重定）：白名单命中 → allow；硬拒命中 → deny（绝对否决，不可被 (b)/(a) 翻案）；
+//   命中「危险但有正当用途」→ risky（**必过 (b)；(b) 放行后仍须过 (a)**，§14.2）；都不命中 → review
+//   （交 (b)；b 明确即终结，b 拿不准/不可用才升 (a)）。
 //
 // fail-closed（§7.5 第一条）——结构上不可能退化：
 //   * classifyShell **要求显式传入 rules**（无默认参数、无 rules 可选重载）；
@@ -31,24 +32,37 @@
 //   * `argv[0]` 含空白（说明塞进来的是**整条命令串**而非程序名）→ deny（无法可靠解析，fail-closed）；
 //   * `sh -c "…"` 把真实命令藏在参数里、无法可靠反推：**外壳/解释器本身就在硬拒名单**
 //     （sh/bash/cmd/pwsh/…），故这一类「在参数里重新引入 shell」的形态仍被守住。
+//
+// —— risky 的判据与前提（§14.2/§14.3-B，T40）——
+// 危险命令**不再一概终结**（客户 2026-10-11 推翻 §7.3「危险即硬拒」）：`rm` 不是永远错的
+//   （删自己刚生成的临时文件合理）——一概硬拒即「过宽则天天误杀」。故新增第四档 `risky`：
+//   **危险但有正当用途**的命令 → 过 (b) pm 审读，(b) 判放行后**仍须过 (a) 客户看原文确认**。
+//   **但**：`risky` 只给「**程序名在 argv 里以可读元素出现、语义可判**」的形态——因为 (a) 是**客户看命令原文**，
+//   得看得懂（`rm -rf build/` 看得懂）。**re-shell / 内联求值**（`sh -c "…"`/`eval`/`node -e`/`awk`…）**不在此列、
+//   仍硬拒终结**：它们 `argv` 里**没有可读的程序名**（真命令是那段 string，其影响发生在子进程内、**完全不经过
+//   `resolveWrite`**），放行 = 整体绕过写边界（§14.4）。**「argv 里看得见」是 (a) 能兜住 risky 的前提。**
 
 import type {
   ShellClass,
   ShellExecutionModel,
   ShellHardDenyRule,
   ShellReadOnlyRule,
+  ShellRiskyRule,
   ShellRules,
 } from "../../model/decision.ts";
 
 /** 引擎已知的规则集版本；rules.version 与之不符 → 硬拒（版本未知，fail-closed）。
- *  "2"：T8a 起规则集按「程序 + argv」重述、元字符仅在 `executionModel` 会经 shell 解释时生效（§7.10）。 */
-export const SHELL_RULES_VERSION = "2";
+ *  "2"：T8a 起规则集按「程序 + argv」重述、元字符仅在 `executionModel` 会经 shell 解释时生效（§7.10）。
+ *  "3"：T40 起 `ShellClass` 增第四档 `risky`（§14）；硬拒名单重划（re-shell/内联求值/提权/系统破坏/LOLBin
+ *       仍硬拒；删除/原地改写/编辑器/进程服务/网络/间接执行器/构建/包管理/git 写 → risky）；规则集新增
+ *       `riskyPrograms` 段。旧 "2" 规则集因版本不符一律被拒（fail-closed）。 */
+export const SHELL_RULES_VERSION = "3";
 
-/** 带原因的判定结果；classifyShell 只取其中的 decision（冻结契约是三态字符串）。 */
+/** 带原因的判定结果；classifyShell 只取其中的 decision（冻结契约是四态字符串）。 */
 export interface ShellVerdict {
   decision: ShellClass;
   reason: string;
-  ruleId: string; // deny:rules-invalid / deny:argv-invalid / deny:opaque-command / deny:program:<id> / deny:token:<t> / allow:readonly:<id> / review
+  ruleId: string; // deny:rules-invalid / deny:argv-invalid / deny:opaque-command / deny:program:<id> / deny:token:<t> / risky:program:<id> / allow:readonly:<id> / review
 }
 
 const EXE_SUFFIX = /\.(exe|cmd|bat|ps1|com)$/i;
@@ -106,6 +120,9 @@ function validateRules(rules: unknown): string | null {
   if (!isStrArr(r.denyTokens)) return "denyTokens 必须是字符串数组";
   if (!Array.isArray(r.readOnly)) return "readOnly 必须是数组";
   if (!Array.isArray(r.hardDenyPrograms)) return "hardDenyPrograms 必须是数组";
+  // riskyPrograms 为 v3 必需项：缺失/非数组 → 硬拒（fail-closed，§7.5）。
+  // 否则「危险但有正当用途」的命令会静默降级为 review（只过 (b)、不强制 (a)），即门禁被削弱。
+  if (!Array.isArray(r.riskyPrograms)) return "riskyPrograms 必须是数组（v3 必需；缺失即 fail-closed 硬拒）";
 
   const ro = r.readOnly as unknown[];
   for (let i = 0; i < ro.length; i++) {
@@ -129,11 +146,38 @@ function validateRules(rules: unknown): string | null {
       return `hardDenyPrograms[${i}] 的 onlyWithSubcommand 非法`;
     }
   }
+  const rk = r.riskyPrograms as unknown[];
+  for (let i = 0; i < rk.length; i++) {
+    const e = rk[i];
+    if (typeof e !== "object" || e === null) return `riskyPrograms[${i}] 非对象`;
+    const o = e as Record<string, unknown>;
+    if (typeof o.id !== "string" || o.id === "") return `riskyPrograms[${i}] 缺少 id`;
+    if (!isStrArr(o.programs) || o.programs.length === 0) return `riskyPrograms[${i}] 的 programs 非法`;
+    if (o.onlyWithFlag !== undefined && !isStrArr(o.onlyWithFlag)) return `riskyPrograms[${i}] 的 onlyWithFlag 非法`;
+    if (o.onlyWithSubcommand !== undefined && !isStrArr(o.onlyWithSubcommand)) {
+      return `riskyPrograms[${i}] 的 onlyWithSubcommand 非法`;
+    }
+  }
   return null;
 }
 
 /** 硬拒程序匹配：program 命中且（若设了约束）flag/子命令满足条件时返回规则 id，否则 null */
 function matchHardDeny(args: string[], program: string, rules: ShellHardDenyRule[]): string | null {
+  for (const r of rules) {
+    if (!r.programs.map((p) => p.toLowerCase()).includes(program)) continue;
+    if (r.onlyWithFlag !== undefined && !hasFlag(args, r.onlyWithFlag)) continue;
+    if (r.onlyWithSubcommand !== undefined) {
+      const sub = typeof args[1] === "string" ? args[1].toLowerCase() : "";
+      if (!r.onlyWithSubcommand.map((s) => s.toLowerCase()).includes(sub)) continue;
+    }
+    return r.id;
+  }
+  return null;
+}
+
+/** risky 程序匹配（§14.3-B）：program 命中且（若设了约束）flag/子命令满足条件时返回规则 id，否则 null。
+ *  ★ 只对「程序名在 argv 里可见」的形态生效；re-shell/内联求值**不经此路**（它们在 hardDenyPrograms，先被拦）。 */
+function matchRisky(args: string[], program: string, rules: ShellRiskyRule[]): string | null {
   for (const r of rules) {
     if (!r.programs.map((p) => p.toLowerCase()).includes(program)) continue;
     if (r.onlyWithFlag !== undefined && !hasFlag(args, r.onlyWithFlag)) continue;
@@ -162,7 +206,7 @@ function matchReadOnly(args: string[], program: string, rules: ShellReadOnlyRule
 
 /**
  * 带原因的判定。参数取 unknown 是为了**强制走运行时校验**——任何调用方传错形状都得到 deny，
- * 而不会因为 TS 类型擦除而静默退化。classifyShell（冻结契约）只是它的三态封装。
+ * 而不会因为 TS 类型擦除而静默退化。classifyShell（冻结契约）只是它的四态封装。
  */
 export function classifyShellDetailed(argv: unknown, rules: unknown): ShellVerdict {
   // 1) 规则集：缺失/非法/版本未知 → 硬拒（fail-closed，§7.5 第一条）
@@ -236,18 +280,29 @@ export function classifyShellDetailed(argv: unknown, rules: unknown): ShellVerdi
     }
   }
 
-  // 7) 白名单（只读命令）→ allow（唯一通向 allow 的分支）
+  // 7) risky 程序（危险但有正当用途）→ "risky"（§14.2：交 (b) pm 审读；(b) 判放行后**仍须**过 (a) 客户）。
+  //    只在「程序名在 argv 里可见、语义可判」时命中——re-shell/内联求值在第 5 步已硬拒，到不了这里。
+  const riskyProg = matchRisky(args, program, R.riskyPrograms ?? []);
+  if (riskyProg !== null) {
+    return {
+      decision: "risky",
+      reason: `命中「危险但有正当用途」程序规则：${riskyProg}（须过 (b) 且必过 (a)）`,
+      ruleId: `risky:program:${riskyProg}`,
+    };
+  }
+
+  // 8) 白名单（只读命令）→ allow（唯一通向 allow 的分支）
   const ro = matchReadOnly(args, program, R.readOnly);
   if (ro !== null) {
     return { decision: "allow", reason: `命中只读白名单：${ro}`, ruleId: `allow:readonly:${ro}` };
   }
 
-  // 8) 都不命中 → review（交 (b)/(a)；在 (b)/(a) 未接时由装配方默认拒绝）
-  return { decision: "review", reason: "未命中白名单，也未命中硬拒——交下一闸", ruleId: "review" };
+  // 9) 都不命中 → review（交 (b)；b 明确即终结，b 拿不准/不可用才升 (a)；未接时由装配方默认拒绝）
+  return { decision: "review", reason: "未命中白名单，也未命中硬拒或 risky——交下一闸", ruleId: "review" };
 }
 
 /**
- * 冻结契约入口：`classifyShell(argv, rules) => "allow" | "deny" | "review"`（§7.4）。
+ * 冻结契约入口：`classifyShell(argv, rules) => "allow" | "deny" | "risky" | "review"`（§7.4/§14.1）。
  * rules 必填；缺失/非法/版本未知 → "deny"（fail-closed）。此函数不吞错误、无默认放行分支。
  */
 export function classifyShell(argv: string[], rules: ShellRules): ShellClass {
@@ -256,13 +311,17 @@ export function classifyShell(argv: string[], rules: ShellRules): ShellClass {
 
 // ---------------------------------------------------------------------------
 // 默认规则集（可被装配方替换/覆盖；数据驱动，便于审计与 pin）。
-// 取舍见本文件与 changelog 的说明：这是**硬地板**，取「已知危险就拒、只读就放、其余交 (b)/(a)」；
-// 不追求完备（间接执行类无法穷尽），未命中者一律 review（由 (b)/(a) 兜底，未接时由装配方默认拒绝）。
+// 取舍见本文件与 changelog 的说明：这是**硬地板**，取「无正当用途/绕过门禁的就拒、只读就放、
+// 危险但有正当用途的交 (b)+(a)、其余交 (b)」；不追求完备（间接执行类无法穷尽），未命中者一律 review。
 //
 // ★ 规则集**按「程序 + argv」分类**（§7.10）：argv[0] 程序黑/白名单、危险 flag、写目标参数。
 //   **不因「无 shell」就认为安全**——`tee`/`dd of=`/`cp`/`mv`/`node -e`/`git checkout` 等**程序自身**照样能写，
-//   故它们按**程序语义**判（在 hardDenyPrograms / git-write 里），而非看有没有 `>`。
+//   故它们按**程序语义**判（在 hardDenyPrograms / riskyPrograms 里），而非看有没有 `>`。
 //   `denyTokens` 保留但**在本默认模型（argv-noshell）下不生效**——它是「一旦改回 shell 解释就恢复」的集合。
+//
+// ★ 三段（§14.3）：`hardDenyPrograms`（deny，终结）/ `riskyPrograms`（risky，过 b 且必过 a）/ `readOnly`（allow）。
+//   划名原则：**只拒「没有任何正当用途」或「放行即绕过门禁」的**——`rm` 有正当用途（删临时文件）故入 risky；
+//   `sh -c` 放行即绕过门禁（§14.4）故仍硬拒。
 // ---------------------------------------------------------------------------
 
 const BACKTICK = "`";
@@ -314,68 +373,79 @@ function defaultReadOnly(): ShellReadOnlyRule[] {
 
 function defaultHardDeny(): ShellHardDenyRule[] {
   return [
-    // 外壳/解释器外壳：`sh -c "…"` 把真实命令藏在参数里，无法可靠反推 → 直接拒
+    // ── A-1 re-shell：外壳/解释器外壳把**真命令藏在参数 string 里**，argv 无可读程序名，(c) 无法分类 ──
+    // `sh -c "…"` 里的 `sh` 自己会解释那段 string ⇒ 其一切影响（含写入）发生在子进程内、**完全不经过
+    // `resolveWrite`**；放行 = 整体绕过写边界（§14.4）。故这一类**仍硬拒终结、不改判 risky**。
     {
-      id: "shell",
+      id: "reshell",
       programs: [
         "sh", "bash", "zsh", "dash", "ash", "ksh", "csh", "tcsh", "fish", "busybox",
         "cmd", "powershell", "pwsh", "wsl", "winpty", "script", "expect",
       ],
     },
-    // 破坏性文件系统操作
-    {
-      id: "destructive-fs",
-      programs: ["rm", "rmdir", "del", "erase", "rd", "shred", "truncate", "dd", "mkfs", "format", "diskpart", "fdisk", "wipefs", "srm"],
-    },
-    // 写入/创建/权限类
-    {
-      id: "fs-write",
-      programs: [
-        "touch", "mkdir", "md", "cp", "copy", "mv", "move", "rename", "ren", "ln", "link", "mklink",
-        "install", "tee", "patch", "chmod", "chown", "chgrp", "attrib", "icacls", "takeown", "cacls",
-        "setfacl", "mkfifo", "mknod", "mount", "umount", "sync",
-      ],
-    },
-    // 交互式编辑器（可写）
-    { id: "editors", programs: ["vi", "vim", "nvim", "nano", "emacs", "ed", "ex", "notepad"] },
-    // 进程/系统状态变更
-    {
-      id: "process-system",
-      programs: ["kill", "killall", "taskkill", "shutdown", "reboot", "halt", "poweroff", "systemctl", "service", "sc", "net", "reg", "regedit", "schtasks", "at", "crontab", "launchctl"],
-    },
-    // 网络抓取/远程执行
-    {
-      id: "network-fetch",
-      programs: ["curl", "wget", "fetch", "aria2c", "scp", "sftp", "ftp", "rsync", "telnet", "nc", "ncat", "netcat", "ssh", "psexec"],
-    },
-    // 执行包装器：接受一个命令并运行它 ⇒ 等价于任意执行
-    {
-      id: "exec-wrapper",
-      programs: ["xargs", "env", "nohup", "nice", "ionice", "timeout", "stdbuf", "watch", "sudo", "doas", "su", "runas", "pkexec", "start", "eval", "exec", "source", "command"],
-    },
-    // 解释器「内联求值」形态：node -e / python -c / perl -e / ruby -e / php -r …（其余形态见已知缺口）
+    // ── A-1 求值内建/包装：把一段 string/命令当代码求值 ⇒ 同上「任意代码」，非「有界危险命令」──
+    { id: "inline-eval", programs: ["eval", "exec", "source", "command", "."] },
+    // ── A-1 解释器「内联求值」形态：node -e / python -c / perl -e / ruby -e / php -r …（其余形态见已知缺口）──
     {
       id: "interpreter-inline",
       programs: ["node", "python", "python2", "python3", "perl", "ruby", "php", "lua", "rscript", "deno", "bun", "ts-node"],
       onlyWithFlag: ["-e", "--eval", "-p", "--print", "-c", "-r", "--require"],
     },
-    // 原地改写
-    { id: "in-place-edit", programs: ["sed", "perl", "ruby"], onlyWithFlag: ["-i", "--in-place"] },
-    // awk 程序可 system()/重定向 → 拒（代价：普通文本处理也走 review）
+    // ── A-1 deno 的 `deno eval <code>` 子命令形态（等价于内联求值）──
+    { id: "deno-eval", programs: ["deno"], onlyWithSubcommand: ["eval"] },
+    // ── A-1 awk 程序可 system()/重定向 ⇒ 等价任意代码（代价：普通文本处理也走 review 以上的硬拒）──
     { id: "awk-exec", programs: ["awk", "gawk", "mawk", "nawk"] },
-    // Windows LOLBins（可下载/执行）
+    // ── A-2 提权：受治理会话里无正当用途 ──
+    { id: "privilege", programs: ["sudo", "doas", "su", "runas", "pkexec"] },
+    // ── A-2 系统级破坏/控制：无正当用途 ──
+    {
+      id: "system-destroy",
+      programs: ["mkfs", "format", "diskpart", "wipefs", "fdisk", "shutdown", "reboot", "halt", "poweroff"],
+    },
+    // ── A-2 Windows 脚本宿主/LOLBin（可下载并执行/绕过策略）：无正当用途 ──
     {
       id: "lolbin",
       programs: ["osascript", "wscript", "cscript", "mshta", "rundll32", "regsvr32", "msiexec", "installutil", "regasm", "regsvcs", "javaws", "msdt", "forfiles", "certutil", "bitsadmin"],
     },
-    // 构建/任务运行器：目标是执行任意程序（Makefile/构建脚本）
+  ];
+}
+
+/**
+ * 默认 risky 规则（§14.3-B）：**危险但有正当用途**的单程序命令 → 判 "risky"（过 (b) pm 审读；b 判放行后**仍须过 (a)**）。
+ * ★ 判据：**程序名在 argv 里以可读元素出现、语义可判**——(a) 客户看命令原文能看懂它的效果（`rm -rf build/` 看得懂）。
+ *   这正是 (a) 能兜住 risky 的前提；「命令藏在 string 里」的 re-shell/内联求值**不进本表**（它们在 hardDenyPrograms）。
+ *   风险交给 (b) 审读 + (a) 人看原文兜。**写目标是否逃出受治理根不由 (c) 判**——(c) 不解析路径（§7.7/§14.3）；
+ *   路径由 resolveWrite 在其自身范围判。但 shell 介导的写不经 resolveWrite（§7.1），故对 shell 写「逃出根」在门禁侧
+ *   无强制——由 (b)+(a) 兜（这也是本档**必须打扰人**的原因）。
+ */
+function defaultRisky(): ShellRiskyRule[] {
+  return [
+    // 删除/截断（删自己刚生成的临时文件等**正当**用途）
+    { id: "risky:delete", programs: ["rm", "rmdir", "del", "erase", "rd", "shred", "srm", "truncate", "dd"] },
+    // 原地改写
+    { id: "risky:in-place-edit", programs: ["sed", "perl", "ruby"], onlyWithFlag: ["-i", "--in-place"] },
+    // 交互式编辑器（可写）
+    { id: "risky:editors", programs: ["vi", "vim", "nvim", "nano", "emacs", "ed", "ex", "notepad"] },
+    // 进程/服务/系统状态变更
     {
-      id: "build-task-runner",
+      id: "risky:process-service",
+      programs: ["kill", "killall", "taskkill", "systemctl", "service", "sc", "net", "reg", "regedit", "schtasks", "at", "crontab", "launchctl"],
+    },
+    // 网络抓取/远程执行
+    {
+      id: "risky:network",
+      programs: ["curl", "wget", "fetch", "aria2c", "scp", "sftp", "ftp", "rsync", "telnet", "nc", "ncat", "netcat", "ssh", "psexec"],
+    },
+    // 间接执行器：被执行的**程序名以可读 argv 元素出现**（区别于 A-1「藏进 string」）⇒ 人能在原文里看懂
+    { id: "risky:indirect-exec", programs: ["xargs", "env", "nohup", "nice", "ionice", "timeout", "stdbuf", "watch", "start"] },
+    // 构建/任务运行器：目标是执行构建脚本（Makefile/…）
+    {
+      id: "risky:build",
       programs: ["make", "gmake", "just", "rake", "gradle", "gradlew", "mvn", "mvnw", "ant", "msbuild", "dotnet", "cargo", "go"],
     },
     // 包管理器的「运行脚本/安装（含生命周期脚本）」形态：npm install 会跑 postinstall
     {
-      id: "pkg-run",
+      id: "risky:pkg-run",
       programs: ["npm", "yarn", "pnpm"],
       onlyWithSubcommand: [
         "run", "exec", "test", "start", "stop", "restart", "ci", "install", "i", "add",
@@ -383,15 +453,24 @@ function defaultHardDeny(): ShellHardDenyRule[] {
         "create", "prune", "dedupe", "rebuild", "build", "prepare", "postinstall",
       ],
     },
-    // npx/corepack：接受任意包名并执行它 ⇒ 恒等同于任意执行，故无子命令例外
-    { id: "npx-exec", programs: ["npx", "corepack"] },
+    // npx/corepack：接受包名并执行它（§14.3-B 明列 risky）
+    { id: "risky:npx", programs: ["npx", "corepack"] },
+    // 文件写入/创建/权限/挂载：开发里**正当**写盘操作，程序名可见
+    {
+      id: "risky:fs-write",
+      programs: [
+        "touch", "mkdir", "md", "cp", "copy", "mv", "move", "rename", "ren", "ln", "link", "mklink",
+        "install", "tee", "patch", "chmod", "chown", "chgrp", "attrib", "icacls", "takeown", "cacls",
+        "setfacl", "mkfifo", "mknod", "mount", "umount", "sync",
+      ],
+    },
     // git 的「危险 flag」写开关：`--output`/`--output=<file>` 会把结果写盘（§7.10「危险 flag」）。
-    // 置于 git-write 之前：只带 --output 的只读子命令（如 `git log --output=x`）也据此硬拒，
-    // 而不再落 review。（readonly:git 的 blockedFlags 保留作纵深冗余。）
-    { id: "git-output-write", programs: ["git"], onlyWithFlag: ["--output"] },
+    // 置于 git 写子命令之前：只带 --output 的只读子命令（如 `git log --output=x`）也据此判 risky。
+    // （readonly:git 的 blockedFlags 保留作纵深冗余。）
+    { id: "risky:git-output-write", programs: ["git"], onlyWithFlag: ["--output"] },
     // git 的写子命令（与 readonly:git 互补：这里列出会改盘/改历史的子命令）
     {
-      id: "git-write",
+      id: "risky:git-write",
       programs: ["git"],
       onlyWithSubcommand: [
         "commit", "push", "pull", "fetch", "clone", "checkout", "switch", "restore", "reset",
@@ -419,12 +498,13 @@ function defaultDenyTokens(): string[] {
 export function defaultShellRules(): ShellRules {
   return {
     version: SHELL_RULES_VERSION,
-    id: "ans-default-v2", // 规则集 id（审计 / §7.6 归属；装配方可取它，不必另传 rulesId）
+    id: "ans-default-v3", // 规则集 id（审计 / §7.6 归属；装配方可取它，不必另传 rulesId）
     // 执行模型（§7.10）：本规则集按「程序 + argv」分类，绑定 `spawn(shell:false)`。
     // ★ 若执行层改回 shell 字符串 / shell:true，必须改为 "shell-string"（或删字段），否则元字符规则空转。
     executionModel: "argv-noshell",
     readOnly: defaultReadOnly(),
     hardDenyPrograms: defaultHardDeny(),
+    riskyPrograms: defaultRisky(),
     denyTokens: defaultDenyTokens(),
   };
 }

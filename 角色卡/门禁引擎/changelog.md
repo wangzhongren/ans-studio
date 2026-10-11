@@ -1,5 +1,82 @@
 # 门禁引擎 变更记录
 
+## 2026-10-11 — T40：shell 闸 (c) 加第四档 `risky`；硬拒不再「危险即拒」（客户 2026-10-11）
+
+客户就 **shell 闸 (c) 的判定**给了新裁定，**部分推翻**设计 §7.3「危险即硬拒终结」。方案见设计
+`docs/design/2026-10-11_design_v1-full-implementation.md` **§14（尤其 §14.2/§14.3/§14.4）**、派发清单 **T40**。
+
+### 裁定要点（客户原话）
+
+> 危险命令（`rm` / `sh -c` 这类）**不终结**：先过 (b) pm 审读，**而且无论 pm 怎么判，都还要过 (a) 客户本人确认**
+> ——**pm 不是终审，客户才是**。理由：**`rm` 不是永远错的**（删自己刚生成的临时文件合理）；一概硬拒就是
+> 「过宽则天天误杀」。**但 PM 已裁（§14.5）**：`sh -c` / `eval` / `node -e` / `awk` 这类「重新引入 shell /
+> 内联求值」的形态**仍然硬拒终结**——它们不是「有界的危险命令」，是「任意代码」。
+
+- **边界**：全部落在本角色边界内——`src/model/decision.ts`、`src/common/门禁引擎/classify-shell.ts`、
+  `test/门禁引擎/classify-shell.test.ts`。**未动**任何编排文件（`src/common/编排/`、`test/编排/`、`test/测试/`）。
+
+### 改动
+
+- **`ShellClass` 三态 → 四态**（`src/model/decision.ts`）：`"allow" | "deny" | "risky" | "review"`。
+  取舍（§14.1）：用**新枚举值**而非「`review` + flag」——次序/终结显式可测。新增 `ShellRiskyRule`
+  （与 `ShellHardDenyRule` 同形：`id/programs/onlyWithFlag?/onlyWithSubcommand?`）；`ShellRules` 加
+  **`riskyPrograms?: ShellRiskyRule[]`**——**类型标可选、运行时必需**：`validateRules` 对缺失/非数组**一律
+  deny**（fail-closed，§7.5）；标可选只为兼容尚未迁移的规则集字面量（如 `test/编排/*` 里手搓的 `ShellRules`），
+  不因本档新增而使别角色文件**编不过**。`ShellVerdict.ruleId` 加 `risky:program:<id>`。
+- **`classifyShell` 加第 7 步 risky**（在**硬拒之后、白名单之前**）：命中 `riskyPrograms` → 返回 `"risky"`。
+  `SHELL_RULES_VERSION` **"2" → "3"**；旧 "2" 规则集因版本不符一律被拒（fail-closed）。
+- **硬拒名单重划**（§14.3，原则「**只拒没有正当用途 / 放行即绕过门禁的**」；§7.10 的 `argv-noshell` 前提仍成立，
+  **元字符那批仍是空转、不作任何理由**）：
+  - **仍硬拒、终结**：① re-shell（`sh`/`bash`/`zsh`/`dash`/`ash`/`ksh`/`fish`/`cmd`/`powershell`/`pwsh`/`wsl`/`busybox`…）；
+    ② 求值内建（`eval`/`exec`/`source`/`command`/`.`）；③ 内联求值（`node -e`/`python -c`/`perl -e`/`ruby -e`/`php -r`/`deno eval`…）；
+    ④ `awk`/`gawk`（可 `system()`）；⑤ 提权（`sudo`/`doas`/`su`/`runas`/`pkexec`）；
+    ⑥ 系统破坏/控制（`mkfs`/`format`/`diskpart`/`wipefs`/`fdisk`/`shutdown`/`reboot`/`halt`/`poweroff`）；
+    ⑦ Windows LOLBin（`mshta`/`wscript`/`cscript`/`rundll32`/`regsvr32`/`msiexec`/`certutil`/`bitsadmin`…）。
+  - **改判 `risky`**：删除（`rm`/`rmdir`/`del`/`shred`/`truncate`/`dd`…）、原地改写（`sed -i`/`perl -i`/`ruby -i`）、
+    编辑器、进程/服务（`kill`/`systemctl`/`reg`…）、网络（`curl`/`wget`/`ssh`…）、**间接执行器**
+    （`xargs`/`env`/`nohup`/`timeout`——**程序名在 argv 里可见**）、构建（`make`/`gradle`/`cargo`…）、
+    包管理（`npm run/install`/`npx`…）、**文件写**（`cp`/`mv`/`mkdir`/`touch`/`chmod`/`tee`…）、
+    `git` 写子命令与 `--output`。
+
+### risky 为何新增
+
+`rm` 这类**不是永远错的**（删自己刚生成的临时文件合理），一概硬拒即设计自认的「**过宽则天天误杀**」；
+同时保留「模型不能单独放行」（(b) 判放行后**仍过 (a)**，客户本人看原文）。(c) 不判路径（§7.7/§14.3），
+故 `risky` 管的是「危险但正当」，风险交给 **(b) 审读 + (a) 人看原文** 兜。
+
+- **`risky` 的判据**（§14.3-B，落成规则/注释）：**只给「程序名在 argv 里以可读元素出现、语义可判」的形态**——
+  因为 (a) 是**客户看命令原文**，得看得懂（`rm -rf build/` 看得懂）。**这是 (a) 能兜住 risky 的前提。**
+
+### `sh -c` 为何仍硬拒（§14.4，核心）
+
+`run_shell` 以 `spawn(argv[0], argv.slice(1), {shell:false})` 执行，但 **`sh -c "…"` 里的 `sh` 自己会解释那段
+string ⇒ 该命令的一切影响（含写入）发生在子进程内、完全不经过 `resolveWrite`**。**放行 `sh -c`（及 `eval`/
+`node -e`）＝ shell 闸与写边界对那条命令整体失效**——(a) 人虽看得到原文，但**门禁对「那段 string 会写什么」
+一无所知、也无法约束**。故 **re-shell/内联求值形态仍硬拒终结、不改判 `risky`**：它们**不是「有界的危险命令」，
+是「任意代码」**。同一道理，**`risky` 绝不收「命令藏在 string 里」的形态**。
+
+### 测试与门禁
+
+- **`test/门禁引擎/classify-shell.test.ts`** 重写（**45 例**）：四档**各有一条可达用例**；原硬拒里改判 risky 的
+  （`rm`/`dd`/`sed -i`/`git` 写子命令…）现断言 **risky**；仍硬拒的（`sh -c`/`eval`/`node -e`/`awk`/`sudo`/`mkfs`/LOLBin…）
+  **逐个钉死**；**反向守卫**（§14.4）：`sh -c` 一类断言 **`deny` 且 `!== risky` 且 `!== allow`**（防后人顺手放宽），
+  并对 `eval`/`node -e`/`python -c`/`awk` 同法加守卫；白名单仍 `allow`、未命中仍 `review`；**规则集缺失/非法/
+  版本未知/`riskyPrograms` 缺失/形状非法仍 `deny`**（fail-closed 不退化，含新增的「`riskyPrograms` 缺失 → deny」用例）。
+- **`test/门禁引擎/`**：`node --test "test/门禁引擎/*.test.ts"` → **120 passed / 0 failed**（其中 `classify-shell.test.ts` 45 例全绿）。
+- **`npm run typecheck`**：**零错误**（全仓基线零，改后仍零；`riskyPrograms?` 标可选，故别角色 `ShellRules` 字面量不受影响）。
+- **全量**：`node --test "test/**/*.test.ts"`（带引号、Node glob、三层路径）→ **632 passed / 1 failed**（基线 621/0）。
+
+### 回报（跨角色，未动他人文件）
+
+- **`test/测试/t9-block3-pin-shell.test.ts:248`**（属**测试**角色）：断言 `rm -rf build` → **硬拒**（`C_DENY`，
+  `(b)/(a)` 不被调用）。现 `rm` 改判 **`risky`**，而**编排（`src/common/编排/shell-gate.ts`）尚未做 T41 改造**——
+  它把 `risky` 当 `review` 走 (b) 分支，故 (b) 桩（`{"verdict":"allow"}`）放行 → `allow:true`，用例失败。
+  **这正是本条预期、且任务明言「不要越界修」的红**——待 **T41（编排三层次序：`risky` 必过 (a)）** 与
+  **T43（测试）** 同步。**本角色未改**（边界外）。
+- **`test/编排/*`**（属**编排**角色）：其 `ShellRules` 字面量（`{version:"1", readOnly, hardDenyPrograms, denyTokens}`）
+  因 `riskyPrograms?` **标为可选**而**仍能编译**；且这些用例**注入桩 `classifyShell`、不跑真引擎**，故**未失败**——
+  如实记录以免误判。
+
 ## 2026-10-11 — 空项目不报警：删去无角色目录时的 warning（空项目是**正常状态**）
 
 客户导入一个**没有角色目录的文件夹**后提出：「项目没有角色卡的时候也不用有错误提示啊，**这个是正常的啊**。」

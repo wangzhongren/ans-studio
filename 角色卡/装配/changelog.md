@@ -1,5 +1,49 @@
 # 装配 变更记录
 
+## 2026-10-11 — T42：如实登记「V1 shell 闸未接线」（两个入口；只加说明与注释，零行为改动）
+
+派发任务 T42。背景：shell 闸三层链——**(c) 确定性硬地板 → (b) pm 审读 → (a) 客户确认**——**已实现、已测试、
+逻辑验过**，但**从任何入口都到不了**：桌面**刻意不 arm**（`DESKTOP_SHELL_GATE_ARMED === false`，不注入
+`ShellGate`），**CLI 入口从未注入**。**客户裁定 V1 就这样——不 arm**（V1 无 OS 沙箱，`run_shell` 起的子进程
+写入**不受 `resolveWrite` 约束**，arm 风险大）。风险是那段代码**看起来像在生效**（绿灯测试加深误解）。本任务
+**不删代码**（该链为将来备），只让**文档与代码都读得出来「现在没接」**。
+
+- **`src/index.ts`（唯一运行时说明落点）**：在 `buildRoleRunDeps` 的函数文档注释内新增一段**明注**（该函数正是
+  构造 `createAdapter` 的接线点）：本 CLI 入口对**任一** runtime 都**不注入 `ShellGate`**——pi 分支调
+  `createPiAdapterFactory(project)` **只传 project、略去第二参 `shellGate`**（其签名 `(project, shellGate?)`），
+  demo 假替身本不涉 shell；据设计 §7.5.1「能力缺席 = 最强 fail-closed」，**未注入 `ShellGate` ⇒ Pi 适配器
+  根本不注册 `run_shell`** ⇒ **本入口下模型没有 shell 能力**；三层链**已实现并已测试**但**从本入口到不了**、
+  **运行时不影响任何行为**。措辞显式写明：**这是客户确认的 V1 范围**（非缺陷 / 欠账）、**将来要启用须新的
+  裁定**（另行评审并在此显式接线）、**不会自行启用**——并明说「别把这段读成『已经在跑』」。**无任何行为改动**
+  （不注入就是不注入；未动 `createPiAdapterFactory` 调用）。
+- **`README.md`「已知范围外 / 未验证」**：原条目 **`- **桌面 shell 闸 V1 不 arm**` 改写为**涵盖**两个入口**的
+  条目 **`- **shell 闸三层链已实现并测试，但 V1 两个入口均未接线**`**——如实写清：`run_shell` 仅在会话构造
+  路径注入 `ShellGate` 时才注册；三层链**已实现并经测试**；但 V1 **两个入口都不注入**（**桌面刻意不 arm**，
+  `DESKTOP_SHELL_GATE_ARMED === false`；**CLI 入口从未注入**，见 `src/index.ts` 的 `buildRoleRunDeps`）；
+  因此**模型在任何入口都没有 shell 能力**、这条链**当前不影响任何运行时行为**；并注明**客户确认的 V1 范围**
+  （V1 无 OS 沙箱、`run_shell` 子进程写入不受 `resolveWrite` 约束）、**将来启用需新裁定、不会自行生效**。
+  **为何改写而非另加一条**：原条目已在本节、且近义，另加会造成近乎重复——改写为**入口中立**的一条更准更省。
+- **README 别处「把 shell 闸说成生效」的核对与修正**：grep README 全部 `shell`/`闸` 命中（第 134/160/162/164 行）。
+  第 134 行是 pm 角色路径里的**条件名** `shell-gate`（非「已启用」主张，**未动**）；第 **160 行**「多任务派发引擎」
+  条目把 `shell 闸` 列为 V1 已达成的清单项（`V1 只到「… + shell 闸」`）——**这是唯一一处读起来像「V1 含 shell 闸」**，
+  已**加限定**为「`shell 闸`（三层链已实现，但 V1 两个入口均未接线，见下）」。**未发现**其他把 shell 闸写成
+  「生效 / 已启用」的措辞。
+- **只读核实（未动他角色文件）**：`app/main.ts`（桌面侧 `DESKTOP_SHELL_GATE_ARMED === false` ⇒ 会话构造路径
+  不注入 `ShellGate`，第 265–273 行的 arm 分支恒为死分支）；`app/desktop/operator-channel.ts`（客户确认的
+  「不 arm」裁定原文与理由）；`src/pipeline/orchestration/run-role.ts`（只读：`createPiAdapterFactory(project, shellGate?)`
+  具接缝，`selectAdapterFactory` 经 `deps.shellGate` 转发）；`src/provider/pi/tools.ts`（只读：`buildGovernedTools`
+  **仅 `shellGate !== undefined`** 时 `push(makeRunShellTool(...))`——能力缺席即不注册的结构性保证）。
+- **测试同步**：`test/装配/` **无**断言 README 内容或 `src/index.ts` 注释文本的用例（grep 确认：仅 `import`/调用
+  `main()` 断言 stdout 行为，注释不进输出），**无需同步**。
+- **验证（两道门）**：`npm run typecheck` → **0 错**（含 `src/index.ts`，注释段类型合法）。`node --test
+  "test/**/*.test.ts"`（**必须带引号**，走 Node glob）→ **621 tests / 600 pass / 21 fail**——**本角色
+  `test/装配/` 全绿（49 pass / 0 fail）**；**21 个失败全在他角色边界**：`test/门禁引擎/classify-shell.test.ts`
+  （15，门禁引擎）+ `test/测试/t9-block3-pin-shell.test.ts`（6，测试）。失败形态为 `classifyShellDetailed`
+  返回 `deny:rules-invalid`（规则集不可用），与「shell 规则集正在被门禁引擎角色并行改动」吻合——**落在我边界
+  之外，未动、如实回报**（上一轮 README 更新时基线为 621/0，故此为**并行改动的中间态**，非本任务引入；
+  本任务只加注释/文档，理论与实测均不触碰 classify-shell）。**未读 `.env`、未发真实网络请求、未打印任何凭据值**。
+  来源：派发任务 T42 + 客户「V1 不 arm」裁定。
+
 ## 2026-10-11 — 更新 README 至当今状态（客户指出并放行）
 
 客户指出「readme.MD 没有更新」，`README.md` 已严重过时。本任务逐条**按代码核实后重写** README，并补定位与新增章节。

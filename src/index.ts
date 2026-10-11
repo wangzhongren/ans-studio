@@ -309,6 +309,17 @@ async function printDoctor(selection: RuntimeSelection): Promise<void> {
  *     默认真实适配器”），注入真实 Pi 适配器工厂。动态导入以便 pipeline 缺失时能被
  *     reportUnavailable 如实诊断，而非顶层加载即崩。
  * 两种情况都注入同一份 project/scope（演示配置的唯一来源，契约 §6）。
+ *
+ * ⚠️ shell 闸（`run_shell`）——**本 CLI 入口 V1 未接线**（如实登记；**客户确认的 V1 范围**，非欠账、
+ *   也**不是「暂未启用」**）：
+ *   · 本入口对**任一** runtime 都**不注入 `ShellGate`**——pi 分支调 `createPiAdapterFactory(project)`
+ *     只传 project、**第二参 `shellGate` 略去**（其签名 `(project, shellGate?)`）；demo 假替身本不涉 shell。
+ *   · 依设计 §7.5.1「能力缺席 = 最强 fail-closed」：**未注入 `ShellGate` ⇒ Pi 适配器根本不注册 `run_shell`**，
+ *     故**本入口下模型没有 shell 能力**。
+ *   · 三层链——(c) 确定性硬地板 → (b) pm 模型审读 → (a) 操作者确认——**已实现并已测试**，但从本入口**到不了**；
+ *     该链在**运行时不影响任何行为**（本入口从不 arm；桌面侧同样刻意不 arm）。
+ *   · 理由（客户裁定）：V1 无 OS 沙箱，`run_shell` 起的子进程写入**不受 `resolveWrite` 约束**，arm 风险大。
+ *   · **将来要启用须新的裁定**并在此显式接线（另行评审）——**不会自行启用**。别把这段读成「已经在跑」。
  */
 async function buildRoleRunDeps(selection: RuntimeSelection): Promise<RunRoleDeps> {
   const { project } = await loadConfig();

@@ -3,8 +3,9 @@
 // 自搭场景：
 //   · pin：匹配→accepted；不匹配→未接受→拒一切写；无 .ans→回退内置（未接受）仍拒写；无 pin 的 accepted:true→置未接受；
 //   · 调度记录与审计（boundary 级）：pm 边界的 docs/scheduling/ 与 docs/audit/(condition shell-gate)；
-//   · V3 三层链 (c)→(b)→(a)：白名单放行且 (b)/(a) 未被调用；硬拒终结且 (b)/(a) 未被调用；
-//     review→(b)；各层拿不准/超时/不可用 → 只往更严的层退；fail-closed 退路；
+//   · V3 三层链 (c)→(b)→(a)：白名单放行且 (b)/(a) 未被调用；**硬拒（sh -c）**终结且 (b)/(a) 未被调用；
+//     **risky（rm 等）→(b)，且 b 放行后仍必过 (a)**（客户 2026-10-11：pm 不是终审，客户才是）；review→(b)；
+//     各层拿不准/超时/不可用 → 只往更严的层退；fail-closed 退路；
 //   · 未 arm → run_shell 根本不注册；run_shell 只在恰好 allow:true 时执行。
 //
 // 全部在系统临时目录内（pin 用例），用完清理。V3 用例为纯内存/子进程，无仓库副作用。
@@ -28,7 +29,9 @@ import {
   createShellGate,
   BRANCH_C_ALLOW,
   BRANCH_C_DENY,
+  BRANCH_B_DENY,
   BRANCH_REVIEW_NO_BA,
+  BRANCH_RISKY_NO_BA,
   BRANCH_RULESET_LOAD_FAILED,
   type PmAskFn,
   type CreateShellGateOptions,
@@ -245,18 +248,85 @@ test("块3/V3(c) 白名单 → 放行，且 (b)/(a) **未被调用**", async () 
   assert.equal(audit.records[0].branch, BRANCH_C_ALLOW);
 });
 
-test("块3/V3(c) 硬拒 → 拒绝、终结，**且 (b)/(a) 未被调用**（硬地板不可翻案：桩本会放行）", async () => {
+test("块3/V3(c) 硬拒（sh -c）→ 拒绝、终结，**且 (b)/(a) 未被调用**（硬地板不可翻案：桩本会放行）", async () => {
+  // ── 何为「硬拒」：`sh -c "…"` 把真命令藏在参数 string 里，客户在原文里**看不懂**、兜不住（§14.4）——
+  //    故它**永远走硬拒终结**，不进 (b)/(a)。（`rm` 已于 2026-10-11 被客户改判 `risky`：见下一条用例；
+  //    本条按新语义改用 `sh -c` 承载「硬拒不可翻案」这条断言。）
   // 关键：(b)、(a) 的桩**本会放行**——若硬地板可被翻案，(b)/(a) 会被调用并放行。断言它们根本没被调用。
   const { gate, calls, audit } = gateWithSpies({
     pmAsk: () => '{"verdict":"allow","reason":"我允许"}',
     operatorChannel: () => ({ outcome: "allow", operatorId: "op" }),
   });
-  const r = await gate(req("rm -rf build", ["rm", "-rf", "build"]));
+  const r = await gate(req('sh -c "rm -rf build"', ["sh", "-c", "rm -rf build"]));
   assert.equal(r.allow, false, "硬拒必须拒绝");
   assert.equal(calls.b, 0, "(b) 本会放行也必须**不被调用**——硬地板绝对否决");
   assert.equal(calls.a, 0, "(a) 本会放行也必须**不被调用**");
   assert.match(r.allow === false ? r.reason : "", /硬拒|deny/);
   assert.equal(audit.records[0].branch, BRANCH_C_DENY);
+
+  // ★ 反向守卫（§14.4，这处最容易被后人顺手放宽）：`sh -c` 命令藏在 string 里、客户看原文看不懂，
+  //   **不得**被放宽为 `risky`（进 (b)/(a)）或 `allow`（直接放行）。直接钉住 (c) 分类，防语义漂移。
+  const rules = defaultShellRules();
+  assert.equal(classifyShell(["sh", "-c", "rm -rf build"], rules), "deny", "sh -c 仍须判 deny（硬拒终结）");
+  assert.notEqual(classifyShell(["sh", "-c", "rm -rf build"], rules), "risky", "sh -c **不得**被放宽为 risky（不进 (b)/(a)）");
+  assert.notEqual(classifyShell(["sh", "-c", "rm -rf build"], rules), "allow", "sh -c **不得**被放宽为 allow");
+});
+
+// —————————————— 块3/V3(c) risky：危险但有正当用途 → 必过 (b)，且 (b) 放行后仍必过 (a) ——————————————
+//
+// ── 为何按新语义断言（客户 2026-10-11 裁定，T40 门禁引擎 + T41 编排）─────────────────────────
+// 客户**部分推翻**「危险即硬拒终结」：`rm`/`dd`/`sed -i`/`git` 写子命令 这类**危险但有正当用途**的命令
+// **不终结**——先过 (b) pm 审读，**无论 pm 怎么判，都要过 (a) 客户本人确认**（原话：**pm 不是终审，客户才是**）。
+// 门禁引擎 (c) 据此把它们从硬拒**改判第四态 `risky`**。次序表（§14.2）：
+//     risky → (b)；b 判「放行」→ **仍须过 (a)**；b 判「拒绝」→ 终结、**不打扰 (a)**；
+//     b 拿不准/不可用/超时 → 升 (a)；(a) 拒绝/超时/不可用 → 拒绝；(b)/(a) 均未接 → 拒（fail-closed）。
+// 故旧断言「`rm -rf build` 硬拒、且 (b)/(a) 不被调用」**已被新语义推翻**——`rm` 现判 `risky`，会接 (b)/(a)。
+// 下方四条逐条钉死上面这张表；**(b) 放行 + (a) 拒绝 → 拒绝** 是本次**最要害**的一条（证明 pm 不是终审）。
+// `gateWithSpies` 注入的 `pmAsk`/`operatorChannel` **就是**契约形状的替身（`PmAskFn` / `OperatorChannelFn`，
+// 形状单一来源 `src/provider/pi/session.ts`）——正例（b 放行 + a 放行）由这两个替身共同构成。
+
+test("块3/V3(c) risky + (b) 放行 + (a) 放行 → 放行（走 b-allow→a-allow）", async () => {
+  const { gate, calls, audit } = gateWithSpies({
+    pmAsk: () => '{"verdict":"allow","sessionId":"s1","model":"m1"}',
+    operatorChannel: () => ({ outcome: "allow", operatorId: "op" }),
+  });
+  const r = await gate(req("rm -rf build", ["rm", "-rf", "build"]));
+  assert.equal(r.allow, true, `risky + b-allow + a-allow → 放行：${JSON.stringify(r)}`);
+  assert.equal(calls.b, 1, "risky 应先过 (b)");
+  assert.equal(calls.a, 1, "★ risky 要害：b 判放行**仍必过 (a)**（pm 不是终审，客户才是）");
+  assert.equal(audit.records[0].branch, "b-allow→a-allow");
+});
+
+test("块3/V3(c) risky + (b) 放行 + (a) 拒绝 → **拒绝**（★ 最要害：pm 不是终审，客户才是）", async () => {
+  const { gate, calls, audit } = gateWithSpies({
+    pmAsk: () => '{"verdict":"allow","sessionId":"s1"}',
+    operatorChannel: () => ({ outcome: "deny", operatorId: "op", reason: "我不批这条" }),
+  });
+  const r = await gate(req("rm -rf build", ["rm", "-rf", "build"]));
+  assert.equal(r.allow, false, "★ pm 放过也没用：客户拒绝 → 拒绝（pm 判放行不构成终审）");
+  assert.equal(calls.b, 1, "(b) 应被调用一次");
+  assert.equal(calls.a, 1, "b 判放行后 risky **必须**惊动 (a)——这正是「pm 不是终审」的落点");
+  assert.equal(audit.records[0].branch, "b-allow→a-deny");
+});
+
+test("块3/V3(c) risky + (b) 拒绝 → 拒绝、终结，**且 (a) 未被调用**（pm 说不该跑就不打扰人）", async () => {
+  const { gate, calls, audit } = gateWithSpies({
+    pmAsk: () => '{"verdict":"deny","reason":"不许"}',
+    operatorChannel: () => ({ outcome: "allow", operatorId: "op" }),
+  });
+  const r = await gate(req("rm -rf build", ["rm", "-rf", "build"]));
+  assert.equal(r.allow, false, "(b) 判拒 → 拒绝");
+  assert.equal(calls.b, 1, "(b) 应被调用一次");
+  assert.equal(calls.a, 0, "risky 唯独 (b) 判拒时**不打扰人**——(a) 不得被调用");
+  assert.equal(audit.records[0].branch, BRANCH_B_DENY);
+});
+
+test("块3/V3(c) risky 且 (b)/(a) 均未接入 → 拒绝（fail-closed：risky 必过 (a)，a 缺席即拒）", async () => {
+  const { gate, calls, audit } = gateWithSpies({});
+  const r = await gate(req("rm -rf build", ["rm", "-rf", "build"]));
+  assert.equal(r.allow, false, "risky 未接 (b)/(a) 必须拒（绝不因缺下一闸而放行）");
+  assert.equal(calls.b + calls.a, 0, "两侧都缺席：不惊动任何层");
+  assert.equal(audit.records[0].branch, BRANCH_RISKY_NO_BA);
 });
 
 test("块3/V3 (c) review → (b) 放行即终结；(b) 拒绝亦终结", async () => {

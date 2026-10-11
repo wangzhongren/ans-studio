@@ -1,5 +1,54 @@
 # 测试 变更记录
 
+## 2026-10-11 — 按新语义改 shell 闸 (c) 判定断言：rm 改判 risky（必过 (b) 且 b 放行后仍必过 (a)）；sh -c 仍硬拒
+
+**来源**：客户就 **shell 闸 (c) 的判定**给新裁定，**部分推翻**「危险即硬拒终结」（原话：**pm 不是终审，客户才是**）。门禁引擎（T40 `src/common/门禁引擎/classify-shell.ts`）+ 编排（T41 `src/common/编排/shell-gate.ts`）已落地：`ShellClass` 四态 `"allow" | "deny" | "risky" | "review"`；`rm`/`dd`/`sed -i`/`git` 写子命令等从硬拒**改判 `risky`**；`sh -c`/`eval`/`node -e`/`awk` **仍硬拒**（命令藏在 string 里，客户看原文看不懂、兜不住，§14.4）。次序表（§14.2）：`risky`→(b)；**b 判放行仍须过 (a)**；b 判拒即终结、**不打扰 (a)**；(a) 拒绝/超时/不可用 → 拒绝；(b)/(a) 均未接 → 拒（fail-closed）。两角色如实回报**未越界改本角色文件**，点名 `test/测试/t9-block3-pin-shell.test.ts:248` 的 `rm -rf build` 硬拒断言已成为失败项（**正是 fail-closed 语义变更的预期，非 bug**）。边界：只写 `test/测试/` 与 `角色卡/测试/`。**只读**：`src/model/decision.ts`、`src/common/门禁引擎/classify-shell.ts`、`src/common/编排/shell-gate.ts`、`src/provider/pi/session.ts`。
+
+### 1) 失效断言（改前，先实测）
+
+本角色 `test/测试/t9-block3-pin-shell.test.ts`（`test` 声明于 **248** 行）按**旧语义**断言 `rm -rf build` 硬拒：
+
+```ts
+const r = await gate(req("rm -rf build", ["rm", "-rf", "build"]));
+assert.equal(r.allow, false, "硬拒必须拒绝");
+assert.equal(calls.b, 0, "(b) 本会放行也必须**不被调用**——硬地板绝对否决");
+assert.equal(calls.a, 0, "(a) 本会放行也必须**不被调用**");
+assert.match(r.allow === false ? r.reason : "", /硬拒|deny/);
+assert.equal(audit.records[0].branch, BRANCH_C_DENY);
+```
+
+独立实测四态（`classifyShell`，`defaultShellRules()`）：`rm -rf build` → **`risky`**（不再 `deny`）；`sh -c …` → **`deny`**；`python x.py` → `review`；`ls -la` → `allow`。故该断言与新区次序表矛盾——`rm` 现走 `risky`，会接 (b)/(a)。**这正是 fail-closed 语义变更的预期**。
+
+### 2) 改法
+
+**① 保留并加固 `sh -c` 那条**（原「硬拒终结」的断言改用 `sh -c` 承载，原断言逐条保留）：
+- 保留：`allow:false`、`calls.b===0`、`calls.a===0`（(b)/(a) 桩**本会放行**，证明硬地板不可翻案）、`reason` 匹配 `/硬拒|deny/`、`branch===BRANCH_C_DENY`。
+- **新增反向守卫**（这处最容易被后人顺手放宽）：直接钉住 (c) 分类——`assert.equal(classifyShell(["sh","-c","rm -rf build"], rules), "deny")` + `assert.notEqual(…, "risky")` + `assert.notEqual(…, "allow")`。
+
+**② 把 `rm` 那条改写为新次序表的四条**（覆盖任务要求的全部分支）：
+- `risky + (b)/(a) 均未接入 → 拒绝`，branch `BRANCH_RISKY_NO_BA`（`risky-default-deny`）；
+- **`risky + (b) 放行 + (a) 拒绝 → 拒绝`**（**最要害**：证明 pm 不是终审）——branch `b-allow→a-deny`，`calls.a===1`；
+- `risky + (b) 拒绝 → 拒绝且 (a) 未被调用`——branch `BRANCH_B_DENY`，`calls.a===0`；
+- `risky + (b) 放行 + (a) 放行 → 放行`——branch `b-allow→a-allow`，`calls.b===calls.a===1`（**正例**）。
+
+### 3) 正例与替身（不只改负例）
+
+四条 risky 用例中，`risky + (b) 放行 + (a) 放行 → 放行` 是**正例**。确认通道替身即既有 `gateWithSpies` 注入的 `pmAsk`（`PmAskFn`）与 `operatorChannel`（`OperatorChannelFn`）——**形状单一来源 `src/provider/pi/session.ts`**（与 `t9-block1-bootstrap.test.ts` finalize 正例**同一套替身**：`(prompt) => ({ outcome: "allow", operatorId: "op" })`）。spy 包装记录 (b)/(a) 调用次数，故「必过 (a)」可断言。
+
+### 4) 扫本角色全目录：有无别处仍按旧语义断言 shell 判定
+
+**无。** `test/测试/` 内 `classifyShell` / `ShellClass` / `risky` / `hardDeny` 命中除本文件（已改）外，仅 `t9-block3-pin-shell.test.ts:426` 的 fail-closed 用例（`classifyShell(["ls"], badRules) === "deny"`）——那是**规则集版本未知**的 fail-closed 断言（程序名单无关），**不受影响、仍绿**。其余文件（`helpers.ts`/`boundary-matrix`/`fail-closed`/`wiring`/`conditions-f5`/`real-entry`/`f7-symlink`/`t9-block2`/`t29-*`）**不含** shell 判定断言。**未改任何非本角色文件**（如实回报；本角色边界不含 `test/门禁引擎/`、`test/编排/`）。
+
+**注**：`test/门禁引擎/classify-shell.test.ts`、`test/编排/shell-gate.test.ts`（**门禁引擎 / 编排**角色，非本角色）是否已随新语义更新**不在本角色边界**，**未核对、未改动**——如发现旧语义断言请由对应角色收口。
+
+### 5) 验证（本角色独立执行）
+
+- `node --test test/测试/t9-block3-pin-shell.test.ts` → **20 pass / 0 fail**（改前 16 例，本条 1 → 5，净 +4）。
+- `node --test test/测试/*.test.ts` → **103 pass / 0 fail**（改前 99）。
+- `npm run typecheck` → **零错误**。
+- 全量 `node --test "test/**/*.test.ts"`（**带引号**走 Node glob，三层路径）→ **657 pass / 0 fail**（基线 653 总 / 652 通过 / 1 失败；那 1 处即本条，已消除）。**改完全量全绿。**
+- 观察（如实登记，非本改动引入）：首跑曾**偶发**一次 `test/pi-adapter/tools.test.ts:248`（`edit_file` 保留 UTF-8 BOM 用例）失败；单跑该文件 3/3 通过、其后两轮全量均 657/657 全绿 ⇒ 判为**偶发 flake**（异角色文件、异路径、与 shell 判定无关）。未改该文件。
+
 ## 2026-10-11 — 按新语义修 finalize 断言：收口需客户确认（fail-closed）
 
 **来源**：客户裁定 **bootstrap 完成方式 =「su 主动提议 → 客户确认 → 完成」**（原话：「完成 bootstrap 应该是 su 主动觉得差不多了，来完成」+「当然需要客户确认了」）。编排（T37）据此改造 `src/common/编排/finalize.ts::finalize()`：**不再「被调用即完成」**，而是**构造提议、经客户确认通道挂起**；**通道缺省/不可用/超时/拒绝 → 不完成**（fail-closed）。确认通道**复用 shell 闸 (a) 的 `OperatorChannelFn`**（形状单一来源 `src/provider/pi/session.ts`），提议是**一种 `OperatorPrompt`**——**不造第二套确认机制**。编排未越界改本角色文件，如实把结论交回本角色收口。边界：只写 `test/测试/` 与 `角色卡/测试/`。**只读**：`src/common/编排/finalize.ts`、`src/provider/pi/session.ts`、`src/pipeline/orchestration/govern-session.ts`。

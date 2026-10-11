@@ -1,5 +1,33 @@
 # 编排 变更记录
 
+## 2026-10-11 — T41：三层次序支持 `risky`——**`risky` 必过 (a)（b 判放行亦然）**；`review` 仍「b 明确即终结」
+
+**来源**：客户裁定（2026-10-11，设计 §14，**部分推翻 §7.3「危险即硬拒终结」**）——危险命令（`rm` 这类）不再一概终结：「先过 (b) pm 审读，**无论 pm 怎么判，都还要过 (a) 你本人**」＝**「pm 不是终审，你才是」**。T40 已把门禁引擎 (c) 改成四态（`allow | deny | risky | review`）并重划硬拒名单；本任务（编排）接上三层链对第四档 `risky` 的**次序与终结**。落点全在本角色边界内（`src/common/编排/shell-gate.ts`、`test/编排/`）。
+
+**改了什么**
+
+1. **`decide` 按四态分派**（`src/common/编排/shell-gate.ts`）：`allow`/`deny` 仍 c 层**终结**、**不进 (b)/(a)**（硬拒不可翻案不变）；`review` 与 `risky` 走**同一条** `runBA` 入口——**唯一差别是新增形参 `mustPassA = (detail.decision === "risky")`**。
+
+2. **`runBA` 实现次序表（§14.2 要害）**：
+   - **(b) 判放行**：`mustPassA`（risky）→ **升 (a)**（`runA`，分支成 `b-allow→a-allow` / `b-allow→a-deny` / `b-allow→a-unavailable` / `b-allow→a-timeout`）；否则（review）→ **终结放行**（`b-allow`，不打扰人）。
+   - **(b) 判拒绝**：两档同 → **终结拒绝**（`b-deny`，**不打扰人**——risky 下 (a) 也**不**被调用）。
+   - **(b) 拿不准/无会话/超时/报错/JSON 非法 → 升 (a)**：两档同（`runB` 原有逻辑不动）。
+   - **(a) 放行 → 放行；拒绝/超时/不可用/未接 → 拒绝**：fail-closed 三退路**逐字保持**。
+
+3. **新增分支常量 `BRANCH_RISKY_NO_BA = "risky-default-deny"`**：`(c)=risky` 且 **(b)/(a) 均未接入** → **默认拒**（fail-closed：risky **必过 (a)**，a 缺席即拒）。原 `review-default-deny`（review 的 (c)-only 默认拒）**不变**。头注释重述为「四态 §14.2 次序表」，并点明 risky 的设计前提（程序名在 argv 可见、客户看原文看得懂）与「re-shell/内联求值根本不到本层」。
+
+**未改的契约（回归保证）**：`allow`/`deny` c 层终结、硬拒不可翻案、(b) 各失败路径升 (a)、(a) 各失败路径拒、(c) 规则集加载失败/无分类器/分类抛错/整体超时 → 拒——**均逐字保持**（既有 `test/编排/{shell-gate,shell-review-chain}.test.ts` 全绿佐证）。
+
+**测试（`test/编排/shell-risky-order.test.ts`，新增 20 条，**逐行覆盖 §14.2 那张表**）**
+- 表行 1 `allow` → 放行、**不进 (b)/(a)**（桩计数为 0）；行 2 `deny` → 终结拒、**不进 (b)/(a)**。
+- 表行 3 `review`：(b) 放行 → **终结放行（(a) 未调用）**；(b) 拒绝 → **终结拒（(a) 未调用）**；(b) 拿不准 → 升 (a)，(a) 放行/拒绝 → 放行/拒。
+- **表行 4 `risky`（要害）**：**★ (b) 放行 + (a) 拒绝 → 最终拒绝（(a) 被调用，证 pm 非终审）**；(b) 放行 + (a) 放行 → 放行（(a) 被调用）；**★ (b) 拒绝 → 终结拒绝、(a) 未被调用（不打扰人）**；(b) 拿不准/无会话/超时/JSON 非法 → 升 (a)；(a) 不可用/未接/超时 → 拒。
+- **★差别证明**：同一 (b) 放行下，`review` → 不打扰人（(a) `opCalls=0`）；`risky` → 必过 (a)（`opCalls=1`）。
+- **(c)-only**：`risky` → `risky-default-deny`；`review` → `review-default-deny`（未因本轮改动而变）。
+- **集成（T40→T41 端到端，用门禁引擎真 `classifyShell`）**：`rm -rf build`=risky → (b) 放行 + (a) 拒绝 → 最终拒绝；`sh -c "rm -rf /"`=deny → 终结拒、(b)/(a) 未被调用（re-shell 仍硬拒）；`ls -la`=allow → 放行、不进 (b)/(a)。
+
+**结果**：`test/编排/` **139/139**；`npm run typecheck` **零错误**。**全量 `node --test "test/**/*.test.ts"`：653 中 652 通过 / 1 失败**——唯一失败仍是 `test/测试/t9-block3-pin-shell.test.ts:248`（**测试角色边界**：断言 `rm -rf build` 硬拒，而 `rm` 现已是 `risky`；**若已接 (b)/(a) 则放行，故断言失败**）。**不属本角色、未动、如实回报**（待测试角色按 §14 新语义更新）。
+
 ## 2026-10-11 — T37：finalize 语义改造——**提议收口 → 客户确认 → 才完成**；pin 首次在确认时写、其后每轮 settle 自动重 pin
 
 **来源**：客户裁定（2026-10-11，设计 §13，**推翻 T33/T36 的「被调用即完成」**）——「完成 bootstrap 应该是 su 主动觉得差不多了来完成；后面 su 可以动态增加和修改」+「当然需要客户确认了」。落点全在本角色边界内（`src/common/编排/finalize.ts`、`src/pipeline/orchestration/{govern-session,run-role}.ts`、重写 `test/编排/{finalize,genesis-finalize-reach}.test.ts`）。

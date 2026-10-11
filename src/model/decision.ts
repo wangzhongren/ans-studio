@@ -22,14 +22,15 @@ export interface TaskScope {
 
 // ---------------------------------------------------------------------------
 // V3 shell 命令级闸 (c)：确定性规则/白名单引擎的共享类型
-// 冻结契约：设计 §7.2/§7.4 —— 纯函数 classifyShell(argv, rules) => "allow" | "deny" | "review"。
+// 冻结契约：设计 §7.2/§7.4/§14 —— 纯函数 classifyShell(argv, rules) => "allow" | "deny" | "risky" | "review"。
 // 判据与路径判定（resolveWrite）**不同**：shell 问的是「这条命令是否被允许执行」，而不是
 // 「这个路径是否在边界内」——因为 `echo x > 路径` 这类写入根本不经过 resolveWrite（§7.1）。
 //
-// 三态语义（§7.3）：
+// 四态语义（§7.3 → §14.1 重定，客户 2026-10-11）：
 //   * 命中白名单（只读命令）        → "allow"（不再经 (b)/(a)）；
-//   * 命中硬拒（危险模式）          → "deny"（**绝对否决**，不可被 (b)/(a) 翻案）；
-//   * 两者都不命中                  → "review"（交下一闸 (b) pm 审读 → (a) 操作者）。
+//   * 命中硬拒（无可正当用途 / 放行即绕过门禁）→ "deny"（**绝对否决**，不可被 (b)/(a) 翻案）；
+//   * 命中「危险但有正当用途」      → "risky"（**必过 (b) pm 审读；(b) 判放行后仍须过 (a) 客户**，§14.2）；
+//   * 都不命中                     → "review"（交 (b)；b 明确即终结，b 拿不准/不可用才升 (a)）。
 // fail-closed（§7.5 第一条）：规则集/白名单加载失败、解析报错、版本未知 → 一律视为硬拒 "deny"，
 //   绝不「规则没了就当没有、一律放行」。故 rules **必须显式传入**（见 classify-shell.ts）。
 //
@@ -37,8 +38,8 @@ export interface TaskScope {
 // 逐条记入审计（§7.6）。
 // ---------------------------------------------------------------------------
 
-/** 命令级判定结果（三态，§7.3） */
-export type ShellClass = "allow" | "deny" | "review";
+/** 命令级判定结果（四态，§7.3 → §14.1） */
+export type ShellClass = "allow" | "deny" | "risky" | "review";
 
 /** 白名单条目：只读、且不能用来执行任意程序的命令 */
 export interface ShellReadOnlyRule {
@@ -54,6 +55,22 @@ export interface ShellHardDenyRule {
   programs: string[]; // 程序名（basename，小写）列表
   onlyWithFlag?: string[]; // 若给出：argv 中须出现其中之一才判 deny（如 sed 仅 -i/--in-place 时才是改写）
   onlyWithSubcommand?: string[]; // 若给出：argv[1]（小写）须命中其中之一才判 deny（如 npm 仅 run/install… 才间接执行）
+}
+
+/**
+ * risky 条目（§14.2/§14.3-B）：**危险但有正当用途**的程序 —— 必须过 (b) pm 审读；(b) 判「放行」后
+ * **仍须过 (a) 客户**（pm 不是终审，客户才是）。
+ *
+ * ★ 只收「**程序名在 argv 里以可读元素出现、语义可判**」的形态（`rm`/`sed -i`/`dd`/`git commit`/`xargs rm`…）：
+ *   (a) 是**客户看命令原文**，得看得懂 —— `rm -rf build/` 看得懂；`sh -c "…"`（真命令藏在 string 里）**看不懂**，
+ *   那类（re-shell / 内联求值）**不进本表、仍硬拒**（§14.4）。**「argv 里看得见」正是 (a) 能兜住 risky 的前提**：
+ *   一旦把「命令藏在 string 里」的形态也放进 risky，(a) 人看原文也看不出它会写什么，client 那层就形同虚设。
+ */
+export interface ShellRiskyRule {
+  id: string; // 规则 id（审计用），如 "risky:delete"
+  programs: string[]; // 程序名（basename，小写）列表
+  onlyWithFlag?: string[]; // 若给出：argv 中须出现其中之一才判 risky（如 sed 仅 -i/--in-place 才是原地改写）
+  onlyWithSubcommand?: string[]; // 若给出：argv[1]（小写）须命中其中之一才判 risky（如 git 写子命令）
 }
 
 /**
@@ -78,5 +95,9 @@ export interface ShellRules {
   executionModel?: ShellExecutionModel; // 命令解释模型（§7.10）；省略 ⇒ 保守假定 shell 解释元字符（denyTokens 生效）
   readOnly: ShellReadOnlyRule[]; // 白名单
   hardDenyPrograms: ShellHardDenyRule[]; // 硬拒程序
+  // 危险但有正当用途的程序（§14.3-B）→ 判 "risky"（必过 (b)；(b) 放行后仍须过 (a)）。
+  // ★ 类型上标记为可选以兼容尚未迁移的规则集字面量；但引擎**在运行时要求它存在**：缺失/非数组 → 硬拒
+  //   "deny"（fail-closed，§7.5）——否则「有正当用途的危险命令」会静默降级为 review（只过 (b)、不强制 (a)）。
+  riskyPrograms?: ShellRiskyRule[];
   denyTokens: string[]; // 危险 shell 记号（子串匹配；**仅当 executionModel 会经 shell 解释时**生效，见 §7.10）
 }
