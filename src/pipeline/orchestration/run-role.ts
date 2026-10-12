@@ -10,14 +10,30 @@
 // 分工（契约 §5，F9）：本层只做编排——角色解析、边界解析、路径判定全部经门禁引擎导出的函数；
 // Pi 调用全部经 Pi 适配器的 RuntimeAdapter。
 //
+// ── 客户确认制收窄（A-3，2026-10-12 设计 A 组）────────────────────────────────────
+// `openRoleSession` 收到 `customerInput`（前端给的客户通道）时，本会话进入**确认制**：
+//   · 客户被 `request_confirmation` 预览并确认后，编排把「**已预览且校验在会话边界内**的具体路径」
+//     发行进本会话的 writeSet（`common/编排/confirmed-writes.ts`）；
+//   · 写入照旧经 gate——**F4 拒掉一切未确认路径**（writeSet 外 = 拒）。
+//   · 通道**不可用/拒绝/未确认** → 不发行 → 该路径写入被拒（fail-closed）。
+// 【已登记的残余漏洞：内容漂移】本机制只保证「**路径**已预览且已确认」；「预览内容 ≠ 写出内容」
+// 关不住（O-A1 内容比对经客户 2026-10-12 裁定不采纳——如实登记，不实现）。
+// 未给 `customerInput` 的会话（无客户通道）保持旧语义：scope 原样传递（可为 undefined = 不收窄）。
+//
+// ── A-4（同日晚）：收口删除 ─────────────────────────────────────────────────────
+// `genesisFinalize`/`operatorChannel`/句柄 `finalize()` 已删——「提议+确认」不再存在；写出的产物由
+// **自动收尾**（每轮 su settle 后 `repinIfBootstrapped`，含首次）完成，确认发生在写入**之前**（上节）。
+//
 // 退出码约定（见 ../../common/编排/exit-codes.ts）：0 = 成功，非 0 = 失败。runRole 以码返回失败；
 // openRoleSession 无退出码，失败即**抛错**给调用方。
 //
 // scope 可选（客户端裁决）：scope === undefined 表示"没有预先存在的任务"（chat / 一次性无收窄），
 // 此时**不做任务级收窄**，只用角色边界；编排把 undefined 原样传给 resolveWrite，绝不伪造全量 writeSet。
+// （确认制会话例外：其 writeSet 由发行器动态持有，见上。）
 
 import type { ProjectConfig, ResolvedRole } from "../../model/role.ts";
 import type { TaskScope } from "../../model/decision.ts";
+import path from "node:path";
 import { resolveRole } from "../../service/role/resolve-role.ts";
 import { resolveBoundary } from "../../service/boundary/resolve-boundary.ts";
 import { resolveWrite } from "../../service/gate/resolve-write.ts";
@@ -27,20 +43,47 @@ import type {
   SessionEvent,
   WriteGate,
   ShellGate,
+  CustomerInputFn,
+  DispatchTaskFn,
   OperatorChannelFn,
-  FinalizeResult,
 } from "../../provider/pi/session.ts";
 import { createPiRuntimeAdapter } from "../../provider/pi/session.ts";
+import { assembleProjectShellGate, type AssembleShellGateOptions } from "./shell-arming.ts";
 import { formatEvent } from "../../common/编排/output.ts";
-import { withHandback, type OrchestrationEvent } from "../../common/编排/handback.ts";
+import { withHandback, type OrchestrationEvent, type TaskReport, normalizeTaskReport } from "../../common/编排/handback.ts";
 import { EXIT_OK, EXIT_USAGE, EXIT_FAILURE } from "../../common/编排/exit-codes.ts";
-import {
-  createSessionFinalizer,
-  repinIfBootstrapped,
-  DEFAULT_GOVERNANCE_BOUNDARY_REL,
-  type SessionFinalizer,
-} from "../../common/编排/finalize.ts";
+import { repinIfBootstrapped, DEFAULT_GOVERNANCE_BOUNDARY_REL } from "../../common/编排/finalize.ts";
+import { conditionSlugsOf, createConfirmedWriteIssuer } from "../../common/编排/confirmed-writes.ts";
 import type { RuntimeKind } from "../../common/编排/args.ts";
+
+/**
+ * **适配器能力面**：编排构造、随 `deps.createAdapter(gate, capabilities)` 交给适配器工厂——
+ * 适配器把其中的能力注册为对应工具（「注入才注册」先例），或按其选项接线。三项：
+ * · `customerInput`（A-3 客户确认制交互；未注入 ⇒ `request_confirmation`/`request_choice` 不注册）。
+ * · `reportHandback`（C-1 交报告；未注入 ⇒ `submit_report` 不注册）——**只给项目角色会话**注入
+ *   （治理角色 su 不自我回交，不注入）。能力形状 = `submit_report{ status, summary, evidence? }`
+ *   的载荷（结构对齐，见 `common/编排/handback.ts::TaskReport`）。
+ * · `sessionDir`（D-1 重启恢复）：本会话的**会话自持目录**，约定路径
+ *   `<projectRoot>/.ans/sessions/<roleId>/`（带尾分隔符）。**编排只算路径、不预建目录**——
+ *   **目录的创建归适配器**（在其真正落盘 SessionManager.create/open 时做）：① 保「不预建 `.ans`」
+ *   的既有语义/断言（每次 `ans govern` 都预建 `.ans/sessions/` 会打破它）；② 谁落盘谁建目录，
+ *   避免「编排建了目录但会话从未写」的空目录；③ 恢复 `open(path)` 不需要预建。
+ *   projectRoot 为空 / roleId 不安全（空、含路径分隔符或 `..`）→ **不传**（旧行为，无持久化）。
+ *   注：一次性路径 `runRole`（`ans role run`）不传（一局即止，无需恢复）。
+ * · `dispatchTask`（H-1 su 派发任务；未注入 ⇒ `dispatch_task` 不注册）——**只给治理角色 su**注入
+ *   （项目角色不给）。形状 = 契约家 `DispatchTaskFn`（前端路由：开/排队/去重/失败保留归前端；
+ *   **派发 ≠ 授权**——能力实现方不得据此授予任何写权）。
+ * · `shellGate`（I-1 开放 shell；未注入 ⇒ `run_shell` 不注册）——**只对项目角色**注入（su 自身不 arm；
+ *   由 `openRoleSession` 在收到 `shellOperatorChannel` 时经 `assembleProjectShellGate` 装配）。
+ *   比工厂第二参优先（`capabilities?.shellGate ?? shellGate`）。
+ */
+export interface AdapterCapabilities {
+  customerInput?: CustomerInputFn;
+  reportHandback?: (report: TaskReport) => void | Promise<void>;
+  sessionDir?: string;
+  dispatchTask?: DispatchTaskFn;
+  shellGate?: ShellGate;
+}
 
 export interface RunRoleInput {
   roleId: string;
@@ -56,7 +99,7 @@ export interface RunRoleResult {
 
 export async function runRole(
   input: RunRoleInput,
-  deps: { createAdapter: (gate: WriteGate) => RuntimeAdapter }
+  deps: { createAdapter: (gate: WriteGate, capabilities?: AdapterCapabilities) => RuntimeAdapter }
 ): Promise<RunRoleResult> {
   const transcript: SessionEvent[] = [];
   const record = (ev: SessionEvent): void => {
@@ -145,26 +188,6 @@ export interface RoleSessionHandle {
   events(): AsyncIterable<OrchestrationEvent>;
   /** 收口：释放底层会话。可重复调用（幂等）；出错如实抛出，不吞。 */
   dispose(): Promise<void>;
-  /**
-   * **收口能力（可选扩展，T36/T37）**：仅当 `openRoleSession` 以 `genesisFinalize: true` 开启时存在。
-   *
-   * 由来：桌面实际走**本入口**（`openRoleSession`），而 finalize 此前只挂在治理会话句柄
-   * （`GovernanceSessionHandle`）上 ⇒ 桌面够不着 ⇒「导入空文件夹 → su 建角色」走完后**无 pin**。
-   * 本字段令**同一条桌面路径**可达收口。实现**唯一**（`src/common/编排/finalize.ts::createSessionFinalizer`，
-   * 与治理会话**共用同一份**，不 fork）。**不破坏既有冻结契约**：纯可选成员，未开启时句柄形状与行为逐字不变。
-   *
-   * **触发时机 = 显式（manual）**：由「su 提议收口 / 消费者显式触发」调，**不在 settle 时自动跑**。
-   *
-   * **T37 语义**：调它 **≠ 立即完成**——它**提议收口、挂起等客户确认**（经注入的 `operatorChannel`，
-   * 复用 shell 闸 (a) 通道）；确认不可用/超时/拒绝 → **不完成**（fail-closed）。`settled` 与 `finalize`
-   * 同时存在；会话未 settle 时 `finalize()` 拒绝。
-   */
-  readonly settled?: boolean;
-  /**
-   * **提议收口 → 挂起等客户确认 → 确认通过才落盘**（写入同样经 `resolveWrite`）。**未 settle → 拒绝**。
-   * 仅当以 `genesisFinalize: true` 开启时存在。**手动语义**——见上方 `settled` 注释。
-   */
-  finalize?(opts?: { acceptanceSource?: string; now?: () => Date }): Promise<FinalizeResult>;
 }
 
 export async function openRoleSession(
@@ -174,27 +197,43 @@ export async function openRoleSession(
     taskId?: string;
     scope?: TaskScope;
     /**
-     * **收口开关（可选，T36/T37）**：置真时，返回的句柄附带 `settled` + `finalize()`。
-     * 授权边界取**本会话解析出的边界**（创世态下即治理种子边界）——与 su 同一授权；写入同样经
-     * `resolveWrite`（收口不绕门，被拒即零副作用）。**不自动跑**：仅**暴露能力**，时机由调用方定。
-     * **T37**：`finalize()` = **提议收口、挂起等客户确认**（经 `operatorChannel`）。
+     * **客户确认制交互通道（A-1/A-3）**：前端给的原始客户通道（CLI 终端 / 桌面交互卡）。
+     * **给出** ⇒ 本会话进入**确认制收窄**：编排在此之上包一层「确认 → 发行 writeSet」的发行器
+     * （`common/编排/confirmed-writes.ts`），并经 `deps.createAdapter(gate, {customerInput})` 注入适配器
+     * ——`request_confirmation`/`request_choice` 两工具据此注册（「注入才注册」）。
+     * **缺省** ⇒ 无客户通道：工具不注册、scope 原样传递（旧语义，逐字不变）。
      */
-    genesisFinalize?: boolean;
+    customerInput?: CustomerInputFn;
     /**
-     * **客户确认通道（T37）**：提议收口时经它挂起问客户（**复用 shell 闸 (a) 通道、不造第二套**）。
-     * 缺省/不可用/超时/拒绝 → **不完成**（fail-closed）。桌面由桌面应用注入对话框通道。
-     */
-    operatorChannel?: OperatorChannelFn;
-    /** 客户确认硬超时（毫秒）；缺省 120000。**超时 = 不完成**。 */
-    confirmTimeoutMs?: number;
-    /**
-     * **自动重 pin（T37，§13.3）**：每轮会话 settle 后，若项目**已 bootstrap**（非创世态、`.ans` 已存在），
-     * 自动重扫边界 → 更新 `.ans` 的 pin + manifest。缺省：**内置治理角色（su）会话来会话为 `true`，其余为 `false`**
-     * ——重 pin 是 su 的固有职责（§13.3「每轮 su settle」），普通角色会话不自动重 pin。
+     * **自动收尾 + 自动重 pin（§13.3 经 A-4 扩为含首次）**：每轮会话 settle 后自动调用
+     * `repinIfBootstrapped`——创世态 = 首次收尾（写 `.ans` + 治理边界文档 + manifest；无可 pin 之物则
+     * 零副作用）；非创世态 = 重扫并更新 `.ans` 的 pin + manifest。缺省：**内置治理角色（su）会话为
+     * `true`，其余为 `false`**——收尾/重 pin 是 su 的固有职责，普通角色会话不做。
      */
     autoRepin?: boolean;
+    /**
+     * **su 派发任务的路由能力（H-1）**：前端提供的路由实现（把派发转成目标角色会话的一条输入；
+     * 开/排队/去重/失败保留归前端）。**只对治理角色会话（su）转交**——项目角色会话即便给了也不注入
+     * （`dispatch_task` 只给 su）；CLI 一次性前端无同等路由（设计已登记），不传即可（工具不注册）。
+     * 校验（roleId 非本项目角色 / 指向 su 自身 → 如实回错）由该能力的实现方做，判定口径用
+     * `common/编排/handback.ts::isDispatchableRoleId`（单一来源）；**派发 ≠ 授权**。
+     */
+    dispatchTask?: DispatchTaskFn;
+    /**
+     * **I-1 开放 shell —— (a) 前端操作者确认通道（兼 arm 开关语义）**：给出 ⇒ 本会话（**仅项目角色**；
+     * su 自身不 arm）由编排装配三层链（(c) 确定性硬地板 → (b) su 模型审读 → (a) 本通道；
+     * 关窗/不答/超时 = **不放行**）并注入 `ShellGate` ⇒ `run_shell` 注册（「注入才注册」语义未改）。
+     * 不给 ⇒ 不 arm（`run_shell` 不存在）。CLI 一次性前端无确认框 ⇒ 不接。
+     */
+    shellOperatorChannel?: OperatorChannelFn;
+    /**
+     * **高级注入（透传 `assembleProjectShellGate`；测试/装配用）**：(c) `classifyShell`/`rules`、
+     * (b) 审读角色 id / `openSession` / 超时、`auditSink` 等。生产调用（桌面）通常只给
+     * `shellOperatorChannel`——（c) 的合法注入源（门禁引擎经 service 的公开出口）就绪后在此传入。
+     */
+    shellArming?: Omit<AssembleShellGateOptions, "project" | "operatorChannel" | "sessionDeps">;
   },
-  deps: { createAdapter: (gate: WriteGate) => RuntimeAdapter }
+  deps: { createAdapter: (gate: WriteGate, capabilities?: AdapterCapabilities) => RuntimeAdapter }
 ): Promise<RoleSessionHandle> {
   // 角色/边界解析：失败即抛错（句柄式接口无退出码）。
   // 会话式入口：**允许** project.builtInRoles 声明的内置治理角色（桌面聊天）。
@@ -202,39 +241,97 @@ export async function openRoleSession(
   if (!setup.ok) throw new Error(setup.reason);
 
   // 底层只建**一个**会话：多轮 send 复用同一 RoleSession，绝不每轮重建。
-  const gate = buildGate(setup.role, input.project, input.scope);
-  const adapter = deps.createAdapter(gate);
-  const session = await adapter.bindRole(setup.role);
+  //
+  // gate（A-3）：有 `customerInput` ⇒ 确认制动态 writeSet（初始为空，发行器追加）；
+  // 无 ⇒ 原样传 input.scope（可为 undefined = 不收窄，旧语义逐字不变）。
+  const confirmationMode = input.customerInput !== undefined;
+  const issued = new Set<string>();
+  const conditions = conditionSlugsOf(setup.role.boundary);
+  const gate: WriteGate = confirmationMode
+    ? (p) =>
+        resolveWrite(p, setup.role.boundary, { writeSet: [...issued], conditions }, {
+          skillRoot: input.project.skillRoot,
+          projectRoot: input.project.projectRoot,
+        })
+    : buildGate(setup.role, input.project, input.scope);
+
+  // 客户通道包装（A-3）：客户确认后，把「已预览且校验在边界内的具体路径」发行进 writeSet。
+  // 只做「确认 → 发行」；裁决结果原样返回（不改答案、不写盘、不成败判定都在别处）。
+  const governedInput: CustomerInputFn | undefined = confirmationMode
+    ? (() => {
+        const issue = createConfirmedWriteIssuer({
+          boundary: setup.role.boundary,
+          conditions,
+          ctx: { skillRoot: input.project.skillRoot, projectRoot: input.project.projectRoot },
+          issued,
+        });
+        const raw = input.customerInput!;
+        return async (req) => {
+          const out = await raw(req);
+          issue(req, out ?? null);
+          return out;
+        };
+      })()
+    : undefined;
 
   // 回交（设计 §10.8）：角色会话 settle → 编排发 `handback` 事件，交回 su。**内置治理角色（su）自身
   // 不回交**（回交的主体是**其他角色**，目的地才是 su）——故对 built-in-governance 角色**不挂**回交。
   const suppressHandback = setup.role.kind === "built-in-governance";
 
-  // settle 追踪（收口的「半成品」守卫据它判「su 是否已完成至少一轮」）。
-  let settledOnce = false;
+  // 交报告（C-1）：**只给回交主体（非 su）**注入 `reportHandback`——模型经 `submit_report` 交的报告
+  // （`summary`/`evidence`/`status`）即回交事件内容；su 不注入（不自我回交）。未交 / 形状非法 →
+  // `withHandback` 回退既有推导（不硬失败）。报告暂存于本会话闭包，settle 取用。
+  let taskReport: TaskReport | undefined;
+  const reportHandback = suppressHandback
+    ? undefined
+    : (report: TaskReport): void => {
+        taskReport = normalizeTaskReport(report);
+      };
 
-  // 收口 + 自动重 pin 的授权边界 = **本会话解析出的边界**（创世态下即治理种子边界；普通角色下即其项目
+  // D-1 重启恢复：本会话的**会话自持目录**（约定 `<projectRoot>/.ans/sessions/<roleId>/`）。
+  // 编排只**算路径**、**不预建目录**（创建归适配器在真正落盘时做——理由见 AdapterCapabilities.sessionDir）。
+  // projectRoot 为空 / roleId 不安全 → 不传（旧行为）。
+  const sessionDir = sessionDirFor(input.project.projectRoot, setup.role.id);
+
+  // H-1 派发任务：**只给治理角色（su）**转交前端路由能力——项目角色会话不注入（`dispatch_task` 只给 su）。
+  const dispatchTask = suppressHandback ? input.dispatchTask : undefined;
+
+  // I-1 开放 shell：**只对项目角色 arm**（su 自身不 arm）。前端给出 (a) 操作者确认通道 ⇒ 装配三层链
+  // （(c) 确定性硬地板 → (b) su 模型审读 → (a) 本通道）并注入 ShellGate ⇒ run_shell 注册
+  // （「注入才注册」语义未改）。装配失败 ⇒ **不 arm**（能力缺席 = fail-closed，run_shell 不注册）。
+  let shellGate: ShellGate | undefined;
+  if (!suppressHandback && input.shellOperatorChannel !== undefined) {
+    try {
+      shellGate = await assembleProjectShellGate({
+        project: input.project,
+        operatorChannel: input.shellOperatorChannel,
+        sessionDeps: deps,
+        ...(input.shellArming ?? {}),
+      });
+    } catch {
+      shellGate = undefined;
+    }
+  }
+
+  const capabilities: AdapterCapabilities = {
+    ...(governedInput !== undefined ? { customerInput: governedInput } : {}),
+    ...(reportHandback !== undefined ? { reportHandback } : {}),
+    ...(sessionDir !== undefined ? { sessionDir } : {}),
+    ...(dispatchTask !== undefined ? { dispatchTask } : {}),
+    ...(shellGate !== undefined ? { shellGate } : {}),
+  };
+  const adapter = deps.createAdapter(
+    gate,
+    Object.keys(capabilities).length > 0 ? capabilities : undefined,
+  );
+  const session = await adapter.bindRole(setup.role);
+
+  // 自动收尾的授权边界 = **本会话解析出的边界**（创世态下即治理种子边界；普通角色下即其项目
   // 边界）——与 su 同一授权。治理边界文档落点：项目未声明（如桌面创世 `path` 为空串）时用默认约定路径。
   const govPath = input.project.governanceBoundary?.path || DEFAULT_GOVERNANCE_BOUNDARY_REL;
 
-  // 收口能力（可选，T36/T37）：实现复用 `createSessionFinalizer`（**唯一实现**）。
-  // T37：`finalize()` = **提议收口 → 挂起等客户确认 → 通过才落盘**（经注入的 `operatorChannel`）。
-  const finalizer: SessionFinalizer | undefined = input.genesisFinalize
-    ? createSessionFinalizer({
-        input: {
-          projectRoot: input.project.projectRoot,
-          skillRoot: input.project.skillRoot,
-          boundary: setup.role.boundary,
-          governanceBoundaryPath: govPath,
-        },
-        isSettled: () => settledOnce,
-        operatorChannel: input.operatorChannel,
-        confirmTimeoutMs: input.confirmTimeoutMs,
-      })
-    : undefined;
-
-  // 自动重 pin（T37，§13.3）：缺省仅**内置治理角色（su）会话**开启。`repinIfBootstrapped` 自身在**创世态
-  // （`.ans` 不存在）为 no-op**——故首次 pin 仍只在客户确认时写，自动刷新只发生在**已 bootstrap**之后。
+  // 自动收尾 + 自动重 pin（A-4 / §13.3）：缺省仅**内置治理角色（su）会话**开启。
+  // `repinIfBootstrapped`：创世态 = **首次收尾**（无可 pin 之物 → 零副作用）；非创世态 = 重扫更新 pin。
   const autoRepinEnabled = input.autoRepin ?? setup.role.kind === "built-in-governance";
 
   let disposed = false;
@@ -244,14 +341,15 @@ export async function openRoleSession(
     },
     events(): AsyncIterable<OrchestrationEvent> {
       const stream = session.events();
-      const wrapped = suppressHandback ? stream : withHandback(stream, { roleId: setup.role.id, taskId: input.taskId });
-      // 透传并在见到 `settled` 时记录（守卫数据源）；对有无收口能力都无害。
-      // 每轮 settle 后（仅在已 bootstrap / 非创世态）**自动重 pin**：重扫边界 → 更新 `.ans` 的 pin + manifest。
-      // best-effort：重 pin 失败（如门禁拒）**不打断事件流**，如实走完本轮（判定/落盘本体在 finalize.ts）。
+      const wrapped = suppressHandback
+        ? stream
+        : withHandback(stream, { roleId: setup.role.id, taskId: input.taskId }, { report: () => taskReport });
+      // 每轮 settle 后**自动收尾 / 自动重 pin**：创世态首次写出 `.ans`（+治理边界文档+manifest），
+      // 非创世态重扫并更新 pin。best-effort：失败（如门禁拒）**不打断事件流**，如实走完本轮
+      // （判定/落盘本体在 finalize.ts；失败结果由下次 settle 重试）。
       return (async function* () {
         for await (const ev of wrapped) {
           if (ev.kind === "settled") {
-            settledOnce = true;
             if (autoRepinEnabled) {
               try {
                 await repinIfBootstrapped({
@@ -261,7 +359,7 @@ export async function openRoleSession(
                   governanceBoundaryPath: govPath,
                 });
               } catch {
-                /* 自动重 pin 是 best-effort；失败不打断会话事件流 */
+                /* 自动收尾/重 pin 是 best-effort；失败不打断会话事件流 */
               }
             }
           }
@@ -275,14 +373,7 @@ export async function openRoleSession(
       await session.dispose(); // 出错如实抛出（调用方在 finally 收口）
     },
   };
-  if (!finalizer) return base;
-  return {
-    ...base,
-    get settled(): boolean {
-      return finalizer.settled;
-    },
-    finalize: (opts) => finalizer.finalize(opts),
-  };
+  return base;
 }
 
 // —————————————————————— 共用辅助 ——————————————————————
@@ -336,6 +427,18 @@ function buildGate(
     });
 }
 
+/**
+ * D-1：会话自持目录的**约定路径**，`<projectRoot>/.ans/sessions/<roleId>/`（含尾分隔符）。
+ * 不满足前置（projectRoot 为空 / roleId 为空、含路径分隔符或 `..`）→ `undefined`（不持久化，旧行为）。
+ * **本函数只算路径**；目录的创建归适配器（见 `AdapterCapabilities.sessionDir` 注释）。
+ */
+function sessionDirFor(projectRoot: string, roleId: string): string | undefined {
+  if (typeof projectRoot !== "string" || projectRoot.trim() === "") return undefined;
+  if (roleId === "" || roleId.includes("/") || roleId.includes("\\") || roleId.includes("..")) return undefined;
+  const dir = path.join(projectRoot, ".ans", "sessions", roleId);
+  return dir.endsWith(path.sep) ? dir : dir + path.sep;
+}
+
 // 构造传给会话的任务提示：含一个**具体、可判定**的改动要求，指向该角色边界与 writeSet 内
 // 真实可写的文件——使（真实模型的）会话确实发起一次写入，从而验证扩展 on("tool_call") 在运行期
 // 触发，而不是只回头索要需求。目标取 writeSet 首项（按定义是角色边界的真子集，故确可写）；
@@ -356,14 +459,15 @@ function buildTaskPrompt(taskId: string | undefined, scope: TaskScope | undefine
   );
 }
 
-// 由 project 构造 adapter 工厂（(gate) => adapter）的**构造器**；可注入替换（测试探针 / 自定义运行时）。
+// 由 project 构造 adapter 工厂（(gate, capabilities?) => adapter）的**构造器**；可注入替换（测试探针 / 自定义运行时）。
 // shellGate（可选）：命令级闸，由编排经 `buildShellGate(...)`（src/common/编排/shell-gate.ts）构造后注入；
 // 缺席 ⇒ Pi 适配器**不注册 run_shell**（§7.5.1 能力缺席即最强 fail-closed）。第二个参数加在末尾，不破坏既有
-// 单参实现（TS 中少参函数可赋给多参类型）。
+// 单参实现（TS 中少参函数可赋给多参类型）。A-3 起：工厂返回的函数额外收 `AdapterCapabilities`
+// （`customerInput` 原样转发给 Pi 适配器——「注入才注册」）。
 export type AdapterFactoryBuilder = (
   project: ProjectConfig,
   shellGate?: ShellGate,
-) => (gate: WriteGate) => RuntimeAdapter;
+) => (gate: WriteGate, capabilities?: AdapterCapabilities) => RuntimeAdapter;
 
 // 运行时选择 adapter 工厂。约定（与装配对齐）：命令参数 `--runtime demo|pi`、环境变量 `ANS_RUNTIME`，
 // 默认 `demo`；由装配解析并注入 runtime，编排据此选择：
@@ -375,28 +479,38 @@ export function selectAdapterFactory(
   runtime: RuntimeKind,
   project: ProjectConfig,
   deps: {
-    createAdapter: (gate: WriteGate) => RuntimeAdapter;
+    createAdapter: (gate: WriteGate, capabilities?: AdapterCapabilities) => RuntimeAdapter;
     piFactory?: AdapterFactoryBuilder;
     shellGate?: ShellGate;
   }
-): (gate: WriteGate) => RuntimeAdapter {
+): (gate: WriteGate, capabilities?: AdapterCapabilities) => RuntimeAdapter {
   if (runtime === "pi") return (deps.piFactory ?? createPiAdapterFactory)(project, deps.shellGate);
   return deps.createAdapter;
 }
 
 // 供 Interface/装配构造默认真实适配器：编排（Pipeline）经 Pi 适配器导出的工厂接线。
 // 契约 §5：编排只经 Pi 适配器导出的函数与类型调用 Pi，不导入其 impl 内部。
-// shellGate 原样转发给 Pi 适配器（工具层据「是否注入」决定 run_shell 是否注册）。
+// shellGate 原样转发给 Pi 适配器（工具层据「是否注入」决定 run_shell 是否注册）；
+// A-3/C-1/D-1：工厂返回的函数收 `AdapterCapabilities`，把 `customerInput`（确认制发行器包装）、
+// `reportHandback`（交报告，项目角色专用）与 `sessionDir`（会话自持目录，D-1）原样转发——Pi 适配器
+// 据此注册 `request_confirmation`/`request_choice`/`submit_report`（均「注入才注册」），并按会话目录落盘。
 export function createPiAdapterFactory(
   project: ProjectConfig,
   shellGate?: ShellGate
-): (gate: WriteGate) => RuntimeAdapter {
-  return (gate) =>
+): (gate: WriteGate, capabilities?: AdapterCapabilities) => RuntimeAdapter {
+  return (gate, capabilities) =>
     createPiRuntimeAdapter({
       gate,
       projectRoot: project.projectRoot,
       skillRoot: project.skillRoot,
-      shellGate,
+      // I-1：能力面给的闸（编排装配）优先；第二参保留兼容（前端自装配的旧路）。
+      // cwd 钉根与凭据剥离均**既有**（核实：real-adapter.ts:755 已传 `shellCwd: opts.projectRoot`；
+      // tools.ts `buildShellEnv` spawn 前剥离 `PI_CREDENTIAL_ENV_VARS`）——本工厂无需另传。
+      shellGate: capabilities?.shellGate ?? shellGate,
+      customerInput: capabilities?.customerInput,
+      reportHandback: capabilities?.reportHandback,
+      sessionDir: capabilities?.sessionDir,
+      dispatchTask: capabilities?.dispatchTask,
     });
 }
 

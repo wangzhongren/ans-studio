@@ -11,9 +11,9 @@ import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
 import type { RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
 import type { ProjectConfig } from "../../src/model/role.ts";
 // 会话事件流类型：编排把 `RoleSessionHandle.events()` 放宽为 `OrchestrationEvent`（既有 `SessionEvent`
-// + 编排在 `settled` 时追加的 `handback` 回交事件，设计 §10.8）。**从编排的模块只读导入、不复制形状。**
-import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
-import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn } from "../../src/provider/pi/session.ts";
+// + 编排在 `settled` 时追加的 `handback` 回交事件，设计 §10.8）。外推时套上 `roleId` 信封
+// （`SessionEventEnvelope`，B-2）——**类型从编排/本角色只读导入、不复制形状**。
+import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, DispatchTaskFn } from "../../src/provider/pi/session.ts";
 
 import { listProject as realListProject } from "../../src/service/role/resolve-role.ts";
 import {
@@ -33,9 +33,22 @@ import {
   type OpenResult,
   type SendResult,
   type StopResult,
-  type BootstrapState,
-  type FinalizeResult,
+  type SessionEventEnvelope,
 } from "./session.ts";
+// I-1 补丁（2026-10-12 客户重发授权）：(c) 规则集实件的形状与构造（**只读转出**——形状 `Omit` 自编排
+// `AssembleShellGateOptions`，见 operator-channel.ts；本层不另立第二份）。
+import type { DesktopShellArming } from "./operator-channel.ts";
+// 客户确认制交互（A-5）：桌面侧的客户通道形状（带角色上下文）——本层只透传，实现在 `customer-input.ts`。
+import type { DesktopCustomerInputFn } from "./customer-input.ts";
+// 输入区图片附件（K-2）：校验/解码/嗅探的**纯逻辑**（渲染进程不碰文件；字节交主进程校验——内容为准）。
+import {
+  decodeImageBase64,
+  sniffImageMime,
+  sanitizeImageName,
+  validateImage,
+  ALLOWED_IMAGE_MIMES,
+  type ImageAttachmentInfo,
+} from "./composer-images.ts";
 // Pi 配置面板逻辑（纯逻辑）：读写仓库根 `.env`（**经共享模块，只读导入、不复制**，设计 §11/T28）。
 import {
   getPiConfig as realGetPiConfig,
@@ -74,13 +87,28 @@ export interface ListProjectResult {
   primaryRoleId: string;
 }
 
+/** 选图结果（K-2）：`image.dataBase64` 供渲染侧预览；`cancelled` 表示用户取消（**不是失败**）。 */
+export interface PickImageResult {
+  ok: boolean;
+  cancelled?: boolean;
+  error?: string;
+  image?: ImageAttachmentInfo & { dataBase64: string };
+}
+
+/** 粘贴/拖入图片的校验结果（K-2）：只**收下与校验**；「送进模型」未接（change 文档如实登记）。 */
+export interface AttachImageResult {
+  ok: boolean;
+  error?: string;
+  image?: ImageAttachmentInfo;
+}
+
 export interface DesktopDeps {
   /** 系统文件夹选择器（由主进程用 electron dialog 注入；测试可注入假实现）。 */
   pickDirectory: () => Promise<string | null>;
-  /** 会话事件外推（主进程用它 webContents.send; 测试可注入收集器）。**入参为编排导出的
-   *  `OrchestrationEvent`**（既有 `SessionEvent` + `handback` 回交事件，§10.8）——与 `RoleSessionHandle.events()`
-   *  同型；**类型从编排导入，不在此另立一份**。 */
-  emitEvent: (ev: OrchestrationEvent) => void;
+  /** 会话事件外推（主进程用它 webContents.send; 测试可注入收集器）。**入参为带 `roleId` 信封的
+   *  `SessionEventEnvelope`**（B-2：多会话并存须按角色分发，防串消息）；`envelope.event` 为编排导出的
+   *  `OrchestrationEvent`（既有 `SessionEvent` + `handback` 回交事件，§10.8）——类型从编排导入、不复制。 */
+  emitEvent: (envelope: SessionEventEnvelope) => void;
   // —— 可注入的下游实现（默认用真实实现；单测可替换以隔离）——
   listProjectFn?: (root: string) => Promise<ProjectListing>;
   openRoleSessionFn?: (
@@ -89,9 +117,14 @@ export interface DesktopDeps {
       project: ProjectConfig;
       taskId?: string;
       scope?: undefined;
-      genesisFinalize?: boolean;
-      operatorChannel?: OperatorChannelFn;
-      confirmTimeoutMs?: number;
+      /** 客户确认制交互通道（A-1/A-3）：仅内置治理角色（su）会话注入（见 session.ts）。 */
+      customerInput?: CustomerInputFn;
+      /** 派发任务能力（H-1）：仅内置治理角色（su）会话注入（见 session.ts::routeDispatch）。 */
+      dispatchTask?: DispatchTaskFn;
+      /** (a) 操作者确认通道（I-1 arm）：经本层透传（**仅项目角色**消费——见 session.ts）。 */
+      shellOperatorChannel?: OperatorChannelFn;
+      /** (c) 规则集实件（I-1 补丁，2026-10-12）：经本层透传（**仅项目角色**消费——与 (a) 同判据）。 */
+      shellArming?: DesktopShellArming;
     },
     deps: { createAdapter: (gate: WriteGate) => RuntimeAdapter },
   ) => Promise<RoleSessionHandle>;
@@ -108,20 +141,60 @@ export interface DesktopDeps {
    */
   emitProjectChanged?: () => void;
   /**
-   * shell 命令级闸（设计 §7.2）——**arm 接缝**。**V1 桌面不 arm**：缺省（不提供）⇒ 不注入 ⇒
-   * Pi 适配器不注册 `run_shell`（能力缺席 = 最强 fail-closed，§7.5.1）。仅当客户拍板 arm、且编排（T8）
-   * 用桌面操作者通道 (a) 装配好 `ShellGate` 后，才由主进程在此传入。**当前无调用方提供它**（如实标注）。
+   * shell 命令级闸（设计 §7.2）——**已装配 gate** 的历史接缝（保留：调用方直接持有一个已装配 `ShellGate`
+   * 时从此传入）。**缺省（不提供）⇒ 不注入** ⇒ Pi 适配器不注册 `run_shell`（能力缺席 = 最强 fail-closed）。
+   * I-1（2026-10-12，客户已裁定 arm）起，桌面的常规路径改为交 **(a) 通道**（见下 `shellOperatorChannel`）
+   * 给编排装配——本字段不再是 arm 的必经之路。
    */
   shellGate?: ShellGate;
   /**
-   * **客户确认通道（T38）**——finalize 收口时把「su 提议收口」摆给客户确认（**复用既有 (a)
-   * `OperatorChannelFn` 通道、不造第二套**）。缺省 ⇒ 不注入 ⇒ 收口时「未接入客户确认通道」→ **不完成**
-   * （fail-closed，§13.1）。桌面由主进程用 `createDesktopOperatorChannel`（presenter 把提议渲染为聊天流里
-   * 一张确认卡）构造后传入。**测试/e2e 可注入替身**（避免弹系统对话框）。
+   * **(a) 操作者确认通道**（I-1，2026-10-12 arm）——交付编排装配 (c)/(b)/(a) `ShellGate`
+   * （`buildShellGate` 的 `operatorChannel`）。**只对项目角色生效**（su 不 arm——审读者不给自己开闸；
+   * 见 session.ts 的 `role.builtIn` 判据）。主进程用 `createDesktopOperatorChannel`（既有 electron
+   * 确认框：命令原文 + 放行/拒绝，拒绝为默认与取消项）构造后注入；**测试/e2e 可注入替身**。
    */
-  operatorChannel?: OperatorChannelFn;
-  /** 客户确认硬超时（毫秒）；缺省 120000。**超时 = 不完成**。 */
-  confirmTimeoutMs?: number;
+  shellOperatorChannel?: OperatorChannelFn;
+  /**
+   * **(c) 规则集实件（I-1 补丁，2026-10-12 客户重发授权）**——与 `shellOperatorChannel` **同一透传面**：
+   * 主进程 arm 时经 `operator-channel.ts::buildDesktopShellArming()` 构造（**只读导入**门禁引擎经 Service
+   * 公开出口的 `classifyShell`/`defaultShellRules`——不复制实现）；构造/加载失败 ⇒ `undefined` ⇒
+   * **不 arm**（主进程同时撤下 (a) 通道——`run_shell` 不注册，fail-closed）。**只对项目角色**下发
+   * （session.ts 与 (a) 同判据；su 不 arm）。**测试/e2e 可注入替身（桩件）**。
+   */
+  shellArming?: DesktopShellArming;
+  /**
+   * 外部浏览器打开（B-1，2026-10-12）：Markdown 链接**外开**（渲染进程不碰 Node——一切经本层）。
+   * 由主进程用 electron `shell.openExternal` 注入；**仅 http/https** 在 Interface 层校验
+   * （渲染进程传来的 URL 一律视为不可信输入）。缺省 ⇒ 未接线（返回失败，fail-closed——不假装打开成功）。
+   */
+  openExternalFn?: (url: string) => Promise<void>;
+  /**
+   * **客户交互通道**（A-1/A-3/A-5，2026-10-12）——su 的 `request_confirmation` / `request_choice`
+   * 挂起等客户作答时，经它把请求摆到界面上并取回裁决（**取代了旧 T38 收口确认通道**）。
+   * 缺省 ⇒ 不注入 ⇒ **su 的确认制不成立**（两工具不注册）——且**绝不悄悄放行**（无确认制 = 无发行 = 被拒）。
+   * 桌面由主进程用 `customer-input.ts::createCustomerInputChannel`（presenter 把请求推为聊天流里的
+   * 交互卡 + per-window pending Map + 按请求快照校验回包）构造后传入。**测试/e2e 可注入替身**。
+   */
+  customerInput?: DesktopCustomerInputFn;
+  /**
+   * 系统图片选择器（K-2）：由主进程注入（electron dialog + fs 读——**渲染进程不碰文件**）。
+   * 返回 `{name, dataBase64}` 或 `null`（用户取消）；抛错 → 本层归为如实失败。测试/e2e 注入替身。
+   */
+  pickImageFileFn?: () => Promise<{ name: string; dataBase64: string } | null>;
+  /**
+   * **角色状态外推**（L-1 + 状态准确性；2026-10-12 追加右栏「待办 / 队列」）：某角色的**真实状态快照**——
+   * `busy`（会话是否有一轮在跑；后台轮次同样计入）+ `summaries`（既有；徽标/队列行用）+ `queue`
+   * （结构化排队条目：来源/摘要/入队时间——**与 summaries 同源**） + `running`（正在跑的那条投递，若有）。
+   * 变化时（开/停/开跑/一轮结束/入队/出队）推送；主进程原样透传 `session:role-state`。缺省 ⇒ 界面无队列/忙态显示。
+   * 测试可注入收集器。
+   */
+  emitRoleState?: (info: {
+    roleId: string;
+    busy: boolean;
+    summaries: string[];
+    queue: { kind: string; sourceRoleId: string; summary: string; at: string }[];
+    running: { kind: string; sourceRoleId: string; summary: string; at: string } | null;
+  }) => void;
   /**
    * Pi 配置面板的目标 `.env` 路径（设计 §11.2）——**可注入**。缺省 = 仓库根 `.env`
    * （`resolveRepoEnvPath()`，与 CLI `--env-file=.env` 同一文件）。**测试/e2e 必须注入系统临时目录下的
@@ -139,21 +212,29 @@ export interface DesktopDeps {
 export interface DesktopInterface {
   pickProject(): Promise<string | null>;
   listProject(input: { projectRoot: string }): Promise<ListProjectResult>;
-  /** 点角色即开：直接建立与该角色的会话（无确认框）。 */
+  /** 点角色即开：直接建立/续接与该角色的会话（无确认框；B-2 起切换不再结束旧会话）。 */
   openSession(input: SessionOpenRequest): Promise<OpenResult>;
   sendSession(input: { text: string }): Promise<SendResult>;
-  stopSession(): Promise<StopResult>;
+  /** 关闭会话（B-2 **定向**：给定 `roleId` 只关它、历史留在界面上；缺省/`null` 关全部，供换项目/退出）。 */
+  stopSession(input?: { roleId?: string | null }): Promise<StopResult>;
+  /** 保活中的角色 id 列表（B-2：左树「有活动会话」小圆点的数据源；纯读、无副作用）。 */
+  listLiveSessions(): Promise<string[]>;
   /**
-   * 「完成 bootstrap」动作的**可见性/就绪状态**（T36）。**仅创世 su 会话**（未 bootstrap 项目上开启的内置
-   * 治理角色会话）可能 `available`；`settled` 供界面提示「该不该现在点」。纯读、无副作用。
+   * 外部浏览器打开一个链接（B-1：Markdown 链接外开）。**仅 http/https**（Interface 层校验——
+   * 渲染进程输入不可信）；成功与否如实返回，不假装成功。
    */
-  getBootstrapState(): Promise<BootstrapState>;
+  openExternal(input: { url: string }): Promise<{ ok: boolean; error?: string }>;
   /**
-   * **显式完成 bootstrap**（T36）：由代码算 SHA-256、写 `.ans/project.json`（pin）+ `docs/bootstrap-manifest.md`
-   * （逐路径留痕）。**显式触发**（不自动跑）；**失败如实返回** `{ok:false, reason}`（未 settle / 无可 pin 之物 /
-   * 门禁拒绝），**不静默、不假装成功**。仅创世 su 会话可达。
+   * **选图**（K-2）：主进程系统文件选择器 + fs 读 → 本层**以真实字节**校验（魔数嗅探定类型、≤5MB）——
+   * 渲染进程不碰文件。取消 → `cancelled:true`；失败（超限/非图片/读取失败）→ `ok:false,error` **如实**。
    */
-  finalizeBootstrap(): Promise<FinalizeResult>;
+  pickImage(): Promise<PickImageResult>;
+  /**
+   * **粘贴/拖入的图片**（K-2）：渲染侧经 File API 读出的 base64 交本层——**声明值（name/mime/尺寸）不可信**：
+   * 本层按真实字节嗅探类型与判尺寸。**只收下并校验**；**送进模型那一段未接**（Pi适配器核实 SDK 中，
+   * 见 change 文档的如实登记——本方法不调用任何模型）。
+   */
+  attachImage(input: { name?: unknown; mime?: unknown; dataBase64?: unknown }): Promise<AttachImageResult>;
   /** 读取 Pi 配置面板视图（机密键值**不外发**，见 `pi-config.ts`）。 */
   getPiConfig(): Promise<PiConfigView>;
   /** 保存 Pi 配置到 `.env`（只改面板键、原子；成功后重载 env，下一会话生效）。 */
@@ -176,23 +257,25 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
 
   const listingCache = new Map<string, ProjectListing>();
 
-  /** 当前打开的角色是否为主入口角色（据门禁引擎给的 `primaryRoleId`，**不硬编码 "su"**）。 */
-  const isPrimaryRoleOpen = (): boolean => {
-    const openId = manager.openForRoleId();
-    if (!openId) return false;
+  /** 某角色是否为主入口角色（据门禁引擎给的 `primaryRoleId`，**不硬编码 "su"**）。 */
+  const isPrimaryRole = (roleId: string): boolean => {
     for (const l of listingCache.values()) {
-      if (l.primaryRoleId === openId) return true;
+      if (l.primaryRoleId === roleId) return true;
     }
     return false;
   };
 
-  // 会话事件外推：先原样转发（主进程推 `session:event`）；再在「**主入口角色**一轮结束（`settled`）」时
-  // 触发「项目可能已变」信号（→ 主进程推 `project:changed` → 渲染侧重取枚举，左树随 su 建角色而长出，§10.3）。
-  // 本层只转达信号，**不判定**写入是否发生（判定唯一来自门禁引擎）。
-  const emitSessionEvent = (ev: OrchestrationEvent): void => {
-    deps.emitEvent(ev);
-    if (ev.kind === "settled" && isPrimaryRoleOpen()) {
+  // 会话事件外推：先原样转发（主进程推 `session:event`；B-2 起为**带 `roleId` 信封**的 `SessionEventEnvelope`）；
+  // 再在「**主入口角色**一轮结束（`settled`）」时触发「项目可能已变」信号（→ 主进程推 `project:changed` →
+  // 渲染侧重取枚举，左树随 su 建角色而长出，§10.3）。判据取**信封里的角色**（多会话并存后不能再看
+  // 「默认活动的那个是谁」）。本层只转达信号，**不判定**写入是否发生（判定唯一来自门禁引擎）。
+  const emitSessionEvent = (envelope: SessionEventEnvelope): void => {
+    deps.emitEvent(envelope);
+    if (envelope.event.kind === "settled" && isPrimaryRole(envelope.roleId)) {
       deps.emitProjectChanged?.();
+      // O-1（2026-10-12）：su 一轮结束 = 「边界可能刚被 su 改过」的**可信时机**——扫一遍活会话的边界快照，
+      // 陈旧者作废重建（内部逐会话隔离、绝不上抛；在跑的轮次跳过）。fire-and-forget，不阻塞事件外推。
+      void manager.refreshStaleBoundaries();
     }
   };
 
@@ -203,10 +286,15 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     buildProjectConfig: buildProjectConfigFn,
     getListing: (root) => listingCache.get(root),
     emitEvent: emitSessionEvent,
+    // L-1 + 状态准确性：真实状态快照外推（变化时；缺省 ⇒ 界面无队列行/忙态——入队本身不受影响）。
+    emitRoleState: deps.emitRoleState,
     shellGate: deps.shellGate,
-    // 客户确认通道（T38）：finalize 收口时经它把提议摆给客户确认（仅创世 finalize 会话消费）。
-    operatorChannel: deps.operatorChannel,
-    confirmTimeoutMs: deps.confirmTimeoutMs,
+    shellOperatorChannel: deps.shellOperatorChannel,
+    // I-1 补丁（2026-10-12 客户重发授权）：(c) 规则集实件——与 (a) 同处透传（仅项目角色消费；见 session.ts）。
+    shellArming: deps.shellArming,
+    // 客户交互通道（A-5）：su 的 request_confirmation/request_choice 经它摆到界面并取回裁决
+    // （仅内置治理角色会话消费；缺省未接 ⇒ 不注入 ⇒ 无确认制——绝不悄悄放行）。
+    customerInput: deps.customerInput,
   });
 
   return {
@@ -266,19 +354,74 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       return manager.send(input.text);
     },
 
-    async stopSession(): Promise<StopResult> {
-      return manager.stop();
+    async stopSession(input?: { roleId?: string | null }): Promise<StopResult> {
+      const roleId = input && typeof input.roleId === "string" ? input.roleId : null;
+      return manager.stop(roleId);
     },
 
-    // —— 创世 finalize（T36）：由界面「完成 bootstrap」动作显式触发（不自动跑）——
-    // 逻辑全在 SessionManager：本层只透传；判定/落盘的唯一实现在编排 `openRoleSession` 附带的 finalize 能力
-    // （经 `createSessionFinalizer`），写入同样经门禁 `resolveWrite`（不绕门，被拒即零副作用）。
-    async getBootstrapState(): Promise<BootstrapState> {
-      return manager.bootstrapState();
+    async listLiveSessions(): Promise<string[]> {
+      return manager.liveRoleIds();
     },
 
-    async finalizeBootstrap(): Promise<FinalizeResult> {
-      return manager.finalizeBootstrap();
+    async openExternal(input: { url: string }): Promise<{ ok: boolean; error?: string }> {
+      const url = input && typeof input.url === "string" ? input.url.trim() : "";
+      // 渲染进程传来的任何内容都视为**不可信输入**：只放行 http/https（挡 javascript:/file:/data: 等）。
+      if (!/^https?:\/\//i.test(url)) {
+        return { ok: false, error: "只允许打开 http/https 链接。" };
+      }
+      if (url.length > 2048) {
+        return { ok: false, error: "链接过长，已拒绝。" };
+      }
+      if (!deps.openExternalFn) {
+        return { ok: false, error: "外部打开未接线（fail-closed）。" };
+      }
+      try {
+        await deps.openExternalFn(url);
+        return { ok: true };
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err) };
+      }
+    },
+
+    // —— 输入区图片（K-2）：**渲染进程不碰文件**——选图走主进程（dialog+fs），字节在**本层**按真实内容校验。——
+    // ⚠ 「送进模型」那一段**未接**（Pi适配器正在核实 SDK 图片内容块）：本层只收下与校验，不调用任何模型。
+    async pickImage(): Promise<PickImageResult> {
+      const fn = deps.pickImageFileFn;
+      if (!fn) {
+        return { ok: false, error: "选图未接线（fail-closed）。" };
+      }
+      let picked: { name: string; dataBase64: string } | null;
+      try {
+        picked = await fn();
+      } catch (err) {
+        return { ok: false, error: `读取图片失败：${err instanceof Error ? err.message : String(err)}` };
+      }
+      if (picked === null) return { ok: true, cancelled: true };
+      const decoded = decodeImageBase64(picked.dataBase64);
+      if (!decoded.ok) return { ok: false, error: decoded.error };
+      const sniffed = sniffImageMime(decoded.buffer);
+      if (sniffed === null) {
+        return { ok: false, error: `内容不是受支持的图片（真实格式不在 ${ALLOWED_IMAGE_MIMES.join(" / ")} 之内）——扩展名不作数。` };
+      }
+      const v = validateImage(sniffed, decoded.buffer.length);
+      if (!v.ok) return { ok: false, error: v.error };
+      return {
+        ok: true,
+        image: { name: sanitizeImageName(picked.name), mime: sniffed, size: decoded.buffer.length, dataBase64: picked.dataBase64 },
+      };
+    },
+
+    async attachImage(input): Promise<AttachImageResult> {
+      // 渲染侧声明值一律不可信：只信**解码后的真实字节**（嗅探类型 + 判尺寸）。
+      const decoded = decodeImageBase64(input ? input.dataBase64 : undefined);
+      if (!decoded.ok) return { ok: false, error: decoded.error };
+      const sniffed = sniffImageMime(decoded.buffer);
+      if (sniffed === null) {
+        return { ok: false, error: `内容不是受支持的图片（真实格式不在 ${ALLOWED_IMAGE_MIMES.join(" / ")} 之内）。` };
+      }
+      const v = validateImage(sniffed, decoded.buffer.length);
+      if (!v.ok) return { ok: false, error: v.error };
+      return { ok: true, image: { name: sanitizeImageName(input ? input.name : undefined), mime: sniffed, size: decoded.buffer.length } };
     },
 
     // —— Pi 配置面板（设计 §11/T28）——

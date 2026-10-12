@@ -39,10 +39,10 @@ import { resolveBoundarySection } from "../../src/common/门禁引擎/boundary-c
 import { sha256File } from "../../src/common/门禁引擎/io.ts";
 import { resolveWrite } from "../../src/service/gate/resolve-write.ts";
 import { buildGovernedTools } from "../../src/provider/pi/tools.ts";
-import { renderGovernanceBoundaryDoc } from "../../src/common/编排/finalize.ts";
+import { renderGovernanceBoundaryDoc, repinIfBootstrapped } from "../../src/common/编排/finalize.ts";
 import type { ProjectConfig } from "../../src/model/role.ts";
 import type { OpenResult } from "../../app/desktop/session.ts";
-import type { OperatorChannelFn, OperatorPrompt, RuntimeAdapter, SessionEvent, ToolCall, WriteGate } from "../../src/provider/pi/session.ts";
+import type { CustomerInputFn, CustomerInputRequest, ToolCall, WriteGate } from "../../src/provider/pi/session.ts";
 
 const TMP_ROOTS: string[] = [];
 function tempRoot(tag: string): string {
@@ -330,121 +330,166 @@ test("新形态：su **直接写出**角色（经创世边界）→ 真实落盘
   assert.ok(listing.roles.some((r) => r.roleId === "新角色"), "listProject 应枚举到 su 建出的新角色");
 });
 
-// —————————————————————— 6) finalize：提议收口需客户确认（T37 新语义）————————————
+// —————————————————————— 6) 客户确认制 + 自动收尾（2026-10-12 A-3/A-4 新语义）————————————
 //
-// ── 为何这两条按**新语义**断言（客户 2026-10-11 裁定）──────────────────────────
-// 客户裁定 **bootstrap 的完成方式 =「su 主动提议 → 客户确认 → 完成」**（原话：「完成 bootstrap 应该是 su
-// 主动觉得差不多了，来完成」+「当然需要客户确认了」）。编排（T37）据此改造 `finalize()`：**它不再
-// 「被调用即完成」**，而是**构造提议、经客户确认通道挂起**；**通道缺省/不可用/超时/拒绝 → 不完成**
-// （fail-closed）。故旧断言「调 `finalize()` 即期望完成」**已被新语义推翻**——本文件按新语义改写为
-// **两条**：① **未确认 → 不完成且零副作用**（负例，原样被删的旧断言）；② **确认通过 → 完成**（正例）。
+// ── 为何本节按**新语义**断言（客户 2026-10-12 批准设计 `2026-10-12_design_governed-interaction-and-chat-ux.md` A 组）──
+// 客户裁定：**删掉「收口」**（原话：「客户确定了才加，不要有个收口，收口去掉」）——「su 提议收口 →
+// 客户确认 → 完成」这套旧面（句柄 `finalize()`/`settled`、`operatorChannel` 注入、`finalize_bootstrap`
+// 工具）**已全部删除**。新语义两层：
+//   · **确认在写入之前**（A-1/A-3）：su 先经 `request_confirmation` 工具（客户通道 = 契约家
+//     `CustomerInputFn`）取得 `confirmed:true`；编排把**预览文本里列出且校验在边界内**的路径发行进
+//     本次会话 writeSet，**F4 拒掉一切未确认路径**（未获同意 → 不落盘，fail-closed）；
+//   · **自动收尾**（A-4）：每轮 su settle 后自动写 `.ans`(pin) + `角色卡/governance-boundary.yaml` +
+//     `docs/bootstrap-manifest.md`（无可 pin 之物 → 零副作用）。`acceptance.source` = **会话边界来源**
+//     （创世指令本身）——旧断言「source 含 operator:<id>」随证据模型变更被**替代**为「等于创世来源」
+//     （确认的审计在工具事件里，不在 `.ans`；这是钉住批准后的新证据模型，不是删断言）。
 //
-// ── 确认通道的形状：与 shell 闸 (a) **同一套 `OperatorChannelFn`** ─────────────────
-// `finalize` 的「提议」是**一种 `OperatorPrompt`**（`{command, argv, cwd, toolCallId, reason?}`），经
-// **shell 闸 (a) 的 `OperatorChannelFn`** 挂起问客户——**不是第二套确认机制**（形状单一来源：
-// `src/provider/pi/session.ts`）。故下表「注入替身」注入的就是**那个形状**：
-//   `(prompt: OperatorPrompt) => { outcome: "allow" | "deny" | "unavailable", operatorId?, reason? }`。
-// 通道缺省（未注入）→ `unavailable` → **不完成**（fail-closed）。
+// 旧三条用例按此改写为三条（**原有断言逐条保留或按新面等价替代，未放宽**）：
+//   ① **未获同意**（客户拒绝 / 通道不可用）→ 确认请求如实回报，后续写入被 F4 拒、零副作用；
+//   ② **确认通过** → 写入真落盘并经自动收尾转正（治理边界文档 + .ans + manifest；pin 独立重算一致）；
+//   ③ **授权拿掉**（边界未接受）→ F6 拒一切、自动收尾被门禁拒（不凭代码身份绕门）。
 
 /** 独立重算文件 SHA-256（与 finalize/门禁引擎同一算法：原始字节 + node:crypto）——**不复用实现方断言**。 */
 function independentSha256(absPath: string): string {
   return createHash("sha256").update(readFileSync(absPath)).digest("hex");
 }
 
-test("用户入口/finalize 未确认：**未接入客户确认通道** → 提议收口但**不完成**（fail-closed），零副作用（.ans / 治理边界文档 / manifest 都不写）", async () => {
-  const dir = tempRoot("finalize-no-confirm");
-  const script: ToolCall[] = [
+/** 确认预览文本：列出将写出的具体路径（A-3 的路径发行以预览文本为准）。 */
+function confirmPreview(): string {
+  return [
+    "将创建角色 新角色，写出以下文件：",
+    "角色卡/新角色/role-card.md",
+    "角色卡/新角色/boundary.yaml",
+    "角色卡/新角色/memo.md",
+  ].join("\n");
+}
+
+/** su 的动作脚本：**先经客户确认，再写盘**（新语义下的标准流程）。 */
+function roleScaffoldScript(): ToolCall[] {
+  return [
+    { name: "request_confirmation", args: { title: "创建角色 新角色（预览）", preview: confirmPreview() } },
     { name: "write_file", args: { path: "角色卡/新角色/role-card.md", content: "# 角色：新角色\n由 su 据对话写出。\n" } },
-    { name: "write_file", args: { path: "角色卡/新角色/boundary.yaml", content: "role: 新角色\nentries:\n  - kind: file\n    path: src/x.ts\n    purpose: t\n" } },
+    {
+      name: "write_file",
+      args: { path: "角色卡/新角色/boundary.yaml", content: "role: 新角色\nentries:\n  - kind: file\n    path: src/x.ts\n    purpose: t\n" },
+    },
     { name: "write_file", args: { path: "角色卡/新角色/memo.md", content: "# 新角色 备忘录\n" } },
-    // 注：su 本轮**不写**项目治理边界文档——这样才可断言「未确认 → 治理边界文档没被写」。
   ];
-  const handle = await openGovernanceSession(
-    // ★ **不注入** `operatorChannel`（缺省）——如实模拟「未接入客户确认通道」（无人值守）。
-    { taskId: "T35-finalize-no-confirm", project: genesisProject(dir) },
-    { createAdapter: (gate) => createFakeRuntimeAdapter({ gate, script, writeRoot: dir }) },
-  );
-  await handle.send("请据对话建出新角色");
-  for await (const _ev of handle.events()) {
-    /* 消费到 settled */
+}
+
+/** 计次客户通道：记录调用次数（「未获同意」必须是**问过之后**的裁决，不是「没问」）。 */
+function countingChannel(inner: CustomerInputFn): { channel: CustomerInputFn; calls: () => number } {
+  let n = 0;
+  return { calls: () => n, channel: (req) => { n++; return inner(req); } };
+}
+
+test("用户入口/确认制未获同意：客户**拒绝** / 通道**不可用** → 未确认路径被 F4 拒、零副作用（.ans / 治理边界文档 / manifest 都不写）", async () => {
+  const scenarios: Array<[string, CustomerInputFn]> = [
+    ["declined", () => ({ outcome: "declined", operatorId: "test-客户", reason: "测试：客户拒绝" })],
+    ["unavailable", () => ({ outcome: "unavailable", reason: "测试：无人值守（等价 stdin EOF）" })],
+  ];
+  for (const [tag, inner] of scenarios) {
+    const dir = tempRoot(`confirm-${tag}`);
+    const { channel, calls } = countingChannel(inner);
+    const toolSummaries: string[] = [];
+    const handle = await openGovernanceSession(
+      // ★ 注入**原始**客户通道（拒绝/不可用）——编排在其外再包「确认 → 发行 writeSet」的发行器。
+      { taskId: `T35-confirm-${tag}`, project: genesisProject(dir), customerInput: channel },
+      {
+        createAdapter: (gate, caps) =>
+          createFakeRuntimeAdapter({ gate, script: roleScaffoldScript(), writeRoot: dir, customerInput: caps?.customerInput }),
+      },
+    );
+    await handle.send("请据对话建出新角色（须先经客户确认）");
+    for await (const ev of handle.events()) {
+      if (ev.kind === "tool_call" || ev.kind === "accepted" || ev.kind === "denied") {
+        toolSummaries.push(`${ev.kind}: ${ev.summary}`);
+      }
+    }
+    await handle.dispose();
+
+    // ★「未获同意」必须是**问过之后**的裁决：su 真发起过确认请求（恰一次），不是没问。
+    assert.equal(calls(), 1, `${tag}：su 应恰好发起过一次客户确认`);
+    // ★ 未获同意 → 不得有任何写入获准；确认请求如实回报；后续写入被 F4 拒（未确认路径不发行）。
+    assert.ok(!toolSummaries.some((s) => s.startsWith("accepted:")), `${tag}：未获同意时不得有任何写入获准：${toolSummaries.join(" | ")}`);
+    assert.ok(toolSummaries.some((s) => /未获客户同意/.test(s)), `${tag}：确认请求应如实回报「未获客户同意」：${toolSummaries.join(" | ")}`);
+    assert.ok(toolSummaries.some((s) => /F4/.test(s)), `${tag}：后续写入应被 F4 拒：${toolSummaries.join(" | ")}`);
+    // ★ 零副作用：角色三件套、.ans、治理边界文档、manifest **都没被写**。
+    assert.equal(existsSync(join(dir, "角色卡", "新角色")), false, `${tag}：未确认不得写出角色文件`);
+    assert.equal(existsSync(join(dir, ".ans")), false, `${tag}：未确认不得创建 .ans/`);
+    assert.equal(existsSync(join(dir, ".ans", "project.json")), false, `${tag}：未确认不得写 .ans/project.json`);
+    assert.equal(existsSync(join(dir, GOV_REL)), false, `${tag}：未确认不得写治理边界文档`);
+    assert.equal(existsSync(join(dir, "docs", "bootstrap-manifest.md")), false, `${tag}：未确认不得写 docs/bootstrap-manifest.md`);
   }
-  assert.equal(handle.settled, true, "会话应已 settle（否则 finalize 因未 settle 被拒，测不到本语义）");
-
-  const res = await handle.finalize();
-  await handle.dispose();
-
-  // ★ 新语义：**未获客户确认 → 不完成**（fail-closed；status=unavailable 表示确认通道未接/不可用）。
-  assert.equal(res.ok, false, "未获客户确认**不得**完成（旧的「被调用即完成」语义已被推翻）");
-  assert.equal(res.status, "unavailable", "缺省确认通道 → unavailable（不是静默完成）");
-  assert.match(
-    res.message ?? "",
-    /未获确认|未接入客户确认通道|fail-closed/,
-    `拒绝原因应说明「收口未获客户确认」，实得：${res.message}`,
-  );
-  // ★ 零副作用：.ans / 治理边界文档 / manifest **都没被写**（提议挂起，未落盘）。
-  assert.equal(existsSync(join(dir, ".ans")), false, "未确认不得创建 .ans/");
-  assert.equal(existsSync(join(dir, ".ans", "project.json")), false, "未确认不得写 .ans/project.json");
-  assert.equal(existsSync(join(dir, GOV_REL)), false, "未确认不得写治理边界文档");
-  assert.equal(existsSync(join(dir, "docs", "bootstrap-manifest.md")), false, "未确认不得写 docs/bootstrap-manifest.md");
-  assert.deepEqual(res.wrote, [], "未确认不得写任何文件");
 });
 
-test("用户入口/finalize 确认通过：注入 **allow 确认通道替身**（= shell 闸 (a) 的 OperatorChannelFn 形状）→ 完成（写出 治理边界文档 + .ans + manifest）；pin 与我独立重算一致；载入器验为 pin-backed accepted", async () => {
-  const dir = tempRoot("finalize-confirm");
-  const script: ToolCall[] = [
-    { name: "write_file", args: { path: "角色卡/新角色/role-card.md", content: "# 角色：新角色\n由 su 据对话写出。\n" } },
-    { name: "write_file", args: { path: "角色卡/新角色/boundary.yaml", content: "role: 新角色\nentries:\n  - kind: file\n    path: src/x.ts\n    purpose: t\n" } },
-    { name: "write_file", args: { path: "角色卡/新角色/memo.md", content: "# 新角色 备忘录\n" } },
-  ];
-  // ★ 确认通道替身：**就是 shell 闸 (a) 的 `OperatorChannelFn` 形状**——su 提议收口时被调用，客户 allow。
-  let proposed: OperatorPrompt | undefined;
-  const allowChannel: OperatorChannelFn = (prompt) => {
-    proposed = prompt;
-    return { outcome: "allow", operatorId: "test-客户" };
+test("用户入口/确认制确认通过：su 先经 request_confirmation 预览并获确认 → 写入真落盘并经**自动收尾**转正（治理边界文档 + .ans + manifest）；pin 与我独立重算一致；载入器验为 pin-backed accepted", async () => {
+  const dir = tempRoot("confirm-allow");
+  // ★ 确认通道替身 = 契约家 `CustomerInputFn` 形状：客户**恰好确认**，并记录被问到的请求。
+  let seenReq: CustomerInputRequest | undefined;
+  const { channel, calls } = countingChannel(() => ({
+    outcome: "answered",
+    value: { confirmed: true },
+    operatorId: "test-客户",
+  }));
+  const recording: CustomerInputFn = (req) => {
+    seenReq = req;
+    return channel(req);
   };
   const handle = await openGovernanceSession(
-    { taskId: "T35-finalize-confirm", project: genesisProject(dir), operatorChannel: allowChannel },
-    { createAdapter: (gate) => createFakeRuntimeAdapter({ gate, script, writeRoot: dir }) },
+    { taskId: "T35-confirm-allow", project: genesisProject(dir), customerInput: recording },
+    {
+      createAdapter: (gate, caps) =>
+        createFakeRuntimeAdapter({ gate, script: roleScaffoldScript(), writeRoot: dir, customerInput: caps?.customerInput }),
+    },
   );
-  await handle.send("请据对话建出新角色");
+  await handle.send("请据对话建出新角色（先经客户确认）");
   for await (const _ev of handle.events()) {
-    /* 消费到 settled */
+    /* 消费到 settled（其间的自动收尾已在事件流内完成） */
   }
-  assert.equal(handle.settled, true, "会话应已 settle");
-  const res = await handle.finalize();
   await handle.dispose();
 
-  // ★ 确认通过 → 完成。
-  assert.equal(res.ok, true, `确认通过后应完成：${res.status ?? ""} ${res.message ?? ""}`);
-  assert.equal(res.status, "completed");
-  // 提议确实是经**那条确认通道**提出的（形状与 shell 闸 (a) 同一 `OperatorPrompt`：command/argv/cwd/toolCallId）。
-  assert.ok(proposed, "应经注入的确认通道提出收口提议");
-  assert.equal(typeof proposed!.command, "string", "提议应带 command（OperatorPrompt 形状）");
-  assert.ok(proposed!.command.length > 0, "提议应有可读文案（「su 提议：可以收口了」）");
-  assert.ok(Array.isArray(proposed!.argv), "提议应带 argv（OperatorPrompt 形状）");
-  assert.equal(proposed!.cwd, dir, "提议的固定 cwd 应为项目根");
-  assert.equal(typeof proposed!.toolCallId, "string", "提议应带 toolCallId（审计串联）");
+  // ★ 确认先于写盘：通道恰被调用一次，且预览列出了将写出的路径（A-1/A-3 的发行依据）。
+  assert.equal(calls(), 1, "应恰发起一次客户确认");
+  assert.ok(seenReq, "应捕获到确认请求");
+  assert.equal(seenReq!.kind, "confirm", "应以 confirm 型请求征询客户");
+  assert.ok(seenReq!.title.includes("新角色"), `确认标题应点名预览对象，实得：${seenReq!.title}`);
+  for (const p of ["角色卡/新角色/role-card.md", "角色卡/新角色/boundary.yaml", "角色卡/新角色/memo.md"]) {
+    assert.ok((seenReq!.preview ?? "").includes(p), `预览应列出将写出的路径 ${p}`);
+  }
 
+  // ★ 确认后的写入**真落盘**（字节相等）。
+  const cardAbs = join(dir, "角色卡", "新角色", "role-card.md");
+  assert.ok(existsSync(cardAbs), "确认后角色文件应真实落盘");
+  assert.equal(readFileSync(cardAbs, "utf8"), "# 角色：新角色\n由 su 据对话写出。\n", "落盘内容须与所写字节相等");
+
+  // ★ 自动收尾（A-4）：settle 后写出 治理边界文档 + .ans + manifest。
   const ansAbs = join(dir, ".ans", "project.json");
   const manifestAbs = join(dir, "docs", "bootstrap-manifest.md");
   const govAbs = join(dir, GOV_REL);
-  assert.ok(existsSync(ansAbs), "应写出 .ans/project.json");
-  assert.ok(existsSync(manifestAbs), "应写出 docs/bootstrap-manifest.md");
-  // §13.2：**首次（确认通过）的 finalize 写出**项目治理边界文档（三个普通目录）。
-  assert.ok(existsSync(govAbs), "确认通过后应写出治理边界文档");
+  assert.ok(existsSync(govAbs), "自动收尾应写出治理边界文档");
   assert.equal(
     readFileSync(govAbs, "utf8"),
     renderGovernanceBoundaryDoc(),
     "治理边界文档内容应 = renderGovernanceBoundaryDoc()（角色卡//docs//.ans/ 三普通目录）",
   );
+  assert.ok(existsSync(ansAbs), "自动收尾应写出 .ans/project.json");
+  assert.ok(existsSync(manifestAbs), "自动收尾应写出 docs/bootstrap-manifest.md");
 
   const ans = JSON.parse(readFileSync(ansAbs, "utf8")) as {
     roles: Record<string, { card: string; boundary: string }>;
     governanceBoundary: { path: string; acceptance: { accepted: boolean; source: string; pin: { path: string; sha256: string }[] } };
   };
   assert.equal(ans.governanceBoundary.acceptance.accepted, true);
-  assert.match(ans.governanceBoundary.acceptance.source, /bootstrap/, "acceptance.source 须如实记录 bootstrap");
-  assert.match(ans.governanceBoundary.acceptance.source, /operator:test-客户/, "acceptance.source 应如实记录**客户确认者**（operator:<id>）");
+  assert.match(ans.governanceBoundary.acceptance.source, /bootstrap/, "acceptance.source 须如实记录 bootstrap 来源");
+  // ★ A-4 证据模型：`.ans` 的接受来源 = **会话边界来源**（创世指令本身）。客户确认发生在**每笔写入
+  // 之前**（request_confirmation + F4 发行），operatorId 记录在工具事件里、不在 `.ans`——故此处按
+  // 新语义断言**逐字等于**创世来源（比旧的 /operator:<id>/ 更严：钉住它就是那一串来源本身）。
+  assert.equal(
+    ans.governanceBoundary.acceptance.source,
+    genesisProject(dir).genesisBootstrap!.source,
+    "acceptance.source 应逐字等于会话边界（创世指令）的来源",
+  );
   const pins = ans.governanceBoundary.acceptance.pin;
   assert.deepEqual(
     pins.map((p) => p.path).sort(),
@@ -474,11 +519,11 @@ test("用户入口/finalize 确认通过：注入 **allow 确认通道替身**�
   assert.equal(role.boundary.parseError, undefined, `角色边界不应有 parseError：${role.boundary.parseError}`);
 });
 
-// —————————————————————— 7) finalize 不绕门（负例）：拿掉授权 → 被拒且零副作用 ————————————
+// —————————————————————— 7) 自动收尾不绕门（负例）：拿掉授权 → 被拒且零副作用 ————————————
 
-test("用户入口/finalize 负例：**把授权拿掉** → finalize 被门禁拒绝且零副作用（不凭代码身份绕门）", async () => {
+test("用户入口/收尾负例：**把授权拿掉**（边界未接受）→ su 写入被 F6 拒、自动收尾被门禁拒且零副作用（不凭代码身份绕门）", async () => {
   const dir = tempRoot("finalize-deny");
-  // 项目治理边界文档存在且可解析，但 **acceptance 未接受**（授权被拿掉）——finalize 的两笔写须被 F6 拒。
+  // 项目治理边界文档存在且可解析，但 **acceptance 未接受**（授权被拿掉）——su 的写入与自动收尾的两笔写须被 F6 拒。
   mkdirSync(join(dir, "角色卡"), { recursive: true });
   writeFileSync(join(dir, GOV_REL), ["role: 治理边界", "entries:", "  - kind: directory", "    path: docs/", "    root: project", "    purpose: x", ""].join("\n"), "utf8");
   const unaccepted: ProjectConfig = {
@@ -488,36 +533,36 @@ test("用户入口/finalize 负例：**把授权拿掉** → finalize 被门禁�
     governanceBoundary: { path: GOV_REL, acceptance: { accepted: false, source: "" } },
   };
 
-  // 桩会话：立即 settle（无真实模型），只为让 finalize 的前置守卫（须已 settle）通过。
-  const immediateSettle = (): RuntimeAdapter => ({
-    async composeContext() {
-      return { systemPrompt: "" };
-    },
-    async bindRole() {
-      return {
-        async prompt(): Promise<void> {},
-        events(): AsyncIterable<SessionEvent> {
-          return (async function* () {
-            yield { kind: "settled", summary: "完成" } as const;
-          })();
-        },
-        async dispose(): Promise<void> {},
-      };
-    },
-  });
-
-  const handle = await openGovernanceSession({ taskId: "T35-finalize-deny", project: unaccepted }, { createAdapter: immediateSettle });
-  await handle.send("（桩会话，立即 settle）");
-  for await (const _ev of handle.events()) {
-    /* 消费到 settled */
+  // 会话：su 尝试写角色文件（应被 F6 拒）；settle 时自动收尾也应被门禁拒（零副作用）。
+  const script: ToolCall[] = [{ name: "write_file", args: { path: "角色卡/新角色/role-card.md", content: "# 角色：新角色\n" } }];
+  const deniedSummaries: string[] = [];
+  const handle = await openGovernanceSession(
+    { taskId: "T35-finalize-deny", project: unaccepted },
+    { createAdapter: (gate) => createFakeRuntimeAdapter({ gate, script, writeRoot: dir }) },
+  );
+  await handle.send("（授权被拿掉：一切写应被拒）");
+  for await (const ev of handle.events()) {
+    if (ev.kind === "denied") deniedSummaries.push(ev.summary);
   }
-  assert.equal(handle.settled, true);
+  await handle.dispose();
 
-  const res = await handle.finalize();
-  assert.equal(res.ok, false, "授权被拿掉后 finalize 必须被拒");
-  assert.match(res.reason ?? "", /门禁拒绝|未被接受|F6/, `拒绝原因应说明门禁判定，实得：${res.reason}`);
+  // ★ 授权被拿掉 → F6 拒一切（su 的写入不得落盘）。
+  assert.ok(
+    deniedSummaries.some((s) => /F6|未被接受/.test(s)),
+    `su 写入应被 F6 拒，实得：${deniedSummaries.join(" | ")}`,
+  );
+  assert.equal(existsSync(join(dir, "角色卡", "新角色")), false, "F6 拒一切：角色目录不得出现");
+  assert.equal(existsSync(join(dir, ".ans")), false, "授权被拿掉：自动收尾不得创建 .ans/");
+
+  // ★ 自动收尾**本体**被门禁拒（与会话 settle 时调用的是同一函数 `repinIfBootstrapped`）：
+  //   结果如实报「被门禁拒绝」，且零副作用——不凭代码身份绕门。
+  const boundary = (await resolveRole("su", unaccepted)).boundary;
+  const res = await repinIfBootstrapped({ projectRoot: dir, skillRoot: dir, boundary, governanceBoundaryPath: GOV_REL });
+  assert.ok(res, "创世态（无 .ans）下应返回收尾结果");
+  assert.equal(res!.ok, false, "授权被拿掉后自动收尾必须被拒");
+  assert.equal(res!.status, "blocked", "应为门禁拒绝（blocked），不是静默完成");
+  assert.match(res!.message ?? "", /门禁拒绝|未被接受|F6/, `拒绝原因应说明门禁判定，实得：${res!.message}`);
   // 零副作用：不建 .ans/、不建任何文件。
   assert.equal(existsSync(join(dir, ".ans")), false, "被拒不得创建 .ans/");
-  assert.deepEqual(res.wrote, [], "被拒不得写任何文件");
-  await handle.dispose();
+  assert.deepEqual(res!.wrote, [], "被拒不得写任何文件");
 });

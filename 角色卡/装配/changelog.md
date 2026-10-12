@@ -1,5 +1,24 @@
 # 装配 变更记录
 
+## 2026-10-12 — README 更新到当前状态（客户直接指示；逐条读实件核实）
+
+重写 `README.md` 的过时面：**收口已废**（改确认制：su 写盘前经 `request_confirmation` 预览获客户同意，编排把已预览且校验在边界内的路径发行进本次会话 writeSet、F4 拒未确认路径；**客户确认不设超时**，等待期间该轮硬超时暂停；同意且写入后 **settle 自动收尾**写 `.ans`(pin)+治理边界文档+manifest）；**回交/派发/队列/重启恢复**（`submit_report` 自动投递 su 验收；su `dispatch_task` 落盘后自动开工、每角色一条队列、客户消息同样入队、右栏「待办/队列」+ 徽标待办数；D-1 `<项目>/.ans/sessions/<角色>/` 恢复历史与上下文，已 gitignore）；**shell 闸改写**（桌面已 arm 三层链 (c)→(b) su 审读→(a) 客户确认；不可解析 ⇒ 直接拒、不打扰客户；只对项目角色 arm；**已知风险：无 OS 沙箱**；**CLI 入口仍未 arm**——实读 `src/index.ts`）；**边界格式**（散文 ⇒ 响亮报错；改边界需重开会话，拒写提示带「旧边界快照」线索）；**桌面呈现**（胶囊输入框 + 图片采集 ≤5MB、**送模型未接**；虚拟渲染 >150 行；Markdown 化 = vendored markdown-it 15.0.2 + sha256 pin；七态徽标；取消 runtime 选择器即默认 pi——旧 README 的「顶栏 runtime 选择器」已删）；文档纪律（文档面随边界授予 + 代码与文档同批交回 + `temp/<角色>/` 暂存区）。「已知范围外」节按实件重写（图片送模型未接、多任务派发引擎仍二期、真机 shell 语义未验、真实 Pi 会话未复验、CLI 与桌面差异）。**只改 `README.md`**。验证：`test/装配/` **52/52**；全量 **859/856/2/1**（两红=既有环境红）；`npm run typecheck` **0 错**；Node v24.14.0 / HEAD d933537。来源：客户「修改 readme.md」直接指示。
+
+
+## 2026-10-12 — 修复 `ans govern <目标目录>` 的「治理边界解析失败」（M1+M2+O1，客户批准）
+
+客户报障：`ans govern /tmp/ans-pi-e2e`（空目录）→ `治理边界解析失败：读取边界文件失败：ENOENT …/角色卡/门禁引擎/boundary.yaml`，退出码 1。**根因（已核对到源码）**：T34 只把注入配置的 `projectRoot` 换成目标目录，而**无 `.ans` 时回退的内置演示配置**里的 `governanceBoundary.path`（`src/index.ts:120`）与六个角色的 `card`/`boundary` 全是**相对 ans-cli 自身**的项目相对路径——su 不在 `project.roles` ⇒ `resolveBoundarySection` 走「治理边界覆盖」分支，去**目标目录**下读该文件 ⇒ ENOENT ⇒ `govern-session.ts` 以 `parseError` 抛错。
+
+- **M1（`src/index.ts`，`loadInjection`）**：目标目录 ≠ ans-cli 根（`path.resolve` 比较，新私有函数 `isSelfProjectRoot`）且 `configSource.kind === "builtin-fallback"` 时，改注入目标项目的**如实形态**——`roles = {}`、`governanceBoundary = { path: "", acceptance: DEMO_ACCEPTANCE }`（回到既有约定：空串不参与治理边界覆盖分支；finalize 落点由 `path || DEFAULT_GOVERNANCE_BOUNDARY_REL` 给出——与桌面「无 `.ans` 传空串」同款）。`ans govern`（无目录）与 `ans govern <ans-cli 根>` 行为逐字不变。
+- **O1（客户批准）**：同一分支补 `genesisBootstrap`（source = `cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/）`）——`ans govern <空目录>` 真能 bootstrap（与桌面「导入空文件夹」同一条有界创世授权；项目自己的治理边界文档一经写出并经 pin 接受即**结构性自终止**）。不加则命令「成功」但 su 一个字也写不了。
+- **M2（`test/装配/govern-target.test.ts`，49 → 52 例）**：新增「注入合同」「自根不变」；原第 6 例拆为两条更严用例——`governCommand` + 假适配器驱动（`EXIT_OK`、边界解析不再失败、创世授权下骨架写入**真落盘**）与 `main` 入口（**先清空 Pi 相关环境变量**：非 0、不含边界/目录错、如实报缺 provider 配置）。**未放宽、未删除原断言**；注释里「非 0 因缺 Pi 凭据」的旧说法一并纠正（适配器**惰性构造**，真实原因就是边界 ENOENT）。
+- **证据**：`test/装配/` **52/52**；全量 `node --test "test/**/*.test.ts"` **681 tests / 678 pass / 2 fail / 1 skipped**（两红与基线完全相同、均他角色环境红，无新增红）；`npm run typecheck` **0 错**。复现对照：修复前（`--env-file=.env`）ENOENT、退出码 1 → 修复后（无凭据环境）`缺少 base URL…`、退出码 1。真实模型端到端（有凭据）**未跑**，属「客户跑」。
+- **未做**：未改 README（O1 已批准，原措辞准确，O3 未触发）；未动他角色文件；未读 `.env`；未发真实模型请求。修复记录：`角色卡/装配/docs/fix/2026-10-12_fix_govern-target-boundary.md`（status: verified，确定性范围）。
+> **注（2026-10-12 同日更晚）：本 bullet 所述机制已被 A 组确认制替换删除，证据失效，保留为实录。**
+- **同日后续轮（2026-10-12）**：编排在 `src/interface/cli/govern.ts` arm 创世收口（注入带 `genesisBootstrap` ⇒ `finalizeBootstrap: true`；新增可选 `GovernDeps.operatorChannel`）后，本角色 `test/装配/govern-target.test.ts` 的 `governCommand` 用例因缺省 CLI 终端通道读 stdin 而**挂起**（实测：45 s 看门狗杀死、退出码 142）。应对：给该例注入**放行桩** `operatorChannel` 并断言挂起**恰好一次**；原断言全部保留（加强，非放宽）。复跑：`test/装配/` **52/52**；全量 **687 tests / 684 pass / 2 fail / 1 skipped**（两红=既有环境红）**自然退出**；`npm run typecheck` **0 错**。
+
+- **同日第三轮（2026-10-12）**：编排按客户批准的 A 组以**确认制**替换收口（删句柄 `settled`/`finalize`/`operatorChannel`；新增 `request_confirmation`/`request_choice`，确认后**发行 writeSet**、未确认路径被 F4 拒；settle 时**自动收尾**写 `.ans`+治理边界文档+manifest）。本角色 `test/装配/govern-target.test.ts` 第 7 例改为：脚本先 `request_confirmation`（预览列出将写路径）再写；deps 注入放行桩 `customerInput`（计次）；适配器工厂转发 `capabilities`；新增「确认恰好一次」「`.ans` 收尾产物存在」断言，原断言全部保留。证据：`test/装配/` **52/52**；全量 **715 tests / 700 pass / 14 fail / 1 skipped**（14 红=他人在途 12 + 既有环境红 2，本目录零红）**自然退出**；typecheck 我方零错。
+
 ## 2026-10-11 — 改准 README「两道门」用例数（621 → 677），并全核数字类陈述
 
 上一轮同步 README「Pi 配置」节时，本角色**如实报出**一处不在当时范围内的过时：`README.md:71`

@@ -1,5 +1,71 @@
 # 测试 变更记录
 
+## 2026-10-12 — 按新语义更新 shell 闸 (b) 不可解析断言：不升 (a)，直接拒绝（b-unparseable-deny）
+
+**来源**：客户裁定（M-2）——(b) 审读输出**不可解析 ⇒ 直接拒绝**（fail-closed），**不升 (a)、不重试、不打扰客户**；编排已落地（`src/common/编排/shell-gate.ts`：删 `BRANCH_B_BADJSON`，新增归因码 `BRANCH_B_UNPARSEABLE="b-unparseable-deny"` + 固定短句 `REASON_B_UNPARSEABLE`；其余分支不变）。边界：只写 `test/测试/**` 与 `角色卡/测试/**`。
+
+### 1) 失效断言（改前）
+
+`t9-block3-pin-shell.test.ts`（原 `:376-381`）：`pmAsk → "这不是 JSON"` + (a) 桩 `unavailable` → 断 `b-badjson→a-unavailable`（旧「升 (a)」语义）。
+
+### 2) 改后断言（未放宽，反而加严）
+
+(a) 桩改为**本会放行**（反向钉住「根本不该惊动客户」）：断言 `allow===false`、audit `conclusion==="deny"`、`branch===BRANCH_B_UNPARSEABLE`、**`calls.a===0`**、`reason===REASON_B_UNPARSEABLE`（固定短句，单一来源，绝不说成放行）。用例名同步改为「…；JSON 非法（不可解析）→ **直接拒绝、不升 (a)**」。**顺带核对**：同文件其余 shell 链断言（(c) 白名单/硬拒含反向守卫、risky 五条含最要害 `b-allow→a-deny`、b-unsure/无会话/超时仍升 (a)、(a) 超时/不可用/未接通道拒绝、规则集加载失败）与现实现逐条相符，**未动**。
+
+### 3) 验证（本角色独立执行，2026-10-12）
+
+- `node --test "test/测试/*.test.ts"` → **110/110 通过，exit 0**（改前 109/110）。
+- `node --test "test/**/*.test.ts"`（引号带）→ **836 计 / 833 过 / 2 红 / 1 跳，exit 1**；两红＝既有环境红（桌面 `pi-config.test.ts:60` 目录名、pm `path-primitives.test.ts:254` macOS `/var`）。
+- `npm run typecheck` → **0 错（exit 0）**。
+- 环境：Node **v24.14.0**、macOS 26.6.2、HEAD **d933537**（改动均未提交）。
+
+## 2026-10-12 — 按客户确认制新语义（A 组）改写本目录 4 条用例：finalize/operatorChannel/settled 旧面已删 → request_confirmation + F4 发行 + 自动收尾
+
+**来源**：客户 2026-10-12 批准设计 `2026-10-12_design_governed-interaction-and-chat-ux.md` A 组（删「收口」、客户确认制、客户同意后自动收尾）；编排/Pi适配器/桌面实施后，本目录 4 条按旧面断言的用例转红。边界：只写 `test/测试/**` 与 `角色卡/测试/**`；未碰他角色文件。
+
+### 1) 失效断言（改前）
+
+- `t9-block1-bootstrap.test.ts` 3 条（第 6/7 节）：用**已删**的句柄 `settled`/`finalize()` 与 `operatorChannel` 注入（finalize 提议-确认整面已删）。
+- `cli-genesis-boundary.test.ts` 1 条（链路面）：用**已删** `operatorChannel`；且其「不确认直接写」脚本在新语义下被 F4 拒（**红即正确**）。
+- 扫全目录「已删 API」：仅上述 4 条；`t9-block3-pin-shell.test.ts` 的 `operatorChannel` 是 **shell 闸 (a)** 的通道（仍在，非已删面），未动。
+
+### 2) 改后断言（新语义；**逐条保留或等价替代，未放宽**）
+
+- t9-block1 ①（未获同意）：客户**拒绝** / 通道**不可用** 两场景——su 应**恰好发起一次** `request_confirmation`；事件断言「未获客户同意」如实回报 + 后续写入被 **F4** 拒（未确认路径不发行）；角色三件套、`.ans`、治理边界文档、manifest **全零副作用**（较旧版**新增**「角色文件也不得出现」断言）。
+- t9-block1 ②（确认通过）：确认桩恰 1 次、预览列出三条将写路径；写入**真落盘**（字节相等）；**自动收尾**写出治理边界文档（内容 = `renderGovernanceBoundaryDoc()`）+ `.ans` + manifest；`acceptance.source` **逐字等于创世来源**——旧断言「含 `operator:test-客户`」随 A-4 证据模型（确认在写入前逐笔进行、operatorId 在工具事件不在 `.ans`）被**替代**为更严的等于断言（注释已注明）；pin 独立重算一致、载入器验 pin-backed accepted、`resolveRole` 无 parseError——**全部保留**。
+- t9-block1 ③（拿掉授权）：边界未接受 → su 写入被 **F6** 拒（事件断言）+ 角色目录不出现；直接调 `repinIfBootstrapped`（= 会话 settle 时调用的**同一函数**）→ `ok:false`、`status:"blocked"`、reason 含门禁拒绝、零副作用——保留旧 reason 断言语义。
+- `cli-genesis-boundary.test.ts` 链路面：改注入 `customerInput` 确认桩（`(gate, caps) => createFakeRuntimeAdapter({…, customerInput: caps?.customerInput})` 镜像真实接线）；越界写不落盘 + 确认后角色文件落盘 + **自动收尾三件落盘** + `exit 0` + 确认恰一次。
+
+### 3) 验证（本角色独立执行，2026-10-12）
+
+- `node --test "test/测试/*.test.ts"` → **110/110 通过，exit 0**。
+- `node --test "test/**/*.test.ts"`（引号带）→ **715 计 / 697 过 / 17 红 / 1 跳，exit 1**——**0 红在本目录**；17 红归属：13 `test/桌面应用/finalize-wiring.test.ts` + 1 `interface.test.ts` + 1 `renderer.test.ts`（桌面角色在途迁移，未修）、1 `pi-config.test.ts` 与 1 `test/项目管理/shared/path-primitives.test.ts`（既有环境红）。
+- `npm run typecheck` → **28 错全在他角色在途文件**（`app/desktop/customer-input.ts` 2、`test/桌面应用/finalize-wiring.test.ts` 22、`test/桌面应用/interface.test.ts` 4）；**本目录 0 错**。
+- 环境：Node **v24.14.0**、macOS 26.6.2、HEAD **d933537**（工作区改动均未提交）。
+- **未验**：真实模型端到端（su 真经确认建角色）——属「客户跑」。
+
+## 2026-10-12 — runCli 默认擦洗凭据/ANS_RUNTIME + 补 CLI `ans govern <目录>` 入口与创世用例（客户批准 M1+M2+M3+O1）
+
+**来源**：本角色第三轮独立复核发现（提案与证据 `docs/fix/2026-10-12_fix_runcli-credential-leak-and-govern-cli-cases.md`）。客户 2026-10-12 批准 **M1+M2+M3+O1**、**未采纳 O2**（无消费者，将来真需要再加），并随 O1 裁定「有 `角色卡/` 无 `.ans`」判据差**维持现状**（桌面对齐另议）。边界：只写 `test/测试/` 与 `角色卡/测试/`。**只读**：`src/common/shared/runtime-shared.ts`、`src/index.ts`、`src/service/role/resolve-role.ts`、`src/service/gate/resolve-write.ts`、`src/interface/cli/govern.ts`、`src/provider/pi/session.ts`。
+
+### 1) 问题（实测）
+
+- `test/测试/helpers.ts` 的 `runCli` 调 `spawnSync` **未传 `env`** ⇒ 子进程继承跑测进程环境。机器上有 `ANS_PI_*`/凭据时：`real-entry` 的 govern 用例**真开会话、发真实模型请求**，且会话成功反使「断言非 0」转红；该会话 su 在自根（演示配置）下边界 = 门禁引擎 Section 1（17 条、accepted、scope 未收窄）——实测 `src/common/门禁引擎/evil.ts` 类写入**会被放行**（极端情况把文件写进仓库）。
+- 同类第二开关：`ANS_RUNTIME=pi` 会把 role run 三条成功用例从演示切到真实适配器（无凭据全红、有凭据真发请求）。
+
+### 2) 改后断言（`test/测试/`）
+
+- `helpers.ts`：新增私有 `scrubbedEnv()`，`runCli` 子进程 env 默认擦洗三类键——`PI_CREDENTIAL_ENV_VARS`（单一来源 `runtime-shared.ts` **只读导入**）+ 全部 `ANS_PI_` 前缀键 + `ANS_RUNTIME`；其余环境原样。**不加** O2 开关（客户未采纳）。
+- `real-entry.test.ts`：`FAIL_CASES` 加可选 `stderrMatch`，govern 条目填 `/缺少 base URL/`（**收紧**：原「非 0」保留，其余断言一字未动）；新增真入口用例「`ans govern <空目录>` → 非 0 + stderr 无「治理边界解析失败」+ 含「缺少 base URL」+ 目标目录零残留」；新增「runCli 默认擦洗」哨兵用例（**实施时增补**：注入哨兵 `ANS_RUNTIME=pi`+凭据变量后断言子进程看不到它们——否则无凭据机器上无法证明擦洗生效；哨兵 base URL 置空 ⇒ 即便擦洗失效也不外连）。
+- 新增 `cli-genesis-boundary.test.ts`（跨角色联调）：① 判定面——空目录注入 su 边界**恰 3 条**（`角色卡/`、`docs/`、`.ans/`），`src/**`、词法逃逸（`角色卡/../src`）、真实路径逃逸、根外绝对路径全拒，三处治理产物放行；② 链路面——`governCommand` + 假适配器：越界写 `src/evil.ts` **不落盘**、`角色卡/X` 骨架**真落盘**、命令 exit 0；③ O1 角落——有 `角色卡/` 无 `.ans` 仍带 `genesisBootstrap`（`listProject.hasRoles=true` 呈现差异），可写面仍只落三处治理产物（客户裁定登记于用例注释与提案文档）。
+
+### 3) 验证（本角色独立执行，2026-10-12）
+
+- `node --test "test/测试/*.test.ts"` → **110/110 通过，exit 0**（基线 105；+5 = M2 1 + M3 2 + O1 1 + 擦洗哨兵 1）。
+- `node --test "test/**/*.test.ts"`（引号带）→ **692 计 / 689 过 / 2 红 / 1 跳，exit 1**（基线 687/684/2/1）。两红为他角色**既有环境红**，未修、不计入本角色回归：`test/桌面应用/pi-config.test.ts:60`（检出目录名）、`test/项目管理/shared/path-primitives.test.ts:254`（macOS `/var`→`/private/var`）。
+- `npm run typecheck` → **0 错（exit 0）**。
+- **未验**：真实模型端到端（su 真建角色 → 提议 → 终端 y/n 确认）——属「客户跑」。
+
 ## 2026-10-11 — 按新语义改 Pi 面板断言：面板键 5→4（3 必填 + 1 可选）、`ANS_PI_PROVIDER` 移出面板（转反向守卫）、`ANS_PI_CONTEXT_WINDOW` 改可选
 
 **来源**：客户就桌面 Pi 设置面板给新裁定（原话：「**这个 pi 为啥需要配置 5 个呢**」——真正必须的只有 **3 个**）。桌面应用据此改 `app/desktop/pi-config.ts`（**只读**）：面板键集合 `PI_PANEL_KEYS` 由 5 → **4**（3 必填 `ANTHROPIC_AUTH_TOKEN`/`ANS_PI_BASE_URL`/`ANS_PI_MODEL` + 1 可选 `ANS_PI_CONTEXT_WINDOW`）；`ANS_PI_PROVIDER` **移出面板**（代码里有默认值 `ans-gateway`、是内部标签，非用户该填）；`ANS_PI_CONTEXT_WINDOW` 从「必填」改「**可选 + 保守默认**」（Pi适配器 `src/common/pi-adapter/provider-config.ts` 定的默认值 `DEFAULT_PI_CONTEXT_WINDOW = 32768`；缺失**不硬失败**，只在日志/事件流提示）。桌面如实回报本角色两处按**旧语义**断言已红（**未动本角色文件**）。边界：只写 `test/测试/` 与 `角色卡/测试/`。**只读**：`app/desktop/pi-config.ts`、`src/common/pi-adapter/provider-config.ts`。

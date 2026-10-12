@@ -1,5 +1,253 @@
 # 桌面应用 变更记录
 
+## 2026-10-12 — Q-1 热路径治理 + Q-2 聊天流虚拟渲染（客户「主线程被阻碍」「应该虚拟渲染啊」）
+
+**来源**：客户原话（澄清：**角色工作期间 UI 卡死**——每事件 IPC→DOM；markdown 疑似卡顿）。**属本角色边界内**。
+
+- **热路径三件**：① **合帧推送**——事件按 16ms（≈一帧）窗口合成 `session:events`（数组、顺序不变；preload 双通道兼容探针）；角色状态快照**按角色去抖 100ms**（只推最新——快照语义）；纯逻辑 `push-batcher.ts`（可单测）。② **批量收尾一次布局**——flush 内抑制滚动/窗口更新，收尾统一贴底；左树每批至多一次（原先每事件一次）；无 per-event scrollHeight 读。③ **流式 Markdown 惰性化**——角色在跑时助手消息先纯文本，**settled 一次性**升级（仅已挂载元素；离屏行挂载时才解析）。④ O-1 哈希加 **mtime+size 缓存**（未变只 stat）。
+- **Q-2 窗口化**：行表 append-only；<150 行全挂载（常规会话逐字不变）；≥150 只实体化**视口 ±30 行**（spacer 撑高、估算+实测高、rAF 合帧滚动）；离屏**不持 DOM、不跑 Markdown**；交互行 keepEl。四条滚动语义逐条保住：贴底 / **P-1 卡定位先实体化再滚** / 切角色**恢复位置** / **回放惰性**（整段批量，不一次性实体化）。
+- **量化（bench-storm，300 事件风暴）**：最长帧间隔 **101.3ms → 18ms**；事件处理总耗时 **192.7ms → 16.7ms**（朴素基线 0.69ms/事件；2000 行回放旧形态估 ≈1.3s → **16.4ms**，挂载行仅 71）。**护栏**：300 事件 <3000ms、200 次未变哈希扫描 <2500ms（且同尺寸内容变更仍检出）、200 次 Markdown <1200ms——均入 `hot-path.test.ts`。
+- **取舍（登记）**：窗口化后 **Ctrl+F/全选只覆盖已实体化行**；建议「复制全文/导出转录」按钮（**未擅自加**，待裁定）。
+- **跨角色建议（未越界）**：门禁拒写路径的 `reloadBoundaryEntriesSync` 同步读盘建议按 mtime+size 缓存或 async 预载（每写尝试的热路径阻塞源）。
+- **证据**：桌面 **155/154/1**（唯一红=既有环境红）；全量 **857/854 · 2 红**（两红均既有环境红）；typecheck **0**。详见 `docs/change/2026-10-12_change_hot-path-and-virtual-stream.md`。
+
+## 2026-10-12 — P-1 待确认卡可达性（真机：卡被 288 行活动淹掉）
+
+**来源**：真机（客户以为卡丢了）。**属本角色边界内**。
+
+- **到达即达**：**先量后挂**（判据=到达前距底 ≤120px 且正看着该角色）⇒ 贴底滚到卡；在往上翻/不在该角色 ⇒ **不打断**。e2e 抓出并修复了「加卡后测量（卡本身越过阈值）⇒ 永不滚动」的时序 bug。
+- **常驻 chip**：视图底部「有 N 条待确认 · 定位」（同状态源 `openRequestIdsFor`）；点击**逐张定位**+高亮（一次性 CSS 动画，无计时器）；作答/失效 ⇒ 灭。
+- **切回**：有未作答卡 ⇒ 滚到第一张（非停在底部）；chip 计数正确（多张逐张）。
+- **证据**：e2e 真机 `P1_*` 9 项全 true（`P1_ARRIVAL_DEBUG` dist=49、卡完整在视口）；桌面 **155/154/1**；全量 **857/854 · 2 红**；typecheck 0。详见 `docs/change/2026-10-12_change_operator-card-reachability.md`。
+
+## 2026-10-12 — e2e 看门狗缺陷修复（「卡住」真因）+ 基准台 bench-storm（新增）
+
+**来源**：pm 干预（e2e 进程 24 分钟纯等待被「卡住」）。**属本角色边界内**。
+
+- **真因（已定位）**：① e2e 收尾 `report.txt` 写入**未先建 OUTDIR**（调用方指定目录不存在 ⇒ ENOENT 未捕获拒绝）且**未兜底 exit** ⇒ run 早已完成、进程留在窗口里空等（CPU≈0）——绝非测试失败。② 另有 harness 形态漂移：`app:list-project` 处理器**在回包前 await 读历史并推送**（与生产 `void pushSessionHistories` 不同形）⇒ 首角色（su）记录因**与回包跨通道竞序**丢失（`RESTORE_SU_OWN_TEXT=false`）。
+- **修复**：`fs.mkdirSync(OUTDIR,{recursive:true})` + 收尾报告 try/catch + **`app.exit(0)` 兜底**；list-project 改**生产形态**（fire-and-forget、回包后推送）。
+- **结果**：e2e **全绿**——`E2E_DONE=1`，165 项 `=true`；仅 2 项 `=false` 且均为**预期值守卫**（退役文案不存在 / 空项目无角色）。
+- **新增基准台** `e2e/bench-storm.mjs`（离线、自超时 90s、逐阶段写盘）：Q-1/Q-2 的前后对照数字来源（见上条）；`BENCH_OUT` 可指定结果路径。
+
+## 2026-10-12 — O-1 边界变更后刷新旧快照会话（读盘哈希检出 ⇒ 作废重建 + 如实行）
+
+**来源**：真机现象（客户「这个问题也要修复一下」）：su 改好 boundary.yaml 后，活会话仍用开会话时的**旧边界快照**拒写。**属本角色边界内**。
+
+- **信号（可信，非界面推测）**：开会话时定格**边界快照指纹**——参与解析的三来源逐一无状态读盘 **sha256 内容哈希**：① 角色 boundary.yaml；② 项目治理边界文件（若有）；③ `.ans/project.json`（pin 刷新即变）。读盘失败记 `<missing>`（保守幂等）。
+- **处置**：`rebuildIfBoundaryStale`——陈旧 ⇒ **作废重建**（dispose → 立即按新边界重开；D-1 沿用）+ **如实一行**（两分支：`历史已从本地会话文件恢复（模型上下文一并恢复）` / `本地无可用会话文件（新建会话）——模型不会记得以上历史`；重开失败另起一行）；**在跑的轮次不打断**。
+- **检查点四处**：发言前（本条照常发出）/ 续接（点角色）/ 投递前（队列保留、不并发）/ **su 一轮结束的全量扫描**（Interface `void refreshStaleBoundaries()`——边界刚被 su 改过的可信时机）。**su 同样适用**。
+- **跨角色建议（未越界）**：拒写文案建议在「盘上边界含该路径、会话快照不含」时补线索「本会话可能持有旧边界快照——请重开会话后重试」（归门禁/编排，请协调方转达）。
+- **测试**：新增 `boundary-refresh.test.ts` **4/4**（真临时目录+真读盘：变更⇒重建+如实行/未变⇒不重建不丢上下文/su+.ans pin 刷新同样触发/投递路径先重建再投不丢队列 + 接线钉）。
+- **证据**：`test/桌面应用` **149 计/148 过/1 红**（唯一红=既有环境红）；全量 **847/844 · 2 红**（两红均既有环境红）；`npm run typecheck` **0 错**。Node v24.14.0 / Darwin arm64 / HEAD `d933537`。
+- 详见 `docs/change/2026-10-12_change_boundary-refresh.md`。
+
+## 2026-10-12 — N-3 右栏「待办 / 队列」组 + N-4 其余接入点一并 Markdown 化
+
+**来源**：客户追加「代办也要在右边显示」+「都要 markdown 化」。**属本角色边界内**。
+
+- **N-3**：`session:role-state` 载荷增**结构化** `queue`（来源/摘要/**入队时间**）+ `running`（**正在跑的那条投递**；settled/失败/dispose 撤销；直接 send 的一轮不入表）——**同一通道、与 summaries 同源，不造第二套数据源**。右栏新增同级 `details.sec`「**待办 / 队列**」（默认展开，计数徽章）：每行=位置（排队 1..N / 「**进行中**」在最前）+ 来源标签（`su 派发`/`客户消息`/`回交投递`）+ 摘要（**有界截断 80**，长内容不铺开）+ 入队时间（本地）；**每字段 esc**；空队列占位「（无待办）」；`onRoleState` **定点更新**（不重排手风琴）；纯映射在 `ui-labels.js`。**排队 ≠ 已执行**。
+- **N-4**：变更记录正文 + 文档索引（路径清单，`- path` 列表）+ **回交卡摘要**改经**同一 `Md` 管线**（同 esc/白名单）；**边界条目保持结构化表格**、**证据列表保持逐条 esc**（不拼 Markdown）；派发卡 `mi-body` 本已走管线（无改动，如实）；样式收敛为通用 `.card-md` 钩子。
+- **测试**：`renderer.test.ts` N-3/N-4 两例（夹具逐条渲染/截断/空占位/esc 反向；三接入点经 Md + XSS 反向〔script/img onerror/iframe〕+ esc 单一来源未破）；`message-queue.test.ts` 快照结构断言扩（结构条目+进行中）；e2e 增 `RIGHT_QUEUE_*` 探针（未跑，登记）。
+- **证据**：`test/桌面应用` **149 计/148 过/1 红**（唯一红=既有环境红）；全量 **847/844 · 2 红**（两红均既有环境红）；`npm run typecheck` **0 错**。Node v24.14.0 / Darwin arm64 / HEAD `d933537`。
+- 详见 `docs/change/2026-10-12_change_right-queue-panel.md` 与 `..._ui-button-label-and-card-markdown.md`（N-4 节）。
+
+## 2026-10-12 — N-1 导入/切换项目按钮文案 + N-2 右栏角色卡 Markdown 渲染
+
+**来源**：客户原话「导入项目之后，按钮名字变成切换项目」「右边的角色卡要有 markdown 渲染」。**属本角色边界内**。
+
+- **N-1**：新增纯映射 `ui-labels.js::pickProjectLabel(hasProject)`（`true⇒切换项目`；其余/清空回退⇒`导入项目`；只认布尔转写）；renderer `updatePickButton()` 判据=**已有状态 `state.projectRoot`**（不靠界面猜测），在 `applyListing`（导入/切换同一落定路径）与初始各刷新；按钮 id 实为 `#btn-import`（派工单写的 `#btn-pick-project` 与实件不符——按实件接线）；文案去掉旧省略号「…」（与客户原话逐字一致）。
+- **N-2**：`renderRight()` 角色卡由 `esc(cardText)` 改为 **`Md.renderMarkdown(cardText)`（既有管线**：同一 esc 单一来源、html:false 白名单、链接 `rel`+`md-link`、图片=原文文本——逐条适用）；容器加 `card-text card-md`；样式解除 pre-wrap、块级/代码块/链接与聊天流同款。**边界/变更记录/文档索引三组未动**；**登记**：变更记录同走 `.card-text` 纯文本——如愿同享 Markdown，改动同款一行，**待裁定**。
+- **测试**：`renderer.test.ts` **+2 例**（N-1 两态/回退/判据源码钉/装载顺序/初始静态文案；N-2 XSS 反向用例 + 经 `Md.renderMarkdown` 钉 + 不再裸 esc 钉 + esc 单一来源未破 + 三组未动反向钉 + 样式钉）；e2e 增 `PROJECT_BTN_*`/`RIGHT_CARD_MD_*` 探针（未跑，登记）。
+- **证据**：`test/桌面应用` **143 计/142 过/1 红**（唯一红=既有环境红）；全量 **841/838 · 2 红**（两红均既有环境红）；`npm run typecheck` **0 错**。Node v24.14.0 / Darwin arm64 / HEAD `d933537`。
+- 详见 `docs/change/2026-10-12_change_ui-button-label-and-card-markdown.md`（含不符之处 2 条）。
+
+## 2026-10-12 — M-1 美化 shell 确认框：应用内确认卡替代原生对话框
+
+**来源**：客户看截图原话「这个太丑了」（原生 dialog 正文=技术文本墙）。**属本角色边界内**。
+
+- **数据面（纯函数）**：`shellIntentSummary`（摘要**只取命令首词**、不编意图）、`plainReasonFor`（升级原因→人话；`risky`/超时/解析失败/不可用/拿不准各有专句；**未识别给通用 fail-closed 句，行话不外露**，原始措辞只进折叠详情）、`buildShellConfirmRequest`、`createShellConfirmPresenter`（**恰 `allow:true` 才放行**；未知 id → `expired` 不放行；关窗 ⇒ 全部不放行；清理兜底只清内存+不放行——判定以通道先到者为准）。
+- **通道（main.ts）**：原生 presenter **退役**；`shell:confirm-request`（主→渲染数据面）+ `shell:confirm-response`（渲染→主决定）；推达失败⇒抛错⇒通道 unavailable。arm 语义不变（两件同备；仅项目角色）。
+- **卡片（renderer）**：弹层标题「shell 命令请求」；命令**逐字**等宽 `<pre>`（不折行/可横滚、textContent、不美化）；白话摘要位；人话「为什么问你」；`<details>` 详情默认收起（argv/cwd + 引号注明 + 审核原文）；按钮 `放行执行/拒绝`（**拒绝默认焦点**）；Esc/关闭（×）/拒绝 = **不放行**；失效态如实（「未获放行」）。**无计时器**（G-1 纪律）。
+- **测试**：`operator-channel.test.ts` **23/23**（数据面逐档含「不含内部用语」断言 + presenter 五路 + 原生对话框退役钉）；`renderer.test.ts` 卡片结构/fail-closed/样式钉；既有 fail-closed 三连保留；e2e 增 `SHELL_CONFIRM_*` 探针（未跑，登记）。
+- **证据**：`test/桌面应用` **141 计/140 过/1 红**（唯一红=既有环境红）；全量 **836/833 · 2 红**（两红均既有环境红）；`npm run typecheck` **0 错**。Node v24.14.0 / Darwin arm64 / HEAD `d933537`。
+- 详见 `docs/change/2026-10-12_change_shell-confirm-card.md`（含取舍：折叠详情保留「审核原文」一行、摘要只给首词、卡片不限期+超时归通道）。
+
+## 2026-10-12 — shell 闸 (c) 规则集**实件注入**接线（客户重发授权）
+
+**来源**：客户重发授权（真机暴露：生产 arm 只注 (a) 未注 (c) ⇒ 闸一律拒绝 ⇒ su 如实报「环境无 shell」）。**属本角色边界内**。
+
+- **构造点**：`operator-channel.ts::buildDesktopShellArming`——**只读导入** `src/service/gate/shell-rules.ts` 的 `classifyShell`（**同一函数引用**）+ `defaultShellRules()`；形状 `Omit` 自编排 `AssembleShellGateOptions`（不复制实现、不另立形状）。**任何一步失败 ⇒ undefined = 不 arm**。
+- **接线（与 (a) 同一处）**：`main.ts`——`shellArming = ARMED ? buildDesktopShellArming() : undefined`；**两件同备才 arm**（(c) 失败 ⇒ 连 (a) 通道也不构造——`run_shell` 不注册，绝不半装）；主进程如实打一行日志（无敏感值）。`session.ts` 与 (a) **同判据**（`role.builtIn`——仅项目角色；su 不 arm）→ `openRoleSession({ shellArming })`（编排 `run-role.ts:303` 已消费）。
+- **测试**：`operator-channel.test.ts` **19/19**——构造**引用同一性**（classifyShell 实件；rules 经加载器原样透传，桩件**不真跑命令**）、失败路径⇒不 arm、注入判据扩两件（su 不收；未配置时两字段都不出现）、arm 决策源码钉改为「两件同备才 arm」；外加**接通核查**（真实 `openRoleSession`+真实装配 ⇒ `capabilities.shellGate` 确实产出——「是否已真正接通：是」的依据）。
+- **证据**：`test/桌面应用` **136/135/1**（唯一红=既有环境红）；全量 **830/827 · 2 红**（两红均既有环境红）；`npm run typecheck` **0 错**。Node v24.14.0 / Darwin arm64 / HEAD `d933537`。
+- 详见 `docs/change/2026-10-12_change_shell-arm.md`（补丁节）。
+
+## 2026-10-12 — L-1 每角色任务队列（可见性 + 客户消息入队）+ 状态准确性（真实信号 + 图标化）
+
+**来源**：客户裁定「每个角色如果正在工作，应该可以有个队列的概念…」（现为直接失败）+「执行的时候这个状态显示不对吧…应该用图标来表示」。**属本角色边界内**。
+
+- **入队（不再直接失败）**：忙时客户消息作为**第三类** `DeliveryItem`（`kind:"message"`）并入**同一条**投递机（E-1/H-1 共用）；`{ok:true, queued:true, position:N}` → 界面如实提示「已入队：等它完成当前任务后处理（第 N 位）」；空闲路径逐字不变；失败语义不变（如实系统行 + 放回队首 + 未丢弃）。**无优先级/抢占**（登记）。
+- **可见性**：新通道 `session:role-state`（`{roleId, busy, summaries}`，忙/闲切换与队列变化时外推）→ 左树徽标「◐ 工作中 · N 待办」+ 该角色聊天流的**队列行**（原位更新、常驻流尾）。
+- **状态准确性（重点）**：判据只许**真实信号**（会话 busy〔含 B-2 后台轮次〕/ 队列深度 / 已 dispose）；**界面侧推测退役**（旧 `working` 事实从纯函数删除，反向断言钉死）。**复现 → 修后**：投递开跑的一轮，旧事实组合派生「空闲」（复现「其实在跑却显示空闲」）；真实快照 busy⇒「工作中」；队列待办不得显示空闲。
+- **图标化**：七态 `{icon,label,className,title}`（○/●/◐/?/■/✕/◌）；「停止」措辞唯一（`STOPPED_LABEL="已停止"`，标签与悬停只此一处 + 渲染侧反向断言）。
+- **顺带修复两处真机缺陷**：① 自动开 su **抢活动角色** ⇒ 用户消息错发 su → `openInternal(userInitiated)`，后台开启不改 activeRoleId；② 投递机**并发重入**（双 drain 抢同一队列）⇒ su 重复开启 + 误报「形状不符」→ 项目级**串行门** `drainChains`。另：demo 适配器补发 `settled`（对齐真实适配器——忙态复位依赖它，绝不可删）；send 改**先置忙再 await**（防快适配器事件竞态）。
+- **测试**：新增 `message-queue.test.ts`（7 例，含复现对照与并发修正钉子）；`renderer.test.ts` B-3 组重写；`interface.test.ts`/`session.test.ts` 适配 L-1 时序（替身推 settled）。
+- **证据**：`test/桌面应用` **136/135/1**（唯一红=既有环境红）；全量 **830/827 · 2 红**（两红均既有环境红）；`npm run typecheck` **0 错**。e2e 增 `ROLE_STATE_*` 探针（未在本机跑，如实登记）。Node v24.14.0 / Darwin arm64 / HEAD `d933537`。
+- 详见 `docs/change/2026-10-12_change_message-queue-and-role-state.md`。
+
+## 2026-10-12 — K-1 胶囊输入框 + K-2 图片发送（到主进程为止；送模型未接）
+
+**来源**：客户裁定（设计 K 组）。**属本角色边界内**。
+
+- **K-1**：输入区改**圆角胶囊**（`#composer-capsule.capsule`：附件键 + 无边框 textarea + **内嵌圆形发送箭头**）；旧「输入框+独立发送钮」行结构退役；Enter/Shift+Enter、发送禁用态、状态位（chat-head）逐字保留。
+- **K-2**：图片**选图/粘贴/拖入** → 缩略图 chips + 移除键；**渲染进程不碰文件**（新 IPC `app:pick-image`/`app:attach-image`，读文件在**主进程**；base64 交 Interface **按真实字节**校验——魔数嗅探类型、≤5MB、png/jpeg/webp/gif 白名单，**扩展名不作数**；取消=`cancelled`≠失败）。校验纯逻辑在 `composer-images.ts`。
+- **⚠ 未接（如实登记）**：**图片送进模型未接线**（Pi适配器核实 SDK 图片内容块中）——发送时如实说明「N 张图片未发送」、图片保留在输入区，**绝不假装已读图**；网关多模态若不支持，届时须如实说「未能识别图片」（登记义务）；图片 base64 未来进会话 JSONL 的体积影响登记（跨角色）。
+- **测试**：新增 `composer-images.test.ts`（3 例）+ `renderer.test.ts` K-1/K-2 钉（含「发送键在胶囊**之内**」「渲染侧不碰 fs」）；e2e 探针同步（`COMPOSER_ROWS_ARE_ATTACH_AND_CAPSULE` 等，未跑）。
+- **证据**：`test/桌面应用` **136/135/1**（唯一红=既有环境红）；全量 **830/827 · 2 红**（两红均既有环境红）；`npm run typecheck` **0 错**。Node v24.14.0 / Darwin arm64 / HEAD `d933537`。
+- 详见 `docs/change/2026-10-12_change_k-input-capsule-and-images.md`。
+
+## 2026-10-12 — I-1：开放 shell（桌面 arm + (a) 确认框接线，仅项目角色）
+
+**来源**：设计稿 I-1；**客户裁定（2026-10-12）**：「现在开放 shell，然后 shell 需要 su 审核一下。如果 su 觉得危险可以让客户决定」。**属本角色边界内**。
+
+- **arm 点**：`DESKTOP_SHELL_GATE_ARMED` `false`→**`true`**（顶部文档重写：新裁定 + **已知风险**；旧「V1 不 arm」记录留作历史）。
+- **接线**：`main.ts` 在 arm 时构造既有 (a) 通道（`createElectronOperatorPresenter`：逐字命令原文 + 放行/拒绝，**拒绝为默认与取消项**）→ `createDesktopInterface({ shellOperatorChannel })` → Interface/`SessionManager` → `openRoleSession` 入参 `shellOperatorChannel`（**编排据它装配 (c)/(b)/(a) ShellGate**——其 `shell-arming.ts` 在制品、run-role 接线未落前静默忽略，登记）。**仅项目角色**（`role.builtIn` 判据；**su 不 arm**——审读者不给自己开闸）。历史 `shellGate` 直注接缝保留。
+- **fail-closed 不变**：关窗/取消/拒绝/超时/抛错 → 不放行（既定三条退路）；「恰 allow 才 spawn」在 Pi 适配器 execute。
+- **留痕核实**：结果进事件流（拒绝 `run_shell 未执行：审核拒绝（…）`→`denied` 事件；tools.ts:571/576/586，toolCallId 逐调用透传）+ 编排审计文件 by/branch；**对话框呈现本身不在事件流**（如实登记）。
+- **已知风险（登记）**：**无沙箱**——放行命令真实执行，命令内写入**不经过写门禁**（`run_shell` 无 path）——放行的命令可绕过写边界；缓解=三层链+交客户+审计，非消除（客户知情授权）。
+- **测试**：`operator-channel.test.ts` **16/16**（arm 决策含源码钉子：main 开关构造/Interface 透传/session 仅项目角色；**注入判据实测 A 收到、su 不收到**；fail-closed 三连与历史接缝用例保留更名）；全套 **121/120/1**（唯一红=既有环境红）。`npm run typecheck` 本角色 0 错（同期编排在制品 1 错，他角色）。e2e 不 arm（离线演示）——登记。
+- 详见 `docs/change/2026-10-12_change_shell-arm.md`。
+
+## 2026-10-12 — 修复真机崩溃：坏形状回交事件喂进 renderHandbackPrompt（未捕获拒绝）
+
+**来源**：真机 `UnhandledPromiseRejectionWarning`（`renderHandbackPrompt` 读 `undefined.taskId`）。**属本角色边界内**。
+
+- **根因**：投递路径是 fire-and-forget（`void this.handleHandback(...)`）——**任何上抛＝未捕获拒绝**；而事件载荷**无形状防御**：`{kind:"handback"}` 缺载荷（或载荷缺 `roleId`）时 `renderHandbackPrompt(undefined)` 直接抛。H-1 泛化后 handback/dispatch 两条渲染路径同处一机，暴露面放大。
+- **修复（三层防御，全如实、绝不静默）**：① `handleHandback` 形状守卫（缺载荷/缺 roleId → 系统行「形状不符…未投递」+ return）；② 渲染 try/catch + 整体 catch（失败如实一行、不入队）；③ `drainQueue` **安全壳**（包 `drainQueueUnsafe`，任何意外拦截为系统行）+ 条目正文守卫。正常路径逐字未动。
+- **全仓核查**：`renderHandbackPrompt`/`renderDispatchPrompt` 在 `app/**` 仅两处调用（均入队定格；dispatch 入参先过校验）；渲染侧 `ev.handback` 缺载荷已有 `if (!hb) return;`。无其它同类点。
+- **回归钉子**：`handback-delivery`/`dispatch-delivery` 各挂 `process.on("unhandledRejection")` **计数断言为 0**（驱动缺载荷/缺 roleId 事件 + 正常 dispatch + 坏回交并入同机）；坏形状如实系统行、不投递；dispatch 条目**不走** handback 渲染（文本逐字断言）。
+- **证据**：typecheck **0 错**；`test/桌面应用` **120/119/1**（唯一红=既有环境红）；全量 **794/791/2 红/1 skipped**（两红均既有环境红，非本改动）。Node v24.14.0 / Darwin 25.6.0 arm64 / HEAD `d933537`。
+- 详见 `docs/fix/2026-10-12_fix_handback-render-crash.md`。
+
+## 2026-10-12 — H-1：su 派发任务路由（复用 E-1 投递机）+ 系统投递输入单独样式
+
+**来源**：设计稿 H-1（`dispatch_task` 契约已冻结于 §4 冻结家）+ 客户观察（投递输入不得长得像"客户发的消息"）。**属本角色边界内**。
+
+- **路由（`session.ts`，E-1 投递机泛化——不造第二套）**：队列条目 `DeliveryItem`、按「项目×目标角色」队列、`settled` 放行本项目各队列；目标未开→**自动开**、忙→**排队按序**、失败→**如实系统行+放回队首**（E-1 文案逐字保留）。**`routeDispatch`**（仅 su 会话注入 `dispatchTask`）：校验三连（空参/不在本项目/内置治理角色含 su 自身）→ **如实回执 `{ok:false}` + 系统行**；受理回 `{ok:true,"已受理…受理≠已完成"}`；**去重=队列期窗口**（`roleId\0task\0reason`，送达即释放——返工可再派；回交去重仍永久）。
+- **依赖登记**：① `renderDispatchPrompt`（编排）未落地 → `renderDispatchPromptLocal` 按设计模板逐字临时顶（落地后切只读导入、删本地，**不得两处并存**）；② `openRoleSession` 入参字段 `dispatchTask` 待编排承接（现为静默忽略我方透传）。
+- **闭环**：su 派发→目标回交（E-1）→su 验收→可再派；除显式输入外无事件再触发派发——**不自我激发**（静置计数断言）。
+- **注入样式**：`tool-rows.js::classifyInjectedMessage`（前缀表 `INJECT_PREFIXES`=`[回交] `/`[派发] `，**两名编排渲染函数的定格格式、非启发式**）；`.msg-injected`（虚线框+图标+来源标签「回交投递 · 来自 X」/「派发 · 来自 su」）**不与 `.msg-user` 同款**；D-1 回放同类；**手输防误伤**（`lastManualSend` 同角色 15s 窗口 + 前缀须在行首）。
+- **测试**：新增 `dispatch-delivery.test.ts`（6 例：自动开/排队/失败保留/校验三连/去重窗口+返工放行/闭环不空转）；`renderer.test.ts` 增分类器与注入样式组（含 **`.msg-user` 仍由 appendUser 专产的反向断言**）；e2e 增 `INJECTED_*`/`MANUAL_*` 探针（已同步未跑）。
+- **证据**：typecheck **0 错**；`test/桌面应用` **118/117/1**（唯一红=既有环境红）；全量 **792/789/2 红/1 skipped**（两红均既有环境红，非本改动）。Node v24.14.0 / Darwin 25.6.0 arm64 / HEAD `d933537`。
+- 详见 `docs/change/2026-10-12_change_dispatch-routing-and-injected-style.md`。
+
+## 2026-10-12 — G-1：交互卡不再按时间过期（唯一失效＝应用重启/关闭）
+
+**来源**：客户裁定（设计 G-1）「没必要超时啊，就卡在这等客户同意呗」。**属本角色边界内**。
+
+- **删"按时间过期"路径**：桌面本就无计时器（复核：renderer/通道/三个纯函数模块**均无 setTimeout/setInterval**）；本次把措辞与注释里的时间性删净（旧「超时或已被处理」不再出现）。
+- **唯一真实失效终态**：`respond` 对无挂起请求仍回 `{ok:false, expired:true}`，语义收窄为**应用关闭/重启**（未决请求随窗口清空）；卡定格文案改如实——「**请求已失效（应用已重启/关闭），未获同意——请让角色重新发起。**」；通道原因「没有待答的交互请求（应用重启/关闭会清空未决请求）」。
+- **等待期覆盖核实**：B-3「等待你确认」按挂起集重算（无任何"等太久"改变态）；未查看指针常驻直到请求被处理——两者**均事件驱动、无时限**。
+- **测试**：「无计时器」钉子（去注释源码断言）+ 旧时间性措辞**不得**存在 + 重启后旧 id → 失效终态与如实文案 + 已作答仍定格；e2e `OPX_EXPIRED_FROZEN` 文案片段改「已失效」。
+- **证据**：`test/桌面应用` 全套 **111 计/110 过/1 红**（唯一红＝既有环境红 pi-config，未动）——G-1 钉子全绿。**并发如实（最终复跑）**：Pi适配器并发移除工具层超时，**剩余 3 处 typecheck 错全在其自身 `test/pi-adapter/customer-input.test.ts`**（他角色在制、非本改动）；全量 **739/735/3 红/1 skipped**（＝其该文件文件级红＋两既有环境红，均非本改动）；本角色套件在上述并发期仍 110/1（本改动红为零）。
+- **跨角色建议**：去时限落点在 **Pi适配器**（停用/移除 `withTimeout` 对该两工具的作用；`ANS_PI_CUSTOMER_INPUT_TIMEOUT_MS` 处置归其）。**残留（适配器仍超时期间）**：工具已判"未获同意"而桌面无信号可辨、卡仍 open，其后作答会显示"已确认"但上游已弃——界面与工具可能不一致；正路＝适配器停用该时限，桌面不自造第二套计时。
+- 详见 `docs/change/2026-10-12_change_no-timeout-cards.md`。
+
+## 2026-10-12 — 真机修复：交互卡严格投递所属 pane（不再只在被查看的会话可见）+ 工具行瘦身
+
+**来源**：客户真机缺陷（卡只在"当时正被查看"的会话可见 → 110s 空转超时）＋客户追加裁定「工具行只显示状态与目标，不显示内容」。**属本角色边界内**。
+
+- **卡修复（根因：修复前 `renderer.js:295` 的 `?: state.selectedRoleId` 回落**——roleId 为空时把卡落进"当时在看"的 pane，切回请求者看不到）：① roleId **只信 payload**（空值走 `(未标识角色)` 兜底并如实提示，**绝不**冒充当前查看角色）；② **挂起登记表** `opRequests`——一条请求一次渲染（幂等，同 id 重复推送不重卡）、幂等物化、`showPane` 切回**补挂**；③ 非当前查看时向当前 pane 放**只读指针**「【待确认】角色 <X> 有一条交互请求…」；④ 徽标按「任一 open 请求」重算（多请求并存正确）；⑤ **过期终态**：`customer-input.ts::respond` 对无挂起请求回 `{ok:false, expired:true}` → 卡定格「该请求已结束（超时或已被处理）——未获同意。」**不再解冻重试**（可重试的非法决定不带 expired）。
+- **110s 窗口**：**不改计时**（时限唯一来源=Pi适配器工具层；桌面不自造第二套计时）；「未查看」本质是可见性，已用三重可见性解决（正确 pane 的卡 + 徽标 + 当前 pane 指针）。**跨角色建议（未做）**：如需「时限从首次可见起算」——桌面出 `operator-seen` 信号、**Pi适配器**出「按 seen 重新计时」，契约落地前桌面绝不自行暂停/重启计时。
+- **工具行瘦身**：新增纯函数 `app/renderer/tool-rows.js::slimToolRow`（首行＋掐「 # 」预览分隔与「 · 」列表＋重复工具名去重＋长无路径内容折叠＋限 140 字；成功/失败词与**失败原因摘要**保留）；实时 `tool_call`/`accepted` 与 D-1 回放工具行均经它；**`denied` 行保持全量**（治理信号）；**`detail` 一律不渲染**（防御）。
+- **测试**：`renderer.test.ts` +2 组（卡修复源码断言 + 工具行「长内容反向断言/真机样例逐字/折叠/原因保留/接线/detail」）；`operator-wiring.test.ts` +1（未知 id→expired 终态 vs 非法决定→可重试）；e2e 加 7c `OPX_*`（跨 pane/指针/徽标/幂等/过期定格）与 `TOOLROW_*`。
+- **证据**：typecheck **0 错**；`test/桌面应用` **111/110/1**（唯一红=既有环境红）；全量 **756/753/2 红/1 skipped**（两红均既有环境红，非本改动）。Node v24.14.0 / Darwin 25.6.0 arm64 / HEAD `d933537`。e2e 已同步、本轮未跑。
+- 详见 `docs/change/2026-10-12_change_operator-card-delivery-and-tool-rows.md`。
+
+## 2026-10-12 — B-1 修订：Markdown 渲染改用第三方库（vendored markdown-it 15.0.2）
+
+**来源**：客户修订（设计稿 B-1 加注「应该用第三方的」）——「自写最小子集」路线**被取代**。**属本角色边界内**（`app/renderer/**`、`test/桌面应用/**`）。
+
+- **选型**：**markdown-it 15.0.2**（`html:false` 默认转义=不必另配消毒器；官方 UMD 单文件自带依赖、无打包器可用；MIT）——弃 marked（HTML 原样透传，须加 DOMPurify，多一部件）。
+- **vendored（pin + 可校验）**：新增 `app/renderer/vendor/{markdown-it.umd.min.js（sha256 635972b9…7be5）, markdown-it.LICENSE, README.md}`；README 记**版本/许可/来源 URL/sha256/升级步骤**（升级须同步 README+测试两处 pin，**不得带红升级**）。**未动 package.json**（属装配）。
+- **`markdown.js` 重写为封装**（接口不变：`esc` 单一来源 + `renderMarkdown`；新增钉子面 `options`/`createRenderer`）：链接白名单 http/https/mailto + `class="md-link" rel="noopener noreferrer"`；围栏/缩进码块输出既有 `.md-pre`/`.md-lang`（内容经唯一 `esc`）；**图片覆写为原文文本**（只 disable 会回落成链接+孤立 `!`）；表格禁用（O-B1 未准）；`breaks:true` 保持聊天换行。
+- **装载**：`index.html` 顺序 vendor → markdown.js → renderer.js（测试钉住）。styles 未动；`renderer.js` 未改。
+- **测试**：`markdown.test.ts` 重写——语法逐字钉输出；**XSS 负例 7 组**（含引号注入 href→百分号编码现场断言）；**`options.html===false` 钉子 + 「html:true 会直通」演示**；**vendor sha256 pin + 装载顺序 + README 一致性**。`renderer.test.ts` B-1 冒烟同序装载。
+- **证据**：typecheck **0 错**；`test/桌面应用` **108/107/1**（唯一红=既有环境红 pi-config，未动）；全量 **753/750/2 红/1 skipped**（两红均既有环境红，非本改动）。Node v24.14.0 / Darwin 25.6.0 arm64 / HEAD `d933537`；vendor sha256 实测=pin 值。
+- 详见 `docs/change/2026-10-12_change_markdown-vendored-library.md`（原 B-1 记录加「同日修订」指针，保留为当时记录）。
+
+## 2026-10-12 — E-1：回交自动投递 su 验收（全自动）+ D-1 契约下的上下文来源文案（失真提示退役）
+
+**来源**：pm 设计稿 E-1（客户裁定全自动、无开关）；同轮 pm 钉死 D-1 契约（dispose/LRU **不擦除**会话文件）。**属本角色边界内**（`app/`、`test/桌面应用/**`）。
+
+- **E-1 投递机（`session.ts`）**：回交（≠su）到达 ⇒ **去重**（`handbackKey` 单一来源，入队即登记）→ 入队 →
+  尝试投递：su **忙**（`LiveSession.busy`，send 置真/settled 置假）⇒ 排队，**按序、先置忙再 send**（防并发）；
+  su **未开** ⇒ **自动开启**（数据驱动 primaryRoleId）再投；**开启/投递失败 ⇒ 如实系统行**（su 的 pane，含
+  原因 +「已保留 + 重试时机」）**+ 放回队首**待重试——**绝不静默丢**。投递文本 = 编排 `renderHandbackPrompt`
+  （只读导入、两前端共用）。**不做**：CLI 前端同等投递（登记）。
+- **D-1 文案分支（pm 契约结论）**：`probeSessionFile`（文件在/不在/坏）→ `OpenResult.contextSource`
+  （resumed/recovered/fresh）+ `contextWarning`；文案**唯一映射** = `role-status.js::sessionContextNotice`。
+  **「模型上下文已重启」失真退役**——dispose 后/LRU 后重开=「已从本地会话文件恢复」；**只有**文件缺失/损坏
+  →新建 才是「不会记得」（有历史才提示；损坏带「损坏」措辞）。逐情形对照表见 change 文档。
+- **测试**：新增 `handback-delivery.test.ts`（5 例：投递单一来源原文/去重/忙时按序排队/未开自动开/两种失败如实+保留重试）；`renderer.test.ts` 增 `sessionContextNotice` 六断言 + 失真文案反向断言；`session-history.test.ts` 增 `probeSessionFile`；e2e 加 `RESTORE_NO_STALE_RESTART_NOTE`。
+- **证据**：typecheck 0 错；`test/桌面应用` **106/105/1**（唯一红=既有环境红）；全量 **751/748/2 红/1 skipped**（两红均既有环境红，非本改动）。Node v24.14.0 / Darwin 25.6.0 arm64 / HEAD `d933537`。e2e 已同步、本轮未跑。
+- 详见 `docs/change/2026-10-12_change_su-handback-acceptance.md`。
+
+## 2026-10-12 — D-1 重启恢复（桌面面）：项目内会话记录的界面回放 + 徽标「空闲（已恢复）」
+
+**来源**：pm 设计稿 D-1（存储＝项目内 `<projectRoot>/.ans/sessions/<roleId>/`；解析/恢复链路由 Pi适配器+编排）。**属本角色边界内**（`app/`、`test/桌面应用/**`）。
+
+- **新增 `app/desktop/session-history.ts`**（纯逻辑+只读 fs；不依赖 electron/Pi SDK）：最近文件挑选（mtime 优先、并列名字大者）；`parseSessionJsonl` **防御式**（坏行/未知 entry/未知 role 跳过不抛并计数；header 不合法整体失败）；entry → `{kind:user|assistant|tool|denied, text, at}`；`readRoleSessionHistory`（无目录=无历史；**跨角色不串**；坏文件 `ok:false` 不抛）。
+- **`main.ts`**：`app:list-project` 后逐角色读取并推 `session:history`（无内容不推；失败不阻断导入——**解析在主进程，渲染进程不碰 SDK/JSONL**）；**`preload.cjs`** 加 `onSessionHistory`。
+- **`renderer.js`**：回放（虚线分隔+「会话已恢复（模型上下文一并恢复）」；`is-replay` 与实时可区分；助手文本走 Markdown/esc 单一来源；未就绪推送**寄存**、`applyListing(fresh)` 后冲洗不串项目）；selectRole 提示分流（恢复者说「已续接恢复的会话」，其余维持 B-2「已重启」文案——互涉已知、登记待编排确认）。
+- **`role-status.js`**：七态（新 `idle-restored`「空闲（已恢复）」，空心绿点——不假装工作中/未开启）。
+- **测试**：新增 `session-history.test.ts`（4 例，含跨角色不串/坏文件）；`renderer.test.ts` B-3 扩七态 + D-1 组；`e2e` 加 `RESTORE_*` drill。
+- **证据**：typecheck 0 错；`test/桌面应用` **99/98/1**（唯一红=既有环境红）；全量 **742/739/2 红/1 skipped**（两红均既有环境红，非本改动）。Node v24.14.0 / Darwin 25.6.0 arm64 / HEAD `d933537`。e2e 已同步、本轮未跑。
+- **登记**：①「新会话」入口与②历史裁剪本轮不做——恢复后无法开干净新会话、长会话全量回放，**建议另派**。
+- 详见 `docs/change/2026-10-12_change_session-restore.md`。
+
+## 2026-10-12 — C-1 桌面面：回交报告卡片（字段呈现 + 转义 + 空证据占位 + blocked 视觉区分）
+
+**来源**：pm 已批准设计稿 §C-1（客户裁定「新增交报告工具」；报告经**既有 `handback` 事件**回流——**桌面不新增任何 IPC/通道**）。**属本角色边界内**（`app/renderer/`、`test/桌面应用/`）。
+
+- **`renderer.js::appendHandback`**：卡片按 **角色 / 任务（若有）/ 结论 / 摘要 / 证据（逐条）** 呈现；摘要与证据一律经 `esc`（`markdown.js` 单一转义来源——模型输出**禁直插**）；**空证据 → 「（未提供证据）」**（不留空白）；**blocked → `is-blocked` 类**（可查的可见区分）。分发未动（B-2 信封：自己的 pane + 镜像进主入口角色 pane；**核查无跨角色串扰**——仅两处落点 + 自镜像守卫 + 编排侧 su 不挂回交）。
+- **`styles.css`**：`.msg-handback.is-blocked` 左**语义色竖条** + 语义边色（不只靠文字）。
+- **测试**：`renderer.test.ts` T20 扩展四组断言（字段行 / `esc(hb.summary`+`esc(e)` 与「不得直插」负例 / 占位文案 / `is-blocked` 类与 `var(--danger)` 样式钩子）；镜像断言保留。`e2e/main.mjs` 镜像卡 +2 检查点（`MIRROR_EVIDENCE_PLACEHOLDER`/`MIRROR_CARD_IS_BLOCKED_VISUAL`）。
+- **证据**：typecheck **0 错**；`test/桌面应用` **94/93/1**（唯一红=既有环境红 pi-config，未动）；全量 **701/698/2 红/1 skipped**（两红均既有环境红，非本改动；总数随他角色并发在制波动）。Node v24.14.0 / Darwin 25.6.0 arm64 / HEAD `d933537`。e2e 已同步、**本轮未跑**。
+- 详见 `docs/change/2026-10-12_change_handback-report-card.md`。
+
+## 2026-10-12 — A-5：客户交互卡与通道泛化 + 收口面删除 + B-3「等待你确认」接线
+
+**来源**：pm 已批准设计稿 §三 A-5（编排 A-3/A-4 与 Pi适配器契约已落地）。**属本角色边界内**（`app/`、`test/桌面应用/`、本角色 docs）。
+
+- **新增 `app/desktop/customer-input.ts`（纯逻辑通道）**：冻结三型（`CustomerInputRequest`/`Outcome`/`Fn`）从 §4 冻结契约家**只读导入**；per-window pending Map + 关联 id；**按请求快照校验**（选项 id ⊆ 已发、单选恰一个、类型相符——非法回包不受理、pending 保留）；归三态。**fail-closed 四条**：未接线→unavailable；窗关（presenter 抛错/rejectAll）→declined；取消/不同意→declined；超时在 Pi适配器工具层（=unavailable）。
+- **通用交互卡（`renderer.js::appendOperatorRequest`）**：`op-kind-confirm/preview/select/multi`；预览=`details` 折叠+`max-height:40vh`+`pre-wrap`；选择=radio/checkbox+提交（空选择禁用）；提交后**定格**、被通道拒收则解冻重试并如实示因；**B-3「等待你确认」随请求亮/灭**（不再留位）。
+- **收口面删除（断言「它不在」防回潮）**：`#bootstrap-action` 链、`appendFinalizeProposal`/`appendFinalizeResult`/`onFinalize`/`refreshBootstrapAction`、`.fp-*`/`.sys-finalize`/`.bootstrap-action` 样式、IPC 四通道（`session:finalize-proposal`/`-confirm`/`session:finalize`/`session:bootstrap-state`）、preload 四方法；`session.ts` 删 `FinalizeResult`/`BootstrapState`/两方法/`genesisFinalize`/`operatorChannel`/`confirmTimeoutMs`，注入判据改「**内置治理角色（builtIn）** → `customerInput`（roleId 每会话闭包绑定）」。产物收尾由编排 settle 后**自动**完成。
+- **测试**：**删 `finalize-wiring.test.ts`（15 例，打的是已删 API）**→ **新增 `operator-wiring.test.ts`（5 例）**：三态+fail-closed 四条+快照校验负例+注入判据/roleId 绑定；`interface.test.ts`/`renderer.test.ts` 对应段改写；`e2e/main.mjs` 同步（真通道 + `OP_*` drill + `BOOTSTRAP_ACTION_REMOVED` 守卫），**本轮未跑**。
+- **证据**：typecheck **0 错**；`test/桌面应用` **94/93/1**（唯一红=既有环境红 pi-config，未动）；全量 **706/703/2 红/1 skipped**（两红均既有环境红，非本改动）。Node v24.14.0 / Darwin 25.6.0 arm64 / HEAD `d933537`。
+- 详见 `docs/change/2026-10-12_change_operator-cards-and-finalize-removal.md`。
+
+## 2026-10-12 — B 组聊天体验：Markdown 渲染 + 切换保留历史（并存会话）+ 角色状态徽标
+
+**来源**：pm 已批准设计稿《受治理交互与聊天体验》B 组（客户确认：B-2 走路线 a「并存会话」；B-3 同日补充并入）。**属本角色边界内**（`app/`、`test/桌面应用/`）。**A 组（交互卡/通道泛化/收口面删除）留下一轮**（等 Pi适配器 + 编排契约落地）；「等待你确认」态**留位**（A 组前恒不出现）。
+
+- **B-1 Markdown**：新增纯函数 `app/renderer/markdown.js`（**先 `esc()` 再解析、只产白名单标签**；`esc` 收归此处为**单一来源**，renderer.js 原本地实现已删）；`appendUser`/`appendAssistant` 改受控渲染、`sys-*` 保持 esc；链接经 `app:open-external` **外开**（Interface 层仅 http/https 校验——渲染进程输入不可信）；表格/图片不做。
+- **B-2 并存会话**：`session.ts` 单 handle → **`Map<roleId, LiveSession>` + LRU**（`MAX_LIVE_SESSIONS=3`，淘汰即 dispose）；事件外推加 **`roleId` 信封**（`SessionEventEnvelope`，多会话不串消息）；**后台持续消费**（切走不停拉）；`stop(roleId)` **定向**（缺省/null=全部）；`open()` 返回 `resumed`。渲染侧：**每角色一个 chat pane**（游离 DOM 保历史与监听器）、`selectRole` **不再 `clearChat`**、LRU 淘汰/显式停后再开在该角色聊天流里**明示「模型上下文已重启」**；新增 `session:live` 通道（左树状态数据源）。
+- **B-3 角色状态徽标**：新增纯函数 `app/renderer/role-status.js`（六态派生 + 文案/样式的**唯一映射**；**只由既有事实推导，不发明进度/预计时间**）；左树色点+短标签（`未开启/空闲/工作中/等待你确认/已停止/错误`）；**悬停**示「最近事件（时间）：摘要」（复用事件流）。
+- **测试与证据**：`npm run typecheck` **0 错**；`node --test "test/桌面应用/*.test.ts"` → **103 计/102 过/1 红**（基线 95/94/1，净增 8 例；**唯一红为既有环境红**——`pi-config` 断言检出目录名以 `ans-cli` 结尾、本机为 `ans-runtime`，未动）；全量 **723/720/2**（两红均既有环境红，非本改动）。锚点：`session.test.ts`「A→B→A 不 dispose A（open 计数=2）」「LRU 逐出」；`renderer.test.ts`「selectRole 不得无条件 clearChat」「六态映射随状态变」；`markdown.test.ts` XSS 两向断言。e2e 已同步新形状并新增 `HISTORY_KEPT_ON_SWITCHBACK`/`MD_*`/`LINK_OPEN_EXTERNAL_CALLED`/`STATUS_BADGE_*` 检查点，**本轮未跑**（真实验收属客户跑）。Node v24.14.0 / Darwin 25.6.0 arm64 / HEAD `d933537`。
+- 详见 `docs/change/2026-10-12_change_markdown-and-multisession.md`。
+- **并发说明**：上列计数为本改动集已就位时刻的实测；随后编排/Pi适配器 A 组在制品改动 `src/**`（`finalize.ts` 导出移除瞬时致全仓加载失败）——**属并发在制品、非本改动**；待其落地后复跑最终确认（已登记）。
+
+## 2026-10-12 — 更正会话路径注释（T32 后理由已过时；含历史条目指针）
+
+**来源**：编排角色如实指出 + 本角色独立核实（逐行读当前源码，**未采信转述**）；客户 2026-10-12 批准 **M1+O1** 后实施。**属本角色边界内**（`app/`、`角色卡/桌面应用/`）。**代码行为零变化**（会话仍经 `openRoleSession` + `scope: undefined`）。
+
+- **M1——`app/desktop/session.ts:287-295` 注释块整体替换**：删去过时理由——「开会话前先经 `writeGovernanceSkeleton` 落骨架（属 T32 待退役面）」（T32 已落地、骨架模块 `src/common/编排/bootstrap.ts` 已删）与「对空项目产出 `writeSet: []`、F4 精确匹配拒一切写、须改它本身」（引擎现行 `effectiveScope` 收窄：`conditions`/`writeSet` 均空时取 `undefined`，`src/pipeline/orchestration/govern-session.ts:159-164`）；行号 `govern-session.ts:121` → `170`。**仍成立的部分保留**（T30 裁决、创世门口在边界选择层、「同一底层会话入口、非第二套机制」）。新增「更正（2026-10-12）」段：**指向**引擎 `effectiveScope` 处（不复制，单一来源）+ 注明「桌面是否统一改走该入口：另行评估」（本次未派、未做）。
+- **O1——历史条目指针（原文未改写）**：本文件 T30 条目「边界登记」节末尾 +1 行、`memo.md` 的 T30 行末各加「2026-10-12 更正：…见 `docs/change/2026-10-12_change_session-comment-refresh.md`」。
+- **有界扫描**：`app/**` 无其它描述同一行为（治理骨架/空 writeSet）的过时注释或文案——本注释为唯一命中；`styles.css` 的「三栏骨架」是界面布局同词异义，已排除。另排查发现同理由残留在本文件 T30 条目与 `memo.md`（已由 O1 指针处理）。
+- **证据**：`npm run typecheck` → **exit 0、0 错**；`node --test "test/桌面应用/*.test.ts"` → **95 计 / 94 过 / 1 红**，与改动前基线**逐项一致**；那 1 红为**既有环境红**（`pi-config.test.ts:60` 断言 `resolveRepoEnvPath()` 以 `ans-cli/.env` 结尾、本机检出目录名为 `ans-runtime`），与本次改动无关，**未动、未修**。注释改动**不影响用例计数**（已核对 `test/桌面应用/**` 无用例读该注释）。未跑 e2e（无行为/界面变化）；未启动 Electron、未发模型请求、未读 `.env`。
+- 详见 `docs/change/2026-10-12_change_session-comment-refresh.md`。
+
 ## 2026-10-11 — Pi 面板瘦身：5 项 → 3 项必填 + 1 项「高级」（客户：「这个 pi 为啥需要配置 5 个呢」——其实不是 5 个）
 
 **来源**：**客户提问**「这个 pi 为啥需要配置 5 个呢」——结论：**其实不是 5 个，真正必须你填的是 3 个**。据此把面板从 5 项改为 **3 项必填 + 1 项可选（收进「高级」）**。**属本角色边界内**（`app/`、`test/桌面应用/`、`角色卡/桌面应用/`）。
@@ -612,6 +860,7 @@ builtIn === true && role.boundary?.acceptance?.accepted === false && hasRoles ==
 ### 边界登记（不在本角色边界内的相邻事项）
 
 - **`openGovernanceSession` 的 shape 收敛（T32）**：本步**未动**编排的治理会话入口。若后续客户/协调方希望桌面 su **统一**经 `openGovernanceSession`（T30 文本的理想形态），需 **T32** 先把它改为**不预建骨架**且**接受 `scope: undefined`**（或按边界条件目录给最小 scope），届时本层可改走它——**当前它做不到，故本层沿用 `openRoleSession`**。
+- **2026-10-12 更正**：本条目「会话路径裁决」与上一条所述的前提**现已满足**——T32 已落地（预建骨架退役、骨架模块 `src/common/编排/bootstrap.ts` 已删），引擎现于 `conditions`/`writeSet` 均空时把 scope 收窄为 `undefined`（权威表述见 `src/pipeline/orchestration/govern-session.ts` 的 `effectiveScope` 处）；`app/desktop/session.ts` 的会话路径注释已同步更正（含行号 `govern-session.ts:121` → `170`）。更正记录见 `docs/change/2026-10-12_change_session-comment-refresh.md`。**上文历史正文保留不改写。**
 
 ## 2026-10-11 — T28：Pi 配置面板 + 启动载入/保存 `.env`（补 Electron 缺失的 `--env-file`）
 

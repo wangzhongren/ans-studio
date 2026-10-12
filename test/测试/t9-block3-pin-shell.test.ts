@@ -30,6 +30,8 @@ import {
   BRANCH_C_ALLOW,
   BRANCH_C_DENY,
   BRANCH_B_DENY,
+  BRANCH_B_UNPARSEABLE,
+  REASON_B_UNPARSEABLE,
   BRANCH_REVIEW_NO_BA,
   BRANCH_RISKY_NO_BA,
   BRANCH_RULESET_LOAD_FAILED,
@@ -343,7 +345,7 @@ test("块3/V3 (c) review → (b) 放行即终结；(b) 拒绝亦终结", async (
   assert.equal(deny.calls.a, 0, "(b) 明确拒绝即终结，不应升级到 (a)");
 });
 
-test("块3/V3 (b) 拿不准 → 升 (a)；无会话 → 升 (a)；超时 → 升 (a)；JSON 非法 → 升 (a)", async () => {
+test("块3/V3 (b) 拿不准 → 升 (a)；无会话 → 升 (a)；超时 → 升 (a)；JSON 非法（不可解析）→ **直接拒绝、不升 (a)**", async () => {
   // (b) 拿不准 → (a) 放行
   const unsure = gateWithSpies({
     pmAsk: () => '{"verdict":"unsure"}',
@@ -371,14 +373,18 @@ test("块3/V3 (b) 拿不准 → 升 (a)；无会话 → 升 (a)；超时 → 升
   assert.equal(rt.allow, true, "b-timeout → a-allow（超时绝不视为放行，而是升级）");
   assert.equal(bTimeout.calls.a, 1);
 
-  // (b) JSON 非法 → (a) 不可用 → 拒绝
+  // (b) JSON 非法（不可解析）→ **直接拒绝**（客户新裁定 M-2：fail-closed——**不升 (a)、不重试、不打扰客户**）。
   const badJson = gateWithSpies({
     pmAsk: () => "这不是 JSON",
-    operatorChannel: () => ({ outcome: "unavailable" }),
+    // (a) 桩**本会放行**：若仍会升级到 (a)，本例会被放行——用它反向钉住「根本不该惊动客户」。
+    operatorChannel: () => ({ outcome: "allow", operatorId: "op" }),
   });
   const rb = await badJson.gate(req("python x.py", ["python", "x.py"]));
-  assert.equal(rb.allow, false, "b-badjson → a-unavailable → 拒绝");
-  assert.equal(badJson.audit.records[0].branch, "b-badjson→a-unavailable");
+  assert.equal(rb.allow, false, "不可解析 ⇒ 直接拒绝（不得放行）");
+  assert.equal(badJson.audit.records[0].conclusion, "deny", "结论应为 deny");
+  assert.equal(badJson.audit.records[0].branch, BRANCH_B_UNPARSEABLE, "归因码应为 b-unparseable-deny（稳定，供人话映射）");
+  assert.equal(badJson.calls.a, 0, "不可解析 ⇒ **不升 (a)、不打扰客户**（a 桩本会放行也不得被调用）");
+  assert.equal(rb.allow === false ? rb.reason : "", REASON_B_UNPARSEABLE, "固定短句如实回给角色（单一来源，绝不说成放行）");
 });
 
 test("块3/V3 (a) 超时 / 不可用 → 一律拒绝（只往更严的层退）", async () => {

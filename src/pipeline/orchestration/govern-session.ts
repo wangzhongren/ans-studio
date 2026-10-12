@@ -24,27 +24,32 @@
 // 按对话决定逐个写出**，门禁只在旁约束「允许写什么」。引擎自身只负责「发现治理角色 → 解析治理边界
 // → 造 scope → 打开内置治理角色会话」。
 //
-// ── 创世 finalize（T33，设计 §12.5）──────────────────────────────────────────
-// su 不会算 hash，故 pin 只能在 su 写完**之后**由代码算。句柄上提供**显式**的 `finalize()`：
-// 扫目标项目角色边界 + 项目治理边界 → 算 SHA-256 → 写 `.ans/project.json`（pin）+ 逐路径留痕
-// （`docs/bootstrap-manifest.md`）。finalize 的写**同样经 `resolveWrite`**（复用 su 的创世授权），
-// 见 `src/common/编排/finalize.ts`。**不在每次 settle 自动跑**（防 pin 半成品）——见句柄注释。
+// ── 客户确认制（A-3，2026-10-12）与创世自动收尾（A-4）────────────────────────────
+// A-3：`GovernSessionInput.customerInput` 给出时，会话进入**确认制收窄**（见 `run-role.ts`）——
+//   写盘前 su 必须先用 `request_confirmation` 把预览摆给客户；客户确认后**编排**把「已预览且校验在
+//   边界内的具体路径」发行进 writeSet，F4 拒掉一切未确认路径。CLI 缺省补终端通道
+//   （`createCliCustomerInput`：确认 y/n、勾选数字序号）。
+// A-4：**「提议 + 确认」的收口已删**（客户：「客户确定了才加，不要有个收口，收口去掉」）——
+//   `finalizeBootstrap`/`operatorChannel`/句柄 `finalize()` 均不存在。写出 `.ans`(pin) +
+//   `角色卡/governance-boundary.yaml` + `docs/bootstrap-manifest.md` 的**自动收尾**由
+//   `openRoleSession` 在每轮 su settle 后自动执行（`repinIfBootstrapped` 含首次），
+//   仍**逐笔先经 `resolveWrite`**，见 `src/common/编排/finalize.ts`。
 
 import type { ProjectConfig } from "../../model/role.ts";
 import type { TaskScope } from "../../model/decision.ts";
 import type { Acceptance, BoundarySection1 } from "../../model/boundary.ts";
-import type { OperatorChannelFn, RuntimeAdapter, SessionEvent, WriteGate, FinalizeResult } from "../../provider/pi/session.ts";
-import { openRoleSession } from "./run-role.ts";
+import type {
+  CustomerInputFn,
+  RuntimeAdapter,
+  SessionEvent,
+  WriteGate,
+} from "../../provider/pi/session.ts";
+import { openRoleSession, type AdapterCapabilities } from "./run-role.ts";
 import { listProject, resolveRole } from "../../service/role/resolve-role.ts";
 import { formatEvent } from "../../common/编排/output.ts";
 import type { OrchestrationEvent } from "../../common/编排/handback.ts";
 import { EXIT_FAILURE, EXIT_OK } from "../../common/编排/exit-codes.ts";
-import { createCliOperatorChannel } from "../../common/编排/operator-channel.ts";
-import {
-  createSessionFinalizer,
-  DEFAULT_GOVERNANCE_BOUNDARY_REL,
-  repinIfBootstrapped,
-} from "../../common/编排/finalize.ts";
+import { createCliCustomerInput } from "../../common/编排/operator-channel.ts";
 
 /** 角色目录名（与 `listProject` 口径一致：项目角色的目录 `角色卡/<id>/`）。 */
 const ROLE_CARD_DIR = "角色卡";
@@ -69,20 +74,13 @@ export interface GovernSessionInput {
   /** 目标项目目录（设计 §12.3，`ans govern <目录>`）：**诊断/透传**用——真正的 `projectRoot` 由**装配**
    *  据它设入 `project.projectRoot`（T34）；此处仅原样带出，供前端如实呈现与后续 finalize（T33）取用。 */
   targetDir?: string;
-  /** **创世 finalize（T33/T37）**：CLI 一次性前端（`runGovernSession`）在其单轮 settle 之后是否
-   *  **显式提议收口**（调 `handle.finalize()`）。缺省 `false`——仅当「本次 `ans govern` 的单位就是一次
-   *  有界 bootstrap」时由调用方显式置真。**T37 起 `finalize()` 的语义 = 提议收口、挂起等客户确认**——
-   *  确认通道不可用/超时/拒绝则**不完成**（fail-closed，见 `finalize.ts`）。多轮消费者（桌面 su 聊天）
-   *  应直接调 `handle.finalize()`。 */
-  finalizeBootstrap?: boolean;
   /**
-   * **客户确认通道（T37）**：finalize 提议收口时，经它挂起问客户。**复用 shell 闸 (a) 的
-   * `OperatorChannelFn` 形状、不造第二套**。缺省：CLI 前端用 `createCliOperatorChannel()`（终端读一行）；
-   * 桌面由桌面应用注入对话框通道。缺省且无人值守（stdin EOF）→ `unavailable` → **不完成**。
+   * **客户确认制交互通道（A-1/A-3）**：前端给的原始客户通道（CLI 终端 / 桌面交互卡），原样透传给
+   * `openRoleSession`——**给出** ⇒ 会话进入确认制收窄（`request_confirmation`/`request_choice` 注册；
+   * 未确认路径被 F4 拒）；**缺省** ⇒ `runGovernSession`（CLI 前端）自动补 `createCliCustomerInput()`；
+   * 直调本引擎时缺省 = 无客户通道（工具不注册、旧语义）。无人值守（stdin EOF）→ `unavailable` → 未获同意。
    */
-  operatorChannel?: OperatorChannelFn;
-  /** 客户确认硬超时（毫秒）；缺省 120000。**超时 = 不完成**。 */
-  confirmTimeoutMs?: number;
+  customerInput?: CustomerInputFn;
   /**
    * **自动重 pin（T37，§13.3）**：每轮 su 会话 settle 后，若项目处于**非创世态**（`.ans/project.json`
    * 已存在），自动重扫边界 → 更新 `.ans` 的 pin + manifest（**不重写治理边界文档**）。缺省 `true`
@@ -99,28 +97,16 @@ export interface GovernanceSessionHandle {
   boundarySource: string;
   /** 生效的 acceptance 证据（供前端如实呈现）。 */
   acceptance: Acceptance;
-  /** 本次会话的 scope（按治理边界条件目录给出）；**创世（普通目录边界）无目标角色时为 `undefined`**
-   *  （设计 §12.2：普通聊天，不做 F4 收窄——否则空 writeSet 的既有语义是「拒一切」）。 */
+  /** 本次会话的**静态** scope（按治理边界与目标角色给出，供呈现）；**创世（普通目录边界）无目标角色时为
+   *  `undefined`**（设计 §12.2）。注：A-3 起，带 `customerInput` 的会话在 gate 层走**确认制动态 writeSet**
+   *  （初始为空、经确认发行）——本字段只是呈现用的静态口径，不再是该会话的可写上界。 */
   scope: TaskScope | undefined;
   /** 目标项目目录（透传自输入；缺省 undefined = 装配默认 ans-cli 自身）。 */
   targetDir?: string;
-  /** 会话是否已 settle 过**至少一轮**（su 已完成至少一轮）。`finalize()` 的前置守卫据它判定
-   *  「su 是否已经写过东西」，避免 pin 半成品。 */
-  readonly settled: boolean;
   /** 发送一轮输入；可反复调用（同一会话，不重建）。 */
   send(text: string): Promise<void>;
-  /** 持续的事件流（含 settle 时的 handback 事件）；跨多轮累积。消费到 `settled` 会置 `settled=true`。 */
+  /** 持续的事件流（含 settle 时的 handback 事件）；跨多轮累积。 */
   events(): AsyncIterable<OrchestrationEvent>;
-  /**
-   * **收口（T37，设计 §13.1）**：**提议收口 → 挂起等客户确认 → 确认通过才落盘**（**不再「被调用即完成」**）。
-   *   · 守卫：**非创世态**（`.ans` 已存在）→ 拒绝；会话**尚未 settle** → 拒绝（防 pin 半成品）；
-   *     **无可 pin 之物** / 门禁拒 → 拒绝（零副作用）。
-   *   · 确认通道：**复用 shell 闸 (a) 的 `OperatorChannelFn`**（不造第二套）；不可用/超时/拒绝 → **不完成**。
-   *   · 确认通过 → 写 **`角色卡/governance-boundary.yaml`（三普通目录）** + `.ans`（pin+acceptance）+ manifest；
-   *     写入**同样经 `resolveWrite`**（见 finalize.ts），被拒则整批中止、零副作用——**不是凭代码身份绕门**。
-   * 返回 `FinalizeResult`（`status`/`message` 如实反馈；`ok===status==="completed"`）。
-   */
-  finalize(opts?: { acceptanceSource?: string; now?: () => Date }): Promise<FinalizeResult>;
   /** 收口：释放底层会话（幂等）；出错如实抛出。 */
   dispose(): Promise<void>;
 }
@@ -130,8 +116,6 @@ export interface GovernSessionResult {
   transcript: SessionEvent[];
   /** 目标项目目录（透传；供 CLI 前端/测试如实观察「目标目录经 deps 传递」）。 */
   targetDir?: string;
-  /** 创世 finalize 的结果（仅当 `GovernSessionInput.finalizeBootstrap===true` 时存在）。 */
-  finalize?: FinalizeResult;
 }
 
 /**
@@ -140,7 +124,7 @@ export interface GovernSessionResult {
  */
 export async function openGovernanceSession(
   input: GovernSessionInput,
-  deps: { createAdapter: (gate: WriteGate) => RuntimeAdapter },
+  deps: { createAdapter: (gate: WriteGate, capabilities?: AdapterCapabilities) => RuntimeAdapter },
 ): Promise<GovernanceSessionHandle> {
   // 1) 发现内置治理角色：数据驱动（同桌面应用），**不硬编码** "su"。
   const govId = input.governanceRoleId ?? (await discoverGovernanceRoleId(input.project));
@@ -154,6 +138,8 @@ export async function openGovernanceSession(
   }
 
   // 3) scope：按治理边界的条件目录给出可写集（见文件头「为何给精确文件」）。
+  //    注（A-3）：带 `customerInput` 的会话在 openRoleSession 内走**确认制动态 writeSet**（本处的静态
+  //    scope 不参与 gate，仅随句柄呈现）；无通道的直调保持旧语义。
   const roleIds = input.targetRoleIds ?? [];
   const scope = buildGovernScope(boundary, roleIds);
   // §12.2：**普通目录边界（创世种子）在无目标角色时，scope 应为 `undefined`**（普通聊天、不做 F4 收窄）。
@@ -164,8 +150,9 @@ export async function openGovernanceSession(
     scope.conditions.length === 0 && scope.writeSet.length === 0 ? undefined : scope;
 
   // 4) 经会话式入口开启内置治理角色（builtInRoles 数据来自枚举；不硬编码 id）。
-  //    `autoRepin`（T37，§13.3）：透传给会话式入口——**每轮 su settle 后**若项目已 bootstrap（非创世态）
-  //    则自动重 pin（判据/写入都在 `openRoleSession` 一处，两前端共用；未显式给则按其缺省 = su 会话开启）。
+  //    `customerInput`（A-3）：原样透传——有通道 ⇒ 确认制收窄（未确认路径被 F4 拒）；缺省 ⇒ 旧语义。
+  //    `autoRepin`（A-4）：透传给会话式入口——**每轮 su settle 后**自动收尾/重 pin（判据/写入都在
+  //    `openRoleSession` 一处，两前端共用；未显式给则按其缺省 = su 会话开启）。
   const sessionProject = withGovernanceRole(input.project, govId);
   const handle = await openRoleSession(
     {
@@ -173,32 +160,11 @@ export async function openGovernanceSession(
       project: sessionProject,
       taskId: input.taskId,
       scope: effectiveScope,
+      customerInput: input.customerInput,
       autoRepin: input.autoRepin,
     },
     deps,
   );
-
-  // settle 追踪（finalize 前置守卫据它判「su 是否已完成至少一轮」）。
-  let settledOnce = false;
-
-  // finalize 的授权边界 = 本次会话解析出的边界（创世种子 / 项目治理边界）——与 su 同一授权。
-  // 治理边界文档落点：项目未声明（`path` 为空串，如桌面创世项目）时用默认约定路径（`||` 而非 `??`——
-  // 空串在此无意义，会把落点错误解析为项目根，导致漏 pin 治理边界文档）。
-  const govPath = input.project.governanceBoundary?.path || DEFAULT_GOVERNANCE_BOUNDARY_REL;
-  // 会话侧 finalize 能力（**唯一实现**：`createSessionFinalizer`）——与桌面路径 `openRoleSession` 共用同一份。
-  // T37：`finalize()` = **提议收口 → 挂起等客户确认 → 通过才落盘**；确认经注入的 `operatorChannel`（复用
-  // shell 闸 (a) 通道）。缺省通道由前端（`runGovernSession`）补 CLI 实现；不可用/超时/拒绝 → 不完成。
-  const finalizer = createSessionFinalizer({
-    input: {
-      projectRoot: input.project.projectRoot,
-      skillRoot: input.project.skillRoot,
-      boundary,
-      governanceBoundaryPath: govPath,
-    },
-    isSettled: () => settledOnce,
-    operatorChannel: input.operatorChannel,
-    confirmTimeoutMs: input.confirmTimeoutMs,
-  });
 
   return {
     governanceRoleId: govId,
@@ -206,20 +172,8 @@ export async function openGovernanceSession(
     acceptance: boundary.acceptance,
     scope: effectiveScope,
     targetDir: input.targetDir,
-    get settled(): boolean {
-      return finalizer.settled;
-    },
     send: (text) => handle.send(text),
-    events(): AsyncIterable<OrchestrationEvent> {
-      const inner = handle.events();
-      return (async function* () {
-        for await (const ev of inner) {
-          if (ev.kind === "settled") settledOnce = true;
-          yield ev;
-        }
-      })();
-    },
-    finalize: (opts) => finalizer.finalize(opts),
+    events: () => handle.events(),
     dispose: () => handle.dispose(),
   };
 }
@@ -237,10 +191,11 @@ async function discoverGovernanceRoleId(project: ProjectConfig): Promise<string>
 /**
  * CLI 一次性前端（保留既有形状）：开启治理会话 → 记录元信息 → 发一轮 → 以 `settled` 收口 → dispose。
  * **装配/驱动逻辑全部在 `openGovernanceSession`**；本函数只是它之上的一层「跑一轮」的壳。
+ * A-4 起**没有收口步骤**——su 经客户确认写出的产物，由每轮 settle 后的**自动收尾**写盘（见 run-role.ts）。
  */
 export async function runGovernSession(
   input: GovernSessionInput,
-  deps: { createAdapter: (gate: WriteGate) => RuntimeAdapter },
+  deps: { createAdapter: (gate: WriteGate, capabilities?: AdapterCapabilities) => RuntimeAdapter },
 ): Promise<GovernSessionResult> {
   const transcript: SessionEvent[] = [];
   const record = (ev: OrchestrationEvent): void => {
@@ -255,10 +210,11 @@ export async function runGovernSession(
     return { code, transcript, targetDir: input.targetDir };
   };
 
-  // CLI 端默认客户确认通道（T37）：终端打印「su 提议收口」并读一行 y/n。**仅在未注入时**补——桌面/测试
-  // 注入自己的通道。惰性 attach stdin（仅真被调用时）；无人值守（EOF）→ unavailable → 不完成（fail-closed）。
+  // CLI 端默认客户通道（A-1/A-5）：确认 y/n、勾选数字序号（单选 `1`、多选 `1,3`）。**仅在未注入时**补——
+  // 桌面/测试注入自己的通道。惰性 attach stdin（仅真被调用时）；无人值守（EOF）→ unavailable → 未获同意
+  // （fail-closed：不发行 writeSet ⇒ 未确认路径的写入照旧被 F4 拒）。
   const effectiveInput: GovernSessionInput =
-    input.operatorChannel !== undefined ? input : { ...input, operatorChannel: createCliOperatorChannel() };
+    input.customerInput !== undefined ? input : { ...input, customerInput: createCliCustomerInput() };
 
   // 开启引擎（发现治理角色 / 解析边界，失败即抛错 → 非 0）。
   let handle: GovernanceSessionHandle;
@@ -278,40 +234,34 @@ export async function runGovernSession(
       (handle.targetDir ? `；目标目录 ${handle.targetDir}` : ""),
   });
   const roleIds = input.targetRoleIds ?? [];
+  const confirmationMode = effectiveInput.customerInput !== undefined;
   record({
     kind: "message",
-    summary: handle.scope
-      ? `治理边界条件目录已声明：conditions=[${handle.scope.conditions.join(", ")}]；` +
-        `可写集 ${handle.scope.writeSet.length} 项` +
-        (roleIds.length > 0 ? `（目标角色：${roleIds.join("、")}）` : "（未指定 --role：无可写文件，仅按边界只读）")
-      : "未声明 scope（创世/普通目录边界：仅按边界，不做任务收窄）",
+    summary: confirmationMode
+      ? "客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝。" +
+        (roleIds.length > 0 ? `（目标角色：${roleIds.join("、")}）` : "")
+      : handle.scope
+        ? `治理边界条件目录已声明：conditions=[${handle.scope.conditions.join(", ")}]；` +
+          `可写集 ${handle.scope.writeSet.length} 项` +
+          (roleIds.length > 0 ? `（目标角色：${roleIds.join("、")}）` : "（未指定 --role：无可写文件，仅按边界只读）")
+        : "未声明 scope（创世/普通目录边界：仅按边界，不做任务收窄）",
   });
 
   let code: number = EXIT_OK;
-  let finalizeResult: FinalizeResult | undefined;
   try {
-    await handle.send(input.prompt ?? buildGovernPrompt(input.taskId, roleIds, handle.scope === undefined));
+    await handle.send(
+      input.prompt ??
+        buildGovernPrompt(input.taskId, roleIds, {
+          canWrite: confirmationMode || handle.scope === undefined,
+          confirmFirst: confirmationMode,
+        }),
+    );
     for await (const ev of handle.events()) {
       record(ev);
       if (ev.kind === "settled") break; // settled 为终止信号（避免与随后 dispose 互等）
     }
-    // 收口（T37）：**仅当显式开启**（`finalizeBootstrap`）——本前端的单位是「一次有界治理任务」，单轮
-    // settle 即其完成点。**T37 起 `finalize()` = 提议收口、挂起等客户确认**（经 CLI 确认通道读一行）；
-    // 确认未通过（拒绝/超时/通道不可用）→ **不完成**（fail-closed），如实记录原因、以非 0 收口。
-    if (input.finalizeBootstrap) {
-      finalizeResult = await handle.finalize();
-      const feedback = finalizeResult.message ?? finalizeResult.reason ?? "未知原因";
-      record({
-        kind: "message",
-        summary: finalizeResult.ok
-          ? `收口完成：写出 ${finalizeResult.wrote.join("、")}（pin ${finalizeResult.pins.length} 条，角色 ${finalizeResult.roles.length}）`
-          : `收口未完成（${finalizeResult.status ?? "unknown"}）：${feedback}`,
-      });
-      if (!finalizeResult.ok) {
-        process.stderr.write(`ans govern · 收口未完成：${feedback}\n`);
-        code = EXIT_FAILURE;
-      }
-    }
+    // A-4：不再有 finalize 步骤——su 在本轮经客户确认写出的产物，已由 settle 触发的**自动收尾**
+    // （openRoleSession 内的 repinIfBootstrapped 含首次）写出 `.ans` + 治理边界文档 + manifest。
   } catch (err) {
     code = EXIT_FAILURE;
     process.stderr.write(`ans govern 会话失败：${errText(err)}\n`);
@@ -326,7 +276,7 @@ export async function runGovernSession(
     }
   }
 
-  return { code, transcript, targetDir: handle.targetDir, finalize: finalizeResult };
+  return { code, transcript, targetDir: handle.targetDir };
 }
 
 /**
@@ -350,23 +300,36 @@ function withGovernanceRole(project: ProjectConfig, govId: string): ProjectConfi
 
 /** 默认任务提示：给出明确、可判定的变更要求（在治理边界内创建目标角色）。
  *  `canWrite`：本次会话是否**真能写**（`scope` 未声明 = 创世/普通目录边界，命中治理产物目录即放行）。
- *  创世下 su 需**据对话决定**建哪些角色，故给出「可直接写治理产物」的指引——**不**误报「不写盘」。 */
-function buildGovernPrompt(taskId: string, roleIds: string[], canWrite: boolean): string {
+ *  创世下 su 需**据对话决定**建哪些角色，故给出「可直接写治理产物」的指引——**不**误报「不写盘」。
+ *  `confirmFirst`（A-3）：**客户确认制**会话——写明「先把预览（角色卡全文 + 边界摘要 + **将要写出的
+ *  具体路径**）经 request_confirmation 请客户确认，拿到 confirmed:true 后才写；未确认路径会被门禁拒」。 */
+function buildGovernPrompt(
+  taskId: string,
+  roleIds: string[],
+  opts: { canWrite: boolean; confirmFirst: boolean },
+): string {
+  const confirmRule = opts.confirmFirst
+    ? "\n**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（角色卡全文 + 边界摘要，" +
+      "**并列出将要写出的具体路径**——路径是发行凭据，没列出的路径写不进去）请客户确认；" +
+      "拿到明确同意（confirmed:true）后才写；未获同意/通道不可用 → 不写盘、如实告知。"
+    : "";
   const head =
     `任务 ${taskId}：以治理身份在**项目治理边界**内工作。` +
     "越出治理边界（`角色卡/`、`docs/`、`.ans/` 之外，如项目的 `src/`，或项目根以外）的写入会在写入之前被门禁拒绝。";
   if (roleIds.length === 0) {
-    return canWrite
-      ? head +
-          "\n未指定目标角色：请**据对话决定要建哪些角色**，并**直接用 write_file 写出**治理产物——" +
-          "`角色卡/<角色>/role-card.md`、`角色卡/<角色>/boundary.yaml`、`角色卡/<角色>/memo.md`，" +
-          "以及项目治理边界文档 `角色卡/governance-boundary.yaml`。这些路径均在治理边界内、可直接写；越界写会被拒。"
+    return opts.canWrite
+      ? head + confirmRule +
+          "\n未指定目标角色：请**据对话决定要建哪些角色**，逐一向客户确认后写出治理产物——" +
+          "`角色卡/<角色>/role-card.md`、`角色卡/<角色>/boundary.yaml`、`角色卡/<角色>/memo.md`。" +
+          "项目治理边界文档 `角色卡/governance-boundary.yaml` 由编排的自动收尾写出，无需你写。"
       : head + "\n本次未指定目标角色（--role）：可写集为空，会话只做调查/规划，不写盘。";
   }
   const targets = roleIds.map((id) => `角色卡/${id}/（role-card.md / boundary.yaml / memo.md）`).join("；");
   return (
-    `${head}\n具体改动要求：请为角色 ${roleIds.join("、")} 用 write_file 建出标准骨架文件：${targets}。` +
-    "（这些路径在治理边界内且已列入可写集；越界或可写集外的写入会被拒。）"
+    `${head}${confirmRule}\n具体改动要求：请为角色 ${roleIds.join("、")} 建出标准骨架文件：${targets}。` +
+    (opts.confirmFirst
+      ? "先经 request_confirmation 预览（含这些路径）获客户确认，再写；未确认路径会被拒。"
+      : "用 write_file 写出上述文件（越界或可写集外的写入会被拒）。")
   );
 }
 

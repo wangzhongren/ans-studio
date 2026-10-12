@@ -38,14 +38,21 @@ npm run app            # = electron app/main.ts（Electron 44 自带 Node 24.21�
 | `app:pick-project` | 渲染 → 主 | `()` → `string \| null`（系统文件夹选择器） |
 | `app:list-project` | 渲染 → 主 | `{ projectRoot }` → `ListProjectResult`（角色清单 + 卡片正文 + 边界条目 + 变更记录/docs 索引 + warnings） |
 | `session:open` | 渲染 → 主 | `{ projectRoot, roleId, runtime }` → `OpenResult`（**点角色即开**：一次调用直接建立会话，无确认步骤） |
-| `session:send` | 渲染 → 主 | `{ text }` → `SendResult`（**可反复调用**：多轮聊天） |
-| `session:stop` | 渲染 → 主 | `()` → `StopResult`（关闭会话；切换角色/关窗时调用） |
-| `session:bootstrap-state` | 渲染 → 主 | `()` → `BootstrapState`（`{available, settled, finalized}`；**仅创世 su 会话**可能 `available`；纯读、无副作用） |
-| `session:finalize` | 渲染 → 主 | `()` → `FinalizeResult`（`{ok, status?, wrote, pins, roles, reason?, message?, projectJsonRel, manifestRel}`；**T37 语义**：su **提议收口、挂起等客户确认**——成功示 wrote/pins/roles，未完成示 reason） |
-| `session:finalize-proposal` | 主 → 渲染 | `{ toolCallId, proposal, reason }`（**su 提议收口**——渲染成聊天流里的确认卡，`[确认完成]`/`[暂不]`） |
-| `session:finalize-confirm` | 渲染 → 主 | `{ toolCallId, allow }` → `{ ok, error? }`（客户对提议的选择：`allow:true`=[确认完成] → 落盘；`false`=[暂不] → 不完成） |
-| `session:event` | 主 → 渲染 | `SessionEvent`（`tool_call` / `denied` / `accepted` / `message` / `settled`） |
+| `session:send` | 渲染 → 主 | `{ text }` → `SendResult`（**可反复调用**；**L-1**：角色忙时消息**入队**而非直接失败——`{ok:true, queued:true, position:N}`，界面如实提示「已入队：等它完成当前任务后处理（第 N 位）」） |
+| `session:stop` | 渲染 → 主 | `{ roleId? }` → `StopResult`（**B-2 定向**：给定 `roleId` 只关它、历史留在界面；缺省/`null` 关全部） |
+| `session:live` | 渲染 → 主 | `()` → `string[]`（保活中的角色 id；B-2 左树「有活动会话」小圆点数据源；纯读） |
+| `session:operator-request` | 主 → 渲染 | `{ id, roleId, request }`（**A-5 交互卡**：confirm〔可带预览〕/ choice〔单选/多选〕——su 的确认制工具挂起时推达；`request` 为冻结形状） |
+| `session:operator-response` | 渲染 → 主 | `{ id, decision }` → `{ ok, error?, expired? }`（主进程**按请求快照校验**后解挂为冻结三态；`expired`=应用重启后旧回包——**不按时间过期**） |
+| `session:history` | 主 → 渲染 | `{ roleId, projectRoot, rows, error }`（**D-1 重启恢复**：主进程只读解析 `<project>/.ans/sessions/<roleId>/` 的规范化界面行；渲染侧不碰 JSONL——解析失败如实携带 error、不阻断导入） |
+| `session:role-state` | 主 → 渲染 | `{ roleId, busy, summaries, queue, running }`（**L-1 + 状态准确性 + 右栏待办**：**真实状态快照**——会话 busy（含 B-2 后台轮次）× 队列；`queue`=结构化排队条目（`{kind, sourceRoleId, summary, at}`——与 summaries 同源）；`running`=正在跑的那条投递（若有）。徽标「工作中 · N 待办」、聊天流队列行与**右栏「待办 / 队列」组**都只信它，界面不做推测） |
+| `shell:confirm-request` | 主 → 渲染 | `{ id, command, summary, reasonPlain, reasonRaw, argvLines, cwd }`（**M-1**：(a) 层**应用内确认卡**数据面——命令**逐字**；summary/reasonPlain 已由主进程翻人话；argv/cwd/原文在折叠详情） |
+| `shell:confirm-response` | 渲染 → 主 | `{ id, allow }` → `{ ok, error?, expired? }`（**M-1**：**恰 `allow:true` 才放行**；拒绝/Esc/关闭=false；`expired`=已失效——未获放行） |
+| `session:event` | 主 → 渲染 | `SessionEvent`（`tool_call` / `denied` / `accepted` / `message` / `settled`）——单发通道（探针/直发）。 |
+| `session:events` | 主 → 渲染 | `SessionEventEnvelope[]`（**Q-1 合帧批量**：16ms（≈一帧）窗口内的事件数组、顺序不变；preload 两通道同解）。 |
 | `project:changed` | 主 → 渲染 | `()`（主入口角色一轮结束时发送）→ 渲染侧重取 `listProject` 让左树刷新 |
+| `app:open-external` | 渲染 → 主 | `{ url }` → `{ ok, error? }`（**B-1**：仅 http/https——渲染输入不可信；Markdown 链接外开） |
+| `app:pick-image` | 渲染 → 主 | `()` → `PickImageResult`（**K-2 选图**：主进程 dialog + fs 读——渲染进程不碰文件；按**真实字节**校验〔魔数嗅探/≤5MB〕；取消=`cancelled:true`≠失败） |
+| `app:attach-image` | 渲染 → 主 | `{ name?, mime?, dataBase64? }` → `AttachImageResult`（**K-2 粘贴/拖入**：声明值不可信、按真实字节校验；**图片送进模型未接**——只收下与校验） |
 | `pi-config:get` | 渲染 → 主 | `()` → `PiConfigView`（`{ path, fields:[{key,secret,value,isSet}] }`；**机密键 value 恒空串**，只给 `isSet`） |
 | `pi-config:save` | 渲染 → 主 | `{ updates: {键:值} }` → `PiConfigSaveResult`（`{ ok, appliedKeys, error? }`；**只含键名、不含值**；成功则写 `.env` 并重载 env） |
 | `window:minimize` | 渲染 → 主 | `()` → `void`（自绘标题栏·最小化 → `win.minimize()`） |
@@ -59,17 +66,17 @@ npm run app            # = electron app/main.ts（Electron 44 自带 Node 24.21�
 - **无** `.ans` → 回退**运行期同意** `acceptance = { accepted: true, source: "desktop-app:导入项目即授权该角色按其完整边界工作（原型，无客户 pin，已知偏离）" }`（登记的非-pin 例外）；
 - `.ans` **存在但不可用** → 载入器 **fail-closed 未接受**（**不回退**运行期同意）。
 再以该 acceptance 构造项目配置，经 `openRoleSession`（`scope` 传 `undefined`）建立会话。`OpenResult.config` 如实带回 `{kind, accepted, acceptanceSource, pinCount, reason}`——渲染进程据此在未授权时内联 `sys-config` 明示「不是已授权状态」。
-同角色重复点击 = 续接（`OpenResult.note` 说明，不重建）；切换角色 = 先 `dispose()` 旧会话再开新会话。
+同角色重复点击 = 续接（`OpenResult.note` 说明，不重建）；**切换角色 = 各自保活（B-2）**——切走**不** dispose、
+切回直接续，超出 `MAX_LIVE_SESSIONS`（LRU）才淘汰最久未用者；`session:stop` 为**定向**关闭（缺省/`null` 关全部）。
 **不存在任何「请求摘要 → 确认」序列**——`DispatchSummary` / `nonce` 已随授权模型一并删除。
 
-## bootstrap 收口的确认面（T38；设计 §13）
+## 客户确认面（**收口已删**；A-5 后的现状 / 2026-10-12）
 
-**完成 bootstrap = su 提议「可以收口了」→ 界面把这件事摆给客户 → 客户确认 → 才 finalize**（客户 2026-10-11 裁定）。
+**T38 时代的「完成 bootstrap」收口面（`session:bootstrap-state`/`session:finalize`/`session:finalize-proposal`/`session:finalize-confirm` 与 `#bootstrap-action`）已全部退役**（A-5「删收口面」：产物收尾由编排在 su 会话 settle 后**自动**完成，桌面不再有 finalize 读写/触发面；历史记录见 `docs/change/2026-10-12_change_operator-cards-and-finalize-removal.md`）。
 
-- **确认通道**：finalize 收口经**既有 (a) `OperatorChannelFn`**（§4 冻结契约家 `src/provider/pi/session.ts`，**不造第二套**）。主进程 `app/main.ts` 用**渲染侧 presenter** 构造，经 `DesktopDeps.operatorChannel` → `SessionManagerDeps.operatorChannel` → **仅创世 finalize 会话**透传给 `openRoleSession`。presenter 把 `OperatorPrompt`（`command` = 提议原文、`reason` = 将写出什么）经 `session:finalize-proposal` 推达渲染侧，挂起等 `session:finalize-confirm` 回传。**fail-closed**：未接通道 / 不可用 / 超时（默认 120s）/ 拒绝 → **不完成**（零副作用）。
-- **确认面**：`renderer.js::appendFinalizeProposal` 渲染聊天流里的一张卡——「su 提议：可以收口了（完成 bootstrap）」+ 将写出什么 + `[确认完成]` / `[暂不]`。**只在 su 已提议时才出现**。触发入口 `#bootstrap-action`（仅创世 su 会话显示）的按钮为「**让 su 提议收口**」。
-- **导出/类型的单一来源**：`OperatorChannelFn` / `OperatorPrompt` / `OperatorOutcome` 从 `src/provider/pi/session.ts` 只读导入（`app/desktop/operator-channel.ts` 原样转出）；`FinalizeResult` 从编排公开句柄 `RoleSessionHandle["finalize"]` 派生（**不导入编排私有 `common/编排/`**）。
-- **测试替身**：确认通道**全用注入替身**（`test/桌面应用/finalize-wiring.test.ts` 注入 allow/deny/unavailable/timeout 通道；e2e 经 `session:finalize-proposal` 推提议 + 注入 `session:finalize-confirm` 收集器），**绝不弹系统对话框**。
+**取代它的是交互卡（A-5）**：su 的 `request_confirmation` / `request_choice` 经 `session:operator-request` 摆成**聊天流里的交互卡**、客户决定经 `session:operator-response` 回传（按请求快照校验）；「客户确定了才加、才落盘」由编排的确认制 writeSet 发行承接（`common/编排/confirmed-writes.ts`，桌面不复制）。**已删面的旧断言保留为「它不存在」守卫**（e2e `OP_OLD_ENTRY_REMOVED`/`OP_OLD_CARD_REMOVED`）。
+
+**shell 闸 arm（I-1，2026-10-12；**M-1 起 (a) 层为应用内确认卡**）**：`DESKTOP_SHELL_GATE_ARMED=true`——(a) 操作者确认通道（`createDesktopOperatorChannel`；呈现端 `createShellConfirmPresenter`：**应用内卡**——命令逐字等宽块 + 人话摘要/原因 + 折叠详情，**拒绝为默认焦点**，Esc/关闭 = 不放行；M-1 前为原生对话框，客户裁定「这个太丑了」后退役）+ **(c) 规则集实件**（`buildDesktopShellArming`：只读导入 `src/service/gate/shell-rules.ts` 的 `classifyShell`/`defaultShellRules`）**两件同备才 arm**，经 `shellOperatorChannel`/`shellArming` 透传给编排装配 (c)/(b)/(a) `ShellGate`（**仅项目角色**；su 不 arm；(c) 加载失败 ⇒ 连 (a) 也不注入——`run_shell` 不注册）。详见 `docs/change/2026-10-12_change_shell-arm.md`（含补丁节与已知风险「无沙箱」）。
 
 ## 自绘标题栏（窗口装饰：由原生改为自绘 / 2026-10-11 客户裁定）
 
@@ -92,26 +99,27 @@ npm run app            # = electron app/main.ts（Electron 44 自带 Node 24.21�
 - **注入点**：`DesktopDeps.envFilePath`（默认仓库根 `.env`；**测试/e2e 必须传系统临时目录假路径**）、`DesktopDeps.piConfigEnv`（保存后重载目标，默认 `process.env`）。
 - **UI**：**「Pi 设置」按钮在**中栏横栏右侧（客户 2026-10-11 裁定去掉运行时选择器后，入口从输入区上移到横栏）+ 可收起面板 `#pi-panel`；token 字段 `type=password`、可显式「显示」；**3 项必填**字段 + 可折叠的「高级」（`<details class="pi-advanced">`，内含可选的 `ANS_PI_CONTEXT_WINDOW` 与一行说明「留空 = 用默认值（偏保守：压缩会提前触发，不会炸会话）；知道确切值就填」）；**必填缺项**时状态行明确告警（可选缺失不算缺）。
 
-## 创世 finalize（「完成 bootstrap」，设计 §12.5 / T36）
+## 创世收口（**已退役** / A-5，2026-10-12）
 
-**背景**：su（模型）**不会算 hash**，故 pin **只能由代码在 su 写完「之后」** 算。编排（T36）已把该能力挂到 `RoleSessionHandle.finalize`（经 `openRoleSession` 的**可选**入参 `genesisFinalize: true` 开启，句柄据它附 `settled` + `finalize()`）。桌面此前**无任何 finalize 调用**，故从用户入口走完 su 建角色后**无 pin**——本步接线。
-
-- **接线点**：`app/desktop/session.ts::SessionManager.open` 对**仅创世 su 会话**（`listing.hasRoles === false && role.builtIn === true`，**不硬编码 "su"**）开 `genesisFinalize: true`；**有角色的普通聊天逐字不传**（行为不变）。
-- **触发时机＝显式**（编排裁定）：su 建角色**可多轮**、每轮都 settle；「settle 就 finalize」会 pin **半成品**。本层**绝不自动调用** `finalize()`，只在 settle 时刷新入口「就绪」提示。**多轮建角色必须全在创世态内完成，finalize 是 bootstrap 的最后一步。**
-- **状态/触发**：`SessionManager.bootstrapState()` 返回 `{available, settled, finalized}`；`SessionManager.finalizeBootstrap()` 转调句柄 `finalize()`（**失败如实返回 `{ok:false, reason}`**，不静默、不假装成功；成功后记 `finalized`）。Interface 层**只透传**（`getBootstrapState()` / `finalizeBootstrap()`）。
-- **`FinalizeResult` 类型来源**：**从编排公开句柄类型派生**（`Awaited<ReturnType<NonNullable<RoleSessionHandle["finalize"]>>>`）——**不导入编排私有 `src/common/编排/finalize.ts`**（§6 禁跨角色导入他人私有 `common/`）。形状由编排**公开面**唯一决定。
-- **不绕门**：finalize 的两笔写（`.ans/project.json`、`docs/bootstrap-manifest.md`）**同样经门禁 `resolveWrite`**（与 su 同一授权边界）；被拒即整批中止、**零副作用**。本层只转调编排实现，**无第二份落盘/边界判定**。
-- **UI**：`#bootstrap-action` 动作条（`index.html`）——**仅** `bootstrapState().available` 为真时显示（创世 su 会话且未 finalize 过）；`settled` 决定就绪态（`.is-pending` 警示「现在点会被拒」/ `.is-ready` 主色「可以完成」）。点「完成 bootstrap」→ `d.finalizeBootstrap()` → `appendFinalizeResult` **如实呈现**：成功示 **写出路径 + Pin 的边界文件与 SHA-256 + Pin 的角色**，被拒示 **完整 reason**。渲染侧**不作判定**（只读主进程状态）。
+**T36 的「创世 finalize 接线」（`genesisFinalize` 入参、`bootstrapState()`/`finalizeBootstrap()`、
+`#bootstrap-action` 动作条）已随 A-5「删收口面」整体删除**——桌面**不再有任何 finalize 读写/触发面**；
+产物收尾由**编排**在 su 会话 settle 后自动完成（客户裁定：见 `docs/change/2026-10-12_change_operator-cards-and-finalize-removal.md`）。
+本页上文历史版本中关于它的描述已不适用；`test/桌面应用/finalize-wiring.test.ts` 亦已删除（其断言并入
+「它不存在」守卫）。su 建角色后的产物仍受门禁约束（写判定唯一来源不变）。
 
 ## 对外导出（主进程侧）
 
 - `app/desktop/interface.ts`：`createDesktopInterface(deps)`、`RoleView`、`ListProjectResult`、`DesktopDeps`、`DesktopInterface`（`SessionOpenRequest`/`OpenResult` 等类型自 `session.ts` 引入使用）。
-- `app/desktop/session.ts`：`SessionManager`、`SessionOpenRequest`、`OpenResult`、`EffectiveConfigInfo`、`SendResult`、`StopResult`、`RuntimeKind`、**`BootstrapState`、`FinalizeResult`**（`FinalizeResult` 从编排公开句柄类型派生）。`SessionManager` 增 `bootstrapState()` / `finalizeBootstrap()`。
-- `app/desktop/chat-adapter.ts`：`createChatDemoAdapter`、`firstProjectFilePath`。
-- `app/desktop/project.ts`：`buildProjectConfig`、`readRoleDocsIndex`、`resolveSkillRoot`。
+- `app/desktop/session.ts`：`SessionManager`、`SessionOpenRequest`、`OpenResult`、`EffectiveConfigInfo`、`SendResult`（**L-1**：增 `queued?`/`position?`）、`StopResult`、`RuntimeKind`、`SessionEventEnvelope`（B-2 信封）、`MAX_LIVE_SESSIONS`。`SessionManagerDeps` 现有注入面：`openRoleSession`/`createPiAdapterFactory`/`createDemoAdapter`/`buildProjectConfig`/`getListing`/`emitEvent`/**`emitRoleState`（L-1 真实状态快照）**/`shellGate`/`shellOperatorChannel`/**`shellArming`（I-1 补丁）**/`customerInput`。
+- `app/desktop/chat-adapter.ts`：`createChatDemoAdapter`、`firstProjectFilePath`（**L-1**：每轮结束发 `settled`——忙态复位依赖它）。
+- `app/desktop/operator-channel.ts`：`DESKTOP_SHELL_GATE_ARMED`、(**I-1 补丁**) **`buildDesktopShellArming`**、**`DesktopShellArming`**（`Omit` 自编排 `AssembleShellGateOptions`）、`createDesktopOperatorChannel`、`describeShellCommand`、`DEFAULT_OPERATOR_CONFIRM_TIMEOUT_MS` 及其类型转出。
+- `app/desktop/customer-input.ts`：`createCustomerInputChannel`、`DesktopCustomerInputFn`（A-5；`respond` 回报 `{ok, error?, expired?}`——`expired`＝应用重启，**非超时**）。
+- `app/desktop/session-history.ts`：`readRoleSessionHistory`、`probeSessionFile`、`ReplayRow`（D-1，只读解析）。
+- `app/desktop/composer-images.ts`：`validateImage`、`sniffImageMime`、`decodeImageBase64`、`sanitizeImageName`、`MAX_IMAGE_BYTES`、`ALLOWED_IMAGE_MIMES`（K-2 纯逻辑）。
+- `app/desktop/project.ts`：`buildProjectConfig`、`buildEffectiveProjectConfig`、`readRoleDocsIndex`、`resolveSkillRoot`。
 - `app/desktop/pi-config.ts`：`PI_PANEL_KEYS`（4 键：3 必填 + 1 可选）、`PI_REQUIRED_KEYS`（3 必填）、`resolveRepoEnvPath`、`getPiConfig`、`savePiConfig`、`loadPiEnv`、`missingPiKeys`（只数必填）（及类型 `PiConfigView` / `PiConfigField` / `PiConfigSaveResult`）——**只读导入**共享 `env-file`，**无第二份 `.env` 实现**。
 - `app/desktop/interface.ts` 的 `DesktopInterface` 增 `getPiConfig()` / `savePiConfig({updates})`；`DesktopDeps` 增 `envFilePath?` / `piConfigEnv?`。
-- `app/desktop/interface.ts` 的 `DesktopInterface` 增 **`getBootstrapState()` / `finalizeBootstrap()`**（T36，创世 finalize 入口）；`DesktopDeps.openRoleSessionFn` 入参增可选 `genesisFinalize?`。
+- `app/desktop/interface.ts` 的 `DesktopInterface` 增 **`openExternal`（B-1）/ `pickImage`·`attachImage`（K-2）**；`DesktopDeps` 增 **`emitRoleState?`（L-1）/ `customerInput?`（A-5）/ `shellOperatorChannel?` 与 `shellArming?`（I-1）/ `openExternalFn?` / `pickImageFileFn?`（K-2）**；`openRoleSessionFn` 入参含 `customerInput?`/`dispatchTask?`/`shellOperatorChannel?`/`shellArming?`（收口相关的 `genesisFinalize?` **已退役**）。
 
 ## 硬约束落实
 

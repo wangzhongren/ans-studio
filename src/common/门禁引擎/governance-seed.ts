@@ -37,10 +37,20 @@ function dir(path: string, purpose: string): BoundaryEntry {
  * 项目治理边界种子条目（设计 §2.2 / §12.2）：以 **project 根**声明三个**普通目录**——
  * `角色卡/`、`docs/`、`.ans/`。`scope: undefined` 下命中即放行；`src/` 等不在集内，不匹配即拒。
  * **条目集合固定为这三个**（不含 `src/`、不含项目内任意文件）——这是「有界」的实质。
+ *
+ * 引导文案（客户 2026-10-12 裁定 C，从源头防）：每角色的边界文件**必须**是
+ * `角色卡/<角色 id>/boundary.yaml`（YAML：`role` + `entries`），散文 `boundary.md` 不会被解析
+ * （加载器只读 YAML 的 `role` + `entries` 结构，散文文件被判「Section 1 为空」）。格式要求与最小
+ * 可抄示例的**单一来源**在 `BUILT_IN_ROLE_CARD_TEXT`（su 会话可见），此处 purpose 只作数据面提示，
+ * 不另写一份长文案。
+ * T-1（客户 2026-10-12 裁定「未通过产物」暂存区）：每角色一个项目根 `temp/<角色 id>/`，暂存
+ * 被验收退回/要求返工的产物供审核对照（**不存**被门禁拒绝的写入内容——拒绝=零副作用）。种子
+ * **不加** `temp/` 条目（创世种子恰为三处治理产物，不动写集）；temp 的完整约定同样以
+ * `BUILT_IN_ROLE_CARD_TEXT` 为单一来源，此处仅在 角色卡/ 条目的 purpose 里交叉提示用途。
  */
 export function governanceBoundaryEntries(): BoundaryEntry[] {
   return [
-    dir("角色卡/", "项目治理产物：角色目录（role-card/boundary/memo/docs）"),
+    dir("角色卡/", "项目治理产物：角色目录（每角色 role-card.md + boundary.yaml——必须 YAML：role + entries，散文 .md 不会被解析；另 memo/docs。未通过/返工产物另存项目根 temp/<角色 id>/——草稿区，不参与 pin）"),
     dir("docs/", "项目级文档脚手架（design/feature/change/fix）"),
     dir(".ans/", "项目初始化产物（.ans/project.json）"),
   ];

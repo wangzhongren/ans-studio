@@ -96,6 +96,8 @@ async function firstExistingFile(dirAbs: string, names: string[]): Promise<strin
  * 枚举一个项目根下的全部角色。
  * - 复用 resolveRole/boundary-core 的解析，界面侧不得另写一份判定；
  * - 单个角色目录的问题（缺 role-card.md / boundary.yaml、边界解析失败）→ 记入 warnings，不抛出；
+ *   边界**文件存在但 Section 1 解析出 0 条**（如散文式 Markdown `boundary.md`）经 `loadBoundaryFile`
+ *   记为 parseError 并落到下方 warning（客户 2026-10-12 裁定 A：响亮失败，不再静默空集）；
  * - **无角色目录**（尚无 `角色卡/`、`role-cards/`）→ **不抛错、不报警**（§10.2）：这是「项目尚未
  *   bootstrap」的**正常初始态**，返回 `[内置 su] + hasRoles:false`（warnings 为空）——界面据此显示
  *   su 并引导发起创世（§10.1/§10.3）；warnings 只留给真异常（缺文件 / 解析失败 / 角色重复）；

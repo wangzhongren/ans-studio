@@ -21,6 +21,9 @@ entries:
   - kind: file
     path: src/service/gate/resolve-write.ts
     purpose: 路径判定
+  - kind: file
+    path: src/service/gate/shell-rules.ts
+    purpose: shell 规则集公开再导出（编排 shell 闸 (c) 层的合法注入源；客户 2026-10-12 确认）
   - kind: directory
     path: src/common/门禁引擎/
     purpose: 本角色私有辅助代码

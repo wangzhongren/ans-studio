@@ -191,85 +191,10 @@ body { display: flex; flex-direction: column; }
 }
 .project-path.is-empty { color: var(--text-3); }
 
-/* 创世 finalize（T36）：「完成 bootstrap」动作条——**仅创世 su 会话**显示，默认隐藏。位于输入区上方。 */
-.bootstrap-action {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 0 28px 10px;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg-soft);
-  font-size: 12.5px;
-  line-height: 1.5;
-}
-.bootstrap-action[hidden] { display: none; }
-.bootstrap-action .ba-ico { flex: 0 0 auto; display: flex; color: var(--text-2); }
-.bootstrap-action .ba-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.bootstrap-action .ba-title { font-weight: 600; color: var(--text); font-size: 12.5px; }
-.bootstrap-action .ba-hint { color: var(--text-2); }
-.bootstrap-action.is-ready { border-color: var(--border-strong); }
-.bootstrap-action.is-pending .ba-ico { color: var(--text-3); }
-.bootstrap-action .ba-btn { flex: 0 0 auto; }
-
-/* 完成 bootstrap 的结果（成功/被拒）：可展开，按结论着色（语义色，面积小）。 */
-details.sys-finalize {
-  align-self: center;
-  max-width: min(680px, 92%);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 9px 13px;
-  background: var(--bg);
-  font-size: 12.5px;
-}
-details.sys-finalize.is-ok { border-color: var(--border); background: var(--success-bg); }
-details.sys-finalize.is-denied { border-color: var(--danger-border); background: var(--danger-bg); }
-details.sys-finalize summary {
-  display: flex;
-  align-items: flex-start;
-  gap: 7px;
-  cursor: pointer;
-  list-style: none;
-  font-size: 12.5px;
-  line-height: 1.5;
-}
-details.sys-finalize summary::-webkit-details-marker { display: none; }
-details.sys-finalize.is-ok summary { color: var(--success); }
-details.sys-finalize.is-denied summary { color: var(--danger); }
-details.sys-finalize summary .sb-ico { flex: 0 0 auto; display: flex; margin-top: 2px; }
-details.sys-finalize summary .chev { flex: 0 0 auto; margin-top: 2px; transition: transform 0.12s ease; }
-details.sys-finalize[open] summary .chev { transform: rotate(90deg); }
-details.sys-finalize .sys-detail {
-  font-family: var(--mono);
-  font-size: 11.5px;
-  line-height: 1.65;
-  color: var(--text);
-  word-break: break-word;
-}
-details.sys-finalize .sys-detail p { margin: 8px 0 4px; }
-details.sys-finalize .fin-wrote { list-style: none; margin: 0; padding: 0; }
-details.sys-finalize .fin-wrote li { position: relative; padding-left: 14px; font-family: var(--mono); }
-details.sys-finalize .fin-wrote li::before {
-  content: ""; position: absolute; left: 2px; top: 0.75em;
-  width: 4px; height: 4px; border-radius: 50%; background: var(--text-3);
-}
-details.sys-finalize table.fin-pins { border-collapse: collapse; width: 100%; }
-details.sys-finalize table.fin-pins th,
-details.sys-finalize table.fin-pins td {
-  text-align: left;
-  padding: 3px 8px 3px 0;
-  vertical-align: top;
-  border-bottom: 1px solid var(--border);
-  word-break: break-all;
-}
-details.sys-finalize table.fin-pins th { color: var(--text-2); font-weight: 500; }
-details.sys-finalize table.fin-pins td.sha { color: var(--text-2); }
-
-/* su 提议收口（T38）：finalize 提议的**确认面**——聊天流里的一张卡（**仅 su 已提议时出现**，不是一直挂着的按钮）。
-   提议原文 + 将写出什么（reason）+ `[确认完成]`/`[暂不]`。浅色、近单色——只用一点克制的深色边框标示「待你确认」。 */
-.msg-finalize-proposal {
+/* ———————— 客户交互卡（A-5，2026-10-12）：确认 / 单选 / 多选 / 带预览的确认 ————————
+   聊天流里的一张卡（由 su 的 `request_confirmation`/`request_choice` 触发；客户作答后**定格**）。
+   浅色、近单色——只用一点克制的深色边框标示「待你作答」。（替掉了 T38 的 finalize 确认卡。） */
+.op-request {
   align-self: center;
   max-width: min(680px, 92%);
   display: flex;
@@ -282,19 +207,49 @@ details.sys-finalize table.fin-pins td.sha { color: var(--text-2); }
   font-size: 12.5px;
   line-height: 1.5;
 }
-.msg-finalize-proposal .fp-head { display: flex; align-items: center; gap: 7px; }
-.msg-finalize-proposal .fp-ico { flex: 0 0 auto; display: flex; color: var(--text-2); }
-.msg-finalize-proposal .fp-title { font-weight: 600; color: var(--text); }
-.msg-finalize-proposal .fp-reason {
+.op-request .op-head { display: flex; align-items: center; gap: 7px; }
+.op-request .op-ico { flex: 0 0 auto; display: flex; color: var(--text-2); }
+.op-request .op-title { font-weight: 600; color: var(--text); }
+.op-request .op-question { color: var(--text); }
+.op-request .op-detail { color: var(--text-2); white-space: pre-wrap; word-break: break-word; }
+/* 预览（角色卡正文 + 边界摘要等长文）：**折叠** + 限高可滚 + pre-wrap（设计 A-5：max-height:40vh; overflow:auto）。 */
+.op-request details.op-preview { border: 1px solid var(--border); border-radius: 6px; background: var(--bg); }
+.op-request details.op-preview summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  cursor: pointer;
+  list-style: none;
+  color: var(--text-2);
+  font-size: 11.5px;
+}
+.op-request details.op-preview summary::-webkit-details-marker { display: none; }
+.op-request details.op-preview summary .chev { transition: transform 0.12s ease; }
+.op-request details.op-preview[open] summary .chev { transform: rotate(90deg); }
+.op-request .op-preview-body {
+  margin: 0;
+  padding: 0 10px 10px;
+  max-height: 40vh;
+  overflow: auto;
   font-family: var(--mono);
   font-size: 11.5px;
-  color: var(--text-2);
+  line-height: 1.6;
+  white-space: pre-wrap;
   word-break: break-word;
+  color: var(--text);
 }
-.msg-finalize-proposal .fp-reason:empty { display: none; }
-.msg-finalize-proposal .fp-actions { display: flex; align-items: center; gap: 8px; }
-.msg-finalize-proposal .fp-note { color: var(--text-2); }
-.msg-finalize-proposal .fp-note-ok { color: var(--success); }
+/* 选项（radio 单选 / checkbox 多选） */
+.op-request .op-options { display: flex; flex-direction: column; gap: 4px; }
+.op-request .op-option { display: flex; align-items: flex-start; gap: 7px; padding: 5px 8px; border-radius: 6px; cursor: pointer; }
+.op-request .op-option:hover { background: var(--bg-hover); }
+.op-request .op-option input { margin-top: 2px; accent-color: var(--text); }
+.op-request .op-option .op-desc { display: block; color: var(--text-2); font-size: 11.5px; }
+.op-request .op-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.op-request .op-note { color: var(--text-2); }
+.op-request .op-note-ok { color: var(--success); }
+.op-request .op-note-err { color: var(--danger); }
+.op-request .op-actions button[hidden] { display: none; }
 
 .tree-label {
   padding: 10px 16px 4px;
@@ -335,7 +290,30 @@ details.sys-finalize table.fin-pins td.sha { color: var(--text-2); }
   white-space: nowrap;
 }
 .ti-sub { font-size: 11.5px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ti-live { flex: 0 0 auto; width: 7px; height: 7px; border-radius: 50%; background: var(--success); }
+/* 左树角色**状态徽标**（B-3，2026-10-12；图标化见同日状态准确性裁定）：**图标 + 短标签**——状态、图标、
+   文案与悬停描述全由 role-status.js 的纯函数唯一映射派生（真实信号：保活/曾开会话/会话 busy/队列深度/错误）；
+   悬停 title = 完整描述 + 最近事件+时间。 */
+.ti-status {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+/* 图标（单字符文本字形，非 emoji）：颜色随状态（下列 st-* 规则）。 */
+.ti-status .ts-ico { font-size: 10px; line-height: 1; color: var(--text-3); }
+.ti-status.st-idle .ts-ico { color: var(--success); }
+.ti-status.st-working .ts-ico { color: var(--text); }
+.ti-status.st-working { color: var(--text); }
+.ti-status.st-confirm .ts-ico { color: var(--text); }
+.ti-status.st-confirm { color: var(--text); }
+.ti-status.st-stopped .ts-ico { color: var(--text-3); }
+.ti-status.st-error .ts-ico { color: var(--danger); }
+.ti-status.st-error { color: var(--danger); }
+/* D-1（2026-10-12）：恢复出来的角色——「空闲（已恢复）」（绿色图标 + 措辞本身已带「已恢复」）。 */
+.ti-status.st-restored .ts-ico { color: var(--success); }
 /* 角色标注（主入口 / 内置）：小药丸（交互式元素，允许小圆角）。 */
 .ti-badge {
   flex: 0 0 auto;
@@ -416,7 +394,9 @@ details.sys-finalize table.fin-pins td.sha { color: var(--text-2); }
   font-size: 13.5px;
   line-height: 1.65;
   word-break: break-word;
-  white-space: pre-wrap;
+  /* B-1（2026-10-12）：消息内容现为**受控 Markdown 渲染**（块级标签）——不再整体 pre-wrap；
+     段落内的换行由渲染器以 <br> 保留（markdown.js 的 inlineLines）。 */
+  white-space: normal;
   color: var(--text);
 }
 .msg-user {
@@ -426,7 +406,75 @@ details.sys-finalize table.fin-pins td.sha { color: var(--text-2); }
   border-radius: var(--radius);
 }
 .msg-assistant { align-self: flex-start; }
+/* Q-1（2026-10-12）：流式段的**纯文本**形态（一轮结束后一次性 Markdown 化——`.is-streaming` 随之移除）。 */
+.msg-assistant.is-streaming { white-space: pre-wrap; word-break: break-word; }
+/* Q-2：窗口化 spacer（窗口外行高之和——撑住总高；本身不可见）。 */
+.virt-spacer { flex: 0 0 auto; width: 100%; }
 .msg .msg-code, .msg code { font-family: var(--mono); font-size: 12.5px; background: var(--bg-soft); border-radius: 4px; padding: 0 4px; }
+
+/* ———————— 每角色聊天容器（B-2 切换保留历史，2026-10-12） ————————
+   同一时刻只有一个 pane 挂在 #chat 下；其余为**游离 DOM**——历史节点与事件监听器因此原样保留
+   （不用 innerHTML 快照，卡片的按钮不会失灵）。布局承接 #chat 原先留给直接子元素的排布。 */
+.chat-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1 0 auto;
+}
+
+/* ———————— Markdown 渲染元素（B-1）：浅色、近单色；块间距收敛在气泡内 ———————— */
+.msg p { margin: 0 0 8px; }
+.msg p:last-child { margin-bottom: 0; }
+.msg h1, .msg h2, .msg h3, .msg h4, .msg h5, .msg h6 { margin: 14px 0 6px; line-height: 1.4; }
+.msg h1:first-child, .msg h2:first-child, .msg h3:first-child,
+.msg h4:first-child, .msg h5:first-child, .msg h6:first-child { margin-top: 0; }
+.msg h1 { font-size: 17px; }
+.msg h2 { font-size: 16px; }
+.msg h3 { font-size: 15px; }
+.msg h4, .msg h5, .msg h6 { font-size: 13.5px; color: var(--text-2); }
+.msg ul, .msg ol { margin: 0 0 8px; padding-left: 22px; }
+.msg li { margin: 2px 0; }
+.msg pre.md-pre {
+  margin: 0 0 8px;
+  padding: 9px 12px 10px;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: auto;
+  max-height: 320px;
+}
+.msg pre.md-pre code {
+  display: block;
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre;
+}
+.msg .md-lang {
+  display: block;
+  margin-bottom: 6px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--text-3);
+}
+.msg blockquote {
+  margin: 0 0 8px;
+  padding: 1px 0 1px 10px;
+  border-left: 2px solid var(--border-strong);
+  color: var(--text-2);
+}
+.msg blockquote:last-child { margin-bottom: 0; }
+/* 链接：外开（经 preload 交由系统浏览器）；没有默认下划线也能看出是链接——用细下划线 + hover 加深。 */
+.msg a.md-link {
+  color: var(--text);
+  text-decoration: underline;
+  text-decoration-color: var(--border-strong);
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.msg a.md-link:hover { text-decoration-color: currentColor; }
 
 /* 系统事件：一行小字注记 + 小图标（技术事实等宽、次级灰）。 */
 .sys {
@@ -449,6 +497,124 @@ details.sys-finalize table.fin-pins td.sha { color: var(--text-2); }
 .sys-loading { color: var(--text-2); }
 .sys-config { color: var(--danger); }
 .sys-config .sys-text { color: var(--danger); }
+/* L-1（2026-10-12）：**队列行**——该角色聊天流里的真实队列快照（原地更新、常驻流尾）；左侧竖线作区分。 */
+.sys-queue {
+  align-self: stretch;
+  max-width: min(760px, 100%);
+  border-left: 2px solid var(--border);
+  padding-left: 8px;
+}
+.sys-queue .sys-text { color: var(--text-2); }
+.sys-queue .sys-ico { color: var(--text-3); }
+
+/* P-1（2026-10-12 真机：待确认卡被 288 行活动淹掉、客户以为卡丢了）：
+   「待确认」**常驻 chip**——#chat 底部的悬浮药丸（sticky 尾元素；同一时刻只有一个 pane 挂载）。
+   点击=逐张定位（滚动 + 高亮）；作答/失效 ⇒ 隐藏（`.op-chip[hidden]`）。**无计时器**（高亮用一次性 CSS 动画）。 */
+.op-chip {
+  position: sticky;
+  bottom: 10px;
+  align-self: center;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--text);
+  color: #fff;
+  border: 1px solid var(--text);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.op-chip[hidden] { display: none; }
+.op-chip:hover { background: #333; border-color: #333; }
+.op-chip:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(31, 31, 31, 0.2); }
+.op-chip .op-chip-ico { display: flex; }
+.op-chip .op-chip-ico svg { width: 12px; height: 12px; }
+
+/* P-1：定位**高亮**（一次性动画；重播靠 renderer 的 class remove/reflow/add——仍无计时器）。 */
+.op-request.is-flash {
+  animation: op-flash 1.2s ease-out 1;
+}
+@keyframes op-flash {
+  0% { box-shadow: 0 0 0 3px rgba(31, 31, 31, 0.35); }
+  100% { box-shadow: 0 0 0 3px rgba(31, 31, 31, 0); }
+}
+
+/* shell 命令确认卡（M-1，2026-10-12 客户裁定「这个太丑了」→ 应用内卡片替代原生对话框）：
+   浅底、极淡边框、按钮依既有设计语言（拒绝=深色实心默认焦点；放行=中性）；命令等宽块原样横滚。 */
+.sc-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(31, 31, 31, 0.28);
+}
+.sc-overlay[hidden] { display: none; }
+.sc-card {
+  width: min(640px, calc(100vw - 48px));
+  max-height: calc(100vh - 64px);
+  overflow: auto;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  padding: 16px 18px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sc-head { display: flex; align-items: center; justify-content: space-between; }
+.sc-title { font-weight: 600; color: var(--text); }
+.sc-close {
+  border: none;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 4px 7px;
+  border-radius: var(--radius-sm);
+}
+.sc-close:hover:not(:disabled) { background: var(--bg-hover); color: var(--text); }
+.sc-close:disabled { opacity: 0.45; cursor: default; }
+.sc-command {
+  margin: 0;
+  padding: 10px 12px;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text);
+  white-space: pre;
+  overflow-x: auto;
+}
+.sc-summary { margin: 0; color: var(--text); }
+.sc-reason { margin: 0; color: var(--text-2); }
+.sc-details {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-soft);
+}
+.sc-details summary { cursor: pointer; padding: 7px 10px; color: var(--text-2); font-size: 12.5px; }
+.sc-details-body { padding: 0 10px 10px; display: flex; flex-direction: column; gap: 6px; }
+.sc-cwd-label, .sc-argv-label { margin: 0; color: var(--text-3); font-size: 11.5px; }
+.sc-cwd { margin: 0; font-family: var(--mono); font-size: 12px; color: var(--text-2); word-break: break-all; }
+.sc-argv {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-2);
+  white-space: pre;
+  overflow-x: auto;
+}
+.sc-reason-raw { margin: 0; color: var(--text-3); font-size: 11.5px; word-break: break-word; }
+.sc-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.sc-hint { margin: 0; color: var(--text-3); font-size: 11.5px; }
+.sc-card.is-expired .sc-command { opacity: 0.75; }
 
 /* 回交卡片（§10.8）：浅底块 + 极淡边框（可折叠结果块式的呈现）；镜像时虚线边框区分。 */
 .msg-handback {
@@ -462,6 +628,41 @@ details.sys-finalize table.fin-pins td.sha { color: var(--text-2); }
   line-height: 1.55;
 }
 .msg-handback.is-mirror { border-style: dashed; }
+/* C-1：blocked 报告的**明显视觉区分**（不只状态文字）——左语义色竖条 + 语义边色。 */
+.msg-handback.is-blocked { border-left: 3px solid var(--danger); border-color: var(--danger-border); }
+
+/* ———————— 会话记录恢复（D-1，2026-10-12）：回放段与实时流**视觉可区分** ————————
+   `.sys-replay-divider` = 回放段的开始分隔（虚线 + 提示语）；`.is-replay` = 回放行的统一标记（略淡）。 */
+.sys-replay-divider { border-top: 1px dashed var(--border-strong); padding-top: 6px; }
+.sys-replay-divider .sys-text { color: var(--text-2); }
+.is-replay { opacity: 0.88; }
+
+/* ———————— 系统投递输入（E-1 回交 / H-1 派发，2026-10-12 客户观察修订）————————
+   投递进角色会话的输入**单独样式**：虚线框 + 图标 + 来源标签（「回交投递 · 来自 X」/「派发 · 来自 su」）——
+   **绝不**与客户手输气泡（.msg-user）同款。可与 .is-replay 组合（D-1 回放路径）。 */
+.msg-injected {
+  align-self: center;
+  max-width: min(680px, 92%);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  padding: 9px 12px;
+  background: var(--bg);
+}
+.msg-injected .mi-head { display: flex; align-items: center; gap: 6px; }
+.msg-injected .mi-ico { display: flex; color: var(--text-2); }
+.msg-injected .mi-chip {
+  font-size: 10.5px;
+  color: var(--text-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0 7px;
+  background: var(--bg-soft);
+}
+.msg-injected .mi-body { color: var(--text-2); }
+.msg-injected.is-dispatch .mi-body { color: var(--text); }
 .hb-head { display: flex; align-items: center; gap: 7px; }
 .hb-ico { display: flex; color: var(--text-2); }
 .hb-title { font-weight: 600; color: var(--text); font-size: 12.5px; }
@@ -633,23 +834,88 @@ details.sys-denied[open] summary { padding-bottom: 6px; margin-bottom: 6px; bord
 .pi-advanced-body { margin-top: 9px; display: grid; gap: 9px; }
 .pi-advanced-hint { margin: 0; font-size: 11.5px; line-height: 1.5; color: var(--text-3); }
 
-.composer-row { display: flex; align-items: flex-end; gap: 8px; }
-.composer textarea {
+/* ———————— 输入区（K-1，2026-10-12 客户裁定：**圆角胶囊** + 发送箭头**内嵌框内**） ———————— */
+.capsule {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px; /* 胶囊：整框全圆角 */
+  background: var(--bg-soft);
+  padding: 6px 8px;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+.capsule:focus-within { border-color: var(--text-3); box-shadow: 0 0 0 3px rgba(31, 31, 31, 0.1); }
+.capsule.is-dropping { border-color: var(--text-3); background: var(--bg-hover); }
+.capsule textarea {
   flex: 1 1 auto;
   min-width: 0;
   resize: none;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg-soft);
+  border: none;
+  background: transparent;
   color: var(--text);
   font: 13px/1.55 var(--sans);
-  padding: 10px 12px;
+  padding: 7px 2px;
   max-height: 140px;
-  transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
-.composer textarea::placeholder { color: var(--text-3); }
-.composer textarea:focus { outline: none; border-color: var(--text-3); box-shadow: 0 0 0 3px rgba(31, 31, 31, 0.1); }
-.btn-send { flex: 0 0 auto; height: 36px; }
+.capsule textarea::placeholder { color: var(--text-3); }
+.capsule textarea:focus { outline: none; }
+/* 框内图标键（添加图片）与**内嵌发送箭头**（圆钮；未开会话时禁用态照旧）。 */
+.cap-icon {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.cap-icon:hover { background: var(--bg-hover); color: var(--text); }
+.cap-send {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: var(--text);
+  color: var(--bg);
+  cursor: pointer;
+}
+.cap-send:disabled { opacity: 0.35; cursor: default; }
+.cap-send:not(:disabled):hover { opacity: 0.92; }
+/* 附件行（K-2）：缩略图 chips（可移除）；空时整行隐藏。 */
+.attach-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.attach-chip {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--bg-soft);
+}
+.attach-chip img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.attach-chip .attach-rm {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
 
 /* ———————— 右栏：角色资料 ———————— */
 .right-body { flex: 1 1 auto; overflow: auto; padding: 6px 0; }
@@ -698,6 +964,46 @@ details.sec[open] > summary .sec-chev { transform: rotate(90deg); }
   max-height: 380px;
   overflow: auto;
 }
+/* 「Markdown 渲染块」通用样式（**card-md 钩子**）：N-2 角色卡、N-4 变更记录/文档索引/回交卡摘要——
+   同一管线、同一钩子、同一套排版（沿用 `.msg` 的排版语言）。`.card-text.card-md` 只多一条：
+   **解除 pre-wrap**（渲染产物自带块结构）。 */
+.card-text.card-md { white-space: normal; }
+.card-md p { margin: 0 0 8px; }
+.card-md p:last-child { margin-bottom: 0; }
+.card-md h1, .card-md h2, .card-md h3, .card-md h4 { margin: 14px 0 6px; line-height: 1.4; }
+.card-md h1:first-child, .card-md h2:first-child, .card-md h3:first-child, .card-md h4:first-child { margin-top: 0; }
+.card-md h1 { font-size: 16px; }
+.card-md h2 { font-size: 15px; }
+.card-md h3 { font-size: 14px; }
+.card-md h4 { font-size: 13px; color: var(--text-2); }
+.card-md ul, .card-md ol { margin: 0 0 8px; padding-left: 20px; }
+.card-md li { margin: 2px 0; }
+.card-md code { font-family: var(--mono); font-size: 12px; background: var(--bg-soft); border-radius: 4px; padding: 0 4px; }
+.card-md pre.md-pre {
+  margin: 0 0 8px;
+  padding: 9px 12px 10px;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: auto;
+  max-height: 260px;
+}
+.card-md pre.md-pre code { display: block; background: none; padding: 0; border-radius: 0; font-size: 12px; line-height: 1.6; white-space: pre; }
+.card-md .md-lang { display: block; margin-bottom: 6px; font-family: var(--mono); font-size: 10.5px; color: var(--text-3); }
+.card-md blockquote { margin: 0 0 8px; padding: 1px 0 1px 10px; border-left: 2px solid var(--border-strong); color: var(--text-2); }
+.card-md a.md-link { color: var(--text); text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 2px; cursor: pointer; }
+.card-md a.md-link:hover { text-decoration-color: currentColor; }
+
+/* 右栏「待办 / 队列」组（2026-10-12 追加；客户：「代办也要在右边显示」）——每条：位置 / 来源 / 摘要 / 入队时间；
+   「进行中」= 正在跑的那条投递（与排队条目视觉可分）。 */
+.queue-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.q-item { display: flex; align-items: baseline; gap: 8px; font-size: 12px; line-height: 1.5; }
+.q-pos { flex: 0 0 auto; min-width: 40px; color: var(--text-3); font-family: var(--mono); font-size: 11px; }
+.q-src { flex: 0 0 auto; color: var(--text-2); border: 1px solid var(--border); border-radius: 999px; padding: 1px 7px; font-size: 11px; width: 72px; text-align: center; }
+.q-text { min-width: 0; word-break: break-word; color: var(--text); }
+.q-meta { flex: 0 0 auto; margin-left: auto; color: var(--text-3); font-family: var(--mono); font-size: 11px; }
+.q-item.is-running .q-src { color: var(--text); border-color: var(--border-strong); }
+.q-item.is-running .q-text { color: var(--text-2); }
 
 /* 边界条目：干净的清单（路径等宽；kind 用小灰标签）；不再用实线/虚线行。 */
 table.boundary { width: 100%; border-collapse: collapse; font-size: 12px; }
@@ -746,7 +1052,7 @@ ul.idx li.dir { color: var(--text-2); }
   .app { grid-template-columns: 208px minmax(0, 1fr) 268px; }
   .chat { padding: 18px; gap: 14px; }
   .composer { padding: 12px 18px 16px; }
-  .bootstrap-action, .pi-panel { margin-left: 18px; margin-right: 18px; }
+  .pi-panel { margin-left: 18px; margin-right: 18px; }
   .pi-field { grid-template-columns: 150px minmax(0, 1fr); }
 }
 

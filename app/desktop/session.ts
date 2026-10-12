@@ -9,28 +9,61 @@
 //    （pin 生效、受 pin 约束）；**无** `.ans` → 回退运行期同意（导入即授权，登记的非-pin 例外）；
 //    `.ans` **存在但不可用** → fail-closed 未接受（**不回退**运行期同意），界面如实呈现。判定链的
 //    唯一实现在共享模块 `src/common/shared/config-loader.ts`（只读导入，不复制）。
-//  - 聊天是多轮的：会话经编排 openRoleSession 建立（**只建一次**），send 反复调；
-//    同一角色重复点击 = 续接当前会话（不重建）；切换角色 = 先 dispose 旧会话再开新会话。
+//  - 聊天是多轮的：会话经编排 openRoleSession 建立，send 反复调；同一角色重复点击 = 续接当前会话（不重建）。
+//  - **切换保留历史（B-2，2026-10-12 设计：路线 a「并存会话」）**：每角色各持一个保活句柄（`sessions` Map）,
+//    **切走不 stop、切回直接续**（句柄与模型上下文天然保留）；同时保活数上限 `MAX_LIVE_SESSIONS`（LRU，
+//    淘汰者 dispose、界面侧历史由渲染层自持）；事件外推带 **`roleId` 信封**（多会话并存不串消息）；
+//    `stop(roleId)` **定向**关闭（缺省=全部，供换项目/退出）。
+//  - **回交自动投递 su 验收 + su 派发任务路由（E-1 / H-1，2026-10-12 设计；客户裁定全自动、无开关）**：
+//    E-1——某角色（≠su）的回交事件到达时，经编排的 `renderHandbackPrompt`（**单一来源**）自动投递进 su 的
+//    会话；H-1——su 经适配器 `dispatch_task` 能力（`dispatchTask`，**仅 su 会话注入**）把任务路由进**目标角色**
+//    的会话（文本 = 编排 `renderDispatchPrompt`；未落地前见 `renderDispatchPromptLocal` 的登记，**不得两处并存**）。
+//    两者**共用一套投递机**：去重（回交=handbackKey 永不重投；派发=**队列期**窗口去重、送达即释放以保返工）+
+//    忙时排队（按序、绝不并发 send）+ 目标未开**自动开启** + 失败**如实系统行 + 保留待重试**（绝不静默丢）。
+//    校验：`routeDispatch` 拒非本项目角色与内置治理角色（含 su 自身）——**如实回执给工具**，绝不静默。
+//    CLI 前端的同等投递**不做**（一次性会话，另议——登记）。
+//  - **会话上下文来源（D-1 契约，pm 2026-10-12 钉死）**：dispose / LRU 淘汰**不擦除**会话文件，重开 = 适配器
+//    从文件恢复——`open()` 以「文件在/不在/坏」分类 `contextSource`（resumed/recovered/fresh），供渲染侧出文案。
+//
 //  - scope 传 undefined（聊天无任务收窄）；判定仍由门禁引擎负责——写入照样实时被拦。
 //  - **冷启动创世（设计 §10.1 / §12.2，任务 T30）**：未 bootstrap 的空项目上，`buildProjectConfig`
 //    会按 `hasRoles === false` **带上 `genesisBootstrap`**；本层照常经 `openRoleSession` 以 `scope: undefined`
 //    开启内置治理角色（su）——门禁引擎据 `genesisBootstrap` 对其返回「项目根」治理种子边界，于是 su 能写出
 //    治理产物（`角色卡/…` / `docs/…` / `.ans/…`），而 `src/**` 仍被拒。**项目一有角色即不再带该字段**
 //    （切换在 `buildProjectConfig`，不在此处），su 随即回到普通聊天（项目边界治理）。
-//  - **创世 finalize（T36）**：su 建角色**可多轮**，「settle 就 finalize」会在第 1 轮后 pin 出**半成品**，
-//    故 finalize **显式触发**——**仅**创世 su 会话（`!hasRoles` 的内置治理角色）经 `openRoleSession` 开
-//    `genesisFinalize: true`，句柄附带 `settled` + `finalize()`；由界面「完成 bootstrap」动作显式调（不自动跑）。
-//    有角色的普通聊天**不开**，其句柄没有 `finalize`。
+//  - **客户确认制交互（A-1/A-3/A-5，2026-10-12）**：**仅内置治理角色（su，`role.builtIn`，数据驱动）**的会话
+//    注入**客户交互通道**（`customer-input.ts` → 编排 `openRoleSession` 的入参 `customerInput`）：该会话进入
+//    **确认制**——`request_confirmation` / `request_choice` 两工具注册、gate 走「**客户确认才发行 writeSet**」
+//    （发行在编排 `common/编排/confirmed-writes.ts`，本层不复制）；**「客户确定了才加、才落盘」取代了旧收口**
+//    ——收口提议/确认/手动 finalize 已删，产物收尾由编排在 settle 后**自动**完成（本层不再有 finalize 面）。
+//    普通角色会话**不注入**（无客户通道：两工具不注册、gate 旧语义逐字不变）。
 
 import type { Acceptance } from "../../src/model/boundary.ts";
 import type { ProjectConfig } from "../../src/model/role.ts";
+// O-1（2026-10-12）：边界快照的**可信信号** = 读盘内容哈希（sha256）——本层只读、不复制门禁解析。
+import fs from "node:fs";
+import path from "node:path";
+import { createHash } from "node:crypto";
 import type { RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
 import { openRoleSession } from "../../src/pipeline/orchestration/run-role.ts";
 // 会话事件流的类型：编排把 `RoleSessionHandle.events()` 放宽为 `OrchestrationEvent`（既有 `SessionEvent`
 // + 编排在 `settled` 时追加的 `handback` 回交事件，设计 §10.8）。**类型从编排的模块只读导入、不复制形状**
 // （单一来源：`src/common/编排/handback.ts`，也是 `run-role.ts` 导入它的位置）。
 import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
-import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn } from "../../src/provider/pi/session.ts";
+// E-1（2026-10-12）：「回交后的 su 验收」的两件**单一来源**（编排提供，只读导入、不复制）——
+// `renderHandbackPrompt`（投递给 su 的输入文案）与 `handbackKey`（去重键）。**两前端共用、不得各写一份**。
+import { renderHandbackPrompt, handbackKey, type TaskHandback } from "../../src/common/编排/handback.ts";
+import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputRequest } from "../../src/provider/pi/session.ts";
+// H-1（2026-10-12）：派发能力的冻结契约（§4 冻结家；只读导入、不复制形状）。
+import type { DispatchTaskPayload, DispatchReceipt, DispatchTaskFn } from "../../src/provider/pi/session.ts";
+// D-1/E-1：会话文件粗探（「在/不在/坏」）——打开会话时分类 `contextSource`（文案分支的事实来源）。
+import { probeSessionFile } from "./session-history.ts";
+// I-1 补丁（2026-10-12 客户重发授权）：(c) 规则集实件的形状（**只读转自** operator-channel.ts——它 `Omit`
+// 自编排的 `AssembleShellGateOptions`；同一契约只许一个形状，本模块不另立第二份）。
+import type { DesktopShellArming } from "./operator-channel.ts";
+// 桌面客户交互通道（A-5）：请求/裁决的冻结形状在 §4 冻结契约家（provider/pi/session.ts），
+// 本模块只读导入转出；`DesktopCustomerInputFn` 是本层对「带角色上下文」的窄扩展（请求本体不带 roleId）。
+import type { DesktopCustomerInputFn } from "./customer-input.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
 // 跨角色共享组件：`.ans` 有效配置载入器（**属主：项目管理**；本角色**只读导入，不复制第二份**，
 // 规则见 `角色卡/项目管理/docs/architecture/shared-components.md`）。它是「有 `.ans` 优先加载、
@@ -49,6 +82,21 @@ import { buildEffectiveProjectConfig } from "./project.ts";
 // T22：`RuntimeKind` 的**单一来源**为 `src/common/shared/runtime-shared.ts`——此处删去本地副本、
 // 改从共享模块**只读导入**并**原样转出**（公开面 `RuntimeKind` 不变、行为逐字不变）。
 export type { RuntimeKind };
+
+/**
+ * 会话事件外推的**信封**（B-2，2026-10-12）：多会话并存后，事件必须携带**它属于哪个角色**
+ * （渲染侧按此分发到该角色的聊天流——不带标识会串消息）。`event` 的类型从编排只读导入、不复制。
+ */
+export interface SessionEventEnvelope {
+  roleId: string;
+  event: OrchestrationEvent;
+}
+
+/**
+ * 同时**保活**的会话数上限（B-2 路线 a 的 LRU 上限；设计建议 3）。超出即淘汰**最久未用**者
+ * （dispose；界面侧历史由渲染层自持——切回时恢复并明示「模型上下文已重启」）。
+ */
+export const MAX_LIVE_SESSIONS = 3;
 
 /** 点角色开聊天时的参数（无任何范围/授权字段——授权来自导入项目这个动作）。 */
 export interface SessionOpenRequest {
@@ -81,11 +129,30 @@ export interface OpenResult {
   note?: string;
   /** 本次会话生效的配置来源与接受状态（供界面如实呈现）。 */
   config?: EffectiveConfigInfo;
+  /**
+   * 是否**续接**了已保活的会话（B-2）：true = 句柄与模型上下文原样保留；false = 本次新建。
+   */
+  resumed?: boolean;
+  /**
+   * **会话上下文来源**（D-1 契约，pm 2026-10-12 钉死）——渲染侧文案分支的**事实输入**：
+   *  · "resumed"   —— 句柄仍在（同运行内续接）；
+   *  · "recovered" —— 本次新建、但**本地会话文件在**（适配器按「目录内有最近会话就恢复」一并恢复上下文——
+   *                   dispose 后、LRU 淘汰后、应用重启后皆如此）；
+   *  · "fresh"     —— 本地会话文件**不存在或损坏** ⇒ **真·新会话**（唯一「不会记得」的情形；
+   *                   损坏时 `contextWarning` 载如实说明）。
+   */
+  contextSource?: "resumed" | "recovered" | "fresh";
+  /** "fresh" 且文件损坏时的如实说明；其余情况缺省。 */
+  contextWarning?: string;
 }
 
 export interface SendResult {
   ok: boolean;
   error?: string;
+  /** L-1：本次消息**已入队**（角色忙）——按到达序在当前任务结束后执行；`position` 为排队位次（1 起）。 */
+  queued?: boolean;
+  /** 入队位次（`queued:true` 时给出）。 */
+  position?: number;
 }
 
 export interface StopResult {
@@ -93,47 +160,26 @@ export interface StopResult {
   note: string;
 }
 
-/**
- * **创世 finalize 能力**（T36 接线）：会话句柄上的 `finalize()` 只在创世 su 会话上存在；其返回形状
- * **从编排的公开句柄类型派生**（`RoleSessionHandle["finalize"]` 的返回）——**不导入编排私有
- * `src/common/编排/finalize.ts`**（工程法案 §6 禁跨角色导入他人私有 `common/`）。故形状由编排的**公开面**
- * 唯一决定，本层不自造第二份定义。
- */
-export type FinalizeResult = Awaited<ReturnType<NonNullable<RoleSessionHandle["finalize"]>>>;
-
-/**
- * 「完成 bootstrap」动作的可见性/就绪状态（供界面**如实呈现**该入口；界面只读此结构、不另作判定）。
- *  · `available` —— 当前会话是否**应**提供「完成 bootstrap」动作：**仅创世 su 会话**（未 bootstrap 项目上
- *    开启的内置治理角色会话，`genesisFinalize` 已开）**且尚未 finalize 过**时为真。**有角色的普通聊天
- *    恒为假**（那些会话的句柄根本没有 `finalize`）。
- *  · `settled` —— 会话是否已 settle **至少一轮**（su 是否说过话）：界面据它提示「该不该现在点」——
- *    未 settle 时点会被拒（无可 pin 之物）。
- *  · `finalized` —— 本会话是否**已成功** finalize 过（成功后界面应隐藏该动作）。
- */
-export interface BootstrapState {
-  available: boolean;
-  settled: boolean;
-  finalized: boolean;
-}
+// （A-5：finalize 面已删——提议/确认/手动收口不复存在；产物收尾由编排在 settle 后自动完成，见文件头。）
 
 export interface SessionManagerDeps {
-  /** 建会话（缺省为编排的 openRoleSession；注入以便单测）。`genesisFinalize` 为本层新接入的**可选**开关
-   *  （T36）——仅对创世 su 会话置真；编排的 `openRoleSession` 接受它并据此给句柄附带 `settled`/`finalize()`。 */
+  /** 建会话（缺省为编排的 openRoleSession；注入以便单测）。入参形状镜像编排当前的公开输入
+   *  （`customerInput`/`autoRepin`；`genesisFinalize`/`operatorChannel` 随 A-4 已删）。 */
   openRoleSession: (
     input: {
       roleId: string;
       project: ProjectConfig;
       taskId?: string;
       scope?: undefined;
-      /** **创世 finalize 开关**（可选，T36）：仅创世 su 会话置真（见 SessionManager.open）。 */
-      genesisFinalize?: boolean;
-      /**
-       * **客户确认通道**（可选，T38）：提议收口时经它挂起问客户（**复用 shell 闸 (a) 通道、不造第二套**）。
-       * 缺省/不可用/超时/拒绝 → **不完成**（fail-closed）。仅创世 finalize 会话消费。
-       */
-      operatorChannel?: OperatorChannelFn;
-      /** 客户确认硬超时（毫秒）；缺省 120000。**超时 = 不完成**。 */
-      confirmTimeoutMs?: number;
+      /** **客户确认制交互通道**（A-1/A-3）：仅内置治理角色（su）会话注入（见 SessionManager.open）。 */
+      customerInput?: CustomerInputFn;
+      /** **派发任务能力**（H-1）：仅内置治理角色（su）会话注入（见 SessionManager.open 与 routeDispatch）。 */
+      dispatchTask?: DispatchTaskFn;
+      /** **(a) 操作者确认通道（I-1 arm）**：仅**项目角色**会话注入（su 不注入——审读者不给自己开闸；
+       *  编排据此装配 (c)/(b)/(a) ShellGate 并注册 `run_shell`；装配落地前被静默忽略——登记）。 */
+      shellOperatorChannel?: OperatorChannelFn;
+      /** **(c) 规则集实件（I-1 补丁，2026-10-12）**：仅**项目角色**会话注入（与 (a) 同判据）。 */
+      shellArming?: DesktopShellArming;
     },
     deps: { createAdapter: (gate: WriteGate) => RuntimeAdapter },
   ) => Promise<RoleSessionHandle>;
@@ -157,71 +203,322 @@ export interface SessionManagerDeps {
    */
   loadEffectiveConfig?: (opts: LoadConfigOptions) => Promise<LoadedConfig>;
   /**
-   * 会话事件外推。**入参为编排导出的 `OrchestrationEvent`**（= 既有 `SessionEvent` + 编排在 `settled`
-   * 时追加的 `handback` 回交事件，设计 §10.8）——与 `RoleSessionHandle.events()` 同为编排的 `OrchestrationEvent`，
-   * 二者类型匹配；渲染侧据此呈现「回交 su」卡片。**类型从编排导入，不在此另立一份。**
+   * 会话事件外推（**带 roleId 信封**，B-2）：多会话并存时渲染侧按角色分发（不带标识会串消息）。
+   * `event` 为编排导出的 `OrchestrationEvent`（= 既有 `SessionEvent` + 编排在 `settled` 时追加的
+   * `handback` 回交事件，设计 §10.8）——**类型从编排导入，不在此另立一份**。
    */
-  emitEvent: (ev: OrchestrationEvent) => void;
+  emitEvent: (envelope: SessionEventEnvelope) => void;
   /**
-   * shell 命令级闸（设计 §7.2）——**arm 接缝**。
+   * **队列变化外推**（L-1 可见性）：某角色队列的**摘要快照**——主进程据此推渲染侧（该角色的队列行 +
+   * 左树「N 待办」徽标）。**只在变化时**发；空数组＝清空显示。缺省 ⇒ 界面无队列行（不影响入队本身）。
+   */
+  emitRoleState?: (info: {
+    roleId: string;
+    busy: boolean;
+    summaries: string[];
+    /** 结构化的排队条目（右栏「待办 / 队列」组用；来源/摘要/入队时间——**与 summaries 同源**，不另造数据源）。 */
+    queue: { kind: string; sourceRoleId: string; summary: string; at: string }[];
+    /** **正在跑的那条投递**（若该轮由队列投递开跑且未结束）；null = 无（直接 send 的一轮不属于队列条目）。 */
+    running: { kind: string; sourceRoleId: string; summary: string; at: string } | null;
+  }) => void;
+  /**
+   * shell 命令级闸（设计 §7.2）——**已装配 gate** 的注入接缝（历史形状，保留）。
    *
-   * **V1 桌面不 arm**（`DESKTOP_SHELL_GATE_ARMED === false`，见 `app/desktop/operator-channel.ts`）：
-   * 缺省（忽略此字段）⇒ 不传 ⇒ Pi 适配器**不注册 `run_shell`**（能力缺席 = 最强 fail-closed，§7.5.1）。
-   * 此字段只为「**可对接**」而存在——一旦客户拍板 arm、且**编排**（T8）用桌面操作者通道 (a)
-   * 装配好 (c)(b)(a) 的 `ShellGate`，把该 gate 从这里注入即可合闸；**当前无调用方提供它**，
-   * 故通道就绪但**未被消费**（如实标注，不假装在用）。
-   *
-   * 注：arm 只对 **pi 运行时**有效——demo 路径经 `createDemoAdapter`（无 shell 入口，只判不写）。
+   * I-1（2026-10-12，**客户已裁定 arm**）之后：桌面交给编排的是 **(a) 通道**（见下 `shellOperatorChannel`），
+   * 由编排装配 (c)(b)(a) 后**自己把 gate 交给 pi 适配器工厂**；本字段保留给「调用方直接持有一个已装配
+   * `ShellGate`」的场景（测试/将来装配形态）。**缺省 ⇒ 不传** ⇒ Pi 适配器不注册 `run_shell`（能力缺席 =
+   * 最强 fail-closed，§7.5.1）。注：arm 只对 **pi 运行时**有效——demo 路径无 shell 入口。
    */
   shellGate?: ShellGate;
   /**
-   * **客户确认通道（T38）**——finalize 收口时经它把「su 提议收口」摆给客户确认（**复用既有 (a)
-   * `OperatorChannelFn` 通道、不造第二套**）。缺省 ⇒ 不注入 ⇒ finalize 收口时「未接入客户确认通道」→
-   * **不完成**（fail-closed，§13.1）。仅**创世 finalize 会话**消费（普通聊天不使用）。
-   *
-   * 桌面由主进程用 `app/desktop/operator-channel.ts::createDesktopOperatorChannel`（presenter 把提议渲染为
-   * 聊天流里的一张确认卡）构造后注入。**通道本身不含任何判定**（它只呈现提议、取回客户选择）。
+   * **(a) 操作者确认通道**（I-1，2026-10-12；客户裁定「现在开放 shell…如果 su 觉得危险可以让客户决定」）——
+   * 桌面把既有「看命令原文 + 放行/拒绝」对话框（`createDesktopOperatorChannel`；拒绝为默认与取消项）作为
+   * (a) 层交给**编排**装配 (c)/(b)/(a) `ShellGate`（`buildShellGate` 的 `operatorChannel` 即本通道）。
+   * **只对项目角色注入**（su 自身不 arm——审读者不给自己开闸；判据 `role.builtIn`，见 `open()`）。
+   * ⚠ 依赖登记：`openRoleSession` 的入参字段名 `shellOperatorChannel` 以钉死/落定契约为准；编排侧装配接线
+   * 落地前，真实 `run-role` 会**静默忽略**本字段（我方透传就位）。
    */
-  operatorChannel?: OperatorChannelFn;
-  /** 客户确认硬超时（毫秒）；缺省 120000（`DEFAULT_CONFIRM_TIMEOUT_MS`）。**超时 = 不完成**。 */
-  confirmTimeoutMs?: number;
+  shellOperatorChannel?: OperatorChannelFn;
+  /**
+   * **(c) 规则集实件（I-1 补丁，2026-10-12 客户重发授权）**——与 `shellOperatorChannel` **同一接线面**
+   * 透传：编排 `openRoleSession({ shellArming })` 用它装配 (c) 层（`classifyShell` + `rules`；缺省 ⇒ 编排
+   * 对「规则集未注入」一律拒绝）。**只对项目角色**传（与 (a) 同判据：su 不 arm）。主进程用
+   * `operator-channel.ts::buildDesktopShellArming()` 构造，**两件同备才 arm**（加载失败 ⇒ 连 (a) 也不注入）。
+   */
+  shellArming?: DesktopShellArming;
+  /**
+   * **客户交互通道**（A-1/A-3/A-5）——`request_confirmation` / `request_choice` 的呈现与裁决回传。
+   * **缺省 ⇒ 不注入** ⇒ 编排侧该会话进入确认制所需的前提不存在（两工具不注册、gate 旧语义）——
+   * 且本层未接通道时**绝不悄悄放行**（通道缺席即 fail-closed）。**仅内置治理角色（su）会话注入**。
+   *
+   * 桌面由主进程用 `app/desktop/customer-input.ts::createCustomerInputChannel`（presenter 把请求推为
+   * 聊天流里的交互卡 + per-window pending Map 校验回包）构造后注入。**通道本身不含任何判定**
+   * （发行 writeSet 在编排 `confirmed-writes.ts`；写不写在 gate/工具）。
+   */
+  customerInput?: DesktopCustomerInputFn;
 }
 
-/** 会话管理器：持有枚举缓存与当前打开的会话句柄；点角色即开，多轮直发。 */
+/** 一个**保活**中的角色会话（B-2：每角色一个句柄 + LRU）。 */
+interface LiveSession {
+  readonly handle: RoleSessionHandle;
+  /** 建会话时的项目根——换项目重开同一角色前须先释放旧句柄（角色 id 可能跨项目同名）。 */
+  readonly projectRoot: string;
+  readonly config: EffectiveConfigInfo;
+  /** LRU 使用序号（越大越近；open/续接时刷新）。 */
+  lastUsed: number;
+  /** **是否有轮次在跑**（E-1/H-1 排队判据）：send 成功置真、收到该角色的 `settled` 事件置假。 */
+  busy: boolean;
+  /**
+   * **O-1（2026-10-12）：本会话持有的边界快照**——开会话时定格的参与文件（绝对路径）与各自**内容哈希**。
+   * 任一处变了 ⇒ 本会话的规则集已陈旧（真机：su 改好 boundary.yaml 后，活会话仍按开会话时解析的旧边界
+   * 拒写）——`boundaryDiff` 检出后**作废重建**。信号只来自读盘哈希（**不得**靠界面推测）。
+   */
+  boundaryPaths: string[];
+  boundaryPrints: Record<string, string>;
+}
+
+/** 一次**系统投递**（E-1 回交投 su / H-1 派发投目标角色 / L-1 客户消息）——投递机的队列条目（**一套机，多调用方**）。 */
+interface DeliveryItem {
+  kind: "handback" | "dispatch" | "message";
+  /** 目标角色 id（回交→su；派发/客户消息→被派角色）。 */
+  targetRoleId: string;
+  /** 发起者（回交=产出角色；派发=派发者 su；客户消息=本端的当前角色）。 */
+  sourceRoleId: string;
+  /** 投递输入正文（**入队时定格**；重试用同一份，不重渲染）。 */
+  text: string;
+  /** 队列行用的一句摘要（L-1 可见性；**绝不**当作已执行呈现）。 */
+  summary: string;
+  /** 去重键（回交=`handbackKey`；派发=内容键，见 `routeDispatch` 的写明；客户消息=每次一条，独立键）。 */
+  dedupKey: string;
+  /** 入队时间（ISO；入队即定格——右栏「待办 / 队列」组显示用；**绝不**当作执行时间）。 */
+  enqueuedAt: string;
+}
+
+/**
+ * H-1 派发输入文案的**临时**实现——**单一来源应为编排的 `renderDispatchPrompt`**（设计 H-1；
+ * 本层届时只读导入、删掉本函数）。编排尚未落地该导出（本次实现时点：`src/**` 无此符号），
+ * 先按设计 H-1 的模板逐字内置；**依赖已登记**（见 change 文档）——落地后必须切换，**不得两处并存**。
+ */
+function renderDispatchPromptLocal(fromRoleId: string, d: DispatchTaskPayload): string {
+  const reason = d.reason !== undefined && d.reason !== "" ? `（原因：${d.reason}）` : "";
+  return `[派发] 来自 ${fromRoleId} 的任务：${d.task}${reason}——完成后请交回报告`;
+}
+
+/** 队列摘要用的一句短句（L-1 可见性；仅呈现，不参与任何判定）。 */
+function shortenText(s: string, n: number): string {
+  const flat = String(s == null ? "" : s).replace(/\s+/g, " ").trim();
+  return flat.length > n ? `${flat.slice(0, n)}…` : flat;
+}
+
+/** O-1：单个文件的**内容指纹**（sha256）。
+ *  **Q-1（2026-10-12）**：热路径加 **mtime+size 缓存**——未变文件只 `stat`、不重读重哈希（防读盘风暴）；
+ *  文件变了（mtime/size 任一不同）才重读重哈希。不存在/读失败记 `<missing>`（清缓存——下次出现要拿到真值）。 */
+const filePrintCache = new Map<string, { mtimeMs: number; size: number; print: string }>();
+async function filePrint(absPath: string): Promise<string> {
+  try {
+    const st = await fs.promises.stat(absPath);
+    const hit = filePrintCache.get(absPath);
+    if (hit !== undefined && hit.mtimeMs === st.mtimeMs && hit.size === st.size) return hit.print;
+    const print = createHash("sha256").update(await fs.promises.readFile(absPath)).digest("hex");
+    filePrintCache.set(absPath, { mtimeMs: st.mtimeMs, size: st.size, print });
+    return print;
+  } catch {
+    filePrintCache.delete(absPath);
+    return "<missing>";
+  }
+}
+
+/**
+ * 会话管理器（B-2：**每角色一个保活句柄** + 上限 LRU）：点角色即开、多轮直发；
+ * **切走不 dispose、切回直接续**；超出 `MAX_LIVE_SESSIONS` 时淘汰最久未用者。
+ */
 export class SessionManager {
   private readonly deps: SessionManagerDeps;
   private readonly loadEffectiveConfig: (opts: LoadConfigOptions) => Promise<LoadedConfig>;
-  private handle: RoleSessionHandle | null = null;
-  private openRoleId: string | null = null;
-  /** 当前会话生效的配置来源（续接时随 OpenResult 一并如实带回）。 */
-  private openConfig: EffectiveConfigInfo | undefined;
-  /** 当前会话是否由「创世 su 会话」开启（句柄带 `finalize` 能力，T36）——决定「完成 bootstrap」入口是否可给。 */
-  private usesFinalize = false;
-  /** 当前会话是否已**成功** finalize 过（成功后界面隐藏该动作）。 */
-  private finalized = false;
+  /** 保活中的会话：roleId → 句柄（上限见 `MAX_LIVE_SESSIONS`）。 */
+  private readonly sessions = new Map<string, LiveSession>();
+  /** 客户消息计数（L-1：逐条独立入队键——客户消息**不去重**）。 */
+  private messageSeq = 0;
+  /** LRU 时钟（单调递增）。 */
+  private lruClock = 0;
+  /** 最近一次 open 的角色（`send` 的目标）。 */
+  private activeRoleId: string | null = null;
+  /** 最近一次 open 用的运行时（自动开启会话时沿用——渲染侧现实里恒为 "pi"）。 */
+  private lastRuntime: RuntimeKind = "pi";
+  // —— 投递机（E-1 回交投 su + H-1 派发投目标角色；**同一套**，不造第二套）——
+  /** 待投递队列：`${projectRoot}\0${targetRoleId}` → 条目（**按到达序**；目标忙时积压，其 settled 后按序放行）。 */
+  private readonly deliveryQueues = new Map<string, DeliveryItem[]>();
+  /**
+   * 投递机**串行链**（每项目一条，2026-10-12 L-1 修正）：多触发点（入队/开尾/settled/派发/回交）可能
+   * **并发**调 `drainQueue`——不串行则同一队列会被两个 drain 同时 shift/open（真机缺陷：su 被**重复开启**
+   * 两个会话、坏条目误报「形状不符」）。串行后每个 `drainQueueUnsafe` 都在前一个跑完后才开始（各自重读队列）。
+   */
+  private readonly drainChains = new Map<string, Promise<void>>();
+  /**
+   * **正在跑的那条投递**（`queueKey(projectRoot, roleId)` → 条目，2026-10-12 右栏「待办 / 队列」追加需求）：
+   * 投递成功（`handle.send` 已开跑）即登记、该角色 `settled` / 投递失败 / dispose 时清除——右栏据此把
+   * 该条如实标注「进行中」（**排队 ≠ 已执行**；直接 send 开跑的一轮不入本表——它不是队列条目）。
+   */
+  private readonly activeDeliveries = new Map<string, DeliveryItem>();
+  /** 回交去重键（`handbackKey` 单一来源；`projectRoot\0<key>`）——**一条回交只投递一次**（永不放行重投）。 */
+  private readonly enqueuedHandbackKeys = new Set<string>();
+  /**
+   * 派发去重键——**队列期窗口去重**（投递成功即释放，见 `drainQueue`；返工可再派发同文任务）。
+   * 契约的 `DispatchTaskPayload` 无 id/时间（钉死不扩），桌面无法区分「重试同一调用」与「新的一次相同文本
+   * 派发」；在途窗口去重防重投，送达后放行以保返工回路可用——语义在 change 文档写明。
+   */
+  private readonly activeDispatchKeys = new Set<string>();
+  /** 「队列受阻」（枚举不到目标）只如实提示**一次**（避免每次触发刷同一行）。 */
+  private readonly suDeliveryBlockedNoted = new Set<string>();
 
   constructor(deps: SessionManagerDeps) {
     this.deps = deps;
     this.loadEffectiveConfig = deps.loadEffectiveConfig ?? defaultLoadEffectiveConfig;
   }
 
+  /** 当前活动会话条目（无则 undefined）。 */
+  private activeEntry(): LiveSession | undefined {
+    return this.activeRoleId !== null ? this.sessions.get(this.activeRoleId) : undefined;
+  }
+
+  /** 释放一个保活会话；dispose 抛错如实返回原因（条目仍移出，不留半死项）。 */
+  private async disposeEntry(roleId: string, entry: LiveSession): Promise<string | null> {
+    this.sessions.delete(roleId);
+    if (this.activeRoleId === roleId) this.activeRoleId = null;
+    this.activeDeliveries.delete(this.queueKey(entry.projectRoot, roleId)); // 会话没了，「进行中」不再成立
+    // 状态准确性：dispose 即真实信号（会话已移出保活表，busy 判据随之恒 false）——外推快照，
+    // 徽标/队列行随之转「已停止」；**不删其投递队列**（未投的待办仍如实保留可见）。
+    this.notifyRoleState(entry.projectRoot, roleId);
+    try {
+      await entry.handle.dispose();
+      return null;
+    } catch (err) {
+      return err instanceof Error ? err.message : String(err);
+    }
+  }
+
+  /** LRU 淘汰：保活数超出 `MAX_LIVE_SESSIONS` 时，从**最久未用**者起 dispose（直到回到上限）。 */
+  private async evictBeyondLimit(): Promise<void> {
+    while (this.sessions.size > MAX_LIVE_SESSIONS) {
+      let oldestId: string | null = null;
+      let oldestUsed = Number.POSITIVE_INFINITY;
+      for (const [id, s] of this.sessions) {
+        if (s.lastUsed < oldestUsed) {
+          oldestUsed = s.lastUsed;
+          oldestId = id;
+        }
+      }
+      if (oldestId === null) return;
+      const entry = this.sessions.get(oldestId);
+      if (!entry) return;
+      await this.disposeEntry(oldestId, entry);
+    }
+  }
+
+  // —————— O-1（2026-10-12）：边界快照检查与作废重建 ——————
+  // 真机现象：su 按流程改好角色的 boundary.yaml（盘上已含目标路径、pin 一致），但该角色的**活会话**仍在用
+  // 开会话时解析的旧边界 ⇒ 写入被拒（「目标路径未匹配任何边界条目」）。信号只取**读盘内容哈希**
+  // （可信信号，不用界面推测）；检出陈旧 ⇒ **作废重建**（dispose → 立即按新边界重开）并如实记一行。
+
+  /** 该会话的边界快照**哪一处**变了（返回变化的相对路径；未变 ⇒ null）。 */
+  private async boundaryDiff(entry: LiveSession): Promise<string | null> {
+    for (const f of entry.boundaryPaths) {
+      const rel = path.relative(entry.projectRoot, f);
+      if (entry.boundaryPrints[rel] !== (await filePrint(f))) return rel;
+    }
+    return null;
+  }
+
+  /** 边界已变时的**如实一行**（按 D-1：会话文件在 ⇒ 说「恢复」；缺失/损坏 ⇒ 说「新建」——不套旧文案）。 */
+  private boundaryRebuiltLine(changedRel: string, probe: "ok" | "missing" | "corrupt"): string {
+    const head = `该角色边界已更新（${changedRel}）——旧会话已作废，按新边界重开。`;
+    return probe === "ok"
+      ? head + "历史已从本地会话文件恢复（模型上下文一并恢复）。"
+      : head + "本地无可用会话文件（新建会话）——模型不会记得以上历史，请重新说明需求。";
+  }
+
+  /** 陈旧 ⇒ 作废重建（dispose → 立即重开 + 如实记行）。返回 undefined = 未陈旧/在跑（不打断）；
+   *  否则返回 `{changed, reopened}`——调用方据此决定续发/续投，或按失败如实处理。 */
+  private async rebuildIfBoundaryStale(
+    roleId: string,
+    userInitiated: boolean,
+  ): Promise<{ changed: string; reopened: OpenResult } | undefined> {
+    const entry = this.sessions.get(roleId);
+    if (!entry) return undefined;
+    if (entry.busy) return undefined; // 在跑的轮次不打断（settle 后放行/下次发言/下次投递再查）
+    const changed = await this.boundaryDiff(entry);
+    if (changed === null) return undefined;
+    const projectRoot = entry.projectRoot;
+    // D-1：dispose **不擦除**会话文件——先探「在/不在/坏」，重开后会按它恢复（措辞据此如实）。
+    const probe = await probeSessionFile(projectRoot, roleId);
+    await this.disposeEntry(roleId, entry);
+    this.deps.emitEvent({ roleId, event: { kind: "message", summary: this.boundaryRebuiltLine(changed, probe) } });
+    const reopened = await this.openInternal({ projectRoot, roleId, runtime: this.lastRuntime }, userInitiated);
+    if (!reopened.ok) {
+      this.deps.emitEvent({
+        roleId,
+        event: { kind: "message", summary: `按新边界重开会话失败：${reopened.error ?? "未知原因"}（请重试或点击左侧角色）。` },
+      });
+    }
+    return { changed, reopened };
+  }
+
   /**
-   * 点角色 → 直接建立会话（无确认框）。
-   *  - 同一角色重复点击：续接当前会话（不重建，消息继续在此会话中发送）；
-   *  - 不同角色：先 dispose 当前会话，再开新会话（一个会话只服务一个角色）。
+   * O-1：对所有**活会话**扫一遍边界快照（su 一轮结束时由 Interface 触发——「边界可能刚被 su 改过」的
+   * 可信时机）。陈旧者作废重建（如实记行）；**在跑的轮次跳过**（下一时机再查）。逐会话 try/catch 隔离
+   * （一个失败不影响其它；不上抛——本方法经 `void` fire-and-forget 调用）。返回重建的角色 id。
+   */
+  async refreshStaleBoundaries(): Promise<string[]> {
+    const rebuiltIds: string[] = [];
+    for (const roleId of [...this.sessions.keys()]) {
+      try {
+        const rebuilt = await this.rebuildIfBoundaryStale(roleId, false);
+        if (rebuilt !== undefined) rebuiltIds.push(roleId);
+      } catch {
+        // 逐会话隔离（读盘异常等）：跳过该角色，不打断事件流；下次时机再查。
+      }
+    }
+    return rebuiltIds;
+  }
+
+  /**
+   * 点角色 → 直接建立/续接会话（无确认框）。见上方类内注释：O-1 起，续接/开启前先查**边界快照**。
    */
   async open(req: SessionOpenRequest): Promise<OpenResult> {
+    return this.openInternal(req, true);
+  }
+
+  /** `open` 的实现（`userInitiated=false` = 投递机后台自动开启：不抢活动角色，其余逐字同）。 */
+  private async openInternal(req: SessionOpenRequest, userInitiated: boolean): Promise<OpenResult> {
     if (!req.projectRoot || !req.roleId) {
       return { ok: false, error: "缺少项目根或角色 id。" };
     }
-    if (this.handle && this.openRoleId === req.roleId) {
-      return { ok: true, note: "已在该角色的会话中，续接当前会话。", config: this.openConfig };
-    }
-    if (this.handle) {
-      const stopped = await this.stop();
-      if (!stopped.ok) {
-        return { ok: false, error: `关闭上一个会话失败：${stopped.note}` };
+    this.lastRuntime = req.runtime; // E-1：自动开启 su 时沿用最近一次运行时
+    // B-2：该角色已有**同项目**的保活会话 → 续接（句柄与模型上下文原样保留）。
+    const existing = this.sessions.get(req.roleId);
+    if (existing && existing.projectRoot === req.projectRoot) {
+      // O-1（2026-10-12）：续接前先查**边界快照**——陈旧 ⇒ 作废并按下方**新建**路径重开（历史按 D-1 恢复）；
+      // 未陈旧 ⇒ 逐字续接（**绝不**误重开丢上下文）。在跑的轮次不打断（busy 时跳过，下一时机再查）。
+      const rebuilt = await this.rebuildIfBoundaryStale(req.roleId, userInitiated);
+      if (rebuilt === undefined) {
+        existing.lastUsed = ++this.lruClock;
+        if (userInitiated) this.activeRoleId = req.roleId;
+        return {
+          ok: true,
+          note: "已在该角色的会话中，续接当前会话。",
+          config: existing.config,
+          resumed: true,
+          contextSource: "resumed",
+        };
       }
+      if (!rebuilt.reopened.ok) {
+        return { ok: false, error: `该角色边界已更新，但按新边界重开会话失败：${rebuilt.reopened.error ?? "未知原因"}。请重试。` };
+      }
+      return rebuilt.reopened;
+    }
+    // 同角色但**换了项目**：先释放旧句柄（角色 id 跨项目可能同名，不能拿旧项目的句柄顶新项目）。
+    if (existing) {
+      await this.disposeEntry(req.roleId, existing);
     }
 
     const listing = this.deps.getListing(req.projectRoot);
@@ -264,14 +561,32 @@ export class SessionManager {
     };
     const boundary = role.boundary;
 
-    // ——— 创世 finalize 开关（T36）：**仅**未 bootstrap 项目上的**内置治理角色（su）**会话置真 ———
+    // ——— 客户确认制交互（A-1/A-3/A-5）：**仅内置治理角色（su）**的会话注入客户交互通道 ———
     //
-    // 判据 = 「项目未 bootstrap」（门禁引擎枚举给出的 `!hasRoles`）**且**「本角色是内置治理角色」
-    // （`role.builtIn`，数据驱动、**不硬编码 "su"**）。**有角色的普通聊天一律不置真**——普通角色（含回到
-    // 普通边界后的 su）的会话**不该**开 finalize：它们不是「创世建角色」的写入者，其句柄本就不带
-    // `finalize()`。置真后编排 `openRoleSession` 给句柄附带 `settled` + `finalize()`（与 su 同一授权边界，
-    // 写入同样经 `resolveWrite`；**不自动跑**，时机由界面显式触发）。
-    const genesisFinalize = listing.hasRoles === false && role.builtIn === true;
+    // 判据 = 「本角色是内置治理角色」（`role.builtIn`，数据驱动、**不硬编码 "su"**）。注入 ⇒ 编排把本会话
+    // 置为**确认制**（`request_confirmation`/`request_choice` 注册；gate 走「客户确认才发行 writeSet」）——
+    // 「客户确定了才加、才落盘」。**普通角色的会话一律不注入**（无客户通道：工具不注册、gate 旧语义逐字
+    // 不变）。通道未接（deps.customerInput 缺省）⇒ 不注入——**绝不**出现「没人问就放行」。
+    const customerInput = role.builtIn === true ? this.deps.customerInput : undefined;
+
+    // H-1：**仅内置治理角色（su）**会话注入**派发能力**（数据驱动；契约在 §4 冻结家 `provider/pi/session.ts`）。
+    // 路由复用 E-1 投递机（`routeDispatch`）；工具「未注入即不注册」——项目角色会话**不注入**（su 才有派发权）。
+    // ⚠ 依赖登记：`openRoleSession` 的入参字段名 `dispatchTask` 以钉死契约为准；编排侧接线落地前，
+    //   真实 run-role 会静默忽略本字段（我方透传就位，等待其承接——见 change 文档）。
+    const dispatchTask: DispatchTaskFn | undefined =
+      role.builtIn === true
+        ? (d: DispatchTaskPayload): DispatchReceipt => this.routeDispatch(req.projectRoot, req.roleId, d)
+        : undefined;
+
+    // I-1（2026-10-12，客户裁定 arm）：**只对项目角色**把 (a) 操作者确认通道交给编排装配 (c)/(b)/(a)
+    // `ShellGate`（su 自身**不 arm**——审读者不给自己开闸；判据 `role.builtIn`，数据驱动）。
+    // ⚠ 依赖登记：`shellOperatorChannel` 字段名以落定契约为准；编排装配接线落地前被静默忽略（我方就位）。
+    const shellOperatorChannel = role.builtIn === true ? undefined : this.deps.shellOperatorChannel;
+
+    // I-1 补丁（2026-10-12，客户重发授权）：**(c) 规则集实件**（`classifyShell` + `rules`）——与 (a) 通道
+    // **同判据**（只对项目角色；su 不 arm）。两件均由主进程构造（`buildDesktopShellArming`）；缺省 ⇒
+    // 编排对「规则集未注入」一律拒绝（fail-closed，绝不放宽）。
+    const shellArming = role.builtIn === true ? undefined : this.deps.shellArming;
 
     // pi 路径把 arm 接缝（shellGate，缺省 undefined = 不 arm）透传给编排的真实适配器工厂
     // （`createPiAdapterFactory(project, shellGate?)` 是编排已冻结的签名，此处不发明新形状）。
@@ -281,166 +596,523 @@ export class SessionManager {
         ? this.deps.createPiAdapterFactory(project, this.deps.shellGate)
         : (gate) => this.deps.createDemoAdapter({ gate, boundary });
 
+    // D-1 契约（pm 2026-10-12 钉死）：本次是**新建**——按「会话文件在/不在/坏」分类上下文来源：
+    //  · 文件在（header 合法）→ "recovered"：适配器按「目录内有最近会话就恢复」一并恢复上下文
+    //    （dispose / LRU 淘汰**不擦除**会话文件——重开即恢复；应用重启同理）；
+    //  · 缺失/损坏 → "fresh"：真·新会话（损坏时带如实说明）——**唯一**「模型不会记得」的情形；
+    //    B-2 时期那句一概而论的「模型上下文已重启」在 D-1 契约下已失真，已退役（文案映射在渲染侧纯函数）。
+    const probe = await probeSessionFile(req.projectRoot, req.roleId);
+    const contextSource: "recovered" | "fresh" = probe === "ok" ? "recovered" : "fresh";
+    const contextWarning = probe === "corrupt" ? "本地会话文件损坏（头不合法），未能恢复" : undefined;
+
+    let handle: RoleSessionHandle;
     try {
       // scope 传 undefined：聊天无预先任务，授权上界 = 角色边界本身（门禁引擎据此不做 F4 收窄）。
       //
       // **会话路径裁决（T30）：沿用 `openRoleSession` + `scope: undefined`，不改走 `openGovernanceSession`。**
       // 理由（§12.2）：创世的门口放在**边界选择层**（`genesisBootstrap`，由 `buildProjectConfig` 按
-      // `hasRoles` 设），`scope` 保持 `undefined`（普通聊天）。而 `openGovernanceSession` 现仍在**内部**
-      // 用 `buildGovernScope(boundary, roleIds)` 造 scope（且开会话前先经 `writeGovernanceSkeleton` 落骨架，
-      // 属 T32 待退役面）——对空项目它会产出 `writeSet: []`，F4 精确匹配下**拒一切写**，与 §12.2
-      // 「`scope: undefined`」相悖；要让它表达 `scope: undefined` 须改它本身，而它属**编排**边界
-      // （`src/pipeline/orchestration/`），非本角色可动。故：本层**沿用既有的 `openRoleSession`**——
-      // 它本就是 `openGovernanceSession` 内部**同样经其开启会话**的**同一底层会话入口**（govern-session.ts:121），
-      // **不是第二套会话机制**；此处只把「未 bootstrap」这一授权事实经 `genesisBootstrap` 交给门禁引擎。
-      this.handle = await this.deps.openRoleSession(
+      // `hasRoles` 设），`scope` 保持 `undefined`（普通聊天）——本层只把「未 bootstrap」这一授权事实经
+      // `genesisBootstrap` 交给门禁引擎。`openRoleSession` 本就是 `openGovernanceSession` 内部**同样经其
+      // 开启会话**的**同一底层会话入口**（`govern-session.ts:170`），**不是第二套会话机制**。
+      //
+      // 更正（2026-10-12）：原 T30 理由已过时——「对空项目产出 `writeSet: []`、F4 精确匹配拒一切写，
+      // 要让它表达 `scope: undefined` 须改它本身；且开会话前先经 `writeGovernanceSkeleton` 落骨架
+      // （属 T32 待退役面）」**已全部失效**：预建骨架随 T32 退役（模块 `src/common/编排/bootstrap.ts`
+      // 已删），引擎现于 `conditions`/`writeSet` 均空时把 scope 收窄为 `undefined`（权威表述见
+      // `src/pipeline/orchestration/govern-session.ts` 的 `effectiveScope` 处，本层不复制）。
+      // 桌面是否统一改走该入口：另行评估（更正记录见
+      // `角色卡/桌面应用/docs/change/2026-10-12_change_session-comment-refresh.md`）。
+      handle = await this.deps.openRoleSession(
         {
           roleId: req.roleId,
           project,
-          ...(genesisFinalize ? { genesisFinalize: true } : {}),
-          // 客户确认通道（T38）：**仅创世 finalize 会话**注入——finalize 收口时经它把「su 提议收口」摆给
-          // 客户确认（复用既有 (a) 通道、不造第二套）。有角色的普通聊天逐字不传（不消费该通道）。
-          ...(genesisFinalize && this.deps.operatorChannel
-            ? {
-                operatorChannel: this.deps.operatorChannel,
-                ...(this.deps.confirmTimeoutMs !== undefined ? { confirmTimeoutMs: this.deps.confirmTimeoutMs } : {}),
-              }
+          // 客户交互通道（A-5）：仅内置治理角色（su）会话注入；**每会话闭包绑定 roleId**（请求本体不带
+          // 角色标识——渲染侧据它把交互卡落到该角色的聊天流、点亮 B-3「等待你确认」）。普通角色逐字不传。
+          ...(customerInput
+            ? { customerInput: (r: CustomerInputRequest) => customerInput(r, { roleId: req.roleId }) }
             : {}),
+          // H-1：派发能力（仅 su 会话注入；契约字段名 `dispatchTask`——编排落地后由其转发给适配器）。
+          ...(dispatchTask ? { dispatchTask } : {}),
+          // I-1：(a) 操作者确认通道（仅项目角色；编排据它装配 (c)/(b)/(a) ShellGate 并注册 run_shell——
+          // 装配接线落地前本字段被静默忽略，登记在案）。
+          ...(shellOperatorChannel ? { shellOperatorChannel } : {}),
+          // I-1 补丁（2026-10-12，客户重发授权）：(c) 实件（classifyShell + defaultShellRules）——与 (a)
+          // 同处装配（缺它 ⇒ 编排对「规则集未注入」一律拒绝——真机曾据此如实报「环境无 shell」）。
+          ...(shellArming ? { shellArming } : {}),
         },
         { createAdapter },
       );
     } catch (err) {
-      this.handle = null;
-      this.openRoleId = null;
       return { ok: false, error: err instanceof Error ? err.message : String(err) };
     }
 
-    this.openRoleId = req.roleId;
-    this.openConfig = config;
-    // finalize 能力随新会话重置：句柄是否带 `finalize`（创世 su 会话才有），以及本会话是否已 finalize 过。
-    this.usesFinalize = typeof this.handle.finalize === "function";
-    this.finalized = false;
-    this.consume();
+    // O-1：**边界快照指纹**定格（角色边界文件 + 项目治理边界文件（若有）+ `.ans/project.json`）——
+    // 这些文件都参与**开会话时**的边界解析（`buildEffectiveProjectConfig` + 门禁 `resolveBoundarySection`）；
+    // 任一处内容哈希变化 ⇒ 本会话持有的规则集已陈旧（`boundaryDiff` 检出后作废重建，绝不让活会话用旧边界）。
+    const boundaryPaths: string[] = [];
+    if (typeof role.boundaryPath === "string" && role.boundaryPath !== "") {
+      boundaryPaths.push(path.resolve(req.projectRoot, role.boundaryPath));
+    }
+    const govRel =
+      project.governanceBoundary && typeof project.governanceBoundary.path === "string" ? project.governanceBoundary.path : "";
+    if (govRel !== "") boundaryPaths.push(path.isAbsolute(govRel) ? govRel : path.resolve(req.projectRoot, govRel));
+    boundaryPaths.push(path.resolve(req.projectRoot, ".ans", "project.json")); // 恒查（缺失记 `<missing>`——pin 刷新即变）
+    const boundaryPrints: Record<string, string> = {};
+    for (const f of boundaryPaths) boundaryPrints[path.relative(req.projectRoot, f)] = await filePrint(f);
+
+    const entry: LiveSession = {
+      handle,
+      projectRoot: req.projectRoot,
+      config,
+      lastUsed: ++this.lruClock,
+      busy: false,
+      boundaryPaths,
+      boundaryPrints,
+    };
+    this.sessions.set(req.roleId, entry);
+    if (userInitiated) this.activeRoleId = req.roleId; // 后台自动开启不抢活动角色（见 open 头注）
+    // 状态准确性 / L-1：开好即外推**真实状态快照**（busy=false + 该角色既有队列摘要）——徽标/队列行据此准确。
+    this.notifyRoleState(req.projectRoot, req.roleId);
+    this.consume(req.roleId, handle, req.projectRoot);
+    // LRU：超出上限先淘汰**最久未用**者（dispose；其界面历史由渲染层自持、切回时恢复并如实提示）。
+    await this.evictBeyondLimit();
     this.deps.emitEvent({
-      kind: "message",
-      summary: `已开启与角色 ${req.roleId} 的会话（运行时 ${req.runtime}）。直接发消息即可；写入由门禁在后台把关。`,
+      roleId: req.roleId,
+      event: {
+        kind: "message",
+        summary: `已开启与角色 ${req.roleId} 的会话（运行时 ${req.runtime}）。直接发消息即可；写入由门禁在后台把关。`,
+      },
     });
-    return { ok: true, config };
+    // 投递机（E-1/H-1）：本会话开好后，尝试放行积压的投递（目标=本角色的队列；为空则 no-op）。
+    void this.drainQueue(req.projectRoot, req.roleId);
+    return { ok: true, config, resumed: false, contextSource, ...(contextWarning ? { contextWarning } : {}) };
   }
 
-  /** 事件消费循环：把句柄的事件流持续外推到渲染侧，直到会话收口。 */
-  private consume(): void {
-    const handle = this.handle;
-    if (!handle) return;
+  /**
+   * 事件消费循环（**每会话一个，后台持续拉取**，B-2）：切走不停拉——重 pin/回交/适配器队列消费都依赖
+   * 拉取（事件流是拉驱动的）；事件带 `roleId` 信封外推，渲染侧按角色分发（多会话并存不会串消息）。
+   */
+  private consume(roleId: string, handle: RoleSessionHandle, projectRoot: string): void {
     void (async () => {
       try {
         for await (const ev of handle.events()) {
+          // E-1/H-1：settled ⇒ 该会话离开「忙」，并尝试按序放行**本项目各队列**的积压投递。
+          // 投递触发**不挑目标**（历史上单队列按项目存放时就是如此）：一轮结束=下一次放行时机（E-1 的
+          // 重试时机之一），各队列在 drainQueue 里各自检查「目标忙/未开」后再决定是否真投。
+          if (ev.kind === "settled") {
+            const en = this.sessions.get(roleId);
+            if (en) {
+              en.busy = false;
+              this.activeDeliveries.delete(this.queueKey(en.projectRoot, roleId)); // 「进行中」随本轮结束撤销
+              // 状态准确性：settled = 「本角色离开工作中」的**真实信号**（B-2 下切走的后台轮次结束也走这里）
+              // ——先外推再放行队列（放行时 busy 复位已可见）。
+              this.notifyRoleState(en.projectRoot, roleId);
+              void this.drainAllQueuesFor(en.projectRoot);
+            }
+          }
+          // E-1：回交到达 ⇒ 自动投递交 su 验收（去重 + 排队 + 失败如实/保留；见 handleHandback）。
+          if (ev.kind === "handback") {
+            void this.handleHandback(projectRoot, ev.handback);
+          }
           try {
-            this.deps.emitEvent(ev);
+            this.deps.emitEvent({ roleId, event: ev });
           } catch {
             // 外推失败（如窗口已关）不得影响会话本身。
           }
         }
       } catch (err) {
-        this.deps.emitEvent({ kind: "message", summary: `会话事件流异常：${err instanceof Error ? err.message : String(err)}` });
+        this.deps.emitEvent({
+          roleId,
+          event: { kind: "message", summary: `会话事件流异常：${err instanceof Error ? err.message : String(err)}` },
+        });
       }
     })();
   }
 
-  /** 发送一轮消息；可反复调用。 */
+  /** 发送一轮消息给**当前活动会话**（最近一次 open 的角色）；可反复调用。
+   *  **L-1（2026-10-12 客户裁定「每个角色…有个队列的概念」）**：角色**忙时不再直接失败**（旧行为＝直转 SDK、
+   *  被回 "already processing" 报错给客户）——客户消息作为**第三类**并入**同一条**投递队列（E-1/H-1 共用），
+   *  按到达序在当前任务结束后执行；空闲路径**逐字不变**。返回 `queued:true + position`（界面据此如实提示）。 */
   async send(text: string): Promise<SendResult> {
-    if (!this.handle) {
+    // O-1（2026-10-12）：发言前先查**边界快照**——陈旧 ⇒ 先作废重建（本条发言直接落到新边界会话上；
+    // 重建失败 ⇒ 如实回错、本条不发送）。在跑的轮次由 rebuild 内部跳过（不打断）。
+    const activeId = this.activeRoleId;
+    if (activeId !== null) {
+      const rebuilt = await this.rebuildIfBoundaryStale(activeId, true);
+      if (rebuilt !== undefined && !rebuilt.reopened.ok) {
+        return { ok: false, error: "该角色边界已更新，但按新边界重开会话失败——本条消息未发送，请重试。" };
+      }
+    }
+    const entry = this.activeEntry();
+    if (!entry) {
       return { ok: false, error: "会话尚未开启（点击左侧角色即可开启）。" };
     }
+    if (entry.busy) {
+      const roleId = this.activeRoleId as string;
+      this.enqueueDelivery(entry.projectRoot, roleId, {
+        kind: "message",
+        targetRoleId: roleId,
+        sourceRoleId: roleId,
+        text,
+        summary: `你：${shortenText(text, 40)}`,
+        // 客户消息逐条独立（**不去重**——同文重复发送是两个意图）：键含自增序号+时间。
+        dedupKey: `msg\u0000${++this.messageSeq}\u0000${Date.now()}`,
+      });
+      const q = this.deliveryQueues.get(this.queueKey(entry.projectRoot, roleId));
+      return { ok: true, queued: true, position: q ? q.length : 1 };
+    }
+    const roleId = this.activeRoleId as string;
+    // L-1 顺序修正（与投递机同款，防竞态）：**先置忙再 await**——快适配器（如演示 runtime）的事件
+    // （含 `settled`）可能在 `send` 返回前就被消费循环处理完；若此刻才置忙，settled 的复位会被反向覆盖，
+    // 忙态将**永不复位**（队列也永不放行）。失败 ⇒ 复位 + 外推（并没有在跑，如实）。
+    entry.busy = true;
     try {
-      await this.handle.send(text);
+      await entry.handle.send(text);
+      this.notifyRoleState(entry.projectRoot, roleId); // 状态准确性：真开跑即外推「工作中」（繁忙与否以会话条目为准）
       return { ok: true };
     } catch (err) {
+      entry.busy = false;
+      this.notifyRoleState(entry.projectRoot, roleId);
       return { ok: false, error: err instanceof Error ? err.message : String(err) };
     }
   }
 
-  /** 关闭会话（切换角色或关闭窗口时调用）。 */
-  async stop(): Promise<StopResult> {
-    if (!this.handle) {
+  /**
+   * 关闭会话（B-2：**定向**）。给定 `roleId` 只关该角色（历史留在界面上）；缺省/`null` 关**全部**
+   * （换项目/退出时用）。dispose 出错如实返回（不静默）。
+   */
+  async stop(roleId?: string | null): Promise<StopResult> {
+    if (typeof roleId === "string" && roleId !== "") {
+      const entry = this.sessions.get(roleId);
+      if (!entry) {
+        return { ok: false, note: `角色 ${roleId} 没有打开的会话。` };
+      }
+      const err = await this.disposeEntry(roleId, entry);
+      return err === null
+        ? { ok: true, note: `已关闭与角色 ${roleId} 的会话（历史记录保留在界面上）。` }
+        : { ok: false, note: `释放会话出错：${err}` };
+    }
+    if (this.sessions.size === 0) {
       return { ok: false, note: "当前没有打开的会话。" };
     }
-    const handle = this.handle;
-    this.handle = null;
-    this.openRoleId = null;
-    this.openConfig = undefined;
-    this.usesFinalize = false;
-    this.finalized = false;
-    try {
-      await handle.dispose();
-    } catch (err) {
-      return { ok: false, note: `释放会话出错：${err instanceof Error ? err.message : String(err)}` };
+    const n = this.sessions.size;
+    let firstError: string | null = null;
+    for (const id of [...this.sessions.keys()]) {
+      const entry = this.sessions.get(id);
+      if (!entry) continue;
+      const err = await this.disposeEntry(id, entry);
+      if (err !== null && firstError === null) firstError = err;
     }
-    return { ok: true, note: "会话已关闭。" };
+    if (firstError !== null) return { ok: false, note: `释放会话出错：${firstError}` };
+    return { ok: true, note: n === 1 ? "会话已关闭。" : `已关闭全部会话（${n} 个）。` };
   }
 
+  /** 是否还有**任何**保活会话（B-2：不再是「唯一句柄」语义）。 */
   isOpen(): boolean {
-    return this.handle !== null;
+    return this.sessions.size > 0;
   }
 
+  /** 当前**活动**（最近一次**用户发起**的 open）的角色 id；无则 null（后台自动开启不改变它）。 */
   openForRoleId(): string | null {
-    return this.openRoleId;
+    return this.activeRoleId;
   }
 
-  /**
-   * 「完成 bootstrap」动作的**当前状态**（T36；供界面如实呈现入口）。纯读、无副作用。
-   *  · 非创世 su 会话（普通聊天 / 未开会话）→ `available:false`（那些会话没有 finalize 能力）；
-   *  · 创世 su 会话且尚未 finalize 过 → `available:true`，`settled` 据句柄的活取值（su 是否说过话）。
-   */
-  bootstrapState(): BootstrapState {
-    const handle = this.handle;
-    if (!handle || !this.usesFinalize || typeof handle.finalize !== "function") {
-      return { available: false, settled: false, finalized: this.finalized };
-    }
-    return { available: !this.finalized, settled: handle.settled === true, finalized: this.finalized };
+  /** 保活中的角色 id 列表（B-3 状态徽标「空闲/已停止」派生据它 + 渲染侧的数据源）。 */
+  liveRoleIds(): string[] {
+    return [...this.sessions.keys()];
   }
 
-  /**
-   * **完成 bootstrap**（T36/T38）：把当前创世 su 会话的 `finalize()` 转调出去。**T37 语义**：`finalize()`
-   * **不再「调用即完成」**——它是「**su 提议收口 → 挂起等客户确认 → 确认通过才落盘**」（经注入的
-   * `operatorChannel`，复用 shell 闸 (a) 通道）：确认通过后由代码（非模型）算各边界文件的 SHA-256、
-   * 写 `.ans/project.json`（pin）+ `docs/bootstrap-manifest.md`（逐路径留痕）+ 项目治理边界文档。
-   * **fail-closed**：未接确认通道 / 客户拒绝 / 超时 / 通道不可用 → **不完成**（`ok:false`）。
-   *
-   * **显式触发**（不自动跑）。**失败路径如实转达**：被拒（未 settle / 无可 pin 之物 / 门禁拒绝 /
-   * 客户拒绝 / 超时）时返回 `ok:false` + `reason`，**不静默、不假装成功**。成功后记 `finalized`
-   * （界面据此把入口读作「项目已转正」——su 仍可继续加/改角色）。
-   *
-   * 仅创世 su 会话可达：其它会话的句柄没有 `finalize`，此时如实返回一个 `ok:false` 结果（不假装具备能力）。
-   */
-  async finalizeBootstrap(): Promise<FinalizeResult> {
-    const handle = this.handle;
-    if (!handle || typeof handle.finalize !== "function") {
-      return {
-        ok: false,
-        reason:
-          "当前会话不支持 finalize：仅「未 bootstrap 项目上开启的内置治理角色（su）会话」可完成 bootstrap。",
-        wrote: [],
-        pins: [],
-        roles: [],
-        projectJsonRel: "",
-        manifestRel: "",
-      };
-    }
+  // —————— 投递机（E-1 回交投 su + H-1 派发投目标角色；**同一套**，不造第二套） ——————
+
+  /** 主入口角色（su）id：**数据驱动**（门禁引擎枚举给的 `primaryRoleId`，不硬编码）；枚举不到 → null。 */
+  private suRoleIdOf(projectRoot: string): string | null {
+    const listing = this.deps.getListing(projectRoot);
+    const id = listing && typeof listing.primaryRoleId === "string" ? listing.primaryRoleId : "";
+    return id !== "" ? id : null;
+  }
+
+  /** 投递进展的**系统行**（首选进目标/请求者的 pane；首选未知时退回兜底角色）——如实、不静默。 */
+  private emitDeliveryNote(preferredRoleId: string | null, fallbackRoleId: string, summary: string): void {
+    const roleId = preferredRoleId !== null && preferredRoleId !== "" ? preferredRoleId : fallbackRoleId;
+    this.deps.emitEvent({ roleId, event: { kind: "tool_call", summary } });
+  }
+
+  /** 队列键：项目 × 目标角色（一套机对多个目标；空目标=主入口暂未枚举到——每次尝试时重解析）。 */
+  private queueKey(projectRoot: string, targetRoleId: string): string {
+    return `${projectRoot}\u0000${targetRoleId}`;
+  }
+
+  private enqueueDelivery(projectRoot: string, targetRoleId: string, item: Omit<DeliveryItem, "enqueuedAt">): void {
+    const key = this.queueKey(projectRoot, targetRoleId);
+    const q = this.deliveryQueues.get(key) ?? [];
+    q.push({ ...item, enqueuedAt: new Date().toISOString() }); // 入队时间**入队即定格**（显示用，非执行时间）
+    this.deliveryQueues.set(key, q);
+    this.notifyRoleState(projectRoot, targetRoleId); // L-1：入队即外推（队列行/徽标如实可见）
+  }
+
+  /** L-1/状态准确性 + 右栏「待办 / 队列」：**真实状态快照**外推（忙/闲 × 队列；变化时）——徽标/队列行/
+   *  右栏待办组**都只信它**（同一通道、**不造第二套数据源**）。含：结构化的排队条目（来源/摘要/入队时间）
+   *  与**正在跑的那条投递**（若有；标注「进行中」——排队 ≠ 已执行）。目标为空（主入口未枚举到）不外推。 */
+  private notifyRoleState(projectRoot: string, targetRoleId: string): void {
+    if (targetRoleId === "") return;
+    const q = this.deliveryQueues.get(this.queueKey(projectRoot, targetRoleId)) ?? [];
+    const busy = this.sessions.get(targetRoleId)?.busy === true;
+    const running = this.activeDeliveries.get(this.queueKey(projectRoot, targetRoleId));
+    const view = (i: DeliveryItem) => ({ kind: i.kind, sourceRoleId: i.sourceRoleId, summary: i.summary, at: i.enqueuedAt });
+    this.deps.emitRoleState?.({
+      roleId: targetRoleId,
+      busy,
+      summaries: q.map((i) => i.summary),
+      queue: q.map(view),
+      running: running !== undefined && busy ? view(running) : null,
+    });
+  }
+
+  /** 回交到达（E-1）：**去重登记**（`handbackKey` 单一来源——一条回交只投递一次）→ 入队 → 尝试投递。
+   *  **真机崩溃修复（2026-10-12）**：本函数经 `void` fire-and-forget 调用（consume 的事件循环），**任何上抛
+   *  都会变成未捕获拒绝**——故：(1) 形状防御（缺 `handback` 载荷 / 缺 `roleId`）先拦；(2) `renderHandbackPrompt`
+   *  渲染包 try/catch（坏形状绝不喂给它）；(3) 整体再包一层 catch——一切都落**如实系统行**，绝不上抛。 */
+  private async handleHandback(projectRoot: string, hb: TaskHandback): Promise<void> {
     try {
-      const result = await handle.finalize();
-      if (result.ok) this.finalized = true;
-      return result;
+      if (!hb || typeof hb !== "object" || typeof (hb as { roleId?: unknown }).roleId !== "string") {
+        this.emitDeliveryNote(
+          this.suRoleIdOf(projectRoot),
+          "(未知角色)",
+          "收到一条**形状不符**的回交事件（缺 handback 载荷 / 缺 roleId）——**未投递**（如实忽略；不崩、不静默）。"
+        );
+        return;
+      }
+      const suRoleId = this.suRoleIdOf(projectRoot);
+      if (suRoleId !== null && hb.roleId === suRoleId) return; // su 不自我回交（编排也不发；防御）
+      const key = `${projectRoot}\u0000${handbackKey(hb)}`;
+      if (this.enqueuedHandbackKeys.has(key)) return; // 去重：重放/重渲染不得重复投递
+      this.enqueuedHandbackKeys.add(key);
+      // 输入文案：编排的 `renderHandbackPrompt`（**单一来源**——两前端共用，本层不各写一份）；**入队即定格**。
+      // 渲染失败（载荷再坏一档）→ 如实系统行 + 不入队（**绝不**把 undefined 喂进渲染函数）。
+      let text: string;
+      try {
+        text = renderHandbackPrompt(hb);
+      } catch (err) {
+        this.emitDeliveryNote(
+          suRoleId,
+          hb.roleId,
+          `回交载荷无法渲染（${err instanceof Error ? err.message : String(err)}）——**未投递**（如实忽略；不崩）。`
+        );
+        return;
+      }
+      this.enqueueDelivery(projectRoot, suRoleId ?? "", {
+        kind: "handback",
+        targetRoleId: suRoleId ?? "",
+        sourceRoleId: hb.roleId,
+        text,
+        summary: `回交投递 · 来自 ${hb.roleId}`,
+        dedupKey: key,
+      });
+      await this.drainQueue(projectRoot, suRoleId);
     } catch (err) {
-      return {
-        ok: false,
-        reason: `finalize 异常：${err instanceof Error ? err.message : String(err)}`,
-        wrote: [],
-        pins: [],
-        roles: [],
-        projectJsonRel: "",
-        manifestRel: "",
-      };
+      // 兜底（belt & braces）：任何意外都如实拦截为系统行——**不产生未捕获拒绝**。
+      this.emitDeliveryNote(
+        this.suRoleIdOf(projectRoot),
+        "(未知角色)",
+        `回交处理异常已拦截（不产生未捕获拒绝）：${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }
+
+  /**
+   * H-1：su 派发任务的路由（注入 su 会话的 `dispatch_task` 能力；**复用 E-1 投递机**）。
+   * 校验（**如实回执**，绝不静默）：目标须是**本项目角色**且**不是内置治理角色**（含 su 自身）。
+   * 回执语义：**入队即回 `{ok:true,"已受理…"}`**（受理≠已完成——目标收到/失败会在两边聊天流如实显示）；
+   * 失败原因进回执（工具如实转达 su）并同步放系统行。去重：`roleId\0task\0reason`——**队列期**窗口去重
+   * （载荷无 id/时间，契约钉死不扩；投递成功即释放，**返工可再派发同文任务**）；一条派发**只在在途窗口**受限。
+   */
+  private routeDispatch(projectRoot: string, fromRoleId: string, d: DispatchTaskPayload): DispatchReceipt {
+    const targetRoleId = d && typeof d.roleId === "string" ? d.roleId.trim() : "";
+    const task = d && typeof d.task === "string" ? d.task : "";
+    const fail = (message: string, row: string): DispatchReceipt => {
+      this.emitDeliveryNote(fromRoleId, fromRoleId, row);
+      return { ok: false, message };
+    };
+    if (targetRoleId === "" || task.trim() === "") {
+      return fail("派发未受理：roleId 与 task 都必须非空。", "派发未受理：roleId 与 task 都必须非空。");
+    }
+    const listing = this.deps.getListing(projectRoot);
+    const target = listing ? listing.roles.find((r) => r.roleId === targetRoleId) : undefined;
+    if (!target) {
+      return fail(
+        `派发未受理：角色 ${targetRoleId} 不在本项目（未枚举到）。`,
+        `派发未受理：角色 ${targetRoleId} 不在本项目——**未投递**（不静默）。`
+      );
+    }
+    if (target.builtIn === true) {
+      return fail(
+        `派发未受理：${targetRoleId} 是内置治理角色（su 自身或同类）——派发对象应是项目角色。`,
+        `派发未受理：${targetRoleId} 是内置治理角色——**未投递**（不静默）。`
+      );
+    }
+    const reason = d && typeof d.reason === "string" ? d.reason : undefined;
+    const dedupKey = `${targetRoleId}\u0000${task}\u0000${reason ?? ""}`;
+    if (this.activeDispatchKeys.has(dedupKey)) {
+      return { ok: true, message: `该派发（目标 ${targetRoleId}，同任务文本）已在投递队列中——已去重，不重复投递。` };
+    }
+    this.activeDispatchKeys.add(dedupKey);
+    this.enqueueDelivery(projectRoot, targetRoleId, {
+      kind: "dispatch",
+      targetRoleId,
+      sourceRoleId: fromRoleId,
+      // 文案单一来源应为编排 `renderDispatchPrompt`（未落地，见 `renderDispatchPromptLocal` 的登记）。
+      text: renderDispatchPromptLocal(fromRoleId, { roleId: targetRoleId, task, reason }),
+      summary: `派发 · 来自 ${fromRoleId}：${shortenText(task, 40)}`,
+      dedupKey,
+    });
+    void this.drainQueue(projectRoot, targetRoleId);
+    return {
+      ok: true,
+      message:
+        `已受理：任务将投递给角色 ${targetRoleId} 的会话` +
+        (this.sessions.get(targetRoleId) ? "" : "（其会话未开——将自动开启）") +
+        `；投递结果/失败会在其聊天流与 su 的聊天流如实显示（受理≠已完成）。`,
+    };
+  }
+
+  /** 某项目**全部**队列的放行尝试（settled 触发的重试时机——投递触发不挑目标，各队列自判忙/开）。 */
+  private async drainAllQueuesFor(projectRoot: string): Promise<void> {
+    const prefix = `${projectRoot}\u0000`;
+    const targets: string[] = [];
+    for (const k of [...this.deliveryQueues.keys()]) {
+      if (k.startsWith(prefix)) targets.push(k.slice(prefix.length));
+    }
+    for (const t of targets) {
+      await this.drainQueue(projectRoot, t);
+    }
+  }
+
+  /**
+   * 投递机的**安全壳 + 串行门**（真机崩溃修复 + L-1 并发修正）：本方法经 `void` fire-and-forget 调用，
+   * **绝不允许上抛**（上抛＝未捕获拒绝）；且同项目的多次调用**串行**（见 `drainChains`）——真正的投递
+   * 逻辑在 `drainQueueUnsafe`（逐字保留，串行门保证其不会被并发重入）。
+   */
+  private async drainQueue(projectRoot: string, targetRoleId: string | null): Promise<void> {
+    const key = projectRoot;
+    const prev = this.drainChains.get(key) ?? Promise.resolve();
+    const next = prev
+      .then(() => this.drainQueueUnsafe(projectRoot, targetRoleId))
+      .catch((err) => {
+        this.emitDeliveryNote(
+          this.suRoleIdOf(projectRoot),
+          "(投递机)",
+          `投递机异常已拦截（不产生未捕获拒绝）：${err instanceof Error ? err.message : String(err)}`
+        );
+      });
+    this.drainChains.set(key, next);
+    try {
+      await next;
+    } finally {
+      // 链尾清理（若期间又有新链悬挂在更后面，让新链自己的 finally 收尾——防泄漏）。
+      if (this.drainChains.get(key) === next) this.drainChains.delete(key);
+    }
+  }
+
+  /**
+   * 尝试投递队首：目标 **忙** → 排队（settled 后按序放行，**绝不并发 send**）；目标 **未开** → **自动开启**再投；
+   * 开启/投递失败 → **如实系统行 + 放回队首保留待重试**（下次时机：目标打开 / 下一次入队 / 一轮结束）。
+   * 目标为空（回交入队时主入口暂未枚举到）→ 每次尝试重解析主入口；仍无 → 提示一次并保留。
+   */
+  private async drainQueueUnsafe(projectRoot: string, targetRoleId: string | null): Promise<void> {
+    const resolvedTarget =
+      targetRoleId !== null && targetRoleId !== "" ? targetRoleId : (this.suRoleIdOf(projectRoot) ?? "");
+    const key = this.queueKey(projectRoot, resolvedTarget);
+    const q = this.deliveryQueues.get(key);
+    if (!q || q.length === 0) return;
+    const item = q[0];
+
+    if (resolvedTarget === "") {
+      const noteKey = this.queueKey(projectRoot, "");
+      if (!this.suDeliveryBlockedNoted.has(noteKey)) {
+        this.suDeliveryBlockedNoted.add(noteKey);
+        this.emitDeliveryNote(
+          null,
+          item.sourceRoleId,
+          `有${item.kind === "handback" ? "回交" : "派发任务"}（来自 ${item.sourceRoleId}）待投递，但当前枚举不到目标（主入口角色）——**未投递**（已保留；下次时机自动重试）。`
+        );
+      }
+      return;
+    }
+
+    let entry = this.sessions.get(resolvedTarget);
+    if (!entry || entry.projectRoot !== projectRoot) {
+      // 目标会话**未开**（或属于别的项目）→ 自动开启再投（su=治理主入口；派发目标=被派角色）。
+      // 后台开启（`userInitiated=false`）：**不抢活动角色**——用户正在看的会话不因投递而易主。
+      const opened = await this.openInternal({ projectRoot, roleId: resolvedTarget, runtime: this.lastRuntime }, false);
+      if (!opened.ok) {
+        this.emitDeliveryNote(
+          item.kind === "handback" ? resolvedTarget : item.sourceRoleId,
+          item.sourceRoleId,
+          item.kind === "handback"
+            ? `有回交（来自 ${item.sourceRoleId}）待投递，但**开启 su 会话失败**：${opened.error ?? "未知原因"}——未投递（已保留；下次时机自动重试：你打开 su、或下一次回交/一轮结束）。`
+            : `有派发任务（来自 ${item.sourceRoleId}）待投递给角色 ${resolvedTarget}，但**开启其会话失败**：${opened.error ?? "未知原因"}——未投递（已保留；下次时机自动重试：你打开该角色、或下一次派发/一轮结束）。`
+        );
+        return;
+      }
+      entry = this.sessions.get(resolvedTarget);
+      this.suDeliveryBlockedNoted.delete(this.queueKey(projectRoot, ""));
+    }
+    if (!entry || entry.projectRoot !== projectRoot) return; // 防御：仍不可用则保持排队
+    if (entry.busy) return; // 目标忙（有轮次在跑）：排队等 settled（绝不并发 send）
+
+    // O-1：投递前查边界快照——陈旧 ⇒ 先作废重建（投递落到新边界会话上；失败则队列保留待重试）。
+    const rebuilt = await this.rebuildIfBoundaryStale(resolvedTarget, false);
+    if (rebuilt !== undefined) {
+      if (!rebuilt.reopened.ok) return; // 队列保留（下次时机自动重试；失败已有如实一行）
+      entry = this.sessions.get(resolvedTarget);
+      if (!entry || entry.projectRoot !== projectRoot) return; // 防御：重开后仍不可用
+    }
+
+    const sent = q.shift() as DeliveryItem;
+    if (q.length === 0) this.deliveryQueues.delete(key);
+    this.notifyRoleState(projectRoot, resolvedTarget); // L-1：出队即外推（队列行/徽标随之更新）
+    // 形状防御（真机崩溃修复的姊妹项）：条目坏了就**不投**——如实一行，绝不把 undefined 喂给 send。
+    if (!sent || typeof sent.text !== "string" || sent.text === "") {
+      this.emitDeliveryNote(
+        sent && typeof sent.sourceRoleId === "string" ? sent.sourceRoleId : null,
+        "(投递机)",
+        "投递条目形状不符（缺正文/来源）——已丢弃该条并如实记行（不崩）。"
+      );
+      return;
+    }
+    // 先置忙再 await（防「open 尾部放行」与本次调用竞态导致并发 send）；失败则复位。
+    entry.busy = true;
+    this.notifyRoleState(projectRoot, resolvedTarget); // 状态准确性：投递开跑即外推「工作中」（shift 时快照尚为闲）
+    try {
+      await entry.handle.send(sent.text);
+      this.activeDeliveries.set(key, sent); // 右栏「进行中」：投递已开跑（settled/失败/dispose 时清除）
+      this.notifyRoleState(projectRoot, resolvedTarget); // 立即外推（running 行即时可见）
+      if (sent.kind === "dispatch") this.activeDispatchKeys.delete(sent.dedupKey); // 送达即释放窗口去重（返工可再派）
+      if (sent.kind === "handback") {
+        this.emitDeliveryNote(resolvedTarget, sent.sourceRoleId, `已自动投递 ${sent.sourceRoleId} 的回交给 su（请其验收：确认通过 / 要求返工 / 上报客户）。`);
+      } else {
+        // 派发成功：目标 pane 看得见"任务到货"，su 的 pane 有一条受理回执行（受理≠已完成，如实）。
+        this.emitDeliveryNote(resolvedTarget, sent.sourceRoleId, `已接收来自 ${sent.sourceRoleId} 的派发任务——请按任务文本执行，完成后交回报告。`);
+        this.emitDeliveryNote(sent.sourceRoleId, sent.sourceRoleId, `已派发任务给 ${resolvedTarget}（已投递到其会话；其结果/回交会回到本会话）。`);
+      }
+    } catch (err) {
+      // 投递失败：**如实提示 + 放回队首**（保持顺序）待重试——绝不静默丢。
+      const en = this.sessions.get(resolvedTarget);
+      if (en) en.busy = false;
+      this.activeDeliveries.delete(key); // 「进行中」撤销（并没有在跑）
+      q.unshift(sent);
+      this.deliveryQueues.set(key, q);
+      this.notifyRoleState(projectRoot, resolvedTarget); // 放回队首：队列快照恢复（如实）
+      const base = err instanceof Error ? err.message : String(err);
+      this.emitDeliveryNote(
+        sent.kind === "handback" ? resolvedTarget : sent.sourceRoleId,
+        sent.sourceRoleId,
+        sent.kind === "handback"
+          ? `回交投递失败（来自 ${sent.sourceRoleId}）：${base}——**未丢弃**，已保留待重试（下次时机自动重试）。`
+          : sent.kind === "dispatch"
+            ? `派发投递失败（目标 ${resolvedTarget}）：${base}——**未丢弃**，已保留待重试（下次时机自动重试）。`
+            : `排队消息投递失败（角色 ${resolvedTarget}）：${base}——**未丢弃**，已保留待重试（下次时机自动重试）。`
+      );
     }
   }
 }

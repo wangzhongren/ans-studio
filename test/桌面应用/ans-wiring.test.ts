@@ -79,7 +79,7 @@ function makeManager(listing: ProjectListing, events: OrchestrationEvent[]): Ses
     createDemoAdapter: createChatDemoAdapter,
     buildProjectConfig,
     getListing: (root) => (root === listing.projectRoot ? listing : undefined),
-    emitEvent: (ev) => events.push(ev),
+    emitEvent: (env) => events.push(env.event),
   });
 }
 

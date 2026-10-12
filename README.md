@@ -3,7 +3,7 @@
 一个**基于 role-first（RFSG）结合 Pi agent** 的 **agent 系统**：
 **role-first（RFSG）管「谁负责、允许改什么」，Pi 管「执行」，两者结合 = 一个受治理的 agent 系统。**
 它把「角色 + 边界」变成一次可审计、fail-closed 的会话：写入**在发生之前**被拦截，
-边界（角色的 Section 1 写入白名单）是**唯一的写授权来源**。
+边界（角色的 Section 1 写入白名单）是**唯一的写授权来源**；治理会话的落盘以**客户确认为前提**（确认制）。
 
 ## ANS 是什么
 
@@ -23,6 +23,10 @@
 - **核心主张**：每个角色只能写它 Section 1（`角色卡/<角色>/boundary.yaml`）里列出的路径。
   完全越界的写、以及「边界内但不在本次任务 writeSet 内」的写，都在**写入之前被拒**，
   拒绝信息按根（`skill:` / `project:`）分组列出允许路径。凡不能确证的，一律 **fail-closed**：拒绝，而不是放行。
+- **客户确认制**：治理会话（su）**写盘前**必须先用 `request_confirmation` 把预览（含**将要写出的具体路径**）
+  摆给客户；客户确认后，编排把「预览里列出且校验在会话边界内」的路径**发行进本次会话的 writeSet**
+  （未确认路径被 F4 拒）。**客户确认不设超时**——等你作答；等待期间该轮的硬超时暂停，
+  不会把「等你点头」的轮次掐掉。拒绝 / 通道不可用 → **不写**（fail-closed）。
 - **分层**（相邻层单向调用）：
   **入口（装配）→ Interface → Pipeline → Service → Provider**；`Model` 为各层共享的冻结类型。
   入口只持有 Interface 层句柄（`runRoleCommand` / `governCommand`），不导入 Service/Provider 对象、
@@ -32,7 +36,7 @@
 
 ## 快速开始
 
-运行环境：**Node ≥ 23.6**（本机验证 **v24.11.1**）。CLI **免构建**——`bin/ans.js` 直接
+运行环境：**Node ≥ 23.6**（本机验证 **v24.14.0**）。CLI **免构建**——`bin/ans.js` 直接
 `import('../src/index.ts')`，由 Node 原生 TypeScript 类型擦除运行。**依赖仍需安装**：
 `npm install`（依赖 `yaml`、`@earendil-works/pi-coding-agent`；桌面另需 devDependency `electron`）。
 
@@ -43,36 +47,50 @@ npm install
 npm run app        # 等价于 electron app/main.ts
 ```
 
-桌面应用是一个**治理会话工作台**：
+桌面应用是一个**治理会话工作台**（默认跑真实 Pi，无 runtime 选择器）：
 
-1. **导入项目**（系统文件夹选择器）。导入即授权；对已有角色的项目，点左侧任意角色即开启会话（**无确认弹窗**），
+1. **导入项目**（系统文件夹选择器）。导入即授权；点左侧任意角色即开启会话（**无确认弹窗**），
    聊天多轮续接。写入由门禁引擎静默约束，**越界写入在聊天流里内联提示**（不弹窗）。
 2. **空文件夹 = 与 su 对话**：导入一个（尚无 `角色卡/` 的）空目录时，左树显示内置治理角色 **su**，
    并给出「项目尚未 bootstrap」提示。你与 su 对话，su 据对话**决定并建出角色**（有界创世，见「角色链」）；
    su 每轮结束，左树自动刷新、长出新建的角色。
-3. **su 提议收口 → 你确认 → 项目转正**：su 觉得差不多了会**主动提议收口**，界面把这件提议作为一张
-   **聊天流里的确认卡**摆给你（`[确认完成]` / `[暂不]`）。确认后写入 `.ans/project.json`（SHA-256 pin）
-   与项目治理边界文档，项目由「创世态」进入「正式态」。**fail-closed**：拒绝 / 超时 / 通道不可用 → **不完成**。
-4. **Pi 设置**：右上「Pi 设置」面板填 Pi 配置并**保存到 `.env`**（见「Pi 配置」）。
-5. 右侧栏展示当前角色的**角色卡 / 边界条目 / 变更记录 / 文档索引**；顶栏有 runtime 选择器（demo / pi）。
+3. **确认制交互**：su 写盘前把预览摆成**聊天流里的交互卡**（确认 / 单选 / 多选，可折叠预览）；
+   你**同意才落盘**——同意后编排把已预览且校验在边界内的路径发行进本次会话 writeSet。
+   **没有「收口」这一步**：写入完成、su 一轮结束（settle）时由代码**自动收尾**——写
+   `.ans/project.json`（SHA-256 pin）+ 项目治理边界文档 + `docs/bootstrap-manifest.md`，项目由「创世态」
+   进入「正式态」。拒绝 / 通道不可用 → 不写、不收尾（fail-closed）。
+4. **回交与派发都自动**：角色完成任务时经 `submit_report` 交回结构化报告（结论 / 摘要 / 证据），
+   **自动投递给 su 验收**（su 会话未开则自动开启；忙则排队；失败如实提示、保留待重试）。
+   su 可用 `dispatch_task` 把开发任务**派给某个角色**，**角色落盘后自动开工**；
+   **派发 ≠ 授权**（写权仍只来自目标角色自己的边界）。每个角色**一条任务队列**：忙时入队（按到达序），
+   **你手打的客户消息同样入队**（不再直接报错），右栏「待办 / 队列」与左树徽标（如「工作中 · 2 待办」）可见。
+5. **重启恢复**：会话持久化在 `<项目>/.ans/sessions/<角色>/`（Pi 会话 JSONL，含完整对话与工具调用；
+   已 `.gitignore`）。重开应用后恢复历史与模型上下文；应用关闭时**未决的确认请求会失效**
+   （不会留下半截的「已同意」，文案如实）。
+6. **Pi 设置**：右上「Pi 设置」面板填 Pi 配置并**保存到 `.env`**（见「Pi 配置」）。
+7. **界面**：输入框为**圆角胶囊**（发送键内嵌）；可选图（png/jpeg/webp/gif、≤5MB）随消息预览
+   （**「图片随消息送进模型」尚未接线**，见「已知范围外」）。助手消息、角色卡 / 变更记录 / 文档索引、
+   回交摘要均 **Markdown 渲染**（第三方库 markdown-it 单文件 vendored + sha256 pin，`html:false` 防 XSS）。
+   左树角色状态为**七态徽标**（未开启 / 空闲 / 工作中 / 等待你确认 / 已停止 / 错误 / 空闲(已恢复)）。
 
 ### CLI
 
 ```bash
 node bin/ans.js doctor                              # 装配自检（无需其余角色落盘）
 node bin/ans.js role run 编排 --task T-1            # 受治理角色会话（默认 demo 假 runtime）
-node bin/ans.js govern <空目录>                      # 真治理会话：对目标目录发起 bootstrap
+node bin/ans.js govern <空目录>                      # 真治理会话：对目标目录发起 bootstrap（确认走终端问答）
 node bin/ans.js --help
 ```
 
 ### 两道门（交付前必过）
 
 ```bash
-node --test "test/**/*.test.ts"   # 全量测试：677 用例、677 通过（引号必须带——走 Node 原生 glob，覆盖三层测试路径）
+node --test "test/**/*.test.ts"   # 全量测试：859 用例、856 通过、1 跳过（2 条失败为既有环境相关，非代码缺陷）
 npm run typecheck                 # tsc --noEmit，零类型错误
 ```
 
 > `test/*/*.test.ts` 这类**两层**写法会漏掉 `test/项目管理/shared/` 等**三层**路径，必须带引号走 Node glob。
+> 本机两条红：桌面面板键断言依赖仓库目录名、pm shared 的 macOS `/var` 符号链接——与代码缺陷无关，已在各自测试内定位。
 
 ## Pi 配置
 
@@ -108,29 +126,39 @@ node --env-file=.env bin/ans.js role run 编排 --task T-1 --runtime pi
 
 - **客户 ↔ su**：`su` 是内置治理角色（id 由门禁引擎枚举给出，**代码不硬编码**）。桌面里 su 是主入口
   （置顶、默认选中）；其他角色保留可聊，定位为次级（查看 / 调试）。
-- **su 主导的 bootstrap（有界创世）**：**导入空文件夹 → 与 su 对话 → su 建角色 → su 提议收口 →
-  客户确认 → 项目转正**。空项目上 su 的写权限来自「项目根治理种子边界」，**只**允许 `角色卡/`、`docs/`、`.ans/`——
+- **su 主导的 bootstrap（有界创世）**：**导入空文件夹 → 与 su 对话 → su 请你确认（交互卡）→ 同意落盘 →
+  自动收尾 → 项目转正**。空项目上 su 的写权限来自「项目根治理种子边界」，**只**允许 `角色卡/`、`docs/`、`.ans/`——
   写 `src/` 或项目根之外一律被拒。这是一次性、有界、条件化的创世授权，**不是** blanket；su 一旦写出项目
-  自己的治理边界文档并经确认，创世授权**结构性自终止**，此后 su 改由该文档治理。
-- **收口需客户确认**：su 主动提议「可以收口了」→ 界面摆给客户 → **客户确认才落盘**（写入照样先经门禁判定）。
-  确认不可用 / 超时 / 拒绝 → 不完成。收口**不影响 su 后续工作**——此后 su **仍可增删改**角色；
-  **每轮 su 会话结束（settle）后，pin 自动重算刷新**，所以「加一个角色」不会让 pin 过时。
-- **回交（handback）**：角色会话完成一个任务时产出结构化回交（`TaskHandback`：角色 / 任务 / 状态 / 摘要 / 证据），
-  交回 su 汇总。V1 只做**事件 + 界面呈现**；自动多角色派发-回收属二期。
+  自己的治理边界文档，创世授权**结构性自终止**，此后 su 改由该文档治理。
+- **确认制（写盘的前提）**：预览（含将写出的路径）→ 你确认（桌面交互卡 / CLI 终端问答，`1` = 单选、
+  `1,3` = 多选，空 = 拒）→ 编排把已预览且校验在边界内的路径发行进本次会话 writeSet → 写入照旧过门禁。
+  **不设超时**（一直等你）；通道不可用 / EOF / 拒绝 → 不写。**当前只给治理角色 su**（设计登记 O-A2：
+  其它角色要问客户时再开）；项目角色会话按自身 Section 1 + 任务 writeSet 受门禁约束。已知残留：
+  确认保证的是「**路径**已确认」，「预览内容 ≠ 写出内容」的内容漂移**关不住**（客户已裁定不采纳内容哈希比对）。
+- **自动收尾**：客户同意并写入后，su 一轮 settle 时由代码自动写 `.ans`(pin) + 治理边界文档 +
+  `docs/bootstrap-manifest.md`；此后**每轮 su settle 自动重算 pin**，所以「加一个角色」不会让 pin 过时。收尾
+  **不影响 su 后续工作**（仍可增删改角色）。
+- **回交报告**：项目角色用 `submit_report`（结论 / 摘要 / 证据）交回——**该报告即回交内容**；
+  桌面**自动投递给 su 验收**（去重、忙时排队、su 未开自动开、失败如实保留）。CLI 一次性前端暂无同等投递。
+- **su 派发任务**：`dispatch_task` 把任务送进目标角色会话（未开会话自动开、忙则排队、回执写明队列位次）；
+  **派发 ≠ 授权**——写权仍只来自目标角色自己的 Section 1。派发失败如实回报，不假设已开工。
+- **文档纪律**：建角色时**文档面随边界一并授予**（feature-map / memo / changelog / functional-description /
+  api-spec + docs 四目录 + 测试目录），且**代码与文档同批交回**；未通过 / 返工产物进 `temp/<角色>/`
+  暂存区（附 `REVIEW.md` 记「谁退的 / 为什么 / 要求什么」）；**被门禁拒的写入不入 temp**（拒绝 = 零副作用）。
 - **`ans init` 已废除**：建项目只保留 su 对话这一条路（CLI `ans govern` 与桌面 su 是**同一个治理会话引擎**的两个前端）。
 
 ## 命令表
 
 | 命令 | 说明 |
 | --- | --- |
-| `ans role run <角色> --task <任务> [--runtime demo\|pi]` | 运行一个受治理角色会话。默认 `demo`（装配自有的演示假 runtime，脚本化发起写入并经门禁判定）；`--runtime pi` 用真实 Pi 适配器（需 Pi 凭据，缺凭据时非 0 退出、**不静默降级**）。 |
-| `ans govern [<目录>] [--task <任务>] [--role <角色id>]…` | **真治理会话**（CLI 前端，与桌面 su 同一引擎）。**接受目标目录**——对 `<目录>` 发起 bootstrap，缺省 = ans-cli 自身；目标目录不存在 / 非目录 → 码 2、明确报错（**不新建、不回退** ans-cli）。 |
+| `ans role run <角色> --task <任务> [--runtime demo\|pi]` | 运行一个受治理角色会话（roleId 严格校验：未登记角色报「未知角色」并以 2 结束）。默认 `demo`（装配自有的演示假 runtime）；`--runtime pi` 用真实 Pi 适配器（缺凭据时非 0 退出、**不静默降级**）。 |
+| `ans govern [<目录>] [--task <任务>] [--role <角色id>]…` | **真治理会话**（CLI 前端，与桌面 su 同一引擎）。**接受目标目录**：对无 `.ans` 的 `<目录>` 发起 bootstrap（有界创世授权 + 确认制：终端问答 `y/放行` / 其它 = 拒）；同意并写入后**自动收尾**写 `.ans`(pin) + 治理边界文档 + manifest。缺省 = ans-cli 自身；目标目录不存在 / 非目录 → 码 2、明确报错（**不新建、不回退** ans-cli）。 |
 | `ans doctor` | 装配自检：打印运行时及其来源、`projectRoot` / `skillRoot`、配置来源（`.ans` 或内置回退）、pin 来源、内嵌演示角色表。 |
 | `ans help` | 用法（含当前运行时）。 |
 
 `ans init` **不存在**（客户决定废除；现落到「未知命令」分支，退出码 2）。
 
-运行时选择优先级：命令行 `--runtime` > 环境变量 `ANS_RUNTIME` > 默认 `demo`。
+运行时选择优先级：命令行 `--runtime` > 环境变量 `ANS_RUNTIME` > 默认 `demo`（桌面默认 pi）。
 
 ## 目录与职责
 
@@ -139,17 +167,17 @@ node --env-file=.env bin/ans.js role run 编排 --task T-1 --runtime pi
 | 角色 | 主要路径 |
 | --- | --- |
 | **项目管理（pm）** | `src/common/shared/`（**跨角色共享组件，唯一属主**）、`test/项目管理/shared/`、`docs/scheduling/`、`docs/audit/`（条件 `shell-gate`）、`角色卡/项目管理/docs/**`（整体架构、全项目工程法案、设计 / 变更 / 修复记录） |
-| **编排** | `src/interface/cli/run.ts`、`src/interface/cli/govern.ts`、`src/pipeline/orchestration/**`（含 `govern-session.ts` 唯一治理会话引擎、`pm-reviewer.ts`）、`src/common/编排/**`、`test/编排/**` |
-| **门禁引擎** | `src/model/**`（跨层共享类型）、`src/service/**`（`resolve-role` / `resolve-boundary` / `resolve-write`）、`src/common/门禁引擎/**`、`test/门禁引擎/**` |
+| **编排** | `src/interface/cli/run.ts`、`src/interface/cli/govern.ts`、`src/pipeline/orchestration/**`（含 `govern-session.ts` 唯一治理会话引擎、`pm-reviewer.ts`、`shell-arming.ts`）、`src/common/编排/**`、`test/编排/**` |
+| **门禁引擎** | `src/model/**`（跨层共享类型）、`src/service/**`（`resolve-role` / `resolve-boundary` / `resolve-write` / `shell-rules`）、`src/common/门禁引擎/**`、`test/门禁引擎/**` |
 | **Pi适配器** | `src/provider/pi/session.ts`、`src/provider/pi/tools.ts`、`src/common/pi-adapter/**`、`test/pi-adapter/**` |
-| **桌面应用** | `app/**`（Electron 主进程、preload 桥、渲染进程）、`test/桌面应用/**` |
+| **桌面应用** | `app/**`（Electron 主进程、preload 桥、渲染进程与 vendored 前端库）、`test/桌面应用/**` |
 | **测试** | `test/测试/**`（跨角色联调、完整流程与回归用例） |
 | **装配** | `src/index.ts`、`bin/ans.js`、`package.json`、`tsconfig.json`、`README.md`、`.env` / `.env.example` / `.gitignore`、`src/common/装配/**`、`test/装配/**`、`.ans/`（条件 `project-init`） |
 
 - **共享组件 `src/common/shared/`**：跨角色共享的**单一来源**——`.ans` 载入器（`config-loader.ts`）、
-  `.env` 读写（`env-file.ts`）、以及路径 / argv / runtime 原语（`path-primitives.ts`、`argv-primitives.ts`、
-  `runtime-shared.ts`）。**属主 pm**；消费方（**装配、桌面应用**）**只读导入、不得留第二份实现**，
-  登记在 `角色卡/项目管理/docs/architecture/shared-components.md`。
+  `.env` 读写（`env-file.ts`）、原子写（`atomic-write.ts`）、以及路径 / argv / runtime 原语
+  （`path-primitives.ts`、`argv-primitives.ts`、`runtime-shared.ts`）。**属主 pm**；消费方（**装配、桌面应用**）
+  **只读导入、不得留第二份实现**，登记在 `角色卡/项目管理/docs/architecture/shared-components.md`。
 - 层间调用方向：**入口（装配）→ Interface → Pipeline → Service → Provider**（`Model` 各层共享）；**仅相邻层可调用**。
 
 ## 安全与凭据
@@ -158,23 +186,32 @@ node --env-file=.env bin/ans.js role run 编排 --task T-1 --runtime pi
 - 凭据**绝不回显**：桌面 Pi 面板对机密键恒返回空串，只给「已设置 / 未设置」；保存回报只含**键名**；
   日志 / 错误信息只记键名、不记值。
 - `.env` 读写的**唯一实现**在共享模块：逐行解析、只替换命中键、保留注释与未知键、原子写（同目录临时文件 + rename）、失败显式报错。
+- **会话数据不出仓**：会话 JSONL（含完整对话与工具调用）落在 `<项目>/.ans/sessions/<角色>/`，
+  该目录已 `.gitignore` 忽略，不会随 `git add .` 入库。
 - 写入落盘在门禁之上还有一道 `writeRoot = projectRoot` 的硬收窄：门禁即便放行某条 **skill 根**的写，写层仍会拒绝
   （只可能更严，不会让边界之外的写通过——有意的纵深防御）。
+- **边界文件格式**：只认 YAML（`role:` + `entries:`）。文件存在但 Section 1 解析为 0 条 → **响亮报错**
+  （记为解析失败、拒一切写），不再静默成空集；给被拒写入的提示会带「本会话可能持有旧边界快照，请重开会话」
+  线索——**边界修订需重开会话才生效**。
 
 ## 已知范围外 / 未验证
 
-- **多任务派发引擎**（pm 产出派发计划 → 编排按拓扑序逐条开会话）：**二期，不在 V1**。
-  V1 只到「单角色受治理会话真落盘 + bootstrap / 创建权 + `.ans` pin + shell 闸（三层链已实现，但 V1 两个入口均未接线，见下）」；「调度权归 pm」
-  在 V1 只落到**纸面归属 + 使用约定**，不实现、不演示多任务派发。
-- **shell 闸三层链已实现并测试，但 V1 两个入口均未接线**：`run_shell` **仅在会话构造路径注入 `ShellGate`
-  时才注册**（能力缺席 = 最强的 fail-closed）。三层链——**(c) 确定性硬地板 → (b) pm 模型审读 → (a) 操作者确认**
-  ——**已实现并经测试**，但 V1 **两个入口都不注入** `ShellGate`：**桌面刻意不 arm**
-  （`DESKTOP_SHELL_GATE_ARMED === false`，理由见 `app/desktop/operator-channel.ts`），**CLI 入口从未注入**
-  （`src/index.ts` 的 `buildRoleRunDeps` 对任一 runtime 都不注入）。因此**模型在任何入口都没有 shell 能力**，
-  这条链**当前不影响任何运行时行为**。这是**客户确认的 V1 范围**（V1 无 OS 沙箱，`run_shell` 起的子进程写入
-  **不受 `resolveWrite` 约束**，arm 风险大）——不是缺陷、不是欠账；将来启用需**新的裁定**，**不会自行生效**。
-- **真实模型轮次本机不可自动验收**：su「据对话决定并建出角色」、su 是否 / 如何提议收口等
-  **模型行为**，须**客户本人**用真实凭据 + 已配 provider 运行；自动化测试覆盖的是**确定性部分**
-  （门禁判定、fail-closed 各退路、pin 刷新等）。
-- **真实 Pi 适配器路径**：已落地。据项目记录，**真实 Pi 会话此前已跑通一次**，但此后改动很多、
+- **shell 闸（`run_shell`）**：**桌面已 arm**——`run_shell` → **(c) 确定性硬地板**（明显危险 / 写类直接拒）
+  → **(b) su 模型审读**（判「危险」或拿不准 → 升级；命令不可解析 ⇒ **直接拒绝、不打扰客户**）→
+  **(a) 客户确认**（看命令原文放行 / 拒绝；关窗 / 不答 / 超时 = **不放行**，fail-closed）→ 执行
+  （cwd 钉项目根、spawn 时剥离凭据环境变量、逐条审计留痕）。**只对项目角色 arm**（su 自身不 arm）。
+  **已知风险（如实登记）：无 OS 沙箱**——被放行的命令，其文件写入**不受写门禁约束**（靠 (c) 硬地板 + su 审读守卫）。
+  **CLI 入口仍未 arm**（`src/index.ts` 不注入 `ShellGate` ⇒ `run_shell` 不注册、模型无 shell 能力）——
+  启用须新的裁定，**不会自行生效**。
+- **图片发送未接通**：桌面可选图（≤5MB、png/jpeg/webp/gif）并预览，但**「图片随消息送进模型」这一段未接**
+  （Pi 适配器正在核实 SDK 的图片内容块支持）——发送时**如实提示未发送**，绝不假装已读图。
+- **CLI 与桌面的差异**：CLI 无图形交互卡（确认走终端问答）、无回交/派发投递机（一次性会话，登记待议）、
+  无任务队列显示；`ans govern` 的确认通道在无人值守（EOF）时 → 不完成、零副作用。
+- **多任务派发引擎仍是二期**：su 可 `dispatch_task` **逐条**把任务送进角色队列，但
+  「pm 产出派发计划 → 编排按拓扑序自动执行」的**多任务派发引擎未实现**。
+- **真实模型轮次本机不可自动验收**：su「据对话决定并建出角色」、交互卡是否 / 如何被调用、确认制收窄下的
+  实际写盘节奏等**模型行为**，须**客户本人**用真实凭据 + 已配 provider 运行；自动化测试覆盖的是**确定性部分**
+  （门禁判定、确认→发行→F4、把关闭环、重启恢复、fail-closed 各退路、pin 刷新等）。
+- **真实 Pi 适配器路径**：据项目记录，**真实 Pi 会话此前已跑通一次**，但此后改动很多、
   **未再复验**——当前端到端状态**未验证**，不夸大也不沿用旧的「尚未跑通」说法。
+  **真机 shell 语义验证**（真实命令的放行 / 拒绝、审计留痕）同样**未做**。

@@ -75,6 +75,10 @@ export function createChatDemoAdapter(opts: { gate: WriteGate; boundary: Boundar
           if (inBound) await attempt(inBound, "角色边界内的写入尝试");
           await attempt(OUT_OF_BOUNDS_PATH, "越界写入尝试");
           push({ kind: "message", summary: `第 ${turn} 轮结束（原型阶段未真正落盘）。` });
+          // L-1（2026-10-12）：轮次**终止信号**与真实适配器对齐（真实 pi 适配器在 `agent_settled` 时发此）——
+          // 会话管理器据此把该角色置回「空闲」并放行其队列。demo 端此前不发（无此语义）；L-1 起忙态判据
+          // 依赖它：不发则一轮跑完忙态永不复位（后续消息只能入队、永不投递）——绝不可删。
+          push({ kind: "settled", summary: `第 ${turn} 轮结束（演示运行时）。` });
         },
 
         events(): AsyncIterable<SessionEvent> {

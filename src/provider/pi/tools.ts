@@ -46,25 +46,71 @@
 // - **执行环境收窄（§7.9）**：spawn 时构造**过滤后的 env**（剥离凭据变量 PI_CREDENTIAL_ENV_VARS），绝不继承
 //   含凭据的 process.env。此项归「执行环境收窄」，与决定「是否允许执行」的审核层**正交**。
 //
-// finalize_bootstrap（设计 §13.1 / T36）：
-// - su 的「主动」＝一个**受治理工具** `finalize_bootstrap`，语义是「**提议收口、挂起等客户确认**」——**不是**
-//   「立即完成」（与 shell 闸 (a) 操作者确认同构：没有确认就不执行）。
-// - 注册条件**照 run_shell 先例**：**未注入能力即不注册**（「是否创世态」由调用方以**是否注入**表达——
-//   编排只在创世态注入）。**不是一直注册着。**
-// - **本层不写盘**：真正的写（`.ans`/治理边界文档/manifest）全在**编排的 finalize** 侧、每笔先经 `resolveWrite`；
-//   本层只 `await 注入的 fn()` 并把 `{ok, message}` **如实**转达模型（措辞须让模型理解「提案+等待确认」，
-//   绝不把「未完成」说成「已完成」）。
-// - **绝不加入 `GOVERNED_WRITE_TOOLS` 之类写类集合**：它本身不改文件，加进去等于没加（同 run_shell §7.7 的理由）。
+// 交互工具族 request_confirmation / request_choice（设计 A-1 / A-2 / A-6；G-1 更新等待语义）：
+// - su 的「问客户」＝**一族两工具**：请求确认（可带 preview——如角色卡 + 边界摘要全文）、请求选择
+//   （单选/多选，options 勾选）。前端把请求渲染成聊天流里的交互卡；本层**只**调用注入的 `CustomerInputFn`
+//   并如实转达，**不写盘、不做治理判定**。
+// - 注册条件**照 run_shell 先例**：**未注入 `customerInput` 即不注册**——
+//   「有无客户通道」由调用方以**是否注入**表达。**不是一直注册着。**
+// - **挂起与等待（G-1，客户裁定「没必要超时，就卡在这等客户同意」）**：等待**缺省不设限**——一直等客户
+//   作答；仅当**显式配置**（`opts.customerInputTimeoutMs` / `ANS_PI_CUSTOMER_INPUT_TIMEOUT_MS`）才计时，
+//   超时 = 未获同意。等待期间经 `InteractionGate` 通知外部**暂停每轮硬超时**（否则 120s 的整轮时限会把
+//   「等你点头」的轮次杀掉）；另有 `raceAbort`（Pi execute 的 AbortSignal——会话中止即立即 fail-closed
+//   返回，防悬挂）。
+// - **诚实边界（G-1 必登记）**：未决请求**只在进程内存**（注入 fn 的挂起 promise + 前端卡的 pending 表）——
+//   **进程结束即失效**：此时既不会有「同意」也不会有「拒绝」送达；本层在收到中止 / 通道不可用时如实返回
+//   「未获客户同意（原因：…）」（等价三态的 unavailable），**绝不假装同意**。D-1 恢复的是会话**历史**，
+//   不是未决的工具调用。
+// - **失败语义**（A-1）：拒绝 / 超时 / 通道不可用 / 抛错 → `ok:false`，文案
+//   「未获客户同意（原因：…）→ 不要写盘；如实告知客户，不得假设同意」——**绝不说成已同意**
+//   （如实转达的措辞先例：`run_shell` 拒绝时的 `未执行：审核拒绝（…）`）。
+// - **绝不加入 `GOVERNED_WRITE_TOOLS`**（无 path、无写，加了等于没加——同 run_shell 的理由）；
+//   `shellKillSwitch` 只按名匹配 `run_shell`，与本族无关。
+//
+// 交报告工具 submit_report（设计 C-1）：
+// - 角色完成（或确认无法完成）本轮任务时，用**模型自己写的**报告回交 su 汇总：status + summary +
+//   evidence。注册条件**照 run_shell / customerInput 先例**：**未注入 `reportHandback` 即不注册**
+//   （只给项目角色——su 不注入即不注册）。前端把它渲染成回交卡。
+// - **本层不写盘、不做治理判定、不进 `GOVERNED_WRITE_TOOLS`**：handler 只把载荷交给注入的能力，并把
+//   回执**如实**转达（失败绝不说成「已交回」）。它**不改变任何写盘权限**。
+//
+// 派发任务工具 dispatch_task（设计 H-1）：
+// - **只给治理角色 su**（由编排以是否注入表达）：把「任务与上下文」派发给目标角色（经编排路由成目标
+//   会话的一条输入）。注册条件**照 run_shell / customerInput / reportHandback 先例**：**未注入
+//   `dispatchTask` 即不注册**。
+// - **语义硬约束（设计逐字）**：**派发 ≠ 授权**——目标角色的写权仍只来自它自己的 Section 1 与
+//   `request_confirmation` 的 `confirmed:true`；派发只是转移**任务与证据**，**不转移身份或写权**。
+// - **本层不写盘、不做治理判定、不进 `GOVERNED_WRITE_TOOLS`**：handler 只把载荷交给注入的能力并
+//   **如实**转达回执（失败绝不说成「已派发」）。
+//
+// （历史）finalize_bootstrap 收口提议工具（设计 §13.1 / T36）已于 2026-10-12（A-4 最后一步）**删除**：
+// 「同意才落盘」改由交互工具族 + 编排 writeSet/F4 承担；本层不再有收口工具与 `finalizeBootstrap` 注入槽。
 
 import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { isAbsolute, resolve } from "node:path";
-import type { WriteGate, ShellGate, ShellReviewResult, FinalizeBootstrapFn } from "./session.ts";
+import type {
+  WriteGate,
+  ShellGate,
+  ShellReviewResult,
+  CustomerInputFn,
+  CustomerInputRequest,
+  CustomerInputOutcome,
+  CustomerInputOption,
+  ReportHandbackFn,
+  ReportHandbackPayload,
+  DispatchTaskFn,
+  DispatchTaskPayload,
+} from "./session.ts";
 import type { WriteDecision } from "../../model/decision.ts";
 import { formatDenialMessage } from "../../common/pi-adapter/format-denial.ts";
 import {
+  CUSTOMER_INPUT_TIMEOUT_ENV,
   DEFAULT_SHELL_REVIEW_TIMEOUT_MS,
   SHELL_REVIEW_TIMEOUT_ENV,
+  type InteractionGate,
+  raceAbort,
+  readOptionalTimeoutMs,
   readTimeoutMs,
   withTimeout,
 } from "../../common/pi-adapter/timeout.ts";
@@ -86,15 +132,17 @@ export interface ToolResult {
 /** run_shell 工具名（唯一 shell 入口）。扩展层据此设能力级 kill-switch，工具集据此注册。 */
 export const SHELL_TOOL_NAME = "run_shell";
 
-/**
- * finalize_bootstrap 工具名（设计 §13.1 / T36；唯一收口提议入口）。
- *
- * **它不在任何写类集合里**（**绝不**加入 `GOVERNED_WRITE_TOOLS` 之类）：它**本身不改文件**——真正的写
- * （`.ans`、治理边界文档、manifest）全在**编排的 finalize** 侧、且**每一笔先经 `resolveWrite`**。本层只
- * **注册并调用**注入的能力，不碰文件系统。故扩展层 `tool_call` 钩子对它**放行**（既非 `run_shell`、又
- * 无 `path`，`shellKillSwitch` 与写类判据都不命中）。
- */
-export const FINALIZE_BOOTSTRAP_TOOL_NAME = "finalize_bootstrap";
+/** request_confirmation 工具名（设计 A-1；交互工具族之一：请求客户确认，可带预览）。 */
+export const REQUEST_CONFIRMATION_TOOL_NAME = "request_confirmation";
+
+/** request_choice 工具名（设计 A-1；交互工具族之一：请求客户勾选/单选，options）。 */
+export const REQUEST_CHOICE_TOOL_NAME = "request_choice";
+
+/** submit_report 工具名（设计 C-1；交报告——角色完成时回交 su 汇总）。 */
+export const SUBMIT_REPORT_TOOL_NAME = "submit_report";
+
+/** dispatch_task 工具名（设计 H-1；su 派发任务给项目角色——派发 ≠ 授权）。 */
+export const DISPATCH_TASK_TOOL_NAME = "dispatch_task";
 
 /** 扩展层对 run_shell 的能力级判定结果：非 undefined 即阻断（默认拒绝）。 */
 export interface ShellKillSwitchDecision {
@@ -129,6 +177,11 @@ export interface ToolDefinition {
     args: Record<string, unknown>;
     /** 本次调用的 id（Pi 在 tool_call 时生成）；run_shell 把它透传给 ShellGate 供留痕用。缺省时视为 ""。 */
     toolCallId?: string;
+    /**
+     * Pi `execute` 传入的**中止信号**（设计 A-6）。交互工具据此在会话中止/取消时**立即** fail-closed
+     * 返回（`raceAbort`），不再挂在等待上；其余工具不用它。
+     */
+    signal?: AbortSignal;
   }): Promise<ToolResult>;
 }
 
@@ -154,15 +207,36 @@ export interface GovernedToolsOptions {
   /** shell 审核硬超时（毫秒）；缺省读 ANS_PI_SHELL_REVIEW_TIMEOUT_MS，再缺省 120000。**超时 = 拒绝**。 */
   shellReviewTimeoutMs?: number;
   /**
-   * 创世收口能力（设计 §13.1 / T36）。**未注入时 `finalize_bootstrap` 根本不被注册**
-   * （**§7.5.1 同款能力缺席 = 最强 fail-closed**，与 `shellGate` 先例**逐字同构**）。
+   * 客户确认制交互能力（设计 A-1）。**未注入时 `request_confirmation` / `request_choice` 根本不注册**
+   * （**同 `shellGate` 的「未注入即不注册」先例**，逐字同构）。
    *
-   * **注册条件怎么表达「创世态」**：本层**同步**、不查文件系统，「是否创世态」由**调用方**判定——
-   * 调用方（编排/装配，持 `isGenesisState`）**只在创世态才注入**本能力；非创世态**不注入** ⇒ 工具不在集合里。
-   * 于是「非创世态 → 不存在」由「不注入」表达（与 `shellGate` 的 arm 判据同构）；**另有的显式守卫**
-   * （非创世态调用即拒）在注入的 finalize **本身**（编排 `createFinalizeProposer` 守卫 1，返回 `not-genesis`）。
+   * **注册条件怎么表达「有客户通道」**：由**调用方**判定并以**是否注入**表达——有客户可问的前端
+   * （CLI 终端 / 桌面交互卡）才注入；无人值守**不注入** ⇒ 工具不在集合里（模型无法请求确认，
+   * 也就无从「假设同意」）。判据是「**有无客户通道**」。
    */
-  finalizeBootstrap?: FinalizeBootstrapFn;
+  customerInput?: CustomerInputFn;
+  /**
+   * 交互等待硬超时（毫秒）。**缺省不设限**（G-1：卡在这等客户同意）——仅当**显式给出**本项或环境变量
+   * `ANS_PI_CUSTOMER_INPUT_TIMEOUT_MS` 才计时；**超时 = 未获同意**（fail-closed）。
+   */
+  customerInputTimeoutMs?: number;
+  /**
+   * 「交互挂起」活动闸（设计 G-1）：等待客户期间 `begin()/end()`，供外部（real-adapter 的**每轮硬超时**）
+   * 暂停/恢复计时——保证「等你点头」的轮次**不被整轮超时掐断**。缺省不联动（fake 适配器等不受影响）。
+   */
+  interactionGate?: InteractionGate;
+  /**
+   * 交报告能力（设计 C-1）。**未注入时 `submit_report` 根本不注册**
+   * （**同 `shellGate` / `customerInput` 的「未注入即不注册」先例**）。只给**项目角色**——
+   * 治理角色 su 不自我回交，编排对它**不注入** ⇒ 工具不存在。
+   */
+  reportHandback?: ReportHandbackFn;
+  /**
+   * 派发任务能力（设计 H-1）。**未注入时 `dispatch_task` 根本不注册**
+   * （**同 `shellGate` / `customerInput` / `reportHandback` 的「未注入即不注册」先例**）。
+   * **只给治理角色 su**——编排对项目角色不注入 ⇒ 工具不存在。
+   */
+  dispatchTask?: DispatchTaskFn;
 }
 
 /** 从工具参数里取出目标路径；容忍 path / file_path / filePath 三种命名。 */
@@ -528,50 +602,329 @@ function makeRunShellTool(shellGate: ShellGate, shellCwd: string, reviewTimeoutM
   };
 }
 
+// —————————————— 交互工具族（设计 A-1；请求确认 / 请求勾选） ——————————————
+
+/** 失败文案（设计 A-1 **逐字**规定；核心纪律：**绝不说成已同意**）。 */
+function notConsented(name: string, reason: string): ToolResult {
+  return { ok: false, message: `${name}：未获客户同意（原因：${reason}）→ 不要写盘；如实告知客户，不得假设同意。` };
+}
+
+/** 操作者标识（审计用；`operatorId` 形状取自 `OperatorOutcome` 先例）。 */
+function operatorTag(operatorId: string | undefined): string {
+  return operatorId !== undefined && operatorId !== "" ? `操作者：${operatorId}` : "操作者：未知";
+}
+
 /**
- * finalize_bootstrap：**收口提议**工具（设计 §13.1 / T36）。调用注入的能力即「**提议收口并挂起等客户确认**」
- * （**不是「立即完成」**）——该能力**内部**走门禁、经 `OperatorChannel` 等客户确认、确认通过才落盘；
- * **本层不碰文件系统**（不 mkdir、不 open、不 write），只把结果**如实**转达给模型。
- *
- * **为何是本层职责**：与 `run_shell` 同构——本层**只调用**注入的能力，**不含任何判定/写盘策略**；真正的写
- * 与门禁在编排的 finalize 侧（`src/common/编排/finalize.ts`，已证明过 `resolveWrite`）。
- *
- * **返回给模型的措辞**（关键，T36 要求）：必须让模型理解「**提案 + 等待确认**」，**绝不**把「未完成」说成
- * 「已完成」。故：
- *   · `ok:true`（`status==="completed"`）→ 明确「**收口完成（客户已确认）**」；
- *   · `ok:false` → 明确「**收口未完成**（项目仍处于创世态，边界尚未 pin）」，并附能力自身的 `message`
- *     作为原因（如「收口未获客户确认」「通道不可用/超时」「非创世态」…）。
+ * 交互工具族的公共等待路径（设计 A-6）：调注入的 `CustomerInputFn` → 套 `raceAbort`（**会话中止 =
+ * 立即 fail-closed 返回，防悬挂**）→ 外套 `withTimeout`（**超时 = 未获同意**）。
+ * 任何异常（含 fn 同步抛错）都**不抛给上层**，一律转成「未获同意」结果（fail-closed；同 run_shell 的
+ * 「审核抛错绝不 spawn」纪律）。
  */
-function makeFinalizeBootstrapTool(finalizeBootstrap: FinalizeBootstrapFn): ToolDefinition {
-  const name = FINALIZE_BOOTSTRAP_TOOL_NAME;
+async function askCustomer(
+  name: string,
+  req: CustomerInputRequest,
+  fn: CustomerInputFn,
+  timeoutMs: number | undefined,
+  signal: AbortSignal | undefined,
+  gate: InteractionGate | undefined,
+): Promise<CustomerInputOutcome | ToolResult> {
+  const label = `${name} 等待客户回应`;
+  // 挂起活动闸（G-1）：等待全程通知外部（每轮硬超时据此暂停计时）；引用计数，可重入。
+  gate?.begin();
+  try {
+    // 组合顺序：raceAbort **在内**（中止最先兑现）、时限 **在外**（若配置了时限，它是地板保证）。
+    // Promise.resolve().then(…) 归一「同步返回 / 同步抛错 / 异步返回」三种注入 fn 形态。
+    const work = raceAbort(Promise.resolve().then(() => fn(req)), signal, label);
+    // **缺省不设限（G-1）**：timeoutMs 未配置（undefined）→ 一直等客户作答。
+    const out = timeoutMs === undefined ? await work : await withTimeout(work, timeoutMs, label);
+    if (out === undefined || out === null) {
+      return notConsented(name, "客户通道不可用（未返回结果，无人值守？）");
+    }
+    return out;
+  } catch (err) {
+    return notConsented(name, reasonOf(err));
+  } finally {
+    gate?.end();
+  }
+}
+
+/**
+ * request_confirmation：**请求客户确认**（设计 A-1）。调用即向客户呈现 `title`（+可选 `preview`/`detail`）
+ * 并**挂起**等其裁决；本层不写盘、不做治理判定，只把裁决**如实**转达模型。
+ *
+ * 返回给模型的语义（关键，同 `run_shell` 如实转达审核结果的纪律——**绝不谎报**）：
+ * - `ok:true` 且措辞「客户已确认」＝**拿到明确同意**（`confirmed:true`）——模型此时才可据此继续（如落盘）；
+ * - `ok:false` 且措辞「未获客户同意」＝ 拒绝 / 明确选「否」/ 超时 / 通道不可用 / 出错——**不要写盘**。
+ */
+function makeRequestConfirmationTool(
+  fn: CustomerInputFn,
+  timeoutMs: number | undefined,
+  gate: InteractionGate | undefined,
+): ToolDefinition {
+  const name = REQUEST_CONFIRMATION_TOOL_NAME;
   return {
     name,
     async handler(call) {
-      void call; // finalize_bootstrap 无参数：acceptanceSource/now 由编排侧决定，模型不该提供。
-      let result: Awaited<ReturnType<FinalizeBootstrapFn>>;
-      try {
-        // 调用即「提议收口并挂起等客户确认」——能力内部完成确认与（获准时）落盘；本层不写盘。
-        result = await finalizeBootstrap();
-      } catch (err) {
-        // 能力抛错（不应发生，编排侧以结果返回而非抛错）→ fail-closed：**未完成**。
-        return {
-          ok: false,
-          message:
-            `${name}：**收口未完成**（提案未能执行，项目仍处于创世态，边界尚未 pin）：${reasonOf(err)}。` +
-            `本工具语义是「提议收口、等待客户确认」——未获确认即不完成；你可稍后再提议。`,
-        };
+      const title = readStringArg(call.args, ["title"]);
+      if (title === undefined || title.trim() === "") {
+        return { ok: false, message: `${name}: 缺少 title 参数，无法向客户发起确认` };
       }
-      if (result.ok) {
+      const preview = readStringArg(call.args, ["preview"]);
+      const detail = readStringArg(call.args, ["detail"]);
+      const req: CustomerInputRequest = {
+        kind: "confirm",
+        title,
+        ...(preview !== undefined ? { preview } : {}),
+        ...(detail !== undefined ? { detail } : {}),
+      };
+
+      const out = await askCustomer(name, req, fn, timeoutMs, call.signal, gate);
+      if ("ok" in out) return out; // 通道故障 / 超时 / 中止 → 未获同意
+      if (out.outcome === "declined") {
+        return notConsented(name, `客户拒绝${out.reason !== undefined ? `（${out.reason}）` : ""}`);
+      }
+      if (out.outcome === "unavailable") {
+        return notConsented(name, out.reason ?? "客户通道不可用");
+      }
+      if (out.value.confirmed === true) {
         return {
           ok: true,
-          message: `${name}：**收口完成**（客户已确认）——项目由「创世态」进入「正式态」。${result.message ?? ""}`,
+          message:
+            `${name}：客户已确认「${title}」（confirmed:true；${operatorTag(out.operatorId)}）——已获明确同意。` +
+            `可按已同意的内容继续（如写盘，写入须与向客户预览的内容一致）。`,
+        };
+      }
+      return notConsented(name, "客户明确未同意（选择了「否」）");
+    },
+  };
+}
+
+/** 校验并读出 options：非空数组、每项含**非空且唯一**的 id 与非空 label、可选字符串 description。非法 → undefined。 */
+function readOptions(args: Record<string, unknown>): CustomerInputOption[] | undefined {
+  const raw = args["options"];
+  if (!Array.isArray(raw) || raw.length === 0) return undefined;
+  const options: CustomerInputOption[] = [];
+  const seen = new Set<string>();
+  for (const entry of raw) {
+    if (entry === null || typeof entry !== "object") return undefined;
+    const rec = entry as Record<string, unknown>;
+    const id = rec["id"];
+    const label = rec["label"];
+    if (typeof id !== "string" || id.trim() === "" || seen.has(id)) return undefined;
+    if (typeof label !== "string" || label.trim() === "") return undefined;
+    const description = typeof rec["description"] === "string" ? rec["description"] : undefined;
+    seen.add(id);
+    options.push({ id, label, ...(description !== undefined ? { description } : {}) });
+  }
+  return options;
+}
+
+/**
+ * request_choice：**请求客户选择**（单选/多选勾选，设计 A-1）。与 request_confirmation 同构：
+ * 挂起等裁决、如实转达、本层不写盘。
+ *
+ * 额外守卫（fail-closed）：通道返回的 `selected` 若含**未提供过的选项 id** → 视为**未获同意**
+ * （宁拒勿猜；子集校验在桌面侧另有一道，见设计 A-5）。
+ */
+function makeRequestChoiceTool(
+  fn: CustomerInputFn,
+  timeoutMs: number | undefined,
+  gate: InteractionGate | undefined,
+): ToolDefinition {
+  const name = REQUEST_CHOICE_TOOL_NAME;
+  return {
+    name,
+    async handler(call) {
+      const title = readStringArg(call.args, ["title"]);
+      if (title === undefined || title.trim() === "") {
+        return { ok: false, message: `${name}: 缺少 title 参数，无法向客户发起选择` };
+      }
+      const options = readOptions(call.args);
+      if (options === undefined) {
+        return {
+          ok: false,
+          message: `${name}: options 参数非法（应为非空数组，每项含非空且唯一的 id 与非空 label）`,
+        };
+      }
+      const question = readStringArg(call.args, ["question"]);
+      const preview = readStringArg(call.args, ["preview"]);
+      const multipleRaw = call.args["multiple"];
+      const multiple = typeof multipleRaw === "boolean" ? multipleRaw : undefined;
+      const req: CustomerInputRequest = {
+        kind: "choice",
+        title,
+        options,
+        ...(question !== undefined ? { question } : {}),
+        ...(multiple !== undefined ? { multiple } : {}),
+        ...(preview !== undefined ? { preview } : {}),
+      };
+
+      const out = await askCustomer(name, req, fn, timeoutMs, call.signal, gate);
+      if ("ok" in out) return out; // 通道故障 / 超时 / 中止 → 未获同意
+      if (out.outcome === "declined") {
+        return notConsented(name, `客户拒绝${out.reason !== undefined ? `（${out.reason}）` : ""}`);
+      }
+      if (out.outcome === "unavailable") {
+        return notConsented(name, out.reason ?? "客户通道不可用");
+      }
+      const selected = out.value.selected;
+      if (!Array.isArray(selected)) {
+        return notConsented(name, "客户通道未返回选择结果（selected 缺失）");
+      }
+      const known = new Set(options.map((o) => o.id));
+      const unknown = selected.filter((id) => !known.has(id));
+      if (unknown.length > 0) {
+        return notConsented(name, `客户通道返回了未提供过的选项 id：${unknown.join("、")}（视为未获同意）`);
+      }
+      const labels = selected.map((id) => {
+        const opt = options.find((o) => o.id === id);
+        return opt !== undefined ? `${opt.id}（${opt.label}）` : id;
+      });
+      return {
+        ok: true,
+        message:
+          `${name}：客户已选择（${operatorTag(out.operatorId)}）：` +
+          `${labels.length > 0 ? labels.join("、") : "（未选择任何项）"}。` +
+          `请按客户的选择继续；**未选中的项不得擅自代选**。`,
+      };
+    },
+  };
+}
+
+// —————————————— 交报告工具（设计 C-1；submit_report） ——————————————
+
+/** 校验并读出 evidence（可选）：字符串数组、每条非空。非法 → undefined；未提供 → []。 */
+function readEvidence(args: Record<string, unknown>): string[] | undefined {
+  const raw = args["evidence"];
+  if (raw === undefined || raw === null) return [];
+  if (!Array.isArray(raw)) return undefined;
+  const out: string[] = [];
+  for (const entry of raw) {
+    if (typeof entry !== "string" || entry.trim() === "") return undefined;
+    out.push(entry);
+  }
+  return out;
+}
+
+/**
+ * submit_report：**交报告**工具（设计 C-1）。本轮任务完成（或确认无法完成）时，把**模型自己写的**
+ * 报告（status + summary + evidence）交回编排（回交 su 汇总）；前端渲染成回交卡。
+ *
+ * 纪律（与交互工具同）：**本层不写盘、不做治理判定、不进 `GOVERNED_WRITE_TOOLS`**——handler 只把载荷
+ * 交给注入的能力并**如实**转达回执：
+ * - 交回成功（回执 `ok:true`，或**无回执**——`null`/`undefined` 视为已接收）→ 明确「报告已交回」+ status；
+ * - 交回被拒（回执 `ok:false`）/ 能力抛错 → `ok:false`，明确「**未能交回**」+ 原因，**绝不**说成「已交回」。
+ * 本工具**不改变任何写盘权限**（写入仍经 write_file/edit_file 与门禁判定）。
+ *
+ * 悬挂防护（A-6 纪律）：用 `raceAbort`——会话中止即立即返回；本工具是**本地回交**、非交互等待，
+ * 故**不设等待超时**（无可配项；不作为会以回执/抛错如实暴露）。
+ */
+function makeSubmitReportTool(fn: ReportHandbackFn): ToolDefinition {
+  const name = SUBMIT_REPORT_TOOL_NAME;
+  return {
+    name,
+    async handler(call) {
+      const statusRaw = call.args["status"];
+      if (statusRaw !== "completed" && statusRaw !== "blocked") {
+        return { ok: false, message: `${name}: status 参数非法（应为 "completed" 或 "blocked"）` };
+      }
+      const summary = readStringArg(call.args, ["summary"]);
+      if (summary === undefined || summary.trim() === "") {
+        return { ok: false, message: `${name}: 缺少 summary 参数（一句话写清改了什么/产出了什么）` };
+      }
+      const evidence = readEvidence(call.args);
+      if (evidence === undefined) {
+        return { ok: false, message: `${name}: evidence 参数非法（应为字符串数组，每条非空）` };
+      }
+      const report: ReportHandbackPayload = {
+        status: statusRaw,
+        summary,
+        ...(evidence.length > 0 ? { evidence } : {}),
+      };
+
+      const label = `${name} 交回报告`;
+      let receipt: Awaited<ReturnType<ReportHandbackFn>>;
+      try {
+        receipt = await raceAbort(Promise.resolve().then(() => fn(report)), call.signal, label);
+      } catch (err) {
+        return {
+          ok: false,
+          message: `${name}：报告**未能交回**（原因：${reasonOf(err)}）——请如实向客户说明，修正后可再次交回。`,
+        };
+      }
+      if (receipt === undefined || receipt === null || receipt.ok) {
+        const detail =
+          receipt !== undefined && receipt !== null && receipt.message !== undefined ? ` ${receipt.message}` : "";
+        return {
+          ok: true,
+          message: `${name}：报告已交回（status: ${statusRaw}）——已把你要说的话交给编排汇总。${detail}`,
         };
       }
       return {
         ok: false,
-        message:
-          `${name}：**收口未完成**（项目仍处于创世态，边界尚未 pin）。${result.message ?? ""}` +
-          `本工具语义是「提议收口、等待客户确认」——未获确认即不完成；你可继续完善，或稍后再提议收口。`,
+        message: `${name}：报告**未能交回**（回执：${receipt.message ?? "被拒"}）——请如实向客户说明，修正后可再次交回。`,
+      };
+    },
+  };
+}
+
+// —————————————— 派发任务工具（设计 H-1；dispatch_task） ——————————————
+
+/**
+ * dispatch_task：**派发任务**工具（设计 H-1，**只给 su**）。把「任务与上下文」交给注入的能力
+ * （编排路由成目标角色会话的一条输入，前端负责自动开/排队/去重——不在本层）。
+ *
+ * 纪律（与交互/交报告工具同）：**本层不写盘、不做治理判定、不进 `GOVERNED_WRITE_TOOLS`**——
+ * handler 只把载荷交给注入的能力并**如实**转达回执：
+ * - 受理成功（回执 `ok:true`，或**无回执**——`null`/`undefined`/`void` 视为已受理）→ 「任务已派发给 <roleId>」，
+ *   并**重申「派发 ≠ 授权」**（防模型把派发当成替对方获准写盘）；
+ * - 被拒（回执 `ok:false`，如「roleId 不是本项目角色 / 指向 su 自身」）/ 能力抛错 → `ok:false`，
+ *   明确「**未能派发**」+ 原因，**绝不**说成「已派发」。
+ * 悬挂防护：`raceAbort`（会话中止即立即返回；本地调用，不设等待超时）。
+ */
+function makeDispatchTaskTool(fn: DispatchTaskFn): ToolDefinition {
+  const name = DISPATCH_TASK_TOOL_NAME;
+  return {
+    name,
+    async handler(call) {
+      const roleId = readStringArg(call.args, ["roleId", "role_id", "role"]);
+      if (roleId === undefined || roleId.trim() === "") {
+        return { ok: false, message: `${name}: 缺少 roleId 参数（目标角色 id），无法派发` };
+      }
+      const task = readStringArg(call.args, ["task"]);
+      if (task === undefined || task.trim() === "") {
+        return { ok: false, message: `${name}: 缺少 task 参数（自足的任务文本），无法派发` };
+      }
+      const reason = readStringArg(call.args, ["reason"]);
+      const payload: DispatchTaskPayload = {
+        roleId,
+        task,
+        ...(reason !== undefined ? { reason } : {}),
+      };
+
+      const label = `${name} 派发`;
+      let receipt: Awaited<ReturnType<DispatchTaskFn>>;
+      try {
+        receipt = await raceAbort(Promise.resolve().then(() => fn(payload)), call.signal, label);
+      } catch (err) {
+        return {
+          ok: false,
+          message: `${name}：任务**未能派发**（原因：${reasonOf(err)}）——请如实向客户说明；**不要当它成功、不要宣称已送达**。`,
+        };
+      }
+      if (receipt === undefined || receipt === null || receipt.ok) {
+        const detail = receipt !== undefined && receipt !== null && receipt.message !== undefined ? ` ${receipt.message}` : "";
+        return {
+          ok: true,
+          message:
+            `${name}：任务已派发给「${roleId}」（status 由对方经回交报告回报）。${detail}` +
+            `注意：**派发 ≠ 授权**——对方的写权仍只来自它自己的边界与 request_confirmation 的 confirmed:true；` +
+            `你不得代为授权，也不能承诺对方一定会写。`,
+        };
+      }
+      return {
+        ok: false,
+        message: `${name}：任务**未能派发**（回执：${receipt.message ?? "被拒"}）——请如实向客户说明；**不要当它成功、不要宣称已送达**。`,
       };
     },
   };
@@ -604,12 +957,29 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
     tools.push(makeRunShellTool(shellGate, shellCwd, reviewMs));
   }
 
-  // 结构性保证（§13.1，同 §7.5.1 先例）：**未注入 finalize 能力时 `finalize_bootstrap` 根本不存在**。
-  // 「是否创世态」由调用方以**是否注入**表达（编排持 `isGenesisState`，只在创世态注入）；故非创世态 ⇒ 不注入
-  // ⇒ 工具不在集合里。这不是「注册了再在 execute 里判空」，而是能力缺席——与 run_shell 逐字同构。
-  const finalizeBootstrap = options?.finalizeBootstrap;
-  if (finalizeBootstrap !== undefined) {
-    tools.push(makeFinalizeBootstrapTool(finalizeBootstrap));
+  // 结构性保证（设计 A-1，同 run_shell 先例）：**未注入客户通道时两交互工具根本不存在**。
+  // 「有无客户通道」由调用方以**是否注入**表达——判据是「有客户通道」。
+  // 工具不存在 ⇒ 模型无法请求确认 ⇒ 也就无从「假设同意」（能力缺席 = 最强 fail-closed，§7.5.1 同款）。
+  const customerInput = options?.customerInput;
+  if (customerInput !== undefined) {
+    // **缺省不设限（G-1）**：仅显式配置（option 或环境变量）才计时。
+    const inputMs = options?.customerInputTimeoutMs ?? readOptionalTimeoutMs(process.env, CUSTOMER_INPUT_TIMEOUT_ENV);
+    tools.push(makeRequestConfirmationTool(customerInput, inputMs, options?.interactionGate));
+    tools.push(makeRequestChoiceTool(customerInput, inputMs, options?.interactionGate));
+  }
+
+  // 结构性保证（设计 C-1，同 run_shell / customerInput 先例）：**未注入回交能力时 `submit_report` 不存在**。
+  // 只给项目角色——su 不注入即不注册（能力缺席 = 最强 fail-closed，§7.5.1 同款）。
+  const reportHandback = options?.reportHandback;
+  if (reportHandback !== undefined) {
+    tools.push(makeSubmitReportTool(reportHandback));
+  }
+
+  // 结构性保证（设计 H-1，同 run_shell / customerInput / reportHandback 先例）：
+  // **未注入派发能力时 `dispatch_task` 不存在**。只给 su——编排对项目角色不注入即不注册。
+  const dispatchTask = options?.dispatchTask;
+  if (dispatchTask !== undefined) {
+    tools.push(makeDispatchTaskTool(dispatchTask));
   }
   return tools;
 }

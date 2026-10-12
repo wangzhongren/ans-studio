@@ -172,15 +172,49 @@ async function loadConfig(projectRoot: string = resolveProjectRoot()): Promise<L
  * 显式目标目录**优先于** `.ans/project.json` 自带的 projectRoot——用户 `ans govern <dir>` 意在为
  * 「那个」目录 bootstrap。
  *
- * 导出以便测试直接断言注入结果：main 的 govern 分支缺 Pi 凭据时会先失败，无法在测试里走完链路。
+ * **目标目录 ≠ ans-cli 自身且无 `.ans`（回退内置演示配置）时**（2026-10-12 修复，见
+ * `角色卡/装配/docs/fix/2026-10-12_fix-govern-target-boundary.md`）：`buildDemoProjectConfig()` 描述的是
+ * **ans-cli 自己**——`roles[*].card/boundary` 与 `governanceBoundary.path` 全是相对本仓库根的项目相对
+ * 路径；若照原样注入，边界解析会去**目标目录**下找 ans-cli 的文件（`ans govern <空目录>` 报
+ * 「治理边界解析失败：ENOENT」的根因）。故此处改注入**目标项目如实形态**：
+ *  · `roles = {}`（ans-cli 的角色表不是目标项目的角色表）；
+ *  · `governanceBoundary.path = ""`（目标项目尚未声明治理边界 → 回到既有约定：空串不参与「治理边界
+ *    覆盖」分支；finalize 落点由 `path || DEFAULT_GOVERNANCE_BOUNDARY_REL` 给出）——与桌面
+ *    「无 `.ans` 传空串」（`app/desktop/project.ts`）同款；
+ *  · `genesisBootstrap`：`ans govern <目录>`（操作者显式发起）在未 bootstrap 的目录上 = 一次**有界创世
+ *    授权**（仅治理产物 角色卡//docs//.ans/；项目自己的治理边界文档一经写出并经 pin 接受即**结构性
+ *    自终止**）——与桌面「导入空文件夹」同一条授权，源如实标注 CLI（不硬编码治理角色 id）。
+ *
+ * 导出以便测试直接断言注入结果与经 governCommand 的接线：main 的 govern 分支对**真实**适配器需要
+ * provider 配置（在会话开启时才解析），测试经 `governCommand(argv, deps)` 注入假适配器走完链路
+ * （见 `test/装配/govern-target.test.ts`）。
  */
 export async function loadInjection(targetDir?: string): Promise<ConfigInjection> {
   const projectRoot = targetDir === undefined ? resolveProjectRoot() : path.resolve(targetDir);
   const { project, source } = await loadConfig(projectRoot);
   if (targetDir !== undefined) {
     project.projectRoot = projectRoot;
+    if (source.kind === "builtin-fallback" && !isSelfProjectRoot(projectRoot)) {
+      project.roles = {};
+      project.governanceBoundary = { path: "", acceptance: DEMO_ACCEPTANCE };
+      project.genesisBootstrap = {
+        source:
+          "cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/）",
+      };
+    }
   }
   return { project, configSource: source };
+}
+
+/**
+ * 「目标目录即 ans-cli 自身」判定（2026-10-12，配 `loadInjection`）：
+ * 用 `path.resolve` 比较（两侧都已绝对化）——使 `ans govern` 与 `ans govern <ans-cli 根>` 两种写法
+ * 行为一致、都不套用「外来目标目录」的配置（演示回退配置本就是描述 ans-cli 自己的）。
+ * 已知边界：经符号链接等价的写法会被判为「外来」而走修复路径——方向是收紧到既有约定
+ * （不放松任何授权），如实登记于上文链接的修复记录。
+ */
+function isSelfProjectRoot(projectRootAbs: string): boolean {
+  return path.resolve(projectRootAbs) === path.resolve(resolveProjectRoot());
 }
 
 /**

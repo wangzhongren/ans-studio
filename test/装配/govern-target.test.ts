@@ -6,23 +6,43 @@
 // `resolveGovernTargetDir`；本任务（装配）在入口 govern 分支据它把注入的 `project.projectRoot` 设为
 // `path.resolve(dir)`（缺省仍 `resolveProjectRoot()`）。
 //
+// ── 2026-10-12 修复（见 `角色卡/装配/docs/fix/2026-10-12_fix-govern-target-boundary.md`）──────
+// T34 只换了 `projectRoot`，但无 `.ans` 时回退的内置演示配置里的路径（roles[*].card/boundary、
+// governanceBoundary.path）都**相对 ans-cli 自身**——对目标目录解析必 ENOENT（`ans govern <空目录>`
+// 报「治理边界解析失败」的根因）。修复：目标目录 ≠ ans-cli 根且为内置回退时，改注入目标项目的如实
+// 形态（roles 空、治理边界 path 空串 = 走既有约定），并按客户批准（O1）带 CLI 创世授权
+// `genesisBootstrap`（与桌面「导入空文件夹」同一条有界创世授权）。
+//
 // 覆盖：
 //  1) 给出目标目录 → 注入的 `project.projectRoot` 即该目录（绝对化；相对路径按 cwd 绝对化）；
 //  2) 缺省 → 仍为 ans-cli 自身（`resolveProjectRoot()`，行为不变）；
 //  3) 目标目录含 `.ans/project.json` → 角色照常载入，且 projectRoot 仍取目标目录；
 //  4) 显式目标目录**优先于** `.ans` 自带的 projectRoot；
 //  5) 目录不存在 / 非目录 → 入口明确报错并非 0，**不静默回退到 ans-cli**；
-//  6) 目录存在 → 目录校验放行（不报目录错），进入治理链路。
+//  6) 目标目录的**注入合同**：空目录 → 不注入 ans-cli 自身的演示数据 + 带 CLI 创世授权；
+//     显式给 ans-cli 根 → 与缺省一致（演示配置原样，自身行为逐字不变）；
+//  7) 目录存在 → 目录校验放行；治理链路走通（经 `governCommand` + 假适配器：EXIT_OK、
+//     边界解析不再失败、客户确认制下 su 的骨架写入真落盘——脚本先 `request_confirmation`
+//     把将写出的路径摆给放行桩 `GovernDeps.customerInput`，并断言确认通道被请求恰好一次）；
+//  8) `main` 入口（环境已清空 Pi 配置）：目录校验放行、不再报治理边界解析失败，
+//     如实以非 0 报缺 provider 配置。
 //
-// 说明：main 的 govern 分支缺 Pi 凭据时会先失败（构造真实适配器时 `resolvePiProviderConfig` 抛错），
-// 故「注入的 projectRoot」经导出的 `loadInjection` 直接断言；入口的目录校验经 `main` 断言其退出码与 stderr。
+// 说明：main 的 govern 分支对**真实**适配器需要 provider 配置（会话开启时才解析），故「注入的
+// projectRoot / 注入合同」经导出的 `loadInjection` 直接断言；链路与入口行为经 `governCommand`
+// 注入假适配器、或经 `main`（先清空 Pi 相关环境变量，保证不发真实模型请求）断言退出码与 stderr。
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { test, after } from "node:test";
 
 import { loadInjection, resolveProjectRoot, main } from "../../src/index.ts";
+// 2026-10-12：入口链路经编排 §6 安全的 Interface 出口驱动（装配本就动态导入它）；假适配器/脚本来自
+// §4 冻结契约家，只读导入，不复制实现。
+import { governCommand } from "../../src/interface/cli/govern.ts";
+import { createFakeRuntimeAdapter } from "../../src/provider/pi/session.ts";
+import type { CustomerInputFn, CustomerInputRequest, ToolCall } from "../../src/provider/pi/session.ts";
+import { PI_CREDENTIAL_ENV_VARS } from "../../src/common/装配/runtime.ts";
 
 const ROOT = mkdtempSync(join(tmpdir(), "ans-govern-target-"));
 after(() => {
@@ -54,6 +74,28 @@ function capture(): { err: string[]; restore: () => void } {
   };
 }
 
+/**
+ * 清空 Pi 相关环境变量后跑一段（跑完原样恢复）：让「无凭据环境」确定、**绝不触发真实模型请求**
+ * （真实适配器在会话开启时才经 `resolvePiProviderConfig` 读 env；缺 base URL 即明确失败，
+ * 不会回落到任何默认端点）。
+ */
+async function withScrubbedPiEnv<T>(fn: () => Promise<T>): Promise<T> {
+  const keys = [...PI_CREDENTIAL_ENV_VARS, "ANS_PI_BASE_URL", "ANS_PI_MODEL", "ANS_PI_CONTEXT_WINDOW"];
+  const saved = new Map<string, string | undefined>();
+  for (const k of keys) {
+    saved.set(k, process.env[k]);
+    delete process.env[k];
+  }
+  try {
+    return await fn();
+  } finally {
+    for (const [k, v] of saved) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+  }
+}
+
 // ---- 1) 目标目录 → 注入的 projectRoot 即该目录 ----
 
 test("loadInjection(目标目录) → 注入的 projectRoot 即该目录（绝对化）", async () => {
@@ -77,6 +119,39 @@ test("loadInjection(相对路径) → 绝对化（相对 cwd）", async () => {
 test("loadInjection() 缺省 → projectRoot 仍为 ans-cli 自身（行为不变）", async () => {
   const { project } = await loadInjection();
   assert.equal(project.projectRoot, resolveProjectRoot());
+});
+
+// ---- 6) 注入合同（2026-10-12 修复）：空目录不带 ans-cli 演示数据；自身根逐字不变 ----
+
+test("loadInjection(空目录) → 不注入 ans-cli 自身的演示数据；带 CLI 操作的创世授权（genesisBootstrap）", async () => {
+  const dir = newDir("empty-contract-");
+  const { project, configSource } = await loadInjection(dir);
+  assert.equal(configSource.kind, "builtin-fallback", "空目录无 .ans → 内置回退");
+  assert.deepEqual(project.roles, {}, "ans-cli 的角色表不得当作目标项目的角色表注入");
+  assert.equal(project.governanceBoundary?.path, "", "目标项目尚未声明治理边界 → 空串（走既有约定）");
+  const genesis = project.genesisBootstrap;
+  assert.ok(genesis, "未 bootstrap 的目标目录须带 genesisBootstrap（否则 su 一个字也写不了）");
+  assert.match(genesis.source, /cli:ans govern/);
+  assert.match(genesis.source, /操作者发起 bootstrap/);
+  assert.match(genesis.source, /角色卡\/\/docs\/\/\.ans\//, "source 应如实标注有界创世的三处治理产物");
+});
+
+test("loadInjection(ans-cli 根，显式给出) → 与缺省同款：演示配置原样（自身行为逐字不变）", async () => {
+  const self = resolveProjectRoot();
+  const variants: Array<[string, Awaited<ReturnType<typeof loadInjection>>]> = [
+    ["显式自身根", await loadInjection(self)],
+    ["缺省", await loadInjection()],
+  ];
+  for (const [label, { project }] of variants) {
+    assert.equal(project.projectRoot, self, label);
+    assert.equal(Object.keys(project.roles).length, 6, `${label}：六个演示角色应原样保留`);
+    assert.equal(
+      project.governanceBoundary?.path,
+      "角色卡/门禁引擎/boundary.yaml",
+      `${label}：演示治理边界路径应原样保留`,
+    );
+    assert.equal(project.genesisBootstrap, undefined, `${label}：自身不得带创世授权`);
+  }
 });
 
 // ---- 3) 目标目录含 .ans → 角色载入，projectRoot 仍取目标目录 ----
@@ -138,18 +213,66 @@ test("ans govern <非目录（文件）> → 明确报错、非 0", async () => 
   assert.match(cap.err.join(""), /不是目录/);
 });
 
-// ---- 6) 目录存在 → 目录校验放行，进入治理链路 ----
+// ---- 7) 目录存在 → 目录校验放行；治理链路走通（2026-10-12 修复后：不再报边界解析失败） ----
 
-test("ans govern <存在的目录> → 目录校验放行（不报目录错），缺 Pi 凭据时如实非 0", async () => {
+test("ans govern <空目录>（经 governCommand + 假适配器）→ EXIT_OK，边界解析不再失败，创世授权下 su 骨架写入真落盘", async () => {
   const dir = newDir("ok-");
+  const inj = await loadInjection(dir);
+  // 客户确认制（2026-10-12 A-1/A-3，取代原「收口提议 + operatorChannel」）：写盘前必须先用
+  // `request_confirmation` 把**将写出的具体路径**摆给客户；客户确认后**编排**才把这些路径发行进
+  // 本次会话的 writeSet（未确认路径被 F4 拒）。故脚本先确认、再写，且预览里列出目标路径。
+  const preview = "将写出以下文件（均已预览）：\n角色卡/X/role-card.md\n角色卡/X/boundary.yaml";
+  const script: ToolCall[] = [
+    { name: "request_confirmation", args: { title: "确认写出角色 X 的骨架文件", preview } },
+    { name: "write_file", args: { path: "角色卡/X/role-card.md", content: "# 角色：X\n" } },
+    { name: "write_file", args: { path: "角色卡/X/boundary.yaml", content: "role: X\nentries: []\n" } },
+  ];
+  // 放行桩：确定性同意；同时计次——断言确认通道被请求**恰好一次**（加强，非放宽）。
+  const confirmRequests: CustomerInputRequest[] = [];
+  const allowCustomer: CustomerInputFn = (req) => {
+    confirmRequests.push(req);
+    return { outcome: "answered", value: { confirmed: true }, operatorId: "test:装配放行桩" };
+  };
   const cap = capture();
-  const code = await main(["govern", dir], {}); // env={} 无 ANS_PI_* 凭据
+  const code = await governCommand(["govern", dir], {
+    ...inj,
+    // 编排经 `createAdapter(gate, capabilities)` 把（已包发行器的）客户通道注入适配器：
+    // 原样转发，`request_confirmation` 工具才会注册（「注入才注册」）。
+    createAdapter: (gate, capabilities) =>
+      createFakeRuntimeAdapter({ gate, script, writeRoot: dir, ...(capabilities ?? {}) }),
+    customerInput: allowCustomer,
+  });
+  cap.restore();
+  const err = cap.err.join("");
+  assert.equal(code, 0, `应正常走完治理会话（含确认制写盘）；stderr=${err}`);
+  assert.ok(
+    !/治理边界解析失败|目标目录不存在|不是目录/.test(err),
+    `不得再报边界/目录错，实际 stderr=${JSON.stringify(err)}`,
+  );
+  assert.ok(existsSync(join(dir, "角色卡", "X", "role-card.md")), "确认后骨架文件应落盘");
+  assert.ok(existsSync(join(dir, "角色卡", "X", "boundary.yaml")), "boundary.yaml 应落盘");
+  assert.equal(readFileSync(join(dir, "角色卡", "X", "role-card.md"), "utf8"), "# 角色：X\n");
+  assert.equal(confirmRequests.length, 1, "客户确认通道应被请求恰好一次（放行桩同意）");
+  assert.equal(confirmRequests[0]?.kind, "confirm", "确认请求的形状应为 confirm（可带预览）");
+  // 确认并写入后由编排**自动收尾**（无人工确认步骤）：`.ans`（pin）应被写出。
+  assert.ok(existsSync(join(dir, ".ans", "project.json")), "确认并写入后应自动收尾（写 .ans/project.json）");
+});
+
+test("ans govern <存在的目录>（main 入口；环境已清空 Pi 配置）→ 目录校验放行、不再报边界解析失败；如实非 0 报缺 provider 配置", async () => {
+  const dir = newDir("ok-main-");
+  const cap = capture();
+  const code = await withScrubbedPiEnv(() => main(["govern", dir], {}));
   cap.restore();
   const err = cap.err.join("");
   assert.ok(
     !/目标目录不存在|不是目录/.test(err),
     `存在的目录应被接受，实际 stderr=${JSON.stringify(err)}`,
   );
-  // 无凭据 → 治理会话无法建立 → 非 0（绝不静默假装成功）。
+  assert.ok(
+    !/治理边界解析失败/.test(err),
+    `不得再报治理边界解析失败（本修复的要害），实际 stderr=${JSON.stringify(err)}`,
+  );
+  // 无 provider 配置 → 治理会话无法建立 → 非 0（绝不静默假装成功）；缺项如实报出。
   assert.notEqual(code, 0);
+  assert.match(err, /缺少 base URL/, "缺 provider 配置时应如实报出真实缺项");
 });

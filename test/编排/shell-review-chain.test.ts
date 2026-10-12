@@ -27,7 +27,8 @@ import {
   BRANCH_B_UNSURE,
   BRANCH_B_UNAVAILABLE,
   BRANCH_B_TIMEOUT,
-  BRANCH_B_BADJSON,
+  BRANCH_B_UNPARSEABLE,
+  REASON_B_UNPARSEABLE,
   BRANCH_A_ALLOW,
   BRANCH_A_DENY,
   BRANCH_A_UNAVAILABLE,
@@ -219,19 +220,51 @@ test("(b) 无 pm 会话（未注入 pmAsk）→ 升级 (a)（分支 b-unavailabl
   assert.equal(audit.records[0].branch, "b-unavailable→a-allow");
 });
 
-test("(b) 判定 JSON 不合法 → 升级 (a)（分支 b-badjson→…）", async () => {
+test("(b) 输出不可解析 → **直接拒绝**（M-2：fail-closed；**不升 (a)、不重试、不打扰客户**）", async () => {
   const audit = createMemoryAuditSink();
+  let pmCalls = 0;
+  let opCalls = 0;
   const gate = createShellGate({
     classifyShell: () => "review",
     rules: RULES,
     rulesId: RULES_ID,
     audit,
-    pmAsk: () => "我觉得可以吧（这不是 JSON）",
-    operatorChannel: () => ({ outcome: "deny", operatorId: "bob" }),
+    pmAsk: () => {
+      pmCalls += 1;
+      return "我觉得可以吧（这不是 JSON）";
+    },
+    operatorChannel: () => {
+      opCalls += 1;
+      return { outcome: "allow", operatorId: "bob" };
+    },
   });
   const r = await gate(REQ);
-  assert.equal(r.allow, false);
-  assert.equal(audit.records[0].branch, escalateBranch(BRANCH_B_BADJSON, BRANCH_A_DENY));
+  assert.equal(r.allow, false, "fail-closed 拒绝");
+  assert.equal(r.reason, REASON_B_UNPARSEABLE, "固定短句（单一来源，与归因码一一对应）");
+  assert.equal(pmCalls, 1, "**不重试**（客户裁定：直接拒绝就行）");
+  assert.equal(opCalls, 0, "**不进 (a)**、不打扰客户");
+  assert.equal(audit.records[0].branch, BRANCH_B_UNPARSEABLE, "归因码稳定：b-unparseable-deny");
+  assert.equal(audit.records[0].conclusion, "deny");
+});
+
+test("(b) 围栏包裹的合法 JSON → 解析容错照旧生效（提示收紧之外的解析侧容错仍在）", async () => {
+  const audit = createMemoryAuditSink();
+  let opCalls = 0;
+  const gate = createShellGate({
+    classifyShell: () => "review",
+    rules: RULES,
+    rulesId: RULES_ID,
+    audit,
+    pmAsk: () => '好的，结论如下：\n```json\n{"verdict":"allow","reason":"只读命令"}\n```',
+    operatorChannel: () => {
+      opCalls += 1;
+      return { outcome: "deny", operatorId: "bob" };
+    },
+  });
+  const r = await gate(REQ);
+  assert.equal(r.allow, true, "围栏+前后文字仍可解析 → 按 allow 终结（review + b 明确放行）");
+  assert.equal(opCalls, 0, "b 明确放行 → 不打扰客户");
+  assert.equal(audit.records[0].branch, BRANCH_B_ALLOW);
 });
 
 test("(b) 报错（会话打不开）→ 升级 (a)（分支 b-unavailable→…）", async () => {

@@ -51,6 +51,13 @@ import type {
 } from "../../src/provider/pi/session.ts";
 export type { OperatorPrompt, OperatorOutcome, OperatorChannelFn };
 
+// (c) 规则集实件（**I-1 补丁**，2026-10-12 客户重发授权）：**只读导入**门禁引擎经 Service 公开出口的
+// 再导出（`src/service/gate/shell-rules.ts`——**同一函数引用**，绝不复制实现、绝不另立第二份规则集）。
+import { classifyShell, defaultShellRules } from "../../src/service/gate/shell-rules.ts";
+// 装配选项形状的**单一来源**在编排（`shell-arming.ts`）：只读导入其类型（运行期擦除），据它取
+// 「前端该注入哪几件」——`Omit` 掉 project/operatorChannel/sessionDeps（那三件由编排按本次会话装配）。
+import type { AssembleShellGateOptions } from "../../src/pipeline/orchestration/shell-arming.ts";
+
 // argv 规范化原语的**单一来源**（pm，T23，`src/common/shared/argv-primitives.ts`）：**只读导入**——
 // 与编排侧（写审计）同源，故「操作者所见」与「审计所记」不可能漂移。此前本模块的**本地副本（逐字镜像）
 // 已删除**（T23 收尾）：**不得有第二份实现**。
@@ -62,19 +69,58 @@ export const DEFAULT_OPERATOR_CONFIRM_TIMEOUT_MS = 120000;
 export const OPERATOR_CONFIRM_TIMEOUT_ENV = "ANS_DESKTOP_OPERATOR_CONFIRM_TIMEOUT_MS";
 
 /**
- * V1 桌面**是否 arm** shell 闸（即：会话构造路径是否注入 `ShellGate`，从而 `run_shell` 被注册）。
+ * 桌面**是否 arm** shell 闸（即：会话构造路径是否把本通道作为 (a) 层交给编排装配、从而 `run_shell` 被注册）。
  *
- * **客户已确认（2026-10-11）：`false` —— V1 桌面不 arm。** 这是**客户确认的 V1 范围**、不是欠账；
- * 桌面本份实现**本即按「不 arm」落**，故**无需实现改动**（详见 changelog 与回报）：
- *  · 操作者通道 (a) 只是三层链的**一层**；arm 与否的开关在**谁装配 `ShellGate`**（编排）——桌面**单方无法 arm**
- *    （它没有 (c) 规则集/分类函数、(b) pm 会话、pm 边界与审计门）。
- *  · 桌面当前最强 fail-closed 是「**能力缺席**」——不注入 `ShellGate` ⇒ `run_shell` 根本不注册（§7.5.1）。
- *  · V1 含义：桌面**不提供 shell 能力**（角色在被导入的项目里不能跑命令）；本通道代码**保留但未被消费**
- *    （如实标注，别让它看起来像在用）。
- * 若将来要 arm：由**编排**用本通道 + (c)/(b) 装配 `ShellGate`，经桌面会话构造路径注入
- * （`app/desktop/session.ts` 的 `shellGate` 接缝），再把此常量改 `true`。
+ * **客户已裁定（2026-10-12，I-1）：「现在开放 shell，然后 shell 需要 su 审核一下。如果 su 觉得危险可以让
+ * 客户决定」——`true`（**已 arm**）**。** 本常量由「V1 不 arm」改为 arm 即本轮开关；与 2026-10-11 的
+ * 「V1 不 arm」旧裁定冲突之处以本条新裁定为准（旧记录保留为历史）。
+ *
+ * 接线口径（本轮）：
+ *  · 桌面把 **(a) 操作者确认通道**（`createDesktopOperatorChannel`：既有「看命令原文 + 放行/拒绝」对话框，
+ *    拒绝为默认与取消项）经会话构造路径交给**编排**装配 (c)/(b)/(a) 三层 `ShellGate`
+ *    （`session.ts` 的 `shellOperatorChannel` 接缝 → `openRoleSession`；编排装配落地前该字段被静默忽略——登记）；
+ *  · **(c) 规则集实件（I-1 补丁，2026-10-12 客户重发授权）**：arm 时**同时**注入 `classifyShell` +
+ *    `rules`（`buildDesktopShellArming`，只读导入门禁引擎经 Service 公开出口的实件）——否则闸因「规则集
+ *    未注入」一律拒绝（真机曾据此如实报「环境无 shell」）；**(c) 与 (a) 两件同备才 arm**，任一构造/加载
+ *    失败 ⇒ 两件都不注入（`run_shell` 不注册——能力缺席即 fail-closed）；
+ *  · **只对项目角色**注入（su 自身不 arm——审读者不给自己开闸，判据 `role.builtIn`，见 session.ts）；
+ *  · fail-closed 语义**不变**：关窗/取消/拒绝/超时/通道抛错 → **不放行**（`createDesktopOperatorChannel` 的三条退路）。
+ *
+ * **已知风险（I-1，如实登记）**：**本轮无沙箱**——客户放行的 shell 命令在项目目录里**真实执行**；命令里的
+ * **写入不经过 `resolveWrite` 写门禁**（`run_shell` 无 path、不进 `GOVERNED_WRITE_TOOLS`）——即：**放行的
+ * 命令可以绕过写边界**。缓解即本条链本身：危险命令交客户决定（(c)/(b) 之后仍由人把关）+ 每命令审计留痕。
  */
-export const DESKTOP_SHELL_GATE_ARMED = false;
+export const DESKTOP_SHELL_GATE_ARMED = true;
+
+// —————————————————————— (c) 规则集实件（I-1 补丁，2026-10-12 客户重发授权） ——————————————————————
+
+/**
+ * 桌面 arm 时随 (a) 通道一并注入的 **(c) 实件**形状——= 编排 `assembleProjectShellGate` 选项里前端负责的
+ * 两个注入位（`classifyShell` + `rules`）；其余（`project`/`operatorChannel`/`sessionDeps` 及 (b) 参数）
+ * 由编排按本次会话装配。形状**只读转自编排**（`Omit<AssembleShellGateOptions, …>`）——不另立第二份。
+ */
+export type DesktopShellArming = Omit<AssembleShellGateOptions, "project" | "operatorChannel" | "sessionDeps">;
+
+/**
+ * 构造 (c) 实件（**只读导入、不复制实现**）：`classifyShell`（门禁引擎纯函数——**同一函数引用**）+
+ * `rules = defaultShellRules()`（规则集本体——门禁引擎的数据）；二者均经 Service 公开出口
+ * `src/service/gate/shell-rules.ts` 再导出（客户确认边界后落地，见其头注）。
+ *
+ * 失败语义：**任何一步失败（含规则集加载抛错）⇒ 返回 `undefined` = 不 arm**——main.ts 据它连 (a) 通道
+ * 也不注入（`run_shell` 不注册——能力缺席即 fail-closed）。**绝不因缺件而放宽**（编排侧对「规则集未注入」
+ * 的既有处置是闸一律拒绝）。
+ *
+ * `loadRules` 仅为单测注入**失败路径**用（桩件抛错 → undefined）；生产恒用 `defaultShellRules`（单一来源）。
+ */
+export function buildDesktopShellArming(
+  loadRules: () => ReturnType<typeof defaultShellRules> = defaultShellRules,
+): DesktopShellArming | undefined {
+  try {
+    return { classifyShell, rules: loadRules() };
+  } catch {
+    return undefined;
+  }
+}
 
 // —————————————————————— 契约形状（**只读导入**；§4 冻结契约家） ——————————————————————
 //
@@ -220,6 +266,144 @@ export function createDesktopOperatorChannel(opts: CreateOperatorChannelOptions)
       return { outcome: "deny", operatorId, reason: decision.note ?? "操作者拒绝执行" };
     }
     return { outcome: "allow", operatorId };
+  };
+}
+
+// —————————————————————— M-1（2026-10-12 客户裁定「这个太丑了」）：应用内确认卡 ——————————————————————
+//
+// 客户看截图裁定：原生 `dialog.showMessageBox` 的确认框「太丑了」——一堵技术文本墙（argv JSON 列表 + 行话式
+// 升级原因）。(a) 层改为**应用内卡片**：标题 + **等宽命令原文块**（逐字、不美化）+ 一句白话摘要 +
+// 「为什么问你」的人话映射 + 折叠的技术详情（argv/cwd）。**fail-closed 逐字不变**：关闭 / 取消 / Esc /
+// 超时 / 通道不可用 → **不放行**（本文件只产**数据面**与裁决；卡片形态在渲染侧；「恰好 allow 才 spawn」的
+// 唯一保证仍在 Pi 适配器 execute）。
+
+/** 白话摘要：把命令**首词**（可执行名）如实摘出；无从概括（空命令/空白）⇒ `null`（**绝不编意图**）。 */
+export function shellIntentSummary(command: string): string | null {
+  const firstLine = String(command == null ? "" : command)
+    .split(/\r?\n/)
+    .find((l) => l.trim() !== "");
+  if (firstLine === undefined) return null;
+  const word = firstLine.trim().split(/\s+/)[0];
+  if (word === undefined || word === "") return null;
+  return `它会在项目里执行：${word}`;
+}
+
+/** 升级原因 → **人话**（(b) 判读的内部用语**不得**原样示人；未识别一律给 fail-closed 通用句——
+ *  既不泄行话、也**不替审核编造结论**；原始措辞只进渲染侧折叠详情供核查）。 */
+export function plainReasonFor(reason: unknown): string {
+  const raw = typeof reason === "string" ? reason : "";
+  if (/risky/i.test(raw)) return "自动审核判定这条命令有风险——按治理规则，有风险的命令必须由你亲自确认才能执行。";
+  if (/超时|timeout/i.test(raw)) return "自动审核超时，未给出结论——按 fail-closed 交你确认。";
+  if (/json|解析|parse/i.test(raw)) return "自动审核给出的结论无法解析，未能形成明确意见——按 fail-closed 交你确认。";
+  if (/报错|异常|error/i.test(raw)) return "自动审核出错了，未给出结论——按 fail-closed 交你确认。";
+  if (/未接入|无会话|不可用|unavailable/i.test(raw)) return "自动审核当前不可用（审读会话未接上）——按 fail-closed 交你确认。";
+  if (/拿不准|不确定/.test(raw)) return "自动审核拿不准——按 fail-closed 交你确认。";
+  return "审核未能给出明确结论，按 fail-closed 交你确认。";
+}
+
+/** 确认卡的**数据面**（主进程 → 渲染侧；只呈现，不含任何判定）。 */
+export interface ShellConfirmRequest {
+  id: string;
+  /** 命令**逐字原文**（决不改写/截断——它是人核对的唯一依据）。 */
+  command: string;
+  /** 白话摘要（`shellIntentSummary`；无从概括为 null——渲染侧隐藏该行）。 */
+  summary: string | null;
+  /** 「为什么问你」——人话（`plainReasonFor`；内部行话不外露）。 */
+  reasonPlain: string;
+  /** 升级原因的**原文**（仅供折叠详情里的核查；可为 null）。 */
+  reasonRaw: string | null;
+  /** 规范化 argv 逐项行（JSON 转义显示；引号仅为界定符——**折叠详情**里才见）。 */
+  argvLines: string[];
+  /** 执行工作目录（钉在项目根）。 */
+  cwd: string;
+}
+
+/** 由既有呈现（`describeShellCommand` 的产物）构建确认卡数据面（纯函数；命令原文逐字转抄）。 */
+export function buildShellConfirmRequest(id: string, display: ShellCommandDisplay): ShellConfirmRequest {
+  const reasonRaw = typeof display.reason === "string" && display.reason !== "" ? display.reason : null;
+  return {
+    id,
+    command: display.command,
+    summary: shellIntentSummary(display.command),
+    reasonPlain: plainReasonFor(reasonRaw),
+    reasonRaw,
+    argvLines: display.argvLines,
+    cwd: display.cwd,
+  };
+}
+
+export interface CreateShellConfirmPresenterOptions {
+  /** 把确认请求推给渲染侧（主进程用 `webContents.send("shell:confirm-request", …)`；测试注入收集器）。
+   *  **推达失败（窗口已关/通道异常）⇒ 抛错**——`createDesktopOperatorChannel` 归为 unavailable，fail-closed。 */
+  present: (request: ShellConfirmRequest) => void;
+  /** 清理兜底（毫秒；**只做内存清理与兜底不放行**——判定语义仍由**通道**的超时决定：谁先到谁生效）。
+   *  缺省 = 通道确认超时（同 env）+ 5000（给通道先判「超时 = unavailable」留出先手）。 */
+  cleanupAfterMs?: number;
+  /** 可注入环境（读取超时 env；缺省 `process.env`）。 */
+  env?: Record<string, string | undefined>;
+}
+
+/** 应用内确认卡的**呈现端**（挂在主进程；渲染侧只渲染，不判定）。 */
+export interface ShellConfirmPresenter {
+  presenter: OperatorPresenter;
+  /** 受理渲染侧的决定回包：**恰 `allow:true` 才放行**；其余（含缺字段/非布尔）= 拒绝；
+   *  未知/已失效 id → `{ok:false, expired:true}`（**不放行**——超时/重启后的旧回包绝无放行语义）。 */
+  respond(input: unknown): { ok: boolean; error?: string; expired?: boolean };
+  /** 全部挂起 → **不放行**（窗口关闭等；fail-closed）。 */
+  rejectAllPending(_reason: string): void;
+  /** 当前挂起数（测试/诊断）。 */
+  pendingCount(): number;
+}
+
+export function createShellConfirmPresenter(opts: CreateShellConfirmPresenterOptions): ShellConfirmPresenter {
+  const env = opts.env ?? process.env;
+  const cleanupAfterMs = opts.cleanupAfterMs ?? readConfirmTimeoutMs(env) + 5000;
+  let seq = 0;
+  const pending = new Map<string, { resolve: (d: OperatorDecision) => void; timer: ReturnType<typeof setTimeout> }>();
+
+  const finish = (id: string, decision: OperatorDecision): boolean => {
+    const entry = pending.get(id);
+    if (entry === undefined) return false;
+    pending.delete(id);
+    clearTimeout(entry.timer);
+    entry.resolve(decision);
+    return true;
+  };
+
+  return {
+    presenter: {
+      async present(_prompt: OperatorPrompt, display: ShellCommandDisplay): Promise<OperatorDecision> {
+        const id = `sc-${++seq}`;
+        const request = buildShellConfirmRequest(id, display);
+        return await new Promise<OperatorDecision>((resolve) => {
+          const timer = setTimeout(() => {
+            pending.delete(id);
+            resolve({ allow: false }); // 兜底：清理 + 不放行（判定语义以通道先到者为准）
+          }, cleanupAfterMs);
+          pending.set(id, { resolve, timer });
+          try {
+            opts.present(request);
+          } catch (err) {
+            clearTimeout(timer);
+            pending.delete(id);
+            throw err; // → 通道 unavailable（fail-closed，绝不当「没人问就放行」）
+          }
+        });
+      },
+    },
+    respond(input) {
+      const req = input && typeof input === "object" ? (input as { id?: unknown; allow?: unknown }) : {};
+      const id = typeof req.id === "string" ? req.id : "";
+      if (id === "" || !pending.has(id)) {
+        return { ok: false, expired: true, error: "此确认已失效（超时或应用重启），未获放行——请让角色重新发起。" };
+      }
+      finish(id, { allow: req.allow === true }); // 恰 allow:true 才放行；其余一律拒绝
+      return { ok: true };
+    },
+    rejectAllPending(_reason) {
+      for (const id of [...pending.keys()]) finish(id, { allow: false });
+    },
+    pendingCount: () => pending.size,
   };
 }
 

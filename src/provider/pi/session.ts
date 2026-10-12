@@ -30,8 +30,36 @@ export interface SessionEvent {
   detail?: unknown;
 }
 
+/**
+ * 会话入参可携带的**图片块**（设计 K-2）。形状**逐字**取自 pi-ai 的 `ImageContent`
+ * （`node_modules/@earendil-works/pi-ai/dist/types.d.ts:277-281`：`{ type:"image"; data; mimeType }`，
+ * `data` 为 base64 字符串）——**与 anthropic 原始形状不同**：SDK 在发送时自行转成 wire 形状
+ * `{ type:"image", source:{ type:"base64", media_type: mimeType, data } }`
+ * （`dist/api/anthropic-messages.js:88-104`；纯图无文时自动补 "(see attached image)"，:105-110）。
+ * 本文件**静态不导入任何 Pi 包**，故此处**逐字声明**镜像（同 FinalizeResult 等既有先例）。
+ */
+export interface PromptImage {
+  type: "image";
+  /** base64 编码的图片数据（不含 data: 前缀）。 */
+  data: string;
+  /** MIME 类型，如 "image/png" / "image/jpeg"。 */
+  mimeType: string;
+}
+
+/** `RoleSession.prompt` 的可选参数（设计 K-2）。 */
+export interface PromptOptions {
+  /** 可选图片附件（经 `session.prompt(text, { images })` 透传给 SDK）。 */
+  images?: PromptImage[];
+}
+
 export interface RoleSession {
-  prompt(text: string): Promise<void>;
+  /**
+   * 发送一条用户输入。**无第二参时逐字保留旧行为**（纯文本）。
+   * 带图（`opts.images`）时透传给 SDK 的 `prompt(text, options)`；模型是否多模态**不由本层猜测**
+   * （不按 `Model.input` 门控）——网关若拒绝，错误以该轮 `stopReason:"error"` 消息进入事件流，
+   * 或以异常上抛（两条路径 real-adapter 均已如实外推）。
+   */
+  prompt(text: string, opts?: PromptOptions): Promise<void>;
   events(): AsyncIterable<SessionEvent>;
   dispose(): Promise<void>;
 }
@@ -93,17 +121,15 @@ export type OperatorChannelFn = (
   prompt: OperatorPrompt,
 ) => Promise<OperatorOutcome | null | undefined> | OperatorOutcome | null | undefined;
 
-// —————————————— 创世收口能力（finalize_bootstrap，设计 §13.1；T36） ——————————————
+// —————————————— finalize 结果型（设计 §13.1；T36 遗留，供编排消费） ——————————————
 //
-// **来历（T36）**：设计 §13.1 的 `finalize_bootstrap` 工具要调用一个由**编排**构造、注入本适配器的能力——
-// 「提议收口、挂起等客户确认」（**不是「立即完成」**）。该能力的**形状**此前只在编排私有
-// `src/common/编排/finalize.ts` 声明（`FinalizeBootstrapFn` / `FinalizeResult`）。
-// 而 **§6 禁跨角色导入他人私有 `common/`**、**§一.2 禁 Provider 向上导入 Pipeline（编排公开面）**，
-// 故 Pi适配器**无正当通路**导入它。依设计 §3.11「唯一正当落点是 `common/shared/` 或 **§4 冻结契约家**」
-// 与 **T20 先例**（operator 三型逐字入本文件），把这两个形状**逐字**声明于本冻结契约家——
-// **读编排私有 `finalize.ts` 确认形状、不导入、不复制实现**。编排的 `FinalizeBootstrapFn` 由**结构类型**
-// 保证可注入（二者逐字一致）。**后续收敛（供编排）**：编排宜改为从本文件导入这两个形状，使来源唯一
-// （与 T20→T21 收敛 operator 三型的做法一致）。
+// **来历（T36）**：`finalize_bootstrap` 工具与 `FinalizeBootstrapFn` 曾随「提议收口、挂起等客户确认」而落于此；
+// 依设计 §3.11 与 T20 先例（operator 三型逐字入本文件），当时的两个结果型也**逐字**声明于本冻结契约家。
+//
+// **现状（2026-10-12，A-4 最后一步）**：`finalize_bootstrap` 工具与 `FinalizeBootstrapFn` 注入型**已删除**
+// （「同意才落盘」改由交互工具族 + 编排 writeSet/F4 承担，见上/下文）。`FinalizeStatus` / `FinalizeResult`
+// **保留**——编排（`src/pipeline/orchestration/govern-session.ts` 等）仍从本文件消费它们；
+// 待编排收口后另行裁决是否一并收敛。
 
 /** finalize 的结果状态（逐字取自编排 `src/common/编排/finalize.ts`；设计 §13.1）。 */
 export type FinalizeStatus =
@@ -127,12 +153,156 @@ export interface FinalizeResult {
   manifestRel: string;
 }
 
+// （已删除：`FinalizeBootstrapFn`——原「注入给 Pi适配器 `finalize_bootstrap` 工具的确切形状」。
+//  随该工具与注入槽一并移除，2026-10-12 A-4 最后一步；其结果型 FinalizeStatus/FinalizeResult 保留如上。）
+
+// —————————————— 客户确认制交互（request_confirmation / request_choice，设计 A-1） ——————————————
+//
+// **来历**：设计稿 `2026-10-12_design_governed-interaction-and-chat-ux.md` §三 A-1（客户确认制交互）
+// 规定：给治理角色 su 新增**交互工具族**（请求确认 / 请求选项-单选多选，前端渲染成交互卡）。
+// 与 T20（operator 三型）同一落点纪律——**冻结形状的单一来源是 §4 冻结契约家**
+// （本文件）；编排/CLI/桌面各自实现自己那半（通道、交互卡），只共用这里的**形状**。
+//
+// **为何另立三型而不复用 OperatorPrompt/OperatorOutcome**：勾选结果（`selected: string[]`）装不进
+// `OperatorOutcome`（只有 allow/deny/unavailable）；请求也带 preview/options 这类结构化载荷。
+// 「不造第二套确认机制」的约束落在**注入点形状**上（同为 `(req) => Promise<outcome>` 的注入 fn、
+// 同样 fail-closed 语义），而非逐字复用类型。
+
+/** 交互请求的单个选项（request_choice 用）。 */
+export interface CustomerInputOption {
+  /** 选项标识（回传 selected 用它；须在本次请求内唯一）。 */
+  id: string;
+  /** 面向客户的选项文案。 */
+  label: string;
+  /** 可选的补充说明。 */
+  description?: string;
+}
+
 /**
- * **创世收口能力**（注入给 Pi适配器 `finalize_bootstrap` 工具的**确切形状**，设计 §13.1 / T36）：
- * 调用即「**提议收口并挂起等客户确认**」（**不是**「立即完成」）。返回给模型/界面的反馈见 `FinalizeResult`。
- * 形状**逐字**取自编排 `src/common/编排/finalize.ts::FinalizeBootstrapFn`（读之确认，不导入）。
+ * 交互工具族交给客户通道的请求（设计 A-1）：
+ * - `confirm`：请求客户确认（可带预览——如「角色卡 + 边界摘要」全文）；
+ * - `choice`：请求客户从给定选项中单选/多选（`multiple` 缺省 false）。
  */
-export type FinalizeBootstrapFn = (opts?: { acceptanceSource?: string; now?: () => Date }) => Promise<FinalizeResult>;
+export type CustomerInputRequest =
+  | {
+      kind: "confirm";
+      /** 一句话概括请客户确认什么。 */
+      title: string;
+      /** 可选的预览内容（角色卡全文 + 边界摘要等，纯文本/markdown）。 */
+      preview?: string;
+      /** 可选的补充细节。 */
+      detail?: string;
+    }
+  | {
+      kind: "choice";
+      title: string;
+      question?: string;
+      options: CustomerInputOption[];
+      /** 单选缺省 false；true = 多选（勾选）。 */
+      multiple?: boolean;
+      preview?: string;
+    };
+
+/**
+ * 客户对交互请求的裁决（设计 A-1 **逐字**三态）：
+ * - `answered`：客户作答——confirm → `value.confirmed`；choice → `value.selected`（所选项 id）；
+ * - `declined`：客户拒绝（关闭/取消，未作答）——**未获同意**；
+ * - `unavailable`：通道不可用 / 超时 / 出错——**未获同意**（fail-closed）。
+ *
+ * `operatorId`（可选，同 `OperatorOutcome` 先例）供审计（谁答的）；`reason` 载拒绝/不可用的原因文案。
+ */
+export type CustomerInputOutcome =
+  | { outcome: "answered"; value: { confirmed?: boolean; selected?: string[] }; operatorId?: string }
+  | { outcome: "declined"; operatorId?: string; reason?: string }
+  | { outcome: "unavailable"; reason?: string };
+
+/**
+ * 「问客户」注入点（CLI 终端映射 / 桌面交互卡）。**未注入时两交互工具根本不注册**
+ * （「有无客户通道」由调用方以是否注入表达，同 `ShellGate` 先例）。
+ *
+ * 语义（与 §7.5 的四条通路同构）：抛错 → 视为通道不可用；返回 `null`/`undefined` → 不可用；
+ * **等待缺省不设限**（设计 G-1：卡在这等客户同意）；仅显式配置 `ANS_PI_CUSTOMER_INPUT_TIMEOUT_MS`
+ * 才计时（超时 = 未获同意）。三者都落「未获同意」。**诚实边界**：未决请求只在**进程内存**，
+ * 进程结束即失效——失效时（中止/通道不可用）本层如实返回「未获客户同意」，**绝不假装同意**。
+ */
+export type CustomerInputFn = (
+  req: CustomerInputRequest,
+) => Promise<CustomerInputOutcome | null | undefined> | CustomerInputOutcome | null | undefined;
+
+// —————————————— 交报告能力（submit_report，设计 C-1） ——————————————
+//
+// **来历**：设计稿 `2026-10-12_design_governed-interaction-and-chat-ux.md` §C-1（客户裁定「新增交报告工具」）：
+// 角色完成任务时交回一份**模型自己写的**报告（做了什么 / 结论 / 证据），交回 su 汇总。
+// 与 T20/A-1 同一落点纪律——**冻结形状的单一来源是 §4 冻结契约家**（本文件）。
+// 字段（status/summary/evidence）与编排 `TaskHandback` **同名同型**，便于编排按其取值；roleId/at 由编排补。
+
+/** 交给编排的回交报告载荷（设计 C-1；即 `submit_report` 的入参）。 */
+export interface ReportHandbackPayload {
+  /** 本轮结果：completed（完成）/ blocked（确认无法完成）。 */
+  status: "completed" | "blocked";
+  /** **模型自己写的**「改了什么 / 产出了什么」——一句话结论（如实）。 */
+  summary: string;
+  /** 关键证据：产物路径 / 变更 / 测试结论。 */
+  evidence?: string[];
+}
+
+/** 交报告能力的结果（编排在收到报告后如实给的回执）。 */
+export interface ReportHandbackReceipt {
+  ok: boolean;
+  message?: string;
+}
+
+/**
+ * 「交报告」注入点（设计 C-1）：**只给项目角色**（治理角色 su 不自我回交，故不给它——由编排以是否注入表达）。
+ * **未注入时 `submit_report` 根本不注册**（同 `ShellGate` / `CustomerInputFn` 先例）。
+ *
+ * 语义：调用即把**模型写好的报告**交给编排（回交 su 汇总）；抛错 → 视为交回失败（handler **如实**返回，
+ * 绝不谎报已交回）；返回 `null`/`undefined`/**void**（无回执）→ 视为**已接收**（编排的注入能力多为
+ * fire-and-forget——`(report) => void | Promise<void>`，**必须可注入**，故返回联合含 void）；
+ * 返回 `{ok:false}` → 交回被拒（如实转达）。载荷字段与编排 `TaskHandback` 同名同型（roleId/at 由编排补）。
+ */
+export type ReportHandbackFn = (
+  report: ReportHandbackPayload,
+) =>
+  | ReportHandbackReceipt
+  | null
+  | undefined
+  | void
+  | Promise<ReportHandbackReceipt | null | undefined | void>;
+
+// —————————————— 派发任务能力（dispatch_task，设计 H-1） ——————————————
+//
+// **来历**：设计稿 §H-1（客户原话「给 su 加一个工具，可以派发任务」）。**只给治理角色 su**——由编排以
+// 是否注入表达（同 customerInput/reportHandback 先例）。**语义硬约束（逐字取自设计）**：**派发 ≠ 授权**——
+// 目标角色的写权仍只来自它自己的 Section 1 与 `request_confirmation` 的 `confirmed:true`；派发只是把
+// 「任务与上下文」送过去（沿用 SKILL 的交接语义：转移任务与证据，**不转移身份或写权**）。
+
+/** 派发任务的载荷（设计 H-1；即 `dispatch_task` 的入参）。 */
+export interface DispatchTaskPayload {
+  /** 目标角色 id（**由注入能力做语义校验**：非本项目角色 / 指向 su 自身 → 以回执回错，本层如实转达）。 */
+  roleId: string;
+  /** 任务文本（**须自足**：目标角色看不到 su 的上下文——做什么 / 依据哪份文档 / 完成标准）。 */
+  task: string;
+  /** 可选：为什么派发（给目标角色与留痕看）。 */
+  reason?: string;
+}
+
+/** 派发能力的结果（编排在受理/拒绝后如实给的回执）。 */
+export interface DispatchReceipt {
+  ok: boolean;
+  message?: string;
+}
+
+/**
+ * 「派发任务」注入点（设计 H-1）。**未注入时 `dispatch_task` 根本不注册**（同 `ShellGate`/`CustomerInputFn`
+ * 先例；**只给 su**——编排对项目角色不注入 ⇒ 工具不存在）。语义：调用即把**任务与上下文**交给编排路由
+ * （前端把派发转成目标角色会话的一条输入）；抛错 → 交回失败（handler **如实**返回，**绝不谎称已派发**）；
+ * 返回 `null`/`undefined`/**void**（无回执）→ 视为**已受理**（编排能力多为 fire-and-forget，返回位须含 void，
+ * 同 `ReportHandbackFn` 的接缝教训）。**派发 ≠ 授权**：本能力不得被实现方用于授予任何写权。
+ */
+export type DispatchTaskFn = (
+  dispatch: DispatchTaskPayload,
+) => DispatchReceipt | null | undefined | void | Promise<DispatchReceipt | null | undefined | void>;
 
 export interface RuntimeAdapter {
   composeContext(role: ResolvedRole): Promise<{ systemPrompt: string }>;
@@ -184,10 +354,23 @@ export function createFakeRuntimeAdapter(opts: {
   /** shell 审核硬超时（毫秒）；缺省读环境变量，再缺省 120000。 */
   shellReviewTimeoutMs?: number;
   /**
-   * 创世收口能力（设计 §13.1 / T36）：由编排构造、注入。**仅当注入时** `finalize_bootstrap` 工具才注册
-   * （**同 `shellGate` 的「未注入即不注册」先例**——能力注入决定注册；调用方**只在创世态**才注入）。
+   * 客户确认制交互能力（设计 A-1）：由编排/前端构造、注入。**仅当注入时** `request_confirmation` /
+   * `request_choice` 两工具才注册（**同 `shellGate` 的「未注入即不注册」先例**——
+   * 判据是「有无客户通道」）。
    */
-  finalizeBootstrap?: FinalizeBootstrapFn;
+  customerInput?: CustomerInputFn;
+  /** 交互等待硬超时（毫秒）；**缺省不设限**（G-1：一直等客户作答）——仅显式给出本项或环境变量 `ANS_PI_CUSTOMER_INPUT_TIMEOUT_MS` 才计时。**超时 = 未获同意**。 */
+  customerInputTimeoutMs?: number;
+  /**
+   * 交报告能力（设计 C-1）：由编排构造、注入。**仅当注入时** `submit_report` 工具才注册
+   * （**同 `shellGate` 的「未注入即不注册」先例**；只给项目角色——su 不注入即不注册）。
+   */
+  reportHandback?: ReportHandbackFn;
+  /**
+   * 派发任务能力（设计 H-1）：由编排构造、注入。**仅当注入时** `dispatch_task` 工具才注册
+   * （**只给 su**——编排对项目角色不注入 ⇒ 不存在；同 `shellGate` 先例）。
+   */
+  dispatchTask?: DispatchTaskFn;
 }): RuntimeAdapter {
   const script = opts.script ?? DEFAULT_FAKE_SCRIPT;
 
@@ -204,14 +387,22 @@ export function createFakeRuntimeAdapter(opts: {
         shellGate: opts.shellGate,
         shellCwd: opts.shellCwd,
         shellReviewTimeoutMs: opts.shellReviewTimeoutMs,
-        finalizeBootstrap: opts.finalizeBootstrap,
+        customerInput: opts.customerInput,
+        customerInputTimeoutMs: opts.customerInputTimeoutMs,
+        reportHandback: opts.reportHandback,
+        dispatchTask: opts.dispatchTask,
       });
       const byName = new Map(tools.map((t) => [t.name, t]));
       const queue = createEventQueue<SessionEvent>();
 
       return {
-        async prompt(text: string): Promise<void> {
-          queue.push({ kind: "message", summary: `用户指令：${text}` });
+        async prompt(text: string, opts?: PromptOptions): Promise<void> {
+          // 假适配器没有模型，**不消费图片**——但签名保持与契约一致（K-2）；无图时事件逐字不变。
+          const imageCount = opts?.images?.length ?? 0;
+          queue.push({
+            kind: "message",
+            summary: imageCount > 0 ? `用户指令：${text}（附 ${imageCount} 张图片）` : `用户指令：${text}`,
+          });
 
           for (const call of script) {
             queue.push({
@@ -275,10 +466,32 @@ export interface PiRuntimeAdapterOptions extends PiProviderConfigInput {
   /** shell 命令级闸（设计 §7.2）；由编排装配后注入。**缺省时 run_shell 不注册**（§7.5.1）。 */
   shellGate?: ShellGate;
   /**
-   * 创世收口能力（设计 §13.1 / T36）：由编排构造、注入。**仅当注入时** `finalize_bootstrap` 工具才注册
-   * （**同 `shellGate` 的「未注入即不注册」先例**——能力注入决定注册；调用方**只在创世态**才注入）。
+   * 客户确认制交互能力（设计 A-1）：由编排/前端构造、注入。**仅当注入时** `request_confirmation` /
+   * `request_choice` 两工具才注册（判据是「有无客户通道」）。
    */
-  finalizeBootstrap?: FinalizeBootstrapFn;
+  customerInput?: CustomerInputFn;
+  /**
+   * 交互等待硬超时（毫秒）；**缺省不设限**（G-1）——仅显式给出或环境变量 `ANS_PI_CUSTOMER_INPUT_TIMEOUT_MS`
+   * 才计时。等待期间 real-adapter 会经活动闸**暂停每轮硬超时**（作答后按剩余时间恢复），
+   * 「等客户」的轮次不再被整轮时限掐断。
+   */
+  customerInputTimeoutMs?: number;
+  /**
+   * 交报告能力（设计 C-1）：由编排构造、注入。**仅当注入时** `submit_report` 工具才注册
+   * （判据是「本会话有回交目标」；只给项目角色——su 不注入即不注册）。
+   */
+  reportHandback?: ReportHandbackFn;
+  /**
+   * 派发任务能力（设计 H-1）：由编排构造、注入。**仅当注入时** `dispatch_task` 工具才注册
+   * （**只给 su**——由编排以是否注入表达）。
+   */
+  dispatchTask?: DispatchTaskFn;
+  /**
+   * 会话持久化目录（设计 D-1，重启恢复）：**给了** ⇒ 该项目角色的会话以 JSONL 落盘于该目录
+   * （有最近会话即恢复，否则新建；**应逐角色隔离**，如 `<项目>/.ans/sessions/<角色>/`）；
+   * **缺省** ⇒ 逐字保留旧行为（`SessionManager.inMemory`，不落盘）。适配器只读写该目录，不碰 `~/.pi`。
+   */
+  sessionDir?: string;
   /** prompt 硬超时（毫秒）；缺省读 ANS_PI_PROMPT_TIMEOUT_MS，再缺省 120000。 */
   promptTimeoutMs?: number;
   /** 构造期单步硬超时（毫秒）；缺省读 ANS_PI_CONSTRUCT_TIMEOUT_MS，再缺省 120000。 */

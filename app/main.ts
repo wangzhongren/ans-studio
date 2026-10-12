@@ -12,9 +12,10 @@
 
 import path from "node:path";
 import os from "node:os";
+import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { app, BrowserWindow, dialog, ipcMain, Menu } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
 
 import { createDesktopInterface, type DesktopInterface } from "./desktop/interface.ts";
 // Pi 配置（设计 §11/T28）：启动把仓库根 `.env` 载入 `process.env`（= 补上 Electron 缺失的 `--env-file`）；
@@ -22,15 +23,25 @@ import { createDesktopInterface, type DesktopInterface } from "./desktop/interfa
 // （pm 属主）——此处**只读导入，不复制**；路径由 `./desktop/pi-config.ts` 解析（可注入，测试/e2e 用临时路径）。
 import { loadEnvFileInto } from "../src/common/shared/env-file.ts";
 import { resolveRepoEnvPath } from "./desktop/pi-config.ts";
-// 会话事件外推的类型：编排把会话事件流放宽为 `OrchestrationEvent`（既有 `SessionEvent` + 编排在 `settled`
-// 时追加的 `handback` 回交事件，设计 §10.8）。**从编排的模块只读导入、不复制形状**——IPC 外推原样透传。
-import type { OrchestrationEvent } from "../src/common/编排/handback.ts";
+// 会话事件外推的类型（B-2）：`SessionEventEnvelope` = `{roleId, event}` 信封（多会话并存按角色分发，防串消息）；
+// `event` 为编排导出的 `OrchestrationEvent`（既有 `SessionEvent` + `settled` 时的 `handback`，设计 §10.8）。
+// **类型从本角色 session.ts 只读导入、不复制形状**——IPC 外推原样透传。
+import type { SessionEventEnvelope } from "./desktop/session.ts";
 import {
+  buildDesktopShellArming,
   createDesktopOperatorChannel,
+  createShellConfirmPresenter,
   DESKTOP_SHELL_GATE_ARMED,
   type OperatorPresenter,
-  type OperatorDecision,
 } from "./desktop/operator-channel.ts";
+// 客户交互通道（A-5，2026-10-12）：su 的 request_confirmation / request_choice 经它摆到聊天流里的交互卡
+// 并取回客户裁决（per-window pending Map + **按请求快照校验回包**——渲染进程输入不可信）。
+import { createCustomerInputChannel } from "./desktop/customer-input.ts";
+// 会话记录恢复（D-1，2026-10-12）：只读解析 `<project>/.ans/sessions/<roleId>/` 的最近会话（**主进程侧**；
+// 渲染进程不碰 Pi SDK/JSONL——只收规范化后的界面行）。
+import { readRoleSessionHistory, type ReplayRow } from "./desktop/session-history.ts";
+// Q-1（2026-10-12 客户「很多操作会阻碍主线程」）：热路径**合并推送**——事件按≈一帧窗口批量、角色状态快照去抖。
+import { createEventBatcher, createRoleStateDebouncer } from "./desktop/push-batcher.ts";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -79,79 +90,37 @@ function createWindow(): BrowserWindow {
   return win;
 }
 
-// —————————————————————— 操作者确认通道 (a)：就绪，但 V1 桌面**不 arm** ——————————————————————
+// —————————————————————— 操作者确认通道 (a)：**已 arm**（I-1；M-1 起为**应用内确认卡**）——————————————————————
 //
-// 本处把操作者通道 (a) 的**表现层**接到 Electron：一条「看命令原文、点放行/拒绝」的确认对话框。
-// 它**只**呈现原文与收选择，**不做任何命令判定**（危险与否由 (c) 判、语义由 (b) 判；第三闸就是「人」本身）。
-// 通道的入参/出参形状以**编排**的 `OperatorChannelFn`（`OperatorPrompt`→`OperatorOutcome`）为准，见
-// `app/desktop/operator-channel.ts`；本表现层只把 `display.text`（逐字原文 + 升级原因）摆给人看。
+// 本处把操作者通道 (a) 的**表现层**接到 Electron；它**只**呈现与收选择，**不做任何命令判定**（危险与否由
+// (c) 判、语义由 (b) 判；第三闸就是「人」本身）。通道的入参/出参形状以**编排**的 `OperatorChannelFn`
+// （`OperatorPrompt`→`OperatorOutcome`）为准，见 `app/desktop/operator-channel.ts`。
 //
-// **V1 桌面刻意不 arm shell 闸**（`DESKTOP_SHELL_GATE_ARMED === false`，理由见 operator-channel.ts 顶部）：
-// 不注入 `ShellGate` ⇒ Pi 适配器**不注册 `run_shell`**（能力缺席 = 最强 fail-closed，§7.5.1）。
-// 故以下只是**就绪**，**当前未被任何会话消费**——如实标注，不假装在用。
-// arm 时（客户拍板后）：① 编排用本通道 + (c)/(b) 装配 `ShellGate`（编排 T8）；
-// ② 经 `app/desktop/interface.ts` 的 `shellGate` 接缝注入会话构造路径。
-function createElectronOperatorPresenter(win: BrowserWindow): OperatorPresenter {
-  return {
-    async present(_prompt, display): Promise<{ allow: boolean }> {
-      // 逐字展示命令原文 + 规范化 argv + cwd（+ 升级原因若 (b) 提供）；display.text 由 operator-channel 如实构造。
-      // 「拒绝」为默认高亮与取消项——关窗 = 不放行（fail-closed 的 UI 侧同向）。
-      const result = await dialog.showMessageBox(win, {
-        type: "warning",
-        buttons: ["放行执行", "拒绝"],
-        defaultId: 1,
-        cancelId: 1,
-        noLink: true,
-        title: "shell 审核 · 操作者确认",
-        message: "一条 shell 命令需要你确认后才执行（请逐字核对下方命令原文）",
-        detail: display.text,
-      });
-      return { allow: result.response === 0 };
-    },
-  };
-}
-
-/** 就绪的桌面操作者通道 (a)（**V1 不 arm，未接入任何会话**——见上）。 */
-function buildDesktopOperatorChannel(win: BrowserWindow) {
+// **客户已裁定 arm（2026-10-12，I-1）**：「现在开放 shell，然后 shell 需要 su 审核一下。如果 su 觉得危险
+// 可以让客户决定」——`DESKTOP_SHELL_GATE_ARMED === true`（理由与已知风险见 operator-channel.ts 顶部）。
+// **M-1（2026-10-12 客户裁定「这个太丑了」）**：确认从**原生对话框**改为**应用内卡片**（复用工作台视觉；
+// 命令等宽块 + 白话摘要 + 人话版「为什么问你」 + 折叠的技术详情）——数据面由
+// `createShellConfirmPresenter` 经 `shell:confirm-request` 推达渲染侧、决定经 `shell:confirm-response` 回传
+// （**恰 allow:true 才放行**；Esc/关窗/超时 → 不放行；关窗 ⇒ `rejectAllPending`）。**只对项目角色**生效
+// （su 自身不 arm——审读者不给自己开闸）。fail-closed 三条（关窗/取消/超时 → 不放行）在 operator-channel.ts。
+/** 桌面操作者通道 (a)（**I-1 已 arm**；presenter 由 `registerIpc` 的 `shellConfirm.presenter` 提供——见彼处）。 */
+function buildDesktopOperatorChannel(presenter: OperatorPresenter) {
   let operatorId = "unknown";
   try {
     operatorId = os.userInfo().username || "unknown";
   } catch {
     operatorId = "unknown";
   }
-  return createDesktopOperatorChannel({ presenter: createElectronOperatorPresenter(win), operatorId });
+  return createDesktopOperatorChannel({ presenter, operatorId });
 }
 
-// —————————————————————— 客户确认通道 (a)：bootstrap 收口的确认面（T38） ——————————————————————
+// —————————————————————— 客户交互通道（A-5）：确认制交互卡 ——————————————————————
 //
-// 客户裁定（设计 §13/§13.4）：**完成 bootstrap = su 主动提议 → 界面把这件事摆给客户 → 客户确认 → 才落盘**。
-// finalize 收口时经**同一个 (a) 通道**（`OperatorChannelFn`，**不造第二套**）把「su 提议收口」摆给客户——
-// 本处把该提议渲染为**聊天流里的一张确认卡**（客户要求「提议在聊天流可见，不是只闪一个按钮」），
-// 而非 shell 闸那种系统对话框：提议经 `session:finalize-proposal` 推给渲染侧；
-// 客户点 `[确认完成]`/`[暂不]` 后经 `session:finalize-confirm` 回传，解挂下面的 Promise。
-// **fail-closed**：窗口已关 / 超时（`createDesktopOperatorChannel` 的硬超时）/ 拒绝 → **非放行**（不完成）。
-function createFinalizePresenter(
-  win: BrowserWindow,
-  pending: Map<string, (d: OperatorDecision) => void>,
-): OperatorPresenter {
-  return {
-    present(prompt): Promise<OperatorDecision> {
-      return new Promise<OperatorDecision>((resolve) => {
-        if (win.isDestroyed()) {
-          resolve({ allow: false, note: "窗口已关闭，无法确认收口（fail-closed）" });
-          return;
-        }
-        pending.set(prompt.toolCallId, resolve);
-        // 提议原文（`prompt.command`，如「su 提议：可以收口了（完成 bootstrap）」）+ 将写出什么（`prompt.reason`）。
-        win.webContents.send("session:finalize-proposal", {
-          toolCallId: prompt.toolCallId,
-          proposal: typeof prompt.command === "string" ? prompt.command : "",
-          reason: typeof prompt.reason === "string" ? prompt.reason : "",
-        });
-      });
-    },
-  };
-}
+// 客户裁定（设计 A-1/A-5，2026-10-12）：「客户确定了才加、才落盘」——su 的 `request_confirmation` /
+// `request_choice` 挂起等客户作答时，经本通道把请求渲染为**聊天流里的一张交互卡**（确认 / 单选 / 多选 /
+// 带预览的确认），客户作答后回传解挂。**fail-closed 四条**（设计 A-5）：未接线 / 窗口已关 → 未获同意；
+// 客户点「不同意/取消」→ declined；超时（Pi适配器工具层的 withTimeout）→ unavailable。**绝不悄悄放行**。
+// 通道的关联/校验/归三态全在 `customer-input.ts`（纯逻辑，可单测）；本处只接线窗口与 IPC。
 
 function desktopOperatorId(): string {
   try {
@@ -161,30 +130,98 @@ function desktopOperatorId(): string {
   }
 }
 
-/** 桌面 bootstrap 收口的**客户确认通道**（T38）——同一 (a) 通道工厂，presenter 渲染为**应用内确认卡**。 */
-function buildDesktopFinalizeChannel(
-  win: BrowserWindow,
-  pending: Map<string, (d: OperatorDecision) => void>,
-) {
-  return createDesktopOperatorChannel({
-    presenter: createFinalizePresenter(win, pending),
-    operatorId: desktopOperatorId(),
-  });
+/** D-1：逐角色读取会话历史并推给渲染侧（**只读**；失败如实携带 error；无内容不推——不刷屏）。 */
+async function pushSessionHistories(win: BrowserWindow, projectRoot: string, roleIds: string[]): Promise<void> {
+  for (const roleId of roleIds) {
+    let payload: { roleId: string; projectRoot: string; rows: ReplayRow[]; error: string | null };
+    try {
+      const hist = await readRoleSessionHistory(projectRoot, roleId);
+      payload = { roleId, projectRoot, rows: hist.rows, error: hist.error ?? null };
+    } catch (err) {
+      // 模块内已防御式；此处再兜一层——恢复失败**绝不**阻断导入。
+      payload = { roleId, projectRoot, rows: [], error: err instanceof Error ? err.message : String(err) };
+    }
+    if (win.isDestroyed()) return;
+    if (payload.rows.length === 0 && payload.error === null) continue; // 无可回放内容：不打扰
+    win.webContents.send("session:history", payload);
+  }
 }
 
 function registerIpc(win: BrowserWindow): void {
-  // 事件外推：主进程 → 渲染进程（会话事件流）。入参为编排导出的 `OrchestrationEvent`
-  // （含 `handback` 回交事件，§10.8）；原样透传，主进程不判定、不加工。
-  const emitEvent = (ev: OrchestrationEvent): void => {
-    if (win.isDestroyed()) return;
-    win.webContents.send("session:event", ev);
+  // 事件外推：主进程 → 渲染进程（会话事件流）。入参为**带 `roleId` 信封**的 `SessionEventEnvelope`
+  // （B-2：多会话并存，渲染侧按角色分发——不带标识会串消息）；原样透传，主进程不判定、不加工。
+  // **Q-1（2026-10-12）合帧推送**：一轮可含几百个事件（tool_call/读文件/结果…），逐事件一次 IPC +
+  // 逐事件渲染会把主线程淹掉——16ms（≈一帧）窗口内合成**一次** `session:events`（数组）；
+  // preload 同时订阅单发 `session:event`（兼容既有探针/直发路径）。事件顺序在批内保持不变。
+  const eventBatcher = createEventBatcher<SessionEventEnvelope>({
+    windowMs: 16,
+    send: (batch) => {
+      if (win.isDestroyed()) return;
+      win.webContents.send("session:events", batch);
+    },
+  });
+  const emitEvent = (envelope: SessionEventEnvelope): void => {
+    eventBatcher.push(envelope);
   };
+  // **Q-1：角色状态快照去抖**（同角色窗口内只留**最新**快照——快照语义）——≥100ms 一次而非每事件一次。
+  const roleStateDebouncer = createRoleStateDebouncer<{
+    roleId: string;
+    busy: boolean;
+    summaries: string[];
+    queue: { kind: string; sourceRoleId: string; summary: string; at: string }[];
+    running: { kind: string; sourceRoleId: string; summary: string; at: string } | null;
+  }>({
+    windowMs: 100,
+    send: (info) => {
+      if (win.isDestroyed()) return;
+      win.webContents.send("session:role-state", info);
+    },
+  });
+  // 关窗：清掉挂起的合并/去抖计时器（窗口已没了，不再推）。
+  win.on("closed", () => {
+    eventBatcher.dispose();
+    roleStateDebouncer.dispose();
+  });
 
-  // 客户确认通道 (a)（T38）：finalize 收口的确认面——提议经 `session:finalize-proposal` 推给渲染侧渲染成
-  // 一张卡；渲染侧点 [确认完成]/[暂不] 后经 `session:finalize-confirm` 回传，解挂下面的确认 Promise
-  // （→ 通道返回 allow/deny → finalize 落盘 / 不完成）。**挂在窗口作用域**（每个窗口一套）。
-  const finalizePending = new Map<string, (d: OperatorDecision) => void>();
-  const finalizeChannel = buildDesktopFinalizeChannel(win, finalizePending);
+  // 客户交互通道（A-5）：请求经 `session:operator-request` 推给渲染侧渲染成交互卡；客户决定经
+  // `session:operator-response` 回传、在通道内**按请求快照校验**后解挂。**挂在窗口作用域**（每窗口一套）。
+  const customerChannel = createCustomerInputChannel({
+    presenter: (payload) => {
+      if (win.isDestroyed()) throw new Error("窗口已关闭，无法呈现交互请求");
+      win.webContents.send("session:operator-request", payload);
+    },
+    operatorId: desktopOperatorId(),
+  });
+  // 窗口关掉：所有挂起请求归「未获同意」（fail-closed）——不留悬案、更不放行。
+  win.on("closed", () => customerChannel.rejectAllPending("窗口已关闭，未获同意（fail-closed）"));
+
+  // M-1（2026-10-12 客户裁定「这个太丑了」）：shell 确认卡的**呈现端**——不再用原生消息框。
+  // 数据面（命令逐字原文 + 人话摘要/原因 + 折叠详情）经 `shell:confirm-request` 推给渲染侧；客户决定经
+  // `shell:confirm-response` 回传（**恰 allow:true 才放行**；Esc/关闭/超时 → 不放行）。
+  // fail-closed：窗口已关时推达抛错 ⇒ 通道归 unavailable（绝不当「没人问就放行」）；关窗 ⇒ 全部挂起不放行。
+  const shellConfirm = createShellConfirmPresenter({
+    present: (request) => {
+      if (win.isDestroyed()) throw new Error("窗口已关闭，无法呈现 shell 确认请求");
+      win.webContents.send("shell:confirm-request", request);
+    },
+  });
+  win.on("closed", () => shellConfirm.rejectAllPending("窗口已关闭，未获放行（fail-closed）"));
+  ipcMain.handle("shell:confirm-response", (_e, input) => shellConfirm.respond(input));
+
+  // I-1（2026-10-12，客户裁定 arm——「现在开放 shell…如果 su 觉得危险可以让客户决定」）+ I-1 补丁
+  // （2026-10-12 客户**重发授权**：接上 (c) 规则集实件）：arm 的**两件**——(c) 实件（`classifyShell` +
+  // `defaultShellRules`，经 `buildDesktopShellArming` 只读导入）与 (a) 操作者确认通道——**同处接线**，
+  // 经 `createDesktopInterface` → 会话构造路径交给**编排**装配 (c)/(b)/(a) `ShellGate`；
+  // **只对项目角色**生效（session.ts 的 `role.builtIn` 判据——su 自身不 arm）。
+  //
+  // **两件同备才 arm（fail-closed）**：(c) 实件构造/加载失败 ⇒ **连 (a) 通道也不注入**——`run_shell`
+  // 不注册（能力缺席即最强 fail-closed；不取「注册了但全拒」的半装态）。如实告知到主进程日志（无敏感值）。
+  const shellArming = DESKTOP_SHELL_GATE_ARMED ? buildDesktopShellArming() : undefined;
+  if (DESKTOP_SHELL_GATE_ARMED && shellArming === undefined) {
+    console.warn("shell 闸未 arm：(c) 规则集加载失败——fail-closed（run_shell 不注册）。");
+  }
+  const shellOperatorChannel =
+    shellArming !== undefined ? buildDesktopOperatorChannel(shellConfirm.presenter) : undefined;
 
   const desktop = createDesktopInterface({
     pickDirectory: async () => {
@@ -196,37 +233,71 @@ function registerIpc(win: BrowserWindow): void {
       return result.filePaths[0];
     },
     emitEvent,
+    // L-1 + 状态准确性 + 右栏「待办 / 队列」（2026-10-12 追加）：真实状态快照（busy × 队列[结构化] × 进行中，
+    // 变化时）原样透传渲染侧——徽标「工作中 · N 待办」、队列行与右栏待办组都只信它（同一通道，不造第二套）。
+    // Q-1：**去抖合并**（同角色只推最新快照，≥100ms 一次）——不再是每事件一次 IPC。
+    emitRoleState: (info) => {
+      roleStateDebouncer.push(info);
+    },
     // 「项目内容可能已变」（su 一轮结束）→ 推 `project:changed` 给渲染侧，触发左树重取枚举（§10.3）。
     // 仅转达信号；是否真有角色被建出由渲染侧重取 `listProject` 后如实呈现（判定不在此）。
     emitProjectChanged: () => {
       if (win.isDestroyed()) return;
       win.webContents.send("project:changed");
     },
-    // 客户确认通道（T38）：finalize 收口时经它把「su 提议收口」摆给客户确认（仅创世 finalize 会话消费）。
-    operatorChannel: finalizeChannel,
+    // 客户交互通道（A-5）：仅内置治理角色（su）会话消费（见 session.ts 的注入判据）。
+    customerInput: customerChannel.customerInput,
+    // B-1：Markdown 链接外开——**校验在 Interface 层**（仅 http/https），此处只接系统浏览器（表现层）。
+    openExternalFn: (url) => shell.openExternal(url),
+    // I-1：arm 的 (a) 层（仅项目角色会话消费；见 session.ts）。未 arm 时为 undefined（等同不注入）。
+    shellOperatorChannel,
+    // I-1 补丁（2026-10-12 客户重发授权）：(c) 规则集实件（与 (a) 同处接线、同判据——两件同备才 arm）。
+    shellArming,
+    // K-2：选图（**渲染进程不碰文件**）——系统文件选择器 + 读文件；字节交 Interface **按真实内容**校验
+    // （类型嗅探/≤5MB 都在 interface 层；此处只读不判）。取消 → null（如实回 `cancelled`）。
+    pickImageFileFn: async () => {
+      const result = await dialog.showOpenDialog(win, {
+        title: "选择图片",
+        properties: ["openFile"],
+        filters: [{ name: "图片", extensions: ["png", "jpg", "jpeg", "webp", "gif"] }],
+      });
+      if (result.canceled || result.filePaths.length === 0) return null;
+      const filePath = result.filePaths[0];
+      const buf = await fs.promises.readFile(filePath);
+      return { name: path.basename(filePath), dataBase64: buf.toString("base64") };
+    },
   });
   iface = desktop;
 
-  // 收口确认的回传（T38）：渲染侧点 [确认完成]/[暂不] → 解挂待确认 Promise（无待确认项时如实回 ok:false）。
-  ipcMain.handle("session:finalize-confirm", (_e, input: { toolCallId?: string; allow?: boolean }) => {
-    const toolCallId = input && typeof input.toolCallId === "string" ? input.toolCallId : "";
-    const resolve = finalizePending.get(toolCallId);
-    if (!resolve) return { ok: false, error: "没有待确认的收口提议" };
-    finalizePending.delete(toolCallId);
-    resolve({ allow: input?.allow === true });
-    return { ok: true };
-  });
+  // 交互回包（A-5）：渲染侧提交决定 → 通道按**请求快照**校验（选项 id ⊆ 已发、单选恰一个、类型相符）
+  // → 解挂为冻结三态；非法回包不受理（pending 保留，界面可重试失败后修正）。
+  ipcMain.handle("session:operator-response", (_e, input) =>
+    customerChannel.respond(input && typeof input === "object" ? input : {}),
+  );
 
   ipcMain.handle("app:pick-project", () => desktop.pickProject());
-  ipcMain.handle("app:list-project", (_e, input: { projectRoot: string }) => desktop.listProject(input));
+  // D-1（2026-10-12）：导入/重载项目后**恢复界面记录**——对每个角色只读解析 `<project>/.ans/sessions/<roleId>/`
+  // 的**最近**会话并推 `session:history`（渲染侧回放进该角色的聊天流；模型上下文由 Pi适配器侧一并恢复）。
+  // 防御式：解析失败/目录缺失**不阻断导入**（失败如实提示，不崩、不静默）。
+  ipcMain.handle("app:list-project", async (_e, input: { projectRoot: string }) => {
+    const res = await desktop.listProject(input);
+    const roles = Array.isArray(res && res.roles) ? res.roles.map((r) => r.roleId) : [];
+    void pushSessionHistories(win, res.projectRoot, roles);
+    return res;
+  });
   // 点角色即开：一次调用直接建立会话（导入项目即授权，无确认框）。
   ipcMain.handle("session:open", (_e, input) => desktop.openSession(input));
   ipcMain.handle("session:send", (_e, input: { text: string }) => desktop.sendSession(input));
-  ipcMain.handle("session:stop", () => desktop.stopSession());
-  // 创世 finalize（T36）：由渲染侧「完成 bootstrap」动作**显式触发**。读取状态无副作用；finalize 写入
-  // 经门禁 `resolveWrite`（与 su 同一授权），被拒即零副作用、结果如实回给渲染侧（含 reason）。
-  ipcMain.handle("session:bootstrap-state", () => desktop.getBootstrapState());
-  ipcMain.handle("session:finalize", () => desktop.finalizeBootstrap());
+  ipcMain.handle("session:stop", (_e, input) => desktop.stopSession(input));
+  // B-2：保活会话列表（左树「有活动会话」小圆点的数据源）——纯读。
+  ipcMain.handle("session:live", () => desktop.listLiveSessions());
+  // B-1：Markdown 链接外开——渲染进程输入经 Interface 校验（仅 http/https）后交系统浏览器。
+  ipcMain.handle("app:open-external", (_e, input) => desktop.openExternal(input));
+  // K-2：输入区图片——选图（主进程读文件）与粘贴/拖入字节校验（渲染进程不碰文件；送模型未接——登记）。
+  ipcMain.handle("app:pick-image", () => desktop.pickImage());
+  ipcMain.handle("app:attach-image", (_e, input) => desktop.attachImage(input));
+  // （A-5：随「收口」删除——产物收尾现由编排在 su 会话 settle 后**自动**完成；桌面不再有
+  //   「完成 bootstrap」的读状态/显式触发两个 IPC；客户确认已改由交互卡承担。）
 
   // —— Pi 配置面板（设计 §11/T28）：读取/保存仓库根 `.env` ——
   // 逻辑全在 Interface 层（`getPiConfig`/`savePiConfig` → `pi-config.ts` → 共享 `env-file`）；
@@ -262,15 +333,10 @@ function registerIpc(win: BrowserWindow): void {
     if (!win.isDestroyed()) win.webContents.send("window:maximized-changed", false);
   });
 
-  // —— 操作者通道 (a)：**V1 不 arm**，故此处不构造、不注入 ——
-  // `DESKTOP_SHELL_GATE_ARMED === false` ⇒ 会话构造路径不注入 `ShellGate` ⇒ `run_shell` 不注册
-  // （能力缺席 = 最强 fail-closed）。下面这个分支**恒不执行**，只为把「arm 时的接线点」如实标出，
-  // 并确保两处（flag / 就绪通道）都在本文件被引用，不被误当「已在使用」。
-  if (DESKTOP_SHELL_GATE_ARMED) {
-    // arm 时：编排用 buildDesktopOperatorChannel(win) 装配 ShellGate 后，经
-    // createDesktopInterface({ ..., shellGate }) 注入。当前恒为死分支。
-    void buildDesktopOperatorChannel(win);
-  }
+  // —— 操作者通道 (a)：**I-1 已 arm** ——
+  // 构造与注入已在上方（`shellOperatorChannel` → `createDesktopInterface`）完成：arm 后 (a) 通道经会话构造
+  // 路径交给**编排**装配 (c)/(b)/(a) `ShellGate`，Pi 适配器据此注册 `run_shell`（仅项目角色；su 不 arm）。
+  // fail-closed 三条（关窗/取消/拒绝/超时/抛错 → 不放行）见 `app/desktop/operator-channel.ts`。
 }
 
 app.whenReady().then(async () => {

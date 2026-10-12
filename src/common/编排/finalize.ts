@@ -1,56 +1,53 @@
 // src/common/编排/finalize.ts
-// **创世 finalize**（设计 §13 / 派发清单 T37）：su（模型）**不会算 hash**，故 pin **只能由代码在
-// su 写完「之后」** 算。本模块即那台「事后」机器 + 收口的**确认闸**。
+// **创世自动收尾**（设计 §12.5/§13 经 2026-10-12 A-4 改造）：su（模型）**不会算 hash**，故 pin
+// **只能由代码在 su 写完「之后」**算。本模块即那台「事后」机器——**不再有任何人工确认步骤**。
 //
-// ── T37 语义改造：从「被调用即完成」→「提议收口、挂起等客户确认」─────────────────────
-// 客户裁定（2026-10-11）：「完成 bootstrap 应该是 su 主动觉得差不多了来完成；后面 su 可以动态增加和
-// 修改」+「当然需要客户确认」。故本模块的 `finalize` **不再**「被调用即完成」——它是
-//   su 主动提议 → 挂起等客户确认 → **确认通过才落盘**。
-// 确认通道**复用 shell 闸的 (a) 操作者确认通道 `OperatorChannelFn`**（形状单一来源在 §4 冻结契约家
-// `src/provider/pi/session.ts`；**不造第二套确认机制**）——提议是**一种 `OperatorPrompt`**。
-// **fail-closed**：确认通道不可用 / 超时 / 客户拒绝 → **不完成**，并给 su 反馈（如「收口未获确认」），
-// su 可继续工作或稍后再提议。这与 shell 闸「没有确认就不执行」**同构**。
+// ── A-4（2026-10-12）：删「提议 + 确认」，保留「自动收尾」─────────────────────────────
+// 客户裁定：「客户确定了才加，不要有个收口，收口去掉」。故：
+//   · **删**：`createSessionFinalizer`/`createFinalizeProposer`（su 提议 → 挂起等客户确认 → 才落盘）
+//     整段，以及 CLI 的 `finalizeBootstrap` arm——「同意才落盘」的客户确认改由 **A-1 交互工具族**
+//     （`request_confirmation`/`request_choice`，见 `src/common/编排/confirmed-writes.ts` 的 writeSet 发行）
+//     承担，确认发生在**写入之前**、由门禁 F4 兜硬底。
+//   · **留**：**写入本体**（`finalizeBootstrap`）与**自动触发**——`repinIfBootstrapped` 扩为**含首次**：
+//     每轮 su settle 后由编排自动调用；创世态（无 `.ans`）= **首次收尾**（写 `.ans`(pin) +
+//     `角色卡/governance-boundary.yaml` + `docs/bootstrap-manifest.md`），非创世态 = 重扫并更新 pin。
+//     ⇒ 客户**同意并写入之后**，项目由代码自动收尾、进入正式态——不再需要客户按任何「完成」。
+//   · **为何保留自动收尾**：① pin 与「项目正式态」的既有语义（`config-loader` 终态规则、桌面
+//     `hasRoles` 过渡）不破；② **创世授权自终止**仍成立（治理边界文档写出 ⇒ `.ans` 的 `gov.path`
+//     非空 ⇒ `resolveBoundarySection` 的项目/治理覆盖分支先于创世分支求值）。
 //
-// ── 守卫（§13.1）────────────────────────────────────────────────────────────────
-//   · **非创世态调用 → 拒绝**（不是静默）：创世态 = 项目尚未 bootstrap（无 `.ans/project.json`）；
-//     首次 finalize 写出 `.ans` 后即进入正式态，再调 `finalize` 一律拒（后续由「自动重 pin」接管）。
-//   · 会话**尚未 settle** → 拒绝（防 pin 半成品）；**无可 pin 之物** → 拒绝（既有守卫保留）。
+// ── 守卫（pin 的「半成品」防线保留）───────────────────────────────────────────────
+//   · **无可 pin 之物 → 拒绝写**（`precheck`）：既无角色 boundary.yaml、也无既存治理边界文档时，
+//     不凭空写出 `.ans`——**零副作用**（正因如此，su 没写任何东西的 settle 不会把项目转正）。
 //   · **每一笔写都先经 `resolveWrite`**（与 su 的写走**同一个门**）——命中即拒则整批中止、**零副作用**；
-//     负例已测（拿掉授权 → 被拒且不产生任何文件/目录）。**不因是「完成」而绕门**。
+//     负例已测（拿掉授权 → 被拒且不产生任何文件/目录）。**不因是「收尾」而绕门**。
 //
-// ── pin 的更新时机（§13.3，最要紧）───────────────────────────────────────────────
-//   · **首次**：**在客户确认通过时**才写 `.ans`（**此前不写**——否则项目在确认前就变正式态，确认失去意义）。
-//   · **其后**：**每轮 su settle 后自动重扫并更新**（`repinIfBootstrapped`；**仅在非创世态**）——
-//     重扫 `角色卡/*/boundary.yaml` + 治理边界 → 更新 `.ans` 的 pin + manifest。
-//     ⇒ **客户加一个角色，pin 不会过时**（该角色写入的那一轮 settle 后自动纳入）。
+// ── pin 的更新时机（§13.3）──────────────────────────────────────────────────────
+//   · **首次**：首个「有物可 pin」的 su settle 后自动写 `.ans`（上一条的守卫保证不会被凭空触发）。
+//   · **其后**：每轮 su settle 后自动重扫 `角色卡/*/boundary.yaml` + 治理边界 → 更新 `.ans` 的 pin
+//     + manifest ⇒ **客户加一个角色，pin 不会过时**。
 //   · **如实标注的取舍（篡改检测窗口）**：pin **自动刷新** ⇒「上一轮结束时的盘面即被接受」。对**外部
 //     （非经 su 会话）**的边界改动，**下一次 su settle 会把它吸收进 pin**——故 **tamper 检测窗口 =
 //     到下一次 su settle 为止**。**这不是一个「钉死不动的篡改检测」**：它钉的是「每轮结束时的边界面」。
 //
 // ── 治理边界文档（§13.2，自终止松绑）─────────────────────────────────────────────
-// 确认通过后写出 **`角色卡/governance-boundary.yaml`**（`GOVERNANCE_BOUNDARY_REL`）——`.ans` 的
+// **首次收尾**写出 **`角色卡/governance-boundary.yaml`**（`GOVERNANCE_BOUNDARY_REL`）——`.ans` 的
 // `governanceBoundary.path` 指向它。此后 `resolveBoundarySection` 走**项目覆盖**分支 ⇒ su 的边界 =
 // **这份文档**（创世分支不再求值；自终止仍是结构性的，但**不再是终点**——su 之后可继续增改角色）。
 // 条目为三个**普通目录**（`角色卡/`、`docs/`、`.ans/`，root project、无 slug）——以便 su **随时**增改。
 // **为何不是 blanket**：写集有界（只这三个目录，**绝不含 `src/`、不含项目内任意文件**），且是**项目工件**
-// （一份具体文档、经客户确认并 pin）。此前 T33 只写 `.ans`+manifest，**治理边界文档从未被 finalize 写出**
-// （只由 su 或测试手写）——本任务补齐：**首次（确认）finalize 写出它**。
+// （一份具体文档、经 pin）。
 //
 // ── 自动重 pin 不重写治理边界文档 ────────────────────────────────────────────────
-// `repinIfBootstrapped` 只更新 `.ans`+manifest（`writeGovernanceBoundaryDoc:false`）——**不覆盖** su
-// 对治理边界文档的增改。首次（确认）finalize 才写出该文档。
+// 非创世态的重 pin 只更新 `.ans`+manifest（`writeGovernanceBoundaryDoc:false`）——**不覆盖** su
+// 对治理边界文档的增改。只有**首次收尾**才写出该文档。
 //
-// ── 为什么这**不是「凭代码身份绕门」**（本任务的核心关切）────────────────────────────
+// ── 为什么这**不是「凭代码身份绕门」**────────────────────────────────────────────
 // finalize **不直接** `fs.writeFile` 而不判定：它对**每一个待写路径**都先经**同一个** `resolveWrite`
 // （targetPath, boundary, scope, ctx）求值——**命中即拒则整批中止、零副作用**（所有待写路径**全部前置求值**，
 // 全放行才逐笔落盘）。即 finalize 的写与 su 的写走**同一个门**（`resolveWrite`）——门禁引擎把
 // 「判定」与「落盘」分开，本模块只提供「判定通过才落盘」的那半。**若把授权拿掉**（边界不含 `.ans/`
 // 且无相应条件、或边界未接受），finalize 立即被拒且**不产生任何文件/目录**（负例已测）。
-//
-// ── 触发时机与身份 ───────────────────────────────────────────────────────────────
-// finalize 是会话句柄上的**显式**能力（`SessionFinalizer.finalize` / `RoleSessionHandle.finalize` /
-// `GovernanceSessionHandle.finalize`）——**不在每次 settle 自动跑**（多轮对话中途会 pin 半成品）。
-// 自动重 pin（`repinIfBootstrapped`）与之相反：它是 settle 后的**自动**动作，**仅非创世态**生效。
 
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, readdir, rename, stat, writeFile } from "node:fs/promises";
@@ -58,14 +55,7 @@ import path from "node:path";
 
 import type { BoundarySection1, PinEntry } from "../../model/boundary.ts";
 import type { WriteDecision } from "../../model/decision.ts";
-import type {
-  OperatorChannelFn,
-  OperatorOutcome,
-  OperatorPrompt,
-  FinalizeStatus,
-  FinalizeResult,
-  FinalizeBootstrapFn,
-} from "../../provider/pi/session.ts";
+import type { FinalizeStatus, FinalizeResult } from "../../provider/pi/session.ts";
 import { resolveWrite } from "../../service/gate/resolve-write.ts";
 import { toPosix } from "../shared/path-primitives.ts";
 import { ansProjectPath } from "../shared/config-loader.ts";
@@ -82,12 +72,10 @@ const BOUNDARY_NAMES = ["boundary.yaml", "boundary.yml", "boundary.md"];
 export const DEFAULT_GOVERNANCE_BOUNDARY_REL = "角色卡/governance-boundary.yaml";
 /** 创世留痕文件的项目相对路径（逐路径留痕，设计 §10.4/§12.5）。 */
 export const BOOTSTRAP_MANIFEST_REL = "docs/bootstrap-manifest.md";
-/** 客户确认的默认硬超时（毫秒）：超时 = 不完成（fail-closed）。 */
-export const DEFAULT_CONFIRM_TIMEOUT_MS = 120000;
 
 /**
  * 项目治理边界文档内容（§13.2）：三个**普通目录**（root project、无 slug）——以便 su **随时**增改角色。
- * **写出的就是这份文档**（首次确认的 finalize 写出）；此后 su 的边界 = 它（项目覆盖分支）。
+ * **写出的就是这份文档**（**首次自动收尾**写出）；此后 su 的边界 = 它（项目覆盖分支）。
  */
 export function renderGovernanceBoundaryDoc(): string {
   const lines = [
@@ -125,43 +113,26 @@ export interface FinalizeInput {
   /** 可注入时钟（测试用）；缺省 `new Date()`。 */
   now?: () => Date;
   /**
-   * 是否写出项目治理边界文档（§13.2）。**首次（客户确认通过）** 为 `true`（缺省）；
-   * **自动重 pin** 为 `false`——**不覆盖** su 对治理边界文档的增改（见文件头）。
+   * 是否写出项目治理边界文档（§13.2）。**首次自动收尾** 为 `true`（缺省）；
+   * **非创世态的重 pin** 为 `false`——**不覆盖** su 对治理边界文档的增改（见文件头）。
    */
   writeGovernanceBoundaryDoc?: boolean;
 }
 
-// —————————————— 收口形状：单一来源 = §4 冻结契约家（收敛，去镜像） ——————————————
+// —————————————— 收口形状的来源（A-4 后的历史注记） ——————————————
 //
-// 三型 `FinalizeStatus` / `FinalizeResult` / `FinalizeBootstrapFn` 的**唯一来源**是 §4 冻结契约家
-// `src/provider/pi/session.ts`（Pi适配器 T36 已**逐字**落于彼处；其「提议收口、等客户确认」语义与守卫
-// 即据之）。此前本模块**自定义了同一份形状** ⇒ **一份契约、两处定义**（本项目一路在收敛的那类镜像：
-// 前两例为 operator 三型、凭据常量 `atomicWrite`）。
-//
-// 依硬规矩「**不得有第二份实现**」与 **T20→T21 先例**（operator 三型逐字入冻结契约家、编排改为**导入 +
-// 再导出**），本模块**删除本地三型定义**，改**从 session.ts 导入**（见文件顶部 import），并**再导出**以
-// 维持本模块既有公开面（**消费方零改动**）。**形状逐字一致**——由**结构类型**保证 `FinalizeBootstrapFn`
-// 仍可注入 Pi适配器的 `finalize_bootstrap` 工具；**零行为变化**。
+// `FinalizeStatus` / `FinalizeResult` 两型的**唯一来源**是 §4 冻结契约家 `src/provider/pi/session.ts`
+// （Pi适配器 T36 逐字落于彼处；本模块**按需导入**使用——见文件顶部 import）。
+// **历史**：T36/T37 时期本模块曾按 T20→T21 的「导入 + 再导出」收敛法，**再导出**
+// `FinalizeStatus` / `FinalizeResult` / `FinalizeBootstrapFn` 三型（维持消费方零改动）。A-4
+// （2026-10-12）删「提议 + 确认」后：`FinalizeBootstrapFn`（收口能力形状）与 `finalize_bootstrap`
+// 工具由 Pi适配器随设计稿「**最后一步**」一并删除 ⇒ 本模块**不再引用它，再导出整段亦删除**
+// （消费方已无一处使用：`run-role.ts` 只用 `repinIfBootstrapped`/`DEFAULT_GOVERNANCE_BOUNDARY_REL`，
+// 测试只用 `finalizeBootstrap`/`isGenesisState`）。**保留的**：写入本体 `finalizeBootstrap`
+// （`FinalizeInput` 为本模块自有输入形状）——供 `repinIfBootstrapped`（每轮 su settle 的自动收尾/
+// 重 pin）使用；**只此一处，不再留三型**。
 
-export type { FinalizeStatus, FinalizeResult, FinalizeBootstrapFn };
-
-/**
- * **会话侧 finalize 能力**（守卫 + 提议 + 确认 + 落盘）——把「非创世态 → 拒 / 未 settle → 拒 /
- * 提议 → 确认 → 落盘」收敛为**唯一实现**，供两处前端**共用、不 fork**：
- *   · `RoleSessionHandle.finalize`（**桌面实际走的那条路** `openRoleSession`，T36）；
- *   · `GovernanceSessionHandle.finalize`（CLI `ans govern` / 桌面 su 的治理会话路径，T33/T37）。
- */
-export interface SessionFinalizer {
-  /** 会话是否已 settle **至少一轮**（活取值，随消费事件流更新；未 settle 时 finalize 拒绝）。 */
-  readonly settled: boolean;
-  /**
-   * **提议收口 → 挂起等客户确认 → 确认通过才落盘**（§13.1；fail-closed）。
-   * 守卫：非创世态 → 拒；未 settle → 拒；无可 pin 之物 → 拒；门禁拒 → 拒（零副作用）。
-   */
-  finalize(opts?: { acceptanceSource?: string; now?: () => Date }): Promise<FinalizeResult>;
-}
-
-/** 三个相关路径（供 finalize 与句柄半成品守卫复用，避免两处各拼一遍）。 */
+/** 三个相关路径（供收尾与句柄半成品守卫复用，避免两处各拼一遍）。 */
 export function finalizeRelPaths(
   projectRoot: string,
   governanceBoundaryPath?: string,
@@ -175,148 +146,11 @@ export function finalizeRelPaths(
 }
 
 /**
- * **创世态判定**（§13.1/§13.3）：项目**尚未 bootstrap**（无 `.ans/project.json`）。
- * 首次 finalize（客户确认通过）写出 `.ans` 后即**进入正式态**——此后再调 `finalize` 一律拒（`not-genesis`），
- * 改由**自动重 pin**（`repinIfBootstrapped`）接管。
+ * **创世态判定**（A-4 后语义）：项目**尚未 bootstrap**（无 `.ans/project.json`）。
+ * 首个「有物可 pin」的 su settle 由**自动收尾**（`repinIfBootstrapped`）写出 `.ans` 后即**进入正式态**。
  */
 export async function isGenesisState(projectRoot: string): Promise<boolean> {
   return !(await isFile(ansProjectPath(projectRoot)));
-}
-
-// —————————————————————— 会话侧 finalize 能力（提议 + 确认 + 落盘） ——————————————————————
-
-export interface CreateSessionFinalizerOptions {
-  /** finalize 的授权上下文（`acceptanceSource`/`now`/`writeGovernanceBoundaryDoc` 逐次给，不在此）。 */
-  input: Omit<FinalizeInput, "acceptanceSource" | "now" | "writeGovernanceBoundaryDoc">;
-  /** **活**守卫数据源：会话是否已 settle 过至少一轮。 */
-  isSettled: () => boolean;
-  /**
-   * **确认通道**（复用 shell 闸 (a) 的 `OperatorChannelFn` 形状——**不造第二套确认机制**）。
-   * 缺省 / 返回 `unavailable` / 抛错 / 超时 → **不完成**（fail-closed，§13.1）。
-   */
-  operatorChannel?: OperatorChannelFn;
-  /** 客户确认硬超时（毫秒）；缺省 `DEFAULT_CONFIRM_TIMEOUT_MS`（120000）。**超时 = 不完成**。 */
-  confirmTimeoutMs?: number;
-  /** 提议文案（给客户看的「su 提议」）；缺省自动生成。 */
-  proposalText?: string;
-  /** 工具调用 id（审计串联）；缺省生成。 */
-  toolCallId?: string;
-}
-
-/**
- * 构造会话侧 finalize 能力（**唯一实现**）。`finalize()` = **提议收口 → 挂起等客户确认 → 通过才落盘**。
- * 「何时 finalize」的政策呼由调用方（su 提议 / 界面动作 / CLI 开关）决定；本能力只提供
- * 「被调 → 守卫 → 提议 → 确认 → 落盘」这一半，不自行触发。
- */
-export function createSessionFinalizer(opts: CreateSessionFinalizerOptions): SessionFinalizer {
-  const propose = createFinalizeProposer(opts);
-  return {
-    get settled(): boolean {
-      return opts.isSettled();
-    },
-    finalize: (o) => propose(o),
-  };
-}
-
-/** 构造 finalize 能力（`FinalizeBootstrapFn`）——注入给 Pi 适配器 `finalize_bootstrap` 工具的确切形状。 */
-export function createFinalizeProposer(opts: CreateSessionFinalizerOptions): FinalizeBootstrapFn {
-  const { input } = opts;
-  const relPaths = finalizeRelPaths(input.projectRoot, input.governanceBoundaryPath);
-  const confirmTimeoutMs = opts.confirmTimeoutMs ?? DEFAULT_CONFIRM_TIMEOUT_MS;
-  const mkResult = (status: FinalizeStatus, message: string, extra?: Partial<Pick<FinalizeResult, "wrote" | "pins" | "roles">>): FinalizeResult => ({
-    ok: status === "completed",
-    status,
-    message,
-    reason: status === "completed" ? undefined : message,
-    wrote: extra?.wrote ?? [],
-    pins: extra?.pins ?? [],
-    roles: extra?.roles ?? [],
-    projectJsonRel: relPaths.projectJsonRel,
-    manifestRel: relPaths.manifestRel,
-  });
-
-  return async function finalize(opts2): Promise<FinalizeResult> {
-    // 守卫 1（§13.1）：**非创世态调用 → 拒绝**（不是静默）——首次 finalize 后 `.ans` 已存在，即正式态。
-    if (!(await isGenesisState(input.projectRoot))) {
-      return mkResult(
-        "not-genesis",
-        "非创世态：项目已完成 bootstrap（`.ans/project.json` 已存在）——`finalize_bootstrap` 仅在创世态可用；" +
-          "此后边界由每轮 su settle 的自动重 pin 维护。",
-      );
-    }
-    // 守卫 2：会话**尚未 settle**（su 一个字都没写）→ 拒绝（防 pin 半成品）。
-    if (!opts.isSettled()) {
-      return mkResult("blocked", "会话尚未 settle（su 尚未完成任何一轮）——拒绝 finalize，避免 pin 到半成品");
-    }
-    // 守卫 3（前置预检）：无可 pin 之物 / 门禁拒 —— 在这些情形**不打扰客户**（不提不可能的收口）。
-    const pre = await precheck(input, true);
-    if (!pre.ok) return mkResult(pre.status, pre.message, { roles: pre.roleIds });
-
-    // —— su 主动提议（一种 `OperatorPrompt`）→ **挂起等客户确认**（复用 shell 闸 (a) 通道）——
-    const proposal: OperatorPrompt = {
-      command: opts.proposalText ?? "su 提议：可以收口了（完成 bootstrap）",
-      argv: [],
-      cwd: input.projectRoot,
-      toolCallId: opts.toolCallId ?? `finalize-${randomUUID()}`,
-      reason:
-        `将写出：${relPaths.governanceBoundaryRel}、${relPaths.projectJsonRel}、${relPaths.manifestRel}` +
-        `（pin ${pre.pinCount} 个边界文件，角色：${pre.roleIds.join("、") || "无"}）。` +
-        "确认后项目由「创世态」进入「正式态」。",
-    };
-    const outcome = await confirm(opts.operatorChannel, proposal, confirmTimeoutMs);
-    if (outcome.kind === "deny") {
-      return mkResult("declined", `收口未获客户确认（客户拒绝${outcome.reason ? `：${outcome.reason}` : ""}）；su 可继续工作或稍后再提议`);
-    }
-    if (outcome.kind === "unavailable") {
-      return mkResult(
-        "unavailable",
-        `收口未获确认：${outcome.reason}——不完成（fail-closed）；su 可继续工作或稍后再提议`,
-      );
-    }
-
-    // —— 确认通过 → 落盘（写出治理边界文档 + `.ans` + manifest；每一笔写仍经 resolveWrite）——
-    return finalizeBootstrap({
-      ...input,
-      acceptanceSource: opts2?.acceptanceSource ?? `客户确认完成 bootstrap（${outcome.by}）`,
-      now: opts2?.now,
-      writeGovernanceBoundaryDoc: true,
-    });
-  };
-}
-
-/** 内部：确认通道的裁决（fail-closed：只 allow 放行）。 */
-type ConfirmOutcome =
-  | { kind: "allow"; by: string }
-  | { kind: "deny"; by: string; reason?: string }
-  | { kind: "unavailable"; reason: string };
-
-/** 问操作者（客户）确认；缺失 / 抛错 / 超时 / 非法 → `unavailable`（不完成）。 */
-async function confirm(
-  channel: OperatorChannelFn | undefined,
-  prompt: OperatorPrompt,
-  timeoutMs: number,
-): Promise<ConfirmOutcome> {
-  if (typeof channel !== "function") {
-    return { kind: "unavailable", reason: "未接入客户确认通道（无人值守？）" };
-  }
-  let out: OperatorOutcome | null | undefined;
-  try {
-    out = await withTimeout(Promise.resolve(channel(prompt)), timeoutMs, "finalize 客户确认");
-  } catch (err) {
-    if (isTimeoutError(err)) return { kind: "unavailable", reason: `客户确认超时（>${timeoutMs}ms）` };
-    return { kind: "unavailable", reason: `客户确认通道报错：${reasonOf(err)}` };
-  }
-  if (out === undefined || out === null || out.outcome === "unavailable") {
-    return { kind: "unavailable", reason: "客户确认通道不可用（无人值守？）" };
-  }
-  if (out.outcome === "allow") return { kind: "allow", by: operatorBy(out) };
-  if (out.outcome === "deny") return { kind: "deny", by: operatorBy(out), reason: out.reason };
-  return { kind: "unavailable", reason: "客户确认通道返回非法结果" };
-}
-
-/** 操作者（客户）身份（审计/`acceptance.source` 用）：`operator:<标识>`，缺标识则标未知。 */
-function operatorBy(out: { operatorId?: string }): string {
-  return out.operatorId ? `operator:${out.operatorId}` : "operator:未知操作者";
 }
 
 // —————————————————————— 前置预检（无可 pin / 门禁拒） ——————————————————————
@@ -475,14 +309,20 @@ export async function finalizeBootstrap(input: FinalizeInput): Promise<FinalizeR
 }
 
 /**
- * **自动重 pin**（§13.3）：**非创世态**（`.ans` 已存在）时，重扫各角色边界（`角色卡/<角色>/boundary.yaml`）
- * + 治理边界 → 更新 `.ans` 的 pin + manifest。**创世态 → 返回 `undefined`（不写）**——首次 pin 只在客户确认时写。
- * **不重写治理边界文档**（`writeGovernanceBoundaryDoc:false`，不覆盖 su 的增改）。
+ * **自动收尾 + 自动重 pin**（A-4 / §13.3）：每轮 su settle 后由编排自动调用——
+ *   · **创世态**（无 `.ans`）= **首次收尾**：扫角色边界 + 治理边界 → 写 `.ans`(pin) +
+ *     **`角色卡/governance-boundary.yaml`** + `docs/bootstrap-manifest.md`。
+ *     幂等安全：**无可 pin 之物 → `nothing-to-pin`、零副作用**（su 本轮什么都没写时不会把项目转正）。
+ *   · **非创世态**：重扫并更新 `.ans` 的 pin + manifest；**不重写治理边界文档**
+ *     （`writeGovernanceBoundaryDoc:false`——不覆盖 su 的增改）。
+ * 两态都不含任何人工确认步骤（确认在**写入之前**由 A-1 交互工具 + F4 完成，见文件头）。
  */
 export async function repinIfBootstrapped(
   input: Omit<FinalizeInput, "writeGovernanceBoundaryDoc">,
 ): Promise<FinalizeResult | undefined> {
-  if (await isGenesisState(input.projectRoot)) return undefined; // 创世态：禁止自动 pin（§13.3）
+  if (await isGenesisState(input.projectRoot)) {
+    return finalizeBootstrap({ ...input, writeGovernanceBoundaryDoc: true }); // 首次收尾（守卫：无可 pin → 零副作用）
+  }
   return finalizeBootstrap({ ...input, writeGovernanceBoundaryDoc: false });
 }
 
@@ -635,32 +475,3 @@ async function sha256File(absPath: string): Promise<string> {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-function reasonOf(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
-
-// 本地超时包装（不跨角色导入 Pi 适配器私有 `common/pi-adapter/timeout.ts`，遵守 §6；逻辑与之一致）。
-function withTimeout<T>(work: Promise<T>, timeoutMs: number, label: string): Promise<T> {
-  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return work;
-  return new Promise<T>((resolveFn, rejectFn) => {
-    const timer = setTimeout(() => {
-      const err = new Error(`${label} 超时（${timeoutMs}ms）：底层操作未在时限内返回，已中止。`);
-      err.name = "TimeoutError";
-      rejectFn(err);
-    }, timeoutMs);
-    work.then(
-      (v) => {
-        clearTimeout(timer);
-        resolveFn(v);
-      },
-      (err) => {
-        clearTimeout(timer);
-        rejectFn(err);
-      },
-    );
-  });
-}
-
-function isTimeoutError(err: unknown): boolean {
-  return err instanceof Error && err.name === "TimeoutError";
-}

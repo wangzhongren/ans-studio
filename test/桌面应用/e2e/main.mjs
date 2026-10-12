@@ -20,6 +20,9 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const APP_DIR = path.resolve(HERE, "..", "..", "..", "app");
 const REPO_ROOT = process.env.ANS_E2E_PROJECT || path.resolve(HERE, "..", "..", "..");
 const OUTDIR = process.env.ANS_E2E_OUTDIR || fs.mkdtempSync(path.join(os.tmpdir(), "ans-e2e-"));
+// 看门狗修复（2026-10-12）：OUTDIR 由调用方指定时必须**先建目录**——否则收尾 report.txt 写入抛 ENOENT
+// （未捕获拒绝）⇒ 进程不退出、表现成「e2e 卡住」（真因已定位：run 已完成，卡在退出前的报告写入）。
+fs.mkdirSync(OUTDIR, { recursive: true });
 // T28：Pi 配置面板的目标 `.env`——**e2e 一律用 OUTDIR 下的临时文件**，
 // **绝不指向仓库根真实 `.env`**（那会改掉客户真实凭据）。注入给 interface 的 `envFilePath`。
 const PI_ENV = path.join(OUTDIR, "e2e-pi.env");
@@ -31,8 +34,15 @@ let win;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const report = [];
 const log = (s) => { report.push(s); };
-// T38：收口确认卡回传（`session:finalize-confirm`）的调用记录——用注入替身收集，**不弹系统对话框**。
-const confirmCalls = [];
+// A-5（2026-10-12）：客户交互通道——用**真实** `createCustomerInputChannel`（app/desktop/customer-input.ts）
+// 装配：presenter 推给渲染侧为交互卡；`session:operator-response` 直连通道（**按请求快照校验**——
+// 非法回包不受理在 e2e 现场可见）。不经真实模型工具，直接以通道推请求（与桌面接线同形）。
+let createCustomerInputChannel = null;
+let customerChannel = null;
+// D-1（2026-10-12）：会话记录恢复——主进程侧只读解析（与 app/main.ts 同形）。
+let readRoleSessionHistory = null;
+// B-1：Markdown 链接外开的调用记录（替身；**不真开系统浏览器**）。
+const openExternalCalls = [];
 
 function registerIpc() {
   const desktop = createDesktopInterface({
@@ -56,13 +66,54 @@ function registerIpc() {
     piConfigEnv: {},
   });
   ipcMain.handle("app:pick-project", () => desktop.pickProject());
-  ipcMain.handle("app:list-project", (_e, input) => desktop.listProject(input));
+  ipcMain.handle("app:list-project", async (_e, input) => {
+    const res = await desktop.listProject(input);
+    // D-1：逐角色只读解析会话历史并推规范化行——**镜像生产形态**（app/main.ts：`void pushSessionHistories(...)`，
+    // fire-and-forget、在 list-project **回包之后**送达 ⇒ 渲染侧走「直接回放」路径）。
+    // ⚠ 2026-10-12 修复：本 harness 原先把「读文件 + 推送」**await 在 handler 内**（回包之前送达）——
+    //   与生产不同形，且多次实测首个角色（su）的记录会因与回包跨通道竞序而**丢失**（改为生产形态后消失）。
+    const roles = Array.isArray(res && res.roles) ? res.roles.map((r) => r.roleId) : [];
+    void (async () => {
+      for (const roleId of roles) {
+        let hist;
+        try {
+          hist = await readRoleSessionHistory(res.projectRoot, roleId);
+        } catch (err) {
+          hist = { rows: [], error: err && err.message ? err.message : String(err) };
+        }
+        if ((hist.rows && hist.rows.length > 0) || hist.error) {
+          if (!win.isDestroyed()) {
+            win.webContents.send("session:history", { roleId, projectRoot: res.projectRoot, rows: hist.rows || [], error: hist.error || null });
+          }
+        }
+      }
+    })();
+    return res;
+  });
   ipcMain.handle("session:open", (_e, input) => desktop.openSession(input));
   ipcMain.handle("session:send", (_e, input) => desktop.sendSession(input));
-  ipcMain.handle("session:stop", () => desktop.stopSession());
-  // T36：创世 finalize 的两个通道（读取入口状态 / 显式完成 bootstrap）。
-  ipcMain.handle("session:bootstrap-state", () => desktop.getBootstrapState());
-  ipcMain.handle("session:finalize", () => desktop.finalizeBootstrap());
+  ipcMain.handle("session:stop", (_e, input) => desktop.stopSession(input));
+  // B-2：保活会话列表（与 app/main.ts 同形）。
+  ipcMain.handle("session:live", () => desktop.listLiveSessions());
+  // B-1：链接外开——替身只记录 URL 并回 ok（**不真开系统浏览器**；校验仍在 Interface 层，与此替身同形）。
+  ipcMain.handle("app:open-external", (_e, input) => {
+    openExternalCalls.push(input && input.url);
+    return { ok: true };
+  });
+  // A-5：客户交互通道（真实实现）：请求经 session:operator-request 推给渲染侧渲染成交互卡；
+  // 回包经 session:operator-response 直连通道（按请求快照校验——选项 id 必须 ⊆ 已发）。
+  customerChannel = createCustomerInputChannel({
+    presenter: (payload) => {
+      if (!win.isDestroyed()) win.webContents.send("session:operator-request", payload);
+    },
+    operatorId: "e2e-operator",
+  });
+  ipcMain.handle("session:operator-response", (_e, input) =>
+    customerChannel.respond(input && typeof input === "object" ? input : {}),
+  );
+  // M-1：shell 确认卡回包通道（e2e 镜像**生产形态**：本 harness 无 shell presenter ⇒ 无挂起请求，
+  // 一律如实回 `expired`——P-1 探针据此断言「Esc=不放行、卡片转**已失效**终态」）。
+  ipcMain.handle("shell:confirm-response", () => ({ ok: false, expired: true, error: "e2e：无挂起请求（镜像生产通道形态）" }));
   ipcMain.handle("pi-config:get", () => desktop.getPiConfig());
   ipcMain.handle("pi-config:save", (_e, input) => desktop.savePiConfig(input));
   // 自绘标题栏的窗口控制（与 app/main.ts 同形，e2e 镜像真实应用；守卫见 run() 步骤 0）。
@@ -154,9 +205,12 @@ async function run() {
   log("SHOT_00_TITLEBAR=" + (await shot("00-titlebar.png")));
 
   // 1) 导入项目 → 左树出角色
+  // N-1（2026-10-12 客户裁定）：导入前按钮是「导入项目」；导入后应变「切换项目」。
+  log("PROJECT_BTN_INITIAL_IMPORT=" + (await wc().executeJavaScript("document.getElementById('btn-import').textContent === '导入项目'")));
   await wc().executeJavaScript("window.__ansRenderer.loadProject(" + JSON.stringify(REPO_ROOT) + ")");
   await sleep(600);
   log("PROJECT_PATH_SHOWN=" + (await wc().executeJavaScript("document.getElementById('project-path').textContent")));
+  log("PROJECT_BTN_SWITCHED=" + (await wc().executeJavaScript("document.getElementById('btn-import').textContent === '切换项目'")));
   const roleIds = await wc().executeJavaScript("window.__ansRenderer.state.roles.map(r=>r.roleId)");
   log("ROLE_COUNT=" + roleIds.length);
   log("ROLE_IDS=" + roleIds.join(", "));
@@ -209,7 +263,7 @@ async function run() {
   log("SU_NO_INLINE_WRITE_ROWS=" + (await wc().executeJavaScript("document.querySelectorAll('#chat .sys-nowrite, #chat .sys-write').length === 0")));
   log("SHOT_01B_SU=" + (await shot("01b-su.png")));
   // T36：仓库根（有角色）的 su 会话是**普通聊天**、非创世态 → **不**显示「完成 bootstrap」入口。
-  log("BOOTSTRAP_ACTION_HIDDEN_WHEN_HAS_ROLES=" + (await wc().executeJavaScript("document.getElementById('bootstrap-action').hidden")));
+  log("BOOTSTRAP_ACTION_REMOVED=" + (await wc().executeJavaScript("document.getElementById('bootstrap-action') === null")));
 
   // 2) 点角色 → 直接进入聊天（无确认框）
   const clicked = await wc().executeJavaScript(
@@ -278,10 +332,13 @@ async function run() {
   );
   await sleep(400);
   const right = await wc().executeJavaScript(
-    "(() => { const t=document.querySelector('#right-body').textContent; return { card:t.includes('角色卡'), boundary:t.includes('边界条目'), rows:document.querySelectorAll('#right-body table.boundary tbody tr').length, changelog:t.includes('变更记录'), docs:t.includes('文档') }; })()",
+    "(() => { const t=document.querySelector('#right-body').textContent; return { card:t.includes('角色卡'), boundary:t.includes('边界条目'), rows:document.querySelectorAll('#right-body table.boundary tbody tr').length, changelog:t.includes('变更记录'), docs:t.includes('文档'), mdCard:!!document.querySelector('#right-body .card-text.card-md h1'), mdNoScript:!document.querySelector('#right-body .card-text script') }; })()",
   );
   log("RIGHT_HAS_CARD=" + right.card + " RIGHT_HAS_BOUNDARY=" + right.boundary + " RIGHT_BOUNDARY_ROWS=" + right.rows);
   log("RIGHT_HAS_CHANGELOG=" + right.changelog + " RIGHT_HAS_DOCS=" + right.docs);
+  // N-2（2026-10-12 客户裁定）：角色卡已走 Markdown（标题成 <h1> 标签）；且无 <script> 注入口。
+  log("RIGHT_CARD_MD_RENDERED=" + right.mdCard);
+  log("RIGHT_CARD_MD_NO_SCRIPT=" + right.mdNoScript);
   log("SHOT_04_PROFILE=" + (await shot("04-profile.png")));
 
   // 7) 守卫（客户 2026-10-11 裁定：去掉运行时选择器、默认跑 pi）——断言**它不存在**。
@@ -296,12 +353,16 @@ async function run() {
   log("PI_SETTINGS_IN_HEADER=" + (await wc().executeJavaScript("!!document.querySelector('.chat-head #btn-pi-settings')")));
   log("RUNTIME_NOTE_SAYS_PI_WRITES=" + (await wc().executeJavaScript("document.getElementById('runtime-note').textContent.includes('真正落到你导入的项目')")));
   log("RUNTIME_NOTE_ONE_LINE_GATED=" + (await wc().executeJavaScript("document.getElementById('runtime-note').textContent.includes('越界写会在写之前被拒')")));
-  // 底部输入区只剩输入框 + 发送（无选择器、无提示行、无 Pi 面板、无 bootstrap 动作）。
+  // 底部输入区（K-1 起：附件行 + **胶囊输入框**〔内嵌发送箭头〕两行；无选择器、无提示行、无 Pi 面板、
+  // 无 bootstrap 动作；状态位在 chat-head〔#session-state/#composer-hint〕）。
   const composer = await wc().executeJavaScript(
-    "(() => { const c=document.querySelector('.composer'); return { rows: c.children.length, hasTextarea: !!c.querySelector('#inp-message'), hasSend: !!c.querySelector('#btn-send'), clean: !c.querySelector('select') && !c.querySelector('#runtime-note') && !c.querySelector('#composer-hint') && !c.querySelector('#pi-panel') && !c.querySelector('#bootstrap-action') }; })()",
+    "(() => { const c=document.querySelector('.composer'); return { rows: c.children.length, hasTextarea: !!c.querySelector('#inp-message'), hasSend: !!c.querySelector('#btn-send'), capsule: !!c.querySelector('#composer-capsule.capsule'), sendInCapsule: !!(c.querySelector('#composer-capsule #btn-send')), attachBtn: !!c.querySelector('#composer-capsule #btn-attach-image'), attachRow: !!c.querySelector('#attach-row'), clean: !c.querySelector('select') && !c.querySelector('#runtime-note') && !c.querySelector('#composer-hint') && !c.querySelector('#pi-panel') && !c.querySelector('#bootstrap-action') }; })()",
   );
   log("COMPOSER_CHILD_ROWS=" + composer.rows);
+  log("COMPOSER_ROWS_ARE_ATTACH_AND_CAPSULE=" + (composer.rows === 2 && composer.attachRow && composer.capsule));
   log("COMPOSER_HAS_TEXTAREA_SEND=" + (composer.hasTextarea && composer.hasSend));
+  log("COMPOSER_SEND_INSIDE_CAPSULE=" + composer.sendInCapsule);
+  log("COMPOSER_ATTACH_BTN=" + composer.attachBtn);
   log("COMPOSER_CLEAN=" + composer.clean);
   log("SHOT_12_COMPOSER=" + (await shot("12-composer.png")));
 
@@ -358,71 +419,160 @@ async function run() {
   )));
   log("SHOT_06_REFRESH=" + (await shot("06-refresh.png")));
 
-  // 8b) T36 创世 finalize：在**临时**空项目上开启创世 su 会话 → 显示「完成 bootstrap」入口。
-  //     因 demo 运行时**不产生 settled**（su「还没说过话」），入口呈「未就绪」（点会被拒）；
-  //     点它 → finalize 被拒（未 settle / 无可 pin 之物）→ 如实显示原因；**确认未写出任何 .ans/manifest**
-  //     （被拒即零副作用；且落点在**临时目录**，绝不碰仓库）。
-  const finProj = fs.mkdtempSync(path.join(OUTDIR, "genesis-"));
-  await wc().executeJavaScript("window.__ansRenderer.loadProject(" + JSON.stringify(finProj) + ")");
+  // 7b) D-1 重启恢复：给 示例角色 与 su 各写一份**手写最小 JSONL** 夹具（首行 header + entry），重载项目 →
+  //     主进程只读解析并推规范化行 → 各自 pane 回放（分隔提示 + is-replay + Markdown 渲染）+ 徽标
+  //     「空闲（已恢复）」；并断言**跨角色不串**（su 的 pane 不得含 示例角色 的文本）。
+  const sessExample = path.join(tmpProj, ".ans", "sessions", "示例角色");
+  const sessSu = path.join(tmpProj, ".ans", "sessions", "su");
+  fs.mkdirSync(sessExample, { recursive: true });
+  fs.mkdirSync(sessSu, { recursive: true });
+  const mkD1Header = (id) => JSON.stringify({ type: "session", version: 3, id, timestamp: "2026-10-12T01:00:00.000Z", cwd: tmpProj });
+  const mkD1Msg = (id, message) => JSON.stringify({ type: "message", id, parentId: null, timestamp: "2026-10-12T01:00:01.000Z", message });
+  fs.writeFileSync(
+    path.join(sessExample, "s.jsonl"),
+    [
+      mkD1Header("ex1"),
+      mkD1Msg("1", { role: "user", content: "示例角色的历史问题" }),
+      mkD1Msg("2", { role: "assistant", content: [{ type: "text", text: "示例角色的**历史回答**" }] }),
+    ].join("\n"),
+  );
+  fs.writeFileSync(path.join(sessSu, "s.jsonl"), [mkD1Header("su1"), mkD1Msg("1", { role: "user", content: "SU 的历史问题" })].join("\n"));
+
+  await wc().executeJavaScript("window.__ansRenderer.loadProject(" + JSON.stringify(tmpProj) + ")");
+  await sleep(700);
+  // 「空闲（已恢复）」徽标在**未开启会话**时成立（回放已到、句柄未开）——**先**探徽标，再点开角色
+  // （点开即开会话 ⇒ live ⇒ 徽标转「空闲」，这是「点角色即开」的既有语义，不是缺陷）。
+  // 诊断（临时）：手动重发 su 的记录——若重发能回放，则「原始 payload 未达渲染侧」（IPC 时序）；若也不能，则渲染侧问题。
+  await sleep(250);
+  log("RESTORE_BADGE_IS_RESTORED=" + (await wc().executeJavaScript("(() => { const it=[...document.querySelectorAll('#role-tree .tree-item')].find((e)=>e.querySelector('.ti-name').textContent==='示例角色'); const s=it && it.querySelector('.ti-status'); return !!s && s.className.includes('st-restored') && s.textContent.includes('空闲（已恢复）'); })()")));
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('示例角色')");
+  await sleep(600);
+  log("RESTORE_DIVIDER_TEXT=" + (await wc().executeJavaScript("(document.querySelector('#chat .sys-replay-divider .sys-text')||{textContent:''}).textContent")));
+  log("RESTORE_ROWS_PRESENT=" + (await wc().executeJavaScript("document.querySelectorAll('#chat .is-replay').length > 0")));
+  log("RESTORE_MD_RENDERED=" + (await wc().executeJavaScript("!!document.querySelector('#chat .msg-assistant.is-replay strong')")));
+  // D-1 契约：失真文案「模型上下文已重启」已退役——恢复场景不得出现它（文案分支由 role-status.js 唯一映射）。
+  log("RESTORE_NO_STALE_RESTART_NOTE=" + (await wc().executeJavaScript("!document.querySelector('#chat').textContent.includes('模型上下文已重启')")));
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('su')");
+  await sleep(600);
+  log("RESTORE_SU_CHAT_SNIPPET=" + (await wc().executeJavaScript("document.querySelector('#chat').textContent.slice(0, 160)")));
+  log("RESTORE_SU_RESTORED_FLAG=" + (await wc().executeJavaScript("JSON.stringify(window.__ansRenderer.state.roleMeta['su'] || null)")));
+  log("RESTORE_SU_REPLAY_ROWS=" + (await wc().executeJavaScript("document.querySelectorAll('#chat .is-replay').length")));
+  log("RESTORE_SU_OWN_TEXT=" + (await wc().executeJavaScript("document.querySelector('#chat').textContent.includes('SU 的历史问题')")));
+  log("RESTORE_NO_CROSSTALK=" + (await wc().executeJavaScript("!document.querySelector('#chat').textContent.includes('示例角色的历史问题')")));
+  log("SHOT_12_RESTORE=" + (await shot("12-restore.png")));
+
+  // 7c) 真机缺陷修复（2026-10-12）：交互卡**严格投递所属 pane**——请求属于非当前查看的角色时：
+  //     不落当前 pane（不串卡）、左树徽标亮「等待你确认」、当前 pane 出**只读指针**；切回见卡并作答；
+  //     重复推送（同 id）**幂等一张**；对已死请求（通道无挂起）作答 → **过期定格**（不解冻重试）。
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('su')");
+  await sleep(800);
+  const pX = customerChannel.customerInput(
+    { kind: "choice", title: "选个目录名", options: [{ id: "a", label: "alpha" }] },
+    { roleId: "示例角色" },
+  );
+  await sleep(300);
+  log("OPX_NOT_IN_VIEWED_PANE=" + (await wc().executeJavaScript("!document.querySelector('#chat .op-request')")));
+  log("OPX_POINTER_IN_VIEWED_PANE=" + (await wc().executeJavaScript("document.querySelector('#chat').textContent.includes('【待确认】角色 示例角色')")));
+  log("OPX_BADGE_LIT=" + (await wc().executeJavaScript("(() => { const it=[...document.querySelectorAll('#role-tree .tree-item')].find((e)=>e.querySelector('.ti-name').textContent==='示例角色'); const s=it && it.querySelector('.ti-status'); return !!s && s.className.includes('st-confirm'); })()")));
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('示例角色')");
+  await sleep(600);
+  log("OPX_CARD_ON_RETURN=" + (await wc().executeJavaScript("!!document.querySelector('#chat .op-request .op-submit')")));
+  // 重复推送（同一 id 的原始推送 ×2）→ 幂等：恰一张卡。
+  wc().send("session:operator-request", { id: "dup-1", roleId: "示例角色", request: { kind: "confirm", title: "重复？" } });
+  wc().send("session:operator-request", { id: "dup-1", roleId: "示例角色", request: { kind: "confirm", title: "重复？" } });
+  await sleep(250);
+  log("OPX_DUP_SINGLE_CARD=" + (await wc().executeJavaScript("document.querySelectorAll('#chat .op-request[data-request-id=dup-1]').length === 1")));
+  // 对已失效请求（dup-1 未经真实通道；G-1：唯一真实失效＝应用重启/关闭）作答 → 通道 expired → 卡片定格
+  // （按钮隐藏 + 「已失效（应用已重启/关闭）」说明），不再解冻。
+  await wc().executeJavaScript("(() => { const c=document.querySelector('#chat .op-request[data-request-id=dup-1]'); c.querySelector('.op-confirm').click(); })()");
+  await sleep(300);
+  log("OPX_EXPIRED_FROZEN=" + (await wc().executeJavaScript("(() => { const c=document.querySelector('#chat .op-request[data-request-id=dup-1]'); const b=c.querySelector('.op-actions button'); return !!b && b.hidden === true && c.textContent.includes('已失效'); })()")));
+  // 真请求作答照常（单选提交）。
+  await wc().executeJavaScript("(() => { const c=[...document.querySelectorAll('#chat .op-request')].find((x)=>x.dataset.requestId!=='dup-1'); const r=c.querySelector('input'); r.checked=true; r.dispatchEvent(new Event('change')); c.querySelector('.op-submit').click(); })()");
+  await sleep(300);
+  const oX = await pX;
+  log("OPX_ANSWERED=" + (!!oX && oX.outcome === "answered"));
+  log("OPX_BADGE_CLEARED=" + (await wc().executeJavaScript("(() => { const it=[...document.querySelectorAll('#role-tree .tree-item')].find((e)=>e.querySelector('.ti-name').textContent==='示例角色'); const s=it && it.querySelector('.ti-status'); return !!s && !s.className.includes('st-confirm'); })()")));
+  log("SHOT_14_OP_CROSSPANE=" + (await shot("14-operator-crosspane.png")));
+
+  // 8b) A-5 客户交互卡：以**真实通道**推四种请求（带预览的确认 / 单选 / 多选 / 纯确认守卫）→
+  //     卡片渲染（折叠预览、radio/checkbox、提交禁用态）→ 作答经**真实通道**校验回传 → 定格；
+  //     负例：伪造 id / 不在请求中的选项 → **不受理**；取消 → declined；B-3「等待你确认」随请求亮/灭。
+  //     落点在**临时**空项目（绝不出仓库）。
+  const opProj = fs.mkdtempSync(path.join(OUTDIR, "genesis-"));
+  await wc().executeJavaScript("window.__ansRenderer.loadProject(" + JSON.stringify(opProj) + ")");
   await sleep(400);
   await wc().executeJavaScript("window.__ansRenderer.selectRole('su')");
   await sleep(800);
-  log("FIN_ACTION_VISIBLE=" + (await wc().executeJavaScript("!document.getElementById('bootstrap-action').hidden")));
-  log("FIN_ACTION_IS_PENDING=" + (await wc().executeJavaScript("document.getElementById('bootstrap-action').className.includes('is-pending')")));
-  log("FIN_HINT_MENTIONS_UNSETTLED=" + (await wc().executeJavaScript("(document.querySelector('#bootstrap-action .ba-hint')||{textContent:''}).textContent.includes('还没有完成任何一轮')")));
-  log("FIN_BTN_PRESENT=" + (await wc().executeJavaScript("!!document.getElementById('btn-finalize')")));
-  await wc().executeJavaScript("window.__ansRenderer.onFinalize()");
-  await sleep(700);
-  log("FIN_DENIED_BLOCK_PRESENT=" + (await wc().executeJavaScript("!!document.querySelector('#chat .sys-finalize.is-denied')")));
-  log("FIN_DENIED_REASON=" + (await wc().executeJavaScript("(document.querySelector('#chat .sys-finalize.is-denied .sys-detail')||{textContent:''}).textContent")));
-  log("FIN_NO_ANS_WRITTEN=" + !fs.existsSync(path.join(finProj, ".ans", "project.json")));
-  log("FIN_NO_MANIFEST_WRITTEN=" + !fs.existsSync(path.join(finProj, "docs", "bootstrap-manifest.md")));
-  // 被拒后入口应保留（用户可补救后再点）——可用性来自主进程状态，不因一次失败而消失。
-  log("FIN_ACTION_STILL_VISIBLE=" + (await wc().executeJavaScript("!document.getElementById('bootstrap-action').hidden")));
-  log("SHOT_11_FINALIZE=" + (await shot("11-finalize.png")));
+  log("OP_NO_CARD_BEFORE_REQUEST=" + (await wc().executeJavaScript("!document.querySelector('#chat .op-request')")));
 
-  // 8c) T38 收口确认面：su 提议收口 → **聊天流里出现确认卡**（提议原文 + `[确认完成]`/`[暂不]`）。
-  //     确认面**只在 su 已提议时才出现**（此刻尚无提议 ⇒ 无卡）；直接把提议推给渲染侧（不经真实 finalize），
-  //     专测渲染侧确认卡的呈现 + 回传接线。**用注入替身收集回传，绝不弹系统对话框**。
-  ipcMain.removeHandler("session:finalize-confirm");
-  ipcMain.handle("session:finalize-confirm", (_e, input) => { confirmCalls.push(input); return { ok: true }; });
-
-  // 提议之前：**不该**有确认卡（「只在 su 已提议时才出现」的守卫）。
-  log("FIN_NO_CARD_BEFORE_PROPOSAL=" + (await wc().executeJavaScript("!document.querySelector('#chat .msg-finalize-proposal')")));
-
-  wc().send("session:finalize-proposal", {
-    toolCallId: "tc-1",
-    proposal: "su 提议：可以收口了（完成 bootstrap）",
-    reason: "将写出：角色卡/governance-boundary.yaml、.ans/project.json、docs/bootstrap-manifest.md",
-  });
-  await sleep(300);
-  log("FIN_CARD_PRESENT=" + (await wc().executeJavaScript("!!document.querySelector('#chat .msg-finalize-proposal')")));
-  log("FIN_CARD_TITLE=" + (await wc().executeJavaScript("(document.querySelector('#chat .msg-finalize-proposal .fp-title')||{}).textContent||''")));
-  log("FIN_CARD_HAS_CONFIRM=" + (await wc().executeJavaScript("!!document.querySelector('#chat .msg-finalize-proposal .fp-confirm')")));
-  log("FIN_CARD_HAS_CONFIRM_TEXT=" + (await wc().executeJavaScript("(document.querySelector('#chat .msg-finalize-proposal .fp-confirm')||{}).textContent||''")));
-  log("FIN_CARD_HAS_DISMISS_TEXT=" + (await wc().executeJavaScript("(document.querySelector('#chat .msg-finalize-proposal .fp-dismiss')||{}).textContent||''")));
-  log("FIN_CARD_REASON_SHOWS=" + (await wc().executeJavaScript("(document.querySelector('#chat .msg-finalize-proposal .fp-reason')||{textContent:''}).textContent.includes('.ans/project.json')")));
-  log("SHOT_13_FIN_CARD=" + (await shot("13-finalize-card.png")));
-
-  // 点 [确认完成] → 回传 `{toolCallId, allow:true}`；卡片就地定格「已确认…」。
-  await wc().executeJavaScript("document.querySelector('#chat .msg-finalize-proposal .fp-confirm').click()");
-  await sleep(300);
-  log("FIN_CONFIRM_CALL_ALLOW=" + (confirmCalls.some((c) => c && c.toolCallId === "tc-1" && c.allow === true)));
-  log("FIN_CARD_DECIDED=" + (await wc().executeJavaScript("(document.querySelector('#chat .msg-finalize-proposal .fp-actions')||{textContent:''}).textContent.includes('已确认')")));
-
-  // 再来一张提议 → 点 [暂不] → 回传 `{toolCallId, allow:false}`；卡片就地定格「已暂不…」。
-  wc().send("session:finalize-proposal", { toolCallId: "tc-2", proposal: "su 提议：可以收口了（完成 bootstrap）", reason: "将写出：.ans/project.json 等" });
-  await sleep(300);
-  await wc().executeJavaScript(
-    "(() => { const cards=document.querySelectorAll('#chat .msg-finalize-proposal'); const c=cards[cards.length-1]; c.querySelector('.fp-dismiss').click(); })()",
+  // ① 带预览的确认：preview 折叠块（默认收起）+ B-3 状态点亮；点 [确认] → answered/confirmed:true；定格。
+  const pOp1 = customerChannel.customerInput(
+    {
+      kind: "confirm",
+      title: "要写出角色卡「示例角色」吗？",
+      preview: "# 角色卡：示例角色\n\n边界将含：\n- 角色卡/示例角色/role-card.md\n- 角色卡/示例角色/boundary.yaml",
+      detail: "确认后按其边界写入。",
+    },
+    { roleId: "su" },
   );
   await sleep(300);
-  log("FIN_DISMISS_CALL_DENY=" + (confirmCalls.some((c) => c && c.toolCallId === "tc-2" && c.allow === false)));
-  log("FIN_CARD_DISMISSED=" + (await wc().executeJavaScript("(() => { const cards=document.querySelectorAll('#chat .msg-finalize-proposal'); const c=cards[cards.length-1]; return c.querySelector('.fp-actions').textContent.includes('已暂不'); })()")));
-  log("FIN_NO_SYSTEM_DIALOG=" + true); // 全程用注入替身（不弹系统对话框）——此守卫恒真，表明该路径不依赖原生对话框。
+  log("OP_CARD_PRESENT=" + (await wc().executeJavaScript("!!document.querySelector('#chat .op-request.op-kind-preview')")));
+  log("OP_CARD_TITLE_SHOWS=" + (await wc().executeJavaScript("(document.querySelector('#chat .op-request .op-title')||{textContent:''}).textContent.includes('示例角色')")));
+  log("OP_PREVIEW_COLLAPSED=" + (await wc().executeJavaScript("(() => { const d=document.querySelector('#chat .op-request details.op-preview'); return !!d && d.open === false; })()")));
+  log("OP_B3_AWAITING_CONFIRM=" + (await wc().executeJavaScript("(() => { const it=[...document.querySelectorAll('#role-tree .tree-item')].find((x)=>x.textContent.indexOf('su')>=0); const s=it && it.querySelector('.ti-status'); return !!s && s.className.includes('st-confirm'); })()")));
+  log("SHOT_11_OPERATOR=" + (await shot("11-operator-card.png")));
+  await wc().executeJavaScript("document.querySelector('#chat .op-request .op-confirm').click()");
+  await sleep(300);
+  const oOp1 = await pOp1;
+  log("OP_CONFIRM_ANSWERED=" + (!!oOp1 && oOp1.outcome === "answered" && oOp1.value.confirmed === true));
+  log("OP_CARD_FROZEN=" + (await wc().executeJavaScript("(document.querySelector('#chat .op-request .op-actions')||{textContent:''}).textContent.includes('已确认')")));
+  log("OP_B3_AWAITING_CLEARED=" + (await wc().executeJavaScript("(() => { const it=[...document.querySelectorAll('#role-tree .tree-item')].find((x)=>x.textContent.indexOf('su')>=0); const s=it && it.querySelector('.ti-status'); return !!s && !s.className.includes('st-confirm'); })()")));
 
-  // 还原：移除替身 handler（真实应用里该通道由 app/main.ts 注册）。
-  ipcMain.removeHandler("session:finalize-confirm");
+  // ② 单选（radio）：未选时提交禁用 → 选一项 → 提交 → selected 回传。
+  const pOp2 = customerChannel.customerInput(
+    { kind: "choice", title: "选一个角色目录名", options: [{ id: "alpha", label: "alpha" }, { id: "beta", label: "beta" }] },
+    { roleId: "su" },
+  );
+  await sleep(300);
+  log("OP_SELECT_HAS_RADIO=" + (await wc().executeJavaScript("!!document.querySelector('#chat .op-request.op-kind-select input[type=radio]')")));
+  log("OP_SUBMIT_DISABLED_INITIALLY=" + (await wc().executeJavaScript("(document.querySelector('#chat .op-request .op-submit')||{}).disabled === true")));
+  await wc().executeJavaScript("(() => { const cards=[...document.querySelectorAll('#chat .op-request')]; const c=cards[cards.length-1]; const r=c.querySelectorAll('input[type=radio]')[1]; r.checked=true; r.dispatchEvent(new Event('change')); c.querySelector('.op-submit').click(); })()");
+  await sleep(300);
+  const oOp2 = await pOp2;
+  log("OP_SELECT_ANSWERED=" + (!!oOp2 && oOp2.outcome === "answered" && JSON.stringify(oOp2.value.selected) === JSON.stringify(["beta"])));
+
+  // ③ 多选（checkbox）：勾两项 → 提交 → selected 两值。
+  const pOp3 = customerChannel.customerInput(
+    { kind: "choice", title: "勾选要包含的文件", multiple: true, options: [{ id: "a", label: "A" }, { id: "b", label: "B" }, { id: "c", label: "C" }] },
+    { roleId: "su" },
+  );
+  await sleep(300);
+  log("OP_MULTI_HAS_CHECKBOX=" + (await wc().executeJavaScript("!!document.querySelector('#chat .op-request.op-kind-multi input[type=checkbox]')")));
+  await wc().executeJavaScript("(() => { const cards=[...document.querySelectorAll('#chat .op-request')]; const c=cards[cards.length-1]; const i=c.querySelectorAll('input[type=checkbox]'); i[0].checked=true; i[0].dispatchEvent(new Event('change')); i[2].checked=true; i[2].dispatchEvent(new Event('change')); c.querySelector('.op-submit').click(); })()");
+  await sleep(300);
+  const oOp3 = await pOp3;
+  log("OP_MULTI_ANSWERED=" + (!!oOp3 && oOp3.outcome === "answered" && JSON.stringify(oOp3.value.selected) === JSON.stringify(["a", "c"])));
+
+  // ④ 快照校验负例：伪造 id / 不在请求中的选项 → 不受理（ok:false）；取消 → declined。
+  const pOp4 = customerChannel.customerInput(
+    { kind: "choice", title: "单选守卫", options: [{ id: "a", label: "A" }] },
+    { roleId: "su" },
+  );
+  await sleep(200);
+  const forgedId = customerChannel.respond({ id: "forged-id", decision: { kind: "choice", selected: ["a"] } });
+  log("OP_FORGED_ID_REJECTED=" + (forgedId.ok === false));
+  const realId = await wc().executeJavaScript("([...document.querySelectorAll('#chat .op-request')].pop()||{dataset:{}}).dataset.requestId");
+  const outOfSet = customerChannel.respond({ id: realId, decision: { kind: "choice", selected: ["zzz"] } });
+  log("OP_OUT_OF_SET_REJECTED=" + (outOfSet.ok === false));
+  await wc().executeJavaScript("(() => { const cards=[...document.querySelectorAll('#chat .op-request')]; const c=cards[cards.length-1]; c.querySelector('.op-cancel').click(); })()");
+  await sleep(300);
+  const oOp4 = await pOp4;
+  log("OP_CANCEL_DECLINED=" + (!!oOp4 && oOp4.outcome === "declined"));
+
+  // 收口面已删守卫：入口容器/旧卡**不存在**（断言「它不在」，防回潮）。
+  log("OP_OLD_ENTRY_REMOVED=" + (await wc().executeJavaScript("document.getElementById('bootstrap-action') === null")));
+  log("OP_OLD_CARD_REMOVED=" + (await wc().executeJavaScript("!document.querySelector('#chat .msg-finalize-proposal') && !document.querySelector('#chat .sys-finalize')")));
 
   // 结束临时会话，避免影响后续步骤（步骤 9 会重载仓库根并点其它角色）。
   await wc().executeJavaScript("window.desktop.stopSession()");
@@ -434,16 +584,20 @@ async function run() {
   await sleep(500);
   await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面应用')");
   await sleep(1000);
+  // B-2：事件外推带 `roleId` 信封（`{roleId, event}`）——直接推给渲染侧时同样要套信封。
   wc().send("session:event", {
-    kind: "handback",
-    summary: "回交 su：完成边界内改动",
-    handback: {
-      roleId: "桌面应用",
-      taskId: "T20",
-      status: "completed",
-      summary: "完成边界内改动",
-      evidence: ["角色卡/桌面应用/feature-map.md"],
-      at: "2026-10-11T00:00:00.000Z",
+    roleId: "桌面应用",
+    event: {
+      kind: "handback",
+      summary: "回交 su：完成边界内改动",
+      handback: {
+        roleId: "桌面应用",
+        taskId: "T20",
+        status: "completed",
+        summary: "完成边界内改动",
+        evidence: ["角色卡/桌面应用/feature-map.md"],
+        at: "2026-10-11T00:00:00.000Z",
+      },
     },
   });
   await sleep(300);
@@ -458,9 +612,12 @@ async function run() {
   await wc().executeJavaScript("window.__ansRenderer.selectRole(window.__ansRenderer.state.primaryRoleId)");
   await sleep(1000);
   wc().send("session:event", {
-    kind: "handback",
-    summary: "回交 su：被拦下",
-    handback: { roleId: "桌面应用", status: "blocked", summary: "被拦下：无写入落地", evidence: [], at: "2026-10-11T00:00:00.000Z" },
+    roleId: "桌面应用",
+    event: {
+      kind: "handback",
+      summary: "回交 su：被拦下",
+      handback: { roleId: "桌面应用", status: "blocked", summary: "被拦下：无写入落地", evidence: [], at: "2026-10-11T00:00:00.000Z" },
+    },
   });
   await sleep(300);
   log("MIRROR_CARD_PRESENT=" + (await wc().executeJavaScript("!!document.querySelector('#chat .msg-handback.is-mirror')")));
@@ -468,7 +625,135 @@ async function run() {
   log("MIRROR_HAS_FROM=" + (await wc().executeJavaScript("(document.querySelector('#chat .msg-handback.is-mirror')||{textContent:''}).textContent.includes('来自 桌面应用 的报告')")));
   log("MIRROR_STATUS_BLOCKED=" + (await wc().executeJavaScript("!!document.querySelector('#chat .msg-handback.is-mirror .hb-status.hb-blocked')")));
   log("MIRROR_EVIDENCE_EMPTY=" + (await wc().executeJavaScript("!!document.querySelector('#chat .msg-handback.is-mirror .hb-ev-empty')")));
+  // C-1（2026-10-12）：空证据占位文案 + blocked 的可见区分（左语义色竖条类）。
+  log("MIRROR_EVIDENCE_PLACEHOLDER=" + (await wc().executeJavaScript("(document.querySelector('#chat .msg-handback.is-mirror .hb-ev-empty')||{textContent:''}).textContent.includes('（未提供证据）')")));
+  log("MIRROR_CARD_IS_BLOCKED_VISUAL=" + (await wc().executeJavaScript("!!document.querySelector('#chat .msg-handback.is-mirror.is-blocked')")));
   log("SHOT_08_MIRROR=" + (await shot("08-mirror.png")));
+
+  // 9b) B-1/B-2/B-3（2026-10-12）：切换保留历史（锚点）→ Markdown 渲染+XSS 转义+链接外开（替身）→ 状态徽标。
+  await wc().executeJavaScript("window.__ansRenderer.selectRole(window.__ansRenderer.state.primaryRoleId)");
+  await sleep(800);
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面应用')");
+  await sleep(800);
+  log("HISTORY_KEPT_ON_SWITCHBACK=" + (await wc().executeJavaScript("!!document.querySelector('#chat .msg-handback')")));
+  // B-1：注入含 Markdown 与「类标签文本」的助手消息——粗体应渲染、`<tag>` 应仍是转义文本。
+  wc().send("session:event", { roleId: "桌面应用", event: { kind: "message", summary: "**粗体** 与 `<tag>` 文本" } });
+  wc().send("session:event", { roleId: "桌面应用", event: { kind: "message", summary: "[示例站点](https://example.com/x)" } });
+  await sleep(250);
+  log("MD_STRONG_RENDERED=" + (await wc().executeJavaScript("!!document.querySelector('#chat .msg-assistant strong')")));
+    log("MD_TAG_TEXT_ESCAPED=" + (await wc().executeJavaScript("(() => { const any=[...document.querySelectorAll('#chat .msg-assistant')].some((m)=>m.textContent.includes('<tag>')); return any && !document.querySelector('#chat tag'); })()")));
+  await wc().executeJavaScript("(document.querySelector('#chat a.md-link')||{click:function(){}}).click()");
+  await sleep(150);
+  log("LINK_OPEN_EXTERNAL_CALLED=" + openExternalCalls.some((u) => u === "https://example.com/x"));
+  // 工具行瘦身（2026-10-12）：含长内容的工具事件渲染后**不含内容**、含目标路径。
+  wc().send("session:event", { roleId: "桌面应用", event: { kind: "tool_call", summary: "read_file：read_file: docs/接口约定.md # 接口约定 · 正文预览【哨兵-勿显示】" } });
+  await sleep(250);
+  log("TOOLROW_NO_CONTENT=" + (await wc().executeJavaScript("!document.querySelector('#chat').textContent.includes('哨兵-勿显示')")));
+  log("TOOLROW_HAS_PATH=" + (await wc().executeJavaScript("document.querySelector('#chat').textContent.includes('read_file：docs/接口约定.md')")));
+  // H-1 附录：系统投递输入单独样式（不长得像客户发的消息）+ 手输防误伤。
+  wc().send("session:event", { roleId: "桌面应用", event: { kind: "message", summary: "用户指令：[回交] 来自 规划者 的报告（任务 T1）\n结论：completed\n摘要：做完了" } });
+  await sleep(250);
+  log("INJECTED_STYLE_PRESENT=" + (await wc().executeJavaScript("!!document.querySelector('#chat .msg-injected.is-handback')")));
+  log("INJECTED_CHIP_LABEL=" + (await wc().executeJavaScript("(document.querySelector('#chat .msg-injected .mi-chip')||{textContent:''}).textContent")));
+  log("INJECTED_NOT_USER_BUBBLE=" + (await wc().executeJavaScript("(() => { const el=document.querySelector('#chat .msg-injected'); return !!el && !el.classList.contains('msg-user'); })()")));
+  // 手输防误伤：真发一条**以投递前缀开头**的文本，再推它的 `用户指令：` 回显 → 不得变成注入样式。
+  await wc().executeJavaScript("(() => { document.getElementById('inp-message').value='[派发] 手输测试勿注入'; document.getElementById('btn-send').click(); })()");
+  await sleep(400);
+  wc().send("session:event", { roleId: "桌面应用", event: { kind: "message", summary: "用户指令：[派发] 手输测试勿注入" } });
+  await sleep(250);
+  log("MANUAL_PREFIX_BUBBLE=" + (await wc().executeJavaScript("[...document.querySelectorAll('#chat .msg-user')].some((e)=>e.textContent.includes('[派发] 手输测试勿注入'))")));
+  log("MANUAL_NOT_INJECTED=" + (await wc().executeJavaScript("![...document.querySelectorAll('#chat .msg-injected')].some((e)=>e.textContent.includes('手输测试勿注入'))")));
+  // B-3：保活会话 ⇒ 「空闲」徽标；悬停数据（最近事件+时间）已记录。
+  log("STATUS_BADGE_TEXT=" + (await wc().executeJavaScript("(() => { const items=[...document.querySelectorAll('#role-tree .tree-item')]; const it=items.find((x)=>x.textContent.indexOf('桌面应用')>=0); const s=it && it.querySelector('.ti-status'); return s ? s.textContent : ''; })()")));
+  log("STATUS_BADGE_IS_IDLE=" + (await wc().executeJavaScript("(() => { const items=[...document.querySelectorAll('#role-tree .tree-item')]; const it=items.find((x)=>x.textContent.indexOf('桌面应用')>=0); const s=it && it.querySelector('.ti-status'); return !!s && s.className.includes('st-idle'); })()")));
+  log("STATUS_LAST_EVENT_RECORDED=" + (await wc().executeJavaScript("(() => { const m=(window.__ansRenderer.state.roleMeta||{})['桌面应用']||{}; return !!(m.lastSummary && m.lastAt); })()")));
+  // L-1 + 状态准确性（2026-10-12）：主进程**真实状态快照** → 徽标「◐ 工作中 · 2 待办」+ 该角色 pane 的
+  // **队列行**；清空快照 → 徽标回「空闲」、队列行移除（界面只如实转述快照，不做界面侧推测）。
+  await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面应用', busy: true, summaries: ['你：排队一', '你：排队二'] })");
+  await sleep(150);
+  log("ROLE_STATE_BADGE_WORKING_PENDING=" + (await wc().executeJavaScript("(() => { const it=[...document.querySelectorAll('#role-tree .tree-item')].find((x)=>x.textContent.indexOf('桌面应用')>=0); const s=it && it.querySelector('.ti-status'); return !!s && s.className.includes('st-working') && s.textContent.includes('工作中 · 2 待办'); })()")));
+  log("ROLE_STATE_BADGE_HAS_ICON=" + (await wc().executeJavaScript("(() => { const it=[...document.querySelectorAll('#role-tree .tree-item')].find((x)=>x.textContent.indexOf('桌面应用')>=0); const s=it && it.querySelector('.ti-status .ts-ico'); return !!s && s.textContent.length>=1; })()")));
+  log("ROLE_STATE_BADGE_HOVER_FULL=" + (await wc().executeJavaScript("(() => { const it=[...document.querySelectorAll('#role-tree .tree-item')].find((x)=>x.textContent.indexOf('桌面应用')>=0); const s=it && it.querySelector('.ti-status'); return !!s && (s.getAttribute('title')||'').includes('2 项已入队'); })()")));
+  log("ROLE_STATE_QUEUE_ROW=" + (await wc().executeJavaScript("(document.querySelector('#chat .queue-row .q-text')||{textContent:''}).textContent.includes('【队列】2 条待办：你：排队一')")));
+  await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面应用', busy: false, summaries: [] })");
+  await sleep(120);
+  log("ROLE_STATE_CLEARED=" + (await wc().executeJavaScript("(() => { const it=[...document.querySelectorAll('#role-tree .tree-item')].find((x)=>x.textContent.indexOf('桌面应用')>=0); const s=it && it.querySelector('.ti-status'); return !!s && s.className.includes('st-idle') && !document.querySelector('#chat .queue-row'); })()")));
+
+  // M-1（2026-10-12 客户裁定「这个太丑了」）：shell 确认卡 = **应用内弹层**（不再用原生对话框）。
+  // 结构/默认焦点/详情收起 + Esc = 不放行（真实 IPC：无挂起 ⇒ expired；卡片转「已失效」而非悄悄关闭）。
+  await wc().executeJavaScript("window.__ansRenderer.onShellConfirm({ id: 'sc-probe-1', command: 'ls -la /tmp && echo hi', summary: '它会在项目里执行：ls', reasonPlain: '审核未能给出明确结论，按 fail-closed 交你确认。', reasonRaw: 'pm 拿不准，交操作者', argvLines: ['[0] \"ls\"', '[1] \"-la\"', '[2] \"/tmp\"'], cwd: '/proj' })");
+  await sleep(200);
+  log("SHELL_CONFIRM_VISIBLE=" + (await wc().executeJavaScript("!document.getElementById('shell-confirm').hidden")));
+  log("SHELL_CONFIRM_COMMAND_VERBATIM=" + (await wc().executeJavaScript("document.getElementById('sc-command').textContent === 'ls -la /tmp && echo hi'")));
+  log("SHELL_CONFIRM_SUMMARY_PLAIN=" + (await wc().executeJavaScript("document.getElementById('sc-summary').textContent.includes('它会在项目里执行')")));
+  log("SHELL_CONFIRM_REASON_PLAIN=" + (await wc().executeJavaScript("document.getElementById('sc-reason').textContent.includes('fail-closed') && !document.getElementById('sc-reason').textContent.includes('pm 拿不准')")));
+  log("SHELL_CONFIRM_DENY_DEFAULT_FOCUS=" + (await wc().executeJavaScript("document.activeElement === document.getElementById('sc-deny')")));
+  log("SHELL_CONFIRM_DETAILS_COLLAPSED=" + (await wc().executeJavaScript("document.getElementById('sc-details').open === false")));
+  await wc().executeJavaScript("document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))");
+  await sleep(300);
+  log("SHELL_CONFIRM_ESC_NOT_ALLOWED=" + (await wc().executeJavaScript("(() => { const o=document.getElementById('shell-confirm'); return o.classList.contains('is-expired') && !o.hidden && document.getElementById('sc-hint').textContent.includes('未获放行'); })()")));
+  // 探针清理：隐藏卡片（不影响后续步骤/截图）。
+  await wc().executeJavaScript("(() => { const el=document.getElementById('shell-confirm'); el.hidden = true; el.classList.remove('is-expired'); window.__ansRenderer.state.shellConfirm = null; })()");
+
+  // N-3（2026-10-12 追加；客户「代办也要在右边显示」）：右栏「待办 / 队列」——夹具注入 → 逐条渲染 +
+  // 「进行中」在最前 + 空占位（数据经 role-state 真实快照通道；此处直接注入该通道的载荷）。
+  await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面应用', busy: true, summaries: ['你：排队一'], queue: [{kind:'message', sourceRoleId:'桌面应用', summary:'你：排队一', at:'2026-10-12T03:00:00.000Z'},{kind:'dispatch', sourceRoleId:'su', summary:'派发 · 来自 su：做X', at:'2026-10-12T03:01:00.000Z'}], running: {kind:'handback', sourceRoleId:'A', summary:'回交投递 · 来自 A', at:'2026-10-12T02:59:00.000Z'} })");
+  await sleep(200);
+  log("RIGHT_QUEUE_SECTION=" + (await wc().executeJavaScript("!!document.querySelector('#right-body #right-queue-body')")));
+  log("RIGHT_QUEUE_ROWS=" + (await wc().executeJavaScript("document.querySelectorAll('#right-queue-body .q-item').length")));
+  log("RIGHT_QUEUE_RUNNING_FIRST=" + (await wc().executeJavaScript("(() => { const first=document.querySelector('#right-queue-body .q-item'); return !!first && first.classList.contains('is-running') && first.textContent.includes('进行中'); })()")));
+  log("RIGHT_QUEUE_SOURCES=" + (await wc().executeJavaScript("(() => { const t=document.querySelector('#right-queue-body').textContent; return t.includes('回交投递') && t.includes('客户消息') && t.includes('su 派发') && t.includes('你：排队一'); })()")));
+  await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面应用', busy: false, summaries: [], queue: [], running: null })");
+  await sleep(150);
+  log("RIGHT_QUEUE_EMPTY_PLACEHOLDER=" + (await wc().executeJavaScript("document.querySelector('#right-queue-body').textContent.includes('（无待办）')")));
+
+  // P-1（2026-10-12 真机：su 的卡被 288 行活动淹掉、客户以为卡丢了）：到达即达 + 常驻 chip + 逐张定位 + 切回滚到卡。
+  // 先造一屏高内容（40 行）并把视口拉到底，再注入待确认卡。
+  for (let i = 0; i < 40; i += 1) {
+    wc().send("session:event", { roleId: "桌面应用", event: { kind: "message", summary: "P-1 填充行 " + i } });
+  }
+  await sleep(400);
+  await wc().executeJavaScript("(() => { const c=document.getElementById('chat'); c.scrollTop = c.scrollHeight; })()");
+  await sleep(100);
+  await wc().executeJavaScript("window.__ansRenderer.appendOperatorRequest({ id: 'p1-card-1', roleId: '桌面应用', request: { kind: 'confirm', title: 'P-1 探针卡一', detail: '到达即达' } })");
+  await sleep(250);
+  log("P1_ARRIVAL_SCROLLED=" + (await wc().executeJavaScript("(() => { const c=document.getElementById('chat'); const pane=[...document.querySelectorAll('#chat .chat-pane')][0]; const kids=pane?pane.children:[]; let card=null; for (const k of kids) { if (k.dataset && k.dataset.requestId==='p1-card-1') card=k; } if (!card) return false; const cr=card.getBoundingClientRect(); const cc=c.getBoundingClientRect(); return cr.top >= cc.top - 1 && cr.bottom <= cc.bottom + 1; })()")));
+  log("P1_ARRIVAL_DEBUG=" + JSON.stringify(await wc().executeJavaScript("(() => { const c=document.getElementById('chat'); const pane=[...document.querySelectorAll('#chat .chat-pane')][0]; const kids=pane?pane.children:[]; let card=null; for (const k of kids) { if (k.dataset && k.dataset.requestId==='p1-card-1') card=k; } const cr=card?card.getBoundingClientRect():null; const cc=c.getBoundingClientRect(); return { hasCard:!!card, dist: Math.round(c.scrollHeight-c.scrollTop-c.clientHeight), st:Math.round(c.scrollTop), sh:Math.round(c.scrollHeight), ch:Math.round(c.clientHeight), crTop: cr?Math.round(cr.top):null, crBottom: cr?Math.round(cr.bottom):null, ccTop:Math.round(cc.top), ccBottom:Math.round(cc.bottom), chipHidden: document.getElementById('op-chip').hidden }; })()")));
+  log("P1_CHIP_VISIBLE=" + (await wc().executeJavaScript("(() => { const el=document.getElementById('op-chip'); return !!el && !el.hidden && el.textContent.includes('有 1 条待确认'); })()")));
+  // 在往上翻（滚到顶）→ 第二张卡到达 ⇒ **不打断**（scrollTop 不变、卡不在视野）+ chip 计数=2。
+  await wc().executeJavaScript("(() => { document.getElementById('chat').scrollTop = 0; })()");
+  await sleep(100);
+  const p1TopBefore = await wc().executeJavaScript("document.getElementById('chat').scrollTop");
+  await wc().executeJavaScript("window.__ansRenderer.appendOperatorRequest({ id: 'p1-card-2', roleId: '桌面应用', request: { kind: 'confirm', title: 'P-1 探针卡二', detail: '不打断' } })");
+  await sleep(250);
+  log("P1_NO_INTERRUPT_TOP=" + ((await wc().executeJavaScript("document.getElementById('chat').scrollTop")) === p1TopBefore));
+  log("P1_CHIP_COUNT2=" + (await wc().executeJavaScript("document.getElementById('op-chip').textContent.includes('有 2 条待确认')")));
+  // 点 chip → 定位到一张并高亮（在视野内）；再点一次 → 轮到另一张（两张都留下 is-flash 痕）。
+  await wc().executeJavaScript("document.getElementById('op-chip').click()");
+  await sleep(200);
+  log("P1_CHIP_CLICK_LOCATES=" + (await wc().executeJavaScript("(() => { const c=document.getElementById('chat'); const flashed=document.querySelector('#chat .op-request.is-flash'); if (!flashed) return false; const cr=flashed.getBoundingClientRect(); const cc=c.getBoundingClientRect(); return cr.top >= cc.top - 1 && cr.bottom <= cc.bottom + 1; })()")));
+  await wc().executeJavaScript("document.getElementById('op-chip').click()");
+  await sleep(200);
+  log("P1_CHIP_SECOND_CARD=" + (await wc().executeJavaScript("document.querySelectorAll('#chat .op-request.is-flash').length === 2")));
+  // 作答（真实 IPC：探针卡无主进程挂起 ⇒ expired 终态）⇒ chip 计数减一，全部终态后隐藏。
+  await wc().executeJavaScript("(() => { const pane=[...document.querySelectorAll('#chat .chat-pane')][0]; const kids=pane?pane.children:[]; for (const k of kids) { if (k.dataset && k.dataset.requestId==='p1-card-1') { const b=k.querySelector('.op-deny'); if (b) b.click(); } } })()");
+  await sleep(300);
+  log("P1_CHIP_COUNT1_AFTER_TERMINAL=" + (await wc().executeJavaScript("(() => { const el=document.getElementById('op-chip'); return !!el && !el.hidden && el.textContent.includes('有 1 条待确认'); })()")));
+  await wc().executeJavaScript("(() => { const pane=[...document.querySelectorAll('#chat .chat-pane')][0]; const kids=pane?pane.children:[]; for (const k of kids) { if (k.dataset && k.dataset.requestId==='p1-card-2') { const b=k.querySelector('.op-deny'); if (b) b.click(); } } })()");
+  await sleep(300);
+  log("P1_CHIP_HIDDEN_AFTER_ALL_TERMINAL=" + (await wc().executeJavaScript("document.getElementById('op-chip').hidden")));
+  // 切回：再注入一张卡 → 切走（su）→ 切回 ⇒ 应**滚动到卡**（而不是停在底部）。
+  await wc().executeJavaScript("window.__ansRenderer.appendOperatorRequest({ id: 'p1-card-3', roleId: '桌面应用', request: { kind: 'confirm', title: 'P-1 探针卡三', detail: '切回滚到卡' } })");
+  await sleep(200);
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('su')");
+  await sleep(900);
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面应用')");
+  await sleep(900);
+  log("P1_SWITCHBACK_SCROLLS_TO_CARD=" + (await wc().executeJavaScript("(() => { const c=document.getElementById('chat'); const pane=[...document.querySelectorAll('#chat .chat-pane')][0]; const kids=pane?pane.children:[]; let card=null; for (const k of kids) { if (k.dataset && k.dataset.requestId==='p1-card-3') card=k; } if (!card) return false; const cr=card.getBoundingClientRect(); const cc=c.getBoundingClientRect(); return cr.top >= cc.top - 1 && cr.bottom <= cc.bottom + 1; })()")));
+  // 探针清理：把 p1-card-3 作答掉（expired 终态），chip 应灭（不影响后续步骤）。
+  await wc().executeJavaScript("(() => { const pane=[...document.querySelectorAll('#chat .chat-pane')][0]; const kids=pane?pane.children:[]; for (const k of kids) { if (k.dataset && k.dataset.requestId==='p1-card-3') { const b=k.querySelector('.op-deny'); if (b) b.click(); } } })()");
+  await sleep(300);
+  log("P1_CLEANUP_CHIP_HIDDEN=" + (await wc().executeJavaScript("document.getElementById('op-chip').hidden")));
 
   // 10) T28：Pi 配置面板——UI 渲染 + 经**注入的临时 .env**（OUTDIR 下，绝不碰仓库根真实 .env）读写往返。
   await wc().executeJavaScript("window.__ansRenderer.openPiPanel()");
@@ -526,6 +811,12 @@ app.whenReady().then(async () => {
     // demo 适配器（用于注入缝：顶掉真实 pi 工厂，令 e2e 离线可跑）。
     const chatMod = await import(pathToFileURL(path.join(APP_DIR, "desktop", "chat-adapter.ts")).href);
     createChatDemoAdapter = chatMod.createChatDemoAdapter;
+    // A-5：客户交互通道（真实现场；presenter 推渲染侧、respond 校验回包）。
+    const ciMod = await import(pathToFileURL(path.join(APP_DIR, "desktop", "customer-input.ts")).href);
+    createCustomerInputChannel = ciMod.createCustomerInputChannel;
+    // D-1：会话记录恢复（真实现场；只读解析）。
+    const shMod = await import(pathToFileURL(path.join(APP_DIR, "desktop", "session-history.ts")).href);
+    readRoleSessionHistory = shMod.readRoleSessionHistory;
   } catch (err) {
     fs.writeFileSync(path.join(OUTDIR, "report.txt"), "IMPORT_ERROR=" + (err && err.stack ? err.stack : err) + "\n");
     app.quit();
@@ -560,7 +851,12 @@ app.whenReady().then(async () => {
       log("E2E_ERROR=" + (err && err.stack ? err.stack : err));
     }
     clearTimeout(watchdog);
-    fs.writeFileSync(path.join(OUTDIR, "report.txt"), report.join("\n") + "\n");
-    app.quit();
+    // 收尾报告：**防御式写**（写失败不让进程卡死——绝不因报告问题丢掉 exit）。
+    try {
+      fs.writeFileSync(path.join(OUTDIR, "report.txt"), report.join("\n") + "\n");
+    } catch (err) {
+      console.error("e2e 报告写入失败：" + (err && err.message ? err.message : err));
+    }
+    app.exit(0);
   });
 });

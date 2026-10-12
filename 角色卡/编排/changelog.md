@@ -1,5 +1,165 @@
 # 编排 变更记录
 
+## 2026-10-12 — M-2 shell 审读「不可解析」不再打扰客户：直接 fail-closed 拒绝 + 提示收紧
+
+**来源**：真机首跑暴露——(a) 层对话框弹「pm 判定 JSON 不合法」；客户：「**json 不合法的问题，就不用发给我了。**」＋补充裁定「**直接拒绝就行了**」（明确**不重试**）。
+
+**改了什么**：
+- **`src/common/编排/shell-gate.ts`**：**删** `BRANCH_B_BADJSON`（旧「升 (a)」语义）；**新增稳定枚举**——归因码 `BRANCH_B_UNPARSEABLE = "b-unparseable-deny"` + **一一对应**的固定短句 `REASON_B_UNPARSEABLE = "审核未能给出明确结论，已按 fail-closed 拒绝；可换更简单的命令形式或稍后重试"`（**单一来源**；桌面 M-1 的「人话映射」**据码对号、别看文本猜**）。`runB` 解析失败（含剥围栏/取首个 JSON 后仍非法）⇒ **直接终结拒绝**（`conclusion: deny`、`by: pm:输出不可解析`）——**不进 (a)、不重试、不打扰客户**；`BOutcome.deny` 增可选 `branch` 覆盖位（缺省仍 `b-deny`）。
+- **其它升级理由逐条不动**：(b) 明确判 **risky ⇒ 仍必过 (a)**；`b-unsure` / `b-unavailable`（无会话/报错）/ `b-timeout` ⇒ 升 (a)；`b-allow`（review）⇒ 终结放行；`b-deny` ⇒ 终结拒绝；c-*、a-* 全部保持。
+- **`src/pipeline/orchestration/pm-reviewer.ts`**：提示侧收紧——「**只输出下列 JSON**（**不得夹带任何解释文字、不得使用代码块围栏**；**字段与取值域固定**：verdict 只能是 allow / deny / unsure；reason / sessionId / model 为字符串）」。**解析侧容错照旧**（`parsePmVerdict` 既有：剥围栏、取首个 `{...}`；新增链级测试钉住仍生效）。**无重试**（客户裁定）。
+
+**测试**：`test/编排/` **160/160**（+1）——`shell-review-chain.test.ts` 重写「不可解析」用例（**pmAsk 恰 1 次**＝不重试、**operatorChannel 0 次**＝不进 (a)、`reason === REASON_B_UNPARSEABLE`、审计 `branch === "b-unparseable-deny"`、`conclusion === "deny"`）+ 新增「围栏包裹合法 JSON 仍解析 → `b-allow` 终结」；`shell-risky-order.test.ts`：risky + 不可解析 → **opCalls 0**、分支 `b-unparseable-deny`（原「升 (a)」断言删除）；`shell-arming.test.ts`：I-1 链上不可解析 → **operatorCalls 0**、fail-closed 短句在；unsure/超时升 (a) 断言保留。
+
+**结果**：`npm run typecheck` 本角色零错；全量 `node --test "test/**/*.test.ts"`（**引号带**）**831 计 / 827 过 / 3 红 / 1 skipped**——3 红逐条：2 条**既有环境红**（桌面面板键目录名、pm shared macOS `/var`）+ 1 条**测试角色旧断言**（`test/测试/t9-block3-pin-shell.test.ts:380-381` 仍断言 `b-badjson→a-*`；M-2 改判后待其更新——**请 pm 转达**；非本角色文件，未动）。**本角色零红**。环境：Node v24.14.0、Darwin 25.6.0、HEAD d933537。真机复验（让 (b) 输出垃圾 → 客户不再被弹框）属**客户跑**。
+
+## 2026-10-12 — L-1 每角色任务队列：派发受理回执单一来源；队列归属前端（不造第二套）
+
+**来源**：设计稿 `2026-10-12_design_governed-interaction-and-chat-ux.md` §L-1（客户：「每个角色如果正在工作，应该可以有个队列的概念，可以派发到队列里面去」）。
+
+**队列归属结论：前端（桌面）持有**——H-1 已定「前端路由：未开会话→自动开；忙→排队；失败/超时→如实提示+保留」；现状核实：桌面投递机已实现（`app/desktop/session.ts` 按 `${projectRoot}\0${targetRoleId}` 的**到达序数组**、忙则积压、其 `settled` 后按序放行、E-1/H-1 **共用一套**、去重窗口）。编排新增队列即**第二套实现** ⇒ 不做；本层只统一**回执文案**并约定接口。
+
+**改了什么（`src/common/编排/handback.ts`，一个纯函数）**：
+- **`formatDispatchReceipt({ targetRoleId, sessionOpen, queuePosition? })`**——受理回执文案**单一来源**：
+  - 忙：`已受理：目标忙，已入队（第 N 位）；受理 ≠ 完成。`（**位置口径** = 入队后在**本角色**队列中的序号（1 起、FIFO 按到达序），由队列持有方计算传入）；
+  - 空闲/正在投递：`已受理：任务将投递给角色 <id> 的会话[（其会话未开——将自动开启）]；投递结果/失败会在其聊天流与 su 的聊天流如实显示（受理≠已完成）。`（按现状文案）；
+  - **受理 ≠ 完成**两形态都写死；校验失败/去重等分支仍归路由实现如实填写。
+- **事件外推（未新增任何冻结类型）**：入队 → 回执含**位置**；出队/投递成功/失败 → 桌面既有 `emitDeliveryNote` 系统行；完成 → 目标回交（E-1）。既有事件流已覆盖队列变化，本层不另立事件类型。
+
+**测试**：`test/编排/handback.test.ts` **+2 例**（共 17）：回执两形态断言（忙含「入队」「第 2 位」「受理 ≠ 完成」；空闲「未开→将自动开启」分支与渠道文案）；**到达序假件驱动**（同一目标队列两条派发 → 位置 1、2；出队 A→B FIFO；清空后转空闲回执）。
+
+**结果**：`test/编排/` **159/159**；`npm run typecheck` 本角色零错；全量 `node --test "test/**/*.test.ts"`（**引号带**）**820 计 / 815 过 / 4 红 / 1 skipped**——4 红逐条：2 条**既有环境红**（桌面面板键目录名、pm shared macOS `/var`）+ 2 条**桌面在途**（`test/桌面应用/interface.test.ts:106`、`session.test.ts:43`——其「可见性」实现进行中）。**本角色零红**。环境：Node v24.14.0、Darwin 25.6.0、HEAD d933537。
+
+**跨角色（请 pm 转达）**：桌面 `routeDispatch` 受理回执切到 `formatDispatchReceipt`（一行；忙分支传目标队列长度+1）；`renderDispatchPromptLocal` 占位切到已落的 `renderDispatchPrompt`。
+
+## 2026-10-12 — I-1 开放 shell：三层链装配与 arm（编排侧）
+
+**来源**：设计稿 `2026-10-12_design_governed-interaction-and-chat-ux.md` §I-1（客户裁定启用 V1 未接线的三层链）。**已知并接受**：V1 无 OS 沙箱——被放行命令的写入绕过写门禁（靠 (c) + su 审读守卫 + 逐条留痕）。
+
+**改了什么**：
+- **新增 `src/pipeline/orchestration/shell-arming.ts`**：`assembleProjectShellGate(opts)` 装配既有三层链——(c) `classifyShell`+规则集**注入**（未注入 ⇒ 闸一律拒绝，fail-closed；依 `shell-gate.ts` 既定架构「规则集内容不属编排」）；(b) 既有 `pm-reviewer`，审读角色 = **`listProject` 枚举的内置治理角色**（缺省即 su；拿不准/判读非法/不可用 → 升 (a)；risky → **必过 (a)**）；(a) 前端注入 `operatorChannel`（关窗/不答/超时 = **不放行**）；审计边界 = 治理角色边界（`buildShellGate` 内建 `docs/audit/shell-gate.jsonl`，审计失败不翻转判定）。
+- **`src/pipeline/orchestration/run-role.ts`**：`AdapterCapabilities` 增 `shellGate`；`openRoleSession` 增 `shellOperatorChannel?`（(a) 通道兼 arm 开关）与 `shellArming?`（高级注入）；**只对项目角色 arm**（su 自身不 arm；装配失败 ⇒ 不 arm = `run_shell` 不注册）；`createPiAdapterFactory` 改 `shellGate: capabilities?.shellGate ?? shellGate`（能力面优先，第二参保留兼容）。
+- **核实并钉住既有件**：命令 cwd 钉项目根 = `real-adapter.ts:755` 已传 `shellCwd: opts.projectRoot`；spawn 剥离凭据 = `tools.ts::buildShellEnv`（删 `PI_CREDENTIAL_ENV_VARS`）——两项**既有**，本层未改、未另传。
+
+**⚠ 跨角色依赖（如实登记）**：(c) 的实件在门禁引擎**私有 common**（`src/common/门禁引擎/classify-shell.ts`）——本角色**不导入**（§6；`shell-gate.ts:49` 预期的 `src/service/gate/` 公开再出口**尚不存在**）⇒ 生产 arm 暂缺合法 (c) 注入源（缺省 ⇒ 闸一律拒绝，fail-closed）。**待办**：门禁引擎经 service 公开再导出 `classifyShell`/`defaultShellRules`（一行文件），桌面经 `shellArming` 注入实件即全链可用——请 pm 转达。
+
+**测试（全假件，绝不真跑命令；(c) 用门禁引擎实件——test/编排 域既有做法）**：新 `test/编排/shell-arming.test.ts` **5 例**：注入即注册/不注入不存在/**su 给了也不 arm**；(c) 硬拒（`sh -c`）→ 不执行且不打扰 (b)/(a)、白名单（`ls -la`）→ 直放；review+(b)allow → **可达且不经 (a)**、risky+(b)allow → **必过 (a)**、a 拒 → 不执行；(b) badjson/unsure → 升 (a)、(a) 不可用/超时（关窗等价）→ 不执行理由如实；留痕（审计 sink 每条请求一条：command/conclusion/branch/by/条件 `shell-gate`；事件流含 run_shell 的 tool_call 与 denied）。
+
+**结果**：`test/编排/` **157/157**；`npm run typecheck` 本角色零错；全量 `node --test "test/**/*.test.ts"`（**引号带**）**800 计 / 797 过 / 2 红 / 1 skipped**——2 红均为**既有环境红**（桌面面板键目录名、pm shared macOS `/var`），全仓其余全绿。环境：Node v24.14.0、Darwin 25.6.0、HEAD d933537。真实执行路径（真命令/真模型审读/真确认框）属**客户跑**。未碰 `src/provider/**`、`src/common/pi-adapter/**`、`app/**`、他角色 tests/docs。
+
+## 2026-10-12 — H-1 su 派发任务：文案与判定口径的单一来源 + 能力透传（只给 su）
+
+**来源**：设计稿 `2026-10-12_design_governed-interaction-and-chat-ux.md` §H-1（客户「给 su 加一个工具，可以派发任务」）。契约家 `DispatchTaskPayload`/`DispatchTaskFn`（`src/provider/pi/session.ts:245-282`，Pi适配器已落）；**前端路由**（转目标角色会话一条输入/自动开会话/忙时排队/去重/失败保留）与**实时校验权威**归桌面；CLI 一次性前端不做同等路由（设计已登记）。**语义硬约束：派发 ≠ 授权**。
+
+**改了什么**：
+- **`src/common/编排/handback.ts`**（两个纯函数）：**`renderDispatchPrompt(req: DispatchTaskPayload)`**——派发文案**单一来源**（两前端共用）：`[派发] 来自 su 的任务（原因：…）` → `task` **原文逐字** → 「完成后请交回报告（改了什么/结论/证据）。」；**不夹带任何授权语义**；`roleId` 用于路由/校验、不进文案。**`isDispatchableRoleId(project, roleId)`**——「非本项目角色 / 指向 su 自身 → 如实回错」的**判定口径单一来源**（`project.roles` 登记为真；内置角色不进映射 ⇒ 自身自动 false；空/未登记 false，fail-closed）；**已登记快照注意**：`project` 为会话开启快照，su 本会话新建角色不在其中——校验权威在持有**实时清单**的前端（重建 project 再判，勿凭旧快照误拒）。
+- **`src/pipeline/orchestration/run-role.ts`**：`AdapterCapabilities` 增 `dispatchTask?: DispatchTaskFn`；`openRoleSession` 增输入 `dispatchTask?`（前端路由实现），**只对治理角色（su）转交**（`suppressHandback ? input.dispatchTask : undefined`——项目角色会话即便误给也不注入）；`createPiAdapterFactory` 原样转发；CLI 不传 ⇒ `dispatch_task` 在 CLI su 会话中不注册（设计已登记）。**编排未加校验包装**：校验须对活的角色清单（快照会误拒 su 刚建的角）；口径由 `isDispatchableRoleId` 单一提供，前端路由以 `{ok:false, message}` 回执如实转达 su。
+
+**测试**：`test/编排/handback.test.ts` **+3 例**：文案逐行（三行恰界/`task` 原文/多行含空行原样/无 reason 不写原因段/roleId 不进文案/**无授权字样反向断言**）；`isDispatchableRoleId` 五态（登记 true；su 自身/未登记/空/快照外 false）；能力透传（**su 拿到、项目角色不给（即便误给）、未给路由不注入**）。
+
+**结果**：`test/编排/` **152/152**；`npm run typecheck` 本角色零错；全量 `node --test "test/**/*.test.ts"`（**引号带**）**780 计 / 775 过 / 4 红 / 1 skipped**——4 红逐条归因：2 条**既有环境红**（桌面面板键目录名、pm shared macOS `/var`）+ 2 条**桌面在途**（`test/桌面应用/handback-delivery.test.ts:194/214`，其 E-1 投递实现进行中）。**本角色零红**。环境：Node v24.14.0、Darwin 25.6.0、HEAD d933537。闭环端到端属**客户跑**。
+
+## 2026-10-12 — G-1 客户确认不设超时（CLI 终端问答语义同步）
+
+**来源**：设计稿 `2026-10-12_design_governed-interaction-and-chat-ux.md` §G-1；客户裁定「交互工具的等待**不超时**」。归属：Pi适配器（去缺省等待上限；**客户输入挂起期间 prompt 硬超时不得掐断该轮**）＋**编排**（CLI 通道语义同步）＋桌面（卡片不再按时间过期）。
+
+**核实与改动（唯一文件 `src/common/编排/operator-channel.ts`，仅注释 + 测试）**：
+- **核实结论**：编排层对客户确认的等待**本就没有计时器**——`createCliCustomerInput` 的 `readLine` 一直等作答（无 `setTimeout`/无超时选项）；`runGovernSession` 一次性壳在等待期间**无任何编排侧时限**。
+- **改注释**：头注原表述「超时由消费方包装（…交互工具的 `withTimeout`）」随 G-1 不成立，改写为：**客户确认制的终端问答不设超时**；**EOF（无人值守）→ `unavailable` → 未获同意——fail-closed 不变**（硬约束，绝不改成「等待」）。shell 闸 (a) 的 `createCliOperatorChannel` 与 `shell-gate.ts` 超时属**另一条链**（shell 审核，超时 = 拒绝），未动。
+- **跨角色如实指出（未动其文件）**：真正会掐断「等客户作答」的两处在 **Pi适配器**（G-1 已派其修）：`provider/pi/tools.ts` 交互工具的 `withTimeout`（`ANS_PI_CUSTOMER_INPUT_TIMEOUT_MS`，缺省 110s）与 `real-adapter` 每轮 prompt 硬超时（缺省 120s）。**本报告日核实：两项尚未落地**——落地前真实端到端「长等客户」仍可能被 110s/120s 截断，属 Pi侧在途。
+
+**测试**：`test/编排/confirmation-gated.test.ts` **+1 例**——`readLine` 延迟 250ms 后作答仍生效（确认与多选各一次，证编排侧不设时限）；EOF → `unavailable` 保留（既有用例）。文案未动。
+
+**结果**：`test/编排/` **149/149**；`npm run typecheck` 本角色零错；全量 `node --test "test/**/*.test.ts"`（**引号带**）**757 计 / 753 过 / 3 红 / 1 skipped**——3 红逐条归因：2 条**既有环境红**（桌面面板键目录名、pm shared macOS `/var`）+ 1 条**桌面在途**（`test/桌面应用/renderer.test.ts:406`，「交互卡严格投递所属 pane」——其 G-1/B 组实现进行中）。**本角色零红**。环境：Node v24.14.0、Darwin 25.6.0、HEAD d933537。
+
+## 2026-10-12 — E-1 回交投递文案的单一来源（`renderHandbackPrompt` + `handbackKey`）
+
+**来源**：设计稿 `2026-10-12_design_governed-interaction-and-chat-ux.md` §E-1（回交后的 su 验收；客户裁定**全自动**，不做开关）。投递/排队/自动开启 su 会话归**桌面应用**；本层只提供共用件。
+
+**改了什么（`src/common/编排/handback.ts`，两个纯函数、无接线变更）**：
+- **`renderHandbackPrompt(hb: TaskHandback): string`**——投递给 su 验收的**文案单一来源**：`[回交] 来自 <角色> 的报告（任务 <taskId，若有>）` → `结论：completed|blocked` → `摘要：<summary>` → `证据：`逐条（无则「（无）」）→ `请验收：确认通过 / 要求返工 / 上报客户。`。**明确请求验收、字段逐条、不夹带权限语义**（回交只搬任务与证据，不搬身份/写权——SKILL.md 交接语义）；**两前端共用，不得各写一份**。
+- **`handbackKey(hb): string`**——**去重键构造单一来源**（§E-1「一条回交只投递一次，避免重放刷屏」）：`<roleId>\0<taskId或空>\0<at>`，同一份 `TaskHandback` 恒等；**登记与排队仍归前端**（本函数只算键）。
+
+**未做（归桌面）**：投递本身、su 忙时排队与失败如实提示、su 未开自动开启再投递、去重登记；选装 **O-E1**（su 结构化记录验收结论）未获准未做。本层未引入任何开关（客户裁定的「全自动」）。
+
+**测试**：`test/编排/handback.test.ts` 12 例（E-1 新增 2）——文案逐行字段断言 + 「请验收」存在 + 无 taskId 不写任务段 + 无证据呈「（无）」+ **无权限字样反向断言**；去重键恒等/差异断言（角色/任务/时间任一不同即不同）。
+
+**结果**：`test/编排/` **148/148**；`npm run typecheck` **全仓零错**；全量 `node --test "test/**/*.test.ts"`（**引号带**）**744 计 / 741 过 / 2 红 / 1 skipped**——2 红均为**既有环境红**（桌面面板键目录名、pm shared macOS `/var`）。环境：Node v24.14.0、Darwin 25.6.0、HEAD d933537。真实端到端（回交→su 真验收）属**客户跑**。
+
+## 2026-10-12 — D-1 会话自持目录接线（重启恢复的编排部分）
+
+**来源**：设计稿 `2026-10-12_design_governed-interaction-and-chat-ux.md` §D-1（重启恢复；**客户已定存储＝项目内**）。契约钉死：适配器新增可选 `sessionDir?: string`，约定路径 `<projectRoot>/.ans/sessions/<roleId>/`；Pi适配器同刻接线（其 `session.ts:415` 已落该选项）。
+
+**改了什么（唯一文件 `src/pipeline/orchestration/run-role.ts`）**：
+- 新私有 `sessionDirFor(projectRoot, roleId)`：约定路径（`path.join(projectRoot, ".ans", "sessions", roleId)` + 尾分隔符）；`projectRoot` 为空、或 `roleId` 不安全（空、含 `/`、`\`、`..`）→ `undefined`（**不传，旧行为**）。
+- `openRoleSession`：`sessionDir` 随**既有能力面**转交——`AdapterCapabilities.sessionDir`（`deps.createAdapter(gate, capabilities)` 那条）；`createPiAdapterFactory` 原样转发。
+- 一次性路径 `runRole`（`ans role run`）**不传**（一局即止，无恢复语义）。
+
+**两个决策（「谁建、何时建」与清理）**：
+1. **目录创建归适配器**（编排只算路径、**不预建**）——协调方建议编排 mkdir，我选允许的备选并给理由（已同步）：① 保 T32 起「**不预建 `.ans`**」的既有语义与断言（`govern-engine.test.ts` 断言 `ans govern <空目录>` 后 `.ans` 不存在，编排预建会打破它）；② 谁落盘谁建目录，避免「编排建了目录但会话从未写」的空目录（恢复 `open(path)` 亦不需预建）。本侧测试**反向断言** `openRoleSession` 后 `.ans` 不存在。**与 `.ans/project.json`（pin）互不干扰**（已逐条核对）：载入器只认该**文件**、`isGenesisState` 只看它；pin 校验只读 pin 路径；`listProject`/`repinIfBootstrapped` 只扫 `角色卡/`；manifest 只列 `角色卡//docs/`。
+2. **上限清理（N=5）：本轮不做删除，登记待办**。理由：多进程并发（桌面开着同一项目跑 CLI `ans govern`）下按 mtime 删「最旧」可能删到**另一活会话正在追加写的文件**（POSIX unlink 静默孤儿、Windows 删失败）；一个会话可能多文件（压缩/branch_summary），按文件数裁会切坏内部一致性。**建议将来**：由适配器在创建新会话时清理「非当前会话且超龄者」（它知道 live 文件），或改按龄清理。
+
+**不改什么**：恢复流程（解析最近会话→`open`→喂 `createAgentSession`；界面只读回放持久 entry）＝ Pi适配器/桌面；无 `sessionDir` 的一切旧行为逐字不变（含 `runRole`、空 `projectRoot`）。
+
+**测试**：新 `test/编排/session-dir.test.ts` **5 例**——路径=约定值（含尾分隔符）且**不预建目录**（反向断言）／治理角色 **su 同样拿到**（「对每个角色」）／`projectRoot` 为空 → 不传／`roleId` 不安全（`su/../evil`）→ 不传且无目录／`runRole` 不传能力面。
+
+**结果**：`test/编排/` **146/146**；`npm run typecheck` **全仓零错**（Pi侧 `sessionDir` 已落，无瞬时红）；全量 `node --test "test/**/*.test.ts"`（**引号带**）**731 计 / 728 过 / 2 红 / 1 skipped**——2 红均为**既有环境红**（桌面面板键目录名、pm shared macOS `/var`）。环境：Node v24.14.0、Darwin 25.6.0、HEAD d933537。真机重启恢复属**客户跑**。
+
+**待办登记（归他角色）**：`.gitignore` 建议补 **`.ans/sessions/`**（现只忽略 `.ans/runtime/`；会话 JSONL 含完整对话内容，不应入库——归装配/pm）；Pi适配器：目录创建确认（若其 `SessionManager.create` 不自动建父目录，补一行 mkdir）+ 清理方案；桌面应用：恢复流程与「能力集变化」提示。
+
+## 2026-10-12 — C-1：交报告（`submit_report`）接入回交事件 + 回交证据只取写类（噪音修正）
+
+**来源**：设计稿 `2026-10-12_design_governed-interaction-and-chat-ux.md` §C-1（客户裁定「**新增交报告工具**」）；Pi适配器同刻落地 `submit_report` 工具与 `ReportHandbackFn` 契约（`session.ts:203-244`，注入才注册）。
+
+**改了什么（位置 → 改动）**：
+- **`src/common/编排/handback.ts`**：① 新增 `TaskReport`（与契约家 `ReportHandbackPayload` **同名同型**——结构对齐、不导入其实现）与 `normalizeTaskReport`（形状校验：非法 status / 空 summary → `undefined`；`evidence` 类型错按缺失——**回退，不硬失败**）；② 新增 `buildReportHandback`——**模型交的报告即回交内容**（`status`/`summary`/`evidence` 取报告值，`evidence` 缺省 `[]`；`roleId`/`taskId`/`at` 编排补）；③ `withHandback` 增 `opts.report`——settle 时**报告优先**，**未见报告回退既有推导**（`buildTaskHandback` 逐字保留）；④ **证据过滤修正**（独立噪音缺陷）：证据由「所有 `accepted` 摘要」改为**只取写类**（新 `isWriteAccepted`：兼容仓内三处实际事件形状——假适配器 `detail.call.name` / 真实适配器「`${toolName} 执行完成`」摘要 / 装配演示「写入被允许…」摘要），`read_file 执行完成` 之类**读事件不再混入证据**。
+- **`src/pipeline/orchestration/run-role.ts`**：`AdapterCapabilities` 增 `reportHandback`；`openRoleSession` **只给项目角色**注入（会话闭包暂存报告，settle 取用；经既有能力面 `createAdapter(gate, capabilities)` 转交），**治理角色 su 不注入**（不自我回交，既有语义）；`createPiAdapterFactory` 原样转发（Pi适配器据此注册 `submit_report`——「注入才注册」）；一次性路径 `runRole` 不涉及（本就不产回交事件）。
+
+**为何**：以前回交摘要是 `settled` 的「会话结束」套话、证据混着读事件——「交给 su 的产物证据」一半是噪音，且模型想表达的结论（做了什么/为何 blocked）无处安放。现在报告即回交；未交报告的一切行为与以前一致（推导 + 只写类证据）。
+
+**不改什么**：回交「只搬证据、不搬身份与写权」（SKILL.md）不变；`HandbackEvent`/`OrchestrationEvent` 形状不变（消费方零改动）；触发时机不变（settle 时先 handback 再透传 settled）；su 不自我回交不变。工具定义与桌面回交卡归各自角色。
+
+**测试**：`test/编排/handback.test.ts` **10 例**（新增 5：证据三形状**正反断言**（含「读事件不得进证据」）/ `normalizeTaskReport`+`buildReportHandback` 单元（非法→回退、evidence 缺省 []）/ `withHandback` 报告优先（与推导相反也取报告）·未见报告回退 / `openRoleSession` 端到端（报告=事件值；未交→回退且读不进证据；非法报告→回退）/ su 不注入 `reportHandback` 且事件流无回交）。
+
+**结果**：`test/编排/` **141/141**；`npm run typecheck` **零错**（含 `src/provider/**`——Pi侧先前的悬空引用已随其落地消解）；全量 `node --test "test/**/*.test.ts"`（**引号带**）**718 计 / 715 过 / 2 红 / 1 skipped**——2 红均为**既有环境红**（桌面面板键目录名、pm shared macOS `/var`），**全仓其余全绿**。环境：Node v24.14.0、Darwin 25.6.0、HEAD d933537。真实模型「自己写报告」的行为属**客户跑**。**未碰** `src/provider/**`、`src/common/pi-adapter/**`、`app/**`、他角色 tests/docs。
+
+## 2026-10-12 — 客户确认制（A-3）+ 删收口改自动收尾（A-4）：编排侧
+
+**来源**：设计稿 `角色卡/项目管理/docs/design/2026-10-12_design_governed-interaction-and-chat-ux.md`（status: approved，客户确认 A+B 全做、**A 组先行**）；客户原话「**客户确定了才加，不要有个收口，收口去掉**」。本角色只读评估（接线点/F4 发行/删收口三问）已被采纳；**O-A1 内容漂移加固客户明确不采纳**。工具与契约（`CustomerInputFn`/两交互工具/`customerInput` 注入面）由 Pi适配器先行落地；交互卡由桌面应用做。
+
+**改了什么（逐项）**：
+- **`src/pipeline/orchestration/run-role.ts`**：`openRoleSession` 增 `customerInput`（前端原始通道）——给出即**确认制收窄**：writeSet **从空开始**；发行器把「已预览且校验在边界内的具体路径」追加进 writeSet（编排内存真状态，模型不可重算）；gate 照旧 `resolveWrite`，**F4 拒一切未确认路径**。删 `genesisFinalize`/`operatorChannel`/`confirmTimeoutMs` 与句柄 `settled`/`finalize`。适配器面：`deps.createAdapter(gate, capabilities?)`（新 `AdapterCapabilities`），`createPiAdapterFactory` 转发 `customerInput`——「注入才注册」先例照旧。
+- **新增 `src/common/编排/confirmed-writes.ts`**（A-3 发行器）：保守正则从 title/preview/detail 提取路径 token（排除 URL/绝对/`..`/目录式；粗体·反引号可提取）→ 逐个用同一 `resolveWrite` 探测（`{writeSet:[p],conditions}`）→ 通过才发行；仅 `confirm`+`confirmed:true` 触发（choice 不发行）。`conditionSlugsOf` 单一推导。
+- **`src/common/编排/finalize.ts`**：删「提议 + 确认」整段（`createSessionFinalizer`/`createFinalizeProposer`/`confirm`/`DEFAULT_CONFIRM_TIMEOUT_MS`/本地 `withTimeout`）；**保留** `finalizeBootstrap` 写入本体（逐笔经门、无可 pin 零副作用）；`repinIfBootstrapped` **扩为含首次**：创世态 = 首次自动收尾（`.ans`+治理边界文档+manifest），非创世态 = 重 pin（不重写治理边界文档）。
+- **`src/pipeline/orchestration/govern-session.ts`**：`GovernSessionInput` 删 finalize 三件套、增 `customerInput`；句柄/结果删 `settled`/`finalize`；`runGovernSession` 删 finalize 段、缺省补 `createCliCustomerInput()`；`buildGovernPrompt` 写入确认制流程（**先预览（含将要写出的路径）→ confirmed:true → 才写**）。
+- **`src/common/编排/operator-channel.ts`**：新增 `createCliCustomerInput`（确认 y/n/是；选择数字序号单选 `1`、多选 `1,3`；空/未识别 → declined；EOF → unavailable——fail-closed）、`parseChoiceInput`（越界/重复/数量不符 → 拒）、`formatCustomerInputPrompt`。原 `createCliOperatorChannel` 保留（shell 闸 (a)）。
+- **`src/interface/cli/govern.ts`**：删 `genesisBootstrap ⇒ finalizeBootstrap: true` 的 arm；`operatorChannel` → `customerInput` 透传。**每次 `ans govern` 都是确认制**（缺省 CLI 终端通道）。
+
+**为何**：客户要「确认了才加」——闸语义落在既有 **F4**（不造票据：票据可由公开输入重算、证明不了审核发生）；收口的「提议+确认」与 A-1 工具族是同一件事的两套说法，删前留后；写出的产物（pin/正式态）保留**自动收尾**，否则项目永不转正、`ans govern` 每次重拿创世授权。
+
+**注册洞（如实）**：内容漂移关不住（O-A1 未采纳）——只保证「**路径**已预览且已确认」；预览未列路径 ⇒ 不发行 ⇒ 写被 F4 拒（fail-closed）。已在 `confirmed-writes.ts`/`run-role.ts` 头注 + change 文档登记。
+
+**测试（本角色）**：重写 `test/编排/finalize.test.ts`（自动收尾语义：首收/守卫零副作用/自动重 pin/单元）；删 `test/编排/genesis-finalize-reach.test.ts`、`test/编排/govern-finalize-wiring.test.ts`（其 API 已删）；新增 `test/编排/confirmation-gated.test.ts` 12 例；更新 `test/编排/govern.test.ts`、`govern-engine.test.ts`（确认脚本 + caps 转发）。
+
+**结果**：`test/编排/` **136/136**；`npm run typecheck` **本角色零错**（19 处剩余全在在途角色：`app/**` 6、`test/桌面应用/**` 4、`test/测试/**` 8、`test/装配/**` 1）；全量 `node --test "test/**/*.test.ts"`（**引号带**）**714 计 / 698 过 / 15 红 / 1 skipped**——15 红逐条归因（**本角色零红**）：桌面 `finalize-wiring` 8（桌面正按 A-4 删其收口面，在途）、测试角色 `t9-block1-bootstrap` 3 + `cli-genesis-boundary` 1（用已删的 `settled`/`finalize`/`operatorChannel`）、装配 `govern-target` 第 7 例 1（脚本无确认直接写 → F4 拒；**其 120s 确认超时挂起已随收口删除消失**）、既有环境红 2（`test/桌面应用/pi-config`（目录名）、`test/项目管理/shared`（macOS `/var`））。环境：Node v24.14.0、Darwin 25.6.0、HEAD d933537。真实端到端（su 真的先征询再写）属**客户跑**。**未碰** `src/provider/**`、`src/common/pi-adapter/**`、`app/**`、`test/桌面应用/**`、`test/测试/**`、`test/装配/**`、他角色 docs。
+
+## 2026-10-12 — 创世收口接线：`ans govern <目录>` 的 bootstrap 在 CLI 真正走完（.ans + 治理边界文档 + manifest 落盘）
+
+**来源**：客户批准本角色提案 `docs/fix/2026-10-12_fix_cli-govern-finalize-wiring.md` 的 **M1+M2**（含「M1 先落、装配随后调第 7 例」的协调顺序）。提案起因：装配 O1（外来目录 + 无 `.ans` 的回退配置补 `genesisBootstrap`）获准后，本角色受装配提案 `:150` 请求评估其对编排侧影响时**确诊**：su 从此能建角色，但收口在 CLI 下无任何入口可达。
+
+**问题（已核对到源码）**：收口机制本身完整（`runGovernSession` 单轮 settle 后 `finalizeBootstrap===true` 才调 `handle.finalize()`；`finalize()` = 提议→挂起等确认→恰好 allow 才落盘），但把它接通的两处入口**都不存在**——① `governCommand` 从不传 `finalizeBootstrap`（接线前 `govern.ts:84-87`；`GovernDeps` 也无字段承载），全仓 `src/**`、`app/**` 无处置真（只有测试直调 `runGovernSession` 置真）⇒ `govern-session.ts:301` 在真实 CLI 里是**死码**；② 设计 §13.1 的 `finalize_bootstrap` 工具按「能力注入才注册」实现，而 `createPiAdapterFactory`（`run-role.ts:390-401`）从不注入它 ⇒ su 也无法在轮内主动提议。后果：`ans govern <空目录>` 里 su 写完角色卡后命令**退出 0**，但 `.ans`/`角色卡/governance-boundary.yaml`/`docs/bootstrap-manifest.md` 一个都不出现——项目永远停在创世态，**比报错更隐蔽**。
+
+**改了什么（只动 Interface 一个文件）**：`src/interface/cli/govern.ts`——
+- **arming**（`:113`）：`deps.project.genesisBootstrap !== undefined` 时向 `runGovernSession` 传 `finalizeBootstrap: true`。**判据只认**装配注入的该字段，**不重算**「目标目录≠自身 且 无 `.ans`」——那三个条件正是装配 M1+O1 设置它的全部前提（装配 fix 文 `:82-91`/`:110-118`），重算 = 第二份装配逻辑，违背「配置单一来源在装配」（`govern.ts:61-68`）。
+- **可选 `GovernDeps.operatorChannel`**（`:44`，条件透传 `:115`）：缺省不传、机制不变（前端自动补 `createCliOperatorChannel()`）；注入面供测试确定性验证「确认→落盘／拒绝→零副作用」，与桌面经 deps 注入对话框通道同形。
+- **为何不得无条件 arm**：不带目录时目标是 ans-cli 自身、演示配置 `gov.path` 非空 ⇒ `govPath` 指向门禁引擎边界，finalize 会试图把「治理边界文档」写到门禁引擎边界文件上；门禁前置全量求值会拒（零副作用），但命令会在 settle 之后从 0 转非 0——把正常入口弄红。
+
+**新增测试**：`test/编排/govern-finalize-wiring.test.ts` 6 例——创世 arm→确认→真落盘（`.ans` pin-backed、acceptance = 「客户确认完成 bootstrap（operator:…）」、角色表含 X）／拒绝→不完成、零副作用、非 0／通道不可用 fail-closed／非创世不 arm（确认通道零调用）／无目录不 arm／`--role` 不影响 arm。全部临时目录、假适配器驱动、不发模型请求。
+
+**跨角色（已按协调顺序实测）**：`test/装配/govern-target.test.ts:217-243` 第 7 例在本接线落地后**转红**（无确认通道 → **120s 确认硬超时** → unavailable → 非 0；断言 `EXIT_OK` 失败，实测 stderr「收口未完成：收口未获确认：客户确认超时（>120000ms）」）。**附加实测**：该例失败后其 `node --test` 子进程**不退出**（默认 CLI 通道的 readline 仍挂 stdin），整套收尾被拖住——装配随后在 deps 加一行 `operatorChannel` 放行桩（依赖本次新增字段）可同时消除「断言红/120s/挂起」三点。**未碰装配任何文件**。
+
+**结果**：`test/编排/` **145/145**（+6）；`npm run typecheck` **0 错**；全量 `node --test "test/**/*.test.ts"`（**引号带**）含第 7 例不能自然跑完（上述挂起），复跑以 `--test-skip-pattern` 排除该例 → **686 计 / 683 过 / 2 红（均为既有环境红：`test/桌面应用` 面板键（目录名）、`test/项目管理/shared` macOS `/var`）/ 1 skipped**。环境：Node v24.14.0、Darwin 25.6.0、HEAD d933537。真实模型端到端（真 su 建角色→提议→确认）仍属**客户跑**。未发真实模型请求、未读 `.env`。
+
 ## 2026-10-11 — 去镜像：`FinalizeStatus` / `FinalizeResult` / `FinalizeBootstrapFn` 收归冻结契约家（单一来源）
 
 **来源**：Pi适配器核查后派发，本角色**核实并执行**。此前三型由本角色定义在**私有** `src/common/编排/finalize.ts`，而 §4 冻结契约家 `src/provider/pi/session.ts`（Pi适配器 T36）**已逐字**声明同一份 ⇒ **一份契约、两处定义**——本项目一路在收敛的那类镜像（前两例为 operator 三型（T20→T21）、凭据常量 `atomicWrite`）。

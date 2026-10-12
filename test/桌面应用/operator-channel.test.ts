@@ -13,17 +13,27 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-import type { ShellGate, RuntimeAdapter, SessionEvent, OperatorPrompt } from "../../src/provider/pi/session.ts";
+import type { ShellGate, RuntimeAdapter, SessionEvent, OperatorPrompt, OperatorChannelFn, WriteGate } from "../../src/provider/pi/session.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
+import { listProject } from "../../src/service/role/resolve-role.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
 import { SessionManager } from "../../app/desktop/session.ts";
-import type { RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
+import { openRoleSession, type RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
 import {
+  buildDesktopShellArming,
+  buildShellConfirmRequest,
   createDesktopOperatorChannel,
+  createShellConfirmPresenter,
   describeShellCommand,
   DESKTOP_SHELL_GATE_ARMED,
+  plainReasonFor,
+  shellIntentSummary,
   type OperatorPresenter,
+  type ShellConfirmRequest,
 } from "../../app/desktop/operator-channel.ts";
 
 /** 造一个请求（`OperatorPrompt`）——命令原文含 shell 元字符（本执行模型下只是普通参数，但人仍应逐字看到）。 */
@@ -150,10 +160,223 @@ test("超时 env 可覆盖（非法值回退默认，不炸）", async () => {
   assert.equal((await ch(req("ls", ["ls"]))).outcome, "allow");
 });
 
-// ————————————————— arm 决策（如实标注） —————————————————
+// ————————————————— arm 决策（I-1，2026-10-12 客户裁定） —————————————————
 
-test("arm 决策：V1 桌面不 arm shell 闸（DESKTOP_SHELL_GATE_ARMED === false，通道当前未被消费）", () => {
-  assert.equal(DESKTOP_SHELL_GATE_ARMED, false, "V1 桌面不 arm（客户已确认；能力缺席 = 最强 fail-closed）");
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const APP_DIR = path.resolve(HERE, "..", "..", "app");
+
+test("arm 决策（I-1 + 补丁）：DESKTOP_SHELL_GATE_ARMED === true——(c) 实件与 (a) 通道**同处接线**（两件同备才 arm）", () => {
+  assert.equal(
+    DESKTOP_SHELL_GATE_ARMED,
+    true,
+    "客户已裁定 arm（2026-10-12：「现在开放 shell，然后 shell 需要 su 审核一下。如果 su 觉得危险可以让客户决定」）"
+  );
+  // 源码钉子：main 按 arm 开关构造 **(c) 实件**（buildDesktopShellArming）+ **(a) 通道**；
+  // **两件同备才 arm**——(c) 构造/加载失败 ⇒ 连 (a) 也不注入（run_shell 不注册，fail-closed）。
+  const mainSrc = fs.readFileSync(path.join(APP_DIR, "main.ts"), "utf8");
+  assert.ok(
+    /DESKTOP_SHELL_GATE_ARMED \? buildDesktopShellArming\(\) : undefined/.test(mainSrc),
+    "main.ts 应按 arm 开关构造 (c) 实件（未 arm ⇒ undefined，等同不注入）"
+  );
+  assert.ok(
+    /shellArming !== undefined \? buildDesktopOperatorChannel\(shellConfirm\.presenter\) : undefined/.test(mainSrc),
+    "main.ts：(c) 实件缺失 ⇒ (a) 通道也不构造（两件同备才 arm——绝不半装；M-1 起 presenter 为应用内卡）"
+  );
+  assert.ok(mainSrc.includes("shellArming,") && mainSrc.includes("shellOperatorChannel,"), "main.ts 应把两件都注入 Interface");
+  const ifaceSrc = fs.readFileSync(path.join(APP_DIR, "desktop", "interface.ts"), "utf8");
+  assert.ok(ifaceSrc.includes("shellOperatorChannel: deps.shellOperatorChannel"), "Interface 应把 (a) 通道透传给会话管理器");
+  assert.ok(ifaceSrc.includes("shellArming: deps.shellArming"), "Interface 应把 (c) 实件透传给会话管理器");
+  const sessSrc = fs.readFileSync(path.join(APP_DIR, "desktop", "session.ts"), "utf8");
+  assert.ok(
+    /role\.builtIn === true \? undefined : this\.deps\.shellOperatorChannel/.test(sessSrc),
+    "session.ts：**仅项目角色**注入 (a)（su 自身不 arm——审读者不给自己开闸）"
+  );
+  assert.ok(
+    /role\.builtIn === true \? undefined : this\.deps\.shellArming/.test(sessSrc),
+    "session.ts：(c) 实件与 (a) 同判据（仅项目角色；su 不 arm）"
+  );
+});
+
+test("I-1 补丁：(c) 实件构造——只读导入的两件**引用同一性**（classifyShell 同一函数引用；rules 原样透传）；失败 ⇒ 不 arm", async () => {
+  const { classifyShell, defaultShellRules } = await import("../../src/service/gate/shell-rules.ts");
+  const arming = buildDesktopShellArming();
+  assert.ok(arming, "实件可构造（生产路径）时不应返回 undefined");
+  assert.equal(arming.classifyShell, classifyShell, "classifyShell 应是门禁引擎实件的**同一函数引用**（不复制实现、不另立第二份规则集）");
+  assert.deepEqual(arming.rules, defaultShellRules(), "rules 应是默认规则集本体（defaultShellRules 的数据）");
+  // 桩件（**不真跑命令**）：加载器返回什么就原样带什么（引用同一性——装配面不加工）。
+  const sentinel = { version: "桩件-勿跑" };
+  const stubbed = buildDesktopShellArming((() => sentinel) as unknown as () => ReturnType<typeof defaultShellRules>);
+  assert.equal(stubbed && stubbed.rules, sentinel, "rules 应原样透传加载器结果（引用同一性）");
+  // 失败路径：加载抛错 ⇒ undefined = 不 arm（main.ts 据此连 (a) 通道也不注入——run_shell 不注册）。
+  const failed = buildDesktopShellArming(() => {
+    throw new Error("桩件：规则集加载失败");
+  });
+  assert.equal(failed, undefined, "构造/加载失败 ⇒ 不 arm（能力缺席即 fail-closed）");
+});
+
+test("I-1 补丁（**真正接通**核查）：真实 openRoleSession + 真实装配——(c) 实件在场时能力面产出 ShellGate（Pi 适配器 run_shell 注册条件成立）", async () => {
+  const REPO_ROOT = path.resolve(HERE, "..", "..");
+  const listing = await listProject(REPO_ROOT);
+  assert.ok(listing.roles.some((r) => r.roleId === "桌面应用"), "本仓库应有「桌面应用」角色（集成核查用真实枚举）");
+  const captured: (Record<string, unknown> | undefined)[] = [];
+  const mgr = new SessionManager({
+    openRoleSession, // **真实**编排入口：装配真跑（不发模型请求、不执行任何命令——闸只在被调用时才判定）
+    createPiAdapterFactory: () => (gate: WriteGate, capabilities?: unknown) => {
+      captured.push(capabilities as Record<string, unknown> | undefined);
+      return {
+        async composeContext() {
+          return { systemPrompt: "测试替身：不触网" };
+        },
+        async bindRole() {
+          return {
+            async prompt(): Promise<void> {},
+            events(): AsyncIterable<SessionEvent> {
+              return {
+                [Symbol.asyncIterator]() {
+                  return { async next() { return { value: undefined as unknown as SessionEvent, done: true }; } };
+                },
+              };
+            },
+            async dispose(): Promise<void> {},
+          };
+        },
+      } as unknown as RuntimeAdapter;
+    },
+    createDemoAdapter: () => {
+      throw new Error("本用例不应构造 demo 适配器");
+    },
+    buildProjectConfig,
+    getListing: (root) => (root === listing.projectRoot ? listing : undefined),
+    emitEvent: () => {},
+    // arm 两件同备（与 main.ts 生产形态同款）：(a) 通道（桩件，绝不真弹窗）+ (c) 实件（真件）。
+    shellOperatorChannel: async () => ({ outcome: "deny", operatorId: "test", reason: "替身拒绝" }),
+    shellArming: buildDesktopShellArming(),
+  });
+  const r = await mgr.open({ projectRoot: listing.projectRoot, roleId: "桌面应用", runtime: "pi" });
+  assert.equal(r.ok, true, "会话应能开启（真实装配在此路径不触网）");
+  assert.ok(
+    captured.length >= 1 && captured[0]?.shellGate !== undefined,
+    "**(c) 接通证据**：真实装配把 ShellGate 放进能力面——run-role 把 `capabilities.shellGate` 交给 Pi 适配器工厂，run_shell 注册条件成立（「是否真正接通：是」的依据）"
+  );
+  await mgr.stop();
+  // 消费点的**只读核查**（读源码断言编排确实消费该字段；不复制实现；字段名以落定契约为准）。
+  const runRoleSrc = fs.readFileSync(path.resolve(APP_DIR, "..", "src", "pipeline", "orchestration", "run-role.ts"), "utf8");
+  assert.ok(/\.\.\.\(input\.shellArming \?\? \{\}\)/.test(runRoleSrc), "run-role 应把 input.shellArming 展开进 assembleProjectShellGate 选项");
+  assert.ok(
+    runRoleSrc.includes("capabilities?.shellGate ?? shellGate"),
+    "Pi 适配器工厂应优先吃能力面的 shellGate（装配产物优先于历史接缝）"
+  );
+});
+
+// ————————————————— M-1（2026-10-12 客户裁定「这个太丑了」）：应用内确认卡 —————————————————
+
+test("M-1 数据面：白话摘要只取命令首词（不编意图）；升级原因译人话（行话不外露）；命令原文逐字", () => {
+  // 摘要：取命令**首词**（可执行名）——事实转抄，不替命令「猜意图」；无从概括 ⇒ null。
+  assert.equal(shellIntentSummary("ls -la"), "它会在项目里执行：ls");
+  assert.equal(shellIntentSummary("  git   commit -m x"), "它会在项目里执行：git");
+  assert.equal(shellIntentSummary("\n\nrm -rf build"), "它会在项目里执行：rm", "空行在前的取首个非空行");
+  assert.equal(shellIntentSummary(""), null, "空命令 ⇒ null（渲染侧隐藏该行——**绝不编**）");
+  assert.equal(shellIntentSummary("   \n  "), null);
+
+  // 升级原因人话映射：截图里的三档行话一律不原样外露（不含 pm/risky/JSON 等内部用语）。
+  const risky = plainReasonFor("risky 命令：pm 判放行，仍须操作者确认（pm 不是终审，客户才是）");
+  assert.ok(risky.includes("风险") && !risky.includes("pm") && !/risky/i.test(risky), "risky → 人话且无内部用语");
+  const timeout = plainReasonFor("pm 审读超时");
+  assert.ok(timeout.includes("超时") && timeout.includes("fail-closed") && !timeout.includes("pm"));
+  const nonJson = plainReasonFor("pm 判定 JSON 不合法");
+  assert.ok(!/json/i.test(nonJson) && nonJson.includes("无法解析"), "non-json → 人话（「无法解析」，不露行话）");
+  const unavailable = plainReasonFor("未接入 pm 审读会话");
+  assert.ok(unavailable.includes("不可用") && !unavailable.includes("pm"));
+  const unsure = plainReasonFor("pm 拿不准，交操作者");
+  assert.ok(unsure.includes("拿不准") && !unsure.includes("pm"));
+  const unknown = plainReasonFor("某种全新未识别原因-XYZ");
+  assert.ok(!unknown.includes("XYZ") && unknown.includes("fail-closed"), "未识别：给通用 fail-closed 句（不把原话丢给客户、不替审核编结论）");
+  assert.equal(plainReasonFor(undefined), plainReasonFor(""), "缺省同解（通用句）");
+
+  // 数据面构建：命令**逐字**（含元字符，不改写/不截断）；原文原因只进折叠详情供核查。
+  const display = describeShellCommand(
+    req("rm -rf build && echo hi", ["rm", "-rf", "build", "&&", "echo", "hi"], "D:/proj", "pm 拿不准，交操作者")
+  );
+  const payload = buildShellConfirmRequest("sc-1", display);
+  assert.equal(payload.command, "rm -rf build && echo hi", "命令原文逐字（含元字符）");
+  assert.equal(payload.summary, "它会在项目里执行：rm");
+  assert.equal(payload.reasonRaw, "pm 拿不准，交操作者", "原文只进折叠详情（核查用）");
+  assert.ok(payload.reasonPlain.includes("拿不准") && !payload.reasonPlain.includes("pm"));
+  assert.deepEqual(payload.argvLines, display.argvLines, "argv 逐项行原样转抄");
+  assert.equal(payload.cwd, "D:/proj");
+});
+
+test("M-1 presenter：恰 allow:true 才放行；拒绝/缺字段 → 不放行；未知 id → expired；关窗 ⇒ 全部不放行", async () => {
+  const sent: ShellConfirmRequest[] = [];
+  const p = createShellConfirmPresenter({ present: (r) => sent.push(r), cleanupAfterMs: 60000, env: {} });
+  const prompt = req("ls -la", ["ls", "-la"], "/proj");
+
+  const d1 = p.presenter.present(prompt, describeShellCommand(prompt));
+  assert.equal(sent.length, 1, "应把数据面推给界面");
+  assert.equal(sent[0].command, "ls -la");
+  assert.equal(p.respond({ id: sent[0].id, allow: true }).ok, true, "回包受理");
+  assert.deepEqual(await d1, { allow: true }, "恰 allow:true ⇒ 放行");
+
+  const d2 = p.presenter.present(prompt, describeShellCommand(prompt));
+  assert.equal(p.respond({ id: sent[1].id, allow: false }).ok, true);
+  assert.deepEqual(await d2, { allow: false }, "拒绝（Esc/关闭同路）⇒ 不放行");
+
+  const d3 = p.presenter.present(prompt, describeShellCommand(prompt));
+  assert.equal(p.respond({ id: sent[2].id }).ok, true, "缺 allow 字段的回包也受理");
+  assert.deepEqual(await d3, { allow: false }, "缺字段/非布尔一律不放行（**恰 true 才放行**）");
+
+  const d4 = p.presenter.present(prompt, describeShellCommand(prompt));
+  p.rejectAllPending("窗口已关闭");
+  assert.deepEqual(await d4, { allow: false }, "关窗（rejectAllPending）⇒ 全部不放行（fail-closed）");
+  assert.equal(p.pendingCount(), 0, "关窗后无挂起残留");
+
+  const exp = p.respond({ id: "sc-旧回包", allow: true });
+  assert.equal(exp.ok, false);
+  assert.equal(exp.expired, true, "未知 id（超时/重启后的旧回包）→ expired（**不放行**）");
+  assert.equal((exp as { allow?: unknown }).allow, undefined, "失效回包不携带任何放行语义");
+});
+
+test("M-1 presenter 兜底与失败：清理兜底解析为不放行（无泄漏）；推送抛错（窗口已关）⇒ 上抛（通道归 unavailable）", async () => {
+  const sent: ShellConfirmRequest[] = [];
+  const p = createShellConfirmPresenter({ present: (r) => sent.push(r), cleanupAfterMs: 30, env: {} });
+  const prompt = req("ls", ["ls"], "/proj");
+  const d = p.presenter.present(prompt, describeShellCommand(prompt));
+  assert.deepEqual(await d, { allow: false }, "清理兜底 ⇒ 不放行（fail-closed；判定语义仍由通道先到者为准）");
+  assert.equal(p.pendingCount(), 0, "兜底后登记清空（无泄漏）");
+  assert.equal(p.respond({ id: sent[0].id, allow: true }).expired, true, "兜底后迟到的回包 → expired（绝不放行）");
+
+  const throwing = createShellConfirmPresenter({
+    present: () => {
+      throw new Error("窗口已关闭，无法呈现 shell 确认请求");
+    },
+    cleanupAfterMs: 1000,
+    env: {},
+  });
+  await assert.rejects(
+    () => throwing.presenter.present(prompt, describeShellCommand(prompt)),
+    /窗口已关闭/,
+    "推送失败应上抛（createDesktopOperatorChannel 归 unavailable——fail-closed，绝不当「没人问就放行」）"
+  );
+  assert.equal(throwing.pendingCount(), 0, "抛错路径不得留下挂起登记");
+});
+
+test("M-1：shell 确认**不再用原生对话框**——(a) 层为应用内卡（通道两端齐备；旧文本墙路径退役）", () => {
+  const mainSrc = fs.readFileSync(path.join(APP_DIR, "main.ts"), "utf8");
+  assert.ok(!mainSrc.includes("dialog.showMessageBox"), "main.ts 不得再用原生对话框做 shell 确认（客户：「这个太丑了」）");
+  assert.ok(!mainSrc.includes("createElectronOperatorPresenter"), "旧原生 presenter 已退役");
+  assert.ok(
+    mainSrc.includes('win.webContents.send("shell:confirm-request", request)'),
+    "main 应把确认数据面推达渲染侧（应用内卡）"
+  );
+  assert.ok(mainSrc.includes('ipcMain.handle("shell:confirm-response"'), "main 应受理决定回包");
+  assert.ok(mainSrc.includes("rejectAllPending") && mainSrc.includes('win.on("closed"'), "关窗 ⇒ 全部挂起不放行（fail-closed）");
+  assert.ok(mainSrc.includes("buildDesktopOperatorChannel(shellConfirm.presenter)"), "arm 接线改用应用内卡 presenter");
+  const preloadSrc = fs.readFileSync(path.join(APP_DIR, "preload.cjs"), "utf8");
+  assert.ok(preloadSrc.includes('"shell:confirm-request"') && preloadSrc.includes("onShellConfirm"), "preload 应订阅确认请求");
+  assert.ok(
+    preloadSrc.includes('"shell:confirm-response"') && preloadSrc.includes("shellConfirmRespond"),
+    "preload 应暴露决定回包（恰 allow:true 才作为放行）"
+  );
 });
 
 // ————————————————— 会话构造路径的 arm 接缝（可对接、默认不合闸） —————————————————
@@ -203,7 +426,7 @@ const STUB_LOADER = async (opts: { fallback: import("../../src/model/role.ts").P
   },
 });
 
-test("arm 接缝：不提供 shellGate → pi 工厂收到 undefined（未合闸，run_shell 不注册）", async () => {
+test("arm 接缝（历史形状）：不提供已装配 shellGate → pi 工厂收到 undefined（该接缝缺省即不合闸）", async () => {
   const captured: (ShellGate | undefined)[] = [];
   const mgr = new SessionManager({
     openRoleSession: async () => fakeHandle(),
@@ -222,11 +445,11 @@ test("arm 接缝：不提供 shellGate → pi 工厂收到 undefined（未合闸
   const r = await mgr.open({ projectRoot: FAKE_LISTING.projectRoot, roleId: "A", runtime: "pi" });
   assert.equal(r.ok, true);
   assert.equal(captured.length, 1, "pi 路径应调用工厂一次");
-  assert.equal(captured[0], undefined, "V1 未 arm：不得注入 shellGate（能力缺席 = 最强 fail-closed）");
+  assert.equal(captured[0], undefined, "缺省不提供已装配 gate ⇒ undefined（历史接缝；I-1 的 arm 走 shellOperatorChannel）");
   await mgr.stop();
 });
 
-test("arm 接缝：提供 shellGate → 原样透传给 pi 工厂（接缝可对接，供客户 arm 时用）", async () => {
+test("arm 接缝（历史形状）：提供已装配 shellGate → 原样透传给 pi 工厂（保留给直接持 gate 的调用方）", async () => {
   const shellGate: ShellGate = async () => ({ allow: true, by: "operator:test" });
   const captured: (ShellGate | undefined)[] = [];
   const mgr = new SessionManager({
@@ -248,6 +471,95 @@ test("arm 接缝：提供 shellGate → 原样透传给 pi 工厂（接缝可对
   assert.equal(r.ok, true);
   assert.equal(captured[0], shellGate, "提供时应把门禁原样透传给 Pi 适配器工厂");
   await mgr.stop();
+});
+
+test("I-1 注入判据：**项目角色**会话收到 (a) 通道（shellOperatorChannel）；su（内置治理角色）**不**注入", async () => {
+  const listing: ProjectListing = {
+    projectRoot: "/proj",
+    roles: [
+      {
+        roleId: "su",
+        cardPath: "",
+        boundaryPath: "",
+        cardText: "su",
+        boundary: { entries: [], boundarySource: "<built-in>", acceptance: { accepted: false, source: "" } },
+        builtIn: true,
+      },
+      {
+        roleId: "A",
+        cardPath: "角色卡/A/role-card.md",
+        boundaryPath: "角色卡/A/boundary.yaml",
+        cardText: "A",
+        boundary: {
+          entries: [{ root: "project", path: "src/a.ts", kind: "file", purpose: "p" }],
+          boundarySource: "角色卡/A/boundary.yaml",
+          acceptance: { accepted: false, source: "" },
+        },
+      },
+    ],
+    warnings: [],
+    hasRoles: true,
+    primaryRoleId: "su",
+  };
+  const channel: OperatorChannelFn = async () => ({ outcome: "deny", operatorId: "test", reason: "替身拒绝" });
+  // I-1 补丁：(c) 实件桩件（**引用同一性**断言用；绝不真跑命令）。
+  const armingStub = {
+    classifyShell: () => "allow" as const,
+    rules: { version: "桩件" },
+  };
+  const captured: { roleId: string; shellOperatorChannel?: OperatorChannelFn; shellArming?: unknown }[] = [];
+  const mgr = new SessionManager({
+    openRoleSession: async (input) => {
+      captured.push({
+        roleId: input.roleId,
+        shellOperatorChannel: input.shellOperatorChannel,
+        shellArming: (input as { shellArming?: unknown }).shellArming,
+      });
+      return fakeHandle();
+    },
+    createPiAdapterFactory: () => () => ({}) as unknown as RuntimeAdapter,
+    createDemoAdapter: () => {
+      throw new Error("本用例不应构造 demo 适配器");
+    },
+    buildProjectConfig,
+    getListing: (root) => (root === "/proj" ? listing : undefined),
+    emitEvent: () => {},
+    shellOperatorChannel: channel,
+    shellArming: armingStub as never,
+    loadEffectiveConfig: STUB_LOADER,
+  });
+  await mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "pi" });
+  await mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "pi" });
+  const a = captured.find((c) => c.roleId === "A");
+  const su = captured.find((c) => c.roleId === "su");
+  assert.equal(a!.shellOperatorChannel, channel, "项目角色应收到 (a) 通道（arm 接线生效）");
+  assert.equal(su!.shellOperatorChannel, undefined, "su 自身不 arm（审读者不给自己开闸）");
+  assert.equal(a!.shellArming, armingStub, "(c) 实件应**原引用**下发给项目角色（装配面不加工——引用同一性）");
+  assert.equal(su!.shellArming, undefined, "su 同样不下发 (c) 实件（与 (a) 同判据）");
+  await mgr.stop(null);
+});
+
+test("I-1 补丁：未 arm（未配置两件）时**什么都不传**——输入里不出现两个字段（等同不注入）", async () => {
+  let seen: Record<string, unknown> | null = null;
+  const mgr = new SessionManager({
+    openRoleSession: async (input) => {
+      seen = input as unknown as Record<string, unknown>;
+      return fakeHandle();
+    },
+    createPiAdapterFactory: () => () => ({}) as unknown as RuntimeAdapter,
+    createDemoAdapter: () => {
+      throw new Error("本用例不应构造 demo 适配器");
+    },
+    buildProjectConfig,
+    getListing: (root) => (root === FAKE_LISTING.projectRoot ? FAKE_LISTING : undefined),
+    emitEvent: () => {},
+    loadEffectiveConfig: STUB_LOADER,
+  });
+  await mgr.open({ projectRoot: FAKE_LISTING.projectRoot, roleId: "A", runtime: "pi" });
+  assert.ok(seen, "应开启过一次会话");
+  assert.ok(!("shellOperatorChannel" in (seen as object)), "未配置 ⇒ (a) 字段不出现（不注入）");
+  assert.ok(!("shellArming" in (seen as object)), "未配置 ⇒ (c) 字段不出现（不注入）");
+  await mgr.stop(null);
 });
 
 test("arm 只影响 pi 路径：demo 路径不构造 pi 工厂（无 shell 入口）", async () => {

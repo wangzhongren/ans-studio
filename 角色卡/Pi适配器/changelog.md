@@ -1,5 +1,81 @@
 # Pi适配器 变更记录
 
+## 2026-10-12 — 客户确认制交互工具族（request_confirmation / request_choice）；executionMode 端到端实测生效
+
+**来源**：设计稿 `角色卡/项目管理/docs/design/2026-10-12_design_governed-interaction-and-chat-ux.md`（**approved**，A 组先行）§三 A-1/A-2/A-6；本轮按派工只做 **A 组中属于 Pi适配器**的部分（**不含** A-4 删除 finalize 类型——最后一步、另派；`finalizeBootstrap` 槽与工具**原样保留**）。完整实施记录：`角色卡/Pi适配器/docs/change/2026-10-12_change_governed-interaction-tools.md`。
+
+**改了什么（全部在本角色 Section 1 内）**
+- `src/provider/pi/session.ts`：按设计 A-1 新增**冻结类型** `CustomerInputOption` / `CustomerInputRequest`（confirm/choice 判别联合，含 `preview`/`options`/`multiple`）/ `CustomerInputOutcome`（**逐字三态** answered/declined/unavailable，`value.selected` 载勾选）/ `CustomerInputFn`（注入点；抛错/`null` = 通道不可用，超时由工具层包装）——**逐字落点先例 T20/T36**。`createFakeRuntimeAdapter` 与 `PiRuntimeAdapterOptions` 各增 `customerInput?` / `customerInputTimeoutMs?` 并透传。**两处可选扩展（已登记）**：`answered.operatorId?`（审计，同 OperatorOutcome 先例）、`declined/unavailable.reason?`（失败文案要带原因）。
+- `src/provider/pi/tools.ts`：增 `REQUEST_CONFIRMATION_TOOL_NAME` / `REQUEST_CHOICE_TOOL_NAME` 与两构造器；**注册照 run_shell/finalize 先例：未注入 `customerInput` 即不注册**（判据＝「有无客户通道」，非「是否创世态」）。handler：参数校验（choice 的 options 非空、id 唯一；非法时**不打扰客户**）→ `askCustomer`（**raceAbort 在内、withTimeout 在外**）→ 三态如实转达；**失败文案逐字**「未获客户同意（原因：…）→ 不要写盘；如实告知客户，不得假设同意」，**绝不说成已同意**（用例锁死）；通道返回**未提供**的选项 id → 视为未获同意。`ToolDefinition.handler` 增可选 `signal`。
+- `src/common/pi-adapter/timeout.ts`：`DEFAULT_CUSTOMER_INPUT_TIMEOUT_MS=110000`（**< prompt 缺省 120s**，留 10s 余量）、`CUSTOMER_INPUT_TIMEOUT_ENV="ANS_PI_CUSTOMER_INPUT_TIMEOUT_MS"`、`CUSTOMER_INPUT_PROMPT_MARGIN_MS=5000`、`resolveCustomerInputTimeoutMs`（**生效值=min(配置, prompt−5s)**，prompt 未设超时则不收敛）、`abortError/isAbortError/raceAbort`（**会话中止=立即 fail-closed，防悬挂**）。
+- `src/common/pi-adapter/real-adapter.ts`：`describeTool`/`toPiTool` **改为导出**（供接线实测）＋两分支（**普通 JSON-Schema**、**description + promptGuidelines（A-2 写死流程）**、**`executionMode:"sequential"`（A-6）**）；`execute` **透传 AbortSignal**（此前丢弃）；`bindRole` 求生效时限（被收敛且注入了通道时打可见 stage 日志）并传 `buildGovernedTools`。
+- **未动**：`GOVERNED_WRITE_TOOLS`（两工具无 path、无写，加等于没加——同 run_shell §7.7）、`shellKillSwitch`（只匹配 run_shell）、扩展钩子（对未知名放行——两工具本就该放行）。
+
+**关键实测：`executionMode:"sequential"` 端到端确证生效（含对照组）**
+- 做法：`test/pi-adapter/interactive-execution-mode.test.ts`，**完全离线**用 pi-ai 内置 **faux provider** 作脚本模型，一条助手消息**同批**发 confirm + write_file，记录时序。
+- 主组（带该字段）：`confirm:start > confirm:end > gate(role.md)` —— 写**在确认完成之后**才执行（且确认后真实落盘）。
+- 对照组（**抹掉该字段**，其余不变）：`gate(role.md) > confirm:start > confirm:end` —— 写**抢跑于确认**。
+- ⇒ **该字段承重且生效**（Pi 1.1.0 全链路：createAgentSession → customTools → 注册包装 → agent-loop 批执行）；此前登记「未实测」，**本轮已实测**。残留（如实）：限「同批内」，跨轮仍靠 A-2 文案；硬保证（先确认后写）在编排 A-3 的 writeSet/F4，**不在本层**。
+
+**验证（本角色执行）**
+- `node --test "test/pi-adapter/*.test.ts"`（**带引号**）→ **97 pass / 0 fail / 0 skipped**（较前 74 净 **+23**：customer-input 19 条 + execution-mode 4 条）。
+- 全量 `node --test "test/**/*.test.ts"`（带引号）→ **715 计 / 702 pass / 12 fail / 1 skip**。**12 红全在他人边界**：`test/桌面应用/**`（该角色正在改 B-2，旧断言与新语义冲突，红随其在途改动波动；同刻其 `app/desktop/**` 亦有在途 typecheck 错误）＋ `test/项目管理/shared/path-primitives.test.ts`（既有 macOS `/private/var` 环境红，基线红之一）。**本角色目录 0 红**；相对派工时基线（692/689/2/1），**+23 计 +23 过即本角色新增**，其余 −10 过全数落在桌面应用在途改动。
+- `npm run typecheck` → **本角色文件零错误**（全仓余下错误全在 `app/desktop/**`、`test/桌面应用/**`，桌面应用在途）。
+- **未读** `.env`、**未发**真实模型请求（faux 进程内、keyless）、**未打印**凭据值。
+
+**边界 / 跨角色（未越界改）**
+- 只写本角色 Section 1：`src/provider/pi/session.ts`、`src/provider/pi/tools.ts`、`src/common/pi-adapter/timeout.ts`、`src/common/pi-adapter/real-adapter.ts`、`test/pi-adapter/**`、`角色卡/Pi适配器/**`。
+- **供编排**：构造 `CustomerInputFn`（复用 `OperatorChannelFn` 通道；CLI 终端映射/桌面交互卡各实现各自那半）并注入；prompt 时限调大时交互时限**自动跟随放宽**（无需同步配置）。**供桌面**：交互卡所需字段全在 `CustomerInputRequest`/`CustomerInputOutcome`（形状单一来源 `session.ts`）。
+
+**追加（同日，小活）：preview 必须列出将写出的具体路径（配合编排 A-3 发行器）**
+- **缘由**（读编排 `src/common/编排/confirmed-writes.ts` 只读确认）：发行器在 `request_confirmation` 返回 `confirmed:true` 后，从 `title + preview + detail` 保守提取「路径样 token」，经 `resolveWrite` 探测后发行进会话 writeSet；**preview 不列路径 ⇒ 不发行 ⇒ 写入被 F4 拒**（fail-closed 但会打断流程）。
+- **改动**（`real-adapter.ts` 的 `describeTool`，纯**文案**，行为未动）：两交互工具的 description + promptGuidelines 增「**preview 必须列出将要写出的具体路径**（相对项目根、含目录）；未列出的路径不会获得许可、写入会被门禁拒绝」；并**明示「列出路径 ≠ 获准」——获准唯一凭据是 `confirmed:true`**；`request_choice` 侧明示**选择≠写盘同意**（choice 不发行任何写盘许可，要写盘仍须另经 request_confirmation）。
+- **测试**：`interactive-execution-mode.test.ts` 增 1 条文案用例（含反向断言：不得出现「列出路径即可写」式措辞）。
+- **验证**：`node --test "test/pi-adapter/*.test.ts"`（带引号）→ **98 pass / 0 fail**（+1）；`npm run typecheck` 本角色零错误。
+
+**追加（同日，A-4 最后一步）：删除旧收口面（finalize_bootstrap）**
+- **缘由**：该工具自 A-4 起**无任何注入方**（编排 genesisFinalize 已删、桌面 finalizeBootstrap 已删）⇒ 永不注册 = **死代码**；「同意才落盘」已由交互工具族 + 编排 writeSet/F4 承担。
+- **删除**（本角色 Section 1 内）：`tools.ts` 的 `FINALIZE_BOOTSTRAP_TOOL_NAME` / `makeFinalizeBootstrapTool` / 注册分支 / `GovernedToolsOptions.finalizeBootstrap` / 头部历史段（改墓碑注记）；`session.ts` 的 `FinalizeBootstrapFn` 与两处 `finalizeBootstrap?` 选项/透传；`real-adapter.ts` 的 import、`describeTool` 分支、`RealPiAdapterOptions.finalizeBootstrap`。**保留** `FinalizeStatus`/`FinalizeResult`（编排仍消费）。「先例」引用改指仍存者（`run_shell`/`shellGate`/`customerInput`）。
+- **测试**：`finalize-bootstrap.test.ts` 由 9 条旧用例**改写为 4 条墓碑用例**（任何构造下不出现；导出面已删；**@ts-expect-error 编译期墓碑**——类型若加回 typecheck 即失败；两结果型仍可用）。旧断言对象已随特性消亡而删除，非放宽。
+- **消费者 grep（先查后删）**：本层选项的外部注入方 **0 处**；`FinalizeBootstrapFn` 唯一外部引用是编排 `finalize.ts:130` 临时再导出——**编排同刻已删**，无编译窗口残留。
+- **验证**：`test/pi-adapter/*.test.ts` → **93 pass / 0 fail**（98 − 9 + 4）；全量 → **701 计 / 698 pass / 2 fail / 1 skip**，**2 红恰为既有环境红**（桌面 pi-config 目录名、pm shared macOS `/var`）；`npm run typecheck` → **全仓零错误**。
+
+**新增（同日）：交报告工具 submit_report（设计 C-1）**
+- **契约落点**：三型入 §4 契约家 `session.ts`——`ReportHandbackPayload { status:"completed"|"blocked"; summary; evidence? }`（与编排 `TaskHandback`/`TaskReport` **逐字同构**）、`ReportHandbackReceipt { ok; message? }`、`ReportHandbackFn`；`createFakeRuntimeAdapter`/`PiRuntimeAdapterOptions` 各增 `reportHandback?` 透传。
+- **工具与注册**：`tools.ts` 增 `SUBMIT_REPORT_TOOL_NAME`/`makeSubmitReportTool`；**未注入 `reportHandback` 即不注册**（只给项目角色；su 不注入即不存在）。handler：参数校验（status 枚举/summary 非空/evidence 字符串数组；非法时 fn 不被调）→ 只把载荷交给注入能力 → **如实**转达（成功/无回执 → 「报告已交回」；拒/抛错 → 「**未能交回**」，绝不谎称）；`raceAbort` 防悬挂、不设等待超时；**不写盘/不判定/不进 GOVERNED_WRITE_TOOLS**。
+- **schema/文案**：`real-adapter.ts` 的 `describeTool` 增分支（status 枚举 + summary 必填 + evidence 数组）；description + promptGuidelines 写死「完成/确认无法完成时**必须**交回报告：一句话结论 + 改了哪些文件/产出了什么 + 关键证据；**不得只在正文里说**」，并明示**不写盘、不改变任何写盘权限**；不设 executionMode。
+- **跨角色形状接缝（已修通）**：编排 `AdapterCapabilities.reportHandback` 是 fire-and-forget（`(report) => void | Promise<void>`）；初版返回联合不含 void ⇒ 集成侧 TS2322/TS2345。修复在本层：返回联合接纳 `void`（= 已接收无回执），并加 fire-and-forget 用例锁死；**未碰编排/装配文件**。
+- **测试**：新增 `test/pi-adapter/submit-report.test.ts` **12 条**（含反向断言：失败措辞不含「已交回」；文案不得暗示写权）。**验证**：`test/pi-adapter/*.test.ts` → **105 pass / 0 fail**；全量 → **718 计 / 715 pass / 2 fail / 1 skip**（2 红仍为既有环境红）；`npm run typecheck` → **全仓零错误**。Node v24.14.0 / macOS 26.6.2 / HEAD `d933537`。
+
+**新增（同日）：D-1 重启恢复（sessionDir 持久会话）**
+- **接线**：`PiRuntimeAdapterOptions` 与 `RealPiAdapterOptions` 各增可选 `sessionDir?: string`；`real-adapter.ts` 新增导出 `selectSessionManager`——**未给 sessionDir ⇒ `SessionManager.inMemory`（逐字旧行为）**；给了 ⇒ 目录内**有最近会话即 `open` 恢复**（`list` 取 modified 最近，与 SDK `continueRecent` 同源语义），否则 `create` 新建。`bindRole` 用它替换原 in-memory 管理器；恢复时 `log.stage` + 事件流可见提示。编排侧 `run-role.ts:455` 已按 `<root>/.ans/sessions/<roleId>/` 逐角色传入（接缝已活，typecheck 全仓零错佐证）。
+- **目录约定（与编排协调确认）**：目录创建**归本层**（编排不预建 `.ans`）——SDK `SessionManager.create` 构造器自会 `mkdir -p`（session-manager.js:646-648），本层**再加显式预建 + `W_OK` 可写校验**（失败给一句话明确错误、声明**不静默退化**）。**如实登记时机**：目录在 **bindRole 时**即建出，**文件仍惰性**（首条消息才落盘）——与编排注释「真正落盘时创建」措辞略有出入，见文档。
+- **环境封闭登记**：持久化**只写 `<项目>/.ans/sessions/<角色>/`，绝不读写 `~/.pi`**——`createAgentSession` 的 `~/.pi` 回落（sdk.js:71-79）被显式 resourceLoader/settingsManager/sessionManager/modelRuntime 全部绕过；ResourceLoader/AgentSession 均无写文件代码；trust store 仅 CLI 入口构造（main.js:576），不在本路径。sessionDir **须逐角色隔离**。
+- **一致性坑（不静默）**：能力集变化（customerInput/reportHandback 增减）⇒ 转录里声明过而本次未注册的工具保持 pending（SDK 按转录恢复装载）——已写进代码注释与文档；界面提示归桌面。
+- **测试**：`test/pi-adapter/session-persistence.test.ts` **6 条**（in-memory 不落盘 / 新建+惰性落盘+目录存在 / 恢复同一文件+往返 / 取最近 / **不可写→明确抛错** / **端到端 faux：关掉再开、上下文含上轮内容**）。
+- **验证**：`test/pi-adapter/*.test.ts` → **111 pass / 0 fail**；全量 → **742 计 / 739 pass / 2 fail / 1 skip**（2 红仍为既有环境红：桌面 pi-config 目录名、pm shared macOS `/var`）；`npm run typecheck` → **全仓零错误**。
+
+**修订（同日）：G-1 客户确认不设超时**
+- **等待缺省不设限**（客户裁定「就卡在这等客户同意」）：`ANS_PI_CUSTOMER_INPUT_TIMEOUT_MS` 退役为**仅显式配置才计时**；`DEFAULT_CUSTOMER_INPUT_TIMEOUT_MS`/`CUSTOMER_INPUT_PROMPT_MARGIN_MS`/`resolveCustomerInputTimeoutMs`（A-6 收敛）**删除**（缺省取消后失去意义；原语义留痕于注释）。新增 `readOptionalTimeoutMs`（未设→undefined=不限时）。
+- **「等客户」的轮次不再被整轮硬超时掐断（关键）**：新增 `InteractionGate`（可重入的等待引用计数）+ **`withPausableTimeout`**（可暂停硬超时：等待中计时停走、恢复后按剩余时间续算）。`real-adapter` 每会话建一个闸传给工具层，`prompt()` 改用 `withPausableTimeout(session.prompt(text), promptMs, "prompt", gate)`。**实证**：faux 端到端——客户 250ms 后同意 vs 每轮 120ms：挂闸时该轮**不被掐断**；**对照组**（不挂闸）到 120ms 即 TimeoutError——挂起暂停是承重机制。
+- **等待期间会话=忙**（核实并钉住）：并发 `session.prompt` 被 SDK 拒（`Agent is already processing…`，agent-session.js:1553），端到端用例断言之。
+- **诚实边界登记**：未决请求只在**进程内存**；进程结束即失效 → 本层如实「未获客户同意（原因：…）」，**绝不假装同意**；D-1 恢复的是历史，不是未决调用。
+- **测试**：`customer-input.test.ts` 改超时语义（mock 时钟：虚拟 180s>旧上限 110s 仍生效、110s 处未超时；env 显式 60s 仍计时）+ 新增 `interaction-gate.test.ts`（4 条）+ `customer-wait-end-to-end.test.ts`（3 条）。
+- **验证**：`test/pi-adapter/*.test.ts` → **120 pass / 0 fail**；全量 → **766 计 / 763 pass / 2 fail / 1 skip**（2 红仍为既有环境红）；`npm run typecheck` → **全仓零错误**。Node v24.14.0 / macOS 26.6.2 / HEAD `d933537`。
+
+**新增（同日）：H-1 su 派发任务工具 dispatch_task**
+- **契约落点**：`session.ts` 新增 `DispatchTaskPayload { roleId; task; reason? }` / `DispatchReceipt { ok; message? }` / `DispatchTaskFn`（返回位含 `void`，编排 fire-and-forget 可直接注入）；两适配器选项各增 `dispatchTask?` 透传。
+- **工具与注册**：`tools.ts` 增 `DISPATCH_TASK_TOOL_NAME`/`makeDispatchTaskTool`；**未注入即不注册**（只给 su）。handler：参数校验（roleId/task 非空；非法不调 fn）→ 只转交载荷 → 受理/void 回「任务已派发」+**重申「派发 ≠ 授权」**；拒/抛错回「**未能派发**」如实（失败文案避开「已派发」子串，配严格反向断言）。`raceAbort` 防悬挂；不写盘/不判定/不进 GOVERNED_WRITE_TOOLS。
+- **文案**：`describeTool` 分支写死三条——**派发 ≠ 授权**（对方写权只来自其边界 + `confirmed:true`；不得承诺/代授）／任务**自足**（对方看不到 su 上下文）／**返工带证据**；并明示不改变任何角色的写权。反向断言：不得出现「已获授权/已放行写盘/授予写权」字样。
+- **如实边界**：roleId 语义校验（非本项目角色/指向 su 自身）归编排的注入能力，经回执原样转达（不静默不猜测）；前端路由（自动开/排队/去重/保留）归编排+桌面；CLI 不做同等路由（登记）。
+- **测试**：`test/pi-adapter/dispatch-task.test.ts` **11 条**。**验证**：`test/pi-adapter/*.test.ts` → **131 pass / 0 fail**；全量 → **777 计 / 774 pass / 2 fail / 1 skip**（2 红仍为既有环境红）；`npm run typecheck` → **全仓零错误**。
+
+**新增（同日）：K-2 图片发送（契约扩展 + 适配器透传）**
+- **契约**（`session.ts`）：新增 `PromptImage`（逐字镜像 pi-ai `ImageContent`：`{type:"image";data;mimeType}`；wire 转换归 SDK）与 `PromptOptions{images?}`；`RoleSession.prompt(text)` → `prompt(text, opts?)`（**可选参，零破坏**）；fake 适配器同步（不消费图片；无图事件逐字不变）。
+- **透传**（`real-adapter.ts`）：prompt 包装抽为**导出工厂 `makeRolePrompt`**（桩件可测）：无图 → 不传 options（逐字旧行为）；带图 → 原样透传同一数组；**不按 `Model.input` 门控**；失败两条路径外推不变。
+- **实测（faux 离线）**：有效图**逐字进 LLM 转录**；**无效图被显式省略**（注记 `[Image omitted: …]`，`image-process.js:47/:55`——非静默）；网关非多模态时 SDK 不拦（无 `Model.input` 门控）→ 由网关报错、两形态可外推；**如实提示落点建议在编排/桌面**。
+- **测试**：`test/pi-adapter/prompt-images.test.ts` **7 条**（契约编译期兼容+键断言；无图逐字旧行为；带图同引用透传；空数组=无图；失败外推+abort+上抛；fake 签名同步；SDK 级有效/无效双断言）。**验证**：`test/pi-adapter/` → **138 pass / 0 fail**；全量 → **813 计 / 810 pass / 2 fail / 1 skip**（2 红仍为既有环境红）；`npm run typecheck` → **全仓零错误**。
+
 ## 2026-10-11 — 注释更正：共享原子写上界 20 → 200（仅注释，无行为变更）
 
 **来源**：pm 已把共享原语 `src/common/shared/atomic-write.ts` 的重试上界由 **20 改为 200**（pm 属主；先复现并发 flake、定性「上界被打满」、并用证据证明「耗尽时 temp 已清、目标文件完好、只损失一次写入」，故取实测尾部 ~63 的约 3× 作裕量）。pm 如实回报：本角色 `src/common/pi-adapter/fs-write.ts:138` 的注释**仍写「≤20 次」**；该文件**已委托共享原语、无第二实现**，**仅注释陈旧**，需改为 200。

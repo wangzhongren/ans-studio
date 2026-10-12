@@ -22,38 +22,76 @@ contextBridge.exposeInMainWorld("desktop", {
   /** 发送一轮消息；开启后可反复调用（多轮聊天，不再确认）。 */
   sendSession: (text) => ipcRenderer.invoke("session:send", { text }),
 
-  /** 关闭当前会话（切换角色或退出时）。 */
-  stopSession: () => ipcRenderer.invoke("session:stop"),
+  /** 关闭会话（B-2 **定向**）：传角色 id 只关该角色（历史留在界面上）；不传/null 关全部（换项目/退出）。 */
+  stopSession: (roleId) =>
+    ipcRenderer.invoke("session:stop", { roleId: roleId == null ? null : String(roleId) }),
+
+  /** 保活中的角色 id 列表（B-2：左树「有活动会话」小圆点数据源）。纯读。 */
+  listLiveSessions: () => ipcRenderer.invoke("session:live"),
+
+  /** 外部浏览器打开链接（B-1：Markdown 链接外开）。主进程/Interface 侧只放行 http/https；
+   *  回报 `{ok, error?}`——不假装打开成功。 */
+  openExternal: (url) => ipcRenderer.invoke("app:open-external", { url: String(url == null ? "" : url) }),
 
   /**
-   * 创世 finalize（T36）：「完成 bootstrap」动作的可见性/就绪状态（`{available, settled, finalized}`）。
-   * 仅创世 su 会话可能 available；渲染侧据它决定是否显示入口、并提示「该不该现在点」。纯读。
+   * 选图（K-2）：主进程系统文件选择器 + 读文件（**渲染进程不碰文件/fs**）→ Interface 按**真实字节**校验
+   * （魔数嗅探类型、≤5MB）。回报 `{ok, image?:{name,mime,size,dataBase64}, cancelled?, error?}`——
+   * 取消是 `cancelled:true`（不是失败）；超限/非图片/读取失败 → `ok:false,error` 如实。
    */
-  getBootstrapState: () => ipcRenderer.invoke("session:bootstrap-state"),
+  pickImage: () => ipcRenderer.invoke("app:pick-image"),
 
   /**
-   * 显式完成 bootstrap（T36/T38）：**T37 语义 = su 提议收口 → 挂起等客户确认 → 确认通过才落盘**。
-   * 返回 `FinalizeResult`（`{ok, wrote, pins, roles, reason?, ...}`）——**成功示写出了什么、失败示原因**
-   * （未接确认通道 / 客户拒绝 / 超时 → **不完成**，fail-closed）。
+   * 粘贴/拖入的图片（K-2）：把 File API 读出的 base64 交主进程 Interface 校验（声明 mime/size 不可信，
+   * 以真实字节为准）。回报 `{ok, image?:{name,mime,size}, error?}`。**图片随消息送进模型那一段未接**
+   * （Pi适配器核实中）——本通道只收下与校验。
    */
-  finalizeBootstrap: () => ipcRenderer.invoke("session:finalize"),
+  attachImage: (input) =>
+    ipcRenderer.invoke("app:attach-image", {
+      name: input && typeof input.name === "string" ? input.name : "",
+      mime: input && typeof input.mime === "string" ? input.mime : "",
+      dataBase64: input && typeof input.dataBase64 === "string" ? input.dataBase64 : "",
+    }),
 
   /**
-   * 订阅「su 提议收口」事件（T38）：finalize 收口时，主进程把提议推来，渲染侧应把它渲染为
-   * **聊天流里的一张确认卡**（提议原文 + `[确认完成]`/`[暂不]`）。入参 `{toolCallId, proposal, reason}`。
-   * 返回取消订阅函数。
+   * 订阅「客户交互请求」（A-5，2026-10-12）：su 的 `request_confirmation` / `request_choice` 挂起等客户
+   * 作答时，主进程把请求推来，渲染侧应把它渲染为**该角色聊天流里的交互卡**（确认 / 单选 / 多选 / 带预览）。
+   * 入参 `{id, roleId, request}`——`request` 为冻结形状：confirm 的 `title/preview?/detail?`；
+   * choice 的 `title/question?/options[{id,label,description?}]/multiple?/preview?`。返回取消订阅函数。
    */
-  onFinalizeProposal: (cb) => {
-    const listener = (_event, p) => cb(p);
-    ipcRenderer.on("session:finalize-proposal", listener);
-    return () => ipcRenderer.removeListener("session:finalize-proposal", listener);
+  onOperatorRequest: (cb) => {
+    const listener = (_event, payload) => cb(payload);
+    ipcRenderer.on("session:operator-request", listener);
+    return () => ipcRenderer.removeListener("session:operator-request", listener);
   },
 
   /**
-   * 回传客户对「su 提议收口」的选择（T38）：`{toolCallId, allow}`——allow:true=[确认完成]，
-   * 否则=[暂不]。解挂主进程挂起的确认 Promise（→ finalize 落盘 / 不完成）。回报 `{ok, error?}`。
+   * 回传客户对交互请求的决定（A-5）：`{id, decision}`——confirm：`{kind:"confirm",confirmed:boolean}`；
+   * choice：`{kind:"choice",selected:string[]}` 或 `{kind:"choice",cancelled:true}`。主进程**按请求快照
+   * 校验**（选项 id 必须 ⊆ 已发、单选恰一个）后解挂为冻结三态；回报 `{ok, error?}`（非法回包不受理）。
    */
-  finalizeConfirm: (input) => ipcRenderer.invoke("session:finalize-confirm", input),
+  operatorRespond: (input) => ipcRenderer.invoke("session:operator-response", input),
+
+  /**
+   * 订阅「shell 命令确认请求」（M-1，2026-10-12）：三层闸 (a) 层为**应用内确认卡**（不再用原生对话框）。
+   * 主进程推 `{id, command, summary, reasonPlain, reasonRaw, argvLines, cwd}`——`command` 为**逐字原文**；
+   * `summary`/`reasonPlain` 已由主进程翻成**人话**（内部行话不外露）；`reasonRaw`/`argvLines`/`cwd` 供
+   * 折叠「详情」核查。渲染侧**只呈现、不判定**。返回取消订阅函数。
+   */
+  onShellConfirm: (cb) => {
+    const listener = (_event, payload) => cb(payload);
+    ipcRenderer.on("shell:confirm-request", listener);
+    return () => ipcRenderer.removeListener("shell:confirm-request", listener);
+  },
+
+  /**
+   * 回传对 shell 确认卡的决定（M-1）：`{id, allow}`——**恰 `allow:true` 才放行**；拒绝 / Esc / 关闭 = false。
+   * 回报 `{ok, error?, expired?}`：`expired:true` = 该确认已失效（超时或应用重启），**未获放行**。
+   */
+  shellConfirmRespond: (input) =>
+    ipcRenderer.invoke("shell:confirm-response", {
+      id: input && typeof input.id === "string" ? input.id : "",
+      allow: !!(input && input.allow === true),
+    }),
 
   /**
    * 读取 Pi 配置面板视图（设计 §11/T28）：返回 `{ path, fields:[{key,secret,value,isSet}] }`。
@@ -67,11 +105,48 @@ contextBridge.exposeInMainWorld("desktop", {
    */
   savePiConfig: (updates) => ipcRenderer.invoke("pi-config:save", { updates }),
 
-  /** 订阅会话事件流；返回取消订阅函数。 */
+  /**
+   * 订阅会话事件流；返回取消订阅函数。
+   * **入参为带 `roleId` 信封的 `{roleId, event}`**（B-2：多会话并存——渲染侧按 `roleId` 分发到该角色的
+   * 聊天流；不带标识会串消息）。`event` 为编排事件（含 `handback` 回交，§10.8）。
+   * **Q-1（2026-10-12）**：生产走 **合帧批量**通道 `session:events`（回调收到**信封数组**，顺序不变）；
+   * 同时保留单发 `session:event`（兼容既有探针/直发路径——回调收到单个信封）。渲染侧两者同解。
+   */
   onSessionEvent: (cb) => {
-    const listener = (_event, ev) => cb(ev);
-    ipcRenderer.on("session:event", listener);
-    return () => ipcRenderer.removeListener("session:event", listener);
+    const single = (_event, envelope) => cb(envelope);
+    const batch = (_event, envelopes) => cb(envelopes);
+    ipcRenderer.on("session:event", single);
+    ipcRenderer.on("session:events", batch);
+    return () => {
+      ipcRenderer.removeListener("session:event", single);
+      ipcRenderer.removeListener("session:events", batch);
+    };
+  },
+
+  /**
+   * 订阅「角色状态变化」（L-1 + 状态准确性；2026-10-12 追加右栏「待办 / 队列」）：主进程在**忙/闲切换**与
+   * **队列变化**时推 `{roleId, busy, summaries, queue, running}`——**真实信号**（会话 busy / 队列深度），
+   * 渲染侧据此出「工作中 · N 待办」徽标、聊天流队列行与**右栏待办组**（`queue` 结构化条目：来源/摘要/入队
+   * 时间；`running`=正在跑的那条投递，可标「进行中」），**不得**用界面侧推测补状态。
+   * 返回取消订阅函数。
+   */
+  onRoleState: (cb) => {
+    const listener = (_event, info) => cb(info);
+    ipcRenderer.on("session:role-state", listener);
+    return () => ipcRenderer.removeListener("session:role-state", listener);
+  },
+
+  /**
+   * 订阅「会话历史已恢复」（D-1，2026-10-12）：项目导入/重载后，主进程对每个角色只读解析
+   * `<project>/.ans/sessions/<roleId>/` 的最近会话，把**规范化后的界面行**推来
+   * （`{roleId, projectRoot, rows:[{kind:user|assistant|tool|denied, text, at}], error}`）——
+   * 渲染侧回放进**该角色**的聊天流（附「会话已恢复」分隔提示）。渲染进程**不碰 Pi SDK/JSONL**。
+   * 返回取消订阅函数。
+   */
+  onSessionHistory: (cb) => {
+    const listener = (_event, payload) => cb(payload);
+    ipcRenderer.on("session:history", listener);
+    return () => ipcRenderer.removeListener("session:history", listener);
   },
 
   /** 订阅「项目内容可能已变」信号（主入口角色 su 一轮结束后，主进程发出）；

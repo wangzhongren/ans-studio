@@ -1,5 +1,221 @@
 # 门禁引擎 变更记录
 
+## 2026-10-12 — 旧快照线索的同步读盘加缓存（mtime+size 短路；转达自桌面的跨角色建议）
+
+背景：桌面侧治理完事件热路径（300 事件风暴最长帧间隔 101ms→18ms）后指出——旧快照线索的**同步小读盘**
+落在「每次落入未匹配分支的写尝试」上，一轮数百次写尝试时会是主进程的同步阻塞源。本派工给该读盘加
+**按 `mtimeMs`+`size` 的模块级缓存/短路**；语义不变（线索仍只在「盘上覆盖、快照不覆盖」时出现；
+失败仍 fail-closed；判定结果从不依赖盘面）。
+
+- **边界**：`src/common/门禁引擎/boundary-core.ts`（`reloadBoundaryEntriesSync` 加缓存 + 可注入
+  `StaleBoundaryProbeIo` 桩口）、`test/门禁引擎/stale-snapshot-hint.test.ts`（追加缓存用例 2 例，
+  既有 4 例断言未动）、本文件；**未动** `resolve-write.ts`（调用不变、拿到默认 io 即自动走缓存）、
+  未碰他角色任何文件。
+- **缓存策略**：模块级 `Map<fileAbs, { mtimeMs, size, entries|null }>`——命中（mtime+size 同）⇒
+  **只做一次 `stat`，跳过读取与解析**；变更 ⇒ 重读重解析并更新缓存。解析失败的 `null` 也按
+  mtime+size 记忆（坏文件不反复解析）；读盘失败（stat 失败 / stat 成功但读不到）**不写缓存**，
+  下次重新判定（文件随时可能出现）。内置标签/空串无 I/O 直返 `null`。容量上限 256、超限整体清空
+  （进程内边界文件数量级本就很小）。缓存条目**只读**（调用方不得改动返回数组）。
+- **如实登记的判定限制**：`mtime+size` 检不出「同尺寸且 mtime 未变」的改动——真实写入都会更新
+  mtime，此类碰撞仅可能出现在粗时间粒度的文件系统上；即便漏检，影响的只是**提示句**（可能未显示/
+  多显示一次旧快照线索），**判定结果（allowed）从不依赖盘面**（纯函数性不变）。
+- **测试**：新增 2 例全绿——① 计数桩：首次读 1 次 → 未变再调**不增加读取**（仅 stat）；**同尺寸
+  内容变更（mtime 变，`utimesSync` 固定时刻求确定性）必须被重读检出**；坏文件同状态命中缓存不反复
+  解析；内置标签零 I/O；文件不存在无读取。② 端到端：经 `resolveWrite` 连续两次同盘面线索一致
+  （缓存透明）；盘面变更后**线索立即失效**、原文案逐字恢复。既有 4 例（触发/条件语义/反向断言/
+  F4 不加线索）原样全绿。本角色套件 **148 计 / 147 过 / 0 红 / 1 skipped**；全量 **859 计 / 856 过 /
+  2 红（既有环境红）/ 1 skipped**（= 协调者基线 857/854 + 本次 2）；`npm run typecheck` 0 错。
+  环境：Node v24.14.0 / macOS 26.6.2 / HEAD `d933537`。
+- **补偿性度量（如实）**：缓存命中路径仍每次执行一次 `statSync`（廉价系统调用，是变更检测的必要
+  成本）；未做 stat 结果本身的高阶缓存（如目录时间戳），如需进一步压榨属后续优化。
+
+## 2026-10-12 — 拒写信息补「旧边界快照」线索（客户派工；真机现象）
+
+真机现象：su 已按流程改好角色边界（盘上文件确含新路径），但角色的**活会话持有开会话时解析的旧边界
+快照** ⇒ 写入被拒，拒绝信息只说「目标路径未匹配任何边界条目」，**不提示「会话快照过期」**——排查者
+（含模型自己）要绕一圈才反应过来。桌面 O-1（边界变更后自动重建旧快照会话）多能自愈；本线索服务
+**残余情形**（轮次正在跑 / 未触达重建时机）。
+
+- **边界**：`src/service/gate/resolve-write.ts`（最末「未匹配」分支追加线索）、
+  `src/common/门禁引擎/boundary-core.ts`（新增同步对照重载 `reloadBoundaryEntriesSync`）、
+  `test/门禁引擎/stale-snapshot-hint.test.ts`（新，4 例）、本文件；未碰
+  `src/provider|pipeline|common/编排|common/pi-adapter|src/service/其余|app/**`、他角色 tests/docs。
+- **触发判据（可判定才加，不猜测）**：**同步重读盘上边界**（`boundarySource` → projectRoot 拼接 →
+  readFileSync → 与异步加载同一套 parseEntries 语义）成功，且重读结果**按与本次判定同一套语义**
+  （root + pathCovers + isActive(e, scope)）**覆盖该路径**——即「盘上含、快照不含」。无法判定
+  （内置 `<built-in:…>` 标签 / 空串 / 读盘失败 / 新解析报错）⇒ **原文案逐字不变**。
+- **文案**（原文案后追加）：「本会话可能持有旧边界快照（盘上边界现已含该路径）——请重开会话后重试；
+  本次判定不变，仍为拒绝。」——末句**防误读为放行**；判定仍拒绝（fail-closed 不变）。
+- **触发面最小化**：线索只在**最终「未匹配任何边界条目」分支**——F6（未接受）/ parseError / F4
+  （writeSet 收窄）/ 跨根混淆 / 条件缺失等既有拒绝理由均不加；对照只看**条目**（不做接受/pin 校验，
+  与「盘上是否含该路径」无关）。
+- **测试**：新用例 4 例全绿（触发 → 理由含线索且 allowed=false、allowedByRoot 不变；条件目录按同一
+  套 isActive 语义对照——快照重开仍不激活时**不加**；**反向断言**——内置标签/读盘失败/盘上不含/
+  新解析报错四种情形 reason **逐字等于**原文案且不含线索；F4 拒绝不加线索）。本角色套件
+  **146 计 / 145 过 / 0 红 / 1 skipped**；全量 **851 计 / 848 过 / 2 红（既有环境红：桌面 pi-config
+  目录名、pm shared macOS `/var`）/ 1 skipped**（= 协调者基线 847/844 + 本次 4）；`npm run typecheck`
+  0 错。环境：Node v24.14.0 / macOS 26.6.2 / HEAD `d933537`。
+- **如实说明（代价与取舍）**：对照是**每次落入该分支时的同步小读盘**（单文件、拒绝路径上，非热路径）；
+  `resolveWrite` 保持**纯函数签名不变**（判定结果不依赖盘面——盘面只影响**文案里的提示句**，故同一
+  输入在不同盘面下 allowed 恒同）。线索是**启发式**：盘上覆盖 + 快照不覆盖**可能**另有成因（如接受
+  证据变化），故措辞用「可能」并明确「本次判定不变」；若重开后仍被拒，将看到对应真实理由（F6 等）。
+
+## 2026-10-12 — 角色「文档面」固定清单 + 交付纪律：su 卡文本写死（客户原话「各个角色的工作流有问题，为啥不写文档呢」）
+
+真机根因（协调者核过，如实登记）：真实项目里 su 建出的角色边界**只授了代码路径**（如「任务清单实现」
+仅 `src/` + `data.json`），**一条文档路径都没有** ⇒ 门禁拒掉一切文档写入 ⇒ 角色**根本不能**维护自己的
+文档（不是不写，是不能写）。本派工是**治理文案**：只动 su 内置卡文本（`BUILT_IN_ROLE_CARD_TEXT`）+
+其头注；判定逻辑一行未改。
+
+- **边界**：`src/common/门禁引擎/boundary-core.ts`（卡文本 + 头注）、
+  `test/门禁引擎/documentation-surface-convention.test.ts`（新，3 例）、本文件；未碰
+  `src/provider|pipeline|common/编排|common/pi-adapter|src/service|app/**`、他角色 tests/docs。
+- **卡文本要点**：① **固定文档面清单**——建/改每个项目角色时**须随边界一并授予**（逐项标 kind）：
+  文件五份（`角色卡/<角色 id>/feature-map.md`、`memo.md`、`changelog.md`、`functional-description.md`、
+  `api-spec.md`，kind: file）；目录四个（`角色卡/<角色 id>/docs/{design,feature,change,fix}/`，
+  kind: directory）；另加该角色自己的测试目录（如 `test/<角色 id>/`，仅当该角色承担测试）；
+  `temp/<角色 id>/` 按 T-1 段一并授予（既有约定保持）。② **交付纪律**——每次交付都要同步自己的文档
+  （功能说明/流程、变更记录、memo、api-spec），**代码与文档同批交回**；文档缺口不得靠「下次补」。
+  ③ 明示必要性：「不给 ⇒ 角色写不了自己的文档」；**无**「未列即默认可写」式表述（守「未列即只读」）。
+- **种子 purpose 未动的判断（同前例）**：清单是「su 往每个角色边界里写什么」的流程文案（卡文本为
+  单一来源）；种子 purpose 是创世三目录的描述，不塞流程清单（种子仍恰为三条）。
+- **测试**：新用例 3 例全绿（清单**逐项**断言——五文件/四目录/测试目录/temp/kind 标注/根因句；
+  交付纪律四条；**反向断言**——凡含「可选/后补/下次补」的小句必须为禁止式，且定向禁用「未列即可写」
+  式表述）。本角色套件 **142 计 / 141 过 / 0 红 / 1 skipped**；全量 **839 计 / 836 过 / 2 红（既有
+  环境红）/ 1 skipped**（= 协调者基线 836/833 + 本次 3）；`npm run typecheck` 0 错。
+  环境：Node v24.14.0 / macOS 26.6.2 / HEAD `d933537`。
+- **如实说明**：执行面仍是**文案约束**——既有项目里已建角色（只授代码路径）的修补要 su 走治理流程
+  重写各自 boundary.yaml（本角色不改任何项目与角色边界文件）；清单只对**此后** su 建/改角色直接生效。
+
+## 2026-10-12 — J-1「确认落盘后自动开工」：su 卡文本写死「落盘后立刻派发第一项开发任务」（客户原话）
+
+客户：「这个确认了，写盘之后，要**自动启动开发**啊。」本派工是**治理文案**：只动 su 内置卡文本
+（`BUILT_IN_ROLE_CARD_TEXT`）+ 其头注；判定逻辑、工具实装、编排接线一行未改。
+
+- **边界**：`src/common/门禁引擎/boundary-core.ts`（卡文本 + 头注）、
+  `test/门禁引擎/dispatch-after-landing-convention.test.ts`（新，4 例）、本文件；未碰
+  `src/provider|pipeline|common/编排|common/pi-adapter|src/service|app/**`、他角色 tests/docs。
+- **文案要点（与 H-1 指引逐字对齐）**：① 角色与治理产物落盘（客户经 `request_confirmation` 确认、
+  写入完成、自动收尾）之后，**立刻**用 `dispatch_task` 把第一项开发任务派发给对应角色——roleId 用
+  刚建出的角色，task 文本**自足**（做什么 / 依据哪份文档或契约 / 完成标准），**不等客户手动转达**；
+  ② **派发 ≠ 授权**——目标角色的写权仍只来自它自己的 Section 1 与 `request_confirmation` 的
+  confirmed:true；不得在任务文本里代授权限（如「已获准写 src/**」）；③ 失败语义——派发失败/被拒
+  （回执「未能派发」）→ 如实告知客户原因，**不得假设已开工**；若没有可派发的角色 → 如实说明并停在
+  「待客户指示」。
+- **措辞与实装对齐（只读核对，未改他角色文件）**：工具名 `dispatch_task` 与参数 roleId/task（自足
+  三要素）取自 `src/provider/pi/tools.ts:145` / `session.ts:252`；「派发 ≠ 授权」写权来源措辞逐字
+  取自 `src/provider/pi/session.ts:248`（H-1 语义硬约束）；失败/回执语义取自同处与
+  `src/common/编排/handback.ts` 的既有单一来源。未发明新词。
+- **种子 purpose 未动的判断**：J-1 是**行为流程**、不涉任何目录路径；种子 purpose 是目录描述，
+  按其单一来源原则不把流程文案塞进目录描述（种子亦保持三条不变）。
+- **测试**：新用例 4 例全绿（「落盘 → 立刻 → dispatch_task → 派发」顺序链 + roleId/自足三要素；
+  「派发 ≠ 授权」逐字措辞与「不得代授权限」；失败语义三条；**反向断言**——任何含「授权/获准/放行」
+  的小句必须为禁止式/否定义，且定向禁用「派发即授权 / 已放行写盘」类表述）。本角色套件
+  **139 计 / 138 过 / 0 红 / 1 skipped**；全量 **806 计 / 803 过 / 2 红（既有环境红：桌面 pi-config
+  目录名、pm shared macOS `/var`）/ 1 skipped**（803 = 上轮 799 + 本次 4）；`npm run typecheck` 0 错。
+  环境：Node v24.14.0 / macOS 26.6.2 / HEAD `d933537`。
+- **如实说明**：① 「立刻派发」以卡文本约定表达（模型行为）——闸层无法强制「必须调用 dispatch_task」，
+  约束靠文案 + 工具回执（派发与否客户在会话里可见）；② 卡文本未写 handback.ts 注记的「新建角色快照
+  可能被前端旧清单误拒」工程细节（不把内部实现细节塞进角色卡；失败语义「如实告知」已覆盖其表现）。
+
+## 2026-10-12 — 派工「shell 规则集公开再导出」：**被边界阻断，如实回报，未动一行**（边界外）
+
+派工要求新增 `src/service/gate/shell-rules.ts`：公开再导出 `classifyShell` 与 `defaultShellRules`
+（供编排 I-1 的 (c) 层注入；编排侧 `shell-arming.ts` 头注已登记「合法注入源＝门禁引擎经
+`src/service/gate/` 的公开再导出，尚不存在」为跨角色待办）。
+
+- **边界判定：不在本角色 Section 1。** `src/service/gate/` 下白名单只有**单文件**
+  `src/service/gate/resolve-write.ts`、**无目录条目**；`shell-rules.ts` 未列 ⇒ 未列即只读——
+  **未创建该文件**（纪律：边界更新走 Governance、不自行扩权）。待 Governance 批准后追加条目
+  （建议：`- kind: file` / `path: src/service/gate/shell-rules.ts` /
+  `purpose: shell 规则集公开再导出（编排 (c) 层注入源）`）再实施；实施内容（逐字转出 + 单一来源头注 +
+  同源断言测试）已备妥于本轮回报。
+- **核对的编排侧事实（只读，未动他角色文件）**：`src/common/编排/shell-gate.ts:50` 注释允许实件在
+  `src/service/gate/` **或** `src/common/门禁引擎/`（未点名 `shell-rules.ts`）；更强的表述在
+  `src/pipeline/orchestration/shell-arming.ts` 头注（注入源 = 经 `src/service/gate/` 的公开再导出，
+  **尚不存在**）；未获注入 ⇒ (c) 一律拒绝（fail-closed，未因缺件而放宽）。
+- **形状核对（注入即通，无需适配器）**：编排 `ClassifyShellFn = (argv, rules) => ShellClass |
+  ShellClassifyDetail`；实装 `classifyShell(argv: string[], rules: ShellRules): ShellClass`
+  （`src/common/门禁引擎/classify-shell.ts:308`）与 `defaultShellRules(): ShellRules`（:498）逐字可注入，
+  名字与注释一致。
+- **证据（本轮零代码改动，复核现状未被破坏）**：`node --test "test/门禁引擎/*.test.ts"` → **133 计 /
+  132 过 / 0 红 / 1 skipped**（Windows 专用）；全量 `node --test "test/**/*.test.ts"` → **800 计 /
+  797 过 / 2 红 / 1 skipped**（两红为既有环境红：桌面 pi-config 目录名、pm shared macOS `/var`；
+  计数随他角色并发新增变化）；`npm run typecheck` → 0 错。Node v24.14.0 / macOS 26.6.2 / HEAD `d933537`。
+- **后续（同日）：边界变更获客户确认并落盘**（Section 1 加行：`src/service/gate/shell-rules.ts`，
+  purpose「shell 规则集公开再导出（编排 shell 闸 (c) 层的合法注入源；客户 2026-10-12 确认）」）⇒
+  **已按备妥内容逐字落地**：新增 `src/service/gate/shell-rules.ts`（逐字转出 `classifyShell` /
+  `defaultShellRules`，同一函数引用、不复制实现；头注写明单一来源）+ `test/门禁引擎/
+  shell-rules-public-reexport.test.ts`（引用同一性 + 公开入口四态冒烟 + 公开/私有同输入同输出，2 例）。
+  **证据**：本角色套件 **135 计 / 134 过 / 0 红 / 1 skipped**；全量 **802 计 / 799 过 / 2 红（既有环境
+  红）/ 1 skipped**（799 = 上轮 797 + 本次 2）；`npm run typecheck` 0 错。编排侧**未动**：
+  `shell-arming.ts` / `run-role.ts` 的注入接线属编排/装配（本角色只提供公开出口）。
+
+## 2026-10-12 — T-1「未通过产物」暂存区：su 卡文本与治理种子文案写死 `temp/<角色 id>/` 约定（客户 2026-10-12）
+
+客户原话：「应该增加一个 temp 文件夹，里面存储没有通过的文件，这样审核也方便点」。已裁定：**每角色一个
+`<项目>/temp/<角色>/`**；**被门禁拒绝的写入内容不存**（保住「拒绝=零副作用」）。本派工是**治理文案，
+不是产品代码**——判定逻辑一行未改，创世种子写集不变（仍恰为三处治理产物）。
+
+- **边界**：`src/common/门禁引擎/boundary-core.ts`（`BUILT_IN_ROLE_CARD_TEXT`）、
+  `src/common/门禁引擎/governance-seed.ts`（purpose 交叉提示 + 指引注释）、
+  `test/门禁引擎/temp-staging-convention.test.ts`（新，5 例）、本文件。未碰 `src/provider|pipeline|
+  common/编排|common/pi-adapter|app/**`、本仓库 `.gitignore`、他人 tests/docs。
+- **su 卡文本追加（单一来源）**：① 建/改每个项目角色边界时，Section 1 应包含 `temp/<角色 id>/`
+  （`kind: directory`，purpose「未通过/返工产物暂存，供审核对照」）；② 退回/返工流程——被验收退回或
+  要求返工的产物**先存档**进 `temp/<角色 id>/`（带日期与版本，如 `2026-10-12_草案-v2.md`），并写
+  `REVIEW.md` 记「谁退的 / 为什么 / 要求什么」，然后才改主交付物，且该流程随角色卡写进新角色；
+  ③ 红线——**不得**把「被门禁拒绝的写入内容」存进 temp（拒绝即零副作用）；temp 属草稿区、不参与 pin；
+  ④ 项目角色建 `.gitignore` 时应忽略 `temp/`（本仓库 `.gitignore` 未动，属装配）。
+- **治理种子文案同步**：`角色卡/` 条目 purpose 交叉点明「未通过/返工产物另存项目根 temp/<角色 id>/
+  ——草稿区，不参与 pin」；**不加** `temp/` 种子条目（`test/测试/cli-genesis-boundary.test.ts` 钉
+  「创世种子仍恰为三处治理产物」，写集不动）；完整退回流程只在 su 卡文本（单一来源，种子不复制）。
+- **测试**：新用例 5 例全绿（卡文本三项约定 + 流程/红线原文 + **反向断言**：任何「拒绝 × temp」小句必须
+  为禁止式、且无肯定式「把被拒内容存 temp」指令 + 种子 purpose 同步且仍恰为三条）。
+  本角色套件 `node --test "test/门禁引擎/*.test.ts"` → **133 计 / 132 过 / 1 skipped**（Windows 专用）；
+  全量 `node --test "test/**/*.test.ts"` → **792 计 / 789 过 / 2 红 / 1 skipped**（两红为既有环境红：
+  桌面 pi-config 目录名、pm shared macOS `/var`；计数随他角色并发新增变化，本角色零新增失败）；
+  `npm run typecheck` 0 错。环境：Node v24.14.0 / macOS 26.6.2 / HEAD `d933537`。
+- **不符之处/须知悉**：种子未加 `temp/` 条目（被钉死的「恰为三处」约束；temp 目录由各角色在自己的
+  accepted 边界下创建，su 创世期无此需求）；su 创世期本身不能写项目根 `.gitignore`（不在其写集），
+  故「建 .gitignore 忽略 temp/」以对项目角色的约定落在卡文本（客户派工原话即如此框定）。
+
+## 2026-10-12 — 散文式 `boundary.md` 静默解析出 0 条 → **响亮失败**（A）+ 从源头防（C）（客户在批准范围外单独裁定）
+
+真机端到端测试抓到：su 给新角色写**散文式 Markdown** 边界文件（`角色卡/<角色>/boundary.md`，形如
+「## 允许写入（白名单，仅此）」+ 反引号路径列表）。文件名白名单接受它（`BOUNDARY_NAMES`），但 legacy
+表格解析器静默产出 **0 条**、`parseError` 为空 ⇒ 该角色一切写入被拒，而拒绝信息只说「未匹配任何边界
+条目…允许路径：（无）」，**完全不提示「边界文件读不懂」**。`ans-playground2` 只读探针复核（三角色
+`entries=0 / parseError=(无) / warnings=[]`）。客户单独裁定修 **A+C**。详见
+`docs/fix/2026-10-12_fix_boundary-prose-silent-empty.md`。
+
+- **边界**：全部落在本角色边界内——`src/common/门禁引擎/boundary-core.ts`、
+  `src/common/门禁引擎/governance-seed.ts`、`src/service/role/resolve-role.ts`（仅注释）、
+  `test/门禁引擎/boundary-empty-and-builtin.test.ts`（新）、本角色 `docs/fix/`、本文件。
+  **未动**闸判定（`resolveWrite` 未改）、`src/provider|pipeline|common/编排|common/pi-adapter|app/**`、
+  任何他人测试与 docs。
+- **A（响亮失败）**：`loadBoundaryFile` 对「文件存在、被读到、但 Section 1 解析出 0 条**且非 YAML**」
+  记 `parseError`（`boundary-core.ts:206`），文案含原因 + 出路（「请把该文件改写为 boundary.yaml」）。
+  两条链自动随行：`resolveWrite` 既有 parseError 分支的拒绝理由携带原因（经 format-denial 渲染，
+  不再只列「允许路径：（无）」）；`listProject` 既有 `parseError` 分支落 **warning**（既有通道）。
+- **C（从源头防）**：`BUILT_IN_ROLE_CARD_TEXT` 写死「边界文件必须是 `角色卡/<角色 id>/boundary.yaml`
+  （YAML：`role` + `entries`）」+ **最小可抄示例** + 「写 Markdown 散文/表格不会被解析」
+  （`boundary-core.ts:41`）；治理种子 `角色卡/` 条目 purpose 同步点名 `boundary.yaml`（`governance-seed.ts:49`，
+  格式要求的单一来源仍在 su 卡文本）。
+- **合法空集如何区分（结论）**：只针对**文件解析路径**——代码合成边界（内置/治理种子/未接受段）不经
+  `loadBoundaryFile`，天然不误伤；**YAML 显式 `entries: []`** 视为作者按声明格式明确表达的空集、
+  **不算解析失败**（客户裁定的 O1 角落依赖此类角色仍可枚举）；只有非 YAML 文件解析出 0 条（散文/
+  无表格）才是「读不懂」→ parseError；`.md` 带合法 legacy 表格照常解析（未加严）。
+- **测试**：新用例 8 例全绿（散文→parseError+出路文案；listProject warning 且无「0 条且无 parseError」
+  静默角色；闸链与 format-denial 呈现原因；合成边界不误伤；YAML 显式空集不误伤；legacy 表格兼容；
+  su 卡文本/种子 purpose 断言）。全量 `node --test "test/**/*.test.ts"` → **726 计 / 723 过 / 2 红 /
+  1 skipped**（两红为既有环境红：桌面 pi-config 目录名、pm shared macOS `/var`；723 = 基线 715 + 新增 8）；
+  `npm run typecheck` 0 错。环境：Node v24.14.0 / macOS 26.6.2 / HEAD `d933537`。
+- **如实登记的行为后果**：全角色边界都读不懂的项目 `hasRoles` 由 true 变 false——与既有 T14「全无效
+  角色」语义一致（含「可发起 bootstrap」提示），桌面据此设 `genesisBootstrap`，su 获得**有界**修复面
+  （仅 `角色卡/`、`docs/`、`.ans/`）可把散文边界改写为 boundary.yaml；修复前是死局（su 连边界都改不了）。
+  真实模型端到端未验（本改不发真实模型请求）；playground2 未改（修复应由 su 走治理流程完成）。
+
 ## 2026-10-11 — T40：shell 闸 (c) 加第四档 `risky`；硬拒不再「危险即拒」（客户 2026-10-11）
 
 客户就 **shell 闸 (c) 的判定**给了新裁定，**部分推翻**设计 §7.3「危险即硬拒终结」。方案见设计

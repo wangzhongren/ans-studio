@@ -115,9 +115,10 @@ export type ClassifyShellFn = (
 // 使其**能在无真实模型的情况下被测试**。真实实现经 `openRoleSession(项目管理, …)` 问 pm 角色
 // （见 `src/pipeline/orchestration/pm-reviewer.ts` 的 `createPmReviewer`）。
 //
-// **接口形状为何是「返回原文（字符串）」而非「返回已解析的对象」**：§7.5 要求「判定 JSON 不合法 → 升级到 (a)」——
-// 这条只有在**本层持有解析职责**时才成立、才可测。故注入点返回 pm 的**原文回复**，由本模块的 `parsePmVerdict`
-// 解析成三态；解析失败即 `b-badjson` → 升级到 (a)。
+// **接口形状为何是「返回原文（字符串）」而非「返回已解析的对象」**：解析（含围栏剥离/取首个 JSON 对象）
+// 与「判定 JSON 不合法怎么办」的职责都落在**本层**、才可测。**M-2（2026-10-12，客户裁定）**：解析失败
+// **直接拒绝**（fail-closed）——**不升级 (a)、不重试、不打扰客户**（客户不要这类打扰）；如实 reason
+// 回给角色（`REASON_B_UNPARSEABLE`，稳定短句）。提示侧收紧在 `pm-reviewer.ts`。
 
 /** (b) 问 pm 的入参：命令原文 + 规范化 argv + 固定 cwd + 本次调用的 toolCallId（审计串联）。 */
 export interface PmReviewInput {
@@ -180,7 +181,14 @@ export const BRANCH_B_DENY = "b-deny"; // pm 判读为拒绝
 export const BRANCH_B_UNSURE = "b-unsure"; // pm 拿不准 → 升级到 (a)
 export const BRANCH_B_UNAVAILABLE = "b-unavailable"; // 无 pm 会话 / pm 报错 → 升级到 (a)
 export const BRANCH_B_TIMEOUT = "b-timeout"; // pm 审读超时 → 升级到 (a)
-export const BRANCH_B_BADJSON = "b-badjson"; // pm 判定 JSON 不合法 → 升级到 (a)
+/**
+ * **(b) 审读输出不可解析 → 直接拒绝**（M-2，2026-10-12 客户裁定：此类失败不再升 (a)、不重试、不打扰客户）。
+ * **归因码稳定**（桌面 M-1 的「人话映射」据此对号，**别看文本猜**）；与 `REASON_B_UNPARSEABLE` 一一对应。
+ */
+export const BRANCH_B_UNPARSEABLE = "b-unparseable-deny";
+/** 与 `BRANCH_B_UNPARSEABLE` 一一对应的**固定短句**（单一来源；如实回给角色，绝不说成放行）。 */
+export const REASON_B_UNPARSEABLE =
+  "审核未能给出明确结论，已按 fail-closed 拒绝；可换更简单的命令形式或稍后重试";
 
 // —— 第三闸 (a) —— 触发分支（升级链：`<b 分支>→<a 分支>`，如 `b-unsure→a-allow`）。
 export const BRANCH_A_ALLOW = "a-allow"; // 操作者放行
@@ -231,7 +239,7 @@ interface ReviewOutcome {
 /** 内部：(b) 的输出——终结（放行/拒绝）或升级到 (a)。 */
 type BOutcome =
   | { kind: "allow"; by: string }
-  | { kind: "deny"; reason: string; by: string }
+  | { kind: "deny"; reason: string; by: string; /** 覆盖归因码（缺省 `BRANCH_B_DENY`；M-2 的不可解析拒绝用 `BRANCH_B_UNPARSEABLE`）。 */ branch?: string }
   | { kind: "escalate"; bBranch: string; bAttr: string; why: string };
 
 /**
@@ -364,7 +372,8 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
     }
     if (b.kind === "deny") {
       // 两档同：b 判拒绝即**终结拒绝**（**不打扰人**）——risky 也**不**因此叫人（§14.2「唯独 b 判拒时不打扰」）。
-      return { result: { allow: false, reason: b.reason, by: b.by }, conclusion: "deny", branch: BRANCH_B_DENY };
+      // 归因码缺省 `b-deny`；M-2 的「不可解析拒绝」自带 `BRANCH_B_UNPARSEABLE`（同样不升 (a)）。
+      return { result: { allow: false, reason: b.reason, by: b.by }, conclusion: "deny", branch: b.branch ?? BRANCH_B_DENY };
     }
     // b.kind === "escalate"：拿不准 / 无会话 / 超时 / 报错 / JSON 非法 → 升级到 (a)（两档同）。
     return await runA(req, b);
@@ -399,10 +408,11 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
       };
     }
 
-    // 判定 JSON 不合法（含 null/undefined）→ 升级到 (a)（§7.5）。
+    // **M-2**：判定输出不可解析（含 null/undefined、围栏剥离与取首个 JSON 对象后仍非法）→ **直接拒绝**
+    // （fail-closed）——**不升级 (a)、不重试、不打扰客户**；如实短句回给角色（归因码稳定，供 M-1 映射人话）。
     const parsed = parsePmVerdict(raw);
     if (parsed === undefined) {
-      return { kind: "escalate", bBranch: BRANCH_B_BADJSON, bAttr: "pm:判定 JSON 不合法", why: "pm 判定 JSON 不合法" };
+      return { kind: "deny", reason: REASON_B_UNPARSEABLE, by: "pm:输出不可解析", branch: BRANCH_B_UNPARSEABLE };
     }
 
     const by = pmBy(parsed);

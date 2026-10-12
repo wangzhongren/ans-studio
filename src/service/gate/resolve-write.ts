@@ -19,6 +19,7 @@ import {
   normalizeLexical,
   realResolve,
 } from "../../common/门禁引擎/paths.ts";
+import { reloadBoundaryEntriesSync } from "../../common/门禁引擎/boundary-core.ts";
 
 /** 条目是否被当前任务的条件声明激活（非条件条目恒真；无 scope 时无声明 → 条件条目不激活） */
 function isActive(e: BoundaryEntry, scope: TaskScope | undefined): boolean {
@@ -160,5 +161,23 @@ export function resolveWrite(
     );
   }
 
-  return deny(`目标路径未匹配任何边界条目（根：${root}）：${rel}`, boundary, scope);
+  // 旧快照线索（客户派工；真机现象）：su 已改好盘上边界，但**活会话持有开会话时解析的旧快照** ⇒
+  // 写入被拒、且原文案只说「未匹配任何边界条目」，不提示「快照过期」——排查者（含模型）要绕一圈。
+  // 触发判据（**可判定才加**）：**同步重读盘上边界**成功（非内置标签 / 读盘成功 / 新解析无报错）且
+  // 重读结果**按与本判定同一套语义**（root + pathCovers + isActive）**覆盖该路径**——即「盘上含、
+  // 快照不含」。无法判定（读盘失败 / 新解析报错等）⇒ 保持原文案逐字不变，**不猜测**。
+  // 桌面 O-1 会在交互时机自动重建旧快照会话（多能自愈）；本句服务残余情形（轮次在跑 / 未触达重建）。
+  // 线索是**提示**、不是放行：判定仍是拒绝（fail-closed 不变，文案已写明「本次判定不变，仍为拒绝」）。
+  const base = `目标路径未匹配任何边界条目（根：${root}）：${rel}`;
+  const fresh = reloadBoundaryEntriesSync(boundary.boundarySource, projectRootAbs, skillRootAbs);
+  const freshCovers =
+    fresh !== null && fresh.some((e) => e.root === root && pathCovers(e, rel) && isActive(e, scope));
+  if (freshCovers) {
+    return deny(
+      `${base}。本会话可能持有旧边界快照（盘上边界现已含该路径）——请重开会话后重试；本次判定不变，仍为拒绝。`,
+      boundary,
+      scope,
+    );
+  }
+  return deny(base, boundary, scope);
 }

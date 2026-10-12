@@ -40,7 +40,8 @@
           <span class="side-title">项目</span>
         </header>
         <div class="side-actions">
-          <button id="btn-import" class="btn btn-primary btn-block">导入项目…</button>
+          <!-- N-1（2026-10-12 客户裁定）：初始「导入项目」；已有项目后由 renderer 经 ui-labels.js 纯映射改「切换项目」。 -->
+          <button id="btn-import" class="btn btn-primary btn-block">导入项目</button>
           <div id="project-path" class="project-path is-empty">尚未导入项目</div>
         </div>
         <div class="tree-label">角色</div>
@@ -79,12 +80,8 @@
           </div>
         </div>
 
-        <!-- 创世 finalize（T36/T38）：bootstrap 收口的**触发入口**（**仅创世 su 会话**显示，默认隐藏）。
-             客户裁定（设计 §13）：完成 = **su 提议「可以收口了」→ 界面把这件事摆给客户 → 客户确认 → 才落盘**。
-             点此按钮 = 请 su 发起收口提议（T37 的 finalize 语义 = 提议、非立即完成）；提议随即以**聊天流里的
-             确认卡**呈现（提议原文 + `[确认完成]`/`[暂不]`，`renderer.js::appendFinalizeProposal`）。确认后才
-             由代码算 SHA-256、写治理边界文档 + .ans/project.json（pin）+ docs/bootstrap-manifest.md；结果如实呈现。 -->
-        <div id="bootstrap-action" class="bootstrap-action" hidden></div>
+        <!-- （A-5，2026-10-12：「完成 bootstrap」入口条已随「收口」删除——产物收尾由编排在 su 会话 settle 后
+             **自动**完成；客户确认改由聊天流里的**交互卡**承担（`renderer.js::appendOperatorRequest`）。） -->
 
         <!-- Pi 配置面板（设计 §11/T28）：设置 pi 运行时所需配置，保存到仓库根 .env。
              默认收起；点横栏的「Pi 设置」展开。token 字段掩码，且值不回显（恒空、只示「已设置/未设置」）。 -->
@@ -135,16 +132,29 @@
           </div>
         </div>
 
-        <!-- 底部输入区：只剩输入框 + 发送（客户 2026-10-11 裁定）。 -->
+        <!-- 底部输入区（K-1，2026-10-12 客户裁定：**圆角胶囊 + 发送箭头内嵌框内**；K-2：支持附加图片）。 -->
         <div class="composer">
-          <div class="composer-row">
+          <!-- 附件行（K-2）：缩略图预览 + 可移除；空时隐藏（内容由 renderer.js 渲染）。 -->
+          <div id="attach-row" class="attach-row" hidden></div>
+          <div class="capsule" id="composer-capsule">
+            <button
+              id="btn-attach-image"
+              class="cap-icon"
+              type="button"
+              title="添加图片（png / jpeg / webp / gif，≤5MB）"
+              aria-label="添加图片"
+            >
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+            </button>
             <textarea
               id="inp-message"
               rows="1"
               placeholder="输入消息，Enter 发送，Shift+Enter 换行"
               spellcheck="false"
             ></textarea>
-            <button id="btn-send" class="btn btn-primary btn-send" disabled>发送</button>
+            <button id="btn-send" class="cap-send" type="button" disabled title="发送（Enter）" aria-label="发送">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
+            </button>
           </div>
         </div>
       </main>
@@ -167,6 +177,52 @@
       </aside>
     </div>
 
+    <!-- shell 命令确认卡（M-1，2026-10-12 客户裁定「这个太丑了」→ **应用内卡片**替代原生对话框）。
+         **fail-closed**：拒绝为默认焦点；关闭（×）/ Esc / 「拒绝」= **不放行**（不会执行）。
+         命令本体 `<pre>` **逐字原文**（不折叠、可横向滚动）；argv/cwd 等技术细节**折叠**（默认收起）。
+         渲染侧只呈现主进程推来的数据面（见 preload `onShellConfirm`），不做任何判定。 -->
+    <div id="shell-confirm" class="sc-overlay" hidden>
+      <div class="sc-card" role="dialog" aria-modal="true" aria-labelledby="sc-title">
+        <div class="sc-head">
+          <span id="sc-title" class="sc-title">shell 命令请求</span>
+          <button id="sc-close" class="sc-close" type="button" title="关闭（不放行）" aria-label="关闭（不放行）">✕</button>
+        </div>
+        <pre id="sc-command" class="sc-command"></pre>
+        <p id="sc-summary" class="sc-summary" hidden></p>
+        <p id="sc-reason" class="sc-reason"></p>
+        <details id="sc-details" class="sc-details">
+          <summary>详情（argv / cwd）</summary>
+          <div class="sc-details-body">
+            <p class="sc-cwd-label">工作目录（cwd）</p>
+            <p id="sc-cwd" class="sc-cwd"></p>
+            <p class="sc-argv-label">规范化参数 argv（JSON 转义显示；引号仅为界定符）</p>
+            <pre id="sc-argv" class="sc-argv"></pre>
+            <p id="sc-reason-raw" class="sc-reason-raw" hidden></p>
+          </div>
+        </details>
+        <div class="sc-actions">
+          <button id="sc-allow" class="btn" type="button">放行执行</button>
+          <button id="sc-deny" class="btn btn-primary" type="button">拒绝</button>
+        </div>
+        <p id="sc-hint" class="sc-hint">点「拒绝」、按 Esc 或关闭本框 = 不放行（不会执行）。</p>
+      </div>
+    </div>
+
+    <!-- Markdown 渲染库（**vendored 单文件**，markdown-it 15.0.2，MIT；来源/校验见 vendor/README.md）——
+         必须先于 markdown.js（封装）加载。 -->
+    <script src="vendor/markdown-it.umd.min.js"></script>
+    <!-- Markdown 封装（库配置 + 安全约束）：**必须先于 renderer.js 加载**——
+         renderer.js 经 `window.ANSMarkdown` 取 `esc`（单一来源）与 `renderMarkdown`。 -->
+    <script src="markdown.js"></script>
+    <!-- 角色状态徽标的纯函数映射（B-3）：状态派生与文案/样式映射与渲染分离（可独立单测）。
+         同样**必须先于 renderer.js 加载**（renderer 经 `window.ANSRoleStatus` 取用）。 -->
+    <script src="role-status.js"></script>
+    <!-- 工具事件行的瘦身映射（2026-10-12 客户裁定：工具行只显示状态与目标、不显示内容）——纯函数，
+         先于 renderer.js 加载（renderer 经 `window.ANSToolRows` 取用）。 -->
+    <script src="tool-rows.js"></script>
+    <!-- 界面文案纯映射（N-1，2026-10-12：「导入项目 / 切换项目」等）——纯函数，先于 renderer.js 加载
+         （renderer 经 `window.ANSUiLabels` 取用）。 -->
+    <script src="ui-labels.js"></script>
     <script src="renderer.js"></script>
   </body>
 </html>

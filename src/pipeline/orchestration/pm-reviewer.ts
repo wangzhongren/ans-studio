@@ -73,13 +73,17 @@ export function createPmReviewer(opts: PmReviewerOptions): (input: PmReviewInput
   };
 }
 
-/** 审核提示：要求 pm **只**以固定 JSON 回复（解析交给 shell-gate 的 `parsePmVerdict`）。 */
+/** 审核提示：要求审读方**只输出固定 JSON**（解析交给 shell-gate 的 `parsePmVerdict`）。
+ *  **M-2（2026-10-12）**：提示侧收紧（只输出 JSON、字段与取值域固定、不得夹带解释/代码块围栏）——
+ *  尽力让模型产出可解析；万一仍不可解析，由 shell-gate **直接拒绝**（fail-closed，不升 (a)、不重试、不打扰客户）。 */
 export function buildPmReviewPrompt(input: PmReviewInput): string {
   return (
     `【shell 命令审核请求】\n` +
     `命令原文（逐字）：\n${input.command}\n` +
     `（规范化 argv：${JSON.stringify(input.argv)}；cwd：${input.cwd}；调用 id：${input.toolCallId}）\n\n` +
-    `请以「放行 / 拒绝 / 拿不准」三态判读该命令能否在本项目内执行，并**只**以下列 JSON 回复（不要任何多余文字）：\n` +
+    `请以「放行 / 拒绝 / 拿不准」三态判读该命令能否在本项目内执行，并**只输出下列 JSON**` +
+    `（**不得夹带任何解释文字、不得使用代码块围栏**；字段与取值域固定：verdict 只能是 allow / deny / unsure；` +
+    `reason / sessionId / model 为字符串）：\n` +
     `{"verdict":"allow|deny|unsure","reason":"简述理由","sessionId":"当前会话标识","model":"当前模型标识"}\n`
   );
 }

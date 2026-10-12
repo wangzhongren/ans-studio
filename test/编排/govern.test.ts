@@ -23,12 +23,14 @@ import { join } from "node:path";
 
 import { governCommand, resolveGovernTargetDir } from "../../src/interface/cli/govern.ts";
 import { runGovernSession } from "../../src/pipeline/orchestration/govern-session.ts";
+import type { AdapterCapabilities } from "../../src/pipeline/orchestration/run-role.ts";
 import { parseGovernArgs } from "../../src/common/编排/args.ts";
 import { listProject } from "../../src/service/role/resolve-role.ts";
 import { createFakeRuntimeAdapter } from "../../src/provider/pi/session.ts";
 import { EXIT_OK, EXIT_USAGE } from "../../src/common/编排/exit-codes.ts";
 import type { ProjectConfig } from "../../src/model/role.ts";
 import type {
+  CustomerInputFn,
   RoleSession,
   RuntimeAdapter,
   SessionEvent,
@@ -108,18 +110,41 @@ function okAdapter(): RuntimeAdapter {
   };
 }
 
+/** 恒「同意」客户通道（A-3：确认制下 writeSet 从空开始，须经确认才发行）。 */
+const confirmAllow: CustomerInputFn = (req) =>
+  req.kind === "confirm"
+    ? { outcome: "answered", value: { confirmed: true }, operatorId: "test-客户" }
+    : { outcome: "answered", value: { selected: [] }, operatorId: "test-客户" };
+
+/** 确认脚本：预览列出「将要写出的具体路径」（发行从呈现文本提取）。 */
+function confirmScript(paths: string[]): ToolCall {
+  return {
+    name: "request_confirmation",
+    args: { title: "预览并请求确认", preview: `将写出：${paths.map((p) => `\`${p}\``).join("、")}` },
+  };
+}
+
 /** 跑一次治理会话并捕获其 gate（经 deps.createAdapter 注入桩）。 */
 async function runAndCaptureGate(
   project: ProjectConfig,
-  targetRoleIds: string[]
+  targetRoleIds: string[],
+  opts: { customerInput?: CustomerInputFn; script?: ToolCall[] } = {},
 ): Promise<{ code: number; gate?: WriteGate }> {
   let gate: WriteGate | undefined;
+  const script = opts.script ?? [];
   const result = await runGovernSession(
-    { taskId: "T-GOV-1", project, targetRoleIds },
     {
-      createAdapter: (g) => {
+      taskId: "T-GOV-1",
+      project,
+      targetRoleIds,
+      ...(opts.customerInput !== undefined ? { customerInput: opts.customerInput } : {}),
+    },
+    {
+      createAdapter: (g, caps) => {
         gate = g;
-        return okAdapter();
+        return script.length > 0
+          ? createFakeRuntimeAdapter({ gate: g, script, writeRoot: project.projectRoot, customerInput: caps?.customerInput })
+          : okAdapter();
       },
     }
   );
@@ -128,19 +153,22 @@ async function runAndCaptureGate(
 
 const ROLE_X_BOUNDARY = "role: X\nentries:\n  - kind: file\n    path: src/x.ts\n    purpose: 测试角色条目\n";
 
-// —— ① 正例：gate 命中治理边界 + 条件 + writeSet ——
+// —— ① 正例：gate 命中治理边界 + 条件 + 已确认路径发行（A-3）——
 
-test("正例：治理会话 gate 命中项目治理边界 + 条件目录 + 可写集 → 角色卡/X/… 可写", async () => {
+test("正例：客户确认（预览列出路径）→ 发行进 writeSet → 角色卡/X/… 可写；未确认路径仍 F4 拒", async () => {
   await withTarget(async ({ target }) => {
     const project = fixtureProject(target);
-    const { code, gate } = await runAndCaptureGate(project, ["X"]);
+    const { code, gate } = await runAndCaptureGate(project, ["X"], {
+      customerInput: confirmAllow,
+      script: [confirmScript(["角色卡/X/role-card.md", "角色卡/X/boundary.yaml", "角色卡/X/memo.md"])],
+    });
     assert.equal(code, EXIT_OK);
     assert.ok(gate, "应构建出 gate");
-    assert.equal(gate!("角色卡/X/role-card.md").allowed, true);
+    assert.equal(gate!("角色卡/X/role-card.md").allowed, true, "已确认发行的路径应放行");
     assert.equal(gate!("角色卡/X/boundary.yaml").allowed, true);
     assert.equal(gate!("角色卡/X/memo.md").allowed, true);
 
-    // 治理边界内（角色卡/）但未列入可写集（角色 Y 未被 --role 指定）→ F4 收窄拒绝。
+    // 治理边界内（角色卡/）但**未确认发行**（角色 Y 既未被预览也未被确认）→ F4 收窄拒绝。
     const y = gate!("角色卡/Y/role-card.md");
     assert.equal(y.allowed, false);
     assert.match((y as { reason: string }).reason, /F4|writeSet/);
@@ -173,13 +201,14 @@ test("正例：治理会话真落盘建 角色卡/X/ → listProject 能枚举�
   await withTarget(async ({ target }) => {
     const project = fixtureProject(target);
     const script: ToolCall[] = [
+      confirmScript(["角色卡/X/role-card.md", "角色卡/X/boundary.yaml", "角色卡/X/memo.md"]),
       { name: "write_file", args: { path: "角色卡/X/role-card.md", content: "# 角色：X\n\n由治理会话创建。\n" } },
       { name: "write_file", args: { path: "角色卡/X/boundary.yaml", content: ROLE_X_BOUNDARY } },
       { name: "write_file", args: { path: "角色卡/X/memo.md", content: "# X 备忘录\n" } },
     ];
     const result = await runGovernSession(
-      { taskId: "T-GOV-1", project, targetRoleIds: ["X"] },
-      { createAdapter: (gate) => createFakeRuntimeAdapter({ gate, script, writeRoot: target }) }
+      { taskId: "T-GOV-1", project, targetRoleIds: ["X"], customerInput: confirmAllow },
+      { createAdapter: (gate, caps) => createFakeRuntimeAdapter({ gate, script, writeRoot: target, customerInput: caps?.customerInput }) }
     );
     assert.equal(result.code, EXIT_OK);
     assert.ok(existsSync(join(target, "角色卡", "X", "role-card.md")), "role-card.md 应落盘");
@@ -203,7 +232,7 @@ test("负例：治理会话写项目 src/ → 写之前被拒、零副作用（�
     ];
     const result = await runGovernSession(
       { taskId: "T-GOV-1", project, targetRoleIds: ["X"] },
-      { createAdapter: (gate) => createFakeRuntimeAdapter({ gate, script, writeRoot: target }) }
+      { createAdapter: (gate, caps) => createFakeRuntimeAdapter({ gate, script, writeRoot: target, customerInput: caps?.customerInput }) }
     );
     // 会话本身成功结束（该次写入被拒，不是会话失败）……
     assert.equal(result.code, EXIT_OK);
@@ -238,7 +267,7 @@ test("负例：改治理边界文件致 pin 失配 → 拒写（命令非 0，�
     ];
     const result = await runGovernSession(
       { taskId: "T-GOV-1", project, targetRoleIds: ["X"] },
-      { createAdapter: (gate) => createFakeRuntimeAdapter({ gate, script, writeRoot: target }) }
+      { createAdapter: (gate, caps) => createFakeRuntimeAdapter({ gate, script, writeRoot: target, customerInput: caps?.customerInput }) }
     );
     assert.notEqual(result.code, 0, "pin 失配 → 命令应非 0");
     assert.equal(existsSync(join(target, "角色卡", "X")), false, "pin 失配 → 不得写盘");
@@ -260,6 +289,7 @@ test("governCommand：接收并使用注入配置 + 适配器 → 运行治理�
   await withTarget(async ({ target }) => {
     const project = fixtureProject(target);
     const script: ToolCall[] = [
+      confirmScript(["角色卡/X/role-card.md", "角色卡/X/boundary.yaml"]),
       { name: "write_file", args: { path: "角色卡/X/role-card.md", content: "# 角色：X\n" } },
       { name: "write_file", args: { path: "角色卡/X/boundary.yaml", content: ROLE_X_BOUNDARY } },
     ];
@@ -272,7 +302,8 @@ test("governCommand：接收并使用注入配置 + 适配器 → 运行治理�
         pinPaths: [],
       },
       targetRoleIds: ["X"],
-      createAdapter: (gate: WriteGate) => createFakeRuntimeAdapter({ gate, script, writeRoot: target }),
+      customerInput: confirmAllow,
+      createAdapter: (gate: WriteGate, caps?: AdapterCapabilities) => createFakeRuntimeAdapter({ gate, script, writeRoot: target, customerInput: caps?.customerInput }),
     };
     const code = await governCommand(["govern", "--role", "X"], deps);
     assert.equal(code, EXIT_OK);
@@ -333,6 +364,7 @@ test("governCommand：接受位置参数目标目录（argv）→ 解析不报�
   await withTarget(async ({ target }) => {
     const project = fixtureProject(target);
     const script: ToolCall[] = [
+      confirmScript(["角色卡/X/role-card.md"]),
       { name: "write_file", args: { path: "角色卡/X/role-card.md", content: "# 角色：X\n" } },
     ];
     const deps = {
@@ -344,7 +376,8 @@ test("governCommand：接受位置参数目标目录（argv）→ 解析不报�
         pinPaths: [],
       },
       targetRoleIds: ["X"],
-      createAdapter: (gate: WriteGate) => createFakeRuntimeAdapter({ gate, script, writeRoot: target }),
+      customerInput: confirmAllow,
+      createAdapter: (gate: WriteGate, caps?: AdapterCapabilities) => createFakeRuntimeAdapter({ gate, script, writeRoot: target, customerInput: caps?.customerInput }),
     };
     // 位置参数目标目录（此处用 target 自身，写盘仍落在 project.projectRoot）不应被当作「多余参数」。
     const code = await governCommand(["govern", target, "--role", "X"], deps);

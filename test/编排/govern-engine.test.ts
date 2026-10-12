@@ -23,6 +23,7 @@ import { createFakeRuntimeAdapter } from "../../src/provider/pi/session.ts";
 import { EXIT_OK } from "../../src/common/编排/exit-codes.ts";
 import type { ProjectConfig } from "../../src/model/role.ts";
 import type {
+  CustomerInputFn,
   RoleSession,
   RuntimeAdapter,
   SessionEvent,
@@ -168,13 +169,25 @@ test("openGovernanceSession：驱动句柄（send + 事件流）能建出 角色
 test("runGovernSession：CLI 前端复用同一引擎（同一边界来源/scope）并以码返回", async () => {
   await withProject(async ({ target, project }) => {
     let gate: WriteGate | undefined;
-    const script: ToolCall[] = [{ name: "write_file", args: { path: "角色卡/X/role-card.md", content: "# 角色：X\n" } }];
+    // A-3：确认制——脚本先经 request_confirmation 预览路径、客户同意（注入放行通道），再写。
+    const script: ToolCall[] = [
+      {
+        name: "request_confirmation",
+        args: { title: "建角色 X", preview: "将写出：`角色卡/X/role-card.md`" },
+      },
+      { name: "write_file", args: { path: "角色卡/X/role-card.md", content: "# 角色：X\n" } },
+    ];
+    const confirmAllow: CustomerInputFn = () => ({
+      outcome: "answered",
+      value: { confirmed: true },
+      operatorId: "test-客户",
+    });
     const result = await runGovernSession(
-      { taskId: "T-ENG-1", project, targetRoleIds: ["X"] },
-      { createAdapter: (g) => ((gate = g), createFakeRuntimeAdapter({ gate: g, script, writeRoot: target })) },
+      { taskId: "T-ENG-1", project, targetRoleIds: ["X"], customerInput: confirmAllow },
+      { createAdapter: (g, caps) => ((gate = g), createFakeRuntimeAdapter({ gate: g, script, writeRoot: target, customerInput: caps?.customerInput })) },
     );
     assert.equal(result.code, EXIT_OK);
-    assert.ok(gate && gate!("角色卡/X/role-card.md").allowed === true, "CLI 前端 gate 同源（同一引擎）");
+    assert.ok(gate && gate!("角色卡/X/role-card.md").allowed === true, "CLI 前端 gate 同源（同一引擎；已确认发行）");
     assert.ok(existsSync(join(target, "角色卡", "X", "role-card.md")), "CLI 前端应驱动同一引擎落盘");
   });
 });

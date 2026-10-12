@@ -13,7 +13,7 @@ import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
 import type { ProjectConfig } from "../../src/model/role.ts";
 import type { RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
 import type { OrchestrationEvent, TaskHandback } from "../../src/common/编排/handback.ts";
-import type { RuntimeAdapter, SessionEvent, WriteGate } from "../../src/provider/pi/session.ts";
+import type { RuntimeAdapter, SessionEvent, WriteGate, CustomerInputFn } from "../../src/provider/pi/session.ts";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -40,17 +40,41 @@ const FAKE_LISTING: ProjectListing = {
   primaryRoleId: "A",
 };
 
-function makeFakeHandle(): { handle: RoleSessionHandle; sends: string[]; disposed: () => number } {
+function makeFakeHandle(): {
+  handle: RoleSessionHandle;
+  sends: string[];
+  disposed: () => number;
+  /** 推一条 `settled`（模拟一轮结束）并等消费循环处理完（忙态复位、队列放行）。 */
+  settle: () => Promise<void>;
+} {
   const sends: string[] = [];
   let disposed = 0;
+  const queue: SessionEvent[] = [];
   const handle: RoleSessionHandle = {
     async send(text: string): Promise<void> { sends.push(text); },
     events(): AsyncIterable<SessionEvent> {
-      return { [Symbol.asyncIterator]() { return { async next() { return { value: undefined as unknown as SessionEvent, done: true }; } }; } };
+      return {
+        [Symbol.asyncIterator]() {
+          return {
+            async next(): Promise<IteratorResult<SessionEvent>> {
+              // 轮询窗口 ~1s：够本用例的几次 send/settle 往返；之后流自然结束（消费循环退出，无泄漏）。
+              for (let i = 0; i < 200; i += 1) {
+                if (queue.length > 0) return { value: queue.shift() as SessionEvent, done: false };
+                await new Promise((r) => setTimeout(r, 5));
+              }
+              return { value: undefined as unknown as SessionEvent, done: true };
+            },
+          };
+        },
+      };
     },
     async dispose(): Promise<void> { disposed += 1; },
   };
-  return { handle, sends, disposed: () => disposed };
+  const settle = async (): Promise<void> => {
+    queue.push({ kind: "settled", summary: "一轮结束（测试替身）" } as SessionEvent);
+    await new Promise((r) => setTimeout(r, 60)); // 等消费循环：忙态复位 + 队列放行
+  };
+  return { handle, sends, disposed: () => disposed, settle };
 }
 
 test("listProject 映射为 RoleView（无 writeSet 字段）", async () => {
@@ -104,7 +128,7 @@ test("内置角色 su：RoleView 标为 builtIn，且不去读文档索引（car
 });
 
 test("openSession 点角色即开：scope undefined、导入即授权；多轮 send 透传、stop 收口", async () => {
-  const { handle, sends, disposed } = makeFakeHandle();
+  const { handle, sends, disposed, settle } = makeFakeHandle();
   let captured: { roleId: string; project: ProjectConfig; scope?: unknown } | undefined;
 
   const iface = createDesktopInterface({
@@ -133,8 +157,10 @@ test("openSession 点角色即开：scope undefined、导入即授权；多轮 s
     "acceptance 来源应如实标注",
   );
 
-  // 多轮 send：同一会话反复发
+  // 多轮 send（L-1 起）：一轮在跑时 send 会**入队**（见 message-queue.test.ts）——替身先推一条 settled
+  // 模拟第一轮结束（忙态复位），下一轮直发；「多轮透传」意图不变。
   assert.equal((await iface.sendSession({ text: "一" })).ok, true);
+  await settle();
   assert.equal((await iface.sendSession({ text: "二" })).ok, true);
   assert.deepEqual(sends, ["一", "二"]);
 
@@ -149,10 +175,11 @@ test("openSession 点角色即开：scope undefined、导入即授权；多轮 s
   assert.equal(disposed(), 1);
 });
 
-test("切换角色：open 新角色前 dispose 旧会话", async () => {
+test("切换角色（B-2）：open 新角色**不** dispose 旧会话（并存）；定向 stop 只关指定角色", async () => {
   const disposed: string[] = [];
   let created = 0;
   function makeHandle(): RoleSessionHandle {
+    const id = String(created);
     return {
       async send(): Promise<void> {},
       events(): AsyncIterable<SessionEvent> {
@@ -167,7 +194,7 @@ test("切换角色：open 新角色前 dispose 旧会话", async () => {
         };
       },
       async dispose(): Promise<void> {
-        disposed.push(String(created));
+        disposed.push(id);
       },
     };
   }
@@ -202,7 +229,12 @@ test("切换角色：open 新角色前 dispose 旧会话", async () => {
 
   assert.equal((await iface.openSession({ projectRoot: "/proj", roleId: "A", runtime: "demo" })).ok, true);
   assert.equal((await iface.openSession({ projectRoot: "/proj", roleId: "B", runtime: "demo" })).ok, true);
-  assert.deepEqual(disposed, ["1"], "第二次 open 前应 dispose 第一次的会话（计数从 1 起）");
+  assert.deepEqual(disposed, [], "B-2：切换角色**不得** dispose 旧会话（并存保活）");
+  assert.deepEqual(await iface.listLiveSessions(), ["A", "B"], "两角色都应保活（状态徽标/圆点的数据源）");
+  const stop = await iface.stopSession({ roleId: "A" });
+  assert.equal(stop.ok, true);
+  assert.deepEqual(disposed, ["1"], "定向 stop 只 dispose 指定角色（计数从 1 起）");
+  assert.deepEqual(await iface.listLiveSessions(), ["B"], "B 不受定向 stop 影响");
 });
 
 test("stopSession：无运行中会话时如实返回", async () => {
@@ -423,7 +455,7 @@ test("T20 handback 事件被外推：Interface 层的 emitEvent 收到编排的 
   ];
   const iface = createDesktopInterface({
     pickDirectory: async () => "/proj",
-    emitEvent: (ev) => events.push(ev),
+    emitEvent: (env) => events.push(env.event),
     listProjectFn: async () => FAKE_LISTING,
     openRoleSessionFn: async (): Promise<RoleSessionHandle> => {
       let i = 0;
@@ -460,19 +492,37 @@ test("T20 handback 事件被外推：Interface 层的 emitEvent 收到编排的 
   );
 });
 
-// ————— T36：创世 finalize 入口经 Interface 透传（读状态无副作用 / 显式触发原样回转）—————
+// ————— A-5（2026-10-12）：客户交互通道经 Interface 透传（仅内置治理角色会话注入）—————
 
-test("T36 getBootstrapState/finalizeBootstrap：Interface 透传会话管理器的状态与结果", async () => {
-  const fakeResult = {
-    ok: true,
-    wrote: [".ans/project.json"],
-    pins: [{ path: "角色卡/x/boundary.yaml", sha256: "a".repeat(64) }],
-    roles: ["x"],
-    projectJsonRel: ".ans/project.json",
-    manifestRel: "docs/bootstrap-manifest.md",
+test("A-5 customerInput：Interface 透传客户通道；仅内置治理角色（su）会话被注入，且 roleId 经闭包绑定", async () => {
+  const listing: ProjectListing = {
+    projectRoot: "/proj",
+    roles: [
+      {
+        roleId: "su",
+        cardPath: "",
+        boundaryPath: "",
+        cardText: "# 角色：ANS Governance（su）",
+        boundary: { entries: [], boundarySource: "<built-in:...>", acceptance: { accepted: false, source: "" } },
+        builtIn: true,
+      },
+      {
+        roleId: "A",
+        cardPath: "角色卡/A/role-card.md",
+        boundaryPath: "角色卡/A/boundary.yaml",
+        cardText: "# A",
+        boundary: {
+          entries: [{ root: "project", path: "src/a.ts", kind: "file", purpose: "p" }],
+          boundarySource: "角色卡/A/boundary.yaml",
+          acceptance: { accepted: false, source: "" },
+        },
+      },
+    ],
+    warnings: [],
+    hasRoles: false,
+    primaryRoleId: "su",
   };
-  let finalized = false;
-  const handle: RoleSessionHandle = {
+  const makeHandle = (): RoleSessionHandle => ({
     async send(): Promise<void> {},
     events(): AsyncIterable<SessionEvent> {
       return {
@@ -486,49 +536,34 @@ test("T36 getBootstrapState/finalizeBootstrap：Interface 透传会话管理器�
       };
     },
     async dispose(): Promise<void> {},
-    get settled(): boolean {
-      return false;
-    },
-    async finalize() {
-      finalized = true;
-      return fakeResult as never;
-    },
-  };
-  // 未 bootstrap 项目上的内置治理角色（创世 su 会话）——会话管理器据此开 genesisFinalize。
-  const listing: ProjectListing = {
-    projectRoot: "/proj",
-    roles: [
-      {
-        roleId: "su",
-        cardPath: "",
-        boundaryPath: "",
-        cardText: "# 角色：ANS Governance（su）",
-        boundary: { entries: [], boundarySource: "<built-in:...>", acceptance: { accepted: false, source: "" } },
-        builtIn: true,
-      },
-    ],
-    warnings: [],
-    hasRoles: false,
-    primaryRoleId: "su",
-  };
+  });
+  const captured: { roleId: string; customerInput?: CustomerInputFn }[] = [];
+  const seen: { roleId: string }[] = [];
   const iface = createDesktopInterface({
     pickDirectory: async () => "/proj",
     emitEvent: () => {},
     listProjectFn: async () => listing,
-    openRoleSessionFn: async () => handle,
+    openRoleSessionFn: async (input) => {
+      captured.push({ roleId: input.roleId, customerInput: input.customerInput });
+      return makeHandle();
+    },
     buildProjectConfigFn: buildProjectConfig,
+    // 桌面侧的客户通道带角色上下文（DesktopCustomerInputFn）——注入替身并断言 ctx 绑定。
+    customerInput: (_req, ctx) => {
+      seen.push({ roleId: ctx.roleId });
+      return { outcome: "declined", reason: "测试替身：拒绝" };
+    },
   });
   await iface.listProject({ projectRoot: "/proj" });
-  assert.equal((await iface.openSession({ projectRoot: "/proj", roleId: "su", runtime: "demo" })).ok, true);
+  await iface.openSession({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
+  await iface.openSession({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
 
-  const st = await iface.getBootstrapState();
-  assert.equal(st.available, true, "创世 su 会话应提供「完成 bootstrap」入口");
-  assert.equal(st.settled, false, "未 settle → settled:false");
-  assert.equal(finalized, false, "仅读入口状态**不得**触发 finalize（无副作用）");
-
-  const res = await iface.finalizeBootstrap();
-  assert.equal(finalized, true, "finalizeBootstrap 应**显式**触发句柄的 finalize");
-  assert.deepEqual(res, fakeResult, "Interface 应原样回转 finalize 结果（不改写、不伪成功）");
-  await iface.stopSession();
-  assert.equal((await iface.getBootstrapState()).available, false, "会话关闭后入口应不可用");
+  const suInput = captured.find((c) => c.roleId === "su");
+  const aInput = captured.find((c) => c.roleId === "A");
+  assert.ok(suInput && typeof suInput.customerInput === "function", "内置治理角色（su）会话应注入 customerInput（确认制成立）");
+  assert.equal(aInput!.customerInput, undefined, "普通角色会话**不**注入（无客户通道：两交互工具不注册）");
+  // roleId 经闭包绑定：调用注入的 fn → 桌面通道收到 ctx.roleId（请求本体不带角色标识）。
+  const out = await suInput!.customerInput!({ kind: "confirm", title: "要写角色卡吗？" });
+  assert.deepEqual(seen, [{ roleId: "su" }], "customerInput 应带 roleId 上下文");
+  assert.equal((out as { outcome: string }).outcome, "declined", "替身裁决原样回转");
 });

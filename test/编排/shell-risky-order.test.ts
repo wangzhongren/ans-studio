@@ -23,7 +23,7 @@ import {
   BRANCH_B_UNSURE,
   BRANCH_B_UNAVAILABLE,
   BRANCH_B_TIMEOUT,
-  BRANCH_B_BADJSON,
+  BRANCH_B_UNPARSEABLE,
   BRANCH_A_ALLOW,
   BRANCH_A_DENY,
   BRANCH_A_UNAVAILABLE,
@@ -240,14 +240,14 @@ test("次序表行 4（risky）：(b) 审读**超时** → 升 (a)；(a) 拒绝 
   assert.equal(audit.records[0].branch, "b-timeout→a-deny");
 });
 
-test("次序表行 4（risky）：(b) 判定 **JSON 非法** → 升 (a)；(a) 拒绝 → 拒绝", async () => {
+test("次序表行 4（risky，M-2 改判）：(b) 输出**不可解析** → **直接拒绝**（fail-closed；**不升 (a)、不打扰客户**）", async () => {
   const s = spies("我觉得可以吧（这不是 JSON）", "deny");
   const { gate, audit } = chain("risky", s);
   const r = await gate(REQ);
   assert.equal(r.allow, false);
-  assert.equal(s.opCalls(), 1);
-  assert.equal(audit.records[0].branch, escalateBranch(BRANCH_B_BADJSON, BRANCH_A_DENY));
-  assert.equal(audit.records[0].branch, "b-badjson→a-deny");
+  assert.equal(s.opCalls(), 0, "不可解析 → **不进 (a)**（客户裁定：这类失败不用发给我）");
+  assert.equal(audit.records[0].branch, BRANCH_B_UNPARSEABLE);
+  assert.equal(audit.records[0].branch, "b-unparseable-deny");
 });
 
 // —————————————————————— (a) 拒绝/超时/不可用/未接 → 拒绝（fail-closed） ——————————————————————
