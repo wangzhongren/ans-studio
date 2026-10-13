@@ -67,9 +67,9 @@ test("buildTaskHandback：形状正确（roleId/taskId/status/summary/evidence/a
   const hb = buildTaskHandback(events, { roleId: "X", taskId: "T-9", now: () => new Date("2026-10-11T00:00:00.000Z") });
   assert.equal(hb.roleId, "X");
   assert.equal(hb.taskId, "T-9");
-  assert.equal(hb.status, "completed");
-  assert.equal(hb.summary, "会话结束");
-  assert.deepEqual(hb.evidence, ["write_file 已获准（写入）：src/thing.ts"]);
+  assert.equal(hb.status, "unreported");
+  assert.match(hb.summary, /未提交正式任务报告/);
+  assert.deepEqual(hb.evidence, ["已写入：src/thing.ts"]);
   assert.equal(hb.at, "2026-10-11T00:00:00.000Z");
 });
 
@@ -84,7 +84,7 @@ test("buildTaskHandback：无写入被接受且有拒绝 → blocked；无 taskI
 
   // 显式覆盖 status。
   const forced = buildTaskHandback([{ kind: "settled", summary: "完成" }], { roleId: "X", status: "completed" });
-  assert.equal(forced.status, "completed");
+  assert.equal(forced.status, "unreported", "没有报告不得强制完成");
 });
 
 // —— withHandback：透传 + settled 前发 handback ——
@@ -108,7 +108,7 @@ test("withHandback：透传 SessionEvent；在 settled **之前**发 handback �
   assert.ok(hbIndex < settledIndex, "handback 应在 settled **之前**（以 settled 为终止信号的消费方才收得到）");
   const hb = (out[hbIndex] as HandbackEvent).handback;
   assert.equal(hb.roleId, "X");
-  assert.equal(hb.status, "completed");
+  assert.equal(hb.status, "unreported");
 });
 
 // —— 端到端：普通角色 settle → handback；治理角色不自我回交 ——
@@ -134,7 +134,7 @@ test("openRoleSession：普通角色 settle → 发出 handback（形状正确�
     assert.equal(hbs.length, 1, "普通角色会话应在 settle 时回交一次");
     assert.equal(hbs[0].roleId, "X");
     assert.equal(hbs[0].taskId, "T-1");
-    assert.equal(hbs[0].status, "completed");
+    assert.equal(hbs[0].status, "unreported");
     assert.equal(typeof hbs[0].at, "string");
     assert.ok(Array.isArray(hbs[0].evidence));
     await handle.dispose();
@@ -179,11 +179,7 @@ test("buildTaskHandback（C-1 噪音修正）：证据只取写类 accepted；�
     { kind: "settled", summary: "会话结束" },
   ];
   const hb = buildTaskHandback(events, { roleId: "X" });
-  assert.deepEqual(hb.evidence, [
-    "write_file 已获准（写入）：src/thing.ts",
-    "edit_file 执行完成",
-    "写入被允许：src/thing.ts（命中条目 project:src/thing.ts）",
-  ]);
+  assert.deepEqual(hb.evidence, ["已写入：src/thing.ts"], "同路径写入去重，泛化完成消息不作证据");
   // 反向断言：任何读类摘要都不得混入（本修正钉死的噪音）。
   assert.ok(!hb.evidence.some((e) => /read_file|读取/.test(e)), "读事件不得进证据");
 });
@@ -253,7 +249,7 @@ test("withHandback（C-1）：收到报告 → 回交内容=报告值（即使�
   const fallback: OrchestrationEvent[] = [];
   for await (const ev of withHandback(gen(), { roleId: "X" }, { report: () => undefined })) fallback.push(ev);
   const hb2 = (fallback.find(isHandback) as HandbackEvent).handback;
-  assert.equal(hb2.summary, "会话结束");
+  assert.match(hb2.summary, /未提交正式任务报告/);
   assert.deepEqual(hb2.evidence, [], "回退推导：只有读事件 → 证据为空");
 });
 
@@ -328,9 +324,9 @@ test("openRoleSession（C-1）：项目角色注入 reportHandback；交报告 �
     const ev2: OrchestrationEvent[] = [];
     for await (const ev of h2.events()) ev2.push(ev);
     const hb2 = (ev2.find(isHandback) as HandbackEvent).handback;
-    assert.equal(hb2.summary, "会话结束", "回退推导：summary = settled 摘要");
-    assert.equal(hb2.status, "completed");
-    assert.deepEqual(hb2.evidence, ["edit_file 执行完成"], "只取写类；读事件不进证据");
+    assert.match(hb2.summary, /未提交正式任务报告/, "没有报告明确待补");
+    assert.equal(hb2.status, "unreported");
+    assert.deepEqual(hb2.evidence, [], "没有路径的工具完成摘要不得假装产物");
     await h2.dispose();
 
     // ③ 报告形状非法 → 回退既有推导（不硬失败、不报错）。
@@ -341,8 +337,8 @@ test("openRoleSession（C-1）：项目角色注入 reportHandback；交报告 �
     const ev3: OrchestrationEvent[] = [];
     for await (const ev of h3.events()) ev3.push(ev);
     const hb3 = (ev3.find(isHandback) as HandbackEvent).handback;
-    assert.equal(hb3.summary, "会话结束", "非法报告 → 回退推导");
-    assert.equal(hb3.status, "completed");
+    assert.match(hb3.summary, /未提交正式任务报告/);
+    assert.equal(hb3.status, "unreported");
     await h3.dispose();
   } finally {
     cleanup(project);
@@ -378,28 +374,19 @@ test("renderHandbackPrompt（E-1）：字段逐条 + 明示请验收；无任务
     at: "2026-10-12T00:00:00.000Z",
   };
   const text = renderHandbackPrompt(hb);
-  const lines = text.split("\n");
-  assert.equal(lines[0], "[回交] 来自 编排 的报告（任务 T-9）");
-  assert.equal(lines[1], "结论：blocked");
-  assert.equal(lines[2], "摘要：写盘被门禁拒绝，等客户确认后继续");
-  assert.equal(lines[3], "证据：");
-  assert.equal(lines[4], "  - 角色卡/编排/report.md");
-  assert.equal(lines[5], "  - node --test 全绿");
-  assert.equal(lines[6], "请验收：确认通过 / 要求返工 / 上报客户。");
-  assert.ok(text.includes("请验收"), "必须明示请 su 验收");
-  assert.ok(!/授权|写权|权限|越权/.test(text), "不得夹带权限语义（回交只搬任务与证据）");
+  assert.ok(text.includes("[回交] 来自 编排 的报告（任务 T-9）"));
+  assert.ok(text.includes("结论：blocked"));
+  assert.ok(text.includes("摘要：写盘被门禁拒绝，等客户确认后继续"));
+  for (const evidence of hb.evidence) assert.ok(text.includes(`  - ${evidence}`));
+  assert.ok(text.includes("向客户给出统一结果"));
+  assert.ok(text.includes("实际测试结果"));
+  assert.ok(text.includes("待补报告/返工"));
+  assert.ok(!/授予.*权限|获得.*写权/.test(text), "不能授予新的权限");
+  const bare = renderHandbackPrompt({ roleId: "X", status: "unreported", summary: "未报告", evidence: [], at: hb.at });
+  assert.ok(bare.includes("任务关联未知"));
+  assert.ok(bare.includes("无可验收证据"));
+  assert.ok(bare.includes("不宣称全部角色或整个任务已完成"));
 
-  // 无 taskId → 不出现「（任务 …）」；无证据 → 如实「（无）」。
-  const bare = renderHandbackPrompt({
-    roleId: "X",
-    status: "completed",
-    summary: "完成",
-    evidence: [],
-    at: "2026-10-12T00:00:00.000Z",
-  });
-  assert.equal(bare.split("\n")[0], "[回交] 来自 X 的报告");
-  assert.ok(!bare.includes("（任务"), "无 taskId 不写任务段");
-  assert.ok(bare.includes("证据：（无）"), "无证据如实呈现");
 });
 
 test("handbackKey（X-2 稳定键）：不含时间戳——同内容不同 at 恒等；角色/任务/轮次/内容任一不同即不同", () => {

@@ -2,6 +2,21 @@
 
 > 实现报告。源码在 `app/`，归「桌面应用」角色。
 
+## 2026-10-13：诊断与显式恢复（canonical v1）
+
+main先配置唯一共享 `src/common/shared/diagnostics.ts`，路径 `app.getPath('userData')/ans/diagnostics`；滚动24小时留存由共享模块维护。窗口加载/故障/IPC、会话/回交、交互等待节点只记录白名单元信息，不保存正文、图片、命令参数或凭据；退出flush/dispose。main自己的IPC由 `createWindowIpcRegistrar` 在窗口关闭时只释放该窗口注册的通道，macOS再建窗可以正常接线。
+
+| 新内部IPC | 输入/输出与边界 |
+| --- | --- |
+| `app:renderer-diagnostic` | 页面提交固定事件名及有限元信息；宿主校验来源窗口、字段类型/限长，组件和项目上下文由main绑定，不能指定path/component/日志目录 |
+| `app:recovery-state` | 只返回宿主已知 `{projectRoot,roleId}`，无任意读取路径 |
+| `app:reload-interface` | 同窗口显式按钮动作，重新加载固定renderer文件；没有自动循环或任意导航URL |
+| `app:recovery-ready` | 恢复界面就绪后，只重推customer/shell仍pending的同id请求，不作答、不延长许可、不复活结束请求 |
+
+renderer恢复用list+select续接已有会话，不走会关闭所有句柄的loadProject。`customer-input`与`operator-channel`新增角色内部 `replayPending():number`。项目角色的 `openRoleSession` 顶层实际注入公开 `RoutineShellPolicy`，仅生效配置已接受且非built-in；su只读/未接受项目不传。精确命令匹配和b允许要求仍由编排控制，桌面不自行批准。
+
+回交状态原样显示 completed/blocked/unreported/failed/aborted；主入口不提前镜像卡片，只显示默认收起的真实投递详情和助手汇总。su队首连续回交经编排 `renderHandbackBatchPrompt` 一次投递，客户消息/派发为屏障，失败整批同序保留。公开队列/发送载荷没有扩展。验证与候选哈希见[修复记录](docs/fix/2026-10-13_fix_viewport-reports-diagnostics.md)。
+
 ## 运行
 
 ```bash

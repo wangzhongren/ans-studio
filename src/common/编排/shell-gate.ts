@@ -4,6 +4,10 @@
 // 归属：编排。仿既有 `WriteGate` 的**注入**模式——判定源与工具**解耦**：本模块产出 `ShellGate`，
 // 注入给 Pi 适配器的 `run_shell`；Pi 适配器**不含任何审核策略，只调用**它。
 //
+// 2026-10-13 客户委托修正：下面三层链是未匹配委托政策时的原规则。
+// 仅宿主 routineShellPolicy + 同项目精确常规检查 + b 明确allow 可免重复a；
+// c硬拒、su只读、b其它结果与非匹配risky均不变，绝不由模型自授。
+//
 // —— 三层审核链 (c) → (b) → (a)（§7.3/§14.2 次序表——判定顺序即交互顺序） ——
 // 客户裁定审核主体为三层组合 **(c) 确定性硬地板 + (b) pm 模型审读 + (a) 操作者确认**（§7.3）。
 // 本模块**串起三层**，映射（§7.5、§14.2 次序表）：
@@ -166,6 +170,8 @@ export type PmAskFn = (
 // 零改动。**单一来源，非第二份**（形状逐字未变）。
 
 export type { OperatorPrompt, OperatorOutcome, OperatorChannelFn };
+import { matchesDelegatedRoutineCheck, type RoutineShellPolicy } from "./routine-shell-policy.ts";
+import { createDiagnosticLogger } from "../shared/diagnostics.ts";
 
 
 // —— 常量 ——
@@ -246,6 +252,7 @@ export function normalizeShellVerdict(input: unknown): ShellVerdictPayload | und
 
 // —— 第三闸 (a) —— 触发分支（升级链：`<b 分支>→<a 分支>`，如 `b-unsure→a-allow`）。
 export const BRANCH_A_ALLOW = "a-allow"; // 操作者放行
+export const BRANCH_B_DELEGATED_ROUTINE = "b-allow→customer-delegated-routine-checks";
 export const BRANCH_A_DENY = "a-deny"; // 操作者拒绝
 export const BRANCH_A_UNAVAILABLE = "a-unavailable"; // 操作者通道不可用 / 未接入 / 报错 → 拒绝
 export const BRANCH_A_TIMEOUT = "a-timeout"; // 操作者确认超时 → 拒绝
@@ -256,6 +263,8 @@ export function escalateBranch(bBranch: string, aBranch: string): string {
 }
 
 export interface CreateShellGateOptions {
+  /** 仅诊断上下文，不参与分类授权。 */
+  projectRoot?: string;
   /** 门禁引擎的纯函数 `classifyShell`（注入）。缺失 → 一律拒绝（能力缺席即 fail-closed）。 */
   classifyShell?: ClassifyShellFn;
   /** 规则集本体，或加载器（可为异步、可抛错）。加载器抛错 → 整条命令拒绝。 */
@@ -269,6 +278,8 @@ export interface CreateShellGateOptions {
   pmAsk?: PmAskFn;
   /** (a) 操作者确认通道（注入）。缺失 / 返回 unavailable / 抛错 / 超时 → **拒绝**（§7.5）。 */
   operatorChannel?: OperatorChannelFn;
+  /** 宿主客户委托：仅匹配本项目常规检查，且 b 明确 allow 后免重复 a。 */
+  routineShellPolicy?: RoutineShellPolicy;
   /** (b) pm 审读的超时（毫秒）；缺省 = `timeoutMs`。**超时 → 升级到 (a)**，绝不视为放行。 */
   pmTimeoutMs?: number;
   /** (a) 操作者确认的超时（毫秒）；缺省 = `timeoutMs`。**超时 → 拒绝**。 */
@@ -310,6 +321,7 @@ type BOutcome =
  * 并把「拒绝」作为一切不确定情形的落点（fail-closed）。
  */
 export function createShellGate(opts: CreateShellGateOptions): ShellGate {
+  const log = createDiagnosticLogger({ component: "orchestration.shell-gate", projectRoot: opts.projectRoot ?? opts.routineShellPolicy?.projectRoot });
   const env = opts.env ?? process.env;
   const timeoutMs = opts.timeoutMs ?? readTimeoutMs(env, SHELL_REVIEW_TIMEOUT_ENV, DEFAULT_SHELL_REVIEW_TIMEOUT_MS);
   const pmTimeoutMs = opts.pmTimeoutMs ?? timeoutMs;
@@ -445,6 +457,13 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
       // `risky`（mustPassA）：**b 判放行亦须过 (a)**（§14.2 要害——pm 非终审）；升 (a) 的分支成 `b-allow→a-…`。
       // `review`：b 明确放行即**终结**（不打扰人）——与 risky 的分水岭就在这里。
       if (mustPassA) {
+        if (matchesDelegatedRoutineCheck(req.argv, req.cwd, opts.routineShellPolicy)) {
+          log.record("shell.routine.delegated", { toolCallId: req.toolCallId, authorizationSource: opts.routineShellPolicy?.authorizationSource });
+          return {
+            result: { allow: true, by: `${b.by} → customer-delegated-routine-checks` },
+            conclusion: "allow", branch: BRANCH_B_DELEGATED_ROUTINE,
+          };
+        }
         return await runA(req, {
           bBranch: BRANCH_B_ALLOW,
           bAttr: b.by,
@@ -464,6 +483,7 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
 
   /** 第二闸 (b)：把命令原文交注入的 pm 审读；拿不准或不可用即升级（绝不视为放行，§7.5）。 */
   async function runB(req: ShellGateRequest): Promise<BOutcome> {
+    log.record("shell.review.start", { toolCallId: req.toolCallId });
     if (typeof opts.pmAsk !== "function") {
       // 无 pm 会话 → 升级到 (a)（"绝不视为放行"，§7.5）。
       return { kind: "escalate", bBranch: BRANCH_B_UNAVAILABLE, bAttr: "pm:无会话", why: "未接入 pm 审读会话" };
@@ -510,6 +530,7 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
     req: ShellGateRequest,
     b: { bBranch: string; bAttr: string; why: string },
   ): Promise<ReviewOutcome> {
+    log.record("shell.operator.requested", { toolCallId: req.toolCallId, reasonCode: b.bBranch });
     // 通道未接入 → 拒绝（不是放行）。
     if (typeof opts.operatorChannel !== "function") {
       return denyOutcome(
@@ -593,6 +614,7 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
 
     // 审计留痕（§7.6）：放行/拒绝都记；含所需字段与声明的条件。审计失败**不翻转**判定
     //（判定已完成且确定），但如实上报到 stderr，绝不静默。
+    log.record("shell.review.end", { toolCallId: req.toolCallId, decision: outcome.conclusion, reasonCode: outcome.branch });
     await audit(req, outcome, now());
     return outcome.result;
   };
@@ -640,6 +662,7 @@ export interface ShellGateBuildDeps {
   pmAsk?: PmAskFn;
   /** (a) 操作者确认通道（注入）。缺省 → (a) 不可用 → 拒绝。桌面端由桌面应用角色提供。 */
   operatorChannel?: OperatorChannelFn;
+  routineShellPolicy?: RoutineShellPolicy;
   /** (b) 审读超时（毫秒）；缺省 = `timeoutMs`。 */
   pmTimeoutMs?: number;
   /** (a) 确认超时（毫秒）；缺省 = `timeoutMs`。 */
@@ -674,11 +697,13 @@ export function buildShellGate(deps: ShellGateBuildDeps): ShellGate {
       }),
     });
   return createShellGate({
+    projectRoot: deps.projectRoot,
     classifyShell: deps.classifyShell,
     rules: deps.rules,
     audit,
     pmAsk: deps.pmAsk,
     operatorChannel: deps.operatorChannel,
+    routineShellPolicy: deps.routineShellPolicy,
     pmTimeoutMs: deps.pmTimeoutMs,
     operatorTimeoutMs: deps.operatorTimeoutMs,
     timeoutMs: deps.timeoutMs,

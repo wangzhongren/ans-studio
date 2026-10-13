@@ -11,12 +11,19 @@ import assert from "node:assert/strict";
 
 import { SessionManager } from "../../app/desktop/session.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
-import { renderHandbackPrompt, type TaskHandback } from "../../src/common/编排/handback.ts";
+import { renderHandbackPrompt, renderHandbackBatchPrompt, type TaskHandback } from "../../src/common/编排/handback.ts";
 import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
 import type { RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
 
 const tick = (ms = 60) => new Promise((r) => setTimeout(r, ms));
+async function waitUntil(predicate: () => boolean): Promise<void> {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    if (predicate()) return;
+    await tick(5);
+  }
+  assert.fail("等待实际事件超时");
+}
 
 const HANDBACK_A1: TaskHandback = {
   roleId: "A",
@@ -64,10 +71,11 @@ interface Harness {
   sent: Record<string, string[]>;
   envelopes: { roleId: string; event: OrchestrationEvent }[];
   openCalls: string[];
+  policies: { roleId: string; policy: unknown }[];
 }
 
 /** 可脚本化假句柄：events() 从共享流拉（轮询；dispose 后立即收口）；send 记入 sent（可注入一次失败）。 */
-function makeHarness(opts: { failSuOpenAttempts?: number; failSuSendTimes?: number } = {}): Harness {
+function makeHarness(opts: { failSuOpenAttempts?: number; failSuSendTimes?: number; failReportSendTimes?: number } = {}): Harness {
   const listing = listingWithSuAndA();
   const streams: Record<string, OrchestrationEvent[]> = { su: [], A: [] };
   const sent: Record<string, string[]> = { su: [], A: [] };
@@ -76,11 +84,17 @@ function makeHarness(opts: { failSuOpenAttempts?: number; failSuSendTimes?: numb
   const stopped: Record<string, boolean> = {};
   let suOpenAttempts = 0;
   let suSendFails = opts.failSuSendTimes ?? 0;
+  let reportSendFails = opts.failReportSendTimes ?? 0;
+  const policies: { roleId: string; policy: unknown }[] = [];
 
   const makeHandle = (roleId: string): RoleSessionHandle => {
     let i = 0;
     return {
       async send(text: string): Promise<void> {
+        if (roleId === "su" && text.startsWith("[回交] ") && reportSendFails > 0) {
+          reportSendFails -= 1;
+          throw new Error("批报告投递失败");
+        }
         if (roleId === "su" && suSendFails > 0) {
           suSendFails -= 1;
           throw new Error("演示：投递通道瞬时失败");
@@ -112,6 +126,7 @@ function makeHarness(opts: { failSuOpenAttempts?: number; failSuSendTimes?: numb
 
   const mgr = new SessionManager({
     openRoleSession: async (input) => {
+      policies.push({ roleId: input.roleId, policy: input.routineShellPolicy });
       openCalls.push(input.roleId);
       if (input.roleId === "su" && (opts.failSuOpenAttempts ?? 0) > suOpenAttempts) {
         suOpenAttempts += 1;
@@ -129,7 +144,7 @@ function makeHarness(opts: { failSuOpenAttempts?: number; failSuSendTimes?: numb
     getListing: (root) => (root === "/proj" ? listing : undefined),
     emitEvent: (env) => envelopes.push(env),
   });
-  return { mgr, streams, sent, envelopes, openCalls };
+  return { mgr, streams, sent, envelopes, openCalls, policies };
 }
 
 test("E-1 投递：A 的回交到达 → **自动开启 su** 并把 `renderHandbackPrompt` 原文投给 su（单一来源）", async () => {
@@ -163,7 +178,7 @@ test("E-1 去重：同一条回交重复到达（重放）→ **只投递一次*
   await h.mgr.stop(null);
 });
 
-test("E-1 排队：su 忙（有轮次在跑）→ 入队；su settle 后**按序**逐条投递（绝不并发 send）", async () => {
+test("E-1 排队：su 忙时保留，settle 后连续回交按原序合成一次验收输入", async () => {
   const h = makeHarness();
   await h.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
   await tick(30);
@@ -179,16 +194,75 @@ test("E-1 排队：su 忙（有轮次在跑）→ 入队；su settle 后**按序
 
   h.streams.su.push({ kind: "settled", summary: "su 一轮结束" });
   await tick(120);
-  assert.deepEqual(h.sent.su.slice(1), [renderHandbackPrompt(HANDBACK_A1)], "settle 后先投第 1 条（按到达序）");
+  assert.deepEqual(h.sent.su.slice(1), [renderHandbackBatchPrompt([HANDBACK_A1, HANDBACK_A2])], "settle 后同一输入含两份报告且顺序保持");
 
   h.streams.su.push({ kind: "settled", summary: "su 又一轮结束" });
   await tick(120);
   assert.deepEqual(
     h.sent.su.slice(1),
-    [renderHandbackPrompt(HANDBACK_A1), renderHandbackPrompt(HANDBACK_A2)],
-    "再 settle 后投第 2 条——**按序、不并发**"
+    [renderHandbackBatchPrompt([HANDBACK_A1, HANDBACK_A2])],
+    "再 settle 不重复投递原批次"
   );
   await h.mgr.stop(null);
+});
+
+test("连续回交投递失败：整批保留同序，重试送达一次，原报告键不丢", async () => {
+  const harness = makeHarness({ failReportSendTimes: 1 });
+  try {
+    await harness.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
+    await harness.mgr.send("先忙");
+    await harness.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+    harness.streams.A.push({ kind: "handback", summary: "one", handback: HANDBACK_A1 }, { kind: "handback", summary: "two", handback: HANDBACK_A2 });
+    await waitUntil(() => harness.envelopes.filter((envelope) => envelope.event.kind === "handback").length === 2);
+    harness.streams.su.push({ kind: "settled", summary: "释放" });
+    await waitUntil(() => harness.envelopes.some((envelope) => envelope.event.summary.includes("批报告投递失败")));
+    assert.deepEqual(harness.sent.su, ["先忙"]);
+    harness.streams.A.push({ kind: "handback", summary: "duplicate", handback: { ...HANDBACK_A1 } }, { kind: "handback", summary: "duplicate", handback: { ...HANDBACK_A2 } });
+    harness.streams.A.push({ kind: "settled", summary: "触发重试" });
+    await waitUntil(() => harness.sent.su.length === 2);
+    assert.deepEqual(harness.sent.su.slice(1), [renderHandbackBatchPrompt([HANDBACK_A1, HANDBACK_A2])]);
+    harness.streams.su.push({ kind: "settled", summary: "完成" });
+    await waitUntil(() => harness.envelopes.some((envelope) => envelope.event.summary === "完成"));
+    assert.equal(harness.sent.su.length, 2, "同轮重放未重新入队，批次没有丢失/重复");
+  } finally {
+    await harness.mgr.stop(null);
+  }
+});
+
+test("客户消息屏障：A报告→客户消息→B报告，不跨消息合批或改变顺序", async () => {
+  const harness = makeHarness();
+  try {
+    await harness.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
+    await harness.mgr.send("先忙");
+    await harness.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+    harness.streams.A.push({ kind: "handback", summary: "one", handback: HANDBACK_A1 });
+    await waitUntil(() => harness.envelopes.some((envelope) => envelope.event.kind === "handback"));
+    await harness.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
+    assert.equal((await harness.mgr.send("客户屏障")).queued, true);
+    harness.streams.A.push({ kind: "handback", summary: "two", handback: HANDBACK_A2 });
+    await waitUntil(() => harness.envelopes.filter((envelope) => envelope.event.kind === "handback").length === 2);
+    for (let round = 0; round < 3; round += 1) {
+      harness.streams.su.push({ kind: "settled", summary: "放行" });
+      await waitUntil(() => harness.sent.su.length === round + 2);
+    }
+    assert.deepEqual(harness.sent.su.slice(1), [renderHandbackPrompt(HANDBACK_A1), "客户屏障", renderHandbackPrompt(HANDBACK_A2)]);
+  } finally {
+    await harness.mgr.stop(null);
+  }
+});
+
+test("常规检查宿主政策实际注入项目角色，su不接委托免确认", async () => {
+  const harness = makeHarness();
+  try {
+    await harness.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+    await harness.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
+    assert.deepEqual(harness.policies, [
+      { roleId: "A", policy: { enabled: true, projectRoot: "/proj", authorizationSource: "customer-delegated-routine-checks" } },
+      { roleId: "su", policy: undefined },
+    ]);
+  } finally {
+    await harness.mgr.stop(null);
+  }
 });
 
 test("E-1 开启失败：如实系统行（含原因与重试时机）+ **保留回交**；下次时机成功投递（绝不静默丢）", async () => {

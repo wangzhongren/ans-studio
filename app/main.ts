@@ -42,11 +42,17 @@ import { createCustomerInputChannel } from "./desktop/customer-input.ts";
 import { readRoleSessionHistory, type ReplayRow } from "./desktop/session-history.ts";
 // Q-1（2026-10-12 客户「很多操作会阻碍主线程」）：热路径**合并推送**——事件按≈一帧窗口批量、角色状态快照去抖。
 import { createEventBatcher, createRoleStateDebouncer } from "./desktop/push-batcher.ts";
+import { configureDiagnostics, createDiagnosticLogger, flushDiagnostics, disposeDiagnostics } from "../src/common/shared/diagnostics.ts";
+import { observeWindowDiagnostics, recordRendererDiagnostic, createWindowIpcRegistrar, RECOVERY_PAGE } from "./desktop/diagnostics.ts";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
 let mainWindow: BrowserWindow | null = null;
 let iface: DesktopInterface | null = null;
+let recoveryProjectRoot: string | null = null;
+let recoveryRoleId: string | null = null;
+const mainDiagnostic = createDiagnosticLogger({ component: "desktop.main" });
+let showMainFailure: (() => void) | undefined;
 
 /**
  * 启动时把**仓库根 `.env`**载入 `process.env`——**这正是补上 `package.json` 里缺失的 `--env-file`**
@@ -59,7 +65,8 @@ let iface: DesktopInterface | null = null;
 async function loadDesktopEnv(): Promise<void> {
   try {
     await loadEnvFileInto(process.env, resolveRepoEnvPath());
-  } catch {
+  } catch (error) {
+    mainDiagnostic.error("app.environment.failed", error);
     // 读取失败不阻断启动；不打印值（凭据纪律，设计 §11.4）。
   }
 }
@@ -86,7 +93,6 @@ function createWindow(): BrowserWindow {
       sandbox: false,
     },
   });
-  win.loadFile(path.join(HERE, "renderer", "index.html"));
   return win;
 }
 
@@ -150,6 +156,39 @@ async function pushSessionHistories(win: BrowserWindow, projectRoot: string, rol
 }
 
 function registerIpc(win: BrowserWindow): void {
+  const registerHandler = createWindowIpcRegistrar(win, ipcMain, mainDiagnostic);
+  let showingFailure = false;
+  const showFailure = (): void => {
+    if (showingFailure || win.isDestroyed()) return;
+    showingFailure = true;
+    void win.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(RECOVERY_PAGE)).catch((error) => mainDiagnostic.error("window.recovery-page.failed", error));
+  };
+  showMainFailure = showFailure;
+  const loadInterface = async (): Promise<void> => {
+    showingFailure = false;
+    try {
+      await win.loadFile(path.join(HERE, "renderer", "index.html"));
+    } catch (error) {
+      mainDiagnostic.error("window.interface.failed", error);
+      showFailure();
+    }
+  };
+  observeWindowDiagnostics(win, mainDiagnostic, showFailure);
+  registerHandler("app:renderer-diagnostic", (event, input) => {
+    if (event.sender !== win.webContents) return { ok: false };
+    const logger = createDiagnosticLogger({ component: "desktop.renderer", projectRoot: recoveryProjectRoot ?? undefined, roleId: recoveryRoleId ?? undefined });
+    return recordRendererDiagnostic(logger, input);
+  });
+  registerHandler("app:recovery-state", (event) => {
+    if (event.sender !== win.webContents) return null;
+    return { projectRoot: recoveryProjectRoot, roleId: recoveryRoleId };
+  });
+  registerHandler("app:reload-interface", async (event) => {
+    if (event.sender !== win.webContents) return { ok: false };
+    mainDiagnostic.record("window.reload.requested");
+    await loadInterface();
+    return { ok: !showingFailure };
+  });
   // 事件外推：主进程 → 渲染进程（会话事件流）。入参为**带 `roleId` 信封**的 `SessionEventEnvelope`
   // （B-2：多会话并存，渲染侧按角色分发——不带标识会串消息）；原样透传，主进程不判定、不加工。
   // **Q-1（2026-10-12）合帧推送**：一轮可含几百个事件（tool_call/读文件/结果…），逐事件一次 IPC +
@@ -208,7 +247,13 @@ function registerIpc(win: BrowserWindow): void {
     },
   });
   win.on("closed", () => shellConfirm.rejectAllPending("窗口已关闭，未获放行（fail-closed）"));
-  ipcMain.handle("shell:confirm-response", (_e, input) => shellConfirm.respond(input));
+  registerHandler("app:recovery-ready", (event) => {
+    if (event.sender !== win.webContents) return { ok: false };
+    customerChannel.replayPending();
+    shellConfirm.replayPending();
+    return { ok: true };
+  });
+  registerHandler("shell:confirm-response", (_e, input) => shellConfirm.respond(input));
 
   // I-1（2026-10-12，客户裁定 arm——「现在开放 shell…如果 su 觉得危险可以让客户决定」）+ I-1 补丁
   // （2026-10-12 客户**重发授权**：接上 (c) 规则集实件）：arm 的**两件**——(c) 实件（`classifyShell` +
@@ -274,55 +319,64 @@ function registerIpc(win: BrowserWindow): void {
     },
   });
   iface = desktop;
+  win.on("closed", () => {
+    void desktop.stopSession({ roleId: null }).catch((error) => mainDiagnostic.error("window.sessions.close.failed", error));
+  });
 
   // 交互回包（A-5）：渲染侧提交决定 → 通道按**请求快照**校验（选项 id ⊆ 已发、单选恰一个、类型相符）
   // → 解挂为冻结三态；非法回包不受理（pending 保留，界面可重试失败后修正）。
-  ipcMain.handle("session:operator-response", (_e, input) =>
+  registerHandler("session:operator-response", (_e, input) =>
     customerChannel.respond(input && typeof input === "object" ? input : {}),
   );
 
-  ipcMain.handle("app:pick-project", () => desktop.pickProject());
+  registerHandler("app:pick-project", () => desktop.pickProject());
   // D-1（2026-10-12）：导入/重载项目后**恢复界面记录**——对每个角色只读解析 `<project>/.ans/sessions/<roleId>/`
   // 的**最近**会话并推 `session:history`（渲染侧回放进该角色的聊天流；模型上下文由 Pi适配器侧一并恢复）。
   // 防御式：解析失败/目录缺失**不阻断导入**（失败如实提示，不崩、不静默）。
-  ipcMain.handle("app:list-project", async (_e, input: { projectRoot: string }) => {
+  registerHandler("app:list-project", async (_e, input: { projectRoot: string }) => {
     const res = await desktop.listProject(input);
+    if (recoveryProjectRoot !== res.projectRoot) recoveryRoleId = null;
+    recoveryProjectRoot = res.projectRoot;
     const roles = Array.isArray(res && res.roles) ? res.roles.map((r) => r.roleId) : [];
     void pushSessionHistories(win, res.projectRoot, roles);
     return res;
   });
   // 点角色即开：一次调用直接建立会话（导入项目即授权，无确认框）。
-  ipcMain.handle("session:open", (_e, input) => desktop.openSession(input));
-  ipcMain.handle("session:send", (_e, input: { text: string; images?: unknown }) => desktop.sendSession(input));
-  ipcMain.handle("session:stop", (_e, input) => desktop.stopSession(input));
+  registerHandler("session:open", async (_e, input) => {
+    const result = await desktop.openSession(input);
+    if (result.ok && input.projectRoot === recoveryProjectRoot) recoveryRoleId = input.roleId;
+    return result;
+  });
+  registerHandler("session:send", (_e, input: { text: string; images?: unknown }) => desktop.sendSession(input));
+  registerHandler("session:stop", (_e, input) => desktop.stopSession(input));
   // P1-1（2026-10-13 客户裁定）：撤回未投递排队消息——Interface 如实回报（仅在队列中的客户消息可撤），主进程只透传。
-  ipcMain.handle("session:withdraw", (_e, input: { roleId: string; id: string }) => desktop.withdrawQueued(input));
+  registerHandler("session:withdraw", (_e, input: { roleId: string; id: string }) => desktop.withdrawQueued(input));
   // P0-2（2026-10-13 客户批准）：停当前轮次——Interface 三态如实回传（已请求停止 / 不支持 / 失败），主进程只透传。
-  ipcMain.handle("session:abort", (_e, input: { roleId: string }) => desktop.abortSession(input));
+  registerHandler("session:abort", (_e, input: { roleId: string }) => desktop.abortSession(input));
   // B-2：保活会话列表（左树「有活动会话」小圆点的数据源）——纯读。
-  ipcMain.handle("session:live", () => desktop.listLiveSessions());
+  registerHandler("session:live", () => desktop.listLiveSessions());
   // B-1：Markdown 链接外开——渲染进程输入经 Interface 校验（仅 http/https）后交系统浏览器。
-  ipcMain.handle("app:open-external", (_e, input) => desktop.openExternal(input));
+  registerHandler("app:open-external", (_e, input) => desktop.openExternal(input));
   // K-2：输入区图片——选图（主进程读文件）与粘贴/拖入字节校验（渲染进程不碰文件）；
   // P0-1（2026-10-13 客户批准）：图片已随消息端到端送进模型（session:send 带载荷，Interface 真实字节重校验）。
-  ipcMain.handle("app:pick-image", () => desktop.pickImage());
-  ipcMain.handle("app:attach-image", (_e, input) => desktop.attachImage(input));
+  registerHandler("app:pick-image", () => desktop.pickImage());
+  registerHandler("app:attach-image", (_e, input) => desktop.attachImage(input));
   // （A-5：随「收口」删除——产物收尾现由编排在 su 会话 settle 后**自动**完成；桌面不再有
   //   「完成 bootstrap」的读状态/显式触发两个 IPC；客户确认已改由交互卡承担。）
 
   // —— Pi 配置面板（设计 §11/T28）：读取/保存仓库根 `.env` ——
   // 逻辑全在 Interface 层（`getPiConfig`/`savePiConfig` → `pi-config.ts` → 共享 `env-file`）；
   // 主进程只透传。**机密键值绝不外发**（`getPiConfig` 对其恒返回空串）；保存回报只含键名。
-  ipcMain.handle("pi-config:get", () => desktop.getPiConfig());
-  ipcMain.handle("pi-config:save", (_e, input: { updates: Record<string, string> }) => desktop.savePiConfig(input));
+  registerHandler("pi-config:get", () => desktop.getPiConfig());
+  registerHandler("pi-config:save", (_e, input: { updates: Record<string, string> }) => desktop.savePiConfig(input));
 
   // —— 自绘标题栏的窗口控制（客户要求：去掉原生标题栏，自绘一条）——
   // 渲染侧右侧三个按钮经这些通道驱动窗口本体。**只做窗口操作、不含任何治理判定**（与本角色硬约束无关，
   // 不涉及边界/写权）。最大化/还原状态经 `window:maximized-changed` 反向外推，令按钮图标随之切换。
-  ipcMain.handle("window:minimize", () => {
+  registerHandler("window:minimize", () => {
     if (!win.isDestroyed()) win.minimize();
   });
-  ipcMain.handle("window:toggle-maximize", () => {
+  registerHandler("window:toggle-maximize", () => {
     if (win.isDestroyed()) return false;
     // 返回**目标**态（而非查询），避免 `maximize()` 的异步时序导致读到旧值；真实态由下方事件兜底。
     if (win.isMaximized()) {
@@ -332,10 +386,10 @@ function registerIpc(win: BrowserWindow): void {
     win.maximize();
     return true;
   });
-  ipcMain.handle("window:close", () => {
+  registerHandler("window:close", () => {
     if (!win.isDestroyed()) win.close();
   });
-  ipcMain.handle("window:is-maximized", () => (win.isDestroyed() ? false : win.isMaximized()));
+  registerHandler("window:is-maximized", () => (win.isDestroyed() ? false : win.isMaximized()));
   // 最大化/还原 → 推给渲染侧（按钮图标在「还原态」与「最大化态」间切换）。
   win.on("maximize", () => {
     if (!win.isDestroyed()) win.webContents.send("window:maximized-changed", true);
@@ -345,6 +399,7 @@ function registerIpc(win: BrowserWindow): void {
   });
 
   // —— 操作者通道 (a)：**I-1 已 arm** ——
+  void loadInterface();
   // 构造与注入已在上方（`shellOperatorChannel` → `createDesktopInterface`）完成：arm 后 (a) 通道经会话构造
   // 路径交给**编排**装配三层链 `ShellGate`，Pi 适配器据此注册 `run_shell`（**仅项目角色**；su 不接 (b)/(a)
   // ——其 shell 走只读档，复用同一份 (c) 实件经 `shellReadonly`）。
@@ -352,6 +407,8 @@ function registerIpc(win: BrowserWindow): void {
 }
 
 app.whenReady().then(async () => {
+  configureDiagnostics({ directory: path.join(app.getPath("userData"), "ans", "diagnostics") });
+  mainDiagnostic.record("app.start", { pid: process.pid });
   // 去掉默认菜单栏（那条「文件 / 编辑 / View / …」）——客户要求自绘标题栏、不要原生 chrome。
   // 这条菜单栏就是 Electron 的默认 application menu；置 null 即整条移除（Windows 上各窗口随之无菜单栏）。
   // **快捷键评估**：文本编辑类快捷键（Ctrl+C/V/X/A、撤销）由 Chromium **原生**处理，不经菜单加速键，故不受影响；
@@ -368,6 +425,25 @@ app.whenReady().then(async () => {
       mainWindow = createWindow();
       registerIpc(mainWindow);
     }
+  });
+}).catch((error) => {
+  mainDiagnostic.error("app.start.failed", error);
+  dialog.showErrorBox("应用启动失败", "界面无法启动，请查看诊断日志后重新打开。");
+});
+
+process.on("uncaughtExceptionMonitor", (error) => mainDiagnostic.error("app.uncaught-exception", error));
+process.on("unhandledRejection", (error) => {
+  mainDiagnostic.error("app.unhandled-rejection", error);
+  showMainFailure?.(); // 明确显示故障，不把被拒绝的业务当成功或自动重发。
+});
+let diagnosticsFlushed = false;
+app.on("before-quit", (event) => {
+  if (diagnosticsFlushed) return;
+  event.preventDefault();
+  mainDiagnostic.record("app.quit");
+  void flushDiagnostics().then(() => disposeDiagnostics()).finally(() => {
+    diagnosticsFlushed = true;
+    app.quit();
   });
 });
 

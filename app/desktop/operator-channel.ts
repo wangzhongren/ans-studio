@@ -62,6 +62,7 @@ import type { AssembleShellGateOptions } from "../../src/pipeline/orchestration/
 // 与编排侧（写审计）同源，故「操作者所见」与「审计所记」不可能漂移。此前本模块的**本地副本（逐字镜像）
 // 已删除**（T23 收尾）：**不得有第二份实现**。
 import { normalizeArgv } from "../../src/common/shared/argv-primitives.ts";
+import { createDiagnosticLogger } from "../../src/common/shared/diagnostics.ts";
 
 /** 默认确认超时（毫秒）。**超时 = 拒绝**（fail-closed，§7.5）。可用环境变量覆盖。 */
 export const DEFAULT_OPERATOR_CONFIRM_TIMEOUT_MS = 120000;
@@ -355,13 +356,15 @@ export interface ShellConfirmPresenter {
   rejectAllPending(_reason: string): void;
   /** 当前挂起数（测试/诊断）。 */
   pendingCount(): number;
+  replayPending(): number;
 }
 
 export function createShellConfirmPresenter(opts: CreateShellConfirmPresenterOptions): ShellConfirmPresenter {
   const env = opts.env ?? process.env;
   const cleanupAfterMs = opts.cleanupAfterMs ?? readConfirmTimeoutMs(env) + 5000;
   let seq = 0;
-  const pending = new Map<string, { resolve: (d: OperatorDecision) => void; timer: ReturnType<typeof setTimeout> }>();
+  const pending = new Map<string, { resolve: (d: OperatorDecision) => void; timer: ReturnType<typeof setTimeout>; request: ShellConfirmRequest }>();
+  const diagnostic = createDiagnosticLogger({ component: "desktop.shell-confirm" });
 
   const finish = (id: string, decision: OperatorDecision): boolean => {
     const entry = pending.get(id);
@@ -379,12 +382,14 @@ export function createShellConfirmPresenter(opts: CreateShellConfirmPresenterOpt
         const request = buildShellConfirmRequest(id, display);
         return await new Promise<OperatorDecision>((resolve) => {
           const timer = setTimeout(() => {
+            diagnostic.record("shell-confirm.expired", { requestId: id });
             pending.delete(id);
             resolve({ allow: false }); // 兜底：清理 + 不放行（判定语义以通道先到者为准）
           }, cleanupAfterMs);
-          pending.set(id, { resolve, timer });
+          pending.set(id, { resolve, timer, request });
           try {
             opts.present(request);
+            diagnostic.record("shell-confirm.presented", { requestId: id, pendingCount: pending.size });
           } catch (err) {
             clearTimeout(timer);
             pending.delete(id);
@@ -400,12 +405,26 @@ export function createShellConfirmPresenter(opts: CreateShellConfirmPresenterOpt
         return { ok: false, expired: true, error: "此确认已失效（超时或应用重启），未获放行——请让角色重新发起。" };
       }
       finish(id, { allow: req.allow === true }); // 恰 allow:true 才放行；其余一律拒绝
+      diagnostic.record("shell-confirm.responded", { requestId: id, decision: req.allow === true });
       return { ok: true };
     },
     rejectAllPending(_reason) {
       for (const id of [...pending.keys()]) finish(id, { allow: false });
     },
     pendingCount: () => pending.size,
+    replayPending() {
+      let count = 0;
+      for (const entry of pending.values()) {
+        try {
+          opts.present(entry.request);
+          count += 1;
+        } catch (error) {
+          diagnostic.error("shell-confirm.replay.failed", error, { requestId: entry.request.id });
+        }
+      }
+      diagnostic.record("shell-confirm.replayed", { count });
+      return count;
+    },
   };
 }
 

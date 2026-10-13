@@ -47,6 +47,8 @@ import type {
   DispatchTaskFn,
   OperatorChannelFn,
   PromptOptions,
+  ReportHandbackFn,
+  ReportHandbackMetadata,
 } from "../../provider/pi/session.ts";
 import { createPiRuntimeAdapter } from "../../provider/pi/session.ts";
 import {
@@ -54,6 +56,7 @@ import {
   assembleReadonlyShellGate,
   type AssembleShellGateOptions,
   type AssembleReadonlyShellGateOptions,
+  type RoutineShellPolicy,
 } from "./shell-arming.ts";
 import { formatEvent } from "../../common/编排/output.ts";
 import { withHandback, type OrchestrationEvent, type TaskReport, normalizeTaskReport } from "../../common/编排/handback.ts";
@@ -63,6 +66,7 @@ import { repinIfBootstrapped, DEFAULT_GOVERNANCE_BOUNDARY_REL } from "../../comm
 import { conditionSlugsOf, createConfirmedWriteIssuer } from "../../common/编排/confirmed-writes.ts";
 import type { RuntimeKind } from "../../common/编排/args.ts";
 import { CLI_POSITIONING } from "../../common/编排/cli-positioning.ts";
+import { createDiagnosticLogger } from "../../common/shared/diagnostics.ts";
 
 /**
  * **适配器能力面**：编排构造、随 `deps.createAdapter(gate, capabilities)` 交给适配器工厂——
@@ -90,7 +94,7 @@ import { CLI_POSITIONING } from "../../common/编排/cli-positioning.ts";
  */
 export interface AdapterCapabilities {
   customerInput?: CustomerInputFn;
-  reportHandback?: (report: TaskReport) => void | Promise<void>;
+  reportHandback?: ReportHandbackFn;
   sessionDir?: string;
   dispatchTask?: DispatchTaskFn;
   shellGate?: ShellGate;
@@ -258,6 +262,8 @@ export async function openRoleSession(
     project: ProjectConfig;
     taskId?: string;
     scope?: TaskScope;
+    /** 宿主按客户委托注入的本项目常规检查政策；项目角色三层链专用。 */
+    routineShellPolicy?: RoutineShellPolicy;
     /**
      * **客户确认制交互通道（A-1/A-3）**：前端给的原始客户通道（CLI 终端 / 桌面交互卡）。
      * **给出** ⇒ 本会话进入**确认制收窄**：编排在此之上包一层「确认 → 发行 writeSet」的发行器
@@ -318,10 +324,15 @@ export async function openRoleSession(
   },
   deps: { createAdapter: (gate: WriteGate, capabilities?: AdapterCapabilities) => RuntimeAdapter }
 ): Promise<RoleSessionHandle> {
+  const log = createDiagnosticLogger({ component: "orchestration.session", projectRoot: input.project.projectRoot, roleId: input.roleId });
+  log.record("session.open.start");
   // 角色/边界解析：失败即抛错（句柄式接口无退出码）。
   // 会话式入口：**允许** project.builtInRoles 声明的内置治理角色（桌面聊天）。
   const setup = await setupRole(input.roleId, input.project, { allowBuiltInRoles: true });
-  if (!setup.ok) throw new Error(setup.reason);
+  if (!setup.ok) {
+    log.error("session.open.failed", new Error(setup.reason));
+    throw new Error(setup.reason);
+  }
 
   // 底层只建**一个**会话：多轮 send 复用同一 RoleSession，绝不每轮重建。
   //
@@ -362,13 +373,24 @@ export async function openRoleSession(
   const suppressHandback = setup.role.kind === "built-in-governance";
 
   // 交报告（C-1）：**只给回交主体（非 su）**注入 `reportHandback`——模型经 `submit_report` 交的报告
-  // （`summary`/`evidence`/`status`）即回交事件内容；su 不注入（不自我回交）。未交 / 形状非法 →
-  // `withHandback` 回退既有推导（不硬失败）。报告暂存于本会话闭包，settle 取用。
-  let taskReport: TaskReport | undefined;
+  // （`summary`/`evidence`/`status`）正常终局优先取报告值；su 不注入。无合法报告明确未报告。
+  // 报告按运行时轮次保存，终局消费。无 metadata 的旧替身仅保留单轮兼容值。
+  const taskReports = new Map<string, TaskReport>();
+  const completedTurns = new Set<string>();
+  let legacyReport: TaskReport | undefined;
   const reportHandback = suppressHandback
     ? undefined
-    : (report: TaskReport): void => {
-        taskReport = normalizeTaskReport(report);
+    : (report: TaskReport, metadata?: ReportHandbackMetadata): void => {
+        const turnId = metadata?.turnId;
+        const normalized = normalizeTaskReport(report);
+        const invalidMetadata = metadata !== undefined && (typeof turnId !== "string" || turnId === "");
+        if (normalized === undefined || invalidMetadata || (turnId !== undefined && completedTurns.has(turnId))) {
+          log.record("report.ignored", { turnId, reasonCode: normalized === undefined ? "invalid-report" : invalidMetadata ? "invalid-turn" : "closed-turn" });
+          return;
+        }
+        if (turnId !== undefined) taskReports.set(turnId, normalized);
+        else legacyReport = normalized;
+        log.record("report.received", { turnId, state: normalized.status, reportSource: "submit_report", count: normalized.evidence?.length ?? 0 });
       };
 
   // D-1 重启恢复：本会话的**会话自持目录**（约定 `<projectRoot>/.ans/sessions/<roleId>/`）。
@@ -391,7 +413,8 @@ export async function openRoleSession(
   if (input.shellReadonly !== undefined) {
     try {
       shellGate = await assembleReadonlyShellGate({ project: input.project, ...input.shellReadonly });
-    } catch {
+    } catch (err) {
+      log.error("shell.arming.failed", err);
       shellGate = undefined; // 装配失败 ⇒ 不 arm（能力缺席 = fail-closed，run_shell 不注册）
     }
   } else if (!suppressHandback && input.shellOperatorChannel !== undefined) {
@@ -401,8 +424,10 @@ export async function openRoleSession(
         operatorChannel: input.shellOperatorChannel,
         sessionDeps: deps,
         ...(input.shellArming ?? {}),
+        ...(input.routineShellPolicy !== undefined ? { routineShellPolicy: input.routineShellPolicy } : {}),
       });
-    } catch {
+    } catch (err) {
+      log.error("shell.arming.failed", err);
       shellGate = undefined;
     }
   }
@@ -419,7 +444,14 @@ export async function openRoleSession(
     gate,
     Object.keys(capabilities).length > 0 ? capabilities : undefined,
   );
-  const session = await adapter.bindRole(setup.role);
+  let session: RoleSession;
+  try {
+    session = await adapter.bindRole(setup.role);
+  } catch (err) {
+    log.error("session.open.failed", err);
+    throw err;
+  }
+  log.record("session.open.ready");
 
   // 自动收尾的授权边界 = **本会话解析出的边界**（创世态下即治理种子边界；普通角色下即其项目
   // 边界）——与 su 同一授权。治理边界文档落点：项目未声明（如桌面创世 `path` 为空串）时用默认约定路径。
@@ -432,17 +464,26 @@ export async function openRoleSession(
   let disposed = false;
   const base: RoleSessionHandle = {
     async send(text: string, opts?: PromptOptions): Promise<void> {
+      legacyReport = undefined;
+      log.record("session.send.start");
+      try {
       // P0-1：opts **原样透传**（同一引用，不克隆不筛选——空数组=无图也原样交给会话）；
       // 不传 opts 时调用形态与旧版逐字一致（单参），行为逐字不变。
-      if (opts === undefined) {
-        await session.prompt(text);
-        return;
+        if (opts === undefined) {
+          await session.prompt(text);
+        } else {
+          await session.prompt(text, opts);
+        }
+        log.record("session.send.end");
+      } catch (err) {
+        log.error("session.send.failed", err);
+        throw err;
       }
-      await session.prompt(text, opts);
     },
     // P0-2 停当前轮次：三态如实返回（形状与语义见 RoleSessionAbortResult 的文档注释）。
     // 消费规则 = 契约 `RoleSession.abort?`：可选方法，缺席 = 该运行时不支持停止，必须如实告知。
     async abort(): Promise<RoleSessionAbortResult> {
+      log.record("session.abort.requested");
       if (session.abort === undefined) {
         return { ok: false, supported: false, error: "当前运行时不支持停止" };
       }
@@ -450,6 +491,7 @@ export async function openRoleSession(
         await session.abort();
         return { ok: true, supported: true };
       } catch (err) {
+        log.error("session.abort.failed", err);
         // SDK 报错如实转达（错误原文进 error），不吞、不谎报已停；不销毁会话。
         return { ok: false, supported: true, error: errText(err) };
       }
@@ -458,7 +500,16 @@ export async function openRoleSession(
       const stream = session.events();
       const wrapped = suppressHandback
         ? stream
-        : withHandback(stream, { roleId: setup.role.id, taskId: input.taskId }, { report: () => taskReport });
+        : withHandback(stream, { roleId: setup.role.id, taskId: input.taskId }, {
+            projectRoot: input.project.projectRoot,
+            report: (turnId) => turnId !== undefined ? taskReports.get(turnId) : legacyReport,
+            completed: (turnId) => {
+              if (turnId !== undefined) {
+                completedTurns.add(turnId);
+                taskReports.delete(turnId);
+              } else legacyReport = undefined;
+            },
+          });
       // 每轮 settle 后**自动收尾 / 自动重 pin**：创世态首次写出 `.ans`（+治理边界文档+manifest），
       // 非创世态重扫并更新 pin。best-effort：失败（如门禁拒）**不打断事件流**，如实走完本轮
       // （判定/落盘本体在 finalize.ts；失败结果由下次 settle 重试）。
@@ -473,7 +524,8 @@ export async function openRoleSession(
                   boundary: setup.role.boundary,
                   governanceBoundaryPath: govPath,
                 });
-              } catch {
+              } catch (err) {
+                log.error("session.repin.failed", err);
                 /* 自动收尾/重 pin 是 best-effort；失败不打断会话事件流 */
               }
             }
@@ -485,6 +537,10 @@ export async function openRoleSession(
     async dispose(): Promise<void> {
       if (disposed) return;
       disposed = true;
+      taskReports.clear();
+      completedTurns.clear();
+      legacyReport = undefined;
+      log.record("session.dispose");
       await session.dispose(); // 出错如实抛出（调用方在 finally 收口）
     },
   };

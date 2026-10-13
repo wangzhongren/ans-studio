@@ -217,7 +217,7 @@ test("O-1 接线钉：信号=读盘内容哈希；检查点=发言/续接/投递
   assert.ok(SESSION_SRC.includes('createHash("sha256")'), "信号 = 内容哈希（可信信号，非界面推测）");
   assert.ok(SESSION_SRC.includes("private async boundaryDiff("), "差异检查（逐文件比对）");
   assert.ok(SESSION_SRC.includes("await this.rebuildIfBoundaryStale(targetRoleId, true);"), "发言前检查（send 路径；目标角色入口定格——2026-10-13 竞态修复）");
-  assert.ok(SESSION_SRC.includes("this.rebuildIfBoundaryStale(req.roleId, userInitiated);"), "续接（点角色）路径检查");
+  assert.ok(SESSION_SRC.includes("this.rebuildIfBoundaryStale(req.roleId, userInitiated, selectionVersion);"), "续接（点角色）路径检查保持本次选择版本");
   assert.ok(
     SESSION_SRC.includes("const rebuilt = await this.rebuildIfBoundaryStale(resolvedTarget, false);"),
     "投递前检查（后台路径同样适用）"

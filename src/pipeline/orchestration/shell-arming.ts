@@ -41,6 +41,8 @@ import { createPmReviewer, type OpenSessionFn } from "./pm-reviewer.ts";
 // 仅类型（`import type` 运行期擦除）：能力面形状的单一来源在 `run-role.ts`（run-role → 本文件为值导入，
 // 本文件 → run-role 仅为类型——无运行期循环）。
 import type { AdapterCapabilities } from "./run-role.ts";
+import type { RoutineShellPolicy } from "../../common/编排/routine-shell-policy.ts";
+export type { RoutineShellPolicy } from "../../common/编排/routine-shell-policy.ts";
 
 /** 无治理边界时的审计边界（未接受 ⇒ 审计写被门禁拒，如实 stderr；**不翻转**判定）。 */
 const NO_AUDIT_BOUNDARY: BoundarySection1 = {
@@ -54,6 +56,8 @@ export interface AssembleShellGateOptions {
   project: ProjectConfig;
   /** (a) 前端操作者确认通道（桌面确认框；关窗/不答/超时 = 不放行）。 */
   operatorChannel: OperatorChannelFn;
+  /** 客户委托的常规检查政策，仅宿主提供；不会给 su 只读档。 */
+  routineShellPolicy?: RoutineShellPolicy;
   /** (c) 门禁引擎纯函数（既有件；**注入**）。未注入 ⇒ 闸一律拒绝（fail-closed）。 */
   classifyShell?: ClassifyShellFn;
   /** (c) 规则集本体或加载器（门禁引擎的数据，如 `defaultShellRules()`）；未注入 ⇒ 同上。 */
@@ -114,6 +118,7 @@ export async function assembleProjectShellGate(opts: AssembleShellGateOptions): 
       }),
     ...(pmAsk !== undefined ? { pmAsk } : {}),
     operatorChannel: opts.operatorChannel,
+    routineShellPolicy: opts.routineShellPolicy,
     ...(opts.pmTimeoutMs !== undefined ? { pmTimeoutMs: opts.pmTimeoutMs } : {}),
     ...(opts.operatorTimeoutMs !== undefined ? { operatorTimeoutMs: opts.operatorTimeoutMs } : {}),
     ...(opts.timeoutMs !== undefined ? { timeoutMs: opts.timeoutMs } : {}),

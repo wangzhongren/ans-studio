@@ -10,6 +10,10 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("desktop", {
+  reportDiagnostic: (input) => ipcRenderer.invoke("app:renderer-diagnostic", input),
+  getRecoveryState: () => ipcRenderer.invoke("app:recovery-state"),
+  recoveryReady: () => ipcRenderer.invoke("app:recovery-ready"),
+  reloadInterface: () => ipcRenderer.invoke("app:reload-interface"),
   /** 调系统文件夹选择器导入项目，返回项目根路径或 null。 */
   pickProject: () => ipcRenderer.invoke("app:pick-project"),
 

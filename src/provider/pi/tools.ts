@@ -112,6 +112,7 @@ import type {
   ShellVerdictPayload,
 } from "./session.ts";
 import type { WriteDecision } from "../../model/decision.ts";
+import type { DiagnosticLog } from "../../common/pi-adapter/lifecycle.ts";
 import { formatDenialMessage } from "../../common/pi-adapter/format-denial.ts";
 import {
   CUSTOMER_INPUT_TIMEOUT_ENV,
@@ -199,6 +200,9 @@ export interface ToolDefinition {
 
 /** buildGovernedTools 的可选参数（契约 §4 签名不变，仅加可选扩展）。 */
 export interface GovernedToolsOptions {
+  /** Captured at tool entry; never infer a late report's turn from the latest prompt. */
+  currentTurnId?: () => string | undefined;
+  diagnostics?: DiagnosticLog;
   /** read_file 解析相对路径的基准目录；缺省 process.cwd()。 */
   readRoot?: string;
   /**
@@ -573,7 +577,7 @@ function runShell(argv: string[], cwd: string, env: Record<string, string>): Pro
  * **审核与 spawn 同址**（§7.1 第 3 条）：这是**唯一** spawn 点，且**没有 token**——不再「登记票据交扩展层」，
  * 因为票据可由公开输入重算、证明不了审核发生过。此处就是每调用保证的唯一落点。
  */
-function makeRunShellTool(shellGate: ShellGate, shellCwd: string, reviewTimeoutMs: number): ToolDefinition {
+function makeRunShellTool(shellGate: ShellGate, shellCwd: string, reviewTimeoutMs: number, gate?: InteractionGate, diagnostics?: DiagnosticLog, currentTurnId?: () => string | undefined): ToolDefinition {
   const name = SHELL_TOOL_NAME;
   return {
     name,
@@ -589,12 +593,21 @@ function makeRunShellTool(shellGate: ShellGate, shellCwd: string, reviewTimeoutM
 
       // —— 唯一的命令级闸：只有恰好 allow:true 才继续（判定与执行在同一条我们的代码路径上）——
       let review: ShellReviewResult | undefined;
+      const turnId = currentTurnId?.();
+      const began = Date.now();
+      gate?.begin();
+      diagnostics?.record("shell.review.start", { turnId, toolCallId, toolName: name });
       try {
-        review = await withTimeout(shellGate({ command, argv, cwd, toolCallId }), reviewTimeoutMs, `${name} 审核`);
+        review = await withTimeout(raceAbort(Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return shellGate({ command, argv, cwd, toolCallId }); }), call.signal, `${name} 审核`), reviewTimeoutMs, `${name} 审核`);
       } catch (err) {
+        diagnostics?.error("shell.review.failed", err, { turnId, toolCallId, toolName: name });
         // 审核抛错 / 超时 → **绝不 spawn**（fail-closed；超时 = 拒绝，§7.5.2）。
         return { ok: false, message: `${name} 未执行：审核未通过（${reasonOf(err)}）` };
+      } finally {
+        gate?.end();
+        diagnostics?.record("shell.review.end", { turnId, toolCallId, toolName: name, durationMs: Date.now() - began, decision: review?.allow === true ? "allow" : "deny" });
       }
+      if (call.signal?.aborted) return { ok: false, message: `${name} 未执行：会话已中止` };
       // 恰好 allow:true 才放行；deny / undefined / 任何非明确 allow → 一律不执行（无 token 可依）。
       if (review === undefined || review === null || review.allow !== true) {
         const denied = review !== undefined && review !== null && review.allow === false ? review : undefined;
@@ -836,11 +849,12 @@ function readEvidence(args: Record<string, unknown>): string[] | undefined {
  * 悬挂防护（A-6 纪律）：用 `raceAbort`——会话中止即立即返回；本工具是**本地回交**、非交互等待，
  * 故**不设等待超时**（无可配项；不作为会以回执/抛错如实暴露）。
  */
-function makeSubmitReportTool(fn: ReportHandbackFn): ToolDefinition {
+function makeSubmitReportTool(fn: ReportHandbackFn, currentTurnId?: () => string | undefined, diagnostics?: DiagnosticLog): ToolDefinition {
   const name = SUBMIT_REPORT_TOOL_NAME;
   return {
     name,
     async handler(call) {
+      const turnId = currentTurnId?.();
       const statusRaw = call.args["status"];
       if (statusRaw !== "completed" && statusRaw !== "blocked") {
         return { ok: false, message: `${name}: status 参数非法（应为 "completed" 或 "blocked"）` };
@@ -862,14 +876,17 @@ function makeSubmitReportTool(fn: ReportHandbackFn): ToolDefinition {
       const label = `${name} 交回报告`;
       let receipt: Awaited<ReturnType<ReportHandbackFn>>;
       try {
-        receipt = await raceAbort(Promise.resolve().then(() => fn(report)), call.signal, label);
+        diagnostics?.record("report.submit.start", { turnId, toolCallId: call.toolCallId, toolName: name });
+        receipt = await raceAbort(Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return turnId === undefined ? fn(report) : fn(report, { turnId }); }), call.signal, label);
       } catch (err) {
+        diagnostics?.error("report.submit.failed", err, { turnId, toolCallId: call.toolCallId, toolName: name });
         return {
           ok: false,
           message: `${name}：报告**未能交回**（原因：${reasonOf(err)}）——请如实向客户说明，修正后可再次交回。`,
         };
       }
       if (receipt === undefined || receipt === null || receipt.ok) {
+        diagnostics?.record("report.submit.accepted", { turnId, toolCallId: call.toolCallId, toolName: name, ok: true });
         const detail =
           receipt !== undefined && receipt !== null && receipt.message !== undefined ? ` ${receipt.message}` : "";
         return {
@@ -877,6 +894,7 @@ function makeSubmitReportTool(fn: ReportHandbackFn): ToolDefinition {
           message: `${name}：报告已交回（status: ${statusRaw}）——已把你要说的话交给编排汇总。${detail}`,
         };
       }
+      diagnostics?.record("report.submit.rejected", { turnId, toolCallId: call.toolCallId, toolName: name, ok: false });
       return {
         ok: false,
         message: `${name}：报告**未能交回**（回执：${receipt.message ?? "被拒"}）——请如实向客户说明，修正后可再次交回。`,
@@ -935,7 +953,7 @@ function makeDispatchTaskTool(fn: DispatchTaskFn): ToolDefinition {
           ok: true,
           message:
             `${name}：任务已派发给「${roleId}」（status 由对方经回交报告回报）。${detail}` +
-            `注意：**派发 ≠ 授权**——对方的写权仍只来自它自己的边界与 request_confirmation 的 confirmed:true；` +
+            `注意：**派发 ≠ 授权**——对方只在自己已接受边界内执行已授权任务，普通操作无需逐次确认；新建或扩张边界、治理写集仍由 su 请求客户确认；` +
             `你不得代为授权，也不能承诺对方一定会写。`,
         };
       }
@@ -1019,7 +1037,7 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
     const shellCwd = options?.shellCwd ?? process.cwd();
     const reviewMs =
       options?.shellReviewTimeoutMs ?? readTimeoutMs(process.env, SHELL_REVIEW_TIMEOUT_ENV, DEFAULT_SHELL_REVIEW_TIMEOUT_MS);
-    tools.push(makeRunShellTool(shellGate, shellCwd, reviewMs));
+    tools.push(makeRunShellTool(shellGate, shellCwd, reviewMs, options?.interactionGate, options?.diagnostics, options?.currentTurnId));
   }
 
   // 结构性保证（设计 A-1，同 run_shell 先例）：**未注入客户通道时两交互工具根本不存在**。
@@ -1037,7 +1055,7 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
   // 只给项目角色——su 不注入即不注册（能力缺席 = 最强 fail-closed，§7.5.1 同款）。
   const reportHandback = options?.reportHandback;
   if (reportHandback !== undefined) {
-    tools.push(makeSubmitReportTool(reportHandback));
+    tools.push(makeSubmitReportTool(reportHandback, options?.currentTurnId, options?.diagnostics));
   }
 
   // 结构性保证（设计 H-1，同 run_shell / customerInput / reportHandback 先例）：
@@ -1053,5 +1071,21 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
   if (shellVerdict !== undefined) {
     tools.push(makeReportShellVerdictTool(shellVerdict));
   }
-  return tools;
+  // Observe customer waits without storing titles, previews or selected values.
+  return tools.map((tool) => {
+    if (tool.name !== REQUEST_CONFIRMATION_TOOL_NAME && tool.name !== REQUEST_CHOICE_TOOL_NAME) return tool;
+    return { ...tool, async handler(call) {
+      const turnId = options?.currentTurnId?.();
+      const began = Date.now();
+      options?.diagnostics?.record("interaction.wait.start", { turnId, toolCallId: call.toolCallId, toolName: tool.name });
+      try {
+        const result = await tool.handler(call);
+        options?.diagnostics?.record("interaction.wait.end", { turnId, toolCallId: call.toolCallId, toolName: tool.name, ok: result.ok, durationMs: Date.now() - began });
+        return result;
+      } catch (error) {
+        options?.diagnostics?.error("interaction.wait.failed", error, { turnId, toolCallId: call.toolCallId, toolName: tool.name, durationMs: Date.now() - began });
+        throw error;
+      }
+    } };
+  });
 }

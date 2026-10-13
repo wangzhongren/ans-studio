@@ -206,7 +206,7 @@ test("arm 决策（I-1 + 补丁）：DESKTOP_SHELL_GATE_ARMED === true——(c) 
     "session.ts：shellReadonly 经 openRoleSession 透传（缺省不传 ⇒ su 不 arm——能力缺席即 fail-closed）"
   );
   assert.ok(
-    /import type \{ AssembleReadonlyShellGateOptions \} from "\.\.\/\.\.\/src\/pipeline\/orchestration\/shell-arming\.ts"/.test(sessSrc),
+    /import type \{ AssembleReadonlyShellGateOptions, RoutineShellPolicy \} from "\.\.\/\.\.\/src\/pipeline\/orchestration\/shell-arming\.ts"/.test(sessSrc),
     "session.ts：只读档装配选项形状**只读导入自编排**（单一来源；不另立第二形状）"
   );
   assert.ok(
@@ -515,7 +515,7 @@ test("M-1：shell 确认**不再用原生对话框**——(a) 层为应用内卡
     mainSrc.includes('win.webContents.send("shell:confirm-request", request)'),
     "main 应把确认数据面推达渲染侧（应用内卡）"
   );
-  assert.ok(mainSrc.includes('ipcMain.handle("shell:confirm-response"'), "main 应受理决定回包");
+  assert.ok(mainSrc.includes('registerHandler("shell:confirm-response"'), "main 经窗口作用域注册器受理决定回包");
   assert.ok(mainSrc.includes("rejectAllPending") && mainSrc.includes('win.on("closed"'), "关窗 ⇒ 全部挂起不放行（fail-closed）");
   assert.ok(mainSrc.includes("buildDesktopOperatorChannel(shellConfirm.presenter)"), "arm 接线改用应用内卡 presenter");
   const preloadSrc = fs.readFileSync(path.join(APP_DIR, "preload.cjs"), "utf8");

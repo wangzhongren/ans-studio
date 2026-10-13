@@ -116,11 +116,15 @@ export function isAbortError(err: unknown): boolean {
  * - 等待期间中止 → 立即拒绝（**不等** `work` 完成）。
  *
  * 如实标注：`work`（客户通道的等待）本身**不可取消**——本函数只保证 **handler 不再悬挂**、
- * 立即以 fail-closed 结果返回；被放弃的底层等待即使之后才有回音也无监听者，无副作用。
+ * 立即以 fail-closed 结果返回；迟到回执不会恢复当前 await。底层能力自身的副作用仍由其属主负责。
  */
 export async function raceAbort<T>(work: Promise<T>, signal: AbortSignal | undefined, label: string): Promise<T> {
   if (signal === undefined) return work;
-  if (signal.aborted) throw abortError(label);
+  if (signal.aborted) {
+    // The already-created work may reject after cancellation; retain a rejection observer.
+    void work.catch(() => {});
+    throw abortError(label);
+  }
   return await new Promise<T>((resolve, reject) => {
     const onAbort = (): void => reject(abortError(label));
     signal.addEventListener("abort", onAbort, { once: true });

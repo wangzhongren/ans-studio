@@ -14,6 +14,19 @@
 
   var d = window.desktop;
   var $ = function (id) { return document.getElementById(id); };
+  function diagnose(event, fields) {
+    if (!d || typeof d.reportDiagnostic !== "function") return;
+    Promise.resolve(d.reportDiagnostic({ event: event, fields: fields || {} })).catch(function (error) {
+      console.error("诊断上报失败", error && error.name);
+    });
+  }
+  window.addEventListener("error", function (event) {
+    diagnose("renderer.error", { errorMessage: String(event.message || "界面异常"), errorType: "Error" });
+  });
+  window.addEventListener("unhandledrejection", function (event) {
+    var error = event.reason;
+    diagnose("renderer.unhandled-rejection", { errorMessage: String(error && error.message || "未处理异常"), errorType: String(error && error.name || "Error") });
+  });
 
   // Markdown 最小子集渲染器（B-1；硬约束：index.html 保证 `markdown.js` **先于本文件**加载）。
   // `esc` 也取自它——**单一来源**（本文件不再自持第二份转义实现）。缺失即显式失败，不静默降级。
@@ -346,7 +359,15 @@
     batchDirtyPanes = [];
     // **先**更新窗口（挂尾行、spacer 与实测高落定），**再**贴底——S-1 根因：修前贴底在窗口更新之前，
     // 长会话（窗口化）里 spacer 尚未增长 ⇒ 贴到「旧底」，每批差一整批高度（e2e 实测差 339px）。
-    for (var i = 0; i < dirty.length; i += 1) updateVirtualWindow(dirty[i], { preferTail: true });
+    for (var i = 0; i < dirty.length; i += 1) {
+      var preferTail = dirty[i] === forcePane || !!(streamPin && streamPin.pin === true && streamPin.pane === dirty[i]);
+      try {
+        updateVirtualWindow(dirty[i], { preferTail: preferTail });
+      } catch (error) {
+        diagnose("renderer.event-error", { errorMessage: String(error && error.message || "窗口显示失败"), errorType: String(error && error.name || "Error") });
+        setHint("部分内容显示失败，可重新点击角色恢复查看。");
+      }
+    }
     var target = null;
     if (forcePane && forcePane.parentNode === $("chat")) target = forcePane;
     else if (streamPin && streamPin.pin === true && streamPin.pane && streamPin.pane.parentNode === $("chat")) target = streamPin.pane;
@@ -457,7 +478,7 @@
     } else if (batchDepth > 0) {
       markDirtyPane(pane); // 批内：只记一次脏（flush 尾统一算窗口）
     } else {
-      updateVirtualWindow(pane, { preferTail: true });
+      updateVirtualWindow(pane, null); // 新输出先保留实际视口；确需贴底由显式 scrollBottomForced 处理。
     }
     return rec;
   }
@@ -533,6 +554,16 @@
       rl.bottom.style.height = sums2[rows.length] - sums2[last + 1] + "px";
     }
     if (wasAtBottom) $("chat").scrollTop = $("chat").scrollHeight; // 本就在底部者：高度修正后仍贴底（上翻者绝不拽）
+    var windowState = "viewport";
+    if (opts && opts.preferTail === true) windowState = "tail";
+    var visibleCount = 0;
+    var currentTop = Math.max(0, chat.scrollTop - paneTop);
+    var currentBottom = currentTop + chat.clientHeight;
+    var currentSums = rl.prefix || rebuildPrefix(rl);
+    for (var visibleIndex = first; visibleIndex <= last; visibleIndex += 1) {
+      if (currentSums[visibleIndex] < currentBottom && currentSums[visibleIndex + 1] > currentTop) visibleCount += 1;
+    }
+    diagnose("renderer.viewport", { firstRow: first, lastRow: last, count: rows.length, visibleCount: visibleCount, state: windowState });
   }
 
   // 滚动 → rAF 合帧 → 一次窗口更新（无 rAF 环境退化为立即——仅测试面）。
@@ -653,18 +684,25 @@
    * 本函数只**呈现**事件携带的结构化数据，**不作任何判定**（是否完成/是否被拦由编排给出）；
    * 「谁进谁的 pane」的分发在 `appendEvent` 里按信封 `roleId` 决定（B-2：各归各的 pane，无跨角色串扰）。
    */
-  function appendHandback(pane, hb, mirror) {
+  function appendHandback(pane, hb) {
     ensureContent(pane);
-    var blocked = hb.status === "blocked";
-    var statusLabel = blocked ? "被拦下" : "已完成";
-    var title = mirror ? "来自 " + esc(hb.roleId) + " 的报告" : "回交 su";
+    var blocked = hb.status !== "completed";
+    var statusLabel = "未知状态";
+    if (hb.status === "completed") statusLabel = "已完成";
+    else if (hb.status === "blocked") statusLabel = "被拦下";
+    else if (hb.status === "failed") statusLabel = "失败";
+    else if (hb.status === "aborted") statusLabel = "已中止";
+    else if (hb.status === "unreported") statusLabel = "未报告";
+    var title = "回交主入口";
+    if (hb.evidence !== undefined && !Array.isArray(hb.evidence)) throw new Error("报告证据形状不符");
     var evItems = hb.evidence && hb.evidence.length
       ? hb.evidence.map(function (e) { return '<li class="hb-ev">' + esc(e) + "</li>"; }).join("")
       : '<li class="hb-ev hb-ev-empty">（未提供证据）</li>';
     var meta = "角色 " + esc(hb.roleId) + (hb.taskId ? "，任务 " + esc(hb.taskId) : "");
     var card = document.createElement("div");
     // `is-blocked`：blocked 的**可见**区分（左语义色竖条 + 边色；不只靠状态文字）。
-    card.className = "msg-handback" + (mirror ? " is-mirror" : "") + (blocked ? " is-blocked" : "");
+    card.className = "msg-handback";
+    if (blocked) card.className += " is-blocked";
     card.innerHTML =
       '<div class="hb-head">' +
       '<span class="hb-ico">' + ICONS.handback + "</span>" +
@@ -899,6 +937,12 @@
         var paneTop = pane.getBoundingClientRect().top - chat.getBoundingClientRect().top + chat.scrollTop;
         chat.scrollTop = Math.max(0, paneTop + sums[rec.index] - (chat.clientHeight - rec.h) / 2);
         updateVirtualWindow(pane, null); // 归位窗口（其余行按新位置重新挂/脱）
+        // 邻近行首次实体化会修正估算高；明确定位以卡的最终真实rect校准，不能停在旧prefix坐标。
+        if (el && el.parentNode === pane) {
+          var cardBounds = el.getBoundingClientRect();
+          var viewportBounds = chat.getBoundingClientRect();
+          chat.scrollTop += cardBounds.top - viewportBounds.top - Math.max(0, (chat.clientHeight - cardBounds.height) / 2);
+        }
       }
     } else {
       el = cardElInPane(pane, requestId);
@@ -1218,12 +1262,14 @@
     var el = document.createElement("div");
     el.className = "msg msg-injected is-" + inj.kind + (isReplay ? " is-replay" : "");
     var label = inj.label + (inj.sourceRoleId ? " · 来自 " + inj.sourceRoleId : "");
+    var body = '<div class="mi-body">' + Md.renderMarkdown(inj.body) + "</div>";
+    if (inj.kind === "handback") body = '<details class="mi-report-detail"><summary>查看已投递的报告详情</summary>' + body + "</details>";
     el.innerHTML =
       '<div class="mi-head">' +
       '<span class="mi-ico">' + (inj.kind === "handback" ? ICONS.handback : ICONS.send) + "</span>" +
       '<span class="mi-chip">' + esc(label) + "</span>" +
       "</div>" +
-      '<div class="mi-body">' + Md.renderMarkdown(inj.body) + "</div>";
+      body;
     return el;
   }
 
@@ -1248,15 +1294,24 @@
     if (Array.isArray(envOrBatch)) {
       batchDepth += 1;
       try {
-        for (var i = 0; i < envOrBatch.length; i += 1) appendOneEvent(envOrBatch[i]);
+        for (var i = 0; i < envOrBatch.length; i += 1) appendEventSafely(envOrBatch[i]);
       } finally {
         batchDepth -= 1;
+        flushBatchSideEffects();
       }
-      flushBatchSideEffects();
       return;
     }
-    appendOneEvent(envOrBatch);
+    appendEventSafely(envOrBatch);
     flushBatchSideEffects();
+  }
+
+  function appendEventSafely(envelope) {
+    try {
+      appendOneEvent(envelope);
+    } catch (error) {
+      diagnose("renderer.event-error", { errorMessage: String(error && error.message || "事件显示失败"), errorType: String(error && error.name || "Error") });
+      setHint("一条事件无法显示，其余消息继续接收。");
+    }
   }
 
   /** 一轮结束（settled）时的**流式 Markdown 一次性升级**（Q-1/Q-2）：
@@ -1303,10 +1358,8 @@
       var hb = ev.handback;
       if (!hb) return;
       // 产出角色自己的聊天 → 「回交 su」卡；主入口角色 su 的聊天 → 镜像「来自 <role> 的报告」。
-      appendHandback(pane, hb, false);
-      if (state.primaryRoleId && roleId !== state.primaryRoleId) {
-        appendHandback(paneFor(state.primaryRoleId), hb, true);
-      }
+      appendHandback(pane, hb);
+      // 主入口只显示真正投递的输入详情与助手汇总；不提前镜像尚在队列中的报告。
       return; // 左树重渲染由批量收尾统一做（flushBatchSideEffects）
     }
     if (kind === "message") {
@@ -1595,6 +1648,7 @@
   }
 
   async function loadProject(projectRoot) {
+    ++roleSelectionVersion; // 换项目使旧的角色开启结果失效。
     // 换项目（fresh）：先关掉**全部**保活会话（老项目的历史**不跨项目保留**——applyListing 里重置各 pane）。
     try { await d.stopSession(null); } catch (err) { /* 关不掉不阻断导入；后续 open 会如实报错 */ }
     state.liveRoles = [];
@@ -1835,6 +1889,7 @@
     var plan = UiLabels.replayPlan(prev, rows);
     // 错误态变化（出现/消失/文案变）⇒ 全量（旧错误分隔行不残留）。
     if (prev && error !== prev.error) plan = { action: "full", from: 0 };
+    diagnose("renderer.replay", { count: rows.length, state: plan.action });
     if (plan.action === "skip") return; // 幂等：同一份历史（重推/重放）不再叠加副本——真机重复渲染修复
     var pane = paneFor(roleId);
     if (plan.action === "full" && prev) {
@@ -2004,8 +2059,11 @@
     $("btn-send").disabled = !state.sessionOpenRoleId;
   }
 
+  var roleSelectionVersion = 0;
   async function selectRole(roleId) {
-    // 同一角色重复点击 = 已在该角色的会话中（续接提示；不重建）。
+    var selectionVersion = ++roleSelectionVersion;
+    var projectRoot = state.projectRoot;
+    // 同角色显式点击仍定位，同时经后端确认会话（本地标记不能代替真实句柄）。
     if (state.sessionOpenRoleId === roleId) {
       setHint("已在该角色的会话中，直接输入消息即可。");
       // U-1：**重复点击同一角色**也是显式动作 ⇒ 行为一致（到底部；有未作答卡则滚到卡）。
@@ -2013,7 +2071,6 @@
         stickPaneToBottomOrCard(roleId);
         updateOpChip(roleId);
       }
-      return;
     }
     state.selectedRoleId = roleId;
     renderRoleTree();
@@ -2034,11 +2091,12 @@
       // 桌面**一律以 pi 发起**（客户 2026-10-11 裁定：界面不再暴露运行时选择器）。
       // B-2：切换**不再先 stop 旧会话**——引擎侧并存（各自保活、切回直接续；LRU 上限见 session.ts）。
       var res = await d.openSession({
-        projectRoot: state.projectRoot,
+        projectRoot: projectRoot,
         roleId: roleId,
         runtime: "pi",
       });
       if (loading) loading.remove();
+      if (selectionVersion !== roleSelectionVersion || state.projectRoot !== projectRoot) return;
       if (!res.ok) {
         state.sessionOpenRoleId = null;
         setState("err", "连接失败");
@@ -2057,6 +2115,7 @@
       updateControls();
       setHint(res.note || "");
       await refreshLiveRoles();
+      if (selectionVersion !== roleSelectionVersion || state.projectRoot !== projectRoot) return;
       renderRoleTree();
       // D-1 契约（pm 2026-10-12 钉死）：上下文来源文案走**唯一映射** `St.sessionContextNotice`——
       // 「dispose/LRU 后重开 = 从本地会话文件恢复（模型上下文一并恢复）」；**只有**「文件缺失/损坏 → 新建」
@@ -2077,6 +2136,7 @@
       // 会话欢迎消息经 session:event 推达，自动出现在该角色的聊天流中。
     } catch (err) {
       if (loading) loading.remove();
+      if (selectionVersion !== roleSelectionVersion || state.projectRoot !== projectRoot) return;
       state.sessionOpenRoleId = null;
       setState("err", "连接失败");
       updateControls();
@@ -2540,6 +2600,7 @@
     var role = selectedRole();
     if (!role) { setHint("请先在左侧选择角色。"); return; }
     var inp = $("inp-message");
+    var projectRoot = state.projectRoot;
     var text = inp.value.trim();
     if (!text) {
       // 仍要求**有字**（图片随消息发送，不单独发图——队列条目的正文形状钉死了非空正文）。
@@ -2557,26 +2618,34 @@
       // 防御路径：正常流程点角色即已开会话；若未开，先补开再发。
       await selectRole(role.roleId);
     }
+    // 补开失败/用户已切换时保留输入和附件，不追加假发送气泡、不调用 sendSession。
+    if (state.projectRoot !== projectRoot || state.selectedRoleId !== role.roleId || state.sessionOpenRoleId !== role.roleId) return;
+    var pane = paneFor(role.roleId);
     // H-1 附录：记「本端手发送的最近一条」——投递回显归类据此**防误伤**（手输即便字面像投递前缀，
     // 其回显也不得被当成系统投递）；普通气泡路径不受影响。
     lastManualSend = { roleId: role.roleId, text: text, at: Date.now() };
     // 带图时在用户气泡上保留**如实记录**（附件行发送成功后清空——图已定格进载荷/队列）。
-    appendUser(activePane(), images.length > 0 ? "（图片 ×" + images.length + "）" + text : text);
+    appendUser(pane, images.length > 0 ? "（图片 ×" + images.length + "）" + text : text);
     inp.value = "";
     autoGrow();
     setHint("");
     try {
       var res = await d.sendSession(text, images);
+      if (state.projectRoot !== projectRoot) return;
       if (!res.ok) {
         metaFor(role.roleId).error = true; // B-3：最近一次轮次以错误结束
-        sysRow(activePane(), "sys-call", ICONS.deny, "发送失败：" + (res.error || ""));
+        if (state.projectRoot === projectRoot && state.sessionOpenRoleId === role.roleId) {
+          state.sessionOpenRoleId = null;
+          updateControls();
+        }
+        sysRow(pane, "sys-call", ICONS.deny, "发送失败：" + (res.error || ""));
         // 拒发（如主进程校验不合格）：附件**保留在输入区**（本条没发出，可移除/压缩后重试）。
       } else if (res.queued === true) {
         // L-1：角色忙——消息**已入队**（不再直接失败）；如实提示位次。徽标/队列行由主进程真实快照驱动
         // （onRoleState），此处不自设忙态（准确性裁定）。图片**入队即定格**（排队后到投递都带原图）。
         stampLastEvent(role.roleId, "你：" + firstLine(text));
         var queuedMsg = "已入队：等它完成当前任务后处理（第 " + (res.position || 1) + " 位）。";
-        sysRow(activePane(), "sys-queue", ICONS.clock, queuedMsg);
+        sysRow(pane, "sys-queue", ICONS.clock, queuedMsg);
         setHint(queuedMsg);
         clearAttachments();
       } else {
@@ -2586,9 +2655,14 @@
       }
       renderRoleTree();
     } catch (err) {
+      if (state.projectRoot !== projectRoot) return;
       metaFor(role.roleId).error = true;
+      if (state.projectRoot === projectRoot && state.sessionOpenRoleId === role.roleId) {
+        state.sessionOpenRoleId = null;
+        updateControls();
+      }
       renderRoleTree();
-      sysRow(activePane(), "sys-call", ICONS.deny, "发送异常：" + (err && err.message ? err.message : err));
+      sysRow(pane, "sys-call", ICONS.deny, "发送异常：" + (err && err.message ? err.message : err));
     }
   }
 
@@ -2668,7 +2742,12 @@
   $("btn-send").addEventListener("click", onSend);
   // 停止入口（P0-2 UI）：忙碌时才可见（updateHaltButton 由 role-state 快照驱动）；点击三态如实行。
   $("btn-halt").addEventListener("click", onHaltClick);
+  var inputCompositionActive = false;
+  $("inp-message").addEventListener("compositionstart", function () { inputCompositionActive = true; });
+  $("inp-message").addEventListener("compositionend", function () { inputCompositionActive = false; });
   $("inp-message").addEventListener("keydown", function (e) {
+    // IME候选确认属于原生组合输入；end可能先于最后keydown，此时229仍标识IME处理。
+    if (inputCompositionActive || e.isComposing || e.keyCode === 229) return;
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSend(); }
   });
   $("inp-message").addEventListener("input", autoGrow);
@@ -2771,6 +2850,20 @@
   if (d.onRoleState) d.onRoleState(onRoleState);
 
   // 供 e2e 探针驱动（仅渲染进程内）。
+  if (d.getRecoveryState) {
+    d.getRecoveryState().then(async function (recovery) {
+      if (!recovery || !recovery.projectRoot) return;
+      var listing = await d.listProject(recovery.projectRoot);
+      applyListing(listing, true); // 恢复界面不调用 loadProject，不停止正在工作的会话。
+      var roleId = recovery.roleId || state.primaryRoleId;
+      if (roleId && state.roles.some(function (role) { return role.roleId === roleId; })) await selectRole(roleId);
+      if (d.recoveryReady) await d.recoveryReady(); // 只重推仍pending的同id请求，不作答。
+      diagnose("renderer.recovery", { state: "ready" });
+    }).catch(function (error) {
+      diagnose("renderer.event-error", { errorMessage: String(error && error.message || "界面恢复失败") });
+      setHint("界面恢复失败，可重新选择项目或角色。");
+    });
+  }
   window.__ansRenderer = {
     state: state,
     loadProject: loadProject,

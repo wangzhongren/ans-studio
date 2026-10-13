@@ -20,6 +20,12 @@ ans role run 订单服务 --task T-123
 
 > 上述命令名与参数已由冻结契约 `2026-10-11_design_ans-cli-v1-prototype.md` §5–§7 确定，并在 `src/index.ts` 实现：`ans role run` 已全链路跑通，`ans govern` 为最小占位链路，另有 `ans doctor` / `ans help`。见 README。
 
+## 当前诊断与任务收口
+
+桌面、Pi适配器和编排共同使用项目管理主属的 `src/common/shared/diagnostics.ts`，诊断日志固定滚动保留24小时，默认目录为Electron userData下 `ans/diagnostics`。关键事件只记录净化后的元数据；各角色不另建存储。接口、时钟清理和消费方见[共享组件目录](architecture/shared-components.md)。
+
+角色回交按实际turnId关联正式报告，失败、超时、中止和未报告不再推导为已完成。桌面把主入口队首连续已到达报告合成一次验收输入，遇客户消息/派发保持FIFO边界；su依据已收到的证据对客户汇总，不猜未知任务收齐。已授权项目的精确常规检查在审核明确允许后自动执行，既有硬拒与其它审核链保持。聊天视口和显式卡定位、故障恢复的实现与验证见[本次统一记录](design/2026-10-13_design_runtime-diagnostics-and-reporting.md)。
+
 ## 角色与职责（已验收）
 
 本项目有 7 个角色，固定身份、各自独立上下文。每个角色位于 `角色卡/<角色>/`，含 `role-card.md`、`boundary.yaml`、`memo.md` 与 `docs/`。

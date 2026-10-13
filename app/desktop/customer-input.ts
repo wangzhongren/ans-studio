@@ -36,6 +36,7 @@ export type { CustomerInputRequest, CustomerInputOutcome, CustomerInputFn };
 // 须按其时序锚点落位）。请求本体（kind/title）与回放侧（session-history.ts 解析的 toolCall 块）两侧
 // 各自用同一函数拼键，渲染侧据此把卡锚定回「调用工具 request_confirmation」附近。只读导入、不复制。
 import { interactionAnchorKey } from "./request-anchor.ts";
+import { createDiagnosticLogger } from "../../src/common/shared/diagnostics.ts";
 
 /** 推给渲染侧的交互请求载荷（IPC `session:operator-request` 的形状，主→渲）。 */
 export interface OperatorRequestPayload {
@@ -93,6 +94,7 @@ export interface CustomerInputChannel {
   rejectAllPending(reason: string): void;
   /** 当前挂起数（测试/如实呈现用）。 */
   pendingCount(): number;
+  replayPending(): number;
 }
 
 /**
@@ -113,7 +115,8 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
   const operatorId =
     typeof opts.operatorId === "string" && opts.operatorId.trim() !== "" ? opts.operatorId : "unknown";
   let seq = 0;
-  const pending = new Map<string, { resolve: (o: CustomerInputOutcome) => void; request: CustomerInputRequest }>();
+  const pending = new Map<string, { resolve: (o: CustomerInputOutcome) => void; request: CustomerInputRequest; payload: OperatorRequestPayload }>();
+  const diagnostic = createDiagnosticLogger({ component: "desktop.customer-input" });
 
   const customerInput: DesktopCustomerInputFn = (req, ctx) =>
     new Promise<CustomerInputOutcome>((resolve) => {
@@ -123,18 +126,22 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
         return;
       }
       const id = opts.nextId ? opts.nextId() : `op-${++seq}`;
-      pending.set(id, { resolve, request: req });
+      const payload = { id, roleId: String((ctx && ctx.roleId) || ""), request: req, anchorKey: interactionAnchorKey(req.kind, req.title) };
+      pending.set(id, { resolve, request: req, payload });
       try {
-        opts.presenter({ id, roleId: String((ctx && ctx.roleId) || ""), request: req, anchorKey: interactionAnchorKey(req.kind, req.title) });
+        opts.presenter(payload);
+        diagnostic.record("interaction.presented", { requestId: id, pendingCount: pending.size });
       } catch (err) {
+        diagnostic.error("interaction.present.failed", err, { requestId: id });
         // 推不达（窗口已关等）→ 未获同意（fail-closed），不留悬案。
         pending.delete(id);
         resolve({ outcome: "declined", operatorId, reason: `客户交互请求未能送达界面：${reasonOf(err)}` });
       }
     });
 
-  function respond(input: { id?: unknown; decision?: unknown }): { ok: boolean; error?: string; expired?: boolean } {
+  function respondUnsafe(input: { id?: unknown; decision?: unknown }): { ok: boolean; error?: string; expired?: boolean } {
     const id = input && typeof input.id === "string" ? input.id : "";
+    diagnostic.record("interaction.response", { requestId: id });
     const entry = pending.get(id);
     if (!entry) {
       // 终态：该 id 已无挂起请求——G-1 起只剩「应用关闭/重启清空了未决请求」这一种真实原因（无按时间超时）。
@@ -194,13 +201,33 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
   }
 
   function rejectAllPending(reason: string): void {
+    diagnostic.record("interaction.closed", { pendingCount: pending.size });
     for (const [, entry] of pending) {
       entry.resolve({ outcome: "declined", operatorId, reason });
     }
     pending.clear();
   }
 
-  return { customerInput, respond, rejectAllPending, pendingCount: () => pending.size };
+  function respond(input: { id?: unknown; decision?: unknown }): { ok: boolean; error?: string; expired?: boolean } {
+    const result = respondUnsafe(input);
+    diagnostic.record("interaction.response.end", { ok: result.ok, requestId: input?.id, pendingCount: pending.size });
+    return result;
+  }
+
+  function replayPending(): number {
+    let count = 0;
+    for (const entry of pending.values()) {
+      try {
+        opts.presenter?.(entry.payload);
+        count += 1;
+      } catch (error) {
+        diagnostic.error("interaction.replay.failed", error, { requestId: entry.payload.id });
+      }
+    }
+    diagnostic.record("interaction.replayed", { count });
+    return count;
+  }
+  return { customerInput, respond, rejectAllPending, pendingCount: () => pending.size, replayPending };
 }
 
 function reasonOf(err: unknown): string {

@@ -1,36 +1,13 @@
-// src/common/编排/handback.ts
-// `TaskHandback`（角色完成回交 su）——事件类型 + 「settle → handback 事件」的编排。
-//
-// 设计 §10.8（客户原话「其他的角色完成了要返回给 su」）：角色会话**完成一个任务**时，产出一份
-// **结构化回交**，交回 su（治理会话），由 su 汇总向客户汇报：
-//   `{ roleId, taskId?, status: "completed" | "blocked", summary, evidence: string[], at }`
-//
-// —— 与 SKILL.md 一致（务必守住的语义）——
-// 跨角色**转移的是「任务与证据」，不是「身份或写权」**（SKILL.md 的交接语义）。故回交**只搬证据**
-// （产物路径 / 变更 / 测试结论），角色**不因回交获得 su 的权限**，su **也不因此获得角色的写权**。
-// 本模块只**携带数据**，不做任何权限提升。
-//
-// —— V1 范围（§10.8）——
-// V1 = **事件 + 界面呈现**：角色会话 **settle** → 编排发一个 `handback` 事件；卡片渲染与镜像进 su
-// 归**桌面应用（T17）**。**自动的多角色派发-回收**（su 派给多个角色、逐一收回、汇总）= 依赖二期
-// S1（派发执行），**本轮不做**——本模块**不含派发引擎**，只在既有会话事件流上挂一条回交事件。
-//
-// —— C-1（2026-10-12）：交报告优先 ——
-// 客户裁定「新增交报告工具」：项目角色经 `submit_report` 交出的报告（`TaskReport`，形状见下）**即回交
-// 事件内容**（`summary`/`evidence`/`status` 取报告值；工具与注入能力 `reportHandback` 在 Pi适配器侧
-// 「注入才注册」，只有回交主体——非 su 的项目角色——才被 `run-role.ts` 注入）；**未交 / 形状非法则回退
-// 既有推导**（`buildTaskHandback`），不硬失败。回退推导同时**修正一个既有噪音缺陷**：证据只取**写类**
-// 被接受事件，不再把 `read_file 执行完成` 之类的读事件混入（见 `isWriteAccepted`）。
-//
-// —— 落点与形状约束 ——
-// `SessionEvent` 是契约 §4 冻结类型（定义在 Pi适配器 `src/provider/pi/session.ts`），其 `kind` 联合
-// **不可在本角色扩**。故回交事件是本角色定义的**编排层事件** `HandbackEvent`，与 `SessionEvent` 组成
-// `OrchestrationEvent` 联合——由编排的会话入口（`openRoleSession`）在 `settled` 时追加，**不另立第二份
-// 会话事件类型**。
+// 编排主属：项目角色回交给主入口的真实结果与统一输入文案。
+// 2026-10-13：detail.turnId 关联正式报告与事件；终局 outcome 压过成功声明；
+// 未交报告明确 unreported/blocked，证据只取可定位的成功文件，不以 settled 推导完成。
+// 回交只搬任务与证据，不转移角色身份或写权限；su 不向自己回交。
+// SessionEvent.kind 仍由 Pi 的冻结契约维护，handback 仅为编排附加事件。
 
 import type { SessionEvent, DispatchTaskPayload } from "../../provider/pi/session.ts";
 import type { ProjectConfig } from "../../model/role.ts";
 import { createHash } from "node:crypto";
+import { createDiagnosticLogger } from "../shared/diagnostics.ts";
 
 /** 角色完成一次任务后的结构化回交（设计 §10.8）。 */
 export interface TaskHandback {
@@ -38,28 +15,25 @@ export interface TaskHandback {
   roleId: string;
   /** 关联任务 id（可选：无任务的 chat 会话不填）。 */
   taskId?: string;
-  /** 结论：completed = 正常完成；blocked = 被拦下（无任何写入被接受、且有拒绝）。 */
-  status: "completed" | "blocked";
-  /** 一句话结论（缺省取 settled 事件的摘要）。 */
+  /** 正式报告结论或真实未报告/失败/中止状态；settled 不代表任务 completed。 */
+  status: "completed" | "blocked" | "unreported" | "failed" | "aborted";
+  /** 任务结果或明确的未完成原因，不能以“会话结束”当结论。 */
   summary: string;
   /** 证据（产物路径 / 变更 / 测试结论）——**只搬证据，不搬身份与写权**。 */
   evidence: string[];
   /** 产出时间（ISO 8601）。**仅供展示**——不参与去重键（X-2：含时间戳的键判重不稳）。 */
   at: string;
-  /**
-   * **会话内轮次序号**（1 起；由 `withHandback` 按「settle 突发」计数后写入）——供 `handbackKey` 的
-   * **稳定去重键**区分两类貌合神离的情况：**同轮重放/重复 settled**（同 `round` ⇒ 恒等键 ⇒ 判重）与
-   * **新轮真返工**（`round` 递增 ⇒ 键不同 ⇒ 照常各自投递，即便文本逐字相同）。**不含任何时间信息**；
-   * 不进入投递文案（`renderHandbackPrompt` 不呈现）。
-   */
+  /** 收口顺序号，供缺少运行时metadata的旧替身使用；真实轮次去重优先turnId。 */
   round?: number;
+  /** 运行时提供的真实轮次标识，跨会话重开也不混淆。 */
+  turnId?: string;
 }
 
 /**
  * **模型交的报告**（C-1，设计 `2026-10-12_design_governed-interaction-and-chat-ux.md` §C-1）：
  * 项目角色经 `submit_report` 工具主动交出的结论——`summary` 是模型自己写的「改了什么」，
  * `evidence` 是产物路径 / 变更 / 测试结论。**交给编排后即成为 `TaskHandback` 的内容**
- * （`summary`/`evidence`/`status` 取报告值）；未调用则回退既有推导。
+ * （`summary`/`evidence`/`status` 取报告值）；未调用则明确未报告。
  *
  * 形状与工具契约 `submit_report{ status, summary, evidence? }` 一致（契约家在 Pi适配器
  * `src/provider/pi/session.ts`；此处按**结构**一致对齐——编排不导入其内部实现，见 §6）。
@@ -85,62 +59,50 @@ export type OrchestrationEvent = SessionEvent | HandbackEvent;
 export interface HandbackContext {
   roleId: string;
   taskId?: string;
-  /** 覆盖结论；缺省按事件流推断（无写入被接受且有拒绝 → blocked，否则 completed）。 */
-  status?: "completed" | "blocked";
+  /** 失败/阻塞覆盖值；没有正式报告不能强制 completed。 */
+  status?: TaskHandback["status"];
   /** 可注入时钟（测试）；缺省 `new Date()`。 */
   now?: () => Date;
 }
 
-/** 写类工具名（受治理的落盘工具；证据过滤与回交推导同口径）。 */
-const WRITE_TOOL_NAMES = ["write_file", "edit_file"] as const;
-
-/**
- * 该 `accepted` 事件是否**写类**（用于证据过滤——设计 C-1：不再把 `read_file` 之类的读事件混进证据）。
- *
- * 事件形状在仓内按适配器不同而不同，本判据兼容三处实际发射点（均为既有事实，逐处核对）：
- *   · 假运行时适配器（`provider/pi/session.ts`）：`detail = { call, result }` → 取 `call.name` 判名单；
- *   · 真实 Pi 适配器（`common/pi-adapter/real-adapter.ts`）：`summary = \`${toolName} 执行完成\``、无 call 明细
- *     → 摘要以写类工具名开头即写类；
- *   · 装配演示假 runtime（`common/装配/demo-runtime.ts`）：`summary` 以「写入被允许」开头（detail = WriteDecision）。
- * 三者都不像的 `accepted`（如 `read_file 执行完成`）→ **不算证据**（防噪音）。
- */
-function isWriteAccepted(ev: SessionEvent): boolean {
-  const call = (ev.detail as { call?: { name?: unknown } } | undefined)?.call;
-  if (call !== undefined && typeof call.name === "string") {
-    return (WRITE_TOOL_NAMES as readonly string[]).includes(call.name);
-  }
-  const s = ev.summary;
-  if (s.startsWith("写入被允许")) return true;
-  return WRITE_TOOL_NAMES.some((n) => s.startsWith(`${n} `));
+/** 写类成功事件的路径事实；兼容旧替身，绝不把工具计数当成果。 */
+const WRITE_TOOL_NAMES = ["write_file", "edit_file", "write", "edit"] as const;
+function detailOf(ev: SessionEvent): Record<string, unknown> {
+  return ev.detail !== null && typeof ev.detail === "object" ? ev.detail as Record<string, unknown> : {};
+}
+export function eventTurnId(ev: SessionEvent): string | undefined {
+  const id = detailOf(ev).turnId;
+  return typeof id === "string" && id !== "" ? id : undefined;
+}
+function writeEvidence(ev: SessionEvent): string | undefined {
+  if (ev.kind !== "accepted") return undefined;
+  const detail = detailOf(ev);
+  if (detail.ok === false || detail.status === "failed" || detail.status === "error") return undefined;
+  const call = detail.call as { name?: unknown; args?: { path?: unknown } } | undefined;
+  const tool = typeof detail.toolName === "string" ? detail.toolName : call?.name;
+  let file = typeof detail.path === "string" ? detail.path : call?.args?.path;
+  if (typeof tool === "string" && !(WRITE_TOOL_NAMES as readonly string[]).includes(tool)) return undefined;
+  // 旧假运行时与演示运行时的成功摘要含路径；泛化“执行完成”没有路径事实，故不录入。
+  const match = ev.summary.match(/^(write_file|edit_file) 已获准（写入）：(.+)$/)
+    ?? ev.summary.match(/^(写入被允许)：(.+?)(?:（命中.*)?$/);
+  if (typeof file !== "string" || file.trim() === "") file = match?.[2];
+  if (typeof file !== "string" || file.trim() === "") return undefined;
+  if (tool === undefined && match === null) return undefined;
+  const edit = tool === "edit" || tool === "edit_file" || match?.[1] === "edit_file";
+  return `${edit ? "已编辑" : "已写入"}：${file}`;
 }
 
-/**
- * 从一轮会话事件构造 `TaskHandback`（**未交报告时的回退推导**）。
- *
- * 结论推断（V1 确定性规则，可被 `ctx.status` 覆盖）：会话读了 `settled` 说明正常收口；若整轮
- * 一次**写类**写入都没被接受（`accepted` 里无写类）**却有拒绝**（有 `denied`）→ 判 `blocked`（角色被拦下、
- * 什么都没落地）；否则 `completed`。
- *
- * 证据 = **写类** `accepted` 事件的摘要（实际被接受落地的文件）——**不含读事件**
- * （`read_file 执行完成` 之类，设计 C-1 修正的既有噪音缺陷），也不含被拒记录（那属审计、非回交证据）。
- */
+/** 无正式报告只返回未报告/阻塞与可定位产物，不推导任务成功。 */
 export function buildTaskHandback(events: SessionEvent[], ctx: HandbackContext): TaskHandback {
-  const acceptedWrites = events.filter((e) => e.kind === "accepted" && isWriteAccepted(e));
-  const denied = events.some((e) => e.kind === "denied");
-  const settled = events.find((e) => e.kind === "settled");
-
-  const status: "completed" | "blocked" =
-    ctx.status ?? (acceptedWrites.length === 0 && denied ? "blocked" : "completed");
-  const summary =
-    settled !== undefined && settled.summary.trim() !== ""
-      ? settled.summary
-      : `角色 ${ctx.roleId} 完成${ctx.taskId ? `（任务 ${ctx.taskId}）` : ""}`;
-
+  const evidence = [...new Set(events.map(writeEvidence).filter((e): e is string => e !== undefined))];
+  const denied = events.find((e) => e.kind === "denied");
+  const status = ctx.status !== undefined && ctx.status !== "completed"
+    ? ctx.status : evidence.length === 0 && denied ? "blocked" : "unreported";
+  const summary = "本轮未提交正式任务报告，尚不能确认任务完成。"
+    + (denied ? `有步骤被拒绝：${denied.summary}` : "")
+    + (evidence.length === 0 ? "本轮没有可定位的产物证据。" : "以下仅为实际写入的文件，尚未验收。");
   const handback: TaskHandback = {
-    roleId: ctx.roleId,
-    status,
-    summary,
-    evidence: acceptedWrites.map((e) => e.summary),
+    roleId: ctx.roleId, status, summary, evidence,
     at: (ctx.now ?? (() => new Date()))().toISOString(),
   };
   if (ctx.taskId !== undefined && ctx.taskId !== "") handback.taskId = ctx.taskId;
@@ -149,7 +111,7 @@ export function buildTaskHandback(events: SessionEvent[], ctx: HandbackContext):
 
 /**
  * 校验模型交来的报告（`submit_report` 的载荷经注入能力到达编排）。形状不符（status 非法 / summary 空 /
- * 字段类型错）→ 返回 `undefined`（**回退既有推导**，不硬失败、不报错——防御模型输出）。
+ * 字段类型错）→ 返回 `undefined`（忽略非法报告，未有合法报告时明确未报告）。
  * 形状**恰好** `{ status, summary, evidence? }`：多余字段忽略；`evidence` 非字符串数组时按缺失处理。
  */
 export function normalizeTaskReport(input: unknown): TaskReport | undefined {
@@ -197,41 +159,38 @@ export function handbackEvent(handback: TaskHandback): HandbackEvent {
  * **不夹带任何权限语义**（回交只搬「任务与证据」，不搬身份或写权——su 不因收到回交获得角色的写权）。
  */
 export function renderHandbackPrompt(hb: TaskHandback): string {
-  const lines: string[] = [];
-  const task = hb.taskId !== undefined && hb.taskId !== "" ? `（任务 ${hb.taskId}）` : "";
-  lines.push(`[回交] 来自 ${hb.roleId} 的报告${task}`);
-  lines.push(`结论：${hb.status}`);
-  lines.push(`摘要：${hb.summary}`);
-  if (hb.evidence.length > 0) {
+  return renderHandbackBatchPrompt([hb]);
+}
+
+/** 已收到报告的统一验收输入；合批不意味着未知角色已收齐。 */
+export function renderHandbackBatchPrompt(handbacks: readonly TaskHandback[]): string {
+  const lines: string[] = handbacks.length === 1 ? [] : [`[回交] 已收到${handbacks.length}份角色结果，请核对后向客户汇总。`];
+  for (const hb of handbacks) {
+    const task = hb.taskId ? `（任务 ${hb.taskId}）` : "（任务关联未知）";
+    lines.push(`[回交] 来自 ${hb.roleId} 的报告${task}`, `结论：${hb.status}`, `摘要：${hb.summary}`);
     lines.push("证据：");
-    for (const e of hb.evidence) lines.push(`  - ${e}`);
-  } else {
-    lines.push("证据：（无）");
+    if (hb.evidence.length > 0) for (const e of hb.evidence) lines.push(`  - ${e}`);
+    else lines.push("  - 无可验收证据；需要原角色补充，不能推定通过。");
   }
-  lines.push("请验收：确认通过 / 要求返工 / 上报客户。");
+  lines.push(
+    "请验收已收到的报告，并向客户给出统一结果：实际完成了什么、产物路径、实际测试结果、哪些未完成或待补报告/返工，以及下一步。",
+    "只有证据支持才确认通过；未报告、失败或中止不得当作完成。不要把会话结束或工具执行次数当成果。",
+    "没有明确任务关联或收齐条件时，只汇总手头结果，不宣称全部角色或整个任务已完成。",
+    "已授权范围内的常规后续操作继续处理，不重复请求同一授权；确有越界或必要客户决策时说明具体原因。",
+  );
   return lines.join("\n");
 }
 
 /**
- * **回交去重键——稳定键（X-2 硬化）**（设计 §E-1「一条回交只投递一次，避免重放刷屏」的构造单一来源）。
- * 投递侧（桌面）以其登记「已投递」集合；本函数只算键，不做登记（登记与排队是前端职责）。
- *
- * **键形状**：`<roleId>\0<taskId或空>\0<round或空>\0<内容哈希16位>`——**不含 `at`**（旧键含毫秒时间戳，
- * 同一轮的两份回交因毫秒差判重失效，真机即由此把 7 份逐字相同的投递送进 su）。内容哈希 =
- * SHA-256(status \0 summary \0 evidence[{i}]…) 前 16 位（仅作次级判据；`round` 已足以区分轮次）。
- *
- * **两类判定的分工（给桌面/后续维护者）**：
- * · **同轮重放 / 重复 settled**（同一批事件被重复消费、或同轮多份回交）⇒ `round` 与内容都相同
- *   ⇒ **同键** ⇒ 判重（不重复投递）。
- * · **新轮真返工**（后一轮产出**逐字相同**的文本）⇒ `round` 递增 ⇒ **键不同** ⇒ **照常各自投递**。
- * ⚠ 用键方**不得**自行拼入时间戳或改用 `at`——那会把上面两类判定一起打回原状。
+ * 去重键单一来源：角色、任务、turnId（旧替身降级round）与内容哈希，不含时间戳。
+ * 同轮重放同键；同文返工的新turnId异键；桌面负责登记和排队，不自行拼at。
  */
 export function handbackKey(hb: TaskHandback): string {
   const contentHash = createHash("sha256")
     .update(`${hb.status}\u0000${hb.summary}\u0000${hb.evidence.join("\u0000")}`)
     .digest("hex")
     .slice(0, 16);
-  return `${hb.roleId}\u0000${hb.taskId ?? ""}\u0000${hb.round ?? ""}\u0000${contentHash}`;
+  return `${hb.roleId}\u0000${hb.taskId ?? ""}\u0000${hb.turnId ?? hb.round ?? ""}\u0000${contentHash}`;
 }
 
 // —————————————— H-1：su 派发任务（dispatch_task）的编排侧共用件 ——————————————
@@ -296,53 +255,68 @@ export function formatDispatchReceipt(opts: {
 }
 
 /**
- * 在会话事件流上挂回交：**透传** `SessionEvent`；当读到 `settled` 时，**先发** `handback` 事件、
- * **再透传** `settled`。
- *
- * 为何先发 handback 再发 settled：既有消费方（runRole / govern / 桌面）以 `settled` 为**终止信号**，
- * 见之即停。若把 handback 排在 settled 之后，这些消费方永远收不到它。排在 settled 之前，语义仍是
- * 「会话即将收口时的回交」，且终止逻辑不受影响。
- *
- * **报告优先（C-1）**：`opts.report` 给出且已收到模型交的报告（`submit_report` 经注入能力送达）⇒
- * 回交内容**取报告值**（`buildReportHandback`）；未交 / 形状非法 ⇒ **回退既有推导**
- * （`buildTaskHandback`），不硬失败、不报错。
- *
- * **每轮至多一份回交（X-2 硬化；真机依据：适配器每轮曾发两次 `settled` ⇒ 每轮两份逐字相同的回交）**：
- * 轮次以**「settle 突发」**为界——一次会话轮结束时 `settled` 可能连发多份；**只认突发里的第一份**
- * 发回交（其余仅**透传**）。若两份 `settled` 之间来了新事件（正常的新一轮，或真返工），视为**新一轮**、
- * 照常再发一份。判定用「自上次回交以来是否出现过新事件」的置位实现（不需要轮次标识符——事件流本身
- * 即界碑）；每份回交带 `round`（递增轮次序号），供 `handbackKey` 做**稳定去重**。
- * **既有语义不变**：先回交再透传 `settled`；无 `settled` 不发回交。
- * 残留（如实登记）：若「两次 `settled` 之间夹着别的**事件**」而实为同轮（根因在适配器侧、其同刻在修），
- * 本防护不会合并——会按新一轮各发一份（`round` 不同 ⇒ 键不同 ⇒ 投递侧也不判重）。
- *
- * 流自然结束（无 `settled`）→ **不发** handback（回交绑定「会话 settle/完成」，非「流关闭」）。
+ * 真实适配器按 detail.turnId 分轮，终局先发 handback 再透传 settled。
+ * 报告取同轮且完成后消费；同轮重复终局只透传，不再回交。
+ * 无 metadata 的旧替身沿已知 settle 突发兼容，但每次收口也清空证据。
  */
 export async function* withHandback(
   source: AsyncIterable<SessionEvent>,
   ctx: HandbackContext,
-  opts: { report?: () => TaskReport | undefined } = {},
+  opts: {
+    report?: (turnId?: string) => TaskReport | undefined;
+    completed?: (turnId?: string) => void;
+    projectRoot?: string;
+  } = {},
 ): AsyncIterable<OrchestrationEvent> {
-  const seen: SessionEvent[] = [];
-  let round = 0; // 已发回交的轮次数（1 起）
-  // 自上次回交以来是否出现过新事件（或尚未发过回交）——决定本轮 settle 突发是否该发回交。
-  let newRound = true;
-  for await (const ev of source) {
-    if (ev.kind === "settled") {
-      if (newRound) {
-        newRound = false;
-        round += 1;
-        const report = opts.report?.();
-        const handback =
-          report !== undefined ? buildReportHandback(report, ctx) : buildTaskHandback([...seen, ev], ctx);
-        handback.round = round;
-        yield handbackEvent(handback);
+  const log = createDiagnosticLogger({ component: "orchestration.handback", roleId: ctx.roleId, projectRoot: opts.projectRoot });
+  const seen = new Map<string, SessionEvent[]>();
+  const finished = new Set<string>();
+  const legacyKey = "";
+  let legacyNewRound = true;
+  let round = 0;
+  try {
+    for await (const ev of source) {
+      const turnId = eventTurnId(ev);
+      const key = turnId ?? legacyKey;
+      if (ev.kind === "settled") {
+        const duplicate = turnId !== undefined ? finished.has(turnId) : !legacyNewRound;
+        if (!duplicate) {
+          if (turnId !== undefined) finished.add(turnId);
+          else legacyNewRound = false;
+          round += 1;
+          const events = [...(seen.get(key) ?? []), ev];
+          seen.delete(key);
+          const report = normalizeTaskReport(opts.report?.(turnId));
+          const handback = report !== undefined ? buildReportHandback(report, ctx) : buildTaskHandback(events, ctx);
+          const detail = detailOf(ev);
+          const outcome = detail.outcome;
+          if (outcome === "failed" || outcome === "timed_out" || outcome === "aborted") {
+            handback.status = outcome === "aborted" ? "aborted" : "failed";
+            const why = outcome === "timed_out" ? "本轮执行超时" : outcome === "aborted" ? "本轮已中止" : "本轮执行失败";
+            const reason = typeof detail.errorCode === "string" ? `（${detail.errorCode}）` : "";
+            handback.summary = `${why}${reason}，尚不能确认任务完成。`
+              + (report !== undefined ? `中断前报告：${report.summary}` : handback.summary);
+          }
+          handback.round = round;
+          if (turnId !== undefined) handback.turnId = turnId;
+          opts.completed?.(turnId);
+          log.record("handback.generated", { turnId, outcome, state: handback.status, reportSource: report === undefined ? "unreported" : "submit_report", count: handback.evidence.length });
+          yield handbackEvent(handback);
+        } else log.record("handback.duplicate", { turnId });
+        yield ev;
+        continue;
       }
-      yield ev; // 重复 settled：仅透传（次序「回交在前、settled 在后」不受影响）
-      continue;
+      // 已终局轮次的迟到事件仅透传，不能作为下一轮证据。
+      if (turnId === undefined || !finished.has(turnId)) {
+        const events = seen.get(key) ?? [];
+        events.push(ev);
+        seen.set(key, events);
+        if (turnId === undefined) legacyNewRound = true;
+      }
+      yield ev;
     }
-    seen.push(ev);
-    newRound = true;
-    yield ev;
+  } finally {
+    seen.clear();
+    finished.clear();
   }
 }

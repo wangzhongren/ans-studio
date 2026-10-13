@@ -274,6 +274,11 @@ export interface ReportHandbackReceipt {
   message?: string;
 }
 
+/** 适配器捕获的报告所属轮次；单参数消费者保持兼容。 */
+export interface ReportHandbackMetadata {
+  turnId: string;
+}
+
 /**
  * 「交报告」注入点（设计 C-1）：**只给项目角色**（治理角色 su 不自我回交，故不给它——由编排以是否注入表达）。
  * **未注入时 `submit_report` 根本不注册**（同 `ShellGate` / `CustomerInputFn` 先例）。
@@ -285,6 +290,7 @@ export interface ReportHandbackReceipt {
  */
 export type ReportHandbackFn = (
   report: ReportHandbackPayload,
+  metadata?: ReportHandbackMetadata,
 ) =>
   | ReportHandbackReceipt
   | null

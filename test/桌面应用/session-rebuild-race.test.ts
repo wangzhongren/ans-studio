@@ -95,17 +95,38 @@ interface Harness {
   sent: SentRec[];
   busyStates: boolean[];
   lastBusy: () => boolean | undefined;
+  sentGenerations: number[];
+  messages: string[];
 }
 
-function makeHarness(root: string, listing: ProjectListing): Harness {
+function makeHarness(root: string, listing: ProjectListing, hooks: {
+  beforeOpen?: (roleId: string, generation: number) => Promise<void>;
+  beforeDispose?: (roleId: string, generation: number) => Promise<void>;
+  listings?: Map<string, ProjectListing>;
+} = {}): Harness {
   const opened: string[] = [];
   const disposed: string[] = [];
   const sent: SentRec[] = [];
   const busyStates: boolean[] = [];
+  const sentGenerations: number[] = [];
+  const messages: string[] = [];
   const mgr = new SessionManager({
     openRoleSession: async (input: { roleId: string }) => {
       opened.push(input.roleId);
-      return makeHandle(input.roleId, opened, disposed, sent);
+      const generation = opened.length;
+      await hooks.beforeOpen?.(input.roleId, generation);
+      const handle = makeHandle(input.roleId, opened, disposed, sent);
+      const originalSend = handle.send.bind(handle);
+      const originalDispose = handle.dispose.bind(handle);
+      handle.send = async (text, opts) => {
+        sentGenerations.push(generation);
+        await originalSend(text, opts);
+      };
+      handle.dispose = async () => {
+        await hooks.beforeDispose?.(input.roleId, generation);
+        await originalDispose();
+      };
+      return handle;
     },
     createPiAdapterFactory: () => {
       throw new Error("本用例不应构造 pi 适配器");
@@ -114,8 +135,13 @@ function makeHarness(root: string, listing: ProjectListing): Harness {
       throw new Error("本用例不应构造 demo 适配器");
     },
     buildProjectConfig,
-    getListing: (r: string) => (r === root ? listing : undefined),
-    emitEvent: () => {},
+    getListing: (projectRoot: string) => {
+      if (projectRoot === root) return listing;
+      return hooks.listings?.get(projectRoot);
+    },
+    emitEvent: (envelope) => {
+      if (envelope.event.kind === "message") messages.push(envelope.event.summary);
+    },
     emitRoleState: (info: { roleId: string; busy: boolean }) => {
       if (info.roleId === "A") busyStates.push(info.busy);
     },
@@ -127,6 +153,8 @@ function makeHarness(root: string, listing: ProjectListing): Harness {
     sent,
     busyStates,
     lastBusy: () => (busyStates.length > 0 ? busyStates[busyStates.length - 1] : undefined),
+    sentGenerations,
+    messages,
   };
 }
 
@@ -184,4 +212,203 @@ test("在跑轮次不被作废重建打断：busy 期间 refreshStaleBoundaries/
   assert.deepEqual(h.mgr.liveRoleIds(), ["A"], "条目恒在保活表");
   await h.mgr.stop(null);
   fs.rmSync(root, { recursive: true, force: true });
+});
+
+test("后台重建完成后再发送：恢复活动目标，消息恰一次送达重建后的句柄", async () => {
+  const { root, listing } = makeProject();
+  const harness = makeHarness(root, listing);
+  try {
+    assert.equal((await harness.mgr.open({ projectRoot: root, roleId: "A", runtime: "demo" })).ok, true);
+    fs.writeFileSync(path.join(root, "角色卡", "A", "boundary.yaml"), "v: 2\n");
+    assert.deepEqual(await harness.mgr.refreshStaleBoundaries(), ["A"]);
+    const result = await harness.mgr.send("继续");
+    assert.equal(result.ok, true, "后台重建已经结束，后续发送仍应成功");
+    assert.equal(harness.mgr.openForRoleId(), "A");
+    assert.deepEqual(harness.sent, [{ role: "A", text: "继续" }]);
+    assert.deepEqual(harness.sentGenerations, [2], "实际投递到新句柄，旧句柄无投递");
+    assert.deepEqual(harness.opened, ["A", "A"]);
+    assert.deepEqual(harness.disposed, ["A"]);
+  } finally {
+    await harness.mgr.stop(null);
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+function waitPoint() {
+  let arrive!: () => void;
+  let release!: () => void;
+  const arrived = new Promise<void>((resolve) => { arrive = resolve; });
+  const blocked = new Promise<void>((resolve) => { release = resolve; });
+  return { arrived, release, async wait() { arrive(); await blocked; } };
+}
+
+function addRoleB(root: string, listing: ProjectListing) {
+  const role = listing.roles[0];
+  listing.roles.push({ ...role, roleId: "B", cardPath: "角色卡/B/role-card.md", boundaryPath: "角色卡/B/boundary.yaml" });
+  fs.mkdirSync(path.join(root, "角色卡", "B"), { recursive: true });
+  fs.writeFileSync(path.join(root, "角色卡", "B", "boundary.yaml"), "v: 1\n");
+  fs.writeFileSync(path.join(root, "角色卡", "B", "role-card.md"), "# B\n");
+}
+
+test("非活动角色后台重建不抢位", async () => {
+  const { root, listing } = makeProject();
+  addRoleB(root, listing);
+  const harness = makeHarness(root, listing);
+  try {
+    await harness.mgr.open({ projectRoot: root, roleId: "B", runtime: "demo" });
+    await harness.mgr.open({ projectRoot: root, roleId: "A", runtime: "demo" });
+    fs.writeFileSync(path.join(root, "角色卡", "B", "boundary.yaml"), "v: 2\n");
+    await harness.mgr.refreshStaleBoundaries();
+    assert.equal(harness.mgr.openForRoleId(), "A");
+    assert.equal((await harness.mgr.send("发给 A")).ok, true);
+    assert.deepEqual(harness.sent, [{ role: "A", text: "发给 A" }]);
+  } finally {
+    await harness.mgr.stop(null);
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+for (const phase of ["dispose", "open"] as const) {
+  for (const action of ["select B", "failed select", "stop A", "stop all", "stop B"] as const) {
+    test(`重建 ${phase} 等待窗口：${action} 保持用户目标/关闭契约`, async () => {
+      const { root, listing } = makeProject();
+      addRoleB(root, listing);
+      const gate = waitPoint();
+      const block = async (roleId: string, generation: number) => {
+        if (roleId === "A" && ((phase === "dispose" && generation === 2) || (phase === "open" && generation === 3))) await gate.wait();
+      };
+      const hooks: Parameters<typeof makeHarness>[2] = {};
+      if (phase === "dispose") hooks.beforeDispose = block;
+      else hooks.beforeOpen = block;
+      const harness = makeHarness(root, listing, hooks);
+      try {
+        await harness.mgr.open({ projectRoot: root, roleId: "B", runtime: "demo" });
+        await harness.mgr.open({ projectRoot: root, roleId: "A", runtime: "demo" });
+        fs.writeFileSync(path.join(root, "角色卡", "A", "boundary.yaml"), "v: 2\n");
+        const refresh = harness.mgr.refreshStaleBoundaries();
+        await gate.arrived;
+        if (action === "select B") {
+          await harness.mgr.open({ projectRoot: root, roleId: "B", runtime: "demo" });
+          gate.release();
+          await refresh;
+          assert.equal(harness.mgr.openForRoleId(), "B");
+          assert.equal((await harness.mgr.send("新的目标")).ok, true);
+          assert.deepEqual(harness.sent, [{ role: "B", text: "新的目标" }]);
+        } else if (action === "failed select") {
+          assert.equal((await harness.mgr.open({ projectRoot: root, roleId: "不存在", runtime: "demo" })).ok, false);
+          gate.release();
+          await refresh;
+          assert.equal(harness.mgr.openForRoleId(), null, "失败的显式选择也撤销旧重建恢复资格");
+        } else if (action === "stop B") {
+          await harness.mgr.stop("B");
+          gate.release();
+          await refresh;
+          assert.equal(harness.mgr.openForRoleId(), "A", "关闭非活动 B 不使 A 失联");
+          assert.equal((await harness.mgr.send("仍给 A")).ok, true);
+          assert.deepEqual(harness.sent, [{ role: "A", text: "仍给 A" }]);
+        } else {
+          let stopped = false;
+          let target: string | null = "A";
+          if (action === "stop all") target = null;
+          const stop = harness.mgr.stop(target).then((result) => { stopped = true; return result; });
+          await Promise.resolve();
+          assert.equal(stopped, false, "关闭必须等已在途重建收口");
+          gate.release();
+          await refresh;
+          assert.equal((await stop).ok, true);
+          assert.equal(harness.mgr.openForRoleId(), null);
+          assert.ok(!harness.mgr.liveRoleIds().includes("A"));
+          assert.deepEqual(harness.sent, []);
+          if (action === "stop all") {
+            assert.deepEqual(harness.mgr.liveRoleIds(), []);
+            // 换项目沿用 stop(null) 再 open；临时项目的同名 A 不被旧重建抢回。
+            const next = makeProject();
+            try {
+              hooks.listings = new Map([[next.root, next.listing]]);
+              assert.equal((await harness.mgr.open({ projectRoot: next.root, roleId: "A", runtime: "demo" })).ok, true);
+              assert.equal(harness.mgr.openForRoleId(), "A");
+              assert.equal((await harness.mgr.send("新项目消息")).ok, true);
+              assert.deepEqual(harness.sentGenerations, [4], "新项目的新句柄接收，旧重建句柄已释放");
+            } finally {
+              fs.rmSync(next.root, { recursive: true, force: true });
+            }
+          }
+        }
+      } finally {
+        gate.release();
+        await harness.mgr.stop(null);
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    });
+  }
+}
+
+test("重开失败保留原错误，不恢复假活动目标、不发送消息", async () => {
+  const { root, listing } = makeProject();
+  const harness = makeHarness(root, listing, {
+    beforeOpen: async (_roleId, generation) => {
+      if (generation === 2) throw new Error("重开失败原文");
+    },
+  });
+  try {
+    await harness.mgr.open({ projectRoot: root, roleId: "A", runtime: "demo" });
+    fs.writeFileSync(path.join(root, "角色卡", "A", "boundary.yaml"), "v: 2\n");
+    const result = await harness.mgr.send("失败不得发送");
+    assert.equal(result.ok, false);
+    assert.match(result.error ?? "", /重开失败原文/);
+    assert.equal(harness.mgr.openForRoleId(), null);
+    assert.deepEqual(harness.sent, []);
+    assert.ok(harness.messages.some((message) => message.includes("重开失败原文")));
+    assert.equal((await harness.mgr.open({ projectRoot: root, roleId: "A", runtime: "demo" })).ok, true);
+    assert.equal((await harness.mgr.send("显式恢复")).ok, true);
+    assert.deepEqual(harness.sent, [{ role: "A", text: "显式恢复" }]);
+  } finally {
+    await harness.mgr.stop(null);
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("关闭全部与双角色刷新扫描交接：停止返回后没有后续重开或投递", async () => {
+  const { root, listing } = makeProject();
+  addRoleB(root, listing);
+  const firstOpen = waitPoint();
+  const firstStopDispose = waitPoint();
+  const laterOpen = waitPoint();
+  const harness = makeHarness(root, listing, {
+    beforeOpen: async (roleId, generation) => {
+      if (roleId === "A" && generation === 3) await firstOpen.wait();
+      if (roleId === "B" && generation === 4) await laterOpen.wait();
+    },
+    beforeDispose: async (roleId, generation) => {
+      if (roleId === "A" && generation === 3) await firstStopDispose.wait();
+    },
+  });
+  try {
+    await harness.mgr.open({ projectRoot: root, roleId: "A", runtime: "demo" });
+    await harness.mgr.open({ projectRoot: root, roleId: "B", runtime: "demo" });
+    for (const roleId of ["A", "B"]) fs.writeFileSync(path.join(root, "角色卡", roleId, "boundary.yaml"), "v: 2\n");
+    const refresh = harness.mgr.refreshStaleBoundaries();
+    await firstOpen.arrived;
+    const stop = harness.mgr.stop(null);
+    firstOpen.release();
+    await firstStopDispose.arrived;
+    // 缺陷版会继续扫描 B 并在 stop 释放 A 的窗口临时移出 B；修复版扫描直接完成。
+    await Promise.race([refresh, laterOpen.arrived]);
+    firstStopDispose.release();
+    assert.equal((await stop).ok, true);
+    assert.deepEqual(harness.mgr.liveRoleIds(), [], "stop 返回时没有旧句柄");
+    laterOpen.release();
+    await refresh;
+    assert.deepEqual(harness.opened, ["A", "B", "A"], "旧扫描不得再启动 B 的重建");
+    assert.deepEqual(harness.mgr.liveRoleIds(), [], "扫描完成也没有复活句柄");
+    assert.equal(harness.mgr.openForRoleId(), null);
+    assert.deepEqual(harness.sent, []);
+    assert.equal((await harness.mgr.send("停止后不得投递")).ok, false);
+  } finally {
+    firstOpen.release();
+    firstStopDispose.release();
+    laterOpen.release();
+    await harness.mgr.stop(null);
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });

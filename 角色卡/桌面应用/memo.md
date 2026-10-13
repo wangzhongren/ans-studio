@@ -2,6 +2,14 @@
 
 记录本角色掌握的事实、待核实事项与续接线索。不写全局规则，不抄任务状态。
 
+- 2026-10-13：输入法候选Enter曾被聊天keydown直接发送。最小保护为compositionstart/end布尔+isComposing+keyCode229，在preventDefault/onSend前返回；end可能先于最终IMEkeydown，229仍必要。结束即清状态，不设任意时间窗/吞下一键，鼠标选词后下一Enter仍正常。来源：客户反馈、MDN官方说明、独立Electron同流红→绿，附件/输入/气泡与sendIPC实测；精准脚本 `test/桌面应用/e2e/ime-enter.mjs`，不必重跑大harness。[记录](docs/fix/2026-10-13_fix_ime-enter-candidate.md)。
+
+- 2026-10-13：本波独立QA补出P-1兼容问题：卡index456经旧prefix定位后仍在屏外（top936/chat bottom584）；scrollToOperatorCard邻近行实体化后需按实际卡/视口rect再校准。最终450行冷窗口同角色显式定位，卡全文及.op-confirm按钮actual rect均可见。普通上翻的scrollTop变化不必然是跳动，应核同一首可见文本与相对offset：QA同一row253 offset仅差0.0625px，是总高修正后内容锚点保持。来源：独立QA、协调方必要修复指令及最终Electron实测；源码renderer最终hash与证据见本波修复记录。
+
+- 2026-10-13：已定位长聊天空白：dirty flush/registerRow固定preferTail，却因上翻pin=false保留scrollTop，视口落在巨大spacer；必须同时断言可见行，单测滚动距离不够。回交双展示来自提前mirror+真实注入，不再给su提前镜像；continuous队首报告可合批，客户message/dispatch是屏障。统一诊断由shared唯一保存24h，main/preload窄桥不接任意路径。reload要list+select续接而非loadProject；replayPending同id、不延长/代答，closed后再注册窗口IPC。真实Electron初次重开测试不能close()后立即注册，需明确await closed模拟activate。来源：客户反馈、canonical v1、专项13/13、Electron实际可见行/崩溃恢复/mac重开通过。详见[修复记录](docs/fix/2026-10-13_fix_viewport-reports-diagnostics.md)。
+
+- 2026-10-13：后台重建**完成后**再 send 曾稳定失联（live A、active null、delivered 0），并发重建测试不能覆盖该顺序。现恢复需校验用户选择版本及同项目句柄；定向关闭非活动 B 不撤销 A 的资格；关闭全部同时终止旧扫描的下一角色步骤并等在途链收口。同角色点击经既有 open 确认，发送失败撤销前端开启标记，补开失败保留文字/附件且不追加发送气泡。来源：客户直接修复授权、项目管理评审与确定性 16/16、Electron 11 项实测。测试 harness 原缺 `app:attach-image`，须沿生产既有通道接到 `desktop.attachImage` 才能验证粘贴图片，不能注入假附件当证明。详见 [修复记录](docs/fix/2026-10-13_fix_background-rebuild-active-session.md)。
+
 - 2026-10-11：客户决定做一个**桌面应用**（不是网页），技术栈定为 **Electron**，代码放在 ans-cli 同一个仓库内，作为 Interface 层的新能力。来源：客户决策。
 - 2026-10-11：角色由 ANS Governance 建立，Section 1 覆盖 `app/`、`test/桌面应用/` 与本角色资料。源码尚未创建。
 - 2026-10-11：**定位是同一个引擎的第二个前端**——CLI 与 App 共用 Service / Pipeline / Provider。所以判定一律调门禁引擎、Pi 一律经 Pi 适配器，**不得在渲染进程里另写一份边界判断**。

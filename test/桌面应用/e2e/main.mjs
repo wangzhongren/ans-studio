@@ -33,7 +33,18 @@ let chatAdapterMod = null; // P0-1：demo 适配器模块引用（takeDemoPrompt
 let slowPromptGate = null; // P0-1 e2e 专用缝：让首轮 prompt 挂起（把「忙」变成确定态，供入队定格断言）
 let slowPromptArmed = false;
 let nextPickPath = null; // P1-3：选目录桩的返回值（null=用户取消；e2e 全程不弹真实系统对话框）
+let repairFailOpen = false;
+let repairFailSend = false;
+let repairThrowSend = false;
+let repairOpenCalls = 0;
+let repairSendCompletions = 0;
+const repairSendRequests = [];
 let win;
+let diagnosticModule;
+let diagnosticStore;
+let registerHandler;
+let recoverySnapshot = { projectRoot: null, roleId: null };
+const operatorPresentations = [];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const report = [];
@@ -49,6 +60,26 @@ let readRoleSessionHistory = null;
 const openExternalCalls = [];
 
 function registerIpc() {
+  const diagnostic = diagnosticStore.createDiagnosticLogger({ component: "desktop.e2e" });
+  registerHandler = diagnosticModule.createWindowIpcRegistrar(win, ipcMain, diagnostic);
+  diagnosticModule.observeWindowDiagnostics(win, diagnostic, () => {
+    void win.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(diagnosticModule.RECOVERY_PAGE));
+  });
+  registerHandler("app:renderer-diagnostic", (event, input) => {
+    if (event.sender !== win.webContents) return { ok: false };
+    return diagnosticModule.recordRendererDiagnostic(diagnostic, input);
+  });
+  registerHandler("app:recovery-state", (event) => event.sender === win.webContents ? recoverySnapshot : null);
+  registerHandler("app:recovery-ready", (event) => {
+    if (event.sender !== win.webContents) return { ok: false };
+    customerChannel.replayPending();
+    return { ok: true };
+  });
+  registerHandler("app:reload-interface", async (event) => {
+    if (event.sender !== win.webContents) return { ok: false };
+    await win.loadFile(path.join(APP_DIR, "renderer", "index.html"));
+    return { ok: true };
+  });
   const desktop = createDesktopInterface({
     // P1-3：目录选择改**桩**（用例经 nextPickPath 驱动；不弹真实系统对话框——e2e 里真对话框会挂住）。
     pickDirectory: async () => nextPickPath,
@@ -86,9 +117,10 @@ function registerIpc() {
     envFilePath: PI_ENV,
     piConfigEnv: {},
   });
-  ipcMain.handle("app:pick-project", () => desktop.pickProject());
-  ipcMain.handle("app:list-project", async (_e, input) => {
+  registerHandler("app:pick-project", () => desktop.pickProject());
+  registerHandler("app:list-project", async (_e, input) => {
     const res = await desktop.listProject(input);
+    recoverySnapshot.projectRoot = res.projectRoot;
     // D-1：逐角色只读解析会话历史并推规范化行——**镜像生产形态**（app/main.ts：`void pushSessionHistories(...)`，
     // fire-and-forget、在 list-project **回包之后**送达 ⇒ 渲染侧走「直接回放」路径）。
     // ⚠ 2026-10-12 修复：本 harness 原先把「读文件 + 推送」**await 在 handler 内**（回包之前送达）——
@@ -111,17 +143,31 @@ function registerIpc() {
     })();
     return res;
   });
-  ipcMain.handle("session:open", (_e, input) => desktop.openSession(input));
-  ipcMain.handle("session:send", (_e, input) => desktop.sendSession(input));
-  ipcMain.handle("session:stop", (_e, input) => desktop.stopSession(input));
+  registerHandler("session:open", async (_e, input) => {
+    repairOpenCalls += 1;
+    if (repairFailOpen) return { ok: false, error: "修复探针：补开失败原文" };
+    const result = await desktop.openSession(input);
+    if (result.ok) recoverySnapshot.roleId = input.roleId;
+    return result;
+  });
+  registerHandler("session:send", async (_e, input) => {
+    repairSendRequests.push(input);
+    if (repairThrowSend) throw new Error("修复探针：发送异常原文");
+    if (repairFailSend) return { ok: false, error: "修复探针：发送失败原文" };
+    const result = await desktop.sendSession(input);
+    repairSendCompletions += 1;
+    return result;
+  });
+  registerHandler("app:attach-image", (_e, input) => desktop.attachImage(input));
+  registerHandler("session:stop", (_e, input) => desktop.stopSession(input));
   // P1-1：撤回未投递排队消息（与 app/main.ts 同形——Interface 如实回报）。
-  ipcMain.handle("session:withdraw", (_e, input) => desktop.withdrawQueued(input));
+  registerHandler("session:withdraw", (_e, input) => desktop.withdrawQueued(input));
   // P0-2：停当前轮次（与 app/main.ts 同形——Interface 三态如实回传）。
-  ipcMain.handle("session:abort", (_e, input) => desktop.abortSession(input));
+  registerHandler("session:abort", (_e, input) => desktop.abortSession(input));
   // B-2：保活会话列表（与 app/main.ts 同形）。
-  ipcMain.handle("session:live", () => desktop.listLiveSessions());
+  registerHandler("session:live", () => desktop.listLiveSessions());
   // B-1：链接外开——替身只记录 URL 并回 ok（**不真开系统浏览器**；校验仍在 Interface 层，与此替身同形）。
-  ipcMain.handle("app:open-external", (_e, input) => {
+  registerHandler("app:open-external", (_e, input) => {
     openExternalCalls.push(input && input.url);
     return { ok: true };
   });
@@ -129,27 +175,28 @@ function registerIpc() {
   // 回包经 session:operator-response 直连通道（按请求快照校验——选项 id 必须 ⊆ 已发）。
   customerChannel = createCustomerInputChannel({
     presenter: (payload) => {
+      operatorPresentations.push(payload);
       if (!win.isDestroyed()) win.webContents.send("session:operator-request", payload);
     },
     operatorId: "e2e-operator",
   });
-  ipcMain.handle("session:operator-response", (_e, input) =>
+  registerHandler("session:operator-response", (_e, input) =>
     customerChannel.respond(input && typeof input === "object" ? input : {}),
   );
   // M-1：shell 确认卡回包通道（e2e 镜像**生产形态**：本 harness 无 shell presenter ⇒ 无挂起请求，
   // 一律如实回 `expired`——P-1 探针据此断言「Esc=不放行、卡片转**已失效**终态」）。
-  ipcMain.handle("shell:confirm-response", () => ({ ok: false, expired: true, error: "e2e：无挂起请求（镜像生产通道形态）" }));
-  ipcMain.handle("pi-config:get", () => desktop.getPiConfig());
-  ipcMain.handle("pi-config:save", (_e, input) => desktop.savePiConfig(input));
+  registerHandler("shell:confirm-response", () => ({ ok: false, expired: true, error: "e2e：无挂起请求（镜像生产通道形态）" }));
+  registerHandler("pi-config:get", () => desktop.getPiConfig());
+  registerHandler("pi-config:save", (_e, input) => desktop.savePiConfig(input));
   // 自绘标题栏的窗口控制（与 app/main.ts 同形，e2e 镜像真实应用；守卫见 run() 步骤 0）。
-  ipcMain.handle("window:minimize", () => { if (!win.isDestroyed()) win.minimize(); });
-  ipcMain.handle("window:toggle-maximize", () => {
+  registerHandler("window:minimize", () => { if (!win.isDestroyed()) win.minimize(); });
+  registerHandler("window:toggle-maximize", () => {
     if (win.isDestroyed()) return false;
     if (win.isMaximized()) { win.unmaximize(); return false; }
     win.maximize(); return true;
   });
-  ipcMain.handle("window:close", () => { if (!win.isDestroyed()) win.close(); });
-  ipcMain.handle("window:is-maximized", () => (win.isDestroyed() ? false : win.isMaximized()));
+  registerHandler("window:close", () => { if (!win.isDestroyed()) win.close(); });
+  registerHandler("window:is-maximized", () => (win.isDestroyed() ? false : win.isMaximized()));
   win.on("maximize", () => { if (!win.isDestroyed()) win.webContents.send("window:maximized-changed", true); });
   win.on("unmaximize", () => { if (!win.isDestroyed()) win.webContents.send("window:maximized-changed", false); });
 }
@@ -204,7 +251,7 @@ async function run() {
   function setWinHandlers(h) {
     for (const [ch, fn] of Object.entries(h)) {
       ipcMain.removeHandler(ch);
-      ipcMain.handle(ch, fn);
+      registerHandler(ch, fn);
     }
   }
   setWinHandlers({
@@ -803,14 +850,11 @@ async function run() {
     },
   });
   await sleep(300);
-  log("MIRROR_CARD_PRESENT=" + (await wc().executeJavaScript("!!document.querySelector('#chat .msg-handback.is-mirror')")));
-  log("MIRROR_CARD_TITLE=" + (await wc().executeJavaScript("(document.querySelector('#chat .msg-handback.is-mirror .hb-title')||{}).textContent||''")));
-  log("MIRROR_HAS_FROM=" + (await wc().executeJavaScript("(document.querySelector('#chat .msg-handback.is-mirror')||{textContent:''}).textContent.includes('来自 桌面应用 的报告')")));
-  log("MIRROR_STATUS_BLOCKED=" + (await wc().executeJavaScript("!!document.querySelector('#chat .msg-handback.is-mirror .hb-status.hb-blocked')")));
-  log("MIRROR_EVIDENCE_EMPTY=" + (await wc().executeJavaScript("!!document.querySelector('#chat .msg-handback.is-mirror .hb-ev-empty')")));
-  // C-1（2026-10-12）：空证据占位文案 + blocked 的可见区分（左语义色竖条类）。
-  log("MIRROR_EVIDENCE_PLACEHOLDER=" + (await wc().executeJavaScript("(document.querySelector('#chat .msg-handback.is-mirror .hb-ev-empty')||{textContent:''}).textContent.includes('（未提供证据）')")));
-  log("MIRROR_CARD_IS_BLOCKED_VISUAL=" + (await wc().executeJavaScript("!!document.querySelector('#chat .msg-handback.is-mirror.is-blocked')")));
+  log("REPORT_NO_PREMATURE_SU_MIRROR=" + (await wc().executeJavaScript("!document.querySelector('#chat .msg-handback.is-mirror')")));
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面应用')");
+  log("SOURCE_REPORT_BLOCKED=" + (await wc().executeJavaScript("!!document.querySelector('#chat .msg-handback.is-blocked .hb-status.hb-blocked')")));
+  log("SOURCE_REPORT_EVIDENCE_PLACEHOLDER=" + (await wc().executeJavaScript("[...document.querySelectorAll('#chat .msg-handback .hb-ev-empty')].some(e=>e.textContent.includes('（未提供证据）'))")));
+  await wc().executeJavaScript("window.__ansRenderer.selectRole(window.__ansRenderer.state.primaryRoleId)");
   log("SHOT_08_MIRROR=" + (await shot("08-mirror.png")));
 
   // 9b) B-1/B-2/B-3（2026-10-12）：切换保留历史（锚点）→ Markdown 渲染+XSS 转义+链接外开（替身）→ 状态徽标。
@@ -837,6 +881,7 @@ async function run() {
   wc().send("session:event", { roleId: "桌面应用", event: { kind: "message", summary: "用户指令：[回交] 来自 规划者 的报告（任务 T1）\n结论：completed\n摘要：做完了" } });
   await sleep(250);
   log("INJECTED_STYLE_PRESENT=" + (await wc().executeJavaScript("!!document.querySelector('#chat .msg-injected.is-handback')")));
+  log("REPORT_DELIVERY_DETAILS_COLLAPSED=" + (await wc().executeJavaScript("[...document.querySelectorAll('#chat .msg-injected.is-handback details')].some(e=>!e.open)")));
   log("INJECTED_CHIP_LABEL=" + (await wc().executeJavaScript("(document.querySelector('#chat .msg-injected .mi-chip')||{textContent:''}).textContent")));
   log("INJECTED_NOT_USER_BUBBLE=" + (await wc().executeJavaScript("(() => { const el=document.querySelector('#chat .msg-injected'); return !!el && !el.classList.contains('msg-user'); })()")));
   // 手输防误伤：真发一条**以投递前缀开头**的文本，再推它的 `用户指令：` 回显 → 不得变成注入样式。
@@ -1070,6 +1115,22 @@ async function run() {
   const s1TopAfter = await wc().executeJavaScript("Math.round(document.getElementById('chat').scrollTop)");
   log("S1_NOT_YANKED=" + (s1TopAfter === s1TopBefore || Math.abs(s1TopAfter - s1TopBefore) <= 2));
   log("S1_STAYED_AWAY_FROM_BOTTOM=" + ((await wc().executeJavaScript(s1dist)) > 900));
+  const visibleRows = "(() => {const chat=document.getElementById('chat'), rect=chat.getBoundingClientRect(); return [...chat.querySelectorAll('.chat-pane > :not(.virt-spacer)')].filter(e=>{const r=e.getBoundingClientRect();return r.bottom>rect.top && r.top<rect.bottom && r.height>0;}).length;})()";
+  log("VIEWPORT_MIDDLE_HAS_VISIBLE_ROWS=" + ((await wc().executeJavaScript(visibleRows)) > 0));
+  await wc().executeJavaScript("document.getElementById('chat').scrollTop=0");
+  await sleep(200);
+  wc().send("session:event", { roleId: "桌面应用", event: { kind: "message", summary: "上翻顶部的单条输出" } });
+  await sleep(200);
+  log("VIEWPORT_TOP_SINGLE_HAS_VISIBLE_ROWS=" + ((await wc().executeJavaScript(visibleRows)) > 0));
+  wc().send("session:events", [
+    { roleId: "桌面应用", event: { kind: "handback", summary: "坏报告", handback: { roleId: "桌面应用", status: "unreported", summary: "bad", evidence: "invalid" } } },
+    { roleId: "桌面应用", event: { kind: "message", summary: "坏事件之后的合法消息" } },
+    { roleId: "桌面应用", event: { kind: "settled", summary: "异常批量也应正确收尾" } },
+  ]);
+  await sleep(250);
+  log("VIEWPORT_TOP_BATCH_SETTLED_HAS_VISIBLE_ROWS=" + ((await wc().executeJavaScript(visibleRows)) > 0));
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面应用')");
+  log("EVENT_BATCH_CONTINUES_AFTER_ERROR=" + (await wc().executeJavaScript("document.getElementById('chat').textContent.includes('坏事件之后的合法消息') && document.getElementById('chat').textContent.includes('异常批量也应正确收尾')")));
   // ③ 回底后再输出 ⇒ 恢复贴底（双向语义的第三点）。
   await wc().executeJavaScript("(() => { const c=document.getElementById('chat'); c.scrollTop = c.scrollHeight; })()");
   await sleep(200);
@@ -1282,6 +1343,126 @@ async function run() {
   const suAfter = await wc().executeJavaScript(suCountExpr);
   log("REPLAY_NO_DOUBLE_ON_REFRESH=" + (afterRefresh === beforeRefresh && (suBefore < 0 || suAfter === suBefore)));
 
+  // 修复验证使用真实 renderer、preload 和 IPC；失败注入只在测试主进程，不新增生产接口。
+  const repairCheck = (name, value) => {
+    log(name + "=" + value);
+    if (value !== true) throw new Error(name + " failed");
+  };
+  const waitRepair = async (expression) => {
+    for (let attempt = 0; attempt < 250; attempt += 1) {
+      if (await wc().executeJavaScript(expression)) return;
+      await sleep(20);
+    }
+    throw new Error("修复行为等待超时：" + expression);
+  };
+  const inputRepair = async (text) => {
+    await wc().executeJavaScript("(() => { const input=document.getElementById('inp-message'); input.value=" + JSON.stringify(text) + "; input.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true})); })()");
+  };
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面应用')");
+  const rowsBeforeConfirm = await wc().executeJavaScript("window.__ansRenderer.rowModelDebug('桌面应用').count");
+  const callsBeforeConfirm = repairOpenCalls;
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面应用')");
+  repairCheck("SESSION_REPAIR_SAME_ROLE_CONFIRMS_BACKEND", repairOpenCalls === callsBeforeConfirm + 1);
+  repairCheck("SESSION_REPAIR_CONFIRM_PRESERVES_HISTORY", (await wc().executeJavaScript("window.__ansRenderer.rowModelDebug('桌面应用').count")) === rowsBeforeConfirm);
+
+  // 后台被释放但前端仍保留旧开启标记：显式同角色点击应恢复，然后真实投递一份。
+  await wc().executeJavaScript("window.desktop.stopSession('桌面应用')");
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面应用')");
+  chatAdapterMod.takeDemoPromptLog();
+  const sendsBeforeRecovery = repairSendRequests.length;
+  const completionsBeforeRecovery = repairSendCompletions;
+  await inputRepair("修复探针恢复消息");
+  for (let attempt = 0; attempt < 250 && repairSendCompletions === completionsBeforeRecovery; attempt += 1) await sleep(20);
+  await waitRepair("window.__ansRenderer.state.roleBusy['桌面应用'] === false && document.getElementById('inp-message').value === ''");
+  const deliveredRepair = chatAdapterMod.takeDemoPromptLog().filter((entry) => entry.text === "修复探针恢复消息");
+  repairCheck("SESSION_REPAIR_EXPLICIT_RECOVERY_DELIVERS_ONCE", repairSendRequests.length === sendsBeforeRecovery + 1 && deliveredRepair.length === 1);
+
+  repairFailSend = true;
+  const beforeFailure = repairSendRequests.length;
+  await inputRepair("修复探针失败消息");
+  await waitRepair("window.__ansRenderer.state.sessionOpenRoleId === null");
+  repairCheck("SESSION_REPAIR_SEND_FAILURE_INVALIDATES", repairSendRequests.length === beforeFailure + 1 && (await wc().executeJavaScript("document.getElementById('chat').textContent.includes('发送失败原文')")));
+  repairFailSend = false;
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面应用')");
+  repairCheck("SESSION_REPAIR_NO_AUTOMATIC_RESEND", repairSendRequests.length === beforeFailure + 1 && chatAdapterMod.takeDemoPromptLog().every((entry) => entry.text !== "修复探针失败消息"));
+
+  repairThrowSend = true;
+  await inputRepair("修复探针异常消息");
+  await waitRepair("window.__ansRenderer.state.sessionOpenRoleId === null");
+  repairCheck("SESSION_REPAIR_SEND_EXCEPTION_INVALIDATES", await wc().executeJavaScript("document.getElementById('chat').textContent.includes('发送异常原文')"));
+  repairThrowSend = false;
+
+  // 真实粘贴图输入，补开失败须保留文字/附件且没有发送气泡或 send IPC。
+  await wc().executeJavaScript("(() => { const bytes=Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII='), c=>c.charCodeAt(0)); const transfer=new DataTransfer(); transfer.items.add(new File([bytes],'repair.png',{type:'image/png'})); document.getElementById('inp-message').dispatchEvent(new ClipboardEvent('paste',{clipboardData:transfer,bubbles:true,cancelable:true})); })()");
+  await waitRepair("document.querySelectorAll('#attach-row .attach-chip').length === 1");
+  repairFailOpen = true;
+  const sendsBeforeOpenFailure = repairSendRequests.length;
+  const rowsBeforeOpenFailure = await wc().executeJavaScript("window.__ansRenderer.rowModelDebug('桌面应用').count");
+  await inputRepair("修复探针补开失败保留输入");
+  await waitRepair("document.getElementById('chat').textContent.includes('补开失败原文')");
+  repairCheck("SESSION_REPAIR_FAILED_OPEN_PRESERVES_INPUT", await wc().executeJavaScript("document.getElementById('inp-message').value === '修复探针补开失败保留输入' && document.querySelectorAll('#attach-row .attach-chip').length === 1"));
+  repairCheck("SESSION_REPAIR_FAILED_OPEN_DOES_NOT_SEND", repairSendRequests.length === sendsBeforeOpenFailure);
+  repairCheck("SESSION_REPAIR_FAILED_OPEN_NO_USER_BUBBLE", (await wc().executeJavaScript("window.__ansRenderer.rowModelDebug('桌面应用').count")) === rowsBeforeOpenFailure + 1);
+  repairFailOpen = false;
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面应用')");
+  repairCheck("SESSION_REPAIR_FAILED_OPEN_EXPLICIT_RECOVERY", await wc().executeJavaScript("window.__ansRenderer.state.sessionOpenRoleId === '桌面应用' && !document.getElementById('btn-send').disabled"));
+  repairCheck("SESSION_REPAIR_FAILED_OPEN_NO_REPLAY", repairSendRequests.length === sendsBeforeOpenFailure);
+
+  for (const [status, label] of [["unreported", "未报告"], ["failed", "失败"], ["aborted", "已中止"]]) {
+    wc().send("session:event", { roleId: "桌面应用", event: { kind: "handback", summary: "新状态", handback: { roleId: "桌面应用", status, summary: status, evidence: [], at: "2026-10-13T00:00:00Z" } } });
+    await sleep(80);
+    repairCheck("REPORT_STATUS_" + status.toUpperCase(), await wc().executeJavaScript("[...document.querySelectorAll('#chat .msg-handback .hb-status')].some(e=>e.textContent===" + JSON.stringify(label) + ")"));
+  }
+
+  // 真实renderer进程退出→明确故障页→用户点击恢复；沿同一helper及受限preload，不调用模型。
+  let pendingAnswered = false;
+  wc().send("session:events", Array.from({ length: 450 }, (_, index) => ({ roleId: "桌面应用", event: { kind: "tool_call", summary: "待确认定位长会话 " + index } })));
+  await sleep(100);
+  await wc().executeJavaScript("document.getElementById('chat').scrollTop=0");
+  await sleep(80);
+  const pendingOutcome = Promise.resolve(customerChannel.customerInput({ kind: "confirm", title: "重载后仍需客户明确作答" }, { roleId: "桌面应用" })).then((value) => { pendingAnswered = true; return value; });
+  const pendingId = operatorPresentations[operatorPresentations.length - 1].id;
+  await sleep(100);
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面应用')");
+  await sleep(150);
+  repairCheck("PENDING_EXPLICIT_SAME_ROLE_CARD_AND_BUTTON_VISIBLE", await wc().executeJavaScript("(() => {const card=document.querySelector('[data-request-id=" + pendingId + "]'),button=card&&card.querySelector('.op-confirm'),view=document.getElementById('chat').getBoundingClientRect();if(!card||!button)return false;const r=card.getBoundingClientRect(),b=button.getBoundingClientRect();return card.textContent.includes('重载后仍需客户明确作答') && r.top>=view.top-1 && r.bottom<=view.bottom+1 && b.top>=view.top && b.bottom<=view.bottom;})()"));
+  const sendsBeforeCrash = repairSendRequests.length;
+  const projectBeforeCrash = recoverySnapshot.projectRoot;
+  const failureLoaded = new Promise((resolve) => wc().once("did-finish-load", resolve));
+  wc().forcefullyCrashRenderer();
+  await failureLoaded;
+  repairCheck("RECOVERY_VISIBLE_FAILURE_BUTTON", await wc().executeJavaScript("!!document.getElementById('reload-interface')"));
+  const restoredLoaded = new Promise((resolve) => wc().once("did-finish-load", resolve));
+  await wc().executeJavaScript("document.getElementById('reload-interface').click()");
+  await restoredLoaded;
+  await waitRepair("window.__ansRenderer && window.__ansRenderer.state.sessionOpenRoleId === '桌面应用'");
+  repairCheck("RECOVERY_PROJECT_AND_ROLE_RESTORED", await wc().executeJavaScript("window.__ansRenderer.state.projectRoot === " + JSON.stringify(projectBeforeCrash)));
+  await wc().executeJavaScript("window.desktop.recoveryReady()");
+  await sleep(100);
+  repairCheck("RECOVERY_SAME_PENDING_CARD_ONCE", await wc().executeJavaScript("document.querySelectorAll('[data-request-id=" + pendingId + "]').length === 1"));
+  repairCheck("RECOVERY_NO_AUTO_REPLY_OR_SEND", pendingAnswered === false && repairSendRequests.length === sendsBeforeCrash);
+  const answered = await wc().executeJavaScript("window.desktop.operatorRespond({id:" + JSON.stringify(pendingId) + ",decision:{kind:'confirm',confirmed:true}})");
+  repairCheck("RECOVERY_OLD_REQUEST_STILL_ANSWERABLE", answered.ok === true && (await pendingOutcome).outcome === "answered");
+  const replayBeforeEnded = operatorPresentations.length;
+  await wc().executeJavaScript("window.desktop.recoveryReady()");
+  repairCheck("RECOVERY_ENDED_REQUEST_NOT_REPLAYED", operatorPresentations.length === replayBeforeEnded);
+  await diagnosticStore.flushDiagnostics();
+  const diagnosticFiles = fs.readdirSync(path.join(OUTDIR, "diagnostics")).filter((file) => file.endsWith(".jsonl"));
+  const diagnosticText = diagnosticFiles.map((file) => fs.readFileSync(path.join(OUTDIR, "diagnostics", file), "utf8")).join("");
+  repairCheck("DIAGNOSTICS_WINDOW_AND_RENDERER_EVENTS", ["window.renderer.gone", "renderer.event-error", "renderer.viewport", "renderer.replay", "renderer.recovery"].every((event) => diagnosticText.includes('"event":"' + event + '"')));
+
+  // macOS同类窗口close后重建：同helper释放自有handlers，真实Electron再注册并加载。
+  const oldWindow = win;
+  const windowClosed = new Promise((resolve) => oldWindow.once("closed", resolve));
+  oldWindow.close();
+  await windowClosed;
+  win = new BrowserWindow({ width: 1360, height: 860, show: true, frame: false, webPreferences: { preload: path.join(APP_DIR, "preload.cjs"), contextIsolation: true, nodeIntegration: false, sandbox: false } });
+  registerIpc();
+  await win.loadFile(path.join(APP_DIR, "renderer", "index.html"));
+  await waitRepair("window.__ansRenderer && window.__ansRenderer.state.sessionOpenRoleId === '桌面应用'");
+  repairCheck("MAC_CLOSE_REOPEN_LOADS_WITHOUT_DUPLICATE_HANDLERS", await wc().executeJavaScript("!!document.getElementById('inp-message') && !!window.desktop"));
+  repairCheck("MAC_CLOSE_REOPEN_NO_AUTO_SEND", repairSendRequests.length === sendsBeforeCrash);
+
   log("E2E_DONE=1");
 }
 
@@ -1301,6 +1482,9 @@ app.whenReady().then(async () => {
     // D-1：会话记录恢复（真实现场；只读解析）。
     const shMod = await import(pathToFileURL(path.join(APP_DIR, "desktop", "session-history.ts")).href);
     readRoleSessionHistory = shMod.readRoleSessionHistory;
+    diagnosticModule = await import(pathToFileURL(path.join(APP_DIR, "desktop", "diagnostics.ts")).href);
+    diagnosticStore = await import(pathToFileURL(path.join(APP_DIR, "..", "src", "common", "shared", "diagnostics.ts")).href);
+    diagnosticStore.configureDiagnostics({ directory: path.join(OUTDIR, "diagnostics") });
   } catch (err) {
     fs.writeFileSync(path.join(OUTDIR, "report.txt"), "IMPORT_ERROR=" + (err && err.stack ? err.stack : err) + "\n");
     app.quit();

@@ -59,7 +59,8 @@ import { openRoleSession } from "../../src/pipeline/orchestration/run-role.ts";
 import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
 // E-1（2026-10-12）：「回交后的 su 验收」的两件**单一来源**（编排提供，只读导入、不复制）——
 // `renderHandbackPrompt`（投递给 su 的输入文案）与 `handbackKey`（去重键）。**两前端共用、不得各写一份**。
-import { renderHandbackPrompt, handbackKey, type TaskHandback } from "../../src/common/编排/handback.ts";
+import { renderHandbackPrompt, renderHandbackBatchPrompt, handbackKey, type TaskHandback } from "../../src/common/编排/handback.ts";
+import { createDiagnosticLogger } from "../../src/common/shared/diagnostics.ts";
 import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputRequest } from "../../src/provider/pi/session.ts";
 // H-1（2026-10-12）：派发能力的冻结契约（§4 冻结家；只读导入、不复制形状）。
 import type { DispatchTaskPayload, DispatchReceipt, DispatchTaskFn, PromptOptions } from "../../src/provider/pi/session.ts";
@@ -71,7 +72,7 @@ import type { DesktopShellArming } from "./operator-channel.ts";
 // su 只读档（客户裁定 2026-10-12：「su 也要有 shell，但是只读」）：只读档装配选项形状的**单一来源**在编排
 // （`shell-arming.ts::AssembleReadonlyShellGateOptions`）——只读导入其类型（运行期擦除），据它取「只读档
 // 该注入哪几件」。**不另立第二形状**（与 `DesktopShellArming` 同法，见 operator-channel.ts 注释）。
-import type { AssembleReadonlyShellGateOptions } from "../../src/pipeline/orchestration/shell-arming.ts";
+import type { AssembleReadonlyShellGateOptions, RoutineShellPolicy } from "../../src/pipeline/orchestration/shell-arming.ts";
 // 桌面客户交互通道（A-5）：请求/裁决的冻结形状在 §4 冻结契约家（provider/pi/session.ts），
 // 本模块只读导入转出；`DesktopCustomerInputFn` 是本层对「带角色上下文」的窄扩展（请求本体不带 roleId）。
 import type { DesktopCustomerInputFn } from "./customer-input.ts";
@@ -188,6 +189,7 @@ export interface SessionManagerDeps {
     input: {
       roleId: string;
       project: ProjectConfig;
+      routineShellPolicy?: RoutineShellPolicy;
       taskId?: string;
       scope?: undefined;
       /** **客户确认制交互通道**（A-1/A-3）：仅内置治理角色（su）会话注入（见 SessionManager.open）。 */
@@ -285,6 +287,12 @@ export interface SessionManagerDeps {
    * （发行 writeSet 在编排 `confirmed-writes.ts`；写不写在 gate/工具）。
    */
   customerInput?: DesktopCustomerInputFn;
+  /**
+   * **实时重枚举并刷新共享角色缓存（2026-10-13 首轮寻址修复）**：`routeDispatch` 缓存 miss 时调用一次——
+   * 实现应为「与界面 `listProject` **同一路径**读盘枚举 + 更新**同一份**共享缓存」（Interface 层给出）。
+   * 缺省 ⇒ miss 时按原口径如实拒绝（不重枚举；测试替身可省）。
+   */
+  refreshListing?: (projectRoot: string) => Promise<void>;
 }
 
 /** 一个**保活**中的角色会话（B-2：每角色一个句柄 + LRU）。 */
@@ -327,6 +335,8 @@ interface DeliveryItem {
    * 都带原图）。缺省（undefined）= 纯文本，投递调用形态与旧版逐字一致（不传第二参）。
    */
   opts?: PromptOptions;
+  handback?: TaskHandback;
+  batchItems?: readonly DeliveryItem[];
 }
 
 /**
@@ -378,6 +388,11 @@ export class SessionManager {
   private lruClock = 0;
   /** 最近一次 open 的角色（`send` 的目标）。 */
   private activeRoleId: string | null = null;
+  /** 用户显式选择/关闭的版本：后台重建只能恢复同一选择，不能抢回用户的新目标。 */
+  private selectionVersion = 0;
+  private selectionTargetRoleId: string | null = null;
+  /** 关闭全部使旧扫描尚未开始的重建步骤失效；选角色不取消后台扫描。 */
+  private boundaryRefreshVersion = 0;
   /** 最近一次 open 用的运行时（自动开启会话时沿用——渲染侧现实里恒为 "pi"）。 */
   private lastRuntime: RuntimeKind = "pi";
   // —— 投递机（E-1 回交投 su + H-1 派发投目标角色；**同一套**，不造第二套）——
@@ -503,9 +518,10 @@ export class SessionManager {
   private rebuildIfBoundaryStale(
     roleId: string,
     userInitiated: boolean,
+    selectionVersion = this.selectionVersion,
   ): Promise<{ changed: string; reopened: OpenResult } | undefined> {
     const prev = this.rebuildChains.get(roleId) ?? Promise.resolve();
-    const run = prev.then(() => this.rebuildIfBoundaryStaleUnsafe(roleId, userInitiated));
+    const run = prev.then(() => this.rebuildIfBoundaryStaleUnsafe(roleId, userInitiated, selectionVersion));
     const tail = run.then(
       () => undefined,
       () => undefined
@@ -520,26 +536,37 @@ export class SessionManager {
   private async rebuildIfBoundaryStaleUnsafe(
     roleId: string,
     userInitiated: boolean,
+    selectionVersion: number,
   ): Promise<{ changed: string; reopened: OpenResult } | undefined> {
     const entry = this.sessions.get(roleId);
     if (!entry) return undefined;
+    const wasActive = this.activeRoleId === roleId;
     if (entry.busy) return undefined; // 在跑的轮次不打断（settle 后放行/下次发言/下次投递再查）
     const changed = await this.boundaryDiff(entry);
     if (changed === null) return undefined;
     if (this.sessions.get(roleId) !== entry || entry.busy) return undefined; // 读盘期间被替换/开跑（TOCTOU）
     const projectRoot = entry.projectRoot;
+    const diagnostic = createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId });
+    diagnostic.record("session.rebuild.start");
     // D-1：dispose **不擦除**会话文件——先探「在/不在/坏」，重开后会按它恢复（措辞据此如实）。
     const probe = await probeSessionFile(projectRoot, roleId);
     if (this.sessions.get(roleId) !== entry || entry.busy) return undefined; // 探测期间被替换/开跑（TOCTOU）
     await this.disposeEntry(roleId, entry);
     this.deps.emitEvent({ roleId, event: { kind: "message", summary: this.boundaryRebuiltLine(changed, probe) } });
-    const reopened = await this.openInternal({ projectRoot, roleId, runtime: this.lastRuntime }, userInitiated);
+    // 重建不自行选择角色。仅成功且用户意图未改变时恢复被 dispose 清空的活动目标。
+    const reopened = await this.openInternal({ projectRoot, roleId, runtime: this.lastRuntime }, false);
+    if (reopened.ok && (wasActive || userInitiated) && this.selectionVersion === selectionVersion) {
+      const current = this.sessions.get(roleId);
+      if (current && current.projectRoot === projectRoot) this.activeRoleId = roleId;
+    }
     if (!reopened.ok) {
+      diagnostic.error("session.rebuild.failed", new Error(reopened.error || "重开失败"));
       this.deps.emitEvent({
         roleId,
         event: { kind: "message", summary: `按新边界重开会话失败：${reopened.error ?? "未知原因"}（请重试或点击左侧角色）。` },
       });
     }
+    diagnostic.record("session.rebuild.end", { ok: reopened.ok });
     return { changed, reopened };
   }
 
@@ -550,7 +577,9 @@ export class SessionManager {
    */
   async refreshStaleBoundaries(): Promise<string[]> {
     const rebuiltIds: string[] = [];
+    const refreshVersion = this.boundaryRefreshVersion;
     for (const roleId of [...this.sessions.keys()]) {
+      if (this.boundaryRefreshVersion !== refreshVersion) break;
       try {
         const rebuilt = await this.rebuildIfBoundaryStale(roleId, false);
         if (rebuilt !== undefined) rebuiltIds.push(roleId);
@@ -565,11 +594,19 @@ export class SessionManager {
    * 点角色 → 直接建立/续接会话（无确认框）。见上方类内注释：O-1 起，续接/开启前先查**边界快照**。
    */
   async open(req: SessionOpenRequest): Promise<OpenResult> {
-    return this.openInternal(req, true);
+    const selectionVersion = ++this.selectionVersion;
+    this.selectionTargetRoleId = req.roleId;
+    await this.rebuildChains.get(req.roleId);
+    const diagnostic = createDiagnosticLogger({ component: "desktop.session", projectRoot: req.projectRoot, roleId: req.roleId });
+    diagnostic.record("session.open.start");
+    const result = await this.openInternal(req, true, selectionVersion);
+    diagnostic.record("session.open.end", { ok: result.ok });
+    if (!result.ok) diagnostic.error("session.open.failed", new Error(result.error || "会话开启失败"));
+    return result;
   }
 
   /** `open` 的实现（`userInitiated=false` = 投递机后台自动开启：不抢活动角色，其余逐字同）。 */
-  private async openInternal(req: SessionOpenRequest, userInitiated: boolean): Promise<OpenResult> {
+  private async openInternal(req: SessionOpenRequest, userInitiated: boolean, selectionVersion = this.selectionVersion): Promise<OpenResult> {
     if (!req.projectRoot || !req.roleId) {
       return { ok: false, error: "缺少项目根或角色 id。" };
     }
@@ -579,14 +616,20 @@ export class SessionManager {
     if (existing && existing.projectRoot === req.projectRoot) {
       // O-1（2026-10-12）：续接前先查**边界快照**——陈旧 ⇒ 作废并按下方**新建**路径重开（历史按 D-1 恢复）；
       // 未陈旧 ⇒ 逐字续接（**绝不**误重开丢上下文）。在跑的轮次不打断（busy 时跳过，下一时机再查）。
-      const rebuilt = await this.rebuildIfBoundaryStale(req.roleId, userInitiated);
+      const rebuilt = await this.rebuildIfBoundaryStale(req.roleId, userInitiated, selectionVersion);
       if (rebuilt === undefined) {
-        existing.lastUsed = ++this.lruClock;
-        if (userInitiated) this.activeRoleId = req.roleId;
+        // 串行等待期间后台可能已替换旧条目，续接必须取当前句柄。
+        const current = this.sessions.get(req.roleId);
+        if (!current || current.projectRoot !== req.projectRoot) {
+          return { ok: false, error: "会话已关闭，请重新点击角色。" };
+        }
+        current.lastUsed = ++this.lruClock;
+        if (userInitiated && this.selectionVersion === selectionVersion) this.activeRoleId = req.roleId;
+        this.notifyRoleState(req.projectRoot, req.roleId); // 重载/续接恢复真实busy与队列，不另推导。
         return {
           ok: true,
           note: "已在该角色的会话中，续接当前会话。",
-          config: existing.config,
+          config: current.config,
           resumed: true,
           contextSource: "resumed",
         };
@@ -640,6 +683,10 @@ export class SessionManager {
       reason: source.downgradeReason,
     };
     const boundary = role.boundary;
+    let routineShellPolicy: RoutineShellPolicy | undefined;
+    if (role.builtIn !== true && config.accepted) {
+      routineShellPolicy = { enabled: true, projectRoot: req.projectRoot, authorizationSource: "customer-delegated-routine-checks" };
+    }
 
     // ——— 客户确认制交互（A-1/A-3/A-5）：**仅内置治理角色（su）**的会话注入客户交互通道 ———
     //
@@ -655,7 +702,7 @@ export class SessionManager {
     //   真实 run-role 会静默忽略本字段（我方透传就位，等待其承接——见 change 文档）。
     const dispatchTask: DispatchTaskFn | undefined =
       role.builtIn === true
-        ? (d: DispatchTaskPayload): DispatchReceipt => this.routeDispatch(req.projectRoot, req.roleId, d)
+        ? (d: DispatchTaskPayload) => this.routeDispatch(req.projectRoot, req.roleId, d) // Promise<DispatchReceipt>——契约允许（工具侧 await）
         : undefined;
 
     // I-1（2026-10-12，客户裁定 arm）：**只对项目角色**把 (a) 操作者确认通道交给编排装配 (c)/(b)/(a)
@@ -716,6 +763,7 @@ export class SessionManager {
         {
           roleId: req.roleId,
           project,
+          ...(routineShellPolicy ? { routineShellPolicy } : {}),
           // 客户交互通道（A-5）：仅内置治理角色（su）会话注入；**每会话闭包绑定 roleId**（请求本体不带
           // 角色标识——渲染侧据它把交互卡落到该角色的聊天流、点亮 B-3「等待你确认」）。普通角色逐字不传。
           ...(customerInput
@@ -763,7 +811,7 @@ export class SessionManager {
       boundaryPrints,
     };
     this.sessions.set(req.roleId, entry);
-    if (userInitiated) this.activeRoleId = req.roleId; // 后台自动开启不抢活动角色（见 open 头注）
+    if (userInitiated && this.selectionVersion === selectionVersion) this.activeRoleId = req.roleId; // 后台自动开启不抢活动角色
     // 状态准确性 / L-1：开好即外推**真实状态快照**（busy=false + 该角色既有队列摘要）——徽标/队列行据此准确。
     this.notifyRoleState(req.projectRoot, req.roleId);
     this.consume(req.roleId, handle, req.projectRoot);
@@ -812,6 +860,7 @@ export class SessionManager {
           }
         }
       } catch (err) {
+        createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId }).error("session.events.failed", err);
         this.deps.emitEvent({
           roleId,
           event: { kind: "message", summary: `会话事件流异常：${err instanceof Error ? err.message : String(err)}` },
@@ -831,21 +880,26 @@ export class SessionManager {
     // 与本次 send 各自的重建赛跑）会在窗口里清空/替换 `activeRoleId`——按「当下的 activeRoleId」取条目会让
     // 本条消息**落空**（旧实现会回「会话尚未开启」且消息丢失）。用户的意图是入口那一刻的活动角色，照它走。
     const targetRoleId = this.activeRoleId;
+    const selectionVersion = this.selectionVersion;
+    const diagnostic = createDiagnosticLogger({ component: "desktop.session", projectRoot: this.activeEntry()?.projectRoot, roleId: targetRoleId ?? undefined });
+    diagnostic.record("session.send.start");
     // O-1（2026-10-12）：发言前先查**边界快照**——陈旧 ⇒ 先作废重建（本条发言直接落到新边界会话上；
     // 重建失败 ⇒ 如实回错、本条不发送）。在跑的轮次由 rebuild 内部跳过（不打断）。
     if (targetRoleId !== null) {
       const rebuilt = await this.rebuildIfBoundaryStale(targetRoleId, true);
       if (rebuilt !== undefined && !rebuilt.reopened.ok) {
-        return { ok: false, error: "该角色边界已更新，但按新边界重开会话失败——本条消息未发送，请重试。" };
+        diagnostic.error("session.send.failed", new Error(rebuilt.reopened.error || "重开失败"));
+        return { ok: false, error: `该角色边界已更新，但按新边界重开会话失败：${rebuilt.reopened.error ?? "未知原因"}——本条消息未发送，请重试。` };
       }
     }
     const entry = targetRoleId !== null ? this.sessions.get(targetRoleId) : undefined;
     if (!entry) {
+      diagnostic.record("session.send.failed", { reasonCode: "session-not-open" });
       return { ok: false, error: "会话尚未开启（点击左侧角色即可开启）。" };
     }
     // 并发重建可能把活动指针清掉（dispose 置 null、后台重开不抢位）——用户意图仍指向 targetRoleId：复位。
     // （若用户期间开了**别的**角色，activeRoleId 非 null，不动它——不抢位。）
-    if (this.activeRoleId === null) this.activeRoleId = targetRoleId;
+    if (this.activeRoleId === null && this.selectionVersion === selectionVersion) this.activeRoleId = targetRoleId;
     if (entry.busy) {
       const roleId = targetRoleId as string;
       this.enqueueDelivery(entry.projectRoot, roleId, {
@@ -860,6 +914,7 @@ export class SessionManager {
         ...(opts !== undefined ? { opts } : {}),
       });
       const q = this.deliveryQueues.get(this.queueKey(entry.projectRoot, roleId));
+      diagnostic.record("session.send.queued", { queueDepth: q?.length ?? 0 });
       return { ok: true, queued: true, position: q ? q.length : 1 };
     }
     const roleId = targetRoleId as string;
@@ -881,8 +936,10 @@ export class SessionManager {
         await entry.handle.send(text, opts);
       }
       this.notifyRoleState(entry.projectRoot, roleId); // 状态准确性：真开跑即外推「工作中」（繁忙与否以会话条目为准）
+      diagnostic.record("session.send.end", { ok: true });
       return { ok: true };
     } catch (err) {
+      diagnostic.error("session.send.failed", err);
       entry.busy = false;
       this.notifyRoleState(entry.projectRoot, roleId);
       return { ok: false, error: err instanceof Error ? err.message : String(err) };
@@ -919,6 +976,18 @@ export class SessionManager {
    * （换项目/退出时用）。dispose 出错如实返回（不静默）。
    */
   async stop(roleId?: string | null): Promise<StopResult> {
+    createDiagnosticLogger({ component: "desktop.session", roleId: roleId ?? undefined }).record("session.stop", { count: this.sessions.size });
+    if (typeof roleId !== "string" || roleId === "" || roleId === this.selectionTargetRoleId) {
+      ++this.selectionVersion;
+      this.selectionTargetRoleId = null;
+    }
+    // 重建会暂时移出条目。等已在途的链收尾后再释放，避免关闭遗漏重建中的句柄。
+    if (typeof roleId === "string" && roleId !== "") {
+      await this.rebuildChains.get(roleId);
+    } else {
+      ++this.boundaryRefreshVersion;
+      await Promise.all([...this.rebuildChains.values()]);
+    }
     if (typeof roleId === "string" && roleId !== "") {
       const entry = this.sessions.get(roleId);
       if (!entry) {
@@ -1055,6 +1124,8 @@ export class SessionManager {
    *  都会变成未捕获拒绝**——故：(1) 形状防御（缺 `handback` 载荷 / 缺 `roleId`）先拦；(2) `renderHandbackPrompt`
    *  渲染包 try/catch（坏形状绝不喂给它）；(3) 整体再包一层 catch——一切都落**如实系统行**，绝不上抛。 */
   private async handleHandback(projectRoot: string, hb: TaskHandback): Promise<void> {
+    const diagnostic = createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId: hb?.roleId });
+    diagnostic.record("report.received", { outcome: hb?.status });
     try {
       if (!hb || typeof hb !== "object" || typeof (hb as { roleId?: unknown }).roleId !== "string") {
         this.emitDeliveryNote(
@@ -1067,7 +1138,10 @@ export class SessionManager {
       const suRoleId = this.suRoleIdOf(projectRoot);
       if (suRoleId !== null && hb.roleId === suRoleId) return; // su 不自我回交（编排也不发；防御）
       const key = `${projectRoot}\u0000${handbackKey(hb)}`;
-      if (this.enqueuedHandbackKeys.has(key)) return; // 去重：重放/重渲染不得重复投递
+      if (this.enqueuedHandbackKeys.has(key)) {
+        diagnostic.record("report.duplicate");
+        return;
+      }
       this.enqueuedHandbackKeys.add(key);
       // 输入文案：编排的 `renderHandbackPrompt`（**单一来源**——两前端共用，本层不各写一份）；**入队即定格**。
       // 渲染失败（载荷再坏一档）→ 如实系统行 + 不入队（**绝不**把 undefined 喂进渲染函数）。
@@ -1089,9 +1163,12 @@ export class SessionManager {
         text,
         summary: `回交投递 · 来自 ${hb.roleId}`,
         dedupKey: key,
+        handback: hb,
       });
+      diagnostic.record("report.enqueued");
       await this.drainQueue(projectRoot, suRoleId);
     } catch (err) {
+      diagnostic.error("report.failed", err);
       // 兜底（belt & braces）：任何意外都如实拦截为系统行——**不产生未捕获拒绝**。
       this.emitDeliveryNote(
         this.suRoleIdOf(projectRoot),
@@ -1107,8 +1184,15 @@ export class SessionManager {
    * 回执语义：**入队即回 `{ok:true,"已受理…"}`**（受理≠已完成——目标收到/失败会在两边聊天流如实显示）；
    * 失败原因进回执（工具如实转达 su）并同步放系统行。去重：`roleId\0task\0reason`——**队列期**窗口去重
    * （载荷无 id/时间，契约钉死不扩；投递成功即释放，**返工可再派发同文任务**）；一条派发**只在在途窗口**受限。
+   *
+   * **首轮寻址修复（2026-10-13 真机 bootstrap J-1 缺陷）**：角色表是**导入项目时枚举的缓存**——全新空项目
+   * bootstrap 首轮里，su 建好角色后**同一轮内**就派发，缓存里还没有新角色（那时 `角色卡/` 不存在）
+   * ⇒ 旧实现如实回「不在本项目（未枚举到）」——J-1「落盘后自动开工」首轮必失败。现：缓存 miss 时经
+   * `deps.refreshListing` **实时重枚举一次**（与界面 `listProject` 同一路径、刷**同一份**共享缓存——
+   * 后续 `openInternal` 自动开会话读的也是它）再判；重枚举失败/仍无 ⇒ 按原口径如实拒绝（不静默、不重试风暴）。
+   * 异步回执：契约 `DispatchTaskFn` 本就允许 `Promise<DispatchReceipt>`（工具侧 await）。
    */
-  private routeDispatch(projectRoot: string, fromRoleId: string, d: DispatchTaskPayload): DispatchReceipt {
+  private async routeDispatch(projectRoot: string, fromRoleId: string, d: DispatchTaskPayload): Promise<DispatchReceipt> {
     const targetRoleId = d && typeof d.roleId === "string" ? d.roleId.trim() : "";
     const task = d && typeof d.task === "string" ? d.task : "";
     const fail = (message: string, row: string): DispatchReceipt => {
@@ -1118,8 +1202,20 @@ export class SessionManager {
     if (targetRoleId === "" || task.trim() === "") {
       return fail("派发未受理：roleId 与 task 都必须非空。", "派发未受理：roleId 与 task 都必须非空。");
     }
-    const listing = this.deps.getListing(projectRoot);
-    const target = listing ? listing.roles.find((r) => r.roleId === targetRoleId) : undefined;
+    const findTarget = (): { builtIn?: boolean } | undefined => {
+      const listing = this.deps.getListing(projectRoot);
+      return listing ? listing.roles.find((r) => r.roleId === targetRoleId) : undefined;
+    };
+    let target = findTarget();
+    if (!target && this.deps.refreshListing) {
+      // 缓存 miss ⇒ 实时重枚举一次（bootstrap 首轮：新角色刚落盘、缓存来自导入时点——见方法注释）。
+      try {
+        await this.deps.refreshListing(projectRoot);
+      } catch {
+        // 重枚举失败（读盘竞态等）：按原 miss 口径如实拒绝，不上抛。
+      }
+      target = findTarget();
+    }
     if (!target) {
       return fail(
         `派发未受理：角色 ${targetRoleId} 不在本项目（未枚举到）。`,
@@ -1207,6 +1303,7 @@ export class SessionManager {
     const q = this.deliveryQueues.get(key);
     if (!q || q.length === 0) return;
     const item = q[0];
+    const diagnostic = createDiagnosticLogger({ component: "desktop.delivery", projectRoot, roleId: resolvedTarget });
 
     if (resolvedTarget === "") {
       const noteKey = this.queueKey(projectRoot, "");
@@ -1240,7 +1337,10 @@ export class SessionManager {
       this.suDeliveryBlockedNoted.delete(this.queueKey(projectRoot, ""));
     }
     if (!entry || entry.projectRoot !== projectRoot) return; // 防御：仍不可用则保持排队
-    if (entry.busy) return; // 目标忙（有轮次在跑）：排队等 settled（绝不并发 send）
+    if (entry.busy) {
+      diagnostic.record("delivery.blocked", { reasonCode: "target-busy", queueDepth: q.length });
+      return;
+    }
 
     // O-1：投递前查边界快照——陈旧 ⇒ 先作废重建（投递落到新边界会话上；失败则队列保留待重试）。
     const rebuilt = await this.rebuildIfBoundaryStale(resolvedTarget, false);
@@ -1250,7 +1350,19 @@ export class SessionManager {
       if (!entry || entry.projectRoot !== projectRoot) return; // 防御：重开后仍不可用
     }
 
-    const sent = q.shift() as DeliveryItem;
+    // 仅 su 队首连续回交合批；客户消息/派发是屏障，正文仍由编排唯一生成。
+    let batchCount = 1;
+    if (resolvedTarget === this.suRoleIdOf(projectRoot) && item.kind === "handback" && item.handback) {
+      while (batchCount < q.length && q[batchCount].kind === "handback" && q[batchCount].handback) batchCount += 1;
+    }
+    let text = item.text;
+    let summary = item.summary;
+    if (batchCount > 1) {
+      text = renderHandbackBatchPrompt(q.slice(0, batchCount).map((queued) => queued.handback as TaskHandback));
+      summary = `回交批次 · ${batchCount} 份报告 · 来自 ${q.slice(0, batchCount).map((queued) => queued.sourceRoleId).join("、")}`;
+    }
+    const sentItems = q.splice(0, batchCount);
+    const sent: DeliveryItem = { ...sentItems[0], text, summary, batchItems: sentItems };
     if (q.length === 0) this.deliveryQueues.delete(key);
     this.notifyRoleState(projectRoot, resolvedTarget); // L-1：出队即外推（队列行/徽标随之更新）
     // 形状防御（真机崩溃修复的姊妹项）：条目坏了就**不投**——如实一行，绝不把 undefined 喂给 send。
@@ -1264,6 +1376,7 @@ export class SessionManager {
     }
     // 先置忙再 await（防「open 尾部放行」与本次调用竞态导致并发 send）；失败则复位。
     entry.busy = true;
+    diagnostic.record("delivery.start", { count: batchCount, queueDepth: q.length, state: sent.kind });
     this.notifyRoleState(projectRoot, resolvedTarget); // 状态准确性：投递开跑即外推「工作中」（shift 时快照尚为闲）
     try {
       // P0-1：**入队即定格**的整包载荷原样透传（整包同一引用；不传时调用形态与旧版逐字一致）。
@@ -1273,10 +1386,11 @@ export class SessionManager {
         await entry.handle.send(sent.text, sent.opts);
       }
       this.activeDeliveries.set(key, sent); // 右栏「进行中」：投递已开跑（settled/失败/dispose 时清除）
+      diagnostic.record("delivery.end", { ok: true, count: batchCount, state: sent.kind });
       this.notifyRoleState(projectRoot, resolvedTarget); // 立即外推（running 行即时可见）
       if (sent.kind === "dispatch") this.activeDispatchKeys.delete(sent.dedupKey); // 送达即释放窗口去重（返工可再派）
       if (sent.kind === "handback") {
-        this.emitDeliveryNote(resolvedTarget, sent.sourceRoleId, `已自动投递 ${sent.sourceRoleId} 的回交给 su（请其验收：确认通过 / 要求返工 / 上报客户）。`);
+        this.emitDeliveryNote(resolvedTarget, sent.sourceRoleId, `已自动投递 ${sentItems.map((queued) => queued.sourceRoleId).join("、")} 的回交给 su（等待验收与汇总）。`);
       } else if (sent.kind === "dispatch") {
         // 派发成功：目标 pane 看得见"任务到货"，su 的 pane 有一条受理回执行（受理≠已完成，如实）。
         this.emitDeliveryNote(resolvedTarget, sent.sourceRoleId, `已接收来自 ${sent.sourceRoleId} 的派发任务——请按任务文本执行，完成后交回报告。`);
@@ -1285,11 +1399,12 @@ export class SessionManager {
       // message 类（排队后的客户消息投递）：**不加额外文案**——消息本体随会话事件出现（真实 pi 的
       // 「用户指令：」回显走注入样式行），此前误落进派发分支（「已接收…派发任务」对消息是错口径，已修）。
     } catch (err) {
+      diagnostic.error("delivery.failed", err, { count: batchCount, state: sent.kind });
       // 投递失败：**如实提示 + 放回队首**（保持顺序）待重试——绝不静默丢。
       const en = this.sessions.get(resolvedTarget);
       if (en) en.busy = false;
       this.activeDeliveries.delete(key); // 「进行中」撤销（并没有在跑）
-      q.unshift(sent);
+      q.unshift(...sentItems);
       this.deliveryQueues.set(key, q);
       this.notifyRoleState(projectRoot, resolvedTarget); // 放回队首：队列快照恢复（如实）
       const base = err instanceof Error ? err.message : String(err);

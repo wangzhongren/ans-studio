@@ -37,7 +37,7 @@ function allowGate(): (p: string) => WriteDecision {
 
 // —————————————————————— 1. wireSettledOnce（stub 会话） ——————————————————————
 
-test("wireSettledOnce（stub）：一次 settle ⇒ 恰 1 个 settled；两次 ⇒ 2；其它事件不产 settled；退订生效", () => {
+test("wireSettledOnce（stub）：同轮重复settle只发一次；新轮再发；退订生效", () => {
   const listeners = new Set<(e: { type: string }) => void>();
   const stub = {
     subscribe(listener: (e: { type: string }) => void): () => void {
@@ -57,7 +57,10 @@ test("wireSettledOnce（stub）：一次 settle ⇒ 恰 1 个 settled；两次 �
   assert.equal(events[0]!.summary, "会话结束");
 
   fire("agent_settled");
-  assert.equal(events.filter((e) => e.kind === "settled").length, 2, "两次 settle ⇒ 两个（每轮一个）");
+  assert.equal(events.filter((e) => e.kind === "settled").length, 1, "同轮重复settle不能重复终态");
+  fire("agent_start");
+  fire("agent_settled");
+  assert.equal(events.filter((e) => e.kind === "settled").length, 2, "明确新轮再发终态");
 
   unsubscribe();
   fire("agent_settled");

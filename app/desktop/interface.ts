@@ -322,6 +322,13 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     // 客户交互通道（A-5）：su 的 request_confirmation/request_choice 经它摆到界面并取回裁决
     // （仅内置治理角色会话消费；缺省未接 ⇒ 不注入 ⇒ 无确认制——绝不悄悄放行）。
     customerInput: deps.customerInput,
+    // 首轮寻址修复（2026-10-13 真机 bootstrap J-1 缺陷）：派发路由缓存 miss 时**实时重枚举一次**——
+    // 与界面 listProject 同一路径（同一 listProjectFn）、刷**同一份**共享缓存（后续 openInternal 自动
+    // 开会话读的也是它）。全新空项目 bootstrap 首轮：su 建好角色后同一轮内派发即可寻址。
+    refreshListing: async (root: string) => {
+      const fresh = await listProjectFn(root);
+      listingCache.set(fresh.projectRoot, fresh);
+    },
   });
 
   return {

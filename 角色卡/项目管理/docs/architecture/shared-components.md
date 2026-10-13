@@ -85,7 +85,20 @@
 
 ---
 
+## 组件 7：统一诊断日志（`diagnostics`）—— 滚动24小时
+
+| 字段 | 说明 |
+| --- | --- |
+| **名称与用途** | 为应用、会话、工具、审核和回交提供同一条可追溯的本地诊断链，避免各角色自造存储/清理规则。 |
+| **代码与公共入口** | `src/common/shared/diagnostics.ts`：`configureDiagnostics`、`createDiagnosticLogger`、`getDiagnosticsStatus`、`flushDiagnostics`、`disposeDiagnostics`；常量 `DIAGNOSTIC_RETENTION_MS=86400000`。 |
+| **属主与消费方** | **项目管理**维护实现和专属测试。桌面 main 初始化目录；桌面、编排、Pi适配器只读消费 logger。消费者已接线并完成独立组合验证。 |
+| **契约与示例** | `createDiagnosticLogger({component:'session',roleId:'A'}).record('send.start',{turnId:'t1'})`；未配置时 no-op。元数据 JSONL 串行落盘，未知字段丢弃、凭据净化；异常用 `.error(event,error,fields)`。IO失败通过 status.lastError 如实反馈，不让业务抛错。 |
+| **留存与目录** | 桌面目录 `app.getPath('userData')/ans/diagnostics`。记录按时间滚动保留24小时，启动清理、写入检查维护期限、每分钟维护清理；扫描最多每分钟一次，避免每条记录扫描整天日志。只处理本模块诊断文件，不修改会话历史、治理审计或用户文件。维护 timer 不阻止正常退出。 |
+| **测试与影响** | `test/项目管理/shared/diagnostics.test.ts` 8/8：精确过期边界、维护自动清理、有序追加、敏感字段净化、IO失败及正常退出。共享接口变动需重跑桌面/编排/Pi消费方；不记录 prompt、源码、原始工具/API正文。依据[统一方案](../design/2026-10-13_design_runtime-diagnostics-and-reporting.md)。 |
+
 ## 变更（本文件）
+
+- 2026-10-13：新增组件7 `diagnostics`，日志存储、净化、24小时清理只有共享实现。角色接线、独立组合验收及实际应用启动日志确认完成，详见统一方案的最终证据。
 
 - 2026-10-11：登记 **组件 6 `atomic-write`**（跨角色共享原子写原语，Windows rename 瞬时 `EPERM` 的**单一来源**处置）。
   由本轮（pm）建：`src/common/shared/atomic-write.ts`，导出 `atomicWrite`/`renameReplacingExisting`/

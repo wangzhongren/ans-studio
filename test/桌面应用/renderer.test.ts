@@ -118,7 +118,7 @@ test("T17：左树可刷新——订阅 project:changed 重取枚举；主入口
 
 // ————————————————— T20：回交（§10.8）呈现与镜像进 su —————————————————
 
-test("T20：handback 事件被呈现为「回交 su」卡片；su 会话开着时镜像为「来自 <role> 的报告」", () => {
+test("T20：来源角色保留报告，主入口不提前镜像，真实投递默认折叠", () => {
   // 按 kind 分支：handback 走 appendHandback（不落入 message/tool_call/accepted/denied 等既有分支）。
   assert.ok(RENDERER.includes('kind === "handback"'), "appendEvent 应按 kind===handback 分支");
   assert.ok(RENDERER.includes("appendHandback"), "应有 appendHandback 呈现回交卡片");
@@ -126,13 +126,15 @@ test("T20：handback 事件被呈现为「回交 su」卡片；su 会话开着�
   // 产出角色自己的聊天 + 主入口角色的镜像（两边都落，即便当前不可见，切回即见）。
   assert.ok(RENDERER.includes("env.roleId"), "appendEvent 应按信封 roleId 分发到该角色的 pane（B-2）");
   // 卡片标题（自己聊天）「回交 su」；镜像标题「来自 <role> 的报告」。
-  assert.ok(RENDERER.includes("回交 su"), "卡片标题应为「回交 su」");
+  assert.ok(RENDERER.includes("回交主入口"), "来源卡片标题说明交回主入口");
   assert.ok(RENDERER.includes("来自 "), "镜像标题应为「来自 <role> 的报告」");
   assert.ok(RENDERER.includes("的报告"), "镜像标题应含「的报告」");
   // 镜像条件：当前打开会话是**产出它的角色**（自己的聊天）或**主入口角色**（镜像）——读 primaryRoleId，不硬编码。
   assert.ok(RENDERER.includes("state.sessionOpenRoleId"), "应读当前打开的会话角色");
   assert.ok(RENDERER.includes("state.primaryRoleId"), "镜像条件应读 primaryRoleId（不硬编码角色名）");
-  assert.ok(RENDERER.includes("is-mirror"), "镜像卡片应有 is-mirror 类钩子");
+  assert.ok(!RENDERER.includes("appendHandback(paneFor(state.primaryRoleId)"), "主入口不提前镜像");
+  assert.ok(RENDERER.includes('class="mi-report-detail"'), "真实投递详情默认收起");
+  for (const status of ["未报告", "失败", "已中止"]) assert.ok(RENDERER.includes(status), "新增结果状态明确显示：" + status);
   // 结论标签：completed / blocked 两态（只呈现编排给的 status，不作判定）。
   assert.ok(RENDERER.includes("已完成") && RENDERER.includes("被拦下"), "应呈现 completed/blocked 两种结论");
   // 证据列表（只搬证据）。
@@ -152,7 +154,7 @@ test("T20：handback 事件被呈现为「回交 su」卡片；su 会话开着�
   // 空证据占位（不留空白）。
   assert.ok(RENDERER.includes("（未提供证据）"), "证据为空应显示「（未提供证据）」占位");
   // blocked 的明显视觉区分（非仅文字）：is-blocked 类 + 语义色竖条样式。
-  assert.ok(RENDERER.includes('blocked ? " is-blocked"'), "blocked 卡片应带 is-blocked 类");
+  assert.ok(RENDERER.includes('if (blocked) card.className += " is-blocked";'), "非完成状态卡片保持 is-blocked 可见区分");
   assert.ok(STYLES.includes(".msg-handback.is-blocked"), "styles.css 应有 .msg-handback.is-blocked 视觉区分");
   assert.ok(/\.msg-handback\.is-blocked\s*\{[^}]*var\(--danger\)/.test(STYLES), "blocked 区分应使用语义色（左侧竖条）");
 });

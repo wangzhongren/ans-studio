@@ -461,3 +461,5 @@
 
 **边界说明**
 - 未改动 `src/pipeline/orchestration/run-role.ts`（编排边界）：其 `createPiAdapterFactory` 只传 gate/root，靠环境变量取配置，故本次改动后若 `.env` 无 `ANS_PI_CONTEXT_WINDOW`，该工厂构造适配器时会**硬失败**——这是预期行为，已在 memo 记录。
+
+- 2026-10-13：完成runtime outcome与诊断修复（用户直接修复授权，项目管理canonical v1）。新增private lifecycle、兼容ReportHandbackMetadata、工具isError/safe detail、审核等待挂闸与中止、5s清理及共享诊断接线；普通任务文案去除逐次确认，新扩张治理边界仍由su确认。离线Pi专项185/185、typecheck与diff-check通过，未部署；详见[修复记录](docs/fix/2026-10-13_fix_runtime-outcome-and-diagnostics.md)。
