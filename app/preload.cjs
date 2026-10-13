@@ -19,12 +19,20 @@ contextBridge.exposeInMainWorld("desktop", {
   /** 点角色即开：直接建立与该角色的会话（导入项目即授权，无确认框）。 */
   openSession: (input) => ipcRenderer.invoke("session:open", input),
 
-  /** 发送一轮消息；开启后可反复调用（多轮聊天，不再确认）。 */
-  sendSession: (text) => ipcRenderer.invoke("session:send", { text }),
+  /** 发送一轮消息；开启后可反复调用（多轮聊天，不再确认）。
+   *  **P0-1（2026-10-13 客户批准）**：`images` 为可选图片载荷（`[{type:"image", data:<base64>, mimeType}]`）——
+   *  主进程按**真实字节重校验**（嗅探 + ≤5MB）后才送模型；渲染侧声明值不可信。 */
+  sendSession: (text, images) =>
+    ipcRenderer.invoke("session:send", { text, images: Array.isArray(images) ? images : [] }),
 
   /** 关闭会话（B-2 **定向**）：传角色 id 只关该角色（历史留在界面上）；不传/null 关全部（换项目/退出）。 */
   stopSession: (roleId) =>
     ipcRenderer.invoke("session:stop", { roleId: roleId == null ? null : String(roleId) }),
+
+  /** 停当前轮次（P0-2，2026-10-13 客户批准）：向该角色会话请求中止当前进行中的轮次。
+   *  回报三态 `{ok, supported, error?}`——已请求停止 / 当前运行时不支持停止 / 停止失败：<error>；
+   *  轮次仍以既有收尾事件结束（渲染侧如实一行，不造「已停止」假象）；重复点击幂等。 */
+  abortSession: (roleId) => ipcRenderer.invoke("session:abort", { roleId: String(roleId == null ? "" : roleId) }),
 
   /** 保活中的角色 id 列表（B-2：左树「有活动会话」小圆点数据源）。纯读。 */
   listLiveSessions: () => ipcRenderer.invoke("session:live"),
@@ -42,8 +50,8 @@ contextBridge.exposeInMainWorld("desktop", {
 
   /**
    * 粘贴/拖入的图片（K-2）：把 File API 读出的 base64 交主进程 Interface 校验（声明 mime/size 不可信，
-   * 以真实字节为准）。回报 `{ok, image?:{name,mime,size}, error?}`。**图片随消息送进模型那一段未接**
-   * （Pi适配器核实中）——本通道只收下与校验。
+   * 以真实字节为准）。回报 `{ok, image?:{name,mime,size}, error?}`。**发送**随消息上送
+   * （`sendSession(text, images)`——主进程重校验后送模型，P0-1 已接线）。
    */
   attachImage: (input) =>
     ipcRenderer.invoke("app:attach-image", {

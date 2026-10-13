@@ -147,6 +147,8 @@ body { display: flex; flex-direction: column; }
   visibility: hidden;
   transition: transform 120ms ease, visibility 0s linear 120ms;
   z-index: 30;
+  /* 裁剪边界：抽屉内任何内容（面板/表格/长词）都不得画到抽屉矩形之外——溢出在抽屉内滚动。 */
+  overflow: hidden;
 }
 #right-drawer.open {
   transform: translateX(0);
@@ -887,12 +889,24 @@ details.sys-denied[open] summary { padding-bottom: 6px; margin-bottom: 6px; bord
    占满抽屉宽度并可滚动（面板本体、保存/掩码纪律一字不动，只是容器变了）。 */
 #right-drawer .pi-panel {
   flex: 1 1 auto;
+  min-width: 0;
   overflow: auto;
   margin: 0;
   border: none;
   border-radius: 0;
   background: none;
 }
+/* Pi 溢出修复（2026-10-13 客户真机复现）：`.pi-field` 的 200px 标签列是按旧右栏列宽设计的——
+   抽屉（268–360px）装不下「200px 标签 + 输入」并排。抽屉内改**堆叠**（标签一行、输入一行）：
+   输入框吃满整行宽度、随抽屉宽度弹性收缩，窄窗（≤1100px 的 268px 档）同样不溢出、不裁切。 */
+#right-drawer .pi-field {
+  grid-template-columns: 1fr;
+  align-items: start;
+  gap: 4px;
+}
+/* 双保险（不依赖状态同步的可靠性）：抽屉未展开（transform 藏在视口右外）时面板一律不可见——
+   即使显隐状态失步，也不会把输入框画到窗口右缘之外。 */
+#right-drawer:not(.open) #pi-panel { visibility: hidden; }
 .pi-panel[hidden] { display: none; }
 .pi-panel-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
 .pi-panel-title { font-size: 12.5px; font-weight: 600; color: var(--text); }
@@ -1007,6 +1021,25 @@ details.sys-denied[open] summary { padding-bottom: 6px; margin-bottom: 6px; bord
   cursor: pointer;
 }
 .cap-send:disabled { opacity: 0.35; cursor: default; }
+/* 停止钮（P0-2，2026-10-13 客户反馈后的位置调整）：输入框区、**发送钮左侧**的小圆钮——同款圆形
+   （32px、999px），**次级色**（描边浅底、不抢发送的实心主色）。仅该角色忙碌时可见（hidden 属性驱动；
+   显式 display:flex 会压掉 [hidden] 的默认 display:none，故补 [hidden] 规则——同 #pi-panel 先例）。
+   与发送钮**并存**：发送钮绝不因忙碌被替换/禁用（「忙碌时发消息=入队」是既定语义）。 */
+.cap-halt {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  background: var(--bg-soft);
+  color: var(--text-2);
+  cursor: pointer;
+}
+.cap-halt:hover { color: var(--text); border-color: var(--text-3); background: var(--bg-hover); }
+.cap-halt[hidden] { display: none; }
 .cap-send:not(:disabled):hover { opacity: 0.92; }
 /* 附件行（K-2）：缩略图 chips（可移除）；空时整行隐藏。 */
 .attach-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
@@ -1172,7 +1205,7 @@ ul.idx li.dir { color: var(--text-2); }
   #right-drawer { width: 268px; }
   .chat { padding: 18px; gap: 14px; }
   .composer { padding: 12px 18px 16px; }
-  .pi-field { grid-template-columns: 150px minmax(0, 1fr); }
+  /* （旧 `.pi-field` 150px 档已删：面板只在抽屉里，抽屉内一律堆叠布局——见 #right-drawer .pi-field。） */
 }
 
 /* ———————— 尊重 prefers-reduced-motion ———————— */

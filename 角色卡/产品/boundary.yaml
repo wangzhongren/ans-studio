@@ -1,0 +1,35 @@
+# 产品边界 —— Section 1 唯一写入白名单
+# 未列路径默认只读。新增目录、改动归属或增删逐条列出的路径，须先由 ANS Governance 更新本文件并经客户确认。
+# 本角色不实现：不授予任何业务源码路径（app/、src/、test/）；仓库 docs/ 归项目管理。
+role: 产品
+entries:
+  - kind: file
+    path: 角色卡/产品/feature-map.md
+    purpose: 功能导航
+  - kind: file
+    path: 角色卡/产品/memo.md
+    purpose: 本角色工作备忘录
+  - kind: file
+    path: 角色卡/产品/changelog.md
+    purpose: 本角色治理变更记录
+  - kind: file
+    path: 角色卡/产品/functional-description.md
+    purpose: 模块笔记与代码位置
+  - kind: file
+    path: 角色卡/产品/api-spec.md
+    purpose: 实现报告
+  - kind: directory
+    path: 角色卡/产品/docs/design/
+    purpose: 产品改进提案与设计记录
+  - kind: directory
+    path: 角色卡/产品/docs/feature/
+    purpose: 产品视角的稳定说明与流程图
+  - kind: directory
+    path: 角色卡/产品/docs/change/
+    purpose: 变更记录
+  - kind: directory
+    path: 角色卡/产品/docs/fix/
+    purpose: 修复记录与问题记录
+  - kind: directory
+    path: temp/产品/
+    purpose: 未通过/返工产物暂存，供审核对照

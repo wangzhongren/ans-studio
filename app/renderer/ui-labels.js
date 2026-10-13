@@ -97,6 +97,46 @@
     return n > 0 ? "有 " + n + " 条待确认 · 定位" : "";
   }
 
+  // —————— D-1 回放去重（2026-10-13 真机「同一段消息渲染两遍」修复）——————
+  // 真机链路：su 一轮结束 → `project:changed` → 渲染侧 refreshProject → 主进程对每角色**重推**会话历史
+  // → 旧实现对同一 pane **无守卫地整份再回放** ⇒ 转录重复（轮次越多重复越多）。本函数给出**纯策略**：
+  // 同一份历史**幂等**（skip）；盘上文件**增长**（追加了新轮次）→ **增量**（只回放尾巴）；其余
+  //（重写/截断/内容不一致）→ **全量重建**（绝不追加第二份）。
+
+  /** 两条回放行是否**逐字段同值**（判等键 = 呈现与锚点用到的全部字段；不做判定、纯比较）。 */
+  function sameReplayRows(a, b) {
+    if (a.length !== b.length) return false;
+    for (var i = 0; i < a.length; i += 1) {
+      var x = a[i] && typeof a[i] === "object" ? a[i] : {};
+      var y = b[i] && typeof b[i] === "object" ? b[i] : {};
+      if (String(x.kind == null ? "" : x.kind) !== String(y.kind == null ? "" : y.kind)) return false;
+      if (String(x.text == null ? "" : x.text) !== String(y.text == null ? "" : y.text)) return false;
+      if (String(x.at == null ? "" : x.at) !== String(y.at == null ? "" : y.at)) return false;
+      if (String(x.requestId == null ? "" : x.requestId) !== String(y.requestId == null ? "" : y.requestId)) return false;
+      if (String(x.anchorKey == null ? "" : x.anchorKey) !== String(y.anchorKey == null ? "" : y.anchorKey)) return false;
+      if (String(x.anchor == null ? "" : x.anchor) !== String(y.anchor == null ? "" : y.anchor)) return false;
+    }
+    return true;
+  }
+
+  /**
+   * 回放策略（纯函数）：`prev` = 上次该角色回放的状态 `{rows}`（无则 null/未定义）；`nextRows` = 本次载荷行。
+   * 返回 `{action:"full"|"skip"|"append", from}`：
+   *  · `full`（首次 / 内容不一致——重写、截断、字段变了）→ from=0：**先作废旧回放再全量重放**；
+   *  · `skip`（与上次逐字段相同）→ 幂等 no-op（重推不再叠加副本）；
+   *  · `append`（新行 = 旧前缀 + 追加尾巴）→ from=旧行数：只回放追加段（增量）。
+   */
+  function replayPlan(prev, nextRows) {
+    var next = Array.isArray(nextRows) ? nextRows : [];
+    if (!prev || !Array.isArray(prev.rows)) return { action: "full", from: 0 };
+    var old = prev.rows;
+    if (sameReplayRows(old, next)) return { action: "skip", from: 0 };
+    if (next.length > old.length && sameReplayRows(old, next.slice(0, old.length))) {
+      return { action: "append", from: old.length };
+    }
+    return { action: "full", from: 0 };
+  }
+
   var api = {
     pickProjectLabel: pickProjectLabel,
     queueSourceLabel: queueSourceLabel,
@@ -105,6 +145,7 @@
     arrivalScrolls: arrivalScrolls,
     pendingChipLabel: pendingChipLabel,
     stickToBottom: stickToBottom,
+    replayPlan: replayPlan,
     AUTO_SCROLL_THRESHOLD_PX: AUTO_SCROLL_THRESHOLD_PX,
     STICK_THRESHOLD_PX: STICK_THRESHOLD_PX,
   };

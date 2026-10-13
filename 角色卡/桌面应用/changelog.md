@@ -1,5 +1,48 @@
 # 桌面应用 变更记录
 
+## 2026-10-13 — 真机状态机簇修复：并发作废重建 TOCTOU（忙态误复位/孤儿会话/消息落空）+ data-state 回 idle + 回放去重（同段消息渲染两遍）
+
+**来源**：协调方真机探针（su 轮次在跑但忙态翻假/停止钮消失；data-state 永不复 idle；聊天流无 settled 行）＋客户截图「su 的消息整段重复渲染两遍」。**属本角色边界内**。
+
+- **机制（只读 CDP 探针取证）**：① 「适配器多发/早发 settled」**排除**（1s/6s 轮各恰一发、与轮末对齐、忙态全程正确）；② 忙态翻假＝**并发作废重建 TOCTOU**——su 轮末自动重 pin 令边界快照常陈旧，settle 触发的 `refreshStaleBoundaries` 与用户紧接的 `send` 各自的重建赛跑，晚到方旧实现按 key 误删新会话条目并推 busy=false（还可能清 activeRoleId 致消息落空）；③ data-state 无回 idle 路径（独立缺陷，坐实）；④ 「无 settled 行」＝虚拟窗口化 DOM 采样伪影（行模型 2300 行、滚到底即见——settled 行该出现且出现）；⑤ 重复渲染＝已登记缺陷触发在案（project:changed→refreshProject→主进程重推历史→无守卫整份再回放；「另有重复事件投递」排除——生产只走合帧批通道）。
+- **修复 A（session.ts）**：作废重建按角色**串行化**（`rebuildChains`，同 drainChains 先例）+ `disposeEntry` **身份守卫**（只删仍在表中的同一引用）+ 每个 await 后 **TOCTOU 重校验**；`send()` **目标角色入口定格**（并发重建不清指针/不丢消息，忙时入队同按定格目标）。
+- **修复 B（renderer.js）**：`syncChatState`——`#chat[data-state]` **只随 role-state 真实快照**（run/idle；与停止钮同一单一数据源），三处校准（setChatHeader/onRoleState/开启成功）；旧「开启即写死 run」退役；err 路径保留。
+- **修复 C（ui-labels.js + renderer.js）**：回放去重——纯函数 `UiLabels.replayPlan`：同份历史**幂等 skip**、增长**增量 append**、其余（重写/截断/错误态变）**全量重建**（`rebuildPane`，绝不追加第二份）；`replayHistory` 记每角色上次状态随项目作废。
+- **测试**：新单测 `session-rebuild-race.test.ts`（并发不变量：恰一次作废/重建、条目保活、消息送达、忙态终态 true——修复前该序列 9/10 消息落空，修复后 10/10 确定性全过）；`renderer.test.ts` +2（replayPlan 六态 + 接线钉；data-state 修复钉）；e2e +7 检查点（`REPLAY_DEDUP_IDEMPOTENT/APPEND/REBUILD`、`REPLAY_NO_DOUBLE_ON_REFRESH`、`DATA_STATE_RUN_WHILE_BUSY/IDLE_AFTER_ROUND`、`SETTLED_ROW_PRESENT`）全 true。
+- **证据**：`npm run typecheck` **0 错**；桌面 → **173 计/172 过/1 红**（唯一红=既有环境红）；全量 → **937 计/934 过/2 红**（两红均既有环境红）；e2e **E2E_DONE=1**（231 true / 2 个既有预期 false）。详见 `docs/change/2026-10-13_change_state-machine-and-replay-dedup.md`。
+
+## 2026-10-13 — 停止钮位置调整（客户反馈「位置有问题」）+ 直接发送路径「开跑即外推 busy」前置缝修复
+
+**来源**：客户原话「**现在停止按钮位置有问题，我觉得应该换个地方**」。**属本角色边界内**。
+
+- **位置（客户裁定）**：停止钮从聊天头移到**输入框区、发送钮左侧**（`#composer-capsule` 内、`#btn-send` 前一兄弟）——同款 32px 圆形、**次级色**、hover「停止当前轮次」；聊天头不再有任何按钮；`.cap-halt[hidden] { display:none }`（display:flex 会压掉 [hidden] 默认——同 #pi-panel 先例）。
+- **红线保持（客户口径）**：**发送钮不可被替换或禁用**——「忙碌时发消息=入队」（DeliveryItem 队列）语义不变；停止钮与发送钮**并存**、各司其职（`updateHaltButton` 不触碰 `btn-send`，有源码钉）；点击仍走 `abortSession` 三态如实行、措辞不变。
+- **前置缝修复（随位置调整暴露，P0-2 功能前提）**：直接发送路径原**只在轮次结束后**才推 busy 快照（`notifyRoleState` 在 `await handle.send` 之后）——长轮次（真实 pi 一轮数分钟）期间界面根本收不到「工作中」，停止钮/左树徽标无从在**进行中**出现（投递机路径本就「先置忙即推」；快适配器掩盖了这条缝）。改为**开跑即外推 busy=true**（与投递机同款；结束后那次保留、兜底快适配器竞态）。行为更准（快照=会话条目真实状态）、不涉判定。e2e harness 补接 `emitRoleState → session:role-state`（生产 main.ts 有、harness 原缺——否则真实忙态到不了渲染侧）。
+- **测试**：`renderer.test.ts` P0-2 钉组改新位置断言（胶囊内、发送钮左侧、聊天头无按钮、圆形/次级色/`[hidden]`、显隐不触碰发送钮）；e2e 新增 `STOP_IN_COMPOSER`/`CHAT_HEAD_NO_BUTTONS`/`STOP_VISIBLE_WITH_REAL_BUSY`（真忙——慢轮在飞）/`SEND_ENABLED_WHILE_BUSY`/`SEND_QUEUES_WHILE_BUSY`（并存钉）全 true。
+- **证据**：`npm run typecheck` **0 错**；`node --test "test/桌面应用/**/*.test.ts"` → **169 计/168 过/1 红**（唯一红=既有环境红）；全量 → **933 计/930 过/2 红**（两红均既有环境红）；e2e **E2E_DONE=1**。详见 `docs/change/2026-10-13_change_p0-halt-and-images.md` §2′。
+
+## 2026-10-13 — P0 收官环（桌面侧）：停止入口（P0-2 UI）+ 图片端到端接线（P0-1）+ 退役「图片未发送」提示（客户批准，编排中环契约已落）
+
+**来源**：客户 2026-10-13 批准两项产品提案；编排中环已落契约（`RoleSessionHandle.abort?` 三态、`send(text, opts?)` 整包透传）。**属本角色边界内**（桌面环只接线与呈现、不做判定）。
+
+- **停止入口（P0-2 UI）**：聊天头 `#btn-halt`「停止」——**仅该角色忙碌时出现**（role-state 真实快照判据，三处刷新点）；点击 `d.abortSession(roleId)`（新 IPC `session:abort` → Interface → `SessionManager.abort`），按**三态**在聊天流**如实一行**（已请求停止——轮次仍以 settled 收尾 / 当前运行时不支持停止 / 停止失败：<error>）；重复点击幂等；**id 刻意避开 btn-stop**（防回潮钉子串口径）；**不是「结束会话」的恢复**（那是关整只会话，本钮只停当前一轮）。
+- **图片端到端（P0-1）**：附件记录带 base64；`onSend` 组 `[{type:"image", data, mimeType}]` 随 `sendSession(text, images)` 上送（用户气泡「（图片 ×N）」前缀留痕；成功即清附件、失败保留重试）；**主进程重校验**（Interface 层：严格解码 → 魔数嗅探 → ≤5MB，mimeType 以嗅探为准；任一张不合格**整条拒发**——绝不丢图发文字）；`DeliveryItem.opts` **入队即定格**、投递整包同一引用透传；不传时调用形态与旧版逐字一致。
+- **demo 适配器**：`prompt(text, opts?)` 接受并记录收包（`takeDemoPromptLog()` 环形上限 50，e2e/单测断言透传保真）；行为不变。
+- **退役**：三处「图片未发送」提示行与 `imageNotWiredNote`（不留死代码）；composer-images/interface/preload/main 的「送模型未接」注释全部更新为已接线口径。
+- **测试**：新单测 `p0-halt-and-images.test.ts`（5 例：abort 三态、重校验拒绝、合法图嗅探定型、队列定格同引用投递）；`renderer.test.ts` K-2 翻转为 P0-1 + 新增 P0-2 停止入口钉（B-3「停止措辞唯一」钉相应收窄为状态徽标的「已停止」）；e2e 新增 STOP_* 四检查点与 IMG_* 六检查点（队列定格用**慢轮缝**把忙变确定态——arm 后首轮 prompt 挂起至放行，不改 demo 本体；harness 注册 `session:abort` 同形）。
+- **证据**：`npm run typecheck` **0 错**；`node --test "test/桌面应用/**/*.test.ts"` → **169 计/168 过/1 红**（唯一红=既有环境红）；全量 → **933 计/930 过/2 红**（两红均既有环境红）；e2e **E2E_DONE=1**（219 true / 2 个既有预期 false）。Node v24.14.0 / Darwin arm64。详见 `docs/change/2026-10-13_change_p0-halt-and-images.md`。
+
+## 2026-10-13 — 待办/队列归角色（图标簇两枚、两节并入角色资料抽屉）+ Pi 面板抽屉内溢出修复（客户裁定，真机复现）
+
+**来源**：客户原话「**代办是不是应该放在角色里面是不是更好呢。不用放在顶部呢。这个是和角色相关的**」；Pi 设置面板真机复现横向溢出（窗口 1516px 时输入框画到 x≈1538–1869、越出窗口右缘）。**属本角色边界内**。
+
+- **图标簇收敛两枚**：`tab-todo`/`tab-queue` 退役——簇只留**角色资料**（`tab-card`）与 **Pi 设置**（`tab-pi`）；渲染侧对应接线删除（不留死代码）。左树徽标与 `#op-chip` 不动。
+- **待办/队列两节入「角色资料」抽屉**：card 分支变六节——既有四组（角色卡/边界/变更/文档）逐字保留，插入**待办 / 队列**节（进行中+排队完整视图）与**队列概览**节（仅排队条目的位次视图）＝原独立两 tab 的内容**逐字搬入**，打开时跟随当前选中角色；`updateRightQueue` 一次同刷两节（定点更新、不重排手风琴）；队列概览抽成 `queueOverviewHtml` 共用。
+- **角标归角色**：角色资料图标角标＝`queueViewsFor(选中角色).length`（进行中+排队；继承原待办图标角标语义；同一 role-state 快照、无新数据源；>0 才显示，收起不丢信息）。
+- **Pi 溢出修复**（`styles.css`，面板字段/保存/掩码纪律一字未动）：`.pi-field` 的 200px 标签列按旧右栏列宽设计、抽屉（268–360px）装不下并排 → 抽屉内**堆叠**（标签一行、输入一行，输入吃满行宽、随抽屉宽度弹性收缩）；抽屉 `overflow: hidden` 作裁剪边界；`#pi-panel` `min-width: 0`；双保险 `#right-drawer:not(.open) #pi-panel { visibility: hidden }`（抽屉未展开时面板不可见——状态即使失步也不画到窗口外）；删 940px 档死规则。
+- **测试**：`renderer.test.ts` 右栏抽屉钉整组改写（两枚图标、退役图标断言不存在、角标=card、两节在角色资料渲染里、Pi 不溢出四钉）；e2e 检查点翻转 + 新增 `NO_RETIRED_TABS`/`RIGHT_HAS_TODO_SECTION`/`RIGHT_HAS_OVERVIEW_SECTION`/`BADGE_ON_CARD_WHILE_COLLAPSED`/`QUEUE_OVERVIEW_IN_CARD` 与 **Pi 几何检查**（`PI_STACKED_FIELDS`/`PI_NO_OVERFLOW`；窄窗口 `win.setSize(900)` ≤1100px 裁定线重测 `PI_NARROW_NO_OVERFLOW` 后恢复）。
+- **证据**：`npm run typecheck` **0 错**；`node --test "test/桌面应用/**/*.test.ts"` → **163 计/162 过/1 红**（唯一红=既有环境红 `pi-config.test.ts`）；e2e **E2E_DONE=1**（新增检查点全 true、既有检查点无回归）。Node v24.14.0 / Darwin arm64。详见 `docs/change/2026-10-13_change_drawer-two-icons-and-pi-fit.md`。
+
 ## 2026-10-13 — 右栏收成右上角图标簇（抽屉）+ Pi 入口上移 + 删「结束会话」/状态 pill（客户裁定，与聊天流去常规提示同批）
 
 **来源**：客户原话「**角色卡这一块的页面，感觉和 claude code 一样，变成右上角几个图标，点了展示呢。这个没必要一直展示**」「**Pi 设置，也放到右上角，结束回话，感觉也没啥用去除。聊天中也没啥用去除吧**」。**属本角色边界内**。

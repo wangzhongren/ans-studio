@@ -20,20 +20,14 @@
         <span class="titlebar-sub">治理会话工作台</span>
       </div>
       <div class="titlebar-controls">
-        <!-- 客户裁定（2026-10-13）：右栏角色卡/待办/队列**默认不常驻**——收成应用右上角一排小图标，
-             点了才以覆盖层抽屉展示（聊天列宽不因开关而 reflow）。激活图标高亮；待办/队列有挂起项时
-             图标带数字角标（收起不丢信息）。三枚按钮为 no-drag（否则点不动）；不算窗口按钮（.win-btn）。 -->
+        <!-- 客户裁定（2026-10-13 两轮）：右栏角色资料**默认不常驻**——收成应用右上角小图标，点了才以覆盖层
+             抽屉展示（聊天列宽不因开关而 reflow）。**待办/队列归角色**（第二轮裁定：「代办是不是应该放在
+             角色里面……这个是和角色相关的」）——簇只留两枚：角色资料（含该角色名下的待办/队列两节，
+             角标=当前选中角色待办深度）与 Pi 设置（面板迁入抽屉）。激活图标高亮；按钮 no-drag；
+             不算窗口按钮（.win-btn）。 -->
         <div id="right-tabs" class="right-tabs">
-          <button id="tab-card" class="tab-btn" type="button" title="角色资料" aria-label="角色资料">
+          <button id="tab-card" class="tab-btn" type="button" title="角色资料（含待办 / 队列）" aria-label="角色资料">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
-            <span class="tab-badge" hidden></span>
-          </button>
-          <button id="tab-todo" class="tab-btn" type="button" title="待办（进行中 + 排队）" aria-label="待办">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3 8-8"/><path d="M21 12v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h11"/></svg>
-            <span class="tab-badge" hidden></span>
-          </button>
-          <button id="tab-queue" class="tab-btn" type="button" title="队列概览" aria-label="队列概览">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>
             <span class="tab-badge" hidden></span>
           </button>
           <button id="tab-pi" class="tab-btn" type="button" title="Pi 设置" aria-label="Pi 设置">
@@ -77,6 +71,8 @@
             <div class="chat-head-main">
               <span id="chat-role" class="chat-role">未选择角色</span>
               <span id="chat-role-sub" class="chat-role-sub">从左侧选择一个角色开始聊天</span>
+              <!-- （停止钮原在聊天头、角色名旁——客户反馈「位置有问题」后已按裁定移到输入框区：
+                   发送钮左侧的小圆钮，见下 #composer-capsule；聊天头不再有任何按钮。） -->
             </div>
             <!-- 客户裁定（2026-10-13）：「聊天中/空闲」状态 pill 删除（界面不再显示）——状态本身**程序化保留**：
                  renderer.js::setState 把 kind 写到 #chat 的 data-state 属性（run/idle/err），e2e 与外部驱动仍可断言。
@@ -127,6 +123,16 @@
               placeholder="输入消息，Enter 发送，Shift+Enter 换行"
               spellcheck="false"
             ></textarea>
+            <!-- 停止钮（P0-2，2026-10-13 客户批准；同日客户反馈「位置有问题」→ 从聊天头移到此处）：
+                 输入框区、**发送钮左侧**的小圆钮（同款圆形、次级色；hover 提示「停止当前轮次」）；
+                 仅该角色会话忙碌时出现（role-state 真实快照判据）；点击 = 请求中止当前一轮
+                 （轮次仍以收尾事件结束，聊天流如实行）。**与发送钮并存、各司其职**——
+                 发送钮绝不因忙碌被替换/禁用（「忙碌时发消息=入队」是既定语义）。
+                 **不是**「结束会话」（那个按钮已按客户裁定删除、不恢复）；id 刻意不用 btn-stop
+                 （退役按钮的防回潮钉按子串断言它不在渲染源里）。 -->
+            <button id="btn-halt" class="cap-halt" type="button" hidden title="停止当前轮次" aria-label="停止当前轮次">
+              <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="7.5" y="7.5" width="9" height="9" rx="1.6" fill="currentColor"/></svg>
+            </button>
             <button id="btn-send" class="cap-send" type="button" disabled title="发送（Enter）" aria-label="发送">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
             </button>
@@ -135,9 +141,10 @@
       </main>
 
       <!-- 右栏已按客户裁定（2026-10-13）改**抽屉**：默认不占屏（覆盖层，不挤压聊天列宽——聊天流不 reflow）；
-           右上角图标簇（#right-tabs 四枚：角色资料 / 待办 / 队列概览 / Pi 设置）点了才滑出；再点同图标 / 点 × / Esc 收起；
-           同一时刻至多开一块；内容跟随当前选中角色。待办=进行中+排队（既有「待办 / 队列」组逐字保留）；
-           队列=仅排队条目的位次概览（入队时间 + 「等它完成当前任务后依次处理」语义）。收起时图标带数字角标（收起不丢信息）。 -->
+           右上角图标簇（#right-tabs 两枚：角色资料（含待办 / 队列）/ Pi 设置）点了才滑出；再点同图标 / 点 × / Esc 收起；
+           同一时刻至多开一块；内容跟随当前选中角色。第二轮裁定（同日）：待办/队列**归角色**——作为
+           「角色资料」抽屉里该角色名下的两节（进行中+排队的待办视图逐字保留；队列=仅排队条目的位次概览）；
+           角色资料图标角标 = 当前选中角色的待办深度（收起不丢信息）。 -->
       <aside id="right-drawer" aria-label="角色资料与待办">
         <div class="drawer-head">
           <span id="drawer-title" class="side-title">角色资料</span>

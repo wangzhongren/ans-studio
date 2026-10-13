@@ -1,5 +1,20 @@
 # 编排 变更记录
 
+## 2026-10-13 — P0-1/P0-2 中环：句柄 `abort?()`（停当前轮次）与 `send` 透传图片
+
+**来源**：产品提案 `角色卡/产品/docs/design/2026-10-13_design_desktop-ux-improvement-proposal.md` 的 **P0-1（图片随消息送进模型）** 与 **P0-2（跑飞轮次的「停」）**，客户 2026-10-13 批准。**前环（Pi适配器）已落并钉死契约**：`RoleSession.abort?`（可选；停当前轮不销毁会话、无在飞轮次=no-op、中止后 settled 仍发射、等待中的客户确认一并 fail-closed、错误如实上抛）与 `PromptOptions.images`；本改动为**中环**（编排句柄层），**桌面接线为后环**（停止按钮/聊天流如实一行/入队定格归桌面环节）。
+
+**改了什么（唯一源文件 `src/pipeline/orchestration/run-role.ts`）**：
+- **`RoleSessionHandle` 增可选 `abort?(): Promise<RoleSessionAbortResult>`（P0-2）**，`RoleSessionAbortResult = { ok, supported, error? }` **三态语义钉死**：会话有 abort ⇒ 透传、`{ok:true,supported:true}`；会话**不带 abort**（demo 替身）⇒ `{ok:false,supported:false,error:"当前运行时不支持停止"}`——**绝不假装已停**；SDK 报错 ⇒ `{ok:false,supported:true,error:<错误原文>}`——**不吞不谎报**（选择「结果承载错误」而非 reject：三态即调用方渲染依据，也避免未处理 rejection）。**不销毁会话**（下一条照发）。**可选方法之由**：同契约 `RoleSession.abort?` 自己的「PromptOptions 先例」——句柄面若必选会强制他角色既有替身桩（`test/桌面应用/**`，非本角色写入边界）全补实现；可选则消费规则与契约层同构（`handle.abort?.()`，**方法缺席与 supported:false 同一处理**），且 **openRoleSession 的句柄恒实现**（测试钉 `typeof === "function"`）。
+- **`send` 扩为 `(text, opts?: PromptOptions)`（P0-1）**：`opts` **整包同一引用原样透传**给 `session.prompt(text, opts)`（`PromptOptions` 自契约家只读导入，**不复制形状**；**空数组=无图**同样原样）；**不传 opts 时单参调用形态逐字不变**（用例钉「恰 1 个实参」，比值相等更严）。多模态与否不猜（契约已明）；队列入队定格归后环。
+- **其余逐字未动**；**只读核实**：pm-reviewer 的 `persistSession:false` 审读会话只消费 `send(text)`（单参）/`events`/`dispose`——加可选参与纯新增方法均不波及（见 change 文档）。
+
+**测试**：新 `test/编排/session-abort-images.test.ts` **8 例**（桩适配器全程不触网）——abort 三态（异步透传＋不销毁＋下一条照发／同步 void 契约形状／缺席 supported:false 如实文案／SDK 报错 error 逐字／**假适配器端到端** supported:false）+ send 透传（opts 逐字相等**且同一引用**／空数组原样／不传 opts 恰 1 实参）。
+
+**结果**：`test/编排/` **182/182**（174+8）；`npm run typecheck` **全仓零错**；全量 `node --test "test/**/*.test.ts"`（**引号带**）**927 计 / 924 过 / 2 红 / 1 skipped**——2 红均为**既有基线红**（`test/桌面应用/pi-config.test.ts` 面板键目录名、`test/项目管理/shared/path-primitives.test.ts` macOS `/var` 符号链接），单独复跑确认独立失败，**无新红**。环境：Node v24.14.0、Darwin 25.6.0。真机验收属后环接线完成后的**客户跑**。详见 [change 文档](docs/change/2026-10-13_change_p01-images-p02-abort-handle.md)。
+
+**后环登记（归桌面）**：① 停止钮（仅工作中出现）调 `handle.abort?.()` 按三态如实呈现；② `session:send` 增 images（主进程重新校验）、`SessionManager.send`/`DeliveryItem` 带图入队定格、退役三处「未接线」提示行。
+
 ## 2026-10-12 — su 只读 shell（客户裁定「su 也要有 shell，但是只读」）
 
 **来源**：客户裁定——内置治理角色 su 目前完全没有 shell（`run_shell` 不注册），给它一个**只读 shell**。设计口径已定：只读 = shell 闸 **(c) 层确定性白名单档的直接映射**——`classifyShell` 判 `allow`（命中 `allow:readonly:*`）⇒ 执行；`risky`/`review` ⇒ **一律拒**（新分支 `readonly-deny`，reason 写明命中档）；`deny` ⇒ 照旧拒（`c-deny`）。**不接 (b) su 模型审读**（su 自己就是审读者，不自审）、**不接 (a) 客户确认**（只读外的命令直接拒，不打扰客户、不弹任何对话框）。拒绝理由写死口径「这是 su 只读档的策略拒绝，不是环境故障」（让模型看懂、不诱导绕试）。

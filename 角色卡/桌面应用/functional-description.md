@@ -82,12 +82,44 @@ test/桌面应用/
   建 Interface 之前构造**同一份** `shellArming`（arm 开关 `DESKTOP_SHELL_GATE_ARMED`）经 Interface 透传；
   测试见 `operator-channel.test.ts`（含真实装配**接通核查**：ls 放行 / rm、node --test 拒）。
   详见 `docs/change/2026-10-12_change_su-readonly-shell-arming.md`。
-- **右栏抽屉 + 右上角图标簇（客户裁定 2026-10-13：右栏不常驻、点了才展示）**：栅格两列、抽屉 `#right-drawer` 为
-  覆盖层（不占列宽、聊天流不 reflow；CSS 120ms 过渡、无计时器）；`#right-tabs` 四枚图标（角色资料/待办/队列概览/
-  Pi 设置）+ 数字角标（待办=视图行数、队列=排队深度——同 role-state 快照）；同图标再点/×/Esc 收起、至多开一块；
-  内容跟随选中角色（角色资料四组与「待办 / 队列」组逐字保留；队列概览=仅排队位次）。Pi 面板整体迁入抽屉
-  （保存/掩码纪律一字不动）；「结束会话」按钮删除（停止能力保留在程序化路径 `d.stopSession(null)`）；
-  「聊天中/空闲」pill 删除（kind 程序化保留在 `#chat` 的 `data-state`）。
+- **右栏抽屉 + 右上角图标簇（客户裁定 2026-10-13 两轮：右栏不常驻、点了才展示；待办/队列归角色）**：栅格两列、
+  抽屉 `#right-drawer` 为覆盖层（不占列宽、聊天流不 reflow；CSS 120ms 过渡、无计时器）；`#right-tabs` **两枚**图标
+  （角色资料/Pi 设置；同日第二轮裁定 tab-todo/tab-queue 退役）+ 数字角标（**角色资料图标角标＝当前选中角色的
+  待办深度**〔进行中+排队，继承原待办角标语义〕——同 role-state 快照）；同图标再点/×/Esc 收起、至多开一块；
+  内容跟随选中角色——**角色资料抽屉六节**：角色卡 / **待办 / 队列**（进行中+排队，`updateRightQueue` 定点同刷）/
+  **队列概览**（仅排队位次）/ 边界条目 / 变更记录 / 文档（待办/队列两节＝原独立 tab 内容逐字搬入、随选中角色）。
+  Pi 面板整体迁入抽屉（保存/掩码纪律一字不动；**抽屉内字段堆叠**——标签一行、输入一行，输入随抽屉宽度弹性
+  收缩，窄窗 ≤1100px 亦不溢出；抽屉 `overflow:hidden` + 未展开面板双保险不可见）；「结束会话」按钮删除
+  （停止能力保留在程序化路径 `d.stopSession(null)`）；「聊天中/空闲」pill 删除（kind 程序化保留在 `#chat` 的
+  `data-state`）。详见 `docs/change/2026-10-13_change_drawer-two-icons-and-pi-fit.md`。
+- **停止当前轮次 + 图片端到端（P0 收官环桌面侧，2026-10-13 客户批准两项提案）**：
+  ① **停止入口**：**输入框区、发送钮左侧**的小圆钮 `#btn-halt`（2026-10-13 客户反馈「位置有问题」后
+  从聊天头移来；同款 32px 圆形、次级色、hover「停止当前轮次」；聊天头不再有任何按钮）——**仅该角色会话
+  忙碌时出现**（role-state 真实快照判据；`updateHaltButton` 随选角色/快照推送/换项目三处刷新；
+  `.cap-halt[hidden]{display:none}`——display:flex 会压掉 [hidden] 默认）；点击 `d.abortSession(roleId)`
+  （IPC `session:abort` → `SessionManager.abort`）按编排 `abort?` **三态契约**在聊天流**如实一行**
+  （已请求停止——轮次仍以既有 `settled` 收尾，不做乐观「已停止」假象 / 当前运行时不支持停止
+  〔方法缺席与 supported:false 同一处理〕/ 停止失败：<error>）；重复点击幂等；**与发送钮并存**——
+  发送钮绝不因忙碌被替换/禁用（「忙碌时发消息=入队」语义不变）；会话保留——**不是**「结束会话」
+  （那已按客户裁定删除、不恢复；渲染侧 id 刻意避开 btn-stop 以保防回潮钉子串口径）。
+  **配套修复**：直接发送路径改为**开跑即外推 busy=true**（原只在轮次结束后推——长轮次期间界面收不到
+  「工作中」、停止钮无从出现；与投递机同款，结束后那次保留兜底竞态）。
+  ② **图片端到端**：渲染侧附件记录带 base64，`onSend` 组契约块 `[{type:"image", data, mimeType}]` 随
+  `sendSession(text, images)` 上送；**主进程重校验**（Interface：严格 base64 解码 → 魔数嗅探定类型〔声明
+  mimeType 仅线索〕→ ≤5MB；任一张不合格**整条拒发**——绝不「丢图发文字」）；`SessionManager` 忙时
+  **入队即定格**（`DeliveryItem.opts` 整包同一引用、投递原样透传），空闲直发同一引用透传，不传时调用形态
+  与旧版逐字一致；发送成功（直发/入队）清附件、失败保留可重试；demo 适配器 `prompt(text, opts?)` 接受并
+  记录收包（`takeDemoPromptLog`，供 e2e/单测断言**透传保真**；行为不变）。三处「图片未发送」提示行与
+  `imageNotWiredNote` 随接线**退役**（不留死代码）。详见 `docs/change/2026-10-13_change_p0-halt-and-images.md`。
+- **真机状态机簇修复（2026-10-13）**：① **作废重建按角色串行化**（`SessionManager.rebuildChains`）+
+  `disposeEntry` 身份守卫 + 每个 `await` 后 TOCTOU 重校验 + `send()` **目标角色入口定格**（并发作废重建
+  不再误删新会话/误复位忙态/丢消息——su 每轮自动重 pin 令重建成热路径，真机由此暴露）；② `#chat[data-state]`
+  改随 role-state **真实快照**（`syncChatState`；run/idle，轮末回 idle 有路径——旧「开启即写死 run」退役，
+  err 两处保留）；③ **回放去重**（`UiLabels.replayPlan` 纯函数：同一份历史**幂等 skip**、增长**增量**、
+  重写/截断/错误态变**全量重建**——真机「同段消息渲染两遍」＝`project:changed`→refresh→主进程重推历史→
+  旧实现整份再回放，已断）。「适配器多发 settled」与「另有重复事件投递」两条假设均**排除**（只读 CDP 探针
+  实测各恰一发/单通道）；「聊天流无 settled 行」＝虚拟窗口化 DOM 采样伪影（行模型有、滚到底即见）。
+  详见 `docs/change/2026-10-13_change_state-machine-and-replay-dedup.md`。
 - **交互卡锚点物化（真机缺陷修复，2026-10-12「已确认的卡切走再切回跑到最下面」）**：卡的（重）物化按
   **时序锚点**落位，open 与 decided 一视同仁——① 主修复＝`materializeOperatorCard` 先按 `requestId` 查行表，
   卡行仍在（Q-2 窗口化下 keepEl 行**离屏脱挂≠丢失**，旧 `cardInPane` 判据误判）⇒ **复用、绝不重建落尾**

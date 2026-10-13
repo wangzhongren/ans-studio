@@ -8,12 +8,12 @@
 
 import type { BoundarySection1 } from "../../src/model/boundary.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
-import type { RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
+import type { RoleSessionHandle, RoleSessionAbortResult } from "../../src/pipeline/orchestration/run-role.ts";
 import type { ProjectConfig } from "../../src/model/role.ts";
 // 会话事件流类型：编排把 `RoleSessionHandle.events()` 放宽为 `OrchestrationEvent`（既有 `SessionEvent`
 // + 编排在 `settled` 时追加的 `handback` 回交事件，设计 §10.8）。外推时套上 `roleId` 信封
 // （`SessionEventEnvelope`，B-2）——**类型从编排/本角色只读导入、不复制形状**。
-import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, DispatchTaskFn } from "../../src/provider/pi/session.ts";
+import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, DispatchTaskFn, PromptImage, PromptOptions } from "../../src/provider/pi/session.ts";
 
 import { listProject as realListProject } from "../../src/service/role/resolve-role.ts";
 import {
@@ -98,7 +98,7 @@ export interface PickImageResult {
   image?: ImageAttachmentInfo & { dataBase64: string };
 }
 
-/** 粘贴/拖入图片的校验结果（K-2）：只**收下与校验**；「送进模型」未接（change 文档如实登记）。 */
+/** 粘贴/拖入图片的校验结果（K-2）：只**收下与校验**（发送时另经 sendSession 真实字节重校验——P0-1 已接线）。 */
 export interface AttachImageResult {
   ok: boolean;
   error?: string;
@@ -222,9 +222,21 @@ export interface DesktopInterface {
   listProject(input: { projectRoot: string }): Promise<ListProjectResult>;
   /** 点角色即开：直接建立/续接与该角色的会话（无确认框；B-2 起切换不再结束旧会话）。 */
   openSession(input: SessionOpenRequest): Promise<OpenResult>;
-  sendSession(input: { text: string }): Promise<SendResult>;
+  /**
+   * 发送一轮消息；开启后可反复调用（多轮聊天，不再确认）。
+   * **P0-1（2026-10-13 客户批准）**：`images` 为可选图片载荷（渲染侧 base64 块）——**渲染进程报的图
+   * 一律不可信**：本层按**真实字节重校验**（base64 严格解码 → 魔数嗅探定类型 → ≤5MB），全过才组
+   * `PromptOptions` 下发；任一张不合格 ⇒ **整条拒发**（fail-closed：绝不「丢图发文字」让客户以为图已送达）。
+   */
+  sendSession(input: { text: string; images?: unknown }): Promise<SendResult>;
   /** 关闭会话（B-2 **定向**：给定 `roleId` 只关它、历史留在界面上；缺省/`null` 关全部，供换项目/退出）。 */
   stopSession(input?: { roleId?: string | null }): Promise<StopResult>;
+  /**
+   * **停当前轮次（P0-2 UI，2026-10-13 客户批准）**：向该角色的会话句柄请求中止当前进行中的轮次。
+   * **三态如实回传**（`RoleSessionAbortResult`：已请求停止 / 当前运行时不支持停止 / 停止失败）——
+   * 轮次仍以既有 `settled` 收尾，本层不制造「已停止」假象；重复点击幂等（无在飞轮次 = no-op）。
+   */
+  abortSession(input: { roleId: string }): Promise<RoleSessionAbortResult>;
   /** 保活中的角色 id 列表（B-2：左树「有活动会话」小圆点的数据源；纯读、无副作用）。 */
   listLiveSessions(): Promise<string[]>;
   /**
@@ -239,8 +251,8 @@ export interface DesktopInterface {
   pickImage(): Promise<PickImageResult>;
   /**
    * **粘贴/拖入的图片**（K-2）：渲染侧经 File API 读出的 base64 交本层——**声明值（name/mime/尺寸）不可信**：
-   * 本层按真实字节嗅探类型与判尺寸。**只收下并校验**；**送进模型那一段未接**（Pi适配器核实 SDK 中，
-   * 见 change 文档的如实登记——本方法不调用任何模型）。
+   * 本层按真实字节嗅探类型与判尺寸，只收下与校验；**发送**经 `sendSession`（本层按真实字节**重校验**后
+   * 组 `PromptOptions` 送模型——P0-1 已接线）。
    */
   attachImage(input: { name?: unknown; mime?: unknown; dataBase64?: unknown }): Promise<AttachImageResult>;
   /** 读取 Pi 配置面板视图（机密键值**不外发**，见 `pi-config.ts`）。 */
@@ -358,13 +370,48 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       return manager.open(input);
     },
 
-    async sendSession(input: { text: string }): Promise<SendResult> {
-      return manager.send(input.text);
+    async sendSession(input: { text: string; images?: unknown }): Promise<SendResult> {
+      const text = input && typeof input.text === "string" ? input.text : "";
+      // —— P0-1：**主进程重校验**（渲染侧报的图一律不可信；以真实字节为准——K-2 同一口径）——
+      // 逐张：严格 base64 解码 → 魔数嗅探定类型（声明 mime 不作数）→ ≤5MB；**全过才放行**，
+      // 任一张不合格 ⇒ 整条拒发（fail-closed：绝不「丢图发文字」让客户以为图已送达）。
+      const rawImages = input && Array.isArray(input.images) ? input.images : [];
+      if (rawImages.length === 0) {
+        return manager.send(text);
+      }
+      const cleaned: PromptImage[] = [];
+      for (const it of rawImages) {
+        const o = it && typeof it === "object" ? (it as Record<string, unknown>) : {};
+        const decoded = decodeImageBase64(o.data);
+        if (!decoded.ok) {
+          return { ok: false, error: `图片未发送（${decoded.error}）——本条消息未发出，请移除该图后重试。` };
+        }
+        const sniffed = sniffImageMime(decoded.buffer);
+        if (sniffed === null) {
+          return {
+            ok: false,
+            error: `图片未发送（内容不是受支持的图片——真实格式不在 ${ALLOWED_IMAGE_MIMES.join(" / ")} 之内，扩展名/声明类型不作数）。本条消息未发出，请移除该图后重试。`,
+          };
+        }
+        const v = validateImage(sniffed, decoded.buffer.length);
+        if (!v.ok) {
+          return { ok: false, error: `图片未发送（${v.error}）——本条消息未发出，请移除该图后重试。` };
+        }
+        cleaned.push({ type: "image", data: typeof o.data === "string" ? o.data : "", mimeType: sniffed });
+      }
+      // 组**契约形状** `PromptOptions`（单一来源 `src/provider/pi/session.ts`）——之后整包同一引用透传。
+      const opts: PromptOptions = { images: cleaned };
+      return manager.send(text, opts);
     },
 
     async stopSession(input?: { roleId?: string | null }): Promise<StopResult> {
       const roleId = input && typeof input.roleId === "string" ? input.roleId : null;
       return manager.stop(roleId);
+    },
+
+    async abortSession(input: { roleId: string }): Promise<RoleSessionAbortResult> {
+      const roleId = input && typeof input.roleId === "string" ? input.roleId : "";
+      return manager.abort(roleId);
     },
 
     async listLiveSessions(): Promise<string[]> {
@@ -391,8 +438,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       }
     },
 
-    // —— 输入区图片（K-2）：**渲染进程不碰文件**——选图走主进程（dialog+fs），字节在**本层**按真实内容校验。——
-    // ⚠ 「送进模型」那一段**未接**（Pi适配器正在核实 SDK 图片内容块）：本层只收下与校验，不调用任何模型。
+    // —— 输入区图片（K-2）：**渲染进程不碰文件**——选图走主进程（dialog+fs），字节在**本层**按真实内容校验。
+    // 发送路径见 sendSession（P0-1：真实字节重校验 → 组载荷随消息送模型）。
     async pickImage(): Promise<PickImageResult> {
       const fn = deps.pickImageFileFn;
       if (!fn) {

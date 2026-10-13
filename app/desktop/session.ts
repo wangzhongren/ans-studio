@@ -51,7 +51,7 @@ import type { ProjectConfig } from "../../src/model/role.ts";
 import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
-import type { RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
+import type { RoleSessionHandle, RoleSessionAbortResult } from "../../src/pipeline/orchestration/run-role.ts";
 import { openRoleSession } from "../../src/pipeline/orchestration/run-role.ts";
 // 会话事件流的类型：编排把 `RoleSessionHandle.events()` 放宽为 `OrchestrationEvent`（既有 `SessionEvent`
 // + 编排在 `settled` 时追加的 `handback` 回交事件，设计 §10.8）。**类型从编排的模块只读导入、不复制形状**
@@ -62,7 +62,7 @@ import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
 import { renderHandbackPrompt, handbackKey, type TaskHandback } from "../../src/common/编排/handback.ts";
 import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputRequest } from "../../src/provider/pi/session.ts";
 // H-1（2026-10-12）：派发能力的冻结契约（§4 冻结家；只读导入、不复制形状）。
-import type { DispatchTaskPayload, DispatchReceipt, DispatchTaskFn } from "../../src/provider/pi/session.ts";
+import type { DispatchTaskPayload, DispatchReceipt, DispatchTaskFn, PromptOptions } from "../../src/provider/pi/session.ts";
 // D-1/E-1：会话文件粗探（「在/不在/坏」）——打开会话时分类 `contextSource`（文案分支的事实来源）。
 import { probeSessionFile } from "./session-history.ts";
 // I-1 补丁（2026-10-12 客户重发授权）：(c) 规则集实件的形状（**只读转自** operator-channel.ts——它 `Omit`
@@ -313,6 +313,12 @@ interface DeliveryItem {
   dedupKey: string;
   /** 入队时间（ISO；入队即定格——右栏「待办 / 队列」组显示用；**绝不**当作执行时间）。 */
   enqueuedAt: string;
+  /**
+   * **P0-1（2026-10-13 客户批准）**：随条目**入队即定格**的整包载荷（`PromptOptions`，契约单一来源
+   * `src/provider/pi/session.ts`；投递时**整包同一引用**透传 `handle.send(text, opts)`——排队后到投递
+   * 都带原图）。缺省（undefined）= 纯文本，投递调用形态与旧版逐字一致（不传第二参）。
+   */
+  opts?: PromptOptions;
 }
 
 /**
@@ -376,6 +382,11 @@ export class SessionManager {
    */
   private readonly drainChains = new Map<string, Promise<void>>();
   /**
+   * **作废重建的按角色串行链（2026-10-13 状态机修复）**：`rebuildIfBoundaryStale` 经它串行化——
+   * 同一角色任一时刻至多一个重建在跑（并发触发方按序等待，各自重查陈旧；见该方法注释）。
+   */
+  private readonly rebuildChains = new Map<string, Promise<void>>();
+  /**
    * **正在跑的那条投递**（`queueKey(projectRoot, roleId)` → 条目，2026-10-12 右栏「待办 / 队列」追加需求）：
    * 投递成功（`handle.send` 已开跑）即登记、该角色 `settled` / 投递失败 / dispose 时清除——右栏据此把
    * 该条如实标注「进行中」（**排队 ≠ 已执行**；直接 send 开跑的一轮不入本表——它不是队列条目）。
@@ -402,8 +413,13 @@ export class SessionManager {
     return this.activeRoleId !== null ? this.sessions.get(this.activeRoleId) : undefined;
   }
 
-  /** 释放一个保活会话；dispose 抛错如实返回原因（条目仍移出，不留半死项）。 */
+  /** 释放一个保活会话；dispose 抛错如实返回原因（条目仍移出，不留半死项）。
+   *  **身份守卫（2026-10-13 状态机修复）**：只释放**仍在表中的这一条**（`get(roleId) === entry` 同一引用）——
+   *  并发路径（settle 触发的 refreshStaleBoundaries 与用户下一次 send/open 各自的作废重建）在各自 `await`
+   *  期间可能已被对方替换/重建；照删会把**新会话（可能正在跑轮次）**误删并推 busy=false（真机「轮次还在跑
+   *  但忙态翻假」的根因一类）。已被替换 ⇒ 本调用 no-op（新条目的处置归它自己的路径）。 */
   private async disposeEntry(roleId: string, entry: LiveSession): Promise<string | null> {
+    if (this.sessions.get(roleId) !== entry) return null; // TOCTOU 防误删（见方法注释）
     this.sessions.delete(roleId);
     if (this.activeRoleId === roleId) this.activeRoleId = null;
     this.activeDeliveries.delete(this.queueKey(entry.projectRoot, roleId)); // 会话没了，「进行中」不再成立
@@ -458,9 +474,34 @@ export class SessionManager {
       : head + "本地无可用会话文件（新建会话）——模型不会记得以上历史，请重新说明需求。";
   }
 
-  /** 陈旧 ⇒ 作废重建（dispose → 立即重开 + 如实记行）。返回 undefined = 未陈旧/在跑（不打断）；
-   *  否则返回 `{changed, reopened}`——调用方据此决定续发/续投，或按失败如实处理。 */
-  private async rebuildIfBoundaryStale(
+  /** 陈旧 ⇒ 作废重建（dispose → 立即重开 + 如实记行）。返回 undefined = 未陈旧/在跑/已被并发替换（不打断）；
+   *  否则返回 `{changed, reopened}`——调用方据此决定续发/续投，或按失败如实处理。
+   *
+   *  **按角色串行化（2026-10-13 状态机修复；同 drainChains 先例）**：同一角色的重建**至多一个在跑**——
+   *  settle 触发的 `refreshStaleBoundaries` 与用户紧接的 `send`/`open` 都会查陈旧，两者**同时**判「陈旧」时：
+   *  旧实现双双 dispose+重开，晚到者的 dispose 会误删对方刚建的新会话（可能已开跑轮次）并推 busy=false
+   *  （真机「轮次还在跑、忙态翻假、停止钮消失 / 消息落空」的根因）。串行后第二个调用**等第一个重建完全
+   *  收尾**再查——那时条目已是新会话（快照新鲜）⇒ 无陈旧 ⇒ no-op；发送/开启照常续在新会话上。
+   *  **TOCTOU 重校验（纵深防御）**：每个 `await`（读盘 diff / 会话文件探测）之后再验**同一引用、仍未开跑**
+   *  ——即便有人绕过串行链（防御层），也不会误删新条目/打断在跑轮次。 */
+  private rebuildIfBoundaryStale(
+    roleId: string,
+    userInitiated: boolean,
+  ): Promise<{ changed: string; reopened: OpenResult } | undefined> {
+    const prev = this.rebuildChains.get(roleId) ?? Promise.resolve();
+    const run = prev.then(() => this.rebuildIfBoundaryStaleUnsafe(roleId, userInitiated));
+    const tail = run.then(
+      () => undefined,
+      () => undefined
+    );
+    this.rebuildChains.set(roleId, tail);
+    void tail.then(() => {
+      if (this.rebuildChains.get(roleId) === tail) this.rebuildChains.delete(roleId); // 链尾清理（防泄漏）
+    });
+    return run;
+  }
+
+  private async rebuildIfBoundaryStaleUnsafe(
     roleId: string,
     userInitiated: boolean,
   ): Promise<{ changed: string; reopened: OpenResult } | undefined> {
@@ -469,9 +510,11 @@ export class SessionManager {
     if (entry.busy) return undefined; // 在跑的轮次不打断（settle 后放行/下次发言/下次投递再查）
     const changed = await this.boundaryDiff(entry);
     if (changed === null) return undefined;
+    if (this.sessions.get(roleId) !== entry || entry.busy) return undefined; // 读盘期间被替换/开跑（TOCTOU）
     const projectRoot = entry.projectRoot;
     // D-1：dispose **不擦除**会话文件——先探「在/不在/坏」，重开后会按它恢复（措辞据此如实）。
     const probe = await probeSessionFile(projectRoot, roleId);
+    if (this.sessions.get(roleId) !== entry || entry.busy) return undefined; // 探测期间被替换/开跑（TOCTOU）
     await this.disposeEntry(roleId, entry);
     this.deps.emitEvent({ roleId, event: { kind: "message", summary: this.boundaryRebuiltLine(changed, probe) } });
     const reopened = await this.openInternal({ projectRoot, roleId, runtime: this.lastRuntime }, userInitiated);
@@ -762,23 +805,31 @@ export class SessionManager {
   /** 发送一轮消息给**当前活动会话**（最近一次 open 的角色）；可反复调用。
    *  **L-1（2026-10-12 客户裁定「每个角色…有个队列的概念」）**：角色**忙时不再直接失败**（旧行为＝直转 SDK、
    *  被回 "already processing" 报错给客户）——客户消息作为**第三类**并入**同一条**投递队列（E-1/H-1 共用），
-   *  按到达序在当前任务结束后执行；空闲路径**逐字不变**。返回 `queued:true + position`（界面据此如实提示）。 */
-  async send(text: string): Promise<SendResult> {
+   *  按到达序在当前任务结束后执行；空闲路径**逐字不变**。返回 `queued:true + position`（界面据此如实提示）。
+   *  **P0-1（2026-10-13 客户批准）**：`opts`（图片载荷）为**可选**——忙时**入队即定格**（排队后到投递都带
+   *  原图）；空闲直发**整包同一引用**透传 `handle.send(text, opts)`。不传 `opts` 时调用形态与旧版逐字一致。 */
+  async send(text: string, opts?: PromptOptions): Promise<SendResult> {
+    // **目标角色在入口定格（2026-10-13 状态机修复）**：并发作废重建（settle 触发的 refreshStaleBoundaries
+    // 与本次 send 各自的重建赛跑）会在窗口里清空/替换 `activeRoleId`——按「当下的 activeRoleId」取条目会让
+    // 本条消息**落空**（旧实现会回「会话尚未开启」且消息丢失）。用户的意图是入口那一刻的活动角色，照它走。
+    const targetRoleId = this.activeRoleId;
     // O-1（2026-10-12）：发言前先查**边界快照**——陈旧 ⇒ 先作废重建（本条发言直接落到新边界会话上；
     // 重建失败 ⇒ 如实回错、本条不发送）。在跑的轮次由 rebuild 内部跳过（不打断）。
-    const activeId = this.activeRoleId;
-    if (activeId !== null) {
-      const rebuilt = await this.rebuildIfBoundaryStale(activeId, true);
+    if (targetRoleId !== null) {
+      const rebuilt = await this.rebuildIfBoundaryStale(targetRoleId, true);
       if (rebuilt !== undefined && !rebuilt.reopened.ok) {
         return { ok: false, error: "该角色边界已更新，但按新边界重开会话失败——本条消息未发送，请重试。" };
       }
     }
-    const entry = this.activeEntry();
+    const entry = targetRoleId !== null ? this.sessions.get(targetRoleId) : undefined;
     if (!entry) {
       return { ok: false, error: "会话尚未开启（点击左侧角色即可开启）。" };
     }
+    // 并发重建可能把活动指针清掉（dispose 置 null、后台重开不抢位）——用户意图仍指向 targetRoleId：复位。
+    // （若用户期间开了**别的**角色，activeRoleId 非 null，不动它——不抢位。）
+    if (this.activeRoleId === null) this.activeRoleId = targetRoleId;
     if (entry.busy) {
-      const roleId = this.activeRoleId as string;
+      const roleId = targetRoleId as string;
       this.enqueueDelivery(entry.projectRoot, roleId, {
         kind: "message",
         targetRoleId: roleId,
@@ -787,23 +838,61 @@ export class SessionManager {
         summary: `你：${shortenText(text, 40)}`,
         // 客户消息逐条独立（**不去重**——同文重复发送是两个意图）：键含自增序号+时间。
         dedupKey: `msg\u0000${++this.messageSeq}\u0000${Date.now()}`,
+        // P0-1：**入队即定格**——整包同一引用存进条目，投递时原样透传（排队不变形）。
+        ...(opts !== undefined ? { opts } : {}),
       });
       const q = this.deliveryQueues.get(this.queueKey(entry.projectRoot, roleId));
       return { ok: true, queued: true, position: q ? q.length : 1 };
     }
-    const roleId = this.activeRoleId as string;
+    const roleId = targetRoleId as string;
     // L-1 顺序修正（与投递机同款，防竞态）：**先置忙再 await**——快适配器（如演示 runtime）的事件
     // （含 `settled`）可能在 `send` 返回前就被消费循环处理完；若此刻才置忙，settled 的复位会被反向覆盖，
     // 忙态将**永不复位**（队列也永不放行）。失败 ⇒ 复位 + 外推（并没有在跑，如实）。
     entry.busy = true;
+    // P0-2 前置修正（2026-10-13，随停止入口同批）：**开跑即外推 busy=true**——与投递机同款
+    //（先置忙即推快照）。旧版只在 round 结束后推：长轮次（真实 pi 一轮数分钟）期间界面根本收不到
+    // 「工作中」快照——停止钮与左树徽标都无从在轮次**进行中**出现（快适配器掩盖了这条缝；停止入口
+    // 把缝暴露出来）。此处开跑即推（如实）；结束后那次保留（兜底快适配器「settled 先于 send 返回
+    // 被消费」的竞态）。
+    this.notifyRoleState(entry.projectRoot, roleId);
     try {
-      await entry.handle.send(text);
+      // P0-1：整包同一引用透传；**不传 opts 时调用形态与旧版逐字一致**（不构造空包）。
+      if (opts === undefined) {
+        await entry.handle.send(text);
+      } else {
+        await entry.handle.send(text, opts);
+      }
       this.notifyRoleState(entry.projectRoot, roleId); // 状态准确性：真开跑即外推「工作中」（繁忙与否以会话条目为准）
       return { ok: true };
     } catch (err) {
       entry.busy = false;
       this.notifyRoleState(entry.projectRoot, roleId);
       return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  }
+
+  /**
+   * **停当前轮次（P0-2 UI，2026-10-13 客户批准）**：向指定角色的会话句柄请求中止当前进行中的轮次。
+   * **三态如实回传**（契约形状 `RoleSessionAbortResult`，语义钉死在编排 run-role.ts）：
+   * - `{ok:true, supported:true}` —— 已请求停止（轮次仍以既有 `settled` 收尾——**不做乐观「已停止」假象**）；
+   * - `{ok:false, supported:false, error}` —— 句柄方法缺席（旧替身）或底层会话不带 abort（如 demo 替身）
+   *   ——「当前运行时不支持停止」，**绝不假装已停**；
+   * - `{ok:false, supported:true, error}` —— 底层 abort 报错：错误原文如实上抛，不吞。
+   * 幂等：无在飞轮次 = no-op（底层不抛错、无副作用——abort 语义已在适配器环测试钉死）。
+   */
+  async abort(roleId: string): Promise<RoleSessionAbortResult> {
+    const entry = typeof roleId === "string" && roleId !== "" ? this.sessions.get(roleId) : undefined;
+    if (!entry) {
+      return { ok: false, supported: false, error: `角色 ${roleId} 没有打开的会话——没有可停止的轮次。` };
+    }
+    // 契约：消费方以 `handle.abort?.()` 调用——**方法缺席**（旧替身）与返回 supported:false 同一处理。
+    if (entry.handle.abort === undefined) {
+      return { ok: false, supported: false, error: "当前运行时不支持停止" };
+    }
+    try {
+      return await entry.handle.abort();
+    } catch (err) {
+      return { ok: false, supported: true, error: err instanceof Error ? err.message : String(err) };
     }
   }
 
@@ -1114,7 +1203,12 @@ export class SessionManager {
     entry.busy = true;
     this.notifyRoleState(projectRoot, resolvedTarget); // 状态准确性：投递开跑即外推「工作中」（shift 时快照尚为闲）
     try {
-      await entry.handle.send(sent.text);
+      // P0-1：**入队即定格**的整包载荷原样透传（整包同一引用；不传时调用形态与旧版逐字一致）。
+      if (sent.opts === undefined) {
+        await entry.handle.send(sent.text);
+      } else {
+        await entry.handle.send(sent.text, sent.opts);
+      }
       this.activeDeliveries.set(key, sent); // 右栏「进行中」：投递已开跑（settled/失败/dispose 时清除）
       this.notifyRoleState(projectRoot, resolvedTarget); // 立即外推（running 行即时可见）
       if (sent.kind === "dispatch") this.activeDispatchKeys.delete(sent.dedupKey); // 送达即释放窗口去重（返工可再派）

@@ -43,7 +43,7 @@ import type {
 } from "../../provider/pi/session.ts";
 import { buildGovernedTools, SHELL_TOOL_NAME, shellKillSwitch } from "../../provider/pi/tools.ts";
 import { formatDenialMessage } from "./format-denial.ts";
-import { createEventQueue } from "./event-queue.ts";
+import { createEventQueue, type EventQueue } from "./event-queue.ts";
 import {
   resolvePiProviderConfig,
   renderContextWindowNotice,
@@ -798,6 +798,8 @@ function extractMessageText(message: unknown): string | undefined {
 export interface PromptCapableSession {
   prompt(text: string, options?: { images: PromptImage[] }): Promise<void>;
   abort(): Promise<void>;
+  /** 收口整个底层会话（`makeRoleSession` 的 dispose 用；AgentSession 本就提供）。 */
+  dispose(): void;
 }
 
 /**
@@ -843,6 +845,56 @@ export function makeRolePrompt(deps: {
       }
       throw err instanceof Error ? err : new Error(message);
     }
+  };
+}
+
+// —————————————————————— 角色会话组装（P0-2 停当前轮次：abort 透传） ——————————————————————
+
+/** `makeRoleSession` 的依赖（bindRole 组装与测试桩件共用；同 `makeRolePrompt` 的接缝先例）。 */
+export interface RoleSessionDeps {
+  session: PromptCapableSession;
+  promptMs: number;
+  gate: InteractionGate;
+  emit: (event: SessionEvent) => void;
+  log: StageLogger;
+  /** 事件队列：`events()` 的流来源；dispose 最后 close（迟到事件先排空）。 */
+  queue: EventQueue<SessionEvent>;
+  /** dispose 内、SDK `session.dispose()` **之前**的收口（退订 settled——dispose 引发的迟到 settled 不再入队）。 */
+  unsubscribe: () => void;
+}
+
+/**
+ * 组装 `RoleSession`（**导出供接线测试**——桩件即可断言 abort 透传与 dispose 顺序，无需真实模型）：
+ * - `prompt`：`makeRolePrompt`（K-2 图片透传 / G-1 可暂停时限 / 失败外推，见其文档）；
+ * - `events`：队列流（既有行为逐字不变）；
+ * - `abort`（提案 P0-2「停当前轮次」，契约 `RoleSession.abort?` 的真适配器实现）：
+ *   透传 Pi SDK `session.abort()`。**语义**（与契约注释一一对应，SDK 源码已核实）：
+ *   · 停当前轮（`agent.abort()` 中止该轮 run 的 AbortController——模型生成与工具执行一并停），
+ *     **不销毁会话**：abort 后仍可继续 prompt（历史与上下文保留）；
+ *   · **无进行中轮次 = no-op**：`agent.abort()` 是 `activeRun?.abortController.abort()`（可选链），
+ *     `waitForIdle()` 在 idle 时立即返回——不抛错、无副作用；
+ *   · **abort 后 settled 仍发射**：SDK `_emitAgentSettled` 无论中止与否都发 `agent_settled`
+ *     （`wireSettledOnce` 照常映射，X-1 唯一发射点），进行中的 `prompt()` promise 正常返回；
+ *   · **等待中的客户确认/交互一并 fail-closed**：run 级 signal 经 agent-loop 传入各工具 `execute`
+ *     （第三参），交互工具的 `raceAbort`（设计 A-6）立即以「未获客户同意」返回——SDK 已天然带动，
+ *     本层无需另接（端到端用例钉住）；
+ *   · 错误如实上抛（不吞错）。
+ * - `dispose`：顺序与提取前逐字一致（退订 → SDK dispose → queue.close）。
+ */
+export function makeRoleSession(deps: RoleSessionDeps): RoleSession {
+  return {
+    prompt: makeRolePrompt(deps),
+    events(): AsyncIterable<SessionEvent> {
+      return deps.queue.stream;
+    },
+    async abort(): Promise<void> {
+      await deps.session.abort();
+    },
+    async dispose(): Promise<void> {
+      deps.unsubscribe();
+      deps.session.dispose();
+      deps.queue.close();
+    },
   };
 }
 
@@ -1053,18 +1105,9 @@ export function createRealPiRuntimeAdapter(opts: RealPiAdapterOptions): RuntimeA
 
       log.stage("bindRole 完成");
 
-      return {
-        // prompt 包装抽为 `makeRolePrompt`（K-2）：图片透传 / 可暂停时限 / 失败外推都在那处，且可直接单测。
-        prompt: makeRolePrompt({ session, promptMs, gate: interactionGate, emit, log }),
-        events(): AsyncIterable<SessionEvent> {
-          return queue.stream;
-        },
-        async dispose(): Promise<void> {
-          unsubscribe();
-          session.dispose();
-          queue.close();
-        },
-      };
+      // 会话组装抽为 `makeRoleSession`（提案 P0-2「停当前轮次」）：prompt/events/dispose 逐字旧行为，
+      // 另透传 abort（SDK session.abort()——语义与核实依据见该函数文档）。
+      return makeRoleSession({ session, promptMs, gate: interactionGate, emit, log, queue, unsubscribe });
     },
   };
 }

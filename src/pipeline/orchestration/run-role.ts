@@ -46,6 +46,7 @@ import type {
   CustomerInputFn,
   DispatchTaskFn,
   OperatorChannelFn,
+  PromptOptions,
 } from "../../provider/pi/session.ts";
 import { createPiRuntimeAdapter } from "../../provider/pi/session.ts";
 import {
@@ -188,9 +189,55 @@ export async function runRole(
 // —————————————————————— 会话句柄式（多轮）接口 ——————————————————————
 // 冻结签名（桌面应用照此编写）。
 
+/**
+ * `RoleSessionHandle.abort()` 的结果（产品提案 P0-2「停当前轮次」，2026-10-13 客户批准）。
+ * 三态**语义钉死**：
+ * - `{ ok:true, supported:true }` —— 已向底层会话请求停止当前轮次（轮次以 `settled` 正常收尾）；
+ * - `{ ok:false, supported:false, error }` —— 底层会话**不带 abort**（如 demo 替身/假适配器）：
+ *   **该运行时不支持停止**，`error` 承载如实文案「当前运行时不支持停止」——绝不假装已停；
+ * - `{ ok:false, supported:true, error }` —— 底层会话有 abort 但 SDK 报错：错误原文（`errText`）
+ *   如实放入 `error`，不吞、不谎报已停。
+ * `error` 统一承载 `ok:false` 时给人看的如实原因；`supported` 告知「该运行时有没有停止能力」。
+ */
+export interface RoleSessionAbortResult {
+  ok: boolean;
+  supported: boolean;
+  error?: string;
+}
+
 export interface RoleSessionHandle {
-  /** 发送一轮输入；可反复调用（底层同一会话，不重建）。 */
-  send(text: string): Promise<void>;
+  /**
+   * 发送一轮输入；可反复调用（底层同一会话，不重建）。
+   * **P0-1 图片接线（2026-10-13 客户批准）**：`opts` 为**可选**图片载荷——整包**原样透传**给底层会话的
+   * `prompt(text, opts)`（契约单一来源 `PromptOptions`，从 `src/provider/pi/session.ts` 只读导入，
+   * **不复制形状**；`images` 为契约 `PromptImage` 块，**空数组 = 无图**，同样原样透传）。
+   * **不传 `opts` 时行为逐字不变**（纯文本，调用形态也与旧版逐字一致）。多模态与否不由本层猜测；
+   * 队列入队定格与桌面接线为**后环**（桌面环节），本层只保证句柄层透传保真。
+   */
+  send(text: string, opts?: PromptOptions): Promise<void>;
+  /**
+   * **停当前轮次（产品提案 P0-2「跑飞轮次的停」，2026-10-13 客户批准）**：向底层会话请求**中止当前
+   * 进行中的 prompt 轮次**（模型生成与工具执行一并停）。契约来源 = `RoleSession.abort?`
+   * （`src/provider/pi/session.ts`，**可选方法**；真适配器实现 = Pi SDK `session.abort()`，
+   * 见 `src/common/pi-adapter/real-adapter.ts` 的 `makeRoleSession`）。
+   *
+   * **语义（钉死）**：
+   * - **不销毁会话**——abort 后本句柄仍可继续 `send`（历史与模型上下文保留）；与 `dispose`（收口整只
+   *   会话）不同；
+   * - **无在飞轮次 = no-op**（底层不抛错、无副作用）；
+   * - **中止后 `settled` 仍发射**——轮次以 `settled` 正常收尾，消费方不会挂起；
+   * - **等待中的客户确认一并 fail-closed**（中止该轮 run 的 AbortSignal，交互工具按「未获同意」返回）；
+   * - **三态如实返回**（形状见 `RoleSessionAbortResult`）：会话**不带 abort**（如 demo 替身）⇒
+   *   `{ ok:false, supported:false, error:"当前运行时不支持停止" }`——**绝不假装已停**；SDK 报错 ⇒
+   *   `{ ok:false, supported:true, error:<错误原文> }`——如实上抛为结果，不吞。
+   * 桌面「停止」入口（何时出现按钮、点击后聊天流的如实一行）为**后环**（桌面环节）。
+   *
+   * **可选方法（契约演进，同契约 `RoleSession.abort?` 的「PromptOptions 先例」）**：既有替身
+   * **不实现它也完全合法**；消费方以 `handle.abort?.()` 调用——**方法缺席**（旧替身）与返回
+   * `supported:false` 同一处理：如实告知「当前运行时不支持停止」，绝不假装已停。
+   * **`openRoleSession` 返回的句柄恒实现本方法**（三态结果即真实回答，缺席只出现在替身）。
+   */
+  abort?(): Promise<RoleSessionAbortResult>;
   /**
    * 持续的事件流；跨多轮累积。产出 `OrchestrationEvent`（既有 `SessionEvent` + 编排在 `settled` 时
    * 追加的 `handback` 回交事件，设计 §10.8）——**治理角色（su）不自我回交**，故其会话只产出 SessionEvent。
@@ -379,8 +426,28 @@ export async function openRoleSession(
 
   let disposed = false;
   const base: RoleSessionHandle = {
-    async send(text: string): Promise<void> {
-      await session.prompt(text);
+    async send(text: string, opts?: PromptOptions): Promise<void> {
+      // P0-1：opts **原样透传**（同一引用，不克隆不筛选——空数组=无图也原样交给会话）；
+      // 不传 opts 时调用形态与旧版逐字一致（单参），行为逐字不变。
+      if (opts === undefined) {
+        await session.prompt(text);
+        return;
+      }
+      await session.prompt(text, opts);
+    },
+    // P0-2 停当前轮次：三态如实返回（形状与语义见 RoleSessionAbortResult 的文档注释）。
+    // 消费规则 = 契约 `RoleSession.abort?`：可选方法，缺席 = 该运行时不支持停止，必须如实告知。
+    async abort(): Promise<RoleSessionAbortResult> {
+      if (session.abort === undefined) {
+        return { ok: false, supported: false, error: "当前运行时不支持停止" };
+      }
+      try {
+        await session.abort();
+        return { ok: true, supported: true };
+      } catch (err) {
+        // SDK 报错如实转达（错误原文进 error），不吞、不谎报已停；不销毁会话。
+        return { ok: false, supported: true, error: errText(err) };
+      }
     },
     events(): AsyncIterable<OrchestrationEvent> {
       const stream = session.events();

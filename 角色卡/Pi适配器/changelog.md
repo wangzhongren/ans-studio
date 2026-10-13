@@ -1,5 +1,37 @@
 # Pi适配器 变更记录
 
+## 2026-10-13 — P0-2「停当前轮次」第一环：`RoleSession.abort?` 入契约 + 真适配器 abort 透传（Pi SDK `session.abort()`）
+
+**来源**：产品提案 `角色卡/产品/docs/design/2026-10-13_design_desktop-ux-improvement-proposal.md` **P0-2**（客户在 P0 三选二中批准）；本角色负责**最底环**——运行时适配器契约与真适配器；**编排句柄（`RoleSessionHandle` 增 `abort()`）与桌面停止入口为后续环节**，契约形状以本条钉死为准。完整实施记录：`角色卡/Pi适配器/docs/change/2026-10-13_change_p02-abort-session.md`。
+
+**契约形状裁定（对派工文本的一处修正，如实登记）**：派工文本写「`RuntimeAdapter` 增可选 `abort?`」，经核实**落点应为 `RoleSession`**——中止语义是**会话级**的（「当前进行中的 prompt 轮次」只存在于 `bindRole` 返回的会话对象上，`RuntimeAdapter` 是工厂、无轮次可言），且提案钉的链路是「编排句柄 → 适配器 `session.abort()`」、编排句柄包装的恰是 `bindRole` 返回的 `RoleSession`（`run-role.ts:370/381` 已核）。同 `PromptOptions` 先例（演进也发生在 `RoleSession.prompt` 上）。`RuntimeAdapter` 处已留一行指引注释。
+
+**改了什么（全部在本角色 Section 1 内）**
+- `src/provider/pi/session.ts`：`RoleSession` 增**可选** `abort?(): Promise<void> | void`（契约演进，同 `PromptOptions` 先例——既有实现/替身不实现也完全合法）。文档注释写清：① 消费方须 `session.abort?.()`，**缺席 = 该运行时不支持停止，上层须如实告知，不得静默装作已停**；② 语义 = 停当前轮（模型生成与工具执行一并停）、**不销毁会话**（可继续发下一条）；③ **无进行中轮次 = no-op 不抛错**；④ **中止后 settled 仍会发射**（既有行为——SDK `agent_settled` 无论中止与否都发，X-1 唯一发射点照常映射），进行中的 `prompt()` promise 正常返回（SDK 落 `stopReason:"aborted"` 收尾、不向上拒绝）；⑤ **等待中的客户确认/交互一并 fail-closed**（run 级 signal → `raceAbort`，SDK 已天然带动）；⑥ 错误如实上抛。`RuntimeAdapter` 加指引注释，不改其成员。
+- `src/common/pi-adapter/real-adapter.ts`：① `PromptCapableSession` 补 `dispose(): void`（本就「结构上兼容 AgentSession」，`makeRoleSession` 收口需要）；② **会话组装抽为导出工厂 `makeRoleSession(deps)`**（同 K-2 `makeRolePrompt` 的桩件接缝先例）——`prompt`（逐字复用 `makeRolePrompt`）/`events`（队列流，逐字不变）/`dispose`（顺序逐字不变：退订 → SDK dispose → queue.close）+ **新增 `abort()`：`await deps.session.abort()` 透传**，错误如实上抛不吞；`bindRole` 改用该工厂（行为零变化的提取 + abort 一项新增）。
+- **未动**：假适配器（替身**不实现** abort——缺席即「不支持停止」，契约可选性由它真实体现）；编排 `run-role.ts` / 桌面（后续环节的边界）。
+
+**SDK 语义核实（全部读安装包 dist 源码，非文档转述）**
+- **无在飞轮次 = no-op 不抛错**：`AgentSession.abort()`（agent-session.js:1909-1920）→ `this.agent.abort()` = `activeRun?.abortController.abort()`（pi-agent-core agent.js:218-220，可选链）→ `waitForIdle()` 在 `isIdle`（`!_isAgentRunActive && !isCompacting`）时立即返回；`abortRetry/abortCompaction/abortBranchSummary` 均 `?.` 守护。
+- **abort 后 settled 仍发射**：`_emitAgentSettled`（agent-session.js:684-691）无论 `_agentRunAbortRequested` 与否都发 `agent_settled`（带 `aborted` 标志）；且**先发射后解 idle 等待**（:707）⇒ `abort()` 返回时 settled 必已入队（断言无竞态）。
+- **进行中的 `prompt()` 正常返回**：agent 层 `runWithLifecycle` 把中止落成 `handleRunFailure` 的 `stopReason:"aborted"` 收尾消息（agent.js:364-376），**不向上 reject**；`prompt()` 末尾 `await _runAgentPrompt(messages)` 随之正常 resolve。
+- **A-6 交互中止的核查结论（派工要求核实项）：SDK abort 已天然带动，无需补接线**——run 级 signal 经 agent-loop 逐层传入各工具 `execute` 第三参（agent-loop.js:574、agent.js:428-434），`agent.abort()` 中止该 controller ⇒ 交互工具内 `raceAbort`（timeout.ts:121-138，设计 A-6）立即以「未获客户同意（…被中止…）」fail-closed 返回，`askCustomer` 的 `finally` 收闸（InteractionGate 归零）。端到端用例钉住（见下）。
+
+**测试（`test/pi-adapter/abort.test.ts` 新增 6 条）**
+- 契约形状钉（无 Pi）：无 `abort` 的会话对象（含**假适配器替身**）仍满足 `RoleSession`（编译期 + 运行期断言可选性）；`abort` 返回型允许「同步 void / Promise / async 函数」三态。
+- `makeRoleSession` 桩件（无 Pi）：`abort()` 恰好透传一次到底层 `session.abort()`、反复调用不抛错；`dispose` 顺序与提取前逐字一致（退订 → SDK dispose → queue.close）、`events()` 流同一性。
+- SDK 级（faux provider，离线，未安装则跳过；boot 逐字复刻 bindRole 接线**含出厂治理扩展**，走**生产 `makeRoleSession`**）：① **主用例**——确认卡挂起中（客户永不作答）`abort?.()` → 不抛错、进行中的 prompt promise 正常返回、gate 收闸（等待中的交互 fail-closed 返回）、**settled 恰 1**、随后会话可继续发下一条（settled 第 2 次 + 「收尾」消息进事件流 = 不销毁会话）；② **no-op 用例**——prompt 前 / 两轮之间 abort 均不抛错、不产生也不吞掉轮次（settled 计数 0 → 1 → 3）。
+
+**验证（本角色执行）**
+- `npm run typecheck` → **全仓零错误**。
+- `node --test "test/pi-adapter/**/*.test.ts"`（带引号）→ **171 pass / 0 fail**（165 既有全绿 + 6 新增）。
+- 全量 `node --test "test/**/*.test.ts"`（带引号）→ **919 计 / 916 pass / 2 fail / 1 skip**；**2 红恰为既有基线红**（`test/桌面应用/pi-config.test.ts` 检出目录名断言、`test/项目管理/shared/path-primitives.test.ts` macOS `/private/var` 环境红），均在本角色边界之外。
+- 未 git 操作、未重启桌面应用、未读 `.env`、未发真实模型请求（faux 进程内、keyless）、未打印凭据值。
+
+**边界 / 跨角色（未越界改）**
+- 只写本角色 Section 1：`src/provider/pi/session.ts`、`src/common/pi-adapter/real-adapter.ts`、`test/pi-adapter/**`（新文件 + `prompt-images.test.ts` 桩件补 `dispose`）、`角色卡/Pi适配器/**`。
+- **供编排（后续环节）**：`openRoleSession` 的 `RoleSessionHandle` 增 `abort()` → `session.abort?.()`（缺席时如实回「当前运行时不支持停止」——demo 替身会话即此形态）；**供桌面（后续环节）**：停止入口按提案 P0-2 的交互口径（工作中才出钮、点击后聊天流如实一行、轮次以 settled 收尾）。
+
 ## 2026-10-12 — 客户确认制交互工具族（request_confirmation / request_choice）；executionMode 端到端实测生效
 
 **来源**：设计稿 `角色卡/项目管理/docs/design/2026-10-12_design_governed-interaction-and-chat-ux.md`（**approved**，A 组先行）§三 A-1/A-2/A-6；本轮按派工只做 **A 组中属于 Pi适配器**的部分（**不含** A-4 删除 finalize 类型——最后一步、另派；`finalizeBootstrap` 槽与工具**原样保留**）。完整实施记录：`角色卡/Pi适配器/docs/change/2026-10-12_change_governed-interaction-tools.md`。

@@ -29,6 +29,9 @@ const PI_ENV = path.join(OUTDIR, "e2e-pi.env");
 
 let createDesktopInterface = null;
 let createChatDemoAdapter = null;
+let chatAdapterMod = null; // P0-1：demo 适配器模块引用（takeDemoPromptLog 断言透传保真用）
+let slowPromptGate = null; // P0-1 e2e 专用缝：让首轮 prompt 挂起（把「忙」变成确定态，供入队定格断言）
+let slowPromptArmed = false;
 let win;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -51,6 +54,9 @@ function registerIpc() {
       return r.canceled ? null : r.filePaths[0] || null;
     },
     emitEvent: (ev) => { if (!win.isDestroyed()) win.webContents.send("session:event", ev); },
+    // L-1/状态准确性（与 app/main.ts 同形；生产经 Q-1 去抖 ≥100ms 合并——此处直推、语义一致）：
+    // 忙碌/队列**真实快照** → 渲染侧（停止钮显隐、左树徽标与队列行都只信它）。
+    emitRoleState: (info) => { if (!win.isDestroyed()) win.webContents.send("session:role-state", info); },
     // ⚠ 测试注入缝（客户 2026-10-11 裁定：界面去掉运行时选择器、桌面一律以 pi 发起）：
     //    顶掉**真实 pi 工厂**，改注入 demo 适配器工厂 ⇒ e2e 仍能**离线**跑完整流程（不触网、不需凭据）。
     //    适配器按 `role.boundary` 构造（bindRole 收到的 ResolvedRole 带 boundary）；行为与既有 demo 一致
@@ -59,7 +65,23 @@ function registerIpc() {
     createPiAdapterFactoryFn: () =>
       (gate) => ({
         composeContext: (role) => createChatDemoAdapter({ gate, boundary: role.boundary }).composeContext(role),
-        bindRole: (role) => createChatDemoAdapter({ gate, boundary: role.boundary }).bindRole(role),
+        bindRole: async (role) => {
+          const session = await createChatDemoAdapter({ gate, boundary: role.boundary }).bindRole(role);
+          // P0-1 e2e 专用缝（仅桌面应用角色、仅 arm 后、仅文本「队列慢轮」命中）：首轮 prompt 挂起直到
+          // e2e 显式放行——不改 demo 适配器本体（记录/行为不变，只是延迟调用），把「忙」变成确定态。
+          if (role.id === "桌面应用") {
+            const origPrompt = session.prompt.bind(session);
+            session.prompt = (text, opts) => {
+              if (slowPromptArmed && text === "队列慢轮") {
+                slowPromptArmed = false;
+                const g = slowPromptGate;
+                return g.promise.then(() => origPrompt(text, opts));
+              }
+              return origPrompt(text, opts);
+            };
+          }
+          return session;
+        },
       }),
     // ⚠ 临时 `.env` 路径（不碰仓库根）；piConfigEnv 用独立对象避免污染 e2e 进程环境。
     envFilePath: PI_ENV,
@@ -93,6 +115,8 @@ function registerIpc() {
   ipcMain.handle("session:open", (_e, input) => desktop.openSession(input));
   ipcMain.handle("session:send", (_e, input) => desktop.sendSession(input));
   ipcMain.handle("session:stop", (_e, input) => desktop.stopSession(input));
+  // P0-2：停当前轮次（与 app/main.ts 同形——Interface 三态如实回传）。
+  ipcMain.handle("session:abort", (_e, input) => desktop.abortSession(input));
   // B-2：保活会话列表（与 app/main.ts 同形）。
   ipcMain.handle("session:live", () => desktop.listLiveSessions());
   // B-1：链接外开——替身只记录 URL 并回 ok（**不真开系统浏览器**；校验仍在 Interface 层，与此替身同形）。
@@ -327,9 +351,83 @@ async function run() {
   log("SESSION_STATE_AFTER_RESUME=" + (await wc().executeJavaScript("document.getElementById('chat').dataset.state || '(none)'"))); // 同上
   log("NO_MODAL_AFTER_RESUME=" + !(await modalExists()));
 
-  // 6) 右栏抽屉（客户裁定 2026-10-13：右栏不常驻，收成右上角图标簇；点开展示、再点收起）：
-  //    先断言默认收起，点 tab-card 展示 → 资料四组（角色卡/边界/变更/文档）在抽屉内；再点收起。
-  log("TABS_PRESENT=" + (await wc().executeJavaScript("['tab-card','tab-todo','tab-queue','tab-pi'].every(id=>!!document.getElementById(id))")));
+  // P0-2（2026-10-13 客户批准「跑飞轮次的停」；同日客户反馈后位置调整）：停止入口——**输入框区、
+  // 发送钮左侧**的小圆钮；**仅忙碌时出现**（role-state 真实快照判据）；点击按三态在聊天流**如实一行**
+  // （demo 替身不带 abort ⇒ 「当前运行时不支持停止」如实；轮次仍以 settled 收尾——此处不造乐观
+  // 「已停止」假象）；空闲/快照复位即隐藏。**与发送钮并存**：发送钮绝不因忙碌被替换/禁用。
+  log("STOP_IN_COMPOSER=" + (await wc().executeJavaScript("(() => { const h=document.getElementById('btn-halt'), c=document.getElementById('composer-capsule'), s=document.getElementById('btn-send'); return !!h && !!c && c.contains(h) && !!s && s.previousElementSibling === h; })()")));
+  log("CHAT_HEAD_NO_BUTTONS=" + (await wc().executeJavaScript("document.querySelectorAll('.chat-head button').length === 0")));
+  await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面应用', busy: false, summaries: [], queue: [], running: null })");
+  await sleep(150);
+  log("STOP_HIDDEN_WHEN_IDLE=" + (await wc().executeJavaScript("document.getElementById('btn-halt').hidden === true")));
+  await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面应用', busy: true, summaries: ['你：在跑'], queue: [], running: null })");
+  await sleep(150);
+  log("STOP_VISIBLE_WHEN_BUSY=" + (await wc().executeJavaScript("document.getElementById('btn-halt').hidden === false")));
+  await wc().executeJavaScript("document.getElementById('btn-halt').click()");
+  await sleep(300);
+  log("STOP_LINE_UNSUPPORTED=" + (await wc().executeJavaScript("[...document.querySelectorAll('#chat .chat-pane .sys-call')].some(function (p) { return p.textContent.indexOf('当前运行时不支持停止') >= 0; })")));
+  await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面应用', busy: false, summaries: [], queue: [], running: null })");
+  await sleep(150);
+  log("STOP_HIDDEN_AFTER_SNAPSHOT_RESET=" + (await wc().executeJavaScript("document.getElementById('btn-halt').hidden === true")));
+
+  // P0-1（2026-10-13 客户批准）：图片端到端——IPC 带载荷 → Interface 真实字节重校验 → 队列入队定格 →
+  // 句柄整包透传 → demo 适配器收包记录（takeDemoPromptLog，**逐字断言**）。队列定格段用**慢轮缝**把
+  // 「忙」变成确定态：首轮 prompt 挂起 → 第二条带图**入队** → 放行 → settled 后按序投递。
+  chatAdapterMod.takeDemoPromptLog();
+  const tinyPng = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+  let releaseSlow;
+  const slowPromise = new Promise((r) => { releaseSlow = r; });
+  slowPromptGate = { promise: slowPromise };
+  slowPromptArmed = true;
+  const p1 = wc().executeJavaScript("window.desktop.sendSession('队列慢轮')"); // 不先 await：首轮挂起期间它持有忙态
+  await sleep(400);
+  // 并存钉（客户红线）：**真忙**（首轮在飞）时——停止钮出现、**发送钮仍可用**，且手发即入队
+  // （停止钮与发送钮并存、各司其职；发送钮绝不因忙碌被替换/禁用）。
+  log("STOP_VISIBLE_WITH_REAL_BUSY=" + (await wc().executeJavaScript("document.getElementById('btn-halt').hidden === false")));
+  log("SEND_ENABLED_WHILE_BUSY=" + (await wc().executeJavaScript("document.getElementById('btn-send').disabled === false")));
+  // data-state（程序化出口）随真实快照：真忙 ⇒ run（2026-10-13 修复后由 role-state 快照驱动）。
+  log("DATA_STATE_RUN_WHILE_BUSY=" + (await wc().executeJavaScript("document.getElementById('chat').dataset.state === 'run'")));
+  await wc().executeJavaScript("(() => { document.getElementById('inp-message').value='忙时手发入队'; document.getElementById('btn-send').click(); })()");
+  await sleep(300);
+  log("SEND_QUEUES_WHILE_BUSY=" + (await wc().executeJavaScript("document.getElementById('composer-hint').textContent.includes('已入队')")));
+  const imgArg = JSON.stringify([{ type: "image", data: tinyPng, mimeType: "image/png" }]);
+  const r2 = await wc().executeJavaScript("window.desktop.sendSession('排队带图', " + imgArg + ")");
+  log("IMG_QUEUE_FROZEN=" + (r2 && r2.queued === true));
+  releaseSlow(); // 放行首轮 → settled → 队列按序投递带图条目
+  const r1 = await p1;
+  await sleep(800); // 等 settled 消费 + 队列 drain（第二条带图投递）
+  const plog = chatAdapterMod.takeDemoPromptLog();
+  const flat = (s) => String(s).replace(/\s+/g, " ").slice(0, 24);
+  // 证据行：demo 收包记录（排队带图带 img=true；其余为慢轮与回交投递的纯文本轮）。
+  log(
+    "IMG_SLOW_ROUND_OK=" + (r1 && r1.ok === true) +
+      " IMG_DEMO_LOG=" + JSON.stringify(plog.map((r) => ({ t: flat(r.text), img: !!(r.opts && r.opts.images && r.opts.images.length) }))),
+  );
+  // 轮末复位（2026-10-13 修复钉）：settle 后 data-state 回 idle；settled 行如实出现在聊天流（该出现就出现）。
+  log("DATA_STATE_IDLE_AFTER_ROUND=" + (await wc().executeJavaScript("document.getElementById('chat').dataset.state === 'idle'")));
+  log("SETTLED_ROW_PRESENT=" + (await wc().executeJavaScript("document.querySelectorAll('#chat .chat-pane .sys-settled').length >= 1")));
+  const imgOk = (r) =>
+    !!r && !!r.opts && Array.isArray(r.opts.images) && r.opts.images.length === 1 &&
+    r.opts.images[0].type === "image" && r.opts.images[0].data === tinyPng && r.opts.images[0].mimeType === "image/png";
+  log("IMG_PASSTHROUGH_QUEUED=" + imgOk(plog.find((r) => r.text === "排队带图")));
+  // 直发带图（空闲路径）：同样逐字透传；纯文本路径不构造空包（opts 缺省）。
+  const rDirect = await wc().executeJavaScript("window.desktop.sendSession('直发带图', " + imgArg + ")");
+  await sleep(700);
+  const plog2 = chatAdapterMod.takeDemoPromptLog();
+  log("IMG_SEND_OK=" + (rDirect && rDirect.ok === true) + " IMG_PASSTHROUGH_DIRECT=" + imgOk(plog2.find((r) => r.text === "直发带图")));
+  // 校验拒绝路径（**主进程重校验**，不信任渲染侧）：坏 MIME（真字节非图）与超大（>5MB）都整条拒发。
+  const rejBad = await wc().executeJavaScript("window.desktop.sendSession('坏图', [{type:'image', data:'aGVsbG8gd29ybGQ=', mimeType:'image/png'}])");
+  log("IMG_REJECT_BAD_MIME=" + (rejBad && rejBad.ok === false && (rejBad.error || "").indexOf("图片未发送") >= 0));
+  const rejBig = await wc().executeJavaScript("window.desktop.sendSession('大图', [{type:'image', data:'QQ=='.repeat(3 * 1024 * 1024), mimeType:'image/png'}])");
+  log("IMG_REJECT_OVERSIZE=" + (rejBig && rejBig.ok === false));
+  // 旧「图片未发送」提示行退役：聊天流不出现该文案（接线后图片真正随消息送进模型）。
+  log("IMG_LEGACY_NOTE_ABSENT=" + (await wc().executeJavaScript("!document.getElementById('chat').textContent.includes('张图片未发送') && !document.getElementById('chat').textContent.includes('尚未接线')")));
+
+  // 6) 右栏抽屉（客户裁定 2026-10-13：右栏不常驻，收成右上角图标簇；点开展示、再点收起；
+  //    第二轮裁定同日：待办/队列归角色——簇只留两枚，两节并入「角色资料」抽屉）：
+  //    先断言默认收起，点 tab-card 展示 → 资料六组（角色卡/待办队列/队列概览/边界/变更/文档）在抽屉内；再点收起。
+  log("TABS_PRESENT=" + (await wc().executeJavaScript("['tab-card','tab-pi'].every(id=>!!document.getElementById(id))")));
+  log("NO_RETIRED_TABS=" + (await wc().executeJavaScript("!document.getElementById('tab-todo') && !document.getElementById('tab-queue')")));
   log("NO_RIGHT_COLUMN=" + (await wc().executeJavaScript("!document.querySelector('.col-right')")));
   log("DRAWER_DEFAULT_CLOSED=" + (await wc().executeJavaScript("!document.getElementById('right-drawer').classList.contains('open')")));
   await wc().executeJavaScript("document.getElementById('tab-card').click()");
@@ -342,9 +440,10 @@ async function run() {
   );
   await sleep(400);
   const right = await wc().executeJavaScript(
-    "(() => { const t=document.querySelector('#right-body').textContent; return { card:t.includes('角色卡'), boundary:t.includes('边界条目'), rows:document.querySelectorAll('#right-body table.boundary tbody tr').length, changelog:t.includes('变更记录'), docs:t.includes('文档'), mdCard:!!document.querySelector('#right-body .card-text.card-md h1'), mdNoScript:!document.querySelector('#right-body .card-text script') }; })()",
+    "(() => { const t=document.querySelector('#right-body').textContent; return { card:t.includes('角色卡'), todo:t.includes('待办 / 队列'), overview:t.includes('队列概览'), boundary:t.includes('边界条目'), rows:document.querySelectorAll('#right-body table.boundary tbody tr').length, changelog:t.includes('变更记录'), docs:t.includes('文档'), mdCard:!!document.querySelector('#right-body .card-text.card-md h1'), mdNoScript:!document.querySelector('#right-body .card-text script') }; })()",
   );
-  log("RIGHT_HAS_CARD=" + right.card + " RIGHT_HAS_BOUNDARY=" + right.boundary + " RIGHT_BOUNDARY_ROWS=" + right.rows);
+  log("RIGHT_HAS_CARD=" + right.card + " RIGHT_HAS_TODO_SECTION=" + right.todo + " RIGHT_HAS_OVERVIEW_SECTION=" + right.overview);
+  log("RIGHT_HAS_BOUNDARY=" + right.boundary + " RIGHT_BOUNDARY_ROWS=" + right.rows);
   log("RIGHT_HAS_CHANGELOG=" + right.changelog + " RIGHT_HAS_DOCS=" + right.docs);
   // N-2（2026-10-12 客户裁定）：角色卡已走 Markdown（标题成 <h1> 标签）；且无 <script> 注入口。
   log("RIGHT_CARD_MD_RENDERED=" + right.mdCard);
@@ -353,19 +452,18 @@ async function run() {
   await wc().executeJavaScript("document.getElementById('tab-card').click()");
   await sleep(300);
   log("DRAWER_TOGGLES_CLOSED=" + (await wc().executeJavaScript("!document.getElementById('right-drawer').classList.contains('open')")));
-  await wc().executeJavaScript("document.getElementById('tab-todo').click()");
+  await wc().executeJavaScript("document.getElementById('tab-pi').click()");
   await sleep(200);
   await wc().executeJavaScript("document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))");
   await sleep(200);
   log("DRAWER_ESC_CLOSES=" + (await wc().executeJavaScript("!document.getElementById('right-drawer').classList.contains('open')")));
-  // 角标继承（收起不丢信息）：注入该角色的真实快照（排队 2 条）→ 收起状态下待办/队列图标角标仍显示。
+  // 角标归角色（收起不丢信息）：注入该角色的真实快照（排队 2 条）→ 收起状态下角色资料图标角标 = 该角色待办深度。
   await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面应用', busy: true, summaries: ['你：排队一', '你：排队二'], queue: [{kind:'message',sourceRoleId:'桌面应用',summary:'你：排队一',at:'2026-10-13T03:00:00.000Z'},{kind:'dispatch',sourceRoleId:'su',summary:'派发 · 来自 su：做X',at:'2026-10-13T03:01:00.000Z'}], running: null })");
   await sleep(200);
-  log("BADGES_WHILE_COLLAPSED_TODO=" + (await wc().executeJavaScript("(() => { const b=document.querySelector('#tab-todo .tab-badge'); return !!b && !b.hidden && b.textContent === '2'; })()")));
-  log("BADGES_WHILE_COLLAPSED_QUEUE=" + (await wc().executeJavaScript("(() => { const b=document.querySelector('#tab-queue .tab-badge'); return !!b && !b.hidden && b.textContent === '2'; })()")));
+  log("BADGE_ON_CARD_WHILE_COLLAPSED=" + (await wc().executeJavaScript("(() => { const b=document.querySelector('#tab-card .tab-badge'); return !!b && !b.hidden && b.textContent === '2'; })()")));
   await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面应用', busy: false, summaries: [], queue: [], running: null })");
   await sleep(150);
-  log("BADGES_CLEAR_ON_EMPTY=" + (await wc().executeJavaScript("document.querySelector('#tab-todo .tab-badge').hidden && document.querySelector('#tab-queue .tab-badge').hidden")));
+  log("BADGES_CLEAR_ON_EMPTY=" + (await wc().executeJavaScript("document.querySelector('#tab-card .tab-badge').hidden")));
   log("SHOT_04_PROFILE=" + (await shot("04-profile.png")));
 
   // 7) 守卫（客户 2026-10-11 裁定：去掉运行时选择器、默认跑 pi）——断言**它不存在**。
@@ -724,9 +822,9 @@ async function run() {
   // 探针清理：隐藏卡片（不影响后续步骤/截图）。
   await wc().executeJavaScript("(() => { const el=document.getElementById('shell-confirm'); el.hidden = true; el.classList.remove('is-expired'); window.__ansRenderer.state.shellConfirm = null; })()");
 
-  // N-3（2026-10-12 追加；客户「代办也要在右边显示」）：右栏「待办 / 队列」——夹具注入 → 逐条渲染 +
-  // 「进行中」在最前 + 空占位（数据经 role-state 真实快照通道；此处直接注入该通道的载荷）。
-  await wc().executeJavaScript("document.getElementById('tab-todo').click()");
+  // N-3（2026-10-12 追加；2026-10-13 第二轮裁定待办/队列归角色）：「角色资料」抽屉内的**待办 / 队列 +
+  // 队列概览两节**——夹具注入 → 逐条渲染 + 「进行中」在最前 + 空占位（数据经 role-state 真实快照通道）。
+  await wc().executeJavaScript("document.getElementById('tab-card').click()");
   await sleep(300);
   await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面应用', busy: true, summaries: ['你：排队一'], queue: [{kind:'message', sourceRoleId:'桌面应用', summary:'你：排队一', at:'2026-10-12T03:00:00.000Z'},{kind:'dispatch', sourceRoleId:'su', summary:'派发 · 来自 su：做X', at:'2026-10-12T03:01:00.000Z'}], running: {kind:'handback', sourceRoleId:'A', summary:'回交投递 · 来自 A', at:'2026-10-12T02:59:00.000Z'} })");
   await sleep(200);
@@ -737,14 +835,13 @@ async function run() {
   await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面应用', busy: false, summaries: [], queue: [], running: null })");
   await sleep(150);
   log("RIGHT_QUEUE_EMPTY_PLACEHOLDER=" + (await wc().executeJavaScript("document.querySelector('#right-queue-body').textContent.includes('（无待办）')")));
-  // 队列概览 tab：排队条目位次视图（内容与待办同快照、视图不同）；随后收起抽屉，不影响后续聊天流断言。
+  // 队列概览节（同抽屉）：排队条目位次视图（内容与待办同快照、视图不同）；随后收起抽屉，不影响后续聊天流断言。
   await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面应用', busy: false, summaries: ['你：排队一','你：排队二'], queue: [{kind:'message', sourceRoleId:'桌面应用', summary:'你：排队一', at:'2026-10-12T03:00:00.000Z'},{kind:'dispatch', sourceRoleId:'su', summary:'派发 · 来自 su：做X', at:'2026-10-12T03:01:00.000Z'}], running: null })");
   await sleep(150);
-  await wc().executeJavaScript("document.getElementById('tab-queue').click()");
-  await sleep(300);
-  log("QUEUE_TAB_OVERVIEW_ROWS=" + (await wc().executeJavaScript("document.querySelectorAll('#right-body .queue-list .q-item').length")));
-  log("QUEUE_TAB_ACTIVE=" + (await wc().executeJavaScript("document.getElementById('tab-queue').classList.contains('active')")));
-  await wc().executeJavaScript("document.getElementById('tab-queue').click()");
+  log("QUEUE_OVERVIEW_ROWS=" + (await wc().executeJavaScript("document.querySelectorAll('#right-queue-overview .queue-list .q-item').length")));
+  log("QUEUE_OVERVIEW_IN_CARD=" + (await wc().executeJavaScript("!!document.querySelector('#right-body #right-queue-overview')")));
+  log("TAB_CARD_ACTIVE_STILL=" + (await wc().executeJavaScript("document.getElementById('tab-card').classList.contains('active')")));
+  await wc().executeJavaScript("document.getElementById('tab-card').click()");
   await sleep(200);
   log("DRAWER_CLOSED_AFTER_N3=" + (await wc().executeJavaScript("!document.getElementById('right-drawer').classList.contains('open')")));
 
@@ -997,6 +1094,28 @@ async function run() {
   log("PI_PANEL_PATH_IS_TEMP=" + (path.resolve(piPathShown) === path.resolve(PI_ENV)));
   log("PI_ENV_NOT_REPO_ROOT=" + (path.resolve(PI_ENV) !== path.resolve(REPO_ROOT, ".env")));
   log("PI_NO_MODAL=" + !(await modalExists()));
+  // Pi 抽屉内不溢出（2026-10-13 客户真机复现修复）：全字段输入框/操作行必须完整落在抽屉矩形（亦即窗口）内；
+  // 字段堆叠（标签一行、输入一行——200px 标签列是按旧右栏列宽设计的，抽屉装不下并排）。
+  const piGeoExpr =
+    "(() => { const d=document.getElementById('right-drawer'); const dr=d.getBoundingClientRect(); const els=[...document.querySelectorAll('#pi-panel .pi-input, #pi-panel .pi-actions')]; const rects=els.map(e=>{const r=e.getBoundingClientRect(); return {left:r.left,right:r.right,top:r.top,bottom:r.bottom};}); const f=document.querySelector('#pi-panel .pi-field'); const lbl=f?f.querySelector('.pi-field-label'):null; const inp=f?f.querySelector('.pi-input'):null; let stacked=false; if(f&&lbl&&inp){const lr=lbl.getBoundingClientRect(),ir=inp.getBoundingClientRect(),fr=f.getBoundingClientRect(); stacked=ir.top>=lr.bottom-2 && ir.left>=fr.left && ir.left<fr.left+40;} return { win:window.innerWidth, drl:dr.left, drr:dr.right, rects:rects, stacked:stacked }; })()";
+  const piGeo = await wc().executeJavaScript(piGeoExpr);
+  log("PI_STACKED_FIELDS=" + piGeo.stacked);
+  log(
+    "PI_NO_OVERFLOW=" +
+      piGeo.rects.every((r) => r.right <= piGeo.drr + 0.5 && r.left >= piGeo.drl - 0.5 && r.right <= piGeo.win + 0.5),
+  );
+  // 窄窗口（≤1100px，客户裁定同样要验证）：缩到 900px（抽屉进入 268px 最窄档）重测 → 恢复原尺寸。
+  win.setSize(900, 720);
+  await sleep(500);
+  const piGeoNarrow = await wc().executeJavaScript(piGeoExpr);
+  log("PI_NARROW_WINDOW=900");
+  log("PI_NARROW_STACKED=" + piGeoNarrow.stacked);
+  log(
+    "PI_NARROW_NO_OVERFLOW=" +
+      piGeoNarrow.rects.every((r) => r.right <= piGeoNarrow.drr + 0.5 && r.left >= piGeoNarrow.drl - 0.5 && r.right <= piGeoNarrow.win + 0.5),
+  );
+  win.setSize(1360, 860);
+  await sleep(400);
   log("SHOT_09_PI_PANEL=" + (await shot("09-pi-panel.png")));
 
   // 填字段 → 保存（经临时 .env）→ 断言写入临时文件、且 token 不回显（保存后回到掩码、值清空）。
@@ -1024,6 +1143,41 @@ async function run() {
   await sleep(200);
   log("DRAWER_CLOSED_AFTER_PI=" + (await wc().executeJavaScript("!document.getElementById('right-drawer').classList.contains('open')")));
 
+  // ———— 2026-10-13 状态机修复：回放去重（真机「同一段消息渲染两遍」——su 写文件 → project:changed →
+  // refreshProject → 主进程重推会话历史 → 旧实现整份再回放）。确定性钉法：向「桌面应用」pane 连推
+  // session:history——同份重推**幂等**、增长走**增量**、重写走**重建**（绝不追加第二份）。
+  const mkRow = (i, tag) => ({ kind: i % 2 === 0 ? "user" : "assistant", text: tag + " · 第 " + i + " 行", at: "2026-10-13T00:00:00.000Z" });
+  const baseRows = Array.from({ length: 6 }, (_, i) => mkRow(i, "去重基线"));
+  const grownRows = [...baseRows, mkRow(6, "增量尾"), mkRow(7, "增量尾")];
+  const rewrittenRows = Array.from({ length: 6 }, (_, i) => mkRow(i, "重写基线"));
+  const countExpr = "(() => { const d = window.__ansRenderer.rowModelDebug('桌面应用'); return d ? d.count : -1; })()";
+  const pushHistory = (rows) => wc().send("session:history", { roleId: "桌面应用", projectRoot: REPO_ROOT, rows, error: null });
+  pushHistory(baseRows);
+  await sleep(400);
+  const c1 = await wc().executeJavaScript(countExpr);
+  pushHistory(baseRows); // 同一份历史**重推**（真机 refreshProject 链路等价物）
+  await sleep(400);
+  const c2 = await wc().executeJavaScript(countExpr);
+  log("REPLAY_DEDUP_IDEMPOTENT=" + (c1 > 0 && c2 === c1));
+  pushHistory(grownRows); // 盘上文件增长 ⇒ 只回放尾巴（增量）
+  await sleep(400);
+  const c3 = await wc().executeJavaScript(countExpr);
+  log("REPLAY_DEDUP_APPEND=" + (c3 === c1 + 2));
+  pushHistory(rewrittenRows); // 内容不一致（重写）⇒ 全量重建（不含旧集合的重复副本）
+  await sleep(500);
+  const c4 = await wc().executeJavaScript(countExpr);
+  log("REPLAY_DEDUP_REBUILD=" + (c4 === rewrittenRows.length));
+  // 真机链路等价：refreshProject（project:changed 触发者）重取枚举 → 主进程重推历史 → 同份历史下
+  // pane 行数不得再增长（幂等；写文件触发的 project:changed 即走这条路）。su 的历史若存在一并核对。
+  const suCountExpr = "(() => { const d = window.__ansRenderer.rowModelDebug('su'); return d ? d.count : -1; })()";
+  const beforeRefresh = await wc().executeJavaScript(countExpr);
+  const suBefore = await wc().executeJavaScript(suCountExpr);
+  await wc().executeJavaScript("window.__ansRenderer.refreshProject()");
+  await sleep(1200);
+  const afterRefresh = await wc().executeJavaScript(countExpr);
+  const suAfter = await wc().executeJavaScript(suCountExpr);
+  log("REPLAY_NO_DOUBLE_ON_REFRESH=" + (afterRefresh === beforeRefresh && (suBefore < 0 || suAfter === suBefore)));
+
   log("E2E_DONE=1");
 }
 
@@ -1036,6 +1190,7 @@ app.whenReady().then(async () => {
     // demo 适配器（用于注入缝：顶掉真实 pi 工厂，令 e2e 离线可跑）。
     const chatMod = await import(pathToFileURL(path.join(APP_DIR, "desktop", "chat-adapter.ts")).href);
     createChatDemoAdapter = chatMod.createChatDemoAdapter;
+    chatAdapterMod = chatMod;
     // A-5：客户交互通道（真实现场；presenter 推渲染侧、respond 校验回包）。
     const ciMod = await import(pathToFileURL(path.join(APP_DIR, "desktop", "customer-input.ts")).href);
     createCustomerInputChannel = ciMod.createCustomerInputChannel;

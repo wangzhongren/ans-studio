@@ -426,9 +426,11 @@ test("B-3 + 状态准确性（2026-10-12 客户裁定）：状态→徽标纯函
   assert.deepEqual(statuses.filter((s) => St.statusBadge(s).label.includes("停止")), ["stopped"], "七态标签里「停止」只出现在 stopped");
   assert.deepEqual(statuses.filter((s) => St.statusBadge(s).title.includes("停止")), ["stopped"], "悬停描述里同样只此一处");
   const rendererCode = RENDERER.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+  // 状态徽标措辞唯一（P0-2 起区分：轮次停止钮的「停止」措辞属 P0-2 功能面、另有钉；此处钉的是
+  // **状态徽标**的「已停止」标签措辞——仍只经 statusBadge/STOPPED_LABEL 唯一映射，代码不自写第二份）。
   assert.ok(
-    !rendererCode.includes("停止"),
-    "渲染侧代码不得自写第二份「停止」措辞（一律经 statusBadge/STOPPED_LABEL 唯一映射——注释不算）"
+    !rendererCode.includes("已停止"),
+    "渲染侧代码不得自写第二份「已停止」状态措辞（一律经 statusBadge/STOPPED_LABEL 唯一映射——注释不算）"
   );
 
   // 渲染侧只经该映射（不自写第二份判断）；悬停示完整描述（+ 最近事件）。
@@ -573,9 +575,9 @@ test("K-1：输入区为**圆角胶囊**、发送箭头**内嵌框内**；快捷
   assert.ok(!STYLES.includes(".composer-row") && !STYLES.includes(".btn-send "), "旧行/旧按钮样式已退役");
 });
 
-// ————————————————— K-2（2026-10-12）：图片发送（到主进程为止；送模型未接） —————————————————
+// ————— K-2（2026-10-12）→ P0-1（2026-10-13 客户批准）：图片端到端接线（随消息送进模型） —————
 
-test("K-2：图片附件——选图/粘贴/拖入入渲染侧，**字节交主进程校验**（渲染进程不碰 fs）；未接如实", () => {
+test("P0-1 图片接线：附件随消息**带载荷上送**（IPC→Interface 重校验→队列定格→句柄透传）；旧「未发送」提示退役", () => {
   assert.ok(INDEX.includes('id="attach-row"') && INDEX.includes('id="btn-attach-image"'), "附件行与选图键存在");
   assert.ok(PRELOAD.includes('"app:pick-image"') && PRELOAD.includes('"app:attach-image"'), "preload 白名单两通道");
   assert.ok(
@@ -586,13 +588,75 @@ test("K-2：图片附件——选图/粘贴/拖入入渲染侧，**字节交主�
   assert.ok(RENDERER.includes('addEventListener("paste"') && RENDERER.includes('"drop"'), "粘贴与拖入入口齐备");
   assert.ok(RENDERER.includes("attachBrowserFile") && RENDERER.includes("FileReader"), "拖/贴经浏览器 File API 读字节（沙箱能力，不经 Node）");
   assert.ok(!RENDERER.includes("node:fs"), "渲染进程不得引入 Node/fs");
-  // 「未接」如实：文案存在且发送/空字发送都提示——**绝不**假装已读图。
-  assert.ok(RENDERER.includes("图片送入模型的能力尚未接线"), "未接如实文案存在");
-  assert.ok(RENDERER.includes("随消息附加的 "), "发送时如实说明「N 张图片未发送」");
+  // P0-1：发送**带载荷上送**——`d.sendSession(text, images)`（`[{type:"image", data:<base64>, mimeType}]`）；
+  // 成功（直发/入队）后清附件；失败保留可重试。
+  assert.ok(/d\.sendSession\(text, images\)/.test(RENDERER), "发送应带图片载荷（d.sendSession(text, images)）");
+  assert.ok(/images = attachments\.map\(function \(a\) \{[\s\S]{0,120}type: "image"[\s\S]{0,120}data: a\.data[\s\S]{0,120}mimeType: a\.mime/.test(RENDERER), "载荷按契约块组装（type/data/mimeType，取自附件记录的 base64）");
+  assert.ok(/function clearAttachments\(\) \{/.test(RENDERER), "应有 clearAttachments（发送成功后清附件）");
+  assert.ok(/addAttachment\(res\.image, "data:" \+ res\.image\.mime \+ ";base64," \+ res\.image\.dataBase64, false, res\.image\.dataBase64\)/.test(RENDERER), "选图路径把 base64 存进附件记录（随消息上送用）");
+  // 旧「未发送」提示**退役**（不留死代码；防回潮——图片真正随消息送进模型了）。
+  assert.ok(!RENDERER.includes("imageNotWiredNote"), "imageNotWiredNote 应已删（不留死代码）");
+  assert.ok(!RENDERER.includes("图片送入模型的能力尚未接线"), "「未接线」文案应已退役");
+  assert.ok(!RENDERER.includes("随消息附加的 "), "「N 张图片未发送」行应已退役");
+  // 主进程侧：session:send 带载荷 + Interface **重校验**（不信任渲染侧）；队列条目入队定格。
+  assert.ok(PRELOAD.includes("Array.isArray(images) ? images : []"), "preload 透传 images 数组（缺省空=纯文本）");
+  assert.ok(MAIN.includes("images?: unknown"), "session:send IPC 形状带 images");
+  const IFACE = fs.readFileSync(path.resolve(HERE, "..", "..", "app", "desktop", "interface.ts"), "utf8");
+  assert.ok(IFACE.includes("decodeImageBase64") && IFACE.includes("sniffImageMime") && IFACE.includes("validateImage"), "Interface 层重校验三件套（解码/嗅探/限幅——不信任渲染侧）");
+  assert.ok(IFACE.includes("整条拒发") || IFACE.includes("本条消息未发出"), "任一张不合格 ⇒ 整条拒发（fail-closed，绝不丢图发文字）");
+  const SESS = fs.readFileSync(path.resolve(HERE, "..", "..", "app", "desktop", "session.ts"), "utf8");
+  assert.ok(SESS.includes("opts?: PromptOptions"), "DeliveryItem 带整包载荷（入队即定格）");
+  assert.ok(/entry\.handle\.send\(text, opts\)/.test(SESS), "直发整包同一引用透传句柄");
+  const ADAPTER = fs.readFileSync(path.resolve(HERE, "..", "..", "app", "desktop", "chat-adapter.ts"), "utf8");
+  assert.ok(ADAPTER.includes("takeDemoPromptLog") && /prompt\(text: string, promptOpts\?: PromptOptions\)/.test(ADAPTER), "demo 适配器 prompt 接受并记录 opts（透传保真可断言）");
   assert.ok(STYLES.includes(".attach-chip") && STYLES.includes(".attach-rm"), "缩略图与移除键样式");
   const CI = fs.readFileSync(path.resolve(HERE, "..", "..", "app", "desktop", "composer-images.ts"), "utf8");
   assert.ok(CI.includes("5 * 1024 * 1024") && CI.includes("ALLOWED_IMAGE_MIMES"), "上限与类型白名单在纯逻辑模块（单一来源）");
   assert.ok(CI.includes("sniffImageMime"), "类型以**真实字节**（魔数）为准——声明 mime/size 不可信");
+});
+
+// ————— P0-2（2026-10-13 客户批准）：停止入口——忙碌才可见、三态如实行、不是「结束会话」回归 —————
+
+test("P0-2 停止入口：#btn-halt 在输入框区（发送钮左侧）仅忙碌时出现；与发送钮并存；三态如实行；结束会话按钮不回归", () => {
+  // 位置（2026-10-13 客户反馈「位置有问题」后的裁定）：输入框胶囊内、**发送钮左侧**的小圆钮；
+  // 聊天头不再有任何按钮。
+  assert.ok(INDEX.includes('id="btn-halt"'), "应有停止钮 #btn-halt");
+  const capsulePos = INDEX.indexOf('id="composer-capsule"');
+  const haltPos = INDEX.indexOf('id="btn-halt"');
+  const sendPos = INDEX.indexOf('id="btn-send"');
+  assert.ok(capsulePos >= 0 && haltPos > capsulePos && sendPos > haltPos, "停止钮应在输入框胶囊内、发送钮**左侧**（客户反馈后位置）");
+  const headStart = INDEX.indexOf('class="chat-head"');
+  const headEnd = INDEX.indexOf("</header>", headStart);
+  assert.ok(headStart >= 0 && headEnd > headStart && !INDEX.slice(headStart, headEnd).includes("<button"), "聊天头不得再有按钮（停止钮已移走）");
+  assert.ok(!INDEX.includes('id="btn-stop"'), "退役的「结束会话」按钮不得回归");
+  assert.ok(!RENDERER.includes("btn-stop"), "渲染源不得再出现 btn-stop（防回潮钉的子串口径不被新钮破坏）");
+  // 圆形次级钮：同款 32px 圆形；hidden 显式补 display:none（display:flex 会压掉 [hidden] 默认）。
+  assert.ok(/\.cap-halt \{[^}]*border-radius: 999px;/.test(STYLES), "停止钮同款圆形（999px）");
+  assert.ok(/\.cap-halt \{[^}]*background: var\(--bg-soft\);/.test(STYLES), "次级色（不抢发送的实心主色）");
+  assert.ok(STYLES.includes(".cap-halt[hidden] { display: none; }"), "hidden 显隐钉（防 display:flex 压掉 [hidden]）");
+  assert.ok(INDEX.includes('title="停止当前轮次"'), "hover 提示「停止当前轮次」");
+  // 显隐判据 = role-state **真实快照**（busy），随 setChatHeader/onRoleState/换项目清零三处刷新。
+  assert.ok(/function updateHaltButton\(\) \{[\s\S]{0,220}state\.roleBusy\[state\.selectedRoleId\] === true/.test(RENDERER), "显隐判据 = role-state 快照的 busy（不做界面侧推测）");
+  assert.ok(/btn\.hidden = !busy;/.test(RENDERER), "空闲即隐藏（hidden 属性驱动）");
+  assert.ok(!/function updateHaltButton\(\) \{[\s\S]{0,320}btn-send/.test(RENDERER), "停止钮显隐不得触碰发送钮（两钮**并存**、各司其职）");
+  const callSites =
+    /function setChatHeader\(role\) \{[\s\S]{0,300}updateHaltButton\(\);/.test(RENDERER) &&
+    /renderQueueRow\(roleId\);[\s\S]{0,200}updateHaltButton\(\);/.test(RENDERER) &&
+    /state\.roleBusy = \{\};[\s\S]{0,200}updateHaltButton\(\);/.test(RENDERER);
+  assert.ok(callSites, "三处刷新点齐备（选角色/快照推送/换项目清零）");
+  // 三态如实行（契约 RoleSessionAbortResult：ok/supported/error）。
+  assert.ok(/async function onHaltClick\(\) \{[\s\S]{0,220}d\.abortSession\(roleId\)/.test(RENDERER), "点击调 d.abortSession（IPC→Interface→manager.abort）");
+  assert.ok(RENDERER.includes("已请求停止当前轮次——轮次仍会以收尾事件结束。"), "ok 态如实行（不做乐观「已停止」假象）");
+  assert.ok(RENDERER.includes("当前运行时不支持停止。"), "supported:false 态如实行（能力缺席如实告知）");
+  assert.ok(/"停止失败：" \+/.test(RENDERER), "失败态如实行（错误原文不吞）");
+  // 全链通道：preload / 主进程 / 会话管理器。
+  assert.ok(PRELOAD.includes('"session:abort"'), "preload 暴露 session:abort");
+  assert.ok(MAIN.includes('"session:abort"'), "主进程注册 session:abort");
+  const SESS = fs.readFileSync(path.resolve(HERE, "..", "..", "app", "desktop", "session.ts"), "utf8");
+  assert.ok(/async abort\(roleId: string\): Promise<RoleSessionAbortResult>/.test(SESS), "SessionManager.abort 三态回传");
+  assert.ok(SESS.includes("entry.handle.abort === undefined"), "方法缺席 = supported:false（与 supported:false 同一处理）");
+  const IFACE = fs.readFileSync(path.resolve(HERE, "..", "..", "app", "desktop", "interface.ts"), "utf8");
+  assert.ok(IFACE.includes("abortSession"), "Interface 暴露 abortSession");
 });
 
 // ————————————————— D-1（2026-10-12）：重启恢复（主进程解析 → 渲染侧回放 → 徽标「空闲（已恢复）」） —————————————————
@@ -606,7 +670,8 @@ test("D-1：会话记录恢复——主进程只读解析并推规范化行；�
   assert.ok(RENDERER.includes("d.onSessionHistory") && RENDERER.includes("onSessionHistory"), "渲染侧应订阅并处理会话恢复");
   // 客户裁定（2026-10-13）：常规「会话已恢复…」分隔行已删（聊天流不摆常规提示）——断言「它不在」，防回潮。
   assert.ok(!RENDERER.includes("会话已恢复（模型上下文一并恢复）"), "常规恢复分隔行应已删（客户裁定：聊天流不摆常规提示）");
-  assert.ok(/error !== null\) \{[\s\S]{0,300}sys-replay-divider/.test(RENDERER), "错误分支的分隔行保留（坏文件如实提示；仅在 error 时出现）");
+  // 2026-10-13 回放去重修复后，错误分隔行**只在全量路径**插入（增量/幂等路径错误态必未变——见 replayHistory）。
+  assert.ok(/error !== null && plan\.action === "full"\) \{[\s\S]{0,300}sys-replay-divider/.test(RENDERER), "错误分支的分隔行保留（坏文件如实提示；仅全量路径插入）");
   assert.ok(RENDERER.includes("sys-replay-divider"), "错误分隔行仍有样式钩子（.sys-replay-divider）");
   assert.ok(RENDERER.includes("is-replay"), "回放行应有 is-replay 标记（视觉可区分）");
   assert.ok(RENDERER.includes("会话记录读取失败，未回放"), "坏文件应如实提示而不崩");
@@ -1028,28 +1093,31 @@ test("锚点物化：重物化复用既有行（不重建落尾）；registerRow
 
 // ————————————————— 右栏图标化 + 抽屉（客户裁定 2026-10-13：右栏不常驻，点了才展示） —————————————————
 
-test("右栏抽屉：默认不占屏（col-right 退役）；右上角图标簇四枚；点开展示/再点收起/Esc；角标收起不丢信息；Pi 面板迁入抽屉", () => {
-  // ① 布局：右栏列（.col-right）退役——栅格两列，聊天列宽不因开关抽屉而变（抽屉=覆盖层）。
+test("右栏抽屉：默认不占屏（col-right 退役）；图标簇两枚（待办/队列归角色）；点开展示/再点收起/Esc；角标=选中角色待办深度；Pi 面板迁入抽屉且抽屉内不溢出", () => {
+  // ① 布局：右栏列（.col-right）退役——栅格两列，聊天列宽不因开关抽屉而改（抽屉=覆盖层）。
   assert.ok(!INDEX.includes("col-right"), "右栏常驻列应退役（.col-right 不在 index.html）");
   assert.ok(INDEX.includes('id="right-drawer"'), "应有右侧抽屉 #right-drawer");
   assert.ok(STYLES.includes("#right-drawer.open") && STYLES.includes("position: absolute"), "抽屉应为覆盖层（absolute + .open 滑出）");
   assert.ok(STYLES.includes("grid-template-columns: 272px minmax(0, 1fr);"), "栅格应为两列（右栏不占列）");
   assert.ok(!/setTimeout|setInterval/.test(RENDERER.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "")), "无计时器纪律不破（抽屉过渡用 CSS）");
-  // ② 图标簇：四枚（角色资料/待办/队列概览/Pi 设置）在标题栏内、窗口按钮之前；不算 .win-btn（三窗口按钮守卫不破）。
+  // ② 图标簇：**两枚**（角色资料/Pi 设置）在标题栏控制区、窗口按钮之前；不算 .win-btn（三窗口按钮守卫不破）。
+  //    第二轮裁定（2026-10-13）：待办/队列归角色——tab-todo/tab-queue 退役（HTML 与渲染侧接线都不留）。
   assert.ok(INDEX.includes('id="right-tabs"'), "应有右上角图标簇 #right-tabs");
-  for (const id of ["tab-card", "tab-todo", "tab-queue", "tab-pi"]) {
+  for (const id of ["tab-card", "tab-pi"] as const) {
     assert.ok(INDEX.includes('id="' + id + '"'), "应有图标按钮 #" + id);
     assert.ok(!new RegExp('id="' + id + '" class="win-btn').test(INDEX), id + " 不是窗口按钮（.win-btn 数量守卫不破）");
   }
+  assert.ok(!INDEX.includes('id="tab-todo"') && !INDEX.includes('id="tab-queue"'), "待办/队列独立图标应退役（归角色，客户第二轮裁定）");
+  assert.ok(!RENDERER.includes('toggleRightDrawer("todo")') && !RENDERER.includes('toggleRightDrawer("queue")'), "渲染侧不应再绑定退役图标的接线");
   const tabsPos = INDEX.indexOf('id="right-tabs"');
   const controlsPos = INDEX.indexOf('class="titlebar-controls"');
   assert.ok(controlsPos >= 0 && tabsPos > controlsPos, "图标簇应在标题栏控制区（应用右上角）");
   assert.ok(STYLES.includes("-webkit-app-region: no-drag"), "图标按钮应为 no-drag（标题栏是拖动区）");
-  // ③ 渲染侧接线：tab 状态机 + 至多开一块 + 同 tab 再点收起 + Esc + ×。
+  // ③ 渲染侧接线：tab 状态机 + 至多开一块 + 同图标再点收起 + Esc + ×。
   assert.ok(RENDERER.includes("rightTab: null"), "state 应持 rightTab（null=全收起，默认不常驻）");
   assert.ok(
     /function toggleRightDrawer\(tab\) \{[\s\S]{0,200}state\.rightTab = state\.rightTab === tab \? null : tab;/.test(RENDERER),
-    "点图标：同 tab 再点=收起、异 tab=切换（至多开一块）"
+    "点图标：同图标再点=收起、异图标=切换（至多开一块）"
   );
   assert.ok(RENDERER.includes("function closeRightDrawer()"), "应有 closeRightDrawer（×/Esc 收起）");
   assert.ok(/e\.key === "Escape" && state\.rightTab !== null[\s\S]{0,120}closeRightDrawer\(\);/.test(RENDERER), "Esc 应收起抽屉（shell 确认卡优先级在前）");
@@ -1059,23 +1127,79 @@ test("右栏抽屉：默认不占屏（col-right 退役）；右上角图标簇�
     /renderRight\(\);\s*\n\s*renderTabs\(\);/.test(RENDERER),
     "selectRole/applyListing 应同处刷 renderRight + renderTabs（内容与角标跟随选中角色）"
   );
-  // ⑤ 角标继承（收起不丢信息）：待办=进行中+排队视图行数；队列=排队条数——同一 role-state 快照、无新数据源。
-  assert.ok(/function renderTabs\(\) \{[\s\S]{0,300}queueViewsFor\(roleId\)/.test(RENDERER), "待办图标角标应取 queueViewsFor（进行中+排队）");
-  assert.ok(/setTabBadge\("queue", qDepth\)/.test(RENDERER) && /state\.queueByRole\[roleId\] \|\| \[\]\)\.length/.test(RENDERER), "队列图标角标应取排队深度");
+  // ⑤ 角标归角色（收起不丢信息）：角色资料图标角标 = 当前选中角色的待办深度（进行中+排队视图行数；
+  //    同一 role-state 快照、无新数据源；继承原待办图标角标语义）。
+  assert.ok(/function renderTabs\(\) \{[\s\S]{0,300}queueViewsFor\(roleId\)/.test(RENDERER), "角标应取 queueViewsFor（选中角色的进行中+排队）");
+  assert.ok(/setTabBadge\("card", views\.length\)/.test(RENDERER), "角色资料图标角标 = 当前选中角色待办深度");
+  assert.ok(!RENDERER.includes('setTabBadge("todo"') && !RENDERER.includes('setTabBadge("queue"'), "退役图标不再有角标逻辑");
   assert.ok(/function setTabBadge\(id, n\) \{[\s\S]{0,300}el\.hidden = false;/.test(RENDERER), "角标 >0 才显示（hidden 控制）");
-  assert.ok(RENDERER.includes('setTabBadge("todo", views.length);'), "待办角标 = 视图行数");
-  // ⑥ 内容不变：卡片 tab 四组逐字保留；待办 tab 既有「待办 / 队列」组逐字保留；队列概览用既有纯映射。
+  // ⑥ 待办/队列归角色：两节进「角色资料」抽屉（六节），内容逐字保留；定点更新同刷两节。
   assert.ok(RENDERER.includes('sec("角色卡", null,'), "角色卡组逐字保留");
+  assert.ok(
+    /sec\("待办 \/ 队列", qViews\.length > 0 \? qViews\.length : "无",[\s\S]{0,120}'<div id="right-queue-body">' \+ queueRowsHtml\(qViews\)/.test(RENDERER),
+    "待办节在角色资料抽屉内（进行中+排队逐字保留，right-queue-body）"
+  );
+  assert.ok(
+    /sec\("队列概览", qDepth > 0 \? qDepth : "无",[\s\S]{0,120}'<div id="right-queue-overview">' \+ queueOverviewHtml\(role\.roleId\)/.test(RENDERER),
+    "队列概览节在角色资料抽屉内（仅排队的位次视图，right-queue-overview）"
+  );
+  assert.ok(
+    /function updateRightQueue\(roleId\) \{[\s\S]{0,400}right-queue-body[\s\S]{0,400}right-queue-overview/.test(RENDERER),
+    "定点更新应同刷待办与队列概览两节（不重排手风琴、不重置展开态）"
+  );
+  assert.ok(RENDERER.includes("（无排队）") && RENDERER.includes("等它完成当前任务后依次处理"), "队列概览：排队位次 + 处理语义逐字保留");
   assert.ok(RENDERER.includes('sec("边界条目", entries.length'), "边界条目组保留");
   assert.ok(RENDERER.includes('sec("变更记录", role.changelog ? null : "无"'), "变更记录组保留");
   assert.ok(RENDERER.includes('sec("文档", role.docs && role.docs.length'), "文档组保留");
-  assert.ok(RENDERER.includes('sec("待办 / 队列", qViews.length > 0 ? qViews.length : "无"'), "待办组逐字保留（进行中+排队）");
-  assert.ok(RENDERER.includes("（无排队）") && RENDERER.includes("等它完成当前任务后依次处理"), "队列概览 tab：排队位次 + 处理语义");
   // ⑦ Pi 面板迁入抽屉：面板本体在 #right-drawer 内、显隐由 tab 状态驱动（保存/掩码逻辑一字不动）。
   const drawerPos = INDEX.indexOf('id="right-drawer"');
   const piPos = INDEX.indexOf('id="pi-panel"');
   assert.ok(drawerPos >= 0 && piPos > drawerPos, "#pi-panel 应在 #right-drawer 之内（随抽屉展示）");
   assert.ok(/function syncPiPanel\(\) \{[\s\S]{0,200}panel\.hidden = state\.rightTab !== "pi";/.test(RENDERER), "Pi 面板显隐由 tab 状态驱动（syncPiPanel）");
-  // ⑧ 样式钩子：图标/角标/抽屉头。
+  // ⑧ Pi 抽屉内不溢出（2026-10-13 真机复现修复）：字段堆叠 + 面板可缩 + 抽屉裁剪 + 未展开不可见。
+  assert.ok(/#right-drawer \.pi-field \{[^}]*grid-template-columns: 1fr;/.test(STYLES), "抽屉内 Pi 字段堆叠（标签/输入各一行，输入吃满行宽、随抽屉宽度收缩）");
+  assert.ok(/#right-drawer \.pi-panel \{[^}]*min-width: 0;/.test(STYLES), "Pi 面板 min-width: 0（不撑破抽屉）");
+  assert.ok(/#right-drawer \{[^}]*overflow: hidden;/.test(STYLES), "抽屉应为裁剪边界（overflow: hidden——内容溢出在抽屉内滚动）");
+  assert.ok(STYLES.includes("#right-drawer:not(.open) #pi-panel { visibility: hidden; }"), "抽屉未展开时面板不可见（双保险，不依赖状态同步）");
+  // ⑨ 样式钩子：图标/角标/抽屉头。
   assert.ok(STYLES.includes(".right-tabs") && STYLES.includes(".tab-btn") && STYLES.includes(".tab-badge") && STYLES.includes(".drawer-head"), "图标簇/角标/抽屉头样式钩子齐备");
+});
+
+// ————————— 2026-10-13 真机状态机修复：回放去重（同份历史幂等/增量/重建）+ data-state 随快照回 idle —————————
+
+test("D-1 修复：回放去重——同一份历史幂等（skip）、增长走增量（append）、其余全量重建；重推不再叠加副本", async () => {
+  const href = new URL("../../app/renderer/ui-labels.js", import.meta.url).href;
+  await import(href);
+  const UL = (globalThis as Record<string, unknown>).ANSUiLabels as {
+    replayPlan: (prev: unknown, next: unknown) => { action: string; from: number };
+  };
+  assert.ok(UL && typeof UL.replayPlan === "function", "应挂 replayPlan（纯函数）");
+  const rr = (kind: string, text: string, at = "2026-10-13T00:00:00.000Z") => ({ kind, text, at });
+  const a1 = [rr("user", "一"), rr("assistant", "二")];
+  assert.deepEqual(UL.replayPlan(null, a1), { action: "full", from: 0 }, "首次回放 = 全量");
+  assert.deepEqual(UL.replayPlan({ rows: a1 }, a1), { action: "skip", from: 0 }, "同一份历史 ⇒ skip（绝不叠加第二份——真机重复渲染修复核心）");
+  const a1b = [rr("user", "一", "2026-10-13T00:00:01.000Z"), rr("assistant", "二")];
+  assert.equal(UL.replayPlan({ rows: a1 }, a1b).action, "full", "字段变化 ⇒ 全量（重建）");
+  const grown = [...a1, rr("user", "三")];
+  assert.deepEqual(UL.replayPlan({ rows: a1 }, grown), { action: "append", from: 2 }, "增长（前缀逐字段一致）⇒ 增量（from=旧行数）");
+  assert.equal(UL.replayPlan({ rows: grown }, a1).action, "full", "截断 ⇒ 全量重建");
+  assert.equal(UL.replayPlan({ rows: a1 }, [rr("user", "一"), rr("assistant", "改了")]).action, "full", "同长不同内容 ⇒ 全量");
+  const anchored = [{ ...rr("user", "确认"), requestId: "op-1", anchorKey: "confirm\u0000t", anchor: "request" }];
+  assert.equal(UL.replayPlan({ rows: anchored }, [{ ...rr("user", "确认"), requestId: "op-1", anchorKey: "confirm\u0000t", anchor: "conclusion" }]).action, "full", "锚点字段变化同样触发全量（卡落位不漂）");
+  // 渲染侧接线：replayHistory 走纯函数策略；skip 幂等返回；full+prev ⇒ 重建 pane；增量只回放尾巴。
+  assert.ok(RENDERER.includes("UiLabels.replayPlan(prev, rows)"), "replayHistory 应经纯函数策略");
+  assert.ok(/plan\.action === "skip"\) return;/.test(RENDERER), "skip ⇒ 幂等返回（不追加）");
+  assert.ok(/plan\.action === "full" && prev\) \{\n      pane = rebuildPane\(roleId\);/.test(RENDERER), "full+prev ⇒ 重建 pane（绝不追加第二份）");
+  assert.ok(/var from = plan\.action === "append" \? plan\.from : 0;/.test(RENDERER), "增量只回放尾巴");
+  assert.ok(/replayState\[roleId\] = \{ rows: rows/.test(RENDERER), "每次回放后记住状态（去重判据）");
+  assert.ok(RENDERER.includes("replayState = Object.create(null);"), "去重状态随项目作废（resetPanes）");
+});
+
+test("data-state 修复：轮末回 idle——data-state 只随 role-state 真实快照（run/idle）", () => {
+  assert.ok(/function syncChatState\(roleId\) \{[\s\S]{0,220}state\.roleBusy\[roleId\] === true/.test(RENDERER), "syncChatState 判据 = 真实快照 roleBusy（单一来源）");
+  assert.ok(/setState\(busy \? "run" : "idle"/.test(RENDERER), "busy ⇒ run；空闲 ⇒ idle（轮末回 idle 的路径）");
+  assert.ok(/updateHaltButton\(\);\n    syncChatState\(role \? role\.roleId : null\);/.test(RENDERER), "setChatHeader（选角色/换项目/开启）同步校准");
+  assert.ok(/if \(state\.selectedRoleId === roleId\) syncChatState\(roleId\);/.test(RENDERER), "onRoleState（快照推送）同步校准");
+  assert.ok(!RENDERER.includes('setState("run", "聊天中")'), "旧「开启即写死 run、无回 idle 路径」已退役");
+  assert.ok(RENDERER.includes('setState("err", "连接失败")'), "err 路径保留（开启失败/异常）");
 });

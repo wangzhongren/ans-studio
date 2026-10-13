@@ -293,13 +293,16 @@ function registerIpc(win: BrowserWindow): void {
   });
   // 点角色即开：一次调用直接建立会话（导入项目即授权，无确认框）。
   ipcMain.handle("session:open", (_e, input) => desktop.openSession(input));
-  ipcMain.handle("session:send", (_e, input: { text: string }) => desktop.sendSession(input));
+  ipcMain.handle("session:send", (_e, input: { text: string; images?: unknown }) => desktop.sendSession(input));
   ipcMain.handle("session:stop", (_e, input) => desktop.stopSession(input));
+  // P0-2（2026-10-13 客户批准）：停当前轮次——Interface 三态如实回传（已请求停止 / 不支持 / 失败），主进程只透传。
+  ipcMain.handle("session:abort", (_e, input: { roleId: string }) => desktop.abortSession(input));
   // B-2：保活会话列表（左树「有活动会话」小圆点的数据源）——纯读。
   ipcMain.handle("session:live", () => desktop.listLiveSessions());
   // B-1：Markdown 链接外开——渲染进程输入经 Interface 校验（仅 http/https）后交系统浏览器。
   ipcMain.handle("app:open-external", (_e, input) => desktop.openExternal(input));
-  // K-2：输入区图片——选图（主进程读文件）与粘贴/拖入字节校验（渲染进程不碰文件；送模型未接——登记）。
+  // K-2：输入区图片——选图（主进程读文件）与粘贴/拖入字节校验（渲染进程不碰文件）；
+  // P0-1（2026-10-13 客户批准）：图片已随消息端到端送进模型（session:send 带载荷，Interface 真实字节重校验）。
   ipcMain.handle("app:pick-image", () => desktop.pickImage());
   ipcMain.handle("app:attach-image", (_e, input) => desktop.attachImage(input));
   // （A-5：随「收口」删除——产物收尾现由编排在 su 会话 settle 后**自动**完成；桌面不再有

@@ -55,6 +55,9 @@ function stubSession(behavior?: (text: string, options?: { images: PromptImage[]
     async abort(): Promise<void> {
       box.aborts += 1;
     },
+    dispose(): void {
+      // 桩件无需释放任何资源（PromptCapableSession 自 2026-10-13 起含 dispose——makeRoleSession 收口用）。
+    },
   };
   box.session = stub;
   return box;

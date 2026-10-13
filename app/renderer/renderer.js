@@ -76,8 +76,8 @@
     // 卡片不按时间自我定格；失效只来自主进程回包（`expired`）或正常裁决。
     shellConfirm: null,
     // 客户裁定（2026-10-13）：右栏改**抽屉**——当前展开的右上角图标 tab（null=全收起）；
-    // "card"=角色资料（角色卡 md + 边界/变更/文档），"todo"=待办/队列（进行中+排队），"queue"=队列概览（仅排队），
-    // "pi"=Pi 配置（面板本体原样迁入抽屉）。同一时刻至多一块；内容跟随当前选中角色。
+    // 第二轮裁定（同日）：簇只留两枚，待办/队列**归角色**——"card"=角色资料（角色卡 md + 待办/队列两节 +
+    // 边界/变更/文档），"pi"=Pi 配置（面板本体原样迁入抽屉）。同一时刻至多一块；内容跟随当前选中角色。
     rightTab: null,
   };
 
@@ -135,6 +135,54 @@
     $("chat-role-sub").textContent = role
       ? "会话由治理引擎全程把关，写入受该角色边界约束"
       : "从左侧选择一个角色开始聊天";
+    updateHaltButton();
+    syncChatState(role ? role.roleId : null);
+  }
+
+  /** `#chat[data-state]`（程序化状态出口，pill 退役后保留）：**只随 role-state 真实快照**——有轮次在跑 =
+   *  `run`、空闲 = `idle`（真机缺陷修复 2026-10-13：旧实现只在开启会话时写 `run`、轮末**无回 idle 路径**，
+   *  开启后恒 `run`）。`err` 仍由开启失败/异常两条路径设置（下一次快照/切角色会再校准）。
+   *  同一单一数据源 = `state.roleBusy`（与停止钮同一判据，不造第二套）。 */
+  function syncChatState(roleId) {
+    var busy = !!roleId && state.roleBusy[roleId] === true;
+    setState(busy ? "run" : "idle", busy ? "聊天中" : "空闲");
+  }
+
+  // —————— 停止入口（P0-2 UI，2026-10-13 客户批准「跑飞轮次的停」；同日客户反馈后位置调整）——————
+  // 位置：**输入框区、发送钮左侧**的小圆钮（#btn-halt；客户反馈「停止按钮位置有问题」——从聊天头移来）。
+  // **仅该角色会话忙碌时出现**（判据 = role-state 真实快照 `state.roleBusy`——主进程外推，不做界面侧推测）；
+  // 点击调 `d.abortSession(roleId)`，按**三态**在聊天流**如实一行**（已请求停止 / 当前运行时不支持停止 /
+  // 停止失败：<error>）。轮次仍以既有 settled 收尾——**不做乐观「已停止」假象**；重复点击幂等
+  // （无在飞轮次 = no-op，abort 语义已在适配器环测试钉死）。**与发送钮并存、各司其职**——发送钮
+  // 绝不因忙碌被替换/禁用（「忙碌时发消息=入队」是既定语义）；这不是已删的「结束会话」按钮
+  // （那是关整只会话；这里只停**当前一轮**，会话保留）。
+  function updateHaltButton() {
+    var btn = $("btn-halt");
+    if (!btn) return;
+    var busy = state.selectedRoleId !== null && state.roleBusy[state.selectedRoleId] === true;
+    btn.hidden = !busy;
+  }
+
+  async function onHaltClick() {
+    var roleId = state.selectedRoleId;
+    if (!roleId) return;
+    var pane = activePane();
+    var res;
+    try {
+      res = await d.abortSession(roleId);
+    } catch (err) {
+      sysRow(pane, "sys-call", ICONS.deny, "停止失败：" + (err && err.message ? err.message : err));
+      return;
+    }
+    var r = res && typeof res === "object" ? res : {};
+    if (r.ok === true) {
+      sysRow(pane, "sys-call", ICONS.call, "已请求停止当前轮次——轮次仍会以收尾事件结束。");
+    } else if (r.supported !== true) {
+      // 方法缺席与 supported:false 同一处理：如实告知能力缺席，绝不假装已停。
+      sysRow(pane, "sys-call", ICONS.call, "当前运行时不支持停止。");
+    } else {
+      sysRow(pane, "sys-call", ICONS.deny, "停止失败：" + (r.error || "未知原因"));
+    }
   }
 
   /**
@@ -233,6 +281,7 @@
     paneRowLists = Object.create(null); // Q-2：行表随 pane 作废（老项目的行模型不跨项目）
     paneAnchors = Object.create(null); // 回放锚点表随项目作废（锚点是行序位——只对老项目的行表有意义）
     opRequests = Object.create(null); // 交互请求登记表随之作废（旧项目的请求已随会话/时限自行落定）
+    replayState = Object.create(null); // 回放去重状态随项目作废（新项目的转录从零核对）
     $("chat").innerHTML = emptyStateHtml();
     bindEmptyState($("chat"));
   }
@@ -1556,6 +1605,7 @@
       state.queueByRole = {};
       state.queueItemsByRole = {};
       state.runningByRole = {};
+      updateHaltButton(); // 停止按钮随快照清零隐藏（P0-2 UI）
       resetPanes();
       flushPendingHistories(); // D-1：本项目的恢复数据（可能先于 pane 就绪推达）在此回放
     }
@@ -1648,6 +1698,10 @@
     state.runningByRole[roleId] = info.running && typeof info.running === "object" ? copyItem(info.running) : null;
     renderQueueRow(roleId);
     renderRoleTree();
+    // 停止按钮（P0-2 UI）随**真实快照**显隐（忙碌=可见；空闲=隐藏——不做界面侧推测）。
+    updateHaltButton();
+    // data-state（程序化出口）同随真实快照：正看着该角色时 run/idle 实时校准（轮末回 idle 的路径）。
+    if (state.selectedRoleId === roleId) syncChatState(roleId);
     // 右栏：若正看着该角色 → 只更新「待办 / 队列」组（**定点更新**，不重排整个手风琴、不重置展开态）。
     if (state.selectedRoleId === roleId) updateRightQueue(roleId);
     // 图标簇角标随**真实快照**刷新（待办=视图行数 / 队列=排队条数——收起也不丢信息）。
@@ -1680,8 +1734,32 @@
 
   // —————— 会话记录恢复（D-1，2026-10-12）：主进程推来的规范化界面行 → 回放进该角色的 pane ——————
   // 渲染进程**不碰 Pi SDK/JSONL**（解析在主进程；本层只呈现）。回放行与实时行**视觉可区分**
-  // （`.is-replay` + 分隔提示行）；助手文本同样走 `Md.renderMarkdown`（esc 单一来源）。
+  // （`.is-replay`）；助手文本同样走 `Md.renderMarkdown`（esc 单一来源）。
+  // **回放去重（2026-10-13 真机「同一段消息渲染两遍」修复）**：su 一轮结束 → `project:changed` →
+  // refreshProject → 主进程对每角色**重推**会话历史——旧实现对同一 pane 无守卫地整份再回放 ⇒ 转录重复。
+  // 现在每角色记住上次回放状态：**同一份历史幂等（skip）**、盘上文件增长走**增量（append）**、
+  // 其余（重写/截断/错误态变化）走**全量重建（full，绝不追加第二份）**——策略是纯函数 `UiLabels.replayPlan`。
   var pendingHistories = []; // 项目尚未就绪/正在切换时先寄存（applyListing(fresh) 重置 pane 后统一冲洗）
+  var replayState = Object.create(null); // roleId → { rows, error, projectRoot }（随项目作废，见 resetPanes）
+
+  /** 重建某角色的 pane（回放 **full** 路径专用——会话文件重写/截断时全量重放，绝不追加第二份）。
+   *  行模型与回放锚点表随 pane 作废重建（锚点是行序位、只对旧行表有意义——旧 Map 一并删，防错位复用）；
+   *  请求登记表（opRequests）**保留**：`materializePendingFor` 会按新行表重物化未作答的卡。 */
+  function rebuildPane(roleId) {
+    var key = String(roleId == null ? "" : roleId);
+    var old = chatPanes[key];
+    var wasActive = !!old && old.parentNode === $("chat");
+    if (old) old.remove();
+    delete chatPanes[key];
+    delete paneRowLists[key];
+    delete paneAnchors[key];
+    var pane = paneFor(key); // 新建空 pane（含空状态；首行登记时 ensureContent 清掉）
+    if (wasActive) {
+      $("chat").innerHTML = "";
+      $("chat").appendChild(pane);
+    }
+    return pane;
+  }
 
   function onSessionHistory(payload) {
     if (!payload || typeof payload !== "object" || typeof payload.roleId !== "string") return;
@@ -1704,10 +1782,19 @@
 
   function replayHistory(payload) {
     var roleId = payload.roleId;
-    var pane = paneFor(roleId);
     var rows = Array.isArray(payload.rows) ? payload.rows : [];
     var error = typeof payload.error === "string" && payload.error !== "" ? payload.error : null;
     if (rows.length === 0 && error === null) return;
+    var prev = replayState[roleId];
+    if (prev && prev.projectRoot !== payload.projectRoot) prev = null; // 防御：跨项目不复用（正常已被 resetPanes 清）
+    var plan = UiLabels.replayPlan(prev, rows);
+    // 错误态变化（出现/消失/文案变）⇒ 全量（旧错误分隔行不残留）。
+    if (prev && error !== prev.error) plan = { action: "full", from: 0 };
+    if (plan.action === "skip") return; // 幂等：同一份历史（重推/重放）不再叠加副本——真机重复渲染修复
+    var pane = paneFor(roleId);
+    if (plan.action === "full" && prev) {
+      pane = rebuildPane(roleId); // 内容不一致（重写/截断）：作废旧回放，全量重放（绝不追加第二份）
+    }
     metaFor(roleId).restored = true; // D-1/B-3：徽标「空闲（已恢复）」——不假装「工作中/未开启」
     // Q-1/Q-2（2026-10-12）：回放包在**批量**里、行走**惰性行表**——长转录（上千行）**不一次性实体化、不一次性
     // 跑 Markdown**：行模型先建好（毫秒级），窗口化下只有视口附近的行真正建 DOM/渲染；收尾统一贴底刷新窗口。
@@ -1715,8 +1802,8 @@
     try {
       // 客户裁定（2026-10-13）：常规回放**不再插入「会话已恢复…」分隔行**——聊天流不摆常规提示，
       // 历史行直接排入；回放行仍有 `.is-replay` 视觉区分、徽标「空闲（已恢复）」保留（状态准确性）。
-      // **错误分支保留**：坏文件如实提示而不崩（异常如实告知，不是常规提示）。
-      if (error !== null) {
+      // **错误分支保留**：坏文件如实提示而不崩（异常如实告知，不是常规提示）——只在全量路径插入（增量下错误态必未变）。
+      if (error !== null && plan.action === "full") {
         registerRow(
           pane,
           function () {
@@ -1732,11 +1819,13 @@
           34
         );
       }
-      for (var i = 0; i < rows.length; i += 1) appendReplayRow(pane, rows[i]);
+      var from = plan.action === "append" ? plan.from : 0;
+      for (var i = from; i < rows.length; i += 1) appendReplayRow(pane, rows[i]);
       scrollBottomForced(pane); // 批内：记为收尾统一贴底（不 per-row 滚）
     } finally {
       batchDepth -= 1;
     }
+    replayState[roleId] = { rows: rows, error: error, projectRoot: typeof payload.projectRoot === "string" ? payload.projectRoot : "" };
     flushBatchSideEffects(); // 左树一次 + 贴底一次 + 虚拟窗口一次
   }
 
@@ -1918,7 +2007,7 @@
       state.sessionOpenRoleId = roleId;
       metaFor(roleId).hadSession = true; // B-3：曾成功开过会话（停/淘汰后据它示「已停止」而非「未开启」）
       metaFor(roleId).error = false;
-      setState("run", "聊天中");
+      syncChatState(roleId); // data-state 随真实快照（2026-10-13 修复：旧实现写死 run、轮末无回 idle 路径）
       renderRoleTree();
       updateControls();
       setHint(res.note || "");
@@ -1995,28 +2084,53 @@
     return html + "</ul>";
   }
 
-  /** 定点更新待办组（仅当该组在当前渲染里存在——不重排手风琴、不重置展开态；抽屉收起时无该节点则跳过）。 */
+  /** 队列概览（**仅排队条目**的位次视图：1..N + 来源 + 摘要 + 入队时间；同一快照的另一个视图，
+   *  无新数据源；进行中那条归「待办 / 队列」节）。条目字段经既有纯映射（来源标签/截断）+ esc。 */
+  function queueOverviewHtml(roleId) {
+    var items = state.queueItemsByRole[roleId] || [];
+    var html = '<div class="q-overview">';
+    html += '<div class="muted small">等它完成当前任务后依次处理（排队 ≠ 已执行）。</div>';
+    if (items.length === 0) {
+      html += '<div class="muted small">（无排队）</div>';
+    } else {
+      html += '<ul class="queue-list">';
+      items.forEach(function (it, i) {
+        html +=
+          '<li class="q-item"><span class="q-pos">' + esc(String(i + 1)) + "</span>" +
+          '<span class="q-src">' + esc(UiLabels.queueSourceLabel(it.kind)) + "</span>" +
+          '<span class="q-text">' + esc(UiLabels.shortenQueueItem(it.summary)) + "</span>" +
+          '<span class="q-meta">' + esc(queueTimeText(it.at)) + "</span></li>";
+      });
+      html += "</ul>";
+    }
+    return html + "</div>";
+  }
+
+  /** 定点更新「角色资料」抽屉里的**待办/队列两节**（2026-10-13 第二轮裁定：两节归角色、同处一抽屉）。
+   *  仅当该节在当前渲染里存在才更新——不重排手风琴、不重置展开态；抽屉收起时无该节点则整体跳过。 */
   function updateRightQueue(roleId) {
     var body = $("right-queue-body");
-    if (!body) return;
-    var views = queueViewsFor(roleId);
-    body.innerHTML = queueRowsHtml(views);
-    var countEl = $("right-queue-count");
-    if (countEl) countEl.textContent = views.length > 0 ? String(views.length) : "无";
+    if (body) {
+      var views = queueViewsFor(roleId);
+      body.innerHTML = queueRowsHtml(views);
+      var countEl = $("right-queue-count");
+      if (countEl) countEl.textContent = views.length > 0 ? String(views.length) : "无";
+    }
+    var overview = $("right-queue-overview");
+    if (overview) overview.innerHTML = queueOverviewHtml(roleId);
   }
 
   // —————— 右抽屉 + 右上角图标簇（客户裁定 2026-10-13）：右栏不常驻，点了才展示 ——————
   // tab → 抽屉标题；同一时刻至多开一块（state.rightTab）；"pi" tab 展示迁入抽屉的既有 Pi 面板
   // （面板本体、保存/掩码纪律一字不动）。内容跟随当前选中角色（打开状态下随 selectRole/applyListing 重渲染）。
 
-  /** 右上角图标簇的**角标**：待办=进行中+排队视图行数；队列=排队条数（同一 role-state 快照，无新数据源）。 */
+  /** 右上角图标簇的**角标**：第二轮裁定（2026-10-13）待办/队列归角色、簇只留两枚——「角色资料」图标角标 =
+   *  当前选中角色的待办深度（进行中+排队视图行数；继承原待办图标角标语义；同一 role-state 快照，无新数据源）。 */
   function renderTabs() {
     var roleId = state.selectedRoleId;
     var views = roleId ? queueViewsFor(roleId) : [];
-    var qDepth = roleId ? (state.queueByRole[roleId] || []).length : 0;
-    setTabBadge("todo", views.length);
-    setTabBadge("queue", qDepth);
-    ["card", "todo", "queue", "pi"].forEach(function (id) {
+    setTabBadge("card", views.length);
+    ["card", "pi"].forEach(function (id) {
       var b = $("tab-" + id);
       if (b) b.classList.toggle("active", state.rightTab === id);
     });
@@ -2065,11 +2179,15 @@
     var body = $("right-body");
     var tab = state.rightTab;
     var titleEl = $("drawer-title");
-    var titles = { card: "角色资料", todo: "待办 / 队列", queue: "队列概览", pi: "Pi 配置" };
+    var titles = { card: "角色资料", pi: "Pi 配置" };
     if (titleEl) titleEl.textContent = titles[tab] || "角色资料";
     syncPiPanel();
     if (!tab) {
       body.innerHTML = "";
+      return;
+    }
+    if (tab === "pi") {
+      body.innerHTML = ""; // Pi 面板本体（#pi-panel）在抽屉内由 syncPiPanel 控制显隐——不在此重渲染
       return;
     }
     var role = selectedRole();
@@ -2081,42 +2199,12 @@
         "</div>";
       return;
     }
-    if (tab === "todo") {
-      // 待办 tab（2026-10-13 客户裁定：右栏收成图标）：**既有「待办 / 队列」组逐字保留**（进行中 + 排队，
-      // 随 session:role-state 快照定点更新——updateRightQueue 不重排手风琴、不重置展开态）。
-      var qViews = queueViewsFor(role.roleId);
-      body.innerHTML = sec("待办 / 队列", qViews.length > 0 ? qViews.length : "无",
-        '<div id="right-queue-body">' + queueRowsHtml(qViews) + "</div>", true, "right-queue-count");
-      return;
-    }
-    if (tab === "queue") {
-      // 队列概览 tab：**仅排队条目**的位次概览（1..N + 来源 + 摘要 + 入队时间；同一快照的另一个视图，
-      // 无新数据源；进行中那条归「待办」tab）。条目字段经既有纯映射（来源标签/截断）+ esc。
-      var items = state.queueItemsByRole[role.roleId] || [];
-      var html = '<div class="q-overview">';
-      html += '<div class="muted small">等它完成当前任务后依次处理（排队 ≠ 已执行）。</div>';
-      if (items.length === 0) {
-        html += '<div class="muted small">（无排队）</div>';
-      } else {
-        html += '<ul class="queue-list">';
-        items.forEach(function (it, i) {
-          html +=
-            '<li class="q-item"><span class="q-pos">' + esc(String(i + 1)) + "</span>" +
-            '<span class="q-src">' + esc(UiLabels.queueSourceLabel(it.kind)) + "</span>" +
-            '<span class="q-text">' + esc(UiLabels.shortenQueueItem(it.summary)) + "</span>" +
-            '<span class="q-meta">' + esc(queueTimeText(it.at)) + "</span></li>";
-        });
-        html += "</ul>";
-      }
-      body.innerHTML = html + "</div>";
-      return;
-    }
-    if (tab === "pi") {
-      body.innerHTML = ""; // Pi 面板本体（#pi-panel）在抽屉内由 syncPiPanel 控制显隐——不在此重渲染
-      return;
-    }
-    // "card"（角色资料）：既有四组逐字保留（角色卡 md / 边界条目 / 变更记录 / 文档索引）。
+    // "card"（角色资料）：既有四组逐字保留（角色卡 md / 边界条目 / 变更记录 / 文档索引）+ **待办/队列两节
+    // 归角色**（2026-10-13 第二轮裁定：「代办是不是应该放在角色里面……这个是和角色相关的」——同一真实
+    // 快照的两个视图、逐字保留；随 session:role-state 快照定点更新，见 updateRightQueue）。
     var entries = role.boundary && role.boundary.entries ? role.boundary.entries : [];
+    var qViews = queueViewsFor(role.roleId);
+    var qDepth = (state.queueByRole[role.roleId] || []).length;
     var html = "";
     html += sec("角色卡", null,
       '<div class="kv">' + esc(role.cardPath) + "</div>" +
@@ -2124,6 +2212,10 @@
       // （`Md.renderMarkdown` 同一 `esc` 单一来源；转义/白名单不变：html:false、链接 rel + `md-link` 类、
       // 图片=原文文本；表格已启用（2026-10-13），单元格照常转义）。`card-md` 只是这套渲染产物的样式钩子。
       '<div class="card-text card-md">' + Md.renderMarkdown(role.cardText || "（空）") + "</div>", true);
+    html += sec("待办 / 队列", qViews.length > 0 ? qViews.length : "无",
+      '<div id="right-queue-body">' + queueRowsHtml(qViews) + "</div>", true, "right-queue-count");
+    html += sec("队列概览", qDepth > 0 ? qDepth : "无",
+      '<div id="right-queue-overview">' + queueOverviewHtml(role.roleId) + "</div>", false);
     html += sec("边界条目", entries.length, renderBoundaryTable(role.boundary), false);
     html += sec("变更记录", role.changelog ? null : "无", renderChangelog(role), false);
     html += sec("文档", role.docs && role.docs.length ? role.docs.length : "无", renderDocs(role), false);
@@ -2180,14 +2272,16 @@
     return '<div class="card-text card-md">' + Md.renderMarkdown(md) + "</div>";
   }
 
-  // —————— 输入区：图片附件（K-2，2026-10-12）：选图 / 粘贴 / 拖入 → 缩略图预览 + 可移除 ——————
+  // —————— 输入区：图片附件（K-2，2026-10-12；**P0-1 端到端接线**，2026-10-13 客户批准）——————
   // 边界：渲染进程**不碰文件系统**——选图走主进程（`d.pickImage()`：dialog + fs 读）；粘贴/拖入仅用浏览器
   // File API 读字节并交主进程校验（`d.attachImage`；**声明 mime/size 不可信**——主进程以真实字节为准：
-  // 魔数嗅探 + ≤5MB）。「图片随消息送进模型」那一段**未接**（Pi适配器正在核实 SDK 图片内容块）——发送时
-  // **如实**提示未发送，绝不假装已读图。
+  // 魔数嗅探 + ≤5MB）。**发送**：随消息**带载荷上送** `d.sendSession(text, images)`——
+  // `[{type:"image", data:<base64>, mimeType}]`；**主进程按真实字节重校验**（解码 → 魔数嗅探 → ≤5MB），
+  // 全过才放行、任一张不合格**整条拒发**（fail-closed，绝不「丢图发文字」）。旧「图片未发送」提示行
+  // 与其生成函数已随接线**退役**（不留死代码——图片真正随消息送进模型了）。
   var IMAGE_MIME_ALLOW = ["image/png", "image/jpeg", "image/webp", "image/gif"];
   var IMAGE_MAX_BYTES = 5 * 1024 * 1024;
-  var attachments = []; // {key, name, mime, size, previewUrl, revoke}
+  var attachments = []; // {key, name, mime, size, data(base64), previewUrl, revoke}
   var attachSeq = 0;
 
   /** 附件行渲染（缩略图 chips；空时整行隐藏）。 */
@@ -2223,15 +2317,32 @@
     renderAttachRow();
   }
 
-  function addAttachment(image, previewUrl, revoke) {
+  function addAttachment(image, previewUrl, revoke, data) {
     attachments.push({
       key: "att-" + (++attachSeq),
       name: String(image.name || "图片"),
       mime: String(image.mime || ""),
       size: Number(image.size) || 0,
+      data: typeof data === "string" ? data : "", // base64（随消息上送用；P0-1）
       previewUrl: String(previewUrl || ""),
       revoke: revoke === true,
     });
+    renderAttachRow();
+  }
+
+  /** 清空附件（发送成功后调用）：撤销 blob 预览、清行——载荷已定格进消息/队列，输入区回到空。 */
+  function clearAttachments() {
+    var old = attachments;
+    attachments = [];
+    for (var i = 0; i < old.length; i += 1) {
+      if (old[i].revoke && old[i].previewUrl.indexOf("blob:") === 0) {
+        try {
+          URL.revokeObjectURL(old[i].previewUrl);
+        } catch (err) {
+          // 撤销失败不影响清空本身
+        }
+      }
+    }
     renderAttachRow();
   }
 
@@ -2288,7 +2399,7 @@
       url = "";
     }
     if (url === "") url = "data:" + res.image.mime + ";base64," + dataBase64;
-    addAttachment(res.image, url, url.indexOf("blob:") === 0);
+    addAttachment(res.image, url, url.indexOf("blob:") === 0, dataBase64);
     setHint("");
   }
 
@@ -2310,17 +2421,8 @@
       return;
     }
     if (res.cancelled) return;
-    addAttachment(res.image, "data:" + res.image.mime + ";base64," + res.image.dataBase64, false);
+    addAttachment(res.image, "data:" + res.image.mime + ";base64," + res.image.dataBase64, false, res.image.dataBase64);
     setHint("");
-  }
-
-  /** 「图片未随消息发送」的如实说明（K-2 接线前**绝不假装已读图**；接线后此文案随之退役）。 */
-  function imageNotWiredNote() {
-    var n = attachments.length;
-    return (
-      "随消息附加的 " + n + " 张图片未发送：图片送入模型的能力尚未接线（Pi适配器正在核实 SDK 图片支持）——" +
-      "图片仍留在输入区，可移除；接线后再发即可。"
-    );
   }
 
   // —————— 中栏：发送消息（多轮直发，不再确认） ——————
@@ -2330,15 +2432,16 @@
     var inp = $("inp-message");
     var text = inp.value.trim();
     if (!text) {
-      if (attachments.length > 0) {
-        // 有图无字：如实说明（不发出任何东西——图片送模型未接；文字也空）。
-        setHint("请先输入文字；图片随消息送模型的能力尚未接线（见聊天流说明）。");
-        sysRow(activePane(), "sys-call", ICONS.call, imageNotWiredNote());
-      } else {
-        setHint("请输入消息内容。");
-      }
+      // 仍要求**有字**（图片随消息发送，不单独发图——队列条目的正文形状钉死了非空正文）。
+      setHint("请输入消息内容；图片会随消息一起发送。");
       return;
     }
+
+    // P0-1：随消息**带载荷上送**（`[{type:"image", data:<base64>, mimeType}]`）——主进程会按真实字节
+    // 重校验（不信任渲染侧）；失败整条拒发、附件保留在输入区可重试。
+    var images = attachments.map(function (a) {
+      return { type: "image", data: a.data, mimeType: a.mime };
+    });
 
     if (state.sessionOpenRoleId !== role.roleId) {
       // 防御路径：正常流程点角色即已开会话；若未开，先补开再发。
@@ -2347,32 +2450,29 @@
     // H-1 附录：记「本端手发送的最近一条」——投递回显归类据此**防误伤**（手输即便字面像投递前缀，
     // 其回显也不得被当成系统投递）；普通气泡路径不受影响。
     lastManualSend = { roleId: role.roleId, text: text, at: Date.now() };
-    appendUser(activePane(), text);
+    // 带图时在用户气泡上保留**如实记录**（附件行发送成功后清空——图已定格进载荷/队列）。
+    appendUser(activePane(), images.length > 0 ? "（图片 ×" + images.length + "）" + text : text);
     inp.value = "";
     autoGrow();
     setHint("");
     try {
-      var res = await d.sendSession(text);
+      var res = await d.sendSession(text, images);
       if (!res.ok) {
         metaFor(role.roleId).error = true; // B-3：最近一次轮次以错误结束
         sysRow(activePane(), "sys-call", ICONS.deny, "发送失败：" + (res.error || ""));
+        // 拒发（如主进程校验不合格）：附件**保留在输入区**（本条没发出，可移除/压缩后重试）。
       } else if (res.queued === true) {
         // L-1：角色忙——消息**已入队**（不再直接失败）；如实提示位次。徽标/队列行由主进程真实快照驱动
-        // （onRoleState），此处不自设忙态（准确性裁定）。
+        // （onRoleState），此处不自设忙态（准确性裁定）。图片**入队即定格**（排队后到投递都带原图）。
         stampLastEvent(role.roleId, "你：" + firstLine(text));
         var queuedMsg = "已入队：等它完成当前任务后处理（第 " + (res.position || 1) + " 位）。";
         sysRow(activePane(), "sys-queue", ICONS.clock, queuedMsg);
         setHint(queuedMsg);
-        if (attachments.length > 0) {
-          sysRow(activePane(), "sys-call", ICONS.call, imageNotWiredNote());
-        }
+        clearAttachments();
       } else {
         // 忙态由主进程快照转述（session:role-state 的 busy=true——见 onRoleState）；此处只记最近一条（悬停用）。
         stampLastEvent(role.roleId, "你：" + firstLine(text));
-        // K-2：图片送模型未接——随消息**如实**说明未发送（图片保留在输入区，不假装已读图）。
-        if (attachments.length > 0) {
-          sysRow(activePane(), "sys-call", ICONS.call, imageNotWiredNote());
-        }
+        clearAttachments();
       }
       renderRoleTree();
     } catch (err) {
@@ -2385,6 +2485,9 @@
   // 「结束会话」按钮已按客户裁定（2026-10-13）删除：渲染侧只服务该按钮的 stop() 一并清（不留死代码）。
   // 停止**能力**保留在程序化路径——换项目时 loadProject 的 d.stopSession(null)「关闭全部」（定向 stopSession
   // 仍在主进程/会话管理器，供该路径与测试使用）。
+  // **区分（P0-2，2026-10-13 客户批准）**：新增的「停止」钮（#btn-halt，**输入框区、发送钮左侧**、
+  // 仅忙碌时出现）停的是**当前一轮**（abort；会话保留、轮次仍以 settled 收尾）——与已删的「结束会话」
+  // （关整只会话）不是一回事，不是它的恢复。
 
   /**
    * Markdown 链接的点击（B-1）：一律**外开**（`d.openExternal` → 主进程校验 http/https 后交系统浏览器），
@@ -2446,6 +2549,8 @@
   initTitlebar();
   $("btn-import").addEventListener("click", importProject);
   $("btn-send").addEventListener("click", onSend);
+  // 停止入口（P0-2 UI）：忙碌时才可见（updateHaltButton 由 role-state 快照驱动）；点击三态如实行。
+  $("btn-halt").addEventListener("click", onHaltClick);
   $("inp-message").addEventListener("keydown", function (e) {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSend(); }
   });
@@ -2507,11 +2612,9 @@
   $("pi-close").addEventListener("click", closePiPanel);
   $("pi-save").addEventListener("click", savePiConfigFromForm);
   $("pi-toggle-secret").addEventListener("click", toggleSecretVisibility);
-  // 右上角图标簇（客户裁定 2026-10-13）：三枚内容 tab（角色资料/待办/队列概览）——同 tab 再点收起；
+  // 右上角图标簇（客户裁定 2026-10-13；第二轮裁定同日：待办/队列归角色，簇只留两枚）——同图标再点收起；
   // 抽屉头 × 收起；Esc 收起（shell 确认卡在先——fail-closed 优先级不受影响）。
   $("tab-card").addEventListener("click", function () { toggleRightDrawer("card"); });
-  $("tab-todo").addEventListener("click", function () { toggleRightDrawer("todo"); });
-  $("tab-queue").addEventListener("click", function () { toggleRightDrawer("queue"); });
   $("drawer-close").addEventListener("click", closeRightDrawer);
   // Markdown 链接（B-1）：点聊天流里的链接一律**外开**（事件委托挂在 #chat 上——pane 切换不丢）。
   $("chat").addEventListener("click", onChatLinkClick);

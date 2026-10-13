@@ -61,6 +61,28 @@ export interface RoleSession {
    */
   prompt(text: string, opts?: PromptOptions): Promise<void>;
   events(): AsyncIterable<SessionEvent>;
+  /**
+   * 中止**当前进行中的 prompt 轮次**（产品提案 P0-2「停当前轮次」，2026-10-13 客户批准；
+   * 本条是其第一环——运行时适配器契约与真适配器；编排句柄与桌面停止入口的接线为后续环节）。
+   *
+   * **可选方法**（契约演进，同 `PromptOptions` 先例）：既有实现/替身**不实现它也完全合法**；
+   * 消费方必须以 `session.abort?.()` 调用——缺席表示**该运行时不支持停止**，上层须如实告知
+   * （如「当前运行时不支持停止」），**不得静默装作已停**。落点说明：中止是**会话级**语义——
+   * 「当前进行中的轮次」只存在于 `bindRole` 返回的会话对象上（`RuntimeAdapter` 是工厂，无轮次可言），
+   * 故钉在本接口而非工厂接口；编排句柄包装的正是本对象。
+   *
+   * 语义（真适配器实现 = Pi SDK `session.abort()`，见 real-adapter 的 `makeRoleSession`）：
+   * - 停**当前轮**（模型生成与工具执行一并停），**不销毁会话**——abort 后本会话仍可继续发下一条
+   *   （历史与模型上下文保留）；与 `dispose`（收口整只会话）不同。
+   * - **无进行中轮次时调用 = no-op**（不抛错、无副作用）。
+   * - **中止后 settled 仍会发射**（既有行为）：SDK 的 `agent_settled` 无论中止与否都发（X-1 唯一
+   *   发射点照常映射）——消费方按 `settled` 收尾本轮，**不会挂起**；进行中的 `prompt()` promise
+   *   亦正常返回（SDK 把中止落成 `stopReason:"aborted"` 的收尾消息，不向上拒绝）。
+   * - **等待中的客户确认/交互一并 fail-closed**：abort 中止该轮 run 级 AbortSignal，交互工具的
+   *   `raceAbort`（设计 A-6）立即以「未获客户同意」返回（SDK 已天然带动，无需另接）。
+   * - 错误如实上抛（不吞错）；实现方与消费方都不得把「已请求中止」谎报为「已完成」。
+   */
+  abort?(): Promise<void> | void;
   dispose(): Promise<void>;
 }
 
@@ -330,6 +352,8 @@ export type ShellVerdictFn = (verdict: ShellVerdictPayload) => void | Promise<vo
 export interface RuntimeAdapter {
   composeContext(role: ResolvedRole): Promise<{ systemPrompt: string }>;
   bindRole(role: ResolvedRole): Promise<RoleSession>;
+  // 「停当前轮次」（提案 P0-2）的能力在 **RoleSession.abort?**（会话级语义，见其文档注释）——
+  // 本工厂接口无轮次可言，不在此重复。
 }
 
 // —————————————————————— 公共辅助 ——————————————————————

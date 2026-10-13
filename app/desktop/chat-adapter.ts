@@ -9,7 +9,7 @@
 // 边界纪律：本文件不判断"能不能写"——判定唯一来自 gate。
 
 import type { BoundarySection1 } from "../../src/model/boundary.ts";
-import type { RuntimeAdapter, RoleSession, SessionEvent, WriteGate } from "../../src/provider/pi/session.ts";
+import type { RuntimeAdapter, RoleSession, SessionEvent, WriteGate, PromptOptions } from "../../src/provider/pi/session.ts";
 import { buildGovernedTools } from "../../src/provider/pi/tools.ts";
 
 /** 越界示例路径：落在项目根内但几乎必不在任何角色边界内，用于稳定演示「写之前被拒」。 */
@@ -19,6 +19,23 @@ const OUT_OF_BOUNDS_PATH = "src/__desktop_out_of_bounds__.ts";
 export function firstProjectFilePath(boundary: BoundarySection1): string | undefined {
   const e = boundary.entries.find((x) => x.root === "project" && x.kind === "file");
   return e ? e.path : undefined;
+}
+
+// —— P0-1（2026-10-13 客户批准）：prompt 载荷记录（**仅演示适配器**；真实适配器不记录、载荷直入 SDK）——
+/** 一次 `prompt(text, opts)` 的收包记录：`opts` 保持**收到的同一引用**（供 e2e/单测断言**透传保真**——
+ *  IPC → Interface 重校验 → SessionManager/队列 → 句柄 → 适配器，逐环不变形）。 */
+export interface DemoPromptRecord {
+  roleId: string;
+  text: string;
+  opts?: PromptOptions;
+}
+/** 模块级记录（环形上限 50 条——防长跑泄漏；e2e/单测经 `takeDemoPromptLog` 取走并清空）。 */
+const demoPromptLog: DemoPromptRecord[] = [];
+/** 取走全部记录并清空（e2e/单测断言用；生产 demo 路径无人调用）。 */
+export function takeDemoPromptLog(): DemoPromptRecord[] {
+  const out = demoPromptLog.slice();
+  demoPromptLog.length = 0;
+  return out;
 }
 
 /**
@@ -69,7 +86,11 @@ export function createChatDemoAdapter(opts: { gate: WriteGate; boundary: Boundar
       };
 
       const session: RoleSession = {
-        async prompt(text: string): Promise<void> {
+        // P0-1：**接受可选 opts 并记录**（同一引用；**行为不变**——图片不参与演示脚本，也不落盘）。
+        // 契约 `RoleSession.prompt` 同形（`PromptOptions` 从冻结契约家只读导入，不复制形状）。
+        async prompt(text: string, promptOpts?: PromptOptions): Promise<void> {
+          if (demoPromptLog.length >= 50) demoPromptLog.shift();
+          demoPromptLog.push({ roleId: role.id, text, opts: promptOpts === undefined ? undefined : promptOpts });
           turn += 1;
           push({ kind: "message", summary: `（演示运行时·第 ${turn} 轮）收到：${text}` });
           if (inBound) await attempt(inBound, "角色边界内的写入尝试");

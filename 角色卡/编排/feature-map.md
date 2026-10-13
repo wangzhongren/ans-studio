@@ -8,7 +8,7 @@
 | 功能 | 一句话用途 | 状态 | 文档 |
 | --- | --- | --- | --- |
 | ans role run（一次性角色会话） | CLI 按角色跑一轮受治理会话：解析角色/边界 → 写入前门禁 → 事件流到 `settled` | 已实现 | 功能文档待补（[受治理会话运行时](docs/change/2026-10-12_change_governed-interaction-a3-a4.md)） |
-| 角色会话句柄（多轮） | 桌面聊天栏的会话式入口：`openRoleSession` 一个会话多轮 send、事件流持续、`dispose` 收口 | 已实现 | 功能文档待补（[会话自持目录](docs/change/2026-10-12_change_session-dir-restore-wiring.md)） |
+| 角色会话句柄（多轮） | 桌面聊天栏的会话式入口：`openRoleSession` 一个会话多轮 send（可带图 `opts.images` 原样透传，P0-1）、`abort?()` 停当前轮次（三态如实：不支持停止即如实说明，P0-2）、事件流持续、`dispose` 收口；桌面停止钮与图片 IPC 接线为后环 | 已实现 | 功能文档待补（[P0-1/P0-2 句柄层](docs/change/2026-10-13_change_p01-images-p02-abort-handle.md)、[会话自持目录](docs/change/2026-10-12_change_session-dir-restore-wiring.md)） |
 | ans govern（治理会话） | su 的治理对话（建/改角色、创世）：CLI 与桌面收敛为同一引擎 `openGovernanceSession` | 已实现 | 功能文档待补（[确认制/删收口](docs/change/2026-10-12_change_governed-interaction-a3-a4.md)） |
 | 客户确认制（写前预览确认） | 写盘前经 `request_confirmation` 预览（含具体路径）并获客户 `confirmed:true`，写集按确认发行 | 已实现 | 功能文档待补（同左；残余「内容漂移」已如实登记） |
 | 自动收尾 / 重 pin | su 会话 settle 后自动重扫并更新 `.ans` pin + manifest（创世首轮 = 首次收尾） | 已实现 | 功能文档待补（同左 + [finalize 相关记录](docs/change/2026-10-12_change_governed-interaction-a3-a4.md)） |
