@@ -534,3 +534,121 @@ test("defaultExtractReply：取最后一条 message（跳过「用户指令：�
   // 提示文案含命令原文（逐字）
   assert.match(buildPmReviewPrompt({ command: "rm -rf /", argv: ["rm", "-rf", "/"], cwd: "/p", toolCallId: "t" }), /rm -rf \//);
 });
+
+// —————————————————————— R-1：结论经工具（shellVerdict）；正文文本解析降为兜底 ——————————————————————
+
+/** 夹具「调工具的模型」：openSession 桩拿到注入 input（含 `shellVerdict`/`persistSession`），
+ *  send 时以给定载荷调用能力（= 真实工具 handler 的行为），事件流可附文本（降级路径用）。 */
+function toolHandle(payload: unknown, opts: { textReply?: string; skipTool?: boolean } = {}): {
+  open: (i: { persistSession?: boolean; shellVerdict?: (p: unknown) => void | Promise<void> }, d?: unknown) => Promise<import("../../src/pipeline/orchestration/run-role.ts").RoleSessionHandle>;
+  isDisposed: () => boolean;
+  seen: () => { persistSession?: boolean; hadVerdictFn: boolean };
+} {
+  let disposed = false;
+  let seen: { persistSession?: boolean; hadVerdictFn: boolean } = { hadVerdictFn: false };
+  return {
+    isDisposed: () => disposed,
+    seen: () => seen,
+    async open(i) {
+      seen = { persistSession: i.persistSession, hadVerdictFn: typeof i.shellVerdict === "function" };
+      return {
+        async send() {
+          if (opts.skipTool !== true) await i.shellVerdict?.(payload);
+        },
+        events(): AsyncIterable<SessionEvent> {
+          return (async function* () {
+            if (opts.textReply !== undefined) yield { kind: "message", summary: opts.textReply } as SessionEvent;
+            yield { kind: "settled", summary: "会话结束" } as SessionEvent;
+          })();
+        },
+        async dispose() {
+          disposed = true;
+        },
+      };
+    },
+  };
+}
+
+test("R-1：审读者调工具 → 闸读到结构化 verdict 并按结论走（review+allow 放行；deny 拒；unsure/risky 升 (a)）；审读会话不持久化", async () => {
+  const cases: Array<{ verdict: "allow" | "deny" | "unsure"; cls: "review" | "risky"; opCallsExpected: number; allow: boolean }> = [
+    { verdict: "allow", cls: "review", opCallsExpected: 0, allow: true },
+    { verdict: "deny", cls: "review", opCallsExpected: 0, allow: false },
+    { verdict: "unsure", cls: "review", opCallsExpected: 1, allow: true }, // unsure → 升 (a)；a=allow → 放行
+    { verdict: "allow", cls: "risky", opCallsExpected: 1, allow: true }, // risky：b 放行仍必过 (a)
+  ];
+  for (const c of cases) {
+    const audit = createMemoryAuditSink();
+    const f = toolHandle({ verdict: c.verdict, reason: "夹具理由" });
+    const ask = createPmReviewer({
+      project: FAQ_PROJECT,
+      sessionDeps: { createAdapter: () => ({}) as never },
+      openSession: f.open as never,
+    });
+    let opCalls = 0;
+    const gate = createShellGate({
+      classifyShell: () => c.cls,
+      rules: RULES,
+      rulesId: RULES_ID,
+      audit,
+      pmAsk: ask,
+      operatorChannel: () => {
+        opCalls += 1;
+        return { outcome: "allow", operatorId: "op" };
+      },
+    });
+    const r = await gate(REQ);
+    assert.equal(r.allow, c.allow, `${c.cls}/${c.verdict} → allow=${c.allow}`);
+    assert.equal(opCalls, c.opCallsExpected, `${c.cls}/${c.verdict} → (a) 调用次数`);
+    assert.equal(f.seen().persistSession, false, "R-1：审读会话固定不持久化");
+    assert.equal(f.seen().hadVerdictFn, true, "R-1：审读会话注入 shellVerdict（工具据此注册）");
+    assert.ok(f.isDisposed(), "审读会话收口");
+  }
+});
+
+test("R-1：工具参数非法（verdict 不在域内）→ 视同未调用；无正文兜底 → b-unparseable-deny（fail-closed，不升 (a)）", async () => {
+  const audit = createMemoryAuditSink();
+  const f = toolHandle({ verdict: "maybe" }); // 非法取值域
+  const ask = createPmReviewer({
+    project: FAQ_PROJECT,
+    sessionDeps: { createAdapter: () => ({}) as never },
+    openSession: f.open as never,
+  });
+  let opCalls = 0;
+  const gate = createShellGate({
+    classifyShell: () => "review",
+    rules: RULES,
+    rulesId: RULES_ID,
+    audit,
+    pmAsk: ask,
+    operatorChannel: () => {
+      opCalls += 1;
+      return { outcome: "allow", operatorId: "op" };
+    },
+  });
+  const r = await gate(REQ);
+  assert.equal(r.allow, false);
+  assert.equal(r.reason, REASON_B_UNPARSEABLE, "固定短句");
+  assert.equal(opCalls, 0, "不进 (a)、不打扰客户");
+  assert.equal(audit.records[0].branch, BRANCH_B_UNPARSEABLE);
+});
+
+test("R-1 降级路径：未调工具但正文写了 JSON → 文本宽松解析兜底仍生效（围栏亦可）", async () => {
+  const audit = createMemoryAuditSink();
+  const f = toolHandle(undefined, { skipTool: true, textReply: '```json\n{"verdict":"deny","reason":"夹具正文"}\n```' });
+  const ask = createPmReviewer({
+    project: FAQ_PROJECT,
+    sessionDeps: { createAdapter: () => ({}) as never },
+    openSession: f.open as never,
+  });
+  const gate = createShellGate({
+    classifyShell: () => "review",
+    rules: RULES,
+    rulesId: RULES_ID,
+    audit,
+    pmAsk: ask,
+    operatorChannel: () => ({ outcome: "allow", operatorId: "op" }),
+  });
+  const r = await gate(REQ);
+  assert.equal(r.allow, false, "降级路径按正文 JSON 判 deny");
+  assert.equal(audit.records[0].branch, BRANCH_B_DENY);
+});

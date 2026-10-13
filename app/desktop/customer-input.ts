@@ -32,6 +32,10 @@ import type {
   CustomerInputFn,
 } from "../../src/provider/pi/session.ts";
 export type { CustomerInputRequest, CustomerInputOutcome, CustomerInputFn };
+// 锚点键的**唯一算法**（真机缺陷修复 2026-10-12：已决卡切走再切回跑到聊天流最末尾——卡的（重）物化
+// 须按其时序锚点落位）。请求本体（kind/title）与回放侧（session-history.ts 解析的 toolCall 块）两侧
+// 各自用同一函数拼键，渲染侧据此把卡锚定回「调用工具 request_confirmation」附近。只读导入、不复制。
+import { interactionAnchorKey } from "./request-anchor.ts";
 
 /** 推给渲染侧的交互请求载荷（IPC `session:operator-request` 的形状，主→渲）。 */
 export interface OperatorRequestPayload {
@@ -41,6 +45,11 @@ export interface OperatorRequestPayload {
   roleId: string;
   /** 冻结形状的请求本体（**原样透传**，不加工）。 */
   request: CustomerInputRequest;
+  /**
+   * 交互请求的**锚点键**（`request-anchor.ts` 的单一算法；由请求本体 kind+title 拼出）。渲染侧把它
+   * 记进请求登记表，供卡的（重）物化与**回放行**（同样带 anchorKey）精确关联——卡落回它发生的位置。
+   */
+  anchorKey: string;
 }
 
 /**
@@ -116,7 +125,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
       const id = opts.nextId ? opts.nextId() : `op-${++seq}`;
       pending.set(id, { resolve, request: req });
       try {
-        opts.presenter({ id, roleId: String((ctx && ctx.roleId) || ""), request: req });
+        opts.presenter({ id, roleId: String((ctx && ctx.roleId) || ""), request: req, anchorKey: interactionAnchorKey(req.kind, req.title) });
       } catch (err) {
         // 推不达（窗口已关等）→ 未获同意（fail-closed），不留悬案。
         pending.delete(id);

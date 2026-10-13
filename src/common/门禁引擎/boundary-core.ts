@@ -40,6 +40,19 @@ export const BUILT_IN_GOVERNANCE_ROLE_ID = "su";
  * 真机根因——su 建出的角色边界只授代码路径、一条文档路径都没有 ⇒ 门禁拒掉一切文档写入，角色
  * **不能**维护自己的文档。故建/改角色时文档面（五文件 + 四目录 + 测试目录）须随边界一并授予，
  * 且**代码与文档同批交回**。
+ * 「内置角色自己的文档面」一段为客户裁定（原话「su 也要有自己的 memo」）：内置治理角色没有角色
+ * 目录，其工作文档固定写在 `docs/su/memo.md`（进行中事项/待确认项）与 `docs/su/changelog.md`
+ * （变更记录），落盘前照常经 request_confirmation 客户确认。同段写死红线：不得在 `角色卡/` 下建
+ * `su`（或任何非项目角色）目录——真机踩坑一次：该目录会被角色枚举按角色 id 解析（`su` 与内置角色
+ * id 冲突 → 判「角色重复」跳过并告警；非角色目录 → 触发「缺少 role-card.md」告警），客户在界面上
+ * 看到了这条提示。
+ * 「边界（三种情形）」一段为协调方 2026-10-12 裁定（结清上一轮登记的未决）：原末段「本版
+ * fail-closed——acceptance 未接受，故治理会话的一切写入都会被门禁在写之前拒绝（契约 §0：v1
+ * 治理会话不允许写盘）」把「既无创世、项目也无治理边界文档」的回退情形写成了普遍结论，会误导 su
+ * 以为自己不能写盘（真机 su 已在正常写治理产物）。现按 `resolveBoundarySection` 的三条分支如实
+ * 限定：① 空项目 + 客户发起 bootstrap（创世）——种子边界生效，治理产物可写；② 已 bootstrap 的
+ * 项目——按该项目治理边界文档工作（pin 接受后创世例外自终止，见 `./governance-seed.ts` 头注
+ * §12.2）；③ 两者皆无才回退内置未接受边界——fail-closed 只指这一种。
  */
 export const BUILT_IN_ROLE_CARD_TEXT = [
   "# 角色：ANS Governance（su）",
@@ -81,6 +94,14 @@ export const BUILT_IN_ROLE_CARD_TEXT = [
   "`角色卡/<角色 id>/docs/change/`、`角色卡/<角色 id>/docs/fix/`；另加该角色自己的测试目录",
   "（如 `test/<角色 id>/`，仅当该角色承担测试；`temp/<角色 id>/` 按上段 T-1 一并授予）。",
   "",
+  "内置治理角色自己**没有角色目录**：你的工作文档固定写在 `docs/su/memo.md`",
+  "（工作备忘录：进行中事项 / 待确认项——有进展或新挂起就更新，不等客户问）",
+  "与 `docs/su/changelog.md`（变更记录）；落盘前照常经 `request_confirmation` 客户确认。",
+  "",
+  "红线：不要在 `角色卡/` 下建 `su`（或任何非项目角色）目录——该目录下每个目录都会被角色枚举",
+  "按角色 id 解析：`su` 与内置角色 id 冲突，会被判「角色重复」跳过并告警；",
+  "非角色目录会触发「缺少 role-card.md」告警。",
+  "",
   "交付纪律：每次交付都要同步自己的文档（功能说明/流程、变更记录、memo、api-spec），",
   "**代码与文档同批交回**；文档缺口不得靠「下次补」。",
   "",
@@ -94,8 +115,10 @@ export const BUILT_IN_ROLE_CARD_TEXT = [
   "派发失败/被拒（回执「未能派发」）→ 如实告知客户原因，**不得假设已开工**；",
   "若没有可派发的角色，如实说明并停在「待客户指示」。",
   "",
-  "边界：内置治理边界（skill 根）。本版 fail-closed——acceptance 未接受，",
-  "故治理会话的一切写入都会被门禁在写之前拒绝（契约 §0：v1 治理会话不允许写盘）。",
+  "边界（三种情形）：① 空项目 + 客户发起 bootstrap（创世）——治理种子边界生效，",
+  "`角色卡/`、`docs/`、`.ans/` 三个目录命中即允许写入，你可写治理产物；",
+  "② 已 bootstrap 的项目——按该项目的治理边界文档工作（pin 接受后创世例外自终止）；",
+  "③ 两者皆无（回退内置、acceptance 未接受）——写入被门禁在写之前拒绝；fail-closed 的本意只指这一种。",
 ].join("\n");
 
 /** 内置治理边界（源自技能 references/built-in-boundary.md），skill 根；condition 为固定 slug */
@@ -129,7 +152,10 @@ function builtInEntries(): BoundaryEntry[] {
 
 /**
  * 内置治理角色的边界（Section 1）。fail-closed：acceptance 恒为未接受，
- * 故 resolveWrite 对其拒绝一切写入——治理会话在 v1 不允许写盘（契约 §0）。
+ * 故 resolveWrite 对其拒绝一切写入——但这**不是**「治理会话一律不能写盘」：只在
+ * resolveBoundarySection 回退到本内置边界时成立（既无创世、项目也无治理边界文档）；
+ * 创世种子（第 3 步）与项目覆盖（第 1/2 步）各有自己的接受证据，不经过本函数。
+ * （口径见 `BUILT_IN_ROLE_CARD_TEXT` 末段「边界（三种情形）」。）
  * 由 resolveBoundarySection 与 listProject 共用，避免两份实现。
  */
 export function builtInBoundarySection(): BoundarySection1 {

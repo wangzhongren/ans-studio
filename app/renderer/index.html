@@ -20,6 +20,27 @@
         <span class="titlebar-sub">治理会话工作台</span>
       </div>
       <div class="titlebar-controls">
+        <!-- 客户裁定（2026-10-13）：右栏角色卡/待办/队列**默认不常驻**——收成应用右上角一排小图标，
+             点了才以覆盖层抽屉展示（聊天列宽不因开关而 reflow）。激活图标高亮；待办/队列有挂起项时
+             图标带数字角标（收起不丢信息）。三枚按钮为 no-drag（否则点不动）；不算窗口按钮（.win-btn）。 -->
+        <div id="right-tabs" class="right-tabs">
+          <button id="tab-card" class="tab-btn" type="button" title="角色资料" aria-label="角色资料">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+            <span class="tab-badge" hidden></span>
+          </button>
+          <button id="tab-todo" class="tab-btn" type="button" title="待办（进行中 + 排队）" aria-label="待办">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3 8-8"/><path d="M21 12v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h11"/></svg>
+            <span class="tab-badge" hidden></span>
+          </button>
+          <button id="tab-queue" class="tab-btn" type="button" title="队列概览" aria-label="队列概览">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>
+            <span class="tab-badge" hidden></span>
+          </button>
+          <button id="tab-pi" class="tab-btn" type="button" title="Pi 设置" aria-label="Pi 设置">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            <span class="tab-badge" hidden></span>
+          </button>
+        </div>
         <button id="win-min" class="win-btn" type="button" title="最小化" aria-label="最小化">
           <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M2.5 6h7" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
         </button>
@@ -57,10 +78,10 @@
               <span id="chat-role" class="chat-role">未选择角色</span>
               <span id="chat-role-sub" class="chat-role-sub">从左侧选择一个角色开始聊天</span>
             </div>
-            <span id="session-state" class="pill pill-idle">未连接</span>
-            <button id="btn-pi-settings" class="btn btn-ghost btn-pi" type="button"
-              title="设置 Pi 运行时配置（保存到 .env）">Pi 设置</button>
-            <button id="btn-stop" class="btn btn-ghost" disabled>结束会话</button>
+            <!-- 客户裁定（2026-10-13）：「聊天中/空闲」状态 pill 删除（界面不再显示）——状态本身**程序化保留**：
+                 renderer.js::setState 把 kind 写到 #chat 的 data-state 属性（run/idle/err），e2e 与外部驱动仍可断言。
+                 「结束会话」按钮删除（客户裁定没啥用）——停止能力保留在程序化路径（换项目时 d.stopSession(null)
+                 「关闭全部」；渲染侧只服务该按钮的 stop() 死代码一并清）。Pi 设置入口上移到右上角图标簇（tab-pi）。 -->
           </div>
           <!-- 提示上移至横栏（客户 2026-10-11 裁定：去掉运行时选择器、默认跑 pi，底部只剩输入框）。
                状态提示与写入语义各压缩为一行；写入语义如实保留（pi 会真正写入导入的项目，但受角色边界约束）。 -->
@@ -83,8 +104,58 @@
         <!-- （A-5，2026-10-12：「完成 bootstrap」入口条已随「收口」删除——产物收尾由编排在 su 会话 settle 后
              **自动**完成；客户确认改由聊天流里的**交互卡**承担（`renderer.js::appendOperatorRequest`）。） -->
 
+        <!-- （Pi 配置面板已随右上角图标化整体迁入右侧抽屉 #right-drawer——见文件尾；
+             面板本体、保存/掩码纪律一字不动；tab=pi 时以抽屉形式展示。） -->
+
+        <!-- 底部输入区（K-1，2026-10-12 客户裁定：**圆角胶囊 + 发送箭头内嵌框内**；K-2：支持附加图片）。 -->
+        <div class="composer">
+          <!-- 附件行（K-2）：缩略图预览 + 可移除；空时隐藏（内容由 renderer.js 渲染）。 -->
+          <div id="attach-row" class="attach-row" hidden></div>
+          <div class="capsule" id="composer-capsule">
+            <button
+              id="btn-attach-image"
+              class="cap-icon"
+              type="button"
+              title="添加图片（png / jpeg / webp / gif，≤5MB）"
+              aria-label="添加图片"
+            >
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+            </button>
+            <textarea
+              id="inp-message"
+              rows="1"
+              placeholder="输入消息，Enter 发送，Shift+Enter 换行"
+              spellcheck="false"
+            ></textarea>
+            <button id="btn-send" class="cap-send" type="button" disabled title="发送（Enter）" aria-label="发送">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
+            </button>
+          </div>
+        </div>
+      </main>
+
+      <!-- 右栏已按客户裁定（2026-10-13）改**抽屉**：默认不占屏（覆盖层，不挤压聊天列宽——聊天流不 reflow）；
+           右上角图标簇（#right-tabs 四枚：角色资料 / 待办 / 队列概览 / Pi 设置）点了才滑出；再点同图标 / 点 × / Esc 收起；
+           同一时刻至多开一块；内容跟随当前选中角色。待办=进行中+排队（既有「待办 / 队列」组逐字保留）；
+           队列=仅排队条目的位次概览（入队时间 + 「等它完成当前任务后依次处理」语义）。收起时图标带数字角标（收起不丢信息）。 -->
+      <aside id="right-drawer" aria-label="角色资料与待办">
+        <div class="drawer-head">
+          <span id="drawer-title" class="side-title">角色资料</span>
+          <button id="drawer-close" class="drawer-close" type="button" title="收起（Esc）" aria-label="收起">✕</button>
+        </div>
+        <div id="right-body" class="right-body">
+          <div class="right-empty">
+            <svg class="empty-icon" viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
+            </svg>
+            <p class="empty-title">选择角色后查看资料</p>
+            <p class="empty-sub">点右上角图标展示对应面板；内容跟随当前选中角色。</p>
+          </div>
+        </div>
         <!-- Pi 配置面板（设计 §11/T28）：设置 pi 运行时所需配置，保存到仓库根 .env。
-             默认收起；点横栏的「Pi 设置」展开。token 字段掩码，且值不回显（恒空、只示「已设置/未设置」）。 -->
+             客户裁定（2026-10-13）：入口上移到右上角图标簇（tab-pi）；面板本体、保存/掩码纪律一字不动，
+             以抽屉形式展示（tab=pi 时显示，其余 tab 或收起时 hidden）。token 字段掩码，值不回显。 -->
         <div id="pi-panel" class="pi-panel" hidden>
           <div class="pi-panel-head">
             <span class="pi-panel-title">Pi 配置</span>
@@ -132,48 +203,6 @@
           </div>
         </div>
 
-        <!-- 底部输入区（K-1，2026-10-12 客户裁定：**圆角胶囊 + 发送箭头内嵌框内**；K-2：支持附加图片）。 -->
-        <div class="composer">
-          <!-- 附件行（K-2）：缩略图预览 + 可移除；空时隐藏（内容由 renderer.js 渲染）。 -->
-          <div id="attach-row" class="attach-row" hidden></div>
-          <div class="capsule" id="composer-capsule">
-            <button
-              id="btn-attach-image"
-              class="cap-icon"
-              type="button"
-              title="添加图片（png / jpeg / webp / gif，≤5MB）"
-              aria-label="添加图片"
-            >
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
-            </button>
-            <textarea
-              id="inp-message"
-              rows="1"
-              placeholder="输入消息，Enter 发送，Shift+Enter 换行"
-              spellcheck="false"
-            ></textarea>
-            <button id="btn-send" class="cap-send" type="button" disabled title="发送（Enter）" aria-label="发送">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
-            </button>
-          </div>
-        </div>
-      </main>
-
-      <!-- 右栏：角色资料（手风琴分组） -->
-      <aside class="col col-right">
-        <header class="side-head">
-          <span id="right-title" class="side-title">角色资料</span>
-        </header>
-        <div id="right-body" class="right-body">
-          <div class="right-empty">
-            <svg class="empty-icon" viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
-            </svg>
-            <p class="empty-title">选择角色后查看资料</p>
-            <p class="empty-sub">角色卡、边界条目、变更记录与文档索引。</p>
-          </div>
-        </div>
       </aside>
     </div>
 

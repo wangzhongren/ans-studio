@@ -101,8 +101,10 @@ function createWindow(): BrowserWindow {
 // **M-1（2026-10-12 客户裁定「这个太丑了」）**：确认从**原生对话框**改为**应用内卡片**（复用工作台视觉；
 // 命令等宽块 + 白话摘要 + 人话版「为什么问你」 + 折叠的技术详情）——数据面由
 // `createShellConfirmPresenter` 经 `shell:confirm-request` 推达渲染侧、决定经 `shell:confirm-response` 回传
-// （**恰 allow:true 才放行**；Esc/关窗/超时 → 不放行；关窗 ⇒ `rejectAllPending`）。**只对项目角色**生效
-// （su 自身不 arm——审读者不给自己开闸）。fail-closed 三条（关窗/取消/超时 → 不放行）在 operator-channel.ts。
+// （**恰 allow:true 才放行**；Esc/关窗/超时 → 不放行；关窗 ⇒ `rejectAllPending`）。**项目角色**走三层链；
+// **su 不接 (b)/(a)**（审读者不给自己开闸：不自审、不弹框）——su 的 shell 是**只读档**（同一份 (c) 实件，
+// 客户裁定 2026-10-12「su 也要有 shell，但是只读」，见 session.ts）。fail-closed 三条（关窗/取消/超时 →
+// 不放行）在 operator-channel.ts。
 /** 桌面操作者通道 (a)（**I-1 已 arm**；presenter 由 `registerIpc` 的 `shellConfirm.presenter` 提供——见彼处）。 */
 function buildDesktopOperatorChannel(presenter: OperatorPresenter) {
   let operatorId = "unknown";
@@ -211,11 +213,14 @@ function registerIpc(win: BrowserWindow): void {
   // I-1（2026-10-12，客户裁定 arm——「现在开放 shell…如果 su 觉得危险可以让客户决定」）+ I-1 补丁
   // （2026-10-12 客户**重发授权**：接上 (c) 规则集实件）：arm 的**两件**——(c) 实件（`classifyShell` +
   // `defaultShellRules`，经 `buildDesktopShellArming` 只读导入）与 (a) 操作者确认通道——**同处接线**，
-  // 经 `createDesktopInterface` → 会话构造路径交给**编排**装配 (c)/(b)/(a) `ShellGate`；
-  // **只对项目角色**生效（session.ts 的 `role.builtIn` 判据——su 自身不 arm）。
+  // 经 `createDesktopInterface` → 会话构造路径交给**编排**装配 `ShellGate`。**两种会话、两档闸**：
+  // **项目角色**走 (c)/(b)/(a) 三层链；**内置治理角色（su）**用**同一份 (c) 实件**经 `shellReadonly`
+  // 装配**只读档**（客户裁定 2026-10-12「su 也要有 shell，但是只读」——su 不接 (b)/(a)：不自审、不弹框）
+  // ——单一来源，两档永不漂移（分发在 session.ts 的 `role.builtIn` 判据处）。
   //
   // **两件同备才 arm（fail-closed）**：(c) 实件构造/加载失败 ⇒ **连 (a) 通道也不注入**——`run_shell`
-  // 不注册（能力缺席即最强 fail-closed；不取「注册了但全拒」的半装态）。如实告知到主进程日志（无敏感值）。
+  // 不注册（能力缺席即最强 fail-closed；不取「注册了但全拒」的半装态；su 只读档同此——缺件即不 arm）。
+  // 如实告知到主进程日志（无敏感值）。
   const shellArming = DESKTOP_SHELL_GATE_ARMED ? buildDesktopShellArming() : undefined;
   if (DESKTOP_SHELL_GATE_ARMED && shellArming === undefined) {
     console.warn("shell 闸未 arm：(c) 规则集加载失败——fail-closed（run_shell 不注册）。");
@@ -249,9 +254,10 @@ function registerIpc(win: BrowserWindow): void {
     customerInput: customerChannel.customerInput,
     // B-1：Markdown 链接外开——**校验在 Interface 层**（仅 http/https），此处只接系统浏览器（表现层）。
     openExternalFn: (url) => shell.openExternal(url),
-    // I-1：arm 的 (a) 层（仅项目角色会话消费；见 session.ts）。未 arm 时为 undefined（等同不注入）。
+    // I-1：arm 的 (a) 层（仅项目角色会话消费——su 不接 (b)/(a)；见 session.ts）。未 arm 时为 undefined（等同不注入）。
     shellOperatorChannel,
     // I-1 补丁（2026-10-12 客户重发授权）：(c) 规则集实件（与 (a) 同处接线、同判据——两件同备才 arm）。
+    // 同一份对象也供 su 只读档（session.ts 对内置治理角色经 `shellReadonly` 复用——单一来源，两档不漂移）。
     shellArming,
     // K-2：选图（**渲染进程不碰文件**）——系统文件选择器 + 读文件；字节交 Interface **按真实内容**校验
     // （类型嗅探/≤5MB 都在 interface 层；此处只读不判）。取消 → null（如实回 `cancelled`）。
@@ -335,7 +341,8 @@ function registerIpc(win: BrowserWindow): void {
 
   // —— 操作者通道 (a)：**I-1 已 arm** ——
   // 构造与注入已在上方（`shellOperatorChannel` → `createDesktopInterface`）完成：arm 后 (a) 通道经会话构造
-  // 路径交给**编排**装配 (c)/(b)/(a) `ShellGate`，Pi 适配器据此注册 `run_shell`（仅项目角色；su 不 arm）。
+  // 路径交给**编排**装配三层链 `ShellGate`，Pi 适配器据此注册 `run_shell`（**仅项目角色**；su 不接 (b)/(a)
+  // ——其 shell 走只读档，复用同一份 (c) 实件经 `shellReadonly`）。
   // fail-closed 三条（关窗/取消/拒绝/超时/抛错 → 不放行）见 `app/desktop/operator-channel.ts`。
 }
 

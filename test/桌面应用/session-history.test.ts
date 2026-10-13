@@ -18,6 +18,8 @@ import {
   sessionsDirFor,
   SESSIONS_REL_DIR,
 } from "../../app/desktop/session-history.ts";
+// 锚点键的两侧单源（真机缺陷修复 2026-10-12）：回放侧（本文件）与请求侧（customer-input 载荷）用同一算法。
+import { anchorKeyForToolCall, interactionAnchorKey } from "../../app/desktop/request-anchor.ts";
 
 const header = (id = "s1") =>
   JSON.stringify({ type: "session", version: 3, id, timestamp: "2026-10-12T01:00:00.000Z", cwd: "/proj" });
@@ -70,8 +72,7 @@ test("D-1 防御式：坏行/未知 entry/未知 role 跳过不抛（计入 skip
   assert.equal(parseSessionJsonl("").ok, false, "空文件 → 失败");
 });
 
-test("D-1 pickLatestSessionFile：mtime 大者优先；并列取名字大者（确定性）", () => {
-  assert.equal(pickLatestSessionFile([]), null);
+test("D-1 pickLatestSessionFile：mtime 大者优先；并列取名字大者（确定性）", () => {  assert.equal(pickLatestSessionFile([]), null);
   assert.equal(pickLatestSessionFile([{ name: "a.jsonl", mtimeMs: 1 }, { name: "b.jsonl", mtimeMs: 2 }]), "b.jsonl");
   assert.equal(pickLatestSessionFile([{ name: "a.jsonl", mtimeMs: 5 }, { name: "b.jsonl", mtimeMs: 5 }]), "b.jsonl", "并列取名字大者");
 });
@@ -135,4 +136,86 @@ test("D-1 readRoleSessionHistory：无目录=无历史（ok）；挑最近文件
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
+});
+
+// ————————————————— 锚点标识（真机缺陷修复 2026-10-12：「已决卡切走再切回跑到聊天流最末尾」） —————————————————
+// 会话回放行把交互工具（request_confirmation / request_choice）的「调用行」与「结论行」带上同一标识
+// （requestId＝pi toolCallId、anchor、anchorKey）——渲染侧据此把交互卡（重）物化到它发生的位置。
+
+test("锚点标识：request_confirmation 的调用行与结论行带同一 requestId/anchorKey（toolCallId 配对，不解析正文）", () => {
+  const text = [
+    header(),
+    msgEntry("e1", { role: "user", content: "请创建角色", timestamp: 1 }),
+    msgEntry("e2", {
+      role: "assistant",
+      content: [
+        { type: "text", text: "先请你确认。" },
+        { type: "toolCall", id: "call_00_abc", name: "request_confirmation", arguments: { title: "写入 3 个文件：docs/design/…", detail: "d" } },
+      ],
+      timestamp: 2,
+    }),
+    msgEntry("e3", {
+      role: "toolResult",
+      toolCallId: "call_00_abc",
+      toolName: "request_confirmation",
+      content: [{ type: "text", text: "request_confirmation：客户已确认「写入 3 个文件：docs/design/…」（confirmed:true；操作者：wzr）" }],
+      timestamp: 3,
+    }),
+  ].join("\n");
+  const r = parseSessionJsonl(text);
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.rows.map((x) => x.kind), ["user", "assistant", "tool", "tool"], "assistant 文本与 toolCall 拆两行");
+  const call = r.rows[2];
+  const concl = r.rows[3];
+  assert.equal(call.text, "调用工具 request_confirmation", "调用行照旧（文本不变——只加标识）");
+  assert.equal(call.requestId, "call_00_abc", "调用行带 pi toolCallId");
+  assert.equal(call.anchor, "request", "调用行标 anchor=request");
+  assert.equal(concl.requestId, "call_00_abc", "结论行凭 toolCallId 对上**同一个** requestId");
+  assert.equal(concl.anchor, "conclusion", "结论行标 anchor=conclusion");
+  assert.equal(call.anchorKey, concl.anchorKey, "两行 anchorKey 相同（请求—结论彼此相认）");
+  assert.equal(call.anchorKey, interactionAnchorKey("confirm", "写入 3 个文件：docs/design/…"), "键由请求本体 kind+title 单一算法拼出（与请求侧同源）");
+  // 锚点键来自请求参数的 title（arguments.title 原样）——不解析结论正文。
+  assert.equal(anchorKeyForToolCall("request_confirmation", { title: "写入 3 个文件：docs/design/…" }), call.anchorKey);
+});
+
+test("锚点标识：request_choice 同样配对；非交互工具/缺 title/孤儿结论一概不着锚（其余行零变化）", () => {
+  const text = [
+    header(),
+    msgEntry("e1", {
+      role: "assistant",
+      content: [{ type: "toolCall", id: "call_choice", name: "request_choice", arguments: { title: "选目录名", options: [{ id: "a", label: "a" }] } }],
+      timestamp: 1,
+    }),
+    msgEntry("e2", { role: "toolResult", toolCallId: "call_choice", toolName: "request_choice", content: [{ type: "text", text: "request_choice：客户已选择（a）" }], timestamp: 2 }),
+    // 非交互工具：不着锚。
+    msgEntry("e3", { role: "assistant", content: [{ type: "toolCall", id: "call_read", name: "read_file", arguments: { path: "docs/x.md" } }], timestamp: 3 }),
+    msgEntry("e4", { role: "toolResult", toolCallId: "call_read", toolName: "read_file", content: [{ type: "text", text: "内容" }], timestamp: 4 }),
+    // 交互工具但缺 title（工具层本就会拒——成不了请求）：不着锚。
+    msgEntry("e5", { role: "assistant", content: [{ type: "toolCall", id: "call_nt", name: "request_confirmation", arguments: {} }], timestamp: 5 }),
+    // 孤儿结论（结论在前、调用行不在解析范围内/被跳过）：不着锚（如实）。
+    msgEntry("e6", { role: "toolResult", toolCallId: "call_orphan", toolName: "request_confirmation", content: [{ type: "text", text: "x" }], timestamp: 6 }),
+  ].join("\n");
+  const r = parseSessionJsonl(text);
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.rows.map((x) => x.kind), ["tool", "tool", "tool", "tool", "tool", "tool"]);
+  const choiceCall = r.rows[0];
+  const choiceConcl = r.rows[1];
+  assert.equal(choiceCall.requestId, "call_choice");
+  assert.equal(choiceConcl.requestId, "call_choice");
+  assert.equal(choiceCall.anchorKey, interactionAnchorKey("choice", "选目录名"));
+  assert.equal(choiceCall.anchorKey, choiceConcl.anchorKey);
+  // 非交互/缺 title/孤儿：无任何锚点字段（如实——渲染侧不误配）。
+  for (const i of [2, 3, 4, 5]) {
+    assert.equal(r.rows[i].requestId, undefined, `行 ${i} 不着锚（requestId 缺省）`);
+    assert.equal(r.rows[i].anchorKey, undefined, `行 ${i} 不着锚（anchorKey 缺省）`);
+    assert.equal(r.rows[i].anchor, undefined, `行 ${i} 不着锚（anchor 缺省）`);
+  }
+  // 直接单测：未知工具名 / 非对象 args / 空 title ⇒ null。
+  assert.equal(anchorKeyForToolCall("read_file", { title: "x" }), null);
+  assert.equal(anchorKeyForToolCall("request_confirmation", "不是对象"), null);
+  assert.equal(anchorKeyForToolCall("request_confirmation", { title: "" }), null);
+  assert.equal(anchorKeyForToolCall("request_confirmation", { title: 42 }), null);
+  // 同一请求本体的两侧键逐字相等（请求侧 interactionAnchorKey ↔ 回放侧 anchorKeyForToolCall）。
+  assert.equal(interactionAnchorKey("confirm", "T"), anchorKeyForToolCall("request_confirmation", { title: "T" }));
+  assert.equal(interactionAnchorKey("choice", "T"), anchorKeyForToolCall("request_choice", { title: "T" }));
 });

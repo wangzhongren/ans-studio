@@ -246,8 +246,9 @@ async function run() {
   log("SU_CLICKED=" + suClicked);
   log("SU_NO_MODAL=" + !(await modalExists()));
   log("SU_CHAT_HEADER=" + (await wc().executeJavaScript("document.getElementById('chat-role').textContent")));
-  log("SU_SESSION_STATE=" + (await wc().executeJavaScript("document.getElementById('session-state').textContent")));
-  log("SU_HAS_WELCOME=" + (await wc().executeJavaScript("document.querySelector('#chat').textContent.includes('已开启与角色 su')")));
+  log("SU_SESSION_STATE=" + (await wc().executeJavaScript("document.getElementById('chat').dataset.state || '(none)'"))); // 状态 pill 已删：kind 程序化保留在 data-state
+  // 客户裁定（2026-10-13）：聊天流**不再有**常规「已开启与角色 X 的会话…」欢迎提示（守卫「它不在」）。
+  log("SU_NO_WELCOME=" + (await wc().executeJavaScript("!document.querySelector('#chat').textContent.includes('已开启与角色')")));
   // 守卫（客户 2026-10-11 裁定）：su **不该**有「只读」徽标与「本版只读」内联说明——客户回到
   // 「导入项目 = 授权；门禁静默执行、拒绝在聊天流内联显示；用户对边界无感」的原模型，「只读」徽标偏离了
   // 这条，故移除。此处断言它**没有出现**（守卫「它不该出现」，不是删断言）。su 那行应只剩「主入口」「内置」。
@@ -273,8 +274,8 @@ async function run() {
   await sleep(1200);
   log("NO_MODAL_AFTER_ROLE_CLICK=" + !(await modalExists()));
   log("CHAT_HEADER_ROLE=" + (await wc().executeJavaScript("document.getElementById('chat-role').textContent")));
-  log("SESSION_STATE=" + (await wc().executeJavaScript("document.getElementById('session-state').textContent")));
-  log("HAS_WELCOME=" + (await wc().executeJavaScript("document.querySelector('#chat').textContent.includes('已开启与角色')")));
+  log("SESSION_STATE=" + (await wc().executeJavaScript("document.getElementById('chat').dataset.state || '(none)'"))); // 同上
+  log("NO_WELCOME_AFTER_OPEN=" + (await wc().executeJavaScript("!document.querySelector('#chat').textContent.includes('已开启与角色')")));
   log("USER_BUBBLES_BEFORE=" + (await wc().executeJavaScript("document.querySelectorAll('#chat .msg-user').length")));
   // 可写的项目角色（桌面应用）：同样**不该**带「只读」标记，聊天流内亦无只读说明（守卫「它不该出现」）。
   const desktopRole = await wc().executeJavaScript(
@@ -308,7 +309,7 @@ async function run() {
   log("SYS_ROWS=" + kinds.join(" | "));
   void kindList;
   log("ACCEPTED_ROWS=" + (await wc().executeJavaScript("document.querySelectorAll('#chat .sys-ok').length")));
-  log("SESSION_STATE_AFTER=" + (await wc().executeJavaScript("document.getElementById('session-state').textContent")));
+  log("SESSION_STATE_AFTER=" + (await wc().executeJavaScript("document.getElementById('chat').dataset.state || '(none)'"))); // 同上
   log("SHOT_02_CHAT=" + (await shot("02-chat.png")));
 
   // 4) 展开拒绝详情（内联、可展开看允许路径）
@@ -323,10 +324,19 @@ async function run() {
   );
   await sleep(500);
   log("RESUME_HINT=" + (await wc().executeJavaScript("document.getElementById('composer-hint').textContent")));
-  log("SESSION_STATE_AFTER_RESUME=" + (await wc().executeJavaScript("document.getElementById('session-state').textContent")));
+  log("SESSION_STATE_AFTER_RESUME=" + (await wc().executeJavaScript("document.getElementById('chat').dataset.state || '(none)'"))); // 同上
   log("NO_MODAL_AFTER_RESUME=" + !(await modalExists()));
 
-  // 6) 右栏资料（角色卡 / 边界 / 变更记录 / 文档 分组）
+  // 6) 右栏抽屉（客户裁定 2026-10-13：右栏不常驻，收成右上角图标簇；点开展示、再点收起）：
+  //    先断言默认收起，点 tab-card 展示 → 资料四组（角色卡/边界/变更/文档）在抽屉内；再点收起。
+  log("TABS_PRESENT=" + (await wc().executeJavaScript("['tab-card','tab-todo','tab-queue','tab-pi'].every(id=>!!document.getElementById(id))")));
+  log("NO_RIGHT_COLUMN=" + (await wc().executeJavaScript("!document.querySelector('.col-right')")));
+  log("DRAWER_DEFAULT_CLOSED=" + (await wc().executeJavaScript("!document.getElementById('right-drawer').classList.contains('open')")));
+  await wc().executeJavaScript("document.getElementById('tab-card').click()");
+  await sleep(400);
+  log("DRAWER_OPENS_ON_TAB=" + (await wc().executeJavaScript("(() => { const d=document.getElementById('right-drawer'); return d.classList.contains('open') && d.getBoundingClientRect().right <= window.innerWidth + 1; })()")));
+  log("TAB_CARD_ACTIVE=" + (await wc().executeJavaScript("document.getElementById('tab-card').classList.contains('active')")));
+  log("DRAWER_TITLE_CARD=" + (await wc().executeJavaScript("(document.getElementById('drawer-title')||{textContent:''}).textContent")));
   await wc().executeJavaScript(
     "[...document.querySelectorAll('#right-body details.sec > summary')].forEach(s=>{ if(!s.parentElement.open) s.click(); });",
   );
@@ -339,6 +349,23 @@ async function run() {
   // N-2（2026-10-12 客户裁定）：角色卡已走 Markdown（标题成 <h1> 标签）；且无 <script> 注入口。
   log("RIGHT_CARD_MD_RENDERED=" + right.mdCard);
   log("RIGHT_CARD_MD_NO_SCRIPT=" + right.mdNoScript);
+  // 再点同图标 = 收起；Esc 也能收起（开 → Esc → 收）。
+  await wc().executeJavaScript("document.getElementById('tab-card').click()");
+  await sleep(300);
+  log("DRAWER_TOGGLES_CLOSED=" + (await wc().executeJavaScript("!document.getElementById('right-drawer').classList.contains('open')")));
+  await wc().executeJavaScript("document.getElementById('tab-todo').click()");
+  await sleep(200);
+  await wc().executeJavaScript("document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))");
+  await sleep(200);
+  log("DRAWER_ESC_CLOSES=" + (await wc().executeJavaScript("!document.getElementById('right-drawer').classList.contains('open')")));
+  // 角标继承（收起不丢信息）：注入该角色的真实快照（排队 2 条）→ 收起状态下待办/队列图标角标仍显示。
+  await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面应用', busy: true, summaries: ['你：排队一', '你：排队二'], queue: [{kind:'message',sourceRoleId:'桌面应用',summary:'你：排队一',at:'2026-10-13T03:00:00.000Z'},{kind:'dispatch',sourceRoleId:'su',summary:'派发 · 来自 su：做X',at:'2026-10-13T03:01:00.000Z'}], running: null })");
+  await sleep(200);
+  log("BADGES_WHILE_COLLAPSED_TODO=" + (await wc().executeJavaScript("(() => { const b=document.querySelector('#tab-todo .tab-badge'); return !!b && !b.hidden && b.textContent === '2'; })()")));
+  log("BADGES_WHILE_COLLAPSED_QUEUE=" + (await wc().executeJavaScript("(() => { const b=document.querySelector('#tab-queue .tab-badge'); return !!b && !b.hidden && b.textContent === '2'; })()")));
+  await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面应用', busy: false, summaries: [], queue: [], running: null })");
+  await sleep(150);
+  log("BADGES_CLEAR_ON_EMPTY=" + (await wc().executeJavaScript("document.querySelector('#tab-todo .tab-badge').hidden && document.querySelector('#tab-queue .tab-badge').hidden")));
   log("SHOT_04_PROFILE=" + (await shot("04-profile.png")));
 
   // 7) 守卫（客户 2026-10-11 裁定：去掉运行时选择器、默认跑 pi）——断言**它不存在**。
@@ -350,7 +377,8 @@ async function run() {
   log("NO_RT_SELECT_CLASS=" + (!noSelector.rtSel));
   log("NO_SELECT_ELEMENTS=" + (noSelector.selects === 0));
   log("RUNTIME_NOTE_IN_HEADER=" + (await wc().executeJavaScript("!!document.querySelector('.chat-head #runtime-note')")));
-  log("PI_SETTINGS_IN_HEADER=" + (await wc().executeJavaScript("!!document.querySelector('.chat-head #btn-pi-settings')")));
+  log("NO_PI_BUTTON_IN_HEADER=" + (await wc().executeJavaScript("!document.querySelector('.chat-head #btn-pi-settings') && !document.querySelector('.chat-head #btn-stop') && !document.getElementById('session-state')"))); // 客户 2026-10-13：Pi 入口上移图标簇、结束会话/状态 pill 删除
+  log("PI_ENTRY_IN_TABS=" + (await wc().executeJavaScript("!!document.querySelector('#right-tabs #tab-pi')")));
   log("RUNTIME_NOTE_SAYS_PI_WRITES=" + (await wc().executeJavaScript("document.getElementById('runtime-note').textContent.includes('真正落到你导入的项目')")));
   log("RUNTIME_NOTE_ONE_LINE_GATED=" + (await wc().executeJavaScript("document.getElementById('runtime-note').textContent.includes('越界写会在写之前被拒')")));
   // 底部输入区（K-1 起：附件行 + **胶囊输入框**〔内嵌发送箭头〕两行；无选择器、无提示行、无 Pi 面板、
@@ -447,7 +475,8 @@ async function run() {
   log("RESTORE_BADGE_IS_RESTORED=" + (await wc().executeJavaScript("(() => { const it=[...document.querySelectorAll('#role-tree .tree-item')].find((e)=>e.querySelector('.ti-name').textContent==='示例角色'); const s=it && it.querySelector('.ti-status'); return !!s && s.className.includes('st-restored') && s.textContent.includes('空闲（已恢复）'); })()")));
   await wc().executeJavaScript("window.__ansRenderer.selectRole('示例角色')");
   await sleep(600);
-  log("RESTORE_DIVIDER_TEXT=" + (await wc().executeJavaScript("(document.querySelector('#chat .sys-replay-divider .sys-text')||{textContent:''}).textContent")));
+  // 客户裁定（2026-10-13）：常规「会话已恢复…」分隔行已删——成功回放不得出现分隔行（错误分支除外）。
+  log("RESTORE_NO_SUCCESS_DIVIDER=" + (await wc().executeJavaScript("document.querySelector('#chat .sys-replay-divider') === null")));
   log("RESTORE_ROWS_PRESENT=" + (await wc().executeJavaScript("document.querySelectorAll('#chat .is-replay').length > 0")));
   log("RESTORE_MD_RENDERED=" + (await wc().executeJavaScript("!!document.querySelector('#chat .msg-assistant.is-replay strong')")));
   // D-1 契约：失真文案「模型上下文已重启」已退役——恢复场景不得出现它（文案分支由 role-status.js 唯一映射）。
@@ -697,6 +726,8 @@ async function run() {
 
   // N-3（2026-10-12 追加；客户「代办也要在右边显示」）：右栏「待办 / 队列」——夹具注入 → 逐条渲染 +
   // 「进行中」在最前 + 空占位（数据经 role-state 真实快照通道；此处直接注入该通道的载荷）。
+  await wc().executeJavaScript("document.getElementById('tab-todo').click()");
+  await sleep(300);
   await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面应用', busy: true, summaries: ['你：排队一'], queue: [{kind:'message', sourceRoleId:'桌面应用', summary:'你：排队一', at:'2026-10-12T03:00:00.000Z'},{kind:'dispatch', sourceRoleId:'su', summary:'派发 · 来自 su：做X', at:'2026-10-12T03:01:00.000Z'}], running: {kind:'handback', sourceRoleId:'A', summary:'回交投递 · 来自 A', at:'2026-10-12T02:59:00.000Z'} })");
   await sleep(200);
   log("RIGHT_QUEUE_SECTION=" + (await wc().executeJavaScript("!!document.querySelector('#right-body #right-queue-body')")));
@@ -706,6 +737,16 @@ async function run() {
   await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面应用', busy: false, summaries: [], queue: [], running: null })");
   await sleep(150);
   log("RIGHT_QUEUE_EMPTY_PLACEHOLDER=" + (await wc().executeJavaScript("document.querySelector('#right-queue-body').textContent.includes('（无待办）')")));
+  // 队列概览 tab：排队条目位次视图（内容与待办同快照、视图不同）；随后收起抽屉，不影响后续聊天流断言。
+  await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面应用', busy: false, summaries: ['你：排队一','你：排队二'], queue: [{kind:'message', sourceRoleId:'桌面应用', summary:'你：排队一', at:'2026-10-12T03:00:00.000Z'},{kind:'dispatch', sourceRoleId:'su', summary:'派发 · 来自 su：做X', at:'2026-10-12T03:01:00.000Z'}], running: null })");
+  await sleep(150);
+  await wc().executeJavaScript("document.getElementById('tab-queue').click()");
+  await sleep(300);
+  log("QUEUE_TAB_OVERVIEW_ROWS=" + (await wc().executeJavaScript("document.querySelectorAll('#right-body .queue-list .q-item').length")));
+  log("QUEUE_TAB_ACTIVE=" + (await wc().executeJavaScript("document.getElementById('tab-queue').classList.contains('active')")));
+  await wc().executeJavaScript("document.getElementById('tab-queue').click()");
+  await sleep(200);
+  log("DRAWER_CLOSED_AFTER_N3=" + (await wc().executeJavaScript("!document.getElementById('right-drawer').classList.contains('open')")));
 
   // P-1（2026-10-12 真机：su 的卡被 288 行活动淹掉、客户以为卡丢了）：到达即达 + 常驻 chip + 逐张定位 + 切回滚到卡。
   // 先造一屏高内容（40 行）并把视口拉到底，再注入待确认卡。
@@ -755,6 +796,185 @@ async function run() {
   await sleep(300);
   log("P1_CLEANUP_CHIP_HIDDEN=" + (await wc().executeJavaScript("document.getElementById('op-chip').hidden")));
 
+  // 真机缺陷修复（2026-10-12「已确认的卡切走再切回变成最下面」）：交互卡**锚点物化**——「回放重建 + 已决卡」
+  // 时序断言（上次暴露时序类 bug 的正是本 harness，故钉在这里）。夹具：临时项目 + su 会话 JSONL（含
+  // request_confirmation 调用行+结论行）→ 回放重建 pane → 真通道发**同题**请求（卡，首物化=当时行表尾=
+  // 它发生的位置）→ 作答（decided）→ 灌 200 行触发**窗口化**（卡行离屏脱挂）→ 切走/切回 ×2（客户动作）
+  // → 断言行模型：恰**一条**卡行（不重建重复行）、行序索引**恒定在锚点**、绝不落到行表尾；未决卡同法回归。
+  const anchorProj = fs.mkdtempSync(path.join(OUTDIR, "anchor-"));
+  const rdirAnchor = path.join(anchorProj, "角色卡", "示例角色");
+  fs.mkdirSync(rdirAnchor, { recursive: true });
+  fs.writeFileSync(path.join(rdirAnchor, "role-card.md"), "# 示例角色\n");
+  fs.writeFileSync(path.join(rdirAnchor, "boundary.yaml"), "entries:\n  - kind: file\n    path: src/x.ts\n    purpose: t\n");
+  const sessAnchor = path.join(anchorProj, ".ans", "sessions", "su");
+  fs.mkdirSync(sessAnchor, { recursive: true });
+  const ANCHOR_TITLE = "写入 3 个文件：docs/design/…";
+  const mkAnchorHeader = (id) => JSON.stringify({ type: "session", version: 3, id, timestamp: "2026-10-12T01:00:00.000Z", cwd: anchorProj });
+  const mkAnchorMsg = (id, message) => JSON.stringify({ type: "message", id, parentId: null, timestamp: "2026-10-12T01:00:01.000Z", message });
+  fs.writeFileSync(
+    path.join(sessAnchor, "s.jsonl"),
+    [
+      mkAnchorHeader("anchor1"),
+      mkAnchorMsg("h1", { role: "user", content: "请创建文档骨架" }),
+      mkAnchorMsg("h2", { role: "assistant", content: [{ type: "text", text: "好的，先请你确认。" }] }),
+      mkAnchorMsg("h3", { role: "assistant", content: [{ type: "toolCall", id: "call_anchor_1", name: "request_confirmation", arguments: { title: ANCHOR_TITLE } }] }),
+      mkAnchorMsg("h4", { role: "toolResult", toolCallId: "call_anchor_1", toolName: "request_confirmation", content: [{ type: "text", text: "request_confirmation：客户已确认「" + ANCHOR_TITLE + "」（confirmed:true；操作者：e2e）" }] }),
+      mkAnchorMsg("h5", { role: "assistant", content: "已完成落盘并读回。" }),
+    ].join("\n"),
+  );
+  await wc().executeJavaScript("window.__ansRenderer.loadProject(" + JSON.stringify(anchorProj) + ")");
+  await sleep(700);
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('su')");
+  await sleep(1000);
+  // 回放锚点表：调用行/结论行被登记且相邻（conclusion = request + 1）。
+  log("ANCHOR_TABLE_REGISTERED=" + (await wc().executeJavaScript(
+    "(() => { const a=window.__ansRenderer.replayAnchorDebug('su'); return a.length===1 && a[0].requestIndex!==null && a[0].conclusionIndex!==null && a[0].conclusionIndex===a[0].requestIndex+1; })()",
+  )));
+  // 同题请求（真通道）：卡首物化=当时行表尾（首次到达不加锚——它就是当下最新事件）。
+  const pAnchor = customerChannel.customerInput({ kind: "confirm", title: ANCHOR_TITLE, detail: "回放后的重新确认" }, { roleId: "su" });
+  await sleep(400);
+  const anchorAtArrival = await wc().executeJavaScript("(() => { const m=window.__ansRenderer.rowModelDebug('su'); return m && m.operators.length===1 ? m.operators[0].index : -1; })()");
+  log("ANCHOR_CARD_AT_ARRIVAL=" + anchorAtArrival);
+  await wc().executeJavaScript("(() => { const c=document.querySelector('#chat .op-request'); if (c) c.querySelector('.op-confirm').click(); })()");
+  await sleep(300);
+  const oAnchor = await pAnchor;
+  log("ANCHOR_CARD_ANSWERED=" + (!!oAnchor && oAnchor.outcome === "answered"));
+  // 灌 200 行 → 窗口化（卡行离屏脱挂——旧缺陷据此在切回时重建落尾）。
+  const anchorFill = [];
+  for (let i = 0; i < 200; i += 1) anchorFill.push({ roleId: "su", event: { kind: "tool_call", summary: "锚点填充行 read_file：docs/a-" + i + ".md" } });
+  wc().send("session:events", anchorFill);
+  await sleep(700);
+  const anchorCheck = "(() => { const m=window.__ansRenderer.rowModelDebug('su'); return JSON.stringify({ count:m.count, last:m.lastIndex, ops:m.operators }); })()";
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('示例角色')");
+  await sleep(800);
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('su')");
+  await sleep(900);
+  const anchorAfter1 = JSON.parse(await wc().executeJavaScript(anchorCheck));
+  log("ANCHOR_ROW_AFTER_SWITCHBACK=" + JSON.stringify(anchorAfter1));
+  log("ANCHOR_STABLE_NOT_TAIL_ONCE=" + (anchorAfter1.ops.length === 1 && anchorAfter1.ops[0].index === anchorAtArrival && anchorAfter1.ops[0].index < anchorAfter1.last));
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('示例角色')");
+  await sleep(600);
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('su')");
+  await sleep(800);
+  const anchorAfter2 = JSON.parse(await wc().executeJavaScript(anchorCheck));
+  log("ANCHOR_STABLE_NOT_TAIL_TWICE=" + (anchorAfter2.ops.length === 1 && anchorAfter2.ops[0].index === anchorAtArrival && anchorAfter2.ops[0].index < anchorAfter2.last));
+  log("ANCHOR_NO_DUPLICATE_ROW=" + (anchorAfter2.ops.length === 1));
+  // 开卡回归（未决卡行为不变）：再发一张**未答**的卡 → 切走/切回 → 行序索引同样恒定；P-1 chip 照常亮。
+  const pOpenAnchor = customerChannel.customerInput({ kind: "confirm", title: "未决回归卡", detail: "open 卡落位回归" }, { roleId: "su" });
+  await sleep(400);
+  const openAtArrival = await wc().executeJavaScript("(() => { const m=window.__ansRenderer.rowModelDebug('su'); return m && m.operators.length===2 ? m.operators[1].index : -1; })()");
+  log("OPEN_CARD_AT_ARRIVAL=" + openAtArrival);
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('示例角色')");
+  await sleep(700);
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('su')");
+  await sleep(900);
+  const openAfter = JSON.parse(await wc().executeJavaScript(anchorCheck));
+  // 未决卡回归口径：**索引恒定**（=到达时的锚点）且不重复建行。它到达后没有后续行 ⇒ 其锚点恰为当时行表尾
+  // （「≠行表尾」的时序断言由上面的已决卡承担——它后面还有 200 行填充）。
+  log("OPEN_CARD_ROWS_AFTER_SWITCHBACK=" + JSON.stringify(openAfter));
+  log("OPEN_CARD_STABLE_AT_ANCHOR=" + (openAfter.ops.length === 2 && openAfter.ops[1].index === openAtArrival));
+  log("OPEN_CARD_CHIP_VISIBLE=" + (await wc().executeJavaScript("(() => { const el=document.getElementById('op-chip'); return !!el && !el.hidden && el.textContent.includes('有 1 条待确认'); })()")));
+  // 清理：把未决卡作答掉（探针卡无主进程挂起 ⇒ expired 终态；chip 灭，不影响后续步骤），回到仓库根项目。
+  await wc().executeJavaScript("(() => { const cs=document.querySelectorAll('#chat .op-request'); const c=cs[cs.length-1]; const b=c && c.querySelector('.op-deny'); if(b) b.click(); })()");
+  await sleep(300);
+  log("OPEN_CARD_CLEANED_CHIP_HIDDEN=" + (await wc().executeJavaScript("document.getElementById('op-chip').hidden")));
+  log("SHOT_15_ANCHOR=" + (await shot("15-anchor-reanchor.png")));
+  // 回到仓库根项目并恢复 S-1 段的前置（挂载的 pane = 桌面应用——loadProject 会重置选中为主入口）。
+  await wc().executeJavaScript("window.__ansRenderer.loadProject(" + JSON.stringify(REPO_ROOT) + ")");
+  await sleep(500);
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面应用')");
+  await sleep(1000);
+
+  // S-1（2026-10-12 客户「现在输出不会让滚动条滚动到最底下了」）：**长会话贴底回归**。
+  // 触发窗口化（>150 行）后持续追加输出：① 在底部 ⇒ 必须**保持贴底**；② 上翻 ⇒ 新输出**不得拽回**。
+  const s1dist = "(function(){ const c=document.getElementById('chat'); return Math.round(c.scrollHeight-c.scrollTop-c.clientHeight); })()";
+  for (let i = 0; i < 200; i += 1) {
+    wc().send("session:event", { roleId: "桌面应用", event: { kind: "tool_call", summary: "S-1 填充行 read_file：docs/s1-" + i + ".md" } });
+  }
+  await sleep(800);
+  log("S1_WINDOWED_ACTIVE=" + (await wc().executeJavaScript("document.querySelectorAll('#chat .chat-pane > .virt-spacer').length === 2")));
+  await wc().executeJavaScript("(() => { const c=document.getElementById('chat'); c.scrollTop = c.scrollHeight; })()");
+  await sleep(200);
+  // ① 贴底场景：分 3 批追加 30 行（模拟合帧流式输出），每批后测距底像素。
+  for (let b = 0; b < 3; b += 1) {
+    const arr = [];
+    for (let i = 0; i < 10; i += 1) arr.push({ roleId: "桌面应用", event: { kind: "tool_call", summary: "S-1 流式追加 b" + b + "-" + i } });
+    wc().send("session:events", arr); // Q-1 合帧形态（生产热路径：批量数组）
+    await sleep(250);
+  }
+  await sleep(300);
+  const s1DistAtBottom = await wc().executeJavaScript(s1dist);
+  log("S1_STICK_AT_BOTTOM_DIST=" + s1DistAtBottom);
+  log("S1_STICK_AT_BOTTOM=" + (s1DistAtBottom <= 8));
+  // ② 上翻场景：滚到中段 → 追加 20 行 ⇒ scrollTop 不得被拽动。
+  await wc().executeJavaScript("(() => { const c=document.getElementById('chat'); c.scrollTop = Math.max(0, c.scrollHeight - c.clientHeight - 1200); })()");
+  await sleep(200);
+  const s1TopBefore = await wc().executeJavaScript("Math.round(document.getElementById('chat').scrollTop)");
+  const upBatch = [];
+  for (let i = 0; i < 20; i += 1) upBatch.push({ roleId: "桌面应用", event: { kind: "tool_call", summary: "S-1 上翻期追加 " + i } });
+  wc().send("session:events", upBatch); // 合帧形态：上翻期的新输出不得拽回
+  await sleep(500);
+  const s1TopAfter = await wc().executeJavaScript("Math.round(document.getElementById('chat').scrollTop)");
+  log("S1_NOT_YANKED=" + (s1TopAfter === s1TopBefore || Math.abs(s1TopAfter - s1TopBefore) <= 2));
+  log("S1_STAYED_AWAY_FROM_BOTTOM=" + ((await wc().executeJavaScript(s1dist)) > 900));
+  // ③ 回底后再输出 ⇒ 恢复贴底（双向语义的第三点）。
+  await wc().executeJavaScript("(() => { const c=document.getElementById('chat'); c.scrollTop = c.scrollHeight; })()");
+  await sleep(200);
+  for (let i = 0; i < 10; i += 1) {
+    wc().send("session:event", { roleId: "桌面应用", event: { kind: "tool_call", summary: "S-1 回底再输出 " + i } });
+  }
+  await sleep(400);
+  const s1DistAgain = await wc().executeJavaScript(s1dist);
+  log("S1_STICK_AGAIN_DIST=" + s1DistAgain);
+  log("S1_STICK_AGAIN=" + (s1DistAgain <= 8));
+
+  // S-1 附带：**常规路径（<150 行，不窗口化）**同款双向断言（su 的小 pane）。
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('su')");
+  await sleep(900);
+  const small = [];
+  for (let i = 0; i < 3; i += 1) small.push({ roleId: "su", event: { kind: "tool_call", summary: "S-1 小 pane 行 " + i } });
+  wc().send("session:events", small);
+  await sleep(400);
+  await wc().executeJavaScript("(() => { const c=document.getElementById('chat'); c.scrollTop = c.scrollHeight; })()");
+  await sleep(150);
+  const small2 = [];
+  for (let i = 0; i < 3; i += 1) small2.push({ roleId: "su", event: { kind: "tool_call", summary: "S-1 小 pane 续 " + i } });
+  wc().send("session:events", small2);
+  await sleep(400);
+  const smallDist = await wc().executeJavaScript(s1dist);
+  log("S1_SMALL_PANE_STICK_DIST=" + smallDist);
+  log("S1_SMALL_PANE_STICK=" + (smallDist <= 8));
+  await wc().executeJavaScript("(() => { const c=document.getElementById('chat'); c.scrollTop = 0; })()");
+  await sleep(150);
+  const smallTopBefore = await wc().executeJavaScript("Math.round(document.getElementById('chat').scrollTop)");
+  const small3 = [];
+  for (let i = 0; i < 3; i += 1) small3.push({ roleId: "su", event: { kind: "tool_call", summary: "S-1 小 pane 上翻期 " + i } });
+  wc().send("session:events", small3);
+  await sleep(400);
+  const smallTopAfter = await wc().executeJavaScript("Math.round(document.getElementById('chat').scrollTop)");
+  log("S1_SMALL_PANE_NOT_YANKED=" + (Math.abs(smallTopAfter - smallTopBefore) <= 2));
+
+  // U-1（2026-10-12 客户裁定「点击这个角色，应该滚动到滚动条最下面」）：点角色 ⇒ 到底部（两条路径 + 重复点击）；
+  // 「有卡 ⇒ 滚到卡」的例外由 P-1 既有一组断言覆盖（本处只测无卡路径，互不影响）。
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面应用')");
+  await sleep(900);
+  const u1WindowedDist = await wc().executeJavaScript(s1dist);
+  log("U1_WINDOWED_TO_BOTTOM_DIST=" + u1WindowedDist);
+  log("U1_WINDOWED_TO_BOTTOM=" + (u1WindowedDist <= 8));
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('su')");
+  await sleep(900);
+  const u1NormalDist = await wc().executeJavaScript(s1dist);
+  log("U1_NORMAL_TO_BOTTOM_DIST=" + u1NormalDist);
+  log("U1_NORMAL_TO_BOTTOM=" + (u1NormalDist <= 8));
+  // 重复点击同一角色（pane 已在视图）⇒ 行为一致（仍到底部）。
+  await wc().executeJavaScript("(() => { const c=document.getElementById('chat'); c.scrollTop = 0; })()");
+  await sleep(150);
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('su')");
+  await sleep(600);
+  const u1RepeatDist = await wc().executeJavaScript(s1dist);
+  log("U1_REPEAT_TO_BOTTOM_DIST=" + u1RepeatDist);
+  log("U1_REPEAT_TO_BOTTOM=" + (u1RepeatDist <= 8));
+
   // 10) T28：Pi 配置面板——UI 渲染 + 经**注入的临时 .env**（OUTDIR 下，绝不碰仓库根真实 .env）读写往返。
   await wc().executeJavaScript("window.__ansRenderer.openPiPanel()");
   await sleep(400);
@@ -762,6 +982,7 @@ async function run() {
     "(() => { const p=document.getElementById('pi-panel'); const keys=window.__ansRenderer.piKeys; const adv=document.querySelector('#pi-panel .pi-advanced'); const cw=document.getElementById('pi-inp-ANS_PI_CONTEXT_WINDOW'); return { open: !!(p && !p.hidden), fieldCount: keys.filter(k=>!!document.getElementById('pi-inp-'+k)).length, keyCount: keys.length, hasProvider: !!document.getElementById('pi-inp-ANS_PI_PROVIDER'), tokenType: (document.getElementById('pi-inp-ANTHROPIC_AUTH_TOKEN')||{}).type, hasSaveBtn: !!document.getElementById('pi-save'), adv: !!adv, advOpen: !!(adv && adv.open), cwInAdv: !!(adv && cw && adv.contains(cw)), hint: (document.querySelector('#pi-panel .pi-advanced-hint')||{}).textContent||'' }; })()",
   );
   log("PI_PANEL_OPEN=" + panel.open);
+  log("PI_PANEL_IN_DRAWER=" + (await wc().executeJavaScript("(() => { const p=document.getElementById('pi-panel'), d=document.getElementById('right-drawer'); return !!p && !!d && d.contains(p) && d.classList.contains('open'); })()")));
   log("PI_FIELD_COUNT=" + panel.fieldCount);
   // 客户 2026-10-11：面板 3 项必填 + 1 项可选（共 4 键），provider 不再占输入框。
   log("PI_KEYS_ARE_FOUR=" + (panel.keyCount === 4));
@@ -798,6 +1019,10 @@ async function run() {
   log("PI_TOKEN_VALUE_CLEARED=" + (afterSave.value === ""));
   log("PI_TOKEN_PLACEHOLDER_SET=" + afterSave.placeholder.includes("已设置"));
   log("SHOT_10_PI_SAVED=" + (await shot("10-pi-saved.png")));
+  // 收起抽屉（再点 tab-pi），不影响后续步骤。
+  await wc().executeJavaScript("document.getElementById('tab-pi').click()");
+  await sleep(200);
+  log("DRAWER_CLOSED_AFTER_PI=" + (await wc().executeJavaScript("!document.getElementById('right-drawer').classList.contains('open')")));
 
   log("E2E_DONE=1");
 }
@@ -842,7 +1067,7 @@ app.whenReady().then(async () => {
   const watchdog = setTimeout(() => {
     try { fs.writeFileSync(path.join(OUTDIR, "report.txt"), report.join("\n") + "\nWATCHDOG_TIMEOUT=1\n"); } catch {}
     app.exit(0);
-  }, 60000);
+  }, 90000);
 
   win.webContents.once("did-finish-load", async () => {
     try {

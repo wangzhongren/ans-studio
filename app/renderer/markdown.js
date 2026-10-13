@@ -11,7 +11,9 @@
 //   1) `html:false` —— 模型输出里的原始 HTML **只以转义文本**出现（XSS 底线；见测试里的**钉子**）；
 //   2) 链接：`validateLink` 收紧为 **http/https/mailto 白名单**（叠加库默认拒绝表）；`rel="noopener
 //      noreferrer"`、类 `md-link`（点击仍由 renderer.js 委托、经 preload 外开——不在应用内导航）；
-//   3) 图片/表格 **禁用**（O-B1 未准；且图片会引外链）——`![x](url)` 以原文文本呈现；
+//   3) 图片**禁用**（O-B1 未准；且图片会引外链）——`![x](url)` 以原文文本呈现；
+//      **表格已启用**（2026-10-13 客户裁定）：`md.disable(["table"])` 删除——`html:false` 下单元格照常
+//      转义（纯 table/tr/td/th 输出，无 XSS 增量；测试钉住「单元格内 HTML 仍被转义」）；
 //   4) 围栏/缩进代码块内容经**本文件唯一的 `esc`** 转义后输出（样式类 `.md-pre`/`.md-lang` 与既有 CSS/测试对齐）。
 //
 // —— 单测面（与渲染分离）——：`esc`（**单一来源**：renderer.js 的既有非 Markdown 路径继续用它）、
@@ -57,7 +59,8 @@
     // 图片**禁用为链接**：`![alt](url)` 以**原文文本**呈现（O-B1 未准；且图片会引外链）——
     // 注意不能只 `disable("image")`：那会让 `[alt](url)` 部分回落成一条普通链接（带着孤立的 `!`），
     // 故**覆写 image 规则**输出转义后的原文。
-    md.disable(["table"]);
+    // 表格：**启用**（2026-10-13 客户裁定，原 `md.disable(["table"])` 删除）——库默认配置即输出
+    // table/thead/tbody/tr/th/td；`html:false` 保证单元格内原文 HTML 照常转义（安全红线不回退，有钉子）。
     md.renderer.rules.image = function (tokens, idx) {
       var token = tokens[idx];
       var alt = String(token.content || "");

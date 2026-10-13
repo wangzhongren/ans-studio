@@ -83,7 +83,9 @@ export const OPERATOR_CONFIRM_TIMEOUT_ENV = "ANS_DESKTOP_OPERATOR_CONFIRM_TIMEOU
  *    `rules`（`buildDesktopShellArming`，只读导入门禁引擎经 Service 公开出口的实件）——否则闸因「规则集
  *    未注入」一律拒绝（真机曾据此如实报「环境无 shell」）；**(c) 与 (a) 两件同备才 arm**，任一构造/加载
  *    失败 ⇒ 两件都不注入（`run_shell` 不注册——能力缺席即 fail-closed）；
- *  · **只对项目角色**注入（su 自身不 arm——审读者不给自己开闸，判据 `role.builtIn`，见 session.ts）；
+ *  · **项目角色**注入 (c)+(a) 走三层链；**内置治理角色（su）不接 (b)/(a)**（审读者不给自己开闸：不自审、
+ *    不弹框）——su 的 shell 由 session.ts 用**同一份 (c) 实件**经 `shellReadonly` 直连**只读档**
+ *    （客户裁定 2026-10-12：「su 也要有 shell，但是只读」；单一来源、两边永不漂移）；缺件时**两边都不 arm**；
  *  · fail-closed 语义**不变**：关窗/取消/拒绝/超时/通道抛错 → **不放行**（`createDesktopOperatorChannel` 的三条退路）。
  *
  * **已知风险（I-1，如实登记）**：**本轮无沙箱**——客户放行的 shell 命令在项目目录里**真实执行**；命令里的

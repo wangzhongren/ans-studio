@@ -1,5 +1,77 @@
 # 桌面应用 变更记录
 
+## 2026-10-13 — 右栏收成右上角图标簇（抽屉）+ Pi 入口上移 + 删「结束会话」/状态 pill（客户裁定，与聊天流去常规提示同批）
+
+**来源**：客户原话「**角色卡这一块的页面，感觉和 claude code 一样，变成右上角几个图标，点了展示呢。这个没必要一直展示**」「**Pi 设置，也放到右上角，结束回话，感觉也没啥用去除。聊天中也没啥用去除吧**」。**属本角色边界内**。
+
+- **默认收起**：右栏常驻列退役——栅格改两列（`272px + 1fr`）；抽屉 `#right-drawer` 为**覆盖层**（`position:absolute` 在 `.app` 上滑出，不占栅格列 ⇒ 聊天列宽不因开关而变、聊天流不 reflow）。过渡纯 CSS 120ms（**无计时器**，G-1 纪律不破）。
+- **右上角图标簇 `#right-tabs`**（标题栏控制区内、窗口按钮之前）：四枚小图标——**角色资料 / 待办 / 队列概览 / Pi 设置**（`no-drag`；**不算 `.win-btn`**——三窗口按钮守卫不破）。激活高亮。
+- **点开展示 / 收起**：点图标 ⇒ 抽屉滑出；**再点同图标 / 抽屉头 × / Esc** ⇒ 收起（Esc 优先级在 shell 确认卡之后）；**同一时刻至多开一块**（点异图标=切换内容）。
+- **角标继承（收起不丢信息）**：待办图标角标＝`queueViewsFor(选中角色).length`（进行中+排队）；队列图标角标＝`queueByRole` 排队深度——**同一 role-state 快照、无新数据源**；>0 才显示。`#op-chip` 与左树徽标**不受影响**。
+- **内容不变、跟随选中角色**：角色资料 tab＝既有四组逐字保留（角色卡 md/边界/变更/文档）；待办 tab＝既有「待办 / 队列」组**逐字保留**（进行中+排队，`updateRightQueue` 定点更新）；队列概览 tab＝**仅排队条目**的位次概览（来源/摘要/入队时间皆既有纯映射；「排队 ≠ 已执行」同句保留）——待办与队列是**同一真实快照的两个视图**（完整列表 vs 仅排队位次；客户想要别的切分只改映射）。
+- **Pi 设置入口上移**：`#btn-pi-settings` 删除 → 图标簇第四枚 `tab-pi`；**面板本体整体迁入抽屉**（`#pi-panel` 移入 `#right-drawer`）——字段、保存/掩码/凭据纪律一字不动，显隐由 tab 状态驱动（`syncPiPanel`）；展开即重取视图。
+- **删「结束会话」按钮**：`#btn-stop` 删除。**停止能力保留在程序化路径**（换项目时 `d.stopSession(null)`「关闭全部」；定向 stopSession 在主进程/会话管理器）；渲染侧只服务该按钮的 `stop()` 死代码一并清（不留死代码）。
+- **删「聊天中/空闲」状态 pill**：`#session-state` 视觉删除；**状态程序化保留**——`setState` 把 kind 写到 `#chat` 的 `data-state`（run/idle/err），e2e 与外部驱动仍可断言；全部调用点跟进。
+- **测试**：`renderer.test.ts` 新增右栏抽屉钉子（8 组：col-right 退役/覆盖层/图标簇四枚且非 win-btn/状态机至多开一块/Esc/内容跟随/角标语义/内容四组+待办组逐字保留/Pi 在抽屉内/样式钩子）并翻转 T28/K-1/B-2 三处旧断言（btn-pi-settings→tab-pi；session-state 删+data-state；btn-stop 删+`d.stopSession(null)` 保留）；e2e 新增 18 个抽屉/角标/Pi 检查点、状态日志改读 `data-state`、第 6 节/N-3/T28 节随抽屉模型接线。
+- **证据**：`npm run typecheck` **0 错**；`node --test "test/桌面应用/**/*.test.ts"` → **163 计/162 过/1 红**（唯一红=既有环境红）；全量 → **913 计/910 过/2 红**（两红均既有环境红）；e2e **E2E_DONE=1**（202 true / 2 个既有预期 false；`TABS_PRESENT`/`DRAWER_DEFAULT_CLOSED`/`DRAWER_OPENS_ON_TAB`/`DRAWER_TOGGLES_CLOSED`/`DRAWER_ESC_CLOSES`/`BADGES_WHILE_COLLAPSED_*`/`PI_PANEL_IN_DRAWER` 等全 true）。Node v24.14.0 / Darwin arm64。详见 `docs/change/2026-10-13_change_chat-stream-declutter-and-md-tables.md`（聊天流去常规提示/表格启用同批记录在该文档前半）。
+
+## 2026-10-13 — 聊天流去常规提示（欢迎行/恢复分隔行删除）+ Markdown 表格启用（客户裁定）
+
+**来源**：客户裁定聊天流不要常规提示、表格要能渲染。**属本角色边界内**。
+
+- **删「已开启与角色 X 的会话…」欢迎行**（`session.ts::openInternal` 的常规欢迎事件删除）：真机每次开会话/切角色都出现，被客户点名。**异常提示全保留**（`contextWarning`、O-1 边界重建行、投递失败/受阻行、开启失败/异常行）。附带效果如实：开启后暂无内容时 pane 保持空状态（含主 CTA）；pi 适配器侧的「会话已恢复：…」恢复说明事件非本角色边界、未动。
+- **删回放分隔行「会话已恢复（模型上下文一并恢复）」**（`renderer.js::replayHistory` 成功回放不再插分隔行；`.is-replay` 视觉区分与**左树「空闲（已恢复）」徽标保留**——状态准确性不是聊天流提示）；**错误分支保留**：坏文件仍出「会话记录读取失败，未回放：<error>」一行（图标改 `ICONS.deny` 与失败行一致；`.sys-replay-divider` 钩子保留给错误分支）。
+- **启用 Markdown 表格**（`markdown.js` 删 `md.disable(["table"])`）：输出纯 `table/thead/tbody/tr/th/td`，**`html:false` 下单元格内原文 HTML 照常转义**（实测 `<script>` → `&lt;script&gt;`，无 XSS 增量）；**图片禁用保持不动**（覆写 image 规则原样）。`styles.css` 表格样式（`.msg table, .card-md table`：边框/表头底色/cell padding；宽表 `display:block + overflow-x:auto + max-width:100%` 不撑破布局；右栏结构化边界表 `table.boundary` 不在作用域）；虚拟窗口行高不受影响（块级表格被 `offsetHeight` 实测覆盖）。
+- **测试翻转四处**：e2e `SU_HAS_WELCOME`/`HAS_WELCOME` → `SU_NO_WELCOME`/`NO_WELCOME_AFTER_OPEN`（不含）；`session.test.ts`「应有会话开启提示」→「不应再有会话开启欢迎提示」（开启时事件为空）；`renderer.test.ts` 恢复分隔行断言翻转 + 错误分支 `error !== null` 源码钉；e2e `RESTORE_DIVIDER_TEXT` → `RESTORE_NO_SUCCESS_DIVIDER`。**补安全钉**：markdown.test.ts「单元格内 HTML 仍被转义」（`&lt;script&gt;` 在 `<td>` 内、不得直通）；表格钉翻转为「渲染 table/thead/th/td」。
+- **同批清理旧框定**：memo 两条 2026-10-11「su 本版只读」记录并作一条按现状带过；changelog 里**未实施的**「本版只读」界面提示方案标注已过时（su 可写治理产物、只读 shell 已落地、只读标记已按客户裁定移除）。
+- **证据**：`npm run typecheck` **0 错**；`node --test "test/桌面应用/**/*.test.ts"` → **162 计/161 过/1 红**（唯一红=既有环境红 `pi-config.test.ts`）；全量 → **912 计/909 过/2 红**（两红均既有环境红）；e2e（真实 Electron）`E2E_DONE=1`、`SU_NO_WELCOME=true`/`NO_WELCOME_AFTER_OPEN=true`/`RESTORE_NO_SUCCESS_DIVIDER=true`、既有检查点无回归（仅 2 个既有预期 false）。Node v24.14.0 / Darwin arm64。详见 `docs/change/2026-10-13_change_chat-stream-declutter-and-md-tables.md`。
+
+## 2026-10-12 — 修复：交互卡（重）物化落到聊天流最末尾（锚点物化；客户真机「已确认的卡切走再切回变成最下面」）
+
+**来源**：客户原话「**这个确认过的，在聊天里面，切换出去，再回来变成最下面了**」。**属本角色边界内**。
+
+- **根因（真机 Electron 探针确证）**：两因素叠加——① Q-2 **窗口化**把离屏 `keepEl` 行**脱挂**（元素实例保留在行表、`parentNode !== pane`），`materializeOperatorCard` 的去重判据 `cardInPane` 按**当前 DOM 子节点**找卡 ⇒ 误判「卡丢了」；② 判丢后**重新建卡并 `registerRow` 追加行表尾**（`registerRow` 无插入位概念）⇒ 每次切走切回（`showPane → materializePendingFor` 对登记表全部条目——含已决卡）都把卡搬到流尾，**且旧行仍持旧元素**（潜在双份）。open 与已决卡同病（未决卡当年恰在流尾、跳尾不可见；被后续活动推离尾部即暴露）。
+- **锚点物化三级落位**（`renderer.js`）：**① 复用既有行（主修复）**——物化先按 `requestId` 扫行表，卡行仍在（离屏≠丢失）⇒ 直接返回、绝不重建；**② 按锚点落位（防线）**——首次到达不加锚（卡=当下最新事件，行表尾即它发生的位置），重物化取「同表首物化位（`entry.anchorIndex`+行表 `seq` 校验）→ 回放锚点表（插到「调用工具 request_confirmation」行之后、结论行之前）」；`registerRow` 新增 `atIndex`（锚点插入 + 其后各行 index 右移重编号——attachRow/卡定位/虚拟窗口语义不变）；**③ 兜底＝追加行表尾，绝不丢卡**（代码写明；落尾的卡仍可被 P-1 chip 定位/作答/定格）。
+- **锚点关联（回放行带上请求标识）**：`session-history.ts` 解析 JSONL 时把 request_confirmation / request_choice 的**调用行**与**结论行**带上同一标识——`requestId`＝pi `toolCallId`（调用行经内容块 `id`、结论行经 `toolCallId` 配对，**不解析正文**）、`anchor`、`anchorKey`＝请求本体 kind+title 的**单一算法键**（新模块 `app/desktop/request-anchor.ts`；工具名常量**只读导入自** `src/provider/pi/tools.ts`，不复制字面量）；`customer-input.ts` 请求载荷同法带 `anchorKey`——两侧逐字可对上。渲染侧按 `anchorKey` 建「调用行/结论行行序位」表（同题问过两次以最后一次为准；随项目作废）。两个 id 命名空间（`op-N` vs `call_00_…`）不对得上属如实（请求对象为冻结形状、不含 toolCallId，边界外不得扩）——以键关联。
+- **不回归**：P-1（切回滚到卡/chip/到达即达）、`#op-chip`、U-1 到底、S-1 贴底、Q-2 窗口化语义、`registerRow` 缺省追加（全部既有调用点零改动）、去重（`cardInPane` 保留为防御层；行模型按 requestId 查重后**同卡恒恰一行**——去重反而变强）。
+- **测试**：`session-history.test.ts` +2（调用/结论配对；choice 同法、非交互/缺 title/孤儿不着锚、两侧键逐字相等）；`renderer.test.ts` +1（锚点物化源码钉：复用既有行/atIndex 插入+重编号/锚点表登记与消费/首次不加锚/兜底写明/探针面/decided 定格同法）；`operator-wiring.test.ts` 载荷断言随新形状更新（deepEqual 含 `anchorKey`）；**e2e 新增「回放重建 + 已决卡」时序断言段**（临时项目 + JSONL 夹具 → 回放 → 真通道同题请求 → 作答 → 灌 200 行窗口化 → 切走/切回 ×2 → 断言行模型：锚点表登记相邻、卡行序索引恒定**≠行表尾**、恰一条卡行不重建；未决卡同法回归 + chip 照常亮）——上次暴露时序类 bug 的正是本 harness，按派发要求钉在它里面。
+- **证据**：真机探针前后对照（修前切回落尾/行表双行；修后索引恒定 213 vs 行表尾 333、行模型恰一条）；e2e `ANCHOR_TABLE_REGISTERED`/`ANCHOR_STABLE_NOT_TAIL_ONCE`/`ANCHOR_STABLE_NOT_TAIL_TWICE`/`ANCHOR_NO_DUPLICATE_ROW`/`OPEN_CARD_STABLE_AT_ANCHOR`/`OPEN_CARD_CHIP_VISIBLE` 全 true、既有检查点无回归（194 true / 2 个既有预期 false，`E2E_DONE=1`）；`npm run typecheck` **0 错**；`node --test "test/桌面应用/**/*.test.ts"` → **162 计/161 过/1 红**（唯一红=既有环境红 `pi-config.test.ts`）；全量 → **912 计/909 过/2 红**（两红均既有环境红：上处 + `test/项目管理/shared/path-primitives.test.ts` macOS /var 符号链接）。Node v24.14.0 / Darwin arm64。详见 `docs/fix/2026-10-12_fix_decided-card-reanchor.md`。
+- **观察到的相邻缺陷（本轮未修、如实登记）**：`project:changed → refreshProject` 再走 `app:list-project` ⇒ 主进程对每角色**再推一次**会话历史 ⇒ 渲染侧对同一 pane **重复回放整份转录**（`onSessionHistory` 对同项目无去重守卫）——宜另开任务（渲染侧按最近已回放的会话文件去重，或主进程只在导入/切换时推）。
+
+## 2026-10-12 — su 只读 shell：桌面侧接线（客户裁定「su 也要有 shell，但是只读」）
+
+**来源**：客户裁定「**su 也要有 shell，但是只读**」。编排侧已落地（`run-role` 的 `shellReadonly` 入参 + `shell-arming` 的 `assembleReadonlyShellGate`，其 change 文档 `角色卡/编排/docs/change/2026-10-12_change_su-readonly-shell.md`）；本角色做**后半**：桌面会话构造路径按角色种类分发两档闸。**属本角色边界内**（`src/**` 一行未改，只读核实）。
+
+- **分发点**（`session.ts`）：内置治理角色（su，判据 `role.builtIn === true`，数据驱动）新增 `shellReadonly = this.deps.shellArming`——**复用同一份 (c) 实件**（`buildDesktopShellArming()` 的 `{classifyShell, rules}`；单一来源、与项目角色**永不漂移**），经 `openRoleSession` 透传 ⇒ 编排装配**只读档** ShellGate（命中 (c) 只读白名单放行；risky/review/deny 一律拒）；**给出即 arm**——su 会话恒 `suppressHandback === true`，只读档分支**不带**该前缀（旧注释联想会误导，已写明）。缺省/构造失败 ⇒ **不传** ⇒ su 不 arm（能力缺席 = fail-closed，绝不放宽）。
+- **su 不接 (b)/(a)**（「审读者不给自己开闸」保留其义）：仍不注入 `shellOperatorChannel`/`shellArming`（两行**逐字未动**）——su 自己就是审读者、不自审；只读外的命令**直接拒、不弹框、不打扰客户**（编排选项面没有 (b)/(a) 即是结构保证）。
+- **项目角色逐字不变**：仍收 `shellOperatorChannel`+`shellArming` 走三层链、**不带** `shellReadonly`。
+- **透传面**（`interface.ts`）：`openRoleSessionFn` 入参镜像增 `shellReadonly?: Omit<AssembleReadonlyShellGateOptions, "project">`——形状**只读导入自编排**（不另立第二形状）。
+- **构造链核对（任务点名项）**：`main.ts::registerIpc` 每窗口在 `createDesktopInterface` **之前**构造同一份 `shellArming`（arm 开关 `DESKTOP_SHELL_GATE_ARMED` 为真时）→ Interface → SessionManager：**无需新增**（su 只读档复用同一对象，引用同一性有测试钉）；**未发现** arm 开关对 su 不生效的时机问题。`operator-channel.ts`/`main.ts` 的 arm 文档与注释按新语义更新（代码零改）。
+- **测试**（`operator-channel.test.ts` **25/25**，+2 新用例、3 处既有用例扩断言）：su 收到 `shellReadonly` 且**恰为同一份 (c) 实件**（引用同一性 + 含 classifyShell/rules）且**不含** (a)/(三层) 字段；项目角色照旧且不含 `shellReadonly`；`deps.shellArming` 缺省 ⇒ 两角色三字段全不出现（fail-closed）；源码钉（新判据行、spread、只读形状只读导入、run-role「给出即 arm」）；**真正接通核查**——临时项目 + 真实 `openRoleSession` + 真实 `buildDesktopShellArming()` ⇒ su 能力面产出只读 gate：`ls -la` 放行 / `rm -rf` 拒（理由含「su 只读档」）/ `node --test` 拒（现状）；全程不触网、不跑命令、审计只在临时目录。
+- **证据**：`test/桌面应用` **159 计/158 过/1 红**（唯一红=既有环境红 `pi-config.test.ts` 检出目录名断言）；全量 **903/900 · 2 红**（两红均既有环境红）；`npm run typecheck` **0 错**。Node v24.14.0 / Darwin arm64 / HEAD `6291ab1`。详见 `docs/change/2026-10-12_change_su-readonly-shell-arming.md`。
+
+## 2026-10-12 — U-1 点击角色 ⇒ 到底部（客户裁定；取代 B-2「恢复位置」）
+
+**来源**：客户原话「**点击这个角色，应该滚动到滚动条最下面**」。**属本角色边界内**。
+
+- **语义反转（客户裁定）**：点角色（切换会话）⇒ **到底部（最新一条）**——**取代** B-2 的「切角色恢复上次位置」（`scrollMemo` 声明/切走记忆/恢复分支**全删干净**，注释剥离后断言无残留）。理由登记：恢复位置会让用户点开后看不到最新一条，客户判为错误。
+- **统一助手** `stickPaneToBottomOrCard`：**有未作答卡 ⇒ 滚到那张卡**（P-1 例外保留）；**无卡 ⇒ 到底部**；三处接线（showPane / **重复点击早退分支** / chip 同刷）。
+- **修 e2e 抓出的漏点**：重复点击同一角色原走 `selectRole` 早退、**根本不滚**（`U1_REPEAT_TO_BOTTOM=false`，dist=556）——早退分支同样走助手，修复后 dist=1。
+- **窗口化兼容**：`scrollBottomForced` 先 `updateVirtualWindow(preferTail)` 实体化尾部再滚（≥150 行落点准确）。
+- **与 S-1 不冲突**：点击=显式动作 ⇒ 强制到底；流式输出仍「在底部才贴底、上翻不拽回」（源码钉 + e2e 双向）。
+- **证据**：e2e 真机三例全 true（窗口化 1px / 常规 1px / 重复点击 1px）；S-1 八项、P-1 十项无回归；`E2E_DONE=1`。桌面 **157/156/1**（唯一红=既有环境红）；全量 **880/877 · 2 红**（两红均既有环境红）；typecheck **0**。Node v24.14.0 / Darwin arm64 / HEAD `6291ab1`。详见 `docs/change/2026-10-12_change_click-to-bottom.md`（含反转理由与历史表述说明）。
+
+## 2026-10-12 — S-1 回归修复：新输出不再自动滚到底（长会话贴底）
+
+**来源**：客户原话「现在输出不会让滚动条滚动到最底下了」。**属本角色边界内**（Q-2/贴底的回归）。
+
+- **复现（真机 e2e 确定性用例）**：长会话（200 行 ⇒ 窗口化）+ **按批**（生产热路径形态）追加 ⇒ 修前 `S1_STICK_AT_BOTTOM_DIST=339`（未贴底）；上翻后新输出**拽回**（`S1_NOT_YANKED=false`）。
+- **根因（逐条核对）**：① 命中主因——**flush 贴底在窗口更新之前**（底部 spacer 未随新行增长 ⇒ 贴到「旧底」，每批差一整批高度）；② rAF 无责（同①）；③ 命中——**旧代码无条件贴底**，违背「上翻不打断」；④ 部分成立——实测修正只 `prefix=null`，spacer 要等下一帧 ⇒ 高度漂移松贴底。
+- **修**：flush **先更新窗口再贴底**；强制贴底前先令窗口落定；新增流式判定 `streamShouldPin`（`stickToBottom` 纯映射、阈值 **24px**、**先量后挂**、批内一次测量复用）——助手/系统/拒绝/注入/回交行走「在底部才贴底」，**用户动作/卡到达/切角色/回放**仍强制；窗口更新内加**「本就在底部者」补偿**（修正后同帧补贴底；上翻者绝不拽）；实测修正后**同帧**重算 prefix 并重设 spacer。
+- **修后（真机 e2e 双向、两类路径）**：窗口化贴底 **339px→1px**；上翻不拽回 true；回底再输出贴底 true；常规路径（<150 行）贴底 **0px**、上翻不拽回 true。
+- **取舍（登记）**：贴底由「每事件即时」变为「**每批收尾一次（≈一帧）+ 窗口落定后**」——最多晚一帧（16ms 级）；上翻期间不再有任何自动滚动（新语义）。
+- **证据**：`test/桌面应用` **156 计/155 过/1 红**（唯一红=既有环境红）；全量 **874/871 · 2 红**（两红均既有环境红）；typecheck **0**；e2e `E2E_DONE=1`（S-1 八项全 true；P-1 十项未回归）。Node v24.14.0 / Darwin arm64 / HEAD `6291ab1`。详见 `docs/change/2026-10-12_change_hot-path-and-virtual-stream.md` 的 S-1 节。
+
 ## 2026-10-12 — Q-1 热路径治理 + Q-2 聊天流虚拟渲染（客户「主线程被阻碍」「应该虚拟渲染啊」）
 
 **来源**：客户原话（澄清：**角色工作期间 UI 卡死**——每事件 IPC→DOM；markdown 疑似卡顿）。**属本角色边界内**。
@@ -1397,9 +1469,8 @@ T10 如实登记过一处**被跨角色依赖阻塞**：裁定要求桌面「**�
 - `node --test test/桌面应用/*.test.ts` → **19 pass / 0 fail**。
 - e2e（真实 Electron 44.7.0）：`SU_IS_FIRST=true`、`SU_TREE_BADGE=true`、`SU_CLICKED=true`、`SU_NO_MODAL=true`、**`SU_HAS_WELCOME=false`**、**`SU_SESSION_STATE=连接失败`**；既有 `NO_MODAL_*`（导入 / 点角色 / 发消息 / 续接）**全过**；桌面应用角色聊天本身正常（2 条用户气泡、2 处拒绝内联、续接提示、右栏四组资料）。
 
-**遗留问题与界面方案（su 即使能聊也写不了 → 误导风险）**
-- su 走内置边界，`acceptance.accepted === false`，`resolveWrite` 的 F6 接受门 **拒绝一切写入**。界面可读到 su 会「创建项目角色」的角色卡，副标题却是「内置治理角色」，**无任何提示**说明其本版只读——用户可能误以为能让 su 干活，却每条写入都被拒。
-- 方案（本角色边界内，待 su 聊天恢复后实施）：把 `roleSubtitle`（或树徽标 / 会话欢迎语）对 su 增补一句「本版只读：受治理会话暂不允许写盘」，并在点 su 开启会话时于聊天流内联一条系统说明，明示「可对话，写入一律被门禁拒绝」。现因聊天本身打不开，暂不实施，仅记录方案。
+**遗留问题与界面方案（2026-10-13 更正：已过时，按现状一句话带过）**
+- 当时评估的「本版只读」界面提示方案**未实施且已过时**——创世/项目治理边界接线后 su **可写治理产物**、**只读 shell 已落地**（2026-10-12）、「只读」徽标/内联已按客户裁定移除（回到「用户对边界无感」模型）。按现状：界面无只读标记，拒写如实内联在聊天流（由门禁承担）。
 
 ## 2026-10-11 — 导入即授权：点角色直接聊天（无确认框）；界面专业化重做
 

@@ -402,22 +402,82 @@ test("renderHandbackPrompt（E-1）：字段逐条 + 明示请验收；无任务
   assert.ok(bare.includes("证据：（无）"), "无证据如实呈现");
 });
 
-test("handbackKey（E-1）：同一回交恒等；角色/任务/时间任一不同即不同（投递去重用）", () => {
+test("handbackKey（X-2 稳定键）：不含时间戳——同内容不同 at 恒等；角色/任务/轮次/内容任一不同即不同", () => {
   const base = {
     roleId: "X",
     taskId: "T-1",
+    round: 3,
     status: "completed" as const,
     summary: "s",
-    evidence: [],
+    evidence: ["a.md"],
     at: "2026-10-12T00:00:00.000Z",
   };
   assert.equal(handbackKey(base), handbackKey({ ...base }), "同一份回交 → 恒等键");
-  assert.notEqual(handbackKey(base), handbackKey({ ...base, at: "2026-10-12T00:00:01.000Z" }));
+  // **X-2 要害**：同内容、不同产出时刻（同轮重放/重复 settled 会各建一份、at 毫秒不同）→ **仍恒等**。
+  assert.equal(
+    handbackKey(base),
+    handbackKey({ ...base, at: "2026-10-12T00:00:01.000Z" }),
+    "不含 at：同轮重放恒等（旧键由此判重失效）",
+  );
+  // 各维任一不同 → 不同键。
+  assert.notEqual(handbackKey(base), handbackKey({ ...base, round: 4 }), "新轮（round 递增）→ 键不同（真返工可各自投递）");
   assert.notEqual(handbackKey(base), handbackKey({ ...base, roleId: "Y" }));
   assert.notEqual(handbackKey(base), handbackKey({ ...base, taskId: "T-2" }));
-  const noTask = { ...base, taskId: undefined };
-  assert.equal(handbackKey(noTask), handbackKey({ ...noTask }), "无 taskId 亦稳定");
-  assert.notEqual(handbackKey(noTask), handbackKey(base));
+  assert.notEqual(handbackKey(base), handbackKey({ ...base, summary: "s2" }), "内容哈希参与键");
+  assert.notEqual(handbackKey(base), handbackKey({ ...base, evidence: ["b.md"] }));
+  assert.notEqual(handbackKey(base), handbackKey({ ...base, status: "blocked" }));
+  const noRound = { ...base, round: undefined };
+  assert.equal(handbackKey(noRound), handbackKey({ ...noRound }), "无 round 亦稳定");
+});
+
+// —— X-2：每轮至多一份回交（双 settled 突发）+ 稳定去重键的两类判定 ——
+
+test("withHandback（X-2）：一轮**双 settled** → 恰一份回交；第二份 settled 仅透传（次序保持）", async () => {
+  const src: SessionEvent[] = [
+    { kind: "message", summary: "干活" },
+    { kind: "settled", summary: "会话结束" },
+    { kind: "settled", summary: "会话结束" }, // 适配器的第二发射点（真机曾每轮如此）
+  ];
+  async function* gen(): AsyncIterable<SessionEvent> {
+    for (const e of src) yield e;
+  }
+  const out: OrchestrationEvent[] = [];
+  for await (const ev of withHandback(gen(), { roleId: "X", taskId: "T-1" })) out.push(ev);
+  assert.equal(out.filter(isHandback).length, 1, "同一 settle 突发只发一份回交");
+  assert.equal(out.filter((e) => e.kind === "settled").length, 2, "两份 settled 均透传（消费方终止语义不变）");
+  const hbIndex = out.findIndex(isHandback);
+  const firstSettledIndex = out.findIndex((e) => e.kind === "settled");
+  assert.ok(hbIndex < firstSettledIndex, "次序保持：回交在第一份 settled **之前**");
+  assert.equal((out[hbIndex] as HandbackEvent).handback.round, 1, "首轮序号 1");
+});
+
+test("withHandback（X-2）：同轮三份 settled（其间无事件）→ 仍一份；真返工（两轮、文本逐字相同）→ 两份且键不同", async () => {
+  // 三连 settled → 一份。
+  async function* triple(): AsyncIterable<SessionEvent> {
+    yield { kind: "settled", summary: "会话结束" };
+    yield { kind: "settled", summary: "会话结束" };
+    yield { kind: "settled", summary: "会话结束" };
+  }
+  const out1: OrchestrationEvent[] = [];
+  for await (const ev of withHandback(triple(), { roleId: "X" })) out1.push(ev);
+  assert.equal(out1.filter(isHandback).length, 1);
+
+  // 真返工：两轮（轮间有新事件）、报告文本**逐字相同** → 两份回交、round 递增、**键不同**（各自投递）。
+  const report: TaskReport = { status: "completed", summary: "同样的报告文本", evidence: ["同一条证据"] };
+  async function* rework(): AsyncIterable<SessionEvent> {
+    yield { kind: "message", summary: "第一轮" };
+    yield { kind: "settled", summary: "会话结束" };
+    yield { kind: "settled", summary: "会话结束" }; // 双 settled 也不影响
+    yield { kind: "message", summary: "第二轮（返工）" };
+    yield { kind: "settled", summary: "会话结束" };
+  }
+  const out2: OrchestrationEvent[] = [];
+  for await (const ev of withHandback(rework(), { roleId: "X", taskId: "T-1" }, { report: () => report })) out2.push(ev);
+  const hbs = out2.filter(isHandback).map((e) => e.handback);
+  assert.equal(hbs.length, 2, "两轮各一份（双 settled 未造成第 3 份）");
+  assert.deepEqual([hbs[0].round, hbs[1].round], [1, 2], "round 递增");
+  assert.notEqual(handbackKey(hbs[0]), handbackKey(hbs[1]), "同文本真返工 → 键不同（照常各自投递）");
+  assert.equal(hbs[0].summary, hbs[1].summary, "文本确实逐字相同（对照组条件成立）");
 });
 
 // —— H-1：派发文案（单一来源）、roleId 判定口径、能力透传（只给 su） ——

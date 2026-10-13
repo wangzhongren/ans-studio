@@ -120,17 +120,94 @@ body { display: flex; flex-direction: column; }
 .win-btn.is-maximized .ico-max { display: none; }
 .win-btn.is-maximized .ico-restore { display: inline; }
 
-/* ———————— 三栏骨架：靠色差与留白区分，不靠粗线 ———————— */
+/* ———————— 两栏骨架 + 右抽屉（客户 2026-10-13：右栏不常驻，收成右上角图标簇；抽屉=覆盖层，聊天列宽不变） ———————— */
 .app {
+  position: relative; /* 抽屉的定位上下文：覆盖层不改变栅格列宽——聊天流不因开关而 reflow */
   display: grid;
-  grid-template-columns: 272px minmax(0, 1fr) 360px;
+  grid-template-columns: 272px minmax(0, 1fr);
   flex: 1 1 auto;
   min-height: 0;
 }
 .col { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .col-left { background: var(--bg-side); }
 .col-mid { background: var(--bg); }
-.col-right { background: var(--bg-soft); border-left: 1px solid var(--border); }
+
+/* 右抽屉：默认藏在视口右外（transform），激活时滑入为**覆盖层**——不占栅格列、聊天流不 reflow。 */
+#right-drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 360px;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-soft);
+  border-left: 1px solid var(--border);
+  transform: translateX(102%);
+  visibility: hidden;
+  transition: transform 120ms ease, visibility 0s linear 120ms;
+  z-index: 30;
+}
+#right-drawer.open {
+  transform: translateX(0);
+  visibility: visible;
+  transition: transform 120ms ease;
+}
+.drawer-head {
+  height: 52px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+}
+.drawer-close {
+  border: none;
+  background: none;
+  color: var(--text-3, var(--text-2));
+  font-size: 13px;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.drawer-close:hover { color: var(--text); background: var(--bg-soft); }
+
+/* 右上角图标簇（#right-tabs）：四枚小图标（角色资料 / 待办 / 队列概览 / Pi 设置），no-drag 可点；
+   激活高亮；待办/队列有挂起项时图标右上角带数字角标（收起不丢信息）。 */
+.right-tabs { display: flex; align-items: center; gap: 2px; margin-right: 6px; }
+.tab-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 24px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-2);
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+  transition: background 120ms ease, color 120ms ease;
+}
+.tab-btn:hover { background: var(--bg-soft); color: var(--text); }
+.tab-btn.active { background: var(--bg-soft); color: var(--text); }
+.tab-badge {
+  position: absolute;
+  top: -3px;
+  right: -4px;
+  min-width: 13px;
+  height: 13px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: var(--text);
+  color: var(--bg);
+  font-size: 9px;
+  line-height: 13px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
 
 /* ———————— 栏头 ———————— */
 .side-head {
@@ -442,6 +519,37 @@ body { display: flex; flex-direction: column; }
   border-radius: var(--radius);
   overflow: auto;
   max-height: 320px;
+}
+/* 表格（Markdown 启用，2026-10-13 客户裁定）：基础边框 + 表头底色 + 单元格 padding；
+   `.msg`（聊天流气泡/注入行/回放行）与 `.card-md`（角色卡/变更记录/文档索引/回交摘要）共用。
+   宽表**不撑破布局**：display:block + overflow-x:auto（容器内横向滚动）+ max-width:100%——
+   虚拟窗口行高不受影响（offsetHeight 实测已覆盖块级表格的实际高度）。 */
+.msg table,
+.card-md table {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  margin: 0 0 8px;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.msg table th,
+.msg table td,
+.card-md table th,
+.card-md table td {
+  border: 1px solid var(--border);
+  padding: 5px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+.msg table th,
+.card-md table th {
+  background: var(--bg-soft);
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
 }
 .msg pre.md-pre code {
   display: block;
@@ -775,6 +883,16 @@ details.sys-denied[open] summary { padding-bottom: 6px; margin-bottom: 6px; bord
   border-radius: var(--radius);
   background: var(--bg-soft);
 }
+/* 客户裁定（2026-10-13）：Pi 面板迁入右侧抽屉（tab=pi 展示）——抽屉内去掉中栏的边距/圆角/底色，
+   占满抽屉宽度并可滚动（面板本体、保存/掩码纪律一字不动，只是容器变了）。 */
+#right-drawer .pi-panel {
+  flex: 1 1 auto;
+  overflow: auto;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+}
 .pi-panel[hidden] { display: none; }
 .pi-panel-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
 .pi-panel-title { font-size: 12.5px; font-weight: 600; color: var(--text); }
@@ -1046,13 +1164,14 @@ ul.idx li.dir { color: var(--text-2); }
 
 /* ———————— 响应式 ———————— */
 @media (max-width: 1180px) {
-  .app { grid-template-columns: 240px minmax(0, 1fr) 320px; }
+  .app { grid-template-columns: 240px minmax(0, 1fr); }
+  #right-drawer { width: 320px; }
 }
 @media (max-width: 940px) {
-  .app { grid-template-columns: 208px minmax(0, 1fr) 268px; }
+  .app { grid-template-columns: 208px minmax(0, 1fr); }
+  #right-drawer { width: 268px; }
   .chat { padding: 18px; gap: 14px; }
   .composer { padding: 12px 18px 16px; }
-  .pi-panel { margin-left: 18px; margin-right: 18px; }
   .pi-field { grid-template-columns: 150px minmax(0, 1fr); }
 }
 

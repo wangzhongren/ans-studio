@@ -45,6 +45,13 @@
 //   2. 分类函数缺失 / 抛错 → **拒绝**；
 //   3. 审核**超时**（超时包装，仿 pi-adapter/timeout.ts）→ **拒绝**。
 //
+// —— su 只读档（`readonlyOnly`，客户裁定 2026-10-12：「su 也要有 shell，但是只读」） ——
+// 同一装配面增可选 `readonlyOnly`——`true` 时只映射 **(c) 层确定性白名单**：allow → 照旧放行（`c-allow`、
+// 直接执行）；deny → 照旧拒绝（`c-deny`）；**risky / review → 一律拒绝**（`readonly-deny`，reason 写明
+// 命中的是哪一档）。**不接 (b)**（su 自己就是审读者，不自审）、**不接 (a)**（只读外的命令直接拒，
+// 不打扰客户、不弹任何对话框）。fail-closed 退路语义不变；**缺省 false = 既有三层链逐字不变**。
+// 装配入口见 `pipeline/orchestration/shell-arming.ts::assembleReadonlyShellGate`。
+//
 // —— 规则引擎 (c) 不在此实现 ——
 // `classifyShell(argv, rules)` 由**门禁引擎**实现（纯函数，`src/service/gate/` 或 `src/common/门禁引擎/`，
 // 并行开发中）。本模块经**注入**依赖它（形参 `classifyShell`），**不含任何规则集**——规则集内容不属编排。
@@ -170,6 +177,13 @@ export const BRANCH_C_ALLOW = "c-allow"; // 命中 c 白名单
 export const BRANCH_C_DENY = "c-deny"; // 命中 c 硬拒
 export const BRANCH_REVIEW_NO_BA = "review-default-deny"; // (c)=review 且 (b)/(a) 均未接入 → 默认拒（保留第一步 fail-closed）
 export const BRANCH_RISKY_NO_BA = "risky-default-deny"; // (c)=risky 且 (b)/(a) 均未接入 → 默认拒（risky 必过 (a)，a 缺席即拒，fail-closed §14.2）
+/**
+ * **su 只读档**（`readonlyOnly`，客户裁定 2026-10-12：「su 也要有 shell，但是只读」）：
+ * (c) 判 `risky` / `review`（未命中只读白名单）→ **一律拒绝**。本档**不接 (b) su 模型审读**
+ * （su 自己就是审读者，不自审）、**不接 (a) 客户确认**（只读外的命令直接拒，不打扰客户）。
+ * reason 里写明命中的是哪一档（risky / review）——让模型看懂「这是 su 只读档的策略拒绝，不是环境故障」。
+ */
+export const BRANCH_READONLY_DENY = "readonly-deny";
 export const BRANCH_RULESET_LOAD_FAILED = "ruleset-load-failed"; // 规则集加载/解析失败
 export const BRANCH_NO_CLASSIFIER = "no-classifier"; // 未注入分类函数
 export const BRANCH_CLASSIFY_ERROR = "classify-error"; // 分类函数抛错
@@ -189,6 +203,46 @@ export const BRANCH_B_UNPARSEABLE = "b-unparseable-deny";
 /** 与 `BRANCH_B_UNPARSEABLE` 一一对应的**固定短句**（单一来源；如实回给角色，绝不说成放行）。 */
 export const REASON_B_UNPARSEABLE =
   "审核未能给出明确结论，已按 fail-closed 拒绝；可换更简单的命令形式或稍后重试";
+
+// —————————————— R-1：审读结论的**工具化**来源（客户裁定：不该按 json 解析自由文本） ——————————————
+//
+// **根因（真机实测）**：旧路径要求审读模型**在正文里写 JSON**，再由本层解析。真机 35/37 个审读轮次里
+// 模型轮**根本没产出正文**（会话历史含网关不认的 `tool_removal` 块 → 每轮 500，助手消息 content 为空、
+// `stopReason:"error"`）⇒ 取回复（`defaultExtractReply` 取最后一条 message 的文本）拿到空串 ⇒ 恒「不可解析」。
+// **主路径改为工具调用**：审读会话注入 `shellVerdict` 能力（「注入才注册」先例；Pi适配器据此注册工具
+// `report_shell_verdict`）——**结构化由构造保证**，不存在「解析模型文本」这一档。正文文本解析**仅作降级**
+// （模型没调工具只写了 JSON 时兜底）。
+//
+// **契约注（跨角色）**：工具名与参数形状以本处常量为编排侧单一来源；Pi适配器注册工具时按此对齐
+// （等价于既有各能力的「冻结点在契约家」做法——本形状的消费方全在编排）。
+
+/** 审读结论工具名（Pi适配器在 `shellVerdict` 注入时注册；未注入 ⇒ 工具不存在）。 */
+export const SHELL_VERDICT_TOOL_NAME = "report_shell_verdict";
+
+/** 审读结论（工具参数——结构化，字段与取值域固定）。 */
+export interface ShellVerdictPayload {
+  /** 结论：allow = 放行；deny = 拒绝；unsure = 拿不准（按既有链升级到 (a)）。 */
+  verdict: "allow" | "deny" | "unsure";
+  /** 可选：简述理由（审计/呈现用）。 */
+  reason?: string;
+}
+
+/** 「审读结论」注入点形状（审读会话专用；调用即把结构化结论交给编排）。 */
+export type ShellVerdictFn = (verdict: ShellVerdictPayload) => void | Promise<void>;
+
+/**
+ * 校验工具参数（**结构化但防御**：工具参数由模型填写，仍须过一遍取值域）：
+ * 形状不符（非对象 / verdict 缺失或不在域内 / reason 类型错）→ `undefined`（消费方按「未拿到明确 verdict」处理）。
+ */
+export function normalizeShellVerdict(input: unknown): ShellVerdictPayload | undefined {
+  if (input === null || typeof input !== "object") return undefined;
+  const rec = input as Record<string, unknown>;
+  const verdict = rec["verdict"];
+  if (verdict !== "allow" && verdict !== "deny" && verdict !== "unsure") return undefined;
+  const out: ShellVerdictPayload = { verdict };
+  if (typeof rec["reason"] === "string") out.reason = rec["reason"];
+  return out;
+}
 
 // —— 第三闸 (a) —— 触发分支（升级链：`<b 分支>→<a 分支>`，如 `b-unsure→a-allow`）。
 export const BRANCH_A_ALLOW = "a-allow"; // 操作者放行
@@ -227,6 +281,15 @@ export interface CreateShellGateOptions {
   now?: () => Date;
   /** 可注入环境（读取超时 env）；缺省 `process.env`。 */
   env?: Record<string, string | undefined>;
+  /**
+   * **su 只读档**（客户裁定 2026-10-12：「su 也要有 shell，但是只读」）：`true` ⇒ 本闸只映射 **(c) 层
+   * 确定性白名单**——`allow` 照旧放行（`c-allow`）、`deny` 照旧拒绝（`c-deny`）、**`risky`/`review` 一律拒绝**
+   * （`readonly-deny`，reason 写明命中档）。**(b)/(a) 即使注入了也永不调用**（su 自己就是审读者，不自审；
+   * 只读外的命令直接拒，不打扰客户、不弹任何对话框）。既有 fail-closed 退路（`ruleset-load-failed` /
+   * `no-classifier` / `classify-error`）语义不变。
+   * **缺省 `false` = 既有三层链行为逐字不变。**
+   */
+  readonlyOnly?: boolean;
 }
 
 /** 内部：一次审核的结论 + 审计所需的分支/结论分类。 */
@@ -306,12 +369,15 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
     }
 
     const by = `ruleset:${detail.ruleId ?? rulesId}`;
+    // su 只读档（readonlyOnly）：三出口（allow / deny / readonly-deny）的 `by` **统一带档位后缀**——
+    // 审计记录（§7.6）无独立 role 字段，档位经 `by`+`branch` 如实落痕，「如实记录请求来自 su 只读档」即可辨识。
+    const byTagged = opts.readonlyOnly === true ? `${by}（su 只读档）` : by;
 
     // 映射（§7.5）。
     if (detail.decision === "allow") {
       // 命中 c 白名单 → 直接放行（**不产出 token**；审核与 spawn 同址于 execute，票据已废，§7.1 第 3 条）。
       return {
-        result: { allow: true, by },
+        result: { allow: true, by: byTagged },
         conclusion: "allow",
         branch: BRANCH_C_ALLOW,
       };
@@ -319,14 +385,31 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
     if (detail.decision === "deny") {
       // 命中 c 硬拒 → 直接拒绝，终结（(b)/(a) 不可翻案）。
       return {
-        result: { allow: false, reason: detail.reason ?? `命中 c 硬拒规则（${by}）`, by },
+        result: { allow: false, reason: detail.reason ?? `命中 c 硬拒规则（${by}）`, by: byTagged },
         conclusion: "deny",
         branch: BRANCH_C_DENY,
       };
     }
-    // decision === "review" 或 "risky"：既未命中白名单、也未被硬拒 → 交第二闸 (b)，再视情形交第三闸 (a)。
-    // (c) 的硬拒**永不至此**（上面已终结）——故 (b)/(a) 只在 (c) **未明令禁止**的区间里判断，
-    // 硬地板不被翻案（§7.3 要害）。cBy 仅作 (a) 都未接入时的审计归属。
+    // decision === "review" 或 "risky"：既未命中白名单、也未被硬拒。
+    // **su 只读档**（readonlyOnly，客户裁定 2026-10-12）：risky/review **一律拒绝**——本档只放行 (c) 白名单，
+    // **不接 (b)**（su 自己就是审读者，不自审）、**不接 (a)**（只读外的命令直接拒，不打扰客户、不弹框）。
+    // reason 写明命中的是哪一档（risky/review），让模型看懂「这是 su 只读档的策略拒绝，不是环境故障」。
+    if (opts.readonlyOnly === true) {
+      const tier = detail.decision === "risky" ? "risky" : "review";
+      return {
+        result: {
+          allow: false,
+          reason:
+            `su 只读档：本会话仅允许只读白名单命令；该命令未命中白名单（(c) 判为 ${tier}），` +
+            `按 su 只读策略拒绝执行——这是策略拒绝，不是环境故障。`,
+          by: byTagged,
+        },
+        conclusion: "deny",
+        branch: BRANCH_READONLY_DENY,
+      };
+    }
+    // 三层链（既有行为，逐字不变）：(c) 的硬拒**永不至此**（上面已终结）——故 (b)/(a) 只在 (c)
+    // **未明令禁止**的区间里判断，硬地板不被翻案（§7.3 要害）。cBy 仅作 (a) 都未接入时的审计归属。
     // §14.2：`risky` 与 `review` 走**同一条**入口，唯一差别是 `mustPassA`——risky 时 (b) 判放行**仍必过 (a)**。
     return await runBA(req, by, detail.decision === "risky");
   }
@@ -572,6 +655,12 @@ export interface ShellGateBuildDeps {
   env?: Record<string, string | undefined>;
   /** 覆盖审计 sink（测试用）；缺省写 `docs/audit/shell-gate.jsonl`。 */
   auditSink?: ShellAuditSink;
+  /**
+   * **su 只读档**（见 `CreateShellGateOptions.readonlyOnly`）：`true` ⇒ 只映射 (c) 白名单，
+   * `risky`/`review` 一律拒绝（`readonly-deny`），**(b)/(a) 即使注入了也永不调用**。
+   * 缺省 `false` = 既有三层链行为逐字不变。
+   */
+  readonlyOnly?: boolean;
 }
 
 export function buildShellGate(deps: ShellGateBuildDeps): ShellGate {
@@ -596,6 +685,7 @@ export function buildShellGate(deps: ShellGateBuildDeps): ShellGate {
     rulesId: deps.rulesId,
     now: deps.now,
     env: deps.env,
+    readonlyOnly: deps.readonlyOnly,
   });
 }
 

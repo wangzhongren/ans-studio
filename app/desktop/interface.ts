@@ -38,6 +38,9 @@ import {
 // I-1 补丁（2026-10-12 客户重发授权）：(c) 规则集实件的形状与构造（**只读转出**——形状 `Omit` 自编排
 // `AssembleShellGateOptions`，见 operator-channel.ts；本层不另立第二份）。
 import type { DesktopShellArming } from "./operator-channel.ts";
+// su 只读档（客户裁定 2026-10-12：「su 也要有 shell，但是只读」）：只读档装配选项形状的**单一来源**在编排
+// （`shell-arming.ts::AssembleReadonlyShellGateOptions`）——只读导入其类型（运行期擦除），本层不另立第二形状。
+import type { AssembleReadonlyShellGateOptions } from "../../src/pipeline/orchestration/shell-arming.ts";
 // 客户确认制交互（A-5）：桌面侧的客户通道形状（带角色上下文）——本层只透传，实现在 `customer-input.ts`。
 import type { DesktopCustomerInputFn } from "./customer-input.ts";
 // 输入区图片附件（K-2）：校验/解码/嗅探的**纯逻辑**（渲染进程不碰文件；字节交主进程校验——内容为准）。
@@ -123,8 +126,11 @@ export interface DesktopDeps {
       dispatchTask?: DispatchTaskFn;
       /** (a) 操作者确认通道（I-1 arm）：经本层透传（**仅项目角色**消费——见 session.ts）。 */
       shellOperatorChannel?: OperatorChannelFn;
-      /** (c) 规则集实件（I-1 补丁，2026-10-12）：经本层透传（**仅项目角色**消费——与 (a) 同判据）。 */
+      /** (c) 规则集实件（I-1 补丁，2026-10-12）：经本层透传（**仅项目角色**消费——与 (a) 同判据走三层链）。 */
       shellArming?: DesktopShellArming;
+      /** **su 只读档（客户裁定 2026-10-12）**：经本层透传（**仅内置治理角色（su）**消费——session.ts
+       *  复用同一份 (c) 实件给出；编排装配只读档 ShellGate，su 的 `run_shell` 只执行 (c) 只读白名单）。 */
+      shellReadonly?: Omit<AssembleReadonlyShellGateOptions, "project">;
     },
     deps: { createAdapter: (gate: WriteGate) => RuntimeAdapter },
   ) => Promise<RoleSessionHandle>;
@@ -149,17 +155,19 @@ export interface DesktopDeps {
   shellGate?: ShellGate;
   /**
    * **(a) 操作者确认通道**（I-1，2026-10-12 arm）——交付编排装配 (c)/(b)/(a) `ShellGate`
-   * （`buildShellGate` 的 `operatorChannel`）。**只对项目角色生效**（su 不 arm——审读者不给自己开闸；
-   * 见 session.ts 的 `role.builtIn` 判据）。主进程用 `createDesktopOperatorChannel`（既有 electron
-   * 确认框：命令原文 + 放行/拒绝，拒绝为默认与取消项）构造后注入；**测试/e2e 可注入替身**。
+   * （`buildShellGate` 的 `operatorChannel`）。**只对项目角色生效**（su **不接 (b)/(a)**——审读者不给自己
+   * 开闸：不自审、不弹框；su 的 shell 走只读档 `shellReadonly`，见 session.ts 的 `role.builtIn` 判据）。
+   * 主进程用 `createDesktopOperatorChannel`（应用内确认卡：命令原文 + 放行/拒绝，拒绝为默认与取消项）
+   * 构造后注入；**测试/e2e 可注入替身**。
    */
   shellOperatorChannel?: OperatorChannelFn;
   /**
    * **(c) 规则集实件（I-1 补丁，2026-10-12 客户重发授权）**——与 `shellOperatorChannel` **同一透传面**：
    * 主进程 arm 时经 `operator-channel.ts::buildDesktopShellArming()` 构造（**只读导入**门禁引擎经 Service
    * 公开出口的 `classifyShell`/`defaultShellRules`——不复制实现）；构造/加载失败 ⇒ `undefined` ⇒
-   * **不 arm**（主进程同时撤下 (a) 通道——`run_shell` 不注册，fail-closed）。**只对项目角色**下发
-   * （session.ts 与 (a) 同判据；su 不 arm）。**测试/e2e 可注入替身（桩件）**。
+   * **不 arm**（主进程同时撤下 (a) 通道——`run_shell` 不注册，fail-closed）。**项目角色**走向上三层链；
+   * **内置治理角色（su）**由 session.ts 用**同一份实件**经 `shellReadonly` 装配**只读档**
+   * （客户裁定 2026-10-12——单一来源，两边永不漂移）。**测试/e2e 可注入替身（桩件）**。
    */
   shellArming?: DesktopShellArming;
   /**

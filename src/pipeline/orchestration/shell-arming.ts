@@ -10,8 +10,13 @@
 // 执行前提（Pi适配器侧，既有，本文件不碰）：`cwd` 钉会话项目根（`createPiAdapterFactory` 现传
 // `shellCwd: projectRoot`）；spawn 前经 `buildShellEnv` **剥离凭据环境变量**（§7.9）。
 //
-// 装配语义（谁 arm、谁能开）：**只对项目角色**装配（调用方 `openRoleSession` 按角色种类决定——su 自身不 arm）；
-// 本函数本身不做角色判定，只负责「按给定 (a) 通道 + 注入的 (c)/(b) 件产出 ShellGate」。
+// **su 只读档**（客户裁定 2026-10-12：「su 也要有 shell，但是只读」）：`assembleReadonlyShellGate` ——
+// 同一审计边界解析（共用 `resolveGovernanceBoundary`），组 `buildShellGate({ readonlyOnly: true })`：
+// **只接 (c)**（命中只读白名单放行；`risky`/`review`/`deny` 一律拒），**不接 (b)**（su 自己就是审读者，
+// 不自审）、**不接 (a)**（只读外的命令直接拒，不打扰客户、不弹任何对话框）。
+//
+// 装配语义（谁 arm、谁能开）：**项目角色**走三层链（调用方 `openRoleSession` 按角色种类决定——su 不接
+// 三层链）；**su 的 `run_shell` 只经只读档注册**。本函数族本身不做角色判定，只负责「按给定件产出 ShellGate」。
 // 审计：`buildShellGate` 内建落盘（`docs/audit/shell-gate.jsonl`，治理边界 + 声明 `shell-gate` 条件；
 // 审计失败不翻转判定，如实 stderr）。
 //
@@ -83,16 +88,11 @@ export interface AssembleShellGateOptions {
  * （stderr 如实，不翻转判定）。全部 fail-closed。
  */
 export async function assembleProjectShellGate(opts: AssembleShellGateOptions): Promise<ShellGate> {
-  // (b) 审读角色：缺省 = 项目内置治理角色（经 listProject 枚举 builtIn，不硬编码 "su"）。
-  let reviewerRoleId = opts.pmRoleId;
-  if (reviewerRoleId === undefined) {
-    try {
-      const listing = await listProject(opts.project.projectRoot);
-      reviewerRoleId = listing.roles.find((r) => r.builtIn === true)?.roleId;
-    } catch {
-      reviewerRoleId = undefined; // 枚举失败 → (b) 不接 → 链上升 (a)（fail-closed，不放宽）
-    }
-  }
+  // (b) 审读角色 + 审计边界：共享解析（缺省枚举 `builtIn`，不硬编码 "su"；`pmRoleId` 给出则直接用它）。
+  const { roleId: reviewerRoleId, boundary: govBoundary } = await resolveGovernanceBoundary(
+    opts.project,
+    opts.pmRoleId,
+  );
 
   const pmAsk =
     reviewerRoleId !== undefined
@@ -103,17 +103,6 @@ export async function assembleProjectShellGate(opts: AssembleShellGateOptions): 
           ...(opts.openSession !== undefined ? { openSession: opts.openSession } : {}),
         })
       : undefined;
-
-  // 审计边界 = 治理角色的边界（项目治理边界文档 / 创世种子 / 内置；docs/ 为其可写区之一）。
-  let govBoundary: BoundarySection1 = NO_AUDIT_BOUNDARY;
-  if (reviewerRoleId !== undefined) {
-    try {
-      const resolved = await resolveRole(reviewerRoleId, opts.project);
-      if (resolved.boundary !== undefined) govBoundary = resolved.boundary;
-    } catch {
-      govBoundary = NO_AUDIT_BOUNDARY;
-    }
-  }
 
   return buildShellGate({
     ...(opts.classifyShell !== undefined ? { classifyShell: opts.classifyShell } : {}),
@@ -135,4 +124,97 @@ export async function assembleProjectShellGate(opts: AssembleShellGateOptions): 
     ...(opts.env !== undefined ? { env: opts.env } : {}),
     ...(opts.auditSink !== undefined ? { auditSink: opts.auditSink } : {}),
   });
+}
+
+// —————————————————————— su 只读档（客户裁定 2026-10-12：「su 也要有 shell，但是只读」） ——————————————————————
+
+/**
+ * `assembleReadonlyShellGate` 的选项（**契约钉死**：三方——编排/桌面/测试——按此接，不许改名）。
+ * **不提供 `operatorChannel` / `pmAsk` / `pmRoleId` / `openSession` / `sessionDeps`**——只读档**不接 (b)/(a)**：
+ * su 自己就是审读者（不自审）；只读外的命令直接拒（不打扰客户、不弹任何对话框）。**type 层面即接不上**。
+ */
+export interface AssembleReadonlyShellGateOptions {
+  /** 目标项目（配置单一来源在装配/前端）。 */
+  project: ProjectConfig;
+  /** (c) 门禁引擎纯函数（既有件；**注入**）。未注入 ⇒ 闸一律拒绝（fail-closed）。 */
+  classifyShell?: ClassifyShellFn;
+  /** (c) 规则集本体或加载器（门禁引擎的数据，如 `defaultShellRules()`）；未注入 ⇒ 同上（fail-closed）。 */
+  rules?: ShellRules | (() => ShellRules | Promise<ShellRules>);
+  /** 整体审核超时（毫秒）。 */
+  timeoutMs?: number;
+  /** 可注入时钟（测试）。 */
+  now?: () => Date;
+  /** 可注入环境（测试）。 */
+  env?: Record<string, string | undefined>;
+  /** 覆盖审计 sink（测试）；缺省落 `docs/audit/shell-gate.jsonl`（经治理边界 + `shell-gate` 条件）。 */
+  auditSink?: ShellAuditSink;
+}
+
+/**
+ * 装配 **su 只读档** `ShellGate`（客户裁定 2026-10-12）。语义：
+ * - **命中 (c) 只读白名单（`allow`）→ 放行执行**（既有 `c-allow` 路径）；
+ * - **`deny` → 照旧拒绝**（`c-deny` 硬拒）；**`risky` / `review` → 一律拒绝**（`readonly-deny`，reason 写明命中档）；
+ * - **不接 pmAsk、不接 operatorChannel**（选项面根本没有这两项；`buildShellGate` 亦不传）；
+ * - fail-closed 退路（`ruleset-load-failed` / `no-classifier` / `classify-error`）与三层链逐字一致——
+ *   **装配失败 / 缺件 ⇒ 一律拒绝**，绝不放宽；调用方（`openRoleSession`）装配抛错 ⇒ **不 arm**（`run_shell` 不注册）。
+ *
+ * 审计边界 = 治理角色边界（与三层链**同一解析**，共用 `resolveGovernanceBoundary`；取不到 ⇒ 审计写被门禁拒、
+ * stderr 如实，**不翻转判定**）。审计仍落 `docs/audit/shell-gate.jsonl`，`execution` 恒「未执行」（既有约定）。
+ */
+export async function assembleReadonlyShellGate(opts: AssembleReadonlyShellGateOptions): Promise<ShellGate> {
+  // 审计边界 = 内置治理角色边界（枚举 builtIn → resolveRole；与三层链共用同一 helper，不造第二份解析）。
+  const { boundary: govBoundary } = await resolveGovernanceBoundary(opts.project);
+
+  return buildShellGate({
+    ...(opts.classifyShell !== undefined ? { classifyShell: opts.classifyShell } : {}),
+    // (c) 规则集未注入 → 加载器抛错 → createShellGate 判 `ruleset-load-failed` → 一律拒绝（fail-closed）。
+    rules:
+      opts.rules ??
+      (() => {
+        throw new Error("(c) shell 规则集未注入——本闸一律拒绝（fail-closed）");
+      }),
+    // **不接 (b)/(a)**：不传 pmAsk、不传 operatorChannel；只读档由 shell-gate 层结构保证两闸永不调用。
+    readonlyOnly: true,
+    ...(opts.timeoutMs !== undefined ? { timeoutMs: opts.timeoutMs } : {}),
+    projectRoot: opts.project.projectRoot,
+    skillRoot: opts.project.skillRoot,
+    pmBoundary: govBoundary,
+    ...(opts.now !== undefined ? { now: opts.now } : {}),
+    ...(opts.env !== undefined ? { env: opts.env } : {}),
+    ...(opts.auditSink !== undefined ? { auditSink: opts.auditSink } : {}),
+  });
+}
+
+// —————————————————————— 共享：内置治理角色发现 + 其边界（审计边界）解析 ——————————————————————
+
+/**
+ * **内置治理角色发现 + 其边界解析**（三层链与只读档**共用**的「审计边界」路径；§6：只经 Service 公开出口）。
+ * - `roleIdOverride` 给出（三层链的 `pmRoleId`）⇒ 直接用它，不枚举；
+ * - 否则经 `listProject` 枚举 `builtIn === true` 的角色（**不硬编码 "su"**）；
+ * - 枚举失败 / 无内置角色 → `roleId: undefined`；边界解析失败 → `boundary: NO_AUDIT_BOUNDARY`。
+ * 调用方按各自 fail-closed 语义处理（三层链：`roleId` 缺席 ⇒ (b) 不接 → 升 (a)；边界缺席 ⇒ 审计写被拒）。
+ */
+async function resolveGovernanceBoundary(
+  project: ProjectConfig,
+  roleIdOverride?: string,
+): Promise<{ roleId: string | undefined; boundary: BoundarySection1 }> {
+  let roleId = roleIdOverride;
+  if (roleId === undefined) {
+    try {
+      const listing = await listProject(project.projectRoot);
+      roleId = listing.roles.find((r) => r.builtIn === true)?.roleId;
+    } catch {
+      roleId = undefined; // 枚举失败 → 无审计边界来源（fail-closed，不放宽）
+    }
+  }
+  if (roleId === undefined) return { roleId: undefined, boundary: NO_AUDIT_BOUNDARY };
+
+  // 审计边界 = 治理角色的边界（项目治理边界文档 / 创世种子 / 内置；docs/ 为其可写区之一）。
+  try {
+    const resolved = await resolveRole(roleId, project);
+    if (resolved.boundary !== undefined) return { roleId, boundary: resolved.boundary };
+  } catch {
+    /* 边界解析失败 → NO_AUDIT_BOUNDARY（审计写被拒，stderr 如实；不翻转判定） */
+  }
+  return { roleId, boundary: NO_AUDIT_BOUNDARY };
 }

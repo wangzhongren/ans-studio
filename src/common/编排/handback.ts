@@ -30,6 +30,7 @@
 
 import type { SessionEvent, DispatchTaskPayload } from "../../provider/pi/session.ts";
 import type { ProjectConfig } from "../../model/role.ts";
+import { createHash } from "node:crypto";
 
 /** 角色完成一次任务后的结构化回交（设计 §10.8）。 */
 export interface TaskHandback {
@@ -43,8 +44,15 @@ export interface TaskHandback {
   summary: string;
   /** 证据（产物路径 / 变更 / 测试结论）——**只搬证据，不搬身份与写权**。 */
   evidence: string[];
-  /** 产出时间（ISO 8601）。 */
+  /** 产出时间（ISO 8601）。**仅供展示**——不参与去重键（X-2：含时间戳的键判重不稳）。 */
   at: string;
+  /**
+   * **会话内轮次序号**（1 起；由 `withHandback` 按「settle 突发」计数后写入）——供 `handbackKey` 的
+   * **稳定去重键**区分两类貌合神离的情况：**同轮重放/重复 settled**（同 `round` ⇒ 恒等键 ⇒ 判重）与
+   * **新轮真返工**（`round` 递增 ⇒ 键不同 ⇒ 照常各自投递，即便文本逐字相同）。**不含任何时间信息**；
+   * 不进入投递文案（`renderHandbackPrompt` 不呈现）。
+   */
+  round?: number;
 }
 
 /**
@@ -205,12 +213,25 @@ export function renderHandbackPrompt(hb: TaskHandback): string {
 }
 
 /**
- * **回交去重键**（设计 §E-1：「一条回交只投递一次（去重），避免重放刷屏」）——构造的单一来源。
- * 投递侧（桌面）以其登记「已投递」集合；键 = `<roleId>\0<taskId或空>\0<at>`（`at` 为回交产出的 ISO 时间，
- * 同一份 `TaskHandback` 恒等）。本函数只算键，不做登记（登记与排队是前端职责）。
+ * **回交去重键——稳定键（X-2 硬化）**（设计 §E-1「一条回交只投递一次，避免重放刷屏」的构造单一来源）。
+ * 投递侧（桌面）以其登记「已投递」集合；本函数只算键，不做登记（登记与排队是前端职责）。
+ *
+ * **键形状**：`<roleId>\0<taskId或空>\0<round或空>\0<内容哈希16位>`——**不含 `at`**（旧键含毫秒时间戳，
+ * 同一轮的两份回交因毫秒差判重失效，真机即由此把 7 份逐字相同的投递送进 su）。内容哈希 =
+ * SHA-256(status \0 summary \0 evidence[{i}]…) 前 16 位（仅作次级判据；`round` 已足以区分轮次）。
+ *
+ * **两类判定的分工（给桌面/后续维护者）**：
+ * · **同轮重放 / 重复 settled**（同一批事件被重复消费、或同轮多份回交）⇒ `round` 与内容都相同
+ *   ⇒ **同键** ⇒ 判重（不重复投递）。
+ * · **新轮真返工**（后一轮产出**逐字相同**的文本）⇒ `round` 递增 ⇒ **键不同** ⇒ **照常各自投递**。
+ * ⚠ 用键方**不得**自行拼入时间戳或改用 `at`——那会把上面两类判定一起打回原状。
  */
 export function handbackKey(hb: TaskHandback): string {
-  return `${hb.roleId}\u0000${hb.taskId ?? ""}\u0000${hb.at}`;
+  const contentHash = createHash("sha256")
+    .update(`${hb.status}\u0000${hb.summary}\u0000${hb.evidence.join("\u0000")}`)
+    .digest("hex")
+    .slice(0, 16);
+  return `${hb.roleId}\u0000${hb.taskId ?? ""}\u0000${hb.round ?? ""}\u0000${contentHash}`;
 }
 
 // —————————————— H-1：su 派发任务（dispatch_task）的编排侧共用件 ——————————————
@@ -286,6 +307,15 @@ export function formatDispatchReceipt(opts: {
  * 回交内容**取报告值**（`buildReportHandback`）；未交 / 形状非法 ⇒ **回退既有推导**
  * （`buildTaskHandback`），不硬失败、不报错。
  *
+ * **每轮至多一份回交（X-2 硬化；真机依据：适配器每轮曾发两次 `settled` ⇒ 每轮两份逐字相同的回交）**：
+ * 轮次以**「settle 突发」**为界——一次会话轮结束时 `settled` 可能连发多份；**只认突发里的第一份**
+ * 发回交（其余仅**透传**）。若两份 `settled` 之间来了新事件（正常的新一轮，或真返工），视为**新一轮**、
+ * 照常再发一份。判定用「自上次回交以来是否出现过新事件」的置位实现（不需要轮次标识符——事件流本身
+ * 即界碑）；每份回交带 `round`（递增轮次序号），供 `handbackKey` 做**稳定去重**。
+ * **既有语义不变**：先回交再透传 `settled`；无 `settled` 不发回交。
+ * 残留（如实登记）：若「两次 `settled` 之间夹着别的**事件**」而实为同轮（根因在适配器侧、其同刻在修），
+ * 本防护不会合并——会按新一轮各发一份（`round` 不同 ⇒ 键不同 ⇒ 投递侧也不判重）。
+ *
  * 流自然结束（无 `settled`）→ **不发** handback（回交绑定「会话 settle/完成」，非「流关闭」）。
  */
 export async function* withHandback(
@@ -294,16 +324,25 @@ export async function* withHandback(
   opts: { report?: () => TaskReport | undefined } = {},
 ): AsyncIterable<OrchestrationEvent> {
   const seen: SessionEvent[] = [];
+  let round = 0; // 已发回交的轮次数（1 起）
+  // 自上次回交以来是否出现过新事件（或尚未发过回交）——决定本轮 settle 突发是否该发回交。
+  let newRound = true;
   for await (const ev of source) {
     if (ev.kind === "settled") {
-      const report = opts.report?.();
-      const handback =
-        report !== undefined ? buildReportHandback(report, ctx) : buildTaskHandback([...seen, ev], ctx);
-      yield handbackEvent(handback);
-      yield ev;
+      if (newRound) {
+        newRound = false;
+        round += 1;
+        const report = opts.report?.();
+        const handback =
+          report !== undefined ? buildReportHandback(report, ctx) : buildTaskHandback([...seen, ev], ctx);
+        handback.round = round;
+        yield handbackEvent(handback);
+      }
+      yield ev; // 重复 settled：仅透传（次序「回交在前、settled 在后」不受影响）
       continue;
     }
     seen.push(ev);
+    newRound = true;
     yield ev;
   }
 }

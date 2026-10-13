@@ -54,7 +54,11 @@ test("describeTool：两交互工具带 executionMode:'sequential' 与 promptGui
     assert.match(d.promptGuidelines!.join("\n"), /写盘/, "准则应写死「写盘」纪律（A-2）");
     assert.match(d.promptGuidelines!.join("\n"), /未获|不要|不得/, "准则应含未获同意时的禁令（A-2）");
   }
-  for (const name of ["write_file", "read_file", "run_shell"]) {
+  // W-1 起：write_file / edit_file **也**钉 sequential（同轮丢写修复）；纯读与非写类不加。
+  for (const name of ["write_file", "edit_file"]) {
+    assert.equal(describeTool(name).executionMode, "sequential", `${name} 应钉 sequential（W-1）`);
+  }
+  for (const name of ["read_file", "run_shell"]) {
     assert.equal(describeTool(name).executionMode, undefined, `${name} 不应擅自改执行模式`);
   }
 });

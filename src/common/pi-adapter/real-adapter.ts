@@ -26,7 +26,7 @@
 // ⚠️ 命名陷阱（附录 A）：Pi 自带的 BoundaryState / BoundaryResult 指**会话上下文/压缩边界**，
 //    与本项目角色边界无关，本文件**不使用**它们、也不据此改动任何边界类型。
 
-import { accessSync, constants, mkdirSync } from "node:fs";
+import { accessSync, constants, mkdirSync, readFileSync } from "node:fs";
 import type { ResolvedRole } from "../../model/role.ts";
 import type {
   WriteGate,
@@ -37,6 +37,7 @@ import type {
   CustomerInputFn,
   ReportHandbackFn,
   DispatchTaskFn,
+  ShellVerdictFn,
   PromptImage,
   PromptOptions,
 } from "../../provider/pi/session.ts";
@@ -117,6 +118,28 @@ export async function buildExplicitRuntime(
     baseUrl: cfg.baseUrl,
     provider: cfg.providerId,
     contextWindow: cfg.contextWindow,
+    // —— compat 显式收窄（2026-10-12 根因修复；客户知情并要求修）——
+    // 模板 compat **实测值**（本机 claude-fable-5）：`supportsMidConvoSystemMessages:true`、
+    // `supportsMidConvoToolChanges:true`、`forceAdaptiveThinking:true`、`supportsStrictTools:true`、
+    // `allowedFallbackModels:[opus…]`。这些是 **Anthropic 官方端点/`inline-tools-2026-09-15` beta** 的能力声明；
+    // 我们克隆后 baseUrl 指向**第三方 anthropic-messages 兼容网关**，上述能力**一律未证实** ⇒ 不收窄即等于
+    // 撒谎，且已实锤造成生产故障：
+    //   · 两 `supportsMidConvo*` 为 true 时，SDK 在**会话中途工具装载变化**后按
+    //     `nativeToolChanges = sMCS && sMCT && initialTools.length>0`（anthropic-messages.js:870）生成
+    //     `{type:"tool_addition"}/{type:"tool_removal"}` 块（:1027-1041）——网关不认该变体，整段重发
+    //     **500 `unknown variant 'tool_removal'`**（真机 su 审读轮 35/37 被拒、助手 content 恒空的根因）。
+    //   · `supportsStrictTools:true` ⇒ 工具 schema 附 Anthropic strict 扩展字段（网关未必认）。
+    //   · `forceAdaptiveThinking:true` ⇒ 强制 adaptive thinking 格式（网关支持未证）。
+    //   · `allowedFallbackModels` 非空 ⇒ 请求可能带服务端 fallback 字段且引用 opus 模型（网关必不支持）。
+    // 故**显式置为 SDK 缺省安全值**（false / 清空）；其余未列 compat 字段原样保留（逐项收窄，不整体丢弃）。
+    compat: {
+      ...templateModel.compat,
+      supportsMidConvoSystemMessages: false,
+      supportsMidConvoToolChanges: false,
+      forceAdaptiveThinking: false,
+      supportsStrictTools: false,
+      allowedFallbackModels: undefined,
+    },
   };
 
   const provider = piAi.createProvider({
@@ -183,6 +206,47 @@ export interface SessionManagerSelection {
   mode: "in-memory" | "resumed" | "created";
   /** 恢复时 = 打开的会话文件；新建时 = 首次落盘将写到的文件（**惰性**：首条消息前不存在）。 */
   sessionFile?: string;
+  /** 被跳过的「含未知块」会话文件数（>0 时调用方应**如实告知**，勿静默）。 */
+  skippedContaminated?: number;
+  /** 需要如实告知的说明（如「全部候选含未知块，已新建」）；无则缺省。 */
+  note?: string;
+}
+
+/**
+ * 检测会话文件里是否含**网关不认识的工具变更块**（`tool_removal` / `tool_addition`，`inline-tools-2026-09-15`
+ * beta 语义）——只认**system 消息 content 里的字面块**（用户/助手正文里出现同样字符串**不算**，防误报）。
+ *
+ * **背景（2026-10-12 实测澄清，如实）**：当前 SDK 的 JSONL **存的不是字面块**——中途工具装载变化落的是
+ * system 消息上的 `toolsAdded`/`toolsRemoved` **元数据**（本地探针确证），字面块是**每次请求**在
+ * anthropic-messages.js:1027-1041 生成、**受模型 compat 两能力位门控**。故：收窄 compat（本文件
+ * `buildExplicitRuntime`）后，**存量会话重发不会再生成该块**——存量污染自动失效、**无需清洗**。
+ * 本检测器是**防御性**的（防万一的旧版/他源文件真的落了字面块）：发现即**跳过该文件**，全候选都被污染则
+ * **新建会话并如实告知**（fail-closed；**不清洗、不改写历史文件**——改写历史风险高且当前无对象）。
+ */
+export function sessionFileHasForeignToolChangeBlocks(filePath: string): boolean {
+  let text: string;
+  try {
+    text = readFileSync(filePath, "utf8");
+  } catch {
+    return false; // 读不到 ⇒ 交由后续 open/list 的既有错误路径处理，这里不截胡
+  }
+  if (!text.includes('"tool_removal"') && !text.includes('"tool_addition"')) return false;
+  for (const line of text.split("\n")) {
+    if (!line.includes('"tool_removal"') && !line.includes('"tool_addition"')) continue;
+    let entry: unknown;
+    try {
+      entry = JSON.parse(line);
+    } catch {
+      continue; // 坏行不影响其余判定（与 SDK 的宽容解析一致）
+    }
+    const message = (entry as { message?: { role?: unknown; content?: unknown } }).message;
+    if (message === undefined || message.role !== "system" || !Array.isArray(message.content)) continue;
+    for (const block of message.content) {
+      const type = (block as { type?: unknown } | null)?.type;
+      if (type === "tool_removal" || type === "tool_addition") return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -230,8 +294,32 @@ export async function selectSessionManager(
   }
   const existing: SessionInfo[] = await SessionManagerClass.list(opts.cwd, dir);
   if (existing.length > 0) {
-    const mostRecent = [...existing].sort((a, b) => b.modified.getTime() - a.modified.getTime())[0]!;
-    return { mode: "resumed", manager: SessionManagerClass.open(mostRecent.path), sessionFile: mostRecent.path };
+    const ordered = [...existing].sort((a, b) => b.modified.getTime() - a.modified.getTime());
+    let skipped = 0;
+    for (const info of ordered) {
+      // 防御性跳过：含网关不认识的工具变更块（见上文档；当前 SDK 不落字面块，此为防万一）。
+      if (sessionFileHasForeignToolChangeBlocks(info.path)) {
+        skipped += 1;
+        continue;
+      }
+      return {
+        mode: "resumed",
+        manager: SessionManagerClass.open(info.path),
+        sessionFile: info.path,
+        ...(skipped > 0 ? { skippedContaminated: skipped } : {}),
+      };
+    }
+    // 全部候选都含未知块 → **如实拒绝恢复并新建**（fail-closed；绝不静默挂死、不清洗历史）。
+    const manager = SessionManagerClass.create(opts.cwd, dir);
+    return {
+      mode: "created",
+      manager,
+      sessionFile: manager.getSessionFile(),
+      skippedContaminated: skipped,
+      note:
+        `检测到 ${skipped} 个会话文件含网关不认识的工具变更块（tool_removal/tool_addition），` +
+        `已**跳过恢复并新建会话**（不静默、不清洗历史）。`,
+    };
   }
   const manager = SessionManagerClass.create(opts.cwd, dir);
   return { mode: "created", manager, sessionFile: manager.getSessionFile() };
@@ -453,6 +541,33 @@ export function describeTool(name: string): ToolPiDescription {
       ],
     };
   }
+  if (name === "report_shell_verdict") {
+    // 审读结论工具（R-1，只给审读会话）：结构化结论（三值枚举）；**不得**暗示它授予任何权限。
+    return {
+      parameters: {
+        type: "object",
+        properties: {
+          verdict: {
+            type: "string",
+            enum: ["allow", "deny", "unsure"],
+            description:
+              "allow = allow execution; deny = deny; unsure = not sure (the existing gate chain decides how to escalate)",
+          },
+          reason: { type: "string", description: "Optional short reason (for audit/display)" },
+        },
+        required: ["verdict"],
+        additionalProperties: true,
+      },
+      description:
+        "交回对当前 shell 命令的**结构化审读结论**（结论以**本工具调用**为准——**不要**只在正文里写结论）。" +
+        "**本工具本身不执行、不放行任何命令，也不改变任何权限**：它只是把你的结论（allow / deny / unsure）" +
+        "交给编排，由既有审读链决定后续（unsure 按其既有规则升级）。verdict 三值之一必填；理由可选。",
+      promptGuidelines: [
+        "审读结论**必须**以 report_shell_verdict 工具调用交回（verdict: allow / deny / unsure）；在正文里写结论不算数。",
+        "本工具不授予任何权限、也不构成对任何命令的放行——它只记录你给出的结论；实际放行由编排的既有审读链决定。",
+      ],
+    };
+  }
   const parameters = {
     type: "object",
     properties: {
@@ -470,7 +585,15 @@ export function describeTool(name: string): ToolPiDescription {
       : name === "edit_file"
         ? "受治理的文件编辑工具。编辑前会向门禁引擎请求判定；被拒绝时不落盘。"
         : "读取文件内容。读取不受写边界约束（写边界只约束「能否改」，不约束「能否看」）。";
-  return { parameters, description };
+  // executionMode（设计 W-1，真机「同轮丢写」修复）：
+  // Pi **缺省同批并行**执行工具（pi-agent-core agent.js:145，A-6 已实测；批级规则：任一工具为
+  // sequential ⇒ 整批顺序执行）。`write_file`/`edit_file` 具**读改写竞态**（尤其 edit = 读→改→写）：
+  // 同批对同一文件 write+edit（或两次 edit）并行时，后者的读发生在先前写落盘之前 ⇒ 结果被覆盖=**丢写**
+  // （离线 A/B 复现：无本字段时 5/5 丢；加后 5/5 全保）。故写类工具一律钉 sequential。
+  // `read_file` **不加**：纯读无写可竞争；且「读+写/编辑」混批已因写类工具 sequential 而**整批顺序**
+  // （批级规则），单独加它只影响纯读批（无意义），反增串行开销。
+  const executionMode = name === "write_file" || name === "edit_file" ? ("sequential" as const) : undefined;
+  return { parameters, description, ...(executionMode !== undefined ? { executionMode } : {}) };
 }
 
 /**
@@ -503,6 +626,33 @@ export function toPiTool(tool: GovernedTool): ToolDefinition {
   } as unknown as ToolDefinition;
 }
 
+// —————————————————————— settle 事件（X-1：恰发一次） ——————————————————————
+
+/**
+ * 把 AgentSession 的 `agent_settled` **恰映射一次**为 `{kind:"settled"}`（设计 X-1）。
+ *
+ * **为何收口到这一个发射点（保留 `session.subscribe`、删扩展层 `on("agent_settled")` 映射）**：
+ * - 真机故障：两处同时发射 ⇒ 每轮 settle **两份** ⇒ 编排 `withHandback` 每份都回交 ⇒ 去重键含时间戳
+ *   （两次差几毫秒）⇒ 去重失效 ⇒ su 收到 7 次逐字相同的重复投递（X-1 上报）。
+ * - `session.subscribe` 是 **AgentSession 的公开事件面**、与事件源同层；**扩展层是可选层**（未加载/加载失败
+ *   即整层缺席），而 `settled` 是消费方的**关键信号**（漏发 ⇒ 消费方永久挂起）——关键信号不应挂在可选层上。
+ * - 扩展层的独立职责（`tool_call` 拦截等）**全部保留**，只删 `agent_settled` 这一处重复映射。
+ * - 中止路径语义保持：`session.abort()` 后 SDK 仍发 `agent_settled`（agent-session.js:689-691），
+ *   本函数照发一个 settled（实测 abort 路径恰 1）——消费方不会挂起。
+ *
+ * 导出供夹具驱动测试（stub 会话或真实 faux 会话均可）。
+ */
+export function wireSettledOnce(
+  session: { subscribe(listener: (event: { type: string }) => void): () => void },
+  emit: (event: SessionEvent) => void,
+): () => void {
+  return session.subscribe((event): void => {
+    if (event.type === "agent_settled") {
+      emit({ kind: "settled", summary: "会话结束" });
+    }
+  });
+}
+
 // —————————————————————— 治理扩展（写类拦截 + shell 能力级 kill-switch） ——————————————————————
 
 /**
@@ -513,6 +663,8 @@ const GOVERNED_WRITE_TOOLS = new Set(["write", "edit", "write_file", "edit_file"
 
 /**
  * 构造治理扩展工厂：注册 on("tool_call") 拦截，写之前调 gate，拒绝时返回 { block: true, reason }。
+ * **导出供接线测试**（X-1：断言本扩展**不含** agent_settled 映射——settled 的唯一发射点是
+ * `wireSettledOnce`，防重复发射点漂移回）。
  * 同时把事件经 emit 推给 RoleSession.events()。
  *
  * **写类**：这是"第二层"——第一层是自定义工具自身在 execute 前调 gate；即便某次自定义工具未拦住
@@ -523,7 +675,7 @@ const GOVERNED_WRITE_TOOLS = new Set(["write", "edit", "write_file", "edit_file"
  * `{block:true}`；**arm 了即放行、交 execute 做每调用细审**。它**不做**每调用 token 校验（票据已废，§7.1
  * 第 3 条），**绝不喂 resolveWrite**（run_shell 的 input 无 path；从命令串解析路径是启发式当判据，见 §7.7）。
  */
-function buildGovernanceExtension(
+export function buildGovernanceExtension(
   gate: WriteGate,
   emit: (event: SessionEvent) => void,
   shellArmed: boolean,
@@ -587,10 +739,6 @@ function buildGovernanceExtension(
         if (text !== undefined && text.length > 0) {
           emit({ kind: "message", summary: text });
         }
-      });
-
-      pi.on("agent_settled", (): void => {
-        emit({ kind: "settled", summary: "会话结束" });
       });
 
       // 上下文压缩：pi 会在每轮后按阈值自动触发。原样外推，否则压缩对用户完全不可见
@@ -728,6 +876,11 @@ export interface RealPiAdapterOptions extends PiProviderConfigInput {
    */
   dispatchTask?: DispatchTaskFn;
   /**
+   * shell 审读结论能力（R-1）；由编排构造、注入（**审读会话专用**）。**缺省时
+   * `report_shell_verdict` 不注册**（同 `shellGate` 的注入先例）。
+   */
+  shellVerdict?: ShellVerdictFn;
+  /**
    * 会话持久化目录（设计 D-1，重启恢复）。**给了** ⇒ 会话以 JSONL 落盘于该目录：目录内有最近会话即
    * `open` 恢复、否则 `create` 新建（**应逐角色隔离**，如 `<项目>/.ans/sessions/<角色>/`——共用一目录
    * 会互相恢复）。**缺省** ⇒ 逐字保留 `SessionManager.inMemory` 旧行为（不落盘）。适配器只读写该目录，
@@ -820,6 +973,8 @@ export function createRealPiRuntimeAdapter(opts: RealPiAdapterOptions): RuntimeA
         reportHandback: opts.reportHandback,
         // 派发任务工具：**仅当注入了派发能力时注册**（设计 H-1；只给 su）。
         dispatchTask: opts.dispatchTask,
+        // 审读结论工具：**仅当注入了审读结论能力时注册**（R-1；只给审读会话）。
+        shellVerdict: opts.shellVerdict,
       });
       const customTools = (governedTools as unknown as GovernedTool[]).map(toPiTool);
 
@@ -850,12 +1005,30 @@ export function createRealPiRuntimeAdapter(opts: RealPiAdapterOptions): RuntimeA
         cwd: opts.projectRoot,
         sessionDir: opts.sessionDir,
       });
+      if (sessionSelection.note !== undefined) {
+        // 跳过污染会话 / 全污染改新建：**如实告知**（日志 + 事件流），不静默。
+        log.stage(sessionSelection.note);
+        emit({ kind: "message", summary: sessionSelection.note });
+      }
       if (sessionSelection.mode === "resumed") {
-        const notice = `会话已恢复：${sessionSelection.sessionFile ?? "（未知文件）"}（历史与模型上下文自该会话续起）`;
-        log.stage(notice);
-        emit({ kind: "message", summary: notice });
+        // 二次降噪（客户 2026-10-12 二次裁定，推翻此前「聊天流保留」的旧叙述）：恢复是**常规事件**——
+        // 终端与**聊天流都不再出现恢复提示**（原 `emit({kind:"message"})` 已删）；仅 `ANS_PI_TRACE`
+        // 打开时以 trace 输出，供排障。首轮只降终端、保留聊天流的那条决定已被客户明确推翻。
+        log.trace(
+          `会话已恢复：${sessionSelection.sessionFile ?? "（未知文件）"}（历史与模型上下文自该会话续起）`,
+        );
+        // 异常路径（与上面全污染 note 同口径）：跳过过含未知块的会话、仍恢复了干净旧档时，该事实**只在
+        // 此分支可见**（此路径 note 为 undefined）——必须如实告知（stage + 事件流），不得静默吞掉；
+        // 恢复本身（常规事件）仍不上聊天流。
+        if (sessionSelection.skippedContaminated !== undefined) {
+          const skipNotice =
+            `检测到 ${sessionSelection.skippedContaminated} 个会话文件含网关不认识的工具变更块` +
+            `（tool_removal/tool_addition），已跳过这些文件、恢复最新一条干净会话（不静默、不清洗历史）。`;
+          log.stage(skipNotice);
+          emit({ kind: "message", summary: skipNotice });
+        }
       } else if (sessionSelection.mode === "created") {
-        log.stage(`新会话（持久化目录：${opts.sessionDir ?? ""}；首条消息后才落盘）`);
+        log.trace(`新会话（持久化目录：${opts.sessionDir ?? ""}；首条消息后才落盘）`);
       }
 
       log.stage("createAgentSession…");
@@ -875,11 +1048,8 @@ export function createRealPiRuntimeAdapter(opts: RealPiAdapterOptions): RuntimeA
         "createAgentSession",
       );
 
-      const unsubscribe = session.subscribe((event): void => {
-        if (event.type === "agent_settled") {
-          emit({ kind: "settled", summary: "会话结束" });
-        }
-      });
+      // settled 的**唯一**发射点（X-1）：见 wireSettledOnce 的理由注释。
+      const unsubscribe = wireSettledOnce(session, emit);
 
       log.stage("bindRole 完成");
 

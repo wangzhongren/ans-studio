@@ -68,6 +68,19 @@
   /** P-1（2026-10-12）：到达时**自动滚动**到卡的距底阈值（px）——「在底部附近」的口径。 */
   var AUTO_SCROLL_THRESHOLD_PX = 120;
 
+  /** S-1（2026-10-12）：**流式输出贴底**的距底阈值（px）——「读者就在底部」的口径（比卡到达的更紧）。 */
+  var STICK_THRESHOLD_PX = 24;
+
+  /**
+   * S-1：普通流式输出到达时是否**贴底**——① 正看着该角色由渲染侧另行判（本函数只管距离）；
+   * ② 视口**距底 ≤ 阈值**（缺省 24px）。距离应在**追加新行之前**测（行本身会立刻把距离推过阈值）。
+   * 用户往上翻（超出阈值）⇒ false = **不打断阅读**（新输出不把读者拽回底部）。
+   */
+  function stickToBottom(distanceToBottom, threshold) {
+    var t = typeof threshold === "number" && isFinite(threshold) ? threshold : STICK_THRESHOLD_PX;
+    return typeof distanceToBottom === "number" && isFinite(distanceToBottom) && distanceToBottom <= t;
+  }
+
   /**
    * P-1：请求到达时是否**自动滚动到卡**——① 正看着该角色（`isViewing`）；② 视口**距底 ≤ 阈值**。
    * 任一不满足（在往上翻 / 不在该角色）⇒ false = **不打断阅读**，改由常驻 chip 提供持久指示。
@@ -91,7 +104,9 @@
     queueItemViews: queueItemViews,
     arrivalScrolls: arrivalScrolls,
     pendingChipLabel: pendingChipLabel,
+    stickToBottom: stickToBottom,
     AUTO_SCROLL_THRESHOLD_PX: AUTO_SCROLL_THRESHOLD_PX,
+    STICK_THRESHOLD_PX: STICK_THRESHOLD_PX,
   };
   root.ANSUiLabels = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api; // 若将来以 CJS 装载

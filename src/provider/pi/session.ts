@@ -304,6 +304,29 @@ export type DispatchTaskFn = (
   dispatch: DispatchTaskPayload,
 ) => DispatchReceipt | null | undefined | void | Promise<DispatchReceipt | null | undefined | void>;
 
+// —————————————— shell 审读结论能力（report_shell_verdict，R-1） ——————————————
+//
+// **来历**：编排 R-1——shell 闸 (b) 的审读结论**放弃解析自由正文**（真机根因：网关 500 使助手正文恒为空 ⇒
+// 恒不可解析），改由**工具调用**取结构化结论。**形状逐字取自编排 `src/common/编排/shell-gate.ts:205-217`**
+// （**读之确认、不导入**——§6 禁导入他人私有 `common/`；与 T20/T36/A-1 同一先例）。
+// **只给审读会话**：由编排（pm-reviewer 路径）以**是否注入**表达；未注入 ⇒ 工具不存在。
+// **收敛建议（供编排）**：可改为从本文件导入三型（同 T20→T21 先例）。
+
+/** 审读结论载荷（逐字取自编排 `shell-gate.ts`；设计 R-1）。 */
+export interface ShellVerdictPayload {
+  /** 结论：allow = 放行；deny = 拒绝；unsure = 拿不准（按既有链升级到 (a)）。 */
+  verdict: "allow" | "deny" | "unsure";
+  /** 可选：简述理由（审计/呈现用）。 */
+  reason?: string;
+}
+
+/**
+ * 「审读结论」注入点（审读会话专用）：调用即把**结构化结论**交给编排（其内部完成捕获/使用）。
+ * 返回位含 `void`（编排形状即 `void | Promise<void>`）；抛错 → 交回失败（handler **如实**返回，
+ * 绝不谎称）。**结论只以本工具调用为准——正文里写结论不算。**
+ */
+export type ShellVerdictFn = (verdict: ShellVerdictPayload) => void | Promise<void>;
+
 export interface RuntimeAdapter {
   composeContext(role: ResolvedRole): Promise<{ systemPrompt: string }>;
   bindRole(role: ResolvedRole): Promise<RoleSession>;
@@ -371,6 +394,11 @@ export function createFakeRuntimeAdapter(opts: {
    * （**只给 su**——编排对项目角色不注入 ⇒ 不存在；同 `shellGate` 先例）。
    */
   dispatchTask?: DispatchTaskFn;
+  /**
+   * shell 审读结论能力（R-1）：由编排构造、注入。**仅当注入时** `report_shell_verdict` 工具才注册
+   * （**只给审读会话**——由调用方以是否注入表达；同 `shellGate` 先例）。
+   */
+  shellVerdict?: ShellVerdictFn;
 }): RuntimeAdapter {
   const script = opts.script ?? DEFAULT_FAKE_SCRIPT;
 
@@ -391,6 +419,7 @@ export function createFakeRuntimeAdapter(opts: {
         customerInputTimeoutMs: opts.customerInputTimeoutMs,
         reportHandback: opts.reportHandback,
         dispatchTask: opts.dispatchTask,
+        shellVerdict: opts.shellVerdict,
       });
       const byName = new Map(tools.map((t) => [t.name, t]));
       const queue = createEventQueue<SessionEvent>();
@@ -486,6 +515,11 @@ export interface PiRuntimeAdapterOptions extends PiProviderConfigInput {
    * （**只给 su**——由编排以是否注入表达）。
    */
   dispatchTask?: DispatchTaskFn;
+  /**
+   * shell 审读结论能力（R-1）：由编排构造、注入（**审读会话专用**——pm-reviewer 路径）。
+   * **仅当注入时** `report_shell_verdict` 工具才注册。
+   */
+  shellVerdict?: ShellVerdictFn;
   /**
    * 会话持久化目录（设计 D-1，重启恢复）：**给了** ⇒ 该项目角色的会话以 JSONL 落盘于该目录
    * （有最近会话即恢复，否则新建；**应逐角色隔离**，如 `<项目>/.ans/sessions/<角色>/`）；

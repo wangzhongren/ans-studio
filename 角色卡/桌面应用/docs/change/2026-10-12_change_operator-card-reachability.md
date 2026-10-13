@@ -34,7 +34,7 @@ events:
   `is-flash` 一次性 CSS 动画——无计时器）；**作答/失效（含 expired 终态）⇒ 灭**。
 - **同一状态源**：chip 计数/徽标/当前 pane 指针都出自 `openRequestIdsFor(roleId)`；刷新点统一在
   `refreshAwaitingBadge`（同处刷 chip）。
-- **切回**（`showPane`）：有未作答卡 ⇒ **滚动到第一张**（而不是停在底部）；无卡 ⇒ Q-2 的滚动位置恢复。
+- **切回**（`showPane`）：有未作答卡 ⇒ **滚动到第一张**（而不是停在底部）；无卡 ⇒ **点击即到底部**（U-1 客户裁定，2026-10-12——取代 Q-2 的「恢复位置」）。
 
 ## 测试与证据（2026-10-12；Node v24.14.0 / Darwin arm64 / HEAD d933537）
 

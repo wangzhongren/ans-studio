@@ -11,6 +11,7 @@ import assert from "node:assert/strict";
 
 import { SessionManager } from "../../app/desktop/session.ts";
 import { createCustomerInputChannel, type OperatorRequestPayload } from "../../app/desktop/customer-input.ts";
+import { interactionAnchorKey } from "../../app/desktop/request-anchor.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
 import type { CustomerInputFn, CustomerInputRequest, SessionEvent } from "../../src/provider/pi/session.ts";
 import type { RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
@@ -34,7 +35,9 @@ test("A-5 通道：confirm 作答 → answered/confirmed:true；「不同意」�
   const req: CustomerInputRequest = { kind: "confirm", title: "写角色卡？", preview: "角色卡…" };
   const p1 = channel.customerInput(req, { roleId: "su" });
   assert.equal(pushed.length, 1, "请求应经 presenter 推达（带 roleId 信封）");
-  assert.deepEqual(pushed[0], { id: "op-1", roleId: "su", request: req });
+  // 锚点键（真机缺陷修复 2026-10-12）：载荷带 anchorKey（请求本体 kind+title 的单一算法键）——
+  // 渲染侧据此与回放行精确关联、把交互卡（重）物化到它发生的位置。
+  assert.deepEqual(pushed[0], { id: "op-1", roleId: "su", request: req, anchorKey: interactionAnchorKey("confirm", "写角色卡？") });
   assert.equal(channel.pendingCount(), 1);
 
   assert.deepEqual(channel.respond({ id: "op-1", decision: { kind: "confirm", confirmed: true } }), { ok: true });

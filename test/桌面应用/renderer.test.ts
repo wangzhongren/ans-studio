@@ -183,16 +183,23 @@ test("T28：Pi 配置面板存在——3 项必填 + 1 项「高级」（可折�
   assert.ok(RENDERER.includes('"ANS_PI_CONTEXT_WINDOW"'), "渲染侧面板键应含 CONTEXT_WINDOW");
   assert.ok(!/"ANS_PI_PROVIDER"/.test(RENDERER), "渲染侧面板键集合不该含 PROVIDER");
   assert.ok(RENDERER.includes("PI_REQUIRED_KEYS"), "渲染侧应区分必填键（缺才告警）");
-  assert.ok(INDEX.includes('id="btn-pi-settings"'), "应有「Pi 设置」按钮");
+  assert.ok(INDEX.includes('id="tab-pi"'), "Pi 设置入口应为右上角图标簇的 tab-pi（2026-10-13 客户裁定）");
+  assert.ok(!INDEX.includes('id="btn-pi-settings"'), "「Pi 设置」文字按钮应已删（入口上移到右上角图标簇）");
   assert.ok(INDEX.includes('id="pi-save"'), "应有保存按钮 #pi-save");
+  const tabsPos = INDEX.indexOf('id="right-tabs"');
+  const tabPiPos = INDEX.indexOf('id="tab-pi"');
+  const winMinPos = INDEX.indexOf('id="win-min"');
+  assert.ok(tabsPos >= 0 && tabPiPos > tabsPos && winMinPos > tabPiPos, "tab-pi 应在图标簇内、窗口按钮之前（右上角）");
   // token 字段默认掩码（type=password）——值以掩码显示、默认不回显。
   assert.ok(/id="pi-inp-ANTHROPIC_AUTH_TOKEN"[^>]*type="password"/.test(INDEX), "token 字段应为 password 掩码");
   // 呈现逻辑：读/存经 window.desktop（主进程掩码/读写，单一来源）；不作判定。
   assert.ok(RENDERER.includes("d.getPiConfig") && RENDERER.includes("d.savePiConfig"), "渲染侧应经 d.getPiConfig/d.savePiConfig");
   assert.ok(RENDERER.includes("openPiPanel") && RENDERER.includes("savePiConfigFromForm"), "应有展开/保存逻辑");
-  // 「Pi 设置」入口在横栏右侧（客户 2026-10-11 裁定：随运行时选择器移除，入口上移到中栏横栏）。
-  assert.ok(RENDERER.includes("togglePiPanel"), "点「Pi 设置」应切换面板展开/收起");
-  assert.ok(INDEX.indexOf('id="btn-pi-settings"') > INDEX.indexOf('class="chat-head"'), "「Pi 设置」入口应移到中栏横栏（在 chat-head 之内/之后）");
+  // 「Pi 设置」入口=右上角图标簇（2026-10-13 客户裁定；togglePiPanel 随文字按钮退役，不留死代码——
+  // 用去注释源码断言，说明性注释里的提及不算）。
+  const codeNoCommentsPi = RENDERER.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+  assert.ok(!codeNoCommentsPi.includes("togglePiPanel"), "togglePiPanel 应随文字按钮退役（入口=tab-pi 的 toggleRightDrawer）");
+  assert.ok(codeNoCommentsPi.includes('toggleRightDrawer("pi")'), "tab-pi 点击应走 toggleRightDrawer（同一抽屉机、至多开一块）");
   // preload 桥两端 + 主进程 IPC 通道齐备。
   assert.ok(PRELOAD.includes("getPiConfig") && PRELOAD.includes("savePiConfig"), "preload 应暴露 getPiConfig/savePiConfig");
   assert.ok(MAIN.includes("pi-config:get") && MAIN.includes("pi-config:save"), "主进程应注册 pi-config IPC 通道");
@@ -351,10 +358,12 @@ test("B-2：selectRole 不得无条件 clearChat；每角色一个 pane；事件
   // 信封三端一致（{roleId, event}）。
   assert.ok(RENDERER.includes("env.roleId"), "渲染侧应按信封 roleId 分发");
   assert.ok(MAIN.includes("SessionEventEnvelope"), "主进程应透传 SessionEventEnvelope（带 roleId 信封）");
-  // 保活列表与定向 stop 的通道两端。
+  // 保活列表与停止通道两端（「结束会话」按钮已删——客户裁定 2026-10-13；停止能力保留在程序化路径：
+  // 换项目时 d.stopSession(null)「关闭全部」；定向 stopSession 在主进程/会话管理器，供该路径与测试使用）。
   assert.ok(PRELOAD.includes("listLiveSessions") && MAIN.includes("session:live"), "应有 session:live 通道两端");
   assert.ok(RENDERER.includes("d.listLiveSessions"), "渲染侧应取保活会话列表");
-  assert.ok(RENDERER.includes("d.stopSession(roleId)"), "stop 应为定向（传 roleId）");
+  assert.ok(RENDERER.includes("d.stopSession(null)"), "换项目路径应保留「关闭全部」停止能力（程序化）");
+  assert.ok(!RENDERER.includes("btn-stop"), "「结束会话」按钮入口应已删（不留死代码）");
   // 样式：pane 容器。
   assert.ok(STYLES.includes(".chat-pane"), "styles.css 应有 .chat-pane");
 });
@@ -549,7 +558,12 @@ test("K-1：输入区为**圆角胶囊**、发送箭头**内嵌框内**；快捷
     INDEX.includes("Enter 发送，Shift+Enter 换行"),
     "快捷键提示（placeholder）保留"
   );
-  assert.ok(INDEX.includes('id="composer-hint"') && INDEX.includes('id="session-state"'), "状态位（#composer-hint/#session-state）仍可达");
+  assert.ok(
+    INDEX.includes('id="composer-hint"') && !INDEX.includes('id="session-state"'),
+    "状态提示 #composer-hint 仍可达；「聊天中/空闲」pill 已删（客户 2026-10-13 裁定）"
+  );
+  // 状态 pill 删除后状态**程序化保留**：setState 把 kind 写到 #chat 的 data-state（外部驱动可断言）。
+  assert.ok(/function setState\(kind, label\) \{[\s\S]{0,200}chat\.dataset\.state = kind;/.test(RENDERER), "setState 应把 kind 写到 #chat 的 data-state（程序化保留）");
   assert.ok(RENDERER.includes("e.shiftKey"), "Enter 发送 / Shift+Enter 换行逻辑保留");
   assert.ok(
     RENDERER.includes('$("btn-send").disabled = !state.sessionOpenRoleId'),
@@ -588,10 +602,12 @@ test("D-1：会话记录恢复——主进程只读解析并推规范化行；�
   assert.ok(PRELOAD.includes("onSessionHistory") && PRELOAD.includes("session:history"), "preload 应暴露 onSessionHistory");
   assert.ok(MAIN.includes("readRoleSessionHistory"), "主进程应读取会话历史（session-history.ts，只读解析）");
   assert.ok(MAIN.includes('"session:history"'), "主进程应推 session:history");
-  // 渲染侧：订阅 + 回放（分隔提示 + .is-replay 与实时行可区分；文本走早已立的 esc/Markdown 单一来源）。
+  // 渲染侧：订阅 + 回放（错误分隔 + .is-replay 与实时行可区分；文本走早已立的 esc/Markdown 单一来源）。
   assert.ok(RENDERER.includes("d.onSessionHistory") && RENDERER.includes("onSessionHistory"), "渲染侧应订阅并处理会话恢复");
-  assert.ok(RENDERER.includes("会话已恢复（模型上下文一并恢复）"), "应有恢复提示语（回放段分隔行）");
-  assert.ok(RENDERER.includes("sys-replay-divider"), "回放段应有分隔样式钩子");
+  // 客户裁定（2026-10-13）：常规「会话已恢复…」分隔行已删（聊天流不摆常规提示）——断言「它不在」，防回潮。
+  assert.ok(!RENDERER.includes("会话已恢复（模型上下文一并恢复）"), "常规恢复分隔行应已删（客户裁定：聊天流不摆常规提示）");
+  assert.ok(/error !== null\) \{[\s\S]{0,300}sys-replay-divider/.test(RENDERER), "错误分支的分隔行保留（坏文件如实提示；仅在 error 时出现）");
+  assert.ok(RENDERER.includes("sys-replay-divider"), "错误分隔行仍有样式钩子（.sys-replay-divider）");
   assert.ok(RENDERER.includes("is-replay"), "回放行应有 is-replay 标记（视觉可区分）");
   assert.ok(RENDERER.includes("会话记录读取失败，未回放"), "坏文件应如实提示而不崩");
   assert.ok(RENDERER.includes("replayHistory") && RENDERER.includes("flushPendingHistories"), "应含回放与（先到数据的）寄存冲洗");
@@ -851,8 +867,8 @@ test("P-1：待确认卡可达性——到达即达（底部阈值内滚到卡/�
   assert.ok(
     /if \(arrivalShouldScrollToCard\(entry\.roleId\)\) scrollBottom\(pane\);/.test(RENDERER) === false &&
       RENDERER.includes("var nearBottomAtArrival = arrivalShouldScrollToCard(entry.roleId);") &&
-      RENDERER.includes("if (nearBottomAtArrival) scrollBottom(pane);"),
-    "物化时：**先量后挂**（到达前距离为判据），仅在阈值内滚到卡；否则不打断阅读"
+      RENDERER.includes("if (nearBottomAtArrival) scrollBottomForced(pane);"),
+    "物化时：**先量后挂**（到达前距离为判据），仅在阈值内滚到卡（强制贴底）；否则不打断阅读"
   );
   // chip：元素/文案/计数/逐张定位/隐藏。
   assert.ok(RENDERER.includes('"op-chip"') && RENDERER.includes("op-chip-text") && RENDERER.includes("UiLabels.pendingChipLabel("), "chip 元素与文案位");
@@ -864,12 +880,12 @@ test("P-1：待确认卡可达性——到达即达（底部阈值内滚到卡/�
   assert.ok(RENDERER.includes("el.scrollIntoView({ block: \"center\" })"), "滚动容器=#chat（块居中）");
   const rendererCode = RENDERER.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
   assert.ok(!rendererCode.includes("setTimeout") && !rendererCode.includes("setInterval"), "无计时器（G-1 纪律不破；高亮=CSS 动画——注释里的说明不算）");
-  // 切回：showPane 有未作答卡 ⇒ 滚到卡（而非停在底部）。
+  // 切换：showPane 有未作答卡 ⇒ 滚到卡（P-1 优先）；无卡 ⇒ 到底部（U-1 客户裁定）。
   assert.ok(
     RENDERER.includes("var pendingIds = openRequestIdsFor(key);") && /scrollToOperatorCard\(key, pendingIds\[0\]\)/.test(RENDERER),
-    "showPane：切回滚到卡（P-1 优先于位置恢复）"
+    "showPane：切到有未作答卡的角色 ⇒ 滚到卡（P-1 优先）"
   );
-  assert.ok(/else if \(typeof scrollMemo\[key\] === "number"\)/.test(RENDERER), "无未作答卡 ⇒ 恢复该角色上次滚动位置（Q-2）");
+  assert.ok(RENDERER.includes("stickPaneToBottomOrCard(key);"), "showPane：无卡 ⇒ 到底部（U-1，经定位助手）");
   assert.ok(RENDERER.includes("updateOpChip(key);"), "showPane 同处刷新 chip（查看状态变了）");
   // 样式钩子。
   assert.ok(STYLES.includes(".op-chip") && STYLES.includes(".op-chip[hidden]") && STYLES.includes(".op-request.is-flash") && STYLES.includes("@keyframes op-flash"), "chip/高亮样式钩子");
@@ -893,9 +909,14 @@ test("Q-2：窗口化行模型（阈值 150 / 缓冲 30 / spacer / rAF 合帧）
   // 语义②P-1 卡定位：目标行未实体化 ⇒ **先实体化再滚动**并高亮。
   assert.ok(/rl\.rows\.length >= VIRT_MIN_ROWS[\s\S]{0,400}attachRow\(rl, rec\)/.test(RENDERER), "滚动到卡：窗口化下先实体化目标行");
   assert.ok(RENDERER.includes('el.classList.add("is-flash")'), "定位高亮保持");
-  // 语义③切角色恢复位置（B-2）：切走记忆、切回恢复（有未作答卡则优先滚到卡——P-1 优先）。
-  assert.ok(RENDERER.includes("scrollMemo[outgoing.dataset.roleId || \"\"] = chat.scrollTop"), "切走记忆滚动位置");
-  assert.ok(/pendingIds\.length > 0\) \{\s*scrollToOperatorCard\(key, pendingIds\[0\]\);\s*\} else if \(typeof scrollMemo\[key\] === "number"\)/.test(RENDERER), "切回：卡优先，否则恢复位置（没记过才贴底）");
+  // 语义③=U-1（2026-10-12 客户裁定，**取代** B-2「恢复位置」）：点角色 ⇒ 到底部（有未作答卡则卡优先——
+  // P-1）；scrollMemo 已删干净（注释剥离后断言，说明性注释不算）。
+  const codeNoComments = RENDERER.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+  assert.ok(!codeNoComments.includes("scrollMemo"), "scrollMemo 已删干净（不留死代码）");
+  assert.ok(
+    /function stickPaneToBottomOrCard\(roleId\) \{[\s\S]{0,600}scrollToOperatorCard\(key, pendingIds\[0\]\);[\s\S]{0,400}scrollBottomForced\(paneFor\(key\)\);/.test(RENDERER),
+    "切角色：有卡滚到卡、无卡到底部（U-1，定位助手）"
+  );
   // 语义④回放惰性：整段包批量，行按需 build（长转录不一次性实体化/解析）。
   assert.ok(/function replayHistory[\s\S]{0,1500}batchDepth \+= 1;/.test(RENDERER), "回放整段在批量里（不 per-row 滚动/布局）");
   assert.ok(/function appendReplayRow[\s\S]{0,900}registerRow\(/.test(RENDERER), "回放行走惰性行表（build 在挂载时才跑）");
@@ -906,4 +927,155 @@ test("Q-2：窗口化行模型（阈值 150 / 缓冲 30 / spacer / rAF 合帧）
   assert.ok(!code.includes("setTimeout") && !code.includes("setInterval"), "renderer 代码仍无 setTimeout/setInterval（rAF 合帧合规）");
   // 样式钩子。
   assert.ok(STYLES.includes(".virt-spacer") && STYLES.includes(".msg-assistant.is-streaming"), "spacer/流式纯文本样式钩子");
+});
+
+// ————————————————— S-1（2026-10-12 客户「输出不会让滚动条滚动到最底下了」）：流式贴底回归 —————————————————
+
+test("S-1：流式输出双向语义——在底部才贴底（先量后挂）、上翻不拽回；窗口化下贴底在窗口更新**之后**", async () => {
+  const href = new URL("../../app/renderer/ui-labels.js", import.meta.url).href;
+  await import(href);
+  const UL = (globalThis as Record<string, unknown>).ANSUiLabels as {
+    stickToBottom: (d: unknown, t?: unknown) => boolean;
+    STICK_THRESHOLD_PX: number;
+  };
+  // 纯判据：距底 ≤24px 才算「在底部」（阈值保守；非法值不贴）。
+  assert.equal(UL.STICK_THRESHOLD_PX, 24, "流式贴底阈值 = 24px");
+  assert.equal(UL.stickToBottom(0), true, "就在底部 ⇒ 贴底");
+  assert.equal(UL.stickToBottom(24), true, "阈值边界含（≤24）");
+  assert.equal(UL.stickToBottom(25), false, "超出阈值（读者在往上翻）⇒ 不贴、不拽");
+  assert.equal(UL.stickToBottom(2000), false, "远在上方 ⇒ 不打断阅读");
+  assert.equal(UL.stickToBottom(NaN), false, "非法距离保守不贴");
+  assert.equal(UL.stickToBottom(undefined), false, "缺省不贴");
+  // 渲染侧接线：流式行**先量后挂**（判定在收付之前）；批量期一次测量（batchStreamPin）。
+  assert.ok(RENDERER.includes("function streamShouldPin(pane)"), "流式贴底判定（先量）");
+  assert.ok(RENDERER.includes("UiLabels.stickToBottom(") && RENDERER.includes("batchStreamPin"), "经纯映射 + 批内一次测量复用");
+  const pinSites = (RENDERER.match(/var pin = streamShouldPin\(pane\);/g) || []).length;
+  assert.ok(pinSites >= 5, "流式五类行（assistant/sys/denied/injected/handback）都先量后挂（实测 " + pinSites + " 处）");
+  assert.ok(RENDERER.includes("scrollBottom(pane, pin);"), "挂完按判定贴底（pin=false 时不滚）");
+  // 强制定点（用户动作/卡到达/切角色/回放）不受流式判定约束。
+  assert.ok(RENDERER.includes("scrollBottomForced(pane); // 用户自己的动作：强制贴底"), "appendUser 强制贴底（自己的动作）");
+  assert.ok(RENDERER.includes("if (nearBottomAtArrival) scrollBottomForced(pane);"), "P-1 到达即达仍走强制路径");
+  assert.ok(/batchDepth \+= 1;[\s\S]{0,1500}scrollBottomForced\(pane\); \/\/ 批内/.test(RENDERER), "回放收尾强制贴底");
+  // **S-1 根因钉**：flush 里贴底必须在**窗口更新之后**（修前在前 ⇒ 长会话每批差一整批高度，e2e 实测 339px）。
+  const flushStart = RENDERER.indexOf("function flushBatchSideEffects()");
+  const flushBody = RENDERER.slice(flushStart, RENDERER.indexOf("\n  }", flushStart));
+  assert.ok(
+    flushBody.indexOf("updateVirtualWindow(dirty[i]") >= 0 &&
+      flushBody.indexOf("updateVirtualWindow(dirty[i]") < flushBody.indexOf('scrollTop = $("chat").scrollHeight'),
+    "flush：先更新窗口（挂尾行/高度落定），再贴底"
+  );
+  // 高度修正后：本就在底部者仍贴底（上翻者绝不拽）——全量实测修正 + spacer 立即重算到位。
+  assert.ok(RENDERER.includes("var wasAtBottom = chat.scrollHeight - chat.scrollTop - chat.clientHeight <= 1;"), "窗口更新入口记「是否在底部」");
+  assert.ok(RENDERER.includes('if (wasAtBottom) $("chat").scrollTop = $("chat").scrollHeight;'), "高度修正后**仅在底部者**补贴底");
+  assert.ok(RENDERER.includes("var sums2 = rebuildPrefix(rl);"), "实测修正后立即重算 prefix 并改 spacer 高度（防一帧漂移）");
+  assert.ok(RENDERER.includes("scrollBottomForced(pane)") && RENDERER.includes("updateVirtualWindow(pane, { preferTail: true });"), "强制贴底前先让窗口落定（窗口化路径）");
+});
+
+// ————————————————— U-1（2026-10-12 客户裁定）：点击角色 ⇒ 到底部 —————————————————
+
+test("U-1：点角色到底部（取代 B-2「恢复位置」；scrollMemo 删净）；有卡仍滚到卡（P-1 保留）；与 S-1 双向语义不互相污染", () => {
+  // ① showPane：无卡 ⇒ scrollBottomForced（到底部）；有卡 ⇒ scrollToOperatorCard（卡优先，P-1 例外保留）。
+  assert.ok(
+    /function stickPaneToBottomOrCard\(roleId\) \{[\s\S]{0,600}scrollToOperatorCard\(key, pendingIds\[0\]\);[\s\S]{0,400}scrollBottomForced\(paneFor\(key\)\);/.test(RENDERER),
+    "定位助手：有卡滚到卡 / 无卡到底部"
+  );
+  assert.ok(RENDERER.includes("stickPaneToBottomOrCard(key);"), "showPane 用定位助手（点角色到底部）");
+  assert.ok(
+    /state\.sessionOpenRoleId === roleId[\s\S]{0,600}stickPaneToBottomOrCard\(roleId\);/.test(RENDERER),
+    "重复点击同一角色 ⇒ 同样到底部（U-1 第 3 点）"
+  );
+  // ② scrollMemo 死代码删净（注释剥离后断言）。
+  const code = RENDERER.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+  assert.ok(!code.includes("scrollMemo"), "「恢复上次位置」实现已删净（无死代码）");
+  assert.ok(!code.includes(":scope > .chat-pane"), "旧「切走记忆」的 outgoing 查询已删");
+  // ③ 窗口化兼容：到底部走 forced——forced 内部先 updateVirtualWindow(preferTail)（先实体化尾部再滚，落点准）。
+  assert.ok(
+    /function scrollBottomForced\(pane\) \{[\s\S]{0,500}updateVirtualWindow\(pane, \{ preferTail: true \}\)/.test(RENDERER),
+    "强制到底部：窗口化先挂尾部再滚"
+  );
+  // ④ 与 S-1 不互相污染：流式判定独立存在（点角色=显式动作 ⇒ forced，不受 streamShouldPin 约束）；
+  //    流式行仍走「在底部才贴底」（上翻不拽回——S-1 语义未被动到）。
+  assert.ok(RENDERER.includes("function streamShouldPin(pane)") && RENDERER.includes("scrollBottom(pane, pin);"), "S-1 流式判定与点角色强制到底分离");
+  assert.ok(RENDERER.includes("if (nearBottomAtArrival) scrollBottomForced(pane);"), "P-1 到达即达仍在（卡到达例外）");
+});
+
+// ————————————————— 真机缺陷修复（2026-10-12）：交互卡锚点物化（已决卡切走切回跑到流尾） —————————————————
+
+test("锚点物化：重物化复用既有行（不重建落尾）；registerRow 支持锚点插入；回放锚点表登记与消费；兜底落尾写明且不丢卡", () => {
+  // ① 主修复：materializeOperatorCard 先查行表——卡行仍在（keepEl 行被虚拟窗口脱挂≠丢失）⇒ 复用、直接返回。
+  assert.ok(
+    /function materializeOperatorCard\(requestId\) \{[\s\S]{0,600}rl0\.rows\[i0\]\.kind === "operator" && rl0\.rows\[i0\]\.requestId === requestId[\s\S]{0,80}return;/.test(RENDERER),
+    "物化应先按 requestId 查既有卡行（离屏≠丢失——不得重建追加行表尾）"
+  );
+  // 旧缺陷的病灶（每次重建都无条件 registerRow 追加尾）不得回潮：去重守卫必须仍存在于重建之前。
+  assert.ok(/function materializeOperatorCard\(requestId\) \{[\s\S]{0,900}cardInPane\(pane, requestId\)\) return;/.test(RENDERER), "去重守卫仍在（同卡不重建）");
+  // ② registerRow 支持 atIndex（锚点插入 + 右移重编号）。
+  assert.ok(/typeof o\.atIndex === "number" && o\.atIndex >= 0 && o\.atIndex <= rl\.rows\.length/.test(RENDERER), "registerRow 应支持 atIndex 锚点插入");
+  assert.ok(/rl\.rows\.splice\(at, 0, rec\);[\s\S]{0,120}rl\.rows\[x\]\.index = x;/.test(RENDERER), "插入后其后各行 index 应右移重编号（attachRow/定位/窗口按 index 找行）");
+  // ③ 回放锚点表：登记（回放行带 anchorKey）+ 消费（物化时按表落位）。
+  assert.ok(RENDERER.includes("function noteReplayAnchor(") && /row\.anchorKey\) noteReplayAnchor\(/.test(RENDERER), "回放行带 anchorKey 时应登记锚点表");
+  assert.ok(/function operatorAnchorIndex\(rl, entry\) \{[\s\S]{0,200}entry\.anchorListSeq === rl\.seq/.test(RENDERER), "物化应按锚点表落位（同表校验用 seq）");
+  assert.ok(/a\.requestIndex !== null && a\.requestIndex \+ 1 <= rl\.rows\.length\) return a\.requestIndex \+ 1;/.test(RENDERER), "回放锚点应插到调用行之后（两行之间）");
+  // ④ 首次到达不加锚（卡=当下最新事件，行表尾即它发生的位置——防同题新请求被插进历史）。
+  assert.ok(/var first = entry\.anchorIndex === undefined;[\s\S]{0,120}var atIndex = first \? null : operatorAnchorIndex\(rl, entry\);/.test(RENDERER), "首次物化应追加（不加锚）；重物化才按锚点落位");
+  // ⑤ 兜底：找不到锚点 ⇒ null ⇒ 追加行表尾——绝不丢卡（代码里写明该兜底）。
+  assert.ok(/return null; \/\/ 兜底：行表尾（绝不丢卡——位置让位于不丢）/.test(RENDERER), "兜底落尾须在代码写明（绝不丢卡）");
+  // ⑥ 探针面：e2e 断言「卡行序索引落在锚点而非行表尾」的读数口。
+  assert.ok(RENDERER.includes("rowModelDebug") && RENDERER.includes("replayAnchorDebug"), "应暴露行模型/锚点表探针（e2e 时序断言用）");
+  // ⑦ open 与 decided 一视同仁：物化路径不分状态（decided 只影响定格呈现，不影响落位）。
+  assert.ok(/entry\.state !== "open"[\s\S]{0,200}freezeOperatorCard\(card, entry\.finalNote\.text/.test(RENDERER), "decided 卡仍按 finalNote 定格呈现（落位同法）");
+});
+
+// ————————————————— 右栏图标化 + 抽屉（客户裁定 2026-10-13：右栏不常驻，点了才展示） —————————————————
+
+test("右栏抽屉：默认不占屏（col-right 退役）；右上角图标簇四枚；点开展示/再点收起/Esc；角标收起不丢信息；Pi 面板迁入抽屉", () => {
+  // ① 布局：右栏列（.col-right）退役——栅格两列，聊天列宽不因开关抽屉而变（抽屉=覆盖层）。
+  assert.ok(!INDEX.includes("col-right"), "右栏常驻列应退役（.col-right 不在 index.html）");
+  assert.ok(INDEX.includes('id="right-drawer"'), "应有右侧抽屉 #right-drawer");
+  assert.ok(STYLES.includes("#right-drawer.open") && STYLES.includes("position: absolute"), "抽屉应为覆盖层（absolute + .open 滑出）");
+  assert.ok(STYLES.includes("grid-template-columns: 272px minmax(0, 1fr);"), "栅格应为两列（右栏不占列）");
+  assert.ok(!/setTimeout|setInterval/.test(RENDERER.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "")), "无计时器纪律不破（抽屉过渡用 CSS）");
+  // ② 图标簇：四枚（角色资料/待办/队列概览/Pi 设置）在标题栏内、窗口按钮之前；不算 .win-btn（三窗口按钮守卫不破）。
+  assert.ok(INDEX.includes('id="right-tabs"'), "应有右上角图标簇 #right-tabs");
+  for (const id of ["tab-card", "tab-todo", "tab-queue", "tab-pi"]) {
+    assert.ok(INDEX.includes('id="' + id + '"'), "应有图标按钮 #" + id);
+    assert.ok(!new RegExp('id="' + id + '" class="win-btn').test(INDEX), id + " 不是窗口按钮（.win-btn 数量守卫不破）");
+  }
+  const tabsPos = INDEX.indexOf('id="right-tabs"');
+  const controlsPos = INDEX.indexOf('class="titlebar-controls"');
+  assert.ok(controlsPos >= 0 && tabsPos > controlsPos, "图标簇应在标题栏控制区（应用右上角）");
+  assert.ok(STYLES.includes("-webkit-app-region: no-drag"), "图标按钮应为 no-drag（标题栏是拖动区）");
+  // ③ 渲染侧接线：tab 状态机 + 至多开一块 + 同 tab 再点收起 + Esc + ×。
+  assert.ok(RENDERER.includes("rightTab: null"), "state 应持 rightTab（null=全收起，默认不常驻）");
+  assert.ok(
+    /function toggleRightDrawer\(tab\) \{[\s\S]{0,200}state\.rightTab = state\.rightTab === tab \? null : tab;/.test(RENDERER),
+    "点图标：同 tab 再点=收起、异 tab=切换（至多开一块）"
+  );
+  assert.ok(RENDERER.includes("function closeRightDrawer()"), "应有 closeRightDrawer（×/Esc 收起）");
+  assert.ok(/e\.key === "Escape" && state\.rightTab !== null[\s\S]{0,120}closeRightDrawer\(\);/.test(RENDERER), "Esc 应收起抽屉（shell 确认卡优先级在前）");
+  assert.ok(RENDERER.includes('$("drawer-close").addEventListener("click", closeRightDrawer);'), "抽屉头 × 应绑定收起");
+  // ④ 内容跟随当前选中角色：selectRole/applyListing 的 renderRight() 同处刷 renderTabs()（角标/高亮同步）。
+  assert.ok(
+    /renderRight\(\);\s*\n\s*renderTabs\(\);/.test(RENDERER),
+    "selectRole/applyListing 应同处刷 renderRight + renderTabs（内容与角标跟随选中角色）"
+  );
+  // ⑤ 角标继承（收起不丢信息）：待办=进行中+排队视图行数；队列=排队条数——同一 role-state 快照、无新数据源。
+  assert.ok(/function renderTabs\(\) \{[\s\S]{0,300}queueViewsFor\(roleId\)/.test(RENDERER), "待办图标角标应取 queueViewsFor（进行中+排队）");
+  assert.ok(/setTabBadge\("queue", qDepth\)/.test(RENDERER) && /state\.queueByRole\[roleId\] \|\| \[\]\)\.length/.test(RENDERER), "队列图标角标应取排队深度");
+  assert.ok(/function setTabBadge\(id, n\) \{[\s\S]{0,300}el\.hidden = false;/.test(RENDERER), "角标 >0 才显示（hidden 控制）");
+  assert.ok(RENDERER.includes('setTabBadge("todo", views.length);'), "待办角标 = 视图行数");
+  // ⑥ 内容不变：卡片 tab 四组逐字保留；待办 tab 既有「待办 / 队列」组逐字保留；队列概览用既有纯映射。
+  assert.ok(RENDERER.includes('sec("角色卡", null,'), "角色卡组逐字保留");
+  assert.ok(RENDERER.includes('sec("边界条目", entries.length'), "边界条目组保留");
+  assert.ok(RENDERER.includes('sec("变更记录", role.changelog ? null : "无"'), "变更记录组保留");
+  assert.ok(RENDERER.includes('sec("文档", role.docs && role.docs.length'), "文档组保留");
+  assert.ok(RENDERER.includes('sec("待办 / 队列", qViews.length > 0 ? qViews.length : "无"'), "待办组逐字保留（进行中+排队）");
+  assert.ok(RENDERER.includes("（无排队）") && RENDERER.includes("等它完成当前任务后依次处理"), "队列概览 tab：排队位次 + 处理语义");
+  // ⑦ Pi 面板迁入抽屉：面板本体在 #right-drawer 内、显隐由 tab 状态驱动（保存/掩码逻辑一字不动）。
+  const drawerPos = INDEX.indexOf('id="right-drawer"');
+  const piPos = INDEX.indexOf('id="pi-panel"');
+  assert.ok(drawerPos >= 0 && piPos > drawerPos, "#pi-panel 应在 #right-drawer 之内（随抽屉展示）");
+  assert.ok(/function syncPiPanel\(\) \{[\s\S]{0,200}panel\.hidden = state\.rightTab !== "pi";/.test(RENDERER), "Pi 面板显隐由 tab 状态驱动（syncPiPanel）");
+  // ⑧ 样式钩子：图标/角标/抽屉头。
+  assert.ok(STYLES.includes(".right-tabs") && STYLES.includes(".tab-btn") && STYLES.includes(".tab-badge") && STYLES.includes(".drawer-head"), "图标簇/角标/抽屉头样式钩子齐备");
 });

@@ -49,8 +49,9 @@ test("点角色即开：open 直接建会话（无摘要/nonce），多轮 send�
   assert.equal(res.ok, true, "点角色应直接开启会话（无确认步骤）");
   await tick();
 
-  // 开启即有提示事件；此时尚无任何写入
-  assert.ok(events.some((e) => e.kind === "message" && e.summary.includes("已开启")), "应有会话开启提示");
+  // 客户裁定（2026-10-13）：常规「已开启…」欢迎提示已删——开启时聊天流**无**常规提示事件
+  // （异常提示保留：contextWarning / O-1 边界重建 / 投递失败等不受影响）；此时尚无任何写入。
+  assert.equal(events.filter((e) => e.kind === "message" && e.summary.includes("已开启")).length, 0, "不应再有会话开启欢迎提示（客户裁定）");
   assert.equal(events.filter((e) => e.kind === "tool_call" || e.kind === "denied").length, 0, "开启时不应有写入尝试");
 
   // 连续两条消息都生效

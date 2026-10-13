@@ -6,6 +6,9 @@
 // **B-2（2026-10-12）：切换角色不再结束旧会话**——每角色一个 chat pane（游离 DOM 保留历史与监听器），
 // 会话在引擎侧并存（renderer 只呈现）；事件带 `roleId` 信封，按角色分发到各自 pane。
 // **B-1（同日）**：消息经最小子集 Markdown 受控渲染（`markdown.js` 的纯函数，先转义后解析）。
+// **真机缺陷修复（2026-10-12）：交互卡锚点物化**——已决/未决卡的（重）物化按其**时序锚点**落位
+// （虚拟窗口脱挂后切回不再重建落尾；主修复＝复用既有行；回放行带请求标识 → 锚点表 → 插回原位；
+// 找不到锚点兜底落尾且绝不丢卡）。open 与 decided 一视同仁。
 (function () {
   "use strict";
 
@@ -72,6 +75,10 @@
     // shell 命令确认卡（M-1，2026-10-12）：当前挂起的一张 `{id, busy}`；无则 null。**无计时器**（G-1 纪律）——
     // 卡片不按时间自我定格；失效只来自主进程回包（`expired`）或正常裁决。
     shellConfirm: null,
+    // 客户裁定（2026-10-13）：右栏改**抽屉**——当前展开的右上角图标 tab（null=全收起）；
+    // "card"=角色资料（角色卡 md + 边界/变更/文档），"todo"=待办/队列（进行中+排队），"queue"=队列概览（仅排队），
+    // "pi"=Pi 配置（面板本体原样迁入抽屉）。同一时刻至多一块；内容跟随当前选中角色。
+    rightTab: null,
   };
 
   // —————— 内联 SVG 图标（无外部依赖） ——————
@@ -115,10 +122,12 @@
 
   function setHint(text) { $("composer-hint").textContent = text || ""; }
 
+  /** 会话状态（客户裁定 2026-10-13：界面**不再显示**「聊天中/空闲」pill）——kind **程序化保留**：
+   *  写到 `#chat` 的 `data-state` 属性（run/idle/err），e2e 与外部驱动仍可断言；label 参数保留以兼容调用点。 */
   function setState(kind, label) {
-    var el = $("session-state");
-    el.className = "pill " + (kind === "run" ? "pill-run" : kind === "err" ? "pill-err" : "pill-idle");
-    el.textContent = label;
+    void label; // pill 文案随视觉删除而退役；kind 才是程序化保留的部分
+    var chat = $("chat");
+    if (chat) chat.dataset.state = kind;
   }
 
   function setChatHeader(role) {
@@ -183,31 +192,33 @@
     return p;
   }
 
+  /** **U-1（2026-10-12 客户裁定）**：把该角色的视图定位到「**最新**」——无未作答卡 ⇒ **到底部**；
+   *  有 ⇒ **滚到那张卡**（P-1 例外优先）。点角色（含重复点击）与切 pane 都走这一条。 */
+  function stickPaneToBottomOrCard(roleId) {
+    var key = String(roleId == null ? "" : roleId);
+    var pendingIds = openRequestIdsFor(key);
+    if (pendingIds.length > 0) {
+      scrollToOperatorCard(key, pendingIds[0]);
+    } else {
+      // 窗口化（≥150 行）时 forced 内部先实体化尾部再滚（落点准确）；常规路径逐字贴底。
+      scrollBottomForced(paneFor(key));
+    }
+  }
+
   /** 把某角色的 pane 切到视图里（唯一挂在 #chat 下的那个）；重挂后按登记表**补挂**未决卡（防丢卡）。 */
   function showPane(roleId) {
     var p = paneFor(roleId);
     var chat = $("chat");
     var key = String(roleId == null ? "" : roleId);
-    // Q-2（2026-10-12）：切走前**记住旧 pane 的滚动位置**（B-2 每角色 pane——切回**恢复位置**）。
     if (p.parentNode !== chat) {
-      var outgoing = chat.querySelector(":scope > .chat-pane");
-      if (outgoing && outgoing !== p) scrollMemo[outgoing.dataset.roleId || ""] = chat.scrollTop;
       chat.innerHTML = "";
       chat.appendChild(p);
     }
     materializePendingFor(key); // 真机缺陷修复：切回必须有未作答的卡
-    // P-1：切回时若仍有未作答卡 ⇒ **滚动到卡**（而非停在底部——卡可能被深处的活动埋着）；
-    // 无卡 ⇒ Q-2：恢复该角色上次的滚动位置（没记过才逐字照旧滚到底）。chip 同处刷新（同一状态源）。
-    var pendingIds = openRequestIdsFor(key);
-    if (pendingIds.length > 0) {
-      scrollToOperatorCard(key, pendingIds[0]);
-    } else if (typeof scrollMemo[key] === "number") {
-      updateVirtualWindow(p, { preferTail: true }); // 先按旧位置大致归位窗口（挂尾部，保证恢复点在窗口内可及）
-      chat.scrollTop = scrollMemo[key];
-      updateVirtualWindow(p, null);
-    } else {
-      scrollBottom(p);
-    }
+    // **U-1（2026-10-12 客户裁定「点击这个角色，应该滚动到滚动条最下面」）**：点角色（切换会话）⇒ **到底部**
+    // （最新一条）——**取代** B-2 时期的「恢复上次位置」（scrollMemo 已删干净，语义反转理由见 change 文档）。
+    // **例外（P-1 优先）**：该角色有未作答的卡 ⇒ 仍**滚到那张卡**。chip 同处刷新（同一状态源）。
+    stickPaneToBottomOrCard(key);
     updateOpChip(key);
   }
 
@@ -220,13 +231,15 @@
   function resetPanes() {
     chatPanes = Object.create(null);
     paneRowLists = Object.create(null); // Q-2：行表随 pane 作废（老项目的行模型不跨项目）
-    scrollMemo = Object.create(null);
+    paneAnchors = Object.create(null); // 回放锚点表随项目作废（锚点是行序位——只对老项目的行表有意义）
     opRequests = Object.create(null); // 交互请求登记表随之作废（旧项目的请求已随会话/时限自行落定）
     $("chat").innerHTML = emptyStateHtml();
     bindEmptyState($("chat"));
   }
 
-  function scrollBottom(pane) {
+  /** **强制**贴底（用户动作/卡到达/切角色/回放收尾等——不看守滚位置）。窗口化时**先让窗口与高度落定**
+   *  再滚（S-1 根因：贴底发生在 spacer 增长之前会差一整批的高度；见 flushBatchSideEffects 的写明）。 */
+  function scrollBottomForced(pane) {
     // 只有**挂在视图里**的 pane 需要（也才允许）滚动；游离 pane 自动滚它没有意义。
     var chat = $("chat");
     if (pane && pane.parentNode === chat) {
@@ -235,8 +248,31 @@
         batchSuppressedScroll = pane;
         return;
       }
+      var rl0 = paneRowLists[pane.dataset.roleId];
+      if (rl0 && rl0.pane === pane && rl0.rows.length >= VIRT_MIN_ROWS) updateVirtualWindow(pane, { preferTail: true });
       chat.scrollTop = chat.scrollHeight;
     }
+  }
+
+  /** S-1（2026-10-12 客户「输出不会让滚动条滚动到最底下了」）：**流式输出**的贴底判定——
+   *  「**在底部附近**（≤ `STICK_THRESHOLD_PX`）才贴底；**用户往上翻就不打断**」。距离必须**在追加新行之前**测
+   *  （行本身会立刻把距离推过阈值——P-1 同款时序坑）。批量期**一次测量、批内复用**（防 per-append 读布局）。 */
+  var batchStreamPin = null; // {pane, pin}
+  function streamShouldPin(pane) {
+    var chat = $("chat");
+    if (!pane || pane.parentNode !== chat) return false;
+    if (batchDepth > 0) {
+      if (batchStreamPin !== null && batchStreamPin.pane === pane) return batchStreamPin.pin;
+      var p = UiLabels.stickToBottom(chat.scrollHeight - chat.scrollTop - chat.clientHeight, UiLabels.STICK_THRESHOLD_PX);
+      batchStreamPin = { pane: pane, pin: p };
+      return p;
+    }
+    return UiLabels.stickToBottom(chat.scrollHeight - chat.scrollTop - chat.clientHeight, UiLabels.STICK_THRESHOLD_PX);
+  }
+
+  /** 流式行通用收尾：**先量后挂**——调用方在 `registerRow` **之前**取 `streamShouldPin(pane)`，挂完再调本函数。 */
+  function scrollBottom(pane, pin) {
+    if (pin === true) scrollBottomForced(pane);
   }
 
   // —————— Q-1/Q-2（2026-10-12）：批量合帧 + 聊天流**窗口化**（客户「应该虚拟渲染啊」） ——————
@@ -252,15 +288,20 @@
   function flushBatchSideEffects() {
     if (batchDepth > 0) return;
     renderRoleTree(); // 状态徽标随事件变化——每批至多一次（原先每事件一次）
-    var pane = batchSuppressedScroll;
+    var forcePane = batchSuppressedScroll;
     batchSuppressedScroll = null;
-    if (pane && pane.parentNode === $("chat")) {
-      $("chat").scrollTop = $("chat").scrollHeight;
-      markDirtyPane(pane);
-    }
+    var streamPin = batchStreamPin; // S-1：批内流式贴底判定（先量后挂的结论）
+    batchStreamPin = null;
+    if (forcePane && forcePane.parentNode === $("chat")) markDirtyPane(forcePane);
     var dirty = batchDirtyPanes;
     batchDirtyPanes = [];
+    // **先**更新窗口（挂尾行、spacer 与实测高落定），**再**贴底——S-1 根因：修前贴底在窗口更新之前，
+    // 长会话（窗口化）里 spacer 尚未增长 ⇒ 贴到「旧底」，每批差一整批高度（e2e 实测差 339px）。
     for (var i = 0; i < dirty.length; i += 1) updateVirtualWindow(dirty[i], { preferTail: true });
+    var target = null;
+    if (forcePane && forcePane.parentNode === $("chat")) target = forcePane;
+    else if (streamPin && streamPin.pin === true && streamPin.pane && streamPin.pane.parentNode === $("chat")) target = streamPin.pane;
+    if (target !== null) $("chat").scrollTop = $("chat").scrollHeight; // 贴底（窗口/高度已落定）
   }
 
   // Q-2 **窗口化行模型**：每个 pane 一张 append-only **行表**——行 = {build(rec)→元素, el|null, h, keepEl, …}。
@@ -273,7 +314,7 @@
   var VIRT_MIN_ROWS = 150;
   var VIRT_BUFFER = 30;
   var paneRowLists = Object.create(null); // roleId → rowList
-  var scrollMemo = Object.create(null);   // roleId → #chat.scrollTop（Q-2：切角色**恢复位置**）
+  var rowListSeq = 0; // 行表身份号（真机缺陷修复：锚点物化据此判断「同一张行表」——重建过的表 seq 不同）
 
   function rowListFor(pane) {
     var key = pane.dataset.roleId || "";
@@ -281,6 +322,7 @@
     if (rl && rl.pane === pane) return rl;
     rl = {
       pane: pane,
+      seq: ++rowListSeq, // 行表身份（重建即换号——锚点物化的同表校验用）
       rows: [],
       top: document.createElement("div"),    // 上 spacer（窗口以上各行高之和）
       bottom: document.createElement("div"), // 下 spacer（窗口以下各行高之和）
@@ -332,13 +374,18 @@
     if (!rec.keepEl) rec.el = null;
   }
 
-  /** 记一行（append-only）。`build(rec)` **惰性**造元素（离屏不构造/不渲染）；`estH` 为估算高（px）。 */
+  /** 记一行（缺省**追加**行表尾；`opts.atIndex` 给出时**按锚点插入**——真机缺陷修复 2026-10-12：
+   *  交互卡的（重）物化要落回它发生时的行序位，而不是永远追加到表尾）。`build(rec)` **惰性**造元素
+   *  （离屏不构造/不渲染）；`estH` 为估算高（px）。插入后其后各行的 index 顺次右移（index 是行在表内的
+   *  序位——attachRow/卡定位/虚拟窗口都按它找行）。 */
   function registerRow(pane, build, estH, opts) {
     var rl = rowListFor(pane);
     ensureContent(pane);
     var o = opts || {};
+    var at = rl.rows.length;
+    if (typeof o.atIndex === "number" && o.atIndex >= 0 && o.atIndex <= rl.rows.length) at = Math.floor(o.atIndex);
     var rec = {
-      index: rl.rows.length,
+      index: at,
       kind: typeof o.kind === "string" ? o.kind : "",
       build: build,
       el: null,
@@ -349,7 +396,12 @@
       measured: false,
       requestId: typeof o.requestId === "string" ? o.requestId : null,
     };
-    rl.rows.push(rec);
+    if (at === rl.rows.length) {
+      rl.rows.push(rec);
+    } else {
+      rl.rows.splice(at, 0, rec);
+      for (var x = at + 1; x < rl.rows.length; x += 1) rl.rows[x].index = x; // 右移重编号（插入极少数，O(n) 一次）
+    }
     rl.prefix = null;
     if (rl.rows.length < VIRT_MIN_ROWS) {
       attachRow(rl, rec); // 小 pane：立即挂载（**不**测量——热路径禁逐条强制布局）
@@ -369,6 +421,8 @@
     if (rows.length < VIRT_MIN_ROWS) return; // 小 pane：全挂载
     var chat = $("chat");
     if (pane.parentNode !== chat) return; // 游离 pane：切回时再算
+    // S-1：进入时记「是否就在底部」——高度/窗口修正后据此补一次贴底（**只在底部者**；上翻者绝不被拽）。
+    var wasAtBottom = chat.scrollHeight - chat.scrollTop - chat.clientHeight <= 1;
     // 首次（或大规模挂载后）对**已挂载**行做一次实测修正（写读分离，一次布局）。
     if (!rl.allMeasured) {
       for (var a = 0; a < rows.length; a += 1) {
@@ -423,7 +477,13 @@
       }
       newly[k].measured = true;
     }
-    if (dirty) rl.prefix = null;
+    if (dirty) {
+      // S-1：实测修正后**立即**重算 prefix 并把 spacer 高度改到位——避免「估→实」差撑出一帧的高度漂移。
+      var sums2 = rebuildPrefix(rl);
+      rl.top.style.height = sums2[first] + "px";
+      rl.bottom.style.height = sums2[rows.length] - sums2[last + 1] + "px";
+    }
+    if (wasAtBottom) $("chat").scrollTop = $("chat").scrollHeight; // 本就在底部者：高度修正后仍贴底（上翻者绝不拽）
   }
 
   // 滚动 → rAF 合帧 → 一次窗口更新（无 rAF 环境退化为立即——仅测试面）。
@@ -466,7 +526,7 @@
       },
       52
     );
-    scrollBottom(pane);
+    scrollBottomForced(pane); // 用户自己的动作：强制贴底
   }
 
   function appendAssistant(pane, text) {
@@ -475,6 +535,7 @@
     // 离屏行（窗口化）**不跑解析器**——挂载时才渲染。非流式（回放/静止态消息）逐字照旧即时渲染。
     var roleId = pane.dataset.roleId || "";
     var streaming = state.roleBusy[roleId] === true;
+    var pin = streamShouldPin(pane); // S-1：**先量后挂**（在底部附近才贴底；上翻不打断）
     registerRow(
       pane,
       function (rec) {
@@ -491,10 +552,11 @@
       60,
       { kind: "assistant", data: text, mdReady: !streaming }
     );
-    scrollBottom(pane);
+    scrollBottom(pane, pin);
   }
 
   function sysRow(pane, cls, icon, text) {
+    var pin = streamShouldPin(pane); // S-1：先量后挂
     var rec = registerRow(
       pane,
       function () {
@@ -505,12 +567,13 @@
       },
       34
     );
-    scrollBottom(pane);
+    scrollBottom(pane, pin);
     return rec.el; // 小 pane（非窗口化）恒已挂载；窗口化下离屏行 el 为 null——调用方须容忍（现有唯一用法=开头 loading 行）
   }
 
   /** 拒绝事件：内联显示，点击可展开看完整信息（含按根分组的允许路径）。 */
   function appendDenied(pane, text) {
+    var pin = streamShouldPin(pane); // S-1：先量后挂
     registerRow(
       pane,
       function () {
@@ -523,7 +586,7 @@
       },
       40
     );
-    scrollBottom(pane);
+    scrollBottom(pane, pin);
   }
 
   /**
@@ -564,8 +627,9 @@
       // 管线**（同一 `esc`/白名单）；**证据列表**保持逐条 esc（不拼成一段 Markdown）。
       '<div class="hb-summary card-md">' + Md.renderMarkdown(hb.summary || "") + "</div>" +
       '<ul class="hb-evidence">' + evItems + "</ul>";
+    var pin = streamShouldPin(pane); // S-1：先量后挂（回交卡到达也按「在底部才贴底」）
     registerRow(pane, function () { return card; }, 190, { keepEl: true, kind: "handback" }); // Q-2：卡离窗保留实例
-    scrollBottom(pane);
+    scrollBottom(pane, pin);
   }
 
   // —————— shell 命令确认卡（M-1，2026-10-12 客户裁定「这个太丑了」）：应用内卡片替代原生对话框 ——————
@@ -666,8 +730,39 @@
   //  · **失效终态**（respond 回 `expired`，G-1 起**只剩一种真实失效**：应用关闭/重启后未决请求不复存在——
   //    客户已裁定「没必要超时啊，就卡在这等客户同意呗」）——卡片可**无限期**保持待答；本块**无任何计时器**
   //    （无 setTimeout/setInterval，测试有钉子）；时限问题归适配器侧，桌面不自造第二套计时。
-  var opRequests = Object.create(null); // requestId → { roleId, request, state:"open"|"decided"|"expired", finalNote, card }
+  var opRequests = Object.create(null); // requestId → { roleId, request, state:"open"|"decided"|"expired", finalNote, card,
+                                        //   anchorKey（请求锚点键，主进程按单一算法给出）,
+                                        //   anchorIndex/anchorListSeq（首次物化的行序位与行表身份——重物化落位用）}
   var opLocalSeq = 0; // 防御：payload 无 id 时本地生成（正常链路 channel 恒给 id）
+
+  // ——— 回放锚点表（真机缺陷修复 2026-10-12：「已决卡切走再切回跑到聊天流最末尾」）———
+  // 主进程 session-history.ts 解析会话 JSONL 时，把 request_confirmation / request_choice 的**调用行**与
+  // **结论行**带上同一标识（requestId＝pi toolCallId、anchor="request"|"conclusion"、anchorKey＝请求本体
+  // kind+title 的单一算法键）。渲染侧回放时按 anchorKey 记下两行的**行序位**，交互卡（重）物化时据此把卡
+  // 插回「调用工具 request_confirmation」行之后（两行之间）＝它发生时的位置。open 与 decided 一视同仁。
+  var paneAnchors = Object.create(null); // roleId → Map<anchorKey, {requestIndex, conclusionIndex, rowsAtReplay}>
+
+  /** 登记一枚回放锚点（appendReplayRow 对带 anchorKey 的回放行调用）。同一 anchorKey 再次出现（同题请求
+   *  历史上问过两次）⇒ 以**最后一次**为准（新的一问把旧结论作废、等它自己的结论行配对）。
+   *  `rowsAtReplay` = 该行登记时的行表长度——重物化时校验当前行表至少长到这个规模（防行表重建后错位）。 */
+  function noteReplayAnchor(roleId, row, rowIndex) {
+    var key = String(roleId == null ? "" : roleId);
+    if (typeof row.anchorKey !== "string" || row.anchorKey === "") return;
+    var table = paneAnchors[key];
+    if (!table) table = paneAnchors[key] = new Map();
+    var a = table.get(row.anchorKey);
+    if (!a) {
+      a = { requestIndex: null, conclusionIndex: null, rowsAtReplay: 0 };
+      table.set(row.anchorKey, a);
+    }
+    if (row.anchor === "request") {
+      a.requestIndex = rowIndex;
+      a.conclusionIndex = null; // 新的一问：旧结论作废（配对以最后一次调用为准）
+    } else if (row.anchor === "conclusion" && a.conclusionIndex === null) {
+      a.conclusionIndex = rowIndex; // 只配第一次见到的结论（紧跟其调用行的那次）
+    }
+    a.rowsAtReplay = rowIndex + 1;
+  }
 
   /** 该角色**未作答**请求的 id 列表（登记次序=到达次序）——左树徽标 / 当前 pane 指针 / P-1 chip **共用同一状态源**。 */
   function openRequestIdsFor(roleId) {
@@ -829,7 +924,10 @@
       materializeOperatorCard(requestId); // 重复到达（重放/重渲染）：幂等补挂，不重复建卡、不重复提示
       return;
     }
-    opRequests[requestId] = entry = { roleId: roleId, request: req, state: "open", finalNote: null, card: null };
+    // anchorKey：请求的锚点键（主进程按单一算法从请求本体 kind+title 拼出）——（重）物化时与回放行
+    // 精确关联、把卡落回它发生的位置；payload 未带（旧主进程/探针直发）⇒ null ⇒ 走首物化位/兜底落尾。
+    var anchorKey = typeof payload.anchorKey === "string" && payload.anchorKey !== "" ? payload.anchorKey : null;
+    opRequests[requestId] = entry = { roleId: roleId, request: req, state: "open", finalNote: null, card: null, anchorKey: anchorKey };
     materializeOperatorCard(requestId);
     refreshAwaitingBadge(roleId);
     if (rawRoleId === "") {
@@ -847,13 +945,52 @@
     }
   }
 
-  /** 物化（幂等）：按登记表把卡建进**其所属** pane——一条请求一次渲染；终态按 finalNote 定格呈现。 */
+  /** 交互卡的**插入位**（锚点物化的②级；真机缺陷修复 2026-10-12）。按优先级：
+   *  a. 首次物化记录的行序位（`anchorListSeq` 校验同一张行表）：其后新行只追加/重编号 ⇒ 此位恒指
+   *     「它发生时的地方」；
+   *  b. 回放锚点表（`anchorKey` 与回放行精确关联——主进程给回放行带 requestId/anchor/anchorKey）：
+   *     插到「调用工具 request_confirmation」行**之后**（结论行之前）＝两行之间；只有结论行可锚时
+   *     插到它**之前**（附近）。`rowsAtReplay` 校验当前行表至少长到锚点登记时的规模（防行表重建后错位）。
+   *  c. **兜底：返回 null ⇒ registerRow 追加行表尾**——找不到任何锚点时**绝不丢卡**（不丢卡优先于落位；
+   *     落尾的卡仍可被 P-1 chip 定位、作答、定格，只是时序位靠后——如实取舍）。 */
+  function operatorAnchorIndex(rl, entry) {
+    if (typeof entry.anchorIndex === "number" && entry.anchorListSeq === rl.seq && entry.anchorIndex <= rl.rows.length) {
+      return entry.anchorIndex;
+    }
+    if (entry.anchorKey) {
+      var table = paneAnchors[entry.roleId];
+      var a = table ? table.get(entry.anchorKey) : null;
+      if (a && rl.rows.length >= a.rowsAtReplay) {
+        if (a.requestIndex !== null && a.requestIndex + 1 <= rl.rows.length) return a.requestIndex + 1;
+        if (a.conclusionIndex !== null && a.conclusionIndex <= rl.rows.length) return a.conclusionIndex;
+      }
+    }
+    return null; // 兜底：行表尾（绝不丢卡——位置让位于不丢）
+  }
+
+  /** 物化（幂等）：按登记表把卡建进**其所属** pane——一条请求一次渲染；终态按 finalNote 定格呈现。
+   *  **锚点物化（真机缺陷修复 2026-10-12，「已确认的卡切走再切回跑到聊天流最下面」）**——三级落位：
+   *  ① **行表里已有这张卡的行 ⇒ 复用、直接返回**（**主修复**）。keepEl 行被虚拟窗口脱挂（离屏）时，
+   *     `cardInPane`（按当前 DOM 子节点找）会误判「卡丢了」——旧实现据此**重新建卡并 registerRow 追加行表尾**，
+   *     即客户所见：已决/未决卡每次切走切回都被搬到流尾，且旧行仍持旧元素（潜在双份呈现）。行仍在（只是
+   *     离屏不持 DOM——keepEl 元素实例保留），虚拟窗口滚到它时自会挂回；这里无事可做。
+   *  ② 走不到 ①（行表被整体重建而登记表仍在——防线）⇒ **按锚点落位**（`operatorAnchorIndex`）：
+   *     首次物化记录的行序位 → 回放锚点表（anchorKey 与回放行精确关联）。**首次到达不加锚**——
+   *     卡就是当下最新事件，行表尾即它发生的位置（防同题新请求被回放锚点插进历史）。
+   *  ③ **兜底：追加行表尾**——找不到任何锚点也**绝不丢卡**（不丢卡优先于落位；语义在 operatorAnchorIndex 写明）。
+   *  open 与 decided 一视同仁（decided 卡按 finalNote 定格呈现，落位同法）。 */
   function materializeOperatorCard(requestId) {
     var entry = opRequests[requestId];
     if (!entry) return;
     var pane = paneFor(entry.roleId);
+    var rl0 = paneRowLists[String(entry.roleId == null ? "" : entry.roleId)];
+    if (rl0 && rl0.pane === pane) {
+      for (var i0 = 0; i0 < rl0.rows.length; i0 += 1) {
+        if (rl0.rows[i0].kind === "operator" && rl0.rows[i0].requestId === requestId) return; // ① 行仍在（可能离屏）——卡未丢
+      }
+    }
     ensureContent(pane);
-    if (cardInPane(pane, requestId)) return; // 去重：同 pane 已有这张卡
+    if (cardInPane(pane, requestId)) return; // 去重：行表缺失但 DOM 还在（防御）——同样不重建
     var req = entry.request;
 
     var isChoice = req.kind === "choice";
@@ -916,9 +1053,19 @@
     // P-1（2026-10-12 真机：卡被后续 288 行活动推走；e2e 又暴露一处时序 bug）：**先量后挂**——
     // 判据是「**到达前**用户是否在底部附近」；卡本体上百 px 会立刻把距离推过阈值，不能拿加卡后的距离当判据。
     var nearBottomAtArrival = arrivalShouldScrollToCard(entry.roleId);
+    // ② 按锚点落位（走不到 ① 的防线——见函数头注）；③ 找不到锚点 ⇒ atIndex=null ⇒ 追加行表尾（兜底不丢卡）。
+    //    **首次到达不加锚**：卡就是当下最新的事件，行表尾＝它发生的位置（此后新行只在其后追加，位置关系
+    //    不再变）——回放锚点表只服务于「位置丢失后的重物化」（防同题新请求被插进历史）。
+    var rl = rowListFor(pane);
+    var first = entry.anchorIndex === undefined;
+    var atIndex = first ? null : operatorAnchorIndex(rl, entry);
     // Q-2：待确认卡入行表（**keepEl**——离窗只脱挂、实例与监听器保留；`requestId` 供 P-1 定位按行找）。
-    registerRow(pane, function () { return card; }, 220, { keepEl: true, kind: "operator", requestId: requestId });
-    if (nearBottomAtArrival) scrollBottom(pane); // 到达即达（在往上翻 ⇒ 不打断——chip 持久指示）
+    var rec = registerRow(pane, function () { return card; }, 220, { keepEl: true, kind: "operator", requestId: requestId, atIndex: atIndex });
+    if (first) {
+      entry.anchorIndex = rec.index; // 首次物化的时序位置（其后新行只追加/重编号，此位恒指「它发生时的地方」）
+      entry.anchorListSeq = rl.seq;
+    }
+    if (nearBottomAtArrival) scrollBottomForced(pane); // 到达即达（在往上翻 ⇒ 不打断——chip 持久指示）
     updateOpChip(entry.roleId);
 
     // —— 作答流程（**登记表驱动**）：提交期间禁用按钮；成功/失效 → **终态定格**（登记 finalNote，
@@ -1034,8 +1181,9 @@
   /** 实时路径：把系统投递输入追加进 pane（**绝不**与客户手输气泡同款——客户观察修订）。 */
   function appendInjectedMessage(pane, inj) {
     // Q-2：注入行入行表（keepEl——离窗保留实例；该类行带展示状态，重建成本不值当）。
+    var pin = streamShouldPin(pane); // S-1：先量后挂
     registerRow(pane, function () { return buildInjectedElement(inj, false); }, 120, { keepEl: true, kind: "injected" });
-    scrollBottom(pane);
+    scrollBottom(pane, pin);
   }
 
   // —————— 会话事件入口 ——————
@@ -1273,21 +1421,27 @@
   }
 
   function openPiPanel() {
-    var panel = $("pi-panel");
-    if (!panel) return;
-    panel.hidden = false;
+    // 客户裁定（2026-10-13）：入口=右上角图标簇 tab-pi；面板迁入抽屉——展开即把 tab 切到 "pi"。
+    if (state.rightTab !== "pi") {
+      state.rightTab = "pi";
+      renderRight();
+      renderTabs();
+    }
     void loadPiConfig();
   }
 
   function closePiPanel() {
-    var panel = $("pi-panel");
-    if (panel) panel.hidden = true;
+    if (state.rightTab !== "pi") {
+      syncPiPanel(); // 已是收起/其它 tab：兜底把面板 hidden 归位（幂等）
+      return;
+    }
+    state.rightTab = null;
+    renderRight();
+    renderTabs();
   }
 
-  function togglePiPanel() {
-    var panel = $("pi-panel");
-    if (panel && !panel.hidden) closePiPanel(); else openPiPanel();
-  }
+  // （togglePiPanel 已随「Pi 设置」文字按钮退役（客户裁定 2026-10-13）——入口=tab-pi 的 toggleRightDrawer，
+  //   不留死代码；openPiPanel/closePiPanel 保留（探针/收起路径仍用）。）
 
   /** token 明/暗切换（明示操作才显示——掩码为默认）。 */
   function toggleSecretVisibility() {
@@ -1392,6 +1546,7 @@
 
     renderRoleTree();
     renderRight();
+    renderTabs();
     setChatHeader(selectedRole());
     updateControls();
     if (fresh) {
@@ -1495,6 +1650,8 @@
     renderRoleTree();
     // 右栏：若正看着该角色 → 只更新「待办 / 队列」组（**定点更新**，不重排整个手风琴、不重置展开态）。
     if (state.selectedRoleId === roleId) updateRightQueue(roleId);
+    // 图标簇角标随**真实快照**刷新（待办=视图行数 / 队列=排队条数——收起也不丢信息）。
+    renderTabs();
   }
 
   /** 该角色聊天流里的**队列行**（一条，原位更新、始终排在流尾）：`【队列】N 条待办：<第 1 条摘要>…`；
@@ -1556,23 +1713,27 @@
     // 跑 Markdown**：行模型先建好（毫秒级），窗口化下只有视口附近的行真正建 DOM/渲染；收尾统一贴底刷新窗口。
     batchDepth += 1;
     try {
-      // 分隔提示（回放段与实时流可区分；坏文件如实提示而不崩）。
-      registerRow(
-        pane,
-        function () {
-          var divider = document.createElement("div");
-          divider.className = "sys sys-replay-divider";
-          divider.innerHTML =
-            '<span class="sys-ico">' + ICONS.handback + "</span>" +
-            '<span class="sys-text">' +
-            esc(error !== null ? "会话记录读取失败，未回放：" + error : "会话已恢复（模型上下文一并恢复）") +
-            "</span>";
-          return divider;
-        },
-        34
-      );
+      // 客户裁定（2026-10-13）：常规回放**不再插入「会话已恢复…」分隔行**——聊天流不摆常规提示，
+      // 历史行直接排入；回放行仍有 `.is-replay` 视觉区分、徽标「空闲（已恢复）」保留（状态准确性）。
+      // **错误分支保留**：坏文件如实提示而不崩（异常如实告知，不是常规提示）。
+      if (error !== null) {
+        registerRow(
+          pane,
+          function () {
+            var divider = document.createElement("div");
+            divider.className = "sys sys-replay-divider";
+            divider.innerHTML =
+              '<span class="sys-ico">' + ICONS.deny + "</span>" +
+              '<span class="sys-text">' +
+              esc("会话记录读取失败，未回放：" + error) +
+              "</span>";
+            return divider;
+          },
+          34
+        );
+      }
       for (var i = 0; i < rows.length; i += 1) appendReplayRow(pane, rows[i]);
-      scrollBottom(pane); // 批内：记为收尾统一贴底（不 per-row 滚）
+      scrollBottomForced(pane); // 批内：记为收尾统一贴底（不 per-row 滚）
     } finally {
       batchDepth -= 1;
     }
@@ -1589,7 +1750,7 @@
     if (kind !== "assistant" && kind !== "user" && kind !== "tool" && kind !== "denied") return; // 未知 kind：跳过（防御式）
     // D-1 回放同样归类：投递输入在回放里也呈**注入样式**（判据=同一张前缀表）；手输的历史行不受影响。
     var injRow = kind === "user" && Tr.classifyInjectedMessage ? Tr.classifyInjectedMessage(text) : null;
-    registerRow(
+    var rec = registerRow(
       pane,
       function () {
         var el;
@@ -1613,7 +1774,10 @@
       kind === "tool" || kind === "denied" ? 34 : 60,
       { keepEl: injRow !== null, kind: "replay" }
     );
-    scrollBottom(pane);
+    // 真机缺陷修复（锚点物化）：交互工具的调用行/结论行带锚点标识（requestId/anchor/anchorKey，主进程
+    // session-history.ts 给出）⇒ 按行序位登记进回放锚点表——交互卡（重）物化据此落回它发生的位置。
+    if (row.anchorKey) noteReplayAnchor(pane.dataset.roleId || "", row, rec.index);
+    scrollBottomForced(pane);
   }
 
   /** 重取当前项目的枚举（su 一轮结束后主进程推 `project:changed` 时调用）→ 左树随之长出（§10.3）。 */
@@ -1700,21 +1864,27 @@
   }
 
   function updateControls() {
-    // 发送/结束仅在**会话已开启**时可用。默认选中主入口但未开会话时，入口是空聊天区的主 CTA（§10.7），
-    // 故不因「有选中角色」而放开发送。
+    // 发送仅在**会话已开启**时可用。默认选中主入口但未开会话时，入口是空聊天区的主 CTA（§10.7），
+    // 故不因「有选中角色」而放开发送。（「结束会话」按钮已按客户裁定 2026-10-13 删除——
+    // 停止能力保留在程序化路径：换项目时 d.stopSession(null)「关闭全部」。）
     $("btn-send").disabled = !state.sessionOpenRoleId;
-    $("btn-stop").disabled = !state.sessionOpenRoleId;
   }
 
   async function selectRole(roleId) {
     // 同一角色重复点击 = 已在该角色的会话中（续接提示；不重建）。
     if (state.sessionOpenRoleId === roleId) {
       setHint("已在该角色的会话中，直接输入消息即可。");
+      // U-1：**重复点击同一角色**也是显式动作 ⇒ 行为一致（到底部；有未作答卡则滚到卡）。
+      if (paneFor(roleId).parentNode === $("chat")) {
+        stickPaneToBottomOrCard(roleId);
+        updateOpChip(roleId);
+      }
       return;
     }
     state.selectedRoleId = roleId;
     renderRoleTree();
     renderRight();
+    renderTabs();
     setChatHeader(selectedRole());
     updateControls();
     // B-2：**不得无条件清空聊天**——切到该角色自己的 pane（历史原样在；节点与监听器都未丢）。
@@ -1825,7 +1995,7 @@
     return html + "</ul>";
   }
 
-  /** 定点更新右栏待办组（仅当该组在当前渲染里存在——不重排手风琴、不重置展开态）。 */
+  /** 定点更新待办组（仅当该组在当前渲染里存在——不重排手风琴、不重置展开态；抽屉收起时无该节点则跳过）。 */
   function updateRightQueue(roleId) {
     var body = $("right-queue-body");
     if (!body) return;
@@ -1835,32 +2005,125 @@
     if (countEl) countEl.textContent = views.length > 0 ? String(views.length) : "无";
   }
 
+  // —————— 右抽屉 + 右上角图标簇（客户裁定 2026-10-13）：右栏不常驻，点了才展示 ——————
+  // tab → 抽屉标题；同一时刻至多开一块（state.rightTab）；"pi" tab 展示迁入抽屉的既有 Pi 面板
+  // （面板本体、保存/掩码纪律一字不动）。内容跟随当前选中角色（打开状态下随 selectRole/applyListing 重渲染）。
+
+  /** 右上角图标簇的**角标**：待办=进行中+排队视图行数；队列=排队条数（同一 role-state 快照，无新数据源）。 */
+  function renderTabs() {
+    var roleId = state.selectedRoleId;
+    var views = roleId ? queueViewsFor(roleId) : [];
+    var qDepth = roleId ? (state.queueByRole[roleId] || []).length : 0;
+    setTabBadge("todo", views.length);
+    setTabBadge("queue", qDepth);
+    ["card", "todo", "queue", "pi"].forEach(function (id) {
+      var b = $("tab-" + id);
+      if (b) b.classList.toggle("active", state.rightTab === id);
+    });
+    var drawer = $("right-drawer");
+    if (drawer) drawer.classList.toggle("open", state.rightTab !== null);
+  }
+
+  function setTabBadge(id, n) {
+    var b = $("tab-" + id);
+    if (!b) return;
+    var el = b.querySelector(".tab-badge");
+    if (!el) return;
+    if (typeof n === "number" && n > 0) {
+      el.textContent = String(n);
+      el.hidden = false;
+    } else {
+      el.textContent = "";
+      el.hidden = true;
+    }
+  }
+
+  /** 点图标：同 tab 再点 = 收起；不同 tab = 切换内容（至多开一块）。 */
+  function toggleRightDrawer(tab) {
+    state.rightTab = state.rightTab === tab ? null : tab;
+    renderRight();
+    renderTabs();
+    if (state.rightTab === "pi") void loadPiConfig(); // Pi 面板每次展开都重取视图（掩码/缺项告警如实）
+  }
+
+  function closeRightDrawer() {
+    if (state.rightTab === null) return;
+    state.rightTab = null;
+    renderRight();
+    renderTabs();
+  }
+
+  /** 抽屉内的 Pi 面板可见性（面板本体 hidden 由 tab 状态驱动；内容/保存/掩码逻辑一字不动）。 */
+  function syncPiPanel() {
+    var panel = $("pi-panel");
+    var body = $("right-body");
+    if (panel) panel.hidden = state.rightTab !== "pi";
+    if (body) body.hidden = state.rightTab === "pi";
+  }
+
   function renderRight() {
     var body = $("right-body");
+    var tab = state.rightTab;
+    var titleEl = $("drawer-title");
+    var titles = { card: "角色资料", todo: "待办 / 队列", queue: "队列概览", pi: "Pi 配置" };
+    if (titleEl) titleEl.textContent = titles[tab] || "角色资料";
+    syncPiPanel();
+    if (!tab) {
+      body.innerHTML = "";
+      return;
+    }
     var role = selectedRole();
     if (!role) {
-      $("right-title").textContent = "角色资料";
       body.innerHTML =
         '<div class="right-empty">' +
         '<p class="empty-title">选择角色后查看资料</p>' +
-        '<p class="empty-sub">角色卡、边界条目、变更记录与文档索引。</p>' +
+        '<p class="empty-sub">点右上角图标展示对应面板；内容跟随当前选中角色。</p>' +
         "</div>";
       return;
     }
-    $("right-title").textContent = "角色资料";
+    if (tab === "todo") {
+      // 待办 tab（2026-10-13 客户裁定：右栏收成图标）：**既有「待办 / 队列」组逐字保留**（进行中 + 排队，
+      // 随 session:role-state 快照定点更新——updateRightQueue 不重排手风琴、不重置展开态）。
+      var qViews = queueViewsFor(role.roleId);
+      body.innerHTML = sec("待办 / 队列", qViews.length > 0 ? qViews.length : "无",
+        '<div id="right-queue-body">' + queueRowsHtml(qViews) + "</div>", true, "right-queue-count");
+      return;
+    }
+    if (tab === "queue") {
+      // 队列概览 tab：**仅排队条目**的位次概览（1..N + 来源 + 摘要 + 入队时间；同一快照的另一个视图，
+      // 无新数据源；进行中那条归「待办」tab）。条目字段经既有纯映射（来源标签/截断）+ esc。
+      var items = state.queueItemsByRole[role.roleId] || [];
+      var html = '<div class="q-overview">';
+      html += '<div class="muted small">等它完成当前任务后依次处理（排队 ≠ 已执行）。</div>';
+      if (items.length === 0) {
+        html += '<div class="muted small">（无排队）</div>';
+      } else {
+        html += '<ul class="queue-list">';
+        items.forEach(function (it, i) {
+          html +=
+            '<li class="q-item"><span class="q-pos">' + esc(String(i + 1)) + "</span>" +
+            '<span class="q-src">' + esc(UiLabels.queueSourceLabel(it.kind)) + "</span>" +
+            '<span class="q-text">' + esc(UiLabels.shortenQueueItem(it.summary)) + "</span>" +
+            '<span class="q-meta">' + esc(queueTimeText(it.at)) + "</span></li>";
+        });
+        html += "</ul>";
+      }
+      body.innerHTML = html + "</div>";
+      return;
+    }
+    if (tab === "pi") {
+      body.innerHTML = ""; // Pi 面板本体（#pi-panel）在抽屉内由 syncPiPanel 控制显隐——不在此重渲染
+      return;
+    }
+    // "card"（角色资料）：既有四组逐字保留（角色卡 md / 边界条目 / 变更记录 / 文档索引）。
     var entries = role.boundary && role.boundary.entries ? role.boundary.entries : [];
     var html = "";
     html += sec("角色卡", null,
       '<div class="kv">' + esc(role.cardPath) + "</div>" +
       // N-2（2026-10-12 客户裁定）：「右边的角色卡要有 markdown 渲染」——走**既有 Markdown 管线**
       // （`Md.renderMarkdown` 同一 `esc` 单一来源；转义/白名单不变：html:false、链接 rel + `md-link` 类、
-      // 图片=原文文本、表格禁用等逐条适用）。`card-md` 只是这套渲染产物的样式钩子。
+      // 图片=原文文本；表格已启用（2026-10-13），单元格照常转义）。`card-md` 只是这套渲染产物的样式钩子。
       '<div class="card-text card-md">' + Md.renderMarkdown(role.cardText || "（空）") + "</div>", true);
-    // 右栏「待办 / 队列」（2026-10-12 追加；客户：「代办也要在右边显示」）：默认**展开**（待办要看得到）；
-    // 随 `session:role-state` 快照**定点更新**（`updateRightQueue`——不重排手风琴、不重置展开态）。
-    var qViews = queueViewsFor(role.roleId);
-    html += sec("待办 / 队列", qViews.length > 0 ? qViews.length : "无",
-      '<div id="right-queue-body">' + queueRowsHtml(qViews) + "</div>", true, "right-queue-count");
     html += sec("边界条目", entries.length, renderBoundaryTable(role.boundary), false);
     html += sec("变更记录", role.changelog ? null : "无", renderChangelog(role), false);
     html += sec("文档", role.docs && role.docs.length ? role.docs.length : "无", renderDocs(role), false);
@@ -2119,24 +2382,9 @@
     }
   }
 
-  async function stop() {
-    var roleId = state.sessionOpenRoleId;
-    if (!roleId) return;
-    try {
-      // B-2：**定向**关闭当前角色的会话（其它角色的保活会话不受影响；被关角色的历史留在它的 pane 上，
-      // 再次点开是**新会话**——渲染侧随后如实提示「模型上下文已重启」）。
-      var r = await d.stopSession(roleId);
-      state.sessionOpenRoleId = null;
-      setState("idle", "未连接");
-      await refreshLiveRoles();
-      renderRoleTree();
-      updateControls();
-      sysRow(paneFor(roleId), "sys-settled", ICONS.ok, r.note || "会话已结束。");
-      setHint("会话已结束。再次点击该角色可重新开启。");
-    } catch (err) {
-      setHint("关闭失败：" + (err && err.message ? err.message : err));
-    }
-  }
+  // 「结束会话」按钮已按客户裁定（2026-10-13）删除：渲染侧只服务该按钮的 stop() 一并清（不留死代码）。
+  // 停止**能力**保留在程序化路径——换项目时 loadProject 的 d.stopSession(null)「关闭全部」（定向 stopSession
+  // 仍在主进程/会话管理器，供该路径与测试使用）。
 
   /**
    * Markdown 链接的点击（B-1）：一律**外开**（`d.openExternal` → 主进程校验 http/https 后交系统浏览器），
@@ -2198,7 +2446,6 @@
   initTitlebar();
   $("btn-import").addEventListener("click", importProject);
   $("btn-send").addEventListener("click", onSend);
-  $("btn-stop").addEventListener("click", stop);
   $("inp-message").addEventListener("keydown", function (e) {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSend(); }
   });
@@ -2254,11 +2501,18 @@
   // N-1：初始按钮文案（未导入 ⇒ 「导入项目」；与 HTML 静态文案同款——此后由 applyListing 维护）。
   updatePickButton();
 
-  // Pi 配置面板（设计 §11/T28）：点横栏的「Pi 设置」切换展开/收起（面板与保存/掩码纪律一字未动）。
-  $("btn-pi-settings").addEventListener("click", togglePiPanel);
+  // Pi 配置面板（设计 §11/T28；客户裁定 2026-10-13 入口上移到右上角图标簇）：tab-pi 点开/再点收起
+  // （面板本体与保存/掩码纪律一字未动）；面板内「收起」照旧可关。
+  $("tab-pi").addEventListener("click", function () { toggleRightDrawer("pi"); });
   $("pi-close").addEventListener("click", closePiPanel);
   $("pi-save").addEventListener("click", savePiConfigFromForm);
   $("pi-toggle-secret").addEventListener("click", toggleSecretVisibility);
+  // 右上角图标簇（客户裁定 2026-10-13）：三枚内容 tab（角色资料/待办/队列概览）——同 tab 再点收起；
+  // 抽屉头 × 收起；Esc 收起（shell 确认卡在先——fail-closed 优先级不受影响）。
+  $("tab-card").addEventListener("click", function () { toggleRightDrawer("card"); });
+  $("tab-todo").addEventListener("click", function () { toggleRightDrawer("todo"); });
+  $("tab-queue").addEventListener("click", function () { toggleRightDrawer("queue"); });
+  $("drawer-close").addEventListener("click", closeRightDrawer);
   // Markdown 链接（B-1）：点聊天流里的链接一律**外开**（事件委托挂在 #chat 上——pane 切换不丢）。
   $("chat").addEventListener("click", onChatLinkClick);
   // Q-2：滚动 → rAF 合帧 → 一次虚拟窗口更新（窗口化长转录时按需挂载/回收）。
@@ -2271,6 +2525,12 @@
     if (e.key === "Escape" && state.shellConfirm) {
       e.preventDefault();
       respondShellConfirm(false);
+      return;
+    }
+    // 抽屉的 Esc 收起（客户裁定：点了才展示；Esc 也是收起路径之一）。
+    if (e.key === "Escape" && state.rightTab !== null) {
+      e.preventDefault();
+      closeRightDrawer();
     }
   });
   // 保存后重载 Pi 配置视图——pi 路径的开会话 fail-closed 报错即由此面板补救（不在此处作判定）。
@@ -2304,5 +2564,27 @@
     onRoleState: onRoleState,
     // M-1：供探针直接注入 shell 确认数据面（按 IPC 契约 `{id, command, summary, reasonPlain, …}`）。
     onShellConfirm: onShellConfirm,
+    // 真机缺陷修复（锚点物化，2026-10-12）探针：读**行模型**（每行 kind/序位/交互卡行）与**回放锚点表**——
+    // e2e 断言「卡的行序索引落在锚点而非行表尾」用（仅渲染进程内，无副作用）。
+    rowModelDebug: function (roleId) {
+      var key = String(roleId == null ? "" : roleId);
+      var pane = paneFor(key);
+      var rl = paneRowLists[key];
+      if (!rl || rl.pane !== pane) return null;
+      var ops = [];
+      for (var i = 0; i < rl.rows.length; i += 1) {
+        if (rl.rows[i].kind === "operator") ops.push({ index: rl.rows[i].index, requestId: rl.rows[i].requestId });
+      }
+      return { count: rl.rows.length, lastIndex: rl.rows.length - 1, operators: ops };
+    },
+    replayAnchorDebug: function (roleId) {
+      var table = paneAnchors[String(roleId == null ? "" : roleId)];
+      if (!table) return [];
+      var out = [];
+      table.forEach(function (a, k) {
+        out.push({ anchorKey: k, requestIndex: a.requestIndex, conclusionIndex: a.conclusionIndex, rowsAtReplay: a.rowsAtReplay });
+      });
+      return out;
+    },
   };
 })();

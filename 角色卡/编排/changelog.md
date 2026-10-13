@@ -1,5 +1,55 @@
 # 编排 变更记录
 
+## 2026-10-12 — su 只读 shell（客户裁定「su 也要有 shell，但是只读」）
+
+**来源**：客户裁定——内置治理角色 su 目前完全没有 shell（`run_shell` 不注册），给它一个**只读 shell**。设计口径已定：只读 = shell 闸 **(c) 层确定性白名单档的直接映射**——`classifyShell` 判 `allow`（命中 `allow:readonly:*`）⇒ 执行；`risky`/`review` ⇒ **一律拒**（新分支 `readonly-deny`，reason 写明命中档）；`deny` ⇒ 照旧拒（`c-deny`）。**不接 (b) su 模型审读**（su 自己就是审读者，不自审）、**不接 (a) 客户确认**（只读外的命令直接拒，不打扰客户、不弹任何对话框）。拒绝理由写死口径「这是 su 只读档的策略拒绝，不是环境故障」（让模型看懂、不诱导绕试）。
+
+**改了什么**：
+- **`src/common/编排/shell-gate.ts`**：`CreateShellGateOptions`/`ShellGateBuildDeps` 增**可选** `readonlyOnly?: boolean`（`buildShellGate` 透传；**缺省 false = 既有行为逐字不变**）；新增导出常量 **`BRANCH_READONLY_DENY = "readonly-deny"`**；`readonlyOnly === true` 时 `risky`/`review` 在进入 `runBA` 前直接返回 `readonly-deny`（(b)/(a) **结构性不可达**，即使注入也永不调用）；allow/deny 走既有 `c-allow`/`c-deny`；fail-closed 三退路语义不动。
+- **`src/pipeline/orchestration/shell-arming.ts`**：新增 `AssembleReadonlyShellGateOptions`（钉死形状，**选项面无 (a)/(b) 注入点**）与 `assembleReadonlyShellGate`——复用「内置治理角色边界 → 审计边界」解析（抽为共享私有 `resolveGovernanceBoundary`，三层链与只读档**共用同一份**，行为逐字不变）组 `buildShellGate({ readonlyOnly: true })`；**不接 pmAsk、不接 operatorChannel**；`rules` 未注入 ⇒ 一律拒（fail-closed）。
+- **`src/pipeline/orchestration/run-role.ts`**：`openRoleSession` 增 `shellReadonly?: Omit<AssembleReadonlyShellGateOptions, "project">`；arm 条件 =「给出即 arm」（装配失败 ⇒ 不 arm = `run_shell` 不注册）；`shellReadonly` 与 `shellOperatorChannel`/`shellArming` 同给 ⇒ **readonly 优先**（只读档执行集严格 ⊆ 三层链——更严的一档）；既有三层链路径逐字不变。⚠ **与任务书字面的一处偏差（如实登记）**：任务书 arm 条件字面写 `!suppressHandback && ...`，而 `suppressHandback === true` 恰是 su——按字面 su 永远 arm 不上，与「仅 su 的只读档」及客户裁定矛盾；实现按裁定为「给出即 arm、readonly 优先」（su 获 arm 与项目角色 readonly 优先两向测试钉住）。
+- **顺带核查（只报告、未改）**：`real-adapter.ts::describeTool` 的 `run_shell` 文案是通用「过 ShellGate 审核、未获明确 allow 绝不执行」——**未把三层审核说死**，对只读档同样成立，**无需改动**。
+
+**边界**：不改 `src/common/门禁引擎/**`（「`node --test` 不在只读白名单」是本任务接受的现状）、`src/provider/pi/**`、`app/**`、CLI 出口；审计仍落 `docs/audit/shell-gate.jsonl`（`execution` 恒「未执行」、命令逐字、分支如实；`by` 带「（su 只读档）」后缀使档位可辨识）。
+
+**测试**：新 `test/编排/shell-readonly.test.ts` **8 例**（全部仅闸判定、绝不真跑命令）：四档映射（allow→执行 / risky、review→`readonly-deny`（reason 写明命中档）/ deny→`c-deny`）；**(b)/(a) 从未被调用**（一调用即抛错的桩 + 计数 0，四档覆盖）；`rules`/`classifyShell` 未注入 ⇒ 一律拒（fail-closed）；**真落盘** `docs/audit/shell-gate.jsonl`（逐字命令/branch/`execution` 恒「未执行」/conditions）；集成（门禁引擎实件）：`ls`/`cat`/`git status`/`node --version` 放行、`rm`→`readonly-deny`、`node --test`→`readonly-deny`、`sh -c`→`c-deny`；run-role：**su 给 `shellReadonly` ⇒ gate 到达 adapter**、su 不给 ⇒ 不 arm、**readonly 优先**（(a)/(b) 0 调用）、假适配器事件流端到端（denied + 「未执行」，无 accepted）。
+
+**结果**：`test/编排/` **174/174**（166 + 8）；`npm run typecheck` **全仓零错**；全量 `node --test "test/**/*.test.ts"`（**引号带**）**901 计 / 898 过 / 2 红 / 1 skipped**——2 红均为**既有环境红**（桌面面板键目录名、pm shared macOS `/var`），**无新红**。环境：Node v24.14.0、Darwin 25.6.0。真机复验（su 实跑 `ls`/`git status` 类命令）属**客户跑**。
+
+## 2026-10-12 — X-2 回交「每轮至多一份」+ 去重键去时间戳（handback 硬化）
+
+**来源**：真机——适配器**每轮发两次 `settled`**（两个发射点；Pi适配器同刻修根因）⇒ `withHandback` 每读一个 settled 发一份回交 ⇒ 每轮两份；旧去重键含 `at`（毫秒差）⇒ 桌面判重失效 ⇒ **su 收到 7 份逐字相同的投递**。本改动为纵深防御。
+
+**改了什么（`src/common/编排/handback.ts`）**：
+- **`withHandback` 每轮至多一份**：轮次以**「settle 突发」**为界——「自上次回交以来是否出现新事件」置位判定；突发首份 settled 发回交并透传，其后重复 settled **仅透传**；其间有事件 → 新一轮照常再发。每份回交写 `round`（1 起）。**既有语义不变**：先回交后透传 settled；无 settled 不发回交。**残留如实登记**：两份 settled 之间若**夹事件**而实为同轮（根因在适配器），本层不合并（round 不同 ⇒ 键不同）。
+- **`handbackKey` 改稳定键**：`<roleId>\0<taskId或空>\0<round或空>\0<内容哈希16位>`（SHA-256(`status\0summary\0evidence…`) 截 16 位，**不含 `at`**）。两类判定分工：**同轮重放/重复 settled ⇒ 恒等键 ⇒ 判重**；**新轮真返工即便文本逐字相同 ⇒ round 递增 ⇒ 键不同 ⇒ 照常各自投递**。`TaskHandback` 增**可选** `round?: number`（withHandback 写入；不进入 `renderHandbackPrompt` 文案）。
+- **对桌面：零代码改动**——桌面只调 `handbackKey(hb)`（键内部形状透明）；`round` 可选字段不影响回交卡。**告诫（请 pm 转达）**：不得自行往键里拼时间戳/改用 `at`，否则两类判定一起打回原状。
+
+**测试**：`test/编排/` **166/166**（+2；既有键用例改写）——双 settled 突发 → 恰一份回交、两份 settled 均透传、**次序（回交在第一份 settled 前）**保持、`round=1`；三连 settled 仍一份；**真返工**（两轮、报告文本逐字相同、其间有新事件且夹双 settled）→ 两份、`round=[1,2]`、**键不同**；稳定键各维断言（**同内容不同 `at` 恒等**——旧键失效的要害；round/角色/任务/摘要/证据/状态任一不同即不同）。
+
+**结果**：`npm run typecheck` 本角色零错；全量 `node --test "test/**/*.test.ts"`（**引号带**）**889 计 / 886 过 / 2 红 / 1 skipped**——2 红均为**既有环境红**（桌面面板键目录名、pm shared macOS `/var`）。环境：Node v24.14.0、Darwin 25.6.0、HEAD d933537。真机复验（双 settled 消失、无重复投递）待 Pi侧根因落地后属**客户跑**。
+
+**跨角色**：Pi适配器——每轮 `settled` 单次发射（根因侧）；桌面应用——无需改码（键使用告诫见上）。
+
+## 2026-10-12 — R-1 修 shell 闸 (b) 审读「恒不可解析」：结论改由工具交回（客户：不应该按 json 解析）
+
+**来源**：真机实测——角色跑 `node --test`（只读/测试类）被闸拒；su 在真机诊断「(b) 审读恒为输出不可解析」；客户裁定「**不应该按照 json 解析**」。
+
+**根因（真机证据，只读核对）**：旧路径要求审读模型**在正文写 JSON**。playground 的 su 会话 JSONL 中 37 个审读轮 **35 轮模型轮直接网关 500**（`500 … unknown variant 'tool_removal'`——su 会话**历史**含网关不认的块，整段重发即被拒），助手消息 `content: []`、`stopReason:"error"` ⇒ `extractMessageText` 只抽 text 块得空串 ⇒ real-adapter 的 `text.length > 0` 守卫**不产 message 事件** ⇒ `defaultExtractReply` 拿空串 ⇒ **恒不可解析**（M-2 后恒 `b-unparseable-deny`）。审计 84 条旁证：`b-unparseable-deny ×24`、`b-badjson→a-allow ×9`（M-2 前——客户被迫按 9 次放行，正是「不用发给我」的来源）、`b-unavailable→a-allow ×7`、`c-allow ×31`、`c-deny ×2`、`no-classifier ×9`。**su 的怀疑核实**：取字段没取错（有正文的轮 `summary` 即模型原文）；断点是**错误轮 content 空 ⇒ 该事件根本不产生**。
+
+**改了什么（编排 Section 1 内）**：
+- **`src/common/编排/shell-gate.ts`**（形状单一来源）：`SHELL_VERDICT_TOOL_NAME = "report_shell_verdict"`；`ShellVerdictPayload { verdict: "allow"|"deny"|"unsure"; reason? }`；`ShellVerdictFn`；`normalizeShellVerdict`（取值域防御）。
+- **`src/pipeline/orchestration/pm-reviewer.ts`**：**主路径 = 工具调用**——审读会话注入 `shellVerdict`（「注入才注册」；Pi适配器据此注册工具）；模型调工具 → 本层捕获 → **序列化 JSON 交回**（**构造保证可解析**）。提示词：首选且唯一结构化通道 = 调工具；正文 JSON 仅降级。**降级保留**：`defaultExtractReply` + 围栏剥离/取首个 `{}`（模型不调工具时零成本兜底）；**两手都无 ⇒ M-2 直拒不变**（不升 (a)、不打扰客户）。**审读会话不持久化**（固定 `persistSession:false`）：不恢复用户 su 会话的坏历史（500 诱因之一）、不污染其聊天记录。
+- **`src/pipeline/orchestration/run-role.ts`**：输入增 `persistSession?: boolean`（缺省 true 不变）与 `shellVerdict?`；`AdapterCapabilities.shellVerdict`；工厂原样转发。
+
+**测试**：`test/编排/` **164/164**（+4）——`shell-review-chain.test.ts`：工具四路（**review+allow 放行不打扰 / deny 拒 / unsure 升 (a) / risky 升 (a)**；断言审读会话 `persistSession===false` 且注入 `shellVerdict`）／工具参数非法 → **`b-unparseable-deny`**／降级路径正文 JSON（含围栏）仍解析；`shell-arming.test.ts` **端到端**：**真 `openRoleSession` + 真实 `assembleProjectShellGate` + 夹具模型经 `shellVerdict` 交回** ⇒ review 类命令**放行且不打扰客户**、审读会话无 `sessionDir`。
+
+**结果**：全量 `node --test "test/**/*.test.ts"`（**引号带**）**863 计 / 860 过 / 2 红 / 1 skipped**——2 红均为**既有环境红**（桌面面板键目录名、pm shared macOS `/var`），全仓其余全绿（测试角色 t9 旧断言已随其自查更新）。`npm run typecheck`：**本角色 1 处瞬时红**——`run-role.ts` 转发 `shellVerdict` 而 Pi侧 `PiRuntimeAdapterOptions` 尚未加该可选字段（落地即消解；**未用类型断言绕过**）。环境：Node v24.14.0、Darwin 25.6.0、HEAD d933537。
+
+**报告必答**：判定来源＝工具 `report_shell_verdict{verdict,reason?}` 经 `shellVerdict` 能力交回的结构化结论；**修后角色能否自跑 `node --test`** ＝编排链证据已证「review→工具 allow→放行」（前置：Pi适配器注册该工具；另因审读会话不再恢复污染历史，真机 500 诱因随之解除）——**预计可自跑，真机复验属客户跑**；**文本解析兜底保留（降级）**，理由：零成本覆盖不调工具的模型，且不改变「两手都无 ⇒ 直拒」的 M-2 策略。
+
+**跨角色（请 pm 转达）**：**Pi适配器**——① `PiRuntimeAdapterOptions` 增 `shellVerdict?`（消解本角色那 1 处瞬时类型红）；② 注入时注册工具 `report_shell_verdict`（schema：verdict 三值必填 + reason 可选；handler 只调能力、如实回执；不入 `GOVERNED_WRITE_TOOLS`）；③ 顺带核实网关 `tool_removal` 500。桌面无需改动（不可解析类不会再弹框——M-2 不变）。
+
 ## 2026-10-12 — M-2 shell 审读「不可解析」不再打扰客户：直接 fail-closed 拒绝 + 提示收紧
 
 **来源**：真机首跑暴露——(a) 层对话框弹「pm 判定 JSON 不合法」；客户：「**json 不合法的问题，就不用发给我了。**」＋补充裁定「**直接拒绝就行了**」（明确**不重试**）。

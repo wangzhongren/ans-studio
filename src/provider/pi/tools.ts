@@ -83,6 +83,13 @@
 // - **本层不写盘、不做治理判定、不进 `GOVERNED_WRITE_TOOLS`**：handler 只把载荷交给注入的能力并
 //   **如实**转达回执（失败绝不说成「已派发」）。
 //
+// 审读结论工具 report_shell_verdict（R-1）：
+// - **只给审读会话**（pm-reviewer 路径注入 `shellVerdict`）：把 shell 闸 (b) 的**结构化审读结论**
+//   （allow/deny/unsure）交回编排——**结论只以工具调用为准，正文里写不算**（真机根因：正文恒为空）。
+//   注册条件**照 run_shell / customerInput 等先例**：**未注入 `shellVerdict` 即不注册**。
+// - **本层不写盘、不做判定、不进 `GOVERNED_WRITE_TOOLS`**；handler 只把载荷交给注入能力并**如实**转达
+//   （失败绝不说成「已交回」）。**它不执行、不放行任何命令、不改变任何权限**——实际放行由编排既有审读链决定。
+//
 // （历史）finalize_bootstrap 收口提议工具（设计 §13.1 / T36）已于 2026-10-12（A-4 最后一步）**删除**：
 // 「同意才落盘」改由交互工具族 + 编排 writeSet/F4 承担；本层不再有收口工具与 `finalizeBootstrap` 注入槽。
 
@@ -101,6 +108,8 @@ import type {
   ReportHandbackPayload,
   DispatchTaskFn,
   DispatchTaskPayload,
+  ShellVerdictFn,
+  ShellVerdictPayload,
 } from "./session.ts";
 import type { WriteDecision } from "../../model/decision.ts";
 import { formatDenialMessage } from "../../common/pi-adapter/format-denial.ts";
@@ -143,6 +152,9 @@ export const SUBMIT_REPORT_TOOL_NAME = "submit_report";
 
 /** dispatch_task 工具名（设计 H-1；su 派发任务给项目角色——派发 ≠ 授权）。 */
 export const DISPATCH_TASK_TOOL_NAME = "dispatch_task";
+
+/** report_shell_verdict 工具名（R-1；审读会话交回结构化审读结论；与编排 shell-gate.ts:206 同串）。 */
+export const SHELL_VERDICT_TOOL_NAME = "report_shell_verdict";
 
 /** 扩展层对 run_shell 的能力级判定结果：非 undefined 即阻断（默认拒绝）。 */
 export interface ShellKillSwitchDecision {
@@ -237,6 +249,11 @@ export interface GovernedToolsOptions {
    * **只给治理角色 su**——编排对项目角色不注入 ⇒ 工具不存在。
    */
   dispatchTask?: DispatchTaskFn;
+  /**
+   * shell 审读结论能力（R-1）。**未注入时 `report_shell_verdict` 根本不注册**
+   * （**同 `shellGate` / `customerInput` 的「未注入即不注册」先例**）。**只给审读会话**。
+   */
+  shellVerdict?: ShellVerdictFn;
 }
 
 /** 从工具参数里取出目标路径；容忍 path / file_path / filePath 三种命名。 */
@@ -930,6 +947,54 @@ function makeDispatchTaskTool(fn: DispatchTaskFn): ToolDefinition {
   };
 }
 
+// —————————————— 审读结论工具（R-1；report_shell_verdict） ——————————————
+
+/**
+ * report_shell_verdict：**审读结论**工具（R-1，**只给审读会话**）。把 `{verdict, reason?}` 结构化结论
+ * 交给注入的能力（编排捕获后按既有审读链使用）；**结论只以本工具调用为准**——正文里写结论不算
+ * （真机根因：助手正文恒为空 ⇒ 旧解析路径恒不可解析）。
+ *
+ * 纪律：**本层不写盘、不做判定、不执行/不放行任何命令、不改变任何权限**——handler 只转交载荷并**如实**转达：
+ * 成功（能力不抛错）→ 「审读结论已交回（verdict: …）」；能力抛错 / 中止 → `ok:false`「**未能交回**」+ 原因，
+ * **绝不**说成「已交回」。参数校验：verdict 必须恰为三值枚举（非法 → 拒绝且**不调用能力**）。
+ * 悬挂防护：`raceAbort`；本地交回、不设等待超时。
+ */
+function makeReportShellVerdictTool(fn: ShellVerdictFn): ToolDefinition {
+  const name = SHELL_VERDICT_TOOL_NAME;
+  return {
+    name,
+    async handler(call) {
+      const verdictRaw = call.args["verdict"];
+      if (verdictRaw !== "allow" && verdictRaw !== "deny" && verdictRaw !== "unsure") {
+        return { ok: false, message: `${name}: verdict 参数非法（应为 "allow" / "deny" / "unsure" 之一）` };
+      }
+      const reason = readStringArg(call.args, ["reason"]);
+      const payload: ShellVerdictPayload = {
+        verdict: verdictRaw,
+        ...(reason !== undefined ? { reason } : {}),
+      };
+
+      const label = `${name} 交回审读结论`;
+      try {
+        await raceAbort(Promise.resolve().then(() => fn(payload)), call.signal, label);
+      } catch (err) {
+        return {
+          ok: false,
+          message:
+            `${name}：审读结论**未能交回**（原因：${reasonOf(err)}）——结论**只**以本工具调用为准` +
+            `（正文里写不算）；请修正后重试。`,
+        };
+      }
+      return {
+        ok: true,
+        message:
+          `${name}：审读结论已交回（verdict: ${verdictRaw}）。编排将按既有审读链使用该结论；` +
+          `本工具本身**不执行、不放行任何命令**。`,
+      };
+    },
+  };
+}
+
 /**
  * 构造受治理工具集：
  * - 写入类 write_file / edit_file（先 gate，获准且配置了 writeRoot 时落盘）；
@@ -980,6 +1045,13 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
   const dispatchTask = options?.dispatchTask;
   if (dispatchTask !== undefined) {
     tools.push(makeDispatchTaskTool(dispatchTask));
+  }
+
+  // 结构性保证（R-1，同 run_shell / customerInput 等先例）：**未注入审读结论能力时
+  // `report_shell_verdict` 不存在**。只给审读会话——由调用方以是否注入表达。
+  const shellVerdict = options?.shellVerdict;
+  if (shellVerdict !== undefined) {
+    tools.push(makeReportShellVerdictTool(shellVerdict));
   }
   return tools;
 }

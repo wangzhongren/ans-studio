@@ -322,3 +322,56 @@ test("I-1：留痕——审计 sink 收到每条请求（command/判定/branch/b
     cleanup(project);
   }
 });
+
+// —— R-1 端到端：真 openRoleSession + 真实装配（assembleProjectShellGate）+ 夹具模型调工具 ——
+
+test("R-1 端到端：夹具模型经 shellVerdict 交回结构化结论 → 只读/测试类命令（review）放行、不打扰客户；审读会话不持久化", async () => {
+  const project = makeTempProject();
+  try {
+    const reviewerCaps: AdapterCapabilities[] = [];
+    // 夹具「模型」：真实 openRoleSession 拿到能力面后，prompt 时像工具 handler 一样调用 shellVerdict。
+    const spyFactory = (gate: WriteGate, caps?: AdapterCapabilities): RuntimeAdapter => {
+      reviewerCaps.push(caps ?? {});
+      return {
+        async composeContext() {
+          return { systemPrompt: "" };
+        },
+        async bindRole(): Promise<RoleSession> {
+          return {
+            async prompt(): Promise<void> {
+              await caps?.shellVerdict?.({ verdict: "allow", reason: "只读/测试类命令" });
+            },
+            events(): AsyncIterable<SessionEvent> {
+              return (async function* () {
+                yield { kind: "settled", summary: "完成" } as SessionEvent;
+              })();
+            },
+            async dispose(): Promise<void> {},
+          };
+        },
+      };
+    };
+    let operatorCalls = 0;
+    const gate = await assembleProjectShellGate({
+      project,
+      operatorChannel: () => {
+        operatorCalls += 1;
+        return { outcome: "deny", operatorId: "t" };
+      },
+      classifyShell,
+      rules: RULES,
+      sessionDeps: { createAdapter: spyFactory },
+      auditSink: { async append() { return { ok: true }; } },
+    });
+    // `mysterytool --flag` = review 类（未命中白名单/硬拒）→ (b) 工具结论 allow → **放行且不打扰客户**。
+    const r = await gate(req("mysterytool --flag", ["mysterytool", "--flag"]));
+    assert.equal(r.allow, true, "夹具模型调工具交回 allow → review 放行（node --test 一类只读/测试命令可走通）");
+    assert.equal(operatorCalls, 0, "未打扰客户");
+
+    const caps = reviewerCaps[reviewerCaps.length - 1];
+    assert.equal(typeof caps?.shellVerdict, "function", "审读会话注入 shellVerdict（工具据此注册）");
+    assert.equal(caps?.sessionDir, undefined, "审读会话不持久化（不恢复/不污染用户 su 会话）");
+  } finally {
+    cleanup(project);
+  }
+});

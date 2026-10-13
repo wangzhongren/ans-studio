@@ -2,7 +2,7 @@
 // 桌面应用（B-1，2026-10-12 **修订**）：Markdown 渲染现为**第三方库封装**（vendored markdown-it 15.0.2；
 // 客户裁定「应该用第三方的」）——本文件仍是**纯函数面**的单测，并承载三组护栏：
 //  ① 语法渲染（标题/列表/围栏码/行内码/粗斜/链接/引用/段落换行）；
-//  ② **XSS 负例**（`<script>`/`<img onerror>`/`javascript:` 链接/引号注入 href/图片与表格——全跑一遍；
+//  ② **XSS 负例**（`<script>`/`<img onerror>`/`javascript:` 链接/引号注入 href/图片/表格单元格——全跑一遍；
 //     库升级或配置改动时它们就是护栏）；
 //  ③ **配置钉子**：`options.html === false`——谁把 `html` 误开成 `true`，这里必红（并附「开了会怎样」的
 //     现场演示）；外加 **vendor 文件 sha256 pin**（防静默换文件）。
@@ -57,7 +57,7 @@ test("语法：标题/粗斜/行内码/引用/列表/围栏码/链接/段落换�
   assert.equal(Md.esc('<a href="x">&'), "&lt;a href=&quot;x&quot;&gt;&amp;");
 });
 
-test("XSS 负例（护栏）：<script>/<img onerror>/javascript: 链接/引号注入 href/图片/表格——一律不产可执行 HTML", () => {
+test("XSS 负例（护栏）：<script>/<img onerror>/javascript: 链接/引号注入 href/图片/表格单元格——一律不产可执行 HTML", () => {
   const s1 = Md.renderMarkdown("<script>alert(1)</script>");
   assert.ok(s1.includes("&lt;script&gt;") && !s1.includes("<script"), "script 标签必须转义（html:false）");
   const s2 = Md.renderMarkdown('<img src=x onerror="alert(1)">');
@@ -77,9 +77,15 @@ test("XSS 负例（护栏）：<script>/<img onerror>/javascript: 链接/引号�
   const s6 = Md.renderMarkdown("![alt](https://x.tld/i.png)");
   assert.ok(!/<img/i.test(s6) && !/<a /i.test(s6), "图片不得渲染为 <img>，也不得回落成链接");
   assert.ok(s6.includes("![alt](https://x.tld/i.png)"), "图片以原文文本呈现");
-  // 表格：未启用（O-B1 未准）——保持文本。
+  // 表格：**已启用**（2026-10-13 客户裁定，原 disable(["table"]) 删除）——渲染为纯 table/th/td；
+  // 行内语法在单元格内照常生效（html:false 不影响库自身的行内解析）。
   const s7 = Md.renderMarkdown("| a | b |\n|---|---|\n| 1 | 2 |");
-  assert.ok(!/<table/i.test(s7) && s7.includes("| a | b |"), "表格不渲染（保持文本）");
+  assert.ok(/<table>[\s\S]*<thead>[\s\S]*<th>a<\/th>[\s\S]*<th>b<\/th>[\s\S]*<tbody>[\s\S]*<td>1<\/td>/.test(s7), "表格应渲染为 table/thead/th/td（不再保持文本）");
+  assert.ok(!s7.includes("| a | b |"), "表格源文本不再原样出现（已结构化）");
+  // ★ 安全钉子（红线不回退）：单元格内的原始 HTML **仍被转义**（html:false 对表格同样生效——无 XSS 增量）。
+  const s7x = Md.renderMarkdown("| x |\n|---|\n| <script>alert(1)</script> |");
+  assert.ok(/<td>&lt;script&gt;alert\(1\)&lt;\/script&gt;<\/td>/.test(s7x), "单元格内 HTML 必须保持转义文本（不得直通）");
+  assert.ok(!/<td><script/i.test(s7x), "单元格内不得出现未转义的 script 标签");
   // 任意 HTML 标签不得直通。
   const s8 = Md.renderMarkdown("<div onmouseover=alert(1)>hi</div>");
   assert.ok(!/<div/i.test(s8), "任意 HTML 标签不得直通");

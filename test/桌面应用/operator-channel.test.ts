@@ -14,6 +14,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -189,11 +190,35 @@ test("arm 决策（I-1 + 补丁）：DESKTOP_SHELL_GATE_ARMED === true——(c) 
   const sessSrc = fs.readFileSync(path.join(APP_DIR, "desktop", "session.ts"), "utf8");
   assert.ok(
     /role\.builtIn === true \? undefined : this\.deps\.shellOperatorChannel/.test(sessSrc),
-    "session.ts：**仅项目角色**注入 (a)（su 自身不 arm——审读者不给自己开闸）"
+    "session.ts：**仅项目角色**注入 (a)（su 不接 (b)/(a)——审读者不给自己开闸）"
   );
   assert.ok(
     /role\.builtIn === true \? undefined : this\.deps\.shellArming/.test(sessSrc),
-    "session.ts：(c) 实件与 (a) 同判据（仅项目角色；su 不 arm）"
+    "session.ts：(c) 实件与 (a) 同判据（仅项目角色走三层链）"
+  );
+  // ——— su 只读档（客户裁定 2026-10-12：「su 也要有 shell，但是只读」）的源码钉子 ———
+  assert.ok(
+    /role\.builtIn === true \? this\.deps\.shellArming : undefined/.test(sessSrc),
+    "session.ts：内置治理角色（su）经 shellReadonly **复用同一份 (c) 实件**（deps.shellArming 原引用——单一来源，与项目角色永不漂移）"
+  );
+  assert.ok(
+    /\.\.\.\(shellReadonly \? \{ shellReadonly \} : \{\}\)/.test(sessSrc),
+    "session.ts：shellReadonly 经 openRoleSession 透传（缺省不传 ⇒ su 不 arm——能力缺席即 fail-closed）"
+  );
+  assert.ok(
+    /import type \{ AssembleReadonlyShellGateOptions \} from "\.\.\/\.\.\/src\/pipeline\/orchestration\/shell-arming\.ts"/.test(sessSrc),
+    "session.ts：只读档装配选项形状**只读导入自编排**（单一来源；不另立第二形状）"
+  );
+  assert.ok(
+    ifaceSrc.includes('shellReadonly?: Omit<AssembleReadonlyShellGateOptions, "project">'),
+    "Interface：透传面镜像**同一形状**（`Omit<AssembleReadonlyShellGateOptions, \"project\">`——不另造第二形状）"
+  );
+  // 编排消费点只读核查：给出即 arm（**不带 `!suppressHandback` 前缀**——su 会话恒 suppressHandback=true，
+  // 带上该前缀 su 永远 arm 不上；只读档分支由 `shellReadonly !== undefined` 单独判）。
+  const runRoleSrc = fs.readFileSync(path.resolve(APP_DIR, "..", "src", "pipeline", "orchestration", "run-role.ts"), "utf8");
+  assert.ok(
+    /if \(input\.shellReadonly !== undefined\) \{/.test(runRoleSrc),
+    "run-role：只读档 arm 判据 = 「给出即 arm」（不带 suppressHandback 前缀——su 恒为 true）"
   );
 });
 
@@ -266,6 +291,128 @@ test("I-1 补丁（**真正接通**核查）：真实 openRoleSession + 真实�
     runRoleSrc.includes("capabilities?.shellGate ?? shellGate"),
     "Pi 适配器工厂应优先吃能力面的 shellGate（装配产物优先于历史接缝）"
   );
+});
+
+test("su 只读档（**真正接通**核查）：真实 openRoleSession + 真实装配——su 会话能力面产出**只读档** ShellGate（ls 放行 / rm 拒、不弹框）", async () => {
+  // 客户裁定 2026-10-12「su 也要有 shell，但是只读」的**桌面侧端到端核查**：SessionManager（内置治理角色
+  // 判据）→ 真实 `openRoleSession`（只读档 arm）→ 真实 `assembleReadonlyShellGate` + 真实 (c) 实件
+  // （`buildDesktopShellArming`：门禁引擎同一函数引用 + 默认规则集）⇒ 能力面 `capabilities.shellGate` 产出，
+  // 且判定就是**只读档**（ls 放行；rm 拒、理由写明只读档）。**全程不触网、不真跑命令**（只做闸判定）；
+  // 项目落在系统临时目录（审计若落盘也只在临时目录，**绝不碰仓库**）。
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ans-desktop-su-readonly-"));
+  try {
+    // 临时项目 fixture：治理边界文档（= X 的边界文件，含 docs/audit/ 条件目录——只读档的审计边界经它解析）
+    // + su（内置治理角色）+ X（项目角色；本用例不点它，只为枚举真实形态）。
+    const xDir = path.join(root, "角色卡", "X");
+    fs.mkdirSync(xDir, { recursive: true });
+    fs.writeFileSync(path.join(xDir, "role-card.md"), "# 角色 X\n");
+    fs.writeFileSync(
+      path.join(xDir, "boundary.yaml"),
+      [
+        "role: X",
+        "entries:",
+        "  - kind: file",
+        "    path: src/x.ts",
+        "    purpose: 测试条目",
+        "  - kind: conditional-directory",
+        "    path: docs/audit/",
+        "    condition: shell-gate",
+        "    root: project",
+        "    purpose: shell 闸审计留痕",
+        "",
+      ].join("\n")
+    );
+    const listing: ProjectListing = {
+      projectRoot: root,
+      roles: [
+        {
+          roleId: "su",
+          cardPath: "",
+          boundaryPath: "",
+          cardText: "su",
+          boundary: { entries: [], boundarySource: "<built-in>", acceptance: { accepted: false, source: "" } },
+          builtIn: true,
+        },
+        {
+          roleId: "X",
+          cardPath: "角色卡/X/role-card.md",
+          boundaryPath: "角色卡/X/boundary.yaml",
+          cardText: "# 角色 X",
+          boundary: {
+            entries: [{ root: "project", path: "src/x.ts", kind: "file", purpose: "测试条目" }],
+            boundarySource: "角色卡/X/boundary.yaml",
+            acceptance: { accepted: true, source: "test:fixture" },
+          },
+        },
+      ],
+      warnings: [],
+      hasRoles: true,
+      primaryRoleId: "su",
+    };
+    // 载入器桩件：直给「治理边界覆盖」已接受态（su 的边界 = 治理边界文档——与真实 `.ans` 生效形态同构）。
+    const loader = async () => {
+      const acceptance = { accepted: true, source: "test:fixture（只读档核查用）" };
+      const project = buildProjectConfig(listing, acceptance, undefined, "角色卡/X/boundary.yaml");
+      return {
+        project,
+        source: { kind: "builtin-fallback" as const, path: "", acceptance, pinPaths: [] },
+      };
+    };
+    const captured: (Record<string, unknown> | undefined)[] = [];
+    const mgr = new SessionManager({
+      openRoleSession, // **真实**编排入口：只读档装配真跑（不发模型请求、不执行任何命令）
+      createPiAdapterFactory: () => (gate: WriteGate, capabilities?: unknown) => {
+        captured.push(capabilities as Record<string, unknown> | undefined);
+        return {
+          async composeContext() {
+            return { systemPrompt: "测试替身：不触网" };
+          },
+          async bindRole() {
+            return {
+              async prompt(): Promise<void> {},
+              events(): AsyncIterable<SessionEvent> {
+                return {
+                  [Symbol.asyncIterator]() {
+                    return { async next() { return { value: undefined as unknown as SessionEvent, done: true }; } };
+                  },
+                };
+              },
+              async dispose(): Promise<void> {},
+            };
+          },
+        } as unknown as RuntimeAdapter;
+      },
+      createDemoAdapter: () => {
+        throw new Error("本用例不应构造 demo 适配器");
+      },
+      buildProjectConfig,
+      getListing: (root2) => (root2 === root ? listing : undefined),
+      emitEvent: () => {},
+      // 与 main.ts 生产形态同款：(c) 实件（真件——同一函数引用 + 默认规则集）——**同一份**也供 su 只读档。
+      shellArming: buildDesktopShellArming(),
+      loadEffectiveConfig: loader,
+    });
+
+    const r = await mgr.open({ projectRoot: root, roleId: "su", runtime: "pi" });
+    assert.equal(r.ok, true, "su 会话应能开启（真实装配；本路径不触网）");
+    const caps = captured[0];
+    const gate = caps?.shellGate as ShellGate | undefined;
+    assert.ok(gate !== undefined, "**接通证据**：su 给只读档 ⇒ 能力面产出 ShellGate（Pi 适配器 run_shell 注册条件成立）");
+
+    // 判定即**只读档**（只接 (c)；不接 (b)/(a)——没有审读会话被打开、没有任何对话框被弹）。
+    const ls = await gate!({ command: "ls -la", argv: ["ls", "-la"], cwd: root, toolCallId: "call-ls" });
+    assert.equal(ls.allow, true, "只读白名单命令（ls）放行——su 只读 shell 的正当用途");
+    const rm = await gate!({ command: "rm -rf x", argv: ["rm", "-rf", "x"], cwd: root, toolCallId: "call-rm" });
+    assert.equal(rm.allow, false, "risky（rm）→ 只读档一律拒（不交 (b) 审读、不打扰客户）");
+    if (!rm.allow) {
+      assert.match(rm.reason, /su 只读档/, "拒绝理由写明只读档策略（模型能看懂是策略拒、不是环境故障）");
+    }
+    const nodeTest = await gate!({ command: "node --test", argv: ["node", "--test"], cwd: root, toolCallId: "call-nt" });
+    assert.equal(nodeTest.allow, false, "review（node --test——不在只读白名单，现状）→ 只读档拒");
+    await mgr.stop();
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
 
 // ————————————————— M-1（2026-10-12 客户裁定「这个太丑了」）：应用内确认卡 —————————————————
@@ -473,7 +620,7 @@ test("arm 接缝（历史形状）：提供已装配 shellGate → 原样透传�
   await mgr.stop();
 });
 
-test("I-1 注入判据：**项目角色**会话收到 (a) 通道（shellOperatorChannel）；su（内置治理角色）**不**注入", async () => {
+test("I-1 注入判据：**项目角色**会话收到 (a) 通道 + (c) 实件（三层链）；su（内置治理角色）不接 (b)/(a)——改收**只读档**（同一份 (c) 实件）", async () => {
   const listing: ProjectListing = {
     projectRoot: "/proj",
     roles: [
@@ -507,13 +654,14 @@ test("I-1 注入判据：**项目角色**会话收到 (a) 通道（shellOperator
     classifyShell: () => "allow" as const,
     rules: { version: "桩件" },
   };
-  const captured: { roleId: string; shellOperatorChannel?: OperatorChannelFn; shellArming?: unknown }[] = [];
+  const captured: { roleId: string; shellOperatorChannel?: OperatorChannelFn; shellArming?: unknown; shellReadonly?: unknown }[] = [];
   const mgr = new SessionManager({
     openRoleSession: async (input) => {
       captured.push({
         roleId: input.roleId,
         shellOperatorChannel: input.shellOperatorChannel,
         shellArming: (input as { shellArming?: unknown }).shellArming,
+        shellReadonly: (input as { shellReadonly?: unknown }).shellReadonly,
       });
       return fakeHandle();
     },
@@ -533,9 +681,21 @@ test("I-1 注入判据：**项目角色**会话收到 (a) 通道（shellOperator
   const a = captured.find((c) => c.roleId === "A");
   const su = captured.find((c) => c.roleId === "su");
   assert.equal(a!.shellOperatorChannel, channel, "项目角色应收到 (a) 通道（arm 接线生效）");
-  assert.equal(su!.shellOperatorChannel, undefined, "su 自身不 arm（审读者不给自己开闸）");
+  assert.equal(su!.shellOperatorChannel, undefined, "su 不接 (b)/(a)（审读者不给自己开闸：不自审、不弹框）");
   assert.equal(a!.shellArming, armingStub, "(c) 实件应**原引用**下发给项目角色（装配面不加工——引用同一性）");
-  assert.equal(su!.shellArming, undefined, "su 同样不下发 (c) 实件（与 (a) 同判据）");
+  assert.equal(su!.shellArming, undefined, "su 不接三层链（其 shell 走只读档）");
+  // ——— su 只读档（客户裁定 2026-10-12：「su 也要有 shell，但是只读」）———
+  assert.equal(
+    su!.shellReadonly,
+    armingStub,
+    "su 应收到 shellReadonly 且**恰为同一份 (c) 实件**（deps.shellArming 原引用——单一来源，与项目角色永不漂移）"
+  );
+  {
+    const ro = su!.shellReadonly as { classifyShell?: unknown; rules?: unknown };
+    assert.equal(typeof ro.classifyShell, "function", "shellReadonly 含 (c) 的 classifyShell（门禁引擎同一函数引用）");
+    assert.ok(ro.rules !== undefined, "shellReadonly 含 (c) 的 rules（规则集本体）");
+  }
+  assert.equal(a!.shellReadonly, undefined, "项目角色不带 shellReadonly（照旧走 (c)/(b)/(a) 三层链，逐字不变）");
   await mgr.stop(null);
 });
 
@@ -559,6 +719,50 @@ test("I-1 补丁：未 arm（未配置两件）时**什么都不传**——输�
   assert.ok(seen, "应开启过一次会话");
   assert.ok(!("shellOperatorChannel" in (seen as object)), "未配置 ⇒ (a) 字段不出现（不注入）");
   assert.ok(!("shellArming" in (seen as object)), "未配置 ⇒ (c) 字段不出现（不注入）");
+  assert.ok(!("shellReadonly" in (seen as object)), "未配置 ⇒ shellReadonly 字段不出现（项目角色不带——照旧）");
+  await mgr.stop(null);
+});
+
+test("su 只读档 fail-closed：deps.shellArming 缺省 ⇒ su 连 shellReadonly 都不注入（能力缺席 = 不 arm，绝不放宽）", async () => {
+  // 「缺省/构造失败 ⇒ 不传」（任务口径：fail-closed）。与上例同款，但开的是**内置治理角色（su）**——
+  // 正是只读档的目标会话；缺件时它同样**什么都拿不到**（不降级、不放宽）。
+  const listing: ProjectListing = {
+    projectRoot: "/proj",
+    roles: [
+      {
+        roleId: "su",
+        cardPath: "",
+        boundaryPath: "",
+        cardText: "su",
+        boundary: { entries: [], boundarySource: "<built-in>", acceptance: { accepted: false, source: "" } },
+        builtIn: true,
+      },
+    ],
+    warnings: [],
+    hasRoles: true,
+    primaryRoleId: "su",
+  };
+  let seen: Record<string, unknown> | null = null;
+  const mgr = new SessionManager({
+    openRoleSession: async (input) => {
+      seen = input as unknown as Record<string, unknown>;
+      return fakeHandle();
+    },
+    createPiAdapterFactory: () => () => ({}) as unknown as RuntimeAdapter,
+    createDemoAdapter: () => {
+      throw new Error("本用例不应构造 demo 适配器");
+    },
+    buildProjectConfig,
+    getListing: (root) => (root === "/proj" ? listing : undefined),
+    emitEvent: () => {},
+    // 刻意不提供 shellArming（(c) 实件构造失败/未接线的主进程形态）。
+    loadEffectiveConfig: STUB_LOADER,
+  });
+  await mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "pi" });
+  assert.ok(seen, "应开启过一次 su 会话");
+  assert.ok(!("shellReadonly" in (seen as object)), "deps.shellArming 缺省 ⇒ su 不注入 shellReadonly（不 arm——绝不半装/放宽）");
+  assert.ok(!("shellArming" in (seen as object)), "su 也不收三层链的 (c) 字段（不接 (b)/(a)）");
+  assert.ok(!("shellOperatorChannel" in (seen as object)), "su 不收 (a) 字段（不弹框）");
   await mgr.stop(null);
 });
 

@@ -76,6 +76,42 @@
 - **实测（faux 离线）**：有效图**逐字进 LLM 转录**；**无效图被显式省略**（注记 `[Image omitted: …]`，`image-process.js:47/:55`——非静默）；网关非多模态时 SDK 不拦（无 `Model.input` 门控）→ 由网关报错、两形态可外推；**如实提示落点建议在编排/桌面**。
 - **测试**：`test/pi-adapter/prompt-images.test.ts` **7 条**（契约编译期兼容+键断言；无图逐字旧行为；带图同引用透传；空数组=无图；失败外推+abort+上抛；fake 签名同步；SDK 级有效/无效双断言）。**验证**：`test/pi-adapter/` → **138 pass / 0 fail**；全量 → **813 计 / 810 pass / 2 fail / 1 skip**（2 红仍为既有环境红）；`npm run typecheck` → **全仓零错误**。
 
+**新增（同日）：R-1 前置——`report_shell_verdict` 工具 + `shellVerdict?` 选项（另附网关 500 根因确证）**
+- **工具/契约**：`session.ts` 新增 `ShellVerdictPayload {verdict:"allow"|"deny"|"unsure"; reason?}` 与 `ShellVerdictFn`（void|Promise<void>；形状逐字取自编排 `shell-gate.ts:205-217`，读之确认不导入）；`tools.ts` 增 `SHELL_VERDICT_TOOL_NAME`/构造器（**未注入即不注册**，**只给审读会话**；verdict 三值枚举校验、非法不调能力；失败「未能交回」如实；防悬挂；不写盘）；`real-adapter.ts` describeTool 分支（枚举 + 「结论以工具调用为准/正文里写不算」+ **不得暗示授予权限**）与三处选项透传。**编排 `run-role.ts:530` 瞬时 TS2353 已消解**（typecheck 归零）。
+- **网关 500（`unknown variant 'tool_removal'`）根因确证（只读，未改）**：pi-ai 仅在 `compat.supportsMidConvoSystemMessages && supportsMidConvoToolChanges` 为真时生成 `tool_addition`/`tool_removal` 块（anthropic-messages.js:870/:1027-1041；缺省 false，types.d.ts:781-783）；而 `buildExplicitRuntime` 克隆模板**原样继承 compat**（实测 claude-fable-5：两能力位均 true + forceAdaptiveThinking + supportsStrictTools + allowedFallbackModels）⇒ SDK 生成网关不认的块 → 整段重发 500。**建议**：克隆时显式收窄 compat（两位置 false；顺带核对其余照抄项）；既有含块 JSONL 建议扫描清理。
+- **测试**：`shell-verdict.test.ts` **10 条**（含反向断言：文案不得出现「已放行/已授权/已授予/代表放行/代为放行」）。**验证**：`test/pi-adapter/` → **148 pass / 0 fail**；全量 → **874 计 / 870 pass / 3 fail / 1 skip**（3 红＝既有环境红 2＋桌面在途 1，非本层）；`npm run typecheck` → **全仓零错误**。Node v24.14.0 / macOS 26.6.2 / HEAD `6291ab1`。
+
+**修复（同日）：网关 500 `unknown variant 'tool_removal'`——compat 收窄 + 存量防御**
+- **主修**：`buildExplicitRuntime` 克隆模板时**显式收窄 compat 五项**（每项注释写明模板实测值与网关情形）：`supportsMidConvoSystemMessages:false`、`supportsMidConvoToolChanges:false`（tool_removal 块生成门槛，anthropic-messages.js:870/:1027-1041）、`forceAdaptiveThinking:false`、`supportsStrictTools:false`、`allowedFallbackModels` 清空；其余 compat 逐项保留。
+- **存量（前提经实测修正）**：探针确证 JSONL 存的是 system 消息上的 **toolsAdded/toolsRemoved 元数据**而非字面块；字面块受 compat 门控**每请求生成** ⇒ **收窄后存量自动失效、无需清洗**。仍加**防御**：检测 system 消息里的字面块 → 跳过该文件（留干净旧档）或全污染时**如实新建**（note 可见；不清洗历史、不静默）。
+- **回归**：新增 `wire-compat-and-legacy.test.ts` **5 条**——compat 断言；**wire 级双向对照**（收窄后无块 / 对照组复现块）；检测不误报用户正文；跳过/新建与干净路径逐字不变。
+- **评估**：可解释「会话中途有过工具装载变化的会话此后恒 500/恒空」一类；其它现象**未逐例取证（未证）**。
+- **验证**：`test/pi-adapter/` → **153 pass / 0 fail**；全量 → **879 计 / 876 pass / 2 fail / 1 skip**（恰为 2 条既有环境红）；`npm run typecheck` → **全仓零错误**。Node v24.14.0 / macOS 26.6.2 / HEAD `6291ab1`。
+
+**修复（同日）：W-1 同轮丢写——写类工具钉 sequential**
+- **复现**（离线 faux A/B）：同批 `write_file`（大内容）+ `edit_file`（同一文件、初始不存在）——**对照组（抹掉 executionMode）3/3 丢写**（edit 效果缺失；探针 5/5 同）；**主组（修复后）3/3 无丢写**（edit 在 write 产物上生效）。
+- **改动**：`describeTool` 对 `write_file`/`edit_file` 透传 `executionMode:"sequential"`（理由注释：同批并行默认 + 读改写竞态）；**`read_file` 判定不加**（纯读无写可竞争 + 批级规则已覆盖读写混批 + 纯读批无意义、反增串行）。
+- **附带影响（登记）**：含写类工具的批**整批顺序执行**（批级规则）——批量多文件写入串行化，性能换正确性。
+- **测试**：新增 `write-sequencing.test.ts` 3 条（形状 + A/B×3）；同步 `interactive-execution-mode.test.ts` 旧断言。**验证**：`test/pi-adapter/` → **156 pass / 0 fail**；全量 → **883 计 / 880 pass / 2 fail / 1 skip**（恰为既有 2 红）；`npm run typecheck` → **全仓零错误**。
+
+**修复（同日）：X-1 每轮重复 settled——唯一发射点**
+- **根因**：两处同发（扩展层 `on("agent_settled")` + `session.subscribe`）⇒ 每轮两份 ⇒ 编排每份回交一次 + 桌面去重键含毫秒 `at` ⇒ 去重失效 ⇒ 重复投递（真机 7 次）。
+- **修复**：**保留 `session.subscribe`**（公开事件面、与事件源同层；扩展层可缺席，而 settled 是消费方关键信号——漏发即挂起），收口为导出函数 `wireSettledOnce`；**删扩展层 `agent_settled` 映射**（其余职责全保留；`buildGovernanceExtension` 改为导出，供测试断言其 handlers 不含 `agent_settled`）。中止路径语义保持（abort 后仍恰 1）。
+- **A/B 实测（离线）**：A 修复前接线 → 一轮 **2**（复现）；B 出厂接线 → **恰 1**（且扩展仍含 tool_call、不含 agent_settled）；abort → 恰 1；stub 单测语义。**连带清点**：其余发射点全部单源单次（无同类重复）。
+- **验证**：`test/pi-adapter/` → **160 pass / 0 fail**；全量 → **889 计 / 886 pass / 2 fail / 1 skip**（恰为既有 2 红）；`npm run typecheck` → **全仓零错误**。
+
+**调整（同日）：终端降噪（客户直接要求）**
+- 「新会话（持久化目录…）」与「会话已恢复：…」两条**每次开会话都出现**的常规行由 `log.stage` 降为 **`log.trace`**（默认不打印；`ANS_PI_TRACE` 才出），理由写进代码注释。异常/一次性行（跳过污染会话 note、prompt 中止、contextWindow 提示等）**仍走 stage**；**事件流恢复提示未动**（界面诚实提示保留；可选建议已登记供客户裁定）。
+- 测试：新增 `log-noise.test.ts` **4 条**（真 logger 门槛；真 bindRole 离线：新会话/恢复走 trace 不走 stage、其余 stage 行不变；污染 note 仍 stage）。**验证**：`test/pi-adapter/` → **164 pass / 0 fail**；全量 → **893 计 / 890 pass / 2 fail / 1 skip**（恰为既有 2 红）；`npm run typecheck` → **全仓零错误**。
+
+**调整（同日）：恢复提示二次降噪——聊天流也不出现（客户推翻此前「事件流保留」决定）**
+- **缘由（客户原话）**：客户在聊天流又看到「**会话已恢复：…（历史与模型上下文自该会话续起）**」并明确表示不需要（「这个也不需要啊，这个不需要」；再次看到后「本来已经让你去掉了，怎么又加回来了」）。上一条「终端降噪」一轮**特意保留**了事件流那条（注释写着「界面/事件流里的那条恢复提示保留——诚实提示」）——**该保留决定已被客户明确推翻**：恢复是常规事件，聊天流也不要。
+- **改动**（`src/common/pi-adapter/real-adapter.ts` 的 `mode === "resumed"` 分支）：**删** `emit({kind:"message", summary:notice})`；`notice` 变量随之清理（恢复行内联进 `log.trace`），原拼接的 skip 片段拆为独立分支。`log.trace` **保留**（终端降噪维持原状，`ANS_PI_TRACE` 打开仍可见——排障用）。注释按新裁定重写（旧叙述「界面/事件流保留」删除，不留与行为矛盾的叙述）。
+- **第 2 条核查（skippedContaminated 是否有信息损失——结论：有，已处理）**：`skippedContaminated` 只在两处有值——① **全污染 ⇒ 新建**的 note 路径（note 已含「已跳过恢复并新建」，`log.stage` + 事件流照旧，本轮**未动**）；② **resumed + 跳过过污染档**（该路径 **note 为 undefined**）——此情形 skip 事实此前**只**出现在被删的那条恢复提示里，直接删 emit 即被静默吞掉。故新增独立分支：该情形**如实告知**（`log.stage` + 事件流，同 note 路径口径：文案「检测到 N 个会话文件含网关不认识的工具变更块（tool_removal/tool_addition），已跳过这些文件、恢复最新一条干净会话（不静默、不清洗历史）。」）；**恢复本身**（常规事件）仍不进聊天流。
+- **测试**（`test/pi-adapter/log-noise.test.ts`，4 → 5 条）：恢复用例断言**反转**——原「事件流应保留恢复提示」改为「**事件流不含**恢复提示」（trace 与「不走 stage」断言保留；事件读取改为先 dispose 再排空）；note 用例补事件流断言；**新增**「resumed + 跳过」（note 为 undefined）组合用例（构造：干净档 `message.timestamp` 较早、污染档 `header.timestamp` 较新 ⇒ list 排序污染在前被跳过）。**断言承重对照（A/B 实测）**：反向注入旧行为（恢复 emit 加回 + skip 分支删除）⇒ 两条用例恰转红；撤销后全绿。
+- **验证**：`node --test "test/pi-adapter/**/*.test.ts"`（带引号）→ **165 pass / 0 fail / 0 skipped**（164 + 1）；全量 `node --test "test/**/*.test.ts"`（带引号）→ **909 计 / 906 pass / 2 fail / 1 skip**——**2 红恰为既有基线红**（`test/桌面应用/pi-config.test.ts` 仓库检出目录名断言、`test/项目管理/shared/path-primitives.test.ts` 的 macOS `/private/var` 前缀），新红 0（计/过较 893/890 的增量含他角色在途改动）；`npm run typecheck` → **全仓零错误**。HEAD `6291ab1`（工作区含他人在途改动）。**未读** `.env`、**未发**真实模型请求。
+- **边界 / 跨角色（未越界改）**：只写 `real-adapter.ts`、`log-noise.test.ts` 与本角色文档面。**供桌面角色**：`app/renderer/renderer.js:1611` 另有一条**回放分隔行**「会话已恢复（模型上下文一并恢复）」（`test/桌面应用/renderer.test.ts:593` 有断言）——那是桌面自己的会话回放 UI，属其边界，**未动**；若客户对聊天流的要求涵盖该行，由桌面角色处置。
+
 ## 2026-10-11 — 注释更正：共享原子写上界 20 → 200（仅注释，无行为变更）
 
 **来源**：pm 已把共享原语 `src/common/shared/atomic-write.ts` 的重试上界由 **20 改为 200**（pm 属主；先复现并发 flake、定性「上界被打满」、并用证据证明「耗尽时 temp 已清、目标文件完好、只损失一次写入」，故取实测尾部 ~63 的约 3× 作裕量）。pm 如实回报：本角色 `src/common/pi-adapter/fs-write.ts:138` 的注释**仍写「≤20 次」**；该文件**已委托共享原语、无第二实现**，**仅注释陈旧**，需改为 200。

@@ -17,6 +17,9 @@ entries:
   - kind: file
     path: src/pipeline/orchestration/pm-reviewer.ts
     purpose: (b) 第二闸的真实接线：把命令原文交 pm 角色判读并取回复原文
+  - kind: file
+    path: src/pipeline/orchestration/shell-arming.ts
+    purpose: shell 闸装配（I-1 三层链 + su 只读档）——补登记（该件系 I-1 建设期新建、此前漏登）
   - kind: directory
     path: src/common/编排/
     purpose: 本角色私有辅助代码

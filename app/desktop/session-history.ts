@@ -16,6 +16,10 @@
 
 import fs from "node:fs";
 import path from "node:path";
+// 真机缺陷修复（2026-10-12）：交互请求的**锚点键**（单一来源 `request-anchor.ts`）——用于把
+// request_confirmation / request_choice 的「调用行」与「结论行」标上同一个键，供渲染侧把交互卡
+// 锚定回它发生的位置（详见该模块头注与 renderer.js 的锚点物化）。
+import { anchorKeyForToolCall } from "./request-anchor.ts";
 
 /** 会话目录相对项目根的位置（契约钉死：`<projectRoot>/.ans/sessions/<roleId>/`）。 */
 export const SESSIONS_REL_DIR = ".ans/sessions";
@@ -26,6 +30,16 @@ export interface ReplayRow {
   text: string;
   /** ISO 时间（entry 时间戳；缺失为空串——如实，不编造）。 */
   at: string;
+  /**
+   * 关联 id（真机缺陷修复 2026-10-12）：交互工具（request_confirmation / request_choice）的
+   * **pi toolCallId**——调用行与其结论行**带同一个值**（结论行经 `toolCallId` 字段对上调用行）。
+   * 其它行缺省（`undefined`）。渲染侧据此把「请求—结论」两行彼此相认（锚点的精确性来源）。
+   */
+  requestId?: string;
+  /** 交互请求的**锚点键**（`request-anchor.ts` 的单一算法拼出；两侧逐字可对上）——渲染侧据此把卡锚定到该请求。 */
+  anchorKey?: string;
+  /** 该行在「请求—结论」对中的位置：调用行 = "request"；结论行 = "conclusion"。非交互行缺省。 */
+  anchor?: "request" | "conclusion";
 }
 
 export interface RoleSessionHistory {
@@ -90,8 +104,13 @@ function asRecord(v: unknown): Record<string, unknown> | null {
   return v !== null && typeof v === "object" ? (v as Record<string, unknown>) : null;
 }
 
-/** 单条 entry → 0..n 个界面行（**认不出一律返回空数组**，由调用方计入 skipped 之外——不算坏行）。 */
-function rowsFromEntry(entry: unknown): ReplayRow[] {
+/** 单条 entry → 0..n 个界面行（**认不出一律返回空数组**，由调用方计入 skipped 之外——不算坏行）。
+ *
+ * `interactionCalls`（真机缺陷修复 2026-10-12）：**跨 entry 的调用表**（pi toolCallId → 锚点键）——
+ * 交互工具调用行登记于此，其**结论行**（后面的 toolResult entry）凭 `toolCallId` 取回同一个键，
+ * 「请求—结论」两行因此彼此相认（供渲染侧插卡定界；见 ReplayRow 的 requestId/anchor/anchorKey）。
+ * 会话文件里调用必先于结论（同一条 assistant 消息的内容块 → 下一条 toolResult 消息），单遍即够。 */
+function rowsFromEntry(entry: unknown, interactionCalls: Map<string, string>): ReplayRow[] {
   const e = asRecord(entry);
   if (!e || e.type !== "message") return []; // 非消息 entry（usage/model_change/compaction/…）不进界面回放
   const m = asRecord(e.message);
@@ -112,7 +131,17 @@ function rowsFromEntry(entry: unknown): ReplayRow[] {
         const b = asRecord(block);
         if (b && b.type === "toolCall") {
           const name = typeof b.name === "string" && b.name !== "" ? b.name : "tool";
-          rows.push({ kind: "tool", text: `调用工具 ${name}`, at });
+          const row: ReplayRow = { kind: "tool", text: `调用工具 ${name}`, at };
+          // 交互工具调用：带上 pi toolCallId（两行相认）与锚点键（渲染侧插卡定界）。
+          const callId = typeof b.id === "string" && b.id !== "" ? b.id : "";
+          const anchorKey = anchorKeyForToolCall(name, b.arguments);
+          if (callId !== "" && anchorKey !== null) {
+            row.requestId = callId;
+            row.anchorKey = anchorKey;
+            row.anchor = "request";
+            interactionCalls.set(callId, anchorKey);
+          }
+          rows.push(row);
         }
       }
     }
@@ -122,7 +151,16 @@ function rowsFromEntry(entry: unknown): ReplayRow[] {
     const name = typeof m.toolName === "string" && m.toolName !== "" ? m.toolName : "工具";
     const text = textOfContent(content);
     const kind: ReplayRow["kind"] = m.isError === true ? "denied" : "tool";
-    return [{ kind, text: text !== "" ? `${name}：${text}` : name, at }];
+    const row: ReplayRow = { kind, text: text !== "" ? `${name}：${text}` : name, at };
+    // 结论行：凭 toolCallId 对上调用行登记的锚点（对上 ⇒ 带上同一 requestId/anchorKey——**不解析正文**）。
+    const callId = typeof m.toolCallId === "string" && m.toolCallId !== "" ? m.toolCallId : "";
+    const anchorKey = callId !== "" ? interactionCalls.get(callId) : undefined;
+    if (callId !== "" && anchorKey !== undefined) {
+      row.requestId = callId;
+      row.anchorKey = anchorKey;
+      row.anchor = "conclusion";
+    }
+    return [row];
   }
   return []; // system 等其它 role：不进界面回放
 }
@@ -136,6 +174,8 @@ export function parseSessionJsonl(text: string): { ok: boolean; rows: ReplayRow[
   let headerParsed = false;
   const rows: ReplayRow[] = [];
   let skipped = 0;
+  // 交互工具调用表（pi toolCallId → 锚点键）：调用行登记、结论行取回——见 rowsFromEntry 的头注。
+  const interactionCalls = new Map<string, string>();
   for (let i = 0; i < lines.length; i += 1) {
     const raw = lines[i].trim();
     if (raw === "") continue;
@@ -154,7 +194,7 @@ export function parseSessionJsonl(text: string): { ok: boolean; rows: ReplayRow[
       headerParsed = true;
       continue;
     }
-    const entryRows = rowsFromEntry(parsed);
+    const entryRows = rowsFromEntry(parsed, interactionCalls);
     if (entryRows.length === 0) {
       skipped += 1; // 认不出的 entry / 无文本的消息——如实计入，不静默吞
       continue;

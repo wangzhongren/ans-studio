@@ -8,17 +8,24 @@ app/
   preload.cjs                 受限 IPC 桥（CJS，contextBridge 白名单）
   desktop/
     interface.ts              桌面 Interface：IPC 处理器（纯逻辑，可单测）
-    session.ts                会话管理器（点角色即开、多轮 send、事件消费、demo/pi 选择）
+    session.ts                会话管理器（点角色即开、多轮 send、事件消费、demo/pi 选择；shell 闸两档分发）
+    session-history.ts        会话记录恢复（D-1）：只读解析 `<project>/.ans/sessions/<roleId>/` 的最近 JSONL
+                              → 规范化界面行（交互工具的调用行/结论行带 requestId/anchor/anchorKey 锚点标识）
+    request-anchor.ts         交互请求锚点键的单一算法（kind+title；请求侧 customer-input 与回放侧
+                              session-history 两侧同源拼键——卡（重）物化的锚点关联）
+    customer-input.ts         客户确认制交互通道（A-5）：请求推达渲染侧（载荷带 anchorKey）+ 按请求快照校验回包
     chat-adapter.ts           多轮演示运行时适配器（脚本化写入，经 gate 判定）
     project.ts                由枚举构造 ProjectConfig；读变更记录/docs 索引
-    operator-channel.ts       操作者/客户确认通道 (a)（纯逻辑；shell 闸 + finalize 收口确认共用，复用不造第二套）
+    operator-channel.ts       操作者确认通道 (a)（纯逻辑；shell 三层链的 (a) 层：应用内确认卡数据面 + presenter；fail-closed 三条）
     pi-config.ts              Pi 配置面板逻辑（读写仓库根 .env，经共享 env-file 模块）
   renderer/
-    index.html / styles.css / renderer.js   视图（无 Node）：顶部自绘标题栏 + 三栏骨架
+    index.html / styles.css / renderer.js   视图（无 Node）：顶部自绘标题栏（右上角图标簇 #right-tabs）+ 两栏骨架 + 右抽屉 #right-drawer
 test/桌面应用/
   project.test.ts / session.test.ts / interface.test.ts   单元与集成测试
-  finalize-wiring.test.ts    创世 finalize 接线 + 收口确认面测试（T36/T38）
-  e2e/main.mjs                端到端自检（真实 Electron 驱动真实界面，截图+报告）
+  session-history.test.ts    D-1 解析/恢复测试（含锚点标识：调用行/结论行配对、非交互/缺 title/孤儿不着锚）
+  operator-wiring.test.ts    确认制交互通道 + 注入判据测试（原 finalize-wiring.test.ts，A-5 按新语义重写）
+  renderer.test.ts           渲染源码不变式守卫（含锚点物化三级落位/兜底落尾源码钉）
+  e2e/main.mjs                端到端自检（真实 Electron 驱动真实界面，截图+报告；含「回放重建+已决卡」时序断言）
 ```
 
 ## 依赖方向
@@ -64,6 +71,32 @@ test/桌面应用/
   将写出什么 + `[确认完成]`/`[暂不]`（**只在 su 已提议时才出现**）；触发入口 `#bootstrap-action` 按钮＝「让 su 提议收口」。
   **fail-closed**：未接通道 / 不可用 / 超时（默认 120s）/ 拒绝 → **不完成且零副作用**。**确认后**读作「项目已转正、su 仍可继续增改角色」；
   未完成示完整 reason（不假装成功）。写入经门禁 `resolveWrite`（不绕门）。`FinalizeResult` 类型从编排公开句柄派生（不导入其私有 `common/编排/`）。
+- **shell 闸两档分发（I-1 + su 只读档；客户裁定 2026-10-12「su 也要有 shell，但是只读」）**：
+  `session.ts::open` 按 `role.builtIn`（数据驱动，不硬编码 "su"）分发——**项目角色**收
+  `shellOperatorChannel`+`shellArming` 走 (c)/(b)/(a) 三层链（(a) = 应用内确认卡）；**内置治理角色（su）**
+  收 `shellReadonly`（**复用同一份 (c) 实件** `deps.shellArming`——单一来源、与项目角色永不漂移）⇒ 编排
+  `assembleReadonlyShellGate` 装配**只读档**：su 的 `run_shell` 只执行 (c) 只读白名单命令，
+  `risky`/`review`/`deny` 一律拒；**不接 (b)/(a)**（不自审、不弹框、不打扰客户）。**给出即 arm**
+  （su 会话恒 `suppressHandback === true`，只读档分支**不带**该前缀——旧注释联想会误导）；缺省/构造失败
+  （`deps.shellArming` undefined）⇒ 不传 ⇒ 不 arm（能力缺席 = fail-closed，绝不放宽）。`main.ts` 每窗口在
+  建 Interface 之前构造**同一份** `shellArming`（arm 开关 `DESKTOP_SHELL_GATE_ARMED`）经 Interface 透传；
+  测试见 `operator-channel.test.ts`（含真实装配**接通核查**：ls 放行 / rm、node --test 拒）。
+  详见 `docs/change/2026-10-12_change_su-readonly-shell-arming.md`。
+- **右栏抽屉 + 右上角图标簇（客户裁定 2026-10-13：右栏不常驻、点了才展示）**：栅格两列、抽屉 `#right-drawer` 为
+  覆盖层（不占列宽、聊天流不 reflow；CSS 120ms 过渡、无计时器）；`#right-tabs` 四枚图标（角色资料/待办/队列概览/
+  Pi 设置）+ 数字角标（待办=视图行数、队列=排队深度——同 role-state 快照）；同图标再点/×/Esc 收起、至多开一块；
+  内容跟随选中角色（角色资料四组与「待办 / 队列」组逐字保留；队列概览=仅排队位次）。Pi 面板整体迁入抽屉
+  （保存/掩码纪律一字不动）；「结束会话」按钮删除（停止能力保留在程序化路径 `d.stopSession(null)`）；
+  「聊天中/空闲」pill 删除（kind 程序化保留在 `#chat` 的 `data-state`）。
+- **交互卡锚点物化（真机缺陷修复，2026-10-12「已确认的卡切走再切回跑到最下面」）**：卡的（重）物化按
+  **时序锚点**落位，open 与 decided 一视同仁——① 主修复＝`materializeOperatorCard` 先按 `requestId` 查行表，
+  卡行仍在（Q-2 窗口化下 keepEl 行**离屏脱挂≠丢失**，旧 `cardInPane` 判据误判）⇒ **复用、绝不重建落尾**
+  （旧实现每次重建+追加行表尾，且旧行仍持旧元素=潜在双份）；② 防线＝同表首物化位（`entry.anchorIndex` +
+  行表 `seq` 校验）或**回放锚点表**插入（回放行带请求标识：`session-history.ts` 把 request_confirmation /
+  request_choice 的调用行与结论行带上同一 `requestId`＝pi toolCallId + `anchorKey`＝kind+title 单一算法键
+  `request-anchor.ts`；`customer-input.ts` 载荷同法带 `anchorKey`——两侧逐字可对上；`registerRow` 新增
+  `atIndex` 锚点插入 + index 右移重编号）；③ **兜底＝追加行表尾，绝不丢卡**（代码写明）。首次到达不加锚
+  （卡=当下最新事件，行表尾即它发生的位置）。详见 `docs/fix/2026-10-12_fix_decided-card-reanchor.md`。
 - **自绘标题栏（窗口装饰，2026-10-11 客户裁定）**：去掉**原生 OS 标题栏**与**默认菜单栏**两样 chrome。
   主进程 `main.ts`：`BrowserWindow` **`frame: false`**（**`resizable` 不动** ⇒ Windows 缩放边框仍在）+
   `app.whenReady()` 里 **`Menu.setApplicationMenu(null)`**（去默认菜单栏；编辑类快捷键由 Chromium 原生处理、

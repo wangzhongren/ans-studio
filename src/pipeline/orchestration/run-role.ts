@@ -48,10 +48,16 @@ import type {
   OperatorChannelFn,
 } from "../../provider/pi/session.ts";
 import { createPiRuntimeAdapter } from "../../provider/pi/session.ts";
-import { assembleProjectShellGate, type AssembleShellGateOptions } from "./shell-arming.ts";
+import {
+  assembleProjectShellGate,
+  assembleReadonlyShellGate,
+  type AssembleShellGateOptions,
+  type AssembleReadonlyShellGateOptions,
+} from "./shell-arming.ts";
 import { formatEvent } from "../../common/编排/output.ts";
 import { withHandback, type OrchestrationEvent, type TaskReport, normalizeTaskReport } from "../../common/编排/handback.ts";
 import { EXIT_OK, EXIT_USAGE, EXIT_FAILURE } from "../../common/编排/exit-codes.ts";
+import type { ShellVerdictFn } from "../../common/编排/shell-gate.ts";
 import { repinIfBootstrapped, DEFAULT_GOVERNANCE_BOUNDARY_REL } from "../../common/编排/finalize.ts";
 import { conditionSlugsOf, createConfirmedWriteIssuer } from "../../common/编排/confirmed-writes.ts";
 import type { RuntimeKind } from "../../common/编排/args.ts";
@@ -73,9 +79,12 @@ import type { RuntimeKind } from "../../common/编排/args.ts";
  * · `dispatchTask`（H-1 su 派发任务；未注入 ⇒ `dispatch_task` 不注册）——**只给治理角色 su**注入
  *   （项目角色不给）。形状 = 契约家 `DispatchTaskFn`（前端路由：开/排队/去重/失败保留归前端；
  *   **派发 ≠ 授权**——能力实现方不得据此授予任何写权）。
- * · `shellGate`（I-1 开放 shell；未注入 ⇒ `run_shell` 不注册）——**只对项目角色**注入（su 自身不 arm；
- *   由 `openRoleSession` 在收到 `shellOperatorChannel` 时经 `assembleProjectShellGate` 装配）。
- *   比工厂第二参优先（`capabilities?.shellGate ?? shellGate`）。
+ * · `shellGate`（I-1 开放 shell + su 只读档；未注入 ⇒ `run_shell` 不注册）——**项目角色**经三层链注入
+ *   （`openRoleSession` 收到 `shellOperatorChannel` 时经 `assembleProjectShellGate` 装配）；**su** 经
+ *   **只读档**注入（收到 `shellReadonly` 时经 `assembleReadonlyShellGate` 装配——客户裁定 2026-10-12：
+ *   「su 也要有 shell，但是只读」）。比工厂第二参优先（`capabilities?.shellGate ?? shellGate`）。
+ * · `shellVerdict`（R-1 shell 审读结论工具；未注入 ⇒ `report_shell_verdict` 不注册）——**审读会话专用**
+ *   （由 `pm-reviewer` 注入；形状单一来源 `common/编排/shell-gate.ts`）。
  */
 export interface AdapterCapabilities {
   customerInput?: CustomerInputFn;
@@ -83,6 +92,7 @@ export interface AdapterCapabilities {
   sessionDir?: string;
   dispatchTask?: DispatchTaskFn;
   shellGate?: ShellGate;
+  shellVerdict?: ShellVerdictFn;
 }
 
 export interface RunRoleInput {
@@ -221,9 +231,9 @@ export async function openRoleSession(
     dispatchTask?: DispatchTaskFn;
     /**
      * **I-1 开放 shell —— (a) 前端操作者确认通道（兼 arm 开关语义）**：给出 ⇒ 本会话（**仅项目角色**；
-     * su 自身不 arm）由编排装配三层链（(c) 确定性硬地板 → (b) su 模型审读 → (a) 本通道；
-     * 关窗/不答/超时 = **不放行**）并注入 `ShellGate` ⇒ `run_shell` 注册（「注入才注册」语义未改）。
-     * 不给 ⇒ 不 arm（`run_shell` 不存在）。CLI 一次性前端无确认框 ⇒ 不接。
+     * su 自身不接三层链——su 的 `run_shell` 走只读档 `shellReadonly`）由编排装配三层链（(c) 确定性硬地板
+     * → (b) su 模型审读 → (a) 本通道；关窗/不答/超时 = **不放行**）并注入 `ShellGate` ⇒ `run_shell` 注册
+     * （「注入才注册」语义未改）。不给 ⇒ 不 arm（`run_shell` 不存在）。CLI 一次性前端无确认框 ⇒ 不接。
      */
     shellOperatorChannel?: OperatorChannelFn;
     /**
@@ -232,6 +242,27 @@ export async function openRoleSession(
      * `shellOperatorChannel`——（c) 的合法注入源（门禁引擎经 service 的公开出口）就绪后在此传入。
      */
     shellArming?: Omit<AssembleShellGateOptions, "project" | "operatorChannel" | "sessionDeps">;
+    /**
+     * **su 只读档（客户裁定 2026-10-12：「su 也要有 shell，但是只读」）**：给出 ⇒ 本会话装配**只读档**
+     * `ShellGate`（`assembleReadonlyShellGate`——只接 (c)：命中只读白名单放行；`risky`/`review`/`deny`
+     * 一律拒；**不接 (b) su 模型审读**——su 自己就是审读者，不自审；**不接 (a) 客户确认**——只读外的
+     * 命令直接拒，不打扰客户、不弹任何对话框）并注入 `capabilities.shellGate` ⇒ `run_shell` 注册
+     * （「注入才注册」语义未改）。设计指向的用途是**内置治理角色 su**（su 自身不接三层链）；对项目角色
+     * 给出时按**更严的一档**处理（只读档执行集严格 ⊆ 三层链执行集）。与 `shellOperatorChannel`/
+     * `shellArming` 同时出现时 **readonly 优先**（见下方 arm 块注释）。装配失败 ⇒ **不 arm**
+     * （`run_shell` 不注册，fail-closed 不变）。**不得为此弹任何对话框**（选项面没有 (a) 通道即是结构保证）。
+     */
+    shellReadonly?: Omit<AssembleReadonlyShellGateOptions, "project">;
+    /**
+     * **R-1：审读结论工具的能力**（`report_shell_verdict`「注入才注册」）——审读会话专用，由
+     * `pm-reviewer` 注入；一般调用方不传。
+     */
+    shellVerdict?: ShellVerdictFn;
+    /**
+     * **D-1 覆盖位**：`false` ⇒ 本会话**不持久化**（不传 `sessionDir`，适配器走 in-memory）。
+     * 审读会话固定用 `false`（不恢复用户 su 会话的可能损坏历史、不污染其聊天记录）；缺省/`true` 行为不变。
+     */
+    persistSession?: boolean;
   },
   deps: { createAdapter: (gate: WriteGate, capabilities?: AdapterCapabilities) => RuntimeAdapter }
 ): Promise<RoleSessionHandle> {
@@ -290,17 +321,28 @@ export async function openRoleSession(
 
   // D-1 重启恢复：本会话的**会话自持目录**（约定 `<projectRoot>/.ans/sessions/<roleId>/`）。
   // 编排只**算路径**、**不预建目录**（创建归适配器在真正落盘时做——理由见 AdapterCapabilities.sessionDir）。
-  // projectRoot 为空 / roleId 不安全 → 不传（旧行为）。
-  const sessionDir = sessionDirFor(input.project.projectRoot, setup.role.id);
+  // projectRoot 为空 / roleId 不安全 / **`persistSession:false`（R-1 审读会话）** → 不传（in-memory）。
+  const sessionDir =
+    input.persistSession === false ? undefined : sessionDirFor(input.project.projectRoot, setup.role.id);
 
   // H-1 派发任务：**只给治理角色（su）**转交前端路由能力——项目角色会话不注入（`dispatch_task` 只给 su）。
   const dispatchTask = suppressHandback ? input.dispatchTask : undefined;
 
-  // I-1 开放 shell：**只对项目角色 arm**（su 自身不 arm）。前端给出 (a) 操作者确认通道 ⇒ 装配三层链
-  // （(c) 确定性硬地板 → (b) su 模型审读 → (a) 本通道）并注入 ShellGate ⇒ run_shell 注册
-  // （「注入才注册」语义未改）。装配失败 ⇒ **不 arm**（能力缺席 = fail-closed，run_shell 不注册）。
+  // I-1 开放 shell（项目角色三层链）+ **su 只读档**（客户裁定 2026-10-12）——两档共用同一个
+  // `shellGate` 能力位（「注入才注册」：注入了 ⇒ Pi 适配器注册 `run_shell`；未注入/装配失败 ⇒
+  // **不 arm**，能力缺席 = fail-closed，绝不放宽）。
+  // 优先级（确定行为，写明）：**`shellReadonly` 优先**——给出即按只读档装配。对 **su** 这是设计指向的
+  // 用途（「su 也要有 shell，但是只读」；三层链恒不对 su arm，故只读档不能再加 `!suppressHandback`
+  // 前缀，否则 su 永远 arm 不上）；对**项目角色**给出时按更严的一档处理（只读档执行集严格 ⊆ 三层链）。
+  // 仅当未给 `shellReadonly` 时，才走既有 `shellOperatorChannel`/`shellArming` 三层链（项目角色，逐字不变）。
   let shellGate: ShellGate | undefined;
-  if (!suppressHandback && input.shellOperatorChannel !== undefined) {
+  if (input.shellReadonly !== undefined) {
+    try {
+      shellGate = await assembleReadonlyShellGate({ project: input.project, ...input.shellReadonly });
+    } catch {
+      shellGate = undefined; // 装配失败 ⇒ 不 arm（能力缺席 = fail-closed，run_shell 不注册）
+    }
+  } else if (!suppressHandback && input.shellOperatorChannel !== undefined) {
     try {
       shellGate = await assembleProjectShellGate({
         project: input.project,
@@ -319,6 +361,7 @@ export async function openRoleSession(
     ...(sessionDir !== undefined ? { sessionDir } : {}),
     ...(dispatchTask !== undefined ? { dispatchTask } : {}),
     ...(shellGate !== undefined ? { shellGate } : {}),
+    ...(input.shellVerdict !== undefined ? { shellVerdict: input.shellVerdict } : {}),
   };
   const adapter = deps.createAdapter(
     gate,
@@ -511,6 +554,7 @@ export function createPiAdapterFactory(
       reportHandback: capabilities?.reportHandback,
       sessionDir: capabilities?.sessionDir,
       dispatchTask: capabilities?.dispatchTask,
+      shellVerdict: capabilities?.shellVerdict,
     });
 }
 
