@@ -8,7 +8,7 @@ import "../../app/renderer/tool-rows.js";
 import "../../app/renderer/ui-labels.js";
 
 interface Activity {
-  toolName: string; target: string; phase: string; status: string; label: string;
+  toolName: string; target: string; fullTarget: string; phase: string; status: string; label: string;
   exceptional: boolean; barrier: boolean; summary: string; callId: string;
 }
 const toolRows = (globalThis as unknown as { ANSToolRows: { activityOf(input: unknown): Activity } }).ANSToolRows;
@@ -143,4 +143,23 @@ test("独立UI2：无执行结果的门禁拒绝不能被映射为执行失败",
   assert.notEqual(denial.status, "completed");
   assert.match(denial.summary, /没有写入权限/);
   assert.equal(denial.target, "outside/no-permission.md");
+});
+
+test("独立S1：孤立read_file失败只从可靠首行补目标，空结构目标也不抹掉它", () => {
+  for (const extra of [{}, { details: { path: "", target: "" } }]) {
+    const parsed = rows([{ role: "toolResult", toolName: "read_file", content: [{ type: "text", text: "read_file 失败：lost.md（ENOENT）" }], ...extra }]);
+    const actual = toolRows.activityOf(parsed[0]);
+    assert.equal(actual.status, "failed");
+    assert.equal(actual.exceptional, true);
+    assert.equal(actual.target, "lost.md");
+    assert.equal(actual.fullTarget, "lost.md");
+    assert.match(actual.summary, /ENOENT/);
+    assert.equal(actual.callId, "", "没有对应调用，不伪造callId");
+  }
+  const misleading = rows([{ role: "toolResult", toolName: "read_file", content: [{ type: "text", text: "旧结果未记录状态\n正文：read_file 失败：private-body.md（ENOENT）" }] }]);
+  const unknown = toolRows.activityOf(misleading[0]);
+  assert.equal(unknown.status, "unknown");
+  assert.equal(unknown.exceptional, false);
+  assert.equal(unknown.fullTarget, "");
+  assert.doesNotMatch(unknown.summary, /private-body|ENOENT/);
 });

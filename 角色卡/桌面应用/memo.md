@@ -2,6 +2,8 @@
 
 记录本角色掌握的事实、待核实事项与续接线索。不写全局规则，不抄任务状态。
 
+- 2026-10-13：旧v2实际重验收五项缺口已返工，测试必须看默认summary目标、right-body实际宽度、控件rect和native完整链；不能以details.textContent/仅CSS属性证明。q-item原flex覆盖grid，q-full100%+margin48实际溢出；inert按矩形只阻被遮审批卡，不改state/原disabled；open/answered/expired/busy都需刷新工作提示。disabled撤回按钮会使native焦点丢到body，真实回执后仅原角色原项恢复重试焦点。Electron按钮Return需要keyDown+char+keyUp，光keydown不能证明按钮激活。见[体验返工](docs/fix/2026-10-13_fix_uiux-reacceptance.md)。
+
 - 2026-10-13：UI/UX v2候选在既定6app文件内完成。隐藏translate抽屉仍扩大.app.scrollWidth，原矩形clip-path解决；bottom按composer真实高度，别复制100px。旧JSONL isError=false仍可能有自有工具确定首行失败，只允许首行固定模板，不查文件正文/stdout。accepted缺可靠结果未知。组跨full用可靠首活动身份，缺身份不恢复旧open；denied交互结论必须返回rec登记conclusion锚点。PM与产品精化保留所有显式角色点击U-1最新/未决，只有普通刷新/展开保阅读；每角色草稿/图片隔离，异步结果归原角色。详见[变更](docs/change/2026-10-13_change_uiux-v2.md)。
 
 - 2026-10-13：输入法候选Enter曾被聊天keydown直接发送。最小保护为compositionstart/end布尔+isComposing+keyCode229，在preventDefault/onSend前返回；end可能先于最终IMEkeydown，229仍必要。结束即清状态，不设任意时间窗/吞下一键，鼠标选词后下一Enter仍正常。来源：客户反馈、MDN官方说明、独立Electron同流红→绿，附件/输入/气泡与sendIPC实测；精准脚本 `test/桌面应用/e2e/ime-enter.mjs`，不必重跑大harness。[记录](docs/fix/2026-10-13_fix_ime-enter-candidate.md)。
@@ -67,3 +69,5 @@
 
 
 
+
+- 2026-10-13：产品S1收尾：孤立旧read_file结果activity.target空并不等于首行目标未知；严格自有失败模板已表达目标时应保留，不能再加矛盾未知。只tool-rows映射fallback变化，不改renderer/布局/firstLine；当前helper9ffda…、隐藏76和定向62已重绑，详见体验返工记录。

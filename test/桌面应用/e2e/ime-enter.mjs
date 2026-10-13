@@ -77,7 +77,7 @@ async function assertSent(name) {
 app.whenReady().then(async () => {
   const watchdog = setTimeout(() => { report.push("WATCHDOG=1"); fs.writeFileSync(path.join(OUTDIR, "report.txt"), report.join("\n")); app.exit(1); }, 15000);
   try {
-    win = new BrowserWindow({ width: 1100, height: 760, show: true, webPreferences: { preload: path.join(APP_DIR, "preload.cjs"), contextIsolation: true, nodeIntegration: false, sandbox: false } });
+    win = new BrowserWindow({ width: 1100, height: 760, show: process.env.ANS_IME_VISIBLE === "1", webPreferences: { preload: path.join(APP_DIR, "preload.cjs"), contextIsolation: true, nodeIntegration: false, sandbox: false } });
     await win.loadFile(path.join(APP_DIR, "renderer", "index.html"));
     await js("window.__ansRenderer.loadProject('/ime-project')");
     await js("window.__ansRenderer.selectRole('A')");

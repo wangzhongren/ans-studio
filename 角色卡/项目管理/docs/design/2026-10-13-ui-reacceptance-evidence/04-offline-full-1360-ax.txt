@@ -1,0 +1,2 @@
+There has been no change in the accessibility tree for Window: "ANS UI/UX 离线验收".
+The focused UI element is 70 按钮 收起, Help: 展开全文

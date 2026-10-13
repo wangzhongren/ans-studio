@@ -9,7 +9,8 @@
 | 产品提案 | 对产品整体（当前焦点=桌面应用）提出带依据与验收的交互方案，交客户选择并经项目管理评审后派发实现 | 首轮历史保留；图片/停止/P1队列管理、LRU、防呆、CLI指路已由属主完成，当前状态见新评审对照 | [首轮提案](docs/design/2026-10-13_design_desktop-ux-improvement-proposal.md)、[当前状态与新建议](docs/design/2026-10-13_design_current-ui-reassessment.md) |
 | 产品评审 | 从用户流程评价当前 UI，区分观察、代码事实与建议，附优先级/属主/成本/验收；不授予实施权 | 已交付当前 UI 重新评审：4张真实窗口截图+AX、已提交源码；限当前仅su空闲的状态 | [2026-10-13 当前 UI 重新评审](docs/design/2026-10-13_design_current-ui-reassessment.md) |
 | 产品与UI/UX联合设计 | 把产品目标转为页面层级、状态行为和验收约束，收到设计师方案后逐轮评价 | 两轮已收口：v2停止保留排队、角色独立状态、实际本地刷新修订已源码核对，产品推荐设计方向；不含O1–O4或业务代码实施 | [第一轮简报](docs/design/2026-10-13_design_product-uiux-meeting-brief.md)、[第二轮评审](docs/design/2026-10-13_design_product-uiux-round2-review.md) |
-| v2实际实现产品验收 | 读取实际候选源码、生产渲染器截图与操作证据，判断UI-1/2/3是否达到已确认目标 | 核心六源码与首轮离线30项已读；初审F1/B3异常summary需修，最终33项/hash/截图与独立证据待补，尚未整体通过 | [实际实现验收记录](docs/design/2026-10-13_design_product-ui-implementation-acceptance.md) |
+| v2实际实现产品验收 | 读取实际候选源码、生产渲染器截图与操作证据，判断UI-1/2/3是否达到已确认目标 | 已推送9e50aac重验收收口：两张当前真机+七张实际renderer图，唯一结论不通过；五项必要返工，R4未亲拍/完整键盘缺证据明确保留，O1–O4后置 | [初次验收清单](docs/design/2026-10-13_design_product-ui-implementation-acceptance.md)、[当前重新验收](docs/design/2026-10-13_design_product-ui-reacceptance.md) |
+| 五项返工独立复验 | 核对新候选五项实际体验及同版证据，客户要求产品/UI都通过后才提交GitHub | 新候选源码/75条报告已读，最终hash/新图待补；S1旧模板目标表述边界已交核，尚未签通过 | [返工复验](docs/design/2026-10-13_design_product-ui-rework-acceptance.md) |
 
 ## 只读参考入口（产品审视的事实来源）
 

@@ -1188,8 +1188,8 @@ details.sec[open] > summary .sec-chev { transform: rotate(90deg); }
 .q-toggle:hover { color: var(--text); border-color: var(--border-strong); }
 .q-withdraw:hover { color: var(--danger); border-color: var(--danger); }
 .q-full {
-  flex: 0 0 100%;
-  margin: 2px 0 0 48px;
+  min-width: 0;
+  margin: 8px 0 0;
   padding: 6px 8px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -1275,9 +1275,26 @@ ul.idx li.dir { color: var(--text-2); }
 .tool-current { font-size: 12px; color: var(--text-2); padding: 4px 0; }
 .role-work { padding: 10px 16px 16px; border-bottom: 1px solid var(--border); }
 .work-heading { font-size: 12px; font-weight: 500; margin: 8px 0; }
-.role-work .q-item { grid-template-columns: 50px minmax(0,1fr) auto; }
-.role-work .q-src { grid-column: 2; }
-.role-work .q-text { grid-column: 2 / -1; }
-.role-work .q-meta { grid-column: 3; grid-row: 1; }
-.role-work .q-actions { grid-column: 2 / -1; }
-.role-work .q-full { grid-column: 1 / -1; }
+/* 单块当前工作；排队为24px位次+可收缩内容，不混用旧flex行定位。 */
+.role-work .q-item { display: grid; grid-template-columns: 24px minmax(0,1fr); column-gap: 8px; align-items: start; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.role-work .q-item.is-running { display: block; padding-top: 0; }
+.role-work .q-pos { min-width: 0; }
+.role-work .q-content { min-width: 0; }
+.role-work .q-head { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.role-work .q-src { width: auto; max-width: 100%; padding: 0; border: 0; border-radius: 0; text-align: left; overflow-wrap: anywhere; }
+.role-work .q-meta { margin-left: auto; }
+.role-work .q-text { margin: 6px 0; font-size: 12.5px; }
+.role-work .q-actions { gap: 8px; flex-wrap: wrap; }
+.role-work .q-toggle, .role-work .q-withdraw { min-height: 28px; padding: 4px 10px; font-size: 12px; line-height: 18px; border-radius: 6px; }
+.role-work .q-full { min-width: 0; max-width: 100%; margin: 8px 0 0; flex-basis: auto; overflow-wrap: anywhere; }
+.role-work .q-feedback { margin-top: 6px; color: var(--danger); font-size: 12px; line-height: 1.55; overflow-wrap: anywhere; }
+.role-work .queue-list { gap: 0; }
+.denied-copy { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.denied-target { font: 11.5px/1.55 var(--mono); overflow-wrap: anywhere; }
+.op-chip { align-self: flex-start; min-height: 30px; max-width: 100%; font-family: var(--sans); text-align: left; }
+
+
+/* 半遮卡不提供可误点的作答；原定位button始终可达，关闭/定位后恢复原动作。 */
+.op-request.is-obscured .op-actions { visibility: hidden; }
+
+.q-toggle:focus-visible, .q-withdraw:focus-visible, .op-chip:focus-visible, .op-preview > summary:focus-visible, .op-request:focus-visible { outline: 2px solid var(--text-2); outline-offset: 2px; }

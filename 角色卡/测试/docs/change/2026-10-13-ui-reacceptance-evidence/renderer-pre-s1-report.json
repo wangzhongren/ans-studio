@@ -1,0 +1,2816 @@
+{
+  "environment": {
+    "electron": "44.7.0",
+    "node": "24.21.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "hidden": true
+  },
+  "input": {
+    "root": "/nonexistent-independent-ui-reacceptance-fixture",
+    "widths": [
+      1360,
+      960
+    ],
+    "initialQueue": [
+      {
+        "id": "own-customer\u0000one",
+        "kind": "message",
+        "summary": "客户独立摘要：这是一条需要保留来源和操作归属的排队消息。这是一条需要保留来源和操作归属的排队消息。这是一条需要保留来源和操作归属的排队消息。这是一条需要保留来源和操作归属的排队消息。这是一条需要保留来源和操作归属的排队消息。这是一条需要保留来源和操作归属的排队消息。",
+        "full": "普通中文全文首段。\n请逐段阅读这份普通消息，并核对右边的每一个字都能够显示。请逐段阅读这份普通消息，并核对右边的每一个字都能够显示。请逐段阅读这份普通消息，并核对右边的每一个字都能够显示。请逐段阅读这份普通消息，并核对右边的每一个字都能够显示。请逐段阅读这份普通消息，并核对右边的每一个字都能够显示。请逐段阅读这份普通消息，并核对右边的每一个字都能够显示。请逐段阅读这份普通消息，并核对右边的每一个字都能够显示。请逐段阅读这份普通消息，并核对右边的每一个字都能够显示。请逐段阅读这份普通消息，并核对右边的每一个字都能够显示。请逐段阅读这份普通消息，并核对右边的每一个字都能够显示。请逐段阅读这份普通消息，并核对右边的每一个字都能够显示。请逐段阅读这份普通消息，并核对右边的每一个字都能够显示。\nOrdinary English sentences wrap inside the drawer without losing their final words. \nOrdinary English sentences wrap inside the drawer without losing their final words. \nOrdinary English sentences wrap inside the drawer without losing their final words. \nOrdinary English sentences wrap inside the drawer without losing their final words. \nOrdinary English sentences wrap inside the drawer without losing their final words. \nOrdinary English sentences wrap inside the drawer without losing their final words. \nOrdinary English sentences wrap inside the drawer without losing their final words. \nOrdinary English sentences wrap inside the drawer without losing their final words. \nOrdinary English sentences wrap inside the drawer without losing their final words. \nOrdinary English sentences wrap inside the drawer without losing their final words. \nOrdinary English sentences wrap inside the drawer without losing their final words. \nOrdinary English sentences wrap inside the drawer without losing their final words. \nOrdinary English sentences wrap inside the drawer without losing their final words. \nOrdinary English sentences wrap inside the drawer without losing their final words. \nOrdinary English sentences wrap inside the drawer without losing their final words. \n全文末尾独立哨兵。",
+        "at": "2026-10-13T08:01:00.000Z"
+      },
+      {
+        "id": "own-dispatch",
+        "kind": "dispatch",
+        "sourceRoleId": "B",
+        "summary": "派发摘要独立二",
+        "full": "派发全文独立二。派发全文独立二。派发全文独立二。派发全文独立二。派发全文独立二。派发全文独立二。派发全文独立二。派发全文独立二。派发全文独立二。派发全文独立二。派发全文独立二。派发全文独立二。派发全文独立二。派发全文独立二。派发全文独立二。派发全文独立二。派发全文独立二。派发全文独立二。派发全文独立二。派发全文独立二。",
+        "at": "2026-10-13T08:02:00.000Z"
+      },
+      {
+        "id": "own-handback",
+        "kind": "handback",
+        "sourceRoleId": "B",
+        "summary": "回交摘要独立三",
+        "full": "回交全文独立三。回交全文独立三。回交全文独立三。回交全文独立三。回交全文独立三。回交全文独立三。回交全文独立三。回交全文独立三。回交全文独立三。回交全文独立三。回交全文独立三。回交全文独立三。回交全文独立三。回交全文独立三。回交全文独立三。回交全文独立三。回交全文独立三。回交全文独立三。回交全文独立三。回交全文独立三。",
+        "at": "2026-10-13T08:03:00.000Z"
+      }
+    ]
+  },
+  "startHashes": {
+    "app/renderer/index.html": "687a0591c0f85657d1f9fad8602c1da6846f2e53fc4f24c415893792934dfbef",
+    "app/renderer/renderer.js": "fc148d35bd722271b6bd89efd29a4afb6b45a20bd34e8832259c6ba388cbd375",
+    "app/renderer/styles.css": "f9c4e41fc88d50c6ecf27794f6861d0736b1c2fa82ab6089e6d962b0b969e953",
+    "app/renderer/tool-rows.js": "64283f26d5bdb662abe3be325f41ea1998b0e924c2825bb2222145972bef1f1d",
+    "app/renderer/ui-labels.js": "9f344ebffdbc66e6f80fbfce56f6aa93f629f6a3deb8216d37bda2de67e01ca1",
+    "app/preload.cjs": "53fbb3a491845f4189df2781c3f68438f2c85681b852052514a3a022697e6f19",
+    "app/desktop/session-history.ts": "94417f7b27fc14a3b8a9c9a39642e36e3adb781dee3e3840b00100b099bc941f",
+    "test/测试/ui-reacceptance-renderer-regression.mjs": "c014c9a17c0b9baa700af05fd9070d6cd93451f5304cc418365e4875981023d9"
+  },
+  "endHashes": {
+    "app/renderer/index.html": "687a0591c0f85657d1f9fad8602c1da6846f2e53fc4f24c415893792934dfbef",
+    "app/renderer/renderer.js": "fc148d35bd722271b6bd89efd29a4afb6b45a20bd34e8832259c6ba388cbd375",
+    "app/renderer/styles.css": "f9c4e41fc88d50c6ecf27794f6861d0736b1c2fa82ab6089e6d962b0b969e953",
+    "app/renderer/tool-rows.js": "64283f26d5bdb662abe3be325f41ea1998b0e924c2825bb2222145972bef1f1d",
+    "app/renderer/ui-labels.js": "9f344ebffdbc66e6f80fbfce56f6aa93f629f6a3deb8216d37bda2de67e01ca1",
+    "app/preload.cjs": "53fbb3a491845f4189df2781c3f68438f2c85681b852052514a3a022697e6f19",
+    "app/desktop/session-history.ts": "94417f7b27fc14a3b8a9c9a39642e36e3adb781dee3e3840b00100b099bc941f",
+    "test/测试/ui-reacceptance-renderer-regression.mjs": "c014c9a17c0b9baa700af05fd9070d6cd93451f5304cc418365e4875981023d9"
+  },
+  "report": [
+    {
+      "name": "R1 one rendered governance fact 1360",
+      "observation": {
+        "ok": true,
+        "facts": [
+          "实际写入导入项目，角色边界外的写入会被拒绝。"
+        ]
+      }
+    },
+    {
+      "name": "R2 queue identity geometry 1360 own-customer\u0000one",
+      "observation": {
+        "ok": true,
+        "pos": "1",
+        "source": "客户消息",
+        "time": "16:01:00",
+        "actions": [
+          {
+            "left": 1049,
+            "top": 382.9375,
+            "right": 1095,
+            "bottom": 410.9375,
+            "width": 46,
+            "height": 28
+          },
+          {
+            "left": 1103,
+            "top": 382.9375,
+            "right": 1149,
+            "bottom": 410.9375,
+            "width": 46,
+            "height": 28
+          }
+        ],
+        "summary": {
+          "left": 1049,
+          "top": 301.9375,
+          "right": 1334,
+          "bottom": 376.9375,
+          "width": 285,
+          "height": 75
+        },
+        "full": {
+          "left": 1049,
+          "top": 418.9375,
+          "right": 1334,
+          "bottom": 1270.4921875,
+          "width": 285,
+          "height": 851.5546875
+        }
+      }
+    },
+    {
+      "name": "R2 queue identity geometry 1360 own-dispatch",
+      "observation": {
+        "ok": true,
+        "pos": "2",
+        "source": "su 派发",
+        "time": "16:02:00",
+        "actions": [
+          {
+            "left": 1049,
+            "top": 424.7421875,
+            "right": 1095,
+            "bottom": 452.7421875,
+            "width": 46,
+            "height": 28
+          }
+        ],
+        "summary": {
+          "left": 1049,
+          "top": 399.9921875,
+          "right": 1334,
+          "bottom": 418.7421875,
+          "width": 285,
+          "height": 18.75
+        },
+        "full": {
+          "left": 1049,
+          "top": 460.7421875,
+          "right": 1334,
+          "bottom": 599.484375,
+          "width": 285,
+          "height": 138.7421875
+        }
+      }
+    },
+    {
+      "name": "R2 queue identity geometry 1360 own-handback",
+      "observation": {
+        "ok": true,
+        "pos": "3",
+        "source": "回交投递",
+        "time": "16:03:00",
+        "actions": [
+          {
+            "left": 1049,
+            "top": 424.734375,
+            "right": 1095,
+            "bottom": 452.734375,
+            "width": 46,
+            "height": 28
+          }
+        ],
+        "summary": {
+          "left": 1049,
+          "top": 399.984375,
+          "right": 1334,
+          "bottom": 418.734375,
+          "width": 285,
+          "height": 18.75
+        },
+        "full": {
+          "left": 1049,
+          "top": 460.734375,
+          "right": 1334,
+          "bottom": 599.4765625,
+          "width": 285,
+          "height": 138.7421875
+        }
+      }
+    },
+    {
+      "name": "R2 ordinary full no overflow or clipped text 1360",
+      "observation": {
+        "ok": true,
+        "body": {
+          "scrollWidth": 349,
+          "clientWidth": 349
+        },
+        "full": {
+          "scrollWidth": 283,
+          "clientWidth": 283
+        }
+      }
+    },
+    {
+      "name": "R2 only queued customer withdrawable 1360",
+      "observation": true
+    },
+    {
+      "name": "actual Tab reaches #right-body .q-withdraw",
+      "observation": [
+        {
+          "matched": false,
+          "id": "btn-halt",
+          "cls": "cap-halt",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "btn-send",
+          "cls": "cap-send",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "drawer-close",
+          "cls": "drawer-close",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "q-toggle",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "q-toggle",
+          "visible": true
+        },
+        {
+          "matched": true,
+          "id": "",
+          "cls": "q-withdraw",
+          "visible": true
+        }
+      ]
+    },
+    {
+      "name": "R2 Shift+Tab reaches same item full action 1360",
+      "observation": true
+    },
+    {
+      "name": "R3 five independent exceptional rows 1360",
+      "observation": true
+    },
+    {
+      "name": "R3 collapsed reliable cause and target truly visible 1360 0",
+      "observation": {
+        "ok": true,
+        "visible": {
+          "open": false,
+          "text": "没有写入权限，未执行outside/independent-denied.md",
+          "hit": true,
+          "horizontal": true
+        }
+      }
+    },
+    {
+      "name": "R3 collapsed reliable cause and target truly visible 1360 1",
+      "observation": {
+        "ok": true,
+        "visible": {
+          "open": false,
+          "text": "文件不存在（ENOENT）docs/independent-missing.md",
+          "hit": true,
+          "horizontal": true
+        }
+      }
+    },
+    {
+      "name": "R3 collapsed reliable cause and target truly visible 1360 2",
+      "observation": {
+        "ok": true,
+        "visible": {
+          "open": false,
+          "text": "run_shell 已执行：node --check independent-missing.js（exit 2）",
+          "hit": true,
+          "horizontal": true
+        }
+      }
+    },
+    {
+      "name": "R3 collapsed reliable cause and target truly visible 1360 3",
+      "observation": {
+        "ok": true,
+        "visible": {
+          "open": false,
+          "text": "旧记录失败，目标无法得知目标未记录",
+          "hit": true,
+          "horizontal": true
+        }
+      }
+    },
+    {
+      "name": "R3 collapsed reliable cause and target truly visible 1360 4",
+      "observation": {
+        "ok": true,
+        "visible": {
+          "open": false,
+          "text": "run_shell 已执行：printf \"ok\"; false（exit 2）",
+          "hit": true,
+          "horizontal": true
+        }
+      }
+    },
+    {
+      "name": "R3 missing reliable state remains unknown 1360",
+      "observation": true
+    },
+    {
+      "name": "R1 one rendered governance fact 960",
+      "observation": {
+        "ok": true,
+        "facts": [
+          "实际写入导入项目，角色边界外的写入会被拒绝。"
+        ]
+      }
+    },
+    {
+      "name": "R2 queue identity geometry 960 own-customer\u0000one",
+      "observation": {
+        "ok": true,
+        "pos": "1",
+        "source": "客户消息",
+        "time": "16:01:00",
+        "actions": [
+          {
+            "left": 649,
+            "top": 304.4375,
+            "right": 695,
+            "bottom": 332.4375,
+            "width": 46,
+            "height": 28
+          },
+          {
+            "left": 703,
+            "top": 304.4375,
+            "right": 749,
+            "bottom": 332.4375,
+            "width": 46,
+            "height": 28
+          }
+        ],
+        "summary": {
+          "left": 649,
+          "top": 223.4375,
+          "right": 934,
+          "bottom": 298.4375,
+          "width": 285,
+          "height": 75
+        },
+        "full": {
+          "left": 649,
+          "top": 340.4375,
+          "right": 934,
+          "bottom": 1191.9921875,
+          "width": 285,
+          "height": 851.5546875
+        }
+      }
+    },
+    {
+      "name": "R2 queue identity geometry 960 own-dispatch",
+      "observation": {
+        "ok": true,
+        "pos": "2",
+        "source": "su 派发",
+        "time": "16:02:00",
+        "actions": [
+          {
+            "left": 649,
+            "top": 304.7421875,
+            "right": 695,
+            "bottom": 332.7421875,
+            "width": 46,
+            "height": 28
+          }
+        ],
+        "summary": {
+          "left": 649,
+          "top": 279.9921875,
+          "right": 934,
+          "bottom": 298.7421875,
+          "width": 285,
+          "height": 18.75
+        },
+        "full": {
+          "left": 649,
+          "top": 340.7421875,
+          "right": 934,
+          "bottom": 479.484375,
+          "width": 285,
+          "height": 138.7421875
+        }
+      }
+    },
+    {
+      "name": "R2 queue identity geometry 960 own-handback",
+      "observation": {
+        "ok": true,
+        "pos": "3",
+        "source": "回交投递",
+        "time": "16:03:00",
+        "actions": [
+          {
+            "left": 649,
+            "top": 304.734375,
+            "right": 695,
+            "bottom": 332.734375,
+            "width": 46,
+            "height": 28
+          }
+        ],
+        "summary": {
+          "left": 649,
+          "top": 279.984375,
+          "right": 934,
+          "bottom": 298.734375,
+          "width": 285,
+          "height": 18.75
+        },
+        "full": {
+          "left": 649,
+          "top": 340.734375,
+          "right": 934,
+          "bottom": 479.4765625,
+          "width": 285,
+          "height": 138.7421875
+        }
+      }
+    },
+    {
+      "name": "R2 ordinary full no overflow or clipped text 960",
+      "observation": {
+        "ok": true,
+        "body": {
+          "scrollWidth": 349,
+          "clientWidth": 349
+        },
+        "full": {
+          "scrollWidth": 283,
+          "clientWidth": 283
+        }
+      }
+    },
+    {
+      "name": "R2 only queued customer withdrawable 960",
+      "observation": true
+    },
+    {
+      "name": "actual Tab reaches #right-body .q-withdraw",
+      "observation": [
+        {
+          "matched": false,
+          "id": "btn-halt",
+          "cls": "cap-halt",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "btn-send",
+          "cls": "cap-send",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "drawer-close",
+          "cls": "drawer-close",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "q-toggle",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "q-toggle",
+          "visible": true
+        },
+        {
+          "matched": true,
+          "id": "",
+          "cls": "q-withdraw",
+          "visible": true
+        }
+      ]
+    },
+    {
+      "name": "R2 Shift+Tab reaches same item full action 960",
+      "observation": true
+    },
+    {
+      "name": "R3 five independent exceptional rows 960",
+      "observation": true
+    },
+    {
+      "name": "R3 collapsed reliable cause and target truly visible 960 0",
+      "observation": {
+        "ok": true,
+        "visible": {
+          "open": false,
+          "text": "没有写入权限，未执行outside/independent-denied.md",
+          "hit": true,
+          "horizontal": true
+        }
+      }
+    },
+    {
+      "name": "R3 collapsed reliable cause and target truly visible 960 1",
+      "observation": {
+        "ok": true,
+        "visible": {
+          "open": false,
+          "text": "文件不存在（ENOENT）docs/independent-missing.md",
+          "hit": true,
+          "horizontal": true
+        }
+      }
+    },
+    {
+      "name": "R3 collapsed reliable cause and target truly visible 960 2",
+      "observation": {
+        "ok": true,
+        "visible": {
+          "open": false,
+          "text": "run_shell 已执行：node --check independent-missing.js（exit 2）",
+          "hit": true,
+          "horizontal": true
+        }
+      }
+    },
+    {
+      "name": "R3 collapsed reliable cause and target truly visible 960 3",
+      "observation": {
+        "ok": true,
+        "visible": {
+          "open": false,
+          "text": "旧记录失败，目标无法得知目标未记录",
+          "hit": true,
+          "horizontal": true
+        }
+      }
+    },
+    {
+      "name": "R3 collapsed reliable cause and target truly visible 960 4",
+      "observation": {
+        "ok": true,
+        "visible": {
+          "open": false,
+          "text": "run_shell 已执行：printf \"ok\"; false（exit 2）",
+          "hit": true,
+          "horizontal": true
+        }
+      }
+    },
+    {
+      "name": "R3 missing reliable state remains unknown 960",
+      "observation": true
+    },
+    {
+      "name": "R4 pending retained and disabled failed",
+      "observation": true
+    },
+    {
+      "name": "R4 refresh and return retain original reading anchor failed",
+      "observation": {
+        "ok": true,
+        "before": {
+          "offset": 169.4375
+        },
+        "offset": 169.4375
+      }
+    },
+    {
+      "name": "R4 original item visible receipt and retained state failed",
+      "observation": {
+        "ok": true,
+        "receipt": "撤回无效：独立返回失败原因",
+        "rect": {
+          "left": 1049,
+          "top": 416.9375,
+          "right": 1334,
+          "bottom": 435.53125,
+          "width": 285,
+          "height": 18.59375
+        }
+      }
+    },
+    {
+      "name": "R4 pending retained and disabled invalid",
+      "observation": true
+    },
+    {
+      "name": "R4 refresh and return retain original reading anchor invalid",
+      "observation": {
+        "ok": true,
+        "before": {
+          "offset": 169.4375
+        },
+        "offset": 169.4375
+      }
+    },
+    {
+      "name": "R4 original item visible receipt and retained state invalid",
+      "observation": {
+        "ok": true,
+        "receipt": "撤回无效：未知原因",
+        "rect": {
+          "left": 1049,
+          "top": 416.9375,
+          "right": 1334,
+          "bottom": 435.53125,
+          "width": 285,
+          "height": 18.59375
+        }
+      }
+    },
+    {
+      "name": "R4 pending retained and disabled throw",
+      "observation": true
+    },
+    {
+      "name": "R4 refresh and return retain original reading anchor throw",
+      "observation": {
+        "ok": true,
+        "before": {
+          "offset": 169.4375
+        },
+        "offset": 169.4375
+      }
+    },
+    {
+      "name": "R4 original item visible receipt and retained state throw",
+      "observation": {
+        "ok": true,
+        "receipt": "撤回失败：Error invoking remote method 'session:withdraw': Error: 独立通道抛错",
+        "rect": {
+          "left": 1049,
+          "top": 416.9375,
+          "right": 1334,
+          "bottom": 454.125,
+          "width": 285,
+          "height": 37.1875
+        }
+      }
+    },
+    {
+      "name": "R4 pending retained and disabled late-role",
+      "observation": true
+    },
+    {
+      "name": "R4 late return does not contaminate B same id",
+      "observation": true
+    },
+    {
+      "name": "R4 refresh and return retain original reading anchor late-role",
+      "observation": {
+        "ok": true,
+        "before": {
+          "offset": 169.4375
+        },
+        "offset": 169.4375
+      }
+    },
+    {
+      "name": "R4 original item visible receipt and retained state late-role",
+      "observation": {
+        "ok": true,
+        "receipt": "撤回无效：原A迟到原因",
+        "rect": {
+          "left": 1049,
+          "top": 416.9375,
+          "right": 1334,
+          "bottom": 435.53125,
+          "width": 285,
+          "height": 18.59375
+        }
+      }
+    },
+    {
+      "name": "R4 success return alone cannot invent queue removal",
+      "observation": true
+    },
+    {
+      "name": "R4 success snapshot removes only original id and renumbers",
+      "observation": true
+    },
+    {
+      "name": "R4 stopping preserves remaining queue",
+      "observation": true
+    },
+    {
+      "name": "R4 old project response cannot contaminate reused role and id",
+      "observation": true
+    },
+    {
+      "name": "R5 ordinary arrival and update retain drawer and reader 1360",
+      "observation": {
+        "ok": true,
+        "after": {
+          "text": "独立阅读段落78 需要保持的历史内容。 需要保持的历史内容。 需要保持的历史内容。 需要保持的历史内容。 需要保持的历史内容。 需要保持的历史内容。 需要保持的历史内容。 需要保持的历史内容。 需要保持的历史内容。 需要保持的历史内容。 需要保持的历史内容。 需要保持的历史内容。\n",
+          "offset": -62.3125
+        }
+      }
+    },
+    {
+      "name": "R5 current open prioritizes wait and role B retains busy 1360",
+      "observation": true
+    },
+    {
+      "name": "R5 other role has no borrowed wait 1360",
+      "observation": true
+    },
+    {
+      "name": "R5 explicit role U1 prioritizes pending card 1360",
+      "observation": true
+    },
+    {
+      "name": "R5 complete hit-visible locator with drawer 1360 card",
+      "observation": {
+        "ok": true,
+        "box": {
+          "left": 300,
+          "top": 711,
+          "right": 454.6328125,
+          "bottom": 741,
+          "width": 154.6328125,
+          "height": 30
+        },
+        "text": "有 1 条待确认 · 定位"
+      }
+    },
+    {
+      "name": "R5 partially covered card cannot invite answer 1360 card",
+      "observation": {
+        "ok": true,
+        "covered": false,
+        "inert": false,
+        "buttons": [
+          {
+            "visible": true,
+            "disabled": false
+          },
+          {
+            "visible": true,
+            "disabled": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "actual Tab reaches #op-chip",
+      "observation": [
+        {
+          "matched": false,
+          "id": "btn-halt",
+          "cls": "cap-halt",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "btn-send",
+          "cls": "cap-send",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "drawer-close",
+          "cls": "drawer-close",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "q-toggle",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "q-toggle",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "q-withdraw",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "q-toggle",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "q-toggle",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "tab-card",
+          "cls": "tab-btn active",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "tab-pi",
+          "cls": "tab-btn",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "win-min",
+          "cls": "win-btn",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "win-max",
+          "cls": "win-btn",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "win-close",
+          "cls": "win-btn win-btn-close",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "btn-import",
+          "cls": "btn btn-primary btn-block",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "tree-item primary active",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "tree-item",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "btn btn-primary op-confirm",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "btn btn-ghost op-deny",
+          "visible": true
+        },
+        {
+          "matched": true,
+          "id": "op-chip",
+          "cls": "op-chip",
+          "visible": true
+        }
+      ]
+    },
+    {
+      "name": "R5 active locate exposes entire card/actions 1360 card",
+      "observation": {
+        "ok": true,
+        "parts": [
+          {
+            "text": "独立确认标题1360",
+            "box": {
+              "left": 756,
+              "top": 437.9765625,
+              "right": 861.875,
+              "bottom": 456.7265625,
+              "width": 105.875,
+              "height": 18.75
+            }
+          },
+          {
+            "text": "预览内容（点击展开）",
+            "box": {
+              "left": 735,
+              "top": 465.7265625,
+              "right": 887,
+              "bottom": 496.9765625,
+              "width": 152,
+              "height": 31.25
+            }
+          },
+          {
+            "text": "确认",
+            "box": {
+              "left": 734,
+              "top": 532.7265625,
+              "right": 786,
+              "bottom": 564.7265625,
+              "width": 52,
+              "height": 32
+            }
+          },
+          {
+            "text": "不同意",
+            "box": {
+              "left": 794,
+              "top": 532.7265625,
+              "right": 859,
+              "bottom": 564.7265625,
+              "width": 65,
+              "height": 32
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "R5 preview text readable after locate 1360 card",
+      "observation": true
+    },
+    {
+      "name": "R5 Esc closes and restores launcher focus 1360 card",
+      "observation": true
+    },
+    {
+      "name": "R5 complete hit-visible locator with drawer 1360 pi",
+      "observation": {
+        "ok": true,
+        "box": {
+          "left": 300,
+          "top": 711,
+          "right": 454.6328125,
+          "bottom": 741,
+          "width": 154.6328125,
+          "height": 30
+        },
+        "text": "有 1 条待确认 · 定位"
+      }
+    },
+    {
+      "name": "R5 partially covered card cannot invite answer 1360 pi",
+      "observation": {
+        "ok": true,
+        "covered": false,
+        "inert": false,
+        "buttons": [
+          {
+            "visible": true,
+            "disabled": false
+          },
+          {
+            "visible": true,
+            "disabled": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "actual Tab reaches #op-chip",
+      "observation": [
+        {
+          "matched": false,
+          "id": "btn-halt",
+          "cls": "cap-halt",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "btn-send",
+          "cls": "cap-send",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "drawer-close",
+          "cls": "drawer-close",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "pi-inp-ANTHROPIC_AUTH_TOKEN",
+          "cls": "pi-input",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "pi-toggle-secret",
+          "cls": "btn btn-ghost btn-mini",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "pi-inp-ANS_PI_BASE_URL",
+          "cls": "pi-input",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "pi-inp-ANS_PI_MODEL",
+          "cls": "pi-input",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "pi-advanced-sum",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "pi-save",
+          "cls": "btn btn-primary btn-mini",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "tab-card",
+          "cls": "tab-btn",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "tab-pi",
+          "cls": "tab-btn active",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "win-min",
+          "cls": "win-btn",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "win-max",
+          "cls": "win-btn",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "win-close",
+          "cls": "win-btn win-btn-close",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "btn-import",
+          "cls": "btn btn-primary btn-block",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "tree-item primary active",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "tree-item",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "btn btn-primary op-confirm",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "btn btn-ghost op-deny",
+          "visible": true
+        },
+        {
+          "matched": true,
+          "id": "op-chip",
+          "cls": "op-chip",
+          "visible": true
+        }
+      ]
+    },
+    {
+      "name": "R5 active locate exposes entire card/actions 1360 pi",
+      "observation": {
+        "ok": true,
+        "parts": [
+          {
+            "text": "独立确认标题1360",
+            "box": {
+              "left": 756,
+              "top": 437.9765625,
+              "right": 861.875,
+              "bottom": 456.7265625,
+              "width": 105.875,
+              "height": 18.75
+            }
+          },
+          {
+            "text": "预览内容（点击展开）",
+            "box": {
+              "left": 735,
+              "top": 465.7265625,
+              "right": 887,
+              "bottom": 496.9765625,
+              "width": 152,
+              "height": 31.25
+            }
+          },
+          {
+            "text": "确认",
+            "box": {
+              "left": 734,
+              "top": 532.7265625,
+              "right": 786,
+              "bottom": 564.7265625,
+              "width": 52,
+              "height": 32
+            }
+          },
+          {
+            "text": "不同意",
+            "box": {
+              "left": 794,
+              "top": 532.7265625,
+              "right": 859,
+              "bottom": 564.7265625,
+              "width": 65,
+              "height": 32
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "R5 preview text readable after locate 1360 pi",
+      "observation": true
+    },
+    {
+      "name": "R5 Esc closes and restores launcher focus 1360 pi",
+      "observation": true
+    },
+    {
+      "name": "R5 answer clears wait but real busy survives 1360",
+      "observation": true
+    },
+    {
+      "name": "R5 settled has no work/wait 1360",
+      "observation": true
+    },
+    {
+      "name": "R5 expired clears wait and restores true busy 1360",
+      "observation": true
+    },
+    {
+      "name": "R5 choice covered state cannot expose operative partial actions 1360 card",
+      "observation": {
+        "ok": true,
+        "covered": false,
+        "inert": false
+      }
+    },
+    {
+      "name": "actual Tab reaches #op-chip",
+      "observation": [
+        {
+          "matched": false,
+          "id": "btn-halt",
+          "cls": "cap-halt",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "btn-send",
+          "cls": "cap-send",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "drawer-close",
+          "cls": "drawer-close",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "q-toggle",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "q-toggle",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "q-withdraw",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "q-toggle",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "q-toggle",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "tab-card",
+          "cls": "tab-btn active",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "tab-pi",
+          "cls": "tab-btn",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "win-min",
+          "cls": "win-btn",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "win-max",
+          "cls": "win-btn",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "win-close",
+          "cls": "win-btn win-btn-close",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "btn-import",
+          "cls": "btn btn-primary btn-block",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "tree-item primary active",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "tree-item",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "btn btn-ghost op-cancel",
+          "visible": true
+        },
+        {
+          "matched": true,
+          "id": "op-chip",
+          "cls": "op-chip",
+          "visible": true
+        }
+      ]
+    },
+    {
+      "name": "R5 choice title preview options and all actions exposed 1360 card",
+      "observation": {
+        "ok": true,
+        "parts": [
+          {
+            "text": "独立选择标题",
+            "box": {
+              "left": 756,
+              "top": 368.3359375,
+              "right": 831,
+              "bottom": 387.0859375,
+              "width": 75,
+              "height": 18.75
+            }
+          },
+          {
+            "text": "请选择一项",
+            "box": {
+              "left": 734,
+              "top": 395.0859375,
+              "right": 888,
+              "bottom": 413.8359375,
+              "width": 154,
+              "height": 18.75
+            }
+          },
+          {
+            "text": "预览内容（点击展开）",
+            "box": {
+              "left": 735,
+              "top": 422.8359375,
+              "right": 887,
+              "bottom": 454.0859375,
+              "width": 152,
+              "height": 31.25
+            }
+          },
+          {
+            "text": "独立选项X",
+            "box": {
+              "left": 734,
+              "top": 463.0859375,
+              "right": 888,
+              "bottom": 491.8359375,
+              "width": 154,
+              "height": 28.75
+            }
+          },
+          {
+            "text": "独立选项Y",
+            "box": {
+              "left": 734,
+              "top": 495.8359375,
+              "right": 888,
+              "bottom": 524.5859375,
+              "width": 154,
+              "height": 28.75
+            }
+          },
+          {
+            "text": "提交",
+            "box": {
+              "left": 734,
+              "top": 532.5859375,
+              "right": 786,
+              "bottom": 564.5859375,
+              "width": 52,
+              "height": 32
+            }
+          },
+          {
+            "text": "取消",
+            "box": {
+              "left": 794,
+              "top": 532.5859375,
+              "right": 846,
+              "bottom": 564.5859375,
+              "width": 52,
+              "height": 32
+            }
+          }
+        ],
+        "submitDisabled": true
+      }
+    },
+    {
+      "name": "R5 choice covered state cannot expose operative partial actions 1360 pi",
+      "observation": {
+        "ok": true,
+        "covered": false,
+        "inert": false
+      }
+    },
+    {
+      "name": "actual Tab reaches #op-chip",
+      "observation": [
+        {
+          "matched": false,
+          "id": "btn-halt",
+          "cls": "cap-halt",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "btn-send",
+          "cls": "cap-send",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "drawer-close",
+          "cls": "drawer-close",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "pi-inp-ANTHROPIC_AUTH_TOKEN",
+          "cls": "pi-input",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "pi-toggle-secret",
+          "cls": "btn btn-ghost btn-mini",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "pi-inp-ANS_PI_BASE_URL",
+          "cls": "pi-input",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "pi-inp-ANS_PI_MODEL",
+          "cls": "pi-input",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "pi-advanced-sum",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "pi-save",
+          "cls": "btn btn-primary btn-mini",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "tab-card",
+          "cls": "tab-btn",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "tab-pi",
+          "cls": "tab-btn active",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "win-min",
+          "cls": "win-btn",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "win-max",
+          "cls": "win-btn",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "win-close",
+          "cls": "win-btn win-btn-close",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "btn-import",
+          "cls": "btn btn-primary btn-block",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "tree-item primary active",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "tree-item",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "btn btn-primary op-submit",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "btn btn-ghost op-cancel",
+          "visible": true
+        },
+        {
+          "matched": true,
+          "id": "op-chip",
+          "cls": "op-chip",
+          "visible": true
+        }
+      ]
+    },
+    {
+      "name": "R5 choice title preview options and all actions exposed 1360 pi",
+      "observation": {
+        "ok": true,
+        "parts": [
+          {
+            "text": "独立选择标题",
+            "box": {
+              "left": 756,
+              "top": 368.3359375,
+              "right": 831,
+              "bottom": 387.0859375,
+              "width": 75,
+              "height": 18.75
+            }
+          },
+          {
+            "text": "请选择一项",
+            "box": {
+              "left": 734,
+              "top": 395.0859375,
+              "right": 888,
+              "bottom": 413.8359375,
+              "width": 154,
+              "height": 18.75
+            }
+          },
+          {
+            "text": "预览内容（点击展开）",
+            "box": {
+              "left": 735,
+              "top": 422.8359375,
+              "right": 887,
+              "bottom": 454.0859375,
+              "width": 152,
+              "height": 31.25
+            }
+          },
+          {
+            "text": "独立选项X",
+            "box": {
+              "left": 734,
+              "top": 463.0859375,
+              "right": 888,
+              "bottom": 491.8359375,
+              "width": 154,
+              "height": 28.75
+            }
+          },
+          {
+            "text": "独立选项Y",
+            "box": {
+              "left": 734,
+              "top": 495.8359375,
+              "right": 888,
+              "bottom": 524.5859375,
+              "width": 154,
+              "height": 28.75
+            }
+          },
+          {
+            "text": "提交",
+            "box": {
+              "left": 734,
+              "top": 532.5859375,
+              "right": 786,
+              "bottom": 564.5859375,
+              "width": 52,
+              "height": 32
+            }
+          },
+          {
+            "text": "取消",
+            "box": {
+              "left": 794,
+              "top": 532.5859375,
+              "right": 846,
+              "bottom": 564.5859375,
+              "width": 52,
+              "height": 32
+            }
+          }
+        ],
+        "submitDisabled": false
+      }
+    },
+    {
+      "name": "actual Tab reaches [data-request-id=\"own-choice-1360\"] .op-submit",
+      "observation": [
+        {
+          "matched": false,
+          "id": "btn-halt",
+          "cls": "cap-halt",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "btn-send",
+          "cls": "cap-send",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "tab-card",
+          "cls": "tab-btn",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "tab-pi",
+          "cls": "tab-btn",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "win-min",
+          "cls": "win-btn",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "win-max",
+          "cls": "win-btn",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "win-close",
+          "cls": "win-btn win-btn-close",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "btn-import",
+          "cls": "btn btn-primary btn-block",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "tree-item primary active",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "tree-item",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "",
+          "visible": true
+        },
+        {
+          "matched": true,
+          "id": "",
+          "cls": "btn btn-primary op-submit",
+          "visible": true
+        }
+      ]
+    },
+    {
+      "name": "R5 choice answered returns to real busy 1360",
+      "observation": true
+    },
+    {
+      "name": "R5 ordinary arrival and update retain drawer and reader 960",
+      "observation": {
+        "ok": true,
+        "after": {
+          "text": "独立阅读段落79 需要保持的历史内容。 需要保持的历史内容。 需要保持的历史内容。 需要保持的历史内容。 需要保持的历史内容。 需要保持的历史内容。 需要保持的历史内容。 需要保持的历史内容。 需要保持的历史内容。 需要保持的历史内容。 需要保持的历史内容。 需要保持的历史内容。\n",
+          "offset": -28.65625
+        }
+      }
+    },
+    {
+      "name": "R5 current open prioritizes wait and role B retains busy 960",
+      "observation": true
+    },
+    {
+      "name": "R5 other role has no borrowed wait 960",
+      "observation": true
+    },
+    {
+      "name": "R5 explicit role U1 prioritizes pending card 960",
+      "observation": true
+    },
+    {
+      "name": "R5 complete hit-visible locator with drawer 960 card",
+      "observation": {
+        "ok": true,
+        "box": {
+          "left": 300,
+          "top": 471,
+          "right": 454.6328125,
+          "bottom": 501,
+          "width": 154.6328125,
+          "height": 30
+        },
+        "text": "有 1 条待确认 · 定位"
+      }
+    },
+    {
+      "name": "R5 partially covered card cannot invite answer 960 card",
+      "observation": {
+        "ok": true,
+        "covered": true,
+        "inert": true,
+        "buttons": [
+          {
+            "visible": false,
+            "disabled": false
+          },
+          {
+            "visible": false,
+            "disabled": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "actual Tab reaches #op-chip",
+      "observation": [
+        {
+          "matched": false,
+          "id": "btn-halt",
+          "cls": "cap-halt",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "btn-send",
+          "cls": "cap-send",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "tab-card",
+          "cls": "tab-btn",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "tab-pi",
+          "cls": "tab-btn",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "win-min",
+          "cls": "win-btn",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "win-max",
+          "cls": "win-btn",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "win-close",
+          "cls": "win-btn win-btn-close",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "btn-import",
+          "cls": "btn btn-primary btn-block",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "tree-item primary active",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "tree-item",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "btn btn-primary op-confirm",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "btn btn-ghost op-deny",
+          "visible": true
+        },
+        {
+          "matched": true,
+          "id": "op-chip",
+          "cls": "op-chip",
+          "visible": true
+        }
+      ]
+    },
+    {
+      "name": "R5 active locate exposes entire card/actions 960 card",
+      "observation": {
+        "ok": true,
+        "parts": [
+          {
+            "text": "独立确认标题960",
+            "box": {
+              "left": 556,
+              "top": 252.6796875,
+              "right": 655.921875,
+              "bottom": 271.4296875,
+              "width": 99.921875,
+              "height": 18.75
+            }
+          },
+          {
+            "text": "预览内容（点击展开）",
+            "box": {
+              "left": 535,
+              "top": 280.4296875,
+              "right": 687,
+              "bottom": 311.6796875,
+              "width": 152,
+              "height": 31.25
+            }
+          },
+          {
+            "text": "确认",
+            "box": {
+              "left": 534,
+              "top": 347.4296875,
+              "right": 586,
+              "bottom": 379.4296875,
+              "width": 52,
+              "height": 32
+            }
+          },
+          {
+            "text": "不同意",
+            "box": {
+              "left": 594,
+              "top": 347.4296875,
+              "right": 659,
+              "bottom": 379.4296875,
+              "width": 65,
+              "height": 32
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "R5 preview text readable after locate 960 card",
+      "observation": true
+    },
+    {
+      "name": "R5 Esc closes and restores launcher focus 960 card",
+      "observation": true
+    },
+    {
+      "name": "R5 complete hit-visible locator with drawer 960 pi",
+      "observation": {
+        "ok": true,
+        "box": {
+          "left": 300,
+          "top": 471,
+          "right": 454.6328125,
+          "bottom": 501,
+          "width": 154.6328125,
+          "height": 30
+        },
+        "text": "有 1 条待确认 · 定位"
+      }
+    },
+    {
+      "name": "R5 partially covered card cannot invite answer 960 pi",
+      "observation": {
+        "ok": true,
+        "covered": true,
+        "inert": true,
+        "buttons": [
+          {
+            "visible": false,
+            "disabled": false
+          },
+          {
+            "visible": false,
+            "disabled": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "actual Tab reaches #op-chip",
+      "observation": [
+        {
+          "matched": false,
+          "id": "btn-halt",
+          "cls": "cap-halt",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "btn-send",
+          "cls": "cap-send",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "tab-card",
+          "cls": "tab-btn",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "tab-pi",
+          "cls": "tab-btn",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "win-min",
+          "cls": "win-btn",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "win-max",
+          "cls": "win-btn",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "win-close",
+          "cls": "win-btn win-btn-close",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "btn-import",
+          "cls": "btn btn-primary btn-block",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "tree-item primary active",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "tree-item",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "btn btn-primary op-confirm",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "btn btn-ghost op-deny",
+          "visible": true
+        },
+        {
+          "matched": true,
+          "id": "op-chip",
+          "cls": "op-chip",
+          "visible": true
+        }
+      ]
+    },
+    {
+      "name": "R5 active locate exposes entire card/actions 960 pi",
+      "observation": {
+        "ok": true,
+        "parts": [
+          {
+            "text": "独立确认标题960",
+            "box": {
+              "left": 556,
+              "top": 252.6796875,
+              "right": 655.921875,
+              "bottom": 271.4296875,
+              "width": 99.921875,
+              "height": 18.75
+            }
+          },
+          {
+            "text": "预览内容（点击展开）",
+            "box": {
+              "left": 535,
+              "top": 280.4296875,
+              "right": 687,
+              "bottom": 311.6796875,
+              "width": 152,
+              "height": 31.25
+            }
+          },
+          {
+            "text": "确认",
+            "box": {
+              "left": 534,
+              "top": 347.4296875,
+              "right": 586,
+              "bottom": 379.4296875,
+              "width": 52,
+              "height": 32
+            }
+          },
+          {
+            "text": "不同意",
+            "box": {
+              "left": 594,
+              "top": 347.4296875,
+              "right": 659,
+              "bottom": 379.4296875,
+              "width": 65,
+              "height": 32
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "R5 preview text readable after locate 960 pi",
+      "observation": true
+    },
+    {
+      "name": "R5 Esc closes and restores launcher focus 960 pi",
+      "observation": true
+    },
+    {
+      "name": "R5 answer clears wait but real busy survives 960",
+      "observation": true
+    },
+    {
+      "name": "R5 settled has no work/wait 960",
+      "observation": true
+    },
+    {
+      "name": "R5 expired clears wait and restores true busy 960",
+      "observation": true
+    },
+    {
+      "name": "R5 choice covered state cannot expose operative partial actions 960 card",
+      "observation": {
+        "ok": true,
+        "covered": true,
+        "inert": true
+      }
+    },
+    {
+      "name": "actual Tab reaches #op-chip",
+      "observation": [
+        {
+          "matched": false,
+          "id": "btn-halt",
+          "cls": "cap-halt",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "btn-send",
+          "cls": "cap-send",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "drawer-close",
+          "cls": "drawer-close",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "q-toggle",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "q-toggle",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "q-withdraw",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "q-toggle",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "q-toggle",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "tab-card",
+          "cls": "tab-btn active",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "tab-pi",
+          "cls": "tab-btn",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "win-min",
+          "cls": "win-btn",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "win-max",
+          "cls": "win-btn",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "win-close",
+          "cls": "win-btn win-btn-close",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "btn-import",
+          "cls": "btn btn-primary btn-block",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "tree-item primary active",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "tree-item",
+          "visible": true
+        },
+        {
+          "matched": true,
+          "id": "op-chip",
+          "cls": "op-chip",
+          "visible": true
+        }
+      ]
+    },
+    {
+      "name": "R5 choice title preview options and all actions exposed 960 card",
+      "observation": {
+        "ok": true,
+        "parts": [
+          {
+            "text": "独立选择标题",
+            "box": {
+              "left": 556,
+              "top": 217.9921875,
+              "right": 631,
+              "bottom": 236.7421875,
+              "width": 75,
+              "height": 18.75
+            }
+          },
+          {
+            "text": "请选择一项",
+            "box": {
+              "left": 534,
+              "top": 244.7421875,
+              "right": 688,
+              "bottom": 263.4921875,
+              "width": 154,
+              "height": 18.75
+            }
+          },
+          {
+            "text": "预览内容（点击展开）",
+            "box": {
+              "left": 535,
+              "top": 272.4921875,
+              "right": 687,
+              "bottom": 303.7421875,
+              "width": 152,
+              "height": 31.25
+            }
+          },
+          {
+            "text": "独立选项X",
+            "box": {
+              "left": 534,
+              "top": 312.7421875,
+              "right": 688,
+              "bottom": 341.4921875,
+              "width": 154,
+              "height": 28.75
+            }
+          },
+          {
+            "text": "独立选项Y",
+            "box": {
+              "left": 534,
+              "top": 345.4921875,
+              "right": 688,
+              "bottom": 374.2421875,
+              "width": 154,
+              "height": 28.75
+            }
+          },
+          {
+            "text": "提交",
+            "box": {
+              "left": 534,
+              "top": 382.2421875,
+              "right": 586,
+              "bottom": 414.2421875,
+              "width": 52,
+              "height": 32
+            }
+          },
+          {
+            "text": "取消",
+            "box": {
+              "left": 594,
+              "top": 382.2421875,
+              "right": 646,
+              "bottom": 414.2421875,
+              "width": 52,
+              "height": 32
+            }
+          }
+        ],
+        "submitDisabled": true
+      }
+    },
+    {
+      "name": "R5 choice covered state cannot expose operative partial actions 960 pi",
+      "observation": {
+        "ok": true,
+        "covered": true,
+        "inert": true
+      }
+    },
+    {
+      "name": "actual Tab reaches #op-chip",
+      "observation": [
+        {
+          "matched": false,
+          "id": "btn-halt",
+          "cls": "cap-halt",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "btn-send",
+          "cls": "cap-send",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "drawer-close",
+          "cls": "drawer-close",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "pi-inp-ANTHROPIC_AUTH_TOKEN",
+          "cls": "pi-input",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "pi-toggle-secret",
+          "cls": "btn btn-ghost btn-mini",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "pi-inp-ANS_PI_BASE_URL",
+          "cls": "pi-input",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "pi-inp-ANS_PI_MODEL",
+          "cls": "pi-input",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "pi-advanced-sum",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "pi-save",
+          "cls": "btn btn-primary btn-mini",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "tab-card",
+          "cls": "tab-btn",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "tab-pi",
+          "cls": "tab-btn active",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "win-min",
+          "cls": "win-btn",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "win-max",
+          "cls": "win-btn",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "win-close",
+          "cls": "win-btn win-btn-close",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "btn-import",
+          "cls": "btn btn-primary btn-block",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "tree-item primary active",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "tree-item",
+          "visible": true
+        },
+        {
+          "matched": true,
+          "id": "op-chip",
+          "cls": "op-chip",
+          "visible": true
+        }
+      ]
+    },
+    {
+      "name": "R5 choice title preview options and all actions exposed 960 pi",
+      "observation": {
+        "ok": true,
+        "parts": [
+          {
+            "text": "独立选择标题",
+            "box": {
+              "left": 556,
+              "top": 217.9921875,
+              "right": 631,
+              "bottom": 236.7421875,
+              "width": 75,
+              "height": 18.75
+            }
+          },
+          {
+            "text": "请选择一项",
+            "box": {
+              "left": 534,
+              "top": 244.7421875,
+              "right": 688,
+              "bottom": 263.4921875,
+              "width": 154,
+              "height": 18.75
+            }
+          },
+          {
+            "text": "预览内容（点击展开）",
+            "box": {
+              "left": 535,
+              "top": 272.4921875,
+              "right": 687,
+              "bottom": 303.7421875,
+              "width": 152,
+              "height": 31.25
+            }
+          },
+          {
+            "text": "独立选项X",
+            "box": {
+              "left": 534,
+              "top": 312.7421875,
+              "right": 688,
+              "bottom": 341.4921875,
+              "width": 154,
+              "height": 28.75
+            }
+          },
+          {
+            "text": "独立选项Y",
+            "box": {
+              "left": 534,
+              "top": 345.4921875,
+              "right": 688,
+              "bottom": 374.2421875,
+              "width": 154,
+              "height": 28.75
+            }
+          },
+          {
+            "text": "提交",
+            "box": {
+              "left": 534,
+              "top": 382.2421875,
+              "right": 586,
+              "bottom": 414.2421875,
+              "width": 52,
+              "height": 32
+            }
+          },
+          {
+            "text": "取消",
+            "box": {
+              "left": 594,
+              "top": 382.2421875,
+              "right": 646,
+              "bottom": 414.2421875,
+              "width": 52,
+              "height": 32
+            }
+          }
+        ],
+        "submitDisabled": false
+      }
+    },
+    {
+      "name": "actual Tab reaches [data-request-id=\"own-choice-960\"] .op-submit",
+      "observation": [
+        {
+          "matched": false,
+          "id": "btn-halt",
+          "cls": "cap-halt",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "btn-send",
+          "cls": "cap-send",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "tab-card",
+          "cls": "tab-btn",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "tab-pi",
+          "cls": "tab-btn",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "win-min",
+          "cls": "win-btn",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "win-max",
+          "cls": "win-btn",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "win-close",
+          "cls": "win-btn win-btn-close",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "btn-import",
+          "cls": "btn btn-primary btn-block",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "tree-item primary active",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "tree-item",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "",
+          "visible": true
+        },
+        {
+          "matched": true,
+          "id": "",
+          "cls": "btn btn-primary op-submit",
+          "visible": true
+        }
+      ]
+    },
+    {
+      "name": "R5 choice answered returns to real busy 960",
+      "observation": true
+    },
+    {
+      "name": "regression undelivered report not duplicated into main role",
+      "observation": true
+    },
+    {
+      "name": "regression one delivered report with one assistant summary",
+      "observation": {
+        "ok": true,
+        "injected": 1,
+        "summary": [
+          "主入口独立汇总答复。"
+        ]
+      }
+    },
+    {
+      "name": "regression IME preserves draft image and bubble",
+      "observation": true
+    },
+    {
+      "name": "regression normal Enter sends once and clears original input",
+      "observation": true
+    }
+  ],
+  "withdrawCalls": [
+    {
+      "roleId": "A",
+      "id": "own-customer\u0000one"
+    },
+    {
+      "roleId": "A",
+      "id": "own-customer\u0000one"
+    },
+    {
+      "roleId": "A",
+      "id": "own-customer\u0000one"
+    },
+    {
+      "roleId": "A",
+      "id": "own-customer\u0000one"
+    },
+    {
+      "roleId": "A",
+      "id": "own-customer\u0000one"
+    },
+    {
+      "roleId": "A",
+      "id": "own-customer\u0000one"
+    }
+  ],
+  "responses": [
+    {
+      "id": "own-open-1360",
+      "decision": {
+        "kind": "confirm",
+        "confirmed": true
+      }
+    },
+    {
+      "id": "own-expired-1360",
+      "decision": {
+        "kind": "confirm",
+        "confirmed": false
+      }
+    },
+    {
+      "id": "own-choice-1360",
+      "decision": {
+        "kind": "choice",
+        "selected": [
+          "x"
+        ]
+      }
+    },
+    {
+      "id": "own-open-960",
+      "decision": {
+        "kind": "confirm",
+        "confirmed": true
+      }
+    },
+    {
+      "id": "own-expired-960",
+      "decision": {
+        "kind": "confirm",
+        "confirmed": false
+      }
+    },
+    {
+      "id": "own-choice-960",
+      "decision": {
+        "kind": "choice",
+        "selected": [
+          "x"
+        ]
+      }
+    }
+  ],
+  "sends": [
+    {
+      "text": "独立组合候选中文",
+      "images": [
+        {
+          "type": "image",
+          "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=",
+          "mimeType": "image/png"
+        }
+      ]
+    }
+  ],
+  "consoleErrors": []
+}

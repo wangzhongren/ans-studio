@@ -1,5 +1,9 @@
 # 桌面应用 模块笔记与代码位置
 
+## UI/UX重验收返工
+
+`appendDenied`默认摘要含原原因及完整已知目标；`queueRowsHtml`使用真实grid与同起点全文，撤回真实回执由`renderWithdrawResult`就近更新、按原role/id保持。`renderCurrentWork`从真实open请求优先busy；原生button定位收抽屉，`syncCoveredOperatorCards`按实际矩形令被遮卡inert/暂隐藏作答，不改审批状态。当前源码指纹、尺寸与键盘链证据见[返工记录](docs/fix/2026-10-13_fix_uiux-reacceptance.md)。
+
 ## UI/UX v2当前入口
 
 聊天实时/回放工具经`tool-rows.js::activityOf`和`renderer.js::appendActivity`聚合为可展开虚拟行；失败和交互独立行。`session-history.ts`保留可选工具事实，`ui-labels.js`回放判等感知事实变化。工作抽屉单列表置顶，资料/全文阅读按角色保存；composer草稿/图片与异步返回归原角色，ResizeObserver测实际高度避抽屉。接口保持原IPC。验证与限制见[UI/UX变更](docs/change/2026-10-13_change_uiux-v2.md)。

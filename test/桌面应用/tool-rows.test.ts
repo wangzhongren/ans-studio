@@ -44,3 +44,19 @@ test('execution-before-denial never claims execution failed; known failures keep
   assert.equal(shell.visibleSummary,'run_shell 已执行：ls missing（exit 2）');
   assert.equal(tools.activityOf({kind:'tool',text:'read_file：read_file 失败：lost.md（ENOENT）'}).visibleSummary,'read_file 失败：lost.md（ENOENT）');
 });
+
+test('full known target survives slim summary for default failure location', () => {
+  const path='directory/'.repeat(30)+'missing.md';
+  const failure=tools.activityOf({kind:'denied',summary:'read_file 执行失败',detail:{toolName:'read_file',path,status:'failed'}});
+  assert.equal(failure.fullTarget,path);
+  assert.ok(failure.target.length<path.length);
+});
+
+test('orphan own read_file failure keeps explicit first-line target without inspecting body', () => {
+  const input=[{type:'session'},{type:'message',message:{role:'toolResult',toolName:'read_file',isError:false,content:[{type:'text',text:'read_file 失败：lost.md（ENOENT）'}]}}];
+  const row=parseSessionJsonl(input.map(x=>JSON.stringify(x)).join('\n')).rows[0];
+  assert.equal(row.activity?.target,'');
+  assert.equal(tools.activityOf(row).fullTarget,'lost.md');
+  assert.equal(tools.activityOf({kind:'tool',text:'read_file：normal.md\nread_file 失败：invented.md（ENOENT）'}).fullTarget,'');
+  assert.equal(tools.activityOf({kind:'tool',text:'arbitrary body lost.md ENOENT'}).fullTarget,'');
+});

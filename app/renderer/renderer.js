@@ -146,8 +146,9 @@
   function setChatHeader(role) {
     $("chat-role").textContent = role ? role.roleId : "未选择角色";
     $("chat-role-sub").textContent = role
-      ? "会话由治理引擎全程把关，写入受该角色边界约束"
+      ? ""
       : "从左侧选择一个角色开始聊天";
+    $("chat-role-sub").hidden = !!role;
     updateHaltButton();
     syncChatState(role ? role.roleId : null);
   }
@@ -243,6 +244,7 @@
   var drawerReading = Object.create(null);
   var renderedDrawerRole = null;
   var withdrawPending = Object.create(null);
+  var withdrawFeedback = Object.create(null);
   var composerDrafts = Object.create(null);
   var projectGeneration = 0;
 
@@ -288,6 +290,7 @@
     var composer = document.querySelector(".composer");
     var app = document.querySelector(".app");
     if (composer && app) app.style.setProperty("--composer-height", composer.getBoundingClientRect().height + "px");
+    syncCoveredOperatorCards();
   }
 
   var chatPanes = Object.create(null); // roleId -> Element
@@ -334,6 +337,8 @@
     // **例外（P-1 优先）**：该角色有未作答的卡 ⇒ 仍**滚到那张卡**。chip 同处刷新（同一状态源）。
     stickPaneToBottomOrCard(key);
     updateOpChip(key);
+    renderCurrentWork(key);
+    syncCoveredOperatorCards();
   }
 
   /** 当前**显示**的 pane（选中角色的；未选角色时用通用空 key——仅兜底，正常流程用不到）。 */
@@ -351,6 +356,7 @@
     drawerReading = Object.create(null);
     renderedDrawerRole = null;
     withdrawPending = Object.create(null);
+    withdrawFeedback = Object.create(null);
     chatPanes = Object.create(null);
     paneRowLists = Object.create(null); // Q-2：行表随 pane 作废（老项目的行模型不跨项目）
     paneAnchors = Object.create(null); // 回放锚点表随项目作废（锚点是行序位——只对老项目的行表有意义）
@@ -641,6 +647,7 @@
       virtScrollScheduled = false;
       var pane = $("chat").querySelector(".chat-pane");
       if (pane) updateVirtualWindow(pane, null);
+      syncCoveredOperatorCards();
     };
     if (typeof window.requestAnimationFrame === "function") window.requestAnimationFrame(run);
     else run();
@@ -745,7 +752,7 @@
     var rl = rowListFor(pane);
     if (activity.exceptional) {
       rl.activityGroup = null;
-      appendDenied(pane, activity.visibleSummary || activity.toolName + ' · ' + activity.label + (activity.target ? ' · ' + activity.target : ''));
+      appendDenied(pane, activity.visibleSummary || activity.toolName + ' · ' + activity.label, activity.fullTarget);
       return rl.rows[rl.rows.length - 1];
     }
     if (activity.barrier) {
@@ -790,7 +797,9 @@
   }
 
   /** 拒绝事件：内联显示，点击可展开看完整信息（含按根分组的允许路径）。 */
-  function appendDenied(pane, text) {
+  function appendDenied(pane, text, target) {
+    // 仅截正文换行，命令里的分号不是原因/退出码的边界。
+    var headline = String(text == null ? "" : text).split(/\r?\n/)[0].trim();
     var pin = streamShouldPin(pane); // S-1：先量后挂
     registerRow(
       pane,
@@ -798,7 +807,9 @@
         var det = document.createElement("details");
         det.className = "sys-denied";
         det.innerHTML =
-          "<summary>" + ICONS.deny + "<span>" + esc(firstLine(text)) + "</span>" + ICONS.chev + "</summary>" +
+          "<summary>" + ICONS.deny + '<span class="denied-copy"><span>' + esc(headline) + '</span>' +
+          (target && headline.indexOf(target) >= 0 ? "" : '<span class="denied-target">' + esc(target || "目标未记录") + '</span>') +
+          "</span>" + ICONS.chev + "</summary>" +
           '<div class="sys-detail">' + esc(text) + "</div>";
         return det;
       },
@@ -1008,6 +1019,8 @@
     metaFor(roleId).awaitingConfirm = openRequestCountFor(roleId) > 0;
     renderRoleTree();
     updateOpChip(roleId);
+    renderCurrentWork(roleId);
+    syncCoveredOperatorCards();
   }
 
   /** 卡片的**终态呈现**（按钮永久隐藏 + 如实说明；重物化时同款输出）。 */
@@ -1104,7 +1117,8 @@
 
   function ensureOpChip() {
     if (opChip !== null) return opChip;
-    var el = document.createElement("div");
+    var el = document.createElement("button");
+    el.type = "button";
     el.id = "op-chip";
     el.className = "op-chip";
     el.hidden = true;
@@ -1115,7 +1129,10 @@
       var ids = openRequestIdsFor(roleId);
       if (ids.length === 0) return;
       if (opChipState.cursor >= ids.length) opChipState.cursor = 0;
+      closeRightDrawer(); // 主动定位先露出完整卡；普通到达/刷新不关抽屉。
       scrollToOperatorCard(roleId, ids[opChipState.cursor]);
+      var card = cardElInPane(paneFor(roleId), ids[opChipState.cursor]);
+      if (card) { card.tabIndex = -1; card.focus({ preventScroll: true }); }
       opChipState.cursor += 1;
     });
     opChip = el;
@@ -1520,7 +1537,7 @@
     else if (kind === "tool_call" || kind === "accepted") appendActivity(pane, Tr.activityOf(ev));
     else if (kind === "denied") {
       var failure = Tr.activityOf(ev);
-      appendDenied(pane, ev.summary + (failure.target ? '\n目标：' + failure.target : ''));
+      appendDenied(pane, ev.summary, failure.fullTarget);
     } // 治理信号（拒绝原因 + 允许路径）：全量，不瘦身
     else if (kind === "settled") {
       // 一轮结束：**忙态由主进程快照转述**（session:role-state 的 busy=false——见 onRoleState），
@@ -1568,7 +1585,7 @@
    *
    * 位置（客户 2026-10-11 裁定）：原来在底部输入区的常驻说明**上移到中栏横栏**（与状态提示同一行），只留一句。
    */
-  var WRITE_NOTE = "写入会真正落到你导入的项目，但受该角色边界约束，越界写会在写之前被拒。";
+  var WRITE_NOTE = "实际写入导入项目，角色边界外的写入会被拒绝。";
 
   /** 横栏常驻写入语义（单一来源；无运行时分支——桌面一律 pi）。 */
   function renderWriteNote() {
@@ -1936,11 +1953,26 @@
   }
 
   /** 当前动作缺少可靠字段时仅转述真实busy；不拿已结束工具冒充当前动作。 */
+  /** 被辅助抽屉覆盖的卡先经既有定位入口读全；inert不改变审批状态/按钮原disabled。 */
+  function syncCoveredOperatorCards() {
+    var pane = $("chat").querySelector(".chat-pane");
+    if (!pane) return;
+    var drawer = $("right-drawer").getBoundingClientRect();
+    pane.querySelectorAll(".op-request").forEach(function (card) {
+      var rect = card.getBoundingClientRect();
+      var covered = state.rightTab !== null && rect.right > drawer.left && rect.left < drawer.right && rect.bottom > drawer.top && rect.top < drawer.bottom;
+      card.inert = covered;
+      card.classList.toggle("is-obscured", covered);
+    });
+  }
+
   function renderCurrentWork(roleId) {
     var pane = paneFor(roleId);
     var el = pane.querySelector(".tool-current");
-    if (state.roleBusy[roleId] !== true) { if (el) el.remove(); return; }
-    if (!el) { el = document.createElement("div"); el.className = "tool-current"; el.textContent = "正在工作"; }
+    var awaiting = openRequestIdsFor(roleId).length > 0;
+    if (!awaiting && state.roleBusy[roleId] !== true) { if (el) el.remove(); return; }
+    if (!el) { el = document.createElement("div"); el.className = "tool-current"; }
+    el.textContent = awaiting ? "等待你确认" : "正在工作";
     pane.appendChild(el);
   }
 
@@ -2333,30 +2365,27 @@
   function queueRowsHtml(views) {
     if (views.length === 0) return '<div class="muted small">无进行中或排队消息</div>';
     var html = '<ul class="queue-list">';
+    var roleId = state.selectedRoleId;
     for (var i = 0; i < views.length; i += 1) {
       var v = views[i];
-      var reading = drawerReading[state.selectedRoleId] || { full: {}, sections: {} };
+      var reading = drawerReading[roleId] || { full: {}, sections: {} };
       var opened = reading.full[v.id] === true;
-      var pending = withdrawPending[state.selectedRoleId + "\u0000" + v.id] === true;
+      var pending = withdrawPending[roleId + "\u0000" + v.id] === true;
+      var feedback = (withdrawFeedback[roleId] || {})[v.id] || "";
       var running = v.pos === "进行中";
       var canWithdraw = v.kind === "message" && !running;
-      // 有「真实全文增量」才出展开钮：full 必须**比显示的摘要更长**（摘要带「你：」前缀但被截断；
-      // 短消息 full 反而更短——展开它没有意义，不摆无用钮）。
       var expandable = v.full !== "" && v.full.length > v.text.length;
-      html +=
-        '<li data-queue-id="' + esc(encodeURIComponent(v.id)) + '" class="q-item' + (running ? " is-running" : "") + '">' +
-        '<span class="q-pos">' + esc(v.pos) + "</span>" +
-        '<span class="q-src">' + esc(v.source) + "</span>" +
-        '<span class="q-text">' + esc(v.text) + "</span>" +
-        '<span class="q-meta">' + esc(queueTimeText(v.at)) + "</span>" +
-        '<span class="q-actions">' +
-        // 属性里的 id 走 **encodeURIComponent**：dedupKey 含 NUL（`msg\u0000…`）——裸放进 HTML 属性会被
-        // 解析替换成 U+FFFD，撤回/展开的定位键随即损坏（真机行为实测）。处理器侧 decodeURIComponent 还原。
-        (expandable ? '<button class="q-toggle" type="button" aria-expanded="' + opened + '" data-id="' + esc(encodeURIComponent(v.id)) + '" title="展开全文">' + (opened ? "收起" : "全文") + '</button>' : "") +
-        (canWithdraw ? '<button class="q-withdraw" type="button" ' + (pending ? "disabled" : "") + ' data-id="' + esc(encodeURIComponent(v.id)) + '" title="撤回该条排队消息（仅未投递者可撤）">' + (pending ? "撤回中…" : "撤回") + '</button>' : "") +
-        "</span>" +
-        (expandable ? '<div class="q-full" data-full-id="' + esc(encodeURIComponent(v.id)) + '"' + (opened ? "" : " hidden") + '>' + esc(v.full) + "</div>" : "") +
-        "</li>";
+      var encoded = esc(encodeURIComponent(v.id));
+      html += '<li data-queue-id="' + encoded + '" class="q-item' + (running ? ' is-running' : '') + '">' +
+        (running ? '' : '<span class="q-pos">' + esc(v.pos) + '</span>') +
+        '<div class="q-content"><div class="q-head"><span class="q-src">' + esc(v.source) + '</span><span class="q-meta">' + esc(queueTimeText(v.at)) + '</span></div>' +
+        '<p class="q-text">' + esc(v.text) + '</p>' +
+        (expandable || canWithdraw ? '<div class="q-actions">' +
+          (expandable ? '<button class="q-toggle" type="button" aria-expanded="' + opened + '" data-id="' + encoded + '" title="展开全文">' + (opened ? '收起' : '全文') + '</button>' : '') +
+          (canWithdraw ? '<button class="q-withdraw" type="button" ' + (pending ? 'disabled' : '') + ' data-id="' + encoded + '" title="撤回该条排队消息（仅未投递者可撤）">' + (pending ? '撤回中…' : '撤回') + '</button>' : '') + '</div>' : '') +
+        (feedback ? '<div class="q-feedback" role="status">' + esc(feedback) + '</div>' : '') +
+        (expandable ? '<div class="q-full" data-full-id="' + encoded + '"' + (opened ? '' : ' hidden') + '>' + esc(v.full) + '</div>' : '') +
+        '</div></li>';
     }
     return html + "</ul>";
   }
@@ -2369,9 +2398,8 @@
     if (!t || !t.closest) return;
     var toggle = t.closest(".q-toggle");
     if (toggle) {
-      var fullEl = toggle.parentNode && toggle.parentNode.parentNode
-        ? toggle.parentNode.parentNode.querySelector(".q-full")
-        : null;
+      var item = toggle.closest(".q-item");
+      var fullEl = item ? item.querySelector(".q-full") : null;
       if (fullEl) {
         fullEl.hidden = !fullEl.hidden;
         toggle.textContent = fullEl.hidden ? "全文" : "收起";
@@ -2398,26 +2426,71 @@
   async function withdrawQueuedMessage(id) {
     var roleId = state.selectedRoleId;
     if (!roleId || !id) return;
+    var generation = projectGeneration;
     var pane = activePane();
     var pendingKey = roleId + "\u0000" + id;
+    var focused = document.activeElement;
+    var restoreFocus = focused && focused.classList.contains("q-withdraw") && focused.dataset.id === encodeURIComponent(id);
+    function restoreWithdrawFocus() {
+      if (!restoreFocus || state.selectedRoleId !== roleId || document.activeElement !== document.body) return;
+      $("right-body").querySelectorAll(".q-withdraw").forEach(function (button) {
+        if (button.dataset.id === encodeURIComponent(id) && !button.disabled) button.focus({ preventScroll: true });
+      });
+    }
     if (withdrawPending[pendingKey]) return;
+    var feedback = withdrawFeedback[roleId] || (withdrawFeedback[roleId] = Object.create(null));
+    delete feedback[id];
     withdrawPending[pendingKey] = true;
-    updateRightQueue(roleId);
+    renderWithdrawResult(roleId, id);
     var res;
     try {
       res = await d.withdrawQueued(roleId, id);
     } catch (err) {
-      sysRow(pane, "sys-call", ICONS.deny, "撤回失败：" + (err && err.message ? err.message : err));
+      if (generation !== projectGeneration) return;
+      feedback[id] = "撤回失败：" + String(err && err.message ? err.message : err);
+      sysRow(pane, "sys-call", ICONS.deny, feedback[id]);
       delete withdrawPending[pendingKey];
-      if (state.selectedRoleId === roleId) updateRightQueue(roleId);
+      if (state.selectedRoleId === roleId) renderWithdrawResult(roleId, id);
+      restoreWithdrawFocus();
       return;
     }
+    if (generation !== projectGeneration) return;
     delete withdrawPending[pendingKey];
-    if (state.selectedRoleId === roleId) updateRightQueue(roleId);
     if (res && res.ok === true) {
+      delete feedback[id];
       sysRow(pane, "sys-call", ICONS.ok, "已撤回排队消息：" + (res.summary || ""));
     } else {
-      sysRow(pane, "sys-call", ICONS.deny, "撤回无效：" + ((res && res.error) || "未知原因"));
+      feedback[id] = "撤回无效：" + ((res && res.error) || "未知原因");
+      sysRow(pane, "sys-call", ICONS.deny, feedback[id]);
+    }
+    if (state.selectedRoleId === roleId) renderWithdrawResult(roleId, id);
+    restoreWithdrawFocus();
+  }
+
+  /** 同项状态更新保留按钮实例/键盘焦点；队列成员仍唯一来自role-state。 */
+  function renderWithdrawResult(roleId, id) {
+    if (state.selectedRoleId !== roleId || renderedDrawerRole !== roleId) return;
+    var items = $("right-body").querySelectorAll(".q-item[data-queue-id]");
+    var encoded = encodeURIComponent(id);
+    for (var i = 0; i < items.length; i += 1) {
+      if (items[i].dataset.queueId !== encoded) continue;
+      captureDrawerReading();
+      var button = items[i].querySelector(".q-withdraw");
+      if (button) {
+        button.disabled = withdrawPending[roleId + "\u0000" + id] === true;
+        button.textContent = button.disabled ? "撤回中…" : "撤回";
+      }
+      var text = (withdrawFeedback[roleId] || {})[id] || "";
+      var note = items[i].querySelector(".q-feedback");
+      if (text) {
+        if (!note) {
+          note = document.createElement("div"); note.className = "q-feedback"; note.setAttribute("role", "status");
+          items[i].querySelector(".q-content").insertBefore(note, items[i].querySelector(".q-full"));
+        }
+        note.textContent = text;
+      } else if (note) note.remove();
+      restoreDrawerReading(roleId);
+      return;
     }
   }
 
@@ -2474,9 +2547,15 @@
     if (state.selectedRoleId !== roleId || renderedDrawerRole !== roleId) return;
     var body = $("right-queue-body");
     if (!body) return;
+    var focused = body.contains(document.activeElement) ? document.activeElement : null;
+    var focusId = focused && focused.dataset.id;
+    var focusClass = focused && (focused.classList.contains("q-toggle") ? "q-toggle" : focused.classList.contains("q-withdraw") ? "q-withdraw" : "");
     captureDrawerReading();
     body.innerHTML = workListHtml(roleId);
     restoreDrawerReading(roleId);
+    if (focusId && focusClass) body.querySelectorAll("." + focusClass).forEach(function (button) {
+      if (button.dataset.id === focusId && !button.disabled) button.focus({ preventScroll: true });
+    });
   }
 
   // —————— 右抽屉 + 右上角图标簇（客户裁定 2026-10-13）：右栏不常驻，点了才展示 ——————
@@ -2495,6 +2574,7 @@
     });
     var drawer = $("right-drawer");
     if (drawer) drawer.classList.toggle("open", state.rightTab !== null);
+    syncCoveredOperatorCards();
   }
 
   function setTabBadge(id, n) {

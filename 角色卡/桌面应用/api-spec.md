@@ -2,6 +2,10 @@
 
 > 实现报告。源码在 `app/`，归「桌面应用」角色。
 
+## 2026-10-13：体验返工（无IPC/后台状态变化）
+
+仅渲染器本地：异常完整展示目标；撤回返回以原roleId+id存局部反馈；真实open请求优先busy展示，覆盖卡inert不修改审批state/按钮原disabled。原定位入口仍同一控制，升级原生button与键盘完整链。没有新网络/IPC接口。见[修复与当前候选](docs/fix/2026-10-13_fix_uiux-reacceptance.md)。
+
 ## 2026-10-13：UI/UX v2内部展示事实
 
 `ReplayRow.activity?`是本角色内部IPC展示数据：toolName、target、phase、status及可选toolCallId/turnId/ok。JSONL仍在主进程只读解析，renderer不接SDK或文件系统。SessionEvent、role-state、图片/发送/撤回IPC均保持不变；缺事实明确未知，accepted不等于执行完成。详情见[变更记录](docs/change/2026-10-13_change_uiux-v2.md)。新解析需要主进程重启，由PM安排；布局可仅重载renderer。

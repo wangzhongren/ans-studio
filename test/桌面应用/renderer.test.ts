@@ -24,9 +24,9 @@ const MAIN = fs.readFileSync(path.resolve(HERE, "..", "..", "app", "main.ts"), "
 const RENDERER_CODE = RENDERER.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
 
 test("写入语义（桌面一律 pi）：明示写入真实落到导入项目，但受角色边界约束（越界写被拒）", () => {
-  assert.ok(RENDERER.includes("写入会真正落到你导入的项目"), "pi 文案须明示写入被导入项目");
-  assert.ok(RENDERER.includes("受该角色边界约束"), "pi 文案须明示受角色边界约束");
-  assert.ok(RENDERER.includes("越界写会在写之前被拒"), "pi 文案须明示越界写在写之前被拒（受边界约束）");
+  assert.ok(RENDERER.includes("实际写入导入项目"), "pi 文案须明示写入被导入项目");
+  assert.ok(RENDERER.includes("角色边界外的写入会被拒绝"), "pi 文案须明示受角色边界约束");
+  assert.ok(RENDERER.includes("角色边界外的写入会被拒绝"), "pi 文案须明示越界写在写之前被拒（受边界约束）");
   // 去掉选择器后不再有 demo 运行时文案（「只判不写」仅 demo 路径成立）。
   assert.ok(!RENDERER.includes("演示运行时（demo）"), "不得再出现 demo 运行时文案");
   assert.ok(!RENDERER.includes("不会落盘"), "不得再出现「不会落盘」（demo 专有语义）");
@@ -510,7 +510,7 @@ test("工具行瘦身（2026-10-12 客户裁定）：只显示状态与目标—
   // 渲染侧接线：tool_call/accepted 与回放的工具行都过瘦身映射；`denied` 全量（治理信号）；detail 一律不渲染。
   assert.ok(RENDERER.includes("Tr.activityOf(ev)"), "实时工具行应经瘦身映射");
   assert.ok(RENDERER.includes("Tr.activityOf(row)"), "回放工具行应经瘦身映射");
-  assert.ok(RENDERER.includes("appendDenied(pane, ev.summary +"), "denied 行保持全量（拒绝原因与允许路径）");
+  assert.ok(RENDERER.includes("appendDenied(pane, ev.summary, failure.fullTarget)"), "denied 行保持全量（拒绝原因与允许路径）");
   assert.ok(!RENDERER.includes("ev.detail"), "事件 detail 一律不渲染（防御：即便带长内容也不铺出）");
   const index = fs.readFileSync(path.join(APP_DIR, "index.html"), "utf8");
   assert.ok(index.indexOf('src="tool-rows.js"') > 0 && index.indexOf('src="tool-rows.js"') < index.indexOf('src="renderer.js"'), "tool-rows.js 应先于 renderer.js 加载");

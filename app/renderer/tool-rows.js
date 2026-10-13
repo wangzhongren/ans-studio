@@ -87,11 +87,12 @@
     var head = raw.split(/\r?\n/)[0];
     if (head.indexOf(tool + '：' + tool) === 0) head = head.slice(tool.length + 1);
     var shellResult = tool === "run_shell" ? /^run_shell 已执行：(.+)（exit (-?\d+|\?)(?:，signal [^）]+)?）$/.exec(head) : null;
-    var knownFailure = tool === "read_file" && /^read_file 失败：.+（.+）$/.test(head) || !!(shellResult && shellResult[2] !== "?" && Number(shellResult[2]) !== 0);
+    var readFailure = tool === "read_file" ? /^read_file 失败：(.+)（.+）$/.exec(head) : null;
+    var knownFailure = !!readFailure || !!(shellResult && shellResult[2] !== "?" && Number(shellResult[2]) !== 0);
     var failed = knownFailure || d.status === "failed" || d.ok === false;
     var status = failed ? "failed" : o.kind === "denied" ? "denied" : phase === "call" ? "call" : d.status === "completed" && d.ok !== false ? "completed" : d.status === "returned" ? "returned" : "unknown";
-    var target = typeof d.target === "string" ? d.target : typeof d.path === "string" ? d.path : shellResult ? shellResult[1] : "";
-    return { toolName: tool, target: slimToolRow(target), phase: phase, status: status,
+    var target = typeof d.target === "string" && d.target !== "" ? d.target : typeof d.path === "string" && d.path !== "" ? d.path : shellResult ? shellResult[1] : readFailure ? readFailure[1] : "";
+    return { toolName: tool, target: slimToolRow(target), fullTarget: target, phase: phase, status: status,
       label: status === "failed" ? "执行失败" : status === "denied" ? "已拒绝" : status === "call" ? "调用发起" : status === "completed" ? "执行完成" : status === "returned" ? "工具返回" : "状态未记录",
       turnId: typeof d.turnId === "string" ? d.turnId : "", callId: typeof d.toolCallId === "string" ? d.toolCallId : "",
       exceptional: failed || o.kind === "denied", visibleSummary: head, barrier: SPECIAL_TOOLS.indexOf(tool) >= 0 || !!o.anchorKey,
