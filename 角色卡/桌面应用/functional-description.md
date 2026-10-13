@@ -120,6 +120,20 @@ test/桌面应用/
   旧实现整份再回放，已断）。「适配器多发 settled」与「另有重复事件投递」两条假设均**排除**（只读 CDP 探针
   实测各恰一发/单通道）；「聊天流无 settled 行」＝虚拟窗口化 DOM 采样伪影（行模型有、滚到底即见）。
   详见 `docs/change/2026-10-13_change_state-machine-and-replay-dedup.md`。
+- **P1 三条（2026-10-13 客户裁定，提案 §P1-1/§P1-2/§P1-3）**：
+  ① **待办最小管理面（P1-1）**：role-state 快照条目增 `id`（=dedupKey）与 `full`（入队即定格全文）；
+  抽屉行在「全文比显示摘要更长」时出「全文」钮（`.q-toggle` → `.q-full` 抽屉内展开）；**仅未投递的
+  「客户消息」**带「撤回」（`.q-withdraw`，`session:withdraw` → `SessionManager.withdraw`）：成功即聊天流
+  如实一行「已撤回排队消息：〈摘要〉」、位次前移走既有快照机制；**已进「进行中」撤回无效如实**（绝不从执行里
+  抽条）、**派发/回交只读**（无撤回钮，呈现与语义同口径）；**不做**重排序/批量清理/优先级。dedupKey 含 NUL
+  ——HTML 属性侧 encodeURIComponent 往返（裸放会被解析替换，e2e 实测坑）。顺带修：排队客户消息投递不再
+  误走派发文案（三类各归各位）。
+  ② **LRU 淘汰避开 busy（P1-2）**：`evictBeyondLimit` 跳过在跑会话 + `keepRoleId`（正在开启者不淘汰）；
+  全忙 ⇒ 暂超限（不掐断后台任务），settled 收口「下一时机」再收；切回被淘汰者的 recovered 文案逐字未动。
+  ③ **切换项目一次性防呆（P1-3）**：有 busy 会话（真实快照）时聊天流顶部出内联确认条 `#switch-confirm`
+  （**#chat 之外=不落聊天历史**；快照归零自动收起）「有 N 个角色正在工作，切换项目会停止它们——
+  [仍要切换] [取消]」；取消=零动作；确认=关闭全部并进新项目；**无 busy 行为逐字不变**。
+  详见 `docs/change/2026-10-13_change_p1-queue-withdraw-lru-switch-guard.md`。
 - **交互卡锚点物化（真机缺陷修复，2026-10-12「已确认的卡切走再切回跑到最下面」）**：卡的（重）物化按
   **时序锚点**落位，open 与 decided 一视同仁——① 主修复＝`materializeOperatorCard` 先按 `requestId` 查行表，
   卡行仍在（Q-2 窗口化下 keepEl 行**离屏脱挂≠丢失**，旧 `cardInPane` 判据误判）⇒ **复用、绝不重建落尾**

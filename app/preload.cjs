@@ -29,6 +29,14 @@ contextBridge.exposeInMainWorld("desktop", {
   stopSession: (roleId) =>
     ipcRenderer.invoke("session:stop", { roleId: roleId == null ? null : String(roleId) }),
 
+  /**
+   * 撤回一条未投递的排队消息（P1-1，2026-10-13 客户裁定）：`id` = role-state 快照条目视图的 `id`。
+   * 仅「客户消息」类、且仍**在队列中（未投递）**者可撤；成功回报 `{ok, summary}`；已「进行中」/派发/
+   * 回交/不存在如实回报 `{ok:false, error}`——绝不假装撤掉。
+   */
+  withdrawQueued: (roleId, id) =>
+    ipcRenderer.invoke("session:withdraw", { roleId: String(roleId == null ? "" : roleId), id: String(id == null ? "" : id) }),
+
   /** 停当前轮次（P0-2，2026-10-13 客户批准）：向该角色会话请求中止当前进行中的轮次。
    *  回报三态 `{ok, supported, error?}`——已请求停止 / 当前运行时不支持停止 / 停止失败：<error>；
    *  轮次仍以既有收尾事件结束（渲染侧如实一行，不造「已停止」假象）；重复点击幂等。 */

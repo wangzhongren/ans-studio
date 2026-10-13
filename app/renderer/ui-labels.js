@@ -40,7 +40,9 @@
    * 待办列表的**视图行**（纯函数；渲染侧逐字段 `esc` 后插入——**排队 ≠ 已执行**如实呈现）：
    *  · `running`（正在跑的那条投递，若有）在最前，位置显示「进行中」；
    *  · `queue` 逐条：位置 = 1..N（与入队次序一致）。
-   * 每行 `{pos, source, text, at}`——`text` 已截断（长内容不铺开），`at` 为 ISO 字符串（原样转出）。
+   * 每行 `{pos, source, text, at, kind, id, full}`——`text` 已截断（长内容不铺开）；`kind` 供渲染侧区分
+   *  可操作性（P1-1：仅 message 可撤）；`id` = 快照给的定位键（撤回用）；`full` = 全文（展开用）。
+   *  `at` 为 ISO 字符串（原样转出）。
    */
   function queueItemViews(queue, running) {
     var views = [];
@@ -50,6 +52,9 @@
         source: queueSourceLabel(running.kind),
         text: shortenQueueItem(running.summary),
         at: typeof running.at === "string" ? running.at : "",
+        kind: typeof running.kind === "string" ? running.kind : "",
+        id: typeof running.id === "string" ? running.id : "",
+        full: typeof running.full === "string" ? running.full : "",
       });
     }
     var items = Array.isArray(queue) ? queue : [];
@@ -60,6 +65,9 @@
         source: queueSourceLabel(it.kind),
         text: shortenQueueItem(it.summary),
         at: typeof it.at === "string" ? it.at : "",
+        kind: typeof it.kind === "string" ? it.kind : "",
+        id: typeof it.id === "string" ? it.id : "",
+        full: typeof it.full === "string" ? it.full : "",
       });
     }
     return views;

@@ -1,5 +1,15 @@
 # 装配 变更记录
 
+## 2026-10-13 — P1-4 配套：`ans role run --help` 真实入口放行（编排转达的跨角色缺口）
+
+编排的 P1-4（CLI 定位指路，客户批准提案）命令层已就位但**真实入口到不了**：`ans role run --help`（无 `--task`）被本角色 `src/common/装配/cli-parse.ts::parseInvocation` 判为「缺少 --task」的 `unknown` ⇒ stderr + 全局 USAGE、退 2。本任务即编排 change 文档（`角色卡/编排/docs/change/2026-10-13_change_cli-positioning.md`）「跨角色登记（归装配）」一节的最小改动。
+
+- **改动（`src/common/装配/cli-parse.ts`，只加一个分支）**：`role run` 位形里出现 `-h`/`--help`（`--task` 缺失/存在均可）时照常返回 `role-run`、整段 argv 原样透传给命令层 `runRoleCommand`（帮助文本与退码归它；令牌集与命令层一致：仅 `-h`/`--help`，裸 `help` 不算）。其余解析/退码路径**逐字未动**——`role run`（无角色）仍「缺少角色 id」、`role run <角色>`（无 help、无 --task）仍「缺少 --task」，均退 2。
+- **测试（`test/装配/cli-parse.test.ts`，52 → 54 例）**：① 放行矩阵——`--help`/`-h`/`装配 --help`/`编排 --task T-1 --help` 四种位形解析为 `role-run` 且 argv 原样透传（`deepEqual`），带 `--task` 位形字段逐字不变；② 防放宽过度——无 help 缺 --task 仍是「缺少 --task」（消息级断言）、裸 `help` 令牌不放行。
+- **真实入口实测**（`node bin/ans.js`）：`ans role run --help` → **退 0**、stdout 含用法行与指路句「本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。」；`ans role run -h` 同；`ans role run`（无参）→ 仍退 2「缺少角色 id」（改前实测即此，简报口径写作「缺 --task」，如实校正）；`ans role run 编排`（无 help）→ 仍退 2「缺少 --task」；`ans role run 编排 --task T-1 --help` → 退 0，与改前逐字相同。
+- **验证**：`test/装配/` **54/54**；全量 `node --test "test/**/*.test.ts"` **950 tests / 947 pass / 2 fail / 1 skipped**（两红=既有基线红：`test/桌面应用/pi-config.test.ts:43` 仓库目录名、`test/项目管理/shared/path-primitives.test.ts:251` macOS `/var`；比 P1-4 记录的 948 恰 +2 例=本次新增）；`npm run typecheck` **0 错**。Node v24.14.0 / HEAD 4b69afb（工作区未提交）。
+- **只动本角色文件**：`src/common/装配/cli-parse.ts`、`test/装配/cli-parse.test.ts`、本角色 changelog/memo、`docs/change/2026-10-13_change_role-run-help-passthrough.md`（新建，本角色 docs/change/ 首篇）。未 git 操作、未重启桌面应用（在飞批次未打扰）、未发真实模型请求、未读 `.env`。变更记录：`角色卡/装配/docs/change/2026-10-13_change_role-run-help-passthrough.md`（status: verified）。
+
 ## 2026-10-12 — README 更新到当前状态（客户直接指示；逐条读实件核实）
 
 重写 `README.md` 的过时面：**收口已废**（改确认制：su 写盘前经 `request_confirmation` 预览获客户同意，编排把已预览且校验在边界内的路径发行进本次会话 writeSet、F4 拒未确认路径；**客户确认不设超时**，等待期间该轮硬超时暂停；同意且写入后 **settle 自动收尾**写 `.ans`(pin)+治理边界文档+manifest）；**回交/派发/队列/重启恢复**（`submit_report` 自动投递 su 验收；su `dispatch_task` 落盘后自动开工、每角色一条队列、客户消息同样入队、右栏「待办/队列」+ 徽标待办数；D-1 `<项目>/.ans/sessions/<角色>/` 恢复历史与上下文，已 gitignore）；**shell 闸改写**（桌面已 arm 三层链 (c)→(b) su 审读→(a) 客户确认；不可解析 ⇒ 直接拒、不打扰客户；只对项目角色 arm；**已知风险：无 OS 沙箱**；**CLI 入口仍未 arm**——实读 `src/index.ts`）；**边界格式**（散文 ⇒ 响亮报错；改边界需重开会话，拒写提示带「旧边界快照」线索）；**桌面呈现**（胶囊输入框 + 图片采集 ≤5MB、**送模型未接**；虚拟渲染 >150 行；Markdown 化 = vendored markdown-it 15.0.2 + sha256 pin；七态徽标；取消 runtime 选择器即默认 pi——旧 README 的「顶栏 runtime 选择器」已删）；文档纪律（文档面随边界授予 + 代码与文档同批交回 + `temp/<角色>/` 暂存区）。「已知范围外」节按实件重写（图片送模型未接、多任务派发引擎仍二期、真机 shell 语义未验、真实 Pi 会话未复验、CLI 与桌面差异）。**只改 `README.md`**。验证：`test/装配/` **52/52**；全量 **859/856/2/1**（两红=既有环境红）；`npm run typecheck` **0 错**；Node v24.14.0 / HEAD d933537。来源：客户「修改 readme.md」直接指示。

@@ -171,6 +171,14 @@ export interface StopResult {
   note: string;
 }
 
+/** P1-1（2026-10-13 客户裁定）：撤回一条**未投递**排队消息的结果——`summary` 供聊天流如实一行
+ *  「已撤回排队消息：〈摘要〉」；失败（不在队列/已在投递中）如实给 `error`，绝不假装撤掉。 */
+export interface WithdrawResult {
+  ok: boolean;
+  summary?: string;
+  error?: string;
+}
+
 // （A-5：finalize 面已删——提议/确认/手动收口不复存在；产物收尾由编排在 settle 后自动完成，见文件头。）
 
 export interface SessionManagerDeps {
@@ -434,18 +442,26 @@ export class SessionManager {
     }
   }
 
-  /** LRU 淘汰：保活数超出 `MAX_LIVE_SESSIONS` 时，从**最久未用**者起 dispose（直到回到上限）。 */
-  private async evictBeyondLimit(): Promise<void> {
+  /** LRU 淘汰：保活数超出 `MAX_LIVE_SESSIONS` 时，从**最久未用**者起 dispose（直到回到上限）。
+   *  **P1-2（2026-10-13 客户裁定，提案首选方案）**：挑选判据加 `!busy`——**跳过正在跑轮次的会话**
+   *  （后台在跑的同样计入 busy，B-2 下切走不停跑）；**全忙则允许暂时超限**（不掐断任何在跑任务），
+   *  待某会话 settled（下一时机＝consume 的 settled 收口处）再收。切回被淘汰者的提示链路（D-1
+   *  recovered/rebuilt 文案）逐字未动——不出现第二套文案。
+   *  `keepRoleId`：本次**正在开启**的那个不淘汰（用户刚点的会话不能被自己的开启动作回收——
+   *  「全忙暂超限」的子情形：除它之外全忙 ⇒ 暂超限）。 */
+  private async evictBeyondLimit(keepRoleId?: string): Promise<void> {
     while (this.sessions.size > MAX_LIVE_SESSIONS) {
       let oldestId: string | null = null;
       let oldestUsed = Number.POSITIVE_INFINITY;
       for (const [id, s] of this.sessions) {
+        if (s.busy) continue; // 正在跑轮次的不淘汰（暂超限等它 settled——绝不静默掐断后台任务）
+        if (keepRoleId !== undefined && id === keepRoleId) continue; // 正在开启的那一个也不淘汰
         if (s.lastUsed < oldestUsed) {
           oldestUsed = s.lastUsed;
           oldestId = id;
         }
       }
-      if (oldestId === null) return;
+      if (oldestId === null) return; // 无可回收者（全忙 / 只剩刚开启的）：暂超限（settled 后下一时机再收）
       const entry = this.sessions.get(oldestId);
       if (!entry) return;
       await this.disposeEntry(oldestId, entry);
@@ -752,7 +768,7 @@ export class SessionManager {
     this.notifyRoleState(req.projectRoot, req.roleId);
     this.consume(req.roleId, handle, req.projectRoot);
     // LRU：超出上限先淘汰**最久未用**者（dispose；其界面历史由渲染层自持、切回时恢复并如实提示）。
-    await this.evictBeyondLimit();
+    await this.evictBeyondLimit(req.roleId); // 正在开启的这一个不淘汰（见方法注释）
     // 客户裁定（2026-10-13）：**常规「已开启与角色 X 的会话…」欢迎提示删除**——聊天流不摆常规提示
     // （真机每次开会话/切角色都出现，被客户点名）。**异常提示保留**：contextWarning（渲染侧按
     // contextSource 如实分支）、O-1 边界重建行、投递失败/受阻行等均不受影响。
@@ -781,6 +797,8 @@ export class SessionManager {
               // ——先外推再放行队列（放行时 busy 复位已可见）。
               this.notifyRoleState(en.projectRoot, roleId);
               void this.drainAllQueuesFor(en.projectRoot);
+              // P1-2：某会话离开 busy = LRU 回收的「下一时机」（暂超限的账在这里还——只收非 busy 者）。
+              void this.evictBeyondLimit();
             }
           }
           // E-1：回交到达 ⇒ 自动投递交 su 验收（去重 + 排队 + 失败如实/保留；见 handleHandback）。
@@ -969,15 +987,60 @@ export class SessionManager {
     this.notifyRoleState(projectRoot, targetRoleId); // L-1：入队即外推（队列行/徽标如实可见）
   }
 
+  /**
+   * **撤回一条未投递的排队消息（P1-1，2026-10-13 客户裁定）**：`id` = 快照条目视图给出的 `id`
+   * （即 `dedupKey`，单一来源）。语义钉死：
+   * - **仅未投递者可撤**：条目仍在队列里 ⇒ 删除，`notifyRoleState` 快照外推（位次自然前移）；返回 `summary`
+   *   供聊天流如实一行「已撤回排队消息：〈摘要〉」；
+   * - **已进「进行中」（drain 已 shift、正投递）⇒ 撤回无效**：如实回错，**绝不**从执行里抽掉已在跑的东西；
+   * - 不在队列（已投递完/已撤回/不存在）⇒ 如实回错；
+   * - **仅「客户消息」类可撤**（客户自己的话）：派发/回交条目属治理流（单方面撤会破坏 su 验收/派发的
+   *   因果）——本层拒绝非 message 条目，界面侧派发/回交**不给撤回钮**（呈现与语义同口径）。
+   * 界面不碰内部结构：只凭快照的 `id` 说话（**不造第二套数据源**）。
+   */
+  withdraw(roleId: string, id: string): WithdrawResult {
+    if (typeof roleId !== "string" || roleId === "" || typeof id !== "string" || id === "") {
+      return { ok: false, error: "撤回参数不完整。" };
+    }
+    // ① 先查「**进行中**」：在跑条目已在 shift 后**不在队列里**（其队列键也可能已随清空删除）——
+    // 直接沿 activeDeliveries 找：命中即撤回无效（如实，与「已投递完」区分开）。
+    for (const [key, item] of this.activeDeliveries) {
+      const target = key.split("\u0000")[1] ?? "";
+      if (target === roleId && item.dedupKey === id) {
+        return { ok: false, error: "该条已进入「进行中」，撤回无效（它正在被执行）。" };
+      }
+    }
+    // ② 再查排队中的条目：仅「客户消息」类可撤（派发/回交属治理流——只读）；找到即删 + 快照外推位次前移。
+    for (const [key, q] of this.deliveryQueues) {
+      const parts = key.split("\u0000");
+      const projectRoot = parts[0] ?? "";
+      const target = parts[1] ?? "";
+      if (target !== roleId) continue; // 只看该角色的队列（一套机多目标）
+      const idx = q.findIndex((i) => i.dedupKey === id);
+      if (idx < 0) continue;
+      const item = q[idx];
+      if (item.kind !== "message") {
+        return { ok: false, error: "该条不是客户消息（派发/回交属治理流）——只读，不可撤回。" };
+      }
+      q.splice(idx, 1);
+      if (q.length === 0) this.deliveryQueues.delete(key);
+      this.notifyRoleState(projectRoot, roleId); // 位次前移/角标随之（既有快照机制；不造第二套）
+      return { ok: true, summary: item.summary };
+    }
+    return { ok: false, error: "该条不在排队中（可能已投递或已撤回）。" };
+  }
+
   /** L-1/状态准确性 + 右栏「待办 / 队列」：**真实状态快照**外推（忙/闲 × 队列；变化时）——徽标/队列行/
    *  右栏待办组**都只信它**（同一通道、**不造第二套数据源**）。含：结构化的排队条目（来源/摘要/入队时间）
-   *  与**正在跑的那条投递**（若有；标注「进行中」——排队 ≠ 已执行）。目标为空（主入口未枚举到）不外推。 */
+   *  与**正在跑的那条投递**（若有；标注「进行中」——排队 ≠ 已执行）。
+   *  **P1-1（2026-10-13 客户裁定）**：条目视图增 `id`（= `dedupKey`，撤回的定位键）与 `full`（入队即定格的
+   *  **全文**——抽屉内「展开看全文」用；摘要字段照旧只作列表显示）。 */
   private notifyRoleState(projectRoot: string, targetRoleId: string): void {
     if (targetRoleId === "") return;
     const q = this.deliveryQueues.get(this.queueKey(projectRoot, targetRoleId)) ?? [];
     const busy = this.sessions.get(targetRoleId)?.busy === true;
     const running = this.activeDeliveries.get(this.queueKey(projectRoot, targetRoleId));
-    const view = (i: DeliveryItem) => ({ kind: i.kind, sourceRoleId: i.sourceRoleId, summary: i.summary, at: i.enqueuedAt });
+    const view = (i: DeliveryItem) => ({ kind: i.kind, sourceRoleId: i.sourceRoleId, summary: i.summary, at: i.enqueuedAt, id: i.dedupKey, full: i.text });
     this.deps.emitRoleState?.({
       roleId: targetRoleId,
       busy,
@@ -1214,11 +1277,13 @@ export class SessionManager {
       if (sent.kind === "dispatch") this.activeDispatchKeys.delete(sent.dedupKey); // 送达即释放窗口去重（返工可再派）
       if (sent.kind === "handback") {
         this.emitDeliveryNote(resolvedTarget, sent.sourceRoleId, `已自动投递 ${sent.sourceRoleId} 的回交给 su（请其验收：确认通过 / 要求返工 / 上报客户）。`);
-      } else {
+      } else if (sent.kind === "dispatch") {
         // 派发成功：目标 pane 看得见"任务到货"，su 的 pane 有一条受理回执行（受理≠已完成，如实）。
         this.emitDeliveryNote(resolvedTarget, sent.sourceRoleId, `已接收来自 ${sent.sourceRoleId} 的派发任务——请按任务文本执行，完成后交回报告。`);
         this.emitDeliveryNote(sent.sourceRoleId, sent.sourceRoleId, `已派发任务给 ${resolvedTarget}（已投递到其会话；其结果/回交会回到本会话）。`);
       }
+      // message 类（排队后的客户消息投递）：**不加额外文案**——消息本体随会话事件出现（真实 pi 的
+      // 「用户指令：」回显走注入样式行），此前误落进派发分支（「已接收…派发任务」对消息是错口径，已修）。
     } catch (err) {
       // 投递失败：**如实提示 + 放回队首**（保持顺序）待重试——绝不静默丢。
       const en = this.sessions.get(resolvedTarget);

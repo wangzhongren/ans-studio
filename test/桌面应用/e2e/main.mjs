@@ -14,7 +14,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { app, BrowserWindow, dialog, ipcMain, Menu } from "electron";
+import { app, BrowserWindow, ipcMain, Menu } from "electron";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const APP_DIR = path.resolve(HERE, "..", "..", "..", "app");
@@ -32,6 +32,7 @@ let createChatDemoAdapter = null;
 let chatAdapterMod = null; // P0-1：demo 适配器模块引用（takeDemoPromptLog 断言透传保真用）
 let slowPromptGate = null; // P0-1 e2e 专用缝：让首轮 prompt 挂起（把「忙」变成确定态，供入队定格断言）
 let slowPromptArmed = false;
+let nextPickPath = null; // P1-3：选目录桩的返回值（null=用户取消；e2e 全程不弹真实系统对话框）
 let win;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -49,10 +50,8 @@ const openExternalCalls = [];
 
 function registerIpc() {
   const desktop = createDesktopInterface({
-    pickDirectory: async () => {
-      const r = await dialog.showOpenDialog(win, { title: "导入项目", properties: ["openDirectory"] });
-      return r.canceled ? null : r.filePaths[0] || null;
-    },
+    // P1-3：目录选择改**桩**（用例经 nextPickPath 驱动；不弹真实系统对话框——e2e 里真对话框会挂住）。
+    pickDirectory: async () => nextPickPath,
     emitEvent: (ev) => { if (!win.isDestroyed()) win.webContents.send("session:event", ev); },
     // L-1/状态准确性（与 app/main.ts 同形；生产经 Q-1 去抖 ≥100ms 合并——此处直推、语义一致）：
     // 忙碌/队列**真实快照** → 渲染侧（停止钮显隐、左树徽标与队列行都只信它）。
@@ -115,6 +114,8 @@ function registerIpc() {
   ipcMain.handle("session:open", (_e, input) => desktop.openSession(input));
   ipcMain.handle("session:send", (_e, input) => desktop.sendSession(input));
   ipcMain.handle("session:stop", (_e, input) => desktop.stopSession(input));
+  // P1-1：撤回未投递排队消息（与 app/main.ts 同形——Interface 如实回报）。
+  ipcMain.handle("session:withdraw", (_e, input) => desktop.withdrawQueued(input));
   // P0-2：停当前轮次（与 app/main.ts 同形——Interface 三态如实回传）。
   ipcMain.handle("session:abort", (_e, input) => desktop.abortSession(input));
   // B-2：保活会话列表（与 app/main.ts 同形）。
@@ -387,9 +388,57 @@ async function run() {
   log("SEND_ENABLED_WHILE_BUSY=" + (await wc().executeJavaScript("document.getElementById('btn-send').disabled === false")));
   // data-state（程序化出口）随真实快照：真忙 ⇒ run（2026-10-13 修复后由 role-state 快照驱动）。
   log("DATA_STATE_RUN_WHILE_BUSY=" + (await wc().executeJavaScript("document.getElementById('chat').dataset.state === 'run'")));
-  await wc().executeJavaScript("(() => { document.getElementById('inp-message').value='忙时手发入队'; document.getElementById('btn-send').click(); })()");
+  // P1-1（2026-10-13 客户裁定）：忙时**连发 3 条**（UI 真实路径）→ 抽屉里看全文 / 撤第 2 条 → 执行序 1、3。
+  const sendUi = (text) =>
+    wc().executeJavaScript("(() => { document.getElementById('inp-message').value=" + JSON.stringify(text) + "; document.getElementById('btn-send').click(); })()");
+  await sendUi("队一");
+  await sleep(250);
+  const longQueued = "队二·需要完整全文的一条消息" + "（补足摘要截断的长度）".repeat(6); // >40 字 ⇒ 摘要被截断、有「全文」钮
+  await sendUi(longQueued);
+  await sleep(250);
+  await sendUi("队三");
   await sleep(300);
   log("SEND_QUEUES_WHILE_BUSY=" + (await wc().executeJavaScript("document.getElementById('composer-hint').textContent.includes('已入队')")));
+  // 打开「角色资料」抽屉 → 待办/队列节：3 行、每行（客户消息）带撤回；长文那条有「全文」。
+  await wc().executeJavaScript("document.getElementById('tab-card').click()");
+  await sleep(400);
+  const qInfo = await wc().executeJavaScript(
+    "(() => { const rows=[...document.querySelectorAll('#right-queue-body .q-item')]; return { n: rows.length, withdrawables: rows.filter(r=>r.querySelector('.q-withdraw')).length, fullBtns: rows.filter(r=>r.querySelector('.q-toggle')).length }; })()",
+  );
+  log("QUEUE_ROWS_THREE=" + (qInfo.n === 3) + " QUEUE_WITHDRAW_ON_MESSAGES=" + (qInfo.withdrawables === 3) + " QUEUE_FULL_TOGGLE_ON_LONG=" + (qInfo.fullBtns === 1)); // 只长文那条出「全文」
+  await wc().executeJavaScript("(() => { const rows=[...document.querySelectorAll('#right-queue-body .q-item')]; const t=rows.find(r=>r.textContent.includes('队二')); const b=t && t.querySelector('.q-toggle'); if (b) b.click(); })()");
+  await sleep(250);
+  const expandInfo = await wc().executeJavaScript(
+    "(() => { const rows=[...document.querySelectorAll('#right-queue-body .q-item')]; const t=rows.find(r=>r.textContent.includes('队二')); const b=t? t.querySelector('.q-toggle'):null; const f=t? t.querySelector('.q-full'):null; return { bText: b ? b.textContent : '(none)', fHidden: f ? f.hidden : '(none)', hasLong: f ? f.textContent.indexOf('需要完整全文') >= 0 : false }; })()",
+  );
+  log("QUEUE_EXPAND_EVIDENCE=" + JSON.stringify(expandInfo));
+  log("QUEUE_EXPAND_FULL=" + (expandInfo.bText === "收起" && expandInfo.fHidden === false && expandInfo.hasLong === true));
+  // 撤第 2 条（长文那条）：聊天流如实一行 + 队列减到 2（位次前移走既有快照）。
+  await wc().executeJavaScript(
+    "(() => { const rows=[...document.querySelectorAll('#right-queue-body .q-item')]; const t=rows.find(r=>r.textContent.includes('队二')); if (t) { const b=t.querySelector('.q-withdraw'); if (b) b.click(); } })()",
+  );
+  await sleep(500);
+  log(
+    "Q_WITHDRAW_LINE=" +
+      (await wc().executeJavaScript(
+        "[...document.querySelectorAll('#chat .chat-pane .sys-call')].some(function (p) { return p.textContent.indexOf('已撤回排队消息：') >= 0; })",
+      )),
+  );
+  log("QUEUE_ROWS_AFTER_WITHDRAW=" + (await wc().executeJavaScript("document.querySelectorAll('#right-queue-body .q-item').length === 2")));
+  // 派发条目只读：按当前渲染快照 + 一条 dispatch 注入 → 派发行**无撤回钮**（呈现与语义同口径）。
+  const injQueue = await wc().executeJavaScript(
+    "(() => { const s=window.__ansRenderer.state; const q=(s.queueItemsByRole['桌面应用']||[]).map(function(i){return {kind:i.kind,sourceRoleId:i.sourceRoleId,summary:i.summary,at:i.at,id:i.id,full:i.full};}); q.push({kind:'dispatch',sourceRoleId:'su',summary:'派发 · 来自 su：做X',at:'2026-10-13T03:00:00.000Z',id:'e2e-dispatch-1',full:'派发任务：做X'}); return q; })()",
+  );
+  await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面应用', busy: true, summaries: [], queue: " + JSON.stringify(injQueue) + ", running: null })");
+  await sleep(400);
+  log(
+    "DISPATCH_ROW_NO_WITHDRAW=" +
+      (await wc().executeJavaScript(
+        "(() => { const rows=[...document.querySelectorAll('#right-queue-body .q-item')]; const d=rows.find(r=>r.textContent.includes('su 派发')); return !!d && !d.querySelector('.q-withdraw'); })()",
+      )),
+  );
+  await wc().executeJavaScript("document.getElementById('tab-card').click()"); // 收起抽屉，回到聊天流
+  await sleep(250);
   const imgArg = JSON.stringify([{ type: "image", data: tinyPng, mimeType: "image/png" }]);
   const r2 = await wc().executeJavaScript("window.desktop.sendSession('排队带图', " + imgArg + ")");
   log("IMG_QUEUE_FROZEN=" + (r2 && r2.queued === true));
@@ -403,6 +452,13 @@ async function run() {
     "IMG_SLOW_ROUND_OK=" + (r1 && r1.ok === true) +
       " IMG_DEMO_LOG=" + JSON.stringify(plog.map((r) => ({ t: flat(r.text), img: !!(r.opts && r.opts.images && r.opts.images.length) }))),
   );
+  // P1-1 验收：撤掉第 2 条后，**执行序 = 队一 → 队三 → 排队带图**；「队二…」绝不进入执行。
+  const idxOf = (t) => plog.findIndex((r) => r.text === t);
+  const iT1 = idxOf("队一");
+  const iT3 = idxOf("队三");
+  const iImg = idxOf("排队带图");
+  const iT2 = plog.findIndex((r) => r.text.indexOf("队二") === 0);
+  log("QUEUED_EXECUTION_ORDER_1_3=" + (iT1 >= 0 && iT3 >= 0 && iImg >= 0 && iT1 < iT3 && iT3 < iImg && iT2 < 0));
   // 轮末复位（2026-10-13 修复钉）：settle 后 data-state 回 idle；settled 行如实出现在聊天流（该出现就出现）。
   log("DATA_STATE_IDLE_AFTER_ROUND=" + (await wc().executeJavaScript("document.getElementById('chat').dataset.state === 'idle'")));
   log("SETTLED_ROW_PRESENT=" + (await wc().executeJavaScript("document.querySelectorAll('#chat .chat-pane .sys-settled').length >= 1")));
@@ -1142,6 +1198,54 @@ async function run() {
   await wc().executeJavaScript("document.getElementById('tab-pi').click()");
   await sleep(200);
   log("DRAWER_CLOSED_AFTER_PI=" + (await wc().executeJavaScript("!document.getElementById('right-drawer').classList.contains('open')")));
+
+  // ———— P1-3（2026-10-13 客户裁定）：切换项目一次性防呆——有 busy 才出内联确认条；取消零动作；确认=关闭全部并进新项目 ————
+  // 造真忙：再次 arm 慢轮缝（同一角色、同一文本可复用），发一条挂起消息持住 busy。
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面应用')");
+  await sleep(700);
+  let releaseSlow2;
+  slowPromptGate = { promise: new Promise((r) => { releaseSlow2 = r; }) };
+  slowPromptArmed = true;
+  const pS2 = wc().executeJavaScript("window.desktop.sendSession('队列慢轮')");
+  await sleep(500);
+  log("SWITCH_SETUP_BUSY=" + (await wc().executeJavaScript("window.__ansRenderer.state.roleBusy['桌面应用'] === true")));
+  await wc().executeJavaScript("document.getElementById('btn-import').click()");
+  await sleep(250);
+  const swBar = await wc().executeJavaScript(
+    "(() => { const b=document.getElementById('switch-confirm'); return { hidden: b.hidden, text: document.getElementById('switch-confirm-text').textContent, inChat: document.getElementById('chat').contains(b) }; })()",
+  );
+  log("SWITCH_CONFIRM_ON_BUSY=" + (!swBar.hidden && swBar.text.indexOf("1 个角色正在工作") >= 0 && swBar.text.indexOf("切换项目会停止它们") >= 0));
+  log("SWITCH_BAR_NOT_IN_CHAT=" + (swBar.inChat === false));
+  // 取消 = 什么都不发生（项目/会话原样）。
+  const beforeCancel = await wc().executeJavaScript("window.desktop.listLiveSessions()");
+  await wc().executeJavaScript("document.getElementById('switch-confirm-cancel').click()");
+  await sleep(250);
+  const afterCancel = await wc().executeJavaScript("window.desktop.listLiveSessions()");
+  log(
+    "SWITCH_CANCEL_NOOP=" +
+      ((await wc().executeJavaScript("document.getElementById('switch-confirm').hidden === true")) &&
+        JSON.stringify(afterCancel) === JSON.stringify(beforeCancel)),
+  );
+  // 确认 = 关闭全部并进新项目（harness 选择器桩返回 REPO_ROOT → loadProject 同仓重载 = 完整「切换」流程）。
+  nextPickPath = REPO_ROOT;
+  await wc().executeJavaScript("document.getElementById('btn-import').click()");
+  await sleep(250);
+  await wc().executeJavaScript("document.getElementById('switch-confirm-go').click()");
+  await sleep(1800);
+  const swAfter = await wc().executeJavaScript(
+    "(async () => ({ live: await window.desktop.listLiveSessions(), path: document.getElementById('project-path').textContent, barHidden: document.getElementById('switch-confirm').hidden }))()",
+  );
+  log(
+    "SWITCH_CONFIRM_RELOADED=" +
+      (swAfter.path === REPO_ROOT && swAfter.barHidden === true && Array.isArray(swAfter.live) && swAfter.live.length === 0),
+  );
+  releaseSlow2(); // 放行挂起轮（会话已被确认流程关闭；挂起 promise 收尾是无害的）
+  // 空闲时切换（重载后无会话）：**零提示**，行为逐字不变（picker 桩返回 null=取消）。
+  nextPickPath = null;
+  await wc().executeJavaScript("document.getElementById('btn-import').click()");
+  await sleep(300);
+  log("SWITCH_NO_CONFIRM_WHEN_IDLE=" + (await wc().executeJavaScript("document.getElementById('switch-confirm').hidden === true")));
+  log("SWITCH_IDLE_HINT=" + (await wc().executeJavaScript("document.getElementById('composer-hint').textContent.includes('已取消导入')")));
 
   // ———— 2026-10-13 状态机修复：回放去重（真机「同一段消息渲染两遍」——su 写文件 → project:changed →
   // refreshProject → 主进程重推会话历史 → 旧实现整份再回放）。确定性钉法：向「桌面应用」pane 连推

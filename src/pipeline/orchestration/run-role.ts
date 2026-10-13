@@ -62,6 +62,7 @@ import type { ShellVerdictFn } from "../../common/编排/shell-gate.ts";
 import { repinIfBootstrapped, DEFAULT_GOVERNANCE_BOUNDARY_REL } from "../../common/编排/finalize.ts";
 import { conditionSlugsOf, createConfirmedWriteIssuer } from "../../common/编排/confirmed-writes.ts";
 import type { RuntimeKind } from "../../common/编排/args.ts";
+import { CLI_POSITIONING } from "../../common/编排/cli-positioning.ts";
 
 /**
  * **适配器能力面**：编排构造、随 `deps.createAdapter(gate, capabilities)` 交给适配器工厂——
@@ -150,6 +151,10 @@ export async function runRole(
       `受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 ${input.taskId} ` +
       (input.scope ? `写集 ${input.scope.writeSet.length} 项` : "未声明 scope（仅按角色边界，不做任务收窄）"),
   });
+  // P1-4 产品定位指路（桌面体验提案，2026-10-13 客户批准）：一次性 CLI 会话启动时如实告知能力面——
+  // 轻量一行、每次会话至多一次；不改变任何能力与判定（shell 本就不 arm、会话本就不持久）。
+  // 句子的单一来源见 common/编排/cli-positioning.ts（帮助输出共用同一句，防漂移）。
+  record({ kind: "message", summary: CLI_POSITIONING });
 
   let code: number = EXIT_OK;
   let session: RoleSession | undefined;

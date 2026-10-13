@@ -33,6 +33,7 @@ import {
   type OpenResult,
   type SendResult,
   type StopResult,
+  type WithdrawResult,
   type SessionEventEnvelope,
 } from "./session.ts";
 // I-1 补丁（2026-10-12 客户重发授权）：(c) 规则集实件的形状与构造（**只读转出**——形状 `Omit` 自编排
@@ -232,6 +233,12 @@ export interface DesktopInterface {
   /** 关闭会话（B-2 **定向**：给定 `roleId` 只关它、历史留在界面上；缺省/`null` 关全部，供换项目/退出）。 */
   stopSession(input?: { roleId?: string | null }): Promise<StopResult>;
   /**
+   * **撤回一条未投递的排队消息（P1-1，2026-10-13 客户裁定）**：`id` = role-state 快照条目视图的 `id`。
+   * 仅「客户消息」类、仅在队列中（未投递）者可撤；已「进行中」/派发/回交/不存在 ⇒ 如实回错
+   * （`WithdrawResult`）。成功返回 `summary` 供聊天流如实一行「已撤回排队消息：〈摘要〉」。
+   */
+  withdrawQueued(input: { roleId: string; id: string }): Promise<WithdrawResult>;
+  /**
    * **停当前轮次（P0-2 UI，2026-10-13 客户批准）**：向该角色的会话句柄请求中止当前进行中的轮次。
    * **三态如实回传**（`RoleSessionAbortResult`：已请求停止 / 当前运行时不支持停止 / 停止失败）——
    * 轮次仍以既有 `settled` 收尾，本层不制造「已停止」假象；重复点击幂等（无在飞轮次 = no-op）。
@@ -407,6 +414,12 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     async stopSession(input?: { roleId?: string | null }): Promise<StopResult> {
       const roleId = input && typeof input.roleId === "string" ? input.roleId : null;
       return manager.stop(roleId);
+    },
+
+    async withdrawQueued(input: { roleId: string; id: string }): Promise<WithdrawResult> {
+      const roleId = input && typeof input.roleId === "string" ? input.roleId : "";
+      const id = input && typeof input.id === "string" ? input.id : "";
+      return manager.withdraw(roleId, id);
     },
 
     async abortSession(input: { roleId: string }): Promise<RoleSessionAbortResult> {

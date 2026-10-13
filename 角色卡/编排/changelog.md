@@ -1,5 +1,22 @@
 # 编排 变更记录
 
+## 2026-10-13 — P1-4 CLI 产品定位：`ans role run` 帮助与启动提示如实指路（只做定位，不做能力补齐）
+
+**来源**：产品提案 `角色卡/产品/docs/design/2026-10-13_design_desktop-ux-improvement-proposal.md` **§P1-4**，客户 2026-10-13 批准。**本轮只做定位 + 指路，不做任何能力补齐**；终端 y/n 确认通道、CLI 会话持久化、CLI 投递机——**提案明示均不做**（等定位被确认、且有真实 CLI 用户诉求再立项）。
+
+**背景**：`ans role run` 走一次性路径（`runRole`）：不接 shell 闸（CLI 无确认框 ⇒ `run_shell` 不注册；`run-role.ts` 调 `deps.createAdapter(gate)` **不传任何 capabilities**；fail-closed 方向正确）、不传会话目录（一局即止）。缺的不是能力而是**定位**：此前没有任何一处告诉用户「这事该去桌面做」。
+
+**改了什么**：
+- **新 `src/common/编排/cli-positioning.ts`**——指路句**单一来源** `CLI_POSITIONING`：「本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。」（帮助输出与启动提示共用，防两处漂移；两点写实：不提供 shell/会话保持、桌面应用）。
+- **`src/interface/cli/run.ts`**——新增 `-h`/`--help`：打印用法 + 指路句、**退 0**、不触配置、不开会话（测试钉工厂零调用、缺注入也可用）。既有解析/退出码路径逐字未动。
+- **`src/pipeline/orchestration/run-role.ts`**——一次性会话启动提示处（「受治理工具集已建立」行之后）加**轻量一行** `record({ kind:"message", summary: CLI_POSITIONING })`：每场至多一次；不改变任何能力与判定；**用法错误路径不打印**（常规提示不打扰，测试钉住）。
+- **报错路径结论（如实登记，任务书要求）**：一次性路径不传 capabilities ⇒ `run_shell` 根本不注册（`provider/pi/tools.ts` 结构性保证）⇒「调用 run_shell 失败」事件在编排/Interface 层**不存在、结构上不可改**；硬造（恒败桩工具/提示词夹带）是任务书明示的「不要为此硬造机制」——**不做**，指路由帮助 + 启动行承担。
+- **跨角色登记（归装配，请 pm 转达）**：裸 `ans role run --help`（无 `--task`）被装配 `parseInvocation` 判「缺少 --task」的 unknown（退 2，到不了本命令）——装配在 `role run` 位形见到 `-h/--help` 时放行整段 argv 给 `runRoleCommand` 即可端到端生效（命令层已就位；`ans role run <角色> --task T-1 --help` 经现有路由**已实测可达**）。
+
+**测试**：新 `test/编排/cli-positioning.test.ts` **6 例**——文案两点写实；`--help`/`-h` 各一例（退 0、含用法行与指路句、不开会话）；缺注入可用；启动恰一行；用法错误不夹带。**测试手法登记**：`captureStdout` 补丁必须**转发 + 记录**——`node --test` 的子进程上报协议帧同走 `process.stdout.write`，吞掉写入会吞掉测试计数（实测 6 例只计入 2 例；已按转发实现并注释）。
+
+**结果**：`test/编排/` **188/188**（182+6，连跑 3 次稳定）；`npm run typecheck` **全仓零错**；全量 `node --test "test/**/*.test.ts"`（**引号带**）**948 计 / 945 过 / 2 红 / 1 skipped**——2 红均为**既有基线红**（`test/桌面应用/pi-config.test.ts` 面板键目录名、`test/项目管理/shared/path-primitives.test.ts` macOS `/var`）；**本角色零红**（首次全量运行曾另见 1 条桌面在飞快照 `queue-withdraw-lru.test.ts`〔P1-1/P1-2〕，复跑已自愈，与本改动零交集）。真实入口实测：`ans role run 编排 --task T-1 --help` → 0 含指路句；演示启动第 4 行为指路行、其余逐字不变。环境：Node v24.14.0、Darwin 25.6.0。未 git 操作、未重启桌面应用、未发真实模型请求。详见 [change 文档](docs/change/2026-10-13_change_cli-positioning.md)。
+
 ## 2026-10-13 — P0-1/P0-2 中环：句柄 `abort?()`（停当前轮次）与 `send` 透传图片
 
 **来源**：产品提案 `角色卡/产品/docs/design/2026-10-13_design_desktop-ux-improvement-proposal.md` 的 **P0-1（图片随消息送进模型）** 与 **P0-2（跑飞轮次的「停」）**，客户 2026-10-13 批准。**前环（Pi适配器）已落并钉死契约**：`RoleSession.abort?`（可选；停当前轮不销毁会话、无在飞轮次=no-op、中止后 settled 仍发射、等待中的客户确认一并 fail-closed、错误如实上抛）与 `PromptOptions.images`；本改动为**中环**（编排句柄层），**桌面接线为后环**（停止按钮/聊天流如实一行/入队定格归桌面环节）。

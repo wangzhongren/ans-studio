@@ -1545,7 +1545,46 @@
     var hasProject = typeof state.projectRoot === "string" && state.projectRoot !== "";
     $("btn-import").textContent = UiLabels.pickProjectLabel(hasProject);
   }
+  // —————— P1-3（2026-10-13 客户裁定）：「切换项目」的一次性防呆 ——————
+  // 触发条件 = **确有后台工作**（role-state 真实快照 `state.roleBusy`，不用界面侧推测）；无 busy ⇒ 行为**逐字不变**。
+  // 确认条是**动作防呆、不是会话内容**：放在 #chat 之外（不进行表/不回放/切项目即随重置消失）。
+  function busyRoleIds() {
+    var ids = [];
+    for (var k in state.roleBusy) {
+      if (state.roleBusy[k] === true) ids.push(k);
+    }
+    return ids;
+  }
+
+  /** 显示/刷新确认条（n=0 时收起——比如等待期间轮次自己结束了，防呆就不再有意义）。 */
+  function showSwitchConfirm() {
+    var bar = $("switch-confirm");
+    if (!bar) return;
+    var ids = busyRoleIds();
+    if (ids.length === 0) {
+      bar.hidden = true;
+      return;
+    }
+    $("switch-confirm-text").textContent = "有 " + ids.length + " 个角色正在工作，切换项目会停止它们——";
+    bar.hidden = false;
+  }
+
+  function hideSwitchConfirm() {
+    var bar = $("switch-confirm");
+    if (bar) bar.hidden = true;
+  }
+
   async function importProject() {
+    // P1-3：破坏性动作防呆——有 busy 会话先出内联确认条（取消=什么都不发生）；无 busy 走原路径（零提示）。
+    if (busyRoleIds().length > 0) {
+      showSwitchConfirm();
+      return;
+    }
+    await doImportProject();
+  }
+
+  /** 真正的导入/切换流程（确认后与原路径共用；loadProject 首步 `d.stopSession(null)`「关闭全部」即确认语义）。 */
+  async function doImportProject() {
     try {
       var p = await d.pickProject();
       if (!p) { setHint("已取消导入。"); return; }
@@ -1685,6 +1724,7 @@
       ? info.summaries.map(function (s) { return String(s == null ? "" : s); })
       : [];
     // 右栏「待办 / 队列」：结构化条目 + 进行中的那条（形状防御式逐字段转写，不信任外部输入）。
+    // P1-1：增 `id`（撤回定位键）与 `full`（全文，展开用）——同一快照通道，**不造第二套数据源**。
     var copyItem = function (it) {
       var o = it && typeof it === "object" ? it : {};
       return {
@@ -1692,6 +1732,8 @@
         sourceRoleId: typeof o.sourceRoleId === "string" ? o.sourceRoleId : "",
         summary: typeof o.summary === "string" ? o.summary : "",
         at: typeof o.at === "string" ? o.at : "",
+        id: typeof o.id === "string" ? o.id : "",
+        full: typeof o.full === "string" ? o.full : "",
       };
     };
     state.queueItemsByRole[roleId] = Array.isArray(info.queue) ? info.queue.map(copyItem) : [];
@@ -1702,6 +1744,9 @@
     updateHaltButton();
     // data-state（程序化出口）同随真实快照：正看着该角色时 run/idle 实时校准（轮末回 idle 的路径）。
     if (state.selectedRoleId === roleId) syncChatState(roleId);
+    // P1-3：切换项目确认条若正挂着——busy 数随之刷新；归零（轮次自己结束）就收起（防呆不再有意义）。
+    var swcf = $("switch-confirm");
+    if (swcf && !swcf.hidden) showSwitchConfirm();
     // 右栏：若正看着该角色 → 只更新「待办 / 队列」组（**定点更新**，不重排整个手风琴、不重置展开态）。
     if (state.selectedRoleId === roleId) updateRightQueue(roleId);
     // 图标簇角标随**真实快照**刷新（待办=视图行数 / 队列=排队条数——收起也不丢信息）。
@@ -2067,21 +2112,86 @@
   }
 
   /** 待办行 HTML：**每字段 esc**（来源/摘要/时间——摘要已在纯映射里截断，长内容不铺开）。
-   *  「进行中」= 正在跑的那条投递；排队条目位置 1..N（**如实**：排队 ≠ 已执行）。 */
+   *  「进行中」= 正在跑的那条投递；排队条目位置 1..N（**如实**：排队 ≠ 已执行）。
+   *  **P1-1（2026-10-13 客户裁定）**：① 有全文者带「全文」展开钮（`.q-toggle` → `.q-full`，抽屉内展开）；
+   *  ② **仅「客户消息」且未投递（非进行中）**的行带「撤回」（`.q-withdraw`）——派发/回交**只读、无撤回钮**
+   *  （呈现与语义同口径：治理流单方面撤会破坏 su 验收/派发的因果）。 */
   function queueRowsHtml(views) {
     if (views.length === 0) return '<div class="muted small">（无待办）</div>';
     var html = '<ul class="queue-list">';
     for (var i = 0; i < views.length; i += 1) {
       var v = views[i];
+      var running = v.pos === "进行中";
+      var canWithdraw = v.kind === "message" && !running;
+      // 有「真实全文增量」才出展开钮：full 必须**比显示的摘要更长**（摘要带「你：」前缀但被截断；
+      // 短消息 full 反而更短——展开它没有意义，不摆无用钮）。
+      var expandable = v.full !== "" && v.full.length > v.text.length;
       html +=
-        '<li class="q-item' + (v.pos === "进行中" ? " is-running" : "") + '">' +
+        '<li class="q-item' + (running ? " is-running" : "") + '">' +
         '<span class="q-pos">' + esc(v.pos) + "</span>" +
         '<span class="q-src">' + esc(v.source) + "</span>" +
         '<span class="q-text">' + esc(v.text) + "</span>" +
         '<span class="q-meta">' + esc(queueTimeText(v.at)) + "</span>" +
+        '<span class="q-actions">' +
+        // 属性里的 id 走 **encodeURIComponent**：dedupKey 含 NUL（`msg\u0000…`）——裸放进 HTML 属性会被
+        // 解析替换成 U+FFFD，撤回/展开的定位键随即损坏（真机行为实测）。处理器侧 decodeURIComponent 还原。
+        (expandable ? '<button class="q-toggle" type="button" data-id="' + esc(encodeURIComponent(v.id)) + '" title="展开全文">全文</button>' : "") +
+        (canWithdraw ? '<button class="q-withdraw" type="button" data-id="' + esc(encodeURIComponent(v.id)) + '" title="撤回该条排队消息（仅未投递者可撤）">撤回</button>' : "") +
+        "</span>" +
+        (expandable ? '<div class="q-full" data-full-id="' + esc(encodeURIComponent(v.id)) + '" hidden>' + esc(v.full) + "</div>" : "") +
         "</li>";
     }
     return html + "</ul>";
+  }
+
+  /** [P1-1] 抽屉待办行的点击（事件委托挂 #right-body——行重渲染不丢绑定）：
+   *  「全文」切换展开、「撤回」调 IPC 并按结果在聊天流如实一行（ok ⇒「已撤回排队消息：〈摘要〉」；
+   *  无效 ⇒「撤回无效：〈原因〉」——绝不假装撤掉）。 */
+  function onRightBodyClick(e) {
+    var t = e.target;
+    if (!t || !t.closest) return;
+    var toggle = t.closest(".q-toggle");
+    if (toggle) {
+      var fullEl = toggle.parentNode && toggle.parentNode.parentNode
+        ? toggle.parentNode.parentNode.querySelector(".q-full")
+        : null;
+      if (fullEl) {
+        fullEl.hidden = !fullEl.hidden;
+        toggle.textContent = fullEl.hidden ? "全文" : "收起";
+      }
+      return;
+    }
+    var wd = t.closest(".q-withdraw");
+    if (wd) {
+      var rawId = wd.getAttribute("data-id") || "";
+      var id = rawId;
+      try {
+        id = decodeURIComponent(rawId); // 与渲染侧 encodeURIComponent 配对（NUL 等字符安全往返）
+      } catch (err) {
+        id = rawId; // 编码异常时按原样尝试（防御，不崩）
+      }
+      void withdrawQueuedMessage(id);
+    }
+  }
+
+  /** [P1-1] 撤回一条排队消息：`id` 来自快照条目（单一数据源）。结果在聊天流如实一行；位次前移由
+   *  onRoleState 的既有快照刷新（updateRightQueue/队列行/角标）自然完成——不造第二套界面状态。 */
+  async function withdrawQueuedMessage(id) {
+    var roleId = state.selectedRoleId;
+    if (!roleId || !id) return;
+    var pane = activePane();
+    var res;
+    try {
+      res = await d.withdrawQueued(roleId, id);
+    } catch (err) {
+      sysRow(pane, "sys-call", ICONS.deny, "撤回失败：" + (err && err.message ? err.message : err));
+      return;
+    }
+    if (res && res.ok === true) {
+      sysRow(pane, "sys-call", ICONS.ok, "已撤回排队消息：" + (res.summary || ""));
+    } else {
+      sysRow(pane, "sys-call", ICONS.deny, "撤回无效：" + ((res && res.error) || "未知原因"));
+    }
   }
 
   /** 队列概览（**仅排队条目**的位次视图：1..N + 来源 + 摘要 + 入队时间；同一快照的另一个视图，
@@ -2548,6 +2658,13 @@
   // —————— 绑定 ——————
   initTitlebar();
   $("btn-import").addEventListener("click", importProject);
+  // P1-3：切换项目确认条两端——取消=什么都不发生（隐藏即止）；确认=关闭全部并进新项目（走原导入流程，
+  // loadProject 首步 stopSession(null)「关闭全部」即「会停止它们」的兑现）。
+  $("switch-confirm-cancel").addEventListener("click", hideSwitchConfirm);
+  $("switch-confirm-go").addEventListener("click", function () {
+    hideSwitchConfirm();
+    void doImportProject();
+  });
   $("btn-send").addEventListener("click", onSend);
   // 停止入口（P0-2 UI）：忙碌时才可见（updateHaltButton 由 role-state 快照驱动）；点击三态如实行。
   $("btn-halt").addEventListener("click", onHaltClick);
@@ -2615,6 +2732,8 @@
   // 右上角图标簇（客户裁定 2026-10-13；第二轮裁定同日：待办/队列归角色，簇只留两枚）——同图标再点收起；
   // 抽屉头 × 收起；Esc 收起（shell 确认卡在先——fail-closed 优先级不受影响）。
   $("tab-card").addEventListener("click", function () { toggleRightDrawer("card"); });
+  // P1-1：抽屉内待办行的「全文 / 撤回」点击（事件委托挂 Persistent 的 #right-body——行重渲染不丢绑定）。
+  $("right-body").addEventListener("click", onRightBodyClick);
   $("drawer-close").addEventListener("click", closeRightDrawer);
   // Markdown 链接（B-1）：点聊天流里的链接一律**外开**（事件委托挂在 #chat 上——pane 切换不丢）。
   $("chat").addEventListener("click", onChatLinkClick);

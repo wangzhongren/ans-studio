@@ -45,7 +45,8 @@ flowchart LR
 | What | Where |
 | --- | --- |
 | 会话句柄式入口（多轮；桌面/CLI 共用） | `src/pipeline/orchestration/run-role.ts` — `openRoleSession()`（确认制、回交、收尾、shell arm 全在此收口） |
-| 一次性路径 | `src/pipeline/orchestration/run-role.ts` — `runRole()`（`ans role run`） |
+| 一次性路径 | `src/pipeline/orchestration/run-role.ts` — `runRole()`（`ans role run`；启动提示含 P1-4 定位指路行） |
+| CLI 定位指路文案单一来源（P1-4） | `src/common/编排/cli-positioning.ts` — `CLI_POSITIONING`（`ans role run` 帮助与一次性会话启动行共用同一句；桌面 = 主工作台、CLI = 一次性执行器） |
 | 治理会话引擎（CLI 与桌面收敛为同一份） | `src/pipeline/orchestration/govern-session.ts` — `openGovernanceSession()` |
 | shell 闸**判定映射**（三层链 + su 只读档） | `src/common/编排/shell-gate.ts` — `createShellGate()` / `buildShellGate()`；只读档选项 `readonlyOnly`、离异分支常量 `BRANCH_READONLY_DENY` |
 | shell 闸**装配**（三层链） | `src/pipeline/orchestration/shell-arming.ts` — `assembleProjectShellGate()` |

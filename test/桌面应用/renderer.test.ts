@@ -1203,3 +1203,61 @@ test("data-state 修复：轮末回 idle——data-state 只随 role-state 真�
   assert.ok(!RENDERER.includes('setState("run", "聊天中")'), "旧「开启即写死 run、无回 idle 路径」已退役");
   assert.ok(RENDERER.includes('setState("err", "连接失败")'), "err 路径保留（开启失败/异常）");
 });
+
+// ————————— P1-1 / P1-2 / P1-3（2026-10-13 客户裁定，产品提案 §P1-1/§P1-2/§P1-3）————————
+
+test("P1-1 UI：待办「全文」展开与「撤回」——仅客户消息且未投递者；派发/回交无撤回钮；撤回/无效各有如实行", () => {
+  // 行渲染：canWithdraw 判据（kind==="message" 且非进行中）；全文按钮只在 full≠摘要 时出现。
+  assert.ok(/var canWithdraw = v\.kind === "message" && !running;/.test(RENDERER), "仅客户消息且未投递（非进行中）可撤");
+  assert.ok(/var expandable = v\.full !== "" && v\.full\.length > v\.text\.length;/.test(RENDERER), "全文比显示摘要更长才出「全文」钮（短消息不摆无用钮）");
+  assert.ok(RENDERER.includes('class="q-toggle"') && RENDERER.includes('class="q-withdraw"'), "两枚行内钮齐备");
+  assert.ok(RENDERER.includes('class="q-full"') && RENDERER.includes("data-full-id"), "全文块（抽屉内展开，不新开窗口）");
+  // 事件委托挂持久节点 #right-body（行重渲染不丢绑定）。
+  assert.ok(RENDERER.includes('$("right-body").addEventListener("click", onRightBodyClick);'), "点击委托挂 #right-body");
+  assert.ok(RENDERER.includes("withdrawQueuedMessage"), "撤回处理函数在");
+  // 如实行文案：ok ⇒「已撤回排队消息：〈摘要〉」；无效 ⇒「撤回无效：〈原因〉」。
+  assert.ok(RENDERER.includes('"已撤回排队消息：" +'), "撤回成功如实一行");
+  assert.ok(RENDERER.includes('"撤回无效：" +'), "撤回无效如实提示（进行中等）");
+  // 通道两端：preload / 主进程 / Interface / 会话管理器（快照 id/full 是撤回与展开的唯一数据源）。
+  assert.ok(PRELOAD.includes('"session:withdraw"'), "preload 暴露 session:withdraw");
+  assert.ok(MAIN.includes('"session:withdraw"'), "主进程注册 session:withdraw");
+  const IFACE = fs.readFileSync(path.resolve(HERE, "..", "..", "app", "desktop", "interface.ts"), "utf8");
+  assert.ok(IFACE.includes("withdrawQueued") && IFACE.includes("manager.withdraw"), "Interface 透传至 SessionManager.withdraw");
+  const SESS = fs.readFileSync(path.resolve(HERE, "..", "..", "app", "desktop", "session.ts"), "utf8");
+  assert.ok(SESS.includes("withdraw(roleId: string, id: string): WithdrawResult"), "SessionManager.withdraw 三态口径");
+  assert.ok(SESS.includes("该条已进入「进行中」，撤回无效"), "进行中撤回无效如实回错（绝不从执行里抽条）");
+  assert.ok(SESS.includes("派发/回交属治理流）——只读，不可撤回"), "派发/回交只读口径（与非消息拒绝同语义）");
+  assert.ok(SESS.includes("id: i.dedupKey, full: i.text"), "快照条目带 id/full（单一数据源）");
+  assert.ok(RENDERER.includes('id: typeof o.id === "string" ? o.id : ""') && RENDERER.includes('full: typeof o.full === "string" ? o.full : ""'), "渲染侧防御式转写 id/full");
+  assert.ok(STYLES.includes(".q-withdraw") && STYLES.includes(".q-full") && STYLES.includes(".q-toggle"), "样式钩子齐备");
+});
+
+test("P1-2：LRU 淘汰跳过 busy + 正在开启者不淘汰；settled 后下一时机再收（源码钉）", () => {
+  const SESS = fs.readFileSync(path.resolve(HERE, "..", "..", "app", "desktop", "session.ts"), "utf8");
+  assert.ok(/if \(s\.busy\) continue; \/\/ 正在跑轮次的不淘汰/.test(SESS), "候选判据含 !busy（跳过在跑）");
+  assert.ok(/keepRoleId !== undefined && id === keepRoleId\) continue;/.test(SESS), "正在开启的那一个也不淘汰（否则用户刚点的会话被自己回收）");
+  assert.ok(/await this\.evictBeyondLimit\(req\.roleId\); \/\/ 正在开启的这一个不淘汰/.test(SESS), "openInternal 传入 keepRoleId");
+  assert.ok(/void this\.evictBeyondLimit\(\);/.test(SESS), "settled 收口为「下一时机」（暂超限的账在此还）");
+  assert.ok(/if \(oldestId === null\) return; \/\/ 无可回收者（全忙 \/ 只剩刚开启的）：暂超限/.test(SESS), "无可回收 ⇒ 暂超限（不掐断任何在跑任务）");
+});
+
+test("P1-3：切换项目一次性防呆——有 busy 才出内联确认条（#chat 之外、不落聊天历史）；无 busy 逐字不变", () => {
+  // 位置：聊天流顶部、#chat 之外（不进行表/回放；切项目随重置消失）。
+  const barPos = INDEX.indexOf('id="switch-confirm"');
+  const chatPos = INDEX.indexOf('<div id="chat"');
+  const headEnd = INDEX.indexOf("</header>");
+  assert.ok(barPos >= 0 && barPos > headEnd && barPos < chatPos, "确认条在聊天头之后、#chat 之前（聊天流顶部且不在 #chat 内）");
+  assert.ok(INDEX.includes(">仍要切换</button>") && INDEX.includes(">取消</button>"), "两端文案齐备");
+  // 触发判据：role-state 真实快照；无 busy 走原路径（零提示）。
+  assert.ok(/function busyRoleIds\(\) \{[\s\S]{0,200}state\.roleBusy\[k\] === true/.test(RENDERER), "busy 判据 = 真实快照（不靠界面猜测）");
+  assert.ok(/if \(busyRoleIds\(\)\.length > 0\) \{\n      showSwitchConfirm\(\);\n      return;\n    \}\n    await doImportProject\(\);/.test(RENDERER), "有 busy ⇒ 只出条不动作；无 busy ⇒ 原路径逐字不变");
+  assert.ok(RENDERER.includes('"有 " + ids.length + " 个角色正在工作，切换项目会停止它们——"'), "文案：有 N 个角色正在工作，切换项目会停止它们——");
+  assert.ok(RENDERER.includes('$("switch-confirm-cancel").addEventListener("click", hideSwitchConfirm);'), "取消=什么都不发生（仅隐藏）");
+  assert.ok(/\$\("switch-confirm-go"\)\.addEventListener\("click", function \(\) \{[\s\S]{0,120}doImportProject\(\);/.test(RENDERER), "确认=走原导入流程（loadProject 首步 stopSession(null) 关闭全部即「会停止它们」的兑现）");
+  assert.ok(
+    RENDERER.includes("if (swcf && !swcf.hidden) showSwitchConfirm();"),
+    "快照推送时刷新计数；归零自动收起（防呆不再有意义）"
+  );
+  assert.ok(INDEX.includes("不落聊天历史"), "注释写明口径（动作防呆，不是会话内容）");
+  assert.ok(STYLES.includes(".switch-confirm") && STYLES.includes(".switch-confirm[hidden] { display: none; }"), "样式钩子（含 [hidden] 显隐钉）");
+});

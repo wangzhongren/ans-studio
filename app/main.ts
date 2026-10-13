@@ -295,6 +295,8 @@ function registerIpc(win: BrowserWindow): void {
   ipcMain.handle("session:open", (_e, input) => desktop.openSession(input));
   ipcMain.handle("session:send", (_e, input: { text: string; images?: unknown }) => desktop.sendSession(input));
   ipcMain.handle("session:stop", (_e, input) => desktop.stopSession(input));
+  // P1-1（2026-10-13 客户裁定）：撤回未投递排队消息——Interface 如实回报（仅在队列中的客户消息可撤），主进程只透传。
+  ipcMain.handle("session:withdraw", (_e, input: { roleId: string; id: string }) => desktop.withdrawQueued(input));
   // P0-2（2026-10-13 客户批准）：停当前轮次——Interface 三态如实回传（已请求停止 / 不支持 / 失败），主进程只透传。
   ipcMain.handle("session:abort", (_e, input: { roleId: string }) => desktop.abortSession(input));
   // B-2：保活会话列表（左树「有活动会话」小圆点的数据源）——纯读。

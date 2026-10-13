@@ -451,6 +451,21 @@ body { display: flex; flex-direction: column; }
 .pill-run { color: var(--text); }
 .pill-err { color: var(--danger); background: var(--danger-bg); border-color: var(--danger-border); }
 
+/* P1-3（2026-10-13 客户裁定）：「切换项目」一次性防呆条——仅在确有后台工作（role-state 真实快照）时出现；
+   内联条在聊天流顶部、#chat 之外（**不落聊天历史**——动作防呆，不是会话内容）。空闲时零提示。 */
+.switch-confirm {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 18px;
+  background: var(--bg-soft);
+  border-bottom: 1px solid var(--border);
+  font-size: 12.5px;
+  color: var(--text);
+}
+.switch-confirm .swcf-text { flex: 1 1 auto; min-width: 0; }
+.switch-confirm[hidden] { display: none; }
+
 .chat {
   flex: 1 1 auto;
   overflow: auto;
@@ -1148,13 +1163,41 @@ details.sec[open] > summary .sec-chev { transform: rotate(90deg); }
 /* 右栏「待办 / 队列」组（2026-10-12 追加；客户：「代办也要在右边显示」）——每条：位置 / 来源 / 摘要 / 入队时间；
    「进行中」= 正在跑的那条投递（与排队条目视觉可分）。 */
 .queue-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.q-item { display: flex; align-items: baseline; gap: 8px; font-size: 12px; line-height: 1.5; }
+.q-item { display: flex; align-items: baseline; gap: 8px; font-size: 12px; line-height: 1.5; flex-wrap: wrap; }
 .q-pos { flex: 0 0 auto; min-width: 40px; color: var(--text-3); font-family: var(--mono); font-size: 11px; }
 .q-src { flex: 0 0 auto; color: var(--text-2); border: 1px solid var(--border); border-radius: 999px; padding: 1px 7px; font-size: 11px; width: 72px; text-align: center; }
 .q-text { min-width: 0; word-break: break-word; color: var(--text); }
 .q-meta { flex: 0 0 auto; margin-left: auto; color: var(--text-3); font-family: var(--mono); font-size: 11px; }
 .q-item.is-running .q-src { color: var(--text); border-color: var(--border-strong); }
 .q-item.is-running .q-text { color: var(--text-2); }
+/* P1-1（2026-10-13 客户裁定）：待办最小管理面——「全文」抽屉内展开 + 「撤回」**仅客户消息且未投递**者；
+   派发/回交呈现为只读（无撤回钮——治理流单方面撤会破坏 su 验收/派发的因果）。 */
+.q-actions { flex: 0 0 auto; display: flex; gap: 6px; align-items: baseline; }
+.q-toggle, .q-withdraw {
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--text-2);
+  font-size: 11px;
+  line-height: 1;
+  padding: 2px 7px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.q-toggle:hover { color: var(--text); border-color: var(--border-strong); }
+.q-withdraw:hover { color: var(--danger); border-color: var(--danger); }
+.q-full {
+  flex: 0 0 100%;
+  margin: 2px 0 0 48px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-soft);
+  color: var(--text-2);
+  font-size: 11.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
 
 /* 边界条目：干净的清单（路径等宽；kind 用小灰标签）；不再用实线/虚线行。 */
 table.boundary { width: 100%; border-collapse: collapse; font-size: 12px; }

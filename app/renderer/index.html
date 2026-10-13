@@ -87,6 +87,16 @@
           </div>
         </header>
 
+        <!-- P1-3（2026-10-13 客户裁定）：「切换项目」的一次性防呆——**仅在确有后台工作**（role-state 真实
+             快照判 busy）时出现的内联确认条（非系统对话框）；取消 = 什么都不发生；确认 = 关闭全部并进新项目；
+             **不落聊天历史**（它是动作防呆，不是会话内容——刻意放在 #chat 之外，不进行表/回放）。
+             空闲时行为逐字不变（零提示）。 -->
+        <div id="switch-confirm" class="switch-confirm" hidden>
+          <span id="switch-confirm-text" class="swcf-text"></span>
+          <button id="switch-confirm-go" class="btn btn-mini" type="button">仍要切换</button>
+          <button id="switch-confirm-cancel" class="btn btn-ghost btn-mini" type="button">取消</button>
+        </div>
+
         <div id="chat" class="chat">
           <div class="chat-empty">
             <svg class="empty-icon" viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

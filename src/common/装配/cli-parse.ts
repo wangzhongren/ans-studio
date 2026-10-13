@@ -33,6 +33,7 @@ function readOption(argv: string[], name: string): string {
  *  - 空 / help 令牌          -> help
  *  - "doctor"                -> doctor（装配自检，当前即可运行）
  *  - "role" "run" <id> --task <t> -> role-run（argv 为 "role run" 之后的剩余参数）
+ *  - "role" "run" … -h/--help -> role-run（整段放行；help 判定与退码归命令层 runRoleCommand）
  *  - "govern" ...            -> govern（argv 为 "govern" 之后的剩余参数）
  */
 export function parseInvocation(argv: string[]): Invocation {
@@ -55,6 +56,12 @@ export function parseInvocation(argv: string[]): Invocation {
       return { kind: "unknown", message: "缺少角色 id：用法 ans role run <角色> --task <任务>" };
     }
     const taskId = readOption(argv.slice(3), "--task");
+    // P1-4 配套（2026-10-13，编排转达的跨角色缺口，见 docs/change/）：`role run` 位形里出现 `-h`/`--help`
+    // 时整体放行给命令层 runRoleCommand（帮助文本与退码归它；令牌集与命令层一致：仅 "-h"/"--help"，
+    // 裸 "help" 不放行）。此前 `ans role run --help`（无 --task）在此被「缺少 --task」截住、help 到不了命令层。
+    if (argv.slice(2).some((t) => t === "-h" || t === "--help")) {
+      return { kind: "role-run", roleId, taskId, argv: argv.slice(2) };
+    }
     if (taskId.length === 0) {
       return { kind: "unknown", message: "缺少 --task：用法 ans role run <角色> --task <任务>" };
     }
