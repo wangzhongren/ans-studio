@@ -5,13 +5,15 @@
 
 > 注：本文件 2026-10-12 建立（此前缺失；role-card 已引用本路径）。功能文档按 `docs/feature/` 规范逐步补齐——先立导航，不建失效链接。
 
+UI/UX v2已完成桌面候选与离线定向验证，独立产品/UI验收待PM：[对话优先与工作抽屉](docs/change/2026-10-13_change_uiux-v2.md)。资料抽屉避输入、工具活动按需展开、工作单列表在前，文本与图片草稿按角色保留。
+
 聊天输入最新修复：[输入法候选Enter不误发送](docs/fix/2026-10-13_fix_ime-enter-candidate.md)，已用独立真实Electron受控事件流验证；组合结束后正常Enter发送、Shift+Enter换行与按钮保持。
 
 | 功能 | 一句话用途 | 状态 | 文档 |
 | --- | --- | --- | --- |
 | 双栏工作台 + 右抽屉 | 导入项目 → 左树（项目/角色，su 置顶为主入口）→ 中栏聊天；右栏角色资料**收成右上角图标簇（两枚：角色资料/Pi 设置）、点了以抽屉展示**（2026-10-13 客户两轮裁定：默认不常驻、聊天列宽不 reflow；待办/队列归角色） | 已实现 | [三栏功能说明](docs/feature/2026-10-11_feature_desktop-three-pane.md)、[右栏图标化与抽屉](docs/change/2026-10-13_change_chat-stream-declutter-and-md-tables.md)、[两枚图标与 Pi 适配](docs/change/2026-10-13_change_drawer-two-icons-and-pi-fit.md) |
 | 点角色即开聊（导入即授权） | 点击角色确认后端并建立/续接多轮会话；后台边界重建后保留有效活动目标，失败可显式恢复；写入由门禁静默把关 | 已实现，修复已验证 | [会话当前流程](docs/feature/2026-10-11_feature_desktop-three-pane.md)、[后台重建后续发修复](docs/fix/2026-10-13_fix_background-rebuild-active-session.md)、[重启恢复](docs/change/2026-10-12_change_session-restore.md) |
-| 会话队列与状态徽标 | 角色忙时消息/投递入队（每角色一条队列）；左树如实显示「工作中 · N 待办」；**待办/队列归角色**——作为「角色资料」抽屉里该角色名下的两节（进行中+排队 / 仅排队位次，逐字保留、随选中角色），角色资料图标角标＝选中角色待办深度（收起不丢信息）；**最小管理面（P1-1）**：条目可展开看全文、**未投递的客户消息可撤回**（派发/回交只读、进行中无效如实）；排队 ≠ 已执行 | 已实现 | [消息队列与角色状态](docs/change/2026-10-12_change_message-queue-and-role-state.md)、[右栏待办组](docs/change/2026-10-12_change_right-queue-panel.md)、[两枚图标与 Pi 适配](docs/change/2026-10-13_change_drawer-two-icons-and-pi-fit.md) |
+| 会话队列与状态徽标 | 角色忙时消息/投递入队（每角色一条队列）；左树如实显示「工作中 · N 待办」；**待办/队列归角色**——作为「角色资料」抽屉里该角色名下的单列表（当前工作在前、排队在后，随选中角色与快照更新并保阅读），角色资料图标角标＝选中角色待办深度（收起不丢信息）；**最小管理面（P1-1）**：条目可展开看全文、**未投递的客户消息可撤回**（派发/回交只读、进行中无效如实）；排队 ≠ 已执行 | 已实现 | [消息队列与角色状态](docs/change/2026-10-12_change_message-queue-and-role-state.md)、[右栏待办组](docs/change/2026-10-12_change_right-queue-panel.md)、[两枚图标与 Pi 适配](docs/change/2026-10-13_change_drawer-two-icons-and-pi-fit.md) |
 | su 治理对话（创世/建角色） | 与内置治理角色 su 对话：未 bootstrap 空项目可创世写出治理产物；产物收尾/重 pin 由编排在轮末自动完成 | 已实现 | [确认制与收口删除](docs/change/2026-10-12_change_operator-cards-and-finalize-removal.md) |
 | 客户确认制交互卡 | su 经 `request_confirmation`/`request_choice` 把「将写什么」摆到聊天流里，客户作答才发行 writeSet、才落盘；卡的（重）物化按**时序锚点**落位（切走/切回、pane 重建、回放后不跳尾；open 与已决一视同仁；兜底落尾不丢卡） | 已实现 | [交互卡投递与工具行](docs/change/2026-10-12_change_operator-card-delivery-and-tool-rows.md)、[卡可达性](docs/change/2026-10-12_change_operator-card-reachability.md)、[锚点物化修复](docs/fix/2026-10-12_fix_decided-card-reanchor.md) |
 | 回交投递 + su 派发路由 | 项目角色结果交回主入口验收/汇总，连续回交一次输入、消息屏障保序、失败保留；主入口不提前重复展示报告 | 已实现，修复已验证 | [回交/诊断修复](docs/fix/2026-10-13_fix_viewport-reports-diagnostics.md)、[派发路由](docs/change/2026-10-12_change_dispatch-routing-and-injected-style.md) |

@@ -508,9 +508,9 @@ test("工具行瘦身（2026-10-12 客户裁定）：只显示状态与目标—
   assert.ok(Tr.slimToolRow("write_file 执行完成").includes("完成"));
   assert.ok(Tr.slimToolRow("read_file 执行失败：EACCES 权限不足").includes("EACCES"));
   // 渲染侧接线：tool_call/accepted 与回放的工具行都过瘦身映射；`denied` 全量（治理信号）；detail 一律不渲染。
-  assert.ok(RENDERER.includes("Tr.slimToolRow(ev.summary)"), "实时工具行应经瘦身映射");
-  assert.ok(RENDERER.includes("Tr.slimToolRow(text)"), "回放工具行应经瘦身映射");
-  assert.ok(RENDERER.includes("appendDenied(pane, ev.summary); // 治理信号"), "denied 行保持全量（拒绝原因与允许路径）");
+  assert.ok(RENDERER.includes("Tr.activityOf(ev)"), "实时工具行应经瘦身映射");
+  assert.ok(RENDERER.includes("Tr.activityOf(row)"), "回放工具行应经瘦身映射");
+  assert.ok(RENDERER.includes("appendDenied(pane, ev.summary +"), "denied 行保持全量（拒绝原因与允许路径）");
   assert.ok(!RENDERER.includes("ev.detail"), "事件 detail 一律不渲染（防御：即便带长内容也不铺出）");
   const index = fs.readFileSync(path.join(APP_DIR, "index.html"), "utf8");
   assert.ok(index.indexOf('src="tool-rows.js"') > 0 && index.indexOf('src="tool-rows.js"') < index.indexOf('src="renderer.js"'), "tool-rows.js 应先于 renderer.js 加载");
@@ -594,8 +594,8 @@ test("P0-1 图片接线：附件随消息**带载荷上送**（IPC→Interface �
   // 成功（直发/入队）后清附件；失败保留可重试。
   assert.ok(/d\.sendSession\(text, images\)/.test(RENDERER), "发送应带图片载荷（d.sendSession(text, images)）");
   assert.ok(/images = attachments\.map\(function \(a\) \{[\s\S]{0,120}type: "image"[\s\S]{0,120}data: a\.data[\s\S]{0,120}mimeType: a\.mime/.test(RENDERER), "载荷按契约块组装（type/data/mimeType，取自附件记录的 base64）");
-  assert.ok(/function clearAttachments\(\) \{/.test(RENDERER), "应有 clearAttachments（发送成功后清附件）");
-  assert.ok(/addAttachment\(res\.image, "data:" \+ res\.image\.mime \+ ";base64," \+ res\.image\.dataBase64, false, res\.image\.dataBase64\)/.test(RENDERER), "选图路径把 base64 存进附件记录（随消息上送用）");
+  assert.ok(/function clearSentAttachments\(roleId, keys\) \{/.test(RENDERER), "应有 clearAttachments（发送成功后清附件）");
+  assert.ok(/addAttachment\(res\.image, "data:" \+ res\.image\.mime \+ ";base64," \+ res\.image\.dataBase64, false, res\.image\.dataBase64, requestRole\)/.test(RENDERER), "选图路径把 base64 存进附件记录（随消息上送用）");
   // 旧「未发送」提示**退役**（不留死代码；防回潮——图片真正随消息送进模型了）。
   assert.ok(!RENDERER.includes("imageNotWiredNote"), "imageNotWiredNote 应已删（不留死代码）");
   assert.ok(!RENDERER.includes("图片送入模型的能力尚未接线"), "「未接线」文案应已退役");
@@ -851,10 +851,10 @@ test("N-3：右栏「待办 / 队列」——夹具逐条渲染（来源/摘要/
   assert.ok(RENDERER.includes("d.onRoleState") && RENDERER.includes("function updateRightQueue("), "随真实快照更新右栏待办组（不造第二套数据源）");
   assert.ok(RENDERER.includes("state.selectedRoleId === roleId") && RENDERER.includes("updateRightQueue(roleId)"), "仅当前查看的角色才更新右栏");
   assert.ok(/queueViewsFor\(role\.roleId\)/.test(RENDERER), "renderRight 按所选角色取队列（切角色切数据）");
-  assert.ok(RENDERER.includes("（无待办）"), "空队列显式占位");
+  assert.ok(RENDERER.includes("无进行中或排队消息"), "空队列显式占位");
   assert.ok(/esc\(v\.pos\)/.test(RENDERER) && /esc\(v\.source\)/.test(RENDERER) && /esc\(v\.text\)/.test(RENDERER), "每字段 esc（禁直插）");
-  assert.ok(RENDERER.includes('"待办 / 队列"'), "分组标题「待办 / 队列」");
-  assert.ok(/sec\("待办 \/ 队列", qViews\.length > 0 \? qViews\.length : "无"/.test(RENDERER), "计数徽章（无 ⇒ 「无」）");
+  assert.ok(RENDERER.includes('当前工作') && RENDERER.includes('排队'), "工作与排队明确分开");
+  assert.ok(RENDERER.includes('setTabBadge("card", views.length)'), "角标来自同份工作快照");
   assert.ok(RENDERER.includes("is-running"), "「进行中」行有视觉区分钩子");
   assert.ok(STYLES.includes(".queue-list") && STYLES.includes(".q-item.is-running") && STYLES.includes(".q-src"), "样式钩子齐备");
 });
@@ -1022,7 +1022,7 @@ test("S-1：流式输出双向语义——在底部才贴底（先量后挂）�
   // 强制定点（用户动作/卡到达/切角色/回放）不受流式判定约束。
   assert.ok(RENDERER.includes("scrollBottomForced(pane); // 用户自己的动作：强制贴底"), "appendUser 强制贴底（自己的动作）");
   assert.ok(RENDERER.includes("if (nearBottomAtArrival) scrollBottomForced(pane);"), "P-1 到达即达仍走强制路径");
-  assert.ok(/batchDepth \+= 1;[\s\S]{0,1500}scrollBottomForced\(pane\); \/\/ 批内/.test(RENDERER), "回放收尾强制贴底");
+  assert.ok(RENDERER.includes("if (!prev) scrollBottomForced(pane)") && RENDERER.includes("if (prev && reading) restoreChatReading(pane, reading)"), "首次回放定位最新，正常刷新恢复当前阅读");
   // **S-1 根因钉**：flush 里贴底必须在**窗口更新之后**（修前在前 ⇒ 长会话每批差一整批高度，e2e 实测 339px）。
   const flushStart = RENDERER.indexOf("function flushBatchSideEffects()");
   const flushBody = RENDERER.slice(flushStart, RENDERER.indexOf("\n  }", flushStart));
@@ -1135,21 +1135,11 @@ test("右栏抽屉：默认不占屏（col-right 退役）；图标簇两枚（�
   assert.ok(/setTabBadge\("card", views\.length\)/.test(RENDERER), "角色资料图标角标 = 当前选中角色待办深度");
   assert.ok(!RENDERER.includes('setTabBadge("todo"') && !RENDERER.includes('setTabBadge("queue"'), "退役图标不再有角标逻辑");
   assert.ok(/function setTabBadge\(id, n\) \{[\s\S]{0,300}el\.hidden = false;/.test(RENDERER), "角标 >0 才显示（hidden 控制）");
-  // ⑥ 待办/队列归角色：两节进「角色资料」抽屉（六节），内容逐字保留；定点更新同刷两节。
-  assert.ok(RENDERER.includes('sec("角色卡", null,'), "角色卡组逐字保留");
-  assert.ok(
-    /sec\("待办 \/ 队列", qViews\.length > 0 \? qViews\.length : "无",[\s\S]{0,120}'<div id="right-queue-body">' \+ queueRowsHtml\(qViews\)/.test(RENDERER),
-    "待办节在角色资料抽屉内（进行中+排队逐字保留，right-queue-body）"
-  );
-  assert.ok(
-    /sec\("队列概览", qDepth > 0 \? qDepth : "无",[\s\S]{0,120}'<div id="right-queue-overview">' \+ queueOverviewHtml\(role\.roleId\)/.test(RENDERER),
-    "队列概览节在角色资料抽屉内（仅排队的位次视图，right-queue-overview）"
-  );
-  assert.ok(
-    /function updateRightQueue\(roleId\) \{[\s\S]{0,400}right-queue-body[\s\S]{0,400}right-queue-overview/.test(RENDERER),
-    "定点更新应同刷待办与队列概览两节（不重排手风琴、不重置展开态）"
-  );
-  assert.ok(RENDERER.includes("（无排队）") && RENDERER.includes("等它完成当前任务后依次处理"), "队列概览：排队位次 + 处理语义逐字保留");
+  // v2工作单列表在资料前，全文与资料阅读按角色保留。
+  assert.ok(RENDERER.includes('sec("角色卡", null,'), "完整角色卡保留");
+  assert.ok(RENDERER.includes('id="right-queue-body" class="role-work"'), "首屏只有一份工作列表");
+  assert.ok(!RENDERER.includes('function queueOverviewHtml'), "不再复制队列概览");
+  assert.ok(RENDERER.includes('captureDrawerReading();') && RENDERER.includes('restoreDrawerReading(roleId);'), "快照更新保持全文与资料阅读状态");
   assert.ok(RENDERER.includes('sec("边界条目", entries.length'), "边界条目组保留");
   assert.ok(RENDERER.includes('sec("变更记录", role.changelog ? null : "无"'), "变更记录组保留");
   assert.ok(RENDERER.includes('sec("文档", role.docs && role.docs.length'), "文档组保留");

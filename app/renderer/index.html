@@ -175,9 +175,8 @@
              以抽屉形式展示（tab=pi 时显示，其余 tab 或收起时 hidden）。token 字段掩码，值不回显。 -->
         <div id="pi-panel" class="pi-panel" hidden>
           <div class="pi-panel-head">
-            <span class="pi-panel-title">Pi 配置</span>
+            <span class="pi-panel-label">保存位置</span>
             <span id="pi-panel-path" class="pi-panel-path"></span>
-            <button id="pi-close" class="btn btn-ghost btn-mini" type="button">收起</button>
           </div>
           <p class="pi-panel-hint">保存写入<strong>仓库根 .env</strong>（已 gitignore、不入库）。只修改下面的键，文件其余内容原样保留；保存后下一会话即用新值。</p>
           <!-- 面板字段：**3 项必填**（端点 / 模型 / token）。`ANS_PI_PROVIDER` 已按客户裁定从面板移除——

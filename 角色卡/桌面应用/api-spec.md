@@ -2,6 +2,10 @@
 
 > 实现报告。源码在 `app/`，归「桌面应用」角色。
 
+## 2026-10-13：UI/UX v2内部展示事实
+
+`ReplayRow.activity?`是本角色内部IPC展示数据：toolName、target、phase、status及可选toolCallId/turnId/ok。JSONL仍在主进程只读解析，renderer不接SDK或文件系统。SessionEvent、role-state、图片/发送/撤回IPC均保持不变；缺事实明确未知，accepted不等于执行完成。详情见[变更记录](docs/change/2026-10-13_change_uiux-v2.md)。新解析需要主进程重启，由PM安排；布局可仅重载renderer。
+
 ## 2026-10-13：诊断与显式恢复（canonical v1）
 
 main先配置唯一共享 `src/common/shared/diagnostics.ts`，路径 `app.getPath('userData')/ans/diagnostics`；滚动24小时留存由共享模块维护。窗口加载/故障/IPC、会话/回交、交互等待节点只记录白名单元信息，不保存正文、图片、命令参数或凭据；退出flush/dispose。main自己的IPC由 `createWindowIpcRegistrar` 在窗口关闭时只释放该窗口注册的通道，macOS再建窗可以正常接线。

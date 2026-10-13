@@ -30,6 +30,8 @@ export interface ReplayRow {
   text: string;
   /** ISO 时间（entry 时间戳；缺失为空串——如实，不编造）。 */
   at: string;
+  /** 桌面内部展示事实；旧历史/旧推送可以缺省，渲染端诚实降级。 */
+  activity?: { toolName: string; target: string; phase: "call" | "result"; status: "call" | "completed" | "returned" | "failed" | "unknown"; toolCallId?: string; turnId?: string; ok?: boolean };
   /**
    * 关联 id（真机缺陷修复 2026-10-12）：交互工具（request_confirmation / request_choice）的
    * **pi toolCallId**——调用行与其结论行**带同一个值**（结论行经 `toolCallId` 字段对上调用行）。
@@ -110,7 +112,7 @@ function asRecord(v: unknown): Record<string, unknown> | null {
  * 交互工具调用行登记于此，其**结论行**（后面的 toolResult entry）凭 `toolCallId` 取回同一个键，
  * 「请求—结论」两行因此彼此相认（供渲染侧插卡定界；见 ReplayRow 的 requestId/anchor/anchorKey）。
  * 会话文件里调用必先于结论（同一条 assistant 消息的内容块 → 下一条 toolResult 消息），单遍即够。 */
-function rowsFromEntry(entry: unknown, interactionCalls: Map<string, string>): ReplayRow[] {
+function rowsFromEntry(entry: unknown, interactionCalls: Map<string, string>, toolTargets: Map<string, string>): ReplayRow[] {
   const e = asRecord(entry);
   if (!e || e.type !== "message") return []; // 非消息 entry（usage/model_change/compaction/…）不进界面回放
   const m = asRecord(e.message);
@@ -134,6 +136,10 @@ function rowsFromEntry(entry: unknown, interactionCalls: Map<string, string>): R
           const row: ReplayRow = { kind: "tool", text: `调用工具 ${name}`, at };
           // 交互工具调用：带上 pi toolCallId（两行相认）与锚点键（渲染侧插卡定界）。
           const callId = typeof b.id === "string" && b.id !== "" ? b.id : "";
+          const args = asRecord(b.arguments);
+          const target = typeof args?.path === "string" ? args.path : typeof args?.command === "string" ? args.command : "";
+          if (callId) toolTargets.set(callId, target);
+          row.activity = { toolName: name, target, phase: "call", status: "call", ...(callId ? { toolCallId: callId } : {}) };
           const anchorKey = anchorKeyForToolCall(name, b.arguments);
           if (callId !== "" && anchorKey !== null) {
             row.requestId = callId;
@@ -154,6 +160,17 @@ function rowsFromEntry(entry: unknown, interactionCalls: Map<string, string>): R
     const row: ReplayRow = { kind, text: text !== "" ? `${name}：${text}` : name, at };
     // 结论行：凭 toolCallId 对上调用行登记的锚点（对上 ⇒ 带上同一 requestId/anchorKey——**不解析正文**）。
     const callId = typeof m.toolCallId === "string" && m.toolCallId !== "" ? m.toolCallId : "";
+    const details = asRecord(m.details);
+    let target = typeof details?.path === "string" ? details.path : toolTargets.get(callId) || "";
+    // 仅消费本仓工具的确定首行模板；文件正文/stdout中的词不参与失败判断。
+    const head = text.split(/\r?\n/)[0];
+    const shell = name === "run_shell" ? /^run_shell 已执行：(.+)（exit (-?\d+|\?)(?:，signal [^）]+)?）$/.exec(head) : null;
+    if (!target && shell) target = shell[1];
+    const knownFailure = name === "read_file" && /^read_file 失败：.+（.+）$/.test(head) || !!(shell && shell[2] !== "?" && Number(shell[2]) !== 0);
+    const failed = m.isError === true || details?.ok === false || details?.status === "failed" || knownFailure;
+    if (failed) row.kind = "denied";
+    row.activity = { toolName: name, target, phase: "result", status: failed ? "failed" : details?.status === "completed" && details?.ok !== false ? "completed" : m.isError === false ? "returned" : "unknown",
+      ...(callId ? { toolCallId: callId } : {}), ...(typeof details?.turnId === "string" ? { turnId: details.turnId } : {}), ...(typeof details?.ok === "boolean" ? { ok: details.ok } : {}) };
     const anchorKey = callId !== "" ? interactionCalls.get(callId) : undefined;
     if (callId !== "" && anchorKey !== undefined) {
       row.requestId = callId;
@@ -176,6 +193,7 @@ export function parseSessionJsonl(text: string): { ok: boolean; rows: ReplayRow[
   let skipped = 0;
   // 交互工具调用表（pi toolCallId → 锚点键）：调用行登记、结论行取回——见 rowsFromEntry 的头注。
   const interactionCalls = new Map<string, string>();
+  const toolTargets = new Map<string, string>();
   for (let i = 0; i < lines.length; i += 1) {
     const raw = lines[i].trim();
     if (raw === "") continue;
@@ -194,7 +212,7 @@ export function parseSessionJsonl(text: string): { ok: boolean; rows: ReplayRow[
       headerParsed = true;
       continue;
     }
-    const entryRows = rowsFromEntry(parsed, interactionCalls);
+    const entryRows = rowsFromEntry(parsed, interactionCalls, toolTargets);
     if (entryRows.length === 0) {
       skipped += 1; // 认不出的 entry / 无文本的消息——如实计入，不静默吞
       continue;

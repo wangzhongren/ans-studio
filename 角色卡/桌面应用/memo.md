@@ -2,6 +2,8 @@
 
 记录本角色掌握的事实、待核实事项与续接线索。不写全局规则，不抄任务状态。
 
+- 2026-10-13：UI/UX v2候选在既定6app文件内完成。隐藏translate抽屉仍扩大.app.scrollWidth，原矩形clip-path解决；bottom按composer真实高度，别复制100px。旧JSONL isError=false仍可能有自有工具确定首行失败，只允许首行固定模板，不查文件正文/stdout。accepted缺可靠结果未知。组跨full用可靠首活动身份，缺身份不恢复旧open；denied交互结论必须返回rec登记conclusion锚点。PM与产品精化保留所有显式角色点击U-1最新/未决，只有普通刷新/展开保阅读；每角色草稿/图片隔离，异步结果归原角色。详见[变更](docs/change/2026-10-13_change_uiux-v2.md)。
+
 - 2026-10-13：输入法候选Enter曾被聊天keydown直接发送。最小保护为compositionstart/end布尔+isComposing+keyCode229，在preventDefault/onSend前返回；end可能先于最终IMEkeydown，229仍必要。结束即清状态，不设任意时间窗/吞下一键，鼠标选词后下一Enter仍正常。来源：客户反馈、MDN官方说明、独立Electron同流红→绿，附件/输入/气泡与sendIPC实测；精准脚本 `test/桌面应用/e2e/ime-enter.mjs`，不必重跑大harness。[记录](docs/fix/2026-10-13_fix_ime-enter-candidate.md)。
 
 - 2026-10-13：本波独立QA补出P-1兼容问题：卡index456经旧prefix定位后仍在屏外（top936/chat bottom584）；scrollToOperatorCard邻近行实体化后需按实际卡/视口rect再校准。最终450行冷窗口同角色显式定位，卡全文及.op-confirm按钮actual rect均可见。普通上翻的scrollTop变化不必然是跳动，应核同一首可见文本与相对offset：QA同一row253 offset仅差0.0625px，是总高修正后内容锚点保持。来源：独立QA、协调方必要修复指令及最终Electron实测；源码renderer最终hash与证据见本波修复记录。

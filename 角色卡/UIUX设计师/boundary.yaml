@@ -1,0 +1,29 @@
+# UI/UX 设计师 —— Section 1 唯一写入白名单，与 boundary.md 同范围。
+# 角色 ID 为目录名 UIUX设计师；显示名 UI/UX 设计师。
+# 角色卡与边界文件仅 Governance 维护；未列路径默认只读。
+role: UIUX设计师
+entries:
+  - kind: file
+    path: 角色卡/UIUX设计师/feature-map.md
+    purpose: 设计交付导航与只读参考入口
+  - kind: file
+    path: 角色卡/UIUX设计师/memo.md
+    purpose: 本角色的事实与续接线索
+  - kind: file
+    path: 角色卡/UIUX设计师/changelog.md
+    purpose: 本角色的交付与变更记录
+  - kind: file
+    path: 角色卡/UIUX设计师/functional-description.md
+    purpose: 本角色职责、设计产物与协作说明
+  - kind: file
+    path: 角色卡/UIUX设计师/api-spec.md
+    purpose: 设计交付约定与实现交接说明
+  - kind: directory
+    path: 角色卡/UIUX设计师/docs/design/
+    purpose: 桌面布局、交互方案、设计规范及可检查的 HTML 原型和素材
+  - kind: directory
+    path: 角色卡/UIUX设计师/docs/change/
+    purpose: 本角色设计产物的修改记录
+  - kind: directory
+    path: 角色卡/UIUX设计师/docs/fix/
+    purpose: 本角色设计产物的问题与修复记录

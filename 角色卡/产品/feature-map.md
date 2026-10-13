@@ -6,8 +6,10 @@
 
 | 功能 | 一句话用途 | 状态 | 文档 |
 | --- | --- | --- | --- |
-| 产品提案 | 对产品整体（当前焦点=桌面应用）做系统审视，产出带优先级的改进提案（P0/P1/P2），交客户拍板后经协调方派发实现 | 已建立（首轮：桌面应用 UX 改进提案，12 条） | [2026-10-13 桌面 UX 改进提案](docs/design/2026-10-13_design_desktop-ux-improvement-proposal.md) |
-| 产品评审 | 对实现角色的提案/交付做产品视角评审（口味五条=裁判标准），结论为 recommend approval / needs revision / not ready | 能力已立（依 role-card 与 proposal-review 参考），尚无已交付评审记录 | 评审纪律见 `ans-governed-construction` 技能 `references/proposal-review.md` |
+| 产品提案 | 对产品整体（当前焦点=桌面应用）提出带依据与验收的交互方案，交客户选择并经项目管理评审后派发实现 | 首轮历史保留；图片/停止/P1队列管理、LRU、防呆、CLI指路已由属主完成，当前状态见新评审对照 | [首轮提案](docs/design/2026-10-13_design_desktop-ux-improvement-proposal.md)、[当前状态与新建议](docs/design/2026-10-13_design_current-ui-reassessment.md) |
+| 产品评审 | 从用户流程评价当前 UI，区分观察、代码事实与建议，附优先级/属主/成本/验收；不授予实施权 | 已交付当前 UI 重新评审：4张真实窗口截图+AX、已提交源码；限当前仅su空闲的状态 | [2026-10-13 当前 UI 重新评审](docs/design/2026-10-13_design_current-ui-reassessment.md) |
+| 产品与UI/UX联合设计 | 把产品目标转为页面层级、状态行为和验收约束，收到设计师方案后逐轮评价 | 两轮已收口：v2停止保留排队、角色独立状态、实际本地刷新修订已源码核对，产品推荐设计方向；不含O1–O4或业务代码实施 | [第一轮简报](docs/design/2026-10-13_design_product-uiux-meeting-brief.md)、[第二轮评审](docs/design/2026-10-13_design_product-uiux-round2-review.md) |
+| v2实际实现产品验收 | 读取实际候选源码、生产渲染器截图与操作证据，判断UI-1/2/3是否达到已确认目标 | 核心六源码与首轮离线30项已读；初审F1/B3异常summary需修，最终33项/hash/截图与独立证据待补，尚未整体通过 | [实际实现验收记录](docs/design/2026-10-13_design_product-ui-implementation-acceptance.md) |
 
 ## 只读参考入口（产品审视的事实来源）
 
@@ -15,8 +17,9 @@
 - 桌面应用功能全貌：[桌面应用 feature-map](../桌面应用/feature-map.md)、[functional-description](../桌面应用/functional-description.md)。
 - 真机实测教训（120s 超时、工具集无列目录）：会话记忆 `real-model-desktop-test-findings`。
 - 真机截图：`/tmp/ans-drive/shots/`（final-ui.png、pi-drawer.png 等）。
+- 本轮当前真机：`/private/tmp/ans-product-ui-review-20261013/`（01–04 与同名 AX）；产品只读证据，UI由项目管理操作并恢复原状态。临时文件不等于仓库长期存档。
 
 ## 说明
 
 - 功能点 = 用户或外部系统能触发并得到结果的行为；本角色不自编业务功能，上表登记的是本角色的产出物类型。
-- 提案文档按 `docs/design/` 规范：每条含 问题/现状 → 依据（客户反馈/代码位置/真机）→ 提案（交互与验收口径）→ 优先级；P0 不超过 3 条。
+- 提案文档按 `docs/design/` 规范：每条含问题/现状、依据、交互、验收、优先级；本轮最高建议仅三项P1，没有当前证据支持新增P0。源码推断不当作真机观察，已修旧问题不重新开单。

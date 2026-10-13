@@ -5,7 +5,7 @@ title: 桌面工作台与角色会话
 created: "2026-10-11"
 updated: "2026-10-13"
 timezone: Asia/Shanghai
-status: verified
+status: implemented-unverified
 related: [background-rebuild-active-session]
 events:
   - date: "2026-10-13"
@@ -30,8 +30,8 @@ events:
 | 栏 | 内容 |
 | --- | --- |
 | 左 | 「导入项目」系统文件夹选择器 → 门禁引擎 `listProject` 枚举角色 → 角色树（内联 SVG 图标、hover/选中态、**状态徽标**〔未开启/空闲/工作中/等待你确认/已停止/错误，悬停示最近事件+时间〕） |
-| 中 | 点角色即聊天：多轮消息直发；`tool_call` / `denied` / `accepted` / `message` / `settled` 以聊天气泡与居中状态行实时刷出；消息经 **Markdown 受控渲染**（vendored markdown-it，`html:false`；链接 `rel` 外开）；**每角色一条独立聊天流**（切换保留历史，见下）；su 的**确认/选择**经聊天流里的**交互卡**（确认/单选/多选/带预览，作答后定格） |
-| 右 | 手风琴分组：角色卡正文、Section 1 边界条目表（斑马纹）、变更记录索引、`docs/` 目录索引 |
+| 中 | 点角色即聊天：多轮消息直发；普通`tool_call`/有可靠结果的`accepted`按相邻活动组折叠，未知状态诚实标注；失败/拒绝与交互直接可见，助手原文以聊天气泡刷出；消息经 **Markdown 受控渲染**（vendored markdown-it，`html:false`；链接 `rel` 外开）；**每角色一条独立聊天流**（切换保留历史，见下）；su 的**确认/选择**经聊天流里的**交互卡**（确认/单选/多选/带预览，作答后定格） |
+| 右 | 360px覆盖抽屉避开实际composer高度，开关不reflow；角色名→当前工作/单份排队→默认折叠的完整角色卡、边界、变更、文档；Pi同位置单标题/关闭，正文滚动 |
 
 ## 会话流程（客户定稿：导入项目 = 授权；点角色即开，全程无确认框）
 
@@ -111,7 +111,32 @@ flowchart TD
 **切换保留历史 / Markdown 渲染与 XSS 转义 / 链接外开 / 角色状态徽标（B-1/B-2/B-3 检查点）**、右栏四组资料，
 逐屏截图并写报告。
 
+## 常规活动、工作阅读与输入草稿
+
+```mermaid
+flowchart TD
+  event[实时事件或桌面JSONL回放] --> facts[读取可靠工具事实，缺状态写未知]
+  facts --> problem{失败/拒绝/交互屏障？}
+  problem -->|是| direct[原位置直接可见，确认卡保持请求/结论锚点]
+  problem -->|否| routine{相邻同角色同轮工具活动？}
+  routine -->|是| group[一条可展开虚拟行，保原时序和主动展开]
+  routine -->|否| original[真实助手原文/用户/投递，终止工具组]
+  group --> height[重测高度，恢复当前可见内容锚点]
+  snapshot[角色busy/queue/running快照] --> work[当前工作与一份排队置顶，角标同源]
+  work --> read[按角色保持资料/全文/抽屉阅读]
+  role[显式点角色] --> latest[独立聊天流，最新或未决优先]
+  role --> draft[恢复该角色文本与图片草稿]
+  draft --> send[发送原角色文字图片，立即腾出输入]
+  send --> response{真实返回？}
+  response -->|成功| clear[只清本次已发送图片]
+  response -->|失败| keep[保留图片，原草稿为空时恢复文字，新输入不被覆盖]
+```
+
+工具返回不等于业务验收。可靠结果才写执行完成；实时缺具体目标/原因/退出码不编造。正常刷新/回放增量/展开和抽屉开关保阅读；所有显式点角色保既有最新/未决优先。异步图像/发送返回归原请求角色，项目切换释放预览资源，IME规则不变。
+
 ## 演变历史
+
+- 2026-10-13：修改，桌面候选已完成、本角色离线定向通过，独立产品/UI验收待PM——对话优先、动态抽屉避输入、单工作列表与阅读/角色草稿保留。见[UI/UX v2](../change/2026-10-13_change_uiux-v2.md)。
 
 - 2026-10-13：修复，已验证——输入法候选Enter不误发，保留文字与附件；结束后的下一普通Enter正常发送，Shift+Enter/按钮保持。见[IME修复](../fix/2026-10-13_fix_ime-enter-candidate.md)。
 

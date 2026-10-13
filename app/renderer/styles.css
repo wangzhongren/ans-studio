@@ -127,6 +127,8 @@ body { display: flex; flex-direction: column; }
   grid-template-columns: 272px minmax(0, 1fr);
   flex: 1 1 auto;
   min-height: 0;
+  min-width: 0;
+  overflow: hidden;
 }
 .col { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .col-left { background: var(--bg-side); }
@@ -137,26 +139,26 @@ body { display: flex; flex-direction: column; }
   position: absolute;
   top: 0;
   right: 0;
-  bottom: 0;
+  bottom: var(--composer-height, 100px);
   width: 360px;
   display: flex;
   flex-direction: column;
   background: var(--bg-soft);
   border-left: 1px solid var(--border);
-  transform: translateX(102%);
+  clip-path: inset(0 0 0 100%);
   visibility: hidden;
-  transition: transform 120ms ease, visibility 0s linear 120ms;
+  transition: clip-path 120ms ease, visibility 0s linear 120ms;
   z-index: 30;
   /* 裁剪边界：抽屉内任何内容（面板/表格/长词）都不得画到抽屉矩形之外——溢出在抽屉内滚动。 */
   overflow: hidden;
 }
 #right-drawer.open {
-  transform: translateX(0);
+  clip-path: inset(0);
   visibility: visible;
-  transition: transform 120ms ease;
+  transition: clip-path 120ms ease;
 }
 .drawer-head {
-  height: 52px;
+  height: 66px;
   flex: 0 0 auto;
   display: flex;
   align-items: center;
@@ -435,7 +437,7 @@ body { display: flex; flex-direction: column; }
 .chat-role-sub { font-size: 12px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chat-head-notes { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 16px; min-height: 15px; }
 .chat-head-notes .composer-hint { flex: 0 1 auto; min-width: 0; }
-.chat-head-notes .runtime-note { flex: 0 0 auto; margin-left: auto; }
+.chat-head-notes .runtime-note { flex: 0 1 auto; min-width: 0; max-width: 100%; margin-left: auto; }
 
 /* 会话状态：小药丸（中性灰；错误态用语义红）。 */
 .pill {
@@ -510,6 +512,7 @@ body { display: flex; flex-direction: column; }
    同一时刻只有一个 pane 挂在 #chat 下；其余为**游离 DOM**——历史节点与事件监听器因此原样保留
    （不用 innerHTML 快照，卡片的按钮不会失灵）。布局承接 #chat 原先留给直接子元素的排布。 */
 .chat-pane {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -923,16 +926,15 @@ details.sys-denied[open] summary { padding-bottom: 6px; margin-bottom: 6px; bord
    即使显隐状态失步，也不会把输入框画到窗口右缘之外。 */
 #right-drawer:not(.open) #pi-panel { visibility: hidden; }
 .pi-panel[hidden] { display: none; }
-.pi-panel-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.pi-panel-head { display: flex; flex-direction: column; align-items: stretch; gap: 4px; margin-bottom: 10px; }
 .pi-panel-title { font-size: 12.5px; font-weight: 600; color: var(--text); }
 .pi-panel-path {
   flex: 1 1 auto;
   min-width: 0;
   font: 11.5px/1.4 var(--mono);
   color: var(--text-3);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 .pi-panel-hint { margin: 0 0 10px; font-size: 12px; line-height: 1.55; color: var(--text-2); }
 .pi-panel-hint strong { color: var(--text); }
@@ -1084,7 +1086,7 @@ details.sys-denied[open] summary { padding-bottom: 6px; margin-bottom: 6px; bord
 }
 
 /* ———————— 右栏：角色资料 ———————— */
-.right-body { flex: 1 1 auto; overflow: auto; padding: 6px 0; }
+.right-body { flex: 1 1 auto; min-width: 0; min-height: 0; overflow: auto; padding: 6px 0; }
 .right-empty { margin: auto; max-width: 300px; text-align: center; color: var(--text-3); padding: 48px 24px; }
 
 /* 分组：浅灰头 + 可展开（参照的折叠块）。 */
@@ -1240,12 +1242,10 @@ ul.idx li.dir { color: var(--text-2); }
 
 /* ———————— 响应式 ———————— */
 @media (max-width: 1180px) {
-  .app { grid-template-columns: 240px minmax(0, 1fr); }
-  #right-drawer { width: 320px; }
+
 }
 @media (max-width: 940px) {
-  .app { grid-template-columns: 208px minmax(0, 1fr); }
-  #right-drawer { width: 268px; }
+
   .chat { padding: 18px; gap: 14px; }
   .composer { padding: 12px 18px 16px; }
   /* （旧 `.pi-field` 150px 档已删：面板只在抽屉里，抽屉内一律堆叠布局——见 #right-drawer .pi-field。） */
@@ -1259,3 +1259,25 @@ ul.idx li.dir { color: var(--text-2); }
     animation-iteration-count: 1 !important;
   }
 }
+
+/* v2：内容层级与局部滚动。抽屉避让实际composer高度，不改变聊天列宽。 */
+#right-drawer .pi-panel { min-height: 0; }
+.drawer-head .side-title { min-width: 0; overflow-wrap: anywhere; }
+.drawer-close { flex: 0 0 auto; }
+.pi-panel-label { font-size: 11px; color: var(--text-2); }
+.runtime-note .rt-text { overflow-wrap: anywhere; }
+.tool-records { max-width: min(760px, 100%); color: var(--text-2); font-size: 12px; }
+.tool-records > summary { cursor: pointer; padding: 7px 0; }
+.tool-records .record-count { margin-left: 10px; color: var(--text-2); }
+.tool-activity { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.tool-activity .activity-target { display: block; overflow-wrap: anywhere; font: 11.5px/1.55 var(--mono); }
+.tool-activity .activity-state { font-size: 11px; }
+.tool-current { font-size: 12px; color: var(--text-2); padding: 4px 0; }
+.role-work { padding: 10px 16px 16px; border-bottom: 1px solid var(--border); }
+.work-heading { font-size: 12px; font-weight: 500; margin: 8px 0; }
+.role-work .q-item { grid-template-columns: 50px minmax(0,1fr) auto; }
+.role-work .q-src { grid-column: 2; }
+.role-work .q-text { grid-column: 2 / -1; }
+.role-work .q-meta { grid-column: 3; grid-row: 1; }
+.role-work .q-actions { grid-column: 2 / -1; }
+.role-work .q-full { grid-column: 1 / -1; }

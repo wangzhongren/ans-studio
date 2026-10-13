@@ -74,7 +74,31 @@
     return null;
   }
 
-  var api = { slimToolRow: slimToolRow, LIMIT: LIMIT, classifyInjectedMessage: classifyInjectedMessage, INJECT_PREFIXES: INJECT_PREFIXES };
+  // 展示事实只来自已存在的执行结果；accepted单独出现不是执行成功。
+  var SPECIAL_TOOLS = ["request_confirmation", "request_choice", "submit_report", "dispatch_task", "request_shell_verdict"];
+  function activityOf(input) {
+    var o = input && typeof input === "object" ? input : {};
+    var d = o.activity || (o.detail && typeof o.detail === "object" ? o.detail : {});
+    var raw = String(o.summary == null ? (o.text || "") : o.summary);
+    var match = /(?:调用工具 |请求调用 |开始执行 )([\w.-]+)/.exec(raw);
+    var resultName = /^([\w.-]+)[:： ]/.exec(raw);
+    var tool = typeof d.toolName === "string" ? d.toolName : (match ? match[1] : resultName ? resultName[1] : "工具");
+    var phase = d.phase || (o.kind === "tool_call" || /^调用工具 [\w.-]+$/.test(raw) ? "call" : "result");
+    var head = raw.split(/\r?\n/)[0];
+    if (head.indexOf(tool + '：' + tool) === 0) head = head.slice(tool.length + 1);
+    var shellResult = tool === "run_shell" ? /^run_shell 已执行：(.+)（exit (-?\d+|\?)(?:，signal [^）]+)?）$/.exec(head) : null;
+    var knownFailure = tool === "read_file" && /^read_file 失败：.+（.+）$/.test(head) || !!(shellResult && shellResult[2] !== "?" && Number(shellResult[2]) !== 0);
+    var failed = knownFailure || d.status === "failed" || d.ok === false;
+    var status = failed ? "failed" : o.kind === "denied" ? "denied" : phase === "call" ? "call" : d.status === "completed" && d.ok !== false ? "completed" : d.status === "returned" ? "returned" : "unknown";
+    var target = typeof d.target === "string" ? d.target : typeof d.path === "string" ? d.path : shellResult ? shellResult[1] : "";
+    return { toolName: tool, target: slimToolRow(target), phase: phase, status: status,
+      label: status === "failed" ? "执行失败" : status === "denied" ? "已拒绝" : status === "call" ? "调用发起" : status === "completed" ? "执行完成" : status === "returned" ? "工具返回" : "状态未记录",
+      turnId: typeof d.turnId === "string" ? d.turnId : "", callId: typeof d.toolCallId === "string" ? d.toolCallId : "",
+      exceptional: failed || o.kind === "denied", visibleSummary: head, barrier: SPECIAL_TOOLS.indexOf(tool) >= 0 || !!o.anchorKey,
+      summary: slimToolRow(raw), at: typeof o.at === "string" ? o.at : "" };
+  }
+
+  var api = { activityOf: activityOf, slimToolRow: slimToolRow, LIMIT: LIMIT, classifyInjectedMessage: classifyInjectedMessage, INJECT_PREFIXES: INJECT_PREFIXES };
   root.ANSToolRows = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api; // 若将来以 CJS 装载
 })(typeof window !== "undefined" ? window : globalThis);
