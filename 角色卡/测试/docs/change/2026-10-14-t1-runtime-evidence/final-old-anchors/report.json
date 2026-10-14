@@ -1,0 +1,24 @@
+{
+  "report": [
+    {
+      "name": "initial row observation",
+      "value": {
+        "model": {
+          "count": 181,
+          "lastIndex": 180,
+          "operators": [],
+          "rowGap": 16
+        },
+        "selected": "A",
+        "project": "/nonexistent-independent-snapshot-key",
+        "groups": []
+      }
+    },
+    {
+      "name": "real JSONL creates >150 renderer rows with one collapsed group",
+      "value": false
+    }
+  ],
+  "error": "AssertionError [ERR_ASSERTION]: real JSONL creates >150 renderer rows with one collapsed group\n\nfalse !== true\n",
+  "stack": "AssertionError [ERR_ASSERTION]: real JSONL creates >150 renderer rows with one collapsed group\n\nfalse !== true\n\n    at check (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%B5%8B%E8%AF%95/uiux-v2-renderer-regression.mjs:22:93)\n    at async file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%B5%8B%E8%AF%95/uiux-v2-renderer-regression.mjs:37:3"
+}

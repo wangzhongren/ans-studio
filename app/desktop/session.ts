@@ -22,8 +22,8 @@
 //    忙时排队（按序、绝不并发 send）+ 目标未开**自动开启** + 失败**如实系统行 + 保留待重试**（绝不静默丢）。
 //    校验：`routeDispatch` 拒非本项目角色与内置治理角色（含 su 自身）——**如实回执给工具**，绝不静默。
 //    CLI 前端的同等投递**不做**（一次性会话，另议——登记）。
-//  - **会话上下文来源（D-1 契约，pm 2026-10-12 钉死）**：dispose / LRU 淘汰**不擦除**会话文件，重开 = 适配器
-//    从文件恢复——`open()` 以「文件在/不在/坏」分类 `contextSource`（resumed/recovered/fresh），供渲染侧出文案。
+//  - **上下文来源（ANS-RUNTIME-V2r1）**：live reuse 是桌面 resumed；只有 handle 的实际原生恢复成功
+//    才是桌面 recovered。恢复失败重建是 fresh + warning。ANS 回放/任意文件不能证明模型上下文恢复。
 //
 //  - scope 传 undefined（聊天无任务收窄）；判定仍由门禁引擎负责——写入照样实时被拦。
 //  - **冷启动创世（设计 §10.1 / §12.2，任务 T30）**：未 bootstrap 的空项目上，`buildProjectConfig`
@@ -52,7 +52,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import type { RoleSessionHandle, RoleSessionAbortResult } from "../../src/pipeline/orchestration/run-role.ts";
-import { openRoleSession } from "../../src/pipeline/orchestration/run-role.ts";
+import { createRuntimeAdapterFactory, type RuntimeAdapterFactoryBuilder, type RuntimeAdapterFactoryOptions, type RuntimeAdapterFactory } from "../../src/pipeline/orchestration/run-role.ts";
 // 会话事件流的类型：编排把 `RoleSessionHandle.events()` 放宽为 `OrchestrationEvent`（既有 `SessionEvent`
 // + 编排在 `settled` 时追加的 `handback` 回交事件，设计 §10.8）。**类型从编排的模块只读导入、不复制形状**
 // （单一来源：`src/common/编排/handback.ts`，也是 `run-role.ts` 导入它的位置）。
@@ -61,19 +61,18 @@ import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
 // `renderHandbackPrompt`（投递给 su 的输入文案）与 `handbackKey`（去重键）。**两前端共用、不得各写一份**。
 import { renderHandbackPrompt, renderHandbackBatchPrompt, handbackKey, type TaskHandback } from "../../src/common/编排/handback.ts";
 import { createDiagnosticLogger } from "../../src/common/shared/diagnostics.ts";
-import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputRequest } from "../../src/provider/pi/session.ts";
+import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputRequest, CustomerInputMetadata, PromptTurnStartedMetadata } from "../../src/model/runtime.ts";
 // H-1（2026-10-12）：派发能力的冻结契约（§4 冻结家；只读导入、不复制形状）。
-import type { DispatchTaskPayload, DispatchReceipt, DispatchTaskFn, PromptOptions } from "../../src/provider/pi/session.ts";
+import type { DispatchTaskPayload, DispatchReceipt, DispatchTaskFn, PromptOptions } from "../../src/model/runtime.ts";
 // D-1/E-1：会话文件粗探（「在/不在/坏」）——打开会话时分类 `contextSource`（文案分支的事实来源）。
-import { probeSessionFile } from "./session-history.ts";
 // I-1 补丁（2026-10-12 客户重发授权）：(c) 规则集实件的形状（**只读转自** operator-channel.ts——它 `Omit`
 // 自编排的 `AssembleShellGateOptions`；同一契约只许一个形状，本模块不另立第二份）。
-import type { DesktopShellArming } from "./operator-channel.ts";
+import type { DesktopOperatorChannelFn, DesktopShellArming } from "./operator-channel.ts";
 // su 只读档（客户裁定 2026-10-12：「su 也要有 shell，但是只读」）：只读档装配选项形状的**单一来源**在编排
 // （`shell-arming.ts::AssembleReadonlyShellGateOptions`）——只读导入其类型（运行期擦除），据它取「只读档
 // 该注入哪几件」。**不另立第二形状**（与 `DesktopShellArming` 同法，见 operator-channel.ts 注释）。
 import type { AssembleReadonlyShellGateOptions, RoutineShellPolicy } from "../../src/pipeline/orchestration/shell-arming.ts";
-// 桌面客户交互通道（A-5）：请求/裁决的冻结形状在 §4 冻结契约家（provider/pi/session.ts），
+// 桌面客户交互通道（A-5）：请求/裁决的冻结形状在 §4 冻结契约家（model/runtime.ts），
 // 本模块只读导入转出；`DesktopCustomerInputFn` 是本层对「带角色上下文」的窄扩展（请求本体不带 roleId）。
 import type { DesktopCustomerInputFn } from "./customer-input.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
@@ -87,7 +86,7 @@ import {
   type LoadedConfig,
 } from "../../src/common/shared/config-loader.ts";
 // 跨角色共享运行时原语（**单一来源**，pm 属主 `src/common/shared/`）：`RuntimeKind`（"demo" | "pi"）。
-import type { RuntimeKind } from "../../src/common/shared/runtime-shared.ts";
+import { RUNTIME_KINDS, type RuntimeKind } from "../../src/common/shared/runtime-shared.ts";
 // 桌面授权链的**唯一实现**（会话语义与界面只读判定共用；采纳 `.ans` 的项目治理边界路径——见 project.ts）。
 import { buildEffectiveProjectConfig } from "./project.ts";
 
@@ -97,10 +96,14 @@ export type { RuntimeKind };
 
 /**
  * 会话事件外推的**信封**（B-2，2026-10-12）：多会话并存后，事件必须携带**它属于哪个角色**
- * （渲染侧按此分发到该角色的聊天流——不带标识会串消息）。`event` 的类型从编排只读导入、不复制。
+ * （渲染侧按 projectRoot/runtime/roleId 分发——不带标识会串消息）。`event` 的类型从编排只读导入、不复制。
  */
 export interface SessionEventEnvelope {
+  /** Display correlation only, captured from the original client delivery. */
+  clientMessageId?: string;
   roleId: string;
+  projectRoot: string;
+  runtime: RuntimeKind;
   event: OrchestrationEvent;
 }
 
@@ -134,7 +137,14 @@ export interface EffectiveConfigInfo {
   reason?: string;
 }
 
+export interface SessionMessageMetadata { clientMessageId?: string }
+
+export interface SessionTarget { projectRoot?: string; roleId: string; runtime?: RuntimeKind }
+
 export interface OpenResult {
+  runtime?: RuntimeKind;
+  projectRoot?: string;
+  profileRevision?: number;
   ok: boolean;
   error?: string;
   /** 续接等情形的说明（ok=true 时也可能有）。 */
@@ -145,16 +155,9 @@ export interface OpenResult {
    * 是否**续接**了已保活的会话（B-2）：true = 句柄与模型上下文原样保留；false = 本次新建。
    */
   resumed?: boolean;
-  /**
-   * **会话上下文来源**（D-1 契约，pm 2026-10-12 钉死）——渲染侧文案分支的**事实输入**：
-   *  · "resumed"   —— 句柄仍在（同运行内续接）；
-   *  · "recovered" —— 本次新建、但**本地会话文件在**（适配器按「目录内有最近会话就恢复」一并恢复上下文——
-   *                   dispose 后、LRU 淘汰后、应用重启后皆如此）；
-   *  · "fresh"     —— 本地会话文件**不存在或损坏** ⇒ **真·新会话**（唯一「不会记得」的情形；
-   *                   损坏时 `contextWarning` 载如实说明）。
-   */
+  /** 桌面 resumed=复用活句柄；recovered=引擎确证原生恢复成功；fresh=新上下文，恢复失败时带 warning。 */
   contextSource?: "resumed" | "recovered" | "fresh";
-  /** "fresh" 且文件损坏时的如实说明；其余情况缺省。 */
+  /** 引擎实际恢复失败或其他上下文警告。 */
   contextWarning?: string;
 }
 
@@ -189,6 +192,7 @@ export interface SessionManagerDeps {
     input: {
       roleId: string;
       project: ProjectConfig;
+      runtime?: RuntimeKind;
       routineShellPolicy?: RoutineShellPolicy;
       taskId?: string;
       scope?: undefined;
@@ -209,8 +213,11 @@ export interface SessionManagerDeps {
        *  缺省/构造失败 ⇒ 不传 ⇒ 不 arm（能力缺席 = fail-closed，绝不放宽）。 */
       shellReadonly?: Omit<AssembleReadonlyShellGateOptions, "project">;
     },
-    deps: { createAdapter: (gate: WriteGate) => RuntimeAdapter },
+    deps: { createAdapter: RuntimeAdapterFactory },
   ) => Promise<RoleSessionHandle>;
+  createRuntimeAdapterFactory?: RuntimeAdapterFactoryBuilder;
+  runtimeOptions?: RuntimeAdapterFactoryOptions;
+  prepareRuntimeProfile?: (runtime: RuntimeKind) => Promise<void>;
   createPiAdapterFactory: (
     project: ProjectConfig,
     shellGate?: ShellGate,
@@ -242,6 +249,11 @@ export interface SessionManagerDeps {
    */
   emitRoleState?: (info: {
     roleId: string;
+    projectRoot: string;
+    runtime: RuntimeKind;
+    profileRevision: number;
+    contextSource?: OpenResult["contextSource"];
+    contextWarning?: string;
     busy: boolean;
     summaries: string[];
     /** 结构化的排队条目（右栏「待办 / 队列」组用；来源/摘要/入队时间——**与 summaries 同源**，不另造数据源）。 */
@@ -265,7 +277,7 @@ export interface SessionManagerDeps {
    * **只对项目角色注入**（su **不接 (b)/(a)**——审读者不给自己开闸：不自审、不弹框；su 的 shell 走
    * `shellReadonly` 只读档，见下；判据 `role.builtIn`，见 `open()`）。
    */
-  shellOperatorChannel?: OperatorChannelFn;
+  shellOperatorChannel?: DesktopOperatorChannelFn;
   /**
    * **(c) 规则集实件（I-1 补丁，2026-10-12 客户重发授权）**——与 `shellOperatorChannel` **同一接线面**
    * 透传：编排 `openRoleSession({ shellArming })` 用它装配 (c) 层（`classifyShell` + `rules`；缺省 ⇒ 编排
@@ -296,7 +308,18 @@ export interface SessionManagerDeps {
 }
 
 /** 一个**保活**中的角色会话（B-2：每角色一个句柄 + LRU）。 */
+interface DeliveryOrigin {
+  clientMessageId?: string;
+  turnId?: string;
+  settled: boolean;
+}
+
 interface LiveSession {
+  readonly origins: { byTurn: Map<string, DeliveryOrigin>; running?: DeliveryOrigin };
+  readonly roleId: string;
+  readonly runtime: RuntimeKind;
+  readonly profileRevision: number;
+  readonly interactionState: { lifetime: AbortController; turn: AbortController };
   readonly handle: RoleSessionHandle;
   /** 建会话时的项目根——换项目重开同一角色前须先释放旧句柄（角色 id 可能跨项目同名）。 */
   readonly projectRoot: string;
@@ -316,6 +339,8 @@ interface LiveSession {
 
 /** 一次**系统投递**（E-1 回交投 su / H-1 派发投目标角色 / L-1 客户消息）——投递机的队列条目（**一套机，多调用方**）。 */
 interface DeliveryItem {
+  clientMessageId?: string;
+  runtime: RuntimeKind;
   kind: "handback" | "dispatch" | "message";
   /** 目标角色 id（回交→su；派发/客户消息→被派角色）。 */
   targetRoleId: string;
@@ -331,7 +356,7 @@ interface DeliveryItem {
   enqueuedAt: string;
   /**
    * **P0-1（2026-10-13 客户批准）**：随条目**入队即定格**的整包载荷（`PromptOptions`，契约单一来源
-   * `src/provider/pi/session.ts`；投递时**整包同一引用**透传 `handle.send(text, opts)`——排队后到投递
+   * `src/model/runtime.ts`；投递时**整包同一引用**透传 `handle.send(text, opts)`——排队后到投递
    * 都带原图）。缺省（undefined）= 纯文本，投递调用形态与旧版逐字一致（不传第二参）。
    */
   opts?: PromptOptions;
@@ -380,7 +405,7 @@ async function filePrint(absPath: string): Promise<string> {
 export class SessionManager {
   private readonly deps: SessionManagerDeps;
   private readonly loadEffectiveConfig: (opts: LoadConfigOptions) => Promise<LoadedConfig>;
-  /** 保活中的会话：roleId → 句柄（上限见 `MAX_LIVE_SESSIONS`）。 */
+  /** 保活中的会话：project × role × runtime → 句柄（上限见 `MAX_LIVE_SESSIONS`）。 */
   private readonly sessions = new Map<string, LiveSession>();
   /** 客户消息计数（L-1：逐条独立入队键——客户消息**不去重**）。 */
   private messageSeq = 0;
@@ -393,8 +418,8 @@ export class SessionManager {
   private selectionTargetRoleId: string | null = null;
   /** 关闭全部使旧扫描尚未开始的重建步骤失效；选角色不取消后台扫描。 */
   private boundaryRefreshVersion = 0;
-  /** 最近一次 open 用的运行时（自动开启会话时沿用——渲染侧现实里恒为 "pi"）。 */
-  private lastRuntime: RuntimeKind = "pi";
+  /** 保存成功才递增的配置版本；活句柄记录它创建时的版本。 */
+  private readonly profileRevisions = new Map<RuntimeKind, number>();
   // —— 投递机（E-1 回交投 su + H-1 派发投目标角色；**同一套**，不造第二套）——
   /** 待投递队列：`${projectRoot}\0${targetRoleId}` → 条目（**按到达序**；目标忙时积压，其 settled 后按序放行）。 */
   private readonly deliveryQueues = new Map<string, DeliveryItem[]>();
@@ -431,6 +456,87 @@ export class SessionManager {
     this.loadEffectiveConfig = deps.loadEffectiveConfig ?? defaultLoadEffectiveConfig;
   }
 
+  private sessionKey(projectRoot: string, roleId: string, runtime: RuntimeKind): string {
+    return `${projectRoot}\u0000${roleId}\u0000${runtime}`;
+  }
+  private targetKey(target: string | SessionTarget): string | undefined {
+    if (typeof target !== "string" && target.projectRoot && target.runtime) return this.sessionKey(target.projectRoot, target.roleId, target.runtime);
+    let roleId = target;
+    if (typeof target !== "string") roleId = target.roleId;
+    const active = this.activeEntry();
+    if (active?.roleId === roleId && this.activeRoleId !== null) return this.activeRoleId;
+    const matches = [...new Set([...this.sessions.keys(), ...this.rebuildChains.keys()])].filter((key) => key.split("\u0000")[1] === roleId);
+    if (matches.length === 1) return matches[0];
+    return undefined;
+  }
+  profileRevision(runtime: RuntimeKind): number { return this.profileRevisions.get(runtime) ?? 0; }
+  profileChanged(runtime: RuntimeKind): number {
+    const revision = this.profileRevision(runtime) + 1;
+    this.profileRevisions.set(runtime, revision);
+    return revision;
+  }
+  hasBusyRuntime(runtime: RuntimeKind): boolean { return [...this.sessions.values()].some((entry) => entry.runtime === runtime && entry.busy); }
+  hasStaleProfile(runtime: RuntimeKind): boolean { return [...this.sessions.values()].some((entry) => entry.runtime === runtime && entry.profileRevision !== this.profileRevision(runtime)); }
+  liveSessionViews(): { projectRoot: string; roleId: string; runtime: RuntimeKind; profileRevision: number }[] {
+    return [...this.sessions.values()].map((entry) => ({ projectRoot: entry.projectRoot, roleId: entry.roleId, runtime: entry.runtime, profileRevision: entry.profileRevision }));
+  }
+  private contextInfo(handle: RoleSessionHandle): Pick<OpenResult, "contextSource" | "contextWarning"> {
+    if (handle.contextSource === "resumed") return { contextSource: "recovered", contextWarning: handle.contextWarning };
+    if (handle.contextSource === "recovered") return { contextSource: "fresh", contextWarning: handle.contextWarning ?? "原生上下文恢复失败，已重建上下文。" };
+    return { contextSource: "fresh", contextWarning: handle.contextWarning };
+  }
+
+  private beginDeliveryOrigin(entry: LiveSession, clientMessageId?: string): DeliveryOrigin {
+    const origin: DeliveryOrigin = { settled: false };
+    if (clientMessageId !== undefined) origin.clientMessageId = clientMessageId;
+    entry.origins.running = origin;
+    return origin;
+  }
+
+  private captureDeliveryOrigin(entry: LiveSession, event: OrchestrationEvent): DeliveryOrigin | undefined {
+    if (event.kind === "handback") return undefined;
+    if (event.runtime !== undefined && event.runtime !== entry.runtime) return undefined;
+    if (event.roleId !== undefined && event.roleId !== entry.roleId) return undefined;
+    if (typeof event.turnId !== "string" || event.turnId === "") return undefined;
+    return entry.origins.byTurn.get(event.turnId); // Only the original prompt's real ack creates this mapping.
+  }
+
+  private async sendDelivery(entry: LiveSession, origin: DeliveryOrigin, text: string, opts?: PromptOptions): Promise<void> {
+    let promptOptions = opts;
+    // Preserve the exact old single-argument/images package path for unidentified legacy substitutes.
+    if (entry.handle.runtime !== undefined || origin.clientMessageId !== undefined || opts?.onTurnStarted !== undefined) {
+      const onTurnStarted = (metadata: PromptTurnStartedMetadata): void => {
+        const key = this.sessionKey(entry.projectRoot, entry.roleId, entry.runtime);
+        if (this.sessions.get(key) !== entry || (origin.settled && origin.turnId === undefined)) return;
+        if (metadata.runtime !== entry.runtime || metadata.roleId !== entry.roleId || typeof metadata.turnId !== "string" || metadata.turnId === "") return;
+        if (origin.turnId === undefined) {
+          origin.turnId = metadata.turnId;
+          entry.origins.byTurn.set(metadata.turnId, origin);
+        }
+        opts?.onTurnStarted?.(metadata);
+      };
+      promptOptions = { ...opts, onTurnStarted };
+    }
+    if (promptOptions === undefined) await entry.handle.send(text);
+    else await entry.handle.send(text, promptOptions);
+  }
+
+  private trimDeliveryOrigins(entry: LiveSession): void {
+    if (entry.origins.byTurn.size <= 128) return;
+    for (const [turnId, origin] of entry.origins.byTurn) {
+      if (!origin.settled || origin === entry.origins.running) continue;
+      entry.origins.byTurn.delete(turnId);
+      if (entry.origins.byTurn.size <= 128) break;
+    }
+  }
+
+  private failDeliveryOrigin(entry: LiveSession, origin: DeliveryOrigin): void {
+    // A bound real turn keeps its original ID for the delayed failed/aborted terminal.
+    origin.settled = true;
+    if (entry.origins.running === origin) delete entry.origins.running;
+    this.trimDeliveryOrigins(entry);
+  }
+
   /** 当前活动会话条目（无则 undefined）。 */
   private activeEntry(): LiveSession | undefined {
     return this.activeRoleId !== null ? this.sessions.get(this.activeRoleId) : undefined;
@@ -445,10 +551,14 @@ export class SessionManager {
     if (this.sessions.get(roleId) !== entry) return null; // TOCTOU 防误删（见方法注释）
     this.sessions.delete(roleId);
     if (this.activeRoleId === roleId) this.activeRoleId = null;
-    this.activeDeliveries.delete(this.queueKey(entry.projectRoot, roleId)); // 会话没了，「进行中」不再成立
+    this.activeDeliveries.delete(this.queueKey(entry.projectRoot, entry.roleId, entry.runtime)); // 会话没了，「进行中」不再成立
     // 状态准确性：dispose 即真实信号（会话已移出保活表，busy 判据随之恒 false）——外推快照，
     // 徽标/队列行随之转「已停止」；**不删其投递队列**（未投的待办仍如实保留可见）。
-    this.notifyRoleState(entry.projectRoot, roleId);
+    this.notifyRoleState(entry.projectRoot, entry.roleId, entry.runtime);
+    entry.origins.byTurn.clear();
+    delete entry.origins.running;
+    entry.interactionState.lifetime.abort();
+    entry.interactionState.turn.abort();
     try {
       await entry.handle.dispose();
       return null;
@@ -497,14 +607,6 @@ export class SessionManager {
     return null;
   }
 
-  /** 边界已变时的**如实一行**（按 D-1：会话文件在 ⇒ 说「恢复」；缺失/损坏 ⇒ 说「新建」——不套旧文案）。 */
-  private boundaryRebuiltLine(changedRel: string, probe: "ok" | "missing" | "corrupt"): string {
-    const head = `该角色边界已更新（${changedRel}）——旧会话已作废，按新边界重开。`;
-    return probe === "ok"
-      ? head + "历史已从本地会话文件恢复（模型上下文一并恢复）。"
-      : head + "本地无可用会话文件（新建会话）——模型不会记得以上历史，请重新说明需求。";
-  }
-
   /** 陈旧 ⇒ 作废重建（dispose → 立即重开 + 如实记行）。返回 undefined = 未陈旧/在跑/已被并发替换（不打断）；
    *  否则返回 `{changed, reopened}`——调用方据此决定续发/续投，或按失败如实处理。
    *
@@ -542,19 +644,19 @@ export class SessionManager {
     if (!entry) return undefined;
     const wasActive = this.activeRoleId === roleId;
     if (entry.busy) return undefined; // 在跑的轮次不打断（settle 后放行/下次发言/下次投递再查）
-    const changed = await this.boundaryDiff(entry);
+    let changed = await this.boundaryDiff(entry);
+    if (changed === null && entry.profileRevision !== this.profileRevision(entry.runtime)) changed = "运行时配置";
     if (changed === null) return undefined;
+    if (entry.profileRevision !== this.profileRevision("pi") && entry.runtime === "pi" && this.hasBusyRuntime("pi")) return undefined;
     if (this.sessions.get(roleId) !== entry || entry.busy) return undefined; // 读盘期间被替换/开跑（TOCTOU）
     const projectRoot = entry.projectRoot;
     const diagnostic = createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId });
     diagnostic.record("session.rebuild.start");
-    // D-1：dispose **不擦除**会话文件——先探「在/不在/坏」，重开后会按它恢复（措辞据此如实）。
-    const probe = await probeSessionFile(projectRoot, roleId);
-    if (this.sessions.get(roleId) !== entry || entry.busy) return undefined; // 探测期间被替换/开跑（TOCTOU）
+    // dispose 保留 ANS 回放；模型上下文是否恢复只读新句柄实际返回。
     await this.disposeEntry(roleId, entry);
-    this.deps.emitEvent({ roleId, event: { kind: "message", summary: this.boundaryRebuiltLine(changed, probe) } });
+    this.deps.emitEvent({ roleId: entry.roleId, projectRoot, runtime: entry.runtime, event: { kind: "message", summary: `该角色边界已更新或运行时配置已保存（${changed}），已作废旧会话，按新边界重开；上下文恢复结果以引擎实际返回为准。` } });
     // 重建不自行选择角色。仅成功且用户意图未改变时恢复被 dispose 清空的活动目标。
-    const reopened = await this.openInternal({ projectRoot, roleId, runtime: this.lastRuntime }, false);
+    const reopened = await this.openInternal({ projectRoot, roleId: entry.roleId, runtime: entry.runtime }, false);
     if (reopened.ok && (wasActive || userInitiated) && this.selectionVersion === selectionVersion) {
       const current = this.sessions.get(roleId);
       if (current && current.projectRoot === projectRoot) this.activeRoleId = roleId;
@@ -562,7 +664,7 @@ export class SessionManager {
     if (!reopened.ok) {
       diagnostic.error("session.rebuild.failed", new Error(reopened.error || "重开失败"));
       this.deps.emitEvent({
-        roleId,
+        roleId: entry.roleId, projectRoot, runtime: entry.runtime,
         event: { kind: "message", summary: `按新边界重开会话失败：${reopened.error ?? "未知原因"}（请重试或点击左侧角色）。` },
       });
     }
@@ -582,7 +684,7 @@ export class SessionManager {
       if (this.boundaryRefreshVersion !== refreshVersion) break;
       try {
         const rebuilt = await this.rebuildIfBoundaryStale(roleId, false);
-        if (rebuilt !== undefined) rebuiltIds.push(roleId);
+        if (rebuilt !== undefined) rebuiltIds.push(roleId.split("\u0000")[1]);
       } catch {
         // 逐会话隔离（读盘异常等）：跳过该角色，不打断事件流；下次时机再查。
       }
@@ -595,8 +697,9 @@ export class SessionManager {
    */
   async open(req: SessionOpenRequest): Promise<OpenResult> {
     const selectionVersion = ++this.selectionVersion;
-    this.selectionTargetRoleId = req.roleId;
-    await this.rebuildChains.get(req.roleId);
+    const key = this.sessionKey(req.projectRoot, req.roleId, req.runtime);
+    this.selectionTargetRoleId = key;
+    await this.rebuildChains.get(key);
     const diagnostic = createDiagnosticLogger({ component: "desktop.session", projectRoot: req.projectRoot, roleId: req.roleId });
     diagnostic.record("session.open.start");
     const result = await this.openInternal(req, true, selectionVersion);
@@ -610,28 +713,32 @@ export class SessionManager {
     if (!req.projectRoot || !req.roleId) {
       return { ok: false, error: "缺少项目根或角色 id。" };
     }
-    this.lastRuntime = req.runtime; // E-1：自动开启 su 时沿用最近一次运行时
+    if (!(RUNTIME_KINDS as readonly string[]).includes(req.runtime)) return { ok: false, error: "未知运行时。" };
+    const key = this.sessionKey(req.projectRoot, req.roleId, req.runtime);
     // B-2：该角色已有**同项目**的保活会话 → 续接（句柄与模型上下文原样保留）。
-    const existing = this.sessions.get(req.roleId);
+    const existing = this.sessions.get(key);
     if (existing && existing.projectRoot === req.projectRoot) {
       // O-1（2026-10-12）：续接前先查**边界快照**——陈旧 ⇒ 作废并按下方**新建**路径重开（历史按 D-1 恢复）；
       // 未陈旧 ⇒ 逐字续接（**绝不**误重开丢上下文）。在跑的轮次不打断（busy 时跳过，下一时机再查）。
-      const rebuilt = await this.rebuildIfBoundaryStale(req.roleId, userInitiated, selectionVersion);
+      const rebuilt = await this.rebuildIfBoundaryStale(key, userInitiated, selectionVersion);
       if (rebuilt === undefined) {
         // 串行等待期间后台可能已替换旧条目，续接必须取当前句柄。
-        const current = this.sessions.get(req.roleId);
+        const current = this.sessions.get(key);
         if (!current || current.projectRoot !== req.projectRoot) {
           return { ok: false, error: "会话已关闭，请重新点击角色。" };
         }
         current.lastUsed = ++this.lruClock;
-        if (userInitiated && this.selectionVersion === selectionVersion) this.activeRoleId = req.roleId;
-        this.notifyRoleState(req.projectRoot, req.roleId); // 重载/续接恢复真实busy与队列，不另推导。
+        if (userInitiated && this.selectionVersion === selectionVersion) this.activeRoleId = key;
+        this.notifyRoleState(req.projectRoot, req.roleId, req.runtime); // 重载/续接恢复真实busy与队列，不另推导。
+        let note = "已在该角色的会话中，续接当前会话。";
+        if (current.profileRevision !== this.profileRevision(req.runtime)) note = "当前轮次继续使用原配置，新配置在轮次结束后应用。";
         return {
           ok: true,
-          note: "已在该角色的会话中，续接当前会话。",
+          note,
           config: current.config,
           resumed: true,
           contextSource: "resumed",
+          runtime: req.runtime, projectRoot: req.projectRoot, profileRevision: current.profileRevision,
         };
       }
       if (!rebuilt.reopened.ok) {
@@ -639,9 +746,9 @@ export class SessionManager {
       }
       return rebuilt.reopened;
     }
-    // 同角色但**换了项目**：先释放旧句柄（角色 id 跨项目可能同名，不能拿旧项目的句柄顶新项目）。
+    // 同一个三元身份才可能复用；跨项目及跨引擎的句柄并存。
     if (existing) {
-      await this.disposeEntry(req.roleId, existing);
+      await this.disposeEntry(key, existing);
     }
 
     const listing = this.deps.getListing(req.projectRoot);
@@ -696,19 +803,24 @@ export class SessionManager {
     // 不变）。通道未接（deps.customerInput 缺省）⇒ 不注入——**绝不**出现「没人问就放行」。
     const customerInput = role.builtIn === true ? this.deps.customerInput : undefined;
 
-    // H-1：**仅内置治理角色（su）**会话注入**派发能力**（数据驱动；契约在 §4 冻结家 `provider/pi/session.ts`）。
+    // H-1：**仅内置治理角色（su）**会话注入**派发能力**（数据驱动；契约在 §4 冻结家 `model/runtime.ts`）。
     // 路由复用 E-1 投递机（`routeDispatch`）；工具「未注入即不注册」——项目角色会话**不注入**（su 才有派发权）。
     // ⚠ 依赖登记：`openRoleSession` 的入参字段名 `dispatchTask` 以钉死契约为准；编排侧接线落地前，
     //   真实 run-role 会静默忽略本字段（我方透传就位，等待其承接——见 change 文档）。
     const dispatchTask: DispatchTaskFn | undefined =
       role.builtIn === true
-        ? (d: DispatchTaskPayload) => this.routeDispatch(req.projectRoot, req.roleId, d) // Promise<DispatchReceipt>——契约允许（工具侧 await）
+        ? (d: DispatchTaskPayload) => this.routeDispatch(req.projectRoot, req.runtime, req.roleId, d) // Promise<DispatchReceipt>——契约允许（工具侧 await）
         : undefined;
 
     // I-1（2026-10-12，客户裁定 arm）：**只对项目角色**把 (a) 操作者确认通道交给编排装配 (c)/(b)/(a)
     // `ShellGate`（判据 `role.builtIn`，数据驱动）。「审读者不给自己开闸」仍成立：su **不接 (b)/(a)**
     // （自己就是审读者、不自审；只读外的命令直接拒、不弹框、不打扰客户）——su 的 shell 走下方**只读档**。
-    const shellOperatorChannel = role.builtIn === true ? undefined : this.deps.shellOperatorChannel;
+    const interactionState = { lifetime: new AbortController(), turn: new AbortController() };
+    let shellOperatorChannel: OperatorChannelFn | undefined;
+    if (role.builtIn !== true && this.deps.shellOperatorChannel) {
+      const channel = this.deps.shellOperatorChannel;
+      shellOperatorChannel = (prompt) => channel(prompt, { roleId: req.roleId, projectRoot: req.projectRoot, runtime: req.runtime, signal: interactionState.turn.signal });
+    }
 
     // I-1 补丁（2026-10-12，客户重发授权）：**(c) 规则集实件**（`classifyShell` + `rules`）——与 (a) 通道
     // **同判据**（只对项目角色走三层链；su 不接 (b)/(a)）。两件均由主进程构造（`buildDesktopShellArming`）；
@@ -728,20 +840,23 @@ export class SessionManager {
     // pi 路径把 arm 接缝（shellGate，缺省 undefined = 不 arm）透传给编排的真实适配器工厂
     // （`createPiAdapterFactory(project, shellGate?)` 是编排已冻结的签名，此处不发明新形状）。
     // undefined ⇒ Pi 适配器不注册 run_shell（§7.5.1）。demo 路径无 shell 入口，与本接缝无关。
-    const createAdapter: (gate: WriteGate) => RuntimeAdapter =
-      req.runtime === "pi"
-        ? this.deps.createPiAdapterFactory(project, this.deps.shellGate)
-        : (gate) => this.deps.createDemoAdapter({ gate, boundary });
-
-    // D-1 契约（pm 2026-10-12 钉死）：本次是**新建**——按「会话文件在/不在/坏」分类上下文来源：
-    //  · 文件在（header 合法）→ "recovered"：适配器按「目录内有最近会话就恢复」一并恢复上下文
-    //    （dispose / LRU 淘汰**不擦除**会话文件——重开即恢复；应用重启同理）；
-    //  · 缺失/损坏 → "fresh"：真·新会话（损坏时带如实说明）——**唯一**「模型不会记得」的情形；
-    //    B-2 时期那句一概而论的「模型上下文已重启」在 D-1 契约下已失真，已退役（文案映射在渲染侧纯函数）。
-    const probe = await probeSessionFile(req.projectRoot, req.roleId);
-    const contextSource: "recovered" | "fresh" = probe === "ok" ? "recovered" : "fresh";
-    const contextWarning = probe === "corrupt" ? "本地会话文件损坏（头不合法），未能恢复" : undefined;
-
+    let createAdapter: RuntimeAdapterFactory;
+    let profileRevision = this.profileRevision(req.runtime);
+    try {
+      await this.deps.prepareRuntimeProfile?.(req.runtime);
+      profileRevision = this.profileRevision(req.runtime);
+      if (this.deps.createRuntimeAdapterFactory) {
+        createAdapter = this.deps.createRuntimeAdapterFactory(project, req.runtime, { ...this.deps.runtimeOptions, shellGate: this.deps.shellGate });
+      } else if (req.runtime === "pi") {
+        createAdapter = this.deps.createPiAdapterFactory(project, this.deps.shellGate);
+      } else if (req.runtime === "demo") {
+        createAdapter = (gate) => this.deps.createDemoAdapter({ gate, boundary });
+      } else {
+        createAdapter = createRuntimeAdapterFactory(project, req.runtime, this.deps.runtimeOptions);
+      }
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
     let handle: RoleSessionHandle;
     try {
       // scope 传 undefined：聊天无预先任务，授权上界 = 角色边界本身（门禁引擎据此不做 F4 收窄）。
@@ -762,12 +877,13 @@ export class SessionManager {
       handle = await this.deps.openRoleSession(
         {
           roleId: req.roleId,
+          runtime: req.runtime,
           project,
           ...(routineShellPolicy ? { routineShellPolicy } : {}),
           // 客户交互通道（A-5）：仅内置治理角色（su）会话注入；**每会话闭包绑定 roleId**（请求本体不带
           // 角色标识——渲染侧据它把交互卡落到该角色的聊天流、点亮 B-3「等待你确认」）。普通角色逐字不传。
           ...(customerInput
-            ? { customerInput: (r: CustomerInputRequest) => customerInput(r, { roleId: req.roleId }) }
+            ? { customerInput: (r: CustomerInputRequest, metadata?: CustomerInputMetadata) => customerInput(r, { roleId: req.roleId, runtime: req.runtime, projectRoot: req.projectRoot, sessionSignal: interactionState.lifetime.signal }, metadata) }
             : {}),
           // H-1：派发能力（仅 su 会话注入；契约字段名 `dispatchTask`——编排落地后由其转发给适配器）。
           ...(dispatchTask ? { dispatchTask } : {}),
@@ -803,6 +919,8 @@ export class SessionManager {
 
     const entry: LiveSession = {
       handle,
+      origins: { byTurn: new Map() },
+      roleId: req.roleId, runtime: req.runtime, profileRevision, interactionState,
       projectRoot: req.projectRoot,
       config,
       lastUsed: ++this.lruClock,
@@ -810,59 +928,77 @@ export class SessionManager {
       boundaryPaths,
       boundaryPrints,
     };
-    this.sessions.set(req.roleId, entry);
-    if (userInitiated && this.selectionVersion === selectionVersion) this.activeRoleId = req.roleId; // 后台自动开启不抢活动角色
+    this.sessions.set(key, entry);
+    if (userInitiated && this.selectionVersion === selectionVersion) this.activeRoleId = key; // 后台自动开启不抢活动角色
     // 状态准确性 / L-1：开好即外推**真实状态快照**（busy=false + 该角色既有队列摘要）——徽标/队列行据此准确。
-    this.notifyRoleState(req.projectRoot, req.roleId);
-    this.consume(req.roleId, handle, req.projectRoot);
+    this.notifyRoleState(req.projectRoot, req.roleId, req.runtime);
+    this.consume(key, entry);
     // LRU：超出上限先淘汰**最久未用**者（dispose；其界面历史由渲染层自持、切回时恢复并如实提示）。
-    await this.evictBeyondLimit(req.roleId); // 正在开启的这一个不淘汰（见方法注释）
+    await this.evictBeyondLimit(key); // 正在开启的这一个不淘汰（见方法注释）
     // 客户裁定（2026-10-13）：**常规「已开启与角色 X 的会话…」欢迎提示删除**——聊天流不摆常规提示
     // （真机每次开会话/切角色都出现，被客户点名）。**异常提示保留**：contextWarning（渲染侧按
     // contextSource 如实分支）、O-1 边界重建行、投递失败/受阻行等均不受影响。
     // 投递机（E-1/H-1）：本会话开好后，尝试放行积压的投递（目标=本角色的队列；为空则 no-op）。
-    void this.drainQueue(req.projectRoot, req.roleId);
-    return { ok: true, config, resumed: false, contextSource, ...(contextWarning ? { contextWarning } : {}) };
+    void this.drainQueue(req.projectRoot, req.roleId, req.runtime);
+    return { ok: true, config, resumed: false, runtime: req.runtime, projectRoot: req.projectRoot, profileRevision: entry.profileRevision, ...this.contextInfo(handle) };
   }
 
   /**
    * 事件消费循环（**每会话一个，后台持续拉取**，B-2）：切走不停拉——重 pin/回交/适配器队列消费都依赖
    * 拉取（事件流是拉驱动的）；事件带 `roleId` 信封外推，渲染侧按角色分发（多会话并存不会串消息）。
    */
-  private consume(roleId: string, handle: RoleSessionHandle, projectRoot: string): void {
+  private consume(key: string, entry: LiveSession): void {
+    const { roleId, handle, projectRoot, runtime } = entry;
     void (async () => {
       try {
         for await (const ev of handle.events()) {
+          if (this.sessions.get(key) !== entry) break;
+          const origin = this.captureDeliveryOrigin(entry, ev);
+          const envelope: SessionEventEnvelope = { roleId, projectRoot, runtime, event: ev };
+          if (ev.kind !== "handback" && typeof ev.turnId === "string" && ev.turnId !== "" && origin?.clientMessageId !== undefined) {
+            envelope.clientMessageId = origin.clientMessageId;
+          }
           // E-1/H-1：settled ⇒ 该会话离开「忙」，并尝试按序放行**本项目各队列**的积压投递。
           // 投递触发**不挑目标**（历史上单队列按项目存放时就是如此）：一轮结束=下一次放行时机（E-1 的
           // 重试时机之一），各队列在 drainQueue 里各自检查「目标忙/未开」后再决定是否真投。
-          if (ev.kind === "settled") {
-            const en = this.sessions.get(roleId);
+          const sourceMatches = ev.kind !== "handback" && (ev.runtime === undefined || ev.runtime === runtime) && (ev.roleId === undefined || ev.roleId === roleId);
+          const legacyTerminal = sourceMatches && origin === undefined && entry.origins.running?.turnId === undefined;
+          if (ev.kind === "settled" && sourceMatches && (origin === entry.origins.running || (origin?.settled === true && entry.origins.running === undefined) || legacyTerminal)) {
+            if (origin) origin.settled = true;
+            delete entry.origins.running;
+            this.trimDeliveryOrigins(entry);
+            entry.interactionState.turn.abort();
+            const en = this.sessions.get(key);
             if (en) {
               en.busy = false;
-              this.activeDeliveries.delete(this.queueKey(en.projectRoot, roleId)); // 「进行中」随本轮结束撤销
+              this.activeDeliveries.delete(this.queueKey(en.projectRoot, roleId, runtime)); // 「进行中」随本轮结束撤销
               // 状态准确性：settled = 「本角色离开工作中」的**真实信号**（B-2 下切走的后台轮次结束也走这里）
               // ——先外推再放行队列（放行时 busy 复位已可见）。
-              this.notifyRoleState(en.projectRoot, roleId);
+              this.notifyRoleState(en.projectRoot, roleId, runtime);
               void this.drainAllQueuesFor(en.projectRoot);
+              if (runtime === "pi") void this.drainPiQueuesAcrossProjects();
               // P1-2：某会话离开 busy = LRU 回收的「下一时机」（暂超限的账在这里还——只收非 busy 者）。
               void this.evictBeyondLimit();
             }
           }
           // E-1：回交到达 ⇒ 自动投递交 su 验收（去重 + 排队 + 失败如实/保留；见 handleHandback）。
           if (ev.kind === "handback") {
-            void this.handleHandback(projectRoot, ev.handback);
+            void this.handleHandback(projectRoot, runtime, ev.handback);
           }
           try {
-            this.deps.emitEvent({ roleId, event: ev });
+            this.deps.emitEvent(envelope);
           } catch {
             // 外推失败（如窗口已关）不得影响会话本身。
           }
         }
       } catch (err) {
         createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId }).error("session.events.failed", err);
+        if (this.sessions.get(key) !== entry) return;
+        entry.interactionState.turn.abort();
+        entry.busy = false;
+        this.notifyRoleState(projectRoot, roleId, runtime);
         this.deps.emitEvent({
-          roleId,
+          roleId, projectRoot, runtime,
           event: { kind: "message", summary: `会话事件流异常：${err instanceof Error ? err.message : String(err)}` },
         });
       }
@@ -875,11 +1011,14 @@ export class SessionManager {
    *  按到达序在当前任务结束后执行；空闲路径**逐字不变**。返回 `queued:true + position`（界面据此如实提示）。
    *  **P0-1（2026-10-13 客户批准）**：`opts`（图片载荷）为**可选**——忙时**入队即定格**（排队后到投递都带
    *  原图）；空闲直发**整包同一引用**透传 `handle.send(text, opts)`。不传 `opts` 时调用形态与旧版逐字一致。 */
-  async send(text: string, opts?: PromptOptions): Promise<SendResult> {
+  async send(text: string, opts?: PromptOptions, target?: SessionTarget, metadata?: SessionMessageMetadata): Promise<SendResult> {
     // **目标角色在入口定格（2026-10-13 状态机修复）**：并发作废重建（settle 触发的 refreshStaleBoundaries
     // 与本次 send 各自的重建赛跑）会在窗口里清空/替换 `activeRoleId`——按「当下的 activeRoleId」取条目会让
     // 本条消息**落空**（旧实现会回「会话尚未开启」且消息丢失）。用户的意图是入口那一刻的活动角色，照它走。
-    const targetRoleId = this.activeRoleId;
+    let clientMessageId: string | undefined;
+    if (typeof metadata?.clientMessageId === "string" && metadata.clientMessageId !== "") clientMessageId = metadata.clientMessageId;
+    let targetRoleId = this.activeRoleId;
+    if (target !== undefined) targetRoleId = this.targetKey(target) ?? null;
     const selectionVersion = this.selectionVersion;
     const diagnostic = createDiagnosticLogger({ component: "desktop.session", projectRoot: this.activeEntry()?.projectRoot, roleId: targetRoleId ?? undefined });
     diagnostic.record("session.send.start");
@@ -900,10 +1039,12 @@ export class SessionManager {
     // 并发重建可能把活动指针清掉（dispose 置 null、后台重开不抢位）——用户意图仍指向 targetRoleId：复位。
     // （若用户期间开了**别的**角色，activeRoleId 非 null，不动它——不抢位。）
     if (this.activeRoleId === null && this.selectionVersion === selectionVersion) this.activeRoleId = targetRoleId;
-    if (entry.busy) {
-      const roleId = targetRoleId as string;
+    if (entry.busy || (entry.runtime === "pi" && entry.profileRevision !== this.profileRevision("pi") && this.hasBusyRuntime("pi"))) {
+      const roleId = entry.roleId;
       this.enqueueDelivery(entry.projectRoot, roleId, {
         kind: "message",
+        clientMessageId,
+        runtime: entry.runtime,
         targetRoleId: roleId,
         sourceRoleId: roleId,
         text,
@@ -913,35 +1054,38 @@ export class SessionManager {
         // P0-1：**入队即定格**——整包同一引用存进条目，投递时原样透传（排队不变形）。
         ...(opts !== undefined ? { opts } : {}),
       });
-      const q = this.deliveryQueues.get(this.queueKey(entry.projectRoot, roleId));
+      const q = this.deliveryQueues.get(this.queueKey(entry.projectRoot, roleId, entry.runtime));
       diagnostic.record("session.send.queued", { queueDepth: q?.length ?? 0 });
       return { ok: true, queued: true, position: q ? q.length : 1 };
     }
-    const roleId = targetRoleId as string;
+    const roleId = entry.roleId;
     // L-1 顺序修正（与投递机同款，防竞态）：**先置忙再 await**——快适配器（如演示 runtime）的事件
     // （含 `settled`）可能在 `send` 返回前就被消费循环处理完；若此刻才置忙，settled 的复位会被反向覆盖，
     // 忙态将**永不复位**（队列也永不放行）。失败 ⇒ 复位 + 外推（并没有在跑，如实）。
+    const origin = this.beginDeliveryOrigin(entry, clientMessageId);
+    entry.interactionState.turn = new AbortController();
     entry.busy = true;
     // P0-2 前置修正（2026-10-13，随停止入口同批）：**开跑即外推 busy=true**——与投递机同款
     //（先置忙即推快照）。旧版只在 round 结束后推：长轮次（真实 pi 一轮数分钟）期间界面根本收不到
     // 「工作中」快照——停止钮与左树徽标都无从在轮次**进行中**出现（快适配器掩盖了这条缝；停止入口
     // 把缝暴露出来）。此处开跑即推（如实）；结束后那次保留（兜底快适配器「settled 先于 send 返回
     // 被消费」的竞态）。
-    this.notifyRoleState(entry.projectRoot, roleId);
+    this.notifyRoleState(entry.projectRoot, entry.roleId, entry.runtime);
     try {
       // P0-1：整包同一引用透传；**不传 opts 时调用形态与旧版逐字一致**（不构造空包）。
-      if (opts === undefined) {
-        await entry.handle.send(text);
-      } else {
-        await entry.handle.send(text, opts);
-      }
-      this.notifyRoleState(entry.projectRoot, roleId); // 状态准确性：真开跑即外推「工作中」（繁忙与否以会话条目为准）
+      await this.sendDelivery(entry, origin, text, opts);
+      this.notifyRoleState(entry.projectRoot, entry.roleId, entry.runtime); // 状态准确性：真开跑即外推「工作中」（繁忙与否以会话条目为准）
       diagnostic.record("session.send.end", { ok: true });
       return { ok: true };
     } catch (err) {
       diagnostic.error("session.send.failed", err);
-      entry.busy = false;
-      this.notifyRoleState(entry.projectRoot, roleId);
+      const ownsRunningDelivery = entry.origins.running === origin;
+      this.failDeliveryOrigin(entry, origin);
+      if (ownsRunningDelivery) {
+        entry.interactionState.turn.abort();
+        entry.busy = false;
+      }
+      this.notifyRoleState(entry.projectRoot, entry.roleId, entry.runtime);
       return { ok: false, error: err instanceof Error ? err.message : String(err) };
     }
   }
@@ -955,8 +1099,11 @@ export class SessionManager {
    * - `{ok:false, supported:true, error}` —— 底层 abort 报错：错误原文如实上抛，不吞。
    * 幂等：无在飞轮次 = no-op（底层不抛错、无副作用——abort 语义已在适配器环测试钉死）。
    */
-  async abort(roleId: string): Promise<RoleSessionAbortResult> {
-    const entry = typeof roleId === "string" && roleId !== "" ? this.sessions.get(roleId) : undefined;
+  async abort(target: string | SessionTarget): Promise<RoleSessionAbortResult> {
+    const key = this.targetKey(target);
+    let entry: LiveSession | undefined;
+    if (key !== undefined) entry = this.sessions.get(key);
+    const roleId = entry?.roleId ?? "";
     if (!entry) {
       return { ok: false, supported: false, error: `角色 ${roleId} 没有打开的会话——没有可停止的轮次。` };
     }
@@ -965,6 +1112,7 @@ export class SessionManager {
       return { ok: false, supported: false, error: "当前运行时不支持停止" };
     }
     try {
+      entry.interactionState.turn.abort();
       return await entry.handle.abort();
     } catch (err) {
       return { ok: false, supported: true, error: err instanceof Error ? err.message : String(err) };
@@ -975,7 +1123,10 @@ export class SessionManager {
    * 关闭会话（B-2：**定向**）。给定 `roleId` 只关该角色（历史留在界面上）；缺省/`null` 关**全部**
    * （换项目/退出时用）。dispose 出错如实返回（不静默）。
    */
-  async stop(roleId?: string | null): Promise<StopResult> {
+  async stop(target?: string | SessionTarget | null): Promise<StopResult> {
+    let roleId: string | undefined;
+    if (target !== undefined && target !== null) roleId = this.targetKey(target);
+    if (target && roleId === undefined) return { ok: false, note: "没有匹配的会话，请指定项目与运行时。" };
     createDiagnosticLogger({ component: "desktop.session", roleId: roleId ?? undefined }).record("session.stop", { count: this.sessions.size });
     if (typeof roleId !== "string" || roleId === "" || roleId === this.selectionTargetRoleId) {
       ++this.selectionVersion;
@@ -1020,12 +1171,12 @@ export class SessionManager {
 
   /** 当前**活动**（最近一次**用户发起**的 open）的角色 id；无则 null（后台自动开启不改变它）。 */
   openForRoleId(): string | null {
-    return this.activeRoleId;
+    return this.activeEntry()?.roleId ?? null;
   }
 
   /** 保活中的角色 id 列表（B-3 状态徽标「空闲/已停止」派生据它 + 渲染侧的数据源）。 */
   liveRoleIds(): string[] {
-    return [...this.sessions.keys()];
+    return [...new Set([...this.sessions.values()].map((entry) => entry.roleId))];
   }
 
   // —————— 投递机（E-1 回交投 su + H-1 派发投目标角色；**同一套**，不造第二套） ——————
@@ -1038,22 +1189,22 @@ export class SessionManager {
   }
 
   /** 投递进展的**系统行**（首选进目标/请求者的 pane；首选未知时退回兜底角色）——如实、不静默。 */
-  private emitDeliveryNote(preferredRoleId: string | null, fallbackRoleId: string, summary: string): void {
+  private emitDeliveryNote(projectRoot: string, runtime: RuntimeKind, preferredRoleId: string | null, fallbackRoleId: string, summary: string): void {
     const roleId = preferredRoleId !== null && preferredRoleId !== "" ? preferredRoleId : fallbackRoleId;
-    this.deps.emitEvent({ roleId, event: { kind: "tool_call", summary } });
+    this.deps.emitEvent({ roleId, projectRoot, runtime, event: { kind: "tool_call", summary } });
   }
 
   /** 队列键：项目 × 目标角色（一套机对多个目标；空目标=主入口暂未枚举到——每次尝试时重解析）。 */
-  private queueKey(projectRoot: string, targetRoleId: string): string {
-    return `${projectRoot}\u0000${targetRoleId}`;
+  private queueKey(projectRoot: string, targetRoleId: string, runtime: RuntimeKind): string {
+    return `${projectRoot}\u0000${targetRoleId}\u0000${runtime}`;
   }
 
   private enqueueDelivery(projectRoot: string, targetRoleId: string, item: Omit<DeliveryItem, "enqueuedAt">): void {
-    const key = this.queueKey(projectRoot, targetRoleId);
+    const key = this.queueKey(projectRoot, targetRoleId, item.runtime);
     const q = this.deliveryQueues.get(key) ?? [];
     q.push({ ...item, enqueuedAt: new Date().toISOString() }); // 入队时间**入队即定格**（显示用，非执行时间）
     this.deliveryQueues.set(key, q);
-    this.notifyRoleState(projectRoot, targetRoleId); // L-1：入队即外推（队列行/徽标如实可见）
+    this.notifyRoleState(projectRoot, targetRoleId, item.runtime); // L-1：入队即外推（队列行/徽标如实可见）
   }
 
   /**
@@ -1067,7 +1218,10 @@ export class SessionManager {
    *   因果）——本层拒绝非 message 条目，界面侧派发/回交**不给撤回钮**（呈现与语义同口径）。
    * 界面不碰内部结构：只凭快照的 `id` 说话（**不造第二套数据源**）。
    */
-  withdraw(roleId: string, id: string): WithdrawResult {
+  withdraw(targetInput: string | SessionTarget, id: string): WithdrawResult {
+    let roleId: string;
+    if (typeof targetInput === "string") roleId = targetInput;
+    else roleId = targetInput.roleId;
     if (typeof roleId !== "string" || roleId === "" || typeof id !== "string" || id === "") {
       return { ok: false, error: "撤回参数不完整。" };
     }
@@ -1084,6 +1238,7 @@ export class SessionManager {
       const parts = key.split("\u0000");
       const projectRoot = parts[0] ?? "";
       const target = parts[1] ?? "";
+      if (typeof targetInput !== "string" && ((targetInput.projectRoot && parts[0] !== targetInput.projectRoot) || (targetInput.runtime && parts[2] !== targetInput.runtime))) continue;
       if (target !== roleId) continue; // 只看该角色的队列（一套机多目标）
       const idx = q.findIndex((i) => i.dedupKey === id);
       if (idx < 0) continue;
@@ -1093,7 +1248,7 @@ export class SessionManager {
       }
       q.splice(idx, 1);
       if (q.length === 0) this.deliveryQueues.delete(key);
-      this.notifyRoleState(projectRoot, roleId); // 位次前移/角标随之（既有快照机制；不造第二套）
+      this.notifyRoleState(projectRoot, roleId, item.runtime); // 位次前移/角标随之（既有快照机制；不造第二套）
       return { ok: true, summary: item.summary };
     }
     return { ok: false, error: "该条不在排队中（可能已投递或已撤回）。" };
@@ -1104,14 +1259,18 @@ export class SessionManager {
    *  与**正在跑的那条投递**（若有；标注「进行中」——排队 ≠ 已执行）。
    *  **P1-1（2026-10-13 客户裁定）**：条目视图增 `id`（= `dedupKey`，撤回的定位键）与 `full`（入队即定格的
    *  **全文**——抽屉内「展开看全文」用；摘要字段照旧只作列表显示）。 */
-  private notifyRoleState(projectRoot: string, targetRoleId: string): void {
+  private notifyRoleState(projectRoot: string, targetRoleId: string, runtime: RuntimeKind): void {
     if (targetRoleId === "") return;
-    const q = this.deliveryQueues.get(this.queueKey(projectRoot, targetRoleId)) ?? [];
-    const busy = this.sessions.get(targetRoleId)?.busy === true;
-    const running = this.activeDeliveries.get(this.queueKey(projectRoot, targetRoleId));
-    const view = (i: DeliveryItem) => ({ kind: i.kind, sourceRoleId: i.sourceRoleId, summary: i.summary, at: i.enqueuedAt, id: i.dedupKey, full: i.text });
+    const q = this.deliveryQueues.get(this.queueKey(projectRoot, targetRoleId, runtime)) ?? [];
+    const entry = this.sessions.get(this.sessionKey(projectRoot, targetRoleId, runtime));
+    const busy = entry?.busy === true;
+    const running = this.activeDeliveries.get(this.queueKey(projectRoot, targetRoleId, runtime));
+    const view = (i: DeliveryItem) => ({ runtime: i.runtime, kind: i.kind, sourceRoleId: i.sourceRoleId, summary: i.summary, at: i.enqueuedAt, id: i.dedupKey, full: i.text });
+    let contextInfo: Pick<OpenResult, "contextSource" | "contextWarning"> = {};
+    if (entry) contextInfo = this.contextInfo(entry.handle);
     this.deps.emitRoleState?.({
-      roleId: targetRoleId,
+      ...contextInfo,
+      roleId: targetRoleId, projectRoot, runtime, profileRevision: entry?.profileRevision ?? this.profileRevision(runtime),
       busy,
       summaries: q.map((i) => i.summary),
       queue: q.map(view),
@@ -1123,12 +1282,12 @@ export class SessionManager {
    *  **真机崩溃修复（2026-10-12）**：本函数经 `void` fire-and-forget 调用（consume 的事件循环），**任何上抛
    *  都会变成未捕获拒绝**——故：(1) 形状防御（缺 `handback` 载荷 / 缺 `roleId`）先拦；(2) `renderHandbackPrompt`
    *  渲染包 try/catch（坏形状绝不喂给它）；(3) 整体再包一层 catch——一切都落**如实系统行**，绝不上抛。 */
-  private async handleHandback(projectRoot: string, hb: TaskHandback): Promise<void> {
+  private async handleHandback(projectRoot: string, runtime: RuntimeKind, hb: TaskHandback): Promise<void> {
     const diagnostic = createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId: hb?.roleId });
     diagnostic.record("report.received", { outcome: hb?.status });
     try {
       if (!hb || typeof hb !== "object" || typeof (hb as { roleId?: unknown }).roleId !== "string") {
-        this.emitDeliveryNote(
+        this.emitDeliveryNote(projectRoot, runtime,
           this.suRoleIdOf(projectRoot),
           "(未知角色)",
           "收到一条**形状不符**的回交事件（缺 handback 载荷 / 缺 roleId）——**未投递**（如实忽略；不崩、不静默）。"
@@ -1137,7 +1296,7 @@ export class SessionManager {
       }
       const suRoleId = this.suRoleIdOf(projectRoot);
       if (suRoleId !== null && hb.roleId === suRoleId) return; // su 不自我回交（编排也不发；防御）
-      const key = `${projectRoot}\u0000${handbackKey(hb)}`;
+      const key = `${projectRoot}\u0000${runtime}\u0000${handbackKey(hb)}`;
       if (this.enqueuedHandbackKeys.has(key)) {
         diagnostic.record("report.duplicate");
         return;
@@ -1149,7 +1308,7 @@ export class SessionManager {
       try {
         text = renderHandbackPrompt(hb);
       } catch (err) {
-        this.emitDeliveryNote(
+        this.emitDeliveryNote(projectRoot, runtime,
           suRoleId,
           hb.roleId,
           `回交载荷无法渲染（${err instanceof Error ? err.message : String(err)}）——**未投递**（如实忽略；不崩）。`
@@ -1158,6 +1317,7 @@ export class SessionManager {
       }
       this.enqueueDelivery(projectRoot, suRoleId ?? "", {
         kind: "handback",
+        runtime,
         targetRoleId: suRoleId ?? "",
         sourceRoleId: hb.roleId,
         text,
@@ -1166,11 +1326,11 @@ export class SessionManager {
         handback: hb,
       });
       diagnostic.record("report.enqueued");
-      await this.drainQueue(projectRoot, suRoleId);
+      await this.drainQueue(projectRoot, suRoleId, runtime);
     } catch (err) {
       diagnostic.error("report.failed", err);
       // 兜底（belt & braces）：任何意外都如实拦截为系统行——**不产生未捕获拒绝**。
-      this.emitDeliveryNote(
+      this.emitDeliveryNote(projectRoot, runtime,
         this.suRoleIdOf(projectRoot),
         "(未知角色)",
         `回交处理异常已拦截（不产生未捕获拒绝）：${err instanceof Error ? err.message : String(err)}`
@@ -1192,11 +1352,11 @@ export class SessionManager {
    * 后续 `openInternal` 自动开会话读的也是它）再判；重枚举失败/仍无 ⇒ 按原口径如实拒绝（不静默、不重试风暴）。
    * 异步回执：契约 `DispatchTaskFn` 本就允许 `Promise<DispatchReceipt>`（工具侧 await）。
    */
-  private async routeDispatch(projectRoot: string, fromRoleId: string, d: DispatchTaskPayload): Promise<DispatchReceipt> {
+  private async routeDispatch(projectRoot: string, runtime: RuntimeKind, fromRoleId: string, d: DispatchTaskPayload): Promise<DispatchReceipt> {
     const targetRoleId = d && typeof d.roleId === "string" ? d.roleId.trim() : "";
     const task = d && typeof d.task === "string" ? d.task : "";
     const fail = (message: string, row: string): DispatchReceipt => {
-      this.emitDeliveryNote(fromRoleId, fromRoleId, row);
+      this.emitDeliveryNote(projectRoot, runtime, fromRoleId, fromRoleId, row);
       return { ok: false, message };
     };
     if (targetRoleId === "" || task.trim() === "") {
@@ -1229,13 +1389,14 @@ export class SessionManager {
       );
     }
     const reason = d && typeof d.reason === "string" ? d.reason : undefined;
-    const dedupKey = `${targetRoleId}\u0000${task}\u0000${reason ?? ""}`;
+    const dedupKey = `${projectRoot}\u0000${runtime}\u0000${targetRoleId}\u0000${task}\u0000${reason ?? ""}`;
     if (this.activeDispatchKeys.has(dedupKey)) {
       return { ok: true, message: `该派发（目标 ${targetRoleId}，同任务文本）已在投递队列中——已去重，不重复投递。` };
     }
     this.activeDispatchKeys.add(dedupKey);
     this.enqueueDelivery(projectRoot, targetRoleId, {
       kind: "dispatch",
+      runtime,
       targetRoleId,
       sourceRoleId: fromRoleId,
       // 文案单一来源应为编排 `renderDispatchPrompt`（未落地，见 `renderDispatchPromptLocal` 的登记）。
@@ -1243,12 +1404,12 @@ export class SessionManager {
       summary: `派发 · 来自 ${fromRoleId}：${shortenText(task, 40)}`,
       dedupKey,
     });
-    void this.drainQueue(projectRoot, targetRoleId);
+    void this.drainQueue(projectRoot, targetRoleId, runtime);
     return {
       ok: true,
       message:
         `已受理：任务将投递给角色 ${targetRoleId} 的会话` +
-        (this.sessions.get(targetRoleId) ? "" : "（其会话未开——将自动开启）") +
+        (this.sessions.get(this.sessionKey(projectRoot, targetRoleId, runtime)) ? "" : "（其会话未开——将自动开启）") +
         `；投递结果/失败会在其聊天流与 su 的聊天流如实显示（受理≠已完成）。`,
     };
   }
@@ -1261,8 +1422,19 @@ export class SessionManager {
       if (k.startsWith(prefix)) targets.push(k.slice(prefix.length));
     }
     for (const t of targets) {
-      await this.drainQueue(projectRoot, t);
+      const [target, runtime] = t.split("\u0000");
+      await this.drainQueue(projectRoot, target, runtime as RuntimeKind);
     }
+  }
+
+  private async drainPiQueuesAcrossProjects(): Promise<void> {
+    if (this.hasBusyRuntime("pi")) return;
+    const projects = new Set<string>();
+    for (const key of this.deliveryQueues.keys()) {
+      const [projectRoot, , runtime] = key.split("\u0000");
+      if (runtime === "pi") projects.add(projectRoot);
+    }
+    for (const projectRoot of projects) await this.drainAllQueuesFor(projectRoot);
   }
 
   /**
@@ -1270,13 +1442,13 @@ export class SessionManager {
    * **绝不允许上抛**（上抛＝未捕获拒绝）；且同项目的多次调用**串行**（见 `drainChains`）——真正的投递
    * 逻辑在 `drainQueueUnsafe`（逐字保留，串行门保证其不会被并发重入）。
    */
-  private async drainQueue(projectRoot: string, targetRoleId: string | null): Promise<void> {
+  private async drainQueue(projectRoot: string, targetRoleId: string | null, runtime: RuntimeKind): Promise<void> {
     const key = projectRoot;
     const prev = this.drainChains.get(key) ?? Promise.resolve();
     const next = prev
-      .then(() => this.drainQueueUnsafe(projectRoot, targetRoleId))
+      .then(() => this.drainQueueUnsafe(projectRoot, targetRoleId, runtime))
       .catch((err) => {
-        this.emitDeliveryNote(
+        this.emitDeliveryNote(projectRoot, runtime,
           this.suRoleIdOf(projectRoot),
           "(投递机)",
           `投递机异常已拦截（不产生未捕获拒绝）：${err instanceof Error ? err.message : String(err)}`
@@ -1296,20 +1468,20 @@ export class SessionManager {
    * 开启/投递失败 → **如实系统行 + 放回队首保留待重试**（下次时机：目标打开 / 下一次入队 / 一轮结束）。
    * 目标为空（回交入队时主入口暂未枚举到）→ 每次尝试重解析主入口；仍无 → 提示一次并保留。
    */
-  private async drainQueueUnsafe(projectRoot: string, targetRoleId: string | null): Promise<void> {
+  private async drainQueueUnsafe(projectRoot: string, targetRoleId: string | null, runtime: RuntimeKind): Promise<void> {
     const resolvedTarget =
       targetRoleId !== null && targetRoleId !== "" ? targetRoleId : (this.suRoleIdOf(projectRoot) ?? "");
-    const key = this.queueKey(projectRoot, resolvedTarget);
+    const key = this.queueKey(projectRoot, resolvedTarget, runtime);
     const q = this.deliveryQueues.get(key);
     if (!q || q.length === 0) return;
     const item = q[0];
     const diagnostic = createDiagnosticLogger({ component: "desktop.delivery", projectRoot, roleId: resolvedTarget });
 
     if (resolvedTarget === "") {
-      const noteKey = this.queueKey(projectRoot, "");
+      const noteKey = this.queueKey(projectRoot, "", runtime);
       if (!this.suDeliveryBlockedNoted.has(noteKey)) {
         this.suDeliveryBlockedNoted.add(noteKey);
-        this.emitDeliveryNote(
+        this.emitDeliveryNote(projectRoot, runtime,
           null,
           item.sourceRoleId,
           `有${item.kind === "handback" ? "回交" : "派发任务"}（来自 ${item.sourceRoleId}）待投递，但当前枚举不到目标（主入口角色）——**未投递**（已保留；下次时机自动重试）。`
@@ -1318,13 +1490,13 @@ export class SessionManager {
       return;
     }
 
-    let entry = this.sessions.get(resolvedTarget);
+    let entry = this.sessions.get(this.sessionKey(projectRoot, resolvedTarget, runtime));
     if (!entry || entry.projectRoot !== projectRoot) {
       // 目标会话**未开**（或属于别的项目）→ 自动开启再投（su=治理主入口；派发目标=被派角色）。
       // 后台开启（`userInitiated=false`）：**不抢活动角色**——用户正在看的会话不因投递而易主。
-      const opened = await this.openInternal({ projectRoot, roleId: resolvedTarget, runtime: this.lastRuntime }, false);
+      const opened = await this.openInternal({ projectRoot, roleId: resolvedTarget, runtime }, false);
       if (!opened.ok) {
-        this.emitDeliveryNote(
+        this.emitDeliveryNote(projectRoot, runtime,
           item.kind === "handback" ? resolvedTarget : item.sourceRoleId,
           item.sourceRoleId,
           item.kind === "handback"
@@ -1333,20 +1505,20 @@ export class SessionManager {
         );
         return;
       }
-      entry = this.sessions.get(resolvedTarget);
-      this.suDeliveryBlockedNoted.delete(this.queueKey(projectRoot, ""));
+      entry = this.sessions.get(this.sessionKey(projectRoot, resolvedTarget, runtime));
+      this.suDeliveryBlockedNoted.delete(this.queueKey(projectRoot, "", runtime));
     }
     if (!entry || entry.projectRoot !== projectRoot) return; // 防御：仍不可用则保持排队
-    if (entry.busy) {
+    if (entry.busy || (runtime === "pi" && entry.profileRevision !== this.profileRevision("pi") && this.hasBusyRuntime("pi"))) {
       diagnostic.record("delivery.blocked", { reasonCode: "target-busy", queueDepth: q.length });
       return;
     }
 
     // O-1：投递前查边界快照——陈旧 ⇒ 先作废重建（投递落到新边界会话上；失败则队列保留待重试）。
-    const rebuilt = await this.rebuildIfBoundaryStale(resolvedTarget, false);
+    const rebuilt = await this.rebuildIfBoundaryStale(this.sessionKey(projectRoot, resolvedTarget, runtime), false);
     if (rebuilt !== undefined) {
       if (!rebuilt.reopened.ok) return; // 队列保留（下次时机自动重试；失败已有如实一行）
-      entry = this.sessions.get(resolvedTarget);
+      entry = this.sessions.get(this.sessionKey(projectRoot, resolvedTarget, runtime));
       if (!entry || entry.projectRoot !== projectRoot) return; // 防御：重开后仍不可用
     }
 
@@ -1364,10 +1536,10 @@ export class SessionManager {
     const sentItems = q.splice(0, batchCount);
     const sent: DeliveryItem = { ...sentItems[0], text, summary, batchItems: sentItems };
     if (q.length === 0) this.deliveryQueues.delete(key);
-    this.notifyRoleState(projectRoot, resolvedTarget); // L-1：出队即外推（队列行/徽标随之更新）
+    this.notifyRoleState(projectRoot, resolvedTarget, runtime); // L-1：出队即外推（队列行/徽标随之更新）
     // 形状防御（真机崩溃修复的姊妹项）：条目坏了就**不投**——如实一行，绝不把 undefined 喂给 send。
     if (!sent || typeof sent.text !== "string" || sent.text === "") {
-      this.emitDeliveryNote(
+      this.emitDeliveryNote(projectRoot, runtime,
         sent && typeof sent.sourceRoleId === "string" ? sent.sourceRoleId : null,
         "(投递机)",
         "投递条目形状不符（缺正文/来源）——已丢弃该条并如实记行（不崩）。"
@@ -1375,40 +1547,44 @@ export class SessionManager {
       return;
     }
     // 先置忙再 await（防「open 尾部放行」与本次调用竞态导致并发 send）；失败则复位。
+    const origin = this.beginDeliveryOrigin(entry, sent.clientMessageId);
+    entry.interactionState.turn = new AbortController();
     entry.busy = true;
+    this.activeDeliveries.set(key, sent); // 与 busy 同时登记；settled/失败/dispose 精确撤销。
     diagnostic.record("delivery.start", { count: batchCount, queueDepth: q.length, state: sent.kind });
-    this.notifyRoleState(projectRoot, resolvedTarget); // 状态准确性：投递开跑即外推「工作中」（shift 时快照尚为闲）
+    this.notifyRoleState(projectRoot, resolvedTarget, runtime); // 状态准确性：投递开跑即外推「工作中」（shift 时快照尚为闲）
     try {
       // P0-1：**入队即定格**的整包载荷原样透传（整包同一引用；不传时调用形态与旧版逐字一致）。
-      if (sent.opts === undefined) {
-        await entry.handle.send(sent.text);
-      } else {
-        await entry.handle.send(sent.text, sent.opts);
-      }
-      this.activeDeliveries.set(key, sent); // 右栏「进行中」：投递已开跑（settled/失败/dispose 时清除）
+      await this.sendDelivery(entry, origin, sent.text, sent.opts);
       diagnostic.record("delivery.end", { ok: true, count: batchCount, state: sent.kind });
-      this.notifyRoleState(projectRoot, resolvedTarget); // 立即外推（running 行即时可见）
+      this.notifyRoleState(projectRoot, resolvedTarget, runtime); // 立即外推（running 行即时可见）
       if (sent.kind === "dispatch") this.activeDispatchKeys.delete(sent.dedupKey); // 送达即释放窗口去重（返工可再派）
       if (sent.kind === "handback") {
-        this.emitDeliveryNote(resolvedTarget, sent.sourceRoleId, `已自动投递 ${sentItems.map((queued) => queued.sourceRoleId).join("、")} 的回交给 su（等待验收与汇总）。`);
+        this.emitDeliveryNote(projectRoot, runtime, resolvedTarget, sent.sourceRoleId, `已自动投递 ${sentItems.map((queued) => queued.sourceRoleId).join("、")} 的回交给 su（等待验收与汇总）。`);
       } else if (sent.kind === "dispatch") {
         // 派发成功：目标 pane 看得见"任务到货"，su 的 pane 有一条受理回执行（受理≠已完成，如实）。
-        this.emitDeliveryNote(resolvedTarget, sent.sourceRoleId, `已接收来自 ${sent.sourceRoleId} 的派发任务——请按任务文本执行，完成后交回报告。`);
-        this.emitDeliveryNote(sent.sourceRoleId, sent.sourceRoleId, `已派发任务给 ${resolvedTarget}（已投递到其会话；其结果/回交会回到本会话）。`);
+        this.emitDeliveryNote(projectRoot, runtime, resolvedTarget, sent.sourceRoleId, `已接收来自 ${sent.sourceRoleId} 的派发任务——请按任务文本执行，完成后交回报告。`);
+        this.emitDeliveryNote(projectRoot, runtime, sent.sourceRoleId, sent.sourceRoleId, `已派发任务给 ${resolvedTarget}（已投递到其会话；其结果/回交会回到本会话）。`);
       }
       // message 类（排队后的客户消息投递）：**不加额外文案**——消息本体随会话事件出现（真实 pi 的
       // 「用户指令：」回显走注入样式行），此前误落进派发分支（「已接收…派发任务」对消息是错口径，已修）。
     } catch (err) {
       diagnostic.error("delivery.failed", err, { count: batchCount, state: sent.kind });
+      const ownsRunningDelivery = entry.origins.running === origin;
+      this.failDeliveryOrigin(entry, origin);
       // 投递失败：**如实提示 + 放回队首**（保持顺序）待重试——绝不静默丢。
-      const en = this.sessions.get(resolvedTarget);
-      if (en) en.busy = false;
-      this.activeDeliveries.delete(key); // 「进行中」撤销（并没有在跑）
-      q.unshift(...sentItems);
-      this.deliveryQueues.set(key, q);
-      this.notifyRoleState(projectRoot, resolvedTarget); // 放回队首：队列快照恢复（如实）
+      const en = this.sessions.get(this.sessionKey(projectRoot, resolvedTarget, runtime));
+      if (en === entry && ownsRunningDelivery) {
+        en.interactionState.turn.abort();
+        en.busy = false;
+      }
+      if (this.activeDeliveries.get(key) === sent) this.activeDeliveries.delete(key);
+      const waiting = this.deliveryQueues.get(key) ?? q;
+      waiting.unshift(...sentItems);
+      this.deliveryQueues.set(key, waiting);
+      this.notifyRoleState(projectRoot, resolvedTarget, runtime); // 放回队首：队列快照恢复（如实）
       const base = err instanceof Error ? err.message : String(err);
-      this.emitDeliveryNote(
+      this.emitDeliveryNote(projectRoot, runtime,
         sent.kind === "handback" ? resolvedTarget : sent.sourceRoleId,
         sent.sourceRoleId,
         sent.kind === "handback"

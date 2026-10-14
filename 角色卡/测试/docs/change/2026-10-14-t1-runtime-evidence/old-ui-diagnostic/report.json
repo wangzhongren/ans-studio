@@ -1,0 +1,387 @@
+{
+  "environment": {
+    "electron": "44.7.0",
+    "node": "24.21.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "hidden": true
+  },
+  "input": {
+    "root": "/nonexistent-independent-ui-reacceptance-fixture",
+    "widths": [
+      1360,
+      960
+    ],
+    "initialQueue": [
+      {
+        "id": "own-customer\u0000one",
+        "kind": "message",
+        "summary": "客户独立摘要：这是一条需要保留来源和操作归属的排队消息。这是一条需要保留来源和操作归属的排队消息。这是一条需要保留来源和操作归属的排队消息。这是一条需要保留来源和操作归属的排队消息。这是一条需要保留来源和操作归属的排队消息。这是一条需要保留来源和操作归属的排队消息。",
+        "full": "普通中文全文首段。\n请逐段阅读这份普通消息，并核对右边的每一个字都能够显示。请逐段阅读这份普通消息，并核对右边的每一个字都能够显示。请逐段阅读这份普通消息，并核对右边的每一个字都能够显示。请逐段阅读这份普通消息，并核对右边的每一个字都能够显示。请逐段阅读这份普通消息，并核对右边的每一个字都能够显示。请逐段阅读这份普通消息，并核对右边的每一个字都能够显示。请逐段阅读这份普通消息，并核对右边的每一个字都能够显示。请逐段阅读这份普通消息，并核对右边的每一个字都能够显示。请逐段阅读这份普通消息，并核对右边的每一个字都能够显示。请逐段阅读这份普通消息，并核对右边的每一个字都能够显示。请逐段阅读这份普通消息，并核对右边的每一个字都能够显示。请逐段阅读这份普通消息，并核对右边的每一个字都能够显示。\nOrdinary English sentences wrap inside the drawer without losing their final words. \nOrdinary English sentences wrap inside the drawer without losing their final words. \nOrdinary English sentences wrap inside the drawer without losing their final words. \nOrdinary English sentences wrap inside the drawer without losing their final words. \nOrdinary English sentences wrap inside the drawer without losing their final words. \nOrdinary English sentences wrap inside the drawer without losing their final words. \nOrdinary English sentences wrap inside the drawer without losing their final words. \nOrdinary English sentences wrap inside the drawer without losing their final words. \nOrdinary English sentences wrap inside the drawer without losing their final words. \nOrdinary English sentences wrap inside the drawer without losing their final words. \nOrdinary English sentences wrap inside the drawer without losing their final words. \nOrdinary English sentences wrap inside the drawer without losing their final words. \nOrdinary English sentences wrap inside the drawer without losing their final words. \nOrdinary English sentences wrap inside the drawer without losing their final words. \nOrdinary English sentences wrap inside the drawer without losing their final words. \n全文末尾独立哨兵。",
+        "at": "2026-10-13T08:01:00.000Z"
+      },
+      {
+        "id": "own-dispatch",
+        "kind": "dispatch",
+        "sourceRoleId": "B",
+        "summary": "派发摘要独立二",
+        "full": "派发全文独立二。派发全文独立二。派发全文独立二。派发全文独立二。派发全文独立二。派发全文独立二。派发全文独立二。派发全文独立二。派发全文独立二。派发全文独立二。派发全文独立二。派发全文独立二。派发全文独立二。派发全文独立二。派发全文独立二。派发全文独立二。派发全文独立二。派发全文独立二。派发全文独立二。派发全文独立二。",
+        "at": "2026-10-13T08:02:00.000Z"
+      },
+      {
+        "id": "own-handback",
+        "kind": "handback",
+        "sourceRoleId": "B",
+        "summary": "回交摘要独立三",
+        "full": "回交全文独立三。回交全文独立三。回交全文独立三。回交全文独立三。回交全文独立三。回交全文独立三。回交全文独立三。回交全文独立三。回交全文独立三。回交全文独立三。回交全文独立三。回交全文独立三。回交全文独立三。回交全文独立三。回交全文独立三。回交全文独立三。回交全文独立三。回交全文独立三。回交全文独立三。回交全文独立三。",
+        "at": "2026-10-13T08:03:00.000Z"
+      }
+    ]
+  },
+  "startHashes": {
+    "app/renderer/index.html": "099705d9b9b408f959524da76b83c4c60d88b49a8e3f0b72399a702217b009eb",
+    "app/renderer/renderer.js": "d8e84f2c90ffb61643d1951d6b13fdb2bdd41129aca02dab0c5537fdd0a6e30a",
+    "app/renderer/styles.css": "a3cec1a4787743ca4ea7d83888c6f83134c8e15755f3e7fe200ad732b0f97c41",
+    "app/renderer/tool-rows.js": "6b89e5c087f33688f9e478d0551d2e37ad1d410a3af96415f536ed539b8bc79e",
+    "app/renderer/ui-labels.js": "84675062eee465df856b4c8dc07a352b84b4d6e9407a89098229a5335b3526cb",
+    "app/preload.cjs": "00fd1faf8063e3b5697e582504749c2b7a38439def396086c61628f20e607300",
+    "app/desktop/session-history.ts": "a99cf603f46793f2f4c6b0876acbfcc06a278b95b35aa3d52c26376dd3cd67b2",
+    "test/测试/ui-reacceptance-renderer-regression.mjs": "d9c4ae1ce161f2b6f1fb443bfe5f51ceeda76e1422b5148d11ef922851151b1e"
+  },
+  "endHashes": {
+    "app/renderer/index.html": "099705d9b9b408f959524da76b83c4c60d88b49a8e3f0b72399a702217b009eb",
+    "app/renderer/renderer.js": "d8e84f2c90ffb61643d1951d6b13fdb2bdd41129aca02dab0c5537fdd0a6e30a",
+    "app/renderer/styles.css": "a3cec1a4787743ca4ea7d83888c6f83134c8e15755f3e7fe200ad732b0f97c41",
+    "app/renderer/tool-rows.js": "6b89e5c087f33688f9e478d0551d2e37ad1d410a3af96415f536ed539b8bc79e",
+    "app/renderer/ui-labels.js": "84675062eee465df856b4c8dc07a352b84b4d6e9407a89098229a5335b3526cb",
+    "app/preload.cjs": "00fd1faf8063e3b5697e582504749c2b7a38439def396086c61628f20e607300",
+    "app/desktop/session-history.ts": "a99cf603f46793f2f4c6b0876acbfcc06a278b95b35aa3d52c26376dd3cd67b2",
+    "test/测试/ui-reacceptance-renderer-regression.mjs": "d9c4ae1ce161f2b6f1fb443bfe5f51ceeda76e1422b5148d11ef922851151b1e"
+  },
+  "report": [
+    {
+      "name": "R1 one rendered governance fact 1360",
+      "observation": {
+        "ok": true,
+        "facts": [
+          "实际写入导入项目，角色边界外的写入会被拒绝。"
+        ]
+      }
+    },
+    {
+      "name": "R2 queue identity geometry 1360 own-customer\u0000one",
+      "observation": {
+        "ok": true,
+        "pos": "1",
+        "source": "客户消息",
+        "time": "16:01:00",
+        "actions": [
+          {
+            "left": 1053,
+            "top": 399.9375,
+            "right": 1099,
+            "bottom": 427.9375,
+            "width": 46,
+            "height": 28
+          },
+          {
+            "left": 1107,
+            "top": 399.9375,
+            "right": 1153,
+            "bottom": 427.9375,
+            "width": 46,
+            "height": 28
+          }
+        ],
+        "summary": {
+          "left": 1053,
+          "top": 318.9375,
+          "right": 1330,
+          "bottom": 393.9375,
+          "width": 277,
+          "height": 75
+        },
+        "full": {
+          "left": 1053,
+          "top": 437.9375,
+          "right": 1330,
+          "bottom": 1523.3125,
+          "width": 277,
+          "height": 1085.375
+        }
+      }
+    },
+    {
+      "name": "R2 queue identity geometry 1360 own-dispatch",
+      "observation": {
+        "ok": true,
+        "pos": "2",
+        "source": "su 派发",
+        "time": "16:02:00",
+        "actions": [
+          {
+            "left": 1053,
+            "top": 417.0625,
+            "right": 1099,
+            "bottom": 445.0625,
+            "width": 46,
+            "height": 28
+          }
+        ],
+        "summary": {
+          "left": 1053,
+          "top": 392.3125,
+          "right": 1330,
+          "bottom": 411.0625,
+          "width": 277,
+          "height": 18.75
+        },
+        "full": {
+          "left": 1053,
+          "top": 455.0625,
+          "right": 1330,
+          "bottom": 652.625,
+          "width": 277,
+          "height": 197.5625
+        }
+      }
+    },
+    {
+      "name": "R2 queue identity geometry 1360 own-handback",
+      "observation": {
+        "ok": true,
+        "pos": "3",
+        "source": "回交投递",
+        "time": "16:03:00",
+        "actions": [
+          {
+            "left": 1053,
+            "top": 416.875,
+            "right": 1099,
+            "bottom": 444.875,
+            "width": 46,
+            "height": 28
+          }
+        ],
+        "summary": {
+          "left": 1053,
+          "top": 392.125,
+          "right": 1330,
+          "bottom": 410.875,
+          "width": 277,
+          "height": 18.75
+        },
+        "full": {
+          "left": 1053,
+          "top": 454.875,
+          "right": 1330,
+          "bottom": 652.4375,
+          "width": 277,
+          "height": 197.5625
+        }
+      }
+    },
+    {
+      "name": "R2 ordinary full no overflow or clipped text 1360",
+      "observation": {
+        "ok": true,
+        "body": {
+          "scrollWidth": 349,
+          "clientWidth": 349
+        },
+        "full": {
+          "scrollWidth": 277,
+          "clientWidth": 277
+        }
+      }
+    },
+    {
+      "name": "R2 only queued customer withdrawable 1360",
+      "observation": true
+    },
+    {
+      "name": "actual Tab reaches #right-body .q-withdraw",
+      "observation": [
+        {
+          "matched": false,
+          "id": "btn-halt",
+          "cls": "cap-halt",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "btn-send",
+          "cls": "cap-send",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "drawer-close",
+          "cls": "drawer-close",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "q-toggle",
+          "visible": true
+        },
+        {
+          "matched": false,
+          "id": "",
+          "cls": "q-toggle",
+          "visible": true
+        },
+        {
+          "matched": true,
+          "id": "",
+          "cls": "q-withdraw",
+          "visible": true
+        }
+      ]
+    },
+    {
+      "name": "R2 Shift+Tab reaches same item full action 1360",
+      "observation": true
+    },
+    {
+      "name": "R3 five independent exceptional rows 1360",
+      "observation": true
+    },
+    {
+      "name": "R3 collapsed reliable cause and target truly visible 1360 0",
+      "observation": {
+        "ok": true,
+        "visible": {
+          "open": false,
+          "text": "没有写入权限，未执行outside/independent-denied.md",
+          "hit": true,
+          "horizontal": true
+        }
+      }
+    },
+    {
+      "name": "R3 collapsed reliable cause and target truly visible 1360 1",
+      "observation": {
+        "ok": true,
+        "visible": {
+          "open": false,
+          "text": "文件不存在（ENOENT）docs/independent-missing.md",
+          "hit": true,
+          "horizontal": true
+        }
+      }
+    },
+    {
+      "name": "R3 collapsed reliable cause and target truly visible 1360 2",
+      "observation": {
+        "ok": true,
+        "visible": {
+          "open": false,
+          "text": "run_shell 已执行：node --check independent-missing.js（exit 2）",
+          "hit": true,
+          "horizontal": true
+        }
+      }
+    },
+    {
+      "name": "R3 collapsed reliable cause and target truly visible 1360 3",
+      "observation": {
+        "ok": true,
+        "visible": {
+          "open": false,
+          "text": "旧记录失败，目标无法得知目标未记录",
+          "hit": true,
+          "horizontal": true
+        }
+      }
+    },
+    {
+      "name": "R3 collapsed reliable cause and target truly visible 1360 4",
+      "observation": {
+        "ok": true,
+        "visible": {
+          "open": false,
+          "text": "run_shell 已执行：printf \"ok\"; false（exit 2）",
+          "hit": true,
+          "horizontal": true
+        }
+      }
+    },
+    {
+      "name": "S1 orphan own failure headline complete without unknown target 1360 0",
+      "observation": {
+        "ok": true,
+        "text": "read_file 失败：lost.md（ENOENT）"
+      }
+    },
+    {
+      "name": "S1 orphan own failure headline complete without unknown target 1360 1",
+      "observation": {
+        "ok": true,
+        "text": "read_file 失败：lost.md（ENOENT）"
+      }
+    },
+    {
+      "name": "S1 result body cannot invent failure or target 1360",
+      "observation": {
+        "ok": true,
+        "summaries": [
+          "查看执行记录1 条活动 · 含状态未记录"
+        ]
+      }
+    },
+    {
+      "name": "R3 missing reliable state remains unknown 1360",
+      "observation": false
+    }
+  ],
+  "withdrawCalls": [],
+  "responses": [],
+  "sends": [],
+  "consoleErrors": [],
+  "failure": {
+    "message": "AssertionError [ERR_ASSERTION]: R3 missing reliable state remains unknown 1360: false\n\nfalse !== true\n",
+    "stack": "AssertionError [ERR_ASSERTION]: R3 missing reliable state remains unknown 1360: false\n\nfalse !== true\n\n    at check (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%B5%8B%E8%AF%95/ui-reacceptance-renderer-regression.mjs:55:10)\n    at async main (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%B5%8B%E8%AF%95/ui-reacceptance-renderer-regression.mjs:229:5)\n    at async file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%B5%8B%E8%AF%95/ui-reacceptance-renderer-regression.mjs:414:5",
+    "snapshot": {
+      "selected": "B",
+      "runtime": "pi",
+      "project": "/nonexistent-independent-ui-reacceptance-fixture",
+      "model": {
+        "count": 1,
+        "lastIndex": 0,
+        "operators": [],
+        "rowGap": 16
+      },
+      "chat": {
+        "scrollTop": 0,
+        "scrollHeight": 655,
+        "clientHeight": 655,
+        "box": {
+          "top": 104.5234375,
+          "bottom": 760,
+          "left": 272,
+          "right": 1360,
+          "width": 1088,
+          "height": 655.4765625
+        }
+      },
+      "groups": [],
+      "chatChildren": [
+        {
+          "className": "chat-pane",
+          "role": "B",
+          "box": {
+            "top": 132.5234375,
+            "bottom": 732,
+            "left": 436,
+            "right": 1196,
+            "width": 760,
+            "height": 599.4765625
+          }
+        }
+      ],
+      "text": "会话记录读取失败，未回放：读取历史失败：Error invoking remote method 'session:history-get': Error: No handler registered for 'session:history-get'"
+    }
+  }
+}

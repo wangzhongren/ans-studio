@@ -1,12 +1,12 @@
 import { randomUUID } from "node:crypto";
-import type { SessionEvent } from "../../provider/pi/session.ts";
+import type { SessionEvent } from "../../model/runtime.ts";
 import type { createDiagnosticLogger } from "../shared/diagnostics.ts";
 
 export type DiagnosticLog = ReturnType<typeof createDiagnosticLogger>;
 export type TurnOutcome = "completed" | "failed" | "aborted" | "timed_out";
 
 /** One prompt identity, shared by tools, reports and the single terminal emitter. */
-export function createTurnLifecycle(emit: (event: SessionEvent) => void, diagnostics?: DiagnosticLog) {
+export function createTurnLifecycle(emit: (event: SessionEvent) => void, diagnostics?: DiagnosticLog, suppliedTurnId?: () => string | undefined) {
   let turnId: string | undefined;
   let settled = false;
   let outcome: TurnOutcome = "completed";
@@ -15,11 +15,13 @@ export function createTurnLifecycle(emit: (event: SessionEvent) => void, diagnos
   let startedAt = 0;
   let quarantined = false;
   let sdkSettled = false;
+  let active = false;
   return {
     currentTurnId: (): string | undefined => turnId,
     begin(): void {
       if (quarantined) throw new Error("会话中止清理未完成，请重新建立会话后重试。");
-      turnId = randomUUID();
+      active = true;
+      turnId = suppliedTurnId?.() ?? randomUUID();
       settled = false;
       forced = false;
       sdkSettled = false;
@@ -29,7 +31,8 @@ export function createTurnLifecycle(emit: (event: SessionEvent) => void, diagnos
       diagnostics?.record("prompt.start", { turnId });
     },
     fail(next: TurnOutcome, code: string): void {
-      if (settled) return;
+      // The first explicit interruption is authoritative; cleanup/rejection cannot relabel it.
+      if (settled || forced) return;
       forced = true;
       outcome = next;
       errorCode = code;
@@ -52,6 +55,7 @@ export function createTurnLifecycle(emit: (event: SessionEvent) => void, diagnos
       if (settled) return;
       if (aborted && !forced) { outcome = "aborted"; errorCode = "ABORTED"; }
       settled = true;
+      active = false;
       const detail = { turnId, outcome, ...(errorCode ? { errorCode } : {}) };
       if (outcome !== "completed") {
         emit({ kind: "denied", summary: outcome === "timed_out" ? "本轮运行超时" : outcome === "aborted" ? "本轮已中止" : "本轮模型运行失败", detail });
@@ -63,6 +67,7 @@ export function createTurnLifecycle(emit: (event: SessionEvent) => void, diagnos
       quarantined = true;
       diagnostics?.record("session.quarantined", { turnId, state: "quarantined" });
     },
+    isActive: (): boolean => active,
     isSettled: (): boolean => settled,
   };
 }

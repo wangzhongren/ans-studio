@@ -1,0 +1,45 @@
+✔ listProject 映射为 RoleView（无 writeSet 字段） (6.908167ms)
+✔ 内置角色 su：RoleView 标为 builtIn，且不去读文档索引（cardPath 为空串） (0.47375ms)
+✔ openSession 点角色即开：scope undefined、导入即授权；多轮 send 透传、stop 收口 (65.48775ms)
+✔ 切换角色（B-2）：open 新角色**不** dispose 旧会话（并存）；定向 stop 只关指定角色 (7.153792ms)
+✔ stopSession：无运行中会话时如实返回 (0.389709ms)
+✔ openSession：未先枚举项目则报错 (0.2085ms)
+✔ listProject：内置 su（已 bootstrap）不再带 readOnly 字段（只读徽标已移除） (0.799917ms)
+✔ listProject：**未 bootstrap**（创世态）内置 su 亦不再带 readOnly 字段 (0.351542ms)
+✔ listProject：可写的项目角色（非内置）亦不再带 readOnly 字段 (1.598042ms)
+✔ T17 listProject：hasRoles 与 primaryRoleId 原样转自门禁引擎（渲染侧据此设主位/默认选中，不硬编码 su） (0.278916ms)
+✔ T17 主入口角色一轮结束（settled）→ 触发 emitProjectChanged；非主入口角色不触发 (54.565625ms)
+✔ T20 handback 事件被外推：Interface 层的 emitEvent 收到编排的 handback 事件（类型已放宽到 OrchestrationEvent） (31.217375ms)
+✔ A-5 customerInput：Interface 透传客户通道；仅内置治理角色（su）会话被注入，且 roleId 经闭包绑定 (1.111916ms)
+✔ D1 shared registry: effective env/file/fallback sources, every secret masked, whitespace is unset (10.403209ms)
+✔ D1 configuration writes only selected string keys atomically, masks URL/userinfo failure and retains revision on failure (15.368458ms)
+✔ D1 same role and project across engines and same role across projects keep distinct handles and exact input targets (12.611042ms)
+✔ D1 background dispatch, queued customer input and handback pin the source engine after selection switches (10.126ms)
+✔ D1 actual Pipeline/Service chooses demo, writes isolated replay and converts native context honestly (70.327667ms)
+✔ D1 actual Pipeline/Service chooses pi, writes isolated replay and converts native context honestly (61.982167ms)
+✔ D1 actual Pipeline/Service chooses codex, writes isolated replay and converts native context honestly (37.995583ms)
+✔ D1 actual Pipeline/Service chooses claude, writes isolated replay and converts native context honestly (33.809917ms)
+✔ D1 profile success rebuilds same engine after busy old Pi finishes; ambient token remains old until safe; failure is unchanged (8.435416ms)
+✔ D1 original customer signal cancels pending confirm/choice and old yes cannot settle a new card (0.933834ms)
+✔ D1 shell terminal failure/timeout and dispose invalidate exact handle card, old allow is expired (3.379417ms)
+✔ D1 state debouncing and constrained bridges preserve project/runtime identity (1.214375ms)
+✔ D1 last busy Pi in another project releases queued profile rebuild without changing ambient mid-turn (4.738917ms)
+✔ D1 confirmation bridge keeps original signal identity and an old disposed stream cannot cancel a new handle card (0.750209ms)
+✔ D1 old Pi JSONL is a display-only fallback and never becomes Codex/Claude history or native restore proof (3.590542ms)
+✔ D1R ANS history preserves authoritative turn/event identity, independent same text and delta order (1.999167ms)
+✔ D1R legacy Pi rows keep optional turn/event metadata absent (2.262583ms)
+✔ D-1 目录契约 + 解析：header + user/assistant(含 toolCall)/toolResult(isError) → 规范化行（顺序与时间保留） (2.653083ms)
+✔ D-1 防御式：坏行/未知 entry/未知 role 跳过不抛（计入 skipped）；header 不合法 → 整体判失败 (1.036375ms)
+✔ D-1 pickLatestSessionFile：mtime 大者优先；并列取名字大者（确定性） (0.183292ms)
+✔ D-1 粗探 probeSessionFile：无文件=missing；header 合法=ok；坏文件=corrupt（打开会话时分类 contextSource 用） (25.519667ms)
+✔ D-1 readRoleSessionHistory：无目录=无历史（ok）；挑最近文件；坏文件→ok:false+error；**跨角色不串** (23.242083ms)
+✔ 锚点标识：request_confirmation 的调用行与结论行带同一 requestId/anchorKey（toolCallId 配对，不解析正文） (0.650833ms)
+✔ 锚点标识：request_choice 同样配对；非交互工具/缺 title/孤儿结论一概不着锚（其余行零变化） (0.558917ms)
+ℹ tests 37
+ℹ suites 0
+ℹ pass 37
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1402.86625

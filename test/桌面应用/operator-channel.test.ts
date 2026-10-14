@@ -189,7 +189,7 @@ test("arm 决策（I-1 + 补丁）：DESKTOP_SHELL_GATE_ARMED === true——(c) 
   assert.ok(ifaceSrc.includes("shellArming: deps.shellArming"), "Interface 应把 (c) 实件透传给会话管理器");
   const sessSrc = fs.readFileSync(path.join(APP_DIR, "desktop", "session.ts"), "utf8");
   assert.ok(
-    /role\.builtIn === true \? undefined : this\.deps\.shellOperatorChannel/.test(sessSrc),
+    sessSrc.includes("role.builtIn !== true && this.deps.shellOperatorChannel"),
     "session.ts：**仅项目角色**注入 (a)（su 不接 (b)/(a)——审读者不给自己开闸）"
   );
   assert.ok(
@@ -680,7 +680,8 @@ test("I-1 注入判据：**项目角色**会话收到 (a) 通道 + (c) 实件（
   await mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "pi" });
   const a = captured.find((c) => c.roleId === "A");
   const su = captured.find((c) => c.roleId === "su");
-  assert.equal(a!.shellOperatorChannel, channel, "项目角色应收到 (a) 通道（arm 接线生效）");
+  assert.equal(typeof a!.shellOperatorChannel, "function", "项目角色应收到绑定本会话生命周期的 (a) 通道");
+  assert.deepEqual(await a!.shellOperatorChannel!({ command: "fixture", argv: ["fixture"], cwd: "/proj", toolCallId: "D1" }), await channel({ command: "fixture", argv: ["fixture"], cwd: "/proj", toolCallId: "D1" }), "绑定包装仍原样转交通道裁决");
   assert.equal(su!.shellOperatorChannel, undefined, "su 不接 (b)/(a)（审读者不给自己开闸：不自审、不弹框）");
   assert.equal(a!.shellArming, armingStub, "(c) 实件应**原引用**下发给项目角色（装配面不加工——引用同一性）");
   assert.equal(su!.shellArming, undefined, "su 不接三层链（其 shell 走只读档）");

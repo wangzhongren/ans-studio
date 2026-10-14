@@ -1,0 +1,22 @@
+# Claude 适配器实现报告
+
+实现对应 [ANS-RUNTIME-V2 revision 1](../项目管理/docs/design/2026-10-14_design_multi-runtime-integration.md) 与 [冻结的核心契约](../运行时核心/api-spec.md)。公开入口为 `src/provider/claude/session.ts::createClaudeRuntimeAdapter(options: RuntimeProviderOptions, dependencies?: ClaudeAdapterDependencies): RuntimeAdapter`，同步返回适配器。`composeContext` 只组合固定角色、边界和工具指南；`bindRole` 只读取注入存储；SDK/Zod 在首次实际 prompt 懒加载。
+
+`ClaudeAdapterDependencies` 仅提供测试替换：`loadSdk` 返回真实 `query/createSdkMcpServer` 形状、`loadZod` 返回 Zod module、`env` 提供隔离环境。生产缺省使用官方包和 process.env，不要求新增 Model 字段。只替换 query 即可由真实 SDK MCP 注册/Client 测生产 handlers；不得调用真实模型来作为常规测试。
+
+SDK 为 `@anthropic-ai/claude-agent-sdk@0.3.299`，正式 peers `zod@4.6.7`、`@modelcontextprotocol/sdk@1.32.1`、`@anthropic-ai/sdk@0.93.0`；SDK metadata 的 native CLI 是 2.1.299，Node 要求 ≥18。依赖安装及 lock 归装配；当前正式版本已复测；以后变更依赖须重跑本角色测试。官方[工具](https://code.claude.com/docs/en/agent-sdk/custom-tools)、[流式输入](https://code.claude.com/docs/en/agent-sdk/streaming-vs-single-mode)、[会话](https://code.claude.com/docs/en/agent-sdk/sessions)及实际 npm tarball `sdk.d.ts` 为接口依据。
+
+配置消费 `modelId/baseUrl/apiKeyEnvVar/promptTimeoutMs/constructTimeoutMs`。环境在适配器构造时复制；认证、endpoint、model和redaction使用同一快照，保存新profile不会改变旧session。环境对应 `ANS_CLAUDE_MODEL` 可选（空为 SDK 默认）、`ANTHROPIC_BASE_URL` 可选（HTTP(S)，拒绝 userinfo）、`ANTHROPIC_API_KEY` 必需（自定义 apiKeyEnvVar 显式映射为此字段）。不接受订阅/OAuth/AUTH_TOKEN 回退。子进程 env 是基础字段 allowlist 加当前 API key/endpoint/独立 config 根，其他 runtime 秘密和 provider 开关不继承。消息/错误用共享全部 credential keys 值净化；handler 异常不透传原文。
+
+实际 SDK Options 为 `tools:[]`、精确 `allowedTools`、`settingSources:[]`（单数）、`strictMcpConfig:true`、`skills:[]/plugins:[]`、`settings:{disableAllHooks:true}`、`extraArgs:{'disable-slash-commands':null}`。SDK MCP server 的 `instance.registerTool` 支持完整 Zod object；JSON Schema 使用严格支持集与真实 Zod `fromJSONSchema` 转换，不截取 root shape，因此 required/optional/union/嵌套/additionalProperties 保留。未知关键字、类型或 required 引用不声明属性明确拒绝。所有 MCP handler 顺序执行，只调用传入的 ANS handler；PreToolUse 必须匹配精确工具名及 `mcp_server={name:'ans',source:'sdk'}`、有效活动轮次，否则 deny；未知 canUseTool 请求 deny。工具事件 detail 用 `toolName/toolCallId`，call ID 包含 ANS turn ID 与原始 native tool_use_id。
+
+`RoleSession.prompt` 支持连续轮次与 PNG/JPEG/GIF/WebP 输入图片。一个活 query 承载多条消息；SDK transport UUID 独立于公共 turnId。每轮只发一次 settled，detail 为 `{outcome,turnId,cleanupError?}`，outcome 为 completed/failed/aborted/timed_out。等待 InteractionGate 时 prompt 时限暂停；stop 先中止该轮 signal，再有限等待 interrupt/close；关闭和 late handlers 不能用下一轮信号，不能回交 late 成功。dispose 幂等并清理临时原生配置。报告/派发成功取决于注入 handler 回执，不从 settled 推导任务完成。
+
+持久化使用注入 storage 的 `validateNativeDirectory/readLatest/prepareNativeDirectory` 及精确 nativeDirectory。SDK `CLAUDE_CONFIG_DIR` 指向该独立根，不能探测共享全局 session；索引和 ANS replay 由 Service 维护。无 storage 时只使用临时配置根和 `persistSession:false`，不创建项目 `.ans`。读取 ID 不标 resumed；只有对应 ID 的成功 SDK result 后才更新。恢复未确认且本轮失败时清除 native ID、附 warning，当前输入不自动重试；下一条明确输入新建上下文，状态 recovered 保留 warning。ANS 回放不构成原生恢复。
+
+原生 MCP 必需 mitigation：`server.timeout=2147483647`、`CLAUDE_CODE_MCP_AUTO_BACKGROUND_MS=0`。ANS prompt deadline 暂停，但 SDK 的硬工具 timer 无禁用接口，客户原生等待仍有约 24.8 天上限；到期不授意、不伪造报告。依据[官方 MCP timeout](https://code.claude.com/docs/en/mcp)。
+
+原生 CLI 2.1.299 已实测：`bare` 会抑制显式 SDK hooks，因此生产移除 bare，改用已验证的 `settings.disableAllHooks:true` 禁用设置文件及插件 hooks，同时保留显式 SDK callbacks。native `prompt_id` 与发送的 SDK input UUID 不同。适配器为每条 wire 输入添加只由自身生成的首行 UUID 标记；UserPromptSubmit 仅从首行查找已登记的原始 Turn，消费后再将 native prompt_id 关联该 Turn，没有 latest/submitting fallback。GUI 和 ANS replay 保留原始输入；受控事件、错误和工具消息清除标记。PreToolUse 校验此 native 映射及精确 SDK server 后，通过 `updatedInput + permissionDecision:'allow'` 写入随机单次 `__ans_call_context`，绑定原始 native tool_use_id/turn/hook signals。MCP handler 消费 token、剥离保留参数，组合原始信号和 native RequestHandlerExtra.signal；未知、重放、过期或无原始上下文的调用失败。公共 schema 保留键冲突拒绝。标记和 nonce 都只关联请求，ANS handler 才执行权限判断。
+
+当前正式包测试 **20/20**、`npx tsc --noEmit` 通过。独立真实 bundled CLI 严格 loopback 探针通过：两条相同输入触发4个本地假 Messages 请求、2个 UserPromptSubmit、2个 PreToolUse、2次真实 MCP handler；updatedInput实际改写参数，两个init工具目录都只含ANS工具。探针使用假凭据，未调用真实模型/账号；最终项目全链路由集成与测试属主继续验收。详见[当前功能](docs/feature/claude-session.md)、[初次证据](docs/change/2026-10-14_change_claude-runtime.md)及[原生修复验证](docs/fix/2026-10-14_fix_claude-native-hook-identity.md)。
+

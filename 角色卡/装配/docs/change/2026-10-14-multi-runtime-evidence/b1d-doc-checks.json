@@ -1,0 +1,23 @@
+{
+  "at": "2026-10-14T09:39:37.503Z",
+  "readmeSha256": "bbbd9e4db9512b7d4b95945f5c26e91e5042354ed1a7b5b31896dc0698c3feef",
+  "desktopSelector": [
+    "pi",
+    "codex",
+    "claude"
+  ],
+  "checks": [
+    "21 own production/config/test files unchanged; no actual .env read",
+    "desktop selector exact pi/codex/claude; demo remains CLI/test only",
+    "obsolete Pi-only/restore/unbounded wording absent; CLI/default/storage/settings/transport limits present",
+    "all 3 README local Markdown targets exist",
+    "Markdown code fences balanced",
+    "README plus changed own documentation: 39 local targets exist; scoped git diff --check exit 0"
+  ],
+  "localLinks": [
+    ".env.example",
+    "角色卡/装配/docs/change/2026-10-14_change_multi-runtime-assembly.md",
+    "角色卡/Claude适配器/docs/fix/2026-10-14_fix_claude-native-hook-identity.md"
+  ],
+  "allowedDocLinksChecked": 39
+}

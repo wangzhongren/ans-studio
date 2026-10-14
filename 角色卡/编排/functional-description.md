@@ -37,7 +37,9 @@ flowchart LR
   role --> conf
   gs --> ch
   role -->|gate/resolveWrite| svc[Service: resolveWrite/resolveRole/listProject]
-  arm -.->|ShellGate 注入| pi[Provider: Pi 适配器 run_shell]
+  role -->|四引擎选择与能力注入| rt[Service: runtime/session createRuntimeAdapter]
+  rt --> providers[Provider: demo / Pi / Codex / Claude]
+  arm -.->|ShellGate 注入| rt
 ```
 
 ## Key Code Locations
@@ -59,7 +61,7 @@ flowchart LR
 | 确认制发行器（写集按客户确认发行） | `src/common/编排/confirmed-writes.ts` — `createConfirmedWriteIssuer()` |
 | CLI 交互通道（客户确认 / 操作者确认） | `src/common/编排/operator-channel.ts` — `createCliCustomerInput()` / `createCliOperatorChannel()` |
 | 角色/边界解析（Service 出口，本角色只消费） | `src/service/role/resolve-role.ts`、`src/service/boundary/resolve-boundary.ts`、`src/service/gate/resolve-write.ts` |
-| 契约类型家（ShellGate / OperatorPrompt / 能力形状等单一来源） | `src/provider/pi/session.ts` |
+| 契约类型家（ShellGate / OperatorPrompt / 能力形状等单一来源） | `src/model/runtime.ts` |
 | 本角色测试 | `test/编排/`（含 `shell-readonly.test.ts`——su 只读档 8 例） |
 
 ## Detailed Explanation
@@ -79,12 +81,16 @@ flowchart LR
 | `src/pipeline/orchestration/*.ts` | Pipeline | Exclusive |
 | `src/common/编排/*.ts` | common（本角色私有） | Exclusive |
 | `test/编排/**` | Test（本角色） | Exclusive |
-| `src/provider/pi/session.ts`（ShellGate/Operator/能力形状） | Provider | Shared（**契约家，只读消费**） |
+| `src/model/runtime.ts`（ShellGate/Operator/能力形状） | Model | Shared（**契约家，只读消费**） |
 | `src/service/gate/resolve-write.ts`、`src/service/role/resolve-role.ts`（公开出口） | Service | Shared（**只读消费**） |
 
 ### Cross-Module Notes
 
 - **门禁引擎**：`classifyShell`/`defaultShellRules`（实件）在门禁引擎私有 common——生产不导入，经注入；`resolveWrite`/`resolveBoundary`/`listProject` 经 Service 公开出口。
-- **Pi 适配器**：`ShellGate`/`ShellReviewResult`/`OperatorPrompt`/`CustomerInputFn`/`DispatchTaskFn` 等形状的单一来源在 `src/provider/pi/session.ts`；`run_shell`/交互工具的注册条件 = 编排是否注入对应能力（「注入才注册」）；spawn 前剥离凭据、cwd 钉项目根均为其既有职责。
+- **Pi 适配器**：`ShellGate`/`ShellReviewResult`/`OperatorPrompt`/`CustomerInputFn`/`DispatchTaskFn` 等形状的单一来源在 `src/model/runtime.ts`；`run_shell`/交互工具的注册条件 = 编排是否注入对应能力（「注入才注册」）；spawn 前剥离凭据、cwd 钉项目根均为其既有职责。
 - **桌面应用**：经 `openRoleSession` 注入 `customerInput`（确认制）、`shellOperatorChannel` 或 `shellReadonly`（su 只读档）、`dispatchTask` 路由等；桌面持有派发队列与去重（编排不造第二套）。
 - **跨角色待办（如实登记）**：(c) 合法注入源（门禁引擎经 `src/service/gate/` 再导出 `classifyShell`/`defaultShellRules`）尚不存在——在此之前一切 arm 路径的闸一律拒绝（fail-closed），接口已按契约留好注入缝。
+
+## 2026-10-14 运行时迁移
+
+运行时选择、Service 工厂、能力注入、原轮次 signal 的确认发行、动态 native context 与 ANS 回放内部接口见 [api-spec](api-spec.md)，完整当前流程见 [运行时选择](docs/feature/runtime-selection.md)。旧 createPiAdapterFactory 保留兼容，调用 Service。编排不导入适配器 SDK 或同伴私有 common。实际 Pi/新SDK 默认工厂、根入口与桌面验证由各原属主负责；自有证据见 [O1 变更](docs/change/2026-10-14_change_multi-runtime-orchestration.md)。

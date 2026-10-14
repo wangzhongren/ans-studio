@@ -1,0 +1,64 @@
+{
+  "report": [
+    {
+      "name": "initial row observation",
+      "value": {
+        "model": {
+          "count": 181,
+          "lastIndex": 180,
+          "operators": [],
+          "rowGap": 16
+        },
+        "selected": "A",
+        "project": "/nonexistent-independent-snapshot-key",
+        "groups": []
+      }
+    },
+    {
+      "name": "real JSONL creates >150 renderer rows with one collapsed group",
+      "value": false
+    }
+  ],
+  "error": "AssertionError [ERR_ASSERTION]: real JSONL creates >150 renderer rows with one collapsed group\n\nfalse !== true\n",
+  "stack": "AssertionError [ERR_ASSERTION]: real JSONL creates >150 renderer rows with one collapsed group\n\nfalse !== true\n\n    at check (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%B5%8B%E8%AF%95/uiux-v2-renderer-regression.mjs:22:93)\n    at async file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%B5%8B%E8%AF%95/uiux-v2-renderer-regression.mjs:37:3",
+  "snapshot": {
+    "selected": "A",
+    "runtime": "pi",
+    "project": "/nonexistent-independent-snapshot-key",
+    "model": {
+      "count": 181,
+      "lastIndex": 180,
+      "operators": [],
+      "rowGap": 16
+    },
+    "chat": {
+      "scrollTop": 0,
+      "scrollHeight": 12791,
+      "clientHeight": 655,
+      "box": {
+        "top": 104.5234375,
+        "bottom": 760,
+        "left": 272,
+        "right": 1360,
+        "width": 1088,
+        "height": 655.4765625
+      }
+    },
+    "groups": [],
+    "chatChildren": [
+      {
+        "className": "chat-pane",
+        "role": "A",
+        "box": {
+          "top": 132.5234375,
+          "bottom": 12867.4609375,
+          "left": 431,
+          "right": 1191,
+          "width": 760,
+          "height": 12734.9375
+        }
+      }
+    ],
+    "text": "independent-row-0 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n\nindependent-row-1 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n\nindependent-row-2 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n\nindependent-row-3 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n\nindependent-row-4 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n\nindependent-row-5 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n\nindependent-row-6 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n\nindependent-row-7 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n\nindependent-row-8 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n\nindependent-row-9 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n\nindependent-row-10 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n\nindependent-row-11 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n\nindependent-row-12 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n\nindependent-row-13 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n\nindependent-row-14 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n\nindependent-row-15 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n\nindependent-row-16 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n\nindependent-row-17 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n\nindependent-row-18 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n\nindependent-row-19 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n\nindependent-row-20 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n\nindependent-row-21 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n\nindependent-row-22 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n\nindependent-row-23 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n\nindependent-row-24 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n\nindependent-row-25 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n\nindependent-row-26 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n\nindependent-row-27 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n\nindependent-row-28 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n\nindependent-row-29 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n\nindependent-row-30 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n\nindependent-row-31 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n\nindependent-row-32 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n\nindependent-row-33 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n\nindependent-row-34 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n\nindependent-row-35 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n\nindependent-row-36 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n\nindependent-row-37 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n\nindependent-row-38 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n\nindependent-row-39 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。"
+  }
+}

@@ -1,0 +1,87 @@
+{
+  "producer": "桌面UI U1R2",
+  "candidateSha256": "b4882fe2e0c674e8d3b3d1185d60a873e9768d0529b48e3bc04c6cdf97b531aa",
+  "status": "owner-verified-independent-pending",
+  "changesSinceStaticGuardFinal": [
+    "app/renderer/renderer.js",
+    "test/桌面应用/e2e/uiux-v2.mjs"
+  ],
+  "files": [
+    {
+      "path": "app/renderer/index.html",
+      "sha256": "099705d9b9b408f959524da76b83c4c60d88b49a8e3f0b72399a702217b009eb"
+    },
+    {
+      "path": "app/renderer/markdown.js",
+      "sha256": "3dd807854a6bb452fc9715aa042c92be5f6bd147d3400dc4a756fa87d6fb37cb"
+    },
+    {
+      "path": "app/renderer/renderer.js",
+      "sha256": "a963e86d6bef51021e3c842b53d93dbeb313d0070257760ef3148a82b719f4cd"
+    },
+    {
+      "path": "app/renderer/role-status.js",
+      "sha256": "922a6c2149a74454fa323c4a64b78e92322c16e14688513560330f693f48b9db"
+    },
+    {
+      "path": "app/renderer/runtime-ui.js",
+      "sha256": "6622e6746c9c835ba28d53f3be63be5a9a550a2679f1485876e724798316d461"
+    },
+    {
+      "path": "app/renderer/styles.css",
+      "sha256": "a3cec1a4787743ca4ea7d83888c6f83134c8e15755f3e7fe200ad732b0f97c41"
+    },
+    {
+      "path": "app/renderer/tool-rows.js",
+      "sha256": "6b89e5c087f33688f9e478d0551d2e37ad1d410a3af96415f536ed539b8bc79e"
+    },
+    {
+      "path": "app/renderer/ui-labels.js",
+      "sha256": "84675062eee465df856b4c8dc07a352b84b4d6e9407a89098229a5335b3526cb"
+    },
+    {
+      "path": "app/renderer/vendor/README.md",
+      "sha256": "831630d9d33509765bf5bb1ad480f469d75a1bc0f4d76731d3047442be1df319"
+    },
+    {
+      "path": "app/renderer/vendor/markdown-it.LICENSE",
+      "sha256": "792c48c5a849a15fdf9e37e8bcf9e6d1dd13b32b46c642a748a0a46a9919d473"
+    },
+    {
+      "path": "app/renderer/vendor/markdown-it.umd.min.js",
+      "sha256": "635972b985228e8af9f0143647c68616b7a3bb09f6946e7e4a52e43dcf5e7be5"
+    },
+    {
+      "path": "test/桌面应用/e2e/bench-storm.mjs",
+      "sha256": "4fdce0728a63903006021013bef43f62b4c523719330e271b7c2595577348897"
+    },
+    {
+      "path": "test/桌面应用/e2e/ime-enter.mjs",
+      "sha256": "d2c6e64a87b01ddc9c59c8a5e259648d02a27ad2077d567f43c75653b759e52b"
+    },
+    {
+      "path": "test/桌面应用/e2e/uiux-design-audit.mjs",
+      "sha256": "99010638a8f63a153cca03d5542aae500e70b5e7c5e0b17e6845f23c95cfc45c"
+    },
+    {
+      "path": "test/桌面应用/e2e/uiux-v2.mjs",
+      "sha256": "91a92dfa22711d39e44ecca627976281aeb8f7c8440662853cb5ec7ab381544c"
+    },
+    {
+      "path": "test/桌面应用/markdown.test.ts",
+      "sha256": "6c2d82df85e4632b3946814c7c8c176a6006648e387a05bdf68fab34889f1063"
+    },
+    {
+      "path": "test/桌面应用/renderer.test.ts",
+      "sha256": "1095a8e0cffe557051289c414177ec86e47e4df8ee699b43c2744b3f26350044"
+    },
+    {
+      "path": "test/桌面应用/runtime-ui.test.ts",
+      "sha256": "6c3c9f9c01b988af29db83bcc2e38eefb07960148c199e8f81f85e4cccadeb3a"
+    },
+    {
+      "path": "test/桌面应用/tool-rows.test.ts",
+      "sha256": "aba711eeb2dd22d35e889be383e495d177ed26f389751830a9ef648072fe003b"
+    }
+  ]
+}

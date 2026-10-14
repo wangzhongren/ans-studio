@@ -81,6 +81,9 @@ entries:
     path: test/桌面应用/e2e/main.mjs
     purpose: 桌面端到端总自检台（真实 Electron：主进程装配 + preload + renderer；含窗口/会话/界面检查点）
   - kind: file
+    path: test/桌面应用/multi-runtime.test.ts
+    purpose: 本次多引擎接入的主进程会话隔离、路由、设置及恢复契约测试
+  - kind: file
     path: 角色卡/桌面窗口/feature-map.md
     purpose: 功能导航
   - kind: file

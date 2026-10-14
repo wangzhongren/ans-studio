@@ -1,0 +1,91 @@
+{
+  "observations": [
+    {
+      "name": "real preload limits renderer Node access",
+      "value": true
+    },
+    {
+      "name": "group parsed and forwarded from real temporary role cards",
+      "value": true
+    },
+    {
+      "name": "pi event/state identity and exactly one terminal with turnId",
+      "value": true
+    },
+    {
+      "name": "pi masked configuration via real main IPC",
+      "value": true
+    },
+    {
+      "name": "pi actual registered handler allowed/denied and isolated history",
+      "value": true
+    },
+    {
+      "name": "pi absent formal report has truthful unreported/blocked handback",
+      "value": true
+    },
+    {
+      "name": "codex event/state identity and exactly one terminal with turnId",
+      "value": true
+    },
+    {
+      "name": "codex masked configuration via real main IPC",
+      "value": true
+    },
+    {
+      "name": "codex actual registered handler allowed/denied and isolated history",
+      "value": true
+    },
+    {
+      "name": "codex absent formal report has truthful unreported/blocked handback",
+      "value": true
+    },
+    {
+      "name": "claude event/state identity and exactly one terminal with turnId",
+      "value": true
+    },
+    {
+      "name": "claude masked configuration via real main IPC",
+      "value": true
+    },
+    {
+      "name": "claude actual registered handler allowed/denied and isolated history",
+      "value": true
+    },
+    {
+      "name": "claude absent formal report has truthful unreported/blocked handback",
+      "value": true
+    },
+    {
+      "name": "three independently live runtime handles",
+      "value": true
+    },
+    {
+      "name": "runtime/group/settings visible at width 1360",
+      "value": true
+    },
+    {
+      "name": "runtime/group/settings visible at width 960",
+      "value": true
+    },
+    {
+      "name": "one actual Claude input renders one assistant response after live/history merge",
+      "value": true
+    }
+  ],
+  "errors": [],
+  "unchanged": true,
+  "process": {
+    "node": "24.21.0",
+    "electron": "44.7.0",
+    "platform": "darwin"
+  },
+  "productionMain": "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/app/main.ts",
+  "replacements": [
+    "external Pi createAgentSession",
+    "Codex engineFactory",
+    "Claude query",
+    "temporary env path",
+    "external dialog selection"
+  ]
+}

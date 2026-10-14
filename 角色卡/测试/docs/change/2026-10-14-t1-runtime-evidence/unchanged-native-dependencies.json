@@ -1,0 +1,30 @@
+{
+  "adapterAndPackagesUnchanged": {
+    "package-lock.json": true,
+    "package.json": true,
+    "src/common/claude-adapter/lifecycle.ts": true,
+    "src/common/claude-adapter/schema.ts": true,
+    "src/common/codex-adapter/config.ts": true,
+    "src/common/codex-adapter/protocol.ts": true,
+    "src/common/pi-adapter/event-queue.ts": true,
+    "src/common/pi-adapter/format-denial.ts": true,
+    "src/common/pi-adapter/fs-write.ts": true,
+    "src/common/pi-adapter/lifecycle.ts": true,
+    "src/common/pi-adapter/logger.ts": true,
+    "src/common/pi-adapter/native-session.ts": true,
+    "src/common/pi-adapter/provider-config.ts": true,
+    "src/common/pi-adapter/real-adapter.ts": true,
+    "src/common/pi-adapter/settings.ts": true,
+    "src/common/pi-adapter/timeout.ts": true,
+    "src/common/pi-adapter/tool-compat.ts": true,
+    "src/provider/claude/session.ts": true,
+    "src/provider/codex/session.ts": true,
+    "src/provider/pi/session.ts": true,
+    "src/provider/pi/tools.ts": true
+  },
+  "currentProbeSources": {
+    "test/codex-adapter/native-probe.mjs": "20efbb67824aa1a7d7a94b3013c36761012f847f474f5d927e9e1bec933fab52",
+    "test/claude-adapter/native-loopback.probe.ts": "8890b28fafbda103dc0fbea632d49ae499e224da3d30096cdf61ae12a2fb0f28"
+  },
+  "note": "T1 original native probe evidence retained. PM confirms probe files/options unchanged; adapter/source/package hashes compare independently to original T1 execution snapshot."
+}

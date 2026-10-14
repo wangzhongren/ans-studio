@@ -154,7 +154,7 @@ test("O-1：边界文件内容变更 ⇒ 活会话作废重建（如实行含文
   assert.ok(line, "应有**如实**重建行（不静默）");
   assert.ok(line!.includes("角色卡/A/boundary.yaml"), "行内含变更文件名");
   assert.ok(line!.includes("按新边界重开"), "行内说明按新边界重开");
-  assert.ok(/历史已从本地会话文件恢复|本地无可用会话文件（新建会话）/.test(line!), "措辞按 D-1 两分支如实（恢复/新建），不套旧文案");
+  assert.ok(line!.includes("上下文恢复结果以引擎实际返回为准"), "重开不根据任意文件存在猜原生恢复成功");
 
   // 重建后指纹已刷新：再发不再重建（连续操作不反复重开）。
   h.streams.A.push({ kind: "settled", summary: "一轮结束" });
@@ -217,17 +217,17 @@ test("O-1 接线钉：信号=读盘内容哈希；检查点=发言/续接/投递
   assert.ok(SESSION_SRC.includes('createHash("sha256")'), "信号 = 内容哈希（可信信号，非界面推测）");
   assert.ok(SESSION_SRC.includes("private async boundaryDiff("), "差异检查（逐文件比对）");
   assert.ok(SESSION_SRC.includes("await this.rebuildIfBoundaryStale(targetRoleId, true);"), "发言前检查（send 路径；目标角色入口定格——2026-10-13 竞态修复）");
-  assert.ok(SESSION_SRC.includes("this.rebuildIfBoundaryStale(req.roleId, userInitiated, selectionVersion);"), "续接（点角色）路径检查保持本次选择版本");
+  assert.ok(SESSION_SRC.includes("this.rebuildIfBoundaryStale(key, userInitiated, selectionVersion);"), "续接（点角色）路径检查保持本次选择版本");
   assert.ok(
-    SESSION_SRC.includes("const rebuilt = await this.rebuildIfBoundaryStale(resolvedTarget, false);"),
+    SESSION_SRC.includes("const rebuilt = await this.rebuildIfBoundaryStale(this.sessionKey(projectRoot, resolvedTarget, runtime), false);"),
     "投递前检查（后台路径同样适用）"
   );
   assert.ok(SESSION_SRC.includes("if (entry.busy) return undefined;"), "在跑的轮次不打断（下一时机再查）");
   assert.ok(SESSION_SRC.includes("async refreshStaleBoundaries()"), "全量扫描入口（su settle 触发）");
   assert.ok(IFACE_SRC.includes("void manager.refreshStaleBoundaries();"), "Interface：su 一轮结束（边界可能刚被改）时触发扫描");
   assert.ok(
-    SESSION_SRC.includes("历史已从本地会话文件恢复（模型上下文一并恢复）") &&
-      SESSION_SRC.includes("本地无可用会话文件（新建会话）"),
-    "措辞按 D-1 两分支如实（恢复 / 新建——不套旧「模型上下文已重启」类文案）"
+    SESSION_SRC.includes("上下文恢复结果以引擎实际返回为准") &&
+      SESSION_SRC.includes('handle.contextSource === "resumed"') && SESSION_SRC.includes('handle.contextSource === "recovered"'),
+    "上下文来源只由引擎实际返回，native resumed/recovered 显式映射，不从文件存在猜恢复"
   );
 });

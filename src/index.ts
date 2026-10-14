@@ -6,9 +6,8 @@
 //  - 本文件在其余角色落盘前也能被加载、解析与自检（doctor / help 立即可用）；
 //  - 顶层加载不会因某个下游模块缺失而整体失败。
 //
-// 运行时依赖注入：runRoleCommand(argv, deps) 需要 deps.createAdapter（把 gate 绑进
-// 一个 runtime 适配器）。装配选择注入**装配自有的演示假 runtime**（§7：演示用假 runtime；
-// §4 的 Provider 假适配器“仅单元测试用”）。这样 main 无需导入 Provider 对象即可完成接线。
+// 运行时依赖注入：真实引擎的 project/runtime/options 作为配置交给 Interface。
+// demo 继续注入装配自有的演示假 runtime。main 无需导入下层对象即可完成接线。
 // 演示配置（projectRoot/skillRoot/roles 及 T-1 的 scope）同样经 deps 作为纯值注入。
 
 import path from "node:path";
@@ -32,9 +31,10 @@ import {
 } from "./common/装配/config-loader.ts";
 
 import type { ProjectConfig, RoleLocation } from "./model/role.ts";
-import type { BoundarySection1, Acceptance } from "./model/boundary.ts";
+import type { Acceptance } from "./model/boundary.ts";
 import type { TaskScope } from "./model/decision.ts";
-import type { RuntimeAdapter, WriteGate } from "./provider/pi/session.ts";
+import type { WriteGate } from "./model/runtime.ts";
+import type { RunRoleCommandDeps } from "./interface/cli/run.ts";
 
 // ---------------------------------------------------------------------------
 // 默认演示配置（契约 §6 末尾表）。属**配置数据**，不是解析逻辑硬编码（F8）。
@@ -97,6 +97,21 @@ const DEMO_ROLES: Record<string, DemoRoleLocation> = {
   Pi适配器: {
     card: "角色卡/Pi适配器/role-card.md",
     boundary: "角色卡/Pi适配器/boundary.yaml",
+    acceptance: DEMO_ACCEPTANCE,
+  },
+  运行时核心: {
+    card: "角色卡/运行时核心/role-card.md",
+    boundary: "角色卡/运行时核心/boundary.yaml",
+    acceptance: DEMO_ACCEPTANCE,
+  },
+  Codex适配器: {
+    card: "角色卡/Codex适配器/role-card.md",
+    boundary: "角色卡/Codex适配器/boundary.yaml",
+    acceptance: DEMO_ACCEPTANCE,
+  },
+  Claude适配器: {
+    card: "角色卡/Claude适配器/role-card.md",
+    boundary: "角色卡/Claude适配器/boundary.yaml",
     acceptance: DEMO_ACCEPTANCE,
   },
   装配: {
@@ -237,22 +252,17 @@ export interface ConfigInjection {
 // main
 // ---------------------------------------------------------------------------
 
-/**
- * runRoleCommand 的依赖注入形状。
- * 契约 §5 冻结签名为 { createAdapter }；装配额外注入 project/scope（纯值）——
- * 这是 createAdapter 之外的**超集字段**，类型上与冻结签名兼容。
- *
- * 单一来源：注入的 project（六个角色的 card/boundary 路径 + acceptance）与
- * scope（writeSet + conditions）是演示配置的**唯一来源**。编排须优先使用此处注入的
- * project/scope，缺失时报清晰错误，不得再自持第二份演示数据。
- */
-export interface RunRoleDeps {
-  createAdapter: (gate: WriteGate) => RuntimeAdapter;
+/** 根入口的纯配置注入；运行对象仍由 Interface 下行创建。 */
+export interface MainOptions {
+  runtimeOptions?: RunRoleCommandDeps["runtimeOptions"];
+}
+
+export interface RunRoleDeps extends RunRoleCommandDeps {
   project: ProjectConfig;
   scope: TaskScope;
 }
 
-const USAGE = `ans —— 受治理会话链路 CLI（v1）
+const USAGE = `ans —— 受治理会话链路 CLI
 
 用法：
   ans role run <角色> --task <任务>   运行一个受治理角色会话（演示：ans role run 编排 --task T-1）
@@ -260,8 +270,8 @@ const USAGE = `ans —— 受治理会话链路 CLI（v1）
   ans doctor                         打印装配自检与内嵌演示配置（无需其余角色落盘）
   ans help                           显示本帮助
 
-运行时选择（默认 demo）：
-  --runtime demo|pi                   demo = 演示假替身；pi = 真实 Pi 适配器（需 Pi 凭据）
+运行时选择（role run 默认 demo；govern 默认 pi）：
+  --runtime demo|pi|codex|claude        demo = 演示假替身；其余为受治理模型运行时（需所选引擎配置）
   环境变量 ANS_RUNTIME                未给出 --runtime 时生效；优先级：命令行 > 环境变量 > 默认
 
 演示：npm run demo   # 等价于 ans role run 编排 --task T-1
@@ -332,42 +342,25 @@ async function printDoctor(selection: RuntimeSelection): Promise<void> {
   for (const [roleId, loc] of Object.entries(project.roles)) {
     lines.push(`  - ${roleId}: ${loc.card} | ${loc.boundary}`);
   }
-  lines.push("（其余角色落盘前，role run 全链路尚不可端到端验证。）");
+  lines.push("（自检仅展示本地配置，不验证模型或 API 可用性。）");
   process.stdout.write(lines.join("\n") + "\n");
 }
 
 /**
- * 依运行时选择构造 runRoleCommand 的依赖。
- * demo：注入装配自有的演示假替身。
- * pi：动态导入编排导出的 createPiAdapterFactory（run-role.ts 注明“供 Interface/装配构造
- *     默认真实适配器”），注入真实 Pi 适配器工厂。动态导入以便 pipeline 缺失时能被
- *     reportUnavailable 如实诊断，而非顶层加载即崩。
- * 两种情况都注入同一份 project/scope（演示配置的唯一来源，契约 §6）。
- *
- * ⚠️ shell 闸（`run_shell`）——**本 CLI 入口 V1 未接线**（如实登记；**客户确认的 V1 范围**，非欠账、
- *   也**不是「暂未启用」**）：
- *   · 本入口对**任一** runtime 都**不注入 `ShellGate`**——pi 分支调 `createPiAdapterFactory(project)`
- *     只传 project、**第二参 `shellGate` 略去**（其签名 `(project, shellGate?)`）；demo 假替身本不涉 shell。
- *   · 依设计 §7.5.1「能力缺席 = 最强 fail-closed」：**未注入 `ShellGate` ⇒ Pi 适配器根本不注册 `run_shell`**，
- *     故**本入口下模型没有 shell 能力**。
- *   · 三层链——(c) 确定性硬地板 → (b) pm 模型审读 → (a) 操作者确认——**已实现并已测试**，但从本入口**到不了**；
- *     该链在**运行时不影响任何行为**（本入口从不 arm；桌面侧同样刻意不 arm）。
- *   · 理由（客户裁定）：V1 无 OS 沙箱，`run_shell` 起的子进程写入**不受 `resolveWrite` 约束**，arm 风险大。
- *   · **将来要启用须新的裁定**并在此显式接线（另行评审）——**不会自行启用**。别把这段读成「已经在跑」。
+ * 入口只把项目、任务、runtime 和配置传给 Interface。
+ * demo 保留装配自有演示替身；真实引擎工厂归下游创建。
+ * CLI 没有注入 ShellGate，受治理 run_shell 不注册。
  */
-async function buildRoleRunDeps(selection: RuntimeSelection): Promise<RunRoleDeps> {
+async function buildRoleRunDeps(selection: RuntimeSelection, options: MainOptions): Promise<RunRoleDeps> {
   const { project } = await loadConfig();
-  const scope = buildDemoTaskScope();
-
-  if (selection.runtime === "pi") {
-    const mod = await import("./pipeline/orchestration/run-role.ts");
-    return { createAdapter: mod.createPiAdapterFactory(project), project, scope };
-  }
-
   return {
-    createAdapter: (gate: WriteGate) => createDemoRuntimeAdapter({ gate }),
     project,
-    scope,
+    scope: buildDemoTaskScope(),
+    runtime: selection.runtime,
+    ...(options.runtimeOptions !== undefined ? { runtimeOptions: options.runtimeOptions } : {}),
+    ...(selection.runtime === "demo" && options.runtimeOptions === undefined
+      ? { createAdapter: (gate: WriteGate) => createDemoRuntimeAdapter({ gate }) }
+      : {}),
   };
 }
 
@@ -378,18 +371,18 @@ async function buildRoleRunDeps(selection: RuntimeSelection): Promise<RunRoleDep
 export async function main(
   argv: string[],
   env: Record<string, string | undefined> = process.env,
+  options: MainOptions = {},
 ): Promise<number> {
   // 运行时选择：先从完整 argv 抽出 --runtime（并剔除，避免下游解析器误判为未知参数），
   // 再按「命令行 > 环境变量 > 默认」解析。非法取值即报错并非 0 结束（不静默忽略）。
   const { argv: restArgv, flag } = extractRuntimeArg(argv);
-  const resolution = resolveRuntime(flag, env);
+  const invocation = parseInvocation(restArgv);
+  const resolution = resolveRuntime(flag, env, invocation.kind === "govern" ? "pi" : "demo");
   if (!resolution.ok) {
     process.stderr.write(`错误：${resolution.message}\n\n${USAGE}`);
     return 2;
   }
   const selection = resolution.selection;
-
-  const invocation = parseInvocation(restArgv);
 
   switch (invocation.kind) {
     case "help": {
@@ -410,7 +403,7 @@ export async function main(
 
     case "role-run": {
       // pi 无凭据：入口**预先**如实报错并非 0 退出；绝不退回 demo、绝不假装成功。
-      if (selection.runtime === "pi" && !hasPiCredential(env)) {
+      if (selection.runtime === "pi" && !invocation.argv.some((token) => token === "-h" || token === "--help") && !hasPiCredential(env)) {
         process.stderr.write(
           `错误：--runtime pi 需要 Pi 凭据，但未检测到。\n` +
             `请设置任一环境变量：${PI_CREDENTIAL_ENV_VARS.join(" / ")}。\n` +
@@ -419,7 +412,7 @@ export async function main(
         return 1;
       }
       try {
-        const deps = await buildRoleRunDeps(selection);
+        const deps = await buildRoleRunDeps(selection, options);
         const mod = await import("./interface/cli/run.ts");
         return await mod.runRoleCommand(invocation.argv, deps);
       } catch (err) {
@@ -442,13 +435,11 @@ export async function main(
           return 2;
         }
         const inject = await loadInjection(targetDir);
-        // 契约 §5 冻结签名 governCommand(argv) 原不接收配置（占位码 2 的根因）。按设计
-        // §3.2 以**超集第二参**注入（见 ConfigInjection）；编排侧（T5）接收前，占位行为不变。
-        const govern = mod.governCommand as (
-          argv: string[],
-          deps?: ConfigInjection,
-        ) => Promise<number>;
-        return await govern(invocation.argv, inject);
+        return await mod.governCommand(invocation.argv, {
+          ...inject,
+          runtime: selection.runtime,
+          ...(options.runtimeOptions !== undefined ? { runtimeOptions: options.runtimeOptions } : {}),
+        });
       } catch (err) {
         return reportUnavailable("govern", err);
       }
@@ -480,9 +471,8 @@ function validateGovernTargetDir(targetDir: string | undefined): string | undefi
 function reportUnavailable(command: string, err: unknown): number {
   const detail = err instanceof Error ? err.message : String(err);
   process.stderr.write(
-    `无法执行 "${command}"：Interface 层尚未就绪（${detail}）。\n` +
-      "装配入口已就绪，待编排/门禁引擎/Pi适配器 落盘后方可端到端验证。\n" +
-      "可先运行 `ans doctor` 检查装配自检与内嵌演示配置。\n",
+    `无法执行 "${command}"：${detail}。\n` +
+      "请检查所选运行时的依赖和配置；不会自动切换引擎。\n",
   );
   return 1;
 }

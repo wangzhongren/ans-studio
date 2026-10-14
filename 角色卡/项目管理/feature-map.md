@@ -6,7 +6,8 @@
 | --- | --- | --- | --- |
 | 整体架构与角色协作 | 项目结构、角色职责与边界、层与调用方向、责任流与协作约定 | 已建立，随关键变更更新 | [架构文档](docs/architecture.md) |
 | 全项目工程法案 | 全项目唯一的工程约束记录（现状事实 / 已确认要求 / 待确认方案 / 已裁定冲突） | 草稿持续演进 | [工程法案](docs/project-rules.md) |
-| 共享组件（`src/common/shared/`） | 跨角色共享原语的实现、测试与登记：config-loader、path-primitives、runtime-shared、argv-primitives、env-file、atomic-write | 6 个已建立并有单测 | [共享组件登记](docs/architecture/shared-components.md)、[单元测试](../../test/项目管理/shared/) |
+| 共享组件（`src/common/shared/`） | 跨角色共享原语与设置目录：config-loader、path-primitives、runtime-shared、argv-primitives、env-file、atomic-write、diagnostics、runtime-settings | 8 个实现；多运行时消费方接线与合并验收进行中 | [共享组件登记](docs/architecture/shared-components.md)、[实际接口与验证](api-spec.md)、[单元测试](../../test/项目管理/shared/) |
+| 多运行时对接 | 已批准的运行时接入组、公共契约迁移与 Pi/Codex/Claude 实施/验收范围 | 核心阶段通过，其余接线进行中 | [ANS-RUNTIME-V2](docs/design/2026-10-14_design_multi-runtime-integration.md) |
 | 设计与跨角色对接设计 | 各轮设计稿、评审记录与对接设计 | 持续更新 | [docs/design/](docs/design/) |
 | 变更与修复记录 | 各轮任务回执、返工与收口记录（含客户验收证据目录） | 持续更新 | [docs/change/](docs/change/)、[docs/fix/](docs/fix/) |
 | 会议纪要 | 跨角色联合评审的议程与纪要 | 已建立 | [docs/meetings/](docs/meetings/) |

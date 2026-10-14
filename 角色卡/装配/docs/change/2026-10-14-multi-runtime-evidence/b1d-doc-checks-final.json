@@ -1,0 +1,28 @@
+{
+  "at": "2026-10-14T12:18:11.644Z",
+  "verificationScope": "docs-only",
+  "readmeSha256": "44941e78c117b14983debdc48bea8fc77c81b514c7a1f3cacc725a3e3071d0d7",
+  "protectedOwnFileCount": 21,
+  "productionConfigTestsUnchanged": true,
+  "readmeLocalLinks": [
+    ".env.example",
+    "角色卡/装配/docs/change/2026-10-14_change_multi-runtime-assembly.md",
+    "角色卡/Claude适配器/docs/fix/2026-10-14_fix_claude-native-hook-identity.md",
+    "角色卡/测试/docs/change/2026-10-14_change_multi-runtime-independent-verification.md",
+    "角色卡/项目管理/docs/change/2026-10-14_change_multi-runtime-integration.md"
+  ],
+  "checks": [
+    "T1 final verified report read; exact actual 23/119/14 and full 1226=1225pass/0fail/1Windows skip reconciled",
+    "README T1 pending wording removed; PM and T1 references exist",
+    "CLI four kinds/desktop three choices/auth/profile/storage/native restoration/ANS vs upstream limits retained",
+    "online model/OS/native broader scope not claimed",
+    "balanced code fences; all README local targets exist",
+    "21 own source/config/test hashes unchanged; actual .env not read; no dynamic/native rerun"
+  ],
+  "allowedDocLinkChecks": 37,
+  "changedDocumentation": [
+    "README.md",
+    "角色卡/装配/feature-map.md",
+    "角色卡/装配/docs/change/2026-10-14_change_readme-multi-runtime-desktop.md"
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "observations": [
+    {
+      "name": "real preload limits renderer Node access",
+      "value": true
+    },
+    {
+      "name": "group parsed and forwarded from real temporary role cards",
+      "value": true
+    }
+  ],
+  "errors": [
+    "Error: T1 wait failed: terminal event\n    at until (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%B5%8B%E8%AF%95/t1-actual-main.mjs:36:60)\n    at async testWindow (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%B5%8B%E8%AF%95/t1-actual-main.mjs:58:5)"
+  ],
+  "process": {
+    "node": "24.21.0",
+    "electron": "44.7.0",
+    "platform": "darwin"
+  },
+  "productionMain": "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/app/main.ts",
+  "replacements": [
+    "external Pi createAgentSession",
+    "Codex engineFactory",
+    "Claude query",
+    "temporary env path",
+    "external dialog selection"
+  ]
+}

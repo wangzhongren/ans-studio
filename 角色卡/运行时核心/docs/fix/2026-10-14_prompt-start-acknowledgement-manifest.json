@@ -1,0 +1,88 @@
+{
+  "version": 1,
+  "producer": "运行时核心",
+  "stage": "C1A",
+  "baselineHead": "906abd3ee275cba82b2f9e54ceef1cd9473c2d5c",
+  "algorithm": "sha256(path + NUL + content + NUL), in listed order",
+  "candidateSha256": "ff9a654a6968c9888b60c03a96d16cf70ff58e3f05bf8c236f8ca8145f0e0e53",
+  "files": [
+    {
+      "path": "src/model/runtime.ts",
+      "sha256": "fcbdf0b89235ffa5c0c7678ad234c9652e7313efe66cead7d0d961c3b471ae62"
+    },
+    {
+      "path": "src/service/runtime/session.ts",
+      "sha256": "cccddb80c4d963b403a9b9dc7fd0e5f3ecb9ca96d45b8037d8f64b67e3f9c763"
+    },
+    {
+      "path": "src/provider/runtime/tools.ts",
+      "sha256": "752382a5c709893f7331e5cb1a1f2aee2d23f8cd9f7c055f40680f2c3dc958b3"
+    },
+    {
+      "path": "src/provider/runtime/schema.ts",
+      "sha256": "67df518e52b5821bba617db35eca375779353f86d24e80af8c98aa45ad9f51f0"
+    },
+    {
+      "path": "src/provider/runtime/session-store.ts",
+      "sha256": "9fbdd32e5bb9df0aea64f2c8ac58dbdf3a1b19bd30cd74ace44e3830294548a2"
+    },
+    {
+      "path": "src/common/runtime-core/event-queue.ts",
+      "sha256": "ac3afa2e42fe82c8c49cf574764ae0c69a32fa61380e01a90f21a3effed9538d"
+    },
+    {
+      "path": "src/common/runtime-core/format-denial.ts",
+      "sha256": "6906f6da4a75913072493fc9e5a4a4c2c6832af171806c95cbcaddd104f2d9e8"
+    },
+    {
+      "path": "src/common/runtime-core/fs-write.ts",
+      "sha256": "bc134fc5b803ca30fcf57fda2778420c4a07a73df52f6218080da8ce174eb438"
+    },
+    {
+      "path": "src/common/runtime-core/timeout.ts",
+      "sha256": "e73a2c76ede16499c1f7da54725206eef63080fa5e76e33ef8f168c9587bbb47"
+    },
+    {
+      "path": "test/runtime-core/abort-failure-semantics.test.ts",
+      "sha256": "c8a40efbe148e689a5aaad0d3f5a98b3ed8937194a2b46212d369fc4ceb38e99"
+    },
+    {
+      "path": "test/runtime-core/customer-input-context.test.ts",
+      "sha256": "d1228008a479a84daa61dddd0d118d8df591b7884b33caf1edf314a2ba076602"
+    },
+    {
+      "path": "test/runtime-core/effective-timeouts.test.ts",
+      "sha256": "c79e52b9008953f7735b07759336d3df6ff19559a900065623162350dfb16520"
+    },
+    {
+      "path": "test/runtime-core/fixtures.ts",
+      "sha256": "be1619f77b3f277ca6917a10b4a06653122f46bf08dd7045ab90bf586bc74f22"
+    },
+    {
+      "path": "test/runtime-core/prompt-start-acknowledgement.test.ts",
+      "sha256": "f2c28313283ec336e615a9eaf2765ad260df8e3ab2fe2b2fcffaada28a074304"
+    },
+    {
+      "path": "test/runtime-core/session-store.test.ts",
+      "sha256": "6251094f05e0f01ab35555f11e73e3f5778a88f38d40a94c489b58cab8b2c5b8"
+    },
+    {
+      "path": "test/runtime-core/session.test.ts",
+      "sha256": "174f78df6ffcb837b79c461de72d7c44cf1cb9507fea587341a1f39fe124357f"
+    },
+    {
+      "path": "test/runtime-core/tools.test.ts",
+      "sha256": "4c8a41cda1cffc5a6024a3041b19ad3c281480e5e732f30432205bc0a2d26a23"
+    }
+  ],
+  "testResult": {
+    "command": "node --test 'test/runtime-core/**/*.test.ts'",
+    "passed": 38,
+    "failed": 0,
+    "skipped": 0
+  },
+  "typecheck": {
+    "command": "npx tsc --noEmit",
+    "exitCode": 0
+  }
+}

@@ -1,0 +1,88 @@
+✔ H-1 路由：su 派发 → 目标未开**自动开**并收到派发输入（模板文案）；su 与目标两边都有系统行 (185.327334ms)
+✔ H-1 排队：目标忙 ⇒ 入队；其 settled 后按序放行（绝不并发 send） (312.531042ms)
+✔ H-1 失败保留：投递失败 ⇒ 如实系统行（未丢弃）+ 放回队首；下次时机成功送达 (333.641459ms)
+✔ H-1 校验（如实回执，不静默）：非本项目角色 / 内置治理角色（含 su 自身）/ 空参数 → {ok:false} + 系统行 (32.107125ms)
+✔ H-1 去重：同一派发在**队列期**重复调用 → 去重（只投一次）；送达后同文再派 → 放行（返工回路） (363.307792ms)
+✔ 真机崩溃修复（钉子）：派发条目**不走 handback 渲染**；坏回交并入同一机也不炸、零未捕获拒绝 (402.665625ms)
+✔ H-1 闭环：su 派发 → 角色回交 → su 收到报告；不重复、不空转（EC-1 后无自激） (422.473125ms)
+✔ E-1 投递：A 的回交到达 → **自动开启 su** 并把 `renderHandbackPrompt` 原文投给 su（单一来源） (184.465625ms)
+✔ E-1 去重：同一条回交重复到达（重放）→ **只投递一次** (180.075417ms)
+✔ E-1 排队：su 忙时保留，settle 后连续回交按原序合成一次验收输入 (462.058916ms)
+✔ 连续回交投递失败：整批保留同序，重试送达一次，原报告键不丢 (37.015917ms)
+✔ 客户消息屏障：A报告→客户消息→B报告，不跨消息合批或改变顺序 (27.574333ms)
+✔ 常规检查宿主政策实际注入项目角色，su不接委托免确认 (0.43125ms)
+✔ E-1 开启失败：如实系统行（含原因与重试时机）+ **保留回交**；下次时机成功投递（绝不静默丢） (331.183333ms)
+✔ 真机崩溃修复：坏形状回交事件（缺载荷/缺 roleId）→ 不投递、如实系统行、**零未捕获拒绝** (283.15075ms)
+✔ E-1 投递失败：如实系统行（含原因）+ 放回队首保留；重试成功后送达（顺序与内容不损） (331.933958ms)
+✔ L-1 入队：忙时客户消息**入队**（不再直接失败）——位次如实、settled 后按到达序自动放行、摘要入快照 (336.331792ms)
+✔ L-1 位次与摘要截断：第 1、2 位如实；超长文本摘要截断（不铺全文） (30.135291ms)
+✔ L-1 失败语义不变：排队消息投递失败 ⇒ 如实系统行（未丢弃）+ 放回队首；下次时机成功送达 (331.892709ms)
+✔ L-1 传输失败仍如实回错：空闲路径的 send 失败 = {ok:false,error}（并**不**虚报忙态） (31.49025ms)
+✔ 状态准确性（复现 vs 修后）：投递开跑的后台轮次——旧事实组合派生「空闲」（复现），真实快照 busy 派生「工作中」（修后） (694.111958ms)
+✔ 状态准确性：队列待办的角色不得显示「空闲」——快照(queueDepth) + 徽标「工作中 · N 待办」 (33.831ms)
+✔ 接线钉子：role-state 通道两端齐备；忙态判据只在主进程（会话 busy × 队列深度）；渲染侧**无**界面侧推测 (1.076291ms)
+✔ D1 shared registry: effective env/file/fallback sources, every secret masked, whitespace is unset (4.243542ms)
+✔ D1 configuration writes only selected string keys atomically, masks URL/userinfo failure and retains revision on failure (7.3475ms)
+✔ D1 same role and project across engines and same role across projects keep distinct handles and exact input targets (4.315375ms)
+✔ D1 background dispatch, queued customer input and handback pin the source engine after selection switches (7.319209ms)
+✔ D1 actual Pipeline/Service chooses demo, writes isolated replay and converts native context honestly (30.121916ms)
+✔ D1 actual Pipeline/Service chooses pi, writes isolated replay and converts native context honestly (29.811541ms)
+✔ D1 actual Pipeline/Service chooses codex, writes isolated replay and converts native context honestly (27.111334ms)
+✔ D1 actual Pipeline/Service chooses claude, writes isolated replay and converts native context honestly (27.726125ms)
+✔ D1 profile success rebuilds same engine after busy old Pi finishes; ambient token remains old until safe; failure is unchanged (11.635209ms)
+✔ D1 original customer signal cancels pending confirm/choice and old yes cannot settle a new card (0.350083ms)
+✔ D1 shell terminal failure/timeout and dispose invalidate exact handle card, old allow is expired (3.19275ms)
+✔ D1 state debouncing and constrained bridges preserve project/runtime identity (0.748333ms)
+✔ D1 last busy Pi in another project releases queued profile rebuild without changing ambient mid-turn (5.097458ms)
+✔ D1 confirmation bridge keeps original signal identity and an old disposed stream cannot cancel a new handle card (0.448541ms)
+✔ D1 old Pi JSONL is a display-only fallback and never becomes Codex/Claude history or native restore proof (3.311125ms)
+✔ D1R ANS history preserves authoritative turn/event identity, independent same text and delta order (1.9535ms)
+✔ D1R legacy Pi rows keep optional turn/event metadata absent (1.858666ms)
+✔ D1R2 direct and queued identical inputs retain original client ID through delayed old settled (9.534791ms)
+✔ D1R2 anonymous dispatch occupies its own origin and unknown/legacy events cannot borrow the next client (7.088292ms)
+✖ D1R2 actual Pipeline/Service returns original client IDs and real distinct turn IDs for same text (12.851166ms)
+✔ 并发作废重建（settle 触发的 refreshStaleBoundaries × 用户 send）——身份守卫下：恰一次作废/重建、条目保活、轮次不被误删 (99.48325ms)
+✔ 在跑轮次不被作废重建打断：busy 期间 refreshStaleBoundaries/send 的陈旧检查都跳过（不误删、不误复位） (97.030709ms)
+✔ 后台重建完成后再发送：恢复活动目标，消息恰一次送达重建后的句柄 (1.812333ms)
+✔ 非活动角色后台重建不抢位 (2.192ms)
+✔ 重建 dispose 等待窗口：select B 保持用户目标/关闭契约 (2.090833ms)
+✔ 重建 dispose 等待窗口：failed select 保持用户目标/关闭契约 (5.2775ms)
+✔ 重建 dispose 等待窗口：stop A 保持用户目标/关闭契约 (2.18075ms)
+✔ 重建 dispose 等待窗口：stop all 保持用户目标/关闭契约 (6.113417ms)
+✔ 重建 dispose 等待窗口：stop B 保持用户目标/关闭契约 (1.701583ms)
+✔ 重建 open 等待窗口：select B 保持用户目标/关闭契约 (1.614208ms)
+✔ 重建 open 等待窗口：failed select 保持用户目标/关闭契约 (2.325ms)
+✔ 重建 open 等待窗口：stop A 保持用户目标/关闭契约 (1.542583ms)
+✔ 重建 open 等待窗口：stop all 保持用户目标/关闭契约 (2.325167ms)
+✔ 重建 open 等待窗口：stop B 保持用户目标/关闭契约 (1.605584ms)
+✔ 重开失败保留原错误，不恢复假活动目标、不发送消息 (1.31925ms)
+✔ 关闭全部与双角色刷新扫描交接：停止返回后没有后续重开或投递 (1.647166ms)
+ℹ tests 59
+ℹ suites 0
+ℹ pass 58
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2200.986333
+
+✖ failing tests:
+
+test at test/桌面应用/multi-runtime.test.ts:478:1
+✖ D1R2 actual Pipeline/Service returns original client IDs and real distinct turn IDs for same text (12.851166ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + undefined
+  - 'actual-second'
+  
+      at TestContext.<anonymous> (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/multi-runtime.test.ts:510:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 'actual-second',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

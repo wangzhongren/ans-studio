@@ -79,22 +79,26 @@
   function activityOf(input) {
     var o = input && typeof input === "object" ? input : {};
     var d = o.activity || (o.detail && typeof o.detail === "object" ? o.detail : {});
+    var call = d.call && typeof d.call === "object" ? d.call : d;
+    var args = call.args && typeof call.args === "object" ? call.args : {};
+    var ok = typeof d.ok === "boolean" ? d.ok : d.result && typeof d.result.ok === "boolean" ? d.result.ok : undefined;
     var raw = String(o.summary == null ? (o.text || "") : o.summary);
     var match = /(?:调用工具 |请求调用 |开始执行 )([\w.-]+)/.exec(raw);
     var resultName = /^([\w.-]+)[:： ]/.exec(raw);
-    var tool = typeof d.toolName === "string" ? d.toolName : (match ? match[1] : resultName ? resultName[1] : "工具");
+    var tool = typeof d.toolName === "string" ? d.toolName : typeof call.name === "string" ? call.name : (match ? match[1] : resultName ? resultName[1] : "工具");
     var phase = d.phase || (o.kind === "tool_call" || /^调用工具 [\w.-]+$/.test(raw) ? "call" : "result");
     var head = raw.split(/\r?\n/)[0];
     if (head.indexOf(tool + '：' + tool) === 0) head = head.slice(tool.length + 1);
     var shellResult = tool === "run_shell" ? /^run_shell 已执行：(.+)（exit (-?\d+|\?)(?:，signal [^）]+)?）$/.exec(head) : null;
     var readFailure = tool === "read_file" ? /^read_file 失败：(.+)（.+）$/.exec(head) : null;
     var knownFailure = !!readFailure || !!(shellResult && shellResult[2] !== "?" && Number(shellResult[2]) !== 0);
-    var failed = knownFailure || d.status === "failed" || d.ok === false;
-    var status = failed ? "failed" : o.kind === "denied" ? "denied" : phase === "call" ? "call" : d.status === "completed" && d.ok !== false ? "completed" : d.status === "returned" ? "returned" : "unknown";
-    var target = typeof d.target === "string" && d.target !== "" ? d.target : typeof d.path === "string" && d.path !== "" ? d.path : shellResult ? shellResult[1] : readFailure ? readFailure[1] : "";
+    var failed = knownFailure || d.status === "failed" || ok === false;
+    var status = failed ? "failed" : o.kind === "denied" ? "denied" : phase === "call" ? "call" : (d.status === "completed" || ok === true) ? "completed" : d.status === "returned" ? "returned" : "unknown";
+    var target = typeof d.target === "string" && d.target !== "" ? d.target : typeof d.path === "string" && d.path !== "" ? d.path : typeof args.path === "string" ? args.path : typeof args.command === "string" ? args.command : shellResult ? shellResult[1] : readFailure ? readFailure[1] : "";
     return { toolName: tool, target: slimToolRow(target), fullTarget: target, phase: phase, status: status,
       label: status === "failed" ? "执行失败" : status === "denied" ? "已拒绝" : status === "call" ? "调用发起" : status === "completed" ? "执行完成" : status === "returned" ? "工具返回" : "状态未记录",
-      turnId: typeof d.turnId === "string" ? d.turnId : "", callId: typeof d.toolCallId === "string" ? d.toolCallId : "",
+      turnId: typeof d.turnId === "string" ? d.turnId : typeof o.turnId === "string" ? o.turnId : "", callId: typeof d.toolCallId === "string" ? d.toolCallId : typeof call.toolCallId === "string" ? call.toolCallId : typeof d.callId === "string" ? d.callId : "",
+      runtime: typeof o.runtime === "string" ? o.runtime : typeof d.runtime === "string" ? d.runtime : "",
       exceptional: failed || o.kind === "denied", visibleSummary: head, barrier: SPECIAL_TOOLS.indexOf(tool) >= 0 || !!o.anchorKey,
       summary: slimToolRow(raw), at: typeof o.at === "string" ? o.at : "" };
   }

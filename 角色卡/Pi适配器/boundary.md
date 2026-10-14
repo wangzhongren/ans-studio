@@ -5,7 +5,7 @@
 | 类型 | 可操作路径 | 用途 |
 | --- | --- | --- |
 | 单文件 | `src/provider/pi/session.ts` | 会话建立与生命周期封装 |
-| 单文件 | `src/provider/pi/tools.ts` | 受治理工具注册与 `tool_call` 钩子 |
+| 单文件 | `src/provider/pi/tools.ts` | 旧工具公开路径的兼容转出；公共执行与 schema 由运行时核心维护 |
 | 目录（私有） | `src/common/pi-adapter/` | 本角色私有辅助代码 |
 | 目录（测试） | `test/pi-adapter/` | 本角色的单元与层契约测试及夹具 |
 | 单文件 | `角色卡/Pi适配器/feature-map.md` | 功能导航 |

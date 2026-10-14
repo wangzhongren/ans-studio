@@ -2,6 +2,10 @@
 
 记录本角色掌握的事实、待核实事项与续接线索。不写全局规则，不抄任务状态。
 
+- 2026-10-14：T1真实入口测试接缝只在 `test/测试/t1-loader.mjs`：Codex/Claude原公开factory注入既有external engine/query，Pi外部createAgentSession替身；实际main/preload/renderer/业务gate均保留，环境路径必须显式temp。preload事件回调既可能单信封也可能数组，观察者须展开。HandbackEvent数据在`handback`内，其turnId也在此；成功终态但无正式报告不能称completed，有工具拒绝时可为blocked。LRU上限实际为3，自动回交会新增su句柄。详见T1[报告](docs/change/2026-10-14_change_multi-runtime-independent-verification.md)与[实际重复问题](docs/fix/2026-10-14_fix_actual-main-live-history-duplication.md)。
+- 2026-10-14：新renderer选角色会主动经现有preload读 `session:history-get` 并读 `session:live-views`；旧独立假IPC脚本须注册这些现有公共接口，历史按project/role/runtime精确返回最近push的原fixture rows，不能缺handler产生人工error再把它当产品回归。Electron app.setPath(userData)要绝对路径。失败catch快照保留rowModel、viewport、rootDOM和replayAnchorDebug，可区分虚拟行未挂载与真实卡位置错；不靠文本相同猜轮次。
+- 2026-10-14：T1最终当前候选验证见同[报告](docs/change/2026-10-14_change_multi-runtime-independent-verification.md#最终候选与独立结论)：actual main23、旧UI119、锚点14、full1225通过/0失败/1Windows旧skip，269代码/test起止同hash。原重复显示与legacy已决卡full错位由原属主修复，未放宽原assert。Core readonly onTurnStarted→Window原closure→clientID只属显示，模型/store不带clientID；主入口同文direct/queued独立actualturn已验。SDK依赖没变，原native探针有限证据保留不重测；online/全OS沙箱仍未测。
+
 - 2026-10-11：角色由 bootstrap 建立。本角色没有直接负责的用户可操作业务功能；只拥有 `test/测试/` 下的联调、完整流程与回归用例。
 - 2026-10-11：可提前依据**已确认**的设计准备用例；依赖尚未实现时不能把替身测试写成联调通过。当前设计文档状态为「待客户确认」，暂不作为已确认基线。来源：设计文档抬头。
 - 2026-10-11：跨角色联调的候选对象是设计文档 §4.1 的完整链路：CLI 解析 → 角色/边界解析 → 拼上下文 → 构工具 → 拉起 worker → 拦截 → 收尾记录。等各能力角色实现并给出实际版本后再接。

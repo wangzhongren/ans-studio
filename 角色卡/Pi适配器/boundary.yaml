@@ -8,7 +8,7 @@ entries:
     purpose: 会话建立与生命周期封装
   - kind: file
     path: src/provider/pi/tools.ts
-    purpose: 受治理工具注册与 tool_call 钩子
+    purpose: 旧工具公开路径的兼容转出；公共执行与 schema 由运行时核心维护
   - kind: directory
     path: src/common/pi-adapter/
     purpose: 本角色私有辅助代码

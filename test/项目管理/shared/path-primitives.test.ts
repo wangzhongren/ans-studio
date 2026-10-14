@@ -10,7 +10,7 @@
 // 隶属：共享组件测试（`src/common/shared/` 的专属测试目录，pm 属主）。
 
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync, rmSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test, after } from "node:test";
@@ -251,7 +251,8 @@ test("两处旧实现同答案（要害）：门禁 realResolve(sync) 与 Pi适�
 test("realResolve 解析 junction 逃逸：经链接到达的真实路径落在链接目标之下", () => {
   if (!LINK) return; // 无法创建链接时跳过
   const real = shared.realResolve(join(LINK, "b"));
-  assert.equal(real, shared.normalizeLexical(join(ROOT, "a", "b")));
+  // tmpdir 的父链本身也可能是链接（Mac /var -> /private/var）；预期以独立 OS realpath 为准。
+  assert.equal(real, shared.normalizeLexical(realpathSync.native(join(ROOT, "a", "b"))));
   // 关键安全性质：判定权威用**链接目标**（而非链接路径）来比较是否在根内。
   assert.equal(shared.isWithinReal(shared.realResolve(ROOT), real), true);
 });

@@ -1,7 +1,7 @@
-# ANS —— 受治理会话链路（v1：CLI + 桌面应用）
+# ANS —— 受治理会话链路（CLI + 桌面应用）
 
-一个**基于 role-first（RFSG）结合 Pi agent** 的 **agent 系统**：
-**role-first（RFSG）管「谁负责、允许改什么」，Pi 管「执行」，两者结合 = 一个受治理的 agent 系统。**
+一个**基于 role-first（RFSG），可选择 Pi、Codex 或 Claude 执行**的 agent 系统：
+**role-first（RFSG）管「谁负责、允许改什么」，ANS 公共工具在执行前检查权限，所选引擎执行会话。**
 它把「角色 + 边界」变成一次可审计、fail-closed 的会话：写入**在发生之前**被拦截，
 边界（角色的 Section 1 写入白名单）是**唯一的写授权来源**；治理会话的落盘以**客户确认为前提**（确认制）。
 
@@ -9,7 +9,7 @@
 
 - **ANS 是一套受 [Role-First Software Governance（RFSG）](https://zenodo.org/records/22824700) 论文启发的
   AI 开发技能**（技能仓库名就叫 **ANS Skill**——它是个名字，**不是缩写**）。本仓库是把它落成一个
-  **可运行的工具**：CLI（`ans`）与 Electron 桌面应用——**执行层用 Pi**。
+  **可运行的工具**：CLI（`ans`）与 Electron 桌面应用——**执行层可选 Pi、Codex 或 Claude**；CLI 另保留不调用模型的 demo。
 - **它从 RFSG 吸收的三点**（技能 README 原文）：
   1. **先确定责任，再确定代码归属。** 先问谁对这项业务行为负责，再明确它需要哪些模块和文件。
   2. **按需广泛阅读，在授权范围内修改。** 排查时可以在实际读取权限内跨模块了解情况，当前上下文只加载任务需要的内容。
@@ -25,20 +25,20 @@
   拒绝信息按根（`skill:` / `project:`）分组列出允许路径。凡不能确证的，一律 **fail-closed**：拒绝，而不是放行。
 - **客户确认制**：治理会话（su）**写盘前**必须先用 `request_confirmation` 把预览（含**将要写出的具体路径**）
   摆给客户；客户确认后，编排把「预览里列出且校验在会话边界内」的路径**发行进本次会话的 writeSet**
-  （未确认路径被 F4 拒）。**客户确认不设超时**——等你作答；等待期间该轮的硬超时暂停，
-  不会把「等你点头」的轮次掐掉。拒绝 / 通道不可用 → **不写**（fail-closed）。
+  （未确认路径被 F4 拒）。**ANS 层的确认等待不设超时**，等待期间暂停该轮硬超时。原生引擎仍有上游限制：
+  Claude MCP 约 24.8 天；Codex dynamicTools 的上游期限未建立，不能承诺无限等待。拒绝 / 通道不可用 → **不写**（fail-closed）。
 - **分层**（相邻层单向调用）：
   **入口（装配）→ Interface → Pipeline → Service → Provider**；`Model` 为各层共享的冻结类型。
   入口只持有 Interface 层句柄（`runRoleCommand` / `governCommand`），不导入 Service/Provider 对象、
   不建「导入全部层」的中央工厂；下游模块按需**动态导入**。
-- **两个前端，一个引擎**：CLI（`ans`）与桌面应用共用同一套 Pipeline / Service / Provider；
+- **两个前端，同一受治理核心**：CLI（`ans`）与桌面应用共用同一套 Pipeline / Service / Provider；
   治理会话引擎（`openGovernanceSession`）对二者是**同一个**（杜绝两份实现）。
 
 ## 快速开始
 
 运行环境：**Node ≥ 23.6**（本机验证 **v24.14.0**）。CLI **免构建**——`bin/ans.js` 直接
 `import('../src/index.ts')`，由 Node 原生 TypeScript 类型擦除运行。**依赖仍需安装**：
-`npm install`（依赖 `yaml`、`@earendil-works/pi-coding-agent`；桌面另需 devDependency `electron`）。
+`npm install`（固定安装 Pi `1.1.0`、Codex CLI `0.162.1`、Claude Agent SDK `0.3.299`、MCP `1.32.1`、Zod `4.6.7` 与 Anthropic SDK `0.93.0`；桌面另需 `electron`）。SDK 按选定引擎懒加载，help/doctor 不开启模型或原生会话。
 
 ### 桌面应用（主推路径）
 
@@ -47,7 +47,7 @@ npm install
 npm run app        # 等价于 electron app/main.ts
 ```
 
-桌面应用是一个**治理会话工作台**（默认跑真实 Pi，无 runtime 选择器）：
+桌面应用是一个**治理会话工作台**。角色名旁的引擎选择器提供 **Pi、Codex、Claude**，默认 Pi；切换后使用所选引擎的会话与设置。demo 仅保留为 CLI 和测试兼容入口，正式桌面选择器不提供该项。
 
 1. **导入项目**（系统文件夹选择器）。导入即授权；点左侧任意角色即开启会话（**无确认弹窗**），
    聊天多轮续接。写入由门禁引擎静默约束，**越界写入在聊天流里内联提示**（不弹窗）。
@@ -65,10 +65,14 @@ npm run app        # 等价于 electron app/main.ts
    **派发 ≠ 授权**（写权仍只来自目标角色自己的边界）。每个角色**一条任务队列**：忙时入队（按到达序），
    **你手打的客户消息同样入队**（不再直接报错）——右上角图标簇「角色资料」抽屉内、该角色名下有「当前工作 / 排队」两节
    （图标角标 = 该角色待办深度），左树徽标（如「工作中 · 2 待办」）同步可见。
-5. **重启恢复**：会话持久化在 `<项目>/.ans/sessions/<角色>/`（Pi 会话 JSONL，含完整对话与工具调用；
-   已 `.gitignore`）。重开应用后恢复历史与模型上下文；应用关闭时**未决的确认请求会失效**
-   （不会留下半截的「已同意」，文案如实）。
-6. **Pi 设置**：右上角「Pi 设置」图标打开抽屉面板填 Pi 配置并**保存到 `.env`**（见「Pi 配置」）。
+5. **历史与上下文**：会话按 `<项目>/.ans/sessions/<角色>/<runtime>/` 隔离：`ans/index.json` 与
+   `ans/replay.jsonl` 保存 ANS 索引/回放，`native/` 保存所选引擎的原生上下文；目录已 `.gitignore`。
+   重开后可读取所属引擎历史，模型上下文只有适配器确认原生恢复成功才显示“已恢复”；恢复失败会说明上下文已重建，
+   文件存在和 ANS 回放不构成恢复成功。旧角色目录 Pi JSONL 仅用于 Pi 兼容展示或复制到 Pi native 后恢复，
+   Codex/Claude 不用它恢复模型。应用关闭时**未决确认会失效**（不会留下半截的“已同意”）。
+6. **运行时设置**：右上角设置图标打开所选引擎的配置抽屉，字段与 Pi/Codex/Claude 的真实要求一致，
+   **保存到 `.env`**；秘密只显示是否已设置，面板还显示有效来源与应用状态。保存不证明账号或端点可连接。
+   忙碌 Pi 会话继续使用原配置，所有旧 Pi 轮次结束后才在下一输入或重开时安全应用新配置（见下方配置说明）。
 7. **界面**：输入框为**圆角胶囊**（发送键内嵌；忙碌时另现**停止钮**，与发送钮并存——只结束**当前轮次**，排队消息 / 草稿 / 资料保留，空闲时隐藏）；可选图（png/jpeg/webp/gif、≤5MB）随消息预览，
    发送时经主进程重校验（解码 / 魔数 / 限额，**任一张不合格整条拒发**；忙时入队即定格），
    随消息一并**送进模型**（图片随消息发送、不单独发图）。助手消息、角色卡 / 变更记录 / 文档索引、
@@ -87,12 +91,12 @@ node bin/ans.js --help
 ### 两道门（交付前必过）
 
 ```bash
-node --test "test/**/*.test.ts"   # 全量测试：1054 用例、1051 通过、1 跳过（2 条失败为既有环境相关，非代码缺陷）
+node --test "test/**/*.test.ts"   # 全量测试（实际结果以本次候选证据为准）
 npm run typecheck                 # tsc --noEmit，零类型错误
 ```
 
 > `test/*/*.test.ts` 这类**两层**写法会漏掉 `test/项目管理/shared/` 等**三层**路径，必须带引号走 Node glob。
-> 本机两条红：桌面面板键断言依赖仓库目录名、pm shared 的 macOS `/var` 符号链接——与代码缺陷无关，已在各自测试内定位。
+> 部分无网络集成用例需要监听 `127.0.0.1`；限制本地 listen 的沙箱会返回 EPERM。首次失败和允许回环后的重测须分别保留。
 
 ## Pi 配置
 
@@ -110,9 +114,9 @@ npm run typecheck                 # tsc --noEmit，零类型错误
 
 **从哪填**：
 
-- **桌面**：右上「Pi 设置」面板 → **保存到仓库根 `.env`**。只改面板键、**保留注释与未知键**、原子写；
+- **桌面**：先在引擎选择器选 Pi，再打开右上设置图标 → **保存到仓库根 `.env`**。只改所选引擎的面板键、**保留注释与未知键**、原子写；
   token 字段掩码且**绝不回显**（只示「已设置 / 未设置」）；`ANS_PI_CONTEXT_WINDOW` 收在可折叠的「高级」里、
-  **可留空**（留空 = 用保守默认）；保存后即时重载，**下一会话生效**。
+  **可留空**（留空 = 用保守默认）；面板给出应用状态。忙碌 Pi 轮次不换凭据，待所有旧 Pi 轮次结束后，在下一输入或重开时安全应用新配置。
 - 桌面**启动时**会把仓库根 `.env` 载入 `process.env`（补上 Electron 进程缺失的 `--env-file`），
   之后 `resolvePiProviderConfig(opts, process.env)` 原样复用（单一来源，无第二份读取逻辑）。
 
@@ -124,6 +128,24 @@ node --env-file=.env bin/ans.js role run 编排 --task T-1 --runtime pi
 
 `.env` 已被 `.gitignore` 忽略；仓库只提供占位符 `.env.example`。凭据纪律见「安全与凭据」。
 
+## Codex 与 Claude 配置
+
+CLI 的 `role run` 和 `govern` 均支持 `--runtime demo|pi|codex|claude`；桌面正式选择器提供 Pi/Codex/Claude，设置抽屉随当前选择变化。配置保存方式沿用 `.env`；从 CLI 使用 `node --env-file=.env bin/ans.js …`。示例见 [`.env.example`](.env.example)，秘密值只留占位符。
+
+| 引擎 | 必填 | 可选与默认 |
+| --- | --- | --- |
+| Pi | `ANTHROPIC_AUTH_TOKEN`、`ANS_PI_BASE_URL`、`ANS_PI_MODEL` | `ANS_PI_CONTEXT_WINDOW` 默认 32768；地址和模型没有默认值 |
+| Codex | `CODEX_API_KEY`（可由 `OPENAI_API_KEY` 替代）、`ANS_CODEX_MODEL` | `ANS_CODEX_BASE_URL` 默认 `https://api.openai.com/v1`，自定义地址须兼容 Responses API |
+| Claude | `ANTHROPIC_API_KEY` | `ANS_CLAUDE_MODEL`、`ANTHROPIC_BASE_URL` 留空使用 SDK 默认 |
+
+Codex 使用固定 CLI 的 app-server JSON-RPC 运输和实验 dynamicTools ANS 代理；代理校验 thread/turn/call 身份后调用真实 MCP handler。它先检查有效配置并关闭全部 native MCP 和原生命令/浏览器等旁路，原生线程使用 read-only/never。这里没有 TS SDK 的审核 callback，也不读取全局登录状态。Claude 使用官方 Agent SDK 的进程内 MCP，只发布传入的 ANS 工具；原生 builtin tools 为空，未知工具拒绝。实际 CLI 的 bare 会抑制 SDK hooks，因此生产不使用 bare，而用 `settings.disableAllHooks:true` 禁用设置/插件 hooks 并保留显式 SDK callbacks。三引擎的实际写入均由核心 handler 在副作用前执行同一门禁。
+
+Claude 必须使用 API key，不使用订阅/OAuth 回退。客户等待暂停 ANS prompt 计时，但 Claude 原生 MCP 仍有约 24.8 天硬上限；超时会失败并取消旧请求，不自动同意。Codex dynamic request 的上游期限未由当前协议建立，也不能承诺原生无限等待。原生上下文恢复只有引擎确认成功才标记“已恢复”；ANS 回放只是可读记录。新存储按 `.ans/sessions/<角色>/<runtime>/native` 与 `ans` 隔离，旧 Pi 记录由 Pi 适配器迁移。
+
+正常安装和无网络协议/门禁测试的结果见 [装配验证](角色卡/装配/docs/change/2026-10-14_change_multi-runtime-assembly.md)。Claude 原生 hook/input 更新已用 bundled CLI `2.1.299`、假凭据和严格本地回环验证，详见 [原生验证](角色卡/Claude适配器/docs/fix/2026-10-14_fix_claude-native-hook-identity.md)。
+
+当前合并候选已通过独立 T1 无网络验证：实际桌面入口 23/23、旧界面 119/119、锚点 14/14；全仓 1226 项中 1225 通过、0 失败、1 项既有 Windows 专属跳过，类型与 diff 检查通过。history/live 合并及主进程交互的实际覆盖见 [独立验证](角色卡/测试/docs/change/2026-10-14_change_multi-runtime-independent-verification.md)，整合状态见 [项目管理报告](角色卡/项目管理/docs/change/2026-10-14_change_multi-runtime-integration.md)。三引擎的在线模型轮次尚未验证，原生探针和本地回环结果只支持各自记录的范围。
+
 ## 角色链
 
 - **客户 ↔ su**：`su` 是内置治理角色（id 由门禁引擎枚举给出，**代码不硬编码**）。桌面里 su 是主入口
@@ -134,7 +156,7 @@ node --env-file=.env bin/ans.js role run 编排 --task T-1 --runtime pi
   自己的治理边界文档，创世授权**结构性自终止**，此后 su 改由该文档治理。
 - **确认制（写盘的前提）**：预览（含将写出的路径）→ 你确认（桌面交互卡 / CLI 终端问答，`1` = 单选、
   `1,3` = 多选，空 = 拒）→ 编排把已预览且校验在边界内的路径发行进本次会话 writeSet → 写入照旧过门禁。
-  **不设超时**（一直等你）；通道不可用 / EOF / 拒绝 → 不写。**当前只给治理角色 su**（设计登记 O-A2：
+  **ANS 层不设确认等待超时**（等待时暂停该轮硬超时）；原生工具仍受上述 Claude/Codex 上游限制，不能承诺所有引擎无限等待。通道不可用 / EOF / 拒绝 → 不写。**当前只给治理角色 su**（设计登记 O-A2：
   其它角色要问客户时再开）；项目角色会话按自身 Section 1 + 任务 writeSet 受门禁约束。已知残留：
   确认保证的是「**路径**已确认」，「预览内容 ≠ 写出内容」的内容漂移**关不住**（客户已裁定不采纳内容哈希比对）。
 - **自动收尾**：客户同意并写入后，su 一轮 settle 时由代码自动写 `.ans`(pin) + 治理边界文档 +
@@ -153,24 +175,27 @@ node --env-file=.env bin/ans.js role run 编排 --task T-1 --runtime pi
 
 | 命令 | 说明 |
 | --- | --- |
-| `ans role run <角色> --task <任务> [--runtime demo\|pi]` | 运行一个受治理角色会话（roleId 严格校验：未登记角色报「未知角色」并以 2 结束）。默认 `demo`（装配自有的演示假 runtime）；`--runtime pi` 用真实 Pi 适配器（缺凭据时非 0 退出、**不静默降级**）。 |
-| `ans govern [<目录>] [--task <任务>] [--role <角色id>]…` | **真治理会话**（CLI 前端，与桌面 su 同一引擎）。**接受目标目录**：对无 `.ans` 的 `<目录>` 发起 bootstrap（有界创世授权 + 确认制：终端问答 `y/放行` / 其它 = 拒）；同意并写入后**自动收尾**写 `.ans`(pin) + 治理边界文档 + manifest。缺省 = ans-cli 自身；目标目录不存在 / 非目录 → 码 2、明确报错（**不新建、不回退** ans-cli）。 |
+| `ans role run <角色> --task <任务> [--runtime demo\|pi\|codex\|claude]` | 运行一个受治理角色会话（roleId 严格校验：未登记角色报「未知角色」并以 2 结束）。默认 `demo`（装配自有的演示假 runtime）；`--runtime pi|codex|claude` 使用所选受治理引擎，缺依赖或配置时非 0 退出，不自动切换引擎。 |
+| `ans govern [<目录>] [--task <任务>] [--role <角色id>]… [--runtime demo\|pi\|codex\|claude]` | **治理会话**（CLI 前端，与桌面 su 同一引擎；未给选择时默认 Pi）。**接受目标目录**：对无 `.ans` 的 `<目录>` 发起 bootstrap（有界创世授权 + 确认制：终端问答 `y/放行` / 其它 = 拒）；同意并写入后**自动收尾**写 `.ans`(pin) + 治理边界文档 + manifest。缺省 = ans-cli 自身；目标目录不存在 / 非目录 → 码 2、明确报错（**不新建、不回退** ans-cli）。 |
 | `ans doctor` | 装配自检：打印运行时及其来源、`projectRoot` / `skillRoot`、配置来源（`.ans` 或内置回退）、pin 来源、内嵌演示角色表。 |
 | `ans help` | 用法（含当前运行时）。 |
 
 `ans init` **不存在**（客户决定废除；现落到「未知命令」分支，退出码 2）。
 
-运行时选择优先级：命令行 `--runtime` > 环境变量 `ANS_RUNTIME` > 默认 `demo`（桌面默认 pi）。
+运行时选择优先级：命令行 `--runtime` > 环境变量 `ANS_RUNTIME` > 命令默认（`role run` 为 `demo`，`govern` 为 `pi`；桌面默认 Pi，正式可选 Pi/Codex/Claude）。显式设置 `ANS_RUNTIME` 时会影响两个命令。
 
 ## 目录与职责
 
-全项目共 **10 个角色**。每个角色只写自己 Section 1（`角色卡/<角色>/boundary.yaml`）内列出的路径。
+全项目共 **13 个角色**。CLI 无 `.ans` 时的内嵌回退登记原六个和运行时组的三个角色，引用各自真实边界；演示任务写集保持原来的单文件收窄。每个角色只写自己 Section 1（`角色卡/<角色>/boundary.yaml`）内列出的路径。
 
 | 角色 | 主要路径 |
 | --- | --- |
 | **项目管理（pm）** | `src/common/shared/`（**跨角色共享组件，唯一属主**）、`test/项目管理/shared/`、`docs/scheduling/`、`docs/audit/`（条件 `shell-gate`）、`角色卡/项目管理/docs/**`（整体架构、全项目工程法案、设计 / 变更 / 修复记录） |
 | **编排** | `src/interface/cli/run.ts`、`src/interface/cli/govern.ts`、`src/pipeline/orchestration/**`（含 `govern-session.ts` 唯一治理会话引擎、`pm-reviewer.ts`、`shell-arming.ts`）、`src/common/编排/**`、`test/编排/**` |
-| **门禁引擎** | `src/model/**`（跨层共享类型）、`src/service/**`（`resolve-role` / `resolve-boundary` / `resolve-write` / `shell-rules`）、`src/common/门禁引擎/**`、`test/门禁引擎/**` |
+| **门禁引擎** | `src/model/boundary.ts`、`role.ts`、`decision.ts`（自身共享类型）、`src/service/gate/`、`role/`、`boundary/`、`shell/`（`resolve-role` / `resolve-boundary` / `resolve-write` / `shell-rules`）、`src/common/门禁引擎/**`、`test/门禁引擎/**` |
+| **运行时核心** | `src/model/runtime.ts`、`src/service/runtime/session.ts`、`src/provider/runtime/`（公共工具、schema、store）、`src/common/runtime-core/`、`test/runtime-core/` |
+| **Codex适配器** | `src/provider/codex/session.ts`、`src/common/codex-adapter/`、`test/codex-adapter/` |
+| **Claude适配器** | `src/provider/claude/session.ts`、`src/common/claude-adapter/`、`test/claude-adapter/` |
 | **Pi适配器** | `src/provider/pi/session.ts`、`src/provider/pi/tools.ts`、`src/common/pi-adapter/**`、`test/pi-adapter/**` |
 | **桌面UI** | `app/renderer/`（桌面渲染前端：界面展示与交互，含 vendored 前端库）、`test/桌面应用/`（渲染侧用例） |
 | **桌面窗口** | `app/main.ts`、`app/preload.cjs`、`app/desktop/`（Electron 主进程、窗口生命周期、preload 受限桥、桌面会话装配）、`test/桌面应用/`（窗口侧用例） |
@@ -181,18 +206,18 @@ node --env-file=.env bin/ans.js role run 编排 --task T-1 --runtime pi
 
 - **共享组件 `src/common/shared/`**：跨角色共享的**单一来源**——`.ans` 载入器（`config-loader.ts`）、
   `.env` 读写（`env-file.ts`）、原子写（`atomic-write.ts`）、以及路径 / argv / runtime 原语
-  （`path-primitives.ts`、`argv-primitives.ts`、`runtime-shared.ts`）。**属主 pm**；消费方（**装配、桌面窗口**）
+  （`path-primitives.ts`、`argv-primitives.ts`、`runtime-shared.ts`、`runtime-settings.ts`）。**属主 pm**；消费方（**装配、桌面窗口**）
   **只读导入、不得留第二份实现**，登记在 `角色卡/项目管理/docs/architecture/shared-components.md`。
 - 层间调用方向：**入口（装配）→ Interface → Pipeline → Service → Provider**（`Model` 各层共享）；**仅相邻层可调用**。
 
 ## 安全与凭据
 
 - 凭据**只**放 `.env`（已被 `.gitignore` 忽略），**绝不**写进任何入库文件；`.env.example` 只含占位符、可入库。
-- 凭据**绝不回显**：桌面 Pi 面板对机密键恒返回空串，只给「已设置 / 未设置」；保存回报只含**键名**；
+- 凭据**绝不回显**：桌面运行时设置对机密键恒返回空串，只给「已设置 / 未设置」；保存回报只含**键名**；
   日志 / 错误信息只记键名、不记值。
 - `.env` 读写的**唯一实现**在共享模块：逐行解析、只替换命中键、保留注释与未知键、原子写（同目录临时文件 + rename）、失败显式报错。
-- **会话数据不出仓**：会话 JSONL（含完整对话与工具调用）落在 `<项目>/.ans/sessions/<角色>/`，
-  该目录已 `.gitignore` 忽略，不会随 `git add .` 入库。
+- **持久化会话记录保留在项目内**：各引擎的 ANS 索引/回放与原生记录落在 `<项目>/.ans/sessions/<角色>/<runtime>/ans/` 和 `native/`；旧 Pi JSONL 只作 Pi 兼容。
+  整个 `.ans/sessions/` 已 `.gitignore` 忽略，不会随 `git add .` 入库。
 - 写入落盘在门禁之上还有一道 `writeRoot = projectRoot` 的硬收窄：门禁即便放行某条 **skill 根**的写，写层仍会拒绝
   （只可能更严，不会让边界之外的写通过——有意的纵深防御）。
 - **边界文件格式**：只认 YAML（`role:` + `entries:`）。文件存在但 Section 1 解析为 0 条 → **响亮报错**

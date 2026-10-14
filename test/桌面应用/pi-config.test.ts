@@ -17,6 +17,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   PI_PANEL_KEYS,
@@ -57,7 +58,7 @@ test("面板键恰为 3+1（必填 token/端点/模型 + 可选 CONTEXT_WINDOW�
   assert.ok(!PI_REQUIRED_KEYS.includes("ANS_PI_CONTEXT_WINDOW"), "上下文窗口是可选，不在必填列");
   // 默认路径指向仓库根（app/desktop 上两级）下的 .env——与 CLI `--env-file=.env` 同一文件。
   assert.equal(path.basename(resolveRepoEnvPath()), ".env");
-  assert.ok(resolveRepoEnvPath().endsWith(path.join("ans-cli", ".env")));
+  assert.equal(resolveRepoEnvPath(), path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", ".env"));
 });
 
 test("载入：loadPiEnv 把假 .env 的值带进 env（补 --env-file）", async () => {

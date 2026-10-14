@@ -68,6 +68,7 @@ export interface RoleStateDebouncer<T extends { roleId: string }> {
 export function createRoleStateDebouncer<T extends { roleId: string }>(opts: {
   /** 去抖窗口（毫秒；缺省 100——「≥100ms 或变更才推」的窗口值）。 */
   windowMs?: number;
+  key?: (info: T) => string;
   send: (info: T) => void;
 }): RoleStateDebouncer<T> {
   const windowMs = typeof opts.windowMs === "number" && opts.windowMs > 0 ? opts.windowMs : 100;
@@ -87,7 +88,7 @@ export function createRoleStateDebouncer<T extends { roleId: string }>(opts: {
 
   return {
     push(info) {
-      pending.set(info.roleId, info); // 同角色：只留最新快照（旧快照无意义）
+      pending.set(opts.key?.(info) ?? info.roleId, info); // 同角色：只留最新快照（旧快照无意义）
       if (timer === null) timer = setTimeout(flush, windowMs);
     },
     flush,

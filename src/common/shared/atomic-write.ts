@@ -92,8 +92,11 @@ export async function retryOnTransient(
  *
  * 处置交由 {@link retryOnTransient}（仅瞬时码、有界、只让出事件循环）。
  */
-export async function renameReplacingExisting(from: string, to: string): Promise<void> {
-  await retryOnTransient(() => rename(from, to));
+export async function renameReplacingExisting(from: string, to: string, signal?: AbortSignal): Promise<void> {
+  await retryOnTransient(async () => {
+    signal?.throwIfAborted();
+    await rename(from, to);
+  });
 }
 
 /** {@link atomicWrite} 的可选参数。 */
@@ -105,6 +108,8 @@ export interface AtomicWriteOptions {
   mode?: number;
   /** 临时文件名的前缀（同目录）；缺省 `.{目标名}.tmp`。 */
   tmpPrefix?: string;
+  /** 当前工具轮次的中止信号；已中止时不提交目标替换，清理已创建的 temp。 */
+  signal?: AbortSignal;
 }
 
 /**
@@ -126,12 +131,15 @@ export async function atomicWrite(
   const tmp = path.join(dir, `${prefix}-${process.pid}-${randomBytes(8).toString("hex")}`);
   let handle: Awaited<ReturnType<typeof open>> | undefined;
   try {
+    options.signal?.throwIfAborted();
     handle = await open(tmp, "wx", options.mode ?? 0o666);
+    options.signal?.throwIfAborted();
     await handle.writeFile(data);
+    options.signal?.throwIfAborted();
     await handle.sync();
     await handle.close();
     handle = undefined;
-    await renameReplacingExisting(tmp, filePath);
+    await renameReplacingExisting(tmp, filePath, options.signal);
   } catch (err) {
     if (handle) {
       try {

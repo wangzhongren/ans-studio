@@ -1,0 +1,17 @@
+[pi] 加载 Pi 包…
+[pi] 构造显式 provider…
+[pi] resourceLoader.reload…
+[pi] createAgentSession…
+[pi] bindRole 完成
+[pi] prompt 发出
+[pi] prompt 中止：prompt 超时（800ms）：底层操作未在时限内返回，已中止以免无限挂起。
+✔ prompt 超时：对永不响应的本地服务，prompt 在时限内中止并报可读原因 (1068.281583ms)
+ℹ prompt 在 810ms 内被中止（设定时限 800ms）
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1141.463583

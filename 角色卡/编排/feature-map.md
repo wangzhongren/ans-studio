@@ -7,6 +7,7 @@
 
 | 功能 | 一句话用途 | 状态 | 文档 |
 | --- | --- | --- | --- |
+| 多运行时受治理会话 | 选四引擎，经 Service 建工具、分角色/runtime 存储与读取实际上下文；中止旧确认不发行写权 | 编排 238/238，实际引擎整合待验 | [运行时选择](docs/feature/runtime-selection.md) |
 | ans role run（一次性角色会话） | CLI 按角色跑一轮受治理会话：解析角色/边界 → 写入前门禁 → 事件流到 `settled` | 已实现 | 功能文档待补（[受治理会话运行时](docs/change/2026-10-12_change_governed-interaction-a3-a4.md)） |
 | 角色会话句柄（多轮） | 桌面聊天栏的会话式入口：`openRoleSession` 一个会话多轮 send（可带图 `opts.images` 原样透传，P0-1）、`abort?()` 停当前轮次（三态如实：不支持停止即如实说明，P0-2）、事件流持续、`dispose` 收口；桌面停止钮与图片 IPC 接线为后环 | 已实现 | 功能文档待补（[P0-1/P0-2 句柄层](docs/change/2026-10-13_change_p01-images-p02-abort-handle.md)、[会话自持目录](docs/change/2026-10-12_change_session-dir-restore-wiring.md)） |
 | ans govern（治理会话） | su 的治理对话（建/改角色、创世）：CLI 与桌面收敛为同一引擎 `openGovernanceSession` | 已实现 | 功能文档待补（[确认制/删收口](docs/change/2026-10-12_change_governed-interaction-a3-a4.md)） |
@@ -17,7 +18,7 @@
 | 回交（任务报告） | 按真实turnId隔离报告与证据，未报告/失败如实回交，主入口核对已收到报告后向客户汇总 | 编排已实现并验证 | [任务报告回交](docs/feature/task-handback.md) |
 | su 派发任务 | su 把任务派发给项目角色（前端路由：未开自动开/忙排队/去重）；派发 ≠ 授权 | 已实现（编排侧） | 功能文档待补（[派发接线](docs/change/2026-10-12_change_su-dispatch-wiring.md)、[派发回执](docs/change/2026-10-12_change_dispatch-receipt-queue.md)） |
 | 交互工具 CLI 通道 | CLI 端的客户确认/操作者确认通道（stdin 问答；EOF/未识别一律 fail-closed） | 已实现 | 功能文档待补（[客户确认不设超时](docs/change/2026-10-12_change_customer-input-no-timeout.md)） |
-| 会话自持目录（重启恢复） | 会话数据落 `<projectRoot>/.ans/sessions/<roleId>/`（目录创建归适配器） | 已实现（编排侧） | 功能文档待补（[session-dir 接线](docs/change/2026-10-12_change_session-dir-restore-wiring.md)） |
+| 会话自持目录（重启恢复） | 会话数据按角色/runtime 隔离于 `.ans/sessions/<role>/<runtime>/`（Service 注入存储，实际持久化才建目录） | 已实现（编排侧） | 功能文档待补（[session-dir 接线](docs/change/2026-10-12_change_session-dir-restore-wiring.md)） |
 
 ## 说明
 

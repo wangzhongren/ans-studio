@@ -28,7 +28,7 @@
 // 跨角色待办（见 change 文档）；未获注入时闸一律拒绝（fail-closed，绝不因缺件而放宽）。
 
 import type { ProjectConfig } from "../../model/role.ts";
-import type { RuntimeAdapter, ShellGate, WriteGate, OperatorChannelFn } from "../../provider/pi/session.ts";
+import type { RuntimeKind, RuntimeAdapter, ShellGate, WriteGate, OperatorChannelFn } from "../../model/runtime.ts";
 import type { BoundarySection1 } from "../../model/boundary.ts";
 import { listProject, resolveRole } from "../../service/role/resolve-role.ts";
 import {
@@ -54,6 +54,7 @@ const NO_AUDIT_BOUNDARY: BoundarySection1 = {
 export interface AssembleShellGateOptions {
   /** 目标项目（配置单一来源在装配/前端）。 */
   project: ProjectConfig;
+  runtime?: RuntimeKind;
   /** (a) 前端操作者确认通道（桌面确认框；关窗/不答/超时 = 不放行）。 */
   operatorChannel: OperatorChannelFn;
   /** 客户委托的常规检查政策，仅宿主提供；不会给 su 只读档。 */
@@ -102,6 +103,7 @@ export async function assembleProjectShellGate(opts: AssembleShellGateOptions): 
     reviewerRoleId !== undefined
       ? createPmReviewer({
           project: opts.project,
+          runtime: opts.runtime,
           sessionDeps: opts.sessionDeps,
           pmRoleId: reviewerRoleId,
           ...(opts.openSession !== undefined ? { openSession: opts.openSession } : {}),

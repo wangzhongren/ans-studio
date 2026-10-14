@@ -1,0 +1,23 @@
+D1R-R1 / Window authoritative history metadata
+producer: 桌面窗口; contract: ANS-RUNTIME-V2 revision 1; scope: accepted boundary.yaml
+UTC: 2026-10-14T09:02:46.824216+00:00
+platform: macOS-26.6.2-arm64-arm-64bit-Mach-O
+node: v24.14.0
+affected Window: 37/37, exit 0, no skips; multi-runtime: 17/17, two new D1R tests
+strict tsc --noEmit --pretty false: exit 0; scoped git diff --check: exit 0
+D1 original 171 tests are historical; UI live/history and actualmain proof pending U1/T1
+SHA-256 current candidate / consumed dependencies:
+9827b035a63bd5d3222f74afd046925069dc02412b5a15f0f9a0b4701687fdc2  app/desktop/runtime-history.ts
+a99cf603f46793f2f4c6b0876acbfcc06a278b95b35aa3d52c26376dd3cd67b2  app/desktop/session-history.ts
+0d4073375559558a9329ef5a55808a0f50bfd2f86ca03f577051d981ca8653cb  test/桌面应用/multi-runtime.test.ts
+974c5c6350cfe7091c24a099b74dc1989a42744767e2767582387c181f5deb69  test/桌面应用/session-history.test.ts
+33f77f96cb3f4ba96f3696ab2209fa527119625a72632df383e8e015e2957c44  test/桌面应用/interface.test.ts
+6d73a579e7f693ffe28bb9906799d55e824a3e4a3715570ee2923ee686aa533c  app/desktop/interface.ts
+a0e2b0686cf90f76d1736fa6219f3add89ae32c5e485b850a1deab18e2d3eee8  src/model/runtime.ts
+3a92ac435bce7f007ef9ba2744374d5daf1d84f70d6ec3cd22b4a926cf0feea9  src/pipeline/orchestration/run-role.ts
+800079b88c4a229b24c91b2ff97e218a87ba10254db6e50b489f28b99b12ce1f  src/service/runtime/session.ts
+9fbdd32e5bb9df0aea64f2c8ac58dbdf3a1b19bd30cd74ace44e3830294548a2  src/provider/runtime/session-store.ts
+b1f2d87ab1f12e829034de2047a400352b7f1d36d7b61fff7cfdcf501512e5a8  角色卡/桌面窗口/boundary.yaml
+d37c56d93886c06f60dc3ae03c04cb70b9615775382afb413dc58f71f5bd79ea  角色卡/桌面窗口/api-spec.md
+cce06c71ae8d501ccded6d2897e4cf5c1a00d279e21bb627496e4c410cf8e674  角色卡/桌面窗口/docs/fix/2026-10-14_fix_history-turn-metadata.md
+e1e5d3b404fe3acab91d62085b6b821386db5521d4a358dddd96780052002e04  角色卡/桌面窗口/docs/feature/multi-runtime-desktop.md

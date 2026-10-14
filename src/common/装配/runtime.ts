@@ -1,7 +1,8 @@
-// 装配私有：运行时选择（demo 假替身 / pi 真实适配器）。
+// 装配私有：运行时选择（demo 假替身 / Pi、Codex、Claude 真实适配器）。
 //
 // 约定（与编排对齐）：
-//   - 命令行 `--runtime demo|pi`；环境变量 `ANS_RUNTIME`；**默认 demo**。
+//   - 命令行 `--runtime demo|pi|codex|claude`；环境变量 `ANS_RUNTIME`。
+//   - 缺省 demo；根入口为 govern 指定 Pi 默认。
 //   - 优先级：命令行 > 环境变量 > 默认。
 //   - 纯函数、不导入下层对象，便于 test/装配/ 单测。
 //
@@ -85,6 +86,7 @@ export function extractRuntimeArg(argv: string[]): { argv: string[]; flag: Runti
 export function resolveRuntime(
   flag: RuntimeFlag,
   env: Record<string, string | undefined>,
+  defaultRuntime: RuntimeKind = DEFAULT_RUNTIME,
 ): RuntimeResolution {
   if (flag.present) {
     if (flag.value === "") {
@@ -104,7 +106,7 @@ export function resolveRuntime(
     return { ok: true, selection: { runtime: fromEnv, source: "env" } };
   }
 
-  return { ok: true, selection: { runtime: DEFAULT_RUNTIME, source: "default" } };
+  return { ok: true, selection: { runtime: defaultRuntime, source: "default" } };
 }
 
 /** 环境里是否存在任一 Pi 凭据变量（去空白后非空即算存在）。 */

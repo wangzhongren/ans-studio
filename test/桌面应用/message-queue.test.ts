@@ -371,19 +371,19 @@ test("接线钉子：role-state 通道两端齐备；忙态判据只在主进程
   assert.ok(MAIN.includes('win.webContents.send("session:role-state", info)'), "main 应推 session:role-state");
   assert.ok(MAIN.includes("emitRoleState") && IFACE.includes("emitRoleState: deps.emitRoleState"), "Interface 应透传 emitRoleState");
   assert.ok(
-    SESSION.includes("const busy = this.sessions.get(targetRoleId)?.busy === true;"),
+    SESSION.includes("const busy = entry?.busy === true;"),
     "忙态判据 = 会话 busy 标志（真实信号——不靠界面推测）"
   );
   assert.ok(
-    SESSION.includes("this.notifyRoleState(en.projectRoot, roleId);"),
+    SESSION.includes("this.notifyRoleState(en.projectRoot, roleId, runtime);"),
     "settled（一轮结束）应外推快照（B-2 后台轮次结束同样走这里）"
   );
-  assert.ok(SESSION.includes("this.notifyRoleState(entry.projectRoot, roleId);"), "直接 send 开跑应外推快照");
+  assert.ok(SESSION.includes("this.notifyRoleState(entry.projectRoot, entry.roleId, entry.runtime);"), "直接 send 开跑应外推快照");
   // L-1 顺序修正（防竞态）：直接 send **先置忙再 await**——快适配器（如 demo）的 settled 可能在 await
   // 返回前就被消费；若此刻才置忙，settled 的复位会被反向覆盖，忙态永不复位（队列永不放行）。
   assert.ok(
     SESSION.indexOf("entry.busy = true;") >= 0 &&
-      SESSION.indexOf("entry.busy = true;") < SESSION.indexOf("await entry.handle.send(text);"),
+      SESSION.indexOf("entry.busy = true;") < SESSION.indexOf("await this.sendDelivery(entry, origin, text, opts);"),
     "直接 send 应先置忙再 await（与投递机同款）"
   );
   // 渲染侧：只如实转述快照；队列行与徽标由它驱动。

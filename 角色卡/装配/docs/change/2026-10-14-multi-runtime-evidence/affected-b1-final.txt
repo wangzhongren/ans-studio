@@ -1,0 +1,322 @@
+✔ firstProjectFilePath：取边界内首个项目根 file 条目 (45.43775ms)
+✔ 点角色即开：open 直接建会话（无摘要/nonce），多轮 send、越界被拒且含按根分组 (147.978125ms)
+✔ 同一角色重复点击：续接当前会话，不重建 (123.586667ms)
+✔ B-2 切换并存：A→B→A 不 dispose 旧会话，切回直接续（open 计数=2） (2.148583ms)
+✔ B-2 LRU 上限：第 MAX_LIVE_SESSIONS+1 个会话淘汰最久未用者；被淘汰者切回是新建 (1.342834ms)
+✔ B-2 事件信封：每会话事件带自己的 roleId；切走/在别的会话期间，后台仍持续拉取（不串消息） (92.168083ms)
+✔ 未导入项目就点角色：open 如实失败 (7.960666ms)
+✔ 未知角色：open 如实失败 (6.323833ms)
+✔ send 在未开启会话时如实失败 (5.884584ms)
+✔ 运行期同意：登记的非-pin 例外——accepted:true 且不带 pin，来源如实标注（行为不变） (9.13325ms)
+✔ T20 handback 事件被外推：会话句柄产出的回交事件经 emitEvent 原样送达（§10.8） (50.568958ms)
+✔ 空参数 -> help (4.1045ms)
+✔ --help / -h / help -> help (0.082959ms)
+✔ doctor -> doctor (0.040458ms)
+✔ role run 编排 --task T-1 -> role-run（argv 为指令后的剩余参数） (0.071291ms)
+✔ --task= 等号写法同样可解析 (0.041959ms)
+✔ role run 缺角色 / 缺 --task -> unknown (0.045834ms)
+✔ P1-4 配套：role run 见 -h/--help 整段放行 -> role-run（--task 缺失/存在均可） (0.062584ms)
+✔ 防放宽过度：无 help 时缺 --task 仍是 unknown「缺少 --task」；裸 help 令牌不放行 (0.065625ms)
+✔ govern 透传剩余参数 (1.362708ms)
+✔ init 子命令已移除 -> unknown（客户废除 init，见编排 T16） (0.615917ms)
+✔ 未知命令 -> unknown (2.830875ms)
+✔ ansProjectPath：项目根下 .ans/project.json (0.682167ms)
+✔ .ans 合法（带 pin）→ 注入 roles/governanceBoundary/acceptance，pin 保留 (18.321875ms)
+✔ .ans 声明 accepted:true 无 pin → 载入方置为未接受（fail-closed，§3.3） (6.6635ms)
+✔ 终态规则纯函数：accepted:true 无 pin → 降级；有 pin / accepted:false → 不变 (0.103542ms)
+✔ pin 与 hash 不符 → 载入层保留（pin 存在），引擎 verifyPins 判未接受 (8.315208ms)
+✔ .ans 合法且 pin 匹配 → 引擎解析后仍 accepted=true（对照） (3.16575ms)
+✔ 无 .ans/project.json → 回退入参 fallback（原样、不崩） (0.349875ms)
+✔ 无 .ans：role run 仍走内置演示配置（未放松，既有行为保持） (45.377959ms)
+✔ 内嵌配置含原六个及三个运行时角色的真实 card/boundary 映射 (0.782ms)
+✔ projectRoot 解析到仓库根（含 package.json 与 src/index.ts） (0.061708ms)
+✔ T-1 的 writeSet 是演示角色“编排”边界的真子集（用于演示 F4） (4.910209ms)
+✔ 演示任务 scope 携带 conditions（门禁引擎新增字段），编排边界无 conditional-directory 故为空 (0.053917ms)
+✔ 演示脚本两笔写入分别演示 F5/F10 与 F4 (1.38175ms)
+✔ 边界接受证据如实标注演示来源，且不由程序自行判定 (0.067625ms)
+✔ 默认脚本：两笔越界写入都在写之前被拒，逐笔给出按根分组的允许路径 (0.50525ms)
+✔ 脚本事件顺序：先 tool_call，再判定，最后 settled (0.113083ms)
+✔ gate 允许时产出 accepted 且不发写入（替身不落盘） (0.078584ms)
+✔ resolveEntryTimeoutMs：默认 5 分钟，合法覆盖生效，非法值回退默认 (0.297041ms)
+✔ 入口确定性收敛：doctor 不挂起、以 0 退出、无 unsettled TLA 警告 (124.635ms)
+✔ 入口退出码可靠：--help 以 0 退出 (86.572791ms)
+✔ 入口退出码可靠：无凭据的 pi 路径以非 0 退出（真实结果，非默认 0） (65.720792ms)
+✔ 入口退出码可靠：demo 路径以 0 退出且无警告 (105.305167ms)
+✔ loadInjection(目标目录) → 注入的 projectRoot 即该目录（绝对化） (2.681208ms)
+✔ loadInjection(相对路径) → 绝对化（相对 cwd） (0.813208ms)
+✔ loadInjection() 缺省 → projectRoot 仍为 ans-cli 自身（行为不变） (0.564542ms)
+✔ loadInjection(空目录) → 不注入 ans-cli 自身的演示数据；带 CLI 操作的创世授权（genesisBootstrap） (0.595375ms)
+✔ loadInjection(ans-cli 根，显式给出) → 与缺省同款：演示配置原样（自身行为逐字不变） (0.458584ms)
+✔ 目标目录含 .ans/project.json → 角色载入，projectRoot 仍取目标目录 (0.828917ms)
+✔ 显式目标目录优先于 .ans 自带的 projectRoot (0.491333ms)
+✔ ans govern <不存在的目录> → 明确报错、非 0，不静默回退到 ans-cli (0.385625ms)
+✔ ans govern <非目录（文件）> → 明确报错、非 0 (0.169541ms)
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-govern-target-bQdTEl/ok-P74HUY
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝。
+[message] 用户指令：任务 T-GOV-1：以治理身份在**项目治理边界**内工作。越出治理边界（`角色卡/`、`docs/`、`.ans/` 之外，如项目的 `src/`，或项目根以外）的写入会在写入之前被门禁拒绝。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（角色卡全文 + 边界摘要，**并列出将要写出的具体路径**——路径是发行凭据，没列出的路径写不进去）请客户确认；拿到明确同意（confirmed:true）后才写；未获同意/通道不可用 → 不写盘、如实告知。
+未指定目标角色：请**据对话决定要建哪些角色**，逐一向客户确认后写出治理产物——`角色卡/<角色>/role-card.md`、`角色卡/<角色>/boundary.yaml`、`角色卡/<角色>/memo.md`。项目治理边界文档 `角色卡/governance-boundary.yaml` 由编排的自动收尾写出，无需你写。
+[tool_call] 模型请求调用 request_confirmation
+[accepted] request_confirmation：客户已确认「确认写出角色 X 的骨架文件」（confirmed:true；操作者：test:装配放行桩）——已获明确同意。可按已同意的内容继续（如写盘，写入须与向客户预览的内容一致）。
+[tool_call] 模型请求调用 write_file
+[accepted] write_file 已获准并落盘：角色卡/X/role-card.md（13 字节写入 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-govern-target-bQdTEl/ok-P74HUY/角色卡/X/role-card.md）
+[tool_call] 模型请求调用 write_file
+[accepted] write_file 已获准并落盘：角色卡/X/boundary.yaml（20 字节写入 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-govern-target-bQdTEl/ok-P74HUY/角色卡/X/boundary.yaml）
+[settled] 会话结束
+✔ ans govern <空目录>（经 governCommand + 假适配器）→ EXIT_OK，边界解析不再失败，创世授权下 su 骨架写入真落盘 (36.371209ms)
+✔ ans govern <存在的目录>（main 入口；环境已清空 Pi 配置）→ 目录校验放行、不再报边界解析失败；如实非 0 报缺 provider 配置 (2.511916ms)
+✔ doctor 显示运行时来源（env ANS_RUNTIME=pi） (0.71025ms)
+✔ --help 显示当前运行时选择（命令行来源，压过默认） (0.174708ms)
+✔ 无效 --runtime 值返回 2 并非 0 报错 (0.100625ms)
+✔ role run 选 pi 且无凭据时非 0 退出、如实报错、绝不退回 demo (0.271958ms)
+✔ runtime resolution preserves each command default and explicit selection priority (0.589875ms)
+[message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md
+[message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] offline factory:demo
+[settled] 会话结束
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-assembly-b1-PxK8CK
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝。
+[message] offline factory:demo
+[settled] 会话结束
+[message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md
+[message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] offline factory:demo
+[settled] 会话结束
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-assembly-b1-PxK8CK
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝。
+[message] offline factory:demo
+[settled] 会话结束
+✔ root flag and env reach demo through actual Interface/Pipeline/Service handlers in both commands (135.270667ms)
+[message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md
+[message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] offline factory:pi
+[settled] 会话结束
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-assembly-b1-ioAKwo
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝。
+[message] offline factory:pi
+[settled] 会话结束
+[message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md
+[message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] offline factory:pi
+[settled] 会话结束
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-assembly-b1-ioAKwo
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝。
+[message] offline factory:pi
+[settled] 会话结束
+✔ root flag and env reach pi through actual Interface/Pipeline/Service handlers in both commands (27.145791ms)
+[message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md
+[message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] offline factory:codex
+[settled] 会话结束
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-assembly-b1-dJqVy0
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝。
+[message] offline factory:codex
+[settled] 会话结束
+[message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md
+[message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] offline factory:codex
+[settled] 会话结束
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-assembly-b1-dJqVy0
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝。
+[message] offline factory:codex
+[settled] 会话结束
+✔ root flag and env reach codex through actual Interface/Pipeline/Service handlers in both commands (21.48475ms)
+[message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md
+[message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] offline factory:claude
+[settled] 会话结束
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-assembly-b1-p2a6MI
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝。
+[message] offline factory:claude
+[settled] 会话结束
+[message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md
+[message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] offline factory:claude
+[settled] 会话结束
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-assembly-b1-p2a6MI
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝。
+[message] offline factory:claude
+[settled] 会话结束
+✔ root flag and env reach claude through actual Interface/Pipeline/Service handlers in both commands (14.623791ms)
+[message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md
+[message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] offline factory:demo
+[settled] 会话结束
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-assembly-default-IQ1lEK
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝。
+[message] offline factory:pi
+[settled] 会话结束
+✔ root command defaults reach demo and Pi respectively through actual Service injection (25.800125ms)
+[message] 已解析角色 运行时核心（kind=project），角色卡：角色卡/运行时核心/role-card.md
+[message] 已解析边界，来源：角色卡/运行时核心/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] [装配演示假 runtime] 角色=运行时核心，脚本化发起 2 次写入（不经真实 Pi SDK，每次写入前经 gate 判定）。
+[tool_call] runtime 请求 write_file -> src/evil.ts
+[denied] 拒绝写入 src/evil.ts：目标路径未匹配任何边界条目（根：project）：src/evil.ts
+允许路径（按根分组）：
+  skill:
+    (无)
+  project:
+    - src/model/runtime.ts
+    - src/service/runtime/session.ts
+    - src/provider/runtime/tools.ts
+    - src/provider/runtime/schema.ts
+    - src/provider/runtime/session-store.ts
+    - src/common/runtime-core
+    - test/runtime-core
+    - 角色卡/运行时核心/feature-map.md
+    - 角色卡/运行时核心/memo.md
+    - 角色卡/运行时核心/changelog.md
+    - 角色卡/运行时核心/functional-description.md
+    - 角色卡/运行时核心/api-spec.md
+    - 角色卡/运行时核心/docs/design
+    - 角色卡/运行时核心/docs/feature
+    - 角色卡/运行时核心/docs/change
+    - 角色卡/运行时核心/docs/fix
+[tool_call] runtime 请求 write_file -> src/common/编排/output.ts
+[denied] 拒绝写入 src/common/编排/output.ts：目标路径未匹配任何边界条目（根：project）：src/common/编排/output.ts
+允许路径（按根分组）：
+  skill:
+    (无)
+  project:
+    - src/model/runtime.ts
+    - src/service/runtime/session.ts
+    - src/provider/runtime/tools.ts
+    - src/provider/runtime/schema.ts
+    - src/provider/runtime/session-store.ts
+    - src/common/runtime-core
+    - test/runtime-core
+    - 角色卡/运行时核心/feature-map.md
+    - 角色卡/运行时核心/memo.md
+    - 角色卡/运行时核心/changelog.md
+    - 角色卡/运行时核心/functional-description.md
+    - 角色卡/运行时核心/api-spec.md
+    - 角色卡/运行时核心/docs/design
+    - 角色卡/运行时核心/docs/feature
+    - 角色卡/运行时核心/docs/change
+    - 角色卡/运行时核心/docs/fix
+[settled] 会话结束（settled）
+[message] 已解析角色 Codex适配器（kind=project），角色卡：角色卡/Codex适配器/role-card.md
+[message] 已解析边界，来源：角色卡/Codex适配器/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] [装配演示假 runtime] 角色=Codex适配器，脚本化发起 2 次写入（不经真实 Pi SDK，每次写入前经 gate 判定）。
+[tool_call] runtime 请求 write_file -> src/evil.ts
+[denied] 拒绝写入 src/evil.ts：目标路径未匹配任何边界条目（根：project）：src/evil.ts
+允许路径（按根分组）：
+  skill:
+    (无)
+  project:
+    - src/provider/codex/session.ts
+    - src/common/codex-adapter
+    - test/codex-adapter
+    - 角色卡/Codex适配器/feature-map.md
+    - 角色卡/Codex适配器/memo.md
+    - 角色卡/Codex适配器/changelog.md
+    - 角色卡/Codex适配器/functional-description.md
+    - 角色卡/Codex适配器/api-spec.md
+    - 角色卡/Codex适配器/docs/design
+    - 角色卡/Codex适配器/docs/feature
+    - 角色卡/Codex适配器/docs/change
+    - 角色卡/Codex适配器/docs/fix
+[tool_call] runtime 请求 write_file -> src/common/编排/output.ts
+[denied] 拒绝写入 src/common/编排/output.ts：目标路径未匹配任何边界条目（根：project）：src/common/编排/output.ts
+允许路径（按根分组）：
+  skill:
+    (无)
+  project:
+    - src/provider/codex/session.ts
+    - src/common/codex-adapter
+    - test/codex-adapter
+    - 角色卡/Codex适配器/feature-map.md
+    - 角色卡/Codex适配器/memo.md
+    - 角色卡/Codex适配器/changelog.md
+    - 角色卡/Codex适配器/functional-description.md
+    - 角色卡/Codex适配器/api-spec.md
+    - 角色卡/Codex适配器/docs/design
+    - 角色卡/Codex适配器/docs/feature
+    - 角色卡/Codex适配器/docs/change
+    - 角色卡/Codex适配器/docs/fix
+[settled] 会话结束（settled）
+[message] 已解析角色 Claude适配器（kind=project），角色卡：角色卡/Claude适配器/role-card.md
+[message] 已解析边界，来源：角色卡/Claude适配器/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] [装配演示假 runtime] 角色=Claude适配器，脚本化发起 2 次写入（不经真实 Pi SDK，每次写入前经 gate 判定）。
+[tool_call] runtime 请求 write_file -> src/evil.ts
+[denied] 拒绝写入 src/evil.ts：目标路径未匹配任何边界条目（根：project）：src/evil.ts
+允许路径（按根分组）：
+  skill:
+    (无)
+  project:
+    - src/provider/claude/session.ts
+    - src/common/claude-adapter
+    - test/claude-adapter
+    - 角色卡/Claude适配器/feature-map.md
+    - 角色卡/Claude适配器/memo.md
+    - 角色卡/Claude适配器/changelog.md
+    - 角色卡/Claude适配器/functional-description.md
+    - 角色卡/Claude适配器/api-spec.md
+    - 角色卡/Claude适配器/docs/design
+    - 角色卡/Claude适配器/docs/feature
+    - 角色卡/Claude适配器/docs/change
+    - 角色卡/Claude适配器/docs/fix
+[tool_call] runtime 请求 write_file -> src/common/编排/output.ts
+[denied] 拒绝写入 src/common/编排/output.ts：目标路径未匹配任何边界条目（根：project）：src/common/编排/output.ts
+允许路径（按根分组）：
+  skill:
+    (无)
+  project:
+    - src/provider/claude/session.ts
+    - src/common/claude-adapter
+    - test/claude-adapter
+    - 角色卡/Claude适配器/feature-map.md
+    - 角色卡/Claude适配器/memo.md
+    - 角色卡/Claude适配器/changelog.md
+    - 角色卡/Claude适配器/functional-description.md
+    - 角色卡/Claude适配器/api-spec.md
+    - 角色卡/Claude适配器/docs/design
+    - 角色卡/Claude适配器/docs/feature
+    - 角色卡/Claude适配器/docs/change
+    - 角色卡/Claude适配器/docs/fix
+[settled] 会话结束（settled）
+✔ new accepted runtime role cards can be reached from root fallback without adding task writes (23.151375ms)
+✔ actual bin default pi Provider fails honestly for missing configuration in role and govern (406.5375ms)
+✔ actual bin default codex Provider fails honestly for missing configuration in role and govern (344.0455ms)
+✔ actual bin default claude Provider fails honestly for missing configuration in role and govern (576.409625ms)
+✔ SDK loading is lazy for module import, help and doctor, including command help (674.244542ms)
+✔ root source depends only on Interface entry, Model and support modules (0.216542ms)
+✔ actual bin missing SDK errors are honest and masked without starting model requests (434.213833ms)
+✔ extractRuntimeArg：抽出 --runtime <值> 并从 argv 剔除（两段式） (1.919458ms)
+✔ extractRuntimeArg：支持 --runtime=<值> 等号写法，任意位置 (0.134625ms)
+✔ extractRuntimeArg：未出现时为 present:false；出现但缺值为空串 (0.234792ms)
+✔ resolveRuntime：命令行 > 环境变量 > 默认 (0.427583ms)
+✔ resolveRuntime：非法取值（含缺值）一律 ok:false，不静默忽略 (0.098167ms)
+✔ hasPiCredential：任一凭据变量非空即为真，空白视为无 (0.292958ms)
+ℹ tests 78
+ℹ suites 0
+ℹ pass 78
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2855.47925

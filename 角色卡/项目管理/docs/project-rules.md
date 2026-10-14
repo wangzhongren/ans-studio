@@ -20,7 +20,7 @@
    - Interface 只调 Pipeline；不直接触达 Service / Provider。
    - Service / Provider 层内部三段式 `abstract/` / `public/` / `impl/`；上层只依赖 `abstract/` 与 `public/` 入口，不直接依赖 `impl/`。
 3. **Model 共享**：共享类型、值对象与不变量由四个运行层共同引用，不属于调用链中的一环。
-4. **固定角色隔离**：一个上下文从绑定到结束只承担一个角色，不能中途切换。跨角色工作必须用**独立上下文**；任何角色都**不派生下游 agent**、不自行调度同伴。
+4. **固定角色隔离**：一个上下文从绑定到结束只承担一个角色，不能中途切换。跨角色工作必须用**独立上下文**。本次客户明确授权专属角色与并行开发，项目管理按技能 `group-leadership.md` 的 Without task_ops 路径核对每角色授权、文档、边界、依赖与写集冲突后启动 fresh worker。普通组员不自行调度同伴。没有客户 pin 的 `.ans/project.json` 时，不伪造 task_ops 配置/审批，也不手写 scheduling 机器日志。
 5. **单一主属主**：共享抽象（Model 类型、公共入口、跨模块契约）只能有一个主属主角色，其他角色只读引用。本项目：
    - `src/model/boundary.ts`、`src/model/role.ts`、`src/model/decision.ts` 的主属主是**门禁引擎**。改动它们会让所有引用方的既有证据失效，须先经项目管理协调。
    - `src/common/shared/`（跨角色共享组件）的唯一写入者是**项目管理**。**现有共享组件**（登记于 `docs/architecture/shared-components.md`）：`config-loader.ts`（`.ans/project.json` 有效配置加载 + pin-backed acceptance 校验）、`path-primitives.ts`（跨角色路径原语，安全相关）、`runtime-shared.ts`（`RuntimeKind` / `PI_CREDENTIAL_ENV_VARS` / `resolveSkillRoot`）、`argv-primitives.ts`（argv 规范化 `normalizeArgv`——**编排**写审计与**桌面窗口**展示操作者所见须**同源**，否则审计的 argv ≠ 操作者看到的 argv）、`env-file.ts`（`.env` 读写模块——**逐行**只改相关键、**原子写**（temp+`rename`）、**凭据不回显**；`.env` 仍归**装配**，本模块是它的**指定写入者**（设计 §11，经 Governance 记档 **G-2**））、`atomic-write.ts`（跨角色共享**原子写**原语——同目录 temp + `fsync` + `rename` **覆盖目标**，并对 rename 的 **Windows 瞬时 `EPERM`**（实时防护/索引器短暂持有目标句柄）做**有界重试**（仅瞬时码 `EPERM`/`EBUSY`/`EACCES`、≤200 次（`RENAME_MAX_ATTEMPTS`，由实测尾部≈63 定）、次数间只 `setImmediate` 让出事件循环、非瞬时立即抛）；抽自 `env-file.ts` 与 **Pi适配器** `fs-write.ts` 两处**同源**写法，消除该处 §6 镜像）。**消费方更新规则**：消费方（**装配**、**桌面窗口**、**编排**、**Pi适配器**、**门禁引擎**）**只读导入**该等模块，**不得复制第二份实现**；组件增删由 pm 在 `docs/architecture/shared-components.md` 登记。**加载器逻辑须单一实现**——已由 `src/common/装配/config-loader.ts` **整体搬迁**至 `src/common/shared/config-loader.ts`（T11，**搬迁非 fork**，逐字等价）；装配侧的本地副本须由 **T12** 改为从共享模块导入并**删除**。在 T12 完成前存在一段**过渡性「两处并存窗口」**（两份代码**逐字相同、行为不分叉**）；此窗口是搬迁的中间态，**不**构成对「不得复制第二份实现」的长期许可。**argv-primitives 消费方动作**：**编排**（`src/common/编排/shell-gate.ts`，**写审计侧**）与**桌面窗口**（`app/desktop/operator-channel.ts`，**呈现操作者侧**）各自删去本地 `normalizeArgv`、改从 `src/common/shared/argv-primitives.ts` 导入（**T21 / T22**）；二者完成前同样处于**过渡性「两处并存窗口」**（两份**逐字相同、行为不分叉**）。
@@ -66,6 +66,8 @@
 - **调度记录归属（2026-10-11 已裁定，冲突已解决）**：早期设计让 CLI（编排）直接写 `docs/scheduling/<task-id>.md`，会绕过 `task_ops` 的校验与锁。**客户裁定「调度权归 pm」后已定**：目录 `docs/scheduling/` **归项目管理（pm）**（其 Section 1 已含该条目，`purpose: 任务调度记录（内容由 task_ops 写入）`）；**内容唯一写入者是 `task_ops`**（技能 `scripts/task_ops.py` + `coordination_store.py`，含 hash 链式机器段）；**编排不得直接写**（机制 `runRole`/`openRoleSession` 留编排，**权力**归 pm）。**使用约定**见 `docs/design/2026-10-11_design_scheduling-record-convention.md`。**注：调度「执行」路径不在 V1（设计 §3.7），本项只落约定与记录格式。**
 
 ## 变更记录
+
+- 2026-10-14：客户确认运行时接入组与开发；中立契约主属运行时核心、Pi/Codex/Claude 为专属适配器。允许本次必要的 v1 冻结契约迁移：Model 中立形状、Pi 兼容转出、公共工具/schema 单一实现、Pipeline 改走 Service、桌面 runtime 隔离和公共回放。具体范围、阶段与验证见 [ANS-RUNTIME-V2](design/2026-10-14_design_multi-runtime-integration.md)；不授权全仓层结构清理或任何所有权扩张。每个精确边界缺口先交 Governance 更新。
 
 - 2026-10-11：首次建立，草稿。依已验收角色定义记录现状，区分已确认要求与未确认方案。来源：治理 bootstrap 后续的项目管理任务。
 - 2026-10-11：§一.5 补记**首个跨角色共享组件** `src/common/shared/config-loader.ts` 与其**消费方更新规则**（装配/桌面只读导入、不复制第二份、`shared-components.md` 登记；逻辑由装配私有 `config-loader.ts` **搬迁**而非 fork）。依据：设计稿 `docs/design/2026-10-11_design_v1-full-implementation.md` §3.10。来源：T10 回报的共享阻塞裁决。

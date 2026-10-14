@@ -11,3 +11,9 @@
 - 2026-10-14：**归档收口同步（归档键约定——同日演进，取代上午的 .frozen 改名过渡）**：旧目录改以 `boundary.yaml` 顶层 `archived: true` 归档（枚举**静默跳过、零提示**；不可开启；边界不予采用）。`project.test.ts` 归档断言由「跳过并提示」更新为「`warnings == []` 且角色表不含「桌面应用」」（未放宽其余断言）；三件套复跑 **42/42**、e2e 按新仓态复跑与上轮**内容级零差异**、仍停既有基线红。报告留档 `docs/change/2026-10-14_archive-key-e2e-report.txt`。Doc: docs/change/2026-10-14_change_split-role-id-test-updates.md（跟进 3 节）
 
 - 2026-10-14：**两项维护事项落地（A 诊断基线红修复 + B 残留清扫；产品评审 + PM 派发）**。**A**：S-1 段夹具工具事件改**生产形状**（`detail{toolName,path,turnId,toolCallId}`、每条唯一 `turnId`，helper `s1Event`）⇒ 组行逐条成行、真窗口化、`renderer.viewport` 真发出——**`DIAGNOSTICS_WINDOW_AND_RENDERER_EVENTS` 由恒红转 true**，尾部 `MAC_CLOSE_REOPEN_*` 两条 + `E2E_DONE=1` 恢复运行；`S1_WINDOWED_ACTIVE` 重锚行模型事实（≥150 行 + 挂载<总行数 + spacer 撑高，弃常驻元素双真）；五事件集合/严重级/`VIRT_MIN_ROWS` 一字未动（评审六禁项全守）。**B**：5 行 log-only 检查按现行口径重锚（`SU_WRITE_NOTE_WRITES_IMPORTED`/`RUNTIME_NOTE_WRITES_IMPORTED` 两处改名；`TOOLROW_HAS_PATH` 改锚 `.activity-op/.activity-target` DOM，夹具生产形状，`TOOLROW_NO_CONTENT` 保留）；11 个边界内测试头注、`project.ts:224` 样例路径、3 处「归属：」句改「桌面窗口」（纯注释面，行为零改动）。证据：e2e **连跑 5 次 + 最终文件复跑 1 次**（67–68s/轮、无 WATCHDOG，run6 与 run1 内容级零差异）——`DIAGNOSTICS=true`、`E2E_DONE=1`、`S1_STAYED_AWAY` 转真、B.1 五检查全 true、**轮间内容级零差异**、`U1_PANE_HEIGHT` 恒 13689（评审观测的 13577/655 不稳定态未复现）；与修复前留档对照＝纯预期位移清单（无新增回归）。`node --test test/桌面应用/*.test.ts` → 206/207（唯一红=pi-config 基线）；typecheck 0 错。报告留档 `docs/change/2026-10-14_diagnostics-fix-runs/run1–6.txt`。Doc: docs/change/2026-10-14_change_split-role-id-test-updates.md（跟进 4 节）
+
+- 2026-10-14：D1 多引擎会话、设置、安全应用点、历史与确认失效接线；171/171 窗口单元与 strict tsc 通过，真实窗口待 T1。Doc: [实施记录](docs/change/2026-10-14_change_multi-runtime-window.md)。
+
+- 2026-10-14：D1R 保留历史行原turnId/eventKind并统一activity ID，受影响37/37与tsc/diff0；真实history/live重复保护待U1/T1。Doc: [修复记录](docs/fix/2026-10-14_fix_history-turn-metadata.md)。
+
+- 2026-10-14：D1R2 真onTurnStarted ack绑定原客户显示ID，匿名/queued/failed/aborted来源隔离，受影响101/101与tsc/diff0；真实窗口由U1/T1续验。Doc: [修复记录](docs/fix/2026-10-14_fix_client-message-origin.md)。

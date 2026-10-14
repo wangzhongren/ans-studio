@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | 单文件 | `app/main.ts` | Electron 主进程入口：建窗与窗口生命周期、IPC 注册、诊断与恢复接线 |
 | 单文件 | `app/preload.cjs` | 受限 IPC 桥（contextBridge 白名单） |
-| 目录 | `app/desktop/` | 桌面 Interface（主进程侧纯逻辑，12 个模块：session/interface/project/session-history/request-anchor/customer-input/operator-channel/pi-config/composer-images/chat-adapter/push-batcher/diagnostics） |
+| 目录 | `app/desktop/` | 桌面 Interface（主进程侧纯逻辑）：会话、项目装配、历史、交互、引擎配置、图片、批推与诊断 |
 | 单文件 | `test/桌面应用/ans-wiring.test.ts` | 主进程侧测试：`.ans` 生效配置接线 |
 | 单文件 | `test/桌面应用/boundary-refresh.test.ts` | 主进程侧测试：边界陈旧重建 |
 | 单文件 | `test/桌面应用/composer-images.test.ts` | 主进程侧测试：图片校验与 Interface 接线 |
@@ -31,6 +31,7 @@
 | 单文件 | `test/桌面应用/session.test.ts` | 主进程侧测试：会话开启/多轮/保活 |
 | 单文件 | `test/桌面应用/su-effective-boundary.test.ts` | 主进程侧测试：su 生效边界 |
 | 单文件 | `test/桌面应用/e2e/main.mjs` | 桌面端到端总自检台（真实 Electron） |
+| 单文件 | `test/桌面应用/multi-runtime.test.ts` | 多引擎会话隔离、路由、设置及恢复契约测试 |
 | 单文件 | `角色卡/桌面窗口/feature-map.md` | 功能导航 |
 | 单文件 | `角色卡/桌面窗口/memo.md` | 本角色工作备忘录 |
 | 单文件 | `角色卡/桌面窗口/changelog.md` | 本角色治理变更记录 |

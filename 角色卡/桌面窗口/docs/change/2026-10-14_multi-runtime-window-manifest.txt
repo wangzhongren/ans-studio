@@ -1,0 +1,58 @@
+D1-R1 evidence manifest
+producer: 桌面窗口
+contract: ANS-RUNTIME-V2 revision 1
+UTC: 2026-10-14T08:23:50.646811+00:00
+platform: macOS-26.6.2-arm64-arm-64bit-Mach-O
+node: v24.14.0
+git HEAD (read only): 906abd3ee275cba82b2f9e54ceef1cd9473c2d5c
+Window tests: 171/171, exit 0; new D1 tests: 15/15, no skips
+tsc --noEmit --pretty false: exit 0
+scoped git diff --check: exit 0
+After verification: main/preload comments synchronized to actual neutral contract only; no executable change. SHA-256 below includes this comment synchronization.
+SHA-256 (candidate and consumed dependencies):
+fa44e80b8d17f77cdc789f09dafbfc7c1890696116a1dcb9a143f70024dcf8fa  app/main.ts
+47cad11458448d6e7f079eacc0c5cec8bf4773543c29d819db1a5e813023b4b6  app/preload.cjs
+039222ecc1f6b2e3a260e1447af545840cad70e8f3b1a8d0e26dc11598abed5a  app/desktop/chat-adapter.ts
+54a017c03537dfe803d409bc026555330116b38e0d7d7bfcd7f49fdaac1ad066  app/desktop/composer-images.ts
+753cb63b3a76040e7a737475b32f14e51b223f879f6ba051ff7da2495dfd8348  app/desktop/customer-input.ts
+0c783e7173f890701afb25f3672e9a70d65efe1c823dc176696344e3c2e6739f  app/desktop/diagnostics.ts
+6d73a579e7f693ffe28bb9906799d55e824a3e4a3715570ee2923ee686aa533c  app/desktop/interface.ts
+ae0b205bbf0d1735e2409c0097d4d70855aea01b24dba7af68e0e370bf72ff00  app/desktop/operator-channel.ts
+56661f1e895e5f2f94b287da568001957f5fe5294110388bc321954950765764  app/desktop/pi-config.ts
+a6bfb89a9b32ee504c6cecf694dc818ccfb433a52f8e3e0b9f61801fdd68a5e0  app/desktop/project.ts
+c7aa2e0ff229ae559f9a767005cec7aa6a8dbcc5fca42a73916ffb75ca811c7b  app/desktop/push-batcher.ts
+593c780b10a2c46108f23a9c0ba26f2c22e31ffb29e2b596fa18a6f930d76dd5  app/desktop/request-anchor.ts
+6a71f07fdbc853e85c62e918f5c614615401c103e68db2ee034caf4432633e5c  app/desktop/runtime-config.ts
+f6b7ddf63e92ae607b1ebdc1cc175fd99278de3bd1db2fd9c6a8f0dee67c1862  app/desktop/runtime-history.ts
+94417f7b27fc14a3b8a9c9a39642e36e3adb781dee3e3840b00100b099bc941f  app/desktop/session-history.ts
+dab487c8404732997539e7cb1bd7a5202c35225856f736d01d724093cc5e70b1  app/desktop/session.ts
+d42a162ec02361ab8aa38b1dd0730821b4ff340ee1b1d20cf6fef00d0ae348a3  test/桌面应用/ans-wiring.test.ts
+0ed61708162f1c199baae01d4ba3c1cf8fdf8d1a23bec28986ee35bd2bdb665b  test/桌面应用/boundary-refresh.test.ts
+17de0826fef5dc2af4b4bd6958b4f31cc7e1590acf60891121e1652d7f92edce  test/桌面应用/composer-images.test.ts
+d734d08f0dfe567d6862bab9f852e44354e468509336a048a3d391643b0a312b  test/桌面应用/diagnostics.test.ts
+21c7a8d0000fbf68bd8453c29f69f9f6d45a6951b717ed251078dfc2de3547ff  test/桌面应用/dispatch-delivery.test.ts
+2f342694adaa091b0dfe4050f451fc4decad3fa437547f510327db38dd1b6cd9  test/桌面应用/dispatch-fresh-enum.test.ts
+e40a7fcb734d3d5e38b2cbabc20dae379bb72a146fe109eeabfba662d8474e8b  test/桌面应用/genesis-bootstrap.test.ts
+a197ace9db04a792fcd2b78309874a98193df84d6591b9118035c3de52820a43  test/桌面应用/handback-delivery.test.ts
+6aa5825423db71890aa4cd5d259dec28c53f1f61ab2c9c539587a2c61034b3d0  test/桌面应用/hot-path.test.ts
+33f77f96cb3f4ba96f3696ab2209fa527119625a72632df383e8e015e2957c44  test/桌面应用/interface.test.ts
+bbf722b314b55364f7e0f7875bb82a31af9367e00e0e5aad53ab43bc4228d785  test/桌面应用/message-queue.test.ts
+00afae3a10c574a72357029b1a6f82f32315b74ca31415b24fa009969daf6b91  test/桌面应用/operator-channel.test.ts
+65fbd5b06671425ef0a4c851a638f1da80c69c3dd47458aa1d81d5017b6b762c  test/桌面应用/operator-wiring.test.ts
+a02210d35a9c743c51b2894e608bc200dfdd4138246d1bb4e6c539c2a4e2b24c  test/桌面应用/p0-halt-and-images.test.ts
+e9c9cb3d580afc69486d05a822408e52ea0c264d921ea43c071d1bc26568368a  test/桌面应用/pi-config.test.ts
+e7502838004ffeb0786ee8932dc181c20ec3b59beb32b7bff72758ebb60aabc7  test/桌面应用/project.test.ts
+5aef9b995dacb9771a5beddbefb9809c13f192c973b03801e4b44fcbdcd0106c  test/桌面应用/queue-withdraw-lru.test.ts
+974c5c6350cfe7091c24a099b74dc1989a42744767e2767582387c181f5deb69  test/桌面应用/session-history.test.ts
+f83fadf2c91a2b0f5e3a33ecce033c147caefb2aaf01dfd3992d169310d9ee7b  test/桌面应用/session-rebuild-race.test.ts
+52bb1e7ab9e05a79ff9f495dbe228f0b65c9266103391cd6b1187d5f80d6f866  test/桌面应用/session.test.ts
+459a83073939dced5e1aba11320b47aa29fe3d89b3df9270576a1a0f7ea9958e  test/桌面应用/su-effective-boundary.test.ts
+0dbb7b5c2516049052fca73b35f24409587a519cf7bbe7f01b52e5cba5e92b6b  test/桌面应用/multi-runtime.test.ts
+a0e2b0686cf90f76d1736fa6219f3add89ae32c5e485b850a1deab18e2d3eee8  src/model/runtime.ts
+5b41531de6e01fb93781a03127b2d54e1ca863687bc41b4b202c65bc2817f616  src/model/role.ts
+3a92ac435bce7f007ef9ba2744374d5daf1d84f70d6ec3cd22b4a926cf0feea9  src/pipeline/orchestration/run-role.ts
+800079b88c4a229b24c91b2ff97e218a87ba10254db6e50b489f28b99b12ce1f  src/service/runtime/session.ts
+dd3038119fa22858ec7ee45d2290e7ae306d98564ec12b34f80ee280f6c89774  src/common/shared/runtime-settings.ts
+fcaa56d7d5e952dc1092b84e34875719d0e2943ae2b00e8ca14b1217b343f9da  src/common/shared/runtime-shared.ts
+5fa1fb212f23e4f99fcdcc673fcc9664825c9af352c31d2ca34e739f2f32a3e7  src/common/shared/env-file.ts
+b1f2d87ab1f12e829034de2047a400352b7f1d36d7b61fff7cfdcf501512e5a8  角色卡/桌面窗口/boundary.yaml

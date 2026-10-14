@@ -17,6 +17,8 @@ import { join } from "node:path";
 
 import { createRealPiRuntimeAdapter } from "../../src/common/pi-adapter/real-adapter.ts";
 import { createStageLogger, type StageLogger } from "../../src/common/pi-adapter/logger.ts";
+import { buildGovernedTools } from "../../src/provider/pi/tools.ts";
+import { createInteractionGate } from "../../src/common/pi-adapter/timeout.ts";
 import { makeGate, makeRole } from "./fixtures.ts";
 
 async function piInstalled(): Promise<boolean> {
@@ -46,7 +48,10 @@ function spyLogger(): { logger: StageLogger; stages: string[]; traces: string[] 
 
 function makeAdapter(opts: { projectRoot: string; sessionDir: string; logger: StageLogger }) {
   return createRealPiRuntimeAdapter({
-    gate: makeGate({ skill: ["技能/示例/"], project: ["src/provider/pi/tools.ts"] }),
+    runtime: "pi",
+    tools: buildGovernedTools(makeGate({ skill: ["技能/示例/"], project: ["src/provider/pi/tools.ts"] })),
+    interactionGate: createInteractionGate(),
+    currentTurnId: () => undefined,
     projectRoot: opts.projectRoot,
     skillRoot: opts.projectRoot,
     sessionDir: opts.sessionDir,

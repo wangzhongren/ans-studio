@@ -1,0 +1,25 @@
+{
+  "candidateSha256": "b4882fe2e0c674e8d3b3d1185d60a873e9768d0529b48e3bc04c6cdf97b531aa",
+  "checks": {
+    "app/renderer/index.html": true,
+    "app/renderer/markdown.js": true,
+    "app/renderer/renderer.js": true,
+    "app/renderer/role-status.js": true,
+    "app/renderer/runtime-ui.js": true,
+    "app/renderer/styles.css": true,
+    "app/renderer/tool-rows.js": true,
+    "app/renderer/ui-labels.js": true,
+    "app/renderer/vendor/README.md": true,
+    "app/renderer/vendor/markdown-it.LICENSE": true,
+    "app/renderer/vendor/markdown-it.umd.min.js": true,
+    "test/\u684c\u9762\u5e94\u7528/e2e/bench-storm.mjs": true,
+    "test/\u684c\u9762\u5e94\u7528/e2e/ime-enter.mjs": true,
+    "test/\u684c\u9762\u5e94\u7528/e2e/uiux-design-audit.mjs": true,
+    "test/\u684c\u9762\u5e94\u7528/e2e/uiux-v2.mjs": true,
+    "test/\u684c\u9762\u5e94\u7528/markdown.test.ts": true,
+    "test/\u684c\u9762\u5e94\u7528/renderer.test.ts": true,
+    "test/\u684c\u9762\u5e94\u7528/runtime-ui.test.ts": true,
+    "test/\u684c\u9762\u5e94\u7528/tool-rows.test.ts": true
+  },
+  "allMatch": true
+}

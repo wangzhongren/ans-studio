@@ -1,0 +1,75 @@
+{
+  "reports": [
+    {
+      "name": "same-turn live then history only one response rejection and old history",
+      "value": true
+    },
+    {
+      "name": "real project-changed refresh does not repeat current turn",
+      "value": true
+    },
+    {
+      "name": "full rebuild retains unpersisted live report settled and original pending card",
+      "value": true
+    },
+    {
+      "name": "history first then exact live event does not duplicate",
+      "value": true
+    },
+    {
+      "name": "two legitimate same-turn identical events remain two occurrences",
+      "value": true
+    },
+    {
+      "name": "distinct turns with identical input and output remain two",
+      "value": true
+    },
+    {
+      "name": "background engine merges in own cache without old engine rows",
+      "value": true
+    },
+    {
+      "name": "history-before-correlated-live binds two identical optimistic inputs exactly once",
+      "value": true
+    },
+    {
+      "name": "repeated known-turn full rebuild keeps original unanchored pending card without borrowed token",
+      "value": false
+    },
+    {
+      "name": "repeated known-turn full rebuild keeps original unanchored pending card without borrowed token observed",
+      "value": {
+        "chat": "inserted past history\nold input\nold history retained\ncurrent input\nnot stored yet\n查看执行记录1 条活动read_filecurrent.md调用发起current rejectioncurrent.mdcurrent rejectioncurrent answer\nhistory before live\nhistory before live\ntwo identical inputs\ntwo identical answers\ntwo identical inputs\ntwo identical answers\nmanual identical\nmanual identical\nmerge pending card确认不同意manual answer one\nmanual answer two\n等待你确认",
+        "assistant": [
+          "inserted past history\n",
+          "old history retained\n",
+          "not stored yet\n",
+          "current answer\n",
+          "history before live\n",
+          "history before live\n",
+          "two identical answers\n",
+          "two identical answers\n",
+          "manual answer one\n",
+          "manual answer two\n"
+        ],
+        "denied": [
+          "current rejectioncurrent.mdcurrent rejection"
+        ],
+        "model": {
+          "count": 19,
+          "lastIndex": 18,
+          "operators": [
+            {
+              "index": 16,
+              "requestId": "merge-confirm"
+            }
+          ],
+          "rowGap": 16
+        }
+      }
+    }
+  ],
+  "errors": [],
+  "error": "AssertionError [ERR_ASSERTION]: repeated known-turn full rebuild keeps original unanchored pending card without borrowed token\n\nfalse !== true\n",
+  "stack": "AssertionError [ERR_ASSERTION]: repeated known-turn full rebuild keeps original unanchored pending card without borrowed token\n\nfalse !== true\n\n    at check (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:24:474)\n    at async mergeChecks (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:169:3)\n    at async file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:199:43"
+}

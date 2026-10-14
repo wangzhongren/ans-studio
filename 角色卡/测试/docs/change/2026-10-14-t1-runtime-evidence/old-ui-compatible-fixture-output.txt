@@ -1,0 +1,97 @@
+Error occurred in handler for 'session:live-views': Error: No handler registered for 'session:live-views'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'session:live-views': Error: No handler registered for 'session:live-views'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'session:live-views': Error: No handler registered for 'session:live-views'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'session:live-views': Error: No handler registered for 'session:live-views'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'session:live-views': Error: No handler registered for 'session:live-views'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'session:live-views': Error: No handler registered for 'session:live-views'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'session:live-views': Error: No handler registered for 'session:live-views'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'session:live-views': Error: No handler registered for 'session:live-views'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'session:live-views': Error: No handler registered for 'session:live-views'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'session:withdraw': Error: 独立通道抛错
+    at main (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%B5%8B%E8%AF%95/ui-reacceptance-renderer-regression.mjs:256:51)
+    at async file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%B5%8B%E8%AF%95/ui-reacceptance-renderer-regression.mjs:417:5
+Error occurred in handler for 'session:live-views': Error: No handler registered for 'session:live-views'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'session:live-views': Error: No handler registered for 'session:live-views'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'session:live-views': Error: No handler registered for 'session:live-views'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'session:live-views': Error: No handler registered for 'session:live-views'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'session:live-views': Error: No handler registered for 'session:live-views'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'session:live-views': Error: No handler registered for 'session:live-views'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'session:live-views': Error: No handler registered for 'session:live-views'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'runtime-config:get': Error: No handler registered for 'runtime-config:get'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'runtime-config:get': Error: No handler registered for 'runtime-config:get'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'session:live-views': Error: No handler registered for 'session:live-views'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'session:live-views': Error: No handler registered for 'session:live-views'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'runtime-config:get': Error: No handler registered for 'runtime-config:get'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'session:live-views': Error: No handler registered for 'session:live-views'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'session:live-views': Error: No handler registered for 'session:live-views'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'session:live-views': Error: No handler registered for 'session:live-views'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'runtime-config:get': Error: No handler registered for 'runtime-config:get'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'runtime-config:get': Error: No handler registered for 'runtime-config:get'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'session:live-views': Error: No handler registered for 'session:live-views'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'session:live-views': Error: No handler registered for 'session:live-views'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'runtime-config:get': Error: No handler registered for 'runtime-config:get'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'session:live-views': Error: No handler registered for 'session:live-views'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'session:live-views': Error: No handler registered for 'session:live-views'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+INDEPENDENT_REACCEPTANCE_PASS 119 /Users/wangzhongren/code/vibeingcode/解压/ans-runtime/角色卡/测试/docs/change/2026-10-14-t1-runtime-evidence/old-ui-compatible-fixture

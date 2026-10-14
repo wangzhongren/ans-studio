@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow, ipcMain } from 'electron';
 import { parseSessionJsonl } from '../../app/desktop/session-history.ts';
+import { RUNTIME_SETTINGS } from '../../src/common/shared/runtime-settings.ts';
 
 const BASE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const APP = path.join(BASE, 'app');
@@ -31,12 +32,16 @@ const initialQueue = [
 const roles = ['A', 'B'].map(roleId => ({ roleId, cardPath: '', cardText: '# ' + roleId + '\n\n职责资料段落。\n'.repeat(70), boundaryPath: '', boundary: { entries: [] }, changelog: null, docs: [] }));
 const listing = { projectRoot: ROOT, primaryRoleId: 'A', hasRoles: true, warnings: [], roles };
 let win, deferredWithdraw, responseValue = { ok: true };
+const fixtureHistories = new Map();
+const fixtureHistoryKey = input => JSON.stringify([input.projectRoot, input.roleId, input.runtime || 'pi']);
 let queueA = initialQueue.slice();
 const snapshot = (roleId = 'A', busy = true) => ({ roleId, busy, summaries: (roleId === 'A' ? queueA : []).map(q => q.summary), queue: roleId === 'A' ? queueA : [], running: busy ? { id: 'own-running-' + roleId, kind: 'message', summary: '当前工作独立' + roleId, full: '进行中全文'.repeat(15), at: '2026-10-13T08:00:00.000Z' } : null });
 const handlers = {
   'app:renderer-diagnostic': () => ({ ok: true }), 'window:is-maximized': () => false,
   'app:recovery-state': () => ({ projectRoot: ROOT, roleId: 'A' }), 'app:recovery-ready': () => ({ ok: true }),
   'app:list-project': (_e, input) => ({ ...listing, projectRoot: input.projectRoot }), 'session:live': () => ['A', 'B'],
+  'session:history-get': (_e, input) => ({ projectRoot: input.projectRoot, roleId: input.roleId, runtime: input.runtime, rows: fixtureHistories.get(fixtureHistoryKey(input)) || [], error: null, skipped: 0 }),
+  'session:live-views': () => ['A', 'B'].map(roleId => ({ projectRoot: ROOT, roleId, runtime: 'pi', profileRevision: 0 })),
   'session:open': () => ({ ok: true, resumed: true, contextSource: 'resumed' }), 'session:stop': () => ({ ok: true }),
   'session:send': (_e, input) => { sends.push(input); return { ok: true }; },
   'session:abort': (_e, input) => { win.webContents.send('session:role-state', snapshot(input.roleId, false)); return { ok: true, supported: true }; },
@@ -45,6 +50,11 @@ const handlers = {
   'app:pick-image': () => ({ ok: true, image: { name: 'independent.png', mime: 'image/png', size: 68, dataBase64: PNG } }),
   'pi-config:get': () => ({ path: ROOT + '/' + 'independent-long-directory/'.repeat(10) + '.env', fields: ['ANTHROPIC_AUTH_TOKEN', 'ANS_PI_BASE_URL', 'ANS_PI_MODEL', 'ANS_PI_CONTEXT_WINDOW'].map(key => ({ key, secret: key === 'ANTHROPIC_AUTH_TOKEN', value: key === 'ANTHROPIC_AUTH_TOKEN' ? '' : 'fixture', isSet: true })) }),
   'pi-config:save': () => ({ ok: true, appliedKeys: [] }),
+  'runtime-config:get': (_e, input) => {
+    const definition = RUNTIME_SETTINGS[input.runtime];
+    const legacy = handlers['pi-config:get']();
+    return { ...legacy, runtime: input.runtime, label: definition.label, revision: 0, application: 'current', missingKeys: [], fields: definition.fields.map(f => ({ ...f, value: f.secret ? '' : 'fixture', isSet: true, source: 'file' })) };
+  },
 };
 Object.entries(handlers).forEach(([channel, handler]) => ipcMain.handle(channel, handler));
 const pause = ms => new Promise(r => setTimeout(r, ms));
@@ -54,7 +64,7 @@ async function check(name, fn, ...args) {
   report.push({ name, observation });
   assert.equal(observation.ok ?? observation, true, name + ': ' + JSON.stringify(observation));
 }
-async function push(channel, payload) { win.webContents.send(channel, payload); await pause(90); }
+async function push(channel, payload) { if (channel === 'session:history') fixtureHistories.set(fixtureHistoryKey(payload), payload.rows); win.webContents.send(channel, payload); await pause(90); }
 async function event(roleId, kind, summary, detail = {}) { await push('session:event', { roleId, event: { kind, summary, detail } }); }
 async function click(selector) { await inspect(s => { const n = document.querySelector(s); if (!n) throw new Error('Missing ' + s); n.click(); }, selector); await pause(120); }
 async function select(roleId) { await inspect(id => window.__ansRenderer.selectRole(id), roleId); await pause(120); }
@@ -80,6 +90,7 @@ async function drawerSettled(label) {
 }
 async function reset(width = 1360, height = 860) {
   queueA = initialQueue.slice(); responseValue = { ok: true };
+  fixtureHistories.clear(); // Each reset is a fresh independent backend scenario.
   win.setContentSize(width, height);
   await win.loadFile(path.join(APP, 'renderer/index.html')); await pause(180);
   await inspect(() => {
@@ -414,7 +425,15 @@ app.whenReady().then(async () => {
     await main();
     assert.deepEqual(hashes(), startHashes, 'candidate changed during verification, evidence invalid');
     assert.equal(consoleErrors.length, 0, 'renderer console errors');
-  } catch (error) { failure = { message: String(error), stack: error.stack }; }
+  } catch (error) {
+    failure = { message: String(error), stack: error.stack };
+    // Failure-only diagnosis; assertions and normal scenario inputs remain unchanged.
+    try { failure.snapshot = await inspect(() => {
+      const chat = document.getElementById('chat');
+      const box = n => { const r = n.getBoundingClientRect(); return { top:r.top,bottom:r.bottom,left:r.left,right:r.right,width:r.width,height:r.height }; };
+      return { selected:__ansRenderer.state.selectedRoleId,runtime:__ansRenderer.state.runtime,project:__ansRenderer.state.projectRoot,model:__ansRenderer.rowModelDebug(__ansRenderer.state.selectedRoleId),chat:{scrollTop:chat.scrollTop,scrollHeight:chat.scrollHeight,clientHeight:chat.clientHeight,box:box(chat)},groups:[...document.querySelectorAll('.tool-records')].map(n=>({text:n.querySelector('summary').textContent,open:n.open,inChat:chat.contains(n),box:box(n)})),chatChildren:[...chat.children].map(n=>({className:n.className,role:n.dataset.roleId,box:box(n)})),text:chat.innerText };
+    }); } catch (snapshotError) { failure.snapshotError = String(snapshotError); }
+  }
   clearTimeout(watchdog);
   const endHashes = hashes();
   fs.writeFileSync(path.join(OUT, 'report.json'), JSON.stringify({ environment: { electron: process.versions.electron, node: process.versions.node, platform: process.platform, arch: process.arch, hidden: true }, input: { root: ROOT, widths: [1360, 960], initialQueue }, startHashes, endHashes, report, withdrawCalls, responses, sends, consoleErrors, failure }, null, 2));

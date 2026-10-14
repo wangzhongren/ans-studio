@@ -1,0 +1,34 @@
+D1R2-R1 / actual prompt ack and original client display ID
+producer: 桌面窗口; contract: ANS-RUNTIME-V2 revision1 + C1A actual Model ack; accepted boundary.yaml
+UTC: 2026-10-14T09:37:57.894330+00:00
+platform: macOS-26.6.2-arm64-arm-64bit-Mach-O
+node: v24.14.0
+affected Window: 101/101, exit0, zero skip; multi-runtime22/22 with five new R2 tests
+strict tsc --noEmit --pretty false: exit0; scoped git diff --check: exit0
+No first-event/FIFO/latest source inference; legacy without actual ack has no display client ID
+D1/D1R1 original full-stage evidence retained as history; actualmain/UI merge pending T1
+SHA-256 current candidate and consumed dependencies:
+b7d935d9247120d5b399eee06b1a8df8980bbaa724aed7a9ba497d6221824bd9  app/main.ts
+00fd1faf8063e3b5697e582504749c2b7a38439def396086c61628f20e607300  app/preload.cjs
+50476f0f8f3fc774dcf725f104ce2ebce1d9dd92986ffde94acdba1d4d7cb05a  app/desktop/interface.ts
+423f6e377e596ca80576668b8572a7451d2d1fd32fc56221384f2d0631ebb713  app/desktop/session.ts
+9827b035a63bd5d3222f74afd046925069dc02412b5a15f0f9a0b4701687fdc2  app/desktop/runtime-history.ts
+a99cf603f46793f2f4c6b0876acbfcc06a278b95b35aa3d52c26376dd3cd67b2  app/desktop/session-history.ts
+fc78948cf4621d7f35733e7e7796692f17621a6af5f4161b08b6f69c66fa73cd  test/桌面应用/multi-runtime.test.ts
+974c5c6350cfe7091c24a099b74dc1989a42744767e2767582387c181f5deb69  test/桌面应用/session-history.test.ts
+33f77f96cb3f4ba96f3696ab2209fa527119625a72632df383e8e015e2957c44  test/桌面应用/interface.test.ts
+bf227d5bcd43a2ef68e8cbd1d71e521edc85e8eae29323a385ed49ed9ef7a508  test/桌面应用/message-queue.test.ts
+21c7a8d0000fbf68bd8453c29f69f9f6d45a6951b717ed251078dfc2de3547ff  test/桌面应用/dispatch-delivery.test.ts
+a197ace9db04a792fcd2b78309874a98193df84d6591b9118035c3de52820a43  test/桌面应用/handback-delivery.test.ts
+f83fadf2c91a2b0f5e3a33ecce033c147caefb2aaf01dfd3992d169310d9ee7b  test/桌面应用/session-rebuild-race.test.ts
+a02210d35a9c743c51b2894e608bc200dfdd4138246d1bb4e6c539c2a4e2b24c  test/桌面应用/p0-halt-and-images.test.ts
+0ed61708162f1c199baae01d4ba3c1cf8fdf8d1a23bec28986ee35bd2bdb665b  test/桌面应用/boundary-refresh.test.ts
+52bb1e7ab9e05a79ff9f495dbe228f0b65c9266103391cd6b1187d5f80d6f866  test/桌面应用/session.test.ts
+fcbdf0b89235ffa5c0c7678ad234c9652e7313efe66cead7d0d961c3b471ae62  src/model/runtime.ts
+3a92ac435bce7f007ef9ba2744374d5daf1d84f70d6ec3cd22b4a926cf0feea9  src/pipeline/orchestration/run-role.ts
+cccddb80c4d963b403a9b9dc7fd0e5f3ecb9ca96d45b8037d8f64b67e3f9c763  src/service/runtime/session.ts
+2bcd0a50583d9d1a13bf9671de6f342475d8d2af3e3a3fb32380891446bc8614  src/common/编排/handback.ts
+b1f2d87ab1f12e829034de2047a400352b7f1d36d7b61fff7cfdcf501512e5a8  角色卡/桌面窗口/boundary.yaml
+8bb7a4a3c408882b6d63ed20ccb0f2fab8b46c91859decc0f97591cfdec35480  角色卡/桌面窗口/api-spec.md
+987ed249d65004828e430cf79a20e7ee0d1c81d2711f721619051183aa815e61  角色卡/桌面窗口/docs/fix/2026-10-14_fix_client-message-origin.md
+c01a0d99c4191243dc9ffaac47bfb3fc7f5144c780e0d4ff1a74a394cd4f645b  角色卡/桌面窗口/docs/feature/multi-runtime-desktop.md

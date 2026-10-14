@@ -29,9 +29,11 @@ ipcMain.handle("app:list-project", () => ({
   projectRoot: "/ime-project", primaryRoleId: "A", hasRoles: true, warnings: [],
   roles: [{ roleId: "A", cardText: "# A", cardPath: "", boundaryPath: "", boundary: { entries: [] }, builtIn: false, changelog: null, docs: [] }],
 }));
+ipcMain.handle("session:history-get", (_event,input) => ({...input,rows:[],error:null,skipped:0}));
 ipcMain.handle("session:open", () => ({ ok: true, resumed: true, contextSource: "resumed" }));
 ipcMain.handle("session:stop", () => ({ ok: true }));
 ipcMain.handle("session:live", () => ["A"]);
+ipcMain.handle("session:live-views", () => [{projectRoot:"/ime-project",roleId:"A",runtime:"pi"}]);
 ipcMain.handle("session:send", (_event, input) => { sent.push(input); return { ok: true }; });
 ipcMain.handle("app:pick-image", () => ({ ok: true, image: { name: "ime.png", mime: "image/png", size: 68, dataBase64: PNG } }));
 

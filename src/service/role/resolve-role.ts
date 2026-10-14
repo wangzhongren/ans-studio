@@ -6,7 +6,7 @@
 // 拒绝开启（「角色 X 已归档，不可开启」）、listProject 静默跳过（不枚举、不产生任何警告）。
 
 import type { BoundarySection1 } from "../../model/boundary.ts";
-import type { ProjectConfig, ResolvedRole, RoleKind, RoleLocation } from "../../model/role.ts";
+import type { ProjectConfig, ResolvedRole, RoleKind, RoleLocation, RoleGroupMetadata } from "../../model/role.ts";
 import {
   BUILT_IN_GOVERNANCE_ROLE_ID,
   BUILT_IN_ROLE_CARD_TEXT,
@@ -15,6 +15,7 @@ import {
   resolveBoundarySection,
 } from "../../common/门禁引擎/boundary-core.ts";
 import { joinRoot, readTextFile } from "../../common/门禁引擎/io.ts";
+import { parseRoleGroupMetadata } from "../../common/门禁引擎/role-card-metadata.ts";
 import { readdir, stat } from "node:fs/promises";
 
 export async function resolveRole(roleId: string, project: ProjectConfig): Promise<ResolvedRole> {
@@ -41,10 +42,12 @@ export async function resolveRole(roleId: string, project: ProjectConfig): Promi
   const kind: RoleKind = loc ? "project" : "built-in-governance";
 
   let cardText = "";
+  let groupMetadata: RoleGroupMetadata = {};
   let location: RoleLocation;
   if (loc) {
     location = loc;
     cardText = await readTextFile(joinRoot(project.projectRoot, loc.card));
+    groupMetadata = parseRoleGroupMetadata(cardText);
   } else {
     location = {
       card: "",
@@ -62,12 +65,13 @@ export async function resolveRole(roleId: string, project: ProjectConfig): Promi
     boundary,
     boundarySource: boundary.boundarySource,
     location,
+    ...groupMetadata,
   };
 }
 
 // ---- 项目角色枚举（桌面应用）----
 
-export interface ProjectRoleSummary {
+export interface ProjectRoleSummary extends RoleGroupMetadata {
   roleId: string;
   cardPath: string; // 项目相对路径（内置角色为空串：没有角色卡文件）
   boundaryPath: string; // 项目相对路径（内置角色为空串：用内置边界）
@@ -241,7 +245,7 @@ export async function listProject(projectRoot: string): Promise<ProjectListing> 
       }
 
       seen.add(roleId);
-      roles.push({ roleId, cardPath, boundaryPath, cardText, boundary });
+      roles.push({ roleId, cardPath, boundaryPath, cardText, boundary, ...parseRoleGroupMetadata(cardText) });
     }
   }
 

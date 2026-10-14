@@ -144,7 +144,7 @@ test("loadInjection(ans-cli 根，显式给出) → 与缺省同款：演示配�
   ];
   for (const [label, { project }] of variants) {
     assert.equal(project.projectRoot, self, label);
-    assert.equal(Object.keys(project.roles).length, 6, `${label}：六个演示角色应原样保留`);
+    assert.deepEqual(Object.keys(project.roles).sort(), ["Pi适配器", "门禁引擎", "编排", "测试", "项目管理", "装配", "运行时核心", "Codex适配器", "Claude适配器"].sort(), `${label}：保留六个原角色并登记三个已接受的运行时角色`);
     assert.equal(
       project.governanceBoundary?.path,
       "角色卡/门禁引擎/boundary.yaml",

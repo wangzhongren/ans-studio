@@ -30,6 +30,10 @@ export interface ReplayRow {
   text: string;
   /** ISO 时间（entry 时间戳；缺失为空串——如实，不编造）。 */
   at: string;
+  /** ANS 回放的权威轮次；旧 Pi JSONL 缺省，不从文本/时间推造。 */
+  turnId?: string;
+  /** ANS 原事件 kind；用户输入及旧 Pi JSONL 缺省。 */
+  eventKind?: string;
   /** 桌面内部展示事实；旧历史/旧推送可以缺省，渲染端诚实降级。 */
   activity?: { toolName: string; target: string; phase: "call" | "result"; status: "call" | "completed" | "returned" | "failed" | "unknown"; toolCallId?: string; turnId?: string; ok?: boolean };
   /**

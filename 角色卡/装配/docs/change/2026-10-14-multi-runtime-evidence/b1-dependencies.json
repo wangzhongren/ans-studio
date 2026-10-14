@@ -1,0 +1,19 @@
+{
+  "at": "2026-10-14T07:36:01.709Z",
+  "files": {
+    "src/common/shared/runtime-settings.ts": "dd3038119fa22858ec7ee45d2290e7ae306d98564ec12b34f80ee280f6c89774",
+    "src/common/shared/runtime-shared.ts": "fcaa56d7d5e952dc1092b84e34875719d0e2943ae2b00e8ca14b1217b343f9da",
+    "src/interface/cli/govern.ts": "b129abf513cc750aaede9702327951625116df3eb8418b5579e3842de03660d0",
+    "src/interface/cli/run.ts": "29850399b0ed46688f05ebad16657952487e2df1a6b28331c9a2835672efbcd6",
+    "src/model/runtime.ts": "a0e2b0686cf90f76d1736fa6219f3add89ae32c5e485b850a1deab18e2d3eee8",
+    "src/pipeline/orchestration/govern-session.ts": "b8515abd867b490cc470704b8035356c3ab5930aa084a53c708bd272c20ec625",
+    "src/pipeline/orchestration/run-role.ts": "3a92ac435bce7f007ef9ba2744374d5daf1d84f70d6ec3cd22b4a926cf0feea9",
+    "src/provider/claude/session.ts": "b91c017a93987fa8fb6922aef59e1d61299f6490acb0c897b3ebaacf0418f8ed",
+    "src/provider/codex/session.ts": "7b82419ed8a406b6e55d09289b017edae700445afb0fdfb515facb8e97128d89",
+    "src/provider/pi/session.ts": "62633997b102feec52f477d104ae8b835062982356cad763306dd6db40816d3a",
+    "src/provider/runtime/schema.ts": "67df518e52b5821bba617db35eca375779353f86d24e80af8c98aa45ad9f51f0",
+    "src/provider/runtime/session-store.ts": "9fbdd32e5bb9df0aea64f2c8ac58dbdf3a1b19bd30cd74ace44e3830294548a2",
+    "src/provider/runtime/tools.ts": "752382a5c709893f7331e5cb1a1f2aee2d23f8cd9f7c055f40680f2c3dc958b3",
+    "src/service/runtime/session.ts": "800079b88c4a229b24c91b2ff97e218a87ba10254db6e50b489f28b99b12ce1f"
+  }
+}

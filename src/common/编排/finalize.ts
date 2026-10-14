@@ -55,7 +55,7 @@ import path from "node:path";
 
 import type { BoundarySection1, PinEntry } from "../../model/boundary.ts";
 import type { WriteDecision } from "../../model/decision.ts";
-import type { FinalizeStatus, FinalizeResult } from "../../provider/pi/session.ts";
+import type { FinalizeStatus, FinalizeResult } from "../../model/runtime.ts";
 import { resolveWrite } from "../../service/gate/resolve-write.ts";
 import { toPosix } from "../shared/path-primitives.ts";
 import { ansProjectPath } from "../shared/config-loader.ts";
@@ -121,7 +121,7 @@ export interface FinalizeInput {
 
 // —————————————— 收口形状的来源（A-4 后的历史注记） ——————————————
 //
-// `FinalizeStatus` / `FinalizeResult` 两型的**唯一来源**是 §4 冻结契约家 `src/provider/pi/session.ts`
+// `FinalizeStatus` / `FinalizeResult` 两型的**唯一来源**是 §4 冻结契约家 `src/model/runtime.ts`
 // （Pi适配器 T36 逐字落于彼处；本模块**按需导入**使用——见文件顶部 import）。
 // **历史**：T36/T37 时期本模块曾按 T20→T21 的「导入 + 再导出」收敛法，**再导出**
 // `FinalizeStatus` / `FinalizeResult` / `FinalizeBootstrapFn` 三型（维持消费方零改动）。A-4

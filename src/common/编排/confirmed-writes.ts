@@ -21,9 +21,10 @@
 
 import type { BoundarySection1 } from "../../model/boundary.ts";
 import type {
+  CustomerInputMetadata,
   CustomerInputOutcome,
   CustomerInputRequest,
-} from "../../provider/pi/session.ts";
+} from "../../model/runtime.ts";
 import { resolveWrite } from "../../service/gate/resolve-write.ts";
 // 跨角色共享路径原语（**单一来源** = pm 属主 `src/common/shared/path-primitives.ts`；不从门禁引擎私有 common 导入）。
 import { isAbsoluteAny, normalizeLexical } from "../shared/path-primitives.ts";
@@ -44,9 +45,10 @@ export function createConfirmedWriteIssuer(opts: {
   ctx: { skillRoot: string; projectRoot: string };
   /** 会话的活 writeSet（gate 以它做 F4；本器只增不改）。 */
   issued: Set<string>;
-}): (req: CustomerInputRequest, out: CustomerInputOutcome | null | undefined) => string[] {
+}): (req: CustomerInputRequest, out: CustomerInputOutcome | null | undefined, metadata?: CustomerInputMetadata) => string[] {
   const { boundary, conditions, ctx, issued } = opts;
-  return (req, out) => {
+  return (req, out, metadata) => {
+    if (metadata?.signal?.aborted) return [];
     // 仅 confirm 且明确同意才算「确认」（choice 的回答不构成写盘同意）。
     if (req.kind !== "confirm") return [];
     if (out === null || out === undefined || out.outcome !== "answered" || out.value.confirmed !== true) {
@@ -60,6 +62,7 @@ export function createConfirmedWriteIssuer(opts: {
       // 与当前已发行集合无关（resolveWrite 的 scope 语义 = 精确 writeSet，见 resolve-write.ts）。
       const decision = resolveWrite(candidate, boundary, { writeSet: [candidate], conditions }, ctx);
       if (!decision.allowed) continue; // 不在边界内 → 不发行（fail-closed）
+      if (metadata?.signal?.aborted) return added;
       issued.add(candidate);
       added.push(candidate);
     }

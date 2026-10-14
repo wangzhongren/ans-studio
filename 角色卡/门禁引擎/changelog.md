@@ -875,3 +875,7 @@ SHA-256 pin 钉死，篡改即失效、fail-closed。方案出处：设计 §3.3
 - **旁注（边界外，须回报，本角色未改）**：`src/pipeline/orchestration/run-role.ts::setupRole` 对
   **未登记在 `project.roles`** 的角色一律以 `EXIT_USAGE` 拒绝，故桌面端「点 su 开启聊天」仍会失败；
   修复点在 `src/pipeline/**`（本角色边界外）。见 `角色卡/桌面应用/changelog.md` 同日记事。
+
+## 2026-10-14：G1 角色协作组摘要
+
+按已批准 ANS-RUNTIME-V2 revision 1 的必要范围，在既有角色结果增加可选只读 group/groupDuty，卡正文单一解析；旧卡缺值不添加属性，归档/内置/角色kind/接受/写权保持既有语义。Model与两处Service结果使用同一 RoleGroupMetadata，未改权限或角色卡。新增8例通过，门禁168通过/0失败/1 Windows专属跳过，完整typecheck通过。当前用法见[功能说明](docs/feature/role-group-metadata.md)，实际契约见[API](api-spec.md)，候选及原始检查摘要见[变更记录](docs/change/2026-10-14_change_role-group-metadata.md)。桌面透传和呈现由对应属主继续验证。

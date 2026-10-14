@@ -1,0 +1,29 @@
+Error occurred in handler for 'session:history-get': Error: No handler registered for 'session:history-get'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'session:live-views': Error: No handler registered for 'session:live-views'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'session:history-get': Error: No handler registered for 'session:history-get'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'session:live-views': Error: No handler registered for 'session:live-views'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'session:history-get': Error: No handler registered for 'session:history-get'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'session:live-views': Error: No handler registered for 'session:live-views'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'session:history-get': Error: No handler registered for 'session:history-get'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'session:live-views': Error: No handler registered for 'session:live-views'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+INDEPENDENT_REACCEPTANCE_FAIL 18 /Users/wangzhongren/code/vibeingcode/解压/ans-runtime/角色卡/测试/docs/change/2026-10-14-t1-runtime-evidence/old-ui-diagnostic
+AssertionError [ERR_ASSERTION]: R3 missing reliable state remains unknown 1360: false
+
+false !== true
+

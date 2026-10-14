@@ -8,7 +8,7 @@
 //     事件流持续，生命周期由调用方 dispose() 收口。桌面应用的聊天栏用它。
 //
 // 分工（契约 §5，F9）：本层只做编排——角色解析、边界解析、路径判定全部经门禁引擎导出的函数；
-// Pi 调用全部经 Pi 适配器的 RuntimeAdapter。
+// 运行时工具与 SDK 调用经 Service 的中立 RuntimeAdapter 接线。
 //
 // ── 客户确认制收窄（A-3，2026-10-12 设计 A 组）────────────────────────────────────
 // `openRoleSession` 收到 `customerInput`（前端给的客户通道）时，本会话进入**确认制**：
@@ -38,6 +38,10 @@ import { resolveRole } from "../../service/role/resolve-role.ts";
 import { resolveBoundary } from "../../service/boundary/resolve-boundary.ts";
 import { resolveWrite } from "../../service/gate/resolve-write.ts";
 import type {
+  RuntimeReplayEntry,
+  RuntimeSessionRecord,
+  RuntimeContextSource,
+  RuntimeKind,
   RoleSession,
   RuntimeAdapter,
   SessionEvent,
@@ -49,8 +53,9 @@ import type {
   PromptOptions,
   ReportHandbackFn,
   ReportHandbackMetadata,
-} from "../../provider/pi/session.ts";
-import { createPiRuntimeAdapter } from "../../provider/pi/session.ts";
+} from "../../model/runtime.ts";
+import { createRuntimeAdapter, type RuntimeSessionOptions } from "../../service/runtime/session.ts";
+import { RUNTIME_KINDS } from "../../common/shared/runtime-shared.ts";
 import {
   assembleProjectShellGate,
   assembleReadonlyShellGate,
@@ -64,7 +69,6 @@ import { EXIT_OK, EXIT_USAGE, EXIT_FAILURE } from "../../common/编排/exit-code
 import type { ShellVerdictFn } from "../../common/编排/shell-gate.ts";
 import { repinIfBootstrapped, DEFAULT_GOVERNANCE_BOUNDARY_REL } from "../../common/编排/finalize.ts";
 import { conditionSlugsOf, createConfirmedWriteIssuer } from "../../common/编排/confirmed-writes.ts";
-import type { RuntimeKind } from "../../common/编排/args.ts";
 import { CLI_POSITIONING } from "../../common/编排/cli-positioning.ts";
 import { createDiagnosticLogger } from "../../common/shared/diagnostics.ts";
 
@@ -76,7 +80,7 @@ import { createDiagnosticLogger } from "../../common/shared/diagnostics.ts";
  *   （治理角色 su 不自我回交，不注入）。能力形状 = `submit_report{ status, summary, evidence? }`
  *   的载荷（结构对齐，见 `common/编排/handback.ts::TaskReport`）。
  * · `sessionDir`（D-1 重启恢复）：本会话的**会话自持目录**，约定路径
- *   `<projectRoot>/.ans/sessions/<roleId>/`（带尾分隔符）。**编排只算路径、不预建目录**——
+ *   `<projectRoot>/.ans/sessions/<roleId>/<runtime>/`（带尾分隔符；旧未显式 runtime 的替身保留旧路径）。**编排只算路径、不预建目录**——
  *   **目录的创建归适配器**（在其真正落盘 SessionManager.create/open 时做）：① 保「不预建 `.ans`」
  *   的既有语义/断言（每次 `ans govern` 都预建 `.ans/sessions/` 会打破它）；② 谁落盘谁建目录，
  *   避免「编排建了目录但会话从未写」的空目录；③ 恢复 `open(path)` 不需要预建。
@@ -96,6 +100,8 @@ export interface AdapterCapabilities {
   customerInput?: CustomerInputFn;
   reportHandback?: ReportHandbackFn;
   sessionDir?: string;
+  runtime?: RuntimeKind;
+  persistSession?: boolean;
   dispatchTask?: DispatchTaskFn;
   shellGate?: ShellGate;
   shellVerdict?: ShellVerdictFn;
@@ -103,6 +109,7 @@ export interface AdapterCapabilities {
 
 export interface RunRoleInput {
   roleId: string;
+  runtime?: RuntimeKind;
   taskId: string;
   project: ProjectConfig;
   scope?: TaskScope;
@@ -115,7 +122,7 @@ export interface RunRoleResult {
 
 export async function runRole(
   input: RunRoleInput,
-  deps: { createAdapter: (gate: WriteGate, capabilities?: AdapterCapabilities) => RuntimeAdapter }
+  deps: RoleSessionDeps = {}
 ): Promise<RunRoleResult> {
   const transcript: SessionEvent[] = [];
   const record = (ev: SessionEvent): void => {
@@ -163,7 +170,8 @@ export async function runRole(
   let code: number = EXIT_OK;
   let session: RoleSession | undefined;
   try {
-    const adapter = deps.createAdapter(gate);
+    const createAdapter = deps.createAdapter ?? createRuntimeAdapterFactory(input.project, input.runtime ?? "demo", deps.runtimeOptions);
+    const adapter = createAdapter(gate);
     session = await adapter.bindRole(role);
     await session.prompt(buildTaskPrompt(input.taskId, input.scope));
     // 事件流以 "settled" 为**终止信号**：见到即停并退出循环。
@@ -171,7 +179,10 @@ export async function runRole(
     // 会与随后的 dispose() 互等（死锁）——那样 main() 永不 resolve（顶层 await 不收敛）。
     for await (const ev of session.events()) {
       record(ev);
-      if (ev.kind === "settled") break;
+      if (ev.kind === "settled") {
+        if (isFailedSettlement(ev)) code = EXIT_FAILURE;
+        break;
+      }
     }
   } catch (err) {
     // 会话建立（bindRole）或会话中途出错 → 非 0。
@@ -215,10 +226,15 @@ export interface RoleSessionAbortResult {
 }
 
 export interface RoleSessionHandle {
+  readonly runtime?: RuntimeKind;
+  readonly roleId?: string;
+  readonly contextSource?: RuntimeContextSource;
+  readonly nativeSessionId?: string;
+  readonly contextWarning?: string;
   /**
    * 发送一轮输入；可反复调用（底层同一会话，不重建）。
    * **P0-1 图片接线（2026-10-13 客户批准）**：`opts` 为**可选**图片载荷——整包**原样透传**给底层会话的
-   * `prompt(text, opts)`（契约单一来源 `PromptOptions`，从 `src/provider/pi/session.ts` 只读导入，
+   * `prompt(text, opts)`（契约单一来源 `PromptOptions`，从 `src/model/runtime.ts` 只读导入，
    * **不复制形状**；`images` 为契约 `PromptImage` 块，**空数组 = 无图**，同样原样透传）。
    * **不传 `opts` 时行为逐字不变**（纯文本，调用形态也与旧版逐字一致）。多模态与否不由本层猜测；
    * 队列入队定格与桌面接线为**后环**（桌面环节），本层只保证句柄层透传保真。
@@ -227,7 +243,7 @@ export interface RoleSessionHandle {
   /**
    * **停当前轮次（产品提案 P0-2「跑飞轮次的停」，2026-10-13 客户批准）**：向底层会话请求**中止当前
    * 进行中的 prompt 轮次**（模型生成与工具执行一并停）。契约来源 = `RoleSession.abort?`
-   * （`src/provider/pi/session.ts`，**可选方法**；真适配器实现 = Pi SDK `session.abort()`，
+   * （`src/model/runtime.ts`，**可选方法**；真适配器实现 = Pi SDK `session.abort()`，
    * 见 `src/common/pi-adapter/real-adapter.ts` 的 `makeRoleSession`）。
    *
    * **语义（钉死）**：
@@ -259,6 +275,7 @@ export interface RoleSessionHandle {
 export async function openRoleSession(
   input: {
     roleId: string;
+    runtime?: RuntimeKind;
     project: ProjectConfig;
     taskId?: string;
     scope?: TaskScope;
@@ -299,7 +316,7 @@ export async function openRoleSession(
      * (b) 审读角色 id / `openSession` / 超时、`auditSink` 等。生产调用（桌面）通常只给
      * `shellOperatorChannel`——（c) 的合法注入源（门禁引擎经 service 的公开出口）就绪后在此传入。
      */
-    shellArming?: Omit<AssembleShellGateOptions, "project" | "operatorChannel" | "sessionDeps">;
+    shellArming?: Omit<AssembleShellGateOptions, "project" | "operatorChannel" | "sessionDeps" | "runtime">;
     /**
      * **su 只读档（客户裁定 2026-10-12：「su 也要有 shell，但是只读」）**：给出 ⇒ 本会话装配**只读档**
      * `ShellGate`（`assembleReadonlyShellGate`——只接 (c)：命中只读白名单放行；`risky`/`review`/`deny`
@@ -322,7 +339,7 @@ export async function openRoleSession(
      */
     persistSession?: boolean;
   },
-  deps: { createAdapter: (gate: WriteGate, capabilities?: AdapterCapabilities) => RuntimeAdapter }
+  deps: RoleSessionDeps = {}
 ): Promise<RoleSessionHandle> {
   const log = createDiagnosticLogger({ component: "orchestration.session", projectRoot: input.project.projectRoot, roleId: input.roleId });
   log.record("session.open.start");
@@ -360,9 +377,10 @@ export async function openRoleSession(
           issued,
         });
         const raw = input.customerInput!;
-        return async (req) => {
-          const out = await raw(req);
-          issue(req, out ?? null);
+        return async (req, metadata) => {
+          const originalMetadata = metadata === undefined ? undefined : { ...metadata };
+          const out = await raw(req, metadata);
+          issue(req, out ?? null, originalMetadata);
           return out;
         };
       })()
@@ -393,11 +411,11 @@ export async function openRoleSession(
         log.record("report.received", { turnId, state: normalized.status, reportSource: "submit_report", count: normalized.evidence?.length ?? 0 });
       };
 
-  // D-1 重启恢复：本会话的**会话自持目录**（约定 `<projectRoot>/.ans/sessions/<roleId>/`）。
+  // D-1：能力面携带所选角色/runtime 的路径；实际 store 由 Service 按所选 runtime 建立。
   // 编排只**算路径**、**不预建目录**（创建归适配器在真正落盘时做——理由见 AdapterCapabilities.sessionDir）。
   // projectRoot 为空 / roleId 不安全 / **`persistSession:false`（R-1 审读会话）** → 不传（in-memory）。
   const sessionDir =
-    input.persistSession === false ? undefined : sessionDirFor(input.project.projectRoot, setup.role.id);
+    input.persistSession === false ? undefined : sessionDirFor(input.project.projectRoot, setup.role.id, input.runtime);
 
   // H-1 派发任务：**只给治理角色（su）**转交前端路由能力——项目角色会话不注入（`dispatch_task` 只给 su）。
   const dispatchTask = suppressHandback ? input.dispatchTask : undefined;
@@ -422,8 +440,9 @@ export async function openRoleSession(
       shellGate = await assembleProjectShellGate({
         project: input.project,
         operatorChannel: input.shellOperatorChannel,
-        sessionDeps: deps,
+        sessionDeps: { ...deps, createAdapter: deps.createAdapter ?? createRuntimeAdapterFactory(input.project, input.runtime ?? "pi", deps.runtimeOptions) },
         ...(input.shellArming ?? {}),
+        runtime: input.runtime,
         ...(input.routineShellPolicy !== undefined ? { routineShellPolicy: input.routineShellPolicy } : {}),
       });
     } catch (err) {
@@ -436,11 +455,14 @@ export async function openRoleSession(
     ...(governedInput !== undefined ? { customerInput: governedInput } : {}),
     ...(reportHandback !== undefined ? { reportHandback } : {}),
     ...(sessionDir !== undefined ? { sessionDir } : {}),
+    ...(input.runtime !== undefined ? { runtime: input.runtime } : {}),
+    ...(input.persistSession !== undefined ? { persistSession: input.persistSession } : {}),
     ...(dispatchTask !== undefined ? { dispatchTask } : {}),
     ...(shellGate !== undefined ? { shellGate } : {}),
     ...(input.shellVerdict !== undefined ? { shellVerdict: input.shellVerdict } : {}),
   };
-  const adapter = deps.createAdapter(
+  const createAdapter = deps.createAdapter ?? createRuntimeAdapterFactory(input.project, input.runtime ?? "pi", deps.runtimeOptions);
+  const adapter = createAdapter(
     gate,
     Object.keys(capabilities).length > 0 ? capabilities : undefined,
   );
@@ -463,6 +485,11 @@ export async function openRoleSession(
 
   let disposed = false;
   const base: RoleSessionHandle = {
+    get runtime() { return session.runtime ?? input.runtime; },
+    get roleId() { return session.roleId ?? setup.role.id; },
+    get contextSource() { return session.contextSource; },
+    get nativeSessionId() { return session.nativeSessionId; },
+    get contextWarning() { return session.contextWarning; },
     async send(text: string, opts?: PromptOptions): Promise<void> {
       legacyReport = undefined;
       log.record("session.send.start");
@@ -603,10 +630,10 @@ function buildGate(
  * 不满足前置（projectRoot 为空 / roleId 为空、含路径分隔符或 `..`）→ `undefined`（不持久化，旧行为）。
  * **本函数只算路径**；目录的创建归适配器（见 `AdapterCapabilities.sessionDir` 注释）。
  */
-function sessionDirFor(projectRoot: string, roleId: string): string | undefined {
+function sessionDirFor(projectRoot: string, roleId: string, runtime?: RuntimeKind): string | undefined {
   if (typeof projectRoot !== "string" || projectRoot.trim() === "") return undefined;
   if (roleId === "" || roleId.includes("/") || roleId.includes("\\") || roleId.includes("..")) return undefined;
-  const dir = path.join(projectRoot, ".ans", "sessions", roleId);
+  const dir = path.join(projectRoot, ".ans", "sessions", roleId, ...(runtime ? [runtime] : []));
   return dir.endsWith(path.sep) ? dir : dir + path.sep;
 }
 
@@ -630,60 +657,71 @@ function buildTaskPrompt(taskId: string | undefined, scope: TaskScope | undefine
   );
 }
 
-// 由 project 构造 adapter 工厂（(gate, capabilities?) => adapter）的**构造器**；可注入替换（测试探针 / 自定义运行时）。
-// shellGate（可选）：命令级闸，由编排经 `buildShellGate(...)`（src/common/编排/shell-gate.ts）构造后注入；
-// 缺席 ⇒ Pi 适配器**不注册 run_shell**（§7.5.1 能力缺席即最强 fail-closed）。第二个参数加在末尾，不破坏既有
-// 单参实现（TS 中少参函数可赋给多参类型）。A-3 起：工厂返回的函数额外收 `AdapterCapabilities`
-// （`customerInput` 原样转发给 Pi 适配器——「注入才注册」）。
-export type AdapterFactoryBuilder = (
-  project: ProjectConfig,
-  shellGate?: ShellGate,
-) => (gate: WriteGate, capabilities?: AdapterCapabilities) => RuntimeAdapter;
+/** Compatibility factory shape; capability injection still controls tool registration. */
+export type RuntimeAdapterFactory = (gate: WriteGate, capabilities?: AdapterCapabilities) => RuntimeAdapter;
+export type AdapterFactoryBuilder = (project: ProjectConfig, shellGate?: ShellGate) => RuntimeAdapterFactory;
+export type RuntimeAdapterFactoryOptions = Omit<RuntimeSessionOptions, "runtime" | "gate" | "projectRoot" | "skillRoot">;
+export type RuntimeAdapterFactoryBuilder = (project: ProjectConfig, runtime: RuntimeKind, options?: RuntimeAdapterFactoryOptions) => RuntimeAdapterFactory;
+export interface RoleSessionDeps {
+  createAdapter?: RuntimeAdapterFactory;
+  runtimeOptions?: RuntimeAdapterFactoryOptions;
+}
 
-// 运行时选择 adapter 工厂。约定（与装配对齐）：命令参数 `--runtime demo|pi`、环境变量 `ANS_RUNTIME`，
-// 默认 `demo`；由装配解析并注入 runtime，编排据此选择：
-//   - "pi"  → 真实 Pi 适配器，经注入的 piFactory（默认 createPiAdapterFactory）接线——**可达的真实路径**；
-//   - "demo" → 入口注入的 createAdapter（装配的演示假 runtime）。
-// 令真实 Pi 适配器可达，且不改变契约 §5 冻结签名（deps 以可选字段扩展）。
-// deps.shellGate：编排构造的 ShellGate，经此转发给 Pi 适配器工厂（demo 工厂由装配自持，不经此处）。
+/** Fixed engine, shared governed tools, exact project roots; no fallback engine. */
+export function createRuntimeAdapterFactory(
+  project: ProjectConfig,
+  runtime: RuntimeKind,
+  options: RuntimeAdapterFactoryOptions = {},
+): RuntimeAdapterFactory {
+  if (!(RUNTIME_KINDS as readonly string[]).includes(runtime)) throw new Error(`未知运行时：${runtime}`);
+  return (gate, capabilities) => createRuntimeAdapter({
+    ...options,
+    runtime, gate, projectRoot: project.projectRoot, skillRoot: project.skillRoot,
+    readRoot: project.projectRoot,
+    writeRoot: runtime === "demo" ? options.writeRoot : project.projectRoot,
+    shellCwd: project.projectRoot,
+    persistSession: capabilities?.persistSession ?? options.persistSession ?? (capabilities?.sessionDir !== undefined),
+    customerInput: capabilities?.customerInput,
+    reportHandback: capabilities?.reportHandback,
+    dispatchTask: capabilities?.dispatchTask,
+    shellGate: capabilities?.shellGate ?? options.shellGate,
+    shellVerdict: capabilities?.shellVerdict,
+  });
+}
+
 export function selectAdapterFactory(
   runtime: RuntimeKind,
   project: ProjectConfig,
   deps: {
-    createAdapter: (gate: WriteGate, capabilities?: AdapterCapabilities) => RuntimeAdapter;
+    createAdapter?: RuntimeAdapterFactory;
     piFactory?: AdapterFactoryBuilder;
     shellGate?: ShellGate;
-  }
-): (gate: WriteGate, capabilities?: AdapterCapabilities) => RuntimeAdapter {
-  if (runtime === "pi") return (deps.piFactory ?? createPiAdapterFactory)(project, deps.shellGate);
-  return deps.createAdapter;
+    runtimeFactory?: RuntimeAdapterFactoryBuilder;
+    runtimeOptions?: RuntimeAdapterFactoryOptions;
+  } = {},
+): RuntimeAdapterFactory {
+  if (!(RUNTIME_KINDS as readonly string[]).includes(runtime)) throw new Error(`未知运行时：${runtime}`);
+  if (deps.runtimeFactory) return deps.runtimeFactory(project, runtime, { ...deps.runtimeOptions, ...(deps.shellGate !== undefined ? { shellGate: deps.shellGate } : {}) });
+  if (runtime === "pi" && deps.piFactory) return deps.piFactory(project, deps.shellGate);
+  if (runtime === "demo" && deps.createAdapter && !deps.runtimeOptions) return deps.createAdapter;
+  return createRuntimeAdapterFactory(project, runtime, { ...deps.runtimeOptions, ...(deps.shellGate !== undefined ? { shellGate: deps.shellGate } : {}) });
 }
 
-// 供 Interface/装配构造默认真实适配器：编排（Pipeline）经 Pi 适配器导出的工厂接线。
-// 契约 §5：编排只经 Pi 适配器导出的函数与类型调用 Pi，不导入其 impl 内部。
-// shellGate 原样转发给 Pi 适配器（工具层据「是否注入」决定 run_shell 是否注册）；
-// A-3/C-1/D-1：工厂返回的函数收 `AdapterCapabilities`，把 `customerInput`（确认制发行器包装）、
-// `reportHandback`（交报告，项目角色专用）与 `sessionDir`（会话自持目录，D-1）原样转发——Pi 适配器
-// 据此注册 `request_confirmation`/`request_choice`/`submit_report`（均「注入才注册」），并按会话目录落盘。
-export function createPiAdapterFactory(
-  project: ProjectConfig,
-  shellGate?: ShellGate
-): (gate: WriteGate, capabilities?: AdapterCapabilities) => RuntimeAdapter {
-  return (gate, capabilities) =>
-    createPiRuntimeAdapter({
-      gate,
-      projectRoot: project.projectRoot,
-      skillRoot: project.skillRoot,
-      // I-1：能力面给的闸（编排装配）优先；第二参保留兼容（前端自装配的旧路）。
-      // cwd 钉根与凭据剥离均**既有**（核实：real-adapter.ts:755 已传 `shellCwd: opts.projectRoot`；
-      // tools.ts `buildShellEnv` spawn 前剥离 `PI_CREDENTIAL_ENV_VARS`）——本工厂无需另传。
-      shellGate: capabilities?.shellGate ?? shellGate,
-      customerInput: capabilities?.customerInput,
-      reportHandback: capabilities?.reportHandback,
-      sessionDir: capabilities?.sessionDir,
-      dispatchTask: capabilities?.dispatchTask,
-      shellVerdict: capabilities?.shellVerdict,
-    });
+/** Existing Pi public name now composes the neutral Service. */
+export function createPiAdapterFactory(project: ProjectConfig, shellGate?: ShellGate): RuntimeAdapterFactory {
+  return createRuntimeAdapterFactory(project, "pi", { shellGate });
+}
+
+/** ANS replay only; native resume is reported by the session's dynamic getters. */
+export async function readRoleSessionHistory(options: { projectRoot: string; roleId: string; runtime: RuntimeKind }): Promise<{ record?: RuntimeSessionRecord; entries: RuntimeReplayEntry[] }> {
+  const service = await import("../../service/runtime/session.ts");
+  return service.readRuntimeSessionHistory(options);
+}
+
+export function isFailedSettlement(event: SessionEvent): boolean {
+  if (event.kind !== "settled") return false;
+  const outcome = (event.detail as { outcome?: unknown } | undefined)?.outcome;
+  return outcome === "failed" || outcome === "aborted" || outcome === "timed_out";
 }
 
 function errText(err: unknown): string {

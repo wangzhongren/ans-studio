@@ -152,16 +152,8 @@ export async function raceAbort<T>(work: Promise<T>, signal: AbortSignal | undef
  * 若不做挂起联动，「等你点头」的轮次会被整轮超时杀掉。有了本闸，**客户输入挂起期间该轮时限暂停**，
  * 作答后按**剩余时间**恢复。
  */
-export interface InteractionGate {
-  /** 进入等待（引用计数 +1；首个进入会通知监听者「暂停」）。 */
-  begin(): void;
-  /** 离开等待（引用计数 −1；归零时通知监听者「恢复」；多余调用为 no-op）。 */
-  end(): void;
-  /** 当前是否有交互在等待客户。 */
-  isWaiting(): boolean;
-  /** 订阅「等待开始/结束」；返回退订函数。 */
-  onChange(listener: (waiting: boolean) => void): () => void;
-}
+export type { InteractionGate } from "../../model/runtime.ts";
+import type { InteractionGate } from "../../model/runtime.ts";
 
 /** 构造交互挂起活动闸。 */
 export function createInteractionGate(): InteractionGate {

@@ -1,5 +1,11 @@
 # 装配备忘录
 
+- 2026-10-14 B1D仅文档：README开头/桌面步骤5、6/设置入口/存储与等待措辞已按实际3desktop/4CLI、通用masked设置、role/runtime ans/native和Pi legacy、适配器实际context修正。ANS层等待无限不代表原生上游无限；Claude24.8d/Codex期限未知保留。21own source/config/tests与写前逐项SHA一致；.env.example已有准确信息未改，actual.env未读。只链接/格式/矛盾/scope检查，无新fullsuite/nativeproof；history/live及Window/T1仍原属主门槛。证据docs/change/2026-10-14_change_readme-multi-runtime-desktop.md。
+
+- 2026-10-14 ANS-RUNTIME-V2 B1：固定本角色已完成Interface-only root接线。flag/env全四运行时贯穿两命令，role默认demo/govern默认Pi，demo原替身和单文件writeSet保持；新增已接受3角色fallback。实际Service+handlers/Nodebin/SDK懒加载/缺配置与SDK错误验证，装配67项+窗口受影响11项78/78、全仓tsc0。原全仓1165/1168两窗口红：边界顺序由Governance修后已精确通过，目录名ans-cli断言交D1。Codex显式空base语义交X1，本示例省略此可选键。A1V最终no-bare+disableAllHooks已同步README。SHA38f896...，原记录/api-spec/稳定feature已补；无实际.env、账号、模型或Git写。
+
+- 2026-10-14 ANS-RUNTIME-V2 B0：精确新依赖安装完成，正常 paths 可用于 Claude A1V。实际 Codex stable 0.162.1 无模型 probe通过；全仓 tsc0；核心/Codex/Claude/Pi组合240/239pass/1sandbox listen EPERM，精确回环重测1/1；入口未改，装配54/54。B1需要PM释放实际依赖，按编排Interface contract传runtime纯值，govern保留Pi默认、role run demo默认。设计和原证据见 docs/design/2026-10-14_design_multi-runtime-assembly.md 与 docs/change/2026-10-14_change_multi-runtime-assembly.md。实际.env不读不写，模型/账号未调用。
+
 记录本角色掌握的事实、待核实事项与续接线索。不写全局规则，不抄任务状态。
 
 - 2026-10-11：角色由 bootstrap 建立。Section 1 覆盖 CLI 入口、包与编译配置、README，及私有 common 与测试目录。文件尚未创建。

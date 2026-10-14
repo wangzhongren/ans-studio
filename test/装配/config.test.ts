@@ -38,12 +38,12 @@ function readBoundaryPaths(boundaryRel: string): string[] {
   return found;
 }
 
-test("内嵌配置含六个角色的 card/boundary 映射，且文件真实存在", () => {
+test("内嵌配置含原六个及三个运行时角色的真实 card/boundary 映射", () => {
   const project = buildDemoProjectConfig();
   const ids = Object.keys(project.roles).sort();
   assert.deepEqual(
     ids,
-    ["Pi适配器", "门禁引擎", "编排", "测试", "项目管理", "装配"].sort(),
+    ["Pi适配器", "门禁引擎", "编排", "测试", "项目管理", "装配", "运行时核心", "Codex适配器", "Claude适配器"].sort(),
   );
   for (const [roleId, loc] of Object.entries(project.roles)) {
     assert.ok(

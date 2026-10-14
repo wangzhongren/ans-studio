@@ -20,9 +20,10 @@
 // 配置缺失时**明确失败**（EXIT_FAILURE），绝不静默回退（与 role run 的 pi 路径同纪律）。可经 deps.createAdapter
 // 注入替身（测试/自定义运行时），不改命令语义。
 
-import type { CustomerInputFn, RuntimeAdapter, WriteGate } from "../../provider/pi/session.ts";
+import type { CustomerInputFn, RuntimeKind } from "../../model/runtime.ts";
 import { runGovernSession } from "../../pipeline/orchestration/govern-session.ts";
-import { createPiAdapterFactory, type AdapterCapabilities } from "../../pipeline/orchestration/run-role.ts";
+import { selectAdapterFactory, type RuntimeAdapterFactory, type RuntimeAdapterFactoryBuilder, type RuntimeAdapterFactoryOptions } from "../../pipeline/orchestration/run-role.ts";
+import { RUNTIME_KINDS } from "../../common/shared/runtime-shared.ts";
 import { parseGovernArgs } from "../../common/编排/args.ts";
 import { EXIT_FAILURE, EXIT_USAGE } from "../../common/编排/exit-codes.ts";
 import type { ConfigInjection } from "../../index.ts";
@@ -30,13 +31,16 @@ import type { ConfigInjection } from "../../index.ts";
 /** 装配注入的超集：配置（ConfigInjection）+ 可选会话适配器工厂 / 目标角色 id / 目标目录 / 客户通道。 */
 export interface GovernDeps extends ConfigInjection {
   /** 可注入会话适配器工厂（缺省 = 真实 Pi 适配器工厂）。 */
-  createAdapter?: (gate: WriteGate, capabilities?: AdapterCapabilities) => RuntimeAdapter;
+  createAdapter?: RuntimeAdapterFactory;
+  runtime?: RuntimeKind;
+  runtimeFactory?: RuntimeAdapterFactoryBuilder;
+  runtimeOptions?: RuntimeAdapterFactoryOptions;
   /** 本次治理会话要创建/重构的角色 id（CLI `--role` 的可选兜底来源）。 */
   targetRoleIds?: string[];
   /** 目标项目目录（装配已算出的兜底；CLI 位置参数 `<目录>` 优先于它）。真正设入 projectRoot 由装配完成（T34）。 */
   targetDir?: string;
   /**
-   * **客户确认制交互通道**（可选；形状单一来源 = 契约家 `provider/pi/session.ts` 的 `CustomerInputFn`）。
+   * **客户确认制交互通道**（可选；形状单一来源 = 契约家 `model/runtime.ts` 的 `CustomerInputFn`）。
    * 给出 ⇒ 本会话进入确认制收窄（A-3）；**缺省不传**——`runGovernSession` 自带 CLI 终端通道
    * （`createCliCustomerInput()`：确认 y/n、勾选数字序号），缺省行为不变。注入面供测试/自定义前端
    * 以确定性方式验证「确认通过 → 可写并自动收尾 / 拒绝 → F4 拒写、零副作用」（与桌面注入交互卡通道同形）。
@@ -54,7 +58,7 @@ export function resolveGovernTargetDir(argv: string[], deps?: Pick<GovernDeps, "
   return parseGovernArgs(argv).dir ?? deps?.targetDir;
 }
 
-const USAGE = "用法：ans govern [<目录>] [--task <任务>] [--role <角色id>]…";
+const USAGE = "用法：ans govern [<目录>] [--task <任务>] [--role <角色id>]… [--runtime demo|pi|codex|claude]";
 
 export async function governCommand(argv: string[], deps?: GovernDeps): Promise<number> {
   // 1) 参数解析（用法错误 → EXIT_USAGE）。目标目录为**可选位置参数**（`ans govern <目录>`，设计 §12.3）；
@@ -78,9 +82,21 @@ export async function governCommand(argv: string[], deps?: GovernDeps): Promise<
   const targetDir = resolveGovernTargetDir(argv, deps);
 
   // 4) 适配器：注入优先；缺省 = 真实 Pi 适配器工厂。构造期失败即非 0，不静默回退 demo。
-  let createAdapter: (gate: WriteGate, capabilities?: AdapterCapabilities) => RuntimeAdapter;
+  const candidate = parsed.runtime || deps.runtime || "pi";
+  if (!(RUNTIME_KINDS as readonly string[]).includes(candidate)) {
+    process.stderr.write(`ans govern 用法错误：未知运行时 ${candidate}\n`);
+    return EXIT_USAGE;
+  }
+  const runtime = candidate as RuntimeKind;
+  let createAdapter: RuntimeAdapterFactory;
   try {
-    createAdapter = deps.createAdapter ?? createPiAdapterFactory(deps.project);
+    createAdapter = deps.createAdapter && !parsed.runtime && !deps.runtime && !deps.runtimeFactory && !deps.runtimeOptions
+      ? deps.createAdapter
+      : selectAdapterFactory(runtime, deps.project, {
+          createAdapter: deps.createAdapter,
+          runtimeFactory: deps.runtimeFactory,
+          runtimeOptions: deps.runtimeOptions,
+        });
   } catch (err) {
     process.stderr.write(`ans govern 无法建立会话适配器：${errText(err)}\n`);
     return EXIT_FAILURE;
@@ -103,6 +119,8 @@ export async function governCommand(argv: string[], deps?: GovernDeps): Promise<
   const result = await runGovernSession(
     {
       taskId: parsed.taskId,
+      runtime,
+      persistSession: deps.runtimeOptions?.persistSession,
       project: deps.project,
       targetRoleIds,
       targetDir,

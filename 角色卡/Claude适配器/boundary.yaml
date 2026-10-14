@@ -1,0 +1,40 @@
+# Section 1：唯一写入白名单。组别不合并权限；未列路径默认只读。
+role: Claude适配器
+entries:
+  - kind: file
+    path: src/provider/claude/session.ts
+    purpose: Claude 运行时公共入口与 SDK 懒加载
+  - kind: directory
+    path: src/common/claude-adapter/
+    purpose: 本角色私有辅助实现
+  - kind: directory
+    path: test/claude-adapter/
+    purpose: 本角色单元测试与契约夹具
+  - kind: file
+    path: 角色卡/Claude适配器/feature-map.md
+    purpose: 本角色实现与功能资料
+  - kind: file
+    path: 角色卡/Claude适配器/memo.md
+    purpose: 本角色实现与功能资料
+  - kind: file
+    path: 角色卡/Claude适配器/changelog.md
+    purpose: 本角色实现与功能资料
+  - kind: file
+    path: 角色卡/Claude适配器/functional-description.md
+    purpose: 本角色实现与功能资料
+  - kind: file
+    path: 角色卡/Claude适配器/api-spec.md
+    purpose: 本角色实现与功能资料
+  - kind: directory
+    path: 角色卡/Claude适配器/docs/design/
+    purpose: 本角色design记录
+  - kind: directory
+    path: 角色卡/Claude适配器/docs/feature/
+    purpose: 本角色feature记录
+  - kind: directory
+    path: 角色卡/Claude适配器/docs/change/
+    purpose: 本角色change记录
+  - kind: directory
+    path: 角色卡/Claude适配器/docs/fix/
+    purpose: 本角色fix记录
+

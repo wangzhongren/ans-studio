@@ -38,6 +38,7 @@ import { readFile } from "node:fs/promises";
 // 跨角色共享原子写原语（**单一来源**，属主：项目管理）——同目录 temp + `fsync` + `rename` 覆盖目标，
 // 并对 rename 的 Windows 瞬时 `EPERM` 做**有界重试**。抽取自本模块与 Pi适配器 `fs-write.ts` 的同源写法。
 import { atomicWrite } from "./atomic-write.ts";
+import { RUNTIME_CREDENTIAL_ENV_VARS } from "./runtime-shared.ts";
 
 /** `.env` 键值对（值已去引号/去内联注释；重复键后者胜）。 */
 export type EnvMap = Record<string, string>;
@@ -62,9 +63,12 @@ export interface LoadEnvResult {
  */
 export const PI_CONFIG_SECRET_KEYS: readonly string[] = ["ANTHROPIC_AUTH_TOKEN"];
 
+/** 多运行时秘密键的单一目录；旧 Pi 名单保留 API 兼容。 */
+export const RUNTIME_CONFIG_SECRET_KEYS: readonly string[] = RUNTIME_CREDENTIAL_ENV_VARS;
+
 /** 该键是否为机密键（供界面掩码判定）。 */
 export function isSecretKey(key: string): boolean {
-  return PI_CONFIG_SECRET_KEYS.includes(key);
+  return RUNTIME_CONFIG_SECRET_KEYS.includes(key);
 }
 
 const REDACTED = "[redacted]";

@@ -1,0 +1,31 @@
+{
+  "phase": "B0 baseline before package install returned",
+  "at": "2026-10-14T06:42:09.856Z",
+  "node": "v24.14.0",
+  "platform": "darwin",
+  "arch": "arm64",
+  "combined": "37e7101bb7cfb4ea459ffdb3bb8d7d510e7601abef59c68c17efebfcda693ef2",
+  "files": {
+    ".env.example": "f264768f2b60c7799a43fd2e15822f3ef4e360cf4f648f2d6b16e4b9627f6171",
+    ".gitignore": "77f37859c27fb2866c026437a4c3c49b6a519c75fe549a99286f9291023964a8",
+    "README.md": "a6d62d545b7fdfcd0f6c39a2d48f9e84353351a2145af2e7b27753536c0c8520",
+    "bin/ans.js": "de9366379a8ed195632881aae09e778dbf07caa5080eeb1f4ce4cd098d117714",
+    "package-lock.json": "a32e065ea24b8fc76a9546950f6792639d44d5ba564f291b145ed01f293ef5c7",
+    "package.json": "7ea9e7482ff183783eded0550d956b2fb7ac376da31be2ca71d22ab41639cab5",
+    "src/common/装配/cli-parse.ts": "b20c17faab026b1fa6df1172efa37189be971595ccc10ce5223b232e337e8052",
+    "src/common/装配/config-loader.ts": "d58e323a17a3001611bb6fbd915af12963819b127fc4b4f45d8380d1cd3928ad",
+    "src/common/装配/demo-runtime.ts": "d0ba03c1599f687d1bcb953639c213cd898b47c31fc663017b4ab3b6fdd36346",
+    "src/common/装配/entry-timeout.ts": "c0b1c20826a494a4c8e4999712807cda8804c42a7cc51e3cdf6789566af79217",
+    "src/common/装配/runtime.ts": "46c6125494e2272448964bd84e195fa35c5a99b3f11db070230c15ed8211ffdb",
+    "src/index.ts": "e54f73b688316b67a48b85f8892c9e388ca6b13cdec3ab860b5095febc163af4",
+    "test/装配/cli-parse.test.ts": "8816c187259835b1f8537a2dc2cadb038be8e256f41043a94cfa9ed0f49f72e6",
+    "test/装配/config-loader.test.ts": "af99d0406527dbe099aeed1dda78e72839fce249fb2eae5d955879ea3519d4ae",
+    "test/装配/config.test.ts": "c0cdefdb08723550307541563cdd0e4d80baf79111229153a14ec3e623ecfeab",
+    "test/装配/demo-runtime.test.ts": "49173037ff612aba0e18108b7fa28a969561cccc963b3c5751a2adf81693d957",
+    "test/装配/entry.test.ts": "45e5d65ba71d5f02634e8f348bfcc6d398b493041438dc2afda5fb37c0c75253",
+    "test/装配/govern-target.test.ts": "b7003e664389a9a08e450dc9d42f447f147614253bf5391e214d2e9d1166b573",
+    "test/装配/main.test.ts": "377652fe20a5d2d5dee46465979055092222ad7cad3eee43d4239c80f842f869",
+    "test/装配/runtime.test.ts": "f24b26fb571934addae0a5936c7bc1c8e866ef6fd20d3917844971366ca2e736",
+    "tsconfig.json": "0a73fe1a9b9b98bc55e6801e8f8a386447c4bc61e6ae307341c70a93da459a73"
+  }
+}

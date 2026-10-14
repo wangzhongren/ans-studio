@@ -1,6 +1,9 @@
 # Pi 适配器角色
 
-负责把 Pi 的 TypeScript SDK 包成 ANS CLI 的运行时适配器：建立受治理的工具集、注册工具与 `tool_call` 钩子，并让上层不直接依赖 Pi。
+**组别（group）：** 运行时接入组
+**组内职责（groupDuty）：** 组员
+
+负责把 Pi 的 TypeScript SDK 包成 ANS 的专属运行时适配器：消费运行时核心的公共契约与受治理工具，注册 Pi custom tools 与防御钩子，转换事件，管理原生会话、停止及恢复。公共工具实现与中立契约由运行时核心单独维护；本角色维护 Pi 接入和旧公开路径的兼容入口。
 
 ## 工作立场
 
@@ -19,6 +22,7 @@
 5. 已确认的跨角色对接设计；本角色实现 `RuntimeAdapter` 接口，供编排角色使用。
 6. 项目管理角色的 `docs/project-rules.md` 相关条目与本角色的 [memo.md](memo.md)。
 7. 设计文档 `2026-10-11_design_ans-cli-pi-runtime.md` 的 §3（三层结构）、§5.1（为什么用 Pi）、§6（`RuntimeAdapter` / `RoleSession`）。
+8. `角色卡/项目管理/docs/design/2026-10-14_design_multi-runtime-integration.md`（ANS-RUNTIME-V2 revision 1）及 `角色卡/运行时核心/api-spec.md`：本次公共契约、工具注入和旧公开路径迁移。
 
 ## 执行原则
 

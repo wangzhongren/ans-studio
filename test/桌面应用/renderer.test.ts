@@ -32,7 +32,7 @@ test("写入语义（桌面一律 pi）：明示写入真实落到导入项目�
   assert.ok(!RENDERER.includes("不会落盘"), "不得再出现「不会落盘」（demo 专有语义）");
 });
 
-test("界面不再有运行时选择器（客户 2026-10-11 裁定：默认跑 pi）——断言「它不存在」", () => {
+test("V2r1：真实 Pi/Codex/Claude 可选，保留单一写入语义和退役 DOM 守卫", () => {
   // 选择器相关 DOM/事件/样式已清干净，且留守卫（断言不存在，防止回潮）。
   assert.ok(!INDEX.includes('id="inp-runtime"'), "index.html 不得再有运行时选择器 #inp-runtime");
   assert.ok(!INDEX.includes("rt-select"), "index.html 不得再有 .rt-select");
@@ -46,7 +46,9 @@ test("界面不再有运行时选择器（客户 2026-10-11 裁定：默认跑 p
   assert.ok(STYLES.includes(".runtime-note"), "styles.css 应有 .runtime-note 样式");
   assert.ok(STYLES.includes(".chat-head-notes"), "styles.css 应有横栏提示区 .chat-head-notes");
   // 会话一律以 pi 发起（renderer 不再读选择器值）。
-  assert.ok(RENDERER.includes('runtime: "pi"'), "renderer 开会话时应以 pi 发起");
+  assert.ok(INDEX.includes('id="runtime-select"'), "新真实引擎选择入口存在");
+  for (const runtime of ["pi", "codex", "claude"]) assert.ok(INDEX.includes('value="' + runtime + '"'), "真实引擎选项：" + runtime);
+  assert.ok(RENDERER.includes("runtime: runtime"), "openSession 传本次捕获的所选引擎");
 });
 
 test("不再有一概而论的「V1 桌面：只判不写」（该说法仅 demo 路径成立）", () => {
@@ -471,7 +473,7 @@ test("真机缺陷修复：交互卡严格投递所属 pane（不回落当前查
   assert.ok(RENDERER.includes("r.expired === true"), "应识别通道的失效回包");
   assert.ok(RENDERER.includes('entry.state = "expired"'), "失效应写入登记表终态（重物化同款定格）");
   assert.ok(
-    RENDERER.includes("请求已失效（应用已重启/关闭），未获同意——请让角色重新发起。"),
+    RENDERER.includes("请求已失效（轮次停止、会话重建或应用关闭），未获同意——请让角色重新发起。"),
     "失效文案如实指向「重启/关闭」并给出路（请让角色重新发起）"
   );
   assert.ok(!RENDERER.includes("超时或已被处理"), "时间源性旧文案已删（G-1）");
@@ -482,7 +484,7 @@ test("真机缺陷修复：交互卡严格投递所属 pane（不回落当前查
   const CI = fs.readFileSync(path.resolve(HERE, "..", "..", "app", "desktop", "customer-input.ts"), "utf8");
   const CI_CODE = CI.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
   assert.ok(CI.includes("expired: true"), "通道应对「无挂起请求」回终态标记");
-  assert.ok(CI.includes("应用重启/关闭会清空未决请求"), "通道终态原因如实（重启/关闭，非超时）");
+  assert.ok(CI.includes("轮次停止、会话重建或应用关闭会使旧请求失效"), "通道终态原因如实（中止/关闭/重启，非计时失效）");
   assert.ok(!CI_CODE.includes("setTimeout") && !CI_CODE.includes("setInterval"), "通道代码不得有计时器（G-1：桌面不自造计时）");
   assert.ok(!CI.includes("可能已超时"), "旧「可能已超时」措辞已删");
 });
@@ -511,7 +513,7 @@ test("工具行瘦身（2026-10-12 客户裁定）：只显示状态与目标—
   assert.ok(RENDERER.includes("Tr.activityOf(ev)"), "实时工具行应经瘦身映射");
   assert.ok(RENDERER.includes("Tr.activityOf(row)"), "回放工具行应经瘦身映射");
   assert.ok(RENDERER.includes("appendDenied(pane, ev.summary, failure.fullTarget)"), "denied 行保持全量（拒绝原因与允许路径）");
-  assert.ok(!RENDERER.includes("ev.detail"), "事件 detail 一律不渲染（防御：即便带长内容也不铺出）");
+  assert.ok(!/(?:innerHTML|textContent)\s*=.*ev\.detail|(?:esc|renderMarkdown)\(ev\.detail/.test(RENDERER), "detail 正文不进入 HTML/文本；只读取实际 outcome 和工具元数据");
   const index = fs.readFileSync(path.join(APP_DIR, "index.html"), "utf8");
   assert.ok(index.indexOf('src="tool-rows.js"') > 0 && index.indexOf('src="tool-rows.js"') < index.indexOf('src="renderer.js"'), "tool-rows.js 应先于 renderer.js 加载");
 });
@@ -592,7 +594,7 @@ test("P0-1 图片接线：附件随消息**带载荷上送**（IPC→Interface �
   assert.ok(!RENDERER.includes("node:fs"), "渲染进程不得引入 Node/fs");
   // P0-1：发送**带载荷上送**——`d.sendSession(text, images)`（`[{type:"image", data:<base64>, mimeType}]`）；
   // 成功（直发/入队）后清附件；失败保留可重试。
-  assert.ok(/d\.sendSession\(text, images\)/.test(RENDERER), "发送应带图片载荷（d.sendSession(text, images)）");
+  assert.ok(/d\.sendSession\(text, images, \{ projectRoot: projectRoot, roleId: role\.roleId, runtime: runtime \}, \{ clientMessageId: clientMessageId \}\)/.test(RENDERER), "发送应带图片载荷（d.sendSession(text, images)）");
   assert.ok(/images = attachments\.map\(function \(a\) \{[\s\S]{0,120}type: "image"[\s\S]{0,120}data: a\.data[\s\S]{0,120}mimeType: a\.mime/.test(RENDERER), "载荷按契约块组装（type/data/mimeType，取自附件记录的 base64）");
   assert.ok(/function clearSentAttachments\(roleId, keys\) \{/.test(RENDERER), "应有 clearAttachments（发送成功后清附件）");
   assert.ok(/addAttachment\(res\.image, "data:" \+ res\.image\.mime \+ ";base64," \+ res\.image\.dataBase64, false, res\.image\.dataBase64, requestRole\)/.test(RENDERER), "选图路径把 base64 存进附件记录（随消息上送用）");
@@ -602,13 +604,23 @@ test("P0-1 图片接线：附件随消息**带载荷上送**（IPC→Interface �
   assert.ok(!RENDERER.includes("随消息附加的 "), "「N 张图片未发送」行应已退役");
   // 主进程侧：session:send 带载荷 + Interface **重校验**（不信任渲染侧）；队列条目入队定格。
   assert.ok(PRELOAD.includes("Array.isArray(images) ? images : []"), "preload 透传 images 数组（缺省空=纯文本）");
-  assert.ok(MAIN.includes("images?: unknown"), "session:send IPC 形状带 images");
+  assert.ok(MAIN.includes('Parameters<DesktopInterface["sendSession"]>[0]') && fs.readFileSync(path.resolve(HERE, "..", "..", "app", "desktop", "interface.ts"), "utf8").includes("images?: unknown"), "session:send IPC引用真实Interface输入类型，包含图片与显示关联metadata");
   const IFACE = fs.readFileSync(path.resolve(HERE, "..", "..", "app", "desktop", "interface.ts"), "utf8");
   assert.ok(IFACE.includes("decodeImageBase64") && IFACE.includes("sniffImageMime") && IFACE.includes("validateImage"), "Interface 层重校验三件套（解码/嗅探/限幅——不信任渲染侧）");
   assert.ok(IFACE.includes("整条拒发") || IFACE.includes("本条消息未发出"), "任一张不合格 ⇒ 整条拒发（fail-closed，绝不丢图发文字）");
   const SESS = fs.readFileSync(path.resolve(HERE, "..", "..", "app", "desktop", "session.ts"), "utf8");
   assert.ok(SESS.includes("opts?: PromptOptions"), "DeliveryItem 带整包载荷（入队即定格）");
-  assert.ok(/entry\.handle\.send\(text, opts\)/.test(SESS), "直发整包同一引用透传句柄");
+  assert.ok(SESS.includes("await this.sendDelivery(entry, origin, text, opts);"), "直发带原opts与原投递身份进入唯一发送helper");
+  const sendDelivery = SESS.slice(SESS.indexOf("  private async sendDelivery("), SESS.indexOf("  private trimDeliveryOrigins("));
+  assert.ok(sendDelivery.startsWith("  private async sendDelivery(") && sendDelivery.includes("let promptOptions = opts;"), "helper从原opts起步，旧整包路径不复制");
+  assert.ok(sendDelivery.includes("entry.handle.runtime !== undefined || origin.clientMessageId !== undefined || opts?.onTurnStarted !== undefined"), "只有真实runtime/显示来源/原ack观察者需要必要通知包装");
+  assert.ok(sendDelivery.includes("promptOptions = { ...opts, onTurnStarted };"), "ack只浅包装原字段并补通知，images数组及图片对象仍为原引用");
+  assert.ok(!/\bimages\s*:|\bopts\.[\w]+\s*=|structuredClone|JSON\.parse|\.map\(/.test(sendDelivery), "helper不得重造图片、复制原图或修改调用者opts");
+  assert.ok(sendDelivery.includes("if (promptOptions === undefined) await entry.handle.send(text);") && sendDelivery.includes("else await entry.handle.send(text, promptOptions);"), "undefined保留单参，有包走实际两参句柄路径");
+  assert.ok(sendDelivery.includes("this.sessions.get(key) !== entry") && sendDelivery.includes("metadata.runtime !== entry.runtime || metadata.roleId !== entry.roleId") && sendDelivery.includes('typeof metadata.turnId !== "string" || metadata.turnId === ""'), "通知只接受原句柄及权威角色/runtime/有效turn");
+  assert.ok(sendDelivery.includes("entry.origins.byTurn.set(metadata.turnId, origin);") && sendDelivery.includes("opts?.onTurnStarted?.(metadata);"), "只绑定原投递，保留调用者原callback通知");
+  const MODEL = fs.readFileSync(path.resolve(HERE, "..", "..", "src", "model", "runtime.ts"), "utf8");
+  assert.ok(/interface PromptTurnStartedMetadata \{\s*readonly turnId: string;\s*readonly roleId: string;\s*readonly runtime: RuntimeKind;/.test(MODEL), "ack metadata只读，不是授权或可变图片载荷");
   const ADAPTER = fs.readFileSync(path.resolve(HERE, "..", "..", "app", "desktop", "chat-adapter.ts"), "utf8");
   assert.ok(ADAPTER.includes("takeDemoPromptLog") && /prompt\(text: string, promptOpts\?: PromptOptions\)/.test(ADAPTER), "demo 适配器 prompt 接受并记录 opts（透传保真可断言）");
   assert.ok(STYLES.includes(".attach-chip") && STYLES.includes(".attach-rm"), "缩略图与移除键样式");
@@ -647,7 +659,7 @@ test("P0-2 停止入口：#btn-halt 在输入框区（发送钮左侧）仅忙�
     /state\.roleBusy = \{\};[\s\S]{0,200}updateHaltButton\(\);/.test(RENDERER);
   assert.ok(callSites, "三处刷新点齐备（选角色/快照推送/换项目清零）");
   // 三态如实行（契约 RoleSessionAbortResult：ok/supported/error）。
-  assert.ok(/async function onHaltClick\(\) \{[\s\S]{0,220}d\.abortSession\(roleId\)/.test(RENDERER), "点击调 d.abortSession（IPC→Interface→manager.abort）");
+  assert.ok(/async function onHaltClick\(\) \{[\s\S]{0,300}d\.abortSession\(target\)/.test(RENDERER), "点击调 d.abortSession（IPC→Interface→manager.abort）");
   assert.ok(RENDERER.includes("已请求停止当前轮次——轮次仍会以收尾事件结束。"), "ok 态如实行（不做乐观「已停止」假象）");
   assert.ok(RENDERER.includes("当前运行时不支持停止。"), "supported:false 态如实行（能力缺席如实告知）");
   assert.ok(/"停止失败：" \+/.test(RENDERER), "失败态如实行（错误原文不吞）");
@@ -655,7 +667,7 @@ test("P0-2 停止入口：#btn-halt 在输入框区（发送钮左侧）仅忙�
   assert.ok(PRELOAD.includes('"session:abort"'), "preload 暴露 session:abort");
   assert.ok(MAIN.includes('"session:abort"'), "主进程注册 session:abort");
   const SESS = fs.readFileSync(path.resolve(HERE, "..", "..", "app", "desktop", "session.ts"), "utf8");
-  assert.ok(/async abort\(roleId: string\): Promise<RoleSessionAbortResult>/.test(SESS), "SessionManager.abort 三态回传");
+  assert.ok(/async abort\(target: string \| SessionTarget\): Promise<RoleSessionAbortResult>/.test(SESS), "SessionManager.abort 三态回传");
   assert.ok(SESS.includes("entry.handle.abort === undefined"), "方法缺席 = supported:false（与 supported:false 同一处理）");
   const IFACE = fs.readFileSync(path.resolve(HERE, "..", "..", "app", "desktop", "interface.ts"), "utf8");
   assert.ok(IFACE.includes("abortSession"), "Interface 暴露 abortSession");
@@ -666,7 +678,7 @@ test("P0-2 停止入口：#btn-halt 在输入框区（发送钮左侧）仅忙�
 test("D-1：会话记录恢复——主进程只读解析并推规范化行；渲染侧回放进该角色 pane（分隔提示 + is-replay）", () => {
   // 通道两端：preload 订阅 + 主进程推送（渲染进程不碰 SDK——解析在 main）。
   assert.ok(PRELOAD.includes("onSessionHistory") && PRELOAD.includes("session:history"), "preload 应暴露 onSessionHistory");
-  assert.ok(MAIN.includes("readRoleSessionHistory"), "主进程应读取会话历史（session-history.ts，只读解析）");
+  assert.ok(MAIN.includes("getSessionHistory") && fs.readFileSync(path.resolve(HERE, "..", "..", "app", "desktop", "runtime-history.ts"), "utf8").includes("readRoleSessionHistory"), "主进程历史经窗口 helper 调 Pipeline 中立回放（只读）");
   assert.ok(MAIN.includes('"session:history"'), "主进程应推 session:history");
   // 渲染侧：订阅 + 回放（错误分隔 + .is-replay 与实时行可区分；文本走早已立的 esc/Markdown 单一来源）。
   assert.ok(RENDERER.includes("d.onSessionHistory") && RENDERER.includes("onSessionHistory"), "渲染侧应订阅并处理会话恢复");
@@ -995,7 +1007,8 @@ test("Q-2：窗口化行模型（阈值 150 / 缓冲 30 / spacer / rAF 合帧）
     "切角色：有卡滚到卡、无卡到底部（U-1，定位助手）"
   );
   // 语义④回放惰性：整段包批量，行按需 build（长转录不一次性实体化/解析）。
-  assert.ok(/function replayHistory[\s\S]{0,1500}batchDepth \+= 1;/.test(RENDERER), "回放整段在批量里（不 per-row 滚动/布局）");
+  const replayBody = RENDERER.slice(RENDERER.indexOf("  function replayHistory("), RENDERER.indexOf("  /** 单条回放行"));
+  assert.ok(replayBody.indexOf("batchDepth += 1;") >= 0 && replayBody.indexOf("batchDepth += 1;") < replayBody.indexOf("appendReplayRow(pane") && replayBody.includes("finally") && replayBody.includes("batchDepth -= 1;"), "回放全部呈现被同一批量/finally包住（不 per-row 滚动/布局）");
   assert.ok(/function appendReplayRow[\s\S]{0,900}registerRow\(/.test(RENDERER), "回放行走惰性行表（build 在挂载时才跑）");
   // 批量收尾副作用（左树每批一次——原先每事件一次）。
   assert.ok(/function flushBatchSideEffects\(\) \{\s*if \(batchDepth > 0\) return;\s*renderRoleTree\(\);/.test(RENDERER), "左树重渲染每批至多一次");
@@ -1191,7 +1204,7 @@ test("D-1 修复：回放去重——同一份历史幂等（skip）、增长走
   // 渲染侧接线：replayHistory 走纯函数策略；skip 幂等返回；full+prev ⇒ 重建 pane；增量只回放尾巴。
   assert.ok(RENDERER.includes("UiLabels.replayPlan(prev, rows)"), "replayHistory 应经纯函数策略");
   assert.ok(/plan\.action === "skip"\) return;/.test(RENDERER), "skip ⇒ 幂等返回（不追加）");
-  assert.ok(/plan\.action === "full" && prev\) \{\n      pane = rebuildPane\(roleId\);/.test(RENDERER), "full+prev ⇒ 重建 pane（绝不追加第二份）");
+  assert.ok(/plan\.action === "full"\) \{[\s\S]{0,180}if \(oldList && oldList\.rows\.length\) pane = rebuildPane\(roleId\);/.test(RENDERER) && RENDERER.includes("preserveUncoveredRows(oldList, nextCounts)"), "full遇既有行必须重建并保留未覆盖内容（含首次live→history，不追加副本）");
   assert.ok(/var from = plan\.action === "append" \? plan\.from : 0;/.test(RENDERER), "增量只回放尾巴");
   assert.ok(/replayState\[roleId\] = \{ rows: rows/.test(RENDERER), "每次回放后记住状态（去重判据）");
   assert.ok(RENDERER.includes("replayState = Object.create(null);"), "去重状态随项目作废（resetPanes）");
@@ -1226,7 +1239,7 @@ test("P1-1 UI：待办「全文」展开与「撤回」——仅客户消息且�
   const IFACE = fs.readFileSync(path.resolve(HERE, "..", "..", "app", "desktop", "interface.ts"), "utf8");
   assert.ok(IFACE.includes("withdrawQueued") && IFACE.includes("manager.withdraw"), "Interface 透传至 SessionManager.withdraw");
   const SESS = fs.readFileSync(path.resolve(HERE, "..", "..", "app", "desktop", "session.ts"), "utf8");
-  assert.ok(SESS.includes("withdraw(roleId: string, id: string): WithdrawResult"), "SessionManager.withdraw 三态口径");
+  assert.ok(SESS.includes("withdraw(targetInput: string | SessionTarget, id: string): WithdrawResult"), "SessionManager.withdraw 三态口径");
   assert.ok(SESS.includes("该条已进入「进行中」，撤回无效"), "进行中撤回无效如实回错（绝不从执行里抽条）");
   assert.ok(SESS.includes("派发/回交属治理流）——只读，不可撤回"), "派发/回交只读口径（与非消息拒绝同语义）");
   assert.ok(SESS.includes("id: i.dedupKey, full: i.text"), "快照条目带 id/full（单一数据源）");
@@ -1238,7 +1251,7 @@ test("P1-2：LRU 淘汰跳过 busy + 正在开启者不淘汰；settled 后下�
   const SESS = fs.readFileSync(path.resolve(HERE, "..", "..", "app", "desktop", "session.ts"), "utf8");
   assert.ok(/if \(s\.busy\) continue; \/\/ 正在跑轮次的不淘汰/.test(SESS), "候选判据含 !busy（跳过在跑）");
   assert.ok(/keepRoleId !== undefined && id === keepRoleId\) continue;/.test(SESS), "正在开启的那一个也不淘汰（否则用户刚点的会话被自己回收）");
-  assert.ok(/await this\.evictBeyondLimit\(req\.roleId\); \/\/ 正在开启的这一个不淘汰/.test(SESS), "openInternal 传入 keepRoleId");
+  assert.ok(/await this\.evictBeyondLimit\(key\); \/\/ 正在开启的这一个不淘汰/.test(SESS), "openInternal 传入 keepRoleId");
   assert.ok(/void this\.evictBeyondLimit\(\);/.test(SESS), "settled 收口为「下一时机」（暂超限的账在此还）");
   assert.ok(/if \(oldestId === null\) return; \/\/ 无可回收者（全忙 \/ 只剩刚开启的）：暂超限/.test(SESS), "无可回收 ⇒ 暂超限（不掐断任何在跑任务）");
 });
@@ -1257,7 +1270,7 @@ test("P1-3：切换项目一次性防呆——有 busy 才出内联确认条（#
   assert.ok(RENDERER.includes('$("switch-confirm-cancel").addEventListener("click", hideSwitchConfirm);'), "取消=什么都不发生（仅隐藏）");
   assert.ok(/\$\("switch-confirm-go"\)\.addEventListener\("click", function \(\) \{[\s\S]{0,120}doImportProject\(\);/.test(RENDERER), "确认=走原导入流程（loadProject 首步 stopSession(null) 关闭全部即「会停止它们」的兑现）");
   assert.ok(
-    RENDERER.includes("if (swcf && !swcf.hidden) showSwitchConfirm();"),
+    RENDERER.includes("if (!backgroundDelivery && swcf && !swcf.hidden) showSwitchConfirm();"),
     "快照推送时刷新计数；归零自动收起（防呆不再有意义）"
   );
   assert.ok(INDEX.includes("不落聊天历史"), "注释写明口径（动作防呆，不是会话内容）");

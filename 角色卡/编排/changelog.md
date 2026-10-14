@@ -633,3 +633,7 @@
 **依赖与阻塞**：门禁引擎的 `classifyShell`（与规则集）**尚未落盘**。本步按方案签名**注入**依赖、未替其实现规则集（不属编排）；待其落盘，只需在 `buildShellGate` 注入即可接线，编排代码无须再改。
 
 **回归**：`node --test test/编排/shell-gate.test.ts` 15/15；全量 `node --test test/*/*.test.ts` 全绿。
+
+## 2026-10-14 O1 多运行时契约迁移
+
+客户已批准 ANS-RUNTIME-V2 revision 1 必要迁移，未扩写集。CLI/四件 Pipeline/私有 common 改走中立Model与Service、四引擎选择、隔离持久化和实际上下文；确认issuer以原signal拒绝迟到yes。本角色159/159 Pipeline、238/238回归、严格scoped tsc0；最新当前工作区全仓编译exit0（Claude/MCP/zod已可见）；B0正常依赖清单、默认Pi迁移/P1和整合尚待验。原始候选与路径见 [变更证据](docs/change/2026-10-14_change_multi-runtime-orchestration.md)。

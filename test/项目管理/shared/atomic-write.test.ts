@@ -16,7 +16,7 @@
 // 全部使用系统临时目录，**不留文件于仓库**，用完递归清理；不指向仓库根真实 `.env`。
 
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, open, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -184,6 +184,46 @@ test("② renameReplacingExisting 覆盖已存在目标成功（原语直测）"
     await renameReplacingExisting(b, a);
     assert.equal(await readFile(a, "utf8"), "BBB");
     assert.deepEqual(await readdir(dir), ["a.txt"], "源文件应已被移走（无残留）");
+  });
+});
+
+test("② 已中止的原子写与 rename 不产生临时文件或替换目标", async () => {
+  await withTmpDir(async (dir) => {
+    const target = path.join(dir, "target.txt");
+    const source = path.join(dir, "source.txt");
+    await writeFile(target, "old");
+    await writeFile(source, "new");
+    const controller = new AbortController();
+    controller.abort();
+    await assert.rejects(() => atomicWrite(target, "new", { signal: controller.signal }), { name: "AbortError" });
+    await assert.rejects(() => renameReplacingExisting(source, target, controller.signal), { name: "AbortError" });
+    assert.equal(await readFile(target, "utf8"), "old");
+    assert.equal(await readFile(source, "utf8"), "new");
+    assert.deepEqual((await readdir(dir)).sort(), ["source.txt", "target.txt"]);
+  });
+});
+
+test("② temp fsync 后中止：保留旧目标，清理未提交的完整 temp", async (t) => {
+  await withTmpDir(async (dir) => {
+    const target = path.join(dir, "target.txt");
+    await writeFile(target, "old");
+    const probe = await open(path.join(dir, "probe"), "wx");
+    const prototype = Object.getPrototypeOf(probe) as { sync(): Promise<void> };
+    const originalSync = prototype.sync;
+    await probe.close();
+    await rm(path.join(dir, "probe"));
+    const controller = new AbortController();
+    const injected = t.mock.method(prototype, "sync", async function(this: { sync(): Promise<void> }) {
+      await originalSync.call(this);
+      controller.abort();
+    });
+    try {
+      await assert.rejects(() => atomicWrite(target, "new", { signal: controller.signal }), { name: "AbortError" });
+    } finally {
+      injected.mock.restore();
+    }
+    assert.equal(await readFile(target, "utf8"), "old");
+    assert.deepEqual(await readdir(dir), ["target.txt"]);
   });
 });
 

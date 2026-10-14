@@ -101,13 +101,13 @@
       if (f.alreadyAnnounced === true) return { kind: "none", text: "" }; // 回放分隔行已说过
       return { kind: "recovered", text: "已从本地会话文件恢复（模型上下文一并恢复）。" };
     }
-    // fresh：真·新会话——**只有**「文件不存在/损坏」这一种情形才是「不会记得」。
+    // 来源未知时不推断恢复或新建；回放存在不证明模型上下文已恢复。
+    if (src !== "fresh") return { kind: "none", text: "" };
+    if (f.contextWarning) return { kind: "fresh", text: String(f.contextWarning) + " 以上为可读历史，模型上下文未恢复，请重新说明需求。" };
     if (f.hadHistory !== true) return { kind: "none", text: "" };
     return {
       kind: "fresh",
-      text: f.contextWarning
-        ? "本地会话文件损坏，未能恢复——已开新会话；模型不会记得以上历史，请重新说明需求。"
-        : "新会话（本地无可用会话文件）——以上为历史记录，模型不会记得；请重新说明需求。",
+      text: "新会话（本地无可用会话文件）——以上为历史记录，模型不会记得；请重新说明需求。",
     };
   }
 

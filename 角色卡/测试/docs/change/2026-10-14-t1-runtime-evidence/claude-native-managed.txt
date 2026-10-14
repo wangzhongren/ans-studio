@@ -1,0 +1,76 @@
+(node:38172) [CLAUDE_SDK_CAN_USE_TOOL_SHADOWED] Warning: canUseTool will not be invoked for: mcp__ans__native_probe. Bare allowedTools entries auto-approve the whole tool before the callback is consulted. To gate every tool call, use a PreToolUse hook; or remove the bare names from allowedTools so they fall through to canUseTool. Allow rules from settings files can also shadow the callback but are not visible here.
+(Use `node --trace-warnings ...` to show where the warning was created)
+{
+  "bundledCli": "2.1.299",
+  "sdk": "0.3.299",
+  "inputUuids": [
+    "ecffc2e2-a3b9-43b0-afb9-94c5cdcf32c0",
+    "94396974-c968-416e-891b-63ed20e2c250"
+  ],
+  "hooks": [
+    {
+      "event": "UserPromptSubmit",
+      "promptId": "0c558e9e-6e41-48c8-a60b-e6a19d3d8bb3",
+      "transportUuid": "ecffc2e2-a3b9-43b0-afb9-94c5cdcf32c0",
+      "contextIssued": false
+    },
+    {
+      "event": "PreToolUse",
+      "promptId": "0c558e9e-6e41-48c8-a60b-e6a19d3d8bb3",
+      "tool": "mcp__ans__native_probe",
+      "source": "sdk",
+      "contextIssued": true
+    },
+    {
+      "event": "UserPromptSubmit",
+      "promptId": "383fc418-9433-48a2-9c51-18729d537280",
+      "transportUuid": "94396974-c968-416e-891b-63ed20e2c250",
+      "contextIssued": false
+    },
+    {
+      "event": "PreToolUse",
+      "promptId": "383fc418-9433-48a2-9c51-18729d537280",
+      "tool": "mcp__ans__native_probe",
+      "source": "sdk",
+      "contextIssued": true
+    }
+  ],
+  "catalogs": [
+    {
+      "tools": [
+        "mcp__ans__native_probe"
+      ],
+      "servers": [
+        "ans"
+      ]
+    },
+    {
+      "tools": [
+        "mcp__ans__native_probe"
+      ],
+      "servers": [
+        "ans"
+      ]
+    }
+  ],
+  "handlerArguments": [
+    {
+      "probeTag": "changed-by-native-hook"
+    },
+    {
+      "probeTag": "changed-by-native-hook"
+    }
+  ],
+  "handlerToolCallIds": [
+    "native-ans-turn-1:toolu_loopback_0",
+    "native-ans-turn-2:toolu_loopback_2"
+  ],
+  "endpoints": [
+    "/v1/messages?beta=true",
+    "/v1/messages?beta=true",
+    "/v1/messages?beta=true",
+    "/v1/messages?beta=true"
+  ],
+  "externalApiCalls": 0,
+  "credentials": "fake-only"
+}

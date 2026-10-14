@@ -4,7 +4,7 @@
 // 回交只搬任务与证据，不转移角色身份或写权限；su 不向自己回交。
 // SessionEvent.kind 仍由 Pi 的冻结契约维护，handback 仅为编排附加事件。
 
-import type { SessionEvent, DispatchTaskPayload } from "../../provider/pi/session.ts";
+import type { RuntimeKind, ReportHandbackPayload, SessionEvent, DispatchTaskPayload } from "../../model/runtime.ts";
 import type { ProjectConfig } from "../../model/role.ts";
 import { createHash } from "node:crypto";
 import { createDiagnosticLogger } from "../shared/diagnostics.ts";
@@ -27,6 +27,7 @@ export interface TaskHandback {
   round?: number;
   /** 运行时提供的真实轮次标识，跨会话重开也不混淆。 */
   turnId?: string;
+  runtime?: RuntimeKind;
 }
 
 /**
@@ -36,13 +37,9 @@ export interface TaskHandback {
  * （`summary`/`evidence`/`status` 取报告值）；未调用则明确未报告。
  *
  * 形状与工具契约 `submit_report{ status, summary, evidence? }` 一致（契约家在 Pi适配器
- * `src/provider/pi/session.ts`；此处按**结构**一致对齐——编排不导入其内部实现，见 §6）。
+ * `src/model/runtime.ts`；此处按**结构**一致对齐——编排不导入其内部实现，见 §6）。
  */
-export interface TaskReport {
-  status: "completed" | "blocked";
-  summary: string;
-  evidence?: string[];
-}
+export type TaskReport = ReportHandbackPayload;
 
 /** 编排层回交事件（在会话 settle 时由编排发出）。 */
 export interface HandbackEvent {
@@ -71,7 +68,7 @@ function detailOf(ev: SessionEvent): Record<string, unknown> {
   return ev.detail !== null && typeof ev.detail === "object" ? ev.detail as Record<string, unknown> : {};
 }
 export function eventTurnId(ev: SessionEvent): string | undefined {
-  const id = detailOf(ev).turnId;
+  const id = ev.turnId ?? detailOf(ev).turnId;
   return typeof id === "string" && id !== "" ? id : undefined;
 }
 function writeEvidence(ev: SessionEvent): string | undefined {
@@ -299,6 +296,7 @@ export async function* withHandback(
           }
           handback.round = round;
           if (turnId !== undefined) handback.turnId = turnId;
+          if (ev.runtime !== undefined) handback.runtime = ev.runtime;
           opts.completed?.(turnId);
           log.record("handback.generated", { turnId, outcome, state: handback.status, reportSource: report === undefined ? "unreported" : "submit_report", count: handback.evidence.length });
           yield handbackEvent(handback);

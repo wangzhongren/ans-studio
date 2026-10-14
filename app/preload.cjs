@@ -26,28 +26,46 @@ contextBridge.exposeInMainWorld("desktop", {
   /** 发送一轮消息；开启后可反复调用（多轮聊天，不再确认）。
    *  **P0-1（2026-10-13 客户批准）**：`images` 为可选图片载荷（`[{type:"image", data:<base64>, mimeType}]`）——
    *  主进程按**真实字节重校验**（嗅探 + ≤5MB）后才送模型；渲染侧声明值不可信。 */
-  sendSession: (text, images) =>
-    ipcRenderer.invoke("session:send", { text, images: Array.isArray(images) ? images : [] }),
+  sendSession: (text, images, target, metadata) =>
+    ipcRenderer.invoke("session:send", { text, images: Array.isArray(images) ? images : [], target, metadata }),
 
   /** 关闭会话（B-2 **定向**）：传角色 id 只关该角色（历史留在界面上）；不传/null 关全部（换项目/退出）。 */
-  stopSession: (roleId) =>
-    ipcRenderer.invoke("session:stop", { roleId: roleId == null ? null : String(roleId) }),
+  stopSession: (roleId) => {
+    if (typeof roleId === "object" && roleId !== null) return ipcRenderer.invoke("session:stop", roleId);
+    if (roleId == null) return ipcRenderer.invoke("session:stop", { roleId: null });
+    return ipcRenderer.invoke("session:stop", { roleId: String(roleId) });
+  },
 
   /**
    * 撤回一条未投递的排队消息（P1-1，2026-10-13 客户裁定）：`id` = role-state 快照条目视图的 `id`。
    * 仅「客户消息」类、且仍**在队列中（未投递）**者可撤；成功回报 `{ok, summary}`；已「进行中」/派发/
    * 回交/不存在如实回报 `{ok:false, error}`——绝不假装撤掉。
    */
-  withdrawQueued: (roleId, id) =>
-    ipcRenderer.invoke("session:withdraw", { roleId: String(roleId == null ? "" : roleId), id: String(id == null ? "" : id) }),
+  withdrawQueued: (roleId, id) => {
+    let target = { roleId: String(roleId ?? "") };
+    if (typeof roleId === "object" && roleId !== null) target = roleId;
+    return ipcRenderer.invoke("session:withdraw", { ...target, id: String(id ?? "") });
+  },
 
   /** 停当前轮次（P0-2，2026-10-13 客户批准）：向该角色会话请求中止当前进行中的轮次。
    *  回报三态 `{ok, supported, error?}`——已请求停止 / 当前运行时不支持停止 / 停止失败：<error>；
    *  轮次仍以既有收尾事件结束（渲染侧如实一行，不造「已停止」假象）；重复点击幂等。 */
-  abortSession: (roleId) => ipcRenderer.invoke("session:abort", { roleId: String(roleId == null ? "" : roleId) }),
+  abortSession: (roleId) => {
+    if (typeof roleId === "object" && roleId !== null) return ipcRenderer.invoke("session:abort", roleId);
+    return ipcRenderer.invoke("session:abort", { roleId: String(roleId ?? "") });
+  },
 
   /** 保活中的角色 id 列表（B-2：左树「有活动会话」小圆点数据源）。纯读。 */
   listLiveSessions: () => ipcRenderer.invoke("session:live"),
+  listLiveSessionViews: () => ipcRenderer.invoke("session:live-views"),
+  getSessionHistory: (input) => ipcRenderer.invoke("session:history-get", input),
+  getRuntimeConfig: (runtime) => ipcRenderer.invoke("runtime-config:get", { runtime }),
+  saveRuntimeConfig: (input) => ipcRenderer.invoke("runtime-config:save", input),
+  onOperatorExpired: (cb) => {
+    const listener = (_event, payload) => cb(payload);
+    ipcRenderer.on("session:operator-expired", listener);
+    return () => ipcRenderer.removeListener("session:operator-expired", listener);
+  },
 
   /** 外部浏览器打开链接（B-1：Markdown 链接外开）。主进程/Interface 侧只放行 http/https；
    *  回报 `{ok, error?}`——不假装打开成功。 */
@@ -120,14 +138,14 @@ contextBridge.exposeInMainWorld("desktop", {
   getPiConfig: () => ipcRenderer.invoke("pi-config:get"),
 
   /**
-   * 保存 Pi 配置到仓库根 `.env`（只改面板键、原子写；成功后主进程重载 env，下一会话生效）。
+   * 保存 Pi 配置到仓库根 `.env`（只改面板键、原子写；成功后在安全点应用，新输入重建会话生效）。
    * 入参 `updates` 为 `{ 键: 值 }`（只含面板键）；回报 `{ ok, appliedKeys, error? }`——**只含键名，不含值**。
    */
   savePiConfig: (updates) => ipcRenderer.invoke("pi-config:save", { updates }),
 
   /**
    * 订阅会话事件流；返回取消订阅函数。
-   * **入参为带 `roleId` 信封的 `{roleId, event}`**（B-2：多会话并存——渲染侧按 `roleId` 分发到该角色的
+   * **入参为 `{projectRoot,roleId,runtime,event}` 信封**（B-2：多会话并存——渲染侧按 `roleId` 分发到该角色的
    * 聊天流；不带标识会串消息）。`event` 为编排事件（含 `handback` 回交，§10.8）。
    * **Q-1（2026-10-12）**：生产走 **合帧批量**通道 `session:events`（回调收到**信封数组**，顺序不变）；
    * 同时保留单发 `session:event`（兼容既有探针/直发路径——回调收到单个信封）。渲染侧两者同解。
@@ -157,10 +175,9 @@ contextBridge.exposeInMainWorld("desktop", {
   },
 
   /**
-   * 订阅「会话历史已恢复」（D-1，2026-10-12）：项目导入/重载后，主进程对每个角色只读解析
-   * `<project>/.ans/sessions/<roleId>/` 的最近会话，把**规范化后的界面行**推来
-   * （`{roleId, projectRoot, rows:[{kind:user|assistant|tool|denied, text, at}], error}`）——
-   * 渲染侧回放进**该角色**的聊天流（附「会话已恢复」分隔提示）。渲染进程**不碰 Pi SDK/JSONL**。
+   * 订阅「会话历史已恢复」（D-1，2026-10-12）：项目导入/重载后，主进程按项目/角色/runtime 读取 ANS 回放，把**规范化后的界面行**推来
+   * （`{roleId,projectRoot,runtime,rows:[{kind:user|assistant|tool|denied,text,at}],error,skipped}`）——
+   * 渲染侧回放进**该角色**的聊天流（回放不证明模型上下文已恢复）。渲染进程**不碰 Pi SDK/JSONL**。
    * 返回取消订阅函数。
    */
   onSessionHistory: (cb) => {

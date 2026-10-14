@@ -1,12 +1,12 @@
 # Pi适配器功能导航
 
-本角色负责的 **Pi 运行时适配器系统功能**导航（功能名称 / 一句话用途 / 当前状态 / 文档链接）。本角色把 Pi 的 TypeScript SDK 包成 ANS CLI 的运行时适配器，实现 `RuntimeAdapter` 接口供编排使用；判定逻辑属门禁引擎，本角色只负责把它接到 Pi 的工具与 `tool_call` 钩子上。每份功能的稳定说明（当前流程 + 流程图 + 演变历史）将按约定在验收后建立在 `docs/feature/<feature-id>.md`——**当前待补**（`docs/feature/` 尚未建立）；本表先链本角色 `docs/` 下**实际存在**的当次变更/修复记录与 changelog 条目，代码位置以 `src/provider/pi/`、`src/common/pi-adapter/` 为准。
+当前 Pi 功能与完整流程见 [使用 Pi 执行受治理角色任务](docs/feature/pi-runtime.md)，接口见 [api-spec](api-spec.md)。ANS-RUNTIME-V2 下中立类型、schema 与治理工具的唯一属主为运行时核心；Pi 只负责 SDK 转换、执行前工具白名单、资源封闭、原生会话与生命周期。下表保留既有功能的历史导航，生产工具执行均已迁到核心。
 
 | 功能 | 一句话用途 | 状态 | 文档 |
 | --- | --- | --- | --- |
-| 运行时适配器与会话生命周期 | `RuntimeAdapter`/`RoleSession` 接口与 `createAgentSession` 装配封闭（显式 resourceLoader/settingsManager/sessionManager/modelRuntime，不读写 `~/.pi`；SettingsManager.inMemory 钉住压缩缺省）；会话持久化恢复（D-1，`<项目>/.ans/sessions/<角色>/`、文件惰性落盘、目录不可写时明确报错不退化为不落盘）；`abort` 停当前轮（P0-2，可选成员）；图片 prompt 透传（K-2） | 已实现 | [session.ts](../../src/provider/pi/session.ts)、[real-adapter.ts](../../src/common/pi-adapter/real-adapter.ts)；[P0-2 变更记录](docs/change/2026-10-13_change_p02-abort-session.md)、[changelog](changelog.md)（2026-10-11、2026-10-13 条目） |
+| 运行时适配器与会话生命周期 | `RuntimeAdapter`/`RoleSession` 接口与 `createAgentSession` 装配封闭（显式 resourceLoader/settingsManager/sessionManager/modelRuntime，不读写 `~/.pi`；SettingsManager.inMemory 钉住压缩缺省）；会话持久化恢复（D-1，生产 `<项目>/.ans/sessions/<角色>/pi/native/`、旧档复制迁移、文件惰性落盘、目录不可写时明确报错不退化为不落盘）；`abort` 停当前轮（P0-2，可选成员）；图片 prompt 透传（K-2） | 已实现 | [session.ts](../../src/provider/pi/session.ts)、[real-adapter.ts](../../src/common/pi-adapter/real-adapter.ts)；[P0-2 变更记录](docs/change/2026-10-13_change_p02-abort-session.md)、[changelog](changelog.md)（2026-10-11、2026-10-13 条目） |
 | 模型接入配置（contextWindow 与网关 500 修复） | contextWindow 解析（默认 32768，来源 explicit/env/default，非法值抛错）；模板克隆显式收窄 compat 五项（`tool_removal`/`tool_addition` 块不再生成——网关 500 根因修复）＋存量污染会话文件检测防御（跳过或如实新建，不静默） | 已实现 | [provider-config.ts](../../src/common/pi-adapter/provider-config.ts)；[changelog](changelog.md)（2026-10-11、2026-10-12 条目） |
-| 冻结契约家（跨角色注入点） | Operator / CustomerInput / ReportHandback / DispatchTask / ShellVerdict / `PromptImage` 等型的单一来源——编排/桌面只按结构类型对接，禁跨角色导入私有 `common/`；`FinalizeStatus`/`FinalizeResult` 保留（编排仍消费） | 已实现 | [session.ts](../../src/provider/pi/session.ts)；[changelog](changelog.md)（2026-10-11 T20、2026-10-12 条目） |
+| 中立契约旧路径兼容 | Operator / CustomerInput / ReportHandback / DispatchTask / ShellVerdict / `PromptImage` 等型的单一来源已迁到 Model；Pi 仅转出——编排/桌面按中立契约对接，禁跨角色导入私有 `common/`；`FinalizeStatus`/`FinalizeResult` 保留（编排仍消费） | 已实现 | [session.ts](../../src/provider/pi/session.ts)；[changelog](changelog.md)（2026-10-11 T20、2026-10-12 条目） |
 | 受治理工具集与治理扩展 | read/write/edit 经 WriteGate 判定、写根恒等于项目根、未配置写根 fail-closed（只判定不落盘）；`run_shell` 独立 ShellGate、未注入即不注册、spawn 不经 shell 且剥离凭据环境变量、cwd 钉在项目根；扩展层 `tool_call` 钩子对 run_shell 为能力级 kill-switch | 已实现 | [tools.ts](../../src/provider/pi/tools.ts)；[changelog](changelog.md)（2026-10-11 T3/T7/T8a 条目） |
 | 写类工具同批顺序化（W-1 丢写修复） | `write_file`/`edit_file` 钉 `executionMode:"sequential"`，防同批并行下 edit 抢跑 write 丢写（A/B 实测承重；含写类工具批整批转顺序） | 已实现 | [changelog](changelog.md)（2026-10-12 W-1 条目）、[write-sequencing.test.ts](../../test/pi-adapter/write-sequencing.test.ts) |
 | 交互工具族 `request_confirmation`/`request_choice` | 客户确认制：未注入客户通道即不注册；等待缺省**不设超时**且不被每轮硬超时掐断（InteractionGate + withPausableTimeout，实证承重）；confirm 的 preview 必须列出将写出的具体路径（列路径 ≠ 获准，获准只认 `confirmed:true`）；同批写抢跑经 `executionMode` 端到端实测钉住 | 已实现 | [交互工具族变更记录](docs/change/2026-10-12_change_governed-interaction-tools.md)；[changelog](changelog.md)（2026-10-12 条目） |
@@ -20,6 +20,6 @@
 
 ## 说明
 
-- 稳定功能文档（`docs/feature/<feature-id>.md`）**待建**——本表只链**实际存在**的文件（当次变更/修复记录、changelog、代码与测试），不留失效链接；后续建好功能文档时回链本表。
-- 本角色不自编编排/桌面/门禁引擎功能；跨角色事项（writeSet/F4 发行、交互卡渲染、判定规则集）不在本表重复。已删除功能的墓碑用例是本角色「不回归」的一部分（见 finalize_bootstrap 行）。
-- 提供方层只实现对接口径；遗留限制与未核实事项见 [memo.md](memo.md)，本表不重复。
+- 表中旧工具、schema 与 fs-write 记录保留为历史说明；当前生产处理器与权限保证见 [运行时核心](../运行时核心/docs/feature/runtime-core.md)。旧 `src/provider/pi/tools.ts` 是显式转出的兼容 facade，旧 fs-write 不在生产工具执行链。
+- P1 当前迁移与最终验证见 [原始记录](docs/change/2026-10-14_change_pi-injected-runtime.md)。没有真实模型请求，也没有提交或推送。
+- 原生恢复成功是核心 resumed；恢复失败重建是 recovered+warning。桌面旧用语须显式转换，ANS 回放不代表恢复模型上下文。

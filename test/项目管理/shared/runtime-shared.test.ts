@@ -12,8 +12,10 @@ import { test } from "node:test";
 
 import {
   RUNTIME_KINDS,
+  RUNTIME_LABELS,
   DEFAULT_RUNTIME,
   PI_CREDENTIAL_ENV_VARS,
+  RUNTIME_CREDENTIAL_ENV_VARS,
   resolveSkillRoot,
 } from "../../../src/common/shared/runtime-shared.ts";
 
@@ -29,7 +31,8 @@ import { resolveSkillRoot as 桌面ResolveSkillRoot } from "../../../app/desktop
 
 test("RuntimeKind 取值单一来源：shared 与编排旧副本一致", () => {
   assert.deepEqual([...RUNTIME_KINDS], [...编排RUNTIME_KINDS]);
-  assert.deepEqual([...RUNTIME_KINDS], ["demo", "pi"]);
+  assert.deepEqual([...RUNTIME_KINDS], ["demo", "pi", "codex", "claude"]);
+  assert.deepEqual(RUNTIME_KINDS.map((runtime) => RUNTIME_LABELS[runtime]), ["演示", "Pi", "Codex", "Claude"]);
 });
 
 test("RuntimeKind 取值单一来源：shared 与装配旧副本（RUNTIME_VALUES / DEFAULT_RUNTIME）一致", () => {
@@ -51,6 +54,13 @@ test("PI_CREDENTIAL_ENV_VARS：shared 与装配、Pi适配器两处旧副本**�
 
 test("resolveSkillRoot：优先 ANS_SKILL_ROOT（取非空值）", () => {
   assert.equal(resolveSkillRoot({ ANS_SKILL_ROOT: "/x/skill" }), "/x/skill");
+});
+
+test("跨引擎秘密键包含旧 Pi 凭据与 SDK CODEX_API_KEY，保持 Pi 旧名单兼容", () => {
+  for (const key of PI_CREDENTIAL_ENV_VARS) assert.ok(RUNTIME_CREDENTIAL_ENV_VARS.includes(key));
+  assert.ok(RUNTIME_CREDENTIAL_ENV_VARS.includes("CODEX_API_KEY"));
+  assert.ok(RUNTIME_CREDENTIAL_ENV_VARS.includes("CODEX_ACCESS_TOKEN"));
+  assert.ok(RUNTIME_CREDENTIAL_ENV_VARS.includes("CLAUDE_CODE_OAUTH_TOKEN"));
 });
 
 test("resolveSkillRoot：缺省回退默认技能目录，且与桌面旧副本同值", () => {

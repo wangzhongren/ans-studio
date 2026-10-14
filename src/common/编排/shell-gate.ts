@@ -47,7 +47,7 @@
 // —— fail-closed 三条退路（§7.5，第一步承担的） ——
 //   1. 规则集加载失败 / 解析报错 → **整条命令拒绝**（绝不「规则没了就一律放行」）；
 //   2. 分类函数缺失 / 抛错 → **拒绝**；
-//   3. 审核**超时**（超时包装，仿 pi-adapter/timeout.ts）→ **拒绝**。
+//   3. 审核**超时**（编排 shell-deadline）→ **拒绝**。
 //
 // —— su 只读档（`readonlyOnly`，客户裁定 2026-10-12：「su 也要有 shell，但是只读」） ——
 // 同一装配面增可选 `readonlyOnly`——`true` 时只映射 **(c) 层确定性白名单**：allow → 照旧放行（`c-allow`、
@@ -61,13 +61,15 @@
 // 并行开发中）。本模块经**注入**依赖它（形参 `classifyShell`），**不含任何规则集**——规则集内容不属编排。
 
 import type {
+  ShellVerdictFn,
+  ShellVerdictPayload,
   ShellGate,
   ShellReviewRequest,
   ShellReviewResult,
   OperatorPrompt,
   OperatorOutcome,
   OperatorChannelFn,
-} from "../../provider/pi/session.ts";
+} from "../../model/runtime.ts";
 import type { BoundarySection1 } from "../../model/boundary.ts";
 import type { ShellClass, ShellRules } from "../../model/decision.ts";
 import {
@@ -76,7 +78,7 @@ import {
   withTimeout,
   isTimeoutError,
   readTimeoutMs,
-} from "../../common/pi-adapter/timeout.ts";
+} from "./shell-deadline.ts";
 import {
   buildShellAuditGate,
   createFileAuditSink,
@@ -90,7 +92,7 @@ import {
 import { normalizeArgv } from "../shared/argv-primitives.ts";
 
 // —— 契约（任务已定死，照做） ——
-// 类型定义归 Pi 适配器的 src/provider/pi/session.ts（工具层与扩展层按同一形状编译）；此处按其形状
+// 类型定义归运行时核心的 src/model/runtime.ts（工具层与扩展层按同一形状编译）；此处按其形状
 // 引用并给出任务里的入参名别名，**不另立第二份定义**（避免形状漂移）。
 
 export type { ShellGate, ShellReviewResult };
@@ -163,7 +165,7 @@ export type PmAskFn = (
 // **通道由注入提供**：CLI 端（`src/interface/cli/`，本角色）读 stdin 打印确认；桌面端由**桌面应用**角色提供对话框。
 // 本模块只**接收**这个注入点——不含任何界面代码。
 //
-// **三型的单一来源在 §4 冻结契约家 `src/provider/pi/session.ts`（T21 起）**：`OperatorPrompt` / `OperatorOutcome` /
+// **三型的单一来源在 §4 冻结契约家 `src/model/runtime.ts`（T21 起）**：`OperatorPrompt` / `OperatorOutcome` /
 // `OperatorChannelFn` 原先定义在本文件，导致桌面应用只能**逐字镜像**（工程法案 §6 禁止跨角色导入他人私有 `common/`）。
 // 经 PM 裁定挪入 Provider 边界（与本模块早先放那里的 `ShellGate` / `ShellReviewRequest` / `ShellReviewResult` 同址）。
 // 本文件**不再定义**任何 operator 形状——只**再导出**其名以保住既有消费方（含 `test/编排/`、`operator-channel.ts`）
@@ -175,7 +177,7 @@ import { createDiagnosticLogger } from "../shared/diagnostics.ts";
 
 
 // —— 常量 ——
-// 审核硬超时默认值与环境变量：复用 pi-adapter/timeout.ts 的**规范常量**（与工具层同一名称、同一口径），
+// 审核硬超时由本角色 shell-deadline 维护，保留既有操作设置名，
 // 不另立第二套 env（`ANS_PI_SHELL_REVIEW_TIMEOUT_MS`，默认 120000ms）。超时 = 拒绝。
 
 // 触发分支（§7.6「触发分支」字段取值）。分三类：c 层终结 / b 层终结 / a 层（含升级链）。
@@ -225,16 +227,8 @@ export const REASON_B_UNPARSEABLE =
 /** 审读结论工具名（Pi适配器在 `shellVerdict` 注入时注册；未注入 ⇒ 工具不存在）。 */
 export const SHELL_VERDICT_TOOL_NAME = "report_shell_verdict";
 
-/** 审读结论（工具参数——结构化，字段与取值域固定）。 */
-export interface ShellVerdictPayload {
-  /** 结论：allow = 放行；deny = 拒绝；unsure = 拿不准（按既有链升级到 (a)）。 */
-  verdict: "allow" | "deny" | "unsure";
-  /** 可选：简述理由（审计/呈现用）。 */
-  reason?: string;
-}
-
-/** 「审读结论」注入点形状（审读会话专用；调用即把结构化结论交给编排）。 */
-export type ShellVerdictFn = (verdict: ShellVerdictPayload) => void | Promise<void>;
+// Compatibility aliases; the neutral Model owns these public shapes.
+export type { ShellVerdictPayload, ShellVerdictFn };
 
 /**
  * 校验工具参数（**结构化但防御**：工具参数由模型填写，仍须过一遍取值域）：

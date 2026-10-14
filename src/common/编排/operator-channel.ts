@@ -32,7 +32,7 @@ import type {
   CustomerInputRequest,
   OperatorOutcome,
   OperatorPrompt,
-} from "../../provider/pi/session.ts";
+} from "../../model/runtime.ts";
 
 /** 认作「放行」的输入（小写比较）。 */
 const DEFAULT_ALLOW_INPUTS = ["y", "yes", "是", "放行", "allow"];

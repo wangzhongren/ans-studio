@@ -13,12 +13,14 @@ import type { ProjectConfig } from "../../src/model/role.ts";
 // 会话事件流类型：编排把 `RoleSessionHandle.events()` 放宽为 `OrchestrationEvent`（既有 `SessionEvent`
 // + 编排在 `settled` 时追加的 `handback` 回交事件，设计 §10.8）。外推时套上 `roleId` 信封
 // （`SessionEventEnvelope`，B-2）——**类型从编排/本角色只读导入、不复制形状**。
-import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, DispatchTaskFn, PromptImage, PromptOptions } from "../../src/provider/pi/session.ts";
+import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, DispatchTaskFn, PromptImage, PromptOptions } from "../../src/model/runtime.ts";
 
 import { listProject as realListProject } from "../../src/service/role/resolve-role.ts";
 import {
   openRoleSession as realOpenRoleSession,
   createPiAdapterFactory as realCreatePiAdapterFactory,
+  createRuntimeAdapterFactory as realCreateRuntimeAdapterFactory,
+  type RuntimeAdapterFactoryBuilder, type RuntimeAdapterFactoryOptions,
 } from "../../src/pipeline/orchestration/run-role.ts";
 import { createChatDemoAdapter } from "./chat-adapter.ts";
 
@@ -30,6 +32,9 @@ import {
 import {
   SessionManager,
   type SessionOpenRequest,
+  type SessionTarget,
+  type SessionMessageMetadata,
+  type SessionManagerDeps,
   type OpenResult,
   type SendResult,
   type StopResult,
@@ -38,7 +43,7 @@ import {
 } from "./session.ts";
 // I-1 补丁（2026-10-12 客户重发授权）：(c) 规则集实件的形状与构造（**只读转出**——形状 `Omit` 自编排
 // `AssembleShellGateOptions`，见 operator-channel.ts；本层不另立第二份）。
-import type { DesktopShellArming } from "./operator-channel.ts";
+import type { DesktopOperatorChannelFn, DesktopShellArming } from "./operator-channel.ts";
 // su 只读档（客户裁定 2026-10-12：「su 也要有 shell，但是只读」）：只读档装配选项形状的**单一来源**在编排
 // （`shell-arming.ts::AssembleReadonlyShellGateOptions`）——只读导入其类型（运行期擦除），本层不另立第二形状。
 import type { AssembleReadonlyShellGateOptions } from "../../src/pipeline/orchestration/shell-arming.ts";
@@ -63,7 +68,13 @@ import {
   type PiConfigEnv,
 } from "./pi-config.ts";
 
+import { isRuntimeKind, getRuntimeConfig, saveRuntimeConfig, applyRuntimeConfig, type RuntimeConfigView, type RuntimeConfigSaveResult, type ProfileApplication } from "./runtime-config.ts";
+import { getSessionHistory, type SessionHistoryView } from "./runtime-history.ts";
+import type { RuntimeKind } from "../../src/model/runtime.ts";
+
 export interface RoleView {
+  readonly group?: string;
+  readonly groupDuty?: string;
   roleId: string;
   cardPath: string;
   boundaryPath: string;
@@ -126,7 +137,7 @@ export interface DesktopDeps {
       /** 派发任务能力（H-1）：仅内置治理角色（su）会话注入（见 session.ts::routeDispatch）。 */
       dispatchTask?: DispatchTaskFn;
       /** (a) 操作者确认通道（I-1 arm）：经本层透传（**仅项目角色**消费——见 session.ts）。 */
-      shellOperatorChannel?: OperatorChannelFn;
+      shellOperatorChannel?: DesktopOperatorChannelFn;
       /** (c) 规则集实件（I-1 补丁，2026-10-12）：经本层透传（**仅项目角色**消费——与 (a) 同判据走三层链）。 */
       shellArming?: DesktopShellArming;
       /** **su 只读档（客户裁定 2026-10-12）**：经本层透传（**仅内置治理角色（su）**消费——session.ts
@@ -135,6 +146,8 @@ export interface DesktopDeps {
     },
     deps: { createAdapter: (gate: WriteGate) => RuntimeAdapter },
   ) => Promise<RoleSessionHandle>;
+  createRuntimeAdapterFactoryFn?: RuntimeAdapterFactoryBuilder;
+  runtimeOptions?: RuntimeAdapterFactoryOptions;
   createPiAdapterFactoryFn?: (project: ProjectConfig, shellGate?: ShellGate) => (gate: WriteGate) => RuntimeAdapter;
   createDemoAdapterFn?: (opts: { gate: WriteGate; boundary: BoundarySection1 }) => RuntimeAdapter;
   buildProjectConfigFn?: typeof realBuildProjectConfig;
@@ -161,7 +174,7 @@ export interface DesktopDeps {
    * 主进程用 `createDesktopOperatorChannel`（应用内确认卡：命令原文 + 放行/拒绝，拒绝为默认与取消项）
    * 构造后注入；**测试/e2e 可注入替身**。
    */
-  shellOperatorChannel?: OperatorChannelFn;
+  shellOperatorChannel?: DesktopOperatorChannelFn;
   /**
    * **(c) 规则集实件（I-1 补丁，2026-10-12 客户重发授权）**——与 `shellOperatorChannel` **同一透传面**：
    * 主进程 arm 时经 `operator-channel.ts::buildDesktopShellArming()` 构造（**只读导入**门禁引擎经 Service
@@ -197,13 +210,7 @@ export interface DesktopDeps {
    * 变化时（开/停/开跑/一轮结束/入队/出队）推送；主进程原样透传 `session:role-state`。缺省 ⇒ 界面无队列/忙态显示。
    * 测试可注入收集器。
    */
-  emitRoleState?: (info: {
-    roleId: string;
-    busy: boolean;
-    summaries: string[];
-    queue: { kind: string; sourceRoleId: string; summary: string; at: string }[];
-    running: { kind: string; sourceRoleId: string; summary: string; at: string } | null;
-  }) => void;
+  emitRoleState?: SessionManagerDeps["emitRoleState"];
   /**
    * Pi 配置面板的目标 `.env` 路径（设计 §11.2）——**可注入**。缺省 = 仓库根 `.env`
    * （`resolveRepoEnvPath()`，与 CLI `--env-file=.env` 同一文件）。**测试/e2e 必须注入系统临时目录下的
@@ -229,23 +236,27 @@ export interface DesktopInterface {
    * 一律不可信**：本层按**真实字节重校验**（base64 严格解码 → 魔数嗅探定类型 → ≤5MB），全过才组
    * `PromptOptions` 下发；任一张不合格 ⇒ **整条拒发**（fail-closed：绝不「丢图发文字」让客户以为图已送达）。
    */
-  sendSession(input: { text: string; images?: unknown }): Promise<SendResult>;
+  sendSession(input: { text: string; images?: unknown; target?: SessionTarget; metadata?: SessionMessageMetadata }): Promise<SendResult>;
   /** 关闭会话（B-2 **定向**：给定 `roleId` 只关它、历史留在界面上；缺省/`null` 关全部，供换项目/退出）。 */
-  stopSession(input?: { roleId?: string | null }): Promise<StopResult>;
+  stopSession(input?: { roleId?: string | null; projectRoot?: string; runtime?: RuntimeKind }): Promise<StopResult>;
   /**
    * **撤回一条未投递的排队消息（P1-1，2026-10-13 客户裁定）**：`id` = role-state 快照条目视图的 `id`。
    * 仅「客户消息」类、仅在队列中（未投递）者可撤；已「进行中」/派发/回交/不存在 ⇒ 如实回错
    * （`WithdrawResult`）。成功返回 `summary` 供聊天流如实一行「已撤回排队消息：〈摘要〉」。
    */
-  withdrawQueued(input: { roleId: string; id: string }): Promise<WithdrawResult>;
+  withdrawQueued(input: { roleId: string; id: string; projectRoot?: string; runtime?: RuntimeKind }): Promise<WithdrawResult>;
   /**
    * **停当前轮次（P0-2 UI，2026-10-13 客户批准）**：向该角色的会话句柄请求中止当前进行中的轮次。
    * **三态如实回传**（`RoleSessionAbortResult`：已请求停止 / 当前运行时不支持停止 / 停止失败）——
    * 轮次仍以既有 `settled` 收尾，本层不制造「已停止」假象；重复点击幂等（无在飞轮次 = no-op）。
    */
-  abortSession(input: { roleId: string }): Promise<RoleSessionAbortResult>;
+  abortSession(input: SessionTarget): Promise<RoleSessionAbortResult>;
   /** 保活中的角色 id 列表（B-2：左树「有活动会话」小圆点的数据源；纯读、无副作用）。 */
   listLiveSessions(): Promise<string[]>;
+  listLiveSessionViews(): Promise<{ projectRoot: string; roleId: string; runtime: RuntimeKind; profileRevision: number }[]>;
+  getSessionHistory(input: SessionOpenRequest): Promise<SessionHistoryView>;
+  getRuntimeConfig(runtime: RuntimeKind): Promise<RuntimeConfigView>;
+  saveRuntimeConfig(input: { runtime: RuntimeKind; updates: unknown }): Promise<RuntimeConfigSaveResult>;
   /**
    * 外部浏览器打开一个链接（B-1：Markdown 链接外开）。**仅 http/https**（Interface 层校验——
    * 渲染进程输入不可信）；成功与否如实返回，不假装成功。
@@ -282,15 +293,18 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   const savePiConfigFn = deps.savePiConfigFn ?? realSavePiConfig;
   const envFilePath = deps.envFilePath ?? resolveRepoEnvPath();
 
+  const pendingProfiles = new Set<RuntimeKind>();
+  const application = (runtime: RuntimeKind): ProfileApplication => {
+    if (pendingProfiles.has(runtime) || manager.hasStaleProfile(runtime)) {
+      if (manager.hasBusyRuntime(runtime)) return "after-active-turn";
+      return "next-session";
+    }
+    return "current";
+  };
   const listingCache = new Map<string, ProjectListing>();
 
   /** 某角色是否为主入口角色（据门禁引擎给的 `primaryRoleId`，**不硬编码 "su"**）。 */
-  const isPrimaryRole = (roleId: string): boolean => {
-    for (const l of listingCache.values()) {
-      if (l.primaryRoleId === roleId) return true;
-    }
-    return false;
-  };
+  const isPrimaryRole = (projectRoot: string, roleId: string): boolean => listingCache.get(projectRoot)?.primaryRoleId === roleId;
 
   // 会话事件外推：先原样转发（主进程推 `session:event`；B-2 起为**带 `roleId` 信封**的 `SessionEventEnvelope`）；
   // 再在「**主入口角色**一轮结束（`settled`）」时触发「项目可能已变」信号（→ 主进程推 `project:changed` →
@@ -298,7 +312,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   // 「默认活动的那个是谁」）。本层只转达信号，**不判定**写入是否发生（判定唯一来自门禁引擎）。
   const emitSessionEvent = (envelope: SessionEventEnvelope): void => {
     deps.emitEvent(envelope);
-    if (envelope.event.kind === "settled" && isPrimaryRole(envelope.roleId)) {
+    if (envelope.event.kind === "settled" && isPrimaryRole(envelope.projectRoot, envelope.roleId)) {
       deps.emitProjectChanged?.();
       // O-1（2026-10-12）：su 一轮结束 = 「边界可能刚被 su 改过」的**可信时机**——扫一遍活会话的边界快照，
       // 陈旧者作废重建（内部逐会话隔离、绝不上抛；在跑的轮次跳过）。fire-and-forget，不阻塞事件外推。
@@ -306,9 +320,20 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     }
   };
 
+  let runtimeFactory = deps.createRuntimeAdapterFactoryFn;
+  if (runtimeFactory === undefined && deps.createPiAdapterFactoryFn === undefined && deps.createDemoAdapterFn === undefined) runtimeFactory = realCreateRuntimeAdapterFactory;
+
   const manager = new SessionManager({
     openRoleSession: openRoleSessionFn,
     createPiAdapterFactory: createPiAdapterFactoryFn,
+    createRuntimeAdapterFactory: runtimeFactory,
+    runtimeOptions: deps.runtimeOptions,
+    prepareRuntimeProfile: async (runtime) => {
+      if (!pendingProfiles.has(runtime)) return;
+      if (runtime === "pi" && manager.hasBusyRuntime("pi")) throw new Error("Pi 的旧轮次仍在执行，新配置将在其结束后应用。消息可继续排队。");
+      await applyRuntimeConfig(runtime, envFilePath, deps.piConfigEnv ?? process.env);
+      pendingProfiles.delete(runtime);
+    },
     createDemoAdapter: createDemoAdapterFn,
     buildProjectConfig: buildProjectConfigFn,
     getListing: (root) => listingCache.get(root),
@@ -359,7 +384,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
             // 文档索引失败不致命：如实留空。
           }
         }
-        roles.push({
+        let roleView: RoleView = {
           roleId: r.roleId,
           cardPath: r.cardPath,
           boundaryPath: r.boundaryPath,
@@ -368,7 +393,10 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           builtIn: r.builtIn === true,
           changelog,
           docs,
-        });
+        };
+        if (r.group !== undefined) roleView = { ...roleView, group: r.group };
+        if (r.groupDuty !== undefined) roleView = { ...roleView, groupDuty: r.groupDuty };
+        roles.push(roleView);
       }
       return {
         projectRoot: listing.projectRoot,
@@ -381,17 +409,18 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     },
 
     async openSession(input): Promise<OpenResult> {
+      if (!input || typeof input.projectRoot !== "string" || typeof input.roleId !== "string" || !isRuntimeKind(input.runtime)) return { ok: false, error: "会话请求须指定项目、角色与运行时。" };
       return manager.open(input);
     },
 
-    async sendSession(input: { text: string; images?: unknown }): Promise<SendResult> {
+    async sendSession(input: { text: string; images?: unknown; target?: SessionTarget; metadata?: SessionMessageMetadata }): Promise<SendResult> {
       const text = input && typeof input.text === "string" ? input.text : "";
       // —— P0-1：**主进程重校验**（渲染侧报的图一律不可信；以真实字节为准——K-2 同一口径）——
       // 逐张：严格 base64 解码 → 魔数嗅探定类型（声明 mime 不作数）→ ≤5MB；**全过才放行**，
       // 任一张不合格 ⇒ 整条拒发（fail-closed：绝不「丢图发文字」让客户以为图已送达）。
       const rawImages = input && Array.isArray(input.images) ? input.images : [];
       if (rawImages.length === 0) {
-        return manager.send(text);
+        return manager.send(text, undefined, input?.target, input?.metadata);
       }
       const cleaned: PromptImage[] = [];
       for (const it of rawImages) {
@@ -413,25 +442,42 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         }
         cleaned.push({ type: "image", data: typeof o.data === "string" ? o.data : "", mimeType: sniffed });
       }
-      // 组**契约形状** `PromptOptions`（单一来源 `src/provider/pi/session.ts`）——之后整包同一引用透传。
+      // 组**契约形状** `PromptOptions`（单一来源 `src/model/runtime.ts`）——之后整包同一引用透传。
       const opts: PromptOptions = { images: cleaned };
-      return manager.send(text, opts);
+      return manager.send(text, opts, input?.target, input?.metadata);
     },
 
-    async stopSession(input?: { roleId?: string | null }): Promise<StopResult> {
+    async stopSession(input?: { roleId?: string | null; projectRoot?: string; runtime?: RuntimeKind }): Promise<StopResult> {
       const roleId = input && typeof input.roleId === "string" ? input.roleId : null;
-      return manager.stop(roleId);
+      if (roleId === null) return manager.stop(null);
+      return manager.stop({ ...input, roleId });
     },
 
-    async withdrawQueued(input: { roleId: string; id: string }): Promise<WithdrawResult> {
+    async withdrawQueued(input: { roleId: string; id: string; projectRoot?: string; runtime?: RuntimeKind }): Promise<WithdrawResult> {
       const roleId = input && typeof input.roleId === "string" ? input.roleId : "";
       const id = input && typeof input.id === "string" ? input.id : "";
-      return manager.withdraw(roleId, id);
+      return manager.withdraw({ ...input, roleId }, id);
     },
 
-    async abortSession(input: { roleId: string }): Promise<RoleSessionAbortResult> {
+    async abortSession(input: SessionTarget): Promise<RoleSessionAbortResult> {
       const roleId = input && typeof input.roleId === "string" ? input.roleId : "";
-      return manager.abort(roleId);
+      return manager.abort({ ...input, roleId });
+    },
+
+    async listLiveSessionViews() { return manager.liveSessionViews(); },
+    async getSessionHistory(input) { return getSessionHistory(input); },
+    async getRuntimeConfig(runtime) {
+      return getRuntimeConfig(runtime, { envPath: envFilePath, env: deps.piConfigEnv, revision: manager.profileRevision(runtime), application: application(runtime) });
+    },
+    async saveRuntimeConfig(input) {
+      if (!input || !isRuntimeKind(input.runtime)) return { ok: false, runtime: "demo", appliedKeys: [], revision: 0, application: "current", error: "未知运行时。" };
+      const result = await saveRuntimeConfig(input, { envPath: envFilePath, revision: manager.profileRevision(input.runtime) });
+      if (result.ok && result.appliedKeys.length > 0) {
+        result.revision = manager.profileChanged(input.runtime);
+        pendingProfiles.add(input.runtime);
+      }
+      result.application = application(input.runtime);
+      return result;
     },
 
     async listLiveSessions(): Promise<string[]> {
@@ -504,13 +550,25 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     // 逻辑全在 `pi-config.ts`（**经共享 `env-file` 模块，只读导入、不复制**）：本层只透传。
     // 机密键的值**绝不外发**（`getPiConfig` 对其恒返回空串）；保存回报**只含键名**。
     async getPiConfig(): Promise<PiConfigView> {
-      return getPiConfigFn(envFilePath);
+      if (deps.getPiConfigFn) return getPiConfigFn(envFilePath);
+      return getRuntimeConfig("pi", { envPath: envFilePath, env: deps.piConfigEnv });
     },
 
     async savePiConfig(input: { updates: Record<string, string> }): Promise<PiConfigSaveResult> {
       const updates = input && typeof input.updates === "object" && input.updates !== null ? input.updates : {};
       // 保存成功后由 `savePiConfig` 内部重载 env（下一会话用新值）；`piConfigEnv` 可注入以隔离单测。
-      return savePiConfigFn({ envPath: envFilePath, updates, env: deps.piConfigEnv });
+      if (deps.savePiConfigFn) return savePiConfigFn({ envPath: envFilePath, updates, env: deps.piConfigEnv });
+      const result = await saveRuntimeConfig({ runtime: "pi", updates }, { envPath: envFilePath });
+      if (result.ok && result.appliedKeys.length > 0) {
+        result.revision = manager.profileChanged("pi");
+        pendingProfiles.add("pi");
+        if (!manager.hasBusyRuntime("pi")) {
+          await applyRuntimeConfig("pi", envFilePath, deps.piConfigEnv ?? process.env);
+          pendingProfiles.delete("pi");
+        }
+      }
+      result.application = application("pi");
+      return result;
     },
   };
 }

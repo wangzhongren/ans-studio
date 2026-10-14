@@ -9,9 +9,9 @@
 // (c)/(b) 由**编排**实现；(a) 是「**人看一眼命令原文，点放行/拒绝**」——CLI 上由编排实现、**桌面端由本模块实现**。
 // **(a) 是第三闸、兜底**：只有当 **(b) 拿不准或不可用**时才会叫人（§7.3）——不是每条命令都弹窗。
 //
-// —— 契约（**单一来源 = §4 冻结契约家** `src/provider/pi/session.ts`） ——
+// —— 契约（**单一来源 = §4 冻结契约家** `src/model/runtime.ts`） ——
 // 注入点三型（入参 `OperatorPrompt`、出参 `OperatorOutcome`、通道 `OperatorChannelFn`）现由 **Pi适配器（T20）**
-// 置于 §4 冻结契约家 `src/provider/pi/session.ts`（经 PM 裁定从编排私有 `common/编排/` 挪入）。**§6 通路已开**，
+// 置于 §4 冻结契约家 `src/model/runtime.ts`（经 PM 裁定从编排私有 `common/编排/` 挪入）。**§6 通路已开**，
 // 故本模块（T22）**删去此前的逐字镜像**，改为**只读导入**（见下方 import）——**同一契约只许一个形状**。
 //   · 入参 `OperatorPrompt = { command; argv; cwd; toolCallId; reason? }`
 //     （`reason?` = **为何升级到人**——(b) pm 拿不准/不可用——**应展示给操作者**，让他知道为什么被问到）；
@@ -48,7 +48,7 @@ import type {
   OperatorPrompt,
   OperatorOutcome,
   OperatorChannelFn,
-} from "../../src/provider/pi/session.ts";
+} from "../../src/model/runtime.ts";
 export type { OperatorPrompt, OperatorOutcome, OperatorChannelFn };
 
 // (c) 规则集实件（**I-1 补丁**，2026-10-12 客户重发授权）：**只读导入**门禁引擎经 Service 公开出口的
@@ -128,7 +128,7 @@ export function buildDesktopShellArming(
 // —————————————————————— 契约形状（**只读导入**；§4 冻结契约家） ——————————————————————
 //
 // T22：契约三型（`OperatorPrompt` / `OperatorOutcome` / `OperatorChannelFn`）已由 Pi适配器（T20）置入
-// **§4 冻结契约家** `src/provider/pi/session.ts`（§6 通路已开）。此处**删去逐字镜像**、改为**只读导入并原样转出**
+// **§4 冻结契约家** `src/model/runtime.ts`（§6 通路已开）。此处**删去逐字镜像**、改为**只读导入并原样转出**
 // （见文件顶部 import）——**同一契约只许一个形状**。公开面保留原名（既有消费方/测试从本模块取这两型仍可用）。
 // **注**：本模块**产出**的通道恒返回确定的 `OperatorOutcome`，窄于 `OperatorChannelFn`（允许空）——不调和，
 // 见顶部「形状对不上」。原本地 `OperatorChannel` 别名（同一契约的第二形状）随镜像一并移除。
@@ -160,9 +160,12 @@ export interface OperatorDecision {
 }
 
 /** 操作者确认的**表现层**（主进程用 electron dialog 实现；测试可注入替身）。 */
+export interface DesktopOperatorMetadata { roleId: string; projectRoot: string; runtime: import("../../src/model/runtime.ts").RuntimeKind; signal: AbortSignal }
+export type DesktopOperatorChannelFn = (prompt: OperatorPrompt, metadata?: DesktopOperatorMetadata) => ReturnType<OperatorChannelFn>;
+
 export interface OperatorPresenter {
   /** 把一次确认请求摆给人看，解析为人的选择；通道不可用/抛错 → 由 channel 归为 fail-closed。 */
-  present(prompt: OperatorPrompt, display: ShellCommandDisplay): Promise<OperatorDecision>;
+  present(prompt: OperatorPrompt, display: ShellCommandDisplay, metadata?: DesktopOperatorMetadata): Promise<OperatorDecision>;
 }
 
 /** 逐项呈现一行参数：JSON 转义（引号仅为界定符，便于无歧义核对空格/引号）。 */
@@ -243,7 +246,10 @@ export function createDesktopOperatorChannel(opts: CreateOperatorChannelOptions)
   const env = opts.env ?? process.env;
   const timeoutMs = opts.timeoutMs ?? readConfirmTimeoutMs(env);
 
-  return async (prompt: OperatorPrompt): Promise<OperatorOutcome> => {
+  return async (prompt: OperatorPrompt, metadata?: DesktopOperatorMetadata): Promise<OperatorOutcome> => {
+    const timeoutController = new AbortController();
+    let displayMetadata = metadata;
+    if (metadata) displayMetadata = { ...metadata, signal: AbortSignal.any([metadata.signal, timeoutController.signal]) };
     // 退路：通道未配置 → 不可用（能力缺席即 fail-closed；绝不当「没人问、那就放行」）。
     if (opts.presenter === undefined) {
       return { outcome: "unavailable", reason: "操作者确认通道未配置（无 presenter），拒绝执行（fail-closed）" };
@@ -253,8 +259,9 @@ export function createDesktopOperatorChannel(opts: CreateOperatorChannelOptions)
     let decision: OperatorDecision;
     try {
       // 超时包装整个确认；超时 = 拒绝（§7.5 退路 3）。
-      decision = await withConfirmTimeout(opts.presenter.present(prompt, display), timeoutMs);
+      decision = await withConfirmTimeout(opts.presenter.present(prompt, display, displayMetadata), timeoutMs);
     } catch (err) {
+      timeoutController.abort();
       const timedOut = err instanceof Error && err.name === OPERATOR_CONFIRM_TIMEOUT_NAME;
       return {
         outcome: "unavailable",
@@ -307,6 +314,9 @@ export function plainReasonFor(reason: unknown): string {
 /** 确认卡的**数据面**（主进程 → 渲染侧；只呈现，不含任何判定）。 */
 export interface ShellConfirmRequest {
   id: string;
+  roleId?: string;
+  projectRoot?: string;
+  runtime?: import("../../src/model/runtime.ts").RuntimeKind;
   /** 命令**逐字原文**（决不改写/截断——它是人核对的唯一依据）。 */
   command: string;
   /** 白话摘要（`shellIntentSummary`；无从概括为 null——渲染侧隐藏该行）。 */
@@ -336,6 +346,7 @@ export function buildShellConfirmRequest(id: string, display: ShellCommandDispla
 }
 
 export interface CreateShellConfirmPresenterOptions {
+  onExpired?: (payload: import("./customer-input.ts").OperatorExpiredPayload) => void;
   /** 把确认请求推给渲染侧（主进程用 `webContents.send("shell:confirm-request", …)`；测试注入收集器）。
    *  **推达失败（窗口已关/通道异常）⇒ 抛错**——`createDesktopOperatorChannel` 归为 unavailable，fail-closed。 */
   present: (request: ShellConfirmRequest) => void;
@@ -363,7 +374,7 @@ export function createShellConfirmPresenter(opts: CreateShellConfirmPresenterOpt
   const env = opts.env ?? process.env;
   const cleanupAfterMs = opts.cleanupAfterMs ?? readConfirmTimeoutMs(env) + 5000;
   let seq = 0;
-  const pending = new Map<string, { resolve: (d: OperatorDecision) => void; timer: ReturnType<typeof setTimeout>; request: ShellConfirmRequest }>();
+  const pending = new Map<string, { resolve: (d: OperatorDecision) => void; timer: ReturnType<typeof setTimeout>; request: ShellConfirmRequest; metadata?: DesktopOperatorMetadata; cleanup: () => void }>();
   const diagnostic = createDiagnosticLogger({ component: "desktop.shell-confirm" });
 
   const finish = (id: string, decision: OperatorDecision): boolean => {
@@ -371,28 +382,46 @@ export function createShellConfirmPresenter(opts: CreateShellConfirmPresenterOpt
     if (entry === undefined) return false;
     pending.delete(id);
     clearTimeout(entry.timer);
+    entry.cleanup();
     entry.resolve(decision);
     return true;
   };
 
+  const expire = (id: string, reason: string) => {
+    const entry = pending.get(id);
+    if (!entry) return;
+    finish(id, { allow: false });
+    try { opts.onExpired?.({ id, roleId: entry.metadata?.roleId ?? "", projectRoot: entry.metadata?.projectRoot, runtime: entry.metadata?.runtime, reason }); }
+    catch (error) { diagnostic.error("shell-confirm.expiration.failed", error, { requestId: id }); }
+  };
   return {
     presenter: {
-      async present(_prompt: OperatorPrompt, display: ShellCommandDisplay): Promise<OperatorDecision> {
+      async present(_prompt: OperatorPrompt, display: ShellCommandDisplay, metadata?: DesktopOperatorMetadata): Promise<OperatorDecision> {
         const id = `sc-${++seq}`;
         const request = buildShellConfirmRequest(id, display);
+        if (metadata) {
+          request.roleId = metadata.roleId;
+          request.projectRoot = metadata.projectRoot;
+          request.runtime = metadata.runtime;
+        }
         return await new Promise<OperatorDecision>((resolve) => {
           const timer = setTimeout(() => {
             diagnostic.record("shell-confirm.expired", { requestId: id });
-            pending.delete(id);
+            expire(id, "shell 确认超时，旧确认失效。");
             resolve({ allow: false }); // 兜底：清理 + 不放行（判定语义以通道先到者为准）
           }, cleanupAfterMs);
-          pending.set(id, { resolve, timer, request });
+          const cancel = () => expire(id, "本轮已结束、停止或会话已重建，旧 shell 确认失效。");
+          const cleanup = () => metadata?.signal.removeEventListener("abort", cancel);
+          pending.set(id, { resolve, timer, request, metadata, cleanup });
+          metadata?.signal.addEventListener("abort", cancel, { once: true });
+          if (metadata?.signal.aborted) { cancel(); return; }
           try {
             opts.present(request);
             diagnostic.record("shell-confirm.presented", { requestId: id, pendingCount: pending.size });
           } catch (err) {
             clearTimeout(timer);
             pending.delete(id);
+            cleanup();
             throw err; // → 通道 unavailable（fail-closed，绝不当「没人问就放行」）
           }
         });
@@ -409,7 +438,7 @@ export function createShellConfirmPresenter(opts: CreateShellConfirmPresenterOpt
       return { ok: true };
     },
     rejectAllPending(_reason) {
-      for (const id of [...pending.keys()]) finish(id, { allow: false });
+      for (const id of [...pending.keys()]) expire(id, _reason);
     },
     pendingCount: () => pending.size,
     replayPending() {

@@ -122,6 +122,8 @@
       if (String(x.at == null ? "" : x.at) !== String(y.at == null ? "" : y.at)) return false;
       if (String(x.requestId == null ? "" : x.requestId) !== String(y.requestId == null ? "" : y.requestId)) return false;
       if (String(x.anchorKey == null ? "" : x.anchorKey) !== String(y.anchorKey == null ? "" : y.anchorKey)) return false;
+      if (String(x.turnId == null ? "" : x.turnId) !== String(y.turnId == null ? "" : y.turnId)) return false;
+      if (String(x.eventKind == null ? "" : x.eventKind) !== String(y.eventKind == null ? "" : y.eventKind)) return false;
       if (JSON.stringify(x.activity || null) !== JSON.stringify(y.activity || null)) return false;
       if (String(x.anchor == null ? "" : x.anchor) !== String(y.anchor == null ? "" : y.anchor)) return false;
     }

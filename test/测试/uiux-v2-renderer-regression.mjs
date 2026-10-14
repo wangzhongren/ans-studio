@@ -11,11 +11,15 @@ fs.mkdirSync(OUT,{recursive:true});app.setPath('userData',path.join(OUT,'user-da
 const ROOT='/nonexistent-independent-snapshot-key';
 const listing={projectRoot:ROOT,primaryRoleId:'A',hasRoles:true,warnings:[],roles:['A','B'].map(roleId=>({roleId,cardText:'# '+roleId,cardPath:'',boundaryPath:'',boundary:{entries:[]},changelog:null,docs:[]}))};
 let win;const report=[];
+const fixtureHistories=new Map();
+const fixtureHistoryKey=input=>JSON.stringify([input.projectRoot,input.roleId,input.runtime||'pi']);
 for(const [name,handler] of Object.entries({
  'app:recovery-state':()=>({projectRoot:ROOT,roleId:'A'}),'app:recovery-ready':()=>({ok:true}),
  'app:renderer-diagnostic':()=>({ok:true}),'window:is-maximized':()=>false,
  'app:list-project':()=>listing,'session:open':()=>({ok:true,resumed:true,contextSource:'resumed'}),
  'session:live':()=>['A','B'],'session:stop':()=>({ok:true}),'session:operator-response':()=>({ok:true}),
+ 'session:history-get':(_e,input)=>({projectRoot:input.projectRoot,roleId:input.roleId,runtime:input.runtime,rows:fixtureHistories.get(fixtureHistoryKey(input))||[],error:null,skipped:0}),
+ 'session:live-views':()=>['A','B'].map(roleId=>({projectRoot:ROOT,roleId,runtime:'pi',profileRevision:0})),
 }))ipcMain.handle(name,handler);
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const js=code=>win.webContents.executeJavaScript(code);
@@ -24,7 +28,7 @@ function parse(messages){const p=parseSessionJsonl([{type:'session'},...messages
 const call=(id,target)=>({role:'assistant',content:[{type:'toolCall',id,name:'read_file',arguments:{path:target}}]});
 const text=t=>({role:'assistant',content:[{type:'text',text:t}]});
 const longMessages=Array.from({length:180},(_,i)=>text('independent-row-'+i+' 阅读正文。'.repeat(10))).concat(Array.from({length:40},(_,i)=>call('ind-call-'+i,'ind-target-'+i+'.md')));
-async function history(roleId,rows){win.webContents.send('session:history',{roleId,projectRoot:ROOT,rows});await pause(100);}
+async function history(roleId,rows){const payload={roleId,projectRoot:ROOT,rows};fixtureHistories.set(fixtureHistoryKey(payload),rows);win.webContents.send('session:history',payload);await pause(100);}
 async function reading(){return js(`(()=>{const c=document.getElementById('chat'),top=c.getBoundingClientRect().top,bottom=c.getBoundingClientRect().bottom;const all=[...c.querySelectorAll('.tool-activity,.msg')];const n=all.find(e=>e.getBoundingClientRect().bottom>top&&e.getBoundingClientRect().top<bottom);return n?{text:n.textContent,offset:n.getBoundingClientRect().top-top}:null;})()`);}
 async function stable(name,before){const after=await reading();report.push({name,before,after});assert.ok(before&&after,name+' content');assert.equal(after.text,before.text,name+' identity');assert.ok(Math.abs(after.offset-before.offset)<2,name+' offset');}
 app.whenReady().then(async()=>{
@@ -78,5 +82,5 @@ app.whenReady().then(async()=>{
   win.webContents.send('session:event',{roleId:'B',event:{kind:'denied',summary:'门禁拒绝：没有写入权限，未执行',detail:{toolName:'write_file',path:'outside/no-permission.md'}}});await pause(100);
   await check('pre-execution policy denial summary keeps reason without execution-failed claim',`(()=>{const all=[...document.querySelectorAll('#chat .sys-denied summary')],n=all.find(x=>x.textContent.includes('没有写入权限'));return !!n&&n.textContent.includes('未执行')&&!n.textContent.includes('执行失败');})()`);
   fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,report},null,2));console.log('INDEPENDENT_RENDERER_PASS '+report.length+' '+OUT);clearTimeout(watchdog);app.quit();
- }catch(error){fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({report,error:String(error),stack:error.stack},null,2));console.error(error);clearTimeout(watchdog);app.exit(1);}
+ }catch(error){let snapshot;try{snapshot=await js(`(()=>{const c=document.getElementById('chat'),box=n=>{const r=n.getBoundingClientRect();return {top:r.top,bottom:r.bottom,left:r.left,right:r.right,width:r.width,height:r.height};};return {selected:__ansRenderer.state.selectedRoleId,runtime:__ansRenderer.state.runtime,project:__ansRenderer.state.projectRoot,model:__ansRenderer.rowModelDebug(__ansRenderer.state.selectedRoleId),replayAnchors:__ansRenderer.replayAnchorDebug(__ansRenderer.state.selectedRoleId),chat:{scrollTop:c.scrollTop,scrollHeight:c.scrollHeight,clientHeight:c.clientHeight,box:box(c)},groups:[...document.querySelectorAll('.tool-records')].map(n=>({text:n.querySelector('summary').textContent,open:n.open,inChat:c.contains(n),box:box(n)})),chatChildren:[...c.children].map(n=>({className:n.className,role:n.dataset.roleId,box:box(n)})),text:c.innerText};})()`);}catch(snapshotError){snapshot={error:String(snapshotError)};}fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({report,error:String(error),stack:error.stack,snapshot},null,2));console.error(error);clearTimeout(watchdog);app.exit(1);}
 });

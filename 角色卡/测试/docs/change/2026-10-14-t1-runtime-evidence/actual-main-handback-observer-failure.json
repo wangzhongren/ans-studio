@@ -1,0 +1,41 @@
+{
+  "observations": [
+    {
+      "name": "real preload limits renderer Node access",
+      "value": true
+    },
+    {
+      "name": "group parsed and forwarded from real temporary role cards",
+      "value": true
+    },
+    {
+      "name": "pi event/state identity and exactly one terminal with turnId",
+      "value": true
+    },
+    {
+      "name": "pi masked configuration via real main IPC",
+      "value": true
+    },
+    {
+      "name": "pi actual registered handler allowed/denied and isolated history",
+      "value": true
+    }
+  ],
+  "errors": [
+    "Uncaught TypeError: Cannot read properties of undefined (reading 'status')",
+    "Error: Script failed to execute, this normally means an error was thrown. Check the renderer console for the error.\n    at node:electron/js2c/renderer_init:1:16535\n    at IpcRendererInternal.<anonymous> (node:electron/js2c/renderer_init:1:11407)\n    at IpcRendererInternal.emit (node:events:514:28)\n    at Object.onMessage (node:electron/js2c/renderer_init:1:10648)"
+  ],
+  "process": {
+    "node": "24.21.0",
+    "electron": "44.7.0",
+    "platform": "darwin"
+  },
+  "productionMain": "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/app/main.ts",
+  "replacements": [
+    "external Pi createAgentSession",
+    "Codex engineFactory",
+    "Claude query",
+    "temporary env path",
+    "external dialog selection"
+  ]
+}

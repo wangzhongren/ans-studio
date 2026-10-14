@@ -1,0 +1,11 @@
+{
+  "reports": [
+    {
+      "name": "same-turn live then history only one response rejection and old history",
+      "value": false
+    }
+  ],
+  "errors": [],
+  "error": "AssertionError [ERR_ASSERTION]: same-turn live then history only one response rejection and old history\n\nfalse !== true\n",
+  "stack": "AssertionError [ERR_ASSERTION]: same-turn live then history only one response rejection and old history\n\nfalse !== true\n\n    at check (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:24:95)\n    at async mergeChecks (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:139:3)\n    at async file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:183:43"
+}

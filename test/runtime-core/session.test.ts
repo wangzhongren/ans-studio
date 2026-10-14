@@ -1,0 +1,274 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { mkdtemp, rm, readdir, readFile, mkdir, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { createRuntimeAdapter, readRuntimeSessionHistory } from "../../src/service/runtime/session.ts";
+import { createRuntimeSessionStore } from "../../src/provider/runtime/session-store.ts";
+import { createEventQueue } from "../../src/common/runtime-core/event-queue.ts";
+import type { RoleSession, RuntimeKind, RuntimeProviderFactory, RuntimeProviderOptions, SessionEvent } from "../../src/model/runtime.ts";
+import { allow, deny, role, until } from "./fixtures.ts";
+
+const temp = () => mkdtemp(path.join(os.tmpdir(), "ans-service-"));
+
+test("Service history operation returns scoped Model records/replay through the existing Provider", async () => {
+  const root = await temp();
+  try {
+    const options = { projectRoot: root, roleId: "history-role", runtime: "codex" as const };
+    assert.deepEqual(await readRuntimeSessionHistory(options), { entries: [] });
+    assert.deepEqual(await readdir(root), []);
+    const store = createRuntimeSessionStore(options);
+    const record = { version: 1 as const, id: "ans-fixture", roleId: options.roleId, runtime: options.runtime, contextSource: "recovered" as const, nativeSessionId: "native-fixture", createdAt: "created", updatedAt: "updated" };
+    const entry = { at: "now", kind: "user" as const, text: "stored history" };
+    await store.saveSession(record); await store.appendReplay([entry]);
+    assert.deepEqual(await readRuntimeSessionHistory(options), { record, entries: [entry] });
+    assert.deepEqual(await readRuntimeSessionHistory({ ...options, runtime: "claude" }), { entries: [] });
+    assert.deepEqual(await readRuntimeSessionHistory({ ...options, roleId: "other-role" }), { entries: [] });
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+function provider(action: (options: RuntimeProviderOptions, emit: (event: SessionEvent) => void, session: RoleSession) => Promise<void>): RuntimeProviderFactory {
+  return (options) => ({
+    async composeContext(role) { return { systemPrompt: role.cardText }; },
+    async bindRole() {
+      const queue = createEventQueue<SessionEvent>();
+      const session: RoleSession = { contextSource: options.storage ? "fresh" : "in-memory", async prompt() { await action(options, queue.push, session); }, events: () => queue.stream, async abort() {}, async dispose() { queue.close(); } };
+      return session;
+    },
+  });
+}
+async function collect(session: RoleSession) {
+  const events: SessionEvent[] = [];
+  const done = (async () => { for await (const event of session.events()) events.push(event); })();
+  return { events, done };
+}
+
+test("Service selects exactly chosen injected factory and executes real governed handler", async () => {
+  const root = await temp();
+  try {
+    for (const runtime of ["pi", "codex", "claude"] as const) {
+      let selected: RuntimeKind | undefined;
+      const factory = provider(async (options, emit) => {
+        selected = options.runtime;
+        assert.equal(options.projectRoot, root); assert.equal(options.storage, undefined);
+        const tool = options.tools.find((tool) => tool.name === "write_file")!;
+        const result = await tool.handler({ name: "write_file", args: { path: "escape/file.txt", content: "x" } });
+        emit({ kind: result.ok ? "accepted" : "denied", summary: result.message });
+        emit({ kind: "settled", summary: "done" }); emit({ kind: "settled", summary: "duplicate" });
+      });
+      const session = await createRuntimeAdapter({ runtime, gate: deny, projectRoot: root, skillRoot: root, writeRoot: root, providerFactories: { [runtime]: factory } }).bindRole(role());
+      const { events, done } = await collect(session);
+      await session.prompt("run"); await session.dispose(); await done;
+      assert.equal(selected, runtime); assert.equal(events.filter((event) => event.kind === "settled").length, 1);
+      assert.equal(events.at(-1)?.runtime, runtime); assert.equal(events.at(-1)?.roleId, "core");
+      assert.ok(events.some((event) => event.kind === "denied"));
+      assert.deepEqual(await readdir(root), []);
+    }
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("Service failure never selects another engine and unknown runtime rejected", async () => {
+  const root = await temp();
+  try {
+    let fallback = false;
+    const adapter = createRuntimeAdapter({ runtime: "codex", gate: allow, projectRoot: root, skillRoot: root, providerFactories: { codex: () => { throw new Error("missing dependency"); }, pi: () => { fallback = true; throw new Error("wrong runtime"); } } });
+    await assert.rejects(adapter.bindRole(role()), /missing dependency/); assert.equal(fallback, false);
+    assert.throws(() => createRuntimeAdapter({ runtime: "unknown" as RuntimeKind, gate: allow, projectRoot: root, skillRoot: root }), /未知运行时/);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("Service persists replay and adapter-confirmed deferred context result after prompt", async () => {
+  const root = await temp();
+  try {
+    const factory = provider(async (_options, emit, session) => { session.contextSource = "recovered"; session.contextWarning = "native restore rejected; new context"; session.nativeSessionId = "new-native-id"; emit({ kind: "settled", summary: "done" }); });
+    const session = await createRuntimeAdapter({ runtime: "claude", gate: allow, projectRoot: root, skillRoot: root, persistSession: true, providerFactories: { claude: factory } }).bindRole(role());
+    assert.deepEqual(await readdir(root), []);
+    await session.prompt("past user", { images: [{ type: "image", data: "DO_NOT_STORE_IMAGE", mimeType: "image/png" }] });
+    await session.dispose();
+    const history = await readRuntimeSessionHistory({ projectRoot: root, roleId: "core", runtime: "claude" });
+    assert.equal(history.record?.contextSource, "recovered"); assert.equal(history.record?.nativeSessionId, "new-native-id");
+    assert.equal(history.entries[0]?.text, "past user");
+    assert.ok(!JSON.stringify(history).includes("DO_NOT_STORE_IMAGE"));
+    assert.equal(history.entries.filter((entry) => entry.event?.kind === "settled").length, 1);
+    assert.match(await readFile(path.join(root, ".ans/sessions/core/claude/ans/index.json"), "utf8"), /recovered/);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("customer wait pauses prompt deadline, abort invalidates late consent, next turn works", async () => {
+  const root = await temp();
+  try {
+    let reply!: (value: { outcome: "answered"; value: { confirmed: true } }) => void;
+    let count = 0;
+    const results: boolean[] = [];
+    const factory = provider(async (options, emit) => {
+      count++;
+      if (count === 1) {
+        const tool = options.tools.find((tool) => tool.name === "request_confirmation")!;
+        const result = await tool.handler({ name: tool.name, args: { title: "confirm" } }); results.push(result.ok);
+      }
+      emit({ kind: "settled", summary: "done", detail: { outcome: "completed" } });
+    });
+    const session = await createRuntimeAdapter({ runtime: "codex", gate: allow, projectRoot: root, skillRoot: root, promptTimeoutMs: 20, customerInput: () => new Promise((resolve) => { reply = resolve; }), providerFactories: { codex: factory } }).bindRole(role());
+    const { events, done } = await collect(session);
+    const run = session.prompt("ask"); await until(() => reply !== undefined);
+    await new Promise((resolve) => setTimeout(resolve, 50)); assert.equal(events.filter((event) => event.kind === "settled").length, 0);
+    await session.abort?.(); await assert.rejects(run, /中止/); reply({ outcome: "answered", value: { confirmed: true } });
+    await until(() => results.length === 1); assert.deepEqual(results, [false]);
+    await session.prompt("next"); await session.dispose(); await done;
+    assert.equal(events.filter((event) => event.kind === "settled").length, 2);
+    assert.deepEqual(events.filter((event) => event.kind === "settled").map((event) => (event.detail as { outcome: string }).outcome), ["aborted", "completed"]);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("throw, native failed outcome and timeout each have one explicit terminal", async () => {
+  const root = await temp();
+  try {
+    for (const [expected, action] of [["failed", async () => { throw new Error("SDK error"); }], ["failed", async (_options: RuntimeProviderOptions, emit: (event: SessionEvent) => void) => { emit({ kind: "settled", summary: "fail", detail: { outcome: "failed" } }); }], ["timed_out", async () => { await new Promise(() => {}); }]] as const) {
+      const session = await createRuntimeAdapter({ runtime: "claude", gate: allow, projectRoot: root, skillRoot: root, promptTimeoutMs: 15, providerFactories: { claude: provider(action) } }).bindRole(role());
+      const { events, done } = await collect(session);
+      await session.prompt("run").catch(() => {}); await session.dispose(); await done;
+      assert.equal(events.filter((event) => event.kind === "settled").length, 1);
+      assert.equal((events.at(-1)?.detail as { outcome: string }).outcome, expected);
+    }
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("corrupt ANS index is rejected before native bind allocates a session", async () => {
+  const root = await temp();
+  try {
+    const directory = path.join(root, ".ans/sessions/core/codex/ans");
+    await mkdir(directory, { recursive: true }); await writeFile(path.join(directory, "index.json"), "{broken}");
+    let bound = false;
+    const factory: RuntimeProviderFactory = () => ({ async composeContext() { return { systemPrompt: "fixture" }; }, async bindRole() { bound = true; throw new Error("should not allocate"); } });
+    await assert.rejects(createRuntimeAdapter({ runtime: "codex", gate: allow, projectRoot: root, skillRoot: root, persistSession: true, providerFactories: { codex: factory } }).bindRole(role()));
+    assert.equal(bound, false);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("transient persistence failure is reported and repaired next prompt can succeed", async () => {
+  const root = await temp();
+  try {
+    let fail = true;
+    const factory: RuntimeProviderFactory = (options) => {
+      const original = options.storage!.saveSession;
+      options.storage!.saveSession = async (record) => { if (fail) { fail = false; throw new Error("transient disk failure"); } return original(record); };
+      return provider(async (_options, emit) => { emit({ kind: "settled", summary: "done" }); })(options);
+    };
+    const session = await createRuntimeAdapter({ runtime: "claude", gate: allow, projectRoot: root, skillRoot: root, persistSession: true, providerFactories: { claude: factory } }).bindRole(role());
+    await assert.rejects(session.prompt("first"), /transient disk failure/);
+    await session.prompt("repaired"); await session.dispose();
+    const history = await readRuntimeSessionHistory({ projectRoot: root, roleId: "core", runtime: "claude" });
+    assert.equal(history.entries.filter((entry) => entry.kind === "user").length, 2);
+    assert.ok(history.record);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("Service event top/detail identity and report metadata share the captured turn", async () => {
+  const root = await temp();
+  try {
+    let metadata: unknown;
+    const factory = provider(async (options, emit) => {
+      const report = options.tools.find((tool) => tool.name === "submit_report")!;
+      assert.equal((await report.handler({ name: report.name, args: { status: "completed", summary: "done" } })).ok, true);
+      emit({ kind: "message", summary: "native event", detail: { turnId: "native-private-id", payload: "content" } });
+      emit({ kind: "settled", summary: "done", detail: { turnId: "native-private-id" } });
+    });
+    const session = await createRuntimeAdapter({ runtime: "pi", gate: allow, projectRoot: root, skillRoot: root, reportHandback: (_report, meta) => { metadata = meta; }, providerFactories: { pi: factory } }).bindRole(role());
+    const { events, done } = await collect(session); await session.prompt("run"); await session.dispose(); await done;
+    const id = events.at(-1)?.turnId;
+    assert.ok(id); assert.notEqual(id, "native-private-id");
+    for (const event of events) { assert.equal(event.turnId, id); assert.equal((event.detail as { turnId: string }).turnId, id); }
+    assert.deepEqual(metadata, { turnId: id, roleId: "core", runtime: "pi" });
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("hanging native abort is bounded, called once, and leaves the session quarantined", async () => {
+  const root = await temp();
+  try {
+    let abortCalls = 0;
+    let entered = false;
+    const factory: RuntimeProviderFactory = () => ({ async composeContext() { return { systemPrompt: "fixture" }; }, async bindRole() {
+      const queue = createEventQueue<SessionEvent>();
+      return { async prompt() { entered = true; await new Promise(() => {}); }, events: () => queue.stream, async abort() { abortCalls++; await new Promise(() => {}); }, async dispose() { queue.close(); } };
+    } });
+    const session = await createRuntimeAdapter({ runtime: "codex", gate: allow, projectRoot: root, skillRoot: root, providerFactories: { codex: factory } }).bindRole(role());
+    const { events, done } = await collect(session);
+    const prompt = session.prompt("run"); const promptResult = assert.rejects(prompt, /中止/); await until(() => entered);
+    const began = Date.now();
+    await assert.rejects(Promise.resolve(session.abort!()), /中止清理.*超时/);
+    assert.ok(Date.now() - began < 1800); await promptResult;
+    assert.equal(abortCalls, 1);
+    await assert.rejects(session.prompt("next"), /清理中/);
+    await session.dispose(); await done;
+    assert.equal(events.filter((event) => event.kind === "settled").length, 1);
+    assert.equal((events.at(-1)?.detail as { outcome: string }).outcome, "aborted");
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("Service configured custom API key is stripped from the actual governed shell child", async () => {
+  const root = await temp();
+  const name = "ANS_RUNTIME_CORE_TEST_CUSTOM_CREDENTIAL";
+  const old = process.env[name]; process.env[name] = "fake-contract-secret";
+  try {
+    let resultMessage = "";
+    const factory = provider(async (options, emit) => {
+      const shell = options.tools.find((tool) => tool.name === "run_shell")!;
+      const result = await shell.handler({ name: shell.name, args: { command: `${process.execPath} -e 'process.stdout.write(String(process.env.ANS_RUNTIME_CORE_TEST_CUSTOM_CREDENTIAL))'` } });
+      assert.equal(result.ok, true); resultMessage = result.message; emit({ kind: "settled", summary: "done" });
+    });
+    const session = await createRuntimeAdapter({ runtime: "codex", gate: allow, projectRoot: root, skillRoot: root, apiKeyEnvVar: name, shellGate: async () => ({ allow: true, by: "fixture" }), providerFactories: { codex: factory } }).bindRole(role());
+    await session.prompt("run"); await session.dispose();
+    assert.match(resultMessage, /stdout:\nundefined/); assert.ok(!resultMessage.includes("fake-contract-secret"));
+  } finally { if (old === undefined) delete process.env[name]; else process.env[name] = old; await rm(root, { recursive: true, force: true }); }
+});
+
+test("outer timeout remains timed_out when abort cleanup emits inner aborted terminals", async () => {
+  let completePrompt!: () => void;
+  let abortCalls = 0;
+  const factory: RuntimeProviderFactory = () => ({ async composeContext() { return { systemPrompt: "fixture" }; }, async bindRole() {
+    const queue = createEventQueue<SessionEvent>();
+    return {
+      async prompt() { await new Promise<void>((resolve) => { completePrompt = resolve; }); },
+      events: () => queue.stream,
+      async abort() {
+        abortCalls++;
+        queue.push({ kind: "settled", summary: "inner cleanup", detail: { outcome: "aborted" } });
+        queue.push({ kind: "settled", summary: "duplicate inner cleanup", detail: { outcome: "aborted" } });
+        completePrompt();
+        await Promise.resolve(); // Consume cleanup events before the outer abort promise returns.
+      },
+      async dispose() { queue.close(); },
+    };
+  } });
+  const session = await createRuntimeAdapter({ runtime: "pi", gate: allow, projectRoot: process.cwd(), skillRoot: process.cwd(), promptTimeoutMs: 15, providerFactories: { pi: factory } }).bindRole(role());
+  const { events, done } = await collect(session);
+  await assert.rejects(session.prompt("race"), /超时/); await session.dispose(); await done;
+  assert.equal(abortCalls, 1);
+  const terminal = events.filter((event) => event.kind === "settled");
+  assert.equal(terminal.length, 1); assert.equal((terminal[0].detail as { outcome: string }).outcome, "timed_out");
+  assert.equal((terminal[0].detail as { turnId: string }).turnId, terminal[0].turnId);
+});
+
+test("outer aborted result stays aborted while failing cleanup remains honestly reported", async () => {
+  let entered = false;
+  let completePrompt!: () => void;
+  const factory: RuntimeProviderFactory = () => ({ async composeContext() { return { systemPrompt: "fixture" }; }, async bindRole() {
+    const queue = createEventQueue<SessionEvent>();
+    return {
+      async prompt() { entered = true; await new Promise<void>((resolve) => { completePrompt = resolve; }); },
+      events: () => queue.stream,
+      async abort() {
+        queue.push({ kind: "settled", summary: "inner cleanup failure", detail: { outcome: "failed" } });
+        completePrompt(); await Promise.resolve(); throw new Error("cleanup fixture failed");
+      },
+      async dispose() { queue.close(); },
+    };
+  } });
+  const session = await createRuntimeAdapter({ runtime: "pi", gate: allow, projectRoot: process.cwd(), skillRoot: process.cwd(), providerFactories: { pi: factory } }).bindRole(role());
+  const { events, done } = await collect(session);
+  const run = session.prompt("abort"); const rejected = assert.rejects(run, /中止/); await until(() => entered);
+  await assert.rejects(Promise.resolve(session.abort!()), /cleanup fixture failed/); await rejected;
+  await assert.rejects(session.prompt("next"), /清理中/); await session.dispose(); await done;
+  const terminal = events.filter((event) => event.kind === "settled");
+  assert.equal(terminal.length, 1); assert.equal((terminal[0].detail as { outcome: string }).outcome, "aborted");
+  assert.ok(events.some((event) => event.kind === "denied" && event.summary.includes("cleanup fixture failed")));
+});

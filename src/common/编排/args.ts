@@ -4,8 +4,9 @@
 // 由调用方（Interface）据此以非 0 结束。
 
 /** 运行时选择取值（与装配对齐）：demo = 装配演示假 runtime；pi = 真实 Pi 适配器。 */
-export const RUNTIME_KINDS = ["demo", "pi"] as const;
-export type RuntimeKind = (typeof RUNTIME_KINDS)[number];
+import { RUNTIME_KINDS } from "../shared/runtime-shared.ts";
+export { RUNTIME_KINDS };
+export type { RuntimeKind } from "../shared/runtime-shared.ts";
 
 export interface ParsedRoleRunArgs {
   roleId: string;
@@ -71,7 +72,7 @@ export function parseRoleRunArgs(argv: string[]): ParsedRoleRunArgs {
 // 校验 --runtime 取值；非法则计入 errors（不写回）。
 function checkRuntime(value: string, errors: string[], assign: (v: string) => void): void {
   if ((RUNTIME_KINDS as readonly string[]).includes(value)) assign(value);
-  else errors.push(`非法的 --runtime：${value}（应为 demo|pi）`);
+  else errors.push(`非法的 --runtime：${value}（应为 ${RUNTIME_KINDS.join("|")}）`);
 }
 
 // 解析 `--task <id>`，缺省用 fallback（govern 命令用）。
@@ -86,6 +87,7 @@ export function parseTaskId(argv: string[], fallback: string): string {
 
 export interface ParsedGovernArgs {
   taskId: string;
+  runtime: string;
   /** 本次治理会话要创建/重构的角色 id（可多次 `--role`；作为 scope 可写集的来源）。 */
   roleIds: string[];
   /** **目标项目目录**（可选位置参数 `ans govern <目录>`，设计 §12.3）：治理会话在此目录上建立 projectRoot。
@@ -106,6 +108,7 @@ export function parseGovernArgs(argv: string[]): ParsedGovernArgs {
   const roleIds: string[] = [];
   let taskId = "";
   let dir: string | undefined;
+  let runtime = "";
 
   for (let i = 0; i < tokens.length; i++) {
     const t = tokens[i];
@@ -120,6 +123,19 @@ export function parseGovernArgs(argv: string[]): ParsedGovernArgs {
       const value = t.slice("--task=".length);
       if (value === "") errors.push("选项 --task 缺少值");
       else taskId = value;
+      continue;
+    }
+    if (t === "--runtime") {
+      const value = tokens[i + 1];
+      if (value === undefined || value === "" || value.startsWith("-")) errors.push("选项 --runtime 缺少值");
+      else checkRuntime(value, errors, (v) => (runtime = v));
+      i += 1;
+      continue;
+    }
+    if (t.startsWith("--runtime=")) {
+      const value = t.slice("--runtime=".length);
+      if (value === "") errors.push("选项 --runtime 缺少值");
+      else checkRuntime(value, errors, (v) => (runtime = v));
       continue;
     }
     if (t === "--role" || t === "-r") {
@@ -145,5 +161,5 @@ export function parseGovernArgs(argv: string[]): ParsedGovernArgs {
   }
 
   if (taskId === "") taskId = "T-GOV-1";
-  return { taskId, roleIds, dir, errors };
+  return { taskId, roleIds, dir, runtime, errors };
 }

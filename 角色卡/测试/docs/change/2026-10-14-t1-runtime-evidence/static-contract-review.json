@@ -1,0 +1,9 @@
+{
+  "productionTestImports": [],
+  "clientIdsInModelOrStore": [],
+  "coreAckInvocationOccurrences": 1,
+  "coreAckBeforePersistence": true,
+  "windowEventMappingUsesOnlyRegisteredTurn": true,
+  "windowActualAckRegistersOriginalClosure": true,
+  "note": "Read-only structure review. Behavioral proof is separately actual-main 23 plus full Core/Window tests, not string checks. Main\u2192Interface\u2192Pipeline\u2192Service\u2192lazy Provider migration was inspected via source; old public Pi facade exceptions remain as approved."
+}

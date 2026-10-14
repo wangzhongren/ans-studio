@@ -1,0 +1,142 @@
+{
+  "report": [
+    {
+      "name": "initial row observation",
+      "value": {
+        "model": {
+          "count": 181,
+          "lastIndex": 180,
+          "operators": [],
+          "rowGap": 16
+        },
+        "selected": "A",
+        "project": "/nonexistent-independent-snapshot-key",
+        "groups": [
+          {
+            "open": false,
+            "text": "查看执行记录40 条活动"
+          }
+        ]
+      }
+    },
+    {
+      "name": "real JSONL creates >150 renderer rows with one collapsed group",
+      "value": true
+    },
+    {
+      "name": "append to expanded same group keeps child reader",
+      "before": {
+        "text": "read_fileind-target-12.md调用发起",
+        "offset": -8.125
+      },
+      "after": {
+        "text": "read_fileind-target-12.md调用发起",
+        "offset": -8.125
+      }
+    },
+    {
+      "name": "append updates actual group activity count and open state",
+      "value": true
+    },
+    {
+      "name": "collapse preserves preceding visible paragraph",
+      "before": {
+        "text": "independent-row-178 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n",
+        "offset": 11.375
+      },
+      "after": {
+        "text": "independent-row-178 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n",
+        "offset": 11.375
+      }
+    },
+    {
+      "name": "expand preserves preceding visible paragraph",
+      "before": {
+        "text": "independent-row-178 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n",
+        "offset": 11.375
+      },
+      "after": {
+        "text": "independent-row-178 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n",
+        "offset": 11.375
+      }
+    },
+    {
+      "name": "different call identity does not inherit open state",
+      "value": true
+    },
+    {
+      "name": "full replay prefix insertion preserves paragraph",
+      "before": {
+        "text": "independent-row-171 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n",
+        "offset": -47.4375
+      },
+      "after": {
+        "text": "independent-row-171 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n",
+        "offset": -47.34375
+      }
+    },
+    {
+      "name": "stable call identity retains user-open group after rewrite",
+      "value": true
+    },
+    {
+      "name": "decided rejected card has distinct request/conclusion anchors after full replay",
+      "value": false
+    }
+  ],
+  "error": "AssertionError [ERR_ASSERTION]: decided rejected card has distinct request/conclusion anchors after full replay\n\nfalse !== true\n",
+  "stack": "AssertionError [ERR_ASSERTION]: decided rejected card has distinct request/conclusion anchors after full replay\n\nfalse !== true\n\n    at check (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%B5%8B%E8%AF%95/uiux-v2-renderer-regression.mjs:26:93)\n    at async file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%B5%8B%E8%AF%95/uiux-v2-renderer-regression.mjs:68:3",
+  "snapshot": {
+    "selected": "B",
+    "runtime": "pi",
+    "project": "/nonexistent-independent-snapshot-key",
+    "model": {
+      "count": 5,
+      "lastIndex": 4,
+      "operators": [
+        {
+          "index": 0,
+          "requestId": "ind-decided"
+        }
+      ],
+      "rowGap": 16
+    },
+    "replayAnchors": [
+      {
+        "anchorKey": "confirm\u0000独立拒绝确认",
+        "requestIndex": 2,
+        "conclusionIndex": 3,
+        "rowsAtReplay": 4
+      }
+    ],
+    "chat": {
+      "scrollTop": 0,
+      "scrollHeight": 655,
+      "clientHeight": 655,
+      "box": {
+        "top": 104.5234375,
+        "bottom": 760,
+        "left": 272,
+        "right": 1360,
+        "width": 1088,
+        "height": 655.4765625
+      }
+    },
+    "groups": [],
+    "chatChildren": [
+      {
+        "className": "chat-pane",
+        "role": "B",
+        "box": {
+          "top": 132.5234375,
+          "bottom": 732,
+          "left": 436,
+          "right": 1196,
+          "width": 760,
+          "height": 599.4765625
+        }
+      }
+    ],
+    "text": "独立拒绝确认\n已回「不同意」（未获同意）。\n\n独立前插\n\nrequest_confirmation · 调用发起\nrequest_confirmation：未获同意：独立失败结论\n目标未记录\n\n结论之后的助手原文"
+  }
+}

@@ -1,0 +1,1 @@
+{"version":"codex-cli 0.162.1","mode":"no model or auth calls","nativeMcpEnabled":[],"projectConfigExcluded":true,"foreignMcpStarted":false,"sandbox":"read-only","approval":"never","shellTool":false,"dynamicRequestIdentities":["threadId","turnId","callId"],"experimentalApi":"initialize accepted and schema verified"}

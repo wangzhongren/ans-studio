@@ -26,22 +26,18 @@
 // ⚠️ 命名陷阱（附录 A）：Pi 自带的 BoundaryState / BoundaryResult 指**会话上下文/压缩边界**，
 //    与本项目角色边界无关，本文件**不使用**它们、也不据此改动任何边界类型。
 
-import { accessSync, constants, mkdirSync, readFileSync } from "node:fs";
+import { accessSync, constants, mkdirSync } from "node:fs";
 import type { ResolvedRole } from "../../model/role.ts";
 import type {
-  WriteGate,
-  RoleSession,
-  RuntimeAdapter,
-  SessionEvent,
-  ShellGate,
-  CustomerInputFn,
-  ReportHandbackFn,
-  DispatchTaskFn,
-  ShellVerdictFn,
-  PromptImage,
-  PromptOptions,
-} from "../../provider/pi/session.ts";
-import { buildGovernedTools, SHELL_TOOL_NAME, shellKillSwitch } from "../../provider/pi/tools.ts";
+  WriteGate, RoleSession, RuntimeAdapter, SessionEvent, PromptImage, PromptOptions,
+  RuntimeProviderOptions, RuntimeSessionStorage, RuntimeContextSource,
+  ToolDefinition as GovernedTool,
+} from "../../model/runtime.ts";
+import { selectNativeSessionManager, sessionFileHasForeignToolChangeBlocks } from "./native-session.ts";
+export { sessionFileHasForeignToolChangeBlocks } from "./native-session.ts";
+import { describeTool } from "./tool-compat.ts";
+export { describeTool } from "./tool-compat.ts";
+export type { ToolPiDescription } from "./tool-compat.ts";
 import { formatDenialMessage } from "./format-denial.ts";
 import { createEventQueue, type EventQueue } from "./event-queue.ts";
 import {
@@ -60,7 +56,6 @@ import {
   DEFAULT_PROMPT_TIMEOUT_MS,
   PROMPT_TIMEOUT_ENV,
   type InteractionGate,
-  createInteractionGate,
   isTimeoutError,
   readTimeoutMs,
   withPausableTimeout,
@@ -76,7 +71,6 @@ import type {
   ToolCallEvent,
   ToolCallEventResult,
   ToolDefinition,
-  ToolExecutionMode,
 } from "@earendil-works/pi-coding-agent";
 
 // —————————————————————— Pi 包动态加载 ——————————————————————
@@ -207,6 +201,7 @@ export interface SessionManagerSelection {
   manager: SessionManager;
   /** in-memory（缺省旧行为）/ resumed（恢复最近会话）/ created（在该目录新建）。 */
   mode: "in-memory" | "resumed" | "created";
+  contextSource?: RuntimeContextSource;
   /** 恢复时 = 打开的会话文件；新建时 = 首次落盘将写到的文件（**惰性**：首条消息前不存在）。 */
   sessionFile?: string;
   /** 被跳过的「含未知块」会话文件数（>0 时调用方应**如实告知**，勿静默）。 */
@@ -216,44 +211,8 @@ export interface SessionManagerSelection {
 }
 
 /**
- * 检测会话文件里是否含**网关不认识的工具变更块**（`tool_removal` / `tool_addition`，`inline-tools-2026-09-15`
- * beta 语义）——只认**system 消息 content 里的字面块**（用户/助手正文里出现同样字符串**不算**，防误报）。
- *
- * **背景（2026-10-12 实测澄清，如实）**：当前 SDK 的 JSONL **存的不是字面块**——中途工具装载变化落的是
- * system 消息上的 `toolsAdded`/`toolsRemoved` **元数据**（本地探针确证），字面块是**每次请求**在
- * anthropic-messages.js:1027-1041 生成、**受模型 compat 两能力位门控**。故：收窄 compat（本文件
- * `buildExplicitRuntime`）后，**存量会话重发不会再生成该块**——存量污染自动失效、**无需清洗**。
- * 本检测器是**防御性**的（防万一的旧版/他源文件真的落了字面块）：发现即**跳过该文件**，全候选都被污染则
- * **新建会话并如实告知**（fail-closed；**不清洗、不改写历史文件**——改写历史风险高且当前无对象）。
- */
-export function sessionFileHasForeignToolChangeBlocks(filePath: string): boolean {
-  let text: string;
-  try {
-    text = readFileSync(filePath, "utf8");
-  } catch {
-    return false; // 读不到 ⇒ 交由后续 open/list 的既有错误路径处理，这里不截胡
-  }
-  if (!text.includes('"tool_removal"') && !text.includes('"tool_addition"')) return false;
-  for (const line of text.split("\n")) {
-    if (!line.includes('"tool_removal"') && !line.includes('"tool_addition"')) continue;
-    let entry: unknown;
-    try {
-      entry = JSON.parse(line);
-    } catch {
-      continue; // 坏行不影响其余判定（与 SDK 的宽容解析一致）
-    }
-    const message = (entry as { message?: { role?: unknown; content?: unknown } }).message;
-    if (message === undefined || message.role !== "system" || !Array.isArray(message.content)) continue;
-    for (const block of message.content) {
-      const type = (block as { type?: unknown } | null)?.type;
-      if (type === "tool_removal" || type === "tool_addition") return true;
-    }
-  }
-  return false;
-}
-
-/**
- * 选会话管理器（设计 D-1，重启恢复）：
+ * 选会话管理器：生产 storage 交给 native-session.ts，用公共回调校验并隔离目录。
+ * 下列 sessionDir 分支仅保留 v1 直接调用兼容（设计 D-1）：
  * - **未给 `sessionDir`** → `SessionManager.inMemory(cwd)`——**逐字保留旧行为**（不落盘）；
  * - 给了 → 目录内**有最近会话即恢复**（`list` 取最近 → `open(path)`），否则 `create(cwd, sessionDir)` 新建。
  *   恢复/新建的判据与 SDK `continueRecent` 同源（相同的 cwd 过滤语义；见 session-manager.js:1354-1362
@@ -274,8 +233,9 @@ export function sessionFileHasForeignToolChangeBlocks(filePath: string): boolean
  */
 export async function selectSessionManager(
   SessionManagerClass: typeof SessionManager,
-  opts: { cwd: string; sessionDir?: string },
+  opts: { cwd: string; sessionDir?: string; storage?: RuntimeSessionStorage },
 ): Promise<SessionManagerSelection> {
+  if (opts.storage) return selectNativeSessionManager(SessionManagerClass, opts.cwd, opts.storage);
   const dir = opts.sessionDir;
   if (dir === undefined || dir.trim() === "") {
     return { mode: "in-memory", manager: SessionManagerClass.inMemory(opts.cwd) };
@@ -350,253 +310,6 @@ function renderSystemPrompt(role: ResolvedRole): string {
 
 // —————————————————————— 受治理工具 → Pi 自定义工具 ——————————————————————
 
-/** 我们自己的受治理工具定义（结构等价于 tools.ts 的 ToolDefinition，含可选 toolCallId / signal 透传）。 */
-interface GovernedTool {
-  name: string;
-  handler(call: {
-    name: string;
-    args: Record<string, unknown>;
-    /** 本次调用的 id（Pi 在 tool_call 时生成）；run_shell 把它透传给 ShellGate 供留痕用。 */
-    toolCallId?: string;
-    /** Pi execute 传入的中止信号（设计 A-6）；交互工具据此在会话中止时立即 fail-closed 返回。 */
-    signal?: AbortSignal;
-  }): Promise<{ ok: boolean; message: string }>;
-}
-
-/** describeTool 的返回：Pi 侧参数 schema、说明与可选的提示/执行模式（均按工具名分派）。 */
-interface ToolPiDescription {
-  parameters: Record<string, unknown>;
-  description: string;
-  /** 仅该工具激活时进系统提示的准则条目（SDK types.d.ts:455-456 的 promptGuidelines）。 */
-  promptGuidelines?: string[];
-  /** 每工具执行模式覆盖（SDK types.d.ts:497-499）：交互工具 = "sequential"（设计 A-6）。 */
-  executionMode?: ToolExecutionMode;
-}
-
-/**
- * 每个受治理工具的 JSON-Schema 与说明（按名分派；run_shell 的 input 是 `{command}`，**没有 path**，见 §7.7）。
- * run_shell **不接受**任何 token 参数——票据机制已废（§7.1 第 3 条），审核在 execute 内、spawn 之前完成。
- *
- * 导出供**接线实测**使用（test/pi-adapter 的 executionMode/交互工具用例；本函数不调 SDK、纯数据）。
- */
-export function describeTool(name: string): ToolPiDescription {
-  if (name === "run_shell") {
-    return {
-      parameters: {
-        type: "object",
-        properties: {
-          command: { type: "string", description: "Shell command to review and (only if allowed) execute" },
-        },
-        required: ["command"],
-        additionalProperties: true,
-      },
-      description: "受治理的 shell 命令工具。执行前必须过 ShellGate 审核；未获明确 allow 绝不执行。",
-    };
-  }
-  if (name === "request_confirmation") {
-    // 交互工具族（设计 A-1/A-2）：请求客户确认（可带预览——如角色卡 + 边界摘要）。
-    // 已授权项目任务可推进；扩张治理边界仍须客户确认。
-    // executionMode:"sequential"（A-6）：防止同批的 write_file 抢跑于确认（Pi 缺省同批并行执行工具）。
-    return {
-      parameters: {
-        type: "object",
-        properties: {
-          title: { type: "string", description: "One-line summary of what you ask the customer to confirm" },
-          preview: {
-            type: "string",
-            description:
-              "Optional full content shown to the customer (e.g. the complete role card + boundary summary) so they can review before agreeing",
-          },
-          detail: { type: "string", description: "Optional extra detail shown with the request" },
-        },
-        required: ["title"],
-        additionalProperties: true,
-      },
-      description:
-        "向客户请求确认并**挂起等待其回应**（前端渲染成交互卡）。已接受项目边界内、已授权任务的普通操作无需逐次确认。" +
-        "真正新建或扩张角色边界、治理写集时，须由 su 把变更呈给客户确认（角色卡全文与边界摘要放进 preview），" +
-        "仅当返回「客户已确认」时才落盘。未获同意（拒绝/超时/通道不可用）→ **不要写盘**，如实告知客户，不得假设同意。" +
-        "**preview 必须列出将要写出的具体路径**（项目内相对路径，如 `角色卡/示例/role-card.md`）——写盘许可依 preview 所列路径发行；" +
-        "**未列出的路径不会获得许可，写入会被门禁拒绝**。注意：列出路径**不等于**获准——获准的唯一凭据是 `confirmed:true`。",
-      promptGuidelines: [
-        "已接受项目边界内、已授权任务的普通写入和检查无需逐次确认；新建或扩张角色边界、治理写集须由 su 经 request_confirmation 取得客户的**明确同意**。未获该变更同意 → 不执行治理变更，不得假设同意。",
-        "新建角色或扩张角色边界时：先把**角色卡全文 + 边界摘要**放进 request_confirmation 的 preview 请客户预览，同意后才写入治理变更。",
-        "request_confirmation 的 preview **必须列出将要写出的具体路径**（每个待写文件一行，相对项目根、含目录，如 " +
-          "`角色卡/示例/role-card.md`）——系统只对 preview 中**列出过**的路径发行写盘许可；**未列出的路径会被门禁拒绝**。" +
-          "列出路径只是「已让客户看到要写什么」，**不等于获准**——是否获准**只看**返回的 `confirmed:true`。",
-      ],
-      executionMode: "sequential",
-    };
-  }
-  if (name === "request_choice") {
-    // 交互工具族（设计 A-1/A-2）：请求客户单选/多选（勾选）。同样 sequential（A-6）。
-    return {
-      parameters: {
-        type: "object",
-        properties: {
-          title: { type: "string", description: "Short heading of the choice you ask the customer to make" },
-          question: { type: "string", description: "Optional question text" },
-          options: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                id: { type: "string", description: "Stable option id returned in the selection" },
-                label: { type: "string", description: "Text shown to the customer" },
-                description: { type: "string", description: "Optional extra explanation" },
-              },
-              required: ["id", "label"],
-              additionalProperties: true,
-            },
-            description: "Non-empty list of options; each id must be unique within this request",
-          },
-          multiple: { type: "boolean", description: "true = multi-select (checkboxes); default false = single-select" },
-          preview: { type: "string", description: "Optional preview content shown to the customer (markdown)" },
-        },
-        required: ["title", "options"],
-        additionalProperties: true,
-      },
-      description:
-        "向客户请求选择（单选或多选勾选）并**挂起等待其回应**（前端渲染成交互卡）。" +
-        "返回客户已选中的选项 id。**未获明确选择（拒绝/超时/通道不可用）→ 不要据此写盘，也不得擅自代选**；如实告知客户。" +
-        "若 preview 里展示将要写出的内容，**必须列出具体路径**（相对项目根、含目录）——但注意：" +
-        "**选择≠写盘同意**或扩张写权。已接受项目边界内的已授权任务无需重复确认；真正新建或扩张角色边界、治理写集仍由 su 请求客户确认，仅 confirmed:true 才执行该治理变更。",
-      promptGuidelines: [
-        "需要客户在若干选项中做选择时用 request_choice；未获明确回答 → 不要据此写盘，也不得假设客户的选择。",
-        "request_choice 的回答**不构成写盘同意**或扩张写权；已接受边界内的已授权任务无需重复确认，新建或扩张角色边界、治理写集仍由 su 经 request_confirmation 请求确认。",
-      ],
-      executionMode: "sequential",
-    };
-  }
-  if (name === "submit_report") {
-    // 交报告工具（设计 C-1）：无 path、无写权；说明写死「完成/确认无法完成时**必须**交报告，
-    // 不得只在正文里说」，并**不得**暗示它有写权或改变写盘权限（它不写盘、不做治理判定）。
-    return {
-      parameters: {
-        type: "object",
-        properties: {
-          status: {
-            type: "string",
-            enum: ["completed", "blocked"],
-            description: "completed = this turn's task is done; blocked = you have confirmed it cannot be done",
-          },
-          summary: {
-            type: "string",
-            description: "Your own one-paragraph report of what you changed / produced (honest)",
-          },
-          evidence: {
-            type: "array",
-            items: {
-              type: "string",
-              description: "One piece of evidence: an artifact path, a change, or a test conclusion",
-            },
-            description: "Key evidence: artifact paths / changes / test results",
-          },
-        },
-        required: ["status", "summary"],
-        additionalProperties: true,
-      },
-      description:
-        "向编排交回本轮任务报告（**回交给 su 汇总**，前端渲染成回交卡）。" +
-        "**本轮任务完成——或你确认无法完成——时，必须先调用本工具交回报告**：`summary` 用一句话写清" +
-        "**改了什么 / 产出了什么**，`evidence` 逐条给关键证据（产物路径 / 变更 / 测试结论）。" +
-        "**不得只在正文里说而不交报告**。本工具**不写盘、不做治理判定、不改变任何写盘权限**——" +
-        "写入仍须经 write_file/edit_file 与门禁；它只是把你写好的报告交回。",
-      promptGuidelines: [
-        "本轮任务完成前（或你确认无法完成时），**必须**调用 submit_report 交回报告：" +
-          "一句话结论 + 改了哪些文件 / 产出了什么 + 关键证据（产物路径、变更、测试结论）。**不得只在正文里说而不交报告**。",
-        "submit_report 只是**交报告**的通道：它不写盘、不做治理判定，也**不改变你的写盘权限**——" +
-          "写入仍须经 write_file / edit_file 过门禁；报告内容要如实（做没做、通过没通过，照实写）。",
-      ],
-    };
-  }
-  if (name === "dispatch_task") {
-    // 派发任务工具（设计 H-1，只给 su）：无 path、无写权。文案写死三条——派发≠授权 / 任务自足 / 返工带证据。
-    return {
-      parameters: {
-        type: "object",
-        properties: {
-          roleId: { type: "string", description: "Target project role id (must be a project role, not su itself)" },
-          task: {
-            type: "string",
-            description:
-              "Self-contained task text: what to do, which document to follow, and the acceptance criteria " +
-              "(the target role cannot see your context); for rework, restate the requirements and include the evidence",
-          },
-          reason: { type: "string", description: "Optional: why you are dispatching this task" },
-        },
-        required: ["roleId", "task"],
-        additionalProperties: true,
-      },
-      description:
-        "向目标角色**派发任务**（经编排路由成对方会话的一条输入；前端负责自动开会话/排队/去重）。" +
-        "**派发 ≠ 授权**——你只能转移「任务与上下文」，**不能**授予或改变对方的写权：对方写入仍只来自它自己的" +
-        "已接受边界和已授权任务；普通操作无需逐次确认，新建或扩张边界、治理写集仍由 su 请求客户确认。任务文本必须**自足**（对方看不到你的上下文）：" +
-        "写清要做什么、依据哪份文档、完成标准；**返工**时把要求与证据一并写进任务文本。" +
-        "roleId 必须是本项目角色（不能是你 su 自己）；本工具**不写盘、不做治理判定、不改变任何角色的写权**。",
-      promptGuidelines: [
-        "派发的是**任务与上下文**；**派发 ≠ 授权**——目标角色只在自己的已接受边界内执行已授权任务，普通操作无需逐次确认；" +
-          "不得在任务文本里代授写权；真正新建或扩张边界、治理写集仍由 su 请求客户确认。",
-        "dispatch_task 的任务文本要**自足**：目标角色看不到你的上下文——写清要做什么、依据哪份文档、完成标准。",
-        "返工时把**要求与证据**一并写进任务文本（复述返工要求 + 相关证据/路径），避免对方凭猜返工。",
-      ],
-    };
-  }
-  if (name === "report_shell_verdict") {
-    // 审读结论工具（R-1，只给审读会话）：结构化结论（三值枚举）；**不得**暗示它授予任何权限。
-    return {
-      parameters: {
-        type: "object",
-        properties: {
-          verdict: {
-            type: "string",
-            enum: ["allow", "deny", "unsure"],
-            description:
-              "allow = allow execution; deny = deny; unsure = not sure (the existing gate chain decides how to escalate)",
-          },
-          reason: { type: "string", description: "Optional short reason (for audit/display)" },
-        },
-        required: ["verdict"],
-        additionalProperties: true,
-      },
-      description:
-        "交回对当前 shell 命令的**结构化审读结论**（结论以**本工具调用**为准——**不要**只在正文里写结论）。" +
-        "**本工具本身不执行、不放行任何命令，也不改变任何权限**：它只是把你的结论（allow / deny / unsure）" +
-        "交给编排，由既有审读链决定后续（unsure 按其既有规则升级）。verdict 三值之一必填；理由可选。",
-      promptGuidelines: [
-        "审读结论**必须**以 report_shell_verdict 工具调用交回（verdict: allow / deny / unsure）；在正文里写结论不算数。",
-        "本工具不授予任何权限、也不构成对任何命令的放行——它只记录你给出的结论；实际放行由编排的既有审读链决定。",
-      ],
-    };
-  }
-  const parameters = {
-    type: "object",
-    properties: {
-      path: { type: "string", description: "Target file path (relative or absolute)" },
-      content: { type: "string", description: "Content to write (write_file)" },
-      old_string: { type: "string", description: "Text to replace (edit_file)" },
-      new_string: { type: "string", description: "Replacement text (edit_file)" },
-    },
-    required: ["path"],
-    additionalProperties: true,
-  };
-  const description =
-    name === "write_file"
-      ? "受治理的文件写入工具。写入前会向门禁引擎请求判定；被拒绝时不落盘。"
-      : name === "edit_file"
-        ? "受治理的文件编辑工具。编辑前会向门禁引擎请求判定；被拒绝时不落盘。"
-        : "读取文件内容。读取不受写边界约束（写边界只约束「能否改」，不约束「能否看」）。";
-  // executionMode（设计 W-1，真机「同轮丢写」修复）：
-  // Pi **缺省同批并行**执行工具（pi-agent-core agent.js:145，A-6 已实测；批级规则：任一工具为
-  // sequential ⇒ 整批顺序执行）。`write_file`/`edit_file` 具**读改写竞态**（尤其 edit = 读→改→写）：
-  // 同批对同一文件 write+edit（或两次 edit）并行时，后者的读发生在先前写落盘之前 ⇒ 结果被覆盖=**丢写**
-  // （离线 A/B 复现：无本字段时 5/5 丢；加后 5/5 全保）。故写类工具一律钉 sequential。
-  // `read_file` **不加**：纯读无写可竞争；且「读+写/编辑」混批已因写类工具 sequential 而**整批顺序**
-  // （批级规则），单独加它只影响纯读批（无意义），反增串行开销。
-  const executionMode = name === "write_file" || name === "edit_file" ? ("sequential" as const) : undefined;
-  return { parameters, description, ...(executionMode !== undefined ? { executionMode } : {}) };
-}
-
 /**
  * 把受治理工具转成 Pi 的 customTools 条目。
  * - parameters 用普通 JSON-Schema 形状（不引入 TypeBox 依赖）；
@@ -606,8 +319,11 @@ export function describeTool(name: string): ToolPiDescription {
  *
  * 导出供**接线实测**使用（test/pi-adapter 的 executionMode 用例直接走本函数再进真实会话链路）。
  */
-export function toPiTool(tool: GovernedTool, context?: { currentTurnId?: () => string | undefined; diagnostics?: DiagnosticLog }): ToolDefinition {
-  const { parameters, description, promptGuidelines, executionMode } = describeTool(tool.name);
+export function toPiTool(tool: Pick<GovernedTool, "name" | "handler"> & Partial<Omit<GovernedTool, "name" | "handler">>, context?: { currentTurnId?: () => string | undefined; diagnostics?: DiagnosticLog }): ToolDefinition {
+  const { parameters, description, promptGuidelines, executionMode } = tool.inputSchema === undefined
+    ? describeTool(tool.name) // v1 name+handler helper compatibility only
+    : { parameters: tool.inputSchema, description: tool.description ?? tool.name,
+        promptGuidelines: tool.promptGuidelines, executionMode: tool.executionMode };
   return {
     name: tool.name,
     label: tool.name,
@@ -678,7 +394,7 @@ export function wireSettledOnce(
   });
 }
 
-// —————————————————————— 治理扩展（写类拦截 + shell 能力级 kill-switch） ——————————————————————
+// —————————————————————— 执行前工具白名单（兼容旧写闸与 shell kill-switch） ——————————————————————
 
 /**
  * 受写门禁约束的工具名。只有这些"写类"调用会经过 gate 拦截。
@@ -687,7 +403,8 @@ export function wireSettledOnce(
 const GOVERNED_WRITE_TOOLS = new Set(["write", "edit", "write_file", "edit_file"]);
 
 /**
- * 构造治理扩展工厂：注册 on("tool_call") 拦截，写之前调 gate，拒绝时返回 { block: true, reason }。
+ * 构造执行前扩展：生产带 allowedToolNames，拒绝任何未注入名称；授权交原 injected handler。
+ * 不带白名单的旧直接测试保留写 gate 与 shell kill-switch 的兼容行为。
  * **导出供接线测试**（X-1：断言本扩展**不含** agent_settled 映射——settled 的唯一发射点是
  * `wireSettledOnce`，防重复发射点漂移回）。
  * 同时把事件经 emit 推给 RoleSession.events()。
@@ -704,7 +421,7 @@ export function buildGovernanceExtension(
   gate: WriteGate,
   emit: (event: SessionEvent) => void,
   shellArmed: boolean,
-  context?: { currentTurnId?: () => string | undefined; diagnostics?: DiagnosticLog },
+  context?: { currentTurnId?: () => string | undefined; diagnostics?: DiagnosticLog; allowedToolNames?: ReadonlySet<string> },
 ): { name: string; factory: (pi: ExtensionAPI) => void } {
   return {
     name: "ans-governance",
@@ -723,7 +440,14 @@ export function buildGovernanceExtension(
         // —— run_shell：**能力级 kill-switch**（设计 §7.5 第 4 条 / §7.7）——
         // 未 arm → {block:true}；已 arm → 放行（undefined），交 execute 做每调用细审。
         // **不做每调用 token 校验、不喂 resolveWrite**（run_shell 的 input 无 path）。
-        const kill = shellKillSwitch({ toolName: event.toolName, shellArmed });
+        if (context?.allowedToolNames !== undefined) {
+          if (context.allowedToolNames.has(event.toolName)) return undefined;
+          const reason = `非注入的 ANS 工具，拒绝执行：${event.toolName}`;
+          emit({ kind: "denied", summary: reason, detail: { toolName: event.toolName, toolCallId: event.toolCallId } });
+          return { block: true, reason };
+        }
+        const kill = event.toolName === "run_shell" && !shellArmed
+          ? { block: true as const, reason: "run_shell 未注入 ShellGate，拒绝执行" } : undefined;
         if (kill !== undefined) {
           emit({
             kind: "denied",
@@ -733,7 +457,7 @@ export function buildGovernanceExtension(
           return kill;
         }
         // run_shell 已 arm：直接放行（每调用保证在 execute 的审核链，不在此处）。
-        if (event.toolName === SHELL_TOOL_NAME) return undefined;
+        if (event.toolName === "run_shell") return undefined;
 
         // 仅写类工具受 gate 约束；读类（read_file 等）与非路径类调用一律放行。
         if (!GOVERNED_WRITE_TOOLS.has(event.toolName)) return undefined;
@@ -852,7 +576,7 @@ export interface PromptCapableSession {
  * - 每轮硬超时**可暂停**（G-1）：客户输入挂起期间计时停走，作答后续算剩余时间；
  * - 失败如实外推（两条路径都不吞）：异常 → 事件流「pi 适配器中止：…」+ `abort()` 底层 + 向上抛出；
  *   SDK `stopReason:"error"` 通过公开订阅跟踪，最终失败即使正文为空也发 denied/failed 终态；
- *   中间重试错误不覆盖最终成功；清理最多5秒，超时隔离会话。
+ *   中间重试错误不覆盖最终成功；生产清理900ms，旧直接 helper 缺省5秒，失败隔离会话。
  */
 export function makeRolePrompt(deps: {
   session: PromptCapableSession;
@@ -863,6 +587,8 @@ export function makeRolePrompt(deps: {
   lifecycle?: TurnLifecycle;
   diagnostics?: DiagnosticLog;
   abortTimeoutMs?: number;
+  requestAbort?: () => Promise<void>;
+  finishOnReturn?: boolean;
 }): (text: string, opts?: PromptOptions) => Promise<void> {
   const { session, promptMs, gate, emit, log } = deps;
   const lifecycle = deps.lifecycle ?? createTurnLifecycle(emit, deps.diagnostics);
@@ -884,7 +610,7 @@ export function makeRolePrompt(deps: {
       await withPausableTimeout(calling, promptMs, "prompt", gate);
       // The SDK emits settled from finally even when prompt rejects afterwards. Publish only
       // after the promise outcome is known, so consumers cannot receive an early false success.
-      if (lifecycle.hasSdkSettled()) lifecycle.finish();
+      if (deps.finishOnReturn || lifecycle.hasSdkSettled()) lifecycle.finish();
       log.stage("prompt 返回");
     } catch (err) {
       const timedOut = isTimeoutError(err);
@@ -897,7 +623,7 @@ export function makeRolePrompt(deps: {
       // 超时/失败后主动中止底层请求，避免悬挂的流继续占用，然后向上抛出，
       // 以便编排层以非 0 退出（不静默挂起）。
       try {
-        await withTimeout(session.abort(), deps.abortTimeoutMs ?? 5000, "abort 清理");
+        await (deps.requestAbort?.() ?? withTimeout(session.abort(), deps.abortTimeoutMs ?? 5000, "abort 清理"));
       } catch (cleanupError) {
         lifecycle.quarantine();
         deps.diagnostics?.error("prompt.cleanup_failed", cleanupError, { turnId: lifecycle.currentTurnId(), errorCode: isTimeoutError(cleanupError) ? "CLEANUP_TIMEOUT" : "CLEANUP_FAILED" });
@@ -926,6 +652,8 @@ export interface RoleSessionDeps {
   lifecycle?: TurnLifecycle;
   diagnostics?: DiagnosticLog;
   abortTimeoutMs?: number;
+  /** Native production sessions deduplicate per-turn abort and ignore idle stop. */
+  strictLifecycle?: boolean;
 }
 
 /**
@@ -948,16 +676,26 @@ export interface RoleSessionDeps {
  */
 export function makeRoleSession(deps: RoleSessionDeps): RoleSession {
   const lifecycle = deps.lifecycle ?? createTurnLifecycle(deps.emit, deps.diagnostics);
+  let abortWork: { id?: string; promise: Promise<void> } | undefined;
+  const requestAbort = (): Promise<void> => {
+    const id = lifecycle.currentTurnId();
+    if (!deps.strictLifecycle) return withTimeout(deps.session.abort(), deps.abortTimeoutMs ?? 5000, "abort 清理");
+    if (abortWork && abortWork.id === id) return abortWork.promise;
+    const promise = withTimeout(Promise.resolve().then(() => deps.session.abort()), deps.abortTimeoutMs ?? 900, "abort 清理");
+    abortWork = { id, promise };
+    return promise;
+  };
   return {
-    prompt: makeRolePrompt({ ...deps, lifecycle }),
+    prompt: makeRolePrompt({ ...deps, lifecycle, requestAbort, finishOnReturn: deps.strictLifecycle }),
     events(): AsyncIterable<SessionEvent> {
       return deps.queue.stream;
     },
     async abort(): Promise<void> {
+      if (deps.strictLifecycle && !lifecycle.isActive()) return;
       deps.diagnostics?.record("session.abort.start", { turnId: lifecycle.currentTurnId() });
       lifecycle.fail("aborted", "ABORTED");
       try {
-        await withTimeout(deps.session.abort(), deps.abortTimeoutMs ?? 5000, "abort 清理");
+        await requestAbort();
         deps.diagnostics?.record("session.abort.end", { turnId: lifecycle.currentTurnId(), ok: true });
       } catch (error) {
         lifecycle.quarantine();
@@ -977,64 +715,33 @@ export function makeRoleSession(deps: RoleSessionDeps): RoleSession {
 
 // —————————————————————— 适配器本体 ——————————————————————
 
-export interface RealPiAdapterOptions extends PiProviderConfigInput {
-  gate: WriteGate;
-  projectRoot: string;
-  skillRoot: string;
-  /** shell 命令级闸（设计 §7.2）；由编排装配后注入。**缺省时 run_shell 不注册**（§7.5.1）。 */
-  shellGate?: ShellGate;
-  /**
-   * 客户确认制交互能力（设计 A-1）；由编排/前端构造、注入。**缺省时 `request_confirmation` /
-   * `request_choice` 不注册**（判据是「有无客户通道」，同 `shellGate` 的注入先例）。
-   */
-  customerInput?: CustomerInputFn;
-  /**
-   * 交互等待硬超时（毫秒）；**缺省不设限**（设计 G-1：卡在这等客户同意）——仅显式给出或环境变量
-   * `ANS_PI_CUSTOMER_INPUT_TIMEOUT_MS` 才计时。等待期间活动闸暂停每轮硬超时（见 `withPausableTimeout`），
-   * 故不再需要 A-6 时代的「等待时限 < prompt 时限」收敛（已随 G-1 删除）。
-   */
-  customerInputTimeoutMs?: number;
-  /**
-   * 交报告能力（设计 C-1）；由编排构造、注入。**缺省时 `submit_report` 不注册**（判据是「本会话有
-   * 回交目标」；只给**项目角色**——su 不注入即不注册，同 `shellGate`/`customerInput` 的注入先例）。
-   */
-  reportHandback?: ReportHandbackFn;
-  /**
-   * 派发任务能力（设计 H-1）；由编排构造、注入。**缺省时 `dispatch_task` 不注册**
-   * （**只给 su**——由编排以是否注入表达，同 `shellGate` 先例）。
-   */
-  dispatchTask?: DispatchTaskFn;
-  /**
-   * shell 审读结论能力（R-1）；由编排构造、注入（**审读会话专用**）。**缺省时
-   * `report_shell_verdict` 不注册**（同 `shellGate` 的注入先例）。
-   */
-  shellVerdict?: ShellVerdictFn;
-  /**
-   * 会话持久化目录（设计 D-1，重启恢复）。**给了** ⇒ 会话以 JSONL 落盘于该目录：目录内有最近会话即
-   * `open` 恢复、否则 `create` 新建（**应逐角色隔离**，如 `<项目>/.ans/sessions/<角色>/`——共用一目录
-   * 会互相恢复）。**缺省** ⇒ 逐字保留 `SessionManager.inMemory` 旧行为（不落盘）。适配器只读写该目录，
-   * **不碰 `~/.pi`**（封闭性论证见 `selectSessionManager` 文档）。
-   */
+export interface RealPiAdapterOptions extends RuntimeProviderOptions, PiProviderConfigInput {
+  /** Legacy direct directory mode, only populated by the v1 public adapter branch. */
   sessionDir?: string;
-  /** 已由 session.ts 预校验并透传的显式配置；缺省时本模块自行解析。 */
   config?: PiProviderConfig;
-  /** 注入日志器（测试用）；缺省按 ANS_PI_TRACE 从 process.env 构造。 */
   logger?: StageLogger;
-  /** prompt 硬超时（毫秒）；缺省读 ANS_PI_PROMPT_TIMEOUT_MS，再缺省 120000。 */
-  promptTimeoutMs?: number;
-  /** 构造期单步硬超时（毫秒）；缺省读 ANS_PI_CONSTRUCT_TIMEOUT_MS，再缺省 120000。 */
-  constructTimeoutMs?: number;
-  /** shell 审核硬超时（毫秒）；缺省读 ANS_PI_SHELL_REVIEW_TIMEOUT_MS，再缺省 120000。超时 = 拒绝。 */
-  shellReviewTimeoutMs?: number;
 }
 
-export function createRealPiRuntimeAdapter(opts: RealPiAdapterOptions): RuntimeAdapter {
+/** Private offline seam; normal construction uses the pinned real SDK and explicit model runtime. */
+export interface PiAdapterDependencies {
+  loadPi?: typeof loadPi;
+  buildRuntime?: typeof buildExplicitRuntime;
+}
+
+export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependencies: PiAdapterDependencies = {}): RuntimeAdapter {
+  const opts = { ...input };
   return {
     async composeContext(role: ResolvedRole): Promise<{ systemPrompt: string }> {
       return { systemPrompt: renderSystemPrompt(role) };
     },
 
     async bindRole(role: ResolvedRole): Promise<RoleSession> {
+      const governedTools = opts.tools.map((tool) => ({ ...tool,
+        inputSchema: structuredClone(tool.inputSchema),
+        ...(tool.promptGuidelines ? { promptGuidelines: [...tool.promptGuidelines] } : {}),
+      }));
+      if (opts.runtime !== "pi") throw new Error("Pi 适配器只能建立 Pi 会话");
+      if (opts.storage && opts.storage.roleId !== role.id) throw new Error("Pi 存储与当前角色不匹配");
       const log = opts.logger ?? createStageLogger(process.env);
       const diagnostics = createDiagnosticLogger({ component: "pi-adapter", projectRoot: opts.projectRoot, roleId: role.id });
       diagnostics.record("session.construct.start");
@@ -1046,10 +753,10 @@ export function createRealPiRuntimeAdapter(opts: RealPiAdapterOptions): RuntimeA
         const cfg = opts.config ?? resolvePiProviderConfig(opts, process.env);
         log.trace(`构造单步时限=${constructMs}ms，prompt 时限=${promptMs}ms`);
 
-        // 交互挂起活动闸（设计 G-1）：等待客户期间**暂停每轮硬超时**（作答后按剩余时间恢复），
+        // 直接使用 Service 注入的交互闸（设计 G-1）：等待客户期间暂停每轮硬超时，
         // 使「卡在这等客户同意」的轮次不被 prompt 时限掐断。等待本身**缺省不设限**（见 tools.ts）；
         // prompt 时限只约束「非等待」的计算与生成时间。
-        const interactionGate = createInteractionGate();
+        const interactionGate = opts.interactionGate;
 
         // 上下文窗口缺失时**不再硬失败**：采用保守默认值，并给出**可见**提示（日志 + 事件流，见下）。
         const contextWindowNotice = renderContextWindowNotice(cfg.contextWindowSource, cfg.contextWindow);
@@ -1059,7 +766,7 @@ export function createRealPiRuntimeAdapter(opts: RealPiAdapterOptions): RuntimeA
         diagnostics.record("session.construct.step", { state: "load_pi" });
         log.stage("加载 Pi 包…");
         const { createAgentSession, DefaultResourceLoader, SessionManager, SettingsManager } = await withTimeout(
-          loadPi(),
+          (dependencies.loadPi ?? loadPi)(),
           constructMs,
           "加载 Pi 包",
         );
@@ -1068,7 +775,7 @@ export function createRealPiRuntimeAdapter(opts: RealPiAdapterOptions): RuntimeA
         diagnostics.record("session.construct.step", { state: "provider" });
         log.stage("构造显式 provider…");
         const { runtime, model } = await withTimeout(
-          buildExplicitRuntime(cfg),
+          (dependencies.buildRuntime ?? buildExplicitRuntime)(cfg),
           constructMs,
           "构造显式 provider",
         );
@@ -1083,49 +790,28 @@ export function createRealPiRuntimeAdapter(opts: RealPiAdapterOptions): RuntimeA
         let lifecycle!: TurnLifecycle;
         const emit = (event: SessionEvent): void => {
           const detail = event.detail !== null && typeof event.detail === "object" ? event.detail : {};
-          queue.push({ ...event, detail: { turnId: lifecycle.currentTurnId(), ...detail } });
+          const turnId = (detail as { turnId?: string }).turnId ?? lifecycle.currentTurnId();
+          queue.push({ ...event, runtime: "pi", roleId: role.id, turnId, detail: { turnId, ...detail } });
         };
-        lifecycle = createTurnLifecycle(emit, diagnostics);
+        lifecycle = createTurnLifecycle(emit, diagnostics, opts.currentTurnId);
         const turnContext = { currentTurnId: lifecycle.currentTurnId, diagnostics };
         // 缺失上下文窗口的可见提示也进入事件流，确保界面/用户看得到（不只留在日志里）。
         if (contextWindowNotice !== undefined) emit({ kind: "message", summary: contextWindowNotice });
 
-        // shell 能力是否 arm：注入 ShellGate 即 arm。它同时决定 run_shell 是否注册（§7.5.1）
-        // 与扩展层 kill-switch 的判据（§7.5.4）——不再是「token 兜底」。
-        const shellArmed = opts.shellGate !== undefined;
-
-        // 受治理工具集：写类（先 gate，获准且配置了 writeRoot 时真正落盘）、读类（读不受写门禁约束），
-        // 以及命令级 run_shell——**仅当注入了 shellGate 时才注册**（§7.5.1）。
-        // 写根恒等于 projectRoot（写根 ≠ 读根，见设计 §3.1 / §6.2）；shell 的 cwd 同样钉在 projectRoot（§7.2）。
-        const governedTools = buildGovernedTools(opts.gate, {
-          readRoot: opts.projectRoot,
-          writeRoot: opts.projectRoot,
-          shellGate: opts.shellGate,
-          shellCwd: opts.projectRoot,
-          shellReviewTimeoutMs: opts.shellReviewTimeoutMs,
-          // 交互工具族：**仅当注入了客户通道时注册**（设计 A-1）；等待缺省不设限（G-1），
-          // 显式配置的时限原样透传；等待期间经活动闸暂停每轮硬超时。
-          customerInput: opts.customerInput,
-          customerInputTimeoutMs: opts.customerInputTimeoutMs,
-          interactionGate,
-          ...turnContext,
-          // 交报告工具：**仅当注入了回交能力时注册**（设计 C-1；只给项目角色）。
-          reportHandback: opts.reportHandback,
-          // 派发任务工具：**仅当注入了派发能力时注册**（设计 H-1；只给 su）。
-          dispatchTask: opts.dispatchTask,
-          // 审读结论工具：**仅当注入了审读结论能力时注册**（R-1；只给审读会话）。
-          shellVerdict: opts.shellVerdict,
-        });
-        const customTools = (governedTools as unknown as GovernedTool[]).map((tool) => toPiTool(tool, turnContext));
-
-        // 扩展 on("tool_call") 拦截：写类目标走 gate；run_shell 只做能力级 kill-switch（未 arm 才 block，
-        // arm 则放行交 execute 细审）。**无 token 存储**——票据机制已删（§7.1 第 3 条）。
-        const extension = buildGovernanceExtension(opts.gate, emit, shellArmed, turnContext);
+        // Injected definitions and the exact shared waiting gate are the production capability source.
+        const allowedToolNames = new Set(governedTools.map((tool) => tool.name));
+        const customTools = governedTools.map((tool) => toPiTool(tool, turnContext));
+        const extension = buildGovernanceExtension(
+          () => { throw new Error("生产工具判定必须由注入 handler 执行"); },
+          emit, allowedToolNames.has("run_shell"), { ...turnContext, allowedToolNames },
+        );
 
         const resourceLoader = new DefaultResourceLoader({
           cwd: opts.projectRoot,
           agentDir: opts.projectRoot,
           extensionFactories: [extension],
+          noExtensions: true,
+          systemPrompt: renderSystemPrompt(role),
           noSkills: true,
           noPromptTemplates: true,
           noThemes: true,
@@ -1140,11 +826,12 @@ export function createRealPiRuntimeAdapter(opts: RealPiAdapterOptions): RuntimeA
         await withTimeout(resourceLoader.reload(), constructMs, "resourceLoader.reload");
 
         // 分段进度：createAgentSession。关内置工具，注册我们自己的受治理工具（含读）；显式注入 model、modelRuntime 与 settingsManager。
-        // 会话管理器（设计 D-1）：给了 sessionDir ⇒ 项目内 JSONL 持久会话（目录内有最近会话即恢复）；
-        // 缺省 ⇒ 逐字保留 in-memory 旧行为。恢复的可用性/一致性坑见 selectSessionManager 文档。
+        // 生产由 storage 指定本角色 Pi native 目录；旧 sessionDir 仅直接 API 兼容。
+        // 缺省为 in-memory，不读取或写入 ~/.pi。
         const sessionSelection = await selectSessionManager(SessionManager, {
           cwd: opts.projectRoot,
           sessionDir: opts.sessionDir,
+          storage: opts.storage,
         });
         diagnostics.record("session.restore", { sessionId: sessionSelection.manager.getSessionId(), state: sessionSelection.mode, count: sessionSelection.skippedContaminated ?? 0 });
         if (sessionSelection.note !== undefined) {
@@ -1191,6 +878,12 @@ export function createRealPiRuntimeAdapter(opts: RealPiAdapterOptions): RuntimeA
           "createAgentSession",
         );
 
+        const unexpected = session.getActiveToolNames().filter((name) => !allowedToolNames.has(name));
+        if (unexpected.length) {
+          session.dispose();
+          throw new Error(`Pi 注册了非注入工具：${unexpected.join(", ")}`);
+        }
+
         // settled 的**唯一**发射点（X-1）：见 wireSettledOnce 的理由注释。
         const unsubscribe = wireSettledOnce(session, emit, lifecycle);
 
@@ -1199,7 +892,13 @@ export function createRealPiRuntimeAdapter(opts: RealPiAdapterOptions): RuntimeA
 
         // 会话组装抽为 `makeRoleSession`（提案 P0-2「停当前轮次」）：prompt/events/dispose 逐字旧行为，
         // 另透传 abort（SDK session.abort()——语义与核实依据见该函数文档）。
-        return makeRoleSession({ session, promptMs, gate: interactionGate, emit, log, queue, unsubscribe, lifecycle, diagnostics });
+        const roleSession = makeRoleSession({ session, promptMs, gate: interactionGate, emit, log, queue, unsubscribe, lifecycle, diagnostics, abortTimeoutMs: 900, strictLifecycle: true });
+        roleSession.runtime = "pi";
+        roleSession.roleId = role.id;
+        roleSession.contextSource = sessionSelection.contextSource ?? (sessionSelection.mode === "in-memory" ? "in-memory" : sessionSelection.mode === "resumed" ? "resumed" : sessionSelection.note ? "recovered" : "fresh");
+        roleSession.nativeSessionId = sessionSelection.manager.getSessionId();
+        roleSession.contextWarning = sessionSelection.note;
+        return roleSession;
       } catch (error) {
         diagnostics.error("session.construct.failed", error);
         throw error;

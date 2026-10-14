@@ -1,0 +1,74 @@
+✔ 空参数 -> help (3.63475ms)
+✔ --help / -h / help -> help (0.135041ms)
+✔ doctor -> doctor (0.076208ms)
+✔ role run 编排 --task T-1 -> role-run（argv 为指令后的剩余参数） (0.168375ms)
+✔ --task= 等号写法同样可解析 (0.142042ms)
+✔ role run 缺角色 / 缺 --task -> unknown (0.128583ms)
+✔ P1-4 配套：role run 见 -h/--help 整段放行 -> role-run（--task 缺失/存在均可） (0.140541ms)
+✔ 防放宽过度：无 help 时缺 --task 仍是 unknown「缺少 --task」；裸 help 令牌不放行 (0.146583ms)
+✔ govern 透传剩余参数 (0.09775ms)
+✔ init 子命令已移除 -> unknown（客户废除 init，见编排 T16） (0.218708ms)
+✔ 未知命令 -> unknown (0.1045ms)
+✔ ansProjectPath：项目根下 .ans/project.json (0.350166ms)
+✔ .ans 合法（带 pin）→ 注入 roles/governanceBoundary/acceptance，pin 保留 (6.140916ms)
+✔ .ans 声明 accepted:true 无 pin → 载入方置为未接受（fail-closed，§3.3） (1.499417ms)
+✔ 终态规则纯函数：accepted:true 无 pin → 降级；有 pin / accepted:false → 不变 (0.1855ms)
+✔ pin 与 hash 不符 → 载入层保留（pin 存在），引擎 verifyPins 判未接受 (7.799833ms)
+✔ .ans 合法且 pin 匹配 → 引擎解析后仍 accepted=true（对照） (2.3265ms)
+✔ 无 .ans/project.json → 回退入参 fallback（原样、不崩） (0.280583ms)
+✔ 无 .ans：role run 仍走内置演示配置（未放松，既有行为保持） (24.230334ms)
+✔ 内嵌配置含六个角色的 card/boundary 映射，且文件真实存在 (1.062667ms)
+✔ projectRoot 解析到仓库根（含 package.json 与 src/index.ts） (0.063916ms)
+✔ T-1 的 writeSet 是演示角色“编排”边界的真子集（用于演示 F4） (12.231917ms)
+✔ 演示任务 scope 携带 conditions（门禁引擎新增字段），编排边界无 conditional-directory 故为空 (0.065708ms)
+✔ 演示脚本两笔写入分别演示 F5/F10 与 F4 (1.246ms)
+✔ 边界接受证据如实标注演示来源，且不由程序自行判定 (0.066625ms)
+✔ 默认脚本：两笔越界写入都在写之前被拒，逐笔给出按根分组的允许路径 (0.51375ms)
+✔ 脚本事件顺序：先 tool_call，再判定，最后 settled (0.11675ms)
+✔ gate 允许时产出 accepted 且不发写入（替身不落盘） (0.0835ms)
+✔ resolveEntryTimeoutMs：默认 5 分钟，合法覆盖生效，非法值回退默认 (0.29525ms)
+✔ 入口确定性收敛：doctor 不挂起、以 0 退出、无 unsettled TLA 警告 (81.458208ms)
+✔ 入口退出码可靠：--help 以 0 退出 (44.278625ms)
+✔ 入口退出码可靠：无凭据的 pi 路径以非 0 退出（真实结果，非默认 0） (44.28775ms)
+✔ 入口退出码可靠：demo 路径以 0 退出且无警告 (78.482875ms)
+✔ loadInjection(目标目录) → 注入的 projectRoot 即该目录（绝对化） (1.515333ms)
+✔ loadInjection(相对路径) → 绝对化（相对 cwd） (0.355791ms)
+✔ loadInjection() 缺省 → projectRoot 仍为 ans-cli 自身（行为不变） (0.215084ms)
+✔ loadInjection(空目录) → 不注入 ans-cli 自身的演示数据；带 CLI 操作的创世授权（genesisBootstrap） (0.481958ms)
+✔ loadInjection(ans-cli 根，显式给出) → 与缺省同款：演示配置原样（自身行为逐字不变） (0.34925ms)
+✔ 目标目录含 .ans/project.json → 角色载入，projectRoot 仍取目标目录 (1.882166ms)
+✔ 显式目标目录优先于 .ans 自带的 projectRoot (0.849708ms)
+✔ ans govern <不存在的目录> → 明确报错、非 0，不静默回退到 ans-cli (0.415917ms)
+✔ ans govern <非目录（文件）> → 明确报错、非 0 (0.205208ms)
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-govern-target-53PXKH/ok-tinVGp
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝。
+[message] 用户指令：任务 T-GOV-1：以治理身份在**项目治理边界**内工作。越出治理边界（`角色卡/`、`docs/`、`.ans/` 之外，如项目的 `src/`，或项目根以外）的写入会在写入之前被门禁拒绝。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（角色卡全文 + 边界摘要，**并列出将要写出的具体路径**——路径是发行凭据，没列出的路径写不进去）请客户确认；拿到明确同意（confirmed:true）后才写；未获同意/通道不可用 → 不写盘、如实告知。
+未指定目标角色：请**据对话决定要建哪些角色**，逐一向客户确认后写出治理产物——`角色卡/<角色>/role-card.md`、`角色卡/<角色>/boundary.yaml`、`角色卡/<角色>/memo.md`。项目治理边界文档 `角色卡/governance-boundary.yaml` 由编排的自动收尾写出，无需你写。
+[tool_call] 模型请求调用 request_confirmation
+[accepted] request_confirmation：客户已确认「确认写出角色 X 的骨架文件」（confirmed:true；操作者：test:装配放行桩）——已获明确同意。可按已同意的内容继续（如写盘，写入须与向客户预览的内容一致）。
+[tool_call] 模型请求调用 write_file
+[accepted] write_file 已获准并落盘：角色卡/X/role-card.md（13 字节写入 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-govern-target-53PXKH/ok-tinVGp/角色卡/X/role-card.md）
+[tool_call] 模型请求调用 write_file
+[accepted] write_file 已获准并落盘：角色卡/X/boundary.yaml（20 字节写入 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-govern-target-53PXKH/ok-tinVGp/角色卡/X/boundary.yaml）
+[settled] 会话结束
+✔ ans govern <空目录>（经 governCommand + 假适配器）→ EXIT_OK，边界解析不再失败，创世授权下 su 骨架写入真落盘 (32.073375ms)
+✔ ans govern <存在的目录>（main 入口；环境已清空 Pi 配置）→ 目录校验放行、不再报边界解析失败；如实非 0 报缺 provider 配置 (1.631917ms)
+✔ doctor 显示运行时来源（env ANS_RUNTIME=pi） (5.606041ms)
+✔ --help 显示当前运行时选择（命令行来源，压过默认） (0.190333ms)
+✔ 无效 --runtime 值返回 2 并非 0 报错 (0.133542ms)
+✔ role run 选 pi 且无凭据时非 0 退出、如实报错、绝不退回 demo (0.496875ms)
+✔ extractRuntimeArg：抽出 --runtime <值> 并从 argv 剔除（两段式） (1.150334ms)
+✔ extractRuntimeArg：支持 --runtime=<值> 等号写法，任意位置 (0.115625ms)
+✔ extractRuntimeArg：未出现时为 present:false；出现但缺值为空串 (0.093083ms)
+✔ resolveRuntime：命令行 > 环境变量 > 默认 (0.184709ms)
+✔ resolveRuntime：非法取值（含缺值）一律 ok:false，不静默忽略 (0.099583ms)
+✔ hasPiCredential：任一凭据变量非空即为真，空白视为无 (0.151625ms)
+ℹ tests 54
+ℹ suites 0
+ℹ pass 54
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 346.492917

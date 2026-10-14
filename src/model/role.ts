@@ -6,13 +6,19 @@ import type { Acceptance, BoundarySection1 } from "./boundary.ts";
 
 export type RoleKind = "project" | "built-in-governance";
 
+/** 角色卡声明的协作信息，仅供展示；不授予权限或改变角色身份。 */
+export interface RoleGroupMetadata {
+  readonly group?: string;
+  readonly groupDuty?: string;
+}
+
 // F8：角色路径来自配置，不硬编码 角色卡/<角色>/
 export interface RoleLocation {
   card: string; // 项目相对路径，如 角色卡/编排/role-card.md
   boundary: string; // 项目相对路径
 }
 
-export interface ResolvedRole {
+export interface ResolvedRole extends RoleGroupMetadata {
   id: string;
   kind: RoleKind;
   cardText: string;

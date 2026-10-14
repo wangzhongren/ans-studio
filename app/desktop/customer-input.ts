@@ -5,7 +5,7 @@
 // 归属：Interface / 桌面窗口（本角色边界内）。纯逻辑，**不依赖 electron**，可在 node 下单测；
 // 真正的推送/呈现由**注入的 presenter** 提供（主进程经 `session:operator-request` 推到渲染侧的交互卡）。
 //
-// —— 契约（**单一来源 = §4 冻结契约家** `src/provider/pi/session.ts`）——
+// —— 契约（**单一来源 = §4 冻结契约家** `src/model/runtime.ts`）——
 // 入参 `CustomerInputRequest`（confirm：title/preview?/detail?；choice：title/question?/options/multiple?/preview?）
 // 与出参 `CustomerInputOutcome`（answered / declined / unavailable 三态）**只读导入、原样转出**——
 // 同一契约只许一个形状（同 operator-channel.ts 的既有惯例）。**时限（G-1，2026-10-12 客户裁定）**：
@@ -30,7 +30,8 @@ import type {
   CustomerInputRequest,
   CustomerInputOutcome,
   CustomerInputFn,
-} from "../../src/provider/pi/session.ts";
+  CustomerInputMetadata,
+} from "../../src/model/runtime.ts";
 export type { CustomerInputRequest, CustomerInputOutcome, CustomerInputFn };
 // 锚点键的**唯一算法**（真机缺陷修复 2026-10-12：已决卡切走再切回跑到聊天流最末尾——卡的（重）物化
 // 须按其时序锚点落位）。请求本体（kind/title）与回放侧（session-history.ts 解析的 toolCall 块）两侧
@@ -44,6 +45,8 @@ export interface OperatorRequestPayload {
   id: string;
   /** 发起请求的角色 id（渲染侧据此把卡落到该角色的聊天流，并点亮 B-3「等待你确认」）。 */
   roleId: string;
+  projectRoot?: string;
+  runtime?: CustomerInputMetadata["runtime"];
   /** 冻结形状的请求本体（**原样透传**，不加工）。 */
   request: CustomerInputRequest;
   /**
@@ -66,7 +69,10 @@ export type OperatorDecisionPayload =
 /** 主进程注入的推送端点：把请求如实送到界面（electron webContents.send；测试注入收集器）。 */
 export type OperatorRequestPresenter = (payload: OperatorRequestPayload) => void;
 
+export interface OperatorExpiredPayload { id: string; roleId: string; projectRoot?: string; runtime?: CustomerInputMetadata["runtime"]; reason: string }
+
 export interface CreateCustomerInputChannelOptions {
+  onExpired?: (payload: OperatorExpiredPayload) => void;
   /** 表现层（主进程 webContents.send）；**未配置 → 一律 unavailable**（能力缺席即 fail-closed）。 */
   presenter?: OperatorRequestPresenter;
   /** 操作者标识（随 `CustomerInputOutcome.operatorId` 交给编排，先例同 shell 闸 (a)）。空/缺失归 unknown。 */
@@ -104,7 +110,8 @@ export interface CustomerInputChannel {
  */
 export type DesktopCustomerInputFn = (
   req: CustomerInputRequest,
-  ctx: { roleId: string },
+  ctx: { roleId: string; runtime?: CustomerInputMetadata["runtime"]; projectRoot?: string; sessionSignal?: AbortSignal },
+  metadata?: CustomerInputMetadata,
 ) => Promise<CustomerInputOutcome | null | undefined> | CustomerInputOutcome | null | undefined;
 
 /**
@@ -115,10 +122,10 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
   const operatorId =
     typeof opts.operatorId === "string" && opts.operatorId.trim() !== "" ? opts.operatorId : "unknown";
   let seq = 0;
-  const pending = new Map<string, { resolve: (o: CustomerInputOutcome) => void; request: CustomerInputRequest; payload: OperatorRequestPayload }>();
+  const pending = new Map<string, { resolve: (o: CustomerInputOutcome) => void; request: CustomerInputRequest; payload: OperatorRequestPayload; cleanup: () => void }>();
   const diagnostic = createDiagnosticLogger({ component: "desktop.customer-input" });
 
-  const customerInput: DesktopCustomerInputFn = (req, ctx) =>
+  const customerInput: DesktopCustomerInputFn = (req, ctx, metadata) =>
     new Promise<CustomerInputOutcome>((resolve) => {
       // 退路：通道未配置 → 不可用（能力缺席即 fail-closed；绝不当「没人问、那就放行」）。
       if (opts.presenter === undefined) {
@@ -126,8 +133,21 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
         return;
       }
       const id = opts.nextId ? opts.nextId() : `op-${++seq}`;
-      const payload = { id, roleId: String((ctx && ctx.roleId) || ""), request: req, anchorKey: interactionAnchorKey(req.kind, req.title) };
-      pending.set(id, { resolve, request: req, payload });
+      const payload: OperatorRequestPayload = { id, roleId: String((ctx && ctx.roleId) || ""), request: req, anchorKey: interactionAnchorKey(req.kind, req.title) };
+      if (ctx.runtime !== undefined) payload.runtime = ctx.runtime;
+      if (ctx.projectRoot !== undefined) payload.projectRoot = ctx.projectRoot;
+      const signals = [metadata?.signal, ctx.sessionSignal].filter((signal): signal is AbortSignal => signal !== undefined);
+      const cleanup = () => { for (const signal of signals) signal.removeEventListener("abort", cancel); };
+      const finish = (outcome: CustomerInputOutcome) => { cleanup(); resolve(outcome); };
+      const cancel = () => {
+        if (!pending.delete(id)) return;
+        finish({ outcome: "unavailable", reason: "本轮已停止或会话已重建，旧确认失效。" });
+        try { opts.onExpired?.({ id, roleId: payload.roleId, runtime: payload.runtime, projectRoot: payload.projectRoot, reason: "本轮已停止或会话已重建，旧确认失效。" }); }
+        catch (error) { diagnostic.error("interaction.expired.failed", error, { requestId: id }); }
+      };
+      pending.set(id, { resolve: finish, request: req, payload, cleanup });
+      for (const signal of signals) signal.addEventListener("abort", cancel, { once: true });
+      if (signals.some((signal) => signal.aborted)) { cancel(); return; }
       try {
         opts.presenter(payload);
         diagnostic.record("interaction.presented", { requestId: id, pendingCount: pending.size });
@@ -135,7 +155,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
         diagnostic.error("interaction.present.failed", err, { requestId: id });
         // 推不达（窗口已关等）→ 未获同意（fail-closed），不留悬案。
         pending.delete(id);
-        resolve({ outcome: "declined", operatorId, reason: `客户交互请求未能送达界面：${reasonOf(err)}` });
+        finish({ outcome: "declined", operatorId, reason: `客户交互请求未能送达界面：${reasonOf(err)}` });
       }
     });
 
@@ -146,7 +166,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     if (!entry) {
       // 终态：该 id 已无挂起请求——G-1 起只剩「应用关闭/重启清空了未决请求」这一种真实原因（无按时间超时）。
       // 界面据此**定格**，不得解冻重试；文案如实指向重启/关闭。
-      return { ok: false, error: "没有待答的交互请求（应用重启/关闭会清空未决请求）", expired: true };
+      return { ok: false, error: "没有待答的交互请求（轮次停止、会话重建或应用关闭会使旧请求失效）", expired: true };
     }
     const d = input.decision as OperatorDecisionPayload | undefined;
     if (!d || typeof d !== "object") {
@@ -202,7 +222,9 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
 
   function rejectAllPending(reason: string): void {
     diagnostic.record("interaction.closed", { pendingCount: pending.size });
-    for (const [, entry] of pending) {
+    for (const [id, entry] of pending) {
+      try { opts.onExpired?.({ id, roleId: entry.payload.roleId, runtime: entry.payload.runtime, projectRoot: entry.payload.projectRoot, reason }); }
+      catch (error) { diagnostic.error("interaction.expired.failed", error, { requestId: id }); }
       entry.resolve({ outcome: "declined", operatorId, reason });
     }
     pending.clear();

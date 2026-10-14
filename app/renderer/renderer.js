@@ -58,9 +58,11 @@
     document.body.innerHTML = '<p style="padding:24px;font:13px sans-serif;">界面组件加载失败：ui-labels.js 未就绪（须在 renderer.js 之前加载）。</p>';
     return;
   }
+  var Rt = window.ANSRuntimeUI;
 
   var state = {
     projectRoot: null,
+    runtime: "pi",
     roles: [],
     // 主入口角色 id：**原样转自门禁引擎 listProject 的 primaryRoleId**（§10.7），渲染侧据此设主位/默认选中，
     // **不硬编码 "su"**。null = 尚未导入项目。
@@ -135,6 +137,7 @@
   /** 会话状态（客户裁定 2026-10-13：界面**不再显示**「聊天中/空闲」pill）——kind **程序化保留**：
    *  写到 `#chat` 的 `data-state` 属性（run/idle/err），e2e 与外部驱动仍可断言；label 参数保留以兼容调用点。 */
   function setState(kind, label) {
+    if (backgroundDelivery) return;
     void label; // pill 文案随视觉删除而退役；kind 才是程序化保留的部分
     var chat = $("chat");
     if (chat) chat.dataset.state = kind;
@@ -168,6 +171,7 @@
   // 绝不因忙碌被替换/禁用（「忙碌时发消息=入队」是既定语义）；这不是已删的「结束会话」按钮
   // （那是关整只会话；这里只停**当前一轮**，会话保留）。
   function updateHaltButton() {
+    if (backgroundDelivery) return;
     var btn = $("btn-halt");
     if (!btn) return;
     var busy = state.selectedRoleId !== null && state.roleBusy[state.selectedRoleId] === true;
@@ -178,13 +182,15 @@
     var roleId = state.selectedRoleId;
     if (!roleId) return;
     var pane = activePane();
+    var target = sessionTarget(roleId);
     var res;
     try {
-      res = await d.abortSession(roleId);
+      res = await d.abortSession(target);
     } catch (err) {
-      sysRow(pane, "sys-call", ICONS.deny, "停止失败：" + (err && err.message ? err.message : err));
+      deliverRuntimePayload(target, function () { sysRow(pane, "sys-call", ICONS.deny, "停止失败：" + (err && err.message ? err.message : err)); });
       return;
     }
+    deliverRuntimePayload(target, function () {
     var r = res && typeof res === "object" ? res : {};
     if (r.ok === true) {
       sysRow(pane, "sys-call", ICONS.call, "已请求停止当前轮次——轮次仍会以收尾事件结束。");
@@ -194,6 +200,7 @@
     } else {
       sysRow(pane, "sys-call", ICONS.deny, "停止失败：" + (r.error || "未知原因"));
     }
+    });
   }
 
   /**
@@ -244,6 +251,89 @@
   var withdrawFeedback = Object.create(null);
   var composerDrafts = Object.create(null);
   var projectGeneration = 0;
+  var runtimeViews = Object.create(null);
+  var backgroundDelivery = false;
+  var liveReplayCounts = Object.create(null);
+  var manualMessages = Object.create(null);
+  var rowOrigin = "extra";
+  var rowReplayToken = null;
+
+  function sessionTarget(roleId) {
+    return { projectRoot: state.projectRoot, roleId: roleId, runtime: state.runtime };
+  }
+
+  function captureRuntimeView() {
+    return { liveRoles: state.liveRoles, roleMeta: state.roleMeta, roleBusy: state.roleBusy,
+      queueByRole: state.queueByRole, queueItemsByRole: state.queueItemsByRole, runningByRole: state.runningByRole,
+      sessionOpenRoleId: state.sessionOpenRoleId, shellConfirm: state.shellConfirm, chatPanes: chatPanes, paneRowLists: paneRowLists, paneAnchors: paneAnchors,
+      opRequests: opRequests, replayState: replayState, activityOpen: activityOpen, groupSeqByRole: groupSeqByRole,
+      groupIdentitiesByRole: groupIdentitiesByRole, drawerReading: drawerReading, composerDrafts: composerDrafts,
+      withdrawPending: withdrawPending, withdrawFeedback: withdrawFeedback, lastManualSend: lastManualSend,
+      liveReplayCounts: liveReplayCounts, manualMessages: manualMessages };
+  }
+
+  function installRuntimeView(view) {
+    var v = view || {};
+    state.liveRoles = v.liveRoles || [];
+    ["roleMeta", "roleBusy", "queueByRole", "queueItemsByRole", "runningByRole"].forEach(function (key) { state[key] = v[key] || Object.create(null); });
+    state.sessionOpenRoleId = v.sessionOpenRoleId || null;
+    state.shellConfirm = v.shellConfirm || null;
+    chatPanes = v.chatPanes || Object.create(null); paneRowLists = v.paneRowLists || Object.create(null);
+    paneAnchors = v.paneAnchors || Object.create(null); opRequests = v.opRequests || Object.create(null);
+    replayState = v.replayState || Object.create(null); activityOpen = v.activityOpen || Object.create(null);
+    groupSeqByRole = v.groupSeqByRole || Object.create(null); groupIdentitiesByRole = v.groupIdentitiesByRole || Object.create(null);
+    drawerReading = v.drawerReading || Object.create(null); composerDrafts = v.composerDrafts || Object.create(null);
+    withdrawPending = v.withdrawPending || Object.create(null); withdrawFeedback = v.withdrawFeedback || Object.create(null);
+    liveReplayCounts = v.liveReplayCounts || Object.create(null); manualMessages = v.manualMessages || Object.create(null);
+    lastManualSend = v.lastManualSend || { roleId: null, text: "", at: 0 };
+  }
+
+  // 异引擎信封仅进入自己的游离视图；任何旧项目信封直接丢弃。
+  function deliverRuntimePayload(payload, handler) {
+    if (!payload || typeof payload !== "object") return;
+    if (payload.projectRoot != null && payload.projectRoot !== state.projectRoot) return;
+    var runtime = payload.runtime || "pi";
+    if (["pi", "codex", "claude", "demo"].indexOf(runtime) < 0) return;
+    if (runtime === state.runtime) { handler(payload); return; }
+    var active = captureRuntimeView(), activeRuntime = state.runtime, selected = state.selectedRoleId;
+    var activeBatch = { depth: batchDepth, dirty: batchDirtyPanes, scroll: batchSuppressedScroll, pin: batchStreamPin };
+    var key = Rt.viewKey(state.projectRoot, runtime);
+    backgroundDelivery = true;
+    state.runtime = runtime; state.selectedRoleId = null;
+    installRuntimeView(runtimeViews[key]);
+    batchDepth = 1; batchDirtyPanes = []; batchSuppressedScroll = null; batchStreamPin = null;
+    try { handler(payload); }
+    finally {
+      try { batchDepth = 0; flushBatchSideEffects(); }
+      finally {
+        runtimeViews[key] = captureRuntimeView();
+        installRuntimeView(active); state.runtime = activeRuntime; state.selectedRoleId = selected; backgroundDelivery = false;
+        batchDepth = activeBatch.depth; batchDirtyPanes = activeBatch.dirty; batchSuppressedScroll = activeBatch.scroll; batchStreamPin = activeBatch.pin;
+      }
+    }
+  }
+
+  async function selectRuntime(runtime) {
+    if (["pi", "codex", "claude"].indexOf(runtime) < 0 || runtime === state.runtime) return;
+    saveComposerDraft(state.selectedRoleId); captureDrawerReading();
+    runtimeViews[Rt.viewKey(state.projectRoot, state.runtime)] = captureRuntimeView();
+    ++roleSelectionVersion; projectGeneration += 1;
+    state.runtime = runtime;
+    piView = null;
+    $("pi-panel").querySelector(".pi-fields").innerHTML = "";
+    $("pi-panel").querySelector(".pi-advanced-body").innerHTML = "";
+    $("pi-panel").querySelector(".pi-advanced").hidden = true;
+    setPiStatus("正在读取 " + Rt.runtimeLabel(runtime) + " 配置…", "");
+    installRuntimeView(runtimeViews[Rt.viewKey(state.projectRoot, runtime)]);
+    renderedDrawerRole = null; state.sessionOpenRoleId = null;
+    $("runtime-select").value = runtime;
+    $("shell-confirm").hidden = true;
+    if (state.shellConfirm) renderShellConfirm(state.shellConfirm);
+    restoreComposerDraft(state.selectedRoleId);
+    showPane(state.selectedRoleId); renderRoleTree(); renderRight(); renderTabs(); updateControls(); setChatHeader(selectedRole());
+    if (state.rightTab === "pi") void loadPiConfig();
+    if (state.selectedRoleId) await selectRole(state.selectedRoleId);
+  }
 
   function captureChatReading(pane) {
     var chat = $("chat");
@@ -345,6 +435,12 @@
 
   /** 重置所有 pane（换项目）：老项目的历史**不跨项目保留**；#chat 恢复为默认空状态。 */
   function resetPanes() {
+    closeShellConfirm();
+    Object.keys(runtimeViews).forEach(function (key) {
+      var drafts = runtimeViews[key].composerDrafts || {};
+      Object.keys(drafts).forEach(function (roleId) { releaseImages(drafts[roleId].images || []); });
+    });
+    runtimeViews = Object.create(null);
     clearAllComposerDrafts();
     projectGeneration += 1;
     activityOpen = Object.create(null);
@@ -359,6 +455,7 @@
     paneAnchors = Object.create(null); // 回放锚点表随项目作废（锚点是行序位——只对老项目的行表有意义）
     opRequests = Object.create(null); // 交互请求登记表随之作废（旧项目的请求已随会话/时限自行落定）
     replayState = Object.create(null); // 回放去重状态随项目作废（新项目的转录从零核对）
+    liveReplayCounts = Object.create(null); manualMessages = Object.create(null);
     $("chat").innerHTML = emptyStateHtml();
     bindEmptyState($("chat"));
   }
@@ -552,6 +649,8 @@
       mdReady: o.mdReady === true,
       measured: false,
       requestId: typeof o.requestId === "string" ? o.requestId : null,
+      origin: o.origin || rowOrigin, replayToken: Object.prototype.hasOwnProperty.call(o, "replayToken") ? o.replayToken : rowReplayToken,
+      manualClientId: o.manualClientId || null,
     };
     if (at === rl.rows.length) {
       rl.rows.push(rec);
@@ -559,6 +658,7 @@
       rl.rows.splice(at, 0, rec);
       for (var x = at + 1; x < rl.rows.length; x += 1) rl.rows[x].index = x; // 右移重编号（插入极少数，O(n) 一次）
     }
+    if (rec.replayToken) (rl.tokenRows || (rl.tokenRows = Object.create(null)))[Rt.tokenId(rec.replayToken)] = rec;
     rl.prefix = null;
     if (rl.rows.length < VIRT_MIN_ROWS) {
       attachRow(rl, rec); // 小 pane：立即挂载（**不**测量——热路径禁逐条强制布局）
@@ -687,7 +787,7 @@
 
   // —————— 事件渲染：气泡 / 系统状态行 / 内联拒绝（均**落到指定 pane**，B-2） ——————
   function appendUser(pane, text) {
-    registerRow(
+    var rec = registerRow(
       pane,
       function () {
         var div = document.createElement("div");
@@ -699,6 +799,7 @@
       52
     );
     scrollBottomForced(pane); // 用户自己的动作：强制贴底
+    return rec;
   }
 
   function appendAssistant(pane, text) {
@@ -737,7 +838,7 @@
         div.innerHTML = '<span class="sys-ico">' + icon + '</span><span class="sys-text">' + esc(text) + "</span>";
         return div;
       },
-      34
+      34, { kind: "system", data: { cls: cls, icon: icon, text: text } }
     );
     scrollBottom(pane, pin);
     return rec.el; // 小 pane（非窗口化）恒已挂载；窗口化下离屏行 el 为 null——调用方须容忍（现有唯一用法=开头 loading 行）
@@ -773,6 +874,14 @@
 
   function appendActivity(pane, activity) {
     var rl = rowListFor(pane);
+    activity.origin = activity.origin || rowOrigin;
+    activity.replayToken = activity.replayToken || rowReplayToken;
+    if (activity.callId) {
+      var targets = rl.activityTargets || (rl.activityTargets = Object.create(null));
+      var targetKey = JSON.stringify([activity.turnId, activity.callId, activity.toolName]);
+      if (activity.fullTarget) targets[targetKey] = { fullTarget: activity.fullTarget, target: activity.target };
+      else if (targets[targetKey]) { activity.fullTarget = targets[targetKey].fullTarget; activity.target = targets[targetKey].target; }
+    }
     if (activity.exceptional) {
       rl.activityGroup = null;
       appendDenied(pane, activity.visibleSummary || activity.toolName + ' · ' + activity.label, activity.fullTarget);
@@ -811,6 +920,7 @@
       rl.activityGroup = rec;
     } else {
       rec.data.items.push(activity);
+      if (activity.replayToken) (rl.tokenRows || (rl.tokenRows = Object.create(null)))[Rt.tokenId(activity.replayToken)] = rec;
       if (!rec.data.turnId && activity.turnId) rec.data.turnId = activity.turnId;
       if (rec.el) fillActivities(rec);
       refreshActivityHeight(pane, rec, saved);
@@ -901,6 +1011,15 @@
 
   function onShellConfirm(payload) {
     if (!payload || typeof payload !== "object" || typeof payload.id !== "string" || payload.id === "") return;
+    if (!Rt.matchesView(payload, state.projectRoot, state.runtime)) return;
+    var cur = state.shellConfirm;
+    if (!cur || cur.id !== payload.id) cur = { id: payload.id, busy: false, runtime: state.runtime, projectRoot: state.projectRoot, roleId: payload.roleId, payload: payload };
+    state.shellConfirm = cur;
+    if (!backgroundDelivery) renderShellConfirm(cur);
+  }
+
+  function renderShellConfirm(cur) {
+    var payload = cur.payload;
     // 命令**逐字原文**：textContent 落入（无 HTML 注入口——不美化、不改写、不截断）。
     $("sc-command").textContent = typeof payload.command === "string" ? payload.command : "";
     var summary = typeof payload.summary === "string" && payload.summary !== "" ? payload.summary : "";
@@ -916,19 +1035,19 @@
     rawEl.hidden = raw === "";
     $("sc-details").open = false; // 技术详情**默认收起**（每次来新请求都复位）
 
-    state.shellConfirm = { id: payload.id, busy: false };
     var overlay = $("shell-confirm");
     overlay.hidden = false;
     overlay.classList.remove("is-expired");
     $("sc-hint").textContent = SHELL_CONFIRM_DEFAULT_HINT;
-    $("sc-deny").disabled = false;
-    $("sc-allow").disabled = false;
-    $("sc-close").disabled = false;
+    $("sc-deny").disabled = cur.busy;
+    $("sc-allow").disabled = cur.busy;
+    $("sc-close").disabled = cur.busy;
+    if (cur.expiredReason) markShellConfirmExpired(cur.expiredReason);
     $("sc-deny").focus(); // 拒绝为默认焦点（fail-closed 的 UI 侧同向）
   }
 
   function closeShellConfirm() {
-    $("shell-confirm").hidden = true;
+    if (!backgroundDelivery) $("shell-confirm").hidden = true;
     state.shellConfirm = null;
   }
 
@@ -936,10 +1055,12 @@
   function markShellConfirmExpired(text) {
     if (!state.shellConfirm) return;
     state.shellConfirm.busy = true;
+    state.shellConfirm.expiredReason = text;
+    if (backgroundDelivery) return;
     $("shell-confirm").classList.add("is-expired");
     $("sc-deny").disabled = true;
     $("sc-allow").disabled = true;
-    $("sc-close").disabled = true;
+    $("sc-close").disabled = false; // 失效后只可关闭展示，不回传放行。
     $("sc-hint").textContent = text;
   }
 
@@ -947,9 +1068,12 @@
    *  失效/通道失败 ⇒ 如实终态（不假装已裁决、更不假装已放行）。 */
   function respondShellConfirm(allow) {
     var cur = state.shellConfirm;
-    if (!cur || cur.busy) return;
+    if (!cur) return;
+    if (cur.busy) { if (cur.expiredReason && allow !== true) closeShellConfirm(); return; }
     cur.busy = true;
     var done = function (res) {
+      deliverRuntimePayload(cur, function () {
+      if (state.shellConfirm !== cur) return;
       if (res && res.ok === true) {
         closeShellConfirm();
         return;
@@ -959,6 +1083,7 @@
         return;
       }
       markShellConfirmExpired("未能回传你的决定（通道未接或异常）——按 fail-closed 不放行；请让角色重新发起。");
+      });
     };
     if (!d.shellConfirmRespond) {
       done(null);
@@ -1043,7 +1168,11 @@
     renderRoleTree();
     updateOpChip(roleId);
     renderCurrentWork(roleId);
-    syncCoveredOperatorCards();
+    if (!backgroundDelivery) syncCoveredOperatorCards();
+  }
+
+  function refreshEntryAwaiting(entry) {
+    deliverRuntimePayload({ projectRoot: entry.projectRoot, runtime: entry.runtime, roleId: entry.roleId }, function () { refreshAwaitingBadge(entry.roleId); });
   }
 
   /** 卡片的**终态呈现**（按钮永久隐藏 + 如实说明；重物化时同款输出）。 */
@@ -1164,6 +1293,7 @@
 
   /** 刷新 chip（与左树徽标 / 当前 pane 指针**同一状态源**、同一刷新点）。 */
   function updateOpChip(roleId) {
+    if (backgroundDelivery) return;
     var el = ensureOpChip();
     var viewing = state.selectedRoleId === roleId && paneFor(roleId).parentNode === $("chat");
     var ids = openRequestIdsFor(roleId);
@@ -1198,15 +1328,26 @@
     // anchorKey：请求的锚点键（主进程按单一算法从请求本体 kind+title 拼出）——（重）物化时与回放行
     // 精确关联、把卡落回它发生的位置；payload 未带（旧主进程/探针直发）⇒ null ⇒ 走首物化位/兜底落尾。
     var anchorKey = typeof payload.anchorKey === "string" && payload.anchorKey !== "" ? payload.anchorKey : null;
-    opRequests[requestId] = entry = { roleId: roleId, request: req, state: "open", finalNote: null, card: null, anchorKey: anchorKey };
+    opRequests[requestId] = entry = { roleId: roleId, runtime: state.runtime, projectRoot: state.projectRoot, request: req, state: "open", finalNote: null, card: null, anchorKey: anchorKey };
     materializeOperatorCard(requestId);
     refreshAwaitingBadge(roleId);
+    if (backgroundDelivery) return;
     if (rawRoleId === "") {
       sysRow(activePane(), "sys-call", ICONS.shield, "（异常）收到一条未带角色标识的交互请求——已就地呈现；正常链路不会如此。");
     } else if (roleId !== state.selectedRoleId) {
       // 可见性指针：请求**不属于**当前查看的角色时，在当前 pane 放一条只读提示（客户「切走就看不到」的正面解法）。
       sysRow(activePane(), "sys-call", ICONS.shield, "【待确认】角色 " + esc(roleId) + " 有一条交互请求等你作答——点左侧该角色查看。");
     }
+  }
+
+  function onOperatorExpired(payload) {
+    if (state.shellConfirm && state.shellConfirm.id === payload.id) markShellConfirmExpired("此确认已失效，未获放行。" + (payload.reason || "请让角色重新发起。"));
+    var entry = payload && opRequests[payload.id];
+    if (!entry || entry.state !== "open" || payload.roleId !== entry.roleId) return;
+    entry.state = "expired";
+    entry.finalNote = { text: "请求已失效，未获同意。" + (payload.reason ? "原因：" + payload.reason : "请让角色重新发起。"), cls: "op-note-err" };
+    if (entry.card) freezeOperatorCard(entry.card, entry.finalNote.text, entry.finalNote.cls);
+    refreshEntryAwaiting(entry);
   }
 
   /** pane 重挂/重建后的**补挂**（正常路径卡随 pane 元素存活；本钩子防 pane 被重建时丢卡）。 */
@@ -1359,34 +1500,36 @@
     }
     /** 回传决定：先乐观熄灯（B-3 按**全部 open 请求**重算）；成功/失效定格；可重试则解冻。 */
     function submit(decision, pendingText, okText) {
-      if (entry.state !== "open") return;
+      if (entry.state !== "open" || entry.runtime !== state.runtime || entry.projectRoot !== state.projectRoot) return;
       setButtonsDisabled(true);
       setNote(pendingText, "");
-      refreshAwaitingBadge(entry.roleId);
+      refreshEntryAwaiting(entry);
       Promise.resolve(d.operatorRespond({ id: requestId, decision: decision }))
         .then(function (r) {
+          if (entry.state !== "open") return;
           if (r && r.ok === true) {
             entry.state = "decided";
             entry.finalNote = { text: okText, cls: "op-note-ok" };
             freezeOperatorCard(card, entry.finalNote.text, entry.finalNote.cls);
-            refreshAwaitingBadge(entry.roleId);
+            refreshEntryAwaiting(entry);
             return;
           }
           if (r && r.expired === true) {
             // **失效终态**（G-1：卡片**不按时间过期**）：此分支只剩一种真实失效——应用关闭/重启后，
             // 未决请求随窗口一起消失；旧卡作答时如实告知（含出路），定格、不再解冻重试。
             entry.state = "expired";
-            entry.finalNote = { text: "请求已失效（应用已重启/关闭），未获同意——请让角色重新发起。", cls: "op-note-err" };
+            entry.finalNote = { text: "请求已失效（轮次停止、会话重建或应用关闭），未获同意——请让角色重新发起。", cls: "op-note-err" };
             freezeOperatorCard(card, entry.finalNote.text, entry.finalNote.cls);
-            refreshAwaitingBadge(entry.roleId);
+            refreshEntryAwaiting(entry);
             return;
           }
           throw new Error((r && r.error) || "通道未受理");
         })
         .catch(function (err) {
+          if (entry.state !== "open") return;
           // 可重试（校验驳回/通道瞬时失败等）：请求仍 open——解冻供修正重试，如实示原因。
           setButtonsDisabled(false);
-          refreshAwaitingBadge(entry.roleId);
+          refreshEntryAwaiting(entry);
           setNote("回传失败：" + String(err && err.message ? err.message : err) + "——请重试。", "op-note-err");
         });
     }
@@ -1485,7 +1628,7 @@
 
   function appendEventSafely(envelope) {
     try {
-      appendOneEvent(envelope);
+      deliverRuntimePayload(envelope, appendOneEvent);
     } catch (error) {
       diagnose("renderer.event-error", { errorMessage: String(error && error.message || "事件显示失败"), errorType: String(error && error.name || "Error") });
       setHint("一条事件无法显示，其余消息继续接收。");
@@ -1524,9 +1667,42 @@
   }
 
   function appendOneEvent(env) {
+    if (!env || !env.event || typeof env.roleId !== "string") return;
+    var ev = env.event;
+    if (ev.runtime != null && ev.runtime !== state.runtime || ev.roleId != null && ev.roleId !== env.roleId) return;
+    bindManualTurn(env);
+    var key = Rt.replayKey({ turnId: ev.turnId, eventKind: ev.kind, text: ev.summary });
+    var counts = liveReplayCounts[env.roleId] || (liveReplayCounts[env.roleId] = Object.create(null));
+    var token = key ? { key: key, occurrence: (counts[key] = (counts[key] || 0) + 1) } : null;
+    var historyCounts = replayState[env.roleId] && replayState[env.roleId].counts || {};
+    if (token && (historyCounts[key] || 0) >= token.occurrence) return;
+    var priorOrigin = rowOrigin, priorToken = rowReplayToken;
+    rowOrigin = "live"; rowReplayToken = token;
+    try { renderOneEvent(env); }
+    finally { rowOrigin = priorOrigin; rowReplayToken = priorToken; }
+  }
+
+  function bindManualTurn(env) {
+    var ev = env.event, message = manualMessages[env.clientMessageId];
+    if (!message || message.roleId !== env.roleId || typeof ev.turnId !== "string" || ev.turnId === "") return;
+    if (message.turnId) return; // 原投递只能绑定一次，不接受迟到事件改绑。
+    message.turnId = ev.turnId;
+    var key = Rt.replayKey({ kind: "user", turnId: ev.turnId, text: message.text });
+    var counts = liveReplayCounts[env.roleId] || (liveReplayCounts[env.roleId] = Object.create(null));
+    message.rec.replayToken = { key: key, occurrence: (counts[key] = (counts[key] || 0) + 1) };
+    var rl = paneRowLists[env.roleId];
+    if (rl) (rl.tokenRows || (rl.tokenRows = Object.create(null)))[Rt.tokenId(message.rec.replayToken)] = message.rec;
+    var history = replayState[env.roleId];
+    if (history && (history.counts[key] || 0) >= message.rec.replayToken.occurrence) {
+      replayHistory({ projectRoot: state.projectRoot, roleId: env.roleId, runtime: state.runtime, rows: history.rows, error: history.error }, true);
+    }
+  }
+
+  function renderOneEvent(env) {
     if (!env || typeof env !== "object" || typeof env.roleId !== "string" || !env.event) return;
     var roleId = env.roleId;
     var ev = env.event;
+    if (ev.runtime != null && ev.runtime !== state.runtime) return;
     var pane = paneFor(roleId);
     var kind = ev.kind || "message";
     // B-3：每条事件都记「最近一条事件摘要 + 时间」（悬停用；复用事件流，不新增数据源）。
@@ -1565,7 +1741,8 @@
     else if (kind === "settled") {
       // 一轮结束：**忙态由主进程快照转述**（session:role-state 的 busy=false——见 onRoleState），
       // 此处只清「上一次的错误态」（本轮正常收口）并记行；**不再**由事件流自设忙闲（准确性裁定）。
-      metaFor(roleId).error = false;
+      var outcome = ev.detail && ev.detail.outcome;
+      metaFor(roleId).error = outcome === "failed" || outcome === "timed_out";
       // Q-1/Q-2：流式段的**一次性 Markdown 化**（本轮期间到达的助手消息先是纯文本——见 appendAssistant）。
       upgradeStreamingMarkdown(roleId);
       sysRow(pane, "sys-settled", ICONS.call, ev.summary);
@@ -1600,9 +1777,9 @@
   }
 
   /**
-   * 写入语义（设计 §3.9 更正，2026-10-11；客户同日裁定去掉运行时选择器、默认跑 pi）。
+   * 写入语义（V2r1：Pi/Codex/Claude 共用同一治理语义）。
    *
-   * 桌面一律走 **pi 真实运行时**（`writeRoot = projectRoot`，经编排 `createPiAdapterFactory` → 真实适配器）：
+   * 所选真实引擎经窗口层与编排建立会话（写入目标为导入项目）：
    * **写入会真正落到导入的项目**，但仍受门禁约束（角色边界 Section 1 + acceptance，与 CLI 同一套
    * `resolveWrite`），**越界写在写之前被拒**。文案只述运行时语义（界面层**不作判定**），判定仍唯一来自门禁引擎。
    *
@@ -1610,7 +1787,7 @@
    */
   var WRITE_NOTE = "实际写入导入项目，角色边界外的写入会被拒绝。";
 
-  /** 横栏常驻写入语义（单一来源；无运行时分支——桌面一律 pi）。
+  /** 横栏常驻写入语义（单一来源；三种真实引擎共用）。
    *  v2 对齐（2026-10-13）：纯文字、无图标（「异常依文字而非堆图标」；说明在标题下方左对齐）。 */
   function renderWriteNote() {
     var el = $("runtime-note");
@@ -1662,101 +1839,103 @@
     piView = view || { path: "", fields: [] };
     var p = $("pi-panel-path");
     if (p) p.textContent = piView.path || "";
-    PI_KEYS.forEach(function (key) {
-      var inp = piInput(key);
+    var fields = piView.fields || [];
+    var label = piView.label || Rt.runtimeLabel(state.runtime);
+    var hint = $("pi-panel").querySelector(".pi-panel-hint");
+    hint.textContent = "保存到仓库根 .env，只修改本引擎字段。" + Rt.applicationLabel(piView.application || "next-session");
+    function fieldHtml(f) {
+      var required = f.required === true || (state.runtime === "pi" && PI_REQUIRED_KEYS.indexOf(f.key) >= 0);
+      return '<label class="pi-field" for="pi-inp-' + esc(f.key) + '"><span class="pi-field-label">' +
+        esc(f.label || f.key) + ' · ' + (required ? "必填" : "可选") + (f.secret ? ' <span class="pi-secret-tag">机密</span>' : "") +
+        '</span><span class="pi-input-wrap"><input id="pi-inp-' + esc(f.key) + '" class="pi-input" type="' + (f.secret ? "password" : "text") +
+        '" autocomplete="off" spellcheck="false" />' + (f.secret ? '<button id="pi-toggle-secret" class="btn btn-ghost btn-mini" type="button">显示</button>' : "") +
+        '</span><span class="runtime-field-help">' + esc(f.key + " · " + Rt.sourceLabel(f) + (f.help ? "。" + f.help : "")) + '</span></label>';
+    }
+    var mainFields = fields.filter(function (f) { return f.key !== "ANS_PI_CONTEXT_WINDOW"; });
+    $("pi-panel").querySelector(".pi-fields").innerHTML = mainFields.map(fieldHtml).join("");
+    var advanced = $("pi-panel").querySelector(".pi-advanced");
+    var advancedField = fields.find(function (f) { return f.key === "ANS_PI_CONTEXT_WINDOW"; });
+    advanced.hidden = !advancedField;
+    advanced.querySelector(".pi-advanced-body").innerHTML = advancedField ? fieldHtml(advancedField) : "";
+    fields.forEach(function (f) {
+      var inp = piInput(f.key);
       if (!inp) return;
-      var f = piFieldByKey(key);
-      if (key === "ANTHROPIC_AUTH_TOKEN") {
+      if (f.secret === true) {
         inp.value = ""; // 绝不回显值
-        inp.placeholder = f && f.isSet ? "已设置，留空则不修改" : "未设置";
+        inp.placeholder = f.isSet ? "已设置，留空则不修改" : "未设置";
         inp.type = "password";
-        var tg = $("pi-toggle-secret");
-        if (tg) tg.textContent = "显示";
-      } else {
-        inp.value = f ? f.value : "";
-      }
+      } else inp.value = typeof f.value === "string" ? f.value : "";
     });
+    var tg = $("pi-toggle-secret");
+    if (tg) tg.addEventListener("click", toggleSecretVisibility);
+    $("drawer-title").textContent = label + " 配置";
   }
 
-  /** 选 pi 但**必填**不全 → 明确告警（fail-closed 的补救入口提示）；必填齐备则如实示「已齐备」。
-   *  可选的上下文窗口（「高级」）留空不算缺——缺失时 Pi适配器用保守默认，不会硬失败。 */
   function renderPiConfigWarning() {
     if (!piView || !piView.fields) { setPiStatus("", ""); return; }
-    var missing = piView.fields
-      .filter(function (f) { return PI_REQUIRED_KEYS.indexOf(f.key) >= 0 && !f.isSet; })
+    var missing = Array.isArray(piView.missingKeys) ? piView.missingKeys : piView.fields
+      .filter(function (f) { return (f.required === true || state.runtime === "pi" && PI_REQUIRED_KEYS.indexOf(f.key) >= 0) && !f.isSet; })
       .map(function (f) { return f.key; });
-    if (missing.length) {
-      setPiStatus("Pi 配置不完整，缺：" + missing.join("、") + "——选 pi 开会话会被拒（fail-closed），请补齐后保存。", "warn");
-    } else {
-      setPiStatus("Pi 配置已齐备。", "ok");
-    }
+    var label = piView.label || Rt.runtimeLabel(state.runtime);
+    setPiStatus(missing.length ? label + " 配置不完整，缺：" + missing.join("、") + "。请补齐后保存。" : label + " 必填配置已齐备。" + Rt.applicationLabel(piView.application || "next-session"), missing.length ? "warn" : "ok");
   }
 
+  var configLoadVersion = 0;
   async function loadPiConfig() {
+    var runtime = state.runtime, projectRoot = state.projectRoot, version = ++configLoadVersion;
     try {
-      var view = await d.getPiConfig();
+      var view = d.getRuntimeConfig ? await d.getRuntimeConfig(runtime) : runtime === "pi" ? await d.getPiConfig() : null;
+      if (runtime !== state.runtime || projectRoot !== state.projectRoot || version !== configLoadVersion) return;
+      if (!view) throw new Error("设置通道未就绪");
       applyPiView(view);
       renderPiConfigWarning();
     } catch (err) {
-      // 读取失败（如 .env 不可读）如实呈现，不静默。
-      setPiStatus("读取 .env 失败：" + (err && err.message ? err.message : err), "err");
+      if (runtime !== state.runtime || version !== configLoadVersion) return;
+      setPiStatus("读取配置失败：" + (err && err.message ? err.message : err), "err");
     }
   }
 
   function openPiPanel() {
-    // 客户裁定（2026-10-13）：入口=右上角图标簇 tab-pi；面板迁入抽屉——展开即把 tab 切到 "pi"。
     if (state.rightTab !== "pi") {
       state.rightTab = "pi";
-      renderRight();
-      renderTabs();
+      renderRight(); renderTabs();
     }
     void loadPiConfig();
   }
 
-  /** token 明/暗切换（明示操作才显示——掩码为默认）。 */
   function toggleSecretVisibility() {
-    var inp = piInput("ANTHROPIC_AUTH_TOKEN");
-    var tg = $("pi-toggle-secret");
+    var f = piView && piView.fields.find(function (field) { return field.secret === true; });
+    var inp = piInput(f ? f.key : "ANTHROPIC_AUTH_TOKEN"), tg = $("pi-toggle-secret");
     if (!inp) return;
     var showing = inp.type === "text";
     inp.type = showing ? "password" : "text";
     if (tg) tg.textContent = showing ? "显示" : "隐藏";
   }
 
-  /**
-   * 保存：从表单收集**面板键**——
-   *  - 非机密键：非空值照写；**清空一个原本已设置的键 = 写入空（清除）**；原本未设置又留空 = **跳过**
-   *    （不凭空造出空键，遵守「只改相关键」）；
-   *  - 机密键（token）：**仅当确实输入了非空值才提交**（留空 = 保留原值，避免把已设置的 token 抹掉）。
-   * 经 `d.savePiConfig` 写 `.env`（只改相关键、原子写、保存后主进程重载 env）。回报只含键名。
-   */
   async function savePiConfigFromForm() {
+    if (!piView || piView.runtime && piView.runtime !== state.runtime) return;
+    var runtime = state.runtime, projectRoot = state.projectRoot;
     var updates = {};
-    PI_KEYS.forEach(function (key) {
-      var inp = piInput(key);
+    (piView.fields || []).forEach(function (f) {
+      var inp = piInput(f.key);
       if (!inp) return;
       var v = inp.value;
-      if (key === "ANTHROPIC_AUTH_TOKEN") {
-        if (v !== "") updates[key] = v; // 留空 = 不修改（保留已设置的值）
-        return;
-      }
-      var f = piFieldByKey(key);
-      var wasSet = !!(f && f.isSet);
-      if (v !== "" || wasSet) updates[key] = v; // 非空照写；清空已设置键 = 清除；未设置留空 = 跳过
+      if (f.secret) { if (v !== "") updates[f.key] = v; return; }
+      if (v !== "" || f.isSet) updates[f.key] = v;
     });
     setPiStatus("正在保存…", "");
+    $("pi-save").disabled = true;
     try {
-      var res = await d.savePiConfig(updates);
-      if (!res || !res.ok) {
-        setPiStatus("保存失败：" + ((res && res.error) || "未知错误"), "err");
-        return;
-      }
-      // 保存成功：重载视图（token 回到「已设置，留空则不修改」）并提示仅改了哪些键。
+      var res = d.saveRuntimeConfig ? await d.saveRuntimeConfig({ runtime: runtime, updates: updates }) : await d.savePiConfig(updates);
+      if (runtime !== state.runtime || projectRoot !== state.projectRoot) return;
+      if (!res || !res.ok) { setPiStatus("保存失败：" + ((res && res.error) || "未知错误"), "err"); return; }
       await loadPiConfig();
-      setPiStatus("已保存到 .env（改动键：" + ((res.appliedKeys && res.appliedKeys.join("、")) || "无") + "）。下一会话即用新值。", "ok");
+      if (runtime !== state.runtime || projectRoot !== state.projectRoot) return;
+      setPiStatus("已保存到 .env（改动键：" + ((res.appliedKeys && res.appliedKeys.join("、")) || "无") + "）。" + Rt.applicationLabel(res.application || "next-session"), "ok");
+      if (state.selectedRoleId && state.roleBusy[state.selectedRoleId] !== true && res.application !== "after-active-turn") await selectRole(state.selectedRoleId);
     } catch (err) {
-      setPiStatus("保存异常：" + (err && err.message ? err.message : err), "err");
-    }
+      if (runtime === state.runtime && projectRoot === state.projectRoot) setPiStatus("保存异常：" + (err && err.message ? err.message : err), "err");
+    } finally { $("pi-save").disabled = false; }
   }
 
   // —————— 左栏：导入项目 + 角色树 ——————
@@ -1770,10 +1949,15 @@
   // 触发条件 = **确有后台工作**（role-state 真实快照 `state.roleBusy`，不用界面侧推测）；无 busy ⇒ 行为**逐字不变**。
   // 确认条是**动作防呆、不是会话内容**：放在 #chat 之外（不进行表/不回放/切项目即随重置消失）。
   function busyRoleIds() {
-    var ids = [];
+    var ids = [], seen = Object.create(null);
     for (var k in state.roleBusy) {
-      if (state.roleBusy[k] === true) ids.push(k);
+      if (state.roleBusy[k] === true) { ids.push(k); seen[k] = true; }
     }
+    Object.keys(runtimeViews).forEach(function (key) {
+      if (key === Rt.viewKey(state.projectRoot, state.runtime)) return;
+      var busy = runtimeViews[key].roleBusy || {};
+      Object.keys(busy).forEach(function (id) { if (busy[id] === true && !seen[id]) { ids.push(id); seen[id] = true; } });
+    });
     return ids;
   }
 
@@ -1883,8 +2067,10 @@
   /** 取主进程的保活会话列表（B-2）→ 「有活动会话」与状态派生的数据源。失败如实清空（不假装有）。 */
   async function refreshLiveRoles() {
     try {
-      var ids = await d.listLiveSessions();
-      state.liveRoles = Array.isArray(ids) ? ids : [];
+      var runtime = state.runtime, projectRoot = state.projectRoot;
+      var ids = d.listLiveSessionViews ? await d.listLiveSessionViews() : await d.listLiveSessions();
+      if (runtime !== state.runtime || projectRoot !== state.projectRoot) return;
+      state.liveRoles = Array.isArray(ids) ? ids.filter(function (id) { return typeof id === "string" ? runtime === "pi" : Rt.matchesView(id, projectRoot, runtime); }).map(function (id) { return typeof id === "string" ? id : id.roleId; }) : [];
     } catch (err) {
       state.liveRoles = [];
     }
@@ -1950,6 +2136,7 @@
     if (!info || typeof info !== "object" || typeof info.roleId !== "string" || info.roleId === "") return;
     var roleId = info.roleId;
     state.roleBusy[roleId] = info.busy === true;
+    if (typeof info.contextSource === "string") showSessionContext(roleId, info);
     state.queueByRole[roleId] = Array.isArray(info.summaries)
       ? info.summaries.map(function (s) { return String(s == null ? "" : s); })
       : [];
@@ -1977,7 +2164,7 @@
     if (state.selectedRoleId === roleId) syncChatState(roleId);
     // P1-3：切换项目确认条若正挂着——busy 数随之刷新；归零（轮次自己结束）就收起（防呆不再有意义）。
     var swcf = $("switch-confirm");
-    if (swcf && !swcf.hidden) showSwitchConfirm();
+    if (!backgroundDelivery && swcf && !swcf.hidden) showSwitchConfirm();
     // 右栏：若正看着该角色 → 只更新「待办 / 队列」组（**定点更新**，不重排整个手风琴、不重置展开态）。
     if (state.selectedRoleId === roleId) updateRightQueue(roleId);
     // 图标簇角标随**真实快照**刷新（待办=视图行数 / 队列=排队条数——收起也不丢信息）。
@@ -1987,6 +2174,7 @@
   /** 当前动作缺少可靠字段时仅转述真实busy；不拿已结束工具冒充当前动作。 */
   /** 被辅助抽屉覆盖的卡先经既有定位入口读全；inert不改变审批状态/按钮原disabled。 */
   function syncCoveredOperatorCards() {
+    if (backgroundDelivery) return;
     var pane = $("chat").querySelector(".chat-pane");
     if (!pane) return;
     var drawer = $("right-drawer").getBoundingClientRect();
@@ -2076,63 +2264,136 @@
     pendingHistories = [];
     for (var i = 0; i < pend.length; i += 1) {
       if (!state.projectRoot || pend[i].projectRoot !== state.projectRoot) continue;
-      replayHistory(pend[i]);
+      deliverRuntimePayload(pend[i], replayHistory);
     }
   }
 
-  function replayHistory(payload) {
+  function preserveUncoveredRows(rl, nextCounts) {
+    var buckets = new Map(), manuals = Object.create(null), anchor = "";
+    function covered(token) { return token && (nextCounts[token.key] || 0) >= token.occurrence; }
+    function preserve(value) { if (!buckets.has(anchor)) buckets.set(anchor, []); buckets.get(anchor).push(value); }
+    if (rl) rl.rows.forEach(function (rec) {
+      if (rec.kind === "activities") {
+        rec.data.items.forEach(function (activity) {
+          if (covered(activity.replayToken)) anchor = Rt.tokenId(activity.replayToken);
+          else if (activity.origin !== "history") preserve({ activity: activity });
+        });
+        return;
+      }
+      if (covered(rec.replayToken)) {
+        anchor = Rt.tokenId(rec.replayToken);
+        if (rec.manualClientId) manuals[anchor] = rec;
+      } else if (rec.origin !== "history" && !(rec.kind === "system" && rec.data.cls === "sys-loading")) preserve({ record: rec });
+    });
+    return { buckets: buckets, manuals: manuals, gap: rl && rl.rowGap || 0 };
+  }
+
+  function appendPreservedRow(pane, old, gap, atIndex) {
+    var savedEl = old.el;
+    var rl = rowListFor(pane);
+    if (typeof atIndex === "number" && atIndex < rl.rows.length) {
+      var table = paneAnchors[pane.dataset.roleId];
+      if (table) table.forEach(function (anchor) {
+        if (anchor.requestIndex !== null && anchor.requestIndex >= atIndex) anchor.requestIndex += 1;
+        if (anchor.conclusionIndex !== null && anchor.conclusionIndex >= atIndex) anchor.conclusionIndex += 1;
+        if (anchor.rowsAtReplay > atIndex) anchor.rowsAtReplay += 1;
+      });
+      Object.keys(opRequests).forEach(function (id) {
+        var entry = opRequests[id];
+        if (entry.roleId === pane.dataset.roleId && entry.anchorListSeq === rl.seq && entry.anchorIndex >= atIndex) entry.anchorIndex += 1;
+      });
+    }
+    var rec = registerRow(pane, function (record) { return savedEl || old.build(record); }, Math.max(1, old.h - gap),
+      { kind: old.kind, data: old.data, keepEl: old.keepEl, mdReady: old.mdReady, requestId: old.requestId,
+        origin: old.origin, replayToken: old.replayToken, manualClientId: old.manualClientId, atIndex: atIndex });
+    if (old.manualClientId && manualMessages[old.manualClientId]) manualMessages[old.manualClientId].rec = rec;
+    if (old.requestId && opRequests[old.requestId]) {
+      opRequests[old.requestId].anchorIndex = rec.index;
+      opRequests[old.requestId].anchorListSeq = rowListFor(pane).seq;
+    }
+    return rec;
+  }
+
+  function replayHistory(payload, forceFull) {
     var roleId = payload.roleId;
     var rows = Array.isArray(payload.rows) ? payload.rows : [];
     var error = typeof payload.error === "string" && payload.error !== "" ? payload.error : null;
     if (rows.length === 0 && error === null) return;
     var prev = replayState[roleId];
-    if (prev && prev.projectRoot !== payload.projectRoot) prev = null; // 防御：跨项目不复用（正常已被 resetPanes 清）
-    var plan = UiLabels.replayPlan(prev, rows);
-    // 错误态变化（出现/消失/文案变）⇒ 全量（旧错误分隔行不残留）。
+    if (prev && prev.projectRoot !== payload.projectRoot) prev = null;
+    var plan = forceFull ? { action: "full", from: 0 } : UiLabels.replayPlan(prev, rows);
     if (prev && error !== prev.error) plan = { action: "full", from: 0 };
     diagnose("renderer.replay", { count: rows.length, state: plan.action });
-    if (plan.action === "skip") return; // 幂等：同一份历史（重推/重放）不再叠加副本——真机重复渲染修复
-    var pane = paneFor(roleId);
+    if (plan.action === "skip") return;
+    var pane = paneFor(roleId), oldList = paneRowLists[roleId];
     var reading = captureChatReading(pane);
-    if (plan.action === "full") groupIdentitiesByRole[roleId] = Object.create(null);
-    if (plan.action === "full" && prev) {
-      pane = rebuildPane(roleId); // 内容不一致（重写/截断）：作废旧回放，全量重放（绝不追加第二份）
+    var nextCounts = Rt.replayCounts(rows);
+    var preserved = plan.action === "full" ? preserveUncoveredRows(oldList, nextCounts) : null;
+    if (plan.action === "full") {
+      groupIdentitiesByRole[roleId] = Object.create(null);
+      if (oldList && oldList.rows.length) pane = rebuildPane(roleId);
     }
-    metaFor(roleId).restored = true; // D-1/B-3：徽标「空闲（已恢复）」——不假装「工作中/未开启」
-    // Q-1/Q-2（2026-10-12）：回放包在**批量**里、行走**惰性行表**——长转录（上千行）**不一次性实体化、不一次性
-    // 跑 Markdown**：行模型先建好（毫秒级），窗口化下只有视口附近的行真正建 DOM/渲染；收尾统一贴底刷新窗口。
+    metaFor(roleId).restored = true;
+    var counts = Object.create(null), liveCounts = liveReplayCounts[roleId] || {};
+    var priorOrigin = rowOrigin, priorToken = rowReplayToken;
+    var operatorAnchors = new Set(), deferredOperators = [];
+    rows.forEach(function (row) {
+      if (row.anchorKey && (row.anchor === "request" || row.anchor === "conclusion")) operatorAnchors.add(row.anchorKey);
+    });
+    function appendSaved(anchor) {
+      if (!preserved || !preserved.buckets.has(anchor)) return;
+      preserved.buckets.get(anchor).forEach(function (entry) {
+        if (entry.activity) {
+          rowOrigin = entry.activity.origin || "live"; rowReplayToken = entry.activity.replayToken || null;
+          appendActivity(pane, entry.activity);
+        } else {
+          var request = entry.record.requestId && opRequests[entry.record.requestId];
+          if (entry.record.kind === "operator" && request && operatorAnchors.has(request.anchorKey)) deferredOperators.push(entry.record);
+          else appendPreservedRow(pane, entry.record, preserved.gap);
+        }
+      });
+      preserved.buckets.delete(anchor);
+    }
     batchDepth += 1;
     try {
-      // 客户裁定（2026-10-13）：常规回放**不再插入「会话已恢复…」分隔行**——聊天流不摆常规提示，
-      // 历史行直接排入；回放行仍有 `.is-replay` 视觉区分、徽标「空闲（已恢复）」保留（状态准确性）。
-      // **错误分支保留**：坏文件如实提示而不崩（异常如实告知，不是常规提示）——只在全量路径插入（增量下错误态必未变）。
+      rowOrigin = "history"; rowReplayToken = null;
       if (error !== null && plan.action === "full") {
-        registerRow(
-          pane,
-          function () {
-            var divider = document.createElement("div");
-            divider.className = "sys sys-replay-divider";
-            divider.innerHTML =
-              '<span class="sys-ico">' + ICONS.deny + "</span>" +
-              '<span class="sys-text">' +
-              esc("会话记录读取失败，未回放：" + error) +
-              "</span>";
-            return divider;
-          },
-          34
-        );
+        registerRow(pane, function () {
+          var divider = document.createElement("div"); divider.className = "sys sys-replay-divider";
+          divider.innerHTML = '<span class="sys-ico">' + ICONS.deny + '</span><span class="sys-text">' + esc("会话记录读取失败，未回放：" + error) + "</span>";
+          return divider;
+        }, 34);
       }
+      appendSaved("");
       var from = plan.action === "append" ? plan.from : 0;
-      for (var i = from; i < rows.length; i += 1) appendReplayRow(pane, rows[i]);
-      if (!prev) scrollBottomForced(pane); // 首次回放定位最新，刷新保留阅读。
+      for (var i = 0; i < rows.length; i += 1) {
+        var key = Rt.replayKey(rows[i]);
+        var token = key ? { key: key, occurrence: (counts[key] = (counts[key] || 0) + 1) } : null;
+        if (i < from) continue;
+        rowOrigin = "history"; rowReplayToken = token;
+        if (plan.action === "append" && token && (liveCounts[key] || 0) >= token.occurrence) {
+          var existing = rowListFor(pane).tokenRows && rowListFor(pane).tokenRows[Rt.tokenId(token)];
+          if (rows[i].anchorKey && existing) noteReplayAnchor(roleId, rows[i], existing.index);
+          continue;
+        }
+        var manual = preserved && preserved.manuals[Rt.tokenId(token)];
+        if (manual) appendPreservedRow(pane, manual, preserved.gap);
+        else appendReplayRow(pane, rows[i]);
+        appendSaved(Rt.tokenId(token));
+      }
+      if (preserved) Array.from(preserved.buckets.keys()).forEach(appendSaved);
+      deferredOperators.forEach(function (record) {
+        var request = opRequests[record.requestId];
+        appendPreservedRow(pane, record, preserved.gap, operatorAnchorIndex(rowListFor(pane), request));
+      });
+      if (!prev) scrollBottomForced(pane);
     } finally {
-      batchDepth -= 1;
+      rowOrigin = priorOrigin; rowReplayToken = priorToken; batchDepth -= 1;
     }
-    replayState[roleId] = { rows: rows, error: error, projectRoot: typeof payload.projectRoot === "string" ? payload.projectRoot : "" };
-    flushBatchSideEffects(); // 左树一次 + 贴底一次 + 虚拟窗口一次
+    replayState[roleId] = { rows: rows, error: error, counts: nextCounts, projectRoot: typeof payload.projectRoot === "string" ? payload.projectRoot : "" };
+    flushBatchSideEffects();
     if (prev && reading) restoreChatReading(pane, reading);
-    materializePendingFor(roleId);
-    renderCurrentWork(roleId);
+    materializePendingFor(roleId); renderCurrentWork(roleId);
   }
 
   /** 单条回放行（kind: user|assistant|tool|denied；助手/用户文本走 Markdown 渲染器，工具行 esc）。
@@ -2218,6 +2479,7 @@
     item.innerHTML =
       '<span class="ti-icon">' + (r.builtIn ? ICONS.shield : ICONS.role) + "</span>" +
       '<span class="ti-main"><span class="ti-name">' + esc(r.roleId) + "</span>" +
+      (r.group && r.groupDuty ? '<span class="ti-group-duty">' + esc(r.groupDuty) + "</span>" : "") +
       '<span class="ti-sub">' + esc(roleSubtitle(r)) + "</span></span>" +
       (isPrimary ? '<span class="ti-badge primary" title="主入口：默认入口与主路径">主入口</span>' : "") +
       (r.builtIn ? '<span class="ti-badge" title="内置角色：定义在 SKILL.md，无角色目录">内置</span>' : "") +
@@ -2240,6 +2502,7 @@
    * （§10.7）——次级角色**保留、可点、可聊**。主入口 id 取门禁引擎给的字段，**不硬编码 "su"**。
    */
   function renderRoleTree() {
+    if (backgroundDelivery) return;
     var el = $("role-tree");
     el.innerHTML = "";
     if (!state.roles.length) {
@@ -2254,7 +2517,11 @@
     }
     if (others.length) {
       el.appendChild(treeGroupLabel("其他角色（查看/调试）"));
-      others.forEach(function (r) { el.appendChild(roleTreeItem(r, false)); });
+      el.lastChild.remove();
+      Rt.roleGroups(others).forEach(function (group) {
+        el.appendChild(treeGroupLabel(group.name));
+        group.roles.forEach(function (r) { el.appendChild(roleTreeItem(r, false)); });
+      });
     }
   }
 
@@ -2273,6 +2540,7 @@
   async function selectRole(roleId) {
     var selectionVersion = ++roleSelectionVersion;
     var projectRoot = state.projectRoot;
+    var runtime = state.runtime;
     // 同角色显式点击仍定位，同时经后端确认会话（本地标记不能代替真实句柄）。
     if (state.sessionOpenRoleId === roleId) {
       setHint("已在该角色的会话中，直接输入消息即可。");
@@ -2306,15 +2574,24 @@
     setHint("");
 
     try {
-      // 桌面**一律以 pi 发起**（客户 2026-10-11 裁定：界面不再暴露运行时选择器）。
+      if (d.getSessionHistory) {
+        var history;
+        try { history = await d.getSessionHistory({ projectRoot: projectRoot, roleId: roleId, runtime: runtime }); }
+        catch (error) { history = { projectRoot: projectRoot, roleId: roleId, runtime: runtime, rows: [], error: "读取历史失败：" + String(error && error.message || error) }; }
+        deliverRuntimePayload(history, onSessionHistory);
+        if (selectionVersion !== roleSelectionVersion || state.projectRoot !== projectRoot || state.runtime !== runtime) return;
+        pane = paneFor(roleId);
+        hasHistory = hasHistory || Array.isArray(history.rows) && history.rows.length > 0;
+      }
+      // 每次开启捕获所选 runtime；不同引擎的后台会话继续保持原身份。
       // B-2：切换**不再先 stop 旧会话**——引擎侧并存（各自保活、切回直接续；LRU 上限见 session.ts）。
       var res = await d.openSession({
         projectRoot: projectRoot,
         roleId: roleId,
-        runtime: "pi",
+        runtime: runtime,
       });
       if (loading) loading.remove();
-      if (selectionVersion !== roleSelectionVersion || state.projectRoot !== projectRoot) return;
+      if (selectionVersion !== roleSelectionVersion || state.projectRoot !== projectRoot || state.runtime !== runtime) return;
       if (!res.ok) {
         state.sessionOpenRoleId = null;
         setState("err", "连接失败");
@@ -2322,7 +2599,7 @@
         metaFor(roleId).error = true; // B-3：该角色最近一次会话开启以错误结束
         renderRoleTree();
         sysRow(pane, "sys-call", ICONS.deny, "会话开启失败：" + (res.error || ""));
-        setHint("会话开启失败，可重试，或在「Pi 设置」中检查配置。");
+        setHint("会话开启失败，可重试，或在「" + Rt.runtimeLabel(runtime) + " 设置」中检查配置。");
         return;
       }
       state.sessionOpenRoleId = roleId;
@@ -2333,19 +2610,11 @@
       updateControls();
       setHint(res.note || "");
       await refreshLiveRoles();
-      if (selectionVersion !== roleSelectionVersion || state.projectRoot !== projectRoot) return;
+      if (selectionVersion !== roleSelectionVersion || state.projectRoot !== projectRoot || state.runtime !== runtime) return;
       renderRoleTree();
       // D-1 契约（pm 2026-10-12 钉死）：上下文来源文案走**唯一映射** `St.sessionContextNotice`——
-      // 「dispose/LRU 后重开 = 从本地会话文件恢复（模型上下文一并恢复）」；**只有**「文件缺失/损坏 → 新建」
-      // 才是真·新会话。B-2 时期那句「模型上下文已重启」已失真退役（逐情形对照表见 change 文档）。
-      var notice = St.sessionContextNotice({
-        resumed: res.resumed === true,
-        contextSource: res.contextSource,
-        contextWarning: res.contextWarning,
-        hadHistory: hasHistory,
-        alreadyAnnounced: metaFor(roleId).restored === true,
-      });
-      if (notice.text) sysRow(pane, "sys-settled", ICONS.call, notice.text);
+      // 实际原生恢复结果由窗口转换；回放存在不证明模型上下文恢复。失败后重建必须保留原因。
+      showSessionContext(roleId, res);
       // 生效配置来源（T13）：`.ans` 存在但不可用 / 声明已接受却缺 pin → 载入器 fail-closed 未接受。
       // 如实内联明示「这不是已授权状态」——绝不回退运行期同意、绝不让用户误以为已授权。
       if (res.config && (res.config.kind === "ans-invalid" || !res.config.accepted)) {
@@ -2354,7 +2623,7 @@
       // 会话欢迎消息经 session:event 推达，自动出现在该角色的聊天流中。
     } catch (err) {
       if (loading) loading.remove();
-      if (selectionVersion !== roleSelectionVersion || state.projectRoot !== projectRoot) return;
+      if (selectionVersion !== roleSelectionVersion || state.projectRoot !== projectRoot || state.runtime !== runtime) return;
       state.sessionOpenRoleId = null;
       setState("err", "连接失败");
       updateControls();
@@ -2362,6 +2631,16 @@
       renderRoleTree();
       sysRow(pane, "sys-call", ICONS.deny, "会话开启异常：" + (err && err.message ? err.message : err));
     }
+  }
+
+  function showSessionContext(roleId, info) {
+    var pane = paneFor(roleId), meta = metaFor(roleId);
+    var token = JSON.stringify([info.contextSource, info.contextWarning || ""]);
+    if (meta.contextNoticeToken === token) return;
+    meta.contextNoticeToken = token;
+    var notice = St.sessionContextNotice({ resumed: info.resumed === true, contextSource: info.contextSource,
+      contextWarning: info.contextWarning, hadHistory: !pane.querySelector(".chat-empty"), alreadyAnnounced: false });
+    if (notice.text) sysRow(pane, "sys-settled", ICONS.call, notice.text);
   }
 
   // —————— 右栏：角色资料（手风琴） ——————
@@ -2461,6 +2740,7 @@
     var generation = projectGeneration;
     var pane = activePane();
     var pendingKey = roleId + "\u0000" + id;
+    var pendingTable = withdrawPending;
     var focused = document.activeElement;
     var restoreFocus = focused && focused.classList.contains("q-withdraw") && focused.dataset.id === encodeURIComponent(id);
     function restoreWithdrawFocus() {
@@ -2476,17 +2756,19 @@
     renderWithdrawResult(roleId, id);
     var res;
     try {
-      res = await d.withdrawQueued(roleId, id);
+      res = await d.withdrawQueued(sessionTarget(roleId), id);
     } catch (err) {
-      if (generation !== projectGeneration) return;
+      delete pendingTable[pendingKey];
       feedback[id] = "撤回失败：" + String(err && err.message ? err.message : err);
+      if (generation !== projectGeneration) return;
       sysRow(pane, "sys-call", ICONS.deny, feedback[id]);
       delete withdrawPending[pendingKey];
       if (state.selectedRoleId === roleId) renderWithdrawResult(roleId, id);
       restoreWithdrawFocus();
       return;
     }
-    if (generation !== projectGeneration) return;
+    delete pendingTable[pendingKey];
+    if (generation !== projectGeneration) { if (!res || !res.ok) feedback[id] = "撤回无效：" + ((res && res.error) || "未知原因"); return; }
     delete withdrawPending[pendingKey];
     if (res && res.ok === true) {
       delete feedback[id];
@@ -2597,6 +2879,7 @@
   /** 右上角图标簇的**角标**：第二轮裁定（2026-10-13）待办/队列归角色、簇只留两枚——「角色资料」图标角标 =
    *  当前选中角色的待办深度（进行中+排队视图行数；继承原待办图标角标语义；同一 role-state 快照，无新数据源）。 */
   function renderTabs() {
+    if (backgroundDelivery) return;
     var roleId = state.selectedRoleId;
     var views = roleId ? queueViewsFor(roleId) : [];
     setTabBadge("card", views.length);
@@ -2653,11 +2936,15 @@
   }
 
   function renderRight() {
+    if (backgroundDelivery) return;
     captureDrawerReading();
     var body = $("right-body");
     var tab = state.rightTab;
     var titleEl = $("drawer-title");
-    var titles = { card: "角色资料", pi: "Pi 配置" };
+    var titles = { card: "角色资料", pi: Rt.runtimeLabel(state.runtime) + " 配置" };
+    var settingsTab = $("tab-pi");
+    settingsTab.title = Rt.runtimeLabel(state.runtime) + " 设置";
+    settingsTab.setAttribute("aria-label", settingsTab.title);
     if (titleEl) titleEl.textContent = titles[tab] || "角色资料";
     syncPiPanel();
     if (!tab) {
@@ -2946,6 +3233,7 @@
     if (!role) { setHint("请先在左侧选择角色。"); return; }
     var inp = $("inp-message");
     var projectRoot = state.projectRoot;
+    var runtime = state.runtime;
     var rawDraft = inp.value;
     var text = rawDraft.trim();
     saveComposerDraft(role.roleId);
@@ -2967,28 +3255,31 @@
       await selectRole(role.roleId);
     }
     // 补开失败/用户已切换时保留输入和附件，不追加假发送气泡、不调用 sendSession。
-    if (state.projectRoot !== projectRoot || state.selectedRoleId !== role.roleId || state.sessionOpenRoleId !== role.roleId) return;
+    if (state.projectRoot !== projectRoot || state.runtime !== runtime || state.selectedRoleId !== role.roleId || state.sessionOpenRoleId !== role.roleId) return;
     var pane = paneFor(role.roleId);
     // H-1 附录：记「本端手发送的最近一条」——投递回显归类据此**防误伤**（手输即便字面像投递前缀，
     // 其回显也不得被当成系统投递）；普通气泡路径不受影响。
     lastManualSend = { roleId: role.roleId, text: text, at: Date.now() };
     // 带图时在用户气泡上保留**如实记录**（附件行发送成功后清空——图已定格进载荷/队列）。
-    appendUser(pane, images.length > 0 ? "（图片 ×" + images.length + "）" + text : text);
+    var clientMessageId = window.crypto.randomUUID();
+    var manualRec = appendUser(pane, images.length > 0 ? "（图片 ×" + images.length + "）" + text : text);
+    manualRec.manualClientId = clientMessageId;
+    manualMessages[clientMessageId] = { roleId: role.roleId, text: text, rec: manualRec, turnId: null };
     // 原发送交互：提交后即腾出输入框；返回只能更新本次请求角色。
     inp.value = "";
     draftFor(role.roleId).text = "";
     autoGrow();
     setHint("");
     function restoreFailedDraft() {
-      if (state.projectRoot !== projectRoot) return;
+      if (state.projectRoot !== projectRoot || state.runtime !== runtime) return;
       if (state.selectedRoleId === role.roleId) saveComposerDraft(role.roleId);
       var original = draftFor(role.roleId);
       if (!original.text) original.text = rawDraft;
       if (state.selectedRoleId === role.roleId) restoreComposerDraft(role.roleId);
     }
     try {
-      var res = await d.sendSession(text, images);
-      if (state.projectRoot !== projectRoot) return;
+      var res = await d.sendSession(text, images, { projectRoot: projectRoot, roleId: role.roleId, runtime: runtime }, { clientMessageId: clientMessageId });
+      deliverRuntimePayload({projectRoot:projectRoot,roleId:role.roleId,runtime:runtime}, function () {
       if (!res.ok) {
         restoreFailedDraft();
         metaFor(role.roleId).error = true; // B-3：最近一次轮次以错误结束
@@ -3012,8 +3303,9 @@
         clearSentAttachments(role.roleId, sentKeys);
       }
       renderRoleTree();
+      });
     } catch (err) {
-      if (state.projectRoot !== projectRoot) return;
+      deliverRuntimePayload({projectRoot:projectRoot,roleId:role.roleId,runtime:runtime}, function () {
       restoreFailedDraft();
       metaFor(role.roleId).error = true;
       if (state.projectRoot === projectRoot && state.sessionOpenRoleId === role.roleId) {
@@ -3022,6 +3314,7 @@
       }
       renderRoleTree();
       sysRow(pane, "sys-call", ICONS.deny, "发送异常：" + (err && err.message ? err.message : err));
+      });
     }
   }
 
@@ -3156,7 +3449,7 @@
       });
     });
   }
-  // 横栏常驻写入语义（桌面一律 pi、界面无选择器——只渲染一次，无 change 监听）。
+  // 横栏写入语义对真实引擎相同；选择器另行处理会话身份。
   renderWriteNote();
   // N-1：初始按钮文案（未导入 ⇒ 「导入项目」；与 HTML 静态文案同款——此后由 applyListing 维护）。
   updatePickButton();
@@ -3164,6 +3457,7 @@
   // Pi 配置面板（设计 §11/T28；客户裁定 2026-10-13 入口上移到右上角图标簇）：tab-pi 点开/再点收起
   // （面板本体与保存/掩码纪律一字未动）；面板内「收起」照旧可关。
   $("tab-pi").addEventListener("click", function () { toggleRightDrawer("pi"); });
+  $("runtime-select").addEventListener("change", function (event) { void selectRuntime(event.target.value); });
   $("pi-save").addEventListener("click", savePiConfigFromForm);
   $("pi-toggle-secret").addEventListener("click", toggleSecretVisibility);
   // 右上角图标簇（客户裁定 2026-10-13；第二轮裁定同日：待办/队列归角色，簇只留两枚）——同图标再点收起；
@@ -3199,13 +3493,17 @@
   d.onProjectChanged(refreshProject);
   // 客户交互请求（A-5）：su 的 request_confirmation/request_choice → 渲染为该角色聊天流里的交互卡
   // （kind：confirm〔可带预览〕/ choice〔单选或勾选〕）；作答经 `d.operatorRespond` 回传（主进程按请求快照校验）。
-  if (d.onOperatorRequest) d.onOperatorRequest(appendOperatorRequest);
+  if (d.onOperatorRequest) d.onOperatorRequest(function (payload) { deliverRuntimePayload(payload, appendOperatorRequest); });
+  if (d.onOperatorExpired) d.onOperatorExpired(function (payload) { deliverRuntimePayload(payload, onOperatorExpired); });
   // shell 命令确认卡（M-1）：主进程推来的数据面 → 应用内卡片（拒绝为默认；Esc/关闭 = 不放行）。
-  if (d.onShellConfirm) d.onShellConfirm(onShellConfirm);
+  if (d.onShellConfirm) d.onShellConfirm(function (payload) { deliverRuntimePayload(payload, onShellConfirm); });
   // 会话记录恢复（D-1）：主进程推来的规范化界面行 → 回放进该角色的 pane（解析在主进程；渲染侧不碰 SDK）。
-  if (d.onSessionHistory) d.onSessionHistory(onSessionHistory);
+  if (d.onSessionHistory) d.onSessionHistory(function (payload) {
+    if (!state.projectRoot || payload.projectRoot && payload.projectRoot !== state.projectRoot) { pendingHistories.push(payload); return; }
+    deliverRuntimePayload(payload, onSessionHistory);
+  });
   // L-1 + 状态准确性：每角色**真实状态快照**（busy × 队列摘要，变化时）→ 徽标「工作中 · N 待办」+ 队列行。
-  if (d.onRoleState) d.onRoleState(onRoleState);
+  if (d.onRoleState) d.onRoleState(function (payload) { deliverRuntimePayload(payload, onRoleState); });
 
   measureComposer();
   if (typeof ResizeObserver === "function") new ResizeObserver(measureComposer).observe(document.querySelector(".composer"));
@@ -3215,6 +3513,7 @@
   if (d.getRecoveryState) {
     d.getRecoveryState().then(async function (recovery) {
       if (!recovery || !recovery.projectRoot) return;
+      if (["pi", "codex", "claude"].indexOf(recovery.runtime) >= 0) { state.runtime = recovery.runtime; $("runtime-select").value = state.runtime; }
       var listing = await d.listProject(recovery.projectRoot);
       applyListing(listing, true); // 恢复界面不调用 loadProject，不停止正在工作的会话。
       var roleId = recovery.roleId || state.primaryRoleId;
@@ -3232,13 +3531,15 @@
     refreshProject: refreshProject,
     refreshLiveRoles: refreshLiveRoles,
     selectRole: selectRole,
+    selectRuntime: selectRuntime,
     openPiPanel: openPiPanel,
     loadPiConfig: loadPiConfig,
     savePiConfigFromForm: savePiConfigFromForm,
     appendOperatorRequest: appendOperatorRequest,
     piKeys: PI_KEYS.slice(),
     // L-1/状态准确性：供探针直接注入真实快照（按 IPC 契约 `{roleId, busy, summaries}`）。
-    onRoleState: onRoleState,
+    onRoleState: function (payload) { deliverRuntimePayload(payload, onRoleState); },
+    onOperatorExpired: function (payload) { deliverRuntimePayload(payload, onOperatorExpired); },
     // M-1：供探针直接注入 shell 确认数据面（按 IPC 契约 `{id, command, summary, reasonPlain, …}`）。
     onShellConfirm: onShellConfirm,
     // 真机缺陷修复（锚点物化，2026-10-12）探针：读**行模型**（每行 kind/序位/交互卡行）与**回放锚点表**——

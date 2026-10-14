@@ -18,12 +18,12 @@ import { fileURLToPath } from "node:url";
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
 
 import { createDesktopInterface, type DesktopInterface } from "./desktop/interface.ts";
-// Pi 配置（设计 §11/T28）：启动把仓库根 `.env` 载入 `process.env`（= 补上 Electron 缺失的 `--env-file`）；
+// 运行时配置：启动把仓库根 `.env` 载入 `process.env`（补 Electron 缺失的 `--env-file`）；
 // 面板经 IPC 读写同一 `.env`。**`.env` 的读写全仓唯一**在共享模块 `src/common/shared/env-file.ts`
 // （pm 属主）——此处**只读导入，不复制**；路径由 `./desktop/pi-config.ts` 解析（可注入，测试/e2e 用临时路径）。
 import { loadEnvFileInto } from "../src/common/shared/env-file.ts";
 import { resolveRepoEnvPath } from "./desktop/pi-config.ts";
-// 会话事件外推的类型（B-2）：`SessionEventEnvelope` = `{roleId, event}` 信封（多会话并存按角色分发，防串消息）；
+// 会话事件外推的类型（B-2）：`SessionEventEnvelope` = `{projectRoot,roleId,runtime,event}` 信封（按三元身份分发）；
 // `event` 为编排导出的 `OrchestrationEvent`（既有 `SessionEvent` + `settled` 时的 `handback`，设计 §10.8）。
 // **类型从本角色 session.ts 只读导入、不复制形状**——IPC 外推原样透传。
 import type { SessionEventEnvelope } from "./desktop/session.ts";
@@ -37,9 +37,10 @@ import {
 // 客户交互通道（A-5，2026-10-12）：su 的 request_confirmation / request_choice 经它摆到聊天流里的交互卡
 // 并取回客户裁决（per-window pending Map + **按请求快照校验回包**——渲染进程输入不可信）。
 import { createCustomerInputChannel } from "./desktop/customer-input.ts";
-// 会话记录恢复（D-1，2026-10-12）：只读解析 `<project>/.ans/sessions/<roleId>/` 的最近会话（**主进程侧**；
-// 渲染进程不碰 Pi SDK/JSONL——只收规范化后的界面行）。
-import { readRoleSessionHistory, type ReplayRow } from "./desktop/session-history.ts";
+// 运行时历史：Pipeline 按 project/role/runtime 读 ANS 回放，转换为界面行。
+// 只有 Pi 无 ANS 回放时保留旧 JSONL 展示 fallback；历史不证明模型上下文恢复。
+import { getSessionHistory } from "./desktop/runtime-history.ts";
+import { RUNTIME_KINDS, type RuntimeKind } from "../src/common/shared/runtime-shared.ts";
 // Q-1（2026-10-12 客户「很多操作会阻碍主线程」）：热路径**合并推送**——事件按≈一帧窗口批量、角色状态快照去抖。
 import { createEventBatcher, createRoleStateDebouncer } from "./desktop/push-batcher.ts";
 import { configureDiagnostics, createDiagnosticLogger, flushDiagnostics, disposeDiagnostics } from "../src/common/shared/diagnostics.ts";
@@ -51,13 +52,14 @@ let mainWindow: BrowserWindow | null = null;
 let iface: DesktopInterface | null = null;
 let recoveryProjectRoot: string | null = null;
 let recoveryRoleId: string | null = null;
+let recoveryRuntime: RuntimeKind = "pi";
 const mainDiagnostic = createDiagnosticLogger({ component: "desktop.main" });
 let showMainFailure: (() => void) | undefined;
 
 /**
  * 启动时把**仓库根 `.env`**载入 `process.env`——**这正是补上 `package.json` 里缺失的 `--env-file`**
- * （设计 §11.3）。此后 `createPiRuntimeAdapter` 内的 `resolvePiProviderConfig(opts, process.env)`
- * **原样复用**（单一来源，无第二份读取逻辑）。**只回报键名、绝不打印任何值**。
+ * 后续所选引擎经 Pipeline/Service 消费有效配置；保存应用由 Interface 安全点控制。
+ * **只回报键名、绝不打印任何值**。
  *
  * 失败处理：`.env` 不存在 → 无操作（`loadEnvFileInto` 的 ENOENT 分支）；其它读取失败**不阻断启动**
  * （界面面板仍可用于补救），且**不打印任何值**（如实留空）。
@@ -141,17 +143,12 @@ function desktopOperatorId(): string {
 /** D-1：逐角色读取会话历史并推给渲染侧（**只读**；失败如实携带 error；无内容不推——不刷屏）。 */
 async function pushSessionHistories(win: BrowserWindow, projectRoot: string, roleIds: string[]): Promise<void> {
   for (const roleId of roleIds) {
-    let payload: { roleId: string; projectRoot: string; rows: ReplayRow[]; error: string | null };
-    try {
-      const hist = await readRoleSessionHistory(projectRoot, roleId);
-      payload = { roleId, projectRoot, rows: hist.rows, error: hist.error ?? null };
-    } catch (err) {
-      // 模块内已防御式；此处再兜一层——恢复失败**绝不**阻断导入。
-      payload = { roleId, projectRoot, rows: [], error: err instanceof Error ? err.message : String(err) };
+    for (const runtime of RUNTIME_KINDS) {
+      const payload = await getSessionHistory({ projectRoot, roleId, runtime });
+      if (win.isDestroyed()) return;
+      if (payload.rows.length === 0 && payload.error === null) continue;
+      win.webContents.send("session:history", payload);
     }
-    if (win.isDestroyed()) return;
-    if (payload.rows.length === 0 && payload.error === null) continue; // 无可回放内容：不打扰
-    win.webContents.send("session:history", payload);
   }
 }
 
@@ -181,7 +178,7 @@ function registerIpc(win: BrowserWindow): void {
   });
   registerHandler("app:recovery-state", (event) => {
     if (event.sender !== win.webContents) return null;
-    return { projectRoot: recoveryProjectRoot, roleId: recoveryRoleId };
+    return { projectRoot: recoveryProjectRoot, roleId: recoveryRoleId, runtime: recoveryRuntime };
   });
   registerHandler("app:reload-interface", async (event) => {
     if (event.sender !== win.webContents) return { ok: false };
@@ -207,12 +204,14 @@ function registerIpc(win: BrowserWindow): void {
   // **Q-1：角色状态快照去抖**（同角色窗口内只留**最新**快照——快照语义）——≥100ms 一次而非每事件一次。
   const roleStateDebouncer = createRoleStateDebouncer<{
     roleId: string;
+    projectRoot: string; runtime: RuntimeKind;
     busy: boolean;
     summaries: string[];
     queue: { kind: string; sourceRoleId: string; summary: string; at: string }[];
     running: { kind: string; sourceRoleId: string; summary: string; at: string } | null;
   }>({
     windowMs: 100,
+    key: (info) => `${info.projectRoot}\u0000${info.roleId}\u0000${info.runtime}`,
     send: (info) => {
       if (win.isDestroyed()) return;
       win.webContents.send("session:role-state", info);
@@ -232,6 +231,7 @@ function registerIpc(win: BrowserWindow): void {
       win.webContents.send("session:operator-request", payload);
     },
     operatorId: desktopOperatorId(),
+    onExpired: (payload) => { if (!win.isDestroyed()) win.webContents.send("session:operator-expired", payload); },
   });
   // 窗口关掉：所有挂起请求归「未获同意」（fail-closed）——不留悬案、更不放行。
   win.on("closed", () => customerChannel.rejectAllPending("窗口已关闭，未获同意（fail-closed）"));
@@ -241,6 +241,7 @@ function registerIpc(win: BrowserWindow): void {
   // `shell:confirm-response` 回传（**恰 allow:true 才放行**；Esc/关闭/超时 → 不放行）。
   // fail-closed：窗口已关时推达抛错 ⇒ 通道归 unavailable（绝不当「没人问就放行」）；关窗 ⇒ 全部挂起不放行。
   const shellConfirm = createShellConfirmPresenter({
+    onExpired: (payload) => { if (!win.isDestroyed()) win.webContents.send("session:operator-expired", payload); },
     present: (request) => {
       if (win.isDestroyed()) throw new Error("窗口已关闭，无法呈现 shell 确认请求");
       win.webContents.send("shell:confirm-request", request);
@@ -330,8 +331,8 @@ function registerIpc(win: BrowserWindow): void {
   );
 
   registerHandler("app:pick-project", () => desktop.pickProject());
-  // D-1（2026-10-12）：导入/重载项目后**恢复界面记录**——对每个角色只读解析 `<project>/.ans/sessions/<roleId>/`
-  // 的**最近**会话并推 `session:history`（渲染侧回放进该角色的聊天流；模型上下文由 Pi适配器侧一并恢复）。
+  // 导入/重载后按每个角色及 runtime 读取 ANS 回放，推带三元身份的 session:history。
+  // 原生上下文是否恢复另由会话 handle 的实际动态状态报告。
   // 防御式：解析失败/目录缺失**不阻断导入**（失败如实提示，不崩、不静默）。
   registerHandler("app:list-project", async (_e, input: { projectRoot: string }) => {
     const res = await desktop.listProject(input);
@@ -344,10 +345,10 @@ function registerIpc(win: BrowserWindow): void {
   // 点角色即开：一次调用直接建立会话（导入项目即授权，无确认框）。
   registerHandler("session:open", async (_e, input) => {
     const result = await desktop.openSession(input);
-    if (result.ok && input.projectRoot === recoveryProjectRoot) recoveryRoleId = input.roleId;
+    if (result.ok && input.projectRoot === recoveryProjectRoot) { recoveryRoleId = input.roleId; recoveryRuntime = input.runtime; }
     return result;
   });
-  registerHandler("session:send", (_e, input: { text: string; images?: unknown }) => desktop.sendSession(input));
+  registerHandler("session:send", (_e, input: Parameters<DesktopInterface["sendSession"]>[0]) => desktop.sendSession(input));
   registerHandler("session:stop", (_e, input) => desktop.stopSession(input));
   // P1-1（2026-10-13 客户裁定）：撤回未投递排队消息——Interface 如实回报（仅在队列中的客户消息可撤），主进程只透传。
   registerHandler("session:withdraw", (_e, input: { roleId: string; id: string }) => desktop.withdrawQueued(input));
@@ -355,6 +356,8 @@ function registerIpc(win: BrowserWindow): void {
   registerHandler("session:abort", (_e, input: { roleId: string }) => desktop.abortSession(input));
   // B-2：保活会话列表（左树「有活动会话」小圆点的数据源）——纯读。
   registerHandler("session:live", () => desktop.listLiveSessions());
+  registerHandler("session:live-views", () => desktop.listLiveSessionViews());
+  registerHandler("session:history-get", (_event, input) => desktop.getSessionHistory(input));
   // B-1：Markdown 链接外开——渲染进程输入经 Interface 校验（仅 http/https）后交系统浏览器。
   registerHandler("app:open-external", (_e, input) => desktop.openExternal(input));
   // K-2：输入区图片——选图（主进程读文件）与粘贴/拖入字节校验（渲染进程不碰文件）；
@@ -364,9 +367,10 @@ function registerIpc(win: BrowserWindow): void {
   // （A-5：随「收口」删除——产物收尾现由编排在 su 会话 settle 后**自动**完成；桌面不再有
   //   「完成 bootstrap」的读状态/显式触发两个 IPC；客户确认已改由交互卡承担。）
 
-  // —— Pi 配置面板（设计 §11/T28）：读取/保存仓库根 `.env` ——
-  // 逻辑全在 Interface 层（`getPiConfig`/`savePiConfig` → `pi-config.ts` → 共享 `env-file`）；
-  // 主进程只透传。**机密键值绝不外发**（`getPiConfig` 对其恒返回空串）；保存回报只含键名。
+  // generic 运行时设置及旧 Pi aliases：Interface 消费共享 registry，并用共享 env-file 原子写。
+  // secret 值恒空，成功保存才变 revision；忙 Pi 凭据在安全点应用。主进程只透传。
+  registerHandler("runtime-config:get", (_event, input) => desktop.getRuntimeConfig(input?.runtime));
+  registerHandler("runtime-config:save", (_event, input) => desktop.saveRuntimeConfig(input));
   registerHandler("pi-config:get", () => desktop.getPiConfig());
   registerHandler("pi-config:save", (_e, input: { updates: Record<string, string> }) => desktop.savePiConfig(input));
 

@@ -16,11 +16,13 @@ app/renderer/
   role-status.js             角色状态徽标七态纯映射（挂 globalThis.ANSRoleStatus）
   tool-rows.js               工具行重构与活动分类纯函数（挂 globalThis.ANSToolRows）
   ui-labels.js               回放计划/文案/队列视图纯映射（挂 globalThis.ANSUiLabels）
+  runtime-ui.js              引擎/组摘要/配置来源和应用时点纯展示映射（挂 ANSRuntimeUI）
   vendor/                    markdown-it 15.0.2（UMD + LICENSE + README：版本/来源/sha256/升级步骤）
 test/桌面应用/（渲染侧，路径沿用拆分前）
   markdown.test.ts           Markdown 语法/XSS 负例/vendor sha256 pin
   renderer.test.ts           渲染源码不变式守卫（含与 preload/main 通道两端交叉守卫）
   tool-rows.test.ts          工具行/回放纯函数
+  runtime-ui.test.ts         三元身份、组元数据、来源/应用文案与隐私隔离约束
   e2e/uiux-v2.mjs            界面交互回归（离线替换 IPC）
   e2e/ime-enter.mjs          输入法候选 Enter 回归
   e2e/bench-storm.mjs        渲染热路径基准台
@@ -42,6 +44,8 @@ test/桌面应用/（渲染侧，路径沿用拆分前）
 - 历史沿革（UI/UX v2、设计对齐、IME、抽屉、图片、P1 等）见冻结归档 `角色卡/桌面应用/docs/` 与[功能导航](feature-map.md)链接。
 
 ## 已知偏离 / 边界登记
+
+V2r1 选择、设置、事件/请求/历史隔离的当前完整流程见 [runtime-choice](docs/feature/runtime-choice.md)。renderer 保存各 runtime 游离视图；当前 profile 的应用/重建、原生恢复结果、凭据来源和请求失效都由窗口层产生，本侧只消费。[原始自测与截图](docs/change/2026-10-14_change_multi-runtime-ui.md)覆盖自己的渲染候选，独立全链路验收另行记录。
 
 - 拆分未物理移动 `test/桌面应用/`；渲染侧测试文件按 file 逐条授权（见 [boundary.yaml](boundary.yaml)）。
 - `e2e/main.mjs`（桌面总自检台）归「桌面窗口」；本角色界面改动如牵动其中 DOM 断言，经项目管理协调由桌面窗口侧同步。

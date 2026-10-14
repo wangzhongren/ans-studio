@@ -497,3 +497,9 @@
 - 未改动 `src/pipeline/orchestration/run-role.ts`（编排边界）：其 `createPiAdapterFactory` 只传 gate/root，靠环境变量取配置，故本次改动后若 `.env` 无 `ANS_PI_CONTEXT_WINDOW`，该工厂构造适配器时会**硬失败**——这是预期行为，已在 memo 记录。
 
 - 2026-10-13：完成runtime outcome与诊断修复（用户直接修复授权，项目管理canonical v1）。新增private lifecycle、兼容ReportHandbackMetadata、工具isError/safe detail、审核等待挂闸与中止、5s清理及共享诊断接线；普通任务文案去除逐次确认，新扩张治理边界仍由su确认。离线Pi专项185/185、typecheck与diff-check通过，未部署；详见[修复记录](docs/fix/2026-10-13_fix_runtime-outcome-and-diagnostics.md)。
+
+## 2026-10-14 — P1 核心工具注入与 Pi 原生隔离迁移
+
+在已批准 ANS-RUNTIME-V2 revision 1 内，把中立契约旧路径改为显式 Model 转出，把 Pi 工具改为核心 public API 的窄 facade。生产 SDK会话直接消费注入 handler/schema/InteractionGate/currentTurnId/storage，native builtin与非注入工具执行前拒绝，旧名称辅助测试继续兼容。Pi legacyJSONL复制到native后恢复，实际上下文来源如实给Service保存；首次明确终态锁定，900ms每轮一次中止清理，失败隔离会话。
+
+原设计/独立影响见 [P1设计](docs/design/2026-10-14_design_pi-injected-runtime.md)，当前完整流程见 [Pi功能](docs/feature/pi-runtime.md)，验证和候选指纹见 [原记录](docs/change/2026-10-14_change_pi-injected-runtime.md)。未改Core/Model/shared/Pipeline/app/package/角色定义，未请求模型、未修改真实.env/持久凭据、未提交推送。

@@ -1,0 +1,627 @@
+// D1 independent Window evidence. Only temporary fake credentials and injected engines.
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { createDesktopInterface } from "../../app/desktop/interface.ts";
+import { SessionManager, type SessionManagerDeps, type SessionEventEnvelope } from "../../app/desktop/session.ts";
+import { getRuntimeConfig, saveRuntimeConfig } from "../../app/desktop/runtime-config.ts";
+import { getSessionHistory } from "../../app/desktop/runtime-history.ts";
+import { createCustomerInputChannel, type OperatorExpiredPayload, type OperatorRequestPayload } from "../../app/desktop/customer-input.ts";
+import { createShellConfirmPresenter, createDesktopOperatorChannel } from "../../app/desktop/operator-channel.ts";
+import { createRoleStateDebouncer } from "../../app/desktop/push-batcher.ts";
+import { buildProjectConfig } from "../../app/desktop/project.ts";
+import { listProject, type ProjectListing } from "../../src/service/role/resolve-role.ts";
+import { createRuntimeAdapterFactory, openRoleSession, type RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
+import type { RuntimeKind, RuntimeProviderFactory, RuntimeProviderOptions, SessionEvent, RuntimeContextSource, CustomerInputRequest, PromptOptions } from "../../src/model/runtime.ts";
+import type { OrchestrationEvent, TaskHandback } from "../../src/common/编排/handback.ts";
+
+function queue<T>() {
+  const pending: T[] = [];
+  let wake: (() => void) | undefined;
+  let closed = false;
+  return {
+    push(event: T) { pending.push(event); wake?.(); wake = undefined; },
+    close() { closed = true; wake?.(); wake = undefined; },
+    async *events() {
+      while (true) {
+        if (pending.length > 0) { yield pending.shift()!; continue; }
+        if (closed) return;
+        await new Promise<void>((resolve) => { wake = resolve; });
+      }
+    },
+  };
+}
+async function until(check: () => boolean) {
+  const deadline = Date.now() + 1500;
+  while (!check()) {
+    if (Date.now() > deadline) throw new Error("D1 test wait expired");
+    await new Promise<void>((resolve) => setTimeout(resolve, 2));
+  }
+}
+function fixture() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ans-d1-"));
+  const dir = path.join(root, "角色卡", "A");
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, "role-card.md"), "# A\n组别：运行时接入组\n组内职责：维护窗口\n");
+  fs.writeFileSync(path.join(dir, "boundary.yaml"), "role: A\nentries:\n  - kind: file\n    path: src/a.ts\n    purpose: D1\n");
+  return { root, envPath: path.join(root, "fake.env"), cleanup() { fs.rmSync(root, { recursive: true, force: true }); } };
+}
+function listing(root: string): ProjectListing {
+  const roles: ProjectListing["roles"] = ["su", "A", "B"].map((roleId) => ({ roleId, builtIn: roleId === "su", cardPath: "", boundaryPath: "", cardText: roleId,
+    boundary: { entries: [], boundarySource: "test:D1", acceptance: { accepted: false, source: "test:D1" } } }));
+  return { projectRoot: root, roles, warnings: [], hasRoles: true, primaryRoleId: "su" };
+}
+function harness(extra: Partial<SessionManagerDeps> = {}) {
+  const opened: { root: string; role: string; runtime: RuntimeKind; stream: ReturnType<typeof queue<OrchestrationEvent>>; sent: string[]; input: Parameters<SessionManagerDeps["openRoleSession"]>[0]; handle: RoleSessionHandle }[] = [];
+  const envelopes: SessionEventEnvelope[] = [];
+  const manager = new SessionManager({
+    openRoleSession: async (input) => {
+      const stream = queue<OrchestrationEvent>();
+      const sent: string[] = [];
+      const handle: RoleSessionHandle = { runtime: input.runtime, contextSource: "fresh", async send(text) { sent.push(text); }, events: () => stream.events(), async dispose() { stream.close(); }, async abort() { stream.push({ kind: "settled", summary: "aborted", detail: { outcome: "aborted" } }); return { ok: true, supported: true }; } };
+      opened.push({ root: input.project.projectRoot, role: input.roleId, runtime: input.runtime!, stream, sent, input, handle });
+      return handle;
+    },
+    createPiAdapterFactory: () => () => { throw new Error("unused injected adapter"); },
+    createDemoAdapter: () => { throw new Error("unused injected adapter"); },
+    buildProjectConfig, getListing: listing, emitEvent: (event) => envelopes.push(event), ...extra,
+  });
+  return { manager, opened, envelopes };
+}
+
+test("D1 shared registry: effective env/file/fallback sources, every secret masked, whitespace is unset", async () => {
+  const temp = fixture();
+  const secret = "D1-SECRET-NEVER-RENDER";
+  fs.writeFileSync(temp.envPath, 'CODEX_API_KEY="   "\nANS_CODEX_MODEL="  "\nANTHROPIC_API_KEY=" "\n');
+  try {
+    const env = { OPENAI_API_KEY: secret, ANTHROPIC_AUTH_TOKEN: secret, ANS_PI_MODEL: "fileless-model", ANS_PI_BASE_URL: "https://example.test", ANTHROPIC_BASE_URL: "https://name:password@example.test/path" };
+    const codex = await getRuntimeConfig("codex", { envPath: temp.envPath, env });
+    assert.deepEqual(codex.missingKeys, ["ANS_CODEX_MODEL"]);
+    assert.equal(codex.fields[0].source, "fallback");
+    assert.equal(codex.fields[0].fallbackKey, "OPENAI_API_KEY");
+    assert.equal(codex.fields[0].isSet, true);
+    assert.equal(codex.fields[0].value, "");
+    const claude = await getRuntimeConfig("claude", { envPath: temp.envPath, env });
+    assert.deepEqual(claude.missingKeys, ["ANTHROPIC_API_KEY"]);
+    assert.ok(!JSON.stringify(claude).includes("password"));
+    const pi = await getRuntimeConfig("pi", { envPath: temp.envPath, env });
+    assert.deepEqual(pi.missingKeys, []);
+    assert.ok(pi.fields.every((field) => field.source === "environment" || field.source === "default"));
+    assert.ok(!JSON.stringify([codex, claude, pi]).includes(secret));
+    const environmentOnly = await getRuntimeConfig("codex", { envPath: path.join(temp.root, "absent.env"), env: { CODEX_API_KEY: "  ", OPENAI_API_KEY: secret, ANS_CODEX_MODEL: "\t" } });
+    assert.equal(environmentOnly.fields[0].source, "fallback");
+    assert.equal(environmentOnly.fields[0].value, "");
+    assert.deepEqual(environmentOnly.missingKeys, ["ANS_CODEX_MODEL"]);
+    const blankClaude = await getRuntimeConfig("claude", { envPath: path.join(temp.root, "absent.env"), env: { ANTHROPIC_API_KEY: " \t " } });
+    assert.deepEqual(blankClaude.missingKeys, ["ANTHROPIC_API_KEY"]);
+  } finally { temp.cleanup(); }
+});
+
+test("D1 configuration writes only selected string keys atomically, masks URL/userinfo failure and retains revision on failure", async () => {
+  const temp = fixture();
+  const original = "# retain\r\nUNKNOWN=original\r\nANS_PI_MODEL=pi-old\r\n";
+  fs.writeFileSync(temp.envPath, original);
+  try {
+    const result = await saveRuntimeConfig({ runtime: "codex", updates: { CODEX_API_KEY: "sentinel", ANS_CODEX_MODEL: "model", ANS_PI_MODEL: "wrong", UNKNOWN: "wrong" } }, { envPath: temp.envPath });
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.appliedKeys, ["CODEX_API_KEY", "ANS_CODEX_MODEL"]);
+    assert.ok(fs.readFileSync(temp.envPath, "utf8").startsWith(original));
+    assert.equal((await saveRuntimeConfig({ runtime: "codex", updates: { CODEX_API_KEY: 123 } }, { envPath: temp.envPath })).ok, false);
+    const before = fs.readFileSync(temp.envPath, "utf8");
+    const invalid = await saveRuntimeConfig({ runtime: "codex", updates: { ANS_CODEX_BASE_URL: "https://name:secret@example.test" } }, { envPath: temp.envPath, revision: 7 });
+    assert.equal(invalid.ok, false);
+    assert.equal(invalid.revision, 7);
+    assert.ok(!JSON.stringify(invalid).includes("secret"));
+    assert.equal(fs.readFileSync(temp.envPath, "utf8"), before);
+    const failure = await saveRuntimeConfig({ runtime: "claude", updates: { ANTHROPIC_API_KEY: "sentinel" } }, { envPath: temp.root, revision: 9 });
+    assert.equal(failure.ok, false);
+    assert.equal(failure.revision, 9);
+    assert.deepEqual(fs.readdirSync(temp.root).sort(), ["fake.env", "角色卡"]);
+  } finally { temp.cleanup(); }
+});
+
+test("D1 same role and project across engines and same role across projects keep distinct handles and exact input targets", async () => {
+  const current = harness();
+  try {
+    await current.manager.open({ projectRoot: "/one", roleId: "A", runtime: "pi" });
+    await current.manager.open({ projectRoot: "/one", roleId: "A", runtime: "codex" });
+    await current.manager.open({ projectRoot: "/two", roleId: "A", runtime: "claude" });
+    assert.equal(current.opened.length, 3);
+    assert.equal((await current.manager.open({ projectRoot: "/one", roleId: "A", runtime: "pi" })).resumed, true);
+    await current.manager.send("pinned", undefined, { projectRoot: "/one", roleId: "A", runtime: "codex" });
+    assert.deepEqual(current.opened[0].sent, []);
+    assert.deepEqual(current.opened[1].sent, ["pinned"]);
+    assert.deepEqual(current.opened[2].sent, []);
+    assert.equal(current.manager.liveSessionViews().length, 3);
+    current.opened[1].stream.push({ kind: "message", summary: "codex only" });
+    await until(() => current.envelopes.some((event) => event.event.summary === "codex only"));
+    const event = current.envelopes.find((item) => item.event.summary === "codex only")!;
+    assert.deepEqual({ root: event.projectRoot, runtime: event.runtime, role: event.roleId }, { root: "/one", runtime: "codex", role: "A" });
+  } finally { await current.manager.stop(); }
+});
+
+test("D1 background dispatch, queued customer input and handback pin the source engine after selection switches", async () => {
+  const current = harness();
+  try {
+    await current.manager.open({ projectRoot: "/one", roleId: "su", runtime: "codex" });
+    const source = current.opened[0];
+    await current.manager.open({ projectRoot: "/one", roleId: "A", runtime: "claude" });
+    const receipt = await source.input.dispatchTask!({ roleId: "A", task: "codex task" });
+    assert.equal(receipt?.ok, true);
+    await until(() => current.opened.some((entry) => entry.role === "A" && entry.runtime === "codex" && entry.sent.length > 0));
+    const target = current.opened.find((entry) => entry.role === "A" && entry.runtime === "codex")!;
+    assert.deepEqual(current.opened.find((entry) => entry.runtime === "claude")!.sent, []);
+    const queued = await current.manager.send("queued codex", undefined, { projectRoot: "/one", roleId: "A", runtime: "codex" });
+    assert.equal(queued.queued, true);
+    await current.manager.open({ projectRoot: "/one", roleId: "A", runtime: "claude" });
+    target.stream.push({ kind: "settled", summary: "done" });
+    await until(() => target.sent.length === 2);
+    assert.equal(target.sent[1], "queued codex");
+    const handback: TaskHandback = { roleId: "A", taskId: "D1", status: "completed", summary: "actual", evidence: [], at: "2026-10-14T00:00:00Z" };
+    target.stream.push({ kind: "handback", summary: "report", handback });
+    await until(() => source.sent.length > 0);
+    assert.ok(source.sent[0].includes("actual"));
+    assert.ok(!current.opened.some((entry) => entry.role === "su" && entry.runtime === "claude"));
+  } finally { await current.manager.stop(); }
+});
+
+for (const runtime of ["demo", "pi", "codex", "claude"] as const) {
+  test(`D1 actual Pipeline/Service chooses ${runtime}, writes isolated replay and converts native context honestly`, async () => {
+    const temp = fixture();
+    const calls: RuntimeProviderOptions[] = [];
+    let context: RuntimeContextSource = "fresh";
+    const factory: RuntimeProviderFactory = (options) => {
+      calls.push(options);
+      return { async composeContext() { return { systemPrompt: "" }; }, async bindRole() {
+        const events = queue<SessionEvent>();
+        return { runtime, get contextSource() { return context; }, get contextWarning() { if (context === "recovered") return "native resume failed"; return undefined; }, async prompt(text) {
+          context = "resumed";
+          if (text === "two") context = "recovered";
+          events.push({ kind: "message", summary: `${runtime}:${text}` });
+          events.push({ kind: "settled", summary: "done", detail: { outcome: "completed" } });
+        }, events: () => events.events(), async dispose() { events.close(); } };
+      } };
+    };
+    const states: Parameters<NonNullable<SessionManagerDeps["emitRoleState"]>>[0][] = [];
+    const desktop = createDesktopInterface({ pickDirectory: async () => null, emitEvent: () => {}, envFilePath: temp.envPath, piConfigEnv: {}, emitRoleState: (state) => states.push(state), runtimeOptions: { providerFactories: { [runtime]: factory } } });
+    try {
+      const roles = await desktop.listProject({ projectRoot: temp.root });
+      assert.equal(roles.roles.find((role) => role.roleId === "A")?.group, "运行时接入组");
+      const opened = await desktop.openSession({ projectRoot: temp.root, roleId: "A", runtime });
+      assert.equal(opened.contextSource, "fresh");
+      assert.equal(calls.length, 1);
+      assert.equal(calls[0].runtime, runtime);
+      assert.equal(calls[0].storage?.directory, path.join(temp.root, ".ans", "sessions", "A", runtime));
+      assert.equal(fs.existsSync(path.join(temp.root, ".ans")), false);
+      assert.equal((await desktop.sendSession({ text: "one" })).ok, true);
+      await until(() => states.some((state) => state.contextSource === "recovered"));
+      const history = await getSessionHistory({ projectRoot: temp.root, roleId: "A", runtime });
+      assert.equal(history.error, null);
+      assert.ok(history.rows.some((row) => row.kind === "user" && row.text === "one"));
+      assert.ok(history.rows.some((row) => row.text === `${runtime}:one`));
+      let otherRuntime: RuntimeKind = "codex";
+      if (runtime === "codex") otherRuntime = "claude";
+      const other = await getSessionHistory({ projectRoot: temp.root, roleId: "A", runtime: otherRuntime });
+      assert.deepEqual(other.rows, []);
+      context = "recovered";
+      await desktop.openSession({ projectRoot: temp.root, roleId: "A", runtime });
+      await desktop.sendSession({ text: "two" });
+      assert.ok(states.some((state) => state.contextSource === "fresh" && state.contextWarning === "native resume failed"));
+    } finally { await desktop.stopSession(); temp.cleanup(); }
+  });
+}
+
+test("D1 profile success rebuilds same engine after busy old Pi finishes; ambient token remains old until safe; failure is unchanged", async () => {
+  const temp = fixture();
+  const env = { ANTHROPIC_AUTH_TOKEN: "old-token" };
+  fs.writeFileSync(temp.envPath, "ANTHROPIC_AUTH_TOKEN=old-token\nANS_PI_MODEL=old-model\n");
+  const opened: { stream: ReturnType<typeof queue<OrchestrationEvent>>; sent: string[]; token: string }[] = [];
+  const desktop = createDesktopInterface({ pickDirectory: async () => null, emitEvent: () => {}, envFilePath: temp.envPath, piConfigEnv: env, listProjectFn: async (root) => listing(root), openRoleSessionFn: async () => {
+    const stream = queue<OrchestrationEvent>(); const sent: string[] = [];
+    opened.push({ stream, sent, token: env.ANTHROPIC_AUTH_TOKEN });
+    return { async send(text) { sent.push(text); }, events: () => stream.events(), async dispose() { stream.close(); } };
+  } });
+  try {
+    await desktop.listProject({ projectRoot: temp.root });
+    await desktop.openSession({ projectRoot: temp.root, roleId: "A", runtime: "pi" });
+    await desktop.sendSession({ text: "busy old" });
+    const saved = await desktop.saveRuntimeConfig({ runtime: "pi", updates: { ANTHROPIC_AUTH_TOKEN: "new-token", ANS_PI_MODEL: "new-model" } });
+    assert.equal(saved.revision, 1);
+    assert.equal(saved.application, "after-active-turn");
+    assert.equal(env.ANTHROPIC_AUTH_TOKEN, "old-token");
+    assert.equal((await desktop.sendSession({ text: "next profile" })).queued, true);
+    const rejected = await desktop.saveRuntimeConfig({ runtime: "pi", updates: { ANS_PI_BASE_URL: "file:///invalid" } });
+    assert.equal(rejected.ok, false);
+    assert.equal(rejected.revision, 1);
+    opened[0].stream.push({ kind: "settled", summary: "old finished" });
+    await until(() => opened.length === 2 && opened[1].sent.length > 0);
+    assert.deepEqual(opened[0].sent, ["busy old"]);
+    assert.deepEqual(opened[1].sent, ["next profile"]);
+    assert.equal(opened[1].token, "new-token");
+    assert.equal((await desktop.listLiveSessionViews())[0].profileRevision, 1);
+  } finally { await desktop.stopSession(); temp.cleanup(); }
+});
+
+test("D1 original customer signal cancels pending confirm/choice and old yes cannot settle a new card", async () => {
+  const requests: OperatorRequestPayload[] = [];
+  const expired: OperatorExpiredPayload[] = [];
+  const channel = createCustomerInputChannel({ operatorId: "test", presenter: (request) => requests.push(request), onExpired: (payload) => expired.push(payload) });
+  const cases: CustomerInputRequest[] = [{ kind: "confirm", title: "old" }, { kind: "choice", title: "old", options: [{ id: "a", label: "A" }] }];
+  for (const request of cases) {
+    const controller = new AbortController();
+    const promise = channel.customerInput(request, { roleId: "su", projectRoot: "/one", runtime: "codex" }, { signal: controller.signal, turnId: "old" });
+    const id = requests.at(-1)!.id;
+    controller.abort();
+    assert.equal((await promise)?.outcome, "unavailable");
+    assert.equal(channel.pendingCount(), 0);
+    assert.equal(channel.respond({ id, decision: { kind: "confirm", confirmed: true } }).expired, true);
+  }
+  assert.equal(expired.length, 2);
+  assert.ok(expired.every((event) => event.runtime === "codex" && event.projectRoot === "/one"));
+  assert.ok(!JSON.stringify(requests).includes("signal"));
+});
+
+test("D1 shell terminal failure/timeout and dispose invalidate exact handle card, old allow is expired", async () => {
+  const requests: { id: string }[] = [];
+  const expired: OperatorExpiredPayload[] = [];
+  const shell = createShellConfirmPresenter({ present: (request) => requests.push(request), onExpired: (event) => expired.push(event), cleanupAfterMs: 1000 });
+  const channel = createDesktopOperatorChannel({ presenter: shell.presenter, operatorId: "test", timeoutMs: 1000 });
+  const current = harness({ shellOperatorChannel: channel });
+  try {
+    await current.manager.open({ projectRoot: "/one", roleId: "A", runtime: "codex" });
+    const first = current.opened[0];
+    await current.manager.send("start");
+    const pending = first.input.shellOperatorChannel!({ command: "example", argv: ["example"], cwd: "/one", toolCallId: "old" });
+    await until(() => requests.length === 1);
+    first.stream.push({ kind: "settled", summary: "native timeout", detail: { outcome: "timed_out" } });
+    await until(() => shell.pendingCount() === 0);
+    assert.notEqual((await pending)?.outcome, "allow");
+    assert.equal(shell.respond({ id: requests[0].id, allow: true }).expired, true);
+    assert.equal(expired[0].runtime, "codex");
+    await current.manager.send("new turn");
+    const secondPending = first.input.shellOperatorChannel!({ command: "second", argv: ["second"], cwd: "/one", toolCallId: "new" });
+    await until(() => requests.length === 2);
+    await current.manager.stop({ projectRoot: "/one", roleId: "A", runtime: "codex" });
+    assert.notEqual((await secondPending)?.outcome, "allow");
+    assert.equal(shell.respond({ id: requests[1].id, allow: true }).expired, true);
+  } finally { await current.manager.stop(); shell.rejectAllPending("test cleanup"); }
+});
+
+test("D1 state debouncing and constrained bridges preserve project/runtime identity", () => {
+  const received: { roleId: string; projectRoot: string; runtime: RuntimeKind }[] = [];
+  const debouncer = createRoleStateDebouncer({ key: (item: typeof received[number]) => `${item.projectRoot}:${item.roleId}:${item.runtime}`, send: (item) => received.push(item) });
+  debouncer.push({ roleId: "A", projectRoot: "/one", runtime: "pi" });
+  debouncer.push({ roleId: "A", projectRoot: "/one", runtime: "codex" });
+  debouncer.flush();
+  assert.equal(received.length, 2);
+  const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+  const preload = fs.readFileSync(path.join(repo, "app/preload.cjs"), "utf8");
+  const main = fs.readFileSync(path.join(repo, "app/main.ts"), "utf8");
+  for (const ipc of ["runtime-config:get", "runtime-config:save", "session:history-get", "session:operator-expired", "session:live-views"]) {
+    assert.ok(preload.includes(ipc)); assert.ok(main.includes(ipc));
+  }
+  for (const source of ["interface.ts", "session.ts", "runtime-history.ts", "runtime-config.ts"]) {
+    const code = fs.readFileSync(path.join(repo, "app/desktop", source), "utf8");
+    assert.ok(!/from ["'][^"']*src\/provider\//.test(code), `${source} imports no Provider`);
+    assert.ok(!code.includes("lastRuntime"), `${source} has no mutable global runtime routing`);
+  }
+});
+
+
+test("D1 last busy Pi in another project releases queued profile rebuild without changing ambient mid-turn", async () => {
+  let applyCount = 0;
+  const current = harness({ prepareRuntimeProfile: async () => {
+    if (current.manager.profileRevision("pi") > 0) assert.equal(current.manager.hasBusyRuntime("pi"), false, "ambient application only happens while all Pi turns are idle");
+    applyCount += 1;
+  } });
+  try {
+    await current.manager.open({ projectRoot: "/one", roleId: "A", runtime: "pi" });
+    await current.manager.send("one old");
+    await current.manager.open({ projectRoot: "/two", roleId: "A", runtime: "pi" });
+    await current.manager.send("two old");
+    current.manager.profileChanged("pi");
+    assert.equal((await current.manager.send("one new", undefined, { projectRoot: "/one", roleId: "A", runtime: "pi" })).queued, true);
+    current.opened[0].stream.push({ kind: "settled", summary: "one ended" });
+    await until(() => current.envelopes.some((event) => event.projectRoot === "/one" && event.event.summary === "one ended"));
+    assert.equal(current.opened.length, 2, "other project Pi still busy, no rebuild/application");
+    assert.equal(applyCount, 2, "only initial creations so far");
+    current.opened[1].stream.push({ kind: "settled", summary: "two ended" });
+    await until(() => current.opened.length === 3 && current.opened[2].sent.length > 0);
+    assert.equal(current.opened[2].root, "/one");
+    assert.equal(current.opened[2].runtime, "pi");
+    assert.deepEqual(current.opened[2].sent, ["one new"]);
+    assert.equal(applyCount, 3);
+  } finally { await current.manager.stop(); }
+});
+
+test("D1 confirmation bridge keeps original signal identity and an old disposed stream cannot cancel a new handle card", async () => {
+  const requests: OperatorRequestPayload[] = [];
+  const channel = createCustomerInputChannel({ presenter: (request) => requests.push(request), operatorId: "D1" });
+  const original = new AbortController();
+  const current = harness({ customerInput: (request, context, metadata) => {
+    assert.equal(metadata?.signal, original.signal);
+    return channel.customerInput(request, context, metadata);
+  } });
+  try {
+    await current.manager.open({ projectRoot: "/one", roleId: "su", runtime: "claude" });
+    const first = current.opened[0];
+    const pending = first.input.customerInput!({ kind: "confirm", title: "old" }, { signal: original.signal, runtime: "claude", turnId: "original" });
+    assert.equal(requests[0].runtime, "claude");
+    original.abort();
+    assert.equal((await pending)?.outcome, "unavailable");
+    assert.equal(channel.respond({ id: requests[0].id, decision: { kind: "confirm", confirmed: true } }).expired, true);
+    await current.manager.stop({ projectRoot: "/one", roleId: "su", runtime: "claude" });
+    await current.manager.open({ projectRoot: "/one", roleId: "su", runtime: "claude" });
+    first.stream.push({ kind: "settled", summary: "late old" });
+    await current.manager.send("new active");
+    assert.deepEqual(current.opened[1].sent, ["new active"]);
+    assert.ok(!current.envelopes.some((event) => event.event.summary === "late old"));
+  } finally { await current.manager.stop(); channel.rejectAllPending("cleanup"); }
+});
+
+
+test("D1 old Pi JSONL is a display-only fallback and never becomes Codex/Claude history or native restore proof", async () => {
+  const temp = fixture();
+  const directory = path.join(temp.root, ".ans", "sessions", "A");
+  fs.mkdirSync(directory, { recursive: true });
+  fs.writeFileSync(path.join(directory, "legacy.jsonl"), JSON.stringify({ type: "session", id: "legacy", version: 3 }) + "\n" + JSON.stringify({ type: "message", message: { role: "user", content: "legacy text" } }) + "\n");
+  try {
+    assert.ok((await getSessionHistory({ projectRoot: temp.root, roleId: "A", runtime: "pi" })).rows.some((row) => row.text === "legacy text"));
+    for (const runtime of ["codex", "claude"] as const) assert.deepEqual((await getSessionHistory({ projectRoot: temp.root, roleId: "A", runtime })).rows, []);
+  } finally { temp.cleanup(); }
+});
+
+test("D1R ANS history preserves authoritative turn/event identity, independent same text and delta order", async () => {
+  const temp = fixture();
+  const directory = path.join(temp.root, ".ans", "sessions", "A", "claude", "ans");
+  fs.mkdirSync(directory, { recursive: true });
+  const entries = [
+    { kind: "user", text: "same input", at: "2026-10-14T00:00:01Z", turnId: "first" },
+    { kind: "event", at: "2026-10-14T00:00:02Z", turnId: "first", event: { kind: "message", summary: "same reply", turnId: "provider-other", detail: { type: "assistant_delta" } } },
+    { kind: "event", at: "2026-10-14T00:00:03Z", turnId: "first", event: { kind: "message", summary: " tail", turnId: "first", detail: { type: "assistant_delta" } } },
+    { kind: "event", at: "2026-10-14T00:00:04Z", turnId: "first", event: { kind: "tool_call", summary: "write", turnId: "provider-other", detail: { toolName: "write_file", toolCallId: "call", args: { path: "src/a.ts" } } } },
+    { kind: "event", at: "2026-10-14T00:00:05Z", turnId: "first", event: { kind: "accepted", summary: "written", turnId: "provider-other", detail: { toolName: "write_file", toolCallId: "call", ok: true } } },
+    { kind: "user", text: "same input", at: "2026-10-14T00:00:06Z", turnId: "second" },
+    { kind: "event", at: "2026-10-14T00:00:07Z", event: { kind: "message", summary: "same reply", turnId: "second", detail: { type: "assistant_delta" } } },
+    { kind: "event", at: "2026-10-14T00:00:08Z", event: { kind: "denied", summary: "blocked", turnId: "second", detail: { toolName: "write_file", toolCallId: "other", ok: false } } },
+    { kind: "user", text: "without ID", at: "2026-10-14T00:00:09Z" },
+  ];
+  fs.writeFileSync(path.join(directory, "replay.jsonl"), entries.map((entry) => JSON.stringify(entry)).join("\n") + "\n");
+  try {
+    const history = await getSessionHistory({ projectRoot: temp.root, roleId: "A", runtime: "claude" });
+    assert.equal(history.error, null);
+    assert.equal(history.rows.length, entries.length, "mapper preserves every original event, including consecutive delta fragments");
+    assert.deepEqual(history.rows.map((row) => row.text), ["same input", "same reply", " tail", "write", "written", "same input", "same reply", "blocked", "without ID"]);
+    assert.deepEqual(history.rows.map((row) => row.turnId), ["first", "first", "first", "first", "first", "second", "second", "second", undefined]);
+    assert.deepEqual(history.rows.map((row) => row.eventKind), [undefined, "message", "message", "tool_call", "accepted", undefined, "message", "denied", undefined]);
+    for (const row of history.rows.filter((row) => row.kind === "user")) assert.equal(Object.hasOwn(row, "eventKind"), false);
+    for (const row of history.rows.filter((row) => row.activity)) assert.equal(row.activity!.turnId, row.turnId, "activity and top-level ID have the same authoritative precedence");
+    assert.equal(history.rows[4].activity?.target, "src/a.ts", "existing target inheritance remains intact");
+    assert.equal(Object.hasOwn(history.rows.at(-1)!, "turnId"), false, "absent authoritative ID remains absent");
+  } finally { temp.cleanup(); }
+});
+
+test("D1R legacy Pi rows keep optional turn/event metadata absent", async () => {
+  const temp = fixture();
+  const directory = path.join(temp.root, ".ans", "sessions", "A");
+  fs.mkdirSync(directory, { recursive: true });
+  fs.writeFileSync(path.join(directory, "legacy.jsonl"), [
+    { type: "session", id: "legacy", version: 3 },
+    { type: "message", message: { role: "user", content: "legacy user" } },
+    { type: "message", message: { role: "assistant", content: [{ type: "text", text: "legacy assistant" }] } },
+  ].map((entry) => JSON.stringify(entry)).join("\n") + "\n");
+  try {
+    const history = await getSessionHistory({ projectRoot: temp.root, roleId: "A", runtime: "pi" });
+    assert.equal(history.error, null);
+    assert.deepEqual(history.rows.map((row) => row.text), ["legacy user", "legacy assistant"]);
+    for (const row of history.rows) {
+      assert.equal(Object.hasOwn(row, "turnId"), false);
+      assert.equal(Object.hasOwn(row, "eventKind"), false);
+    }
+  } finally { temp.cleanup(); }
+});
+
+test("D1R2 direct and queued identical inputs retain original client ID through delayed old settled", async () => {
+  const current = harness();
+  try {
+    await current.manager.open({ projectRoot: "/one", roleId: "A", runtime: "codex" });
+    const source = current.opened[0];
+    source.handle.send = async (text, opts) => {
+      source.sent.push(text);
+      const turns = ["first-turn", "second-turn", "third-turn"];
+      opts?.onTurnStarted?.({ turnId: turns[source.sent.length - 1], roleId: "A", runtime: "codex" });
+    };
+    await current.manager.send("same", undefined, undefined, { clientMessageId: "first-client" });
+    assert.equal((await current.manager.send("same", undefined, undefined, { clientMessageId: "second-client" })).queued, true);
+    source.stream.push({ kind: "message", summary: "first event", roleId: "A", runtime: "codex", turnId: "first-turn" });
+    source.stream.push({ kind: "settled", summary: "first settled", roleId: "A", runtime: "codex", turnId: "first-turn" });
+    await until(() => source.sent.length === 2);
+    source.stream.push({ kind: "message", summary: "second event", roleId: "A", runtime: "codex", turnId: "second-turn" });
+    source.stream.push({ kind: "settled", summary: "delayed first settled", roleId: "A", runtime: "codex", turnId: "first-turn" });
+    await until(() => current.envelopes.some((event) => event.event.summary === "delayed first settled"));
+    const eventBySummary = (summary: string) => current.envelopes.find((event) => event.event.summary === summary)!;
+    assert.equal(eventBySummary("first event").clientMessageId, "first-client");
+    assert.equal(eventBySummary("first settled").clientMessageId, "first-client");
+    assert.equal(eventBySummary("second event").clientMessageId, "second-client");
+    assert.equal(eventBySummary("delayed first settled").clientMessageId, "first-client");
+    assert.equal((await current.manager.send("third", undefined, undefined, { clientMessageId: "third-client" })).queued, true, "old settled must not clear second turn busy");
+    source.stream.push({ kind: "settled", summary: "second settled", roleId: "A", runtime: "codex", turnId: "second-turn" });
+    await until(() => source.sent.length === 3);
+    source.stream.push({ kind: "message", summary: "third event", roleId: "A", runtime: "codex", turnId: "third-turn" });
+    await until(() => current.envelopes.some((event) => event.event.summary === "third event"));
+    assert.equal(eventBySummary("third event").clientMessageId, "third-client");
+  } finally { await current.manager.stop(); }
+});
+
+test("D1R2 anonymous dispatch occupies its own origin and unknown/legacy events cannot borrow the next client", async () => {
+  const current = harness({ openRoleSession: async (input) => {
+    const stream = queue<OrchestrationEvent>();
+    const sent: string[] = [];
+    const handle: RoleSessionHandle = {
+      runtime: input.runtime,
+      async send(text, opts) {
+        sent.push(text);
+        let turnId = "anonymous-turn";
+        if (sent.length === 2) turnId = "client-turn";
+        opts?.onTurnStarted?.({ turnId, roleId: input.roleId, runtime: input.runtime! });
+      }, events: () => stream.events(), async dispose() { stream.close(); },
+    };
+    current.opened.push({ root: input.project.projectRoot, role: input.roleId, runtime: input.runtime!, stream, sent, input, handle });
+    return handle;
+  } });
+  try {
+    await current.manager.open({ projectRoot: "/one", roleId: "su", runtime: "codex" });
+    await current.opened[0].input.dispatchTask!({ roleId: "A", task: "anonymous" });
+    await until(() => current.opened.some((item) => item.role === "A" && item.sent.length === 1));
+    const source = current.opened.find((item) => item.role === "A")!;
+    const target = { projectRoot: "/one", roleId: "A", runtime: "codex" as const };
+    assert.equal((await current.manager.send("client", undefined, target, { clientMessageId: "client" })).queued, true);
+    source.stream.push({ kind: "message", summary: "anonymous event", roleId: "A", runtime: "codex", turnId: "anonymous-turn" });
+    source.stream.push({ kind: "settled", summary: "anonymous settled", roleId: "A", runtime: "codex", turnId: "anonymous-turn" });
+    await until(() => source.sent.length === 2);
+    source.stream.push({ kind: "message", summary: "foreign unknown", roleId: "B", runtime: "codex", turnId: "unknown" });
+    source.stream.push({ kind: "message", summary: "legacy missing ID" });
+    source.stream.push({ kind: "message", summary: "client event", roleId: "A", runtime: "codex", turnId: "client-turn" });
+    source.stream.push({ kind: "message", summary: "unclaimed unknown", roleId: "A", runtime: "codex", turnId: "other-unknown" });
+    await until(() => current.envelopes.some((event) => event.event.summary === "unclaimed unknown"));
+    for (const summary of ["anonymous event", "anonymous settled", "foreign unknown", "legacy missing ID", "unclaimed unknown"]) {
+      assert.equal(Object.hasOwn(current.envelopes.find((event) => event.event.summary === summary)!, "clientMessageId"), false, summary);
+    }
+    assert.equal(current.envelopes.find((event) => event.event.summary === "client event")?.clientMessageId, "client");
+  } finally { await current.manager.stop(); }
+});
+
+test("D1R2 actual Pipeline/Service returns original client IDs and real distinct turn IDs for same text", async () => {
+  const temp = fixture();
+  const events: SessionEventEnvelope[] = [];
+  const releases: (() => void)[] = [];
+  const factory: RuntimeProviderFactory = (options) => ({
+    async composeContext() { return { systemPrompt: "" }; },
+    async bindRole(role) {
+      let promptCount = 0;
+      const stream = queue<SessionEvent>();
+      return {
+        runtime: options.runtime,
+        async prompt() {
+          promptCount += 1;
+          stream.push({ kind: "message", summary: `${role.id}:start ${promptCount}` });
+          if (role.id === "A") await new Promise<void>((resolve) => releases.push(resolve));
+          stream.push({ kind: "settled", summary: "done", detail: { outcome: "completed" } });
+        }, events: () => stream.events(), async dispose() { releases.forEach((release) => release()); stream.close(); },
+      };
+    },
+  });
+  const desktop = createDesktopInterface({ pickDirectory: async () => null, emitEvent: (event) => events.push(event), envFilePath: temp.envPath, piConfigEnv: {}, runtimeOptions: { providerFactories: { claude: factory } } });
+  try {
+    await desktop.listProject({ projectRoot: temp.root });
+    await desktop.openSession({ projectRoot: temp.root, roleId: "A", runtime: "claude" });
+    const first = desktop.sendSession({ text: "same", metadata: { clientMessageId: "actual-first" } });
+    await until(() => events.some((event) => event.event.summary === "A:start 1"));
+    assert.equal((await desktop.sendSession({ text: "same", metadata: { clientMessageId: "actual-second" } })).queued, true);
+    releases[0](); await first;
+    await until(() => events.some((event) => event.event.summary === "A:start 2"));
+    const firstEvent = events.find((event) => event.event.summary === "A:start 1")!;
+    const secondEvent = events.find((event) => event.event.summary === "A:start 2")!;
+    assert.equal(firstEvent.clientMessageId, "actual-first");
+    assert.equal(secondEvent.clientMessageId, "actual-second");
+    assert.ok(firstEvent.event.kind !== "handback" && firstEvent.event.turnId);
+    assert.ok(secondEvent.event.kind !== "handback" && secondEvent.event.turnId);
+    assert.notEqual(firstEvent.event.turnId, secondEvent.event.turnId);
+    releases[1]();
+    await until(() => events.filter((event) => event.roleId === "A" && event.event.kind === "settled").length === 2);
+    assert.deepEqual(events.filter((event) => event.roleId === "A" && event.event.kind === "settled").map((event) => event.clientMessageId), ["actual-first", "actual-second"]);
+  } finally { releases.forEach((release) => release()); await desktop.stopSession(); temp.cleanup(); }
+});
+
+test("D1R2 actual ack preserves a failed delayed terminal and the next aborted original client", async () => {
+  const temp = fixture();
+  const envelopes: SessionEventEnvelope[] = [];
+  let releaseTerminal!: () => void;
+  const terminalGate = new Promise<void>((resolve) => { releaseTerminal = resolve; });
+  let terminalPaused = false;
+  let releaseNative: (() => void) | undefined;
+  const provider: RuntimeProviderFactory = (options) => ({
+    async composeContext() { return { systemPrompt: "" }; },
+    async bindRole(role) {
+      const stream = queue<SessionEvent>();
+      let calls = 0;
+      return { runtime: options.runtime,
+        async prompt() {
+          calls += 1;
+          if (role.id === "A" && calls === 1) throw new Error("fake first native failure");
+          stream.push({ kind: "message", summary: `${role.id}:native ${calls}` });
+          if (role.id === "A" && calls === 2) await new Promise<void>((resolve) => { releaseNative = resolve; });
+          stream.push({ kind: "settled", summary: "native ended", detail: { outcome: "completed" } });
+        }, events: () => stream.events(), async abort() { releaseNative?.(); }, async dispose() { releaseNative?.(); stream.close(); },
+      };
+    },
+  });
+  const desktop = createDesktopInterface({ pickDirectory: async () => null, emitEvent: (event) => envelopes.push(event), envFilePath: temp.envPath, piConfigEnv: {}, runtimeOptions: { providerFactories: { codex: provider } },
+    openRoleSessionFn: async (input, deps) => {
+      const actual = await openRoleSession(input, deps);
+      if (input.roleId !== "A") return actual;
+      return { runtime: actual.runtime, send: (text, opts) => actual.send(text, opts), abort: () => actual.abort!(), async dispose() { releaseTerminal(); await actual.dispose(); },
+        async *events() {
+          for await (const event of actual.events()) {
+            if (event.kind === "settled" && !terminalPaused) { terminalPaused = true; await terminalGate; }
+            yield event;
+          }
+        },
+      };
+    },
+  });
+  try {
+    await desktop.listProject({ projectRoot: temp.root });
+    await desktop.openSession({ projectRoot: temp.root, roleId: "A", runtime: "codex" });
+    const failed = await desktop.sendSession({ text: "same", metadata: { clientMessageId: "failed-original" } });
+    assert.equal(failed.ok, false);
+    await until(() => terminalPaused);
+    const next = desktop.sendSession({ text: "same", metadata: { clientMessageId: "aborted-original" } });
+    await until(() => releaseNative !== undefined);
+    releaseTerminal();
+    await until(() => envelopes.some((event) => event.event.kind === "settled" && event.clientMessageId === "failed-original"));
+    assert.equal((await desktop.sendSession({ text: "after abort", metadata: { clientMessageId: "after-original" } })).queued, true, "late failed terminal cannot clear a newer turn busy");
+    await desktop.abortSession({ projectRoot: temp.root, roleId: "A", runtime: "codex" });
+    assert.equal((await next).ok, false);
+    await until(() => envelopes.some((event) => event.event.kind === "settled" && event.clientMessageId === "aborted-original"));
+    const failedTerminal = envelopes.find((event) => event.event.kind === "settled" && event.clientMessageId === "failed-original")!;
+    const abortedTerminal = envelopes.find((event) => event.event.kind === "settled" && event.clientMessageId === "aborted-original")!;
+    assert.equal((failedTerminal.event as SessionEvent).detail && ((failedTerminal.event as SessionEvent).detail as { outcome: string }).outcome, "failed");
+    assert.equal(((abortedTerminal.event as SessionEvent).detail as { outcome: string }).outcome, "aborted");
+    assert.notEqual((failedTerminal.event as SessionEvent).turnId, (abortedTerminal.event as SessionEvent).turnId);
+  } finally { releaseTerminal(); releaseNative?.(); await desktop.stopSession(); temp.cleanup(); }
+});
+
+test("D1R2 no-ack failure and legacy/unknown events cannot lend an old client ID to a later acknowledged call", async () => {
+  const current = harness();
+  try {
+    await current.manager.open({ projectRoot: "/one", roleId: "A", runtime: "codex" });
+    const source = current.opened[0];
+    let calls = 0;
+    source.handle.send = async (text, opts) => {
+      calls += 1;
+      if (calls === 1) throw new Error("rejected before a turn exists");
+      source.sent.push(text);
+      opts?.onTurnStarted?.({ turnId: "next-real-turn", roleId: "A", runtime: "codex" });
+    };
+    assert.equal((await current.manager.send("same", undefined, undefined, { clientMessageId: "never-started" })).ok, false);
+    await current.manager.send("same", undefined, undefined, { clientMessageId: "next-original" });
+    source.stream.push({ kind: "message", summary: "unknown old", roleId: "A", runtime: "codex", turnId: "never-started-turn" });
+    source.stream.push({ kind: "message", summary: "no turn" });
+    source.stream.push({ kind: "message", summary: "exact next", roleId: "A", runtime: "codex", turnId: "next-real-turn" });
+    await until(() => current.envelopes.some((event) => event.event.summary === "exact next"));
+    assert.equal(current.envelopes.find((event) => event.event.summary === "exact next")?.clientMessageId, "next-original");
+    for (const summary of ["unknown old", "no turn"]) assert.equal(Object.hasOwn(current.envelopes.find((event) => event.event.summary === summary)!, "clientMessageId"), false);
+    await current.manager.stop();
+    await current.manager.open({ projectRoot: "/one", roleId: "A", runtime: "codex" });
+    const legacy = current.opened.at(-1)!;
+    await current.manager.send("legacy", undefined, undefined, { clientMessageId: "unsupported-original" });
+    legacy.stream.push({ kind: "message", summary: "legacy with ID but no ack", roleId: "A", runtime: "codex", turnId: "unsupported-turn" });
+    legacy.stream.push({ kind: "settled", summary: "legacy without turn" });
+    await until(() => current.envelopes.some((event) => event.event.summary === "legacy without turn"));
+    for (const summary of ["legacy with ID but no ack", "legacy without turn"]) assert.equal(Object.hasOwn(current.envelopes.find((event) => event.event.summary === summary)!, "clientMessageId"), false);
+  } finally { await current.manager.stop(); }
+});

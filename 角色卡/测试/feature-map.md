@@ -4,6 +4,7 @@
 
 | 交付物 | 一句话用途 | 状态 | 文档 |
 | --- | --- | --- | --- |
+| 三运行时独立入口验证（T1） | 真CLI/Pipeline/实际Electron主入口的选择、门禁、取消、隔离与回归证据 | verified：独立11、实际main23、旧UI119、锚点14通过；全仓1225通过/0失败/1旧Windows skip | [方案](docs/design/2026-10-14_design_multi-runtime-independent-verification.md)、[报告](docs/change/2026-10-14_change_multi-runtime-independent-verification.md)、[重复问题](docs/fix/2026-10-14_fix_actual-main-live-history-duplication.md) |
 | 跨角色联调（CLI 真入口与治理链） | 真实命令入口的行为与失败面：未知命令/用法错误码、`govern` 缺 provider 配置、创世边界恰 3 条、越界写零副作用 | 现行（2026-10-12 全绿） | [real-entry](../../test/测试/real-entry.test.ts)、[cli-genesis-boundary](../../test/测试/cli-genesis-boundary.test.ts)、[runCli 凭据擦洗问题记录](docs/fix/2026-10-12_fix_runcli-credential-leak-and-govern-cli-cases.md) |
 | 完整流程（su 建角色 → 写落盘 → pin/shell 闸） | bootstrap 全链：三件套字节相等落盘、写前拒越界、F4/F6、shell 闸 (a)/(b)/(c) 次序与 fail-closed | 现行 | [t9-block1](../../test/测试/t9-block1-bootstrap.test.ts)、[t9-block2](../../test/测试/t9-block2-write-landing.test.ts)、[t9-block3](../../test/测试/t9-block3-pin-shell.test.ts) |
 | Pi 配置往返与写入纪律 | 面板载入→适配器构造→保存重载；只改相关键、原子无残留、哨兵不回显 | 现行 | [roundtrip](../../test/测试/t29-pi-config-roundtrip.test.ts)、[write-discipline](../../test/测试/t29-write-discipline.test.ts) |

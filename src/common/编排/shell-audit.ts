@@ -16,7 +16,7 @@
 
 import { appendFile, mkdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-import type { WriteGate } from "../../provider/pi/session.ts";
+import type { WriteGate } from "../../model/runtime.ts";
 import type { BoundarySection1 } from "../../model/boundary.ts";
 import type { TaskScope } from "../../model/decision.ts";
 import { resolveWrite } from "../../service/gate/resolve-write.ts";

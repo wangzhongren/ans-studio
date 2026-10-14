@@ -1,0 +1,31 @@
+{
+  "at": "2026-10-14T07:36:01.707Z",
+  "node": "v24.14.0",
+  "platform": "darwin",
+  "arch": "arm64",
+  "combined": "38f896e0ace0de540606080595e322c3e81cb80d8f3dab2a8b6506fba45a105c",
+  "files": {
+    ".env.example": "4cf8e45b1ba282e074284986dd988623cedf92cd7324fd7a9ff1427cc65b5021",
+    ".gitignore": "77f37859c27fb2866c026437a4c3c49b6a519c75fe549a99286f9291023964a8",
+    "README.md": "afaefb78daa07f07696baf286c50d24620e0c19acde200e3d3a5f0b255d78e28",
+    "bin/ans.js": "b576429f73108a185eac8a2afe832941b1340b9eea6a34023c75d450ee42f054",
+    "package-lock.json": "38b2f2da801bcc0980ecdcdb146f5a723c374cf0a3795e7e16121efced45b749",
+    "package.json": "a3ea68c320c1421fe3c132952a60835995203da0ef62003422b1444f54b9986c",
+    "src/common/装配/cli-parse.ts": "b20c17faab026b1fa6df1172efa37189be971595ccc10ce5223b232e337e8052",
+    "src/common/装配/config-loader.ts": "d58e323a17a3001611bb6fbd915af12963819b127fc4b4f45d8380d1cd3928ad",
+    "src/common/装配/demo-runtime.ts": "a0443e3455e6634e62a1055300ee06c3028d4c3ec1dce99ac855bc1099e765e2",
+    "src/common/装配/entry-timeout.ts": "c0b1c20826a494a4c8e4999712807cda8804c42a7cc51e3cdf6789566af79217",
+    "src/common/装配/runtime.ts": "6ac98339dac6cd72ad02224bf60f85f3b5750d9a8bed51ec4d4d0ed6e45ca9c0",
+    "src/index.ts": "f9b12b8cd4ab40a0c9cd68018fff80fdf2cc0095050fd7782c6909256de94a85",
+    "test/装配/cli-parse.test.ts": "8816c187259835b1f8537a2dc2cadb038be8e256f41043a94cfa9ed0f49f72e6",
+    "test/装配/config-loader.test.ts": "af99d0406527dbe099aeed1dda78e72839fce249fb2eae5d955879ea3519d4ae",
+    "test/装配/config.test.ts": "d9f690a7e31583d3da68fc8b3b3dc19be5b37af4a65583f0b16764214d4487fb",
+    "test/装配/demo-runtime.test.ts": "49173037ff612aba0e18108b7fa28a969561cccc963b3c5751a2adf81693d957",
+    "test/装配/entry.test.ts": "45e5d65ba71d5f02634e8f348bfcc6d398b493041438dc2afda5fb37c0c75253",
+    "test/装配/govern-target.test.ts": "58805c2b856fd69e09539e94a45113f40b4172bfe180848564aa46f76ada196a",
+    "test/装配/main.test.ts": "377652fe20a5d2d5dee46465979055092222ad7cad3eee43d4239c80f842f869",
+    "test/装配/multi-runtime.test.ts": "6178b8591d780e9f133ca4ea8711ada4ee0775f56b470a1a874d2b1dd0f93f64",
+    "test/装配/runtime.test.ts": "f24b26fb571934addae0a5936c7bc1c8e866ef6fd20d3917844971366ca2e736",
+    "tsconfig.json": "0a73fe1a9b9b98bc55e6801e8f8a386447c4bc61e6ae307341c70a93da459a73"
+  }
+}

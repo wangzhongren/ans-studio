@@ -1,0 +1,1 @@
+新增自有fixture首次Electron加载SyntaxError: Unexpected token }，node --check定位uiux-v2.mjs第173行多余括号；该启动没有执行任何行为断言，以SIGINT结束。修正该一处测试语法后node --check与最终Electron12项通过。原T1断言未改。

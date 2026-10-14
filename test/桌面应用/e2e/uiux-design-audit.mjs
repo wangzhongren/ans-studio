@@ -29,6 +29,8 @@ const snapshot = (busy = true) => ({ roleId: 'su', busy, summaries: activeQueue.
 const handlers = {
   'app:renderer-diagnostic': () => ({ ok: true }), 'app:recovery-state': () => ({ projectRoot: ROOT, roleId: 'su' }), 'app:recovery-ready': () => ({ ok: true }),
   'window:is-maximized': () => false, 'app:list-project': () => listing, 'app:pick-project': () => ROOT,
+  'session:history-get':(_e,input)=>({...input,rows:[],error:null,skipped:0}), 'session:live-views':()=>[{projectRoot:ROOT,roleId:'su',runtime:'pi'}],
+  'runtime-config:get':()=>handlers['pi-config:get'](), 'runtime-config:save':()=>({ok:true,appliedKeys:[]}),
   'session:open': () => ({ ok: true, resumed: true, contextSource: 'resumed' }), 'session:live': () => ['su'], 'session:stop': () => ({ ok: true }),
   'session:abort': () => ({ ok: true, supported: true }),
   'session:operator-response': () => ({ ok: true }),

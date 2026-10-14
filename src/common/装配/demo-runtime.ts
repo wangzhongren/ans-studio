@@ -18,7 +18,7 @@ import type {
   SessionEvent,
   ToolCall,
   WriteGate,
-} from "../../provider/pi/session.ts";
+} from "../../model/runtime.ts";
 import type { ResolvedRole } from "../../model/role.ts";
 import type { WriteDecision } from "../../model/decision.ts";
 

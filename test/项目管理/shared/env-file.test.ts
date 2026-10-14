@@ -21,6 +21,7 @@ import {
   mergeEnvText,
   parseEnvFile,
   PI_CONFIG_SECRET_KEYS,
+  RUNTIME_CONFIG_SECRET_KEYS,
   readEnvFile,
   renderEnvValue,
   saveEnvFile,
@@ -395,6 +396,12 @@ test("⑧ 机密键名单含 ANTHROPIC_AUTH_TOKEN；isSecretKey 判定一致", (
   assert.equal(isSecretKey("ANTHROPIC_AUTH_TOKEN"), true);
   assert.equal(isSecretKey("ANS_PI_MODEL"), false);
   assert.equal(isSecretKey("ANS_PI_BASE_URL"), false);
+  for (const key of RUNTIME_CONFIG_SECRET_KEYS) assert.equal(isSecretKey(key), true);
+  assert.equal(isSecretKey("CODEX_API_KEY"), true);
+  assert.equal(isSecretKey("CODEX_ACCESS_TOKEN"), true);
+  assert.equal(isSecretKey("CLAUDE_CODE_OAUTH_TOKEN"), true);
+  assert.equal(isSecretKey("OPENAI_API_KEY"), true);
+  assert.equal(isSecretKey("ANS_CODEX_MODEL"), false);
 });
 
 // ---- ⑨ 读→改→写→读 往返（端到端，纪律叠加） ----

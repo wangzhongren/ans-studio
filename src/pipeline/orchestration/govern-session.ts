@@ -39,12 +39,12 @@ import type { ProjectConfig } from "../../model/role.ts";
 import type { TaskScope } from "../../model/decision.ts";
 import type { Acceptance, BoundarySection1 } from "../../model/boundary.ts";
 import type {
+  RuntimeKind,
+  PromptOptions,
   CustomerInputFn,
-  RuntimeAdapter,
   SessionEvent,
-  WriteGate,
-} from "../../provider/pi/session.ts";
-import { openRoleSession, type AdapterCapabilities } from "./run-role.ts";
+} from "../../model/runtime.ts";
+import { openRoleSession, isFailedSettlement, type RoleSessionDeps, type RoleSessionHandle } from "./run-role.ts";
 import { listProject, resolveRole } from "../../service/role/resolve-role.ts";
 import { formatEvent } from "../../common/编排/output.ts";
 import type { OrchestrationEvent } from "../../common/编排/handback.ts";
@@ -63,6 +63,8 @@ export const ROLE_SCAFFOLD_FILES: readonly string[] = ["role-card.md", "boundary
 
 export interface GovernSessionInput {
   taskId: string;
+  runtime?: RuntimeKind;
+  persistSession?: boolean;
   /** 装配注入的 project（配置单一来源在装配，契约 §6）。 */
   project: ProjectConfig;
   /** 本次治理会话要创建/重构的角色 id 列表（给出可写集）；缺省 = 无可写文件（仅按边界只读）。 */
@@ -90,7 +92,7 @@ export interface GovernSessionInput {
 }
 
 /** 治理会话句柄（**唯一引擎**的产物；两前端只驱动它，不各自实现装配）。 */
-export interface GovernanceSessionHandle {
+export interface GovernanceSessionHandle extends RoleSessionHandle {
   /** 治理角色 id（经 `listProject` 枚举，非硬编码）。 */
   governanceRoleId: string;
   /** 边界来源（项目治理边界，或冷启动创世种子）。 */
@@ -104,7 +106,7 @@ export interface GovernanceSessionHandle {
   /** 目标项目目录（透传自输入；缺省 undefined = 装配默认 ans-cli 自身）。 */
   targetDir?: string;
   /** 发送一轮输入；可反复调用（同一会话，不重建）。 */
-  send(text: string): Promise<void>;
+  send(text: string, opts?: PromptOptions): Promise<void>;
   /** 持续的事件流（含 settle 时的 handback 事件）；跨多轮累积。 */
   events(): AsyncIterable<OrchestrationEvent>;
   /** 收口：释放底层会话（幂等）；出错如实抛出。 */
@@ -124,7 +126,7 @@ export interface GovernSessionResult {
  */
 export async function openGovernanceSession(
   input: GovernSessionInput,
-  deps: { createAdapter: (gate: WriteGate, capabilities?: AdapterCapabilities) => RuntimeAdapter },
+  deps: RoleSessionDeps = {},
 ): Promise<GovernanceSessionHandle> {
   // 1) 发现内置治理角色：数据驱动（同桌面应用），**不硬编码** "su"。
   const govId = input.governanceRoleId ?? (await discoverGovernanceRoleId(input.project));
@@ -157,6 +159,8 @@ export async function openGovernanceSession(
   const handle = await openRoleSession(
     {
       roleId: govId,
+      runtime: input.runtime,
+      persistSession: input.persistSession,
       project: sessionProject,
       taskId: input.taskId,
       scope: effectiveScope,
@@ -167,12 +171,18 @@ export async function openGovernanceSession(
   );
 
   return {
+    get runtime() { return handle.runtime; },
+    get roleId() { return handle.roleId; },
+    get contextSource() { return handle.contextSource; },
+    get nativeSessionId() { return handle.nativeSessionId; },
+    get contextWarning() { return handle.contextWarning; },
+    abort: () => handle.abort!(),
     governanceRoleId: govId,
     boundarySource: resolved.boundarySource,
     acceptance: boundary.acceptance,
     scope: effectiveScope,
     targetDir: input.targetDir,
-    send: (text) => handle.send(text),
+    send: (text, opts) => handle.send(text, opts),
     events: () => handle.events(),
     dispose: () => handle.dispose(),
   };
@@ -195,7 +205,7 @@ async function discoverGovernanceRoleId(project: ProjectConfig): Promise<string>
  */
 export async function runGovernSession(
   input: GovernSessionInput,
-  deps: { createAdapter: (gate: WriteGate, capabilities?: AdapterCapabilities) => RuntimeAdapter },
+  deps: RoleSessionDeps = {},
 ): Promise<GovernSessionResult> {
   const transcript: SessionEvent[] = [];
   const record = (ev: OrchestrationEvent): void => {
@@ -258,7 +268,10 @@ export async function runGovernSession(
     );
     for await (const ev of handle.events()) {
       record(ev);
-      if (ev.kind === "settled") break; // settled 为终止信号（避免与随后 dispose 互等）
+      if (ev.kind === "settled") {
+        if (isFailedSettlement(ev)) code = EXIT_FAILURE;
+        break;
+      }
     }
     // A-4：不再有 finalize 步骤——su 在本轮经客户确认写出的产物，已由 settle 触发的**自动收尾**
     // （openRoleSession 内的 repinIfBootstrapped 含首次）写出 `.ans` + 治理边界文档 + manifest。

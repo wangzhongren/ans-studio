@@ -1,0 +1,20 @@
+npm warn Unknown user config "ELECTRON_MIRROR". This will stop working in the next major version of npm.
+npm warn Unknown user config "ELECTRON_BUILDER_BINARIES_MIRROR". This will stop working in the next major version of npm.
+
+> ans-cli@1.0.0 typecheck
+> tsc --noEmit
+
+test/测试/t1-pipeline-integration.test.ts(84,46): error TS2339: Property 'detail' does not exist on type 'OrchestrationEvent'.
+  Property 'detail' does not exist on type 'HandbackEvent'.
+test/测试/t1-pipeline-integration.test.ts(85,49): error TS2339: Property 'turnId' does not exist on type 'OrchestrationEvent'.
+  Property 'turnId' does not exist on type 'HandbackEvent'.
+test/测试/t1-pipeline-integration.test.ts(86,40): error TS2339: Property 'turnId' does not exist on type 'OrchestrationEvent'.
+  Property 'turnId' does not exist on type 'HandbackEvent'.
+test/测试/t1-pipeline-integration.test.ts(86,54): error TS2339: Property 'detail' does not exist on type 'OrchestrationEvent'.
+  Property 'detail' does not exist on type 'HandbackEvent'.
+test/测试/t1-pipeline-integration.test.ts(89,62): error TS2339: Property 'turnId' does not exist on type 'OrchestrationEvent'.
+  Property 'turnId' does not exist on type 'HandbackEvent'.
+test/测试/t1-pipeline-integration.test.ts(110,31): error TS2339: Property 'detail' does not exist on type 'OrchestrationEvent'.
+  Property 'detail' does not exist on type 'HandbackEvent'.
+test/测试/t1-pipeline-integration.test.ts(112,89): error TS2339: Property 'turnId' does not exist on type 'OrchestrationEvent'.
+  Property 'turnId' does not exist on type 'HandbackEvent'.

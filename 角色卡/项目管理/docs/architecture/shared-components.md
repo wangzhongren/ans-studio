@@ -39,6 +39,8 @@
 
 ## 组件 3：共享运行时原语（`runtime-shared`）
 
+2026-10-14，依据 [ANS-RUNTIME-V2 revision 1](../design/2026-10-14_design_multi-runtime-integration.md)，现行枚举扩为 `demo/pi/codex/claude`，新增 `RUNTIME_LABELS`；默认仍是 `demo`。下面原 v1 的字段来源解释保留作迁移背景，以 [本角色实际实现报告](../../api-spec.md) 为当前接口和验证状态。编排的第二枚举正由其属主 O1 收敛，不能提前宣称所有消费方已一致。
+
 | 字段 | 说明 |
 | --- | --- |
 | **名称与用途** | 三类散在多处的运行时小原语的**单一来源**：① `RuntimeKind`（`"demo"｜"pi"`，原散在编排/装配/桌面 **3 处**）；② `PI_CREDENTIAL_ENV_VARS`（Pi 凭据变量名单，原散在装配/Pi适配器 **2 处**，**安全相关**：装配据此判「有没有凭据」、Pi适配器据此在 spawn 时**剥离**）；③ `resolveSkillRoot`（技能根解析，原散在装配/桌面 **2 处**）。 |
@@ -95,6 +97,10 @@
 | **契约与示例** | `createDiagnosticLogger({component:'session',roleId:'A'}).record('send.start',{turnId:'t1'})`；未配置时 no-op。元数据 JSONL 串行落盘，未知字段丢弃、凭据净化；异常用 `.error(event,error,fields)`。IO失败通过 status.lastError 如实反馈，不让业务抛错。 |
 | **留存与目录** | 桌面目录 `app.getPath('userData')/ans/diagnostics`。记录按时间滚动保留24小时，启动清理、写入检查维护期限、每分钟维护清理；扫描最多每分钟一次，避免每条记录扫描整天日志。只处理本模块诊断文件，不修改会话历史、治理审计或用户文件。维护 timer 不阻止正常退出。 |
 | **测试与影响** | `test/项目管理/shared/diagnostics.test.ts` 8/8：精确过期边界、维护自动清理、有序追加、敏感字段净化、IO失败及正常退出。共享接口变动需重跑桌面/编排/Pi消费方；不记录 prompt、源码、原始工具/API正文。依据[统一方案](../design/2026-10-13_design_runtime-diagnostics-and-reporting.md)。 |
+
+## 组件 8：运行时设置目录（`runtime-settings`）
+
+`src/common/shared/runtime-settings.ts` 由项目管理单一维护，桌面窗口通过只读导入 `RUNTIME_SETTINGS/getRuntimeSettingsDefinition` 组装掩码设置视图；renderer 接收 IPC 视图，不直接引用 Node/TypeScript 文件。字段登记真实 SDK 的 `key/label/required/secret/fallbackKeys?/help?`，不包含凭据值、不推断 SDK/账户可用。Pi、Codex、Claude 各自真实字段和默认行为见 [实现报告](../../api-spec.md)；SDK 实际支持变化须由原属主报告后更新并重测消费方。测试 `test/项目管理/shared/runtime-settings.test.ts` 2/2，验证所有 credential alias 都被秘密键目录覆盖，以及各引擎 required/default 语义。依据 [ANS-RUNTIME-V2](../design/2026-10-14_design_multi-runtime-integration.md)。
 
 ## 变更（本文件）
 

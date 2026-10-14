@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { app, BrowserWindow, ipcMain } from 'electron';
 import { parseSessionJsonl } from '../../../app/desktop/session-history.ts';
+import { RUNTIME_SETTINGS } from '../../../src/common/shared/runtime-settings.ts';
 const HERE=path.dirname(fileURLToPath(import.meta.url));
 const APP=path.resolve(HERE,'../../../app');
 const OUT=process.env.ANS_UIUX_OUTDIR || fs.mkdtempSync(path.join(os.tmpdir(),'ans-uiux-v2-'));
@@ -15,10 +16,12 @@ const ROOT='/offline-uiux-fixture';
 const PNG='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=';
 let win, pickResolve, sendResolve, withdrawResolve;
 let pickDeferred=false, sendDeferred=false, withdrawMode='fail', interactiveReady=false, operatorMode='normal';
-const reports=[]; const errors=[]; const sends=[];
+const reports=[]; const errors=[]; const sends=[]; const opens=[]; const histories=[]; const stops=[]; const aborts=[]; const responses=[]; const configSaves=[]; const shellResponses=[]; const configApplications={};
+let saveMode="success", saveApplication="next-session";
+let mergeReplayAfterList=false, sendQueued=false; const mergeHistories=new Map();
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 const js=code=>win.webContents.executeJavaScript(code.includes('await ')?'(async()=>{'+code+'})()':code);
-async function check(name, code){const value=await js(code);reports.push({name,value});assert.equal(value,true,name);}
+async function check(name, code){const value=await js(code);reports.push({name,value});if(!value)reports.push({name:name+' observed',value:await js(`(()=>({chat:document.getElementById('chat').textContent,assistant:[...document.querySelectorAll('#chat .msg-assistant')].map(x=>x.textContent),denied:[...document.querySelectorAll('#chat .sys-denied')].map(x=>x.textContent),model:window.__ansRenderer.rowModelDebug(window.__ansRenderer.state.selectedRoleId)}))()`)});assert.equal(value,true,name);}
 const roles=['A','B'].map(roleId=>({roleId,cardPath:ROOT+'/角色卡/'+roleId+'/role-card.md',cardText:'# '+roleId+'\n\n完整角色职责。\n\n'+('资料内容用于检查阅读态。\n\n'.repeat(80)),boundary:{entries:[]},boundaryPath:'',changelog:null,docs:[]}));
 const listing={projectRoot:ROOT,primaryRoleId:'A',hasRoles:true,warnings:[],roles};
 const longFull='全文 '+ '排队消息详细内容与来源。\n'.repeat(40)+'长连续文本 '+ 'ordinaryword'.repeat(120);
@@ -27,17 +30,26 @@ let activeQueue=queue.slice();
 const snapshot=(busy=true)=>({roleId:'A',busy,summaries:activeQueue.map(x=>x.summary),queue:activeQueue,running:busy?{id:'running',kind:'message',summary:'正在处理当前请求',full:'',at:'2026-10-13T10:00:00Z'}:null});
 const handlers={
  'app:renderer-diagnostic':()=>({ok:true}), 'app:recovery-state':()=>({projectRoot:ROOT,roleId:'A'}),'app:recovery-ready':()=>({ok:true}),
- 'window:is-maximized':()=>false,'app:list-project':()=>listing,'app:pick-project':()=>ROOT,
- 'session:open':()=>({ok:true,resumed:true,contextSource:'resumed'}),'session:live':()=>['A','B'],'session:stop':()=>({ok:true}),
- 'session:abort':()=>{win.webContents.send('session:role-state',snapshot(false)); return {ok:true,supported:true};},
- 'session:operator-response':()=>operatorMode==='expired'?({ok:false,expired:true,error:'离线受控请求已失效'}):({ok:true}),
+ 'window:is-maximized':()=>false,'app:list-project':()=>{if(mergeReplayAfterList)for(const h of mergeHistories.values())win.webContents.send('session:history',h);return listing;},'app:pick-project':()=>ROOT,
+ 'session:open':(_e,input)=>{opens.push(input);return {ok:true,resumed:true,contextSource:'resumed',runtime:input.runtime,projectRoot:input.projectRoot,profileRevision:0};},'session:live':()=>['A','B'],'session:stop':(_e,input)=>{stops.push(input);return {ok:true};},
+ 'session:history-get':(_e,input)=>{histories.push(input);return mergeHistories.get(input.runtime+'|'+input.roleId)||{...input,rows:[],error:null,skipped:0};},
+ 'session:live-views':()=>[{projectRoot:ROOT,roleId:'A',runtime:'pi'},{projectRoot:ROOT,roleId:'B',runtime:'pi'},...opens.map(x=>({projectRoot:x.projectRoot,roleId:x.roleId,runtime:x.runtime}))],
+ 'session:abort':(_e,input)=>{aborts.push(input);win.webContents.send('session:role-state',{...snapshot(false),...input}); return {ok:true,supported:true};},
+ 'session:operator-response':(_e,input)=>{responses.push(input);return operatorMode==='expired'?({ok:false,expired:true,error:'离线受控请求已失效'}):({ok:true});},
+ 'runtime-config:get':(_e,input)=>runtimeConfig(input.runtime),
+ 'shell:confirm-response':(_e,input)=>{shellResponses.push(input);return {ok:true};},
+ 'runtime-config:save':(_e,input)=>{if(saveMode!=='fail')configApplications[input.runtime]=saveApplication;configSaves.push({runtime:input.runtime,keys:Object.keys(input.updates)});return saveMode==='fail'?{ok:false,error:'离线原子写失败'}:{ok:true,runtime:input.runtime,appliedKeys:Object.keys(input.updates),revision:1,application:saveApplication};},
  'pi-config:get':()=>({path:ROOT+'/'+('a-very-long-path/'.repeat(12))+'.env',fields:['ANTHROPIC_AUTH_TOKEN','ANS_PI_BASE_URL','ANS_PI_MODEL','ANS_PI_CONTEXT_WINDOW'].map(key=>({key,secret:key==='ANTHROPIC_AUTH_TOKEN',value:key==='ANTHROPIC_AUTH_TOKEN'?'':'fixture',isSet:true}))}),
  'pi-config:save':()=>({ok:true,appliedKeys:[]}),
  'app:pick-image':()=>pickDeferred?new Promise(r=>pickResolve=r):({ok:true,image:{name:'fixture.png',mime:'image/png',size:68,dataBase64:PNG}}),
  'app:attach-image':(_e,input)=>({ok:true,image:{name:input.name,mime:'image/png',size:68}}),
- 'session:send':(_e,input)=>{sends.push(input);return sendDeferred?new Promise(r=>sendResolve=r):{ok:true};},
+ 'session:send':(_e,input)=>{sends.push(input);return sendDeferred?new Promise(r=>sendResolve=r):sendQueued?{ok:true,queued:true,position:1}:{ok:true};},
  'session:withdraw':(_e,input)=>interactiveReady?({ok:false,error:'离线受控返回：当前无法撤回，请重试。'}):new Promise((resolve,reject)=>{withdrawResolve=()=>{if(withdrawMode==='throw'){reject(new Error('离线受控网络不可用'));return;}if(withdrawMode==='success'){activeQueue=activeQueue.filter(x=>x.id!==input.id);win.webContents.send('session:role-state',snapshot(false)); resolve({ok:true,summary:'客户长消息'});}else resolve({ok:false,error:'离线受控拒绝'});};}),
 };
+function runtimeConfig(runtime) {
+  const definition=RUNTIME_SETTINGS[runtime];
+  return {runtime,label:definition.label,path:runtime==='pi'?ROOT+'/'+('a-very-long-path/'.repeat(12))+'.env':ROOT+'/.env',revision:0,application:configApplications[runtime]||'next-session',missingKeys:[],fields:definition.fields.map(f=>({...f,value:f.secret?'':f.required?'fixture':'',isSet:f.required,source:f.secret&&runtime==='codex'?'fallback':f.required?'environment':'default',fallbackKey:f.secret&&runtime==='codex'?'OPENAI_API_KEY':undefined}))};
+}
 Object.entries(handlers).forEach(([name,fn])=>ipcMain.handle(name,fn));
 const key=async name=>{const keyCode=name==='Enter'?'Return':name;win.webContents.sendInputEvent({type:'keyDown',keyCode});if(name==='Enter')win.webContents.sendInputEvent({type:'char',keyCode:'\r'});win.webContents.sendInputEvent({type:'keyUp',keyCode});await pause(50);};
 const event=(kind,summary,detail)=>({roleId:'A',event:{kind,summary,detail}});
@@ -46,12 +58,146 @@ async function push(channel,payload){win.webContents.send(channel,payload);await
 function ownHistory(){return parseSessionJsonl([{type:'session'},{type:'message',message:{role:'assistant',content:[{type:'toolCall',id:'rs',name:'run_shell',arguments:{command:'ls missing'}}]}},{type:'message',message:{role:'toolResult',toolCallId:'rs',toolName:'run_shell',isError:false,content:[{type:'text',text:'run_shell 已执行：ls missing（exit 1）\nstdout:\nSECRET'}]}},{type:'message',message:{role:'toolResult',toolName:'read_file',isError:false,content:[{type:'text',text:'read_file 失败：lost.md（ENOENT）'}]}},{type:'message',message:{role:'assistant',content:[{type:'text',text:'历史助手答复。'}]}}].map(x=>JSON.stringify(x)).join('\n')).rows;}
 const viewportGeometry=`(() => { const root=document.documentElement,b=document.body,a=document.querySelector('.app'),c=document.querySelector('.composer').getBoundingClientRect(),d=document.getElementById('right-drawer').getBoundingClientRect(); const visible=id=>{let r=document.getElementById(id).getBoundingClientRect();return r.width>0&&r.left>=0&&r.right<=innerWidth&&r.bottom<=innerHeight&&r.top>=0;};return root.scrollWidth===root.clientWidth&&b.scrollWidth===b.clientWidth&&a.scrollWidth===a.clientWidth&&visible('btn-send')&&visible('btn-halt')&&visible('drawer-close')&&d.bottom<=c.top+1;})()`;
 async function reading(){return js(`(() => {let c=document.getElementById('chat'),t=c.getBoundingClientRect().top;let nodes=[...c.querySelectorAll('.msg,.tool-records,.sys-denied')];let n=nodes.find(x=>x.getBoundingClientRect().bottom>t&&x.getBoundingClientRect().top<c.getBoundingClientRect().bottom);return n?{text:n.textContent.slice(0,60),offset:n.getBoundingClientRect().top-t}:null;})()`);}
+async function runtimeChecks() {
+  const runtimeRoles=[{roleId:'A'}, {roleId:'Pi适配器',group:'运行时接入组',groupDuty:'组员'}, {roleId:'Codex适配器',group:'运行时接入组',groupDuty:'组员'}, {roleId:'Claude适配器',group:'运行时接入组',groupDuty:'组员'}, {roleId:'运行时核心',group:'运行时接入组',groupDuty:'组长'}, {roleId:'项目管理',group:'项目协调组',groupDuty:'组长'}, {roleId:'未知职责',group:'测试 <script>window.INJECTED=1</script>',groupDuty:'<img src=x onerror=window.INJECTED=2>'}, {roleId:'B'}];
+  listing.roles=runtimeRoles.map(r=>({...r,cardText:'# '+r.roleId,cardPath:'',boundary:{entries:[]},changelog:null,docs:[]}));
+  await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRuntime('pi');await window.__ansRenderer.selectRole('运行时核心')`);
+  await check('runtime groups lead first and unknown metadata escaped',`(()=>{let e=document.getElementById('role-tree'),labels=[...e.querySelectorAll('.tree-group')].map(x=>x.textContent),lead=e.querySelector('.tree-group:nth-child(3)');return labels.includes('运行时接入组')&&labels.includes('项目协调组')&&labels.includes('其他角色（查看/调试）')&&[...e.querySelectorAll('.ti-name')].indexOf([...e.querySelectorAll('.ti-name')].find(x=>x.textContent==='运行时核心'))<[...e.querySelectorAll('.ti-name')].indexOf([...e.querySelectorAll('.ti-name')].find(x=>x.textContent==='Pi适配器'))&&!e.querySelector('script,img')&&!window.INJECTED;})()`);
+  const roleId='运行时核心';
+  const payload=(runtime,extra={})=>({projectRoot:ROOT,roleId,runtime,...extra});
+  await push('session:history',payload('pi',{rows:[{kind:'assistant',text:'Pi专属历史'}]}));
+  await push('session:role-state',payload('pi',{busy:true,summaries:['Pi队列'],queue:[{id:'pi-q',kind:'message',summary:'Pi队列',full:'Pi队列全文',runtime:'pi'}]}));
+  await push('session:operator-request',payload('pi',{id:'pi-old-confirm',request:{kind:'confirm',title:'Pi旧轮确认'}}));
+  await js(`document.getElementById('inp-message').value='Pi草稿';document.getElementById('inp-message').dispatchEvent(new Event('input'))`);
+  await js(`window.__runtimeOldAction=document.querySelector('[data-request-id="pi-old-confirm"] .op-confirm')`);
+  const stopCount=stops.length;
+  await js(`await window.__ansRenderer.selectRuntime('codex')`);
+  assert.equal(stops.length,stopCount,'dropdown preserves old backend work');
+  const beforeOldYes=responses.length;await js(`window.__runtimeOldAction.click()`);await pause(30);assert.equal(responses.length,beforeOldYes,'hidden old engine action cannot answer new context');
+  await check('new engine no Pi history queue confirmation or draft',`!document.getElementById('chat').textContent.includes('Pi专属历史')&&!document.getElementById('chat').textContent.includes('Pi队列')&&!document.querySelector('[data-request-id="pi-old-confirm"]')&&document.getElementById('inp-message').value===''&&window.__ansRenderer.state.runtime==='codex'`);
+  await push('session:events',[payload('pi',{event:{kind:'message',summary:'后台Pi消息'}}),payload('codex',{event:{kind:'message',summary:'Codex当前消息'}}),{projectRoot:'/old-project',roleId,runtime:'codex',event:{kind:'message',summary:'旧项目不得出现'}}]);
+  await push('session:role-state',payload('pi',{busy:true,summaries:['Pi后台队列'],queue:[]}));
+  await check('old engine envelopes cache only and stale project ignored',`document.getElementById('chat').textContent.includes('Codex当前消息')&&!document.getElementById('chat').textContent.includes('后台Pi消息')&&!document.getElementById('chat').textContent.includes('旧项目不得出现')&&window.__ansRenderer.state.roleBusy['运行时核心']!==true`);
+  await push('session:history',payload('codex',{rows:[{kind:'assistant',text:'Codex专属历史'}]}));
+  await push('session:events',[payload('codex',{event:{runtime:'codex',turnId:'actual-turn',kind:'tool_call',summary:'read_file',detail:{toolName:'read_file',toolCallId:'actual-call',args:{path:'actual/codex.md'}}}}),payload('codex',{event:{runtime:'codex',turnId:'actual-turn',kind:'accepted',summary:'读取返回',detail:{toolName:'read_file',toolCallId:'actual-call',ok:true}}})]);
+  await check('actual Codex call/result target correlation and completion',`(()=>{let rows=[...document.querySelectorAll('#chat .tool-activity')];return rows.some(r=>r.textContent.includes('actual/codex.md')&&r.textContent.includes('调用发起'))&&rows.some(r=>r.textContent.includes('actual/codex.md')&&r.textContent.includes('执行完成'));})()`);
+
+  await js(`document.getElementById('inp-message').value='Codex请求';document.getElementById('btn-send').click()`);await pause(80);
+  assert.deepEqual(sends.at(-1).target,{projectRoot:ROOT,roleId,runtime:'codex'},'send captured runtime target');
+  await js(`document.getElementById('tab-pi').click()`);await pause(100);
+  await check('Codex secret fallback and optional official Responses settings',`document.getElementById('drawer-title').textContent==='Codex 配置'&&document.getElementById('pi-inp-CODEX_API_KEY').value===''&&document.getElementById('pi-inp-CODEX_API_KEY').type==='password'&&document.getElementById('pi-panel').textContent.includes('回退（OPENAI_API_KEY）')&&document.getElementById('pi-panel').textContent.includes('Responses API')&&document.getElementById('pi-inp-ANS_CODEX_BASE_URL').value===''&&!document.getElementById('pi-inp-ANTHROPIC_AUTH_TOKEN')`);
+  saveMode='fail';await js(`document.getElementById('pi-inp-CODEX_API_KEY').value='FAKE-DRAFT-SECRET';document.getElementById('pi-inp-ANS_CODEX_MODEL').value='draft-model';document.getElementById('pi-save').click()`);await pause(100);
+  await check('failed save keeps draft and honest error',`document.getElementById('pi-inp-CODEX_API_KEY').value==='FAKE-DRAFT-SECRET'&&document.getElementById('pi-inp-ANS_CODEX_MODEL').value==='draft-model'&&document.getElementById('pi-status').textContent.includes('离线原子写失败')&&!document.getElementById('pi-panel').textContent.includes('FAKE-DRAFT-SECRET')`);
+  saveMode='success';saveApplication='after-active-turn';await js(`document.getElementById('pi-save').click()`);await pause(100);
+  await check('saved secret cleared and busy apply timing truthful',`document.getElementById('pi-inp-CODEX_API_KEY').value===''&&document.getElementById('pi-status').textContent.includes('当前轮次继续使用原配置')`);
+  for(const [width,height] of [[1360,860],[960,620]]) {
+    win.setContentSize(width,height);await pause(150);
+    await check('runtime settings geometry '+width,`(()=>{const body=document.getElementById('pi-panel'),select=document.getElementById('runtime-select').getBoundingClientRect(),chat=document.querySelector('.chat-head').getBoundingClientRect();return document.body.scrollWidth===innerWidth&&body.scrollWidth===body.clientWidth&&select.right<=innerWidth&&select.top>=chat.top&&select.bottom<=chat.bottom&&[...body.querySelectorAll('input')].every(x=>x.getBoundingClientRect().right<=innerWidth);})()`);
+    fs.writeFileSync(path.join(OUT,'runtime-settings-'+width+'.png'),(await win.webContents.capturePage()).toPNG());
+  }
+  await js(`document.getElementById('drawer-close').click();await window.__ansRenderer.selectRuntime('claude')`);
+  await js(`document.getElementById('tab-pi').click()`);await pause(100);
+  await check('Claude required key and optional SDK model endpoint',`document.getElementById('drawer-title').textContent==='Claude 配置'&&document.getElementById('pi-inp-ANTHROPIC_API_KEY').type==='password'&&document.getElementById('pi-inp-ANS_CLAUDE_MODEL').value===''&&document.getElementById('pi-panel').textContent.includes('SDK 默认模型')&&!document.getElementById('pi-inp-CODEX_API_KEY')`);
+  await js(`document.getElementById('drawer-close').click()`);
+  await push('session:role-state',payload('claude',{busy:true,summaries:[],queue:[]}));
+  await js(`document.getElementById('btn-halt').click()`);await pause(100);
+  assert.deepEqual(aborts.at(-1),{projectRoot:ROOT,roleId,runtime:'claude'},'abort exact target');
+  await push('session:events',[payload('claude',{event:{kind:'settled',summary:'本轮运行失败',detail:{outcome:'failed'}}})]);
+  await check('failed outcome remains error',`window.__ansRenderer.state.roleMeta['运行时核心'].error===true`);
+  await push('session:role-state',payload('claude',{busy:false,summaries:[],queue:[],contextSource:'fresh',contextWarning:'原生恢复失败，已重建上下文。'}));
+  await check('failed native restore honest rebuilding notice',`document.getElementById('chat').textContent.includes('已重建上下文')&&!document.getElementById('chat').textContent.includes('模型上下文一并恢复')`);
+  await push('shell:confirm-request',payload('pi',{id:'sc-runtime-old',command:'echo literal',summary:null,reasonPlain:'离线确认',cwd:ROOT,argvLines:[]}));
+  await check('foreign runtime shell caches without showing in current engine',`document.getElementById('shell-confirm').hidden`);
+  await push('session:operator-expired',payload('pi',{id:'sc-runtime-old',reason:'原shell轮次已中止'}));
+  await push('session:operator-expired',payload('pi',{id:'pi-old-confirm',reason:'原轮次已中止'}));
+  const responseCount=responses.length;
+  await js(`await window.__ansRenderer.selectRuntime('pi')`);
+  await check('Pi own history background queue draft and expired card restored',`document.getElementById('chat').textContent.includes('Pi专属历史')&&document.getElementById('chat').textContent.includes('后台Pi消息')&&document.getElementById('chat').textContent.includes('Pi后台队列')&&document.getElementById('inp-message').value==='Pi草稿'&&document.querySelector('[data-request-id="pi-old-confirm"] .op-confirm').hidden&&document.querySelector('[data-request-id="pi-old-confirm"] .op-note').textContent.includes('原轮次已中止')`);
+  await check('expired old shell shown disabled in its own runtime',`!document.getElementById('shell-confirm').hidden&&document.getElementById('sc-allow').disabled&&document.getElementById('sc-hint').textContent.includes('原shell轮次已中止')`);
+  const shellCount=shellResponses.length;await js(`document.getElementById('sc-allow').click();document.getElementById('sc-close').click()`);await pause(30);assert.equal(shellResponses.length,shellCount,'expired shell cannot authorize and closing only dismisses');
+  await js(`document.querySelector('[data-request-id="pi-old-confirm"] .op-confirm').click()`);await pause(40);
+  assert.equal(responses.length,responseCount,'late yes cannot respond after expiry');
+  for(const [width,height] of [[1360,860],[960,620]]) {win.setContentSize(width,height);await pause(120);fs.writeFileSync(path.join(OUT,'runtime-groups-'+width+'.png'),(await win.webContents.capturePage()).toPNG());}
+  assert.ok(opens.some(x=>x.runtime==='pi')&&opens.some(x=>x.runtime==='codex')&&opens.some(x=>x.runtime==='claude'),'three real choices reach bridge');
+  for(const runtime of ['pi','codex','claude'])assert.ok(histories.some(x=>x.projectRoot===ROOT&&x.roleId===roleId&&x.runtime===runtime),'history exact '+runtime);
+  reports.push({name:'runtime bridge targets',opens:opens.slice(-8),histories:histories.slice(-8),aborts:aborts.slice(-1),configSaves});
+}
+async function mergeChecks() {
+  listing.roles=roles;
+  await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRole('A')`);
+  const payload=(runtime,roleId,extra={})=>({projectRoot:ROOT,roleId,runtime,...extra});
+  const row=(turnId,kind,text,eventKind)=>({turnId,kind,text,eventKind,at:''});
+  const live=(runtime,roleId,turnId,kind,summary,extra={})=>payload(runtime,roleId,{event:{turnId,runtime,kind,summary,...extra}});
+  async function history(runtime,roleId,rows){const h=payload(runtime,roleId,{rows,error:null,skipped:0});mergeHistories.set(runtime+'|'+roleId,h);await push('session:history',h);}
+  const older=[row('old','user','old input'),row('old','assistant','old history retained','message')];
+  await history('pi','A',older);
+  await push('session:events',[live('pi','A','current','tool_call','read_file',{detail:{toolName:'read_file',toolCallId:'current-call',args:{path:'current.md'}}}),live('pi','A','current','denied','current rejection',{detail:{toolName:'read_file',toolCallId:'current-call',ok:false}}),live('pi','A','current','message','current answer'),live('pi','A','current','settled','current settled'),payload('pi','A',{event:{kind:'handback',summary:'handback',handback:{roleId:'A',turnId:'current',status:'unreported',summary:'current report remains',evidence:[],at:''}}})]);
+  await push('session:operator-request',payload('pi','A',{id:'merge-confirm',request:{kind:'confirm',title:'merge pending card'}}));
+  await js(`window.__mergeCard=document.querySelector('[data-request-id="merge-confirm"]')`);
+  const current=[row('current','user','current input'),{...row('current','tool','read_file','tool_call'),activity:{toolName:'read_file',toolCallId:'current-call',turnId:'current',target:'current.md',phase:'call',status:'call'}},{...row('current','denied','current rejection','denied'),activity:{toolName:'read_file',toolCallId:'current-call',turnId:'current',target:'current.md',phase:'result',status:'failed'}},row('current','assistant','current answer','message')];
+  await history('pi','A',[...older,...current]);
+  await check('same-turn live then history only one response rejection and old history',`[...document.querySelectorAll('#chat .msg-assistant')].filter(x=>x.textContent.trim()==='current answer').length===1&&[...document.querySelectorAll('#chat .sys-denied')].filter(x=>x.textContent.includes('current rejection')).length===1&&document.getElementById('chat').textContent.includes('old history retained')`);
+  mergeReplayAfterList=true;await push('project:changed',{});
+  await check('real project-changed refresh does not repeat current turn',`[...document.querySelectorAll('#chat .msg-assistant')].filter(x=>x.textContent.trim()==='current answer').length===1&&[...document.querySelectorAll('#chat .msg-handback')].filter(x=>x.textContent.includes('current report remains')).length===1`);
+  await push('session:events',[live('pi','A','not-yet-stored','message','not stored yet')]);
+  const rewritten=[row('prefix','assistant','inserted past history','message'),...older,...current];
+  await history('pi','A',rewritten);
+  await check('full rebuild retains unpersisted live report settled and original pending card',`document.getElementById('chat').textContent.includes('not stored yet')&&document.getElementById('chat').textContent.includes('inserted past history')&&document.querySelector('[data-request-id="merge-confirm"]')===window.__mergeCard&&!window.__mergeCard.querySelector('.op-confirm').hidden&&[...document.querySelectorAll('#chat .sys-settled')].filter(x=>x.textContent.trim()==='current settled').length===1&&document.querySelectorAll('#chat .msg-handback').length===1`);
+  const firstBeforeLive=row('history-first','assistant','history before live','message');
+  await history('pi','A',[...rewritten,firstBeforeLive]);
+  await push('session:events',[live('pi','A','history-first','message','history before live')]);
+  await check('history first then exact live event does not duplicate',`[...document.querySelectorAll('#chat .msg-assistant')].filter(x=>x.textContent.trim()==='history before live').length===1`);
+  await push('session:events',[live('pi','A','history-first','message','history before live')]);
+  const repeated=[...rewritten,firstBeforeLive,firstBeforeLive];await history('pi','A',repeated);
+  await check('two legitimate same-turn identical events remain two occurrences',`[...document.querySelectorAll('#chat .msg-assistant')].filter(x=>x.textContent.trim()==='history before live').length===2`);
+  await push('session:events',[live('pi','A','identical-1','message','two identical answers'),live('pi','A','identical-2','message','two identical answers')]);
+  await history('pi','A',[...repeated,row('identical-1','user','two identical inputs'),row('identical-1','assistant','two identical answers','message'),row('identical-2','user','two identical inputs'),row('identical-2','assistant','two identical answers','message')]);
+  await check('distinct turns with identical input and output remain two',`[...document.querySelectorAll('#chat .msg-user')].filter(x=>x.textContent.trim()==='two identical inputs').length===2&&[...document.querySelectorAll('#chat .msg-assistant')].filter(x=>x.textContent.trim()==='two identical answers').length===2`);
+  await push('session:events',[live('codex','A','bg','message','background authoritative answer')]);
+  await history('codex','A',[row('bg','user','background input'),row('bg','assistant','background authoritative answer','message')]);
+  await js(`await window.__ansRenderer.selectRuntime('codex')`);
+  await check('background engine merges in own cache without old engine rows',`[...document.querySelectorAll('#chat .msg-assistant')].filter(x=>x.textContent.trim()==='background authoritative answer').length===1&&!document.getElementById('chat').textContent.includes('current answer')`);
+  await js(`await window.__ansRenderer.selectRuntime('pi')`);
+  sendQueued=true;
+  await js(`document.getElementById('inp-message').value='manual identical';document.getElementById('btn-send').click()`);await pause(70);
+  const first=sends.at(-1);await js(`document.getElementById('inp-message').value='manual identical';document.getElementById('btn-send').click()`);await pause(70);
+  const second=sends.at(-1);assert.equal(typeof first.metadata.clientMessageId,'string','first exact client ID crossed real preload');assert.notEqual(first.metadata.clientMessageId,second.metadata.clientMessageId,'identical sends own different IDs');
+  const previous=mergeHistories.get('pi|A').rows;
+  await history('pi','A',[...previous,row('manual-1','user','manual identical'),row('manual-2','user','manual identical')]);
+  await push('session:events',[{...live('pi','A','manual-1','message','manual answer one'),clientMessageId:first.metadata.clientMessageId},{...live('pi','A','manual-2','message','manual answer two'),clientMessageId:second.metadata.clientMessageId}]);
+  await check('history-before-correlated-live binds two identical optimistic inputs exactly once',`[...document.querySelectorAll('#chat .msg-user')].filter(x=>x.textContent.trim()==='manual identical').length===2&&document.getElementById('chat').textContent.includes('manual answer one')&&document.getElementById('chat').textContent.includes('manual answer two')`);
+  await check('repeated known-turn full rebuild keeps original unanchored pending card without borrowed token',`document.querySelector('[data-request-id="merge-confirm"]')===window.__mergeCard&&!window.__mergeCard.querySelector('.op-confirm').hidden`);
+  sendQueued=false;mergeReplayAfterList=false;
+  await js(`await window.__ansRenderer.selectRole('B')`);
+  const anchored=parseSessionJsonl([{type:'session'},
+    {type:'message',message:{role:'assistant',content:[{type:'toolCall',id:'legacy-request',name:'request_confirmation',arguments:{title:'legacy decided anchor'}}]}},
+    {type:'message',message:{role:'toolResult',toolName:'request_confirmation',toolCallId:'legacy-request',isError:true,content:[{type:'text',text:'未获同意：legacy conclusion'}]}},
+    {type:'message',message:{role:'assistant',content:[{type:'text',text:'legacy after conclusion'}]}}
+  ].map(x=>JSON.stringify(x)).join('\n')).rows;
+  await history('pi','B',anchored);
+  await push('session:operator-request',payload('pi','B',{id:'legacy-decided',anchorKey:anchored[0].anchorKey,request:{kind:'confirm',title:'legacy decided anchor'}}));
+  await js(`window.__legacyDecidedCard=document.querySelector('[data-request-id="legacy-decided"]');window.__legacyDecidedCard.querySelector('.op-deny').click()`);await pause(60);
+  await history('pi','B',[{kind:'assistant',text:'legacy prefix',at:''},...anchored]);
+  await check('legacy decided full replay reuses original card between actual request and conclusion',`(()=>{let a=window.__ansRenderer.replayAnchorDebug('B').find(x=>x.anchorKey===${JSON.stringify('confirm\u0000legacy decided anchor')}),m=window.__ansRenderer.rowModelDebug('B'),card=document.querySelector('[data-request-id="legacy-decided"]'),op=m.operators.find(x=>x.requestId==='legacy-decided');return !!a&&card===window.__legacyDecidedCard&&op.index===a.requestIndex+1&&op.index<a.conclusionIndex&&card.querySelector('.op-confirm').hidden&&card.querySelector('.op-note').textContent.includes('不同意');})()`);
+  await js(`await window.__ansRenderer.selectRole('A')`);
+  await history('pi','B',[{kind:'assistant',text:'background legacy prefix',at:''},{kind:'assistant',text:'legacy prefix',at:''},...anchored]);
+  await js(`await window.__ansRenderer.selectRole('B')`);
+  await check('background legacy rebuild keeps exact decided DOM and shifted anchor indices',`(()=>{let a=window.__ansRenderer.replayAnchorDebug('B').find(x=>x.anchorKey===${JSON.stringify('confirm\u0000legacy decided anchor')}),m=window.__ansRenderer.rowModelDebug('B'),op=m.operators.find(x=>x.requestId==='legacy-decided');return document.querySelector('[data-request-id="legacy-decided"]')===window.__legacyDecidedCard&&op.index===a.requestIndex+1&&a.conclusionIndex===op.index+1&&m.operators.length===1;})()`);
+
+  const legacy=[{kind:'assistant',text:'legacy identical',at:'1'},{kind:'assistant',text:'legacy identical',at:'2'}];
+  await history('pi','B',legacy);await history('pi','B',legacy);
+  await check('unknown legacy no false text-set dedup and old replay stays idempotent',`[...document.querySelectorAll('#chat .msg-assistant')].filter(x=>x.textContent.trim()==='legacy identical').length===2`);
+  await js(`await window.__ansRenderer.selectRole('A')`);
+  for(const width of [1360,960]){win.setContentSize(width,width===960?620:860);await pause(80);fs.writeFileSync(path.join(OUT,'merge-'+width+'.png'),(await win.webContents.capturePage()).toPNG());}
+}
 app.whenReady().then(async()=>{
  const watchdog=setTimeout(()=>{fs.writeFileSync(path.join(OUT,'watchdog.txt'),'timeout');app.exit(1);},60000);
  try {
   win=new BrowserWindow({width:1360,height:860,useContentSize:true,frame:false,show:INTERACTIVE,webPreferences:{preload:path.join(APP,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:false}});
   win.webContents.on('console-message',event=>{if(event.level==='error')errors.push(event.message);});
   await win.loadFile(path.join(APP,'renderer/index.html'));win.setTitle('ANS UI/UX 离线验收');await pause(150);
+  if(process.env.ANS_MERGE_UI_ONLY==='1'){await mergeChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports,sends:sends.map(x=>({text:x.text,target:x.target,clientMessageId:x.metadata&&x.metadata.clientMessageId}))},null,2));console.log('MERGE_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
+  if(process.env.ANS_RUNTIME_UI_ONLY==='1'){await runtimeChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports,sends},null,2));console.log('RUNTIME_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   await push('session:role-state',snapshot());
   await push('session:events',activityEvents());
   await check('routine collapsed; failure direct; assistant untouched',`document.querySelectorAll('#chat .tool-records').length===2&&!document.querySelector('#chat .tool-records').open&&document.querySelector('#chat .sys-denied').textContent.includes('missing.md')&&document.querySelector('#chat .msg-assistant').textContent==='真实助手答复保持原文。'`);
@@ -218,6 +364,7 @@ app.whenReady().then(async()=>{
   operatorMode='normal';await push('session:role-state',snapshot(false));
   await push('session:events',[event('message','普通助手追问：请补充验收标准。')]);
   await check('ordinary question creates no pending',`document.getElementById('op-chip').hidden&&!document.querySelector('#chat .tool-current')`);
+  await runtimeChecks();
   if(errors.length) reports.push({name:'renderer console errors',errors});assert.equal(errors.length,0);
   fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports,sends},null,2));
   console.log('UIUX_V2_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);

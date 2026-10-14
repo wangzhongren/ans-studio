@@ -33,6 +33,9 @@ entries:
     path: test/桌面应用/e2e/uiux-prototype-measure.mjs
     purpose: 设计原型测量夹具——只读载入 UIUX 原型 HTML 实测两档尺寸
   - kind: file
+    path: test/桌面应用/runtime-ui.test.ts
+    purpose: 本次多引擎选择、运行时组及设置展示的渲染契约测试
+  - kind: file
     path: 角色卡/桌面UI/feature-map.md
     purpose: 功能导航
   - kind: file

@@ -18,7 +18,7 @@
 //    （开不了会话 / 取不到结论 → 抛错或返回空 → shell-gate 判 (b) 不可用/不可解析，按 M-2 直拒或升 (a)）。
 
 import type { ProjectConfig } from "../../model/role.ts";
-import type { RuntimeAdapter, SessionEvent, WriteGate } from "../../provider/pi/session.ts";
+import type { RuntimeKind, RuntimeAdapter, SessionEvent, WriteGate } from "../../model/runtime.ts";
 import type { PmReviewInput } from "../../common/编排/shell-gate.ts";
 import {
   normalizeShellVerdict,
@@ -32,6 +32,7 @@ import { openRoleSession, type RoleSessionHandle } from "./run-role.ts";
 export type OpenSessionFn = (
   input: {
     roleId: string;
+    runtime?: RuntimeKind;
     project: ProjectConfig;
     taskId?: string;
     /** 审读会话固定 `false`——不恢复/不污染用户 su 会话；缺省行为（true）不受影响。 */
@@ -45,6 +46,7 @@ export type OpenSessionFn = (
 export interface PmReviewerOptions {
   /** 装配注入的 project（配置单一来源在装配）。 */
   project: ProjectConfig;
+  runtime?: RuntimeKind;
   /** 传给 `openRoleSession` 的依赖（通常是装配注入的 `{ createAdapter }`）。 */
   sessionDeps: { createAdapter: (gate: WriteGate) => RuntimeAdapter };
   /** pm 角色 id；缺省 `"项目管理"`。 */
@@ -81,7 +83,7 @@ export function createPmReviewer(opts: PmReviewerOptions): (input: PmReviewInput
     // 审读会话**不持久化**（`persistSession:false`）：① 不恢复用户 su 会话里可能已损坏/被网关拒收的历史
     // （真机 500 的诱因之一，见 shell-gate.ts 的 R-1 注）；② 不把审核往返灌进用户的 su 聊天记录。
     const handle = await open(
-      { roleId: pmRoleId, project: opts.project, taskId: opts.taskId, persistSession: false, shellVerdict },
+      { roleId: pmRoleId, runtime: opts.runtime, project: opts.project, taskId: opts.taskId, persistSession: false, shellVerdict },
       opts.sessionDeps,
     );
     try {

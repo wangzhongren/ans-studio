@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // ANS CLI 可执行入口（装配层）。
-// Node 24 原生擦除 TypeScript 类型，直接动态导入 src/index.ts —— 免 npm install、免构建。
+// Node 24 原生擦除 TypeScript 类型，直接动态导入 src/index.ts —— 需 npm install，免构建。
 //
 // 收敛保证（关键）：顶层 `await main(...)` 必须**真正 resolve** 并给出退出码，进程随后正常
 // 结束——不再依赖事件循环“意外排空”（那会导致 unsettled top-level await 警告与不可靠的退出码）。
