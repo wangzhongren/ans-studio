@@ -22,6 +22,9 @@ entries:
     path: README.md
     purpose: 安装与使用说明
   - kind: file
+    path: LICENSE
+    purpose: 客户指定的项目开源许可证
+  - kind: file
     path: .env
     purpose: 本地环境配置，含 Pi 凭据；不入库
   - kind: file

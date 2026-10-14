@@ -9,6 +9,7 @@
 | 单文件 | `package.json` | 包定义、依赖与脚本 |
 | 单文件 | `tsconfig.json` | TypeScript 编译配置 |
 | 单文件 | `README.md` | 安装与使用说明 |
+| 单文件 | `LICENSE` | 客户指定的项目开源许可证 |
 | 目录（私有） | `src/common/装配/` | 本角色私有辅助代码 |
 | 目录（测试） | `test/装配/` | 本角色的启动冒烟与接线测试及夹具 |
 | 单文件 | `角色卡/装配/feature-map.md` | 功能导航 |
