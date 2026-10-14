@@ -1,5 +1,21 @@
 # 装配 变更记录
 
+## 2026-10-14 — README 过时表述核改（客户指示「修改一下，并且提交」；PM 转达漂移点，逐条实读核实）
+
+PM 初查给出 5 类漂移点；本任务**每条先对现行代码 / 记录核实再改**（不照抄转述），并顺带扫同类过时处。**由 PM 统一提交**（本角色不 commit）。
+
+- **① 图片已接通（原表述两个方向都反了）——改**：
+  - 快速开始 7：删「『图片随消息送进模型』尚未接线」，改为「可选图（png/jpeg/webp/gif、≤5MB）随消息预览 → 发送时经主进程重校验（解码 / 魔数 / 限额，**任一张不合格整条拒发**；忙时入队即定格）→ 随消息一并**送进模型**（不单独发图）」。
+  - 「已知范围外」整条「图片发送未接通」**删除**（无残余限制可留——类型 / 大小 / 随消息发送属常规约束，不是「未做」）。
+  - 依据：`角色卡/桌面窗口/feature-map.md`（「停止与图片端到端」＝已实现）、`角色卡/Pi适配器/feature-map.md`（「图片 prompt 透传（K-2）」＝已实现）、归档 change `角色卡/桌面应用/docs/change/2026-10-13_change_p0-halt-and-images.md`（主进程重校验 / 队列入队定格 / 整包透传、**退役「图片未发送」提示**）、实读 `app/desktop/composer-images.ts`（`MAX_IMAGE_BYTES=5MB`、`ALLOWED_IMAGE_MIMES`=png/jpeg/webp/gif）。
+- **② 两道门用例数——改**：`859 用例、856 通过` → **`1054 用例、1051 通过、1 跳过`**。依据：本任务实跑 `node --test "test/**/*.test.ts"` → **1054 计 / 1051 过 / 2 红 / 1 skip**（两红＝既有环境红：`pi-config` 目录名、pm `path-primitives` macOS `/var`），与 PM 当晨记录一致；第 93 行两条红的描述经核对仍准，未动。
+- **③ 右栏布局——改**：快速开始 4 的「右栏『待办 / 队列』」→ **右上角图标簇「角色资料」抽屉内「当前工作 / 排队」两节**（图标角标 = 该角色待办深度）；6 的「右上『Pi 设置』面板」→ **右上角「Pi 设置」图标打开抽屉面板**。依据：实读 `app/renderer/renderer.js`（`workListHtml` 现行文案 `<h3 class="work-heading">当前工作</h3>` / `排队`）、`app/renderer/index.html`（`#right-tabs` 两枚图标簇、Pi 面板迁入抽屉）、归档 change `2026-10-13_change_drawer-two-icons-and-pi-fit.md`。
+- **④ shell 闸状态——改写**：原「**只对项目角色 arm**（su 自身不 arm）」已过时。改为：桌面已 arm（**(c) 实件与 (a) 通道两件同备才 arm**）；**项目角色**三层链——(b) 结论经 `report_shell_verdict` 工具交回、「危险」类即使 (b) 放行也必过 (a)；**已授权项目的精确常规检查**（`npm test` / `npm run typecheck` / 项目内 `node --test test/*.test.ts` 窄匹配）在 (b) 明确放行后**自动执行**；**su 走只读档**（客户裁定「su 也要有 shell，但是只读」：只接 (c)、白名单直接放行、`risky`/`review`/`deny` 全拒、**不接 (b)/(a)**）。「CLI 未 arm」与「无 OS 沙箱」两条保留（核实仍真实）。依据：实读 `src/pipeline/orchestration/shell-arming.ts`（`assembleProjectShellGate` / `assembleReadonlyShellGate`）、`src/common/编排/routine-shell-policy.ts`、`src/common/编排/shell-gate.ts`（delegated-routine 分支：b 明确 allow 可免重复 a）、`app/main.ts`（两档分发注释 + 两件同备才 arm）、`app/desktop/session.ts`（routine 注入条件＝非内置角色且 accepted）、`app/desktop/operator-channel.ts`（`DESKTOP_SHELL_GATE_ARMED=true`）、`src/index.ts`（CLI 仍不注入 `ShellGate`）。
+- **⑤ 顺带核**：**七态徽标**（快速开始 7）——实读 `app/renderer/role-status.js` 恰为七态（含 `idle-restored`），**准确、未动**。**「真实 Pi 此后未再复验」条——改写**：原「真机 shell 语义验证同样**未做**」与真机证据矛盾（`角色卡/编排/changelog.md` R-1/M-2/X-2 条目引真机审计数据：`c-allow ×31`、`c-deny ×2`、客户多次放行、审读不可解析 / 重复投递均**真机暴露并修复**；另 2026-10-12 首次桌面 + 真模型端到端有会话记录）。改为：「已不止一次真机运行（2026-10-12 起，客户在真机上使用）……真机 shell 已有放行 / 拒绝 / 审计留痕记录；但此后改动很多、**未再系统复验——当前端到端状态未验证**；su 只读 shell、工具化审读等现行档位的真机复核**属客户跑**」。
+- **未改而存疑（如实报告，供 PM 裁定）**：a) 快速开始 7 未提**停止钮**（P0-2 已发布的输入区特性）——属遗漏非过时表述，按任务口径未加（**同日 PM 裁定补入，见下条 ⑥**）；b) Pi 设置「3 必填 + 1 可选」经实读 `app/desktop/pi-config.ts`（`PI_PANEL_KEYS`=4 / `PI_REQUIRED_KEYS`=3，无超时键）仍准，未动；c) P0-3「120s 超时进面板」未见落地，README 原未涉及、无需改。
+- **⑥ 停止钮（PM 同日裁定补入）**：快速开始 7 补一句「忙碌时另现**停止钮**，与发送钮并存——只结束**当前轮次**，排队消息 / 草稿 / 资料保留，空闲时隐藏」。依据：归档 change `2026-10-13_change_p0-halt-and-images.md`（P0-2：停的是**当前一轮**——会话保留、轮次仍以既有 settled 收尾、非「结束会话」的恢复；与发送钮并存、忙碌时发消息＝入队语义不变）＋实读 `app/renderer/renderer.js`（`#btn-halt`：输入框区、发送钮左侧、**仅忙碌时出现**）与 `index.html`（默认 `hidden`、title「停止当前轮次」）。
+- **验证**：`git diff --check` → **通过**（无空白问题）；stale 扫描（`尚未接线`/`未接通`/`859`/`右栏`/`只对项目角色 arm`/`跑通一次`）→ **零残留**。本任务只改 `README.md`（＋本 changelog、`memo.md`），未碰代码与他角色文件；**未 commit**（客户已指示提交，由 PM 统一执行）。
+
 ## 2026-10-14 — 补建 `角色卡/装配/feature-map.md`（role-card 死链修复；客户要求统一补建）
 
 role-card.md 第 11 行「当前导航见[装配功能导航](feature-map.md)」此前是**死链**——该文件自 bootstrap 起从未建立（客户普查发现 5 个角色同缺、要求统一补建）。本任务按「名称 / 一句话用途 / 当前状态 / 文档链接」建立本角色导航页。
