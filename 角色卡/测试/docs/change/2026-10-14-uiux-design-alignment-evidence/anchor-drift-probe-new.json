@@ -1,0 +1,92 @@
+{
+  "electron": "44.7.0",
+  "node": "24.21.0",
+  "app": "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/app",
+  "report": [
+    {
+      "name": "setup: >150 rows in one collapsed group",
+      "value": true
+    },
+    {
+      "name": "setup: append grows group to 46 activities",
+      "value": true
+    },
+    {
+      "name": "toggle drift (4 collapse/expand cycles)",
+      "value": [
+        {
+          "label": "initial",
+          "offset": 11.25,
+          "text": "independent-row-",
+          "scrollTop": 9938,
+          "groupH": 2487.3125
+        },
+        {
+          "label": "collapse cycle 0",
+          "offset": 12.3125,
+          "text": "independent-row-",
+          "scrollTop": 9856,
+          "groupH": 36
+        },
+        {
+          "label": "expand cycle 0",
+          "offset": 13.25,
+          "text": "independent-row-",
+          "scrollTop": 9936,
+          "groupH": 2487.3125
+        },
+        {
+          "label": "collapse cycle 1",
+          "offset": 14.3125,
+          "text": "independent-row-",
+          "scrollTop": 9854,
+          "groupH": 36
+        },
+        {
+          "label": "expand cycle 1",
+          "offset": 15.25,
+          "text": "independent-row-",
+          "scrollTop": 9934,
+          "groupH": 2487.3125
+        },
+        {
+          "label": "collapse cycle 2",
+          "offset": -52.875,
+          "text": "independent-row-",
+          "scrollTop": 9852,
+          "groupH": 36
+        },
+        {
+          "label": "expand cycle 2",
+          "offset": -52.9375,
+          "text": "independent-row-",
+          "scrollTop": 9933,
+          "groupH": 2487.3125
+        },
+        {
+          "label": "collapse cycle 3",
+          "offset": -52.875,
+          "text": "independent-row-",
+          "scrollTop": 9852,
+          "groupH": 36
+        },
+        {
+          "label": "expand cycle 3",
+          "offset": -52.9375,
+          "text": "independent-row-",
+          "scrollTop": 9933,
+          "groupH": 2487.3125
+        }
+      ]
+    },
+    {
+      "name": "reading paragraph metrics",
+      "value": {
+        "offsetHeight": 53,
+        "rectH": 53.1875,
+        "fontSize": "14px",
+        "lineHeight": "26.6px"
+      }
+    }
+  ]
+}

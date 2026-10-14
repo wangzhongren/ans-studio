@@ -162,7 +162,7 @@ node --env-file=.env bin/ans.js role run 编排 --task T-1 --runtime pi
 
 ## 目录与职责
 
-全项目共 **7 个角色**。每个角色只写自己 Section 1（`角色卡/<角色>/boundary.yaml`）内列出的路径。
+全项目共 **10 个角色**。每个角色只写自己 Section 1（`角色卡/<角色>/boundary.yaml`）内列出的路径。
 
 | 角色 | 主要路径 |
 | --- | --- |
@@ -170,13 +170,16 @@ node --env-file=.env bin/ans.js role run 编排 --task T-1 --runtime pi
 | **编排** | `src/interface/cli/run.ts`、`src/interface/cli/govern.ts`、`src/pipeline/orchestration/**`（含 `govern-session.ts` 唯一治理会话引擎、`pm-reviewer.ts`、`shell-arming.ts`）、`src/common/编排/**`、`test/编排/**` |
 | **门禁引擎** | `src/model/**`（跨层共享类型）、`src/service/**`（`resolve-role` / `resolve-boundary` / `resolve-write` / `shell-rules`）、`src/common/门禁引擎/**`、`test/门禁引擎/**` |
 | **Pi适配器** | `src/provider/pi/session.ts`、`src/provider/pi/tools.ts`、`src/common/pi-adapter/**`、`test/pi-adapter/**` |
-| **桌面应用** | `app/**`（Electron 主进程、preload 桥、渲染进程与 vendored 前端库）、`test/桌面应用/**` |
+| **桌面UI** | `app/renderer/`（桌面渲染前端：界面展示与交互，含 vendored 前端库）、`test/桌面应用/`（渲染侧用例） |
+| **桌面窗口** | `app/main.ts`、`app/preload.cjs`、`app/desktop/`（Electron 主进程、窗口生命周期、preload 受限桥、桌面会话装配）、`test/桌面应用/`（窗口侧用例） |
 | **测试** | `test/测试/**`（跨角色联调、完整流程与回归用例） |
 | **装配** | `src/index.ts`、`bin/ans.js`、`package.json`、`tsconfig.json`、`README.md`、`.env` / `.env.example` / `.gitignore`、`src/common/装配/**`、`test/装配/**`、`.ans/`（条件 `project-init`） |
+| **产品** | `角色卡/产品/**`（产品视角：把 CLI 与桌面客户端当整体做评审与提案；不写产品代码） |
+| **UIUX设计师** | `角色卡/UIUX设计师/**`（桌面界面布局、交互方案、可检查的 HTML 设计原型与设计规范；设计产物由实现角色接入正式应用） |
 
 - **共享组件 `src/common/shared/`**：跨角色共享的**单一来源**——`.ans` 载入器（`config-loader.ts`）、
   `.env` 读写（`env-file.ts`）、原子写（`atomic-write.ts`）、以及路径 / argv / runtime 原语
-  （`path-primitives.ts`、`argv-primitives.ts`、`runtime-shared.ts`）。**属主 pm**；消费方（**装配、桌面应用**）
+  （`path-primitives.ts`、`argv-primitives.ts`、`runtime-shared.ts`）。**属主 pm**；消费方（**装配、桌面窗口**）
   **只读导入、不得留第二份实现**，登记在 `角色卡/项目管理/docs/architecture/shared-components.md`。
 - 层间调用方向：**入口（装配）→ Interface → Pipeline → Service → Provider**（`Model` 各层共享）；**仅相邻层可调用**。
 

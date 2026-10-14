@@ -1,5 +1,5 @@
 // test/桌面应用/e2e/main.mjs
-// 桌面应用端到端自检：以真实 Electron 主进程启动真实 preload + 真实渲染进程。
+// 桌面窗口端到端自检：以真实 Electron 主进程启动真实 preload + 真实渲染进程。
 // 驱动（客户最终模型「导入项目 = 授权；点角色即开」）：
 //   导入 D:\work\ans-cli → 左树出角色 → 点角色【直接进入聊天，全程无确认框】
 //   → 连发两条消息都生效 → 一次越界写入被拒且拒绝消息内联显示（可展开看允许路径）
@@ -97,9 +97,9 @@ function registerIpc() {
         composeContext: (role) => createChatDemoAdapter({ gate, boundary: role.boundary }).composeContext(role),
         bindRole: async (role) => {
           const session = await createChatDemoAdapter({ gate, boundary: role.boundary }).bindRole(role);
-          // P0-1 e2e 专用缝（仅桌面应用角色、仅 arm 后、仅文本「队列慢轮」命中）：首轮 prompt 挂起直到
+          // P0-1 e2e 专用缝（仅桌面窗口角色、仅 arm 后、仅文本「队列慢轮」命中）：首轮 prompt 挂起直到
           // e2e 显式放行——不改 demo 适配器本体（记录/行为不变，只是延迟调用），把「忙」变成确定态。
-          if (role.id === "桌面应用") {
+          if (role.id === "桌面窗口") {
             const origPrompt = session.prompt.bind(session);
             session.prompt = (text, opts) => {
               if (slowPromptArmed && text === "队列慢轮") {
@@ -340,7 +340,7 @@ async function run() {
 
   // 2) 点角色 → 直接进入聊天（无确认框）
   const clicked = await wc().executeJavaScript(
-    "(() => { const it=[...document.querySelectorAll('#role-tree .tree-item')].find(e=>e.textContent.includes('桌面应用')); if(it){it.click(); return true;} return false; })()",
+    "(() => { const it=[...document.querySelectorAll('#role-tree .tree-item')].find(e=>e.textContent.includes('桌面窗口')); if(it){it.click(); return true;} return false; })()",
   );
   log("CLICKED_DESKTOP_ROLE=" + clicked);
   await sleep(1200);
@@ -349,9 +349,9 @@ async function run() {
   log("SESSION_STATE=" + (await wc().executeJavaScript("document.getElementById('chat').dataset.state || '(none)'"))); // 同上
   log("NO_WELCOME_AFTER_OPEN=" + (await wc().executeJavaScript("!document.querySelector('#chat').textContent.includes('已开启与角色')")));
   log("USER_BUBBLES_BEFORE=" + (await wc().executeJavaScript("document.querySelectorAll('#chat .msg-user').length")));
-  // 可写的项目角色（桌面应用）：同样**不该**带「只读」标记，聊天流内亦无只读说明（守卫「它不该出现」）。
+  // 可写的项目角色（桌面窗口）：同样**不该**带「只读」标记，聊天流内亦无只读说明（守卫「它不该出现」）。
   const desktopRole = await wc().executeJavaScript(
-    "(() => { const it=[...document.querySelectorAll('#role-tree .tree-item')].find(e=>e.textContent.includes('桌面应用')); return { badge: !!(it && it.querySelector('.ti-badge.readonly')), rows: document.querySelectorAll('#chat .sys-readonly').length }; })()",
+    "(() => { const it=[...document.querySelectorAll('#role-tree .tree-item')].find(e=>e.textContent.includes('桌面窗口')); return { badge: !!(it && it.querySelector('.ti-badge.readonly')), rows: document.querySelectorAll('#chat .sys-readonly').length }; })()",
   );
   log("DESKTOP_ROLE_NO_READONLY_BADGE=" + !desktopRole.badge + " DESKTOP_ROLE_NO_READONLY_ROWS=" + (desktopRole.rows === 0));
   // 去掉运行时选择器后：聊天流内不再有 demo 写入语义；旧的一概而论文案应已不存在。
@@ -392,7 +392,7 @@ async function run() {
 
   // 5) 同角色重复点击 = 续接（不重建、不弹框）
   await wc().executeJavaScript(
-    "(() => { const it=[...document.querySelectorAll('#role-tree .tree-item')].find(e=>e.textContent.includes('桌面应用')); it && it.click(); })()",
+    "(() => { const it=[...document.querySelectorAll('#role-tree .tree-item')].find(e=>e.textContent.includes('桌面窗口')); it && it.click(); })()",
   );
   await sleep(500);
   log("RESUME_HINT=" + (await wc().executeJavaScript("document.getElementById('composer-hint').textContent")));
@@ -405,16 +405,16 @@ async function run() {
   // 「已停止」假象）；空闲/快照复位即隐藏。**与发送钮并存**：发送钮绝不因忙碌被替换/禁用。
   log("STOP_IN_COMPOSER=" + (await wc().executeJavaScript("(() => { const h=document.getElementById('btn-halt'), c=document.getElementById('composer-capsule'), s=document.getElementById('btn-send'); return !!h && !!c && c.contains(h) && !!s && s.previousElementSibling === h; })()")));
   log("CHAT_HEAD_NO_BUTTONS=" + (await wc().executeJavaScript("document.querySelectorAll('.chat-head button').length === 0")));
-  await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面应用', busy: false, summaries: [], queue: [], running: null })");
+  await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面窗口', busy: false, summaries: [], queue: [], running: null })");
   await sleep(150);
   log("STOP_HIDDEN_WHEN_IDLE=" + (await wc().executeJavaScript("document.getElementById('btn-halt').hidden === true")));
-  await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面应用', busy: true, summaries: ['你：在跑'], queue: [], running: null })");
+  await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面窗口', busy: true, summaries: ['你：在跑'], queue: [], running: null })");
   await sleep(150);
   log("STOP_VISIBLE_WHEN_BUSY=" + (await wc().executeJavaScript("document.getElementById('btn-halt').hidden === false")));
   await wc().executeJavaScript("document.getElementById('btn-halt').click()");
   await sleep(300);
   log("STOP_LINE_UNSUPPORTED=" + (await wc().executeJavaScript("[...document.querySelectorAll('#chat .chat-pane .sys-call')].some(function (p) { return p.textContent.indexOf('当前运行时不支持停止') >= 0; })")));
-  await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面应用', busy: false, summaries: [], queue: [], running: null })");
+  await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面窗口', busy: false, summaries: [], queue: [], running: null })");
   await sleep(150);
   log("STOP_HIDDEN_AFTER_SNAPSHOT_RESET=" + (await wc().executeJavaScript("document.getElementById('btn-halt').hidden === true")));
 
@@ -474,9 +474,9 @@ async function run() {
   log("QUEUE_ROWS_AFTER_WITHDRAW=" + (await wc().executeJavaScript("document.querySelectorAll('#right-queue-body .q-item').length === 2")));
   // 派发条目只读：按当前渲染快照 + 一条 dispatch 注入 → 派发行**无撤回钮**（呈现与语义同口径）。
   const injQueue = await wc().executeJavaScript(
-    "(() => { const s=window.__ansRenderer.state; const q=(s.queueItemsByRole['桌面应用']||[]).map(function(i){return {kind:i.kind,sourceRoleId:i.sourceRoleId,summary:i.summary,at:i.at,id:i.id,full:i.full};}); q.push({kind:'dispatch',sourceRoleId:'su',summary:'派发 · 来自 su：做X',at:'2026-10-13T03:00:00.000Z',id:'e2e-dispatch-1',full:'派发任务：做X'}); return q; })()",
+    "(() => { const s=window.__ansRenderer.state; const q=(s.queueItemsByRole['桌面窗口']||[]).map(function(i){return {kind:i.kind,sourceRoleId:i.sourceRoleId,summary:i.summary,at:i.at,id:i.id,full:i.full};}); q.push({kind:'dispatch',sourceRoleId:'su',summary:'派发 · 来自 su：做X',at:'2026-10-13T03:00:00.000Z',id:'e2e-dispatch-1',full:'派发任务：做X'}); return q; })()",
   );
-  await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面应用', busy: true, summaries: [], queue: " + JSON.stringify(injQueue) + ", running: null })");
+  await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面窗口', busy: true, summaries: [], queue: " + JSON.stringify(injQueue) + ", running: null })");
   await sleep(400);
   log(
     "DISPATCH_ROW_NO_WITHDRAW=" +
@@ -527,8 +527,9 @@ async function run() {
   log("IMG_LEGACY_NOTE_ABSENT=" + (await wc().executeJavaScript("!document.getElementById('chat').textContent.includes('张图片未发送') && !document.getElementById('chat').textContent.includes('尚未接线')")));
 
   // 6) 右栏抽屉（客户裁定 2026-10-13：右栏不常驻，收成右上角图标簇；点开展示、再点收起；
-  //    第二轮裁定同日：待办/队列归角色——簇只留两枚，两节并入「角色资料」抽屉）：
-  //    先断言默认收起，点 tab-card 展示 → 资料六组（角色卡/待办队列/队列概览/边界/变更/文档）在抽屉内；再点收起。
+  //    第二轮裁定同日：待办/队列归角色——簇只留两枚；UIUX v2：并入「角色资料」的**单份工作列表**
+  //    〔当前工作+排队；空态一条说明——"空态不保留两份列表"（interaction-v1 §资料）〕）：
+  //    先断言默认收起，点 tab-card 展示 → 资料五组（角色卡/工作列表/边界/变更/文档）在抽屉内；再点收起。
   log("TABS_PRESENT=" + (await wc().executeJavaScript("['tab-card','tab-pi'].every(id=>!!document.getElementById(id))")));
   log("NO_RETIRED_TABS=" + (await wc().executeJavaScript("!document.getElementById('tab-todo') && !document.getElementById('tab-queue')")));
   log("NO_RIGHT_COLUMN=" + (await wc().executeJavaScript("!document.querySelector('.col-right')")));
@@ -543,9 +544,10 @@ async function run() {
   );
   await sleep(400);
   const right = await wc().executeJavaScript(
-    "(() => { const t=document.querySelector('#right-body').textContent; return { card:t.includes('角色卡'), todo:t.includes('待办 / 队列'), overview:t.includes('队列概览'), boundary:t.includes('边界条目'), rows:document.querySelectorAll('#right-body table.boundary tbody tr').length, changelog:t.includes('变更记录'), docs:t.includes('文档'), mdCard:!!document.querySelector('#right-body .card-text.card-md h1'), mdNoScript:!document.querySelector('#right-body .card-text script') }; })()",
+    "(() => { const t=document.querySelector('#right-body').textContent; return { card:t.includes('角色卡'), todo:!!document.querySelector('#right-body #right-queue-body'), singleList:!!document.querySelector('#right-body #right-queue-body') && !document.querySelector('#right-body #right-queue-overview'), boundary:t.includes('边界条目'), rows:document.querySelectorAll('#right-body table.boundary tbody tr').length, changelog:t.includes('变更记录'), docs:t.includes('文档'), mdCard:!!document.querySelector('#right-body .card-text.card-md h1'), mdNoScript:!document.querySelector('#right-body .card-text script') }; })()",
   );
-  log("RIGHT_HAS_CARD=" + right.card + " RIGHT_HAS_TODO_SECTION=" + right.todo + " RIGHT_HAS_OVERVIEW_SECTION=" + right.overview);
+  // todo=工作列表区在（原「待办 / 队列」节）；singleList=单份列表口径（原「队列概览」独立节已按 UIUX v2 并入，不保留第二份视图）。
+  log("RIGHT_HAS_CARD=" + right.card + " RIGHT_HAS_TODO_SECTION=" + right.todo + " RIGHT_QUEUE_SINGLE_LIST=" + right.singleList);
   log("RIGHT_HAS_BOUNDARY=" + right.boundary + " RIGHT_BOUNDARY_ROWS=" + right.rows);
   log("RIGHT_HAS_CHANGELOG=" + right.changelog + " RIGHT_HAS_DOCS=" + right.docs);
   // N-2（2026-10-12 客户裁定）：角色卡已走 Markdown（标题成 <h1> 标签）；且无 <script> 注入口。
@@ -561,10 +563,10 @@ async function run() {
   await sleep(200);
   log("DRAWER_ESC_CLOSES=" + (await wc().executeJavaScript("!document.getElementById('right-drawer').classList.contains('open')")));
   // 角标归角色（收起不丢信息）：注入该角色的真实快照（排队 2 条）→ 收起状态下角色资料图标角标 = 该角色待办深度。
-  await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面应用', busy: true, summaries: ['你：排队一', '你：排队二'], queue: [{kind:'message',sourceRoleId:'桌面应用',summary:'你：排队一',at:'2026-10-13T03:00:00.000Z'},{kind:'dispatch',sourceRoleId:'su',summary:'派发 · 来自 su：做X',at:'2026-10-13T03:01:00.000Z'}], running: null })");
+  await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面窗口', busy: true, summaries: ['你：排队一', '你：排队二'], queue: [{kind:'message',sourceRoleId:'桌面窗口',summary:'你：排队一',at:'2026-10-13T03:00:00.000Z'},{kind:'dispatch',sourceRoleId:'su',summary:'派发 · 来自 su：做X',at:'2026-10-13T03:01:00.000Z'}], running: null })");
   await sleep(200);
   log("BADGE_ON_CARD_WHILE_COLLAPSED=" + (await wc().executeJavaScript("(() => { const b=document.querySelector('#tab-card .tab-badge'); return !!b && !b.hidden && b.textContent === '2'; })()")));
-  await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面应用', busy: false, summaries: [], queue: [], running: null })");
+  await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面窗口', busy: false, summaries: [], queue: [], running: null })");
   await sleep(150);
   log("BADGES_CLEAR_ON_EMPTY=" + (await wc().executeJavaScript("document.querySelector('#tab-card .tab-badge').hidden")));
   log("SHOT_04_PROFILE=" + (await shot("04-profile.png")));
@@ -812,20 +814,20 @@ async function run() {
   //    直接把 handback 事件推给渲染侧（不经真实 pi 会话），专测渲染侧呈现与镜像（不真开 pi 会话）。
   await wc().executeJavaScript("window.__ansRenderer.loadProject(" + JSON.stringify(REPO_ROOT) + ")");
   await sleep(500);
-  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面应用')");
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面窗口')");
   await sleep(1000);
   // B-2：事件外推带 `roleId` 信封（`{roleId, event}`）——直接推给渲染侧时同样要套信封。
   wc().send("session:event", {
-    roleId: "桌面应用",
+    roleId: "桌面窗口",
     event: {
       kind: "handback",
       summary: "回交 su：完成边界内改动",
       handback: {
-        roleId: "桌面应用",
+        roleId: "桌面窗口",
         taskId: "T20",
         status: "completed",
         summary: "完成边界内改动",
-        evidence: ["角色卡/桌面应用/feature-map.md"],
+        evidence: ["角色卡/桌面窗口/feature-map.md"],
         at: "2026-10-11T00:00:00.000Z",
       },
     },
@@ -838,20 +840,20 @@ async function run() {
   log("HANDBACK_EVIDENCE_ROWS=" + (await wc().executeJavaScript("document.querySelectorAll('#chat .msg-handback .hb-evidence .hb-ev').length")));
   log("SHOT_07_HANDBACK=" + (await shot("07-handback.png")));
 
-  // 切到 su（主入口，primaryRoleId）→ 该回交应**镜像**进 su 的聊天流：标题「来自 桌面应用 的报告」、blocked 结论。
+  // 切到 su（主入口，primaryRoleId）→ 该回交应**镜像**进 su 的聊天流：标题「来自 桌面窗口 的报告」、blocked 结论。
   await wc().executeJavaScript("window.__ansRenderer.selectRole(window.__ansRenderer.state.primaryRoleId)");
   await sleep(1000);
   wc().send("session:event", {
-    roleId: "桌面应用",
+    roleId: "桌面窗口",
     event: {
       kind: "handback",
       summary: "回交 su：被拦下",
-      handback: { roleId: "桌面应用", status: "blocked", summary: "被拦下：无写入落地", evidence: [], at: "2026-10-11T00:00:00.000Z" },
+      handback: { roleId: "桌面窗口", status: "blocked", summary: "被拦下：无写入落地", evidence: [], at: "2026-10-11T00:00:00.000Z" },
     },
   });
   await sleep(300);
   log("REPORT_NO_PREMATURE_SU_MIRROR=" + (await wc().executeJavaScript("!document.querySelector('#chat .msg-handback.is-mirror')")));
-  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面应用')");
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面窗口')");
   log("SOURCE_REPORT_BLOCKED=" + (await wc().executeJavaScript("!!document.querySelector('#chat .msg-handback.is-blocked .hb-status.hb-blocked')")));
   log("SOURCE_REPORT_EVIDENCE_PLACEHOLDER=" + (await wc().executeJavaScript("[...document.querySelectorAll('#chat .msg-handback .hb-ev-empty')].some(e=>e.textContent.includes('（未提供证据）'))")));
   await wc().executeJavaScript("window.__ansRenderer.selectRole(window.__ansRenderer.state.primaryRoleId)");
@@ -860,12 +862,12 @@ async function run() {
   // 9b) B-1/B-2/B-3（2026-10-12）：切换保留历史（锚点）→ Markdown 渲染+XSS 转义+链接外开（替身）→ 状态徽标。
   await wc().executeJavaScript("window.__ansRenderer.selectRole(window.__ansRenderer.state.primaryRoleId)");
   await sleep(800);
-  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面应用')");
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面窗口')");
   await sleep(800);
   log("HISTORY_KEPT_ON_SWITCHBACK=" + (await wc().executeJavaScript("!!document.querySelector('#chat .msg-handback')")));
   // B-1：注入含 Markdown 与「类标签文本」的助手消息——粗体应渲染、`<tag>` 应仍是转义文本。
-  wc().send("session:event", { roleId: "桌面应用", event: { kind: "message", summary: "**粗体** 与 `<tag>` 文本" } });
-  wc().send("session:event", { roleId: "桌面应用", event: { kind: "message", summary: "[示例站点](https://example.com/x)" } });
+  wc().send("session:event", { roleId: "桌面窗口", event: { kind: "message", summary: "**粗体** 与 `<tag>` 文本" } });
+  wc().send("session:event", { roleId: "桌面窗口", event: { kind: "message", summary: "[示例站点](https://example.com/x)" } });
   await sleep(250);
   log("MD_STRONG_RENDERED=" + (await wc().executeJavaScript("!!document.querySelector('#chat .msg-assistant strong')")));
     log("MD_TAG_TEXT_ESCAPED=" + (await wc().executeJavaScript("(() => { const any=[...document.querySelectorAll('#chat .msg-assistant')].some((m)=>m.textContent.includes('<tag>')); return any && !document.querySelector('#chat tag'); })()")));
@@ -873,12 +875,12 @@ async function run() {
   await sleep(150);
   log("LINK_OPEN_EXTERNAL_CALLED=" + openExternalCalls.some((u) => u === "https://example.com/x"));
   // 工具行瘦身（2026-10-12）：含长内容的工具事件渲染后**不含内容**、含目标路径。
-  wc().send("session:event", { roleId: "桌面应用", event: { kind: "tool_call", summary: "read_file：read_file: docs/接口约定.md # 接口约定 · 正文预览【哨兵-勿显示】" } });
+  wc().send("session:event", { roleId: "桌面窗口", event: { kind: "tool_call", summary: "read_file：read_file: docs/接口约定.md # 接口约定 · 正文预览【哨兵-勿显示】" } });
   await sleep(250);
   log("TOOLROW_NO_CONTENT=" + (await wc().executeJavaScript("!document.querySelector('#chat').textContent.includes('哨兵-勿显示')")));
   log("TOOLROW_HAS_PATH=" + (await wc().executeJavaScript("document.querySelector('#chat').textContent.includes('read_file：docs/接口约定.md')")));
   // H-1 附录：系统投递输入单独样式（不长得像客户发的消息）+ 手输防误伤。
-  wc().send("session:event", { roleId: "桌面应用", event: { kind: "message", summary: "用户指令：[回交] 来自 规划者 的报告（任务 T1）\n结论：completed\n摘要：做完了" } });
+  wc().send("session:event", { roleId: "桌面窗口", event: { kind: "message", summary: "用户指令：[回交] 来自 规划者 的报告（任务 T1）\n结论：completed\n摘要：做完了" } });
   await sleep(250);
   log("INJECTED_STYLE_PRESENT=" + (await wc().executeJavaScript("!!document.querySelector('#chat .msg-injected.is-handback')")));
   log("REPORT_DELIVERY_DETAILS_COLLAPSED=" + (await wc().executeJavaScript("[...document.querySelectorAll('#chat .msg-injected.is-handback details')].some(e=>!e.open)")));
@@ -887,25 +889,25 @@ async function run() {
   // 手输防误伤：真发一条**以投递前缀开头**的文本，再推它的 `用户指令：` 回显 → 不得变成注入样式。
   await wc().executeJavaScript("(() => { document.getElementById('inp-message').value='[派发] 手输测试勿注入'; document.getElementById('btn-send').click(); })()");
   await sleep(400);
-  wc().send("session:event", { roleId: "桌面应用", event: { kind: "message", summary: "用户指令：[派发] 手输测试勿注入" } });
+  wc().send("session:event", { roleId: "桌面窗口", event: { kind: "message", summary: "用户指令：[派发] 手输测试勿注入" } });
   await sleep(250);
   log("MANUAL_PREFIX_BUBBLE=" + (await wc().executeJavaScript("[...document.querySelectorAll('#chat .msg-user')].some((e)=>e.textContent.includes('[派发] 手输测试勿注入'))")));
   log("MANUAL_NOT_INJECTED=" + (await wc().executeJavaScript("![...document.querySelectorAll('#chat .msg-injected')].some((e)=>e.textContent.includes('手输测试勿注入'))")));
   // B-3：保活会话 ⇒ 「空闲」徽标；悬停数据（最近事件+时间）已记录。
-  log("STATUS_BADGE_TEXT=" + (await wc().executeJavaScript("(() => { const items=[...document.querySelectorAll('#role-tree .tree-item')]; const it=items.find((x)=>x.textContent.indexOf('桌面应用')>=0); const s=it && it.querySelector('.ti-status'); return s ? s.textContent : ''; })()")));
-  log("STATUS_BADGE_IS_IDLE=" + (await wc().executeJavaScript("(() => { const items=[...document.querySelectorAll('#role-tree .tree-item')]; const it=items.find((x)=>x.textContent.indexOf('桌面应用')>=0); const s=it && it.querySelector('.ti-status'); return !!s && s.className.includes('st-idle'); })()")));
-  log("STATUS_LAST_EVENT_RECORDED=" + (await wc().executeJavaScript("(() => { const m=(window.__ansRenderer.state.roleMeta||{})['桌面应用']||{}; return !!(m.lastSummary && m.lastAt); })()")));
+  log("STATUS_BADGE_TEXT=" + (await wc().executeJavaScript("(() => { const items=[...document.querySelectorAll('#role-tree .tree-item')]; const it=items.find((x)=>x.textContent.indexOf('桌面窗口')>=0); const s=it && it.querySelector('.ti-status'); return s ? s.textContent : ''; })()")));
+  log("STATUS_BADGE_IS_IDLE=" + (await wc().executeJavaScript("(() => { const items=[...document.querySelectorAll('#role-tree .tree-item')]; const it=items.find((x)=>x.textContent.indexOf('桌面窗口')>=0); const s=it && it.querySelector('.ti-status'); return !!s && s.className.includes('st-idle'); })()")));
+  log("STATUS_LAST_EVENT_RECORDED=" + (await wc().executeJavaScript("(() => { const m=(window.__ansRenderer.state.roleMeta||{})['桌面窗口']||{}; return !!(m.lastSummary && m.lastAt); })()")));
   // L-1 + 状态准确性（2026-10-12）：主进程**真实状态快照** → 徽标「◐ 工作中 · 2 待办」+ 该角色 pane 的
   // **队列行**；清空快照 → 徽标回「空闲」、队列行移除（界面只如实转述快照，不做界面侧推测）。
-  await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面应用', busy: true, summaries: ['你：排队一', '你：排队二'] })");
+  await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面窗口', busy: true, summaries: ['你：排队一', '你：排队二'] })");
   await sleep(150);
-  log("ROLE_STATE_BADGE_WORKING_PENDING=" + (await wc().executeJavaScript("(() => { const it=[...document.querySelectorAll('#role-tree .tree-item')].find((x)=>x.textContent.indexOf('桌面应用')>=0); const s=it && it.querySelector('.ti-status'); return !!s && s.className.includes('st-working') && s.textContent.includes('工作中 · 2 待办'); })()")));
-  log("ROLE_STATE_BADGE_HAS_ICON=" + (await wc().executeJavaScript("(() => { const it=[...document.querySelectorAll('#role-tree .tree-item')].find((x)=>x.textContent.indexOf('桌面应用')>=0); const s=it && it.querySelector('.ti-status .ts-ico'); return !!s && s.textContent.length>=1; })()")));
-  log("ROLE_STATE_BADGE_HOVER_FULL=" + (await wc().executeJavaScript("(() => { const it=[...document.querySelectorAll('#role-tree .tree-item')].find((x)=>x.textContent.indexOf('桌面应用')>=0); const s=it && it.querySelector('.ti-status'); return !!s && (s.getAttribute('title')||'').includes('2 项已入队'); })()")));
+  log("ROLE_STATE_BADGE_WORKING_PENDING=" + (await wc().executeJavaScript("(() => { const it=[...document.querySelectorAll('#role-tree .tree-item')].find((x)=>x.textContent.indexOf('桌面窗口')>=0); const s=it && it.querySelector('.ti-status'); return !!s && s.className.includes('st-working') && s.textContent.includes('工作中 · 2 待办'); })()")));
+  log("ROLE_STATE_BADGE_HAS_ICON=" + (await wc().executeJavaScript("(() => { const it=[...document.querySelectorAll('#role-tree .tree-item')].find((x)=>x.textContent.indexOf('桌面窗口')>=0); const s=it && it.querySelector('.ti-status .ts-ico'); return !!s && s.textContent.length>=1; })()")));
+  log("ROLE_STATE_BADGE_HOVER_FULL=" + (await wc().executeJavaScript("(() => { const it=[...document.querySelectorAll('#role-tree .tree-item')].find((x)=>x.textContent.indexOf('桌面窗口')>=0); const s=it && it.querySelector('.ti-status'); return !!s && (s.getAttribute('title')||'').includes('2 项已入队'); })()")));
   log("ROLE_STATE_QUEUE_ROW=" + (await wc().executeJavaScript("(document.querySelector('#chat .queue-row .q-text')||{textContent:''}).textContent.includes('【队列】2 条待办：你：排队一')")));
-  await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面应用', busy: false, summaries: [] })");
+  await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面窗口', busy: false, summaries: [] })");
   await sleep(120);
-  log("ROLE_STATE_CLEARED=" + (await wc().executeJavaScript("(() => { const it=[...document.querySelectorAll('#role-tree .tree-item')].find((x)=>x.textContent.indexOf('桌面应用')>=0); const s=it && it.querySelector('.ti-status'); return !!s && s.className.includes('st-idle') && !document.querySelector('#chat .queue-row'); })()")));
+  log("ROLE_STATE_CLEARED=" + (await wc().executeJavaScript("(() => { const it=[...document.querySelectorAll('#role-tree .tree-item')].find((x)=>x.textContent.indexOf('桌面窗口')>=0); const s=it && it.querySelector('.ti-status'); return !!s && s.className.includes('st-idle') && !document.querySelector('#chat .queue-row'); })()")));
 
   // M-1（2026-10-12 客户裁定「这个太丑了」）：shell 确认卡 = **应用内弹层**（不再用原生对话框）。
   // 结构/默认焦点/详情收起 + Esc = 不放行（真实 IPC：无挂起 ⇒ expired；卡片转「已失效」而非悄悄关闭）。
@@ -923,24 +925,27 @@ async function run() {
   // 探针清理：隐藏卡片（不影响后续步骤/截图）。
   await wc().executeJavaScript("(() => { const el=document.getElementById('shell-confirm'); el.hidden = true; el.classList.remove('is-expired'); window.__ansRenderer.state.shellConfirm = null; })()");
 
-  // N-3（2026-10-12 追加；2026-10-13 第二轮裁定待办/队列归角色）：「角色资料」抽屉内的**待办 / 队列 +
-  // 队列概览两节**——夹具注入 → 逐条渲染 + 「进行中」在最前 + 空占位（数据经 role-state 真实快照通道）。
+  // N-3（2026-10-12 追加；2026-10-13 第二轮裁定待办/队列归角色；UIUX v2：两视图并为**单份工作列表**）：
+  // 「角色资料」抽屉内的**工作列表（当前工作 + 排队）**——夹具注入 → 逐条渲染 + 进行中最前（归「当前工作」组）
+  // + 位次 + 空占位（数据经 role-state 真实快照通道，不造第二套数据源）。
   await wc().executeJavaScript("document.getElementById('tab-card').click()");
   await sleep(300);
-  await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面应用', busy: true, summaries: ['你：排队一'], queue: [{kind:'message', sourceRoleId:'桌面应用', summary:'你：排队一', at:'2026-10-12T03:00:00.000Z'},{kind:'dispatch', sourceRoleId:'su', summary:'派发 · 来自 su：做X', at:'2026-10-12T03:01:00.000Z'}], running: {kind:'handback', sourceRoleId:'A', summary:'回交投递 · 来自 A', at:'2026-10-12T02:59:00.000Z'} })");
+  await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面窗口', busy: true, summaries: ['你：排队一'], queue: [{kind:'message', sourceRoleId:'桌面窗口', summary:'你：排队一', at:'2026-10-12T03:00:00.000Z'},{kind:'dispatch', sourceRoleId:'su', summary:'派发 · 来自 su：做X', at:'2026-10-12T03:01:00.000Z'}], running: {kind:'handback', sourceRoleId:'A', summary:'回交投递 · 来自 A', at:'2026-10-12T02:59:00.000Z'} })");
   await sleep(200);
   log("RIGHT_QUEUE_SECTION=" + (await wc().executeJavaScript("!!document.querySelector('#right-body #right-queue-body')")));
   log("RIGHT_QUEUE_ROWS=" + (await wc().executeJavaScript("document.querySelectorAll('#right-queue-body .q-item').length")));
-  log("RIGHT_QUEUE_RUNNING_FIRST=" + (await wc().executeJavaScript("(() => { const first=document.querySelector('#right-queue-body .q-item'); return !!first && first.classList.contains('is-running') && first.textContent.includes('进行中'); })()")));
+  // 进行中最前：首行带 is-running 且归「当前工作」组标题下（v2 结构——行内不再印「进行中」字样）。
+  log("RIGHT_QUEUE_RUNNING_FIRST=" + (await wc().executeJavaScript("(() => { const body=document.querySelector('#right-queue-body'); const first=body && body.querySelector('.q-item'); const heading=body && body.querySelector('.work-heading'); return !!first && first.classList.contains('is-running') && !!heading && heading.textContent.includes('当前工作'); })()")));
   log("RIGHT_QUEUE_SOURCES=" + (await wc().executeJavaScript("(() => { const t=document.querySelector('#right-queue-body').textContent; return t.includes('回交投递') && t.includes('客户消息') && t.includes('su 派发') && t.includes('你：排队一'); })()")));
-  await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面应用', busy: false, summaries: [], queue: [], running: null })");
+  await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面窗口', busy: false, summaries: [], queue: [], running: null })");
   await sleep(150);
-  log("RIGHT_QUEUE_EMPTY_PLACEHOLDER=" + (await wc().executeJavaScript("document.querySelector('#right-queue-body').textContent.includes('（无待办）')")));
-  // 队列概览节（同抽屉）：排队条目位次视图（内容与待办同快照、视图不同）；随后收起抽屉，不影响后续聊天流断言。
-  await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面应用', busy: false, summaries: ['你：排队一','你：排队二'], queue: [{kind:'message', sourceRoleId:'桌面应用', summary:'你：排队一', at:'2026-10-12T03:00:00.000Z'},{kind:'dispatch', sourceRoleId:'su', summary:'派发 · 来自 su：做X', at:'2026-10-12T03:01:00.000Z'}], running: null })");
+  log("RIGHT_QUEUE_EMPTY_PLACEHOLDER=" + (await wc().executeJavaScript("document.querySelector('#right-queue-body').textContent.includes('无进行中或排队消息')")));
+  // 位次视图（同一单份列表）：排队条目**位次行**（UIUX v2 两视图并一——位次在列表行内，不另设独立概览节）；
+  // 随后收起抽屉，不影响后续聊天流断言。
+  await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面窗口', busy: false, summaries: ['你：排队一','你：排队二'], queue: [{kind:'message', sourceRoleId:'桌面窗口', summary:'你：排队一', at:'2026-10-12T03:00:00.000Z'},{kind:'dispatch', sourceRoleId:'su', summary:'派发 · 来自 su：做X', at:'2026-10-12T03:01:00.000Z'}], running: null })");
   await sleep(150);
-  log("QUEUE_OVERVIEW_ROWS=" + (await wc().executeJavaScript("document.querySelectorAll('#right-queue-overview .queue-list .q-item').length")));
-  log("QUEUE_OVERVIEW_IN_CARD=" + (await wc().executeJavaScript("!!document.querySelector('#right-body #right-queue-overview')")));
+  log("QUEUE_POSITION_ROWS=" + (await wc().executeJavaScript("document.querySelectorAll('#right-queue-body .q-item .q-pos').length")));
+  log("QUEUE_POSITION_IN_CARD=" + (await wc().executeJavaScript("!!document.querySelector('#right-body #right-queue-body .q-pos')")));
   log("TAB_CARD_ACTIVE_STILL=" + (await wc().executeJavaScript("document.getElementById('tab-card').classList.contains('active')")));
   await wc().executeJavaScript("document.getElementById('tab-card').click()");
   await sleep(200);
@@ -949,12 +954,12 @@ async function run() {
   // P-1（2026-10-12 真机：su 的卡被 288 行活动淹掉、客户以为卡丢了）：到达即达 + 常驻 chip + 逐张定位 + 切回滚到卡。
   // 先造一屏高内容（40 行）并把视口拉到底，再注入待确认卡。
   for (let i = 0; i < 40; i += 1) {
-    wc().send("session:event", { roleId: "桌面应用", event: { kind: "message", summary: "P-1 填充行 " + i } });
+    wc().send("session:event", { roleId: "桌面窗口", event: { kind: "message", summary: "P-1 填充行 " + i } });
   }
   await sleep(400);
   await wc().executeJavaScript("(() => { const c=document.getElementById('chat'); c.scrollTop = c.scrollHeight; })()");
   await sleep(100);
-  await wc().executeJavaScript("window.__ansRenderer.appendOperatorRequest({ id: 'p1-card-1', roleId: '桌面应用', request: { kind: 'confirm', title: 'P-1 探针卡一', detail: '到达即达' } })");
+  await wc().executeJavaScript("window.__ansRenderer.appendOperatorRequest({ id: 'p1-card-1', roleId: '桌面窗口', request: { kind: 'confirm', title: 'P-1 探针卡一', detail: '到达即达' } })");
   await sleep(250);
   log("P1_ARRIVAL_SCROLLED=" + (await wc().executeJavaScript("(() => { const c=document.getElementById('chat'); const pane=[...document.querySelectorAll('#chat .chat-pane')][0]; const kids=pane?pane.children:[]; let card=null; for (const k of kids) { if (k.dataset && k.dataset.requestId==='p1-card-1') card=k; } if (!card) return false; const cr=card.getBoundingClientRect(); const cc=c.getBoundingClientRect(); return cr.top >= cc.top - 1 && cr.bottom <= cc.bottom + 1; })()")));
   log("P1_ARRIVAL_DEBUG=" + JSON.stringify(await wc().executeJavaScript("(() => { const c=document.getElementById('chat'); const pane=[...document.querySelectorAll('#chat .chat-pane')][0]; const kids=pane?pane.children:[]; let card=null; for (const k of kids) { if (k.dataset && k.dataset.requestId==='p1-card-1') card=k; } const cr=card?card.getBoundingClientRect():null; const cc=c.getBoundingClientRect(); return { hasCard:!!card, dist: Math.round(c.scrollHeight-c.scrollTop-c.clientHeight), st:Math.round(c.scrollTop), sh:Math.round(c.scrollHeight), ch:Math.round(c.clientHeight), crTop: cr?Math.round(cr.top):null, crBottom: cr?Math.round(cr.bottom):null, ccTop:Math.round(cc.top), ccBottom:Math.round(cc.bottom), chipHidden: document.getElementById('op-chip').hidden }; })()")));
@@ -963,7 +968,7 @@ async function run() {
   await wc().executeJavaScript("(() => { document.getElementById('chat').scrollTop = 0; })()");
   await sleep(100);
   const p1TopBefore = await wc().executeJavaScript("document.getElementById('chat').scrollTop");
-  await wc().executeJavaScript("window.__ansRenderer.appendOperatorRequest({ id: 'p1-card-2', roleId: '桌面应用', request: { kind: 'confirm', title: 'P-1 探针卡二', detail: '不打断' } })");
+  await wc().executeJavaScript("window.__ansRenderer.appendOperatorRequest({ id: 'p1-card-2', roleId: '桌面窗口', request: { kind: 'confirm', title: 'P-1 探针卡二', detail: '不打断' } })");
   await sleep(250);
   log("P1_NO_INTERRUPT_TOP=" + ((await wc().executeJavaScript("document.getElementById('chat').scrollTop")) === p1TopBefore));
   log("P1_CHIP_COUNT2=" + (await wc().executeJavaScript("document.getElementById('op-chip').textContent.includes('有 2 条待确认')")));
@@ -982,11 +987,11 @@ async function run() {
   await sleep(300);
   log("P1_CHIP_HIDDEN_AFTER_ALL_TERMINAL=" + (await wc().executeJavaScript("document.getElementById('op-chip').hidden")));
   // 切回：再注入一张卡 → 切走（su）→ 切回 ⇒ 应**滚动到卡**（而不是停在底部）。
-  await wc().executeJavaScript("window.__ansRenderer.appendOperatorRequest({ id: 'p1-card-3', roleId: '桌面应用', request: { kind: 'confirm', title: 'P-1 探针卡三', detail: '切回滚到卡' } })");
+  await wc().executeJavaScript("window.__ansRenderer.appendOperatorRequest({ id: 'p1-card-3', roleId: '桌面窗口', request: { kind: 'confirm', title: 'P-1 探针卡三', detail: '切回滚到卡' } })");
   await sleep(200);
   await wc().executeJavaScript("window.__ansRenderer.selectRole('su')");
   await sleep(900);
-  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面应用')");
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面窗口')");
   await sleep(900);
   log("P1_SWITCHBACK_SCROLLS_TO_CARD=" + (await wc().executeJavaScript("(() => { const c=document.getElementById('chat'); const pane=[...document.querySelectorAll('#chat .chat-pane')][0]; const kids=pane?pane.children:[]; let card=null; for (const k of kids) { if (k.dataset && k.dataset.requestId==='p1-card-3') card=k; } if (!card) return false; const cr=card.getBoundingClientRect(); const cc=c.getBoundingClientRect(); return cr.top >= cc.top - 1 && cr.bottom <= cc.bottom + 1; })()")));
   // 探针清理：把 p1-card-3 作答掉（expired 终态），chip 应灭（不影响后续步骤）。
@@ -1077,17 +1082,17 @@ async function run() {
   await sleep(300);
   log("OPEN_CARD_CLEANED_CHIP_HIDDEN=" + (await wc().executeJavaScript("document.getElementById('op-chip').hidden")));
   log("SHOT_15_ANCHOR=" + (await shot("15-anchor-reanchor.png")));
-  // 回到仓库根项目并恢复 S-1 段的前置（挂载的 pane = 桌面应用——loadProject 会重置选中为主入口）。
+  // 回到仓库根项目并恢复 S-1 段的前置（挂载的 pane = 桌面窗口——loadProject 会重置选中为主入口）。
   await wc().executeJavaScript("window.__ansRenderer.loadProject(" + JSON.stringify(REPO_ROOT) + ")");
   await sleep(500);
-  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面应用')");
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面窗口')");
   await sleep(1000);
 
   // S-1（2026-10-12 客户「现在输出不会让滚动条滚动到最底下了」）：**长会话贴底回归**。
   // 触发窗口化（>150 行）后持续追加输出：① 在底部 ⇒ 必须**保持贴底**；② 上翻 ⇒ 新输出**不得拽回**。
   const s1dist = "(function(){ const c=document.getElementById('chat'); return Math.round(c.scrollHeight-c.scrollTop-c.clientHeight); })()";
   for (let i = 0; i < 200; i += 1) {
-    wc().send("session:event", { roleId: "桌面应用", event: { kind: "tool_call", summary: "S-1 填充行 read_file：docs/s1-" + i + ".md" } });
+    wc().send("session:event", { roleId: "桌面窗口", event: { kind: "tool_call", summary: "S-1 填充行 read_file：docs/s1-" + i + ".md" } });
   }
   await sleep(800);
   log("S1_WINDOWED_ACTIVE=" + (await wc().executeJavaScript("document.querySelectorAll('#chat .chat-pane > .virt-spacer').length === 2")));
@@ -1096,7 +1101,7 @@ async function run() {
   // ① 贴底场景：分 3 批追加 30 行（模拟合帧流式输出），每批后测距底像素。
   for (let b = 0; b < 3; b += 1) {
     const arr = [];
-    for (let i = 0; i < 10; i += 1) arr.push({ roleId: "桌面应用", event: { kind: "tool_call", summary: "S-1 流式追加 b" + b + "-" + i } });
+    for (let i = 0; i < 10; i += 1) arr.push({ roleId: "桌面窗口", event: { kind: "tool_call", summary: "S-1 流式追加 b" + b + "-" + i } });
     wc().send("session:events", arr); // Q-1 合帧形态（生产热路径：批量数组）
     await sleep(250);
   }
@@ -1109,7 +1114,7 @@ async function run() {
   await sleep(200);
   const s1TopBefore = await wc().executeJavaScript("Math.round(document.getElementById('chat').scrollTop)");
   const upBatch = [];
-  for (let i = 0; i < 20; i += 1) upBatch.push({ roleId: "桌面应用", event: { kind: "tool_call", summary: "S-1 上翻期追加 " + i } });
+  for (let i = 0; i < 20; i += 1) upBatch.push({ roleId: "桌面窗口", event: { kind: "tool_call", summary: "S-1 上翻期追加 " + i } });
   wc().send("session:events", upBatch); // 合帧形态：上翻期的新输出不得拽回
   await sleep(500);
   const s1TopAfter = await wc().executeJavaScript("Math.round(document.getElementById('chat').scrollTop)");
@@ -1119,23 +1124,23 @@ async function run() {
   log("VIEWPORT_MIDDLE_HAS_VISIBLE_ROWS=" + ((await wc().executeJavaScript(visibleRows)) > 0));
   await wc().executeJavaScript("document.getElementById('chat').scrollTop=0");
   await sleep(200);
-  wc().send("session:event", { roleId: "桌面应用", event: { kind: "message", summary: "上翻顶部的单条输出" } });
+  wc().send("session:event", { roleId: "桌面窗口", event: { kind: "message", summary: "上翻顶部的单条输出" } });
   await sleep(200);
   log("VIEWPORT_TOP_SINGLE_HAS_VISIBLE_ROWS=" + ((await wc().executeJavaScript(visibleRows)) > 0));
   wc().send("session:events", [
-    { roleId: "桌面应用", event: { kind: "handback", summary: "坏报告", handback: { roleId: "桌面应用", status: "unreported", summary: "bad", evidence: "invalid" } } },
-    { roleId: "桌面应用", event: { kind: "message", summary: "坏事件之后的合法消息" } },
-    { roleId: "桌面应用", event: { kind: "settled", summary: "异常批量也应正确收尾" } },
+    { roleId: "桌面窗口", event: { kind: "handback", summary: "坏报告", handback: { roleId: "桌面窗口", status: "unreported", summary: "bad", evidence: "invalid" } } },
+    { roleId: "桌面窗口", event: { kind: "message", summary: "坏事件之后的合法消息" } },
+    { roleId: "桌面窗口", event: { kind: "settled", summary: "异常批量也应正确收尾" } },
   ]);
   await sleep(250);
   log("VIEWPORT_TOP_BATCH_SETTLED_HAS_VISIBLE_ROWS=" + ((await wc().executeJavaScript(visibleRows)) > 0));
-  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面应用')");
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面窗口')");
   log("EVENT_BATCH_CONTINUES_AFTER_ERROR=" + (await wc().executeJavaScript("document.getElementById('chat').textContent.includes('坏事件之后的合法消息') && document.getElementById('chat').textContent.includes('异常批量也应正确收尾')")));
   // ③ 回底后再输出 ⇒ 恢复贴底（双向语义的第三点）。
   await wc().executeJavaScript("(() => { const c=document.getElementById('chat'); c.scrollTop = c.scrollHeight; })()");
   await sleep(200);
   for (let i = 0; i < 10; i += 1) {
-    wc().send("session:event", { roleId: "桌面应用", event: { kind: "tool_call", summary: "S-1 回底再输出 " + i } });
+    wc().send("session:event", { roleId: "桌面窗口", event: { kind: "tool_call", summary: "S-1 回底再输出 " + i } });
   }
   await sleep(400);
   const s1DistAgain = await wc().executeJavaScript(s1dist);
@@ -1170,7 +1175,7 @@ async function run() {
 
   // U-1（2026-10-12 客户裁定「点击这个角色，应该滚动到滚动条最下面」）：点角色 ⇒ 到底部（两条路径 + 重复点击）；
   // 「有卡 ⇒ 滚到卡」的例外由 P-1 既有一组断言覆盖（本处只测无卡路径，互不影响）。
-  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面应用')");
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面窗口')");
   await sleep(900);
   const u1WindowedDist = await wc().executeJavaScript(s1dist);
   log("U1_WINDOWED_TO_BOTTOM_DIST=" + u1WindowedDist);
@@ -1262,14 +1267,14 @@ async function run() {
 
   // ———— P1-3（2026-10-13 客户裁定）：切换项目一次性防呆——有 busy 才出内联确认条；取消零动作；确认=关闭全部并进新项目 ————
   // 造真忙：再次 arm 慢轮缝（同一角色、同一文本可复用），发一条挂起消息持住 busy。
-  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面应用')");
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面窗口')");
   await sleep(700);
   let releaseSlow2;
   slowPromptGate = { promise: new Promise((r) => { releaseSlow2 = r; }) };
   slowPromptArmed = true;
   const pS2 = wc().executeJavaScript("window.desktop.sendSession('队列慢轮')");
   await sleep(500);
-  log("SWITCH_SETUP_BUSY=" + (await wc().executeJavaScript("window.__ansRenderer.state.roleBusy['桌面应用'] === true")));
+  log("SWITCH_SETUP_BUSY=" + (await wc().executeJavaScript("window.__ansRenderer.state.roleBusy['桌面窗口'] === true")));
   await wc().executeJavaScript("document.getElementById('btn-import').click()");
   await sleep(250);
   const swBar = await wc().executeJavaScript(
@@ -1309,14 +1314,14 @@ async function run() {
   log("SWITCH_IDLE_HINT=" + (await wc().executeJavaScript("document.getElementById('composer-hint').textContent.includes('已取消导入')")));
 
   // ———— 2026-10-13 状态机修复：回放去重（真机「同一段消息渲染两遍」——su 写文件 → project:changed →
-  // refreshProject → 主进程重推会话历史 → 旧实现整份再回放）。确定性钉法：向「桌面应用」pane 连推
+  // refreshProject → 主进程重推会话历史 → 旧实现整份再回放）。确定性钉法：向「桌面窗口」pane 连推
   // session:history——同份重推**幂等**、增长走**增量**、重写走**重建**（绝不追加第二份）。
   const mkRow = (i, tag) => ({ kind: i % 2 === 0 ? "user" : "assistant", text: tag + " · 第 " + i + " 行", at: "2026-10-13T00:00:00.000Z" });
   const baseRows = Array.from({ length: 6 }, (_, i) => mkRow(i, "去重基线"));
   const grownRows = [...baseRows, mkRow(6, "增量尾"), mkRow(7, "增量尾")];
   const rewrittenRows = Array.from({ length: 6 }, (_, i) => mkRow(i, "重写基线"));
-  const countExpr = "(() => { const d = window.__ansRenderer.rowModelDebug('桌面应用'); return d ? d.count : -1; })()";
-  const pushHistory = (rows) => wc().send("session:history", { roleId: "桌面应用", projectRoot: REPO_ROOT, rows, error: null });
+  const countExpr = "(() => { const d = window.__ansRenderer.rowModelDebug('桌面窗口'); return d ? d.count : -1; })()";
+  const pushHistory = (rows) => wc().send("session:history", { roleId: "桌面窗口", projectRoot: REPO_ROOT, rows, error: null });
   pushHistory(baseRows);
   await sleep(400);
   const c1 = await wc().executeJavaScript(countExpr);
@@ -1358,22 +1363,22 @@ async function run() {
   const inputRepair = async (text) => {
     await wc().executeJavaScript("(() => { const input=document.getElementById('inp-message'); input.value=" + JSON.stringify(text) + "; input.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true})); })()");
   };
-  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面应用')");
-  const rowsBeforeConfirm = await wc().executeJavaScript("window.__ansRenderer.rowModelDebug('桌面应用').count");
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面窗口')");
+  const rowsBeforeConfirm = await wc().executeJavaScript("window.__ansRenderer.rowModelDebug('桌面窗口').count");
   const callsBeforeConfirm = repairOpenCalls;
-  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面应用')");
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面窗口')");
   repairCheck("SESSION_REPAIR_SAME_ROLE_CONFIRMS_BACKEND", repairOpenCalls === callsBeforeConfirm + 1);
-  repairCheck("SESSION_REPAIR_CONFIRM_PRESERVES_HISTORY", (await wc().executeJavaScript("window.__ansRenderer.rowModelDebug('桌面应用').count")) === rowsBeforeConfirm);
+  repairCheck("SESSION_REPAIR_CONFIRM_PRESERVES_HISTORY", (await wc().executeJavaScript("window.__ansRenderer.rowModelDebug('桌面窗口').count")) === rowsBeforeConfirm);
 
   // 后台被释放但前端仍保留旧开启标记：显式同角色点击应恢复，然后真实投递一份。
-  await wc().executeJavaScript("window.desktop.stopSession('桌面应用')");
-  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面应用')");
+  await wc().executeJavaScript("window.desktop.stopSession('桌面窗口')");
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面窗口')");
   chatAdapterMod.takeDemoPromptLog();
   const sendsBeforeRecovery = repairSendRequests.length;
   const completionsBeforeRecovery = repairSendCompletions;
   await inputRepair("修复探针恢复消息");
   for (let attempt = 0; attempt < 250 && repairSendCompletions === completionsBeforeRecovery; attempt += 1) await sleep(20);
-  await waitRepair("window.__ansRenderer.state.roleBusy['桌面应用'] === false && document.getElementById('inp-message').value === ''");
+  await waitRepair("window.__ansRenderer.state.roleBusy['桌面窗口'] === false && document.getElementById('inp-message').value === ''");
   const deliveredRepair = chatAdapterMod.takeDemoPromptLog().filter((entry) => entry.text === "修复探针恢复消息");
   repairCheck("SESSION_REPAIR_EXPLICIT_RECOVERY_DELIVERS_ONCE", repairSendRequests.length === sendsBeforeRecovery + 1 && deliveredRepair.length === 1);
 
@@ -1383,7 +1388,7 @@ async function run() {
   await waitRepair("window.__ansRenderer.state.sessionOpenRoleId === null");
   repairCheck("SESSION_REPAIR_SEND_FAILURE_INVALIDATES", repairSendRequests.length === beforeFailure + 1 && (await wc().executeJavaScript("document.getElementById('chat').textContent.includes('发送失败原文')")));
   repairFailSend = false;
-  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面应用')");
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面窗口')");
   repairCheck("SESSION_REPAIR_NO_AUTOMATIC_RESEND", repairSendRequests.length === beforeFailure + 1 && chatAdapterMod.takeDemoPromptLog().every((entry) => entry.text !== "修复探针失败消息"));
 
   repairThrowSend = true;
@@ -1397,33 +1402,33 @@ async function run() {
   await waitRepair("document.querySelectorAll('#attach-row .attach-chip').length === 1");
   repairFailOpen = true;
   const sendsBeforeOpenFailure = repairSendRequests.length;
-  const rowsBeforeOpenFailure = await wc().executeJavaScript("window.__ansRenderer.rowModelDebug('桌面应用').count");
+  const rowsBeforeOpenFailure = await wc().executeJavaScript("window.__ansRenderer.rowModelDebug('桌面窗口').count");
   await inputRepair("修复探针补开失败保留输入");
   await waitRepair("document.getElementById('chat').textContent.includes('补开失败原文')");
   repairCheck("SESSION_REPAIR_FAILED_OPEN_PRESERVES_INPUT", await wc().executeJavaScript("document.getElementById('inp-message').value === '修复探针补开失败保留输入' && document.querySelectorAll('#attach-row .attach-chip').length === 1"));
   repairCheck("SESSION_REPAIR_FAILED_OPEN_DOES_NOT_SEND", repairSendRequests.length === sendsBeforeOpenFailure);
-  repairCheck("SESSION_REPAIR_FAILED_OPEN_NO_USER_BUBBLE", (await wc().executeJavaScript("window.__ansRenderer.rowModelDebug('桌面应用').count")) === rowsBeforeOpenFailure + 1);
+  repairCheck("SESSION_REPAIR_FAILED_OPEN_NO_USER_BUBBLE", (await wc().executeJavaScript("window.__ansRenderer.rowModelDebug('桌面窗口').count")) === rowsBeforeOpenFailure + 1);
   repairFailOpen = false;
-  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面应用')");
-  repairCheck("SESSION_REPAIR_FAILED_OPEN_EXPLICIT_RECOVERY", await wc().executeJavaScript("window.__ansRenderer.state.sessionOpenRoleId === '桌面应用' && !document.getElementById('btn-send').disabled"));
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面窗口')");
+  repairCheck("SESSION_REPAIR_FAILED_OPEN_EXPLICIT_RECOVERY", await wc().executeJavaScript("window.__ansRenderer.state.sessionOpenRoleId === '桌面窗口' && !document.getElementById('btn-send').disabled"));
   repairCheck("SESSION_REPAIR_FAILED_OPEN_NO_REPLAY", repairSendRequests.length === sendsBeforeOpenFailure);
 
   for (const [status, label] of [["unreported", "未报告"], ["failed", "失败"], ["aborted", "已中止"]]) {
-    wc().send("session:event", { roleId: "桌面应用", event: { kind: "handback", summary: "新状态", handback: { roleId: "桌面应用", status, summary: status, evidence: [], at: "2026-10-13T00:00:00Z" } } });
+    wc().send("session:event", { roleId: "桌面窗口", event: { kind: "handback", summary: "新状态", handback: { roleId: "桌面窗口", status, summary: status, evidence: [], at: "2026-10-13T00:00:00Z" } } });
     await sleep(80);
     repairCheck("REPORT_STATUS_" + status.toUpperCase(), await wc().executeJavaScript("[...document.querySelectorAll('#chat .msg-handback .hb-status')].some(e=>e.textContent===" + JSON.stringify(label) + ")"));
   }
 
   // 真实renderer进程退出→明确故障页→用户点击恢复；沿同一helper及受限preload，不调用模型。
   let pendingAnswered = false;
-  wc().send("session:events", Array.from({ length: 450 }, (_, index) => ({ roleId: "桌面应用", event: { kind: "tool_call", summary: "待确认定位长会话 " + index } })));
+  wc().send("session:events", Array.from({ length: 450 }, (_, index) => ({ roleId: "桌面窗口", event: { kind: "tool_call", summary: "待确认定位长会话 " + index } })));
   await sleep(100);
   await wc().executeJavaScript("document.getElementById('chat').scrollTop=0");
   await sleep(80);
-  const pendingOutcome = Promise.resolve(customerChannel.customerInput({ kind: "confirm", title: "重载后仍需客户明确作答" }, { roleId: "桌面应用" })).then((value) => { pendingAnswered = true; return value; });
+  const pendingOutcome = Promise.resolve(customerChannel.customerInput({ kind: "confirm", title: "重载后仍需客户明确作答" }, { roleId: "桌面窗口" })).then((value) => { pendingAnswered = true; return value; });
   const pendingId = operatorPresentations[operatorPresentations.length - 1].id;
   await sleep(100);
-  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面应用')");
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面窗口')");
   await sleep(150);
   repairCheck("PENDING_EXPLICIT_SAME_ROLE_CARD_AND_BUTTON_VISIBLE", await wc().executeJavaScript("(() => {const card=document.querySelector('[data-request-id=" + pendingId + "]'),button=card&&card.querySelector('.op-confirm'),view=document.getElementById('chat').getBoundingClientRect();if(!card||!button)return false;const r=card.getBoundingClientRect(),b=button.getBoundingClientRect();return card.textContent.includes('重载后仍需客户明确作答') && r.top>=view.top-1 && r.bottom<=view.bottom+1 && b.top>=view.top && b.bottom<=view.bottom;})()"));
   const sendsBeforeCrash = repairSendRequests.length;
@@ -1435,7 +1440,7 @@ async function run() {
   const restoredLoaded = new Promise((resolve) => wc().once("did-finish-load", resolve));
   await wc().executeJavaScript("document.getElementById('reload-interface').click()");
   await restoredLoaded;
-  await waitRepair("window.__ansRenderer && window.__ansRenderer.state.sessionOpenRoleId === '桌面应用'");
+  await waitRepair("window.__ansRenderer && window.__ansRenderer.state.sessionOpenRoleId === '桌面窗口'");
   repairCheck("RECOVERY_PROJECT_AND_ROLE_RESTORED", await wc().executeJavaScript("window.__ansRenderer.state.projectRoot === " + JSON.stringify(projectBeforeCrash)));
   await wc().executeJavaScript("window.desktop.recoveryReady()");
   await sleep(100);
@@ -1459,7 +1464,7 @@ async function run() {
   win = new BrowserWindow({ width: 1360, height: 860, show: true, frame: false, webPreferences: { preload: path.join(APP_DIR, "preload.cjs"), contextIsolation: true, nodeIntegration: false, sandbox: false } });
   registerIpc();
   await win.loadFile(path.join(APP_DIR, "renderer", "index.html"));
-  await waitRepair("window.__ansRenderer && window.__ansRenderer.state.sessionOpenRoleId === '桌面应用'");
+  await waitRepair("window.__ansRenderer && window.__ansRenderer.state.sessionOpenRoleId === '桌面窗口'");
   repairCheck("MAC_CLOSE_REOPEN_LOADS_WITHOUT_DUPLICATE_HANDLERS", await wc().executeJavaScript("!!document.getElementById('inp-message') && !!window.desktop"));
   repairCheck("MAC_CLOSE_REOPEN_NO_AUTO_SEND", repairSendRequests.length === sendsBeforeCrash);
 

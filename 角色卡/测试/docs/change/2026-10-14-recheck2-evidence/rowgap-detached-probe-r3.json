@@ -1,0 +1,318 @@
+{
+  "electron": "44.7.0",
+  "node": "24.21.0",
+  "app": "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/app",
+  "report": [
+    {
+      "name": "detached: row table built before mount with unread gap cache",
+      "value": {
+        "count": 181,
+        "lastIndex": 180,
+        "operators": [],
+        "rowGap": null
+      }
+    },
+    {
+      "name": "mounted: gap cache equals real pane row-gap and >0",
+      "value": {
+        "rowGap": 16,
+        "paneGap": 16
+      }
+    },
+    {
+      "name": "detached-then-mounted: toggle drift (4 cycles, dual reading)",
+      "value": [
+        {
+          "label": "initial",
+          "firstVisibleOffset": 11.375,
+          "fixedAnchorOffset": 11.375,
+          "sameReadingText": true,
+          "scrollTop": 12348,
+          "group": {
+            "groups": 1,
+            "open": true,
+            "h": 2487,
+            "docH": 18625
+          }
+        },
+        {
+          "label": "collapse cycle 0",
+          "firstVisibleOffset": 11.375,
+          "fixedAnchorOffset": 11.375,
+          "sameReadingText": true,
+          "scrollTop": 12348,
+          "group": {
+            "groups": 1,
+            "open": false,
+            "h": 36,
+            "docH": 16126
+          }
+        },
+        {
+          "label": "expand cycle 0",
+          "firstVisibleOffset": 11.375,
+          "fixedAnchorOffset": 11.375,
+          "sameReadingText": true,
+          "scrollTop": 12348,
+          "group": {
+            "groups": 1,
+            "open": true,
+            "h": 2487,
+            "docH": 18577
+          }
+        },
+        {
+          "label": "collapse cycle 1",
+          "firstVisibleOffset": 11.375,
+          "fixedAnchorOffset": 11.375,
+          "sameReadingText": true,
+          "scrollTop": 12348,
+          "group": {
+            "groups": 1,
+            "open": false,
+            "h": 36,
+            "docH": 16126
+          }
+        },
+        {
+          "label": "expand cycle 1",
+          "firstVisibleOffset": 11.375,
+          "fixedAnchorOffset": 11.375,
+          "sameReadingText": true,
+          "scrollTop": 12348,
+          "group": {
+            "groups": 1,
+            "open": true,
+            "h": 2487,
+            "docH": 18577
+          }
+        },
+        {
+          "label": "collapse cycle 2",
+          "firstVisibleOffset": 11.375,
+          "fixedAnchorOffset": 11.375,
+          "sameReadingText": true,
+          "scrollTop": 12348,
+          "group": {
+            "groups": 1,
+            "open": false,
+            "h": 36,
+            "docH": 16126
+          }
+        },
+        {
+          "label": "expand cycle 2",
+          "firstVisibleOffset": 11.375,
+          "fixedAnchorOffset": 11.375,
+          "sameReadingText": true,
+          "scrollTop": 12348,
+          "group": {
+            "groups": 1,
+            "open": true,
+            "h": 2487,
+            "docH": 18577
+          }
+        },
+        {
+          "label": "collapse cycle 3",
+          "firstVisibleOffset": 11.375,
+          "fixedAnchorOffset": 11.375,
+          "sameReadingText": true,
+          "scrollTop": 12348,
+          "group": {
+            "groups": 1,
+            "open": false,
+            "h": 36,
+            "docH": 16126
+          }
+        },
+        {
+          "label": "expand cycle 3",
+          "firstVisibleOffset": 11.375,
+          "fixedAnchorOffset": 11.375,
+          "sameReadingText": true,
+          "scrollTop": 12348,
+          "group": {
+            "groups": 1,
+            "open": true,
+            "h": 2487,
+            "docH": 18577
+          }
+        }
+      ]
+    },
+    {
+      "name": "U1 sampling: 20 alternating role clicks, distance-to-bottom each",
+      "value": [
+        {
+          "click": 1,
+          "role": "A",
+          "distance": 0,
+          "scrollTop": 10534,
+          "scrollHeight": 11192,
+          "clientHeight": 658
+        },
+        {
+          "click": 2,
+          "role": "B",
+          "distance": 0,
+          "scrollTop": 17830,
+          "scrollHeight": 18488,
+          "clientHeight": 658
+        },
+        {
+          "click": 3,
+          "role": "A",
+          "distance": 0,
+          "scrollTop": 10534,
+          "scrollHeight": 11192,
+          "clientHeight": 658
+        },
+        {
+          "click": 4,
+          "role": "B",
+          "distance": 0,
+          "scrollTop": 17830,
+          "scrollHeight": 18488,
+          "clientHeight": 658
+        },
+        {
+          "click": 5,
+          "role": "A",
+          "distance": 0,
+          "scrollTop": 10534,
+          "scrollHeight": 11192,
+          "clientHeight": 658
+        },
+        {
+          "click": 6,
+          "role": "B",
+          "distance": 0,
+          "scrollTop": 17830,
+          "scrollHeight": 18488,
+          "clientHeight": 658
+        },
+        {
+          "click": 7,
+          "role": "A",
+          "distance": 0,
+          "scrollTop": 10534,
+          "scrollHeight": 11192,
+          "clientHeight": 658
+        },
+        {
+          "click": 8,
+          "role": "B",
+          "distance": 0,
+          "scrollTop": 17830,
+          "scrollHeight": 18488,
+          "clientHeight": 658
+        },
+        {
+          "click": 9,
+          "role": "A",
+          "distance": 0,
+          "scrollTop": 10534,
+          "scrollHeight": 11192,
+          "clientHeight": 658
+        },
+        {
+          "click": 10,
+          "role": "B",
+          "distance": 0,
+          "scrollTop": 17830,
+          "scrollHeight": 18488,
+          "clientHeight": 658
+        },
+        {
+          "click": 11,
+          "role": "A",
+          "distance": 0,
+          "scrollTop": 10534,
+          "scrollHeight": 11192,
+          "clientHeight": 658
+        },
+        {
+          "click": 12,
+          "role": "B",
+          "distance": 0,
+          "scrollTop": 17830,
+          "scrollHeight": 18488,
+          "clientHeight": 658
+        },
+        {
+          "click": 13,
+          "role": "A",
+          "distance": 0,
+          "scrollTop": 10534,
+          "scrollHeight": 11192,
+          "clientHeight": 658
+        },
+        {
+          "click": 14,
+          "role": "B",
+          "distance": 0,
+          "scrollTop": 17830,
+          "scrollHeight": 18488,
+          "clientHeight": 658
+        },
+        {
+          "click": 15,
+          "role": "A",
+          "distance": 0,
+          "scrollTop": 10534,
+          "scrollHeight": 11192,
+          "clientHeight": 658
+        },
+        {
+          "click": 16,
+          "role": "B",
+          "distance": 0,
+          "scrollTop": 17830,
+          "scrollHeight": 18488,
+          "clientHeight": 658
+        },
+        {
+          "click": 17,
+          "role": "A",
+          "distance": 0,
+          "scrollTop": 10534,
+          "scrollHeight": 11192,
+          "clientHeight": 658
+        },
+        {
+          "click": 18,
+          "role": "B",
+          "distance": 0,
+          "scrollTop": 17830,
+          "scrollHeight": 18488,
+          "clientHeight": 658
+        },
+        {
+          "click": 19,
+          "role": "A",
+          "distance": 0,
+          "scrollTop": 10534,
+          "scrollHeight": 11192,
+          "clientHeight": 658
+        },
+        {
+          "click": 20,
+          "role": "B",
+          "distance": 0,
+          "scrollTop": 17830,
+          "scrollHeight": 18488,
+          "clientHeight": 658
+        }
+      ]
+    },
+    {
+      "name": "U1 sampling summary",
+      "value": {
+        "clicks": 20,
+        "misses": 0,
+        "missDetails": []
+      }
+    }
+  ]
+}

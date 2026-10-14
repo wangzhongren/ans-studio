@@ -1,5 +1,5 @@
 // test/桌面应用/session.test.ts
-// 桌面应用：会话管理器端到端单测——真实 openRoleSession + 真实 listProject + 真实多轮演示适配器。
+// 桌面窗口：会话管理器端到端单测——真实 openRoleSession + 真实 listProject + 真实多轮演示适配器。
 // 验证（客户最终模型「导入项目即授权；点角色即开」）：open 直接建会话（无摘要/无 nonce）；
 // 多轮 send 事件持续刷出；同角色重复点击续接（不重建）；**B-2（2026-10-12）：切换角色**不** dispose——
 // 各自保活、切回续接（LRU 上限 MAX_LIVE_SESSIONS）**；事件带 `roleId` 信封（多会话不串）；越界被拒。
@@ -36,8 +36,9 @@ function makeManager(listing: ProjectListing, events: OrchestrationEvent[]): Ses
 
 test("firstProjectFilePath：取边界内首个项目根 file 条目", async () => {
   const listing = await listProject(REPO_ROOT);
-  const role = listing.roles.find((r) => r.roleId === "桌面应用")!;
-  assert.equal(firstProjectFilePath(role.boundary), "角色卡/桌面应用/feature-map.md");
+  const role = listing.roles.find((r) => r.roleId === "桌面窗口")!;
+  // 拆分后（2026-10-14）本角色边界的首个 project file 条目是 app/main.ts。
+  assert.equal(firstProjectFilePath(role.boundary), "app/main.ts");
 });
 
 test("点角色即开：open 直接建会话（无摘要/nonce），多轮 send、越界被拒且含按根分组", async () => {
@@ -45,7 +46,7 @@ test("点角色即开：open 直接建会话（无摘要/nonce），多轮 send�
   const events: OrchestrationEvent[] = [];
   const mgr = makeManager(listing, events);
 
-  const res = await mgr.open({ projectRoot: listing.projectRoot, roleId: "桌面应用", runtime: "demo" });
+  const res = await mgr.open({ projectRoot: listing.projectRoot, roleId: "桌面窗口", runtime: "demo" });
   assert.equal(res.ok, true, "点角色应直接开启会话（无确认步骤）");
   await tick();
 
@@ -91,10 +92,10 @@ test("同一角色重复点击：续接当前会话，不重建", async () => {
     emitEvent: (env) => events.push(env.event),
   });
 
-  const r1 = await mgr.open({ projectRoot: listing.projectRoot, roleId: "桌面应用", runtime: "demo" });
+  const r1 = await mgr.open({ projectRoot: listing.projectRoot, roleId: "桌面窗口", runtime: "demo" });
   assert.equal(r1.ok, true);
   await tick();
-  const r2 = await mgr.open({ projectRoot: listing.projectRoot, roleId: "桌面应用", runtime: "demo" });
+  const r2 = await mgr.open({ projectRoot: listing.projectRoot, roleId: "桌面窗口", runtime: "demo" });
   assert.equal(r2.ok, true, "同角色重复点击应成功（续接）");
   assert.ok(r2.note, "续接应附说明");
   assert.equal(opened, 1, "续接不得重建会话");
@@ -303,7 +304,7 @@ test("B-2 事件信封：每会话事件带自己的 roleId；切走/在别的�
 test("未导入项目就点角色：open 如实失败", async () => {
   const listing = await listProject(REPO_ROOT);
   const mgr = makeManager(listing, []);
-  const r = await mgr.open({ projectRoot: "D:/never-listed", roleId: "桌面应用", runtime: "demo" });
+  const r = await mgr.open({ projectRoot: "D:/never-listed", roleId: "桌面窗口", runtime: "demo" });
   assert.equal(r.ok, false);
   assert.match(r.error || "", /尚未枚举/);
 });
@@ -359,7 +360,7 @@ test("运行期同意：登记的非-pin 例外——accepted:true 且不带 pin
     emitEvent: () => {},
   });
 
-  const r = await mgr.open({ projectRoot: listing.projectRoot, roleId: "桌面应用", runtime: "demo" });
+  const r = await mgr.open({ projectRoot: listing.projectRoot, roleId: "桌面窗口", runtime: "demo" });
   assert.equal(r.ok, true);
   assert.ok(captured, "应调用 openRoleSession");
   const acc = captured!.governanceBoundary?.acceptance;
@@ -378,11 +379,11 @@ test("T20 handback 事件被外推：会话句柄产出的回交事件经 emitEv
   const listing = await listProject(REPO_ROOT);
   const events: OrchestrationEvent[] = [];
   const handback: TaskHandback = {
-    roleId: "桌面应用",
+    roleId: "桌面窗口",
     taskId: "T20",
     status: "completed",
     summary: "完成边界内改动",
-    evidence: ["角色卡/桌面应用/feature-map.md"],
+    evidence: ["角色卡/桌面窗口/feature-map.md"],
     at: "2026-10-11T00:00:00.000Z",
   };
   // 假句柄：事件流产出编排的 `OrchestrationEvent`（settled 之前带一条 handback，与 withHandback 同序）。
@@ -422,16 +423,16 @@ test("T20 handback 事件被外推：会话句柄产出的回交事件经 emitEv
     emitEvent: (env) => events.push(env.event),
   });
 
-  const r = await mgr.open({ projectRoot: listing.projectRoot, roleId: "桌面应用", runtime: "demo" });
+  const r = await mgr.open({ projectRoot: listing.projectRoot, roleId: "桌面窗口", runtime: "demo" });
   assert.equal(r.ok, true);
   await tick();
 
   const hb = events.find((e) => e.kind === "handback");
   assert.ok(hb, "handback 事件应经 emitEvent 外推（emitEvent 已放宽到 OrchestrationEvent）");
   const payload = (hb as Extract<OrchestrationEvent, { kind: "handback" }>).handback;
-  assert.equal(payload.roleId, "桌面应用", "回交应携带产出角色 id");
+  assert.equal(payload.roleId, "桌面窗口", "回交应携带产出角色 id");
   assert.equal(payload.status, "completed", "回交应携带结论（completed/blocked）");
   assert.equal(payload.taskId, "T20", "回交应携带任务 id");
-  assert.deepEqual(payload.evidence, ["角色卡/桌面应用/feature-map.md"], "回交只搬证据（产物路径）");
+  assert.deepEqual(payload.evidence, ["角色卡/桌面窗口/feature-map.md"], "回交只搬证据（产物路径）");
   await mgr.stop();
 });

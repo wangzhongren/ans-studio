@@ -117,9 +117,6 @@
     readonly:
       '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
       '<rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>',
-    pen:
-      '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-      '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
     handback:
       '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
       '<path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 5 5v2"/></svg>',
@@ -443,10 +440,11 @@
 
   // Q-2 **窗口化行模型**：每个 pane 一张 append-only **行表**——行 = {build(rec)→元素, el|null, h, keepEl, …}。
   //  · 行数 < `VIRT_MIN_ROWS`（150）⇒ **全挂载**（常规会话逐字不变：既有行为/探针/定位全保）；
-  //  · ≥ 阈值 ⇒ 只实体化「视口 ± VIRT_BUFFER 行」，窗口外折成上下 **spacer**（按行高和撑总高）——离屏行
+  //  · ≥ 阈值 ⇒ 只实体化「视口 ± VIRT_BUFFER 行」，窗口外折成上下 **spacer**（按行占位和撑总高）——离屏行
   //    **不持 DOM、不跑 Markdown**（`build` 惰性、挂载时构造/渲染）；
-  //  · 行高：先按类型**估算**，挂载/升级后 `offsetHeight` **实测修正**（估算 + 测量修正；写读分离防 reflow）；
-  //  · 滚动：`#chat` 的 scroll 经 **rAF 合帧**后跑一次 `updateVirtualWindow`（每帧至多一次）。
+  //  · 行高：先按类型**估算**，挂载/升级后**实测修正**——口径 = 真实行高（rect，小数）+ pane 行距
+  //    （`rowFootprint`；spacer 记账与真实布局同口径，见其注释）；写读分离防 reflow；
+  //  · 滚动：`#chat` 的 scroll 经 rAF 合帧后跑一次 `updateVirtualWindow`（每帧至多一次）。
   // 交互行（待确认卡/回交卡/注入行）标 `keepEl`——离窗时**保留元素实例**（监听器/内部状态不丢），仅脱挂。
   var VIRT_MIN_ROWS = 150;
   var VIRT_BUFFER = 30;
@@ -461,10 +459,11 @@
       pane: pane,
       seq: ++rowListSeq, // 行表身份（重建即换号——锚点物化的同表校验用）
       rows: [],
-      top: document.createElement("div"),    // 上 spacer（窗口以上各行高之和）
-      bottom: document.createElement("div"), // 下 spacer（窗口以下各行高之和）
+      top: document.createElement("div"),    // 上 spacer（窗口以上各行占位之和）
+      bottom: document.createElement("div"), // 下 spacer（窗口以下各行占位之和）
       prefix: null,
       allMeasured: false,
+      rowGap: null, // pane 纵向行距（flex row-gap）缓存——行占位口径的一半（见 rowFootprint）
     };
     rl.top.className = "virt-spacer";
     rl.bottom.className = "virt-spacer";
@@ -480,6 +479,26 @@
     for (var i = 0; i < rl.rows.length; i += 1) sums[i + 1] = sums[i] + rl.rows[i].h;
     rl.prefix = sums;
     return sums;
+  }
+
+  /** 行模型的**完整布局占位**口径（2026-10-14 锚点漂移修复）：`rec.h` = 行的真实高度（rect，含小数）
+   *  + pane 的纵向行距（flex row-gap）。spacer 记账必须与真实布局同口径——窗口化下每行在 pane 里实际
+   *  占用「行高 + 行距」，若只记行高（或只记 offsetHeight 的取整值），每次挂/脱引起窗口构成变化时，
+   *  其上方正文在内容坐标里都会按行距量级（≈16px/行）位移，开合执行记录组时表现为逐轮累积的阅读
+   *  锚点漂移（详见 docs/fix/2026-10-14_fix_virtual-row-anchor-drift.md）。
+   *  注意：**脱离文档的 pane 读不到样式表**（后台角色事件/恢复数据会先于挂载进 pane 建行表——
+   *  `getComputedStyle` 对未连接元素返回空），此时不得把读不到的结果当 0 落缓存；只在可读（已连接）
+   *  时缓存，未读到时返回暂缺省（挂载后的实测会以正确行距修正）。 */
+  function paneRowGap(rl) {
+    if (rl.rowGap === null && rl.pane.isConnected) {
+      var g = parseFloat(getComputedStyle(rl.pane).rowGap);
+      if (isFinite(g) && g >= 0) rl.rowGap = g;
+    }
+    return rl.rowGap === null ? 0 : rl.rowGap;
+  }
+  function rowFootprint(rl, el) {
+    var h = el.getBoundingClientRect().height + paneRowGap(rl);
+    return h > 0 ? h : 0;
   }
 
   /** 挂一行到窗口（保持行序：插到其后首个**已挂载**行之前；没有则插到 bottom spacer 前）。 */
@@ -502,7 +521,7 @@
     if (rec.el === null) return;
     if (rec.el.parentNode === rl.pane) {
       if (!rec.measured) {
-        var m = rec.el.offsetHeight;
+        var m = rowFootprint(rl, rec.el);
         if (m > 0) rec.h = m;
         rec.measured = true;
       }
@@ -513,8 +532,8 @@
 
   /** 记一行（缺省**追加**行表尾；`opts.atIndex` 给出时**按锚点插入**——真机缺陷修复 2026-10-12：
    *  交互卡的（重）物化要落回它发生时的行序位，而不是永远追加到表尾）。`build(rec)` **惰性**造元素
-   *  （离屏不构造/不渲染）；`estH` 为估算高（px）。插入后其后各行的 index 顺次右移（index 是行在表内的
-   *  序位——attachRow/卡定位/虚拟窗口都按它找行）。 */
+   *  （离屏不构造/不渲染）；`estH` 为估算高（px，**行高口径**——存表时补 pane 行距，与实测同口径）。
+   *  插入后其后各行的 index 顺次右移（index 是行在表内的序位——attachRow/卡定位/虚拟窗口都按它找行）。 */
   function registerRow(pane, build, estH, opts) {
     var rl = rowListFor(pane);
     ensureContent(pane);
@@ -527,7 +546,7 @@
       kind: typeof o.kind === "string" ? o.kind : "",
       build: build,
       el: null,
-      h: typeof estH === "number" && estH > 0 ? estH : 40,
+      h: (typeof estH === "number" && estH > 0 ? estH : 40) + paneRowGap(rl),
       keepEl: o.keepEl === true,
       data: o.data,
       mdReady: o.mdReady === true,
@@ -566,7 +585,7 @@
       for (var a = 0; a < rows.length; a += 1) {
         var ra = rows[a];
         if (ra.el !== null && ra.el.parentNode === pane) {
-          var ma = ra.el.offsetHeight;
+          var ma = rowFootprint(rl, ra.el);
           if (ma > 0) ra.h = ma;
           ra.measured = true;
         }
@@ -612,7 +631,7 @@
     // 新挂载行实测（写完统一读——一次布局）。
     var dirty = false;
     for (var k = 0; k < newly.length; k += 1) {
-      var mk = newly[k].el.offsetHeight;
+      var mk = rowFootprint(rl, newly[k].el);
       if (mk > 0 && mk !== newly[k].h) {
         newly[k].h = mk;
         dirty = true;
@@ -727,7 +746,7 @@
   function refreshActivityHeight(pane, rec, saved) {
     var rl = rowListFor(pane);
     if (rec.el && rec.el.parentNode === pane) {
-      var h = rec.el.offsetHeight;
+      var h = rowFootprint(rl, rec.el);
       if (h > 0) rec.h = h;
     }
     rec.measured = false;
@@ -742,8 +761,12 @@
     var unknown = data.items.some(function (a) { return a.status === "unknown"; });
     rec.el.innerHTML = '<summary>查看执行记录<span class="record-count">' + data.items.length + ' 条活动' +
       (unknown ? ' · 含状态未记录' : '') + '</span></summary>' + data.items.map(function (a, i) {
-        return '<div class="tool-activity" title="' + esc(a.at || '') + '" data-activity-index="' + i + '"><span>' + esc(a.toolName) +
-          '<span class="activity-target">' + esc(a.target || '目标未记录') + '</span></span><span class="activity-state">' + esc(a.label) + '</span></div>';
+        // v2 对齐（2026-10-13）：三列 = 42px 时间 / 操作名+目标 / 状态；未知状态带 is-unknown（琥珀色）。
+        return '<div class="tool-activity" title="' + esc(a.at || '') + '" data-activity-index="' + i + '">' +
+          '<span class="activity-time">' + esc(a.at || '') + '</span>' +
+          '<span class="activity-op">' + esc(a.toolName) +
+          '<span class="activity-target">' + esc(a.target || '目标未记录') + '</span></span>' +
+          '<span class="activity-state' + (a.status === "unknown" ? ' is-unknown' : '') + '">' + esc(a.label) + '</span></div>';
       }).join("");
     rec.el.open = data.open;
   }
@@ -807,7 +830,7 @@
         var det = document.createElement("details");
         det.className = "sys-denied";
         det.innerHTML =
-          "<summary>" + ICONS.deny + '<span class="denied-copy"><span>' + esc(headline) + '</span>' +
+          "<summary>" + '<span class="denied-copy"><span>' + esc(headline) + '</span>' +
           (target && headline.indexOf(target) >= 0 ? "" : '<span class="denied-target">' + esc(target || "目标未记录") + '</span>') +
           "</span>" + ICONS.chev + "</summary>" +
           '<div class="sys-detail">' + esc(text) + "</div>";
@@ -1076,7 +1099,7 @@
       // 窗口化：先实体化该行（未挂载则挂载 + 实测），再按其真实位置滚动（块居中）。
       if (rec.el === null || rec.el.parentNode !== pane) {
         attachRow(rl, rec);
-        var m = rec.el.offsetHeight;
+        var m = rowFootprint(rl, rec.el);
         if (m > 0) rec.h = m;
         rec.measured = true;
         rl.prefix = null;
@@ -1488,7 +1511,7 @@
     }
     var dirty = false;
     for (var j = 0; j < touched.length; j += 1) {
-      var m = touched[j].el.offsetHeight;
+      var m = rowFootprint(rl, touched[j].el);
       if (m > 0 && m !== touched[j].h) {
         touched[j].h = m;
         dirty = true;
@@ -1587,12 +1610,13 @@
    */
   var WRITE_NOTE = "实际写入导入项目，角色边界外的写入会被拒绝。";
 
-  /** 横栏常驻写入语义（单一来源；无运行时分支——桌面一律 pi）。 */
+  /** 横栏常驻写入语义（单一来源；无运行时分支——桌面一律 pi）。
+   *  v2 对齐（2026-10-13）：纯文字、无图标（「异常依文字而非堆图标」；说明在标题下方左对齐）。 */
   function renderWriteNote() {
     var el = $("runtime-note");
     if (!el) return;
     el.className = "runtime-note";
-    el.innerHTML = '<span class="rt-ico">' + ICONS.pen + '</span><span class="rt-text">' + esc(WRITE_NOTE) + "</span>";
+    el.innerHTML = '<span class="rt-text">' + esc(WRITE_NOTE) + "</span>";
   }
 
   // —————— Pi 配置面板（设计 §11/T28）：设置 pi 运行时配置 → 保存到仓库根 .env ——————
@@ -1819,6 +1843,14 @@
     var pp = $("project-path");
     pp.textContent = res.projectRoot;
     pp.classList.remove("is-empty");
+    // v2 对齐：项目名 = 路径末段（纯展示派生，无新数据源）；无项目时回落隐藏。
+    var pn = $("project-name");
+    if (pn) {
+      var seg = String(res.projectRoot == null ? "" : res.projectRoot).replace(/[\\/]+$/, "").split(/[\\/]/);
+      var base = seg.length ? seg[seg.length - 1] : "";
+      pn.textContent = base;
+      pn.hidden = base === "";
+    }
     renderWarnings(res.warnings || []);
 
     var has = function (id) { return !!id && state.roles.some(function (r) { return r.roleId === id; }); };
@@ -3220,7 +3252,9 @@
       for (var i = 0; i < rl.rows.length; i += 1) {
         if (rl.rows[i].kind === "operator") ops.push({ index: rl.rows[i].index, requestId: rl.rows[i].requestId });
       }
-      return { count: rl.rows.length, lastIndex: rl.rows.length - 1, operators: ops };
+      // rowGap：行占位口径中的 pane 行距缓存（2026-10-14 锚点漂移修复）——e2e 断言
+      // 「未挂载期建行表的角色挂载后读到与已挂载角色相同的行距」用（防脱离文档读样式表落 0 缓存）。
+      return { count: rl.rows.length, lastIndex: rl.rows.length - 1, operators: ops, rowGap: rl.rowGap };
     },
     replayAnchorDebug: function (roleId) {
       var table = paneAnchors[String(roleId == null ? "" : roleId)];

@@ -1,0 +1,119 @@
+{
+  "electron": "44.7.0",
+  "node": "24.21.0",
+  "app": "/private/tmp/ans-ui-fix/ans-prefix/app",
+  "report": [
+    {
+      "name": "setup: >150 rows in one collapsed group",
+      "value": true
+    },
+    {
+      "name": "setup: append grows group to 46 activities",
+      "value": true
+    },
+    {
+      "name": "toggle drift (4 collapse/expand cycles)",
+      "value": [
+        {
+          "label": "initial",
+          "firstVisibleOffset": 11.25,
+          "firstVisibleText": "independent-row-",
+          "sameReadingText": true,
+          "fixedAnchorOffset": 11.25,
+          "fixedAnchorPrefix": "independent-row-178 阅读",
+          "scrollTop": 9938,
+          "groupH": 2487.3125
+        },
+        {
+          "label": "collapse cycle 0",
+          "firstVisibleOffset": 12.3125,
+          "firstVisibleText": "independent-row-",
+          "sameReadingText": true,
+          "fixedAnchorOffset": 12.3125,
+          "fixedAnchorPrefix": "independent-row-178 阅读",
+          "scrollTop": 9856,
+          "groupH": 36
+        },
+        {
+          "label": "expand cycle 0",
+          "firstVisibleOffset": 13.25,
+          "firstVisibleText": "independent-row-",
+          "sameReadingText": true,
+          "fixedAnchorOffset": 13.25,
+          "fixedAnchorPrefix": "independent-row-178 阅读",
+          "scrollTop": 9936,
+          "groupH": 2487.3125
+        },
+        {
+          "label": "collapse cycle 1",
+          "firstVisibleOffset": 14.3125,
+          "firstVisibleText": "independent-row-",
+          "sameReadingText": true,
+          "fixedAnchorOffset": 14.3125,
+          "fixedAnchorPrefix": "independent-row-178 阅读",
+          "scrollTop": 9854,
+          "groupH": 36
+        },
+        {
+          "label": "expand cycle 1",
+          "firstVisibleOffset": 15.25,
+          "firstVisibleText": "independent-row-",
+          "sameReadingText": true,
+          "fixedAnchorOffset": 15.25,
+          "fixedAnchorPrefix": "independent-row-178 阅读",
+          "scrollTop": 9934,
+          "groupH": 2487.3125
+        },
+        {
+          "label": "collapse cycle 2",
+          "firstVisibleOffset": -52.875,
+          "firstVisibleText": "independent-row-",
+          "sameReadingText": false,
+          "fixedAnchorOffset": 16.3125,
+          "fixedAnchorPrefix": "independent-row-178 阅读",
+          "scrollTop": 9852,
+          "groupH": 36
+        },
+        {
+          "label": "expand cycle 2",
+          "firstVisibleOffset": -52.9375,
+          "firstVisibleText": "independent-row-",
+          "sameReadingText": false,
+          "fixedAnchorOffset": 16.25,
+          "fixedAnchorPrefix": "independent-row-178 阅读",
+          "scrollTop": 9933,
+          "groupH": 2487.3125
+        },
+        {
+          "label": "collapse cycle 3",
+          "firstVisibleOffset": -52.875,
+          "firstVisibleText": "independent-row-",
+          "sameReadingText": false,
+          "fixedAnchorOffset": 16.3125,
+          "fixedAnchorPrefix": "independent-row-178 阅读",
+          "scrollTop": 9852,
+          "groupH": 36
+        },
+        {
+          "label": "expand cycle 3",
+          "firstVisibleOffset": -52.9375,
+          "firstVisibleText": "independent-row-",
+          "sameReadingText": false,
+          "fixedAnchorOffset": 16.25,
+          "fixedAnchorPrefix": "independent-row-178 阅读",
+          "scrollTop": 9933,
+          "groupH": 2487.3125
+        }
+      ]
+    },
+    {
+      "name": "reading paragraph metrics",
+      "value": {
+        "offsetHeight": 53,
+        "rectH": 53.1875,
+        "fontSize": "14px",
+        "lineHeight": "26.6px"
+      }
+    }
+  ]
+}

@@ -2,6 +2,8 @@
 
 记录本角色掌握的事实、待核实事项与续接线索。不写全局规则，不抄任务状态。
 
+- 2026-10-13：**按 UI/UX v2 设计对齐**（客户「按照 UI设计来改」）。要点（复核用）：聊天头 66=16+21(标题 15px×1.4)+1+16(说明 11.5px/16)+11+1 边框；960 档 padding 14/24/13 同得 66；composer 100=min-height+胶囊 52（textarea lh24+padding 5×2+边框）；抽屉底边仍按 `--composer-height` 动态、不复制 100。`.attach-row` 的 `[hidden]` 曾被 `display:flex` 压掉（白占 8px）已补。**虚拟行安全规则**：流内行（.msg/.tool-records/.sys/卡）禁用垂直 margin（模型按 offsetHeight 计高）——纵向节奏只能 gap 或 padding；抽屉内（非虚拟化）可用 margin。夹具：`test/桌面应用/e2e/uiux-design-audit.mjs`（两档实测 A/B/C + report.json）、`uiux-prototype-measure.mjs`（原型载入 Electron 实测）。**已知红（非回归）**：`main.mjs` 的 `DIAGNOSTICS_WINDOW_AND_RENDERER_EVENTS` 在基线（HEAD 7457da4）同样红——工具行瘦身后 S-1 段不再产生 ≥150 行窗口化 pane、`renderer.viewport` 无从发出；两候选 258 项日志零差异。交回 PM 项：原型 speaker 行、逐段纵向 margin、绿焦点环入规范与否。详见[对齐修复](docs/fix/2026-10-13_fix_uiux-design-alignment.md)。
+
 - 2026-10-13：旧v2实际重验收五项缺口已返工，测试必须看默认summary目标、right-body实际宽度、控件rect和native完整链；不能以details.textContent/仅CSS属性证明。q-item原flex覆盖grid，q-full100%+margin48实际溢出；inert按矩形只阻被遮审批卡，不改state/原disabled；open/answered/expired/busy都需刷新工作提示。disabled撤回按钮会使native焦点丢到body，真实回执后仅原角色原项恢复重试焦点。Electron按钮Return需要keyDown+char+keyUp，光keydown不能证明按钮激活。见[体验返工](docs/fix/2026-10-13_fix_uiux-reacceptance.md)。
 
 - 2026-10-13：UI/UX v2候选在既定6app文件内完成。隐藏translate抽屉仍扩大.app.scrollWidth，原矩形clip-path解决；bottom按composer真实高度，别复制100px。旧JSONL isError=false仍可能有自有工具确定首行失败，只允许首行固定模板，不查文件正文/stdout。accepted缺可靠结果未知。组跨full用可靠首活动身份，缺身份不恢复旧open；denied交互结论必须返回rec登记conclusion锚点。PM与产品精化保留所有显式角色点击U-1最新/未决，只有普通刷新/展开保阅读；每角色草稿/图片隔离，异步结果归原角色。详见[变更](docs/change/2026-10-13_change_uiux-v2.md)。

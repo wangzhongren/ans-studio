@@ -28,7 +28,7 @@ ans role run 订单服务 --task T-123
 
 ## 角色与职责（已验收）
 
-本项目有 7 个角色，固定身份、各自独立上下文。每个角色位于 `角色卡/<角色>/`，含 `role-card.md`、`boundary.yaml`、`memo.md` 与 `docs/`。
+本项目有 10 个角色，固定身份、各自独立上下文。每个角色位于 `角色卡/<角色>/`，含 `role-card.md`、`boundary.yaml`、`memo.md` 与 `docs/`。
 
 | 角色 | 负责什么 | 主要层/目录 | 角色卡 |
 | --- | --- | --- | --- |
@@ -38,12 +38,15 @@ ans role run 订单服务 --task T-123
 | Pi适配器 | 把 Pi 的 TypeScript SDK 包成运行时适配器：建工具集、注册工具与 `tool_call` 钩子 | Provider（`src/provider/pi/`） | [role-card](../../Pi适配器/role-card.md) |
 | 装配 | 入口、构建与测试配置、层间接线；让各角色的能力能被真正启动 | `src/index.ts`、`bin/ans.js`、`package.json`、`tsconfig.json` | [role-card](../../装配/role-card.md) |
 | 测试 | 独立做跨角色联调、完整流程与回归，给出可复现结论；不修产品代码 | `test/测试/` | [role-card](../../测试/role-card.md) |
-| 桌面应用 | Electron 桌面客户端：三栏界面（项目/角色树、会话聊天、角色资料），同一引擎的第二个前端 | Interface（`app/`、`test/桌面应用/`） | [role-card](../../桌面应用/role-card.md) |
+| 产品 | 产品视角：把 CLI 与桌面客户端当作整体，从使用与维护两端审视体验、流程与优先级；产出提案与评审，不写产品代码 | `角色卡/产品/` | [role-card](../../产品/role-card.md) |
+| UIUX设计师 | 桌面界面布局、交互方案、可检查的 HTML 设计原型与设计规范，参加联合评审；设计产物由实现角色接入正式应用 | `角色卡/UIUX设计师/` | [role-card](../../UIUX设计师/role-card.md) |
+| 桌面UI | 桌面客户端渲染前端（`app/renderer/`）：界面展示与交互，按已确认设计实现；不接触 Node/文件系统 | Interface（`app/renderer/`、渲染侧测试） | [role-card](../../桌面UI/role-card.md) |
+| 桌面窗口 | Electron 主进程、窗口生命周期、preload 受限桥与桌面会话装配 | Interface（`app/main.ts`、`app/preload.cjs`、`app/desktop/`、窗口侧测试） | [role-card](../../桌面窗口/role-card.md) |
 
 三点补充：
 
 - **门禁引擎是 `src/model/` 下三个共享类型文件（`boundary.ts`、`role.ts`、`decision.ts`）的唯一主属主**，其他角色只读引用。改动它们会让所有引用方的既有证据失效。
-- **项目管理是 `src/common/shared/`（跨角色共享组件）的唯一写入者**，并维护 `docs/architecture/shared-components.md`。**现有共享组件**：`src/common/shared/config-loader.ts`（`.ans/project.json` 有效配置加载 + pin-backed acceptance 校验；由**装配**与**桌面应用**只读导入，消费方不复制第二份）。
+- **项目管理是 `src/common/shared/`（跨角色共享组件）的唯一写入者**，并维护 `docs/architecture/shared-components.md`。**现有共享组件**：`src/common/shared/config-loader.ts`（`.ans/project.json` 有效配置加载 + pin-backed acceptance 校验；由**装配**与**桌面窗口**只读导入，消费方不复制第二份）。
 - **`docs/scheduling/`（调度记录）归项目管理**：目录在 pm 的 Section 1 内（`purpose: 任务调度记录（内容由 task_ops 写入）`）；**内容唯一写入者是 `task_ops`**（技能 `scripts/task_ops.py`，含 hash 链式机器段），pm 只承载/发起、不另写一份，**编排不得直接写**（F3）。使用约定与真实记录样例见 `docs/design/2026-10-11_design_scheduling-record-convention.md`。**注：调度「执行」路径不在 V1（设计 §3.7）。**
 
 ## 分层与调用方向（已验收）
@@ -60,7 +63,7 @@ Model: 由上面四个运行层共享
 - **Service / Provider 层内部三段式**：`abstract/`（契约）、`public/`（对外入口）、`impl/`（具体实现）；上层只依赖 `abstract/`，不直接依赖 `impl/`。
 - **`common/` 是支撑目录，不是第六层**。每个角色有私有 `common/<role-id>/`；跨角色共享走项目管理的 `common/shared/`；`common/` 不得反向调用运行层。
 
-**桌面应用是 Interface 层的第二个前端**：与 CLI（`src/interface/cli/`）同处 Interface 层，共用 Pipeline / Service / Provider；判定一律调门禁引擎，Pi 调用一律经 Pi 适配器，渲染进程不另写边界判断（见 `app/desktop/`）。
+**桌面客户端是 Interface 层的第二个前端**（2026-10-14 自「桌面应用」拆分为**桌面UI**与**桌面窗口**两个角色）：与 CLI（`src/interface/cli/`）同处 Interface 层，共用 Pipeline / Service / Provider；判定一律调门禁引擎，Pi 调用一律经 Pi 适配器，渲染进程不另写边界判断（`app/renderer/` 归桌面UI；`app/main.ts`、`app/preload.cjs`、`app/desktop/` 归桌面窗口）。
 
 **与技能示例的命名差异（现状，如实记录）**：技能 `references/architecture.md` 的示例树用复数名（`models/`、`services/`、`providers/`、`pipelines/`）。本项目已验收的边界用单数名：`src/model/`、`src/service/`、`src/provider/`、`src/pipeline/`、`src/interface/`。职责保持不变，仅词形不同；以本项目的实际路径为准。
 
@@ -94,7 +97,7 @@ flowchart TD
 | 各角色 → 测试 | 开发角色做自己的单元测试；跨角色、完整流程与回归由测试角色独立做 | 测试发现问题报告复现步骤，项目管理安排所属角色修复，再由测试角色复测 |
 | 全部 ← 项目管理 | 调度、对接受权、验收与共享组件由项目管理统筹 | 任何角色发现要改别人的文件，把请求交回项目管理 |
 
-各角色的详细功能流程由**各角色自己**维护在 `docs/feature/<功能-id>.md`，本文件只链接、不复制。目前仅**桌面应用**建立了功能文档（`角色卡/桌面应用/docs/feature/2026-10-11_feature_desktop-three-pane.md`），其余角色的功能文档尚未建立（验收后由各角色补）；共享组件文档已建立（`角色卡/项目管理/docs/architecture/shared-components.md`，登记本项目首个共享组件 `src/common/shared/config-loader.ts`）。
+各角色的详细功能流程由**各角色自己**维护在 `docs/feature/<功能-id>.md`，本文件只链接、不复制。功能文档现状：拆分前的 `角色卡/桌面应用/docs/feature/2026-10-11_feature_desktop-three-pane.md` 随旧目录冻结归档（**桌面UI**/**桌面窗口**引为共用历史，两角色自有功能文档待各自验收后建立）；其余角色的功能文档尚未建立（验收后由各角色补）；共享组件文档已建立（`角色卡/项目管理/docs/architecture/shared-components.md`，登记本项目首个共享组件 `src/common/shared/config-loader.ts`）。
 
 ## 运行时结构（v1 原型已落地）
 
@@ -113,7 +116,7 @@ flowchart TD
 
 核心选择：**构造优于拦截**（已落地）。受治理的工具由自己注册，未受治理的内置工具可以直接让它**不存在**（`noTools: "builtin"`），"没有那道门，就不需要守门"。第二层 `pi.on("tool_call")` 钩子作为 fail-safe 兜底（见 `src/common/pi-adapter/real-adapter.ts` 的治理扩展）。
 
-**写入层有一道隐式的第二边界（须留意，勿当隐含行为）**：受治理工具的写入层 `writeRoot` **恒为 projectRoot**（`src/provider/pi/tools.ts`）——它**不在任何 `boundary.yaml` 里表达**。门禁按其 `root: project | skill` 判定，写入层只落 projectRoot，故**门禁放行的 skill 根写会被写层拒**（有意收窄 = 纵深防御：内建治理边界全是 skill 根，正好在写层再兜一次「治理会话不写技能目录」）。**授权的唯一来源仍是 Section 1**——`writeRoot` 只紧不松，不会放行 Section 1 之外的写，只会让 Section 1 之内的 skill 根写被二次拒绝。此收窄属**如实标注的边界行为**（与「容器/OS 沙箱未做」同列）。另：**桌面应用的写入按运行时路径区分**——**demo 路径只判不写**（`app/desktop/chat-adapter.ts` 未传 `writeRoot` → 写层 fail-closed），**pi 路径真实写入**（编排 `createPiAdapterFactory` → 真实适配器，`writeRoot=projectRoot`，受门禁约束；需凭据 + `ANS_PI_BASE_URL` / `ANS_PI_MODEL`；`ANS_PI_CONTEXT_WINDOW` 现为可选、缺省用保守默认）。**界面文案须按运行时如实**。详见设计稿 `docs/design/2026-10-11_design_v1-full-implementation.md` §3.8、§3.9。
+**写入层有一道隐式的第二边界（须留意，勿当隐含行为）**：受治理工具的写入层 `writeRoot` **恒为 projectRoot**（`src/provider/pi/tools.ts`）——它**不在任何 `boundary.yaml` 里表达**。门禁按其 `root: project | skill` 判定，写入层只落 projectRoot，故**门禁放行的 skill 根写会被写层拒**（有意收窄 = 纵深防御：内建治理边界全是 skill 根，正好在写层再兜一次「治理会话不写技能目录」）。**授权的唯一来源仍是 Section 1**——`writeRoot` 只紧不松，不会放行 Section 1 之外的写，只会让 Section 1 之内的 skill 根写被二次拒绝。此收窄属**如实标注的边界行为**（与「容器/OS 沙箱未做」同列）。另：**桌面窗口的写入按运行时路径区分**——**demo 路径只判不写**（`app/desktop/chat-adapter.ts` 未传 `writeRoot` → 写层 fail-closed），**pi 路径真实写入**（编排 `createPiAdapterFactory` → 真实适配器，`writeRoot=projectRoot`，受门禁约束；需凭据 + `ANS_PI_BASE_URL` / `ANS_PI_MODEL`；`ANS_PI_CONTEXT_WINDOW` 现为可选、缺省用保守默认）。**界面文案须按运行时如实**。详见设计稿 `docs/design/2026-10-11_design_v1-full-implementation.md` §3.8、§3.9。
 
 > **前提核实更新**：设计 §7 的三条前提状态已变——**V1（`noTools:"builtin"` 与 `customTools` 可否并存）已核实成立**（"内置不存在 + 注册自定义"在 API 层成立，接线探针 `test/pi-adapter/wire-probe.ts` 印证）；**V4（`on("tool_call")` 钩子是否 fail-closed）已确认为 fail-closed**（处理器出错 → 工具在执行前被阻断）；**V3（`run_shell` 给不给）仍是政策选择、未决**——它决定「构造优于拦截」是否需回落到「构造 + 拦截双轨」。依据：设计稿 `2026-10-11_design_ans-cli-v1-prototype.md` 附录 A（来自安装包 `@earendil-works/pi-coding-agent@1.1.0` 产物）；原始评审见 `docs/design/2026-10-11_design_ans-cli-pi-runtime-review.md`。
 
@@ -136,3 +139,8 @@ flowchart TD
 - **文档审计（本次）**。通读全文并与当前仓库逐条核对，就地修正过时陈述：(1)「状态说明」中「应用代码目前尚未建立」已删——`src/`、`app/` 已落盘；运行时「尚在评审」改为「已有冻结契约（accepted）与落地代码」。(2)「角色与职责」6 个角色 → **7 个**，补桌面应用行，边界文件名 `boundary.md` → `boundary.yaml`。(3) 命令名 `ans role run` / `govern` / `init` 由「方案/待确认」改为**已实现**。(4)「运行时结构：**方案/待确认**」改为「**v1 原型已落地**」：`noTools:"builtin"` + `customTools`、治理扩展 `on("tool_call")` 均已在 `src/common/pi-adapter/real-adapter.ts` 中；「一个角色 = 一个 worker 进程」改为如实描述（进程内一次绑定，未见派生子进程）。(5) 前提更新：**V1 已核实、V4 已确认 fail-closed、V3 仍未决**。(6)「待核实与未决」逐条更新（原始评审 `needs revision` 已被 accepted 契约取代；补真实模型轮次与容器沙箱未验证）。(7) 各角色功能文档状态更正（仅桌面应用已建）。**依据**：`src/`、`app/`、`package.json`、`角色卡/*/boundary.yaml`、设计稿 `2026-10-11_design_ans-cli-v1-prototype.md`（含附录 A）、评审记录 `2026-10-11_design_ans-cli-pi-runtime-review.md`、变更记录 `docs/change/2026-10-11_change_su-session-open.md`。
 - **补记：写入层的隐式第二边界（2026-10-11）**。T3 落地「写入真落盘」后，在「运行时结构」段落补记：受治理写入层 `writeRoot` **恒为 projectRoot**（不在任何 `boundary.yaml` 里表达），故**门禁放行的 skill 根写会被写层拒**（有意收窄、纵深防御）；**授权唯一来源仍是 Section 1**（writeRoot 只紧不松）。同时如实标注**桌面应用当前只判不写**（`chat-adapter` 未传 `writeRoot`），真实写入列二期。**依据**：`src/provider/pi/tools.ts`、`app/desktop/chat-adapter.ts`、设计稿 `docs/design/2026-10-11_design_v1-full-implementation.md` §3.8/§3.9。来源：协调方转达 T3 回报。
 - **补记：`docs/scheduling/` 的归属与唯一写入者（2026-10-11）**。在「角色与职责」补记：`docs/scheduling/`（调度记录）**归项目管理**（Section 1），**内容唯一写入者是 `task_ops`**（技能 `scripts/task_ops.py`，含 hash 链式机器段），pm 只承载/发起、**编排不得直接写**（F3）；使用约定与真实记录样例见 `docs/design/2026-10-11_design_scheduling-record-convention.md`。**注：调度「执行」路径不在 V1**（设计 §3.7）。**依据**：`角色卡/项目管理/boundary.yaml`、设计稿 `docs/design/2026-10-11_design_v1-full-implementation.md` §3.4/§3.6/§3.7、技能 `references/task-operations.md`。来源：本项目任务 T6。
+
+## 变更（2026-10-14）
+
+- **角色拆分：桌面应用 → 桌面UI ＋ 桌面窗口**。客户指令「桌面拆分成两个角色吧，一个UI，一个window 相关的」；拆分名称「桌面UI」「桌面窗口」经客户确认。上文角色表、「分层与调用方向」与「运行时结构」相关段落已同步；旧目录 `角色卡/桌面应用/` **原位冻结归档**（`boundary.yaml` 保留原名并置顶层 `archived: true`——门禁引擎 2026-10-14 按客户指令落地的**归档键约定**：枚举静默跳过（零提示）、不可开启、其边界不予采用；另有 `归档说明.md`；既有链接全部保持有效）。拆分设计含逐文件路由表（`app/**` 与 `test/桌面应用/**`，程序化核对无遗漏、无重叠）：`角色卡/桌面UI/docs/design/2026-10-14_design_role-split-ui.md`、`角色卡/桌面窗口/docs/design/2026-10-14_design_role-split-window.md`。
+- **角色表补录 产品 / UIUX设计师**：两名 2026-10-13 建立的角色此前未登记入角色表，本次随拆分更新一并补录（职责照各自角色卡）；角色数 7 → 10。

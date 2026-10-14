@@ -51,7 +51,7 @@ function listing(): ProjectListing {
         },
     builtIn: builtIn ? true : undefined,
   });
-  return { projectRoot: "/proj", roles: [mk("su", true), mk("A"), mk("B"), mk("C"), mk("桌面应用")], warnings: [], hasRoles: true, primaryRoleId: "su" };
+  return { projectRoot: "/proj", roles: [mk("su", true), mk("A"), mk("B"), mk("C"), mk("桌面窗口")], warnings: [], hasRoles: true, primaryRoleId: "su" };
 }
 
 interface SentRec {
@@ -130,9 +130,9 @@ test("P0-2 abort 三态：demo 替身 ⇒ supported:false（「当前运行时�
       getListing: (root: string) => (root === repoListing.projectRoot ? repoListing : undefined),
     }) as never,
   );
-  const r = await mgr.open({ projectRoot: repoListing.projectRoot, roleId: "桌面应用", runtime: "demo" });
+  const r = await mgr.open({ projectRoot: repoListing.projectRoot, roleId: "桌面窗口", runtime: "demo" });
   assert.equal(r.ok, true);
-  const res = await mgr.abort("桌面应用");
+  const res = await mgr.abort("桌面窗口");
   assert.deepEqual(
     { ok: res.ok, supported: res.supported },
     { ok: false, supported: false },

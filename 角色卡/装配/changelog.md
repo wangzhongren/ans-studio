@@ -1,5 +1,21 @@
 # 装配 变更记录
 
+## 2026-10-14 — README 同步「桌面应用」角色拆分（→ 桌面UI ＋ 桌面窗口）
+
+「桌面应用」按客户确认拆分为 **桌面UI**（渲染前端，`app/renderer/`）与 **桌面窗口**（Electron 主进程、preload 受限桥、桌面会话装配；`app/main.ts`、`app/preload.cjs`、`app/desktop/`），客户 2026-10-14 确认名称（原话「桌面UI/桌面窗口 这个可以」）；旧目录 `角色卡/桌面应用/` 原位冻结归档——**终止形态为「归档键约定」**：`boundary.yaml` 保留原名 ＋ 顶层 `archived: true`（客户同日定案「还是加一个已归档吧，归档是合理的」），角色枚举**静默跳过（零提示）**、该角色**不可开启**、其边界不予采用；当日上午曾短暂使用 `.frozen` 改名过渡（会出「缺少 boundary.yaml，已跳过」提示），**同日按客户决定演进为归档键约定**（本条目初稿据上午形态撰写，此处按同日演进更正）——详见 `归档说明.md` 与 `角色卡/桌面应用/boundary.yaml` 头部注记。PM 已更新 `docs/architecture.md`（角色表）与 `docs/project-rules.md`（共享组件消费方名单）。两份拆分设计的 §4 均注明：README 属装配、按需由属主刷新（`角色卡/桌面UI/docs/design/2026-10-14_design_role-split-ui.md`、`角色卡/桌面窗口/docs/design/2026-10-14_design_role-split-window.md`）。本任务即按此同步 `README.md`。
+
+- **README 改动（旧 → 新）**：
+  1. 「目录与职责」角色表行：``| **桌面应用** | `app/**`（Electron 主进程、preload 桥、渲染进程与 vendored 前端库）、`test/桌面应用/**` |`` → **桌面UI**、**桌面窗口** 两行——按两个新角色 `boundary.yaml` 实读：`app/renderer/`（渲染前端）↔ `app/main.ts`／`app/preload.cjs`／`app/desktop/`（主进程、窗口生命周期、preload 受限桥、桌面会话装配）；测试路径**沿用** `test/桌面应用/`（拆分设计：路径不变、逐文件授权），两行分别标注「渲染侧用例」/「窗口侧用例」。
+  2. 同节计数句「全项目共 **7 个角色**」→「**10 个角色**」，并在表尾补录 **产品**、**UIUX设计师** 两行——拆分的**直接后果修正**（任务清单「角色表行」之外的必做配套）：拆行使表行 7→8，只拆行不动计数句会留下「计 7 对 8 行」的自相矛盾；而真实角色数经两处核实为 **10**（PM `architecture.md`「本项目有 10 个角色」；`角色卡/` 实测 10 个活角色目录＋1 个冻结归档），**8 不是任何口径下的真值**，故按真实值补全。两补录行内容源自 PM 已更新的架构表同名行，写入面与两角色 `boundary.yaml` 实读一致（均为各自 `角色卡/<角色>/**`）。
+  3. 共享组件段：`消费方（**装配、桌面应用**）` → `消费方（**装配、桌面窗口**）`——app 侧消费方为桌面窗口（渲染进程不经 Node、不消费共享模块），与 PM `project-rules.md` §一.5 的消费方更新一致。
+- **刻意未改（产品称谓，5 处）**：L1 标题「v1：CLI + 桌面应用」、L12「CLI 与 Electron 桌面应用」、L34「CLI 与桌面应用共用同一套…」、L43 节题「桌面应用（主推路径）」、L50「桌面应用是一个治理会话工作台」——均指**整个桌面产品**而非角色名，保留不动。表内 `test/桌面应用/` 为**物理路径字面量**（目录仍在、逐文件分属两角色），照留。
+- **验证（两道门；首跑于当日上午 `.frozen` 过渡形态，归档键约定落地后同日复跑——两次均如实记录）**：
+  - **首跑** `node --test "test/**/*.test.ts"` → **1046 tests / 1042 pass / 3 fail / 1 skipped**；3 红＝① `test/桌面应用/pi-config.test.ts:60` 仓库目录名 `ans-cli` 基线红、② `test/项目管理/shared/path-primitives.test.ts:254` macOS `/var` 基线红、③ `test/门禁引擎/list-project.test.ts:41` 遇 `.frozen` 过渡方案的「缺少 boundary.yaml，已跳过」提示。
+  - **演进后复跑** → **1054 tests / 1050 pass / 3 fail / 1 skipped**；③ list-project 随**静默跳过**转绿；现 3 红＝① 同上基线红、② 同上基线红、③ `test/桌面应用/project.test.ts:29` 仍期望「跳过**并提示**」（上午形态、与归档键约定**零提示**不符）——属**他角色（桌面窗口）待同步**，未动。
+  - `npm run typecheck` → **0 错**（两次）；本角色 `test/装配/` → **54/54**；**本角色两次零红**。
+- **格式自检**：编辑后角色表 10 个数据行经 awk 复核全部 3 竖线、反引号成对；`grep` 复核「桌面应用」余 5 处皆产品称谓。
+- **只动**：`README.md`、本 changelog、`memo.md`。未碰 `app/**`、`src/**`、`test/**`、他角色目录；未 git 操作（不 commit）。
+
 ## 2026-10-13 — P1-4 配套：`ans role run --help` 真实入口放行（编排转达的跨角色缺口）
 
 编排的 P1-4（CLI 定位指路，客户批准提案）命令层已就位但**真实入口到不了**：`ans role run --help`（无 `--task`）被本角色 `src/common/装配/cli-parse.ts::parseInvocation` 判为「缺少 --task」的 `unknown` ⇒ stderr + 全局 USAGE、退 2。本任务即编排 change 文档（`角色卡/编排/docs/change/2026-10-13_change_cli-positioning.md`）「跨角色登记（归装配）」一节的最小改动。

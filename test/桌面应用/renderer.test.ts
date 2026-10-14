@@ -967,6 +967,16 @@ test("Q-2：窗口化行模型（阈值 150 / 缓冲 30 / spacer / rAF 合帧）
   assert.ok(RENDERER.includes("var VIRT_BUFFER = 30;"), "窗口外缓冲 = 30 行");
   assert.ok(RENDERER.includes("function registerRow(") && RENDERER.includes("function updateVirtualWindow("), "行表 + 窗口更新");
   assert.ok(/rl\.top\.style\.height = sums\[first\] \+ "px";/.test(RENDERER) && /rl\.bottom\.style\.height = sums\[rows\.length\] - sums\[last \+ 1\] \+ "px";/.test(RENDERER), "上下 spacer 撑总高（按行高和）");
+  // 行占位口径（2026-10-14 锚点漂移修复钉）：`rec.h` = 真实行高（rect，小数）+ pane 行距（flex row-gap）。
+  // spacer 记账必须与真实布局同口径——否则窗口构成变化会按行距量级位移正文，开合记录组逐轮累积漂移。
+  assert.ok(RENDERER.includes("function rowFootprint(rl, el)") && RENDERER.includes("el.getBoundingClientRect().height + paneRowGap(rl)"), "行占位 = rect 行高（小数）+ pane row-gap");
+  assert.ok(RENDERER.includes("parseFloat(getComputedStyle(rl.pane).rowGap)"), "行距实读计算样式（不硬编码 16）");
+  assert.ok(RENDERER.includes("rl.rowGap === null && rl.pane.isConnected"), "脱离文档的 pane 读不到样式表 ⇒ 只在已连接时缓存行距（读不到不得当 0 写死——后台事件/恢复数据会先于挂载建行表）");
+  assert.ok(RENDERER.includes("return rl.rowGap === null ? 0 : rl.rowGap;"), "行距未读到时返回暂缺省（挂载后实测修正），不污染缓存");
+  assert.ok(!/\.el\.offsetHeight/.test(RENDERER), "行高实测不再直接取 offsetHeight 取整（全走 rowFootprint）");
+  const footprintSites = (RENDERER.match(/rowFootprint\(rl, /g) || []).length;
+  assert.ok(footprintSites >= 6, "六类实测修正（Detach/首次全量/新挂载/记录组开合/卡定位/流式升级）统一口径（实测 " + footprintSites + " 处）");
+  assert.ok(/h: \(typeof estH === "number" && estH > 0 \? estH : 40\) \+ paneRowGap\(rl\),/.test(RENDERER), "估算高入表即补行距（与实测同口径）");
   assert.ok(RENDERER.includes("rec.el = null"), "普通行离窗**丢元素**（不持 DOM）；keepEl 行保留实例");
   assert.ok(RENDERER.includes("keepEl: true"), "交互行（待确认卡/回交卡/注入行）keepEl");
   assert.ok(RENDERER.includes('addEventListener("scroll", onChatScroll)') && RENDERER.includes("requestAnimationFrame(run)"), "滚动经 rAF 合帧（每帧至多一次窗口更新）");

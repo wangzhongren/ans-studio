@@ -1,5 +1,5 @@
 // test/桌面应用/operator-channel.test.ts
-// 桌面应用：操作者确认通道 (a) 的逻辑与 fail-closed 单测 + arm 接缝（不真弹窗、无 electron）。
+// 桌面窗口：操作者确认通道 (a) 的逻辑与 fail-closed 单测 + arm 接缝（不真弹窗、无 electron）。
 //
 // 设计依据：§7.3（(a) 是第三闸、兜底，只有当 (b) 拿不准/不可用时才叫人）、§7.4（落点 app/ 对话框）、
 // §7.5（fail-closed 三条：拒绝 / 超时 / 不可用）、§7.6（审计 by/branch 归编排）。
@@ -242,7 +242,7 @@ test("I-1 补丁：(c) 实件构造——只读导入的两件**引用同一性*
 test("I-1 补丁（**真正接通**核查）：真实 openRoleSession + 真实装配——(c) 实件在场时能力面产出 ShellGate（Pi 适配器 run_shell 注册条件成立）", async () => {
   const REPO_ROOT = path.resolve(HERE, "..", "..");
   const listing = await listProject(REPO_ROOT);
-  assert.ok(listing.roles.some((r) => r.roleId === "桌面应用"), "本仓库应有「桌面应用」角色（集成核查用真实枚举）");
+  assert.ok(listing.roles.some((r) => r.roleId === "桌面窗口"), "本仓库应有「桌面窗口」角色（集成核查用真实枚举）");
   const captured: (Record<string, unknown> | undefined)[] = [];
   const mgr = new SessionManager({
     openRoleSession, // **真实**编排入口：装配真跑（不发模型请求、不执行任何命令——闸只在被调用时才判定）
@@ -277,7 +277,7 @@ test("I-1 补丁（**真正接通**核查）：真实 openRoleSession + 真实�
     shellOperatorChannel: async () => ({ outcome: "deny", operatorId: "test", reason: "替身拒绝" }),
     shellArming: buildDesktopShellArming(),
   });
-  const r = await mgr.open({ projectRoot: listing.projectRoot, roleId: "桌面应用", runtime: "pi" });
+  const r = await mgr.open({ projectRoot: listing.projectRoot, roleId: "桌面窗口", runtime: "pi" });
   assert.equal(r.ok, true, "会话应能开启（真实装配在此路径不触网）");
   assert.ok(
     captured.length >= 1 && captured[0]?.shellGate !== undefined,

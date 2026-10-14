@@ -1,0 +1,101 @@
+{
+  "electron": "44.7.0",
+  "node": "24.21.0",
+  "report": [
+    {
+      "name": "initial row observation",
+      "value": {
+        "model": {
+          "count": 182,
+          "lastIndex": 181,
+          "operators": []
+        },
+        "selected": "A",
+        "project": "/nonexistent-independent-snapshot-key",
+        "groups": [
+          {
+            "open": false,
+            "text": "查看执行记录40 条活动"
+          }
+        ]
+      }
+    },
+    {
+      "name": "real JSONL creates >150 renderer rows with one collapsed group",
+      "value": true
+    },
+    {
+      "name": "append to expanded same group keeps child reader",
+      "before": {
+        "text": "read_fileind-target-12.md调用发起",
+        "offset": -7.59375
+      },
+      "after": {
+        "text": "read_fileind-target-12.md调用发起",
+        "offset": -7.59375
+      }
+    },
+    {
+      "name": "append updates actual group activity count and open state",
+      "value": true
+    },
+    {
+      "name": "toggle drift recorded instead of asserted (original tolerance |Δ|<2px)",
+      "value": [
+        {
+          "label": "collapse preserves preceding visible paragraph",
+          "offset": -32.3125,
+          "deltaFromBefore": -0.65625,
+          "sameReadingText": true,
+          "text": "independent-row-"
+        },
+        {
+          "label": "expand preserves preceding visible paragraph",
+          "offset": -31.65625,
+          "deltaFromBefore": 0,
+          "sameReadingText": true,
+          "text": "independent-row-"
+        }
+      ]
+    },
+    {
+      "name": "different call identity does not inherit open state",
+      "value": true
+    },
+    {
+      "name": "full replay prefix insertion preserves paragraph",
+      "before": {
+        "text": "independent-row-170 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n",
+        "offset": 0.6875
+      },
+      "after": {
+        "text": "independent-row-170 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n",
+        "offset": 0.6875
+      }
+    },
+    {
+      "name": "stable call identity retains user-open group after rewrite",
+      "value": true
+    },
+    {
+      "name": "decided rejected card has distinct request/conclusion anchors after full replay",
+      "value": true
+    },
+    {
+      "name": "explicit cross-role click prioritizes pending card",
+      "value": true
+    },
+    {
+      "name": "collapsed failure summary contains reliable missing-file reason",
+      "value": true
+    },
+    {
+      "name": "collapsed shell failure summary contains reliable exit 2",
+      "value": true
+    },
+    {
+      "name": "pre-execution policy denial summary keeps reason without execution-failed claim",
+      "value": true
+    }
+  ]
+}

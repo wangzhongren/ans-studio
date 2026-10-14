@@ -2,6 +2,8 @@
 // 冻结契约 §3：resolveRole(roleId, project): Promise<ResolvedRole>
 // 路径取自 project.roles[roleId]（F8）；未在配置中的角色视为内置治理角色。
 // listProject 为桌面应用枚举一个项目根下的全部角色，复用本文件与 boundary-core 的解析。
+// 归档约定（客户 2026-10-14）：角色边界 YAML 顶层 `archived: true` ⇒ 冻结归档角色——resolveRole
+// 拒绝开启（「角色 X 已归档，不可开启」）、listProject 静默跳过（不枚举、不产生任何警告）。
 
 import type { BoundarySection1 } from "../../model/boundary.ts";
 import type { ProjectConfig, ResolvedRole, RoleKind, RoleLocation } from "../../model/role.ts";
@@ -17,6 +19,25 @@ import { readdir, stat } from "node:fs/promises";
 
 export async function resolveRole(roleId: string, project: ProjectConfig): Promise<ResolvedRole> {
   const loc = project.roles ? project.roles[roleId] : undefined;
+
+  // 归档角色 fail-closed 拒绝（客户 2026-10-14 约定）：角色边界文件顶层 `archived: true` ⇒ 该角色为
+  // 冻结归档（拆分/退役的角色原位留档），任何按 id 解析/开启入口（CLI `ans role run`、桌面开启会话，
+  // 皆经本函数）一律拒绝。探测用**中性读取**（accepted:false、无 pin）：归档判定不依赖接受/pin 状态——
+  // pin 失效或治理接受证据缺失时照常先看到归档标记，不给绕过口。调用方（setupRole）会再包一层
+  // 「角色/边界解析失败：」前缀，错误主体如实为「角色 X 已归档，不可开启」。
+  if (loc && loc.boundary !== "") {
+    const probe = await loadBoundaryFile(
+      loc.boundary,
+      joinRoot(project.projectRoot, loc.boundary),
+      project.projectRoot,
+      project.skillRoot,
+      { accepted: false, source: "" },
+    );
+    if (probe.archived === true) {
+      throw new Error(`角色 ${roleId} 已归档，不可开启`);
+    }
+  }
+
   const kind: RoleKind = loc ? "project" : "built-in-governance";
 
   let cardText = "";
@@ -101,6 +122,9 @@ async function firstExistingFile(dirAbs: string, names: string[]): Promise<strin
  * - **无角色目录**（尚无 `角色卡/`、`role-cards/`）→ **不抛错、不报警**（§10.2）：这是「项目尚未
  *   bootstrap」的**正常初始态**，返回 `[内置 su] + hasRoles:false`（warnings 为空）——界面据此显示
  *   su 并引导发起创世（§10.1/§10.3）；warnings 只留给真异常（缺文件 / 解析失败 / 角色重复）；
+ * - **归档目录**（边界顶层 `archived: true`，客户 2026-10-14 约定）→ **静默跳过**：不枚举、不产生
+ *   任何警告（归档对枚举不可见，替代「缺少 boundary.yaml」类告警路径；禁止改名绕过——归档角色用
+ *   原名 boundary.yaml + 该标记留档；resolveRole 对同一标记 fail-closed 拒绝开启）；
  * - **项目级真错误**（项目根不存在/不是目录、角色目录路径是文件、无读权限）→ 抛出明确错误。
  * - listProject 无接受证据入参，故所列 boundary 的 acceptance 一律为未接受（仅用于展示）。
  * - 结果含 `primaryRoleId`（内置治理角色 id）：桌面据此设主入口，**渲染侧不硬编码 "su"**（§10.7）。
@@ -134,6 +158,10 @@ export async function listProject(projectRoot: string): Promise<ProjectListing> 
 
   const roles: ProjectRoleSummary[] = [];
   const seen = new Set<string>();
+  // 归档计数（客户 2026-10-14 约定）：全部子目录均为归档静默跳过时，**不补**「未枚举到有效角色」汇总
+  // （归档对枚举不可见：不产生任何警告）；只要存在活目录（无论成败），汇总照发——与归档机制引入前一致。
+  let totalRoleDirs = 0;
+  let archivedSkips = 0;
 
   // 内置治理角色（su）：永远排在第一位，且没有角色目录——由引擎合成一条，界面据此显示。
   // 不参与下方目录枚举（seen 先占位，若项目里恰好有同名目录则记 warning 跳过）。
@@ -165,14 +193,32 @@ export async function listProject(projectRoot: string): Promise<ProjectListing> 
         continue;
       }
       const relDir = `${root.name}/${roleId}`;
+      totalRoleDirs += 1;
+
+      // 归档探测（客户 2026-10-14 约定）：「角色目录的边界解析出 archived: true」⇒ 该目录为**冻结归档**，
+      // **静默跳过**——不枚举、不产生任何警告（替代「缺少 boundary.yaml / 解析失败」等逐条告警路径）。
+      // 探测先于 role-card 检查：归档目录即便缺 role-card.md 也不告警（归档=对枚举不可见）。
+      // 边界为中性读取（accepted:false、无 pin）：归档判定不依赖接受/pin 状态。
+      const boundaryName = await firstExistingFile(joinRoot(projAbs, relDir), BOUNDARY_NAMES);
+      let boundary: BoundarySection1 | undefined;
+      if (boundaryName !== null) {
+        const boundaryPath = `${relDir}/${boundaryName}`;
+        boundary = await loadBoundaryFile(boundaryPath, joinRoot(projAbs, boundaryPath), projAbs, projAbs, {
+          accepted: false,
+          source: "",
+        });
+        if (boundary.archived === true) {
+          archivedSkips += 1;
+          continue;
+        }
+      }
 
       const cardName = await firstExistingFile(joinRoot(projAbs, relDir), CARD_NAMES);
       if (!cardName) {
         warnings.push(`${relDir}：缺少 role-card.md，已跳过`);
         continue;
       }
-      const boundaryName = await firstExistingFile(joinRoot(projAbs, relDir), BOUNDARY_NAMES);
-      if (!boundaryName) {
+      if (boundaryName === null || boundary === undefined) {
         warnings.push(`${relDir}：缺少 boundary.yaml，已跳过`);
         continue;
       }
@@ -188,14 +234,7 @@ export async function listProject(projectRoot: string): Promise<ProjectListing> 
         continue;
       }
 
-      // 复用现有边界解析（与 resolveRole 同源）
-      const boundary = await loadBoundaryFile(
-        boundaryPath,
-        joinRoot(projAbs, boundaryPath),
-        projAbs,
-        projAbs,
-        { accepted: false, source: "" },
-      );
+      // 边界解析失败（复用上方探测时的解析结果，与 resolveRole 同源）
       if (boundary.parseError) {
         warnings.push(`${relDir}：边界解析失败：${boundary.parseError}，已跳过`);
         continue;
@@ -214,7 +253,10 @@ export async function listProject(projectRoot: string): Promise<ProjectListing> 
   // 有角色目录但一个有效角色都没枚举到（全都缺文件/解析失败）→ 仍补一条汇总提示：**有目录却无
   // 有效角色**是真异常（每个失败角色的具体原因已在上面逐条记入 warnings）。注意这与「无角色目录」
   // 不同——后者是「尚未 bootstrap」的正常初始态、不再报警（见函数首部注释）。
-  if (!hasRoles && foundRoots.length > 0) {
+  // 例外（客户 2026-10-14 归档约定）：若目录下的子目录**全部**为归档静默跳过，归档对枚举不可见——
+  // 不补本汇总（归档不产生任何警告）；只要存在活目录（无论成败），汇总照发，行为与归档机制引入前一致。
+  const allDirsArchived = totalRoleDirs > 0 && archivedSkips === totalRoleDirs;
+  if (!hasRoles && foundRoots.length > 0 && !allDirsArchived) {
     warnings.push(
       `项目根下未枚举到有效角色；仅内置治理角色 ${BUILT_IN_GOVERNANCE_ROLE_ID} 可用（可发起 bootstrap）`,
     );

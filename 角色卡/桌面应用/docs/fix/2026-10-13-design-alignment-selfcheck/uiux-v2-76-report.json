@@ -1,0 +1,529 @@
+{
+  "electron": "44.7.0",
+  "node": "24.21.0",
+  "reports": [
+    {
+      "name": "routine collapsed; failure direct; assistant untouched",
+      "value": true
+    },
+    {
+      "name": "single brief real write fact",
+      "value": true
+    },
+    {
+      "name": "default failure shows known path",
+      "value": true
+    },
+    {
+      "name": "known shell exit survives literal semicolon",
+      "value": true
+    },
+    {
+      "name": "full target plus unknown target honest",
+      "value": true
+    },
+    {
+      "name": "live failed reason visible in summary",
+      "value": true
+    },
+    {
+      "name": "before-execution rejection keeps visible reason",
+      "value": true
+    },
+    {
+      "name": "unknown is honest count",
+      "value": true
+    },
+    {
+      "name": "one work list precedes collapsed full documents",
+      "value": true
+    },
+    {
+      "name": "snapshot keeps full and document open",
+      "value": true
+    },
+    {
+      "name": "keyboard tabs to full",
+      "value": true
+    },
+    {
+      "name": "keyboard collapses full",
+      "value": true
+    },
+    {
+      "name": "keyboard expands full",
+      "value": true
+    },
+    {
+      "name": "keyboard tabs to withdraw",
+      "value": true
+    },
+    {
+      "name": "role geometry 1360",
+      "value": true
+    },
+    {
+      "name": "queue full/grid/action rect 1360",
+      "value": true
+    },
+    {
+      "name": "queue geometry 1360",
+      "value": {
+        "clientWidth": 349,
+        "scrollWidth": 349,
+        "full": {
+          "x": 1053,
+          "y": 409.9375,
+          "width": 277,
+          "height": 1728.4375,
+          "top": 409.9375,
+          "right": 1330,
+          "bottom": 2138.375,
+          "left": 1053
+        },
+        "actions": [
+          {
+            "label": "收起",
+            "rect": {
+              "x": 1053,
+              "y": 371.9375,
+              "width": 46,
+              "height": 28,
+              "top": 371.9375,
+              "right": 1099,
+              "bottom": 399.9375,
+              "left": 1053
+            }
+          },
+          {
+            "label": "撤回",
+            "rect": {
+              "x": 1107,
+              "y": 371.9375,
+              "width": 46,
+              "height": 28,
+              "top": 371.9375,
+              "right": 1153,
+              "bottom": 399.9375,
+              "left": 1107
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "pi geometry 1360",
+      "value": true
+    },
+    {
+      "name": "Pi only one title/close 1360",
+      "value": true
+    },
+    {
+      "name": "growing composer avoids drawer 1360",
+      "value": true
+    },
+    {
+      "name": "closed no horizontal overflow 1360",
+      "value": true
+    },
+    {
+      "name": "role geometry 960",
+      "value": true
+    },
+    {
+      "name": "queue full/grid/action rect 960",
+      "value": true
+    },
+    {
+      "name": "queue geometry 960",
+      "value": {
+        "clientWidth": 349,
+        "scrollWidth": 349,
+        "full": {
+          "x": 653,
+          "y": 409.9375,
+          "width": 277,
+          "height": 1728.4375,
+          "top": 409.9375,
+          "right": 930,
+          "bottom": 2138.375,
+          "left": 653
+        },
+        "actions": [
+          {
+            "label": "收起",
+            "rect": {
+              "x": 653,
+              "y": 371.9375,
+              "width": 46,
+              "height": 28,
+              "top": 371.9375,
+              "right": 699,
+              "bottom": 399.9375,
+              "left": 653
+            }
+          },
+          {
+            "label": "撤回",
+            "rect": {
+              "x": 707,
+              "y": 371.9375,
+              "width": 46,
+              "height": 28,
+              "top": 371.9375,
+              "right": 753,
+              "bottom": 399.9375,
+              "left": 707
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "pi geometry 960",
+      "value": true
+    },
+    {
+      "name": "Pi only one title/close 960",
+      "value": true
+    },
+    {
+      "name": "growing composer avoids drawer 960",
+      "value": true
+    },
+    {
+      "name": "closed no horizontal overflow 960",
+      "value": true
+    },
+    {
+      "name": "B independent no A image",
+      "value": true
+    },
+    {
+      "name": "A draft image resources full restored",
+      "value": true
+    },
+    {
+      "name": "late pick does not touch B",
+      "value": true
+    },
+    {
+      "name": "late pick stored in A",
+      "value": true
+    },
+    {
+      "name": "late send leaves B untouched",
+      "value": true
+    },
+    {
+      "name": "success clears original A sent items",
+      "value": true
+    },
+    {
+      "name": "halt preserves queued 3/full",
+      "value": true
+    },
+    {
+      "name": "withdraw pending retains item",
+      "value": true
+    },
+    {
+      "name": "failed withdraw full retained",
+      "value": true
+    },
+    {
+      "name": "withdraw failure inline next to action",
+      "value": true
+    },
+    {
+      "name": "withdraw failure keeps draft image resources",
+      "value": true
+    },
+    {
+      "name": "thrown withdrawal error inline and retryable",
+      "value": true
+    },
+    {
+      "name": "keyboard withdrawal response retains same action",
+      "value": true
+    },
+    {
+      "name": "snapshot preserves failure inline",
+      "value": true
+    },
+    {
+      "name": "late withdraw not B feedback",
+      "value": true
+    },
+    {
+      "name": "late withdraw belongs A item",
+      "value": true
+    },
+    {
+      "name": "success uses real returned snapshot",
+      "value": true
+    },
+    {
+      "name": "historical own-template failures direct",
+      "value": true
+    },
+    {
+      "name": "historical failure reasons visible without expand",
+      "value": true
+    },
+    {
+      "name": "virtual visible nonempty",
+      "value": true
+    },
+    {
+      "name": "incremental reader anchor",
+      "before": {
+        "text": "row-128 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天",
+        "offset": -11.875
+      },
+      "after": {
+        "text": "row-128 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天",
+        "offset": -11.875
+      }
+    },
+    {
+      "name": "group materialized and open",
+      "value": true
+    },
+    {
+      "name": "user-open group survives unrelated incremental",
+      "value": true
+    },
+    {
+      "name": "stable group restored after full prefix insertion",
+      "value": true
+    },
+    {
+      "name": "full replay preserves content identity",
+      "before": {
+        "text": "row-128 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天",
+        "offset": -10.625
+      },
+      "after": {
+        "text": "row-128 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天",
+        "offset": -9.625
+      }
+    },
+    {
+      "name": "denied conclusion anchor and decided card retained",
+      "value": true
+    },
+    {
+      "name": "pending locator visible after role click",
+      "value": true
+    },
+    {
+      "name": "open pending supersedes true busy",
+      "value": true
+    },
+    {
+      "name": "pending entry fully reachable with card 960",
+      "value": true
+    },
+    {
+      "name": "covered pending actions unavailable card",
+      "value": true
+    },
+    {
+      "name": "pending geometry card",
+      "value": {
+        "chat": {
+          "x": 272,
+          "y": 102,
+          "width": 688,
+          "height": 359,
+          "top": 102,
+          "right": 960,
+          "bottom": 461,
+          "left": 272
+        },
+        "card": {
+          "x": 296,
+          "y": 213.65625,
+          "width": 630,
+          "height": 136.40625,
+          "top": 213.65625,
+          "right": 926,
+          "bottom": 350.0625,
+          "left": 296
+        },
+        "buttons": [
+          {
+            "hidden": false,
+            "inert": false,
+            "rect": {
+              "x": 314,
+              "y": 302.0625,
+              "width": 52,
+              "height": 32,
+              "top": 302.0625,
+              "right": 366,
+              "bottom": 334.0625,
+              "left": 314
+            }
+          },
+          {
+            "hidden": false,
+            "inert": false,
+            "rect": {
+              "x": 374,
+              "y": 302.0625,
+              "width": 65,
+              "height": 32,
+              "top": 302.0625,
+              "right": 439,
+              "bottom": 334.0625,
+              "left": 374
+            }
+          }
+        ],
+        "active": "op-request op-kind-preview is-flash",
+        "drawer": ""
+      }
+    },
+    {
+      "name": "keyboard locate closes card and exposes all actions",
+      "value": true
+    },
+    {
+      "name": "pending entry fully reachable with pi 960",
+      "value": true
+    },
+    {
+      "name": "covered pending actions unavailable pi",
+      "value": true
+    },
+    {
+      "name": "pending geometry pi",
+      "value": {
+        "chat": {
+          "x": 272,
+          "y": 102,
+          "width": 688,
+          "height": 359,
+          "top": 102,
+          "right": 960,
+          "bottom": 461,
+          "left": 272
+        },
+        "card": {
+          "x": 296,
+          "y": 213.65625,
+          "width": 630,
+          "height": 136.40625,
+          "top": 213.65625,
+          "right": 926,
+          "bottom": 350.0625,
+          "left": 296
+        },
+        "buttons": [
+          {
+            "hidden": false,
+            "inert": false,
+            "rect": {
+              "x": 314,
+              "y": 302.0625,
+              "width": 52,
+              "height": 32,
+              "top": 302.0625,
+              "right": 366,
+              "bottom": 334.0625,
+              "left": 314
+            }
+          },
+          {
+            "hidden": false,
+            "inert": false,
+            "rect": {
+              "x": 374,
+              "y": 302.0625,
+              "width": 65,
+              "height": 32,
+              "top": 302.0625,
+              "right": 439,
+              "bottom": 334.0625,
+              "left": 374
+            }
+          }
+        ],
+        "active": "op-request op-kind-preview is-flash",
+        "drawer": ""
+      }
+    },
+    {
+      "name": "keyboard locate closes pi and exposes all actions",
+      "value": true
+    },
+    {
+      "name": "keyboard reaches original preview",
+      "value": true
+    },
+    {
+      "name": "keyboard expands original preview",
+      "value": true
+    },
+    {
+      "name": "keyboard enters original confirm action",
+      "value": true
+    },
+    {
+      "name": "keyboard reaches deny action",
+      "value": true
+    },
+    {
+      "name": "answered pending returns to true busy",
+      "value": true
+    },
+    {
+      "name": "idle after answered removes work",
+      "value": true
+    },
+    {
+      "name": "keyboard reaches retained image removal",
+      "value": true
+    },
+    {
+      "name": "keyboard returns to composer image",
+      "value": true
+    },
+    {
+      "name": "keyboard returns to input",
+      "value": true
+    },
+    {
+      "name": "pending arrival preserves drawer",
+      "value": true
+    },
+    {
+      "name": "expired request restores actual true busy",
+      "value": true
+    },
+    {
+      "name": "ordinary question creates no pending",
+      "value": true
+    }
+  ],
+  "sends": [
+    {
+      "text": "A draft",
+      "images": [
+        {
+          "type": "image",
+          "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=",
+          "mimeType": "image/png"
+        },
+        {
+          "type": "image",
+          "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=",
+          "mimeType": "image/png"
+        }
+      ]
+    }
+  ]
+}

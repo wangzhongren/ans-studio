@@ -55,8 +55,10 @@
           <span class="side-title">项目</span>
         </header>
         <div class="side-actions">
-          <!-- N-1（2026-10-12 客户裁定）：初始「导入项目」；已有项目后由 renderer 经 ui-labels.js 纯映射改「切换项目」。 -->
-          <button id="btn-import" class="btn btn-primary btn-block">导入项目</button>
+          <!-- N-1（2026-10-12 客户裁定）：初始「导入项目」；已有项目后由 renderer 经 ui-labels.js 纯映射改「切换项目」。
+               v2 对齐（2026-10-13）：白底描边按钮（btn-project）、项目名（14px/600）+ 路径两行。 -->
+          <button id="btn-import" class="btn btn-block btn-project">导入项目</button>
+          <div id="project-name" class="project-name" hidden></div>
           <div id="project-path" class="project-path is-empty">尚未导入项目</div>
         </div>
         <div class="tree-label">角色</div>

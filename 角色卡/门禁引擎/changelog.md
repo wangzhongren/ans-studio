@@ -1,5 +1,102 @@
 # 门禁引擎 变更记录
 
+## 2026-10-14（二）— 归档角色约定 `archived: true`：boundary.yaml 恢复原名原位留档；枚举静默跳过、开启 fail-closed 拒绝（客户口头指令经 PM 转达；取代上条 .frozen 方案与期望）
+
+客户改令（PM 转达）：冻结归档目录 `角色卡/桌面应用/` 要**补回原名 `boundary.yaml`**（不再用 `.frozen`
+改名方案——客户要求目录里就有这份文件）。为不让它按现有枚举规则复活成第三个活角色，PM 给定约定并由本
+角色实现：边界 YAML 支持**顶层键 `archived: true`**（与 role/entries 并列，保留其余字段与注释原样）；
+解析出该标记时 ① `listProject` 不枚举该角色、**不产生任何警告**（静默跳过，替代「缺少 boundary.yaml」
+告警路径）；② 按 id 解析/开启入口（`resolveRole`，CLI `role run` 与桌面开启所经入口）**fail-closed 拒绝**、
+错误信息明确；③ 不带该键的目录行为**完全不变**。本条目取代上条（.frozen 时期的「恰一条警告」严格期望
+——上条结尾对其早有预判：「若日后实现『归档静默跳过』，只需把该期望改回 `[]`（注释已指路）」；今按新指令
+如期改回）。**未实现**任何超出约定的功能。
+
+- **边界**：`src/model/boundary.ts`（`BoundarySection1` 增可选 `archived`——本角色为主属主的共享类型，
+  加可选字段向后兼容）、`src/common/门禁引擎/boundary-yaml.ts`、`src/common/门禁引擎/boundary-core.ts`、
+  `src/service/role/resolve-role.ts`、`test/门禁引擎/archived-role.test.ts`（新，8 例）、
+  `test/门禁引擎/list-project.test.ts`（真实仓库用例期望回改）；本文件、`memo.md`。**未碰** `app/**`、
+  `test/桌面应用/**`、任何他角色目录与文件；不 commit。
+- **解析层**（`boundary-yaml.ts`）：`archived` 入 `TOP_KEYS` 并**严格校验布尔**——`archived: "true"`
+  （字符串）/`archived: 1` 一律解析失败（fail-closed 家族：坏配置整条拒绝，不给模糊地带）；`false`/缺省
+  = 不标记（等价未归档）。新导出 `parseBoundaryYamlDoc(text)` 回传 `{ entries, archived? }`；旧入口
+  `parseBoundaryYaml` 变薄包装（仍只回条目，**向后兼容**，既有调用与测试逐字不变）。`boundary-core.ts`
+  的 `parseEntries` 换成 `parseEntriesDoc`（legacy `.md` 无归档标记）；`loadBoundaryFile` 解析成功且
+  `archived === true` 时在结果上携带 `archived: true`——**失败路径（unaccepted）不带该标记**，归档判定
+  一律走**中性读取**（accepted:false、无 pin），不依赖接受/pin 状态。
+- **枚举**（`listProject`）：每个角色目录先探边界文件的归档标记，命中即**静默跳过**（不枚举、零警告）。
+  探测**先于**缺 role-card.md 检查——归档目录即便缺卡也不告警（归档=对枚举不可见）。追加细则：若目录下
+  子目录**全部**为归档静默跳过，则**不补**「未枚举到有效角色」汇总提示（否则该场景仍会出一条警告，
+  违背「不产生任何警告」）；只要存在活目录（无论成败），汇总照发——与归档机制引入前逐个比对无行为变化
+  （逐条告警顺序、缺卡优先于缺边界等均保持原样；仅边界文件的读取时机提前，纯读无副作用）。
+- **开启**（`resolveRole`）：注册角色（`project.roles`）的边界文件解析出 `archived: true` ⇒ 抛
+  「**角色 X 已归档，不可开启**」——CLI `role run` 与桌面 `openRoleSession` 皆经 `setupRole → resolveRole`，
+  失败信息主体即该句（`setupRole` 会再包一层「角色/边界解析失败：」前缀，属编排侧既有格式、未动）。
+  探测独立于治理接受证据：即便接受/pin 缺失或失效，照常先看到归档标记，无绕过口。
+- **防御深度**（`resolveBoundarySection` 第 1 步）：归档角色的边界**一律不作为写权来源**——命中即返回
+  未接受 + `parseError`（「角色 X 已归档（边界顶层 archived: true），其边界不予采用」）⇒ `resolveWrite`
+  拒绝一切写入。覆盖「绕过 resolveRole 直接按 id 解析边界」的调用方（开启入口的明示拒绝仍在 resolveRole）。
+- **测试**：新增 `test/门禁引擎/archived-role.test.ts`（8 例，**夹具、全绿**）：解析（合法键/布尔严格/
+  false 与缺省不标记/loadBoundaryFile 回传）；listProject（与活角色共存静默、全归档同样静默无汇总、
+  缺 role-card.md 也静默、不带 archived 键行为不变——缺边界仍逐条告警且归档不吞旁告警）；resolveRole
+  （归档拒绝——无接受证据与有接受证据两态皆拒；活角色照常）；防御深度（boundary 未接受 + parseError +
+  resolveWrite 全拒）。`list-project.test.ts` 真实仓库用例：期望**改回** `deepEqual(warnings, [])`，并
+  加守卫「`桌面应用` 不得复活为活角色」（归档约定点 ① 的原位钉死）；注释注明等待态。
+- **测试与门禁（如实分列）**：`node --test test/门禁引擎/archived-role.test.ts` → **8/8 全过**；
+  `node --test "test/门禁引擎/*.test.ts"`（带引号）→ **161 计 / 159 过 / 1 红 / 1 skipped**——唯一红为
+  **预期的等待态**：`list-project.test.ts` 真实仓库用例（治理侧尚未恢复文件，`角色卡/桌面应用/` 仍无
+  boundary.yaml → 实得恰一条「缺少 boundary.yaml」警告 vs 期望 `[]`）；全量 `node --test "test/**/*.test.ts"`
+  （带引号）→ **1054 计 / 1050 过 / 3 红 / 1 skipped**——3 红 = 上述等待态 + 两条既有基线红
+  （`test/桌面应用/pi-config.test.ts` 检出目录名、`test/项目管理/shared/path-primitives.test.ts`
+  macOS `/var`），**无新红**（相对上条 1046/1043/2 基线红，恰为 +8 新夹具全过、真实仓库用例转入等待态）；
+  `npm run typecheck` **0 错**。环境：Node v24.14.0 / macOS / 工作区含他角色未提交改动。
+- **等待态已闭（2026-10-14 当日闭环）**：治理侧已恢复 `角色卡/桌面应用/boundary.yaml`（原名 + 顶层
+  `archived: true`，其余字段与注释原样）；本角色复跑——真实仓库用例**转绿**，门禁引擎套件
+  **161 计 / 160 过 / 0 红 / 1 skipped**（全绿除 Windows 专用 skip）；全量 **1054 计 / 1050 过 / 3 红 / 1 skipped**，
+  3 红 = 两条既有基线红 + `test/桌面应用/project.test.ts:29`（**跨角色新旧衔接、非本角色文件、未动**：
+  该文件仍按 `.frozen` 过渡态断言「枚举如实跳过**并提示**缺 boundary.yaml」——归档键约定下变为
+  **静默无提示**，其属主〔桌面窗口/桌面UI 侧〕需按新语义更新，已转报 PM）。恢复前曾在真实 `角色卡/`
+  树临时副本上预演（warnings `[]`、桌面应用不枚举、其余活角色照常、resolveRole 抛「已归档，不可开启」
+  ——与恢复后实测逐项一致，只读复制、未动归档目录本体）。归档目录内 `归档说明.md` 与 `role-card.md`
+  相关链接的同步仍归其属主（**非本角色文件、未动**）。备查：su 卡文本
+  （`BUILT_IN_ROLE_CARD_TEXT`）**未**提及归档约定——如日后要 su 在治理流程里主动归档角色，须另立任务
+  补卡文本（留意 J-1 守卫的措辞碰撞，见上条备忘）。
+
+## 2026-10-14 — list-project 真实枚举期望更新：如实钉住冻结归档目录（桌面应用）唯一一条预期提示
+
+> 后续更新（同日）：客户改令恢复原名 `boundary.yaml` 并采用上文 `archived: true` 归档约定——本条期望
+> 方案已由归档键约定取代；本条保留为 `.frozen` 方案时期的事实记录（同日治理侧恢复文件后，其上条目
+> 复跑转绿、闭环）。
+
+任务指明「只更新测试期望，不实现归档静默跳过」。背景事实链：客户 2026-10-14 确认「桌面应用」拆分为
+**桌面UI / 桌面窗口**，旧目录 `角色卡/桌面应用/` **原位冻结归档**——其 `boundary.yaml` 已改名
+`boundary.yaml.frozen`（`归档说明.md` 明记：改名后角色枚举跳过该目录，导入本仓库会有**一条**
+「缺少 boundary.yaml，已跳过」系统提示，「**属预期**；如需消除，建议后续由门禁引擎支持『归档标记静默
+跳过』约定」，并注「请勿改名恢复」）。PM 已按「接受该提示」处理，用户知悉。连带后果：真实枚举测试原先
+断言本仓库 `warnings` 严格为空，现转红（装配角色全量跑：1046 计 / 1042 过 / 3 红 = 本项 + 两条已知基线红）。
+
+- **定位（读出实际语义）**：取红断言在 `test/门禁引擎/list-project.test.ts:23` 用例（对 **REPO_ROOT
+  真实仓库**，非夹具）原第 41 行 `assert.deepEqual(listing.warnings, [])`。运行复现实得
+  `warnings === ["角色卡/桌面应用：缺少 boundary.yaml，已跳过"]`——恰一条，与 `归档说明.md` 所述一致
+  （该条出自 `resolve-role.ts:176` 既有「缺 boundary.yaml」通道；`角色卡/` 下其余 11 个目录均正常枚举）。
+- **改动（旧 → 新，仅此一处用例，最小改动）**：
+  - 用例名：「……边界均解析成功**且无警告**」→「……边界均解析成功；**警告恰为冻结归档目录一条**」。
+  - 断言：`deepEqual(warnings, [])` → `deepEqual(warnings, ["角色卡/桌面应用：缺少 boundary.yaml，已跳过"], …)`
+    ——按任务给定口径取**严格等于该一行**（比「白名单+其余为空」更强：新增/缺失/改名/换序任何一条都转红）。
+  - 用例内加注释注明依据（客户确认的拆分、`归档说明.md`、严格相等意图、若未来实现「归档静默跳过」须再更新期望）
+    ——该注释同时是该未决选项的**唯一耦合点**（见下）。
+- **未动（防越界佐证）**：其余警告断言一律保持原强度——同文件其余四处夹具用例（英文/中文/空目录、T14 坏角色）
+  仍为 `deepEqual(warnings, [])` 或逐条 match；`boundary-empty-and-builtin.test.ts:194` 亦为夹具用例、
+  未动；`src/**` 一行未改（无需）；「归档标记静默跳过」等新功能**本任务明确不做**。
+- **测试与门禁**：`node --test test/门禁引擎/list-project.test.ts` → **7/7 全过**（含取红用例转绿）；
+  `node --test "test/门禁引擎/*.test.ts"`（带引号）→ **153 计 / 152 过 / 0 红 / 1 skipped**（Windows 专用，
+  与上一基线计数一致）；全量 `node --test "test/**/*.test.ts"`（带引号）→ **1046 计 / 1043 过 / 2 红 / 1 skipped**
+  ——相对装配侧取红时的 1046/1042/3 红，**恰回绿本项**，2 红**恰为两条既有基线红**（`test/桌面应用/pi-config.test.ts`
+  检出目录名 ans-cli、`test/项目管理/shared/path-primitives.test.ts` macOS `/var` 符号链接），无新红；
+  `npm run typecheck` **0 错**。环境：Node v24.14.0 / macOS / 工作区含他角色未提交改动（未触碰其文件）。
+- **对「归档静默跳过」选项的影响评估（一句话）**：本改动不替该选项背书、也不放开警告检查——它恰让该条提示
+  **保持可见**直到选项落地；若日后实现，只需把本期望从「恰一行」改回 `[]`（一行改动，注释已指路），
+  无结构性耦合。
+
 ## 2026-10-12 — su 卡文本末段改写：fail-closed 限定到「两者皆无」的回退情形（结清上一轮登记的未决；协调方裁定「改」）
 
 上一轮（su 文档面，见下条）回交时如实登记了一条未决：`BUILT_IN_ROLE_CARD_TEXT` 末段「本版 fail-closed——

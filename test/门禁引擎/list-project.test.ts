@@ -38,6 +38,16 @@ test("listProject：枚举真实项目（本仓库）全部角色，边界均解
   // T14：有角色的项目 → hasRoles:true，且提供主入口 id（内置 su）供桌面侧设主位（渲染侧不硬编码 "su"）。
   assert.equal(listing.hasRoles, true);
   assert.equal(listing.primaryRoleId, "su");
+  // 归档约定（客户 2026-10-14，PM 转达）：`角色卡/桌面应用/`（已拆分为 桌面UI/桌面窗口）原位冻结归档，
+  // 其 boundary.yaml **恢复原名**并带顶层 `archived: true`——枚举**静默跳过**：不枚举该角色、不产生任何
+  // 警告（见 test/门禁引擎/archived-role.test.ts 的夹具用例钉死该约定）。故本仓库 warnings 为空；
+  // 除该归档目录外出现任何警告即回归。
+  // 收尾（2026-10-14）：治理侧恢复 boundary.yaml 后本用例已复跑转绿——此前（恢复前，目录仅剩
+  // boundary.yaml.frozen）走「缺少 boundary.yaml」告警路径的暂时红属预期等待态，已闭。
+  assert.ok(
+    !ids.includes("桌面应用"),
+    `冻结归档角色不得复活为活角色（应静默跳过，实际：${ids.join(",")}）`,
+  );
   assert.deepEqual(listing.warnings, []);
 });
 

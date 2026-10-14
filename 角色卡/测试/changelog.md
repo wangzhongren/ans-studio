@@ -1,5 +1,38 @@
 # 测试 变更记录
 
+## 2026-10-14 — 「按设计对齐」候选独立回归：主套件 119 条与回放 11 项通过；发现并上报虚拟行锚点漂移真实回归；抽屉关闭动画竞态为测试侧观测订正
+
+**来源**：PM 冻结新候选（桌面「按 UI/UX v2 设计对齐」，纯视觉/骨架；实施记录见桌面属主 `docs/fix/2026-10-13_fix_uiux-design-alignment.md`，该角色重组中按现路径引用）。依赖变化使本角色上轮证据（旧指纹 fc148d35/f9c4e41f）失效，按 Governing Invariant 重跑受影响项并按新指纹重绑。边界：只写 `test/测试/**` 与 `角色卡/测试/**`；**未改产品代码、未碰他角色文件、未 commit/push**。
+
+### 1) 测试侧订正（断言零变化）
+
+- 首跑 102 条止于 'R5 choice title preview options and all actions exposed 960 card'。诊断（`drawer-close-race-diagnose.json`）：**既有**的 120ms 抽屉关闭动画（`#right-drawer` clip-path/可见性过渡——本候选仅改其底色/边色，动画为未变上下文）在激活后 ~80ms 时刻仍有可见残条（clip≈85–94%）；设计把未决卡从 `min(680px,92%)` 改**通栏**（V13）后卡右缘采样点（x≈908@960）落入残条区间。卡片本体可命中，只是**观测时刻未到**：400ms 后复测整卡全过，只加观测与等待（断言零变化）的诊断副本满跑 119 条通过。
+- 订正 `ui-reacceptance-renderer-regression.mjs`：新增 `drawerSettled()`——两处「定位后整卡曝光」断言前等待抽屉 `visibility:hidden`（超时照原断言按真实状态判定，fail-closed）；两条曝光断言观测补记 `inert/rightTab/drawerVisibility`。**断言本体与其余断言一字未改**（脚本 4071945e→124d05f4）。等待证据：choice 两档 waits=3（约 60ms 残量）、confirm 两档 waits=0。
+
+### 2) 真实回归（已上报，待属主修复后复测）
+
+- 长会话（218 行、虚拟化）收起/展开执行记录组（46 条活动）：**旧候选**（`git show HEAD:` 原样取出 /private/tmp 运行，A/B 同夹具同脚本）收起 **−0.65625px**、展开 **0（完全复位）**、4 轮无累积；**新候选** **+1.0625px / +0.9375px**、逐轮净 **+2px** 累积、第 3 轮收起后锚点跳位 **68.125px**（offset +15.25→−52.875）后停在新位置；阅读文本身份两臂均保持。
+- 交付锚点套件 13 条断言 **12 过 1 红**（'expand preserves preceding visible paragraph offset'：Δ=2.0px ≮ 2px；fail-fast 其余 8 条未跑；诊断副本证其余 11 条全过）。**未动断言、未放宽容差**。归因初判（供属主）：本候选 renderer.js 仅改呈现（记录行补时间列等），锚点机制代码未动；布局行高/组高为小数（段落 53.1875、组 2487.3125）而虚拟窗口记账用 `offsetHeight` 取整（53/2487），开合链 `refreshActivityHeight→updateVirtualWindow→restoreChatReading` 中整数/小数偏差从「互相抵消」变为「每轮 +2px 系统性漂移」，越界后换锚一档。
+- 最小复现 `test/测试/uiux-anchor-drift-probe.mjs`（含旧候选 A/B 运行方法注释）；诊断副本 `test/测试/uiux-anchor-probe.mjs`（APP 可指向旧候选；仅把两处开合断言改为记录，其余全强度）。
+
+### 3) 结果与重基线判定
+
+- `node --test test/测试/uiux-v2-replay-regression.test.ts` → **11/11，0 skip，exit 0**（重绑重跑）。
+- `node_modules/.bin/electron test/测试/ui-reacceptance-renderer-regression.mjs`（hidden、隔离 userData、受控内存 IPC）→ **119 条**（99 断言＋12 实际 Tab 行＋8 抽屉等待行）**通过，exit 0**，consoleErrors 空，run 起止指纹一致；两次满跑一致。
+- `node_modules/.bin/electron test/测试/uiux-v2-renderer-regression.mjs` → **exit 1**（上述真实回归）。
+- **零处重基线**：逐条核对三套脚本，**无断言编码设计值**（聊天头 66/composer 100/胶囊 52/760 居中/字号行高颜色/记录行时间列均不在断言内）；几何断言=设计无关不变量（相对 |Δ|<2px、无横向溢出、左缘对齐）＋R2 自身口径（动作 ≥28px，V31 已保留）；设计值只出现在观测字段，如 960 档会话列实测 630px（卡盒 296→926）与属主记录「960 档铺满 630」及原型 `.conversation` 一致。
+- R1–R5 行为零改动核验：单份说明、全文/位次/点击区、默认异常目标/原因/exit、撤回就地回执、未决优先/定位/作答、IME、回交单一展示、停止保队列、图片/草稿——**全过**；唯一不符「语义零变化」即上述锚点漂移。
+- 环境：Electron 44.7.0/内置 Node 24.21.0、终端 Node v24.14.0、macOS 26.6.2/arm64；HEAD 7457da4。**未跑**：全量/他角色套件、真实模型/网络/业务、GUI 截图；锚点套件 fail-fast 后 8 条仅诊断副本覆盖（不冒充通过）。
+- 证据：`docs/change/2026-10-14_change_uiux-design-alignment-regression.md`（status blocked → 见下节复测后更新为 verified）＋ `docs/change/2026-10-14-uiux-design-alignment-evidence/`（renderer-report.json、renderer-presettle-race-fail.json、drawer-close-race-diagnose.json、anchors-report.json、anchor-drift-probe-new/old.json、anchor-coverage-new/old.json、replay-output.txt、candidate-hashes.txt）。
+
+### 4) 修复候选复测（当日追加，结论改判：全部转绿）
+
+修复候选 `renderer.js 402e49a7…`（styles/index/tool-rows/ui-labels/preload/session-history 与上轮冻结一致）独立复测：**主套件 119 条满跑通过（exit 0，报告内 startHashes==endHashes）**；**回放 11/11**；**锚点 14 条全跑全过（exit 0）**——上轮红项 'expand preserves preceding visible paragraph offset' **转绿**（收起/展开 before=after=11.1875、零漂移），fail-fast 之后的 8 条（单组折叠/追加/换身份/前插/已决卡双锚/跨角色未决/三条失败摘要）**实际跑到且逐项通过**。漂移探针升级 v2（**固定元素读数**，桌面UI建议；两读数并列）：修复候选 4 轮开合恒定 11.1875、scrollTop 恒定 12382；旧 HEAD 臂 −0.65625/0 与上轮一致。**「68.125px 跳位」订正（本角色实测，非仅算术推断）**：旧探针「首个可见行」读数在累计漂移约一格后**切换目标行**所致的观测伪影——保留修前行为的中间副本（`renderer.js fba0f1de…`，**非冻结指纹**、仅机制核对；本场景读数与冻结修前候选逐位一致）双读数实测：**固定元素**读数平滑 ~+1px/轮（11.25→16.3125，无跳变），**首可见行**第 5 次开合起读作 −52.875，恰为 16.3125 − 69.1875（69.1875 ＝ 行高 53.1875 ＋ pane 16px 行距，均实测）；真实症状 = ~1px/轮缓移、约 5 次开合后顶部多露一行。探针已改用固定元素读数（升级为交付断言时的口径）。本日 change 记录 status **blocked → verified**；证据 `docs/change/2026-10-14-driftfix-recheck-evidence/`（renderer-report.json、anchors-report.json、replay-output.txt、drift-probe-fix.json、drift-probe-oldhead.json、drift-probe-intermediate-mechanism.json、candidate-hashes.txt——运行结束后复核指纹与运行前一致）。**未改产品代码、未 commit。**
+
+### 5) 第二版候选复测（行距缓存修复，当日再追加，全绿）
+
+候选 `renderer.js 47703d0b…`（styles/index/tool-rows/ui-labels/preload/session-history 与上轮冻结一致）。属主摘要：U1 定性排查发现**行距缓存缺陷**——脱离文档的 pane 首次读行距得到空串被当 0 缓存，后台早到事件/恢复路径（行表在挂载前建成）会让该 pane 退回「不含行距」旧错口径；修法＝**仅挂载时读、命中才缓存**；`rowModelDebug` 只增收 `rowGap`。本角色独立复测：主套件 **119 条满跑（exit 0，报告内 startHashes==endHashes）**、回放 **11/11**、锚点 **14/14（全跑全过，收起/展开 before=after=11.1875）**、漂移探针双读数 **4 轮恒定 11.1875、scrollTop 恒定 12382**。**新增独立覆盖** `test/测试/uiux-rowgap-detached-probe.mjs`（本角色新写，r1–r3 三轮）：①B 角色**未挂载期**建行表 181 行（虚拟化）且 `rowGap:null`（未读**不落值**）；②树点点选挂载后 `rowGap===16` 且**等于挂载 pane `getComputedStyle` 实读值**、>0（独立真值源）；③挂载后 4 轮开合**零漂移**——组确在真切换（`open` 翻转、组高 2487↔36、docH 18625↔16126）；④**U1 抽跑**：两角色深内容、无未决，交替点角色树 20 次/轮 × 3 轮 = **60 次全部到底（0 miss）**，未出现属主所述既有偶发。排障备注（防误读）：新探针首两轮曾报 +428px 跳变，经查为**本角色夹具缺陷**（50 条后续正文误用消息对象未过 `parse` 成 ReplayRow → 组后为空 → 触发上轮已记录的「收起末尾大组 scroll 夹紧」既有口径），与产品无关；修正后三轮确定性通过。对照限制：本机无 402e49a7 副本可 A/B，独立判据＝「修复后行为正确 ＋ 缓存若为 0 时探针即红（rowGap≠paneGap）」。证据 `docs/change/2026-10-14-recheck2-evidence/`（renderer-report.json、anchors-report.json、replay-output.txt、drift-probe-final2.json、rowgap-detached-probe-r1/r2/r3.json、candidate-hashes.txt——运行结束后复核指纹与运行前一致）。**未改产品代码、未 commit。**
+
 ## 2026-10-12 — 按新语义更新 shell 闸 (b) 不可解析断言：不升 (a)，直接拒绝（b-unparseable-deny）
 
 **来源**：客户裁定（M-2）——(b) 审读输出**不可解析 ⇒ 直接拒绝**（fail-closed），**不升 (a)、不重试、不打扰客户**；编排已落地（`src/common/编排/shell-gate.ts`：删 `BRANCH_B_BADJSON`，新增归因码 `BRANCH_B_UNPARSEABLE="b-unparseable-deny"` + 固定短句 `REASON_B_UNPARSEABLE`；其余分支不变）。边界：只写 `test/测试/**` 与 `角色卡/测试/**`。

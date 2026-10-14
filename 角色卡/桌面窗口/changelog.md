@@ -1,0 +1,11 @@
+# 桌面窗口 变更记录
+
+- 2026-10-14：创建——按客户「桌面拆分成两个角色吧，一个UI，一个window相关的」从「桌面应用」拆分：本角色承接 Electron 主进程、窗口生命周期、preload 受限桥与桌面会话装配（`app/main.ts`、`app/preload.cjs`、`app/desktop/` 与主进程侧测试）。**客户 2026-10-14 确认原话「桌面UI/桌面窗口 这个可以」——已确认生效**；旧角色目录原位冻结为归档。Doc: docs/design/2026-10-14_design_role-split-window.md
+
+- 2026-10-14：**拆分落地：样例角色 id 更新（本角色侧待办件，PM 派发执行）**。`test/桌面应用/` 5 个文件（`session`、`operator-channel`、`project`、`p0-halt-and-images`〔清单外同因转红〕与 `e2e/main.mjs` 85 处）里以「桌面应用」为样例角色的引用改指「桌面窗口」；`firstProjectFilePath` 期望按新边界重新推导为 `app/main.ts`；`project.test.ts` 按新枚举事实重写断言（含「冻结目录被跳过并提示」「桌面UI 与 桌面窗口 两个新角色」）。e2e 保留 2 处 `test/桌面应用/` 目录路径（目录名沿用拆分前）。证据：三个指定单测 **42/42 全过**；全部边界内单测 **207 计 206 过 / 1 红**（唯一红=既有基线 `pi-config.test.ts` 检出目录名断言）；`npm run typecheck` 整仓 0 错；e2e 退出 0，与拆分前留档报告逐行对照仅预期差异 + 一条被改名揭开的陈旧抽屉检查（界面断言同步待办，交 PM）。**未改 `app/**`、`src/**`、`test/测试/**` 及任何其他角色文件。** Doc: docs/change/2026-10-14_change_split-role-id-test-updates.md
+
+- 2026-10-14：**抽屉/队列 e2e 断言同步至 UIUX v2 现行结构（PM 同日跟进派发）**：6 处 log-only 检查按现行真实结构重锚（`RIGHT_HAS_TODO_SECTION`→工作列表区存在；`RIGHT_HAS_OVERVIEW_SECTION`/`QUEUE_OVERVIEW_ROWS`/`QUEUE_OVERVIEW_IN_CARD` 随语义改名 `RIGHT_QUEUE_SINGLE_LIST`/`QUEUE_POSITION_ROWS`/`QUEUE_POSITION_IN_CARD`；`RIGHT_QUEUE_RUNNING_FIRST`→is-running+「当前工作」组；`RIGHT_QUEUE_EMPTY_PLACEHOLDER`→「无进行中或排队消息」）；**未升级严重级**（保持 log-only）。证据：e2e 重跑退出 0、6 处转真、与上轮逐行仅差这 6 处+路径+堆栈行号、仍停在既有基线红（`DIAGNOSTICS_WINDOW_AND_RENDERER_EVENTS`）；报告留档 `docs/change/2026-10-14_drawer-check-sync-e2e-report.txt`。同族「文案/格式面」5 行脱节如实列名交 PM 决定（见 change 记录跟进节）。
+
+- 2026-10-14：**锚点漂移修复候选（renderer.js `402e49a7…`）e2e 核对**：重跑 5 次，与今日两轮对照内容级无新增差异、仍停同点位基线红、6 处抽屉/队列断言全真；唯一例外=首跑 `U1_WINDOWED_TO_BOTTOM=false`（1/5 偶发，4 次复跑全真）——修前样本 0/4，不足以归因，交 PM 定性；未改 main.mjs 等待与断言。报告留档 `docs/change/2026-10-14_anchor-drift-fix-e2e-report{,-trial2}.txt`。Doc: docs/change/2026-10-14_change_split-role-id-test-updates.md（跟进 2 节）
+
+- 2026-10-14：**归档收口同步（归档键约定——同日演进，取代上午的 .frozen 改名过渡）**：旧目录改以 `boundary.yaml` 顶层 `archived: true` 归档（枚举**静默跳过、零提示**；不可开启；边界不予采用）。`project.test.ts` 归档断言由「跳过并提示」更新为「`warnings == []` 且角色表不含「桌面应用」」（未放宽其余断言）；三件套复跑 **42/42**、e2e 按新仓态复跑与上轮**内容级零差异**、仍停既有基线红。报告留档 `docs/change/2026-10-14_archive-key-e2e-report.txt`。Doc: docs/change/2026-10-14_change_split-role-id-test-updates.md（跟进 3 节）

@@ -7,7 +7,7 @@ import { readFileSync, statSync } from "node:fs";
 import type { Acceptance, BoundaryEntry, BoundarySection1, PinEntry, Root } from "../../model/boundary.ts";
 import type { ProjectConfig } from "../../model/role.ts";
 import { parseBoundarySection1 } from "./boundary-parse.ts";
-import { parseBoundaryYaml } from "./boundary-yaml.ts";
+import { parseBoundaryYamlDoc } from "./boundary-yaml.ts";
 import { joinRoot, readTextFile, sha256File } from "./io.ts";
 import { absRel, compareKey, normalizeLexical } from "./paths.ts";
 // 冷启动「有界创世例外」（设计 §10.1 / §12.2）：治理种子边界的构造（`governanceBoundaryEntries` /
@@ -179,10 +179,14 @@ function isYamlPath(p: string): boolean {
   return q.endsWith(".yaml") || q.endsWith(".yml");
 }
 
-/** 按格式解析条目：YAML 严格；其他走 legacy Markdown */
-function parseEntries(text: string, sourcePath: string, defaultRoot: Root): BoundaryEntry[] {
-  if (isYamlPath(sourcePath)) return parseBoundaryYaml(text);
-  return parseBoundarySection1(text, defaultRoot);
+/** 按格式解析条目（+ YAML 的顶层 archived 标记）：YAML 严格；其他走 legacy Markdown（无归档标记）。 */
+function parseEntriesDoc(
+  text: string,
+  sourcePath: string,
+  defaultRoot: Root,
+): { entries: BoundaryEntry[]; archived?: boolean } {
+  if (isYamlPath(sourcePath)) return parseBoundaryYamlDoc(text);
+  return { entries: parseBoundarySection1(text, defaultRoot) };
 }
 
 /** 统一的"未接受"结果：清空条目、accepted=false、原因写入 parseError（resolveWrite 据此拒一切写）。 */
@@ -235,7 +239,10 @@ async function verifyPins(fileAbs: string, projectRootAbs: string, pins: PinEntr
 }
 
 /** 读取并解析一个边界文件；失败（读取、解析或 pin 校验）返回"未接受 + parseError"的边界。
- *  导出供 listProject 复用，避免另写一份解析。 */
+ *  导出供 listProject 复用，避免另写一份解析。
+ *  归档标记（客户 2026-10-14 约定）：YAML 顶层 `archived: true` 时，解析成功的结果携带 `archived: true`
+ *  ——调用方（listProject / resolveRole）据此静默跳过或拒绝开启；失败路径（unaccepted）不带该标记，
+ *  归档判定请走**中性读取**（accepted:false、无 pin），勿依赖接受/pin 状态。 */
 export async function loadBoundaryFile(
   boundarySource: string,
   fileAbs: string,
@@ -250,8 +257,11 @@ export async function loadBoundaryFile(
     return unaccepted(boundarySource, `读取边界文件失败：${(err as Error).message}`);
   }
   let entries: BoundaryEntry[];
+  let archived: boolean | undefined;
   try {
-    entries = parseEntries(text, boundarySource, rootOfFile(fileAbs, projectRootAbs, skillRootAbs));
+    const parsed = parseEntriesDoc(text, boundarySource, rootOfFile(fileAbs, projectRootAbs, skillRootAbs));
+    entries = parsed.entries;
+    archived = parsed.archived;
   } catch (err) {
     return unaccepted(boundarySource, (err as Error).message);
   }
@@ -286,7 +296,7 @@ export async function loadBoundaryFile(
     if (pinErr !== null) return unaccepted(boundarySource, `边界未通过 SHA-256 pin 校验：${pinErr}`);
   }
 
-  return { entries, boundarySource, acceptance };
+  return archived === true ? { entries, boundarySource, acceptance, archived: true } : { entries, boundarySource, acceptance };
 }
 
 /**
@@ -359,7 +369,7 @@ export function reloadBoundaryEntriesSync(
   if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
   let entries: BoundaryEntry[] | null;
   try {
-    entries = parseEntries(text, boundarySource, rootOfFile(fileAbs, projectRootAbs, skillRootAbs));
+    entries = parseEntriesDoc(text, boundarySource, rootOfFile(fileAbs, projectRootAbs, skillRootAbs)).entries;
   } catch {
     entries = null; // 新解析报错：对照不可信，无法判定（不猜测）；按 mtime+size 记忆
   }
@@ -397,7 +407,14 @@ export async function resolveBoundarySection(
 
   // 1) 项目覆盖（若已接受）
   if (gov && gov.acceptance && gov.acceptance.accepted === true && loc && loc.boundary) {
-    return loadBoundaryFile(loc.boundary, joinRoot(projectRootAbs, loc.boundary), projectRootAbs, skillRootAbs, gov.acceptance);
+    const section = await loadBoundaryFile(loc.boundary, joinRoot(projectRootAbs, loc.boundary), projectRootAbs, skillRootAbs, gov.acceptance);
+    // 归档防御（客户 2026-10-14 约定）：角色边界顶层 `archived: true` ⇒ 该角色已冻结归档，其声明的
+    // 条目**一律不作为写权来源**——即便有调用方绕过 resolveRole 直接按 id 解析边界，这里也 fail-closed
+    // （parseError ⇒ resolveWrite 拒绝一切写入）。开启入口的明示拒绝（「角色 X 已归档，不可开启」）在 resolveRole。
+    if (section.archived === true) {
+      return unaccepted(section.boundarySource, `角色 ${roleId} 已归档（边界顶层 archived: true），其边界不予采用`);
+    }
+    return section;
   }
 
   // 2) 治理边界覆盖

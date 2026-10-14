@@ -7,6 +7,8 @@
 
 产品/UI重验收的五项返工已完成当前候选与本角色定向验证，独立签收待PM：[体验返工](docs/fix/2026-10-13_fix_uiux-reacceptance.md)。
 
+按 UI/UX v2 设计的视觉与骨架对齐已完成候选与本角色两档实测/定向验证，独立 UI/产品复核待PM：[按设计对齐](docs/fix/2026-10-13_fix_uiux-design-alignment.md)。
+
 UI/UX v2已完成桌面候选与离线定向验证，独立产品/UI验收待PM：[对话优先与工作抽屉](docs/change/2026-10-13_change_uiux-v2.md)。资料抽屉避输入、工具活动按需展开、工作单列表在前，文本与图片草稿按角色保留。
 
 聊天输入最新修复：[输入法候选Enter不误发送](docs/fix/2026-10-13_fix_ime-enter-candidate.md)，已用独立真实Electron受控事件流验证；组合结束后正常Enter发送、Shift+Enter换行与按钮保持。

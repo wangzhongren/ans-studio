@@ -1,0 +1,113 @@
+# 桌面窗口边界 —— Section 1 唯一写入白名单
+# 未列路径默认只读。新增目录、改动归属或增删逐条列出的路径，须先由 ANS Governance 更新本文件并经客户确认。
+# 本角色是 Interface 层的桌面主进程侧（2026-10-14 从「桌面应用」拆分）：Electron 主进程、窗口生命周期、
+# preload 受限桥与桌面会话装配。路径判定一律调门禁引擎，Pi 调用一律经 Pi 适配器；渲染前端（app/renderer/）
+# 属「桌面UI」角色，本角色经 preload 白名单通道与主→渲染事件对外提供能力。
+role: 桌面窗口
+entries:
+  - kind: file
+    path: app/main.ts
+    purpose: Electron 主进程入口：建窗（无边框/自绘标题栏接线/mac 重开）、IPC 注册、诊断与恢复接线
+  - kind: file
+    path: app/preload.cjs
+    purpose: 受限 IPC 桥（contextBridge 白名单，不暴露 Node 能力）
+  - kind: directory
+    path: app/desktop/
+    purpose: 桌面 Interface（主进程侧纯逻辑）：会话管理器、投递与队列、客户交互通道、shell 闸接线、会话历史解析、Pi 配置、项目装配、事件批推与诊断
+  - kind: file
+    path: test/桌面应用/ans-wiring.test.ts
+    purpose: 主进程侧测试——`.ans` 生效配置接线（project/session）
+  - kind: file
+    path: test/桌面应用/boundary-refresh.test.ts
+    purpose: 主进程侧测试——边界陈旧快照作废重建（session）
+  - kind: file
+    path: test/桌面应用/composer-images.test.ts
+    purpose: 主进程侧测试——图片校验纯逻辑与 Interface 接线（composer-images/interface）
+  - kind: file
+    path: test/桌面应用/diagnostics.test.ts
+    purpose: 主进程侧测试——窗口/渲染诊断与交互通道（diagnostics/customer-input/operator-channel）
+  - kind: file
+    path: test/桌面应用/dispatch-delivery.test.ts
+    purpose: 主进程侧测试——su 派发投递机（session）
+  - kind: file
+    path: test/桌面应用/dispatch-fresh-enum.test.ts
+    purpose: 主进程侧测试——派发前新鲜枚举（session/interface）
+  - kind: file
+    path: test/桌面应用/genesis-bootstrap.test.ts
+    purpose: 主进程侧测试——创世态配置与创世写判定（project + 门禁引擎）
+  - kind: file
+    path: test/桌面应用/handback-delivery.test.ts
+    purpose: 主进程侧测试——回交自动投递 su（session）
+  - kind: file
+    path: test/桌面应用/hot-path.test.ts
+    purpose: 主进程侧测试——事件合帧批推与角色状态去抖（push-batcher/session）
+  - kind: file
+    path: test/桌面应用/interface.test.ts
+    purpose: 主进程侧测试——桌面 Interface 处理器（interface）
+  - kind: file
+    path: test/桌面应用/message-queue.test.ts
+    purpose: 主进程侧测试——每角色消息队列与真实状态快照（session）
+  - kind: file
+    path: test/桌面应用/operator-channel.test.ts
+    purpose: 主进程侧测试——操作者确认通道 (a) 与 arm/只读档分发（operator-channel/session）
+  - kind: file
+    path: test/桌面应用/operator-wiring.test.ts
+    purpose: 主进程侧测试——客户确认制交互通道与锚点键（customer-input/request-anchor/session）
+  - kind: file
+    path: test/桌面应用/p0-halt-and-images.test.ts
+    purpose: 主进程侧测试——停止当前轮次与图片端到端（session/interface）
+  - kind: file
+    path: test/桌面应用/pi-config.test.ts
+    purpose: 主进程侧测试——Pi 配置面板读写纪律（pi-config/interface）
+  - kind: file
+    path: test/桌面应用/project.test.ts
+    purpose: 主进程侧测试——枚举构造 ProjectConfig 与文档索引（project）
+  - kind: file
+    path: test/桌面应用/queue-withdraw-lru.test.ts
+    purpose: 主进程侧测试——队列撤回与 LRU 淘汰（session）
+  - kind: file
+    path: test/桌面应用/session-history.test.ts
+    purpose: 主进程侧测试——会话 JSONL 解析与锚点标识（session-history/request-anchor）
+  - kind: file
+    path: test/桌面应用/session-rebuild-race.test.ts
+    purpose: 主进程侧测试——并发作废重建竞态（session）
+  - kind: file
+    path: test/桌面应用/session.test.ts
+    purpose: 主进程侧测试——会话开启/多轮发送/多会话保活（session/chat-adapter）
+  - kind: file
+    path: test/桌面应用/su-effective-boundary.test.ts
+    purpose: 主进程侧测试——su 生效边界经 .ans 治理边界路径采纳（project/interface）
+  - kind: file
+    path: test/桌面应用/e2e/main.mjs
+    purpose: 桌面端到端总自检台（真实 Electron：主进程装配 + preload + renderer；含窗口/会话/界面检查点）
+  - kind: file
+    path: 角色卡/桌面窗口/feature-map.md
+    purpose: 功能导航
+  - kind: file
+    path: 角色卡/桌面窗口/memo.md
+    purpose: 本角色工作备忘录
+  - kind: file
+    path: 角色卡/桌面窗口/changelog.md
+    purpose: 本角色治理变更记录
+  - kind: file
+    path: 角色卡/桌面窗口/functional-description.md
+    purpose: 模块笔记与代码位置
+  - kind: file
+    path: 角色卡/桌面窗口/api-spec.md
+    purpose: 实现报告（IPC 通道与导出）
+  - kind: directory
+    path: 角色卡/桌面窗口/docs/design/
+    purpose: 设计记录
+  - kind: directory
+    path: 角色卡/桌面窗口/docs/feature/
+    purpose: 本角色功能的稳定说明与流程图
+  - kind: directory
+    path: 角色卡/桌面窗口/docs/change/
+    purpose: 变更记录
+  - kind: directory
+    path: 角色卡/桌面窗口/docs/fix/
+    purpose: 修复记录
+
+# 注：`package.json`（electron 依赖、scripts、入口字段）、`README.md`、`bin/`、`tsconfig.json` 属装配角色；
+# `app/renderer/` 属「桌面UI」角色；跨角色需求交项目管理协调。
+# `角色卡/桌面应用/`（已拆分冻结）不在任何角色的写入面内：只读归档，见其 role-card 与归档说明。

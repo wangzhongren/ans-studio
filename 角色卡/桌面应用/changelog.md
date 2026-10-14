@@ -1,5 +1,17 @@
 # 桌面应用 变更记录
 
+## 2026-10-13 — 按 UI/UX v2 设计对齐桌面视觉与骨架（客户「按照 UI设计来改」授权）
+
+客户看过实现与设计后原话「这个和设计还是有差别啊，你让桌面按照 UI设计来改，改完了让UI，和产品复核」——本派发即实施授权。**只读差异调查先行**：用离线夹具把当前实现（1360×860 / 960×620 两档实测 rect 与计算样式）与 v2 设计规范＋原型（原型 HTML 同法载入 Electron 实测）逐项对照，列 40 项差异（V1–V40），全部对齐（保留/交回 PM 项除外）：
+
+- **骨架**：聊天头 60.37→**66.0**（padding 16/26/11、标题 15px/650、说明 11.5px 标题下左对齐**去图标**）；composer 区 85→**100**（padding 20/28/22、胶囊 48→**52**、textarea 13px/24px）；聊天滚动区 24/28→28/30（960 档 24）；**会话列 760px 居中**（`.chat-pane` max-width+margin auto）——助手正文满列 14px/**1.9**，用户气泡 14/14/3/14 圆角、`#F0F2ED`、max-width 88%。
+- **色板**：主文字 `#1F1F1F→#242624`、次级 `#6B6B6B→#737773`、细线 `#E8E8E6→#E5E7E3`、hover `#EEEFEB`、选中 `#E8EBE4`、抽屉底 `#FCFCFA`；语义红 `#964035`/底 `#FCF5F2`、成功 `#32735B`、琥珀 `#87602B`。
+- **组件**：记录组（左细线 2px `#E1E6DD`+13px 缩进、'›' 统一收纳箭头、summary 行高 26、**42px 时间列**、op mono `#5F6859`、未知态琥珀——与原型 42/643/40 逐列一致）；异常卡（浅红底+左 3px `#B16452` 竖条+文字原因、去图标、目标行 mono 中性）；未决卡（浅暖底 `#FBFAF5`+左 3px `#A99060`+白底描边「不同意」）；侧栏（白底描边「导入/切换项目」、项目名=路径末段+路径、角色行 12px 内边距）；抽屉（头 padding 0 20+下细线、正文 20px、资料组去卡片盒）；Pi（label 11px、输入 39.8px 高与原型同、路径底块、机密标签 9px、保存行 34px）；composer（图片钮 30×28、停止钮 30px——P0-2 钉的 999px 圆与 `--bg-soft` 底保留）；焦点统一 `outline 2px #42745E offset 3px`（窗口边缘钮例外）。
+- **顺带修**：`.attach-row` 的 `[hidden]` 被 `display:flex` 压掉（空附件行白占 8px）——补 `[hidden]{display:none}`。
+- **交回 PM（不实施）**：原型独有的助手说话人行（会进行回放行模型）、逐段纵向 margin 节奏（虚拟行按 offsetHeight 计高，行级 margin 会破坏总高）、绿焦点环是否入规范。
+- **验证**：定向 **62/62**（renderer 41/41）；`npm run typecheck` 0 错；语法/花括号/`git diff --check` 通过；既有 `uiux-v2.mjs` **UIUX_V2_PASS 76**；IME `E2E_DONE=1`；两档离线测量（关键 rect 与设计值一致、无横向溢出）。**全量 `main.mjs`：与 stash 掉本改动的基线复跑逐项零差异（258 条日志键值全同）**——两轮都在既有检查 `DIAGNOSTICS_WINDOW_AND_RENDERER_EVENTS` 处作红截至（`renderer.viewport` 诊断在工具行瘦身后无从发出，**基线同红**、非本改动回归；该点之后的 mac 重开场景两轮同样未跑，建议 PM 另派修场景）。
+- 源码仅改 `app/renderer/{renderer.js,styles.css,index.html}`（tool-rows/ui-labels 未动）；新增测量夹具 `test/桌面应用/e2e/{uiux-design-audit,uiux-prototype-measure}.mjs`（只读）。候选冻结，独立 UI/产品复核通过后由 PM 提交。未提交、未推送。详见[对齐修复](docs/fix/2026-10-13_fix_uiux-design-alignment.md)。
+
 ## 2026-10-13 — 产品与UI重验收的五项体验返工
 
 按客户“修改吧”及PM释放，在现有renderer/styles/tool-rows内修单份说明、真实grid/全文、可见异常目标、撤回行内回执、真实未决优先/无遮挡键盘定位。定向62/62、离线76记录、IME/类型/语法通过；全桌面206/207（既有目录名断言1红）。候选冻结，等待产品/UI实际复验通过后由PM提交。见[返工修复](docs/fix/2026-10-13_fix_uiux-reacceptance.md)。

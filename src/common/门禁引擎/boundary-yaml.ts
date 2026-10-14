@@ -1,6 +1,8 @@
 // 门禁引擎私有辅助：边界文档 YAML 固定格式解析（严格校验，fail-closed）
 // 任一违规 → 抛错，由 boundary-core 转成"边界解析失败"，resolveWrite 对一切写入拒绝。
 // 注意：不要只丢弃出错条目继续放行——那会让坏配置静默变成"没写就没权限"。
+// 顶层键：role / entries / archived（客户 2026-10-14 归档约定——archived: true 表示该角色目录为
+// 冻结归档；解析器只负责如实回传该标记，跳过/拒绝语义在 resolve-role 与 boundary-core）。
 
 import { parse as parseYaml } from "yaml";
 import type { BoundaryEntry, EntryKind, Root } from "../../model/boundary.ts";
@@ -9,7 +11,7 @@ import { normalizeLexical } from "./paths.ts";
 
 const KINDS = new Set(["file", "directory", "conditional-directory"]);
 const ROOTS = new Set(["project", "skill"]);
-const TOP_KEYS = new Set(["role", "entries"]);
+const TOP_KEYS = new Set(["role", "entries", "archived"]);
 const ENTRY_KEYS = new Set(["kind", "path", "purpose", "root", "condition"]);
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
@@ -22,6 +24,12 @@ function fail(msg: string): never {
 
 /** 严格解析边界 YAML；任何违规抛错（整个边界视为解析失败） */
 export function parseBoundaryYaml(text: string): BoundaryEntry[] {
+  return parseBoundaryYamlDoc(text).entries;
+}
+
+/** 解析结果的完整文档形态：条目 + 顶层归档标记（archived: true 时给出；否则不出现该字段）。
+ *  `archived` 严格校验为布尔——`archived: "true"`（字符串）等一律解析失败，不给模糊地带。 */
+export function parseBoundaryYamlDoc(text: string): { entries: BoundaryEntry[]; archived?: boolean } {
   let doc: unknown;
   try {
     doc = parseYaml(text);
@@ -33,6 +41,9 @@ export function parseBoundaryYaml(text: string): BoundaryEntry[] {
   const top = doc as Record<string, unknown>;
   for (const k of Object.keys(top)) {
     if (!TOP_KEYS.has(k)) fail(`未知顶层键：${k}`);
+  }
+  if (top.archived !== undefined && typeof top.archived !== "boolean") {
+    fail("archived 必须是布尔值（true = 该角色目录为冻结归档）");
   }
   const entriesRaw = top.entries;
   if (entriesRaw === undefined) fail("缺少必填键：entries");
@@ -79,5 +90,5 @@ export function parseBoundaryYaml(text: string): BoundaryEntry[] {
     out.push(entry);
   });
 
-  return out;
+  return top.archived === true ? { entries: out, archived: true } : { entries: out };
 }

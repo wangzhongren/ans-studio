@@ -1,3 +1,8 @@
+> **已拆分冻结（2026-10-14，客户已确认生效——同日原话「桌面UI/桌面窗口 这个可以」）**：本角色按客户裁定「桌面拆分成两个角色吧，一个UI，一个window 相关的」拆分为：
+> [桌面UI](../桌面UI/role-card.md)（渲染前端，`app/renderer/`）与 [桌面窗口](../桌面窗口/role-card.md)（主进程/preload/桌面会话装配，`app/main.ts`、`app/preload.cjs`、`app/desktop/`）。
+> 本目录整体转为**冻结归档**：不再作为任何写入依据；`boundary.yaml` 保留原名并置顶层 `archived: true`（**归档键约定**，门禁引擎已落地——角色枚举静默跳过本目录、该角色不可开启；**请勿移除该键**）。
+> 资料去向见[归档说明](归档说明.md)。以下为拆分前的历史正文，原样保留。
+
 # 桌面应用角色
 
 负责 ANS 的桌面客户端（Electron）：三栏界面——左侧项目与角色树，中间会话聊天，右侧角色资料（说明、边界、变更记录与文档索引）。把受治理会话从命令行搬到人直接可用的界面。
@@ -14,7 +19,7 @@
 
 ## 必读资料
 
-1. [本角色边界](boundary.yaml)：Section 1 是唯一写入白名单。
+1. [本角色边界](boundary.yaml)（历史归档，`archived: true`）：Section 1 是唯一写入白名单。
 2. `ans-governed-construction` 技能的 `references/architecture.md`（五层结构、依赖方向与公开导出）与 `references/interface.md`（接口层约束，含 GUI 适配器）。
 3. `references/testing.md`、`references/documentation.md` 及按需的写作指南。
 4. 已确认的跨角色对接设计。本角色是 Interface 层新增的桌面能力：**路径判定一律调门禁引擎的 `resolveWrite`，Pi 调用一律经 Pi 适配器的 `RuntimeAdapter`**。

@@ -102,7 +102,7 @@ test/桌面应用/
   `data-state`）。详见 `docs/change/2026-10-13_change_drawer-two-icons-and-pi-fit.md`。
 - **停止当前轮次 + 图片端到端（P0 收官环桌面侧，2026-10-13 客户批准两项提案）**：
   ① **停止入口**：**输入框区、发送钮左侧**的小圆钮 `#btn-halt`（2026-10-13 客户反馈「位置有问题」后
-  从聊天头移来；同款 32px 圆形、次级色、hover「停止当前轮次」；聊天头不再有任何按钮）——**仅该角色会话
+  从聊天头移来；圆形、次级色、hover「停止当前轮次」；聊天头不再有任何按钮）——**仅该角色会话
   忙碌时出现**（role-state 真实快照判据；`updateHaltButton` 随选角色/快照推送/换项目三处刷新；
   `.cap-halt[hidden]{display:none}`——display:flex 会压掉 [hidden] 默认）；点击 `d.abortSession(roleId)`
   （IPC `session:abort` → `SessionManager.abort`）按编排 `abort?` **三态契约**在聊天流**如实一行**
@@ -161,6 +161,22 @@ test/桌面应用/
   `window:is-maximized`（初始化）+ `window:maximized-changed`（外推）反映到按钮图标（`.win-btn.is-maximized`）。
   纯窗口操作、**无治理判定**。e2e 自建窗口同步 `frame:false`+`setApplicationMenu(null)`，接线用**注入替身**验证
   （绝不真点关闭/最小化/最大化）。
+
+- **按 UI/UX v2 设计对齐（2026-10-13 客户「按照 UI设计来改」授权）**：只读差异调查 → 40 项逐项对齐 →
+  两档实测复核。骨架：聊天头 **66px**（`16+21+1+16+11+1`；960 档 padding 14/24/13 同得 66）、composer 区
+  **100px**（min-height + 胶囊 **52px**：textarea 13px/24px + padding 5×2 + 边框）、`.chat-pane` **max-width 760
+  居中**（会话列）、聊天滚动区 28/30（≤1180px 档 24）。色板：`--text #242624`/`--text-2 #737773`/`--border
+  #E5E7E3`/`--bg-hover #EEEFEB`/`--bg-selected #E8EBE4`/`--bg-drawer #FCFCFA`；语义 `#964035/#FCF5F2`、
+  成功 `#32735B`、琥珀 `#87602B`；焦点环统一 `outline 2px #42745E offset 3px`（`.win-btn` 窗口边缘例外，
+  保留内嵌环）。组件：记录组左细线 + '›' 统一箭头（`.tool-records`/`details.sec`/`.pi-advanced` 的 svg 箭头
+  `display:none`，'›' 由 `::before` 出）+ 42px 时间列（`fillActivities` 增 `.activity-time`/`.activity-op`/
+  `.is-unknown`）；异常卡浅红底+左 3px 竖条+去图标（`appendDenied` 摘要不再拼 `ICONS.deny`）；未决卡浅暖底；
+  侧栏「导入/切换项目」改白底描边 `.btn-project`、项目名=路径末段（`#project-name`，纯展示派生）；
+  `renderWriteNote` 去图标（`ICONS.pen` 一并删）。**虚拟行红线**：流内行禁用垂直 margin（行模型按
+  `offsetHeight` 计高）——纵向节奏只走 gap/padding；抽屉（非虚拟化）内可用 margin。**顺带修**：
+  `.attach-row` 的 `[hidden]` 曾被 `display:flex` 压掉（白占 8px）→ 补 `.attach-row[hidden]{display:none}`。
+  保留项与交回 PM 项（原型说话人行/逐段纵向 margin/绿焦点环规范归属）见
+  `docs/fix/2026-10-13_fix_uiux-design-alignment.md`。
 
 ## 已知偏离
 

@@ -17,7 +17,7 @@
 3. 技能 `references/documentation.md` 与 `references/documentation-design.md`；写 change/fix 时再读对应指南。
 4. 项目管理的[工程法案](../项目管理/docs/project-rules.md)、[整体架构](../项目管理/docs/architecture.md)中与任务有关的内容，核对条目是否已确认。
 5. 本角色的 [memo.md](memo.md)、[feature-map.md](feature-map.md)、[functional-description.md](functional-description.md)、[api-spec.md](api-spec.md)。
-6. 产品的[功能导航](../产品/feature-map.md)及任务指定的产品目标、评审意见；桌面应用的[功能导航](../桌面应用/feature-map.md)、[模块说明](../桌面应用/functional-description.md)与相关真实界面证据，均只读。
+6. 产品的[功能导航](../产品/feature-map.md)及任务指定的产品目标、评审意见；桌面实现侧的[桌面UI 功能导航](../桌面UI/feature-map.md)、[模块说明](../桌面UI/functional-description.md)与[桌面窗口 功能导航](../桌面窗口/feature-map.md)、[模块说明](../桌面窗口/functional-description.md)及相关真实界面证据（含拆分前历史归档 `角色卡/桌面应用/`），均只读。
 7. 联合评审前读技能 `references/meeting.md` 与项目管理给出的议程；提交待实施方案时读 `references/proposal-review.md`。需要核对实现契约时按需只读 `references/architecture.md` 与对应层说明，不因此取得源码写权。
 
 ## 执行原则

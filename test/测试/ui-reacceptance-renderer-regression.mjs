@@ -65,6 +65,19 @@ async function key(keyCode, modifiers = []) {
   win.webContents.sendInputEvent({ type: 'keyUp', keyCode, modifiers });
   await pause(80);
 }
+// 抽屉关闭是既有的120ms clip-path动画（本候选未改）：定位激活后须等其结束，再断言「整卡可命中」。
+// 否则采样点会与收拢中的抽屉残条竞态——设计对齐把未决卡加宽到整列（右缘约x=926@960），
+// 卡右缘采样点落进动画中的抽屉可见残条区间。这是观测时序问题，不改断言：超时也照原断言按真实状态判定。
+async function drawerSettled(label) {
+  for (let i = 0; i < 100; i++) {
+    if (await inspect(() => getComputedStyle(document.getElementById('right-drawer')).visibility) === 'hidden') {
+      report.push({ name: 'drawer close animation settled before exposure assert ' + label, observation: { visibility: 'hidden', waits: i } });
+      return;
+    }
+    await pause(20);
+  }
+  report.push({ name: 'drawer close animation did not settle before exposure assert ' + label, observation: { visibility: 'still-visible-after-2s' } });
+}
 async function reset(width = 1360, height = 860) {
   queueA = initialQueue.slice(); responseValue = { ok: true };
   win.setContentSize(width, height);
@@ -310,10 +323,11 @@ async function main() {
       const responsesBefore = responses.length;
       await key(tab === 'card' ? 'Enter' : 'Space');
       assert.equal(responses.length, responsesBefore, 'locating never answers');
+      await drawerSettled('confirm exposure ' + width + ' ' + tab);
       await check('R5 active locate exposes entire card/actions ' + width + ' ' + tab, id => {
         const card = document.querySelector('[data-request-id="' + id + '"]');
         const parts = ['.op-title', '.op-preview > summary', '.op-confirm', '.op-deny'].map(s => card.querySelector(s));
-        return { ok: window.__ansRenderer.state.rightTab === null && !card.inert && parts.every(n => window.QA.hit(n)) && !card.querySelector('.op-confirm').disabled && !card.querySelector('.op-deny').disabled && document.activeElement === card, parts: parts.map(n => ({ text: window.QA.text(n), box: window.QA.box(n) })) };
+        return { ok: window.__ansRenderer.state.rightTab === null && !card.inert && parts.every(n => window.QA.hit(n)) && !card.querySelector('.op-confirm').disabled && !card.querySelector('.op-deny').disabled && document.activeElement === card, parts: parts.map(n => ({ text: window.QA.text(n), box: window.QA.box(n) })), diag: { inert: card.inert, rightTab: window.__ansRenderer.state.rightTab, drawerVisibility: getComputedStyle(document.getElementById('right-drawer')).visibility } };
       }, request.id);
       await inspect(id => document.querySelector('[data-request-id="' + id + '"] .op-preview > summary').click(), request.id);
       await pause(90);
@@ -348,10 +362,11 @@ async function main() {
       await focusByTab('#op-chip');
       const beforeChoiceLocate = responses.length; await key('Enter');
       assert.equal(responses.length, beforeChoiceLocate, 'choice locate cannot answer');
+      await drawerSettled('choice exposure ' + width + ' ' + tab);
       await check('R5 choice title preview options and all actions exposed ' + width + ' ' + tab, (id, selected) => {
         const c = document.querySelector('[data-request-id="' + id + '"]');
         const parts = [c.querySelector('.op-title'), c.querySelector('.op-question'), c.querySelector('.op-preview summary'), ...c.querySelectorAll('.op-option'), c.querySelector('.op-submit'), c.querySelector('.op-cancel')];
-        return { ok: !c.inert && parts.every(n => window.QA.hit(n)) && c.querySelector('.op-submit').disabled === !selected && !c.querySelector('.op-cancel').disabled, parts: parts.map(n => ({ text: window.QA.text(n), box: window.QA.box(n) })), submitDisabled: c.querySelector('.op-submit').disabled };
+        return { ok: !c.inert && parts.every(n => window.QA.hit(n)) && c.querySelector('.op-submit').disabled === !selected && !c.querySelector('.op-cancel').disabled, parts: parts.map(n => ({ text: window.QA.text(n), box: window.QA.box(n) })), submitDisabled: c.querySelector('.op-submit').disabled, diag: { inert: c.inert, rightTab: window.__ansRenderer.state.rightTab, drawerVisibility: getComputedStyle(document.getElementById('right-drawer')).visibility } };
       }, choiceId, tab === 'pi');
       if (tab === 'card') {
         await inspect(id => document.querySelector('[data-request-id="' + id + '"] input[value="x"]').click(), choiceId);

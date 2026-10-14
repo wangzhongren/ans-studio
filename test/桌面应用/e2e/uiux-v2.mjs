@@ -47,7 +47,7 @@ function ownHistory(){return parseSessionJsonl([{type:'session'},{type:'message'
 const viewportGeometry=`(() => { const root=document.documentElement,b=document.body,a=document.querySelector('.app'),c=document.querySelector('.composer').getBoundingClientRect(),d=document.getElementById('right-drawer').getBoundingClientRect(); const visible=id=>{let r=document.getElementById(id).getBoundingClientRect();return r.width>0&&r.left>=0&&r.right<=innerWidth&&r.bottom<=innerHeight&&r.top>=0;};return root.scrollWidth===root.clientWidth&&b.scrollWidth===b.clientWidth&&a.scrollWidth===a.clientWidth&&visible('btn-send')&&visible('btn-halt')&&visible('drawer-close')&&d.bottom<=c.top+1;})()`;
 async function reading(){return js(`(() => {let c=document.getElementById('chat'),t=c.getBoundingClientRect().top;let nodes=[...c.querySelectorAll('.msg,.tool-records,.sys-denied')];let n=nodes.find(x=>x.getBoundingClientRect().bottom>t&&x.getBoundingClientRect().top<c.getBoundingClientRect().bottom);return n?{text:n.textContent.slice(0,60),offset:n.getBoundingClientRect().top-t}:null;})()`);}
 app.whenReady().then(async()=>{
- const watchdog=setTimeout(()=>{fs.writeFileSync(path.join(OUT,'watchdog.txt'),'timeout');app.exit(1);},45000);
+ const watchdog=setTimeout(()=>{fs.writeFileSync(path.join(OUT,'watchdog.txt'),'timeout');app.exit(1);},60000);
  try {
   win=new BrowserWindow({width:1360,height:860,useContentSize:true,frame:false,show:INTERACTIVE,webPreferences:{preload:path.join(APP,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:false}});
   win.webContents.on('console-message',event=>{if(event.level==='error')errors.push(event.message);});
@@ -142,6 +142,44 @@ app.whenReady().then(async()=>{
   await check('stable group restored after full prefix insertion',`document.querySelector('#chat .tool-records')?.open===true`);
   const readingAfterFull=await reading();reports.push({name:'full replay preserves content identity',before:readingBeforeFull,after:readingAfterFull});
   assert.equal(readingBeforeFull.text,readingAfterFull.text);assert.ok(Math.abs(readingBeforeFull.offset-readingAfterFull.offset)<2);
+  // ——— 虚拟行锚点回归（2026-10-14 修复钉）：长会话里反复开合「执行记录组」，组前正文不得位移累积。
+  // 断言写成与设计无关的不变量：以**同一段正文元素**（row-120，组前紧邻行）为锚，四轮开合全程其相对
+  // 聊天顶的偏移全程波动 <2px（展开后复位、无逐轮累积、不跳位）。修前该值逐轮 +2px 累积、约 5 轮后
+  // 越过一行高度导致首可见行切换（fix/2026-10-14 记录里有 A/B 数据）。
+  const anchorInfo=()=>js(`(()=>{const c=document.getElementById('chat'),t=c.getBoundingClientRect().top;const n=[...c.querySelectorAll('.msg')].find(e=>e.textContent.startsWith('row-120 '));const r=n?n.getBoundingClientRect():null;const g=document.querySelector('#chat .tool-records');return {found:!!n,parented:!!(n&&n.parentNode&&n.parentNode.classList.contains('chat-pane')),offset:r?r.top-t:null,open:g?g.open:null,scrollTop:c.scrollTop};})()`);
+  async function toggleDrift(label,width,height){
+    win.setContentSize(width,height);await pause(150);
+    await js(`(()=>{const c=document.getElementById('chat'),n=document.querySelector('#chat .tool-records');n.open=true;c.scrollTop+=n.getBoundingClientRect().top-c.getBoundingClientRect().top-150;})()`);await pause(150);
+    assert.equal(await js(`document.querySelectorAll('#chat .tool-records').length`),1,`toggle fixture single group ${label}`);
+    const base=await anchorInfo();assert.ok(base.found&&base.parented,`anchor paragraph materialized ${label}`);
+    const offsets=[base.offset];
+    for(let cycle=0;cycle<4;cycle++){
+      await js(`document.querySelector('#chat .tool-records').open=false`);await pause(150);
+      const a=await anchorInfo();assert.ok(a.found&&a.parented,`anchor materialized after collapse ${cycle} ${label}`);assert.equal(a.open,false);offsets.push(a.offset);
+      await js(`document.querySelector('#chat .tool-records').open=true`);await pause(150);
+      const b=await anchorInfo();assert.ok(b.found&&b.parented,`anchor materialized after expand ${cycle} ${label}`);assert.equal(b.open,true);offsets.push(b.offset);
+    }
+    const spread=Math.max(...offsets)-Math.min(...offsets);
+    reports.push({name:`activity group toggle reader anchor ${label}`,offsets,spread});
+    assert.ok(spread<2,`反复开合执行记录组不位移组前正文（${label} spread=${spread}）`);
+  }
+  await toggleDrift('960',960,620);
+  await toggleDrift('1360',1360,860);
+  win.setContentSize(960,620);await pause(120);
+  // ——— 脱离文档送史（后台角色/恢复数据先于挂载推达）后首次挂载的锚点稳定性（2026-10-14 口径缓存回归钉）：
+  // 行表可能在 pane **未挂载**时建成——此时 `getComputedStyle` 读不到样式表（返回空），若把读不到当 0
+  // 落缓存，该角色挂载后整个 pane 都会退回「不含行距」的错口径、开合组重新漂移（本用例即该路径）。
+  await js(`await window.__ansRenderer.selectRole('A')`);await pause(150);
+  await push('session:history',{roleId:'C',projectRoot:ROOT,rows:longRows});
+  await check('detached-pane role rowlist built before mount',`(()=>{const m=window.__ansRenderer.rowModelDebug('C');return !!m&&m.count>150&&!document.querySelector('#chat .chat-pane[data-role-id="C"]');})()`);
+  await js(`await window.__ansRenderer.selectRole('C')`);await pause(250);
+  await check('detached-history role mounted windowed',`(()=>{const p=document.querySelector('#chat .chat-pane[data-role-id="C"]');return !!p&&document.querySelectorAll('#chat .chat-pane > .virt-spacer').length===2;})()`);
+  // 口径缓存不变量（设计无关）：C 行表建于未挂载期，挂载后其行距缓存必须与始终已挂载的 A 相同且已读到（>0）。
+  // 反例（把脱离文档读到的空值当 0 落缓存）修前实测：C.rowGap=0 vs A.rowGap=16（见 2026-10-14 fix 记录）。
+  await check('detached-history pane reads same row gap as attached pane',`(()=>{const c=window.__ansRenderer.rowModelDebug('C'),a=window.__ansRenderer.rowModelDebug('A');return !!c&&!!a&&c.rowGap>0&&c.rowGap===a.rowGap;})()`);
+  await js(`(()=>{const c=document.getElementById('chat');c.scrollTop=Math.floor((c.scrollHeight-c.clientHeight)*0.5);})()`);await pause(200);
+  await toggleDrift('detached-history',960,620);
+  await js(`await window.__ansRenderer.selectRole('A')`);await pause(200);
   const requestRows=parseSessionJsonl([{type:'session'},
     {type:'message',message:{role:'assistant',content:[{type:'toolCall',name:'request_confirmation',id:'conf-1',arguments:{title:'拒绝后原位'}}]}},
     {type:'message',message:{role:'toolResult',toolName:'request_confirmation',toolCallId:'conf-1',isError:true,content:[{type:'text',text:'未获同意'}]}}

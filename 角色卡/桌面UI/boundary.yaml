@@ -1,0 +1,65 @@
+# 桌面UI 边界 —— Section 1 唯一写入白名单
+# 未列路径默认只读。新增目录、改动归属或增删逐条列出的路径，须先由 ANS Governance 更新本文件并经客户确认。
+# 本角色是 Interface 层的桌面渲染前端（Electron renderer，2026-10-14 从「桌面应用」拆分）：
+# 只做展示与交互，不接触 Node/文件系统；「这个路径能不能写」的判定一律经主进程调门禁引擎，
+# 渲染进程内不得出现第二份判定实现。IPC 通道与主进程实现属「桌面窗口」，本角色按契约消费。
+role: 桌面UI
+entries:
+  - kind: directory
+    path: app/renderer/
+    purpose: 渲染进程前端（index.html / styles.css / renderer.js / markdown.js / role-status.js / tool-rows.js / ui-labels.js 及 vendor 第三方库）
+  - kind: file
+    path: test/桌面应用/markdown.test.ts
+    purpose: 渲染侧单测——Markdown 渲染与 vendor pin（被测对象 app/renderer/markdown.js）
+  - kind: file
+    path: test/桌面应用/renderer.test.ts
+    purpose: 渲染侧单测——渲染源码不变式守卫（被测对象 app/renderer/*；含与 preload/main 通道两端的交叉守卫）
+  - kind: file
+    path: test/桌面应用/tool-rows.test.ts
+    purpose: 渲染侧单测——工具行/回放纯函数（被测对象 app/renderer/tool-rows.js、ui-labels.js）
+  - kind: file
+    path: test/桌面应用/e2e/uiux-v2.mjs
+    purpose: 界面回归——UI/UX v2 交互（离线替换 IPC，驱动真实 renderer）
+  - kind: file
+    path: test/桌面应用/e2e/ime-enter.mjs
+    purpose: 界面回归——输入法候选 Enter 不误发送（真实 renderer 受控事件流）
+  - kind: file
+    path: test/桌面应用/e2e/bench-storm.mjs
+    purpose: 界面基准台——渲染热路径（合帧/批量/虚拟窗口/回放耗时）
+  - kind: file
+    path: test/桌面应用/e2e/uiux-design-audit.mjs
+    purpose: 设计对齐测量夹具——renderer 两档关键 rect 与计算样式（只读测量）
+  - kind: file
+    path: test/桌面应用/e2e/uiux-prototype-measure.mjs
+    purpose: 设计原型测量夹具——只读载入 UIUX 原型 HTML 实测两档尺寸
+  - kind: file
+    path: 角色卡/桌面UI/feature-map.md
+    purpose: 功能导航
+  - kind: file
+    path: 角色卡/桌面UI/memo.md
+    purpose: 本角色工作备忘录
+  - kind: file
+    path: 角色卡/桌面UI/changelog.md
+    purpose: 本角色治理变更记录
+  - kind: file
+    path: 角色卡/桌面UI/functional-description.md
+    purpose: 模块笔记与代码位置
+  - kind: file
+    path: 角色卡/桌面UI/api-spec.md
+    purpose: 实现报告（渲染侧导出与 DOM 契约）
+  - kind: directory
+    path: 角色卡/桌面UI/docs/design/
+    purpose: 设计记录
+  - kind: directory
+    path: 角色卡/桌面UI/docs/feature/
+    purpose: 本角色功能的稳定说明与流程图
+  - kind: directory
+    path: 角色卡/桌面UI/docs/change/
+    purpose: 变更记录
+  - kind: directory
+    path: 角色卡/桌面UI/docs/fix/
+    purpose: 修复记录
+
+# 注：`package.json`（electron 依赖、scripts、入口字段）、`README.md`、`bin/`、`tsconfig.json` 属装配角色；
+# `app/main.ts`、`app/preload.cjs`、`app/desktop/` 属「桌面窗口」角色；跨角色需求交项目管理协调。
+# `角色卡/桌面应用/`（已拆分冻结）不在任何角色的写入面内：只读归档，见其 role-card 与归档说明。

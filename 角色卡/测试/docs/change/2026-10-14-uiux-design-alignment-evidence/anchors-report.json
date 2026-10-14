@@ -1,0 +1,65 @@
+{
+  "report": [
+    {
+      "name": "initial row observation",
+      "value": {
+        "model": {
+          "count": 182,
+          "lastIndex": 181,
+          "operators": []
+        },
+        "selected": "A",
+        "project": "/nonexistent-independent-snapshot-key",
+        "groups": [
+          {
+            "open": false,
+            "text": "查看执行记录40 条活动"
+          }
+        ]
+      }
+    },
+    {
+      "name": "real JSONL creates >150 renderer rows with one collapsed group",
+      "value": true
+    },
+    {
+      "name": "append to expanded same group keeps child reader",
+      "before": {
+        "text": "read_fileind-target-12.md调用发起",
+        "offset": -8.25
+      },
+      "after": {
+        "text": "read_fileind-target-12.md调用发起",
+        "offset": -8.25
+      }
+    },
+    {
+      "name": "append updates actual group activity count and open state",
+      "value": true
+    },
+    {
+      "name": "collapse preserves preceding visible paragraph",
+      "before": {
+        "text": "independent-row-178 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n",
+        "offset": 11.25
+      },
+      "after": {
+        "text": "independent-row-178 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n",
+        "offset": 12.3125
+      }
+    },
+    {
+      "name": "expand preserves preceding visible paragraph",
+      "before": {
+        "text": "independent-row-178 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n",
+        "offset": 11.25
+      },
+      "after": {
+        "text": "independent-row-178 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。 阅读正文。\n",
+        "offset": 13.25
+      }
+    }
+  ],
+  "error": "AssertionError [ERR_ASSERTION]: expand preserves preceding visible paragraph offset",
+  "stack": "AssertionError [ERR_ASSERTION]: expand preserves preceding visible paragraph offset\n    at stable (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%B5%8B%E8%AF%95/uiux-v2-renderer-regression.mjs:29:199)\n    at async file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%B5%8B%E8%AF%95/uiux-v2-renderer-regression.mjs:49:88"
+}

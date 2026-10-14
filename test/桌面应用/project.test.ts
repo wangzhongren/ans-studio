@@ -1,5 +1,5 @@
 // test/桌面应用/project.test.ts
-// 桌面应用：项目/角色装配辅助的单测（纯逻辑；node --test 直接跑 .ts）。
+// 桌面窗口：项目/角色装配辅助的单测（纯逻辑；node --test 直接跑 .ts）。
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -24,13 +24,19 @@ test("posixDirname：取目录名", () => {
 
 test("buildProjectConfig：由枚举结果构造角色表，acceptance 透传", async () => {
   const listing = await listProject(REPO_ROOT);
+  // 归档事实（2026-10-14，同日演进——上午过渡做法「boundary.yaml 改名 .frozen ⇒ 跳过并提示」已按
+  // 客户决定改为**归档键约定**：boundary.yaml 恢复原名、顶层 `archived: true`）：枚举**静默跳过**归档
+  // 目录——零警告、不可开启（resolveRole 拒绝）、边界不予采用；活角色为「桌面UI」与「桌面窗口」两个。
+  assert.deepEqual(listing.warnings, [], "枚举不应有任何警告（归档目录按归档键约定静默跳过、零提示）");
   const cfg = buildProjectConfig(listing, { accepted: true, source: "unit-test" }, { ANS_SKILL_ROOT: "/x/skill" });
   assert.equal(cfg.projectRoot, listing.projectRoot);
   assert.equal(cfg.skillRoot, "/x/skill");
   const roleIds = Object.keys(cfg.roles);
-  assert.ok(roleIds.includes("桌面应用"), "应含 桌面应用 角色");
-  assert.ok(cfg.roles["桌面应用"].card.endsWith("role-card.md"));
-  assert.ok(cfg.roles["桌面应用"].boundary.endsWith("boundary.yaml"));
+  assert.ok(!roleIds.includes("桌面应用"), "归档的「桌面应用」不得再被登记进角色表");
+  assert.ok(roleIds.includes("桌面窗口"), "应含 桌面窗口 角色");
+  assert.ok(cfg.roles["桌面窗口"].card.endsWith("role-card.md"));
+  assert.ok(cfg.roles["桌面窗口"].boundary.endsWith("boundary.yaml"));
+  assert.ok(roleIds.includes("桌面UI"), "应含 桌面UI 角色（拆分的另一半）");
   assert.equal(cfg.governanceBoundary?.acceptance.accepted, true);
 });
 
@@ -54,11 +60,11 @@ test("su：枚举结果里排第一且标为内置，且不进 ProjectConfig 的
 
   const cfg = buildProjectConfig(listing, { accepted: true, source: "unit-test" }, { ANS_SKILL_ROOT: "/x/skill" });
   assert.equal(cfg.roles["su"], undefined, "su 无角色目录，不得登记进 roles（否则会去读空路径）");
-  assert.ok(cfg.roles["桌面应用"], "项目角色照常登记");
+  assert.ok(cfg.roles["桌面窗口"], "项目角色照常登记");
   // 但 su 要登记进 builtInRoles：会话式入口（openRoleSession / 桌面聊天）据此允许开启它。
   assert.ok(cfg.builtInRoles?.includes("su"), "内置角色 su 应出现在 builtInRoles");
   // 项目角色不得混入 builtInRoles。
-  assert.ok(!cfg.builtInRoles?.includes("桌面应用"), "项目角色不得出现在 builtInRoles");
+  assert.ok(!cfg.builtInRoles?.includes("桌面窗口"), "项目角色不得出现在 builtInRoles");
 });
 
 test("su：resolveRole 下沉为 built-in-governance，走内置边界、不抛错", async () => {

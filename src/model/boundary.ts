@@ -55,4 +55,10 @@ export interface BoundarySection1 {
   acceptance: Acceptance;
   // 边界解析失败时的原因（YAML 严格校验失败、读取失败等）；存在时 resolveWrite 拒绝一切写入
   parseError?: string;
+  // 归档标记（客户 2026-10-14 约定）：边界 YAML 顶层 `archived: true` 时置 true——该角色目录为
+  // **冻结归档**（拆分/退役的角色原位留档，如桌面应用拆分为桌面UI/桌面窗口后留档）。语义：
+  //  · listProject **静默跳过**（不枚举该角色、不产生任何警告——归档对枚举不可见）；
+  //  · 按 id 解析/开启角色的入口（resolveRole，CLI role run 与桌面开启皆经此）**fail-closed 拒绝**。
+  // 仅在边界文件解析成功且声明为 true 时出现；不带该键的角色行为完全不变。
+  archived?: boolean;
 }
