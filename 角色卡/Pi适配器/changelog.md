@@ -1,5 +1,17 @@
 # Pi适配器 变更记录
 
+## 2026-10-14 — 补建功能导航 `feature-map.md`（修复 role-card 死链）
+
+**来源**：客户要求（PM 派发）——`role-card.md` 的「当前导航见[Pi适配器功能导航](feature-map.md)」原为**死链**（该文件从未建立；全项目 5 个角色同缺、统一补建）。
+
+**写了什么（`角色卡/Pi适配器/feature-map.md`，新增，本角色 Section 1 内）**
+- 按 changelog/memo 实际记录整理 **13 条**功能：运行时适配器与会话生命周期、模型接入配置（contextWindow 与网关 500 修复）、冻结契约家、受治理工具集与治理扩展、写类工具同批顺序化（W-1）、交互工具族（request_confirmation/request_choice）、submit_report（C-1）、dispatch_task（H-1）、report_shell_verdict（R-1）、finalize_bootstrap（**已删除**·墓碑行）、fs-write 原子写与守卫、provider-config 与凭据红线、运行时结果生命周期与诊断。
+- 每行＝名称 / 一句话用途 / 当前状态 / 文档链接；稳定功能文档按实际状态如实标注**待补**（`docs/feature/` 尚未建立），先链实际存在的 `docs/change/`、`docs/fix/`、changelog 条目与代码/测试文件。不虚构、不为凑数灌水。
+
+**验证（本角色执行）**
+- **链接自检（硬性纪律）**：脚本提取全文 30 个相对链接逐一验证存在性 → **30/30 OK**，无新死链；role-card 死链随之解除。
+- 本次为纯文档新增（未动代码）：同日上一任务的本角色绿证沿用——`node --test "test/pi-adapter/*.test.ts"` 185 pass / 0 fail、`npm run typecheck` exit 0。
+
 ## 2026-10-14 — 测试夹具中性化：`dispatch-task.test.ts` 四处「桌面应用」改「示例角色」（旧角色名残留清扫）
 
 **来源**：产品评审 `角色卡/产品/docs/design/2026-10-14_design_maintenance-review-diagnostics-and-residues.md` **§2.2 第 13 项**（旧角色名残留逐项处置，属主＝Pi适配器；建议「示例角色」）。角色「桌面应用」已于 2026-10-14 拆分为桌面UI/桌面窗口并归档；**客户已批准清理**。

@@ -1,5 +1,14 @@
 # 装配 变更记录
 
+## 2026-10-14 — 补建 `角色卡/装配/feature-map.md`（role-card 死链修复；客户要求统一补建）
+
+role-card.md 第 11 行「当前导航见[装配功能导航](feature-map.md)」此前是**死链**——该文件自 bootstrap 起从未建立（客户普查发现 5 个角色同缺、要求统一补建）。本任务按「名称 / 一句话用途 / 当前状态 / 文档链接」建立本角色导航页。
+
+- **内容（12 条交付物/职责）**：① CLI 根入口与可执行脚本（`src/index.ts`、`bin/ans.js`；含入口兜底超时与「CLI 入口未 arm shell 闸」如实登记）② 命令解析（`cli-parse.ts`）③ `ans govern <目标目录>` ④ `ans doctor` 装配自检 ⑤ `.ans/project.json` 载入接线（`config-loader.ts` 薄转发）⑥ 演示运行时与运行时接线（`demo-runtime.ts` / `runtime.ts`）⑦ 构建与测试配置（`package.json` / `tsconfig.json`）⑧ 两道门 ⑨ 装配测试（`test/装配/`，8 文件 54 例）⑩ README ⑪ `.env` / `.env.example`（指定写入者 G-2）⑫ `.ans/`（条件目录 `project-init` 写权）。
+- **文档现状如实标注（不预链、不产生死链）**：本角色暂无 `docs/feature/` 稳定功能文档；`docs/design/` 未建立；`functional-description.md` / `api-spec.md`（边界已列路径）尚未落盘。链到实际存在的 `docs/change/`（1 篇）、`docs/fix/`（1 篇）、`changelog.md` / `memo.md`、README、PM 共享组件与 Section 1 授权记档。
+- **链接自检**：页内全部相对链接 **24 条**逐一 `test -e`——**全部存在、零死链**（含 `../../README.md`、`../../test/装配/`、`../项目管理/docs/…`、`../编排|桌面UI|桌面窗口/feature-map.md` 等跨层相对路径）；表格 12 个数据行经 awk 复核全部 5 竖线、反引号成对；role-card:11 死链随之解析。
+- **本任务只动**：`角色卡/装配/feature-map.md`（新建）、本 changelog、`memo.md`；未碰其余文件；未 git 操作。
+
 ## 2026-10-14 — README 同步「桌面应用」角色拆分（→ 桌面UI ＋ 桌面窗口）
 
 「桌面应用」按客户确认拆分为 **桌面UI**（渲染前端，`app/renderer/`）与 **桌面窗口**（Electron 主进程、preload 受限桥、桌面会话装配；`app/main.ts`、`app/preload.cjs`、`app/desktop/`），客户 2026-10-14 确认名称（原话「桌面UI/桌面窗口 这个可以」）；旧目录 `角色卡/桌面应用/` 原位冻结归档——**终止形态为「归档键约定」**：`boundary.yaml` 保留原名 ＋ 顶层 `archived: true`（客户同日定案「还是加一个已归档吧，归档是合理的」），角色枚举**静默跳过（零提示）**、该角色**不可开启**、其边界不予采用；当日上午曾短暂使用 `.frozen` 改名过渡（会出「缺少 boundary.yaml，已跳过」提示），**同日按客户决定演进为归档键约定**（本条目初稿据上午形态撰写，此处按同日演进更正）——详见 `归档说明.md` 与 `角色卡/桌面应用/boundary.yaml` 头部注记。PM 已更新 `docs/architecture.md`（角色表）与 `docs/project-rules.md`（共享组件消费方名单）。两份拆分设计的 §4 均注明：README 属装配、按需由属主刷新（`角色卡/桌面UI/docs/design/2026-10-14_design_role-split-ui.md`、`角色卡/桌面窗口/docs/design/2026-10-14_design_role-split-window.md`）。本任务即按此同步 `README.md`。

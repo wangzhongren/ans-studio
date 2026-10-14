@@ -1,5 +1,21 @@
 # 门禁引擎 变更记录
 
+## 2026-10-14（三）— 补建功能导航 `feature-map.md`（客户要求统一补建；修复 role-card 死链）
+
+- **背景**：`role-card.md`「系统功能导航」的链接「当前导航见[门禁引擎功能导航](feature-map.md)」自建角色
+  以来指向**不存在的文件**（死链；全仓普查 5 个角色同缺，客户要求统一补建）。
+- **交付**：新建 `角色卡/门禁引擎/feature-map.md`——10 条功能导航行（功能 / 一句话用途 / 状态 / 文档链接）：
+  共享类型（Model 层）主属；双来源角色解析与项目枚举（`resolveRole`/`listProject`）；**归档角色约定
+  （`archived: true`）**；双来源边界解析（含创世种子与内置回退）；写权判定 `resolveWrite`（含旧快照线索）；
+  写权接受证据 F6（`.ans` pin 链）；shell 命令级闸 (c) `classifyShell` 与公开再导出；散文式边界响亮失败
+  修复（A+C）；su 内置卡文本与治理约定文案；共享路径原语与解析 IO 辅助。
+- **纪律（不虚构、不灌水、零死链）**：文档列**只链实际存在**的目标——`changelog.md` / `memo.md` /
+  `role-card.md` / `boundary.yaml` / `docs/change/2026-10-12_change_su-doc-surface.md` /
+  `docs/fix/2026-10-12_fix_boundary-prose-silent-empty.md` / `test/门禁引擎/archived-role.test.ts`；
+  `docs/feature/`、`functional-description.md`、`api-spec.md` 尚无内容 ⇒ **不造链接**，在页首与说明中
+  如实标注「待建」。**链接自检：7 个相对目标逐一核在，0 死链**；role-card 侧的死链随之闭合。
+- **边界**：本文件在 Section 1 白名单内；本条同批更新本 changelog 与 `memo.md`，未动其他文件；不 commit。
+
 ## 2026-10-14（二）— 归档角色约定 `archived: true`：boundary.yaml 恢复原名原位留档；枚举静默跳过、开启 fail-closed 拒绝（客户口头指令经 PM 转达；取代上条 .frozen 方案与期望）
 
 客户改令（PM 转达）：冻结归档目录 `角色卡/桌面应用/` 要**补回原名 `boundary.yaml`**（不再用 `.frozen`
