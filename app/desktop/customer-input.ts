@@ -2,7 +2,7 @@
 // 桌面应用的**客户确认制交互通道**（设计 A-1/A-5，2026-10-12）——su 的 `request_confirmation` /
 // `request_choice` 两工具挂起等客户作答时，经本模块把请求摆到界面上并取回裁决。
 //
-// 归属：Interface / 桌面应用（本角色边界内）。纯逻辑，**不依赖 electron**，可在 node 下单测；
+// 归属：Interface / 桌面窗口（本角色边界内）。纯逻辑，**不依赖 electron**，可在 node 下单测；
 // 真正的推送/呈现由**注入的 presenter** 提供（主进程经 `session:operator-request` 推到渲染侧的交互卡）。
 //
 // —— 契约（**单一来源 = §4 冻结契约家** `src/provider/pi/session.ts`）——

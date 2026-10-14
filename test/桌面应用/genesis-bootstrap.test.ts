@@ -1,5 +1,5 @@
 // test/桌面应用/genesis-bootstrap.test.ts
-// 桌面应用（T30）：**冷启动创世接线**的验证——未 bootstrap 的空项目上，su 能否写出治理产物。
+// 桌面窗口（T30）：**冷启动创世接线**的验证——未 bootstrap 的空项目上，su 能否写出治理产物。
 //
 // 依据：设计 §12.2（核心裁决）——
 //   · 门口放在**边界选择层**：未 bootstrap（`hasRoles === false`）时 `ProjectConfig` 设 `genesisBootstrap`；

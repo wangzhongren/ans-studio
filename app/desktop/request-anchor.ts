@@ -15,7 +15,7 @@
 // 映射取 §4 冻结契约家的工具名常量，不复制字面量）+ `title`（工具把 `args.title` **原样**交给客户通道，
 // 回放解析的 `arguments.title` 即同一字符串）。键按这两项拼出，**确定性**、无启发式解析。
 //
-// 归属：Interface / 桌面应用（本角色边界内）。纯逻辑，**不依赖 electron**，可在 node 下单测。
+// 归属：Interface / 桌面窗口（本角色边界内）。纯逻辑，**不依赖 electron**，可在 node 下单测。
 
 // 工具名的**单一来源**（§4 冻结契约家所在层：provider/pi/tools.ts 的公开导出）——只读导入、不复制字面量。
 import { REQUEST_CONFIRMATION_TOOL_NAME, REQUEST_CHOICE_TOOL_NAME } from "../../src/provider/pi/tools.ts";

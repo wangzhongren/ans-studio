@@ -1,7 +1,7 @@
 // app/desktop/operator-channel.ts
 // 桌面应用的「操作者确认通道 (a)」——shell 审核三层链的**第三闸、兜底**（设计 §7.3/§7.4/§7.5/§7.6）。
 //
-// 归属：Interface / 桌面应用（本角色边界内）。纯逻辑，**不依赖 electron**，可在 node 下单测；
+// 归属：Interface / 桌面窗口（本角色边界内）。纯逻辑，**不依赖 electron**，可在 node 下单测；
 // 真正的弹窗表现由**注入的 presenter** 提供（主进程用 electron dialog 实现，见 app/main.ts）。
 //
 // —— 这与什么（判据） ——

@@ -332,7 +332,9 @@ async function run() {
   log("SU_BADGE_LABELS=" + suNoReadonly.labels);
   // 写入语义（客户 2026-10-11 裁定：去掉运行时选择器、默认跑 pi）：常驻**横栏**（不再内联进聊天流）。
   log("SU_WRITE_NOTE_IN_HEADER=" + (await wc().executeJavaScript("!!document.querySelector('.chat-head #runtime-note')")));
-  log("SU_WRITE_NOTE_SAYS_PI=" + (await wc().executeJavaScript("document.getElementById('runtime-note').textContent.includes('真正落到你导入的项目')")));
+  // v2 现行口径重锚（2026-10-14）：说明单一来源 `WRITE_NOTE`＝「实际写入导入项目，角色边界外的写入会被拒绝。」
+  // （旧串『真正落到你导入的项目』属 v1 文案，早已不渲染。）
+  log("SU_WRITE_NOTE_WRITES_IMPORTED=" + (await wc().executeJavaScript("document.getElementById('runtime-note').textContent.includes('实际写入导入项目')")));
   log("SU_NO_INLINE_WRITE_ROWS=" + (await wc().executeJavaScript("document.querySelectorAll('#chat .sys-nowrite, #chat .sys-write').length === 0")));
   log("SHOT_01B_SU=" + (await shot("01b-su.png")));
   // T36：仓库根（有角色）的 su 会话是**普通聊天**、非创世态 → **不**显示「完成 bootstrap」入口。
@@ -582,8 +584,8 @@ async function run() {
   log("RUNTIME_NOTE_IN_HEADER=" + (await wc().executeJavaScript("!!document.querySelector('.chat-head #runtime-note')")));
   log("NO_PI_BUTTON_IN_HEADER=" + (await wc().executeJavaScript("!document.querySelector('.chat-head #btn-pi-settings') && !document.querySelector('.chat-head #btn-stop') && !document.getElementById('session-state')"))); // 客户 2026-10-13：Pi 入口上移图标簇、结束会话/状态 pill 删除
   log("PI_ENTRY_IN_TABS=" + (await wc().executeJavaScript("!!document.querySelector('#right-tabs #tab-pi')")));
-  log("RUNTIME_NOTE_SAYS_PI_WRITES=" + (await wc().executeJavaScript("document.getElementById('runtime-note').textContent.includes('真正落到你导入的项目')")));
-  log("RUNTIME_NOTE_ONE_LINE_GATED=" + (await wc().executeJavaScript("document.getElementById('runtime-note').textContent.includes('越界写会在写之前被拒')")));
+  log("RUNTIME_NOTE_WRITES_IMPORTED=" + (await wc().executeJavaScript("document.getElementById('runtime-note').textContent.includes('实际写入导入项目')")));
+  log("RUNTIME_NOTE_ONE_LINE_GATED=" + (await wc().executeJavaScript("document.getElementById('runtime-note').textContent.includes('角色边界外的写入会被拒绝')")));
   // 底部输入区（K-1 起：附件行 + **胶囊输入框**〔内嵌发送箭头〕两行；无选择器、无提示行、无 Pi 面板、
   // 无 bootstrap 动作；状态位在 chat-head〔#session-state/#composer-hint〕）。
   const composer = await wc().executeJavaScript(
@@ -618,7 +620,7 @@ async function run() {
   log("BOOTSTRAP_NO_LEFT_NOTICE_ELEMENT=" + (await wc().executeJavaScript("[...document.querySelectorAll('body *')].every(el=>!el.classList.contains('bootstrap-notice'))")));
   // 横栏第二行不再重复它：未 bootstrap 时状态提示留空；横栏只留写入语义（#runtime-note 仍在）。
   log("BOOTSTRAP_HINT_EMPTY=" + (await wc().executeJavaScript("document.getElementById('composer-hint').textContent.trim() === ''")));
-  log("WRITE_NOTE_REMAINS_IN_HEADER=" + (await wc().executeJavaScript("document.getElementById('runtime-note').textContent.includes('越界写会在写之前被拒')")));
+  log("WRITE_NOTE_REMAINS_IN_HEADER=" + (await wc().executeJavaScript("document.getElementById('runtime-note').textContent.includes('角色边界外的写入会被拒绝')")));
   // 守卫：「只读」徽标已按客户裁定移除——**任何**项目状态（含创世态）下 su 都不该出现它。
   log("BOOTSTRAP_SU_NO_READONLY_BADGE=" + (await wc().executeJavaScript(
     "(() => { const it=[...document.querySelectorAll('#role-tree .tree-item')].find(e=>e.querySelector('.ti-name').textContent==='su'); return !(it && it.querySelector('.ti-badge.readonly')); })()",
@@ -874,11 +876,13 @@ async function run() {
   await wc().executeJavaScript("(document.querySelector('#chat a.md-link')||{click:function(){}}).click()");
   await sleep(150);
   log("LINK_OPEN_EXTERNAL_CALLED=" + openExternalCalls.some((u) => u === "https://example.com/x"));
-  // 工具行瘦身（2026-10-12）：含长内容的工具事件渲染后**不含内容**、含目标路径。
-  wc().send("session:event", { roleId: "桌面窗口", event: { kind: "tool_call", summary: "read_file：read_file: docs/接口约定.md # 接口约定 · 正文预览【哨兵-勿显示】" } });
+  // 工具行（2026-10-12 瘦身裁定 + 2026-10-14 重锚）：v2 组行只印「查看执行记录 N 条活动」；操作名与目标在组内
+  // 展开项 `.activity-op/.activity-target`（目标从**生产形状 `detail.path`** 取，不再从 summary 解析）。含长内容
+  // 的工具事件渲染后不得出现内容（哨兵）。
+  wc().send("session:event", { roleId: "桌面窗口", event: { kind: "tool_call", summary: "read_file：docs/接口约定.md # 接口约定 · 正文预览【哨兵-勿显示】", detail: { toolName: "read_file", path: "docs/接口约定.md", turnId: "t-toolrow-1", toolCallId: "call-t-toolrow-1" } } });
   await sleep(250);
   log("TOOLROW_NO_CONTENT=" + (await wc().executeJavaScript("!document.querySelector('#chat').textContent.includes('哨兵-勿显示')")));
-  log("TOOLROW_HAS_PATH=" + (await wc().executeJavaScript("document.querySelector('#chat').textContent.includes('read_file：docs/接口约定.md')")));
+  log("TOOLROW_HAS_PATH=" + (await wc().executeJavaScript("(() => { const op=[...document.querySelectorAll('#chat .activity-op')].some(e=>e.textContent.includes('read_file')); const target=[...document.querySelectorAll('#chat .activity-target')].some(e=>e.textContent.includes('docs/接口约定.md')); return op && target; })()")));
   // H-1 附录：系统投递输入单独样式（不长得像客户发的消息）+ 手输防误伤。
   wc().send("session:event", { roleId: "桌面窗口", event: { kind: "message", summary: "用户指令：[回交] 来自 规划者 的报告（任务 T1）\n结论：completed\n摘要：做完了" } });
   await sleep(250);
@@ -1089,19 +1093,26 @@ async function run() {
   await sleep(1000);
 
   // S-1（2026-10-12 客户「现在输出不会让滚动条滚动到最底下了」）：**长会话贴底回归**。
-  // 触发窗口化（>150 行）后持续追加输出：① 在底部 ⇒ 必须**保持贴底**；② 上翻 ⇒ 新输出**不得拽回**。
+  // 触发窗口化（≥150 行）后持续追加输出：① 在底部 ⇒ 必须**保持贴底**；② 上翻 ⇒ 新输出**不得拽回**。
+  // ⚠ 组行行数依赖（2026-10-14 修复钉）：工具事件按 `detail.turnId` 归组（renderer.js `appendActivity`）——
+  //   夹具事件**必须带生产形状 `detail` 且每条唯一 `turnId`**，才逐条自成「查看执行记录」组行；不带
+  //   `turnId` 的填充会塌成一行、窗口化被饿死（这正是诊断基线红的根因）。生产形状见
+  //   `src/common/pi-adapter/real-adapter.ts` 的 tool_execution_start/end 外推。⚠
   const s1dist = "(function(){ const c=document.getElementById('chat'); return Math.round(c.scrollHeight-c.scrollTop-c.clientHeight); })()";
+  const s1Event = (turnKey, summary, path) => ({ roleId: "桌面窗口", event: { kind: "tool_call", summary, detail: { toolName: "read_file", path, turnId: turnKey, toolCallId: "call-" + turnKey } } });
   for (let i = 0; i < 200; i += 1) {
-    wc().send("session:event", { roleId: "桌面窗口", event: { kind: "tool_call", summary: "S-1 填充行 read_file：docs/s1-" + i + ".md" } });
+    wc().send("session:event", s1Event("s1-fill-" + i, "S-1 填充行 read_file：docs/s1-" + i + ".md", "docs/s1-" + i + ".md"));
   }
   await sleep(800);
-  log("S1_WINDOWED_ACTIVE=" + (await wc().executeJavaScript("document.querySelectorAll('#chat .chat-pane > .virt-spacer').length === 2")));
+  // S1_WINDOWED_ACTIVE 重锚（2026-10-14）：钉**行模型事实**——≥150 行且挂载的直接子行远少于总行数、
+  // spacer 实际撑高（不再查「常驻的 2 个 .virt-spacer」——那不是窗口化信号，恒真）。
+  log("S1_WINDOWED_ACTIVE=" + (await wc().executeJavaScript("(() => { const m=window.__ansRenderer.rowModelDebug('桌面窗口'); if (!m || !(m.count >= 150)) return false; const pane=document.querySelector('#chat .chat-pane'); if (!pane) return false; const kids=[...pane.children]; const mounted=kids.filter(e=>!e.classList.contains('virt-spacer')).length; const spacerH=kids.filter(e=>e.classList.contains('virt-spacer')).reduce((s,e)=>s+e.getBoundingClientRect().height,0); return mounted < m.count && spacerH > 0; })()")));
   await wc().executeJavaScript("(() => { const c=document.getElementById('chat'); c.scrollTop = c.scrollHeight; })()");
   await sleep(200);
   // ① 贴底场景：分 3 批追加 30 行（模拟合帧流式输出），每批后测距底像素。
   for (let b = 0; b < 3; b += 1) {
     const arr = [];
-    for (let i = 0; i < 10; i += 1) arr.push({ roleId: "桌面窗口", event: { kind: "tool_call", summary: "S-1 流式追加 b" + b + "-" + i } });
+    for (let i = 0; i < 10; i += 1) arr.push(s1Event("s1-live-" + b + "-" + i, "S-1 流式追加 b" + b + "-" + i, "docs/s1-live-b" + b + "-" + i + ".md"));
     wc().send("session:events", arr); // Q-1 合帧形态（生产热路径：批量数组）
     await sleep(250);
   }
@@ -1114,7 +1125,7 @@ async function run() {
   await sleep(200);
   const s1TopBefore = await wc().executeJavaScript("Math.round(document.getElementById('chat').scrollTop)");
   const upBatch = [];
-  for (let i = 0; i < 20; i += 1) upBatch.push({ roleId: "桌面窗口", event: { kind: "tool_call", summary: "S-1 上翻期追加 " + i } });
+  for (let i = 0; i < 20; i += 1) upBatch.push(s1Event("s1-up-" + i, "S-1 上翻期追加 " + i, "docs/s1-up-" + i + ".md"));
   wc().send("session:events", upBatch); // 合帧形态：上翻期的新输出不得拽回
   await sleep(500);
   const s1TopAfter = await wc().executeJavaScript("Math.round(document.getElementById('chat').scrollTop)");
@@ -1140,7 +1151,7 @@ async function run() {
   await wc().executeJavaScript("(() => { const c=document.getElementById('chat'); c.scrollTop = c.scrollHeight; })()");
   await sleep(200);
   for (let i = 0; i < 10; i += 1) {
-    wc().send("session:event", { roleId: "桌面窗口", event: { kind: "tool_call", summary: "S-1 回底再输出 " + i } });
+    wc().send("session:event", s1Event("s1-redown-" + i, "S-1 回底再输出 " + i, "docs/s1-redown-" + i + ".md"));
   }
   await sleep(400);
   const s1DistAgain = await wc().executeJavaScript(s1dist);
@@ -1175,10 +1186,13 @@ async function run() {
 
   // U-1（2026-10-12 客户裁定「点击这个角色，应该滚动到滚动条最下面」）：点角色 ⇒ 到底部（两条路径 + 重复点击）；
   // 「有卡 ⇒ 滚到卡」的例外由 P-1 既有一组断言覆盖（本处只测无卡路径，互不影响）。
+  // 前置（2026-10-14）：S-1 修好（组行逐条、真窗口化）后，本段「WINDOWED」才是真·窗口化回底（此前 S-1 空转）。
+  // U1_PANE_HEIGHT（同批加采样）：评审观测该处 pane 内容高运行间不稳（13577/655px），多轮重跑据此定性。
   await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面窗口')");
   await sleep(900);
   const u1WindowedDist = await wc().executeJavaScript(s1dist);
   log("U1_WINDOWED_TO_BOTTOM_DIST=" + u1WindowedDist);
+  log("U1_PANE_HEIGHT=" + (await wc().executeJavaScript("(() => { const p=document.querySelector('#chat .chat-pane'); return p ? Math.round(p.scrollHeight) : -1; })()")));
   log("U1_WINDOWED_TO_BOTTOM=" + (u1WindowedDist <= 8));
   await wc().executeJavaScript("window.__ansRenderer.selectRole('su')");
   await sleep(900);
@@ -1420,6 +1434,8 @@ async function run() {
   }
 
   // 真实renderer进程退出→明确故障页→用户点击恢复；沿同一helper及受限preload，不调用模型。
+  // 注：本批 450 条仍是**无 turnId 的旧形状**（会塌成一组行）——相关断言（未决卡可见/恢复）不依赖长会话
+  // 窗口化；是否同法改生产形状，产品评审列为可选、待 PM 批次决定（2026-10-14），本批有意保留。
   let pendingAnswered = false;
   wc().send("session:events", Array.from({ length: 450 }, (_, index) => ({ roleId: "桌面窗口", event: { kind: "tool_call", summary: "待确认定位长会话 " + index } })));
   await sleep(100);

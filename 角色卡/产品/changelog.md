@@ -1,5 +1,15 @@
 # 产品 变更记录
 
+## 2026-10-14 — 两项维护事项（e2e 诊断基线红 / 旧名残留）产品评估，附修复口径与逐项处置
+
+**来源**：客户对遗留维护事项指示「也做了吧，先让产品看一下」；PM 派产品先评审范围与做法。新增[两项维护事项评审](docs/design/2026-10-14_design_maintenance-review-diagnostics-and-residues.md)。
+
+**做了什么**：只读核对 main.mjs 检查机制与 S-1/U-1 段、renderer.js 窗口化/组行/写入说明、tool-rows v2、五份留档 e2e 报告、两份自查基线、项目管理遗留清单与桌面窗口 change 记录；盘点 8 次历史 e2e 的 diagnostics jsonl；另在 /tmp 复制 harness 加只读探针实跑两次（仓库零改动，`git status` 干净）。
+
+**核心结论**：① **A 归因实证**——S-1 段 200 条 tool_call 自 `9e50aac`（组行引入）起塌成 1 行（探针：count=2、「200 条活动」单组行、pane 无滚动余量），`renderer.viewport` 只在 ≥150 行窗口化时由 `updateVirtualWindow` 发出、10 次运行 0 次；检查抛错后 mac 重开 2 条 + `E2E_DONE` 共 13 行场景停跑。**口径**：夹具改生产形状（唯一 `turnId`）恢复真窗口化 + `S1_WINDOWED_ACTIVE` 重锚（现恒真的空转检查）；列六种「放宽断言换绿」明确反对（删事件/降级 repairCheck/调 VIRT_MIN_ROWS 等）。**新观察**：U-1 pane 高两次采样 13577px vs 655px（与 U1 偶发 1/30 同域），机制未定、交属主多次重跑定位。② **B 逐项处置**：5 行 log-only 全部更新不删、维持 log-only（三态覆盖有意保留；子串锚现行 WRITE_NOTE 双句）；旧名残留精确 14 处（12 头注=11 桌面窗口+1 桌面UI、pi-adapter 夹具、project.ts:224）；附加发现（3 条「归属…桌面应用」句、uiux-design-audit 假枚举夹具）交 PM 定；列「明确不改」名录并警告勿做全仓 grep-replace（归档机制测试与产品称谓会误伤）。③ **优先级**：A=P1 现在做、B=P2 建议同批。④ 与 R1–R5、设计对齐、拆分责任条款、归档键约定相容，逐条说明。
+
+**边界与状态**：评审完成、**未实施**；实施由 PM 派属主（桌面窗口主、Pi适配器/桌面UI 各件）。写集仅本角色新 review、feature-map、memo、本文件；未改 `app/`、`src/`、`test/`、其他角色文件，未操作用户 ANS/模型，未 commit/push（HEAD 仍 `7347049`）。未跑到自检台全绿（红点在后为预期）、未回检 `9234899` 当次是否曾绿（推断）、13.5k 不稳定态机制未查明——均如实入档。
+
 ## 2026-10-14 — 第二版候选（行距缓存加固）产品补签，维持通过
 
 **来源**：PM 派发补签——桌面UI 在 U1 偶发项排查中发现并修复一处窄缺陷，renderer.js 由 `402e49a7…` 取代为 `47703d0b35b276e5b84c3b603fcded4dd9ed1fce8e35bf1fcf9330e488800b0d`（本机 sha256 复核一致；styles/index/tool-rows/ui-labels 不变），要求按惯例做受影响项复核并补签。

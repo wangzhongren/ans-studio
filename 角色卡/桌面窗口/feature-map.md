@@ -15,7 +15,7 @@
 | Pi 配置面板逻辑（主进程侧） | 启动载入仓库根 `.env`（补 Electron 缺失的 `--env-file`）；面板键 3 必填+1 高级；掩码/原子写/只改相关键 | 已实现 | 归档：[api-spec §Pi 配置面板](../桌面应用/api-spec.md)、[面板瘦身](../桌面应用/changelog.md)（2026-10-11 条目） |
 | 项目导入与枚举 | 经门禁引擎 `listProject` 枚举角色（不重写解析）；构造 ProjectConfig（含创世态判定）；读变更记录/docs 索引（只读展示） | 已实现 | 归档：[三栏功能说明](../桌面应用/docs/feature/2026-10-11_feature_desktop-three-pane.md)、[`.ans` 接线](../桌面应用/docs/change/2026-10-12_change_session-comment-refresh.md) |
 | 诊断与显式恢复 | 唯一共享 logger 滚动 24h；窗口加载/故障/IPC 诊断；显式重载续接、同 id 重推仍 pending 请求（不代答/不延期） | 已实现 | 归档：[视口/报告/诊断修复](../桌面应用/docs/fix/2026-10-13_fix_viewport-reports-diagnostics.md) |
-| 端到端总自检台（e2e/main.mjs） | 真实 Electron 驱动主进程装配+preload+renderer 全链自检（离线替换适配器；截图+报告） | 已实现（2026-10-14 拆分落地：样例角色改「桌面窗口」并跑通，见[变更记录](docs/change/2026-10-14_change_split-role-id-test-updates.md)） | 归档：[桌面应用 memo](../桌面应用/memo.md)、[e2e 看门狗修复](../桌面应用/changelog.md)（2026-10-12 条目） |
+| 端到端总自检台（e2e/main.mjs） | 真实 Electron 驱动主进程装配+preload+renderer 全链自检（离线替换适配器；截图+报告） | 已实现（2026-10-14：样例角色改「桌面窗口」；诊断基线红随「S-1 生产形状夹具」修复，`E2E_DONE=1` 全程跑通——见[变更记录](docs/change/2026-10-14_change_split-role-id-test-updates.md)） | 归档：[桌面应用 memo](../桌面应用/memo.md)、[e2e 看门狗修复](../桌面应用/changelog.md)（2026-10-12 条目） |
 
 ## 说明
 

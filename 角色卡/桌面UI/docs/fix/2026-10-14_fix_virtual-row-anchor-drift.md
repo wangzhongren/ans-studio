@@ -118,7 +118,7 @@ C(i, f) = sums[f] + 16 + Σ_{f≤j<i} (real_j + 16)     （f = first，实测逐
 | test/桌面应用/e2e/uiux-v2.mjs | 156b73ca3ca82f298d0b03cdbb5e27faea00820afd5659dabaf4f84d0dfe37ce |
 | test/桌面应用/renderer.test.ts | df1c195c30a2685a37de5f1228b20d044eac7566485470d209d8476b12b28998 |
 
-未变（与上一冻结一致）：`app/renderer/styles.css` `69b2ea02…`、`index.html` `9b542de1…`、`tool-rows.js` `9ffda4bf…`、`ui-labels.js` `9f344ebf…`、`e2e/uiux-design-audit.mjs` `9a804242…`、`e2e/uiux-prototype-measure.mjs` `36e0b856…`。第一版修复候选（renderer.js `402e49a7…`、uiux-v2 `83b519e6…`、renderer.test.ts `c01163cc…`）已被本轮 §9 追加修整改代（该版全部证据仍按当时候选记录有效；U1 定性数据即以 `402e49a7` 采集）。
+未变（与上一冻结一致）：`app/renderer/styles.css` `69b2ea02…`、`index.html` `9b542de1…`、`tool-rows.js` `9ffda4bf…`、`ui-labels.js` `9f344ebf…`、`e2e/uiux-prototype-measure.mjs` `36e0b856…`。`e2e/uiux-design-audit.mjs` 后随当日「旧名残留清扫」重存为 `0f0233c4…`（`9a804242…` 失效；清扫只改夹具示例角色名，重跑 report.json 与改名前逐字节一致——不影响本记录任何测量值与证据）。第一版修复候选（renderer.js `402e49a7…`、uiux-v2 `83b519e6…`、renderer.test.ts `c01163cc…`）已被本轮 §9 追加修整改代（该版全部证据仍按当时候选记录有效；U1 定性数据即以 `402e49a7` 采集）。
 
 ## 7. 与归档设计对齐记录的关系
 

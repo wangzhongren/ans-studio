@@ -1,5 +1,5 @@
 // test/桌面应用/su-effective-boundary.test.ts
-// 桌面应用：**已 bootstrap 项目里 `.ans` 的项目治理边界路径被采纳**——内置治理角色（su）的**生效边界**
+// 桌面窗口：**已 bootstrap 项目里 `.ans` 的项目治理边界路径被采纳**——内置治理角色（su）的**生效边界**
 // 即项目治理边界（gate 放行其条目内的写、拒绝条目外的写）。这是「桌面丢弃 `.ans` 项目治理边界路径」那处
 // bug 的修复证据（修复点在 `app/desktop/project.ts::buildEffectiveProjectConfig`）。
 //

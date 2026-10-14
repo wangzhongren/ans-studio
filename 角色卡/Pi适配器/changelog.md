@@ -1,5 +1,27 @@
 # Pi适配器 变更记录
 
+## 2026-10-14 — 测试夹具中性化：`dispatch-task.test.ts` 四处「桌面应用」改「示例角色」（旧角色名残留清扫）
+
+**来源**：产品评审 `角色卡/产品/docs/design/2026-10-14_design_maintenance-review-diagnostics-and-residues.md` **§2.2 第 13 项**（旧角色名残留逐项处置，属主＝Pi适配器；建议「示例角色」）。角色「桌面应用」已于 2026-10-14 拆分为桌面UI/桌面窗口并归档；**客户已批准清理**。
+
+**先核对后动手（只读）**：四处（68/98/103/142 行）确为**纯字符串夹具**——`makeDispatchTaskTool`（`src/provider/pi/tools.ts:920-966`）对 `roleId` 只做「非空句法校验 → 逐字进载荷交注入 fn → 逐字回显进成功文案」；「是否本项目角色」的语义校验归**注入能力**，本层不查任何角色枚举/仓库。用例的注入 fn 是 spy（只记录），全文件无真实仓库查询 ⇒ 安全中性化（若核对发现耦合会先停下交回 PM——核对结果为无）。
+
+**改了什么（全部在 `test/pi-adapter/dispatch-task.test.ts`）**
+- 68/98/142 行：`roleId: "桌面应用"` → `"示例角色"`（GOOD_ARGS、逐字载荷断言、缺 task 校验用例各一处）。
+- 103 行：成功文案断言 `任务已派发给「桌面应用」` → `「示例角色」`（文案模板逐字回显 roleId，随夹具联动）。
+- 新增一行夹具注释（写明用中性名、不做角色枚举，防后人改回真实角色名）。
+- **测试语义与覆盖面零变化**：用例数、断言结构、其余文案断言均未动。
+
+**验证（本角色执行）**
+- `node --test "test/pi-adapter/*.test.ts"`（带引号）→ **185 pass / 0 fail**。
+- `npm run typecheck` → **exit 0、全仓零错误**。
+- 如实登记：任务文本给的 `node --test test/pi-adapter/`（目录形参、无引号）在 Node v24.14.0 报 `Cannot find module …/test/pi-adapter`——以未改动的 `test/门禁引擎/` 同报为证，属**命令形式**行为（目录被当模块加载），非本次改动引入；本仓惯例为带引号 glob 形式。
+
+**边界 / 残留普查（未越界改，清单已报 PM）**
+- 本角色边界内其余「桌面应用」均为**历史记录或路径引用**：本 changelog / memo / `docs/change/` 的历史条目、`test/桌面应用/**` 路径名（路径不是角色引用，拆分轮已约定沿用）——按「历史留档不回改」保留。
+- 两处 **src 来历注释**（`src/common/pi-adapter/provider-config.ts:10`、`src/provider/pi/session.ts:117`）在本批写集之外，未动，清单报 PM。
+- `test/pi-adapter/finalize-bootstrap.test.ts:4` 的「桌面 finalizeBootstrap 已删」为墓碑**历史叙述**（且非「桌面应用」整串），未动，报 PM 备核。
+
 ## 2026-10-13 — P0-2「停当前轮次」第一环：`RoleSession.abort?` 入契约 + 真适配器 abort 透传（Pi SDK `session.abort()`）
 
 **来源**：产品提案 `角色卡/产品/docs/design/2026-10-13_design_desktop-ux-improvement-proposal.md` **P0-2**（客户在 P0 三选二中批准）；本角色负责**最底环**——运行时适配器契约与真适配器；**编排句柄（`RoleSessionHandle` 增 `abort()`）与桌面停止入口为后续环节**，契约形状以本条钉死为准。完整实施记录：`角色卡/Pi适配器/docs/change/2026-10-13_change_p02-abort-session.md`。

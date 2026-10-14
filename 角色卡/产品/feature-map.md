@@ -12,6 +12,7 @@
 | v2实际实现产品验收 | 读取实际候选源码、生产渲染器截图与操作证据，判断UI-1/2/3是否达到已确认目标 | 历史：9e50aac上唯一结论不通过、五项必要返工（已由后续轮次闭合，记录保留不改写） | [初次验收清单](docs/design/2026-10-13_design_product-ui-implementation-acceptance.md)、[当前重新验收](docs/design/2026-10-13_design_product-ui-reacceptance.md) |
 | 五项返工独立复验 | 核对新候选五项实际体验及同版证据，客户要求产品/UI都通过后才提交GitHub | 已收口：最终结论由本轮最终复验取代——五项在最终候选（含漂移修复）上全部保持，历史记录保留 | [返工复验](docs/design/2026-10-13_design_product-ui-rework-acceptance.md) |
 | 设计对齐最终产品复验 | 对「按 UI/UX v2 设计对齐 + 虚拟行锚点漂移修复」的最终冻结候选做产品面独立复核（R1–R5 保持 + 对齐的产品面评估），给出提交前置的唯一结论 | **通过（限产品面）**：测试三套件（119/11/14）哈希绑定全绿、PM 两档 A/B/C 图与读数逐项核对、桌面两记录与我方源码只读核对；无阻断缺陷，观察项与限制如实列明。**第二版候选（renderer 47703d0b，行距缓存加固）补签维持通过**：无产品面受影响项，新增 detached 路径独立探针（rowGap=16、零漂移、U1 60/60） | [2026-10-14 最终产品复验（含第二版补签）](docs/design/2026-10-14_design_product-design-alignment-final-signoff.md) |
+| 维护事项评审 | 对遗留维护事项（A：e2e 诊断基线红；B：陈旧 log-only 检查与旧角色名残留）做产品视角的范围与做法评审，含修复口径、逐项处置与风险提示 | 已交付（2026-10-14）：A 归因实证（S-1 段 200 事件塌 1 行、viewport 全程 0 次、13 行尾段场景停跑）与保真修复口径（夹具改生产形状带唯一 turnId、S1_WINDOWED_ACTIVE 重锚；列六种换绿反例）；B 逐项处置=5 行 log-only 更新不删 + 旧名 14 处更新（另附加发现交 PM）+ 勿动名录；A=P1、B=P2 建议同批。**未实施**，实施由 PM 派属主 | [2026-10-14 两项维护事项评审](docs/design/2026-10-14_design_maintenance-review-diagnostics-and-residues.md) |
 
 ## 只读参考入口（产品审视的事实来源）
 

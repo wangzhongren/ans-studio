@@ -45,4 +45,4 @@ test/桌面应用/（主进程侧 22 个，路径沿用拆分前，逐文件清�
 
 - 拆分未物理移动 `test/桌面应用/`；主进程侧测试文件按 file 逐条授权（见 [boundary.yaml](boundary.yaml)）。
 - **拆分落地已完成**（2026-10-14）：`e2e/main.mjs` 与四个真实枚举测试（`session`/`operator-channel`/`project`/`p0-halt-and-images`）的样例角色 id 已改「桌面窗口」并全量跑通，详见[变更记录](docs/change/2026-10-14_change_split-role-id-test-updates.md)。**抽屉/队列断言已于同日同步至 UIUX v2 现行结构**（PM 跟进派发：6 处 log-only 重锚、3 处日志键随语义改名）；剩余 5 行同族「文案/格式面」脱节已列名交 PM 决定是否再派（见该记录跟进节）。
-- 已知环境红：`pi-config.test.ts` 检出目录名断言（基线）；`e2e/main.mjs` 在既有检查点红截至（基线同红）。
+- 已知环境红：`pi-config.test.ts` 检出目录名断言（基线）。`e2e/main.mjs` 的 `DIAGNOSTICS` 基线红已于 2026-10-14 修复（S-1 夹具改生产形状＋唯一 `turnId` ⇒ 真窗口化；尾部 mac 场景与 `E2E_DONE=1` 恢复，连跑 5+1 次轮间内容级零差异——见[变更记录](docs/change/2026-10-14_change_split-role-id-test-updates.md) 跟进 4）。

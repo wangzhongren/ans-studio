@@ -64,8 +64,9 @@ function assertNeverClaimsDispatched(message: string): void {
   assert.equal(/已派发/.test(message), false, `失败措辞绝不能含「已派发」：${message}`);
 }
 
+/** 派发夹具：roleId 用中性名，避免与任何真实角色耦合（载荷是纯字符串，本层不做角色枚举）。 */
 const GOOD_ARGS = {
-  roleId: "桌面应用",
+  roleId: "示例角色",
   task: "修 renderer.js 的卡片高度；依据 docs/design/x.md §3；完成标准：node --test 全绿并回交报告",
   reason: "返工：首次未含测试结论",
 };
@@ -95,12 +96,12 @@ test("handler 把载荷逐字交给 fn；回执 ok:true → 「任务已派发�
 
   assert.equal(s.calls, 1, "handler 必须真的调用注入的 fn");
   assert.deepEqual(s.last, {
-    roleId: "桌面应用",
+    roleId: "示例角色",
     task: "修 renderer.js 的卡片高度；依据 docs/design/x.md §3；完成标准：node --test 全绿并回交报告",
     reason: "返工：首次未含测试结论",
   });
   assert.equal(r.ok, true);
-  assert.match(r.message, /任务已派发给「桌面应用」/);
+  assert.match(r.message, /任务已派发给「示例角色」/);
   assert.match(r.message, /派发 ≠ 授权/, "成功文案应重申「派发 ≠ 授权」");
   assert.match(r.message, /已接受边界内执行已授权任务/);
   assert.match(r.message, /普通操作无需逐次确认/);
@@ -139,7 +140,7 @@ test("参数校验：roleId / task 缺失或空白 → ok:false 且 fn 未被调
   assert.equal(blankRole.ok, false);
   assert.match(blankRole.message, /roleId/);
 
-  const noTask = await dispatch.handler({ name: DISPATCH_TASK_TOOL_NAME, args: { roleId: "桌面应用" } });
+  const noTask = await dispatch.handler({ name: DISPATCH_TASK_TOOL_NAME, args: { roleId: "示例角色" } });
   assert.equal(noTask.ok, false);
   assert.match(noTask.message, /task/);
 

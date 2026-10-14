@@ -1,5 +1,5 @@
 // test/桌面应用/interface.test.ts
-// 桌面应用 Interface 层单测：注入假下游，验证枚举→RoleView 映射、点角色即开（scope undefined、
+// 桌面窗口 Interface 层单测：注入假下游，验证枚举→RoleView 映射、点角色即开（scope undefined、
 // 导入即授权的 acceptance）、多轮 send 透传与切换角色的 dispose 语义。
 
 import test from "node:test";

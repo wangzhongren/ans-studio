@@ -23,6 +23,9 @@ events:
   - date: "2026-10-14"
     kind: implemented
     summary: 归档收口同步（归档键约定 archived: true——静默跳过、零提示）：project.test.ts 归档断言与记录按新事实更新；三件套 42/42、e2e 复跑内容级零差异、仍停基线红
+  - date: "2026-10-14"
+    kind: verified
+    summary: 两项维护事项（产品评审 + PM 派发）：A——S-1 夹具改生产形状（唯一 turnId）修复诊断基线红，DIAGNOSTICS=true、E2E_DONE=1、mac 尾部恢复；B——5 行 log-only 重锚（2 处改名）+11 头注+4 处注释面改现行角色；连跑 5 次轮间零差异、留档
 ---
 
 # 拆分落地：桌面测试与自检的样例角色改指「桌面窗口」
@@ -101,17 +104,60 @@ events:
 
 **重跑对照（无新增差异）**：`ANS_E2E_OUTDIR=<tmp> node_modules/.bin/electron test/桌面应用/e2e/main.mjs` → 退出 0、348 行，仍停在既有基线红 `DIAGNOSTICS_WINDOW_AND_RENDERER_EVENTS`（同点位同红）。与上一轮 run 逐行 diff：差异**恰为**上述 6 处被修检查 + OUTDIR/SHOT 路径 + E2E 堆栈行号（加注释所致）。与拆分前留档基线（规范化角色名后）对照：差异仅为拆分预期项（角色清单、边界行数 11→34）、本表 6 处新断言（由 false / 计数 0 转真——其旧形态在基线本来就无法为真）、`P1_ARRIVAL_DEBUG` 调试数字与堆栈行号。原始报告留档：[2026-10-14_drawer-check-sync-e2e-report.txt](2026-10-14_drawer-check-sync-e2e-report.txt)。
 
-**范围外发现（未动，交 PM 定）**：同一「界面断言 vs 现行界面」家族还剩 5 行 log-only 属**文案/格式面**：`SU_WRITE_NOTE_SAYS_PI`、`RUNTIME_NOTE_SAYS_PI_WRITES`、`RUNTIME_NOTE_ONE_LINE_GATED`、`WRITE_NOTE_REMAINS_IN_HEADER`（现行说明为 `WRITE_NOTE = "实际写入导入项目，角色边界外的写入会被拒绝。"`，`app/renderer/renderer.js`）与 `TOOLROW_HAS_PATH`（tool-rows v2 行格式）。它们不涉抽屉/队列结构、在拆分前留档中即为 false；是否再派一批同步由 PM 决定。软性建议（不越权）：本批 6 项无需升级为阻断门——抽屉结构属 UIUX 呈现面、已有 log-only 对照与 UIUX 侧视觉回归覆盖；如需更强口径，宜并入 UIUX 侧回归而非 e2e 阻断。
+**范围外发现（未动，交 PM 定）**：同一「界面断言 vs 现行界面」家族还剩 5 行 log-only 属**文案/格式面**：`SU_WRITE_NOTE_SAYS_PI`、`RUNTIME_NOTE_SAYS_PI_WRITES`、`RUNTIME_NOTE_ONE_LINE_GATED`、`WRITE_NOTE_REMAINS_IN_HEADER`（现行说明为 `WRITE_NOTE = "实际写入导入项目，角色边界外的写入会被拒绝。"`，`app/renderer/renderer.js`）与 `TOOLROW_HAS_PATH`（tool-rows v2 行格式）。它们不涉抽屉/队列结构、在拆分前留档中即为 false；是否再派一批同步由 PM 决定。软性建议（不越权）：本批 6 项无需升级为阻断门——抽屉结构属 UIUX 呈现面、已有 log-only 对照与 UIUX 侧视觉回归覆盖；如需更强口径，宜并入 UIUX 侧回归而非 e2e 阻断。（**同日跟进 4 更正：上述 5 行已随 PM 派发完成同步**，见该节 B。）
 
 ### 跟进 2（同日）：桌面UI 锚点漂移修复候选的 e2e 重跑核对
 
 候选：`app/renderer/renderer.js` = SHA-256 `402e49a73ad65bb220b30ff8d57623ff38e7fa3d8aa982abb199b07f120cc938`（落档时本机复核一致；`styles.css`/`index.html`/`tool-rows.js`/`ui-labels.js` 的 mtime 证实未动，与今日两轮所见相同）。重跑命令同上；报告留档：[首跑](2026-10-14_anchor-drift-fix-e2e-report.txt)、[第二次](2026-10-14_anchor-drift-fix-e2e-report-trial2.txt)。
 
-结论：**与今日两轮逐行对照，内容级无新增差异**——仍停在既有基线红 `DIAGNOSTICS_WINDOW_AND_RENDERER_EVENTS`（同点位同红）、6 处抽屉/队列断言全真、其余全部一致（仅输出路径与堆栈行号差异）。**唯一例外（如实登记）**：首跑的 `U1_WINDOWED_TO_BOTTOM=false`（`DIST=12922`，窗口化 pane 点角色未回底）；随后 4 次重跑均回 `true`（`DIST=0`）——**5 次中 1 次，属偶发**。该检查在修前留档基线与今日两轮共 4 次观测全为 `true`；0/4 对 1/5 的样本量**不足以判定偶发是否与本次修复相关**，交 PM 路由定性（建议加长等待或多次试次由桌面UI/测试角色核查）。本角色未改动 main.mjs 的等待与断言（保持本批范围）。
+结论：**与今日两轮逐行对照，内容级无新增差异**——仍停在既有基线红 `DIAGNOSTICS_WINDOW_AND_RENDERER_EVENTS`（同点位同红）、6 处抽屉/队列断言全真、其余全部一致（仅输出路径与堆栈行号差异）。**唯一例外（如实登记）**：首跑的 `U1_WINDOWED_TO_BOTTOM=false`（`DIST=12922`，窗口化 pane 点角色未回底）；随后 4 次重跑均回 `true`（`DIST=0`）——**5 次中 1 次，属偶发**。该检查在修前留档基线与今日两轮共 4 次观测全为 `true`；0/4 对 1/5 的样本量**不足以判定偶发是否与本次修复相关**，交 PM 路由定性（建议加长等待或多次试次由桌面UI/测试角色核查）。本角色未改动 main.mjs 的等待与断言（保持本批范围）。（**同日跟进 4 更正：S-1 真窗口化修复后连跑 5 次，该域读数恒 pane 高=13689px、`U1_WINDOWED_TO_BOTTOM=true` 全真——偶发未复现，新基线已立并加了采样行**。）
 
 ### 跟进 3（同日）：归档收口（归档键约定）同步
 
 旧目录改以**归档键约定**归档（`boundary.yaml` 恢复原名 + 顶层 `archived: true`；见本文首节「冻结方式当日有一次演进」）。本角色侧同步：① `project.test.ts` 归档断言由「跳过并提示」改为「`warnings == []` **且** 角色表不含『桌面应用』」（其余断言不动、不放宽），注释同步更新；② 复跑三件套（session/operator-channel/project）**42/42 全过**，全边界内单测 **206/207**（唯一红=pi-config 检出目录名基线）；③ e2e 按新仓态重跑一次：与上一干净对照（跟进 2 trial 2）**内容级差异 0 行**（仅输出路径/堆栈行号），仍停同点位基线红 `DIAGNOSTICS_WINDOW_AND_RENDERER_EVENTS`——渲染侧 `#warnings`（有展示位）在两种归档形态下对全部检查点均不可见。报告留档：[2026-10-14_archive-key-e2e-report.txt](2026-10-14_archive-key-e2e-report.txt)。
+
+### 跟进 4（同日）：两项维护事项落地——A 诊断基线红修复 + B 残留清扫
+
+客户批准两项维护，先由产品评审（`角色卡/产品/docs/design/2026-10-14_design_maintenance-review-diagnostics-and-residues.md`），PM 派发本角色边界主体。
+
+**候选环境**：6 轮 run 于 11:28–11:36 执行——`app/renderer/renderer.js` = `47703d0b35b276e5b84c3b603fcded4dd9ed1fce8e35bf1fcf9330e488800b0d`（**PM 提交 7347049 的最终渲染候选**；styles `69b2ea02…`/index `9b542de1…`/tool-rows `9ffda4bf…`/ui-labels `9f344ebf…` 与其锚点漂移修复记录一致、未动）。即证据组合 = 最终渲染候选 + 本批 main.mjs／注释面改动。另：同日归档收口跑（10:51）也已落在该 renderer 版上、与 402e49a7 版对照内容级零差异。
+
+**A：`DIAGNOSTICS_WINDOW_AND_RENDERER_EVENTS` 基线红修复（按真实场景修，非放宽）**
+
+根因（评审实证，本角色复核一致）：S-1 段夹具工具事件不带 `detail.turnId`，现渲染把连续工具事件归入同一「查看执行记录」组行（renderer.js `appendActivity`：仅 `turnId` 变化才分新组）⇒ 200 条塌成 1 行 ⇒ 行数 < `VIRT_MIN_ROWS`(150) ⇒ `updateVirtualWindow` 提前返回 ⇒ `renderer.viewport` 从未发出。改动（均在 main.mjs）：
+
+- **S-1 填充/流式/上翻/回底四批事件改生产形状**：`detail: { toolName, path, turnId, toolCallId }`（形状对照 `src/common/pi-adapter/real-adapter.ts` 的 tool_execution_start/end 外推），**每条唯一 `turnId`**（helper `s1Event`）逐条自成组行 ⇒ 真窗口化 ⇒ 五事件齐。
+- **`S1_WINDOWED_ACTIVE` 重锚**：钉行模型事实——`rowModelDebug.count ≥ 150` 且挂载的直接子行 < 总行数、spacer 实际撑高（旧查「常驻 2 个 `.virt-spacer`」恒真、空转）。
+- **`DIAGNOSTICS_WINDOW_AND_RENDERER_EVENTS` 五事件期望集合一字未动**；`repairCheck` 语义、严重级均未动。
+- 注释同步更新（组行 `turnId` 行数依赖「下轮防退化钉」；U-1 段前置说明）。
+- **评审明列六种「换绿」一条未犯**：未删 `renderer.viewport`、未降级/删检查、未动 `VIRT_MIN_ROWS`（完全未触 `app/renderer/**`）、未让小 pane 发事件、未伪发诊断、**也未只加事件数**（所有填充都带唯一 turnId）。
+
+**B：残留清扫（全部零行为改动）**
+
+- **5 行 log-only 检查按现行口径重锚（更新不删、严重级不变）**：`SU_WRITE_NOTE_SAYS_PI`→**改名 `SU_WRITE_NOTE_WRITES_IMPORTED`**（锚「实际写入导入项目」）；`RUNTIME_NOTE_SAYS_PI_WRITES`→**改名 `RUNTIME_NOTE_WRITES_IMPORTED`**（同串）；`RUNTIME_NOTE_ONE_LINE_GATED`（锚「角色边界外的写入会被拒绝」）；`WRITE_NOTE_REMAINS_IN_HEADER`（同串）；`TOOLROW_HAS_PATH`——夹具改**生产形状事件**（`detail.path`）＋断言锚 `.activity-op/.activity-target` DOM，保留 `TOOLROW_NO_CONTENT`。依据：现行说明单一来源 `WRITE_NOTE`＝「实际写入导入项目，角色边界外的写入会被拒绝。」（renderer.js）。
+- **11 个 `test/桌面应用/*.test.ts` 行 2 头注**「桌面应用（Tx）」→「桌面窗口」，直接改写、无历史注记（`ans-wiring`/`boundary-refresh`/`composer-images`/`dispatch-delivery`/`genesis-bootstrap`/`handback-delivery`/`interface`/`message-queue`/`operator-wiring`/`session-history`/`su-effective-boundary`）；`markdown.test.ts`（属桌面UI）未动。
+- **`app/desktop/project.ts:224`** 注释样例路径 → `角色卡/编排/role-card.md`；**3 处「归属：」句**（`customer-input.ts`/`operator-channel.ts`/`request-anchor.ts`）→「桌面窗口」。判定逻辑/行为零改动（纯注释与归属句）。
+- 边界外三项（`test/pi-adapter/dispatch-task.test.ts`、`markdown.test.ts`、`uiux-design-audit.mjs`）本侧未动——PM 另派 Pi适配器/桌面UI；未做全仓 grep-replace。
+
+**证据（连跑 5 次 + 最终文件复跑 1 次；报告留档 [run1–6](2026-10-14_diagnostics-fix-runs/run1.txt)）**
+
+| 项 | 5 次结果 |
+| --- | --- |
+| 退出码 / 耗时 / 看门狗 | 0 / 67–68s / 无 WATCHDOG |
+| `DIAGNOSTICS_WINDOW_AND_RENDERER_EVENTS` | **true（恒红修复）** |
+| `MAC_CLOSE_REOPEN_LOADS_WITHOUT_DUPLICATE_HANDLERS` / `MAC_CLOSE_REOPEN_NO_AUTO_SEND` / `E2E_DONE` | true / true / **E2E_DONE=1**（尾部 13 行场景真的恢复运行） |
+| `S1_WINDOWED_ACTIVE`（重锚后）/ `S1_STICK_AT_BOTTOM` / `S1_NOT_YANKED` / `S1_STAYED_AWAY_FROM_BOTTOM` / `S1_STICK_AGAIN` | 全 true（`STAYED_AWAY` 由 false 转真，评审预期） |
+| `U1_PANE_HEIGHT` / `U1_WINDOWED_TO_BOTTOM`（=DIST 3px） | **13689（5/5 恒定）** / true |
+| B.1 五检查（含改名两项） | 全 true |
+| **轮间内容级差异** | **0 行**（除输出路径/无堆栈行差异——不再有 E2E_ERROR） |
+
+run6＝最终文件（加 450-批保留注释后）的复跑：68s、与 run1 **内容级零差异**、`DIAGNOSTICS=true`/`E2E_DONE=1`——留档与最终候选逐一对应。
+
+**与修复前留档逐行对照＝全部为预期位移**（无「新增回归」）：`SU_WRITE_NOTE_SAYS_PI=false`→`SU_WRITE_NOTE_WRITES_IMPORTED=true`；`RUNTIME_NOTE_SAYS_PI_WRITES=false`→`RUNTIME_NOTE_WRITES_IMPORTED=true`；`RUNTIME_NOTE_ONE_LINE_GATED`/`WRITE_NOTE_REMAINS_IN_HEADER`/`TOOLROW_HAS_PATH` false→true；`S1_STAYED_AWAY_FROM_BOTTOM` false→true；`U1_WINDOWED_TO_BOTTOM_DIST` 0→3 且新增 `U1_PANE_HEIGHT=13689`；`DIAGNOSTICS…=false`+`E2E_ERROR`+堆栈（5 行）→ `=true`+`MAC_CLOSE_REOPEN_*`×2+`E2E_DONE=1`（恢复的尾部）。**其余 320+ 行逐字一致**。
+
+**U-1 新观察定性（评审 §1.5 交办）**：修复后连跑 5 次，该处 pane 内容高恒 **13689px**、`U1_WINDOWED_TO_BOTTOM=true`（DIST=3）——评审观测的 13577/655 不稳定态**未复现**；真窗口化下该读数已稳定（新基线由新加的 `U1_PANE_HEIGHT` 行逐轮钉住即可对照）。未发现渲染侧根因（无需交回）；若后续轮次再现不稳，既有采样行可直接对照。
+
+**验证面**：`node --test test/桌面应用/*.test.ts` → **206/207**（唯一红=pi-config 检出目录名基线）；`npm run typecheck` → 0 错。**范围外**：L1424 的 450 条「待确认定位长会话」填充仍未带 turnId（评审列为可选、PM 批次未含）——相关断言全真，未动。
 
 ## 交回 PM 的关联线索
 

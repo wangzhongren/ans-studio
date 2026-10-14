@@ -1,5 +1,5 @@
 // test/桌面应用/session-history.test.ts
-// 桌面应用（D-1，2026-10-12）：**重启恢复**的主进程侧——会话 JSONL 解析/规范化（防御式）+ 最近会话挑选 +
+// 桌面窗口（D-1，2026-10-12）：**重启恢复**的主进程侧——会话 JSONL 解析/规范化（防御式）+ 最近会话挑选 +
 // 读角色历史（无目录=无历史、坏文件不抛、**跨角色不串**）。夹具＝手写最小 JSONL（首行 header + 每行一 entry），
 // 形状照 Pi SDK 的持久化格式（`message` entry 的 `message` 为 `{role, content, timestamp}`；assistant 的
 // content 块含 text/toolCall；toolResult 为 `{role:"toolResult", toolName, content, isError, timestamp}`）。

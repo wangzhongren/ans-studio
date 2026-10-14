@@ -221,7 +221,7 @@ async function walkDir(absDir: string, relPrefix: string, out: DocsIndexEntry[])
 
 /**
  * 读取某角色的变更记录与 docs/ 目录索引。
- * 输入 cardPathRel 为角色卡项目相对路径（如 角色卡/桌面应用/role-card.md）；角色目录取其父目录。
+ * 输入 cardPathRel 为角色卡项目相对路径（如 角色卡/编排/role-card.md）；角色目录取其父目录。
  */
 export async function readRoleDocsIndex(
   projectRoot: string,

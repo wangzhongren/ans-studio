@@ -16,13 +16,13 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwM
 let win;
 const pause = ms => new Promise(r => setTimeout(r, ms));
 const js = code => win.webContents.executeJavaScript(code.includes('await ') ? '(async()=>{' + code + '})()' : code);
-const roles = ['su', '桌面应用'].map(roleId => ({ roleId, cardPath: ROOT + '/角色卡/' + roleId + '/role-card.md', cardText: '# ' + roleId + '\n\n完整角色职责与边界说明。\n\n' + ('资料内容用于检查阅读态。\n\n'.repeat(40)), boundary: { entries: [] }, boundaryPath: '', changelog: null, docs: [] }));
+const roles = ['su', '示例角色'].map(roleId => ({ roleId, cardPath: ROOT + '/角色卡/' + roleId + '/role-card.md', cardText: '# ' + roleId + '\n\n完整角色职责与边界说明。\n\n' + ('资料内容用于检查阅读态。\n\n'.repeat(40)), boundary: { entries: [] }, boundaryPath: '', changelog: null, docs: [] }));
 const listing = { projectRoot: ROOT, primaryRoleId: 'su', hasRoles: true, warnings: [], roles };
 const longFull = '全文 ' + '排队消息详细内容与来源。\n'.repeat(30) + '长连续文本 ' + 'ordinaryword'.repeat(100);
 const queue = [
   { id: 'msg\u0000long', kind: 'message', summary: '客户长消息：' + '超过80字的队列摘要用于核对换行、时间与操作归属。'.repeat(6), full: longFull, at: '2026-10-13T10:01:00Z' },
-  { id: 'dispatch', kind: 'dispatch', sourceRoleId: '桌面应用', summary: '派发任务', full: '', at: '2026-10-13T10:02:00Z' },
-  { id: 'handback', kind: 'handback', sourceRoleId: '桌面应用', summary: '回交报告', full: '', at: '2026-10-13T10:03:00Z' },
+  { id: 'dispatch', kind: 'dispatch', sourceRoleId: '示例角色', summary: '派发任务', full: '', at: '2026-10-13T10:02:00Z' },
+  { id: 'handback', kind: 'handback', sourceRoleId: '示例角色', summary: '回交报告', full: '', at: '2026-10-13T10:03:00Z' },
 ];
 let activeQueue = queue.slice();
 const snapshot = (busy = true) => ({ roleId: 'su', busy, summaries: activeQueue.map(x => x.summary), queue: activeQueue, running: busy ? { id: 'running', kind: 'message', summary: '正在处理当前请求', full: '', at: '2026-10-13T10:00:00Z' } : null });
