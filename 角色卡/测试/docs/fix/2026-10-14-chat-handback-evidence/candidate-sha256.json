@@ -1,0 +1,6 @@
+{
+  "src/common/编排/handback.ts": "a6782edd274eea3d85bcd75109b3de43eaa2e53ad115a4e965a999bdbdd886a8",
+  "src/pipeline/orchestration/run-role.ts": "000fb82b9bd3d7ecca59fcbca66aed6d92c188583b7ea83dd13517b54aa2e621",
+  "app/desktop/session.ts": "43948d439e80af3e1801b7586a4f3a4a99c9f5484fccccf5931f7e998a51652c",
+  "test/测试/chat-handback-integration.test.ts": "411e511a812475f7511ec3bd1003b3439af27066d8fa52f88bae1a094c13965e"
+}

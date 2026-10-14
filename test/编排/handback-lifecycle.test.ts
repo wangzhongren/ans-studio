@@ -100,8 +100,9 @@ test("events延迟至两次send结束后消费，报告仍按metadata关联且�
     async composeContext() { return { systemPrompt: "" }; },
     async bindRole() {
       return {
-        async prompt() {
+        async prompt(_text, options) {
           const id = String(++sends);
+          options?.onTurnStarted?.({ turnId: id, roleId: "X", runtime: "pi" });
           if (id !== "3") await report!({ status: "completed", summary: `实际结果${id}`, evidence: [`src/${id}.ts`] }, { turnId: id });
           if (id === "1") await report!({ status: "invalid", summary: "错误报告" } as unknown as TaskReport, { turnId: id });
           pending.push(ev("settled", id, { outcome: "completed" }));
@@ -123,7 +124,7 @@ test("events延迟至两次send结束后消费，报告仍按metadata关联且�
     const handle = await openRoleSession({ roleId: "X", project: f.project }, { createAdapter: (_gate, caps) => { report = caps?.reportHandback; return adapter; } });
     await handle.send("first");
     await handle.send("second");
-    await handle.send("third without report");
+    await handle.send("third without report", { handback: { required: true } });
     const hbs: TaskHandback[] = [];
     for await (const item of handle.events()) if (item.kind === "handback") hbs.push(item.handback);
     assert.deepEqual(hbs.map((hb) => hb.turnId), ["1", "2", "3"]);

@@ -314,7 +314,8 @@
   }
 
   async function selectRuntime(runtime) {
-    if (["pi", "codex", "claude"].indexOf(runtime) < 0 || runtime === state.runtime) return;
+    if (!state.projectRoot || ["pi", "codex", "claude"].indexOf(runtime) < 0 || runtime === state.runtime) return;
+    ++configSaveVersion;
     saveComposerDraft(state.selectedRoleId); captureDrawerReading();
     runtimeViews[Rt.viewKey(state.projectRoot, state.runtime)] = captureRuntimeView();
     ++roleSelectionVersion; projectGeneration += 1;
@@ -326,12 +327,12 @@
     setPiStatus("正在读取 " + Rt.runtimeLabel(runtime) + " 配置…", "");
     installRuntimeView(runtimeViews[Rt.viewKey(state.projectRoot, runtime)]);
     renderedDrawerRole = null; state.sessionOpenRoleId = null;
-    $("runtime-select").value = runtime;
+    engineSelector.sync(runtime, !state.projectRoot);
     $("shell-confirm").hidden = true;
     if (state.shellConfirm) renderShellConfirm(state.shellConfirm);
     restoreComposerDraft(state.selectedRoleId);
     showPane(state.selectedRoleId); renderRoleTree(); renderRight(); renderTabs(); updateControls(); setChatHeader(selectedRole());
-    if (state.rightTab === "pi") void loadPiConfig();
+    void loadPiConfig();
     if (state.selectedRoleId) await selectRole(state.selectedRoleId);
   }
 
@@ -1878,20 +1879,37 @@
       .map(function (f) { return f.key; });
     var label = piView.label || Rt.runtimeLabel(state.runtime);
     setPiStatus(missing.length ? label + " 配置不完整，缺：" + missing.join("、") + "。请补齐后保存。" : label + " 必填配置已齐备。" + Rt.applicationLabel(piView.application || "next-session"), missing.length ? "warn" : "ok");
+    return missing;
+  }
+
+  function renderRuntimeConfigNotice(text, kind, actionable) {
+    var bar = $("runtime-config-notice");
+    bar.hidden = !state.projectRoot || !text;
+    bar.className = "runtime-config-notice" + (kind ? " is-" + kind : "");
+    $("runtime-config-message").textContent = text || "";
+    var button = $("runtime-config-settings");
+    button.hidden = !actionable;
+    button.textContent = "打开 " + Rt.runtimeLabel(state.runtime) + " 设置";
   }
 
   var configLoadVersion = 0;
+  var configSaveVersion = 0;
   async function loadPiConfig() {
     var runtime = state.runtime, projectRoot = state.projectRoot, version = ++configLoadVersion;
+    renderRuntimeConfigNotice("正在检查 " + Rt.runtimeLabel(runtime) + " 配置…", "", false);
     try {
       var view = d.getRuntimeConfig ? await d.getRuntimeConfig(runtime) : runtime === "pi" ? await d.getPiConfig() : null;
       if (runtime !== state.runtime || projectRoot !== state.projectRoot || version !== configLoadVersion) return;
-      if (!view) throw new Error("设置通道未就绪");
+      if (!view || !Array.isArray(view.fields) || (d.getRuntimeConfig && (view.runtime !== runtime || !Array.isArray(view.missingKeys) || !view.missingKeys.every(function (key) { return typeof key === "string"; })))) throw new Error("配置摘要未就绪");
       applyPiView(view);
-      renderPiConfigWarning();
+      var missing = renderPiConfigWarning();
+      renderRuntimeConfigNotice(missing.length ? Rt.runtimeLabel(runtime) + " 配置不完整，缺：" + missing.join("、") + "。" : "", "warn", missing.length > 0);
+      return { view: view, missing: missing };
     } catch (err) {
-      if (runtime !== state.runtime || version !== configLoadVersion) return;
+      if (runtime !== state.runtime || projectRoot !== state.projectRoot || version !== configLoadVersion) return;
+      piView = null;
       setPiStatus("读取配置失败：" + (err && err.message ? err.message : err), "err");
+      renderRuntimeConfigNotice("读取 " + Rt.runtimeLabel(runtime) + " 配置失败，请打开设置检查或重试。", "err", true);
     }
   }
 
@@ -1901,6 +1919,7 @@
       renderRight(); renderTabs();
     }
     void loadPiConfig();
+    $("drawer-close").focus();
   }
 
   function toggleSecretVisibility() {
@@ -1914,7 +1933,8 @@
 
   async function savePiConfigFromForm() {
     if (!piView || piView.runtime && piView.runtime !== state.runtime) return;
-    var runtime = state.runtime, projectRoot = state.projectRoot;
+    var runtime = state.runtime, projectRoot = state.projectRoot, saveVersion = ++configSaveVersion;
+    ++configLoadVersion;
     var updates = {};
     (piView.fields || []).forEach(function (f) {
       var inp = piInput(f.key);
@@ -1927,14 +1947,14 @@
     $("pi-save").disabled = true;
     try {
       var res = d.saveRuntimeConfig ? await d.saveRuntimeConfig({ runtime: runtime, updates: updates }) : await d.savePiConfig(updates);
-      if (runtime !== state.runtime || projectRoot !== state.projectRoot) return;
+      if (runtime !== state.runtime || projectRoot !== state.projectRoot || saveVersion !== configSaveVersion) return;
       if (!res || !res.ok) { setPiStatus("保存失败：" + ((res && res.error) || "未知错误"), "err"); return; }
-      await loadPiConfig();
-      if (runtime !== state.runtime || projectRoot !== state.projectRoot) return;
-      setPiStatus("已保存到 .env（改动键：" + ((res.appliedKeys && res.appliedKeys.join("、")) || "无") + "）。" + Rt.applicationLabel(res.application || "next-session"), "ok");
+      var refreshed = await loadPiConfig();
+      if (runtime !== state.runtime || projectRoot !== state.projectRoot || saveVersion !== configSaveVersion) return;
+      if (refreshed) setPiStatus("已保存到 .env（改动键：" + ((res.appliedKeys && res.appliedKeys.join("、")) || "无") + "）。" + (refreshed.missing.length ? "必填配置仍缺：" + refreshed.missing.join("、") + "。" : "必填配置已齐备。") + Rt.applicationLabel(res.application || "next-session"), refreshed.missing.length ? "warn" : "ok");
       if (state.selectedRoleId && state.roleBusy[state.selectedRoleId] !== true && res.application !== "after-active-turn") await selectRole(state.selectedRoleId);
     } catch (err) {
-      if (runtime === state.runtime && projectRoot === state.projectRoot) setPiStatus("保存异常：" + (err && err.message ? err.message : err), "err");
+      if (runtime === state.runtime && projectRoot === state.projectRoot && saveVersion === configSaveVersion) setPiStatus("保存异常：" + (err && err.message ? err.message : err), "err");
     } finally { $("pi-save").disabled = false; }
   }
 
@@ -2019,8 +2039,11 @@
    * 主入口 id 一律取门禁引擎给的 `primaryRoleId`，**不硬编码 "su"**。
    */
   function applyListing(res, fresh) {
+    var projectChanged = state.projectRoot !== res.projectRoot;
+    engineSelector.close(false);
     state.projectRoot = res.projectRoot;
     updatePickButton(); // N-1：已有项目 ⇒ 按钮文案「切换项目」（纯映射见 ui-labels.js）
+    if (projectChanged || fresh) { ++configSaveVersion; void loadPiConfig(); }
     state.roles = res.roles || [];
     state.primaryRoleId = res.primaryRoleId || null;
     state.hasRoles = res.hasRoles !== false;
@@ -2530,6 +2553,7 @@
   }
 
   function updateControls() {
+    engineSelector.sync(state.runtime, !state.projectRoot);
     // 发送仅在**会话已开启**时可用。默认选中主入口但未开会话时，入口是空聊天区的主 CTA（§10.7），
     // 故不因「有选中角色」而放开发送。（「结束会话」按钮已按客户裁定 2026-10-13 删除——
     // 停止能力保留在程序化路径：换项目时 d.stopSession(null)「关闭全部」。）
@@ -3450,6 +3474,8 @@
     });
   }
   // 横栏写入语义对真实引擎相同；选择器另行处理会话身份。
+  var engineSelector = window.ANSEngineSelector.create($("runtime-select"), $("runtime-options"), function (runtime) { void selectRuntime(runtime); });
+  engineSelector.sync(state.runtime, !state.projectRoot);
   renderWriteNote();
   // N-1：初始按钮文案（未导入 ⇒ 「导入项目」；与 HTML 静态文案同款——此后由 applyListing 维护）。
   updatePickButton();
@@ -3457,7 +3483,7 @@
   // Pi 配置面板（设计 §11/T28；客户裁定 2026-10-13 入口上移到右上角图标簇）：tab-pi 点开/再点收起
   // （面板本体与保存/掩码纪律一字未动）；面板内「收起」照旧可关。
   $("tab-pi").addEventListener("click", function () { toggleRightDrawer("pi"); });
-  $("runtime-select").addEventListener("change", function (event) { void selectRuntime(event.target.value); });
+  $("runtime-config-settings").addEventListener("click", openPiPanel);
   $("pi-save").addEventListener("click", savePiConfigFromForm);
   $("pi-toggle-secret").addEventListener("click", toggleSecretVisibility);
   // 右上角图标簇（客户裁定 2026-10-13；第二轮裁定同日：待办/队列归角色，簇只留两枚）——同图标再点收起；
@@ -3513,7 +3539,7 @@
   if (d.getRecoveryState) {
     d.getRecoveryState().then(async function (recovery) {
       if (!recovery || !recovery.projectRoot) return;
-      if (["pi", "codex", "claude"].indexOf(recovery.runtime) >= 0) { state.runtime = recovery.runtime; $("runtime-select").value = state.runtime; }
+      if (["pi", "codex", "claude"].indexOf(recovery.runtime) >= 0) { state.runtime = recovery.runtime; engineSelector.sync(state.runtime, !state.projectRoot); }
       var listing = await d.listProject(recovery.projectRoot);
       applyListing(listing, true); // 恢复界面不调用 loadProject，不停止正在工作的会话。
       var roleId = recovery.roleId || state.primaryRoleId;

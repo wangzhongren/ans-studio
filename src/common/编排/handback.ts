@@ -62,6 +62,12 @@ export interface HandbackContext {
   now?: () => Date;
 }
 
+/** Per-prompt intent, bound to a real turn by the Pipeline send entry. */
+export interface HandbackIntent {
+  required: boolean;
+  taskId?: string;
+}
+
 /** 写类成功事件的路径事实；兼容旧替身，绝不把工具计数当成果。 */
 const WRITE_TOOL_NAMES = ["write_file", "edit_file", "write", "edit"] as const;
 function detailOf(ev: SessionEvent): Record<string, unknown> {
@@ -262,6 +268,8 @@ export async function* withHandback(
   opts: {
     report?: (turnId?: string) => TaskReport | undefined;
     completed?: (turnId?: string) => void;
+    /** Missing real-turn intent is chat; absent resolver preserves direct helper compatibility. */
+    intent?: (turnId?: string) => HandbackIntent | undefined;
     projectRoot?: string;
   } = {},
 ): AsyncIterable<OrchestrationEvent> {
@@ -284,7 +292,19 @@ export async function* withHandback(
           const events = [...(seen.get(key) ?? []), ev];
           seen.delete(key);
           const report = normalizeTaskReport(opts.report?.(turnId));
-          const handback = report !== undefined ? buildReportHandback(report, ctx) : buildTaskHandback(events, ctx);
+          let intent: HandbackIntent | undefined;
+          if (opts.intent === undefined) intent = { required: true, taskId: ctx.taskId };
+          else intent = opts.intent(turnId);
+          if (report === undefined && intent?.required !== true) {
+            opts.completed?.(turnId);
+            log.record("handback.chat.skipped", { turnId });
+            yield ev;
+            continue;
+          }
+          const turnContext = { ...ctx, taskId: intent?.taskId };
+          let handback: TaskHandback;
+          if (report !== undefined) handback = buildReportHandback(report, turnContext);
+          else handback = buildTaskHandback(events, turnContext);
           const detail = detailOf(ev);
           const outcome = detail.outcome;
           if (outcome === "failed" || outcome === "timed_out" || outcome === "aborted") {

@@ -51,7 +51,7 @@ import type { ProjectConfig } from "../../src/model/role.ts";
 import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
-import type { RoleSessionHandle, RoleSessionAbortResult } from "../../src/pipeline/orchestration/run-role.ts";
+import type { RoleSessionHandle, RoleSessionAbortResult, RoleSessionSendOptions } from "../../src/pipeline/orchestration/run-role.ts";
 import { createRuntimeAdapterFactory, type RuntimeAdapterFactoryBuilder, type RuntimeAdapterFactoryOptions, type RuntimeAdapterFactory } from "../../src/pipeline/orchestration/run-role.ts";
 // 会话事件流的类型：编排把 `RoleSessionHandle.events()` 放宽为 `OrchestrationEvent`（既有 `SessionEvent`
 // + 编排在 `settled` 时追加的 `handback` 回交事件，设计 §10.8）。**类型从编排的模块只读导入、不复制形状**
@@ -356,8 +356,8 @@ interface DeliveryItem {
   enqueuedAt: string;
   /**
    * **P0-1（2026-10-13 客户批准）**：随条目**入队即定格**的整包载荷（`PromptOptions`，契约单一来源
-   * `src/model/runtime.ts`；投递时**整包同一引用**透传 `handle.send(text, opts)`——排队后到投递
-   * 都带原图）。缺省（undefined）= 纯文本，投递调用形态与旧版逐字一致（不传第二参）。
+   * `src/model/runtime.ts`；投递时组合编排来源与 ACK 回调，images 数组保持原引用。
+   * 缺省（undefined）= 无图片；纯文本也明确传本轮 handback.required。
    */
   opts?: PromptOptions;
   handback?: TaskHandback;
@@ -501,9 +501,9 @@ export class SessionManager {
     return entry.origins.byTurn.get(event.turnId); // Only the original prompt's real ack creates this mapping.
   }
 
-  private async sendDelivery(entry: LiveSession, origin: DeliveryOrigin, text: string, opts?: PromptOptions): Promise<void> {
-    let promptOptions = opts;
-    // Preserve the exact old single-argument/images package path for unidentified legacy substitutes.
+  private async sendDelivery(entry: LiveSession, origin: DeliveryOrigin, text: string, opts?: PromptOptions, requiresHandback = false): Promise<void> {
+    // Every invocation declares its own source; chat also overrides any legacy session taskId.
+    let promptOptions: RoleSessionSendOptions = { ...opts, handback: { required: requiresHandback } };
     if (entry.handle.runtime !== undefined || origin.clientMessageId !== undefined || opts?.onTurnStarted !== undefined) {
       const onTurnStarted = (metadata: PromptTurnStartedMetadata): void => {
         const key = this.sessionKey(entry.projectRoot, entry.roleId, entry.runtime);
@@ -515,10 +515,9 @@ export class SessionManager {
         }
         opts?.onTurnStarted?.(metadata);
       };
-      promptOptions = { ...opts, onTurnStarted };
+      promptOptions = { ...promptOptions, onTurnStarted };
     }
-    if (promptOptions === undefined) await entry.handle.send(text);
-    else await entry.handle.send(text, promptOptions);
+    await entry.handle.send(text, promptOptions);
   }
 
   private trimDeliveryOrigins(entry: LiveSession): void {
@@ -1008,9 +1007,9 @@ export class SessionManager {
   /** 发送一轮消息给**当前活动会话**（最近一次 open 的角色）；可反复调用。
    *  **L-1（2026-10-12 客户裁定「每个角色…有个队列的概念」）**：角色**忙时不再直接失败**（旧行为＝直转 SDK、
    *  被回 "already processing" 报错给客户）——客户消息作为**第三类**并入**同一条**投递队列（E-1/H-1 共用），
-   *  按到达序在当前任务结束后执行；空闲路径**逐字不变**。返回 `queued:true + position`（界面据此如实提示）。
+   *  按到达序在当前任务结束后执行；空闲路径同样声明聊天来源。返回 `queued:true + position`（界面据此如实提示）。
    *  **P0-1（2026-10-13 客户批准）**：`opts`（图片载荷）为**可选**——忙时**入队即定格**（排队后到投递都带
-   *  原图）；空闲直发**整包同一引用**透传 `handle.send(text, opts)`。不传 `opts` 时调用形态与旧版逐字一致。 */
+   *  原图）；空闲直发与出队均组合本轮来源和 ACK，images 数组保持原引用。 */
   async send(text: string, opts?: PromptOptions, target?: SessionTarget, metadata?: SessionMessageMetadata): Promise<SendResult> {
     // **目标角色在入口定格（2026-10-13 状态机修复）**：并发作废重建（settle 触发的 refreshStaleBoundaries
     // 与本次 send 各自的重建赛跑）会在窗口里清空/替换 `activeRoleId`——按「当下的 activeRoleId」取条目会让
@@ -1051,7 +1050,7 @@ export class SessionManager {
         summary: `你：${shortenText(text, 40)}`,
         // 客户消息逐条独立（**不去重**——同文重复发送是两个意图）：键含自增序号+时间。
         dedupKey: `msg\u0000${++this.messageSeq}\u0000${Date.now()}`,
-        // P0-1：**入队即定格**——整包同一引用存进条目，投递时原样透传（排队不变形）。
+        // P0-1：**入队即定格**——原包存进条目；投递组合来源和 ACK，图片引用不变。
         ...(opts !== undefined ? { opts } : {}),
       });
       const q = this.deliveryQueues.get(this.queueKey(entry.projectRoot, roleId, entry.runtime));
@@ -1072,7 +1071,7 @@ export class SessionManager {
     // 被消费」的竞态）。
     this.notifyRoleState(entry.projectRoot, entry.roleId, entry.runtime);
     try {
-      // P0-1：整包同一引用透传；**不传 opts 时调用形态与旧版逐字一致**（不构造空包）。
+      // P0-1：组合聊天来源与 ACK；图片数组保持原引用。
       await this.sendDelivery(entry, origin, text, opts);
       this.notifyRoleState(entry.projectRoot, entry.roleId, entry.runtime); // 状态准确性：真开跑即外推「工作中」（繁忙与否以会话条目为准）
       diagnostic.record("session.send.end", { ok: true });
@@ -1554,8 +1553,8 @@ export class SessionManager {
     diagnostic.record("delivery.start", { count: batchCount, queueDepth: q.length, state: sent.kind });
     this.notifyRoleState(projectRoot, resolvedTarget, runtime); // 状态准确性：投递开跑即外推「工作中」（shift 时快照尚为闲）
     try {
-      // P0-1：**入队即定格**的整包载荷原样透传（整包同一引用；不传时调用形态与旧版逐字一致）。
-      await this.sendDelivery(entry, origin, sent.text, sent.opts);
+      // P0-1：入队定格载荷与真实条目来源一起投递；图片数组保持原引用。
+      await this.sendDelivery(entry, origin, sent.text, sent.opts, sent.kind === "dispatch");
       diagnostic.record("delivery.end", { ok: true, count: batchCount, state: sent.kind });
       this.notifyRoleState(projectRoot, resolvedTarget, runtime); // 立即外推（running 行即时可见）
       if (sent.kind === "dispatch") this.activeDispatchKeys.delete(sent.dedupKey); // 送达即释放窗口去重（返工可再派）

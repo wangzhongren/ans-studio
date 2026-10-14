@@ -1,5 +1,9 @@
 # 编排 变更记录
 
+## 2026-10-14 — 普通聊天不自动产生任务未报告回交
+
+客户确认 revision 2 后实施：send 的 Pipeline 专用 handback.required 按 Core 真实ACK绑定 turnId；显式聊天覆盖旧 taskId，正式任务兜底与主动报告保留。跳过聊天仍清理本轮，未知真实轮次不借legacy。编排247/247通过，真桌面待测试角色复验。见[修复记录](docs/fix/2026-10-14_fix_chat-handback-scope.md)。
+
 ## 2026-10-13 — P1-4 CLI 产品定位：`ans role run` 帮助与启动提示如实指路（只做定位，不做能力补齐）
 
 **来源**：产品提案 `角色卡/产品/docs/design/2026-10-13_design_desktop-ux-improvement-proposal.md` **§P1-4**，客户 2026-10-13 批准。**本轮只做定位 + 指路，不做任何能力补齐**；终端 y/n 确认通道、CLI 会话持久化、CLI 投递机——**提案明示均不做**（等定位被确认、且有真实 CLI 用户诉求再立项）。

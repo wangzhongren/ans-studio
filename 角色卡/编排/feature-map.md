@@ -15,7 +15,7 @@
 | 自动收尾 / 重 pin | su 会话 settle 后自动重扫并更新 `.ans` pin + manifest（创世首轮 = 首次收尾） | 已实现 | 功能文档待补（同左 + [finalize 相关记录](docs/change/2026-10-12_change_governed-interaction-a3-a4.md)） |
 | shell 闸（三层链：项目角色） | c-b-a审核与留痕；宿主已委托本项目精确常规检查且b明确允许时免重复a | 编排已实现并验证 | [shell审核](docs/feature/shell-review.md) |
 | **su 只读 shell（只读档）** | **su 的 `run_shell` 只执行 (c) 只读白名单命令；risky/review/deny 一律拒——不接 (b)/(a)、不弹框** | **已实现** | [su 只读 shell](docs/change/2026-10-12_change_su-readonly-shell.md)（稳定功能说明待补） |
-| 回交（任务报告） | 按真实turnId隔离报告与证据，未报告/失败如实回交，主入口核对已收到报告后向客户汇总 | 编排已实现并验证 | [任务报告回交](docs/feature/task-handback.md) |
+| 回交（任务报告） | 按真实ACK/turnId隔离来源、报告与证据，普通聊天不自动回交；正式任务未报告/失败如实回交，主入口核对已收到报告后向客户汇总 | 编排已实现并验证 | [任务报告回交](docs/feature/task-handback.md) |
 | su 派发任务 | su 把任务派发给项目角色（前端路由：未开自动开/忙排队/去重）；派发 ≠ 授权 | 已实现（编排侧） | 功能文档待补（[派发接线](docs/change/2026-10-12_change_su-dispatch-wiring.md)、[派发回执](docs/change/2026-10-12_change_dispatch-receipt-queue.md)） |
 | 交互工具 CLI 通道 | CLI 端的客户确认/操作者确认通道（stdin 问答；EOF/未识别一律 fail-closed） | 已实现 | 功能文档待补（[客户确认不设超时](docs/change/2026-10-12_change_customer-input-no-timeout.md)） |
 | 会话自持目录（重启恢复） | 会话数据按角色/runtime 隔离于 `.ans/sessions/<role>/<runtime>/`（Service 注入存储，实际持久化才建目录） | 已实现（编排侧） | 功能文档待补（[session-dir 接线](docs/change/2026-10-12_change_session-dir-restore-wiring.md)） |

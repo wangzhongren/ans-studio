@@ -10,8 +10,8 @@
 //    - 坏 MIME（真字节非图）⇒ 整条拒发（ok:false，handle 不被触碰）；
 //    - 超 5MB ⇒ 整条拒发；
 //    - 合法图 ⇒ 组契约 `PromptOptions`（mimeType 以**嗅探结果**为准，声明值仅线索）→ manager → 句柄
-//      **整包同一引用**透传；
-//    - 队列**入队即定格**：忙时带图入队、settled 放行后**同一引用**投递（排队后到投递都带原图）。
+//      组合来源与 ACK，图片数组原引用、内容保真；
+//    - 队列**入队即定格**：忙时带图入队、settled 放行后图片数组**同一引用**投递（排队后到投递都带原图）。
 //
 // **不发真实模型请求**：全程假句柄 / demo 替身，无网络、无 Pi SDK、不落盘。
 
@@ -23,7 +23,7 @@ import { fileURLToPath } from "node:url";
 import { SessionManager } from "../../app/desktop/session.ts";
 import { createDesktopInterface } from "../../app/desktop/interface.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
-import { openRoleSession as realOpenRoleSession, type RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
+import { openRoleSession as realOpenRoleSession, type RoleSessionHandle, type RoleSessionSendOptions } from "../../src/pipeline/orchestration/run-role.ts";
 import type { PromptOptions } from "../../src/provider/pi/session.ts";
 import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
 import { listProject, type ProjectListing } from "../../src/service/role/resolve-role.ts";
@@ -56,7 +56,7 @@ function listing(): ProjectListing {
 
 interface SentRec {
   text: string;
-  opts?: PromptOptions;
+  opts?: RoleSessionSendOptions;
 }
 
 /** 假句柄：登记 (text, opts)；abort 行为可注入（undefined = 旧式替身不带方法）。 */
@@ -228,7 +228,7 @@ test("P0-1 重校验拒绝路径：坏 MIME（真字节非图）与超 5MB 都**
   assert.equal(sent.length, 0, "句柄仍未被触碰");
 });
 
-test("P0-1 合法图：组契约 PromptOptions（mimeType 以**嗅探**为准）→ 句柄**整包同一引用**透传", async () => {
+test("P0-1 合法图：组契约 PromptOptions（mimeType 以**嗅探**为准）→ 句柄图片载荷保真并明确聊天来源", async () => {
   const sent: SentRec[] = [];
   const streams: Record<string, OrchestrationEvent[]> = { A: [] };
   const desktop = createDesktopInterface(
@@ -260,16 +260,17 @@ test("P0-1 合法图：组契约 PromptOptions（mimeType 以**嗅探**为准）
   assert.equal(imgs![0].data, TINY_PNG, "base64 数据**逐字**透传（不重编码）");
   assert.equal(imgs![0].mimeType, "image/png", "mimeType = 嗅探结果（声明值仅线索）");
 
-  // 纯文本（不传 images）路径行为不变：句柄只收 text（第二参缺省）。先让上一轮以 settled 收尾
+  // 纯文本仍明确声明聊天来源，但不产生图片字段。先让上一轮以 settled 收尾
   //（忙态由真实事件流复位——与生产同形），再发第二条。
   streams.A.push({ kind: "settled", summary: "A 一轮结束" });
   await tick(200);
   await desktop.sendSession({ text: "纯文本" });
   assert.equal(sent.length, 2);
-  assert.equal(sent[1].opts, undefined, "不传 images ⇒ 不构造空包（调用形态与旧版一致）");
+  assert.deepEqual(sent[1].opts?.handback, { required: false }, "纯文本明确chat来源");
+  assert.equal(Object.hasOwn(sent[1].opts!, "images"), false, "无图片不制造images字段");
 });
 
-test("P0-1 队列入队**定格**：忙时带图入队、settled 放行后**同一引用**投递（排队后到投递都带原图）", async () => {
+test("P0-1 队列入队**定格**：忙时带图入队、settled 放行后图片数组**同一引用**投递（排队后到投递都带原图）", async () => {
   const sent: SentRec[] = [];
   const streams: Record<string, OrchestrationEvent[]> = { A: [] };
   let openedRoleId = "";
@@ -304,6 +305,9 @@ test("P0-1 队列入队**定格**：忙时带图入队、settled 放行后**同�
   assert.equal(sent.length, 2, "settled 后队列投递");
   assert.equal(sent[1].text, "第二条带图");
   assert.ok(sent[1].opts, "投递带载荷");
-  assert.equal(sent[1].opts, opts2 as unknown as object, "**同一引用**——入队即定格，排队不变形");
+  assert.notEqual(sent[1].opts, opts2, "来源和ACK使用新外层包，不改客户原包");
+  assert.equal(sent[1].opts?.images, opts2.images, "图片数组原引用——排队不变形");
+  assert.deepEqual(sent[1].opts?.handback, { required: false }, "排队客户图片仍为chat");
+  assert.equal(Object.hasOwn(opts2, "handback"), false, "客户原包不写入编排私有字段");
   assert.equal(sent[1].opts?.images?.[0].data, TINY_PNG, "原图逐字到达");
 });

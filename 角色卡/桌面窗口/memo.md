@@ -2,6 +2,10 @@
 
 记录本角色掌握的事实、待核实事项与续接线索。不写全局规则，不抄任务状态。
 
+- 2026-10-14：客户确认换用「双括号字印」，当前 `APP_ICON_PATH` = `app/desktop/assets/ans-bracket-seal.png`，README 直接引用同一PNG；macOS Electron 独立检查及typecheck通过。[记录](docs/change/2026-10-14_change_bracket-seal-icon.md)。下条悬桥 A 是先前设计历史。
+
+- 2026-10-14：图标由 `app/main.ts` 的 `APP_ICON_PATH` 定位到 `app/desktop/assets/ans-suspended-bridge-a.png`；窗口与 macOS ready 后的 Dock 共用。真实 Electron 独立检查可解码并成功建窗/设置 Dock，完整应用与其他平台外观未验证。[记录](docs/change/2026-10-14_change_suspended-bridge-icon.md)。
+
 - 2026-10-14：角色由 ANS Governance 创建并经客户确认生效（当日原话「桌面UI/桌面窗口 这个可以」），Section 1 覆盖 `app/main.ts`、`app/preload.cjs`、`app/desktop/`（目录）、22 个主进程侧测试文件与角色资料。来源：客户「桌面拆分成两个角色吧，一个UI，一个window 相关的」。
 - 2026-10-14：拆分前全部历史（设计/变更/修复/功能说明/changelog/memo/api-spec）保留在冻结归档 `角色卡/桌面应用/`（原位未移动，链接有效）；本角色 feature-map 按条目链到对应归档文档。归档说明见 `角色卡/桌面应用/归档说明.md`。
 - 2026-10-14：**拆分落地后需处理的测试更新（属本角色侧，交 PM 派发）：已于 2026-10-14 完成（见下条）**——① `e2e/main.mjs` 以 `"桌面应用"` 为样例项目角色（树点击/慢轮缝 arm 钩子/role-state 驱动，82 处提及）——冻结后该角色不再被枚举，须改指新角色 id（建议 `桌面窗口`）；② `session.test.ts:39`、`operator-channel.test.ts:245`、`project.test.ts:31-33` 以真实仓库枚举断言「桌面应用」存在（含 `firstProjectFilePath` = `角色卡/桌面应用/feature-map.md`）——须一并更新。

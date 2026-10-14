@@ -12,7 +12,7 @@ import { buildProjectConfig } from "../../app/desktop/project.ts";
 import { renderHandbackPrompt, type TaskHandback } from "../../src/common/编排/handback.ts";
 import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
 import type { DispatchTaskFn, DispatchReceipt } from "../../src/provider/pi/session.ts";
-import type { RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
+import type { RoleSessionHandle, RoleSessionSendOptions } from "../../src/pipeline/orchestration/run-role.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
 
 const tick = (ms = 60) => new Promise((r) => setTimeout(r, ms));
@@ -59,6 +59,7 @@ interface Harness {
   mgr: SessionManager;
   streams: Record<string, OrchestrationEvent[]>;
   sent: Record<string, string[]>;
+  sendOptions: Record<string, RoleSessionSendOptions[]>;
   envelopes: { roleId: string; event: OrchestrationEvent }[];
   openCalls: string[];
   /** 打开某角色时拿到的派发能力（仅 su 会话应注入）——测试直接调用以驱动路由。 */
@@ -69,6 +70,7 @@ function makeHarness(opts: { failSends?: Record<string, number> } = {}): Harness
   const l = listing();
   const streams: Record<string, OrchestrationEvent[]> = { su: [], A: [], B: [] };
   const sent: Record<string, string[]> = { su: [], A: [], B: [] };
+  const sendOptions: Record<string, RoleSessionSendOptions[]> = {};
   const envelopes: { roleId: string; event: OrchestrationEvent }[] = [];
   const openCalls: string[] = [];
   const openInputs: Record<string, { dispatchTask?: DispatchTaskFn }> = {};
@@ -78,7 +80,8 @@ function makeHarness(opts: { failSends?: Record<string, number> } = {}): Harness
   const makeHandle = (roleId: string): RoleSessionHandle => {
     let i = 0;
     return {
-      async send(text: string): Promise<void> {
+      async send(text: string, options?: RoleSessionSendOptions): Promise<void> {
+        (sendOptions[roleId] ??= []).push(options ?? {});
         if ((failLeft[roleId] ?? 0) > 0) {
           failLeft[roleId] = (failLeft[roleId] ?? 0) - 1;
           throw new Error(`演示：${roleId} 投递通道瞬时失败`);
@@ -124,7 +127,7 @@ function makeHarness(opts: { failSends?: Record<string, number> } = {}): Harness
     getListing: (root) => (root === "/proj" ? l : undefined),
     emitEvent: (env) => envelopes.push(env),
   });
-  return { mgr, streams, sent, envelopes, openCalls, dispatchOf: (roleId) => openInputs[roleId]?.dispatchTask };
+  return { mgr, streams, sent, sendOptions, envelopes, openCalls, dispatchOf: (roleId) => openInputs[roleId]?.dispatchTask };
 }
 
 test("H-1 路由：su 派发 → 目标未开**自动开**并收到派发输入（模板文案）；su 与目标两边都有系统行", async () => {
@@ -139,6 +142,7 @@ test("H-1 路由：su 派发 → 目标未开**自动开**并收到派发输入�
   assert.equal(r.ok, true);
   assert.ok(/已受理/.test(r.message || "") && /未开——将自动开启/.test(r.message || ""), "回执如实（受理≠已完成；会话未开会自动开）");
   await tick(150);
+  assert.deepEqual(h.sendOptions.A.map(o => o.handback), [{ required: true }]);
   assert.ok(h.openCalls.includes("A"), "目标未开会话 ⇒ **自动开启**");
   assert.deepEqual(h.sent.A, [dispatchTemplate("su", "给 A 的活", "因为排期")], "目标收到派发输入（模板文案）");
   assert.ok(
@@ -165,6 +169,7 @@ test("H-1 排队：目标忙 ⇒ 入队；其 settled 后按序放行（绝不�
   assert.deepEqual(h.sent.A, ["A 先忙一会儿"], "A 忙：派发**排队**，不得并发投递");
   h.streams.A.push({ kind: "settled", summary: "A 一轮结束" });
   await tick(150);
+  assert.deepEqual(h.sendOptions.A.map(o => o.handback), [{ required: false }, { required: true }]);
   assert.deepEqual(h.sent.A, ["A 先忙一会儿", dispatchTemplate("su", "排队活")], "settled 后按序放行派发");
   await h.mgr.stop(null);
 });
@@ -184,6 +189,8 @@ test("H-1 失败保留：投递失败 ⇒ 如实系统行（未丢弃）+ 放回
 
   h.streams.A.push({ kind: "settled", summary: "重试时机" });
   await tick(150);
+  assert.ok(h.sendOptions.A.length >= 3);
+  assert.ok(h.sendOptions.A.every(o => o.handback?.required === true), "每次重试保持正式任务来源");
   assert.deepEqual(h.sent.A, [dispatchTemplate("su", "会失败一次")], "保留的派发在下次时机成功送达");
   await h.mgr.stop(null);
 });
@@ -236,6 +243,7 @@ test("H-1 去重：同一派发在**队列期**重复调用 → 去重（只投�
   assert.ok(!/去重/.test(r3.message || ""), "送达后同文再派 → 新派发（不被去重）");
   h.streams.A.push({ kind: "settled", summary: "又一轮结束" });
   await tick(150);
+  assert.deepEqual(h.sendOptions.A.map(o => o.handback?.required), [false, true, true]);
   assert.equal(h.sent.A.filter((t) => t === dispatchTemplate("su", "返工：改 X")).length, 2, "返工可再派（共两次投递）");
   await h.mgr.stop(null);
 });

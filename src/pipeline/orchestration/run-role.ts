@@ -51,6 +51,7 @@ import type {
   DispatchTaskFn,
   OperatorChannelFn,
   PromptOptions,
+  PromptTurnStartedMetadata,
   ReportHandbackFn,
   ReportHandbackMetadata,
 } from "../../model/runtime.ts";
@@ -64,7 +65,7 @@ import {
   type RoutineShellPolicy,
 } from "./shell-arming.ts";
 import { formatEvent } from "../../common/编排/output.ts";
-import { withHandback, type OrchestrationEvent, type TaskReport, normalizeTaskReport } from "../../common/编排/handback.ts";
+import { withHandback, type OrchestrationEvent, type TaskReport, type HandbackIntent, normalizeTaskReport } from "../../common/编排/handback.ts";
 import { EXIT_OK, EXIT_USAGE, EXIT_FAILURE } from "../../common/编排/exit-codes.ts";
 import type { ShellVerdictFn } from "../../common/编排/shell-gate.ts";
 import { repinIfBootstrapped, DEFAULT_GOVERNANCE_BOUNDARY_REL } from "../../common/编排/finalize.ts";
@@ -225,6 +226,11 @@ export interface RoleSessionAbortResult {
   error?: string;
 }
 
+/** Pipeline-only prompt intent; never forwarded as a Runtime option or write authorization. */
+export interface RoleSessionSendOptions extends PromptOptions {
+  handback?: HandbackIntent;
+}
+
 export interface RoleSessionHandle {
   readonly runtime?: RuntimeKind;
   readonly roleId?: string;
@@ -233,13 +239,12 @@ export interface RoleSessionHandle {
   readonly contextWarning?: string;
   /**
    * 发送一轮输入；可反复调用（底层同一会话，不重建）。
-   * **P0-1 图片接线（2026-10-13 客户批准）**：`opts` 为**可选**图片载荷——整包**原样透传**给底层会话的
-   * `prompt(text, opts)`（契约单一来源 `PromptOptions`，从 `src/model/runtime.ts` 只读导入，
-   * **不复制形状**；`images` 为契约 `PromptImage` 块，**空数组 = 无图**，同样原样透传）。
-   * **不传 `opts` 时行为逐字不变**（纯文本，调用形态也与旧版逐字一致）。多模态与否不由本层猜测；
-   * 队列入队定格与桌面接线为**后环**（桌面环节），本层只保证句柄层透传保真。
+   * handback.required:true 标明任务，false 标明聊天并覆盖会话 taskId；缺省沿用明确的会话 taskId。
+   * 真实运行时通过 Core 同步开轮 ACK 绑定本轮来源，组合并恰一次转达调用方的 ACK 回调。
+   * handback 只由编排消费，不传给 Runtime；images 数组保持原引用。
+   * 未标记且没有 ACK 的旧替身保留原 options 引用与单参数调用路径。
    */
-  send(text: string, opts?: PromptOptions): Promise<void>;
+  send(text: string, opts?: RoleSessionSendOptions): Promise<void>;
   /**
    * **停当前轮次（产品提案 P0-2「跑飞轮次的停」，2026-10-13 客户批准）**：向底层会话请求**中止当前
    * 进行中的 prompt 轮次**（模型生成与工具执行一并停）。契约来源 = `RoleSession.abort?`
@@ -396,6 +401,8 @@ export async function openRoleSession(
   const taskReports = new Map<string, TaskReport>();
   const completedTurns = new Set<string>();
   let legacyReport: TaskReport | undefined;
+  const turnIntents = new Map<string, HandbackIntent>();
+  let legacyIntent: HandbackIntent | undefined;
   const reportHandback = suppressHandback
     ? undefined
     : (report: TaskReport, metadata?: ReportHandbackMetadata): void => {
@@ -490,19 +497,46 @@ export async function openRoleSession(
     get contextSource() { return session.contextSource; },
     get nativeSessionId() { return session.nativeSessionId; },
     get contextWarning() { return session.contextWarning; },
-    async send(text: string, opts?: PromptOptions): Promise<void> {
+    async send(text: string, opts?: RoleSessionSendOptions): Promise<void> {
       legacyReport = undefined;
+      let intent: HandbackIntent;
+      if (opts?.handback !== undefined) {
+        intent = { required: opts.handback.required };
+        if (opts.handback.required && opts.handback.taskId) intent.taskId = opts.handback.taskId;
+      } else {
+        intent = { required: typeof input.taskId === "string" && input.taskId !== "" };
+        if (intent.required) intent.taskId = input.taskId;
+      }
+      legacyIntent = intent;
+      let acknowledged = false;
+      let promptOptions: PromptOptions | undefined = opts;
+      // Unmarked legacy doubles retain their old exact-reference/single-argument path.
+      // Real runtimes and explicit Pipeline intent use the Core's synchronous opening ack.
+      if (session.runtime !== undefined || opts?.handback !== undefined || opts?.onTurnStarted !== undefined) {
+        const onTurnStarted = (metadata: PromptTurnStartedMetadata): void => {
+          if (acknowledged || disposed || metadata.roleId !== setup.role.id
+            || (session.runtime !== undefined && metadata.runtime !== session.runtime)
+            || typeof metadata.turnId !== "string" || metadata.turnId === ""
+            || completedTurns.has(metadata.turnId)) return;
+          acknowledged = true;
+          turnIntents.set(metadata.turnId, intent);
+          if (legacyIntent === intent) legacyIntent = undefined;
+          opts?.onTurnStarted?.(metadata);
+        };
+        const { handback: _pipelineIntent, ...runtimeOptions } = opts ?? {};
+        promptOptions = { ...runtimeOptions, onTurnStarted };
+      }
       log.record("session.send.start");
       try {
-      // P0-1：opts **原样透传**（同一引用，不克隆不筛选——空数组=无图也原样交给会话）；
-      // 不传 opts 时调用形态与旧版逐字一致（单参），行为逐字不变。
-        if (opts === undefined) {
+      // 图片原引用保留；真实开轮绑定路径组合 ACK，并剥离 Pipeline 专用来源字段。
+        if (promptOptions === undefined) {
           await session.prompt(text);
         } else {
-          await session.prompt(text, opts);
+          await session.prompt(text, promptOptions);
         }
         log.record("session.send.end");
       } catch (err) {
+        if (!acknowledged && legacyIntent === intent) legacyIntent = undefined;
         log.error("session.send.failed", err);
         throw err;
       }
@@ -530,11 +564,20 @@ export async function openRoleSession(
         : withHandback(stream, { roleId: setup.role.id, taskId: input.taskId }, {
             projectRoot: input.project.projectRoot,
             report: (turnId) => turnId !== undefined ? taskReports.get(turnId) : legacyReport,
+            intent: (turnId) => {
+              if (turnId !== undefined) return turnIntents.get(turnId);
+              if (session.runtime === undefined) return legacyIntent;
+              return undefined;
+            },
             completed: (turnId) => {
               if (turnId !== undefined) {
                 completedTurns.add(turnId);
                 taskReports.delete(turnId);
-              } else legacyReport = undefined;
+                turnIntents.delete(turnId);
+              } else {
+                legacyReport = undefined;
+                legacyIntent = undefined;
+              }
             },
           });
       // 每轮 settle 后**自动收尾 / 自动重 pin**：创世态首次写出 `.ans`（+治理边界文档+manifest），
@@ -567,6 +610,8 @@ export async function openRoleSession(
       taskReports.clear();
       completedTurns.clear();
       legacyReport = undefined;
+      turnIntents.clear();
+      legacyIntent = undefined;
       log.record("session.dispose");
       await session.dispose(); // 出错如实抛出（调用方在 finally 收口）
     },

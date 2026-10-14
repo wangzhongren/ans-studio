@@ -474,8 +474,21 @@ body { display: flex; flex-direction: column; }
 .chat-head-top { display: flex; align-items: center; gap: 12px; }
 .chat-head-main { flex: 1 1 auto; min-width: 0; display: flex; align-items: baseline; gap: 10px; }
 .runtime-select-label { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-2); flex: 0 0 auto; }
-#runtime-select { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 3px 5px; max-width: 95px; }
-#runtime-select:focus-visible { outline: 2px solid var(--text-2); outline-offset: 2px; }
+#runtime-select { width: 104px; height: 28px; flex: 0 0 104px; padding: 0 10px; display: flex; align-items: center; justify-content: space-between; gap: 12px; font: 12px var(--sans); color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
+#runtime-select:hover { background: var(--bg-hover); border-color: var(--border-strong); }
+#runtime-select[aria-expanded="true"] { background: var(--bg-soft); border-color: var(--border-strong); }
+#runtime-select:disabled { color: var(--text-2); background: var(--bg-side); border-color: var(--border); cursor: default; }
+#runtime-select:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.engine-value, .engine-option-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.engine-chevron, .engine-tick { width: 12px; height: 12px; flex: none; fill: none; stroke: var(--text-2); stroke-width: 1.5; }
+#runtime-select[aria-expanded="true"] .engine-chevron { transform: rotate(180deg); }
+.engine-menu { position: fixed; z-index: 1000; width: 160px; max-width: calc(100vw - 16px); padding: 4px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 4px 14px rgba(36,38,36,.08); overflow-y: auto; }
+.engine-menu[hidden] { display: none; }
+.engine-option { height: 32px; padding: 0 10px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+.engine-option[aria-selected="true"] { background: var(--bg-selected); font-weight: 600; }
+.engine-option.active { background: var(--bg-hover); outline: 1px solid var(--border-strong); outline-offset: -1px; }
+.engine-tick { stroke: var(--text); stroke-width: 1.6; visibility: hidden; }
+.engine-option[aria-selected="true"] .engine-tick { visibility: visible; }
 .ti-group-duty { font-size: 10px; color: var(--text-2); margin-left: 5px; overflow-wrap: anywhere; }
 .runtime-field-help { font-size: 11px; color: var(--text-2); line-height: 1.5; overflow-wrap: anywhere; }
 .chat-role { font-size: 15px; font-weight: 650; color: var(--text); line-height: 1.4; }
@@ -1385,3 +1398,9 @@ textarea:focus-visible,
   outline: 2px solid var(--focus-ring);
   outline-offset: 3px;
 }
+
+/* 当前引擎配置摘要：聊天历史外，缺项可直接打开设置。 */
+.runtime-config-notice { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; padding: 8px 24px; font-size: 12px; line-height: 1.5; background: #f4f4f2; }
+.runtime-config-notice[hidden] { display: none; }
+.runtime-config-notice span { overflow-wrap: anywhere; min-width: 0; }
+.runtime-config-notice.is-err { color: #b42318; }

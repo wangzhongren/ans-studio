@@ -1,0 +1,6 @@
+18a6906829b58b52ec22eb5b1fdf980123bb87bd105ef79196d0a55dc3de88f9  app/renderer/renderer.js
+a75bf1e8433d7fdb100b9a6122f49f559c4adb0fbd93edf77d70d500c8ad0b39  app/renderer/index.html
+ce50fd057fdcaf59b094d950c2ab858eed10e553ce85c7b1a50b5bce50792fd0  app/renderer/styles.css
+6622e6746c9c835ba28d53f3be63be5a9a550a2679f1485876e724798316d461  app/renderer/runtime-ui.js
+e0b8b1ab82418dbd6533d01f0723ef66997508a6559e9a7b209e529513563c52  test/桌面应用/renderer.test.ts
+08cd5dc86d9291e6e2ca194598431264e8587f4f8baeba1ef7c45f945dff4715  test/桌面应用/e2e/uiux-v2.mjs

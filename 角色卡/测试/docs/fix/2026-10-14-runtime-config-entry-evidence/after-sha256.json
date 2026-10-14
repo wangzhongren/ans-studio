@@ -1,0 +1,6 @@
+{
+  "app/renderer/renderer.js": "18a6906829b58b52ec22eb5b1fdf980123bb87bd105ef79196d0a55dc3de88f9",
+  "app/renderer/index.html": "a75bf1e8433d7fdb100b9a6122f49f559c4adb0fbd93edf77d70d500c8ad0b39",
+  "app/renderer/styles.css": "ce50fd057fdcaf59b094d950c2ab858eed10e553ce85c7b1a50b5bce50792fd0",
+  ".env": "3d7ecbd3b35a7f546d8e5ddd7f6d96afd190daae812c2010496aab6949b1724f"
+}

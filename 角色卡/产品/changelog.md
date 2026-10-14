@@ -1,5 +1,9 @@
 # 产品 变更记录
 
+## 2026-10-14 — 引擎选择器联合设计产品首轮
+
+新增[产品简报](docs/design/2026-10-14_design_engine-selector-product-brief.md)，建议统一触发器与三项弹层，保留禁用、缺配置恢复、引擎隔离，给完整键盘与窄窗验收条件。同步导航与memo；只读当前源码，第二轮已核对最终原型HTML/JS（aab42cf7…）与UIUX四张双宽图，三条针对性反馈实际闭合，recommend approval限设计方向；不是实施验收，未实现/未操作用户ANS。
+
 ## 2026-10-14 — 两项维护事项（e2e 诊断基线红 / 旧名残留）产品评估，附修复口径与逐项处置
 
 **来源**：客户对遗留维护事项指示「也做了吧，先让产品看一下」；PM 派产品先评审范围与做法。新增[两项维护事项评审](docs/design/2026-10-14_design_maintenance-review-diagnostics-and-residues.md)。

@@ -5,6 +5,7 @@
 
 | 功能 | 一句话用途 | 状态 | 文档 |
 | --- | --- | --- | --- |
+| 应用图标 | 窗口与 macOS 运行中 Dock 使用「双括号字印」PNG，与 README 共用资源 | 已接入 | [接入记录](docs/change/2026-10-14_change_bracket-seal-icon.md) |
 | 窗口生命周期与自绘标题栏接线 | 无边框窗口（`frame:false`、无默认菜单）、三窗口钮/最大化态经 IPC 驱动、关窗释放本窗口 IPC、mac 重开可再建 | 已实现 | 归档：[三栏功能说明](../桌面应用/docs/feature/2026-10-11_feature_desktop-three-pane.md)、[空态收敛与标题栏](../桌面应用/changelog.md)（2026-10-11 条目） |
 | preload 受限 IPC 桥 | `contextBridge` 白名单通道，不暴露任何 Node 能力；两通道兼容（单发/合帧批） | 已实现 | 归档：[api-spec](../桌面应用/api-spec.md)（IPC 通道全表） |
 | 桌面会话装配（点角色即开） | 导入即授权：`.ans` pin-backed acceptance / 运行期同意；多会话保活（LRU 跳过 busy）；边界陈旧检测与作废重建（串行化+身份守卫）；状态机真实快照；按项目/角色/runtime 隔离、profile 变更安全重建 | 窗口单元验证通过，真实窗口待 T1 | [当前行为](docs/feature/multi-runtime-desktop.md)；归档：[`.ans` 接线](../桌面应用/docs/change/2026-10-12_change_session-comment-refresh.md)、[会话恢复](../桌面应用/docs/change/2026-10-12_change_session-restore.md)、[边界刷新](../桌面应用/docs/change/2026-10-12_change_boundary-refresh.md)、[状态机簇修复](../桌面应用/docs/change/2026-10-13_change_state-machine-and-replay-dedup.md) |

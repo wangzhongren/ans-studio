@@ -47,6 +47,7 @@ import { configureDiagnostics, createDiagnosticLogger, flushDiagnostics, dispose
 import { observeWindowDiagnostics, recordRendererDiagnostic, createWindowIpcRegistrar, RECOVERY_PAGE } from "./desktop/diagnostics.ts";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
+const APP_ICON_PATH = path.join(HERE, "desktop", "assets", "ans-bracket-seal.png");
 
 let mainWindow: BrowserWindow | null = null;
 let iface: DesktopInterface | null = null;
@@ -80,6 +81,7 @@ function createWindow(): BrowserWindow {
     minWidth: 960,
     minHeight: 620,
     title: "ANS 桌面应用（受治理会话）",
+    icon: APP_ICON_PATH,
     backgroundColor: "#0f1115",
     // 客户要求（2026-10-11）：去掉原生标题栏与默认菜单栏，自绘一个。
     //  - `frame: false` = 无边框：去掉 OS 那条标题栏（图标 + 标题 + 三个系统按钮）。
@@ -411,6 +413,9 @@ function registerIpc(win: BrowserWindow): void {
 }
 
 app.whenReady().then(async () => {
+  if (process.platform === "darwin") {
+    app.dock?.setIcon(APP_ICON_PATH);
+  }
   configureDiagnostics({ directory: path.join(app.getPath("userData"), "ans", "diagnostics") });
   mainDiagnostic.record("app.start", { pid: process.pid });
   // 去掉默认菜单栏（那条「文件 / 编辑 / View / …」）——客户要求自绘标题栏、不要原生 chrome。

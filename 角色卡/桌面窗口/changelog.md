@@ -1,5 +1,9 @@
 # 桌面窗口 变更记录
 
+- 2026-10-14：客户确认双括号字印并要求更新README和桌面图标；两处共用 `app/desktop/assets/ans-bracket-seal.png`。窗口/macOS Dock 独立检查、typecheck与diff检查通过。[记录](docs/change/2026-10-14_change_bracket-seal-icon.md)。
+
+- 2026-10-14：按客户要求接入悬桥 A 窗口与 macOS Dock 图标；真实 Electron 独立检查通过。客户随后指出与整体风格不搭，产品与 UI/UX 结合现有 CSS 和界面截图重新讨论，生成暖灰/炭灰「双括号字印」PNG 候选 `app/desktop/assets/ans-bracket-seal-concept.png`，尚未替换运行时配置。[接入证据](docs/change/2026-10-14_change_suspended-bridge-icon.md)。
+
 - 2026-10-14：创建——按客户「桌面拆分成两个角色吧，一个UI，一个window相关的」从「桌面应用」拆分：本角色承接 Electron 主进程、窗口生命周期、preload 受限桥与桌面会话装配（`app/main.ts`、`app/preload.cjs`、`app/desktop/` 与主进程侧测试）。**客户 2026-10-14 确认原话「桌面UI/桌面窗口 这个可以」——已确认生效**；旧角色目录原位冻结为归档。Doc: docs/design/2026-10-14_design_role-split-window.md
 
 - 2026-10-14：**拆分落地：样例角色 id 更新（本角色侧待办件，PM 派发执行）**。`test/桌面应用/` 5 个文件（`session`、`operator-channel`、`project`、`p0-halt-and-images`〔清单外同因转红〕与 `e2e/main.mjs` 85 处）里以「桌面应用」为样例角色的引用改指「桌面窗口」；`firstProjectFilePath` 期望按新边界重新推导为 `app/main.ts`；`project.test.ts` 按新枚举事实重写断言（含「冻结目录被跳过并提示」「桌面UI 与 桌面窗口 两个新角色」）。e2e 保留 2 处 `test/桌面应用/` 目录路径（目录名沿用拆分前）。证据：三个指定单测 **42/42 全过**；全部边界内单测 **207 计 206 过 / 1 红**（唯一红=既有基线 `pi-config.test.ts` 检出目录名断言）；`npm run typecheck` 整仓 0 错；e2e 退出 0，与拆分前留档报告逐行对照仅预期差异 + 一条被改名揭开的陈旧抽屉检查（界面断言同步待办，交 PM）。**未改 `app/**`、`src/**`、`test/测试/**` 及任何其他角色文件。** Doc: docs/change/2026-10-14_change_split-role-id-test-updates.md

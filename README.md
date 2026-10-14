@@ -1,5 +1,13 @@
 # ANS —— 受治理会话链路（CLI + 桌面应用）
 
+<p align="center">
+  <img src="app/desktop/assets/ans-bracket-seal.png" alt="ANS 双括号字印：暖灰圆角底、炭灰相向括号与独立短横桥" width="240" />
+</p>
+
+图标采用产品与 UI/UX 对照应用整体风格联合设计的「双括号字印」：暖灰底与炭灰图形
+呼应工作台的浅色分区和克制线框，相向括号表达职责与授权边界，独立短横桥表达边界内的协作。
+README 与桌面窗口、macOS 运行中 Dock 共用同一张透明背景 PNG。
+
 一个**基于 role-first（RFSG），可选择 Pi、Codex 或 Claude 执行**的 agent 系统：
 **role-first（RFSG）管「谁负责、允许改什么」，ANS 公共工具在执行前检查权限，所选引擎执行会话。**
 它把「角色 + 边界」变成一次可审计、fail-closed 的会话：写入**在发生之前**被拦截，

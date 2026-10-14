@@ -75,13 +75,12 @@
               <span id="chat-role-sub" class="chat-role-sub">从左侧选择一个角色开始聊天</span>
               <!-- （停止钮原在聊天头、角色名旁——客户反馈「位置有问题」后已按裁定移到输入框区：
                    发送钮左侧的小圆钮，见下 #composer-capsule；聊天头不再有任何按钮。） -->
-            <label class="runtime-select-label" for="runtime-select">引擎
-              <select id="runtime-select" aria-label="会话引擎">
-                <option value="pi">Pi</option>
-                <option value="codex">Codex</option>
-                <option value="claude">Claude</option>
-              </select>
-            </label>
+            <div class="runtime-select-label"><span>引擎</span>
+              <button id="runtime-select" class="engine-trigger" type="button" role="combobox" aria-label="会话引擎，当前 Pi" aria-haspopup="listbox" aria-controls="runtime-options" aria-expanded="false" aria-disabled="true" disabled>
+                <span class="engine-value">Pi</span>
+                <svg class="engine-chevron" viewBox="0 0 12 12" aria-hidden="true"><path d="m3 4.5 3 3 3-3" /></svg>
+              </button>
+            </div>
             </div>
             <!-- 客户裁定（2026-10-13）：「聊天中/空闲」状态 pill 删除（界面不再显示）——状态本身**程序化保留**：
                  renderer.js::setState 把 kind 写到 #chat 的 data-state 属性（run/idle/err），e2e 与外部驱动仍可断言。
@@ -104,6 +103,11 @@
           <span id="switch-confirm-text" class="swcf-text"></span>
           <button id="switch-confirm-go" class="btn btn-mini" type="button">仍要切换</button>
           <button id="switch-confirm-cancel" class="btn btn-ghost btn-mini" type="button">取消</button>
+        </div>
+
+        <div id="runtime-config-notice" class="runtime-config-notice" role="status" aria-live="polite" hidden>
+          <span id="runtime-config-message"></span>
+          <button id="runtime-config-settings" class="btn btn-ghost btn-mini" type="button" hidden>打开设置</button>
         </div>
 
         <div id="chat" class="chat">
@@ -277,7 +281,13 @@
     <!-- 界面文案纯映射（N-1，2026-10-12：「导入项目 / 切换项目」等）——纯函数，先于 renderer.js 加载
          （renderer 经 `window.ANSUiLabels` 取用）。 -->
     <script src="ui-labels.js"></script>
+    <div id="runtime-options" class="engine-menu" role="listbox" aria-label="会话引擎" hidden>
+      <div id="runtime-option-pi" class="engine-option" role="option" aria-selected="true" data-runtime="pi" title="Pi"><span class="engine-option-name">Pi</span><svg class="engine-tick" viewBox="0 0 12 12" aria-hidden="true"><path d="m2 6 2.5 2.5 5.5-6" /></svg></div>
+      <div id="runtime-option-codex" class="engine-option" role="option" aria-selected="false" data-runtime="codex" title="Codex"><span class="engine-option-name">Codex</span><svg class="engine-tick" viewBox="0 0 12 12" aria-hidden="true"><path d="m2 6 2.5 2.5 5.5-6" /></svg></div>
+      <div id="runtime-option-claude" class="engine-option" role="option" aria-selected="false" data-runtime="claude" title="Claude"><span class="engine-option-name">Claude</span><svg class="engine-tick" viewBox="0 0 12 12" aria-hidden="true"><path d="m2 6 2.5 2.5 5.5-6" /></svg></div>
+    </div>
     <script src="runtime-ui.js"></script>
+    <script src="engine-selector.js"></script>
     <script src="renderer.js"></script>
   </body>
 </html>

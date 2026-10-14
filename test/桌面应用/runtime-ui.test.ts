@@ -91,3 +91,16 @@ test("客户端气泡只按窗口clientMessageId与真实turnId绑定，不猜�
   assert.doesNotMatch(bind,/lastManualSend|lastRuntime|latest|find\(.*text/);
   assert.match(renderer,/window\.crypto\.randomUUID\(\)/);
 });
+
+await import(new URL("../../app/renderer/engine-selector.js", import.meta.url).href);
+const Es = (globalThis as any).ANSEngineSelector;
+test("引擎菜单定位：下开、上翻、限高与横向视口夹取", () => {
+  const rect = {left:600,top:80,bottom:108};
+  const down = Es.placement(rect,{width:960,height:620},160,106);
+  assert.equal(down.down,true); assert.equal(down.top,114); assert.equal(down.left,600);
+  const up = Es.placement({left:900,top:170,bottom:198},{width:960,height:210},160,106);
+  assert.equal(up.down,false); assert.equal(up.left,792); assert.equal(up.top,58);
+  const tiny = Es.placement({left:900,top:50,bottom:78},{width:960,height:100},160,106);
+  assert.equal(tiny.down,false); assert.equal(tiny.maxHeight,36); assert.equal(tiny.top,8);
+  assert.ok(tiny.top+tiny.maxHeight<=92);
+});

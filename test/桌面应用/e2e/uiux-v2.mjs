@@ -18,6 +18,11 @@ let win, pickResolve, sendResolve, withdrawResolve;
 let pickDeferred=false, sendDeferred=false, withdrawMode='fail', interactiveReady=false, operatorMode='normal';
 const reports=[]; const errors=[]; const sends=[]; const opens=[]; const histories=[]; const stops=[]; const aborts=[]; const responses=[]; const configSaves=[]; const shellResponses=[]; const configApplications={};
 let saveMode="success", saveApplication="next-session";
+const CONFIG_ONLY=process.env.ANS_CONFIG_UI_ONLY==='1';
+const SELECTOR_ONLY=process.env.ANS_SELECTOR_UI_ONLY==='1';
+const configReads=[];
+let recoveryEnabled=!(CONFIG_ONLY||SELECTOR_ONLY), listFailure=false, pickResult=ROOT, configFailure=false, configMalformed=false, configDeferred=false, saveDeferred=false;
+let configMissing={}, configPending=[], savePending=[];
 let mergeReplayAfterList=false, sendQueued=false; const mergeHistories=new Map();
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 const js=code=>win.webContents.executeJavaScript(code.includes('await ')?'(async()=>{'+code+'})()':code);
@@ -29,16 +34,16 @@ const queue=[{id:'msg\u0000long',kind:'message',summary:'客户长消息：'+ '�
 let activeQueue=queue.slice();
 const snapshot=(busy=true)=>({roleId:'A',busy,summaries:activeQueue.map(x=>x.summary),queue:activeQueue,running:busy?{id:'running',kind:'message',summary:'正在处理当前请求',full:'',at:'2026-10-13T10:00:00Z'}:null});
 const handlers={
- 'app:renderer-diagnostic':()=>({ok:true}), 'app:recovery-state':()=>({projectRoot:ROOT,roleId:'A'}),'app:recovery-ready':()=>({ok:true}),
- 'window:is-maximized':()=>false,'app:list-project':()=>{if(mergeReplayAfterList)for(const h of mergeHistories.values())win.webContents.send('session:history',h);return listing;},'app:pick-project':()=>ROOT,
+ 'app:renderer-diagnostic':()=>({ok:true}), 'app:recovery-state':()=>recoveryEnabled?({projectRoot:ROOT,roleId:'A'}):({}),'app:recovery-ready':()=>({ok:true}),
+ 'window:is-maximized':()=>false,'app:list-project':(_e,projectRoot)=>{if(listFailure)throw new Error('fixture listing failed');if(mergeReplayAfterList)for(const h of mergeHistories.values())win.webContents.send('session:history',h);return {...listing,projectRoot:projectRoot?.projectRoot||ROOT};},'app:pick-project':()=>pickResult,
  'session:open':(_e,input)=>{opens.push(input);return {ok:true,resumed:true,contextSource:'resumed',runtime:input.runtime,projectRoot:input.projectRoot,profileRevision:0};},'session:live':()=>['A','B'],'session:stop':(_e,input)=>{stops.push(input);return {ok:true};},
  'session:history-get':(_e,input)=>{histories.push(input);return mergeHistories.get(input.runtime+'|'+input.roleId)||{...input,rows:[],error:null,skipped:0};},
  'session:live-views':()=>[{projectRoot:ROOT,roleId:'A',runtime:'pi'},{projectRoot:ROOT,roleId:'B',runtime:'pi'},...opens.map(x=>({projectRoot:x.projectRoot,roleId:x.roleId,runtime:x.runtime}))],
  'session:abort':(_e,input)=>{aborts.push(input);win.webContents.send('session:role-state',{...snapshot(false),...input}); return {ok:true,supported:true};},
  'session:operator-response':(_e,input)=>{responses.push(input);return operatorMode==='expired'?({ok:false,expired:true,error:'离线受控请求已失效'}):({ok:true});},
- 'runtime-config:get':(_e,input)=>runtimeConfig(input.runtime),
+ 'runtime-config:get':(_e,input)=>{configReads.push(input.runtime);return configDeferred?new Promise((resolve,reject)=>configPending.push({runtime:input.runtime,resolve,reject})):configFailure?Promise.reject(new Error('fixture config failed')):configMalformed?{...runtimeConfig(input.runtime),missingKeys:undefined}:runtimeConfig(input.runtime);},
  'shell:confirm-response':(_e,input)=>{shellResponses.push(input);return {ok:true};},
- 'runtime-config:save':(_e,input)=>{if(saveMode!=='fail')configApplications[input.runtime]=saveApplication;configSaves.push({runtime:input.runtime,keys:Object.keys(input.updates)});return saveMode==='fail'?{ok:false,error:'离线原子写失败'}:{ok:true,runtime:input.runtime,appliedKeys:Object.keys(input.updates),revision:1,application:saveApplication};},
+ 'runtime-config:save':(_e,input)=>{if(saveDeferred)return new Promise(resolve=>savePending.push(resolve));if(saveMode!=='fail')configApplications[input.runtime]=saveApplication;configSaves.push({runtime:input.runtime,keys:Object.keys(input.updates)});return saveMode==='fail'?{ok:false,error:'离线原子写失败'}:{ok:true,runtime:input.runtime,appliedKeys:Object.keys(input.updates),revision:1,application:saveApplication};},
  'pi-config:get':()=>({path:ROOT+'/'+('a-very-long-path/'.repeat(12))+'.env',fields:['ANTHROPIC_AUTH_TOKEN','ANS_PI_BASE_URL','ANS_PI_MODEL','ANS_PI_CONTEXT_WINDOW'].map(key=>({key,secret:key==='ANTHROPIC_AUTH_TOKEN',value:key==='ANTHROPIC_AUTH_TOKEN'?'':'fixture',isSet:true}))}),
  'pi-config:save':()=>({ok:true,appliedKeys:[]}),
  'app:pick-image':()=>pickDeferred?new Promise(r=>pickResolve=r):({ok:true,image:{name:'fixture.png',mime:'image/png',size:68,dataBase64:PNG}}),
@@ -48,16 +53,117 @@ const handlers={
 };
 function runtimeConfig(runtime) {
   const definition=RUNTIME_SETTINGS[runtime];
-  return {runtime,label:definition.label,path:runtime==='pi'?ROOT+'/'+('a-very-long-path/'.repeat(12))+'.env':ROOT+'/.env',revision:0,application:configApplications[runtime]||'next-session',missingKeys:[],fields:definition.fields.map(f=>({...f,value:f.secret?'':f.required?'fixture':'',isSet:f.required,source:f.secret&&runtime==='codex'?'fallback':f.required?'environment':'default',fallbackKey:f.secret&&runtime==='codex'?'OPENAI_API_KEY':undefined}))};
+  return {runtime,label:definition.label,path:runtime==='pi'?ROOT+'/'+('a-very-long-path/'.repeat(12))+'.env':ROOT+'/.env',revision:0,application:configApplications[runtime]||'next-session',missingKeys:configMissing[runtime]||[],fields:definition.fields.map(f=>({...f,value:f.secret?'':f.required?'fixture':'',isSet:f.required&&!(configMissing[runtime]||[]).includes(f.key),source:f.secret&&runtime==='codex'?'fallback':f.required?'environment':'default',fallbackKey:f.secret&&runtime==='codex'?'OPENAI_API_KEY':undefined}))};
 }
 Object.entries(handlers).forEach(([name,fn])=>ipcMain.handle(name,fn));
-const key=async name=>{const keyCode=name==='Enter'?'Return':name;win.webContents.sendInputEvent({type:'keyDown',keyCode});if(name==='Enter')win.webContents.sendInputEvent({type:'char',keyCode:'\r'});win.webContents.sendInputEvent({type:'keyUp',keyCode});await pause(50);};
+const key=async (name,modifiers=[])=>{const keyCode=({Enter:'Return',ArrowDown:'Down',ArrowUp:'Up'})[name]||name;win.webContents.sendInputEvent({type:'keyDown',keyCode,modifiers});if(name==='Enter')win.webContents.sendInputEvent({type:'char',keyCode:'\r',modifiers});win.webContents.sendInputEvent({type:'keyUp',keyCode,modifiers});await pause(50);};
 const event=(kind,summary,detail)=>({roleId:'A',event:{kind,summary,detail}});
 function activityEvents(prefix='') { return [event('tool_call','模型请求调用 read_file（目标：a.md）',{toolName:'read_file',path:'a.md'}),event('accepted','read_file 执行完成',{toolName:'read_file',path:'a.md',ok:true,status:'completed',turnId:prefix+'turn-1'}),event('accepted','request accepted',{toolName:'legacy',path:'legacy.md'}),event('denied','文件不存在',{toolName:'read_file',path:'missing.md',status:'failed',ok:false}),event('tool_call','开始执行 read_file',{toolName:'read_file',path:'b.md'}),event('message','真实助手答复保持原文。')]; }
 async function push(channel,payload){win.webContents.send(channel,payload);await pause(80);}
 function ownHistory(){return parseSessionJsonl([{type:'session'},{type:'message',message:{role:'assistant',content:[{type:'toolCall',id:'rs',name:'run_shell',arguments:{command:'ls missing'}}]}},{type:'message',message:{role:'toolResult',toolCallId:'rs',toolName:'run_shell',isError:false,content:[{type:'text',text:'run_shell 已执行：ls missing（exit 1）\nstdout:\nSECRET'}]}},{type:'message',message:{role:'toolResult',toolName:'read_file',isError:false,content:[{type:'text',text:'read_file 失败：lost.md（ENOENT）'}]}},{type:'message',message:{role:'assistant',content:[{type:'text',text:'历史助手答复。'}]}}].map(x=>JSON.stringify(x)).join('\n')).rows;}
 const viewportGeometry=`(() => { const root=document.documentElement,b=document.body,a=document.querySelector('.app'),c=document.querySelector('.composer').getBoundingClientRect(),d=document.getElementById('right-drawer').getBoundingClientRect(); const visible=id=>{let r=document.getElementById(id).getBoundingClientRect();return r.width>0&&r.left>=0&&r.right<=innerWidth&&r.bottom<=innerHeight&&r.top>=0;};return root.scrollWidth===root.clientWidth&&b.scrollWidth===b.clientWidth&&a.scrollWidth===a.clientWidth&&visible('btn-send')&&visible('btn-halt')&&visible('drawer-close')&&d.bottom<=c.top+1;})()`;
 async function reading(){return js(`(() => {let c=document.getElementById('chat'),t=c.getBoundingClientRect().top;let nodes=[...c.querySelectorAll('.msg,.tool-records,.sys-denied')];let n=nodes.find(x=>x.getBoundingClientRect().bottom>t&&x.getBoundingClientRect().top<c.getBoundingClientRect().bottom);return n?{text:n.textContent.slice(0,60),offset:n.getBoundingClientRect().top-t}:null;})()`);}
+async function selectorChecks() {
+  const trigger=`document.getElementById('runtime-select')`, menu=`document.getElementById('runtime-options')`;
+  await check('disabled combobox before import',`${trigger}.disabled&&${trigger}.getAttribute('aria-disabled')==='true'&&${trigger}.getAttribute('role')==='combobox'`);
+  await js(`${trigger}.click();${trigger}.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))`);
+  await check('disabled cannot open',`${menu}.hidden&&${trigger}.getAttribute('aria-expanded')==='false'`);
+  listing.roles=[];listing.hasRoles=false;listing.primaryRoleId=null;configMissing.claude=['ANTHROPIC_API_KEY'];
+  await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)})`);await pause(60);
+  await check('empty folder enables custom selector',`!${trigger}.disabled&&${trigger}.getAttribute('aria-disabled')==='false'`);
+  await js(`${trigger}.focus()`);await key('Enter');await key('End');
+  await check('End browses Claude without commit',`window.__ansRenderer.state.runtime==='pi'&&${trigger}.getAttribute('aria-activedescendant')==='runtime-option-claude'&&document.getElementById('runtime-option-pi').getAttribute('aria-selected')==='true'&&document.getElementById('runtime-option-claude').getAttribute('aria-selected')==='false'`);
+  const before=configReads.length;await key('Space');await pause(70);
+  await check('Space commits Claude once with live missing entry',`window.__ansRenderer.state.runtime==='claude'&&${trigger}.value==='claude'&&${menu}.hidden&&${trigger}.getAttribute('aria-label')==='会话引擎，当前 Claude'&&document.getElementById('runtime-config-settings').textContent==='打开 Claude 设置'`);assert.equal(configReads.length,before+1);
+  const same=configReads.length;await key('Enter');await key('Enter');await pause(40);
+  await check('current Enter only closes',`${menu}.hidden&&window.__ansRenderer.state.runtime==='claude'`);assert.equal(configReads.length,same);
+  await key('Home');await key('ArrowUp');
+  await check('Home opens first and stops at top',`${trigger}.getAttribute('aria-activedescendant')==='runtime-option-pi'`);
+  await key('Escape');
+  await check('Escape cancels and retains trigger focus',`${menu}.hidden&&window.__ansRenderer.state.runtime==='claude'&&document.activeElement===${trigger}`);
+  await key('ArrowDown');await key('ArrowDown');
+  await check('closed arrow opens selected and stops at last',`${trigger}.getAttribute('aria-activedescendant')==='runtime-option-claude'`);
+  await key('Home');await key('Tab');
+  await check('Tab cancels naturally to missing settings',`${menu}.hidden&&window.__ansRenderer.state.runtime==='claude'&&document.activeElement.id==='runtime-config-settings'`);
+  await js(`${trigger}.focus()`);await key('Enter');await key('Home');
+  await key('Tab',['shift']);
+  await check('ShiftTab cancellation leaves natural previous target',`${menu}.hidden&&window.__ansRenderer.state.runtime==='claude'&&document.activeElement.id==='btn-import'`);
+  await js(`${trigger}.focus();${trigger}.click()`);await key('Home');
+  await js(`document.getElementById('runtime-config-settings').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));document.getElementById('runtime-config-settings').focus()`);
+  await check('outside pointer cancels without focus stealing',`${menu}.hidden&&window.__ansRenderer.state.runtime==='claude'&&document.activeElement.id==='runtime-config-settings'`);
+  await js(`${trigger}.focus();${trigger}.click();window.dispatchEvent(new Event('blur'))`);
+  await check('window blur closes without commit',`${menu}.hidden&&window.__ansRenderer.state.runtime==='claude'`);
+  await js(`${trigger}.click();document.getElementById('runtime-option-codex').dispatchEvent(new PointerEvent('pointermove',{bubbles:true}))`);
+  await check('hover moves temporary only and keeps selected check',`${trigger}.getAttribute('aria-activedescendant')==='runtime-option-codex'&&document.getElementById('runtime-option-claude').getAttribute('aria-selected')==='true'`);
+  const mouseBefore=configReads.length;await js(`document.getElementById('runtime-option-codex').click()`);await pause(60);
+  await check('option click commits Codex once',`window.__ansRenderer.state.runtime==='codex'&&${trigger}.value==='codex'&&${menu}.hidden`);assert.equal(configReads.length,mouseBefore+1);
+  const currentClick=configReads.length;await js(`${trigger}.click();document.getElementById('runtime-option-codex').click()`);await pause(30);assert.equal(configReads.length,currentClick);
+  await check('current click no business reread',`${menu}.hidden`);
+  await js(`await window.__ansRenderer.selectRuntime('claude')`);await pause(60);
+  await check('programmatic runtime sync selected and label',`${trigger}.textContent.includes('Claude')&&document.getElementById('runtime-option-claude').getAttribute('aria-selected')==='true'`);
+  for(const width of [1360,960]){win.setContentSize(width,width===960?620:860);await pause(60);await js(`${trigger}.focus();${trigger}.click()`);await key('ArrowUp');await check('selector dimensions and viewport '+width,`(()=>{const t=${trigger}.getBoundingClientRect(),m=${menu}.getBoundingClientRect();return t.width===104&&t.height===28&&m.width===160&&m.left>=8&&m.right<=innerWidth-8&&m.bottom<=innerHeight-8&&document.body.scrollWidth===innerWidth;})()`);fs.writeFileSync(path.join(OUT,'selector-'+width+'-open.png'),(await win.webContents.capturePage()).toPNG());await key('Escape');}
+  await js(`document.querySelector('.engine-value').textContent='VERY LONG ENGINE LABEL THAT MUST NOT OVERFLOW';document.querySelector('#runtime-option-claude .engine-option-name').textContent='Claude VERY LONG LABEL';${trigger}.click()`);
+  await check('long label ellipsis retains accessible full name',`${trigger}.title==='Claude VERY LONG LABEL'&&${trigger}.getAttribute('aria-label').includes('Claude VERY LONG LABEL')&&${trigger}.querySelector('.engine-value').scrollWidth>${trigger}.querySelector('.engine-value').clientWidth&&${menu}.scrollWidth===${menu}.clientWidth`);
+  await key('Escape');await js(`document.querySelector('#runtime-option-claude .engine-option-name').textContent='Claude';await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)})`);await pause(60);
+  await js(`${trigger}.style.position='fixed';${trigger}.style.top='170px';${trigger}.style.left='900px';${trigger}.focus()`);win.setContentSize(960,210);await pause(60);await key('Enter');
+  await check('low viewport flips upward and clamps horizontally',`${menu}.dataset.direction==='up'&&${menu}.getBoundingClientRect().top>=8&&${menu}.getBoundingClientRect().right<=innerWidth-8`);
+  await key('Escape');await js(`${trigger}.style.top='50px'`);win.setContentSize(960,100);await pause(60);await key('End');
+  await check('tiny viewport internal scroll keeps active visible',`(()=>{const m=${menu},a=document.getElementById(${trigger}.getAttribute('aria-activedescendant')),mr=m.getBoundingClientRect(),ar=a.getBoundingClientRect();return m.scrollHeight>m.clientHeight&&mr.top>=8&&mr.bottom<=innerHeight-8&&ar.bottom<=mr.bottom+1&&ar.top>=mr.top-1;})()`);
+  await key('Home');await check('tiny viewport Home active becomes visible',`document.getElementById('runtime-option-pi').getBoundingClientRect().top>=${menu}.getBoundingClientRect().top`);await key('Escape');
+  win.setContentSize(960,620);await js(`${trigger}.style.position='';${trigger}.style.top='';${trigger}.style.left='';${trigger}.click();await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)})`);await pause(60);
+  await check('project application closes pending menu',`${menu}.hidden`);
+  await js(`document.getElementById('runtime-config-settings').click()`);await pause(60);
+  await check('missing entry still opens existing Claude drawer',`window.__ansRenderer.state.rightTab==='pi'&&document.getElementById('drawer-title').textContent==='Claude 配置'`);
+}
+async function configChecks() {
+  const notice=`document.getElementById('runtime-config-notice')`, msg=`document.getElementById('runtime-config-message')`, button=`document.getElementById('runtime-config-settings')`;
+  await check('before import disabled and no notice',`document.getElementById('runtime-select').disabled&&${notice}.hidden`);
+  await js(`await window.__ansRenderer.selectRuntime('claude')`);
+  await check('programmatic no-project guard',`window.__ansRenderer.state.runtime==='pi'`);
+  pickResult=null;await js(`document.getElementById('btn-import').click()`);await pause(60);
+  await check('cancel initial import remains disabled',`document.getElementById('runtime-select').disabled`);
+  pickResult=ROOT;listFailure=true;await js(`document.getElementById('btn-import').click()`);await pause(60);
+  await check('failed initial import remains disabled',`document.getElementById('runtime-select').disabled`);
+  listFailure=false;listing.roles=[];listing.hasRoles=false;listing.primaryRoleId=null;
+  configMissing.pi=['ANTHROPIC_AUTH_TOKEN','ANS_PI_MODEL'];
+  await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)})`);await pause(60);
+  await check('empty imported folder enables and checks Pi without role',`!document.getElementById('runtime-select').disabled&&!${notice}.hidden&&${msg}.textContent.includes('ANS_PI_MODEL')&&window.__ansRenderer.state.selectedRoleId===null`);
+  configMissing.claude=['ANTHROPIC_API_KEY'];configMissing.codex=['CODEX_API_KEY','ANS_CODEX_MODEL'];
+  await js(`await window.__ansRenderer.selectRuntime('claude')`);await pause(60);
+  await check('closed drawer Claude missing key actionable outside chat',`!${notice}.hidden&&${msg}.textContent.includes('ANTHROPIC_API_KEY')&&${button}.textContent==='打开 Claude 设置'&&window.__ansRenderer.state.rightTab===null&&!document.getElementById('chat').textContent.includes('ANTHROPIC_API_KEY')`);
+  await js(`${button}.focus()`);await key('Enter');await pause(60);
+  await check('keyboard opens existing Claude settings',`window.__ansRenderer.state.rightTab==='pi'&&document.getElementById('drawer-title').textContent==='Claude 配置'&&document.getElementById('pi-inp-ANTHROPIC_API_KEY').value===''`);
+  await js(`document.getElementById('drawer-close').click()`);
+  for(const width of [1360,960]){win.setContentSize(width,width===960?620:860);await pause(80);await check('notice fits '+width,`document.body.scrollWidth===innerWidth&&${button}.getBoundingClientRect().right<=innerWidth&&${notice}.getBoundingClientRect().bottom<=innerHeight`);fs.writeFileSync(path.join(OUT,'config-notice-'+width+'.png'),(await win.webContents.capturePage()).toPNG());}
+  configDeferred=true;await js(`await window.__ansRenderer.selectRuntime('pi');await window.__ansRenderer.selectRuntime('codex')`);
+  configPending[1].resolve(runtimeConfig('codex'));await pause(60);configPending[0].resolve(runtimeConfig('pi'));await pause(60);
+  await check('late engine response cannot replace Codex notice',`${msg}.textContent.includes('CODEX_API_KEY')&&!${msg}.textContent.includes('ANTHROPIC_AUTH_TOKEN')`);configPending=[];
+  await js(`void window.__ansRenderer.loadPiConfig();await window.__ansRenderer.loadProject('/new-config-project')`);await pause(30);
+  configPending[1].resolve(runtimeConfig('codex'));await pause(40);configPending[0].reject(new Error('old project failed'));await pause(40);
+  await check('late old project error ignored',`${msg}.textContent.includes('CODEX_API_KEY')&&!${msg}.textContent.includes('读取')`);configPending=[];
+  await js(`void window.__ansRenderer.loadPiConfig();void window.__ansRenderer.loadPiConfig()`);await pause(30);
+  configPending[1].resolve({...runtimeConfig('codex'),missingKeys:[]});await pause(40);configPending[0].resolve(runtimeConfig('codex'));await pause(40);
+  await check('older request on same engine cannot replace latest complete result',`${notice}.hidden`);configPending=[];configDeferred=false;
+  configMalformed=true;await js(`await window.__ansRenderer.loadPiConfig()`);
+  await check('missing summary treated as read failure',`${msg}.textContent.includes('读取 Codex 配置失败')&&!${button}.hidden`);configMalformed=false;
+  pickResult=null;await js(`document.getElementById('btn-import').click()`);await pause(40);listFailure=true;pickResult=ROOT;await js(`document.getElementById('btn-import').click()`);await pause(40);listFailure=false;
+  await check('existing project survives cancel and failed switch',`window.__ansRenderer.state.projectRoot==='/new-config-project'&&!document.getElementById('runtime-select').disabled&&window.__ansRenderer.state.runtime==='codex'`);
+  configFailure=true;await js(`await window.__ansRenderer.loadPiConfig()`);
+  await check('read failure offers settings and never complete',`${msg}.textContent.includes('读取 Codex 配置失败')&&!${button}.hidden&&!document.getElementById('pi-status').textContent.includes('齐备')`);configFailure=false;
+  await js(`await window.__ansRenderer.selectRuntime('claude');window.__ansRenderer.openPiPanel()`);await pause(60);
+  await js(`document.getElementById('pi-save').click()`);await pause(80);
+  await check('successful save retains missing result',`document.getElementById('pi-status').textContent.includes('必填配置仍缺')&&${msg}.textContent.includes('ANTHROPIC_API_KEY')`);
+  saveMode='fail';await js(`document.getElementById('pi-inp-ANTHROPIC_API_KEY').value='FAKE-DRAFT-ONLY';document.getElementById('pi-save').click()`);await pause(80);
+  await check('save failure keeps draft and missing notice',`document.getElementById('pi-inp-ANTHROPIC_API_KEY').value==='FAKE-DRAFT-ONLY'&&document.getElementById('pi-status').textContent.includes('保存失败')&&!${notice}.hidden`);saveMode='success';configFailure=true;
+  await js(`document.getElementById('pi-save').click()`);await pause(80);
+  await check('save success read failure not overwritten',`document.getElementById('pi-status').textContent.includes('读取配置失败')&&!document.getElementById('pi-status').textContent.includes('已保存')&&${msg}.textContent.includes('读取 Claude 配置失败')`);configFailure=false;
+  configMissing.claude=[];await js(`await window.__ansRenderer.loadPiConfig();document.getElementById('pi-save').click()`);await pause(80);
+  await check('save complete hides missing and clears secret input',`${notice}.hidden&&document.getElementById('pi-status').textContent.includes('必填配置已齐备')&&document.getElementById('pi-inp-ANTHROPIC_API_KEY').value===''`);
+  saveDeferred=true;await js(`document.getElementById('pi-save').click()`);await pause(30);
+  await js(`await window.__ansRenderer.selectRuntime('pi');await window.__ansRenderer.selectRuntime('claude')`);await pause(50);
+  savePending[0]({ok:true,appliedKeys:['OLD_SAVE'],application:'current'});await pause(50);saveDeferred=false;
+  await check('save from prior visit cannot overwrite current status',`!document.getElementById('pi-status').textContent.includes('OLD_SAVE')&&document.getElementById('drawer-title').textContent==='Claude 配置'`);
+}
 async function runtimeChecks() {
   const runtimeRoles=[{roleId:'A'}, {roleId:'Pi适配器',group:'运行时接入组',groupDuty:'组员'}, {roleId:'Codex适配器',group:'运行时接入组',groupDuty:'组员'}, {roleId:'Claude适配器',group:'运行时接入组',groupDuty:'组员'}, {roleId:'运行时核心',group:'运行时接入组',groupDuty:'组长'}, {roleId:'项目管理',group:'项目协调组',groupDuty:'组长'}, {roleId:'未知职责',group:'测试 <script>window.INJECTED=1</script>',groupDuty:'<img src=x onerror=window.INJECTED=2>'}, {roleId:'B'}];
   listing.roles=runtimeRoles.map(r=>({...r,cardText:'# '+r.roleId,cardPath:'',boundary:{entries:[]},changelog:null,docs:[]}));
@@ -196,6 +302,8 @@ app.whenReady().then(async()=>{
   win=new BrowserWindow({width:1360,height:860,useContentSize:true,frame:false,show:INTERACTIVE,webPreferences:{preload:path.join(APP,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:false}});
   win.webContents.on('console-message',event=>{if(event.level==='error')errors.push(event.message);});
   await win.loadFile(path.join(APP,'renderer/index.html'));win.setTitle('ANS UI/UX 离线验收');await pause(150);
+  if(SELECTOR_ONLY){await selectorChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports,configReads},null,2));console.log('SELECTOR_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
+  if(CONFIG_ONLY){await configChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports},null,2));console.log('CONFIG_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(process.env.ANS_MERGE_UI_ONLY==='1'){await mergeChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports,sends:sends.map(x=>({text:x.text,target:x.target,clientMessageId:x.metadata&&x.metadata.clientMessageId}))},null,2));console.log('MERGE_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(process.env.ANS_RUNTIME_UI_ONLY==='1'){await runtimeChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports,sends},null,2));console.log('RUNTIME_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   await push('session:role-state',snapshot());

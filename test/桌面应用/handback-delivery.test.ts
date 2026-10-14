@@ -13,7 +13,7 @@ import { SessionManager } from "../../app/desktop/session.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
 import { renderHandbackPrompt, renderHandbackBatchPrompt, type TaskHandback } from "../../src/common/编排/handback.ts";
 import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
-import type { RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
+import type { RoleSessionHandle, RoleSessionSendOptions } from "../../src/pipeline/orchestration/run-role.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
 
 const tick = (ms = 60) => new Promise((r) => setTimeout(r, ms));
@@ -69,6 +69,7 @@ interface Harness {
   mgr: SessionManager;
   streams: Record<string, OrchestrationEvent[]>;
   sent: Record<string, string[]>;
+  sendOptions: Record<string, RoleSessionSendOptions[]>;
   envelopes: { roleId: string; event: OrchestrationEvent }[];
   openCalls: string[];
   policies: { roleId: string; policy: unknown }[];
@@ -79,6 +80,7 @@ function makeHarness(opts: { failSuOpenAttempts?: number; failSuSendTimes?: numb
   const listing = listingWithSuAndA();
   const streams: Record<string, OrchestrationEvent[]> = { su: [], A: [] };
   const sent: Record<string, string[]> = { su: [], A: [] };
+  const sendOptions: Record<string, RoleSessionSendOptions[]> = {};
   const envelopes: { roleId: string; event: OrchestrationEvent }[] = [];
   const openCalls: string[] = [];
   const stopped: Record<string, boolean> = {};
@@ -90,7 +92,8 @@ function makeHarness(opts: { failSuOpenAttempts?: number; failSuSendTimes?: numb
   const makeHandle = (roleId: string): RoleSessionHandle => {
     let i = 0;
     return {
-      async send(text: string): Promise<void> {
+      async send(text: string, options?: RoleSessionSendOptions): Promise<void> {
+        (sendOptions[roleId] ??= []).push(options ?? {});
         if (roleId === "su" && text.startsWith("[回交] ") && reportSendFails > 0) {
           reportSendFails -= 1;
           throw new Error("批报告投递失败");
@@ -144,7 +147,7 @@ function makeHarness(opts: { failSuOpenAttempts?: number; failSuSendTimes?: numb
     getListing: (root) => (root === "/proj" ? listing : undefined),
     emitEvent: (env) => envelopes.push(env),
   });
-  return { mgr, streams, sent, envelopes, openCalls, policies };
+  return { mgr, streams, sent, sendOptions, envelopes, openCalls, policies };
 }
 
 test("E-1 投递：A 的回交到达 → **自动开启 su** 并把 `renderHandbackPrompt` 原文投给 su（单一来源）", async () => {
@@ -157,6 +160,7 @@ test("E-1 投递：A 的回交到达 → **自动开启 su** 并把 `renderHandb
   await tick(150);
 
   assert.ok(h.openCalls.includes("su"), "su 会话未开 ⇒ **自动开启**（su 是治理主入口，验收是其职责）");
+  assert.deepEqual(h.sendOptions.su.map(o => o.handback), [{ required: false }]);
   assert.equal(h.sent.su.length, 1, "su 恰好收到一条输入");
   assert.equal(h.sent.su[0], renderHandbackPrompt(HANDBACK_A1), "投递文本 === 编排 renderHandbackPrompt 的输出（**单一来源**，非复制）");
   assert.ok(h.sent.su[0].includes("角色卡/A/role-card.md") && h.sent.su[0].includes("请验收"), "含报告字段与验收请求");
@@ -246,6 +250,7 @@ test("客户消息屏障：A报告→客户消息→B报告，不跨消息合批
       await waitUntil(() => harness.sent.su.length === round + 2);
     }
     assert.deepEqual(harness.sent.su.slice(1), [renderHandbackPrompt(HANDBACK_A1), "客户屏障", renderHandbackPrompt(HANDBACK_A2)]);
+    assert.ok(harness.sendOptions.su.every(o => o.handback?.required === false), "直发、排队客户消息与回交消费都是chat");
   } finally {
     await harness.mgr.stop(null);
   }

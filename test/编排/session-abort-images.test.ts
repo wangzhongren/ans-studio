@@ -237,3 +237,40 @@ test("P0-1 send：不传 opts ⇒ 旧行为逐字不变（prompt 恰 1 个实参
     cleanup(project);
   }
 });
+
+test("逐轮来源只由编排消费，真实ACK链回一次且图片数组原引用保留", async () => {
+  const project = makeTempProject();
+  const images = [IMG];
+  let received: PromptOptions | undefined;
+  let callbackCount = 0;
+  const adapter: RuntimeAdapter = {
+    async composeContext() { return { systemPrompt: "" }; },
+    async bindRole() {
+      return {
+        runtime: "pi",
+        async prompt(_text, opts) {
+          received = opts;
+          const ack = { turnId: "real-turn", runtime: "pi" as const, roleId: "X" };
+          opts?.onTurnStarted?.(ack);
+          opts?.onTurnStarted?.(ack);
+        },
+        async *events() { yield { kind: "settled" as const, summary: "done", turnId: "real-turn" }; },
+        async dispose() {},
+      };
+    },
+  };
+  const handle = await openRoleSession({ roleId: "X", project }, { createAdapter: () => adapter });
+  try {
+    await handle.send("图片任务", { images, handback: { required: true, taskId: "IMAGE" }, onTurnStarted: metadata => {
+      callbackCount += 1;
+      assert.equal(metadata.turnId, "real-turn");
+    } });
+    assert.equal(received?.images, images);
+    assert.ok(received && !("handback" in received));
+    assert.equal(callbackCount, 1);
+    const reports = [];
+    for await (const event of handle.events()) if (event.kind === "handback") reports.push(event.handback);
+    assert.equal(reports.length, 1);
+    assert.equal(reports[0].taskId, "IMAGE");
+  } finally { await handle.dispose(); cleanup(project); }
+});

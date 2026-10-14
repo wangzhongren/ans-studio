@@ -47,7 +47,7 @@ test("V2r1：真实 Pi/Codex/Claude 可选，保留单一写入语义和退役 D
   assert.ok(STYLES.includes(".chat-head-notes"), "styles.css 应有横栏提示区 .chat-head-notes");
   // 会话一律以 pi 发起（renderer 不再读选择器值）。
   assert.ok(INDEX.includes('id="runtime-select"'), "新真实引擎选择入口存在");
-  for (const runtime of ["pi", "codex", "claude"]) assert.ok(INDEX.includes('value="' + runtime + '"'), "真实引擎选项：" + runtime);
+  for (const runtime of ["pi", "codex", "claude"]) assert.ok(INDEX.includes('data-runtime="' + runtime + '"'), "真实引擎选项：" + runtime);
   assert.ok(RENDERER.includes("runtime: runtime"), "openSession 传本次捕获的所选引擎");
 });
 
@@ -612,11 +612,12 @@ test("P0-1 图片接线：附件随消息**带载荷上送**（IPC→Interface �
   assert.ok(SESS.includes("opts?: PromptOptions"), "DeliveryItem 带整包载荷（入队即定格）");
   assert.ok(SESS.includes("await this.sendDelivery(entry, origin, text, opts);"), "直发带原opts与原投递身份进入唯一发送helper");
   const sendDelivery = SESS.slice(SESS.indexOf("  private async sendDelivery("), SESS.indexOf("  private trimDeliveryOrigins("));
-  assert.ok(sendDelivery.startsWith("  private async sendDelivery(") && sendDelivery.includes("let promptOptions = opts;"), "helper从原opts起步，旧整包路径不复制");
+  assert.ok(sendDelivery.startsWith("  private async sendDelivery(") && sendDelivery.includes("requiresHandback = false") && sendDelivery.includes("let promptOptions: RoleSessionSendOptions = { ...opts, handback: { required: requiresHandback } };"), "helper每次浅包装原opts并明确来源；即时聊天默认false，原图片引用保留");
+  assert.ok(SESS.includes('await this.sendDelivery(entry, origin, sent.text, sent.opts, sent.kind === "dispatch");'), "出队仅dispatch要求回交true，客户聊天及回交false");
   assert.ok(sendDelivery.includes("entry.handle.runtime !== undefined || origin.clientMessageId !== undefined || opts?.onTurnStarted !== undefined"), "只有真实runtime/显示来源/原ack观察者需要必要通知包装");
-  assert.ok(sendDelivery.includes("promptOptions = { ...opts, onTurnStarted };"), "ack只浅包装原字段并补通知，images数组及图片对象仍为原引用");
+  assert.ok(sendDelivery.includes("promptOptions = { ...promptOptions, onTurnStarted };"), "ack浅包装来源包并补通知，images数组及图片对象仍为原引用");
   assert.ok(!/\bimages\s*:|\bopts\.[\w]+\s*=|structuredClone|JSON\.parse|\.map\(/.test(sendDelivery), "helper不得重造图片、复制原图或修改调用者opts");
-  assert.ok(sendDelivery.includes("if (promptOptions === undefined) await entry.handle.send(text);") && sendDelivery.includes("else await entry.handle.send(text, promptOptions);"), "undefined保留单参，有包走实际两参句柄路径");
+  assert.ok(sendDelivery.includes("await entry.handle.send(text, promptOptions);") && !sendDelivery.includes("await entry.handle.send(text);"), "每次发送都以两参传递明确来源包，纯文本聊天也带false");
   assert.ok(sendDelivery.includes("this.sessions.get(key) !== entry") && sendDelivery.includes("metadata.runtime !== entry.runtime || metadata.roleId !== entry.roleId") && sendDelivery.includes('typeof metadata.turnId !== "string" || metadata.turnId === ""'), "通知只接受原句柄及权威角色/runtime/有效turn");
   assert.ok(sendDelivery.includes("entry.origins.byTurn.set(metadata.turnId, origin);") && sendDelivery.includes("opts?.onTurnStarted?.(metadata);"), "只绑定原投递，保留调用者原callback通知");
   const MODEL = fs.readFileSync(path.resolve(HERE, "..", "..", "src", "model", "runtime.ts"), "utf8");
@@ -641,7 +642,7 @@ test("P0-2 停止入口：#btn-halt 在输入框区（发送钮左侧）仅忙�
   assert.ok(capsulePos >= 0 && haltPos > capsulePos && sendPos > haltPos, "停止钮应在输入框胶囊内、发送钮**左侧**（客户反馈后位置）");
   const headStart = INDEX.indexOf('class="chat-head"');
   const headEnd = INDEX.indexOf("</header>", headStart);
-  assert.ok(headStart >= 0 && headEnd > headStart && !INDEX.slice(headStart, headEnd).includes("<button"), "聊天头不得再有按钮（停止钮已移走）");
+  assert.ok(headStart >= 0 && headEnd > headStart && !INDEX.slice(headStart, headEnd).replace(/<button id="runtime-select"[\s\S]*?<\/button>/, "").includes("<button"), "聊天头除已批准引擎combobox外不得有按钮（停止钮已移走）");
   assert.ok(!INDEX.includes('id="btn-stop"'), "退役的「结束会话」按钮不得回归");
   assert.ok(!RENDERER.includes("btn-stop"), "渲染源不得再出现 btn-stop（防回潮钉的子串口径不被新钮破坏）");
   // 圆形次级钮：同款 32px 圆形；hidden 显式补 display:none（display:flex 会压掉 [hidden] 默认）。
@@ -784,7 +785,7 @@ test("N-1：「导入项目 / 切换项目」按钮文案——纯函数两态 +
     "判据只取已有状态 state.projectRoot（不靠界面猜测）"
   );
   assert.ok(
-    /function applyListing\(res, fresh\) \{\n    state\.projectRoot = res\.projectRoot;\n    updatePickButton\(\);/.test(RENDERER),
+    /function applyListing\(res, fresh\) \{[\s\S]{0,160}state\.projectRoot = res\.projectRoot;\n    updatePickButton\(\);/.test(RENDERER),
     "applyListing 应刷新按钮文案（导入/切换同一路径落定）"
   );
   assert.ok(RENDERER.includes("updatePickButton();"), "初始也应刷新（未导入 ⇒ 「导入项目」）");

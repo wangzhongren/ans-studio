@@ -332,7 +332,7 @@ test("openRoleSession（C-1）：项目角色注入 reportHandback；交报告 �
     // ③ 报告形状非法 → 回退既有推导（不硬失败、不报错）。
     const stub3 = stubAdapter([{ kind: "settled", summary: "会话结束" }]);
     const h3 = await openRoleSession({ roleId: "X", project }, { createAdapter: stub3.createAdapter });
-    await h3.send("干活");
+    await h3.send("干活", { handback: { required: true } });
     (stub3.caps()!.reportHandback as unknown as (r: unknown) => void)({ status: "weird", summary: "" });
     const ev3: OrchestrationEvent[] = [];
     for await (const ev of h3.events()) ev3.push(ev);
