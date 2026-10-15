@@ -1,0 +1,24 @@
+{
+  "status": "in-progress",
+  "sourceTag": "v1.0.0",
+  "sourceCommit": "83445ebcf24454c6107838cb7f2221882c6638ea",
+  "at": "2026-10-15T09:53:44.885362+00:00",
+  "platformsPlanned": [
+    "darwin-arm64",
+    "darwin-x64",
+    "win32-x64"
+  ],
+  "releaseRule": "Each native platform build and actual packaged launch smoke must pass; source tag immutable; build overlay and hashes recorded",
+  "credentialPreflight": {
+    "gitSshPush": true,
+    "githubHttpsCredential": false,
+    "ghTokenInEnv": false,
+    "note": "Checking existing browser login; no credentials persisted"
+  },
+  "coverage": "Not yet built or verified; previous development tests do not certify packages",
+  "realEnvSha256": "3d7ecbd3b35a7f546d8e5ddd7f6d96afd190daae812c2010496aab6949b1724f",
+  "protectedDesktopDesign": {
+    "角色卡/UIUX设计师/docs/design/2026-10-15_design_visual-convergence.md": "25474437047fdb864fcb401f8ff42b67bcf77cc534b98b37c44146cfa265c101",
+    "角色卡/UIUX设计师/docs/design/2026-10-15_design_visual-convergence-prototype.html": "e95b363dfe4191f32a53d139de3b80d75a48b89362f886376ed49e3ad7b4ea4b"
+  }
+}

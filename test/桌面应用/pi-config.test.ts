@@ -1,3 +1,4 @@
+import * as piConfigModule from "../../app/desktop/pi-config.ts";
 // test/桌面应用/pi-config.test.ts
 // T28：桌面 Pi 配置面板逻辑（`app/desktop/pi-config.ts` + 经 `interface.ts` 的接线）单测。
 //
@@ -298,4 +299,51 @@ test("interface：getPiConfig/savePiConfig 经注入的临时路径读写（不�
   } finally {
     t.cleanup();
   }
+});
+
+
+test('packaged configuration resolves to persistent userData instead of source/resources while development keeps repo path',()=>{
+ const t=makeTempEnv();try{
+  const resolver=Reflect.get(piConfigModule,'resolveDesktopEnvPath') as ((options:{isPackaged:boolean;userDataPath?:string})=>string)|undefined;
+  const actual=resolver?resolver({isPackaged:true,userDataPath:t.dir}):resolveRepoEnvPath();
+  assert.equal(actual,path.join(t.dir,'.env'),'installed app must never use the source/resources .env path');
+  assert.equal(typeof resolver,'function');assert.equal(resolver!({isPackaged:false}),resolveRepoEnvPath());
+  assert.throws(()=>resolver!({isPackaged:true}),/userData/);
+ }finally{t.cleanup();}
+});
+
+test('packaged settings save and a fresh startup environment share the injected writable path without touching bundled config',async()=>{
+ const t=makeTempEnv();const env:Record<string,string|undefined>={};const packagedPath=piConfigModule.resolveDesktopEnvPath({isPackaged:true,userDataPath:t.dir});
+ const first=createDesktopInterface({pickDirectory:async()=>null,emitEvent:()=>{},envFilePath:packagedPath,piConfigEnv:env});
+ let second:ReturnType<typeof createDesktopInterface>|undefined;
+ try{
+  assert.equal(fs.existsSync(packagedPath),false);assert.deepEqual((await loadPiEnv(env,packagedPath)).applied,[]);assert.equal(fs.existsSync(packagedPath),false,'missing startup settings do not create an env file');
+  assert.ok((await first.getRuntimeConfig('claude')).missingKeys.includes('ANTHROPIC_API_KEY'));
+  const saved=await first.saveRuntimeConfig({runtime:'claude',updates:{ANTHROPIC_API_KEY:SENTINEL_TOKEN,ANS_CLAUDE_MODEL:'fake-model'}});assert.equal(saved.ok,true);assert.equal(JSON.stringify(saved).includes(SENTINEL_TOKEN),false);
+  const view=await first.getRuntimeConfig('claude');assert.equal(view.path,packagedPath);assert.equal(view.fields.find(f=>f.key==='ANTHROPIC_API_KEY')?.isSet,true);assert.equal(view.fields.find(f=>f.key==='ANTHROPIC_API_KEY')?.value,'');
+  const restarted:Record<string,string|undefined>={};await loadPiEnv(restarted,packagedPath);assert.equal(restarted.ANTHROPIC_API_KEY,SENTINEL_TOKEN);
+  second=createDesktopInterface({pickDirectory:async()=>null,emitEvent:()=>{},envFilePath:packagedPath,piConfigEnv:restarted});
+  const reloaded=await second.getRuntimeConfig('claude');assert.deepEqual(reloaded.missingKeys,[]);assert.equal(reloaded.path,packagedPath);assert.equal(JSON.stringify(reloaded).includes(SENTINEL_TOKEN),false);
+  for(const runtime of ['pi','codex','claude'] as const)assert.equal((await second.getRuntimeConfig(runtime)).path,packagedPath,'every runtime reads the same injected settings file');
+ }finally{first.disposeProjectDocuments();second?.disposeProjectDocuments();await first.stopSession();await second?.stopSession();t.cleanup();}
+});
+
+test('packaged smoke requires explicit isolated absolute paths, while ordinary startup has no smoke request',async()=>{
+ const {parsePackagedSmokeArguments}=await import('../../app/desktop/packaged-smoke.ts');const t=makeTempEnv();
+ try{
+  assert.equal(parsePackagedSmokeArguments(['app','--user-data-dir='+t.dir]),undefined);
+  assert.deepEqual(parsePackagedSmokeArguments(['app','--ans-packaged-smoke',path.join(t.dir,'result.json'),'--user-data-dir='+t.dir]),{resultPath:path.join(t.dir,'result.json'),userDataPath:t.dir});
+  assert.deepEqual(parsePackagedSmokeArguments(['app','--ans-packaged-smoke',path.join(t.dir,'result.json'),'--user-data-dir',t.dir]),{resultPath:path.join(t.dir,'result.json'),userDataPath:t.dir});
+  assert.throws(()=>parsePackagedSmokeArguments(['--ans-packaged-smoke','relative.json','--user-data-dir='+t.dir]),/absolute/);
+  assert.throws(()=>parsePackagedSmokeArguments(['--ans-packaged-smoke',path.join(t.dir,'result.json')]),/isolated/);
+ }finally{t.cleanup();}
+});
+
+test('packaged smoke script reads existing IPC and exercises settings without publishing configuration values or calling save/model APIs',async()=>{
+ const {packagedSmokeScript}=await import('../../app/desktop/packaged-smoke.ts');const vm=await import('node:vm');const expected=path.join(os.tmpdir(),'quoted "fixture"','.env');
+ const invoked:string[]=[];let open=false;
+ const nodes:Record<string,unknown>={'runtime-select':{disabled:true},'tab-pi':{click(){open=true;}},'right-drawer':{getAttribute:()=>open?'false':'true'},'drawer-close':{click(){open=false;}}};
+ const bridge=new Proxy({getRecoveryState:async()=>({projectRoot:null}),getRuntimeConfig:async(runtime:string)=>{invoked.push(runtime);return {runtime,path:expected,missingKeys:['FAKE_REQUIRED_KEY'],fields:[{key:'FAKE_SECRET',value:SENTINEL_TOKEN}]};}},{get(target,key){if(!(key in target))throw new Error('unexpected privileged smoke API');return Reflect.get(target,key);}});
+ const observed=await vm.runInNewContext(packagedSmokeScript(expected),{window:{desktop:bridge},document:{querySelector:(selector:string)=>selector==='.app'?{}:null,getElementById:(id:string)=>nodes[id]}});
+ assert.deepEqual(invoked,['pi','codex','claude']);assert.ok(Object.values(observed.checks).every(value=>value===true));assert.equal(open,false);assert.equal(JSON.stringify(observed).includes(SENTINEL_TOKEN),false);
 });

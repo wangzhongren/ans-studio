@@ -16,6 +16,12 @@ entries:
     path: package-lock.json
     purpose: npm install 自动生成的依赖锁定文件
   - kind: file
+    path: .github/workflows/release.yml
+    purpose: v1.0.0 来源可审计的跨平台构建、包测试和 Release 流水线
+  - kind: file
+    path: electron-builder.yml
+    purpose: Electron 分发构建配置与产物资源白名单
+  - kind: file
     path: tsconfig.json
     purpose: TypeScript 编译配置
   - kind: file

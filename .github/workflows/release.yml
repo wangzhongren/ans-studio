@@ -1,0 +1,113 @@
+name: Build and verify release
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: Frozen application source tag
+        required: true
+        default: v1.0.0
+      publish:
+        description: Publish draft after all native gates pass
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: release-v1.0.0
+  cancel-in-progress: false
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            platform: mac
+            arch: arm64
+          - os: macos-15-intel
+            platform: mac
+            arch: x64
+          - os: windows-2025
+            platform: win
+            arch: x64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.14.0
+          registry-url: https://registry.npmjs.org
+      - name: Assemble frozen source and explicit overlay
+        env:
+          SOURCE_REF: ${{ inputs.source_ref }}
+        run: node src/common/装配/release-prepare.mjs
+      - name: Install exact locked dependencies
+        working-directory: .release/source
+        run: npm ci
+      - name: Typecheck
+        working-directory: .release/source
+        run: npm run typecheck
+      - name: Regression tests
+        working-directory: .release/source
+        run: node --test "test/**/*.test.ts"
+      - name: Package native executable
+        working-directory: .release/source
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npm run package -- --${{ matrix.platform }} --${{ matrix.arch }} --publish never
+      - name: Verify extracted archive and actual packaged UI
+        working-directory: .release/source
+        run: node src/common/装配/release-verify.mjs release-output ${{ matrix.arch }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            .release/source/release-output/*.zip
+            .release/source/release-output/manifest-*.json
+            .release/source/release-output/SHA256SUMS-*.txt
+          if-no-files-found: error
+      - name: Flatten provenance artifact layout
+        if: always()
+        run: node src/common/装配/release-provenance.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: provenance-${{ matrix.platform }}-${{ matrix.arch }}
+          path: .release/provenance/
+  release:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          merge-multiple: true
+          path: release-assets
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: provenance-*
+          path: release-provenance
+      - name: Verify full native artifact set and source bindings
+        run: node src/common/装配/release-assets.mjs release-assets release-provenance
+      - name: Verify and upload only passing assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_PUBLISH: ${{ inputs.publish }}
+        shell: bash
+        run: |
+          cd release-assets
+          test "$(find . -name '*.zip' | wc -l)" -eq 3
+          for sums in SHA256SUMS-*.txt; do sha256sum -c "$sums"; done
+          if gh release view v1.0.0 --json isDraft --jq '.isDraft' > draft-state.txt; then
+            test "$(cat draft-state.txt)" = true
+          else
+            gh release create v1.0.0 --verify-tag --draft --title 'ANS Studio 1.0.0' --notes '基于固定 v1.0.0 源码及 manifest 列明的打包修复 overlay。macOS arm64、macOS x64、Windows x64 各由原生 runner 构建并实际启动验证。未签名、未公证：macOS Gatekeeper 或 Windows SmartScreen 可能提示，请先核对 SHA256。最低 macOS 13；Windows 10/11 x64。包内不含密钥，首次使用请在设置中填写。详细来源与测试见各平台 manifest。'
+          fi
+          gh release upload v1.0.0 ./*.zip ./manifest-*.json ./SHA256SUMS-*.txt ./release-provenance.json ./overlay.patch
+          if test "$RELEASE_PUBLISH" = true; then gh release edit v1.0.0 --draft=false; fi

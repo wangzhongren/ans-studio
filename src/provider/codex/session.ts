@@ -62,7 +62,10 @@ async function nativeEngine(input: CodexEngineInput, cliPath?: string): Promise<
     argumentsPrefix = [path.join(path.dirname(packageJson), "bin/codex.js")];
   }
   const child = spawn(command, [...argumentsPrefix, "app-server", "--listen", "stdio://", "--strict-config", ...input.configOverrides.flatMap(value => ["-c", value])], {
-    cwd: input.cwd, env: input.env, stdio: ["pipe", "pipe", "pipe"], detached: process.platform !== "win32",
+    // Electron's executable is also our Node host for the default JS CLI. Keep
+    // the isolated allowlist; explicit native CLI paths need no Electron flags.
+    cwd: input.cwd, env: !cliPath && process.versions.electron ? { ...input.env, ELECTRON_RUN_AS_NODE: "1" } : input.env,
+    stdio: ["pipe", "pipe", "pipe"], detached: process.platform !== "win32",
   });
   const requests = new Map<number, { resolve: (value: unknown) => void; reject: (reason: unknown) => void; timer: ReturnType<typeof setTimeout> }>();
   const listeners = new Set<(method: string, params: unknown) => void>();

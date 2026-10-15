@@ -70,3 +70,5 @@ flowchart TD
 | 2026-10-14 | 修复 | 已验证 | 可选地址空白使用官方默认，显式优先级与环境快照一致 | [空地址修复](../fix/2026-10-14_fix_blank-base-url-default.md) |
 
 2026-10-15 当前真实工具展示已经接入A4；required/profile在原生初始化前检查，真实opaque身份不再经过旧递归scrub。模型原text/content/images保持。自有22/22与固定CLI0.162.1本地假服务回环通过；最终全仓类型检查通过，在线/真实桌面未在本角色验证。见[本次实施](../change/2026-10-15_change_tool-display-projection.md)。
+
+2026-10-15 安装包兼容：默认 JavaScript Codex CLI 在 Electron 宿主中，仅给严格隔离的子进程环境增加 `ELECTRON_RUN_AS_NODE=1`；普通 Node 和显式原生 `cliPath` 保持原样。25/25 自有回归、类型检查和实际 Electron+真实 CLI 无模型线程初始化/清理通过，最终发行安装包和 Windows 由装配/测试验收。见[修复与证据](../fix/2026-10-15_fix_packaged-electron-node-launch.md)。

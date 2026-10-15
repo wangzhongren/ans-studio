@@ -10,3 +10,5 @@
 
 
 2026-10-15 Codex-A-1：固定本角色实施A4/C2.tp1 consumer r2；批准13/Core14均MATCH。生产仅session.ts，自有session.test.ts；22/22，实际命令6/6，pinned CLI0.162.1+realMCP本地假SSE回环绿，外部模型0。最终全仓typecheck0。候选/依赖与复跑脚本见docs/change/2026-10-15_change_tool-display-projection.md；不触protocol/config/他人文件。
+
+2026-10-15 v1.0发行必要修复：仅session.ts默认JS CLI+Electron宿主时，spawn隔离env副本增加ELECTRON_RUN_AS_NODE=1。Node/显式native CLI不变。新增3实际spawn断言，自有25/25、tsc0、diffcheck0；真实Electron44.7+CLI0.162.1本地initialize/config/受限thread/start/dispose通过，模型0。生产SHA0b603897...，见docs/fix/2026-10-15_fix_packaged-electron-node-launch.md。装配必须保持runAsNode fuse并实际packaged测试；owner未在Windows验收，不动tag/commit。

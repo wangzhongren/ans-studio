@@ -2264,7 +2264,7 @@
     var fields = piView.fields || [];
     var label = piView.label || Rt.runtimeLabel(state.runtime);
     var hint = $("pi-panel").querySelector(".pi-panel-hint");
-    hint.textContent = "保存到仓库根 .env，只修改本引擎字段。" + Rt.applicationLabel(piView.application || "next-session");
+    hint.textContent = "保存到上方显示的 .env 路径，只修改本引擎字段。" + Rt.applicationLabel(piView.application || "next-session");
     function fieldHtml(f) {
       var required = f.required === true || (state.runtime === "pi" && PI_REQUIRED_KEYS.indexOf(f.key) >= 0);
       return '<label class="pi-field" for="pi-inp-' + esc(f.key) + '"><span class="pi-field-label">' +

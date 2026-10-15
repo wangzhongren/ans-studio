@@ -18,7 +18,10 @@
     "demo": "node bin/ans.js role run 编排 --task T-1",
     "app": "electron app/main.ts",
     "test:assembly": "node --test \"test/装配/**/*.test.ts\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "package": "electron-builder --config electron-builder.yml",
+    "release:prepare": "node src/common/装配/release-prepare.mjs",
+    "release:verify": "node src/common/装配/release-verify.mjs"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "0.3.299",
@@ -31,6 +34,7 @@
   },
   "devDependencies": {
     "electron": "44.7.0",
+    "electron-builder": "26.15.3",
     "typescript": "^7.0.2"
   }
 }

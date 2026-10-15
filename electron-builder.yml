@@ -1,0 +1,29 @@
+appId: io.github.wangzhongren.ans-studio
+productName: ANS Studio
+copyright: Copyright © 2026 ANS Studio contributors
+asar: false
+npmRebuild: false
+directories:
+  output: release-output
+files:
+  - app/**/*
+  - src/**/*
+  - bin/**/*
+  - package.json
+  - LICENSE
+  - '!**/.env*'
+  - '!**/.ans{,/**/*}'
+  - '!**/*.{log,map}'
+  - '!**/test{,/**/*}'
+  - '!**/tests{,/**/*}'
+artifactName: 'ANS-Studio-${version}-${os}-${arch}.${ext}'
+mac:
+  icon: app/desktop/assets/ans-bracket-seal.png
+  target: zip
+  category: public.app-category.developer-tools
+  identity: null
+  minimumSystemVersion: '13.0'
+win:
+  icon: app/desktop/assets/ans-bracket-seal.png
+  target: zip
+publish: null

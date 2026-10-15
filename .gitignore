@@ -4,3 +4,5 @@ node_modules/
 .ans/sessions/
 .claude/settings.local.json
 *.log
+.release/
+release-output/

@@ -26,3 +26,5 @@ CLI 四运行时的当前接线见 [稳定功能说明](docs/feature/cli-runtime
 - 文档现状：本次建立四运行时装配的稳定功能、设计与原始变更证据；公开报告见 [api-spec](api-spec.md)。原 govern 修复和 help 透传记录继续保留。
 - 用户可操作的系统功能属于各能力角色，见各自 `角色卡/<角色>/feature-map.md`（与装配接线最相关的：[编排](../编排/feature-map.md)、[桌面UI](../桌面UI/feature-map.md)、[桌面窗口](../桌面窗口/feature-map.md)）。
 - 装配的启动检查与冒烟不替代测试角色的跨角色联调与回归。
+
+- [桌面运行包构建与发布](docs/feature/desktop-release-packaging.md)：固定 tag 加精确 overlay、三原生架构 ZIP、实际解压程序启动、来源与校验清单；CI/发布实测状态见本次变更。

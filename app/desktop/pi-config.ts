@@ -70,6 +70,15 @@ export function resolveRepoEnvPath(): string {
   return path.join(path.resolve(HERE, "..", ".."), ".env");
 }
 
+/** Main injects this one path into startup loading and every runtime settings operation. */
+export function resolveDesktopEnvPath(options: { isPackaged: boolean; userDataPath?: string }): string {
+  if (!options.isPackaged) return resolveRepoEnvPath();
+  if (typeof options.userDataPath !== "string" || !path.isAbsolute(options.userDataPath)) {
+    throw new Error("Packaged runtime configuration requires an absolute userData path.");
+  }
+  return path.join(options.userDataPath, ".env");
+}
+
 /** 面板里单个键的视图。 */
 export interface PiConfigField {
   key: string;

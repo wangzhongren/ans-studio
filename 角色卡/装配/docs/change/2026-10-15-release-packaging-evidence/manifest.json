@@ -1,0 +1,36 @@
+{
+  "producer": "装配",
+  "sourceRef": "v1.0.0",
+  "sourceSha": "83445ebcf24454c6107838cb7f2221882c6638ea",
+  "status": "implemented-awaiting-native-ci",
+  "files": {
+    "package.json": "22c1d6fb9ca25e0b7491f883164be35dfd5f4eaf00e5c089b70be69ca2d9b97c",
+    "package-lock.json": "d20e6ba6f5e7b2074a662ecaf8228be00c5c537e3bc3c4f9a3bb85cdf2b31d98",
+    ".gitignore": "8ddb6245db81e99e990842672ec5b5f228d8cb81779b57912091675b231ef265",
+    "README.md": "46b9d68d5b9de0a3a2f51a4f35c767954f27960ae628875460f5e4e8fe74e3ca",
+    "electron-builder.yml": "bab71c8399472061824aceefc2be3facce0ffecafa836dd22271cba6383d6be2",
+    ".github/workflows/release.yml": "9a14f3caed9055fb7cb884f345e4669cadd25fbd8ab4bfcd9efb097cb6233b9a",
+    "test/装配/release-packaging.test.ts": "bbbffb79e1de9773e18d1d5642b670d4f2b2109f8db74ba1edf66f291b0985aa",
+    "src/common/装配/release-assets.mjs": "dee3fed2f2dd83d60504a2d470ed528d5596ce8f4020c3541e673481718a2055",
+    "src/common/装配/release-policy.d.mts": "ab6a8c3317eef0a7617ebc6c920f92b1927e260144e237eb167e479d900b16ff",
+    "src/common/装配/release-policy.mjs": "9768a6af2462a19e1ee0840585b39c3f1e14c937ebe8997353d57081eaa2cc8d",
+    "src/common/装配/release-prepare.mjs": "58370ecd1245eedb109af82a464f6f00401a4cd435603753d599ac66931cc6f5",
+    "src/common/装配/release-provenance.mjs": "d2e491dd177500d313037a88265d082f2c7b79ab22e7b3b4d115533f784c5cb4",
+    "src/common/装配/release-verify.mjs": "44206588b6fa7975eebf5be6b5f12b2d7ef7a537cab5f17312cc9ee7a78a00ef"
+  },
+  "checks": {
+    "assemblyTests": {
+      "total": 70,
+      "pass": 70,
+      "fail": 0
+    },
+    "typecheckExit": 0,
+    "localBuild": "mac-arm64 ZIP built using existing Electron44.7.0 distribution, unsigned; uncommitted discovery candidate, not release source proof",
+    "nativeCi": "not yet run",
+    "release": "not uploaded"
+  },
+  "limitations": [
+    "Local build is not Windows or macOS x64 evidence.",
+    "Source overlay manifest must be generated after candidate commit; no fabricated release provenance."
+  ]
+}

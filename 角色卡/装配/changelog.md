@@ -1,5 +1,7 @@
 # 装配 变更记录
 
+- 2026-10-15：ANS Governance 依据客户“让相关角色配置打包流程，基于 v1.0.0 编译 macOS 和 Windows 运行包，测试通过后上传 Release”明确授权，新增 `.github/workflows/release.yml` 与 `electron-builder.yml` 两个精确单文件；同步 MD 中漏列的现有 YAML 条目，不放开 `.github/` 目录、不修改 tag/pin 或应用代码。见[治理记录](docs/change/2026-10-15_change_release-packaging-boundary.md)。
+
 ## 2026-10-14 — README 过时表述核改（客户指示「修改一下，并且提交」；PM 转达漂移点，逐条实读核实）
 
 PM 初查给出 5 类漂移点；本任务**每条先对现行代码 / 记录核实再改**（不照抄转述），并顺带扫同类过时处。**由 PM 统一提交**（本角色不 commit）。

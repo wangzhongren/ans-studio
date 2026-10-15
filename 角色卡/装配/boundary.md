@@ -7,9 +7,15 @@
 | 单文件 | `src/index.ts` | CLI 根入口与层间接线 |
 | 单文件 | `bin/ans.js` | 可执行入口脚本 |
 | 单文件 | `package.json` | 包定义、依赖与脚本 |
+| 单文件 | `package-lock.json` | npm install 自动生成的依赖锁定文件 |
+| 单文件 | `.github/workflows/release.yml` | v1.0.0 来源可审计的跨平台构建、包测试和 Release 流水线 |
+| 单文件 | `electron-builder.yml` | Electron 分发构建配置与产物资源白名单 |
 | 单文件 | `tsconfig.json` | TypeScript 编译配置 |
 | 单文件 | `README.md` | 安装与使用说明 |
 | 单文件 | `LICENSE` | 客户指定的项目开源许可证 |
+| 单文件 | `.env` | 本地环境配置，含 Pi 凭据；不入库 |
+| 单文件 | `.env.example` | 环境变量示例，只含占位符，可入库 |
+| 单文件 | `.gitignore` | 忽略规则（node_modules/、.env 等） |
 | 目录（私有） | `src/common/装配/` | 本角色私有辅助代码 |
 | 目录（测试） | `test/装配/` | 本角色的启动冒烟与接线测试及夹具 |
 | 单文件 | `角色卡/装配/feature-map.md` | 功能导航 |
@@ -21,6 +27,7 @@
 | 目录 | `角色卡/装配/docs/feature/` | 本角色功能的稳定说明与流程图 |
 | 目录 | `角色卡/装配/docs/change/` | 变更记录 |
 | 目录 | `角色卡/装配/docs/fix/` | 修复记录 |
+| 条件目录 | `.ans/` | 仅 `project-init` 条件：项目初始化产物（角色表、治理边界与接受证据 SHA-256 pin） |
 
 入口只持有接口层句柄，不导入服务层或提供方层对象；不得建立导入全部层的中央工厂。装配冒烟检查不替代固定测试角色的联调与回归。
 

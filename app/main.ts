@@ -18,11 +18,12 @@ import { fileURLToPath } from "node:url";
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
 
 import { createDesktopInterface, type DesktopInterface } from "./desktop/interface.ts";
-// 运行时配置：启动把仓库根 `.env` 载入 `process.env`（补 Electron 缺失的 `--env-file`）；
+// 运行时配置：开发使用仓库 `.env`，安装包使用 userData/.env，启动载入 `process.env`（补 Electron 缺失的 `--env-file`）；
 // 面板经 IPC 读写同一 `.env`。**`.env` 的读写全仓唯一**在共享模块 `src/common/shared/env-file.ts`
 // （pm 属主）——此处**只读导入，不复制**；路径由 `./desktop/pi-config.ts` 解析（可注入，测试/e2e 用临时路径）。
 import { loadEnvFileInto } from "../src/common/shared/env-file.ts";
-import { resolveRepoEnvPath } from "./desktop/pi-config.ts";
+import { resolveDesktopEnvPath } from "./desktop/pi-config.ts";
+import { parsePackagedSmokeArguments, packagedSmokeScript } from "./desktop/packaged-smoke.ts";
 // 会话事件外推的类型（B-2）：`SessionEventEnvelope` = `{projectRoot,roleId,runtime,event}` 信封（按三元身份分发）；
 // `event` 为编排导出的 `OrchestrationEvent`（既有 `SessionEvent` + `settled` 时的 `handback`，设计 §10.8）。
 // **类型从本角色 session.ts 只读导入、不复制形状**——IPC 外推原样透传。
@@ -45,6 +46,14 @@ import { createEventBatcher, createRoleStateDebouncer } from "./desktop/push-bat
 import { configureDiagnostics, createDiagnosticLogger, flushDiagnostics, disposeDiagnostics } from "../src/common/shared/diagnostics.ts";
 import { observeWindowDiagnostics, recordRendererDiagnostic, createWindowIpcRegistrar, RECOVERY_PAGE } from "./desktop/diagnostics.ts";
 
+const smokeRequest = parsePackagedSmokeArguments(process.argv);
+if (smokeRequest) {
+  // Only the explicit verification entry overrides userData; normal app startup keeps Electron's default.
+  fs.mkdirSync(smokeRequest.userDataPath, { recursive: true, mode: 0o700 });
+  app.setPath("userData", smokeRequest.userDataPath);
+}
+let desktopEnvPath: string | undefined;
+
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const APP_ICON_PATH = path.join(HERE, "desktop", "assets", "ans-bracket-seal.png");
 
@@ -57,16 +66,16 @@ const mainDiagnostic = createDiagnosticLogger({ component: "desktop.main" });
 let showMainFailure: (() => void) | undefined;
 
 /**
- * 启动时把**仓库根 `.env`**载入 `process.env`——**这正是补上 `package.json` 里缺失的 `--env-file`**
+ * 启动时把**已解析的运行时 `.env`**载入 `process.env`——**这正是补上 `package.json` 里缺失的 `--env-file`**
  * 后续所选引擎经 Pipeline/Service 消费有效配置；保存应用由 Interface 安全点控制。
  * **只回报键名、绝不打印任何值**。
  *
  * 失败处理：`.env` 不存在 → 无操作（`loadEnvFileInto` 的 ENOENT 分支）；其它读取失败**不阻断启动**
  * （界面面板仍可用于补救），且**不打印任何值**（如实留空）。
  */
-async function loadDesktopEnv(): Promise<void> {
+async function loadDesktopEnv(envPath: string): Promise<void> {
   try {
-    await loadEnvFileInto(process.env, resolveRepoEnvPath());
+    await loadEnvFileInto(process.env, envPath);
   } catch (error) {
     mainDiagnostic.error("app.environment.failed", error);
     // 读取失败不阻断启动；不打印值（凭据纪律，设计 §11.4）。
@@ -275,7 +284,9 @@ function registerIpc(win: BrowserWindow): void {
   const shellOperatorChannel =
     shellArming !== undefined ? buildDesktopOperatorChannel(shellConfirm.presenter) : undefined;
 
+  if (!desktopEnvPath) throw new Error("运行时配置路径尚未初始化。");
   const desktop = createDesktopInterface({
+    envFilePath: desktopEnvPath,
     pickDirectory: async () => {
       const result = await dialog.showOpenDialog(win, {
         title: "导入项目（选择项目根文件夹）",
@@ -433,10 +444,28 @@ app.whenReady().then(async () => {
   // 被移除的只是默认菜单提供的加速键（Ctrl+R 重载、Ctrl+Shift+I 开发者工具、Ctrl+Q 退出等）。
   // 本应用是极简聊天工具，这些**并非必要**，故**不补回任何加速键**（更不把菜单栏加回来）。
   Menu.setApplicationMenu(null);
-  // 先把 `.env` 载入环境（补 `--env-file`），再建窗——使首个 pi 会话即拿得到 `ANS_PI_*`/token。
-  await loadDesktopEnv();
+  // Resolve once after Electron initialization; package resources are never the settings write target.
+  const userDataPath = app.getPath("userData");
+  if (app.isPackaged) await fs.promises.mkdir(userDataPath, { recursive: true, mode: 0o700 });
+  desktopEnvPath = resolveDesktopEnvPath({ isPackaged: app.isPackaged, userDataPath });
+  await loadDesktopEnv(desktopEnvPath);
   mainWindow = createWindow();
   registerIpc(mainWindow);
+  if (smokeRequest) {
+    const smokeWindow = mainWindow;
+    smokeWindow.webContents.once("did-finish-load", () => {
+      void (async () => {
+        let result: Record<string, unknown> = { ok: false, isPackaged: app.isPackaged, arch: process.arch, platform: process.platform, version: app.getVersion(), envPath: desktopEnvPath };
+        try {
+          const observed = await smokeWindow.webContents.executeJavaScript(packagedSmokeScript(desktopEnvPath!)) as { checks: Record<string, boolean>; missingKeys: Record<string, string[]> };
+          result = { ...result, ...observed, ok: app.isPackaged && Object.values(observed.checks).every(value => value === true) };
+        } catch { result = { ...result, error: "Packaged window/preload/IPC verification failed." }; }
+        try { await fs.promises.writeFile(smokeRequest.resultPath, JSON.stringify(result, null, 2) + "\n", { mode: 0o600 }); }
+        catch { app.exit(1); return; }
+        app.exit(result.ok === true ? 0 : 1);
+      })();
+    });
+  }
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
