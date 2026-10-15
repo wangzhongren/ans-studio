@@ -1,0 +1,114 @@
+[
+  {
+    "runtime": "pi",
+    "roleId": "su",
+    "turnId": "9c02880e-3bd3-487e-9cc6-93dac73287e4",
+    "kind": "tool_call",
+    "summary": "dispatch_task 调用发起",
+    "detail": {
+      "toolName": "dispatch_task",
+      "phase": "start",
+      "toolCallId": "call_00_DjacwJnNoYriNSKALgiF1146",
+      "turnId": "9c02880e-3bd3-487e-9cc6-93dac73287e4",
+      "display": {
+        "version": 1,
+        "omissions": []
+      }
+    }
+  },
+  {
+    "runtime": "pi",
+    "roleId": "su",
+    "turnId": "9c02880e-3bd3-487e-9cc6-93dac73287e4",
+    "kind": "tool_call",
+    "summary": "dispatch_task 调用发起",
+    "detail": {
+      "toolName": "dispatch_task",
+      "phase": "start",
+      "toolCallId": "call_01_hYgNQIcORrTlVvJoP1pP7689",
+      "turnId": "9c02880e-3bd3-487e-9cc6-93dac73287e4",
+      "display": {
+        "version": 1,
+        "omissions": []
+      }
+    }
+  },
+  {
+    "runtime": "pi",
+    "roleId": "su",
+    "turnId": "9c02880e-3bd3-487e-9cc6-93dac73287e4",
+    "kind": "denied",
+    "summary": "dispatch_task 执行失败（dispatch_task：任务**未能派发**（回执：派发未受理：角色 实现者 不在本项目（未枚举到）。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。）",
+    "detail": {
+      "toolName": "dispatch_task",
+      "phase": "result",
+      "toolCallId": "call_00_DjacwJnNoYriNSKALgiF1146",
+      "turnId": "9c02880e-3bd3-487e-9cc6-93dac73287e4",
+      "ok": false,
+      "status": "failed",
+      "errorCode": "TOOL_FAILED",
+      "display": {
+        "version": 1,
+        "omissions": [],
+        "resultText": {
+          "text": "dispatch_task：任务**未能派发**（回执：派发未受理：角色 实现者 不在本项目（未枚举到）。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。",
+          "truncated": false,
+          "redacted": false
+        },
+        "error": {
+          "text": "dispatch_task：任务**未能派发**（回执：派发未受理：角色 实现者 不在本项目（未枚举到）。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。",
+          "truncated": false,
+          "redacted": false
+        },
+        "durationMs": 16
+      }
+    }
+  },
+  {
+    "runtime": "pi",
+    "roleId": "su",
+    "turnId": "9c02880e-3bd3-487e-9cc6-93dac73287e4",
+    "kind": "accepted",
+    "summary": "dispatch_task 执行完成",
+    "detail": {
+      "toolName": "dispatch_task",
+      "phase": "result",
+      "toolCallId": "call_01_hYgNQIcORrTlVvJoP1pP7689",
+      "turnId": "9c02880e-3bd3-487e-9cc6-93dac73287e4",
+      "ok": true,
+      "status": "completed",
+      "display": {
+        "version": 1,
+        "omissions": [],
+        "resultText": {
+          "text": "dispatch_task：任务已派发给「测试者」（status 由对方经回交报告回报）。 已受理：任务将投递给角色 测试者 的会话（其会话未开——将自动开启）；投递结果/失败会在其聊天流与 su 的聊天流如实显示（受理≠已完成）。注意：**派发 ≠ 授权**——对方只在自己已接受边界内执行已授权任务，普通操作无需逐次确认；新建或扩张边界、治理写集仍由 su 请求客户确认；你不得代为授权，也不能承诺对方一定会写。",
+          "truncated": false,
+          "redacted": false
+        },
+        "durationMs": 16
+      }
+    }
+  },
+  {
+    "kind": "denied",
+    "summary": "本轮已中止",
+    "runtime": "pi",
+    "roleId": "su",
+    "turnId": "9c02880e-3bd3-487e-9cc6-93dac73287e4",
+    "detail": {
+      "turnId": "9c02880e-3bd3-487e-9cc6-93dac73287e4",
+      "outcome": "aborted"
+    }
+  },
+  {
+    "kind": "settled",
+    "summary": "本轮运行超时",
+    "runtime": "pi",
+    "roleId": "su",
+    "turnId": "9c02880e-3bd3-487e-9cc6-93dac73287e4",
+    "detail": {
+      "turnId": "9c02880e-3bd3-487e-9cc6-93dac73287e4",
+      "outcome": "timed_out"
+    }
+  }
+]

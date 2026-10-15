@@ -1,0 +1,7 @@
+{
+  "status": "partial network download rejected before extraction",
+  "bytes": 216109888,
+  "sha256": "3197f82770d9edde2adb11954aa18178a3c936f1624d77f150413e6191256c49",
+  "expectedBytes": 404892017,
+  "expectedSha256": "92118718ae34b1194c615d2c94c78b37d0324bce0b0ac9e31529431c0bc59270"
+}

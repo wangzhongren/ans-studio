@@ -1,0 +1,76 @@
+Window: "ANS 治理会话工作台", App: ANS Studio.
+0 标准窗口 ANS 治理会话工作台, Secondary Actions: Raise
+	1 container ANS 治理会话工作台
+		2 container
+			3 HTML 内容 ANS 治理会话工作台, URL: file:///private/tmp/ans-taskboard-release-kn7tg1vm/extracted/ANS%20Studio.app/Contents/Resources/app/app/renderer/index.html
+				4 container
+					5 文本 ANS
+					6 按钮 最小化
+					7 按钮 最大化
+					8 按钮 关闭
+				9 container
+					10 text ans AGENT WORKSPACE
+					11 文本 ans-real-taskboard-sf0tuykb
+					12 文本 /private/tmp/ans-real-taskboard-sf0tuykb
+					13 文本 工作空间
+					14 container 角色列表
+						15 文本 主入口
+						16 按钮 s su Pi · 等待你确认
+							17 文本 s
+							18 文本 su
+							19 文本 Pi ·
+							20 文本 等待你确认
+					21 按钮 切换项目
+					22 按钮 Pi 设置
+					23 文本 1 个角色 · 本地会话
+					24 container
+						25 text su 新会话
+						26 组合框 (settable) Description: 会话引擎，当前 Pi, Value: Pi
+							27 文本 Pi
+						28 按钮 工作概览
+						29 按钮 角色资料
+					30 container
+						31 text 本次开启会话：新会话 我要在这个空文件夹真正开发一个可使用的中文离线任务看板。需要：新增任务（拒绝空白标题）、待办/进行中/已完成三种状态、筛选和各状态计数、删除任务，刷新页面后任务仍保留。页面要清晰，数据只保存在本机；不使用远端后台、外部依赖或CDN。本机有Node.js。 请先给最小实现方案、角色分工、文件范围、完成标准和启动方式。确认后，由相应角色实际创建代码和自动化测试，运行测试并回交结果；不要只贴示例代码让我复制。开发和测试分工，做完后我会独立检查实际改动与页面。测试要能自行结束，不必提前替我启动长驻服务。 确认：离线中文任务看板的最小方案、角色分工与治理产物（含边界与写入路径）
+						32 开合三角标记 预览内容（点击展开）
+							33 文本 预览内容（点击展开）
+						34 文本 # 交付计划：离线中文任务看板（本机 Node.js，零依赖）
+
+## 1. 最小实现方案
+- 一个 Node 进程（仅内置模块 `http`/`fs`/`path`/`url`）同时提供：静态页面 + JSON 接口。
+- 数据落本机文件 `data/tasks.json`：服务启动时自动创建；写入为原子写（先写临时文件再 rename），避免半截文件。
+- 前端 `public/` 原生 HTML/CSS/JS，中文界面，**无 CDN、无外链字体/图标**，离线可用。
+- 仅监听 `127.0.0.1`；无远端后台、无外部依赖、无 `npm install`。
+
+## 2. 冻结契约（实现与测试都按它，两侧不得各改各的）
+任务对象：`{ id: string, title: string, status: "todo"|"doing"|"done", createdAt: ISO, updatedAt: ISO }`
+
+| 方法 | 路径 | 请求 | 成功 | 失败 |
+|---|---|---|---|---|
+| GET | `/api/tasks` | — | 200 `{tasks:[...]
+						35 文本 确认后我会：① 写入上述治理产物（角色卡 + 边界 + docs/su 文档）；② 立刻分别派发任务给「实现者」（写代码+文档面）与「测试者」（写并运行独立自动化测试，按冻结契约）；③ 汇总两侧回执与测试结果给你。若你在选项上想改（例如数据改用浏览器 localStorage 而非 data/tasks.json、或要求 UI 用三列看板而非单列表），请在回复里说明，我改后再落盘。
+						36 按钮 确认
+						37 按钮 不同意
+						38 text 明白。这是空项目的创世（bootstrap）场景：我先把方案、分工、边界与完成标准一次呈给你确认，确认后由 su 落盘治理产物，再**立即派发**给「实现者」和「测试者」实际写代码、写测试、跑测试并回交（不是示例代码）。
+
+要点先说清楚（细节见确认卡）：
+
+- **架构**：单个 Node 进程（只用内置 `http/fs/path/url`，零外部依赖）同时提供静态页面与 JSON 接口；数据写在本机 `data/tasks.json`（启动自动创建、原子写），刷新/重启后保留；仅监听 `127.0.0.1`。
+- **分工**：实现者写 `server/`、`public/`；测试者**独立**写 `test/测试者/` 的 `node:test` 用例并运行，不改实现代码。
+- **测试自结束**：用例内用临时数据文件 + 随机端口在进程内启停，跑完自行关闭，不残留常驻进程；你不需要提前启动任何服务。 等待你确认
+						39 按钮 有 1 条待确认 · 定位
+					40 container
+						41 文本输入区 (settable) Description: 发送给当前角色的消息, Placeholder: 给su发送消息…
+						42 按钮 Description: 添加图片, Help: 添加图片（png / jpeg / webp / gif，≤5MB）
+						43 text su / Pi Enter 发送，Shift + Enter 换行
+						44 按钮 停止当前轮次
+						45 按钮 Description: 发送, Help: 发送（Enter）
+					46 文本 普通聊天不会自动产生任务报告
+					47 文本 实际写入导入项目，角色边界外的写入会被拒绝。
+48 menu bar
+	49 ANS Studio
+	50 File
+	51 Edit
+	52 View
+	53 Window
+
+The focused UI element is 32 开合三角标记 预览内容（点击展开）

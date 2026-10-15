@@ -1,0 +1,47 @@
+role: 实现者
+entries:
+  - kind: directory
+    path: server/
+    purpose: Node 内置模块 HTTP 服务与任务 JSON 持久化实现（含 /api/tasks 接口）
+  - kind: directory
+    path: public/
+    purpose: 离线中文前端页面（index.html / app.js / style.css），无任何外部依赖与 CDN 外链
+  - kind: file
+    path: package.json
+    purpose: 零依赖工程声明（type: module）与 start/test 脚本
+  - kind: file
+    path: README.md
+    purpose: 启动方式、测试命令、数据位置说明
+  - kind: file
+    path: .gitignore
+    purpose: 忽略草稿区 temp/ 与本地运行数据 data/
+  - kind: directory
+    path: temp/实现者/
+    purpose: 未通过/返工产物暂存，供审核对照（草稿区，不参与 pin）
+  - kind: file
+    path: 角色卡/实现者/feature-map.md
+    purpose: 角色文档面：文件与功能映射
+  - kind: file
+    path: 角色卡/实现者/memo.md
+    purpose: 角色文档面：工作备忘录
+  - kind: file
+    path: 角色卡/实现者/changelog.md
+    purpose: 角色文档面：变更记录
+  - kind: file
+    path: 角色卡/实现者/functional-description.md
+    purpose: 角色文档面：功能说明与流程
+  - kind: file
+    path: 角色卡/实现者/api-spec.md
+    purpose: 角色文档面：接口契约
+  - kind: directory
+    path: 角色卡/实现者/docs/design/
+    purpose: 角色文档面：设计文档
+  - kind: directory
+    path: 角色卡/实现者/docs/feature/
+    purpose: 角色文档面：功能文档
+  - kind: directory
+    path: 角色卡/实现者/docs/change/
+    purpose: 角色文档面：变更文档
+  - kind: directory
+    path: 角色卡/实现者/docs/fix/
+    purpose: 角色文档面：修复文档

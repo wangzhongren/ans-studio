@@ -1,0 +1,11 @@
+{
+  "classification": "model-generated project governance YAML invalid; product fail-closed warning present, not a stale-role-cache claim",
+  "projectFile": "角色卡/实现者/boundary.yaml",
+  "sha256": "cbf50fcabd0ca206024f222f1c40cca5bf90aa642f2e7e2b13c4b607ced2ccde",
+  "observedError": "Nested mappings are not allowed in compact mappings; unquoted colon in purpose type: module",
+  "implementationDispatchAccepted": false,
+  "testerDispatchAccepted": true,
+  "firstSuTurnTimedOut": true,
+  "businessCodeWritten": false,
+  "recovery": "ask actual software su to quote YAML scalar, keep authorization scope unchanged, then re-dispatch"
+}

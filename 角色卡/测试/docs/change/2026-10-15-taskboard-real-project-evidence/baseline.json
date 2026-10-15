@@ -1,0 +1,27 @@
+{
+  "status": "planned; no project application files written",
+  "at": "2026-10-15T12:35:36.460351+00:00",
+  "ansHead": "e3c0100f7c9999c0843e02a344c3f3b5f28520bb",
+  "software": "public v1.0.0 macOS arm64 ZIP",
+  "artifactSha256": "92118718ae34b1194c615d2c94c78b37d0324bce0b0ac9e31529431c0bc59270",
+  "packageDirectory": "/private/tmp/ans-taskboard-release-kn7tg1vm",
+  "projectRoot": "/private/tmp/ans-real-taskboard-sf0tuykb",
+  "emptyGitBaseline": "472fa98dfe77181b912813bf0512627d1cecebbf",
+  "realDeveloperEnvSha256": "3d7ecbd3b35a7f546d8e5ddd7f6d96afd190daae812c2010496aab6949b1724f",
+  "realFlow": "All taskboard governance, business code and project tests to be created through actual ANS desktop role conversations; root only independent test/audit",
+  "projectAccepted": "离线任务看板：新增、状态切换、删除、本地保存；自动化测试",
+  "model": "Pi with existing configured provider; no credential values in evidence",
+  "downloadedBytes": 404892017,
+  "downloadedSha256": "92118718ae34b1194c615d2c94c78b37d0324bce0b0ac9e31529431c0bc59270",
+  "releaseArtifactVerified": true,
+  "applicationPath": "/private/tmp/ans-taskboard-release-kn7tg1vm/extracted/ANS Studio.app",
+  "isolation": {
+    "actualSettingsPath": "/private/tmp/ans-taskboard-env-probe/real-userdata/.env",
+    "actualNativeUiPathVerified": true,
+    "piCredentialSource": "process environment only",
+    "configCompleteInNativeUi": true,
+    "credentialValuesWrittenToEvidence": false
+  },
+  "appPid": 60305,
+  "initialPromptSubmittedThroughNativeUi": true
+}
