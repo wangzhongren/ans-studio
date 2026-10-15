@@ -66,3 +66,5 @@ API 最短使用方式是由核心 `createRuntimeAdapter({runtime:'claude', gate
 | 2026-10-14 | 修复 | 已验证 | 移除bare、按wire标记关联真实nativeprompt_id并冻结环境快照 | [原生证据](../fix/2026-10-14_fix_claude-native-hook-identity.md) |
 
 | 2026-10-15 | 修改 | 本角色验证通过，完整流待集成 | A4工具展示与C2.tp1 SDK运输保护 | [实施证据](../change/2026-10-15_change_tool-display-projection.md) |
+
+| 2026-10-15 | 测试修复 | 本角色29/29、tsc通过 | 发布高负载确认等待夹具用显式逻辑时钟保留50ms/100ms契约，并加精确超时负对照；生产不变 | [记录](../fix/2026-10-15_fix_release-test-clock.md) |

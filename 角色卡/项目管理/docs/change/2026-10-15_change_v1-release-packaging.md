@@ -61,3 +61,11 @@ PM只读当前diff与release-policy，确认此批不改运行时/安全Provider
 policy精确文件补收Window三测试、Pi一测试、root两测试，装配/Codex原目录选择已覆盖其自有修改；新helper/原中文路径处理保持。发布说明/README明确Windows来源文档阅读暂不可用，未暗示支持。各owner专项及root8负例通过按原producer记录，不冒称WindowsCI已通过；CI1两mac原生构建启动及本机实际tagoverlay配置保存重启/Esc/键盘/缺配归root证据。
 
 结论仍ready-for-CI：可在最终full/typecheck收口后提交/push/派发CI2，不需等待尚未运行的CI才允许启动；三平台最终source/overlay/产物manifest一致与真实Windows包smoke门槛不变，默认draft不publish。PM本次未执行测试、GUI或修改peer。
+
+## CI2 Intel确认暂停用例的确定性时间订正
+
+root报告Windows全仓已绿进入打包、arm64全绿，Intel仅root自有T1 confirmation集成用例100ms deadline被真实IO/调度耗尽。PM已读该用例，当前await pause180依赖墙钟速度，实际目标是证明等待客户暂停deadline，不是测试CI磁盘性能。不能增deadline或靠重跑遮红。
+
+同意root仅own t1-pipeline-integration.test.ts对三runtime confirmation case采用显式Date/setTimeout虚拟时钟：保原100/180阈值、真实Pipeline/FS/事件/hostgate与全部abort/stale/写许可/报告断言；启用在Core创建前，逐case隔离清理，不靠stop/error文本。观察循环用未mock setImmediate/performance及真实外层10s watchdog；必须同mock clock增加不进入客户等待tick100仍Core timed_out负对照，防时钟不生效或伪永不超时。原30ms真实timeout用例不变，不修改生产。仅订正逻辑时钟的可控输入，不放宽业务行为。装配policy逐文件增该自有测试，保首Intel红，最终三个平台全CI重跑；当前Intel与Windows包gate未签通过。PM仅只读审，不替root实现/执行测试。
+
+CI3前PM已实读最终root own diff：原100/180/5逻辑数值及全部业务/历史断言保留，mock在创建Core前生效，真实performance/setImmediate观察+10s外层限时，三runtime逐例99未settled+1到100真timed_out/单failed handback/无src写入负对照成立；原30ms真实timeout未改。root自验8/8按其执行归因。新增负例首红为handback与settled异步到达顺序，等待两者到齐再严格各1并非删除断言，原红保留。结论ready-for-CI3，同一overlay完整三平台重跑；生产deadline未抬高/归零，未新改产品合同。PM本次未运行测试或改同伴代码。

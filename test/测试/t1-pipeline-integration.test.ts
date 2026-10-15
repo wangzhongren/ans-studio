@@ -3,6 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
+import { setImmediate as nextIO } from "node:timers/promises";
 import { openRoleSession, readRoleSessionHistory } from "../../src/pipeline/orchestration/run-role.ts";
 import type { ProjectConfig } from "../../src/model/role.ts";
 import type { CustomerInputMetadata, CustomerInputOutcome, RuntimeKind, RuntimeProviderFactory, RuntimeProviderOptions, SessionEvent, ToolResult } from "../../src/model/runtime.ts";
@@ -46,9 +47,12 @@ async function tool(options: RuntimeProviderOptions, name: string, args: Record<
 }
 const pause = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
 async function until(fn: () => boolean) { const end = Date.now() + 2500; while (!fn()) { if (Date.now() > end) throw new Error("T1 observation timeout"); await pause(2); } }
+// Observe actual IO without consuming or deadlocking the explicitly controlled deadline clock.
+async function untilIO(fn: () => boolean) { const end = performance.now() + 2500; while (!fn()) { if (performance.now() > end) throw new Error("T1 observation timeout"); await nextIO(); } }
 
 for (const runtime of ["pi", "codex", "claude"] as const) {
-  test(`T1 ${runtime}: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report`, async () => {
+  test(`T1 ${runtime}: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report`, { timeout: 10000 }, async (t) => {
+    t.mock.timers.enable({ apis: ["Date", "setTimeout"], now: Date.now() });
     const project = fixture(), receipts: ToolResult[] = [], events: OrchestrationEvent[] = [];
     let answer: ((value: CustomerInputOutcome) => void) | undefined, metadata: CustomerInputMetadata | undefined, phase = 0;
     const provider = engine(async (options, text, signal) => {
@@ -70,19 +74,19 @@ for (const runtime of ["pi", "codex", "claude"] as const) {
     const pump = (async () => { for await (const event of handle.events()) events.push(event); })();
     try {
       const first = handle.send("confirm"); const rejected = assert.rejects(first);
-      await until(() => answer !== undefined); await pause(180);
-      assert.equal(events.filter(e => e.kind === "settled").length, 0, "actual waiting gate pauses the 100ms deadline during 180ms customer wait");
+      await untilIO(() => answer !== undefined); t.mock.timers.tick(180); await nextIO();
+      assert.equal(events.filter(e => e.kind === "settled").length, 0, "actual waiting gate pauses the 100ms deadline during 180ms explicit logical customer wait");
       assert.equal(metadata?.runtime, runtime); assert.equal(metadata?.roleId, "X"); assert.ok(metadata?.turnId);
       assert.equal(metadata?.signal?.aborted, false);
       assert.deepEqual(await handle.abort?.(), { ok: true, supported: true }); await rejected;
       assert.equal(metadata?.signal?.aborted, true);
-      answer!({ outcome: "answered", value: { confirmed: true } }); await pause(5);
+      answer!({ outcome: "answered", value: { confirmed: true } }); t.mock.timers.tick(5); await nextIO();
       await handle.send("write"); assert.equal(receipts.at(-1)?.ok, false); assert.equal(fs.existsSync(path.join(project.projectRoot, "src/X/current.txt")), false);
       phase = 1; await handle.send("current");
       assert.deepEqual(receipts.slice(-4).map(r => r.ok), [true, true, false, true]);
       assert.equal(fs.readFileSync(path.join(project.projectRoot, "src/X/current.txt"), "utf8"), runtime + " valid current consent");
       assert.equal(fs.existsSync(path.join(project.projectRoot, "src/X/unlisted.txt")), false);
-      await until(() => events.filter(e => e.kind === "handback").length === 3);
+      await untilIO(() => events.filter(e => e.kind === "handback").length === 3);
       const terminals = events.filter((e): e is SessionEvent => e.kind === "settled"); assert.equal(terminals.length, 3);
       assert.deepEqual(terminals.map(e => (e.detail as { outcome: string }).outcome), ["aborted", "completed", "completed"]);
       assert.equal(new Set(terminals.map(e => e.turnId)).size, 3);
@@ -95,6 +99,33 @@ for (const runtime of ["pi", "codex", "claude"] as const) {
       assert.equal(history.record?.nativeSessionId, `T1-native-${runtime}`);
       assert.deepEqual(history.entries.filter(e => e.kind === "user").map(e => e.text), ["confirm", "write", "current"]);
       assert.equal(fs.existsSync(path.join(project.projectRoot, ".ans/sessions/X", runtime === "pi" ? "codex" : "pi")), false);
+    } finally { await handle.dispose(); await pump; fs.rmSync(project.projectRoot, { recursive: true, force: true }); }
+  });
+  test(`T1 ${runtime}: the same controlled Core clock expires exactly 100ms outside customer waiting`, { timeout: 10000 }, async (t) => {
+    t.mock.timers.enable({ apis: ["Date", "setTimeout"], now: Date.now() });
+    const project = fixture(), events: OrchestrationEvent[] = [];
+    let active = false;
+    const provider = engine(async (_options, _text, signal) => {
+      active = true;
+      await new Promise<void>(resolve => signal.addEventListener("abort", () => resolve(), { once: true }));
+    });
+    const handle = await openRoleSession({ roleId: "X", taskId: "T1-clock-control", project, runtime, persistSession: false },
+      { runtimeOptions: { providerFactories: { [runtime]: provider.factory }, promptTimeoutMs: 100 } });
+    const pump = (async () => { for await (const event of handle.events()) events.push(event); })();
+    try {
+      const rejected = assert.rejects(handle.send("no customer wait"), /超时.*100ms/);
+      await untilIO(() => active);
+      t.mock.timers.tick(99); await nextIO();
+      assert.equal(events.filter(event => event.kind === "settled").length, 0, "99 active milliseconds remain below the unchanged deadline");
+      t.mock.timers.tick(1); await rejected;
+      await untilIO(() => events.some(event => event.kind === "handback") && events.some(event => event.kind === "settled"));
+      const terminals = events.filter((event): event is SessionEvent => event.kind === "settled");
+      assert.equal(terminals.length, 1);
+      assert.equal((terminals[0].detail as { outcome: string }).outcome, "timed_out");
+      const reports = events.filter(event => event.kind === "handback");
+      assert.equal(reports.length, 1);
+      assert.equal(reports[0].handback!.status, "failed");
+      assert.equal(fs.existsSync(path.join(project.projectRoot, "src")), false);
     } finally { await handle.dispose(); await pump; fs.rmSync(project.projectRoot, { recursive: true, force: true }); }
   });
 }

@@ -1,0 +1,69 @@
+✔ T1 pi: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report (61.103625ms)
+✖ T1 pi: the same controlled Core clock expires exactly 100ms outside customer waiting (3.437875ms)
+✔ T1 codex: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report (44.834125ms)
+✖ T1 codex: the same controlled Core clock expires exactly 100ms outside customer waiting (2.603917ms)
+✔ T1 claude: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report (42.7325ms)
+✖ T1 claude: the same controlled Core clock expires exactly 100ms outside customer waiting (1.891417ms)
+✔ T1 real outer failed remains one terminal and truthful handback after external cleanup completion (4.673459ms)
+✔ T1 real outer timed_out remains one terminal and truthful handback after external cleanup completion (35.982416ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 5
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 336.724541
+
+✖ failing tests:
+
+test at test/测试/t1-pipeline-integration.test.ts:104:3
+✖ T1 pi: the same controlled Core clock expires exactly 100ms outside customer waiting (3.437875ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%B5%8B%E8%AF%95/t1-pipeline-integration.test.ts:123:14)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/测试/t1-pipeline-integration.test.ts:104:3
+✖ T1 codex: the same controlled Core clock expires exactly 100ms outside customer waiting (2.603917ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%B5%8B%E8%AF%95/t1-pipeline-integration.test.ts:123:14)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/测试/t1-pipeline-integration.test.ts:104:3
+✖ T1 claude: the same controlled Core clock expires exactly 100ms outside customer waiting (1.891417ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%B5%8B%E8%AF%95/t1-pipeline-integration.test.ts:123:14)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

@@ -33,3 +33,13 @@ root在解压的真实.app原生GUI独立验证：导入前引擎disabled；设�
 ## 第二候选提交前
 
 所有owner完成平台输入订正，PM只读回审ready-for-CI。完整本机Node1397 total /1396 pass /0 fail /1 Windows-only skip，typecheck0、diff0。未改6个已实际手工验证的运行时文件；Windows不支持的文档功能没有放宽，明确执行负例而非跳过整套。下一步仍须CI2三个真实平台完整回归及包解压启动，不能用本机结果替代。
+
+## CI2 Intel 原红与测试时钟订正方案
+
+CI2 Intel 的唯一全仓失败是 root 自有 T1 pi confirmation 集成，100ms prompt deadline 包含真实文件IO/调度负载，实际case约532ms，触发真实TimeoutError100。不能提高100ms阈值、减少180ms等待或重跑遮红。PM已只读同意限定测试修改：仅该3runtime确认用例在Core创建前启用 node:test Date/setTimeout可控时钟，等待时显式tick180；观察使用未mock的setImmediate/performance，外层10s真实watchdog；原abort/stale consent/精准写入/报告/终态/历史/磁盘断言全保。每runtime增加同一时钟下未进入确认等待、tick99未终态/tick1到100ms确实timed_out的负对照，且原30ms真实时间超时用例不变。此为逻辑时间契约测试，不再声称180ms实际墙钟等待；生产timer和budget不变。依据[Node Test MockTimers](https://nodejs.org/download/release/v22.14.0/docs/api/test.html)。装配只精确加入本测试文件overlay；之后仍重跑三平台完整CI与包启动。
+
+第三轮前验证：T1时钟专项8/8（3确认、3严格100ms负对照、2原真实失败/30ms超时）通过；新增负对照首红为handback先于settled异步到达，改为等待两事件到齐再断唯一性，未更改1条终态/1条回交断言。整仓首次还发现Claude旧50ms时序fixture同类误超时，交Claude属主，仅将该case改50/100ms受控时钟并新增49+1负对照，原真实超时等case不变，own29/29、tsc0。保留整仓红，不调高阈值、不跳过或retry求绿。
+
+CI2 Windows完整1397总/1395通过/0失败/2既有平台跳过；实际ZIP455095439字节、native依赖和7UI checks全真，已上传CI artifact但因Intel红整轮未Release。arm64亦通过全套及实际包。Windows现有平台拒读assert执行而非skip，两个skip来自原有POSIX专属进程组清理测试。详情见ci2-results.json与原始各平台日志。
+
+第三候选提交前本机完整1401 total /1400 pass /0 fail /1平台skip，typecheck0。此结果包含所有时钟负对照；CI仍要求同提交三平台完整验证，暂不发布。

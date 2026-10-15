@@ -1,0 +1,16 @@
+✔ T1 pi: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report (66.852083ms)
+✔ T1 pi: the same controlled Core clock expires exactly 100ms outside customer waiting (4.1855ms)
+✔ T1 codex: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report (45.629959ms)
+✔ T1 codex: the same controlled Core clock expires exactly 100ms outside customer waiting (1.950416ms)
+✔ T1 claude: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report (47.160958ms)
+✔ T1 claude: the same controlled Core clock expires exactly 100ms outside customer waiting (2.5545ms)
+✔ T1 real outer failed remains one terminal and truthful handback after external cleanup completion (4.099625ms)
+✔ T1 real outer timed_out remains one terminal and truthful handback after external cleanup completion (35.330625ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 327.962292

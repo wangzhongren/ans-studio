@@ -1,0 +1,71 @@
+{
+  "darwin-x64": {
+    "tests": [
+      "ℹ tests 1397",
+      "ℹ pass 1395",
+      "ℹ fail 1",
+      "ℹ skipped 1"
+    ],
+    "failedTests": [
+      "2026-10-15T11:22:12.5579450Z ✖ T1 pi: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report (532.147761ms)",
+      "2026-10-15T11:22:12.7229660Z ✖ failing tests:",
+      "2026-10-15T11:22:12.7231910Z ✖ T1 pi: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report (532.147761ms)"
+    ]
+  },
+  "darwin-arm64": {
+    "tests": [
+      "ℹ tests 1397",
+      "ℹ pass 1396",
+      "ℹ fail 0",
+      "ℹ skipped 1"
+    ],
+    "failedTests": [],
+    "artifact": {
+      "file": "ANS-Studio-1.0.0-mac-arm64.zip",
+      "size": 404891999,
+      "sha256": "2d0b74b491149437858e61a772e5b8a3e4dc1f745f888594f887b99b5412dc04"
+    },
+    "smoke": {
+      "dom": true,
+      "preload": true,
+      "ipc": true,
+      "importDisabled": true,
+      "missingConfiguration": true,
+      "settings": true,
+      "envPathMatches": true
+    },
+    "nativeDeps": {
+      "sdkImports": "PACKAGED_SDK_IMPORTS_OK",
+      "codexVersion": "codex-cli 0.162.1",
+      "claudeVersion": "2.1.299 (Claude Code)"
+    }
+  },
+  "win32-x64": {
+    "tests": [
+      "ℹ tests 1397",
+      "ℹ pass 1395",
+      "ℹ fail 0",
+      "ℹ skipped 2"
+    ],
+    "failedTests": [],
+    "artifact": {
+      "file": "ANS-Studio-1.0.0-win-x64.zip",
+      "size": 455095439,
+      "sha256": "2f44ead2319442d45d5a2be3a140f98c01c18194706485896d14340c87705b33"
+    },
+    "smoke": {
+      "dom": true,
+      "preload": true,
+      "ipc": true,
+      "importDisabled": true,
+      "missingConfiguration": true,
+      "settings": true,
+      "envPathMatches": true
+    },
+    "nativeDeps": {
+      "sdkImports": "PACKAGED_SDK_IMPORTS_OK",
+      "codexVersion": "codex-cli 0.162.1",
+      "claudeVersion": "2.1.299 (Claude Code)"
+    }
+  }
+}

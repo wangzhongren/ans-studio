@@ -1,0 +1,18 @@
+{
+  "sourceTag": "v1.0.0",
+  "sourceSha": "83445ebcf24454c6107838cb7f2221882c6638ea",
+  "runs": [
+    {
+      "url": "https://github.com/wangzhongren/ans-studio/actions/runs/38717918774",
+      "overlay": "2bd0a606029286e884d5fd68840c13ebd1e023c2",
+      "status": "failed",
+      "summary": "mac arm64/x64 full regression and native package checks passed; Windows 29 test fixture/platform-precondition failures, release skipped"
+    },
+    {
+      "url": "https://github.com/wangzhongren/ans-studio/actions/runs/38726449725",
+      "overlay": "605c50f2fbb13d8cee41d069c444859e249fb4e0",
+      "status": "in-progress",
+      "publish": false
+    }
+  ]
+}
