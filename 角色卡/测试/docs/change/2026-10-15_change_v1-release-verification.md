@@ -1,7 +1,7 @@
 ---
 type: change
 created: "2026-10-15"
-status: in-progress
+status: verified
 ---
 
 # v1.0.0 跨平台运行包独立验证
@@ -43,3 +43,25 @@ CI2 Intel 的唯一全仓失败是 root 自有 T1 pi confirmation 集成，100ms
 CI2 Windows完整1397总/1395通过/0失败/2既有平台跳过；实际ZIP455095439字节、native依赖和7UI checks全真，已上传CI artifact但因Intel红整轮未Release。arm64亦通过全套及实际包。Windows现有平台拒读assert执行而非skip，两个skip来自原有POSIX专属进程组清理测试。详情见ci2-results.json与原始各平台日志。
 
 第三候选提交前本机完整1401 total /1400 pass /0 fail /1平台skip，typecheck0。此结果包含所有时钟负对照；CI仍要求同提交三平台完整验证，暂不发布。
+
+## 最终验收与公开发布：verified
+
+最终 [CI3 38728387848](https://github.com/wangzhongren/ans-studio/actions/runs/38728387848) 全部成功；[ANS Studio 1.0.0 已正式公开](https://github.com/wangzhongren/ans-studio/releases/tag/v1.0.0)，发布后以未登录浏览器（Sign in 可见）复核 Latest/released、三下载入口及14项资产（12上传+GitHub自动源码2件），公开截图见 [release-public-guest.png](2026-10-15-v1-release-evidence/release-public-guest.png)。没有剩余发布待办。
+
+| 实际原生平台 | 全仓总数 | 通过 / 失败 / 平台跳过 | 实际解压包启动 |
+| --- | --- | --- | --- |
+| macOS arm64 | 1401 | 1400 / 0 / 1 | 7项UI/preload/IPC检查通过 |
+| macOS x64 | 1401 | 1400 / 0 / 1 | 同上 |
+| Windows x64 | 1401 | 1399 / 0 / 2 | 同上 |
+
+每个平台真实执行 Pi/Claude SDK 和 Photon WASM 加载、Codex CLI0.162.1及Claude CLI2.1.299。Windows文档unsupported的负向验证实际执行，不属于2项skip；平台skip为既有专属用例。运行包验证为离线检查，没有把API可配置或CLI版本输出称为在线模型验证。
+
+root独立读取Git对象的mode/blob/path重建源树，先用原标签tree作自校验，再组合精确overlay：source83445ebcf24454c6107838cb7f2221882c6638ea、overlayc3d106602b5a82fc5fa7e1bd9e1d7485239d8b4a、actualTree15427e074c23ad1d4b52d0b191f57fe3bdeb5167、patchSHAa7297f345b371754ff07f4165b54d9159a1f0846e6758c27220803660432f45c，与三个实际CI manifest逐项一致；lock与builder亦一致。集合校验原日志RELEASE_ASSET_SET_VERIFIED已保存。不是把浮动main或原tag直接冒称安装包源码。
+
+发布前检查草稿12上传资产，GitHub服务器显示的三个ZIP SHA-256逐个与实际原生构建测试的manifest相等。公开后，从匿名HTTPS对三份ZIP HEAD请求核实200及精确字节长度，并实际下载九件公开metadata/校验和/补丁；公开manifest、校验文件和patch与CI及独立源树审计一致。没有为了重复验证而再次传输1.3GB ZIP；服务器digest已绑定原生实际被测包。详见 [ci3-results.json](2026-10-15-v1-release-evidence/ci3-results.json)、[GitHub摘要核验](2026-10-15-v1-release-evidence/github-upload-digests.json)、[匿名下载核验](2026-10-15-v1-release-evidence/public-download-verification.json)。
+
+公开资产：mac-arm64 404892017字节、mac-x64 426086246字节、win-x64 455095457字节；三份运行包均由对应原生runner实际解压启动，不以交叉编译或开发Electron冒充。详细SHA见上述manifest及Release公开SHA256SUMS。
+
+PM最后只读回签ready-for-release后，root通过GitHub真实发布按钮完成公开，并实际读到Latest/released/正式v1.0.0 URL。装配与PM已将自身记录改verified；root检查原v1.0.0 tag没有移动、真实.env及accepted V2两件未变、最终CI后没有任何runtime/build/test输入更改，最后仅补文档与证据。
+
+交付范围：macOS13+ Apple Silicon和Intel，Windows10/11 x64可解压运行ZIP；不包含签名/公证、自动更新或安装器。Windows既有受限来源文档阅读不可用，按接受方案安全拒读，完整摘要和执行记录保留；Release明确这项限制。GitHub自动Source code ZIP只含原tag，复现运行包需应用公开overlay.patch。

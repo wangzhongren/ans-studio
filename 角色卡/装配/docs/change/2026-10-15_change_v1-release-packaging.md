@@ -3,7 +3,7 @@ id: v1-release-packaging-assembly
 type: change
 title: v1.0.0 三平台运行包与可审计发布装配
 created: "2026-10-15"
-status: authorized
+status: verified
 ---
 
 客户已经要求相关角色实施打包、测试后上传 Release。装配上下文固定绑定装配角色，使用现有 Section 1；新建构建配置和 workflow 等待 Governance 精确列权后写入。
@@ -51,3 +51,25 @@ CI run `38717918774` 的 Windows 回归失败已由 root 保留原日志。装�
 README 与工作流 Release notes 已明确：Windows 暂不支持内置受限来源文档阅读；完整摘要和执行记录仍保留，来源文件可由操作者使用系统编辑器查看。没有声称提供尚未实现的一键外部打开按钮。此限制来自已经接受的 r2 安全 Provider 取舍，本轮不放松 fail-closed。
 
 第二候选装配窄验命令 `node --test test/装配/multi-runtime.test.ts test/装配/release-packaging.test.ts` 为 16/16，typecheck 和 diff 检查退出 0。此验证发生在 macOS，Windows 必须以后续相同 overlay SHA/tree 的三平台原生 CI 为准。生产功能六文件没有在本轮改变，未重打包。装配脚本、workflow 与说明现已冻结，交 root 合并属主测试后创建第二候选及再次派发全部门槛。
+
+
+## 最终同源三平台 CI 验证与草稿上传
+
+本节为当前结果，前文候选与首红均保留为历史。已只读核对 root 保存的 CI3 三份 manifest、回归原日志、集合校验日志和上传日志：run [38728387848](https://github.com/wangzhongren/ans-studio/actions/runs/38728387848)，source `83445ebcf24454c6107838cb7f2221882c6638ea`，最终 overlay `c3d106602b5a82fc5fa7e1bd9e1d7485239d8b4a`。三平台实际 tree 均为 `15427e074c23ad1d4b52d0b191f57fe3bdeb5167`，overlay patch SHA256 `a7297f345b371754ff07f4165b54d9159a1f0846e6758c27220803660432f45c`，并经 root 独立 Git 对象树重建一致。
+
+每个平台共 1401 项：macOS arm64、macOS x64 各 1400 通过/0 失败/1 平台跳过；Windows x64 1399 通过/0 失败/2 平台跳过。每个 runner 都执行其同架构 ZIP 的真实解压程序启动，7 项 UI/preload/IPC/配置检查全部通过，同时实际加载 SDK/WASM 并运行 Codex CLI 0.162.1、Claude CLI 2.1.299，没有在线模型请求。首两轮的 Windows 盘符/CRLF/平台信号 oracle、已接受 Windows 文档读取限制和确定性时钟 fixture 修复有原红及属主记录；未放宽生产 Provider、改超时阈值、删断言或为获得成功重试旧候选。最终三包完全来自同一 CI3 构建提交，没有混用早期资产。
+
+| 运行包 | 字节数 | SHA256 |
+| --- | ---: | --- |
+| `ANS-Studio-1.0.0-mac-arm64.zip` | 404892017 | `92118718ae34b1194c615d2c94c78b37d0324bce0b0ac9e31529431c0bc59270` |
+| `ANS-Studio-1.0.0-mac-x64.zip` | 426086246 | `fe03c2e0e08eb6d5d19ec9045fc58d7f5967ed5f3aadc321d2d06d85cfe1eb17` |
+| `ANS-Studio-1.0.0-win-x64.zip` | 455095457 | `03be992e7081ef63a4a719e15fda08a8e6a5518a9edccfbfa10b51d1378f2047` |
+
+发布 job 的完整三平台来源集合校验通过；12 项资产（3 ZIP、3 manifest、4 校验清单、1 provenance、1 overlay patch）已实际上传到 draft。root 已通过 WebUI 实际公开发布，并在未登录页面确认可访问三个运行包；页面显示 Latest/released、没有 Draft，GitHub 保存的三个 ZIP SHA256 与 CI3 manifest 逐项一致。结果原件在[独立测试 CI3 清单](../../../测试/docs/change/2026-10-15-v1-release-evidence/ci3-results.json)，[发布页面](https://github.com/wangzhongren/ans-studio/releases/tag/v1.0.0)作为交付入口。
+
+
+## 公开发布确认
+
+[ANS Studio 1.0.0](https://github.com/wangzhongren/ans-studio/releases/tag/v1.0.0)已实际公开发布。root 独立测试保留未登录公开页面证据 `release-public-guest.png` / AX 与 GitHub 资产 digest 对照 `github-upload-digests.json`；3 个运行包加 manifest、校验值、来源、overlay 共 12 项分发资产均在公开页面，另有 GitHub 自动生成的两项源码下载。装配据此将本记录置为 verified，README 与功能说明改为已发布。
+
+此次仅文档收口，未改构建提交 `c3d106602b5a82fc5fa7e1bd9e1d7485239d8b4a`、固定 source tag `83445ebcf24454c6107838cb7f2221882c6638ea`、实际构建 tree、产物或 tag；未将文档提交伪称为运行包来源。未签名/未公证、Windows 内置受限来源文档阅读不支持及这些启动验证没有调用在线模型的范围保持明确。

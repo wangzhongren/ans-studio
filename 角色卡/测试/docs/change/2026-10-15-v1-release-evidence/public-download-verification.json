@@ -1,0 +1,40 @@
+{
+  "status": "verified public unauthenticated download access",
+  "releaseUrl": "https://github.com/wangzhongren/ans-studio/releases/tag/v1.0.0",
+  "archives": [
+    {
+      "target": "win32-x64",
+      "name": "ANS-Studio-1.0.0-win-x64.zip",
+      "status": 200,
+      "contentLength": 455095457,
+      "sizeMatches": true
+    },
+    {
+      "target": "darwin-arm64",
+      "name": "ANS-Studio-1.0.0-mac-arm64.zip",
+      "status": 200,
+      "contentLength": 404892017,
+      "sizeMatches": true
+    },
+    {
+      "target": "darwin-x64",
+      "name": "ANS-Studio-1.0.0-mac-x64.zip",
+      "status": 200,
+      "contentLength": 426086246,
+      "sizeMatches": true
+    }
+  ],
+  "downloadedMetadataFiles": [
+    "manifest-darwin-arm64.json",
+    "manifest-darwin-x64.json",
+    "manifest-win32-x64.json",
+    "release-provenance.json",
+    "overlay.patch",
+    "SHA256SUMS-overlay.txt",
+    "SHA256SUMS-darwin-arm64.txt",
+    "SHA256SUMS-darwin-x64.txt",
+    "SHA256SUMS-win32-x64.txt"
+  ],
+  "metadataMatchesActualNativeManifests": true,
+  "publishedPatchMatchesIndependentGitTreeAudit": true
+}

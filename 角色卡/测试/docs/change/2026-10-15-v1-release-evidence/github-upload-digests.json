@@ -1,0 +1,17 @@
+{
+  "win32-x64": {
+    "asset": "ANS-Studio-1.0.0-win-x64.zip",
+    "githubDigest": "03be992e7081ef63a4a719e15fda08a8e6a5518a9edccfbfa10b51d1378f2047",
+    "matchesNativeManifest": true
+  },
+  "darwin-arm64": {
+    "asset": "ANS-Studio-1.0.0-mac-arm64.zip",
+    "githubDigest": "92118718ae34b1194c615d2c94c78b37d0324bce0b0ac9e31529431c0bc59270",
+    "matchesNativeManifest": true
+  },
+  "darwin-x64": {
+    "asset": "ANS-Studio-1.0.0-mac-x64.zip",
+    "githubDigest": "fe03c2e0e08eb6d5d19ec9045fc58d7f5967ed5f3aadc321d2d06d85cfe1eb17",
+    "matchesNativeManifest": true
+  }
+}

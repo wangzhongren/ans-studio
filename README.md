@@ -44,9 +44,19 @@ README 与桌面窗口、macOS 运行中 Dock 共用同一张透明背景 PNG。
 
 ## 桌面运行包与发布构建
 
-运行包由 [Release 工作流](.github/workflows/release.yml)分别在 macOS arm64、macOS x64 和 Windows x64 原生环境生成 ZIP；解压后打开 `ANS Studio.app` 或 `ANS Studio.exe`，无需另外安装 Node.js。macOS 最低版本为 **13.0**，Windows 为 **10/11 x64**。Windows 暂不支持内置受限来源文档阅读；完整摘要与执行记录仍可查看，来源文件可由系统编辑器查看。运行包不包含开发机的密钥或会话，首次运行从左下角「设置」填写引擎配置；安装版配置保存在用户数据目录的 `.env`，开发启动继续使用仓库根 `.env`。
+运行包由 [Release 工作流](.github/workflows/release.yml)分别在 macOS arm64、macOS x64 和 Windows x64 原生环境生成 ZIP；解压后打开 `ANS Studio.app` 或 `ANS Studio.exe`，无需另外安装 Node.js。macOS 最低版本为 **13.0**，Windows 为 **10/11 x64**。Windows 暂不支持内置受限来源文档阅读；完整摘要与执行记录仍可查看，来源文件可由系统编辑器查看。运行包不包含开发机的密钥或会话，首次运行从左下角「设置」填写引擎配置；运行包配置保存在用户数据目录的 `.env`，开发启动继续使用仓库根 `.env`。
 
 工作流默认生成待审核的 draft Release，全部平台验证后才发布到 [GitHub Releases](https://github.com/wangzhongren/ans-studio/releases)。当前构建来源为固定的 `v1.0.0` 加 manifest 明确列出的打包适配 overlay，既有 tag 不移动；每个平台同时提供来源、实际构建 tree、测试结果和 SHA256 清单。产物未签名、未公证，系统可能显示来源确认提示，下载后请先核对校验值。
+
+`v1.0.0` 运行包已通过[三平台原生 CI](https://github.com/wangzhongren/ans-studio/actions/runs/38728387848)，12 项分发资产已公开发布。[下载页面](https://github.com/wangzhongren/ans-studio/releases/tag/v1.0.0)提供以下文件；macOS 选与处理器匹配的一项，Windows 下载后完整解压再启动，保留同目录资源文件。
+
+| 平台 | 运行包 | 全仓回归（共 1401 项） | 实际解压包启动 |
+| --- | --- | --- | --- |
+| macOS Apple Silicon | `ANS-Studio-1.0.0-mac-arm64.zip` | 1400 通过，0 失败，1 平台跳过 | 通过 |
+| macOS Intel | `ANS-Studio-1.0.0-mac-x64.zip` | 1400 通过，0 失败，1 平台跳过 | 通过 |
+| Windows x64 | `ANS-Studio-1.0.0-win-x64.zip` | 1399 通过，0 失败，2 平台跳过 | 通过 |
+
+每个平台均实际验证 SDK/WASM、Codex CLI 0.162.1、Claude CLI 2.1.299，以及窗口、preload、IPC、导入前禁选、缺配置、设置开闭和用户配置路径。全部产物使用 source `83445eb` + overlay `c3d1066`，构建 tree 一致。发布资产中的 `manifest-*.json`、`SHA256SUMS-*.txt`、`release-provenance.json` 与 `overlay.patch` 可用于核验下载和来源；这些启动检查没有调用在线模型。
 
 维护者在 GitHub Actions 手动运行 `Build and verify release`，`source_ref` 固定 `v1.0.0`。本地可用 `npm ci`、`npm run package -- --mac --arm64 --publish never`（或匹配本机的 `--mac --x64` / `--win --x64`）构建，输出到 `release-output/`。实际发布要求匹配架构的包启动检查通过；跨平台生成文件不等于该平台已测试。
 
@@ -144,14 +154,14 @@ Claude 必须使用 API key，不使用订阅/OAuth 回退。客户等待暂停 
 
 正常安装和无网络协议/门禁测试的结果见 [装配验证](角色卡/装配/docs/change/2026-10-14_change_multi-runtime-assembly.md)。Claude 原生 hook/input 更新已用 bundled CLI `2.1.299`、假凭据和严格本地回环验证，详见 [原生验证](角色卡/Claude适配器/docs/fix/2026-10-14_fix_claude-native-hook-identity.md)。
 
-## 验证现状（2026-10-15）
+## V2 界面阶段验证（历史，2026-10-15）
 
 - **真实 Electron 桌面**：在 macOS 上以 1360×860、960×860 走查，覆盖导入前禁选、下拉键盘操作、Claude 缺配置入口、抽屉焦点与草稿保持、普通聊天、请求选择、队列撤回、停止、工具详情、来源文档阅读及正式派发 / 回交。
 - **真实在线 Pi + p-limit 项目**：正式任务在隔离项目副本内实际运行 `npm test`，**31 项通过、退出码 0**，授权报告文档实际落盘；修复后的独立任务复验派发与回交，无额外匿名工具行。p-limit 四个业务文件在本轮界面验收中保持不变。普通聊天未产生任务报告。
 - **全仓自动验证**：1385 项，**1384 通过、0 失败、1 跳过**（macOS 下的既有 Windows 专用路径用例）；`npm run typecheck` 与 diff 检查通过。独立 Electron 渲染、锚点与行距脚本通过。
-- **范围**：在线模型验证为 Pi；Claude 的缺配置与设置入口经过真实桌面验证，Codex / Claude 的协议与适配器验证使用受控测试、本地回环等各自记录的方法，不等同于在线模型或全平台验收。不同原生走查步骤的实际候选版本见详细记录。
+- **范围**：在线模型验证为 Pi；Claude 的缺配置与设置入口经过真实桌面验证，Codex / Claude 的协议与适配器验证使用受控测试、本地回环等各自记录的方法，不等同于在线模型任务验收。三平台运行包的最终构建与启动结果见上方发布小节；不同原生走查步骤的实际候选版本见详细记录。
 
-最终证据见[独立验证记录](角色卡/测试/docs/change/2026-10-15_change_visual-v2-independent-verification.md)与[版本 / 结果清单](角色卡/测试/docs/change/2026-10-15-visual-v2-implementation-evidence/final-verification.json)，整体验收见[项目管理报告](角色卡/项目管理/docs/change/2026-10-15_change_visual-convergence-implementation.md)。早期多运行时无网络接线结果仍保留在[历史验证](角色卡/测试/docs/change/2026-10-14_change_multi-runtime-independent-verification.md)，不作为当前结果。
+V2 阶段证据见[独立验证记录](角色卡/测试/docs/change/2026-10-15_change_visual-v2-independent-verification.md)与[版本 / 结果清单](角色卡/测试/docs/change/2026-10-15-visual-v2-implementation-evidence/final-verification.json)，整体验收见[项目管理报告](角色卡/项目管理/docs/change/2026-10-15_change_visual-convergence-implementation.md)。早期多运行时无网络接线结果仍保留在[历史验证](角色卡/测试/docs/change/2026-10-14_change_multi-runtime-independent-verification.md)，不作为当前结果。
 
 ## 角色链
 
@@ -250,6 +260,6 @@ Claude 必须使用 API key，不使用订阅/OAuth 回退。客户等待暂停 
   无任务队列显示；`ans govern` 的确认通道在无人值守（EOF）时 → 不完成、零副作用。
 - **多任务派发引擎仍是二期**：su 可 `dispatch_task` **逐条**把任务送进角色队列，但
   「pm 产出派发计划 → 编排按拓扑序自动执行」的**多任务派发引擎未实现**。
-- **模型行为与测试范围**：确定性门禁、确认、恢复和投递测试不证明模型在任意需求下都能正确建角色或完成代码任务。已完成的真实 Pi 桌面与 p-limit 验收见上方「验证现状」；Codex / Claude 在线任务、全平台表现及未在记录中实际执行的场景仍未验证。
+- **模型行为与测试范围**：确定性门禁、确认、恢复和投递测试不证明模型在任意需求下都能正确建角色或完成代码任务。已完成的真实 Pi 桌面与 p-limit 验收见上方「验证现状」；Codex / Claude 在线任务及未在记录中实际执行的场景仍未验证；三平台运行包的构建与启动结果见上方发布小节。
 
 本项目采用 MIT 许可证，详见 [LICENSE](LICENSE)。

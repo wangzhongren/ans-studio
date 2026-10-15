@@ -1,0 +1,177 @@
+﻿2026-10-15T11:38:15.1315690Z ##[group]Run node src/common/装配/release-verify.mjs release-output arm64
+2026-10-15T11:38:15.1324550Z [36;1mnode src/common/装配/release-verify.mjs release-output arm64[0m
+2026-10-15T11:38:15.1716960Z shell: /bin/bash -e {0}
+2026-10-15T11:38:15.1717830Z env:
+2026-10-15T11:38:15.1718420Z   NPM_CONFIG_USERCONFIG: /Users/runner/work/_temp/.npmrc
+2026-10-15T11:38:15.1719530Z   NODE_AUTH_TOKEN: XXXXX-XXXXX-XXXXX-XXXXX
+2026-10-15T11:38:15.1720350Z ##[endgroup]
+2026-10-15T11:38:22.2441230Z WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir "/var/folders/nj/vtw8zd2j31d1gdrtntc5y4600000gn/T/" (codex_home: AbsolutePathBuf("/var/folders/nj/vtw8zd2j31d1gdrtntc5y4600000gn/T/ans-packaged-smoke-XFJrUe/home/.codex"))
+2026-10-15T11:38:28.1281190Z npm warn Unknown user config "always-auth". This will stop working in the next major version of npm.
+2026-10-15T11:38:28.3585970Z {
+2026-10-15T11:38:28.3587190Z   "sourceRef": "v1.0.0",
+2026-10-15T11:38:28.3588210Z   "sourceSha": "83445ebcf24454c6107838cb7f2221882c6638ea",
+2026-10-15T11:38:28.3588930Z   "overlaySha": "c3d106602b5a82fc5fa7e1bd9e1d7485239d8b4a",
+2026-10-15T11:38:28.3589350Z   "actualTree": "15427e074c23ad1d4b52d0b191f57fe3bdeb5167",
+2026-10-15T11:38:28.3589720Z   "overlayPaths": [
+2026-10-15T11:38:28.3590030Z     ".github/workflows/release.yml",
+2026-10-15T11:38:28.3590340Z     "app/desktop/packaged-smoke.ts",
+2026-10-15T11:38:28.3590690Z     "app/desktop/pi-config.ts",
+2026-10-15T11:38:28.3591030Z     "app/main.ts",
+2026-10-15T11:38:28.3591320Z     "app/renderer/index.html",
+2026-10-15T11:38:28.3591590Z     "app/renderer/renderer.js",
+2026-10-15T11:38:28.3591920Z     "electron-builder.yml",
+2026-10-15T11:38:28.3592290Z     "package-lock.json",
+2026-10-15T11:38:28.3592570Z     "package.json",
+2026-10-15T11:38:28.3593460Z     "src/common/装配/release-assets.mjs",
+2026-10-15T11:38:28.3593880Z     "src/common/装配/release-policy.d.mts",
+2026-10-15T11:38:28.3594210Z     "src/common/装配/release-policy.mjs",
+2026-10-15T11:38:28.3594600Z     "src/common/装配/release-prepare.mjs",
+2026-10-15T11:38:28.3595060Z     "src/common/装配/release-provenance.mjs",
+2026-10-15T11:38:28.3595440Z     "src/common/装配/release-verify.mjs",
+2026-10-15T11:38:28.3595910Z     "src/provider/codex/session.ts",
+2026-10-15T11:38:28.3596620Z     "test/claude-adapter/session.test.ts",
+2026-10-15T11:38:28.3597160Z     "test/codex-adapter/electron-launch.test.ts",
+2026-10-15T11:38:28.3597680Z     "test/codex-adapter/electron-node-probe.mjs",
+2026-10-15T11:38:28.3598060Z     "test/codex-adapter/session.test.ts",
+2026-10-15T11:38:28.3598940Z     "test/pi-adapter/tool-display-projection.test.ts",
+2026-10-15T11:38:28.3599560Z     "test/桌面应用/boundary-refresh.test.ts",
+2026-10-15T11:38:28.3600020Z     "test/桌面应用/interface.test.ts",
+2026-10-15T11:38:28.3600850Z     "test/桌面应用/pi-config.test.ts",
+2026-10-15T11:38:28.3601190Z     "test/桌面应用/project-document.test.ts",
+2026-10-15T11:38:28.3602450Z     "test/测试/p1p7-document-integration.test.ts",
+2026-10-15T11:38:28.3604690Z     "test/测试/t1-pipeline-integration.test.ts",
+2026-10-15T11:38:28.3605410Z     "test/测试/t1-real-cli.test.ts",
+2026-10-15T11:38:28.3606640Z     "test/装配/multi-runtime.test.ts",
+2026-10-15T11:38:28.3607080Z     "test/装配/release-packaging.test.ts"
+2026-10-15T11:38:28.3607480Z   ],
+2026-10-15T11:38:28.3608290Z   "overlayPatchSha256": "a7297f345b371754ff07f4165b54d9159a1f0846e6758c27220803660432f45c",
+2026-10-15T11:38:28.3609040Z   "excludedChanges": [
+2026-10-15T11:38:28.3609290Z     ".gitignore",
+2026-10-15T11:38:28.3609550Z     "README.md",
+2026-10-15T11:38:28.3610380Z     "角色卡/Claude适配器/docs/feature/claude-session.md",
+2026-10-15T11:38:28.3610880Z     "角色卡/Claude适配器/docs/fix/2026-10-15_fix_release-test-clock.md",
+2026-10-15T11:38:28.3611450Z     "角色卡/Claude适配器/memo.md",
+2026-10-15T11:38:28.3611930Z     "角色卡/Codex适配器/docs/feature/codex-governed-session.md",
+2026-10-15T11:38:28.3613160Z     "角色卡/Codex适配器/docs/fix/2026-10-15_fix_packaged-electron-node-launch.md",
+2026-10-15T11:38:28.3613820Z     "角色卡/Codex适配器/docs/fix/2026-10-15_fix_windows-native-wire-fixture.md",
+2026-10-15T11:38:28.3621260Z     "角色卡/Codex适配器/memo.md",
+2026-10-15T11:38:28.3621890Z     "角色卡/Pi适配器/docs/fix/2026-10-15_fix_windows-shell-termination-oracle.md",
+2026-10-15T11:38:28.3622540Z     "角色卡/Pi适配器/feature-map.md",
+2026-10-15T11:38:28.3623170Z     "角色卡/桌面UI/docs/fix/2026-10-15_fix_packaged-env-path-hint.md",
+2026-10-15T11:38:28.3623580Z     "角色卡/桌面窗口/api-spec.md",
+2026-10-15T11:38:28.3624540Z     "角色卡/桌面窗口/docs/fix/2026-10-15-packaged-runtime-config-evidence/manifest.json",
+2026-10-15T11:38:28.3625200Z     "角色卡/桌面窗口/docs/fix/2026-10-15-packaged-runtime-config-evidence/owner-green.txt",
+2026-10-15T11:38:28.3672140Z     "角色卡/桌面窗口/docs/fix/2026-10-15-packaged-runtime-config-evidence/path-green.txt",
+2026-10-15T11:38:28.3673260Z     "角色卡/桌面窗口/docs/fix/2026-10-15-packaged-runtime-config-evidence/path-red.txt",
+2026-10-15T11:38:28.3674160Z     "角色卡/桌面窗口/docs/fix/2026-10-15-packaged-runtime-config-evidence/typecheck-green.txt",
+2026-10-15T11:38:28.3676560Z     "角色卡/桌面窗口/docs/fix/2026-10-15-windows-document-test-oracles-evidence/mac-owner-green.txt",
+2026-10-15T11:38:28.3677560Z     "角色卡/桌面窗口/docs/fix/2026-10-15-windows-document-test-oracles-evidence/manifest.json",
+2026-10-15T11:38:28.3678310Z     "角色卡/桌面窗口/docs/fix/2026-10-15-windows-document-test-oracles-evidence/typecheck-green.txt",
+2026-10-15T11:38:28.3679190Z     "角色卡/桌面窗口/docs/fix/2026-10-15_fix_packaged-runtime-config.md",
+2026-10-15T11:38:28.3679840Z     "角色卡/桌面窗口/docs/fix/2026-10-15_fix_windows-document-test-oracles.md",
+2026-10-15T11:38:28.3680500Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/baseline.json",
+2026-10-15T11:38:28.3683030Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/ci-runs.json",
+2026-10-15T11:38:28.3685660Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/ci1-arm64-regression.txt",
+2026-10-15T11:38:28.3686510Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/ci1-macx64-regression.txt",
+2026-10-15T11:38:28.3687430Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/ci1-win-regression-red.txt",
+2026-10-15T11:38:28.3688510Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/ci2-darwin-arm64-manifest.json",
+2026-10-15T11:38:28.3689640Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/ci2-darwin-arm64-package.txt",
+2026-10-15T11:38:28.3690300Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/ci2-darwin-arm64-regression.txt",
+2026-10-15T11:38:28.3691430Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/ci2-darwin-x64-regression.txt",
+2026-10-15T11:38:28.3692210Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/ci2-local-full-green.txt",
+2026-10-15T11:38:28.3693080Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/ci2-local-tsc.txt",
+2026-10-15T11:38:28.3693770Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/ci2-results.json",
+2026-10-15T11:38:28.3694360Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/ci2-win32-x64-manifest.json",
+2026-10-15T11:38:28.3695180Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/ci2-win32-x64-package.txt",
+2026-10-15T11:38:28.3696350Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/ci2-win32-x64-regression.txt",
+2026-10-15T11:38:28.3697260Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/ci3-local-full-green.txt",
+2026-10-15T11:38:28.3698040Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/ci3-local-tsc.txt",
+2026-10-15T11:38:28.3698760Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/ci3-preflight-claude-old-clock-red.txt",
+2026-10-15T11:38:28.3699520Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/claude-clock-green.txt",
+2026-10-15T11:38:28.3700170Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/full-native-loopback-green.txt",
+2026-10-15T11:38:28.3701150Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/full-sandbox-red.txt",
+2026-10-15T11:38:28.3701820Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/local-independent-audit.json",
+2026-10-15T11:38:28.3702680Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/local-mac-arm64-manifest.json",
+2026-10-15T11:38:28.3708580Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/local-mac-arm64-verify.txt",
+2026-10-15T11:38:28.3709280Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/local-source-provenance.json",
+2026-10-15T11:38:28.3710110Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/native-package-claude-missing-config.png",
+2026-10-15T11:38:28.3710950Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/native-package-claude-return-ax.txt",
+2026-10-15T11:38:28.3711550Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/native-package-claude-settings-ax.txt",
+2026-10-15T11:38:28.3712990Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/native-package-settings-restarted-ax.txt",
+2026-10-15T11:38:28.3713830Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/native-package-settings-saved-ax.txt",
+2026-10-15T11:38:28.3714510Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/own-fixtures-first-new-oracle-red.txt",
+2026-10-15T11:38:28.3715250Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/own-fixtures-green.txt",
+2026-10-15T11:38:28.3715820Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/t1-clock-green.txt",
+2026-10-15T11:38:28.3716490Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/t1-clock-negative-observation-red.txt",
+2026-10-15T11:38:28.3717240Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/typecheck.txt",
+2026-10-15T11:38:28.3717830Z     "角色卡/测试/docs/change/2026-10-15_change_v1-release-verification.md",
+2026-10-15T11:38:28.3718470Z     "角色卡/装配/boundary.md",
+2026-10-15T11:38:28.3718830Z     "角色卡/装配/boundary.yaml",
+2026-10-15T11:38:28.3719090Z     "角色卡/装配/changelog.md",
+2026-10-15T11:38:28.3719590Z     "角色卡/装配/docs/change/2026-10-15-release-packaging-evidence/manifest.json",
+2026-10-15T11:38:28.3720320Z     "角色卡/装配/docs/change/2026-10-15-release-packaging-evidence/tag-overlay-mac-arm64-manifest.json",
+2026-10-15T11:38:28.3721170Z     "角色卡/装配/docs/change/2026-10-15_change_release-packaging-boundary.md",
+2026-10-15T11:38:28.3722150Z     "角色卡/装配/docs/change/2026-10-15_change_v1-release-packaging.md",
+2026-10-15T11:38:28.3722750Z     "角色卡/装配/docs/feature/desktop-release-packaging.md",
+2026-10-15T11:38:28.3723470Z     "角色卡/装配/feature-map.md",
+2026-10-15T11:38:28.3724160Z     "角色卡/装配/memo.md",
+2026-10-15T11:38:28.3724720Z     "角色卡/项目管理/docs/change/2026-10-15_change_v1-release-packaging.md"
+2026-10-15T11:38:28.3725090Z   ],
+2026-10-15T11:38:28.3725530Z   "runUrl": "https://github.com/wangzhongren/ans-studio/actions/runs/38728387848",
+2026-10-15T11:38:28.3726090Z   "platform": "darwin",
+2026-10-15T11:38:28.3726400Z   "arch": "arm64",
+2026-10-15T11:38:28.3726700Z   "node": "v24.14.0",
+2026-10-15T11:38:28.3726940Z   "npm": "11.9.0",
+2026-10-15T11:38:28.3727470Z   "lockSha256": "d20e6ba6f5e7b2074a662ecaf8228be00c5c537e3bc3c4f9a3bb85cdf2b31d98",
+2026-10-15T11:38:28.3727930Z   "builder": "26.15.3",
+2026-10-15T11:38:28.3728170Z   "startedAt": "2026-10-15T11:38:22.342Z",
+2026-10-15T11:38:28.3728570Z   "finishedAt": "2026-10-15T11:38:28.132Z",
+2026-10-15T11:38:28.3728910Z   "unsigned": true,
+2026-10-15T11:38:28.3729060Z   "smoke": {
+2026-10-15T11:38:28.3729200Z     "ok": true,
+2026-10-15T11:38:28.3729360Z     "isPackaged": true,
+2026-10-15T11:38:28.3729540Z     "arch": "arm64",
+2026-10-15T11:38:28.3730720Z     "platform": "darwin",
+2026-10-15T11:38:28.3731150Z     "version": "1.0.0",
+2026-10-15T11:38:28.3731740Z     "envPath": "/var/folders/nj/vtw8zd2j31d1gdrtntc5y4600000gn/T/ans-packaged-smoke-XFJrUe/home/userdata/.env",
+2026-10-15T11:38:28.3732330Z     "checks": {
+2026-10-15T11:38:28.3732580Z       "dom": true,
+2026-10-15T11:38:28.3732750Z       "preload": true,
+2026-10-15T11:38:28.3732960Z       "ipc": true,
+2026-10-15T11:38:28.3733120Z       "importDisabled": true,
+2026-10-15T11:38:28.3733540Z       "missingConfiguration": true,
+2026-10-15T11:38:28.3733900Z       "settings": true,
+2026-10-15T11:38:28.3734180Z       "envPathMatches": true
+2026-10-15T11:38:28.3734470Z     },
+2026-10-15T11:38:28.3734700Z     "missingKeys": {
+2026-10-15T11:38:28.3735180Z       "pi": [
+2026-10-15T11:38:28.3735610Z         "ANTHROPIC_AUTH_TOKEN",
+2026-10-15T11:38:28.3736400Z         "ANS_PI_BASE_URL",
+2026-10-15T11:38:28.3736760Z         "ANS_PI_MODEL"
+2026-10-15T11:38:28.3737050Z       ],
+2026-10-15T11:38:28.3737260Z       "codex": [
+2026-10-15T11:38:28.3737410Z         "CODEX_API_KEY",
+2026-10-15T11:38:28.3737650Z         "ANS_CODEX_MODEL"
+2026-10-15T11:38:28.3737950Z       ],
+2026-10-15T11:38:28.3738160Z       "claude": [
+2026-10-15T11:38:28.3738310Z         "ANTHROPIC_API_KEY"
+2026-10-15T11:38:28.3738480Z       ]
+2026-10-15T11:38:28.3738660Z     }
+2026-10-15T11:38:28.3738840Z   },
+2026-10-15T11:38:28.3738980Z   "nativeDependencies": {
+2026-10-15T11:38:28.3739280Z     "sdkImports": "PACKAGED_SDK_IMPORTS_OK",
+2026-10-15T11:38:28.3739730Z     "codexVersion": "codex-cli 0.162.1",
+2026-10-15T11:38:28.3740100Z     "claudeVersion": "2.1.299 (Claude Code)"
+2026-10-15T11:38:28.3740430Z   },
+2026-10-15T11:38:28.3740610Z   "process": {
+2026-10-15T11:38:28.3740830Z     "code": 0,
+2026-10-15T11:38:28.3741090Z     "signal": null,
+2026-10-15T11:38:28.3741290Z     "stdout": "",
+2026-10-15T11:38:28.3742910Z     "stderr": "2026-10-15 11:38:25.788 ANS Studio Helper[3832:16111] XPC error for connection com.apple.backupd.sandbox.xpc: Connection invalid\n2026-10-15 11:38:25.788 ANS Studio Helper[3832:16106] XPC error for connection com.apple.backupd.sandbox.xpc: Connection invalid\n2026-10-15 11:38:25.792 ANS Studio Helper[3832:16111] XPC error for connection com.apple.backupd.sandbox.xpc: Connection invalid\n"
+2026-10-15T11:38:28.3744200Z   },
+2026-10-15T11:38:28.3744390Z   "artifact": {
+2026-10-15T11:38:28.3744590Z     "file": "ANS-Studio-1.0.0-mac-arm64.zip",
+2026-10-15T11:38:28.3744860Z     "size": 404892017,
+2026-10-15T11:38:28.3745340Z     "sha256": "92118718ae34b1194c615d2c94c78b37d0324bce0b0ac9e31529431c0bc59270"
+2026-10-15T11:38:28.3745750Z   }
+2026-10-15T11:38:28.3746040Z }

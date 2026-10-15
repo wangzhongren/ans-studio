@@ -1,0 +1,23 @@
+﻿2026-10-15T11:43:35.4654952Z ##[group]Run cd release-assets
+2026-10-15T11:43:35.4655347Z [36;1mcd release-assets[0m
+2026-10-15T11:43:35.4655680Z [36;1mtest "$(find . -name '*.zip' | wc -l)" -eq 3[0m
+2026-10-15T11:43:35.4656120Z [36;1mfor sums in SHA256SUMS-*.txt; do sha256sum -c "$sums"; done[0m
+2026-10-15T11:43:35.4657080Z [36;1mif gh release view v1.0.0 --json isDraft --jq '.isDraft' > draft-state.txt; then[0m
+2026-10-15T11:43:35.4657603Z [36;1m  test "$(cat draft-state.txt)" = true[0m
+2026-10-15T11:43:35.4657923Z [36;1melse[0m
+2026-10-15T11:43:35.4659302Z [36;1m  gh release create v1.0.0 --verify-tag --draft --title 'ANS Studio 1.0.0' --notes '基于固定 v1.0.0 源码及 manifest 列明的打包修复 overlay。macOS arm64、macOS x64、Windows x64 各由原生 runner 构建并实际启动验证。未签名、未公证：macOS Gatekeeper 或 Windows SmartScreen 可能提示，请先核对 SHA256。最低 macOS 13；Windows 10/11 x64。Windows 暂不支持内置受限来源文档阅读；保留完整摘要与执行记录，来源文件可由系统编辑器查看。包内不含密钥，首次使用请在设置中填写。详细来源与测试见各平台 manifest。'[0m
+2026-10-15T11:43:35.4660833Z [36;1mfi[0m
+2026-10-15T11:43:35.4661330Z [36;1mgh release upload v1.0.0 ./*.zip ./manifest-*.json ./SHA256SUMS-*.txt ./release-provenance.json ./overlay.patch[0m
+2026-10-15T11:43:35.4662072Z [36;1mif test "$RELEASE_PUBLISH" = true; then gh release edit v1.0.0 --draft=false; fi[0m
+2026-10-15T11:43:35.4728978Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-10-15T11:43:35.4729367Z env:
+2026-10-15T11:43:35.4732232Z   GH_TOKEN: ***
+2026-10-15T11:43:35.4732488Z   RELEASE_PUBLISH: false
+2026-10-15T11:43:35.4732754Z ##[endgroup]
+2026-10-15T11:43:35.7819550Z ANS-Studio-1.0.0-mac-arm64.zip: OK
+2026-10-15T11:43:36.0952716Z ANS-Studio-1.0.0-mac-x64.zip: OK
+2026-10-15T11:43:36.0972866Z overlay.patch: OK
+2026-10-15T11:43:36.0973391Z release-provenance.json: OK
+2026-10-15T11:43:36.4314217Z ANS-Studio-1.0.0-win-x64.zip: OK
+2026-10-15T11:43:37.0567906Z release not found
+2026-10-15T11:43:37.9977841Z https://github.com/wangzhongren/ans-studio/releases/tag/untagged-44bb9ddcf2e1b01190e6

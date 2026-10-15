@@ -3,7 +3,7 @@ id: v1-release-packaging
 type: change
 title: v1.0.0可审计跨平台打包与Release协调
 created: "2026-10-15"
-status: authorized
+status: verified
 revision: 1
 ---
 
@@ -69,3 +69,21 @@ root报告Windows全仓已绿进入打包、arm64全绿，Intel仅root自有T1 c
 同意root仅own t1-pipeline-integration.test.ts对三runtime confirmation case采用显式Date/setTimeout虚拟时钟：保原100/180阈值、真实Pipeline/FS/事件/hostgate与全部abort/stale/写许可/报告断言；启用在Core创建前，逐case隔离清理，不靠stop/error文本。观察循环用未mock setImmediate/performance及真实外层10s watchdog；必须同mock clock增加不进入客户等待tick100仍Core timed_out负对照，防时钟不生效或伪永不超时。原30ms真实timeout用例不变，不修改生产。仅订正逻辑时钟的可控输入，不放宽业务行为。装配policy逐文件增该自有测试，保首Intel红，最终三个平台全CI重跑；当前Intel与Windows包gate未签通过。PM仅只读审，不替root实现/执行测试。
 
 CI3前PM已实读最终root own diff：原100/180/5逻辑数值及全部业务/历史断言保留，mock在创建Core前生效，真实performance/setImmediate观察+10s外层限时，三runtime逐例99未settled+1到100真timed_out/单failed handback/无src写入负对照成立；原30ms真实timeout未改。root自验8/8按其执行归因。新增负例首红为handback与settled异步到达顺序，等待两者到齐再严格各1并非删除断言，原红保留。结论ready-for-CI3，同一overlay完整三平台重跑；生产deadline未抬高/归零，未新改产品合同。PM本次未运行测试或改同伴代码。
+
+
+## CI3最终发布前回签
+
+PM实读root ci3-results.json、三个ci3平台manifest、expected-source-tree.json与原RELEASE_ASSET_SET_VERIFIED日志：CI run 38728387848三原生目标构建及解压实际包启动均成功；mac两架构各1401总1400过0失败1平台跳过，Windows1401总1399过0失败2既有POSIX前提跳过。七UI checks全true，实际isPackaged/平台架构、Pi+Claude SDK/Photon WASM、Codex0.162.1、Claude2.1.299可执行结果齐全；不外推在线模型或所有OS版本。
+
+三平台manifest统一source83445ebcf24454c6107838cb7f2221882c6638ea，overlayc3d106602b5a82fc5fa7e1bd9e1d7485239d8b4a，actualTree15427e074c23ad1d4b52d0b191f57fe3bdeb5167，patchSHA256 a7297f345b371754ff07f4165b54d9159a1f0846e6758c27220803660432f45c，与root独立Git blob/mode/path树重建及算法自检相符，lock/builder一致。各ZIP file/size/hash在平台manifest与root汇总一致，集合校验真实日志过。原tag保留，未把overlay冒称旧tag原生内容。
+
+结论ready-for-release，非已公开：所有既定平台CI/来源/包启动gate已具证据，root本机实际包设置保存/重启/导入/Claude缺配/键盘回焦既有验证不冒充Windows手动亲测。root可按客户已授权打开draft核12资产（3ZIP+3manifest+4SHA清单+provenance+patch）、未签名/未公证/macOS13/Windows来源文档暂不可用说明后publish，无需新许可；若缺资产则停在draft修复。PM只读审计，未GUI/改peer/触发布。实际发布URL与公开状态到后再将本记录verified。
+
+
+## 实际公开发布与最终验收
+
+root已通过GitHub Web UI实际发布[ANS Studio v1.0.0](https://github.com/wangzhongren/ans-studio/releases/tag/v1.0.0)，owner页面Latest/released且无Draft；另用显示Sign in的未登录浏览器确认公开页面可见，证据release-public-guest.png及AX由测试角色留存，不归PM亲自网页操作。公开14资产为12上传资产及GitHub自动2源码归档，不把自动源码包冒充已叠加构建源。
+
+发布前root核对三个ZIP的GitHub服务器SHA256逐个等于CI3原生manifest，证据[github-upload-digests.json](../../../测试/docs/change/2026-10-15-v1-release-evidence/github-upload-digests.json)，最终CI3结果见[ci3-results.json](../../../测试/docs/change/2026-10-15-v1-release-evidence/ci3-results.json)及[运行记录](https://github.com/wangzhongren/ans-studio/actions/runs/38728387848)。发布说明明确3下载链接/解压、各平台真实测试数量、固定source83445加overlayc3d、自动source zip复现需应用公开patch、未签名未公证、Windows受限文档不可用与离线包smoke范围。
+
+客户已授权配置、打包、测试通过后上传Release，本轮对应治理/实现/各平台回归与实际包启动/独立审计/公开发布均已完成，PM记录verified。未移动v1.0.0、未改发布资产；PM本次只更新自有文档，不额外测试/GUI/改代码。此前ready或未公开描述为阶段历史，以本节为当前状态。

@@ -11,8 +11,15 @@
     {
       "url": "https://github.com/wangzhongren/ans-studio/actions/runs/38726449725",
       "overlay": "605c50f2fbb13d8cee41d069c444859e249fb4e0",
-      "status": "in-progress",
+      "status": "failed; Windows actual package and arm64 passed, Intel root 100ms wall-clock fixture failed",
+      "publish": false
+    },
+    {
+      "url": "https://github.com/wangzhongren/ans-studio/actions/runs/38728387848",
+      "overlay": "c3d106602b5a82fc5fa7e1bd9e1d7485239d8b4a",
+      "status": "success; all three native full suites, actual packages and asset-set checks passed; draft created then owner UI publicly published",
       "publish": false
     }
-  ]
+  ],
+  "releaseUrl": "https://github.com/wangzhongren/ans-studio/releases/tag/v1.0.0"
 }

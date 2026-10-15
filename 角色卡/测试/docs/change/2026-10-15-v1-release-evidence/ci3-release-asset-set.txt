@@ -1,0 +1,5 @@
+﻿2026-10-15T11:43:33.6603802Z ##[group]Run node src/common/装配/release-assets.mjs release-assets release-provenance
+2026-10-15T11:43:33.6604562Z [36;1mnode src/common/装配/release-assets.mjs release-assets release-provenance[0m
+2026-10-15T11:43:33.6898340Z shell: /usr/bin/bash -e {0}
+2026-10-15T11:43:33.6898812Z ##[endgroup]
+2026-10-15T11:43:35.4513900Z RELEASE_ASSET_SET_VERIFIED darwin-arm64 darwin-x64 win32-x64

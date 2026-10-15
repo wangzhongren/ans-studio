@@ -1,0 +1,188 @@
+HTML 内容 Release ANS Studio 1.0.0 · wangzhongren/ans-studio, URL: github.com/wangzhongren/ans-studio/releases/tag/v1.0.0
+							40 container
+								41 link Skip to content, Value: github.com/wangzhongren/ans-studio/releases/tag/v1.0.0#start-of-content
+								42 container Global navigation menu
+									43 弹出式按钮 Open menu
+									44 link Homepage ( g then d ), Value: github.com/
+									45 container Breadcrumbs
+										46 内容列表
+											47 container
+												48 link wangzhongren, Value: github.com/wangzhongren
+											49 container
+												50 link ans-studio, Value: github.com/wangzhongren/ans-studio
+												51 弹出式按钮 Switch repository ( option shift r )
+									52 按钮 Open quick search dialog, type / to search
+									53 link Chat with Copilot, Value: github.com/copilot
+									54 弹出式按钮 Open Copilot…
+									55 弹出式按钮 Create new...
+									56 link All issues, Value: github.com/issues
+									57 link All pull requests, Value: github.com/pulls
+									58 link All repositories, Value: github.com/repos
+									59 弹出式按钮 Open user navigation menu
+										60 图像 Wlink
+									61 标题 Repository navigation, Value: 2
+										62 文本 Repository navigation
+									63 container Repository
+										64 内容列表
+											65 link Code, Value: github.com/wangzhongren/ans-studio
+											66 link Issues, Value: github.com/wangzhongren/ans-studio/issues
+											67 link Pull requests, Value: github.com/wangzhongren/ans-studio/pulls
+											68 link Agents, Value: github.com/wangzhongren/ans-studio/agents?author=wangzhongren
+											69 link Actions, Value: github.com/wangzhongren/ans-studio/actions
+											70 link Projects, Value: github.com/wangzhongren/ans-studio/projects
+											71 link Wiki, Value: github.com/wangzhongren/ans-studio/wiki
+											72 link Security and quality, Value: github.com/wangzhongren/ans-studio/security
+											73 link Insights, Value: github.com/wangzhongren/ans-studio/pulse
+											74 link Settings, Value: github.com/wangzhongren/ans-studio/settings
+							75 container
+								76 container Breadcrumb
+									77 内容列表
+										78 container
+											79 link Releases, Value: github.com/wangzhongren/ans-studio/releases
+										80 link v1.0.0, Value: github.com/wangzhongren/ans-studio/releases/tag/v1.0.0
+								81 标题 ANS Studio 1.0.0, Value: 1
+									82 文本 ANS Studio 1.0.0
+								83 link Latest, Value: github.com/wangzhongren/ans-studio/releases/latest
+								84 弹出式按钮 Compare
+								85 link Edit: ANS Studio 1.0.0, Value: github.com/wangzhongren/ans-studio/releases/edit/v1.0.0
+								86 按钮 Delete: ANS Studio 1.0.0
+								87 图像 @github-actions
+								88 link github-actions, Value: github.com/apps/github-actions
+								89 文本  released this 
+								90 container Oct 15, 2026, 19:49 GMT+8
+									91 文本 now
+								92 文本 · 
+								93 link 3 commits , Value: github.com/wangzhongren/ans-studio/compare/v1.0.0...main
+								94 文本 to main since this release
+								95 link Tag v1.0.0, Value: github.com/wangzhongren/ans-studio/tree/v1.0.0
+								96 link Commit 83445eb, Value: github.com/wangzhongren/ans-studio/commit/83445ebcf24454c6107838cb7f2221882c6638ea
+								97 文本 已完成 macOS Apple Silicon、macOS Intel 和 Windows x64 三份运行包。
+								98 内容列表
+									99 container
+										100 AXListMarker • 
+										101 link macOS Apple Silicon 下载, Value: github.com/wangzhongren/ans-studio/releases/download/v1.0.0/ANS-Studio-1.0.0-mac-arm64.zip
+									102 container
+										103 AXListMarker • 
+										104 link macOS Intel 下载, Value: github.com/wangzhongren/ans-studio/releases/download/v1.0.0/ANS-Studio-1.0.0-mac-x64.zip
+									105 container
+										106 AXListMarker • 
+										107 link Windows x64 下载, Value: github.com/wangzhongren/ans-studio/releases/download/v1.0.0/ANS-Studio-1.0.0-win-x64.zip
+								108 文本 macOS 13 及以上：解压后打开 ANS Studio.app。Windows 10/11 x64：解压后运行 ANS Studio.exe，保留完整 resources 目录。包内不含密钥，首次使用请通过左下角设置填写。
+								109 link 完整构建与测试记录, Value: github.com/wangzhongren/ans-studio/actions/runs/38728387848
+								110 text ：三平台均完成原生构建、解压后实际程序启动、7 项界面/preload/IPC 检查，以及 Pi/Claude SDK、Photon WASM、Codex CLI 0.162.1 和 Claude CLI 2.1.299 的离线验证。每个平台全仓 1401 项；两份 macOS 各 1400 通过、0 失败、1 平台跳过，Windows 为 1399 通过、0 失败、2 平台跳过。 源码基线为固定 v1.0.0（83445eb），叠加已审查的打包修复提交 
+								111 link c3d1066, Value: github.com/wangzhongren/ans-studio/commit/c3d106602b5a82fc5fa7e1bd9e1d7485239d8b4a
+								112 text 。原标签保持不变；实际源码树、依赖和产物 SHA-256 见各平台 manifest、release-provenance.json、overlay.patch 与 SHA256SUMS 文件。GitHub 自带的 Source code 压缩包仅对应原标签，复现运行包还需应用附带 overlay.patch。 运行包未签名、未公证，macOS Gatekeeper 或 Windows SmartScreen 可能提示，请核对 SHA-256。Windows 暂不支持内置受限来源文档阅读；完整摘要与执行记录保留，来源文件可手动用系统编辑器查看。本次运行包验证未调用在线模型。
+								113 按钮 Assets 14
+								114 内容列表
+									115 container
+										116 link ANS-Studio-1.0.0-mac-arm64.zip, Value: github.com/wangzhongren/ans-studio/releases/download/v1.0.0/ANS-Studio-1.0.0-mac-arm64.zip
+										117 文本 sha256:92118718ae34b1194c615d2c94c78b37d0324bce0b0ac9e31529431c0bc59270
+										118 按钮 Copy to clipboard digest for ANS-Studio-1.0.0-mac-arm64.zip
+										119 文本 386 MB
+										120 container Oct 15, 2026, 19:43 GMT+8
+											121 文本 6 minutes ago
+									122 container
+										123 link ANS-Studio-1.0.0-mac-x64.zip, Value: github.com/wangzhongren/ans-studio/releases/download/v1.0.0/ANS-Studio-1.0.0-mac-x64.zip
+										124 文本 sha256:fe03c2e0e08eb6d5d19ec9045fc58d7f5967ed5f3aadc321d2d06d85cfe1eb17
+										125 按钮 Copy to clipboard digest for ANS-Studio-1.0.0-mac-x64.zip
+										126 文本 406 MB
+										127 container Oct 15, 2026, 19:43 GMT+8
+											128 文本 6 minutes ago
+									129 container
+										130 link ANS-Studio-1.0.0-win-x64.zip, Value: github.com/wangzhongren/ans-studio/releases/download/v1.0.0/ANS-Studio-1.0.0-win-x64.zip
+										131 文本 sha256:03be992e7081ef63a4a719e15fda08a8e6a5518a9edccfbfa10b51d1378f2047
+										132 按钮 Copy to clipboard digest for ANS-Studio-1.0.0-win-x64.zip
+										133 文本 434 MB
+										134 container Oct 15, 2026, 19:43 GMT+8
+											135 文本 6 minutes ago
+									136 container
+										137 link manifest-darwin-arm64.json, Value: github.com/wangzhongren/ans-studio/releases/download/v1.0.0/manifest-darwin-arm64.json
+										138 文本 sha256:84d69218c1a1ad74c62198595bcc85f1ee78c52e85501605b8db6da858fecad8
+										139 按钮 Copy to clipboard digest for manifest-darwin-arm64.json
+										140 文本 9.08 KB
+										141 container Oct 15, 2026, 19:43 GMT+8
+											142 文本 6 minutes ago
+									143 container
+										144 link manifest-darwin-x64.json, Value: github.com/wangzhongren/ans-studio/releases/download/v1.0.0/manifest-darwin-x64.json
+										145 文本 sha256:c2df551f7912bee27cef0d5157d31f0ba0f2c840a94258f3613e0eece6b3a002
+										146 按钮 Copy to clipboard digest for manifest-darwin-x64.json
+										147 文本 10.7 KB
+										148 container Oct 15, 2026, 19:43 GMT+8
+											149 文本 6 minutes ago
+									150 container
+										151 link manifest-win32-x64.json, Value: github.com/wangzhongren/ans-studio/releases/download/v1.0.0/manifest-win32-x64.json
+										152 文本 sha256:64a6e2a0e175af0784437cc23f3692c0176b09e02cafbfdc37f0f6ad905edcea
+										153 按钮 Copy to clipboard digest for manifest-win32-x64.json
+										154 文本 8.69 KB
+										155 container Oct 15, 2026, 19:43 GMT+8
+											156 文本 6 minutes ago
+									157 container
+										158 link overlay.patch, Value: github.com/wangzhongren/ans-studio/releases/download/v1.0.0/overlay.patch
+										159 文本 sha256:a7297f345b371754ff07f4165b54d9159a1f0846e6758c27220803660432f45c
+										160 按钮 Copy to clipboard digest for overlay.patch
+										161 文本 243 KB
+										162 container Oct 15, 2026, 19:43 GMT+8
+											163 文本 6 minutes ago
+									164 container
+										165 link release-provenance.json, Value: github.com/wangzhongren/ans-studio/releases/download/v1.0.0/release-provenance.json
+										166 文本 sha256:b08ad90b4d30d477f517acc9f8a65d043d040241f6adcf5361214a80951e1b02
+										167 按钮 Copy to clipboard digest for release-provenance.json
+										168 文本 7.31 KB
+										169 container Oct 15, 2026, 19:43 GMT+8
+											170 文本 6 minutes ago
+									171 container
+										172 link SHA256SUMS-darwin-arm64.txt, Value: github.com/wangzhongren/ans-studio/releases/download/v1.0.0/SHA256SUMS-darwin-arm64.txt
+										173 文本 sha256:faf8e59bae122a425912092bb2a80f85695f5a1fba877be69d168761cce066f9
+										174 按钮 Copy to clipboard digest for SHA256SUMS-darwin-arm64.txt
+										175 文本 97 Bytes
+										176 container Oct 15, 2026, 19:43 GMT+8
+											177 文本 6 minutes ago
+									178 container
+										179 link SHA256SUMS-darwin-x64.txt, Value: github.com/wangzhongren/ans-studio/releases/download/v1.0.0/SHA256SUMS-darwin-x64.txt
+										180 文本 sha256:70b78ee19713eee2b63702ce0bc9a2c9f03f69091382a33ca0ae76d39c0f2d45
+										181 按钮 Copy to clipboard digest for SHA256SUMS-darwin-x64.txt
+										182 文本 95 Bytes
+										183 container Oct 15, 2026, 19:43 GMT+8
+											184 文本 6 minutes ago
+									185 container
+										186 link SHA256SUMS-overlay.txt, Value: github.com/wangzhongren/ans-studio/releases/download/v1.0.0/SHA256SUMS-overlay.txt
+										187 文本 sha256:8bc51fcd6d4713bb0648539797004e2043e5bcaa56ce966f47fc6f90193c2736
+										188 按钮 Copy to clipboard digest for SHA256SUMS-overlay.txt
+										189 文本 170 Bytes
+										190 container Oct 15, 2026, 19:43 GMT+8
+											191 文本 6 minutes ago
+									192 container
+										193 link SHA256SUMS-win32-x64.txt, Value: github.com/wangzhongren/ans-studio/releases/download/v1.0.0/SHA256SUMS-win32-x64.txt
+										194 文本 sha256:e4c2c43e78aa6df48c3ef1ae589b277db6d45b9dc8f63f95169717a378d21bea
+										195 按钮 Copy to clipboard digest for SHA256SUMS-win32-x64.txt
+										196 文本 95 Bytes
+										197 container Oct 15, 2026, 19:43 GMT+8
+											198 文本 6 minutes ago
+									199 container
+										200 link Source code (zip), Value: github.com/wangzhongren/ans-studio/archive/refs/tags/v1.0.0.zip
+										201 container Oct 15, 2026, 17:47 GMT+8
+											202 文本 2 hours ago
+									203 container
+										204 link Source code (tar.gz), Value: github.com/wangzhongren/ans-studio/archive/refs/tags/v1.0.0.tar.gz
+										205 container Oct 15, 2026, 17:47 GMT+8
+											206 文本 2 hours ago
+								207 开合三角标记 Add or remove reactions
+							208 container
+								209 标题 Footer, Value: 2
+									210 文本 Footer
+								211 link GitHub Homepage, Value: github.com/
+								212 文本 © 2026 GitHub, Inc.
+								213 container Footer
+									214 标题 Footer navigation, Value: 3
+										215 文本 Footer navigation
+									216 内容列表 Footer navigation
+										217 link Terms, Value: docs.github.com/site-policy/github-terms/github-terms-of-service
+										218 link Privacy, Value: docs.github.com/site-policy/privacy-policies/github-privacy-statement
+										219 link Security, Value: github.com/security
+										220 link Status, Value: githubstatus.com/
+										221 link Community, Value: github.community/
+										222 link Docs, Value: docs.github.com/
+										223 link Contact, Value: support.github.com/?tags=dotcom-footer
+										224 按钮 Manage cookies
+										225 按钮 Do not share my personal information
+				226 

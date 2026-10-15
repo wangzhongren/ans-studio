@@ -1,0 +1,199 @@
+Browser tab: 8, Title: "Release ANS Studio 1.0.0 · wangzhongren/ans-studio · GitHub", URL: "https://github.com/wangzhongren/ans-studio/releases/tag/v1.0.0".
+0 AXWebArea Release ANS Studio 1.0.0 · wangzhongren/ans-studio · GitHub, URL: github.com/wangzhongren/ans-studio/releases/tag/v1.0.0
+	1 container
+		2 link Description: Skip to content, Value: github.com/wangzhongren/ans-studio/releases/tag/v1.0.0#start-of-content
+		3 container
+			4 heading Navigation Menu, Value: 2
+				5 text Navigation Menu
+			6 link Description: Homepage, Value: github.com/
+			7 container
+				8 container Global
+					9 content list
+						10 button (collapsed) Platform, Secondary Actions: Expand
+						11 button (collapsed) Solutions, Secondary Actions: Expand
+						12 button (collapsed) Resources, Secondary Actions: Expand
+						13 button (collapsed) Open Source, Secondary Actions: Expand
+						14 button (collapsed) Enterprise, Secondary Actions: Expand
+						15 link Description: Pricing, Value: github.com/pricing
+				16 pop up button (collapsed) Description: Search or jump to, type / to search, Secondary Actions: Expand
+				17 link Description: Sign in, Value: github.com/login?return_to=https%3A%2F%2Fgithub.com%2Fwangzhongren%2Fans-studio%2Freleases%2Ftag%2Fv1.0.0
+				18 link Description: Sign up, Value: github.com/signup?ref_cta=Sign+up&ref_loc=header+logged+out&ref_page=%2F%3Cuser-name%3E%2F%3Crepo-name%3E%2Freleases%2Fshow&source=header-repo&source_repo=wangzhongren%2Fans-studio
+				19 pop up button Appearance settings
+	20 container js-repo-pjax-container
+		21 container Global navigation menu
+			22 container Breadcrumbs
+				23 content list
+					24 container
+						25 link Description: wangzhongren, Value: github.com/wangzhongren
+					26 link Description: ans-studio, Value: github.com/wangzhongren/ans-studio
+			27 heading Repository navigation, Value: 2
+				28 text Repository navigation
+			29 container Repository
+				30 content list
+					31 link Description: Code, Value: github.com/wangzhongren/ans-studio
+					32 link Description: Issues, Value: github.com/wangzhongren/ans-studio/issues
+					33 link Description: Pull requests, Value: github.com/wangzhongren/ans-studio/pulls
+					34 link Description: Actions, Value: github.com/wangzhongren/ans-studio/actions
+					35 link Description: Projects, Value: github.com/wangzhongren/ans-studio/projects
+					36 link Description: Security and quality, Value: github.com/wangzhongren/ans-studio/security
+					37 link Description: Insights, Value: github.com/wangzhongren/ans-studio/pulse
+		38 container repo-content-pjax-container
+			39 container Breadcrumb
+				40 content list
+					41 container
+						42 link Description: Releases, Value: github.com/wangzhongren/ans-studio/releases
+					43 link Description: v1.0.0, Value: github.com/wangzhongren/ans-studio/releases/tag/v1.0.0
+			44 container
+				45 heading ANS Studio 1.0.0, Value: 1
+					46 text ANS Studio 1.0.0
+				47 link Description: Latest, Value: github.com/wangzhongren/ans-studio/releases/latest
+			48 pop up button (collapsed) Compare, ID: select-panel-6009addf-9ff1-48b3-9236-01f50b46e54b-button, Secondary Actions: Expand
+			49 container
+				50 image @github-actions
+				51 link Description: github-actions, Value: github.com/apps/github-actions
+				52 text  released this 
+				53 container Oct 15, 2026, 19:49 GMT+8
+					104 text 1 minute ago
+			55 container
+				56 text · 
+				57 link Description: 3 commits , Value: github.com/wangzhongren/ans-studio/compare/v1.0.0...main
+				58 text to main since this release
+			59 link Description: Tag v1.0.0, Value: github.com/wangzhongren/ans-studio/tree/v1.0.0
+			60 link Description: Commit 83445eb, Value: github.com/wangzhongren/ans-studio/commit/83445ebcf24454c6107838cb7f2221882c6638ea
+			61 text 已完成 macOS Apple Silicon、macOS Intel 和 Windows x64 三份运行包。
+			62 content list
+				63 container
+					64 AXListMarker • 
+					65 link Description: macOS Apple Silicon 下载, Value: github.com/wangzhongren/ans-studio/releases/download/v1.0.0/ANS-Studio-1.0.0-mac-arm64.zip
+				66 container
+					67 AXListMarker • 
+					68 link Description: macOS Intel 下载, Value: github.com/wangzhongren/ans-studio/releases/download/v1.0.0/ANS-Studio-1.0.0-mac-x64.zip
+				69 container
+					70 AXListMarker • 
+					71 link Description: Windows x64 下载, Value: github.com/wangzhongren/ans-studio/releases/download/v1.0.0/ANS-Studio-1.0.0-win-x64.zip
+			72 text macOS 13 及以上：解压后打开 ANS Studio.app。Windows 10/11 x64：解压后运行 ANS Studio.exe，保留完整 resources 目录。包内不含密钥，首次使用请通过左下角设置填写。
+			73 container
+				74 link Description: 完整构建与测试记录, Value: github.com/wangzhongren/ans-studio/actions/runs/38728387848
+				75 text ：三平台均完成原生构建、解压后实际程序启动、7 项界面/preload/IPC 检查，以及 Pi/Claude SDK、Photon WASM、Codex CLI 0.162.1 和 Claude CLI 2.1.299 的离线验证。每个平台全仓 1401 项；两份 macOS 各 1400 通过、0 失败、1 平台跳过，Windows 为 1399 通过、0 失败、2 平台跳过。
+			76 container
+				77 text 源码基线为固定 v1.0.0（83445eb），叠加已审查的打包修复提交 
+				78 link Description: c3d1066, Value: github.com/wangzhongren/ans-studio/commit/c3d106602b5a82fc5fa7e1bd9e1d7485239d8b4a
+				79 text 。原标签保持不变；实际源码树、依赖和产物 SHA-256 见各平台 manifest、release-provenance.json、overlay.patch 与 SHA256SUMS 文件。GitHub 自带的 Source code 压缩包仅对应原标签，复现运行包还需应用附带 overlay.patch。
+			80 text 运行包未签名、未公证，macOS Gatekeeper 或 Windows SmartScreen 可能提示，请核对 SHA-256。Windows 暂不支持内置受限来源文档阅读；完整摘要与执行记录保留，来源文件可手动用系统编辑器查看。本次运行包验证未调用在线模型。
+			81 container
+				82 button (expanded) Assets 14, Secondary Actions: Collapse
+					83 text Assets
+					84 text 14
+				105 content list
+					106 container
+						107 link Description: ANS-Studio-1.0.0-mac-arm64.zip, Value: github.com/wangzhongren/ans-studio/releases/download/v1.0.0/ANS-Studio-1.0.0-mac-arm64.zip
+						108 text sha256:92118718ae34b1194c615d2c94c78b37d0324bce0b0ac9e31529431c0bc59270
+						109 button Description: Copy to clipboard digest for ANS-Studio-1.0.0-mac-arm64.zip, ID: clipboard-button-sha256:92118718ae34b1194c615d2c94c78b37d0324bce0b0ac9e31529431c0bc59270
+						110 text 386 MB
+						111 container Oct 15, 2026, 19:43 GMT+8
+							112 text 7 minutes ago
+					113 container
+						114 link Description: ANS-Studio-1.0.0-mac-x64.zip, Value: github.com/wangzhongren/ans-studio/releases/download/v1.0.0/ANS-Studio-1.0.0-mac-x64.zip
+						115 text sha256:fe03c2e0e08eb6d5d19ec9045fc58d7f5967ed5f3aadc321d2d06d85cfe1eb17
+						116 button Description: Copy to clipboard digest for ANS-Studio-1.0.0-mac-x64.zip, ID: clipboard-button-sha256:fe03c2e0e08eb6d5d19ec9045fc58d7f5967ed5f3aadc321d2d06d85cfe1eb17
+						117 text 406 MB
+						118 container Oct 15, 2026, 19:43 GMT+8
+							119 text 7 minutes ago
+					120 container
+						121 link Description: ANS-Studio-1.0.0-win-x64.zip, Value: github.com/wangzhongren/ans-studio/releases/download/v1.0.0/ANS-Studio-1.0.0-win-x64.zip
+						122 text sha256:03be992e7081ef63a4a719e15fda08a8e6a5518a9edccfbfa10b51d1378f2047
+						123 button Description: Copy to clipboard digest for ANS-Studio-1.0.0-win-x64.zip, ID: clipboard-button-sha256:03be992e7081ef63a4a719e15fda08a8e6a5518a9edccfbfa10b51d1378f2047
+						124 text 434 MB
+						125 container Oct 15, 2026, 19:43 GMT+8
+							126 text 7 minutes ago
+					127 container
+						128 link Description: manifest-darwin-arm64.json, Value: github.com/wangzhongren/ans-studio/releases/download/v1.0.0/manifest-darwin-arm64.json
+						129 text sha256:84d69218c1a1ad74c62198595bcc85f1ee78c52e85501605b8db6da858fecad8
+						130 button Description: Copy to clipboard digest for manifest-darwin-arm64.json, ID: clipboard-button-sha256:84d69218c1a1ad74c62198595bcc85f1ee78c52e85501605b8db6da858fecad8
+						131 text 9.08 KB
+						132 container Oct 15, 2026, 19:43 GMT+8
+							133 text 7 minutes ago
+					134 container
+						135 link Description: manifest-darwin-x64.json, Value: github.com/wangzhongren/ans-studio/releases/download/v1.0.0/manifest-darwin-x64.json
+						136 text sha256:c2df551f7912bee27cef0d5157d31f0ba0f2c840a94258f3613e0eece6b3a002
+						137 button Description: Copy to clipboard digest for manifest-darwin-x64.json, ID: clipboard-button-sha256:c2df551f7912bee27cef0d5157d31f0ba0f2c840a94258f3613e0eece6b3a002
+						138 text 10.7 KB
+						139 container Oct 15, 2026, 19:43 GMT+8
+							140 text 7 minutes ago
+					141 container
+						142 link Description: manifest-win32-x64.json, Value: github.com/wangzhongren/ans-studio/releases/download/v1.0.0/manifest-win32-x64.json
+						143 text sha256:64a6e2a0e175af0784437cc23f3692c0176b09e02cafbfdc37f0f6ad905edcea
+						144 button Description: Copy to clipboard digest for manifest-win32-x64.json, ID: clipboard-button-sha256:64a6e2a0e175af0784437cc23f3692c0176b09e02cafbfdc37f0f6ad905edcea
+						145 text 8.69 KB
+						146 container Oct 15, 2026, 19:43 GMT+8
+							147 text 7 minutes ago
+					148 container
+						149 link Description: overlay.patch, Value: github.com/wangzhongren/ans-studio/releases/download/v1.0.0/overlay.patch
+						150 text sha256:a7297f345b371754ff07f4165b54d9159a1f0846e6758c27220803660432f45c
+						151 button Description: Copy to clipboard digest for overlay.patch, ID: clipboard-button-sha256:a7297f345b371754ff07f4165b54d9159a1f0846e6758c27220803660432f45c
+						152 text 243 KB
+						153 container Oct 15, 2026, 19:43 GMT+8
+							154 text 7 minutes ago
+					155 container
+						156 link Description: release-provenance.json, Value: github.com/wangzhongren/ans-studio/releases/download/v1.0.0/release-provenance.json
+						157 text sha256:b08ad90b4d30d477f517acc9f8a65d043d040241f6adcf5361214a80951e1b02
+						158 button Description: Copy to clipboard digest for release-provenance.json, ID: clipboard-button-sha256:b08ad90b4d30d477f517acc9f8a65d043d040241f6adcf5361214a80951e1b02
+						159 text 7.31 KB
+						160 container Oct 15, 2026, 19:43 GMT+8
+							161 text 7 minutes ago
+					162 container
+						163 link Description: SHA256SUMS-darwin-arm64.txt, Value: github.com/wangzhongren/ans-studio/releases/download/v1.0.0/SHA256SUMS-darwin-arm64.txt
+						164 text sha256:faf8e59bae122a425912092bb2a80f85695f5a1fba877be69d168761cce066f9
+						165 button Description: Copy to clipboard digest for SHA256SUMS-darwin-arm64.txt, ID: clipboard-button-sha256:faf8e59bae122a425912092bb2a80f85695f5a1fba877be69d168761cce066f9
+						166 text 97 Bytes
+						167 container Oct 15, 2026, 19:43 GMT+8
+							168 text 7 minutes ago
+					169 container
+						170 link Description: SHA256SUMS-darwin-x64.txt, Value: github.com/wangzhongren/ans-studio/releases/download/v1.0.0/SHA256SUMS-darwin-x64.txt
+						171 text sha256:70b78ee19713eee2b63702ce0bc9a2c9f03f69091382a33ca0ae76d39c0f2d45
+						172 button Description: Copy to clipboard digest for SHA256SUMS-darwin-x64.txt, ID: clipboard-button-sha256:70b78ee19713eee2b63702ce0bc9a2c9f03f69091382a33ca0ae76d39c0f2d45
+						173 text 95 Bytes
+						174 container Oct 15, 2026, 19:43 GMT+8
+							175 text 7 minutes ago
+					176 container
+						177 link Description: SHA256SUMS-overlay.txt, Value: github.com/wangzhongren/ans-studio/releases/download/v1.0.0/SHA256SUMS-overlay.txt
+						178 text sha256:8bc51fcd6d4713bb0648539797004e2043e5bcaa56ce966f47fc6f90193c2736
+						179 button Description: Copy to clipboard digest for SHA256SUMS-overlay.txt, ID: clipboard-button-sha256:8bc51fcd6d4713bb0648539797004e2043e5bcaa56ce966f47fc6f90193c2736
+						180 text 170 Bytes
+						181 container Oct 15, 2026, 19:43 GMT+8
+							182 text 7 minutes ago
+					183 container
+						184 link Description: SHA256SUMS-win32-x64.txt, Value: github.com/wangzhongren/ans-studio/releases/download/v1.0.0/SHA256SUMS-win32-x64.txt
+						185 text sha256:e4c2c43e78aa6df48c3ef1ae589b277db6d45b9dc8f63f95169717a378d21bea
+						186 button Description: Copy to clipboard digest for SHA256SUMS-win32-x64.txt, ID: clipboard-button-sha256:e4c2c43e78aa6df48c3ef1ae589b277db6d45b9dc8f63f95169717a378d21bea
+						187 text 95 Bytes
+						188 container Oct 15, 2026, 19:43 GMT+8
+							189 text 7 minutes ago
+					190 container
+						191 link Description: Source code (zip), Value: github.com/wangzhongren/ans-studio/archive/refs/tags/v1.0.0.zip
+						192 container Oct 15, 2026, 17:47 GMT+8
+							193 text 2 hours ago
+					194 container
+						195 link Description: Source code (tar.gz), Value: github.com/wangzhongren/ans-studio/archive/refs/tags/v1.0.0.tar.gz
+						196 container Oct 15, 2026, 17:47 GMT+8
+							197 text 2 hours ago
+	86 container
+		87 heading Footer, Value: 2
+			88 text Footer
+		89 link Description: GitHub Homepage, Value: github.com/
+		90 text © 2026 GitHub, Inc.
+		91 container Footer
+			92 heading Footer navigation, Value: 3, ID: sr-footer-heading
+				93 text Footer navigation
+			94 content list Footer navigation
+				95 link Description: Terms, Value: docs.github.com/site-policy/github-terms/github-terms-of-service
+				96 link Description: Privacy, Value: docs.github.com/site-policy/privacy-policies/github-privacy-statement
+				97 link Description: Security, Value: github.com/security
+				98 link Description: Status, Value: githubstatus.com/
+				99 link Description: Community, Value: github.community/
+				100 link Description: Docs, Value: docs.github.com/
+				101 link Description: Contact, Value: support.github.com/?tags=dotcom-footer
+				102 button Manage cookies
+				103 button Do not share my personal information
+
+The focused UI element is 0 AXWebArea Release ANS Studio 1.0.0 · wangzhongren/ans-studio · GitHub, URL: github.com/wangzhongren/ans-studio/releases/tag/v1.0.0

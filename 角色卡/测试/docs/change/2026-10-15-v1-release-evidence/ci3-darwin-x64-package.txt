@@ -1,0 +1,177 @@
+﻿2026-10-15T11:39:16.4195240Z ##[group]Run node src/common/装配/release-verify.mjs release-output x64
+2026-10-15T11:39:16.4196390Z [36;1mnode src/common/装配/release-verify.mjs release-output x64[0m
+2026-10-15T11:39:16.4266770Z shell: /bin/bash -e {0}
+2026-10-15T11:39:16.4267260Z env:
+2026-10-15T11:39:16.4267760Z   NPM_CONFIG_USERCONFIG: /Users/runner/work/_temp/.npmrc
+2026-10-15T11:39:16.4268470Z   NODE_AUTH_TOKEN: XXXXX-XXXXX-XXXXX-XXXXX
+2026-10-15T11:39:16.4269130Z ##[endgroup]
+2026-10-15T11:39:27.1854590Z WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir "/var/folders/20/jp1_0n3n7kndh6rnbqb5344m0000gn/T/" (codex_home: AbsolutePathBuf("/var/folders/20/jp1_0n3n7kndh6rnbqb5344m0000gn/T/ans-packaged-smoke-NJDnlI/home/.codex"))
+2026-10-15T11:39:34.2858990Z npm warn Unknown user config "always-auth". This will stop working in the next major version of npm.
+2026-10-15T11:39:35.1082900Z {
+2026-10-15T11:39:35.1084200Z   "sourceRef": "v1.0.0",
+2026-10-15T11:39:35.1084970Z   "sourceSha": "83445ebcf24454c6107838cb7f2221882c6638ea",
+2026-10-15T11:39:35.1088130Z   "overlaySha": "c3d106602b5a82fc5fa7e1bd9e1d7485239d8b4a",
+2026-10-15T11:39:35.1089360Z   "actualTree": "15427e074c23ad1d4b52d0b191f57fe3bdeb5167",
+2026-10-15T11:39:35.1090890Z   "overlayPaths": [
+2026-10-15T11:39:35.1091720Z     ".github/workflows/release.yml",
+2026-10-15T11:39:35.1092800Z     "app/desktop/packaged-smoke.ts",
+2026-10-15T11:39:35.1093680Z     "app/desktop/pi-config.ts",
+2026-10-15T11:39:35.1094230Z     "app/main.ts",
+2026-10-15T11:39:35.1096710Z     "app/renderer/index.html",
+2026-10-15T11:39:35.1097480Z     "app/renderer/renderer.js",
+2026-10-15T11:39:35.1098710Z     "electron-builder.yml",
+2026-10-15T11:39:35.1100790Z     "package-lock.json",
+2026-10-15T11:39:35.1101590Z     "package.json",
+2026-10-15T11:39:35.1102940Z     "src/common/装配/release-assets.mjs",
+2026-10-15T11:39:35.1104590Z     "src/common/装配/release-policy.d.mts",
+2026-10-15T11:39:35.1105750Z     "src/common/装配/release-policy.mjs",
+2026-10-15T11:39:35.1106840Z     "src/common/装配/release-prepare.mjs",
+2026-10-15T11:39:35.1107680Z     "src/common/装配/release-provenance.mjs",
+2026-10-15T11:39:35.1108630Z     "src/common/装配/release-verify.mjs",
+2026-10-15T11:39:35.1110700Z     "src/provider/codex/session.ts",
+2026-10-15T11:39:35.1112900Z     "test/claude-adapter/session.test.ts",
+2026-10-15T11:39:35.1114800Z     "test/codex-adapter/electron-launch.test.ts",
+2026-10-15T11:39:35.1116940Z     "test/codex-adapter/electron-node-probe.mjs",
+2026-10-15T11:39:35.1118010Z     "test/codex-adapter/session.test.ts",
+2026-10-15T11:39:35.1119100Z     "test/pi-adapter/tool-display-projection.test.ts",
+2026-10-15T11:39:35.1120800Z     "test/桌面应用/boundary-refresh.test.ts",
+2026-10-15T11:39:35.1121820Z     "test/桌面应用/interface.test.ts",
+2026-10-15T11:39:35.1122860Z     "test/桌面应用/pi-config.test.ts",
+2026-10-15T11:39:35.1124010Z     "test/桌面应用/project-document.test.ts",
+2026-10-15T11:39:35.1126620Z     "test/测试/p1p7-document-integration.test.ts",
+2026-10-15T11:39:35.1128200Z     "test/测试/t1-pipeline-integration.test.ts",
+2026-10-15T11:39:35.1129220Z     "test/测试/t1-real-cli.test.ts",
+2026-10-15T11:39:35.1130220Z     "test/装配/multi-runtime.test.ts",
+2026-10-15T11:39:35.1131060Z     "test/装配/release-packaging.test.ts"
+2026-10-15T11:39:35.1131990Z   ],
+2026-10-15T11:39:35.1133060Z   "overlayPatchSha256": "a7297f345b371754ff07f4165b54d9159a1f0846e6758c27220803660432f45c",
+2026-10-15T11:39:35.1136780Z   "excludedChanges": [
+2026-10-15T11:39:35.1137500Z     ".gitignore",
+2026-10-15T11:39:35.1138090Z     "README.md",
+2026-10-15T11:39:35.1139290Z     "角色卡/Claude适配器/docs/feature/claude-session.md",
+2026-10-15T11:39:35.1140950Z     "角色卡/Claude适配器/docs/fix/2026-10-15_fix_release-test-clock.md",
+2026-10-15T11:39:35.1142400Z     "角色卡/Claude适配器/memo.md",
+2026-10-15T11:39:35.1144780Z     "角色卡/Codex适配器/docs/feature/codex-governed-session.md",
+2026-10-15T11:39:35.1146200Z     "角色卡/Codex适配器/docs/fix/2026-10-15_fix_packaged-electron-node-launch.md",
+2026-10-15T11:39:35.1148880Z     "角色卡/Codex适配器/docs/fix/2026-10-15_fix_windows-native-wire-fixture.md",
+2026-10-15T11:39:35.1151910Z     "角色卡/Codex适配器/memo.md",
+2026-10-15T11:39:35.1155470Z     "角色卡/Pi适配器/docs/fix/2026-10-15_fix_windows-shell-termination-oracle.md",
+2026-10-15T11:39:35.1158470Z     "角色卡/Pi适配器/feature-map.md",
+2026-10-15T11:39:35.1164330Z     "角色卡/桌面UI/docs/fix/2026-10-15_fix_packaged-env-path-hint.md",
+2026-10-15T11:39:35.1166110Z     "角色卡/桌面窗口/api-spec.md",
+2026-10-15T11:39:35.1169320Z     "角色卡/桌面窗口/docs/fix/2026-10-15-packaged-runtime-config-evidence/manifest.json",
+2026-10-15T11:39:35.1174830Z     "角色卡/桌面窗口/docs/fix/2026-10-15-packaged-runtime-config-evidence/owner-green.txt",
+2026-10-15T11:39:35.1177920Z     "角色卡/桌面窗口/docs/fix/2026-10-15-packaged-runtime-config-evidence/path-green.txt",
+2026-10-15T11:39:35.1179670Z     "角色卡/桌面窗口/docs/fix/2026-10-15-packaged-runtime-config-evidence/path-red.txt",
+2026-10-15T11:39:35.1181360Z     "角色卡/桌面窗口/docs/fix/2026-10-15-packaged-runtime-config-evidence/typecheck-green.txt",
+2026-10-15T11:39:35.1183090Z     "角色卡/桌面窗口/docs/fix/2026-10-15-windows-document-test-oracles-evidence/mac-owner-green.txt",
+2026-10-15T11:39:35.1185980Z     "角色卡/桌面窗口/docs/fix/2026-10-15-windows-document-test-oracles-evidence/manifest.json",
+2026-10-15T11:39:35.1187720Z     "角色卡/桌面窗口/docs/fix/2026-10-15-windows-document-test-oracles-evidence/typecheck-green.txt",
+2026-10-15T11:39:35.1189250Z     "角色卡/桌面窗口/docs/fix/2026-10-15_fix_packaged-runtime-config.md",
+2026-10-15T11:39:35.1190540Z     "角色卡/桌面窗口/docs/fix/2026-10-15_fix_windows-document-test-oracles.md",
+2026-10-15T11:39:35.1191680Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/baseline.json",
+2026-10-15T11:39:35.1193300Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/ci-runs.json",
+2026-10-15T11:39:35.1194760Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/ci1-arm64-regression.txt",
+2026-10-15T11:39:35.1196080Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/ci1-macx64-regression.txt",
+2026-10-15T11:39:35.1197340Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/ci1-win-regression-red.txt",
+2026-10-15T11:39:35.1198780Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/ci2-darwin-arm64-manifest.json",
+2026-10-15T11:39:35.1200460Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/ci2-darwin-arm64-package.txt",
+2026-10-15T11:39:35.1201890Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/ci2-darwin-arm64-regression.txt",
+2026-10-15T11:39:35.1203290Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/ci2-darwin-x64-regression.txt",
+2026-10-15T11:39:35.1204600Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/ci2-local-full-green.txt",
+2026-10-15T11:39:35.1205790Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/ci2-local-tsc.txt",
+2026-10-15T11:39:35.1207260Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/ci2-results.json",
+2026-10-15T11:39:35.1208640Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/ci2-win32-x64-manifest.json",
+2026-10-15T11:39:35.1210030Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/ci2-win32-x64-package.txt",
+2026-10-15T11:39:35.1211430Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/ci2-win32-x64-regression.txt",
+2026-10-15T11:39:35.1214210Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/ci3-local-full-green.txt",
+2026-10-15T11:39:35.1215460Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/ci3-local-tsc.txt",
+2026-10-15T11:39:35.1216810Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/ci3-preflight-claude-old-clock-red.txt",
+2026-10-15T11:39:35.1218520Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/claude-clock-green.txt",
+2026-10-15T11:39:35.1220090Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/full-native-loopback-green.txt",
+2026-10-15T11:39:35.1221610Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/full-sandbox-red.txt",
+2026-10-15T11:39:35.1223490Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/local-independent-audit.json",
+2026-10-15T11:39:35.1224840Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/local-mac-arm64-manifest.json",
+2026-10-15T11:39:35.1226660Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/local-mac-arm64-verify.txt",
+2026-10-15T11:39:35.1228010Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/local-source-provenance.json",
+2026-10-15T11:39:35.1229470Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/native-package-claude-missing-config.png",
+2026-10-15T11:39:35.1231020Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/native-package-claude-return-ax.txt",
+2026-10-15T11:39:35.1232510Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/native-package-claude-settings-ax.txt",
+2026-10-15T11:39:35.1234130Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/native-package-settings-restarted-ax.txt",
+2026-10-15T11:39:35.1235690Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/native-package-settings-saved-ax.txt",
+2026-10-15T11:39:35.1237190Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/own-fixtures-first-new-oracle-red.txt",
+2026-10-15T11:39:35.1239060Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/own-fixtures-green.txt",
+2026-10-15T11:39:35.1240530Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/t1-clock-green.txt",
+2026-10-15T11:39:35.1241920Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/t1-clock-negative-observation-red.txt",
+2026-10-15T11:39:35.1243190Z     "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/typecheck.txt",
+2026-10-15T11:39:35.1244270Z     "角色卡/测试/docs/change/2026-10-15_change_v1-release-verification.md",
+2026-10-15T11:39:35.1245120Z     "角色卡/装配/boundary.md",
+2026-10-15T11:39:35.1245660Z     "角色卡/装配/boundary.yaml",
+2026-10-15T11:39:35.1246240Z     "角色卡/装配/changelog.md",
+2026-10-15T11:39:35.1273040Z     "角色卡/装配/docs/change/2026-10-15-release-packaging-evidence/manifest.json",
+2026-10-15T11:39:35.1275660Z     "角色卡/装配/docs/change/2026-10-15-release-packaging-evidence/tag-overlay-mac-arm64-manifest.json",
+2026-10-15T11:39:35.1278190Z     "角色卡/装配/docs/change/2026-10-15_change_release-packaging-boundary.md",
+2026-10-15T11:39:35.1281790Z     "角色卡/装配/docs/change/2026-10-15_change_v1-release-packaging.md",
+2026-10-15T11:39:35.1283290Z     "角色卡/装配/docs/feature/desktop-release-packaging.md",
+2026-10-15T11:39:35.1284880Z     "角色卡/装配/feature-map.md",
+2026-10-15T11:39:35.1285990Z     "角色卡/装配/memo.md",
+2026-10-15T11:39:35.1288320Z     "角色卡/项目管理/docs/change/2026-10-15_change_v1-release-packaging.md"
+2026-10-15T11:39:35.1289440Z   ],
+2026-10-15T11:39:35.1290520Z   "runUrl": "https://github.com/wangzhongren/ans-studio/actions/runs/38728387848",
+2026-10-15T11:39:35.1291820Z   "platform": "darwin",
+2026-10-15T11:39:35.1292460Z   "arch": "x64",
+2026-10-15T11:39:35.1293000Z   "node": "v24.14.0",
+2026-10-15T11:39:35.1293900Z   "npm": "11.9.0",
+2026-10-15T11:39:35.1295110Z   "lockSha256": "d20e6ba6f5e7b2074a662ecaf8228be00c5c537e3bc3c4f9a3bb85cdf2b31d98",
+2026-10-15T11:39:35.1296680Z   "builder": "26.15.3",
+2026-10-15T11:39:35.1297420Z   "startedAt": "2026-10-15T11:39:27.286Z",
+2026-10-15T11:39:35.1298400Z   "finishedAt": "2026-10-15T11:39:34.288Z",
+2026-10-15T11:39:35.1299190Z   "unsigned": true,
+2026-10-15T11:39:35.1299740Z   "smoke": {
+2026-10-15T11:39:35.1300640Z     "ok": true,
+2026-10-15T11:39:35.1301230Z     "isPackaged": true,
+2026-10-15T11:39:35.1302140Z     "arch": "x64",
+2026-10-15T11:39:35.1302990Z     "platform": "darwin",
+2026-10-15T11:39:35.1303960Z     "version": "1.0.0",
+2026-10-15T11:39:35.1305600Z     "envPath": "/var/folders/20/jp1_0n3n7kndh6rnbqb5344m0000gn/T/ans-packaged-smoke-NJDnlI/home/userdata/.env",
+2026-10-15T11:39:35.1307240Z     "checks": {
+2026-10-15T11:39:35.1307940Z       "dom": true,
+2026-10-15T11:39:35.1308500Z       "preload": true,
+2026-10-15T11:39:35.1309280Z       "ipc": true,
+2026-10-15T11:39:35.1309940Z       "importDisabled": true,
+2026-10-15T11:39:35.1311930Z       "missingConfiguration": true,
+2026-10-15T11:39:35.1312870Z       "settings": true,
+2026-10-15T11:39:35.1313510Z       "envPathMatches": true
+2026-10-15T11:39:35.1314320Z     },
+2026-10-15T11:39:35.1316250Z     "missingKeys": {
+2026-10-15T11:39:35.1317520Z       "pi": [
+2026-10-15T11:39:35.1318080Z         "ANTHROPIC_AUTH_TOKEN",
+2026-10-15T11:39:35.1318680Z         "ANS_PI_BASE_URL",
+2026-10-15T11:39:35.1319520Z         "ANS_PI_MODEL"
+2026-10-15T11:39:35.1319950Z       ],
+2026-10-15T11:39:35.1320330Z       "codex": [
+2026-10-15T11:39:35.1321460Z         "CODEX_API_KEY",
+2026-10-15T11:39:35.1322040Z         "ANS_CODEX_MODEL"
+2026-10-15T11:39:35.1322770Z       ],
+2026-10-15T11:39:35.1323520Z       "claude": [
+2026-10-15T11:39:35.1324050Z         "ANTHROPIC_API_KEY"
+2026-10-15T11:39:35.1324850Z       ]
+2026-10-15T11:39:35.1325230Z     }
+2026-10-15T11:39:35.1325560Z   },
+2026-10-15T11:39:35.1326180Z   "nativeDependencies": {
+2026-10-15T11:39:35.1326910Z     "sdkImports": "PACKAGED_SDK_IMPORTS_OK",
+2026-10-15T11:39:35.1327980Z     "codexVersion": "codex-cli 0.162.1",
+2026-10-15T11:39:35.1329020Z     "claudeVersion": "2.1.299 (Claude Code)"
+2026-10-15T11:39:35.1329580Z   },
+2026-10-15T11:39:35.1329960Z   "process": {
+2026-10-15T11:39:35.1330480Z     "code": 0,
+2026-10-15T11:39:35.1330910Z     "signal": null,
+2026-10-15T11:39:35.1331330Z     "stdout": "",
+2026-10-15T11:39:35.1350170Z     "stderr": "[23089:1015/113928.810984:ERROR:ui/gl/gl_display.cc:665] Initialization of all (1) EGL display types failed.\n[23089:1015/113928.811931:ERROR:ui/gl/init/gl_initializer_mac.cc:127] GLDisplayEGL::Initialize failed.\n[23089:1015/113928.811962:ERROR:ui/gl/gl_display.cc:665] Initialization of all (1) EGL display types failed.\n[23089:1015/113928.811971:ERROR:ui/gl/init/gl_initializer_mac.cc:127] GLDisplayEGL::Initialize failed.\n[23089:1015/113929.043716:ERROR:components/viz/service/main/viz_main_impl.cc:190] Exiting GPU process due to errors during initialization\n[23115:1015/113930.114839:ERROR:ui/gl/gl_display.cc:665] Initialization of all (1) EGL display types failed.\n[23115:1015/113930.115653:ERROR:ui/gl/init/gl_initializer_mac.cc:127] GLDisplayEGL::Initialize failed.\n[23115:1015/113930.115681:ERROR:ui/gl/gl_display.cc:665] Initialization of all (1) EGL display types failed.\n[23115:1015/113930.115699:ERROR:ui/gl/init/gl_initializer_mac.cc:127] GLDisplayEGL::Initialize failed.\n[23115:1015/113930.313372:ERROR:components/viz/service/main/viz_main_impl.cc:190] Exiting GPU process due to errors during initialization\n2026-10-15 11:39:31.878 ANS Studio Helper[23095:62191] XPC error for connection com.apple.backupd.sandbox.xpc: Connection invalid\n2026-10-15 11:39:31.879 ANS Studio Helper[23095:62187] XPC error for connection com.apple.backupd.sandbox.xpc: Connection invalid\n2026-10-15 11:39:31.904 ANS Studio Helper[23095:62187] XPC error for connection com.apple.backupd.sandbox.xpc: Connection invalid\n[23182:1015/113932.029472:ERROR:ui/gl/gl_display.cc:665] Initialization of all (1) EGL display types failed.\n[23182:1015/113932.029994:ERROR:ui/gl/init/gl_initializer_mac.cc:127] GLDisplayEGL::Initialize failed.\n[23182:1015/113932.030019:ERROR:ui/gl/gl_display.cc:665] Initialization of all (1) EGL display types failed.\n[23182:1015/113932.030025:ERROR:ui/gl/init/gl_initializer_mac.cc:127] GLDisplayEGL::Initialize failed.\n[23182:1015/113932.073662:ERROR:components/viz/service/main/viz_main_impl.cc:190] Exiting GPU process due to errors during initialization\n"
+2026-10-15T11:39:35.1366460Z   },
+2026-10-15T11:39:35.1366830Z   "artifact": {
+2026-10-15T11:39:35.1367340Z     "file": "ANS-Studio-1.0.0-mac-x64.zip",
+2026-10-15T11:39:35.1367910Z     "size": 426086246,
+2026-10-15T11:39:35.1368710Z     "sha256": "fe03c2e0e08eb6d5d19ec9045fc58d7f5967ed5f3aadc321d2d06d85cfe1eb17"
+2026-10-15T11:39:35.1369520Z   }
+2026-10-15T11:39:35.1369820Z }
