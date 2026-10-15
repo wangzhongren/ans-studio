@@ -1,0 +1,56 @@
+Window: "ANS 治理会话工作台", App: Electron.
+0 标准窗口 ANS 治理会话工作台, Secondary Actions: Raise
+	1 container ANS 治理会话工作台
+		2 container
+			3 HTML 内容 ANS 治理会话工作台, URL: file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/app/renderer/index.html
+				4 container 测试 · 来源文档
+					5 文本 测试 · 来源文档
+					6 按钮 Description: 收起, Help: 收起（Esc）
+					7 container
+						8 文本 以下是当前项目中该角色已列出的可读文档，请选择要阅读的文件。
+						9 内容列表
+							10 container
+								11 text role-card.md 角色卡/测试/role-card.md
+								12 按钮 阅读
+							13 container
+								14 text code-null-1-independent.md 角色卡/测试/docs/change/code-null-1-independent.md
+								15 按钮 阅读
+							16 container
+								17 text desktop-npm-test.md 角色卡/测试/docs/change/desktop-npm-test.md
+								18 按钮 阅读
+							19 container
+								20 text desktop-validation.md 角色卡/测试/docs/change/desktop-validation.md
+								21 按钮 阅读
+							22 container
+								23 text dup-e2e-1.md 角色卡/测试/docs/change/dup-e2e-1.md
+								24 按钮 阅读
+							25 container
+								26 text dup-fresh-3.md 角色卡/测试/docs/change/dup-fresh-3.md
+								27 按钮 阅读
+							28 container
+								29 text p1p7-invalid-utf8.md 角色卡/测试/docs/change/p1p7-invalid-utf8.md
+								30 按钮 阅读
+							31 container
+								32 text p1p7-long-display.md 角色卡/测试/docs/change/p1p7-long-display.md
+								33 按钮 阅读
+							34 container
+								35 text p1p7-oversize.md 角色卡/测试/docs/change/p1p7-oversize.md
+								36 按钮 阅读
+							37 container
+								38 text p1p7-static-render.md 角色卡/测试/docs/change/p1p7-static-render.md
+								39 按钮 阅读
+							40 container
+								41 text p1p7-unicode.md 角色卡/测试/docs/change/p1p7-unicode.md
+								42 按钮 阅读
+							43 container
+								44 text v2-real-1.md 角色卡/测试/docs/change/v2-real-1.md
+								45 按钮 阅读
+						46 按钮 刷新已列文档
+47 menu bar
+	48 Electron
+	49 File
+	50 Edit
+	51 View
+	52 Window
+
+The focused UI element is 45 按钮 阅读

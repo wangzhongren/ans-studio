@@ -1,9 +1,11 @@
 // Public ANS session index and readable replay. Owner: 运行时核心.
-import { appendFile, mkdir, readFile, lstat } from "node:fs/promises";
+import { appendFile, mkdir, readFile, lstat, readdir } from "node:fs/promises";
 import path from "node:path";
+import { createHash } from "node:crypto";
+import { validateReportSnapshot, canonicalJson } from "../../common/runtime-core/report-provenance.ts";
 import { atomicWrite } from "../../common/shared/atomic-write.ts";
 import { RUNTIME_KINDS } from "../../common/shared/runtime-shared.ts";
-import type { RuntimeKind, RuntimeReplayEntry, RuntimeSessionRecord, RuntimeSessionStorage } from "../../model/runtime.ts";
+import type { RuntimeKind, RuntimeReplayEntry, RuntimeSessionRecord, RuntimeSessionStorage, RuntimeReportSnapshotV1 } from "../../model/runtime.ts";
 
 export interface RuntimeSessionStoreOptions { projectRoot: string; roleId: string; runtime: RuntimeKind }
 
@@ -58,6 +60,7 @@ async function readOptional(file: string): Promise<string | undefined> {
   return readFile(file, "utf8");
 }
 
+const reportQueues = new Map<string,Promise<unknown>>();
 export function createRuntimeSessionStore(options: RuntimeSessionStoreOptions): RuntimeSessionStorage {
   const directory = runtimeSessionDirectory(options);
   const ansDirectory = path.join(directory, "ans");
@@ -89,6 +92,46 @@ export function createRuntimeSessionStore(options: RuntimeSessionStoreOptions): 
       await validateNativeDirectory();
     }),
     ...(options.runtime === "pi" ? { legacyDirectory: path.dirname(directory) } : {}),
+    saveReport: (value) => {
+      const report=validateReportSnapshot(value);
+      if(report.source.roleId!==options.roleId||report.source.runtime!==options.runtime) return Promise.reject(new Error("INVALID"));
+      const directoryKey=directory+"/reports";
+      const work=(reportQueues.get(directoryKey)??Promise.resolve()).then(()=>serialize(async()=>{
+        await prepare();
+        const reportsDirectory=path.join(ansDirectory,"reports");
+        await checkDirectoryChain(options.projectRoot,reportsDirectory);
+        await mkdir(reportsDirectory,{recursive:true,mode:0o700});
+        await checkDirectoryChain(options.projectRoot,reportsDirectory);
+        const file=path.join(reportsDirectory,report.reportId+".json");
+        const old=await readOptional(file);
+        if(old!==undefined){const prior=validateReportSnapshot(JSON.parse(old));if(canonicalJson(prior)!==canonicalJson(report))throw new Error("CONFLICT");return "already-saved" as const;}
+        await atomicWrite(file,JSON.stringify(report)+"\n",{mode:0o600});return "saved" as const;
+      }));
+      const settled=work.then(()=>undefined,()=>undefined);reportQueues.set(directoryKey,settled);void settled.finally(()=>{if(reportQueues.get(directoryKey)===settled)reportQueues.delete(directoryKey);});return work;
+    },
+    readReports: () => serialize(async()=>{
+      await check();const dir=path.join(ansDirectory,"reports");await checkDirectoryChain(options.projectRoot,dir);
+      const files=await readdir(dir).catch((error:NodeJS.ErrnoException)=>{if(error.code==='ENOENT')return [];throw error;});
+      const reports:RuntimeReportSnapshotV1[]=[];const reportErrors:{reportId?:string;code:string}[]=[];
+      for(const name of files.sort()){
+        if(!/^[a-f0-9]{64}\.json$/.test(name)){reportErrors.push({code:'INVALID'});continue;}
+        try{const raw=await readOptional(path.join(dir,name));const report=validateReportSnapshot(JSON.parse(raw??''));if(report.reportId!==name.slice(0,-5)||report.source.roleId!==options.roleId||report.source.runtime!==options.runtime)throw Error('INVALID');reports.push(report);}
+        catch{reportErrors.push({reportId:name.slice(0,-5),code:'INVALID'});}
+      }return {reports,reportErrors};
+    }),
+    checkpointReplay:()=>serialize(async()=>{await check();const raw=await readOptional(replayFile)??'';return {bytes:Buffer.byteLength(raw),sha256:createHash('sha256').update(raw).digest('hex')};}),
+    repairReplayTail:(checkpoint,entries,record)=>serialize(async()=>{
+      await prepare();const raw=await readOptional(replayFile)??'';const data=Buffer.from(raw);const prefix=data.subarray(0,checkpoint.bytes);
+      if(prefix.length!==checkpoint.bytes||createHash('sha256').update(prefix).digest('hex')!==checkpoint.sha256)throw Error('REPLAY_CHANGED');
+      const suffix=data.subarray(checkpoint.bytes).toString('utf8');
+      if(suffix&&!suffix.endsWith('\n'))throw Error('REPLAY_DAMAGED');
+      const lines=suffix? suffix.slice(0,-1).split('\n'):[];
+      for(const line of lines)try{JSON.parse(line);}catch{throw Error('REPLAY_DAMAGED');}
+      const intended=entries.map(entry=>JSON.stringify(entry));
+      if(lines.length>intended.length||lines.some((line,index)=>line!==intended[index]))throw Error('REPLAY_CHANGED');
+      if(record){validateRecord(record,options);await atomicWrite(indexFile,JSON.stringify(record)+'\n',{mode:0o600});}
+      await atomicWrite(replayFile,prefix.toString('utf8')+intended.map(line=>line+'\n').join(''),{mode:0o600});
+    }),
     readLatest: () => serialize(async () => {
       await check();
       const raw = await readOptional(indexFile);

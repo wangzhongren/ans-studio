@@ -118,3 +118,11 @@ test("库文件 pin：vendor 的 markdown-it 单文件 sha256 与记录一致（
   assert.ok(readme.includes("15.0.2") && readme.includes(sha), "vendor/README.md 须记录版本与同一 sha256");
   assert.ok(readme.includes("MIT"), "须记录许可（MIT）");
 });
+
+test("B受限文档仍静态呈现：原文可读且不建立图片脚本或本地文件资源",()=>{
+ const html=Md.renderMarkdown('# 报告\n\n<script>RUN()</script>\n\n![remote](https://invalid.example/automatic.png)\n\n[local](file:///private/secret)\n\n[script](javascript:alert(1))\n\n```html\n<iframe src=evil></iframe>\n```');
+ assert.ok(html.includes('&lt;script&gt;'));
+ assert.ok(!/<script|<iframe|<img/i.test(html));
+ assert.ok(!/href=["'](?:file:|javascript:|data:)/i.test(html));
+ assert.ok(html.includes('报告'));
+});

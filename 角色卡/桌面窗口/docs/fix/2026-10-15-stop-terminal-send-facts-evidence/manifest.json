@@ -1,0 +1,61 @@
+{
+  "stage": "WINDOW-STOP-TERMINAL-FIX-1; real Electron restart/verification pending",
+  "head": "fca8f6bd3d76d719dfbca071056449dedbaef957",
+  "node": "v24.14.0",
+  "affectedFiles": {
+    "app/desktop/session.ts": "182e5d7a3ffffd2b6cad3864a99373b07e00a0b587cccfbd0bbcf10422c55389",
+    "test/桌面应用/multi-runtime.test.ts": "7647f4b16267f51b77afb23dd66f37a5c408da3484b058d43cbab0dabe9f4443"
+  },
+  "consumedDependencies": {
+    "src/model/runtime.ts": "4d3278969daea6f45fd098a11cd5aea076fd646c080f09c10d4a8daba88314dd",
+    "src/service/runtime/session.ts": "991146051f429ef26b46b21154a574086b312233047b29c99a9d522c01280f02",
+    "src/pipeline/orchestration/run-role.ts": "fad87c2372ca5752a08a702284111db097dc7a2b3f9c9c6d6ac9789ccd4d1d64",
+    "src/common/编排/handback.ts": "ae4153c7d2d279caf395233f76727418e39093bb24eeeeea76ac554e0e14c6dd"
+  },
+  "baseManifest": "角色卡/桌面窗口/docs/change/2026-10-15-complete-flow-window-ac-evidence/manifest.json",
+  "legacyOverlay": "角色卡/桌面窗口/docs/fix/2026-10-15-legacy-projection-provenance-evidence/manifest.json",
+  "rootRedEvidence": [
+    "角色卡/测试/docs/change/2026-10-15-p1p7-implementation-evidence/desktop-stop-expired-ax.txt",
+    "角色卡/测试/docs/change/2026-10-15-p1p7-implementation-evidence/desktop-expired-radio-mutates-red-ax.txt",
+    "角色卡/测试/docs/change/2026-10-15-p1p7-implementation-evidence/desktop-stopped-state.png"
+  ],
+  "targetedCommand": "node --test test/桌面应用/multi-runtime.test.ts test/桌面应用/p0-halt-and-images.test.ts test/桌面应用/operator-wiring.test.ts",
+  "targetedPassed": 45,
+  "allCommand": [
+    "node",
+    "--test",
+    "test/桌面应用/ans-wiring.test.ts",
+    "test/桌面应用/boundary-refresh.test.ts",
+    "test/桌面应用/composer-images.test.ts",
+    "test/桌面应用/diagnostics.test.ts",
+    "test/桌面应用/dispatch-delivery.test.ts",
+    "test/桌面应用/dispatch-fresh-enum.test.ts",
+    "test/桌面应用/genesis-bootstrap.test.ts",
+    "test/桌面应用/handback-delivery.test.ts",
+    "test/桌面应用/hot-path.test.ts",
+    "test/桌面应用/interface.test.ts",
+    "test/桌面应用/message-queue.test.ts",
+    "test/桌面应用/operator-channel.test.ts",
+    "test/桌面应用/operator-wiring.test.ts",
+    "test/桌面应用/p0-halt-and-images.test.ts",
+    "test/桌面应用/pi-config.test.ts",
+    "test/桌面应用/project.test.ts",
+    "test/桌面应用/queue-withdraw-lru.test.ts",
+    "test/桌面应用/session-history.test.ts",
+    "test/桌面应用/session-rebuild-race.test.ts",
+    "test/桌面应用/session.test.ts",
+    "test/桌面应用/su-effective-boundary.test.ts",
+    "test/桌面应用/multi-runtime.test.ts",
+    "test/桌面应用/project-document.test.ts"
+  ],
+  "allPassed": 214,
+  "allFailed": 0,
+  "typecheckExit": 0,
+  "diffCheckExit": 0,
+  "approved13HashesUnchanged": true,
+  "notCovered": [
+    "root完整重启后的真实Pi桌面停止同场景",
+    "在线Codex/Claude停止",
+    "未知legacy无ACK/无typed输入/无公开终态不能补造事实"
+  ]
+}

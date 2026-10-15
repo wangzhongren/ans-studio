@@ -1,0 +1,14 @@
+The following is a diff from the previous accessibility tree for Window: "ANS 治理会话工作台" with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+Removed element IDs: 224-243
+~						201 text 已从本地会话文件恢复（模型上下文一并恢复）。 已从本地会话文件恢复（模型上下文一并恢复）。 UX-WALK-1：用于交互设计走查的隔离普通聊天。请仅调用一次request_choice，标题“选择查看方式”，选项“查看摘要”和“查看完整记录”，说明“只选择显示方式，不写文件，不派发任务”。不要调用其他工具，不改任何文件或配置，不提交报告；等待我回答后只简短回复选择结果并结束。 选择查看方式
++						224 文本 只选择显示方式，不写文件，不派发任务
++						225 container
++							226 单选按钮 查看摘要, Value: 0
++							227 文本 查看摘要
++						228 container
++							229 单选按钮 查看完整记录, Value: 1
++							230 文本 查看完整记录
++						231 按钮 提交
++						232 按钮 取消
++						233 文本 等待你确认
+The focused UI element is 229 单选按钮 查看完整记录, Value: 1

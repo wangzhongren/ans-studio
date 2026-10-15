@@ -6,7 +6,7 @@ import { join } from "node:path";
 import type * as SDK from "@anthropic-ai/claude-agent-sdk";
 import type * as Zod from "zod";
 import type { ResolvedRole } from "../../model/role.ts";
-import type { RuntimeAdapter, RuntimeProviderOptions, RoleSession, SessionEvent, RuntimeTurnOutcome, PromptOptions } from "../../model/runtime.ts";
+import type { RuntimeAdapter, RuntimeProviderOptions, RoleSession, SessionEvent, RuntimeTurnOutcome, PromptOptions, RuntimeToolEventFactsV1 } from "../../model/runtime.ts";
 import { RUNTIME_CREDENTIAL_ENV_VARS } from "../../common/shared/runtime-shared.ts";
 import { toClaudeSchema } from "../../common/claude-adapter/schema.ts";
 import { abortError, createQueue, waitForTurn } from "../../common/claude-adapter/lifecycle.ts";
@@ -43,6 +43,9 @@ const INPUT_CONTEXT_PREFIX = /^\[ANS_INPUT_CONTEXT:([a-f0-9]{8}-[a-f0-9]{4}-[a-f
 
 export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, dependencies: ClaudeAdapterDependencies = {}): RuntimeAdapter {
   if (options.runtime !== "claude") throw new Error("Claude 适配器只接受 runtime=claude");
+  if (options.toolDisplayMode === "required-v1" && (typeof options.projectToolEvent !== "function" || typeof options.registerToolDisplayProfile !== "function")) {
+    throw new Error("Claude required-v1 工具展示缺少 projector/register 能力");
+  }
   // Auth, endpoint and redaction must use the same immutable profile snapshot.
   const env = { ...(dependencies.env ?? process.env) };
   const credentialName = options.apiKeyEnvVar ?? "ANTHROPIC_API_KEY";
@@ -64,6 +67,11 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
   return {
     async composeContext(role) { return { systemPrompt: systemPrompt(role) }; },
     async bindRole(role: ResolvedRole): Promise<RoleSession> {
+      options.registerToolDisplayProfile?.({
+        apiKeyEnvVar: credentialName,
+        credentials: [...new Set([credentialName, ...(options.toolDisplayCredentialEnvNames ?? [])])]
+          .map((name) => ({ name, value: env[name] })),
+      });
       const storage = options.storage;
       if (storage && (storage.runtime !== "claude" || storage.roleId !== role.id)) throw new Error("Claude 存储 runtime/role 不匹配");
       await storage?.validateNativeDirectory?.();
@@ -81,6 +89,30 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
       const emit = (turn: Turn, kind: SessionEvent["kind"], summary: string, detail?: unknown) => {
         if (turn.controller.signal.aborted && kind !== "settled") return;
         events.push({ runtime: "claude", roleId: role.id, turnId: turn.id, kind, summary: redact(summary), detail });
+      };
+      // A projection is already protected. Never feed its identities back through redact/emit.
+      const projectionDiagnostic = (code: "PROJECTION_FAILED" | "CALL_CONTEXT_UNATTRIBUTED") => {
+        events.push({ runtime: "claude", kind: "message", summary: "工具展示诊断",
+          detail: { version: 1, source: "tool-display-diagnostic", code } });
+      };
+      const emitTool = (turn: Turn, facts: RuntimeToolEventFactsV1, legacyKind: SessionEvent["kind"], legacySummary: string) => {
+        if (turn.controller.signal.aborted) return;
+        if (!options.projectToolEvent) {
+          emit(turn, legacyKind, legacySummary, { toolCallId: facts.toolCallId, toolName: facts.toolName });
+          return;
+        }
+        try {
+          const event = options.projectToolEvent({ ...facts, runtime: "claude", roleId: role.id, turnId: turn.id }, redact);
+          events.push(event);
+        } catch { projectionDiagnostic("PROJECTION_FAILED"); }
+      };
+      const emitUnattributed = () => {
+        if (!options.projectToolEvent) { projectionDiagnostic("CALL_CONTEXT_UNATTRIBUTED"); return; }
+        try {
+          const event = options.projectToolEvent({ origin: "diagnostic", code: "CALL_CONTEXT_UNATTRIBUTED" }, redact);
+          // No active-turn fallback: an unknown hook does not identify a business call.
+          events.push(event);
+        } catch { projectionDiagnostic("PROJECTION_FAILED"); }
       };
       const safeFailure = (error: unknown) => error instanceof Error && ["AbortError", "TimeoutError"].includes(error.name)
         ? error : new Error(`Claude SDK 运行失败：${redact(error instanceof Error ? error.message : String(error))}`);
@@ -170,16 +202,18 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
             const { [CALL_CONTEXT_ARG]: _privateContext, ...publicArgs } = inputArgs;
             const run = current.toolTail.then(async () => {
               if (!callTurn || callTurn !== active || signal.aborted || current.closed) return { content: [{ type: "text" as const, text: "原始工具请求上下文无效或已结束，工具未执行" }], isError: true };
-              emit(callTurn, "tool_call", `${tool.name}`, { toolCallId, toolName: tool.name });
+              const facts = { toolCallId, toolName: tool.name, input: { rule: tool.displayInputRule, args: publicArgs } };
+              emitTool(callTurn, { ...facts, phase: "start", origin: "handler-start" }, "tool_call", tool.name);
               try {
                 const result = await tool.handler({ name: tool.name, args: publicArgs, signal, toolCallId });
                 if (signal.aborted || current.closed) return { content: [{ type: "text" as const, text: "本轮已中止，工具结果已丢弃" }], isError: true };
                 const message = redact(result.message);
-                emit(callTurn, result.ok ? "accepted" : "denied", message, { toolCallId, toolName: tool.name });
+                emitTool(callTurn, { ...facts, phase: "result", origin: "handler-result", result }, result.ok ? "accepted" : "denied", message);
                 return { content: [{ type: "text" as const, text: message }], isError: !result.ok };
-              } catch {
+              } catch (error) {
                 const message = `${tool.name} 执行失败；ANS 治理能力未返回成功`;
-                emit(callTurn, "denied", message, { toolCallId, toolName: tool.name });
+                if (!signal.aborted && !current.closed) emitTool(callTurn, { ...facts, phase: "result", origin: "handler-result",
+                  error: error instanceof Error ? { message: error.message } : {} }, "denied", message);
                 return { content: [{ type: "text" as const, text: message }], isError: true };
               }
             });
@@ -218,8 +252,12 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
               current.contexts.set(token, { turn: originalTurn, toolName: hook.tool_name.slice("mcp__ans__".length), toolUseId: hook.tool_use_id, signal: AbortSignal.any([original!.signal, hookOptions.signal]) });
               return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow", updatedInput: { ...hook.tool_input as Record<string, unknown>, [CALL_CONTEXT_ARG]: token } } };
             }
-            const callTurn = active;
-            if (callTurn) emit(callTurn, "denied", "拒绝非 ANS 工具或已中止轮次的调用");
+            if (originalTurn) {
+              const tool = options.tools.find((candidate) => `mcp__ans__${candidate.name}` === hook.tool_name);
+              emitTool(originalTurn, { origin: "governance-hook", phase: "blocked", toolName: tool?.name ?? hook.tool_name,
+                toolCallId: `${originalTurn.id}:${hook.tool_use_id}`,
+                result: { ok: false, message: "拒绝非 ANS 工具或已中止轮次的调用" } }, "denied", "拒绝非 ANS 工具或已中止轮次的调用");
+            } else emitUnattributed();
             return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: "仅允许当前轮注册的 ANS MCP 工具" } };
           }] }],
           },

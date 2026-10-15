@@ -1,0 +1,41 @@
+{
+  "at": "2026-10-15T06:11:08.194671+00:00",
+  "frozenDesigns": {
+    "角色卡/项目管理/docs/design/2026-10-15_design_complete-flow-interface-plan.md": true,
+    "角色卡/运行时核心/docs/design/2026-10-15_design_tool-display-contract-a.md": true,
+    "角色卡/桌面窗口/docs/design/2026-10-15_design_restricted-document-read.md": true,
+    "角色卡/运行时核心/docs/design/2026-10-15_design_report-provenance-contract-c.md": true,
+    "角色卡/编排/docs/design/2026-10-15_design_report-provenance-consumer-c.md": true,
+    "角色卡/桌面窗口/docs/design/2026-10-15_design_complete-flow-ac-consumers.md": true,
+    "角色卡/桌面UI/docs/design/2026-10-15_design_complete-flow-consumer-plan.md": true,
+    "角色卡/Pi适配器/docs/design/2026-10-15_design_tool-display-and-report-consumer.md": true,
+    "角色卡/Codex适配器/docs/design/2026-10-15_design_tool-display-and-report-consumer.md": true,
+    "角色卡/Claude适配器/docs/design/2026-10-15_design_tool-display-ac-assessment.md": true,
+    "角色卡/UIUX设计师/docs/design/2026-10-15_design_complete-flow-interface-ux-review.md": true,
+    "角色卡/产品/docs/design/2026-10-15_design_desktop-complete-walkthrough.md": true,
+    "角色卡/测试/docs/design/2026-10-15_three-interface-verification-plan.md": true
+  },
+  "envUnchanged": true,
+  "businessSourcesUnchanged": {
+    "index.js": true,
+    "test.js": true,
+    "index.d.ts": true,
+    "package.json": true
+  },
+  "readerFixturesUnchanged": {
+    "p1p7-unicode.md": true,
+    "p1p7-oversize.md": true,
+    "p1p7-invalid-utf8.md": true,
+    "p1p7-static-render.md": true
+  },
+  "actualCoreUserInputs": {
+    "su": 10,
+    "测试": 1,
+    "维护": 1
+  },
+  "sourceReportCounts": {
+    "su": 0,
+    "测试": 1,
+    "维护": 0
+  }
+}

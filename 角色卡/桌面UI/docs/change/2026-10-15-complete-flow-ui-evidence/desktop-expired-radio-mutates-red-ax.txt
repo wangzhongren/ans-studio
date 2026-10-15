@@ -1,0 +1,82 @@
+Window: "ANS 治理会话工作台", App: Electron.
+0 标准窗口 ANS 治理会话工作台, Secondary Actions: Raise
+	1 container ANS 治理会话工作台
+		2 container
+			3 HTML 内容 ANS 治理会话工作台, URL: file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/app/renderer/index.html
+				4 container
+					5 text ANS 治理会话工作台
+					6 按钮 Description: 角色资料, Help: 角色资料（含待办 / 队列）
+					7 按钮 Pi 设置
+					8 按钮 最小化
+					9 按钮 最大化
+					10 按钮 关闭
+				11 container
+					12 文本 项目
+					13 按钮 切换项目
+					14 文本 ans-p1p7-desktop-QWGoKc
+					15 文本 /private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-p1p7-desktop-QWGoKc
+					16 文本 角色
+					17 container 角色列表
+						18 文本 主入口
+						19 按钮 su 内置治理角色（定义见 SKILL.md） 主入口 内置 错误
+							20 文本 su
+							21 文本 内置治理角色（定义见 SKILL.md）
+							22 文本 主入口
+							23 文本 内置
+							24 文本 错误
+						25 文本 其他角色（查看/调试）
+						26 按钮 测试 角色卡：测试 未开启
+							27 文本 测试
+							28 文本 角色卡：测试
+							29 文本 未开启
+						30 按钮 维护 角色卡：维护 未开启
+							31 文本 维护
+							32 文本 角色卡：维护
+							33 文本 未开启
+						34 按钮 项目管理 角色卡：项目管理 未开启
+							35 文本 项目管理
+							36 文本 角色卡：项目管理
+							37 文本 未开启
+					38 container
+						39 text su 引擎
+						40 组合框 (settable) Description: 会话引擎，当前 Pi, Value: Pi
+							41 文本 Pi
+						42 text 实际写入导入项目，角色边界外的写入会被拒绝。 新会话；可读历史保留，模型未恢复
+					43 container
+						44 text 本次开启会话：新会话 P1P7-CHAT-1：这是普通聊天交互测试。请仅调用一次 request_choice，标题“选择查看方式”，单选且不预选答案，选项“查看摘要”和“查看完整记录”，说明“只选择显示方式，不写文件，不派发任务”。等待我回答后只简短回复选择结果。不调用其他工具，不改文件或配置，不提交报告。 选择查看方式
+						45 文本 只选择显示方式，不写文件，不派发任务
+						46 container
+							47 单选按钮 查看摘要, Value: 0
+							48 文本 查看摘要
+						49 container
+							50 单选按钮 查看完整记录, Value: 1
+							51 文本 查看完整记录
+						52 text 已提交选择。 request_choice · 执行完成
+						53 开合三角标记 查看安全执行详情
+							54 文本 查看安全执行详情
+						55 container
+							56 text 你选择了： 查看完整记录 （full）。
+						57 text 会话结束 P1P7-QUEUE-KEEP：这是排队普通消息，只简短回复“已收到保留消息”，不调用工具、不派发、不提交报告。 已入队：等它完成当前任务后处理（第 1 位）。 P1P7-QUEUE-WITHDRAW：这条测试消息将被撤回，不应交给模型。 已入队：等它完成当前任务后处理（第 2 位）。 已撤回排队消息：你：P1P7-QUEUE-WITHDRAW：这条测试消息将被撤回，不应交给模型。 已收到保留消息 会话结束 P1P7-STOP-1：普通聊天停止测试。仅调用一次 request_choice，标题“停止前的选择”，单选选项“继续查看”和“暂不查看”，不预选。等待我操作。不读写文件、不派发、不提交报告。 停止前的选择
+						58 单选按钮 继续查看, Value: 1
+						59 文本 继续查看
+						60 单选按钮 暂不查看, Value: 0
+						61 text 暂不查看 请求已失效，未获同意。原因：本轮已停止或会话已重建，旧确认失效。 request_choice · 执行失败：request_choice 执行失败（request_choice：未获客户同意（原因：request_choice 等待客户回应 被中止（会话中止/取消，未获客户回应）。）→ 不要写盘；如实告知客户，不得假设同意。）
+						62 开合三角标记 查看安全执行详情
+							63 文本 查看安全执行详情
+						64 文本 已请求停止当前轮次——轮次仍会以收尾事件结束。
+						65 开合三角标记 本轮已中止 目标未记录
+							66 文本 本轮已中止
+							67 文本 目标未记录
+						68 text 本轮已中止 发送失败：本轮运行 被中止（会话中止/取消，未获客户回应）。
+					69 container
+						70 按钮 Description: 添加图片, Help: 添加图片（png / jpeg / webp / gif，≤5MB）
+						71 文本输入区 (settable) Value: P1P7-STOP-1：普通聊天停止测试。仅调用一次 request_choice，标题“停止前的选择”，单选选项“继续查看”和“暂不查看”，不预选。等待我操作。不读写文件、不派发、不提交报告。, Placeholder: 输入消息，Enter 发送，Shift+Enter 换行
+						72 按钮 (disabled) Description: 发送, Help: 发送（Enter）
+73 menu bar
+	74 Electron
+	75 File
+	76 Edit
+	77 View
+	78 Window
+
+The focused UI element is 58 单选按钮 继续查看, Value: 1

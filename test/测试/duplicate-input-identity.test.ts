@@ -24,6 +24,9 @@ for (const runtime of ["pi", "codex", "claude"] as const) {
     const factory: RuntimeProviderFactory = options => ({
       async composeContext() { return { systemPrompt: "independent controlled external engine" }; },
       async bindRole(role) {
+        assert.equal(options.toolDisplayMode, "required-v1");
+        assert.equal(typeof options.registerToolDisplayProfile, "function");
+        options.registerToolDisplayProfile!({ credentials: [] });
         let closed = false;
         let wake: (() => void) | undefined;
         const rows: SessionEvent[] = [];

@@ -1,0 +1,201 @@
+{
+  "at": "2026-10-15T04:42:27.005Z",
+  "manifest": "角色卡/桌面窗口/docs/change/2026-10-15-complete-flow-window-ac-evidence/manifest.json",
+  "manifestHash": "623fc2bf148c24c86db544a853de92d11077e21672ce9d435b34aa40538822b4",
+  "checked": [
+    {
+      "path": "app/desktop/session.ts",
+      "expected": "63bae375299ad4f5464f3bf22204a55f35a7dd85bafd62660bff0e691c09814f",
+      "actual": "63bae375299ad4f5464f3bf22204a55f35a7dd85bafd62660bff0e691c09814f"
+    },
+    {
+      "path": "app/desktop/runtime-history.ts",
+      "expected": "050fd5fe41085840dd1dd8f2972225e38b916d0f999570592103aa0d34a6e1cf",
+      "actual": "050fd5fe41085840dd1dd8f2972225e38b916d0f999570592103aa0d34a6e1cf"
+    },
+    {
+      "path": "app/desktop/session-history.ts",
+      "expected": "58e65918aff579685b2240e1d108b2b0d385ea167f698336c353efd45f7845f6",
+      "actual": "58e65918aff579685b2240e1d108b2b0d385ea167f698336c353efd45f7845f6"
+    },
+    {
+      "path": "app/desktop/interface.ts",
+      "expected": "dc6c769e77ce5029f7320dffdee2f4c411f242423b38d52e510ed3f015b9fd30",
+      "actual": "dc6c769e77ce5029f7320dffdee2f4c411f242423b38d52e510ed3f015b9fd30"
+    },
+    {
+      "path": "app/desktop/request-anchor.ts",
+      "expected": "7539da9ac445e838bcb86ad863f57f74274a80cb5d395c7a7ef469e30ea8b4dc",
+      "actual": "7539da9ac445e838bcb86ad863f57f74274a80cb5d395c7a7ef469e30ea8b4dc"
+    },
+    {
+      "path": "app/main.ts",
+      "expected": "f4339c2ee0aa87a306534010435e47c771559d56e316393d8d04ba1208267940",
+      "actual": "f4339c2ee0aa87a306534010435e47c771559d56e316393d8d04ba1208267940"
+    },
+    {
+      "path": "app/preload.cjs",
+      "expected": "7fc95a6a5ac63edcea06ef2b31a2d14e3348e3bd27b35d9fa994332554133ce1",
+      "actual": "7fc95a6a5ac63edcea06ef2b31a2d14e3348e3bd27b35d9fa994332554133ce1"
+    },
+    {
+      "path": "test/桌面应用/ans-wiring.test.ts",
+      "expected": "0c619e6350c5476b5f1f0eedce0d500efa728d9a0905802c0372e27dc10fce0d",
+      "actual": "0c619e6350c5476b5f1f0eedce0d500efa728d9a0905802c0372e27dc10fce0d"
+    },
+    {
+      "path": "test/桌面应用/boundary-refresh.test.ts",
+      "expected": "b08751cb9a732a957689ce8152b442a053b3ba163cbe4258a75f9659a925e53b",
+      "actual": "b08751cb9a732a957689ce8152b442a053b3ba163cbe4258a75f9659a925e53b"
+    },
+    {
+      "path": "test/桌面应用/diagnostics.test.ts",
+      "expected": "ffe99bd44d192b1181888b2dcb2b52298328a938fdf2ab7d30c0df68daccc40d",
+      "actual": "ffe99bd44d192b1181888b2dcb2b52298328a938fdf2ab7d30c0df68daccc40d"
+    },
+    {
+      "path": "test/桌面应用/dispatch-delivery.test.ts",
+      "expected": "7062305b470d5217b0e5216c4ef9cbaa465a7ccf8db0758a84b5670afa0b6959",
+      "actual": "7062305b470d5217b0e5216c4ef9cbaa465a7ccf8db0758a84b5670afa0b6959"
+    },
+    {
+      "path": "test/桌面应用/handback-delivery.test.ts",
+      "expected": "1ae1e5d5bd8c2fcc231c33176d9ce2216ee4687d50e61eb3708d616f0f2dd1f0",
+      "actual": "1ae1e5d5bd8c2fcc231c33176d9ce2216ee4687d50e61eb3708d616f0f2dd1f0"
+    },
+    {
+      "path": "test/桌面应用/hot-path.test.ts",
+      "expected": "1817814bdd6be5c9e08be43d75412e43526eec6e73066ab46ee9a44a29909bf5",
+      "actual": "1817814bdd6be5c9e08be43d75412e43526eec6e73066ab46ee9a44a29909bf5"
+    },
+    {
+      "path": "test/桌面应用/interface.test.ts",
+      "expected": "c1f6069dec497f3d9d0e5cd859fa16381fd375a7c1d288edbd5006dceb6b94fc",
+      "actual": "c1f6069dec497f3d9d0e5cd859fa16381fd375a7c1d288edbd5006dceb6b94fc"
+    },
+    {
+      "path": "test/桌面应用/message-queue.test.ts",
+      "expected": "575a2a8a3ee1e9b8d48a530263b3db6009c3b5b8ffb833f16f3bdf9b7326c49a",
+      "actual": "575a2a8a3ee1e9b8d48a530263b3db6009c3b5b8ffb833f16f3bdf9b7326c49a"
+    },
+    {
+      "path": "test/桌面应用/multi-runtime.test.ts",
+      "expected": "6c850e7179a89d37b7d60bd785b3427ad1168751f4ed073a3fe0b79f36481e9f",
+      "actual": "6c850e7179a89d37b7d60bd785b3427ad1168751f4ed073a3fe0b79f36481e9f"
+    },
+    {
+      "path": "test/桌面应用/session-history.test.ts",
+      "expected": "b7ef2428b01cdff16608a960f958542712c7bb77fe3291772148bb935634153f",
+      "actual": "b7ef2428b01cdff16608a960f958542712c7bb77fe3291772148bb935634153f"
+    },
+    {
+      "path": "test/桌面应用/session.test.ts",
+      "expected": "75a80f7cc4a5cfade7d92ec649f46670796a2c09c4a0fbf705797482546eef6d",
+      "actual": "75a80f7cc4a5cfade7d92ec649f46670796a2c09c4a0fbf705797482546eef6d"
+    },
+    {
+      "path": "src/common/runtime-core/report-provenance.ts",
+      "expected": "d13fcf3bb6f50c19f2ba6b4aeb4a608ff791daa2995246b005adc9bb98108d27",
+      "actual": "d13fcf3bb6f50c19f2ba6b4aeb4a608ff791daa2995246b005adc9bb98108d27"
+    },
+    {
+      "path": "src/common/runtime-core/tool-display.ts",
+      "expected": "983c53207eab92c6448c1681e829c0700b42a12153a5817bab217dbb6c2c8e9e",
+      "actual": "983c53207eab92c6448c1681e829c0700b42a12153a5817bab217dbb6c2c8e9e"
+    },
+    {
+      "path": "src/common/编排/handback.ts",
+      "expected": "ae4153c7d2d279caf395233f76727418e39093bb24eeeeea76ac554e0e14c6dd",
+      "actual": "ae4153c7d2d279caf395233f76727418e39093bb24eeeeea76ac554e0e14c6dd"
+    },
+    {
+      "path": "src/model/runtime.ts",
+      "expected": "4d3278969daea6f45fd098a11cd5aea076fd646c080f09c10d4a8daba88314dd",
+      "actual": "4d3278969daea6f45fd098a11cd5aea076fd646c080f09c10d4a8daba88314dd"
+    },
+    {
+      "path": "src/pipeline/orchestration/govern-session.ts",
+      "expected": "9894f9364f2ab23840213085125e8f80fd6ab49c298b34847651586b0514c2d7",
+      "actual": "9894f9364f2ab23840213085125e8f80fd6ab49c298b34847651586b0514c2d7"
+    },
+    {
+      "path": "src/pipeline/orchestration/run-role.ts",
+      "expected": "fad87c2372ca5752a08a702284111db097dc7a2b3f9c9c6d6ac9789ccd4d1d64",
+      "actual": "fad87c2372ca5752a08a702284111db097dc7a2b3f9c9c6d6ac9789ccd4d1d64"
+    },
+    {
+      "path": "src/provider/runtime/session-store.ts",
+      "expected": "fbe84fc39e62b9992be09afac0887258cfc02f8cbca3d5432a5ea943c6ca79a3",
+      "actual": "fbe84fc39e62b9992be09afac0887258cfc02f8cbca3d5432a5ea943c6ca79a3"
+    },
+    {
+      "path": "src/provider/runtime/tools.ts",
+      "expected": "5db9187e52b2413c46a07e516c56f8b27455bccd7c002ad8b9bf3db84ddd9298",
+      "actual": "5db9187e52b2413c46a07e516c56f8b27455bccd7c002ad8b9bf3db84ddd9298"
+    },
+    {
+      "path": "src/service/runtime/session.ts",
+      "expected": "991146051f429ef26b46b21154a574086b312233047b29c99a9d522c01280f02",
+      "actual": "991146051f429ef26b46b21154a574086b312233047b29c99a9d522c01280f02"
+    },
+    {
+      "path": "src/model/project-document.ts",
+      "expected": "cb13869cb5ae55721e8a168c39ceb5a17dd73bb4cf699954eb3cc4dafe33511e",
+      "actual": "cb13869cb5ae55721e8a168c39ceb5a17dd73bb4cf699954eb3cc4dafe33511e"
+    },
+    {
+      "path": "src/pipeline/project-document/read-project-document.ts",
+      "expected": "fe199997441df96d89ab5f52ff578353fb9bc8b00602f8159dd2ecd8f246d94d",
+      "actual": "fe199997441df96d89ab5f52ff578353fb9bc8b00602f8159dd2ecd8f246d94d"
+    },
+    {
+      "path": "src/service/project-document/abstract/document-reader.ts",
+      "expected": "c7d1aff487398ed7012eafd28077a91fccace90f3329c0d52e5a9f6694ad8130",
+      "actual": "c7d1aff487398ed7012eafd28077a91fccace90f3329c0d52e5a9f6694ad8130"
+    },
+    {
+      "path": "src/service/project-document/public/read-project-document.ts",
+      "expected": "691fd17249e0757707bfb19fb617666d1679123254e7792d60d42c86765e617f",
+      "actual": "691fd17249e0757707bfb19fb617666d1679123254e7792d60d42c86765e617f"
+    },
+    {
+      "path": "src/service/project-document/impl/read-project-document.ts",
+      "expected": "658062375a4349cd9c64423976bc03b3b15bd748e0fa2823a0aee8f69eff997e",
+      "actual": "658062375a4349cd9c64423976bc03b3b15bd748e0fa2823a0aee8f69eff997e"
+    },
+    {
+      "path": "src/provider/project-document/abstract/file-reader.ts",
+      "expected": "bbf8b28444db745d5b05c79dd135170c754ec9f55bf90837bd4fea1967d977a9",
+      "actual": "bbf8b28444db745d5b05c79dd135170c754ec9f55bf90837bd4fea1967d977a9"
+    },
+    {
+      "path": "src/provider/project-document/public/file-reader.ts",
+      "expected": "b114befdb3c5e1b9781b12bd41a0945ad1bd219d57f6f6b8c58260cd0ca70d83",
+      "actual": "b114befdb3c5e1b9781b12bd41a0945ad1bd219d57f6f6b8c58260cd0ca70d83"
+    },
+    {
+      "path": "src/provider/project-document/impl/file-reader.ts",
+      "expected": "9a387b077f0142c49a4f3846f5af98611a7dee97f3d455bb42dcb585dbe1ae8a",
+      "actual": "9a387b077f0142c49a4f3846f5af98611a7dee97f3d455bb42dcb585dbe1ae8a"
+    },
+    {
+      "path": "app/desktop/project.ts",
+      "expected": "7ff7826899c6eb9720787f6b01468916e50443d6f0a929cd1b8569d42f4faa8c",
+      "actual": "7ff7826899c6eb9720787f6b01468916e50443d6f0a929cd1b8569d42f4faa8c"
+    },
+    {
+      "path": "test/桌面应用/project-document.test.ts",
+      "expected": "38bcebcf4df05b42acc21ba56835f28c0fac235deb712d86b2ea9be56d7733c2",
+      "actual": "38bcebcf4df05b42acc21ba56835f28c0fac235deb712d86b2ea9be56d7733c2"
+    }
+  ],
+  "mismatches": [],
+  "independent": {
+    "command": "node --test test/测试/p1p7-document-integration.test.ts test/测试/p1p7-tool-display-integration.test.ts test/测试/p1p7-report-integration.test.ts test/测试/p1p7-window-provenance-integration.test.ts test/测试/chat-handback-integration.test.ts",
+    "exitCode": 0,
+    "pass": 17,
+    "fail": 0,
+    "coverage": "Final Window candidate, actual Core/Pipeline/Window and filesystem with controlled external engines; no GUI claim",
+    "output": "✔ independent pi: real Desktop → Pipeline → Core separates chat, queued chat, dispatch and explicit reports (30.807209ms)\n✔ independent codex: real Desktop → Pipeline → Core separates chat, queued chat, dispatch and explicit reports (18.008667ms)\n✔ independent claude: real Desktop → Pipeline → Core separates chat, queued chat, dispatch and explicit reports (24.1765ms)\n✔ independent B: native grant, opaque reference, actual bounded file reads, revocation and project switch (74.205625ms)\n✔ independent C pi: one durable member, safe input history, raw model text, real target receipt and no duplicate prompt (54.899208ms)\n✔ independent C codex: one durable member, safe input history, raw model text, real target receipt and no duplicate prompt (45.307875ms)\n✔ independent C claude: one durable member, safe input history, raw model text, real target receipt and no duplicate prompt (34.986667ms)\n✔ independent C: failure after real ACK but before input save invokes no model and cannot repair by prompting (23.40925ms)\n✔ independent C: history failure after a real model call cannot turn storage retry into another prompt (17.840208ms)\n✔ independent C: an injected report storage failure retries the frozen member once without rerunning its model (12.806125ms)\n✔ independent pi: real shell effects, failures and protected details survive Core to Window history (73.851208ms)\n✔ independent codex: real shell effects, failures and protected details survive Core to Window history (66.290083ms)\n✔ independent claude: real shell effects, failures and protected details survive Core to Window history (56.239167ms)\n✔ independent A: a real non-tool engine failure must not become a tool display diagnostic (11.403ms)\n✔ independent C Window: failed source save and concurrent recovery continue one original delivery without source replay or raw IPC (56.677ms)\n✔ independent C Window: initial source save and its notification continue one original delivery without source replay or raw IPC (45.984167ms)\n✔ independent C Window: failed target receipt and history-only recovery continue one original delivery without source replay or raw IPC (55.231875ms)\nℹ tests 17\nℹ suites 0\nℹ pass 17\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 519.743834\n"
+  }
+}

@@ -72,7 +72,7 @@ function writeAns(root: string, acceptance: Record<string, unknown>): void {
 }
 
 /** 用真实下游（编排/演示适配器/枚举）构造会话管理器——**不注入** loadEffectiveConfig（用共享载入器）。 */
-function makeManager(listing: ProjectListing, events: OrchestrationEvent[]): SessionManager {
+function makeManager(listing: ProjectListing, events: import("../../app/desktop/session.ts").DesktopOrchestrationEvent[]): SessionManager {
   return new SessionManager({
     openRoleSession,
     createPiAdapterFactory,
@@ -91,7 +91,7 @@ test("有带 pin 的 .ans → pin 生效：会话用其 pin-backed acceptance，
   writeAns(root, { accepted: true, source: "客户 pin 2026-10-11", pin: [{ path: BOUNDARY_REL, sha256: sha }] });
 
   const listing = await listProject(root);
-  const events: OrchestrationEvent[] = [];
+  const events: import("../../app/desktop/session.ts").DesktopOrchestrationEvent[] = [];
   const mgr = makeManager(listing, events);
 
   const res = await mgr.open({ projectRoot: root, roleId: "R", runtime: "demo" });
@@ -135,7 +135,7 @@ test(".ans 存在但不可解析 → 未接受、不回退运行期同意（界�
   writeAt(root, ".ans/project.json", "{ 这不是合法 JSON");
 
   const listing = await listProject(root);
-  const events: OrchestrationEvent[] = [];
+  const events: import("../../app/desktop/session.ts").DesktopOrchestrationEvent[] = [];
   const mgr = makeManager(listing, events);
 
   const res = await mgr.open({ projectRoot: root, roleId: "R", runtime: "demo" });
@@ -161,7 +161,7 @@ test("无 .ans → 回退运行期同意（登记的非-pin 例外，行为不�
   const root = newProject(); // 不写 .ans
 
   const listing = await listProject(root);
-  const events: OrchestrationEvent[] = [];
+  const events: import("../../app/desktop/session.ts").DesktopOrchestrationEvent[] = [];
   const mgr = makeManager(listing, events);
 
   const res = await mgr.open({ projectRoot: root, roleId: "R", runtime: "demo" });

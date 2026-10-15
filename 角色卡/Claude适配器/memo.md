@@ -6,3 +6,5 @@ SDK0.3.299（native2.1.299），实际 Option 是 settingSources 单数；MCP完
 
 
 A1V：正式MCP1.32.1；20/20和整仓tsc通过，真实bundledCLI回环probe通过。bare实际禁显式hooks，已移除；settings.disableAllHooks:true保留SDKcallbacks。nativeprompt_id不同于SDKuuid，用wire首行随机UUID登记原始Turn，不用submitting fallback；事件清除标记。环境构造时snapshot，profile变动不改变旧session。详见native-hook-identity修复记录。
+
+2026-10-15 CLAUDE-A-1：批准13hash/Core final14hash匹配后接A4/C2.tp1。仅session生产；required-v1早拒+bind profile登记；真实source→注入投影→薄queue，SDK content不改。未知hook不借active，真实blocked保原Turn。自有28/28、Core实际MCP/read/shell、C运输sentinel、真实bundledCLI纯127回环通过，tsc0。详情和哈希见docs/change/2026-10-15_change_tool-display-projection.md。不能把standalone旧夹具当生产A保证；Core依赖变更后重跑。

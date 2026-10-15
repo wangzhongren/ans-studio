@@ -1,0 +1,189 @@
+{
+  "reports": [
+    {
+      "name": "V2 ordinary chat stays ordinary before any structured report",
+      "value": true
+    },
+    {
+      "name": "V2 accepted structural positions and real window controls",
+      "value": true
+    },
+    {
+      "name": "V2 ordinary chat work overview has no invented report",
+      "value": true
+    },
+    {
+      "name": "V2 source report uses separate layered top and facts before primary source and full copy",
+      "value": true
+    },
+    {
+      "name": "V2 preview is deterministic real summary while complete safe copy is independently reachable",
+      "value": true
+    },
+    {
+      "name": "V2 report status unknown association redaction truncation omission and save facts remain visible",
+      "value": true
+    },
+    {
+      "name": "V2 report declaration alone cannot fold an active assistant stream",
+      "value": true
+    },
+    {
+      "name": "V2 true settled folds only the exact report turn assistant original in place",
+      "value": true
+    },
+    {
+      "name": "V2 late exact turn reply follows settled rule and other turns remain ordinary",
+      "value": true
+    },
+    {
+      "name": "V2 task request folds only by exact structured report actual turn without reordering ordinary chat",
+      "value": true
+    },
+    {
+      "name": "V2 local state refresh preserves full report and original task expansion",
+      "value": true
+    },
+    {
+      "name": "V2 modal declares dialog and makes whole background inert",
+      "value": true
+    },
+    {
+      "name": "V2 document drawer matches 18px heading source block and outlined right reading action",
+      "value": true
+    },
+    {
+      "name": "V2 native window controls retain visible icons and real IPC while business background is inert",
+      "value": true
+    },
+    {
+      "name": "V2 Shift Tab wraps from first to last actual drawer control",
+      "value": true
+    },
+    {
+      "name": "V2 Tab wraps last to first without escaping modal",
+      "value": true
+    },
+    {
+      "name": "V2 background focus cannot escape into composer",
+      "value": true
+    },
+    {
+      "name": "V2 Escape restores actual visible report invoker draft and same chat reading",
+      "value": true
+    },
+    {
+      "name": "V2 measured geometry 1360",
+      "value": {
+        "nav": 208,
+        "pane": 800,
+        "capsule": 800,
+        "button": {
+          "x": 409,
+          "y": 552.703125,
+          "width": 130,
+          "height": 32,
+          "top": 552.703125,
+          "right": 539,
+          "bottom": 584.703125,
+          "left": 409
+        },
+        "composer": {
+          "x": 208,
+          "y": 694.40625,
+          "width": 1152,
+          "height": 165.59375,
+          "top": 694.40625,
+          "right": 1360,
+          "bottom": 860,
+          "left": 208
+        },
+        "root": 1360,
+        "innerWidth": 1360
+      }
+    },
+    {
+      "name": "V2 real geometry 1360",
+      "value": true
+    },
+    {
+      "name": "V2 modal width is 424 at 1360",
+      "value": true
+    },
+    {
+      "name": "V2 measured geometry 960",
+      "value": {
+        "nav": 176,
+        "pane": 736,
+        "capsule": 736,
+        "button": {
+          "x": 221,
+          "y": 574.203125,
+          "width": 130,
+          "height": 32,
+          "top": 574.203125,
+          "right": 351,
+          "bottom": 606.203125,
+          "left": 221
+        },
+        "composer": {
+          "x": 176,
+          "y": 698.40625,
+          "width": 784,
+          "height": 161.59375,
+          "top": 698.40625,
+          "right": 960,
+          "bottom": 860,
+          "left": 176
+        },
+        "root": 960,
+        "innerWidth": 960
+      }
+    },
+    {
+      "name": "V2 real geometry 960",
+      "value": true
+    },
+    {
+      "name": "V2 modal width is 424 at 960",
+      "value": true
+    },
+    {
+      "name": "V2 cold exact report turn folds neutral original only and preserves explicit expansion",
+      "value": true
+    },
+    {
+      "name": "V2 received report shares layered safe report ordering with one separate batch receipt",
+      "value": true
+    },
+    {
+      "name": "V2 target batch facts use actual compact component typography spacing and boundaries",
+      "value": true
+    },
+    {
+      "name": "V2 independent work overview includes own and actual received structured reports",
+      "value": true
+    },
+    {
+      "name": "V2 work de-duplicates only real report identity while separate delivery attempts stay visible",
+      "value": true
+    },
+    {
+      "name": "SV13 distinct receiver turn streaming stays expanded",
+      "value": true
+    },
+    {
+      "name": "SV13 true settled receiver folds only exact assistant original",
+      "value": true
+    },
+    {
+      "name": "SV13 later receiver text folds preserving explicit expansion",
+      "value": true
+    },
+    {
+      "name": "SV13 cold receiver keeps neutral label flags expansion and unrelated legacy text",
+      "value": true
+    }
+  ],
+  "errors": []
+}

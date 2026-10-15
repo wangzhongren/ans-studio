@@ -90,6 +90,15 @@ test("makeRolePrompt: standalone input echo has typed identity; Core production 
   }
 });
 
+test("makeRolePrompt: SDK option allowlist strips Core provenance, presentation and progress while preserving original text/images", async () => {
+  const stub = stubSession(); let progress = 0;
+  const prompt = makeRolePrompt({ session: stub.session, promptMs: 1000, gate: createInteractionGate(), emit: () => {}, log: silentLogger(), emitPromptInput: false });
+  const images = [PNG];
+  await prompt("original modelPromptText", { images, inputProvenance: { sentinel: "never-in-SDK-provenance" }, inputPresentation: { sentinel: "never-in-SDK-presentation" }, onDeliveryProgress: () => { progress++; }, onTurnStarted: () => { throw new Error("Core-only callback"); } } as never);
+  assert.equal(stub.calls[0].text, "original modelPromptText"); assert.equal(stub.calls[0].options?.images, images);
+  assert.deepEqual(Object.keys(stub.calls[0].options!), ["images"]); assert.equal(progress, 0);
+});
+
 test("makeRolePrompt：无图 → 逐字旧行为（不传 options；事件文案不变）", async () => {
   const stub = stubSession();
   const events: string[] = [];

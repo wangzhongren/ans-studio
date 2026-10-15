@@ -31,3 +31,22 @@ Service 为每轮提供一个 ID，归一事件的顶层和 `detail.turnId`，�
 状态：C1 Model/工具/schema/store/Service 已实现，自有无网络测试通过；Pi/Codex/Claude 的 SDK 迁移与用户入口接线由各原属主独立完成，不能把这些核心结果当成最终整合验收。详见 [原始验证记录](docs/change/2026-10-14_change_runtime-core.md)。Adapter 个性化配置若需要新增字段，先交核心协调并补充本文件，不能各自增殖公共类型。
 
 **输入显示身份（2026-10-15）：** PromptInputEventDetail 的 source 固定为 prompt-input，text 为原文，imageCount 可选。Core 在实际开始通知/user持久化/取消检查后、native prompt前发一次 kind:message，顶层与 detail.turnId 都为 actualturn；非空图片只记数量，图片原对象继续透传。Pi 注入路径不再另发 echo，demo 有 Core turn 时同理；direct helper 兼容由原属主维护。Window/UI 按 actualturn 关联 replay user 与 typed echo，不按正文前缀猜输入，不补猜旧数据身份。CustomerInputMetadata.toolCallId 可选，只透传确认/选择 handler 原始 callId，缺席仍缺席，旧单参回调兼容，不新增许可。见[本次修复](docs/fix/2026-10-15_fix_run-shell-description.md)。
+
+## 已实施 A4 / C2.tp1 接口（2026-10-15，整合待验）
+
+`src/model/runtime.ts` 是中立类型唯一来源；实际字段请引用它，不复制本节摘要当另一份schema。
+
+- A：`RuntimeProviderOptions.toolDisplayMode='required-v1'`由Core固定，注入`projectToolEvent`、`registerToolDisplayProfile`与`toolDisplayCredentialEnvNames`。Core factory前检查注入，bind后检查profile已登记，未登记关闭inner并拒绝首prompt。适配器仍须在自身SDK加载/效果前按此模式早拒；旧standalone缺mode保兼容，不能把Core生产降为legacy。
+- projector消费实际`RuntimeToolEventSource`，返回有界ToolDisplayV1或无业务结论message诊断，身份不经文本redactor。`ToolDefinition.displayInputRule`和实际handler共享原路径/命令选择；`ToolResult.execution?`来自shell真实结构，仅观测旧收集器丢弃事实，不改变原message/argv/审核/收集阈值。新projection异常不等于工具拒绝。
+- `projectRuntimeLegacyHistory(input:RuntimeLegacyHistoryProjectionInputV1)`是Service纯同步桥，无FS/Provider/SDK。Window现reader产物由Pipeline包装调用后再发protected结果；Pipeline包装与Window parser/锚点接线由原属主实现，Core不直接读Window旧native文件。
+- 历史公共读取`readRuntimeSessionHistory({projectRoot,roleId,runtime,credentialEnvNames?})`对旧工具事件/消息文本采用当前已知值和格式保护，兼容返回reports/reportErrors；不构造SDK或为了显示补读业务文件。旧轮换secret不可恢复、未知秘密不称全面DLP。
+- C：Core返回`RoleSession.persistence`，mode由实际ANS storage决定（enabled/disabled），scope与方法均闭包绑定；不接受caller布尔、路径或source scope覆盖。无该能力的旧外部adapter由Pipeline按unknown-live降级，不由Core创建目录代替。
+- `recordFinalReport(draft)`只接本session已结束actualturn的最终业务投影；`retryReportPersistence(reportId)`、`getReportPersistence(reportId)`只保存/查询原冻结材料。saved/already-saved不等已投递或验收；`accepted-memory`工具回执明确候选待收口。源enabled失败不变原outcome。
+- 可信目标`PromptOptions.inputProvenance`或live-only`inputPresentation`由Core验证，进入inner.prompt前剥离新metadata/回调；原模型text与images引用保持。C目标历史/IPC只用安全文本副本（16KiB正文/1KiB摘要、inputTextProjection.modelInputRecorded:false），普通无C聊天不改变。
+- PM实施裁定的必要兼容补：`RuntimeLiveHandbackPresentationV1`额外可选`deliveryId/attemptId/target`；三齐且目标匹配才提供receipt/progress/查重，全缺保原live且不造身份，部分为INVALID。它不产生durable reportId，不把live reports写盘，disabled仍无目录。
+- `getDeliveryReceipt(attemptId)`、`retryDeliveryHistoryPersistence(attemptId)`与`onPersistenceChange`是bound capability操作。ACK早于user保存；新C边界/最终receipt独立记录。可能执行事实优先于再次读盘/输入失效，不能因后来磁盘坏了变为“未执行”。最终receipt跨handle可读；无final只保守pending，无outcome，不从邻近settled猜。
+- 仅保存恢复按完整base指纹+本次完整已知记录前缀检查，原子补缺尾段/index；损坏、外来后续拒补，不截坏行、不重prompt。16MiB恢复预算、128详细receipt与最小seen身份保护、dispose expired均有实际回归。source保存成功后的首次入队由Window唯一状态归并推进；target补历史绝不启动Provider。
+
+属主实现及故障日志见[实施记录](docs/change/2026-10-15_change_complete-flow-core.md)。此接口发布不替代三适配器、Pipeline、Window/UI和独立桌面验收，也没有部署声明。
+
+**2026-10-15 非工具边界修复：** accepted/denied不自动等于工具事件。Core live/history同用结构判断，仅显式tool_call或非空toolName/嵌套call.name走工具projector；普通引擎/运输事实保原kind和实际scope/turn、安全summary与已知outcome，不造工具name/phase/call，不保未知raw detail。API无新字段。[独验红转绿与新候选](docs/fix/2026-10-15_fix_non-tool-event-routing.md)，原final-manifest保历史，新Service依赖需重测。

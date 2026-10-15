@@ -1,0 +1,267 @@
+✔ runtime resolution preserves each command default and explicit selection priority (0.54675ms)
+[message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md
+[message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+ans role run 会话失败：Core-managed tool display profile was not registered
+✖ root flag and env reach demo through actual Interface/Pipeline/Service handlers in both commands (46.532208ms)
+[message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md
+[message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+ans role run 会话失败：Core-managed tool display profile was not registered
+✖ root flag and env reach pi through actual Interface/Pipeline/Service handlers in both commands (3.598083ms)
+[message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md
+[message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+ans role run 会话失败：Core-managed tool display profile was not registered
+✖ root flag and env reach codex through actual Interface/Pipeline/Service handlers in both commands (2.224125ms)
+[message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md
+[message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+ans role run 会话失败：Core-managed tool display profile was not registered
+✖ root flag and env reach claude through actual Interface/Pipeline/Service handlers in both commands (1.929125ms)
+[message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md
+[message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+ans role run 会话失败：Core-managed tool display profile was not registered
+✖ root command defaults reach demo and Pi respectively through actual Service injection (2.021292ms)
+[message] 已解析角色 运行时核心（kind=project），角色卡：角色卡/运行时核心/role-card.md
+[message] 已解析边界，来源：角色卡/运行时核心/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] [装配演示假 runtime] 角色=运行时核心，脚本化发起 2 次写入（不经真实 Pi SDK，每次写入前经 gate 判定）。
+[tool_call] runtime 请求 write_file -> src/evil.ts
+[denied] 拒绝写入 src/evil.ts：目标路径未匹配任何边界条目（根：project）：src/evil.ts
+允许路径（按根分组）：
+  skill:
+    (无)
+  project:
+    - src/model/runtime.ts
+    - src/service/runtime/session.ts
+    - src/provider/runtime/tools.ts
+    - src/provider/runtime/schema.ts
+    - src/provider/runtime/session-store.ts
+    - src/common/runtime-core
+    - test/runtime-core
+    - 角色卡/运行时核心/feature-map.md
+    - 角色卡/运行时核心/memo.md
+    - 角色卡/运行时核心/changelog.md
+    - 角色卡/运行时核心/functional-description.md
+    - 角色卡/运行时核心/api-spec.md
+    - 角色卡/运行时核心/docs/design
+    - 角色卡/运行时核心/docs/feature
+    - 角色卡/运行时核心/docs/change
+    - 角色卡/运行时核心/docs/fix
+[tool_call] runtime 请求 write_file -> src/common/编排/output.ts
+[denied] 拒绝写入 src/common/编排/output.ts：目标路径未匹配任何边界条目（根：project）：src/common/编排/output.ts
+允许路径（按根分组）：
+  skill:
+    (无)
+  project:
+    - src/model/runtime.ts
+    - src/service/runtime/session.ts
+    - src/provider/runtime/tools.ts
+    - src/provider/runtime/schema.ts
+    - src/provider/runtime/session-store.ts
+    - src/common/runtime-core
+    - test/runtime-core
+    - 角色卡/运行时核心/feature-map.md
+    - 角色卡/运行时核心/memo.md
+    - 角色卡/运行时核心/changelog.md
+    - 角色卡/运行时核心/functional-description.md
+    - 角色卡/运行时核心/api-spec.md
+    - 角色卡/运行时核心/docs/design
+    - 角色卡/运行时核心/docs/feature
+    - 角色卡/运行时核心/docs/change
+    - 角色卡/运行时核心/docs/fix
+[settled] 会话结束（settled）
+[message] 已解析角色 Codex适配器（kind=project），角色卡：角色卡/Codex适配器/role-card.md
+[message] 已解析边界，来源：角色卡/Codex适配器/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] [装配演示假 runtime] 角色=Codex适配器，脚本化发起 2 次写入（不经真实 Pi SDK，每次写入前经 gate 判定）。
+[tool_call] runtime 请求 write_file -> src/evil.ts
+[denied] 拒绝写入 src/evil.ts：目标路径未匹配任何边界条目（根：project）：src/evil.ts
+允许路径（按根分组）：
+  skill:
+    (无)
+  project:
+    - src/provider/codex/session.ts
+    - src/common/codex-adapter
+    - test/codex-adapter
+    - 角色卡/Codex适配器/feature-map.md
+    - 角色卡/Codex适配器/memo.md
+    - 角色卡/Codex适配器/changelog.md
+    - 角色卡/Codex适配器/functional-description.md
+    - 角色卡/Codex适配器/api-spec.md
+    - 角色卡/Codex适配器/docs/design
+    - 角色卡/Codex适配器/docs/feature
+    - 角色卡/Codex适配器/docs/change
+    - 角色卡/Codex适配器/docs/fix
+[tool_call] runtime 请求 write_file -> src/common/编排/output.ts
+[denied] 拒绝写入 src/common/编排/output.ts：目标路径未匹配任何边界条目（根：project）：src/common/编排/output.ts
+允许路径（按根分组）：
+  skill:
+    (无)
+  project:
+    - src/provider/codex/session.ts
+    - src/common/codex-adapter
+    - test/codex-adapter
+    - 角色卡/Codex适配器/feature-map.md
+    - 角色卡/Codex适配器/memo.md
+    - 角色卡/Codex适配器/changelog.md
+    - 角色卡/Codex适配器/functional-description.md
+    - 角色卡/Codex适配器/api-spec.md
+    - 角色卡/Codex适配器/docs/design
+    - 角色卡/Codex适配器/docs/feature
+    - 角色卡/Codex适配器/docs/change
+    - 角色卡/Codex适配器/docs/fix
+[settled] 会话结束（settled）
+[message] 已解析角色 Claude适配器（kind=project），角色卡：角色卡/Claude适配器/role-card.md
+[message] 已解析边界，来源：角色卡/Claude适配器/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] [装配演示假 runtime] 角色=Claude适配器，脚本化发起 2 次写入（不经真实 Pi SDK，每次写入前经 gate 判定）。
+[tool_call] runtime 请求 write_file -> src/evil.ts
+[denied] 拒绝写入 src/evil.ts：目标路径未匹配任何边界条目（根：project）：src/evil.ts
+允许路径（按根分组）：
+  skill:
+    (无)
+  project:
+    - src/provider/claude/session.ts
+    - src/common/claude-adapter
+    - test/claude-adapter
+    - 角色卡/Claude适配器/feature-map.md
+    - 角色卡/Claude适配器/memo.md
+    - 角色卡/Claude适配器/changelog.md
+    - 角色卡/Claude适配器/functional-description.md
+    - 角色卡/Claude适配器/api-spec.md
+    - 角色卡/Claude适配器/docs/design
+    - 角色卡/Claude适配器/docs/feature
+    - 角色卡/Claude适配器/docs/change
+    - 角色卡/Claude适配器/docs/fix
+[tool_call] runtime 请求 write_file -> src/common/编排/output.ts
+[denied] 拒绝写入 src/common/编排/output.ts：目标路径未匹配任何边界条目（根：project）：src/common/编排/output.ts
+允许路径（按根分组）：
+  skill:
+    (无)
+  project:
+    - src/provider/claude/session.ts
+    - src/common/claude-adapter
+    - test/claude-adapter
+    - 角色卡/Claude适配器/feature-map.md
+    - 角色卡/Claude适配器/memo.md
+    - 角色卡/Claude适配器/changelog.md
+    - 角色卡/Claude适配器/functional-description.md
+    - 角色卡/Claude适配器/api-spec.md
+    - 角色卡/Claude适配器/docs/design
+    - 角色卡/Claude适配器/docs/feature
+    - 角色卡/Claude适配器/docs/change
+    - 角色卡/Claude适配器/docs/fix
+[settled] 会话结束（settled）
+✔ new accepted runtime role cards can be reached from root fallback without adding task writes (7.440083ms)
+✔ actual bin default pi Provider fails honestly for missing configuration in role and govern (393.09275ms)
+✔ actual bin default codex Provider fails honestly for missing configuration in role and govern (384.322416ms)
+✔ actual bin default claude Provider fails honestly for missing configuration in role and govern (703.966125ms)
+✔ SDK loading is lazy for module import, help and doctor, including command help (735.956584ms)
+✔ root source depends only on Interface entry, Model and support modules (0.272209ms)
+✔ actual bin missing SDK errors are honest and masked without starting model requests (544.872125ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 8
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2886.859333
+
+✖ failing tests:
+
+test at test/装配/multi-runtime.test.ts:68:3
+✖ root flag and env reach demo through actual Interface/Pipeline/Service handlers in both commands (46.532208ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E8%A3%85%E9%85%8D/multi-runtime.test.ts:76:16)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/装配/multi-runtime.test.ts:68:3
+✖ root flag and env reach pi through actual Interface/Pipeline/Service handlers in both commands (3.598083ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E8%A3%85%E9%85%8D/multi-runtime.test.ts:76:16)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/装配/multi-runtime.test.ts:68:3
+✖ root flag and env reach codex through actual Interface/Pipeline/Service handlers in both commands (2.224125ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E8%A3%85%E9%85%8D/multi-runtime.test.ts:76:16)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/装配/multi-runtime.test.ts:68:3
+✖ root flag and env reach claude through actual Interface/Pipeline/Service handlers in both commands (1.929125ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E8%A3%85%E9%85%8D/multi-runtime.test.ts:76:16)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/装配/multi-runtime.test.ts:97:1
+✖ root command defaults reach demo and Pi respectively through actual Service injection (2.021292ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E8%A3%85%E9%85%8D/multi-runtime.test.ts:102:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

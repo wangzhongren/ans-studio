@@ -31,7 +31,8 @@ import type { ResolvedRole } from "../../model/role.ts";
 import type {
   WriteGate, RoleSession, RuntimeAdapter, SessionEvent, PromptImage, PromptOptions,
   RuntimeProviderOptions, RuntimeSessionStorage, RuntimeContextSource,
-  ToolDefinition as GovernedTool,
+  ToolDefinition as GovernedTool, RuntimeToolEventProjector, RuntimeToolResultFactsV1,
+  RuntimeToolErrorFactsV1, RuntimeToolInputFactsV1, ToolDisplayInputRuleV1, RuntimeToolEventSource,
 } from "../../model/runtime.ts";
 import { selectNativeSessionManager, sessionFileHasForeignToolChangeBlocks } from "./native-session.ts";
 export { sessionFileHasForeignToolChangeBlocks } from "./native-session.ts";
@@ -310,6 +311,34 @@ function renderSystemPrompt(role: ResolvedRole): string {
 
 // —————————————————————— 受治理工具 → Pi 自定义工具 ——————————————————————
 
+function projectToolEvent(projector: RuntimeToolEventProjector, source: RuntimeToolEventSource): SessionEvent {
+  try { return projector(source); }
+  catch { return { kind: "message", summary: "工具显示投影失败", detail: { version: 1, source: "tool-display-diagnostic", code: "PROJECTION_FAILED" } }; }
+}
+
+interface PiCallFacts {
+  turnId?: string;
+  input?: RuntimeToolInputFactsV1;
+  result?: RuntimeToolResultFactsV1;
+  error?: RuntimeToolErrorFactsV1;
+}
+interface PiToolEventContext {
+  currentTurnId?: () => string | undefined;
+  diagnostics?: DiagnosticLog;
+  projectToolEvent?: RuntimeToolEventProjector;
+  callFacts?: Map<string, PiCallFacts>;
+  inputRules?: ReadonlyMap<string, ToolDisplayInputRuleV1 | undefined>;
+  roleId?: string;
+}
+// Only display-eligible argument keys may be retained across the SDK hook boundary.
+function displayInput(rule: ToolDisplayInputRuleV1 | undefined, args: unknown): RuntimeToolInputFactsV1 {
+  const raw = args !== null && typeof args === "object" ? args as Record<string, unknown> : {};
+  const keys = rule === "core-path-v1" ? ["path", "file_path", "filePath"] : rule === "core-command-v1" ? ["command", "cmd"] : [];
+  const selected: Record<string, unknown> = {};
+  for (const key of keys) if (key in raw) selected[key] = typeof raw[key] === "string" || raw[key] === null || raw[key] === undefined ? raw[key] : false;
+  return { rule, args: selected };
+}
+
 /**
  * 把受治理工具转成 Pi 的 customTools 条目。
  * - parameters 用普通 JSON-Schema 形状（不引入 TypeBox 依赖）；
@@ -319,7 +348,7 @@ function renderSystemPrompt(role: ResolvedRole): string {
  *
  * 导出供**接线实测**使用（test/pi-adapter 的 executionMode 用例直接走本函数再进真实会话链路）。
  */
-export function toPiTool(tool: Pick<GovernedTool, "name" | "handler"> & Partial<Omit<GovernedTool, "name" | "handler">>, context?: { currentTurnId?: () => string | undefined; diagnostics?: DiagnosticLog }): ToolDefinition {
+export function toPiTool(tool: Pick<GovernedTool, "name" | "handler"> & Partial<Omit<GovernedTool, "name" | "handler">>, context?: PiToolEventContext): ToolDefinition {
   const { parameters, description, promptGuidelines, executionMode } = tool.inputSchema === undefined
     ? describeTool(tool.name) // v1 name+handler helper compatibility only
     : { parameters: tool.inputSchema, description: tool.description ?? tool.name,
@@ -340,14 +369,17 @@ export function toPiTool(tool: Pick<GovernedTool, "name" | "handler"> & Partial<
       const turnId = context?.currentTurnId?.();
       const path = extractCallPath(record);
       const began = Date.now();
+      const facts = context?.callFacts?.get(toolCallId);
       context?.diagnostics?.record("tool.start", { turnId, toolCallId, toolName: tool.name, path });
       let result: Awaited<ReturnType<GovernedTool["handler"]>>;
       try {
         result = await tool.handler({ name: tool.name, args: record, toolCallId, signal });
       } catch (error) {
+        if (facts && error instanceof Error) facts.error = { message: error.message };
         context?.diagnostics?.error("tool.result", error, { turnId, toolCallId, toolName: tool.name, path, ok: false, durationMs: Date.now() - began });
         throw error;
       }
+      if (facts) facts.result = { ok: result.ok, message: result.message, ...(result.execution ? { execution: { ...result.execution } } : {}) };
       const details = {
         turnId, toolCallId, toolName: tool.name, path, ok: result.ok,
         status: result.ok ? "completed" : "failed", durationMs: Date.now() - began,
@@ -421,12 +453,19 @@ export function buildGovernanceExtension(
   gate: WriteGate,
   emit: (event: SessionEvent) => void,
   shellArmed: boolean,
-  context?: { currentTurnId?: () => string | undefined; diagnostics?: DiagnosticLog; allowedToolNames?: ReadonlySet<string> },
+  context?: PiToolEventContext & { allowedToolNames?: ReadonlySet<string> },
 ): { name: string; factory: (pi: ExtensionAPI) => void } {
   return {
     name: "ans-governance",
     factory: (pi: ExtensionAPI): void => {
       const calls = new Map<string, { turnId?: string; path?: string }>();
+      const facts = context?.callFacts ?? new Map<string, PiCallFacts>();
+      const blocked = (event: ToolCallEvent, reason: string, legacy: SessionEvent): void => {
+        if (!context?.projectToolEvent) { emit(legacy); return; }
+        const call = facts.get(event.toolCallId);
+        if (!call) { emit(projectToolEvent(context.projectToolEvent, { origin: "diagnostic", code: "CALL_CONTEXT_UNATTRIBUTED" })); return; }
+        emit(projectToolEvent(context.projectToolEvent, { origin: "governance-hook", phase: "blocked", runtime: "pi", roleId: context.roleId, turnId: call.turnId, toolCallId: event.toolCallId, toolName: event.toolName, input: call.input, result: { ok: false, message: reason } }));
+      };
       // 工具调用前的治理拦截点（唯一经文可注册的 tool_call 钩子）。
       pi.on("tool_call", (event: ToolCallEvent): ToolCallEventResult | undefined => {
         const input = (event as { input?: unknown }).input;
@@ -440,17 +479,13 @@ export function buildGovernanceExtension(
         if (context?.allowedToolNames !== undefined) {
           if (context.allowedToolNames.has(event.toolName)) return undefined;
           const reason = `非注入的 ANS 工具，拒绝执行：${event.toolName}`;
-          emit({ kind: "denied", summary: reason, detail: { ...identity, toolName: event.toolName } });
+          blocked(event, reason, { kind: "denied", summary: reason, detail: { ...identity, toolName: event.toolName } });
           return { block: true, reason };
         }
         const kill = event.toolName === "run_shell" && !shellArmed
           ? { block: true as const, reason: "run_shell 未注入 ShellGate，拒绝执行" } : undefined;
         if (kill !== undefined) {
-          emit({
-            kind: "denied",
-            summary: kill.reason,
-            detail: { ...identity, toolName: event.toolName },
-          });
+          blocked(event, kill.reason, { kind: "denied", summary: kill.reason, detail: { ...identity, toolName: event.toolName } });
           return kill;
         }
         // run_shell 已 arm：直接放行（每调用保证在 execute 的审核链，不在此处）。
@@ -464,7 +499,7 @@ export function buildGovernanceExtension(
         if (decision.allowed) return undefined;
 
         const reason = formatDenialMessage(decision);
-        emit({ kind: "denied", summary: reason, detail: { ...identity, toolName: event.toolName, path } });
+        blocked(event, reason, { kind: "denied", summary: reason, detail: { ...identity, toolName: event.toolName, path } });
         // fail-closed：写之前阻断，绝不执行。
         return { block: true, reason };
       });
@@ -473,13 +508,21 @@ export function buildGovernanceExtension(
       pi.on("tool_execution_start", (event): void => {
         const metadata = { turnId: context?.currentTurnId?.(), path: extractCallPath(event.args) };
         calls.set(event.toolCallId, metadata);
+        const call = { turnId: metadata.turnId, input: displayInput(context?.inputRules?.get(event.toolName), event.args) };
+        facts.set(event.toolCallId, call);
         context?.diagnostics?.record("tool.execution.start", { ...metadata, toolName: event.toolName, toolCallId: event.toolCallId });
+        if (context?.projectToolEvent) {
+          emit(projectToolEvent(context.projectToolEvent, { origin: "native-start", phase: "start", runtime: "pi", roleId: context.roleId, toolName: event.toolName, toolCallId: event.toolCallId, ...call }));
+          return;
+        }
         emit({ kind: "tool_call", summary: `模型请求调用 ${event.toolName}${metadata.path !== undefined ? `（目标：${metadata.path}）` : ""}`, detail: { ...metadata, toolName: event.toolName, toolCallId: event.toolCallId, phase: "start" } });
       });
 
       pi.on("tool_execution_end", (event): void => {
         const metadata = calls.get(event.toolCallId);
         calls.delete(event.toolCallId);
+        const call = facts.get(event.toolCallId);
+        facts.delete(event.toolCallId);
         const result = event.result.details !== null && typeof event.result.details === "object" ? event.result.details as Record<string, unknown> : {};
         const detail = {
           turnId: typeof result.turnId === "string" ? result.turnId : metadata?.turnId,
@@ -489,6 +532,11 @@ export function buildGovernanceExtension(
           ...(event.isError ? { errorCode: result.errorCode === "ABORTED" ? "ABORTED" : "TOOL_FAILED" } : {}),
         };
         context?.diagnostics?.record("tool.execution.result", detail);
+        if (context?.projectToolEvent) {
+          const content = Array.isArray(event.result.content) ? event.result.content.map((block: unknown) => { const item = block !== null && typeof block === "object" ? block as Record<string, unknown> : {}; return item.type === "text" && typeof item.text === "string" ? { type: "text" as const, text: item.text } : { type: "unsupported" as const }; }) : [{ type: "unsupported" as const }];
+          emit(projectToolEvent(context.projectToolEvent, { origin: "native-result", phase: "result", runtime: "pi", roleId: context.roleId, toolName: event.toolName, toolCallId: event.toolCallId, turnId: call?.turnId ?? (typeof result.turnId === "string" ? result.turnId : undefined), input: call?.input, result: call?.result, error: call?.error ?? (result.errorCode === "ABORTED" || result.errorCode === "TOOL_FAILED" ? { code: result.errorCode } : undefined), durationMs: event.durationMs, native: { isError: event.isError, content } }));
+          return;
+        }
         emit({
           kind: event.isError ? "denied" : "accepted",
           summary: `${event.toolName} 执行${event.isError ? "失败" : "完成"}`,
@@ -750,7 +798,10 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
           opts.constructTimeoutMs ?? readTimeoutMs(process.env, CONSTRUCT_TIMEOUT_ENV, DEFAULT_CONSTRUCT_TIMEOUT_MS);
         const promptMs =
           opts.promptTimeoutMs ?? readTimeoutMs(process.env, PROMPT_TIMEOUT_ENV, DEFAULT_PROMPT_TIMEOUT_MS);
-        const cfg = opts.config ?? resolvePiProviderConfig(opts, process.env);
+        if (opts.toolDisplayMode === "required-v1" && (typeof opts.projectToolEvent !== "function" || typeof opts.registerToolDisplayProfile !== "function")) throw new Error("Pi required-v1 tool display capabilities are missing");
+        const profileEnv = { ...process.env };
+        const cfg = opts.config ?? resolvePiProviderConfig(opts, profileEnv);
+        opts.registerToolDisplayProfile?.({ apiKeyEnvVar: cfg.apiKeyEnvVar, credentials: [...new Set([cfg.apiKeyEnvVar, ...(opts.toolDisplayCredentialEnvNames ?? [])])].map(name => ({ name, value: profileEnv[name] })) });
         log.trace(`构造单步时限=${constructMs}ms，prompt 时限=${promptMs}ms`);
 
         // 直接使用 Service 注入的交互闸（设计 G-1）：等待客户期间暂停每轮硬超时，
@@ -790,11 +841,13 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
         let lifecycle!: TurnLifecycle;
         const emit = (event: SessionEvent): void => {
           const detail = event.detail !== null && typeof event.detail === "object" ? event.detail : {};
-          const turnId = (detail as { turnId?: string }).turnId ?? lifecycle.currentTurnId();
+          const isToolProjection = opts.projectToolEvent !== undefined && (typeof (detail as { toolName?: string }).toolName === "string" || (detail as { source?: string }).source === "tool-display-diagnostic");
+          const turnId = event.turnId ?? (detail as { turnId?: string }).turnId ?? (isToolProjection ? undefined : lifecycle.currentTurnId());
           queue.push({ ...event, runtime: "pi", roleId: role.id, turnId, detail: { turnId, ...detail } });
         };
         lifecycle = createTurnLifecycle(emit, diagnostics, opts.currentTurnId);
-        const turnContext = { currentTurnId: lifecycle.currentTurnId, diagnostics };
+        const callFacts = new Map<string, PiCallFacts>();
+        const turnContext: PiToolEventContext = { currentTurnId: lifecycle.currentTurnId, diagnostics, projectToolEvent: opts.projectToolEvent, callFacts, roleId: role.id, inputRules: new Map(governedTools.map(tool => [tool.name, tool.displayInputRule])) };
         // 缺失上下文窗口的可见提示也进入事件流，确保界面/用户看得到（不只留在日志里）。
         if (contextWindowNotice !== undefined) emit({ kind: "message", summary: contextWindowNotice });
 
@@ -892,7 +945,7 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
 
         // 会话组装抽为 `makeRoleSession`（提案 P0-2「停当前轮次」）：prompt/events/dispose 逐字旧行为，
         // 另透传 abort（SDK session.abort()——语义与核实依据见该函数文档）。
-        const roleSession = makeRoleSession({ session, promptMs, gate: interactionGate, emit, log, queue, unsubscribe, lifecycle, diagnostics, abortTimeoutMs: 900, strictLifecycle: true, emitPromptInput: false });
+        const roleSession = makeRoleSession({ session, promptMs, gate: interactionGate, emit, log, queue, unsubscribe: () => { unsubscribe(); callFacts.clear(); }, lifecycle, diagnostics, abortTimeoutMs: 900, strictLifecycle: true, emitPromptInput: false });
         roleSession.runtime = "pi";
         roleSession.roleId = role.id;
         roleSession.contextSource = sessionSelection.contextSource ?? (sessionSelection.mode === "in-memory" ? "in-memory" : sessionSelection.mode === "resumed" ? "resumed" : sessionSelection.note ? "recovered" : "fresh");

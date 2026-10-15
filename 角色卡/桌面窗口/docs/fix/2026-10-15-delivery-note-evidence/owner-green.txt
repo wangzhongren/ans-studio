@@ -1,0 +1,39 @@
+✔ H-1 路由：su 派发 → 目标未开**自动开**并收到派发输入（模板文案）；su 与目标两边都有系统行 (186.488792ms)
+✔ H-1 排队：目标忙 ⇒ 入队；其 settled 后按序放行（绝不并发 send） (313.056ms)
+✔ H-1 失败保留：投递失败 ⇒ 如实系统行（未丢弃）+ 放回队首；下次时机成功送达 (334.159375ms)
+✔ H-1 校验（如实回执，不静默）：非本项目角色 / 内置治理角色（含 su 自身）/ 空参数 → {ok:false} + 系统行 (30.549667ms)
+✔ H-1 去重：同一派发在**队列期**重复调用 → 去重（只投一次）；送达后同文再派 → 放行（返工回路） (362.774916ms)
+✔ 真机崩溃修复（钉子）：派发条目**不走 handback 渲染**；坏回交并入同一机也不炸、零未捕获拒绝 (404.673417ms)
+✔ H-1 闭环：su 派发 → 角色回交 → su 收到报告；不重复、不空转（EC-1 后无自激） (424.712542ms)
+✔ delivery notes are typed system messages, never ghost tools or extra prompts on the actual dispatch path (203.420084ms)
+✔ 首轮寻址①（管理器）：缓存 miss ⇒ 实时重枚举一次 ⇒ 受理 + drain 自动开启新角色并投递；仍无/重枚举抛错都如实 (248.64775ms)
+✔ 首轮寻址②（Interface 集成）：真实接线——导入时空项目、角色随后落盘，同一轮派发照样寻址（刷同一份共享缓存） (244.108792ms)
+✔ E-1 投递：A 的回交到达 → **自动开启 su** 并把 `renderHandbackPrompt` 原文投给 su（单一来源） (186.192208ms)
+✔ E-1 去重：同一条回交重复到达（重放）→ **只投递一次** (182.571ms)
+✔ E-1 排队：su 忙时保留，settle 后连续回交按原序合成一次验收输入 (465.575833ms)
+✔ 连续回交投递失败：整批保留同序，重试送达一次，原报告键不丢 (28.481708ms)
+✔ 客户消息屏障：A报告→客户消息→B报告，不跨消息合批或改变顺序 (40.3805ms)
+✔ 常规检查宿主政策实际注入项目角色，su不接委托免确认 (1.585291ms)
+✔ E-1 开启失败：如实系统行（含原因与重试时机）+ **保留回交**；下次时机成功投递（绝不静默丢） (333.89875ms)
+✔ 真机崩溃修复：坏形状回交事件（缺载荷/缺 roleId）→ 不投递、如实系统行、**零未捕获拒绝** (281.745792ms)
+✔ E-1 投递失败：如实系统行（含原因）+ 放回队首保留；重试成功后送达（顺序与内容不损） (332.41675ms)
+✔ C Window merges source saved-before-business and retry Promise/change orders into one enqueue (25.737375ms)
+✔ C frozen batch retries keep members and delivery ID while later reports stay separate (38.592917ms)
+✔ C possible provider start and unknown failure do not automatically prompt again (146.262792ms)
+✔ C target history retry is one storage operation, read-only queries do not prompt, replaced handles expire (13.514917ms)
+✔ C disabled and unknown-live source facts preserve live delivery without inventing durable report IDs (23.534458ms)
+✔ L-1 入队：忙时客户消息**入队**（不再直接失败）——位次如实、settled 后按到达序自动放行、摘要入快照 (340.776084ms)
+✔ L-1 位次与摘要截断：第 1、2 位如实；超长文本摘要截断（不铺全文） (32.1055ms)
+✔ L-1 失败语义不变：排队消息投递失败 ⇒ 如实系统行（未丢弃）+ 放回队首；下次时机成功送达 (332.587666ms)
+✔ L-1 传输失败仍如实回错：空闲路径的 send 失败 = {ok:false,error}（并**不**虚报忙态） (32.333083ms)
+✔ 状态准确性（复现 vs 修后）：投递开跑的后台轮次——旧事实组合派生「空闲」（复现），真实快照 busy 派生「工作中」（修后） (700.356083ms)
+✔ 状态准确性：队列待办的角色不得显示「空闲」——快照(queueDepth) + 徽标「工作中 · N 待办」 (33.042167ms)
+✔ 接线钉子：role-state 通道两端齐备；忙态判据只在主进程（会话 busy × 队列深度）；渲染侧**无**界面侧推测 (1.06075ms)
+ℹ tests 31
+ℹ suites 0
+ℹ pass 31
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2426.294708

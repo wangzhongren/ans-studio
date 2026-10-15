@@ -1,0 +1,54 @@
+✔ injected schema/description/executionMode override legacy name lookup and exact SDK signal reaches handler (0.704667ms)
+✔ production hook denies every native or unregistered tool and permits only injected names (0.321375ms)
+✔ actual production bind registers injected tools only, freezes definition and emits exact Service turn (452.231833ms)
+✔ Service -> real Pi native wiring shares injected wait gate, captured customer context and one terminal (424.405ms)
+✔ Pi cancellation forwards original customer signal; late consent stays aborted across next turn (16.420291ms)
+✔ native Pi storage starts fresh then restores actual native context, separate from ANS replay (16.718083ms)
+✔ Pi legacy file migrates to native copy, retains original ID/context and never appends old role file (8.848167ms)
+✔ malformed native history rebuilds with recovered warning; never reads sibling Codex/Claude files (11.44075ms)
+✔ store validate callback rejects directory symlink before Pi parse or new native write (3.928708ms)
+✔ Pi storage refuses file symlink and role/runtime mismatch without touching other storage (4.378917ms)
+[pi] 未配置上下文窗口（opts.contextWindow 与 ANS_PI_CONTEXT_WINDOW 均未给出）：已采用保守默认值 32768 tokens。默认偏小 → 压缩可能提前触发（良性）；如需精确值，请设置 ANS_PI_CONTEXT_WINDOW 或传入 opts.contextWindow。
+[pi] 加载 Pi 包…
+[pi] 构造显式 provider…
+[pi] resourceLoader.reload…
+[pi] createAgentSession…
+[pi] bindRole 完成
+✔ public injected factory accepts Model shape and keeps compose/load free of filesystem effects (4.441916ms)
+✔ migrated Service/Pi timers honor legacy env once and native timeout normalizes to one timed_out terminal (50.971416ms)
+✔ native stop cleanup rejects promptly and quarantines actual bound session when SDK cannot finish (907.294875ms)
+✔ Service saves actual fresh/resumed/recovered Pi metadata and public replay remains runtime-isolated (69.492833ms)
+✔ 契约：PromptImage 与 pi-ai ImageContent 结构兼容（编译期）且键恰为 {type,data,mimeType} (2.058959ms)
+✔ makeRolePrompt: standalone input echo has typed identity; Core production can suppress it without losing images (1.19925ms)
+✔ makeRolePrompt: SDK option allowlist strips Core provenance, presentation and progress while preserving original text/images (0.102958ms)
+✔ makeRolePrompt：无图 → 逐字旧行为（不传 options；事件文案不变） (0.085958ms)
+✔ makeRolePrompt：带图 → 原样透传（同一数组引用）+ 事件可见「附 N 张图片」 (0.090542ms)
+✔ makeRolePrompt：空数组 = 无图（不传 options、文案不变） (0.074875ms)
+✔ makeRolePrompt：失败 → 事件「pi 适配器中止」+ abort 底层 + 原错误上抛（既有语义不变） (0.378125ms)
+✔ fake 适配器：带图不破（事件可见张数）；文本路径事件逐字不变 (1.404709ms)
+✔ SDK 级（faux provider，离线）：有效图进入 LLM 转录；无效图被**显式省略**（注记可见，非静默） (505.943709ms)
+ℹ 有效图逐字进转录；无效图显式省略（注记可见）
+✔ real SDK nine tool names, sequential: handler once/start once/result once (530.429458ms)
+✔ real SDK nine tool names, parallel: handler once/start once/result once (28.502792ms)
+✔ real SDK whitelist: no handler effect, canonical start and true failure remain (13.969125ms)
+✔ real SDK write-denied: no handler effect, canonical start and true failure remain (10.06225ms)
+✔ real SDK shell-denied: no handler effect, canonical start and true failure remain (13.458541ms)
+✔ real SDK missing: no handler effect, canonical start and true failure remain (14.699625ms)
+✔ real SDK invalid: no handler effect, canonical start and true failure remain (9.861083ms)
+✔ real SDK throw: no handler effect, canonical start and true failure remain (10.051584ms)
+✔ mapping preserves different turns, duplicate/late failed ends and legacy missing identity without text guesses (0.208416ms)
+✔ required-v1 missing capabilities rejects before SDK; actual config override profile registers first (463.566459ms)
+✔ Core -> actual Pi -> real read/ENOENT/shell: display projected, execution remains private, SDK content unchanged (83.227083ms)
+✔ native bridge preserves handler result/throw and unsupported content, call identity and rule; metadata is not SDK options (14.451ms)
+✔ injected projector throw emits safe diagnostic without failing actual handler or model (7.61475ms)
+✔ all nine injected names project start/result once; real declared rule wins over tool name; blocked and failed native end coexist (79.258958ms)
+✔ real Pi SDK receives original prompt and image reference only; Core-only metadata never enters SDK/transcript (26.80175ms)
+✔ real Pi shell exit0, spawn failure, signal and review denial retain actual process facts without invented exit (44.089417ms)
+ℹ tests 39
+ℹ suites 0
+ℹ pass 39
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2143.438667

@@ -1,0 +1,56 @@
+✔ 语法：标题/粗斜/行内码/引用/列表/围栏码/链接/段落换行（markdown-it 输出形状） (2.653042ms)
+✔ XSS 负例（护栏）：<script>/<img onerror>/javascript: 链接/引号注入 href/图片/表格单元格——一律不产可执行 HTML (0.64275ms)
+✔ 配置钉子：options.html 必须为 false（误开成 true 本测试必红）；并现场演示「开了会怎样」 (0.360917ms)
+✔ 库文件 pin：vendor 的 markdown-it 单文件 sha256 与记录一致（静默换文件/升级未同步必红） (0.669416ms)
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/renderer.test.ts:35
+
+test("V2r1：真实 Pi/Codex/Claude 可选，保留单一写入语义和退役 DOM 守卫"", () => {
+                                                                       ^^^^^^^^^^
+  // 选择器相关 DOM/事件/样式已清干净，且留守卫（断言不存在，防止回潮）。
+
+SyntaxError [ERR_INVALID_TYPESCRIPT_SYNTAX]: Expected ',', got 'string literal'
+    at parseTypeScript (node:internal/modules/typescript:72:36)
+    at processTypeScriptCode (node:internal/modules/typescript:146:42)
+    at stripTypeScriptModuleTypes (node:internal/modules/typescript:209:22)
+    at ModuleLoader.<anonymous> (node:internal/modules/esm/translators:640:29)
+    at #translate (node:internal/modules/esm/loader:473:20)
+    at afterLoad (node:internal/modules/esm/loader:529:29)
+    at ModuleLoader.loadAndTranslate (node:internal/modules/esm/loader:534:12)
+    at #getOrCreateModuleJobAfterResolve (node:internal/modules/esm/loader:577:36)
+    at afterResolve (node:internal/modules/esm/loader:625:52)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:631:12) {
+  code: 'ERR_INVALID_TYPESCRIPT_SYNTAX'
+}
+
+Node.js v24.14.0
+✖ test/桌面应用/renderer.test.ts (66.229209ms)
+✔ 三元视图身份不串项目或引擎，旧缺身份只兼容 Pi (0.470917ms)
+✔ 只按 IPC 组摘要分组：组长置前、未知职责原文保留、缺组不推权限 (0.330042ms)
+✔ 设置来源和应用时点只呈现窗口实际字段 (0.256833ms)
+✔ 上下文未知/只读历史不冒充原生恢复；重建原因准确呈现 (0.140125ms)
+✔ 实际工具元数据保留 turn/call/runtime；未报告结果不称完成 (0.297833ms)
+✔ renderer 仅消费 IPC，机密为空且无持久化，切引擎不停止后台任务 (0.602875ms)
+✔ activity facts: accepted alone is unknown; explicit result succeeds; old call remains call (0.665625ms)
+✔ known own tool first-line failures remain visible even with historical isError=false (0.610833ms)
+✔ tool replay state changes invalidate equality without exposing body (0.109709ms)
+✔ execution-before-denial never claims execution failed; known failures keep exact visible first line (0.074417ms)
+✔ full known target survives slim summary for default failure location (0.068ms)
+✔ orphan own read_file failure keeps explicit first-line target without inspecting body (0.086041ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 16
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 97.84725
+
+✖ failing tests:
+
+test at test/桌面应用/renderer.test.ts:1:1
+✖ test/桌面应用/renderer.test.ts (66.229209ms)
+  'test failed'

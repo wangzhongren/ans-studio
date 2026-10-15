@@ -1,0 +1,13 @@
+{
+  "producer": "root fixed测试",
+  "initial": "Independent renderer exited0/14 assertions but log No handler registered runtime-config:get",
+  "classification": "test fixture missing an already-existing public IPC, not a product regression",
+  "fixScope": [
+    "test/测试/uiux-v2-renderer-regression.mjs",
+    "test/测试/uiux-anchor-drift-probe.mjs",
+    "test/测试/uiux-rowgap-detached-probe.mjs"
+  ],
+  "change": "contract-compatible fake runtime config; older probes also now return only exact own already-pushed history/current pi live views",
+  "assertionsChanged": 0,
+  "baselineOtherGate": "Intermediate Node full1379/1378pass0fail1WindowsSkip; final renderer/CSS selector patch still in progress, not final result"
+}

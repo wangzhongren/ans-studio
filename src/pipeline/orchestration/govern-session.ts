@@ -40,11 +40,10 @@ import type { TaskScope } from "../../model/decision.ts";
 import type { Acceptance, BoundarySection1 } from "../../model/boundary.ts";
 import type {
   RuntimeKind,
-  PromptOptions,
   CustomerInputFn,
   SessionEvent,
 } from "../../model/runtime.ts";
-import { openRoleSession, isFailedSettlement, type RoleSessionDeps, type RoleSessionHandle } from "./run-role.ts";
+import { openRoleSession, isFailedSettlement, type RoleSessionDeps, type RoleSessionHandle, type RoleSessionSendOptions } from "./run-role.ts";
 import { listProject, resolveRole } from "../../service/role/resolve-role.ts";
 import { formatEvent } from "../../common/编排/output.ts";
 import type { OrchestrationEvent } from "../../common/编排/handback.ts";
@@ -106,7 +105,7 @@ export interface GovernanceSessionHandle extends RoleSessionHandle {
   /** 目标项目目录（透传自输入；缺省 undefined = 装配默认 ans-cli 自身）。 */
   targetDir?: string;
   /** 发送一轮输入；可反复调用（同一会话，不重建）。 */
-  send(text: string, opts?: PromptOptions): Promise<void>;
+  send(text: string, opts?: RoleSessionSendOptions): Promise<void>;
   /** 持续的事件流（含 settle 时的 handback 事件）；跨多轮累积。 */
   events(): AsyncIterable<OrchestrationEvent>;
   /** 收口：释放底层会话（幂等）；出错如实抛出。 */
@@ -176,6 +175,12 @@ export async function openGovernanceSession(
     get contextSource() { return handle.contextSource; },
     get nativeSessionId() { return handle.nativeSessionId; },
     get contextWarning() { return handle.contextWarning; },
+    get persistenceMode() { return handle.persistenceMode; },
+    retryReportPersistence: (id) => handle.retryReportPersistence!(id),
+    getReportPersistence: (id) => handle.getReportPersistence!(id),
+    retryDeliveryHistoryPersistence: (id) => handle.retryDeliveryHistoryPersistence!(id),
+    getDeliveryReceipt: (id) => handle.getDeliveryReceipt!(id),
+    onPersistenceChange: (listener) => handle.onPersistenceChange!(listener),
     abort: () => handle.abort!(),
     governanceRoleId: govId,
     boundarySource: resolved.boundarySource,

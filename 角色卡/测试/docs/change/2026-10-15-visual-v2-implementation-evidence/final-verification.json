@@ -1,0 +1,214 @@
+{
+  "status": "verified",
+  "at": "2026-10-15T09:34:16.950526+00:00",
+  "producer": "root fixed 测试; actual native Electron via CUA",
+  "sourceFiles": {
+    "app/renderer/index.html": "7beda47c504c81ba8a7748b407eb60efc27ec531e936d93868a9480528514f00",
+    "app/renderer/styles.css": "df554f8760809edf09184a824876012cf0d41feadffc518dacb34c05573f7469",
+    "app/renderer/renderer.js": "5324b786162b46962d03ff698a3e562963df82c33b16c4a8dc177b39e253b4c3",
+    "app/renderer/tool-rows.js": "a4d86a1c8c45a4c84ed9cd283596d164c63833849899bb05bfcbf0379901d4bd",
+    "app/renderer/runtime-ui.js": "47b136e300389ff3e3d3b67e3a5995f801dce9f3330b3520e8dbeffaabf87b26",
+    "app/renderer/role-status.js": "2daab2f108e3351f6143270f18d7f07dddeb48ae9408ba545fda6ffc5c7aeec5",
+    "app/desktop/session.ts": "1e623ae7f71462d80bb69eb3e464a1bdd2dcb8c45b0907dc60646c9a6d749df1"
+  },
+  "changedSinceTaskStart": [
+    "app/renderer/renderer.js",
+    "app/renderer/index.html",
+    "app/renderer/styles.css",
+    "app/renderer/tool-rows.js",
+    "app/desktop/session.ts",
+    "test/桌面应用/message-queue.test.ts",
+    "test/桌面应用/renderer.test.ts",
+    "test/桌面应用/dispatch-delivery.test.ts",
+    "test/桌面应用/tool-rows.test.ts",
+    "test/桌面应用/handback-delivery.test.ts",
+    "test/测试/uiux-rowgap-detached-probe.mjs",
+    "test/测试/uiux-anchor-drift-probe.mjs",
+    "test/测试/uiux-v2-renderer-regression.mjs",
+    "test/桌面应用/e2e/uiux-v2.mjs"
+  ],
+  "acceptedV2Unchanged": true,
+  "r2Frozen13Unchanged": true,
+  "realEnvUnchanged": true,
+  "oldUncommittedWorkPreserved": true,
+  "gates": {
+    "node": {
+      "total": 1385,
+      "pass": 1384,
+      "fail": 0,
+      "skip": 1,
+      "skipReason": "Windows-only case-insensitive path on macOS",
+      "exit": 0
+    },
+    "typecheckExit": 0,
+    "independentElectronScriptsExit": [
+      0,
+      0,
+      0
+    ],
+    "rowgapMiss": "0/20",
+    "note": "renderer14 and anchor4 are observation/report records, not test counts",
+    "diffCheckExit": 0
+  },
+  "native": {
+    "projectRoot": "/private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-p1p7-desktop-JqO4lM",
+    "onlineEngine": "Pi",
+    "suUserInputs": 9,
+    "workerInputs": 2,
+    "formalDispatchStarts": 2,
+    "reports": [
+      {
+        "reportId": "8b6c9ca7a44fda52112515ef224920d319cfa7c75c72c8c768ed4086fd5b84cd",
+        "at": "2026-10-15T08:05:55.610Z",
+        "status": "completed"
+      },
+      {
+        "reportId": "446dd7fe21b53dc0f5324e560106645806f075476f1a33005f13c4f1c9f2ffb9",
+        "at": "2026-10-15T08:46:35.455Z",
+        "status": "completed"
+      }
+    ],
+    "receipts": [
+      {
+        "version": 1,
+        "deliveryId": "656144c6-5594-4912-a443-9381ff08f02e",
+        "attemptId": "414caa7d-a3ce-4692-8ea4-1df8ae819cb3",
+        "inputSaved": true,
+        "providerMayHaveStarted": true,
+        "history": "saved",
+        "retryHistoryAvailable": false,
+        "retryDeliveryAllowed": false,
+        "turnId": "ab929347-7181-49d0-9051-f9c5f28c0802",
+        "outcome": "completed"
+      },
+      {
+        "version": 1,
+        "deliveryId": "ec5f7ecf-e7ce-4953-b099-58e1cd39b58f",
+        "attemptId": "4ad312b8-d404-4b83-b82c-0daa5fce31f7",
+        "inputSaved": true,
+        "providerMayHaveStarted": true,
+        "history": "saved",
+        "retryHistoryAvailable": false,
+        "retryDeliveryAllowed": false,
+        "turnId": "f3f21936-3058-4e38-93e2-7a887c224236",
+        "outcome": "completed"
+      }
+    ],
+    "workerCoreTools": 12,
+    "workerNativeTools": [
+      {
+        "id": "call_00_QnUktMFubwPRMAKpYnIA9932",
+        "name": "read_file"
+      },
+      {
+        "id": "call_01_QuW38hmhzPPQwFrK1ncm1682",
+        "name": "read_file"
+      },
+      {
+        "id": "call_02_T966erijYNlYHMUp7fAE2553",
+        "name": "read_file"
+      },
+      {
+        "id": "call_03_U3NEcAIfs0sGMtoN2uTS0406",
+        "name": "read_file"
+      },
+      {
+        "id": "call_00_xDGgk0nrmWCZVAnZVkqG8768",
+        "name": "run_shell"
+      },
+      {
+        "id": "call_01_C4GoakUs6Qz5OkRDSfMI8136",
+        "name": "run_shell"
+      },
+      {
+        "id": "call_02_zKBWBgAkuzsFFeyxIq881045",
+        "name": "run_shell"
+      },
+      {
+        "id": "call_00_Y54MMDDuWUk90s8ekjMB6062",
+        "name": "run_shell"
+      },
+      {
+        "id": "call_00_5LNG41SGQE1ywa9bMEMC1023",
+        "name": "write_file"
+      },
+      {
+        "id": "call_00_dJMlVjlRsY2XzdsYuraA6473",
+        "name": "submit_report"
+      },
+      {
+        "id": "call_00_ET_2myQoDNKjillgi3DFLvw6259",
+        "name": "run_shell"
+      },
+      {
+        "id": "call_00_0PsnUHU9mVOJWBC0uoJ08148",
+        "name": "submit_report"
+      }
+    ],
+    "shellCalls": [
+      {
+        "callId": "call_00_xDGgk0nrmWCZVAnZVkqG8768",
+        "command": "wc -c 角色卡/测试/docs/change/p1p7-long-display.md",
+        "exitCode": 0
+      },
+      {
+        "callId": "call_01_C4GoakUs6Qz5OkRDSfMI8136",
+        "command": "node -v",
+        "exitCode": 0
+      },
+      {
+        "callId": "call_02_zKBWBgAkuzsFFeyxIq881045",
+        "command": "node -v",
+        "exitCode": 0
+      },
+      {
+        "callId": "call_00_Y54MMDDuWUk90s8ekjMB6062",
+        "command": "npm test",
+        "exitCode": 0
+      },
+      {
+        "callId": "call_00_ET_2myQoDNKjillgi3DFLvw6259",
+        "command": "node -v",
+        "exitCode": 0
+      }
+    ],
+    "ordinarySuSourceReports": 0,
+    "nativeOriginal20480XsPreserved": true,
+    "pLimitTestsPassed": 31,
+    "businessFourFilesUnchanged": true,
+    "documentFixturesUnchanged": true,
+    "governancePinsMatch": true,
+    "twoTasks": "V2-REAL-1 full npm execution; V2-FIX-1 new explicit producer regression, not old task retry"
+  },
+  "reviews": {
+    "uiux": "角色卡/UIUX设计师/docs/design/2026-10-15_design_visual-v2-implementation-review.md",
+    "uiuxSha256": "76cb82d0ea38d264b1a2d94009b134f7cfb39a4e19e6916622fbda017f1ff56a",
+    "pm": "角色卡/项目管理/docs/change/2026-10-15_change_visual-convergence-implementation.md",
+    "pmSha256": "e9616a6a9f861e5fb1bc6c5eff41fee2514529b7db75ac0b609a9ee03276d901",
+    "pmStatus": "verified"
+  },
+  "evidenceSha256": {
+    "native-final-target-report-1360.png": "653f8eb74ef3f6f2737d4f8ddb82d750038c6d4306b22c72854d2d538fe15710",
+    "native-final-target-report-960.png": "43f7c48edebbd85e85867105d9c3f49d694969b1469e2aad5117568cb183011e",
+    "native-final-batch-960.png": "2c4a24fdbf93e526748a170ae1603721f2280a630aabc6029a8714e0accc44ca",
+    "native-final-npm-output-read.png": "3b0a43f256cfbb3dc823656ef04beb859427cf001ba404d28255b2af4776fa7d",
+    "native-nested-960-before.png": "e51685678bceb4c4977639d4f5fdf7a66a5e4e9b4fc4e444ceaab1de821481a1",
+    "native-nested-960-after.png": "a6821d536b439d969c2933ce2cb79f13444aa8f3d6a40457eeedee87de22e005",
+    "native-final-source-order-ax.txt": "4cdb8eb304373fd8caef8059d700647baeb7eaefecf002c8a71f4941904fa9ff",
+    "native-final-target-reply-fold-ax.txt": "3191de8c13f1e360500e0656203ead86c309a5f7adcbd63466c3f9bd9f858fdc",
+    "native-final-cross-role-doc-ax.txt": "f27e24c72c826357ef91942a3d3aaa86d2d78b7a14e4d548eb93997277aefe1e",
+    "native-final-safe-copy-ax.txt": "2cf4ea55191874c627181c18101e1a5b46d69caf5f2821e9766ee1c17f1050e4",
+    "native-final-truncation-ax.txt": "1d51d7275c5dce711d8fa9d4ab8be3eef508d85c21f93ef0f4e8b43142751f6c",
+    "final-full.log": "e8d962cce383d6d3969ecd4fd1b1bd44369d5b06d874c3f74f543f4c3422e748",
+    "final-renderer.log": "75f2e272b3761a3b34ab05ce6ff455de43a1e9fcc9da4303227d9b5e83cb86af",
+    "final-anchor.log": "39a47d53b3ae1fd01d21a677fcd514d507532422501120c028efe5a68a446494",
+    "final-rowgap.log": "9a819fdd881dadfe655b423855eee390cc71c10d9b17a9013c4ecccb10cc5c7b",
+    "final-renderer-report.json": "7f7b7e72e195d9db7bd3624a7f0e95ca820195879c4c3ff70e39fccef81de31d"
+  },
+  "coverageLimits": [
+    "Online Pi only; Claude missing-config/entry native tested, other adapters controlled suites only.",
+    "Initial import/queue/stop/960 deep document native checks on prior V2 bytes; final owner regressions and root final suites cover affected paths. Final source report order/reply fold/tool details/cross-role read/1360 and 960 report views native retested on final renderer5324.",
+    "Product review static; UIUX inspected root actual PNG/AX and code, did not operate GUI itself.",
+    "Source report declaration is separate from independent verification; historical red and intermediate manifests retained."
+  ]
+}

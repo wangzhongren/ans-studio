@@ -1,0 +1,33 @@
+{
+  "producer": "桌面窗口 WINDOW-B-FIX-1",
+  "head": "fca8f6bd3d76d719dfbca071056449dedbaef957",
+  "node": "v24.14.0",
+  "files": {
+    "src/service/project-document/impl/read-project-document.ts": "658062375a4349cd9c64423976bc03b3b15bd748e0fa2823a0aee8f69eff997e",
+    "src/service/project-document/abstract/document-reader.ts": "c7d1aff487398ed7012eafd28077a91fccace90f3329c0d52e5a9f6694ad8130",
+    "src/pipeline/project-document/read-project-document.ts": "fe199997441df96d89ab5f52ff578353fb9bc8b00602f8159dd2ecd8f246d94d",
+    "app/desktop/interface.ts": "4d95af5652def636eb639ab33f2ecb8489384a45e1600f6699efc62904902cd3",
+    "test/桌面应用/project-document.test.ts": "38bcebcf4df05b42acc21ba56835f28c0fac235deb712d86b2ea9be56d7733c2",
+    "test/桌面应用/interface.test.ts": "a33a90d74d38e5c91e30ed5d2da18a7d2a2bf51823f1c4482bf18a4b70579fb1"
+  },
+  "commands": {
+    "owner": "node --test test/桌面应用/project-document.test.ts test/桌面应用/interface.test.ts test/桌面应用/project.test.ts test/桌面应用/diagnostics.test.ts",
+    "typecheck": "npm run typecheck",
+    "format": "git diff --check"
+  },
+  "ownerTests": {
+    "passed": 39,
+    "failed": 0
+  },
+  "typecheckExit": 0,
+  "formatExit": 0,
+  "approvedDocCount": 13,
+  "approvedHashesUnchanged": true,
+  "priorBManifest": "角色卡/桌面窗口/docs/change/2026-10-15-restricted-document-implementation-evidence/manifest.json",
+  "priorRedEvidence": "角色卡/测试/docs/change/2026-10-15-p1p7-implementation-evidence/b-failed-import-red.json",
+  "notCovered": [
+    "真实Electron完整阅读",
+    "Linux/Windows实机"
+  ],
+  "independentGreenEvidence": "角色卡/测试/docs/change/2026-10-15-p1p7-implementation-evidence/b-failed-import-green.json"
+}

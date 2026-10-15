@@ -67,10 +67,15 @@
    * `pendingCount`（队列待办数，可选）：> 0 时短标签带「 · N 待办」后缀（**如实**——有排队待办不得只显示忙闲）；
    * 悬停描述同时带上待办说明。计数非法（非正数/非有限数）按 0 处理。
    */
-  function statusBadge(status, pendingCount) {
+  function pendingKindLabel(kinds) {
+    if (Array.isArray(kinds) && kinds.length && kinds.every(function (kind) { return kind === "choice"; })) return "待选择";
+    if (!Array.isArray(kinds) || !kinds.length || kinds.every(function (kind) { return kind === "confirm"; })) return "待确认";
+    return "待处理";
+  }
+  function statusBadge(status, pendingCount, waitingKinds) {
     var b = BADGES[status] || { icon: "?", label: "未知", className: "st-unknown", title: "未知状态（保守占位）" };
     var n = typeof pendingCount === "number" && isFinite(pendingCount) && pendingCount > 0 ? Math.floor(pendingCount) : 0;
-    var label = b.label + (n > 0 ? " · " + n + " 待办" : "");
+    var label = (status === "awaiting-confirm" && Array.isArray(waitingKinds) && waitingKinds.length && pendingKindLabel(waitingKinds) !== "待确认" ? pendingKindLabel(waitingKinds) : b.label) + (n > 0 ? " · " + n + " 待办" : "");
     var title = b.title;
     if (n > 0) {
       title +=
@@ -112,6 +117,7 @@
   }
 
   var api = {
+    pendingKindLabel: pendingKindLabel,
     deriveRoleStatus: deriveRoleStatus,
     statusBadge: statusBadge,
     sessionContextNotice: sessionContextNotice,

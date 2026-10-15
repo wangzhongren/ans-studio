@@ -3,7 +3,7 @@ id: codex-governed-session
 type: feature
 title: 使用 Codex 执行受治理角色会话
 created: "2026-10-14"
-updated: "2026-10-14"
+updated: "2026-10-15"
 timezone: Asia/Shanghai
 status: implemented-unverified
 related: [codex-governed-transport-design, codex-governed-session-implementation, multi-runtime-integration-v2]
@@ -23,7 +23,9 @@ events:
 ```mermaid
 flowchart TD
   select[调用方选择 Codex 和固定角色] --> core[核心注入工具、当前轮 ID 和精确存储]
-  core --> config[适配器检查模型/key/API 地址]
+  core --> required{required注入能力齐全？}
+  required -->|否| fail
+  required -->|是| config[同env快照检查模型/key/API并内存登记profile]
   config --> inspect[空工作根、独立状态根，读取配置]
   inspect --> disable[禁用全部 native MCP 后重启验证]
   disable --> valid{限制全部生效？}
@@ -43,7 +45,10 @@ flowchart TD
   identity -->|否| denied[拒绝，不调用 handler]
   identity -->|是| handler[MCP 顺序队列调用原 handler]
   handler --> receipt[返回真实成功或拒绝]
-  receipt --> end[转换中立事件，恰好一次 settled]
+  handler --> project[真实start/result及rule/args/execution交注入投影]
+  project --> protected[保护后薄出口入队，失败只诊断]
+  receipt --> end[模型原text/content回执，恰好一次 settled]
+  protected --> end
   denied --> end
   turn --> stop[中止/超时/上游取消，使原信号失效]
   stop --> clean{原生停止完成？}
@@ -63,3 +68,5 @@ flowchart TD
 | 2026-10-14 | 设计 | 已实施，自有测试通过 | SDK 缺少有效配置与轮次归属接口，使用必要 app-server 和真实内存 MCP | [运输设计](../design/2026-10-14_design_codex-governed-transport.md) |
 | 2026-10-14 | 修改 | 待稳定运输/最终联调 | 配置隔离、原始轮次工具回调、停止/恢复与脱敏 | [实施结果](../change/2026-10-14_change_codex-governed-session.md) |
 | 2026-10-14 | 修复 | 已验证 | 可选地址空白使用官方默认，显式优先级与环境快照一致 | [空地址修复](../fix/2026-10-14_fix_blank-base-url-default.md) |
+
+2026-10-15 当前真实工具展示已经接入A4；required/profile在原生初始化前检查，真实opaque身份不再经过旧递归scrub。模型原text/content/images保持。自有22/22与固定CLI0.162.1本地假服务回环通过；最终全仓类型检查通过，在线/真实桌面未在本角色验证。见[本次实施](../change/2026-10-15_change_tool-display-projection.md)。

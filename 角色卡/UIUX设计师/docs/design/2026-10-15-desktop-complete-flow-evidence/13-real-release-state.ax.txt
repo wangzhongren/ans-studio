@@ -1,0 +1,5 @@
+The following is a diff from the previous accessibility tree for Window: "ANS 治理会话工作台" with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+Removed element IDs: 273, 337
++							453 文本 ›
++							454 文本 ›
+The focused UI element is 441 container 选择查看方式 只选择显示方式，不写文件，不派发任务 查看摘要 查看完整记录 提交 取消

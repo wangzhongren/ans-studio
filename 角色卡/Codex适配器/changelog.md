@@ -6,3 +6,5 @@
 
 - 2026-10-14 X1S：修复可选 API 地址空白错误，显式空白选官方默认，显式非空继续覆盖环境；验证 model/base/key/脱敏使用同一捕获结果。当前 16/16 自有测试、全仓 tsc0；稳定探针此前由装配通过，本次没有重跑或改运输。详见[修复](docs/fix/2026-10-14_fix_blank-base-url-default.md)。
 
+
+- 2026-10-15：Codex真实工具展示投影、required/profile与模型输入保持接线完成；22/22及固定CLI本地回环通过，全仓类型检查通过。[实施记录](docs/change/2026-10-15_change_tool-display-projection.md)。

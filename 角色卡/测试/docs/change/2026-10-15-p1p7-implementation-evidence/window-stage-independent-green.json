@@ -1,0 +1,33 @@
+{
+  "at": "2026-10-15T04:27:08.580Z",
+  "status": "Window implementation stage, not final frozen candidate",
+  "history": {
+    "command": "node --test test/测试/p1p7-tool-display-integration.test.ts test/测试/p1p7-report-integration.test.ts",
+    "exitCode": 0,
+    "pass": 10,
+    "fail": 0,
+    "output": "✔ independent C pi: one durable member, safe input history, raw model text, real target receipt and no duplicate prompt (39.84725ms)\n✔ independent C codex: one durable member, safe input history, raw model text, real target receipt and no duplicate prompt (28.627292ms)\n✔ independent C claude: one durable member, safe input history, raw model text, real target receipt and no duplicate prompt (25.801791ms)\n✔ independent C: failure after real ACK but before input save invokes no model and cannot repair by prompting (14.917791ms)\n✔ independent C: history failure after a real model call cannot turn storage retry into another prompt (21.393916ms)\n✔ independent C: an injected report storage failure retries the frozen member once without rerunning its model (12.6705ms)\n✔ independent pi: real shell effects, failures and protected details survive Core to Window history (73.317958ms)\n✔ independent codex: real shell effects, failures and protected details survive Core to Window history (58.963958ms)\n✔ independent claude: real shell effects, failures and protected details survive Core to Window history (50.569666ms)\n✔ independent A: a real non-tool engine failure must not become a tool display diagnostic (8.685292ms)\nℹ tests 10\nℹ suites 0\nℹ pass 10\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 312.805375\n"
+  },
+  "live": {
+    "command": "node --test test/测试/chat-handback-integration.test.ts",
+    "exitCode": 0,
+    "pass": 3,
+    "fail": 0,
+    "oracleChange": "Statuses/source actual turn preserved, consume safe public report/liveReport; additional no raw handback IPC assertion"
+  },
+  "recovery": {
+    "command": "node --test test/测试/p1p7-window-provenance-integration.test.ts",
+    "exitCode": 0,
+    "pass": 1,
+    "fail": 0,
+    "coverage": "Actual Window/Pipeline/Core storage injected failure, queries zero save, concurrent retry one real save/one original target continuation/source model1; protected all transports, SDK original text, dispose no replay"
+  },
+  "afterExecutionHashes": {
+    "app/desktop/session.ts": "17363ffb8929da42426e646ff4f50310fc7414a2dfc85386f835c64871469db3",
+    "app/desktop/runtime-history.ts": "b4a449b31979ea127fe7de0b9b9967b696685ebc788b686a948fe371d6c02367",
+    "app/desktop/session-history.ts": "091d19257622204a5089bdb0132edfdf6905641c2c85585d766e1bf025a6a8d7",
+    "src/service/runtime/session.ts": "991146051f429ef26b46b21154a574086b312233047b29c99a9d522c01280f02",
+    "test/测试/p1p7-window-provenance-integration.test.ts": "c8334866c9c4814ce942b15b5fe0caa9e1975fcad7816b3d825f9dc0b6b34525",
+    "test/测试/chat-handback-integration.test.ts": "8b4b3276d12c90b6f4722145e1d6fbc5570a8461e0ef37b34e61f64623b45311"
+  }
+}

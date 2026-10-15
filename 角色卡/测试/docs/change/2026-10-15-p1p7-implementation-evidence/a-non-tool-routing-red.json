@@ -1,0 +1,9 @@
+{
+  "command": "node --test --test-name-pattern='non-tool engine failure' test/测试/p1p7-tool-display-integration.test.ts",
+  "oracleNote": "Checks the approved non-tool routing boundary, rather than requiring an arbitrary fixture detail.source field",
+  "chunk_id": "b6305f",
+  "wall_time_seconds": 0.00255375,
+  "exit_code": 1,
+  "original_token_count": 250,
+  "output": "✖ independent A: a real non-tool engine failure must not become a tool display diagnostic (14.98775ms)\nℹ tests 1\nℹ suites 0\nℹ pass 0\nℹ fail 1\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 109.238417\n\n✖ failing tests:\n\ntest at test/测试/p1p7-tool-display-integration.test.ts:148:1\n✖ independent A: a real non-tool engine failure must not become a tool display diagnostic (14.98775ms)\n  AssertionError [ERR_ASSERTION]: a non-tool engine failure has no tool identity to invent\n  \n  true !== false\n  \n      at TestContext.<anonymous> (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%B5%8B%E8%AF%95/p1p7-tool-display-integration.test.ts:173:12)\n      at async Test.run (node:internal/test_runner/test:1125:7)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: true,\n    expected: false,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n"
+}

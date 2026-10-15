@@ -1,0 +1,15 @@
+✔ B Model budget is raw bytes; Provider reads a checked local descriptor without changing bytes (6.619625ms)
+✔ B Provider refuses unsupported platforms, lexical escapes, directories and symlinks (1.601834ms)
+✔ B Provider detects check/open and opened/read file replacement and closes the original handle (8.157416ms)
+✔ B Service issues opaque refs only after native grant, refresh revokes refs and scope switch rejects old requests (3.774708ms)
+✔ B Service fatal UTF8, binary, BOM, absent file and bounded failure classification (4.284666ms)
+✔ B Service late read never returns content after scope revoke; provider failures are fixed safe messages (0.233333ms)
+✔ B Pipeline preserves trusted native grant and close sequencing over the real Service (3.100667ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 94.984083

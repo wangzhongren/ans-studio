@@ -1,0 +1,8 @@
+{
+  "command": "node --test --test-name-pattern='history failure after' test/测试/p1p7-report-integration.test.ts",
+  "chunk_id": "4a59d5",
+  "wall_time_seconds": 0.180610875,
+  "exit_code": 1,
+  "original_token_count": 326,
+  "output": "✖ independent C: history failure after a real model call cannot turn storage retry into another prompt (28.409042ms)\nℹ tests 1\nℹ suites 0\nℹ pass 0\nℹ fail 1\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 260.624\n\n✖ failing tests:\n\ntest at test/测试/p1p7-report-integration.test.ts:183:1\n✖ independent C: history failure after a real model call cannot turn storage retry into another prompt (28.409042ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  false !== true\n  \n      at Object.<anonymous> (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%B5%8B%E8%AF%95/p1p7-report-integration.test.ts:219:14)\n      at expectedException (node:assert:578:17)\n      at expectsError (node:assert:703:21)\n      at strict.rejects (node:assert:769:3)\n      at async TestContext.<anonymous> (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%B5%8B%E8%AF%95/p1p7-report-integration.test.ts:217:5)\n      at async Test.run (node:internal/test_runner/test:1125:7)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: false,\n    expected: true,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n"
+}

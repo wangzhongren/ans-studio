@@ -1,5 +1,9 @@
 # 编排 变更记录
 
+## 2026-10-15 — ORCHESTRATION-C-1 最终报告与安全历史消费
+
+按批准A4/C2.tp1/consumer2，三源码接真实bound报告保存/ID恢复查询、治理透明代理、安全live与纯legacy投影；Window唯一enqueue，原模型text/图片不变，新显示副本不raw旁路。A4写证据与旧兼容同步。自身256/256、typecheck0；下游实际投递和真实桌面待属主。见[实施记录](docs/change/2026-10-15_change_report-provenance-consumer.md)。
+
 ## 2026-10-14 — 普通聊天不自动产生任务未报告回交
 
 客户确认 revision 2 后实施：send 的 Pipeline 专用 handback.required 按 Core 真实ACK绑定 turnId；显式聊天覆盖旧 taskId，正式任务兜底与主动报告保留。跳过聊天仍清理本轮，未知真实轮次不借legacy。编排247/247通过，真桌面待测试角色复验。见[修复记录](docs/fix/2026-10-14_fix_chat-handback-scope.md)。

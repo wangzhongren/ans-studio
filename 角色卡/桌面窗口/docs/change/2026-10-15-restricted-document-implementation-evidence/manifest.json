@@ -1,0 +1,35 @@
+{
+  "producer": "桌面窗口 WINDOW-B-1",
+  "head": "fca8f6bd3d76d719dfbca071056449dedbaef957",
+  "node": "v24.14.0",
+  "platform": "Darwin 25.6.0 arm64",
+  "files": {
+    "src/model/project-document.ts": "cb13869cb5ae55721e8a168c39ceb5a17dd73bb4cf699954eb3cc4dafe33511e",
+    "src/pipeline/project-document/read-project-document.ts": "368ec1c868f6727211c77312ac962c5f3c8a14285233db64a9d418f638123dd5",
+    "src/service/project-document/abstract/document-reader.ts": "6fd58113bca65f0d323c008bc88a6a4f222dc9ffc902b9324bdfbb73ca53720e",
+    "src/service/project-document/public/read-project-document.ts": "691fd17249e0757707bfb19fb617666d1679123254e7792d60d42c86765e617f",
+    "src/service/project-document/impl/read-project-document.ts": "016e0f1e2cefdb53ab12984b230299bc5244610cca555c1c4d02418d98d6cd80",
+    "src/provider/project-document/abstract/file-reader.ts": "bbf8b28444db745d5b05c79dd135170c754ec9f55bf90837bd4fea1967d977a9",
+    "src/provider/project-document/public/file-reader.ts": "b114befdb3c5e1b9781b12bd41a0945ad1bd219d57f6f6b8c58260cd0ca70d83",
+    "src/provider/project-document/impl/file-reader.ts": "9a387b077f0142c49a4f3846f5af98611a7dee97f3d455bb42dcb585dbe1ae8a",
+    "app/main.ts": "80b2595f0e65794b4197d4ee70dd6c744ba5b063b6af497827ca7a85e11cb4fe",
+    "app/preload.cjs": "06cc8b46173281c5e113f3bd5eff1279066157b42ab1bbe10d1be19812a35d23",
+    "app/desktop/interface.ts": "77f9975b3cc5a9fd72a3538947ee6b614ba72862a985e05a53de28c78f251cb9",
+    "app/desktop/project.ts": "7ff7826899c6eb9720787f6b01468916e50443d6f0a929cd1b8569d42f4faa8c",
+    "test/桌面应用/project-document.test.ts": "146bc300931efeff85a76d17c16d8e666113c520eaa5651249b6fef7bd477f74",
+    "test/桌面应用/interface.test.ts": "448c51072ac59f4112748b6d6eaf2714448851946b01cb42712b58b5c52458fd"
+  },
+  "approvedManifest": "角色卡/项目管理/docs/design/2026-10-15-complete-flow-interface-evidence/review-manifest.json",
+  "approvedDocumentsMatch": true,
+  "ownerTests": {
+    "total": 36,
+    "passed": 36
+  },
+  "typecheck": "blocked by parallel Core source diagnostics; see typecheck.txt",
+  "notCovered": [
+    "真实Electron UI阅读（待UI与测试角色）",
+    "Linux实际文件系统/Windows实际平台",
+    "恶意本地writer瞬时祖先路径替换与硬链接的严格隔离（合同明确不保证）",
+    "网络/未知文件系统不启用"
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "beforeCount": 2,
+  "afterCount": 3,
+  "delta": 1,
+  "expectedDelta": 1,
+  "pass": true,
+  "oracleNote": "Both observations use complete AX state; prior diff-only observation retained separately and is not a product failure.",
+  "renderer": "efd2e33c45e587c2784a5e98528a035f08f9bca8e4c55b62d52dbe8f1f84e92c"
+}

@@ -1,0 +1,19 @@
+{
+  "at": "2026-10-15T05:21:14.648Z",
+  "producer": "root fixed 测试",
+  "stage": "Actual Electron renderer reloaded after owner P3 scroll fix; config return rechecked; model requests not yet sent",
+  "files": {
+    "app/renderer/index.html": "859bdc3bf386426663a1e46a07274aed82778854122b8ae344fea8ae46bbf0d3",
+    "app/renderer/styles.css": "0115cceb178bcaca0d933f657750dda12a7a6b6e13d3cc3ed573c46a65323993",
+    "app/renderer/renderer.js": "91316665a8f027a2ff58648d37b8e37170a443beb85523d6e8212081ee829395",
+    "app/renderer/tool-rows.js": "712c30b5cf2c3825eca3b6c068834730d1e3ca9908ad82b6c8a2e50e7cf17afe",
+    "app/renderer/runtime-ui.js": "47b136e300389ff3e3d3b67e3a5995f801dce9f3330b3520e8dbeffaabf87b26",
+    "app/renderer/role-status.js": "2daab2f108e3351f6143270f18d7f07dddeb48ae9408ba545fda6ffc5c7aeec5",
+    "app/desktop/runtime-history.ts": "8d605a48ec79fc8cc93837b976cef5caf7877f6da8ab06d928f68e92d8d93d47",
+    "app/desktop/session-history.ts": "1753450964ab160cbfba9b0560a08971574801f9bc5210d772cfe29d6b4f5eec",
+    "app/desktop/session.ts": "63bae375299ad4f5464f3bf22204a55f35a7dd85bafd62660bff0e691c09814f",
+    "app/main.ts": "f4339c2ee0aa87a306534010435e47c771559d56e316393d8d04ba1208267940",
+    "app/preload.cjs": "7fc95a6a5ac63edcea06ef2b31a2d14e3348e3bd27b35d9fa994332554133ce1"
+  },
+  "envUnchanged": true
+}

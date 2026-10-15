@@ -20,3 +20,6 @@ SDK 为 `@anthropic-ai/claude-agent-sdk@0.3.299`，正式 peers `zod@4.6.7`、`@
 
 当前正式包测试 **20/20**、`npx tsc --noEmit` 通过。独立真实 bundled CLI 严格 loopback 探针通过：两条相同输入触发4个本地假 Messages 请求、2个 UserPromptSubmit、2个 PreToolUse、2次真实 MCP handler；updatedInput实际改写参数，两个init工具目录都只含ANS工具。探针使用假凭据，未调用真实模型/账号；最终项目全链路由集成与测试属主继续验收。详见[当前功能](docs/feature/claude-session.md)、[初次证据](docs/change/2026-10-14_change_claude-runtime.md)及[原生修复验证](docs/fix/2026-10-14_fix_claude-native-hook-identity.md)。
 
+
+
+2026-10-15 CLAUDE-A-1：已接入A4。RuntimeProviderOptions.toolDisplayMode=required-v1要求projectToolEvent/registerToolDisplayProfile在工厂构造时为函数，否则SDK前拒绝；bindRole仅登记实际apiKeyEnvVar及toolDisplayCredentialEnvNames在同一构造快照选中的键值，纯内存无日志。handler-start/handler-result交原publicArgs、tool.displayInputRule、真实ToolResult.message/execution或Error.message；投影对象直接入队，不经旧summary redactor二次改写身份。原SDK content仍仅现有redact(message)，execution不入SDK。无原Turn的PreToolUse只CALL_CONTEXT_UNATTRIBUTED诊断，权限仍deny。standalone缺省mode保原工具事件；投影异常仅固定安全诊断。C inputProvenance/inputPresentation/onDeliveryProgress由Core先剥离，原模型输入/图片不变。28/28、真实本地回环和tsc通过，见[本轮证据](docs/change/2026-10-15_change_tool-display-projection.md)；未测在线模型与最终桌面。

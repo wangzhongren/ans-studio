@@ -42,3 +42,5 @@
 - 2026-10-14 O1：上下文固定编排，已批准 ANS-RUNTIME-V2 revision 1 必要迁移。四引擎 runtime 工厂经 Service，公共形状从 Model 引用，旧 Pi alias 保留；实际 store 按 role/runtime，native context getter prompt 后动态读。确认包装转 metadata，issuer 用 snapshot 原 signal 拒绝中止后的迟到 yes。Service 历史缺口由核心 C1H 补齐；Pi P1/B0 依赖默认工厂兼容尚待验证。本角色设计/API/运行时功能文档为续接入口。
 
 - 2026-10-14：客户确认聊天回交修复 revision2。send新公开 RoleSessionSendOptions.handback.required，Core真实ACK关联turnId，聊天无报告skip但仍清理；显式false不继承session taskId，主动报告保留。编排247/247通过；typecheck曾受测试角色在途TS错误影响，最终结果见修复记录。桌面条目dispatch=true，其它=false，真正桌面复测归测试角色。来源：[本次记录](docs/fix/2026-10-14_fix_chat-handback-scope.md)。
+
+- 2026-10-15 ORCHESTRATION-C-1：A4/C2.tp1/consumer2批准后按实际Core bound persistence接线，外层record，不在common调用Service；Window唯一enqueue。source事件新增report/liveReport/reportPersistence安全字段，rawhandback仅内部modeltext；proxy/get/change/govern透明，disabledunknown保live。公开纯projectRoleLegacyHistory和history context键名保护。A4完整未隐藏display写路径提证据，legacy保兼容。自身256/256+typecheck0；下游未验。批准manifest不修改，当前证据见[实施记录](docs/change/2026-10-15_change_report-provenance-consumer.md)。

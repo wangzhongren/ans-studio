@@ -23,6 +23,8 @@ function fakeProvider() {
   const results: ToolResult[] = [];
   const factory: RuntimeProviderFactory = (options) => {
     calls.push(options);
+    assert.ok(options.registerToolDisplayProfile, "actual Core supplies required-v1 profile registration");
+    options.registerToolDisplayProfile({ credentials: [] });
     return {
       async composeContext() { return { systemPrompt: "assembly offline engine" }; },
       async bindRole(role) {

@@ -1,0 +1,26 @@
+{
+  "producer": "root fixed测试",
+  "prototypeSha256": "a19eb2880b6631386cd0c0f1576d507d934f3c245fff0f3405e2eef5a420926a",
+  "viewport": {
+    "width": 1360,
+    "height": 900
+  },
+  "steps": [
+    "fill draft 保留此草稿 · 视觉评审",
+    "click 查看来源角色文档",
+    "click [data-doc=\"1\"] 角色说明",
+    "observe document shows docs/change/p1p7-real-1.md / p-limit测试记录 instead of role-card.md",
+    "click 返回文档清单",
+    "read DOM activeElement data-doc"
+  ],
+  "actual": {
+    "focusDoc": "0",
+    "draft": "保留此草稿 · 视觉评审"
+  },
+  "expected": {
+    "focusDoc": "1",
+    "document": "role-card.md corresponding to explicit choice"
+  },
+  "result": "prototype bug sent UIUX, pending fix; not production failure",
+  "viewportReset": true
+}

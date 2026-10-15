@@ -1,0 +1,32 @@
+{
+  "producer": "/root/uiux_visual 固定UIUX",
+  "version": 2,
+  "htmlSha256": "dcc614d0f3fcfffbc798c7c1f7fd64f87eb98b4a67abd6dd5724cf34b29ab092",
+  "surface": "CUA normal IAB own tab1",
+  "passed": {
+    "PV-R1": "chat/work0 无报告，空态",
+    "PV-R2": "info→docs→doc1→docs backInfo=true focusDoc=1→info focus=infoDocs",
+    "PM-full-summary": "reportFull完整safe summary可展开",
+    "PM-expanded-state": "模拟发送后execution.open=true/reportFull.open=true",
+    "menu-selection": "config场景菜单唯一aria-selected为Claude"
+  },
+  "screenshots": [
+    "prototype-v2-report-1360.png",
+    "prototype-v2-report-960.png",
+    "prototype-v2-preview-504.png"
+  ],
+  "preview504": {
+    "innerWidth": 504,
+    "windowWidth": 503.984375,
+    "overflow": false,
+    "sourceVisible": true
+  },
+  "viewportReset": true,
+  "guiReleased": true,
+  "notClaimed": [
+    "产品原型亲测",
+    "屏读",
+    "生产实现",
+    "真实接口/模型链路"
+  ]
+}

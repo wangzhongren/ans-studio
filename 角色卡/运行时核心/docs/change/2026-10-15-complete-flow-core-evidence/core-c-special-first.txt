@@ -1,0 +1,16 @@
+✔ actual bound mode, final source identity, idempotent safe report save and conflict are independent of model execution (23.201959ms)
+✔ source retry only saves the first frozen snapshot, duplicate clicks share one operation and disposal expires it (14.703125ms)
+✔ target stores safe text but Provider receives original model text and images; final receipt survives a new handle (26.770542ms)
+✔ ACK is not delivery: user failure has exact Provider count and history retry never invokes it (25.243875ms)
+✔ ACK is not delivery: boundary failure has exact Provider count and history retry never invokes it (24.87275ms)
+✔ ACK is not delivery: index failure has exact Provider count and history retry never invokes it (34.246334ms)
+✔ partial replay is not silently repaired or replayed; later foreign records also block repair (16.744334ms)
+✔ disabled bound mode does not create directories; live-only views do not become durable report snapshots (0.709583ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 230.5565

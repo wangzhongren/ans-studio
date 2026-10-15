@@ -1,0 +1,21 @@
+{
+  "status": "planned-not-executed",
+  "entry": "actual Electron, current candidate after restart, native folder chooser",
+  "project": "fresh local p-limit fixture from desktop-fixture-before.json, source write grants remain revoked",
+  "ordinaryChoicePrompt": "P1P7-CHAT-1：这是普通聊天交互测试。请仅调用一次 request_choice，标题“选择查看方式”，选项“查看摘要”和“查看完整记录”，说明“只选择显示方式，不写文件，不派发任务”。等待我回答后只简短回复选择结果。不调用其他工具，不改文件或配置，不提交报告。",
+  "queuedKeepPrompt": "P1P7-QUEUE-KEEP：这是排队普通消息，只简短回复“已收到保留消息”，不调用工具、不派发、不提交报告。",
+  "queuedWithdrawPrompt": "P1P7-QUEUE-WITHDRAW：这条测试消息将被撤回，不应交给模型。",
+  "formalDispatchPrompt": "P1P7-REAL-1：仅一次 dispatch_task 给测试角色：只读 index.js 和 test.js，核对既有 null 校验修复；read_file docs/p1p7-does-not-exist.md，预期 ENOENT 如实记录；再 read_file 角色卡/测试/docs/change/p1p7-long-display.md（约20KiB的展示截断探针，只记录结果，不全文引用）；分别两次独立 run_shell 执行 node -v；最后一次精确 npm test，记录真实通过数和退出码。源码、边界与配置一律不改。报告只写自己已有授权的角色卡/测试/docs/change/p1p7-real-1.md，随后 submit_report，摘要含 P1P7-REAL-1。你收到报告后仅只读核对并简短汇总，不新增派发或写文件。常规操作已授权，不重复请求同一确认，真实权限询问仍按系统处理。",
+  "observations": [
+    "No project: engine selector disabled; native import creates trusted document refs.",
+    "No default choice; role info shows pending separately from running/queue; keyboard select and submit.",
+    "Kept queue reaches model once; withdrawn queue never reaches model; ordinary chat emits no handback.",
+    "Two actual same-command calls remain separate; one start/result per call; ENOENT and actual exit/output readable.",
+    "One formal source report, one target delivery, report statement distinguished from independent acceptance; reload preserves identity.",
+    "Report -> source role document list -> explicit file choice -> static document; no role/runtime/chat/draft changes.",
+    "Unicode succeeds, oversize/invalid UTF8/unsupported directory errors remain truthful; script/images do not execute/load.",
+    "Missing configuration action opens settings; Esc/close restores actual invoker and preserves draft; no credentials saved.",
+    "Stop invalidates pending request; old decision cannot act on next turn; context status follows actual session lifecycle."
+  ],
+  "scopeLimit": "Online Pi when locally configured; Codex/Claude online not implied by controlled SDK tests. No real .env edits, no reopened business source grants."
+}

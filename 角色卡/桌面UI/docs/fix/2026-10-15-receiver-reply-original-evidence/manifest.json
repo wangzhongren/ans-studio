@@ -1,0 +1,70 @@
+{
+  "packet": "SV13 receiver original reply coverage",
+  "status": "owner-verified; root native final hotreload pending",
+  "baselineManifest": "角色卡/桌面UI/docs/fix/2026-10-15-delivery-batch-facts-evidence/manifest.json",
+  "baselineSha256": "e7b82867aa43a84b1862ea23b93debb5e092431d3469798b472477d3f2f22058",
+  "sourceFiles": {
+    "app/renderer/index.html": "7beda47c504c81ba8a7748b407eb60efc27ec531e936d93868a9480528514f00",
+    "app/renderer/styles.css": "df554f8760809edf09184a824876012cf0d41feadffc518dacb34c05573f7469",
+    "app/renderer/renderer.js": "ce182363adf4f1775a58e011bf06377cb1e6d8a25b0a621cee59e123faea32ae",
+    "app/renderer/tool-rows.js": "a4d86a1c8c45a4c84ed9cd283596d164c63833849899bb05bfcbf0379901d4bd",
+    "app/renderer/runtime-ui.js": "47b136e300389ff3e3d3b67e3a5995f801dce9f3330b3520e8dbeffaabf87b26",
+    "app/renderer/role-status.js": "2daab2f108e3351f6143270f18d7f07dddeb48ae9408ba545fda6ffc5c7aeec5"
+  },
+  "testFiles": {
+    "test/桌面应用/tool-rows.test.ts": "f47d86fcbdb255e2606485d372bf61b47c9b77966a7bfd19deb2bd4186aebefc",
+    "test/桌面应用/runtime-ui.test.ts": "1123d3d9e700531a9e6cd5b6cfa166712406d4fa4b4d72af1cb04ffb6cd59397",
+    "test/桌面应用/renderer.test.ts": "c1bbdba5355081775795d8bffdf629f90dff5aaad47af22dbe54166c9d7a4fa2",
+    "test/桌面应用/markdown.test.ts": "936c9fd95530d0d39eda43a8ec73809a374d68cb6b3b9fa3b12f5858de4ea99e",
+    "test/桌面应用/e2e/uiux-v2.mjs": "a3e4d45a3a3f1b870b56878fb273890e2e586c7622cddec92030f67ed042fe54"
+  },
+  "changedThisFix": [
+    "app/renderer/renderer.js",
+    "test/桌面应用/renderer.test.ts",
+    "test/桌面应用/e2e/uiux-v2.mjs"
+  ],
+  "tests": {
+    "visual-green": {
+      "records": 33,
+      "booleanTrue": 31,
+      "booleanFalse": 0,
+      "errors": []
+    },
+    "consumer": {
+      "records": 41,
+      "booleanTrue": 40,
+      "booleanFalse": 0,
+      "errors": []
+    },
+    "full": {
+      "records": 99,
+      "booleanTrue": 89,
+      "booleanFalse": 0,
+      "errors": []
+    },
+    "ghost": {
+      "records": 9,
+      "booleanTrue": 9,
+      "booleanFalse": 0,
+      "errors": []
+    }
+  },
+  "unitPassed": 71,
+  "unitFailed": 0,
+  "typecheckExit": 0,
+  "diffCheckExit": 0,
+  "allSelftestElectronQuit": true,
+  "providerCalls": 0,
+  "firstVisualRed": "Composite settled assertion correctly observed receiver folding; unrelated Markdown text trailing newline differed from exact text fixture. Only new text comparison trims whitespace; all identity/folding/content guards retained.",
+  "evidenceFiles": {
+    "ans-receiver-fold-node-red.log": "16b220a7ad45b12b2aac9b1620b2217aed568188424f9797ef7fed228b7242c7",
+    "visual-green.json": "5ae3e725fbc1a15d1f579b85f59fb286e9cc1dfae7bde342c2562b66e2b520fd",
+    "consumer.json": "4037bb685c65cdf724c23cc2de255bea6edf14521b46d885e7bdbcf3339d2b5e",
+    "full.json": "baaea18ca151cf47630aae1a60e03f0a2232b673989b96a2788f8162d7fbc5d4",
+    "ans-receiver-fold-tsc-final.log": "49ad917c426e1ab9bb7e5ad8c53a2fa4844fe03331b01623eac87fa4a881b15c",
+    "visual-first-red-observed.json": "9da5c7de7961d867657a9681bb6cac6fa2af08cf8186f7c1d4d70837e8f9540c",
+    "ans-receiver-fold-node-green.log": "3c1681058e3e9aa5f52374e255161cb6fba2ad7e14a77ebaf4a833b5ef130014",
+    "ghost.json": "13a617b8e5d9dac78cc594955cbbdc8720228e3794e0cc3bb38607fc32574d1f"
+  },
+  "combinedSha256": "1d2aa5e609c8360c0c2527f1ead96a4db27a0f174b80ff63d7eeb8a20155ff11"
+}

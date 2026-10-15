@@ -1,0 +1,27 @@
+{
+  "producer": "root fixed测试",
+  "prototypeSha256": "c575bc45e2494cb1658ba4bcfebfa0ffa93685ba28e248b890cce498771f86e6",
+  "viewport": {
+    "width": 960,
+    "height": 860
+  },
+  "confirmedIssues": [
+    {
+      "path": "普通聊天→工作0",
+      "actual": "最近任务回交 p-limit测试报告 报告声明已完成",
+      "expected": "本演示普通聊天没有任务报告"
+    },
+    {
+      "path": "角色资料→查看已列文档→doc1→返回文档清单",
+      "actual": "无返回角色资料按钮",
+      "expected": "保留返回原资料上下文"
+    }
+  ],
+  "improvedFromFirst": {
+    "explicitDoc1ShowsRoleCard": true,
+    "returnFocusDoc1": true
+  },
+  "productEvidence": "Independent static findings confirmed by root actual browser; product browser initialization blocked, no product dynamic claim",
+  "viewportReset": true,
+  "result": "sent UIUX for focused repair"
+}

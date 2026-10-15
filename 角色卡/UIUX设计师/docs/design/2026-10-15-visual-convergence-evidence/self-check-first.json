@@ -1,0 +1,52 @@
+{
+  "producer": "/root/uiux_visual 固定 UIUX设计师",
+  "phase": "首轮自验，待产品和root第二轮",
+  "prototypeSha256": "c575bc45e2494cb1658ba4bcfebfa0ffa93685ba28e248b890cce498771f86e6",
+  "environment": "macOS CUA / Codex IAB，本地HTML模拟",
+  "native": {
+    "window": [
+      1360,
+      860
+    ],
+    "operations": [
+      "当前测试/Pi报告",
+      "报告来源入口→清单→显选9799字节报告→Escape回原入口"
+    ],
+    "notDone": [
+      "本角色原生960",
+      "发送模型",
+      "修改设置"
+    ],
+    "production": {
+      "app/renderer/renderer.js": "394a7abb0af61fa3f7a5ee0652238e70883d17d798235c37954cdf41086a5252",
+      "app/renderer/styles.css": "0115cceb178bcaca0d933f657750dda12a7a6b6e13d3cc3ed573c46a65323993",
+      "app/renderer/index.html": "859bdc3bf386426663a1e46a07274aed82778854122b8ae344fea8ae46bbf0d3"
+    }
+  },
+  "prototype": {
+    "window": [
+      960,
+      860
+    ],
+    "measurements": {
+      "sidebarWidth": 176,
+      "sourceButtonBottom": 676.53125,
+      "composerTop": 698.234375,
+      "horizontalOverflow": false
+    },
+    "passed": [
+      "doc1角色说明显示而非doc0报告",
+      "返回清单focusDoc=1",
+      "初始选择未选且提交disabled",
+      "改选后停止，input disabled",
+      "Claude设置Escape回configBtn",
+      "草稿仍为原型草稿"
+    ],
+    "limitations": [
+      "待产品独立review",
+      "未测屏读",
+      "非真实读写或模型能力",
+      "resize仅设计演示"
+    ]
+  }
+}

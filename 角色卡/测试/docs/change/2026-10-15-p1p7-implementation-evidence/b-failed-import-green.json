@@ -1,0 +1,9 @@
+{
+  "command": "node --test test/测试/p1p7-document-integration.test.ts",
+  "assertionsUnchangedAfterRed": true,
+  "chunk_id": "e57cfb",
+  "wall_time_seconds": 0.000005875,
+  "exit_code": 0,
+  "original_token_count": 59,
+  "output": "✔ independent B: native grant, opaque reference, actual bounded file reads, revocation and project switch (8.068875ms)\nℹ tests 1\nℹ suites 0\nℹ pass 1\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 60.754875\n"
+}

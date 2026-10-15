@@ -1,0 +1,44 @@
+✔ 窄诊断桥：关键节点落入统一sink，拒任意事件/路径，凭据净化且不存正文 (9.59575ms)
+✔ 窗口关闭只释放自有IPC，再建窗可注册同名handler，不删其他通道 (0.163334ms)
+✔ 客户请求恢复：重放同id不作答，仍可答旧请求，已结束请求不复活 (0.293042ms)
+✔ shell确认恢复：不重置时限、不代答，失效请求不能复活 (10.820083ms)
+✔ listProject 映射为 RoleView（无 writeSet 字段） (2.486667ms)
+✔ 内置角色 su：RoleView 标为 builtIn，且不去读文档索引（cardPath 为空串） (0.154917ms)
+✔ openSession 点角色即开：scope undefined、导入即授权；多轮 send 透传、stop 收口 (63.932458ms)
+✔ 切换角色（B-2）：open 新角色**不** dispose 旧会话（并存）；定向 stop 只关指定角色 (0.967208ms)
+✔ stopSession：无运行中会话时如实返回 (0.123625ms)
+✔ openSession：未先枚举项目则报错 (0.139209ms)
+✔ listProject：内置 su（已 bootstrap）不再带 readOnly 字段（只读徽标已移除） (0.098ms)
+✔ listProject：**未 bootstrap**（创世态）内置 su 亦不再带 readOnly 字段 (0.071625ms)
+✔ listProject：可写的项目角色（非内置）亦不再带 readOnly 字段 (0.505958ms)
+✔ T17 listProject：hasRoles 与 primaryRoleId 原样转自门禁引擎（渲染侧据此设主位/默认选中，不硬编码 su） (0.162708ms)
+✔ T17 主入口角色一轮结束（settled）→ 触发 emitProjectChanged；非主入口角色不触发 (50.966792ms)
+✔ T20 handback 事件被外推：Interface 层的 emitEvent 收到编排的 handback 事件（类型已放宽到 OrchestrationEvent） (25.8475ms)
+✔ A-5 customerInput：Interface 透传客户通道；仅内置治理角色（su）会话被注入，且 roleId 经闭包绑定 (0.9885ms)
+✔ B Interface native picker alone grants document refs; renderer listing, cancel and another window cannot grant (5.052291ms)
+✔ B Model budget is raw bytes; Provider reads a checked local descriptor without changing bytes (15.595083ms)
+✔ B Provider refuses unsupported platforms, lexical escapes, directories and symlinks (2.699291ms)
+✔ B Provider detects check/open and opened/read file replacement and closes the original handle (8.582209ms)
+✔ B Service issues opaque refs only after native grant, refresh revokes refs and scope switch rejects old requests (3.734292ms)
+✔ B Service fatal UTF8, binary, BOM, absent file and bounded failure classification (5.222375ms)
+✔ B Service late read never returns content after scope revoke; provider failures are fixed safe messages (0.277416ms)
+✔ B Pipeline preserves trusted native grant and close sequencing over the real Service (2.516917ms)
+✔ B Provider rejects symlink parents, escaped links and root replacement after grant (4.057292ms)
+✔ B Provider detects in-place growth and parent directory replacement around a descriptor read (5.810333ms)
+✔ B refs cannot be minted for hidden, unknown formats or lexical escape listing entries (1.872041ms)
+✔ B actual preload exports only the restricted document invoke shape (0.952375ms)
+✔ B out-of-order listings and root-grant failure cannot publish stale or unsupported refs (0.092708ms)
+✔ resolveSkillRoot：优先 ANS_SKILL_ROOT (0.338083ms)
+✔ posixDirname：取目录名 (0.0575ms)
+✔ buildProjectConfig：由枚举结果构造角色表，acceptance 透传 (29.737917ms)
+✔ readRoleDocsIndex：列出 docs 目录并读到设计稿；读到 changelog.md (1.187541ms)
+✔ su：枚举结果里排第一且标为内置，且不进 ProjectConfig 的 roles 映射 (7.966666ms)
+✔ su：resolveRole 下沉为 built-in-governance，走内置边界、不抛错 (6.880292ms)
+ℹ tests 36
+ℹ suites 0
+ℹ pass 36
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1251.2255

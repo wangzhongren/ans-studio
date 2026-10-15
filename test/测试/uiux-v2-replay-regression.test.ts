@@ -83,7 +83,11 @@ test("独立UI2：交互调用和结论保留同一锚点，不被普通工具�
   assert.equal(parsed[1].requestId, "confirm-7");
   assert.equal(parsed[0].anchor, "request");
   assert.equal(parsed[1].anchor, "conclusion");
-  assert.equal(parsed[0].anchorKey, "confirm\u0000是否保存方案？");
+  // Approved A/r4 legacy anchor: SHA-256 of UTF-8 "confirm\0是否保存方案？".
+  // Keep the exact deterministic key and matching request/conclusion oracle,
+  // while requiring that the transport no longer carries the raw title key.
+  assert.equal(parsed[0].anchorKey, "legacy-anchor-v1:3604608f3b66dae175e6b9e70c384b9af435c6858b10584170839f3a2ba86983");
+  assert.ok(!parsed[0].anchorKey.includes("是否保存方案？"));
   assert.equal(parsed[0].anchorKey, parsed[1].anchorKey);
   assert.ok(parsed.every((row) => toolRows.activityOf(row).barrier === true));
   for (const name of ["request_choice", "submit_report", "dispatch_task", "report_shell_verdict"]) {

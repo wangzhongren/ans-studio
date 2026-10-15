@@ -1,0 +1,157 @@
+{
+  "at": "2026-10-15T08:30:32.596301+00:00",
+  "producer": "root fixed测试",
+  "projectRoot": "/private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-p1p7-desktop-JqO4lM",
+  "actualOnlineEngine": "Pi",
+  "ordinary": {
+    "keepInputs": 1,
+    "withdrawInputs": 0,
+    "suSourceReports": 0
+  },
+  "formal": {
+    "dispatchStarts": 1,
+    "workerInputs": 1,
+    "sourceReports": 1,
+    "targetHandbackInputs": 1,
+    "receipts": [
+      {
+        "version": 1,
+        "deliveryId": "656144c6-5594-4912-a443-9381ff08f02e",
+        "attemptId": "414caa7d-a3ce-4692-8ea4-1df8ae819cb3",
+        "inputSaved": true,
+        "providerMayHaveStarted": true,
+        "history": "saved",
+        "retryHistoryAvailable": false,
+        "retryDeliveryAllowed": false,
+        "turnId": "ab929347-7181-49d0-9051-f9c5f28c0802",
+        "outcome": "completed"
+      }
+    ],
+    "coreToolStarts": 10,
+    "nativeToolCalls": [
+      {
+        "id": "call_00_QnUktMFubwPRMAKpYnIA9932",
+        "name": "read_file"
+      },
+      {
+        "id": "call_01_QuW38hmhzPPQwFrK1ncm1682",
+        "name": "read_file"
+      },
+      {
+        "id": "call_02_T966erijYNlYHMUp7fAE2553",
+        "name": "read_file"
+      },
+      {
+        "id": "call_03_U3NEcAIfs0sGMtoN2uTS0406",
+        "name": "read_file"
+      },
+      {
+        "id": "call_00_xDGgk0nrmWCZVAnZVkqG8768",
+        "name": "run_shell"
+      },
+      {
+        "id": "call_01_C4GoakUs6Qz5OkRDSfMI8136",
+        "name": "run_shell"
+      },
+      {
+        "id": "call_02_zKBWBgAkuzsFFeyxIq881045",
+        "name": "run_shell"
+      },
+      {
+        "id": "call_00_Y54MMDDuWUk90s8ekjMB6062",
+        "name": "run_shell"
+      },
+      {
+        "id": "call_00_5LNG41SGQE1ywa9bMEMC1023",
+        "name": "write_file"
+      },
+      {
+        "id": "call_00_dJMlVjlRsY2XzdsYuraA6473",
+        "name": "submit_report"
+      }
+    ],
+    "shellCalls": [
+      {
+        "callId": "call_00_xDGgk0nrmWCZVAnZVkqG8768",
+        "command": "wc -c 角色卡/测试/docs/change/p1p7-long-display.md",
+        "process": {
+          "exitCode": 0,
+          "stdout": {
+            "text": "   20503 角色卡/测试/docs/change/p1p7-long-display.md\n",
+            "truncated": false,
+            "redacted": false
+          },
+          "stderr": {
+            "text": "",
+            "truncated": false,
+            "redacted": false
+          }
+        }
+      },
+      {
+        "callId": "call_01_C4GoakUs6Qz5OkRDSfMI8136",
+        "command": "node -v",
+        "process": {
+          "exitCode": 0,
+          "stdout": {
+            "text": "v24.14.0\n",
+            "truncated": false,
+            "redacted": false
+          },
+          "stderr": {
+            "text": "",
+            "truncated": false,
+            "redacted": false
+          }
+        }
+      },
+      {
+        "callId": "call_02_zKBWBgAkuzsFFeyxIq881045",
+        "command": "node -v",
+        "process": {
+          "exitCode": 0,
+          "stdout": {
+            "text": "v24.14.0\n",
+            "truncated": false,
+            "redacted": false
+          },
+          "stderr": {
+            "text": "",
+            "truncated": false,
+            "redacted": false
+          }
+        }
+      },
+      {
+        "callId": "call_00_Y54MMDDuWUk90s8ekjMB6062",
+        "command": "npm test",
+        "process": {
+          "exitCode": 0,
+          "stdout": {
+            "text": "\n> p-limit@7.3.3 test\n> xo && ava && tsd\n\n\n  scripts/benchmarker.js:3:1\n  ⚠  3:1  Unexpected todo comment: TODO: I will move this to a proper....  no-warning-comments\n\n  1 warning\n\n\n  ✔ throws on invalid concurrency argument\n  ✔ throws the concurrency validation error for null\n  ✔ clearQueue\n  ✔ accepts additional arguments\n  ✔ map rejects with the iterable error when it throws before the first item\n  ✔ continues after sync throw\n  ✔ runs all tasks asynchronously\n  ✔ map resolves to an empty array for an empty iterable\n  ✔ non-promise returning function\n  ✔ map accepts an iterable (set)\n  ✔ map accepts an iterable (array iterator)\n  ✔ map accepts array-like inputs\n  ✔ map passes sequential indexes for a generator\n  ✔ map rejects with the mapper error\n  ✔ map\n  ✔ propagates async execution context properly\n  ✔ limitFunction exposes clearQueue\n  ✔ shared context with a limited provider helper\n  ✔ map passes index and preserves order with concurrency\n  ✔ map works when detached from the limit\n  ✔ map does not leave unhandled rejections when the iterable throws\n  ✔ clearQueue rejects pending promises when enabled (101ms)\n  ✔ map rejects immediately with the iterable error and still runs already scheduled tasks (102ms)\n  ✔ accepts options object (102ms)\n  ✔ does not ignore errors (114ms)\n  ✔ change concurrency to bigger value (153ms)\n  ✔ change concurrency to smaller value (203ms)\n  ✔ concurrency: 1 (605ms)\n  ✔ concurrency: 4 (2.2s)\n  ✔ limitFunction() (2.3s)\n  ✔ activeCount and pendingCount properties (3s)\n  ─\n\n  31 tests passed\n",
+            "truncated": false,
+            "redacted": false
+          },
+          "stderr": {
+            "text": "npm warn Unknown env config \"electron-builder-binaries-mirror\". This will stop working in the next major version of npm.\nnpm warn Unknown env config \"electron-mirror\". This will stop working in the next major version of npm.\nnpm warn Unknown user config \"ELECTRON_MIRROR\". This will stop working in the next major version of npm.\nnpm warn Unknown user config \"ELECTRON_BUILDER_BINARIES_MIRROR\". This will stop working in the next major version of npm.\n",
+            "truncated": false,
+            "redacted": false
+          }
+        }
+      }
+    ],
+    "longDisplay": {
+      "bytes": 16384,
+      "truncated": true,
+      "nativeOriginal20480XsPreserved": true
+    },
+    "reportDocumentBytes": 10542
+  },
+  "businessFilesUnchanged": {
+    "index.js": true,
+    "test.js": true,
+    "index.d.ts": true,
+    "package.json": true
+  },
+  "status": "execution verified; extra Window delivery note/UI ghost under repair, not final desktop acceptance"
+}

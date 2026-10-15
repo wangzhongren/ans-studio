@@ -1,0 +1,59 @@
+{
+  "reports": [
+    {
+      "name": "nested reading fixture has visible real opener and positive inner and outer scroll",
+      "value": true
+    },
+    {
+      "name": "nested role reading actual before",
+      "value": {
+        "nested": {
+          "card": 2086,
+          "docs": 2047,
+          "changes": 2659
+        },
+        "outer": 916
+      }
+    },
+    {
+      "name": "P3 return preserves actual role scroll and expansion",
+      "value": true
+    },
+    {
+      "name": "P6 return role restores equivalent visible document entry focus",
+      "value": true
+    },
+    {
+      "name": "nested role reading actual after",
+      "value": {
+        "outer": 916,
+        "inner": {
+          "card": 0,
+          "docs": 0,
+          "changes": 0
+        }
+      }
+    },
+    {
+      "name": "P3 independent card docs changes inner scroll survives alongside outer expansion focus",
+      "value": false
+    },
+    {
+      "name": "P3 independent card docs changes inner scroll survives alongside outer expansion focus observed",
+      "value": {
+        "chat": "",
+        "assistant": [],
+        "denied": [],
+        "model": {
+          "count": 1,
+          "lastIndex": 0,
+          "operators": [],
+          "rowGap": 16
+        }
+      }
+    }
+  ],
+  "errors": [],
+  "error": "AssertionError [ERR_ASSERTION]: P3 independent card docs changes inner scroll survives alongside outer expansion focus\n\nfalse !== true\n",
+  "stack": "AssertionError [ERR_ASSERTION]: P3 independent card docs changes inner scroll survives alongside outer expansion focus\n\nfalse !== true\n\n    at check (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:37:474)\n    at async roleDocumentFocusChecks (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:115:2)\n    at async file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:656:169"
+}

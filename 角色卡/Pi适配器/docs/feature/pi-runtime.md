@@ -68,3 +68,5 @@ flowchart TD
 演变历史：2026-10-14 [P1 设计与独立影响](../design/2026-10-14_design_pi-injected-runtime.md) → [迁移与验证](../change/2026-10-14_change_pi-injected-runtime.md)。先前图片/停止/诊断/工具变化仍见本角色既有 change/fix 与 changelog；本文件解释当前实际 Pi SDK路径，跨角色最终验收由各原属主完成。
 
 工具事件只有 SDK execution_start 一个开始出口，带实际turnId/toolCallId和phase=start。它表示模型请求，并不表示已获授权；治理hook拒绝phase=blocked、SDK结束phase=result均保留真实事实。Core生产路径统一typed prompt-input输入，Pi不再另发旧输入回显；direct helper默认保留兼容typed回显。见2026-10-15 [重复事件修复与SDK验证](../fix/2026-10-15_fix_canonical-tool-events.md)。
+
+批准A/r4后的Core生产接线固定required-v1：Pi在SDK加载前验证注入函数并登记本次实际凭据profile；全部工具事件经同一注入projector取得显示target/result/process，身份和模型原content保真。execution由私有同call事实传递，不混入SDK详情。旧独立入口可legacy兼容但没有A保护保证，投影失败仅固定diagnostic，不造工具失败。历史与C持久化仍由Core/编排/窗口负责。实现与实测见[PI-A-1](../change/2026-10-15_change_tool-display-projection.md)。

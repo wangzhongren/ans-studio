@@ -1,0 +1,43 @@
+✔ 窄诊断桥：关键节点落入统一sink，拒任意事件/路径，凭据净化且不存正文 (11.624875ms)
+✔ 窗口关闭只释放自有IPC，再建窗可注册同名handler，不删其他通道 (0.183375ms)
+✔ 客户请求恢复：重放同id不作答，仍可答旧请求，已结束请求不复活 (0.50325ms)
+✔ shell确认恢复：不重置时限、不代答，失效请求不能复活 (11.998708ms)
+✔ C actual preload saving/query bridges and typed subscriptions are cancellable and do not send model text (1.960417ms)
+✔ E-1 投递：A 的回交到达 → **自动开启 su** 并把 `renderHandbackPrompt` 原文投给 su（单一来源） (182.980625ms)
+✔ E-1 去重：同一条回交重复到达（重放）→ **只投递一次** (183.528542ms)
+✔ E-1 排队：su 忙时保留，settle 后连续回交按原序合成一次验收输入 (466.656708ms)
+✔ 连续回交投递失败：整批保留同序，重试送达一次，原报告键不丢 (40.276709ms)
+✔ 客户消息屏障：A报告→客户消息→B报告，不跨消息合批或改变顺序 (49.8475ms)
+✔ 常规检查宿主政策实际注入项目角色，su不接委托免确认 (1.161458ms)
+✔ E-1 开启失败：如实系统行（含原因与重试时机）+ **保留回交**；下次时机成功投递（绝不静默丢） (331.494584ms)
+✔ 真机崩溃修复：坏形状回交事件（缺载荷/缺 roleId）→ 不投递、如实系统行、**零未捕获拒绝** (284.124083ms)
+✔ E-1 投递失败：如实系统行（含原因）+ 放回队首保留；重试成功后送达（顺序与内容不损） (335.44625ms)
+✔ C Window merges source saved-before-business and retry Promise/change orders into one enqueue (24.897375ms)
+✔ C frozen batch retries keep members and delivery ID while later reports stay separate (42.837209ms)
+✔ C possible provider start and unknown failure do not automatically prompt again (145.250625ms)
+✔ C target history retry is one storage operation, read-only queries do not prompt, replaced handles expire (12.71525ms)
+✔ C disabled and unknown-live source facts preserve live delivery without inventing durable report IDs (25.213584ms)
+✔ listProject 映射为 RoleView（无 writeSet 字段） (2.956541ms)
+✔ 内置角色 su：RoleView 标为 builtIn，且不去读文档索引（cardPath 为空串） (0.158334ms)
+✔ openSession 点角色即开：scope undefined、导入即授权；多轮 send 透传、stop 收口 (63.06775ms)
+✔ 切换角色（B-2）：open 新角色**不** dispose 旧会话（并存）；定向 stop 只关指定角色 (1.13575ms)
+✔ stopSession：无运行中会话时如实返回 (0.133792ms)
+✔ openSession：未先枚举项目则报错 (0.141875ms)
+✔ listProject：内置 su（已 bootstrap）不再带 readOnly 字段（只读徽标已移除） (0.117041ms)
+✔ listProject：**未 bootstrap**（创世态）内置 su 亦不再带 readOnly 字段 (0.080708ms)
+✔ listProject：可写的项目角色（非内置）亦不再带 readOnly 字段 (0.54075ms)
+✔ T17 listProject：hasRoles 与 primaryRoleId 原样转自门禁引擎（渲染侧据此设主位/默认选中，不硬编码 su） (0.167042ms)
+✔ T17 主入口角色一轮结束（settled）→ 触发 emitProjectChanged；非主入口角色不触发 (51.789334ms)
+✔ T20 handback 事件被外推：Interface 层的 emitEvent 收到编排的 handback 事件（类型已放宽到 OrchestrationEvent） (26.358125ms)
+✔ A-5 customerInput：Interface 透传客户通道；仅内置治理角色（su）会话被注入，且 roleId 经闭包绑定 (0.996916ms)
+✔ B Interface native picker alone grants document refs; renderer listing, cancel and another window cannot grant (5.934584ms)
+✔ B failed listing or native cancel preserves the previous imported document scope (5.235792ms)
+✔ C restricted Interface validates current scope and derives support from actual bound mode (1.095375ms)
+ℹ tests 35
+ℹ suites 0
+ℹ pass 35
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2251.880458

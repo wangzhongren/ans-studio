@@ -16,6 +16,7 @@ const fixtureHistoryKey=input=>JSON.stringify([input.projectRoot,input.roleId,in
 for(const [name,handler] of Object.entries({
  'app:recovery-state':()=>({projectRoot:ROOT,roleId:'A'}),'app:recovery-ready':()=>({ok:true}),
  'app:renderer-diagnostic':()=>({ok:true}),'window:is-maximized':()=>false,
+ 'runtime-config:get':(_e,input)=>({runtime:input.runtime,label:'Fixture engine',path:ROOT+'/.env',revision:0,application:'next-session',missingKeys:[],fields:[]}),
  'app:list-project':()=>listing,'session:open':()=>({ok:true,resumed:true,contextSource:'resumed'}),
  'session:live':()=>['A','B'],'session:stop':()=>({ok:true}),'session:operator-response':()=>({ok:true}),
  'session:history-get':(_e,input)=>({projectRoot:input.projectRoot,roleId:input.roleId,runtime:input.runtime,rows:fixtureHistories.get(fixtureHistoryKey(input))||[],error:null,skipped:0}),

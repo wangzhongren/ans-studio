@@ -60,7 +60,7 @@ interface Harness {
   streams: Record<string, OrchestrationEvent[]>;
   sent: Record<string, string[]>;
   sendOptions: Record<string, RoleSessionSendOptions[]>;
-  envelopes: { roleId: string; event: OrchestrationEvent }[];
+  envelopes: import("../../app/desktop/session.ts").SessionEventEnvelope[];
   openCalls: string[];
   /** 打开某角色时拿到的派发能力（仅 su 会话应注入）——测试直接调用以驱动路由。 */
   dispatchOf: (roleId: string) => DispatchTaskFn | undefined;
@@ -71,7 +71,7 @@ function makeHarness(opts: { failSends?: Record<string, number> } = {}): Harness
   const streams: Record<string, OrchestrationEvent[]> = { su: [], A: [], B: [] };
   const sent: Record<string, string[]> = { su: [], A: [], B: [] };
   const sendOptions: Record<string, RoleSessionSendOptions[]> = {};
-  const envelopes: { roleId: string; event: OrchestrationEvent }[] = [];
+  const envelopes: import("../../app/desktop/session.ts").SessionEventEnvelope[] = [];
   const openCalls: string[] = [];
   const openInputs: Record<string, { dispatchTask?: DispatchTaskFn }> = {};
   const stopped: Record<string, boolean> = {};
@@ -146,11 +146,11 @@ test("H-1 路由：su 派发 → 目标未开**自动开**并收到派发输入�
   assert.ok(h.openCalls.includes("A"), "目标未开会话 ⇒ **自动开启**");
   assert.deepEqual(h.sent.A, [dispatchTemplate("su", "给 A 的活", "因为排期")], "目标收到派发输入（模板文案）");
   assert.ok(
-    h.envelopes.some((e) => e.roleId === "su" && e.event.kind === "tool_call" && /已派发任务给 A/.test(e.event.summary)),
+    h.envelopes.some((e) => e.roleId === "su" && e.event.kind === "message" && (e.event.detail as {source?: string} | undefined)?.source === "delivery-note" && /已派发任务给 A/.test(e.event.summary)),
     "su 的 pane 有受理回执行"
   );
   assert.ok(
-    h.envelopes.some((e) => e.roleId === "A" && e.event.kind === "tool_call" && /已接收来自 su 的派发任务/.test(e.event.summary)),
+    h.envelopes.some((e) => e.roleId === "A" && e.event.kind === "message" && (e.event.detail as {source?: string} | undefined)?.source === "delivery-note" && /已接收来自 su 的派发任务/.test(e.event.summary)),
     "目标的 pane 有「任务到货」行"
   );
   await h.mgr.stop(null);
@@ -183,7 +183,7 @@ test("H-1 失败保留：投递失败 ⇒ 如实系统行（未丢弃）+ 放回
   await dispatch({ roleId: "A", task: "会失败一次" });
   await tick(150);
   assert.equal(h.sent.A.length, 0, "投递失败：未送达");
-  const note = h.envelopes.find((e) => e.roleId === "su" && e.event.kind === "tool_call" && /派发投递失败（目标 A）/.test(e.event.summary));
+  const note = h.envelopes.find((e) => e.roleId === "su" && e.event.kind === "message" && (e.event.detail as {source?: string} | undefined)?.source === "delivery-note" && /派发投递失败（目标 A）/.test(e.event.summary));
   assert.ok(note, "**如实系统行**（不静默）");
   assert.ok(/未丢弃/.test(note!.event.summary) && /重试/.test(note!.event.summary), "系统行说明「未丢弃 + 重试」");
 
@@ -205,7 +205,7 @@ test("H-1 校验（如实回执，不静默）：非本项目角色 / 内置治�
   assert.equal(unknown.ok, false);
   assert.ok(/不在本项目/.test(unknown.message || ""), "工具收到如实失败原因");
   assert.ok(
-    h.envelopes.some((e) => e.roleId === "su" && e.event.kind === "tool_call" && /角色 不存在 不在本项目/.test(e.event.summary)),
+    h.envelopes.some((e) => e.roleId === "su" && e.event.kind === "message" && (e.event.detail as {source?: string} | undefined)?.source === "delivery-note" && /角色 不存在 不在本项目/.test(e.event.summary)),
     "系统行如实"
   );
 
@@ -272,7 +272,7 @@ test("真机崩溃修复（钉子）：派发条目**不走 handback 渲染**；
     await tick(100);
     assert.equal(rejections.length, 0, "**不得出现未捕获拒绝**（真机崩溃钉子）");
     assert.ok(
-      h.envelopes.some((e) => e.event.kind === "tool_call" && /形状不符/.test(e.event.summary)),
+      h.envelopes.some((e) => e.event.kind === "message" && (e.event.detail as {source?: string} | undefined)?.source === "delivery-note" && /形状不符/.test(e.event.summary)),
       "坏回交应如实系统行（不崩、不静默）"
     );
     await h.mgr.stop(null);
@@ -301,4 +301,24 @@ test("H-1 闭环：su 派发 → 角色回交 → su 收到报告；不重复、
   assert.equal(h.sent.A.length, aCount, "A 无多余投递");
   assert.equal(h.sent.su.length, suCount, "su 无多余投递（不重复、不空转）");
   await h.mgr.stop(null);
+});
+
+test('delivery notes are typed system messages, never ghost tools or extra prompts on the actual dispatch path',async()=>{
+ const h=makeHarness();
+ try{
+  await h.mgr.open({projectRoot:'/proj',roleId:'su',runtime:'demo'});
+  assert.equal((await h.dispatchOf('su')!({roleId:'A',task:'one actual dispatch'}))?.ok,true);
+  await tick(100);
+  h.streams.A.push({kind:'tool_call',summary:'actual controlled tool start',runtime:'demo',roleId:'A',turnId:'actual-turn',detail:{toolName:'read_file',toolCallId:'actual-call',phase:'start'}},{kind:'accepted',summary:'actual controlled tool result',runtime:'demo',roleId:'A',turnId:'actual-turn',detail:{toolName:'read_file',toolCallId:'actual-call',phase:'result',ok:true}});
+  await tick(100);
+  const worker=h.envelopes.filter(e=>e.roleId==='A');
+  assert.equal(worker.filter(e=>e.event.kind==='tool_call').length,1,'the dispatch progress note must not add a second tool row');
+  assert.deepEqual(h.sent.A,[dispatchTemplate('su','one actual dispatch')]);assert.equal(h.sent.su.length,0,'notes never prompt the coordinator');
+  const notes=h.envelopes.filter(e=>e.event.kind==='message'&&(e.event.detail as {source?:string}|undefined)?.source==='delivery-note');
+  assert.equal(notes.length,2);
+  assert.ok(notes.some(e=>e.roleId==='A'&&e.event.summary==='已接收来自 su 的派发任务——请按任务文本执行，完成后交回报告。'));
+  assert.ok(notes.some(e=>e.roleId==='su'&&e.event.summary==='已派发任务给 A（已投递到其会话；其结果/回交会回到本会话）。'));
+  for(const note of notes){assert.equal(note.projectRoot,'/proj');assert.equal(note.runtime,'demo');assert.equal(Object.hasOwn(note.event,'turnId'),false);assert.deepEqual((note.event as {detail:unknown}).detail,{source:'delivery-note'});}
+  const actual=worker.find(e=>e.event.kind==='tool_call')!.event as {turnId?:string;detail?:{toolCallId?:string;phase?:string}};assert.equal(actual.turnId,'actual-turn');assert.equal(actual.detail?.toolCallId,'actual-call');assert.equal(actual.detail?.phase,'start');
+ }finally{await h.mgr.stop();}
 });

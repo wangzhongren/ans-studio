@@ -128,7 +128,7 @@ test("T20：来源角色保留报告，主入口不提前镜像，真实投递�
   // 产出角色自己的聊天 + 主入口角色的镜像（两边都落，即便当前不可见，切回即见）。
   assert.ok(RENDERER.includes("env.roleId"), "appendEvent 应按信封 roleId 分发到该角色的 pane（B-2）");
   // 卡片标题（自己聊天）「回交 su」；镜像标题「来自 <role> 的报告」。
-  assert.ok(RENDERER.includes("回交主入口"), "来源卡片标题说明交回主入口");
+  assert.ok(RENDERER.includes("报告声明：") && RENDERER.includes("系统按终态记录："), "来源卡片标题说明交回主入口");
   assert.ok(RENDERER.includes("来自 "), "镜像标题应为「来自 <role> 的报告」");
   assert.ok(RENDERER.includes("的报告"), "镜像标题应含「的报告」");
   // 镜像条件：当前打开会话是**产出它的角色**（自己的聊天）或**主入口角色**（镜像）——读 primaryRoleId，不硬编码。
@@ -146,17 +146,17 @@ test("T20：来源角色保留报告，主入口不提前镜像，真实投递�
   assert.ok(STYLES.includes(".is-mirror"), "styles.css 应有 .is-mirror 镜像区分样式");
   // ——— C-1（2026-10-12）：回交报告卡片——字段渲染 + 转义 + 空证据占位 + blocked 视觉区分 ———
   // 字段：角色 / 任务（若有）/ 结论 / 摘要 / 证据（逐条）。
-  assert.ok(RENDERER.includes('"角色 "') && RENDERER.includes('"，任务 "'), "卡片应含「角色 …，任务 …」字段行（任务有则示）");
+  assert.ok(RENDERER.includes("report.source.roleId") && RENDERER.includes("任务关联未知"), "卡片应含「角色 …，任务 …」字段行（任务有则示）");
   assert.ok(RENDERER.includes('"hb-summary card-md"'), "摘要应有 hb-summary + card-md（Markdown 卡块）呈现位");
   // N-4（2026-10-12 客户裁定「都要 markdown 化」）：摘要改经**同一 Markdown 管线**——仍是「模型输出禁直插」
   // （单一来源的转义/白名单在管线内）。
-  assert.ok(/Md\.renderMarkdown\(hb\.summary/.test(RENDERER), "摘要应经 Md.renderMarkdown（同一 esc 单一来源）");
-  assert.ok(RENDERER.includes("esc(e)"), "证据逐条应以 esc 转义后呈现");
+  assert.ok(RENDERER.includes("Md.renderMarkdown(preview)") && RENDERER.includes("Md.renderMarkdown(full)"), "摘要应经 Md.renderMarkdown（同一 esc 单一来源）");
+  assert.ok(RENDERER.includes("esc(reportText(item))"), "证据逐条应以 esc 转义后呈现");
   assert.ok(!/hb-summary[^"]*">'\s*\+\s*hb\.summary/.test(RENDERER), "摘要不得未经管线处理直插 innerHTML");
   // 空证据占位（不留空白）。
   assert.ok(RENDERER.includes("（未提供证据）"), "证据为空应显示「（未提供证据）」占位");
   // blocked 的明显视觉区分（非仅文字）：is-blocked 类 + 语义色竖条样式。
-  assert.ok(RENDERER.includes('if (blocked) card.className += " is-blocked";'), "非完成状态卡片保持 is-blocked 可见区分");
+  assert.ok(RENDERER.includes('(report.status !== "completed" ? " is-blocked" : "")'), "非完成状态卡片保持 is-blocked 可见区分");
   assert.ok(STYLES.includes(".msg-handback.is-blocked"), "styles.css 应有 .msg-handback.is-blocked 视觉区分");
   assert.ok(/\.msg-handback\.is-blocked\s*\{[^}]*var\(--danger\)/.test(STYLES), "blocked 区分应使用语义色（左侧竖条）");
 });
@@ -193,7 +193,7 @@ test("T28：Pi 配置面板存在——3 项必填 + 1 项「高级」（可折�
   const tabsPos = INDEX.indexOf('id="right-tabs"');
   const tabPiPos = INDEX.indexOf('id="tab-pi"');
   const winMinPos = INDEX.indexOf('id="win-min"');
-  assert.ok(tabsPos >= 0 && tabPiPos > tabsPos && winMinPos > tabPiPos, "tab-pi 应在图标簇内、窗口按钮之前（右上角）");
+  assert.ok(tabsPos >= 0 && tabPiPos > INDEX.indexOf('class="sidebar-foot"') && tabPiPos < INDEX.indexOf('id="sidebar-role-count"') && winMinPos < tabsPos, "tab-pi 应在图标簇内、窗口按钮之前（右上角）");
   // token 字段默认掩码（type=password）——值以掩码显示、默认不回显。
   assert.ok(/id="pi-inp-ANTHROPIC_AUTH_TOKEN"[^>]*type="password"/.test(INDEX), "token 字段应为 password 掩码");
   // 呈现逻辑：读/存经 window.desktop（主进程掩码/读写，单一来源）；不作判定。
@@ -512,7 +512,7 @@ test("工具行瘦身（2026-10-12 客户裁定）：只显示状态与目标—
   // 渲染侧接线：tool_call/accepted 与回放的工具行都过瘦身映射；`denied` 全量（治理信号）；detail 一律不渲染。
   assert.ok(RENDERER.includes("Tr.activityOf(ev)"), "实时工具行应经瘦身映射");
   assert.ok(RENDERER.includes("Tr.activityOf(row)"), "回放工具行应经瘦身映射");
-  assert.ok(RENDERER.includes("appendActivity(pane, failure)") && RENDERER.includes("activity.deniedSummary || activity.visibleSummary"), "denied 行保持全量（拒绝原因与允许路径）");
+  assert.ok(RENDERER.includes("if (Tr.isToolActivity(ev)) appendActivity(pane, Tr.activityOf(ev))") && RENDERER.includes('else if (!appendTurnTerminal(pane, ev)) sysRow(pane, "sys-call", ICONS.deny, ev.summary)') && RENDERER.includes("activity.deniedSummary || activity.visibleSummary"), "denied 行保持全量（拒绝原因与允许路径）");
   assert.ok(!/(?:innerHTML|textContent)\s*=.*ev\.detail|(?:esc|renderMarkdown)\(ev\.detail/.test(RENDERER), "detail 正文不进入 HTML/文本；只读取实际 outcome 和工具元数据");
   const index = fs.readFileSync(path.join(APP_DIR, "index.html"), "utf8");
   assert.ok(index.indexOf('src="tool-rows.js"') > 0 && index.indexOf('src="tool-rows.js"') < index.indexOf('src="renderer.js"'), "tool-rows.js 应先于 renderer.js 加载");
@@ -561,7 +561,7 @@ test("K-1：输入区为**圆角胶囊**、发送箭头**内嵌框内**；快捷
   assert.ok(capStart >= 0 && sendPos > capStart, "发送键应在胶囊容器**之内**（位于其开始标签之后）");
   assert.ok(!INDEX.includes("composer-row"), "旧的「输入框 + 独立发送钮」行结构已退役");
   assert.ok(
-    INDEX.includes("Enter 发送，Shift+Enter 换行"),
+    INDEX.includes("Enter 发送，Shift + Enter 换行"),
     "快捷键提示（placeholder）保留"
   );
   assert.ok(
@@ -613,7 +613,7 @@ test("P0-1 图片接线：附件随消息**带载荷上送**（IPC→Interface �
   assert.ok(SESS.includes("await this.sendDelivery(entry, origin, text, opts);"), "直发带原opts与原投递身份进入唯一发送helper");
   const sendDelivery = SESS.slice(SESS.indexOf("  private async sendDelivery("), SESS.indexOf("  private trimDeliveryOrigins("));
   assert.ok(sendDelivery.startsWith("  private async sendDelivery(") && sendDelivery.includes("requiresHandback = false") && sendDelivery.includes("let promptOptions: RoleSessionSendOptions = { ...opts, handback: { required: requiresHandback } };"), "helper每次浅包装原opts并明确来源；即时聊天默认false，原图片引用保留");
-  assert.ok(SESS.includes('await this.sendDelivery(entry, origin, sent.text, sent.opts, sent.kind === "dispatch");'), "出队仅dispatch要求回交true，客户聊天及回交false");
+  assert.ok(SESS.includes('await this.sendDelivery(entry, origin, sent.text, sendOptions, sent.kind === "dispatch");'), "出队仅dispatch要求回交true，客户聊天及回交false");
   assert.ok(sendDelivery.includes("entry.handle.runtime !== undefined || origin.clientMessageId !== undefined || opts?.onTurnStarted !== undefined"), "只有真实runtime/显示来源/原ack观察者需要必要通知包装");
   assert.ok(sendDelivery.includes("promptOptions = { ...promptOptions, onTurnStarted };"), "ack浅包装来源包并补通知，images数组及图片对象仍为原引用");
   assert.ok(!/\bimages\s*:|\bopts\.[\w]+\s*=|structuredClone|JSON\.parse|\.map\(/.test(sendDelivery), "helper不得重造图片、复制原图或修改调用者opts");
@@ -642,7 +642,7 @@ test("P0-2 停止入口：#btn-halt 在输入框区（发送钮左侧）仅忙�
   assert.ok(capsulePos >= 0 && haltPos > capsulePos && sendPos > haltPos, "停止钮应在输入框胶囊内、发送钮**左侧**（客户反馈后位置）");
   const headStart = INDEX.indexOf('class="chat-head"');
   const headEnd = INDEX.indexOf("</header>", headStart);
-  assert.ok(headStart >= 0 && headEnd > headStart && !INDEX.slice(headStart, headEnd).replace(/<button id="runtime-select"[\s\S]*?<\/button>/, "").includes("<button"), "聊天头除已批准引擎combobox外不得有按钮（停止钮已移走）");
+  assert.ok(headStart >= 0 && headEnd > headStart && !INDEX.slice(headStart, headEnd).replace(/<button id="(?:runtime-select|tab-work|tab-card)"[\s\S]*?<\/button>/g, "").includes("<button"), "聊天头除已批准引擎combobox外不得有按钮（停止钮已移走）");
   assert.ok(!INDEX.includes('id="btn-stop"'), "退役的「结束会话」按钮不得回归");
   assert.ok(!RENDERER.includes("btn-stop"), "渲染源不得再出现 btn-stop（防回潮钉的子串口径不被新钮破坏）");
   // 圆形次级钮：同款 32px 圆形；hidden 显式补 display:none（display:flex 会压掉 [hidden] 默认）。
@@ -655,7 +655,7 @@ test("P0-2 停止入口：#btn-halt 在输入框区（发送钮左侧）仅忙�
   assert.ok(/btn\.hidden = !busy;/.test(RENDERER), "空闲即隐藏（hidden 属性驱动）");
   assert.ok(!/function updateHaltButton\(\) \{[\s\S]{0,320}btn-send/.test(RENDERER), "停止钮显隐不得触碰发送钮（两钮**并存**、各司其职）");
   const callSites =
-    /function setChatHeader\(role\) \{[\s\S]{0,300}updateHaltButton\(\);/.test(RENDERER) &&
+    (RENDERER.match(/function setChatHeader\(role\) \{([\s\S]*?)\n  \}/)?.[1] || "").includes("updateHaltButton();") &&
     /renderQueueRow\(roleId\);[\s\S]{0,200}updateHaltButton\(\);/.test(RENDERER) &&
     /state\.roleBusy = \{\};[\s\S]{0,200}updateHaltButton\(\);/.test(RENDERER);
   assert.ok(callSites, "三处刷新点齐备（选角色/快照推送/换项目清零）");
@@ -867,7 +867,7 @@ test("N-3：右栏「待办 / 队列」——夹具逐条渲染（来源/摘要/
   assert.ok(RENDERER.includes("无进行中或排队消息"), "空队列显式占位");
   assert.ok(/esc\(v\.pos\)/.test(RENDERER) && /esc\(v\.source\)/.test(RENDERER) && /esc\(v\.text\)/.test(RENDERER), "每字段 esc（禁直插）");
   assert.ok(RENDERER.includes('当前工作') && RENDERER.includes('排队'), "工作与排队明确分开");
-  assert.ok(RENDERER.includes('setTabBadge("card", views.length)'), "角标来自同份工作快照");
+  assert.ok(RENDERER.includes('setTabBadge("work", views.length + (roleId ? openRequestCountFor(roleId) : 0))'), "角标来自同份工作快照");
   assert.ok(RENDERER.includes("is-running"), "「进行中」行有视觉区分钩子");
   assert.ok(STYLES.includes(".queue-list") && STYLES.includes(".q-item.is-running") && STYLES.includes(".q-src"), "样式钩子齐备");
 });
@@ -882,12 +882,12 @@ test("N-4：变更记录/文档索引/回交卡摘要一并 Markdown 化（同�
   // 三接入点：都经 `Md.renderMarkdown`（同一函数、同一配置）；旧纯文本路径退役。
   assert.ok(/Md\.renderMarkdown\(role\.changelog\.text\)/.test(RENDERER), "变更记录正文经 Md");
   assert.ok(/Md\.renderMarkdown\(md\)/.test(RENDERER), "文档索引（路径清单）经 Md");
-  assert.ok(/Md\.renderMarkdown\(hb\.summary/.test(RENDERER), "回交卡摘要经 Md");
+  assert.ok(RENDERER.includes("Md.renderMarkdown(preview)") && RENDERER.includes("Md.renderMarkdown(full)"), "回交卡摘要经 Md");
   assert.ok(!RENDERER.includes("esc(role.changelog.text)"), "变更记录不再走纯文本 esc 路径");
   assert.ok(!RENDERER.includes("esc(hb.summary"), "回交卡摘要不再走纯文本 esc 路径");
   // 卡片其余部分纪律不变：**证据列表**保持逐条 esc（不拼成一段 Markdown）。
   assert.ok(
-    /hb\.evidence\.map\(function \(e\) \{ return '<li class="hb-ev">' \+ esc\(e\)/.test(RENDERER),
+    RENDERER.includes("esc(reportText(item))") && RENDERER.includes('<ul class="hb-evidence">'),
     "证据条目逐条 esc（保持列表——不拼成一段 Markdown）"
   );
   // XSS 反向用例：逐接入点载荷（含 <script>/<img onerror>/<iframe>）经同一模块一律为转义文本、不得成标签。
@@ -1010,7 +1010,7 @@ test("Q-2：窗口化行模型（阈值 150 / 缓冲 30 / spacer / rAF 合帧）
   // 语义④回放惰性：整段包批量，行按需 build（长转录不一次性实体化/解析）。
   const replayBody = RENDERER.slice(RENDERER.indexOf("  function replayHistory("), RENDERER.indexOf("  /** 单条回放行"));
   assert.ok(replayBody.indexOf("batchDepth += 1;") >= 0 && replayBody.indexOf("batchDepth += 1;") < replayBody.indexOf("appendReplayRow(pane") && replayBody.includes("finally") && replayBody.includes("batchDepth -= 1;"), "回放全部呈现被同一批量/finally包住（不 per-row 滚动/布局）");
-  assert.ok(/function appendReplayRow[\s\S]{0,900}registerRow\(/.test(RENDERER), "回放行走惰性行表（build 在挂载时才跑）");
+  assert.ok(RENDERER.slice(RENDERER.indexOf("  function appendReplayRow("), RENDERER.indexOf("  async function refreshProject(")).includes("var rec = registerRow(") && RENDERER.slice(RENDERER.indexOf("  function appendReplayRow("), RENDERER.indexOf("  async function refreshProject(")).includes("function () {"), "回放行走惰性行表（build 在挂载时才跑）");
   // 批量收尾副作用（左树每批一次——原先每事件一次）。
   assert.ok(/function flushBatchSideEffects\(\) \{\s*if \(batchDepth > 0\) return;\s*renderRoleTree\(\);/.test(RENDERER), "左树重渲染每批至多一次");
   // 无计时器纪律不破（rAF 不算计时器）。
@@ -1124,7 +1124,7 @@ test("右栏抽屉：默认不占屏（col-right 退役）；图标簇两枚（�
   assert.ok(!INDEX.includes("col-right"), "右栏常驻列应退役（.col-right 不在 index.html）");
   assert.ok(INDEX.includes('id="right-drawer"'), "应有右侧抽屉 #right-drawer");
   assert.ok(STYLES.includes("#right-drawer.open") && STYLES.includes("position: absolute"), "抽屉应为覆盖层（absolute + .open 滑出）");
-  assert.ok(STYLES.includes("grid-template-columns: 272px minmax(0, 1fr);"), "栅格应为两列（右栏不占列）");
+  assert.ok(STYLES.includes("grid-template-columns:208px minmax(0,1fr)") && STYLES.includes("grid-template-columns:176px minmax(0,1fr)") && STYLES.includes("max-width:800px"), "栅格应为两列（右栏不占列）");
   assert.ok(!/setTimeout|setInterval/.test(RENDERER.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "")), "无计时器纪律不破（抽屉过渡用 CSS）");
   // ② 图标簇：**两枚**（角色资料/Pi 设置）在标题栏控制区、窗口按钮之前；不算 .win-btn（三窗口按钮守卫不破）。
   //    第二轮裁定（2026-10-13）：待办/队列归角色——tab-todo/tab-queue 退役（HTML 与渲染侧接线都不留）。
@@ -1156,7 +1156,7 @@ test("右栏抽屉：默认不占屏（col-right 退役）；图标簇两枚（�
   // ⑤ 角标归角色（收起不丢信息）：角色资料图标角标 = 当前选中角色的待办深度（进行中+排队视图行数；
   //    同一 role-state 快照、无新数据源；继承原待办图标角标语义）。
   assert.ok(/function renderTabs\(\) \{[\s\S]{0,300}queueViewsFor\(roleId\)/.test(RENDERER), "角标应取 queueViewsFor（选中角色的进行中+排队）");
-  assert.ok(/setTabBadge\("card", views\.length\)/.test(RENDERER), "角色资料图标角标 = 当前选中角色待办深度");
+  assert.ok(RENDERER.includes('setTabBadge("work", views.length + (roleId ? openRequestCountFor(roleId) : 0))'), "角色资料图标角标 = 当前选中角色待办深度");
   assert.ok(!RENDERER.includes('setTabBadge("todo"') && !RENDERER.includes('setTabBadge("queue"'), "退役图标不再有角标逻辑");
   assert.ok(/function setTabBadge\(id, n\) \{[\s\S]{0,300}el\.hidden = false;/.test(RENDERER), "角标 >0 才显示（hidden 控制）");
   // v2工作单列表在资料前，全文与资料阅读按角色保留。
@@ -1166,7 +1166,7 @@ test("右栏抽屉：默认不占屏（col-right 退役）；图标簇两枚（�
   assert.ok(RENDERER.includes('captureDrawerReading();') && RENDERER.includes('restoreDrawerReading(roleId);'), "快照更新保持全文与资料阅读状态");
   assert.ok(RENDERER.includes('sec("边界条目", entries.length'), "边界条目组保留");
   assert.ok(RENDERER.includes('sec("变更记录", role.changelog ? null : "无"'), "变更记录组保留");
-  assert.ok(RENDERER.includes('sec("文档", role.docs && role.docs.length'), "文档组保留");
+  assert.ok(RENDERER.includes('sec("文档", role.docs && role.docs.filter'), "文档组保留");
   // ⑦ Pi 面板迁入抽屉：面板本体在 #right-drawer 内、显隐由 tab 状态驱动（保存/掩码逻辑一字不动）。
   const drawerPos = INDEX.indexOf('id="right-drawer"');
   const piPos = INDEX.indexOf('id="pi-panel"');
@@ -1204,7 +1204,7 @@ test("D-1 修复：回放去重——同一份历史幂等（skip）、增长走
   assert.equal(UL.replayPlan({ rows: anchored }, [{ ...rr("user", "确认"), requestId: "op-1", anchorKey: "confirm\u0000t", anchor: "conclusion" }]).action, "full", "锚点字段变化同样触发全量（卡落位不漂）");
   // 渲染侧接线：replayHistory 走纯函数策略；skip 幂等返回；full+prev ⇒ 重建 pane；增量只回放尾巴。
   assert.ok(RENDERER.includes("UiLabels.replayPlan(prev, rows)"), "replayHistory 应经纯函数策略");
-  assert.ok(/plan\.action === "skip"\) return;/.test(RENDERER), "skip ⇒ 幂等返回（不追加）");
+  assert.ok(/plan\.action === "skip"\) \{[\s\S]{0,260}return;/.test(RENDERER), "skip ⇒ 幂等返回（不追加）");
   assert.ok(/plan\.action === "full"\) \{[\s\S]{0,180}if \(oldList && oldList\.rows\.length\) pane = rebuildPane\(roleId\);/.test(RENDERER) && RENDERER.includes("preserveUncoveredRows(oldList, nextCounts)"), "full遇既有行必须重建并保留未覆盖内容（含首次live→history，不追加副本）");
   assert.ok(/var from = plan\.action === "append" \? plan\.from : 0;/.test(RENDERER), "增量只回放尾巴");
   assert.ok(/replayState\[roleId\] = \{ rows: rows/.test(RENDERER), "每次回放后记住状态（去重判据）");
@@ -1243,7 +1243,7 @@ test("P1-1 UI：待办「全文」展开与「撤回」——仅客户消息且�
   assert.ok(SESS.includes("withdraw(targetInput: string | SessionTarget, id: string): WithdrawResult"), "SessionManager.withdraw 三态口径");
   assert.ok(SESS.includes("该条已进入「进行中」，撤回无效"), "进行中撤回无效如实回错（绝不从执行里抽条）");
   assert.ok(SESS.includes("派发/回交属治理流）——只读，不可撤回"), "派发/回交只读口径（与非消息拒绝同语义）");
-  assert.ok(SESS.includes("id: i.dedupKey, full: i.text"), "快照条目带 id/full（单一数据源）");
+  assert.ok(SESS.includes('id: i.dedupKey, full: i.kind === "handback" ? i.safeText') && SESS.includes(': i.text'), "快照条目带 id/full（单一数据源）");
   assert.ok(RENDERER.includes('id: typeof o.id === "string" ? o.id : ""') && RENDERER.includes('full: typeof o.full === "string" ? o.full : ""'), "渲染侧防御式转写 id/full");
   assert.ok(STYLES.includes(".q-withdraw") && STYLES.includes(".q-full") && STYLES.includes(".q-toggle"), "样式钩子齐备");
 });
@@ -1276,4 +1276,36 @@ test("P1-3：切换项目一次性防呆——有 busy 才出内联确认条（#
   );
   assert.ok(INDEX.includes("不落聊天历史"), "注释写明口径（动作防呆，不是会话内容）");
   assert.ok(STYLES.includes(".switch-confirm") && STYLES.includes(".switch-confirm[hidden] { display: none; }"), "样式钩子（含 [hidden] 显隐钉）");
+});
+
+test("V2 target batch receipt uses one compact factual dl without per-report execution claims", () => {
+  assert.ok(RENDERER.includes('class="report-facts delivery-batch-facts"'));
+  for (const label of ['接收历史', '目标输入记录', '目标轮次结果']) assert.ok(RENDERER.includes('<dt>' + label + '</dt>'));
+  assert.ok(STYLES.includes('.msg-delivery > .persistence-state { margin:14px 0; padding:0; border:0; }'));
+  assert.ok(!RENDERER.includes('<p class="delivery-execution">'));
+});
+
+test("SV13 received reply folding uses exact receiver turn independently of report source turn", () => {
+  assert.ok(RENDERER.includes('function applyReportedTask(pane, turnId, receiver)'));
+  assert.ok(RENDERER.includes('applyReportedTask(pane, turnId, true);'));
+  assert.ok(RENDERER.includes('本轮回交处理回复原文（展开）'));
+  assert.ok(RENDERER.includes('!receiver && taskTurn(rec) === turnId'));
+});
+
+test("cold report snapshots sort copied list by valid actual times only, keeping ties and unknown wire order", () => {
+  const match = RENDERER.match(/  function orderedHistoryReports\(reports\) \{([\s\S]*?)\n  \}/);
+  assert.ok(match, "cold report sort helper exists");
+  const order = new Function('reports', match[1]);
+  const newer = {reportId:'446dd',at:'2026-10-15T08:46:00Z'}, older = {reportId:'8b6c',at:'2026-10-15T08:05:00Z'};
+  const wire = [newer, older];
+  assert.deepEqual(order(wire), [older, newer]);
+  assert.deepEqual(wire, [newer, older], 'payload is never mutated');
+  assert.equal(order(wire)[0], older, 'report identities remain original objects');
+  const tie = {...older,reportId:'tie'};
+  assert.deepEqual(order([older,tie]), [older,tie]);
+  for (const at of [undefined,'invalid','']) {
+    const unknown = {reportId:'unknown',at};
+    assert.deepEqual(order([newer,unknown,older]),[newer,unknown,older]);
+  }
+  assert.equal((RENDERER.match(/orderedHistoryReports\(payload\.reports\)/g)||[]).length,2,'both cold replay paths use copy ordering');
 });

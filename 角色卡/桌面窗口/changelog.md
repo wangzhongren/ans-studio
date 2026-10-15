@@ -1,5 +1,7 @@
 # 桌面窗口 变更记录
 
+- 2026-10-15：ANS Governance 依据客户确认的总方案 revision 2 / B revision 2，核实无属主冲突后精确新增 8 个 B Model/Pipeline/Service/Provider 源码单文件与 1 个测试单文件权限；同步角色职责、必读资料、functional-description 及 MD/YAML 镜像，Model 唯一主属为桌面窗口。未扩目录权限、未新建角色、未改业务/测试或已批准设计。治理结构核验见[治理记录](docs/change/2026-10-15_change_restricted-document-boundary.md)；B 实现与真实桌面测试由原固定属主后续完成。
+
 - 2026-10-14：客户确认双括号字印并要求更新README和桌面图标；两处共用 `app/desktop/assets/ans-bracket-seal.png`。窗口/macOS Dock 独立检查、typecheck与diff检查通过。[记录](docs/change/2026-10-14_change_bracket-seal-icon.md)。
 
 - 2026-10-14：按客户要求接入悬桥 A 窗口与 macOS Dock 图标；真实 Electron 独立检查通过。客户随后指出与整体风格不搭，产品与 UI/UX 结合现有 CSS 和界面截图重新讨论，生成暖灰/炭灰「双括号字印」PNG 候选 `app/desktop/assets/ans-bracket-seal-concept.png`，尚未替换运行时配置。[接入证据](docs/change/2026-10-14_change_suspended-bridge-icon.md)。

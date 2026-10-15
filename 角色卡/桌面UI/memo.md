@@ -26,3 +26,20 @@ U1R渲染阶段已实现turn/event/原文+次数合并及独立clientMessageId�
 U1R最终：仅迁移renderer.test.ts旧直发handle名字守卫；实际sendDelivery区分legacy原包/单参与真实ack浅包装，images保持同引用、原callback与身份校验保留。自有60/60、tsc/scope diff0；T1actual23生产fingerprint全部当前匹配，非本侧重跑。最终19file hash5c85d48bca3060f7847fe20c8dcb87e59a5bb4a476805b64ce2ebf4a872b73ba，原阶段/红记录保留，见docs/fix/2026-10-14_fix_live-history-merge.md。
 
 U1R2本侧冻结：原卡按真实request/conclusion重插与显式null token保留；60/12/tsc绿。新19file候选b4882fe2e0c674e8d3b3d1185d60a873e9768d0529b48e3bc04c6cdf97b531aa，产品renderer已变，T1实际23/旧119/锚点14/全仓待重验。详见docs/fix/2026-10-14_fix_preserved-card-replay-anchor.md。
+
+- 2026-10-15 UXv2六源接线：源HandbackEvent的实际公开字段是report/liveReport/reportPersistence（无raw handback）；目标新C文本只读安全副本且modelInputRecorded:false，不能再标完整模型原文。B只消费Window签发epoch/docID，P3先来源角色列表显选，不按evidence找路径。五保存/查询方法与两可取消状态事件同ID归并，raw/private状态不造UI能力。当前实现与最终hash见docs/change/2026-10-15_change_complete-flow-ui.md，批准13文档不可改写。
+
+
+2026-10-15 root真实GUI首红补修仍属UI-P1–7-1：当前轮新增转录不是旧上下文；send通用error不是aborted事实；ACK不是inputAccepted；sessionCurrent不是ready；终态卡radio也须只读。最终候选renderer daf00c90 / tool-rows97b688e5，受控证据与root真实验收分开，批准设计及13hash未改。
+
+
+2026-10-15 最后终态展示补修：renderer efd2e33c继承daf，只把同scope/actualturn/structuredoutcome的普通诊断与收尾放同一行，保不同诊断与工具、legacy。strictRED→12GREEN及既有全组受控回归通过；原生验收另属root，IME仍标daf。所有Electron自测已结束，避免与root CUA同bundle守卫干扰。
+
+
+2026-10-15 P3 nested真实首红补修：renderer394a7abb，按既有section身份同时保card/changes/docs内滚及outer/expanded/原入口focus；位置严格首RED→GREEN11（9bool+2快照），原全组与IME26当前字节均过。rootGUI退出后集中测试，全部窗口退出后释放slot；当前原生验收由root，批准13/依赖48未改。
+
+
+2026-10-15 UI-VISUAL-V2-1：严格按e95/2547结构实施，最终rendererb5cf95d/styles56d2ff9/indexbb5c29a；3source+2tests变动，其余P1P7保留。work独立聚合实际source/received safe报告，ID只在概览去重，attempt不删。SV13 cold可靠turn中性入口/live需真实settled，flags入口可读。所有自测已quit，root接管；received受控PNG为中间帧明确excluded，不能拿它证明布局通过。
+
+
+2026-10-15 原生V2空态仍指右上角首红后，仅按root授权改三处设置/资料指路字符串，当前index7beda47c、renderer5b80a727、styles56d2ff9e。无新Electron，静态67/语法/diff0；结构版full/visual等保bb5/b5执行版本，root独占GUI重载实际词句，不能将旧图当新native证明。

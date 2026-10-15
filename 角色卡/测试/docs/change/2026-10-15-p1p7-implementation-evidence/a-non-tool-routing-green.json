@@ -1,0 +1,9 @@
+{
+  "command": "node --test --test-name-pattern='non-tool engine failure' test/测试/p1p7-tool-display-integration.test.ts",
+  "serviceSha": "991146051f429ef26b46b21154a574086b312233047b29c99a9d522c01280f02",
+  "chunk_id": "f08acb",
+  "wall_time_seconds": 0.016924125,
+  "exit_code": 0,
+  "original_token_count": 56,
+  "output": "✔ independent A: a real non-tool engine failure must not become a tool display diagnostic (16.542458ms)\nℹ tests 1\nℹ suites 0\nℹ pass 1\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 110.057417\n"
+}

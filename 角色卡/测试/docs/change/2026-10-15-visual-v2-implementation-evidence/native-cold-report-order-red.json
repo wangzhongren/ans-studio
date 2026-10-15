@@ -1,0 +1,23 @@
+{
+  "producer": "root fixed测试",
+  "evidenceAX": "native-nested-960-close-ax.txt",
+  "observedSourceCardOrder": [
+    {
+      "reportId": "446dd7fe21b53dc0f5324e560106645806f075476f1a33005f13c4f1c9f2ffb9",
+      "at": "2026-10-15T08:46:35.455Z",
+      "summaryPrefix": "【V2-FIX-1】独立回归任务（与 V2-REAL-1 无关、非重试）：按指令恰好"
+    },
+    {
+      "reportId": "8b6c9ca7a44fda52112515ef224920d319cfa7c75c72c8c768ed4086fd5b84cd",
+      "at": "2026-10-15T08:05:55.610Z",
+      "summaryPrefix": "按 V2-REAL-1 严格顺序完成了 6 步真实只读验证，全部结果（命令原文、原始"
+    }
+  ],
+  "actualAXPrefixes": [
+    "126 text 报告声明：已完成 Pi · 任务关联未知 报告原文摘录 【V2-FIX-1】独立回归任务（与 V2-REAL-1 无关、非重试）：按指令恰好执行一次 run_shell",
+    "145 text 报告声明：已完成 Pi · 任务关联未知 报告原文摘录 按 V2-REAL-1 严格顺序完成了 6 步真实只读验证，全部结果（命令原文、原始输出、错误原文、退出码）如实写入 角色卡/测试/docs/change/v2-real-1.md（10542 字节）。未修改任何源码/测试/配置文件，未安装依赖，"
+  ],
+  "rootCause": "provider returns filename-hash order, renderer cold snapshot append kept it; independent source report cards reversed actual submission time",
+  "requiredFix": "copy cold reports list and stably order by valid at only if all valid, preserve unknown/ties; no event-row/live reordering",
+  "status": "owner strict red/green, native hot reload pending"
+}

@@ -1,0 +1,15 @@
+{
+  "at": "2026-10-15T04:23:25.031Z",
+  "projectRoot": "/private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-p1p7-desktop-QWGoKc",
+  "command": "npm test",
+  "exitCode": 0,
+  "pass": 31,
+  "coverage": "Independent direct baseline in fresh p-limit fixture, not agent/desktop execution",
+  "hashes": {
+    "index.js": "66694e944d5dfeec1237fd304b3c24369b7ee18de717778750b7712f5dd30f3c",
+    "test.js": "d0999b4a92161f0fd35c819d0c7554098260aaf54fdac908fe936194c1dc5587",
+    "package.json": "daa6b0d168d7197eccbfef1c678e8f00b79d063129bf48f4ee2db38dc605ca7f",
+    "index.d.ts": "d367543c32631ba661e044b1d1f44deed2bbf54654dd0eb251061337162514ee"
+  },
+  "output": "npm warn Unknown user config \"ELECTRON_MIRROR\". This will stop working in the next major version of npm.\nnpm warn Unknown user config \"ELECTRON_BUILDER_BINARIES_MIRROR\". This will stop working in the next major version of npm.\n\n> p-limit@7.3.3 test\n> xo && ava && tsd\n\n\n  scripts/benchmarker.js:3:1\n  ⚠  3:1  Unexpected todo comment: TODO: I will move this to a proper....  no-warning-comments\n\n  1 warning\n\n\n  ✔ throws on invalid concurrency argument\n  ✔ throws the concurrency validation error for null\n  ✔ clearQueue\n  ✔ accepts additional arguments\n  ✔ map rejects with the iterable error when it throws before the first item\n  ✔ continues after sync throw\n  ✔ runs all tasks asynchronously\n  ✔ map resolves to an empty array for an empty iterable\n  ✔ non-promise returning function\n  ✔ map accepts an iterable (set)\n  ✔ map accepts an iterable (array iterator)\n  ✔ map accepts array-like inputs\n  ✔ map passes sequential indexes for a generator\n  ✔ map rejects with the mapper error\n  ✔ map\n  ✔ propagates async execution context properly\n  ✔ limitFunction exposes clearQueue\n  ✔ shared context with a limited provider helper\n  ✔ map passes index and preserves order with concurrency\n  ✔ map works when detached from the limit\n  ✔ map does not leave unhandled rejections when the iterable throws\n  ✔ clearQueue rejects pending promises when enabled (102ms)\n  ✔ map rejects immediately with the iterable error and still runs already scheduled tasks (102ms)\n  ✔ accepts options object (102ms)\n  ✔ does not ignore errors (113ms)\n  ✔ change concurrency to bigger value (153ms)\n  ✔ change concurrency to smaller value (203ms)\n  ✔ concurrency: 1 (605ms)\n  ✔ concurrency: 4 (2.2s)\n  ✔ limitFunction() (2.5s)\n  ✔ activeCount and pendingCount properties (3s)\n  ─\n\n  31 tests passed\n"
+}

@@ -1,0 +1,15 @@
+[
+  {
+    "draft": "保留我的原草稿，不要覆盖。",
+    "focus": "message",
+    "step": "failure suggestion preserves existing"
+  },
+  {
+    "draft": "测试依赖未安装，请先说明恢复步骤，暂不执行安装。",
+    "step": "empty failure suggestion fills"
+  },
+  {
+    "draft": "示例也不能覆盖这份草稿。",
+    "step": "example preserves existing"
+  }
+]

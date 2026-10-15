@@ -36,8 +36,18 @@ export interface ReplayRow {
   eventKind?: string;
   /** Explicit Core input identity; absent on unknown legacy echoes. */
   input?: import("../../src/model/runtime.ts").PromptInputEventDetail;
+  inputProvenance?: import("../../src/model/runtime.ts").RuntimeInputProvenanceV1;
+  inputPresentation?: import("../../src/model/runtime.ts").RuntimeLiveHandbackPresentationV1;
+  inputTextProjection?: import("../../src/model/runtime.ts").RuntimeInputTextProjectionV1;
+  deliveryReceipt?: import("../../src/model/runtime.ts").RuntimeDeliveryReceiptV1;
+  deliveryBoundary?: { version: 1; deliveryId: string; attemptId: string; turnId: string; stage: 'provider-may-start' };
+  textProjection?: import("../../src/model/runtime.ts").DisplayTextV1;
+  /** Only parser facts, never text-template targets, qualify for the neutral projection. */
+  legacyTargetSource?: 'argument' | 'tool-detail' | 'same-call' | 'template-only';
+  legacyStatusSource?: import("../../src/model/runtime.ts").RuntimeLegacyToolFactsV1['statusSource'];
+  metadataOmissions?: import("../../src/model/runtime.ts").RuntimeProtectedLegacyHistoryEntryV1['metadataOmissions'];
   /** 桌面内部展示事实；旧历史/旧推送可以缺省，渲染端诚实降级。 */
-  activity?: { toolName: string; target: string; phase: "call" | "start" | "blocked" | "result"; status: "call" | "completed" | "returned" | "failed" | "unknown"; toolCallId?: string; turnId?: string; ok?: boolean };
+  activity?: { toolName: string; target: string; phase: "call" | "start" | "blocked" | "result"; status: "call" | "completed" | "returned" | "failed" | "unknown"; toolCallId?: string; turnId?: string; ok?: boolean; display?: import("../../src/model/runtime.ts").ToolDisplayV1 };
   /**
    * 关联 id（真机缺陷修复 2026-10-12）：交互工具（request_confirmation / request_choice）的
    * **pi toolCallId**——调用行与其结论行**带同一个值**（结论行经 `toolCallId` 字段对上调用行）。
@@ -145,6 +155,7 @@ function rowsFromEntry(entry: unknown, interactionCalls: Map<string, string>, to
           const args = asRecord(b.arguments);
           const target = typeof args?.path === "string" ? args.path : typeof args?.command === "string" ? args.command : "";
           if (callId) toolTargets.set(callId, target);
+          row.legacyTargetSource = "argument";
           row.activity = { toolName: name, target, phase: "call", status: "call", ...(callId ? { toolCallId: callId } : {}) };
           const anchorKey = anchorKeyForToolCall(name, b.arguments);
           if (callId !== "" && anchorKey !== null) {
@@ -171,9 +182,11 @@ function rowsFromEntry(entry: unknown, interactionCalls: Map<string, string>, to
     // 仅消费本仓工具的确定首行模板；文件正文/stdout中的词不参与失败判断。
     const head = text.split(/\r?\n/)[0];
     const shell = name === "run_shell" ? /^run_shell 已执行：(.+)（exit (-?\d+|\?)(?:，signal [^）]+)?）$/.exec(head) : null;
-    if (!target && shell) target = shell[1];
+    row.legacyTargetSource = typeof details?.path === 'string' ? 'tool-detail' : toolTargets.get(callId) ? 'same-call' : undefined;
+    if (!target && shell) { target = shell[1]; row.legacyTargetSource = 'template-only'; }
     const knownFailure = name === "read_file" && /^read_file 失败：.+（.+）$/.test(head) || !!(shell && shell[2] !== "?" && Number(shell[2]) !== 0);
     const failed = m.isError === true || details?.ok === false || details?.status === "failed" || knownFailure;
+    row.legacyStatusSource = knownFailure && m.isError !== true && details?.ok !== false && details?.status !== 'failed' ? 'legacy-classifier' : typeof m.isError === 'boolean' ? 'native-result' : typeof details?.ok === 'boolean' || typeof details?.status === 'string' ? 'tool-details' : 'legacy-classifier';
     if (failed) row.kind = "denied";
     row.activity = { toolName: name, target, phase: "result", status: failed ? "failed" : details?.status === "completed" && details?.ok !== false ? "completed" : m.isError === false ? "returned" : "unknown",
       ...(callId ? { toolCallId: callId } : {}), ...(typeof details?.turnId === "string" ? { turnId: details.turnId } : {}), ...(typeof details?.ok === "boolean" ? { ok: details.ok } : {}) };
@@ -319,4 +332,23 @@ export async function probeSessionFile(projectRoot: string, roleId: string): Pro
 
 function reasonOf(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
+}
+
+
+/** Pure conversion of existing parser facts; it neither expands IO nor trusts template-derived commands. */
+export function toRuntimeLegacyEntries(rows: readonly ReplayRow[]): import("../../src/model/runtime.ts").RuntimeLegacyHistoryEntryV1[] {
+  return rows.map(row => {
+    const anchor = row.anchorKey && row.anchor ? { token: row.anchorKey, position: row.anchor, ...(row.requestId ? { nativeCallId: row.requestId } : {}) } : undefined;
+    const base = { ...(row.at ? { at: row.at } : {}), ...(anchor ? { anchor } : {}) };
+    if (row.kind === 'user' || row.kind === 'assistant') return { ...base, kind: row.kind === 'user' ? 'user-text' as const : 'assistant-text' as const, text: row.text };
+    const a = row.activity;
+    const source = row.legacyTargetSource;
+    return { ...base, kind: 'tool-record' as const, text: row.text, tool: {
+      toolName: a?.toolName ?? '工具', phase: a?.phase === 'call' || a?.phase === 'start' ? 'start' as const : 'result' as const,
+      ...(a?.toolCallId ? { toolCallId: a.toolCallId } : {}), ...(a?.turnId ? { turnId: a.turnId } : {}),
+      ...(typeof a?.ok === 'boolean' ? { ok: a.ok } : {}),
+      ...(a && a.status !== 'call' ? { reportedStatus: a.status, statusSource: row.legacyStatusSource ?? 'legacy-classifier' as const } : {}),
+      ...(a?.target && source && source !== 'template-only' ? { target: { kind: a.toolName === 'run_shell' ? 'command' as const : 'path' as const, value: a.target, source } } : {}),
+    } };
+  });
 }

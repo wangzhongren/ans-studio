@@ -1,0 +1,129 @@
+{
+  "task": "Codex-A-1",
+  "role": "Codex适配器",
+  "at": "2026-10-15T04:28:19.656612+00:00",
+  "contracts": "total-r2/A4/C2.text_policy_revision1/Codex-consumer-r2",
+  "node": "v24.14.0",
+  "platform": "darwin-arm64",
+  "files": [
+    {
+      "path": "src/provider/codex/session.ts",
+      "sha256": "b8ad992535f6f4e309026c7750b2311de668ccddddaea91d73a36ca9eeafcea9"
+    },
+    {
+      "path": "test/codex-adapter/session.test.ts",
+      "sha256": "a3c2b29f81cb848e194028d36abdf6a64064b0d6d4d21385d06829015874448d"
+    },
+    {
+      "path": "角色卡/Codex适配器/api-spec.md",
+      "sha256": "58d512b6e007e1a5d0c7a381bcf8c068aaf4b2766b0b75884c735f9edd5ceea7"
+    },
+    {
+      "path": "角色卡/Codex适配器/memo.md",
+      "sha256": "919a989a19ab67771dad49d0e76323c3fa8b620fcb89245ed843818a84c45681"
+    },
+    {
+      "path": "角色卡/Codex适配器/changelog.md",
+      "sha256": "7ceb855f56ca68710a335567131cb038d22a7abb1e6d4cb66443d0eeffbc5911"
+    },
+    {
+      "path": "角色卡/Codex适配器/feature-map.md",
+      "sha256": "8f5c4aaa4e08d1fdd7228dbc32f69aac12551ea644753581f7398dc42ffd7388"
+    },
+    {
+      "path": "角色卡/Codex适配器/docs/feature/codex-governed-session.md",
+      "sha256": "f3f97f2bbc626236daa91b104746c7005987bd2ac56f5001ef5ed8a8fee7880a"
+    },
+    {
+      "path": "角色卡/Codex适配器/docs/change/2026-10-15_change_tool-display-projection.md",
+      "sha256": "92651f0ac5b2421016a4af559b821a8990b927c356bfffc5012c2ec506ac6365"
+    }
+  ],
+  "combinedSha256": "b85a1f51903a122b0678872882120a51868f1bb25d7e8df0f9a27130e216bac6",
+  "coreDependencyCombinedSha256": "dd6b50518ca7504118907e996b76f8553e0f586c9837f573a5e8bfc8c897f015",
+  "coreDependencies": [
+    {
+      "path": "src/common/runtime-core/report-provenance.ts",
+      "sha256": "d13fcf3bb6f50c19f2ba6b4aeb4a608ff791daa2995246b005adc9bb98108d27"
+    },
+    {
+      "path": "src/common/runtime-core/tool-display.ts",
+      "sha256": "983c53207eab92c6448c1681e829c0700b42a12153a5817bab217dbb6c2c8e9e"
+    },
+    {
+      "path": "src/model/runtime.ts",
+      "sha256": "4d3278969daea6f45fd098a11cd5aea076fd646c080f09c10d4a8daba88314dd"
+    },
+    {
+      "path": "src/provider/runtime/session-store.ts",
+      "sha256": "fbe84fc39e62b9992be09afac0887258cfc02f8cbca3d5432a5ea943c6ca79a3"
+    },
+    {
+      "path": "src/provider/runtime/tools.ts",
+      "sha256": "5db9187e52b2413c46a07e516c56f8b27455bccd7c002ad8b9bf3db84ddd9298"
+    },
+    {
+      "path": "src/service/runtime/session.ts",
+      "sha256": "991146051f429ef26b46b21154a574086b312233047b29c99a9d522c01280f02"
+    },
+    {
+      "path": "test/runtime-core/effective-timeouts.test.ts",
+      "sha256": "23a3d3cd069006607f68177b198f720529c467eff943dcfe3f51e580bcabb491"
+    },
+    {
+      "path": "test/runtime-core/fixtures.ts",
+      "sha256": "43930eb6647726bc92bff93992b73a2fac87a7d69669e871c616787b2b54ca16"
+    },
+    {
+      "path": "test/runtime-core/legacy-history-projection.test.ts",
+      "sha256": "c6bed08a0ed8d90bc6465d2ffc175a24a5f2265e723d9697ebff3f7eeded33b3"
+    },
+    {
+      "path": "test/runtime-core/prompt-start-acknowledgement.test.ts",
+      "sha256": "7320017c0701cb54f47458145bf7681229e0a66775b33922b4af5636609770b2"
+    },
+    {
+      "path": "test/runtime-core/report-provenance.test.ts",
+      "sha256": "dd95d05abca6bee8f30b109943c75d2ad5121a13f46b7eab5d3d8266b35d3100"
+    },
+    {
+      "path": "test/runtime-core/session.test.ts",
+      "sha256": "e920051308a87bcf24a324a07f33f6f474ae9f1d599e6dea671384a47c79e9b1"
+    },
+    {
+      "path": "test/runtime-core/tool-display.test.ts",
+      "sha256": "6ec09d3dba701f1e4e73155f16b2155e402b94b7427eb27b34650f7e3479ef2e"
+    },
+    {
+      "path": "test/runtime-core/tools.test.ts",
+      "sha256": "25ea9a89c5eec032cf10bb222ec53eef58d17c92ad05469a0f6913897ae7cba0"
+    }
+  ],
+  "approvalManifestMatches": 13,
+  "checks": {
+    "ownTests": "22/22 pass,0 skip",
+    "typecheck": "exit0",
+    "diffCheck": "exit0",
+    "controlledEntryCLI": "6/6 pass,external SDK controlled",
+    "pinnedNativeCLI": "0.162.1 real process/default nativeEngine/real MCP/local fake Responses SSE:2 requests,1 handler,2 phases;final rerun pass",
+    "externalModelCalls": 0
+  },
+  "unchangedCodexHelpers": {
+    "src/common/codex-adapter/config.ts": "77dc8267225f24db27e42147dfc3e1a8c2cfe8e3884ac7c40f90135767eb192f",
+    "src/common/codex-adapter/protocol.ts": "11cb4a624b060933e28407e2a26812e6d3a6b80d8b6494c5945c54f23b606e50",
+    "test/codex-adapter/fixtures.ts": "8f25c7a9b97ac91330ae36e8c0cee345767cb3d97a05e0ba6bc262f79506f8b3"
+  },
+  "evidence": {
+    "角色卡/Codex适配器/docs/change/2026-10-15-codex-tool-display-evidence/controlled-entry-cli.txt": "217fcb3b2837438f598b9abd4e016d68330d01524ed80267504e2dbd1b32ad89",
+    "角色卡/Codex适配器/docs/change/2026-10-15-codex-tool-display-evidence/native-loopback.probe.ts": "bf9144e9800f336cd73d57df0e04094edb772455225d4d90899cfa0dc2baa2b8",
+    "角色卡/Codex适配器/docs/change/2026-10-15-codex-tool-display-evidence/native-loopback.txt": "1a1a7d819135e658bf5dbdad347044e1148eed98f3e1d48943e20db7b161b6f7",
+    "角色卡/Codex适配器/docs/change/2026-10-15-codex-tool-display-evidence/tests.txt": "cae23f4bed2641f174aa65cb54f4e046aa828ca448c090a03f08f244be5ef19d",
+    "角色卡/Codex适配器/docs/change/2026-10-15-codex-tool-display-evidence/typecheck-before-window-fixtures.txt": "2cf90b43ffa09310fa8f6e5c52aaab96319a5faeab0808094fec887d6657446e",
+    "角色卡/Codex适配器/docs/change/2026-10-15-codex-tool-display-evidence/typecheck.txt": "49ad917c426e1ab9bb7e5ad8c53a2fa4844fe03331b01623eac87fa4a881b15c"
+  },
+  "limitations": [
+    "online model and real credentials untested",
+    "real desktop and complete P1–P7 acceptance belongs to independent verification",
+    "Windows process cleanup not dynamically tested"
+  ]
+}

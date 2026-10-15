@@ -1,0 +1,148 @@
+{
+  "stage": "CLAUDE-A-1 verified candidate; final desktop/full-flow pending",
+  "contracts": {
+    "A": 4,
+    "C": 2,
+    "C_text_policy_revision": 1,
+    "ClaudeConsumer": 2
+  },
+  "node": "v24.14.0",
+  "platform": "Darwin",
+  "arch": "arm64",
+  "files": [
+    {
+      "path": "src/provider/claude/session.ts",
+      "sha256": "e51e73e3593cbce8f57afba22b4913c30959e9a488eeac80e27e25b9e5921b87"
+    },
+    {
+      "path": "test/claude-adapter/session.test.ts",
+      "sha256": "44a8b4c72d854c58b4385bf979667b629a943e52e1b511a8e6ea4c6740c3df51"
+    },
+    {
+      "path": "test/claude-adapter/native-loopback.probe.ts",
+      "sha256": "8593a0632c0e916f838a258fa6d71f3f8730902f6268d53c9dc926591fa125c8"
+    },
+    {
+      "path": "角色卡/Claude适配器/api-spec.md",
+      "sha256": "9909319c48a23e44e05b8c75ed152351ce10179ca3b47b453848f09be5d10d65"
+    },
+    {
+      "path": "角色卡/Claude适配器/memo.md",
+      "sha256": "50822cc0c19faaf21ea8cf3fdabf0cf76f5d2c4887e538866828dd467a1a9322"
+    },
+    {
+      "path": "角色卡/Claude适配器/changelog.md",
+      "sha256": "4c3222dc8980a15266e62c3cfa45f7b1436771eb42f4212be47c249b50b258ee"
+    },
+    {
+      "path": "角色卡/Claude适配器/docs/feature/claude-session.md",
+      "sha256": "ae4481e01715cf9af15853fb1a62e2d7d56853cfefe016d13f59e1539027c37c"
+    },
+    {
+      "path": "角色卡/Claude适配器/docs/change/2026-10-15_change_tool-display-projection.md",
+      "sha256": "8e148847e1d19fbd23c207335d91caa83deb1ccdca7f9e01f044a3f386961244"
+    }
+  ],
+  "approved13": {
+    "角色卡/项目管理/docs/design/2026-10-15_design_complete-flow-interface-plan.md": true,
+    "角色卡/运行时核心/docs/design/2026-10-15_design_tool-display-contract-a.md": true,
+    "角色卡/桌面窗口/docs/design/2026-10-15_design_restricted-document-read.md": true,
+    "角色卡/运行时核心/docs/design/2026-10-15_design_report-provenance-contract-c.md": true,
+    "角色卡/编排/docs/design/2026-10-15_design_report-provenance-consumer-c.md": true,
+    "角色卡/桌面窗口/docs/design/2026-10-15_design_complete-flow-ac-consumers.md": true,
+    "角色卡/桌面UI/docs/design/2026-10-15_design_complete-flow-consumer-plan.md": true,
+    "角色卡/Pi适配器/docs/design/2026-10-15_design_tool-display-and-report-consumer.md": true,
+    "角色卡/Codex适配器/docs/design/2026-10-15_design_tool-display-and-report-consumer.md": true,
+    "角色卡/Claude适配器/docs/design/2026-10-15_design_tool-display-ac-assessment.md": true,
+    "角色卡/UIUX设计师/docs/design/2026-10-15_design_complete-flow-interface-ux-review.md": true,
+    "角色卡/产品/docs/design/2026-10-15_design_desktop-complete-walkthrough.md": true,
+    "角色卡/测试/docs/design/2026-10-15_three-interface-verification-plan.md": true
+  },
+  "coreCombinedSha256": "9395a1807e5af6248572bd04856adb959dbec5c01101669154803957bd55e7dc",
+  "coreDependencyMatches": [
+    {
+      "path": "src/common/runtime-core/report-provenance.ts",
+      "match": true
+    },
+    {
+      "path": "src/common/runtime-core/tool-display.ts",
+      "match": true
+    },
+    {
+      "path": "src/model/runtime.ts",
+      "match": true
+    },
+    {
+      "path": "src/provider/runtime/session-store.ts",
+      "match": true
+    },
+    {
+      "path": "src/provider/runtime/tools.ts",
+      "match": true
+    },
+    {
+      "path": "src/service/runtime/session.ts",
+      "match": true
+    },
+    {
+      "path": "test/runtime-core/effective-timeouts.test.ts",
+      "match": true
+    },
+    {
+      "path": "test/runtime-core/fixtures.ts",
+      "match": true
+    },
+    {
+      "path": "test/runtime-core/legacy-history-projection.test.ts",
+      "match": true
+    },
+    {
+      "path": "test/runtime-core/prompt-start-acknowledgement.test.ts",
+      "match": true
+    },
+    {
+      "path": "test/runtime-core/report-provenance.test.ts",
+      "match": true
+    },
+    {
+      "path": "test/runtime-core/session.test.ts",
+      "match": true
+    },
+    {
+      "path": "test/runtime-core/tool-display.test.ts",
+      "match": true
+    },
+    {
+      "path": "test/runtime-core/tools.test.ts",
+      "match": true
+    }
+  ],
+  "checks": {
+    "unit": {
+      "tests": 28,
+      "passed": 28,
+      "exit": 0,
+      "log": "tests.txt"
+    },
+    "nativeLoopback": {
+      "exit": 0,
+      "log": "native-loopback.txt",
+      "fakeCredentialsOnly": true,
+      "externalModelCalls": 0
+    },
+    "typecheck": {
+      "exit": 0,
+      "log": "typecheck.txt"
+    },
+    "diff": {
+      "exit": 0,
+      "log": "diff-check.txt"
+    }
+  },
+  "unverified": [
+    "real account/online model",
+    "user desktop",
+    "final cross-role complete flow"
+  ],
+  "scope": "one Claude production source plus own tests/documents; no peer modifications"
+}

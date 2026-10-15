@@ -7,8 +7,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import * as SDK from "@anthropic-ai/claude-agent-sdk";
 import type { ResolvedRole } from "../../src/model/role.ts";
-import type { InteractionGate, RoleSession, ToolExecutionCall } from "../../src/model/runtime.ts";
+import type { RoleSession, ToolExecutionCall } from "../../src/model/runtime.ts";
 import { createClaudeRuntimeAdapter } from "../../src/provider/claude/session.ts";
+import { createRuntimeAdapter } from "../../src/service/runtime/session.ts";
 
 const root = await mkdtemp(join(tmpdir(), "ans-claude-native-loopback-"));
 const inputUuids: string[] = [];
@@ -57,9 +58,10 @@ try {
   assert.ok(address && typeof address === "object");
   const endpoint = `http://127.0.0.1:${address.port}`;
   const role: ResolvedRole = { id: "native-probe", kind: "project", cardText: "# Native loopback fixture", boundary: { entries: [], boundarySource: "fixture", acceptance: { accepted: true, source: "fixture" } }, boundarySource: "fixture", location: { card: "fixture", boundary: "fixture" } };
-  const gate: InteractionGate = { begin() {}, end() {}, isWaiting: () => false, onChange: () => () => {} };
-  let turnNumber = 0;
-  const adapter = createClaudeRuntimeAdapter({ runtime: "claude", projectRoot: root, skillRoot: root, interactionGate: gate, currentTurnId: () => `native-ans-turn-${++turnNumber}`, modelId: "claude-sonnet-4-6", baseUrl: endpoint, constructTimeoutMs: 10000, promptTimeoutMs: 15000,
+  const adapter = createRuntimeAdapter({ runtime: "claude", projectRoot: root, skillRoot: root, gate: () => ({ allowed: false, reason: "probe has no write effects", allowedByRoot: { project: [], skill: [] } }), modelId: "claude-sonnet-4-6", baseUrl: endpoint, constructTimeoutMs: 10000, promptTimeoutMs: 15000,
+    providerFactories: { claude: (config) => {
+      assert.equal(config.toolDisplayMode, "required-v1");
+      return createClaudeRuntimeAdapter({ ...config,
     tools: [{ name: "native_probe", description: "Loopback fixture only", inputSchema: { type: "object", properties: { probeTag: { type: "string" } }, required: ["probeTag"], additionalProperties: false }, handler: async (call) => { calls.push(call); return { ok: true, message: "native handler reached" }; } }],
   }, { env: { PATH: process.env.PATH, HOME: root, TMPDIR: root, ANTHROPIC_API_KEY: "sk-ant-api03-loopback-FAKE-NOT-A-CREDENTIAL" }, loadSdk: async () => ({ createSdkMcpServer: SDK.createSdkMcpServer, query: (params) => {
     const options = params.options!;
@@ -78,11 +80,17 @@ try {
     nativeQuery = actual;
     const observed = (async function* () { for await (const message of actual) { if (message.type === "system" && message.subtype === "init") catalogs.push({ tools: message.tools, servers: message.mcp_servers.map((server) => server.name) }); yield message; } })();
     return Object.assign(observed, { close: () => actual.close(), interrupt: () => actual.interrupt() }) as unknown as SDK.Query;
-  } }) });
+  } }) }); } }, });
   session = await adapter.bindRole(role);
+  const rows: import("../../src/model/runtime.ts").SessionEvent[] = [];
+  const drain = (async () => { for await (const row of session!.events()) { rows.push(row); if (rows.filter((event) => event.kind === "settled").length === 2) break; } })();
   await session.prompt("same loopback input text");
   await session.prompt("same loopback input text");
   if (failure) throw failure;
+  await drain;
+  assert.equal(rows.filter((row) => (row.detail as { phase?: string })?.phase === "start").length, 2);
+  assert.equal(rows.filter((row) => (row.detail as { phase?: string })?.phase === "result").length, 2);
+  assert.equal(JSON.stringify(rows).includes("__ans_call_context"), false);
   assert.equal(calls.length, 2);
   for (const call of calls) { assert.deepEqual(call.args, { probeTag: "changed-by-native-hook" }); assert.equal(call.signal?.aborted, true); }
   assert.equal(inputUuids.length, 2);

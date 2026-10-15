@@ -1,0 +1,29 @@
+{
+  "proposalVersion": "complete-flow-interface-plan/revision2",
+  "contracts": {
+    "A": 4,
+    "B": 2,
+    "C": 2,
+    "C_text_policy_revision": 1
+  },
+  "baseCommit": "fca8f6bd3d76d719dfbca071056449dedbaef957",
+  "status": "design-reviewed-not-implemented",
+  "files": {
+    "角色卡/项目管理/docs/design/2026-10-15_design_complete-flow-interface-plan.md": "0f3eac701c022a172d4b3546cb973f02779ea1a87bf7a016d705eb72911472e1",
+    "角色卡/运行时核心/docs/design/2026-10-15_design_tool-display-contract-a.md": "f8b9af4ea541dbf4843f76c6a6d210d6dd093883a9b5a96014e523ca151fd91f",
+    "角色卡/桌面窗口/docs/design/2026-10-15_design_restricted-document-read.md": "262acafa8ad910ae13fbe9e14db610452e4234bb3bb407280cfea6f5653ed4aa",
+    "角色卡/运行时核心/docs/design/2026-10-15_design_report-provenance-contract-c.md": "dc82964999d1cd0a60b8ccb9177e4385da382251bd79c8148f454980f8b5030c",
+    "角色卡/编排/docs/design/2026-10-15_design_report-provenance-consumer-c.md": "052ed1fe2d08455428491586b4944bcb927d452cf28ee518f9ff09c66739dffd",
+    "角色卡/桌面窗口/docs/design/2026-10-15_design_complete-flow-ac-consumers.md": "2af93f0ec4c42480454b411250bc06a2b63df1f17618bdfed389716a35ce7b02",
+    "角色卡/桌面UI/docs/design/2026-10-15_design_complete-flow-consumer-plan.md": "9f6883249c8b98a28d4e3d9e29e10e9940e03efe8a6594d57e6535e9edee28ae",
+    "角色卡/Pi适配器/docs/design/2026-10-15_design_tool-display-and-report-consumer.md": "729aae46875aa17a038faeb40a2fd279c5d6da11b3c074ecedebe7d2c61ed361",
+    "角色卡/Codex适配器/docs/design/2026-10-15_design_tool-display-and-report-consumer.md": "c429c3bec5c8cedee45f88af26ff221491500fcaa1d51e5952bb4f9b92399983",
+    "角色卡/Claude适配器/docs/design/2026-10-15_design_tool-display-ac-assessment.md": "dbeb2eab03766cff3419b77d6f5a265774a86a183fc92968bf5bde018ecce333",
+    "角色卡/UIUX设计师/docs/design/2026-10-15_design_complete-flow-interface-ux-review.md": "b3171583b9d82559a03c8e5b13c1bf2dee09cf036deffe4712ebeda2874f98b5",
+    "角色卡/产品/docs/design/2026-10-15_design_desktop-complete-walkthrough.md": "eaf846b7a9b358186ef3ea57fb03d5ef733ccc32644571edc9576f93b05ed4f2",
+    "角色卡/测试/docs/design/2026-10-15_three-interface-verification-plan.md": "7fdddc5ed8905d3101ded10ee036f505fce672c77793e1c3e3a6c1ee31b1a0c0"
+  },
+  "trackedProductionDiff": [],
+  "envSha256": "3d7ecbd3b35a7f546d8e5ddd7f6d96afd190daae812c2010496aab6949b1724f",
+  "brokenDocumentLinks": []
+}

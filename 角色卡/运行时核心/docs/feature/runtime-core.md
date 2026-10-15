@@ -76,3 +76,45 @@ Service 外层已经确定的失败、中止或超时结果具有优先级；随
 实际输入由 Core 在开始确认、原输入持久化及取消检查后统一发一次 message，detail.source 为 prompt-input、text 为原文，非空图片只记 imageCount。top/detail.turnId 都为该实际轮次；Pi 注入与 demo Core 路径不再另发输入回声。消费者凭标记与轮次合并同一输入的历史/live表示，真实助手前缀文字和同文不同轮均保留。确认/选择回调另外收到入口原 toolCallId（可选），供实际请求卡关联；它不增加写权。run_shell 说明明确一次 argv 程序调用、不解释 shell operators/展开，多命令分开调用，原审核与执行不变。
 
 2026-10-15 修复：Core已自验，独立桌面待验。单次可信输入事件、确认卡原调用身份与argv说明，见[当前修复与证据](../fix/2026-10-15_fix_run-shell-description.md)。
+
+## 展开真实工具详情与核对报告历史
+
+Core给适配器同一套必需显示投影，实际命令/路径、ToolResult原message及shell结构结果成为有界、安全的展示数据；模型仍收到原工具内容。身份、start/blocked/result不混用，投影失败只报告显示诊断，不改治理或实际终态。旧native-only历史由Window原reader/解析后经Pipeline调用纯Service保护，不为了补命令再执行或读业务文件；没有事实就未保存。
+
+```mermaid
+flowchart TD
+  actual[实际tool输入与结果] --> model[原message和执行语义给模型]
+  actual --> project[注入projector 净化后UTF8预算]
+  project --> guard[Core实际turn归一与最终allowlist]
+  guard --> replay[保护后的事件落ANS历史]
+  guard --> desktop[窗口与UI按实际call/phase展示]
+  legacy[窗口原native历史解析] --> pipeline[Pipeline纯桥]
+  pipeline --> pure[Service纯历史保护]
+  pure --> desktop
+```
+
+实际绑定的ANS store决定persistence.enabled/disabled。Pipeline最终报告在真正收口后交bound capability保存，报告成员与目标投递尝试、实际目标turn分别标识。source保存失败只影响保存状态；显式重试仅存同快照，成功后可首次继续原回交。disabled及旧adapter保原live语义，不能伪称保存成功。
+
+```mermaid
+flowchart TD
+  final[编排已最终化报告] --> mode{实际源持久能力}
+  mode -->|disabled或legacy| live[仅live报告 标未保存]
+  mode -->|enabled| report[绑定capability保存安全快照]
+  report -->|失败| retry[显式重试保存 同reportId 无源prompt]
+  retry --> report
+  report -->|成功| enqueue[Window唯一登记入队 冻结成员与原模型文本]
+  enqueue --> ack[目标actualturn ACK 尚未证明保存或执行]
+  ack --> input[安全显示副本保存 原模型文本仍独立]
+  input -->|失败| noProvider[Provider未开始 回执如实]
+  input --> boundary[持久或内存边界]
+  boundary --> provider[原模型文本与图片调用Provider一次]
+  provider --> receipt[实际终态和最终保存回执]
+  receipt -->|历史失败| saveOnly[只补可证完整尾段或index 不重模型]
+  saveOnly -->|损坏 外来写入 失效| blocked[明确拒补 不猜不修旧日志]
+```
+
+新C历史是“交接内容（安全显示副本）”，不是完整模型输入；flags如实表示净化/截断。原文仍逐字给SDK，原生转录与普通chat未被泛清。bound保存材料会随16MiB预算或handle关闭失效，详细成功回执最多128个；最小seen保护防同attempt被再次当成新执行。磁盘后来损坏也不能把已执行事实倒退为未执行。跨文件事务、跨进程exactly-once和重启自动发队列均不在能力内。
+
+2026-10-15：A4/C2文本补充1核心实现与自测完成，消费者整合待验。[实际候选与故障证据](../change/2026-10-15_change_complete-flow-core.md)，[公共API](../../api-spec.md)。
+
+工具展示仅处理真实工具结构；普通引擎失败即使kind=denied，仍是原失败，不产生空工具名或虚构blocked阶段。live和历史同判断，未知detail不侧车回传，真实failed终态与安全summary保持。2026-10-15该必要边界修复已Core77/77及原独验1/1通过，消费者整体重测待续：[当前修复](../fix/2026-10-15_fix_non-tool-event-routing.md)。

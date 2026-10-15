@@ -1,0 +1,9 @@
+{
+  "command": "node --test test/测试/uiux-v2-replay-regression.test.ts",
+  "stage": "UI implementation in progress after first stable render, not final candidate or GUI",
+  "chunk_id": "cffb37",
+  "wall_time_seconds": 0.000006125,
+  "exit_code": 0,
+  "original_token_count": 299,
+  "output": "✔ 独立UI2：正文声称成功不把缺状态的历史结果变成成功 (0.910667ms)\n✔ 独立UI2：交错调用结果按callId保持目标，isError=false只证明工具返回 (0.442083ms)\n✔ 独立UI2：可靠失败优先于冲突成功字段，必须保留异常和目标 (0.173791ms)\n✔ 独立UI2：实时accepted无结果诚实降级；明确结果和回放口径一致 (0.166375ms)\n✔ 独立UI2：交互调用和结论保留同一锚点，不被普通工具聚合 (0.541875ms)\n✔ 独立UI2：回放正文不变但事实变化时必须重建，不能把未知留成旧状态 (0.236958ms)\n✔ 独立UI2：目标、交互锚点和明确失败更新同样触发回放重建 (0.08ms)\n✔ 独立UI2：没有对应callId的结果不偷取相邻路径 (0.0635ms)\n✔ 独立UI2：shell失败保留可信首行exit，stdout中的exit或成功不是结果依据 (0.357541ms)\n✔ 独立UI2：无执行结果的门禁拒绝不能被映射为执行失败 (0.162916ms)\n✔ 独立S1：孤立read_file失败只从可靠首行补目标，空结构目标也不抹掉它 (0.135ms)\nℹ tests 11\nℹ suites 0\nℹ pass 11\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 76.861209\n"
+}

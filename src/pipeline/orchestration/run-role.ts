@@ -54,8 +54,17 @@ import type {
   PromptTurnStartedMetadata,
   ReportHandbackFn,
   ReportHandbackMetadata,
+  ReportHandbackReceipt,
+  ReportSaveResultV1,
+  ReportSaveStateV1,
+  DeliverySaveResultV1,
+  DeliveryReceiptQueryV1,
+  RuntimePersistenceChangeV1,
+  RuntimeLiveReportDraftV1,
+  RuntimeLegacyHistoryEntryV1,
+  RuntimeLegacyHistoryProjectionV1,
 } from "../../model/runtime.ts";
-import { createRuntimeAdapter, type RuntimeSessionOptions } from "../../service/runtime/session.ts";
+import { createRuntimeAdapter, projectRuntimeLiveHandback, projectRuntimeLegacyHistory, type RuntimeSessionOptions } from "../../service/runtime/session.ts";
 import { RUNTIME_KINDS } from "../../common/shared/runtime-shared.ts";
 import {
   assembleProjectShellGate,
@@ -65,7 +74,7 @@ import {
   type RoutineShellPolicy,
 } from "./shell-arming.ts";
 import { formatEvent } from "../../common/编排/output.ts";
-import { withHandback, type OrchestrationEvent, type TaskReport, type HandbackIntent, normalizeTaskReport } from "../../common/编排/handback.ts";
+import { withHandback, type OrchestrationEvent, type TaskReport, type HandbackIntent, type HandbackEvent, normalizeTaskReport } from "../../common/编排/handback.ts";
 import { EXIT_OK, EXIT_USAGE, EXIT_FAILURE } from "../../common/编排/exit-codes.ts";
 import type { ShellVerdictFn } from "../../common/编排/shell-gate.ts";
 import { repinIfBootstrapped, DEFAULT_GOVERNANCE_BOUNDARY_REL } from "../../common/编排/finalize.ts";
@@ -232,6 +241,12 @@ export interface RoleSessionSendOptions extends PromptOptions {
 }
 
 export interface RoleSessionHandle {
+  readonly persistenceMode?: "enabled" | "disabled" | "unknown-live";
+  retryReportPersistence?(reportId: string): Promise<ReportSaveResultV1>;
+  getReportPersistence?(reportId: string): Promise<ReportSaveStateV1>;
+  retryDeliveryHistoryPersistence?(attemptId: string): Promise<DeliverySaveResultV1>;
+  getDeliveryReceipt?(attemptId: string): Promise<DeliveryReceiptQueryV1>;
+  onPersistenceChange?(listener: (change: RuntimePersistenceChangeV1) => void): () => void;
   readonly runtime?: RuntimeKind;
   readonly roleId?: string;
   readonly contextSource?: RuntimeContextSource;
@@ -405,17 +420,18 @@ export async function openRoleSession(
   let legacyIntent: HandbackIntent | undefined;
   const reportHandback = suppressHandback
     ? undefined
-    : (report: TaskReport, metadata?: ReportHandbackMetadata): void => {
+    : (report: TaskReport, metadata?: ReportHandbackMetadata): ReportHandbackReceipt => {
         const turnId = metadata?.turnId;
         const normalized = normalizeTaskReport(report);
         const invalidMetadata = metadata !== undefined && (typeof turnId !== "string" || turnId === "");
         if (normalized === undefined || invalidMetadata || (turnId !== undefined && completedTurns.has(turnId))) {
           log.record("report.ignored", { turnId, reasonCode: normalized === undefined ? "invalid-report" : invalidMetadata ? "invalid-turn" : "closed-turn" });
-          return;
+          return { ok: false, message: "报告无效或所属轮次已关闭，未接收。" };
         }
         if (turnId !== undefined) taskReports.set(turnId, normalized);
         else legacyReport = normalized;
         log.record("report.received", { turnId, state: normalized.status, reportSource: "submit_report", count: normalized.evidence?.length ?? 0 });
+        return { ok: true, state: "accepted-memory" };
       };
 
   // D-1：能力面携带所选角色/runtime 的路径；实际 store 由 Service 按所选 runtime 建立。
@@ -491,7 +507,107 @@ export async function openRoleSession(
   const autoRepinEnabled = input.autoRepin ?? setup.role.kind === "built-in-governance";
 
   let disposed = false;
+  const persistenceSubscriptions = new Set<() => void>();
+  const boundRoleId = setup.role.id;
+  const protectionContext = { credentialEnvNames: trustedCredentialNames(deps.runtimeOptions) };
+
+  async function recordFinalHandback(event: HandbackEvent): Promise<HandbackEvent> {
+    const handback = event.handback;
+    const draft: RuntimeLiveReportDraftV1 = {
+      source: { roleId: boundRoleId },
+      taskId: handback.taskId ?? null,
+      origin: handback.origin,
+      status: handback.status,
+      summary: handback.summary,
+      evidence: handback.evidence,
+      at: handback.at,
+    };
+    if (handback.runtime !== undefined) draft.source.runtime = handback.runtime;
+    if (handback.turnId !== undefined) draft.source.turnId = handback.turnId;
+    let liveReport;
+    try {
+      liveReport = projectRuntimeLiveHandback(draft, protectionContext);
+    } catch {
+      log.record("report.projection.failed", { errorCode: "INVALID" });
+      return { kind: "handback", summary: "报告安全显示内容生成失败。", handback,
+        reportPersistence: { state: "failed", code: "INVALID", retryAvailable: false } };
+    }
+    const safe: HandbackEvent = { ...event, summary: `回交 su：${liveReport.summary.text}`, liveReport };
+    const persistence = session.persistence;
+    if (persistence === undefined || handback.turnId === undefined) {
+      safe.reportPersistence = { state: "unknown-live", retryAvailable: false };
+      return safe;
+    }
+    if (persistence.mode === "disabled") {
+      safe.reportPersistence = { state: "disabled", code: "PERSISTENCE_DISABLED", retryAvailable: false };
+      return safe;
+    }
+    // Core owns the actual bound scope, ended-turn validation, safe snapshot and retries.
+    let result: ReportSaveResultV1;
+    try {
+      result = await persistence.recordFinalReport({
+        ...draft,
+        source: { roleId: boundRoleId, runtime: persistence.scope.runtime, turnId: handback.turnId },
+        origin: handback.origin ?? "terminal-fallback",
+      });
+    } catch {
+      log.record("report.persistence.failed", { turnId: handback.turnId, errorCode: "PERSIST_FAILED" });
+      safe.reportPersistence = { state: "failed", code: "PERSIST_FAILED", retryAvailable: false };
+      return safe;
+    }
+    if (result.report !== undefined) {
+      safe.report = result.report;
+      safe.liveReport = { source: result.report.source, taskId: result.report.taskId, origin: result.report.origin,
+        status: result.report.status, summary: result.report.summary, evidence: result.report.evidence,
+        evidenceOmitted: result.report.evidenceOmitted, at: result.report.at };
+      safe.summary = `回交 su：${result.report.summary.text}`;
+    }
+    if (result.ok) {
+      safe.reportPersistence = { state: "saved", reportId: result.report.reportId, retryAvailable: false };
+    } else {
+      let state: NonNullable<HandbackEvent["reportPersistence"]>["state"] = "failed";
+      if (result.state === "expired") state = "expired";
+      safe.reportPersistence = { state, reportId: result.reportId, code: result.code, retryAvailable: result.retryAvailable };
+    }
+    return safe;
+  }
   const base: RoleSessionHandle = {
+    get persistenceMode() {
+      if (session.persistence !== undefined) return session.persistence.mode;
+      return "unknown-live";
+    },
+    async retryReportPersistence(reportId) {
+      if (disposed) return { ok: false, state: "expired", code: "SNAPSHOT_EXPIRED", retryAvailable: false, message: "原会话已关闭。" };
+      if (session.persistence) return session.persistence.retryReportPersistence(reportId);
+      return { ok: false, state: "unsupported", code: "UNSUPPORTED", retryAvailable: false, message: "当前会话不支持报告保存。" };
+    },
+    async getReportPersistence(reportId) {
+      if (disposed) return { state: "expired", code: "SNAPSHOT_EXPIRED", retryAvailable: false };
+      if (session.persistence) return session.persistence.getReportPersistence(reportId);
+      return { state: "unsupported", code: "UNSUPPORTED", retryAvailable: false };
+    },
+    async retryDeliveryHistoryPersistence(attemptId) {
+      if (disposed) return { ok: false, state: "expired", code: "SNAPSHOT_EXPIRED", retryAvailable: false, message: "原会话已关闭。" };
+      if (session.persistence) return session.persistence.retryDeliveryHistoryPersistence(attemptId);
+      return { ok: false, state: "unsupported", code: "UNSUPPORTED", retryAvailable: false, message: "当前会话不支持历史补保存。" };
+    },
+    async getDeliveryReceipt(attemptId) {
+      if (disposed) return { state: "expired", code: "SNAPSHOT_EXPIRED", retryAvailable: false };
+      if (session.persistence) return session.persistence.getDeliveryReceipt(attemptId);
+      return { state: "unsupported", code: "UNSUPPORTED", retryAvailable: false };
+    },
+    onPersistenceChange(listener) {
+      if (disposed || session.persistence === undefined) return () => {};
+      const unsubscribeCore = session.persistence.onPersistenceChange(change => {
+        if (!disposed) listener(change);
+      });
+      const unsubscribe = () => {
+        persistenceSubscriptions.delete(unsubscribe);
+        unsubscribeCore();
+      };
+      persistenceSubscriptions.add(unsubscribe);
+      return unsubscribe;
+    },
     get runtime() { return session.runtime ?? input.runtime; },
     get roleId() { return session.roleId ?? setup.role.id; },
     get contextSource() { return session.contextSource; },
@@ -585,6 +701,10 @@ export async function openRoleSession(
       // （判定/落盘本体在 finalize.ts；失败结果由下次 settle 重试）。
       return (async function* () {
         for await (const ev of wrapped) {
+          if (ev.kind === "handback") {
+            yield await recordFinalHandback(ev);
+            continue;
+          }
           if (ev.kind === "settled") {
             if (autoRepinEnabled) {
               try {
@@ -607,6 +727,7 @@ export async function openRoleSession(
     async dispose(): Promise<void> {
       if (disposed) return;
       disposed = true;
+      for (const unsubscribe of [...persistenceSubscriptions]) unsubscribe();
       taskReports.clear();
       completedTurns.clear();
       legacyReport = undefined;
@@ -758,9 +879,33 @@ export function createPiAdapterFactory(project: ProjectConfig, shellGate?: Shell
 }
 
 /** ANS replay only; native resume is reported by the session's dynamic getters. */
-export async function readRoleSessionHistory(options: { projectRoot: string; roleId: string; runtime: RuntimeKind }): Promise<{ record?: RuntimeSessionRecord; entries: RuntimeReplayEntry[] }> {
+export async function readRoleSessionHistory(
+  options: { projectRoot: string; roleId: string; runtime: RuntimeKind },
+  context?: { credentialEnvNames?: readonly string[] },
+): ReturnType<typeof import("../../service/runtime/session.ts").readRuntimeSessionHistory> {
   const service = await import("../../service/runtime/session.ts");
-  return service.readRuntimeSessionHistory(options);
+  return service.readRuntimeSessionHistory({ ...options, credentialEnvNames: context?.credentialEnvNames });
+}
+
+/** Host-only context: renderer text/requests never choose credential names or history entries. */
+export function projectRoleLegacyHistory(
+  input: { projectRoot: string; roleId: string; runtime: "pi"; readOk: boolean;
+    entries: readonly RuntimeLegacyHistoryEntryV1[]; source?: string; error?: string; skipped: number },
+  context?: { credentialEnvNames?: readonly string[] },
+): RuntimeLegacyHistoryProjectionV1 {
+  if (typeof input?.projectRoot !== "string" || input.projectRoot.trim() === ""
+    || typeof input.roleId !== "string" || input.roleId.trim() === "" || input.runtime !== "pi") {
+    return { ok: false, version: 1, code: "INVALID_INPUT", message: { text: "历史范围无效。", redacted: false, truncated: false }, entries: [] };
+  }
+  return projectRuntimeLegacyHistory({ scope: { roleId: input.roleId, runtime: input.runtime },
+    readOk: input.readOk, entries: input.entries, source: input.source, error: input.error,
+    skipped: input.skipped, credentialEnvNames: context?.credentialEnvNames });
+}
+
+function trustedCredentialNames(options?: RuntimeAdapterFactoryOptions): readonly string[] {
+  const names = [...(options?.extraCredentialEnvVars ?? [])];
+  if (options?.apiKeyEnvVar) names.push(options.apiKeyEnvVar);
+  return [...new Set(names.filter(name => typeof name === "string" && name.trim() !== ""))];
 }
 
 export function isFailedSettlement(event: SessionEvent): boolean {

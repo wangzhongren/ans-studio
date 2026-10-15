@@ -1,3 +1,6 @@
+import type { PersistenceReply, PersistenceValues, PersistenceUpdated, PersistenceScope } from "./session.ts";
+import { createProjectDocumentReader } from "../../src/pipeline/project-document/read-project-document.ts";
+import type { ProjectDocumentRef, ProjectDocumentScope, DocumentReadErrorCode, ReadProjectDocumentResult } from "../../src/model/project-document.ts";
 // app/desktop/interface.ts
 // 桌面应用的 Interface 层：IPC 通道背后的处理器（纯逻辑，不依赖 electron，可在 node 下单测）。
 //
@@ -27,6 +30,7 @@ import { createChatDemoAdapter } from "./chat-adapter.ts";
 import {
   buildProjectConfig as realBuildProjectConfig,
   readRoleDocsIndex,
+  projectDocumentCandidates,
   type DocsIndexEntry,
 } from "./project.ts";
 import {
@@ -84,9 +88,12 @@ export interface RoleView {
   builtIn: boolean;
   changelog: { path: string; text: string } | null;
   docs: DocsIndexEntry[];
+  documents?: ProjectDocumentRef[];
 }
 
 export interface ListProjectResult {
+  documentScope?: ProjectDocumentScope;
+  documentReadUnavailable?: DocumentReadErrorCode;
   projectRoot: string;
   roles: RoleView[];
   warnings: string[];
@@ -124,6 +131,7 @@ export interface DesktopDeps {
    *  `SessionEventEnvelope`**（B-2：多会话并存须按角色分发，防串消息）；`envelope.event` 为编排导出的
    *  `OrchestrationEvent`（既有 `SessionEvent` + `handback` 回交事件，§10.8）——类型从编排导入、不复制。 */
   emitEvent: (envelope: SessionEventEnvelope) => void;
+  emitPersistenceChange?: (update: PersistenceUpdated) => void;
   // —— 可注入的下游实现（默认用真实实现；单测可替换以隔离）——
   listProjectFn?: (root: string) => Promise<ProjectListing>;
   openRoleSessionFn?: (
@@ -226,7 +234,14 @@ export interface DesktopDeps {
 }
 
 export interface DesktopInterface {
+  retryReportSave(input: unknown): Promise<PersistenceReply<PersistenceValues['retryReportSave']>>;
+  getReportSaveState(input: unknown): Promise<PersistenceReply<PersistenceValues['getReportSaveState']>>;
+  retryDeliveryHistorySave(input: unknown): Promise<PersistenceReply<PersistenceValues['retryDeliveryHistorySave']>>;
+  getDeliveryReceipt(input: unknown): Promise<PersistenceReply<PersistenceValues['getDeliveryReceipt']>>;
+  getSessionPersistence(input: unknown): Promise<PersistenceReply<PersistenceValues['getSessionPersistence']>>;
   pickProject(): Promise<string | null>;
+  readProjectDocument(input: unknown): Promise<ReadProjectDocumentResult>;
+  disposeProjectDocuments(): void;
   listProject(input: { projectRoot: string }): Promise<ListProjectResult>;
   /** 点角色即开：直接建立/续接与该角色的会话（无确认框；B-2 起切换不再结束旧会话）。 */
   openSession(input: SessionOpenRequest): Promise<OpenResult>;
@@ -302,6 +317,9 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     return "current";
   };
   const listingCache = new Map<string, ProjectListing>();
+  const documentReader = createProjectDocumentReader();
+  let importedProjectRoot: string | undefined;
+  let importSequence = 0;
 
   /** 某角色是否为主入口角色（据门禁引擎给的 `primaryRoleId`，**不硬编码 "su"**）。 */
   const isPrimaryRole = (projectRoot: string, roleId: string): boolean => listingCache.get(projectRoot)?.primaryRoleId === roleId;
@@ -338,6 +356,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     buildProjectConfig: buildProjectConfigFn,
     getListing: (root) => listingCache.get(root),
     emitEvent: emitSessionEvent,
+    emitPersistenceChange: update => { if (update.scope.projectRoot === importedProjectRoot) deps.emitPersistenceChange?.(update); },
     // L-1 + 状态准确性：真实状态快照外推（变化时；缺省 ⇒ 界面无队列行/忙态——入队本身不受影响）。
     emitRoleState: deps.emitRoleState,
     shellGate: deps.shellGate,
@@ -356,10 +375,33 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     },
   });
 
+  async function persistenceCall<K extends keyof PersistenceValues>(operation: K, input: unknown): Promise<PersistenceReply<PersistenceValues[K]>> {
+    const invalid = (code: 'INVALID_REQUEST' | 'PROJECT_NOT_ACTIVE'): PersistenceReply<PersistenceValues[K]> => ({ ok: false, version: 1, code, message: code === 'INVALID_REQUEST' ? '保存请求无效。' : '该项目不是当前导入项目。' });
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return invalid('INVALID_REQUEST');
+    const r = input as Record<string, unknown>;
+    const idKey = operation === 'retryReportSave' || operation === 'getReportSaveState' ? 'reportId' : operation === 'getSessionPersistence' ? undefined : 'attemptId';
+    if (r.version !== 1 || typeof r.projectRoot !== 'string' || typeof r.roleId !== 'string' || !r.roleId || !isRuntimeKind(r.runtime) || Object.keys(r).some(k => !['version','projectRoot','roleId','runtime',...(idKey ? [idKey] : [])].includes(k)) || idKey && (typeof r[idKey] !== 'string' || !r[idKey])) return invalid('INVALID_REQUEST');
+    if (r.projectRoot !== importedProjectRoot || !listingCache.get(r.projectRoot)?.roles.some(role => role.roleId === r.roleId)) return invalid('PROJECT_NOT_ACTIVE');
+    const scope: PersistenceScope = { projectRoot: r.projectRoot, roleId: r.roleId, runtime: r.runtime };
+    const result = await manager.persistenceOperation(scope, operation, idKey ? r[idKey] as string : undefined);
+    if (importedProjectRoot !== scope.projectRoot) return invalid('PROJECT_NOT_ACTIVE');
+    return result;
+  }
+
   return {
+    retryReportSave: input => persistenceCall('retryReportSave', input),
+    getReportSaveState: input => persistenceCall('getReportSaveState', input),
+    retryDeliveryHistorySave: input => persistenceCall('retryDeliveryHistorySave', input),
+    getDeliveryReceipt: input => persistenceCall('getDeliveryReceipt', input),
+    getSessionPersistence: input => persistenceCall('getSessionPersistence', input),
     async pickProject(): Promise<string | null> {
-      return deps.pickDirectory();
+      const root = await deps.pickDirectory();
+      if (root !== null) await documentReader.grantNativeSelection(root);
+      else documentReader.cancelNativeSelection();
+      return root;
     },
+    readProjectDocument(input) { return documentReader.read(input); },
+    disposeProjectDocuments() { documentReader.dispose(); },
 
     async listProject(input): Promise<ListProjectResult> {
       const projectRoot = input.projectRoot;
@@ -367,6 +409,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         throw new Error("缺少项目根路径。");
       }
       // 门禁引擎：唯一枚举来源，界面侧不重写解析。
+      const generation = ++importSequence;
+      const documentSequence = documentReader.beginListing(projectRoot);
       const listing = await listProjectFn(projectRoot);
       listingCache.set(listing.projectRoot, listing);
 
@@ -398,7 +442,12 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         if (r.groupDuty !== undefined) roleView = { ...roleView, groupDuty: r.groupDuty };
         roles.push(roleView);
       }
+      if (generation === importSequence) importedProjectRoot = listing.projectRoot;
+      const documentListing = documentReader.updateListing(documentSequence, listing.projectRoot, roles.map(projectDocumentCandidates));
+      for (const role of roles) role.documents = documentListing.documents[role.roleId] ?? [];
       return {
+        ...(documentListing.documentScope ? { documentScope: documentListing.documentScope } : {}),
+        ...(documentListing.documentReadUnavailable ? { documentReadUnavailable: documentListing.documentReadUnavailable } : {}),
         projectRoot: listing.projectRoot,
         roles,
         warnings: listing.warnings,
@@ -465,7 +514,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     },
 
     async listLiveSessionViews() { return manager.liveSessionViews(); },
-    async getSessionHistory(input) { return getSessionHistory(input); },
+    async getSessionHistory(input) { const history = await getSessionHistory(input, { credentialEnvNames: [...(deps.runtimeOptions?.extraCredentialEnvVars ?? []), ...(deps.runtimeOptions?.apiKeyEnvVar ? [deps.runtimeOptions.apiKeyEnvVar] : [])] }); manager.registerPersistenceHistory(history); return history; },
     async getRuntimeConfig(runtime) {
       return getRuntimeConfig(runtime, { envPath: envFilePath, env: deps.piConfigEnv, revision: manager.profileRevision(runtime), application: application(runtime) });
     },

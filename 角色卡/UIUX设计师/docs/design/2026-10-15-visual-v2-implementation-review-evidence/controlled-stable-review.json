@@ -1,0 +1,21 @@
+{
+  "producerOfImages": "桌面UI controlled Electron renderer",
+  "reviewer": "UIUX design image/source review; no GUI control",
+  "candidate": {
+    "app/renderer/index.html": "bb5c29a5b375639328e749754d2205d8a681d1a03c03e4d88eb0d877f42783d5",
+    "app/renderer/styles.css": "56d2ff9e34004181f240a9b619d2d3a1b65f21f4621b950751734e398dd31949",
+    "app/renderer/renderer.js": "b5cf95d7532e4a8c36ee7af8af47b8efe73f9359fcc82f9a775b8c15416b0dd8"
+  },
+  "images": {
+    "角色卡/UIUX设计师/docs/design/2026-10-15-visual-v2-implementation-review-evidence/ui-stable-visual-v2-1360.png": "d9d4316a4b516864187d4e1358af32d2ad85bc2c54020a9c2941a3989ac2c488",
+    "角色卡/UIUX设计师/docs/design/2026-10-15-visual-v2-implementation-review-evidence/ui-stable-visual-v2-960.png": "c5594fe986c4d39481ed5b9061ea14aac6b2dea3041b5f36ad3b45ef8ed8a9e7",
+    "角色卡/UIUX设计师/docs/design/2026-10-15-visual-v2-implementation-review-evidence/ui-stable-visual-v2-drawer-1360.png": "e9cd84848ed5a4e60725f4e20cad5ddbdff12e519be23ac0d5213049bcaa125f",
+    "角色卡/UIUX设计师/docs/design/2026-10-15-visual-v2-implementation-review-evidence/ui-stable-visual-v2-drawer-960.png": "9f9d027289c45e701c32bdad4dc12b6c5fa3c9605ef0200b8f54cdb1b30efb4c",
+    "角色卡/UIUX设计师/docs/design/2026-10-15-visual-v2-implementation-review-evidence/ui-stable-visual-v2-received-960.png": "164a0f0e1deea4c3fcaf8a8cb1390232fc8c44db69bf62c5f99a73c4d63cdbed"
+  },
+  "result": "visible main structures aligned, prior 2 visual gaps closed; pending native and stable received screenshot",
+  "excludedProof": {
+    "ui-stable-visual-v2-received-960.png": "right white partial overlay and receipt not in view; suspected intermediate capture; not evidence of final received layout or established product defect"
+  },
+  "nativeClaim": false
+}

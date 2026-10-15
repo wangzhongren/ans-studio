@@ -400,3 +400,171 @@ test("owned native process group cleanup kills a wrapper and child that ignore S
     assert.throws(() => process.kill(childPid, 0), { code: "ESRCH" });
   } finally { await session.dispose(); await rm(root, { recursive: true, force: true }); }
 });
+
+test("required display capabilities reject at factory before any native, MCP or storage effects", async () => {
+  const engines = harness();
+  let effects = 0;
+  const validProjector: NonNullable<import("../../src/model/runtime.ts").RuntimeProviderOptions["projectToolEvent"]> = () => { throw new Error("not reached"); };
+  for (const capabilities of [
+    {}, { projectToolEvent: validProjector }, { registerToolDisplayProfile: () => {} },
+    { projectToolEvent: 1, registerToolDisplayProfile: () => {} },
+    { projectToolEvent: validProjector, registerToolDisplayProfile: "invalid" },
+  ]) {
+    assert.throws(() => createCodexRuntimeAdapter(options("/fixture", engines, {
+      toolDisplayMode: "required-v1", mcpLoader: async () => { effects++; throw new Error("not reached"); },
+      storage: { prepareNativeDirectory: async () => { effects++; } } as RuntimeSessionStorage,
+      ...capabilities as Partial<import("../../src/provider/codex/session.ts").CodexRuntimeAdapterOptions>,
+    })), /requires projector\/register/);
+  }
+  assert.equal(effects, 0);
+  assert.equal(engines.engines.length, 0);
+});
+
+test("profile registers selected credential and named extras from the same immutable bind snapshot before effects", async () => {
+  const engines = harness();
+  const env = { CUSTOM: "fake-selected", EXTRA: "fake-extra", UNLISTED: "fake-unlisted", PATH: process.env.PATH };
+  let profile: import("../../src/model/runtime.ts").RuntimeToolDisplayProfileV1 | undefined;
+  const session = await createCodexRuntimeAdapter(options("/fixture", engines, {
+    env, apiKeyEnvVar: "CUSTOM", toolDisplayCredentialEnvNames: ["EXTRA", "CUSTOM", "MISSING"],
+    registerToolDisplayProfile(value) {
+      assert.equal(engines.engines.length, 0);
+      profile = value;
+      env.CUSTOM = "changed-after-snapshot";
+      env.PATH = "changed-path";
+    },
+  })).bindRole(role);
+  assert.deepEqual(profile, { apiKeyEnvVar: "CUSTOM", credentials: [
+    { name: "CUSTOM", value: "fake-selected" }, { name: "EXTRA", value: "fake-extra" }, { name: "MISSING", value: undefined },
+  ] });
+  assert.equal(engines.engine.input.env.CODEX_API_KEY, "fake-selected");
+  assert.notEqual(engines.engine.input.env.PATH, "changed-path");
+  await session.dispose();
+  const refused = harness();
+  let storageEffects = 0;
+  await assert.rejects(createCodexRuntimeAdapter(options("/fixture", refused, {
+    registerToolDisplayProfile() { throw new Error("profile rejected"); },
+    storage: { validateNativeDirectory: async () => { storageEffects++; } } as RuntimeSessionStorage,
+  })).bindRole(role), /profile rejected/);
+  assert.equal(refused.engines.length, 0);
+  assert.equal(storageEffects, 0);
+});
+
+test("injected display receives real handler facts, rules, error and execution; opaque identities bypass legacy scrub", async () => {
+  const engines = harness();
+  const sources: import("../../src/model/runtime.ts").RuntimeToolEventFactsV1[] = [];
+  const handlerIds: string[] = [];
+  const secret = "fake-codex-key";
+  const execution = { exitCode: 7, stdout: "stdout sentinel", stderr: "stderr sentinel", error: "process sentinel" };
+  let count = 0;
+  const tools: ToolDefinition[] = [{ name: "run_shell", description: "fixture", displayInputRule: "core-command-v1", inputSchema: { type: "object" }, async handler(call) {
+    handlerIds.push(call.toolCallId!);
+    count++;
+    if (count === 2) throw new Error(`error ${secret}`);
+    if (count === 3) throw { raw: "arbitrary object must stay absent" };
+    return { ok: false, message: "model original sentinel", execution };
+  } }, { name: "read_file", description: "custom no rule", inputSchema: { type: "object" }, async handler() { return { ok: true, message: "custom result" }; } }];
+  const session = await createCodexRuntimeAdapter(options("/fixture", engines, {
+    tools, toolDisplayMode: "required-v1", currentTurnId: () => `turn:${secret}`, registerToolDisplayProfile() {},
+    projectToolEvent(source, redact) {
+      assert.ok("phase" in source);
+      sources.push(source);
+      let summary = "safe start";
+      if (source.phase === "result") summary = redact!(source.result?.message ?? source.error?.message ?? "generic failure");
+      return { runtime: source.runtime, roleId: source.roleId, turnId: source.turnId, kind: source.phase === "start" ? "tool_call" : "denied", summary,
+        detail: { toolName: source.toolName, toolCallId: source.toolCallId, turnId: source.turnId, phase: source.phase } };
+    },
+  })).bindRole(role);
+  const events = collect(session);
+  const turn = await start(session, engines.engine);
+  const args = { cmd: `echo ${secret}`, arbitrary: "raw never queued" };
+  const receipt = await engines.engine.call("run_shell", args, { callId: `native:${secret}` });
+  assert.deepEqual(receipt, { success: false, contentItems: [{ type: "inputText", text: "model original sentinel" }] });
+  await engines.engine.call("run_shell", {});
+  await engines.engine.call("run_shell", {});
+  await engines.engine.call("read_file", { file_path: "custom target" });
+  engines.engine.finish(); await turn.completion; await session.dispose(); await events.done;
+  assert.equal(sources.length, 8);
+  assert.deepEqual(sources.map(source => source.origin), Array.from({ length: 4 }, () => ["handler-start", "handler-result"]).flat());
+  assert.deepEqual(sources[0].input, { rule: "core-command-v1", args });
+  assert.equal(sources[0].toolCallId, handlerIds[0]);
+  assert.equal(sources[0].turnId, `turn:${secret}`);
+  const first = sources[1]; assert.equal(first.phase, "result");
+  if (first.phase === "result") assert.deepEqual(first.result, { ok: false, message: "model original sentinel", execution });
+  const thrown = sources[3]; assert.equal(thrown.phase, "result");
+  if (thrown.phase === "result") { assert.deepEqual(thrown.error, { message: `error ${secret}` }); assert.equal(thrown.result, undefined); }
+  const nonError = sources[5]; if (nonError.phase === "result") assert.deepEqual(nonError.error, {});
+  assert.equal(sources[6].input?.rule, undefined);
+  assert.ok(events.entries.filter(event => event.kind === "tool_call").every(event => (event.detail as { phase: string }).phase === "start"));
+  assert.equal((events.entries[0].detail as { toolCallId: string }).toolCallId, handlerIds[0]);
+  assert.equal(events.entries[0].turnId, `turn:${secret}`);
+  assert.equal(events.entries.some(event => JSON.stringify(event).includes("raw never queued")), false);
+  assert.equal(events.entries.some(event => JSON.stringify(event).includes("arbitrary object")), false);
+  assert.equal(events.entries.some(event => event.summary.includes(secret)), false);
+});
+
+test("projector failure emits bounded diagnostic without raw fallback or changing model receipt and settled outcome", async () => {
+  const engines = harness();
+  const session = await createCodexRuntimeAdapter(options("/fixture", engines, {
+    toolDisplayMode: "required-v1", registerToolDisplayProfile() {}, projectToolEvent() { throw new Error("raw projector exception"); },
+    tools: [{ name: "echo", description: "fixture", inputSchema: { type: "object" }, async handler() { return { ok: true, message: "original model text" }; } }],
+  })).bindRole(role);
+  const events = collect(session); const turn = await start(session, engines.engine);
+  assert.deepEqual(await engines.engine.call("echo", { path: "raw target" }), { success: true, contentItems: [{ type: "inputText", text: "original model text" }] });
+  engines.engine.finish(); await turn.completion; await session.dispose(); await events.done;
+  assert.equal(events.entries.length, 3);
+  for (const event of events.entries.slice(0, 2)) assert.deepEqual(event.detail, { version: 1, source: "tool-display-diagnostic", code: "PROJECTION_FAILED" });
+  assert.equal(JSON.stringify(events.entries).includes("raw"), false);
+  assert.deepEqual(events.entries.at(-1)?.detail, { outcome: "completed" });
+});
+
+test("provider prompt keeps exact model text and image bytes while ignoring Core-only delivery metadata", async () => {
+  const engines = harness();
+  const session = await createCodexRuntimeAdapter(options("/fixture", engines)).bindRole(role);
+  const image = { type: "image" as const, mimeType: "image/png", data: Buffer.from("image exact bytes").toString("base64") };
+  const original = "model raw sentinel\n原始文字";
+  const promptOptions: import("../../src/model/runtime.ts").PromptOptions = { images: [image], inputProvenance: { version: 1, kind: "handback", deliveryId: "Core only", attemptId: "attempt", target: { roleId: role.id, runtime: "codex" }, reports: [] }, inputPresentation: { version: 1, kind: "handback-live", durability: "memory-only", reports: [], deliveryId: "Core only" }, onDeliveryProgress() { throw new Error("not provider responsibility"); } };
+  const completion = session.prompt(original, promptOptions);
+  await until(() => engines.engine.turns === 1);
+  const params = engines.engine.requests.find(request => request.method === "turn/start")!.params;
+  const input = params.input as Array<Record<string, unknown>>;
+  assert.deepEqual(input[0], { type: "text", text: original, text_elements: [] });
+  assert.equal(await readFile(String(input[1].path), "utf8"), "image exact bytes");
+  assert.equal(JSON.stringify(params).includes("Core only"), false);
+  assert.deepEqual(Object.keys(params).sort(), ["approvalPolicy", "approvalsReviewer", "input", "model", "sandboxPolicy", "threadId"]);
+  engines.engine.finish(); await completion; await session.dispose();
+});
+
+test("projection never attributes unknown, repeated, queued stopped or late callbacks to a new turn", async () => {
+  const engines = harness();
+  const sources: import("../../src/model/runtime.ts").RuntimeToolEventFactsV1[] = [];
+  let release!: () => void;
+  let began = false;
+  let writes = 0;
+  let turnId = "first actual turn";
+  const session = await createCodexRuntimeAdapter(options("/fixture", engines, {
+    currentTurnId: () => turnId, toolDisplayMode: "required-v1", registerToolDisplayProfile() {},
+    projectToolEvent(source) {
+      assert.ok("phase" in source); sources.push(source);
+      return { runtime: "codex", turnId: source.turnId, kind: "tool_call", summary: "protected", detail: { toolName: source.toolName, toolCallId: source.toolCallId, turnId: source.turnId, phase: source.phase } };
+    },
+    tools: [{ name: "hold", description: "fixture", inputSchema: { type: "object" }, async handler() { began = true; await new Promise<void>(resolve => { release = resolve; }); return { ok: true, message: "late result", execution: { exitCode: 0 } }; } },
+      { name: "write", description: "fixture", inputSchema: { type: "object" }, async handler() { writes++; return { ok: true, message: "written" }; } }],
+  })).bindRole(role);
+  const first = await start(session, engines.engine);
+  const holding = engines.engine.call("hold", {}, { callId: "same native call" }); await until(() => began);
+  const queued = engines.engine.call("write", {});
+  assert.equal((await engines.engine.call("hold", {}, { callId: "same native call" })).success, false);
+  assert.equal((await engines.engine.call("unknown", {})).success, false);
+  await session.abort!(); await first.completion;
+  turnId = "second actual turn";
+  const second = await start(session, engines.engine);
+  assert.equal((await engines.engine.call("write", {}, { turnId: first.nativeTurnId })).success, false);
+  release(); await holding; await queued;
+  assert.equal(writes, 0);
+  assert.equal(sources.length, 1);
+  assert.equal(sources[0].turnId, "first actual turn");
+  await engines.engine.call("write", {});
+  assert.equal(sources.length, 3);
+  assert.ok(sources.slice(1).every(source => source.turnId === "second actual turn"));
+  engines.engine.finish(); await second.completion; await session.dispose();
+});

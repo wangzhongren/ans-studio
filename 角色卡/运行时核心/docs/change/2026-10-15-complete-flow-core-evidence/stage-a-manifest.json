@@ -1,0 +1,35 @@
+{
+  "stage": "A public API release; C overlaps Model/Service and remains under implementation",
+  "at": "2026-10-15T03:40:05.223Z",
+  "files": [
+    {
+      "path": "src/model/runtime.ts",
+      "sha256": "4d3278969daea6f45fd098a11cd5aea076fd646c080f09c10d4a8daba88314dd"
+    },
+    {
+      "path": "src/common/runtime-core/tool-display.ts",
+      "sha256": "57643567ada6d088028931519c1ca321b7060a4d0784b4920f079b5614618c2d"
+    },
+    {
+      "path": "src/provider/runtime/tools.ts",
+      "sha256": "5db9187e52b2413c46a07e516c56f8b27455bccd7c002ad8b9bf3db84ddd9298"
+    },
+    {
+      "path": "src/service/runtime/session.ts",
+      "sha256": "52f8ef68ba3ed9d9042625e8da5d369f18efa32e7e75c5829e00f9f8e930f784"
+    },
+    {
+      "path": "test/runtime-core/tool-display.test.ts",
+      "sha256": "55b0db84556b394e9083bd12edc3caaedaa19e838ffb4837fb521c1d056b597a"
+    },
+    {
+      "path": "test/runtime-core/legacy-history-projection.test.ts",
+      "sha256": "c6bed08a0ed8d90bc6465d2ffc175a24a5f2265e723d9697ebff3f7eeded33b3"
+    }
+  ],
+  "checks": {
+    "coreA52": "/private/tmp/core-a-all-second.txt",
+    "currentTsc": "/private/tmp/core-c-tsc4.txt"
+  },
+  "compatibility": "required-v1 fixed by Core; controlled factories register the actual empty profile; optional live delivery identity pending test only, no durable source identity added"
+}

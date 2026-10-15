@@ -1,0 +1,8 @@
+{
+  "projectRoot": "/private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-p1p7-desktop-JqO4lM",
+  "command": "npm test",
+  "exitCode": 0,
+  "pass": 31,
+  "log": "/private/tmp/ans-visual-v2-plimit-baseline.log",
+  "producer": "root independent shell baseline; not native UI execution"
+}

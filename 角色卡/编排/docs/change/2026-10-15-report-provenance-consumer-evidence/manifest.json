@@ -1,0 +1,62 @@
+{
+  "stage": "ORCHESTRATION-C-1; Window/UI integration pending",
+  "contracts": {
+    "A": 4,
+    "C": 2,
+    "text_policy_revision": 1,
+    "consumer": 2
+  },
+  "platform": "Darwin",
+  "arch": "arm64",
+  "node": "v24.14.0",
+  "files": [
+    {
+      "path": "src/common/编排/handback.ts",
+      "sha256": "ae4153c7d2d279caf395233f76727418e39093bb24eeeeea76ac554e0e14c6dd"
+    },
+    {
+      "path": "src/pipeline/orchestration/run-role.ts",
+      "sha256": "fad87c2372ca5752a08a702284111db097dc7a2b3f9c9c6d6ac9789ccd4d1d64"
+    },
+    {
+      "path": "src/pipeline/orchestration/govern-session.ts",
+      "sha256": "9894f9364f2ab23840213085125e8f80fd6ab49c298b34847651586b0514c2d7"
+    },
+    {
+      "path": "test/编排/handback-lifecycle.test.ts",
+      "sha256": "ee770d8cc4508d3827c5facda200892e47680aaa99168b3973d2d8caf786fdfa"
+    },
+    {
+      "path": "test/编排/runtime-orchestration.test.ts",
+      "sha256": "8d9228d2a183c8c0be1f749a48a124ec47e36b1d2850cafa4dceeeed665d4434"
+    },
+    {
+      "path": "test/编排/report-provenance-consumer.test.ts",
+      "sha256": "68cbc6a02608acad51fcff9024e9496110a89499912a5e4bb56fe48107acf932"
+    }
+  ],
+  "combinedSha256": "ba462ba78609128199a67988422b051bc8450c2d65664e50393ee0a44b6e6310",
+  "checks": {
+    "unit": {
+      "command": "node --test 'test/编排/*.test.ts'",
+      "tests": 256,
+      "passed": 256,
+      "failed": 0,
+      "skipped": 0,
+      "exit": 0,
+      "log": "tests.log"
+    },
+    "typecheck": {
+      "command": "npm run typecheck",
+      "exit": 0,
+      "log": "typecheck.log"
+    },
+    "approvedMismatches": [],
+    "coreMismatches": []
+  },
+  "limitations": [
+    "No actual Window/UI/native model/desktop verification",
+    "No SDK/native transcript rewriting",
+    "Source raw handback/model text remain internal; downstream must not send raw IPC"
+  ]
+}

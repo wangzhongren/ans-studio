@@ -1,0 +1,20 @@
+✔ E-1 投递：A 的回交到达 → **自动开启 su** 并把 `renderHandbackPrompt` 原文投给 su（单一来源） (184.517417ms)
+✔ E-1 去重：同一条回交重复到达（重放）→ **只投递一次** (184.117042ms)
+✔ E-1 排队：su 忙时保留，settle 后连续回交按原序合成一次验收输入 (467.641291ms)
+✔ 连续回交投递失败：整批保留同序，重试送达一次，原报告键不丢 (39.295792ms)
+✔ 客户消息屏障：A报告→客户消息→B报告，不跨消息合批或改变顺序 (43.411375ms)
+✔ 常规检查宿主政策实际注入项目角色，su不接委托免确认 (2.343292ms)
+✔ E-1 开启失败：如实系统行（含原因与重试时机）+ **保留回交**；下次时机成功投递（绝不静默丢） (331.864708ms)
+✔ 真机崩溃修复：坏形状回交事件（缺载荷/缺 roleId）→ 不投递、如实系统行、**零未捕获拒绝** (281.54025ms)
+✔ E-1 投递失败：如实系统行（含原因）+ 放回队首保留；重试成功后送达（顺序与内容不损） (334.001416ms)
+✔ C Window merges source saved-before-business and retry Promise/change orders into one enqueue (27.317375ms)
+✔ C frozen batch retries keep members and delivery ID while later reports stay separate (43.481542ms)
+✔ C possible provider start and unknown failure do not automatically prompt again (149.619292ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2180.378375

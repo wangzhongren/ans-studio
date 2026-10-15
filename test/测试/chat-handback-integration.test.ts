@@ -41,6 +41,9 @@ for (const runtime of ["pi", "codex", "claude"] as const satisfies readonly Runt
     const factory: RuntimeProviderFactory = options => ({
       async composeContext() { return { systemPrompt: "independent external engine" }; },
       async bindRole(role) {
+        assert.equal(options.toolDisplayMode, "required-v1");
+        assert.equal(typeof options.registerToolDisplayProfile, "function");
+        options.registerToolDisplayProfile!({ credentials: [] });
         let closed = false;
         let wake: (() => void) | undefined;
         let controller = new AbortController();
@@ -106,7 +109,9 @@ for (const runtime of ["pi", "codex", "claude"] as const satisfies readonly Runt
     const statusAt = (index: number) => {
       const event = handbacks()[index].event;
       assert.equal(event.kind, "handback");
-      return event.kind === "handback" ? event.handback.status : undefined;
+      if (event.kind !== "handback") return undefined;
+      assert.equal(Object.hasOwn(event, "handback"), false, "raw internal model handback must never enter the desktop envelope");
+      return (event.report ?? event.liveReport)?.status;
     };
     try {
       assert.equal((await manager.open(target)).ok, true);
@@ -144,9 +149,10 @@ for (const runtime of ["pi", "codex", "claude"] as const satisfies readonly Runt
       assert.equal((await manager.send("ordinary explicit-report", undefined, target)).ok, true);
       await until(() => handbacks().length === 3 && delivered() === 3);
       assert.equal(statusAt(2), "completed");
-      const turnIds = handbacks().map(row => row.event.kind === "handback" ? row.event.handback.turnId : undefined);
+      const turnIds = handbacks().map(row => row.event.kind === "handback" ? (row.event.report ?? row.event.liveReport)?.source.turnId : undefined);
       assert.ok(turnIds.every(id => typeof id === "string" && id.length > 0));
       assert.equal(new Set(turnIds).size, 3, "each real turn owns exactly one report");
+      assert.equal(fs.existsSync(path.join(root, ".ans")), false, "source and target persist=false must retain live delivery without creating persistence directories");
     } finally {
       release?.();
       await manager.stop();

@@ -18,6 +18,10 @@
 | 诊断与显式恢复 | 唯一共享 logger 滚动 24h；窗口加载/故障/IPC 诊断；显式重载续接、同 id 重推仍 pending 请求（不代答/不延期） | 已实现 | 归档：[视口/报告/诊断修复](../桌面应用/docs/fix/2026-10-13_fix_viewport-reports-diagnostics.md) |
 | 端到端总自检台（e2e/main.mjs） | 真实 Electron 驱动主进程装配+preload+renderer 全链自检（离线替换适配器；截图+报告） | 已实现（2026-10-14：样例角色改「桌面窗口」；诊断基线红随「S-1 生产形状夹具」修复，`E2E_DONE=1` 全程跑通——见[变更记录](docs/change/2026-10-14_change_split-role-id-test-updates.md)） | 归档：[桌面应用 memo](../桌面应用/memo.md)、[e2e 看门狗修复](../桌面应用/changelog.md)（2026-10-12 条目） |
 
+| 受限文档只读 | 原生导入后签发opaque引用，256KiB UTF8 md/txt分层读取与句柄/scope复核 | 窗口专项通过，UI真实阅读待验收 | [功能](docs/feature/restricted-document-read.md) |
+
+| 工具与报告安全桌面数据 | 安全工具详情/历史、只保存恢复、真实投递回执与一次入队 | 窗口23文件206项通过，真实UI待独立验收 | [功能](docs/feature/complete-flow-window-data.md) |
+
 ## 说明
 
 - 本角色不自编项目管理/测试功能；功能文档建立在验收达标后，先立导航不留失效链接。

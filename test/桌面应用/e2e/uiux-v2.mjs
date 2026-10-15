@@ -16,14 +16,22 @@ const ROOT='/offline-uiux-fixture';
 const PNG='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=';
 let win, pickResolve, sendResolve, withdrawResolve;
 let pickDeferred=false, sendDeferred=false, withdrawMode='fail', interactiveReady=false, operatorMode='normal';
-const reports=[]; const errors=[]; const sends=[]; const opens=[]; const histories=[]; const stops=[]; const aborts=[]; const responses=[]; const configSaves=[]; const shellResponses=[]; const configApplications={};
+const windowCalls=[]; const reports=[]; const errors=[]; const sends=[]; const opens=[]; const histories=[]; const stops=[]; const aborts=[]; const responses=[]; const configSaves=[]; const shellResponses=[]; const configApplications={};
 let saveMode="success", saveApplication="next-session";
 const CONFIG_ONLY=process.env.ANS_CONFIG_UI_ONLY==='1';
+const FRESH_CONTEXT_ONLY=process.env.ANS_FRESH_CONTEXT_UI_ONLY==='1';
+const ROLE_FOCUS_ONLY=process.env.ANS_ROLE_RETURN_FOCUS_UI_ONLY==='1';
+const TERMINAL_ONLY=process.env.ANS_TERMINAL_UI_ONLY==='1';
+const SEND_FACTS_ONLY=process.env.ANS_SEND_FACTS_UI_ONLY==='1';
+const TERMINAL_MERGE_ONLY=process.env.ANS_TERMINAL_MERGE_UI_ONLY==='1';
+const VISUAL_ONLY=process.env.ANS_VISUAL_V2_UI_ONLY==='1';
+const GHOST_ONLY=process.env.ANS_DELIVERY_NOTE_UI_ONLY==='1';
+const FLOW_ONLY=process.env.ANS_COMPLETE_FLOW_UI_ONLY==='1'||FRESH_CONTEXT_ONLY||ROLE_FOCUS_ONLY||TERMINAL_ONLY||SEND_FACTS_ONLY||TERMINAL_MERGE_ONLY||VISUAL_ONLY||GHOST_ONLY;
 const PROJECT_RESET_ONLY=process.env.ANS_PROJECT_RESET_UI_ONLY==='1';
 const DUP_ONLY=process.env.ANS_DUP_UI_ONLY==='1';
 const SELECTOR_ONLY=process.env.ANS_SELECTOR_UI_ONLY==='1';
 const configReads=[];
-let recoveryEnabled=!(CONFIG_ONLY||SELECTOR_ONLY), listFailure=false, pickResult=ROOT, configFailure=false, configMalformed=false, configDeferred=false, saveDeferred=false;
+let recoveryEnabled=!(CONFIG_ONLY||SELECTOR_ONLY||FLOW_ONLY), listFailure=false, pickResult=ROOT, configFailure=false, configMalformed=false, configDeferred=false, saveDeferred=false;
 let configMissing={}, configPending=[], savePending=[];
 let mergeReplayAfterList=false, sendQueued=false; const mergeHistories=new Map();
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
@@ -35,10 +43,22 @@ const longFull='全文 '+ '排队消息详细内容与来源。\n'.repeat(40)+'�
 const queue=[{id:'msg\u0000long',kind:'message',summary:'客户长消息：'+ '超过80字的队列摘要用于核对换行、时间与操作归属。'.repeat(6),full:longFull,at:'2026-10-13T10:01:00Z'},{id:'dispatch',kind:'dispatch',sourceRoleId:'B',summary:'派发任务',full:'',at:'2026-10-13T10:02:00Z'},{id:'handback',kind:'handback',sourceRoleId:'B',summary:'回交报告',full:'',at:'2026-10-13T10:03:00Z'}];
 let activeQueue=queue.slice();
 const snapshot=(busy=true)=>({roleId:'A',busy,summaries:activeQueue.map(x=>x.summary),queue:activeQueue,running:busy?{id:'running',kind:'message',summary:'正在处理当前请求',full:'',at:'2026-10-13T10:00:00Z'}:null});
+let flowOpenResult=null, flowLongRoleDocs=false;
+let docMode='success',docCalls=[],docPending=[],flowSavePending=[],saveModeDeferred=false,flowSaveFailure=null,persistenceCalls=[];
+const flowReports={},flowReceipts={};
+const outer=(input,value)=>({ok:true,version:1,scope:{projectRoot:input.projectRoot,roleId:input.roleId,runtime:input.runtime},value});
+const documentRefs=['one','two'].map((id,index)=>({version:1,projectViewId:'epoch-one',documentId:'doc-'+id,roleId:'A',relativePath:'角色卡/A/docs/'+id+'.md',label:'报告 '+(index+1),format:'markdown'}));
 const handlers={
  'app:renderer-diagnostic':()=>({ok:true}), 'app:recovery-state':()=>recoveryEnabled?({projectRoot:ROOT,roleId:'A'}):({}),'app:recovery-ready':()=>({ok:true}),
- 'window:is-maximized':()=>false,'app:list-project':(_e,projectRoot)=>{if(listFailure)throw new Error('fixture listing failed');if(mergeReplayAfterList)for(const h of mergeHistories.values())win.webContents.send('session:history',h);return {...listing,projectRoot:projectRoot?.projectRoot||ROOT};},'app:pick-project':()=>pickResult,
- 'session:open':(_e,input)=>{opens.push(input);return {ok:true,resumed:true,contextSource:'resumed',runtime:input.runtime,projectRoot:input.projectRoot,profileRevision:0};},'session:live':()=>['A','B'],'session:stop':(_e,input)=>{stops.push(input);return {ok:true};},
+ 'project:document-read':(_e,input)=>{docCalls.push(input);if(docMode==='deferred')return new Promise(resolve=>docPending.push(resolve));if(docMode!=='success')return {ok:false,version:1,projectViewId:input.projectViewId,documentId:input.documentId,code:docMode,message:'fixed safe error'};return {ok:true,version:1,projectViewId:input.projectViewId,documentId:input.documentId,roleId:input.documentId.endsWith('-b')?'B':'A',relativePath:'角色卡/'+(input.documentId.endsWith('-b')?'B':'A')+'/docs/one.md',format:'markdown',byteLength:100,text:'# 已列文档\n\n<script>window.BAD_DOC=1</script>\n\n![image](https://invalid.example/never.png)\n\n[javascript](javascript:alert(1))\n\n文档正文'};},
+ 'session:get-persistence':(_e,input)=>{persistenceCalls.push({operation:'capabilities',input});return outer(input,{mode:'enabled',reportSaveSupported:true,deliveryHistorySaveSupported:true,querySupported:true});},
+ 'report:get-save-state':(_e,input)=>{persistenceCalls.push({operation:'report-query',input});return outer(input,flowReports[input.reportId]||{state:'saved',reportId:input.reportId,retryAvailable:false});},
+ 'delivery:get-receipt':(_e,input)=>{persistenceCalls.push({operation:'receipt-query',input});return outer(input,flowReceipts[input.attemptId]?{state:'known',receipt:flowReceipts[input.attemptId]}:{state:'expired',code:'SNAPSHOT_EXPIRED',retryAvailable:false});},
+ 'report:retry-save':(_e,input)=>{persistenceCalls.push({operation:'report-save',input});if(saveModeDeferred)return new Promise(resolve=>flowSavePending.push({resolve,input}));if(flowSaveFailure)return outer(input,{ok:false,state:flowSaveFailure==='SNAPSHOT_EXPIRED'?'expired':'failed',reportId:input.reportId,code:flowSaveFailure,retryAvailable:false,message:'固定安全失败'});const value={ok:true,state:'saved',report:flowReports[input.reportId].report,retryAvailable:false};flowReports[input.reportId]={...value,reportId:input.reportId};return outer(input,value);},
+ 'delivery:retry-history-save':(_e,input)=>{persistenceCalls.push({operation:'history-save',input});const receipt={...flowReceipts[input.attemptId],history:'saved',retryHistoryAvailable:false};flowReceipts[input.attemptId]=receipt;return outer(input,{ok:true,state:'saved',receipt});},
+ 'window:minimize':()=>{windowCalls.push('minimize');return {ok:true};},'window:toggle-maximize':()=>{windowCalls.push('maximize');return {ok:true};},'window:close':()=>{windowCalls.push('close');return {ok:true};},
+ 'window:is-maximized':()=>false,'app:list-project':(_e,projectRoot)=>{if(listFailure)throw new Error('fixture listing failed');if(mergeReplayAfterList)for(const h of mergeHistories.values())win.webContents.send('session:history',h);return {...listing,projectRoot:projectRoot?.projectRoot||ROOT,...(FLOW_ONLY?{documentScope:{version:1,projectViewId:'epoch-one',projectRoot:projectRoot?.projectRoot||ROOT},roles:listing.roles.map(role=>({...role,documents:role.roleId==='A'?documentRefs:role.roleId==='B'?documentRefs.map(ref=>({...ref,roleId:'B',documentId:ref.documentId+'-b',relativePath:ref.relativePath.replace('/A/','/B/')})):[],...(flowLongRoleDocs?{changelog:{path:'changelog.md',text:'# 真实长变更\n\n'+('保留变更阅读位置。\n\n'.repeat(100))}}:{}),docs:flowLongRoleDocs?Array.from({length:100},(_,n)=>({kind:'file',path:'docs/record-'+n+'.md'})):[{kind:'directory',path:'docs/change'},{kind:'file',path:'docs/one.md'}]}))}:{})};},'app:pick-project':()=>pickResult,
+ 'session:open':(_e,input)=>{opens.push(input);return {ok:true,resumed:true,contextSource:'resumed',runtime:input.runtime,projectRoot:input.projectRoot,profileRevision:0,...(flowOpenResult||{})};},'session:live':()=>['A','B'],'session:stop':(_e,input)=>{stops.push(input);return {ok:true};},
  'session:history-get':(_e,input)=>{histories.push(input);return mergeHistories.get(input.runtime+'|'+input.roleId)||{...input,rows:[],error:null,skipped:0};},
  'session:live-views':()=>[{projectRoot:ROOT,roleId:'A',runtime:'pi'},{projectRoot:ROOT,roleId:'B',runtime:'pi'},...opens.map(x=>({projectRoot:x.projectRoot,roleId:x.roleId,runtime:x.runtime}))],
  'session:abort':(_e,input)=>{aborts.push(input);win.webContents.send('session:role-state',{...snapshot(false),...input}); return {ok:true,supported:true};},
@@ -59,12 +79,366 @@ function runtimeConfig(runtime) {
 }
 Object.entries(handlers).forEach(([name,fn])=>ipcMain.handle(name,fn));
 const key=async (name,modifiers=[])=>{const keyCode=({Enter:'Return',ArrowDown:'Down',ArrowUp:'Up'})[name]||name;win.webContents.sendInputEvent({type:'keyDown',keyCode,modifiers});if(name==='Enter')win.webContents.sendInputEvent({type:'char',keyCode:'\r',modifiers});win.webContents.sendInputEvent({type:'keyUp',keyCode,modifiers});await pause(50);};
+function safeReport(hb) { const text=s=>({text:s||'',redacted:false,truncated:false});return {source:{roleId:hb.roleId,runtime:'pi',turnId:hb.turnId},taskId:hb.taskId||null,origin:hb.status==='unreported'?'terminal-fallback':'submitted-report',status:hb.status,summary:text(hb.summary),evidence:(hb.evidence||[]).map(text),evidenceOmitted:0,at:hb.at||''}; }
 const event=(kind,summary,detail)=>({roleId:'A',event:{kind,summary,detail}});
 function activityEvents(prefix='') { return [event('tool_call','模型请求调用 read_file（目标：a.md）',{toolName:'read_file',path:'a.md'}),event('accepted','read_file 执行完成',{toolName:'read_file',path:'a.md',ok:true,status:'completed',turnId:prefix+'turn-1'}),event('accepted','request accepted',{toolName:'legacy',path:'legacy.md'}),event('denied','文件不存在',{toolName:'read_file',path:'missing.md',status:'failed',ok:false}),event('tool_call','开始执行 read_file',{toolName:'read_file',path:'b.md'}),event('message','真实助手答复保持原文。')]; }
 async function push(channel,payload){win.webContents.send(channel,payload);await pause(80);}
 function ownHistory(){return parseSessionJsonl([{type:'session'},{type:'message',message:{role:'assistant',content:[{type:'toolCall',id:'rs',name:'run_shell',arguments:{command:'ls missing'}}]}},{type:'message',message:{role:'toolResult',toolCallId:'rs',toolName:'run_shell',isError:false,content:[{type:'text',text:'run_shell 已执行：ls missing（exit 1）\nstdout:\nSECRET'}]}},{type:'message',message:{role:'toolResult',toolName:'read_file',isError:false,content:[{type:'text',text:'read_file 失败：lost.md（ENOENT）'}]}},{type:'message',message:{role:'assistant',content:[{type:'text',text:'历史助手答复。'}]}}].map(x=>JSON.stringify(x)).join('\n')).rows;}
-const viewportGeometry=`(() => { const root=document.documentElement,b=document.body,a=document.querySelector('.app'),c=document.querySelector('.composer').getBoundingClientRect(),d=document.getElementById('right-drawer').getBoundingClientRect(); const visible=id=>{let r=document.getElementById(id).getBoundingClientRect();return r.width>0&&r.left>=0&&r.right<=innerWidth&&r.bottom<=innerHeight&&r.top>=0;};return root.scrollWidth===root.clientWidth&&b.scrollWidth===b.clientWidth&&a.scrollWidth===a.clientWidth&&visible('btn-send')&&visible('btn-halt')&&visible('drawer-close')&&d.bottom<=c.top+1;})()`;
+const viewportGeometry=`(() => { const root=document.documentElement,b=document.body,a=document.querySelector('.app'),c=document.querySelector('.composer').getBoundingClientRect(),d=document.getElementById('right-drawer').getBoundingClientRect(); const visible=id=>{let r=document.getElementById(id).getBoundingClientRect();return r.width>0&&r.left>=0&&r.right<=innerWidth&&r.bottom<=innerHeight&&r.top>=0;};return root.scrollWidth===root.clientWidth&&b.scrollWidth===b.clientWidth&&a.scrollWidth===a.clientWidth&&visible('btn-send')&&visible('btn-halt')&&visible('drawer-close')&&d.bottom<=innerHeight&&Math.abs(d.width-424)<1&&document.querySelector(".col-mid").inert;})()`;
 async function reading(){return js(`(() => {let c=document.getElementById('chat'),t=c.getBoundingClientRect().top;let nodes=[...c.querySelectorAll('.msg,.tool-records,.sys-denied')];let n=nodes.find(x=>x.getBoundingClientRect().bottom>t&&x.getBoundingClientRect().top<c.getBoundingClientRect().bottom);return n?{text:n.textContent.slice(0,60),offset:n.getBoundingClientRect().top-t}:null;})()`);}
+async function freshContextChecks(){
+  const project=ROOT+'-new-context';flowOpenResult={resumed:false,contextSource:'fresh'};
+  await js(`await window.__ansRenderer.loadProject(${JSON.stringify(project)});await window.__ansRenderer.selectRole('A')`);
+  await check('P5 truly fresh open says new context without old history',`document.getElementById('context-state').textContent==='新会话'`);
+  await js(`document.getElementById('inp-message').value='首条普通选择';document.getElementById('btn-send').click()`);await pause(30);
+  const sent=sends.at(-1),turn='fresh-first-turn';
+  await push('session:events',[{projectRoot:project,roleId:'A',runtime:'pi',clientMessageId:sent.metadata.clientMessageId,event:{kind:'message',runtime:'pi',roleId:'A',turnId:turn,summary:'用户指令：首条普通选择',detail:{source:'prompt-input',text:'首条普通选择'}}},{projectRoot:project,roleId:'A',runtime:'pi',event:{kind:'tool_call',runtime:'pi',roleId:'A',turnId:turn,summary:'请求选择',detail:{toolName:'request_choice',toolCallId:'fresh-choice-call',phase:'start'}}}]);
+  await push('session:role-state',{projectRoot:project,roleId:'A',runtime:'pi',busy:true,summaries:[],queue:[],contextSource:'fresh'});
+  await check('P5 fresh first prompt tool and snapshot do not invent old lost context',`document.getElementById('context-state').textContent==='新会话'&&!document.getElementById('context-state').textContent.includes('模型未恢复')`);
+  await push('session:history',{projectRoot:project,roleId:'A',runtime:'pi',rows:[{kind:'user',text:'首条普通选择',turnId:turn},{kind:'tool',text:'请求选择',turnId:turn,eventKind:'tool_call',activity:{toolName:'request_choice',toolCallId:'fresh-choice-call',phase:'start',status:'call'}}]});
+  await push('session:role-state',{projectRoot:project,roleId:'A',runtime:'pi',busy:false,summaries:[],queue:[],contextSource:'fresh'});
+  await check('P5 current-handle replay update remains fresh without false old-history warning',`document.getElementById('context-state').textContent==='新会话'`);
+  const oldProject=ROOT+'-old-readable';mergeHistories.set('pi|A',{projectRoot:oldProject,roleId:'A',runtime:'pi',rows:[{kind:'assistant',text:'真实旧可读历史',turnId:'older'}],error:null});flowOpenResult={resumed:false,contextSource:'fresh',contextWarning:'原生恢复失败，已重建上下文。'};
+  await js(`await window.__ansRenderer.loadProject(${JSON.stringify(oldProject)});await window.__ansRenderer.selectRole('A')`);
+  await check('P5 actual at-open old history retains truthful failed-restore notice',`document.getElementById('context-state').textContent.includes('可读历史保留，模型未恢复')&&document.getElementById('context-state').title.includes('原生恢复失败')`);
+  mergeHistories.delete('pi|A');flowOpenResult=null;
+}
+async function roleDocumentFocusChecks(){
+ flowLongRoleDocs=true;
+ await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRole('A');if(window.__ansRenderer.state.rightTab!=='card')document.getElementById('tab-card').click();['card','docs','changes'].forEach(id=>document.querySelector('details[data-section="'+id+'"]').open=true);document.getElementById('right-body').scrollTop=document.getElementById('right-body').scrollHeight`);await pause(30);
+ await js(`['card','docs','changes'].forEach(id=>{let el=document.querySelector('details[data-section="'+id+'"] .card-text');el.scrollTop=el.scrollHeight});document.getElementById('right-body').scrollTop=document.getElementById('right-body').scrollHeight`);await pause(30);
+ const nested=await js(`Object.fromEntries(['card','docs','changes'].map(id=>[id,document.querySelector('details[data-section="'+id+'"] .card-text').scrollTop]))`);assert.ok(Object.values(nested).every(x=>x>100));
+ await check('nested reading fixture has visible real opener and positive inner and outer scroll',`(()=>{let b=document.querySelector('.role-document-entry').getBoundingClientRect(),d=document.getElementById('right-body').getBoundingClientRect();return b.top>=d.top&&b.bottom<=d.bottom&&document.getElementById('right-body').scrollTop>100})()`);
+ const before=await js(`document.getElementById('right-body').scrollTop`);assert.ok(before>100);reports.push({name:'nested role reading actual before',value:{nested,outer:before}});
+ await js(`[...document.querySelectorAll('#right-body button')].find(x=>x.textContent==='查看已列文档').click();document.querySelector('[data-doc-id="doc-one"]').click()`);await pause(30);
+ await js(`document.querySelector('[data-doc-action="back-list"]').click();document.querySelector('[data-doc-action="back-role"]').click()`);await pause(30);
+ await check('P3 return preserves actual role scroll and expansion',`document.querySelector('details[data-section="card"]').open&&Math.abs(document.getElementById('right-body').scrollTop-${before})<2`);
+ await check('P6 return role restores equivalent visible document entry focus',`document.activeElement.textContent==='查看已列文档'&&!!document.activeElement.closest('#right-body')&&document.activeElement.getClientRects().length>0`);
+ reports.push({name:'nested role reading actual after',value:await js(`({outer:document.getElementById('right-body').scrollTop,inner:Object.fromEntries(['card','docs','changes'].map(id=>[id,document.querySelector('details[data-section="'+id+'"] .card-text').scrollTop]))})`)});
+ await check('P3 independent card docs changes inner scroll survives alongside outer expansion focus',`['card','docs','changes'].every(id=>document.querySelector('details[data-section="'+id+'"]').open&&Math.abs(document.querySelector('details[data-section="'+id+'"] .card-text').scrollTop-(${JSON.stringify(nested)})[id])<2)&&Math.abs(document.getElementById('right-body').scrollTop-${before})<2&&document.activeElement.classList.contains('role-document-entry')`);
+ await js(`await window.__ansRenderer.selectRole('B');['card','docs','changes'].forEach(id=>document.querySelector('details[data-section="'+id+'"]').open=true)`);await pause(30);
+ await check('nested role reading does not leak into another role',`['card','docs','changes'].every(id=>document.querySelector('details[data-section="'+id+'"] .card-text').scrollTop===0)`);
+ await js(`await window.__ansRenderer.selectRole('A')`);await pause(30);
+ await check('returning original role restores only its own nested reading',`['card','docs','changes'].every(id=>Math.abs(document.querySelector('details[data-section="'+id+'"] .card-text').scrollTop-(${JSON.stringify(nested)})[id])<2)`);
+ await js(`await window.__ansRenderer.selectRuntime('claude');['card','docs','changes'].forEach(id=>document.querySelector('details[data-section="'+id+'"]').open=true)`);await pause(30);
+ await check('nested role reading does not leak into another runtime',`['card','docs','changes'].every(id=>document.querySelector('details[data-section="'+id+'"] .card-text').scrollTop===0)`);
+ await js(`await window.__ansRenderer.selectRuntime('pi')`);await pause(30);
+ await check('returning original runtime restores only its own nested reading',`['card','docs','changes'].every(id=>Math.abs(document.querySelector('details[data-section="'+id+'"] .card-text').scrollTop-(${JSON.stringify(nested)})[id])<2)`);
+ await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT+'-nested-new')});await window.__ansRenderer.selectRole('A');if(window.__ansRenderer.state.rightTab!=='card')document.getElementById('tab-card').click();['card','docs','changes'].forEach(id=>document.querySelector('details[data-section="'+id+'"]').open=true)`);await pause(30);
+ await check('nested role reading is reset for a genuinely different project',`['card','docs','changes'].every(id=>document.querySelector('details[data-section="'+id+'"] .card-text').scrollTop===0)`);
+ flowLongRoleDocs=false;
+}
+async function terminalChecks(){
+ await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRole('A')`);
+ const scoped={projectRoot:ROOT,roleId:'A',runtime:'pi'};
+ sendQueued=true;await js(`document.getElementById('inp-message').value='排队首条';document.getElementById('btn-send').click()`);await pause(40);
+ await check('P7 actual queued response sets current hint',`document.getElementById('composer-hint').textContent.includes('已入队')`);
+ await push('session:role-state',{...scoped,roleId:'B',busy:false,queue:[],summaries:[]});
+ await check('P7 other role empty queue cannot clear current queued hint',`document.getElementById('composer-hint').textContent.includes('已入队')`);
+ await push('session:role-state',{...scoped,busy:false,queue:[],summaries:[]});
+ await check('P7 authoritative empty queue clears current hint but keeps queue history',`document.getElementById('composer-hint').textContent===''&&document.querySelector('.sys-queue').textContent.includes('已入队')`);
+ await js(`document.getElementById('inp-message').value='排队第二条';document.getElementById('btn-send').click()`);await pause(40);const sent=sends.at(-1);
+ await js(`document.getElementById('btn-send').click()`);await pause(20);
+ await push('session:role-state',{...scoped,busy:false,queue:[],summaries:[]});
+ await check('P7 newer validation hint survives late queue empty snapshot',`document.getElementById('composer-hint').textContent.includes('请输入消息内容')`);
+ await js(`document.getElementById('inp-message').value='排队实际绑定';document.getElementById('btn-send').click()`);await pause(30);const bound=sends.at(-1);
+ await push('session:events',[{...scoped,clientMessageId:bound.metadata.clientMessageId,event:{kind:'message',turnId:'queued-actual',summary:'用户输入',detail:{source:'prompt-input',text:'排队第二条'}}}]);
+ await check('P7 matching actual turn ACK clears only its queued hint',`document.getElementById('composer-hint').textContent===''`);sendQueued=false;
+ sendDeferred=true;await js(`document.getElementById('inp-message').value='ACK先于入队响应';document.getElementById('btn-send').click()`);await pause(20);const early=sends.at(-1);
+ await push('session:events',[{...scoped,clientMessageId:early.metadata.clientMessageId,event:{kind:'message',turnId:'early-ack',summary:'用户输入',detail:{source:'prompt-input',text:'ACK先于入队响应'}}}]);sendResolve({ok:true,queued:true,position:1});sendDeferred=false;await pause(30);
+ await check('P7 late queued reply cannot revive hint after matching actual ACK',`document.getElementById('composer-hint').textContent===''`);
+ const request={...scoped,id:'terminal-choice',request:{kind:'choice',title:'终态选项',options:[{id:'one',label:'继续'},{id:'two',label:'停止'}]}};
+ await push('session:operator-request',request);await push('session:operator-expired',{...scoped,id:request.id,reason:'轮次已停止'});
+ await check('P7 expired decision inputs frozen without choosing',`[...document.querySelectorAll('[data-request-id="terminal-choice"] input')].every(x=>x.disabled&&!x.checked)&&[...document.querySelectorAll('[data-request-id="terminal-choice"] .op-actions button')].every(x=>x.disabled)`);
+ await push('session:operator-request',{...request,id:'decided-choice'});await js(`document.querySelector('[data-request-id="decided-choice"] input').click();document.querySelector('[data-request-id="decided-choice"] .op-submit').click()`);await pause(40);
+ await check('P7 decided answer remains checked and all inputs frozen',`[...document.querySelectorAll('[data-request-id="decided-choice"] input')].every(x=>x.disabled)&&document.querySelector('[data-request-id="decided-choice"] input').checked`);
+ await push('session:events',[{...scoped,event:{kind:'denied',turnId:'ordinary-abort',summary:'本轮已中止',detail:{outcome:'aborted'}}}]);
+ await check('A non-tool terminal stays actual system fact without invented tool target',`[...document.querySelectorAll('.sys-call')].some(x=>x.textContent==='本轮已中止')&&![...document.querySelectorAll('.tool-row,.activity-row,details')].some(x=>x.textContent.includes('本轮已中止')&&x.textContent.includes('目标未记录'))`);
+ await push('session:history',{...scoped,rows:[{kind:'denied',eventKind:'denied',turnId:'ordinary-abort',text:'本轮已中止'},{kind:'denied',eventKind:'denied',turnId:'other-abort',text:'本轮已中止'}]});
+ await check('A replay non-tool terminal preserves two actual turns without fabricated tool details',`[...document.querySelectorAll('.sys-call')].filter(x=>x.textContent==='本轮已中止').length===2&&![...document.querySelectorAll('details')].some(x=>x.textContent.includes('本轮已中止')&&x.textContent.includes('目标未记录'))`);
+}
+async function sendFactsChecks(){
+ await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRole('A')`);
+ const scope={projectRoot:ROOT,roleId:'A',runtime:'pi'};
+ async function begin(text){sendDeferred=true;await js(`document.getElementById('inp-message').value=${JSON.stringify(text)};document.getElementById('btn-send').click()`);await pause(20);return sends.at(-1).metadata.clientMessageId;}
+ async function event(client,turn,kind,outcome){await push('session:events',[{...scope,clientMessageId:client,event:{kind,turnId:turn,summary:kind==='settled'?'实际收尾 '+outcome:'用户输入',detail:kind==='settled'?{outcome}:{source:'prompt-input',text:'实际普通消息'}}}]);}
+ let id=await begin('已接收停止消息');sendResolve({ok:false,error:'engine stop',clientMessageId:id,turnId:'stop-one',inputAccepted:true,outcome:'aborted',sessionCurrent:true});await pause(30);
+ await check('P7 structured aborted reply keeps current handle and cleared accepted draft',`window.__ansRenderer.state.sessionOpenRoleId==='A'&&!document.getElementById('btn-send').disabled&&document.getElementById('inp-message').value===''&&!window.__ansRenderer.state.roleMeta.A.error&&!document.getElementById('chat').textContent.includes('发送失败：engine stop')`);
+ await event(id,'stop-one','message');await event(id,'stop-one','settled','aborted');
+ id=await begin('返回先于收尾');sendResolve({ok:false,error:'no terminal yet',clientMessageId:id,turnId:'stop-two',inputAccepted:true,sessionCurrent:true});await pause(30);
+ await check('P7 accepted unknown result does not restore prompt or clear current handle',`document.getElementById('inp-message').value===''&&window.__ansRenderer.state.sessionOpenRoleId==='A'&&document.getElementById('composer-hint').textContent.includes('尚未报告')`);
+ await js(`document.getElementById('inp-message').value='下一条客户草稿'`);await event(id,'wrong-turn','settled','failed');
+ await check('P7 wrong actual turn cannot overwrite original send outcome',`document.getElementById('composer-hint').textContent.includes('尚未报告')&&document.getElementById('inp-message').value==='下一条客户草稿'`);
+ await event(id,'stop-two','message');await event(id,'stop-two','settled','aborted');
+ await check('P7 delayed actual aborted terminal resolves unknown without changing new draft',`document.getElementById('composer-hint').textContent===''&&document.getElementById('inp-message').value==='下一条客户草稿'&&window.__ansRenderer.state.sessionOpenRoleId==='A'&&!window.__ansRenderer.state.roleMeta.A.error`);
+ id=await begin('收尾先于返回');await event(id,'stop-three','message');await event(id,'stop-three','settled','aborted');sendResolve({ok:false,error:'late stop',clientMessageId:id,turnId:'stop-three',inputAccepted:true,sessionCurrent:true});await pause(30);
+ await check('P7 actual aborted stream before failed promise remains usable',`!window.__ansRenderer.state.roleMeta.A.error&&window.__ansRenderer.state.sessionOpenRoleId==='A'&&document.getElementById('inp-message').value===''`);
+ id=await begin('真实失败不能伪中止');await event(id,'real-failure','message');await event(id,'real-failure','settled','failed');sendResolve({ok:false,error:'actual failure',clientMessageId:id,turnId:'real-failure',inputAccepted:true,outcome:'failed',sessionCurrent:true});await pause(30);
+ await check('P7 true accepted failed outcome remains error without requeueing accepted prompt',`window.__ansRenderer.state.roleMeta.A.error&&window.__ansRenderer.state.sessionOpenRoleId==='A'&&!document.getElementById('btn-send').disabled&&document.getElementById('inp-message').value===''`);
+ id=await begin('未接受拒发保留');sendResolve({ok:false,error:'rejected before input',clientMessageId:id,sessionCurrent:true});await pause(30);
+ await check('P7 genuine unaccepted rejection restores draft and retains known current handle',`document.getElementById('inp-message').value==='未接受拒发保留'&&window.__ansRenderer.state.roleMeta.A.error&&window.__ansRenderer.state.sessionOpenRoleId==='A'&&document.getElementById('chat').textContent.includes('发送失败：rejected before input')`);
+ id=await begin('后台Pi拒发');await js(`await window.__ansRenderer.selectRuntime('claude');document.getElementById('inp-message').value='Claude新草稿'`);sendResolve({ok:false,error:'old runtime rejected',clientMessageId:id});await pause(30);
+ await check('P7 old runtime rejected result cannot disable current runtime or overwrite draft',`window.__ansRenderer.state.runtime==='claude'&&window.__ansRenderer.state.sessionOpenRoleId==='A'&&!document.getElementById('btn-send').disabled&&document.getElementById('inp-message').value==='Claude新草稿'`);
+ sendDeferred=false;
+}
+async function terminalMergeChecks(){
+ await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRole('A')`);
+ const scope={projectRoot:ROOT,roleId:'A',runtime:'pi'};
+ const event=(kind,turnId,outcome,summary,detail={})=>({...scope,event:{kind,turnId,summary,detail:{outcome,...detail}}});
+ await push('session:events',[event('denied','merged-stop','aborted','本轮已中止'),event('settled','merged-stop','aborted','本轮已中止')]);
+ await check('same actual turn and outcome denied plus settled has one readable terminal',`[...document.querySelectorAll('.sys-text')].filter(x=>x.textContent==='本轮已中止').length===1`);
+ await push('session:events',[event('settled','reverse-failure','failed','实际失败收尾'),event('denied','reverse-failure','failed','真实错误：服务拒绝，保留完整诊断')]);
+ await check('reverse arrival keeps actual failure and full diagnostic in same terminal row',`[...document.querySelectorAll('.turn-terminal')].some(x=>x.textContent.includes('实际失败收尾')&&x.textContent.includes('真实错误：服务拒绝，保留完整诊断'))&&window.__ansRenderer.state.roleMeta.A.error`);
+ await push('session:events',[event('denied','other-stop','aborted','本轮已中止'),event('settled','other-stop','aborted','本轮已中止')]);
+ await check('different actual turns retain two independent terminal records',`[...document.querySelectorAll('.turn-terminal')].filter(x=>x.textContent==='本轮已中止').length===2`);
+ await push('session:events',[event('denied',undefined,'aborted','匿名真实终态'),event('settled',undefined,'aborted','匿名真实终态')]);
+ await check('legacy without actual turn never merged by equal text',`[...document.querySelectorAll('.sys-text')].filter(x=>x.textContent==='匿名真实终态').length===2`);
+ await push('session:events',[event('denied','distinct-outcome','failed','真实失败事实'),event('settled','distinct-outcome','timed_out','真实超时事实')]);
+ await check('different structured outcomes in same turn remain separate facts',`[...document.querySelectorAll('.turn-terminal')].filter(x=>x.textContent.includes('真实失败事实')||x.textContent.includes('真实超时事实')).length===2`);
+ await push('session:events',[event('denied','tool-turn','aborted','真实工具拒绝',{toolName:'run_shell',toolCallId:'tool-denied',phase:'blocked'}),event('settled','tool-turn','aborted','工具轮次已中止')]);
+ await check('tool denial keeps independent tool lifecycle and terminal',`document.getElementById('chat').textContent.includes('真实工具拒绝')&&[...document.querySelectorAll('.turn-terminal')].some(x=>x.textContent.includes('工具轮次已中止')&&!x.textContent.includes('真实工具拒绝'))`);
+ await push('session:history',{...scope,rows:[{kind:'assistant',text:'真正较早历史',turnId:'earlier'},{kind:'denied',eventKind:'denied',turnId:'merged-stop',text:'本轮已中止'},{kind:'denied',eventKind:'denied',turnId:'reverse-failure',text:'真实错误：服务拒绝，保留完整诊断'},{kind:'denied',eventKind:'denied',turnId:'other-stop',text:'本轮已中止'}]});
+ await check('actual matching denied replay reuses terminal fact and retains distinct diagnostics',`[...document.querySelectorAll('.sys-text')].filter(x=>x.textContent==='本轮已中止').length===2&&[...document.querySelectorAll('.turn-terminal')].some(x=>x.textContent.includes('真实错误：服务拒绝，保留完整诊断')&&x.textContent.includes('实际失败收尾'))`);
+ await push('session:events',[event('settled','merged-stop','aborted','本轮已中止')]);
+ await check('late settled after matching history does not append another terminal',`[...document.querySelectorAll('.sys-text')].filter(x=>x.textContent==='本轮已中止').length===2`);
+ await push('session:events',[event('denied','reverse-failure','failed','另一项真实失败诊断')]);
+ await check('additional same-turn diagnosis remains reachable in the existing terminal',`[...document.querySelectorAll('.turn-terminal')].filter(x=>x.dataset.turnId==='reverse-failure').length===1&&[...document.querySelectorAll('.turn-terminal')].some(x=>x.textContent.includes('另一项真实失败诊断')&&x.textContent.includes('真实错误：服务拒绝'))`);
+ await js(`await window.__ansRenderer.selectRuntime('claude')`);await push('session:events',[{...event('denied','merged-stop','aborted','Claude独立终态'),runtime:'claude'},{...event('settled','merged-stop','aborted','Claude独立终态'),runtime:'claude'}]);
+ await check('same turn ID in other runtime remains independent',`document.querySelectorAll('.turn-terminal').length===1&&document.querySelector('.turn-terminal').textContent==='Claude独立终态'`);
+ await js(`await window.__ansRenderer.selectRuntime('pi')`);
+ const lateHistory=[{kind:'denied',eventKind:'denied',turnId:'history-first',text:'已有真实历史中止'}];await push('session:history',{...scope,rows:lateHistory});
+ await push('session:events',[event('denied','history-first','aborted','已有真实历史中止'),event('settled','history-first','aborted','已有真实历史中止')]);
+ await check('history-first exact replay identity is promoted only by trusted matching live outcome',`[...document.querySelectorAll('.sys-text')].filter(x=>x.textContent==='已有真实历史中止').length===1&&[...document.querySelectorAll('.turn-terminal')].some(x=>x.dataset.turnId==='history-first')`);
+ const many=Array.from({length:220},(_,n)=>({...scope,event:{kind:'message',turnId:'virtual-'+n,summary:'真实长列表记录 '+n+' '+('内容'.repeat(20))}}));await push('session:events',many);await push('session:events',[event('denied','virtual-stop','aborted','虚拟列表中止')]);
+ await js(`document.getElementById('chat').scrollTop=160;document.getElementById('chat').dispatchEvent(new Event('scroll'))`);await pause(40);const scroll=await js(`document.getElementById('chat').scrollTop`);
+ await push('session:events',[event('settled','virtual-stop','aborted','虚拟列表中止')]);await pause(40);
+ await check('offscreen terminal update keeps virtual reading position',`Math.abs(document.getElementById('chat').scrollTop-${scroll})<2`);
+
+}
+async function visualChecks(){
+ await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRole('A')`);
+ const scope={projectRoot:ROOT,roleId:'A',runtime:'pi'},request='明确任务请求原文。'+('内容原样保留。'.repeat(80));
+ await js(`document.getElementById('inp-message').value=${JSON.stringify(request)};document.getElementById('btn-send').click()`);await pause(30);const sent=sends.at(-1);
+ await push('session:events',[{...scope,clientMessageId:sent.metadata.clientMessageId,event:{kind:'message',turnId:'visual-task',summary:'用户输入',detail:{source:'prompt-input',text:request}}},{...scope,event:{kind:'message',turnId:'ordinary-chat',summary:'用户输入',detail:{source:'prompt-input',text:'普通聊天不折叠也不制造报告'}}}]);
+ await push('session:role-state',{...scope,busy:true,queue:[],summaries:[]});
+ await push('session:events',[{...scope,event:{kind:'message',turnId:'visual-task',summary:'本轮角色回复原文。不得删除改写，模型原文保留。'}}]);
+ await check('V2 ordinary chat stays ordinary before any structured report',`document.querySelectorAll('.msg-handback').length===0&&document.querySelectorAll('.task-request').length===0`);
+ await check('V2 accepted structural positions and real window controls',`document.querySelector('.sidebar-foot #btn-import')&&document.querySelector('.sidebar-foot #tab-pi')&&document.querySelector('.chat-head #tab-work')&&document.querySelector('.chat-head #tab-card')&&document.querySelector('.session-actions #runtime-select')&&document.querySelector('.capsule > textarea')&&document.querySelector('.composer-bottom #composer-scope')&&document.querySelector('.composer-bottom #btn-send')&&['win-min','win-max','win-close'].every(id=>{let e=document.getElementById(id),r=e.getBoundingClientRect();return r.width>0&&r.height>0&&r.right<=innerWidth&&!e.closest('[inert]')})?true:false`);
+ await js(`document.getElementById('tab-work').click()`);await pause(150);await check('V2 ordinary chat work overview has no invented report',`document.getElementById('drawer-title').textContent.includes('工作概览')&&document.querySelector('.recent-reports').textContent.includes('暂无回交报告')&&!document.querySelector('.recent-report')&&!document.querySelector('#right-body details[data-section]')`);await key('Escape');
+ const full='真实报告原文🙂。'.repeat(100)+'\nsummary-tail-safe',preview=Array.from(full).slice(0,180).join('').split(/\r?\n/).slice(0,4).join('\n');
+ const report={version:1,reportId:'visual-report',source:{roleId:'A',runtime:'pi',turnId:'visual-task'},taskId:null,origin:'submitted-report',status:'completed',summary:{text:full,redacted:true,truncated:true},evidence:[{text:'真实证据原文，不根据stdout构造结论',redacted:false,truncated:true}],evidenceOmitted:2,at:'2026-10-15T00:00:00Z'};flowReports[report.reportId]={state:'saved',reportId:report.reportId,report,retryAvailable:false};
+ await push('session:events',[{...scope,event:{kind:'handback',report,reportPersistence:flowReports[report.reportId],summary:'可信报告已到达'}}]);await pause(60);
+ await check('V2 source report uses separate layered top and facts before primary source and full copy',`(()=>{let c=document.querySelector('.msg-handback'),t=c.querySelector('.report-top'),b=c.querySelector('.report-body');return t&&b&&t.querySelector('.report-eyebrow')&&t.querySelector('.report-title')&&t.querySelector('.hb-head')&&b.querySelector('.report-facts').compareDocumentPosition(b.querySelector('.report-actions'))&Node.DOCUMENT_POSITION_FOLLOWING&&b.querySelector('.report-actions').firstElementChild.classList.contains('report-source-button')&&getComputedStyle(t).backgroundColor==='rgb(244, 248, 242)'?true:false})()`);
+ await check('V2 preview is deterministic real summary while complete safe copy is independently reachable',`document.querySelector('.hb-summary').textContent.trim()===${JSON.stringify(preview)}&&!document.querySelector('.report-complete').open&&document.querySelector('.hb-complete-summary').textContent.includes('summary-tail-safe')&&document.querySelector('.report-complete > summary').textContent==='查看完整报告摘要与证据'`);
+ await check('V2 report status unknown association redaction truncation omission and save facts remain visible',`(()=>{let c=document.querySelector('.msg-handback'),d=c.querySelector('.report-complete');return c.textContent.includes('报告声明：已完成')&&c.querySelector('.hb-meta').textContent.includes('任务关联未知')&&c.querySelector('.projection-flags').textContent.includes('已截断')&&c.querySelector('.projection-flags').textContent.includes('净化')&&c.querySelector('.projection-flags').textContent.includes('预算省略')&&c.querySelector('.report-facts').textContent.includes('尚未确认')&&c.querySelector('.report-disclaimer').textContent.includes('不等于独立验收通过')&&c.querySelector('.persistence-message').textContent==='报告已保存'&&!d.open})()`);
+ await check('V2 report declaration alone cannot fold an active assistant stream',`document.querySelectorAll('.reply-original').length===0&&document.querySelector('.msg-assistant.is-streaming').textContent==='本轮角色回复原文。不得删除改写，模型原文保留。'`);
+ await push('session:events',[{...scope,event:{kind:'settled',turnId:'visual-task',summary:'会话结束',detail:{outcome:'completed'}}}]);
+ await check('V2 true settled folds only the exact report turn assistant original in place',`document.querySelectorAll('.reply-original').length===1&&!document.querySelector('.reply-original').open&&document.querySelector('.reply-original > summary').textContent==='本轮角色回复原文（展开）'&&document.querySelector('.reply-original .msg-assistant').textContent.includes('不得删除改写')&&!document.querySelector('.reply-original .sys,.reply-original .tool-records,.reply-original .op-request')`);
+ await push('session:events',[{...scope,event:{kind:'message',turnId:'visual-task',summary:'同实际turn后到原回复'}},{...scope,event:{kind:'message',turnId:'unrelated-chat',summary:'未关联报告的聊天回复'}}]);
+ await check('V2 late exact turn reply follows settled rule and other turns remain ordinary',`document.querySelectorAll('.reply-original').length===2&&[...document.querySelectorAll('.msg-assistant')].some(x=>x.textContent.includes('未关联报告的聊天回复')&&!x.closest('.reply-original'))`);
+ await check('V2 task request folds only by exact structured report actual turn without reordering ordinary chat',`document.querySelectorAll('.task-request').length===1&&!document.querySelector('.task-request').open&&document.querySelector('.task-request').textContent.includes(${JSON.stringify(request)})&&[...document.querySelectorAll('.msg-user')].some(x=>x.textContent.trim()==='普通聊天不折叠也不制造报告'&&!x.closest('.task-request'))`);
+ await js(`document.querySelector('.report-complete').open=true;document.querySelector('.task-request').open=true;window.__visualComplete=document.querySelector('.report-complete');document.getElementById('inp-message').value='V2保留客户草稿'`);
+ await push('report-persistence-updated',{version:1,scope,change:{kind:'report-save',reportId:report.reportId,state:{state:'saved',reportId:report.reportId,retryAvailable:false}}});
+ await check('V2 local state refresh preserves full report and original task expansion',`document.querySelector('.report-complete')===window.__visualComplete&&document.querySelector('.report-complete').open&&document.querySelector('.task-request').open`);
+ await js(`document.querySelector('.report-complete').open=false;document.querySelector('.task-request').open=false;document.querySelector('.report-source-button').scrollIntoView({block:'center'});document.querySelector('.report-source-button').focus();document.querySelector('.report-source-button').click()`);await pause(180);
+ await check('V2 modal declares dialog and makes whole background inert',`document.getElementById('right-drawer').getAttribute('role')==='dialog'&&document.getElementById('right-drawer').getAttribute('aria-modal')==='true'&&!document.getElementById('drawer-backdrop').hidden&&document.querySelector('.col-left').inert&&document.querySelector('.col-mid').inert&&!document.getElementById('win-min').closest('[inert]')&&document.activeElement.id==='drawer-close'`);
+ await check('V2 document drawer matches 18px heading source block and outlined right reading action',`(()=>{let h=document.getElementById('drawer-title'),li=document.querySelector('.document-list li'),m=li.querySelector('.document-list-meta'),b=li.querySelector('button');return getComputedStyle(h).fontSize==='18px'&&document.querySelector('.document-source-note')&&b.getBoundingClientRect().left>=m.getBoundingClientRect().right&&b.getBoundingClientRect().height>=32&&getComputedStyle(b).borderTopWidth==='1px'?true:false})()`);
+ await js(`document.getElementById('win-min').click();document.getElementById('win-max').click();document.getElementById('win-close').click()`);await pause(30);assert.deepEqual(windowCalls,['minimize','maximize','close']);
+ await check('V2 native window controls retain visible icons and real IPC while business background is inert',`['win-min','win-max','win-close'].every(id=>{let e=document.getElementById(id),svg=e.querySelector('svg'),r=svg.getBoundingClientRect();return !e.closest('[inert]')&&r.width>0&&r.height>0})&&document.querySelector('.col-mid').inert`);
+ await js(`document.getElementById('drawer-close').focus()`);
+ await key('Tab',['shift']);
+ await check('V2 Shift Tab wraps from first to last actual drawer control',`document.getElementById('right-drawer').contains(document.activeElement)&&document.activeElement.dataset.docAction==='refresh'`);await key('Tab');
+ await check('V2 Tab wraps last to first without escaping modal',`document.activeElement.id==='drawer-close'`);
+ await js(`document.getElementById('inp-message').focus()`);
+ await check('V2 background focus cannot escape into composer',`document.getElementById('right-drawer').contains(document.activeElement)`);
+ const chatTop=await js(`document.getElementById('chat').scrollTop`),sendBefore=sends.length,openBefore=opens.length;
+ await key('Escape');await pause(150);
+ await check('V2 Escape restores actual visible report invoker draft and same chat reading',`document.activeElement.classList.contains('report-source-button')&&!document.querySelector('.col-mid').inert&&document.getElementById('drawer-backdrop').hidden&&document.getElementById('inp-message').value==='V2保留客户草稿'&&Math.abs(document.getElementById('chat').scrollTop-${chatTop})<2&&window.__ansRenderer.state.selectedRoleId==='A'&&window.__ansRenderer.state.runtime==='pi'`);assert.equal(sends.length,sendBefore);assert.equal(opens.length,openBefore);
+ for(const width of [1360,960]){win.setContentSize(width,860);await pause(100);await js(`document.querySelector('.msg-handback').scrollIntoView({block:'start'})`);await pause(40);
+ reports.push({name:'V2 measured geometry '+width,value:await js(`({nav:document.querySelector('.col-left').getBoundingClientRect().width,pane:document.querySelector('.chat-pane').getBoundingClientRect().width,capsule:document.getElementById('composer-capsule').getBoundingClientRect().width,button:document.querySelector('.report-source-button').getBoundingClientRect().toJSON(),composer:document.querySelector('.composer').getBoundingClientRect().toJSON(),root:document.documentElement.scrollWidth,innerWidth})`)});fs.writeFileSync(path.join(OUT,'visual-v2-precheck-'+width+'.png'),(await win.webContents.capturePage()).toPNG());
+ await check('V2 real geometry '+width,`(()=>{let nav=document.querySelector('.col-left').getBoundingClientRect(),p=document.querySelector('.chat-pane').getBoundingClientRect(),c=document.getElementById('composer-capsule').getBoundingClientRect(),button=document.querySelector('.report-source-button'),b=button.getBoundingClientRect();return Math.abs(nav.width-${width===1360?208:176})<1&&p.width<=800&&Math.abs(p.width-c.width)<2&&document.documentElement.scrollWidth<=innerWidth&&b.height>=32&&b.bottom<=document.querySelector('.composer').getBoundingClientRect().top})()`);
+ fs.writeFileSync(path.join(OUT,'visual-v2-'+width+'.png'),(await win.webContents.capturePage()).toPNG());
+ await js(`document.querySelector('.report-source-button').click()`);await pause(150);
+ await check('V2 modal width is 424 at '+width,`Math.abs(document.getElementById('right-drawer').getBoundingClientRect().width-424)<1`);fs.writeFileSync(path.join(OUT,'visual-v2-drawer-'+width+'.png'),(await win.webContents.capturePage()).toPNG());await key('Escape');}
+ await js(`document.querySelector('.reply-original').open=true`);
+ await push('session:history',{...scope,rows:[{kind:'user',turnId:'visual-task',text:request},{kind:'assistant',eventKind:'message',turnId:'visual-task',text:'本轮角色回复原文。不得删除改写，模型原文保留。'},{kind:'assistant',eventKind:'message',turnId:'visual-task',text:'可靠cold报告关联原文 [REDACTED]',textProjection:{text:'可靠cold报告关联原文 [REDACTED]',redacted:true,truncated:true}},{kind:'assistant',eventKind:'message',text:'legacy无turn原文保留展开'},{kind:'assistant',eventKind:'message',turnId:'ordinary-other',text:'其它turn无报告原文保留展开'}],reports:[report]});await pause(50);
+ await check('V2 cold exact report turn folds neutral original only and preserves explicit expansion',`[...document.querySelectorAll('.reply-original')].some(x=>x.textContent.includes('可靠cold报告关联原文')&&!x.open&&x.querySelector('summary .projection-flags').textContent.includes('已截断'))&&[...document.querySelectorAll('.reply-original')].some(x=>x.textContent.includes('不得删除改写')&&x.open)&&[...document.querySelectorAll('.msg-assistant')].some(x=>x.textContent.includes('legacy无turn')&&!x.closest('.reply-original'))&&[...document.querySelectorAll('.msg-assistant')].some(x=>x.textContent.includes('其它turn无报告')&&!x.closest('.reply-original'))`);
+ const received={...report,reportId:'visual-received',source:{roleId:'B',runtime:'pi',turnId:'received-source'},summary:{text:'收到的真实安全摘要。'+('原文不生成新结论。'.repeat(40))+'received-tail',redacted:false,truncated:false}};
+ const receipt={version:1,deliveryId:'visual-delivery',attemptId:'visual-attempt',turnId:'visual-target',inputSaved:true,providerMayHaveStarted:true,history:'saved',outcome:'completed',retryHistoryAvailable:false,retryDeliveryAllowed:false};flowReceipts[receipt.attemptId]=receipt;
+ const delivery={source:'prompt-input',text:'安全交接显示副本',inputProvenance:{version:1,kind:'handback',deliveryId:receipt.deliveryId,attemptId:receipt.attemptId,target:{roleId:'A',runtime:'pi'},reports:[received]},inputTextProjection:{version:1,source:'trusted-handback-display',modelInputRecorded:false,redacted:false,truncated:false,summaryTruncated:false}};
+ const promptBefore=sends.length;
+ await push('session:events',[{...scope,event:{kind:'message',turnId:'visual-target',summary:'真实回交投递',detail:delivery}}]);await pause(60);
+ await check('V2 received report shares layered safe report ordering with one separate batch receipt',`(()=>{let c=document.querySelector('.msg-delivery'),r=c.querySelector('.delivery-report'),p=c.querySelector(':scope > .persistence-state');return c.querySelectorAll(':scope > .persistence-state').length===1&&p.querySelectorAll(':scope > .delivery-batch-facts').length===1&&Array.from(p.querySelectorAll('dt')).map(x=>x.textContent).join('|')==='接收历史|目标输入记录|目标轮次结果'&&Array.from(p.querySelectorAll('dd')).map(x=>x.textContent).join('|')==='已保存|已保存|已完成'&&p.compareDocumentPosition(r)&Node.DOCUMENT_POSITION_FOLLOWING&&r.querySelector('.report-top .report-eyebrow').textContent.includes('B')&&!r.querySelector('.persistence-state')&&r.querySelector('.report-actions').firstElementChild.classList.contains('report-source-button')&&r.querySelector('.hb-complete-summary').textContent.includes('received-tail')&&!c.querySelector('.safe-input-copy').open?true:false})()`);
+ await check('V2 target batch facts use actual compact component typography spacing and boundaries',`(()=>{let p=document.querySelector('.msg-delivery > .persistence-state'),d=p.querySelector('.delivery-batch-facts'),c=getComputedStyle(d);return getComputedStyle(d.querySelector('dt')).fontSize==='11px'&&getComputedStyle(d.querySelector('dd')).fontSize==='13px'&&c.rowGap==='12px'&&c.columnGap==='24px'&&c.paddingTop==='14px'&&c.paddingBottom==='14px'&&c.borderTopWidth==='1px'&&c.borderBottomWidth==='1px'&&getComputedStyle(p).borderLeftWidth==='0px'&&!p.querySelector('.delivery-execution')})()`);
+ await js(`document.getElementById('tab-work').click()`);await pause(150);
+ await check('V2 independent work overview includes own and actual received structured reports',`document.getElementById('drawer-title').textContent.includes('工作概览')&&document.querySelectorAll('.recent-report').length===2&&!document.getElementById('right-body').textContent.includes('暂无回交报告')&&!document.querySelector('#right-body details[data-section]')`);
+ await key('Escape');
+ const receipt2={...receipt,attemptId:'visual-attempt-two',turnId:'visual-target-two'};flowReceipts[receipt2.attemptId]=receipt2;
+ await push('session:events',[{...scope,event:{kind:'message',turnId:receipt2.turnId,summary:'另一次真实投递同份报告',detail:{...delivery,inputProvenance:{...delivery.inputProvenance,attemptId:receipt2.attemptId}}}}]);await pause(40);await js(`document.getElementById('tab-work').click()`);await pause(80);
+ await check('V2 work de-duplicates only real report identity while separate delivery attempts stay visible',`document.querySelectorAll('.recent-report').length===2&&document.querySelectorAll('.msg-delivery').length===2`);await key('Escape');assert.equal(sends.length,promptBefore);
+ await pause(300);
+ for (const width of [1360,960]) {
+  win.setContentSize(width,860);await pause(180);
+  await js(`document.querySelector('.msg-delivery').scrollIntoView({block:'start'})`);await pause(220);
+  await js(`new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))`);
+  fs.writeFileSync(path.join(OUT,'visual-v2-received-'+width+'.png'),(await win.webContents.capturePage()).toPNG());
+ }
+
+
+ await push('session:events',[{...scope,event:{kind:'message',turnId:'visual-target',summary:'接收轮流式解说原文'}},{...scope,event:{kind:'message',turnId:'other-chat',summary:'无关普通聊天'}}]);await pause(40);
+ await check('SV13 distinct receiver turn streaming stays expanded',`[...document.querySelectorAll('.msg-assistant')].some(x=>x.textContent.trim()==='接收轮流式解说原文'&&!x.closest('.reply-original'))`);
+ await push('session:events',[{...scope,event:{kind:'settled',turnId:'visual-target',summary:'接收轮结束',detail:{outcome:'completed'}}}]);await pause(60);
+ await check('SV13 true settled receiver folds only exact assistant original',`[...document.querySelectorAll('.reply-original')].some(x=>x.querySelector('summary').textContent==='本轮回交处理回复原文（展开）'&&x.textContent.includes('接收轮流式解说原文')&&!x.open)&&[...document.querySelectorAll('.msg-assistant')].some(x=>x.textContent.trim()==='无关普通聊天'&&!x.closest('.reply-original'))&&!document.querySelector('.msg-delivery').closest('.reply-original')`);
+ await js(`let x=[...document.querySelectorAll('.reply-original')].find(x=>x.textContent.includes('接收轮流式解说原文'));x.open=true`);
+ await push('session:events',[{...scope,event:{kind:'message',turnId:'visual-target',summary:'接收轮后到原文'}}]);await pause(40);
+ await check('SV13 later receiver text folds preserving explicit expansion',`[...document.querySelectorAll('.reply-original')].some(x=>x.textContent.includes('接收轮后到原文')&&!x.open)&&[...document.querySelectorAll('.reply-original')].some(x=>x.textContent.includes('接收轮流式解说原文')&&x.open)`);
+ await push('session:history',{...scope,rows:[{kind:'user',turnId:'visual-target',text:'安全交接显示副本',inputProvenance:delivery.inputProvenance,inputTextProjection:delivery.inputTextProjection},{kind:'assistant',turnId:'visual-target',text:'接收轮流式解说原文'},{kind:'assistant',turnId:'visual-target',text:'冷记录安全副本',textProjection:{redacted:true,truncated:true}},{kind:'assistant',turnId:'other-chat',text:'无关普通聊天'},{kind:'assistant',text:'legacy无turn'}],reports:[]});await pause(80);
+ await check('SV13 cold receiver keeps neutral label flags expansion and unrelated legacy text',`[...document.querySelectorAll('.reply-original')].some(x=>x.querySelector('summary').textContent.includes('本轮回交处理回复原文（展开）')&&x.textContent.includes('冷记录安全副本')&&!x.open&&x.querySelector('summary .projection-flags').textContent.includes('已截断'))&&[...document.querySelectorAll('.reply-original')].some(x=>x.textContent.includes('接收轮流式解说原文')&&x.open)&&[...document.querySelectorAll('.msg-assistant')].some(x=>x.textContent.trim()==='无关普通聊天'&&!x.closest('.reply-original'))&&[...document.querySelectorAll('.msg-assistant')].some(x=>x.textContent.trim()==='legacy无turn'&&!x.closest('.reply-original'))`);
+
+ const orderRoot=ROOT+'/cold-report-order';await js(`await window.__ansRenderer.loadProject(${JSON.stringify(orderRoot)});await window.__ansRenderer.selectRole('A')`);
+ const orderScope={projectRoot:orderRoot,roleId:'A',runtime:'pi'};
+ const newer={...report,reportId:'446dd-order-new',at:'2026-10-15T08:46:00Z',summary:{text:'order-newer-report',redacted:false,truncated:false}},older={...report,reportId:'8b6c-order-old',at:'2026-10-15T08:05:00Z',summary:{text:'order-older-report',redacted:false,truncated:false}};
+ flowReports[newer.reportId]=newer;flowReports[older.reportId]=older;
+ const orderRows=[{kind:'assistant',text:'row-first'},{kind:'tool',text:'real read',activity:{toolName:'read_file',callId:'order-read',turnId:'order-row-turn',phase:'start'}},{kind:'tool',text:'real shell',activity:{toolName:'run_shell',callId:'order-shell',turnId:'order-row-turn',phase:'start'}},{kind:'assistant',text:'row-last'}];
+ await push('session:history',{...orderScope,rows:orderRows,reports:[newer,older]});await pause(80);
+ await check('cold reports reverse hash wire becomes actual time old to new while tool row order remains',`(()=>{let cards=[...document.querySelectorAll('.msg-handback')];return cards.length===2&&cards[0].textContent.includes('order-older-report')&&cards[1].textContent.includes('order-newer-report')&&document.querySelectorAll('.tool-activity').length===2&&document.querySelectorAll('.tool-activity')[0].textContent.includes('read_file')&&document.querySelectorAll('.tool-activity')[1].textContent.includes('run_shell')})()`);
+ await push('session:history',{...orderScope,rows:orderRows,reports:[newer,older]});await pause(40);
+ await check('cold sorted report identities still deduplicate on repeated history snapshot',`document.querySelectorAll('.msg-handback').length===2`);
+ const unknownRoot=ROOT+'/cold-report-unknown';await js(`await window.__ansRenderer.loadProject(${JSON.stringify(unknownRoot)});await window.__ansRenderer.selectRole('A')`);
+ await push('session:history',{...orderScope,projectRoot:unknownRoot,rows:[],reports:[{...newer,at:'invalid'},older]});await pause(80);
+ await check('cold unknown report time preserves wire ordering without guessing',`(()=>{let c=[...document.querySelectorAll('.msg-handback')];return c.length===2&&c[0].textContent.includes('order-newer-report')&&c[1].textContent.includes('order-older-report')})()`);
+
+}
+async function deliveryNoteChecks(){
+ listing.roles[0].builtIn=true;
+ const project=ROOT+'/very-long-project-folder-name-'.repeat(18);
+ await js(`await window.__ansRenderer.loadProject(${JSON.stringify(project)});await window.__ansRenderer.selectRole('B')`);
+ const scope={projectRoot:project,roleId:'B',runtime:'pi'};
+ const oldNote='已接收来自 su 的派发任务——请按任务文本执行，完成后交回报告。';
+ await push('session:events',[{...scope,event:{kind:'tool_call',summary:oldNote}}]);
+ const original=JSON.parse(fs.readFileSync(path.resolve(APP,'../角色卡/桌面UI/docs/fix/2026-10-15-delivery-note-ui-evidence/real-protected-history.json'),'utf8'));
+ const history={...original,...scope,reports:original.reports.map(report=>({...report,source:{...report.source,roleId:'B'}}))};
+ for(const report of history.reports)flowReports[report.reportId]={state:'saved',reportId:report.reportId,report,retryAvailable:false};
+ await push('session:history',history);
+ await check('real ten-call history plus old delivery note never creates an eleventh anonymous tool',`document.querySelectorAll('.tool-call-record').length===10&&document.querySelectorAll('.tool-activity').length===0&&document.querySelectorAll('.tool-records').length===0`);
+ await check('old anonymous delivery event stays fully reachable as explicit unknown system record',`[...document.querySelectorAll('.sys-unknown-tool-event')].some(x=>x.textContent.includes('旧/未知系统记录')&&x.textContent.includes(${JSON.stringify(oldNote)}))`);
+ const typedNote='已自动投递 测试 的回交给 su（等待验收与汇总）。全文进展不裁剪。';
+ await push('session:events',[{...scope,event:{kind:'message',summary:typedNote,detail:{source:'delivery-note'}}}]);
+ await check('new actual wire delivery note is full system fact never assistant or tool',`[...document.querySelectorAll('.sys-delivery-note')].some(x=>x.textContent===${JSON.stringify(typedNote)})&&![...document.querySelectorAll('.msg-assistant')].some(x=>x.textContent.includes(${JSON.stringify(typedNote)}))&&document.querySelectorAll('.tool-call-record').length===10&&document.querySelectorAll('.tool-activity').length===0`);
+ await check('all real tool names phases and genuine failed result remain',`(()=>{let records=[...document.querySelectorAll('.tool-call-record')],names=records.map(x=>x.querySelector('summary strong').textContent);return names.filter(x=>x==='read_file').length===4&&names.filter(x=>x==='run_shell').length===4&&names.includes('write_file')&&names.includes('submit_report')&&records.every(x=>x.querySelector('.tool-call-status').textContent.includes('调用发起'))&&records.some(x=>x.textContent.includes('v2-does-not-exist.md')&&x.querySelector('.tool-call-status').textContent.includes('执行失败'))})()`);
+ await push('session:history',{...history,rows:[{kind:'assistant',text:'更早的真实历史记录'},...history.rows]});
+ await check('history rebuild preserves system notes without promoting them into activities',`document.querySelectorAll('.tool-call-record').length===10&&document.querySelectorAll('.tool-activity').length===0&&[...document.querySelectorAll('.sys-delivery-note')].some(x=>x.textContent===${JSON.stringify(typedNote)})&&document.querySelector('.sys-unknown-tool-event').textContent.includes(${JSON.stringify(oldNote)})`);
+ await push('session:events',[{...scope,event:{kind:'tool_call',summary:oldNote}}]);
+ await check('unidentified identical progress events are not text-deduplicated or promoted to tools',`document.querySelectorAll('.sys-unknown-tool-event').length===2&&document.querySelectorAll('.tool-call-record').length===10&&document.querySelectorAll('.tool-activity').length===0`);
+ for(const width of [1360,960]){win.setContentSize(width,860);await pause(100);fs.writeFileSync(path.join(OUT,'delivery-note-'+width+'.png'),(await win.webContents.capturePage()).toPNG());}
+ await push('session:events',[{...scope,event:{kind:'tool_call',summary:'旧工具调用',detail:{name:'write_file',args:{path:'legacy.md'}}}}]);
+ await check('known legacy live metadata remains an actual named tool',`document.querySelectorAll('.tool-activity').length===1&&document.querySelector('.tool-activity').textContent.includes('write_file')&&document.querySelector('.tool-activity').textContent.includes('legacy.md')`);
+ await check('builtin identity stays data and accessible without duplicate third visible line',`(()=>{let e=document.querySelector('.tree-item.primary');return e.classList.contains('builtin')&&e.getAttribute('aria-description').includes('内置')&&e.getAttribute('aria-description').includes('主入口')&&!e.querySelector('.ti-badge')})()`);
+ await check('long project path is single line ellipsis with full actual title',`(()=>{let e=document.getElementById('project-path'),c=getComputedStyle(e);return c.whiteSpace==='nowrap'&&c.textOverflow==='ellipsis'&&e.scrollWidth>e.clientWidth&&e.title===window.__ansRenderer.state.projectRoot&&e.getBoundingClientRect().height<=parseFloat(c.lineHeight)+1})()`);
+ assert.equal(sends.length,0,'history and progress rendering must not prompt');
+}
+async function completeFlowChecks(){
+  await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRole('A')`);
+  const payload=(event,roleId='A',runtime='pi')=>({projectRoot:ROOT,roleId,runtime,event:{...event,roleId,runtime}});
+  const text=(value,flags={})=>({text:value,redacted:false,truncated:false,...flags});
+  await check('fresh empty context never mistakes loader for history',`document.getElementById('context-state').textContent==='会话继续使用现有上下文'&&!document.getElementById('context-state').textContent.includes('历史')`);
+  await push('session:role-state',{projectRoot:ROOT,roleId:'A',runtime:'pi',busy:false,summaries:[],queue:[],contextSource:'fresh'});
+  await check('empty fresh session has no above-history warning',`document.getElementById('context-state').textContent==='新会话'&&!document.getElementById('chat').textContent.includes('以上为历史')`);
+  const start={kind:'tool_call',turnId:'display-turn',summary:'安全开始',detail:{toolName:'run_shell',toolCallId:'display-call',phase:'start',display:{version:1,target:{kind:'command',value:text('node -v')},omissions:[]}}};
+  const result={kind:'accepted',turnId:'display-turn',summary:'安全结果',detail:{toolName:'run_shell',toolCallId:'display-call',phase:'result',ok:false,display:{version:1,target:{kind:'command',value:text('node -v')},error:text('ENOENT 原始安全错误'),process:{exitCode:2,stdout:text('安全输出 [REDACTED]',{redacted:true}),stderr:text('安全stderr',{truncated:true})},resultText:text('结果预览'),durationMs:32,omissions:['budget']}}};
+  await push('session:events',[payload(start),payload(result),payload(result)]);
+  await check('A same call one accessible lifecycle with true target and failure',`document.querySelectorAll('#chat .tool-call-record').length===1&&document.querySelector('.tool-call-target').textContent==='node -v'&&document.querySelector('.tool-call-status').textContent.includes('执行失败')`);
+  await js(`document.querySelector('.tool-call-record').open=true`);
+  await check('A safe detail streams exit error and flags readable',`(()=>{const t=document.querySelector('.tool-call-details').textContent;return t.includes('ENOENT')&&t.includes('退出码：2')&&t.includes('安全输出')&&t.includes('已净化')&&t.includes('已截断')&&t.includes('32 ms');})()`);
+  await push('session:events',[payload({...result,detail:{...result.detail,toolCallId:'display-other'}})]);
+  await check('A different same-text actual call remains separate',`document.querySelectorAll('#chat .tool-call-record').length===2&&document.querySelector('.tool-call-record').open`);
+  await push('session:events',[payload({...result,detail:{...result.detail,toolCallId:'unknown-display',display:{version:99},args:{command:'RAW_MUST_NOT_SHOW'}}})]);
+  await js(`[...document.querySelectorAll('.tool-call-record')].at(-1).open=true`);
+  await check('A unknown display never falls to raw args',`document.getElementById('chat').textContent.includes('不支持此详情版本')&&!document.getElementById('chat').textContent.includes('RAW_MUST_NOT_SHOW')`);
+  fs.writeFileSync(path.join(OUT,'01-tool-detail.png'),(await win.webContents.capturePage()).toPNG());
+  const snapshot={version:1,reportId:'report-one',source:{roleId:'A',runtime:'pi',turnId:'source-one'},taskId:null,origin:'submitted-report',status:'completed',summary:text('已完成的安全摘要'),evidence:[text('并非授权路径 /hidden.env')],evidenceOmitted:1,at:'2026-10-15T00:00:00Z'};
+  flowReports['report-one']={state:'failed',reportId:'report-one',report:snapshot,code:'PERSIST_FAILED',retryAvailable:true};
+  await push('session:events',[payload({kind:'handback',summary:'安全报告',report:snapshot,reportPersistence:flowReports['report-one']})]);await pause(60);
+  await check('C source declared result not independent acceptance and failed save button',`document.querySelector('.msg-handback').textContent.includes('报告声明：已完成')&&document.querySelector('.msg-handback').textContent.includes('不等于独立验收')&&[...document.querySelectorAll('.msg-handback button')].some(x=>x.textContent==='重试保存报告')`);
+  await js(`document.querySelector('.msg-handback').scrollIntoView({block:'center'})`);fs.writeFileSync(path.join(OUT,'02-source-report.png'),(await win.webContents.capturePage()).toPNG());
+  const beforeDoc=docCalls.length,openCount=opens.length;await js(`document.querySelector('.msg-handback .report-source-button').scrollIntoView({block:'center'});document.querySelector('.msg-handback .report-source-button').click()`);await pause(30);
+  await check('B source list requires explicit file pick without chat switch or opening model',`document.getElementById('drawer-title').textContent==='A · 来源文档'&&document.querySelectorAll('[data-doc-id]').length===2&&window.__ansRenderer.state.selectedRoleId==='A'&&window.__ansRenderer.state.runtime==='pi'`);assert.equal(docCalls.length,beforeDoc);assert.equal(opens.length,openCount);
+  await js(`document.querySelector('[data-doc-id="doc-one"]').click()`);await pause(50);
+  assert.deepEqual(docCalls.at(-1),{version:1,projectViewId:'epoch-one',documentId:'doc-one'});
+  await check('B static markdown no scripts automatic image or unsafe link',`document.getElementById('document-read-text').textContent.includes('文档正文')&&!document.querySelector('#document-read-text script,#document-read-text img,#document-read-text iframe')&&!window.BAD_DOC&&![...document.querySelectorAll('#document-read-text a')].some(x=>x.getAttribute('href').startsWith('javascript:'))`);
+  fs.writeFileSync(path.join(OUT,'03-document-read.png'),(await win.webContents.capturePage()).toPNG());
+  await js(`document.querySelector('[data-doc-action="back-list"]').click()`);
+  await check('B back list restores explicit file focus',`document.activeElement.dataset.docId==='doc-one'`);
+  docMode='TOO_LARGE';await js(`document.querySelector('[data-doc-id="doc-two"]').click()`);await pause(40);
+  await check('B actual too-large result remains explicit error not partial success',`document.getElementById('document-read-status').textContent.includes('256KiB')&&!document.getElementById('document-read-text').textContent`);
+  await js(`document.querySelector('[data-doc-action="back-list"]').click()`);docMode='deferred';await js(`document.querySelector('[data-doc-id="doc-one"]').click();document.getElementById('drawer-close').click()`);
+  docPending[0]({ok:true,version:1,projectViewId:'epoch-one',documentId:'doc-one',roleId:'A',relativePath:'one.md',format:'text',text:'LATE_DOCUMENT',byteLength:13});await pause(30);docMode='success';
+  await check('B close invalidates late document and returns actual report invoker',`window.__ansRenderer.state.rightTab===null&&!document.getElementById('right-body').textContent.includes('LATE_DOCUMENT')&&document.activeElement.textContent==='查看来源角色文档'`);
+  saveModeDeferred=true;const savesBefore=persistenceCalls.filter(x=>x.operation==='report-save').length,sendsBefore=sends.length;
+  await js(`[...document.querySelectorAll('.msg-handback button')].find(x=>x.textContent==='重试保存报告').click()`);await pause(30);
+  await js(`document.querySelector('.msg-handback .persistence-state button').click()`);await pause(30);
+  assert.equal(persistenceCalls.filter(x=>x.operation==='report-save').length,savesBefore+1);
+  const originalCard=await js(`(()=>{window.__flowReportCard=document.querySelector('.msg-handback');return !!window.__flowReportCard;})()`);assert.equal(originalCard,true);
+  await push('report-persistence-updated',{version:1,scope:{projectRoot:ROOT,roleId:'A',runtime:'pi'},change:{kind:'report-save',scope:{roleId:'A',runtime:'pi'},reportId:'report-one',state:{state:'saved',reportId:'report-one',retryAvailable:false}}});
+  flowSavePending[0].resolve(outer(flowSavePending[0].input,{ok:true,state:'saved',report:snapshot,retryAvailable:false}));await pause(40);saveModeDeferred=false;
+  await check('C source same card once save success with promise event race',`document.querySelector('.msg-handback')===window.__flowReportCard&&document.querySelector('.msg-handback .persistence-message').textContent==='报告已保存'&&![...document.querySelectorAll('.msg-handback button')].some(x=>x.textContent==='重试保存报告')`);assert.equal(sends.length,sendsBefore);
+  const receipt={version:1,deliveryId:'delivery-one',attemptId:'attempt-one',turnId:'target-one',inputSaved:true,providerMayHaveStarted:true,history:'failed',outcome:'completed',retryHistoryAvailable:true,retryDeliveryAllowed:false};flowReceipts['attempt-one']=receipt;
+  const input={source:'prompt-input',text:'安全交接 [REDACTED]',inputProvenance:{version:1,kind:'handback',deliveryId:'delivery-one',attemptId:'attempt-one',target:{roleId:'A',runtime:'pi'},reports:[snapshot]},inputTextProjection:{version:1,source:'trusted-handback-display',modelInputRecorded:false,redacted:true,truncated:true,summaryTruncated:true}};
+  await push('session:events',[payload({kind:'message',turnId:'target-one',summary:'安全摘要',detail:input})]);await pause(60);
+  await check('C target safe display copy flags not complete model input',`document.querySelector('.safe-input-copy summary').textContent==='交接内容（安全显示副本）'&&document.querySelector('.safe-input-copy').textContent.includes('此处未记录完整模型输入')&&document.querySelector('.safe-input-copy').textContent.includes('已净化')&&document.querySelector('.safe-input-copy').textContent.includes('显示副本已截断')`);
+  const targetSends=sends.length,targetOpens=opens.length;await js(`[...document.querySelectorAll('.msg-delivery button')].find(x=>x.textContent==='重试保存历史').click()`);await pause(40);
+  await check('C target only save updates same original card no re-prompt',`document.querySelectorAll('.msg-delivery').length===1&&document.querySelector('.msg-delivery .delivery-batch-facts .persistence-message').textContent==='已保存'`);assert.equal(sends.length,targetSends);assert.equal(opens.length,targetOpens);
+  const snap2={...snapshot,reportId:'report-expired',source:{...snapshot.source,turnId:'source-expired'}};flowReports['report-expired']={state:'failed',reportId:'report-expired',report:snap2,retryAvailable:true};await push('session:events',[payload({kind:'handback',report:snap2,reportPersistence:flowReports['report-expired'],summary:'安全待保存'})]);await pause(40);
+  await push('report-persistence-updated',{version:1,scope:{projectRoot:ROOT,roleId:'A',runtime:'pi'},change:{kind:'report-save',scope:{roleId:'A',runtime:'pi'},reportId:'report-expired',state:{state:'expired',reportId:'report-expired',retryAvailable:false,code:'SNAPSHOT_EXPIRED'}}});
+  await check('C expired original report removes unsafe retry',`[...document.querySelectorAll('.msg-handback')].at(-1).textContent.includes('已失效')&&![...document.querySelectorAll('.msg-handback')].at(-1).textContent.includes('重试保存报告')`);
+  await js(`document.getElementById('inp-message').value='保留非空草稿';document.getElementById('tab-pi').click()`);await pause(30);await js(`document.getElementById('pi-save').click()`);await pause(60);await key('Escape');
+  await check('P6 config save retains existing conversation draft',`document.getElementById('inp-message').value==='保留非空草稿'&&window.__ansRenderer.state.sessionOpenRoleId==='A'`);
+  configMissing.claude=['ANTHROPIC_API_KEY'];await js(`await window.__ansRenderer.selectRuntime('claude')`);await pause(50);await js(`document.getElementById('runtime-config-settings').focus()`);await key('Enter');await key('Escape');
+  await check('P6 missing setting closes back to actual notice invoker',`document.activeElement.id==='runtime-config-settings'`);
+  await js(`await window.__ansRenderer.selectRuntime('pi')`);await push('session:operator-request',{projectRoot:ROOT,roleId:'A',runtime:'pi',id:'flow-choice',request:{kind:'choice',title:'选择查看方式',options:[{id:'one',label:'摘要'},{id:'two',label:'完整'}]}});
+  await js(`document.getElementById('tab-work').click()`);
+  await check('P7 choice pending separated from empty queue',`document.getElementById('right-body').textContent.includes('待选择')&&document.getElementById('right-body').textContent.includes('无进行中或排队消息')&&document.getElementById('role-tree').textContent.includes('待选择')`);
+  await js(`document.querySelector('.pending-locate').click()`);
+  await check('P7 locate uses original request no default decision',`window.__ansRenderer.state.rightTab===null&&document.activeElement.dataset.requestId==='flow-choice'&&![...document.querySelectorAll('[data-request-id="flow-choice"] input[type=radio]')].some(x=>x.checked)&&document.querySelector('[data-request-id="flow-choice"] .op-submit').disabled`);
+  const sourceBefore=await js(`document.querySelectorAll('.msg-handback').length`);
+  await push('session:events',[payload({kind:'handback',report:{...snapshot,reportId:'wrong-scope',source:{roleId:'B',runtime:'pi',turnId:'wrong'}},reportPersistence:{state:'saved',retryAvailable:false}})]);
+  await check('C source report mismatched role is not promoted',`document.querySelectorAll('.msg-handback').length===${sourceBefore}`);
+  const fallback={...snapshot,reportId:'fallback-report',origin:'terminal-fallback',status:'aborted',source:{...snapshot.source,turnId:'fallback-turn'}};flowReports[fallback.reportId]={state:'saved',reportId:fallback.reportId,report:fallback,retryAvailable:false};
+  await push('session:events',[payload({kind:'handback',report:fallback,reportPersistence:flowReports[fallback.reportId],summary:'安全兜底'})]);await pause(40);
+  await check('C fallback abort is system outcome not submitted success',`[...document.querySelectorAll('.msg-handback')].at(-1).textContent.includes('系统按终态记录：已中止')`);
+  const live=safeReport({roleId:'A',turnId:'live-only',status:'completed',summary:'仅本次安全报告'});const beforeLiveQueries=persistenceCalls.length;
+  await push('session:events',[payload({kind:'handback',liveReport:live,reportPersistence:{state:'disabled',retryAvailable:false},summary:'安全live'})]);await pause(30);
+  await check('C disabled live report remains visible without fake persisted ID',`[...document.querySelectorAll('.msg-handback')].at(-1).textContent.includes('仅本次会话可见')&&![...document.querySelectorAll('.msg-handback')].at(-1).textContent.includes('重试保存')`);assert.equal(persistenceCalls.length,beforeLiveQueries);
+  const failed={...snapshot,reportId:'outer-success-inner-fail',source:{...snapshot.source,turnId:'failure-inner'}};flowReports[failed.reportId]={state:'failed',reportId:failed.reportId,report:failed,retryAvailable:true};await push('session:events',[payload({kind:'handback',report:failed,reportPersistence:flowReports[failed.reportId],summary:'安全待存'})]);await pause(40);
+  flowSaveFailure='CONFLICT';await js(`[...document.querySelectorAll('.msg-handback')].at(-1).querySelector('.persistence-state button').click()`);await pause(40);flowSaveFailure=null;
+  await check('C outer ok inner failed never announced saved',`[...document.querySelectorAll('.msg-handback')].at(-1).querySelector('.persistence-message').textContent.includes('冲突')&&![...document.querySelectorAll('.msg-handback')].at(-1).querySelector('.persistence-state button')`);
+  await push('session:history',{projectRoot:ROOT,roleId:'A',runtime:'pi',rows:[],reportErrors:[{reportId:'unreadable-report',code:'INVALID'}]});
+  await check('C unreadable report record is explicit without new outcome card',`document.getElementById('history-projection-note').textContent.includes('报告记录')&&document.getElementById('history-projection-note').textContent.includes('不可读')&&!document.getElementById('chat').textContent.includes('unreadable-report')`);
+  const openBeforeQueries=opens.length,sendBeforeQueries=sends.length,saveCount=persistenceCalls.filter(x=>x.operation==='report-save'||x.operation==='history-save').length;
+  await push('session:history',{projectRoot:ROOT,roleId:'A',runtime:'pi',rows:[],reports:[snapshot,fallback],projection:{omittedEntries:12,invalidEntries:2,truncated:true},skipped:3});await pause(40);
+  await check('A4 history omission invalid and parser counts are separate',`document.getElementById('history-projection-note').textContent.includes('省略前 12')&&document.getElementById('history-projection-note').textContent.includes('无效投影条目 2')&&document.getElementById('history-projection-note').textContent.includes('原解析跳过 3')`);assert.equal(opens.length,openBeforeQueries);assert.equal(sends.length,sendBeforeQueries);assert.equal(persistenceCalls.filter(x=>x.operation==='report-save'||x.operation==='history-save').length,saveCount);
+  const targetReport={...snapshot,reportId:'source-b-report',source:{roleId:'B',runtime:'pi',turnId:'b-source'}};
+  const otherInput={...input,inputProvenance:{...input.inputProvenance,attemptId:'attempt-two',deliveryId:'delivery-two',reports:[targetReport]}};flowReceipts['attempt-two']={...receipt,attemptId:'attempt-two',deliveryId:'delivery-two'};
+  await push('session:events',[payload({kind:'message',turnId:'target-two',summary:'安全目标',detail:otherInput})]);await pause(40);const beforeB=opens.length;
+  await js(`[...document.querySelectorAll('.msg-delivery')].at(-1).querySelector('.delivery-report button').click()`);await pause(30);
+  await check('P3 source B documents browsing never changes chatting A or engine',`document.getElementById('drawer-title').textContent==='B · 来源文档'&&window.__ansRenderer.state.selectedRoleId==='A'&&window.__ansRenderer.state.runtime==='pi'&&document.querySelectorAll('[data-doc-id]').length===2`);assert.equal(opens.length,beforeB);
+  for(const code of ['PROJECT_NOT_GRANTED','STALE_SCOPE','NOT_LISTED','SYMLINK_NOT_ALLOWED','INVALID_UTF8','BINARY_CONTENT','PERMISSION_DENIED','UNSUPPORTED_ENVIRONMENT']){
+    docMode=code;await js(`document.querySelector('[data-doc-id]').click()`);await pause(20);await check('B structured '+code+' error not hidden',`document.getElementById('document-read-status').textContent.length>0&&!document.getElementById('document-read-text').textContent`);await js(`document.querySelector('[data-doc-action="back-list"]').click()`);
+  }docMode='success';await js(`document.getElementById('drawer-close').click()`);
+  await push('delivery-history-updated',{version:1,scope:{projectRoot:ROOT,roleId:'A',runtime:'pi'},change:{kind:'delivery-history-save',scope:{roleId:'A',runtime:'pi'},attemptId:'attempt-two',state:'expired',receipt:flowReceipts['attempt-two'],retryAvailable:false,code:'SNAPSHOT_EXPIRED'}});
+  await check('C expired material cannot keep old receipt retry enabled',`[...document.querySelectorAll('.msg-delivery')].at(-1).querySelector('.persistence-message').textContent.includes('已失效')&&![...document.querySelectorAll('.msg-delivery')].at(-1).querySelector('.persistence-state button')`);
+  const legacyRow={kind:'denied',text:'旧文本分类：shell exit 7',at:'',activity:{toolName:'run_shell',phase:'result',status:'failed',toolCallId:'native-only-call',target:''},textProjection:text('旧文本分类：shell exit 7'),legacyStatusSource:'legacy-classifier',metadataOmissions:['timestamp','anchor-token','oversize-identity']};
+  await push('session:history',{projectRoot:ROOT,roleId:'A',runtime:'pi',rows:[legacyRow]});
+  await js(`[...document.querySelectorAll('#chat .sys-denied')].at(-1).open=true`);await pause(30);
+  await check('A4 actual legacy status and omissions shown without invented exit or identity',`(()=>{const t=[...document.querySelectorAll('#chat .sys-denied')].at(-1).textContent;return t.includes('旧文本分类')&&t.includes('不是新机器执行事实')&&t.includes('原时间未保存')&&t.includes('原定位标记未提供')&&t.includes('原调用身份超出展示预算')&&!t.includes('退出码：7');})()`);
+  flowLongRoleDocs=true;await js(`await window.__ansRenderer.refreshProject();document.getElementById('tab-card').click();['card','docs','changes'].forEach(id=>document.querySelector('details[data-section="'+id+'"]').open=true);document.getElementById('right-body').scrollTop=document.getElementById('right-body').scrollHeight`);await pause(30);
+  const roleReadScroll=await js(`document.getElementById('right-body').scrollTop`);assert.ok(roleReadScroll>100,'role reading fixture must really scroll');
+  await js(`[...document.querySelectorAll('#right-body button')].find(x=>x.textContent==='查看已列文档').click()`);await pause(20);await js(`document.querySelector('[data-doc-action="back-role"]').click()`);await pause(20);
+  await check('P3 role documents back restores role reading and expanded section',`document.querySelector('details[data-section="card"]').open&&Math.abs(document.getElementById('right-body').scrollTop-${roleReadScroll})<2`);
+  await js(`document.getElementById('drawer-close').click()`);
+  for(const width of [1360,960]){win.setContentSize(width,width===960?620:860);await pause(50);await check('complete flow layout fits '+width,`document.body.scrollWidth===innerWidth`);fs.writeFileSync(path.join(OUT,'complete-flow-'+width+'.png'),(await win.webContents.capturePage()).toPNG());}
+  reports.push({name:'read/save/query actual controlled operations',docCalls,persistenceCalls,modelSends:sends.length});
+}
 async function projectResetChecks() {
   await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRole('A')`);
   await push('session:events',[{projectRoot:ROOT,roleId:'A',runtime:'pi',event:{kind:'settled',summary:'OLD_ROOT_FAILURE',detail:{outcome:'failed'}}}]);
@@ -196,10 +570,11 @@ async function selectorChecks() {
   await key('ArrowDown');await key('ArrowDown');
   await check('closed arrow opens selected and stops at last',`${trigger}.getAttribute('aria-activedescendant')==='runtime-option-claude'`);
   await key('Home');await key('Tab');
-  await check('Tab cancels naturally to missing settings',`${menu}.hidden&&window.__ansRenderer.state.runtime==='claude'&&document.activeElement.id==='runtime-config-settings'`);
+  await check('Tab cancels naturally to accepted work overview without committing',`${menu}.hidden&&window.__ansRenderer.state.runtime==='claude'&&document.activeElement.id==='tab-work'`);
+  await key('Tab');await key('Tab');await check('missing settings remains naturally keyboard reachable after work and role actions',`document.activeElement.id==='runtime-config-settings'`);
   await js(`${trigger}.focus()`);await key('Enter');await key('Home');
   await key('Tab',['shift']);
-  await check('ShiftTab cancellation leaves natural previous target',`${menu}.hidden&&window.__ansRenderer.state.runtime==='claude'&&document.activeElement.id==='btn-import'`);
+  await check('ShiftTab cancellation leaves natural previous target',`${menu}.hidden&&window.__ansRenderer.state.runtime==='claude'&&document.activeElement.id==='tab-pi'`);
   await js(`${trigger}.focus();${trigger}.click()`);await key('Home');
   await js(`document.getElementById('runtime-config-settings').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));document.getElementById('runtime-config-settings').focus()`);
   await check('outside pointer cancels without focus stealing',`${menu}.hidden&&window.__ansRenderer.state.runtime==='claude'&&document.activeElement.id==='runtime-config-settings'`);
@@ -213,7 +588,7 @@ async function selectorChecks() {
   await check('current click no business reread',`${menu}.hidden`);
   await js(`await window.__ansRenderer.selectRuntime('claude')`);await pause(60);
   await check('programmatic runtime sync selected and label',`${trigger}.textContent.includes('Claude')&&document.getElementById('runtime-option-claude').getAttribute('aria-selected')==='true'`);
-  for(const width of [1360,960]){win.setContentSize(width,width===960?620:860);await pause(60);await js(`${trigger}.focus();${trigger}.click()`);await key('ArrowUp');await check('selector dimensions and viewport '+width,`(()=>{const t=${trigger}.getBoundingClientRect(),m=${menu}.getBoundingClientRect();return t.width===104&&t.height===28&&m.width===160&&m.left>=8&&m.right<=innerWidth-8&&m.bottom<=innerHeight-8&&document.body.scrollWidth===innerWidth;})()`);fs.writeFileSync(path.join(OUT,'selector-'+width+'-open.png'),(await win.webContents.capturePage()).toPNG());await key('Escape');}
+  for(const width of [1360,960]){win.setContentSize(width,width===960?620:860);await pause(60);await js(`${trigger}.focus();${trigger}.click()`);await key('ArrowUp');await check('selector dimensions and viewport '+width,`(()=>{const t=${trigger}.getBoundingClientRect(),m=${menu}.getBoundingClientRect();return t.width===104&&t.height===32&&m.width===180&&Math.abs(m.right-t.right)<1&&m.left>=8&&m.right<=innerWidth-8&&m.bottom<=innerHeight-8&&document.body.scrollWidth===innerWidth;})()`);fs.writeFileSync(path.join(OUT,'selector-'+width+'-open.png'),(await win.webContents.capturePage()).toPNG());await key('Escape');}
   await js(`document.querySelector('.engine-value').textContent='VERY LONG ENGINE LABEL THAT MUST NOT OVERFLOW';document.querySelector('#runtime-option-claude .engine-option-name').textContent='Claude VERY LONG LABEL';${trigger}.click()`);
   await check('long label ellipsis retains accessible full name',`${trigger}.title==='Claude VERY LONG LABEL'&&${trigger}.getAttribute('aria-label').includes('Claude VERY LONG LABEL')&&${trigger}.querySelector('.engine-value').scrollWidth>${trigger}.querySelector('.engine-value').clientWidth&&${menu}.scrollWidth===${menu}.clientWidth`);
   await key('Escape');await js(`document.querySelector('#runtime-option-claude .engine-option-name').textContent='Claude';await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)})`);await pause(60);
@@ -323,7 +698,7 @@ async function runtimeChecks() {
   await push('session:events',[payload('claude',{event:{kind:'settled',summary:'本轮运行失败',detail:{outcome:'failed'}}})]);
   await check('failed outcome remains error',`window.__ansRenderer.state.roleMeta['运行时核心'].error===true`);
   await push('session:role-state',payload('claude',{busy:false,summaries:[],queue:[],contextSource:'fresh',contextWarning:'原生恢复失败，已重建上下文。'}));
-  await check('failed native restore honest rebuilding notice',`document.getElementById('chat').textContent.includes('已重建上下文')&&!document.getElementById('chat').textContent.includes('模型上下文一并恢复')`);
+  await check('failed native restore honest rebuilding notice',`document.getElementById('context-state').title.includes('已重建上下文')&&document.getElementById('context-state').textContent.includes('恢复失败')&&!document.getElementById('context-state').textContent.includes('已从本地恢复')`);
   await push('shell:confirm-request',payload('pi',{id:'sc-runtime-old',command:'echo literal',summary:null,reasonPlain:'离线确认',cwd:ROOT,argvLines:[]}));
   await check('foreign runtime shell caches without showing in current engine',`document.getElementById('shell-confirm').hidden`);
   await push('session:operator-expired',payload('pi',{id:'sc-runtime-old',reason:'原shell轮次已中止'}));
@@ -349,7 +724,7 @@ async function mergeChecks() {
   async function history(runtime,roleId,rows){const h=payload(runtime,roleId,{rows,error:null,skipped:0});mergeHistories.set(runtime+'|'+roleId,h);await push('session:history',h);}
   const older=[row('old','user','old input'),row('old','assistant','old history retained','message')];
   await history('pi','A',older);
-  await push('session:events',[live('pi','A','current','tool_call','read_file',{detail:{toolName:'read_file',toolCallId:'current-call',args:{path:'current.md'}}}),live('pi','A','current','denied','current rejection',{detail:{toolName:'read_file',toolCallId:'current-call',ok:false}}),live('pi','A','current','message','current answer'),live('pi','A','current','settled','current settled'),payload('pi','A',{event:{kind:'handback',summary:'handback',handback:{roleId:'A',turnId:'current',status:'unreported',summary:'current report remains',evidence:[],at:''}}})]);
+  await push('session:events',[live('pi','A','current','tool_call','read_file',{detail:{toolName:'read_file',toolCallId:'current-call',args:{path:'current.md'}}}),live('pi','A','current','denied','current rejection',{detail:{toolName:'read_file',toolCallId:'current-call',ok:false}}),live('pi','A','current','message','current answer'),live('pi','A','current','settled','current settled'),payload('pi','A',{event:{kind:'handback',summary:'handback',liveReport:safeReport({roleId:'A',turnId:'current',status:'unreported',summary:'current report remains',evidence:[],at:''})}})]);
   await push('session:operator-request',payload('pi','A',{id:'merge-confirm',request:{kind:'confirm',title:'merge pending card'}}));
   await js(`window.__mergeCard=document.querySelector('[data-request-id="merge-confirm"]')`);
   const current=[row('current','user','current input'),{...row('current','tool','read_file','tool_call'),activity:{toolName:'read_file',toolCallId:'current-call',turnId:'current',target:'current.md',phase:'call',status:'call'}},{...row('current','denied','current rejection','denied'),activity:{toolName:'read_file',toolCallId:'current-call',turnId:'current',target:'current.md',phase:'blocked',status:'failed'}},row('current','assistant','current answer','message')];
@@ -396,11 +771,11 @@ async function mergeChecks() {
   await push('session:operator-request',payload('pi','B',{id:'legacy-decided',anchorKey:anchored[0].anchorKey,request:{kind:'confirm',title:'legacy decided anchor'}}));
   await js(`window.__legacyDecidedCard=document.querySelector('[data-request-id="legacy-decided"]');window.__legacyDecidedCard.querySelector('.op-deny').click()`);await pause(60);
   await history('pi','B',[{kind:'assistant',text:'legacy prefix',at:''},...anchored]);
-  await check('legacy decided full replay reuses original card between actual request and conclusion',`(()=>{let a=window.__ansRenderer.replayAnchorDebug('B').find(x=>x.anchorKey===${JSON.stringify('confirm\u0000legacy decided anchor')}),m=window.__ansRenderer.rowModelDebug('B'),card=document.querySelector('[data-request-id="legacy-decided"]'),op=m.operators.find(x=>x.requestId==='legacy-decided');return !!a&&card===window.__legacyDecidedCard&&op.index===a.requestIndex+1&&op.index<a.conclusionIndex&&card.querySelector('.op-confirm').hidden&&card.querySelector('.op-note').textContent.includes('不同意');})()`);
+  await check('legacy decided full replay reuses original card between actual request and conclusion',`(()=>{let a=window.__ansRenderer.replayAnchorDebug('B').find(x=>x.anchorKey===${JSON.stringify('legacy-anchor-v1:511466706a245bf7206fd2e8526b54b52d58bd1454ffcb6969b3b3716afb5440')}),m=window.__ansRenderer.rowModelDebug('B'),card=document.querySelector('[data-request-id="legacy-decided"]'),op=m.operators.find(x=>x.requestId==='legacy-decided');return !!a&&card===window.__legacyDecidedCard&&op.index===a.requestIndex+1&&op.index<a.conclusionIndex&&card.querySelector('.op-confirm').hidden&&card.querySelector('.op-note').textContent.includes('不同意');})()`);
   await js(`await window.__ansRenderer.selectRole('A')`);
   await history('pi','B',[{kind:'assistant',text:'background legacy prefix',at:''},{kind:'assistant',text:'legacy prefix',at:''},...anchored]);
   await js(`await window.__ansRenderer.selectRole('B')`);
-  await check('background legacy rebuild keeps exact decided DOM and shifted anchor indices',`(()=>{let a=window.__ansRenderer.replayAnchorDebug('B').find(x=>x.anchorKey===${JSON.stringify('confirm\u0000legacy decided anchor')}),m=window.__ansRenderer.rowModelDebug('B'),op=m.operators.find(x=>x.requestId==='legacy-decided');return document.querySelector('[data-request-id="legacy-decided"]')===window.__legacyDecidedCard&&op.index===a.requestIndex+1&&a.conclusionIndex===op.index+1&&m.operators.length===1;})()`);
+  await check('background legacy rebuild keeps exact decided DOM and shifted anchor indices',`(()=>{let a=window.__ansRenderer.replayAnchorDebug('B').find(x=>x.anchorKey===${JSON.stringify('legacy-anchor-v1:511466706a245bf7206fd2e8526b54b52d58bd1454ffcb6969b3b3716afb5440')}),m=window.__ansRenderer.rowModelDebug('B'),op=m.operators.find(x=>x.requestId==='legacy-decided');return document.querySelector('[data-request-id="legacy-decided"]')===window.__legacyDecidedCard&&op.index===a.requestIndex+1&&a.conclusionIndex===op.index+1&&m.operators.length===1;})()`);
 
   const legacy=[{kind:'assistant',text:'legacy identical',at:'1'},{kind:'assistant',text:'legacy identical',at:'2'}];
   await history('pi','B',legacy);await history('pi','B',legacy);
@@ -414,6 +789,10 @@ app.whenReady().then(async()=>{
   win=new BrowserWindow({width:1360,height:860,useContentSize:true,frame:false,show:INTERACTIVE,webPreferences:{preload:path.join(APP,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:false}});
   win.webContents.on('console-message',event=>{if(event.level==='error')errors.push(event.message);});
   await win.loadFile(path.join(APP,'renderer/index.html'));win.setTitle('ANS UI/UX 离线验收');await pause(150);
+  if(GHOST_ONLY){await deliveryNoteChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({reports,errors},null,2));console.log('DELIVERY_NOTE_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
+  if(VISUAL_ONLY){await visualChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({reports,errors},null,2));console.log('VISUAL_V2_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
+  if(FRESH_CONTEXT_ONLY||ROLE_FOCUS_ONLY||TERMINAL_ONLY||SEND_FACTS_ONLY||TERMINAL_MERGE_ONLY){if(FRESH_CONTEXT_ONLY)await freshContextChecks();else if(ROLE_FOCUS_ONLY)await roleDocumentFocusChecks();else if(TERMINAL_ONLY)await terminalChecks();else if(SEND_FACTS_ONLY)await sendFactsChecks();else await terminalMergeChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({reports,errors},null,2));console.log((FRESH_CONTEXT_ONLY?'FRESH_CONTEXT':ROLE_FOCUS_ONLY?'ROLE_FOCUS':TERMINAL_ONLY?'TERMINAL':SEND_FACTS_ONLY?'SEND_FACTS':'TERMINAL_MERGE')+'_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
+  if(FLOW_ONLY){await completeFlowChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports},null,2));console.log('COMPLETE_FLOW_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(PROJECT_RESET_ONLY){await projectResetChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports},null,2));console.log('PROJECT_RESET_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(DUP_ONLY){await duplicateChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports},null,2));console.log('DUP_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(SELECTOR_ONLY){await selectorChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports,configReads},null,2));console.log('SELECTOR_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
@@ -433,12 +812,13 @@ app.whenReady().then(async()=>{
   await push('session:events',[event('denied','拒绝写入：目标不在角色允许范围',{toolName:'write_file',path:'outside.md'})]);
   await check('before-execution rejection keeps visible reason',`[...document.querySelectorAll('#chat .sys-denied > summary')].some(x=>x.textContent.includes('目标不在角色允许范围')&&!x.textContent.includes('执行失败'))`);
   await check('unknown is honest count',`document.querySelector('#chat .tool-records summary').textContent.includes('3 条活动')&&document.querySelector('#chat .tool-records summary').textContent.includes('状态未记录')`);
-  await js(`document.getElementById('tab-card').click()`);await pause(160);
-  await check('one work list precedes collapsed full documents',`document.querySelectorAll('#right-body #right-queue-body').length===1&&document.querySelectorAll('#right-body .q-item').length===4&&!document.querySelector('#right-body details').open&&!document.getElementById('right-queue-overview')&&document.getElementById('drawer-title').textContent.includes('A')`);
-  await js(`document.querySelector('#right-body .q-toggle').click();document.querySelector('#right-body details').open=true;document.getElementById('inp-message').value='A draft';document.getElementById('inp-message').dispatchEvent(new Event('input'));`);
-  await push('session:role-state',snapshot());
-  await check('snapshot keeps full and document open',`!document.querySelector('#right-body .q-full').hidden&&document.querySelector('#right-body details').open`);
-  await js(`document.getElementById('btn-attach-image').click()`);await pause(80);
+  await js(`document.getElementById('tab-work').click()`);await pause(160);
+  await check('one independent work list without duplicated role documents',`document.querySelectorAll('#right-body #right-queue-body').length===1&&document.querySelectorAll('#right-body .q-item').length===4&&!document.querySelector('#right-body details[data-section]')&&!document.getElementById('right-queue-overview')&&document.getElementById('drawer-title').textContent.includes('工作概览')`);
+  await js(`document.querySelector('#right-body .q-toggle').click();document.getElementById('inp-message').value='A draft';document.getElementById('inp-message').dispatchEvent(new Event('input'));`);
+  await key('Escape');await js(`document.getElementById('tab-card').click();document.querySelector('#right-body details').open=true`);await push('session:role-state',snapshot());
+  await check('snapshot keeps independent role document open',`document.querySelector('#right-body details').open`);
+  await key('Escape');await js(`document.getElementById('btn-attach-image').click()`);await pause(80);await js(`document.getElementById('tab-work').click()`);await push('session:role-state',snapshot());
+  await check('snapshot keeps full after independent role document and back',`!document.querySelector('#right-body .q-full').hidden`);
   await js(`document.getElementById('drawer-close').focus()`);await key('Tab');await check('keyboard tabs to full',`document.activeElement.classList.contains('q-toggle')`);await key('Enter');await check('keyboard collapses full',`document.querySelector('#right-body .q-full').hidden===true`);await key('Enter');await check('keyboard expands full',`document.querySelector('#right-body .q-full').hidden===false`);await key('Tab');await check('keyboard tabs to withdraw',`document.activeElement.classList.contains('q-withdraw')`);
   for(const [width,height] of [[1360,860],[960,620]]) {
     win.setContentSize(width,height);await pause(100);
@@ -446,7 +826,7 @@ app.whenReady().then(async()=>{
     await check(`queue full/grid/action rect ${width}`,`(()=>{let b=document.getElementById('right-body'),i=b.querySelector('.q-item:not(.is-running)'),f=b.querySelector('.q-full'),a=f.closest('.q-item').querySelector('.q-actions'),t=f.closest('.q-item').querySelector('.q-text'),buttons=[...b.querySelectorAll('.q-toggle,.q-withdraw')];return b.scrollWidth===b.clientWidth&&getComputedStyle(i).display==='grid'&&Math.abs(f.getBoundingClientRect().left-t.getBoundingClientRect().left)<1&&Math.abs(a.getBoundingClientRect().left-t.getBoundingClientRect().left)<1&&buttons.every(x=>{let r=x.getBoundingClientRect();return r.height>=28&&r.right<=b.getBoundingClientRect().right;});})()`);
     reports.push({name:'queue geometry '+width,value:await js(`(()=>{let b=document.getElementById('right-body'),f=b.querySelector('.q-full');return {clientWidth:b.clientWidth,scrollWidth:b.scrollWidth,full:f.getBoundingClientRect().toJSON(),actions:[...b.querySelectorAll('.q-toggle,.q-withdraw')].map(x=>({label:x.textContent,rect:x.getBoundingClientRect().toJSON()}))};})()`)});
     const chatWidth=await js(`document.getElementById('chat').getBoundingClientRect().width`);
-    await js(`document.getElementById('tab-pi').click()`);await pause(160);
+    await key('Escape');await js(`document.getElementById('tab-pi').click()`);await pause(160);
     await check(`pi geometry ${width}`,viewportGeometry);
     await check(`Pi only one title/close ${width}`,`!document.querySelector('.pi-panel-title')&&!document.getElementById('pi-close')&&document.getElementById('drawer-title').textContent==='Pi 配置'&&document.getElementById('pi-panel-path').scrollWidth<=document.getElementById('pi-panel-path').clientWidth`);
     assert.equal(await js(`document.getElementById('chat').getBoundingClientRect().width`),chatWidth,'no reflow');
@@ -454,12 +834,12 @@ app.whenReady().then(async()=>{
     await check(`growing composer avoids drawer ${width}`,viewportGeometry);
     await js(`document.getElementById('drawer-close').click()`);await pause(160);
     await check(`closed no horizontal overflow ${width}`,`document.body.scrollWidth===innerWidth&&document.querySelector('.app').scrollWidth===document.querySelector('.app').clientWidth`);
-    await js(`document.getElementById('tab-card').click()`);await pause(160);
+    await js(`document.getElementById('tab-work').click()`);await pause(160);
   }
   await js(`document.getElementById('inp-message').value='A draft';await window.__ansRenderer.selectRole('B');document.getElementById('inp-message').value='B draft'`);
   await check('B independent no A image',`document.querySelectorAll('#attach-row .attach-chip').length===0&&!document.getElementById('right-body').textContent.includes('客户长消息')`);
   await js(`await window.__ansRenderer.selectRole('A')`);
-  await check('A draft image resources full restored',`document.getElementById('inp-message').value==='A draft'&&document.querySelectorAll('#attach-row .attach-chip').length===1&&!document.querySelector('#right-body .q-full').hidden&&document.querySelector('#right-body details').open`);
+  await check('A draft image resources full restored',`document.getElementById('inp-message').value==='A draft'&&document.querySelectorAll('#attach-row .attach-chip').length===1&&!document.querySelector('#right-body .q-full').hidden&&window.__ansRenderer.state.rightTab==='work'`);
   pickDeferred=true;await js(`document.getElementById('btn-attach-image').click()`);await pause(50);await js(`await window.__ansRenderer.selectRole('B')`);
   pickResolve({ok:true,image:{name:'late.png',mime:'image/png',size:68,dataBase64:PNG}});await pause(70);
   await check('late pick does not touch B',`document.getElementById('inp-message').value==='B draft'&&document.querySelectorAll('#attach-row .attach-chip').length===0`);
@@ -477,7 +857,9 @@ app.whenReady().then(async()=>{
   await check('withdraw pending retains item',`document.querySelectorAll('#right-body .q-item').length===3&&document.querySelector('#right-body .q-withdraw').disabled`);
   withdrawResolve();await pause(80);await check('failed withdraw full retained',`document.querySelectorAll('#right-body .q-item').length===3&&!document.querySelector('#right-body .q-full').hidden&&!document.querySelector('#right-body .q-withdraw').disabled`);
   await check('withdraw failure inline next to action',`document.querySelector('#right-body .q-feedback').textContent.includes('离线受控拒绝')&&document.querySelector('#right-body .q-feedback').getBoundingClientRect().top-document.querySelector('#right-body .q-actions').getBoundingClientRect().bottom<=8`);
+  await key('Escape');await js(`document.getElementById('tab-card').click()`);
   await check('withdraw failure keeps draft image resources',`document.getElementById('inp-message').value==='撤回时保留的草稿'&&document.querySelectorAll('#attach-row .attach-chip').length===1&&document.querySelector('#right-body details').open`);
+  await key('Escape');await js(`document.getElementById('tab-work').click()`);
   withdrawMode='throw';await js(`document.querySelector('#right-body .q-withdraw').focus()`);await key('Enter');await pause(40);withdrawResolve();await pause(80);
   await check('thrown withdrawal error inline and retryable',`document.querySelector('#right-body .q-feedback').textContent.includes('离线受控网络不可用')&&!document.querySelector('#right-body .q-withdraw').disabled`);
   await check('keyboard withdrawal response retains same action',`document.activeElement.classList.contains('q-withdraw')`);
@@ -565,9 +947,9 @@ app.whenReady().then(async()=>{
   await check('open pending supersedes true busy',`document.querySelector('#chat .tool-current').textContent==='等待你确认'&&window.__ansRenderer.state.roleBusy.A===true`);
   for(const mode of ['card','pi']) {
     await js(`document.getElementById('tab-${mode}').click()`);await pause(160);
-    await check(`pending entry fully reachable with ${mode} 960`,`(()=>{let e=document.getElementById('op-chip'),r=e.getBoundingClientRect(),d=document.getElementById('right-drawer').getBoundingClientRect();return e.tagName==='BUTTON'&&!e.hidden&&r.left>=272&&r.right<=d.left&&r.top>=36&&r.bottom<=innerHeight;})()`);
+    await check(`pending entry fully reachable with ${mode} 960`,`(()=>{let e=document.getElementById('op-chip'),r=e.getBoundingClientRect(),d=document.getElementById('right-drawer').getBoundingClientRect();return e.tagName==='BUTTON'&&!e.hidden&&document.querySelector('.col-mid').inert&&!document.getElementById('drawer-backdrop').hidden&&r.left>=document.getElementById('chat').getBoundingClientRect().left&&r.top>=36&&r.bottom<=innerHeight;})()`);
     await check(`covered pending actions unavailable ${mode}`,`document.querySelector('#chat .op-request').inert===true&&getComputedStyle(document.querySelector('#chat .op-actions')).visibility==='hidden'`);
-    await js(`document.getElementById('op-chip').focus()`);await key('Enter');await pause(140);
+    await key('Escape');await js(`document.getElementById('op-chip').focus()`);await key('Enter');await pause(140);
     reports.push({name:'pending geometry '+mode,value:await js(`(()=>{let c=document.getElementById('chat').getBoundingClientRect(),e=document.querySelector('#chat .op-request');return {chat:c.toJSON(),card:e.getBoundingClientRect().toJSON(),buttons:[...e.querySelectorAll('.op-actions button')].map(b=>({hidden:b.hidden,inert:e.inert,rect:b.getBoundingClientRect().toJSON()})),active:document.activeElement.className,drawer:document.getElementById('right-drawer').className};})()`)});
     await check(`keyboard locate closes ${mode} and exposes all actions`,`(()=>{let c=document.getElementById('chat').getBoundingClientRect(),e=document.querySelector('#chat .op-request'),r=e.getBoundingClientRect(),buttons=[...e.querySelectorAll('.op-actions button')];return !e.inert&&!document.getElementById('right-drawer').classList.contains('open')&&r.left>=c.left&&r.right<=c.right&&r.top>=c.top&&r.bottom<=c.bottom&&buttons.every(b=>{let x=b.getBoundingClientRect();return x.left>=c.left&&x.right<=c.right&&x.top>=c.top&&x.bottom<=c.bottom;})&&document.activeElement===e;})()`);
   }
@@ -577,7 +959,7 @@ app.whenReady().then(async()=>{
   await check('answered pending returns to true busy',`document.getElementById('op-chip').hidden&&document.querySelector('#chat .tool-current').textContent==='正在工作'`);
   await push('session:role-state',snapshot(false));
   await check('idle after answered removes work',`!document.querySelector('#chat .tool-current')`);
-  await key('Tab');await check('keyboard reaches retained image removal',`document.activeElement.classList.contains('attach-rm')`);await key('Tab');await check('keyboard returns to composer image',`document.activeElement.id==='btn-attach-image'`);await key('Tab');await check('keyboard returns to input',`document.activeElement.id==='inp-message'`);
+  await key('Tab');await check('keyboard reaches retained image removal',`document.activeElement.classList.contains('attach-rm')`);await key('Tab');await check('keyboard returns to input above toolbar',`document.activeElement.id==='inp-message'`);await key('Tab');await check('keyboard returns to composer image toolbar',`document.activeElement.id==='btn-attach-image'`);
   operatorMode='expired';await push('session:role-state',snapshot(true));await js(`document.getElementById('tab-card').click()`);
   await push('session:operator-request',{id:'expired-fixture',roleId:'A',request:{kind:'confirm',title:'失效回执检查'}});
   await check('pending arrival preserves drawer',`document.getElementById('right-drawer').classList.contains('open')&&document.querySelector('#chat .tool-current').textContent==='等待你确认'`);

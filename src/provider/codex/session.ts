@@ -6,7 +6,7 @@ import path from "node:path";
 import os from "node:os";
 import { randomUUID } from "node:crypto";
 import type { ResolvedRole } from "../../model/role.ts";
-import type { RuntimeAdapter, RuntimeProviderOptions, RoleSession, SessionEvent, ToolResult, RuntimeTurnOutcome } from "../../model/runtime.ts";
+import type { RuntimeAdapter, RuntimeProviderOptions, RoleSession, SessionEvent, ToolResult, RuntimeTurnOutcome, RuntimeToolEventFactsV1, RuntimeToolErrorFactsV1 } from "../../model/runtime.ts";
 import { object, deferred, eventQueue, pausedDeadline, bounded } from "../../common/codex-adapter/protocol.ts";
 import type { CodexRpcConnection, CodexEngineInput, CodexEngineFactory } from "../../common/codex-adapter/protocol.ts";
 import { settings, safetyConfig, safetyOverrides, effectiveConfig, verifyThread } from "../../common/codex-adapter/config.ts";
@@ -209,6 +209,9 @@ interface TurnState {
 }
 
 export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): RuntimeAdapter {
+  if (options.toolDisplayMode === "required-v1" && (typeof options.projectToolEvent !== "function" || typeof options.registerToolDisplayProfile !== "function")) {
+    throw new Error("Codex required-v1 tool display requires projector/register capabilities");
+  }
   const composeContext = async (role: ResolvedRole) => ({ systemPrompt: [
     role.cardText,
     `固定角色：${role.id}。实际项目目录：${options.projectRoot}。`,
@@ -220,7 +223,14 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
   return {
     composeContext,
     async bindRole(role) {
-      const config = settings(options, options.env ?? process.env);
+      // Resolve authentication, profile registration and child environment from one snapshot.
+      const environmentSnapshot = { ...(options.env ?? process.env) };
+      const config = settings(options, environmentSnapshot);
+      options.registerToolDisplayProfile?.({
+        apiKeyEnvVar: config.keyName,
+        credentials: [...new Set([config.keyName, ...(options.toolDisplayCredentialEnvNames ?? [])])]
+          .map(name => ({ name, value: environmentSnapshot[name] })),
+      });
       const storage = options.storage;
       if (storage && (storage.runtime !== "codex" || storage.roleId !== role.id)) throw new Error("Codex storage role/runtime mismatch");
       const toolMap = new Map(options.tools.map(tool => [tool.name, tool]));
@@ -256,6 +266,19 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
       const emit = (turn: TurnState | undefined, kind: SessionEvent["kind"], summary: string, detail?: unknown) => {
         queue.push({ runtime: "codex", roleId: role.id, ...(turn ? { turnId: turn.ansId } : {}), kind, summary: config.redact(summary), ...(detail === undefined ? {} : { detail: scrub(detail) }) });
       };
+      // Projected display text is already protected; never recursively scrub its opaque IDs.
+      const emitTool = (turn: TurnState, facts: RuntimeToolEventFactsV1, legacyKind: SessionEvent["kind"], legacySummary: string, legacyDetail: unknown) => {
+        if (!options.projectToolEvent) {
+          emit(turn, legacyKind, legacySummary, legacyDetail);
+          return;
+        }
+        try {
+          queue.push(options.projectToolEvent({ ...facts, runtime: "codex", roleId: role.id, turnId: turn.ansId }, config.redact));
+        } catch {
+          queue.push({ runtime: "codex", kind: "message", summary: "Tool display projection failed",
+            detail: { version: 1, source: "tool-display-diagnostic", code: "PROJECTION_FAILED" } });
+        }
+      };
       const cleanup = () => cleanupPromise ??= (async () => {
         unsubscribe?.();
         const results = await Promise.allSettled([client?.close(), server?.close(), engine?.close()]);
@@ -271,7 +294,7 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
         await storage?.validateNativeDirectory?.();
         const provider = `ans_${instanceId.replaceAll("-", "")}`;
         const providerDefinition = `model_providers.${provider}={name="ANS Codex",base_url=${JSON.stringify(config.baseUrl)},env_key="CODEX_API_KEY",wire_api="responses",requires_openai_auth=false}`;
-        const environment = { PATH: (options.env ?? process.env).PATH ?? path.dirname(process.execPath), CODEX_HOME: nativeHome, CODEX_API_KEY: config.key };
+        const environment = { PATH: environmentSnapshot.PATH ?? path.dirname(process.execPath), CODEX_HOME: nativeHome, CODEX_API_KEY: config.key };
         const engineFactory = options.engineFactory ?? ((input: CodexEngineInput) => nativeEngine(input, options.cliPath));
         const connect = async (disabled: readonly string[]) => {
           const connected = await engineFactory({ cwd, nativeHome, env: environment, configOverrides: [...safetyOverrides(cwd, disabled), providerDefinition, `model_provider=${JSON.stringify(provider)}`], timeoutMs: options.constructTimeoutMs ?? 30000 });
@@ -305,11 +328,20 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
           // Capture the original state before awaiting any other call; never substitute active.signal.
           const { turn, name, callId } = original;
           const tool = toolMap.get(name)!;
+          const args = object(params.arguments ?? {}, "tool arguments");
+          const facts = { toolName: name, toolCallId: callId, input: { rule: tool.displayInputRule, args } };
+          let displayError: RuntimeToolErrorFactsV1 | undefined;
+          let handlerStarted = false;
           const execute = async (): Promise<ToolResult> => {
             if (turn.controller.signal.aborted || turn.completed || active !== turn) return { ok: false, message: "ANS refused a stopped or stale turn" };
-            emit(turn, "tool_call", name, { toolName: name, name, toolCallId: callId, args: params.arguments });
-            try { return await tool.handler({ name, args: object(params.arguments ?? {}, "tool arguments"), toolCallId: callId, signal: turn.controller.signal }); }
-            catch (error) { return { ok: false, message: config.redact(error) }; }
+            handlerStarted = true;
+            emitTool(turn, { ...facts, phase: "start", origin: "handler-start" }, "tool_call", name, { toolName: name, name, toolCallId: callId, args });
+            try { return await tool.handler({ name, args, toolCallId: callId, signal: turn.controller.signal }); }
+            catch (error) {
+              displayError = {};
+              if (error instanceof Error) displayError = { message: error.message };
+              return { ok: false, message: config.redact(error) };
+            }
           };
           // A single queue also prevents a sequential write from overlapping parallel reads/tools.
           const resultPromise = sequential.then(execute, execute);
@@ -319,7 +351,11 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
             ? { ok: false, message: "ANS refused a result from a stopped turn" }
             : returned;
           // A late callback cannot append an apparent success after that turn's settled event.
-          if (!turn.completed && active === turn) emit(turn, result.ok ? "accepted" : "denied", result.message, { toolName: name, name, toolCallId: callId, ok: result.ok });
+          if (!turn.completed && active === turn && (handlerStarted || !options.projectToolEvent)) {
+            let source: RuntimeToolEventFactsV1 = { ...facts, phase: "result", origin: "handler-result", result };
+            if (displayError && result === returned) source = { ...facts, phase: "result", origin: "handler-result", error: displayError };
+            emitTool(turn, source, result.ok ? "accepted" : "denied", result.message, { toolName: name, name, toolCallId: callId, ok: result.ok });
+          }
           return { isError: !result.ok, content: [{ type: "text", text: config.redact(result.message) }] };
         });
         const [serverTransport, clientTransport] = modules.InMemoryTransport.createLinkedPair();

@@ -1,0 +1,56 @@
+{
+  "reports": [
+    {
+      "name": "disabled combobox before import",
+      "value": true
+    },
+    {
+      "name": "disabled cannot open",
+      "value": true
+    },
+    {
+      "name": "empty folder enables custom selector",
+      "value": true
+    },
+    {
+      "name": "End browses Claude without commit",
+      "value": true
+    },
+    {
+      "name": "Space commits Claude once with live missing entry",
+      "value": true
+    },
+    {
+      "name": "current Enter only closes",
+      "value": true
+    },
+    {
+      "name": "Home opens first and stops at top",
+      "value": true
+    },
+    {
+      "name": "Escape cancels and retains trigger focus",
+      "value": true
+    },
+    {
+      "name": "closed arrow opens selected and stops at last",
+      "value": true
+    },
+    {
+      "name": "Tab cancels naturally to missing settings",
+      "value": false
+    },
+    {
+      "name": "Tab cancels naturally to missing settings observed",
+      "value": {
+        "chat": "项目尚未 bootstrap与  对话，让它把角色建出来；左树会随之长出。",
+        "assistant": [],
+        "denied": [],
+        "model": null
+      }
+    }
+  ],
+  "errors": [],
+  "error": "AssertionError [ERR_ASSERTION]: Tab cancels naturally to missing settings\n\nfalse !== true\n",
+  "stack": "AssertionError [ERR_ASSERTION]: Tab cancels naturally to missing settings\n\nfalse !== true\n\n    at check (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:38:474)\n    at async selectorChecks (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:513:3)\n    at async file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:736:21"
+}

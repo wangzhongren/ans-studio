@@ -1,0 +1,26 @@
+✔ Service history operation returns scoped Model records/replay through the existing Provider (17.678125ms)
+✔ each actual runtime turn publishes one typed original input before native work and retains real assistant text (49.373ms)
+✔ input echo is absent for rejected or failed-start prompts; demo Core and standalone have one input producer (0.747709ms)
+✔ Service selects exactly chosen injected factory and executes real governed handler (0.858042ms)
+✔ Service failure never selects another engine and unknown runtime rejected (0.311583ms)
+✔ Service persists replay and adapter-confirmed deferred context result after prompt (10.133625ms)
+✔ customer wait pauses prompt deadline, abort invalidates late consent, next turn works (54.328333ms)
+✔ throw, native failed outcome and timeout each have one explicit terminal (16.033166ms)
+✔ corrupt ANS index is rejected before native bind allocates a session (1.696083ms)
+✔ transient persistence failure is reported and repaired next prompt can succeed (10.331416ms)
+✔ Service event top/detail identity and report metadata share the captured turn (0.499208ms)
+✔ hanging native abort is bounded, called once, and leaves the session quarantined (1004.381625ms)
+✔ Service configured custom API key is stripped from the actual governed shell child (23.400416ms)
+✔ outer timeout remains timed_out when abort cleanup emits inner aborted terminals (16.907167ms)
+✔ outer aborted result stays aborted while failing cleanup remains honestly reported (2.903292ms)
+✔ Core-managed binding rejects a provider that did not register its display profile before first prompt (0.116667ms)
+✔ ordinary engine failure stays a non-tool fact in live, stored and reloaded events while actual tools retain projections (12.349ms)
+✔ history does not resurrect an old empty-name synthetic tool phase on an engine failure (2.902542ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 18
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1296.855791

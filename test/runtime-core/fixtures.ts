@@ -9,3 +9,9 @@ export async function until(predicate: () => boolean): Promise<void> {
   const end = Date.now() + 1500;
   while (!predicate()) { if (Date.now() > end) throw new Error("fixture wait timed out"); await new Promise<void>((resolve) => setTimeout(resolve, 2)); }
 }
+
+/** Actual required-v1 protocol for controlled providers; no production bypass. */
+export function registerControlledDisplayProfile(options: import('../../src/model/runtime.ts').RuntimeProviderOptions): void {
+  if(options.toolDisplayMode!=='required-v1'||typeof options.projectToolEvent!=='function'||typeof options.registerToolDisplayProfile!=='function')throw new Error('controlled provider missing actual display contract');
+  options.registerToolDisplayProfile({credentials:[]});
+}

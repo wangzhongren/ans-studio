@@ -1,0 +1,31 @@
+{
+  "version": 2,
+  "status": "design-complete-pending-user-confirmation",
+  "owner": "UIUX设计师",
+  "files": {
+    "角色卡/UIUX设计师/docs/design/2026-10-15_design_visual-convergence.md": "25474437047fdb864fcb401f8ff42b67bcf77cc534b98b37c44146cfa265c101",
+    "角色卡/UIUX设计师/docs/design/2026-10-15_design_visual-convergence-prototype.html": "e95b363dfe4191f32a53d139de3b80d75a48b89362f886376ed49e3ad7b4ea4b"
+  },
+  "verification": {
+    "producer": "root fixed测试",
+    "canonical": "角色卡/测试/docs/design/2026-10-15_visual-convergence-prototype-verification.md",
+    "canonicalSha256": "b98a2a6fafb1af8e46add0ea895bb94f432b45a38762647235be1a3614ca7f2c",
+    "manifest": "角色卡/测试/docs/design/2026-10-15-visual-convergence-verification-evidence/final-verification.json",
+    "manifestSha256": "bf4411c70907ec510b0c156657385bd93ff2f3946c1b5ecf24e0bcca063ab85e",
+    "coverage": "dcc main revisions; e95 affected state fixes, safe full summary, preserved expansion, unknown facts, 1360/960/504 layout"
+  },
+  "uiuxEvidence": {
+    "producer": "/root/uiux_visual 固定UIUX",
+    "selfCheck": "self-check-v2.json",
+    "native": "1360 read-only report→trusted list→explicit document→Escape",
+    "e95DynamicSelfCheck": "unavailable existing IAB; root produced final verification"
+  },
+  "formalApplicationImplemented": false,
+  "frozenP1P7Modified": false,
+  "limits": [
+    "All prototype business facts are marked demo",
+    "Product final review static only; no product dynamic signoff invented",
+    "No new API or permission",
+    "Waiting customer confirmation before implementation"
+  ]
+}

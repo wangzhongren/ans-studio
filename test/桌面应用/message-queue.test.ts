@@ -77,7 +77,7 @@ interface Harness {
   mgr: SessionManager;
   streams: Record<string, OrchestrationEvent[]>;
   sent: Record<string, string[]>;
-  envelopes: { roleId: string; event: OrchestrationEvent }[];
+  envelopes: { roleId: string; event: import("../../app/desktop/session.ts").DesktopOrchestrationEvent }[];
   roleStates: RoleStateSnapshot[];
   openCalls: string[];
   /** 可运行期调整的失败计数器（`handle.send` 每次调用消耗 1；用于精确安排「第二次尝试失败」）。 */
@@ -90,7 +90,7 @@ function makeHarness(): Harness {
   const l = listing();
   const streams: Record<string, OrchestrationEvent[]> = { su: [], A: [] };
   const sent: Record<string, string[]> = { su: [], A: [] };
-  const envelopes: { roleId: string; event: OrchestrationEvent }[] = [];
+  const envelopes: { roleId: string; event: import("../../app/desktop/session.ts").DesktopOrchestrationEvent }[] = [];
   const roleStates: RoleStateSnapshot[] = [];
   const openCalls: string[] = [];
   const stopped: Record<string, boolean> = {};
@@ -247,7 +247,7 @@ test("L-1 失败语义不变：排队消息投递失败 ⇒ 如实系统行（�
   await tick(150);
   assert.deepEqual(h.sent.A, ["第一条"], "投递失败：未送达");
   const note = h.envelopes.find(
-    (e) => e.event.kind === "tool_call" && /排队消息投递失败（角色 A）/.test(e.event.summary)
+    (e) => e.event.kind === "message" && (e.event.detail as {source?: string} | undefined)?.source === "delivery-note" && /排队消息投递失败（角色 A）/.test(e.event.summary)
   );
   assert.ok(note, "**如实系统行**（不静默）");
   assert.ok(/未丢弃/.test(note!.event.summary) && /重试/.test(note!.event.summary), "说明「未丢弃 + 待重试」");
@@ -295,7 +295,7 @@ test("状态准确性（复现 vs 修后）：投递开跑的后台轮次——�
   // 并发投递修正（同轮）：多个触发点（回交入队 + settled 放行）竞争时，串行门保证不重复开启、不误报。
   assert.equal(h.openCalls.filter((r) => r === "su").length, 1, "su 只应被自动开启 **一次**（旧缺陷：双 drain 并发 ⇒ 开两个会话）");
   assert.equal(
-    h.envelopes.filter((e) => e.event.kind === "tool_call" && /形状不符/.test(e.event.summary)).length,
+    h.envelopes.filter((e) => e.event.kind === "message" && (e.event.detail as {source?: string} | undefined)?.source === "delivery-note" && /形状不符/.test(e.event.summary)).length,
     0,
     "不得误报「投递条目形状不符」（旧缺陷：双 drain 抢同一队列 shift 出 undefined）"
   );

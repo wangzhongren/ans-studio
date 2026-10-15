@@ -8,3 +8,5 @@
 
 2026-10-14 X1S：API 地址选中值 trim 后空白 -> 官方默认；显式空白覆盖环境，显式非空优先，required model/key 和 URL 安全检查保持。当前安装库自有16/16、全仓tsc0。已读取装配稳定CLI探针通过的原证据，运输未变不重复probe；当前源码/测试组合a1c40099de0496efa8452aacf3f944fc462bdb90ac3c185421b88161bc642ede，详见fix记录。
 
+
+2026-10-15 Codex-A-1：固定本角色实施A4/C2.tp1 consumer r2；批准13/Core14均MATCH。生产仅session.ts，自有session.test.ts；22/22，实际命令6/6，pinned CLI0.162.1+realMCP本地假SSE回环绿，外部模型0。最终全仓typecheck0。候选/依赖与复跑脚本见docs/change/2026-10-15_change_tool-display-projection.md；不触protocol/config/他人文件。

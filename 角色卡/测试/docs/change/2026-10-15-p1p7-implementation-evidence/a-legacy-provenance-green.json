@@ -1,0 +1,9 @@
+{
+  "command": "node --test --test-name-pattern='legacy: protected native-only' test/测试/p1p7-tool-display-integration.test.ts",
+  "coverage": "Original target/status provenance assertions retained; added real oversized native timestamp omission assertion, original log unchanged/template target/process not promoted.",
+  "chunk_id": "5e79d5",
+  "wall_time_seconds": 0.054353458,
+  "exit_code": 0,
+  "original_token_count": 69,
+  "output": "✔ independent A legacy: protected native-only history preserves classification and target provenance without promoting template execution facts (7.131291ms)\nℹ tests 1\nℹ suites 0\nℹ pass 1\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 144.197083\n"
+}

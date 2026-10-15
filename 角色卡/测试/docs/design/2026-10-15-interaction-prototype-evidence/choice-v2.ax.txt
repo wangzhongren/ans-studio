@@ -1,0 +1,87 @@
+Browser tab: 5, Title: "ANS 完整工作流程 · 设计原型 v2", URL: "http://127.0.0.1:8766/2026-10-15_design_desktop-complete-flow-prototype.html".
+1 AXWebArea ANS 完整工作流程 · 设计原型 v2, URL: 127.0.0.1:8766/2026-10-15_design_desktop-complete-flow-prototype.html
+	2 text ANS · 从导入到拿到成果 · v2
+	3 text 设计原型 / 全部模拟。不会导入真实文件夹、保存配置、派发任务、执行命令或连接模型。演示控制与产品界面分开。画布按原尺寸展示，窄预览区可横向滚动。
+	4 container
+		5 text 画布
+		6 pop up button (collapsed, settable) 画布, Value: 1360 × 860, ID: demo-size, Secondary Actions: Expand
+			7 menu
+				8 (selected) 1360 × 860
+				9 960 × 620
+	10 container
+		11 text 演示起点
+		12 pop up button (collapsed, settable) 演示起点, Value: 普通聊天 · 待选择, ID: demo-stage, Secondary Actions: Expand
+			13 menu
+				14 首次打开
+				15 导入后缺配置
+				16 已导入 / 字段齐备
+				17 会话已开启
+				18 普通聊天
+				19 正式派发记录
+				20 (selected) 普通聊天 · 待选择
+				21 正式任务 · 权限确认（未亲测模拟）
+				22 运行与排队
+				23 停止受理 · 等待收尾
+				24 收到回交成果
+				25 运行失败
+				26 发送失败
+				27 旧历史字段未保存
+				28 报告读取失败
+	29 button 模拟下一事件, ID: demo-next
+	30 button 重置演示, ID: demo-reset
+	31 container Description: ANS 演示工作台, ID: app
+		32 container
+			33 text ANS
+			34 button Description: 角色资料与队列, ID: open-info
+			35 button Description: Pi 设置, ID: open-settings
+		36 container
+			37 text 项目
+			38 button 切换项目, ID: import
+			59 container project-context
+				60 text p-limit · 演示项目
+				61 text /演示项目/p-limit
+			39 text 角色
+			62 container roles
+				63 text 主入口
+				64 button su 统筹需求与正式派发 待选择
+					65 text su
+					66 text 统筹需求与正式派发
+					67 text 待选择
+				68 text 项目角色
+				69 button 测试 测试与结果报告 未开启
+					70 text 测试
+					71 text 测试与结果报告
+					72 text 未开启
+				73 button 维护 项目维护 未开启
+					74 text 维护
+					75 text 项目维护
+					76 text 未开启
+		40 container
+			77 text su
+			42 text 引擎
+			43 combo box (collapsed) Description: 会话引擎，当前 Pi, Value: Pi, ID: engine, Secondary Actions: Expand
+				78 text Pi
+			79 text 模型上下文：新会话（演示），未恢复之前的模型上下文 · 写入仍受角色边界约束
+			46 container chat
+				80 text 我想先选择查看方式，不写文件，不派发任务。
+				81 container confirmation
+					82 text 选择查看方式
+					83 text 等待选择
+					84 text 只选择显示方式，不写文件，不派发任务。
+					85 container 查看方式
+						86 text 查看方式
+						87 radio button (settable, integer) Description: 查看摘要, Value: 0
+						88 radio button (settable, integer) Description: 查看完整记录, Value: 0
+					89 button (disabled) 提交选择
+					90 button 取消
+					91 text 模拟普通聊天 request_choice；不是文件写入许可，也不是任务完成。
+			92 button 有 1 条待处理 · 定位, ID: pending-locate
+			51 button Description: 添加图片（演示）, ID: attach
+			52 text entry area (settable) Description: 消息草稿, ID: message
+			53 button Description: 发送消息, ID: send
+	55 container
+		56 text 当前是设计草稿，实际桌面问题以规范中的证据范围为准。完整说明：
+		57 link Description: 问题、方案与验证记录, Value: 127.0.0.1:8766/2026-10-15_design_desktop-complete-flow.md
+		58 text 。顶部“模拟下一事件”仅推进演示事件，不是正式产品按钮。
+
+The focused UI element is 12 pop up button (collapsed, settable) 演示起点, Value: 普通聊天 · 待选择, ID: demo-stage, Secondary Actions: Expand

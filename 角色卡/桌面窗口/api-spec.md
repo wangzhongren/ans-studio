@@ -90,3 +90,35 @@ ANS历史 ReplayRow 增可选 `input?:PromptInputEventDetail`。仅 source=promp
 session:operator-request 的 OperatorRequestPayload 增可选turnId/toolCallId，来自原CustomerInputMetadata非空字段；已有id仍是答复pending键，不冒充模型callId。原signal、scope、请求快照、取消及过期机制不变。main/preload通道透明转发，无新增IPC。恢复提示没有本批新增生命周期字段。证据见[窗口修复](docs/fix/2026-10-15_fix_duplicate-display-identity.md)。
 
 工具历史 activity.phase 可含 call/start/blocked/result。显式 canonical detail.phase 三值优先；无显式值时按原eventKind映射tool_call→start、accepted→result、denied→blocked。legacy native toolResult仍result，同call blocked与failed result不得互吞，原日志不改。
+
+## B2 受限文档只读（WINDOW-B-1）
+
+`listProject`兼容增加documentScope?与documentReadUnavailable?，每role增加documents?。主进程原生pick成功建立当前窗口grant，renderer直接listProject不授权；同窗口重载保grant，关闭清空。新`desktop.readProjectDocument({version:1,projectViewId,documentId})`→`project:document-read`，返回Model唯一ReadProjectDocumentResult，无root/path/URL入参。PROJECT_NOT_GRANTED是未原生选择的原因细分，不扩大读权。`disposeProjectDocuments`仅main内部关窗调用，preload不暴露。
+
+公开类型`src/model/project-document.ts`，分层入口`createProjectDocumentReader`。cardPath/changelogPath为项目相对，候选docs.path是角色卡目录相对（docs/x.md）；对UI已发ref.relativePath为项目相对，仅展示，读取只用opaque ID。支持范围md/txt UTF8≤262144原始字节、NUL/超限/不合法编码失败无partialtext，平台/句柄与scope失效按完整error union消费。现只窗口接口实现，UI静态阅读后接，验证见[实施记录](docs/change/2026-10-15_change_restricted-document-read.md)。
+
+B导入提交时机修复（WINDOW-B-FIX-1）：原生选择和beginListing为pending，成功updateListing才提交active scope/refs。选择后枚举失败或取消保留原项目阅读；成功导入未授权项目也撤旧scope并报PROJECT_NOT_GRANTED。Pipeline内部cancelNativeSelection只清待选授权与迟到token，不新增renderer IPC。详见docs/fix/2026-10-15_fix_document-scope-import-commit.md。
+
+## A4 / C2 text_policy_revision 1（WINDOW-A/C-1实际接口）
+
+SessionEventEnvelope.event为DesktopOrchestrationEvent：工具SessionEvent已经上游保护；源handback只`summary/report?/liveReport?/reportPersistence?`，无rawhandback。raw业务对象/原模型交接不进IPC；新C输入/交接详情只Core安全copy，标签“交接内容（安全显示副本）”，flags为Model RuntimeInputTextProjectionV1，modelInputRecorded:false不等于完整native转录。回交queue.full/running.full仅safe copy或等待占位。
+
+历史activity.display为Model ToolDisplayV1；ReplayRow兼容新增inputProvenance/inputPresentation/inputTextProjection、deliveryReceipt/deliveryBoundary，SessionHistoryView可含reports/reportErrors/projection。目标继承取安全display.target，确认卡可信turn/call可直接给request/conclusion；旧Pi native-only经现parser中立转换→Pipeline纯保护，raw rows/source/error不侧带IPC。哈希helper两端统一legacy-anchor-v1:SHA256，不改真实call/turn。
+
+| preload方法 | IPC | ID字段 |
+| --- | --- | --- |
+| retryReportSave | report:retry-save | reportId |
+| getReportSaveState | report:get-save-state | reportId |
+| retryDeliveryHistorySave | delivery:retry-history-save | attemptId |
+| getDeliveryReceipt | delivery:get-receipt | attemptId |
+| getSessionPersistence | session:get-persistence | 无 |
+
+每请求含version:1/projectRoot/roleId/runtime及表中ID，不接正文/路径/持久布尔；实际当前导入scope、原绑定handle和已登记ID核对。返回PersistenceReply<T>外层ok只说明受限调用完成，value为Core对应ReportSaveResultV1/ReportSaveStateV1/DeliverySaveResultV1/DeliveryReceiptQueryV1或能力快照；value自己的ok/state仍须判定。mode unknown-live即使proxy方法存在也reportSaveSupported/deliveryHistorySaveSupported/querySupported全false。disabled能力入口可存在，具体retryAvailable以Core ID状态为准。
+
+onReportPersistenceUpdated/onDeliveryHistoryUpdated订阅report-persistence-updated/delivery-history-updated并返回取消函数；payload{version:1,scope:{projectRoot,roleId,runtime},change:Core RuntimePersistenceChangeV1相应分支}。原handle闭包守卫与dispose退订；状态只更新原卡，Window唯一同步归并器负责首次saved业务一次入队，Pipeline没有另一条enqueue。查询不写入不prompt；保存同ID单在途无timer，target补存绝不Provider，source仅保存成功可首次继续回交。最终receipt缺失不得推saved；过期/未知/可能开始禁止自动重投。精确证据见[实施记录](docs/change/2026-10-15_change_complete-flow-window-ac.md)。
+
+A4 legacy provenance窄修：protected工具t.statusSource/target.source分别原样输出legacyStatusSource/legacyTargetSource，缺失不猜；每protected row.metadataOmissions透传为ReplayRow.metadataOmissions，类型直接引用Model RuntimeProtectedLegacyHistoryEntryV1[metadataOmissions]，允许timestamp/anchor-token/oversize-identity。UI可标真实来源/省略原因，不从原文推导。模板target/process仍不恢复。证据见docs/fix/2026-10-15_fix_legacy-projection-provenance.md。
+
+## 停止轮次的SendResult事实快照（WINDOW-STOP-TERMINAL-FIX-1）
+
+既有sendSession透明返回兼容可选turnId/clientMessageId/inputAccepted:true/outcome/sessionCurrent。turnId仅原调用ACK，inputAccepted仅同actualturn typed prompt-input已观察，outcome仅公开settled.detail.outcome首有效enum；无证据缺席。不解析错误文案、不等终态、不新IPC/Model。sessionCurrent是返回时原entry仍当前，不代表provider清理完成；false不等于没有新的当前会话。先拒后终态时UI经现session:event按actualturn+clientID合并，返回快照不被迟到事件修改；同client异turn不能互借。真正failed/timed_out与未接受输入的错误/草稿处理仍由真实事实决定，不将stop请求当完成。证据见[停止收口修复](docs/fix/2026-10-15_fix_stop-terminal-send-facts.md)。

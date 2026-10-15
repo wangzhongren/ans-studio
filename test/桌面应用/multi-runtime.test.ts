@@ -174,6 +174,7 @@ for (const runtime of ["demo", "pi", "codex", "claude"] as const) {
     const calls: RuntimeProviderOptions[] = [];
     let context: RuntimeContextSource = "fresh";
     const factory: RuntimeProviderFactory = (options) => {
+      options.registerToolDisplayProfile?.({ credentials: [] });
       calls.push(options);
       return { async composeContext() { return { systemPrompt: "" }; }, async bindRole() {
         const events = queue<SessionEvent>();
@@ -501,7 +502,7 @@ test("D1R2 actual Pipeline/Service returns original client IDs and real distinct
   const temp = fixture();
   const events: SessionEventEnvelope[] = [];
   const releases: (() => void)[] = [];
-  const factory: RuntimeProviderFactory = (options) => ({
+  const factory: RuntimeProviderFactory = (options) => (options.registerToolDisplayProfile?.({ credentials: [] }), {
     async composeContext() { return { systemPrompt: "" }; },
     async bindRole(role) {
       let promptCount = 0;
@@ -546,7 +547,7 @@ test("D1R2 actual ack preserves a failed delayed terminal and the next aborted o
   const terminalGate = new Promise<void>((resolve) => { releaseTerminal = resolve; });
   let terminalPaused = false;
   let releaseNative: (() => void) | undefined;
-  const provider: RuntimeProviderFactory = (options) => ({
+  const provider: RuntimeProviderFactory = (options) => (options.registerToolDisplayProfile?.({ credentials: [] }), {
     async composeContext() { return { systemPrompt: "" }; },
     async bindRole(role) {
       const stream = queue<SessionEvent>();
@@ -689,4 +690,109 @@ test("history preserves canonical start/blocked/result phases for the same faile
     assert.ok(history.rows.every(row => row.activity?.turnId === "actual-turn" && row.activity.toolCallId === "actual-call"));
     assert.equal(history.rows[0].anchor, "request", "canonical start preserves request anchor");
   } finally { temp.cleanup(); }
+});
+
+test('A native-only Pi fallback stays readable through pure protected projection without raw anchor or template facts',async()=>{
+ const temp=fixture();const key='ANS_WINDOW_LEGACY_FAKE_'+Date.now();const secret='legacy-fixture-secret-unique';process.env[key]=secret;
+ const dir=path.join(temp.root,'.ans','sessions','A');fs.mkdirSync(dir,{recursive:true});
+ const title='request '+secret;const file=path.join(dir,'legacy.jsonl');
+ const raw=[{type:'session',id:'legacy'},
+  {type:'message',timestamp:'2026-10-15T01:00:00Z',message:{role:'user',content:'user '+secret}},
+  {type:'message',timestamp:'2026-10-15T01:00:01Z',message:{role:'assistant',content:[{type:'text',text:'answer '+secret},{type:'toolCall',id:'native-call',name:'request_confirmation',arguments:{title}}]}},
+  {type:'message',timestamp:'2026-10-15T01:00:02Z',message:{role:'toolResult',toolCallId:'native-call',toolName:'request_confirmation',isError:true,content:[{type:'text',text:'failure '+secret}]}},
+  {type:'message',timestamp:'2026-10-15T01:00:03Z',message:{role:'toolResult',toolCallId:'template-call',toolName:'run_shell',isError:false,content:[{type:'text',text:'run_shell 已执行：pretend command（exit 9）'}]}}
+ ].map(entry=>JSON.stringify(entry)).join('\n')+'\n';fs.writeFileSync(file,raw);
+ try{
+  const history=await getSessionHistory({projectRoot:temp.root,roleId:'A',runtime:'pi'},{credentialEnvNames:[key]});
+  assert.equal(history.error,null);assert.equal(history.rows.length,5);assert.equal(JSON.stringify(history).includes(secret),false);
+  assert.ok(history.rows[0].text.includes('[REDACTED]'));
+  const call=history.rows.find(r=>r.anchor==='request')!,result=history.rows.find(r=>r.anchor==='conclusion')!;
+  assert.match(call.anchorKey!,/^legacy-anchor-v1:[0-9a-f]{64}$/);assert.equal(call.anchorKey,result.anchorKey);assert.equal(call.requestId,'native-call');assert.equal(result.requestId,'native-call');
+  assert.equal(Object.hasOwn(call,'turnId'),false);assert.equal(Object.hasOwn(result,'turnId'),false,'native call ID never fabricates a Core turn');
+  const template=history.rows.at(-1)!;assert.equal(template.activity?.target,'');assert.equal(template.activity?.display?.process,undefined,'old template text is readable but never becomes execution facts');
+  assert.equal(fs.readFileSync(file,'utf8'),raw);
+ }finally{delete process.env[key];temp.cleanup();}
+});
+
+test('A legacy provenance and authoritative metadata omissions survive the protected Window mapping',async()=>{
+ const temp=fixture();const key='ANS_WINDOW_METADATA_FAKE_'+Date.now();const protectedTimestamp='2026-10-15T01:00:00.000Z';process.env[key]=protectedTimestamp;
+ const dir=path.join(temp.root,'.ans','sessions','A');fs.mkdirSync(dir,{recursive:true});const file=path.join(dir,'legacy-provenance.jsonl');
+ const raw=[{type:'session',id:'provenance'},
+ {type:'message',timestamp:protectedTimestamp,message:{role:'user',content:'ordinary text with protected timestamp metadata'}},
+ {type:'message',timestamp:'2026-10-15T01:00:01Z',message:{role:'assistant',content:[{type:'toolCall',id:'read-call',name:'read_file',arguments:{path:'docs/kept.md'}}]}},
+ {type:'message',timestamp:'2026-10-15T01:00:02Z',message:{role:'toolResult',toolCallId:'read-call',toolName:'read_file',isError:false,content:[{type:'text',text:'old readable result'}]}},
+ {type:'message',timestamp:'2026-10-15T01:00:03Z',message:{role:'toolResult',toolCallId:'template-only',toolName:'run_shell',isError:false,content:[{type:'text',text:'run_shell 已执行：template command（exit 7）'}]}},
+ {type:'message',timestamp:'2026-10-15T01:00:04Z',message:{role:'assistant',content:[{type:'toolCall',id:'x'.repeat(70000),name:'read_file',arguments:{path:'docs/oversize.md'}}]}},
+ ].map(entry=>JSON.stringify(entry)).join('\n')+'\n';fs.writeFileSync(file,raw);
+ try{
+  const view=await getSessionHistory({projectRoot:temp.root,roleId:'A',runtime:'pi'},{credentialEnvNames:[key]});assert.equal(view.error,null);
+  const result=view.rows.find(row=>row.activity?.toolName==='read_file'&&row.activity.phase==='result')!;
+  assert.equal(result.activity?.target,'docs/kept.md');assert.equal(result.legacyTargetSource,'same-call');assert.equal(result.legacyStatusSource,'native-result');
+  const shell=view.rows.find(row=>row.activity?.toolName==='run_shell')!;assert.equal(shell.activity?.status,'failed');assert.equal(shell.legacyStatusSource,'legacy-classifier');assert.equal(shell.legacyTargetSource,undefined);assert.equal(shell.activity?.target,'');assert.equal(shell.activity?.display?.process,undefined);
+  assert.ok(view.rows.some(row=>row.metadataOmissions?.includes('timestamp')),'the projector—not Window inference—reports omitted protected timestamps');
+  assert.ok(view.rows.some(row=>row.metadataOmissions?.includes('oversize-identity')),'oversized native identity diagnostics preserve the public omission flag');
+  assert.equal(JSON.stringify(view).includes(protectedTimestamp),false);assert.equal(fs.readFileSync(file,'utf8'),raw);
+ }finally{delete process.env[key];temp.cleanup();}
+});
+
+test('stop send facts use the original ACK/input/terminal, never the rejection text, and keep the current session',async()=>{
+ for(const outcome of ['aborted','failed','timed_out'] as const){const current=harness();try{await current.manager.open({projectRoot:'/one',roleId:'A',runtime:'codex'});const source=current.opened[0];let prompts=0;
+ source.handle.send=async(_text,opts)=>{prompts++;const turnId='fact-'+outcome;opts?.onTurnStarted?.({turnId,roleId:'A',runtime:'codex'});source.stream.push({kind:'message',summary:'not used for classification',roleId:'A',runtime:'codex',turnId,detail:{source:'prompt-input',text:'actual accepted input'}});source.stream.push({kind:'settled',summary:'also not used',roleId:'A',runtime:'codex',turnId,detail:{outcome}});await until(()=>current.envelopes.some(e=>e.event.kind==='settled'&&e.event.turnId===turnId));throw new Error('same opaque failure for every outcome');};
+ const result=await current.manager.send('input',undefined,undefined,{clientMessageId:'client'});assert.equal(result.ok,false);assert.equal(result.turnId,'fact-'+outcome);assert.equal(result.clientMessageId,'client');assert.equal(result.inputAccepted,true);assert.equal(result.outcome,outcome);assert.equal(result.sessionCurrent,true);assert.equal(prompts,1);
+ assert.equal((await current.manager.open({projectRoot:'/one',roleId:'A',runtime:'codex'})).resumed,true,'a rejected turn does not dispose the actual handle');
+ }finally{await current.manager.stop();}}
+});
+
+test('send rejection before public events remains unknown; later same-client different turns do not borrow outcomes',async()=>{
+ const current=harness();try{await current.manager.open({projectRoot:'/one',roleId:'A',runtime:'codex'});const source=current.opened[0];let calls=0;
+ source.handle.send=async(_text,opts)=>{calls++;opts?.onTurnStarted?.({turnId:'turn-'+calls,roleId:'A',runtime:'codex'});throw new Error('opaque');};
+ const first=await current.manager.send('same',undefined,undefined,{clientMessageId:'reused-client'});assert.equal(first.turnId,'turn-1');assert.equal(first.sessionCurrent,true);assert.equal(Object.hasOwn(first,'inputAccepted'),false);assert.equal(Object.hasOwn(first,'outcome'),false,'no waiting or guessing after early rejection');
+ const second=await current.manager.send('same',undefined,undefined,{clientMessageId:'reused-client'});assert.equal(second.turnId,'turn-2');
+ source.stream.push({kind:'message',summary:'old accepted',roleId:'A',runtime:'codex',turnId:'turn-1',detail:{source:'prompt-input',text:'same'}});source.stream.push({kind:'settled',summary:'late old abort',roleId:'A',runtime:'codex',turnId:'turn-1',detail:{outcome:'aborted'}});
+ source.stream.push({kind:'settled',summary:'new timeout',roleId:'A',runtime:'codex',turnId:'turn-2',detail:{outcome:'timed_out'}});
+ await until(()=>current.envelopes.some(e=>e.event.summary==='new timeout'));assert.equal(Object.hasOwn(first,'outcome'),false);assert.equal(Object.hasOwn(second,'outcome'),false,'returned snapshots are not mutated by late events');
+ const terminals=current.envelopes.filter(e=>e.event.kind==='settled');assert.deepEqual(terminals.map(e=>[e.clientMessageId,e.event.kind!=='handback'&&e.event.turnId,(e.event as SessionEvent).detail]),[['reused-client','turn-1',{outcome:'aborted'}],['reused-client','turn-2',{outcome:'timed_out'}]]);assert.equal(calls,2);
+ }finally{await current.manager.stop();}
+});
+
+test('no ACK and mismatched/unknown terminal metadata cannot manufacture accepted input or a stop outcome',async()=>{
+ const current=harness();try{await current.manager.open({projectRoot:'/one',roleId:'A',runtime:'codex'});const source=current.opened[0];
+ source.handle.send=async()=>{source.stream.push({kind:'message',summary:'本轮已中止 用户指令：looks accepted',turnId:'unacknowledged',detail:{source:'prompt-input',text:'text'}});source.stream.push({kind:'settled',summary:'本轮已中止',turnId:'unacknowledged',detail:{outcome:'aborted'}});await until(()=>current.envelopes.some(e=>e.event.kind==='settled'));throw new Error('AbortError 本轮已中止');};
+ const result=await current.manager.send('text',undefined,undefined,{clientMessageId:'not-started'});assert.equal(result.sessionCurrent,true);for(const field of ['turnId','inputAccepted','outcome'])assert.equal(Object.hasOwn(result,field),false,field);
+ }finally{await current.manager.stop();}
+});
+
+test('send result reports the original handle is no longer current after replacement while its turn rejects',async()=>{
+ const current=harness();try{await current.manager.open({projectRoot:'/one',roleId:'A',runtime:'codex'});const source=current.opened[0];let release!:()=>void;
+ source.handle.send=async(_text,opts)=>{opts?.onTurnStarted?.({turnId:'old-handle-turn',roleId:'A',runtime:'codex'});await new Promise<void>(r=>{release=r});throw new Error('opaque old failure');};
+ const pending=current.manager.send('text',undefined,undefined,{clientMessageId:'old'});await until(()=>!!release);await current.manager.stop({projectRoot:'/one',roleId:'A',runtime:'codex'});await current.manager.open({projectRoot:'/one',roleId:'A',runtime:'codex'});release();const result=await pending;assert.equal(result.turnId,'old-handle-turn');assert.equal(result.sessionCurrent,false);assert.equal(Object.hasOwn(result,'outcome'),false);
+ }finally{await current.manager.stop();}
+});
+
+test('actual Core request_choice abort preserves accepted/current facts, expires the old decision and allows one explicit next prompt',async()=>{
+ const temp=fixture();const envelopes:SessionEventEnvelope[]=[];const requests:OperatorRequestPayload[]=[];
+ const channel=createCustomerInputChannel({operatorId:'stop-test',presenter:request=>requests.push(request)});let prompts=0,firstFinished=false;
+ const provider:RuntimeProviderFactory=options=>{options.registerToolDisplayProfile?.({credentials:[]});return {async composeContext(){return {systemPrompt:''}},async bindRole(role){const stream=queue<SessionEvent>();return {runtime:options.runtime,async prompt(){prompts++;const turnId=options.currentTurnId();try{if(prompts===1){const choice=options.tools.find(tool=>tool.name==='request_choice')!;assert.ok(choice);await choice.handler({name:'request_choice',toolCallId:'actual-stop-choice',args:{title:'controlled stop choice',options:[{id:'one',label:'One'},{id:'two',label:'Two'}]}});}stream.push({kind:'settled',summary:'native done',runtime:options.runtime,roleId:role.id,turnId,detail:{outcome:'completed'}});}finally{if(prompts===1)firstFinished=true;}},events:()=>stream.events(),async abort(){},async dispose(){stream.close();}};}}};
+ const desktop=createDesktopInterface({pickDirectory:async()=>null,emitEvent:event=>envelopes.push(event),customerInput:channel.customerInput,envFilePath:temp.envPath,piConfigEnv:{},runtimeOptions:{providerFactories:{codex:provider}},openRoleSessionFn:(input,deps)=>openRoleSession({...input,autoRepin:false},deps)});
+ try{await desktop.listProject({projectRoot:temp.root});assert.equal((await desktop.openSession({projectRoot:temp.root,roleId:'su',runtime:'codex'})).ok,true);
+ const pending=desktop.sendSession({text:'first explicit prompt',metadata:{clientMessageId:'actual-stop'}});await until(()=>requests.length===1);assert.equal((await desktop.abortSession({projectRoot:temp.root,roleId:'su',runtime:'codex'})).ok,true);
+ const result=await pending;await until(()=>envelopes.some(e=>e.event.kind==='settled'&&e.clientMessageId==='actual-stop'));
+ const terminal=envelopes.find(e=>e.event.kind==='settled'&&e.clientMessageId==='actual-stop')!;assert.equal((terminal.event as SessionEvent).detail && ((terminal.event as SessionEvent).detail as {outcome:string}).outcome,'aborted');assert.equal(result.inputAccepted,true);assert.equal(result.sessionCurrent,true);assert.equal(result.turnId,terminal.event.kind!=='handback'&&terminal.event.turnId);if(result.outcome!==undefined)assert.equal(result.outcome,'aborted');
+ assert.equal(channel.respond({id:requests[0].id,decision:{kind:'choice',selected:['one']}}).expired,true);await until(()=>firstFinished);assert.equal(prompts,1,'stop never repeats the model input');
+ assert.equal((await desktop.sendSession({text:'second explicit prompt',metadata:{clientMessageId:'after-stop'}})).ok,true);assert.equal(prompts,2);assert.equal((await desktop.openSession({projectRoot:temp.root,roleId:'su',runtime:'codex'})).resumed,true);
+ }finally{await desktop.stopSession();desktop.disposeProjectDocuments();channel.rejectAllPending('cleanup');temp.cleanup();}
+});
+
+test('same client IDs across sequential actual turns retain separate first public outcomes',async()=>{
+ const current=harness();try{await current.manager.open({projectRoot:'/one',roleId:'A',runtime:'codex'});const source=current.opened[0];let calls=0;
+ source.handle.send=async(_text,opts)=>{const index=++calls;const turnId='sequential-'+index;opts?.onTurnStarted?.({turnId,roleId:'A',runtime:'codex'});source.stream.push({kind:'message',summary:'input',turnId,detail:{source:'prompt-input',text:'same'}});source.stream.push({kind:'settled',summary:'authoritative first '+index,turnId,detail:{outcome:index===1?'aborted':'completed'}});source.stream.push({kind:'settled',summary:'duplicate '+index,turnId,detail:{outcome:'failed'}});await until(()=>current.envelopes.some(e=>e.event.summary==='duplicate '+index));throw new Error('same opaque rejection');};
+ const first=await current.manager.send('same',undefined,undefined,{clientMessageId:'same-client'});const second=await current.manager.send('same',undefined,undefined,{clientMessageId:'same-client'});assert.equal(first.outcome,'aborted');assert.equal(second.outcome,'completed');assert.equal(first.inputAccepted,true);assert.equal(second.inputAccepted,true);assert.notEqual(first.turnId,second.turnId);assert.equal(calls,2);
+ }finally{await current.manager.stop();}
+});
+
+test('foreign scope terminal and typed input cannot lend facts to a correctly acknowledged turn',async()=>{
+ const current=harness();try{await current.manager.open({projectRoot:'/one',roleId:'A',runtime:'codex'});const source=current.opened[0];
+ source.handle.send=async(_text,opts)=>{opts?.onTurnStarted?.({turnId:'claimed',roleId:'A',runtime:'codex'});source.stream.push({kind:'message',summary:'foreign accepted',turnId:'claimed',roleId:'B',runtime:'codex',detail:{source:'prompt-input',text:'text'}});source.stream.push({kind:'settled',summary:'foreign terminal',turnId:'claimed',roleId:'A',runtime:'pi',detail:{outcome:'aborted'}});await until(()=>current.envelopes.some(e=>e.event.summary==='foreign terminal'));throw new Error('opaque');};
+ const result=await current.manager.send('text',undefined,undefined,{clientMessageId:'client'});assert.equal(result.turnId,'claimed');assert.equal(Object.hasOwn(result,'inputAccepted'),false);assert.equal(Object.hasOwn(result,'outcome'),false);assert.ok(current.envelopes.filter(e=>e.event.summary.startsWith('foreign')).every(e=>e.clientMessageId===undefined));
+ }finally{await current.manager.stop();}
 });

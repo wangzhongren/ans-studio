@@ -1,0 +1,9 @@
+{
+  "command": "node --test --test-name-pattern='legacy: protected native-only' test/测试/p1p7-tool-display-integration.test.ts",
+  "classification": "UI caller found Window dropping existing protected legacy statusSource and target.source; root independently reproduced via real native-only parser/Pipeline/Core/Window. No raw log rewrite and no template process facts requested.",
+  "chunk_id": "8f5c43",
+  "wall_time_seconds": 0.202711542,
+  "exit_code": 1,
+  "original_token_count": 288,
+  "output": "✖ independent A legacy: protected native-only history preserves classification and target provenance without promoting template execution facts (6.421709ms)\nℹ tests 1\nℹ suites 0\nℹ pass 0\nℹ fail 1\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 301.745083\n\n✖ failing tests:\n\ntest at test/测试/p1p7-tool-display-integration.test.ts:180:1\n✖ independent A legacy: protected native-only history preserves classification and target provenance without promoting template execution facts (6.421709ms)\n  AssertionError [ERR_ASSERTION]: a retained target keeps the public parser provenance\n  + actual - expected\n  \n  + undefined\n  - 'same-call'\n  \n      at TestContext.<anonymous> (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%B5%8B%E8%AF%95/p1p7-tool-display-integration.test.ts:198:12)\n      at async Test.run (node:internal/test_runner/test:1125:7)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    expected: 'same-call',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n"
+}

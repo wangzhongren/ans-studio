@@ -441,7 +441,7 @@ test("T17 主入口角色一轮结束（settled）→ 触发 emitProjectChanged�
 // ————— T20：会话事件外推放宽到编排事件——handback 被 Interface 层外推（设计 §10.8）—————
 
 test("T20 handback 事件被外推：Interface 层的 emitEvent 收到编排的 handback 事件（类型已放宽到 OrchestrationEvent）", async () => {
-  const events: OrchestrationEvent[] = [];
+  const events: import("../../app/desktop/session.ts").DesktopOrchestrationEvent[] = [];
   const handback: TaskHandback = {
     roleId: "A",
     status: "blocked",
@@ -450,7 +450,7 @@ test("T20 handback 事件被外推：Interface 层的 emitEvent 收到编排的 
     at: "2026-10-11T00:00:00.000Z",
   };
   const seq: OrchestrationEvent[] = [
-    { kind: "handback", summary: "回交 su：被拦下", handback },
+    { kind: "handback", summary: "回交 su：被拦下", handback, liveReport: { source: { roleId: handback.roleId }, taskId: handback.taskId ?? null, status: handback.status, summary: { text: handback.summary, truncated: false, redacted: false }, evidence: handback.evidence.map(text => ({ text, truncated: false, redacted: false })), evidenceOmitted: 0, at: handback.at } },
     { kind: "settled", summary: "会话结束" },
   ];
   const iface = createDesktopInterface({
@@ -486,7 +486,7 @@ test("T20 handback 事件被外推：Interface 层的 emitEvent 收到编排的 
   const hb = events.find((e) => e.kind === "handback");
   assert.ok(hb, "handback 事件应经 Interface 的 emitEvent 外推（emitEvent 已放宽到 OrchestrationEvent）");
   assert.equal(
-    (hb as Extract<OrchestrationEvent, { kind: "handback" }>).handback.status,
+    (hb as Extract<import("../../app/desktop/session.ts").DesktopOrchestrationEvent, { kind: "handback" }>).liveReport!.status,
     "blocked",
     "外推的 handback 数据应原样（含 status）",
   );
@@ -566,4 +566,65 @@ test("A-5 customerInput：Interface 透传客户通道；仅内置治理角色�
   const out = await suInput!.customerInput!({ kind: "confirm", title: "要写角色卡吗？" });
   assert.deepEqual(seen, [{ roleId: "su" }], "customerInput 应带 roleId 上下文");
   assert.equal((out as { outcome: string }).outcome, "declined", "替身裁决原样回转");
+});
+
+test('B Interface native picker alone grants document refs; renderer listing, cancel and another window cannot grant', async () => {
+ const fs=await import('node:fs/promises');const os=await import('node:os');
+ const root=await fs.mkdtemp(path.join(os.tmpdir(),'ans-doc-interface-'));
+ await fs.mkdir(path.join(root,'角色卡/A/docs'),{recursive:true});
+ await fs.writeFile(path.join(root,'角色卡/A/role-card.md'),'# card');
+ await fs.writeFile(path.join(root,'角色卡/A/docs/report.md'),'report body');
+ const listing={...FAKE_LISTING,projectRoot:root};
+ let selected:string|null=null;
+ const iface=createDesktopInterface({pickDirectory:async()=>selected,emitEvent:()=>{},listProjectFn:async()=>listing,envFilePath:path.join(root,'absent-fake-env')});
+ const other=createDesktopInterface({pickDirectory:async()=>null,emitEvent:()=>{},listProjectFn:async()=>listing,envFilePath:path.join(root,'absent-fake-env')});
+ try{
+  assert.equal((await iface.listProject({projectRoot:root})).documentReadUnavailable,'PROJECT_NOT_GRANTED');
+  assert.equal(await iface.pickProject(),null);
+  assert.equal((await iface.listProject({projectRoot:root})).documentScope,undefined);
+  selected=root;assert.equal(await iface.pickProject(),root);
+  const view=await iface.listProject({projectRoot:root});assert.ok(view.documentScope);
+  const ref=view.roles[0].documents!.find(d=>d.label==='report.md')!;assert.ok(ref);
+  const request={version:1,projectViewId:ref.projectViewId,documentId:ref.documentId};
+  const content=await iface.readProjectDocument(request);assert.ok(content.ok);if(content.ok)assert.equal(content.text,'report body');
+  assert.equal((await other.listProject({projectRoot:root})).documentScope,undefined);
+  const foreign=await other.readProjectDocument(request);assert.ok(!foreign.ok);if(!foreign.ok)assert.equal(foreign.code,'PROJECT_NOT_GRANTED');
+  const refresh=await iface.listProject({projectRoot:root});assert.equal(refresh.documentScope?.projectViewId,view.documentScope?.projectViewId,'same native-granted window survives renderer reload/list refresh');
+  const forged=await iface.readProjectDocument({...request,projectRoot:root,path:'.env'});assert.ok(!forged.ok);if(!forged.ok)assert.equal(forged.code,'INVALID_REQUEST');
+  iface.disposeProjectDocuments();const closed=await iface.readProjectDocument(request);assert.ok(!closed.ok);if(!closed.ok)assert.equal(closed.code,'PROJECT_NOT_ACTIVE');
+ }finally{iface.disposeProjectDocuments();other.disposeProjectDocuments();await fs.rm(root,{recursive:true,force:true});}
+});
+
+test('B failed listing or native cancel preserves the previous imported document scope',async()=>{
+ const fs=await import('node:fs/promises');const os=await import('node:os');
+ const a=await fs.mkdtemp(path.join(os.tmpdir(),'ans-doc-active-'));const b=await fs.mkdtemp(path.join(os.tmpdir(),'ans-doc-pending-'));
+ await fs.mkdir(path.join(a,'角色卡/A/docs'),{recursive:true});await fs.writeFile(path.join(a,'角色卡/A/role-card.md'),'card');await fs.writeFile(path.join(a,'角色卡/A/docs/report.md'),'active A');
+ let selection:string|null=a;let failB=true;
+ const iface=createDesktopInterface({pickDirectory:async()=>selection,emitEvent:()=>{},envFilePath:path.join(a,'absent-fake-env'),listProjectFn:async root=>{if(root===b&&failB)throw new Error('controlled enumeration failure');return {...FAKE_LISTING,projectRoot:root};}});
+ try{
+  await iface.pickProject();const before=await iface.listProject({projectRoot:a});const ref=before.roles[0].documents!.find(d=>d.label==='report.md')!;const request={version:1,projectViewId:ref.projectViewId,documentId:ref.documentId};
+  selection=b;await iface.pickProject();assert.equal((await iface.readProjectDocument(request)).ok,true);
+  await assert.rejects(iface.listProject({projectRoot:b}),/controlled enumeration failure/);
+  const stillActive=await iface.readProjectDocument(request);assert.ok(stillActive.ok);if(stillActive.ok)assert.equal(stillActive.text,'active A');
+  selection=null;assert.equal(await iface.pickProject(),null);assert.equal((await iface.readProjectDocument(request)).ok,true);
+  failB=false;const next=await iface.listProject({projectRoot:b});assert.equal(next.documentReadUnavailable,'PROJECT_NOT_GRANTED');assert.equal((await iface.readProjectDocument(request)).ok,false,'only successful import changes the active scope');
+ }finally{iface.disposeProjectDocuments();await fs.rm(a,{recursive:true,force:true});await fs.rm(b,{recursive:true,force:true});}
+});
+
+test('C restricted Interface validates current scope and derives support from actual bound mode', async () => {
+ let calls = 0;
+ const handle = makeFakeHandle().handle;
+ handle.retryReportPersistence = async () => { calls++; return { ok: false, state: 'unsupported', code: 'UNSUPPORTED', retryAvailable: false, message: 'safe' }; };
+ handle.getReportPersistence = async () => { calls++; return { state: 'unsupported', code: 'UNSUPPORTED', retryAvailable: false }; };
+ handle.retryDeliveryHistoryPersistence = async () => { calls++; return { ok: false, state: 'unsupported', code: 'UNSUPPORTED', retryAvailable: false, message: 'safe' }; };
+ handle.getDeliveryReceipt = async () => { calls++; return { state: 'unsupported', code: 'UNSUPPORTED', retryAvailable: false }; };
+ const iface = createDesktopInterface({ pickDirectory: async () => null, emitEvent: () => {}, listProjectFn: async () => FAKE_LISTING, openRoleSessionFn: async () => ({ ...handle, persistenceMode: 'unknown-live' }) });
+ try {
+  const scope = { version: 1, projectRoot: '/proj', roleId: 'A', runtime: 'demo' };
+  assert.equal((await iface.getSessionPersistence(scope)).ok, false);
+  await iface.listProject({ projectRoot: '/proj' }); await iface.openSession({ projectRoot: '/proj', roleId: 'A', runtime: 'demo' });
+  const caps = await iface.getSessionPersistence(scope); assert.ok(caps.ok); if (caps.ok) assert.deepEqual(caps.value, { mode: 'unknown-live', reportSaveSupported: false, deliveryHistorySaveSupported: false, querySupported: false });
+  for (const input of [{ ...scope, projectRoot: '/other' }, { ...scope, roleId: 'missing' }, { ...scope, reportId: 'forged', summary: 'raw fake report' }, { ...scope, version: 2 }]) assert.equal((await iface.retryReportSave(input)).ok, false);
+  assert.equal((await iface.retryReportSave({ ...scope, reportId: 'forged' })).ok, false); assert.equal(calls, 0, 'invalid/unknown IDs never invoke even present proxies');
+ } finally { await iface.stopSession(); iface.disposeProjectDocuments(); }
 });

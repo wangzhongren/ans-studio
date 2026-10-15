@@ -1,0 +1,25 @@
+{
+  "reports": [
+    {
+      "name": "same actual turn and outcome denied plus settled has one readable terminal",
+      "value": false
+    },
+    {
+      "name": "same actual turn and outcome denied plus settled has one readable terminal observed",
+      "value": {
+        "chat": "本轮已中止本轮已中止",
+        "assistant": [],
+        "denied": [],
+        "model": {
+          "count": 3,
+          "lastIndex": 2,
+          "operators": [],
+          "rowGap": 16
+        }
+      }
+    }
+  ],
+  "errors": [],
+  "error": "AssertionError [ERR_ASSERTION]: same actual turn and outcome denied plus settled has one readable terminal\n\nfalse !== true\n",
+  "stack": "AssertionError [ERR_ASSERTION]: same actual turn and outcome denied plus settled has one readable terminal\n\nfalse !== true\n\n    at check (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:37:474)\n    at async terminalMergeChecks (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:169:2)\n    at async file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:634:299"
+}

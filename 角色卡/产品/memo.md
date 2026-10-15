@@ -28,3 +28,17 @@
 - 2026-10-14（引擎选择器联合设计首轮）：客户要求产品与UI/UX重新设计下拉框。已读本角色卡/boundary.yaml（无boundary.md）、工程法案与当前renderer。已交[产品简报](docs/design/2026-10-14_design_engine-selector-product-brief.md)：紧凑触发器＋三项自绘列表，已选勾/临时焦点分离，确认才调用既有selectRuntime，取消/Tab/视口/长名完整口径；未导入禁选、空项目可选、缺配主条和设置恢复路径、runtimeViews隔离保持。不操作真实ANS、不实现；待原型第二轮。
 
 - 2026-10-14（引擎选择器第二轮收口）：只读UX最终原型HTML/JS（aab42cf7…）与四张1360/960截图，原型补齐当前值动态ARIA、打开<引擎>设置、同项仅close已逐一核对。产品recommend approval限设计方向，无剩余方向阻塞；键盘动态仅由UX自验、PM转述，非产品亲操。待实施后实际renderer/IPC/隔离、屏读软件/长名/极端高度验收，未实施或真实模型调用。
+
+- 2026-10-15（完整桌面走查首阶段）：亲自CUA真实Electron，HEAD fca8f6b；status-retest普通聊天/三引擎缺配与设置→duplicate-retest su派发回交/测试失败历史/资料文档→960×760窄窗，11张PNG在本角色design证据目录。首单P1失败无原因目标、P2工具明细无命令/ISO碎行、P3成果路径无打开入口为优先；P4内部交接指令/P5空态恢复噪声/P6设置Esc回错入口为P2。未发消息/改env/代码/停止/决定；已释放控制权给root准备pending。详见[走查记录](docs/design/2026-10-15_design_desktop-complete-walkthrough.md)。
+
+- 2026-10-15（真实选择第二阶段）：root仅普通聊天产生UX-WALK-1单选pending；产品亲测点击/Down改选、Tab到提交、资料覆盖后pill关抽屉定位聚焦与下一Tab radio；960缩窗卡落输入区下、定位完整恢复。未最终提交/取消/停止，暂选完整记录、恢复1360×860，已明确释放给UIUX。P7仅待确认信息一致性（抽屉只无队列，不误说队列数据错）；合计15截图。最终决定/权限审批预览、运行中队列、未导入仍未覆盖。
+
+- 2026-10-15（完整流程第二轮收口）：产品独立IAB读v1并操作choice/取消/定位、报告原文阅读/失败/返回、资料文件阅读返回、执行/停止。发现失败后续覆盖草稿、chat保存配置退ready两实质回归，另stop收起详情；UX同轮v2修复。reload最终0ea73a…后实际复核非空保护/空才填、chat+choice保存保状态/草稿/请求、stop保展开/草稿等待收尾、960choice未选禁提交/待选择标签/定位Tab、legacy未保存和报告完成声明；规范3143a45e…本机绑定。recommend approval仅设计方向，无产品方向阻塞。接口前置/生产验证/附件IME屏读及精确滚动未测保留；4原型PNG与15真机分开，已关自身原型标签、不再动ANS。
+
+- 2026-10-15（UXv2确认后的接口产品短评）：只读产品P3/UXv2/Window B2尾部，推荐最小“查看来源角色文档→用户显选B已签ref→正文”，无须本版typed artifact；浏览来源列表不切聊天角色/引擎，不自动选首项，不从evidence赋读权，未知来源/无refs/未grant/不支持平台分因说明。正文↔来源列表↔原回交保持invoker/阅读/草稿。PM须显式让客户知晓一键报告改两步、Windows暂拒读、重启原生重选、可信本地项目而非恶意本地writer沙箱，md/txt256KiB范围；短评不是第三轮设计重做/实施验收。已附同份走查记录。
+
+- 2026-10-15（视觉收敛首轮）：按用户授权产品+UIUX设计，固定产品，仅新design和自身导航。亲操当前394a7abb真实Electron只读：1360报告/资料→960报告→恢复1360并release GUI，3 PNG+AX。目标V1–V5：导航阅读比例、身份/动作/结果层级、报告先声明结论后证据、来源按钮、统一尺度；不代画UX，不改P1P7语义/接口，不发消息或决定。文档revision1待亲审具体原型。见[产品目标](docs/design/2026-10-15_design_visual-convergence-product.md)。
+
+- 2026-10-15（视觉收敛第二轮静态）：具体HTML c575bc45/说明82f8f8b7已读，V1–V5方向符合；静态发现工作概览无场景伪回交、资料→文档→正文→清单丢返回资料，发root待亲点/UX改。本context browsers[]、iab/edge不可用，初始化bundled受信runtime被auto-review以绕过不可用浏览器路径拒绝，遵守不再试替代surface，未打开新tab/动roottab/设置viewport。产品亲审缺口明确不代签，root正常IAB独立点验不归我。当前具体原型需修订，设计未实施。
+
+- 2026-10-15（视觉收敛V2最终静态回签）：实际HTML e95b363d/说明revision2 01bd3347核对，PV-R1 report场景条件/其它空态、PV-R2 docsFromInfo重建backInfo与返回焦点、完整summary与readingStates、缺配状态/清toast均已回应。recommend approval仅具体设计交用户确认；接受424模态暂禁后台、折任务请求、报告优先及504仅缩放演示取舍。不尝试被拒浏览器路径；动态结果归root正常IAB，产品亲审缺口仍保留，不代签、不实施。

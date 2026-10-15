@@ -1,0 +1,41 @@
+{
+  "reports": [
+    {
+      "name": "P7 actual queued response sets current hint",
+      "value": true
+    },
+    {
+      "name": "P7 other role empty queue cannot clear current queued hint",
+      "value": true
+    },
+    {
+      "name": "P7 authoritative empty queue clears current hint but keeps queue history",
+      "value": true
+    },
+    {
+      "name": "P7 newer validation hint survives late queue empty snapshot",
+      "value": true
+    },
+    {
+      "name": "P7 matching actual turn ACK clears only its queued hint",
+      "value": true
+    },
+    {
+      "name": "P7 late queued reply cannot revive hint after matching actual ACK",
+      "value": true
+    },
+    {
+      "name": "P7 expired decision inputs frozen without choosing",
+      "value": true
+    },
+    {
+      "name": "P7 decided answer remains checked and all inputs frozen",
+      "value": true
+    },
+    {
+      "name": "A non-tool terminal stays actual system fact without invented tool target",
+      "value": true
+    }
+  ],
+  "errors": []
+}

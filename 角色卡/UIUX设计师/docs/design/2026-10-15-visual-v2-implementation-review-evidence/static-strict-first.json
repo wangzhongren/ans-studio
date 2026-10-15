@@ -1,0 +1,21 @@
+{
+  "producer": "/root/uiux_visual fixed UIUX",
+  "type": "static in-progress source comparison; no GUI",
+  "files": {
+    "app/renderer/index.html": "2de7f4df5bc3cb4d789b9e54d7fd80100d9dab7d80771b08223d231187589cb5",
+    "app/renderer/styles.css": "1096289e685ac75d3de0ecc9e19ea7ca6c1f7f7f1a707af7bb6a5394fa5af52f",
+    "app/renderer/renderer.js": "95e032e09132de210729c3635f1924ae2cbd91bf5a9fd8a420be6690bb38bfad"
+  },
+  "structuralGaps": [
+    "SV1 header action architecture",
+    "SV3 sidebar project/footer architecture",
+    "SV5 report layered head/body",
+    "SV6 fact/action ordering",
+    "SV8 composer two-level layout"
+  ],
+  "status": "not aligned yet; await owner stable candidate",
+  "accepted": {
+    "spec": "25474437047fdb864fcb401f8ff42b67bcf77cc534b98b37c44146cfa265c101",
+    "html": "e95b363dfe4191f32a53d139de3b80d75a48b89362f886376ed49e3ad7b4ea4b"
+  }
+}

@@ -1,0 +1,109 @@
+{
+  "task": "CORE-A-NONTOOL-FIX-1",
+  "at": "2026-10-15T04:18:13.000Z",
+  "node": "v24.14.0",
+  "platform": "darwin",
+  "arch": "arm64",
+  "previousManifest": "角色卡/运行时核心/docs/change/2026-10-15-complete-flow-core-evidence/final-manifest.json",
+  "previousCombinedSha256": "9395a1807e5af6248572bd04856adb959dbec5c01101669154803957bd55e7dc",
+  "combinedSha256": "dd6b50518ca7504118907e996b76f8553e0f586c9837f573a5e8bfc8c897f015",
+  "files": [
+    {
+      "path": "src/common/runtime-core/report-provenance.ts",
+      "sha256": "d13fcf3bb6f50c19f2ba6b4aeb4a608ff791daa2995246b005adc9bb98108d27"
+    },
+    {
+      "path": "src/common/runtime-core/tool-display.ts",
+      "sha256": "983c53207eab92c6448c1681e829c0700b42a12153a5817bab217dbb6c2c8e9e"
+    },
+    {
+      "path": "src/model/runtime.ts",
+      "sha256": "4d3278969daea6f45fd098a11cd5aea076fd646c080f09c10d4a8daba88314dd"
+    },
+    {
+      "path": "src/provider/runtime/session-store.ts",
+      "sha256": "fbe84fc39e62b9992be09afac0887258cfc02f8cbca3d5432a5ea943c6ca79a3"
+    },
+    {
+      "path": "src/provider/runtime/tools.ts",
+      "sha256": "5db9187e52b2413c46a07e516c56f8b27455bccd7c002ad8b9bf3db84ddd9298"
+    },
+    {
+      "path": "src/service/runtime/session.ts",
+      "sha256": "991146051f429ef26b46b21154a574086b312233047b29c99a9d522c01280f02"
+    },
+    {
+      "path": "test/runtime-core/effective-timeouts.test.ts",
+      "sha256": "23a3d3cd069006607f68177b198f720529c467eff943dcfe3f51e580bcabb491"
+    },
+    {
+      "path": "test/runtime-core/fixtures.ts",
+      "sha256": "43930eb6647726bc92bff93992b73a2fac87a7d69669e871c616787b2b54ca16"
+    },
+    {
+      "path": "test/runtime-core/legacy-history-projection.test.ts",
+      "sha256": "c6bed08a0ed8d90bc6465d2ffc175a24a5f2265e723d9697ebff3f7eeded33b3"
+    },
+    {
+      "path": "test/runtime-core/prompt-start-acknowledgement.test.ts",
+      "sha256": "7320017c0701cb54f47458145bf7681229e0a66775b33922b4af5636609770b2"
+    },
+    {
+      "path": "test/runtime-core/report-provenance.test.ts",
+      "sha256": "dd95d05abca6bee8f30b109943c75d2ad5121a13f46b7eab5d3d8266b35d3100"
+    },
+    {
+      "path": "test/runtime-core/session.test.ts",
+      "sha256": "e920051308a87bcf24a324a07f33f6f474ae9f1d599e6dea671384a47c79e9b1"
+    },
+    {
+      "path": "test/runtime-core/tool-display.test.ts",
+      "sha256": "6ec09d3dba701f1e4e73155f16b2155e402b94b7427eb27b34650f7e3479ef2e"
+    },
+    {
+      "path": "test/runtime-core/tools.test.ts",
+      "sha256": "25ea9a89c5eec032cf10bb222ec53eef58d17c92ad05469a0f6913897ae7cba0"
+    }
+  ],
+  "changedFromPrevious": [
+    {
+      "path": "src/service/runtime/session.ts",
+      "sha256": "991146051f429ef26b46b21154a574086b312233047b29c99a9d522c01280f02"
+    },
+    {
+      "path": "test/runtime-core/session.test.ts",
+      "sha256": "e920051308a87bcf24a324a07f33f6f474ae9f1d599e6dea671384a47c79e9b1"
+    }
+  ],
+  "checks": {
+    "narrow": {
+      "command": "node --test test/runtime-core/session.test.ts",
+      "pass": 18,
+      "fail": 0,
+      "exit": 0
+    },
+    "originalIndependent": {
+      "command": "node --test --test-name-pattern='non-tool engine failure' test/测试/p1p7-tool-display-integration.test.ts",
+      "pass": 1,
+      "fail": 0,
+      "exit": 0
+    },
+    "core": {
+      "command": "node --test 'test/runtime-core/*.test.ts'",
+      "pass": 77,
+      "fail": 0,
+      "exit": 0
+    },
+    "typecheck": {
+      "command": "npm run typecheck",
+      "exit": 0
+    },
+    "diff": {
+      "command": "git diff --check",
+      "exit": 0
+    }
+  },
+  "approvedDocumentsUnchanged": true,
+  "peerTestUnchanged": true,
+  "callerRetest": "Independent A/C; adapter Core integration; Pipeline/Window history consumers. Public API and original projector remain unchanged."
+}

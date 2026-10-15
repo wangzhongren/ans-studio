@@ -1,0 +1,78 @@
+{
+  "packet": "UI-VISUAL-V2 batch facts final correction",
+  "status": "owner-verified; root native hotreload verification pending",
+  "baselineManifest": "角色卡/桌面UI/docs/fix/2026-10-15-delivery-note-ui-evidence/manifest.json",
+  "baselineManifestSha256": "bd6aa67c71a543ee4f8013b4c6dccaff355a6347d5b3883a81ae2eb9041c6371",
+  "sourceFiles": {
+    "app/renderer/index.html": "7beda47c504c81ba8a7748b407eb60efc27ec531e936d93868a9480528514f00",
+    "app/renderer/styles.css": "df554f8760809edf09184a824876012cf0d41feadffc518dacb34c05573f7469",
+    "app/renderer/renderer.js": "34b14fc07b963f9e76ac512264bac2c61d6dc9bce52f58868514019bd468464b",
+    "app/renderer/tool-rows.js": "a4d86a1c8c45a4c84ed9cd283596d164c63833849899bb05bfcbf0379901d4bd",
+    "app/renderer/runtime-ui.js": "47b136e300389ff3e3d3b67e3a5995f801dce9f3330b3520e8dbeffaabf87b26",
+    "app/renderer/role-status.js": "2daab2f108e3351f6143270f18d7f07dddeb48ae9408ba545fda6ffc5c7aeec5"
+  },
+  "testFiles": {
+    "test/桌面应用/tool-rows.test.ts": "f47d86fcbdb255e2606485d372bf61b47c9b77966a7bfd19deb2bd4186aebefc",
+    "test/桌面应用/runtime-ui.test.ts": "1123d3d9e700531a9e6cd5b6cfa166712406d4fa4b4d72af1cb04ffb6cd59397",
+    "test/桌面应用/renderer.test.ts": "815395b896eb51b6f167337b857f810917a319bb18adc6acbd4f2ccbdaea079a",
+    "test/桌面应用/markdown.test.ts": "936c9fd95530d0d39eda43a8ec73809a374d68cb6b3b9fa3b12f5858de4ea99e",
+    "test/桌面应用/e2e/uiux-v2.mjs": "d51e16700f7517905a38b1073ca1b9849fc560284a01ad56247fbf3b2d5b448b"
+  },
+  "changedThisFix": [
+    "app/renderer/renderer.js",
+    "app/renderer/styles.css",
+    "test/桌面应用/renderer.test.ts",
+    "test/桌面应用/e2e/uiux-v2.mjs"
+  ],
+  "tests": {
+    "visual-final": {
+      "records": 29,
+      "booleanTrue": 27,
+      "booleanFalse": 0,
+      "errors": []
+    },
+    "consumer": {
+      "records": 41,
+      "booleanTrue": 40,
+      "booleanFalse": 0,
+      "errors": []
+    },
+    "full": {
+      "records": 99,
+      "booleanTrue": 89,
+      "booleanFalse": 0,
+      "errors": []
+    },
+    "ghost": {
+      "records": 9,
+      "booleanTrue": 9,
+      "booleanFalse": 0,
+      "errors": []
+    }
+  },
+  "unitPassed": 70,
+  "unitFailed": 0,
+  "typecheckExit": 0,
+  "diffCheckExit": 0,
+  "allSelftestElectronQuit": true,
+  "providerCalls": 0,
+  "sourceFactsUntouched": true,
+  "approved13Mismatches": [],
+  "dependencyMismatches": [],
+  "designMismatches": [],
+  "evidenceFiles": {
+    "ans-batch-facts-node-green.log": "85b39e41c20406f88990ca6e6636c4438e36c575b3dde33c1b24639141874738",
+    "visual-v2-received-960.png": "5c373232beeeb026830bcb35c5ac428ef60975d40b53c81307c1b96d113cc3ef",
+    "consumer.json": "4037bb685c65cdf724c23cc2de255bea6edf14521b46d885e7bdbcf3339d2b5e",
+    "visual-v2-received-1360.png": "afac2c6c5fcead4772ff953234a0dac291fedf9e60ac45efef95bb02ff1e2708",
+    "full.json": "a22676490966f1b9aecbc8fadeb5d66e6836f8cf934e1e6b3d67c47155d3a738",
+    "visual-final.json": "b9238f4379ce72d3fc416eeff8b9d2c27876e29ee20f27bbadc48a7691173bdd",
+    "ans-batch-facts-node-red.log": "1d1126dfb151cc06f9610d532d05bd574ba61d7da2de20b1dc2d39482f61fa40",
+    "ghost.json": "13a617b8e5d9dac78cc594955cbbdc8720228e3794e0cc3bb38607fc32574d1f",
+    "ans-batch-facts-tsc.log": "49ad917c426e1ab9bb7e5ad8c53a2fa4844fe03331b01623eac87fa4a881b15c"
+  },
+  "excluded": [
+    "First visual capture before settled drawer transition remains excluded. Final recapture waits transition and settled viewport frames."
+  ],
+  "combinedSha256": "d83843d29bfca83c47f995ad0d86030d3fb03b8a659701019abfd5594fef6471"
+}

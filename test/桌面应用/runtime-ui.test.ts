@@ -118,3 +118,22 @@ test("可信输入与工具使用actual turn/call/phase，不靠正文和嵌套t
   assert.notEqual(Rt.replayKey(call),Rt.replayKey({...call,detail:{...call.detail,toolCallId:"two"}}));
   assert.equal(Rt.replayCounts([input,input])[Rt.replayKey(input)],1);
 });
+
+test("P7选择与确认根据真实kind，保存状态不等于验收或重新投递",()=>{
+ assert.equal(St.statusBadge('awaiting-confirm',0,['choice']).label,'待选择');
+ assert.equal(St.statusBadge('awaiting-confirm',0,['confirm']).label,'等待你确认');
+ assert.equal(St.statusBadge('working',2,['choice']).label,'工作中 · 2 待办');
+ assert.equal(Rt.textFlags({redacted:true,truncated:true}),'已净化 · 已截断');
+ assert.equal(Rt.persistenceLabel({state:'saved'},false),'报告已保存');
+ assert.equal(Rt.persistenceLabel({history:'saved'},true),'接收历史已保存');
+ assert.match(Rt.persistenceLabel({state:'expired'},false),/已失效/);
+ assert.match(Rt.persistenceLabel({state:'disabled'},false),/仅本次会话/);
+ assert.match(Rt.shortTime('2026-10-15T00:01:02Z'),/^\d{2}:\d{2}$/);
+ assert.equal(Rt.shortTime('not-a-time'),'');
+ assert.match(Rt.metadataLabel(['timestamp','anchor-token','oversize-identity']),/原时间.*定位标记.*调用身份/);
+ assert.equal(Rt.metadataLabel(['UNKNOWN_RAW_VALUE']),'');
+ assert.equal(St.pendingKindLabel(['choice','confirm']),'待处理');
+ assert.match(Rt.documentError('PROJECT_NOT_GRANTED'),/重新选择项目文件夹/);
+ assert.match(Rt.documentError('UNSUPPORTED_ENVIRONMENT'),/不支持安全读取/);
+ assert.equal(Rt.documentError('UNKNOWN_RAW_NODE_MESSAGE'),'无法读取此文档。');
+});

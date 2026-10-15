@@ -1,0 +1,15 @@
+[
+  {
+    "chat": "这个项目有哪些测试？先给我介绍，不需要派发。\n\n可以先阅读测试说明，再决定是否交给测试角色执行。当前只是普通对话，没有产生正式派发。",
+    "draft": "草稿保留检查",
+    "inputDisabled": false,
+    "stage": "chat",
+    "step": "chat save keeps session"
+  },
+  {
+    "request": "选择查看方式\n等待选择\n\n只选择显示方式，不写文件，不派发任务。\n\n查看方式\n 查看摘要\n 查看完整记录\n提交选择\n取消\n模拟普通聊天 request_choice；不是文件写入许可，也不是任务完成。",
+    "stage": "choice",
+    "step": "pending save keeps request",
+    "submitDisabled": true
+  }
+]

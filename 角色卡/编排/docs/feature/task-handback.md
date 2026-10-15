@@ -3,7 +3,7 @@ id: task-handback
 type: feature
 title: 角色任务报告回交与主入口汇总输入
 created: "2026-10-13"
-updated: "2026-10-14"
+updated: "2026-10-15"
 timezone: Asia/Shanghai
 status: verified
 related: [truthful-handback-and-authorized-shell]
@@ -41,7 +41,13 @@ flowchart TD
   failed --> deliver[清理本轮报告和证据，先handback后settled]
   reported --> deliver
   unreported --> deliver
-  deliver --> desktop[桌面去重排队，把同项目连续回交交主入口]
+  deliver --> persist{实际会话持久档？}
+  persist -->|enabled| save[Pipeline记录最终报告快照]
+  save -->|失败| failedsave[显示真实成果与未保存 只重试保存]
+  save -->|已保存| desktop[Window唯一归并入队并交主入口]
+  failedsave -->|保存恢复成功| desktop
+  persist -->|disabled或unknown-live| live[安全live摘要 不暗建目录]
+  live --> desktop
   desktop --> summary[主入口核对已收到结果，向客户汇总成果与待补事项]
 ```
 
@@ -77,3 +83,13 @@ flowchart TD
 | 2026-10-13 | 修复 | 编排已验证 | 按turnId隔离、真实终态、可定位证据、已收到报告的汇总输入 | [本次修复](../fix/2026-10-13_fix_truthful-handback-and-authorized-shell.md) |
 
 | 2026-10-14 | 修复 | 编排专项已验证，桌面待复测 | 本轮来源绑定真实ACK，普通聊天不自动缺报告回交 | [聊天来源修复](../fix/2026-10-14_fix_chat-handback-scope.md) |
+
+| 2026-10-15 | 修改 | 编排256/256与typecheck通过，下游待接 | bound最终报告记录、ID保存代理、安全来源与纯legacy历史桥接 | [C消费实施](../change/2026-10-15_change_report-provenance-consumer.md) |
+
+## 最终报告保存与恢复
+
+编排只在终态覆盖结束后由Pipeline调用真实Core bound persistence记录，不在工具候选回执时保存最终成员。origin区分submitted-report/terminal-fallback，completed仍不等于独立验收。源enabled保存失败保留真实终态和安全live事实，Window暂不自动投；同ID显式保存恢复只保存Core冻结快照，成功后Window可首次投递，不重跑源模型。disabled与旧unknown adapter保持原live兼容，不造durable身份/目录。Window唯一入队，Pipeline仅代理Model保存/查询/通知结果。
+
+目标inputProvenance或安全live presentation由可信队列传入，目标真实ACK不代表落盘；Core receipt给实际inputSaved/providerMayHaveStarted/history状态。可能Provider已启动或回执未知时不自动重投，target保存恢复不调用Provider。source与target实际turn/task未知分开，不猜任务收齐。原模型交接text只在内部给SDK，新ANS输入/事件/summary/IPC使用带modelInputRecorded:false的冻结安全显示副本，图片原引用保留；原TaskHandback不得作为IPC原文侧车。
+
+新A4成功写结果只将完整未redacted/truncated的display.path作为可定位产物事实，隐藏/截断不能回退raw字段。evidence仍不发行文件读许可；B资料入口另走可信来源角色当前docrefs显选，不宣称精确报告一键读取。

@@ -1,0 +1,37 @@
+{
+  "reports": [
+    {
+      "name": "fresh empty context never mistakes loader for history",
+      "value": true
+    },
+    {
+      "name": "empty fresh session has no above-history warning",
+      "value": true
+    },
+    {
+      "name": "A same call one accessible lifecycle with true target and failure",
+      "value": true
+    },
+    {
+      "name": "A safe detail streams exit error and flags readable",
+      "value": true
+    },
+    {
+      "name": "A different same-text actual call remains separate",
+      "value": true
+    },
+    {
+      "name": "A unknown display never falls to raw args",
+      "value": true
+    },
+    {
+      "name": "C source declared result not independent acceptance and failed save button",
+      "value": true
+    }
+  ],
+  "errors": [
+    "Uncaught TypeError: Cannot read properties of null (reading 'scrollIntoView')"
+  ],
+  "error": "Error: Script failed to execute, this normally means an error was thrown. Check the renderer console for the error.",
+  "stack": "Error: Script failed to execute, this normally means an error was thrown. Check the renderer console for the error.\n    at node:electron/js2c/renderer_init:1:16535\n    at IpcRendererInternal.<anonymous> (node:electron/js2c/renderer_init:1:11407)\n    at IpcRendererInternal.emit (node:events:514:28)\n    at Object.onMessage (node:electron/js2c/renderer_init:1:10648)"
+}

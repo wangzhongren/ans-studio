@@ -1,0 +1,85 @@
+Window: "ANS 治理会话工作台", App: Electron.
+0 标准窗口 ANS 治理会话工作台, Secondary Actions: Raise
+	1 container ANS 治理会话工作台
+		2 container
+			3 HTML 内容 ANS 治理会话工作台, URL: file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/app/renderer/index.html
+				4 container
+					5 文本 ANS
+					6 按钮 最小化
+					7 按钮 最大化
+					8 按钮 关闭
+				9 container
+					10 text ans AGENT WORKSPACE
+					11 文本 ans-p1p7-desktop-JqO4lM
+					12 文本 /private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-p1p7-desktop-JqO4lM
+					13 文本 工作空间
+					14 container 角色列表
+						15 文本 主入口
+						16 按钮 s su Pi · 空闲 内置
+							17 文本 s
+							18 文本 su
+							19 文本 Pi ·
+							20 文本 空闲
+							21 文本 内置
+						22 文本 其他角色（查看/调试）
+						23 按钮 测 测试 Pi · 空闲
+							24 文本 测
+							25 文本 测试
+							26 文本 Pi ·
+							27 文本 空闲
+						28 按钮 维 维护 Pi · 未开启
+							29 文本 维
+							30 文本 维护
+							31 文本 Pi ·
+							32 文本 未开启
+						33 按钮 项 项目管理 Pi · 未开启
+							34 文本 项
+							35 文本 项目管理
+							36 文本 Pi ·
+							37 文本 未开启
+					38 按钮 切换项目
+					39 按钮 Pi 设置
+					40 文本 4 个角色 · 本地会话
+					41 container
+						42 text su 新会话
+						43 组合框 (settable) Description: 会话引擎，当前 Pi, Value: Pi
+							44 文本 Pi
+						45 按钮 工作概览
+						46 按钮 角色资料
+					47 container
+						48 text 本次开启会话：新会话 V2-CHAT-1：这是普通聊天。请只回复“V2 普通聊天正常”。不要调用工具、派发任务或提交报告。
+						49 文本 V2 普通聊天正常
+						50 text 会话结束 V2-CHOICE-1：这是普通聊天中的交互测试。请调用一次 request_choice，标题“V2 本轮先检查什么”，只给两个单选项“查看摘要”和“查看完整记录”，不要预选。收到选择后只回复选择内容，不派发正式任务或提交报告。 V2 本轮先检查什么
+						51 container
+							52 单选按钮 (disabled) 查看摘要, Value: 0
+							53 文本 查看摘要
+						54 container
+							55 单选按钮 (disabled) 查看完整记录, Value: 1
+							56 文本 查看完整记录
+						57 text 已提交选择。 request_choice · 执行完成
+						58 开合三角标记 查看安全执行详情
+							59 文本 查看安全执行详情
+						60 文本 客户选择：查看完整记录
+						61 text 会话结束 V2-QUEUE-KEEP：请只回复“V2 保留队列已处理”，不要工具或报告。 已入队：等它完成当前任务后处理（第 1 位）。 V2-QUEUE-WITHDRAW：这条会在执行前撤回，不应进入模型。 已入队：等它完成当前任务后处理（第 2 位）。 已撤回排队消息：你：V2-QUEUE-WITHDRAW：这条会在执行前撤回，不应进入模型。 V2 保留队列已处理 会话结束 V2-STOP-1：普通聊天交互测试。请调用一次 request_choice，标题“V2 停止失效检查”，两个单选项“继续检查”和“稍后再看”，不预选。等待我的决定，不派发任务或提交报告。 V2 停止失效检查
+						62 单选按钮 (disabled) 继续检查, Value: 0
+						63 文本 继续检查
+						64 单选按钮 (disabled) 稍后再看, Value: 0
+						65 text 稍后再看 请求已失效，未获同意。原因：本轮已停止或会话已重建，旧确认失效。 request_choice · 执行失败：request_choice 执行失败（request_choice：未获客户同意（原因：request_choice 等待客户回应 被中止（会话中止/取消，未获客户回应）。）→ 不要写盘；如实告知客户，不得假设同意。）
+						66 开合三角标记 查看安全执行详情
+							67 文本 查看安全执行详情
+						68 text 已请求停止当前轮次——轮次仍会以收尾事件结束。 本轮已中止
+					69 container
+						70 文本输入区 (settable) Description: 发送给当前角色的消息, Value: V2 停止期间未发送草稿, Placeholder: 给su发送消息…
+						71 按钮 Description: 添加图片, Help: 添加图片（png / jpeg / webp / gif，≤5MB）
+						72 text su / Pi Enter 发送，Shift + Enter 换行
+						73 按钮 Description: 发送, Help: 发送（Enter）
+					74 文本 普通聊天不会自动产生任务报告
+					75 文本 实际写入导入项目，角色边界外的写入会被拒绝。
+76 menu bar
+	77 Electron
+	78 File
+	79 Edit
+	80 View
+	81 Window
+
+The focused UI element is 3 HTML 内容 ANS 治理会话工作台, URL: file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/app/renderer/index.html

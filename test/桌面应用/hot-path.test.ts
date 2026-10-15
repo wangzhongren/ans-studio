@@ -115,7 +115,7 @@ test("Q-1 push-batcher：事件窗口合并（N 推 → 1 次 send、顺序不�
 test("Q-1 事件风暴（300 事件，假适配器）：管理器侧处理耗时护栏 + 事件仍逐条外推（批量在 main 层）", async () => {
   const dir = makeProject();
   const l = listing(dir);
-  const envelopes: { roleId: string; event: OrchestrationEvent }[] = [];
+  const envelopes: { roleId: string; event: import("../../app/desktop/session.ts").DesktopOrchestrationEvent }[] = [];
   const streams: Record<string, OrchestrationEvent[]> = { su: [], A: [] };
   const stopped: Record<string, boolean> = {};
   const STORM = 300;
@@ -205,7 +205,7 @@ test("Q-1 O-1 哈希缓存：未变文件只 stat（mtime+size 命中）；内�
       stopped[roleId] = true;
     },
   });
-  const envelopes: { roleId: string; event: OrchestrationEvent }[] = [];
+  const envelopes: { roleId: string; event: import("../../app/desktop/session.ts").DesktopOrchestrationEvent }[] = [];
   const mgr = new SessionManager({
     openRoleSession: async (input) => makeHandle(input.roleId),
     createPiAdapterFactory: () => {

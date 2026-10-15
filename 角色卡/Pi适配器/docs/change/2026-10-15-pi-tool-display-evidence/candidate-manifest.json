@@ -1,0 +1,86 @@
+{
+  "task": "PI-A-1",
+  "at": "2026-10-15T03:53:51.538298+00:00",
+  "approvalManifest": "角色卡/项目管理/docs/design/2026-10-15-complete-flow-interface-evidence/review-manifest.json",
+  "approved13DocumentsMatch": true,
+  "productionFiles": [
+    "src/common/pi-adapter/real-adapter.ts"
+  ],
+  "testFiles": [
+    "test/pi-adapter/tool-display-projection.test.ts",
+    "test/pi-adapter/prompt-images.test.ts"
+  ],
+  "api": "Model RuntimeToolEventSource/projector/profile/rule; required-v1/legacy-standalone; no private Core import",
+  "before": {
+    "src/common/pi-adapter/real-adapter.ts": "4be2cd47e5b8888efb8f9c483274c44da8049bbe71ca7692272d7c60ccb8fcc5",
+    "test/pi-adapter/tool-display-projection.test.ts": "eb1cc3b343e09fe2676b0f28bb4e870823ede26fc74f9c4514747d12cef2493e",
+    "test/pi-adapter/prompt-images.test.ts": "4980166d455fbbd41a8346bbdd8fe2606af08d58fc108b01a278ef3ae68bf162",
+    "src/model/runtime.ts": "4d3278969daea6f45fd098a11cd5aea076fd646c080f09c10d4a8daba88314dd",
+    "src/service/runtime/session.ts": "797593fa3cba6106d4519cf6ea48dde648e9c9e223ca53874dbe30eb326bc7e2",
+    "src/provider/runtime/tools.ts": "5db9187e52b2413c46a07e516c56f8b27455bccd7c002ad8b9bf3db84ddd9298",
+    "src/common/runtime-core/tool-display.ts": "983c53207eab92c6448c1681e829c0700b42a12153a5817bab217dbb6c2c8e9e"
+  },
+  "after": {
+    "src/common/pi-adapter/real-adapter.ts": "4be2cd47e5b8888efb8f9c483274c44da8049bbe71ca7692272d7c60ccb8fcc5",
+    "test/pi-adapter/tool-display-projection.test.ts": "eb1cc3b343e09fe2676b0f28bb4e870823ede26fc74f9c4514747d12cef2493e",
+    "test/pi-adapter/prompt-images.test.ts": "4980166d455fbbd41a8346bbdd8fe2606af08d58fc108b01a278ef3ae68bf162",
+    "src/model/runtime.ts": "4d3278969daea6f45fd098a11cd5aea076fd646c080f09c10d4a8daba88314dd",
+    "src/service/runtime/session.ts": "797593fa3cba6106d4519cf6ea48dde648e9c9e223ca53874dbe30eb326bc7e2",
+    "src/provider/runtime/tools.ts": "5db9187e52b2413c46a07e516c56f8b27455bccd7c002ad8b9bf3db84ddd9298",
+    "src/common/runtime-core/tool-display.ts": "983c53207eab92c6448c1681e829c0700b42a12153a5817bab217dbb6c2c8e9e"
+  },
+  "hashStable": true,
+  "checks": [
+    {
+      "name": "pi-targeted39",
+      "argv": [
+        "node",
+        "--test",
+        "test/pi-adapter/tool-display-projection.test.ts",
+        "test/pi-adapter/prompt-images.test.ts",
+        "test/pi-adapter/injected-runtime.test.ts",
+        "test/pi-adapter/tool-call-events.test.ts"
+      ],
+      "exitCode": 0,
+      "log": "角色卡/Pi适配器/docs/change/2026-10-15-pi-tool-display-evidence/pi-targeted39.log"
+    },
+    {
+      "name": "typecheck",
+      "argv": [
+        "npm",
+        "run",
+        "typecheck"
+      ],
+      "exitCode": 0,
+      "log": "角色卡/Pi适配器/docs/change/2026-10-15-pi-tool-display-evidence/typecheck.log"
+    },
+    {
+      "name": "diff-check",
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exitCode": 0,
+      "log": "角色卡/Pi适配器/docs/change/2026-10-15-pi-tool-display-evidence/diff-check.log"
+    }
+  ],
+  "fullPiRegression": {
+    "argv": [
+      "node",
+      "--test",
+      "test/pi-adapter/*.test.ts"
+    ],
+    "exitCode": 0,
+    "passed": 217,
+    "failed": 0,
+    "log": "角色卡/Pi适配器/docs/change/2026-10-15-pi-tool-display-evidence/pi-all217.log",
+    "limitation": "Full suite ran while Core C could grow; latest targeted evidence pins before/after hashes above. Local fake HTTP required managed loopback escalation."
+  },
+  "notTested": [
+    "online model/account",
+    "user desktop",
+    "Window/UI integration",
+    "whole repository final integration"
+  ]
+}

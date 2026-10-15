@@ -18,3 +18,7 @@
 
 
 2026-10-15 C1I：Core统一input echo在ack/userpersist/signal后native前单emit，detail.source=prompt-input/text/imageCount?且detail.turnId=top actualturn；Pi生产注入false由Pi属主维护，demo有Coreturn不自echo。确认/选择metadata optional toolCallId入口原值透传，不猜ID/正文。schema两说明明确argv-noshell，执行不变。Core+Pi shell+wiring57/57、tsc0，独立桌面待联合验证；原red与首候选detail.turnId失败保留说明，见本次fix。
+
+2026-10-15 CORE-A/C-1：按用户批准总r2及匹配review-manifest实施A4/C2.tp1，批准design/manifest不可改。新common/tool-display是唯一投影，Model required-v1/profile/rule/execution精确接口已落，Core fake factory必须实际register空profile；己目录fixtures/effective-timeouts属于必要协议维护。C bound persistence/capability来自实际storage；source原子report、target安全user/typed文本+boundary/finalreceipt、只保存恢复与budget/expired已落。PM裁定live presentation可选deliveryId/attemptId/target全齐才新receipt，全缺legacy兼容，部分INVALID；不添durable报告身份/写权。同attempt必须先读已知内存事实，再验输入/读磁盘，修过真实后置损坏倒退providermay=false的独验红。Source ID冲突不覆盖、Provider可能调用不自动重发。最终候选/checks见own change，不能拿本地core测试当Window/三adapter已接。
+
+2026-10-15 CORE-A-NONTOOL-FIX-1：普通engine denied不能仅按kind送tool projector。Service live/history同routeRuntimeDisplayEvent，只显式tool_call或非空toolName/嵌套call.name视工具；裸Error.name不是toolName。非工具仅安全summary/actualscope/turn/合法outcome，不raw侧车/造phase。Service991146051f429ef26b46b21154a574086b312233047b29c99a9d522c01280f02，新组合dd6b5051...；session18/18、root原独验1/1、Core77/77、tsc/diff0；原9395候选清单保持历史，peer需重测。只改己scopeService及session测试，见fix原证据。

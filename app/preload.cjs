@@ -20,6 +20,16 @@ contextBridge.exposeInMainWorld("desktop", {
   /** 枚举项目下的角色（含角色卡正文、边界条目、文档与变更记录索引）。 */
   listProject: (projectRoot) => ipcRenderer.invoke("app:list-project", { projectRoot }),
 
+  /** B/2: only opaque current-project refs; no renderer filesystem paths. */
+  readProjectDocument: (input) => ipcRenderer.invoke("project:document-read", input),
+  retryReportSave: input => ipcRenderer.invoke('report:retry-save', input),
+  getReportSaveState: input => ipcRenderer.invoke('report:get-save-state', input),
+  retryDeliveryHistorySave: input => ipcRenderer.invoke('delivery:retry-history-save', input),
+  getDeliveryReceipt: input => ipcRenderer.invoke('delivery:get-receipt', input),
+  getSessionPersistence: input => ipcRenderer.invoke('session:get-persistence', input),
+  onReportPersistenceUpdated: callback => { const listener = (_event, payload) => callback(payload); ipcRenderer.on('report-persistence-updated', listener); return () => ipcRenderer.removeListener('report-persistence-updated', listener); },
+  onDeliveryHistoryUpdated: callback => { const listener = (_event, payload) => callback(payload); ipcRenderer.on('delivery-history-updated', listener); return () => ipcRenderer.removeListener('delivery-history-updated', listener); },
+
   /** 点角色即开：直接建立与该角色的会话（导入项目即授权，无确认框）。 */
   openSession: (input) => ipcRenderer.invoke("session:open", input),
 

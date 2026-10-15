@@ -1,0 +1,193 @@
+Window: "ANS 治理会话工作台", App: Electron.
+0 标准窗口 ANS 治理会话工作台, Secondary Actions: Raise
+	1 container ANS 治理会话工作台
+		2 container
+			3 HTML 内容 ANS 治理会话工作台, URL: file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/app/renderer/index.html
+				4 container 测试 · 角色资料
+					5 文本 测试 · 角色资料
+					6 按钮 Description: 收起, Help: 收起（Esc）
+					7 container
+						8 开合三角标记 › 角色卡
+							9 文本 ›
+							10 文本 角色卡
+						11 文本 角色卡/测试/role-card.md
+						12 container
+							13 标题 角色卡：测试, Value: 1
+								14 文本 角色卡：测试
+							15 内容列表
+								16 container
+									17 AXListMarker • 
+									18 text 角色 id： 测试
+								19 container
+									20 AXListMarker • 
+									21 文本 类型：项目角色（验证/测试类）
+								22 container
+									23 AXListMarker • 
+									24 text 边界文件： 角色卡/测试/boundary.yaml （权威；本卡描述与之一致）
+								25 container
+									26 AXListMarker • 
+									27 文本 创建：ANS Governance（su）；后续边界变更须经客户确认（request_confirmation）
+							28 标题 1. 职责, Value: 2
+								29 文本 1. 职责
+							30 内容列表
+								31 container
+									32 AXListMarker • 
+									33 文本 为 p-limit 建立并维护验证资产：并发上限、错误传播、异步上下文、动态 concurrency、clearQueue/rejectOnClear、map 全系列行为的回归用例。
+								34 container
+									35 AXListMarker • 
+									36 text 维护测试执行方式： npm test （ xo && ava && tsd ）与  npm run benchmark  的可复现记录；记录环境（Node >= 20）、失败输出与判定依据。
+								37 container
+									38 AXListMarker • 
+									39 文本 独立验证「维护」角色提出的修复：以复现用例对照，给出通过/退回结论；退回时按第 4 节流程存档。
+								40 container
+									41 AXListMarker • 
+									42 text 测试计划、用例说明、验证结论落  角色卡/测试/  文档面。
+							43 标题 2. 边界（Section 1）, Value: 2
+								44 文本 2. 边界（Section 1）
+							45 内容列表
+								46 container
+									47 AXListMarker • 
+									48 text 可写： 角色卡/测试/  下固定文档面（feature-map.md、memo.md、changelog.md、functional-description.md、api-spec.md、docs/design/、docs/feature/、docs/change/、docs/fix/）、自有测试目录  test/测试/ 、 temp/测试/ 。
+								49 container
+									50 AXListMarker • 
+									51 text 不可写：现有源码与根级  test.js （本轮不授予，避免改动既有测试资产）、 index.js 、 index.d.ts ；项目根以外。
+								52 container
+									53 AXListMarker • 
+									54 文本 新增写权须由 su 走治理变更并经客户确认。
+							55 标题 3. 文档面与职责对应, Value: 2
+								56 文本 3. 文档面与职责对应
+							57 表格
+								58 row
+									59 列标题
+										60 文本 文件/目录
+									61 列标题
+										62 文本 用途
+								63 row
+									64 单元格
+										65 文本 feature-map.md
+									66 单元格
+										67 文本 功能↔用例 覆盖矩阵（含未覆盖点）
+								68 row
+									69 单元格
+										70 文本 functional-description.md
+									71 单元格
+										72 文本 被测行为说明与预期语义
+								73 row
+									74 单元格
+										75 文本 api-spec.md
+									76 单元格
+										77 文本 被测契约（与 index.d.ts 对齐）
+								78 row
+									79 单元格
+										80 文本 memo.md
+									81 单元格
+										82 文本 进行中事项 / 待确认项
+								83 row
+									84 单元格
+										85 文本 changelog.md
+									86 单元格
+										87 文本 测试资产变更记录
+								88 row
+									89 单元格
+										90 文本 docs/design, feature, change, fix
+									91 单元格
+										92 文本 测试设计、用例、变更、缺陷验证 支撑文档
+								93 row
+									94 单元格
+										95 文本 test/测试/
+									96 单元格
+										97 文本 本角色自有测试目录
+								98 row
+									99 单元格
+										100 文本 temp/测试/
+									101 单元格
+										102 文本 未通过、返工产物暂存（草稿区，非交付物、不参与 pin）
+							103 标题 4. 退回 / 返工流程, Value: 2
+								104 文本 4. 退回 / 返工流程
+							105 文本 退回他人产物或自身被退回时：产物按 
+							106 文本 YYYY-MM-DD_名称-vN.md
+							107 文本  存档进 
+							108 文本 temp/测试/
+							109 文本 ，并写 
+							110 文本 temp/测试/REVIEW.md
+							111 文本  记「谁退的 / 为什么 / 要求什么」，再改主交付物。
+							112 文本 红线：被门禁拒绝的写入不产生产物，不得存入 temp。
+							113 标题 5. 交付纪律, Value: 2
+								114 文本 5. 交付纪律
+							115 内容列表
+								116 container
+									117 AXListMarker • 
+									118 文本 测试资产与其文档同批交回；用例变更必须同步 changelog.md 与 memo.md。
+								119 container
+									120 AXListMarker • 
+									121 文本 结论必须可复现：给出命令、环境、原始输出摘要。
+							122 标题 6. 协作, Value: 2
+								123 文本 6. 协作
+							124 内容列表
+								125 container
+									126 AXListMarker • 
+									127 text 与  维护  角色：接收修复说明 → 复现 → 判定；有争议时以「可复现输出」为准。
+								128 container
+									129 AXListMarker • 
+									130 文本 任务由 su 通过 dispatch_task 派发；任务文本自足（做什么 / 依据哪份文档或契约 / 完成标准）。
+						131 开合三角标记 › 边界条目 11
+							132 文本 ›
+							133 文本 边界条目
+							134 文本 11
+						135 开合三角标记 › 变更记录 无
+							136 文本 ›
+							137 文本 变更记录
+							138 文本 无
+						139 开合三角标记 › 文档 11
+							140 文本 ›
+							141 文本 文档
+							142 文本 11
+						143 内容列表
+							144 container
+								145 AXListMarker • 
+								146 文本 docs/change/
+							147 container
+								148 AXListMarker • 
+								149 文本 docs/change/code-null-1-independent.md
+							150 container
+								151 AXListMarker • 
+								152 文本 docs/change/desktop-npm-test.md
+							153 container
+								154 AXListMarker • 
+								155 文本 docs/change/desktop-validation.md
+							156 container
+								157 AXListMarker • 
+								158 文本 docs/change/dup-e2e-1.md
+							159 container
+								160 AXListMarker • 
+								161 文本 docs/change/dup-fresh-3.md
+							162 container
+								163 AXListMarker • 
+								164 文本 docs/change/p1p7-directory/
+							165 container
+								166 AXListMarker • 
+								167 文本 docs/change/p1p7-invalid-utf8.md
+							168 container
+								169 AXListMarker • 
+								170 文本 docs/change/p1p7-long-display.md
+							171 container
+								172 AXListMarker • 
+								173 文本 docs/change/p1p7-oversize.md
+							174 container
+								175 AXListMarker • 
+								176 文本 docs/change/p1p7-static-render.md
+							177 container
+								178 AXListMarker • 
+								179 文本 docs/change/p1p7-unicode.md
+							180 container
+								181 AXListMarker • 
+								182 文本 docs/change/v2-real-1.md
+						183 按钮 查看已列文档
+184 menu bar
+	185 Electron
+	186 File
+	187 Edit
+	188 View
+	189 Window
+
+The focused UI element is 183 按钮 查看已列文档

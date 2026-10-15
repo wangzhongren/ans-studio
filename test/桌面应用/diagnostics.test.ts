@@ -87,3 +87,15 @@ test("shell确认恢复：不重置时限、不代答，失效请求不能复活
   assert.equal(channel.replayPending(), 0);
   assert.equal(channel.respond({ id: ids[0], allow: true }).expired, true);
 });
+
+test('C actual preload saving/query bridges and typed subscriptions are cancellable and do not send model text',async()=>{
+ const vm = await import('node:vm'); const script = await fs.readFile(new URL('../../app/preload.cjs',import.meta.url),'utf8');
+ let api:any; const invokes:unknown[][]=[]; const listeners=new Map<string,Set<Function>>();
+ vm.runInNewContext(script,{require:()=>({contextBridge:{exposeInMainWorld:(_key:string,value:unknown)=>{api=value;}},ipcRenderer:{invoke:(...args:unknown[])=>{invokes.push(args);return Promise.resolve({ok:true});},on:(event:string,fn:Function)=>{const set=listeners.get(event)??new Set();set.add(fn);listeners.set(event,set);},removeListener:(event:string,fn:Function)=>listeners.get(event)?.delete(fn)}})});
+ const scope={version:1,projectRoot:'/one',roleId:'A',runtime:'demo'};
+ for(const [method,channel,id] of [['retryReportSave','report:retry-save',{reportId:'r'}],['getReportSaveState','report:get-save-state',{reportId:'r'}],['retryDeliveryHistorySave','delivery:retry-history-save',{attemptId:'a'}],['getDeliveryReceipt','delivery:get-receipt',{attemptId:'a'}],['getSessionPersistence','session:get-persistence',{}]] as const){const request={...scope,...id};await api[method](request);assert.deepEqual(invokes.at(-1),[channel,request]);}
+ let count=0; const cancel=api.onReportPersistenceUpdated(()=>{count++;});const cancelTarget=api.onDeliveryHistoryUpdated(()=>{count++;});
+ for(const fn of listeners.get('report-persistence-updated')??[])fn({}, {version:1}); for(const fn of listeners.get('delivery-history-updated')??[])fn({}, {version:1});assert.equal(count,2);
+ cancel();cancelTarget();assert.equal(listeners.get('report-persistence-updated')?.size,0);assert.equal(listeners.get('delivery-history-updated')?.size,0);
+ assert.ok(invokes.every(args=>args[0]!=='session:send'));
+});

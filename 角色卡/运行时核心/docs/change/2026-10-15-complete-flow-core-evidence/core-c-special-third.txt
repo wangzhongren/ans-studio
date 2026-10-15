@@ -1,0 +1,21 @@
+✔ actual bound mode, final source identity, idempotent safe report save and conflict are independent of model execution (33.159875ms)
+✔ source retry only saves the first frozen snapshot, duplicate clicks share one operation and disposal expires it (15.98625ms)
+✔ target stores safe text but Provider receives original model text and images; final receipt survives a new handle (31.575667ms)
+✔ ACK is not delivery: user failure has exact Provider count and history retry never invokes it (25.898042ms)
+✔ ACK is not delivery: boundary failure has exact Provider count and history retry never invokes it (26.283041ms)
+✔ ACK is not delivery: index failure has exact Provider count and history retry never invokes it (28.551ms)
+✔ partial replay is not silently repaired or replayed; later foreign records also block repair (16.210708ms)
+✔ disabled bound mode does not create directories; live-only views do not become durable report snapshots (0.85825ms)
+✔ live optional delivery identity is all-or-none and target-bound; disabled mode has real in-memory receipts without directories (0.78975ms)
+✔ foreign later replay records block history repair without altering the replay or invoking Provider again (19.119167ms)
+✔ no final receipt cannot be reconstructed from boundary or nearby settled after reopening (20.89475ms)
+✔ 128 detailed receipt bound does not forget seen disabled attempts or re-execute one after eviction (5.418166ms)
+✔ 16MiB frozen recovery budget expires oldest failed source snapshots rather than keeping unbounded material (1488.560666ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1805.7455

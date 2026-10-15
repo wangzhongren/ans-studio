@@ -1,0 +1,11 @@
+✔ B Model budget is raw bytes; Provider reads a checked local descriptor without changing bytes (3.311416ms)
+✔ B Provider refuses unsupported platforms, lexical escapes, directories and symlinks (1.619917ms)
+✔ B Provider detects check/open and opened/read file replacement and closes the original handle (3.193ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 57.478459

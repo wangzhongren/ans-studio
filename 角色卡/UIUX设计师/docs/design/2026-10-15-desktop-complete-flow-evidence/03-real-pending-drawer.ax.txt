@@ -1,0 +1,24 @@
+The following is a diff from the previous accessibility tree for Window: "ANS 治理会话工作台" with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+Removed element IDs: 202-211
+~						201 text 已从本地会话文件恢复（模型上下文一并恢复）。 已从本地会话文件恢复（模型上下文一并恢复）。 UX-WALK-1：用于交互设计走查的隔离普通聊天。请仅调用一次request_choice，标题“选择查看方式”，选项“查看摘要”和“查看完整记录”，说明“只选择显示方式，不写文件，不派发任务”。不要调用其他工具，不改任何文件或配置，不提交报告；等待我回答后只简短回复选择结果并结束。 等待你确认
++					224 container 角色资料与待办
++						225 文本 su · 角色资料
++						226 按钮 Description: 收起, Help: 收起（Esc）
++						227 container
++							228 文本 无进行中或排队消息
++							229 开合三角标记 › 角色卡
++								230 文本 ›
++								231 文本 角色卡
++							232 开合三角标记 › 边界条目 5
++								233 文本 ›
++								234 文本 边界条目
++								235 文本 5
++							236 开合三角标记 › 变更记录 无
++								237 文本 ›
++								238 文本 变更记录
++								239 文本 无
++							240 开合三角标记 › 文档 无
++								241 文本 ›
++								242 文本 文档
++								243 文本 无
+The focused UI element is 226 按钮 Description: 收起, Help: 收起（Esc）

@@ -1,0 +1,70 @@
+{
+  "packet": "cold report snapshot time ordering",
+  "status": "owner-verified; root actual same reports hotreload pending",
+  "baselineManifest": "角色卡/桌面UI/docs/fix/2026-10-15-receiver-reply-original-evidence/manifest.json",
+  "baselineSha256": "45ec17c85f4dbd36e1b10480b041b35018dcf171869f8ee7cc9a3763b63a1cb8",
+  "sourceFiles": {
+    "app/renderer/index.html": "7beda47c504c81ba8a7748b407eb60efc27ec531e936d93868a9480528514f00",
+    "app/renderer/styles.css": "df554f8760809edf09184a824876012cf0d41feadffc518dacb34c05573f7469",
+    "app/renderer/renderer.js": "5324b786162b46962d03ff698a3e562963df82c33b16c4a8dc177b39e253b4c3",
+    "app/renderer/tool-rows.js": "a4d86a1c8c45a4c84ed9cd283596d164c63833849899bb05bfcbf0379901d4bd",
+    "app/renderer/runtime-ui.js": "47b136e300389ff3e3d3b67e3a5995f801dce9f3330b3520e8dbeffaabf87b26",
+    "app/renderer/role-status.js": "2daab2f108e3351f6143270f18d7f07dddeb48ae9408ba545fda6ffc5c7aeec5"
+  },
+  "testFiles": {
+    "test/桌面应用/tool-rows.test.ts": "f47d86fcbdb255e2606485d372bf61b47c9b77966a7bfd19deb2bd4186aebefc",
+    "test/桌面应用/runtime-ui.test.ts": "1123d3d9e700531a9e6cd5b6cfa166712406d4fa4b4d72af1cb04ffb6cd59397",
+    "test/桌面应用/renderer.test.ts": "3b729b59f883d1a85bc51e5f03b6499d3cbdb1b2ce58442c5535c05dd85eb306",
+    "test/桌面应用/markdown.test.ts": "936c9fd95530d0d39eda43a8ec73809a374d68cb6b3b9fa3b12f5858de4ea99e",
+    "test/桌面应用/e2e/uiux-v2.mjs": "b0398a1e127d021457febf556c679ca4e0435241b2b1169db3ec0b1f4887ec09"
+  },
+  "changedThisFix": [
+    "app/renderer/renderer.js",
+    "test/桌面应用/renderer.test.ts",
+    "test/桌面应用/e2e/uiux-v2.mjs"
+  ],
+  "tests": {
+    "visual-green": {
+      "records": 36,
+      "booleanTrue": 34,
+      "booleanFalse": 0,
+      "errors": []
+    },
+    "consumer": {
+      "records": 41,
+      "booleanTrue": 40,
+      "booleanFalse": 0,
+      "errors": []
+    },
+    "full": {
+      "records": 99,
+      "booleanTrue": 89,
+      "booleanFalse": 0,
+      "errors": []
+    },
+    "ghost": {
+      "records": 9,
+      "booleanTrue": 9,
+      "booleanFalse": 0,
+      "errors": []
+    }
+  },
+  "unitPassed": 72,
+  "unitFailed": 0,
+  "typecheckExit": 0,
+  "diffCheckExit": 0,
+  "allSelftestElectronQuit": true,
+  "providerCalls": 0,
+  "firstVisualRed": "Actual source cards old then new and tools read then shell correct. New fixture was protected legacy kindtool .tool-activity but assertion mistakenly selected canonical .tool-call-record. Corrected only new selector to exactly 2 legacy activities read then shell; original report order/count and identity assertions preserved.",
+  "evidenceFiles": {
+    "visual-green.json": "59f03125948f6a14b59503a79fdf0e7298ad149b5f8dab08f9d1b6bf876dab58",
+    "node-green.log": "5929093086cdcb6ab4c4c47b739478cde7b12edac20da43a0de53837a2f96a29",
+    "consumer.json": "4037bb685c65cdf724c23cc2de255bea6edf14521b46d885e7bdbcf3339d2b5e",
+    "full.json": "6e8c87810eaf257e8a6fa906598e1b04fecd2f826e3cda06045b81d8b56e7a04",
+    "tsc-final.log": "49ad917c426e1ab9bb7e5ad8c53a2fa4844fe03331b01623eac87fa4a881b15c",
+    "visual-first-red-observed.json": "d555b7585b7b27322cffa3052da41927395cefcd6e0a0e08881b42996d20b73f",
+    "ghost.json": "13a617b8e5d9dac78cc594955cbbdc8720228e3794e0cc3bb38607fc32574d1f",
+    "node-red.log": "ad22b76b16db1cab67b6ef847c1c76691deda0a1089c71e5a19898e8eab0b1e3"
+  },
+  "combinedSha256": "ead43d09e447b6ca7d4bcc0d835244a115b237573f79fa676feb972d66cc8982"
+}

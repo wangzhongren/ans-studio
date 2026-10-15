@@ -1,0 +1,13 @@
+{
+  "reports": [
+    {
+      "name": "P3 return preserves actual role scroll and expansion",
+      "value": true
+    },
+    {
+      "name": "P6 return role restores equivalent visible document entry focus",
+      "value": true
+    }
+  ],
+  "errors": []
+}

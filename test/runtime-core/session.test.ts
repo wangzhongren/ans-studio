@@ -1,3 +1,4 @@
+import { registerControlledDisplayProfile } from './fixtures.ts';
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, rm, readdir, readFile, mkdir, writeFile } from "node:fs/promises";
@@ -28,7 +29,7 @@ test("Service history operation returns scoped Model records/replay through the 
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 function provider(action: (options: RuntimeProviderOptions, emit: (event: SessionEvent) => void, session: RoleSession) => Promise<void>): RuntimeProviderFactory {
-  return (options) => ({
+  return (options) => (registerControlledDisplayProfile(options), {
     async composeContext(role) { return { systemPrompt: role.cardText }; },
     async bindRole() {
       const queue = createEventQueue<SessionEvent>();
@@ -51,7 +52,7 @@ test("each actual runtime turn publishes one typed original input before native 
       const images = [{ type: "image" as const, data: "IMAGE_NOT_IN_ECHO", mimeType: "image/png" }];
       const options = { images, onTurnStarted: (metadata: { turnId: string }) => { inputs.push(metadata.turnId); } };
       let calls = 0;
-      const factory: RuntimeProviderFactory = (providerOptions) => ({
+      const factory: RuntimeProviderFactory = (providerOptions) => (registerControlledDisplayProfile(providerOptions), {
         async composeContext() { return { systemPrompt: "fixture" }; },
         async bindRole() {
           const queue = createEventQueue<SessionEvent>();
@@ -221,7 +222,7 @@ test("corrupt ANS index is rejected before native bind allocates a session", asy
     const directory = path.join(root, ".ans/sessions/core/codex/ans");
     await mkdir(directory, { recursive: true }); await writeFile(path.join(directory, "index.json"), "{broken}");
     let bound = false;
-    const factory: RuntimeProviderFactory = () => ({ async composeContext() { return { systemPrompt: "fixture" }; }, async bindRole() { bound = true; throw new Error("should not allocate"); } });
+    const factory: RuntimeProviderFactory = (options) => (registerControlledDisplayProfile(options), { async composeContext() { return { systemPrompt: "fixture" }; }, async bindRole() { bound = true; throw new Error("should not allocate"); } });
     await assert.rejects(createRuntimeAdapter({ runtime: "codex", gate: allow, projectRoot: root, skillRoot: root, persistSession: true, providerFactories: { codex: factory } }).bindRole(role()));
     assert.equal(bound, false);
   } finally { await rm(root, { recursive: true, force: true }); }
@@ -269,7 +270,7 @@ test("hanging native abort is bounded, called once, and leaves the session quara
   try {
     let abortCalls = 0;
     let entered = false;
-    const factory: RuntimeProviderFactory = () => ({ async composeContext() { return { systemPrompt: "fixture" }; }, async bindRole() {
+    const factory: RuntimeProviderFactory = (options) => (registerControlledDisplayProfile(options), { async composeContext() { return { systemPrompt: "fixture" }; }, async bindRole() {
       const queue = createEventQueue<SessionEvent>();
       return { async prompt() { entered = true; await new Promise(() => {}); }, events: () => queue.stream, async abort() { abortCalls++; await new Promise(() => {}); }, async dispose() { queue.close(); } };
     } });
@@ -307,7 +308,7 @@ test("Service configured custom API key is stripped from the actual governed she
 test("outer timeout remains timed_out when abort cleanup emits inner aborted terminals", async () => {
   let completePrompt!: () => void;
   let abortCalls = 0;
-  const factory: RuntimeProviderFactory = () => ({ async composeContext() { return { systemPrompt: "fixture" }; }, async bindRole() {
+  const factory: RuntimeProviderFactory = (options) => (registerControlledDisplayProfile(options), { async composeContext() { return { systemPrompt: "fixture" }; }, async bindRole() {
     const queue = createEventQueue<SessionEvent>();
     return {
       async prompt() { await new Promise<void>((resolve) => { completePrompt = resolve; }); },
@@ -334,7 +335,7 @@ test("outer timeout remains timed_out when abort cleanup emits inner aborted ter
 test("outer aborted result stays aborted while failing cleanup remains honestly reported", async () => {
   let entered = false;
   let completePrompt!: () => void;
-  const factory: RuntimeProviderFactory = () => ({ async composeContext() { return { systemPrompt: "fixture" }; }, async bindRole() {
+  const factory: RuntimeProviderFactory = (options) => (registerControlledDisplayProfile(options), { async composeContext() { return { systemPrompt: "fixture" }; }, async bindRole() {
     const queue = createEventQueue<SessionEvent>();
     return {
       async prompt() { entered = true; await new Promise<void>((resolve) => { completePrompt = resolve; }); },
@@ -354,4 +355,61 @@ test("outer aborted result stays aborted while failing cleanup remains honestly 
   const terminal = events.filter((event) => event.kind === "settled");
   assert.equal(terminal.length, 1); assert.equal((terminal[0].detail as { outcome: string }).outcome, "aborted");
   assert.ok(events.some((event) => event.kind === "denied" && event.summary.includes("cleanup fixture failed")));
+});
+
+
+test("Core-managed binding rejects a provider that did not register its display profile before first prompt",async()=>{
+  let disposed=0,native=0;
+  const factory:RuntimeProviderFactory=options=>{
+    assert.equal(options.toolDisplayMode,"required-v1");assert.equal(typeof options.projectToolEvent,"function");assert.equal(typeof options.registerToolDisplayProfile,"function");
+    return {async composeContext(){return {systemPrompt:"fixture"};},async bindRole(){return {async prompt(){native++;},events:()=>({async *[Symbol.asyncIterator](){}}),async dispose(){disposed++;}};}};
+  };
+  await assert.rejects(createRuntimeAdapter({runtime:"codex",gate:allow,projectRoot:process.cwd(),skillRoot:process.cwd(),providerFactories:{codex:factory}}).bindRole(role()),/profile was not registered/);
+  assert.equal(native,0);assert.equal(disposed,1);
+});
+
+test("ordinary engine failure stays a non-tool fact in live, stored and reloaded events while actual tools retain projections",async()=>{
+  const root=await temp();const key='CORE_NON_TOOL_TEST_KEY';const secret='non-tool-fake-secret';const previous=process.env[key];process.env[key]=secret;
+  try{
+    const factory:RuntimeProviderFactory=options=>{
+      registerControlledDisplayProfile(options);
+      const queue=createEventQueue<SessionEvent>();
+      return {async composeContext(){return {systemPrompt:'fixture'};},async bindRole(){return {
+        async prompt(){
+          queue.push({kind:'denied',summary:`engine recovery failed ${secret}`,detail:{source:'engine-context-failure',name:'TransportError',rawDetail:secret,outcome:'failed'}});
+          queue.push({kind:'accepted',summary:'engine transport prepared',detail:{source:'engine-context-ready',rawDetail:secret}});
+          const tool=options.tools.find(tool=>tool.name==='read_file')!;const args={path:'missing-engine-test.txt'},toolCallId='actual-read-call';
+          queue.push(options.projectToolEvent!({phase:'start',origin:'handler-start',toolName:tool.name,toolCallId,input:{rule:tool.displayInputRule,args}}));
+          const result=await tool.handler({name:tool.name,args,toolCallId});assert.equal(result.ok,false);
+          queue.push(options.projectToolEvent!({phase:'result',origin:'handler-result',toolName:tool.name,toolCallId,input:{rule:tool.displayInputRule,args},result}));
+          queue.push({kind:'settled',summary:'actual failed outcome',detail:{outcome:'failed'}});
+        },events:()=>queue.stream,async dispose(){queue.close();},
+      };}};
+    };
+    const session=await createRuntimeAdapter({runtime:'pi',gate:allow,projectRoot:root,skillRoot:root,persistSession:true,extraCredentialEnvVars:[key],providerFactories:{pi:factory}}).bindRole(role());
+    const {events,done}=await collect(session);await session.prompt('observe actual failure');await session.dispose();await done;
+    const engine=events.find(event=>event.kind==='denied'&&event.summary.startsWith('engine recovery failed'))!;
+    assert.ok(engine);assert.equal(engine.summary,'engine recovery failed [REDACTED]');assert.equal(engine.runtime,'pi');assert.equal(engine.roleId,'core');assert.ok(engine.turnId);
+    for(const field of ['toolName','phase','call','display','rawDetail','source','name'])assert.equal(Object.hasOwn(engine.detail??{},field),false,field);
+    assert.deepEqual(engine.detail,{turnId:engine.turnId,outcome:'failed'});
+    const ready=events.find(event=>event.kind==='accepted'&&event.summary==='engine transport prepared')!;assert.ok(ready);assert.equal(Object.hasOwn(ready.detail??{},'toolName'),false);
+    const actual=events.find(event=>(event.detail as {toolName?:string})?.toolName==='read_file'&&event.kind==='denied')!;
+    assert.equal((actual.detail as {phase:string}).phase,'result');assert.match((actual.detail as {display:{error:{text:string}}}).display.error.text,/ENOENT/);
+    assert.equal((events.at(-1)!.detail as {outcome:string}).outcome,'failed');
+    const file=path.join(root,'.ans/sessions/core/pi/ans/replay.jsonl');const raw=await readFile(file,'utf8');assert.ok(!raw.includes(secret));assert.ok(!raw.includes('TransportError'));
+    const history=await readRuntimeSessionHistory({projectRoot:root,roleId:'core',runtime:'pi',credentialEnvNames:[key]});
+    const restored=history.entries.find(entry=>entry.event?.summary==='engine recovery failed [REDACTED]')!.event!;
+    assert.equal(restored.kind,'denied');assert.deepEqual(restored.detail,engine.detail);assert.equal(Object.hasOwn(restored.detail??{},'phase'),false);
+    assert.equal((history.entries.find(entry=>(entry.event?.detail as {toolName?:string})?.toolName==='read_file'&&entry.event?.kind==='denied')!.event!.detail as {phase:string}).phase,'result');
+    assert.equal(await readFile(file,'utf8'),raw,'history reads must not rewrite old records');
+  }finally{if(previous===undefined)delete process.env[key];else process.env[key]=previous;await rm(root,{recursive:true,force:true});}
+});
+
+test("history does not resurrect an old empty-name synthetic tool phase on an engine failure",async()=>{
+  const root=await temp();try{
+    const store=createRuntimeSessionStore({projectRoot:root,roleId:'core',runtime:'pi'});
+    await store.appendReplay([{at:'2026-10-15T00:00:00.000Z',kind:'event',turnId:'actual-old-turn',event:{kind:'denied',summary:'old engine failure',runtime:'pi',roleId:'core',turnId:'actual-old-turn',detail:{toolName:'',phase:'blocked',turnId:'actual-old-turn',rawDetail:'password=hide-me'}}}]);
+    const history=await readRuntimeSessionHistory({projectRoot:root,roleId:'core',runtime:'pi'});const event=history.entries[0].event!;
+    assert.equal(event.kind,'denied');assert.equal(event.summary,'old engine failure');assert.deepEqual(event.detail,{turnId:'actual-old-turn'});assert.equal(Object.hasOwn(event.detail??{},'phase'),false);
+  }finally{await rm(root,{recursive:true,force:true});}
 });

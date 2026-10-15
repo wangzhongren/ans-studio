@@ -1,0 +1,4 @@
+Error occurred in handler for 'runtime-config:get': Error: No handler registered for 'runtime-config:get'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+INDEPENDENT_RENDERER_PASS 14 /private/tmp/ans-visual-v2-root-renderer

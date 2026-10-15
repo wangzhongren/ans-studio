@@ -132,7 +132,13 @@
 
   // （原本地 `esc` 实现已在 B-1 删除：转义是 `markdown.js` 的**单一来源**——见文件头。）
 
-  function setHint(text) { $("composer-hint").textContent = text || ""; }
+  var currentHintSource = null;
+  function setHint(text, source) { $("composer-hint").textContent = text || ""; currentHintSource = source || null; }
+  function clearQueueHint(roleId, clientMessageId) {
+    if (backgroundDelivery || state.selectedRoleId !== roleId) return;
+    var source = currentHintSource;
+    if (source && source.kind === "queue" && source.projectRoot === state.projectRoot && source.runtime === state.runtime && source.roleId === roleId && (!clientMessageId || source.clientMessageId === clientMessageId)) setHint("");
+  }
 
   /** 会话状态（客户裁定 2026-10-13：界面**不再显示**「聊天中/空闲」pill）——kind **程序化保留**：
    *  写到 `#chat` 的 `data-state` 属性（run/idle/err），e2e 与外部驱动仍可断言；label 参数保留以兼容调用点。 */
@@ -149,6 +155,9 @@
       ? ""
       : "从左侧选择一个角色开始聊天";
     $("chat-role-sub").hidden = !!role;
+    $("composer-scope").textContent = (role ? role.roleId : "未选择角色") + " / " + Rt.runtimeLabel(state.runtime);
+    $("inp-message").placeholder = role ? "给" + role.roleId + "发送消息…" : "选择角色后发送消息…";
+    renderContextState(role ? role.roleId : null);
     updateHaltButton();
     syncChatState(role ? role.roleId : null);
   }
@@ -269,7 +278,7 @@
       opRequests: opRequests, replayState: replayState, activityOpen: activityOpen, groupSeqByRole: groupSeqByRole,
       groupIdentitiesByRole: groupIdentitiesByRole, drawerReading: drawerReading, composerDrafts: composerDrafts,
       withdrawPending: withdrawPending, withdrawFeedback: withdrawFeedback, lastManualSend: lastManualSend,
-      liveReplayCounts: liveReplayCounts, manualMessages: manualMessages };
+      liveReplayCounts: liveReplayCounts, manualMessages: manualMessages, reportCards: reportCards, deliveryCards: deliveryCards, persistenceCache: persistenceCache };
   }
 
   function installRuntimeView(view) {
@@ -285,6 +294,7 @@
     drawerReading = v.drawerReading || Object.create(null); composerDrafts = v.composerDrafts || Object.create(null);
     withdrawPending = v.withdrawPending || Object.create(null); withdrawFeedback = v.withdrawFeedback || Object.create(null);
     liveReplayCounts = v.liveReplayCounts || Object.create(null); manualMessages = v.manualMessages || Object.create(null);
+    reportCards = v.reportCards || Object.create(null); deliveryCards = v.deliveryCards || Object.create(null); persistenceCache = v.persistenceCache || Object.create(null);
     lastManualSend = v.lastManualSend || { roleId: null, text: "", at: 0 };
   }
 
@@ -316,6 +326,7 @@
   async function selectRuntime(runtime) {
     if (!state.projectRoot || ["pi", "codex", "claude"].indexOf(runtime) < 0 || runtime === state.runtime) return;
     ++configSaveVersion;
+    invalidateDocumentRead();
     saveComposerDraft(state.selectedRoleId); captureDrawerReading();
     runtimeViews[Rt.viewKey(state.projectRoot, state.runtime)] = captureRuntimeView();
     ++roleSelectionVersion; projectGeneration += 1;
@@ -457,6 +468,7 @@
     opRequests = Object.create(null); // 交互请求登记表随之作废（旧项目的请求已随会话/时限自行落定）
     replayState = Object.create(null); // 回放去重状态随项目作废（新项目的转录从零核对）
     liveReplayCounts = Object.create(null); manualMessages = Object.create(null);
+    reportCards = Object.create(null); deliveryCards = Object.create(null); persistenceCache = Object.create(null);
     $("chat").innerHTML = emptyStateHtml();
     bindEmptyState($("chat"));
   }
@@ -652,6 +664,7 @@
       requestId: typeof o.requestId === "string" ? o.requestId : null,
       origin: o.origin || rowOrigin, replayToken: Object.prototype.hasOwnProperty.call(o, "replayToken") ? o.replayToken : rowReplayToken,
       manualClientId: o.manualClientId || null,
+      turnId: typeof o.turnId === "string" ? o.turnId : "", assistantText: o.assistantText === true, originalOpen: o.originalOpen === true, originalFlags: o.originalFlags || "",
     };
     if (at === rl.rows.length) {
       rl.rows.push(rec);
@@ -805,12 +818,13 @@
     return rec;
   }
 
-  function appendAssistant(pane, text) {
+  function appendAssistant(pane, text, turnId) {
     // Q-1/Q-2（2026-10-12）：**流式惰性 Markdown**——该角色正在跑（真信号 `roleBusy`）时助手消息先以
     // **纯文本**挂上（textContent——天然转义），一轮结束（settled）再**一次性** Markdown 化该段；
     // 离屏行（窗口化）**不跑解析器**——挂载时才渲染。非流式（回放/静止态消息）逐字照旧即时渲染。
     var roleId = pane.dataset.roleId || "";
-    var streaming = state.roleBusy[roleId] === true;
+    var replyRows = rowListFor(pane);
+    var streaming = state.roleBusy[roleId] === true && !(turnId && replyRows.settledTurns && replyRows.settledTurns[turnId]);
     var pin = streamShouldPin(pane); // S-1：**先量后挂**（在底部附近才贴底；上翻不打断）
     registerRow(
       pane,
@@ -826,7 +840,7 @@
         return div;
       },
       60,
-      { kind: "assistant", data: text, mdReady: !streaming }
+      { kind: "assistant", data: text, mdReady: !streaming, turnId: turnId, assistantText: true }
     );
     scrollBottom(pane, pin);
   }
@@ -845,6 +859,43 @@
     );
     scrollBottom(pane, pin);
     return rec.el; // 小 pane（非窗口化）恒已挂载；窗口化下离屏行 el 为 null——调用方须容忍（现有唯一用法=开头 loading 行）
+  }
+
+  function terminalFact(event) {
+    if (!event || ["denied", "settled"].indexOf(event.kind) < 0 || typeof event.turnId !== "string" || !event.turnId || Tr.isToolActivity(event)) return null;
+    var outcome = event.detail && event.detail.outcome;
+    return ["completed", "failed", "aborted", "timed_out"].indexOf(outcome) >= 0 ? { turnId: event.turnId, outcome: outcome } : null;
+  }
+  function buildTurnTerminal(rec) {
+    var div = document.createElement("div"), texts = [];
+    div.className = "sys sys-call turn-terminal";
+    div.dataset.turnId = rec.data.turnId; div.dataset.outcome = rec.data.outcome;
+    // 身份已由实际turn/outcome确定；这里只让同一生命周期的相同摘要读一次，不用于识别或删除别的事实。
+    rec.data.sources.forEach(function (source) { if (texts.indexOf(source.text) < 0) texts.push(source.text); });
+    div.innerHTML = '<span class="sys-ico">' + (rec.data.outcome === "completed" ? ICONS.call : ICONS.deny) + '</span><div class="sys-text">' + texts.map(function (text) { return '<div>' + esc(text) + '</div>'; }).join("") + '</div>';
+    return div;
+  }
+  function appendTurnTerminal(pane, event, previousData) {
+    var identity = terminalFact(event); if (!identity) return false;
+    var rl = rowListFor(pane), reading = captureChatReading(pane), pin = streamShouldPin(pane);
+    var rec = rl.rows.find(function (row) { return row.kind === "turn-terminal" && row.data.turnId === identity.turnId && row.data.outcome === identity.outcome; });
+    var sourceToken = event.kind === "denied" ? rowReplayToken : null;
+    if (!rec && sourceToken && rl.tokenRows) {
+      var existing = rl.tokenRows[Rt.tokenId(sourceToken)];
+      if (existing && existing.kind === "system" && existing.data.cls === "sys-call") rec = existing;
+    }
+    var isNew = !rec;
+    var data = rec && rec.kind === "turn-terminal" ? rec.data : previousData || { turnId: identity.turnId, outcome: identity.outcome, sources: [] };
+    if (!data.sources.some(function (source) { return source.kind === event.kind && source.text === event.summary; })) data.sources.push({ kind: event.kind, text: String(event.summary || ""), replayToken: sourceToken });
+    if (!rec) rec = registerRow(pane, buildTurnTerminal, 34, { kind: "turn-terminal", data: data, replayToken: sourceToken });
+    else {
+      rec.kind = "turn-terminal"; rec.data = data; rec.build = buildTurnTerminal;
+      if (rec.el) { var updated = buildTurnTerminal(rec); rec.el.className = updated.className; rec.el.dataset.turnId = data.turnId; rec.el.dataset.outcome = data.outcome; rec.el.innerHTML = updated.innerHTML; }
+      refreshActivityHeight(pane, rec, reading);
+    }
+    data.sources.forEach(function (source) { if (source.replayToken) { (rl.tokenRows || (rl.tokenRows = Object.create(null)))[Rt.tokenId(source.replayToken)] = rec; if (!rec.replayToken) rec.replayToken = source.replayToken; } });
+    if (isNew) scrollBottom(pane, pin);
+    return true;
   }
 
   function refreshActivityHeight(pane, rec, saved) {
@@ -867,12 +918,24 @@
       (unknown ? ' · 含状态未记录' : '') + '</span></summary>' + data.items.map(function (a, i) {
         // v2 对齐（2026-10-13）：三列 = 42px 时间 / 操作名+目标 / 状态；未知状态带 is-unknown（琥珀色）。
         return '<div class="tool-activity" title="' + esc(a.at || '') + '" data-activity-index="' + i + '">' +
-          '<span class="activity-time">' + esc(a.at || '') + '</span>' +
+          '<span class="activity-time">' + esc(Rt.shortTime(a.at)) + '</span>' +
           '<span class="activity-op">' + esc(a.toolName) +
           '<span class="activity-target">' + esc(a.target || '目标未记录') + '</span></span>' +
-          '<span class="activity-state' + (a.status === "unknown" ? ' is-unknown' : '') + '">' + esc(a.label) + '</span></div>';
+          '<span class="activity-state' + (a.status === "unknown" ? ' is-unknown' : '') + '">' + esc(a.label) + (a.legacyStatusSource === 'legacy-classifier' ? ' · 旧文本分类' : '') + '</span></div>' + ((a.hasDisplay || a.legacyTextProjection) ? '<details class="legacy-tool-detail" data-legacy-index="' + i + '"' + (a.legacyOpen ? ' open' : '') + '><summary>查看已保存的安全详情</summary><div></div></details>' : '');
       }).join("");
     rec.el.open = data.open;
+    rec.el.querySelectorAll("[data-legacy-index]").forEach(function (details) {
+      var activity = data.items[Number(details.dataset.legacyIndex)];
+      function show() {
+        activity.legacyOpen = details.open;
+        var body = details.querySelector("div");
+        if (details.open && !body.dataset.materialized) { body.innerHTML = toolDetails(activity) + displayField("历史原记录（安全显示）", activity.legacyTextProjection); body.dataset.materialized = "true"; }
+        rec.measured = false;
+        if (rec.pane && rec.pane.isConnected) refreshActivityHeight(rec.pane, rec, captureChatReading(rec.pane));
+      }
+      details.addEventListener("toggle", show);
+      if (details.open) show();
+    });
   }
 
   function activityIdentity(activity) {
@@ -892,11 +955,29 @@
     if (!entry.card || !entry.activityStages) return;
     var panel = entry.card.querySelector(".op-tool-lifecycle");
     if (!panel) { panel = document.createElement("div"); panel.className = "sys sys-call op-tool-lifecycle"; entry.card.appendChild(panel); }
+    var previousDetails = panel.querySelector(".operator-tool-details"), wasOpen = previousDetails && previousDetails.open;
+    var focusedDetail = previousDetails && previousDetails.contains(document.activeElement);
     panel.textContent = ["blocked", "result"].filter(function (phase) { return entry.activityStages[phase]; }).map(function (phase) {
       var activity = entry.activityStages[phase];
       return activity.toolName + " · " + activity.label + (activity.exceptional ? "：" + (activity.deniedSummary || activity.visibleSummary) : "");
     }).join("；");
     panel.hidden = panel.textContent === "";
+    var displayed = ["blocked", "result"].filter(function (phase) { return entry.activityStages[phase] && entry.activityStages[phase].hasDisplay; });
+    if (displayed.length) {
+      var detail = document.createElement("details"); detail.className = "operator-tool-details";
+      detail.innerHTML = '<summary>查看安全执行详情</summary><div class="operator-safe-detail-body"></div>';
+      function materializeOperatorDetails() {
+        var body = detail.querySelector("div"); if (!detail.open || body.dataset.materialized) return;
+        var pane = paneFor(entry.roleId), reading = captureChatReading(pane);
+        body.innerHTML = displayed.map(function (phase) { return toolDetails(entry.activityStages[phase]); }).join(""); body.dataset.materialized = "true";
+        var rl = paneRowLists[entry.roleId], rec = rl && rl.rows.find(function (record) { return record.requestId && opRequests[record.requestId] === entry; });
+        if (rec && pane.isConnected) refreshActivityHeight(pane, rec, reading);
+      }
+      detail.addEventListener("toggle", materializeOperatorDetails);
+      panel.appendChild(detail); panel.hidden = false;
+      detail.open = wasOpen === true; if (detail.open) materializeOperatorDetails();
+      if (focusedDetail) detail.querySelector("summary").focus({ preventScroll: true });
+    }
   }
   function rememberActivities(rl, rec) {
     var map = rl.activityByIdentity || (rl.activityByIdentity = Object.create(null));
@@ -921,6 +1002,55 @@
     return rec;
   }
 
+  function displayField(label, value) {
+    if (!value || typeof value.text !== "string") return "";
+    return '<section class="tool-detail-field"><strong>' + esc(label) + '</strong><span class="projection-flags">' + esc(Rt.textFlags(value)) + '</span><pre>' + esc(value.text) + '</pre></section>';
+  }
+  function toolDetails(activity) {
+    var display = activity.display;
+    var statusSource = { "native-result": "状态来源：原生结果记录", "tool-details": "状态来源：工具明细记录", "legacy-classifier": "状态来源：旧文本分类，不是新机器执行事实" }[activity.legacyStatusSource];
+    var targetSource = { argument: "目标来源：原参数记录", "tool-detail": "目标来源：工具明细记录", "same-call": "目标来源：同一真实调用记录" }[activity.legacyTargetSource];
+    var notes = [statusSource, targetSource, Rt.metadataLabel(activity.metadataOmissions)].filter(Boolean).join("；");
+    var metadata = notes ? '<p class="projection-flags">' + esc(notes) + '</p>' : "";
+    if (!display) return metadata + '<p class="muted">' + (activity.displayUnsupported ? "不支持此详情版本。" : "这条历史没有保存更多目标和错误详情。") + '</p>';
+    var html = display.target ? displayField(display.target.kind === "command" ? "实际命令" : "目标文件", display.target.value) : '<p class="muted">目标未保存</p>';
+    html += displayField("错误", display.error) + displayField("结果", display.resultText);
+    var process = display.process;
+    if (process) {
+      if (typeof process.exitCode === "number") html += '<p>退出码：' + esc(process.exitCode) + '</p>';
+      if (process.signal) html += '<p>信号：' + esc(process.signal) + '</p>';
+      html += displayField("标准输出", process.stdout) + displayField("标准错误", process.stderr);
+    }
+    if (typeof display.durationMs === "number") html += '<p>耗时：' + esc(display.durationMs) + ' ms</p>';
+    if (display.omissions && display.omissions.length) html += '<p class="muted">' + esc(display.omissions.map(function (reason) { return reason === "budget" ? "部分展示内容因预算省略" : reason === "unsupported-content" ? "非文本结果未展示" : "未支持的输入未展示"; }).join("；")) + '</p>';
+    return metadata + html;
+  }
+  function refreshToolLifecycle(record, pane) {
+    if (!record.el || record.kind === "operator") return;
+    var stages = record.activityStages || {}, all = ["start", "blocked", "result"].filter(function (phase) { return stages[phase]; });
+    var activity = stages.result || stages.blocked || stages.start;
+    if (!activity) return;
+    if (!all.some(function (phase) { return stages[phase].hasDisplay; })) {
+      record.el.textContent = activity.toolName + " · " + all.map(function (phase) { var a = stages[phase]; return a.label + (a.exceptional ? "：" + (a.deniedSummary || a.visibleSummary) : ""); }).join("；"); return;
+    }
+    var old = record.el.querySelector("details"), open = old && old.open;
+    var focus = old && old.contains(document.activeElement);
+    var target = activity.fullTarget || stages.start && stages.start.fullTarget || "目标未保存";
+    var timestamp = Rt.shortTime(activity.at);
+    var label = all.map(function (phase) { return stages[phase].label; }).join(" → ");
+    var errorPreview = activity.display && activity.display.error ? reportText(activity.display.error).split(/\r?\n/)[0] : activity.errorCode || "";
+    record.el.innerHTML = '<details class="tool-call-record"' + (open ? ' open' : '') + '><summary><span class="tool-call-time" title="' + esc(activity.at || "时间未保存") + '">' + esc(timestamp) + '</span><strong>' + esc(activity.toolName) + '</strong><span class="tool-call-target">' + esc(target) + '</span><span class="tool-call-status">' + esc(label) + '</span>' + (errorPreview ? '<span class="tool-call-error">' + esc(errorPreview.length > 180 ? errorPreview.slice(0,180) + '…' : errorPreview) + '</span>' : '') + '</summary><div class="tool-call-details"></div></details>';
+    var details = record.el.querySelector("details"), body = record.el.querySelector(".tool-call-details");
+    function materialize() {
+      if (!details.open || body.dataset.materialized) return;
+      var reading = captureChatReading(pane);
+      body.innerHTML = all.map(function (phase) { return '<h4>' + esc(stages[phase].label) + '</h4>' + toolDetails(stages[phase]); }).join("");
+      body.dataset.materialized = "true"; record.measured = false; if (pane.isConnected) refreshActivityHeight(pane, record, reading);
+    }
+    details.addEventListener("toggle", materialize);
+    if (open) materialize();
+    if (focus) record.el.querySelector("summary").focus({ preventScroll: true });
+  }
   function appendActivity(pane, activity) {
     var rl = rowListFor(pane);
     activity.origin = activity.origin || rowOrigin;
@@ -951,16 +1081,12 @@
       if (!lifecycle) {
         lifecycle = registerRow(pane, function (record) {
           var el = document.createElement("div"); el.className = "sys sys-call";
-          record.el = el; if (record.refreshLifecycle) record.refreshLifecycle(); return el;
+          record.el = el; el.addEventListener("toggle", function () { refreshActivityHeight(pane, record, captureChatReading(pane)); }, true); if (record.refreshLifecycle) record.refreshLifecycle(); return el;
         }, 34, { kind: "tool-lifecycle", data: null });
         lifecycle.activityStages = {};
-        lifecycle.refreshLifecycle = function () {
-          if (!lifecycle.el || lifecycle.kind === "operator") return;
-          lifecycle.el.textContent = activity.toolName + " · " + ["start", "blocked", "result"].filter(function (phase) { return lifecycle.activityStages[phase]; }).map(function (phase) {
-            var stage = lifecycle.activityStages[phase]; return stage.label + (stage.exceptional ? "：" + (stage.deniedSummary || stage.visibleSummary) : "");
-          }).join("；");
-        };
+        lifecycle.refreshLifecycle = function () { refreshToolLifecycle(lifecycle, pane); };
       }
+      if (activity.hasDisplay) lifecycle.keepEl = true;
       lifecycle.activityStages = lifecycle.activityStages || {};
       lifecycle.activityStages[activity.identityPhase] = activity;
       lifecycles[callKey] = lifecycle;
@@ -978,7 +1104,7 @@
     }
     if (activity.exceptional) {
       rl.activityGroup = null;
-      appendDenied(pane, activity.deniedSummary || activity.visibleSummary || activity.toolName + ' · ' + activity.label, activity.fullTarget);
+      appendDenied(pane, activity.deniedSummary || activity.visibleSummary || activity.toolName + ' · ' + activity.label, activity.fullTarget, activity);
       var deniedRec = rl.rows[rl.rows.length - 1]; deniedRec.toolActivity = activity; rememberActivities(rl, deniedRec);
       return deniedRec;
     }
@@ -1001,7 +1127,7 @@
       rec = registerRow(pane, function (record) {
         var el = document.createElement("details");
         el.className = "tool-records";
-        record.el = el;
+        record.el = el; record.pane = pane;
         fillActivities(record);
         el.addEventListener("toggle", function () {
           if (record.data.open === el.open) return;
@@ -1020,13 +1146,14 @@
       if (rec.el) fillActivities(rec);
       refreshActivityHeight(pane, rec, saved);
     }
+    rec.pane = pane;
     rememberActivities(rl, rec);
     scrollBottom(pane, pin);
     return rec;
   }
 
   /** 拒绝事件：内联显示，点击可展开看完整信息（含按根分组的允许路径）。 */
-  function appendDenied(pane, text, target) {
+  function appendDenied(pane, text, target, activity) {
     // 仅截正文换行，命令里的分号不是原因/退出码的边界。
     var headline = String(text == null ? "" : text).split(/\r?\n/)[0].trim();
     var pin = streamShouldPin(pane); // S-1：先量后挂
@@ -1040,6 +1167,15 @@
           (target && headline.indexOf(target) >= 0 ? "" : '<span class="denied-target">' + esc(target || "目标未记录") + '</span>') +
           "</span>" + ICONS.chev + "</summary>" +
           '<div class="sys-detail">' + esc(text) + "</div>";
+        if (activity && (activity.hasDisplay || activity.legacyTextProjection)) {
+          var body = det.querySelector(".sys-detail"); body.textContent = "";
+          det.addEventListener("toggle", function () {
+            if (!det.open || body.dataset.materialized) return;
+            var reading = captureChatReading(pane);
+            body.innerHTML = toolDetails(activity) + displayField("历史原记录（安全显示）", activity.legacyTextProjection); body.dataset.materialized = "true";
+            var rl = rowListFor(pane), record = rl.rows.find(function (item) { return item.el === det; }); if (record) refreshActivityHeight(pane, record, reading);
+          });
+        }
         return det;
       },
       40
@@ -1062,39 +1198,207 @@
    * 本函数只**呈现**事件携带的结构化数据，**不作任何判定**（是否完成/是否被拦由编排给出）；
    * 「谁进谁的 pane」的分发在 `appendEvent` 里按信封 `roleId` 决定（B-2：各归各的 pane，无跨角色串扰）。
    */
-  function appendHandback(pane, hb) {
-    ensureContent(pane);
-    var blocked = hb.status !== "completed";
-    var statusLabel = "未知状态";
-    if (hb.status === "completed") statusLabel = "已完成";
-    else if (hb.status === "blocked") statusLabel = "被拦下";
-    else if (hb.status === "failed") statusLabel = "失败";
-    else if (hb.status === "aborted") statusLabel = "已中止";
-    else if (hb.status === "unreported") statusLabel = "未报告";
-    var title = "回交主入口";
-    if (hb.evidence !== undefined && !Array.isArray(hb.evidence)) throw new Error("报告证据形状不符");
-    var evItems = hb.evidence && hb.evidence.length
-      ? hb.evidence.map(function (e) { return '<li class="hb-ev">' + esc(e) + "</li>"; }).join("")
-      : '<li class="hb-ev hb-ev-empty">（未提供证据）</li>';
-    var meta = "角色 " + esc(hb.roleId) + (hb.taskId ? "，任务 " + esc(hb.taskId) : "");
-    var card = document.createElement("div");
-    // `is-blocked`：blocked 的**可见**区分（左语义色竖条 + 边色；不只靠状态文字）。
-    card.className = "msg-handback";
-    if (blocked) card.className += " is-blocked";
-    card.innerHTML =
-      '<div class="hb-head">' +
-      '<span class="hb-ico">' + ICONS.handback + "</span>" +
-      '<span class="hb-title">' + title + "</span>" +
-      '<span class="hb-status ' + (blocked ? "hb-blocked" : "hb-ok") + '">' + statusLabel + "</span>" +
-      "</div>" +
-      '<div class="hb-meta">' + meta + "</div>" +
-      // N-4（2026-10-12 客户裁定「都要 markdown 化」）：回交卡**摘要**（角色产出的报告文本）走**同一 Markdown
-      // 管线**（同一 `esc`/白名单）；**证据列表**保持逐条 esc（不拼成一段 Markdown）。
-      '<div class="hb-summary card-md">' + Md.renderMarkdown(hb.summary || "") + "</div>" +
-      '<ul class="hb-evidence">' + evItems + "</ul>";
-    var pin = streamShouldPin(pane); // S-1：先量后挂（回交卡到达也按「在底部才贴底」）
-    registerRow(pane, function () { return card; }, 190, { keepEl: true, kind: "handback" }); // Q-2：卡离窗保留实例
-    scrollBottom(pane, pin);
+  var reportCards = Object.create(null), deliveryCards = Object.create(null), persistenceCache = Object.create(null);
+  function storageKey(scope, id) { return JSON.stringify([scope.projectRoot, scope.roleId, scope.runtime, id]); }
+  function reportText(value) { return value && typeof value.text === "string" ? value.text : ""; }
+  function reportDeclaration(report) {
+    var labels = { completed: "已完成", blocked: "被拦下", unreported: "未报告", failed: "失败", aborted: "已中止" };
+    var origin = report.origin === "submitted-report" ? "报告声明：" : report.origin === "terminal-fallback" ? "系统按终态记录：" : "来源未确认：";
+    return origin + (labels[report.status] || "未知状态");
+  }
+  function reportBody(report, includeSave) {
+    if (!report || report.reportId && report.version !== 1) return '<p>不支持此报告版本，未生成成果摘要。</p>';
+    var full = reportText(report.summary), preview = Array.from(full).slice(0, 180).join("").split(/\r?\n/).slice(0, 4).join("\n"), folded = preview.length < full.length;
+    var evidence = report.evidence || [], flags = Rt.textFlags(report.summary);
+    var evidenceFlags = evidence.some(function (item) { return item.truncated; }) ? "部分证据显示已截断" : "";
+    if (evidence.some(function (item) { return item.redacted; })) evidenceFlags += (evidenceFlags ? "；" : "") + "部分证据已净化";
+    return '<div class="report-top"><div class="report-eyebrow">来源 ' + esc(report.source && report.source.roleId || "未知") + ' · ' + esc(report.origin === "submitted-report" ? "正式回交" : report.origin === "terminal-fallback" ? "终态记录" : "来源未确认") + '</div><h2 class="report-title">任务报告</h2><div class="hb-head"><strong>' + esc(reportDeclaration(report)) + '</strong></div><p class="hb-meta">' + esc(report.source && report.source.runtime ? Rt.runtimeLabel(report.source.runtime) : "引擎未知") + ' · ' + esc(report.taskId ? "任务 " + report.taskId : "任务关联未知") + '</p></div><div class="report-body"><div class="excerpt-label">报告原文摘录</div><div class="hb-summary card-md">' + Md.renderMarkdown(preview) + '</div><p class="projection-flags">' + esc([flags, folded ? "摘要已折叠，完整可用显示副本见下方" : "", evidenceFlags, report.evidenceOmitted ? "另有 " + report.evidenceOmitted + " 条证据因预算省略" : ""].filter(Boolean).join("；")) + '</p><dl class="report-facts">' + (includeSave ? '<div><dt>报告存储</dt><dd><div class="persistence-state" role="status" aria-live="polite"></div></dd></div>' : '') + '<div><dt>独立验收</dt><dd>尚未确认</dd></div></dl><p class="report-disclaimer">以上为报告或终态记录，不等于独立验收通过。</p><div class="report-actions"><details class="report-complete"><summary>查看完整报告摘要与证据</summary><div class="report-complete-body"><div class="hb-complete-summary card-md">' + Md.renderMarkdown(full) + '</div><p class="projection-flags">' + esc(flags) + '</p><ul class="hb-evidence">' + (evidence.length ? evidence.map(function (item) { return '<li>' + esc(reportText(item)) + '<small class="projection-flags">' + esc(Rt.textFlags(item)) + '</small></li>'; }).join("") : '<li>（未提供证据）</li>') + '</ul></div></details></div></div>';
+  }
+  function bindReportReading(card, pane) {
+    card.querySelectorAll("details").forEach(function (details) { details.addEventListener("toggle", function () {
+      var rl = paneRowLists[pane.dataset.roleId], rec = rl && rl.rows.find(function (row) { return row.el === card; });
+      if (rec) refreshActivityHeight(pane, rec, captureChatReading(pane));
+    }); });
+  }
+  function taskTurn(rec) {
+    if (!rec.replayToken) return null;
+    try { var key = JSON.parse(rec.replayToken.key); return key[0] === "input" ? key[1] : null; } catch (_) { return null; }
+  }
+  function applyReportedTask(pane, turnId, receiver) {
+    if (typeof turnId !== "string" || !turnId) return;
+    var rl = rowListFor(pane), reading = captureChatReading(pane);
+    if (receiver) (rl.deliveryTurns || (rl.deliveryTurns = Object.create(null)))[turnId] = true;
+    receiver = !!(rl.deliveryTurns && rl.deliveryTurns[turnId]);
+    if (!receiver) (rl.reportedTurns || (rl.reportedTurns = Object.create(null)))[turnId] = true;
+    rl.rows.forEach(function (rec) {
+      var reply = rec.assistantText && rec.turnId === turnId && (rec.origin === "history" || rl.settledTurns && rl.settledTurns[turnId]);
+      var task = !receiver && taskTurn(rec) === turnId && rec.kind !== "injected";
+      if ((!reply && !task) || reply && rec.replyFolded || task && rec.taskRequest) return;
+      var previousBuild = rec.build;
+      if (reply) { rec.replyFolded = true; rec.deliveryReply = receiver; } else rec.taskRequest = true;
+      rec.keepEl = true;
+      rec.build = function (record) { return wrapTaskRequest(previousBuild(record), record, reply); };
+      if (rec.el) { var previous = rec.el, parent = previous.parentNode, next = previous.nextSibling; rec.el = wrapTaskRequest(previous, rec, reply); if (parent) parent.insertBefore(rec.el, next); }
+      refreshActivityHeight(pane, rec, reading);
+    });
+  }
+  function wrapTaskRequest(content, record, reply) {
+    var className = reply ? "reply-original" : "task-request";
+    if (content.classList.contains(className)) return content;
+    var details = document.createElement("details"); details.className = className; details.open = record.originalOpen === true;
+    var summary = document.createElement("summary"); summary.textContent = reply ? record.deliveryReply ? "本轮回交处理回复原文（展开）" : "本轮角色回复原文（展开）" : "任务请求原文"; if (record.originalFlags) { var flags = document.createElement("small"); flags.className = "original-flags projection-flags"; flags.textContent = record.originalFlags; summary.appendChild(flags); } details.appendChild(summary);
+    var body = document.createElement("div"); body.className = "task-request-body"; body.appendChild(content); details.appendChild(body);
+    details.addEventListener("toggle", function () { record.originalOpen = details.open; var pane = details.closest(".chat-pane"), rl = pane && paneRowLists[pane.dataset.roleId], rec = rl && rl.rows.find(function (row) { return row.el === details; }); if (rec) { rec.originalOpen = details.open; refreshActivityHeight(pane, rec, captureChatReading(pane)); } });
+    return details;
+  }
+
+  function sourceDocumentButton(report, container) {
+    var roleId = report.source && report.source.roleId;
+    if (!roleId || report.reportId && report.version !== 1) return;
+    var button = document.createElement("button"); button.type = "button"; button.className = "btn report-source-button"; button.textContent = "查看来源角色文档";
+    button.addEventListener("click", function () { documentList(roleId, button, "report"); }); var actions = container.querySelector(".report-actions"); if (actions) actions.insertBefore(button, actions.firstChild); else container.appendChild(button);
+  }
+  function findCardRecord(entry) {
+    var rl = paneRowLists[entry.scope.roleId];
+    return rl && rl.pane === entry.pane ? rl.rows.find(function (row) { return row.el === entry.card; }) : null;
+  }
+  function updatePersistenceCard(entry) {
+    var state = entry.saveState || {}, target = entry.target;
+    var panel = entry.card.querySelector(".persistence-state"); if (!panel) return;
+    var hadFocus = panel.contains(document.activeElement);
+    var reading = captureChatReading(entry.pane);
+    var text = entry.pending ? target ? "正在保存历史…" : "正在保存报告…" : Rt.persistenceLabel(state, target);
+    var retry = target ? state.history === "failed" && state.retryHistoryAvailable : state.state === "failed" && state.retryAvailable;
+    var supported = entry.capabilities && (target ? entry.capabilities.deliveryHistorySaveSupported : entry.capabilities.reportSaveSupported);
+    var receipt = entry.lastReceipt;
+    var receiptOutcomeLabel = receipt && ({ completed: "已完成", failed: "失败", aborted: "已中止", timed_out: "运行超时" }[receipt.outcome] || receipt.outcome);
+    var historyLabel = entry.pending ? "正在保存历史…" : state.history === "saved" || state.history === "already-saved" ? "已保存" : text;
+    var inputLabel = receipt ? receipt.inputSaved === true ? "已保存" : receipt.history === "disabled" ? "未启用历史保存" : "尚未保存" : "未确认";
+    var outcomeLabel = receipt ? receipt.outcome ? receiptOutcomeLabel : receipt.providerMayHaveStarted ? "可能已开始，结果未确认" : "尚未交给Provider" : "未确认";
+    var execution = target ? '<dl class="report-facts delivery-batch-facts"><div><dt>接收历史</dt><dd class="persistence-message" tabindex="-1">' + esc(historyLabel) + '</dd></div><div><dt>目标输入记录</dt><dd>' + esc(inputLabel) + '</dd></div><div><dt>目标轮次结果</dt><dd>' + esc(outcomeLabel) + '</dd></div></dl>' : "";
+    var signature = JSON.stringify([text, execution, entry.error || "", !!retry, !!supported, !!entry.pending]);
+    if (entry.renderSignature === signature) return;
+    entry.renderSignature = signature;
+    panel.innerHTML = (target ? execution : '<span class="persistence-message" tabindex="-1">' + esc(text) + '</span>') + (target && state.history === "failed" ? '<p class="muted small">补存已有记录，不再次执行或投递。</p>' : '') + (entry.error ? '<p class="persistence-error">' + esc(entry.error) + '</p>' : '');
+    if (retry && supported && entry.id) {
+      var button = document.createElement("button"); button.type = "button"; button.className = "btn btn-ghost btn-mini"; button.textContent = target ? "重试保存历史" : "重试保存报告"; button.disabled = entry.pending === true;
+      button.addEventListener("click", function () { void persistenceAction(entry, true); }); panel.appendChild(button);
+    }
+    if (hadFocus) {
+      var focus = !entry.pending && retry && supported ? panel.querySelector("button") : panel.querySelector(".persistence-message");
+      if (focus) focus.focus({ preventScroll: true });
+    }
+    var rec = findCardRecord(entry); if (rec) refreshActivityHeight(entry.pane, rec, reading);
+  }
+  function persistenceValue(entry, value) {
+    if (!value) return;
+    if (entry.target && (value.receipt && value.receipt.version !== 1 || value.history && value.version !== undefined && value.version !== 1)) {
+      entry.error = "不支持此接收回执版本。"; entry.capabilities = null; updatePersistenceCard(entry); return;
+    }
+    if (entry.target && (value.receipt && value.receipt.version === 1 || value.version === 1 && value.history)) entry.lastReceipt = value.receipt || value;
+    var next = entry.target ? value.receipt || (value.history ? value : null) : value;
+    if (entry.target && ["expired", "unsupported", "disabled", "failed"].indexOf(value.state) >= 0) next = { history: value.state, retryHistoryAvailable: value.retryAvailable === true, code: value.code };
+    if (!next) {
+      if (value.state === "expired" || value.state === "unsupported" || value.state === "disabled") next = entry.target ? { history: value.state, retryHistoryAvailable: false, code: value.code } : value;
+      else return;
+    }
+    if (entry.target && next.attemptId && next.attemptId !== entry.id || !entry.target && next.reportId && next.reportId !== entry.id) return;
+    if (next.state === "already-saved") next = Object.assign({}, next, { state: "saved" });
+    var previous = entry.saveState || {};
+    // 成功存储事实不被迟到pending/failed覆盖，expired仍撤销恢复能力。
+    if ((previous.history || previous.state) === "saved" && ["saved", "already-saved", "expired"].indexOf(next.history || next.state) < 0) return;
+    entry.saveState = next; entry.error = null; updatePersistenceCard(entry);
+  }
+  async function persistenceAction(entry, retry) {
+    if (!entry.id || entry.pending) return;
+    var root = state.projectRoot, generation = projectGeneration, sequence = (entry.requestVersion || 0) + 1;
+    entry.requestVersion = sequence;
+    var request = { version: 1, projectRoot: entry.scope.projectRoot, roleId: entry.scope.roleId, runtime: entry.scope.runtime };
+    request[entry.target ? "attemptId" : "reportId"] = entry.id;
+    var operation = retry ? entry.target ? "retryDeliveryHistorySave" : "retryReportSave" : entry.target ? "getDeliveryReceipt" : "getReportSaveState";
+    if (!d[operation]) { entry.capabilities = null; updatePersistenceCard(entry); return; }
+    if (retry) { entry.pending = true; updatePersistenceCard(entry); }
+    try {
+      if (!retry && d.getSessionPersistence) {
+        var caps = await d.getSessionPersistence({ version: 1, projectRoot: request.projectRoot, roleId: request.roleId, runtime: request.runtime });
+        if (caps && caps.ok && caps.version === 1 && caps.scope && storageKey(caps.scope, "") === storageKey(entry.scope, "")) entry.capabilities = caps.value;
+      }
+      var result = await d[operation](request);
+      if (root !== state.projectRoot || generation !== projectGeneration || entry.requestVersion !== sequence) return;
+      if (!result || result.version !== 1 || result.ok && !result.scope || result.scope && storageKey(result.scope, "") !== storageKey(entry.scope, "")) throw new Error();
+      if (!result.ok) {
+        entry.error = ({ SNAPSHOT_EXPIRED: "可补存的会话材料已失效，无法在此补存。", SESSION_NOT_AVAILABLE: "当前没有原会话可供保存恢复。", UNSUPPORTED: "当前会话不支持此保存恢复能力。", PROJECT_NOT_ACTIVE: "项目已失效。", INVALID_REQUEST: "保存请求无效。" })[result.code] || "无法取得保存状态。";
+        entry.capabilities = null;
+      } else persistenceValue(entry, result.value); // 外层ok不等于内层保存成功。
+    } catch (_) { if (root === state.projectRoot && entry.requestVersion === sequence) entry.error = "保存状态请求失败。"; }
+    finally { entry.pending = false; if (root === state.projectRoot && entry.requestVersion === sequence) updatePersistenceCard(entry); }
+  }
+  function onPersistenceUpdate(payload) {
+    if (!payload || payload.version !== 1 || !payload.scope || payload.scope.projectRoot !== state.projectRoot || !payload.change) return;
+    var change = payload.change;
+    if (!change.scope || change.scope.roleId !== payload.scope.roleId || change.scope.runtime !== payload.scope.runtime) return;
+    deliverRuntimePayload({ projectRoot: payload.scope.projectRoot, roleId: payload.scope.roleId, runtime: payload.scope.runtime }, function () {
+      var target = change.kind === "delivery-history-save";
+      if (!target && change.kind !== "report-save") return;
+      var id = target ? change.attemptId : change.reportId;
+      if (typeof id !== "string" || !id) return;
+      var key = storageKey(payload.scope, id);
+      var entry = (target ? deliveryCards : reportCards)[key];
+      var value = target ? change.state === "expired" ? { state: "expired", receipt: change.receipt, retryAvailable: false, code: change.code } : change.receipt || { history: change.state, retryHistoryAvailable: change.retryAvailable, code: change.code } : change.state;
+      persistenceCache[key] = value;
+      if (entry) persistenceValue(entry, value);
+    });
+  }
+  function appendHandback(pane, report, persistence) {
+    if (!report || !report.source || report.source.roleId !== pane.dataset.roleId || report.source.runtime && report.source.runtime !== state.runtime || typeof report.summary !== "object" || report.reportId && report.version !== 1) return;
+    applyReportedTask(pane, report.source.turnId);
+    var scope = { projectRoot: state.projectRoot, roleId: report.source.roleId, runtime: report.source.runtime || state.runtime };
+    var key = report.reportId && storageKey(scope, report.reportId), existing = key && reportCards[key];
+    if (existing) { existing.pane = pane; if (!findCardRecord(existing)) registerRow(pane, function () { return existing.card; }, 190, { keepEl: true, kind: "handback" }); if (persistence) persistenceValue(existing, persistence); return; }
+    var card = document.createElement("div"); card.className = "msg-handback" + (report.status !== "completed" ? " is-blocked" : "");
+    card.innerHTML = reportBody(report, true);
+    sourceDocumentButton(report, card);
+    bindReportReading(card, pane);
+    applyReportedTask(pane, report.source.turnId);
+    var entry = { card: card, pane: pane, report: report, scope: scope, id: report.reportId, target: false, saveState: persistence || { state: report.reportId ? "saved" : "unknown-live", retryAvailable: false } };
+    if (key) reportCards[key] = entry;
+    updatePersistenceCard(entry);
+    var pin = streamShouldPin(pane); registerRow(pane, function () { return card; }, 190, { keepEl: true, kind: "handback" }); scrollBottom(pane, pin);
+    if (key && persistenceCache[key]) persistenceValue(entry, persistenceCache[key]);
+    if (key) void persistenceAction(entry, false);
+    updateWorkReports(scope.roleId);
+  }
+  function appendDelivery(pane, input, text, projection, turnId) {
+    var provenance = input && input.inputProvenance, presentation = input && input.inputPresentation;
+    if (!provenance && !presentation) return false;
+    var value = provenance || presentation;
+    if (value.version !== 1 || !Array.isArray(value.reports)) return false;
+    applyReportedTask(pane, turnId, true);
+    var scope = { projectRoot: state.projectRoot, roleId: pane.dataset.roleId, runtime: state.runtime };
+    var id = value.attemptId, key = storageKey(scope, id || "live:" + (turnId || ""));
+    if (deliveryCards[key]) { var previous = deliveryCards[key]; previous.pane = pane; if (!findCardRecord(previous)) registerRow(pane, function () { return previous.card; }, 170, { keepEl: true, kind: "injected" }); return true; }
+    var card = document.createElement("div"); card.className = "msg-injected msg-delivery";
+    card.innerHTML = '<p>回交投递 · 本批 ' + value.reports.length + ' 份（不表示全部收齐）</p>';
+    value.reports.forEach(function (report) { var body = document.createElement("section"); body.className = "delivery-report"; body.innerHTML = reportBody(report, false); sourceDocumentButton(report, body); card.appendChild(body); });
+    var details = document.createElement("details"); details.className = "safe-input-copy";
+    var summary = document.createElement("summary"); summary.textContent = "交接内容（安全显示副本）"; details.appendChild(summary);
+    var flag = document.createElement("p"); flag.className = "projection-flags"; flag.textContent = "此处未记录完整模型输入" + (projection && projection.redacted ? " · 已净化" : "") + (projection && projection.truncated ? " · 显示副本已截断" : "") + (projection && projection.summaryTruncated ? " · 摘要已截断" : ""); details.appendChild(flag);
+    var pre = document.createElement("pre"); pre.textContent = projection && projection.version === 1 && projection.source === "trusted-handback-display" && projection.modelInputRecorded === false ? text : "交接内容安全显示副本未提供，不能显示完整模型输入。"; details.appendChild(pre); card.appendChild(details);
+    bindReportReading(card, pane);
+    var panel = document.createElement("div"); panel.className = "persistence-state"; panel.setAttribute("role", "status"); panel.setAttribute("aria-live", "polite"); card.insertBefore(panel, card.querySelector(".delivery-report") || card.querySelector(".safe-input-copy"));
+    var entry = { card: card, pane: pane, reports: value.reports, scope: scope, id: id, target: true, saveState: { history: presentation ? "disabled" : "pending", retryHistoryAvailable: false } };
+    deliveryCards[key] = entry; updatePersistenceCard(entry);
+    var pin = streamShouldPin(pane); registerRow(pane, function () { return card; }, 170, { keepEl: true, kind: "injected" }); scrollBottom(pane, pin);
+    if (persistenceCache[key]) persistenceValue(entry, persistenceCache[key]);
+    if (id) void persistenceAction(entry, false);
+    updateWorkReports(scope.roleId);
+    return true;
+  }
+  function applyDeliveryReceipt(pane, receipt) {
+    if (!receipt || receipt.version !== 1) return;
+    var scope = { projectRoot: state.projectRoot, roleId: pane.dataset.roleId, runtime: state.runtime }, key = storageKey(scope, receipt.attemptId);
+    persistenceCache[key] = receipt;
+    if (deliveryCards[key]) persistenceValue(deliveryCards[key], receipt);
   }
 
   // —————— shell 命令确认卡（M-1，2026-10-12 客户裁定「这个太丑了」）：应用内卡片替代原生对话框 ——————
@@ -1133,6 +1437,7 @@
 
     var overlay = $("shell-confirm");
     overlay.hidden = false;
+    syncDrawerModal();
     overlay.classList.remove("is-expired");
     $("sc-hint").textContent = SHELL_CONFIRM_DEFAULT_HINT;
     $("sc-deny").disabled = cur.busy;
@@ -1145,6 +1450,8 @@
   function closeShellConfirm() {
     if (!backgroundDelivery) $("shell-confirm").hidden = true;
     state.shellConfirm = null;
+    syncDrawerModal();
+    if (!backgroundDelivery && state.rightTab !== null) $("drawer-close").focus({ preventScroll: true });
   }
 
   /** 卡片终态（失效/回传失败）：禁用全部动作键 + 如实一行——**绝不**呈现为「已放行」。 */
@@ -1264,6 +1571,7 @@
     renderRoleTree();
     updateOpChip(roleId);
     renderCurrentWork(roleId);
+    updateRightQueue(roleId);
     if (!backgroundDelivery) syncCoveredOperatorCards();
   }
 
@@ -1273,8 +1581,8 @@
 
   /** 卡片的**终态呈现**（按钮永久隐藏 + 如实说明；重物化时同款输出）。 */
   function freezeOperatorCard(card, text, cls) {
-    var bs = card.querySelectorAll(".op-actions button");
-    for (var i = 0; i < bs.length; i += 1) bs[i].hidden = true;
+    var bs = card.querySelectorAll(".op-actions button, .op-options input");
+    for (var i = 0; i < bs.length; i += 1) { bs[i].disabled = true; if (bs[i].tagName === "BUTTON") bs[i].hidden = true; }
     var noteEl = card.querySelector(".op-note");
     if (noteEl) {
       noteEl.hidden = false;
@@ -1402,7 +1710,8 @@
       opChipState.count = ids.length;
       opChipState.cursor = 0; // 计数变了（新到达/已作答）⇒ 定位从头开始（先给最早那张）
     }
-    el.querySelector(".op-chip-text").textContent = UiLabels.pendingChipLabel(ids.length);
+    var pendingLabel = St.pendingKindLabel(ids.map(function (id) { return opRequests[id].request.kind; }));
+    el.querySelector(".op-chip-text").textContent = pendingLabel === "待确认" ? UiLabels.pendingChipLabel(ids.length) : "有 " + ids.length + " 条" + pendingLabel + " · 定位";
     el.hidden = false;
     $("chat").appendChild(el); // 保持在 #chat 尾部（sticky 贴底）——空状态/重挂把它清掉后由本处复位
   }
@@ -1427,6 +1736,7 @@
     opRequests[requestId] = entry = { roleId: roleId, runtime: state.runtime, projectRoot: state.projectRoot, turnId: typeof payload.turnId === "string" ? payload.turnId : "", toolCallId: typeof payload.toolCallId === "string" ? payload.toolCallId : "", request: req, state: "open", finalNote: null, card: null, anchorKey: anchorKey };
     materializeOperatorCard(requestId);
     refreshAwaitingBadge(roleId);
+    updateRightQueue(roleId);
     if (backgroundDelivery) return;
     if (rawRoleId === "") {
       sysRow(activePane(), "sys-call", ICONS.shield, "（异常）收到一条未带角色标识的交互请求——已就地呈现；正常链路不会如此。");
@@ -1592,7 +1902,7 @@
       noteEl.textContent = text;
     }
     function setButtonsDisabled(disabled) {
-      var bs = card.querySelectorAll(".op-actions button");
+      var bs = card.querySelectorAll(".op-actions button, .op-options input");
       for (var i = 0; i < bs.length; i += 1) bs[i].disabled = disabled;
     }
     /** 回传决定：先乐观熄灯（B-3 按**全部 open 请求**重算）；成功/失效定格；可重试则解冻。 */
@@ -1653,6 +1963,7 @@
     if (btnSubmit) {
       var inputs = card.querySelectorAll(".op-options input");
       function refreshSubmit() {
+        if (entry.state !== "open") return;
         var any = false;
         for (var i = 0; i < inputs.length; i += 1) {
           if (inputs[i].checked) { any = true; break; }
@@ -1679,9 +1990,9 @@
   function buildInjectedElement(inj, isReplay) {
     var el = document.createElement("div");
     el.className = "msg msg-injected is-" + inj.kind + (isReplay ? " is-replay" : "");
-    var label = inj.label + (inj.sourceRoleId ? " · 来自 " + inj.sourceRoleId : "");
+    var label = inj.kind === "handback" ? "原始交接内容 · 来源未确认" : inj.label + (inj.sourceRoleId ? " · 来自 " + inj.sourceRoleId : "");
     var body = '<div class="mi-body">' + Md.renderMarkdown(inj.body) + "</div>";
-    if (inj.kind === "handback") body = '<details class="mi-report-detail"><summary>查看已投递的报告详情</summary>' + body + "</details>";
+    if (inj.kind === "handback") body = '<details class="mi-report-detail"><summary>交接内容（结构化来源未保存）</summary>' + body + "</details>";
     el.innerHTML =
       '<div class="mi-head">' +
       '<span class="mi-ico">' + (inj.kind === "handback" ? ICONS.handback : ICONS.send) + "</span>" +
@@ -1775,7 +2086,7 @@
     var token = key ? { key: key, occurrence: (counts[key] = canonical ? 1 : (counts[key] || 0) + 1) } : null;
     var historyCounts = replayState[env.roleId] && replayState[env.roleId].counts || {};
     var toolIdentity = canonical && JSON.parse(canonical)[0] === "tool";
-    if (!toolIdentity && token && ((historyCounts[key] || 0) >= token.occurrence || canonical && alreadyLive)) return;
+    if (!terminalFact(ev) && !toolIdentity && token && ((historyCounts[key] || 0) >= token.occurrence || canonical && alreadyLive)) return;
     var priorOrigin = rowOrigin, priorToken = rowReplayToken;
     rowOrigin = "live"; rowReplayToken = token;
     try { renderOneEvent(env); }
@@ -1785,14 +2096,21 @@
   function bindManualTurn(env) {
     var ev = env.event, message = manualMessages[env.clientMessageId];
     if (!message || message.roleId !== env.roleId || typeof ev.turnId !== "string" || ev.turnId === "") return;
-    if (message.turnId) return; // 原投递只能绑定一次，不接受迟到事件改绑。
+    if (message.turnId && message.turnId !== ev.turnId) return;
+    var firstBinding = !message.rec.replayToken;
     message.turnId = ev.turnId;
+    if (ev.kind === "message" && ev.detail && ev.detail.source === "prompt-input" && typeof ev.detail.text === "string") message.inputAccepted = true;
+    if (!message.outcome && ev.kind === "settled" && ev.detail && ["completed", "failed", "aborted", "timed_out"].indexOf(ev.detail.outcome) >= 0) message.outcome = ev.detail.outcome;
+    if (message.onFacts) message.onFacts();
+    clearQueueHint(env.roleId, env.clientMessageId);
+    if (!firstBinding) return; // 后续同轮事实可更新，原投递身份不可改绑。
     var key = Rt.replayKey({ kind: "user", turnId: ev.turnId, text: message.text });
     var counts = liveReplayCounts[env.roleId] || (liveReplayCounts[env.roleId] = Object.create(null));
     message.rec.replayToken = { key: key, occurrence: (counts[key] = 1) };
     var rl = paneRowLists[env.roleId];
     if (rl) (rl.tokenRows || (rl.tokenRows = Object.create(null)))[Rt.tokenId(message.rec.replayToken)] = message.rec;
     var history = replayState[env.roleId];
+    if (rl && (rl.reportedTurns && rl.reportedTurns[ev.turnId] || rl.deliveryTurns && rl.deliveryTurns[ev.turnId])) applyReportedTask(paneFor(env.roleId), ev.turnId);
     if (history && (history.counts[key] || 0) >= message.rec.replayToken.occurrence) {
       replayHistory({ projectRoot: state.projectRoot, roleId: env.roleId, runtime: state.runtime, rows: history.rows, error: history.error }, true);
     }
@@ -1809,14 +2127,17 @@
     metaFor(roleId).hadSession = true;
     stampLastEvent(roleId, ev.summary);
     if (kind === "handback") {
-      var hb = ev.handback;
-      if (!hb) return;
+      var hb = ev.report || ev.liveReport;
+      if (!hb) { sysRow(pane, "sys-call", ICONS.handback, "回交已收到（旧来源，安全详情未提供）"); return; }
       // 产出角色自己的聊天 → 「回交 su」卡；主入口角色 su 的聊天 → 镜像「来自 <role> 的报告」。
-      appendHandback(pane, hb);
+      appendHandback(pane, hb, ev.reportPersistence);
       // 主入口只显示真正投递的输入详情与助手汇总；不提前镜像尚在队列中的报告。
       return; // 左树重渲染由批量收尾统一做（flushBatchSideEffects）
     }
     if (kind === "message") {
+      if (ev.detail && ev.detail.source === "delivery-note") { sysRow(pane, "sys-call sys-delivery-note", ICONS.call, ev.summary); return; }
+      if (ev.detail && ev.detail.source === "delivery-receipt") { applyDeliveryReceipt(pane, ev.detail.receipt); return; }
+      if (ev.detail && ev.detail.source === "delivery-boundary") return;
       // 事件流异常经外推层以 message 形式送来（session.ts consume 的 catch）——如实归为「错误」态。
       if (typeof ev.summary === "string" && ev.summary.indexOf("会话事件流异常") === 0) {
         metaFor(roleId).error = true;
@@ -1826,15 +2147,17 @@
       // **手输防误伤**：若该回显正是本端刚手发送的文本（同角色、15s 内），一律不当投递——普通气泡路径。
       var input = ev.detail && ev.detail.source === "prompt-input" && typeof ev.detail.text === "string" ? ev.detail : null;
       if (input) {
+        if (appendDelivery(pane, input, input.text, input.inputTextProjection, ev.turnId)) return;
         var injected = Tr.classifyInjectedMessage ? Tr.classifyInjectedMessage(input.text) : null;
         if (injected) appendInjectedMessage(pane, injected);
-        else appendUser(pane, input.text, false);
-      } else appendAssistant(pane, ev.summary);
+        else { appendUser(pane, input.text, false); var inputList = rowListFor(pane); if ((inputList.reportedTurns && inputList.reportedTurns[ev.turnId] || inputList.deliveryTurns && inputList.deliveryTurns[ev.turnId])) applyReportedTask(pane, ev.turnId); }
+      } else { appendAssistant(pane, ev.summary, ev.turnId); var replyList = rowListFor(pane); if ((replyList.reportedTurns && replyList.reportedTurns[ev.turnId] || replyList.deliveryTurns && replyList.deliveryTurns[ev.turnId])) applyReportedTask(pane, ev.turnId); }
     }
-    else if (kind === "tool_call" || kind === "accepted") appendActivity(pane, Tr.activityOf(ev));
+    else if ((kind === "tool_call" || kind === "accepted") && Tr.isToolActivity(ev)) appendActivity(pane, Tr.activityOf(ev));
+    else if (kind === "tool_call") sysRow(pane, "sys-call sys-unknown-tool-event", ICONS.call, "旧/未知系统记录：" + ev.summary);
     else if (kind === "denied") {
-      var failure = Tr.activityOf(ev);
-      appendActivity(pane, failure);
+      if (Tr.isToolActivity(ev)) appendActivity(pane, Tr.activityOf(ev));
+      else if (!appendTurnTerminal(pane, ev)) sysRow(pane, "sys-call", ICONS.deny, ev.summary);
     } // 治理信号（拒绝原因 + 允许路径）：全量，不瘦身
     else if (kind === "settled") {
       // 一轮结束：**忙态由主进程快照转述**（session:role-state 的 busy=false——见 onRoleState），
@@ -1843,7 +2166,8 @@
       metaFor(roleId).error = outcome === "failed" || outcome === "timed_out";
       // Q-1/Q-2：流式段的**一次性 Markdown 化**（本轮期间到达的助手消息先是纯文本——见 appendAssistant）。
       upgradeStreamingMarkdown(roleId);
-      sysRow(pane, "sys-settled", ICONS.call, ev.summary);
+      if (typeof ev.turnId === "string" && ev.turnId) { var settledList = rowListFor(pane); (settledList.settledTurns || (settledList.settledTurns = Object.create(null)))[ev.turnId] = true; if ((settledList.reportedTurns && settledList.reportedTurns[ev.turnId] || settledList.deliveryTurns && settledList.deliveryTurns[ev.turnId])) applyReportedTask(pane, ev.turnId); }
+      if (!appendTurnTerminal(pane, ev)) sysRow(pane, "sys-settled", ICONS.call, ev.summary);
     }
     else sysRow(pane, "sys-settled", ICONS.call, ev.summary);
     // 状态徽标随事件变化（工作中↔空闲/错误等）——左树重渲染改在**批量收尾**统一做（每批至多一次）。
@@ -2010,7 +2334,122 @@
     }
   }
 
-  function openPiPanel() {
+  var drawerInvoker = null;
+  var documentView = null, documentReadVersion = 0, documentScope = null, documentReadUnavailable = null;
+  function validInvoker(el) { if (!el || !el.isConnected || el.disabled || !el.getClientRects().length) return false; var rect = el.getBoundingClientRect(); return rect.bottom > 0 && rect.top < window.innerHeight && rect.right > 0 && rect.left < window.innerWidth; }
+  function rememberInvoker(event) { drawerInvoker = event && event.currentTarget && event.currentTarget.nodeType === 1 ? event.currentTarget : document.activeElement; }
+  function restoreInvoker(fallback) {
+    var target = validInvoker(drawerInvoker) ? drawerInvoker : fallback;
+    if (validInvoker(target)) target.focus({ preventScroll: true });
+  }
+  function invalidateDocumentRead() {
+    documentReadVersion += 1;
+    if (state.rightTab === "document") { state.rightTab = null; documentView = null; }
+  }
+  function documentContextMatches(view) {
+    return documentView === view && view.projectRoot === state.projectRoot && view.runtime === state.runtime && view.chatRoleId === state.selectedRoleId;
+  }
+  function documentList(roleId, invoker, origin) {
+    captureDrawerReading();
+    invalidateDocumentRead();
+    if (!invoker || !$("right-drawer").contains(invoker)) drawerInvoker = invoker || document.activeElement;
+    documentView = { projectRoot: state.projectRoot, runtime: state.runtime, chatRoleId: state.selectedRoleId, roleId: roleId,
+      origin: origin || "report", listScroll: 0, selectedId: null, mode: "list", error: null, refs: [] };
+    var role = state.roles.find(function (r) { return r.roleId === roleId; });
+    documentView.refs = role && Array.isArray(role.documents) ? role.documents : [];
+    if (!role) documentView.error = "无法确定来源角色，暂不能列出来源文档。";
+    state.rightTab = "document"; renderRight(); renderTabs(); $("drawer-close").focus();
+  }
+  function renderDocumentView() {
+    var view = documentView, body = $("right-body");
+    if (!view) { body.textContent = "文档上下文已失效。"; return; }
+    $("drawer-title").textContent = view.roleId + " · 来源文档";
+    if (view.mode === "list") {
+      body.innerHTML = (view.origin === "card" ? '<button class="btn btn-ghost btn-mini" data-doc-action="back-role">返回角色资料</button>' : '') +
+        '<p class="document-source-note">以下是当前项目中该角色已列出的可读文档，请选择要阅读的文件。</p>' +
+        (!documentScope ? '<p role="status">' + esc(Rt.documentError(documentReadUnavailable || "PROJECT_NOT_GRANTED")) + '</p>' : '') +
+        (view.error ? '<p role="status">' + esc(view.error) + '</p>' : '') +
+        (view.refs.length ? '<ul class="document-list">' + view.refs.map(function (ref) { return '<li><div class="document-list-meta"><strong>' + esc(ref.label) + '</strong><small>' + esc(ref.relativePath) + '</small></div><button class="btn btn-mini" data-doc-id="' + esc(ref.documentId) + '"' + (!documentScope || ref.projectViewId !== documentScope.projectViewId ? ' disabled' : '') + '>阅读</button></li>'; }).join("") + '</ul>' : '<p>该角色当前没有已列出的可读文档。</p>') +
+        '<button class="btn btn-ghost btn-mini" data-doc-action="refresh">刷新已列文档</button>';
+      body.scrollTop = view.listScroll || 0;
+      if (view.selectedId) body.querySelectorAll('[data-doc-id]').forEach(function (button) { if (button.dataset.docId === view.selectedId) button.focus({ preventScroll: true }); });
+      return;
+    }
+    body.innerHTML = '<button class="btn btn-ghost btn-mini" data-doc-action="back-list">返回来源文档</button><p class="document-path">' + esc(view.ref && view.ref.relativePath || "") + '</p><div id="document-read-status" role="status"></div><div id="document-read-text" class="document-read-text"></div>';
+    var status = $("document-read-status"), content = $("document-read-text");
+    if (view.mode === "loading") status.textContent = "正在读取文档…";
+    else if (view.mode === "error") {
+      status.textContent = view.error;
+      if (["IO_ERROR", "CHANGED_DURING_READ", "NOT_FOUND", "PERMISSION_DENIED"].indexOf(view.errorCode) >= 0) {
+        var retry = document.createElement("button"); retry.className = "btn btn-ghost btn-mini"; retry.textContent = "重试读取"; retry.dataset.docAction = "retry"; status.appendChild(retry);
+      }
+    } else if (view.result) {
+      status.textContent = "只读文档 · " + view.result.byteLength + " 字节";
+      if (view.result.format === "markdown") { content.classList.add("card-md"); content.innerHTML = Md.renderMarkdown(view.result.text); }
+      else { var pre = document.createElement("pre"); pre.textContent = view.result.text; content.appendChild(pre); }
+    }
+  }
+  async function readDocument(ref) {
+    var view = documentView;
+    if (!view || !documentScope || ref.projectViewId !== documentScope.projectViewId || ref.roleId !== view.roleId) return;
+    if (view.mode === "list") view.listScroll = $("right-body").scrollTop;
+    var version = ++documentReadVersion, epoch = documentScope.projectViewId;
+    view.ref = ref; view.selectedId = ref.documentId; view.mode = "loading"; view.error = null;
+    renderRight();
+    try {
+      var result = d.readProjectDocument ? await d.readProjectDocument({ version: 1, projectViewId: epoch, documentId: ref.documentId }) : { ok: false, code: "UNSUPPORTED_ENVIRONMENT" };
+      if (version !== documentReadVersion || !documentContextMatches(view) || !documentScope || documentScope.projectViewId !== epoch) return;
+      if (!result || result.version !== 1 || result.projectViewId && result.projectViewId !== epoch || result.documentId && result.documentId !== ref.documentId) result = { ok: false, code: "INVALID_REQUEST" };
+      if (result.ok && result.projectViewId === epoch && result.documentId === ref.documentId && result.roleId === ref.roleId && ["markdown", "text"].indexOf(result.format) >= 0 && typeof result.text === "string") { view.result = result; view.mode = "content"; }
+      else { view.mode = "error"; view.errorCode = result.code || "IO_ERROR"; view.error = Rt.documentError(view.errorCode); }
+    } catch (_) {
+      if (version !== documentReadVersion || !documentContextMatches(view)) return;
+      view.mode = "error"; view.errorCode = "IO_ERROR"; view.error = Rt.documentError("IO_ERROR");
+    }
+    renderRight();
+  }
+  async function refreshDocumentList() {
+    var view = documentView, version = ++documentReadVersion;
+    if (!view) return;
+    try {
+      var listing = await d.listProject(view.projectRoot);
+      if (version !== documentReadVersion || !documentContextMatches(view)) return;
+      if (!listing || listing.projectRoot !== view.projectRoot) throw new Error();
+      documentScope = listing.documentScope || null; documentReadUnavailable = listing.documentReadUnavailable;
+      var role = (listing.roles || []).find(function (r) { return r.roleId === view.roleId; });
+      view.refs = role && role.documents || []; view.error = role ? null : "无法确定来源角色，暂不能列出来源文档。";
+      // 清单刷新不applyListing、不切聊天角色/引擎或开启会话。
+    } catch (_) { if (documentContextMatches(view)) view.error = "文档清单刷新失败。"; }
+    if (documentContextMatches(view)) renderRight();
+  }
+  function onDocumentAction(event) {
+    if (state.rightTab !== "document" || !documentView) return;
+    var action = event.target.closest('[data-doc-action]'), refButton = event.target.closest('[data-doc-id]');
+    if (refButton) { var ref = documentView.refs.find(function (item) { return item.documentId === refButton.dataset.docId; }); if (ref) void readDocument(ref); return; }
+    if (action) {
+      if (action.dataset.docAction === "refresh") void refreshDocumentList();
+      else if (action.dataset.docAction === "retry" && documentView.ref) void readDocument(documentView.ref);
+      else if (action.dataset.docAction === "back-list") { documentReadVersion += 1; documentView.mode = "list"; renderRight(); }
+      else if (action.dataset.docAction === "back-role") { documentReadVersion += 1; state.rightTab = "card"; documentView = null; renderRight(); renderTabs(); var equivalent = $("right-body").querySelector(".role-document-entry"); if (validInvoker(equivalent)) equivalent.focus({ preventScroll: true }); else restoreInvoker($("tab-card")); }
+      return;
+    }
+    var link = event.target.closest('a');
+    if (link) {
+      event.preventDefault();
+      var href = link.getAttribute("href") || "";
+      if (/^https?:\/\//i.test(href)) { if (d.openExternal) void d.openExternal(href); }
+      else {
+        var path = href;
+        try { var resolved = new URL(href, "https://document.invalid/" + (documentView.ref && documentView.ref.relativePath || "")); path = resolved.origin === "https://document.invalid" ? decodeURIComponent(resolved.pathname.slice(1)) : ""; } catch (_) { path = ""; }
+        var target = documentView.refs.find(function (ref) { return ref.relativePath === path; });
+        if (target) void readDocument(target);
+        else { var note = $("document-read-status"); if (note) note.textContent = "此链接尚未提供阅读入口。"; }
+      }
+    }
+  }
+  function openPiPanel(event) {
+    if (state.rightTab === "document") invalidateDocumentRead();
+    rememberInvoker(event);
     if (state.rightTab !== "pi") {
       state.rightTab = "pi";
       renderRight(); renderTabs();
@@ -2049,7 +2488,7 @@
       var refreshed = await loadPiConfig();
       if (runtime !== state.runtime || projectRoot !== state.projectRoot || saveVersion !== configSaveVersion) return;
       if (refreshed) setPiStatus("已保存到 .env（改动键：" + ((res.appliedKeys && res.appliedKeys.join("、")) || "无") + "）。" + (refreshed.missing.length ? "必填配置仍缺：" + refreshed.missing.join("、") + "。" : "必填配置已齐备。") + Rt.applicationLabel(res.application || "next-session"), refreshed.missing.length ? "warn" : "ok");
-      if (state.selectedRoleId && state.roleBusy[state.selectedRoleId] !== true && res.application !== "after-active-turn") await selectRole(state.selectedRoleId);
+      // 保存配置不重新开启当前会话，后续输入由窗口实际profile应用时点接管。
     } catch (err) {
       if (runtime === state.runtime && projectRoot === state.projectRoot && saveVersion === configSaveVersion) setPiStatus("保存异常：" + (err && err.message ? err.message : err), "err");
     } finally { $("pi-save").disabled = false; }
@@ -2140,6 +2579,9 @@
     engineSelector.close(false);
     state.projectRoot = res.projectRoot;
     updatePickButton(); // N-1：已有项目 ⇒ 按钮文案「切换项目」（纯映射见 ui-labels.js）
+    if (projectChanged || fresh) invalidateDocumentRead();
+    if (documentScope && (!res.documentScope || documentScope.projectViewId !== res.documentScope.projectViewId)) invalidateDocumentRead();
+    documentScope = res.documentScope || null; documentReadUnavailable = res.documentReadUnavailable || null;
     if (projectChanged || fresh) { ++configSaveVersion; void loadPiConfig(); }
     state.roles = res.roles || [];
     state.primaryRoleId = res.primaryRoleId || null;
@@ -2177,6 +2619,8 @@
       resetPanes();
       flushPendingHistories(); // D-1：本项目的恢复数据（可能先于 pane 就绪推达）在此回放
     }
+    $("sidebar-role-count").textContent = state.roles.length + " 个角色 · 本地会话";
+    $("project-path").title = state.projectRoot || "尚未导入项目";
     renderRoleTree();
     renderRight();
     renderTabs();
@@ -2237,7 +2681,8 @@
    *  最近事件（若有）。图标/文案/样式/描述均来自 `St.statusBadge` 的**唯一映射**。 */
   function statusBadgeHtml(roleId) {
     var pending = (state.queueByRole[roleId] || []).length;
-    var badge = St.statusBadge(roleStatusOf(roleId), pending);
+    var waitingKinds = openRequestIdsFor(roleId).map(function (id) { return opRequests[id].request.kind; });
+    var badge = St.statusBadge(roleStatusOf(roleId), pending, waitingKinds);
     var m = state.roleMeta[roleId] || {};
     var hover = badge.title + (m.lastSummary ? " ｜ 最近事件（" + m.lastAt + "）：" + m.lastSummary : "");
     return (
@@ -2274,6 +2719,7 @@
       };
     };
     state.queueItemsByRole[roleId] = Array.isArray(info.queue) ? info.queue.map(copyItem) : [];
+    if (Array.isArray(info.queue) && info.queue.length === 0) clearQueueHint(roleId);
     state.runningByRole[roleId] = info.running && typeof info.running === "object" ? copyItem(info.running) : null;
     renderQueueRow(roleId);
     renderCurrentWork(roleId);
@@ -2312,7 +2758,7 @@
     var awaiting = openRequestIdsFor(roleId).length > 0;
     if (!awaiting && state.roleBusy[roleId] !== true) { if (el) el.remove(); return; }
     if (!el) { el = document.createElement("div"); el.className = "tool-current"; }
-    el.textContent = awaiting ? "等待你确认" : "正在工作";
+    el.textContent = awaiting ? St.pendingKindLabel(openRequestIdsFor(roleId).map(function (id) { return opRequests[id].request.kind; })).replace("待", "等待你") : "正在工作";
     pane.appendChild(el);
   }
 
@@ -2393,6 +2839,12 @@
     function covered(token) { return token && (nextCounts[token.key] || 0) >= token.occurrence; }
     function preserve(value) { if (!buckets.has(anchor)) buckets.set(anchor, []); buckets.get(anchor).push(value); }
     if (rl) rl.rows.forEach(function (rec) {
+      if (rec.kind === "turn-terminal") {
+        var coveredSource = rec.data.sources.find(function (source) { return covered(source.replayToken); });
+        if (coveredSource) anchor = Rt.tokenId(coveredSource.replayToken);
+        else if (rec.origin !== "history") preserve({ record: rec });
+        return;
+      }
       if (rec.kind === "activities" || rec.kind === "tool-lifecycle") {
         var preservedActivities = rec.kind === "activities" ? rec.data.items : Object.keys(rec.activityStages).map(function (phase) { return rec.activityStages[phase]; });
         preservedActivities.forEach(function (activity) {
@@ -2428,7 +2880,7 @@
     var adopted = operatorEntry && savedEl && adoptOperatorLifecycle(pane, operatorEntry, savedEl, old);
     var rec = adopted || registerRow(pane, function (record) { return savedEl || old.build(record); }, Math.max(1, old.h - gap),
       { kind: old.kind, data: old.data, keepEl: old.keepEl, mdReady: old.mdReady, requestId: old.requestId,
-        origin: old.origin, replayToken: old.replayToken, manualClientId: old.manualClientId, atIndex: atIndex });
+        origin: old.origin, replayToken: old.replayToken, manualClientId: old.manualClientId, atIndex: atIndex, turnId: old.turnId, assistantText: old.assistantText, originalOpen: old.originalOpen, originalFlags: old.originalFlags });
     if (old.manualClientId && manualMessages[old.manualClientId]) manualMessages[old.manualClientId].rec = rec;
     rec.toolActivity = old.toolActivity; rec.activityStages = old.activityStages ? Object.assign({}, old.activityStages, rec.activityStages || {}) : rec.activityStages;
     if (rec.activityStages && operatorEntry) { operatorEntry.activityStages = rec.activityStages; fillOperatorLifecycle(operatorEntry); }
@@ -2440,19 +2892,40 @@
     return rec;
   }
 
+  function orderedHistoryReports(reports) {
+    var copy = Array.isArray(reports) ? reports.slice() : [];
+    if (!copy.every(function (report) { return report && typeof report.at === "string" && report.at.trim() !== "" && Number.isFinite(Date.parse(report.at)); })) return copy;
+    return copy.sort(function (a, b) { return Date.parse(a.at) - Date.parse(b.at); });
+  }
+
   function replayHistory(payload, forceFull) {
     var roleId = payload.roleId;
     var rows = Array.isArray(payload.rows) ? payload.rows : [];
     var error = typeof payload.error === "string" && payload.error !== "" ? payload.error : null;
-    if (rows.length === 0 && error === null) return;
+    var projection = payload.projection || {}, projectionNote = [];
+    if (projection.omittedEntries) projectionNote.push("仅显示最近记录，已省略前 " + projection.omittedEntries + " 条");
+    if (projection.invalidEntries) projectionNote.push("无效投影条目 " + projection.invalidEntries + " 条");
+    if (payload.skipped) projectionNote.push("原解析跳过 " + payload.skipped + " 条");
+    if (projection.truncated) projectionNote.push("部分文字已截断");
+    if (payload.reportErrors && payload.reportErrors.length) projectionNote.push("有 " + payload.reportErrors.length + " 项报告记录不可读，不作为成果显示");
+    metaFor(roleId).historyNotice = projectionNote.join("；");
+    if (roleId === state.selectedRoleId) renderContextState(roleId);
+    if (rows.length === 0 && error === null && !(payload.reports && payload.reports.length)) return;
     var prev = replayState[roleId];
     if (prev && prev.projectRoot !== payload.projectRoot) prev = null;
     var plan = forceFull ? { action: "full", from: 0 } : UiLabels.replayPlan(prev, rows);
     if (prev && error !== prev.error) plan = { action: "full", from: 0 };
     diagnose("renderer.replay", { count: rows.length, state: plan.action });
-    if (plan.action === "skip") return;
+    if (plan.action === "skip") {
+      orderedHistoryReports(payload.reports).forEach(function (report) { appendHandback(paneFor(roleId), report, { state: "saved", reportId: report.reportId, retryAvailable: false }); });
+      return;
+    }
     var pane = paneFor(roleId), oldList = paneRowLists[roleId];
     var reading = captureChatReading(pane);
+    var knownOriginalRows = Object.create(null);
+    if (oldList) oldList.rows.forEach(function (record) { if ((record.taskRequest || record.replyFolded) && record.replayToken) knownOriginalRows[Rt.tokenId(record.replayToken)] = record.el ? record.el.open : record.originalOpen; });
+    var knownTerminalRows = Object.create(null);
+    if (oldList) oldList.rows.forEach(function (record) { if (record.kind === "turn-terminal") record.data.sources.forEach(function (source) { if (source.replayToken) knownTerminalRows[Rt.tokenId(source.replayToken)] = record.data; }); });
     var nextCounts = Rt.replayCounts(rows);
     var preserved = plan.action === "full" ? preserveUncoveredRows(oldList, nextCounts) : null;
     if (plan.action === "full") {
@@ -2505,7 +2978,7 @@
         }
         var manual = preserved && preserved.manuals[Rt.tokenId(token)];
         if (manual) appendPreservedRow(pane, manual, preserved.gap);
-        else appendReplayRow(pane, rows[i]);
+        else { var replayed = appendReplayRow(pane, rows[i], knownTerminalRows[Rt.tokenId(token)]); if (replayed && Object.prototype.hasOwnProperty.call(knownOriginalRows, Rt.tokenId(token))) replayed.originalOpen = knownOriginalRows[Rt.tokenId(token)]; }
         appendSaved(Rt.tokenId(token));
       }
       if (preserved) Array.from(preserved.buckets.keys()).forEach(appendSaved);
@@ -2520,19 +2993,28 @@
     replayState[roleId] = { rows: rows, error: error, counts: nextCounts, projectRoot: typeof payload.projectRoot === "string" ? payload.projectRoot : "" };
     flushBatchSideEffects();
     if (prev && reading) restoreChatReading(pane, reading);
+    orderedHistoryReports(payload.reports).forEach(function (report) { appendHandback(pane, report, { state: "saved", reportId: report.reportId, retryAvailable: false }); });
+    Object.keys(rowListFor(pane).deliveryTurns || {}).forEach(function (turnId) { applyReportedTask(pane, turnId, true); });
     materializePendingFor(roleId); renderCurrentWork(roleId);
   }
 
   /** 单条回放行（kind: user|assistant|tool|denied；助手/用户文本走 Markdown 渲染器，工具行 esc）。
    *  Q-2：`build` **惰性**——离屏行不建 DOM、不跑解析器；挂载时才构造。 */
-  function appendReplayRow(pane, row) {
+  function appendReplayRow(pane, row, knownTerminal) {
     if (!row || typeof row !== "object") return;
     var kind = String(row.kind || "");
     var text = String(row.text == null ? "" : row.text);
+    if (row.deliveryReceipt) { applyDeliveryReceipt(pane, row.deliveryReceipt); return; }
+    if (row.deliveryBoundary) return;
+    if (kind === "user" && appendDelivery(pane, { inputProvenance: row.inputProvenance, inputPresentation: row.inputPresentation }, text, row.inputTextProjection, row.turnId)) return;
     if (text === "") return;
     if (kind !== "assistant" && kind !== "user" && kind !== "tool" && kind !== "denied") return; // 未知 kind：跳过（防御式）
     // D-1 回放同样归类：投递输入在回放里也呈**注入样式**（判据=同一张前缀表）；手输的历史行不受影响。
-    if (kind === "tool" || kind === "denied") {
+    if (kind === "denied" && !Tr.isToolActivity(row)) {
+      if (!knownTerminal || !appendTurnTerminal(pane, { kind: "denied", turnId: knownTerminal.turnId, summary: text, detail: { outcome: knownTerminal.outcome } }, knownTerminal)) sysRow(pane, "sys-call", ICONS.deny, text);
+      return;
+    }
+    if ((kind === "tool" || kind === "denied") && Tr.isToolActivity(row)) {
       var toolRec = appendActivity(pane, Tr.activityOf(row));
       if (row.anchorKey && toolRec) noteReplayAnchor(pane.dataset.roleId || "", row, toolRec.index);
       return;
@@ -2557,14 +3039,17 @@
             '<span class="sys-text">' + esc(Tr.slimToolRow(text)) + "</span>";
         }
         if (row.at) el.setAttribute("title", "恢复自：" + String(row.at));
+        var flags = [Rt.textFlags(row.textProjection), Rt.metadataLabel(row.metadataOmissions)].filter(Boolean).join("；");
+        if (flags) { var note = document.createElement("small"); note.className = "projection-flags"; note.textContent = flags; el.appendChild(note); }
         return el;
       },
       kind === "tool" || kind === "denied" ? 34 : 60,
-      { keepEl: injRow !== null, kind: "replay", data: { identity: JSON.stringify([kind, text, row.at || ""]) } }
+      { keepEl: injRow !== null, kind: "replay", turnId: row.turnId, assistantText: kind === "assistant", originalFlags: [Rt.textFlags(row.textProjection), Rt.metadataLabel(row.metadataOmissions)].filter(Boolean).join("；"), data: { identity: JSON.stringify([kind, text, row.at || ""]) } }
     );
     // 真机缺陷修复（锚点物化）：交互工具的调用行/结论行带锚点标识（requestId/anchor/anchorKey，主进程
     // session-history.ts 给出）⇒ 按行序位登记进回放锚点表——交互卡（重）物化据此落回它发生的位置。
     if (row.anchorKey) noteReplayAnchor(pane.dataset.roleId || "", row, rec.index);
+    return rec;
   }
 
   /** 重取当前项目的枚举（su 一轮结束后主进程推 `project:changed` 时调用）→ 左树随之长出（§10.3）。 */
@@ -2603,14 +3088,15 @@
       (r.roleId === state.selectedRoleId ? " active" : "");
     item.setAttribute("role", "button");
     item.setAttribute("tabindex", "0");
+    var identityDescription = [isPrimary ? "主入口：默认入口与主路径" : "", r.builtIn ? "内置角色：定义在 SKILL.md，无角色目录" : ""].filter(Boolean).join("；");
+    if (identityDescription) { item.setAttribute("aria-description", identityDescription); item.title = r.roleId + "；" + identityDescription; }
     item.innerHTML =
-      '<span class="ti-icon">' + (r.builtIn ? ICONS.shield : ICONS.role) + "</span>" +
+      '<span class="ti-icon"><span class="ti-avatar">' + esc(Array.from(r.roleId).slice(0, 1).join("")) + "</span></span>" +
       '<span class="ti-main"><span class="ti-name">' + esc(r.roleId) + "</span>" +
       (r.group && r.groupDuty ? '<span class="ti-group-duty">' + esc(r.groupDuty) + "</span>" : "") +
-      '<span class="ti-sub">' + esc(roleSubtitle(r)) + "</span></span>" +
-      (isPrimary ? '<span class="ti-badge primary" title="主入口：默认入口与主路径">主入口</span>' : "") +
-      (r.builtIn ? '<span class="ti-badge" title="内置角色：定义在 SKILL.md，无角色目录">内置</span>' : "") +
-      statusBadgeHtml(r.roleId);
+      '<span class="ti-sub">' + esc(Rt.runtimeLabel(state.runtime)) + ' · ' + statusBadgeHtml(r.roleId) + "</span></span>" +
+      '<span class="ti-facts">' +
+      "</span>";
     function activate() { selectRole(r.roleId); }
     item.addEventListener("click", activate);
     item.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); activate(); } });
@@ -2667,8 +3153,10 @@
   var roleSelectionVersion = 0;
   async function selectRole(roleId) {
     var selectionVersion = ++roleSelectionVersion;
+    invalidateDocumentRead();
     var projectRoot = state.projectRoot;
     var runtime = state.runtime;
+    metaFor(roleId).contextText = "正在开启或恢复会话…"; renderContextState(roleId);
     // 同角色显式点击仍定位，同时经后端确认会话（本地标记不能代替真实句柄）。
     if (state.sessionOpenRoleId === roleId) {
       setHint("已在该角色的会话中，直接输入消息即可。");
@@ -2713,6 +3201,7 @@
       }
       // 每次开启捕获所选 runtime；不同引擎的后台会话继续保持原身份。
       // B-2：切换**不再先 stop 旧会话**——引擎侧并存（各自保活、切回直接续；LRU 上限见 session.ts）。
+      var readableHistoryAtOpen = hasTranscript(roleId);
       var res = await d.openSession({
         projectRoot: projectRoot,
         roleId: roleId,
@@ -2722,6 +3211,7 @@
       if (selectionVersion !== roleSelectionVersion || state.projectRoot !== projectRoot || state.runtime !== runtime) return;
       if (!res.ok) {
         state.sessionOpenRoleId = null;
+        metaFor(roleId).contextText = "会话开启失败"; renderContextState(roleId);
         setState("err", "连接失败");
         updateControls();
         metaFor(roleId).error = true; // B-3：该角色最近一次会话开启以错误结束
@@ -2742,7 +3232,7 @@
       renderRoleTree();
       // D-1 契约（pm 2026-10-12 钉死）：上下文来源文案走**唯一映射** `St.sessionContextNotice`——
       // 实际原生恢复结果由窗口转换；回放存在不证明模型上下文恢复。失败后重建必须保留原因。
-      showSessionContext(roleId, res);
+      showSessionContext(roleId, res, true, readableHistoryAtOpen);
       // 生效配置来源（T13）：`.ans` 存在但不可用 / 声明已接受却缺 pin → 载入器 fail-closed 未接受。
       // 如实内联明示「这不是已授权状态」——绝不回退运行期同意、绝不让用户误以为已授权。
       if (res.config && (res.config.kind === "ans-invalid" || !res.config.accepted)) {
@@ -2755,20 +3245,37 @@
       state.sessionOpenRoleId = null;
       setState("err", "连接失败");
       updateControls();
+      metaFor(roleId).contextText = "会话开启失败"; renderContextState(roleId);
       metaFor(roleId).error = true; // B-3：会话开启异常
       renderRoleTree();
       sysRow(pane, "sys-call", ICONS.deny, "会话开启异常：" + (err && err.message ? err.message : err));
     }
   }
 
-  function showSessionContext(roleId, info) {
-    var pane = paneFor(roleId), meta = metaFor(roleId);
-    var token = JSON.stringify([info.contextSource, info.contextWarning || ""]);
-    if (meta.contextNoticeToken === token) return;
-    meta.contextNoticeToken = token;
-    var notice = St.sessionContextNotice({ resumed: info.resumed === true, contextSource: info.contextSource,
-      contextWarning: info.contextWarning, hadHistory: !pane.querySelector(".chat-empty"), alreadyAnnounced: false });
-    if (notice.text) sysRow(pane, "sys-settled", ICONS.call, notice.text);
+  function hasTranscript(roleId) {
+    var history = replayState[roleId];
+    if (history && history.rows.some(function (row) { return row.kind === "user" || row.kind === "assistant" || row.kind === "tool" || row.kind === "denied"; })) return true;
+    var rl = paneRowLists[roleId];
+    return !!rl && rl.rows.some(function (row) { return ["assistant", "activities", "injected", "replay", "handback", "operator", "tool-lifecycle"].indexOf(row.kind) >= 0 || row.manualClientId; });
+  }
+  function renderContextState(roleId) {
+    var el = $("context-state"); if (!el || backgroundDelivery) return;
+    var meta = roleId && state.roleMeta[roleId];
+    el.textContent = meta && meta.contextText || "尚未开启会话";
+    el.title = meta && meta.contextWarning || "";
+    var history = $("history-projection-note"); if (history) history.textContent = meta && meta.historyNotice || "";
+  }
+  function showSessionContext(roleId, info, fromOpen, readableHistoryAtOpen) {
+    var meta = metaFor(roleId);
+    if (fromOpen && info.resumed === false) meta.readableHistoryAtOpen = readableHistoryAtOpen === true;
+    var text = info.resumed || info.contextSource === "resumed" ? "会话继续使用现有上下文" : info.contextSource === "recovered" ? "已从本地恢复模型上下文" : info.contextSource === "fresh" ? info.contextWarning ? "恢复失败，当前为新会话" : "新会话" : "上下文来源未报告";
+    if (info.contextSource === "fresh" && meta.readableHistoryAtOpen === true) text += "；可读历史保留，模型未恢复";
+    meta.contextText = text; meta.contextWarning = info.contextWarning || "";
+    if (roleId === state.selectedRoleId) renderContextState(roleId);
+    if (fromOpen && info.resumed === false && ["fresh", "recovered"].indexOf(info.contextSource) >= 0) {
+      sysRow(paneFor(roleId), "sys-context-event", ICONS.call, "本次开启会话：" + text + (info.contextWarning ? "。" + info.contextWarning : ""));
+    }
+    // 仅实际open返回resumed:false留本次事实；快照广播只更新固定区域，不以同文猜生命周期。
   }
 
   // —————— 右栏：角色资料（手风琴） ——————
@@ -2808,6 +3315,7 @@
     for (var i = 0; i < views.length; i += 1) {
       var v = views[i];
       var reading = drawerReading[roleId] || { full: {}, sections: {} };
+      if (state.rightTab === "work") reading = reading.work || { full: {}, sections: {} };
       var opened = reading.full[v.id] === true;
       var pending = withdrawPending[roleId + "\u0000" + v.id] === true;
       var feedback = (withdrawFeedback[roleId] || {})[v.id] || "";
@@ -2820,7 +3328,7 @@
         '<div class="q-content"><div class="q-head"><span class="q-src">' + esc(v.source) + '</span><span class="q-meta">' + esc(queueTimeText(v.at)) + '</span></div>' +
         '<p class="q-text">' + esc(v.text) + '</p>' +
         (expandable || canWithdraw ? '<div class="q-actions">' +
-          (expandable ? '<button class="q-toggle" type="button" aria-expanded="' + opened + '" data-id="' + encoded + '" title="展开全文">' + (opened ? '收起' : '全文') + '</button>' : '') +
+          (expandable ? '<button class="q-toggle" data-safe-input="' + (v.kind === 'handback') + '" type="button" aria-expanded="' + opened + '" data-id="' + encoded + '" title="展开全文">' + (opened ? '收起' : v.kind === 'handback' ? '交接内容（安全显示副本）' : '全文') + '</button>' : '') +
           (canWithdraw ? '<button class="q-withdraw" type="button" ' + (pending ? 'disabled' : '') + ' data-id="' + encoded + '" title="撤回该条排队消息（仅未投递者可撤）">' + (pending ? '撤回中…' : '撤回') + '</button>' : '') + '</div>' : '') +
         (feedback ? '<div class="q-feedback" role="status">' + esc(feedback) + '</div>' : '') +
         (expandable ? '<div class="q-full" data-full-id="' + encoded + '"' + (opened ? '' : ' hidden') + '>' + esc(v.full) + '</div>' : '') +
@@ -2841,7 +3349,7 @@
       var fullEl = item ? item.querySelector(".q-full") : null;
       if (fullEl) {
         fullEl.hidden = !fullEl.hidden;
-        toggle.textContent = fullEl.hidden ? "全文" : "收起";
+        toggle.textContent = fullEl.hidden ? toggle.dataset.safeInput === "true" ? "交接内容（安全显示副本）" : "全文" : "收起";
         toggle.setAttribute("aria-expanded", String(!fullEl.hidden));
         captureDrawerReading();
       }
@@ -2937,10 +3445,17 @@
   }
 
   function captureDrawerReading() {
-    if (state.rightTab !== "card" || !renderedDrawerRole) return;
+    if (["card", "work"].indexOf(state.rightTab) < 0 || !renderedDrawerRole) return;
     var body = $("right-body");
-    var old = drawerReading[renderedDrawerRole] || { sections: {}, full: {} };
-    body.querySelectorAll("details[data-section]").forEach(function (d) { old.sections[d.dataset.section] = d.open; });
+    if (body.dataset.drawerView !== state.rightTab) return;
+    var base = drawerReading[renderedDrawerRole] || { sections: {}, full: {} };
+    var old = state.rightTab === "work" ? base.work || (base.work = { sections: {}, full: {} }) : base;
+    old.sectionScroll = old.sectionScroll || {};
+    body.querySelectorAll("details[data-section]").forEach(function (d) {
+      old.sections[d.dataset.section] = d.open;
+      var content = d.querySelector(".card-text");
+      if (d.open && content) old.sectionScroll[d.dataset.section] = { top: content.scrollTop, left: content.scrollLeft };
+    });
     body.querySelectorAll("[data-full-id]").forEach(function (el) {
       var id; try { id = decodeURIComponent(el.dataset.fullId); } catch (_) { id = el.dataset.fullId; }
       old.full[id] = !el.hidden;
@@ -2955,14 +3470,19 @@
       old.anchor = { section: candidates[i].dataset.section, id: candidates[i].dataset.queueId || (button ? button.dataset.id : null), offset: candidates[i].getBoundingClientRect().top - top };
       break;
     }
-    drawerReading[renderedDrawerRole] = old;
+    drawerReading[renderedDrawerRole] = base;
   }
 
   function restoreDrawerReading(roleId) {
     var saved = drawerReading[roleId];
+    if (state.rightTab === "work") saved = saved && saved.work;
     var body = $("right-body");
     if (!saved) { body.scrollTop = 0; return; }
-    body.querySelectorAll("details[data-section]").forEach(function (d) { d.open = saved.sections[d.dataset.section] === true; });
+    body.querySelectorAll("details[data-section]").forEach(function (d) {
+      d.open = saved.sections[d.dataset.section] === true;
+      var position = saved.sectionScroll && saved.sectionScroll[d.dataset.section], content = d.querySelector(".card-text");
+      if (position && content) { content.scrollTop = position.top; content.scrollLeft = position.left; }
+    });
     body.scrollTop = saved.scrollTop || 0;
     if (saved.anchor) {
       var nodes = body.querySelectorAll(".q-item, details[data-section]");
@@ -2976,15 +3496,54 @@
     }
   }
 
+  function pendingRequestsHtml(roleId) {
+    var ids = openRequestIdsFor(roleId);
+    if (!ids.length) return '<p class="muted small">无待处理请求</p>';
+    return '<h3 class="work-heading">待处理 ' + ids.length + '</h3><ul class="pending-requests">' + ids.map(function (id) {
+      var request = opRequests[id].request;
+      return '<li><span>' + esc(request.kind === "choice" ? "待选择" : "待确认") + ' · ' + esc(request.title || "交互请求") + '</span><button type="button" class="btn btn-ghost btn-mini pending-locate" data-request-id="' + esc(id) + '">定位</button></li>';
+    }).join("") + '</ul>';
+  }
   function workListHtml(roleId) {
+    var pending = pendingRequestsHtml(roleId);
     var views = queueViewsFor(roleId);
-    if (!views.length) return '<div class="muted small">无进行中或排队消息</div>';
+    if (!views.length) return pending + '<div class="muted small">无进行中或排队消息</div>';
     var running = views.filter(function (v) { return v.pos === "进行中"; });
     var queue = views.filter(function (v) { return v.pos !== "进行中"; });
-    return (running.length ? '<h3 class="work-heading">当前工作</h3>' + queueRowsHtml(running) : '') +
+    return pending + (running.length ? '<h3 class="work-heading">当前工作</h3>' + queueRowsHtml(running) : '') +
       (queue.length ? '<h3 class="work-heading">排队</h3>' + queueRowsHtml(queue) : '');
   }
 
+  function currentWorkReports(roleId) {
+    var reports = [], ids = new Set(), objects = new Set();
+    function add(report, entry) {
+      if (!report || !report.source || !report.summary || typeof report.summary.text !== "string" || report.reportId && report.version !== 1) return;
+      var key = report.reportId ? JSON.stringify([report.source.roleId, report.source.runtime, report.reportId]) : null;
+      if (key ? ids.has(key) : objects.has(report)) return;
+      if (key) ids.add(key); else objects.add(report);
+      var record = findCardRecord(entry);
+      reports.push({ report: report, key: key, order: record ? record.index : reports.length });
+    }
+    function matches(entry) { return entry.scope.projectRoot === state.projectRoot && entry.scope.runtime === state.runtime && entry.scope.roleId === roleId; }
+    Object.keys(reportCards).forEach(function (key) { var entry = reportCards[key]; if (matches(entry)) add(entry.report, entry); });
+    Object.keys(deliveryCards).forEach(function (key) { var entry = deliveryCards[key]; if (matches(entry)) (entry.reports || []).forEach(function (report) { add(report, entry); }); });
+    return reports.sort(function (a, b) { return a.order - b.order; });
+  }
+  function updateWorkReports(roleId) {
+    if (backgroundDelivery || state.rightTab !== "work" || state.selectedRoleId !== roleId || renderedDrawerRole !== roleId) return;
+    var list = $("right-body").querySelector(".recent-reports"); if (!list) return;
+    var scroll = $("right-body").scrollTop, active = document.activeElement, focused = list.contains(active), identity = focused && active.closest(".recent-report");
+    var key = identity && identity.dataset.reportIdentity;
+    var reports = currentWorkReports(roleId);
+    list.innerHTML = '<h3>最近回交</h3>' + (!reports.length ? '<p class="muted small">暂无回交报告</p>' : '');
+    reports.forEach(function (value, index) {
+      var report = value.report, item = document.createElement("div"); item.className = "recent-report"; item.dataset.reportIdentity = value.key || "live:" + index;
+      item.innerHTML = '<p>' + esc(reportDeclaration(report)) + '</p><p>' + esc(Array.from(reportText(report.summary)).slice(0, 120).join("")) + '</p><small class="projection-flags">' + esc(Rt.textFlags(report.summary)) + '</small>';
+      sourceDocumentButton(report, item); list.appendChild(item);
+    });
+    $("right-body").scrollTop = scroll;
+    if (focused && document.activeElement === document.body) list.querySelectorAll(".recent-report").forEach(function (item) { if (item.dataset.reportIdentity === key) item.querySelector("button").focus({ preventScroll: true }); });
+  }
   function updateRightQueue(roleId) {
     if (state.selectedRoleId !== roleId || renderedDrawerRole !== roleId) return;
     var body = $("right-queue-body");
@@ -3006,17 +3565,29 @@
 
   /** 右上角图标簇的**角标**：第二轮裁定（2026-10-13）待办/队列归角色、簇只留两枚——「角色资料」图标角标 =
    *  当前选中角色的待办深度（进行中+排队视图行数；继承原待办图标角标语义；同一 role-state 快照，无新数据源）。 */
+  function syncDrawerModal() {
+    if (backgroundDelivery) return;
+    var open = state.rightTab !== null, drawer = $("right-drawer");
+    [document.querySelector(".col-left"), document.querySelector(".col-mid")].forEach(function (element) { if (element) element.inert = open; });
+    $("drawer-backdrop").hidden = !open;
+    drawer.setAttribute("aria-hidden", String(!open));
+    drawer.inert = !open || !$("shell-confirm").hidden;
+  }
+  function drawerFocusables() {
+    return Array.from($("right-drawer").querySelectorAll('button,input,textarea,select,a[href],summary,[tabindex]')).filter(function (element) { return !element.disabled && element.tabIndex >= 0 && element.getClientRects().length && !element.closest('[hidden]'); });
+  }
   function renderTabs() {
     if (backgroundDelivery) return;
     var roleId = state.selectedRoleId;
     var views = roleId ? queueViewsFor(roleId) : [];
-    setTabBadge("card", views.length);
-    ["card", "pi"].forEach(function (id) {
+    setTabBadge("work", views.length + (roleId ? openRequestCountFor(roleId) : 0));
+    ["work", "card", "pi"].forEach(function (id) {
       var b = $("tab-" + id);
       if (b) b.classList.toggle("active", state.rightTab === id);
     });
     var drawer = $("right-drawer");
     if (drawer) drawer.classList.toggle("open", state.rightTab !== null);
+    syncDrawerModal();
     syncCoveredOperatorCards();
   }
 
@@ -3037,11 +3608,13 @@
   /** 点图标：同 tab 再点 = 收起；不同 tab = 切换内容（至多开一块）。 */
   function toggleRightDrawer(tab) {
     captureDrawerReading();
+    if (state.rightTab === "document") invalidateDocumentRead();
+    drawerInvoker = $("tab-" + tab) || document.activeElement;
     state.rightTab = state.rightTab === tab ? null : tab;
     renderRight();
     renderTabs();
     if (state.rightTab) $("drawer-close").focus();
-    else $("tab-" + tab).focus();
+    else restoreInvoker($("tab-" + tab));
     if (state.rightTab === "pi") void loadPiConfig(); // Pi 面板每次展开都重取视图（掩码/缺项告警如实）
   }
 
@@ -3049,10 +3622,11 @@
     if (state.rightTab === null) return;
     captureDrawerReading();
     var priorTab = state.rightTab;
+    documentReadVersion += 1; documentView = null;
     state.rightTab = null;
     renderRight();
     renderTabs();
-    $("tab-" + priorTab).focus();
+    restoreInvoker($(priorTab === "pi" ? "tab-pi" : priorTab === "work" ? "tab-work" : "tab-card"));
   }
 
   /** 抽屉内的 Pi 面板可见性（面板本体 hidden 由 tab 状态驱动；内容/保存/掩码逻辑一字不动）。 */
@@ -3069,7 +3643,8 @@
     var body = $("right-body");
     var tab = state.rightTab;
     var titleEl = $("drawer-title");
-    var titles = { card: "角色资料", pi: Rt.runtimeLabel(state.runtime) + " 配置" };
+    body.dataset.drawerView = tab || "";
+    var titles = { work: "工作概览", card: "角色资料", pi: Rt.runtimeLabel(state.runtime) + " 配置" };
     var settingsTab = $("tab-pi");
     settingsTab.title = Rt.runtimeLabel(state.runtime) + " 设置";
     settingsTab.setAttribute("aria-label", settingsTab.title);
@@ -3079,6 +3654,7 @@
       body.innerHTML = "";
       return;
     }
+    if (tab === "document") { renderDocumentView(); return; }
     if (tab === "pi") {
       body.innerHTML = ""; // Pi 面板本体（#pi-panel）在抽屉内由 syncPiPanel 控制显隐——不在此重渲染
       return;
@@ -3088,9 +3664,14 @@
       body.innerHTML =
         '<div class="right-empty">' +
         '<p class="empty-title">选择角色后查看资料</p>' +
-        '<p class="empty-sub">点右上角图标展示对应面板；内容跟随当前选中角色。</p>' +
+        '<p class="empty-sub">先在左侧选择角色，再从会话头部的“角色资料”或“工作概览”打开对应面板；内容跟随当前角色。</p>' +
         "</div>";
       return;
+    }
+    if (tab === "work") {
+      if (titleEl) titleEl.textContent = role.roleId + " · 工作概览";
+      body.innerHTML = '<div id="right-queue-body" class="role-work">' + workListHtml(role.roleId) + '</div><section class="recent-reports"><h3>最近回交</h3></section>';
+      renderedDrawerRole = role.roleId; updateWorkReports(role.roleId); restoreDrawerReading(role.roleId); return;
     }
     // "card"（角色资料）：既有四组逐字保留（角色卡 md / 边界条目 / 变更记录 / 文档索引）+ **待办/队列两节
     // 归角色**（2026-10-13 第二轮裁定：「代办是不是应该放在角色里面……这个是和角色相关的」——同一真实
@@ -3101,7 +3682,7 @@
     if (titleEl) titleEl.textContent = role.roleId + " · 角色资料";
     var saved = drawerReading[role.roleId] || { sections: {}, full: {} };
     drawerReading[role.roleId] = saved;
-    var html = '<div id="right-queue-body" class="role-work">' + workListHtml(role.roleId) + '</div>';
+    var html = "";
     html += sec("角色卡", null,
       '<div class="kv">' + esc(role.cardPath) + "</div>" +
       // N-2（2026-10-12 客户裁定）：「右边的角色卡要有 markdown 渲染」——走**既有 Markdown 管线**
@@ -3110,8 +3691,10 @@
       '<div class="card-text card-md">' + Md.renderMarkdown(role.cardText || "（空）") + "</div>", false);
     html += sec("边界条目", entries.length, renderBoundaryTable(role.boundary), false);
     html += sec("变更记录", role.changelog ? null : "无", renderChangelog(role), false);
-    html += sec("文档", role.docs && role.docs.length ? role.docs.length : "无", renderDocs(role), false);
+    html += sec("文档", role.docs && role.docs.filter(function (item) { return item.kind === "file"; }).length || "无", renderDocs(role), false);
     body.innerHTML = html;
+    var documentEntry = document.createElement("button"); documentEntry.className = "btn btn-ghost btn-mini role-document-entry"; documentEntry.textContent = "查看已列文档";
+    documentEntry.addEventListener("click", function () { documentList(role.roleId, documentEntry, "card"); }); body.appendChild(documentEntry);
     renderedDrawerRole = role.roleId;
     body.querySelectorAll("details.sec").forEach(function (d, i) {
       d.dataset.section = ["card", "boundary", "changes", "docs"][i];
@@ -3405,25 +3988,51 @@
       if (!original.text) original.text = rawDraft;
       if (state.selectedRoleId === role.roleId) restoreComposerDraft(role.roleId);
     }
+    var message = manualMessages[clientMessageId];
+    function clearSendHint() {
+      if (!backgroundDelivery && currentHintSource && currentHintSource.kind === "send" && currentHintSource.clientMessageId === clientMessageId && currentHintSource.projectRoot === projectRoot && currentHintSource.runtime === runtime) setHint("");
+    }
+    function reconcileFailedSend() {
+      var result = message.result;
+      if (!result || result.ok) return;
+      if (message.inputAccepted) clearSentAttachments(role.roleId, sentKeys);
+      var outcome = message.outcome;
+      if (outcome === "aborted" || outcome === "completed") {
+        metaFor(role.roleId).error = false;
+        clearSendHint(); renderRoleTree(); return;
+      }
+      if (!outcome && message.turnId) {
+        if (!backgroundDelivery && state.selectedRoleId === role.roleId && (!currentHintSource && !$("composer-hint").textContent || currentHintSource && currentHintSource.kind === "send" && currentHintSource.clientMessageId === clientMessageId)) setHint("发送调用未正常返回，实际轮次结果尚未报告。", { kind: "send", projectRoot: projectRoot, runtime: runtime, roleId: role.roleId, clientMessageId: clientMessageId });
+        return;
+      }
+      clearSendHint();
+      metaFor(role.roleId).error = true;
+      if (!message.inputAccepted) {
+        restoreFailedDraft();
+        if (result.sessionCurrent == null && !message.turnId && state.projectRoot === projectRoot && state.sessionOpenRoleId === role.roleId) { state.sessionOpenRoleId = null; if (!backgroundDelivery) updateControls(); }
+      }
+      // 已接受轮次由真实settled记录报告失败；拒发仍保留原发送错误。
+      if (!message.inputAccepted && !message.failureShown) { message.failureShown = true; sysRow(pane, "sys-call", ICONS.deny, (result.transportException ? "发送异常：" : "发送失败：") + (result.error || "")); }
+      renderRoleTree();
+    }
+    message.onFacts = reconcileFailedSend;
     try {
       var res = await d.sendSession(text, images, { projectRoot: projectRoot, roleId: role.roleId, runtime: runtime }, { clientMessageId: clientMessageId });
       deliverRuntimePayload({projectRoot:projectRoot,roleId:role.roleId,runtime:runtime}, function () {
       if (!res.ok) {
-        restoreFailedDraft();
-        metaFor(role.roleId).error = true; // B-3：最近一次轮次以错误结束
-        if (state.projectRoot === projectRoot && state.sessionOpenRoleId === role.roleId) {
-          state.sessionOpenRoleId = null;
-          updateControls();
-        }
-        sysRow(pane, "sys-call", ICONS.deny, "发送失败：" + (res.error || ""));
-        // 拒发（如主进程校验不合格）：附件**保留在输入区**（本条没发出，可移除/压缩后重试）。
+        if (res.clientMessageId != null && res.clientMessageId !== clientMessageId || res.turnId && message.turnId && res.turnId !== message.turnId) { if (!backgroundDelivery) setHint("发送返回的轮次身份不一致，未改写当前会话。"); return; }
+        if (typeof res.turnId === "string" && res.turnId) message.turnId = res.turnId;
+        if (res.inputAccepted === true && message.turnId) message.inputAccepted = true;
+        if (!message.outcome && message.turnId && ["completed", "failed", "aborted", "timed_out"].indexOf(res.outcome) >= 0) message.outcome = res.outcome;
+        message.result = res;
+        reconcileFailedSend();
       } else if (res.queued === true) {
         // L-1：角色忙——消息**已入队**（不再直接失败）；如实提示位次。徽标/队列行由主进程真实快照驱动
         // （onRoleState），此处不自设忙态（准确性裁定）。图片**入队即定格**（排队后到投递都带原图）。
         stampLastEvent(role.roleId, "你：" + firstLine(text));
         var queuedMsg = "已入队：等它完成当前任务后处理（第 " + (res.position || 1) + " 位）。";
         sysRow(pane, "sys-queue", ICONS.clock, queuedMsg);
-        if (state.selectedRoleId === role.roleId) setHint(queuedMsg);
+        if (state.selectedRoleId === role.roleId && !manualMessages[clientMessageId].turnId) setHint(queuedMsg, { kind: "queue", projectRoot: projectRoot, runtime: runtime, roleId: role.roleId, clientMessageId: clientMessageId });
         clearSentAttachments(role.roleId, sentKeys);
       } else {
         // 忙态由主进程快照转述（session:role-state 的 busy=true——见 onRoleState）；此处只记最近一条（悬停用）。
@@ -3434,14 +4043,8 @@
       });
     } catch (err) {
       deliverRuntimePayload({projectRoot:projectRoot,roleId:role.roleId,runtime:runtime}, function () {
-      restoreFailedDraft();
-      metaFor(role.roleId).error = true;
-      if (state.projectRoot === projectRoot && state.sessionOpenRoleId === role.roleId) {
-        state.sessionOpenRoleId = null;
-        updateControls();
-      }
-      renderRoleTree();
-      sysRow(pane, "sys-call", ICONS.deny, "发送异常：" + (err && err.message ? err.message : err));
+      message.result = { ok: false, transportException: true, error: String(err && err.message || err) };
+      reconcileFailedSend();
       });
     }
   }
@@ -3579,6 +4182,16 @@
   }
   // 横栏写入语义对真实引擎相同；选择器另行处理会话身份。
   var engineSelector = window.ANSEngineSelector.create($("runtime-select"), $("runtime-options"), function (runtime) { void selectRuntime(runtime); });
+  function alignEngineMenu() {
+    var menu = $("runtime-options"); if (menu.hidden) return;
+    var rect = $("runtime-select").getBoundingClientRect();
+    var position = window.ANSEngineSelector.placement({ left: rect.right - menu.offsetWidth, top: rect.top, bottom: rect.bottom, height: rect.height }, { width: window.innerWidth, height: window.innerHeight }, menu.offsetWidth, menu.offsetHeight);
+    menu.style.left = position.left + "px";
+  }
+  [$("runtime-select"), $("runtime-options")].forEach(function (element) { element.addEventListener("click", alignEngineMenu); element.addEventListener("keydown", alignEngineMenu); });
+  window.addEventListener("resize", alignEngineMenu);
+  window.addEventListener("scroll", alignEngineMenu, true);
+
   engineSelector.sync(state.runtime, !state.projectRoot);
   renderWriteNote();
   // N-1：初始按钮文案（未导入 ⇒ 「导入项目」；与 HTML 静态文案同款——此后由 applyListing 维护）。
@@ -3592,9 +4205,17 @@
   $("pi-toggle-secret").addEventListener("click", toggleSecretVisibility);
   // 右上角图标簇（客户裁定 2026-10-13；第二轮裁定同日：待办/队列归角色，簇只留两枚）——同图标再点收起；
   // 抽屉头 × 收起；Esc 收起（shell 确认卡在先——fail-closed 优先级不受影响）。
+  $("tab-work").addEventListener("click", function () { toggleRightDrawer("work"); });
   $("tab-card").addEventListener("click", function () { toggleRightDrawer("card"); });
   // P1-1：抽屉内待办行的「全文 / 撤回」点击（事件委托挂 Persistent 的 #right-body——行重渲染不丢绑定）。
   $("right-body").addEventListener("click", onRightBodyClick);
+  $("right-body").addEventListener("click", onDocumentAction);
+  $("right-body").addEventListener("click", function (event) {
+    var button = event.target.closest(".pending-locate"); if (!button) return;
+    var id = button.dataset.requestId, entry = opRequests[id]; if (!entry || entry.roleId !== state.selectedRoleId) return;
+    closeRightDrawer(); scrollToOperatorCard(entry.roleId, id);
+    var card = cardElInPane(paneFor(entry.roleId), id); if (card) { card.tabIndex = -1; card.focus({ preventScroll: true }); }
+  });
   $("drawer-close").addEventListener("click", closeRightDrawer);
   // Markdown 链接（B-1）：点聊天流里的链接一律**外开**（事件委托挂在 #chat 上——pane 切换不丢）。
   $("chat").addEventListener("click", onChatLinkClick);
@@ -3604,11 +4225,21 @@
   $("sc-deny").addEventListener("click", function () { respondShellConfirm(false); });
   $("sc-allow").addEventListener("click", function () { respondShellConfirm(true); });
   $("sc-close").addEventListener("click", function () { respondShellConfirm(false); });
+  $("drawer-backdrop").addEventListener("click", closeRightDrawer);
+  document.addEventListener("focusin", function (event) {
+    if (state.rightTab !== null && $("shell-confirm").hidden && !$("right-drawer").contains(event.target) && !event.target.closest(".win-btn")) $("drawer-close").focus({ preventScroll: true });
+  });
   document.addEventListener("keydown", function (e) {
     if (e.key === "Escape" && state.shellConfirm) {
       e.preventDefault();
       respondShellConfirm(false);
       return;
+    }
+    if (e.key === "Tab" && state.rightTab !== null && $("shell-confirm").hidden) {
+      var focusable = drawerFocusables(), index = focusable.indexOf(document.activeElement);
+      if (!focusable.length) { e.preventDefault(); $("right-drawer").focus(); }
+      else if (e.shiftKey && index <= 0) { e.preventDefault(); focusable[focusable.length - 1].focus(); }
+      else if (!e.shiftKey && (index < 0 || index === focusable.length - 1)) { e.preventDefault(); focusable[0].focus(); }
     }
     // 抽屉的 Esc 收起（客户裁定：点了才展示；Esc 也是收起路径之一）。
     if (e.key === "Escape" && state.rightTab !== null) {
@@ -3623,6 +4254,10 @@
   d.onProjectChanged(refreshProject);
   // 客户交互请求（A-5）：su 的 request_confirmation/request_choice → 渲染为该角色聊天流里的交互卡
   // （kind：confirm〔可带预览〕/ choice〔单选或勾选〕）；作答经 `d.operatorRespond` 回传（主进程按请求快照校验）。
+  var persistenceUnsubscribers = [];
+  if (d.onReportPersistenceUpdated) persistenceUnsubscribers.push(d.onReportPersistenceUpdated(onPersistenceUpdate));
+  if (d.onDeliveryHistoryUpdated) persistenceUnsubscribers.push(d.onDeliveryHistoryUpdated(onPersistenceUpdate));
+  window.addEventListener("beforeunload", function () { persistenceUnsubscribers.forEach(function (off) { if (typeof off === "function") off(); }); });
   if (d.onOperatorRequest) d.onOperatorRequest(function (payload) { deliverRuntimePayload(payload, appendOperatorRequest); });
   if (d.onOperatorExpired) d.onOperatorExpired(function (payload) { deliverRuntimePayload(payload, onOperatorExpired); });
   // shell 命令确认卡（M-1）：主进程推来的数据面 → 应用内卡片（拒绝为默认；Esc/关闭 = 不放行）。

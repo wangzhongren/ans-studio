@@ -37,3 +37,19 @@
 - 2026-10-14（晚）：第二版窄修复补签。桌面UI排查偶发项时发现并修「脱离文档的pane首次读行距空串被当0缓存」缺陷（后台早到/恢复路径退回旧错口径；修法=仅挂载时读、命中才缓存＋调试字段rowModelDebug.rowGap）。新指纹 renderer 47703d0b…（取代402e49a7），其余四文件与夹具未变（实测）。本角色重跑只读夹具两遍：report.json 逐字节一致（全量读数不变）、十图9张逐字节一致、B960-role 唯一1像素抗锯齿差异（(798,17)标题栏角标，1/255级，确定性）。视觉零变化成立；四项裁定/设计值不受影响；设计面结论维持通过（[补签节](docs/design/2026-10-14_design_uiux-final-acceptance.md)）。测试角色第二版独立复测进行中；U1_WINDOWED偶发定性为既有、非本修复引入。
 
 - 2026-10-14：本上下文固定UIUX，仅交[引擎选择器v1设计](docs/design/2026-10-14_design_engine-selector.md)和HTML/六图；104×28触发、160列表、32行、复用现tokens。真实native深菜单观察由root提供，自身仅实际原型IAB两档/键盘/禁用。当前/active分离、同项仅关层、设置按钮明确引擎、动态可访问名带当前值；无IPC。屏读/生产未测，200极矮滚动active可见留实施验收，未改业务。
+
+- 2026-10-15：新一轮[完整流程v1](docs/design/2026-10-15_design_desktop-complete-flow.md)基线fca8f6b。产品release后本人CUA亲操作真实Electron，13图：普通choice临时改选/Tab不提交，缺配Claude设置不保存及Esc回错入口，测试失败/12活动/文档路径、960×620定位；P1–P7同意且定位本身保留。root后续统一提交选择非本人。原型仅模拟已点通，未选null/禁提交，按调用身份详情、受限报告阅读、invoker可见性fallback、草稿/队列保持。P1/2源字段/P3只读IPC/P4typed持久合同均待冻结；旧历史不猜补、真实恢复不抹；评审中，不改生产。
+
+- 2026-10-15 第二轮：当前完整流版本v2。产品亲测暴露并已修非空草稿被建议覆盖、设置保存无条件退ready、停止折叠详情；root/PM指出未选默认与侧栏kind已修。本人IAB实测31/32/33 JSON记录三条修复，保留普通choice与权限分开，报告改“报告声明：已完成”。仍待同v2产品/PM最终结论，原型/规范不构成生产授权。
+
+- 2026-10-15 三接口阶段：[两项UX短评](docs/design/2026-10-15_design_complete-flow-interface-ux-review.md)接受来源角色文档显选、多一步需新确认；仅ID补存报告/历史同卡，query无副作用，expired无按钮，disabled/unknown保原live。注意source补存成功可由Window首次继续原待回交流程，不能宣传保存后绝不投递；不重模型/重复投递。只读文档评审，无浏览器/未来API测试，冻结v2两hash3143a45e/0ea73a24实核不变。
+
+- 2026-10-15 视觉收敛：固定UIUX，用户授权设计/原型/评审。本人原生1360测试/Pi真实报告→清单→显选9799B→Esc，只读3图；272导航/长报告/双阅读面问题实见。新原型c575首版，两档208/176导航+按需424抽屉；root发现选doc1显示doc0已修、本人focusDoc1实测。960来源按钮首屏可见、停止禁编辑、缺配Esc回真实入口和草稿保持。当前待产品第二轮，不改生产或冻结P1–P7，详见[本轮方案](docs/design/2026-10-15_design_visual-convergence.md)。
+
+2026-10-15 视觉收敛第二轮：V2 dcc614d0…已修普通聊天概览假报告、清单返回资料链、完整summary可达与reading重绘展开；自身IAB实测三档，原型不代产品亲测。规范含逐项回应，待root/PM具体版复核。
+
+2026-10-15 本轮视觉设计V2收口：HTML e95b363d…，root正常IAB已完成分版实际检查（dcc主修/e95状态窄修与最终三档），产品静态最终推荐；本角色不代签产品原型亲测。自身新manifest绑定最终规范、原型和root canonical。正式应用未实施，等待客户确认。
+
+2026-10-15 客户已授权视觉V2实施，新增[落地独立评审](docs/design/2026-10-15_design_visual-v2-implementation-review.md)。仅自身新文档/证据写权；accepted视觉规范/原型与r2冻结不改。当前首轮只读准备、待稳定候选与root串行GUI，未签通过。
+
+2026-10-15 V2正式落地严格UIUX范围通过：renderer5324b786/stylesdf554f87/index7beda，SV1–SV13及真实batch/资料阅读差距均关闭。依据本角色源码/看图与root真实native截图/AX，未冒签亲操作；accepted原件不变，详见[最终评审](docs/design/2026-10-15_design_visual-v2-implementation-review.md)。无新增设计项或明确待修阻点。

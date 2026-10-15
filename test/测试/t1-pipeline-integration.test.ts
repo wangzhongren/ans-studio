@@ -20,6 +20,9 @@ function engine(work: (options: RuntimeProviderOptions, text: string, signal: Ab
   const factory: RuntimeProviderFactory = options => {
     calls.push(options);
     return { async composeContext() { return { systemPrompt: "independent external engine" }; }, async bindRole(role) {
+      assert.equal(options.toolDisplayMode, "required-v1");
+      assert.equal(typeof options.registerToolDisplayProfile, "function");
+      options.registerToolDisplayProfile!({ credentials: [] });
       let controller = new AbortController(), done = false, wake: (() => void) | undefined;
       const rows: SessionEvent[] = [];
       const push = (event: SessionEvent) => { rows.push(event); wake?.(); wake = undefined; };

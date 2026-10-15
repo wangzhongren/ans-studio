@@ -1,0 +1,24 @@
+{
+  "stopBefore": {
+    "details": [
+      false,
+      true,
+      false,
+      true,
+      false
+    ],
+    "top": 0
+  },
+  "stopAfter": {
+    "buttonDisabled": true,
+    "details": [
+      false,
+      true,
+      false,
+      true,
+      false
+    ],
+    "draft": "保留停止前草稿",
+    "top": 0
+  }
+}

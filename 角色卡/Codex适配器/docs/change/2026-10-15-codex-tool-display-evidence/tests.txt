@@ -1,0 +1,30 @@
+✔ loading/factory is lazy; model/key required, optional official URL, userinfo rejected (85.13775ms)
+✔ optional API address blank values use official default; explicit nonblank wins environment and invalid values stay redacted (6.180625ms)
+✔ bound model/address/key and error redaction keep the same captured environment after async transport starts (5.205959ms)
+✔ config enumeration/verification occurs before thread, no unsafe config/catalog fallback (3.606167ms)
+✔ real MCP callbacks use injected schemas and gates: deny/throw have zero writes, allow writes (23.038291ms)
+✔ shell deny/unknown native tool never executes and optional capabilities only come from injection (5.67175ms)
+✔ sequential MCP calls keep original turn signal, queued writes and late old-turn requests cannot cross abort (11.298041ms)
+✔ customer wait pauses deadline; abort and late confirmed do not authorize, next turn can continue (163.051792ms)
+✔ upstream tool-request cancellation invalidates original signal; timeout/failed turn settle exactly once (57.257875ms)
+✔ stop is idempotent and bounded; hanging interrupt quarantines rather than claiming continued session (758.497875ms)
+✔ exact role/runtime native store checks, confirmed resume vs recovered; later model failure retains resumed (27.415333ms)
+✔ native directory symlink rejected before engine, absent persistence creates no .ans, images stay temporary (7.6165ms)
+✔ all injected ANS capability callbacks keep receipts/turn metadata; denied customer and failed report stay failed (6.564416ms)
+✔ call IDs differ across restarts; all shared credential values are scrubbed from model/tool outputs (11.149542ms)
+✔ actual native process JSON-RPC parser routes callbacks and serverRequest/resolved cancellation (62.513292ms)
+✔ owned native process group cleanup kills a wrapper and child that ignore SIGTERM (1147.548625ms)
+✔ required display capabilities reject at factory before any native, MCP or storage effects (0.864583ms)
+✔ profile registers selected credential and named extras from the same immutable bind snapshot before effects (4.03ms)
+✔ injected display receives real handler facts, rules, error and execution; opaque identities bypass legacy scrub (8.0015ms)
+✔ projector failure emits bounded diagnostic without raw fallback or changing model receipt and settled outcome (6.254875ms)
+✔ provider prompt keeps exact model text and image bytes while ignoring Core-only delivery metadata (5.994125ms)
+✔ projection never attributes unknown, repeated, queued stopped or late callbacks to a new turn (13.447958ms)
+ℹ tests 22
+ℹ suites 0
+ℹ pass 22
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2492.399833

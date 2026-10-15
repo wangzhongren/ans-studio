@@ -168,3 +168,26 @@ test("回交诊断记录真实来源/状态，不记录任务正文与证据内�
     assert.ok(!text.includes("会话结束"));
   } finally { await disposeDiagnostics(); fs.rmSync(root, { recursive: true, force: true }); }
 });
+
+test("A4完整成功写入路径形成兜底证据；隐藏/截断与新summary/raw别名不能绕过", async () => {
+  const complete = { version: 1, target: { kind: "path", value: { text: "src/a.ts", truncated: false, redacted: false } }, omissions: [] };
+  const base: SessionEvent = { kind: "accepted", summary: "write_file 已获准（写入）：src/raw-alias.ts", turnId: "a", detail: {
+    phase: "result", ok: true, status: "completed", toolName: "write_file", path: "src/raw-alias.ts", display: complete,
+  } };
+  const success = buildTaskHandback([base, base], { roleId: "X" });
+  assert.equal(success.status, "unreported");
+  assert.deepEqual(success.evidence, ["已写入：src/a.ts"]);
+  const cases = [
+    { display: { ...complete, target: { kind: "path", value: { text: "[REDACTED]", truncated: false, redacted: true } } } },
+    { display: { ...complete, target: { kind: "path", value: { text: "src/a", truncated: true, redacted: false } } } },
+    { phase: "start" }, { phase: "blocked" }, { ok: false }, { ok: undefined }, { status: "failed" },
+    { toolName: "read_file" }, { display: { ...complete, version: 2 } },
+    { display: { ...complete, target: { kind: "command", value: complete.target.value } } },
+  ];
+  for (const override of cases) {
+    const event = { ...base, detail: { ...(base.detail as Record<string, unknown>), ...override } };
+    assert.deepEqual(buildTaskHandback([event], { roleId: "X" }).evidence, [], JSON.stringify(override));
+  }
+  assert.deepEqual(buildTaskHandback([{ kind: "accepted", summary: "旧结果", detail: { phase: "result", ok: true, toolName: "write_file", path: "src/legacy-result.ts" } }], { roleId: "X" }).evidence, ["已写入：src/legacy-result.ts"]);
+  assert.deepEqual(buildTaskHandback([{ kind: "accepted", summary: "write_file 已获准（写入）：src/legacy.ts" }], { roleId: "X" }).evidence, ["已写入：src/legacy.ts"]);
+});

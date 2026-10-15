@@ -1,0 +1,8 @@
+{
+  "command": "npm run typecheck",
+  "chunk_id": "100f98",
+  "wall_time_seconds": 0.761142,
+  "exit_code": 0,
+  "original_token_count": 68,
+  "output": "npm warn Unknown user config \"ELECTRON_MIRROR\". This will stop working in the next major version of npm.\nnpm warn Unknown user config \"ELECTRON_BUILDER_BINARIES_MIRROR\". This will stop working in the next major version of npm.\n\n> ans-cli@1.0.0 typecheck\n> tsc --noEmit\n\n"
+}

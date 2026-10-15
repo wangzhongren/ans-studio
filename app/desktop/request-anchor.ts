@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 // app/desktop/request-anchor.ts
 // 交互请求的**锚点键**（真机缺陷修复 2026-10-12：「已决交互卡切走再切回跑到聊天流最末尾」）。
 //
@@ -22,7 +23,7 @@ import { REQUEST_CONFIRMATION_TOOL_NAME, REQUEST_CHOICE_TOOL_NAME } from "../../
 
 /** 交互请求的锚点键（两侧唯一算法；title 逐字取用、不做归一化——不同即为不同请求）。 */
 export function interactionAnchorKey(kind: "confirm" | "choice", title: string): string {
-  return (kind === "choice" ? "choice" : "confirm") + "\u0000" + String(title == null ? "" : title);
+  return "legacy-anchor-v1:" + createHash("sha256").update((kind === "choice" ? "choice" : "confirm") + "\u0000" + String(title == null ? "" : title)).digest("hex");
 }
 
 /**

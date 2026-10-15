@@ -1,0 +1,42 @@
+✔ activity facts: accepted alone is unknown; explicit result succeeds; old call remains call (0.835083ms)
+✔ known own tool first-line failures remain visible even with historical isError=false (1.087584ms)
+✔ tool replay state changes invalidate equality without exposing body (0.232083ms)
+✔ execution-before-denial never claims execution failed; known failures keep exact visible first line (0.122375ms)
+✔ full known target survives slim summary for default failure location (0.090417ms)
+✔ orphan own read_file failure keeps explicit first-line target without inspecting body (0.160375ms)
+✔ canonical start/result/blocked各自保留真实状态与实际工具名 (0.130834ms)
+✔ A4 consumer only reads public safe display target and rejects unknown versions (0.08025ms)
+✔ tool identity never inferred for ordinary aborted terminal (0.065917ms)
+✖ delivery notes are not tool activities; known legacy and trusted tool metadata stay tools (0.551375ms)
+✔ actual protected worker history retains all ten calls and failure result without adding a generic (0.566084ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 10
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 86.443042
+
+✖ failing tests:
+
+test at test/桌面应用/tool-rows.test.ts:91:1
+✖ delivery notes are not tool activities; known legacy and trusted tool metadata stay tools (0.551375ms)
+  AssertionError [ERR_ASSERTION]: old anonymous delivery progress cannot manufacture a tool call
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/tool-rows.test.ts:93:9)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

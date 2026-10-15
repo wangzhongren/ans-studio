@@ -1,0 +1,13 @@
+diff --git "a/test/\350\243\205\351\205\215/multi-runtime.test.ts" "b/test/\350\243\205\351\205\215/multi-runtime.test.ts"
+index c37af5a..7e0cc93 100644
+--- "a/test/\350\243\205\351\205\215/multi-runtime.test.ts"
++++ "b/test/\350\243\205\351\205\215/multi-runtime.test.ts"
+@@ -23,6 +23,8 @@ function fakeProvider() {
+   const results: ToolResult[] = [];
+   const factory: RuntimeProviderFactory = (options) => {
+     calls.push(options);
++    assert.ok(options.registerToolDisplayProfile, "actual Core supplies required-v1 profile registration");
++    options.registerToolDisplayProfile({ credentials: [] });
+     return {
+       async composeContext() { return { systemPrompt: "assembly offline engine" }; },
+       async bindRole(role) {

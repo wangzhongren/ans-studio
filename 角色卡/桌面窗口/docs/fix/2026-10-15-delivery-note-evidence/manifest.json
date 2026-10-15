@@ -1,0 +1,38 @@
+{
+  "stage": "WINDOW-DELIVERY-NOTE-FIX-1; producer typed note, native reload verification pending",
+  "head": "fca8f6bd3d76d719dfbca071056449dedbaef957",
+  "node": "v24.14.0",
+  "affectedFiles": {
+    "app/desktop/session.ts": "1e623ae7f71462d80bb69eb3e464a1bdd2dcb8c45b0907dc60646c9a6d749df1",
+    "test/桌面应用/dispatch-delivery.test.ts": "1b9c72a42cd701b5e44245213d665fa1bbcabf83b47be2d2733f7d58a2b3ffc9",
+    "test/桌面应用/handback-delivery.test.ts": "b5b451d59fb04ddf51dcd02a4382c7bddb56a097d9c693fb0b0b143014a53ca8",
+    "test/桌面应用/message-queue.test.ts": "db62d9ead5c7819dd7db60e1fdb17130366b789bb1483e34d4ed1cac5be3ffc2"
+  },
+  "wire": {
+    "kind": "message",
+    "detail": {
+      "source": "delivery-note"
+    }
+  },
+  "strictRedGreen": {
+    "command": "node --test --test-name-pattern='delivery notes are typed system messages' test/桌面应用/dispatch-delivery.test.ts",
+    "beforeExit": 1,
+    "beforeExtraToolCount": 2,
+    "expectedTools": 1,
+    "afterExit": 0,
+    "targetPromptCount": 1,
+    "coordinatorExtraPromptCount": 0
+  },
+  "ownerCommand": "node --test test/桌面应用/dispatch-delivery.test.ts test/桌面应用/handback-delivery.test.ts test/桌面应用/message-queue.test.ts test/桌面应用/dispatch-fresh-enum.test.ts",
+  "ownerPassed": 31,
+  "ownerFailed": 0,
+  "typecheckExit": 0,
+  "diffCheckExit": 0,
+  "approved13HashesUnchanged": true,
+  "baseStopOverlay": "角色卡/桌面窗口/docs/fix/2026-10-15-stop-terminal-send-facts-evidence/manifest.json",
+  "rootNativeRedEvidence": "角色卡/测试/docs/change/2026-10-15-visual-v2-implementation-evidence/native-extra-tool-row-open-red-ax.txt",
+  "notCovered": [
+    "root重启候选后新正式任务的真实native/Core/UI计数对照",
+    "不以旧formal npm31/report证明本字节全链重跑"
+  ]
+}

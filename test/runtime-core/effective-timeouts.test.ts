@@ -1,3 +1,4 @@
+import { registerControlledDisplayProfile } from './fixtures.ts';
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createRuntimeAdapter } from "../../src/service/runtime/session.ts";
@@ -20,6 +21,7 @@ async function withPiEnv(prompt: string | undefined, construct: string | undefin
 
 function immediateProvider(capture: (options: RuntimeProviderOptions) => void): RuntimeProviderFactory {
   return (options) => {
+    registerControlledDisplayProfile(options);
     capture(options);
     return {
       async composeContext() { return { systemPrompt: "fixture" }; },

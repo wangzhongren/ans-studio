@@ -1,0 +1,102 @@
+{
+  "stage": "WINDOW-A/C-1 owner verified; renderer/real Electron acceptance pending",
+  "producer": "桌面窗口",
+  "head": "fca8f6bd3d76d719dfbca071056449dedbaef957",
+  "node": "v24.14.0",
+  "contracts": {
+    "A": 4,
+    "B": 2,
+    "C": 2,
+    "C_text_policy_revision": 1,
+    "WindowAC": 3
+  },
+  "sourceFiles": {
+    "app/desktop/session.ts": "63bae375299ad4f5464f3bf22204a55f35a7dd85bafd62660bff0e691c09814f",
+    "app/desktop/runtime-history.ts": "050fd5fe41085840dd1dd8f2972225e38b916d0f999570592103aa0d34a6e1cf",
+    "app/desktop/session-history.ts": "58e65918aff579685b2240e1d108b2b0d385ea167f698336c353efd45f7845f6",
+    "app/desktop/interface.ts": "dc6c769e77ce5029f7320dffdee2f4c411f242423b38d52e510ed3f015b9fd30",
+    "app/desktop/request-anchor.ts": "7539da9ac445e838bcb86ad863f57f74274a80cb5d395c7a7ef469e30ea8b4dc",
+    "app/main.ts": "f4339c2ee0aa87a306534010435e47c771559d56e316393d8d04ba1208267940",
+    "app/preload.cjs": "7fc95a6a5ac63edcea06ef2b31a2d14e3348e3bd27b35d9fa994332554133ce1"
+  },
+  "testFiles": {
+    "test/桌面应用/ans-wiring.test.ts": "0c619e6350c5476b5f1f0eedce0d500efa728d9a0905802c0372e27dc10fce0d",
+    "test/桌面应用/boundary-refresh.test.ts": "b08751cb9a732a957689ce8152b442a053b3ba163cbe4258a75f9659a925e53b",
+    "test/桌面应用/diagnostics.test.ts": "ffe99bd44d192b1181888b2dcb2b52298328a938fdf2ab7d30c0df68daccc40d",
+    "test/桌面应用/dispatch-delivery.test.ts": "7062305b470d5217b0e5216c4ef9cbaa465a7ccf8db0758a84b5670afa0b6959",
+    "test/桌面应用/handback-delivery.test.ts": "1ae1e5d5bd8c2fcc231c33176d9ce2216ee4687d50e61eb3708d616f0f2dd1f0",
+    "test/桌面应用/hot-path.test.ts": "1817814bdd6be5c9e08be43d75412e43526eec6e73066ab46ee9a44a29909bf5",
+    "test/桌面应用/interface.test.ts": "c1f6069dec497f3d9d0e5cd859fa16381fd375a7c1d288edbd5006dceb6b94fc",
+    "test/桌面应用/message-queue.test.ts": "575a2a8a3ee1e9b8d48a530263b3db6009c3b5b8ffb833f16f3bdf9b7326c49a",
+    "test/桌面应用/multi-runtime.test.ts": "6c850e7179a89d37b7d60bd785b3427ad1168751f4ed073a3fe0b79f36481e9f",
+    "test/桌面应用/session-history.test.ts": "b7ef2428b01cdff16608a960f958542712c7bb77fe3291772148bb935634153f",
+    "test/桌面应用/session.test.ts": "75a80f7cc4a5cfade7d92ec649f46670796a2c09c4a0fbf705797482546eef6d"
+  },
+  "consumedDependencies": {
+    "src/common/runtime-core/report-provenance.ts": "d13fcf3bb6f50c19f2ba6b4aeb4a608ff791daa2995246b005adc9bb98108d27",
+    "src/common/runtime-core/tool-display.ts": "983c53207eab92c6448c1681e829c0700b42a12153a5817bab217dbb6c2c8e9e",
+    "src/common/编排/handback.ts": "ae4153c7d2d279caf395233f76727418e39093bb24eeeeea76ac554e0e14c6dd",
+    "src/model/runtime.ts": "4d3278969daea6f45fd098a11cd5aea076fd646c080f09c10d4a8daba88314dd",
+    "src/pipeline/orchestration/govern-session.ts": "9894f9364f2ab23840213085125e8f80fd6ab49c298b34847651586b0514c2d7",
+    "src/pipeline/orchestration/run-role.ts": "fad87c2372ca5752a08a702284111db097dc7a2b3f9c9c6d6ac9789ccd4d1d64",
+    "src/provider/runtime/session-store.ts": "fbe84fc39e62b9992be09afac0887258cfc02f8cbca3d5432a5ea943c6ca79a3",
+    "src/provider/runtime/tools.ts": "5db9187e52b2413c46a07e516c56f8b27455bccd7c002ad8b9bf3db84ddd9298",
+    "src/service/runtime/session.ts": "991146051f429ef26b46b21154a574086b312233047b29c99a9d522c01280f02"
+  },
+  "dependencyNote": "Core Service current hash matches PM release991146...; original Core final-manifest predates its two-file non-tool history fix. Record actual consumed hashes, do not overwrite peer manifests.",
+  "BStableFiles": {
+    "src/model/project-document.ts": "cb13869cb5ae55721e8a168c39ceb5a17dd73bb4cf699954eb3cc4dafe33511e",
+    "src/pipeline/project-document/read-project-document.ts": "fe199997441df96d89ab5f52ff578353fb9bc8b00602f8159dd2ecd8f246d94d",
+    "src/service/project-document/abstract/document-reader.ts": "c7d1aff487398ed7012eafd28077a91fccace90f3329c0d52e5a9f6694ad8130",
+    "src/service/project-document/public/read-project-document.ts": "691fd17249e0757707bfb19fb617666d1679123254e7792d60d42c86765e617f",
+    "src/service/project-document/impl/read-project-document.ts": "658062375a4349cd9c64423976bc03b3b15bd748e0fa2823a0aee8f69eff997e",
+    "src/provider/project-document/abstract/file-reader.ts": "bbf8b28444db745d5b05c79dd135170c754ec9f55bf90837bd4fea1967d977a9",
+    "src/provider/project-document/public/file-reader.ts": "b114befdb3c5e1b9781b12bd41a0945ad1bd219d57f6f6b8c58260cd0ca70d83",
+    "src/provider/project-document/impl/file-reader.ts": "9a387b077f0142c49a4f3846f5af98611a7dee97f3d455bb42dcb585dbe1ae8a",
+    "app/desktop/project.ts": "7ff7826899c6eb9720787f6b01468916e50443d6f0a929cd1b8569d42f4faa8c",
+    "test/桌面应用/project-document.test.ts": "38bcebcf4df05b42acc21ba56835f28c0fac235deb712d86b2ea9be56d7733c2"
+  },
+  "approvedManifest": "角色卡/项目管理/docs/design/2026-10-15-complete-flow-interface-evidence/review-manifest.json",
+  "approvedDocCount": 13,
+  "approvedHashesUnchanged": true,
+  "ownerCommand": [
+    "node",
+    "--test",
+    "test/桌面应用/ans-wiring.test.ts",
+    "test/桌面应用/boundary-refresh.test.ts",
+    "test/桌面应用/composer-images.test.ts",
+    "test/桌面应用/diagnostics.test.ts",
+    "test/桌面应用/dispatch-delivery.test.ts",
+    "test/桌面应用/dispatch-fresh-enum.test.ts",
+    "test/桌面应用/genesis-bootstrap.test.ts",
+    "test/桌面应用/handback-delivery.test.ts",
+    "test/桌面应用/hot-path.test.ts",
+    "test/桌面应用/interface.test.ts",
+    "test/桌面应用/message-queue.test.ts",
+    "test/桌面应用/operator-channel.test.ts",
+    "test/桌面应用/operator-wiring.test.ts",
+    "test/桌面应用/p0-halt-and-images.test.ts",
+    "test/桌面应用/pi-config.test.ts",
+    "test/桌面应用/project.test.ts",
+    "test/桌面应用/queue-withdraw-lru.test.ts",
+    "test/桌面应用/session-history.test.ts",
+    "test/桌面应用/session-rebuild-race.test.ts",
+    "test/桌面应用/session.test.ts",
+    "test/桌面应用/su-effective-boundary.test.ts",
+    "test/桌面应用/multi-runtime.test.ts",
+    "test/桌面应用/project-document.test.ts"
+  ],
+  "ownerTests": {
+    "files": 23,
+    "passed": 206,
+    "failed": 0
+  },
+  "typecheckExit": 0,
+  "diffCheckExit": 0,
+  "notCovered": [
+    "生产renderer实现/真实Electron交互验收",
+    "在线Pi/Codex/Claude完整新流程（本角色不操作窗口）",
+    "旧native底层整文件读取无界风险未迁移/修复",
+    "未知历史秘密不保证通用DLP或跨进程exactly-once"
+  ]
+}

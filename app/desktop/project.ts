@@ -255,3 +255,13 @@ export async function readRoleDocsIndex(
 
   return { changelog, docs };
 }
+
+
+/** Converts the existing trusted listing only; renderer paths/evidence are never document candidates. */
+export function projectDocumentCandidates(role: {
+  roleId: string; builtIn: boolean; cardPath: string;
+  changelog: { path: string; text: string } | null; docs: DocsIndexEntry[];
+}): import("../../src/model/project-document.ts").ProjectDocumentRoleCandidates {
+  return { roleId: role.roleId, builtIn: role.builtIn, cardPath: role.cardPath,
+    ...(role.changelog ? { changelogPath: role.changelog.path } : {}), docs: role.docs };
+}

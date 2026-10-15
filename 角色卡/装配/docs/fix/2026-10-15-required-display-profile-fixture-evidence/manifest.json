@@ -1,0 +1,81 @@
+{
+  "task": "ASSEMBLY-FIXTURE-1",
+  "producerRole": "装配",
+  "at": "2026-10-15T04:42:49.046Z",
+  "node": "v24.14.0",
+  "platform": "darwin",
+  "arch": "arm64",
+  "head": "fca8f6bd3d76d719dfbca071056449dedbaef957",
+  "actualChangedFiles": [
+    {
+      "path": "test/装配/multi-runtime.test.ts",
+      "beforeSha256": "6178b8591d780e9f133ca4ea8711ada4ee0775f56b470a1a874d2b1dd0f93f64",
+      "sha256": "18329834063f41d9ec616fec726254a929a97addc102e04353bc52f5a31ff903"
+    }
+  ],
+  "coreCombinedSha256": "dd6b50518ca7504118907e996b76f8553e0f586c9837f573a5e8bfc8c897f015",
+  "coreMismatch": [],
+  "approvedDocumentCount": 13,
+  "approvedMismatch": [],
+  "checks": {
+    "red": {
+      "command": "node --test test/装配/multi-runtime.test.ts",
+      "tests": 13,
+      "pass": 8,
+      "fail": 5,
+      "exit": 1
+    },
+    "green": {
+      "command": "node --test test/装配/multi-runtime.test.ts",
+      "tests": 13,
+      "pass": 13,
+      "fail": 0,
+      "exit": 0
+    },
+    "regression": {
+      "command": "npm run test:assembly",
+      "log": "regression.log",
+      "tests": 67,
+      "pass": 67,
+      "fail": 0,
+      "exit": 0
+    },
+    "typecheck": {
+      "command": "npm run typecheck",
+      "exit": 0
+    },
+    "diff": {
+      "command": "git diff --check -- test/装配/multi-runtime.test.ts",
+      "exit": 0
+    }
+  },
+  "limitations": "Offline fixtures and CLI subprocesses only; no real model or actual user desktop tested.",
+  "actualDocumentationFiles": [
+    {
+      "path": "角色卡/装配/docs/fix/2026-10-15_fix_required-display-profile-fixture.md",
+      "sha256": "813926f35ba5a6be553a1461680d41a746ac879c85cb601d17170b3edecd1e70"
+    }
+  ],
+  "evidenceFiles": [
+    {
+      "path": "角色卡/装配/docs/fix/2026-10-15-required-display-profile-fixture-evidence/green.log",
+      "sha256": "55c185bc223f1f3eea9f38b875357b98c9070a3901f4177cc83cb1d643544d88"
+    },
+    {
+      "path": "角色卡/装配/docs/fix/2026-10-15-required-display-profile-fixture-evidence/patch.diff",
+      "sha256": "d197cc8a922679b93074f31004db64d73efdc2a20757b43179057457fc0ef6bb"
+    },
+    {
+      "path": "角色卡/装配/docs/fix/2026-10-15-required-display-profile-fixture-evidence/red.log",
+      "sha256": "2882a259b1902fe485f07891796275f37a77ca5962709b18850eed87acfa082a"
+    },
+    {
+      "path": "角色卡/装配/docs/fix/2026-10-15-required-display-profile-fixture-evidence/regression.log",
+      "sha256": "7ab15419ac4f19bc630c81669d4b58a376ef0444194adf8b78b9193b194d0f2f"
+    },
+    {
+      "path": "角色卡/装配/docs/fix/2026-10-15-required-display-profile-fixture-evidence/typecheck.log",
+      "sha256": "49ad917c426e1ab9bb7e5ad8c53a2fa4844fe03331b01623eac87fa4a881b15c"
+    }
+  ]
+}

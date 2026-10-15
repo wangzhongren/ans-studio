@@ -1,4 +1,5 @@
 // Shared ANS tool execution. Owner: 运行时核心. SDK adapters receive handlers by injection.
+import { coreToolTarget } from "../../common/runtime-core/tool-display.ts";
 import { createEventQueue } from "../../common/runtime-core/event-queue.ts";
 import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
@@ -92,8 +93,7 @@ export type { ToolDefinition, ToolResult, GovernedToolsOptions } from "../../mod
 
 /** 从工具参数里取出目标路径；容忍 path / file_path / filePath 三种命名。 */
 function readTargetPath(args: Record<string, unknown>): string | undefined {
-  const candidate = args["path"] ?? args["file_path"] ?? args["filePath"];
-  return typeof candidate === "string" ? candidate : undefined;
+  return coreToolTarget("core-path-v1", args);
 }
 
 /** 从工具参数里按候选键名取字符串。 */
@@ -366,6 +366,8 @@ interface ShellExecOutcome {
   stdout: string;
   stderr: string;
   error?: string;
+  stdoutTruncated?: boolean;
+  stderrTruncated?: boolean;
 }
 
 /**
@@ -388,6 +390,8 @@ function runShell(argv: string[], cwd: string, env: Record<string, string>, sign
     const errOut: Buffer[] = [];
     let outLen = 0;
     let errLen = 0;
+    let stdoutTruncated = false;
+    let stderrTruncated = false;
     let settled = false;
     let aborted = false;
     let killTimer: ReturnType<typeof setTimeout> | undefined;
@@ -398,7 +402,8 @@ function runShell(argv: string[], cwd: string, env: Record<string, string>, sign
       signal?.removeEventListener("abort", abort);
       if (killTimer) clearTimeout(killTimer);
       if (cleanupTimer) clearTimeout(cleanupTimer);
-      resolveOutcome(aborted ? { ...outcome, error: outcome.error ?? "会话已中止，命令已请求终止" } : outcome);
+      const observed = { ...outcome, stdoutTruncated, stderrTruncated };
+      resolveOutcome(aborted ? { ...observed, error: outcome.error ?? "会话已中止，命令已请求终止" } : observed);
     };
     const abort = (): void => {
       aborted = true;
@@ -412,13 +417,13 @@ function runShell(argv: string[], cwd: string, env: Record<string, string>, sign
       if (outLen < MAX_SHELL_OUTPUT_BYTES) {
         out.push(d);
         outLen += d.length;
-      }
+      } else { stdoutTruncated = true; }
     });
     child.stderr?.on("data", (d: Buffer) => {
       if (errLen < MAX_SHELL_OUTPUT_BYTES) {
         errOut.push(d);
         errLen += d.length;
-      }
+      } else { stderrTruncated = true; }
     });
     child.on("error", (e) => settle({ stdout: Buffer.concat(out).toString("utf8"), stderr: Buffer.concat(errOut).toString("utf8"), error: reasonOf(e) }));
     child.on("close", (code, signal) =>
@@ -445,7 +450,7 @@ function makeRunShellTool(shellGate: ShellGate, shellCwd: string, reviewTimeoutM
   return {
     name,
     async handler(call) {
-      const command = readStringArg(call.args, ["command", "cmd"]);
+      const command = coreToolTarget("core-command-v1", call.args);
       if (command === undefined || command.trim() === "") {
         return { ok: false, message: `${name}: 缺少 command 参数，无法审核执行` };
       }
@@ -482,11 +487,12 @@ function makeRunShellTool(shellGate: ShellGate, shellCwd: string, reviewTimeoutM
       // —— 恰好 allow:true：构造**剥离凭据后**的 env（§7.9），随后**才**启动子进程 ——
       const outcome = await runShell(argv, cwd, buildShellEnv(process.env, extraCredentialEnvVars), call.signal);
       if (outcome.error !== undefined) {
-        return { ok: false, message: `${name} 执行失败（未能启动或运行）：${outcome.error}` };
+        return { ok: false, message: `${name} 执行失败（未能启动或运行）：${outcome.error}`, execution: { error: outcome.error, ...(outcome.code !== undefined ? { exitCode:outcome.code } : {}), ...(outcome.signal ? {signal:outcome.signal} : {}) } };
       }
       const code = outcome.code;
       return {
         ok: code === 0,
+        execution: { ...(code !== undefined ? {exitCode:code} : {}), ...(outcome.signal ? {signal:outcome.signal} : {}), stdout:outcome.stdout, stderr:outcome.stderr, stdoutTruncated:outcome.stdoutTruncated === true, stderrTruncated:outcome.stderrTruncated === true },
         message:
           `${name} 已执行：${command}（exit ${code ?? "?"}${outcome.signal ? `，signal ${outcome.signal}` : ""}）\n` +
           `stdout:\n${outcome.stdout}\nstderr:\n${outcome.stderr}`,
@@ -769,7 +775,7 @@ function makeSubmitReportTool(fn: ReportHandbackFn, currentTurnId?: () => string
           receipt !== undefined && receipt !== null && receipt.message !== undefined ? ` ${receipt.message}` : "";
         return {
           ok: true,
-          message: `${name}：报告已交回（status: ${statusRaw}）——已把你要说的话交给编排汇总。${detail}`,
+          message: receipt?.state === "accepted-memory" ? `${name}：候选报告已收到（status: ${statusRaw}），最终保存与投递待本轮收口。${detail}` : `${name}：报告已交回（status: ${statusRaw}）——已把你要说的话交给编排汇总。${detail}`,
         };
       }
       diagnostics?.record("report.submit.rejected", { turnId, toolCallId: call.toolCallId, toolName: name, ok: false });
@@ -953,7 +959,7 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
   // Observe customer waits without storing titles, previews or selected values.
   return tools.map((tool) => {
     const { parameters, ...description } = describeTool(tool.name);
-    const defined: ToolDefinition = { ...tool, ...description, inputSchema: parameters, async handler(call) {
+    const defined: ToolDefinition = { ...tool, ...description, displayInputRule: ["read_file","write_file","edit_file"].includes(tool.name) ? "core-path-v1" : tool.name === "run_shell" ? "core-command-v1" : "none", inputSchema: parameters, async handler(call) {
       if (call.signal?.aborted) return abortedToolResult(tool.name);
       const result = await tool.handler(call);
       return call.signal?.aborted && result.ok ? abortedToolResult(tool.name) : result;
@@ -977,9 +983,11 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
 
 /** SDK-free demo Provider-compatible double; uses only the exact injected tool handlers. */
 export function createDemoRuntimeAdapter(options: RuntimeProviderOptions, script: ToolCall[] = []): RuntimeAdapter {
+  if (options.toolDisplayMode === "required-v1" && (typeof options.projectToolEvent !== "function" || typeof options.registerToolDisplayProfile !== "function")) throw new Error("Core-managed demo requires tool display projection");
   return {
     async composeContext(role) { return { systemPrompt: role.cardText }; },
     async bindRole(role) {
+      options.registerToolDisplayProfile?.({ credentials:[] });
       const queue = createEventQueue<SessionEvent>();
       let disposed = false;
       return {
@@ -993,10 +1001,11 @@ export function createDemoRuntimeAdapter(options: RuntimeProviderOptions, script
             queue.push({ kind: "message", summary: `用户指令：${text}`, detail: input });
           }
           for (const call of script) {
-            queue.push({ kind: "tool_call", summary: `模型请求调用 ${call.name}`, detail: call });
             const tool = options.tools.find((candidate) => candidate.name === call.name);
+            const source = { toolName:call.name, toolCallId: (call as {toolCallId?:string}).toolCallId, turnId:options.currentTurnId(), runtime:options.runtime, roleId:role.id, input:{rule:tool?.displayInputRule,args:call.args} };
+            queue.push(options.projectToolEvent ? options.projectToolEvent({...source,phase:"start",origin:"handler-start"}) : { kind: "tool_call", summary: `模型请求调用 ${call.name}`, detail: call });
             const result = tool ? await tool.handler(call) : { ok: false, message: `未知工具：${call.name}` };
-            queue.push({ kind: result.ok ? "accepted" : "denied", summary: result.message, detail: { call, result } });
+            queue.push(options.projectToolEvent ? options.projectToolEvent({...source,phase:"result",origin:"handler-result",result}) : { kind: result.ok ? "accepted" : "denied", summary: result.message, detail: { call, result } });
           }
           queue.push({ kind: "settled", summary: "会话结束", detail: { outcome: "completed" } });
         },

@@ -1,0 +1,24 @@
+{
+  "stage": "WINDOW-A-LEGACY-PROVENANCE-FIX-1",
+  "head": "fca8f6bd3d76d719dfbca071056449dedbaef957",
+  "node": "v24.14.0",
+  "affectedFiles": {
+    "app/desktop/runtime-history.ts": "8d605a48ec79fc8cc93837b976cef5caf7877f6da8ab06d928f68e92d8d93d47",
+    "app/desktop/session-history.ts": "1753450964ab160cbfba9b0560a08971574801f9bc5210d772cfe29d6b4f5eec",
+    "test/桌面应用/multi-runtime.test.ts": "213f9f12830aab351c4689ce79ef856a0c45f3a7147c9aaac1ab406bea279288"
+  },
+  "baseManifest": "角色卡/桌面窗口/docs/change/2026-10-15-complete-flow-window-ac-evidence/manifest.json",
+  "redEvidence": "角色卡/测试/docs/change/2026-10-15-p1p7-implementation-evidence/a-legacy-provenance-red.json",
+  "ownerCommand": "node --test test/桌面应用/multi-runtime.test.ts test/桌面应用/session-history.test.ts",
+  "ownerTests": {
+    "passed": 35,
+    "failed": 0
+  },
+  "typecheckExit": 0,
+  "diffCheckExit": 0,
+  "approved13HashesUnchanged": true,
+  "notCovered": [
+    "root原断言green由root复跑另记",
+    "真实桌面由后续UI/测试角色验收"
+  ]
+}

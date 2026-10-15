@@ -1,0 +1,19 @@
+{
+  "at": "2026-10-15T08:43:55.315870+00:00",
+  "sourceHashes": {
+    "app/renderer/index.html": "7beda47c504c81ba8a7748b407eb60efc27ec531e936d93868a9480528514f00",
+    "app/renderer/styles.css": "3aef7a8fa8d5b14e076fb33bc4284dbbd75092992c85dc0d57e0306a99364819",
+    "app/renderer/renderer.js": "a6ec9c54d10c9e54551d643e44f9a69b43a2550917d74d01ce3dfa3a756b2a64",
+    "app/renderer/tool-rows.js": "a4d86a1c8c45a4c84ed9cd283596d164c63833849899bb05bfcbf0379901d4bd",
+    "app/desktop/session.ts": "1e623ae7f71462d80bb69eb3e464a1bdd2dcb8c45b0907dc60646c9a6d749df1"
+  },
+  "full": {
+    "tests": 1382,
+    "pass": 1381,
+    "fail": 0,
+    "skip": 1,
+    "exitCode": 0,
+    "log": "full-after-note-fix.log"
+  },
+  "status": "automated green; final native regression pending"
+}

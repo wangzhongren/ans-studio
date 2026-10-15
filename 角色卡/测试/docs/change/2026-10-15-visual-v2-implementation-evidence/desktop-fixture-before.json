@@ -1,0 +1,58 @@
+{
+  "projectRoot": "/private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-p1p7-desktop-JqO4lM",
+  "sourceRoot": "/private/tmp/ans-real-p-limit-20261015-duplicate-retest",
+  "sourceCommit": "a8a6fbec4e0e866d6d779b10889bb4f5567e70eb",
+  "sourceFiles": {
+    "index.js": "66694e944d5dfeec1237fd304b3c24369b7ee18de717778750b7712f5dd30f3c",
+    "test.js": "d0999b4a92161f0fd35c819d0c7554098260aaf54fdac908fe936194c1dc5587",
+    "index.d.ts": "d367543c32631ba661e044b1d1f44deed2bbf54654dd0eb251061337162514ee",
+    "package.json": "daa6b0d168d7197eccbfef1c678e8f00b79d063129bf48f4ee2db38dc605ca7f"
+  },
+  "candidateFiles": {
+    "index.js": "66694e944d5dfeec1237fd304b3c24369b7ee18de717778750b7712f5dd30f3c",
+    "test.js": "d0999b4a92161f0fd35c819d0c7554098260aaf54fdac908fe936194c1dc5587",
+    "index.d.ts": "d367543c32631ba661e044b1d1f44deed2bbf54654dd0eb251061337162514ee",
+    "package.json": "daa6b0d168d7197eccbfef1c678e8f00b79d063129bf48f4ee2db38dc605ca7f"
+  },
+  "documents": {
+    "p1p7-unicode.md": {
+      "bytes": 122,
+      "sha256": "ceebe01620b6c286a95bd23b237e6439414f4cb64a2e983147026d109607a80b"
+    },
+    "p1p7-oversize.md": {
+      "bytes": 262145,
+      "sha256": "7a358119d340746b59b62110cefded648a92240ab6be67f6314871e3ef28b63c"
+    },
+    "p1p7-invalid-utf8.md": {
+      "bytes": 2,
+      "sha256": "eddf68639913a3cb8331cdfe7f87559e0beccf2c289c0d90ac4d89b3204004f8"
+    },
+    "p1p7-long-display.md": {
+      "bytes": 20503,
+      "sha256": "3efc1bbc8a5cba73dbf2aff770db7af51db152e74527a0e6eb5a69ef0d06e1cf"
+    },
+    "p1p7-static-render.md": {
+      "bytes": 272,
+      "sha256": "98b04bcaaa39f7e11d92bd86cda77fbbb8ab603ab1d26f08b79d9bf4881a881f"
+    }
+  },
+  "pins": [
+    {
+      "path": "角色卡/governance-boundary.yaml",
+      "matches": true
+    },
+    {
+      "path": "角色卡/测试/boundary.yaml",
+      "matches": true
+    },
+    {
+      "path": "角色卡/维护/boundary.yaml",
+      "matches": true
+    },
+    {
+      "path": "角色卡/项目管理/boundary.yaml",
+      "matches": true
+    }
+  ],
+  "sessionsCopied": false
+}

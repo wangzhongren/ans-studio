@@ -4,7 +4,7 @@
 // 回交只搬任务与证据，不转移角色身份或写权限；su 不向自己回交。
 // SessionEvent.kind 仍由 Pi 的冻结契约维护，handback 仅为编排附加事件。
 
-import type { RuntimeKind, ReportHandbackPayload, SessionEvent, DispatchTaskPayload } from "../../model/runtime.ts";
+import type { RuntimeKind, ReportHandbackPayload, SessionEvent, DispatchTaskPayload, RuntimeReportDraftV1, RuntimeReportSnapshotV1, RuntimeLiveReportViewV1, RuntimePersistenceErrorCode } from "../../model/runtime.ts";
 import type { ProjectConfig } from "../../model/role.ts";
 import { createHash } from "node:crypto";
 import { createDiagnosticLogger } from "../shared/diagnostics.ts";
@@ -28,6 +28,7 @@ export interface TaskHandback {
   /** 运行时提供的真实轮次标识，跨会话重开也不混淆。 */
   turnId?: string;
   runtime?: RuntimeKind;
+  origin?: RuntimeReportDraftV1["origin"];
 }
 
 /**
@@ -47,6 +48,15 @@ export interface HandbackEvent {
   /** 供既有「只读 summary」的消费方直接呈现的一句话。 */
   summary: string;
   handback: TaskHandback;
+  /** Internal raw handback above is for model delivery only; expose these safe values to UI. */
+  report?: RuntimeReportSnapshotV1;
+  liveReport?: RuntimeLiveReportViewV1;
+  reportPersistence?: {
+    state: "saved" | "failed" | "disabled" | "unknown-live" | "expired";
+    reportId?: string;
+    code?: RuntimePersistenceErrorCode;
+    retryAvailable: boolean;
+  };
 }
 
 /** 编排层事件：既有会话事件 + 编排追加的回交事件。 */
@@ -80,14 +90,31 @@ export function eventTurnId(ev: SessionEvent): string | undefined {
 function writeEvidence(ev: SessionEvent): string | undefined {
   if (ev.kind !== "accepted") return undefined;
   const detail = detailOf(ev);
+  // A result is authoritative: a hidden/partial target must never fall back to raw aliases.
+  if (Object.prototype.hasOwnProperty.call(detail, "display")) {
+    const display = detail.display as { version?: unknown; target?: { kind?: unknown; value?: { text?: unknown; redacted?: unknown; truncated?: unknown } } } | undefined;
+    const tool = detail.toolName;
+    if (detail.phase !== "result" || detail.ok !== true || detail.status === "failed" || detail.status === "error"
+      || typeof tool !== "string" || !(WRITE_TOOL_NAMES as readonly string[]).includes(tool)
+      || display?.version !== 1 || display.target?.kind !== "path") return undefined;
+    const value = display.target.value;
+    if (typeof value?.text !== "string" || value.text.trim() === "" || value.redacted !== false || value.truncated !== false) return undefined;
+    if (tool === "edit" || tool === "edit_file") return `已编辑：${value.text}`;
+    return `已写入：${value.text}`;
+  }
+  if (detail.phase === "start" || detail.phase === "blocked") return undefined;
   if (detail.ok === false || detail.status === "failed" || detail.status === "error") return undefined;
   const call = detail.call as { name?: unknown; args?: { path?: unknown } } | undefined;
   const tool = typeof detail.toolName === "string" ? detail.toolName : call?.name;
   let file = typeof detail.path === "string" ? detail.path : call?.args?.path;
   if (typeof tool === "string" && !(WRITE_TOOL_NAMES as readonly string[]).includes(tool)) return undefined;
   // 旧假运行时与演示运行时的成功摘要含路径；泛化“执行完成”没有路径事实，故不录入。
-  const match = ev.summary.match(/^(write_file|edit_file) 已获准（写入）：(.+)$/)
-    ?? ev.summary.match(/^(写入被允许)：(.+?)(?:（命中.*)?$/);
+  let match: RegExpMatchArray | null = null;
+  // Only the old unphased summary contract can supply a legacy path.
+  if (detail.phase === undefined) {
+    match = ev.summary.match(/^(write_file|edit_file) 已获准（写入）：(.+)$/)
+      ?? ev.summary.match(/^(写入被允许)：(.+?)(?:（命中.*)?$/);
+  }
   if (typeof file !== "string" || file.trim() === "") file = match?.[2];
   if (typeof file !== "string" || file.trim() === "") return undefined;
   if (tool === undefined && match === null) return undefined;
@@ -315,6 +342,8 @@ export async function* withHandback(
               + (report !== undefined ? `中断前报告：${report.summary}` : handback.summary);
           }
           handback.round = round;
+          if (report !== undefined) handback.origin = "submitted-report";
+          else handback.origin = "terminal-fallback";
           if (turnId !== undefined) handback.turnId = turnId;
           if (ev.runtime !== undefined) handback.runtime = ev.runtime;
           opts.completed?.(turnId);

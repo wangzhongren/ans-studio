@@ -1,0 +1,1142 @@
+{
+  "packet": "UI-DELIVERY-NOTE-FIX-1",
+  "status": "implemented-owner-verified; root native V2-FIX-1 pending",
+  "baseline": "baseline.json",
+  "sourceFiles": {
+    "app/renderer/index.html": "7beda47c504c81ba8a7748b407eb60efc27ec531e936d93868a9480528514f00",
+    "app/renderer/styles.css": "3aef7a8fa8d5b14e076fb33bc4284dbbd75092992c85dc0d57e0306a99364819",
+    "app/renderer/renderer.js": "a6ec9c54d10c9e54551d643e44f9a69b43a2550917d74d01ce3dfa3a756b2a64",
+    "app/renderer/tool-rows.js": "a4d86a1c8c45a4c84ed9cd283596d164c63833849899bb05bfcbf0379901d4bd",
+    "app/renderer/runtime-ui.js": "47b136e300389ff3e3d3b67e3a5995f801dce9f3330b3520e8dbeffaabf87b26",
+    "app/renderer/role-status.js": "2daab2f108e3351f6143270f18d7f07dddeb48ae9408ba545fda6ffc5c7aeec5"
+  },
+  "testFiles": {
+    "test/桌面应用/tool-rows.test.ts": "f47d86fcbdb255e2606485d372bf61b47c9b77966a7bfd19deb2bd4186aebefc",
+    "test/桌面应用/runtime-ui.test.ts": "1123d3d9e700531a9e6cd5b6cfa166712406d4fa4b4d72af1cb04ffb6cd59397",
+    "test/桌面应用/renderer.test.ts": "c038cbd0ea6db9bf1cf74aad277cd3930e8c68f67b19e341b2fd89ac4f88c8d2",
+    "test/桌面应用/markdown.test.ts": "936c9fd95530d0d39eda43a8ec73809a374d68cb6b3b9fa3b12f5858de4ea99e",
+    "test/桌面应用/e2e/uiux-v2.mjs": "34da310d317b7a8c0904ec6c431d2e94eea974894fc880fcd187066ff4649e9e"
+  },
+  "changedThisFix": [
+    "app/renderer/renderer.js",
+    "app/renderer/tool-rows.js",
+    "app/renderer/styles.css",
+    "test/桌面应用/tool-rows.test.ts",
+    "test/桌面应用/e2e/uiux-v2.mjs"
+  ],
+  "producerOverlay": {
+    "path": "角色卡/桌面窗口/docs/fix/2026-10-15-delivery-note-evidence/manifest.json",
+    "sha256": "171f8d22557f882e3a66cc8f493303273cad5873ec36f78643b98491a8e7f742"
+  },
+  "consumedDependencies": {
+    "src/common/runtime-core/report-provenance.ts": {
+      "expectedSha256": "d13fcf3bb6f50c19f2ba6b4aeb4a608ff791daa2995246b005adc9bb98108d27",
+      "actualSha256": "d13fcf3bb6f50c19f2ba6b4aeb4a608ff791daa2995246b005adc9bb98108d27"
+    },
+    "src/common/runtime-core/tool-display.ts": {
+      "expectedSha256": "983c53207eab92c6448c1681e829c0700b42a12153a5817bab217dbb6c2c8e9e",
+      "actualSha256": "983c53207eab92c6448c1681e829c0700b42a12153a5817bab217dbb6c2c8e9e"
+    },
+    "src/model/runtime.ts": {
+      "expectedSha256": "4d3278969daea6f45fd098a11cd5aea076fd646c080f09c10d4a8daba88314dd",
+      "actualSha256": "4d3278969daea6f45fd098a11cd5aea076fd646c080f09c10d4a8daba88314dd"
+    },
+    "src/provider/runtime/session-store.ts": {
+      "expectedSha256": "fbe84fc39e62b9992be09afac0887258cfc02f8cbca3d5432a5ea943c6ca79a3",
+      "actualSha256": "fbe84fc39e62b9992be09afac0887258cfc02f8cbca3d5432a5ea943c6ca79a3"
+    },
+    "src/provider/runtime/tools.ts": {
+      "expectedSha256": "5db9187e52b2413c46a07e516c56f8b27455bccd7c002ad8b9bf3db84ddd9298",
+      "actualSha256": "5db9187e52b2413c46a07e516c56f8b27455bccd7c002ad8b9bf3db84ddd9298"
+    },
+    "src/service/runtime/session.ts": {
+      "expectedSha256": "991146051f429ef26b46b21154a574086b312233047b29c99a9d522c01280f02",
+      "actualSha256": "991146051f429ef26b46b21154a574086b312233047b29c99a9d522c01280f02"
+    },
+    "test/runtime-core/effective-timeouts.test.ts": {
+      "expectedSha256": "23a3d3cd069006607f68177b198f720529c467eff943dcfe3f51e580bcabb491",
+      "actualSha256": "23a3d3cd069006607f68177b198f720529c467eff943dcfe3f51e580bcabb491"
+    },
+    "test/runtime-core/fixtures.ts": {
+      "expectedSha256": "43930eb6647726bc92bff93992b73a2fac87a7d69669e871c616787b2b54ca16",
+      "actualSha256": "43930eb6647726bc92bff93992b73a2fac87a7d69669e871c616787b2b54ca16"
+    },
+    "test/runtime-core/legacy-history-projection.test.ts": {
+      "expectedSha256": "c6bed08a0ed8d90bc6465d2ffc175a24a5f2265e723d9697ebff3f7eeded33b3",
+      "actualSha256": "c6bed08a0ed8d90bc6465d2ffc175a24a5f2265e723d9697ebff3f7eeded33b3"
+    },
+    "test/runtime-core/prompt-start-acknowledgement.test.ts": {
+      "expectedSha256": "7320017c0701cb54f47458145bf7681229e0a66775b33922b4af5636609770b2",
+      "actualSha256": "7320017c0701cb54f47458145bf7681229e0a66775b33922b4af5636609770b2"
+    },
+    "test/runtime-core/report-provenance.test.ts": {
+      "expectedSha256": "dd95d05abca6bee8f30b109943c75d2ad5121a13f46b7eab5d3d8266b35d3100",
+      "actualSha256": "dd95d05abca6bee8f30b109943c75d2ad5121a13f46b7eab5d3d8266b35d3100"
+    },
+    "test/runtime-core/session.test.ts": {
+      "expectedSha256": "e920051308a87bcf24a324a07f33f6f474ae9f1d599e6dea671384a47c79e9b1",
+      "actualSha256": "e920051308a87bcf24a324a07f33f6f474ae9f1d599e6dea671384a47c79e9b1"
+    },
+    "test/runtime-core/tool-display.test.ts": {
+      "expectedSha256": "6ec09d3dba701f1e4e73155f16b2155e402b94b7427eb27b34650f7e3479ef2e",
+      "actualSha256": "6ec09d3dba701f1e4e73155f16b2155e402b94b7427eb27b34650f7e3479ef2e"
+    },
+    "test/runtime-core/tools.test.ts": {
+      "expectedSha256": "25ea9a89c5eec032cf10bb222ec53eef58d17c92ad05469a0f6913897ae7cba0",
+      "actualSha256": "25ea9a89c5eec032cf10bb222ec53eef58d17c92ad05469a0f6913897ae7cba0"
+    },
+    "app/desktop/session.ts": {
+      "expectedSha256": "1e623ae7f71462d80bb69eb3e464a1bdd2dcb8c45b0907dc60646c9a6d749df1",
+      "actualSha256": "1e623ae7f71462d80bb69eb3e464a1bdd2dcb8c45b0907dc60646c9a6d749df1"
+    },
+    "app/desktop/runtime-history.ts": {
+      "expectedSha256": "8d605a48ec79fc8cc93837b976cef5caf7877f6da8ab06d928f68e92d8d93d47",
+      "actualSha256": "8d605a48ec79fc8cc93837b976cef5caf7877f6da8ab06d928f68e92d8d93d47"
+    },
+    "app/desktop/session-history.ts": {
+      "expectedSha256": "1753450964ab160cbfba9b0560a08971574801f9bc5210d772cfe29d6b4f5eec",
+      "actualSha256": "1753450964ab160cbfba9b0560a08971574801f9bc5210d772cfe29d6b4f5eec"
+    },
+    "app/desktop/interface.ts": {
+      "expectedSha256": "dc6c769e77ce5029f7320dffdee2f4c411f242423b38d52e510ed3f015b9fd30",
+      "actualSha256": "dc6c769e77ce5029f7320dffdee2f4c411f242423b38d52e510ed3f015b9fd30"
+    },
+    "app/desktop/request-anchor.ts": {
+      "expectedSha256": "7539da9ac445e838bcb86ad863f57f74274a80cb5d395c7a7ef469e30ea8b4dc",
+      "actualSha256": "7539da9ac445e838bcb86ad863f57f74274a80cb5d395c7a7ef469e30ea8b4dc"
+    },
+    "app/main.ts": {
+      "expectedSha256": "f4339c2ee0aa87a306534010435e47c771559d56e316393d8d04ba1208267940",
+      "actualSha256": "f4339c2ee0aa87a306534010435e47c771559d56e316393d8d04ba1208267940"
+    },
+    "app/preload.cjs": {
+      "expectedSha256": "7fc95a6a5ac63edcea06ef2b31a2d14e3348e3bd27b35d9fa994332554133ce1",
+      "actualSha256": "7fc95a6a5ac63edcea06ef2b31a2d14e3348e3bd27b35d9fa994332554133ce1"
+    },
+    "test/桌面应用/ans-wiring.test.ts": {
+      "expectedSha256": "0c619e6350c5476b5f1f0eedce0d500efa728d9a0905802c0372e27dc10fce0d",
+      "actualSha256": "0c619e6350c5476b5f1f0eedce0d500efa728d9a0905802c0372e27dc10fce0d"
+    },
+    "test/桌面应用/boundary-refresh.test.ts": {
+      "expectedSha256": "b08751cb9a732a957689ce8152b442a053b3ba163cbe4258a75f9659a925e53b",
+      "actualSha256": "b08751cb9a732a957689ce8152b442a053b3ba163cbe4258a75f9659a925e53b"
+    },
+    "test/桌面应用/diagnostics.test.ts": {
+      "expectedSha256": "ffe99bd44d192b1181888b2dcb2b52298328a938fdf2ab7d30c0df68daccc40d",
+      "actualSha256": "ffe99bd44d192b1181888b2dcb2b52298328a938fdf2ab7d30c0df68daccc40d"
+    },
+    "test/桌面应用/dispatch-delivery.test.ts": {
+      "expectedSha256": "1b9c72a42cd701b5e44245213d665fa1bbcabf83b47be2d2733f7d58a2b3ffc9",
+      "actualSha256": "1b9c72a42cd701b5e44245213d665fa1bbcabf83b47be2d2733f7d58a2b3ffc9"
+    },
+    "test/桌面应用/handback-delivery.test.ts": {
+      "expectedSha256": "b5b451d59fb04ddf51dcd02a4382c7bddb56a097d9c693fb0b0b143014a53ca8",
+      "actualSha256": "b5b451d59fb04ddf51dcd02a4382c7bddb56a097d9c693fb0b0b143014a53ca8"
+    },
+    "test/桌面应用/hot-path.test.ts": {
+      "expectedSha256": "1817814bdd6be5c9e08be43d75412e43526eec6e73066ab46ee9a44a29909bf5",
+      "actualSha256": "1817814bdd6be5c9e08be43d75412e43526eec6e73066ab46ee9a44a29909bf5"
+    },
+    "test/桌面应用/interface.test.ts": {
+      "expectedSha256": "c1f6069dec497f3d9d0e5cd859fa16381fd375a7c1d288edbd5006dceb6b94fc",
+      "actualSha256": "c1f6069dec497f3d9d0e5cd859fa16381fd375a7c1d288edbd5006dceb6b94fc"
+    },
+    "test/桌面应用/message-queue.test.ts": {
+      "expectedSha256": "db62d9ead5c7819dd7db60e1fdb17130366b789bb1483e34d4ed1cac5be3ffc2",
+      "actualSha256": "db62d9ead5c7819dd7db60e1fdb17130366b789bb1483e34d4ed1cac5be3ffc2"
+    },
+    "test/桌面应用/multi-runtime.test.ts": {
+      "expectedSha256": "7647f4b16267f51b77afb23dd66f37a5c408da3484b058d43cbab0dabe9f4443",
+      "actualSha256": "7647f4b16267f51b77afb23dd66f37a5c408da3484b058d43cbab0dabe9f4443"
+    },
+    "test/桌面应用/session-history.test.ts": {
+      "expectedSha256": "b7ef2428b01cdff16608a960f958542712c7bb77fe3291772148bb935634153f",
+      "actualSha256": "b7ef2428b01cdff16608a960f958542712c7bb77fe3291772148bb935634153f"
+    },
+    "test/桌面应用/session.test.ts": {
+      "expectedSha256": "75a80f7cc4a5cfade7d92ec649f46670796a2c09c4a0fbf705797482546eef6d",
+      "actualSha256": "75a80f7cc4a5cfade7d92ec649f46670796a2c09c4a0fbf705797482546eef6d"
+    },
+    "src/model/project-document.ts": {
+      "expectedSha256": "cb13869cb5ae55721e8a168c39ceb5a17dd73bb4cf699954eb3cc4dafe33511e",
+      "actualSha256": "cb13869cb5ae55721e8a168c39ceb5a17dd73bb4cf699954eb3cc4dafe33511e"
+    },
+    "src/pipeline/project-document/read-project-document.ts": {
+      "expectedSha256": "fe199997441df96d89ab5f52ff578353fb9bc8b00602f8159dd2ecd8f246d94d",
+      "actualSha256": "fe199997441df96d89ab5f52ff578353fb9bc8b00602f8159dd2ecd8f246d94d"
+    },
+    "src/service/project-document/abstract/document-reader.ts": {
+      "expectedSha256": "c7d1aff487398ed7012eafd28077a91fccace90f3329c0d52e5a9f6694ad8130",
+      "actualSha256": "c7d1aff487398ed7012eafd28077a91fccace90f3329c0d52e5a9f6694ad8130"
+    },
+    "src/service/project-document/public/read-project-document.ts": {
+      "expectedSha256": "691fd17249e0757707bfb19fb617666d1679123254e7792d60d42c86765e617f",
+      "actualSha256": "691fd17249e0757707bfb19fb617666d1679123254e7792d60d42c86765e617f"
+    },
+    "src/service/project-document/impl/read-project-document.ts": {
+      "expectedSha256": "658062375a4349cd9c64423976bc03b3b15bd748e0fa2823a0aee8f69eff997e",
+      "actualSha256": "658062375a4349cd9c64423976bc03b3b15bd748e0fa2823a0aee8f69eff997e"
+    },
+    "src/provider/project-document/abstract/file-reader.ts": {
+      "expectedSha256": "bbf8b28444db745d5b05c79dd135170c754ec9f55bf90837bd4fea1967d977a9",
+      "actualSha256": "bbf8b28444db745d5b05c79dd135170c754ec9f55bf90837bd4fea1967d977a9"
+    },
+    "src/provider/project-document/public/file-reader.ts": {
+      "expectedSha256": "b114befdb3c5e1b9781b12bd41a0945ad1bd219d57f6f6b8c58260cd0ca70d83",
+      "actualSha256": "b114befdb3c5e1b9781b12bd41a0945ad1bd219d57f6f6b8c58260cd0ca70d83"
+    },
+    "src/provider/project-document/impl/file-reader.ts": {
+      "expectedSha256": "9a387b077f0142c49a4f3846f5af98611a7dee97f3d455bb42dcb585dbe1ae8a",
+      "actualSha256": "9a387b077f0142c49a4f3846f5af98611a7dee97f3d455bb42dcb585dbe1ae8a"
+    },
+    "app/desktop/project.ts": {
+      "expectedSha256": "7ff7826899c6eb9720787f6b01468916e50443d6f0a929cd1b8569d42f4faa8c",
+      "actualSha256": "7ff7826899c6eb9720787f6b01468916e50443d6f0a929cd1b8569d42f4faa8c"
+    },
+    "test/桌面应用/project-document.test.ts": {
+      "expectedSha256": "38bcebcf4df05b42acc21ba56835f28c0fac235deb712d86b2ea9be56d7733c2",
+      "actualSha256": "38bcebcf4df05b42acc21ba56835f28c0fac235deb712d86b2ea9be56d7733c2"
+    },
+    "src/pipeline/orchestration/run-role.ts": {
+      "expectedSha256": "fad87c2372ca5752a08a702284111db097dc7a2b3f9c9c6d6ac9789ccd4d1d64",
+      "actualSha256": "fad87c2372ca5752a08a702284111db097dc7a2b3f9c9c6d6ac9789ccd4d1d64"
+    },
+    "src/common/编排/handback.ts": {
+      "expectedSha256": "ae4153c7d2d279caf395233f76727418e39093bb24eeeeea76ac554e0e14c6dd",
+      "actualSha256": "ae4153c7d2d279caf395233f76727418e39093bb24eeeeea76ac554e0e14c6dd"
+    },
+    "src/pipeline/orchestration/govern-session.ts": {
+      "expectedSha256": "9894f9364f2ab23840213085125e8f80fd6ab49c298b34847651586b0514c2d7",
+      "actualSha256": "9894f9364f2ab23840213085125e8f80fd6ab49c298b34847651586b0514c2d7"
+    },
+    "test/编排/handback-lifecycle.test.ts": {
+      "expectedSha256": "ee770d8cc4508d3827c5facda200892e47680aaa99168b3973d2d8caf786fdfa",
+      "actualSha256": "ee770d8cc4508d3827c5facda200892e47680aaa99168b3973d2d8caf786fdfa"
+    },
+    "test/编排/runtime-orchestration.test.ts": {
+      "expectedSha256": "8d9228d2a183c8c0be1f749a48a124ec47e36b1d2850cafa4dceeeed665d4434",
+      "actualSha256": "8d9228d2a183c8c0be1f749a48a124ec47e36b1d2850cafa4dceeeed665d4434"
+    },
+    "test/编排/report-provenance-consumer.test.ts": {
+      "expectedSha256": "68cbc6a02608acad51fcff9024e9496110a89499912a5e4bb56fe48107acf932",
+      "actualSha256": "68cbc6a02608acad51fcff9024e9496110a89499912a5e4bb56fe48107acf932"
+    }
+  },
+  "dependencyMismatches": [],
+  "designFiles": {
+    "角色卡/UIUX设计师/docs/design/2026-10-15_design_visual-convergence-prototype.html": {
+      "expectedSha256": "e95b363dfe4191f32a53d139de3b80d75a48b89362f886376ed49e3ad7b4ea4b",
+      "actualSha256": "e95b363dfe4191f32a53d139de3b80d75a48b89362f886376ed49e3ad7b4ea4b"
+    },
+    "角色卡/UIUX设计师/docs/design/2026-10-15_design_visual-convergence.md": {
+      "expectedSha256": "25474437047fdb864fcb401f8ff42b67bcf77cc534b98b37c44146cfa265c101",
+      "actualSha256": "25474437047fdb864fcb401f8ff42b67bcf77cc534b98b37c44146cfa265c101"
+    }
+  },
+  "approved13Manifest": {
+    "path": "角色卡/项目管理/docs/design/2026-10-15-complete-flow-interface-evidence/review-manifest.json",
+    "sha256": "768bf8625a9fed84d10a4eccfd92b35633ba0ea36344637cc8c151230e294d8c"
+  },
+  "tests": {
+    "strictRed": [
+      "node-red.log",
+      "renderer-red.json"
+    ],
+    "ghostGreen": 9,
+    "unitPassed": 69,
+    "unitFailed": 0,
+    "renderer": {
+      "visual": {
+        "true": 26,
+        "false": 0,
+        "errors": [],
+        "records": 28,
+        "nonBooleanMeasurements": [
+          {
+            "name": "V2 measured geometry 1360",
+            "value": {
+              "nav": 208,
+              "pane": 800,
+              "capsule": 800,
+              "button": {
+                "x": 409,
+                "y": 552.703125,
+                "width": 130,
+                "height": 32,
+                "top": 552.703125,
+                "right": 539,
+                "bottom": 584.703125,
+                "left": 409
+              },
+              "composer": {
+                "x": 208,
+                "y": 694.40625,
+                "width": 1152,
+                "height": 165.59375,
+                "top": 694.40625,
+                "right": 1360,
+                "bottom": 860,
+                "left": 208
+              },
+              "root": 1360,
+              "innerWidth": 1360
+            }
+          },
+          {
+            "name": "V2 measured geometry 960",
+            "value": {
+              "nav": 176,
+              "pane": 736,
+              "capsule": 736,
+              "button": {
+                "x": 221,
+                "y": 574.203125,
+                "width": 130,
+                "height": 32,
+                "top": 574.203125,
+                "right": 351,
+                "bottom": 606.203125,
+                "left": 221
+              },
+              "composer": {
+                "x": 176,
+                "y": 698.40625,
+                "width": 784,
+                "height": 161.59375,
+                "top": 698.40625,
+                "right": 960,
+                "bottom": 860,
+                "left": 176
+              },
+              "root": 960,
+              "innerWidth": 960
+            }
+          }
+        ]
+      },
+      "consumer": {
+        "true": 40,
+        "false": 0,
+        "errors": [],
+        "records": 41,
+        "nonBooleanMeasurements": [
+          {
+            "name": "read/save/query actual controlled operations",
+            "docCalls": [
+              {
+                "version": 1,
+                "projectViewId": "epoch-one",
+                "documentId": "doc-one"
+              },
+              {
+                "version": 1,
+                "projectViewId": "epoch-one",
+                "documentId": "doc-two"
+              },
+              {
+                "version": 1,
+                "projectViewId": "epoch-one",
+                "documentId": "doc-one"
+              },
+              {
+                "version": 1,
+                "projectViewId": "epoch-one",
+                "documentId": "doc-one-b"
+              },
+              {
+                "version": 1,
+                "projectViewId": "epoch-one",
+                "documentId": "doc-one-b"
+              },
+              {
+                "version": 1,
+                "projectViewId": "epoch-one",
+                "documentId": "doc-one-b"
+              },
+              {
+                "version": 1,
+                "projectViewId": "epoch-one",
+                "documentId": "doc-one-b"
+              },
+              {
+                "version": 1,
+                "projectViewId": "epoch-one",
+                "documentId": "doc-one-b"
+              },
+              {
+                "version": 1,
+                "projectViewId": "epoch-one",
+                "documentId": "doc-one-b"
+              },
+              {
+                "version": 1,
+                "projectViewId": "epoch-one",
+                "documentId": "doc-one-b"
+              },
+              {
+                "version": 1,
+                "projectViewId": "epoch-one",
+                "documentId": "doc-one-b"
+              }
+            ],
+            "persistenceCalls": [
+              {
+                "operation": "capabilities",
+                "input": {
+                  "version": 1,
+                  "projectRoot": "/offline-uiux-fixture",
+                  "roleId": "A",
+                  "runtime": "pi"
+                }
+              },
+              {
+                "operation": "report-query",
+                "input": {
+                  "version": 1,
+                  "projectRoot": "/offline-uiux-fixture",
+                  "roleId": "A",
+                  "runtime": "pi",
+                  "reportId": "report-one"
+                }
+              },
+              {
+                "operation": "report-save",
+                "input": {
+                  "version": 1,
+                  "projectRoot": "/offline-uiux-fixture",
+                  "roleId": "A",
+                  "runtime": "pi",
+                  "reportId": "report-one"
+                }
+              },
+              {
+                "operation": "capabilities",
+                "input": {
+                  "version": 1,
+                  "projectRoot": "/offline-uiux-fixture",
+                  "roleId": "A",
+                  "runtime": "pi"
+                }
+              },
+              {
+                "operation": "receipt-query",
+                "input": {
+                  "version": 1,
+                  "projectRoot": "/offline-uiux-fixture",
+                  "roleId": "A",
+                  "runtime": "pi",
+                  "attemptId": "attempt-one"
+                }
+              },
+              {
+                "operation": "history-save",
+                "input": {
+                  "version": 1,
+                  "projectRoot": "/offline-uiux-fixture",
+                  "roleId": "A",
+                  "runtime": "pi",
+                  "attemptId": "attempt-one"
+                }
+              },
+              {
+                "operation": "capabilities",
+                "input": {
+                  "version": 1,
+                  "projectRoot": "/offline-uiux-fixture",
+                  "roleId": "A",
+                  "runtime": "pi"
+                }
+              },
+              {
+                "operation": "report-query",
+                "input": {
+                  "version": 1,
+                  "projectRoot": "/offline-uiux-fixture",
+                  "roleId": "A",
+                  "runtime": "pi",
+                  "reportId": "report-expired"
+                }
+              },
+              {
+                "operation": "capabilities",
+                "input": {
+                  "version": 1,
+                  "projectRoot": "/offline-uiux-fixture",
+                  "roleId": "A",
+                  "runtime": "pi"
+                }
+              },
+              {
+                "operation": "report-query",
+                "input": {
+                  "version": 1,
+                  "projectRoot": "/offline-uiux-fixture",
+                  "roleId": "A",
+                  "runtime": "pi",
+                  "reportId": "fallback-report"
+                }
+              },
+              {
+                "operation": "capabilities",
+                "input": {
+                  "version": 1,
+                  "projectRoot": "/offline-uiux-fixture",
+                  "roleId": "A",
+                  "runtime": "pi"
+                }
+              },
+              {
+                "operation": "report-query",
+                "input": {
+                  "version": 1,
+                  "projectRoot": "/offline-uiux-fixture",
+                  "roleId": "A",
+                  "runtime": "pi",
+                  "reportId": "outer-success-inner-fail"
+                }
+              },
+              {
+                "operation": "report-save",
+                "input": {
+                  "version": 1,
+                  "projectRoot": "/offline-uiux-fixture",
+                  "roleId": "A",
+                  "runtime": "pi",
+                  "reportId": "outer-success-inner-fail"
+                }
+              },
+              {
+                "operation": "capabilities",
+                "input": {
+                  "version": 1,
+                  "projectRoot": "/offline-uiux-fixture",
+                  "roleId": "A",
+                  "runtime": "pi"
+                }
+              },
+              {
+                "operation": "receipt-query",
+                "input": {
+                  "version": 1,
+                  "projectRoot": "/offline-uiux-fixture",
+                  "roleId": "A",
+                  "runtime": "pi",
+                  "attemptId": "attempt-two"
+                }
+              }
+            ],
+            "modelSends": 0
+          }
+        ]
+      },
+      "full": {
+        "true": 89,
+        "false": 0,
+        "errors": [],
+        "records": 99,
+        "nonBooleanMeasurements": [
+          {
+            "name": "queue geometry 1360",
+            "value": {
+              "clientWidth": 413,
+              "scrollWidth": 413,
+              "full": {
+                "x": 993,
+                "y": 452.78125,
+                "width": 333,
+                "height": 1573.125,
+                "top": 452.78125,
+                "right": 1326,
+                "bottom": 2025.90625,
+                "left": 993
+              },
+              "actions": [
+                {
+                  "label": "收起",
+                  "rect": {
+                    "x": 993,
+                    "y": 414.78125,
+                    "width": 46,
+                    "height": 28,
+                    "top": 414.78125,
+                    "right": 1039,
+                    "bottom": 442.78125,
+                    "left": 993
+                  }
+                },
+                {
+                  "label": "撤回",
+                  "rect": {
+                    "x": 1047,
+                    "y": 414.78125,
+                    "width": 46,
+                    "height": 28,
+                    "top": 414.78125,
+                    "right": 1093,
+                    "bottom": 442.78125,
+                    "left": 1047
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "name": "queue geometry 960",
+            "value": {
+              "clientWidth": 413,
+              "scrollWidth": 413,
+              "full": {
+                "x": 593,
+                "y": 452.78125,
+                "width": 333,
+                "height": 1573.125,
+                "top": 452.78125,
+                "right": 926,
+                "bottom": 2025.90625,
+                "left": 593
+              },
+              "actions": [
+                {
+                  "label": "收起",
+                  "rect": {
+                    "x": 593,
+                    "y": 414.78125,
+                    "width": 46,
+                    "height": 28,
+                    "top": 414.78125,
+                    "right": 639,
+                    "bottom": 442.78125,
+                    "left": 593
+                  }
+                },
+                {
+                  "label": "撤回",
+                  "rect": {
+                    "x": 647,
+                    "y": 414.78125,
+                    "width": 46,
+                    "height": 28,
+                    "top": 414.78125,
+                    "right": 693,
+                    "bottom": 442.78125,
+                    "left": 647
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "name": "incremental reader anchor",
+            "before": {
+              "text": "row-117 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天",
+              "offset": 19.1875
+            },
+            "after": {
+              "text": "row-117 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天",
+              "offset": 19.1875
+            }
+          },
+          {
+            "name": "full replay preserves content identity",
+            "before": {
+              "text": "row-117 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天",
+              "offset": 19.1875
+            },
+            "after": {
+              "text": "row-117 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天验证。 长聊天",
+              "offset": 19.1875
+            }
+          },
+          {
+            "name": "activity group toggle reader anchor 960",
+            "offsets": [
+              72.1875,
+              72.1875,
+              72.1875,
+              72.1875,
+              72.1875,
+              72.1875,
+              72.1875,
+              72.1875,
+              72.1875
+            ],
+            "spread": 0
+          },
+          {
+            "name": "activity group toggle reader anchor 1360",
+            "offsets": [
+              72.1875,
+              72.1875,
+              72.1875,
+              72.1875,
+              72.1875,
+              72.1875,
+              72.1875,
+              72.1875,
+              72.1875
+            ],
+            "spread": 0
+          },
+          {
+            "name": "activity group toggle reader anchor detached-history",
+            "offsets": [
+              72,
+              72,
+              72,
+              72,
+              72,
+              72,
+              72,
+              72,
+              72
+            ],
+            "spread": 0
+          },
+          {
+            "name": "pending geometry card",
+            "value": {
+              "chat": {
+                "x": 176,
+                "y": 98,
+                "width": 784,
+                "height": 304.40625,
+                "top": 98,
+                "right": 960,
+                "bottom": 402.40625,
+                "left": 176
+              },
+              "card": {
+                "x": 200,
+                "y": 182.25,
+                "width": 736,
+                "height": 136.40625,
+                "top": 182.25,
+                "right": 936,
+                "bottom": 318.65625,
+                "left": 200
+              },
+              "buttons": [
+                {
+                  "hidden": false,
+                  "inert": false,
+                  "rect": {
+                    "x": 218,
+                    "y": 270.65625,
+                    "width": 52,
+                    "height": 32,
+                    "top": 270.65625,
+                    "right": 270,
+                    "bottom": 302.65625,
+                    "left": 218
+                  }
+                },
+                {
+                  "hidden": false,
+                  "inert": false,
+                  "rect": {
+                    "x": 278,
+                    "y": 270.65625,
+                    "width": 65,
+                    "height": 32,
+                    "top": 270.65625,
+                    "right": 343,
+                    "bottom": 302.65625,
+                    "left": 278
+                  }
+                }
+              ],
+              "active": "op-request op-kind-preview is-flash",
+              "drawer": ""
+            }
+          },
+          {
+            "name": "pending geometry pi",
+            "value": {
+              "chat": {
+                "x": 176,
+                "y": 98,
+                "width": 784,
+                "height": 304.40625,
+                "top": 98,
+                "right": 960,
+                "bottom": 402.40625,
+                "left": 176
+              },
+              "card": {
+                "x": 200,
+                "y": 182.25,
+                "width": 736,
+                "height": 136.40625,
+                "top": 182.25,
+                "right": 936,
+                "bottom": 318.65625,
+                "left": 200
+              },
+              "buttons": [
+                {
+                  "hidden": false,
+                  "inert": false,
+                  "rect": {
+                    "x": 218,
+                    "y": 270.65625,
+                    "width": 52,
+                    "height": 32,
+                    "top": 270.65625,
+                    "right": 270,
+                    "bottom": 302.65625,
+                    "left": 218
+                  }
+                },
+                {
+                  "hidden": false,
+                  "inert": false,
+                  "rect": {
+                    "x": 278,
+                    "y": 270.65625,
+                    "width": 65,
+                    "height": 32,
+                    "top": 270.65625,
+                    "right": 343,
+                    "bottom": 302.65625,
+                    "left": 278
+                  }
+                }
+              ],
+              "active": "op-request op-kind-preview is-flash",
+              "drawer": ""
+            }
+          },
+          {
+            "name": "runtime bridge targets",
+            "opens": [
+              {
+                "projectRoot": "/offline-uiux-fixture",
+                "roleId": "B",
+                "runtime": "pi"
+              },
+              {
+                "projectRoot": "/offline-uiux-fixture",
+                "roleId": "A",
+                "runtime": "pi"
+              },
+              {
+                "projectRoot": "/offline-uiux-fixture",
+                "roleId": "B",
+                "runtime": "pi"
+              },
+              {
+                "projectRoot": "/offline-uiux-fixture",
+                "roleId": "A",
+                "runtime": "pi"
+              },
+              {
+                "projectRoot": "/offline-uiux-fixture",
+                "roleId": "运行时核心",
+                "runtime": "pi"
+              },
+              {
+                "projectRoot": "/offline-uiux-fixture",
+                "roleId": "运行时核心",
+                "runtime": "codex"
+              },
+              {
+                "projectRoot": "/offline-uiux-fixture",
+                "roleId": "运行时核心",
+                "runtime": "claude"
+              },
+              {
+                "projectRoot": "/offline-uiux-fixture",
+                "roleId": "运行时核心",
+                "runtime": "pi"
+              }
+            ],
+            "histories": [
+              {
+                "projectRoot": "/offline-uiux-fixture",
+                "roleId": "B",
+                "runtime": "pi"
+              },
+              {
+                "projectRoot": "/offline-uiux-fixture",
+                "roleId": "A",
+                "runtime": "pi"
+              },
+              {
+                "projectRoot": "/offline-uiux-fixture",
+                "roleId": "B",
+                "runtime": "pi"
+              },
+              {
+                "projectRoot": "/offline-uiux-fixture",
+                "roleId": "A",
+                "runtime": "pi"
+              },
+              {
+                "projectRoot": "/offline-uiux-fixture",
+                "roleId": "运行时核心",
+                "runtime": "pi"
+              },
+              {
+                "projectRoot": "/offline-uiux-fixture",
+                "roleId": "运行时核心",
+                "runtime": "codex"
+              },
+              {
+                "projectRoot": "/offline-uiux-fixture",
+                "roleId": "运行时核心",
+                "runtime": "claude"
+              },
+              {
+                "projectRoot": "/offline-uiux-fixture",
+                "roleId": "运行时核心",
+                "runtime": "pi"
+              }
+            ],
+            "aborts": [
+              {
+                "projectRoot": "/offline-uiux-fixture",
+                "roleId": "运行时核心",
+                "runtime": "claude"
+              }
+            ],
+            "configSaves": [
+              {
+                "runtime": "codex",
+                "keys": [
+                  "CODEX_API_KEY",
+                  "ANS_CODEX_MODEL"
+                ]
+              },
+              {
+                "runtime": "codex",
+                "keys": [
+                  "CODEX_API_KEY",
+                  "ANS_CODEX_MODEL"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "nested": {
+        "true": 9,
+        "false": 0,
+        "errors": [],
+        "records": 11,
+        "nonBooleanMeasurements": [
+          {
+            "name": "nested role reading actual before",
+            "value": {
+              "nested": {
+                "card": 2086,
+                "docs": 2047,
+                "changes": 2659
+              },
+              "outer": 746
+            }
+          },
+          {
+            "name": "nested role reading actual after",
+            "value": {
+              "outer": 746,
+              "inner": {
+                "card": 2086,
+                "docs": 2047,
+                "changes": 2659
+              }
+            }
+          }
+        ]
+      },
+      "selector": {
+        "true": 26,
+        "false": 0,
+        "errors": [],
+        "records": 26,
+        "nonBooleanMeasurements": []
+      },
+      "runtime": {
+        "true": 15,
+        "false": 0,
+        "errors": [],
+        "records": 16,
+        "nonBooleanMeasurements": [
+          {
+            "name": "runtime bridge targets",
+            "opens": [
+              {
+                "projectRoot": "/offline-uiux-fixture",
+                "roleId": "A",
+                "runtime": "pi"
+              },
+              {
+                "projectRoot": "/offline-uiux-fixture",
+                "roleId": "运行时核心",
+                "runtime": "pi"
+              },
+              {
+                "projectRoot": "/offline-uiux-fixture",
+                "roleId": "运行时核心",
+                "runtime": "codex"
+              },
+              {
+                "projectRoot": "/offline-uiux-fixture",
+                "roleId": "运行时核心",
+                "runtime": "claude"
+              },
+              {
+                "projectRoot": "/offline-uiux-fixture",
+                "roleId": "运行时核心",
+                "runtime": "pi"
+              }
+            ],
+            "histories": [
+              {
+                "projectRoot": "/offline-uiux-fixture",
+                "roleId": "A",
+                "runtime": "pi"
+              },
+              {
+                "projectRoot": "/offline-uiux-fixture",
+                "roleId": "运行时核心",
+                "runtime": "pi"
+              },
+              {
+                "projectRoot": "/offline-uiux-fixture",
+                "roleId": "运行时核心",
+                "runtime": "codex"
+              },
+              {
+                "projectRoot": "/offline-uiux-fixture",
+                "roleId": "运行时核心",
+                "runtime": "claude"
+              },
+              {
+                "projectRoot": "/offline-uiux-fixture",
+                "roleId": "运行时核心",
+                "runtime": "pi"
+              }
+            ],
+            "aborts": [
+              {
+                "projectRoot": "/offline-uiux-fixture",
+                "roleId": "运行时核心",
+                "runtime": "claude"
+              }
+            ],
+            "configSaves": [
+              {
+                "runtime": "codex",
+                "keys": [
+                  "CODEX_API_KEY",
+                  "ANS_CODEX_MODEL"
+                ]
+              },
+              {
+                "runtime": "codex",
+                "keys": [
+                  "CODEX_API_KEY",
+                  "ANS_CODEX_MODEL"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "duplicate": {
+        "true": 32,
+        "false": 0,
+        "errors": [],
+        "records": 32,
+        "nonBooleanMeasurements": []
+      },
+      "merge": {
+        "true": 12,
+        "false": 0,
+        "errors": [],
+        "records": 12,
+        "nonBooleanMeasurements": []
+      },
+      "terminalmerge": {
+        "true": 12,
+        "false": 0,
+        "errors": [],
+        "records": 12,
+        "nonBooleanMeasurements": []
+      },
+      "sendfacts": {
+        "true": 8,
+        "false": 0,
+        "errors": [],
+        "records": 8,
+        "nonBooleanMeasurements": []
+      },
+      "terminal": {
+        "true": 10,
+        "false": 0,
+        "errors": [],
+        "records": 10,
+        "nonBooleanMeasurements": []
+      },
+      "config": {
+        "true": 20,
+        "false": 0,
+        "errors": [],
+        "records": 20,
+        "nonBooleanMeasurements": []
+      },
+      "project": {
+        "true": 7,
+        "false": 0,
+        "errors": [],
+        "records": 7,
+        "nonBooleanMeasurements": []
+      },
+      "fresh": {
+        "true": 4,
+        "false": 0,
+        "errors": [],
+        "records": 4,
+        "nonBooleanMeasurements": []
+      }
+    },
+    "imeTrue": 26,
+    "typecheckExit": 0,
+    "diffCheckExit": 0
+  },
+  "limits": [
+    "No real user GUI or Provider calls; protected real history scope-only rebound to controlled fixture.",
+    "Root native verification belongs to root evidence, not this owner test.",
+    "Previous received screenshot intermediate frame remains excluded; no new received-layout claim."
+  ],
+  "allSelftestElectronQuit": true,
+  "evidenceFiles": {
+    "sendfacts-green.json": "2624b63d6e1e6e65537219cfbeab2cb3f05829e2c9cdf691b4d862ffb880cde9",
+    "nested-green.json": "93e095eee92c45132d38ebaa2e193cb79f94898d1b134aaa4f17bded9e42b028",
+    "visual-green.json": "c73abd0f1d1494b0652d1e345b966beefa6eb0cf5660d7a889d50ad0350fc6a9",
+    "full-green.json": "18aa8448e63a6170f2f52ec66eb3f2df156bd09f8e7d793c697180a086b82c29",
+    "consumer-green.json": "4037bb685c65cdf724c23cc2de255bea6edf14521b46d885e7bdbcf3339d2b5e",
+    "terminal-green.json": "597b0562351862289e4a6face8ba633b32a42f54c1f9e75dcebdc740e86c1878",
+    "real-protected-history.json": "b52bb34a8d7717ec355ce5c96cd26cec47967a184fba8fada2a591916f213272",
+    "project-green.json": "dc728f3d262c3be24319eb2a33ae2c5692b33e4ed40493524cc51e26ea19755d",
+    "typecheck.log": "49ad917c426e1ab9bb7e5ad8c53a2fa4844fe03331b01623eac87fa4a881b15c",
+    "ime-green.txt": "7479c3a5784ad2dfe0f91610abda151fc6617c4530e461a64ef340d750d1d85b",
+    "merge-green.json": "f0bf9450dc03342994ff3506dae4a19cef96f5f5fb4b3acc1136d702e8a436f7",
+    "renderer-red.json": "9e533c7c76f04664082414c5697697e32b6f85f11387b2224e6d5aaddc300357",
+    "delivery-note-1360.png": "ae4460c8a8965f6477492b672b132b704116c9308a9f609c9ebf6c67ff83915d",
+    "baseline.json": "1f1c7bb72363efe5326b32ec070a828f4de53f16b2bed3b94d45fef040ca2634",
+    "native-ghost-red-ax.txt": "5d3760ce6087496fd2eeb593d0a98207d2457f80e60347bfefd6553cb83446eb",
+    "unit-green.log": "418324fb34c7476ce832a983e439e6bebbd19cd66db211fd634b41b99bffa980",
+    "fresh-green.json": "0f3fdc0e5ce8052495a7d5fd17ee9c07bba1249dfcc9795544a3ee6f675cd748",
+    "config-green.json": "6bafdccc728cc99917ab2b89e0c8b62c3ceb5db88031fe30547671a37a2c0460",
+    "runtime-green.json": "a985763cd5ba1cc8bcbc6e4e947b9f8bfb68e1f6a3ea56cba1ef79b44ed513b9",
+    "delivery-note-960.png": "d0f81ea5d162c9bc2e36fc03351d78e80a7b2f61ecdc749afbe78062241ac8a9",
+    "renderer-green.json": "13a617b8e5d9dac78cc594955cbbdc8720228e3794e0cc3bb38607fc32574d1f",
+    "duplicate-green.json": "8d984f7f36cf25f2e9b085424479dc5d68dda433e58ac08c5e047245ff4b15f0",
+    "node-red.log": "6525fb2c65f6a2d05eb31d02b99a162264b9eab8c1023d5e06721d6115a61fd2",
+    "terminalmerge-green.json": "ed4a66881e7806aa75cae035b63c05c60527ecab2301121b6741b7e9abd863cb",
+    "selector-green.json": "0df0f04effca431aeb9335a16f590ef9e3b037734241dcdb4d6c383757404d8f"
+  },
+  "approved13Mismatches": [],
+  "combinedSha256": "506dae65cbff5bb5fb2adf2a7c5e0b682e2848ff28024beca2c50e35094edcf6"
+}

@@ -129,3 +129,21 @@ test("customer decline/abort and failed handbacks are honest; report/dispatch ca
   await legacy.get("submit_report")!.handler({ name: "submit_report", args: { status: "completed", summary: "done" } });
   assert.deepEqual(metadata, { turnId: "legacy" });
 });
+
+test("shell exposes actual structured execution and observed collection truncation without parsing model text", async()=>{
+  const root=await temp();try{
+    const shell=tools(allow,{shellGate:async()=>({allow:true,by:'fixture'}),shellCwd:root}).get('run_shell')!;
+    const failed=await shell.handler({name:'run_shell',args:{command:`${process.execPath} -e 'process.stdout.write("actual stdout");process.stderr.write("actual stderr");process.exit(7)'`}});
+    assert.equal(failed.ok,false);assert.equal(failed.execution?.exitCode,7);assert.equal(failed.execution?.stdout,'actual stdout');assert.equal(failed.execution?.stderr,'actual stderr');
+    assert.match(failed.message,/actual stdout/);assert.match(failed.message,/actual stderr/);
+    const large=await shell.handler({name:'run_shell',args:{command:`${process.execPath} -e 'process.stdout.write("x".repeat(3000000))'`}});
+    assert.equal(large.ok,true);assert.equal(large.execution?.stdoutTruncated,true);assert.ok(large.execution!.stdout!.length>=1048576);assert.ok(large.execution!.stdout!.length<3000000);
+    const missing=await shell.handler({name:'run_shell',args:{command:'ans-no-such-executable-for-test'}});assert.equal(missing.ok,false);assert.equal(missing.execution?.exitCode,undefined);assert.ok(missing.execution?.error);
+  }finally{await rm(root,{recursive:true,force:true});}
+});
+
+test('accepted-memory report receipt states final persistence and delivery are still pending',async()=>{
+ const report=tools(allow,{reportHandback:()=>({ok:true,state:'accepted-memory'})}).get('submit_report')!;
+ const result=await report.handler({name:'submit_report',args:{status:'completed',summary:'candidate'}});
+ assert.equal(result.ok,true);assert.match(result.message,/候选报告已收到/);assert.match(result.message,/最终保存与投递待本轮收口/);assert.ok(!result.message.includes('报告已交回'));
+});

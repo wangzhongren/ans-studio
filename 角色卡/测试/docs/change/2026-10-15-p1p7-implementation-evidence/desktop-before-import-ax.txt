@@ -1,0 +1,36 @@
+Window: "ANS 治理会话工作台", App: Electron.
+0 标准窗口 ANS 治理会话工作台, Secondary Actions: Raise
+	1 container ANS 治理会话工作台
+		2 container
+			3 HTML 内容 ANS 治理会话工作台, URL: file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/app/renderer/index.html
+				4 container
+					5 text ANS 治理会话工作台
+					6 按钮 Description: 角色资料, Help: 角色资料（含待办 / 队列）
+					7 按钮 Pi 设置
+					8 按钮 最小化
+					9 按钮 最大化
+					10 按钮 关闭
+				11 container
+					12 文本 项目
+					13 按钮 导入项目
+					14 文本 尚未导入项目
+					15 文本 角色
+					16 container 角色列表
+					17 container
+						18 text 未选择角色 从左侧选择一个角色开始聊天 引擎
+						19 组合框 (disabled) Description: 会话引擎，当前 Pi, Value: Pi
+						20 text 实际写入导入项目，角色边界外的写入会被拒绝。 尚未开启会话
+					21 container
+						22 text 导入项目后，点击左侧任意角色即可开始聊天 引擎配置可在右上角设置中查看。写入由治理引擎把关，越界操作会在对话中直接提示。
+					23 container
+						24 按钮 Description: 添加图片, Help: 添加图片（png / jpeg / webp / gif，≤5MB）
+						25 文本输入区 (settable) 输入消息，Enter 发送，Shift+Enter 换行
+						26 按钮 (disabled) Description: 发送, Help: 发送（Enter）
+27 menu bar
+	28 Electron
+	29 File
+	30 Edit
+	31 View
+	32 Window
+
+The focused UI element is 3 HTML 内容 ANS 治理会话工作台, URL: file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/app/renderer/index.html

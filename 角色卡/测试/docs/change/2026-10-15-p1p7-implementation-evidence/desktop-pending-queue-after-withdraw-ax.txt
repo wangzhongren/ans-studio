@@ -1,0 +1,93 @@
+Window: "ANS 治理会话工作台", App: Electron.
+0 标准窗口 ANS 治理会话工作台, Secondary Actions: Raise
+	1 container ANS 治理会话工作台
+		2 container
+			3 HTML 内容 ANS 治理会话工作台, URL: file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/app/renderer/index.html
+				4 container
+					5 text ANS 治理会话工作台
+					6 按钮 Description: 角色资料, Help: 角色资料（含待办 / 队列）
+					7 按钮 Pi 设置
+					8 按钮 最小化
+					9 按钮 最大化
+					10 按钮 关闭
+				11 container
+					12 文本 项目
+					13 按钮 切换项目
+					14 文本 ans-p1p7-desktop-QWGoKc
+					15 文本 /private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-p1p7-desktop-QWGoKc
+					16 文本 角色
+					17 container 角色列表
+						18 文本 主入口
+						19 按钮 su 内置治理角色（定义见 SKILL.md） 主入口 内置 待选择 · 1 待办
+							20 文本 su
+							21 文本 内置治理角色（定义见 SKILL.md）
+							22 文本 主入口
+							23 文本 内置
+							24 文本 待选择 · 1 待办
+						25 文本 其他角色（查看/调试）
+						26 按钮 测试 角色卡：测试 未开启
+							27 文本 测试
+							28 文本 角色卡：测试
+							29 文本 未开启
+						30 按钮 维护 角色卡：维护 未开启
+							31 文本 维护
+							32 文本 角色卡：维护
+							33 文本 未开启
+						34 按钮 项目管理 角色卡：项目管理 未开启
+							35 文本 项目管理
+							36 文本 角色卡：项目管理
+							37 文本 未开启
+					38 container
+						39 text su 引擎
+						40 组合框 (settable) Description: 会话引擎，当前 Pi, Value: Pi
+							41 文本 Pi
+						42 text 已入队：等它完成当前任务后处理（第 2 位）。 实际写入导入项目，角色边界外的写入会被拒绝。 新会话；可读历史保留，模型未恢复
+					43 container
+						44 text 本次开启会话：新会话 P1P7-CHAT-1：这是普通聊天交互测试。请仅调用一次 request_choice，标题“选择查看方式”，单选且不预选答案，选项“查看摘要”和“查看完整记录”，说明“只选择显示方式，不写文件，不派发任务”。等待我回答后只简短回复选择结果。不调用其他工具，不改文件或配置，不提交报告。 P1P7-QUEUE-KEEP：这是排队普通消息，只简短回复“已收到保留消息”，不调用工具、不派发、不提交报告。 已入队：等它完成当前任务后处理（第 1 位）。 P1P7-QUEUE-WITHDRAW：这条测试消息将被撤回，不应交给模型。 已入队：等它完成当前任务后处理（第 2 位）。 已撤回排队消息：你：P1P7-QUEUE-WITHDRAW：这条测试消息将被撤回，不应交给模型。 【队列】1 条待办：你：P1P7-QUEUE-KEEP：这是排队普通消息，只简短回复“已收到保留消息”，…——等它完成当前任务后依次处理。 等待你选择
+						45 按钮 有 1 条待选择 · 定位
+					46 container
+						47 按钮 Description: 添加图片, Help: 添加图片（png / jpeg / webp / gif，≤5MB）
+						48 文本输入区 (settable) 输入消息，Enter 发送，Shift+Enter 换行
+						49 按钮 停止当前轮次
+						50 按钮 Description: 发送, Help: 发送（Enter）
+					51 container 角色资料与待办
+						52 文本 su · 角色资料
+						53 按钮 Description: 收起, Help: 收起（Esc）
+						54 container
+							55 标题 待处理 1, Value: 3
+								56 文本 待处理 1
+							57 内容列表
+								58 container
+									59 文本 待选择 · 选择查看方式
+									60 按钮 定位
+							61 标题 排队, Value: 3
+								62 文本 排队
+							63 内容列表
+								64 container
+									65 text 1 客户消息 13:22:59 你：P1P7-QUEUE-KEEP：这是排队普通消息，只简短回复“已收到保留消息”，…
+									66 按钮 全文, Help: 展开全文
+									67 按钮 撤回, Help: 撤回该条排队消息（仅未投递者可撤）
+							68 开合三角标记 › 角色卡
+								69 文本 ›
+								70 文本 角色卡
+							71 开合三角标记 › 边界条目 5
+								72 文本 ›
+								73 文本 边界条目
+								74 文本 5
+							75 开合三角标记 › 变更记录 无
+								76 文本 ›
+								77 文本 变更记录
+								78 文本 无
+							79 开合三角标记 › 文档 无
+								80 文本 ›
+								81 文本 文档
+								82 文本 无
+							83 按钮 查看已列文档
+84 menu bar
+	85 Electron
+	86 File
+	87 Edit
+	88 View
+	89 Window
+
+The focused UI element is 3 HTML 内容 ANS 治理会话工作台, URL: file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/app/renderer/index.html

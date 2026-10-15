@@ -4,6 +4,8 @@
 
 本角色实现 ANS 桌面客户端的主进程侧（`app/main.ts`、`app/preload.cjs`、`app/desktop/`）：窗口、通道、会话与装配；判定一律调门禁引擎、Pi 一律经适配器。渲染前端（`app/renderer/`）属「桌面UI」。拆分背景与逐文件路由见[拆分设计](docs/design/2026-10-14_design_role-split-window.md)。
 
+2026-10-15 按客户确认的[总方案 revision 2](../项目管理/docs/design/2026-10-15_design_complete-flow-interface-plan.md)，本角色增加 [B/r2 受限项目文档读取](docs/design/2026-10-15_design_restricted-document-read.md)专属 Model/Pipeline/Service/Provider 维护职责。授权精确增加 8 个源码与 1 个测试文件；没有扩张其他角色边界，没有授予各层目录或 `common/`。本节描述已生效的责任分配，B 代码与真实桌面行为仍待属主实施和独立测试，不能当成当前已可使用的功能；治理检查见[变更记录](docs/change/2026-10-15_change_restricted-document-boundary.md)。
+
 ## 代码位置
 
 ```
@@ -25,13 +27,31 @@ app/
     chat-adapter.ts           演示运行时适配器（仅测试注入缝使用；每轮发 settled）
     push-batcher.ts           事件合帧批推与角色状态去抖（纯逻辑）
     diagnostics.ts            窗口/渲染/进程诊断观察与窄桥
-test/桌面应用/（主进程侧 22 个，路径沿用拆分前，逐文件清单见 boundary.yaml）
+test/桌面应用/（路径沿用拆分前，逐文件清单见 boundary.yaml；B 测试单文件新增授权，尚待创建）
   e2e/main.mjs                桌面端到端总自检台（真实 Electron；自建窗与生产 main.ts 同形）
 ```
 
 ## 依赖方向
 
 `main.ts`（入口）→ `app/desktop/*`（Interface）→ 编排 `openRoleSession` / 门禁引擎 `listProject`/`resolveWrite` → 下游；共享组件（`config-loader`、`env-file`、`diagnostics`、`runtime-shared`、`argv/path-primitives`）只读导入。主进程**不导入** `src/` 下 Service/Provider 的 impl；只经冻结导出调用。
+
+## B 文档读取专属职责与代码位置（已授权，待实现）
+
+| 层 | 精确文件 | 本角色职责 |
+| --- | --- | --- |
+| Model | `src/model/project-document.ts` | 唯一主属：B 版本、引用、可信导入内部类型、请求/结果与错误类型；无 IO，其他角色只读消费 |
+| Pipeline | `src/pipeline/project-document/read-project-document.ts` | 对外唯一 `createProjectDocumentReader` 入口；组合 scope 更新、读取与关闭 |
+| Service abstract | `src/service/project-document/abstract/document-reader.ts` | 服务接口与 Provider 所需读取条件 |
+| Service public | `src/service/project-document/public/read-project-document.ts` | 受限服务创建/调用入口 |
+| Service impl | `src/service/project-document/impl/read-project-document.ts` | 唯一权限 registry、清单资格、预算/格式/编码政策与安全错误映射 |
+| Provider abstract | `src/provider/project-document/abstract/file-reader.ts` | 文件句柄事实与受限有界 IO 接口 |
+| Provider public | `src/provider/project-document/public/file-reader.ts` | 平台文件读取能力工厂 |
+| Provider impl | `src/provider/project-document/impl/file-reader.ts` | 路径与句柄校验、只读 open、有界 read、关闭与平台能力检查 |
+| 测试 | `test/桌面应用/project-document.test.ts` | 服务/Provider 预算、编码、句柄竞态、grant/scope 与引用失效 |
+
+既有 `main.ts`、`preload.cjs`、`app/desktop/interface.ts` 与 `project.ts` 接入 B 的 IPC/可信原生选目录 grant/既有文档索引；新读取能力不在 Interface 直接增加 fs。调用方向为 Interface → Pipeline → Service public/abstract → Provider public/abstract → Node 基础设施，各层可引用 Model；上层不直导下层 impl、不平级互调、不把 fs 藏进 common。Service 是阅读清单与权限 registry 的唯一实现，Interface 只投递可信 listing 候选；Provider 只返回文件事实与字节。
+
+B 的每窗口 grant 只来自原生选目录，renderer root/recovery/evidence 文本均不授权；关窗清除，重启须原生重选。清单限本次已导入非 builtIn 角色的资料卡/changelog/docs file；UTF-8 md/txt 每文件至多 262144 原始字节，预算、symlink、平台能力与竞态限制遵照 B/r2。支持可信本地 macOS/Linux 受测文件系统，Windows/能力不足拒读，不保证对抗恶意本地 writer 的瞬时目录替换或硬链接来源。读取资格不替代 `resolveWrite` 写门禁；共享路径原语只读复用，文档正文不进诊断或自动交模型。UI 安全渲染与真实窗口验收分别由桌面UI及测试角色负责，具体行为以实现后的功能文档和原始证据为准。
 
 ## 关键实现点（拆分时承接，详见归档）
 

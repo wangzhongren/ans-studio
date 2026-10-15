@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-15T06:12:08.018798+00:00",
+  "command": "node --test 'test/**/*.test.ts'",
+  "rendererSha256": "efd2e33c45e587c2784a5e98528a035f08f9bca8e4c55b62d52dbe8f1f84e92c",
+  "exitCode": 0,
+  "tests": 1379,
+  "pass": 1378,
+  "fail": 0,
+  "skip": 1,
+  "rawLog": "/private/tmp/ans-p1p7-final-full-efd.log",
+  "rawLogSha256": "257fc96ccfbd291e1278d04148da361c8eaaed92bb26574fa7545d5326302bfe",
+  "scope": "After terminal merge; before nested drawer fix. Not final newer candidate."
+}

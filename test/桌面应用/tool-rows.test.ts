@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { parseSessionJsonl } from '../../app/desktop/session-history.ts';
 await import(new URL('../../app/renderer/tool-rows.js', import.meta.url).href);
 await import(new URL('../../app/renderer/ui-labels.js', import.meta.url).href);
@@ -68,4 +69,39 @@ test('canonical start/result/blocked各自保留真实状态与实际工具名',
   assert.equal(tools.activityOf({...input,kind:'accepted',detail:{...input.detail,phase:'result',ok:true}}).status,'completed');
   assert.equal(tools.activityOf({...input,kind:'denied',detail:{...input.detail,phase:'blocked',ok:false}}).exceptional,true);
  }
+});
+
+test('A4 consumer only reads public safe display target and rejects unknown versions',()=>{
+ const safe={version:1,target:{kind:'command',value:{text:'node -v',redacted:false,truncated:false}},omissions:[]};
+ const event={kind:'tool_call',turnId:'actual',detail:{toolName:'run_shell',toolCallId:'call',phase:'start',args:{command:'RAW_ARG_NOT_PUBLIC'},path:'RAW_PATH',display:safe}};
+ assert.equal(tools.activityOf(event).fullTarget,'node -v');
+ assert.equal(tools.activityOf(event).display,safe);
+ assert.equal(tools.activityOf({...event,detail:{...event.detail,display:{version:99}}}).fullTarget,'');
+ assert.equal(tools.activityOf({...event,detail:{...event.detail,display:{version:1,omissions:['unsupported-input']}}}).fullTarget,'');
+ assert.equal(tools.activityOf({...event,detail:{...event.detail,display:{version:99}}}).displayUnsupported,true);
+});
+
+test('tool identity never inferred for ordinary aborted terminal', () => {
+ assert.equal(tools.isToolActivity({kind:'denied',summary:'本轮已中止',detail:{outcome:'aborted'}}),false);
+ assert.equal(tools.isToolActivity({kind:'denied',summary:'read_file: text alone'}),false);
+ assert.equal(tools.isToolActivity({kind:'denied',detail:{toolName:'read_file',phase:'blocked'}}),true);
+ assert.equal(tools.isToolActivity({kind:'tool',text:'legacy recorded tool'}),true);
+});
+
+test('delivery notes are not tool activities; known legacy and trusted tool metadata stay tools', () => {
+ const note='已接收来自 su 的派发任务——请按任务文本执行，完成后交回报告。';
+ assert.equal(tools.isToolActivity({kind:'tool_call',summary:note}),false,'old anonymous delivery progress cannot manufacture a tool call');
+ assert.equal(tools.isToolActivity({kind:'message',summary:note,detail:{source:'delivery-note'}}),false);
+ assert.equal(tools.isToolActivity({kind:'tool',text:'旧版有类型工具记录'}),true);
+ assert.equal(tools.isToolActivity({kind:'tool_call',detail:{name:'write_file',args:{path:'a.md'}}}),true);
+ assert.equal(tools.isToolActivity({kind:'tool_call',turnId:'actual',detail:{toolCallId:'real-call',phase:'start'}}),true);
+});
+test('actual protected worker history retains all ten calls and failure result without adding a generic', () => {
+ const history=JSON.parse(readFileSync(new URL('../../角色卡/桌面UI/docs/fix/2026-10-15-delivery-note-ui-evidence/real-protected-history.json',import.meta.url),'utf8'));
+ const activities=history.rows.filter((r:any)=>r.kind==='tool'||r.kind==='denied').map((r:any)=>tools.activityOf(r));
+ assert.equal(activities.length,20);
+ assert.equal(new Set(activities.filter((a:any)=>a.identityPhase==='start').map((a:any)=>a.callId)).size,10);
+ assert.equal(activities.some((a:any)=>a.toolName==='工具'),false);
+ assert.deepEqual(activities.filter((a:any)=>a.identityPhase==='start').map((a:any)=>a.toolName).sort(),['read_file','read_file','read_file','read_file','run_shell','run_shell','run_shell','run_shell','submit_report','write_file'].sort());
+ assert.ok(activities.some((a:any)=>a.identityPhase==='result'&&a.status==='failed'&&a.fullTarget.includes('v2-does-not-exist.md')));
 });

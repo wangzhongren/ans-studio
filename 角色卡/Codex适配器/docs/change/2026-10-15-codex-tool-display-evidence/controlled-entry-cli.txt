@@ -1,0 +1,14 @@
+✔ T1 actual bin role/pi: actual adapter and registered handler reject an out-of-boundary write (577.087208ms)
+✔ T1 actual bin govern/pi: actual adapter and registered handler reject an out-of-boundary write (404.58475ms)
+✔ T1 actual bin role/codex: actual adapter and registered handler reject an out-of-boundary write (200.623167ms)
+✔ T1 actual bin govern/codex: actual adapter and registered handler reject an out-of-boundary write (312.386ms)
+✔ T1 actual bin role/claude: actual adapter and registered handler reject an out-of-boundary write (221.613459ms)
+✔ T1 actual bin govern/claude: actual adapter and registered handler reject an out-of-boundary write (191.681292ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1954.922584

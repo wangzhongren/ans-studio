@@ -1,0 +1,10 @@
+{
+  "htmlSha256": "e95b363dfe4191f32a53d139de3b80d75a48b89362f886376ed49e3ad7b4ea4b",
+  "changes": [
+    "config header 尚未开启 · 待配置",
+    "scenario change hides toast and clears timer"
+  ],
+  "browserAttempt": "reused existing tab1; Browser is not available:2",
+  "browserPassed": false,
+  "pending": "root正常已授权IAB实际复测"
+}

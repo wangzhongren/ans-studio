@@ -1,0 +1,9 @@
+{
+  "command": "node --test test/测试/p1p7-window-provenance-integration.test.ts",
+  "coverage": "Actual Window/Pipeline/Core with public storage injection: failed source save, concurrent recovery and one original delivery; initial source success notification/event merge; failed target receipt append and history-only repair. Source model1/target handoff1, raw SDK text preserved/all captured Window transports protected; no GUI claim.",
+  "chunk_id": "93daf5",
+  "wall_time_seconds": 0.114619625,
+  "exit_code": 0,
+  "original_token_count": 140,
+  "output": "✔ independent C Window: failed source save and concurrent recovery continue one original delivery without source replay or raw IPC (48.979834ms)\n✔ independent C Window: initial source save and its notification continue one original delivery without source replay or raw IPC (34.331916ms)\n✔ independent C Window: failed target receipt and history-only recovery continue one original delivery without source replay or raw IPC (38.986375ms)\nℹ tests 3\nℹ suites 0\nℹ pass 3\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 217.073917\n"
+}

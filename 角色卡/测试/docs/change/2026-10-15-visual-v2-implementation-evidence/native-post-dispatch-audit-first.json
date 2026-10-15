@@ -1,0 +1,31 @@
+{
+  "su": {
+    "userInputs": 7,
+    "reports": 0,
+    "events": {
+      "message": 15,
+      "settled": 7,
+      "tool_call": 3,
+      "accepted": 2,
+      "denied": 2
+    }
+  },
+  "测试": {
+    "userInputs": 1,
+    "reports": 1,
+    "events": {
+      "message": 5,
+      "tool_call": 10,
+      "denied": 1,
+      "accepted": 9,
+      "settled": 1
+    }
+  },
+  "businessUnchanged": {
+    "index.js": true,
+    "test.js": true,
+    "index.d.ts": true,
+    "package.json": true
+  },
+  "reportBytes": 10542
+}

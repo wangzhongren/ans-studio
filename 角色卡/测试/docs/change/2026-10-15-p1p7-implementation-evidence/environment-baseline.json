@@ -1,0 +1,12 @@
+{
+  "node": "v24.14.0",
+  "platform": "darwin",
+  "envSha256": "3d7ecbd3b35a7f546d8e5ddd7f6d96afd190daae812c2010496aab6949b1724f",
+  "baseCommit": "fca8f6bd3d76d719dfbca071056449dedbaef957",
+  "priorExactSourceResult": {
+    "passed": 1258,
+    "failed": 0,
+    "skipped": 1,
+    "note": "Previous candidate evidence; not a new P1–P7 result"
+  }
+}

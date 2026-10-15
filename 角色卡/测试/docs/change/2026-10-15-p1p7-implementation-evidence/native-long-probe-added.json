@@ -1,0 +1,9 @@
+{
+  "at": "2026-10-15T04:55:54.280Z",
+  "projectRoot": "/private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-p1p7-desktop-QWGoKc",
+  "path": "角色卡/测试/docs/change/p1p7-long-display.md",
+  "bytes": 20503,
+  "sha256": "3efc1bbc8a5cba73dbf2aff770db7af51db152e74527a0e6eb5a69ef0d06e1cf",
+  "purpose": "One real read_file produces a >16KiB protected tool display and an actual truncation marker; not executed yet",
+  "businessSourceChanged": false
+}

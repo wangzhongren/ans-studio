@@ -20,3 +20,11 @@
 ## 2026-10-15 输入与请求显示身份修复
 
 按客户既有缺陷修复授权及PM统一r1实施Core v2：统一typed输入、透传确认/选择原callId、demo生产单输入、run_shell两处argv说明。实际行为回归57/57、tsc0，独立消费者/桌面验收待续；无执行/门禁/权限变化。见[修复与原始证据](docs/fix/2026-10-15_fix_run-shell-description.md)。
+
+## 2026-10-15 CORE-A/C-1
+
+实施批准A4/C2文本政策1：受保护工具详情、旧native历史纯桥、真实结构execution、bound报告保存/目标receipt及仅保存恢复。原工具message/执行/门禁及给模型的交接原文保持，C历史另存有界显示副本。必要live三身份字段按PM同意图裁定兼容补入，旧live/disabled保留、不暗建目录。实际自测、原红与单调执行事实修复见[实施记录](docs/change/2026-10-15_change_complete-flow-core.md)；消费者整合与独立桌面待验。
+
+### 2026-10-15 普通引擎失败的显示边界
+
+修复无工具事实的accepted/denied被当工具的问题，live/history共用结构判断；保真实失败、身份与安全文本，丢未知raw侧车，不修改原工具投影或公共API。Core77/77、原独验1/1；[修复与依赖指纹](docs/fix/2026-10-15_fix_non-tool-event-routing.md)。

@@ -24,3 +24,7 @@
 - 2026-10-14：D1R-R1 修复实际main暴露的Window历史metadata丢失：ReplayRow optional turnId/eventKind，user仅entry.turnId，event entry.turnId??event.turnId + event.kind，activity同一ID。现mapper逐事件无delta压缩，不引入合并；旧Pi不造字段。受影响37/37（multi-runtime17/17）、tsc/diff0，原D1 171项保持历史。T1原重复红尚待U1/T1最终复测。来源：docs/fix/2026-10-14_fix_history-turn-metadata.md。
 
 - 2026-10-14：D1R2-R1 callback必须来自原prompt invocation闭包的Core实际onTurnStarted ACK。已删除首次事件FIFO猜测及uncertain降级；缺ACKlegacy不附clientID。匿名prompt也登记；failed/aborted迟到terminal保留原ID，旧send拒绝不得中止新轮确认/清新busy。受影响101/101、multi-runtime22/22（R2+5）、tsc/diff0，候选与消费Model/Core/Pipeline哈希见docs/fix/2026-10-14_client-message-origin-manifest.txt。准备期58/59原红保留，计数按role修而非放宽断言；最终真实UI合并待T1。
+
+- 2026-10-15：WINDOW-B-1已实现批准B2分层8src与窗口IPC/nativegrant。核心路径只读Model/Pipeline公开服务；docs候选path是role-card目录相对，不是项目相对。owner4文件36/36，Core并行在途typecheck红不越修；真实UI/Linux/Windows待共同候选独立验证。见docs/change/2026-10-15_change_restricted-document-read.md。
+
+- 2026-10-15：WINDOW-A/C-1实现A4/C2安全消费。safe源事件无rawhandback；新C queue.full也只safe副本。source saved通知先业务事件可发生，必须单归并保saved不被旧failed覆盖、await前queued；targethistorysave不等再投递。unknown-live五proxy存在不等Core能力。23文件206/206+tsc0，真实UI后验，见docs/change/2026-10-15_change_complete-flow-window-ac.md。

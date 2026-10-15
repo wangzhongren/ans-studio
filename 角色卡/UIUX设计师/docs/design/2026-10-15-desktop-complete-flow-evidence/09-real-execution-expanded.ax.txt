@@ -1,0 +1,26 @@
+The following is a diff from the previous accessibility tree for Window: "ANS 治理会话工作台" with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
++						397 container 2026-10-15T01:23:48.631Z
++							398 text 2026-10-15T01:23:48.631Z run_shell 目标未记录 调用发起
++						399 container 2026-10-15T01:23:48.632Z
++							400 text 2026-10-15T01:23:48.632Z run_shell 目标未记录 调用发起
++						401 container 2026-10-15T01:23:48.634Z
++							402 text 2026-10-15T01:23:48.634Z run_shell 目标未记录 调用发起
++						403 container 2026-10-15T01:23:48.636Z
++							404 text 2026-10-15T01:23:48.636Z run_shell 目标未记录 调用发起
++						405 container 2026-10-15T01:23:48.648Z
++							406 text 2026-10-15T01:23:48.648Z run_shell 目标未记录 执行完成
++						407 container 2026-10-15T01:23:48.650Z
++							408 text 2026-10-15T01:23:48.650Z run_shell 目标未记录 执行完成
++						409 container 2026-10-15T01:23:48.654Z
++							410 text 2026-10-15T01:23:48.654Z run_shell 目标未记录 执行完成
++						411 container 2026-10-15T01:23:48.656Z
++							412 text 2026-10-15T01:23:48.656Z run_shell 目标未记录 执行完成
++						413 container 2026-10-15T01:23:54.755Z
++							414 text 2026-10-15T01:23:54.755Z run_shell 目标未记录 调用发起
++						415 container 2026-10-15T01:24:13.897Z
++							416 text 2026-10-15T01:24:13.897Z run_shell 目标未记录 执行完成
++						417 container 2026-10-15T01:24:16.119Z
++							418 text 2026-10-15T01:24:16.119Z run_shell 目标未记录 调用发起
++						419 container 2026-10-15T01:24:16.141Z
++							420 text 2026-10-15T01:24:16.141Z run_shell 目标未记录 执行完成
+The focused UI element is 321 开合三角标记 › 查看执行记录 12 条活动

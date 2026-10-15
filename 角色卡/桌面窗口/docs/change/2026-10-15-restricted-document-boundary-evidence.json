@@ -1,0 +1,181 @@
+{
+  "candidate": "ANS Governance B 8+1 boundary only",
+  "node": "v24.14.0",
+  "platform": "darwin",
+  "activeRoleCount": 13,
+  "windowEntriesBefore": 35,
+  "windowEntriesAfter": 44,
+  "added": [
+    {
+      "path": "src/model/project-document.ts",
+      "owners": [
+        "桌面窗口"
+      ]
+    },
+    {
+      "path": "src/pipeline/project-document/read-project-document.ts",
+      "owners": [
+        "桌面窗口"
+      ]
+    },
+    {
+      "path": "src/service/project-document/abstract/document-reader.ts",
+      "owners": [
+        "桌面窗口"
+      ]
+    },
+    {
+      "path": "src/service/project-document/public/read-project-document.ts",
+      "owners": [
+        "桌面窗口"
+      ]
+    },
+    {
+      "path": "src/service/project-document/impl/read-project-document.ts",
+      "owners": [
+        "桌面窗口"
+      ]
+    },
+    {
+      "path": "src/provider/project-document/abstract/file-reader.ts",
+      "owners": [
+        "桌面窗口"
+      ]
+    },
+    {
+      "path": "src/provider/project-document/public/file-reader.ts",
+      "owners": [
+        "桌面窗口"
+      ]
+    },
+    {
+      "path": "src/provider/project-document/impl/file-reader.ts",
+      "owners": [
+        "桌面窗口"
+      ]
+    },
+    {
+      "path": "test/桌面应用/project-document.test.ts",
+      "owners": [
+        "桌面窗口"
+      ]
+    }
+  ],
+  "exactNine": true,
+  "removedOrChanged": [],
+  "mirror": true,
+  "overlaps": [],
+  "allCodeFiles": 273,
+  "ownershipIssues": [],
+  "protectedChanged": [],
+  "manifestMismatch": [],
+  "listingWarnings": [],
+  "windowGroup": "桌面窗口",
+  "windowGroupDuty": "组长",
+  "listingEntryCount": 44,
+  "codeAbsent": true,
+  "brokenLinks": [],
+  "gateChecks": {
+    "passed": 22,
+    "fixtureAcceptanceOnly": true,
+    "results": [
+      {
+        "target": "src/model/project-document.ts",
+        "allowed": true
+      },
+      {
+        "target": "src/pipeline/project-document/read-project-document.ts",
+        "allowed": true
+      },
+      {
+        "target": "src/service/project-document/abstract/document-reader.ts",
+        "allowed": true
+      },
+      {
+        "target": "src/service/project-document/public/read-project-document.ts",
+        "allowed": true
+      },
+      {
+        "target": "src/service/project-document/impl/read-project-document.ts",
+        "allowed": true
+      },
+      {
+        "target": "src/provider/project-document/abstract/file-reader.ts",
+        "allowed": true
+      },
+      {
+        "target": "src/provider/project-document/public/file-reader.ts",
+        "allowed": true
+      },
+      {
+        "target": "src/provider/project-document/impl/file-reader.ts",
+        "allowed": true
+      },
+      {
+        "target": "test/桌面应用/project-document.test.ts",
+        "allowed": true
+      },
+      {
+        "target": "src/model/project-document-extra.ts",
+        "allowed": false
+      },
+      {
+        "target": "src/pipeline/project-document/other.ts",
+        "allowed": false
+      },
+      {
+        "target": "src/service/project-document/abstract/other.ts",
+        "allowed": false
+      },
+      {
+        "target": "src/service/project-document/public/other.ts",
+        "allowed": false
+      },
+      {
+        "target": "src/service/project-document/impl/other.ts",
+        "allowed": false
+      },
+      {
+        "target": "src/provider/project-document/abstract/other.ts",
+        "allowed": false
+      },
+      {
+        "target": "src/provider/project-document/public/other.ts",
+        "allowed": false
+      },
+      {
+        "target": "src/provider/project-document/impl/other.ts",
+        "allowed": false
+      },
+      {
+        "target": "test/桌面应用/project-document-other.test.ts",
+        "allowed": false
+      },
+      {
+        "target": "src/common/project-document/reader.ts",
+        "allowed": false
+      },
+      {
+        "target": "app/renderer/renderer.js",
+        "allowed": false
+      },
+      {
+        "target": "src/model/runtime.ts",
+        "allowed": false
+      },
+      {
+        "target": "src/model/project-document.ts",
+        "writeSet": [],
+        "allowed": false
+      }
+    ]
+  },
+  "definitionSha256": {
+    "角色卡/桌面窗口/role-card.md": "f11418cd5cb5c5f47274279b989befa9d13a441450c57315cdec308ada132bdb",
+    "角色卡/桌面窗口/boundary.md": "acdcf793b33f0422791b2b756c50ecb355242e56556bb951b564e894d7652de6",
+    "角色卡/桌面窗口/boundary.yaml": "c480cbdde112be68ae377351645428f5e95b8bbd8189d170bc25512548e81e94",
+    "角色卡/桌面窗口/functional-description.md": "534909d05e9e3b3ad0bb8797229a0dd4f04fdf8f4a6cdf04cd84c706b1cbd386",
+    "角色卡/桌面窗口/changelog.md": "1116f88a72649664a0e705790a175913a2ff237e636776c72805e79cd2cf3178",
+    "角色卡/桌面窗口/docs/change/2026-10-15_change_restricted-document-boundary.md": "7a8eebd9fb6789003f9baa4aae3ed59ba19a4c1130524ba275c8c45631ecab94"
+  }
+}

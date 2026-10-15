@@ -1,0 +1,23 @@
+npm warn Unknown user config "ELECTRON_MIRROR". This will stop working in the next major version of npm.
+npm warn Unknown user config "ELECTRON_BUILDER_BINARIES_MIRROR". This will stop working in the next major version of npm.
+
+> ans-cli@1.0.0 typecheck
+> tsc --noEmit
+
+src/provider/project-document/impl/file-reader.ts(17,36): error TS2534: A function returning 'never' cannot have a reachable end point.
+src/provider/project-document/impl/file-reader.ts(61,24): error TS2345: Argument of type 'BigIntStats | Stats' is not assignable to parameter of type '{ dev: number; ino: number; size: number; mtimeMs: number; ctimeMs: number; }'.
+  Type 'BigIntStats' is not assignable to type '{ dev: number; ino: number; size: number; mtimeMs: number; ctimeMs: number; }'.
+    Types of property 'dev' are incompatible.
+      Type 'bigint' is not assignable to type 'number'.
+src/provider/project-document/impl/file-reader.ts(74,57): error TS2345: Argument of type 'BigIntStats | Stats' is not assignable to parameter of type '{ dev: number; ino: number; }'.
+  Type 'BigIntStats' is not assignable to type '{ dev: number; ino: number; }'.
+    Types of property 'dev' are incompatible.
+      Type 'bigint' is not assignable to type 'number'.
+src/provider/project-document/impl/file-reader.ts(74,91): error TS2345: Argument of type 'BigIntStats | Stats' is not assignable to parameter of type '{ dev: number; ino: number; size: number; mtimeMs: number; ctimeMs: number; }'.
+  Type 'BigIntStats' is not assignable to type '{ dev: number; ino: number; size: number; mtimeMs: number; ctimeMs: number; }'.
+    Types of property 'dev' are incompatible.
+      Type 'bigint' is not assignable to type 'number'.
+src/provider/project-document/impl/file-reader.ts(75,55): error TS2345: Argument of type 'BigIntStats | Stats' is not assignable to parameter of type '{ dev: number; ino: number; }'.
+  Type 'BigIntStats' is not assignable to type '{ dev: number; ino: number; }'.
+    Types of property 'dev' are incompatible.
+      Type 'bigint' is not assignable to type 'number'.

@@ -1,0 +1,117 @@
+{
+  "at": "2026-10-15T06:44:12.576517+00:00",
+  "producer": "root fixed测试",
+  "prototypeSha256": "e95b363dfe4191f32a53d139de3b80d75a48b89362f886376ed49e3ad7b4ea4b",
+  "status": "prototype-verified-design-pending-user-confirmation",
+  "cases": [
+    {
+      "path": "ordinary chat work overview",
+      "observed": "no task report, empty-state explanation",
+      "result": "pass",
+      "testedPrototypeSha256": "dcc614d0f3fcfffbc798c7c1f7fd64f87eb98b4a67abd6dd5724cf34b29ab092"
+    },
+    {
+      "path": "explicit source document",
+      "observed": "doc1 role-card content, back focusDoc1, return info button preserved",
+      "result": "pass",
+      "testedPrototypeSha256": "dcc614d0f3fcfffbc798c7c1f7fd64f87eb98b4a67abd6dd5724cf34b29ab092"
+    },
+    {
+      "path": "return role info",
+      "observed": "focus infoDocs; nonempty draft unchanged",
+      "result": "pass",
+      "testedPrototypeSha256": "dcc614d0f3fcfffbc798c7c1f7fd64f87eb98b4a67abd6dd5724cf34b29ab092"
+    },
+    {
+      "path": "pending choice",
+      "observed": "zero initial radio selection, submit disabled; keyboard Space selects without submitting",
+      "result": "pass",
+      "testedPrototypeSha256": "dcc614d0f3fcfffbc798c7c1f7fd64f87eb98b4a67abd6dd5724cf34b29ab092"
+    },
+    {
+      "path": "stop",
+      "observed": "all choice radios disabled, original chosen value/draft retained",
+      "result": "pass",
+      "testedPrototypeSha256": "dcc614d0f3fcfffbc798c7c1f7fd64f87eb98b4a67abd6dd5724cf34b29ab092"
+    },
+    {
+      "path": "missing config",
+      "observed": "banner settings then Escape returns configBtn, draft unchanged",
+      "result": "pass",
+      "testedPrototypeSha256": "dcc614d0f3fcfffbc798c7c1f7fd64f87eb98b4a67abd6dd5724cf34b29ab092"
+    },
+    {
+      "path": "engine keyboard",
+      "observed": "Claude selected menu; Home then Escape keeps Claude and returns runtimeBtn",
+      "result": "pass",
+      "testedPrototypeSha256": "dcc614d0f3fcfffbc798c7c1f7fd64f87eb98b4a67abd6dd5724cf34b29ab092"
+    },
+    {
+      "path": "before import",
+      "observed": "runtime button disabled",
+      "result": "pass",
+      "testedPrototypeSha256": "dcc614d0f3fcfffbc798c7c1f7fd64f87eb98b4a67abd6dd5724cf34b29ab092"
+    },
+    {
+      "path": "complete summary",
+      "observed": "full safe summary including ENOENT/truncation accessible separately from execution log",
+      "result": "pass",
+      "testedPrototypeSha256": "e95b363dfe4191f32a53d139de3b80d75a48b89362f886376ed49e3ad7b4ea4b"
+    },
+    {
+      "path": "local redraw",
+      "observed": "sending demo message keeps reportFull and execution details expanded",
+      "result": "pass",
+      "testedPrototypeSha256": "e95b363dfe4191f32a53d139de3b80d75a48b89362f886376ed49e3ad7b4ea4b"
+    },
+    {
+      "path": "unknown outcome",
+      "observed": "maybe-started/unsaved/expired/outcome unknown distinct; no auto replay",
+      "result": "pass",
+      "testedPrototypeSha256": "e95b363dfe4191f32a53d139de3b80d75a48b89362f886376ed49e3ad7b4ea4b"
+    },
+    {
+      "path": "final config state patch",
+      "observed": "stop→config shows 尚未开启·待配置 and toastHidden true",
+      "result": "pass",
+      "testedPrototypeSha256": "e95b363dfe4191f32a53d139de3b80d75a48b89362f886376ed49e3ad7b4ea4b"
+    }
+  ],
+  "viewports": [
+    {
+      "width": 960,
+      "height": 860,
+      "navWidth": 176,
+      "sourceButtonBottom": 676.53125,
+      "composerTop": 711.234375,
+      "horizontalOverflow": false,
+      "screenshot": "final-prototype-960.jpg"
+    },
+    {
+      "width": 1360,
+      "height": 860,
+      "navWidth": 208,
+      "sourceButtonBottom": 686.03125,
+      "composerTop": 707.234375,
+      "horizontalOverflow": false,
+      "screenshot": "final-prototype-1360.jpg"
+    },
+    {
+      "width": 504,
+      "height": 860,
+      "demoWindowWidth": 503.984375,
+      "horizontalOverflow": false,
+      "screenshot": "final-prototype-preview-504.jpg",
+      "scope": "scaled 960 demo canvas, not a product mobile layout"
+    }
+  ],
+  "viewportRestored": true,
+  "sourceMismatches": [],
+  "screenshotCorrection": "First immediate screenshot after viewport resize returned stale960 frame; preserved intermediate-stale-960.jpg, excluded from1360 proof. Refreshed AX and actual final-prototype-1360.jpg verified JPEG1360x860. Browser screenshot bytes JPEG, filenames corrected.",
+  "limits": [
+    "Prototype only; no backend/model/file-system/config safety or application acceptance claim.",
+    "Product independent review is static only after alternate runtime initialization was denied by automatic approval; root did not attribute its dynamic results to product.",
+    "Screen reader and IME not tested in this prototype review."
+  ],
+  "candidateCoverage": "dcc V2 source/navigation/pending/config menu cases plus e95 narrow header/toast affected retest, full summary/retained details/error/layout on final e95. No unchanged scenario is misrepresented as replayed after reload."
+}

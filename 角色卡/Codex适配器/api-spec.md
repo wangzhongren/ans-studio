@@ -18,3 +18,10 @@
 
 自有命令：`node --test 'test/codex-adapter/**/*.test.ts'` 与 `npm run typecheck`，X1S 当前均通过。`node test/codex-adapter/native-probe.mjs` 稳定结果由装配记录；本次仅设置解析变化，没有重跑运输探针。早期临时 harness 的原始命令见实施记录，生产没有临时包路径 fallback。
 
+
+
+## 2026-10-15 Codex-A-1：A4/C2.tp1 实际消费
+
+required-v1 缺注入 projector/register 时在任何外部初始化前拒绝；bindRole 同一 env 快照解析认证并纯内存登记选中键与 Core 指定键。真实 handler 的 start/result、displayInputRule、原args、Error.message 和 execution 只交注入投影，净化后事件走薄出口，opaque turn/call不scrub；无独立hook不造blocked。投影失败只固定诊断。模型 text/content/images 与既有profile/url保护保持，delivery选项不进app-server。
+
+自有22/22、独立测试角色实际命令入口6/6、固定Codex CLI0.162.1本地假SSE回环通过（2请求/1handler/2投影，外部模型0）。最终全仓typecheck0。详见[本次实施及候选证据](docs/change/2026-10-15_change_tool-display-projection.md)。在线与真实桌面仍待独验，原16/16/typecheck0是历史候选结果。

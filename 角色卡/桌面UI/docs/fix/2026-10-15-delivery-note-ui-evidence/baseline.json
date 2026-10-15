@@ -1,0 +1,17 @@
+{
+  "files": {
+    "app/renderer/index.html": "7beda47c504c81ba8a7748b407eb60efc27ec531e936d93868a9480528514f00",
+    "app/renderer/styles.css": "56d2ff9e34004181f240a9b619d2d3a1b65f21f4621b950751734e398dd31949",
+    "app/renderer/renderer.js": "5b80a72796e4e8cff369a378deb96ca1c5bc6d1dcabe92adf6bef1dc0f8b3b13",
+    "app/renderer/tool-rows.js": "97b688e51ce098e95c7b7f71aec822dc5e2fe8c491672ccf2beb6fe4841e5f8f",
+    "app/renderer/runtime-ui.js": "47b136e300389ff3e3d3b67e3a5995f801dce9f3330b3520e8dbeffaabf87b26",
+    "app/renderer/role-status.js": "2daab2f108e3351f6143270f18d7f07dddeb48ae9408ba545fda6ffc5c7aeec5",
+    "test/桌面应用/tool-rows.test.ts": "09df08d330b5e09f03085aa35c7940fd6f5687456493d6ea62b5a1235bad4d01",
+    "test/桌面应用/runtime-ui.test.ts": "1123d3d9e700531a9e6cd5b6cfa166712406d4fa4b4d72af1cb04ffb6cd59397",
+    "test/桌面应用/renderer.test.ts": "c038cbd0ea6db9bf1cf74aad277cd3930e8c68f67b19e341b2fd89ac4f88c8d2",
+    "test/桌面应用/markdown.test.ts": "936c9fd95530d0d39eda43a8ec73809a374d68cb6b3b9fa3b12f5858de4ea99e",
+    "test/桌面应用/e2e/uiux-v2.mjs": "de49d6d935a30a58698ff2c615fe29523703113ee6d3b1197baab09f94b35b40"
+  },
+  "fixtureSha256": "b52bb34a8d7717ec355ce5c96cd26cec47967a184fba8fada2a591916f213272",
+  "note": "Direct actual public getSessionHistory read only; original target untouched; Core10calls,20toolphases,25rows,1report."
+}

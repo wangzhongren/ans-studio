@@ -23,7 +23,7 @@ const REPO_ROOT = path.resolve(HERE, "..", "..");
 
 const tick = (ms = 40) => new Promise((r) => setTimeout(r, ms));
 
-function makeManager(listing: ProjectListing, events: OrchestrationEvent[]): SessionManager {
+function makeManager(listing: ProjectListing, events: import("../../app/desktop/session.ts").DesktopOrchestrationEvent[]): SessionManager {
   return new SessionManager({
     openRoleSession,
     createPiAdapterFactory,
@@ -43,7 +43,7 @@ test("firstProjectFilePath：取边界内首个项目根 file 条目", async () 
 
 test("点角色即开：open 直接建会话（无摘要/nonce），多轮 send、越界被拒且含按根分组", async () => {
   const listing = await listProject(REPO_ROOT);
-  const events: OrchestrationEvent[] = [];
+  const events: import("../../app/desktop/session.ts").DesktopOrchestrationEvent[] = [];
   const mgr = makeManager(listing, events);
 
   const res = await mgr.open({ projectRoot: listing.projectRoot, roleId: "桌面窗口", runtime: "demo" });
@@ -78,7 +78,7 @@ test("点角色即开：open 直接建会话（无摘要/nonce），多轮 send�
 
 test("同一角色重复点击：续接当前会话，不重建", async () => {
   const listing = await listProject(REPO_ROOT);
-  const events: OrchestrationEvent[] = [];
+  const events: import("../../app/desktop/session.ts").DesktopOrchestrationEvent[] = [];
   let opened = 0;
   const mgr = new SessionManager({
     openRoleSession: (input, deps) => {
@@ -377,7 +377,7 @@ test("运行期同意：登记的非-pin 例外——accepted:true 且不带 pin
 
 test("T20 handback 事件被外推：会话句柄产出的回交事件经 emitEvent 原样送达（§10.8）", async () => {
   const listing = await listProject(REPO_ROOT);
-  const events: OrchestrationEvent[] = [];
+  const events: import("../../app/desktop/session.ts").DesktopOrchestrationEvent[] = [];
   const handback: TaskHandback = {
     roleId: "桌面窗口",
     taskId: "T20",
@@ -391,7 +391,7 @@ test("T20 handback 事件被外推：会话句柄产出的回交事件经 emitEv
     openRoleSession: async () => {
       const seq: OrchestrationEvent[] = [
         { kind: "settled", summary: "会话结束" },
-        { kind: "handback", summary: `回交 su：${handback.summary}`, handback },
+        { kind: "handback", summary: `回交 su：${handback.summary}`, handback, liveReport: { source: { roleId: handback.roleId }, taskId: handback.taskId ?? null, status: handback.status, summary: { text: handback.summary, truncated: false, redacted: false }, evidence: handback.evidence.map(text => ({ text, truncated: false, redacted: false })), evidenceOmitted: 0, at: handback.at } },
       ];
       let i = 0;
       return {
@@ -429,10 +429,11 @@ test("T20 handback 事件被外推：会话句柄产出的回交事件经 emitEv
 
   const hb = events.find((e) => e.kind === "handback");
   assert.ok(hb, "handback 事件应经 emitEvent 外推（emitEvent 已放宽到 OrchestrationEvent）");
-  const payload = (hb as Extract<OrchestrationEvent, { kind: "handback" }>).handback;
-  assert.equal(payload.roleId, "桌面窗口", "回交应携带产出角色 id");
+  assert.equal(Object.hasOwn(hb!, "handback"), false, "raw model report never reaches IPC");
+  const payload = (hb as Extract<import("../../app/desktop/session.ts").DesktopOrchestrationEvent, { kind: "handback" }>).liveReport!;
+  assert.equal(payload.source.roleId, "桌面窗口", "回交应携带产出角色 id");
   assert.equal(payload.status, "completed", "回交应携带结论（completed/blocked）");
   assert.equal(payload.taskId, "T20", "回交应携带任务 id");
-  assert.deepEqual(payload.evidence, ["角色卡/桌面窗口/feature-map.md"], "回交只搬证据（产物路径）");
+  assert.deepEqual(payload.evidence.map(e => e.text), ["角色卡/桌面窗口/feature-map.md"], "回交只搬证据（产物路径）");
   await mgr.stop();
 });

@@ -1,0 +1,27 @@
+Window: "ANS 治理会话工作台", App: Electron.
+0 标准窗口 ANS 治理会话工作台, Secondary Actions: Raise
+	1 container ANS 治理会话工作台
+		2 container
+			3 HTML 内容 ANS 治理会话工作台, URL: file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/app/renderer/index.html
+				4 container su · 工作概览
+					5 文本 su · 工作概览
+					6 按钮 Description: 收起, Help: 收起（Esc）
+					7 container
+						8 文本 无待处理请求
+						9 文本 无进行中或排队消息
+						10 标题 最近回交, Value: 3
+							11 文本 最近回交
+						12 文本 报告声明：已完成
+						13 文本 按 V2-REAL-1 严格顺序完成了 6 步真实只读验证，全部结果（命令原文、原始输出、错误原文、退出码）如实写入 角色卡/测试/docs/change/v2-real-1.md（10542 字节）。未修改任何源码/测试/配置文件，未安装
+						14 按钮 查看来源角色文档
+						15 文本 报告声明：已完成
+						16 文本 【V2-FIX-1】独立回归任务（与 V2-REAL-1 无关、非重试）：按指令恰好执行一次 run_shell `node -v`（无参数），真实 stdout 为 `v24.14.0`，真实 exitCode 为 0，stderr 为空
+						17 按钮 查看来源角色文档
+18 menu bar
+	19 Electron
+	20 File
+	21 Edit
+	22 View
+	23 Window
+
+The focused UI element is 6 按钮 Description: 收起, Help: 收起（Esc）

@@ -1,0 +1,771 @@
+{
+  "task": "UI-P1–7-1",
+  "producer": "桌面UI",
+  "at": "2026-10-15T06:13:00.280312+00:00",
+  "head": "fca8f6bd3d76d719dfbca071056449dedbaef957",
+  "node": "v24.14.0",
+  "sourceFiles": {
+    "app/renderer/index.html": "859bdc3bf386426663a1e46a07274aed82778854122b8ae344fea8ae46bbf0d3",
+    "app/renderer/styles.css": "0115cceb178bcaca0d933f657750dda12a7a6b6e13d3cc3ed573c46a65323993",
+    "app/renderer/renderer.js": "394a7abb0af61fa3f7a5ee0652238e70883d17d798235c37954cdf41086a5252",
+    "app/renderer/tool-rows.js": "97b688e51ce098e95c7b7f71aec822dc5e2fe8c491672ccf2beb6fe4841e5f8f",
+    "app/renderer/runtime-ui.js": "47b136e300389ff3e3d3b67e3a5995f801dce9f3330b3520e8dbeffaabf87b26",
+    "app/renderer/role-status.js": "2daab2f108e3351f6143270f18d7f07dddeb48ae9408ba545fda6ffc5c7aeec5"
+  },
+  "testFiles": {
+    "test/桌面应用/tool-rows.test.ts": "09df08d330b5e09f03085aa35c7940fd6f5687456493d6ea62b5a1235bad4d01",
+    "test/桌面应用/runtime-ui.test.ts": "1123d3d9e700531a9e6cd5b6cfa166712406d4fa4b4d72af1cb04ffb6cd59397",
+    "test/桌面应用/renderer.test.ts": "59d1fdef738c14c59f7161c2d7378782cdaf643a805394b5e804beea4bb53ec8",
+    "test/桌面应用/markdown.test.ts": "936c9fd95530d0d39eda43a8ec73809a374d68cb6b3b9fa3b12f5858de4ea99e",
+    "test/桌面应用/e2e/uiux-v2.mjs": "e265a4accaa79574b2d0f5230ed80a54c42ee717261f8c0c1da63db5c0f6f205"
+  },
+  "approvedManifest": "角色卡/项目管理/docs/design/2026-10-15-complete-flow-interface-evidence/review-manifest.json",
+  "approvedDocumentCount": 13,
+  "approvedDocumentMismatches": [],
+  "dependencyManifests": [
+    "角色卡/运行时核心/docs/fix/2026-10-15-non-tool-event-routing-evidence/manifest.json",
+    "角色卡/桌面窗口/docs/change/2026-10-15-complete-flow-window-ac-evidence/manifest.json",
+    "角色卡/桌面窗口/docs/fix/2026-10-15-legacy-projection-provenance-evidence/manifest.json",
+    "角色卡/编排/docs/change/2026-10-15-report-provenance-consumer-evidence/manifest.json",
+    "角色卡/桌面窗口/docs/fix/2026-10-15-stop-terminal-send-facts-evidence/manifest.json"
+  ],
+  "consumedDependencies": {
+    "src/common/runtime-core/report-provenance.ts": {
+      "expectedSha256": "d13fcf3bb6f50c19f2ba6b4aeb4a608ff791daa2995246b005adc9bb98108d27",
+      "actualSha256": "d13fcf3bb6f50c19f2ba6b4aeb4a608ff791daa2995246b005adc9bb98108d27"
+    },
+    "src/common/runtime-core/tool-display.ts": {
+      "expectedSha256": "983c53207eab92c6448c1681e829c0700b42a12153a5817bab217dbb6c2c8e9e",
+      "actualSha256": "983c53207eab92c6448c1681e829c0700b42a12153a5817bab217dbb6c2c8e9e"
+    },
+    "src/model/runtime.ts": {
+      "expectedSha256": "4d3278969daea6f45fd098a11cd5aea076fd646c080f09c10d4a8daba88314dd",
+      "actualSha256": "4d3278969daea6f45fd098a11cd5aea076fd646c080f09c10d4a8daba88314dd"
+    },
+    "src/provider/runtime/session-store.ts": {
+      "expectedSha256": "fbe84fc39e62b9992be09afac0887258cfc02f8cbca3d5432a5ea943c6ca79a3",
+      "actualSha256": "fbe84fc39e62b9992be09afac0887258cfc02f8cbca3d5432a5ea943c6ca79a3"
+    },
+    "src/provider/runtime/tools.ts": {
+      "expectedSha256": "5db9187e52b2413c46a07e516c56f8b27455bccd7c002ad8b9bf3db84ddd9298",
+      "actualSha256": "5db9187e52b2413c46a07e516c56f8b27455bccd7c002ad8b9bf3db84ddd9298"
+    },
+    "src/service/runtime/session.ts": {
+      "expectedSha256": "991146051f429ef26b46b21154a574086b312233047b29c99a9d522c01280f02",
+      "actualSha256": "991146051f429ef26b46b21154a574086b312233047b29c99a9d522c01280f02"
+    },
+    "test/runtime-core/effective-timeouts.test.ts": {
+      "expectedSha256": "23a3d3cd069006607f68177b198f720529c467eff943dcfe3f51e580bcabb491",
+      "actualSha256": "23a3d3cd069006607f68177b198f720529c467eff943dcfe3f51e580bcabb491"
+    },
+    "test/runtime-core/fixtures.ts": {
+      "expectedSha256": "43930eb6647726bc92bff93992b73a2fac87a7d69669e871c616787b2b54ca16",
+      "actualSha256": "43930eb6647726bc92bff93992b73a2fac87a7d69669e871c616787b2b54ca16"
+    },
+    "test/runtime-core/legacy-history-projection.test.ts": {
+      "expectedSha256": "c6bed08a0ed8d90bc6465d2ffc175a24a5f2265e723d9697ebff3f7eeded33b3",
+      "actualSha256": "c6bed08a0ed8d90bc6465d2ffc175a24a5f2265e723d9697ebff3f7eeded33b3"
+    },
+    "test/runtime-core/prompt-start-acknowledgement.test.ts": {
+      "expectedSha256": "7320017c0701cb54f47458145bf7681229e0a66775b33922b4af5636609770b2",
+      "actualSha256": "7320017c0701cb54f47458145bf7681229e0a66775b33922b4af5636609770b2"
+    },
+    "test/runtime-core/report-provenance.test.ts": {
+      "expectedSha256": "dd95d05abca6bee8f30b109943c75d2ad5121a13f46b7eab5d3d8266b35d3100",
+      "actualSha256": "dd95d05abca6bee8f30b109943c75d2ad5121a13f46b7eab5d3d8266b35d3100"
+    },
+    "test/runtime-core/session.test.ts": {
+      "expectedSha256": "e920051308a87bcf24a324a07f33f6f474ae9f1d599e6dea671384a47c79e9b1",
+      "actualSha256": "e920051308a87bcf24a324a07f33f6f474ae9f1d599e6dea671384a47c79e9b1"
+    },
+    "test/runtime-core/tool-display.test.ts": {
+      "expectedSha256": "6ec09d3dba701f1e4e73155f16b2155e402b94b7427eb27b34650f7e3479ef2e",
+      "actualSha256": "6ec09d3dba701f1e4e73155f16b2155e402b94b7427eb27b34650f7e3479ef2e"
+    },
+    "test/runtime-core/tools.test.ts": {
+      "expectedSha256": "25ea9a89c5eec032cf10bb222ec53eef58d17c92ad05469a0f6913897ae7cba0",
+      "actualSha256": "25ea9a89c5eec032cf10bb222ec53eef58d17c92ad05469a0f6913897ae7cba0"
+    },
+    "app/desktop/session.ts": {
+      "expectedSha256": "182e5d7a3ffffd2b6cad3864a99373b07e00a0b587cccfbd0bbcf10422c55389",
+      "actualSha256": "182e5d7a3ffffd2b6cad3864a99373b07e00a0b587cccfbd0bbcf10422c55389",
+      "sourceManifest": "角色卡/桌面窗口/docs/fix/2026-10-15-stop-terminal-send-facts-evidence/manifest.json"
+    },
+    "app/desktop/runtime-history.ts": {
+      "expectedSha256": "8d605a48ec79fc8cc93837b976cef5caf7877f6da8ab06d928f68e92d8d93d47",
+      "actualSha256": "8d605a48ec79fc8cc93837b976cef5caf7877f6da8ab06d928f68e92d8d93d47"
+    },
+    "app/desktop/session-history.ts": {
+      "expectedSha256": "1753450964ab160cbfba9b0560a08971574801f9bc5210d772cfe29d6b4f5eec",
+      "actualSha256": "1753450964ab160cbfba9b0560a08971574801f9bc5210d772cfe29d6b4f5eec"
+    },
+    "app/desktop/interface.ts": {
+      "expectedSha256": "dc6c769e77ce5029f7320dffdee2f4c411f242423b38d52e510ed3f015b9fd30",
+      "actualSha256": "dc6c769e77ce5029f7320dffdee2f4c411f242423b38d52e510ed3f015b9fd30"
+    },
+    "app/desktop/request-anchor.ts": {
+      "expectedSha256": "7539da9ac445e838bcb86ad863f57f74274a80cb5d395c7a7ef469e30ea8b4dc",
+      "actualSha256": "7539da9ac445e838bcb86ad863f57f74274a80cb5d395c7a7ef469e30ea8b4dc"
+    },
+    "app/main.ts": {
+      "expectedSha256": "f4339c2ee0aa87a306534010435e47c771559d56e316393d8d04ba1208267940",
+      "actualSha256": "f4339c2ee0aa87a306534010435e47c771559d56e316393d8d04ba1208267940"
+    },
+    "app/preload.cjs": {
+      "expectedSha256": "7fc95a6a5ac63edcea06ef2b31a2d14e3348e3bd27b35d9fa994332554133ce1",
+      "actualSha256": "7fc95a6a5ac63edcea06ef2b31a2d14e3348e3bd27b35d9fa994332554133ce1"
+    },
+    "test/桌面应用/ans-wiring.test.ts": {
+      "expectedSha256": "0c619e6350c5476b5f1f0eedce0d500efa728d9a0905802c0372e27dc10fce0d",
+      "actualSha256": "0c619e6350c5476b5f1f0eedce0d500efa728d9a0905802c0372e27dc10fce0d"
+    },
+    "test/桌面应用/boundary-refresh.test.ts": {
+      "expectedSha256": "b08751cb9a732a957689ce8152b442a053b3ba163cbe4258a75f9659a925e53b",
+      "actualSha256": "b08751cb9a732a957689ce8152b442a053b3ba163cbe4258a75f9659a925e53b"
+    },
+    "test/桌面应用/diagnostics.test.ts": {
+      "expectedSha256": "ffe99bd44d192b1181888b2dcb2b52298328a938fdf2ab7d30c0df68daccc40d",
+      "actualSha256": "ffe99bd44d192b1181888b2dcb2b52298328a938fdf2ab7d30c0df68daccc40d"
+    },
+    "test/桌面应用/dispatch-delivery.test.ts": {
+      "expectedSha256": "7062305b470d5217b0e5216c4ef9cbaa465a7ccf8db0758a84b5670afa0b6959",
+      "actualSha256": "7062305b470d5217b0e5216c4ef9cbaa465a7ccf8db0758a84b5670afa0b6959"
+    },
+    "test/桌面应用/handback-delivery.test.ts": {
+      "expectedSha256": "1ae1e5d5bd8c2fcc231c33176d9ce2216ee4687d50e61eb3708d616f0f2dd1f0",
+      "actualSha256": "1ae1e5d5bd8c2fcc231c33176d9ce2216ee4687d50e61eb3708d616f0f2dd1f0"
+    },
+    "test/桌面应用/hot-path.test.ts": {
+      "expectedSha256": "1817814bdd6be5c9e08be43d75412e43526eec6e73066ab46ee9a44a29909bf5",
+      "actualSha256": "1817814bdd6be5c9e08be43d75412e43526eec6e73066ab46ee9a44a29909bf5"
+    },
+    "test/桌面应用/interface.test.ts": {
+      "expectedSha256": "c1f6069dec497f3d9d0e5cd859fa16381fd375a7c1d288edbd5006dceb6b94fc",
+      "actualSha256": "c1f6069dec497f3d9d0e5cd859fa16381fd375a7c1d288edbd5006dceb6b94fc"
+    },
+    "test/桌面应用/message-queue.test.ts": {
+      "expectedSha256": "575a2a8a3ee1e9b8d48a530263b3db6009c3b5b8ffb833f16f3bdf9b7326c49a",
+      "actualSha256": "575a2a8a3ee1e9b8d48a530263b3db6009c3b5b8ffb833f16f3bdf9b7326c49a"
+    },
+    "test/桌面应用/multi-runtime.test.ts": {
+      "expectedSha256": "7647f4b16267f51b77afb23dd66f37a5c408da3484b058d43cbab0dabe9f4443",
+      "actualSha256": "7647f4b16267f51b77afb23dd66f37a5c408da3484b058d43cbab0dabe9f4443",
+      "sourceManifest": "角色卡/桌面窗口/docs/fix/2026-10-15-stop-terminal-send-facts-evidence/manifest.json"
+    },
+    "test/桌面应用/session-history.test.ts": {
+      "expectedSha256": "b7ef2428b01cdff16608a960f958542712c7bb77fe3291772148bb935634153f",
+      "actualSha256": "b7ef2428b01cdff16608a960f958542712c7bb77fe3291772148bb935634153f"
+    },
+    "test/桌面应用/session.test.ts": {
+      "expectedSha256": "75a80f7cc4a5cfade7d92ec649f46670796a2c09c4a0fbf705797482546eef6d",
+      "actualSha256": "75a80f7cc4a5cfade7d92ec649f46670796a2c09c4a0fbf705797482546eef6d"
+    },
+    "src/model/project-document.ts": {
+      "expectedSha256": "cb13869cb5ae55721e8a168c39ceb5a17dd73bb4cf699954eb3cc4dafe33511e",
+      "actualSha256": "cb13869cb5ae55721e8a168c39ceb5a17dd73bb4cf699954eb3cc4dafe33511e"
+    },
+    "src/pipeline/project-document/read-project-document.ts": {
+      "expectedSha256": "fe199997441df96d89ab5f52ff578353fb9bc8b00602f8159dd2ecd8f246d94d",
+      "actualSha256": "fe199997441df96d89ab5f52ff578353fb9bc8b00602f8159dd2ecd8f246d94d"
+    },
+    "src/service/project-document/abstract/document-reader.ts": {
+      "expectedSha256": "c7d1aff487398ed7012eafd28077a91fccace90f3329c0d52e5a9f6694ad8130",
+      "actualSha256": "c7d1aff487398ed7012eafd28077a91fccace90f3329c0d52e5a9f6694ad8130"
+    },
+    "src/service/project-document/public/read-project-document.ts": {
+      "expectedSha256": "691fd17249e0757707bfb19fb617666d1679123254e7792d60d42c86765e617f",
+      "actualSha256": "691fd17249e0757707bfb19fb617666d1679123254e7792d60d42c86765e617f"
+    },
+    "src/service/project-document/impl/read-project-document.ts": {
+      "expectedSha256": "658062375a4349cd9c64423976bc03b3b15bd748e0fa2823a0aee8f69eff997e",
+      "actualSha256": "658062375a4349cd9c64423976bc03b3b15bd748e0fa2823a0aee8f69eff997e"
+    },
+    "src/provider/project-document/abstract/file-reader.ts": {
+      "expectedSha256": "bbf8b28444db745d5b05c79dd135170c754ec9f55bf90837bd4fea1967d977a9",
+      "actualSha256": "bbf8b28444db745d5b05c79dd135170c754ec9f55bf90837bd4fea1967d977a9"
+    },
+    "src/provider/project-document/public/file-reader.ts": {
+      "expectedSha256": "b114befdb3c5e1b9781b12bd41a0945ad1bd219d57f6f6b8c58260cd0ca70d83",
+      "actualSha256": "b114befdb3c5e1b9781b12bd41a0945ad1bd219d57f6f6b8c58260cd0ca70d83"
+    },
+    "src/provider/project-document/impl/file-reader.ts": {
+      "expectedSha256": "9a387b077f0142c49a4f3846f5af98611a7dee97f3d455bb42dcb585dbe1ae8a",
+      "actualSha256": "9a387b077f0142c49a4f3846f5af98611a7dee97f3d455bb42dcb585dbe1ae8a"
+    },
+    "app/desktop/project.ts": {
+      "expectedSha256": "7ff7826899c6eb9720787f6b01468916e50443d6f0a929cd1b8569d42f4faa8c",
+      "actualSha256": "7ff7826899c6eb9720787f6b01468916e50443d6f0a929cd1b8569d42f4faa8c"
+    },
+    "test/桌面应用/project-document.test.ts": {
+      "expectedSha256": "38bcebcf4df05b42acc21ba56835f28c0fac235deb712d86b2ea9be56d7733c2",
+      "actualSha256": "38bcebcf4df05b42acc21ba56835f28c0fac235deb712d86b2ea9be56d7733c2"
+    },
+    "src/pipeline/orchestration/run-role.ts": {
+      "expectedSha256": "fad87c2372ca5752a08a702284111db097dc7a2b3f9c9c6d6ac9789ccd4d1d64",
+      "actualSha256": "fad87c2372ca5752a08a702284111db097dc7a2b3f9c9c6d6ac9789ccd4d1d64"
+    },
+    "src/common/编排/handback.ts": {
+      "expectedSha256": "ae4153c7d2d279caf395233f76727418e39093bb24eeeeea76ac554e0e14c6dd",
+      "actualSha256": "ae4153c7d2d279caf395233f76727418e39093bb24eeeeea76ac554e0e14c6dd"
+    },
+    "src/pipeline/orchestration/govern-session.ts": {
+      "expectedSha256": "9894f9364f2ab23840213085125e8f80fd6ab49c298b34847651586b0514c2d7",
+      "actualSha256": "9894f9364f2ab23840213085125e8f80fd6ab49c298b34847651586b0514c2d7"
+    },
+    "test/编排/handback-lifecycle.test.ts": {
+      "expectedSha256": "ee770d8cc4508d3827c5facda200892e47680aaa99168b3973d2d8caf786fdfa",
+      "actualSha256": "ee770d8cc4508d3827c5facda200892e47680aaa99168b3973d2d8caf786fdfa"
+    },
+    "test/编排/runtime-orchestration.test.ts": {
+      "expectedSha256": "8d9228d2a183c8c0be1f749a48a124ec47e36b1d2850cafa4dceeeed665d4434",
+      "actualSha256": "8d9228d2a183c8c0be1f749a48a124ec47e36b1d2850cafa4dceeeed665d4434"
+    },
+    "test/编排/report-provenance-consumer.test.ts": {
+      "expectedSha256": "68cbc6a02608acad51fcff9024e9496110a89499912a5e4bb56fe48107acf932",
+      "actualSha256": "68cbc6a02608acad51fcff9024e9496110a89499912a5e4bb56fe48107acf932"
+    }
+  },
+  "dependencyMismatches": [],
+  "ownerTests": {
+    "nodeUnit": {
+      "tests": 67,
+      "pass": 67,
+      "fail": 0,
+      "skip": 0,
+      "exit": 0,
+      "rendererSha256": "394a7abb0af61fa3f7a5ee0652238e70883d17d798235c37954cdf41086a5252"
+    },
+    "actualRenderer": {
+      "consumer-report.json": {
+        "records": 41,
+        "trueBooleanObservations": 40,
+        "falseBooleanObservations": 0,
+        "exit": 0,
+        "rendererSha256": "394a7abb0af61fa3f7a5ee0652238e70883d17d798235c37954cdf41086a5252"
+      },
+      "full-ui-report.json": {
+        "records": 98,
+        "trueBooleanObservations": 88,
+        "falseBooleanObservations": 0,
+        "exit": 0,
+        "rendererSha256": "394a7abb0af61fa3f7a5ee0652238e70883d17d798235c37954cdf41086a5252"
+      },
+      "merge-report.json": {
+        "records": 12,
+        "trueBooleanObservations": 12,
+        "falseBooleanObservations": 0,
+        "exit": 0,
+        "rendererSha256": "394a7abb0af61fa3f7a5ee0652238e70883d17d798235c37954cdf41086a5252"
+      },
+      "duplicate-report.json": {
+        "records": 32,
+        "trueBooleanObservations": 32,
+        "falseBooleanObservations": 0,
+        "exit": 0,
+        "rendererSha256": "394a7abb0af61fa3f7a5ee0652238e70883d17d798235c37954cdf41086a5252"
+      },
+      "runtime-report.json": {
+        "records": 16,
+        "trueBooleanObservations": 15,
+        "falseBooleanObservations": 0,
+        "exit": 0,
+        "rendererSha256": "394a7abb0af61fa3f7a5ee0652238e70883d17d798235c37954cdf41086a5252"
+      },
+      "config-report.json": {
+        "records": 20,
+        "trueBooleanObservations": 20,
+        "falseBooleanObservations": 0,
+        "exit": 0,
+        "rendererSha256": "394a7abb0af61fa3f7a5ee0652238e70883d17d798235c37954cdf41086a5252"
+      },
+      "selector-report.json": {
+        "records": 25,
+        "trueBooleanObservations": 25,
+        "falseBooleanObservations": 0,
+        "exit": 0,
+        "rendererSha256": "394a7abb0af61fa3f7a5ee0652238e70883d17d798235c37954cdf41086a5252"
+      },
+      "project-reset-report.json": {
+        "records": 7,
+        "trueBooleanObservations": 7,
+        "falseBooleanObservations": 0,
+        "exit": 0,
+        "rendererSha256": "394a7abb0af61fa3f7a5ee0652238e70883d17d798235c37954cdf41086a5252"
+      },
+      "p5-first-prompt-green.json": {
+        "records": 4,
+        "trueBooleanObservations": 4,
+        "falseBooleanObservations": 0,
+        "exit": 0,
+        "rendererSha256": "394a7abb0af61fa3f7a5ee0652238e70883d17d798235c37954cdf41086a5252"
+      },
+      "p3-return-focus-green.json": {
+        "records": 11,
+        "trueBooleanObservations": 9,
+        "falseBooleanObservations": 0,
+        "exit": 0,
+        "rendererSha256": "394a7abb0af61fa3f7a5ee0652238e70883d17d798235c37954cdf41086a5252"
+      },
+      "p7-terminal-green.json": {
+        "records": 10,
+        "trueBooleanObservations": 10,
+        "falseBooleanObservations": 0,
+        "exit": 0,
+        "rendererSha256": "394a7abb0af61fa3f7a5ee0652238e70883d17d798235c37954cdf41086a5252"
+      },
+      "send-facts-green.json": {
+        "records": 8,
+        "trueBooleanObservations": 8,
+        "falseBooleanObservations": 0,
+        "exit": 0,
+        "rendererSha256": "394a7abb0af61fa3f7a5ee0652238e70883d17d798235c37954cdf41086a5252"
+      },
+      "terminal-merge-green.json": {
+        "records": 12,
+        "trueBooleanObservations": 12,
+        "falseBooleanObservations": 0,
+        "exit": 0,
+        "rendererSha256": "394a7abb0af61fa3f7a5ee0652238e70883d17d798235c37954cdf41086a5252"
+      }
+    },
+    "ime": {
+      "trueAssertions": 26,
+      "done": true,
+      "exit": 0,
+      "rendererSha256": "394a7abb0af61fa3f7a5ee0652238e70883d17d798235c37954cdf41086a5252"
+    },
+    "typecheckExit": 0,
+    "diffCheckExit": 0
+  },
+  "limits": [
+    "Controlled Electron/preload IPC proves UI consumers, not backend I/O or Provider side-effect counts.",
+    "Real desktop/native/20KiB/actual storage verification remains root-owned.",
+    "No real credentials, .env, target project, approved design or prototype changed.",
+    "IME fixture does not provide runtime-config:get; caught missing-handler fixture warning, 26 protected behaviors pass.",
+    "Queue snapshots do not expose clientMessageId; current hint clears on exact ACK or authoritative empty queue, never guessed withdrawal identity."
+  ],
+  "orchestrationCombinedSha256": "ba462ba78609128199a67988422b051bc8450c2d65664e50393ee0a44b6e6310",
+  "previousRendererSha256": "08201e9390253764d87fc533ac15b6e2d1140c0408994ba5961de41d7156ce13",
+  "previousStages": [
+    {
+      "rendererSha256": "91316665a8f027a2ff58648d37b8e37170a443beb85523d6e8212081ee829395",
+      "ownerTests": {
+        "nodeUnit": {
+          "pass": 66,
+          "fail": 0,
+          "skip": 0,
+          "exit": 0,
+          "rendererSha256": "91316665a8f027a2ff58648d37b8e37170a443beb85523d6e8212081ee829395"
+        },
+        "actualRenderer": {
+          "consumer-report.json": {
+            "records": 41,
+            "trueBooleanObservations": 40,
+            "falseBooleanObservations": 0,
+            "exit": 0,
+            "rendererSha256": "91316665a8f027a2ff58648d37b8e37170a443beb85523d6e8212081ee829395"
+          },
+          "full-ui-report.json": {
+            "records": 98,
+            "trueBooleanObservations": 88,
+            "falseBooleanObservations": 0,
+            "exit": 0,
+            "rendererSha256": "91316665a8f027a2ff58648d37b8e37170a443beb85523d6e8212081ee829395"
+          },
+          "duplicate-report.json": {
+            "records": 32,
+            "trueBooleanObservations": 32,
+            "falseBooleanObservations": 0,
+            "exit": 0,
+            "rendererSha256": "08201e9390253764d87fc533ac15b6e2d1140c0408994ba5961de41d7156ce13",
+            "applicability": "Previous renderer 08201e9; only two P3 drawer sampling guards changed afterward. Current consumer41/full98/merge12/unit66/typecheck verify affected path."
+          },
+          "merge-report.json": {
+            "records": 12,
+            "trueBooleanObservations": 12,
+            "falseBooleanObservations": 0,
+            "exit": 0,
+            "rendererSha256": "91316665a8f027a2ff58648d37b8e37170a443beb85523d6e8212081ee829395"
+          },
+          "runtime-report.json": {
+            "records": 16,
+            "trueBooleanObservations": 15,
+            "falseBooleanObservations": 0,
+            "exit": 0,
+            "rendererSha256": "08201e9390253764d87fc533ac15b6e2d1140c0408994ba5961de41d7156ce13",
+            "applicability": "Previous renderer 08201e9; only two P3 drawer sampling guards changed afterward. Current consumer41/full98/merge12/unit66/typecheck verify affected path."
+          },
+          "config-report.json": {
+            "records": 20,
+            "trueBooleanObservations": 20,
+            "falseBooleanObservations": 0,
+            "exit": 0,
+            "rendererSha256": "08201e9390253764d87fc533ac15b6e2d1140c0408994ba5961de41d7156ce13",
+            "applicability": "Previous renderer 08201e9; only two P3 drawer sampling guards changed afterward. Current consumer41/full98/merge12/unit66/typecheck verify affected path."
+          },
+          "selector-report.json": {
+            "records": 25,
+            "trueBooleanObservations": 25,
+            "falseBooleanObservations": 0,
+            "exit": 0,
+            "rendererSha256": "08201e9390253764d87fc533ac15b6e2d1140c0408994ba5961de41d7156ce13",
+            "applicability": "Previous renderer 08201e9; only two P3 drawer sampling guards changed afterward. Current consumer41/full98/merge12/unit66/typecheck verify affected path."
+          },
+          "project-reset-report.json": {
+            "records": 7,
+            "trueBooleanObservations": 7,
+            "falseBooleanObservations": 0,
+            "exit": 0,
+            "rendererSha256": "08201e9390253764d87fc533ac15b6e2d1140c0408994ba5961de41d7156ce13",
+            "applicability": "Previous renderer 08201e9; only two P3 drawer sampling guards changed afterward. Current consumer41/full98/merge12/unit66/typecheck verify affected path."
+          }
+        },
+        "ime": {
+          "trueAssertions": 26,
+          "done": true,
+          "exit": 0,
+          "rendererSha256": "08201e9390253764d87fc533ac15b6e2d1140c0408994ba5961de41d7156ce13"
+        },
+        "typecheckExit": 0,
+        "diffCheckExit": 0
+      },
+      "combinedSha256": "6989f1c157249a4398dd2efa3408ad30138f8ba3c044987c9a286977c7b5fd78",
+      "historicalArtifactsPrefix": "previous-stage-"
+    },
+    {
+      "rendererSha256": "daf00c90fee97425428159ed46e9b58ede4292d07e7ac70353e20639a8228f01",
+      "ownerTests": {
+        "nodeUnit": {
+          "tests": 67,
+          "pass": 67,
+          "fail": 0,
+          "skip": 0,
+          "exit": 0,
+          "rendererSha256": "efd2e33c45e587c2784a5e98528a035f08f9bca8e4c55b62d52dbe8f1f84e92c"
+        },
+        "actualRenderer": {
+          "consumer-report.json": {
+            "records": 41,
+            "trueBooleanObservations": 40,
+            "falseBooleanObservations": 0,
+            "exit": 0,
+            "rendererSha256": "efd2e33c45e587c2784a5e98528a035f08f9bca8e4c55b62d52dbe8f1f84e92c"
+          },
+          "full-ui-report.json": {
+            "records": 98,
+            "trueBooleanObservations": 88,
+            "falseBooleanObservations": 0,
+            "exit": 0,
+            "rendererSha256": "efd2e33c45e587c2784a5e98528a035f08f9bca8e4c55b62d52dbe8f1f84e92c"
+          },
+          "merge-report.json": {
+            "records": 12,
+            "trueBooleanObservations": 12,
+            "falseBooleanObservations": 0,
+            "exit": 0,
+            "rendererSha256": "efd2e33c45e587c2784a5e98528a035f08f9bca8e4c55b62d52dbe8f1f84e92c"
+          },
+          "duplicate-report.json": {
+            "records": 32,
+            "trueBooleanObservations": 32,
+            "falseBooleanObservations": 0,
+            "exit": 0,
+            "rendererSha256": "efd2e33c45e587c2784a5e98528a035f08f9bca8e4c55b62d52dbe8f1f84e92c"
+          },
+          "runtime-report.json": {
+            "records": 16,
+            "trueBooleanObservations": 15,
+            "falseBooleanObservations": 0,
+            "exit": 0,
+            "rendererSha256": "efd2e33c45e587c2784a5e98528a035f08f9bca8e4c55b62d52dbe8f1f84e92c"
+          },
+          "config-report.json": {
+            "records": 20,
+            "trueBooleanObservations": 20,
+            "falseBooleanObservations": 0,
+            "exit": 0,
+            "rendererSha256": "efd2e33c45e587c2784a5e98528a035f08f9bca8e4c55b62d52dbe8f1f84e92c"
+          },
+          "selector-report.json": {
+            "records": 25,
+            "trueBooleanObservations": 25,
+            "falseBooleanObservations": 0,
+            "exit": 0,
+            "rendererSha256": "efd2e33c45e587c2784a5e98528a035f08f9bca8e4c55b62d52dbe8f1f84e92c"
+          },
+          "project-reset-report.json": {
+            "records": 7,
+            "trueBooleanObservations": 7,
+            "falseBooleanObservations": 0,
+            "exit": 0,
+            "rendererSha256": "efd2e33c45e587c2784a5e98528a035f08f9bca8e4c55b62d52dbe8f1f84e92c"
+          },
+          "p5-first-prompt-green.json": {
+            "records": 4,
+            "trueBooleanObservations": 4,
+            "falseBooleanObservations": 0,
+            "exit": 0,
+            "rendererSha256": "efd2e33c45e587c2784a5e98528a035f08f9bca8e4c55b62d52dbe8f1f84e92c"
+          },
+          "p3-return-focus-green.json": {
+            "records": 2,
+            "trueBooleanObservations": 2,
+            "falseBooleanObservations": 0,
+            "exit": 0,
+            "rendererSha256": "efd2e33c45e587c2784a5e98528a035f08f9bca8e4c55b62d52dbe8f1f84e92c"
+          },
+          "p7-terminal-green.json": {
+            "records": 10,
+            "trueBooleanObservations": 10,
+            "falseBooleanObservations": 0,
+            "exit": 0,
+            "rendererSha256": "efd2e33c45e587c2784a5e98528a035f08f9bca8e4c55b62d52dbe8f1f84e92c"
+          },
+          "send-facts-green.json": {
+            "records": 8,
+            "trueBooleanObservations": 8,
+            "falseBooleanObservations": 0,
+            "exit": 0,
+            "rendererSha256": "efd2e33c45e587c2784a5e98528a035f08f9bca8e4c55b62d52dbe8f1f84e92c"
+          },
+          "terminal-merge-green.json": {
+            "records": 12,
+            "trueBooleanObservations": 12,
+            "falseBooleanObservations": 0,
+            "exit": 0,
+            "rendererSha256": "efd2e33c45e587c2784a5e98528a035f08f9bca8e4c55b62d52dbe8f1f84e92c"
+          }
+        },
+        "ime": {
+          "trueAssertions": 26,
+          "done": true,
+          "exit": 0,
+          "rendererSha256": "daf00c90fee97425428159ed46e9b58ede4292d07e7ac70353e20639a8228f01",
+          "applicability": "Executed on previous daf candidate; narrow terminal aggregation changes no input/IME functions. Not rerun to avoid same-bundle CUA interference during root native verification."
+        },
+        "typecheckExit": 0,
+        "diffCheckExit": 0
+      },
+      "combinedSha256": "355b848aa5d6d73c11a970cbd24e7a1d8e56ccf8b91306176ddab8054c42c251",
+      "historicalArtifactsPrefix": "stage-daf-"
+    },
+    {
+      "rendererSha256": "efd2e33c45e587c2784a5e98528a035f08f9bca8e4c55b62d52dbe8f1f84e92c",
+      "ownerTests": {
+        "nodeUnit": {
+          "tests": 67,
+          "pass": 67,
+          "fail": 0,
+          "skip": 0,
+          "exit": 0,
+          "rendererSha256": "394a7abb0af61fa3f7a5ee0652238e70883d17d798235c37954cdf41086a5252"
+        },
+        "actualRenderer": {
+          "consumer-report.json": {
+            "records": 41,
+            "trueBooleanObservations": 40,
+            "falseBooleanObservations": 0,
+            "exit": 0,
+            "rendererSha256": "394a7abb0af61fa3f7a5ee0652238e70883d17d798235c37954cdf41086a5252"
+          },
+          "full-ui-report.json": {
+            "records": 98,
+            "trueBooleanObservations": 88,
+            "falseBooleanObservations": 0,
+            "exit": 0,
+            "rendererSha256": "394a7abb0af61fa3f7a5ee0652238e70883d17d798235c37954cdf41086a5252"
+          },
+          "merge-report.json": {
+            "records": 12,
+            "trueBooleanObservations": 12,
+            "falseBooleanObservations": 0,
+            "exit": 0,
+            "rendererSha256": "394a7abb0af61fa3f7a5ee0652238e70883d17d798235c37954cdf41086a5252"
+          },
+          "duplicate-report.json": {
+            "records": 32,
+            "trueBooleanObservations": 32,
+            "falseBooleanObservations": 0,
+            "exit": 0,
+            "rendererSha256": "394a7abb0af61fa3f7a5ee0652238e70883d17d798235c37954cdf41086a5252"
+          },
+          "runtime-report.json": {
+            "records": 16,
+            "trueBooleanObservations": 15,
+            "falseBooleanObservations": 0,
+            "exit": 0,
+            "rendererSha256": "394a7abb0af61fa3f7a5ee0652238e70883d17d798235c37954cdf41086a5252"
+          },
+          "config-report.json": {
+            "records": 20,
+            "trueBooleanObservations": 20,
+            "falseBooleanObservations": 0,
+            "exit": 0,
+            "rendererSha256": "394a7abb0af61fa3f7a5ee0652238e70883d17d798235c37954cdf41086a5252"
+          },
+          "selector-report.json": {
+            "records": 25,
+            "trueBooleanObservations": 25,
+            "falseBooleanObservations": 0,
+            "exit": 0,
+            "rendererSha256": "394a7abb0af61fa3f7a5ee0652238e70883d17d798235c37954cdf41086a5252"
+          },
+          "project-reset-report.json": {
+            "records": 7,
+            "trueBooleanObservations": 7,
+            "falseBooleanObservations": 0,
+            "exit": 0,
+            "rendererSha256": "394a7abb0af61fa3f7a5ee0652238e70883d17d798235c37954cdf41086a5252"
+          },
+          "p5-first-prompt-green.json": {
+            "records": 4,
+            "trueBooleanObservations": 4,
+            "falseBooleanObservations": 0,
+            "exit": 0,
+            "rendererSha256": "394a7abb0af61fa3f7a5ee0652238e70883d17d798235c37954cdf41086a5252"
+          },
+          "p3-return-focus-green.json": {
+            "records": 11,
+            "trueBooleanObservations": 9,
+            "falseBooleanObservations": 0,
+            "exit": 0,
+            "rendererSha256": "394a7abb0af61fa3f7a5ee0652238e70883d17d798235c37954cdf41086a5252"
+          },
+          "p7-terminal-green.json": {
+            "records": 10,
+            "trueBooleanObservations": 10,
+            "falseBooleanObservations": 0,
+            "exit": 0,
+            "rendererSha256": "394a7abb0af61fa3f7a5ee0652238e70883d17d798235c37954cdf41086a5252"
+          },
+          "send-facts-green.json": {
+            "records": 8,
+            "trueBooleanObservations": 8,
+            "falseBooleanObservations": 0,
+            "exit": 0,
+            "rendererSha256": "394a7abb0af61fa3f7a5ee0652238e70883d17d798235c37954cdf41086a5252"
+          },
+          "terminal-merge-green.json": {
+            "records": 12,
+            "trueBooleanObservations": 12,
+            "falseBooleanObservations": 0,
+            "exit": 0,
+            "rendererSha256": "394a7abb0af61fa3f7a5ee0652238e70883d17d798235c37954cdf41086a5252"
+          }
+        },
+        "ime": {
+          "trueAssertions": 26,
+          "done": true,
+          "exit": 0,
+          "rendererSha256": "394a7abb0af61fa3f7a5ee0652238e70883d17d798235c37954cdf41086a5252"
+        },
+        "typecheckExit": 0,
+        "diffCheckExit": 0
+      },
+      "combinedSha256": "d3f25848d0aa60ae98a745035002855539703f125dc5332ef834b6f63b37d3c1",
+      "historicalArtifactsPrefix": "stage-efd-"
+    }
+  ],
+  "finalNarrowFixHistory": [
+    {
+      "scope": "P3 role-info -> document list -> back retains role reading",
+      "changes": [
+        "documentList captures role drawer before changing tab",
+        "captureDrawerReading ignores non-role drawer DOM"
+      ],
+      "red": "role-doc-return-red.json",
+      "currentConsumerRecords": 41,
+      "currentBooleanObservations": 40,
+      "rootReloadRequired": true,
+      "sourceChangeOnly": "app/renderer/renderer.js"
+    },
+    {
+      "scope": "Root actual GUI P3/P5/P7/A defects within approved UI-P1–7-1",
+      "rendererSha256": "daf00c90fee97425428159ed46e9b58ede4292d07e7ac70353e20639a8228f01",
+      "toolRowsSha256": "97b688e51ce098e95c7b7f71aec822dc5e2fe8c491672ccf2beb6fe4841e5f8f",
+      "red": [
+        "p5-first-prompt-red.json",
+        "p3-return-focus-red.json",
+        "desktop-fresh-context-header-red-ax.txt",
+        "desktop-expired-radio-mutates-red-ax.txt",
+        "desktop-ordinary-chat-complete-ax.txt"
+      ],
+      "changes": [
+        "freeze actual readable-history-before-open fact instead of current prompt/replay DOM",
+        "return to equivalent visible role-document entry focus with stable fallback",
+        "source-bound current queue hint exact ACK or authoritative empty queue; preserve historical records and newer hints",
+        "freeze decision inputs/buttons on pending submission and final decisions/expired state",
+        "non-tool terminal remains full system fact in live/history",
+        "same-client same-actual-turn structured send result and stream merge; preserve true failures and unknown; aborted never requeues accepted prompt"
+      ],
+      "rootReloadRequired": true
+    },
+    {
+      "scope": "Same actual turn/outcome ordinary denied+settled one readable lifecycle",
+      "changedProductFiles": [
+        "app/renderer/renderer.js"
+      ],
+      "rendererSha256": "efd2e33c45e587c2784a5e98528a035f08f9bca8e4c55b62d52dbe8f1f84e92c",
+      "red": "terminal-merge-red.json",
+      "rootNativeRed": "desktop-final-stop-after-ax.txt",
+      "green": "terminal-merge-green.json",
+      "strictBooleanObservations": 12,
+      "identity": "existing scoped pane + nonempty authoritative top turnId + exact valid detail.outcome + non-tool event kind denied/settled",
+      "preservation": [
+        "distinct diagnostics retained inside the same lifecycle",
+        "no merging anonymous legacy, different turns/outcomes, or tool denial",
+        "live/history reuse only via exact replay tokens of previously observed real terminal sources",
+        "cold history with no outcome remains an unguessed plain record",
+        "virtual row update retains reading position"
+      ],
+      "rootReloadRequired": true,
+      "selftestElectronAllExited": true
+    }
+  ],
+  "finalNarrowFix": {
+    "scope": "P3 existing nested role-card/changelog/docs reading state",
+    "changedProductFiles": [
+      "app/renderer/renderer.js"
+    ],
+    "rendererSha256": "394a7abb0af61fa3f7a5ee0652238e70883d17d798235c37954cdf41086a5252",
+    "red": "nested-role-reading-red.json",
+    "green": "p3-return-focus-green.json",
+    "greenRecords": 11,
+    "strictBooleanObservations": 9,
+    "actualBefore": {
+      "outer": 916,
+      "card": 2086,
+      "docs": 2047,
+      "changes": 2659
+    },
+    "redAfter": {
+      "outer": 916,
+      "card": 0,
+      "docs": 0,
+      "changes": 0
+    },
+    "greenAfter": {
+      "outer": 916,
+      "card": 2086,
+      "docs": 2047,
+      "changes": 2659
+    },
+    "identity": "existing per-runtime/per-role drawerReading, existing stable data-section with single existing .card-text",
+    "preservation": [
+      "original outer/anchor/expanded/focus assertions unchanged",
+      "original visible opener verified",
+      "other role/runtime/new-project cannot inherit or overwrite saved original reading",
+      "no public API/dependency/message/report/static-content change"
+    ],
+    "rootReloadRequired": true,
+    "selftestElectronAllExited": true
+  },
+  "sendFactsOverlay": {
+    "manifest": "角色卡/桌面窗口/docs/fix/2026-10-15-stop-terminal-send-facts-evidence/manifest.json",
+    "manifestSha256": "9adbeaadc671990d89a44665705aca8c0541ad4f35ff54af24816ef8b29cd0fa",
+    "ownerTargetedPassed": 45,
+    "ownerAllPassed": 214,
+    "actualMatch": true
+  },
+  "combinedSha256": "03b44cae0545ffeaae25baaf2477945a4f6e127bb3919ea721f5d32ebd013434"
+}

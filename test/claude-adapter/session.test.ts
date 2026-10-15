@@ -13,7 +13,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createClaudeRuntimeAdapter } from "../../src/provider/claude/session.ts";
 import { buildGovernedTools } from "../../src/provider/runtime/tools.ts";
 import { createRuntimeSessionStore } from "../../src/provider/runtime/session-store.ts";
-import { createRuntimeAdapter } from "../../src/service/runtime/session.ts";
+import { createRuntimeAdapter, projectRuntimeLiveHandback } from "../../src/service/runtime/session.ts";
 import { toClaudeSchema } from "../../src/common/claude-adapter/schema.ts";
 import type { ResolvedRole } from "../../src/model/role.ts";
 import type { RuntimeProviderOptions, InteractionGate, ToolDefinition, SessionEvent, WriteGate } from "../../src/model/runtime.ts";
@@ -525,4 +525,236 @@ test("core Service receives real Claude MCP reports/dispatch receipts and saves 
   assert.equal(record?.nativeSessionId, session.nativeSessionId);
   assert.equal(record?.contextSource, "fresh");
   assert.equal((await storage.readReplay()).filter((row) => row.event?.kind === "settled").length, 1);
+}));
+
+test("required-v1 rejects each missing display capability before SDK load; profile registers bind snapshot only", async () => fixture(async (root) => {
+  const engine = fake(async () => {});
+  for (const missing of ["projectToolEvent", "registerToolDisplayProfile"] as const) {
+    const config: RuntimeProviderOptions = { ...options(root, []), toolDisplayMode: "required-v1",
+      projectToolEvent: () => { throw new Error("unused"); }, registerToolDisplayProfile: () => {} };
+    delete config[missing];
+    assert.throws(() => createClaudeRuntimeAdapter(config, engine.dependencies), /projector\/register/);
+  }
+  assert.equal(engine.loadCount, 0);
+  const profiles: unknown[] = [];
+  const env = { ...environment, CUSTOM_KEY: "fake-profile-original", EXTRA_KEY: "fake-extra-original", UNLISTED: "never-register" };
+  const adapter = createClaudeRuntimeAdapter({ ...options(root, []), toolDisplayMode: "required-v1", apiKeyEnvVar: "CUSTOM_KEY",
+    toolDisplayCredentialEnvNames: ["EXTRA_KEY"], projectToolEvent: () => { throw new Error("unused"); },
+    registerToolDisplayProfile: (profile) => { profiles.push(profile); } }, { ...engine.dependencies, env });
+  env.CUSTOM_KEY = "fake-profile-mutated";
+  const session = await adapter.bindRole(role);
+  assert.deepEqual(profiles, [{ apiKeyEnvVar: "CUSTOM_KEY", credentials: [{ name: "CUSTOM_KEY", value: "fake-profile-original" }, { name: "EXTRA_KEY", value: "fake-extra-original" }] }]);
+  assert.equal(engine.loadCount, 0);
+  await session.dispose();
+}));
+
+test("real Core projector receives actual args/rule/result execution while SDK content and opaque identities stay unchanged", async () => fixture(async (root) => {
+  const sources: import("../../src/model/runtime.ts").RuntimeToolEventSource[] = [];
+  const marker = "fixture-api-secret";
+  const result = { ok: false, message: `failure ${marker} https://example.test/p?secret=query`, execution: { exitCode: 7, stdout: `out ${marker}`, stderr: "real stderr", error: "real process failure", stdoutTruncated: true } };
+  const tool: ToolDefinition = { name: "run_shell", description: "fixture", inputSchema: { type: "object", properties: { command: { type: "string" }, content: { type: "string" } } }, displayInputRule: "core-command-v1",
+    handler: async (call) => { assert.deepEqual(call.args, { command: `echo ${marker}`, content: "PRIVATE BODY" }); return result; } };
+  const engine = fake(async (client) => {
+    const received = await client.callTool({ name: "run_shell", arguments: { command: `echo ${marker}`, content: "PRIVATE BODY" } });
+    assert.deepEqual(received.content, [{ type: "text", text: "failure [REDACTED] https://example.test/p?secret=query" }]);
+    assert.equal(received.isError, true);
+    assert.equal(JSON.stringify(received).includes("exitCode"), false);
+  });
+  const service = createRuntimeAdapter({ runtime: "claude", projectRoot: root, skillRoot: root, gate: allow,
+    providerFactories: { claude: (config) => createClaudeRuntimeAdapter({ ...config, tools: [tool],
+      projectToolEvent: (source, redact) => { sources.push(source); return config.projectToolEvent!(source, redact); } }, engine.dependencies) } });
+  const session = await service.bindRole(role);
+  const reading = collect(session, 1);
+  await session.prompt("fixture original");
+  const rows = await reading;
+  const facts = sources.filter((source): source is import("../../src/model/runtime.ts").RuntimeToolEventFactsV1 => source.origin === "handler-start" || source.origin === "handler-result");
+  assert.equal(facts.length, 2);
+  assert.equal(facts[0]!.input!.rule, "core-command-v1");
+  assert.deepEqual(facts[0]!.input!.args, { command: `echo ${marker}`, content: "PRIVATE BODY" });
+  assert.equal(facts[1]!.origin, "handler-result");
+  if (facts[1]!.origin === "handler-result") assert.deepEqual(facts[1]!.result, result);
+  assert.ok(facts[0]!.toolCallId!.startsWith(`${facts[0]!.turnId}:`));
+  const tools = rows.filter((row) => (row.detail as { phase?: string })?.phase);
+  assert.equal(tools.length, 2);
+  assert.equal(tools.some((row) => (row.detail as { phase: string }).phase === "blocked"), false);
+  const detail = tools[1]!.detail as import("../../src/model/runtime.ts").ToolEventDetailV1;
+  assert.equal(detail.toolCallId, facts[0]!.toolCallId);
+  assert.equal(detail.display!.process!.exitCode, 7);
+  assert.equal(detail.display!.process!.stdout!.truncated, true);
+  assert.equal(detail.display!.process!.stdout!.text, "out [REDACTED]");
+  assert.equal(detail.display!.error!.text, "real process failure");
+  assert.equal(JSON.stringify(detail.display).includes(marker), false);
+  assert.equal(JSON.stringify(rows).includes("PRIVATE BODY"), false);
+  assert.equal(JSON.stringify(rows).includes("__ans_call_context"), false);
+  await session.dispose();
+}));
+
+test("actual handler thrown Error projects protected message, unknown throw stays opaque, model retains original generic failure", async () => fixture(async (root) => {
+  for (const thrown of [new Error("error fixture-api-secret"), { secret: "UNKNOWN_PRIVATE_OBJECT" }]) {
+    const engine = fake(async (client) => {
+      const received = await client.callTool({ name: "explode", arguments: {} });
+      assert.deepEqual(received.content, [{ type: "text", text: "explode 执行失败；ANS 治理能力未返回成功" }]);
+      assert.equal(received.isError, true);
+    });
+    const service = createRuntimeAdapter({ runtime: "claude", projectRoot: root, skillRoot: root, gate: allow,
+      providerFactories: { claude: (config) => createClaudeRuntimeAdapter({ ...config, tools: [{ name: "explode", description: "fixture", inputSchema: { type: "object", properties: {} }, handler: async () => { throw thrown; } }] }, engine.dependencies) } });
+    const session = await service.bindRole(role);
+    const reading = collect(session, 1);
+    await session.prompt("throw fixture");
+    const rows = await reading;
+    assert.equal(JSON.stringify(rows).includes("UNKNOWN_PRIVATE_OBJECT"), false);
+    assert.equal(JSON.stringify(rows).includes("fixture-api-secret"), false);
+    const result = rows.find((row) => (row.detail as { phase?: string })?.phase === "result")!;
+    assert.equal(result.kind, "denied");
+    if (thrown instanceof Error) assert.equal((result.detail as import("../../src/model/runtime.ts").ToolEventDetailV1).display!.error!.text, "error [REDACTED]");
+    await session.dispose();
+  }
+}));
+
+test("unknown and old PreToolUse never borrow active turn; real original hook denial alone is blocked", async () => fixture(async (root) => {
+  let oldId: string | undefined;
+  const engine = fake(async (_client, config, user) => {
+    const hook = config.hooks!.PreToolUse![0]!.hooks[0]!;
+    for (const promptId of [undefined, "unknown-native", ...(oldId ? [oldId] : [])]) {
+      const decision = await hook({ hook_event_name: "PreToolUse", prompt_id: promptId, tool_name: "Bash", tool_input: {}, tool_use_id: "unattributed", session_id: "fixture", transcript_path: "fixture", cwd: root }, undefined, { signal: new AbortController().signal });
+      assert.equal((decision as { hookSpecificOutput: { permissionDecision: string } }).hookSpecificOutput.permissionDecision, "deny");
+    }
+    if (!oldId) {
+      await hook({ hook_event_name: "PreToolUse", prompt_id: user.uuid, tool_name: "Bash", tool_input: {}, tool_use_id: "real-deny", session_id: "fixture", transcript_path: "fixture", cwd: root }, undefined, { signal: new AbortController().signal });
+      oldId = user.uuid;
+    }
+  });
+  const config = options(root, []);
+  const sources: import("../../src/model/runtime.ts").RuntimeToolEventSource[] = [];
+  const session = await createClaudeRuntimeAdapter({ ...config, projectToolEvent: (source) => {
+    sources.push(source);
+    if (source.origin === "diagnostic") return { kind: "message", summary: "safe", detail: { version: 1, source: "tool-display-diagnostic", code: source.code } };
+    if (!("phase" in source)) throw new Error("unexpected fixture source");
+    return { kind: "denied", summary: "safe blocked", turnId: source.turnId, detail: { toolName: source.toolName, toolCallId: source.toolCallId, phase: source.phase } };
+  } }, engine.dependencies).bindRole(role);
+  const reading = collect(session, 2);
+  await session.prompt("one");
+  await session.prompt("two");
+  const rows = await reading;
+  assert.equal(sources.filter((source) => source.origin === "governance-hook").length, 1);
+  assert.equal(sources.filter((source) => source.origin === "diagnostic").length, 4);
+  for (const row of rows.filter((row) => (row.detail as { code?: string })?.code === "CALL_CONTEXT_UNATTRIBUTED")) assert.equal(row.turnId, undefined);
+  await session.dispose();
+}));
+
+test("projector failure yields only bounded diagnostic without changing tool result or successful turn", async () => fixture(async (root) => {
+  const engine = fake(async (client) => {
+    const received = await client.callTool({ name: "ok", arguments: {} });
+    assert.deepEqual(received.content, [{ type: "text", text: "original tool content" }]);
+    assert.equal(received.isError, false);
+  });
+  const session = await createClaudeRuntimeAdapter({ ...options(root, [{ name: "ok", description: "fixture", inputSchema: { type: "object", properties: {} }, handler: async () => ({ ok: true, message: "original tool content" }) }]),
+    projectToolEvent: () => { throw new Error("DO_NOT_LEAK_PROJECTION_ERROR"); } }, engine.dependencies).bindRole(role);
+  const reading = collect(session, 1);
+  await session.prompt("original");
+  const rows = await reading;
+  assert.equal(rows.filter((row) => (row.detail as { code?: string })?.code === "PROJECTION_FAILED").length, 2);
+  assert.equal(rows.some((row) => row.kind === "denied" || row.kind === "accepted" || row.kind === "tool_call"), false);
+  assert.equal(JSON.stringify(rows).includes("DO_NOT_LEAK"), false);
+  assert.equal((rows.at(-1)!.detail as { outcome: string }).outcome, "completed");
+  await session.dispose();
+}));
+
+test("Core strips C metadata before Claude and preserves exact SDK prompt/images while publishing safe display copy", async () => fixture(async (root) => {
+  const modelText = "MODEL_SENTINEL fixture-api-secret https://example.test/p?secret=xyz";
+  const images: import("../../src/model/runtime.ts").PromptImage[] = [{ type: "image", mimeType: "image/png", data: "AA==" }];
+  let providerOptions: import("../../src/model/runtime.ts").PromptOptions | undefined;
+  const engine = fake(async (_client, config, user) => {
+    const content = user.message.content as Array<{ type: string; text?: string; source?: unknown }>;
+    assert.equal(content[0]!.text!.split("\n").slice(1).join("\n"), modelText);
+    assert.deepEqual(content[1], { type: "image", source: { type: "base64", media_type: "image/png", data: "AA==" } });
+    for (const name of ["inputPresentation", "inputProvenance", "onDeliveryProgress", "toolDisplayMode", "registerToolDisplayProfile", "projectToolEvent"]) assert.equal(name in config, false);
+  });
+  const service = createRuntimeAdapter({ runtime: "claude", projectRoot: root, skillRoot: root, gate: allow, persistSession: true,
+    providerFactories: { claude: (config) => {
+      const adapter = createClaudeRuntimeAdapter(config, engine.dependencies);
+      return { ...adapter, async bindRole(boundRole) { const inner = await adapter.bindRole(boundRole); const prompt = inner.prompt.bind(inner);
+        inner.prompt = async (text, opts) => { providerOptions = opts; return prompt(text, opts); }; return inner; } };
+    } } });
+  const session = await service.bindRole(role);
+  const reading = collect(session, 1);
+  await session.prompt(modelText, { images, inputPresentation: { version: 1, kind: "handback-live", durability: "memory-only", reports: [projectRuntimeLiveHandback({ source: { roleId: "source" }, taskId: null, status: "completed", summary: "fixture safe report", evidence: [], at: new Date().toISOString() })] }, onDeliveryProgress: () => {} });
+  assert.equal(providerOptions!.images, images);
+  for (const name of ["inputPresentation", "inputProvenance", "onDeliveryProgress"]) assert.equal(name in providerOptions!, false);
+  const rows = await reading;
+  const input = rows.find((row) => (row.detail as { source?: string })?.source === "prompt-input")!;
+  const detail = input.detail as import("../../src/model/runtime.ts").PromptInputEventDetail;
+  assert.equal(detail.text.includes("fixture-api-secret"), false);
+  assert.equal(detail.inputTextProjection!.modelInputRecorded, false);
+  assert.equal(detail.inputTextProjection!.redacted, true);
+  const saved = await session.persistence!.recordFinalReport({ source: { roleId: role.id, runtime: "claude", turnId: rows.at(-1)!.turnId! }, taskId: null,
+    origin: "submitted-report", status: "completed", summary: "DURABLE_SENTINEL fixture-api-secret", evidence: [], at: new Date().toISOString() });
+  assert.equal(saved.ok, true);
+  if (!saved.ok) throw new Error("fixture report save failed");
+  const durableReading = collect(session, 1);
+  await session.prompt(modelText, { images, inputProvenance: { version: 1, kind: "handback", deliveryId: randomUUID(), attemptId: randomUUID(), target: { roleId: role.id, runtime: "claude" }, reports: [saved.report] }, onDeliveryProgress: () => {} });
+  await durableReading;
+  for (const name of ["inputPresentation", "inputProvenance", "onDeliveryProgress"]) assert.equal(name in providerOptions!, false);
+  assert.equal(engine.users.length, 2);
+  assert.equal(providerOptions!.images, images);
+  await session.dispose();
+}));
+
+test("thin projected outlet never redacts supplied opaque identities or restores suppressed oversized identity", async () => fixture(async (root) => {
+  let index = 0;
+  const engine = fake(async (client) => { await client.callTool({ name: "identity", arguments: {} }); });
+  const session = await createClaudeRuntimeAdapter({ ...options(root, [{ name: "identity", description: "fixture", inputSchema: { type: "object", properties: {} }, handler: async () => ({ ok: true, message: "safe" }) }]),
+    currentTurnId: () => "fixture-api-secret", projectToolEvent: (source, redact) => {
+      assert.ok("phase" in source);
+      if (!("phase" in source)) throw new Error("unexpected source");
+      assert.equal(source.turnId, "fixture-api-secret");
+      assert.ok(source.toolCallId!.startsWith("fixture-api-secret:"));
+      assert.equal(redact!("fixture-api-secret"), "[REDACTED]");
+      if (index++ === 0) return { kind: "tool_call", runtime: "claude", roleId: "fixture-api-secret", turnId: source.turnId, summary: "already safe", detail: { phase: "start", toolName: "fixture-api-secret", toolCallId: source.toolCallId } };
+      return { kind: "message", summary: "fixed diagnostic", detail: { source: "tool-display-diagnostic", version: 1, code: "IDENTITY_TOO_LARGE" } };
+    } }, engine.dependencies).bindRole(role);
+  const reading = collect(session, 1);
+  await session.prompt("identity fixture");
+  const rows = await reading;
+  const start = rows.find((row) => row.kind === "tool_call")!;
+  assert.equal(start.turnId, "fixture-api-secret");
+  assert.equal(start.roleId, "fixture-api-secret");
+  assert.equal((start.detail as { toolName: string }).toolName, "fixture-api-secret");
+  assert.ok((start.detail as { toolCallId: string }).toolCallId.startsWith("fixture-api-secret:"));
+  const diagnostic = rows.find((row) => (row.detail as { code?: string })?.code === "IDENTITY_TOO_LARGE")!;
+  assert.equal(diagnostic.turnId, undefined);
+  assert.equal(diagnostic.roleId, undefined);
+  await session.dispose();
+}));
+
+test("required production path displays real read ENOENT and Node shell output without parsing result messages", async () => fixture(async (root) => {
+  const command = `node -e "process.stdout.write('actual out');process.stderr.write('actual err');process.exit(3)"`;
+  const engine = fake(async (client) => {
+    const read = await client.callTool({ name: "read_file", arguments: { path: "missing-file.txt" } });
+    assert.equal(read.isError, true);
+    const shell = await client.callTool({ name: "run_shell", arguments: { command } });
+    assert.equal(shell.isError, true);
+    assert.match(JSON.stringify(shell.content), /actual out/);
+    assert.match(JSON.stringify(shell.content), /actual err/);
+    assert.equal(JSON.stringify(shell).includes('"execution"'), false);
+  });
+  const service = createRuntimeAdapter({ runtime: "claude", projectRoot: root, skillRoot: root, gate: allow, readRoot: root, shellCwd: root,
+    shellGate: async () => ({ allow: true, by: "fixture" }), providerFactories: { claude: (config) => createClaudeRuntimeAdapter(config, engine.dependencies) } });
+  const session = await service.bindRole(role);
+  const reading = collect(session, 1);
+  await session.prompt("actual tools");
+  const rows = await reading;
+  const results = rows.filter((row) => (row.detail as { phase?: string })?.phase === "result").map((row) => row.detail as import("../../src/model/runtime.ts").ToolEventDetailV1);
+  assert.equal(results.length, 2);
+  const read = results.find((detail) => detail.toolName === "read_file")!;
+  assert.equal(read.display!.target!.value.text, "missing-file.txt");
+  assert.match(read.display!.error!.text, /ENOENT/);
+  assert.equal(read.display!.process, undefined);
+  const shell = results.find((detail) => detail.toolName === "run_shell")!;
+  assert.equal(shell.display!.target!.value.text, command);
+  assert.equal(shell.display!.process!.exitCode, 3);
+  assert.equal(shell.display!.process!.stdout!.text, "actual out");
+  assert.equal(shell.display!.process!.stderr!.text, "actual err");
+  assert.equal(rows.some((row) => (row.detail as { phase?: string })?.phase === "blocked"), false);
+  await session.dispose();
 }));

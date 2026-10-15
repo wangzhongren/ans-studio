@@ -1,0 +1,18 @@
+{
+  "stage": "before UI-VISUAL-V2-1",
+  "files": {
+    "app/renderer/index.html": "859bdc3bf386426663a1e46a07274aed82778854122b8ae344fea8ae46bbf0d3",
+    "app/renderer/styles.css": "0115cceb178bcaca0d933f657750dda12a7a6b6e13d3cc3ed573c46a65323993",
+    "app/renderer/renderer.js": "394a7abb0af61fa3f7a5ee0652238e70883d17d798235c37954cdf41086a5252",
+    "app/renderer/tool-rows.js": "97b688e51ce098e95c7b7f71aec822dc5e2fe8c491672ccf2beb6fe4841e5f8f",
+    "app/renderer/runtime-ui.js": "47b136e300389ff3e3d3b67e3a5995f801dce9f3330b3520e8dbeffaabf87b26",
+    "app/renderer/role-status.js": "2daab2f108e3351f6143270f18d7f07dddeb48ae9408ba545fda6ffc5c7aeec5",
+    "test/桌面应用/tool-rows.test.ts": "09df08d330b5e09f03085aa35c7940fd6f5687456493d6ea62b5a1235bad4d01",
+    "test/桌面应用/runtime-ui.test.ts": "1123d3d9e700531a9e6cd5b6cfa166712406d4fa4b4d72af1cb04ffb6cd59397",
+    "test/桌面应用/renderer.test.ts": "59d1fdef738c14c59f7161c2d7378782cdaf643a805394b5e804beea4bb53ec8",
+    "test/桌面应用/markdown.test.ts": "936c9fd95530d0d39eda43a8ec73809a374d68cb6b3b9fa3b12f5858de4ea99e",
+    "test/桌面应用/e2e/uiux-v2.mjs": "e265a4accaa79574b2d0f5230ed80a54c42ee717261f8c0c1da63db5c0f6f205"
+  },
+  "prototype": "e95b363dfe4191f32a53d139de3b80d75a48b89362f886376ed49e3ad7b4ea4b",
+  "spec": "25474437047fdb864fcb401f8ff42b67bcf77cc534b98b37c44146cfa265c101"
+}

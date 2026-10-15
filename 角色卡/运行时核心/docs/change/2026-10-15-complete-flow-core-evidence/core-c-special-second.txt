@@ -1,0 +1,40 @@
+✔ actual bound mode, final source identity, idempotent safe report save and conflict are independent of model execution (23.802166ms)
+✔ source retry only saves the first frozen snapshot, duplicate clicks share one operation and disposal expires it (14.578208ms)
+✔ target stores safe text but Provider receives original model text and images; final receipt survives a new handle (28.0665ms)
+✔ ACK is not delivery: user failure has exact Provider count and history retry never invokes it (24.131ms)
+✔ ACK is not delivery: boundary failure has exact Provider count and history retry never invokes it (24.408958ms)
+✔ ACK is not delivery: index failure has exact Provider count and history retry never invokes it (31.155292ms)
+✔ partial replay is not silently repaired or replayed; later foreign records also block repair (16.707125ms)
+✔ disabled bound mode does not create directories; live-only views do not become durable report snapshots (0.912083ms)
+✔ live optional delivery identity is all-or-none and target-bound; disabled mode has real in-memory receipts without directories (0.788ms)
+✔ foreign later replay records block history repair without altering the replay or invoking Provider again (19.386791ms)
+✔ no final receipt cannot be reconstructed from boundary or nearby settled after reopening (22.555875ms)
+✖ 128 detailed receipt bound does not forget seen disabled attempts or re-execute one after eviction (6.059708ms)
+✔ 16MiB frozen recovery budget expires oldest failed source snapshots rather than keeping unbounded material (1556.305042ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 12
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1845.055
+
+✖ failing tests:
+
+test at test/runtime-core/report-provenance.test.ts:129:1
+✖ 128 detailed receipt bound does not forget seen disabled attempts or re-execute one after eviction (6.059708ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  'known' !== 'expired'
+  
+      at TestContext.<anonymous> (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/runtime-core/report-provenance.test.ts:134:41)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'known',
+    expected: 'expired',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

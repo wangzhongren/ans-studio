@@ -26,9 +26,13 @@ fs.mkdirSync(OUT,{recursive:true});app.setPath('userData',path.join(OUT,'user-da
 const ROOT='/nonexistent-independent-snapshot-key';
 const listing={projectRoot:ROOT,primaryRoleId:'A',hasRoles:true,warnings:[],roles:['A','B'].map(roleId=>({roleId,cardText:'# '+roleId,cardPath:'',boundaryPath:'',boundary:{entries:[]},changelog:null,docs:[]}))};
 let win;const report=[];
+const fixtureHistories=new Map();
 for(const [name,handler] of Object.entries({
  'app:recovery-state':()=>({projectRoot:ROOT,roleId:'A'}),'app:recovery-ready':()=>({ok:true}),
  'app:renderer-diagnostic':()=>({ok:true}),'window:is-maximized':()=>false,
+ 'runtime-config:get':(_e,input)=>({runtime:input.runtime,label:'Fixture engine',path:ROOT+'/.env',revision:0,application:'next-session',missingKeys:[],fields:[]}),
+ 'session:history-get':(_e,input)=>({...input,rows:(input.runtime||'pi')==='pi'?(fixtureHistories.get(input.roleId)||[]):[],error:null,skipped:0}),
+ 'session:live-views':()=>['A','B'].map(roleId=>({projectRoot:ROOT,roleId,runtime:'pi',profileRevision:0})),
  'app:list-project':()=>listing,'session:open':()=>({ok:true,resumed:true,contextSource:'resumed'}),
  'session:live':()=>['A','B'],'session:stop':()=>({ok:true}),'session:operator-response':()=>({ok:true}),
 }))ipcMain.handle(name,handler);
@@ -39,7 +43,7 @@ function parse(messages){const p=parseSessionJsonl([{type:'session'},...messages
 const call=(id,target)=>({role:'assistant',content:[{type:'toolCall',id,name:'read_file',arguments:{path:target}}]});
 const text=t=>({role:'assistant',content:[{type:'text',text:t}]});
 const longMessages=Array.from({length:180},(_,i)=>text('independent-row-'+i+' 阅读正文。'.repeat(10))).concat(Array.from({length:40},(_,i)=>call('ind-call-'+i,'ind-target-'+i+'.md')));
-async function history(roleId,rows){win.webContents.send('session:history',{roleId,projectRoot:ROOT,rows});await pause(100);}
+async function history(roleId,rows){fixtureHistories.set(roleId,rows);win.webContents.send('session:history',{roleId,projectRoot:ROOT,rows});await pause(100);}
 async function reading(){return js(`(()=>{const c=document.getElementById('chat'),top=c.getBoundingClientRect().top,bottom=c.getBoundingClientRect().bottom;const all=[...c.querySelectorAll('.tool-activity,.msg')];const n=all.find(e=>e.getBoundingClientRect().bottom>top&&e.getBoundingClientRect().top<bottom);return n?{text:n.textContent,offset:n.getBoundingClientRect().top-top}:null;})()`);}
 app.whenReady().then(async()=>{
  const watchdog=setTimeout(()=>{fs.writeFileSync(path.join(OUT,'watchdog.txt'),'timeout');app.exit(1);},30000);

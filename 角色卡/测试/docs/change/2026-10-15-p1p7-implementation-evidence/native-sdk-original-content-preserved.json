@@ -1,0 +1,10 @@
+{
+  "at": "2026-10-15T05:52:55.903Z",
+  "projectRoot": "/private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-p1p7-desktop-QWGoKc",
+  "coverage": "Actual online Pi native SDK journal compared with protected ANS/UI long-read result, not a global native-log redaction claim",
+  "nativeLongestXRun": 20480,
+  "nativeToolCallId": "call_03_BwvIm5oUhki1bOoRamll4727",
+  "executionSidecarAbsent": true,
+  "protectedDisplayBytes": 16384,
+  "originalProbeFileBytes": 20503
+}

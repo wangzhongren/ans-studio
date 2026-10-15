@@ -39,7 +39,6 @@ import {
 import { createCustomerInputChannel } from "./desktop/customer-input.ts";
 // 运行时历史：Pipeline 按 project/role/runtime 读 ANS 回放，转换为界面行。
 // 只有 Pi 无 ANS 回放时保留旧 JSONL 展示 fallback；历史不证明模型上下文恢复。
-import { getSessionHistory } from "./desktop/runtime-history.ts";
 import { RUNTIME_KINDS, type RuntimeKind } from "../src/common/shared/runtime-shared.ts";
 // Q-1（2026-10-12 客户「很多操作会阻碍主线程」）：热路径**合并推送**——事件按≈一帧窗口批量、角色状态快照去抖。
 import { createEventBatcher, createRoleStateDebouncer } from "./desktop/push-batcher.ts";
@@ -143,12 +142,12 @@ function desktopOperatorId(): string {
 }
 
 /** D-1：逐角色读取会话历史并推给渲染侧（**只读**；失败如实携带 error；无内容不推——不刷屏）。 */
-async function pushSessionHistories(win: BrowserWindow, projectRoot: string, roleIds: string[]): Promise<void> {
+async function pushSessionHistories(win: BrowserWindow, projectRoot: string, roleIds: string[], reader: DesktopInterface): Promise<void> {
   for (const roleId of roleIds) {
     for (const runtime of RUNTIME_KINDS) {
-      const payload = await getSessionHistory({ projectRoot, roleId, runtime });
+      const payload = await reader.getSessionHistory({ projectRoot, roleId, runtime });
       if (win.isDestroyed()) return;
-      if (payload.rows.length === 0 && payload.error === null) continue;
+      if (payload.rows.length === 0 && payload.error === null && !payload.reports?.length && !payload.reportErrors?.length) continue;
       win.webContents.send("session:history", payload);
     }
   }
@@ -289,6 +288,9 @@ function registerIpc(win: BrowserWindow): void {
     // L-1 + 状态准确性 + 右栏「待办 / 队列」（2026-10-12 追加）：真实状态快照（busy × 队列[结构化] × 进行中，
     // 变化时）原样透传渲染侧——徽标「工作中 · N 待办」、队列行与右栏待办组都只信它（同一通道，不造第二套）。
     // Q-1：**去抖合并**（同角色只推最新快照，≥100ms 一次）——不再是每事件一次 IPC。
+    emitPersistenceChange: update => {
+      if (!win.isDestroyed()) win.webContents.send(update.change.kind === 'report-save' ? 'report-persistence-updated' : 'delivery-history-updated', update);
+    },
     emitRoleState: (info) => {
       roleStateDebouncer.push(info);
     },
@@ -323,6 +325,7 @@ function registerIpc(win: BrowserWindow): void {
   });
   iface = desktop;
   win.on("closed", () => {
+    desktop.disposeProjectDocuments();
     void desktop.stopSession({ roleId: null }).catch((error) => mainDiagnostic.error("window.sessions.close.failed", error));
   });
 
@@ -333,6 +336,12 @@ function registerIpc(win: BrowserWindow): void {
   );
 
   registerHandler("app:pick-project", () => desktop.pickProject());
+  registerHandler("project:document-read", (_e, input) => desktop.readProjectDocument(input));
+  registerHandler("report:retry-save", (_e, input) => desktop.retryReportSave(input));
+  registerHandler("report:get-save-state", (_e, input) => desktop.getReportSaveState(input));
+  registerHandler("delivery:retry-history-save", (_e, input) => desktop.retryDeliveryHistorySave(input));
+  registerHandler("delivery:get-receipt", (_e, input) => desktop.getDeliveryReceipt(input));
+  registerHandler("session:get-persistence", (_e, input) => desktop.getSessionPersistence(input));
   // 导入/重载后按每个角色及 runtime 读取 ANS 回放，推带三元身份的 session:history。
   // 原生上下文是否恢复另由会话 handle 的实际动态状态报告。
   // 防御式：解析失败/目录缺失**不阻断导入**（失败如实提示，不崩、不静默）。
@@ -341,7 +350,7 @@ function registerIpc(win: BrowserWindow): void {
     if (recoveryProjectRoot !== res.projectRoot) recoveryRoleId = null;
     recoveryProjectRoot = res.projectRoot;
     const roles = Array.isArray(res && res.roles) ? res.roles.map((r) => r.roleId) : [];
-    void pushSessionHistories(win, res.projectRoot, roles);
+    void pushSessionHistories(win, res.projectRoot, roles, desktop);
     return res;
   });
   // 点角色即开：一次调用直接建立会话（导入项目即授权，无确认框）。

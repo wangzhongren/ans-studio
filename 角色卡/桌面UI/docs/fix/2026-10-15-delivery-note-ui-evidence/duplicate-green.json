@@ -1,0 +1,142 @@
+{
+  "electron": "44.7.0",
+  "node": "24.21.0",
+  "reports": [
+    {
+      "name": "one canonical lifecycle read_file",
+      "value": true
+    },
+    {
+      "name": "one canonical lifecycle write_file",
+      "value": true
+    },
+    {
+      "name": "one canonical lifecycle edit_file",
+      "value": true
+    },
+    {
+      "name": "one canonical lifecycle run_shell",
+      "value": true
+    },
+    {
+      "name": "one canonical lifecycle request_confirmation",
+      "value": true
+    },
+    {
+      "name": "one canonical lifecycle request_choice",
+      "value": true
+    },
+    {
+      "name": "one canonical lifecycle dispatch_task",
+      "value": true
+    },
+    {
+      "name": "one canonical lifecycle submit_report",
+      "value": true
+    },
+    {
+      "name": "one canonical lifecycle report_shell_verdict",
+      "value": true
+    },
+    {
+      "name": "typed input repeated live is single injected row",
+      "value": true
+    },
+    {
+      "name": "live then history input remains one",
+      "value": true
+    },
+    {
+      "name": "different actual turn retained and real assistant prefix not converted",
+      "value": true
+    },
+    {
+      "name": "full rebuild preserves uncovered second input and assistant",
+      "value": true
+    },
+    {
+      "name": "history first then typed live still one",
+      "value": true
+    },
+    {
+      "name": "blocked result and failure preserved without success downgrade",
+      "value": true
+    },
+    {
+      "name": "unknown legacy starts and true other call turn retained",
+      "value": true
+    },
+    {
+      "name": "card and lifecycle single tool-first",
+      "value": true
+    },
+    {
+      "name": "full rebuild retains original decided card tool-first",
+      "value": true
+    },
+    {
+      "name": "same title distinct call request retained tool-first",
+      "value": true
+    },
+    {
+      "name": "card and lifecycle single card-first",
+      "value": true
+    },
+    {
+      "name": "full rebuild retains original decided card card-first",
+      "value": true
+    },
+    {
+      "name": "same title distinct call request retained card-first",
+      "value": true
+    },
+    {
+      "name": "manual clientMessage ack consumes typed input without duplicate",
+      "value": true
+    },
+    {
+      "name": "normal tools live history share phase identities",
+      "value": true
+    },
+    {
+      "name": "duplicate sparse metadata retains original target",
+      "value": true
+    },
+    {
+      "name": "history same call start blocked result all retained",
+      "value": true
+    },
+    {
+      "name": "history then live phases still single lifecycle",
+      "value": true
+    },
+    {
+      "name": "same failed body different actual calls remain two failures",
+      "value": true
+    },
+    {
+      "name": "foreign role runtime identity never covers foreground",
+      "value": true
+    },
+    {
+      "name": "background role retains one canonical input",
+      "value": true
+    },
+    {
+      "name": "background Codex input retained in own view",
+      "value": true
+    },
+    {
+      "name": "canonical input and tool updates preserve virtual reader anchor",
+      "value": true,
+      "before": {
+        "text": "reader-110 原阅读段落保持。 原阅读段落保持。 原阅读段落保持。 原阅读段落保持。 原阅读段落保持。 原阅读段",
+        "offset": -22
+      },
+      "after": {
+        "text": "reader-110 原阅读段落保持。 原阅读段落保持。 原阅读段落保持。 原阅读段落保持。 原阅读段落保持。 原阅读段",
+        "offset": -22
+      }
+    }
+  ]
+}

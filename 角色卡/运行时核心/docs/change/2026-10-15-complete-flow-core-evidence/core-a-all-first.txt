@@ -1,0 +1,83 @@
+✔ pre-aborted public tools retain specific failure semantics and invoke no capability (0.638792ms)
+✔ abort during public capability waits keeps actual handler failure wording instead of generic cancellation (31.620375ms)
+✔ success received as cancellation arrives is still converted to the tool-specific failure (1.060209ms)
+✔ confirmation passes original cancellation context; late yes cannot issue next-turn write permission (23.50325ms)
+✔ choice callback receives the captured original signal/turn and legacy single-argument callbacks remain valid (3.085083ms)
+✔ Pi env 300s/310s values reach both actual Service timers and injected Provider options (9.408917ms)
+✔ Service explicit Pi timing overrides env, including the legacy disabled-timer values (0.38475ms)
+✔ Pi effective env parse matches legacy fallback/floor while explicit invalid values stay unchanged (0.315834ms)
+✔ other runtime defaults do not consume Pi env and Service gives their actual timers/provider the same default (0.50925ms)
+✔ native-only values are protected without a provider, retain real IDs/token and keep reader counts separate (14.74925ms)
+✔ raw title anchors and invalid dates are omitted; no turn/call or execution is inferred from body (0.34325ms)
+✔ return budget selects a continuous recent suffix, preserves order and reports omissions (74.151916ms)
+✔ reader failure and malformed bridge are distinct and cannot raw-fallback (0.413167ms)
+✔ actual turn has one synchronous acknowledgement before persisted input/native work and shares all identities (48.746709ms)
+✔ active and disposed prompt rejections have no turn acknowledgement (2.6305ms)
+✔ quarantined prompt rejection has no acknowledgement after one stopped actual turn (3.019458ms)
+✔ synchronous acknowledgement throw yields one failed terminal, zero native work, and releases the turn (0.341542ms)
+✔ acknowledged turns keep aborted/timed_out outcomes and single matching terminal (18.38125ms)
+✔ store: creation/read stay lazy; roles/runtimes never share index or replay (58.700583ms)
+✔ store: concurrent writes serialize; corrupt history fails honestly (33.52ms)
+✔ store: traversal, mismatched scope and symlinked runtime directories rejected (1.625833ms)
+✔ store: native validation stays lazy and native symlink is rejected before effects (3.241208ms)
+✔ Service history operation returns scoped Model records/replay through the existing Provider (51.077208ms)
+✔ each actual runtime turn publishes one typed original input before native work and retains real assistant text (52.823042ms)
+✔ input echo is absent for rejected or failed-start prompts; demo Core and standalone have one input producer (0.7195ms)
+✔ Service selects exactly chosen injected factory and executes real governed handler (1.257208ms)
+✔ Service failure never selects another engine and unknown runtime rejected (0.459916ms)
+✔ Service persists replay and adapter-confirmed deferred context result after prompt (9.472625ms)
+✔ customer wait pauses prompt deadline, abort invalidates late consent, next turn works (54.241667ms)
+✔ throw, native failed outcome and timeout each have one explicit terminal (16.521625ms)
+✔ corrupt ANS index is rejected before native bind allocates a session (4.517167ms)
+✔ transient persistence failure is reported and repaired next prompt can succeed (11.170333ms)
+✔ Service event top/detail identity and report metadata share the captured turn (0.694417ms)
+✔ hanging native abort is bounded, called once, and leaves the session quarantined (1004.281917ms)
+✔ Service configured custom API key is stripped from the actual governed shell child (21.883375ms)
+✔ outer timeout remains timed_out when abort cleanup emits inner aborted terminals (16.635125ms)
+✔ outer aborted result stays aborted while failing cleanup remains honestly reported (2.7825ms)
+✔ real fields survive projection; nonzero exit is not parsed from message, block is a separate fact (1.191084ms)
+✔ target selection is exactly the actual Core alias contract; custom names do not imply rules (0.109708ms)
+✔ native fallback only takes explicit text; native outcome wins and unsupported objects never serialize (0.114709ms)
+✔ profile capture is required, custom actual credentials are registered in memory and cannot rebind (0.244583ms)
+✔ known values and patterns are protected before truncation; IDs never pass through a redactor (7.652959ms)
+✖ UTF-8 and encoded JSON budgets use independent byte counts and survive a second projection (6.123917ms)
+✔ projection faults and oversize identity produce messages without fabricated business conclusions (18.550625ms)
+✔ control characters use a visible replacement independently of Unicode clipping (0.157333ms)
+✔ Model/schema: required write/edit fields, optionals, unknown names and injected capabilities (0.951333ms)
+✔ gate deny/throw and gate-triggered abort produce zero filesystem effects (7.326667ms)
+✔ real write/edit preserves UTF-8 BOM/CRLF and rejects missing match or symlink escape (26.185375ms)
+✔ pre-aborted edit and capability handlers never run or mutate (1.324417ms)
+✔ shell gate deny/throw/timeout have no effects; explicit allow runs argv without shell (34.19775ms)
+✔ abort running shell kills child before delayed write and returns failure (725.771708ms)
+✔ customer decline/abort and failed handbacks are honest; report/dispatch carry captured turn (5.42375ms)
+ℹ tests 52
+ℹ suites 0
+ℹ pass 51
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1367.578667
+
+✖ failing tests:
+
+test at test/runtime-core/tool-display.test.ts:52:1
+✖ UTF-8 and encoded JSON budgets use independent byte counts and survive a second projection (6.123917ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(Buffer.byteLength(JSON.stringify(d))<=57344)
+  
+      at TestContext.<anonymous> (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/runtime-core/tool-display.test.ts:57:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

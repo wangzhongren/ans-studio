@@ -1,3 +1,5 @@
+import { RuntimeDeliveryError } from "../../src/model/runtime.ts";
+import type { SessionEvent, RuntimeTurnOutcome, RuntimePersistenceChangeV1, ReportSaveResultV1, ReportSaveStateV1, DeliverySaveResultV1, DeliveryReceiptQueryV1, RuntimeDeliveryReceiptV1, RuntimeReportSnapshotV1, RuntimeLiveReportViewV1, RuntimeInputProvenanceV1, RuntimeLiveHandbackPresentationV1 } from "../../src/model/runtime.ts";
 // app/desktop/session.ts
 // 桌面应用的「会话」装配（纯逻辑，不依赖 electron，可在 node 下单测）。
 //
@@ -50,13 +52,13 @@ import type { ProjectConfig } from "../../src/model/role.ts";
 // O-1（2026-10-12）：边界快照的**可信信号** = 读盘内容哈希（sha256）——本层只读、不复制门禁解析。
 import fs from "node:fs";
 import path from "node:path";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { RoleSessionHandle, RoleSessionAbortResult, RoleSessionSendOptions } from "../../src/pipeline/orchestration/run-role.ts";
 import { createRuntimeAdapterFactory, type RuntimeAdapterFactoryBuilder, type RuntimeAdapterFactoryOptions, type RuntimeAdapterFactory } from "../../src/pipeline/orchestration/run-role.ts";
 // 会话事件流的类型：编排把 `RoleSessionHandle.events()` 放宽为 `OrchestrationEvent`（既有 `SessionEvent`
 // + 编排在 `settled` 时追加的 `handback` 回交事件，设计 §10.8）。**类型从编排的模块只读导入、不复制形状**
 // （单一来源：`src/common/编排/handback.ts`，也是 `run-role.ts` 导入它的位置）。
-import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
+import type { OrchestrationEvent, HandbackEvent } from "../../src/common/编排/handback.ts";
 // E-1（2026-10-12）：「回交后的 su 验收」的两件**单一来源**（编排提供，只读导入、不复制）——
 // `renderHandbackPrompt`（投递给 su 的输入文案）与 `handbackKey`（去重键）。**两前端共用、不得各写一份**。
 import { renderHandbackPrompt, renderHandbackBatchPrompt, handbackKey, type TaskHandback } from "../../src/common/编排/handback.ts";
@@ -96,15 +98,21 @@ export type { RuntimeKind };
 
 /**
  * 会话事件外推的**信封**（B-2，2026-10-12）：多会话并存后，事件必须携带**它属于哪个角色**
- * （渲染侧按 projectRoot/runtime/roleId 分发——不带标识会串消息）。`event` 的类型从编排只读导入、不复制。
+ * （渲染侧按 projectRoot/runtime/roleId 分发——不带标识会串消息）。源报告只保留公开安全投影，raw handback不进入此传输类型。
  */
+export type DesktopOrchestrationEvent = SessionEvent | Omit<HandbackEvent, 'handback'>;
+export type PersistenceScope = { projectRoot: string; roleId: string; runtime: RuntimeKind };
+export type PersistenceReply<T> = { ok: true; version: 1; scope: PersistenceScope; value: T } | { ok: false; version: 1; scope?: PersistenceScope; code: 'INVALID_REQUEST' | 'PROJECT_NOT_ACTIVE' | 'SESSION_NOT_AVAILABLE' | 'SNAPSHOT_EXPIRED' | 'UNSUPPORTED'; message: string };
+export type PersistenceCapabilities = { mode: 'enabled' | 'disabled' | 'unknown-live'; reportSaveSupported: boolean; deliveryHistorySaveSupported: boolean; querySupported: boolean };
+export interface PersistenceValues { retryReportSave: ReportSaveResultV1; getReportSaveState: ReportSaveStateV1; retryDeliveryHistorySave: DeliverySaveResultV1; getDeliveryReceipt: DeliveryReceiptQueryV1; getSessionPersistence: PersistenceCapabilities }
+export type PersistenceUpdated = { version: 1; scope: PersistenceScope; change: RuntimePersistenceChangeV1 };
 export interface SessionEventEnvelope {
   /** Display correlation only, captured from the original client delivery. */
   clientMessageId?: string;
   roleId: string;
   projectRoot: string;
   runtime: RuntimeKind;
-  event: OrchestrationEvent;
+  event: DesktopOrchestrationEvent;
 }
 
 /**
@@ -163,6 +171,13 @@ export interface OpenResult {
 
 export interface SendResult {
   ok: boolean;
+  /** Observed facts for this exact invocation. ACK is not input acceptance. */
+  turnId?: string;
+  clientMessageId?: string;
+  inputAccepted?: true;
+  outcome?: RuntimeTurnOutcome;
+  /** Original handle is still current, not a promise that provider cleanup has finished. */
+  sessionCurrent?: boolean;
   error?: string;
   /** L-1：本次消息**已入队**（角色忙）——按到达序在当前任务结束后执行；`position` 为排队位次（1 起）。 */
   queued?: boolean;
@@ -243,6 +258,7 @@ export interface SessionManagerDeps {
    * `handback` 回交事件，设计 §10.8）——**类型从编排导入，不在此另立一份**。
    */
   emitEvent: (envelope: SessionEventEnvelope) => void;
+  emitPersistenceChange?: (update: PersistenceUpdated) => void;
   /**
    * **队列变化外推**（L-1 可见性）：某角色队列的**摘要快照**——主进程据此推渲染侧（该角色的队列行 +
    * 左树「N 待办」徽标）。**只在变化时**发；空数组＝清空显示。缺省 ⇒ 界面无队列行（不影响入队本身）。
@@ -309,12 +325,15 @@ export interface SessionManagerDeps {
 
 /** 一个**保活**中的角色会话（B-2：每角色一个句柄 + LRU）。 */
 interface DeliveryOrigin {
+  inputAccepted?: true;
+  outcome?: RuntimeTurnOutcome;
   clientMessageId?: string;
   turnId?: string;
   settled: boolean;
 }
 
 interface LiveSession {
+  unsubscribePersistence?: () => void;
   readonly origins: { byTurn: Map<string, DeliveryOrigin>; running?: DeliveryOrigin };
   readonly roleId: string;
   readonly runtime: RuntimeKind;
@@ -339,6 +358,12 @@ interface LiveSession {
 
 /** 一次**系统投递**（E-1 回交投 su / H-1 派发投目标角色 / L-1 客户消息）——投递机的队列条目（**一套机，多调用方**）。 */
 interface DeliveryItem {
+  report?: RuntimeReportSnapshotV1;
+  liveReport?: RuntimeLiveReportViewV1;
+  liveDurability?: 'memory-only' | 'unknown-live';
+  deliveryId?: string;
+  safeText?: string;
+  attemptId?: string;
   clientMessageId?: string;
   runtime: RuntimeKind;
   kind: "handback" | "dispatch" | "message";
@@ -440,6 +465,11 @@ export class SessionManager {
    * 该条如实标注「进行中」（**排队 ≠ 已执行**；直接 send 开跑的一轮不入本表——它不是队列条目）。
    */
   private readonly activeDeliveries = new Map<string, DeliveryItem>();
+  private readonly reportStates = new Map<string, { owner?: LiveSession; event?: HandbackEvent; state?: ReportSaveStateV1; queued: boolean }>();
+  private readonly attemptStates = new Map<string, { owner?: LiveSession; receipt: RuntimeDeliveryReceiptV1 }>();
+  private readonly knownReports = new Set<string>();
+  private readonly knownAttempts = new Set<string>();
+  private readonly persistenceInFlight = new Map<string, Promise<unknown>>();
   /** 回交去重键（`handbackKey` 单一来源；`projectRoot\0<key>`）——**一条回交只投递一次**（永不放行重投）。 */
   private readonly enqueuedHandbackKeys = new Set<string>();
   /**
@@ -520,6 +550,16 @@ export class SessionManager {
     await entry.handle.send(text, promptOptions);
   }
 
+  private sendFacts(entry: LiveSession, origin: DeliveryOrigin): Pick<SendResult, 'turnId' | 'clientMessageId' | 'inputAccepted' | 'outcome' | 'sessionCurrent'> {
+    return {
+      ...(origin.turnId !== undefined ? { turnId: origin.turnId } : {}),
+      ...(origin.clientMessageId !== undefined ? { clientMessageId: origin.clientMessageId } : {}),
+      ...(origin.inputAccepted ? { inputAccepted: true } : {}),
+      ...(origin.outcome !== undefined ? { outcome: origin.outcome } : {}),
+      sessionCurrent: this.sessions.get(this.sessionKey(entry.projectRoot, entry.roleId, entry.runtime)) === entry,
+    };
+  }
+
   private trimDeliveryOrigins(entry: LiveSession): void {
     if (entry.origins.byTurn.size <= 128) return;
     for (const [turnId, origin] of entry.origins.byTurn) {
@@ -548,6 +588,22 @@ export class SessionManager {
    *  但忙态翻假」的根因一类）。已被替换 ⇒ 本调用 no-op（新条目的处置归它自己的路径）。 */
   private async disposeEntry(roleId: string, entry: LiveSession): Promise<string | null> {
     if (this.sessions.get(roleId) !== entry) return null; // TOCTOU 防误删（见方法注释）
+    try { entry.unsubscribePersistence?.(); } catch { /* closing a presenter cannot retain a stale handle */ }
+    for (const [key, state] of this.reportStates) if (state.owner === entry) {
+      if (state.state?.retryAvailable) {
+        const reportId = key.slice(key.lastIndexOf('\0') + 1);
+        state.state = { state: 'expired', reportId, code: 'SNAPSHOT_EXPIRED', retryAvailable: false };
+        try { this.deps.emitPersistenceChange?.({ version: 1, scope: this.persistenceScope(entry), change: { kind: 'report-save', scope: { roleId: entry.roleId, runtime: entry.runtime }, reportId, state: state.state } }); } catch { /* display observers do not prevent disposal */ }
+      }
+      state.owner = undefined; state.event = undefined;
+    }
+    for (const state of this.attemptStates.values()) if (state.owner === entry) {
+      if (state.receipt.retryHistoryAvailable) {
+        state.receipt = { ...state.receipt, retryHistoryAvailable: false };
+        try { this.deps.emitPersistenceChange?.({ version: 1, scope: this.persistenceScope(entry), change: { kind: 'delivery-history-save', scope: { roleId: entry.roleId, runtime: entry.runtime }, attemptId: state.receipt.attemptId, state: 'expired', receipt: state.receipt, retryAvailable: false, code: 'SNAPSHOT_EXPIRED' } }); } catch { /* display observers do not prevent disposal */ }
+      }
+      state.owner = undefined;
+    }
     this.sessions.delete(roleId);
     if (this.activeRoleId === roleId) this.activeRoleId = null;
     this.activeDeliveries.delete(this.queueKey(entry.projectRoot, entry.roleId, entry.runtime)); // 会话没了，「进行中」不再成立
@@ -928,6 +984,12 @@ export class SessionManager {
       boundaryPrints,
     };
     this.sessions.set(key, entry);
+    entry.unsubscribePersistence = entry.handle.onPersistenceChange?.(change => {
+      if (this.sessions.get(key) !== entry || change.scope.roleId !== entry.roleId || change.scope.runtime !== entry.runtime) return;
+      if (change.kind === 'report-save') this.mergeReportState(entry, undefined, change.state, change.reportId);
+      else if (change.receipt) this.rememberReceipt(entry, change.receipt);
+      this.deps.emitPersistenceChange?.({ version: 1, scope: this.persistenceScope(entry), change });
+    });
     if (userInitiated && this.selectionVersion === selectionVersion) this.activeRoleId = key; // 后台自动开启不抢活动角色
     // 状态准确性 / L-1：开好即外推**真实状态快照**（busy=false + 该角色既有队列摘要）——徽标/队列行据此准确。
     this.notifyRoleState(req.projectRoot, req.roleId, req.runtime);
@@ -953,7 +1015,15 @@ export class SessionManager {
         for await (const ev of handle.events()) {
           if (this.sessions.get(key) !== entry) break;
           const origin = this.captureDeliveryOrigin(entry, ev);
-          const envelope: SessionEventEnvelope = { roleId, projectRoot, runtime, event: ev };
+          if (origin && ev.kind === 'message') {
+            const detail = ev.detail as { source?: unknown; text?: unknown } | undefined;
+            if (detail?.source === 'prompt-input' && typeof detail.text === 'string') origin.inputAccepted = true;
+          }
+          if (origin && ev.kind === 'settled') {
+            const outcome = (ev.detail as { outcome?: unknown } | undefined)?.outcome;
+            if (outcome === 'completed' || outcome === 'failed' || outcome === 'aborted' || outcome === 'timed_out') origin.outcome ??= outcome;
+          }
+          const envelope: SessionEventEnvelope = { roleId, projectRoot, runtime, event: ev.kind === 'handback' ? this.displayHandback(ev) : ev };
           if (ev.kind !== "handback" && typeof ev.turnId === "string" && ev.turnId !== "" && origin?.clientMessageId !== undefined) {
             envelope.clientMessageId = origin.clientMessageId;
           }
@@ -982,7 +1052,17 @@ export class SessionManager {
           }
           // E-1：回交到达 ⇒ 自动投递交 su 验收（去重 + 排队 + 失败如实/保留；见 handleHandback）。
           if (ev.kind === "handback") {
-            void this.handleHandback(projectRoot, runtime, ev.handback);
+            this.mergeReportState(entry, ev);
+          }
+          if (ev.kind === 'message') {
+            const detail = ev.detail as { source?: string; text?: string; inputProvenance?: RuntimeInputProvenanceV1; inputPresentation?: RuntimeLiveHandbackPresentationV1; receipt?: RuntimeDeliveryReceiptV1 } | undefined;
+            if (detail?.source === 'prompt-input' && (detail.inputProvenance || detail.inputPresentation)) {
+              const attemptId = detail.inputProvenance?.attemptId ?? detail.inputPresentation?.attemptId;
+              const active = this.activeDeliveries.get(this.queueKey(projectRoot, roleId, runtime));
+              if (active && attemptId === active.attemptId) active.safeText = detail.text;
+            }
+            if (detail?.source === 'delivery-receipt' && detail.receipt) this.rememberReceipt(entry, detail.receipt);
+            if (detail?.source === 'delivery-boundary' || detail?.source === 'delivery-receipt') envelope.event = { ...ev, summary: '投递历史状态' };
           }
           try {
             this.deps.emitEvent(envelope);
@@ -1075,7 +1155,7 @@ export class SessionManager {
       await this.sendDelivery(entry, origin, text, opts);
       this.notifyRoleState(entry.projectRoot, entry.roleId, entry.runtime); // 状态准确性：真开跑即外推「工作中」（繁忙与否以会话条目为准）
       diagnostic.record("session.send.end", { ok: true });
-      return { ok: true };
+      return { ok: true, ...this.sendFacts(entry, origin) };
     } catch (err) {
       diagnostic.error("session.send.failed", err);
       const ownsRunningDelivery = entry.origins.running === origin;
@@ -1085,7 +1165,7 @@ export class SessionManager {
         entry.busy = false;
       }
       this.notifyRoleState(entry.projectRoot, entry.roleId, entry.runtime);
-      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+      return { ok: false, error: err instanceof Error ? err.message : String(err), ...this.sendFacts(entry, origin) };
     }
   }
 
@@ -1190,7 +1270,7 @@ export class SessionManager {
   /** 投递进展的**系统行**（首选进目标/请求者的 pane；首选未知时退回兜底角色）——如实、不静默。 */
   private emitDeliveryNote(projectRoot: string, runtime: RuntimeKind, preferredRoleId: string | null, fallbackRoleId: string, summary: string): void {
     const roleId = preferredRoleId !== null && preferredRoleId !== "" ? preferredRoleId : fallbackRoleId;
-    this.deps.emitEvent({ roleId, projectRoot, runtime, event: { kind: "tool_call", summary } });
+    this.deps.emitEvent({ roleId, projectRoot, runtime, event: { kind: "message", summary, detail: { source: "delivery-note" } } });
   }
 
   /** 队列键：项目 × 目标角色（一套机对多个目标；空目标=主入口暂未枚举到——每次尝试时重解析）。 */
@@ -1264,7 +1344,7 @@ export class SessionManager {
     const entry = this.sessions.get(this.sessionKey(projectRoot, targetRoleId, runtime));
     const busy = entry?.busy === true;
     const running = this.activeDeliveries.get(this.queueKey(projectRoot, targetRoleId, runtime));
-    const view = (i: DeliveryItem) => ({ runtime: i.runtime, kind: i.kind, sourceRoleId: i.sourceRoleId, summary: i.summary, at: i.enqueuedAt, id: i.dedupKey, full: i.text });
+    const view = (i: DeliveryItem) => ({ runtime: i.runtime, kind: i.kind, sourceRoleId: i.sourceRoleId, summary: i.summary, at: i.enqueuedAt, id: i.dedupKey, full: i.kind === "handback" ? i.safeText ?? "交接内容（安全显示副本）：等待生成" : i.text });
     let contextInfo: Pick<OpenResult, "contextSource" | "contextWarning"> = {};
     if (entry) contextInfo = this.contextInfo(entry.handle);
     this.deps.emitRoleState?.({
@@ -1277,11 +1357,92 @@ export class SessionManager {
     });
   }
 
+  private persistenceScope(entry: LiveSession): PersistenceScope { return { projectRoot: entry.projectRoot, roleId: entry.roleId, runtime: entry.runtime }; }
+  private persistenceKey(scope: PersistenceScope, id: string): string { return `${scope.projectRoot}\0${scope.roleId}\0${scope.runtime}\0${id}`; }
+  private displayHandback(event: HandbackEvent): DesktopOrchestrationEvent {
+    const { handback: _internal, ...safe } = event;
+    return { kind: 'handback', summary: event.report || event.liveReport ? safe.summary : '回交已收到（旧来源，安全详情未提供）', ...(safe.report ? { report: safe.report } : {}), ...(safe.liveReport ? { liveReport: safe.liveReport } : {}), ...(safe.reportPersistence ? { reportPersistence: safe.reportPersistence } : {}) };
+  }
+  private mergeReportState(entry: LiveSession, event?: HandbackEvent, update?: ReportSaveStateV1, updatedId?: string): void {
+    const id = updatedId ?? event?.reportPersistence?.reportId ?? event?.report?.reportId;
+    if (!id) {
+      const state = event?.reportPersistence?.state;
+      const liveCompatible = state === 'disabled' || state === 'unknown-live' || state === undefined && entry.handle.persistenceMode !== 'enabled';
+      if (event && liveCompatible) void this.handleHandback(entry.projectRoot, entry.runtime, event.handback, undefined, event.liveReport, state === 'unknown-live' ? 'unknown-live' : state === 'disabled' || entry.handle.persistenceMode === 'disabled' ? 'memory-only' : 'unknown-live');
+      return;
+    }
+    const key = this.persistenceKey(this.persistenceScope(entry), id);
+    this.knownReports.add(key);
+    const record = this.reportStates.get(key) ?? { owner: entry, queued: false };
+    if (record.owner !== entry && record.owner !== undefined) return;
+    record.owner = entry;
+    if (event) record.event = structuredClone(event);
+    if (update && (record.state?.state !== 'saved' || update.state === 'saved' || update.state === 'expired')) record.state = structuredClone(update);
+    else if (!update && event?.reportPersistence && (!record.state || event.reportPersistence.state === 'saved')) record.state = { state: event.reportPersistence.state === 'unknown-live' ? 'unsupported' : event.reportPersistence.state, reportId: id, ...(event.report ? { report: event.report } : {}), retryAvailable: event.reportPersistence.retryAvailable, ...(event.reportPersistence.code ? { code: event.reportPersistence.code } : {}) };
+    if (record.state?.state === 'saved' && !record.state.report && event?.report) record.state = { ...record.state, report: event.report };
+    if (record.state?.state === 'expired') record.event = undefined;
+    this.reportStates.set(key, record);
+    if (record.event && record.state?.state === 'saved' && record.state.report && !record.queued) {
+      record.queued = true; // synchronous once gate, before handleHandback's first await
+      void this.handleHandback(entry.projectRoot, entry.runtime, record.event.handback, record.state.report, record.event.liveReport);
+    }
+  }
+  private rememberReceipt(entry: LiveSession, receipt: RuntimeDeliveryReceiptV1): void {
+    const key = this.persistenceKey(this.persistenceScope(entry), receipt.attemptId);
+    this.knownAttempts.add(key); this.attemptStates.set(key, { owner: entry, receipt });
+  }
+  registerPersistenceHistory(history: import('./runtime-history.ts').SessionHistoryView): void {
+    const scope = { projectRoot: history.projectRoot, roleId: history.roleId, runtime: history.runtime };
+    for (const report of history.reports ?? []) this.knownReports.add(this.persistenceKey(scope, report.reportId));
+    for (const row of history.rows) {
+      const id = row.deliveryReceipt?.attemptId ?? row.deliveryBoundary?.attemptId ?? row.inputProvenance?.attemptId;
+      if (id) this.knownAttempts.add(this.persistenceKey(scope, id));
+    }
+  }
+  async persistenceOperation<K extends keyof PersistenceValues>(scope: PersistenceScope, operation: K, id?: string): Promise<PersistenceReply<PersistenceValues[K]>> {
+    const entry = this.sessions.get(this.sessionKey(scope.projectRoot, scope.roleId, scope.runtime));
+    const failed = (code: 'SESSION_NOT_AVAILABLE' | 'SNAPSHOT_EXPIRED' | 'UNSUPPORTED'): PersistenceReply<PersistenceValues[K]> => ({ ok: false, version: 1, scope, code, message: code === 'SNAPSHOT_EXPIRED' ? '原保存材料已失效。' : '当前会话不支持此保存操作。' });
+    if (!entry) {
+      const key = id ? this.persistenceKey(scope, id) : undefined;
+      const known = key && (operation === 'retryReportSave' || operation === 'getReportSaveState' ? this.knownReports.has(key) : this.knownAttempts.has(key));
+      return failed(known ? 'SNAPSHOT_EXPIRED' : 'SESSION_NOT_AVAILABLE');
+    }
+    const mode = entry.handle.persistenceMode ?? 'unknown-live';
+    if (operation === 'getSessionPersistence') return { ok: true, version: 1, scope, value: { mode, reportSaveSupported: mode !== 'unknown-live' && !!entry.handle.retryReportPersistence, deliveryHistorySaveSupported: mode !== 'unknown-live' && !!entry.handle.retryDeliveryHistoryPersistence, querySupported: mode !== 'unknown-live' && !!entry.handle.getReportPersistence && !!entry.handle.getDeliveryReceipt } as PersistenceValues[K] };
+    const key = this.persistenceKey(scope, id!);
+    const source = operation === 'retryReportSave' || operation === 'getReportSaveState';
+    if (!(source ? this.knownReports : this.knownAttempts).has(key)) return failed('SNAPSHOT_EXPIRED');
+    if (mode === 'unknown-live') return failed('UNSUPPORTED');
+    if (operation === 'retryReportSave' && this.reportStates.get(key)?.owner !== entry || operation === 'retryDeliveryHistorySave' && this.attemptStates.get(key)?.owner !== entry) return failed('SNAPSHOT_EXPIRED');
+    const isRetry = operation === 'retryReportSave' || operation === 'retryDeliveryHistorySave';
+    const work = async () => {
+      let value: ReportSaveResultV1 | ReportSaveStateV1 | DeliverySaveResultV1 | DeliveryReceiptQueryV1 | undefined;
+      if (operation === 'retryReportSave') value = await entry.handle.retryReportPersistence?.(id!);
+      else if (operation === 'getReportSaveState') value = await entry.handle.getReportPersistence?.(id!);
+      else if (operation === 'retryDeliveryHistorySave') value = await entry.handle.retryDeliveryHistoryPersistence?.(id!);
+      else value = await entry.handle.getDeliveryReceipt?.(id!);
+      if (this.sessions.get(this.sessionKey(scope.projectRoot, scope.roleId, scope.runtime)) !== entry) return failed('SNAPSHOT_EXPIRED');
+      if (!value) return failed('UNSUPPORTED');
+      if (operation === 'retryReportSave') {
+        const result = value as ReportSaveResultV1;
+        const state: ReportSaveStateV1 = result.ok ? { state: 'saved', reportId: result.report.reportId, report: result.report, retryAvailable: false } : { state: result.state, reportId: result.reportId ?? id, report: result.report, code: result.code, retryAvailable: result.retryAvailable };
+        this.mergeReportState(entry, undefined, state, id);
+      }
+      if (operation === 'retryDeliveryHistorySave') { const receipt = (value as DeliverySaveResultV1).receipt; if (receipt) this.rememberReceipt(entry, receipt); }
+      return { ok: true, version: 1, scope, value: value as PersistenceValues[K] } as PersistenceReply<PersistenceValues[K]>;
+    };
+    if (!isRetry) return work().catch(() => failed("UNSUPPORTED"));
+    const inflightKey = operation + '\0' + key;
+    const existing = this.persistenceInFlight.get(inflightKey); if (existing) return existing as Promise<PersistenceReply<PersistenceValues[K]>>;
+    const promise = work().catch(() => failed("UNSUPPORTED")).finally(() => { if (this.persistenceInFlight.get(inflightKey) === promise) this.persistenceInFlight.delete(inflightKey); });
+    this.persistenceInFlight.set(inflightKey, promise); return promise;
+  }
+
   /** 回交到达（E-1）：**去重登记**（`handbackKey` 单一来源——一条回交只投递一次）→ 入队 → 尝试投递。
    *  **真机崩溃修复（2026-10-12）**：本函数经 `void` fire-and-forget 调用（consume 的事件循环），**任何上抛
    *  都会变成未捕获拒绝**——故：(1) 形状防御（缺 `handback` 载荷 / 缺 `roleId`）先拦；(2) `renderHandbackPrompt`
    *  渲染包 try/catch（坏形状绝不喂给它）；(3) 整体再包一层 catch——一切都落**如实系统行**，绝不上抛。 */
-  private async handleHandback(projectRoot: string, runtime: RuntimeKind, hb: TaskHandback): Promise<void> {
+  private async handleHandback(projectRoot: string, runtime: RuntimeKind, hb: TaskHandback, report?: RuntimeReportSnapshotV1, liveReport?: RuntimeLiveReportViewV1, liveDurability?: 'memory-only' | 'unknown-live'): Promise<void> {
     const diagnostic = createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId: hb?.roleId });
     diagnostic.record("report.received", { outcome: hb?.status });
     try {
@@ -1293,6 +1454,9 @@ export class SessionManager {
         );
         return;
       }
+      hb = structuredClone(hb);
+      if (report) report = structuredClone(report);
+      if (liveReport) liveReport = structuredClone(liveReport);
       const suRoleId = this.suRoleIdOf(projectRoot);
       if (suRoleId !== null && hb.roleId === suRoleId) return; // su 不自我回交（编排也不发；防御）
       const key = `${projectRoot}\u0000${runtime}\u0000${handbackKey(hb)}`;
@@ -1323,6 +1487,8 @@ export class SessionManager {
         summary: `回交投递 · 来自 ${hb.roleId}`,
         dedupKey: key,
         handback: hb,
+        ...(report ? { report } : {}),
+        ...(liveReport ? { liveReport, liveDurability } : {}),
       });
       diagnostic.record("report.enqueued");
       await this.drainQueue(projectRoot, suRoleId, runtime);
@@ -1523,7 +1689,7 @@ export class SessionManager {
 
     // 仅 su 队首连续回交合批；客户消息/派发是屏障，正文仍由编排唯一生成。
     let batchCount = 1;
-    if (resolvedTarget === this.suRoleIdOf(projectRoot) && item.kind === "handback" && item.handback) {
+    if (resolvedTarget === this.suRoleIdOf(projectRoot) && item.kind === "handback" && item.handback && !item.deliveryId) {
       while (batchCount < q.length && q[batchCount].kind === "handback" && q[batchCount].handback) batchCount += 1;
     }
     let text = item.text;
@@ -1532,8 +1698,9 @@ export class SessionManager {
       text = renderHandbackBatchPrompt(q.slice(0, batchCount).map((queued) => queued.handback as TaskHandback));
       summary = `回交批次 · ${batchCount} 份报告 · 来自 ${q.slice(0, batchCount).map((queued) => queued.sourceRoleId).join("、")}`;
     }
-    const sentItems = q.splice(0, batchCount);
-    const sent: DeliveryItem = { ...sentItems[0], text, summary, batchItems: sentItems };
+    const removedItems = q.splice(0, batchCount);
+    const sentItems = item.deliveryId && item.batchItems ? [...item.batchItems] : removedItems;
+    const sent: DeliveryItem = item.deliveryId ? item : { ...sentItems[0], text, summary, batchItems: sentItems, ...(item.kind === 'handback' ? { deliveryId: randomUUID() } : {}) };
     if (q.length === 0) this.deliveryQueues.delete(key);
     this.notifyRoleState(projectRoot, resolvedTarget, runtime); // L-1：出队即外推（队列行/徽标随之更新）
     // 形状防御（真机崩溃修复的姊妹项）：条目坏了就**不投**——如实一行，绝不把 undefined 喂给 send。
@@ -1554,7 +1721,23 @@ export class SessionManager {
     this.notifyRoleState(projectRoot, resolvedTarget, runtime); // 状态准确性：投递开跑即外推「工作中」（shift 时快照尚为闲）
     try {
       // P0-1：入队定格载荷与真实条目来源一起投递；图片数组保持原引用。
-      await this.sendDelivery(entry, origin, sent.text, sent.opts, sent.kind === "dispatch");
+      let sendOptions = sent.opts;
+      if (sent.kind === 'handback') {
+        const members = sent.batchItems ?? [sent];
+        const snapshots = members.map(m => m.report);
+        const liveViews = members.map(m => m.liveReport ?? (m.report ? { source: m.report.source, taskId: m.report.taskId, origin: m.report.origin, status: m.report.status, summary: m.report.summary, evidence: m.report.evidence, evidenceOmitted: m.report.evidenceOmitted, at: m.report.at } : undefined));
+        if (snapshots.every((r): r is RuntimeReportSnapshotV1 => !!r) || liveViews.every((r): r is RuntimeLiveReportViewV1 => !!r)) {
+          sent.attemptId = randomUUID();
+          const identity = { deliveryId: sent.deliveryId!, attemptId: sent.attemptId, target: { roleId: resolvedTarget, runtime } };
+          sendOptions = { ...sent.opts,
+            ...(snapshots.every((r): r is RuntimeReportSnapshotV1 => !!r) ? { inputProvenance: { version: 1, kind: 'handback', ...identity, reports: snapshots } as RuntimeInputProvenanceV1 } : { inputPresentation: { version: 1, kind: 'handback-live', durability: members.some(m => m.liveDurability === 'unknown-live') ? 'unknown-live' : 'memory-only', ...identity, reports: liveViews } as RuntimeLiveHandbackPresentationV1 }),
+            onDeliveryProgress: progress => {
+              if (this.sessions.get(key) === entry) this.rememberReceipt(entry!, progress.receipt);
+              sent.opts?.onDeliveryProgress?.(progress);
+            } };
+        }
+      }
+      await this.sendDelivery(entry, origin, sent.text, sendOptions, sent.kind === "dispatch");
       diagnostic.record("delivery.end", { ok: true, count: batchCount, state: sent.kind });
       this.notifyRoleState(projectRoot, resolvedTarget, runtime); // 立即外推（running 行即时可见）
       if (sent.kind === "dispatch") this.activeDispatchKeys.delete(sent.dedupKey); // 送达即释放窗口去重（返工可再派）
@@ -1568,26 +1751,34 @@ export class SessionManager {
       // message 类（排队后的客户消息投递）：**不加额外文案**——消息本体随会话事件出现（真实 pi 的
       // 「用户指令：」回显走注入样式行），此前误落进派发分支（「已接收…派发任务」对消息是错口径，已修）。
     } catch (err) {
-      diagnostic.error("delivery.failed", err, { count: batchCount, state: sent.kind });
+      if (sent.kind === 'handback') diagnostic.record('delivery.failed', { count: batchCount, state: sent.kind });
+      else diagnostic.error("delivery.failed", err, { count: batchCount, state: sent.kind });
+      const receipt = err instanceof RuntimeDeliveryError ? err.receipt : sent.attemptId ? this.attemptStates.get(this.persistenceKey(this.persistenceScope(entry), sent.attemptId))?.receipt : undefined;
+      if (receipt) this.rememberReceipt(entry, receipt);
+      const cAttempt = sent.kind === 'handback' && !!sent.attemptId;
+      const canRetry = !cAttempt || !!receipt && !receipt.providerMayHaveStarted && receipt.retryDeliveryAllowed;
+      const mayBeActive = cAttempt && (!receipt || receipt.providerMayHaveStarted);
       const ownsRunningDelivery = entry.origins.running === origin;
-      this.failDeliveryOrigin(entry, origin);
+      if (!mayBeActive) this.failDeliveryOrigin(entry, origin);
       // 投递失败：**如实提示 + 放回队首**（保持顺序）待重试——绝不静默丢。
       const en = this.sessions.get(this.sessionKey(projectRoot, resolvedTarget, runtime));
-      if (en === entry && ownsRunningDelivery) {
+      if (en === entry && ownsRunningDelivery && !mayBeActive) {
         en.interactionState.turn.abort();
         en.busy = false;
       }
-      if (this.activeDeliveries.get(key) === sent) this.activeDeliveries.delete(key);
+      if (this.activeDeliveries.get(key) === sent && !mayBeActive) this.activeDeliveries.delete(key);
       const waiting = this.deliveryQueues.get(key) ?? q;
-      waiting.unshift(...sentItems);
-      this.deliveryQueues.set(key, waiting);
+      if (canRetry) {
+        waiting.unshift(...(sent.kind === 'handback' ? [sent] : sentItems));
+        this.deliveryQueues.set(key, waiting);
+      }
       this.notifyRoleState(projectRoot, resolvedTarget, runtime); // 放回队首：队列快照恢复（如实）
-      const base = err instanceof Error ? err.message : String(err);
+      const base = sent.kind === "handback" && cAttempt ? !canRetry ? "可能已经处理或保存状态未知，未自动重发；可核对历史保存状态。" : "输入尚未交给模型，未丢弃，已保留同一批次待重试。" : err instanceof Error ? err.message : String(err);
       this.emitDeliveryNote(projectRoot, runtime,
         sent.kind === "handback" ? resolvedTarget : sent.sourceRoleId,
         sent.sourceRoleId,
         sent.kind === "handback"
-          ? `回交投递失败（来自 ${sent.sourceRoleId}）：${base}——**未丢弃**，已保留待重试（下次时机自动重试）。`
+          ? `回交投递失败（来自 ${sent.sourceRoleId}）：${base}${!cAttempt ? "——未丢弃，已保留待重试（下次时机自动重试）。" : ""}`
           : sent.kind === "dispatch"
             ? `派发投递失败（目标 ${resolvedTarget}）：${base}——**未丢弃**，已保留待重试（下次时机自动重试）。`
             : `排队消息投递失败（角色 ${resolvedTarget}）：${base}——**未丢弃**，已保留待重试（下次时机自动重试）。`

@@ -45,3 +45,36 @@
 sendSession第四参为optional `{clientMessageId}`，每个输入使用独立浏览器UUID；窗口从原投递与Core实际turn ack产生信封optional clientMessageId。UI只按该ID与原role/runtime/project的气泡绑定权威turnId，旧三参继续兼容；未知旧流不猜latest/同文本。历史optional顶层turnId/eventKind由窗口透传Core原metadata；逐次出现匹配并保留未落盘记录、回交/收尾及确认卡。runtime-ui.js新增replayKey/replayCounts/tokenId；ui-labels判等增加turn/event字段。前一静态守卫候选的自有60项与独立真实main23项通过，当时生产fingerprint匹配；阶段9项受控metadata和静态守卫分别记录，真实ack/主进程证据见[U1R记录](docs/fix/2026-10-14_fix_live-history-merge.md)。
 
 U1R2新增真实卡锚点保留修复：有窗口request/conclusion标识时，原保留operator延后按operatorAnchorIndex插入，复用原DOM并更新后续索引；显式null replayToken保持未知。当前自有60/离线Electron12通过，产品字节变化后的独立实际23及旧UI/锚点回归待T1重验，前版23只作历史。见[当前修复记录](docs/fix/2026-10-14_fix_preserved-card-replay-anchor.md)。
+
+
+## 2026-10-15 UXv2 A/B/C消费者接线
+
+已按批准总r2实现UI侧六文件，Model类型唯一定义见 `src/model/runtime.ts` 与 `src/model/project-document.ts`；UI不复制投影器、读取策略或公共schema。工具消费actual display/phase，legacy只消费Window保护后的来源/省略字段和opaque hashed定位token。源handback消费report/liveReport/reportPersistence，raw TaskHandback不进入UI；目标inputProvenance/inputPresentation与安全文本标志按可信身份显示，真实报告声明不等验收。
+
+`desktop.readProjectDocument`仅传version/projectViewId/documentId，从当前documentScope及RoleView.documents显选；不传路径/root/URL。`retryReportSave`/`getReportSaveState`、`retryDeliveryHistorySave`/`getDeliveryReceipt`、`getSessionPersistence`仅传version/projectRoot/roleId/runtime与已有reportId或attemptId；外层受限ok与Core value保存结果分读。`onReportPersistenceUpdated`/`onDeliveryHistoryUpdated`按version/scope/change接入，同ID更新原卡，beforeunload调用取消订阅。两类重试保存不构造正文/新ID、不调用send或开启角色；目标历史补存永不Provider，源保存可由Window唯一enqueue首次继续原回交。
+
+角色/引擎/项目切换、关闭/返回/另开文档的本地请求序号拒绝旧结果；不对OS读取作取消保证。固定上下文区 `#context-state`、历史省略/不可读报告区 `#history-projection-note`；文档同抽屉，真实opener回焦和阅读/草稿保持。实际字段/当前哈希、首红和验证边界统一见 `docs/change/2026-10-15_change_complete-flow-ui.md` 与对应manifest，不将离线IPC结果当后端安全或在线验收。
+
+
+### 2026-10-15 真实停止事实的UI消费补充
+
+沿现有sendSession返回消费Window可选flat事实（不另定义公共schema）：turnId/clientMessageId、inputAccepted:true、RuntimeTurnOutcome、sessionCurrent。与同scope/client/实际turn事件合并；仅typed prompt-input证明接收，ACK不等接收，首可信settled不改绑。正常aborted不回填已接收prompt、不误关会话；unknown保留未知，真失败/未接受拒发仍如实。sessionCurrent不保证ready，旧runtime返回不改当前草稿/按钮。无timer、错误文案判断或新的IPC。
+
+P7当前queuehint是独立来源状态，不删聊天记录；对应client ACK/权威空queue清当前hint。交互终态与提交期间所有决策input/button disabled；非工具denied在live/history均仅显示实际系统事实。P5只用实际open前可读历史事实，P3资料返回恢复等效可见入口焦点。详见本轮change/evidence。
+
+
+同轮非工具终态展示：在现有project/runtime/role视图内，仅可信非空topturn+相同有效outcome的非工具denied/settled聚合原行；不同诊断原文保留。无turn/不同turn/outcome或工具生命周期不受影响。历史仅复用已观察真实来源的精确replay token；冷历史缺outcome不补猜。无新API/公共schema/generation。
+
+
+资料阅读状态补充：既有per-runtime/per-role drawerReading除outer/anchor/expanded外，按现有data-section存其唯一.card-text的scrollTop/scrollLeft，展开后先还内层再沿原outer/focus流程；新项目沿原reset清空。纯私有消费者状态，不新增IPC/公共字段，不改文档内容。
+
+
+## UI-VISUAL-V2-1 当前DOM与消费约定
+
+既有preload/IPC/Model契约不变。#tab-pi移动导航底部；#runtime-select、#tab-work（新增UI入口）、#tab-card位于会话头右；#btn-import导航底部；原win-min/max/close保真实窗口操作。#composer-capsule保原ID，textarea在上，附件/scope/键盘提示/发送/停止在下；原事件与图文/IME/callback身份不变。
+
+work、card、pi、document复用424模态抽屉。仅导航/会话业务面inert，Tab不出资料层；系统窗口按钮不inert。work读取原pending/queue及reportCards/deliveryCards的实际safe reports，同scope真实reportId避免概览重复，不删除不同attempt时间线。来源文档仍只调用既有受限readProjectDocument，显选refs，不从report文字抽路径。
+
+源与received报告共享reportBody：来源眉题/标题/声明，真实summary有界视图预览，完整可用safe summary/evidence可展开；source保存与独立验收分开，target回执在batch层。公开typedflags与unknown/省略照留，不改预算/modelPromptText。原文折叠仅实际report/source-turn关联：live等真实settled，cold非活动历史仅中性入口；无turn legacy不猜。记录自己的explicit open与既有replaytoken，保原位置，不合并工具/系统诊断/决定/终态。
+
+布局按accepted V2（208/176、800、424、32）及180px右对齐引擎菜单；菜单只调用既有公开ANSEngineSelector.placement，未修改readonly selector模块或复制其viewport规则。当前字节/实际测试/有效图与排除图见本轮own evidence manifest；普通chat不生成报告、报告声明不等独立验收仍为不变量。

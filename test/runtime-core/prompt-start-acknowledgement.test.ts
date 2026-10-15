@@ -1,3 +1,4 @@
+import { registerControlledDisplayProfile } from './fixtures.ts';
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -22,6 +23,7 @@ test("actual turn has one synchronous acknowledgement before persisted input/nat
     let reportMetadata: ReportHandbackMetadata | undefined;
     const forwarded: Array<PromptOptions | undefined> = [];
     const factory: RuntimeProviderFactory = (options) => {
+      registerControlledDisplayProfile(options);
       const append = options.storage!.appendReplay;
       options.storage!.appendReplay = async (entries) => {
         if (entries.some((entry) => entry.kind === "user")) order.push("persist-user");
@@ -67,7 +69,7 @@ test("actual turn has one synchronous acknowledgement before persisted input/nat
 test("active and disposed prompt rejections have no turn acknowledgement", async () => {
   let entered = false;
   let complete!: () => void;
-  const factory: RuntimeProviderFactory = () => ({ async composeContext() { return { systemPrompt: "fixture" }; }, async bindRole() {
+  const factory: RuntimeProviderFactory = (options) => (registerControlledDisplayProfile(options), { async composeContext() { return { systemPrompt: "fixture" }; }, async bindRole() {
     const queue = createEventQueue<SessionEvent>();
     return { async prompt() { entered = true; await new Promise<void>((resolve) => { complete = resolve; }); queue.push({ kind: "settled", summary: "done" }); }, events: () => queue.stream, async dispose() { queue.close(); } };
   } });
@@ -83,7 +85,7 @@ test("active and disposed prompt rejections have no turn acknowledgement", async
 test("quarantined prompt rejection has no acknowledgement after one stopped actual turn", async () => {
   let entered = false;
   let complete!: () => void;
-  const factory: RuntimeProviderFactory = () => ({ async composeContext() { return { systemPrompt: "fixture" }; }, async bindRole() {
+  const factory: RuntimeProviderFactory = (options) => (registerControlledDisplayProfile(options), { async composeContext() { return { systemPrompt: "fixture" }; }, async bindRole() {
     const queue = createEventQueue<SessionEvent>();
     return {
       async prompt() { entered = true; await new Promise<void>((resolve) => { complete = resolve; }); }, events: () => queue.stream,
@@ -102,7 +104,7 @@ test("quarantined prompt rejection has no acknowledgement after one stopped actu
 test("synchronous acknowledgement throw yields one failed terminal, zero native work, and releases the turn", async () => {
   let nativePrompts = 0;
   let nativeAborts = 0;
-  const factory: RuntimeProviderFactory = () => ({ async composeContext() { return { systemPrompt: "fixture" }; }, async bindRole() {
+  const factory: RuntimeProviderFactory = (options) => (registerControlledDisplayProfile(options), { async composeContext() { return { systemPrompt: "fixture" }; }, async bindRole() {
     const queue = createEventQueue<SessionEvent>();
     return { async prompt() { nativePrompts++; queue.push({ kind: "settled", summary: "done" }); }, events: () => queue.stream, async abort() { nativeAborts++; }, async dispose() { queue.close(); } };
   } });
@@ -122,7 +124,7 @@ test("acknowledged turns keep aborted/timed_out outcomes and single matching ter
   for (const expected of ["aborted", "timed_out"] as const) {
     let entered = false;
     let complete!: () => void;
-    const factory: RuntimeProviderFactory = () => ({ async composeContext() { return { systemPrompt: "fixture" }; }, async bindRole() {
+    const factory: RuntimeProviderFactory = (options) => (registerControlledDisplayProfile(options), { async composeContext() { return { systemPrompt: "fixture" }; }, async bindRole() {
       const queue = createEventQueue<SessionEvent>();
       return { async prompt() { entered = true; await new Promise<void>((resolve) => { complete = resolve; }); }, events: () => queue.stream, async abort() { queue.push({ kind: "settled", summary: "inner cleanup", detail: { outcome: "aborted" } }); complete(); await Promise.resolve(); }, async dispose() { queue.close(); } };
     } });

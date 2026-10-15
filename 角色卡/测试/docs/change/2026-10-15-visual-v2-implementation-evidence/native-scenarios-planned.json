@@ -1,0 +1,7 @@
+{
+  "projectRoot": "/private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-p1p7-desktop-JqO4lM",
+  "ordinary": "V2-CHAT-1：这是普通聊天。请只回复“V2 普通聊天正常”。不要调用工具、派发任务或提交报告。",
+  "choice": "V2-CHOICE-1：这是普通聊天中的交互测试。请调用一次 request_choice，标题“V2 本轮先检查什么”，只给两个单选项“查看摘要”和“查看完整记录”，不要预选。收到选择后只回复选择内容，不派发正式任务或提交报告。",
+  "stop": "V2-STOP-1：普通聊天交互测试。请调用一次 request_choice，标题“V2 停止失效检查”，两个单选项“继续检查”和“稍后再看”，不预选。等待我的决定，不派发任务或提交报告。",
+  "formal": "V2-REAL-1：请通过 dispatch_task 恰好一次把下面完整任务派发给“测试”角色，不要自己代做或重复派发。测试任务：在当前 p-limit 项目做真实只读验证，依次 read_file index.js 与 test.js 核对 null 校验/用例；read_file docs/v2-does-not-exist.md，照实记录 ENOENT；read_file 角色卡/测试/docs/change/p1p7-long-display.md 观察约20KiB长结果但不全文复述；两次独立 run_shell node -v；run_shell npm test 恰好一次，不追加参数，记录退出码与通过数、stderr或warning。不得修改 index.js/test.js/index.d.ts/package.json 或配置。把每步真实结果写入已有授权内的 角色卡/测试/docs/change/v2-real-1.md，然后 submit_report 恰好一次，summary给简短真实结论并说明失败探针/显示截断。用已有边界，不申请新权限。主入口收到回交后只简短说明报告声明与尚待独立验收，不再运行工具。"
+}

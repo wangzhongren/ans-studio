@@ -1,7 +1,7 @@
 # 桌面窗口边界 —— Section 1 唯一写入白名单
 # 未列路径默认只读。新增目录、改动归属或增删逐条列出的路径，须先由 ANS Governance 更新本文件并经客户确认。
-# 本角色是 Interface 层的桌面主进程侧（2026-10-14 从「桌面应用」拆分）：Electron 主进程、窗口生命周期、
-# preload 受限桥与桌面会话装配。路径判定一律调门禁引擎，Pi 调用一律经 Pi 适配器；渲染前端（app/renderer/）
+# 本角色负责 Interface 层桌面主进程侧及 B 受限文档读取专属 Model/Pipeline/Service/Provider 精确文件；
+# 不授权整个 src 或层目录。Electron 主进程、窗口生命周期、preload 受限桥与桌面会话装配；写资格判定一律调门禁引擎，Pi 调用一律经 Pi 适配器；渲染前端（app/renderer/）
 # 属「桌面UI」角色，本角色经 preload 白名单通道与主→渲染事件对外提供能力。
 role: 桌面窗口
 entries:
@@ -14,6 +14,30 @@ entries:
   - kind: directory
     path: app/desktop/
     purpose: 桌面 Interface（主进程侧纯逻辑）：会话管理器、投递与队列、客户交互通道、shell 闸接线、会话历史解析、Pi 配置、项目装配、事件批推与诊断
+  - kind: file
+    path: src/model/project-document.ts
+    purpose: B 专属 Model 唯一主属：版本、文档引用、可信导入类型、请求/结果与错误类型；不含 IO
+  - kind: file
+    path: src/pipeline/project-document/read-project-document.ts
+    purpose: B Pipeline 公开入口：编排文档 reader 创建、scope 更新、读取与关闭
+  - kind: file
+    path: src/service/project-document/abstract/document-reader.ts
+    purpose: B Service 抽象：受限文档服务接口与 Provider 所需读取条件
+  - kind: file
+    path: src/service/project-document/public/read-project-document.ts
+    purpose: B Service 公开入口：创建/调用受限文档服务
+  - kind: file
+    path: src/service/project-document/impl/read-project-document.ts
+    purpose: B Service 实现：唯一 scope registry、清单资格、预算/格式/编码政策与错误映射
+  - kind: file
+    path: src/provider/project-document/abstract/file-reader.ts
+    purpose: B Provider 抽象：文件句柄事实与受限有界 IO 接口
+  - kind: file
+    path: src/provider/project-document/public/file-reader.ts
+    purpose: B Provider 公开入口：平台文件读取能力工厂
+  - kind: file
+    path: src/provider/project-document/impl/file-reader.ts
+    purpose: B Provider 实现：lstat/realpath/open/fstat、有界 read/close 与平台能力检查
   - kind: file
     path: test/桌面应用/ans-wiring.test.ts
     purpose: 主进程侧测试——`.ans` 生效配置接线（project/session）
@@ -83,6 +107,9 @@ entries:
   - kind: file
     path: test/桌面应用/multi-runtime.test.ts
     purpose: 本次多引擎接入的主进程会话隔离、路由、设置及恢复契约测试
+  - kind: file
+    path: test/桌面应用/project-document.test.ts
+    purpose: B 专属测试：服务/Provider 预算、编码、句柄竞态、grant/scope 与引用失效
   - kind: file
     path: 角色卡/桌面窗口/feature-map.md
     purpose: 功能导航

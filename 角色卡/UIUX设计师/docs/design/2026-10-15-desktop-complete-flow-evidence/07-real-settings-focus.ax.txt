@@ -1,0 +1,3 @@
+The following is a diff from the previous accessibility tree for Window: "ANS 治理会话工作台" with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+Removed element IDs: 252-265
+The focused UI element is 7 按钮 Claude 设置

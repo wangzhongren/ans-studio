@@ -1,0 +1,16 @@
+{
+  "imageProducer": "root fixed测试 actual native Electron",
+  "reviewer": "fixedUIUX image/source only",
+  "image": "角色卡/测试/docs/change/2026-10-15-visual-v2-implementation-evidence/native-worker-report-1360.png",
+  "imageSha256": "599b9d553edacd50d3896dcf6516e54b559f62da5438b2276921146d0ff67ded",
+  "candidate": {
+    "renderer": "5b80a72796e4e8cff369a378deb96ca1c5bc6d1dcabe92adf6bef1dc0f8b3b13",
+    "index": "7beda47c504c81ba8a7748b407eb60efc27ec531e936d93868a9480528514f00",
+    "styles": "56d2ff9e34004181f240a9b619d2d3a1b65f21f4621b950751734e398dd31949"
+  },
+  "findings": [
+    "builtin third line identity should move to title/aria-description",
+    "long project path should single-line ellipsis with existing full title"
+  ],
+  "notFinalPass": true
+}

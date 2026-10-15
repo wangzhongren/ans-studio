@@ -1,0 +1,34 @@
+Window: "ANS 治理会话工作台", App: Electron.
+0 标准窗口 ANS 治理会话工作台, Secondary Actions: Raise
+	1 container ANS 治理会话工作台
+		2 container
+			3 HTML 内容 ANS 治理会话工作台, URL: file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/app/renderer/index.html
+				4 container
+					5 文本 ANS
+					6 按钮 最小化
+					7 按钮 最大化
+					8 按钮 关闭
+				9 container
+					10 container 测试 · 来源文档
+						11 文本 测试 · 来源文档
+						12 按钮 Description: 收起, Help: 收起（Esc）
+						13 container
+							14 按钮 返回来源文档
+							15 text 角色卡/测试/docs/change/p1p7-static-render.md 只读文档 · 272 字节
+							16 标题 静态文档测试, Value: 1
+								17 文本 静态文档测试
+							18 container
+								19 text <script>document.title='P1P7-UNSAFE-SCRIPT'</script> ![本地阻止加载探针](http://127.0.0.1:9/p1p7-image) [危险协议](javascript:document.title='P1P7-UNSAFE-LINK')
+							20 文本 以上内容必须静态显示，不能执行脚本或自动加载图片。
+21 menu bar
+	22 Electron
+	23 File
+	24 Edit
+	25 View
+	26 Window
+
+Selected text: ```
+￼
+```
+
+Note: Pay special attention to the content selected by the user. If the user asks a question or refers to the content they are looking at on-screen, they might be referring to the selected content (but they might be referring to something else that's visible, too).

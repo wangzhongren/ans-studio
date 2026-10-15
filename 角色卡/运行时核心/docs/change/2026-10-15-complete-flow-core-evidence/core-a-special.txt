@@ -1,0 +1,42 @@
+✔ native-only values are protected without a provider, retain real IDs/token and keep reader counts separate (0.955916ms)
+✔ raw title anchors and invalid dates are omitted; no turn/call or execution is inferred from body (0.3185ms)
+✔ return budget selects a continuous recent suffix, preserves order and reports omissions (52.572917ms)
+✔ reader failure and malformed bridge are distinct and cannot raw-fallback (5.291917ms)
+✔ real fields survive projection; nonzero exit is not parsed from message, block is a separate fact (1.969167ms)
+✔ target selection is exactly the actual Core alias contract; custom names do not imply rules (0.540916ms)
+✔ native fallback only takes explicit text; native outcome wins and unsupported objects never serialize (0.14225ms)
+✔ profile capture is required, custom actual credentials are registered in memory and cannot rebind (0.260166ms)
+✔ known values and patterns are protected before truncation; IDs never pass through a redactor (0.3225ms)
+✖ UTF-8 and encoded JSON budgets use independent byte counts and survive a second projection (6.053292ms)
+✔ projection faults and oversize identity produce messages without fabricated business conclusions (2.703125ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 10
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 124.946458
+
+✖ failing tests:
+
+test at test/runtime-core/tool-display.test.ts:52:1
+✖ UTF-8 and encoded JSON budgets use independent byte counts and survive a second projection (6.053292ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(!value.text.includes('\ufffd'))
+  
+      at TestContext.<anonymous> (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/runtime-core/tool-display.test.ts:56:114)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

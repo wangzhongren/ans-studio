@@ -1,0 +1,1 @@
+{"pinnedCLI":"0.162.1","httpRequests":2,"handlerCalls":1,"projectedPhases":["start","result"],"toolCallIdentityPreserved":true,"modelTextPreserved":true,"executionSidecarSentToModel":false,"externalModelCalls":0,"credentials":"fake only"}

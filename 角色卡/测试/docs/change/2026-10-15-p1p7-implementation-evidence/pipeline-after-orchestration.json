@@ -1,0 +1,18 @@
+{
+  "at": "2026-10-15T04:13:53.265Z",
+  "command": "node --test test/测试/chat-handback-integration.test.ts test/测试/duplicate-input-identity.test.ts test/测试/t1-pipeline-integration.test.ts",
+  "exitCode": 0,
+  "pass": 11,
+  "fail": 0,
+  "coverage": "Controlled external engines, real Core/Pipeline: ordinary chat no report, formal dispatch handback, disabled persistence keeps live/no .ans, duplicate input identity, abort/stale choice and truthful terminal; not GUI/online SDK",
+  "hashes": {
+    "src/service/runtime/session.ts": "7c93fdbd5302ca0bb9936514c481cc29c858ea8eae6c1d69fa8ae82ccae5b005",
+    "src/common/编排/handback.ts": "ae4153c7d2d279caf395233f76727418e39093bb24eeeeea76ac554e0e14c6dd",
+    "src/pipeline/orchestration/run-role.ts": "fad87c2372ca5752a08a702284111db097dc7a2b3f9c9c6d6ac9789ccd4d1d64",
+    "src/pipeline/orchestration/govern-session.ts": "9894f9364f2ab23840213085125e8f80fd6ab49c298b34847651586b0514c2d7",
+    "test/测试/chat-handback-integration.test.ts": "5fdf35e1e76c3994f60ba9773b6ff275039c28925c0c3931c683dfed402cdbec",
+    "test/测试/duplicate-input-identity.test.ts": "ef1bcf692dbaaa09466505061dfaa18a474dbb4348d92605e618ee081c83d9ca",
+    "test/测试/t1-pipeline-integration.test.ts": "b357d4aeda9fabdf784f8cae3924f8d8c6e4b44395ec3491f994e2c5403431c8"
+  },
+  "output": "✔ independent pi: real Desktop → Pipeline → Core separates chat, queued chat, dispatch and explicit reports (26.809083ms)\n✔ independent codex: real Desktop → Pipeline → Core separates chat, queued chat, dispatch and explicit reports (15.297167ms)\n✔ independent claude: real Desktop → Pipeline → Core separates chat, queued chat, dispatch and explicit reports (18.986084ms)\n✔ independent pi: one input per real turn, same-text turns and genuine assistant quote survive history merge (33.269042ms)\n✔ independent codex: one input per real turn, same-text turns and genuine assistant quote survive history merge (18.091125ms)\n✔ independent claude: one input per real turn, same-text turns and genuine assistant quote survive history merge (18.731625ms)\n✔ T1 pi: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report (257.869667ms)\n✔ T1 codex: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report (257.617ms)\n✔ T1 claude: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report (241.91425ms)\n✔ T1 real outer failed remains one terminal and truthful handback after external cleanup completion (5.551125ms)\n✔ T1 real outer timed_out remains one terminal and truthful handback after external cleanup completion (38.943334ms)\nℹ tests 11\nℹ suites 0\nℹ pass 11\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 914.467459\n"
+}

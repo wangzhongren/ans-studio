@@ -1,0 +1,22 @@
+Window: "ANS 治理会话工作台", App: Electron.
+0 标准窗口 ANS 治理会话工作台, Secondary Actions: Raise
+	1 container ANS 治理会话工作台
+		2 container
+			3 HTML 内容 ANS 治理会话工作台, URL: file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/app/renderer/index.html
+				4 container su · 工作概览
+					5 文本 su · 工作概览
+					6 按钮 Description: 收起, Help: 收起（Esc）
+					7 container
+						8 文本 无待处理请求
+						9 文本 无进行中或排队消息
+						10 标题 最近回交, Value: 3
+							11 文本 最近回交
+						12 文本 暂无回交报告
+13 menu bar
+	14 Electron
+	15 File
+	16 Edit
+	17 View
+	18 Window
+
+The focused UI element is 6 按钮 Description: 收起, Help: 收起（Esc）

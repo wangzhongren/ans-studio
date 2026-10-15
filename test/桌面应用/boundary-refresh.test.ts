@@ -68,7 +68,7 @@ interface Harness {
   mgr: SessionManager;
   streams: Record<string, OrchestrationEvent[]>;
   sent: Record<string, string[]>;
-  envelopes: { roleId: string; event: OrchestrationEvent }[];
+  envelopes: { roleId: string; event: import("../../app/desktop/session.ts").DesktopOrchestrationEvent }[];
   openCalls: string[];
   dispatchOf: (roleId: string) => DispatchTaskFn | undefined;
 }
@@ -76,7 +76,7 @@ interface Harness {
 function makeHarness(l: ProjectListing): Harness {
   const streams: Record<string, OrchestrationEvent[]> = { su: [], A: [] };
   const sent: Record<string, string[]> = { su: [], A: [] };
-  const envelopes: { roleId: string; event: OrchestrationEvent }[] = [];
+  const envelopes: { roleId: string; event: import("../../app/desktop/session.ts").DesktopOrchestrationEvent }[] = [];
   const openCalls: string[] = [];
   const openInputs: Record<string, { dispatchTask?: DispatchTaskFn }> = {};
   const stopped: Record<string, boolean> = {};

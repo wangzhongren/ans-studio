@@ -1,0 +1,9 @@
+✔ delivery notes are typed system messages, never ghost tools or extra prompts on the actual dispatch path (205.136458ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 314.119917

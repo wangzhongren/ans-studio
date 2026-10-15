@@ -219,3 +219,8 @@ test("锚点标识：request_choice 同样配对；非交互工具/缺 title/孤
   assert.equal(interactionAnchorKey("confirm", "T"), anchorKeyForToolCall("request_confirmation", { title: "T" }));
   assert.equal(interactionAnchorKey("choice", "T"), anchorKeyForToolCall("request_choice", { title: "T" }));
 });
+
+test('legacy anchors keep exact original equivalence without sending raw titles or merging distinct calls',()=>{
+ const a=interactionAnchorKey('confirm','secret-title-1');const b=interactionAnchorKey('confirm','secret-title-2');
+ assert.match(a,/^legacy-anchor-v1:[0-9a-f]{64}$/);assert.notEqual(a,b);assert.notEqual(a,interactionAnchorKey('choice','secret-title-1'));assert.equal(a.includes('secret-title'),false);assert.equal(a,anchorKeyForToolCall('request_confirmation',{title:'secret-title-1'}));
+});

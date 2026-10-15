@@ -24,3 +24,8 @@ Pi 时限显式值优先，缺省读旧 ANS_PI_PROMPT_TIMEOUT_MS/ANS_PI_CONSTRUC
 ## 2026-10-15 工具及输入事件身份修复
 
 Pi唯一tool_call事件源为SDK tool_execution_start，detail带真实turnId/toolCallId/phase=start；治理拒绝phase=blocked，SDK结果phase=result，两者独立保真。生产Core注入路径Pi关闭自身input echo，消费Core唯一typed prompt-input；direct makeRolePrompt默认兼容旧摘要并提供source/text/imageCount。公共RoleSession形状未改，门禁与handler未改。实际验证与候选指纹见[本次修复记录](docs/fix/2026-10-15_fix_canonical-tool-events.md)。
+
+
+## PI-A-1 统一工具显示接线（2026-10-15）
+
+生产消费Model实际RuntimeToolEventSource/projector、ToolDefinition.displayInputRule与RuntimeProviderOptions的toolDisplayMode/projectToolEvent/registerToolDisplayProfile/toolDisplayCredentialEnvNames。required-v1缺函数SDK前拒绝，cfg实际选中键/值以同次env快照纯内存登记；legacy直接入口兼容。真实start/hook blocked/native result统一投影；execution只经私有callFacts桥到projector，SDK content和原安全details不新增execution或C对象。未知旧hook不借当前turn，原text/images与metadata双层剥离保持。见[实现及候选证据](docs/change/2026-10-15_change_tool-display-projection.md)。

@@ -1,0 +1,117 @@
+✔ H-1 路由：su 派发 → 目标未开**自动开**并收到派发输入（模板文案）；su 与目标两边都有系统行 (184.173542ms)
+✔ H-1 排队：目标忙 ⇒ 入队；其 settled 后按序放行（绝不并发 send） (312.290917ms)
+✔ H-1 失败保留：投递失败 ⇒ 如实系统行（未丢弃）+ 放回队首；下次时机成功送达 (331.320833ms)
+✔ H-1 校验（如实回执，不静默）：非本项目角色 / 内置治理角色（含 su 自身）/ 空参数 → {ok:false} + 系统行 (31.178542ms)
+✔ H-1 去重：同一派发在**队列期**重复调用 → 去重（只投一次）；送达后同文再派 → 放行（返工回路） (370.804042ms)
+✔ 真机崩溃修复（钉子）：派发条目**不走 handback 渲染**；坏回交并入同一机也不炸、零未捕获拒绝 (402.685791ms)
+✔ H-1 闭环：su 派发 → 角色回交 → su 收到报告；不重复、不空转（EC-1 后无自激） (426.07925ms)
+✔ E-1 投递：A 的回交到达 → **自动开启 su** 并把 `renderHandbackPrompt` 原文投给 su（单一来源） (184.718458ms)
+✔ E-1 去重：同一条回交重复到达（重放）→ **只投递一次** (181.490125ms)
+✔ E-1 排队：su 忙时保留，settle 后连续回交按原序合成一次验收输入 (462.275292ms)
+✖ 连续回交投递失败：整批保留同序，重试送达一次，原报告键不丢 (1211.962667ms)
+✔ 客户消息屏障：A报告→客户消息→B报告，不跨消息合批或改变顺序 (53.65175ms)
+✔ 常规检查宿主政策实际注入项目角色，su不接委托免确认 (5.334541ms)
+✔ E-1 开启失败：如实系统行（含原因与重试时机）+ **保留回交**；下次时机成功投递（绝不静默丢） (336.591917ms)
+✔ 真机崩溃修复：坏形状回交事件（缺载荷/缺 roleId）→ 不投递、如实系统行、**零未捕获拒绝** (282.998541ms)
+✖ E-1 投递失败：如实系统行（含原因）+ 放回队首保留；重试成功后送达（顺序与内容不损） (184.169459ms)
+✔ listProject 映射为 RoleView（无 writeSet 字段） (4.621708ms)
+✔ 内置角色 su：RoleView 标为 builtIn，且不去读文档索引（cardPath 为空串） (0.200917ms)
+✔ openSession 点角色即开：scope undefined、导入即授权；多轮 send 透传、stop 收口 (67.0565ms)
+✔ 切换角色（B-2）：open 新角色**不** dispose 旧会话（并存）；定向 stop 只关指定角色 (0.888375ms)
+✔ stopSession：无运行中会话时如实返回 (0.137875ms)
+✔ openSession：未先枚举项目则报错 (0.134416ms)
+✔ listProject：内置 su（已 bootstrap）不再带 readOnly 字段（只读徽标已移除） (0.084083ms)
+✔ listProject：**未 bootstrap**（创世态）内置 su 亦不再带 readOnly 字段 (0.062917ms)
+✔ listProject：可写的项目角色（非内置）亦不再带 readOnly 字段 (0.436ms)
+✔ T17 listProject：hasRoles 与 primaryRoleId 原样转自门禁引擎（渲染侧据此设主位/默认选中，不硬编码 su） (0.131459ms)
+✔ T17 主入口角色一轮结束（settled）→ 触发 emitProjectChanged；非主入口角色不触发 (51.938375ms)
+✔ T20 handback 事件被外推：Interface 层的 emitEvent 收到编排的 handback 事件（类型已放宽到 OrchestrationEvent） (26.982208ms)
+✔ A-5 customerInput：Interface 透传客户通道；仅内置治理角色（su）会话被注入，且 roleId 经闭包绑定 (0.709542ms)
+✔ B Interface native picker alone grants document refs; renderer listing, cancel and another window cannot grant (3.737084ms)
+✔ B failed listing or native cancel preserves the previous imported document scope (3.303417ms)
+✔ L-1 入队：忙时客户消息**入队**（不再直接失败）——位次如实、settled 后按到达序自动放行、摘要入快照 (336.4665ms)
+✔ L-1 位次与摘要截断：第 1、2 位如实；超长文本摘要截断（不铺全文） (32.034541ms)
+✔ L-1 失败语义不变：排队消息投递失败 ⇒ 如实系统行（未丢弃）+ 放回队首；下次时机成功送达 (333.140083ms)
+✔ L-1 传输失败仍如实回错：空闲路径的 send 失败 = {ok:false,error}（并**不**虚报忙态） (32.20675ms)
+✔ 状态准确性（复现 vs 修后）：投递开跑的后台轮次——旧事实组合派生「空闲」（复现），真实快照 busy 派生「工作中」（修后） (698.846958ms)
+✔ 状态准确性：队列待办的角色不得显示「空闲」——快照(queueDepth) + 徽标「工作中 · N 待办」 (34.347375ms)
+✔ 接线钉子：role-state 通道两端齐备；忙态判据只在主进程（会话 busy × 队列深度）；渲染侧**无**界面侧推测 (1.229084ms)
+✔ D1 shared registry: effective env/file/fallback sources, every secret masked, whitespace is unset (5.8385ms)
+✔ D1 configuration writes only selected string keys atomically, masks URL/userinfo failure and retains revision on failure (12.336792ms)
+✔ D1 same role and project across engines and same role across projects keep distinct handles and exact input targets (4.384416ms)
+✔ D1 background dispatch, queued customer input and handback pin the source engine after selection switches (8.433792ms)
+✔ D1 actual Pipeline/Service chooses demo, writes isolated replay and converts native context honestly (29.019084ms)
+✔ D1 actual Pipeline/Service chooses pi, writes isolated replay and converts native context honestly (19.696542ms)
+✔ D1 actual Pipeline/Service chooses codex, writes isolated replay and converts native context honestly (16.839917ms)
+✔ D1 actual Pipeline/Service chooses claude, writes isolated replay and converts native context honestly (18.066917ms)
+✔ D1 profile success rebuilds same engine after busy old Pi finishes; ambient token remains old until safe; failure is unchanged (7.433792ms)
+✔ D1 original customer signal cancels pending confirm/choice and old yes cannot settle a new card (0.389417ms)
+✔ D1 shell terminal failure/timeout and dispose invalidate exact handle card, old allow is expired (3.561833ms)
+✔ D1 state debouncing and constrained bridges preserve project/runtime identity (0.844209ms)
+✔ D1 last busy Pi in another project releases queued profile rebuild without changing ambient mid-turn (5.404209ms)
+✔ D1 confirmation bridge keeps original signal identity and an old disposed stream cannot cancel a new handle card (0.483916ms)
+✔ D1 old Pi JSONL is a display-only fallback and never becomes Codex/Claude history or native restore proof (4.676375ms)
+✔ D1R ANS history preserves authoritative turn/event identity, independent same text and delta order (2.512375ms)
+✔ D1R legacy Pi rows keep optional turn/event metadata absent (1.914ms)
+✔ D1R2 direct and queued identical inputs retain original client ID through delayed old settled (8.339791ms)
+✔ D1R2 anonymous dispatch occupies its own origin and unknown/legacy events cannot borrow the next client (6.5665ms)
+✔ D1R2 actual Pipeline/Service returns original client IDs and real distinct turn IDs for same text (11.77725ms)
+✔ D1R2 actual ack preserves a failed delayed terminal and the next aborted original client (23.083875ms)
+✔ D1R2 no-ack failure and legacy/unknown events cannot lend an old client ID to a later acknowledged call (4.488292ms)
+✔ typed prompt input history joins only actual same-turn input sources and preserves legacy facts (3.727833ms)
+✔ operator payload preserves original call identity and leaves absent legacy IDs absent (0.125291ms)
+✔ history preserves canonical start/blocked/result phases for the same failed tool call (2.531167ms)
+✔ A-5 通道：confirm 作答 → answered/confirmed:true；「不同意」→ declined（未获同意） (1.421375ms)
+✔ A-5 通道（请求快照校验）：selected 必须 ⊆ 已给选项、单选恰一个、空选择不受理——非法回包不落三态 (0.11425ms)
+✔ A-5 通道：多选子集/去重合法；取消 → declined；窗口关闭 rejectAll → declined；未接线 → unavailable (0.125459ms)
+✔ A-5 通道（真机语义）：未知 id 回包 → 终态 expired；非法决定 → 可重试（无 expired） (0.110208ms)
+✔ A-5 注入判据：仅内置治理角色（su）会话注入 customerInput；roleId 闭包绑定；普通角色不注入 (5.497416ms)
+✔ A-5 未接通道：deps.customerInput 缺省 ⇒ 连 su 也不注入（无确认制——绝不悄悄放行） (2.27675ms)
+✔ D-1 目录契约 + 解析：header + user/assistant(含 toolCall)/toolResult(isError) → 规范化行（顺序与时间保留） (1.601333ms)
+✔ D-1 防御式：坏行/未知 entry/未知 role 跳过不抛（计入 skipped）；header 不合法 → 整体判失败 (0.337083ms)
+✔ D-1 pickLatestSessionFile：mtime 大者优先；并列取名字大者（确定性） (0.073083ms)
+✔ D-1 粗探 probeSessionFile：无文件=missing；header 合法=ok；坏文件=corrupt（打开会话时分类 contextSource 用） (47.726333ms)
+✔ D-1 readRoleSessionHistory：无目录=无历史（ok）；挑最近文件；坏文件→ok:false+error；**跨角色不串** (14.976083ms)
+✔ 锚点标识：request_confirmation 的调用行与结论行带同一 requestId/anchorKey（toolCallId 配对，不解析正文） (0.814209ms)
+✔ 锚点标识：request_choice 同样配对；非交互工具/缺 title/孤儿结论一概不着锚（其余行零变化） (0.405791ms)
+ℹ tests 76
+ℹ suites 0
+ℹ pass 74
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3677.484708
+
+✖ failing tests:
+
+test at test/桌面应用/handback-delivery.test.ts:213:1
+✖ 连续回交投递失败：整批保留同序，重试送达一次，原报告键不丢 (1211.962667ms)
+  AssertionError [ERR_ASSERTION]: 等待实际事件超时
+      at waitUntil (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/handback-delivery.test.ts:25:10)
+      at async TestContext.<anonymous> (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/handback-delivery.test.ts:222:5)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at test/桌面应用/handback-delivery.test.ts:325:1
+✖ E-1 投递失败：如实系统行（含原因）+ 放回队首保留；重试成功后送达（顺序与内容不损） (184.169459ms)
+  AssertionError [ERR_ASSERTION]: 系统行须说明「未丢弃/保留待重试」
+      at TestContext.<anonymous> (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/handback-delivery.test.ts:336:10)
+      at runNextTicks (node:internal/process/task_queues:65:5)
+      at process.processTimers (node:internal/timers:538:9)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

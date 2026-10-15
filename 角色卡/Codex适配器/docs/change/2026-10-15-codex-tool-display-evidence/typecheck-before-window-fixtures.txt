@@ -1,0 +1,51 @@
+npm warn Unknown user config "ELECTRON_MIRROR". This will stop working in the next major version of npm.
+npm warn Unknown user config "ELECTRON_BUILDER_BINARIES_MIRROR". This will stop working in the next major version of npm.
+
+> ans-cli@1.0.0 typecheck
+> tsc --noEmit
+
+test/桌面应用/ans-wiring.test.ts(82,37): error TS2345: Argument of type 'DesktopOrchestrationEvent' is not assignable to parameter of type 'OrchestrationEvent'.
+  Type 'Omit<HandbackEvent, "handback">' is not assignable to type 'OrchestrationEvent'.
+    Property 'handback' is missing in type 'Omit<HandbackEvent, "handback">' but required in type 'HandbackEvent'.
+test/桌面应用/boundary-refresh.test.ts(127,40): error TS2345: Argument of type 'SessionEventEnvelope' is not assignable to parameter of type '{ roleId: string; event: OrchestrationEvent; }'.
+  Types of property 'event' are incompatible.
+    Type 'DesktopOrchestrationEvent' is not assignable to type 'OrchestrationEvent'.
+      Type 'Omit<HandbackEvent, "handback">' is not assignable to type 'OrchestrationEvent'.
+        Property 'handback' is missing in type 'Omit<HandbackEvent, "handback">' but required in type 'HandbackEvent'.
+test/桌面应用/dispatch-delivery.test.ts(128,40): error TS2345: Argument of type 'SessionEventEnvelope' is not assignable to parameter of type '{ roleId: string; event: OrchestrationEvent; }'.
+  Types of property 'event' are incompatible.
+    Type 'DesktopOrchestrationEvent' is not assignable to type 'OrchestrationEvent'.
+      Type 'Omit<HandbackEvent, "handback">' is not assignable to type 'OrchestrationEvent'.
+        Property 'handback' is missing in type 'Omit<HandbackEvent, "handback">' but required in type 'HandbackEvent'.
+test/桌面应用/handback-delivery.test.ts(148,40): error TS2345: Argument of type 'SessionEventEnvelope' is not assignable to parameter of type '{ roleId: string; event: OrchestrationEvent; }'.
+  Types of property 'event' are incompatible.
+    Type 'DesktopOrchestrationEvent' is not assignable to type 'OrchestrationEvent'.
+      Type 'Omit<HandbackEvent, "handback">' is not assignable to type 'OrchestrationEvent'.
+        Property 'handback' is missing in type 'Omit<HandbackEvent, "handback">' but required in type 'HandbackEvent'.
+test/桌面应用/hot-path.test.ts(161,40): error TS2345: Argument of type 'SessionEventEnvelope' is not assignable to parameter of type '{ roleId: string; event: OrchestrationEvent; }'.
+  Types of property 'event' are incompatible.
+    Type 'DesktopOrchestrationEvent' is not assignable to type 'OrchestrationEvent'.
+      Type 'Omit<HandbackEvent, "handback">' is not assignable to type 'OrchestrationEvent'.
+        Property 'handback' is missing in type 'Omit<HandbackEvent, "handback">' but required in type 'HandbackEvent'.
+test/桌面应用/hot-path.test.ts(219,40): error TS2345: Argument of type 'SessionEventEnvelope' is not assignable to parameter of type '{ roleId: string; event: OrchestrationEvent; }'.
+  Types of property 'event' are incompatible.
+    Type 'DesktopOrchestrationEvent' is not assignable to type 'OrchestrationEvent'.
+      Type 'Omit<HandbackEvent, "handback">' is not assignable to type 'OrchestrationEvent'.
+        Property 'handback' is missing in type 'Omit<HandbackEvent, "handback">' but required in type 'HandbackEvent'.
+test/桌面应用/interface.test.ts(458,37): error TS2345: Argument of type 'DesktopOrchestrationEvent' is not assignable to parameter of type 'OrchestrationEvent'.
+  Type 'Omit<HandbackEvent, "handback">' is not assignable to type 'OrchestrationEvent'.
+    Property 'handback' is missing in type 'Omit<HandbackEvent, "handback">' but required in type 'HandbackEvent'.
+test/桌面应用/message-queue.test.ts(145,40): error TS2345: Argument of type 'SessionEventEnvelope' is not assignable to parameter of type '{ roleId: string; event: OrchestrationEvent; }'.
+  Types of property 'event' are incompatible.
+    Type 'DesktopOrchestrationEvent' is not assignable to type 'OrchestrationEvent'.
+      Type 'Omit<HandbackEvent, "handback">' is not assignable to type 'OrchestrationEvent'.
+        Property 'handback' is missing in type 'Omit<HandbackEvent, "handback">' but required in type 'HandbackEvent'.
+test/桌面应用/session.test.ts(33,37): error TS2345: Argument of type 'DesktopOrchestrationEvent' is not assignable to parameter of type 'OrchestrationEvent'.
+  Type 'Omit<HandbackEvent, "handback">' is not assignable to type 'OrchestrationEvent'.
+    Property 'handback' is missing in type 'Omit<HandbackEvent, "handback">' but required in type 'HandbackEvent'.
+test/桌面应用/session.test.ts(92,37): error TS2345: Argument of type 'DesktopOrchestrationEvent' is not assignable to parameter of type 'OrchestrationEvent'.
+  Type 'Omit<HandbackEvent, "handback">' is not assignable to type 'OrchestrationEvent'.
+    Property 'handback' is missing in type 'Omit<HandbackEvent, "handback">' but required in type 'HandbackEvent'.
+test/桌面应用/session.test.ts(423,37): error TS2345: Argument of type 'DesktopOrchestrationEvent' is not assignable to parameter of type 'OrchestrationEvent'.
+  Type 'Omit<HandbackEvent, "handback">' is not assignable to type 'OrchestrationEvent'.
+    Property 'handback' is missing in type 'Omit<HandbackEvent, "handback">' but required in type 'HandbackEvent'.

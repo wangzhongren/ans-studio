@@ -52,6 +52,9 @@ function fakeProvider(
   const calls: RuntimeProviderOptions[] = [];
   const factory: RuntimeProviderFactory = (options) => {
     calls.push(options);
+    assert.equal(options.toolDisplayMode, "required-v1");
+    assert.equal(typeof options.registerToolDisplayProfile, "function");
+    options.registerToolDisplayProfile!({ credentials: [] });
     return {
       async composeContext() { return { systemPrompt: "" }; },
       async bindRole() {
