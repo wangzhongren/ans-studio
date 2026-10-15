@@ -23,3 +23,5 @@
 - 表中旧工具、schema 与 fs-write 记录保留为历史说明；当前生产处理器与权限保证见 [运行时核心](../运行时核心/docs/feature/runtime-core.md)。旧 `src/provider/pi/tools.ts` 是显式转出的兼容 facade，旧 fs-write 不在生产工具执行链。
 - P1 当前迁移与最终验证见 [原始记录](docs/change/2026-10-14_change_pi-injected-runtime.md)。没有真实模型请求，也没有提交或推送。
 - 原生恢复成功是核心 resumed；恢复失败重建是 recovered+warning。桌面旧用语须显式转换，ANS 回放不代表恢复模型上下文。
+
+- 2026-10-15：工具与输入事件同源身份修复已实现，见[修复记录](docs/fix/2026-10-15_fix_canonical-tool-events.md)。

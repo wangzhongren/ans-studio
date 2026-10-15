@@ -787,7 +787,8 @@
   }
 
   // —————— 事件渲染：气泡 / 系统状态行 / 内联拒绝（均**落到指定 pane**，B-2） ——————
-  function appendUser(pane, text) {
+  function appendUser(pane, text, force) {
+    var inputPin = force === false ? streamShouldPin(pane) : null;
     var rec = registerRow(
       pane,
       function () {
@@ -799,7 +800,8 @@
       },
       52
     );
-    scrollBottomForced(pane); // 用户自己的动作：强制贴底
+    if (force === false) scrollBottom(pane, inputPin);
+    else scrollBottomForced(pane); // 用户自己的动作：强制贴底
     return rec;
   }
 
@@ -873,10 +875,101 @@
     rec.el.open = data.open;
   }
 
+  function activityIdentity(activity) {
+    return activity.turnId && activity.callId && activity.identityPhase ? JSON.stringify([activity.turnId, activity.callId, activity.identityPhase]) : null;
+  }
+  function lifecycleIdentity(turnId, callId) { return turnId && callId ? JSON.stringify([turnId, callId]) : null; }
+  function matchingOperator(pane, activity) {
+    var ids = Object.keys(opRequests);
+    for (var i = 0; i < ids.length; i += 1) {
+      var entry = opRequests[ids[i]];
+      if (entry.projectRoot === state.projectRoot && entry.runtime === state.runtime && entry.roleId === pane.dataset.roleId &&
+          entry.turnId && entry.toolCallId && entry.turnId === activity.turnId && entry.toolCallId === activity.callId) return entry;
+    }
+    return null;
+  }
+  function fillOperatorLifecycle(entry) {
+    if (!entry.card || !entry.activityStages) return;
+    var panel = entry.card.querySelector(".op-tool-lifecycle");
+    if (!panel) { panel = document.createElement("div"); panel.className = "sys sys-call op-tool-lifecycle"; entry.card.appendChild(panel); }
+    panel.textContent = ["blocked", "result"].filter(function (phase) { return entry.activityStages[phase]; }).map(function (phase) {
+      var activity = entry.activityStages[phase];
+      return activity.toolName + " · " + activity.label + (activity.exceptional ? "：" + (activity.deniedSummary || activity.visibleSummary) : "");
+    }).join("；");
+    panel.hidden = panel.textContent === "";
+  }
+  function rememberActivities(rl, rec) {
+    var map = rl.activityByIdentity || (rl.activityByIdentity = Object.create(null));
+    var activities = rec.activityStages ? Object.keys(rec.activityStages).map(function (phase) { return rec.activityStages[phase]; }) :
+      rec.toolActivity ? [rec.toolActivity] : rec.kind === "activities" ? rec.data.items : [];
+    activities.forEach(function (activity) { var key = activityIdentity(activity); if (key) map[key] = { activity: activity, record: rec };
+      if (activity.replayToken) (rl.tokenRows || (rl.tokenRows = Object.create(null)))[Rt.tokenId(activity.replayToken)] = rec;
+    });
+    if (rec.activityStages && activities.length) (rl.toolLifecycles || (rl.toolLifecycles = Object.create(null)))[lifecycleIdentity(activities[0].turnId, activities[0].callId)] = rec;
+  }
+  function adoptOperatorLifecycle(pane, entry, card, old) {
+    var rl = rowListFor(pane), key = lifecycleIdentity(entry.turnId, entry.toolCallId);
+    var rec = key && rl.toolLifecycles && rl.toolLifecycles[key];
+    if (!rec || rec.kind === "operator") return null;
+    var reading = captureChatReading(pane);
+    if (rec.el && rec.el.parentNode === pane) rec.el.replaceWith(card);
+    rec.el = card; rec.build = function () { return card; }; rec.kind = "operator";
+    rec.keepEl = true; rec.requestId = old ? old.requestId : card.dataset.requestId; rec.replayToken = null;
+    rec.activityStages = entry.activityStages = rec.activityStages || entry.activityStages || {};
+    entry.card = card; fillOperatorLifecycle(entry); rememberActivities(rl, rec);
+    refreshActivityHeight(pane, rec, reading);
+    return rec;
+  }
+
   function appendActivity(pane, activity) {
     var rl = rowListFor(pane);
     activity.origin = activity.origin || rowOrigin;
     activity.replayToken = activity.replayToken || rowReplayToken;
+    var identity = activityIdentity(activity), map = rl.activityByIdentity || (rl.activityByIdentity = Object.create(null));
+    var existing = identity && map[identity];
+    if (existing) {
+      var previous = existing.activity;
+      // 同阶段重复可补失败事实，绝不让重复成功覆盖已知失败/拒绝。
+      if (!previous.exceptional || activity.exceptional) {
+        var reading0 = captureChatReading(pane);
+        if (!activity.fullTarget && previous.fullTarget) { activity.fullTarget = previous.fullTarget; activity.target = previous.target; }
+        Object.assign(previous, activity);
+        var rec0 = existing.record;
+        if (rec0.kind === "activities" && rec0.el) fillActivities(rec0);
+        if (rec0.refreshLifecycle) rec0.refreshLifecycle();
+        var op0 = matchingOperator(pane, activity); if (op0) fillOperatorLifecycle(op0);
+        refreshActivityHeight(pane, rec0, reading0);
+      }
+      return existing.record;
+    }
+    if (identity && activity.barrier) {
+      var lifecyclePin = streamShouldPin(pane), lifecycleReading = captureChatReading(pane);
+      var callKey = lifecycleIdentity(activity.turnId, activity.callId);
+      var lifecycles = rl.toolLifecycles || (rl.toolLifecycles = Object.create(null));
+      var lifecycle = lifecycles[callKey], operator = matchingOperator(pane, activity);
+      if (!lifecycle && operator) lifecycle = rl.rows.find(function (record) { return record.requestId && opRequests[record.requestId] === operator; });
+      if (!lifecycle) {
+        lifecycle = registerRow(pane, function (record) {
+          var el = document.createElement("div"); el.className = "sys sys-call";
+          record.el = el; if (record.refreshLifecycle) record.refreshLifecycle(); return el;
+        }, 34, { kind: "tool-lifecycle", data: null });
+        lifecycle.activityStages = {};
+        lifecycle.refreshLifecycle = function () {
+          if (!lifecycle.el || lifecycle.kind === "operator") return;
+          lifecycle.el.textContent = activity.toolName + " · " + ["start", "blocked", "result"].filter(function (phase) { return lifecycle.activityStages[phase]; }).map(function (phase) {
+            var stage = lifecycle.activityStages[phase]; return stage.label + (stage.exceptional ? "：" + (stage.deniedSummary || stage.visibleSummary) : "");
+          }).join("；");
+        };
+      }
+      lifecycle.activityStages = lifecycle.activityStages || {};
+      lifecycle.activityStages[activity.identityPhase] = activity;
+      lifecycles[callKey] = lifecycle;
+      if (operator) { operator.activityStages = lifecycle.activityStages; fillOperatorLifecycle(operator); }
+      if (lifecycle.refreshLifecycle) lifecycle.refreshLifecycle();
+      rememberActivities(rl, lifecycle); refreshActivityHeight(pane, lifecycle, lifecycleReading);
+      scrollBottom(pane, lifecyclePin);
+      return lifecycle;
+    }
     if (activity.callId) {
       var targets = rl.activityTargets || (rl.activityTargets = Object.create(null));
       var targetKey = JSON.stringify([activity.turnId, activity.callId, activity.toolName]);
@@ -885,8 +978,9 @@
     }
     if (activity.exceptional) {
       rl.activityGroup = null;
-      appendDenied(pane, activity.visibleSummary || activity.toolName + ' · ' + activity.label, activity.fullTarget);
-      return rl.rows[rl.rows.length - 1];
+      appendDenied(pane, activity.deniedSummary || activity.visibleSummary || activity.toolName + ' · ' + activity.label, activity.fullTarget);
+      var deniedRec = rl.rows[rl.rows.length - 1]; deniedRec.toolActivity = activity; rememberActivities(rl, deniedRec);
+      return deniedRec;
     }
     if (activity.barrier) {
       rl.activityGroup = null;
@@ -926,6 +1020,7 @@
       if (rec.el) fillActivities(rec);
       refreshActivityHeight(pane, rec, saved);
     }
+    rememberActivities(rl, rec);
     scrollBottom(pane, pin);
     return rec;
   }
@@ -1329,7 +1424,7 @@
     // anchorKey：请求的锚点键（主进程按单一算法从请求本体 kind+title 拼出）——（重）物化时与回放行
     // 精确关联、把卡落回它发生的位置；payload 未带（旧主进程/探针直发）⇒ null ⇒ 走首物化位/兜底落尾。
     var anchorKey = typeof payload.anchorKey === "string" && payload.anchorKey !== "" ? payload.anchorKey : null;
-    opRequests[requestId] = entry = { roleId: roleId, runtime: state.runtime, projectRoot: state.projectRoot, request: req, state: "open", finalNote: null, card: null, anchorKey: anchorKey };
+    opRequests[requestId] = entry = { roleId: roleId, runtime: state.runtime, projectRoot: state.projectRoot, turnId: typeof payload.turnId === "string" ? payload.turnId : "", toolCallId: typeof payload.toolCallId === "string" ? payload.toolCallId : "", request: req, state: "open", finalNote: null, card: null, anchorKey: anchorKey };
     materializeOperatorCard(requestId);
     refreshAwaitingBadge(roleId);
     if (backgroundDelivery) return;
@@ -1473,7 +1568,7 @@
     var first = entry.anchorIndex === undefined;
     var atIndex = first ? null : operatorAnchorIndex(rl, entry);
     // Q-2：待确认卡入行表（**keepEl**——离窗只脱挂、实例与监听器保留；`requestId` 供 P-1 定位按行找）。
-    var rec = registerRow(pane, function () { return card; }, 220, { keepEl: true, kind: "operator", requestId: requestId, atIndex: atIndex });
+    var rec = adoptOperatorLifecycle(pane, entry, card) || registerRow(pane, function () { return card; }, 220, { keepEl: true, kind: "operator", requestId: requestId, atIndex: atIndex });
     if (first) {
       entry.anchorIndex = rec.index; // 首次物化的时序位置（其后新行只追加/重编号，此位恒指「它发生时的地方」）
       entry.anchorListSeq = rl.seq;
@@ -1484,6 +1579,7 @@
     // —— 作答流程（**登记表驱动**）：提交期间禁用按钮；成功/失效 → **终态定格**（登记 finalNote，
     //    重物化时同款输出）；可重试失败（校验驳回等）→ 解冻重试——如实，不假装成功。 ——
     entry.card = card;
+    fillOperatorLifecycle(entry);
     if (entry.state !== "open") {
       freezeOperatorCard(card, entry.finalNote.text, entry.finalNote.cls); // 补挂的终态卡：定格呈现
       return;
@@ -1672,11 +1768,14 @@
     var ev = env.event;
     if (ev.runtime != null && ev.runtime !== state.runtime || ev.roleId != null && ev.roleId !== env.roleId) return;
     bindManualTurn(env);
-    var key = Rt.replayKey({ turnId: ev.turnId, eventKind: ev.kind, text: ev.summary });
+    var key = Rt.replayKey({ turnId: ev.turnId, kind: ev.kind, eventKind: ev.kind, text: ev.summary, detail: ev.detail });
     var counts = liveReplayCounts[env.roleId] || (liveReplayCounts[env.roleId] = Object.create(null));
-    var token = key ? { key: key, occurrence: (counts[key] = (counts[key] || 0) + 1) } : null;
+    var canonical = Rt.canonicalKey({ turnId: ev.turnId, kind: ev.kind, eventKind: ev.kind, detail: ev.detail });
+    var alreadyLive = key && counts[key];
+    var token = key ? { key: key, occurrence: (counts[key] = canonical ? 1 : (counts[key] || 0) + 1) } : null;
     var historyCounts = replayState[env.roleId] && replayState[env.roleId].counts || {};
-    if (token && (historyCounts[key] || 0) >= token.occurrence) return;
+    var toolIdentity = canonical && JSON.parse(canonical)[0] === "tool";
+    if (!toolIdentity && token && ((historyCounts[key] || 0) >= token.occurrence || canonical && alreadyLive)) return;
     var priorOrigin = rowOrigin, priorToken = rowReplayToken;
     rowOrigin = "live"; rowReplayToken = token;
     try { renderOneEvent(env); }
@@ -1690,7 +1789,7 @@
     message.turnId = ev.turnId;
     var key = Rt.replayKey({ kind: "user", turnId: ev.turnId, text: message.text });
     var counts = liveReplayCounts[env.roleId] || (liveReplayCounts[env.roleId] = Object.create(null));
-    message.rec.replayToken = { key: key, occurrence: (counts[key] = (counts[key] || 0) + 1) };
+    message.rec.replayToken = { key: key, occurrence: (counts[key] = 1) };
     var rl = paneRowLists[env.roleId];
     if (rl) (rl.tokenRows || (rl.tokenRows = Object.create(null)))[Rt.tokenId(message.rec.replayToken)] = message.rec;
     var history = replayState[env.roleId];
@@ -1725,19 +1824,17 @@
       // 系统投递输入（E-1 回交 / H-1 派发）**单独样式**：判据＝编排两名渲染函数的定格前缀
       // （`tool-rows.js::INJECT_PREFIXES`；**非启发式**——格式若变只改那张表）＋剥离 `用户指令：` 回显前缀。
       // **手输防误伤**：若该回显正是本端刚手发送的文本（同角色、15s 内），一律不当投递——普通气泡路径。
-      var injected = Tr.classifyInjectedMessage ? Tr.classifyInjectedMessage(ev.summary) : null;
-      var recentManual =
-        injected !== null &&
-        lastManualSend.roleId === roleId &&
-        injected.body === lastManualSend.text &&
-        Date.now() - lastManualSend.at < 15000;
-      if (injected !== null && !recentManual) appendInjectedMessage(pane, injected);
-      else appendAssistant(pane, ev.summary);
+      var input = ev.detail && ev.detail.source === "prompt-input" && typeof ev.detail.text === "string" ? ev.detail : null;
+      if (input) {
+        var injected = Tr.classifyInjectedMessage ? Tr.classifyInjectedMessage(input.text) : null;
+        if (injected) appendInjectedMessage(pane, injected);
+        else appendUser(pane, input.text, false);
+      } else appendAssistant(pane, ev.summary);
     }
     else if (kind === "tool_call" || kind === "accepted") appendActivity(pane, Tr.activityOf(ev));
     else if (kind === "denied") {
       var failure = Tr.activityOf(ev);
-      appendDenied(pane, ev.summary, failure.fullTarget);
+      appendActivity(pane, failure);
     } // 治理信号（拒绝原因 + 允许路径）：全量，不瘦身
     else if (kind === "settled") {
       // 一轮结束：**忙态由主进程快照转述**（session:role-state 的 busy=false——见 onRoleState），
@@ -2069,11 +2166,6 @@
       if (!has(state.sessionOpenRoleId)) state.sessionOpenRoleId = null;
     }
 
-    renderRoleTree();
-    renderRight();
-    renderTabs();
-    setChatHeader(selectedRole());
-    updateControls();
     if (fresh) {
       setState("idle", "未连接");
       state.roleMeta = {}; // B-3：换项目后状态从零开始（老项目的状态不跨项目保留）
@@ -2085,6 +2177,11 @@
       resetPanes();
       flushPendingHistories(); // D-1：本项目的恢复数据（可能先于 pane 就绪推达）在此回放
     }
+    renderRoleTree();
+    renderRight();
+    renderTabs();
+    setChatHeader(selectedRole());
+    updateControls();
   }
 
   /** 取主进程的保活会话列表（B-2）→ 「有活动会话」与状态派生的数据源。失败如实清空（不假装有）。 */
@@ -2296,8 +2393,9 @@
     function covered(token) { return token && (nextCounts[token.key] || 0) >= token.occurrence; }
     function preserve(value) { if (!buckets.has(anchor)) buckets.set(anchor, []); buckets.get(anchor).push(value); }
     if (rl) rl.rows.forEach(function (rec) {
-      if (rec.kind === "activities") {
-        rec.data.items.forEach(function (activity) {
+      if (rec.kind === "activities" || rec.kind === "tool-lifecycle") {
+        var preservedActivities = rec.kind === "activities" ? rec.data.items : Object.keys(rec.activityStages).map(function (phase) { return rec.activityStages[phase]; });
+        preservedActivities.forEach(function (activity) {
           if (covered(activity.replayToken)) anchor = Rt.tokenId(activity.replayToken);
           else if (activity.origin !== "history") preserve({ activity: activity });
         });
@@ -2326,10 +2424,15 @@
         if (entry.roleId === pane.dataset.roleId && entry.anchorListSeq === rl.seq && entry.anchorIndex >= atIndex) entry.anchorIndex += 1;
       });
     }
-    var rec = registerRow(pane, function (record) { return savedEl || old.build(record); }, Math.max(1, old.h - gap),
+    var operatorEntry = old.requestId && opRequests[old.requestId];
+    var adopted = operatorEntry && savedEl && adoptOperatorLifecycle(pane, operatorEntry, savedEl, old);
+    var rec = adopted || registerRow(pane, function (record) { return savedEl || old.build(record); }, Math.max(1, old.h - gap),
       { kind: old.kind, data: old.data, keepEl: old.keepEl, mdReady: old.mdReady, requestId: old.requestId,
         origin: old.origin, replayToken: old.replayToken, manualClientId: old.manualClientId, atIndex: atIndex });
     if (old.manualClientId && manualMessages[old.manualClientId]) manualMessages[old.manualClientId].rec = rec;
+    rec.toolActivity = old.toolActivity; rec.activityStages = old.activityStages ? Object.assign({}, old.activityStages, rec.activityStages || {}) : rec.activityStages;
+    if (rec.activityStages && operatorEntry) { operatorEntry.activityStages = rec.activityStages; fillOperatorLifecycle(operatorEntry); }
+    rememberActivities(rl, rec);
     if (old.requestId && opRequests[old.requestId]) {
       opRequests[old.requestId].anchorIndex = rec.index;
       opRequests[old.requestId].anchorListSeq = rowListFor(pane).seq;
@@ -2391,8 +2494,9 @@
       var from = plan.action === "append" ? plan.from : 0;
       for (var i = 0; i < rows.length; i += 1) {
         var key = Rt.replayKey(rows[i]);
-        var token = key ? { key: key, occurrence: (counts[key] = (counts[key] || 0) + 1) } : null;
-        if (i < from) continue;
+        var seenCanonical = key && Rt.canonicalKey(rows[i]) && counts[key];
+        var token = key ? { key: key, occurrence: (counts[key] = Rt.canonicalKey(rows[i]) ? 1 : (counts[key] || 0) + 1) } : null;
+        if (i < from || seenCanonical && rows[i].kind === "user") continue;
         rowOrigin = "history"; rowReplayToken = token;
         if (plan.action === "append" && token && (liveCounts[key] || 0) >= token.occurrence) {
           var existing = rowListFor(pane).tokenRows && rowListFor(pane).tokenRows[Rt.tokenId(token)];

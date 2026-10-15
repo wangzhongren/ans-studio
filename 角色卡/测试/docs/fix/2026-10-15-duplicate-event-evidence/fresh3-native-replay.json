@@ -1,0 +1,718 @@
+{
+  "su": {
+    "nativeCalls": [
+      {
+        "id": "call_00_LAlSe47USnBsURILuTLi0597",
+        "name": "run_shell",
+        "arguments": {
+          "command": "ls -la 角色卡"
+        }
+      },
+      {
+        "id": "call_01_0HeJyHC4nwA4v8R0j7JY9352",
+        "name": "read_file",
+        "arguments": {
+          "path": "角色卡/governance-boundary.yaml"
+        }
+      },
+      {
+        "id": "call_00_JxwKpPUkARP8p0Icimcz1367",
+        "name": "run_shell",
+        "arguments": {
+          "command": "ls -la 角色卡/测试"
+        }
+      },
+      {
+        "id": "call_01_tLj9kfB7NwtbFEtDj9Dj4695",
+        "name": "read_file",
+        "arguments": {
+          "path": "角色卡/测试/boundary.yaml"
+        }
+      },
+      {
+        "id": "call_02_5DtYEK12G00BMI3Lg3R11122",
+        "name": "read_file",
+        "arguments": {
+          "path": "角色卡/测试/role-card.md"
+        }
+      },
+      {
+        "id": "call_00_dYmIk0tIbciVZEhD6kl91650",
+        "name": "dispatch_task",
+        "arguments": {
+          "roleId": "测试",
+          "reason": "DUP-FRESH-3 独立验证任务：确认 null 校验修复并做环境/git/npm test 复现记录",
+          "task": "DUP-FRESH-3 验证任务（你在全新会话，无历史上下文，以下文本自足）\n\n一、只读核对（不修改任何文件）\n1. 读 index.js 与 test.js（只读），确认 null 校验修复已落地：写明你看到的 null 校验逻辑所在位置与判定方式，以及 test.js 中对应的断言用例（区分「看到」与「推断」）。\n2. read_file docs/does-not-exist-dup-probe.txt —— 预期读取失败（该文件不存在）。请如实记录该失败（工具返回的错误信息原文摘要），不要创建该文件、不要手动造出该文件。\n\n二、环境与改动概览（按「单程序工具」约定：一个程序一次调用，不得使用 && / ; / 管道 / 重定向 / 变量展开）\n3. run_shell 实际执行 node -v：必须分两次独立调用（两个 run_shell 调用，各记一次输出与退出码）。\n4. 查看 git 状态与改动概览：分次独立调用（例如 git status 一次、git diff --stat 一次），记录原始输出摘要。\n\n三、精确测试\n5. 最后执行 npm test（一次，命令精确为 npm test），预期 31 项通过、退出码 0。记录：命令、结果摘要（通过数/失败数）、退出码、关键原始输出。\n\n四、约束\n- 源码、边界、配置一律不改：不写 index.js、index.d.ts、test.js、package.json、.gitignore 等；只读 + 运行命令 + 写你报告。\n- 第 2 步的读取失败是预期结果，不是缺陷，请如实记为「预期失败」。\n\n五、报告\n- 把完整记录写到 角色卡/测试/docs/change/dup-fresh-3.md（落在你自己的文档面内），内容含：每步的命令/输入、原始输出摘要、退出码、判定结论（null 校验修复是否确认、npm test 是否 31 通过且退出 0、两处异常/预期失败的说明）。\n- 结论必须可复现：给出命令、环境（Node 版本）、原始输出摘要。\n\n六、提交\n- 用 submit_report 提交，摘要中必须包含字符串 DUP-FRESH-3。"
+        }
+      },
+      {
+        "id": "call_00_mhZPjQsZh2ENWAgRjCV29498",
+        "name": "read_file",
+        "arguments": {
+          "path": "角色卡/测试/docs/change/dup-fresh-3.md"
+        }
+      },
+      {
+        "id": "call_01_Xui6qNshaL3AfR0XGJHm6601",
+        "name": "read_file",
+        "arguments": {
+          "path": "index.js"
+        }
+      },
+      {
+        "id": "call_02_6TsNMbNnMZMUV9xkJmEk7512",
+        "name": "read_file",
+        "arguments": {
+          "path": "test.js"
+        }
+      },
+      {
+        "id": "call_03_gBdCi7Jx3mtBuEjvFoSf9285",
+        "name": "run_shell",
+        "arguments": {
+          "command": "git diff --stat"
+        }
+      }
+    ],
+    "nativeResultCount": 10,
+    "startCount": 10,
+    "duplicateStartKeys": [],
+    "inputRows": [
+      {
+        "at": "2026-10-15T01:23:21.406Z",
+        "kind": "user",
+        "text": "DUP-FRESH-3：这是p-limit真实候选的全新会话，无旧会话历史。仅一次dispatch_task给测试角色，任务：只读index.js/test.js确认null校验修复；read_file docs/does-not-exist-dup-probe.txt，预期失败需记录；run_shell实际node -v两次，必须两个调用；查看git状态与改动概览（按单程序工具约定）；最后精确npm test，预期31通过和退出0。源码/边界/配置一律不改，报告写自己的角色卡/测试/docs/change/dup-fresh-3.md，submit_report摘要含DUP-FRESH-3。收到报告后你只读核对并简短汇总，不再派发或写其他文件。以上已授权，不再询问是否继续。",
+        "turnId": "1ed00b11-b5ef-4cd7-9996-54a09701e06f"
+      },
+      {
+        "at": "2026-10-15T01:24:36.081Z",
+        "kind": "user",
+        "text": "[回交] 来自 测试 的报告（任务关联未知）\n结论：completed\n摘要：DUP-FRESH-3 独立验证任务：确认 null 校验修复并做环境/git/npm test 复现记录。全程只读+运行命令，未改任何受保护文件；完整记录已写入 角色卡/测试/docs/change/dup-fresh-3.md。结论：null 校验修复确认落地（index.js 第 6 行 `typeof concurrency === 'object' && concurrency !== null`，test.js 末块有对应断言），npm test 31 项通过、退出码 0；探针文件读取失败与 npm 配置告警均为预期/无关。\n证据：\n  - 产物：角色卡/测试/docs/change/dup-fresh-3.md（8428 字节，含每步命令/原始输出摘要/退出码/判定）\n  - index.js 第6行看到 null 校验：if (typeof concurrency === 'object' && concurrency !== null) {...}；validateConcurrency 对 null 抛 TypeError('Expected `concurrency` to be a number from 1 and up')\n  - test.js 末块看到断言用例 test('throws the concurrency validation error for null')，t.throws(..., {instanceOf: TypeError}) 且 t.is(error.message, 'Expected `concurrency` to be a number from 1 and up')\n  - git diff index.js test.js：- if (typeof concurrency === 'object') { / + if (typeof concurrency === 'object' && concurrency !== null) {；test.js 新增 8 行对应用例\n  - read_file docs/does-not-exist-dup-probe.txt 预期失败：ENOENT: no such file or directory, open '.../docs/does-not-exist-dup-probe.txt'（未创建该文件）\n  - node -v 两次独立调用均为 v24.14.0、退出码 0（空 stderr）\n  - git status 退出0：modified index.js、modified test.js；untracked .ans/、docs/、角色卡/；git diff --stat：2 files changed, 9 insertions(+), 1 deletion(-)\n  - npm test 退出码 0：> xo && ava && tsd；输出 '31 tests passed'，含 ✔ throws the concurrency validation error for null；xo 仅 1 条 no-warning-comments warning（scripts/benchmarker.js TODO）\n  - npm test stderr 仅 4 条 npm warn Unknown ... config（环境级告警，与结果无关）\n  - 约束遵守：未写 index.js / index.d.ts / test.js / package.json / .gitignore\n请验收已收到的报告，并向客户给出统一结果：实际完成了什么、产物路径、实际测试结果、哪些未完成或待补报告/返工，以及下一步。\n只有证据支持才确认通过；未报告、失败或中止不得当作完成。不要把会话结束或工具执行次数当成果。\n没有明确任务关联或收齐条件时，只汇总手头结果，不宣称全部角色或整个任务已完成。\n已授权范围内的常规后续操作继续处理，不重复请求同一授权；确有越界或必要客户决策时说明具体原因。",
+        "turnId": "ce48ec36-98af-475e-a75e-c053248380cc"
+      }
+    ],
+    "typedInputs": [
+      {
+        "kind": "message",
+        "summary": "用户指令：DUP-FRESH-3：这是p-limit真实候选的全新会话，无旧会话历史。仅一次dispatch_task给测试角色，任务：只读index.js/test.js确认null校验修复；read_file docs/does-not-exist-dup-probe.txt，预期失败需记录；run_shell实际node -v两次，必须两个调用；查看git状态与改动概览（按单程序工具约定）；最后精确npm test，预期31通过和退出0。源码/边界/配置一律不改，报告写自己的角色卡/测试/docs/change/dup-fresh-3.md，submit_report摘要含DUP-FRESH-3。收到报告后你只读核对并简短汇总，不再派发或写其他文件。以上已授权，不再询问是否继续。",
+        "runtime": "pi",
+        "roleId": "su",
+        "turnId": "1ed00b11-b5ef-4cd7-9996-54a09701e06f",
+        "detail": {
+          "source": "prompt-input",
+          "text": "DUP-FRESH-3：这是p-limit真实候选的全新会话，无旧会话历史。仅一次dispatch_task给测试角色，任务：只读index.js/test.js确认null校验修复；read_file docs/does-not-exist-dup-probe.txt，预期失败需记录；run_shell实际node -v两次，必须两个调用；查看git状态与改动概览（按单程序工具约定）；最后精确npm test，预期31通过和退出0。源码/边界/配置一律不改，报告写自己的角色卡/测试/docs/change/dup-fresh-3.md，submit_report摘要含DUP-FRESH-3。收到报告后你只读核对并简短汇总，不再派发或写其他文件。以上已授权，不再询问是否继续。",
+          "turnId": "1ed00b11-b5ef-4cd7-9996-54a09701e06f"
+        }
+      },
+      {
+        "kind": "message",
+        "summary": "用户指令：[回交] 来自 测试 的报告（任务关联未知）\n结论：completed\n摘要：DUP-FRESH-3 独立验证任务：确认 null 校验修复并做环境/git/npm test 复现记录。全程只读+运行命令，未改任何受保护文件；完整记录已写入 角色卡/测试/docs/change/dup-fresh-3.md。结论：null 校验修复确认落地（index.js 第 6 行 `typeof concurrency === 'object' && concurrency !== null`，test.js 末块有对应断言），npm test 31 项通过、退出码 0；探针文件读取失败与 npm 配置告警均为预期/无关。\n证据：\n  - 产物：角色卡/测试/docs/change/dup-fresh-3.md（8428 字节，含每步命令/原始输出摘要/退出码/判定）\n  - index.js 第6行看到 null 校验：if (typeof concurrency === 'object' && concurrency !== null) {...}；validateConcurrency 对 null 抛 TypeError('Expected `concurrency` to be a number from 1 and up')\n  - test.js 末块看到断言用例 test('throws the concurrency validation error for null')，t.throws(..., {instanceOf: TypeError}) 且 t.is(error.message, 'Expected `concurrency` to be a number from 1 and up')\n  - git diff index.js test.js：- if (typeof concurrency === 'object') { / + if (typeof concurrency === 'object' && concurrency !== null) {；test.js 新增 8 行对应用例\n  - read_file docs/does-not-exist-dup-probe.txt 预期失败：ENOENT: no such file or directory, open '.../docs/does-not-exist-dup-probe.txt'（未创建该文件）\n  - node -v 两次独立调用均为 v24.14.0、退出码 0（空 stderr）\n  - git status 退出0：modified index.js、modified test.js；untracked .ans/、docs/、角色卡/；git diff --stat：2 files changed, 9 insertions(+), 1 deletion(-)\n  - npm test 退出码 0：> xo && ava && tsd；输出 '31 tests passed'，含 ✔ throws the concurrency validation error for null；xo 仅 1 条 no-warning-comments warning（scripts/benchmarker.js TODO）\n  - npm test stderr 仅 4 条 npm warn Unknown ... config（环境级告警，与结果无关）\n  - 约束遵守：未写 index.js / index.d.ts / test.js / package.json / .gitignore\n请验收已收到的报告，并向客户给出统一结果：实际完成了什么、产物路径、实际测试结果、哪些未完成或待补报告/返工，以及下一步。\n只有证据支持才确认通过；未报告、失败或中止不得当作完成。不要把会话结束或工具执行次数当成果。\n没有明确任务关联或收齐条件时，只汇总手头结果，不宣称全部角色或整个任务已完成。\n已授权范围内的常规后续操作继续处理，不重复请求同一授权；确有越界或必要客户决策时说明具体原因。",
+        "runtime": "pi",
+        "roleId": "su",
+        "turnId": "ce48ec36-98af-475e-a75e-c053248380cc",
+        "detail": {
+          "source": "prompt-input",
+          "text": "[回交] 来自 测试 的报告（任务关联未知）\n结论：completed\n摘要：DUP-FRESH-3 独立验证任务：确认 null 校验修复并做环境/git/npm test 复现记录。全程只读+运行命令，未改任何受保护文件；完整记录已写入 角色卡/测试/docs/change/dup-fresh-3.md。结论：null 校验修复确认落地（index.js 第 6 行 `typeof concurrency === 'object' && concurrency !== null`，test.js 末块有对应断言），npm test 31 项通过、退出码 0；探针文件读取失败与 npm 配置告警均为预期/无关。\n证据：\n  - 产物：角色卡/测试/docs/change/dup-fresh-3.md（8428 字节，含每步命令/原始输出摘要/退出码/判定）\n  - index.js 第6行看到 null 校验：if (typeof concurrency === 'object' && concurrency !== null) {...}；validateConcurrency 对 null 抛 TypeError('Expected `concurrency` to be a number from 1 and up')\n  - test.js 末块看到断言用例 test('throws the concurrency validation error for null')，t.throws(..., {instanceOf: TypeError}) 且 t.is(error.message, 'Expected `concurrency` to be a number from 1 and up')\n  - git diff index.js test.js：- if (typeof concurrency === 'object') { / + if (typeof concurrency === 'object' && concurrency !== null) {；test.js 新增 8 行对应用例\n  - read_file docs/does-not-exist-dup-probe.txt 预期失败：ENOENT: no such file or directory, open '.../docs/does-not-exist-dup-probe.txt'（未创建该文件）\n  - node -v 两次独立调用均为 v24.14.0、退出码 0（空 stderr）\n  - git status 退出0：modified index.js、modified test.js；untracked .ans/、docs/、角色卡/；git diff --stat：2 files changed, 9 insertions(+), 1 deletion(-)\n  - npm test 退出码 0：> xo && ava && tsd；输出 '31 tests passed'，含 ✔ throws the concurrency validation error for null；xo 仅 1 条 no-warning-comments warning（scripts/benchmarker.js TODO）\n  - npm test stderr 仅 4 条 npm warn Unknown ... config（环境级告警，与结果无关）\n  - 约束遵守：未写 index.js / index.d.ts / test.js / package.json / .gitignore\n请验收已收到的报告，并向客户给出统一结果：实际完成了什么、产物路径、实际测试结果、哪些未完成或待补报告/返工，以及下一步。\n只有证据支持才确认通过；未报告、失败或中止不得当作完成。不要把会话结束或工具执行次数当成果。\n没有明确任务关联或收齐条件时，只汇总手头结果，不宣称全部角色或整个任务已完成。\n已授权范围内的常规后续操作继续处理，不重复请求同一授权；确有越界或必要客户决策时说明具体原因。",
+          "turnId": "ce48ec36-98af-475e-a75e-c053248380cc"
+        }
+      }
+    ],
+    "toolResults": [
+      {
+        "role": "toolResult",
+        "toolCallId": "call_00_LAlSe47USnBsURILuTLi0597",
+        "toolName": "run_shell",
+        "content": [
+          {
+            "type": "text",
+            "text": "run_shell 已执行：ls -la 角色卡（exit 0）\nstdout:\ntotal 8\ndrwxr-xr-x@  6 wangzhongren  wheel  192 Oct 14 22:41 .\ndrwxr-xr-x@ 22 wangzhongren  wheel  704 Oct 15 09:18 ..\n-rw-r--r--@  1 wangzhongren  wheel  388 Oct 14 20:51 governance-boundary.yaml\ndrwxr-xr-x@  6 wangzhongren  wheel  192 Oct 14 20:56 测试\ndrwxr-xr-x@  9 wangzhongren  wheel  288 Oct 14 22:56 维护\ndrwxr-xr-x@  6 wangzhongren  wheel  192 Oct 14 22:42 项目管理\n\nstderr:\n"
+          }
+        ],
+        "details": {
+          "turnId": "1ed00b11-b5ef-4cd7-9996-54a09701e06f",
+          "toolCallId": "call_00_LAlSe47USnBsURILuTLi0597",
+          "toolName": "run_shell",
+          "ok": true,
+          "status": "completed",
+          "durationMs": 14
+        },
+        "isError": false,
+        "durationMs": 15,
+        "timestamp": 1792027404933
+      },
+      {
+        "role": "toolResult",
+        "toolCallId": "call_01_0HeJyHC4nwA4v8R0j7JY9352",
+        "toolName": "read_file",
+        "content": [
+          {
+            "type": "text",
+            "text": "read_file: 角色卡/governance-boundary.yaml\n\nrole: 治理边界\nentries:\n  - kind: directory\n    path: 角色卡/\n    root: project\n    purpose: 角色目录：新建/修改角色（role-card/boundary/memo/docs）与治理边界文档自身\n  - kind: directory\n    path: docs/\n    root: project\n    purpose: 项目文档\n  - kind: directory\n    path: .ans/\n    root: project\n    purpose: .ans/project.json（acceptance/pin 更新）\n"
+          }
+        ],
+        "details": {
+          "turnId": "1ed00b11-b5ef-4cd7-9996-54a09701e06f",
+          "toolCallId": "call_01_0HeJyHC4nwA4v8R0j7JY9352",
+          "toolName": "read_file",
+          "path": "角色卡/governance-boundary.yaml",
+          "ok": true,
+          "status": "completed",
+          "durationMs": 8
+        },
+        "isError": false,
+        "durationMs": 9,
+        "timestamp": 1792027404933
+      },
+      {
+        "role": "toolResult",
+        "toolCallId": "call_00_JxwKpPUkARP8p0Icimcz1367",
+        "toolName": "run_shell",
+        "content": [
+          {
+            "type": "text",
+            "text": "run_shell 已执行：ls -la 角色卡/测试（exit 0）\nstdout:\ntotal 24\ndrwxr-xr-x@ 6 wangzhongren  wheel   192 Oct 14 20:56 .\ndrwxr-xr-x@ 6 wangzhongren  wheel   192 Oct 14 22:41 ..\n-rw-------@ 1 wangzhongren  wheel  1086 Oct 14 20:51 boundary.yaml\ndrwxr-xr-x@ 3 wangzhongren  wheel    96 Oct 14 20:56 docs\n-rw-------@ 1 wangzhongren  wheel   999 Oct 14 20:51 memo.md\n-rw-------@ 1 wangzhongren  wheel  2697 Oct 14 20:51 role-card.md\n\nstderr:\n"
+          }
+        ],
+        "details": {
+          "turnId": "1ed00b11-b5ef-4cd7-9996-54a09701e06f",
+          "toolCallId": "call_00_JxwKpPUkARP8p0Icimcz1367",
+          "toolName": "run_shell",
+          "ok": true,
+          "status": "completed",
+          "durationMs": 13
+        },
+        "isError": false,
+        "durationMs": 14,
+        "timestamp": 1792027407660
+      },
+      {
+        "role": "toolResult",
+        "toolCallId": "call_01_tLj9kfB7NwtbFEtDj9Dj4695",
+        "toolName": "read_file",
+        "content": [
+          {
+            "type": "text",
+            "text": "read_file: 角色卡/测试/boundary.yaml\n\nrole: 测试\nentries:\n  - kind: directory\n    path: temp/测试/\n    purpose: 未通过/返工产物暂存，供审核对照（草稿区）\n  - kind: directory\n    path: test/测试/\n    purpose: 本角色负责的测试目录\n  - kind: file\n    path: 角色卡/测试/feature-map.md\n    purpose: 覆盖矩阵（功能↔用例）\n  - kind: file\n    path: 角色卡/测试/memo.md\n    purpose: 工作备忘录（进行中事项/待确认项）\n  - kind: file\n    path: 角色卡/测试/changelog.md\n    purpose: 变更记录\n  - kind: file\n    path: 角色卡/测试/functional-description.md\n    purpose: 被测行为说明\n  - kind: file\n    path: 角色卡/测试/api-spec.md\n    purpose: 被测契约（与 index.d.ts 对齐）\n  - kind: directory\n    path: 角色卡/测试/docs/design/\n    purpose: 测试设计文档\n  - kind: directory\n    path: 角色卡/测试/docs/feature/\n    purpose: 用例文档\n  - kind: directory\n    path: 角色卡/测试/docs/change/\n    purpose: 变更文档\n  - kind: directory\n    path: 角色卡/测试/docs/fix/\n    purpose: 缺陷验证文档\n"
+          }
+        ],
+        "details": {
+          "turnId": "1ed00b11-b5ef-4cd7-9996-54a09701e06f",
+          "toolCallId": "call_01_tLj9kfB7NwtbFEtDj9Dj4695",
+          "toolName": "read_file",
+          "path": "角色卡/测试/boundary.yaml",
+          "ok": true,
+          "status": "completed",
+          "durationMs": 6
+        },
+        "isError": false,
+        "durationMs": 7,
+        "timestamp": 1792027407660
+      },
+      {
+        "role": "toolResult",
+        "toolCallId": "call_02_5DtYEK12G00BMI3Lg3R11122",
+        "toolName": "read_file",
+        "content": [
+          {
+            "type": "text",
+            "text": "read_file: 角色卡/测试/role-card.md\n\n# 角色卡：测试\n\n- 角色 id：`测试`\n- 类型：项目角色（验证/测试类）\n- 边界文件：`角色卡/测试/boundary.yaml`（权威；本卡描述与之一致）\n- 创建：ANS Governance（su）；后续边界变更须经客户确认（request_confirmation）\n\n## 1. 职责\n- 为 p-limit 建立并维护验证资产：并发上限、错误传播、异步上下文、动态 concurrency、clearQueue/rejectOnClear、map 全系列行为的回归用例。\n- 维护测试执行方式：`npm test`（`xo && ava && tsd`）与 `npm run benchmark` 的可复现记录；记录环境（Node >= 20）、失败输出与判定依据。\n- 独立验证「维护」角色提出的修复：以复现用例对照，给出通过/退回结论；退回时按第 4 节流程存档。\n- 测试计划、用例说明、验证结论落 `角色卡/测试/` 文档面。\n\n## 2. 边界（Section 1）\n- 可写：`角色卡/测试/` 下固定文档面（feature-map.md、memo.md、changelog.md、functional-description.md、api-spec.md、docs/design/、docs/feature/、docs/change/、docs/fix/）、自有测试目录 `test/测试/`、`temp/测试/`。\n- 不可写：现有源码与根级 `test.js`（本轮不授予，避免改动既有测试资产）、`index.js`、`index.d.ts`；项目根以外。\n- 新增写权须由 su 走治理变更并经客户确认。\n\n## 3. 文档面与职责对应\n| 文件/目录 | 用途 |\n| --- | --- |\n| feature-map.md | 功能↔用例 覆盖矩阵（含未覆盖点） |\n| functional-description.md | 被测行为说明与预期语义 |\n| api-spec.md | 被测契约（与 index.d.ts 对齐） |\n| memo.md | 进行中事项 / 待确认项 |\n| changelog.md | 测试资产变更记录 |\n| docs/design, feature, change, fix | 测试设计、用例、变更、缺陷验证 支撑文档 |\n| test/测试/ | 本角色自有测试目录 |\n| temp/测试/ | 未通过、返工产物暂存（草稿区，非交付物、不参与 pin） |\n\n## 4. 退回 / 返工流程\n退回他人产物或自身被退回时：产物按 `YYYY-MM-DD_名称-vN.md` 存档进 `temp/测试/`，并写 `temp/测试/REVIEW.md` 记「谁退的 / 为什么 / 要求什么」，再改主交付物。\n红线：被门禁拒绝的写入不产生产物，不得存入 temp。\n\n## 5. 交付纪律\n- 测试资产与其文档同批交回；用例变更必须同步 changelog.md 与 memo.md。\n- 结论必须可复现：给出命令、环境、原始输出摘要。\n\n## 6. 协作\n- 与 `维护` 角色：接收修复说明 → 复现 → 判定；有争议时以「可复现输出」为准。\n- 任务由 su 通过 dispatch_task 派发；任务文本自足（做什么 / 依据哪份文档或契约 / 完成标准）。\n"
+          }
+        ],
+        "details": {
+          "turnId": "1ed00b11-b5ef-4cd7-9996-54a09701e06f",
+          "toolCallId": "call_02_5DtYEK12G00BMI3Lg3R11122",
+          "toolName": "read_file",
+          "path": "角色卡/测试/role-card.md",
+          "ok": true,
+          "status": "completed",
+          "durationMs": 7
+        },
+        "isError": false,
+        "durationMs": 8,
+        "timestamp": 1792027407660
+      },
+      {
+        "role": "toolResult",
+        "toolCallId": "call_00_dYmIk0tIbciVZEhD6kl91650",
+        "toolName": "dispatch_task",
+        "content": [
+          {
+            "type": "text",
+            "text": "dispatch_task：任务已派发给「测试」（status 由对方经回交报告回报）。 已受理：任务将投递给角色 测试 的会话（其会话未开——将自动开启）；投递结果/失败会在其聊天流与 su 的聊天流如实显示（受理≠已完成）。注意：**派发 ≠ 授权**——对方只在自己已接受边界内执行已授权任务，普通操作无需逐次确认；新建或扩张边界、治理写集仍由 su 请求客户确认；你不得代为授权，也不能承诺对方一定会写。"
+          }
+        ],
+        "details": {
+          "turnId": "1ed00b11-b5ef-4cd7-9996-54a09701e06f",
+          "toolCallId": "call_00_dYmIk0tIbciVZEhD6kl91650",
+          "toolName": "dispatch_task",
+          "ok": true,
+          "status": "completed",
+          "durationMs": 1
+        },
+        "isError": false,
+        "durationMs": 2,
+        "timestamp": 1792027416509
+      },
+      {
+        "role": "toolResult",
+        "toolCallId": "call_00_mhZPjQsZh2ENWAgRjCV29498",
+        "toolName": "read_file",
+        "content": [
+          {
+            "type": "text",
+            "text": "read_file: 角色卡/测试/docs/change/dup-fresh-3.md\n\n# DUP-FRESH-3 独立验证记录（全新会话，无历史上下文）\n\n- 任务：DUP-FRESH-3 独立验证任务：确认 null 校验修复并做环境/git/npm test 复现记录\n- 执行角色：测试\n- 工作目录：/private/tmp/ans-real-p-limit-20261015-duplicate-retest\n- 约束：全程只读 + 运行命令；未修改 index.js / index.d.ts / test.js / package.json / .gitignore 等任何受保护文件。\n\n---\n\n## 1. 只读核对：null 校验修复\n\n### 1.1 index.js 中的 null 校验逻辑（「看到」）\n\n- 位置：`index.js` 第 6 行（`pLimit(concurrency)` 函数体内，进入 `validateConcurrency(concurrency)` 之前）。\n- 判定方式：先判断入参是否为对象，且**显式排除 null**：\n\n  ```js\n  if (typeof concurrency === 'object' && concurrency !== null) {\n      ({concurrency, rejectOnClear = false} = concurrency);\n  }\n  ```\n\n- 语义：当传入 `null` 时，`typeof null === 'object'` 为真，但 `concurrency !== null` 为假，因此**不会进入对象解构分支**；`concurrency` 保持为 `null`，随后交由 `validateConcurrency(null)` 处理。\n- `validateConcurrency`（index.js 文件末尾）判定：\n\n  ```js\n  if (!((Number.isInteger(concurrency) || concurrency === Number.POSITIVE_INFINITY) && concurrency > 0)) {\n      throw new TypeError('Expected `concurrency` to be a number from 1 and up');\n  }\n  ```\n\n  `Number.isInteger(null)` 为 false、`null === Infinity` 为 false → 抛 `TypeError('Expected `concurrency` to be a number from 1 and up')`。\n\n- 结论（「看到」）：null 校验修复**已实际落在 index.js 中**，即条件从 `typeof concurrency === 'object'` 变为 `typeof concurrency === 'object' && concurrency !== null`。\n- 交叉印证（git diff，见第 4 节）：diff 明确显示该行为本次改动，旧行为 `typeof concurrency === 'object'` → 新行为 `typeof concurrency === 'object' && concurrency !== null`。改动未触及 `validateConcurrency` 的判定文本。\n\n### 1.2 test.js 中对应断言用例（「看到」）\n\n- 位置：`test.js` 文件末尾新增用例（diff 显示位于 `limitFunction()` 用例之后，为文件新增的末块）。\n- 用例原文：\n\n  ```js\n  test('throws the concurrency validation error for null', t => {\n      const error = t.throws(() => {\n          pLimit(null);\n      }, {instanceOf: TypeError});\n\n      t.is(error.message, 'Expected `concurrency` to be a number from 1 and up');\n  });\n  ```\n\n- 断言方式：\n  1. `t.throws(..., {instanceOf: TypeError})`：断言 `pLimit(null)` 抛出的错误是 `TypeError` 实例；\n  2. `t.is(error.message, 'Expected `concurrency` to be a number from 1 and up')`：断言错误消息文本与源码头一致。\n- 结论（「看到」）：test.js 中存在与修复一一对应的回归断言；断言既校验错误类型也校验消息文本。\n\n### 1.3 「看到」与「推断」的分界\n\n- 看到（直接读取到的源码/文本）：index.js 第 6 行的 null 排除条件；test.js 新增用例的断言内容；`validateConcurrency` 的实现文本；git diff 的具体 +/- 行。\n- 推断（基于看到的内容作出的解释）：`typeof null === 'object'` 导致旧逻辑进入解构而报错、从而需要加 `concurrency !== null`；这是对 JS 语言语义的推断，未另有独立运行时探针佐证（本次未新增任何探针文件，也不允许改测试）。运行时层面的最终确认以第 5 节 `npm test` 中该用例通过为准。\n\n---\n\n## 2. 预期读取失败（第 2 步）\n\n- 命令/输入：`read_file docs/does-not-exist-dup-probe.txt`\n- 工具返回错误原文（摘要）：\n\n  > `read_file 失败：docs/does-not-exist-dup-probe.txt（ENOENT: no such file or directory, open '/private/tmp/ans-real-p-limit-20261015-duplicate-retest/docs/does-not-exist-dup-probe.txt'）`\n\n- 退出/结果：读取失败（ENOENT）。\n- 判定：**预期失败**，非缺陷。该文件被设计为不存在，用于验证「读取不存在的路径会如实失败」。未创建该文件，未以任何方式伪造其存在。\n\n---\n\n## 3. 环境：Node 版本（两次独立调用）\n\n按「单程序工具」约定，两次 `node -v` 为两个独立的 run_shell 调用，各记一次输出与退出码。\n\n| # | 命令 | stdout | stderr | 退出码 |\n| --- | --- | --- | --- | --- |\n| 3-a | `node -v` | `v24.14.0` | （空） | 0 |\n| 3-b | `node -v` | `v24.14.0` | （空） | 0 |\n\n- 结论：Node 版本 `v24.14.0`，两次一致；满足项目要求（Node >= 20）。\n\n---\n\n## 4. git 状态与改动概览（分次独立调用）\n\n### 4.1 `git status`\n\n- 命令：`git status`（退出码 0）\n- 原始输出摘要：\n\n  ```\n  On branch main\n  Your branch is up to date with 'origin/main'.\n\n  Changes not staged for commit:\n  \tmodified:   index.js\n  \tmodified:   test.js\n\n  Untracked files:\n  \t.ans/\n  \tdocs/\n  \t\"角色卡/\"\n\n  no changes added to commit\n  ```\n\n### 4.2 `git diff --stat`\n\n- 命令：`git diff --stat`（退出码 0）\n- 原始输出摘要：\n\n  ```\n   index.js | 2 +-\n   test.js  | 8 ++++++++\n   2 files changed, 9 insertions(+), 1 deletion(-)\n  ```\n\n### 4.3 `git diff index.js test.js`（补充，用于精确定位改动）\n\n- 命令：`git diff index.js test.js`（退出码 0）\n- 关键原始输出摘要：\n\n  ```\n  -\tif (typeof concurrency === 'object') {\n  +\tif (typeof concurrency === 'object' && concurrency !== null) {\n\n  +test('throws the concurrency validation error for null', t => {\n  +\tconst error = t.throws(() => {\n  +\t\tpLimit(null);\n  +\t}, {instanceOf: TypeError});\n  +\n  +\tt.is(error.message, 'Expected `concurrency` to be a number from 1 and up');\n  +});\n  ```\n\n- 判定：工作区改动仅两处，且与第 1 节看到的修复/用例完全对应；未出现其它源码或配置改动。\n\n---\n\n## 5. 精确测试：`npm test`\n\n- 命令（精确）：`npm test`\n- 展开脚本：`> p-limit@7.3.3 test` → `> xo && ava && tsd`\n- 退出码：**0**\n- 结果摘要：**31 tests passed，0 failed**（xo：0 error，1 warning；tsd 通过——因整体 exit 0 且未中断，`xo && ava && tsd` 全链通过）\n\n关键原始输出摘要（stdout）：\n\n```\n> p-limit@7.3.3 test\n> xo && ava && tsd\n\n  scripts/benchmarker.js:3:1\n  ⚠  3:1  Unexpected todo comment: TODO: I will move this to a proper....  no-warning-comments\n\n  1 warning\n\n  ✔ throws on invalid concurrency argument\n  ✔ throws the concurrency validation error for null\n  ✔ clearQueue\n  ...\n  ✔ limitFunction() (2.5s)\n  ✔ activeCount and pendingCount properties (3s)\n  ─\n\n  31 tests passed\n```\n\nstderr 摘要（与测试判定无关的 npm 配置告警）：\n\n```\nnpm warn Unknown env config \"electron-builder-binaries-mirror\". ...\nnpm warn Unknown env config \"electron-mirror\". ...\nnpm warn Unknown user config \"ELECTRON_MIRROR\". ...\nnpm warn Unknown user config \"ELECTRON_BUILDER_BINARIES_MIRROR\". ...\n```\n\n- 关键点：目标用例 `✔ throws the concurrency validation error for null` **出现在通过列表中**，为 31 项之一。\n- `xo` 侧仅有 1 条 warning（`scripts/benchmarker.js` 的 TODO 注释，`no-warning-comments`），无 error，不阻断退出码；`tsd` 未报错。\n\n---\n\n## 6. 判定结论\n\n1. **null 校验修复：确认落地。** 依据：index.js 第 6 行条件为 `typeof concurrency === 'object' && concurrency !== null`（直接看到 + git diff 印证），对应 test.js 末块新增断言，且该断言在 `npm test` 中通过。\n2. **`npm test`：31 项通过、退出码 0，符合预期。** 依据：命令 `npm test`，stdout `31 tests passed`，退出码 0。\n3. **两处异常/预期失败说明：**\n   - `docs/does-not-exist-dup-probe.txt` 读取失败（ENOENT）＝**预期失败**，非缺陷；未创建该文件。\n   - `npm test` stderr 的 4 条 `npm warn Unknown ... config` 为环境级 npm 配置告警，与测试结果无关，不影响退出码 0。\n\n---\n\n## 7. 可复现性\n\n- 环境：Node `v24.14.0`（`node -v` ×2 均为该版本，退出码 0）。\n- 复现命令序列（逐条独立执行）：\n\n  ```\n  node -v\n  node -v\n  git status\n  git diff --stat\n  npm test\n  ```\n\n- 预期：`node -v` 输出 `v24.14.0`、退出 0；`git status` 显示 index.js / test.js 已修改；`git diff --stat` 显示 `2 files changed, 9 insertions(+), 1 deletion(-)`；`npm test` 输出 `31 tests passed`、退出码 0。\n- 本次全部记录均来自上述命令的原始输出（摘要），未做人工构造。\n"
+          }
+        ],
+        "details": {
+          "turnId": "ce48ec36-98af-475e-a75e-c053248380cc",
+          "toolCallId": "call_00_mhZPjQsZh2ENWAgRjCV29498",
+          "toolName": "read_file",
+          "path": "角色卡/测试/docs/change/dup-fresh-3.md",
+          "ok": true,
+          "status": "completed",
+          "durationMs": 10
+        },
+        "isError": false,
+        "durationMs": 11,
+        "timestamp": 1792027485171
+      },
+      {
+        "role": "toolResult",
+        "toolCallId": "call_01_Xui6qNshaL3AfR0XGJHm6601",
+        "toolName": "read_file",
+        "content": [
+          {
+            "type": "text",
+            "text": "read_file: index.js\n\nimport Queue from 'yocto-queue';\n\nexport default function pLimit(concurrency) {\n\tlet rejectOnClear = false;\n\n\tif (typeof concurrency === 'object' && concurrency !== null) {\n\t\t({concurrency, rejectOnClear = false} = concurrency);\n\t}\n\n\tvalidateConcurrency(concurrency);\n\n\tif (typeof rejectOnClear !== 'boolean') {\n\t\tthrow new TypeError('Expected `rejectOnClear` to be a boolean');\n\t}\n\n\tconst queue = new Queue();\n\tlet activeCount = 0;\n\n\tconst resumeNext = () => {\n\t\t// Process the next queued function if we're under the concurrency limit\n\t\tif (activeCount < concurrency && queue.size > 0) {\n\t\t\tactiveCount++;\n\t\t\tqueue.dequeue().run();\n\t\t}\n\t};\n\n\tconst next = () => {\n\t\tactiveCount--;\n\t\tresumeNext();\n\t};\n\n\tconst run = async (function_, resolve, arguments_) => {\n\t\t// Execute the function and capture the result promise\n\t\tconst result = (async () => function_(...arguments_))();\n\n\t\t// Resolve immediately with the promise (don't wait for completion)\n\t\tresolve(result);\n\n\t\t// Wait for the function to complete (success or failure)\n\t\t// We catch errors here to prevent unhandled rejections,\n\t\t// but the original promise rejection is preserved for the caller\n\t\ttry {\n\t\t\tawait result;\n\t\t} catch {}\n\n\t\t// Decrement active count and process next queued function\n\t\tnext();\n\t};\n\n\tconst enqueue = (function_, resolve, reject, arguments_) => {\n\t\tconst queueItem = {reject};\n\n\t\t// Queue the internal resolve function instead of the run function\n\t\t// to preserve the asynchronous execution context.\n\t\tnew Promise(internalResolve => { // eslint-disable-line promise/param-names\n\t\t\tqueueItem.run = internalResolve;\n\t\t\tqueue.enqueue(queueItem);\n\t\t}).then(run.bind(undefined, function_, resolve, arguments_)); // eslint-disable-line promise/prefer-await-to-then\n\n\t\t// Start processing immediately if we haven't reached the concurrency limit\n\t\tif (activeCount < concurrency) {\n\t\t\tresumeNext();\n\t\t}\n\t};\n\n\tconst generator = (function_, ...arguments_) => new Promise((resolve, reject) => {\n\t\tenqueue(function_, resolve, reject, arguments_);\n\t});\n\n\tObject.defineProperties(generator, {\n\t\tactiveCount: {\n\t\t\tget: () => activeCount,\n\t\t},\n\t\tpendingCount: {\n\t\t\tget: () => queue.size,\n\t\t},\n\t\tclearQueue: {\n\t\t\tvalue() {\n\t\t\t\tif (!rejectOnClear) {\n\t\t\t\t\tqueue.clear();\n\t\t\t\t\treturn;\n\t\t\t\t}\n\n\t\t\t\tconst abortError = AbortSignal.abort().reason;\n\n\t\t\t\twhile (queue.size > 0) {\n\t\t\t\t\tqueue.dequeue().reject(abortError);\n\t\t\t\t}\n\t\t\t},\n\t\t},\n\t\tconcurrency: {\n\t\t\tget: () => concurrency,\n\n\t\t\tset(newConcurrency) {\n\t\t\t\tvalidateConcurrency(newConcurrency);\n\t\t\t\tconcurrency = newConcurrency;\n\n\t\t\t\tqueueMicrotask(() => {\n\t\t\t\t\t// eslint-disable-next-line no-unmodified-loop-condition\n\t\t\t\t\twhile (activeCount < concurrency && queue.size > 0) {\n\t\t\t\t\t\tresumeNext();\n\t\t\t\t\t}\n\t\t\t\t});\n\t\t\t},\n\t\t},\n\t\tmap: {\n\t\t\tasync value(iterable, function_) {\n\t\t\t\tconst promises = [];\n\n\t\t\t\ttry {\n\t\t\t\t\tArray.from(iterable, (value, index) => {\n\t\t\t\t\t\tconst promise = generator(function_, value, index);\n\t\t\t\t\t\tpromises.push(promise);\n\t\t\t\t\t\treturn promise;\n\t\t\t\t\t});\n\t\t\t\t} catch (error) {\n\t\t\t\t\t// The iterable threw, so `Promise.all` never observes the already scheduled promises. Observe them here to avoid unhandled rejections.\n\t\t\t\t\tfor (const promise of promises) {\n\t\t\t\t\t\tpromise.catch(() => {}); // eslint-disable-line promise/prefer-await-to-then\n\t\t\t\t\t}\n\n\t\t\t\t\tthrow error;\n\t\t\t\t}\n\n\t\t\t\treturn Promise.all(promises);\n\t\t\t},\n\t\t},\n\t});\n\n\treturn generator;\n}\n\nexport function limitFunction(function_, options) {\n\tconst limit = pLimit(options);\n\n\tconst limitedFunction = (...arguments_) => limit(() => function_(...arguments_));\n\tObject.defineProperty(limitedFunction, 'clearQueue', {\n\t\tvalue: limit.clearQueue,\n\t});\n\n\treturn limitedFunction;\n}\n\nfunction validateConcurrency(concurrency) {\n\tif (!((Number.isInteger(concurrency) || concurrency === Number.POSITIVE_INFINITY) && concurrency > 0)) {\n\t\tthrow new TypeError('Expected `concurrency` to be a number from 1 and up');\n\t}\n}\n"
+          }
+        ],
+        "details": {
+          "turnId": "ce48ec36-98af-475e-a75e-c053248380cc",
+          "toolCallId": "call_01_Xui6qNshaL3AfR0XGJHm6601",
+          "toolName": "read_file",
+          "path": "index.js",
+          "ok": true,
+          "status": "completed",
+          "durationMs": 8
+        },
+        "isError": false,
+        "durationMs": 8,
+        "timestamp": 1792027485171
+      },
+      {
+        "role": "toolResult",
+        "toolCallId": "call_02_6TsNMbNnMZMUV9xkJmEk7512",
+        "toolName": "read_file",
+        "content": [
+          {
+            "type": "text",
+            "text": "read_file: test.js\n\nimport process from 'node:process';\nimport {AsyncLocalStorage} from 'node:async_hooks';\nimport {setTimeout as delay} from 'node:timers/promises';\nimport test from 'ava';\nimport inRange from 'in-range';\nimport timeSpan from 'time-span';\nimport randomInt from 'random-int';\nimport pLimit, {limitFunction} from './index.js';\n\ntest('concurrency: 1', async t => {\n\tconst input = [\n\t\t[10, 300],\n\t\t[20, 200],\n\t\t[30, 100],\n\t];\n\n\tconst end = timeSpan();\n\tconst limit = pLimit(1);\n\n\tconst mapper = ([value, ms]) => limit(async () => {\n\t\tawait delay(ms);\n\t\treturn value;\n\t});\n\n\tt.deepEqual(await Promise.all(input.map(x => mapper(x))), [10, 20, 30]);\n\tt.true(inRange(end(), {start: 590, end: 650}));\n});\n\ntest('concurrency: 4', async t => {\n\tconst concurrency = 5;\n\tlet running = 0;\n\n\tconst limit = pLimit(concurrency);\n\n\tconst input = Array.from({length: 100}, () => limit(async () => {\n\t\trunning++;\n\t\tt.true(running <= concurrency);\n\t\tawait delay(randomInt(30, 200));\n\t\trunning--;\n\t}));\n\n\tawait Promise.all(input);\n});\n\ntest('propagates async execution context properly', async t => {\n\tconst concurrency = 2;\n\tconst limit = pLimit(concurrency);\n\tconst store = new AsyncLocalStorage();\n\n\tconst checkId = async id => {\n\t\tawait Promise.resolve();\n\t\tt.is(id, store.getStore()?.id);\n\t};\n\n\tconst startContext = async id => store.run({id}, () => limit(checkId, id));\n\n\tawait Promise.all(Array.from({length: 100}, (_, id) => startContext(id)));\n});\n\ntest('non-promise returning function', async t => {\n\tawait t.notThrowsAsync(async () => {\n\t\tconst limit = pLimit(1);\n\t\tawait limit(() => null);\n\t});\n});\n\ntest('continues after sync throw', async t => {\n\tconst limit = pLimit(1);\n\tlet ran = false;\n\n\tconst promises = [\n\t\tlimit(() => {\n\t\t\tthrow new Error('err');\n\t\t}),\n\t\tlimit(() => {\n\t\t\tran = true;\n\t\t}),\n\t];\n\n\ttry {\n\t\tawait Promise.all(promises);\n\t} catch {}\n\n\tt.is(ran, true);\n});\n\ntest('accepts additional arguments', async t => {\n\tconst limit = pLimit(1);\n\tconst symbol = Symbol('test');\n\n\tawait limit(a => t.is(a, symbol), symbol);\n});\n\ntest('shared context with a limited provider helper', async t => {\n\tconst limit = pLimit(1);\n\tconst sharedContext = {values: []};\n\n\tconst runWithContext = (function_, ...arguments_) => limit(function_, sharedContext, ...arguments_);\n\n\tconst addValue = async (context, value) => {\n\t\tcontext.values.push(value);\n\t\tawait delay(10);\n\t\treturn context.values.length;\n\t};\n\n\tconst firstPromise = runWithContext(addValue, 'first');\n\tconst secondPromise = runWithContext(addValue, 'second');\n\n\tt.is(limit.activeCount, 1);\n\tt.is(limit.pendingCount, 1);\n\n\tconst results = await Promise.all([firstPromise, secondPromise]);\n\n\tt.deepEqual(results, [1, 2]);\n\tt.deepEqual(sharedContext.values, ['first', 'second']);\n});\n\ntest('does not ignore errors', async t => {\n\tconst limit = pLimit(1);\n\tconst error = new Error('🦄');\n\n\tconst promises = [\n\t\tlimit(async () => {\n\t\t\tawait delay(30);\n\t\t}),\n\t\tlimit(async () => {\n\t\t\tawait delay(80);\n\t\t\tthrow error;\n\t\t}),\n\t\tlimit(async () => {\n\t\t\tawait delay(50);\n\t\t}),\n\t];\n\n\tawait t.throwsAsync(Promise.all(promises), {is: error});\n});\n\ntest('runs all tasks asynchronously', async t => {\n\tconst limit = pLimit(3);\n\n\tlet value = 1;\n\n\tconst one = limit(() => 1);\n\tconst two = limit(() => value);\n\n\tt.is(limit.activeCount, 2);\n\n\tvalue = 2;\n\n\tconst result = await Promise.all([one, two]);\n\n\tt.deepEqual(result, [1, 2]);\n});\n\ntest('activeCount and pendingCount properties', async t => {\n\tconst limit = pLimit(5);\n\tt.is(limit.activeCount, 0);\n\tt.is(limit.pendingCount, 0);\n\n\tconst runningPromise1 = limit(() => delay(1000));\n\tt.is(limit.activeCount, 1);\n\tt.is(limit.pendingCount, 0);\n\n\tawait runningPromise1;\n\tt.is(limit.activeCount, 0);\n\tt.is(limit.pendingCount, 0);\n\n\tconst immediatePromises = Array.from({length: 5}, () => limit(() => delay(1000)));\n\tconst delayedPromises = Array.from({length: 3}, () => limit(() => delay(1000)));\n\n\tt.is(limit.activeCount, 5);\n\tt.is(limit.pendingCount, 3);\n\n\tawait Promise.all(immediatePromises);\n\tt.is(limit.activeCount, 3);\n\tt.is(limit.pendingCount, 0);\n\n\tawait Promise.all(delayedPromises);\n\n\tt.is(limit.activeCount, 0);\n\tt.is(limit.pendingCount, 0);\n});\n\ntest('clearQueue', async t => {\n\tconst limit = pLimit(1);\n\n\tArray.from({length: 1}, () => limit(() => delay(1000)));\n\tArray.from({length: 3}, () => limit(() => delay(1000)));\n\n\tawait Promise.resolve();\n\tt.is(limit.pendingCount, 3);\n\tlimit.clearQueue();\n\tt.is(limit.pendingCount, 0);\n});\n\n// Node.js 20 has a bug where DOMException is not properly handled by AVA's `throwsAsync`.\nconst testClearQueueRejects = process.versions.node.startsWith('20.') ? test.skip : test;\n\ntestClearQueueRejects('clearQueue rejects pending promises when enabled', async t => {\n\tconst limit = pLimit({concurrency: 1, rejectOnClear: true});\n\n\tconst runningPromise = limit(() => delay(100));\n\tconst pendingPromiseOne = limit(() => delay(10));\n\tconst pendingPromiseTwo = limit(() => delay(10));\n\n\tawait Promise.resolve();\n\tt.is(limit.pendingCount, 2);\n\n\tlimit.clearQueue();\n\tt.is(limit.pendingCount, 0);\n\n\tawait runningPromise;\n\tawait t.throwsAsync(pendingPromiseOne, {name: 'AbortError'});\n\tawait t.throwsAsync(pendingPromiseTwo, {name: 'AbortError'});\n});\n\ntestClearQueueRejects('limitFunction exposes clearQueue', async t => {\n\tconst limitedFunction = limitFunction(() => delay(20), {concurrency: 1, rejectOnClear: true});\n\n\tconst runningPromise = limitedFunction();\n\tconst pendingPromise = limitedFunction();\n\n\tlimitedFunction.clearQueue();\n\n\tawait runningPromise;\n\tawait t.throwsAsync(pendingPromise, {name: 'AbortError'});\n});\n\ntest('map', async t => {\n\tconst limit = pLimit(1);\n\tconst results = await limit.map([1, 2, 3, 4, 5, 6, 7], input => input + 1);\n\n\tt.deepEqual(results, [2, 3, 4, 5, 6, 7, 8]);\n});\n\ntest('map works when detached from the limit', async t => {\n\tconst limit = pLimit(1);\n\tconst {map} = limit;\n\tlet running = 0;\n\tlet maxRunning = 0;\n\tconst mapper = async input => {\n\t\trunning++;\n\t\tmaxRunning = Math.max(maxRunning, running);\n\t\tawait delay(10);\n\t\trunning--;\n\t\treturn input * 2;\n\t};\n\n\tconst directResult = limit(mapper, 1);\n\tconst mapResult = map([2, 3], mapper);\n\n\tt.deepEqual(await Promise.all([directResult, mapResult]), [2, [4, 6]]);\n\tt.is(maxRunning, 1);\n});\n\ntest('map passes index and preserves order with concurrency', async t => {\n\tconst limit = pLimit(3);\n\tconst inputs = [10, 10, 10, 10, 10];\n\n\t// eslint-disable-next-line unicorn/no-array-method-this-argument\n\tconst results = await limit.map(inputs, async (value, index) => {\n\t\t// Simulate variable async duration per index to shuffle completion order\n\t\tawait delay((inputs.length - index) * 5);\n\t\treturn value + index;\n\t});\n\n\t// Results should be in input order and include index\n\tt.deepEqual(results, [10, 11, 12, 13, 14]);\n});\n\ntest('map accepts an iterable (set)', async t => {\n\tconst limit = pLimit(2);\n\tconst inputs = new Set([1, 2, 3, 4]);\n\n\tconst results = await limit.map(inputs, input => input * 2); // eslint-disable-line unicorn/no-array-method-this-argument\n\n\tt.deepEqual(results, [2, 4, 6, 8]);\n});\n\ntest('map accepts an iterable (array iterator)', async t => {\n\tconst limit = pLimit(2);\n\tconst inputs = [1, 2, 3, 4].values();\n\n\tconst results = await limit.map(inputs, input => input * 2); // eslint-disable-line unicorn/no-array-method-this-argument\n\n\tt.deepEqual(results, [2, 4, 6, 8]);\n});\n\ntest('map accepts array-like inputs', async t => {\n\tconst limit = pLimit(1);\n\tconst inputs = {0: 'a', 1: 'b', length: 2};\n\n\tconst results = await limit.map(inputs, (value, index) => `${index}:${value}`); // eslint-disable-line unicorn/no-array-method-this-argument\n\n\tt.deepEqual(results, ['0:a', '1:b']);\n});\n\ntest('map does not leave unhandled rejections when the iterable throws', async t => {\n\tconst limit = pLimit(1);\n\tconst error = new Error('Iterator failed');\n\n\tfunction * inputs() {\n\t\tyield 1;\n\t\tyield 2;\n\t\tyield 3;\n\t\tthrow error;\n\t}\n\n\tawait t.throwsAsync(limit.map(inputs(), async value => {\n\t\tawait delay(10);\n\t\tthrow new Error(`Mapper ${value} failed`);\n\t}), {is: error});\n\n\t// Wait for the active and queued mappers to reject. AVA fails the run if any rejection is unhandled.\n\tawait limit(() => {});\n\tt.is(limit.activeCount, 0);\n\tt.is(limit.pendingCount, 0);\n});\n\ntest('map rejects with the mapper error', async t => {\n\tconst limit = pLimit(2);\n\tconst error = new Error('🦄');\n\n\tawait t.throwsAsync(limit.map([1, 2, 3], async value => {\n\t\tif (value === 2) {\n\t\t\tthrow error;\n\t\t}\n\n\t\treturn value;\n\t}), {is: error});\n});\n\ntest('map resolves to an empty array for an empty iterable', async t => {\n\tconst limit = pLimit(1);\n\n\tt.deepEqual(await limit.map([], () => t.fail('mapper should not be called')), []);\n\tt.deepEqual(await limit.map(new Set(), () => t.fail('mapper should not be called')), []);\n});\n\ntest('map rejects with the iterable error when it throws before the first item', async t => {\n\tconst limit = pLimit(1);\n\tconst error = new Error('Iterator failed');\n\n\tconst inputs = {\n\t\t* [Symbol.iterator]() { // eslint-disable-line require-yield\n\t\t\tthrow error;\n\t\t},\n\t};\n\n\tawait t.throwsAsync(limit.map(inputs, () => t.fail('mapper should not be called')), {is: error}); // eslint-disable-line unicorn/no-array-callback-reference, unicorn/no-array-method-this-argument\n\tt.is(limit.activeCount, 0);\n\tt.is(limit.pendingCount, 0);\n});\n\ntest('map rejects immediately with the iterable error and still runs already scheduled tasks', async t => {\n\tconst limit = pLimit(1);\n\tconst error = new Error('Iterator failed');\n\tconst completed = [];\n\n\tfunction * inputs() {\n\t\tyield 1;\n\t\tyield 2;\n\t\tthrow error;\n\t}\n\n\tawait t.throwsAsync(limit.map(inputs(), async value => {\n\t\tawait delay(50);\n\t\tcompleted.push(value);\n\t}), {is: error});\n\n\t// The rejection should not wait for the scheduled tasks to finish\n\tt.deepEqual(completed, []);\n\n\t// With concurrency 1, this only runs after the already scheduled tasks\n\tawait limit(() => {});\n\tt.deepEqual(completed, [1, 2]);\n\tt.is(limit.activeCount, 0);\n\tt.is(limit.pendingCount, 0);\n});\n\ntest('map passes sequential indexes for a generator', async t => {\n\tconst limit = pLimit(2);\n\n\tfunction * inputs() {\n\t\tyield 'a';\n\t\tyield 'b';\n\t\tyield 'c';\n\t}\n\n\tconst results = await limit.map(inputs(), (value, index) => `${index}:${value}`);\n\n\tt.deepEqual(results, ['0:a', '1:b', '2:c']);\n});\n\ntest('accepts options object', async t => {\n\tconst limit = pLimit({concurrency: 1});\n\n\tconst input = [\n\t\tlimit(async () => {\n\t\t\tawait delay(50);\n\t\t\treturn 1;\n\t\t}),\n\t\tlimit(async () => {\n\t\t\tawait delay(50);\n\t\t\treturn 2;\n\t\t}),\n\t];\n\n\tt.deepEqual(await Promise.all(input), [1, 2]);\n\tt.is(limit.concurrency, 1);\n});\n\ntest('throws on invalid concurrency argument', t => {\n\tt.throws(() => {\n\t\tpLimit(0);\n\t});\n\n\tt.throws(() => {\n\t\tpLimit(-1);\n\t});\n\n\tt.throws(() => {\n\t\tpLimit(1.2);\n\t});\n\n\tt.throws(() => {\n\t\tpLimit(undefined);\n\t});\n\n\tt.throws(() => {\n\t\tpLimit(true);\n\t});\n\n\tt.throws(() => {\n\t\tpLimit({});\n\t});\n\n\tt.throws(() => {\n\t\tpLimit({concurrency: 0});\n\t});\n});\n\ntest('change concurrency to smaller value', async t => {\n\tconst limit = pLimit(4);\n\tlet running = 0;\n\tconst log = [];\n\tconst promises = Array.from({length: 10}).map(() =>\n\t\tlimit(async () => {\n\t\t\t++running;\n\t\t\tlog.push(running);\n\t\t\tawait delay(50);\n\t\t\t--running;\n\t\t}));\n\tawait delay(0);\n\tt.is(running, 4);\n\n\tlimit.concurrency = 2;\n\tawait Promise.all(promises);\n\tt.deepEqual(log, [1, 2, 3, 4, 2, 2, 2, 2, 2, 2]);\n});\n\ntest('change concurrency to bigger value', async t => {\n\tconst limit = pLimit(2);\n\tlet running = 0;\n\tconst log = [];\n\tconst promises = Array.from({length: 10}).map(() =>\n\t\tlimit(async () => {\n\t\t\t++running;\n\t\t\tlog.push(running);\n\t\t\tawait delay(50);\n\t\t\t--running;\n\t\t}));\n\tawait delay(0);\n\tt.is(running, 2);\n\n\tlimit.concurrency = 4;\n\tawait Promise.all(promises);\n\tt.deepEqual(log, [1, 2, 3, 4, 4, 4, 4, 4, 4, 4]);\n});\n\ntest('limitFunction()', async t => {\n\tconst concurrency = 5;\n\tlet running = 0;\n\n\tconst limitedFunction = limitFunction(async () => {\n\t\trunning++;\n\t\tt.true(running <= concurrency);\n\t\tawait delay(randomInt(30, 200));\n\t\trunning--;\n\t}, {concurrency});\n\n\tconst input = Array.from({length: 100}, limitedFunction);\n\n\tawait Promise.all(input);\n});\n\ntest('throws the concurrency validation error for null', t => {\n\tconst error = t.throws(() => {\n\t\tpLimit(null);\n\t}, {instanceOf: TypeError});\n\n\tt.is(error.message, 'Expected `concurrency` to be a number from 1 and up');\n});\n"
+          }
+        ],
+        "details": {
+          "turnId": "ce48ec36-98af-475e-a75e-c053248380cc",
+          "toolCallId": "call_02_6TsNMbNnMZMUV9xkJmEk7512",
+          "toolName": "read_file",
+          "path": "test.js",
+          "ok": true,
+          "status": "completed",
+          "durationMs": 5
+        },
+        "isError": false,
+        "durationMs": 5,
+        "timestamp": 1792027485171
+      },
+      {
+        "role": "toolResult",
+        "toolCallId": "call_03_gBdCi7Jx3mtBuEjvFoSf9285",
+        "toolName": "run_shell",
+        "content": [
+          {
+            "type": "text",
+            "text": "run_shell 已执行：git diff --stat（exit 0）\nstdout:\n index.js | 2 +-\n test.js  | 8 ++++++++\n 2 files changed, 9 insertions(+), 1 deletion(-)\n\nstderr:\n"
+          }
+        ],
+        "details": {
+          "turnId": "ce48ec36-98af-475e-a75e-c053248380cc",
+          "toolCallId": "call_03_gBdCi7Jx3mtBuEjvFoSf9285",
+          "toolName": "run_shell",
+          "ok": true,
+          "status": "completed",
+          "durationMs": 32
+        },
+        "isError": false,
+        "durationMs": 32,
+        "timestamp": 1792027485171
+      }
+    ]
+  },
+  "测试": {
+    "nativeCalls": [
+      {
+        "id": "call_00_HHT03zn6iL2VclyZKroX8131",
+        "name": "read_file",
+        "arguments": {
+          "path": "index.js"
+        }
+      },
+      {
+        "id": "call_01_Ijo3my6x2BchOR1leNA49938",
+        "name": "read_file",
+        "arguments": {
+          "path": "test.js"
+        }
+      },
+      {
+        "id": "call_02_H8CIlBrSVEYnL2J8oYi76007",
+        "name": "read_file",
+        "arguments": {
+          "path": "docs/does-not-exist-dup-probe.txt"
+        }
+      },
+      {
+        "id": "call_00_s1TNmSAR5fdi7nrZyl5P0317",
+        "name": "run_shell",
+        "arguments": {
+          "command": "node -v"
+        }
+      },
+      {
+        "id": "call_01_jbbeSSlwRBYv9WtsbD0F9726",
+        "name": "run_shell",
+        "arguments": {
+          "command": "node -v"
+        }
+      },
+      {
+        "id": "call_02_QdPDp5GkNY2dLgEEoNqa8776",
+        "name": "run_shell",
+        "arguments": {
+          "command": "git status"
+        }
+      },
+      {
+        "id": "call_03_w3sbf36MSyIc6l8kRr3n3967",
+        "name": "run_shell",
+        "arguments": {
+          "command": "git diff --stat"
+        }
+      },
+      {
+        "id": "call_00_FBPH9ZpfxCti8Kxzv2o79397",
+        "name": "run_shell",
+        "arguments": {
+          "command": "npm test"
+        }
+      },
+      {
+        "id": "call_00_0toZZPffKOIeKjOIWqLB5101",
+        "name": "run_shell",
+        "arguments": {
+          "command": "git diff index.js test.js"
+        }
+      },
+      {
+        "id": "call_00_3QF5UQbAnfg5mBXBGk4D6120",
+        "name": "write_file",
+        "arguments": {
+          "path": "角色卡/测试/docs/change/dup-fresh-3.md",
+          "content": "# DUP-FRESH-3 独立验证记录（全新会话，无历史上下文）\n\n- 任务：DUP-FRESH-3 独立验证任务：确认 null 校验修复并做环境/git/npm test 复现记录\n- 执行角色：测试\n- 工作目录：/private/tmp/ans-real-p-limit-20261015-duplicate-retest\n- 约束：全程只读 + 运行命令；未修改 index.js / index.d.ts / test.js / package.json / .gitignore 等任何受保护文件。\n\n---\n\n## 1. 只读核对：null 校验修复\n\n### 1.1 index.js 中的 null 校验逻辑（「看到」）\n\n- 位置：`index.js` 第 6 行（`pLimit(concurrency)` 函数体内，进入 `validateConcurrency(concurrency)` 之前）。\n- 判定方式：先判断入参是否为对象，且**显式排除 null**：\n\n  ```js\n  if (typeof concurrency === 'object' && concurrency !== null) {\n      ({concurrency, rejectOnClear = false} = concurrency);\n  }\n  ```\n\n- 语义：当传入 `null` 时，`typeof null === 'object'` 为真，但 `concurrency !== null` 为假，因此**不会进入对象解构分支**；`concurrency` 保持为 `null`，随后交由 `validateConcurrency(null)` 处理。\n- `validateConcurrency`（index.js 文件末尾）判定：\n\n  ```js\n  if (!((Number.isInteger(concurrency) || concurrency === Number.POSITIVE_INFINITY) && concurrency > 0)) {\n      throw new TypeError('Expected `concurrency` to be a number from 1 and up');\n  }\n  ```\n\n  `Number.isInteger(null)` 为 false、`null === Infinity` 为 false → 抛 `TypeError('Expected `concurrency` to be a number from 1 and up')`。\n\n- 结论（「看到」）：null 校验修复**已实际落在 index.js 中**，即条件从 `typeof concurrency === 'object'` 变为 `typeof concurrency === 'object' && concurrency !== null`。\n- 交叉印证（git diff，见第 4 节）：diff 明确显示该行为本次改动，旧行为 `typeof concurrency === 'object'` → 新行为 `typeof concurrency === 'object' && concurrency !== null`。改动未触及 `validateConcurrency` 的判定文本。\n\n### 1.2 test.js 中对应断言用例（「看到」）\n\n- 位置：`test.js` 文件末尾新增用例（diff 显示位于 `limitFunction()` 用例之后，为文件新增的末块）。\n- 用例原文：\n\n  ```js\n  test('throws the concurrency validation error for null', t => {\n      const error = t.throws(() => {\n          pLimit(null);\n      }, {instanceOf: TypeError});\n\n      t.is(error.message, 'Expected `concurrency` to be a number from 1 and up');\n  });\n  ```\n\n- 断言方式：\n  1. `t.throws(..., {instanceOf: TypeError})`：断言 `pLimit(null)` 抛出的错误是 `TypeError` 实例；\n  2. `t.is(error.message, 'Expected `concurrency` to be a number from 1 and up')`：断言错误消息文本与源码头一致。\n- 结论（「看到」）：test.js 中存在与修复一一对应的回归断言；断言既校验错误类型也校验消息文本。\n\n### 1.3 「看到」与「推断」的分界\n\n- 看到（直接读取到的源码/文本）：index.js 第 6 行的 null 排除条件；test.js 新增用例的断言内容；`validateConcurrency` 的实现文本；git diff 的具体 +/- 行。\n- 推断（基于看到的内容作出的解释）：`typeof null === 'object'` 导致旧逻辑进入解构而报错、从而需要加 `concurrency !== null`；这是对 JS 语言语义的推断，未另有独立运行时探针佐证（本次未新增任何探针文件，也不允许改测试）。运行时层面的最终确认以第 5 节 `npm test` 中该用例通过为准。\n\n---\n\n## 2. 预期读取失败（第 2 步）\n\n- 命令/输入：`read_file docs/does-not-exist-dup-probe.txt`\n- 工具返回错误原文（摘要）：\n\n  > `read_file 失败：docs/does-not-exist-dup-probe.txt（ENOENT: no such file or directory, open '/private/tmp/ans-real-p-limit-20261015-duplicate-retest/docs/does-not-exist-dup-probe.txt'）`\n\n- 退出/结果：读取失败（ENOENT）。\n- 判定：**预期失败**，非缺陷。该文件被设计为不存在，用于验证「读取不存在的路径会如实失败」。未创建该文件，未以任何方式伪造其存在。\n\n---\n\n## 3. 环境：Node 版本（两次独立调用）\n\n按「单程序工具」约定，两次 `node -v` 为两个独立的 run_shell 调用，各记一次输出与退出码。\n\n| # | 命令 | stdout | stderr | 退出码 |\n| --- | --- | --- | --- | --- |\n| 3-a | `node -v` | `v24.14.0` | （空） | 0 |\n| 3-b | `node -v` | `v24.14.0` | （空） | 0 |\n\n- 结论：Node 版本 `v24.14.0`，两次一致；满足项目要求（Node >= 20）。\n\n---\n\n## 4. git 状态与改动概览（分次独立调用）\n\n### 4.1 `git status`\n\n- 命令：`git status`（退出码 0）\n- 原始输出摘要：\n\n  ```\n  On branch main\n  Your branch is up to date with 'origin/main'.\n\n  Changes not staged for commit:\n  \tmodified:   index.js\n  \tmodified:   test.js\n\n  Untracked files:\n  \t.ans/\n  \tdocs/\n  \t\"角色卡/\"\n\n  no changes added to commit\n  ```\n\n### 4.2 `git diff --stat`\n\n- 命令：`git diff --stat`（退出码 0）\n- 原始输出摘要：\n\n  ```\n   index.js | 2 +-\n   test.js  | 8 ++++++++\n   2 files changed, 9 insertions(+), 1 deletion(-)\n  ```\n\n### 4.3 `git diff index.js test.js`（补充，用于精确定位改动）\n\n- 命令：`git diff index.js test.js`（退出码 0）\n- 关键原始输出摘要：\n\n  ```\n  -\tif (typeof concurrency === 'object') {\n  +\tif (typeof concurrency === 'object' && concurrency !== null) {\n\n  +test('throws the concurrency validation error for null', t => {\n  +\tconst error = t.throws(() => {\n  +\t\tpLimit(null);\n  +\t}, {instanceOf: TypeError});\n  +\n  +\tt.is(error.message, 'Expected `concurrency` to be a number from 1 and up');\n  +});\n  ```\n\n- 判定：工作区改动仅两处，且与第 1 节看到的修复/用例完全对应；未出现其它源码或配置改动。\n\n---\n\n## 5. 精确测试：`npm test`\n\n- 命令（精确）：`npm test`\n- 展开脚本：`> p-limit@7.3.3 test` → `> xo && ava && tsd`\n- 退出码：**0**\n- 结果摘要：**31 tests passed，0 failed**（xo：0 error，1 warning；tsd 通过——因整体 exit 0 且未中断，`xo && ava && tsd` 全链通过）\n\n关键原始输出摘要（stdout）：\n\n```\n> p-limit@7.3.3 test\n> xo && ava && tsd\n\n  scripts/benchmarker.js:3:1\n  ⚠  3:1  Unexpected todo comment: TODO: I will move this to a proper....  no-warning-comments\n\n  1 warning\n\n  ✔ throws on invalid concurrency argument\n  ✔ throws the concurrency validation error for null\n  ✔ clearQueue\n  ...\n  ✔ limitFunction() (2.5s)\n  ✔ activeCount and pendingCount properties (3s)\n  ─\n\n  31 tests passed\n```\n\nstderr 摘要（与测试判定无关的 npm 配置告警）：\n\n```\nnpm warn Unknown env config \"electron-builder-binaries-mirror\". ...\nnpm warn Unknown env config \"electron-mirror\". ...\nnpm warn Unknown user config \"ELECTRON_MIRROR\". ...\nnpm warn Unknown user config \"ELECTRON_BUILDER_BINARIES_MIRROR\". ...\n```\n\n- 关键点：目标用例 `✔ throws the concurrency validation error for null` **出现在通过列表中**，为 31 项之一。\n- `xo` 侧仅有 1 条 warning（`scripts/benchmarker.js` 的 TODO 注释，`no-warning-comments`），无 error，不阻断退出码；`tsd` 未报错。\n\n---\n\n## 6. 判定结论\n\n1. **null 校验修复：确认落地。** 依据：index.js 第 6 行条件为 `typeof concurrency === 'object' && concurrency !== null`（直接看到 + git diff 印证），对应 test.js 末块新增断言，且该断言在 `npm test` 中通过。\n2. **`npm test`：31 项通过、退出码 0，符合预期。** 依据：命令 `npm test`，stdout `31 tests passed`，退出码 0。\n3. **两处异常/预期失败说明：**\n   - `docs/does-not-exist-dup-probe.txt` 读取失败（ENOENT）＝**预期失败**，非缺陷；未创建该文件。\n   - `npm test` stderr 的 4 条 `npm warn Unknown ... config` 为环境级 npm 配置告警，与测试结果无关，不影响退出码 0。\n\n---\n\n## 7. 可复现性\n\n- 环境：Node `v24.14.0`（`node -v` ×2 均为该版本，退出码 0）。\n- 复现命令序列（逐条独立执行）：\n\n  ```\n  node -v\n  node -v\n  git status\n  git diff --stat\n  npm test\n  ```\n\n- 预期：`node -v` 输出 `v24.14.0`、退出 0；`git status` 显示 index.js / test.js 已修改；`git diff --stat` 显示 `2 files changed, 9 insertions(+), 1 deletion(-)`；`npm test` 输出 `31 tests passed`、退出码 0。\n- 本次全部记录均来自上述命令的原始输出（摘要），未做人工构造。\n"
+        }
+      },
+      {
+        "id": "call_00_ET_HTBUKdsmci0IlccN1PKh0171",
+        "name": "submit_report",
+        "arguments": {
+          "status": "completed",
+          "summary": "DUP-FRESH-3 独立验证任务：确认 null 校验修复并做环境/git/npm test 复现记录。全程只读+运行命令，未改任何受保护文件；完整记录已写入 角色卡/测试/docs/change/dup-fresh-3.md。结论：null 校验修复确认落地（index.js 第 6 行 `typeof concurrency === 'object' && concurrency !== null`，test.js 末块有对应断言），npm test 31 项通过、退出码 0；探针文件读取失败与 npm 配置告警均为预期/无关。",
+          "evidence": [
+            "产物：角色卡/测试/docs/change/dup-fresh-3.md（8428 字节，含每步命令/原始输出摘要/退出码/判定）",
+            "index.js 第6行看到 null 校验：if (typeof concurrency === 'object' && concurrency !== null) {...}；validateConcurrency 对 null 抛 TypeError('Expected `concurrency` to be a number from 1 and up')",
+            "test.js 末块看到断言用例 test('throws the concurrency validation error for null')，t.throws(..., {instanceOf: TypeError}) 且 t.is(error.message, 'Expected `concurrency` to be a number from 1 and up')",
+            "git diff index.js test.js：- if (typeof concurrency === 'object') { / + if (typeof concurrency === 'object' && concurrency !== null) {；test.js 新增 8 行对应用例",
+            "read_file docs/does-not-exist-dup-probe.txt 预期失败：ENOENT: no such file or directory, open '.../docs/does-not-exist-dup-probe.txt'（未创建该文件）",
+            "node -v 两次独立调用均为 v24.14.0、退出码 0（空 stderr）",
+            "git status 退出0：modified index.js、modified test.js；untracked .ans/、docs/、角色卡/；git diff --stat：2 files changed, 9 insertions(+), 1 deletion(-)",
+            "npm test 退出码 0：> xo && ava && tsd；输出 '31 tests passed'，含 ✔ throws the concurrency validation error for null；xo 仅 1 条 no-warning-comments warning（scripts/benchmarker.js TODO）",
+            "npm test stderr 仅 4 条 npm warn Unknown ... config（环境级告警，与结果无关）",
+            "约束遵守：未写 index.js / index.d.ts / test.js / package.json / .gitignore"
+          ]
+        }
+      }
+    ],
+    "nativeResultCount": 11,
+    "startCount": 11,
+    "duplicateStartKeys": [],
+    "inputRows": [
+      {
+        "at": "2026-10-15T01:23:36.537Z",
+        "kind": "user",
+        "text": "[派发] 来自 su 的任务：DUP-FRESH-3 验证任务（你在全新会话，无历史上下文，以下文本自足）\n\n一、只读核对（不修改任何文件）\n1. 读 index.js 与 test.js（只读），确认 null 校验修复已落地：写明你看到的 null 校验逻辑所在位置与判定方式，以及 test.js 中对应的断言用例（区分「看到」与「推断」）。\n2. read_file docs/does-not-exist-dup-probe.txt —— 预期读取失败（该文件不存在）。请如实记录该失败（工具返回的错误信息原文摘要），不要创建该文件、不要手动造出该文件。\n\n二、环境与改动概览（按「单程序工具」约定：一个程序一次调用，不得使用 && / ; / 管道 / 重定向 / 变量展开）\n3. run_shell 实际执行 node -v：必须分两次独立调用（两个 run_shell 调用，各记一次输出与退出码）。\n4. 查看 git 状态与改动概览：分次独立调用（例如 git status 一次、git diff --stat 一次），记录原始输出摘要。\n\n三、精确测试\n5. 最后执行 npm test（一次，命令精确为 npm test），预期 31 项通过、退出码 0。记录：命令、结果摘要（通过数/失败数）、退出码、关键原始输出。\n\n四、约束\n- 源码、边界、配置一律不改：不写 index.js、index.d.ts、test.js、package.json、.gitignore 等；只读 + 运行命令 + 写你报告。\n- 第 2 步的读取失败是预期结果，不是缺陷，请如实记为「预期失败」。\n\n五、报告\n- 把完整记录写到 角色卡/测试/docs/change/dup-fresh-3.md（落在你自己的文档面内），内容含：每步的命令/输入、原始输出摘要、退出码、判定结论（null 校验修复是否确认、npm test 是否 31 通过且退出 0、两处异常/预期失败的说明）。\n- 结论必须可复现：给出命令、环境（Node 版本）、原始输出摘要。\n\n六、提交\n- 用 submit_report 提交，摘要中必须包含字符串 DUP-FRESH-3。（原因：DUP-FRESH-3 独立验证任务：确认 null 校验修复并做环境/git/npm test 复现记录）——完成后请交回报告",
+        "turnId": "e1d35ceb-72ff-48da-b8cd-ff3a774394d9"
+      }
+    ],
+    "typedInputs": [
+      {
+        "kind": "message",
+        "summary": "用户指令：[派发] 来自 su 的任务：DUP-FRESH-3 验证任务（你在全新会话，无历史上下文，以下文本自足）\n\n一、只读核对（不修改任何文件）\n1. 读 index.js 与 test.js（只读），确认 null 校验修复已落地：写明你看到的 null 校验逻辑所在位置与判定方式，以及 test.js 中对应的断言用例（区分「看到」与「推断」）。\n2. read_file docs/does-not-exist-dup-probe.txt —— 预期读取失败（该文件不存在）。请如实记录该失败（工具返回的错误信息原文摘要），不要创建该文件、不要手动造出该文件。\n\n二、环境与改动概览（按「单程序工具」约定：一个程序一次调用，不得使用 && / ; / 管道 / 重定向 / 变量展开）\n3. run_shell 实际执行 node -v：必须分两次独立调用（两个 run_shell 调用，各记一次输出与退出码）。\n4. 查看 git 状态与改动概览：分次独立调用（例如 git status 一次、git diff --stat 一次），记录原始输出摘要。\n\n三、精确测试\n5. 最后执行 npm test（一次，命令精确为 npm test），预期 31 项通过、退出码 0。记录：命令、结果摘要（通过数/失败数）、退出码、关键原始输出。\n\n四、约束\n- 源码、边界、配置一律不改：不写 index.js、index.d.ts、test.js、package.json、.gitignore 等；只读 + 运行命令 + 写你报告。\n- 第 2 步的读取失败是预期结果，不是缺陷，请如实记为「预期失败」。\n\n五、报告\n- 把完整记录写到 角色卡/测试/docs/change/dup-fresh-3.md（落在你自己的文档面内），内容含：每步的命令/输入、原始输出摘要、退出码、判定结论（null 校验修复是否确认、npm test 是否 31 通过且退出 0、两处异常/预期失败的说明）。\n- 结论必须可复现：给出命令、环境（Node 版本）、原始输出摘要。\n\n六、提交\n- 用 submit_report 提交，摘要中必须包含字符串 DUP-FRESH-3。（原因：DUP-FRESH-3 独立验证任务：确认 null 校验修复并做环境/git/npm test 复现记录）——完成后请交回报告",
+        "runtime": "pi",
+        "roleId": "测试",
+        "turnId": "e1d35ceb-72ff-48da-b8cd-ff3a774394d9",
+        "detail": {
+          "source": "prompt-input",
+          "text": "[派发] 来自 su 的任务：DUP-FRESH-3 验证任务（你在全新会话，无历史上下文，以下文本自足）\n\n一、只读核对（不修改任何文件）\n1. 读 index.js 与 test.js（只读），确认 null 校验修复已落地：写明你看到的 null 校验逻辑所在位置与判定方式，以及 test.js 中对应的断言用例（区分「看到」与「推断」）。\n2. read_file docs/does-not-exist-dup-probe.txt —— 预期读取失败（该文件不存在）。请如实记录该失败（工具返回的错误信息原文摘要），不要创建该文件、不要手动造出该文件。\n\n二、环境与改动概览（按「单程序工具」约定：一个程序一次调用，不得使用 && / ; / 管道 / 重定向 / 变量展开）\n3. run_shell 实际执行 node -v：必须分两次独立调用（两个 run_shell 调用，各记一次输出与退出码）。\n4. 查看 git 状态与改动概览：分次独立调用（例如 git status 一次、git diff --stat 一次），记录原始输出摘要。\n\n三、精确测试\n5. 最后执行 npm test（一次，命令精确为 npm test），预期 31 项通过、退出码 0。记录：命令、结果摘要（通过数/失败数）、退出码、关键原始输出。\n\n四、约束\n- 源码、边界、配置一律不改：不写 index.js、index.d.ts、test.js、package.json、.gitignore 等；只读 + 运行命令 + 写你报告。\n- 第 2 步的读取失败是预期结果，不是缺陷，请如实记为「预期失败」。\n\n五、报告\n- 把完整记录写到 角色卡/测试/docs/change/dup-fresh-3.md（落在你自己的文档面内），内容含：每步的命令/输入、原始输出摘要、退出码、判定结论（null 校验修复是否确认、npm test 是否 31 通过且退出 0、两处异常/预期失败的说明）。\n- 结论必须可复现：给出命令、环境（Node 版本）、原始输出摘要。\n\n六、提交\n- 用 submit_report 提交，摘要中必须包含字符串 DUP-FRESH-3。（原因：DUP-FRESH-3 独立验证任务：确认 null 校验修复并做环境/git/npm test 复现记录）——完成后请交回报告",
+          "turnId": "e1d35ceb-72ff-48da-b8cd-ff3a774394d9"
+        }
+      }
+    ],
+    "toolResults": [
+      {
+        "role": "toolResult",
+        "toolCallId": "call_00_HHT03zn6iL2VclyZKroX8131",
+        "toolName": "read_file",
+        "content": [
+          {
+            "type": "text",
+            "text": "read_file: index.js\n\nimport Queue from 'yocto-queue';\n\nexport default function pLimit(concurrency) {\n\tlet rejectOnClear = false;\n\n\tif (typeof concurrency === 'object' && concurrency !== null) {\n\t\t({concurrency, rejectOnClear = false} = concurrency);\n\t}\n\n\tvalidateConcurrency(concurrency);\n\n\tif (typeof rejectOnClear !== 'boolean') {\n\t\tthrow new TypeError('Expected `rejectOnClear` to be a boolean');\n\t}\n\n\tconst queue = new Queue();\n\tlet activeCount = 0;\n\n\tconst resumeNext = () => {\n\t\t// Process the next queued function if we're under the concurrency limit\n\t\tif (activeCount < concurrency && queue.size > 0) {\n\t\t\tactiveCount++;\n\t\t\tqueue.dequeue().run();\n\t\t}\n\t};\n\n\tconst next = () => {\n\t\tactiveCount--;\n\t\tresumeNext();\n\t};\n\n\tconst run = async (function_, resolve, arguments_) => {\n\t\t// Execute the function and capture the result promise\n\t\tconst result = (async () => function_(...arguments_))();\n\n\t\t// Resolve immediately with the promise (don't wait for completion)\n\t\tresolve(result);\n\n\t\t// Wait for the function to complete (success or failure)\n\t\t// We catch errors here to prevent unhandled rejections,\n\t\t// but the original promise rejection is preserved for the caller\n\t\ttry {\n\t\t\tawait result;\n\t\t} catch {}\n\n\t\t// Decrement active count and process next queued function\n\t\tnext();\n\t};\n\n\tconst enqueue = (function_, resolve, reject, arguments_) => {\n\t\tconst queueItem = {reject};\n\n\t\t// Queue the internal resolve function instead of the run function\n\t\t// to preserve the asynchronous execution context.\n\t\tnew Promise(internalResolve => { // eslint-disable-line promise/param-names\n\t\t\tqueueItem.run = internalResolve;\n\t\t\tqueue.enqueue(queueItem);\n\t\t}).then(run.bind(undefined, function_, resolve, arguments_)); // eslint-disable-line promise/prefer-await-to-then\n\n\t\t// Start processing immediately if we haven't reached the concurrency limit\n\t\tif (activeCount < concurrency) {\n\t\t\tresumeNext();\n\t\t}\n\t};\n\n\tconst generator = (function_, ...arguments_) => new Promise((resolve, reject) => {\n\t\tenqueue(function_, resolve, reject, arguments_);\n\t});\n\n\tObject.defineProperties(generator, {\n\t\tactiveCount: {\n\t\t\tget: () => activeCount,\n\t\t},\n\t\tpendingCount: {\n\t\t\tget: () => queue.size,\n\t\t},\n\t\tclearQueue: {\n\t\t\tvalue() {\n\t\t\t\tif (!rejectOnClear) {\n\t\t\t\t\tqueue.clear();\n\t\t\t\t\treturn;\n\t\t\t\t}\n\n\t\t\t\tconst abortError = AbortSignal.abort().reason;\n\n\t\t\t\twhile (queue.size > 0) {\n\t\t\t\t\tqueue.dequeue().reject(abortError);\n\t\t\t\t}\n\t\t\t},\n\t\t},\n\t\tconcurrency: {\n\t\t\tget: () => concurrency,\n\n\t\t\tset(newConcurrency) {\n\t\t\t\tvalidateConcurrency(newConcurrency);\n\t\t\t\tconcurrency = newConcurrency;\n\n\t\t\t\tqueueMicrotask(() => {\n\t\t\t\t\t// eslint-disable-next-line no-unmodified-loop-condition\n\t\t\t\t\twhile (activeCount < concurrency && queue.size > 0) {\n\t\t\t\t\t\tresumeNext();\n\t\t\t\t\t}\n\t\t\t\t});\n\t\t\t},\n\t\t},\n\t\tmap: {\n\t\t\tasync value(iterable, function_) {\n\t\t\t\tconst promises = [];\n\n\t\t\t\ttry {\n\t\t\t\t\tArray.from(iterable, (value, index) => {\n\t\t\t\t\t\tconst promise = generator(function_, value, index);\n\t\t\t\t\t\tpromises.push(promise);\n\t\t\t\t\t\treturn promise;\n\t\t\t\t\t});\n\t\t\t\t} catch (error) {\n\t\t\t\t\t// The iterable threw, so `Promise.all` never observes the already scheduled promises. Observe them here to avoid unhandled rejections.\n\t\t\t\t\tfor (const promise of promises) {\n\t\t\t\t\t\tpromise.catch(() => {}); // eslint-disable-line promise/prefer-await-to-then\n\t\t\t\t\t}\n\n\t\t\t\t\tthrow error;\n\t\t\t\t}\n\n\t\t\t\treturn Promise.all(promises);\n\t\t\t},\n\t\t},\n\t});\n\n\treturn generator;\n}\n\nexport function limitFunction(function_, options) {\n\tconst limit = pLimit(options);\n\n\tconst limitedFunction = (...arguments_) => limit(() => function_(...arguments_));\n\tObject.defineProperty(limitedFunction, 'clearQueue', {\n\t\tvalue: limit.clearQueue,\n\t});\n\n\treturn limitedFunction;\n}\n\nfunction validateConcurrency(concurrency) {\n\tif (!((Number.isInteger(concurrency) || concurrency === Number.POSITIVE_INFINITY) && concurrency > 0)) {\n\t\tthrow new TypeError('Expected `concurrency` to be a number from 1 and up');\n\t}\n}\n"
+          }
+        ],
+        "details": {
+          "turnId": "e1d35ceb-72ff-48da-b8cd-ff3a774394d9",
+          "toolCallId": "call_00_HHT03zn6iL2VclyZKroX8131",
+          "toolName": "read_file",
+          "path": "index.js",
+          "ok": true,
+          "status": "completed",
+          "durationMs": 9
+        },
+        "isError": false,
+        "durationMs": 10,
+        "timestamp": 1792027419153
+      },
+      {
+        "role": "toolResult",
+        "toolCallId": "call_01_Ijo3my6x2BchOR1leNA49938",
+        "toolName": "read_file",
+        "content": [
+          {
+            "type": "text",
+            "text": "read_file: test.js\n\nimport process from 'node:process';\nimport {AsyncLocalStorage} from 'node:async_hooks';\nimport {setTimeout as delay} from 'node:timers/promises';\nimport test from 'ava';\nimport inRange from 'in-range';\nimport timeSpan from 'time-span';\nimport randomInt from 'random-int';\nimport pLimit, {limitFunction} from './index.js';\n\ntest('concurrency: 1', async t => {\n\tconst input = [\n\t\t[10, 300],\n\t\t[20, 200],\n\t\t[30, 100],\n\t];\n\n\tconst end = timeSpan();\n\tconst limit = pLimit(1);\n\n\tconst mapper = ([value, ms]) => limit(async () => {\n\t\tawait delay(ms);\n\t\treturn value;\n\t});\n\n\tt.deepEqual(await Promise.all(input.map(x => mapper(x))), [10, 20, 30]);\n\tt.true(inRange(end(), {start: 590, end: 650}));\n});\n\ntest('concurrency: 4', async t => {\n\tconst concurrency = 5;\n\tlet running = 0;\n\n\tconst limit = pLimit(concurrency);\n\n\tconst input = Array.from({length: 100}, () => limit(async () => {\n\t\trunning++;\n\t\tt.true(running <= concurrency);\n\t\tawait delay(randomInt(30, 200));\n\t\trunning--;\n\t}));\n\n\tawait Promise.all(input);\n});\n\ntest('propagates async execution context properly', async t => {\n\tconst concurrency = 2;\n\tconst limit = pLimit(concurrency);\n\tconst store = new AsyncLocalStorage();\n\n\tconst checkId = async id => {\n\t\tawait Promise.resolve();\n\t\tt.is(id, store.getStore()?.id);\n\t};\n\n\tconst startContext = async id => store.run({id}, () => limit(checkId, id));\n\n\tawait Promise.all(Array.from({length: 100}, (_, id) => startContext(id)));\n});\n\ntest('non-promise returning function', async t => {\n\tawait t.notThrowsAsync(async () => {\n\t\tconst limit = pLimit(1);\n\t\tawait limit(() => null);\n\t});\n});\n\ntest('continues after sync throw', async t => {\n\tconst limit = pLimit(1);\n\tlet ran = false;\n\n\tconst promises = [\n\t\tlimit(() => {\n\t\t\tthrow new Error('err');\n\t\t}),\n\t\tlimit(() => {\n\t\t\tran = true;\n\t\t}),\n\t];\n\n\ttry {\n\t\tawait Promise.all(promises);\n\t} catch {}\n\n\tt.is(ran, true);\n});\n\ntest('accepts additional arguments', async t => {\n\tconst limit = pLimit(1);\n\tconst symbol = Symbol('test');\n\n\tawait limit(a => t.is(a, symbol), symbol);\n});\n\ntest('shared context with a limited provider helper', async t => {\n\tconst limit = pLimit(1);\n\tconst sharedContext = {values: []};\n\n\tconst runWithContext = (function_, ...arguments_) => limit(function_, sharedContext, ...arguments_);\n\n\tconst addValue = async (context, value) => {\n\t\tcontext.values.push(value);\n\t\tawait delay(10);\n\t\treturn context.values.length;\n\t};\n\n\tconst firstPromise = runWithContext(addValue, 'first');\n\tconst secondPromise = runWithContext(addValue, 'second');\n\n\tt.is(limit.activeCount, 1);\n\tt.is(limit.pendingCount, 1);\n\n\tconst results = await Promise.all([firstPromise, secondPromise]);\n\n\tt.deepEqual(results, [1, 2]);\n\tt.deepEqual(sharedContext.values, ['first', 'second']);\n});\n\ntest('does not ignore errors', async t => {\n\tconst limit = pLimit(1);\n\tconst error = new Error('🦄');\n\n\tconst promises = [\n\t\tlimit(async () => {\n\t\t\tawait delay(30);\n\t\t}),\n\t\tlimit(async () => {\n\t\t\tawait delay(80);\n\t\t\tthrow error;\n\t\t}),\n\t\tlimit(async () => {\n\t\t\tawait delay(50);\n\t\t}),\n\t];\n\n\tawait t.throwsAsync(Promise.all(promises), {is: error});\n});\n\ntest('runs all tasks asynchronously', async t => {\n\tconst limit = pLimit(3);\n\n\tlet value = 1;\n\n\tconst one = limit(() => 1);\n\tconst two = limit(() => value);\n\n\tt.is(limit.activeCount, 2);\n\n\tvalue = 2;\n\n\tconst result = await Promise.all([one, two]);\n\n\tt.deepEqual(result, [1, 2]);\n});\n\ntest('activeCount and pendingCount properties', async t => {\n\tconst limit = pLimit(5);\n\tt.is(limit.activeCount, 0);\n\tt.is(limit.pendingCount, 0);\n\n\tconst runningPromise1 = limit(() => delay(1000));\n\tt.is(limit.activeCount, 1);\n\tt.is(limit.pendingCount, 0);\n\n\tawait runningPromise1;\n\tt.is(limit.activeCount, 0);\n\tt.is(limit.pendingCount, 0);\n\n\tconst immediatePromises = Array.from({length: 5}, () => limit(() => delay(1000)));\n\tconst delayedPromises = Array.from({length: 3}, () => limit(() => delay(1000)));\n\n\tt.is(limit.activeCount, 5);\n\tt.is(limit.pendingCount, 3);\n\n\tawait Promise.all(immediatePromises);\n\tt.is(limit.activeCount, 3);\n\tt.is(limit.pendingCount, 0);\n\n\tawait Promise.all(delayedPromises);\n\n\tt.is(limit.activeCount, 0);\n\tt.is(limit.pendingCount, 0);\n});\n\ntest('clearQueue', async t => {\n\tconst limit = pLimit(1);\n\n\tArray.from({length: 1}, () => limit(() => delay(1000)));\n\tArray.from({length: 3}, () => limit(() => delay(1000)));\n\n\tawait Promise.resolve();\n\tt.is(limit.pendingCount, 3);\n\tlimit.clearQueue();\n\tt.is(limit.pendingCount, 0);\n});\n\n// Node.js 20 has a bug where DOMException is not properly handled by AVA's `throwsAsync`.\nconst testClearQueueRejects = process.versions.node.startsWith('20.') ? test.skip : test;\n\ntestClearQueueRejects('clearQueue rejects pending promises when enabled', async t => {\n\tconst limit = pLimit({concurrency: 1, rejectOnClear: true});\n\n\tconst runningPromise = limit(() => delay(100));\n\tconst pendingPromiseOne = limit(() => delay(10));\n\tconst pendingPromiseTwo = limit(() => delay(10));\n\n\tawait Promise.resolve();\n\tt.is(limit.pendingCount, 2);\n\n\tlimit.clearQueue();\n\tt.is(limit.pendingCount, 0);\n\n\tawait runningPromise;\n\tawait t.throwsAsync(pendingPromiseOne, {name: 'AbortError'});\n\tawait t.throwsAsync(pendingPromiseTwo, {name: 'AbortError'});\n});\n\ntestClearQueueRejects('limitFunction exposes clearQueue', async t => {\n\tconst limitedFunction = limitFunction(() => delay(20), {concurrency: 1, rejectOnClear: true});\n\n\tconst runningPromise = limitedFunction();\n\tconst pendingPromise = limitedFunction();\n\n\tlimitedFunction.clearQueue();\n\n\tawait runningPromise;\n\tawait t.throwsAsync(pendingPromise, {name: 'AbortError'});\n});\n\ntest('map', async t => {\n\tconst limit = pLimit(1);\n\tconst results = await limit.map([1, 2, 3, 4, 5, 6, 7], input => input + 1);\n\n\tt.deepEqual(results, [2, 3, 4, 5, 6, 7, 8]);\n});\n\ntest('map works when detached from the limit', async t => {\n\tconst limit = pLimit(1);\n\tconst {map} = limit;\n\tlet running = 0;\n\tlet maxRunning = 0;\n\tconst mapper = async input => {\n\t\trunning++;\n\t\tmaxRunning = Math.max(maxRunning, running);\n\t\tawait delay(10);\n\t\trunning--;\n\t\treturn input * 2;\n\t};\n\n\tconst directResult = limit(mapper, 1);\n\tconst mapResult = map([2, 3], mapper);\n\n\tt.deepEqual(await Promise.all([directResult, mapResult]), [2, [4, 6]]);\n\tt.is(maxRunning, 1);\n});\n\ntest('map passes index and preserves order with concurrency', async t => {\n\tconst limit = pLimit(3);\n\tconst inputs = [10, 10, 10, 10, 10];\n\n\t// eslint-disable-next-line unicorn/no-array-method-this-argument\n\tconst results = await limit.map(inputs, async (value, index) => {\n\t\t// Simulate variable async duration per index to shuffle completion order\n\t\tawait delay((inputs.length - index) * 5);\n\t\treturn value + index;\n\t});\n\n\t// Results should be in input order and include index\n\tt.deepEqual(results, [10, 11, 12, 13, 14]);\n});\n\ntest('map accepts an iterable (set)', async t => {\n\tconst limit = pLimit(2);\n\tconst inputs = new Set([1, 2, 3, 4]);\n\n\tconst results = await limit.map(inputs, input => input * 2); // eslint-disable-line unicorn/no-array-method-this-argument\n\n\tt.deepEqual(results, [2, 4, 6, 8]);\n});\n\ntest('map accepts an iterable (array iterator)', async t => {\n\tconst limit = pLimit(2);\n\tconst inputs = [1, 2, 3, 4].values();\n\n\tconst results = await limit.map(inputs, input => input * 2); // eslint-disable-line unicorn/no-array-method-this-argument\n\n\tt.deepEqual(results, [2, 4, 6, 8]);\n});\n\ntest('map accepts array-like inputs', async t => {\n\tconst limit = pLimit(1);\n\tconst inputs = {0: 'a', 1: 'b', length: 2};\n\n\tconst results = await limit.map(inputs, (value, index) => `${index}:${value}`); // eslint-disable-line unicorn/no-array-method-this-argument\n\n\tt.deepEqual(results, ['0:a', '1:b']);\n});\n\ntest('map does not leave unhandled rejections when the iterable throws', async t => {\n\tconst limit = pLimit(1);\n\tconst error = new Error('Iterator failed');\n\n\tfunction * inputs() {\n\t\tyield 1;\n\t\tyield 2;\n\t\tyield 3;\n\t\tthrow error;\n\t}\n\n\tawait t.throwsAsync(limit.map(inputs(), async value => {\n\t\tawait delay(10);\n\t\tthrow new Error(`Mapper ${value} failed`);\n\t}), {is: error});\n\n\t// Wait for the active and queued mappers to reject. AVA fails the run if any rejection is unhandled.\n\tawait limit(() => {});\n\tt.is(limit.activeCount, 0);\n\tt.is(limit.pendingCount, 0);\n});\n\ntest('map rejects with the mapper error', async t => {\n\tconst limit = pLimit(2);\n\tconst error = new Error('🦄');\n\n\tawait t.throwsAsync(limit.map([1, 2, 3], async value => {\n\t\tif (value === 2) {\n\t\t\tthrow error;\n\t\t}\n\n\t\treturn value;\n\t}), {is: error});\n});\n\ntest('map resolves to an empty array for an empty iterable', async t => {\n\tconst limit = pLimit(1);\n\n\tt.deepEqual(await limit.map([], () => t.fail('mapper should not be called')), []);\n\tt.deepEqual(await limit.map(new Set(), () => t.fail('mapper should not be called')), []);\n});\n\ntest('map rejects with the iterable error when it throws before the first item', async t => {\n\tconst limit = pLimit(1);\n\tconst error = new Error('Iterator failed');\n\n\tconst inputs = {\n\t\t* [Symbol.iterator]() { // eslint-disable-line require-yield\n\t\t\tthrow error;\n\t\t},\n\t};\n\n\tawait t.throwsAsync(limit.map(inputs, () => t.fail('mapper should not be called')), {is: error}); // eslint-disable-line unicorn/no-array-callback-reference, unicorn/no-array-method-this-argument\n\tt.is(limit.activeCount, 0);\n\tt.is(limit.pendingCount, 0);\n});\n\ntest('map rejects immediately with the iterable error and still runs already scheduled tasks', async t => {\n\tconst limit = pLimit(1);\n\tconst error = new Error('Iterator failed');\n\tconst completed = [];\n\n\tfunction * inputs() {\n\t\tyield 1;\n\t\tyield 2;\n\t\tthrow error;\n\t}\n\n\tawait t.throwsAsync(limit.map(inputs(), async value => {\n\t\tawait delay(50);\n\t\tcompleted.push(value);\n\t}), {is: error});\n\n\t// The rejection should not wait for the scheduled tasks to finish\n\tt.deepEqual(completed, []);\n\n\t// With concurrency 1, this only runs after the already scheduled tasks\n\tawait limit(() => {});\n\tt.deepEqual(completed, [1, 2]);\n\tt.is(limit.activeCount, 0);\n\tt.is(limit.pendingCount, 0);\n});\n\ntest('map passes sequential indexes for a generator', async t => {\n\tconst limit = pLimit(2);\n\n\tfunction * inputs() {\n\t\tyield 'a';\n\t\tyield 'b';\n\t\tyield 'c';\n\t}\n\n\tconst results = await limit.map(inputs(), (value, index) => `${index}:${value}`);\n\n\tt.deepEqual(results, ['0:a', '1:b', '2:c']);\n});\n\ntest('accepts options object', async t => {\n\tconst limit = pLimit({concurrency: 1});\n\n\tconst input = [\n\t\tlimit(async () => {\n\t\t\tawait delay(50);\n\t\t\treturn 1;\n\t\t}),\n\t\tlimit(async () => {\n\t\t\tawait delay(50);\n\t\t\treturn 2;\n\t\t}),\n\t];\n\n\tt.deepEqual(await Promise.all(input), [1, 2]);\n\tt.is(limit.concurrency, 1);\n});\n\ntest('throws on invalid concurrency argument', t => {\n\tt.throws(() => {\n\t\tpLimit(0);\n\t});\n\n\tt.throws(() => {\n\t\tpLimit(-1);\n\t});\n\n\tt.throws(() => {\n\t\tpLimit(1.2);\n\t});\n\n\tt.throws(() => {\n\t\tpLimit(undefined);\n\t});\n\n\tt.throws(() => {\n\t\tpLimit(true);\n\t});\n\n\tt.throws(() => {\n\t\tpLimit({});\n\t});\n\n\tt.throws(() => {\n\t\tpLimit({concurrency: 0});\n\t});\n});\n\ntest('change concurrency to smaller value', async t => {\n\tconst limit = pLimit(4);\n\tlet running = 0;\n\tconst log = [];\n\tconst promises = Array.from({length: 10}).map(() =>\n\t\tlimit(async () => {\n\t\t\t++running;\n\t\t\tlog.push(running);\n\t\t\tawait delay(50);\n\t\t\t--running;\n\t\t}));\n\tawait delay(0);\n\tt.is(running, 4);\n\n\tlimit.concurrency = 2;\n\tawait Promise.all(promises);\n\tt.deepEqual(log, [1, 2, 3, 4, 2, 2, 2, 2, 2, 2]);\n});\n\ntest('change concurrency to bigger value', async t => {\n\tconst limit = pLimit(2);\n\tlet running = 0;\n\tconst log = [];\n\tconst promises = Array.from({length: 10}).map(() =>\n\t\tlimit(async () => {\n\t\t\t++running;\n\t\t\tlog.push(running);\n\t\t\tawait delay(50);\n\t\t\t--running;\n\t\t}));\n\tawait delay(0);\n\tt.is(running, 2);\n\n\tlimit.concurrency = 4;\n\tawait Promise.all(promises);\n\tt.deepEqual(log, [1, 2, 3, 4, 4, 4, 4, 4, 4, 4]);\n});\n\ntest('limitFunction()', async t => {\n\tconst concurrency = 5;\n\tlet running = 0;\n\n\tconst limitedFunction = limitFunction(async () => {\n\t\trunning++;\n\t\tt.true(running <= concurrency);\n\t\tawait delay(randomInt(30, 200));\n\t\trunning--;\n\t}, {concurrency});\n\n\tconst input = Array.from({length: 100}, limitedFunction);\n\n\tawait Promise.all(input);\n});\n\ntest('throws the concurrency validation error for null', t => {\n\tconst error = t.throws(() => {\n\t\tpLimit(null);\n\t}, {instanceOf: TypeError});\n\n\tt.is(error.message, 'Expected `concurrency` to be a number from 1 and up');\n});\n"
+          }
+        ],
+        "details": {
+          "turnId": "e1d35ceb-72ff-48da-b8cd-ff3a774394d9",
+          "toolCallId": "call_01_Ijo3my6x2BchOR1leNA49938",
+          "toolName": "read_file",
+          "path": "test.js",
+          "ok": true,
+          "status": "completed",
+          "durationMs": 6
+        },
+        "isError": false,
+        "durationMs": 7,
+        "timestamp": 1792027419153
+      },
+      {
+        "role": "toolResult",
+        "toolCallId": "call_02_H8CIlBrSVEYnL2J8oYi76007",
+        "toolName": "read_file",
+        "content": [
+          {
+            "type": "text",
+            "text": "read_file 失败：docs/does-not-exist-dup-probe.txt（ENOENT: no such file or directory, open '/private/tmp/ans-real-p-limit-20261015-duplicate-retest/docs/does-not-exist-dup-probe.txt'）"
+          }
+        ],
+        "details": {
+          "turnId": "e1d35ceb-72ff-48da-b8cd-ff3a774394d9",
+          "toolCallId": "call_02_H8CIlBrSVEYnL2J8oYi76007",
+          "toolName": "read_file",
+          "path": "docs/does-not-exist-dup-probe.txt",
+          "ok": false,
+          "status": "failed",
+          "durationMs": 1,
+          "errorCode": "TOOL_FAILED"
+        },
+        "isError": true,
+        "durationMs": 3,
+        "timestamp": 1792027419153
+      },
+      {
+        "role": "toolResult",
+        "toolCallId": "call_00_s1TNmSAR5fdi7nrZyl5P0317",
+        "toolName": "run_shell",
+        "content": [
+          {
+            "type": "text",
+            "text": "run_shell 已执行：node -v（exit 0）\nstdout:\nv24.14.0\n\nstderr:\n"
+          }
+        ],
+        "details": {
+          "turnId": "e1d35ceb-72ff-48da-b8cd-ff3a774394d9",
+          "toolCallId": "call_00_s1TNmSAR5fdi7nrZyl5P0317",
+          "toolName": "run_shell",
+          "ok": true,
+          "status": "completed",
+          "durationMs": 31
+        },
+        "isError": false,
+        "durationMs": 32,
+        "timestamp": 1792027428656
+      },
+      {
+        "role": "toolResult",
+        "toolCallId": "call_01_jbbeSSlwRBYv9WtsbD0F9726",
+        "toolName": "run_shell",
+        "content": [
+          {
+            "type": "text",
+            "text": "run_shell 已执行：node -v（exit 0）\nstdout:\nv24.14.0\n\nstderr:\n"
+          }
+        ],
+        "details": {
+          "turnId": "e1d35ceb-72ff-48da-b8cd-ff3a774394d9",
+          "toolCallId": "call_01_jbbeSSlwRBYv9WtsbD0F9726",
+          "toolName": "run_shell",
+          "ok": true,
+          "status": "completed",
+          "durationMs": 32
+        },
+        "isError": false,
+        "durationMs": 33,
+        "timestamp": 1792027428656
+      },
+      {
+        "role": "toolResult",
+        "toolCallId": "call_02_QdPDp5GkNY2dLgEEoNqa8776",
+        "toolName": "run_shell",
+        "content": [
+          {
+            "type": "text",
+            "text": "run_shell 已执行：git status（exit 0）\nstdout:\nOn branch main\nYour branch is up to date with 'origin/main'.\n\nChanges not staged for commit:\n  (use \"git add <file>...\" to update what will be committed)\n  (use \"git restore <file>...\" to discard changes in working directory)\n\tmodified:   index.js\n\tmodified:   test.js\n\nUntracked files:\n  (use \"git add <file>...\" to include in what will be committed)\n\t.ans/\n\tdocs/\n\t\"\\350\\247\\222\\350\\211\\262\\345\\215\\241/\"\n\nno changes added to commit (use \"git add\" and/or \"git commit -a\")\n\nstderr:\n"
+          }
+        ],
+        "details": {
+          "turnId": "e1d35ceb-72ff-48da-b8cd-ff3a774394d9",
+          "toolCallId": "call_02_QdPDp5GkNY2dLgEEoNqa8776",
+          "toolName": "run_shell",
+          "ok": true,
+          "status": "completed",
+          "durationMs": 38
+        },
+        "isError": false,
+        "durationMs": 39,
+        "timestamp": 1792027428656
+      },
+      {
+        "role": "toolResult",
+        "toolCallId": "call_03_w3sbf36MSyIc6l8kRr3n3967",
+        "toolName": "run_shell",
+        "content": [
+          {
+            "type": "text",
+            "text": "run_shell 已执行：git diff --stat（exit 0）\nstdout:\n index.js | 2 +-\n test.js  | 8 ++++++++\n 2 files changed, 9 insertions(+), 1 deletion(-)\n\nstderr:\n"
+          }
+        ],
+        "details": {
+          "turnId": "e1d35ceb-72ff-48da-b8cd-ff3a774394d9",
+          "toolCallId": "call_03_w3sbf36MSyIc6l8kRr3n3967",
+          "toolName": "run_shell",
+          "ok": true,
+          "status": "completed",
+          "durationMs": 35
+        },
+        "isError": false,
+        "durationMs": 36,
+        "timestamp": 1792027428657
+      },
+      {
+        "role": "toolResult",
+        "toolCallId": "call_00_FBPH9ZpfxCti8Kxzv2o79397",
+        "toolName": "run_shell",
+        "content": [
+          {
+            "type": "text",
+            "text": "run_shell 已执行：npm test（exit 0）\nstdout:\n\n> p-limit@7.3.3 test\n> xo && ava && tsd\n\n\n  scripts/benchmarker.js:3:1\n  ⚠  3:1  Unexpected todo comment: TODO: I will move this to a proper....  no-warning-comments\n\n  1 warning\n\n\n  ✔ throws on invalid concurrency argument\n  ✔ throws the concurrency validation error for null\n  ✔ clearQueue\n  ✔ accepts additional arguments\n  ✔ map rejects with the iterable error when it throws before the first item\n  ✔ continues after sync throw\n  ✔ runs all tasks asynchronously\n  ✔ map resolves to an empty array for an empty iterable\n  ✔ non-promise returning function\n  ✔ map accepts an iterable (set)\n  ✔ map accepts an iterable (array iterator)\n  ✔ map accepts array-like inputs\n  ✔ map passes sequential indexes for a generator\n  ✔ map rejects with the mapper error\n  ✔ map\n  ✔ propagates async execution context properly\n  ✔ limitFunction exposes clearQueue\n  ✔ shared context with a limited provider helper\n  ✔ map passes index and preserves order with concurrency\n  ✔ map works when detached from the limit\n  ✔ map does not leave unhandled rejections when the iterable throws\n  ✔ clearQueue rejects pending promises when enabled (102ms)\n  ✔ map rejects immediately with the iterable error and still runs already scheduled tasks (102ms)\n  ✔ accepts options object (101ms)\n  ✔ does not ignore errors (112ms)\n  ✔ change concurrency to bigger value (152ms)\n  ✔ change concurrency to smaller value (204ms)\n  ✔ concurrency: 1 (607ms)\n  ✔ concurrency: 4 (2.2s)\n  ✔ limitFunction() (2.5s)\n  ✔ activeCount and pendingCount properties (3s)\n  ─\n\n  31 tests passed\n\nstderr:\nnpm warn Unknown env config \"electron-builder-binaries-mirror\". This will stop working in the next major version of npm.\nnpm warn Unknown env config \"electron-mirror\". This will stop working in the next major version of npm.\nnpm warn Unknown user config \"ELECTRON_MIRROR\". This will stop working in the next major version of npm.\nnpm warn Unknown user config \"ELECTRON_BUILDER_BINARIES_MIRROR\". This will stop working in the next major version of npm.\n"
+          }
+        ],
+        "details": {
+          "turnId": "e1d35ceb-72ff-48da-b8cd-ff3a774394d9",
+          "toolCallId": "call_00_FBPH9ZpfxCti8Kxzv2o79397",
+          "toolName": "run_shell",
+          "ok": true,
+          "status": "completed",
+          "durationMs": 19141
+        },
+        "isError": false,
+        "durationMs": 19141,
+        "timestamp": 1792027453897
+      },
+      {
+        "role": "toolResult",
+        "toolCallId": "call_00_0toZZPffKOIeKjOIWqLB5101",
+        "toolName": "run_shell",
+        "content": [
+          {
+            "type": "text",
+            "text": "run_shell 已执行：git diff index.js test.js（exit 0）\nstdout:\ndiff --git a/index.js b/index.js\nindex c24de57..b78e37a 100644\n--- a/index.js\n+++ b/index.js\n@@ -3,7 +3,7 @@ import Queue from 'yocto-queue';\n export default function pLimit(concurrency) {\n \tlet rejectOnClear = false;\n \n-\tif (typeof concurrency === 'object') {\n+\tif (typeof concurrency === 'object' && concurrency !== null) {\n \t\t({concurrency, rejectOnClear = false} = concurrency);\n \t}\n \ndiff --git a/test.js b/test.js\nindex 08e197e..a51ed58 100644\n--- a/test.js\n+++ b/test.js\n@@ -493,3 +493,11 @@ test('limitFunction()', async t => {\n \n \tawait Promise.all(input);\n });\n+\n+test('throws the concurrency validation error for null', t => {\n+\tconst error = t.throws(() => {\n+\t\tpLimit(null);\n+\t}, {instanceOf: TypeError});\n+\n+\tt.is(error.message, 'Expected `concurrency` to be a number from 1 and up');\n+});\n\nstderr:\n"
+          }
+        ],
+        "details": {
+          "turnId": "e1d35ceb-72ff-48da-b8cd-ff3a774394d9",
+          "toolCallId": "call_00_0toZZPffKOIeKjOIWqLB5101",
+          "toolName": "run_shell",
+          "ok": true,
+          "status": "completed",
+          "durationMs": 20
+        },
+        "isError": false,
+        "durationMs": 21,
+        "timestamp": 1792027456141
+      },
+      {
+        "role": "toolResult",
+        "toolCallId": "call_00_3QF5UQbAnfg5mBXBGk4D6120",
+        "toolName": "write_file",
+        "content": [
+          {
+            "type": "text",
+            "text": "write_file 已获准并落盘：角色卡/测试/docs/change/dup-fresh-3.md（8428 字节写入 /private/tmp/ans-real-p-limit-20261015-duplicate-retest/角色卡/测试/docs/change/dup-fresh-3.md）"
+          }
+        ],
+        "details": {
+          "turnId": "e1d35ceb-72ff-48da-b8cd-ff3a774394d9",
+          "toolCallId": "call_00_3QF5UQbAnfg5mBXBGk4D6120",
+          "toolName": "write_file",
+          "path": "角色卡/测试/docs/change/dup-fresh-3.md",
+          "ok": true,
+          "status": "completed",
+          "durationMs": 8
+        },
+        "isError": false,
+        "durationMs": 8,
+        "timestamp": 1792027469227
+      },
+      {
+        "role": "toolResult",
+        "toolCallId": "call_00_ET_HTBUKdsmci0IlccN1PKh0171",
+        "toolName": "submit_report",
+        "content": [
+          {
+            "type": "text",
+            "text": "submit_report：报告已交回（status: completed）——已把你要说的话交给编排汇总。"
+          }
+        ],
+        "details": {
+          "turnId": "e1d35ceb-72ff-48da-b8cd-ff3a774394d9",
+          "toolCallId": "call_00_ET_HTBUKdsmci0IlccN1PKh0171",
+          "toolName": "submit_report",
+          "ok": true,
+          "status": "completed",
+          "durationMs": 1
+        },
+        "isError": false,
+        "durationMs": 2,
+        "timestamp": 1792027473164
+      }
+    ]
+  }
+}

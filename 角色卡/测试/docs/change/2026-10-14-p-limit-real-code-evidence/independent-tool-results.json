@@ -1,0 +1,116 @@
+[
+  {
+    "at": "2026-10-14T14:49:26.607Z",
+    "tool": "run_shell",
+    "toolCallId": "call_00_9eNZ1E85fh809tLZ8DeF8180",
+    "details": {
+      "turnId": "cff5a4a4-e4bf-4b23-98cd-f3c4dd710392",
+      "toolCallId": "call_00_9eNZ1E85fh809tLZ8DeF8180",
+      "toolName": "run_shell",
+      "ok": true,
+      "status": "completed",
+      "durationMs": 37
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "run_shell 已执行：git diff -- index.js test.js（exit 0）\nstdout:\ndiff --git a/index.js b/index.js\nindex c24de57..b78e37a 100644\n--- a/index.js\n+++ b/index.js\n@@ -3,7 +3,7 @@ import Queue from 'yocto-queue';\n export default function pLimit(concurrency) {\n \tlet rejectOnClear = false;\n \n-\tif (typeof concurrency === 'object') {\n+\tif (typeof concurrency === 'object' && concurrency !== null) {\n \t\t({concurrency, rejectOnClear = false} = concurrency);\n \t}\n \ndiff --git a/test.js b/test.js\nindex 08e197e..a51ed58 100644\n--- a/test.js\n+++ b/test.js\n@@ -493,3 +493,11 @@ test('limitFunction()', async t => {\n \n \tawait Promise.all(input);\n });\n+\n+test('throws the concurrency validation error for null', t => {\n+\tconst error = t.throws(() => {\n+\t\tpLimit(null);\n+\t}, {instanceOf: TypeError});\n+\n+\tt.is(error.message, 'Expected `concurrency` to be a number from 1 and up');\n+});\n\nstderr:\n"
+      }
+    ]
+  },
+  {
+    "at": "2026-10-14T14:49:26.607Z",
+    "tool": "run_shell",
+    "toolCallId": "call_01_vCtRXhDepii38zzgdrJZ1410",
+    "details": {
+      "turnId": "cff5a4a4-e4bf-4b23-98cd-f3c4dd710392",
+      "toolCallId": "call_01_vCtRXhDepii38zzgdrJZ1410",
+      "toolName": "run_shell",
+      "ok": true,
+      "status": "completed",
+      "durationMs": 39
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "run_shell 已执行：git status --porcelain（exit 0）\nstdout:\n M index.js\n M test.js\n?? .ans/\n?? docs/\n?? \"\\350\\247\\222\\350\\211\\262\\345\\215\\241/\"\n\nstderr:\n"
+      }
+    ]
+  },
+  {
+    "at": "2026-10-14T14:49:26.607Z",
+    "tool": "run_shell",
+    "toolCallId": "call_02_mbpwCRi2XgMvLUacqPEP8066",
+    "details": {
+      "turnId": "cff5a4a4-e4bf-4b23-98cd-f3c4dd710392",
+      "toolCallId": "call_02_mbpwCRi2XgMvLUacqPEP8066",
+      "toolName": "run_shell",
+      "ok": true,
+      "status": "completed",
+      "durationMs": 29
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "run_shell 已执行：node -v（exit 0）\nstdout:\nv24.14.0\n\nstderr:\n"
+      }
+    ]
+  },
+  {
+    "at": "2026-10-14T14:49:26.607Z",
+    "tool": "run_shell",
+    "toolCallId": "call_03_3gSlZQ9T2sm93tJpq4U39972",
+    "details": {
+      "turnId": "cff5a4a4-e4bf-4b23-98cd-f3c4dd710392",
+      "toolCallId": "call_03_3gSlZQ9T2sm93tJpq4U39972",
+      "toolName": "run_shell",
+      "ok": true,
+      "status": "completed",
+      "durationMs": 104
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "run_shell 已执行：npm -v（exit 0）\nstdout:\n11.9.0\n\nstderr:\nnpm warn Unknown env config \"electron-builder-binaries-mirror\". This will stop working in the next major version of npm.\nnpm warn Unknown env config \"electron-mirror\". This will stop working in the next major version of npm.\nnpm warn Unknown user config \"ELECTRON_MIRROR\". This will stop working in the next major version of npm.\nnpm warn Unknown user config \"ELECTRON_BUILDER_BINARIES_MIRROR\". This will stop working in the next major version of npm.\n"
+      }
+    ]
+  },
+  {
+    "at": "2026-10-14T14:49:40.734Z",
+    "tool": "run_shell",
+    "toolCallId": "call_00_3FZOYj9LFgOgLypBCvE89439",
+    "details": {
+      "turnId": "cff5a4a4-e4bf-4b23-98cd-f3c4dd710392",
+      "toolCallId": "call_00_3FZOYj9LFgOgLypBCvE89439",
+      "toolName": "run_shell",
+      "ok": true,
+      "status": "completed",
+      "durationMs": 13015
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "run_shell 已执行：npm test（exit 0）\nstdout:\n\n> p-limit@7.3.3 test\n> xo && ava && tsd\n\n\n  scripts/benchmarker.js:3:1\n  ⚠  3:1  Unexpected todo comment: TODO: I will move this to a proper....  no-warning-comments\n\n  1 warning\n\n\n  ✔ throws on invalid concurrency argument\n  ✔ throws the concurrency validation error for null\n  ✔ clearQueue\n  ✔ accepts additional arguments\n  ✔ map rejects with the iterable error when it throws before the first item\n  ✔ continues after sync throw\n  ✔ runs all tasks asynchronously\n  ✔ map resolves to an empty array for an empty iterable\n  ✔ non-promise returning function\n  ✔ map accepts an iterable (set)\n  ✔ map accepts an iterable (array iterator)\n  ✔ map accepts array-like inputs\n  ✔ map passes sequential indexes for a generator\n  ✔ map rejects with the mapper error\n  ✔ map\n  ✔ propagates async execution context properly\n  ✔ limitFunction exposes clearQueue\n  ✔ shared context with a limited provider helper\n  ✔ map passes index and preserves order with concurrency\n  ✔ map works when detached from the limit\n  ✔ map does not leave unhandled rejections when the iterable throws\n  ✔ clearQueue rejects pending promises when enabled (101ms)\n  ✔ map rejects immediately with the iterable error and still runs already scheduled tasks (101ms)\n  ✔ accepts options object\n  ✔ does not ignore errors (112ms)\n  ✔ change concurrency to bigger value (151ms)\n  ✔ change concurrency to smaller value (201ms)\n  ✔ concurrency: 1 (604ms)\n  ✔ concurrency: 4 (2.2s)\n  ✔ limitFunction() (2.4s)\n  ✔ activeCount and pendingCount properties (3s)\n  ─\n\n  31 tests passed\n\nstderr:\nnpm warn Unknown env config \"electron-builder-binaries-mirror\". This will stop working in the next major version of npm.\nnpm warn Unknown env config \"electron-mirror\". This will stop working in the next major version of npm.\nnpm warn Unknown user config \"ELECTRON_MIRROR\". This will stop working in the next major version of npm.\nnpm warn Unknown user config \"ELECTRON_BUILDER_BINARIES_MIRROR\". This will stop working in the next major version of npm.\n"
+      }
+    ]
+  },
+  {
+    "at": "2026-10-14T14:50:15.731Z",
+    "tool": "submit_report",
+    "toolCallId": "call_00_u7UWDHDYEziSOcXbnxSy0267",
+    "details": {
+      "turnId": "cff5a4a4-e4bf-4b23-98cd-f3c4dd710392",
+      "toolCallId": "call_00_u7UWDHDYEziSOcXbnxSy0267",
+      "toolName": "submit_report",
+      "ok": true,
+      "status": "completed",
+      "durationMs": 1
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "submit_report：报告已交回（status: completed）——已把你要说的话交给编排汇总。"
+      }
+    ]
+  }
+]

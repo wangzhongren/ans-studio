@@ -1,0 +1,105 @@
+[
+  {
+    "role": "su",
+    "nativeToolCalls": {
+      "read_file": 18,
+      "request_confirmation": 5,
+      "write_file": 19,
+      "dispatch_task": 7
+    },
+    "replayCallEvents": {
+      "read_file": 36,
+      "request_confirmation": 10,
+      "write_file": 38,
+      "dispatch_task": 14
+    },
+    "replayStartsWithoutCallId": {
+      "read_file": 18,
+      "request_confirmation": 5,
+      "write_file": 19,
+      "dispatch_task": 7
+    },
+    "replayPath": "/private/tmp/ans-real-p-limit-20261014/.ans/sessions/su/pi/ans/replay.jsonl",
+    "replaySha256": "59dfd9081933d4238528cd327f3cba237ad954e25e009c1ff5400a6e919bd8df",
+    "nativePath": "/private/tmp/ans-real-p-limit-20261014/.ans/sessions/su/pi/native/2026-10-14T12-49-15-526Z_01a13a75-b706-779d-8bf2-fca658360416.jsonl",
+    "nativeSha256": "d259128263516c0cbcf6199b4168ac2bd8770cf7e87a1939a6768329aea7c22c"
+  },
+  {
+    "role": "测试",
+    "nativeToolCalls": {
+      "read_file": 13,
+      "write_file": 3,
+      "submit_report": 5,
+      "run_shell": 8
+    },
+    "replayCallEvents": {
+      "read_file": 26,
+      "write_file": 6,
+      "submit_report": 10,
+      "run_shell": 16
+    },
+    "replayStartsWithoutCallId": {
+      "read_file": 13,
+      "write_file": 3,
+      "submit_report": 5,
+      "run_shell": 8
+    },
+    "replayPath": "/private/tmp/ans-real-p-limit-20261014/.ans/sessions/测试/pi/ans/replay.jsonl",
+    "replaySha256": "14e024b9522429ea22270d5eb5ff04f3c3b21c089279c10108e67e63ee2a778d",
+    "nativePath": "/private/tmp/ans-real-p-limit-20261014/.ans/sessions/测试/pi/native/2026-10-14T12-56-02-754Z_01a13a7b-edc2-7755-9eb6-d67c69b1b1d3.jsonl",
+    "nativeSha256": "52c837100c1b94ebf8890fcc624b38f56d90eb884b9643d7121a66da4f9a4335"
+  },
+  {
+    "role": "维护",
+    "nativeToolCalls": {
+      "read_file": 12,
+      "edit_file": 5,
+      "run_shell": 10,
+      "write_file": 5,
+      "submit_report": 1
+    },
+    "replayCallEvents": {
+      "read_file": 24,
+      "edit_file": 10,
+      "run_shell": 20,
+      "write_file": 10,
+      "submit_report": 2
+    },
+    "replayStartsWithoutCallId": {
+      "read_file": 12,
+      "edit_file": 5,
+      "run_shell": 10,
+      "write_file": 5,
+      "submit_report": 1
+    },
+    "replayPath": "/private/tmp/ans-real-p-limit-20261014/.ans/sessions/维护/pi/ans/replay.jsonl",
+    "replaySha256": "5b7c0e01c9cbaf33b9fbd768b21e8d4ee50b783c84133114063b99fcd2d3afb7",
+    "nativePath": "/private/tmp/ans-real-p-limit-20261014/.ans/sessions/维护/pi/native/2026-10-14T14-46-48-508Z_01a13ae1-55bb-74b3-a2b4-00d7a2db4f0c.jsonl",
+    "nativeSha256": "815ffb1c5d5944f476e2b8c5d86a652203449ebd6bb7a9fcdbbff31992733472"
+  },
+  {
+    "role": "项目管理",
+    "nativeToolCalls": {
+      "read_file": 8,
+      "write_file": 1,
+      "edit_file": 1,
+      "submit_report": 1
+    },
+    "replayCallEvents": {
+      "read_file": 16,
+      "write_file": 2,
+      "edit_file": 2,
+      "submit_report": 2
+    },
+    "replayStartsWithoutCallId": {
+      "read_file": 8,
+      "write_file": 1,
+      "edit_file": 1,
+      "submit_report": 1
+    },
+    "replayPath": "/private/tmp/ans-real-p-limit-20261014/.ans/sessions/项目管理/pi/ans/replay.jsonl",
+    "replaySha256": "e9d3dfd5b33f3f853dc159cd6ea55c000400bf3d7527cb6675ba8044448f4887",
+    "nativePath": "/private/tmp/ans-real-p-limit-20261014/.ans/sessions/项目管理/pi/native/2026-10-14T14-41-39-611Z_01a13adc-9f1a-74b3-a2b4-00d52835a7fe.jsonl",
+    "nativeSha256": "8b1ed5067026ed2da2d8fd5802541faf15362a591e18ee77f893e2ab2954b7b9"
+  }
+]

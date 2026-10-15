@@ -86,7 +86,7 @@ test("独立UI2：交互调用和结论保留同一锚点，不被普通工具�
   assert.equal(parsed[0].anchorKey, "confirm\u0000是否保存方案？");
   assert.equal(parsed[0].anchorKey, parsed[1].anchorKey);
   assert.ok(parsed.every((row) => toolRows.activityOf(row).barrier === true));
-  for (const name of ["request_choice", "submit_report", "dispatch_task", "request_shell_verdict"]) {
+  for (const name of ["request_choice", "submit_report", "dispatch_task", "report_shell_verdict"]) {
     assert.equal(toolRows.activityOf({ kind: "tool_call", detail: { toolName: name } }).barrier, true, name);
   }
 });

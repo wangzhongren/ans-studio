@@ -19,7 +19,7 @@ import type {
   ShellVerdictFn,
   ShellVerdictPayload,
   InteractionGate,
-  RuntimeAdapter, RuntimeProviderOptions, SessionEvent, ToolCall,
+  PromptInputEventDetail, RuntimeAdapter, RuntimeProviderOptions, SessionEvent, ToolCall,
   ToolDefinition, ToolResult, GovernedToolsOptions,
 } from "../../model/runtime.ts";
 import type { WriteDecision } from "../../model/decision.ts";
@@ -113,8 +113,8 @@ function handbackMetadata(turnId: string, scope?: Pick<GovernedToolsOptions, "ro
   return { turnId, ...(scope?.roleId ? { roleId: scope.roleId } : {}), ...(scope?.runtime ? { runtime: scope.runtime } : {}) };
 }
 
-function customerMetadata(signal: AbortSignal | undefined, turnId: string | undefined, scope?: Pick<GovernedToolsOptions, "roleId" | "runtime">): CustomerInputMetadata {
-  return { ...(signal ? { signal } : {}), ...(turnId !== undefined ? { turnId } : {}), ...(scope?.roleId ? { roleId: scope.roleId } : {}), ...(scope?.runtime ? { runtime: scope.runtime } : {}) };
+function customerMetadata(signal: AbortSignal | undefined, turnId: string | undefined, scope?: Pick<GovernedToolsOptions, "roleId" | "runtime">, toolCallId?: string): CustomerInputMetadata {
+  return { ...(signal ? { signal } : {}), ...(turnId !== undefined ? { turnId } : {}), ...(scope?.roleId ? { roleId: scope.roleId } : {}), ...(scope?.runtime ? { runtime: scope.runtime } : {}), ...(toolCallId !== undefined ? { toolCallId } : {}) };
 }
 
 /**
@@ -569,7 +569,7 @@ function makeRequestConfirmationTool(
   return {
     name,
     async handler(call) {
-      const metadata = customerMetadata(call.signal, currentTurnId?.(), scope);
+      const metadata = customerMetadata(call.signal, currentTurnId?.(), scope, call.toolCallId);
       const title = readStringArg(call.args, ["title"]);
       if (title === undefined || title.trim() === "") {
         return { ok: false, message: `${name}: 缺少 title 参数，无法向客户发起确认` };
@@ -642,7 +642,7 @@ function makeRequestChoiceTool(
   return {
     name,
     async handler(call) {
-      const metadata = customerMetadata(call.signal, currentTurnId?.(), scope);
+      const metadata = customerMetadata(call.signal, currentTurnId?.(), scope, call.toolCallId);
       const title = readStringArg(call.args, ["title"]);
       if (title === undefined || title.trim() === "") {
         return { ok: false, message: `${name}: 缺少 title 参数，无法向客户发起选择` };
@@ -984,9 +984,14 @@ export function createDemoRuntimeAdapter(options: RuntimeProviderOptions, script
       let disposed = false;
       return {
         contextSource: "in-memory",
-        async prompt(text) {
+        async prompt(text, promptOptions) {
           if (disposed) throw new Error("会话已关闭");
-          queue.push({ kind: "message", summary: `用户指令：${text}` });
+          // A real Core turn already publishes the canonical input. Direct demo use retains its echo.
+          if (options.currentTurnId() === undefined) {
+            const imageCount = promptOptions?.images?.length ?? 0;
+            const input: PromptInputEventDetail = { source: "prompt-input", text, ...(imageCount > 0 ? { imageCount } : {}) };
+            queue.push({ kind: "message", summary: `用户指令：${text}`, detail: input });
+          }
           for (const call of script) {
             queue.push({ kind: "tool_call", summary: `模型请求调用 ${call.name}`, detail: call });
             const tool = options.tools.find((candidate) => candidate.name === call.name);

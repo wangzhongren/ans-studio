@@ -34,8 +34,10 @@ export interface ReplayRow {
   turnId?: string;
   /** ANS 原事件 kind；用户输入及旧 Pi JSONL 缺省。 */
   eventKind?: string;
+  /** Explicit Core input identity; absent on unknown legacy echoes. */
+  input?: import("../../src/model/runtime.ts").PromptInputEventDetail;
   /** 桌面内部展示事实；旧历史/旧推送可以缺省，渲染端诚实降级。 */
-  activity?: { toolName: string; target: string; phase: "call" | "result"; status: "call" | "completed" | "returned" | "failed" | "unknown"; toolCallId?: string; turnId?: string; ok?: boolean };
+  activity?: { toolName: string; target: string; phase: "call" | "start" | "blocked" | "result"; status: "call" | "completed" | "returned" | "failed" | "unknown"; toolCallId?: string; turnId?: string; ok?: boolean };
   /**
    * 关联 id（真机缺陷修复 2026-10-12）：交互工具（request_confirmation / request_choice）的
    * **pi toolCallId**——调用行与其结论行**带同一个值**（结论行经 `toolCallId` 字段对上调用行）。

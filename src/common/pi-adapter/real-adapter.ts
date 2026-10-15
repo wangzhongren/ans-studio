@@ -431,11 +431,8 @@ export function buildGovernanceExtension(
       pi.on("tool_call", (event: ToolCallEvent): ToolCallEventResult | undefined => {
         const input = (event as { input?: unknown }).input;
         const path = extractCallPath(input);
-        emit({
-          kind: "tool_call",
-          summary: `模型请求调用 ${event.toolName}${path !== undefined ? `（目标：${path}）` : ""}`,
-          detail: { toolName: event.toolName, path },
-        });
+        // SDK execution_start is the sole canonical start (also emitted before blocked calls).
+        const identity = { turnId: context?.currentTurnId?.(), toolCallId: event.toolCallId, phase: "blocked" };
 
         // —— run_shell：**能力级 kill-switch**（设计 §7.5 第 4 条 / §7.7）——
         // 未 arm → {block:true}；已 arm → 放行（undefined），交 execute 做每调用细审。
@@ -443,7 +440,7 @@ export function buildGovernanceExtension(
         if (context?.allowedToolNames !== undefined) {
           if (context.allowedToolNames.has(event.toolName)) return undefined;
           const reason = `非注入的 ANS 工具，拒绝执行：${event.toolName}`;
-          emit({ kind: "denied", summary: reason, detail: { toolName: event.toolName, toolCallId: event.toolCallId } });
+          emit({ kind: "denied", summary: reason, detail: { ...identity, toolName: event.toolName } });
           return { block: true, reason };
         }
         const kill = event.toolName === "run_shell" && !shellArmed
@@ -452,7 +449,7 @@ export function buildGovernanceExtension(
           emit({
             kind: "denied",
             summary: kill.reason,
-            detail: { toolName: event.toolName, toolCallId: event.toolCallId },
+            detail: { ...identity, toolName: event.toolName },
           });
           return kill;
         }
@@ -467,7 +464,7 @@ export function buildGovernanceExtension(
         if (decision.allowed) return undefined;
 
         const reason = formatDenialMessage(decision);
-        emit({ kind: "denied", summary: reason, detail: { toolName: event.toolName, path } });
+        emit({ kind: "denied", summary: reason, detail: { ...identity, toolName: event.toolName, path } });
         // fail-closed：写之前阻断，绝不执行。
         return { block: true, reason };
       });
@@ -477,7 +474,7 @@ export function buildGovernanceExtension(
         const metadata = { turnId: context?.currentTurnId?.(), path: extractCallPath(event.args) };
         calls.set(event.toolCallId, metadata);
         context?.diagnostics?.record("tool.execution.start", { ...metadata, toolName: event.toolName, toolCallId: event.toolCallId });
-        emit({ kind: "tool_call", summary: `开始执行 ${event.toolName}`, detail: { ...metadata, toolName: event.toolName, toolCallId: event.toolCallId } });
+        emit({ kind: "tool_call", summary: `模型请求调用 ${event.toolName}${metadata.path !== undefined ? `（目标：${metadata.path}）` : ""}`, detail: { ...metadata, toolName: event.toolName, toolCallId: event.toolCallId, phase: "start" } });
       });
 
       pi.on("tool_execution_end", (event): void => {
@@ -486,7 +483,7 @@ export function buildGovernanceExtension(
         const result = event.result.details !== null && typeof event.result.details === "object" ? event.result.details as Record<string, unknown> : {};
         const detail = {
           turnId: typeof result.turnId === "string" ? result.turnId : metadata?.turnId,
-          toolName: event.toolName, toolCallId: event.toolCallId,
+          toolName: event.toolName, toolCallId: event.toolCallId, phase: "result",
           path: typeof result.path === "string" ? result.path : metadata?.path,
           ok: !event.isError, status: event.isError ? "failed" : "completed", durationMs: event.durationMs,
           ...(event.isError ? { errorCode: result.errorCode === "ABORTED" ? "ABORTED" : "TOOL_FAILED" } : {}),
@@ -589,6 +586,8 @@ export function makeRolePrompt(deps: {
   abortTimeoutMs?: number;
   requestAbort?: () => Promise<void>;
   finishOnReturn?: boolean;
+  /** Core owns the input echo on injected production sessions. Direct helpers retain compatibility. */
+  emitPromptInput?: boolean;
 }): (text: string, opts?: PromptOptions) => Promise<void> {
   const { session, promptMs, gate, emit, log } = deps;
   const lifecycle = deps.lifecycle ?? createTurnLifecycle(emit, deps.diagnostics);
@@ -598,10 +597,10 @@ export function makeRolePrompt(deps: {
     lifecycle.begin();
     running = true;
     const images = opts?.images !== undefined && opts.images.length > 0 ? opts.images : undefined;
-    emit({
+    if (deps.emitPromptInput !== false) emit({
       kind: "message",
       summary: images !== undefined ? `用户指令：${text}（附 ${images.length} 张图片）` : `用户指令：${text}`,
-      detail: { turnId: lifecycle.currentTurnId() },
+      detail: { turnId: lifecycle.currentTurnId(), source: "prompt-input", text, ...(images ? { imageCount: images.length } : {}) },
     });
     log.stage("prompt 发出");
     try {
@@ -654,6 +653,7 @@ export interface RoleSessionDeps {
   abortTimeoutMs?: number;
   /** Native production sessions deduplicate per-turn abort and ignore idle stop. */
   strictLifecycle?: boolean;
+  emitPromptInput?: boolean;
 }
 
 /**
@@ -892,7 +892,7 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
 
         // 会话组装抽为 `makeRoleSession`（提案 P0-2「停当前轮次」）：prompt/events/dispose 逐字旧行为，
         // 另透传 abort（SDK session.abort()——语义与核实依据见该函数文档）。
-        const roleSession = makeRoleSession({ session, promptMs, gate: interactionGate, emit, log, queue, unsubscribe, lifecycle, diagnostics, abortTimeoutMs: 900, strictLifecycle: true });
+        const roleSession = makeRoleSession({ session, promptMs, gate: interactionGate, emit, log, queue, unsubscribe, lifecycle, diagnostics, abortTimeoutMs: 900, strictLifecycle: true, emitPromptInput: false });
         roleSession.runtime = "pi";
         roleSession.roleId = role.id;
         roleSession.contextSource = sessionSelection.contextSource ?? (sessionSelection.mode === "in-memory" ? "in-memory" : sessionSelection.mode === "resumed" ? "resumed" : sessionSelection.note ? "recovered" : "fresh");

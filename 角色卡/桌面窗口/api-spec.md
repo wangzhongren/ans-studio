@@ -82,3 +82,11 @@ Customer callback 第二参保留 O1 的原 CustomerInputMetadata.signal；sessi
 ## 本轮回交来源（chat-handback-scope revision 2）
 
 实现[编排规范](../编排/docs/fix/2026-10-14_fix_chat-handback-scope.md)：Window 每次实际 send 都传 Pipeline 的 RoleSessionSendOptions.handback。只有队列 kind=dispatch 为 required:true；即时客户消息、排队 message、回交消费（含合批）为 required:false，覆盖旧会话 taskId。重试由保留条目的 kind 决定，不解析正文。图片数组原引用与原 onTurnStarted 回调保留，clientMessageId 仍只经真实 ACK 关联。新字段不进入 IPC，不改变历史解析；聊天主动 submit_report 仍由编排产出并按既有路径投递。验证见[修复记录](docs/fix/2026-10-14_fix_chat-handback-origin.md)。
+
+## 重复显示身份（2026-10-15 revision 2）
+
+ANS历史 ReplayRow 增可选 `input?:PromptInputEventDetail`。仅 source=prompt-input 的 message 规范为输入行，原text/imageCount与actualturn保留；同请求project/role/runtime及非空turn的persisted user与typed echo返回单输入，保persisted正文/at，原审计不改。未知旧消息不解析前缀或猜重。live事件原样传送，由UI按同契约呈现。
+
+session:operator-request 的 OperatorRequestPayload 增可选turnId/toolCallId，来自原CustomerInputMetadata非空字段；已有id仍是答复pending键，不冒充模型callId。原signal、scope、请求快照、取消及过期机制不变。main/preload通道透明转发，无新增IPC。恢复提示没有本批新增生命周期字段。证据见[窗口修复](docs/fix/2026-10-15_fix_duplicate-display-identity.md)。
+
+工具历史 activity.phase 可含 call/start/blocked/result。显式 canonical detail.phase 三值优先；无显式值时按原eventKind映射tool_call→start、accepted→result、denied→blocked。legacy native toolResult仍result，同call blocked与failed result不得互吞，原日志不改。

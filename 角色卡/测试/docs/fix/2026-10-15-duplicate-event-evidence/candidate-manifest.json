@@ -1,0 +1,15 @@
+{
+  "app/renderer/renderer.js": "cbd3a40459776306f04b12c24e66e7e0da5edab9eec9625f40311f7abd53df0a",
+  "app/renderer/runtime-ui.js": "1f42507f791e28f28af3b7de4062cf70f703bd62787d714530141417747f6e0f",
+  "app/renderer/tool-rows.js": "50547315a89162f4f52f534b3729e4621f54c53dd0b4a8a8c62a07fc64d12495",
+  "app/desktop/runtime-history.ts": "46343b7ffe8625b4bd089dc10bb35a6a176364f4535721c15343ad5b743d7fcf",
+  "app/desktop/session-history.ts": "b43712b2d178cc87187385122dede6a4af591a2bd5ac851c56bdcbb0b1552ec2",
+  "app/desktop/customer-input.ts": "2480318937b1d0b875d5bb160e8ef1ba8eeb501cf7e8b562051ef64dc2740600",
+  "src/model/runtime.ts": "d2cc30c5160371d17f88ec18b4fcdbfad422e9a8e147efd8e750d7dc57024cc5",
+  "src/service/runtime/session.ts": "21c5d7eb93abeb8e23a1ffc8aaab54d89caa899d63a14556db9ed2de9583fb7d",
+  "src/provider/runtime/tools.ts": "a67ab1375f8330d063e16d45d873c42d389c5406749d5ee2ba19851ff2e9cb36",
+  "src/provider/runtime/schema.ts": "1b1ded078d67d775c8cd7a406de858d0aa34c4e863ba84f8a5c163ff9e4552d1",
+  "src/common/pi-adapter/real-adapter.ts": "16d7264ac165f7ab85e0bd69bf7afb5b69b7e96cd3ed52d729c28fceb2477bae",
+  "test/\u6d4b\u8bd5/duplicate-input-identity.test.ts": "6159ec54d5f103b4d734b311bb8dbac0dc16bd02989a6cc00b6bad5565aecf28",
+  "test/\u6d4b\u8bd5/uiux-v2-replay-regression.test.ts": "32514bd64338808c4acbb592a279856a05140918541ed95f842de216c262dad8"
+}

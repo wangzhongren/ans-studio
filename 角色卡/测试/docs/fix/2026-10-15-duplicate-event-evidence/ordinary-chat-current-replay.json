@@ -1,0 +1,56 @@
+[
+  {
+    "at": "2026-10-15T01:26:32.786Z",
+    "kind": "user",
+    "text": "DUP-CHAT-4：这是一条普通聊天，只回复“普通聊天收到”，不要调用工具、不要派发、不要生成报告。",
+    "turnId": "31e9ae59-2539-45fe-bc1e-bf76d552f566"
+  },
+  {
+    "at": "2026-10-15T01:26:32.792Z",
+    "kind": "event",
+    "event": {
+      "kind": "message",
+      "summary": "用户指令：DUP-CHAT-4：这是一条普通聊天，只回复“普通聊天收到”，不要调用工具、不要派发、不要生成报告。",
+      "runtime": "pi",
+      "roleId": "su",
+      "turnId": "31e9ae59-2539-45fe-bc1e-bf76d552f566",
+      "detail": {
+        "source": "prompt-input",
+        "text": "DUP-CHAT-4：这是一条普通聊天，只回复“普通聊天收到”，不要调用工具、不要派发、不要生成报告。",
+        "turnId": "31e9ae59-2539-45fe-bc1e-bf76d552f566"
+      }
+    },
+    "turnId": "31e9ae59-2539-45fe-bc1e-bf76d552f566"
+  },
+  {
+    "at": "2026-10-15T01:26:34.413Z",
+    "kind": "event",
+    "event": {
+      "kind": "message",
+      "summary": "普通聊天收到",
+      "runtime": "pi",
+      "roleId": "su",
+      "turnId": "31e9ae59-2539-45fe-bc1e-bf76d552f566",
+      "detail": {
+        "turnId": "31e9ae59-2539-45fe-bc1e-bf76d552f566"
+      }
+    },
+    "turnId": "31e9ae59-2539-45fe-bc1e-bf76d552f566"
+  },
+  {
+    "at": "2026-10-15T01:26:34.416Z",
+    "kind": "event",
+    "event": {
+      "kind": "settled",
+      "summary": "会话结束",
+      "runtime": "pi",
+      "roleId": "su",
+      "turnId": "31e9ae59-2539-45fe-bc1e-bf76d552f566",
+      "detail": {
+        "turnId": "31e9ae59-2539-45fe-bc1e-bf76d552f566",
+        "outcome": "completed"
+      }
+    },
+    "turnId": "31e9ae59-2539-45fe-bc1e-bf76d552f566"
+  }
+]

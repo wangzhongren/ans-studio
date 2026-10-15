@@ -15,7 +15,8 @@ flowchart TD
   prompt --> ack[原prompt闭包同步一次开始确认]
   ack -->|callback抛错| ackfailed[failed终态 释放active 无nativeprompt]
   ackfailed --> terminal
-  ack -->|返回或缺省| native[原保存输入及nativeprompt]
+  ack -->|返回或缺省| inputecho[保存原输入 取消检查 单次typed输入事件]
+  inputecho --> native[原nativeprompt 图片对象透传]
   native --> call{工具请求?}
   call -->|写或编辑| writegate{写 gate 允许且未停止?}
   writegate -->|否| deny[拒绝 无写入副作用]
@@ -71,3 +72,7 @@ Service 外层已经确定的失败、中止或超时结果具有优先级；随
 | 2026-10-14 | 修复 | 核心已验证，Pi回归待原属主重测 | 停止时保留工具专属失败语义 | [C1P 当前证据](../fix/2026-10-14_fix_tool-abort-failure-messages.md) |
 | 2026-10-14 | 修复 | 核心已验证，Pi迁移竞态待原属主重测 | 外层既定结果不被内层清理事件改写 | [C1O 当前证据](../fix/2026-10-14_fix_outer-terminal-outcome.md) |
 | 2026-10-14 | 修复 | 核心已验证，桌面原闭包映射待属主/独立测试 | 原始prompt得到真实turn的同步只读开始确认 | [C1A 当前证据](../fix/2026-10-14_fix_prompt-start-acknowledgement.md) |
+
+实际输入由 Core 在开始确认、原输入持久化及取消检查后统一发一次 message，detail.source 为 prompt-input、text 为原文，非空图片只记 imageCount。top/detail.turnId 都为该实际轮次；Pi 注入与 demo Core 路径不再另发输入回声。消费者凭标记与轮次合并同一输入的历史/live表示，真实助手前缀文字和同文不同轮均保留。确认/选择回调另外收到入口原 toolCallId（可选），供实际请求卡关联；它不增加写权。run_shell 说明明确一次 argv 程序调用、不解释 shell operators/展开，多命令分开调用，原审核与执行不变。
+
+2026-10-15 修复：Core已自验，独立桌面待验。单次可信输入事件、确认卡原调用身份与argv说明，见[当前修复与证据](../fix/2026-10-15_fix_run-shell-description.md)。

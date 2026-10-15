@@ -1,0 +1,3 @@
+Partial observed tool output; original narrow log was overwritten by final rerun, not a complete raw log.
+Service event top/detail identity and report metadata share the captured turn failed: actual detail.turnId undefined, expected 8d649adf-eb7f-46cf-a5d6-84b04a526776 at session.test.ts:262.
+Original existing assertion was preserved. Core canonical input detail gained the same actual turnId and final narrow24/full57 passed.

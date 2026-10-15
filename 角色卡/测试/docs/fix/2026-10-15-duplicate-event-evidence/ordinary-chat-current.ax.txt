@@ -1,0 +1,60 @@
+Window: "ANS 治理会话工作台", App: Electron.
+0 标准窗口 ANS 治理会话工作台, Secondary Actions: Raise
+	1 container ANS 治理会话工作台
+		2 container
+			3 HTML 内容 ANS 治理会话工作台, URL: file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/app/renderer/index.html
+				4 container
+					5 text ANS 治理会话工作台
+					6 按钮 Description: 角色资料, Help: 角色资料（含待办 / 队列）
+					7 按钮 Pi 设置
+					8 按钮 最小化
+					9 按钮 最大化
+					10 按钮 关闭
+				11 container
+					12 文本 项目
+					13 按钮 切换项目
+					14 文本 ans-real-p-limit-20261015-status-retest
+					15 文本 /private/tmp/ans-real-p-limit-20261015-status-retest
+					16 文本 角色
+					17 container 角色列表
+						18 文本 主入口
+						19 按钮 su 内置治理角色（定义见 SKILL.md） 主入口 内置 空闲
+							20 文本 su
+							21 文本 内置治理角色（定义见 SKILL.md）
+							22 文本 主入口
+							23 文本 内置
+							24 文本 空闲
+						25 文本 其他角色（查看/调试）
+						26 按钮 测试 角色卡：测试 未开启
+							27 文本 测试
+							28 文本 角色卡：测试
+							29 文本 未开启
+						30 按钮 维护 角色卡：维护 未开启
+							31 文本 维护
+							32 文本 角色卡：维护
+							33 文本 未开启
+						34 按钮 项目管理 角色卡：项目管理 未开启
+							35 文本 项目管理
+							36 文本 角色卡：项目管理
+							37 文本 未开启
+					38 container
+						39 text su 引擎
+						40 组合框 (settable) Description: 会话引擎，当前 Pi, Value: Pi
+							41 文本 Pi
+						42 文本 实际写入导入项目，角色边界外的写入会被拒绝。
+					43 container
+						44 text 新会话（本地无可用会话文件）——以上为历史记录，模型不会记得；请重新说明需求。 DUP-CHAT-4：这是一条普通聊天，只回复“普通聊天收到”，不要调用工具、不要派发、不要生成报告。
+						45 文本 普通聊天收到
+						46 text 会话结束 该角色边界已更新或运行时配置已保存（.ans/project.json），已作废旧会话，按新边界重开；上下文恢复结果以引擎实际返回为准。 已从本地会话文件恢复（模型上下文一并恢复）。
+					47 container
+						48 按钮 Description: 添加图片, Help: 添加图片（png / jpeg / webp / gif，≤5MB）
+						49 文本输入区 (settable) 输入消息，Enter 发送，Shift+Enter 换行
+						50 按钮 Description: 发送, Help: 发送（Enter）
+51 menu bar
+	52 Electron
+	53 File
+	54 Edit
+	55 View
+	56 Window
+
+The focused UI element is 49 文本输入区 (settable) 输入消息，Enter 发送，Shift+Enter 换行

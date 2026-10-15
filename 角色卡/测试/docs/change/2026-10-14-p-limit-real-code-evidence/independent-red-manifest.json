@@ -1,0 +1,8 @@
+{
+  "fixture": "/private/tmp/ans-p-limit-independent-red-ZfLydl",
+  "command": "ava test.js",
+  "node": "v24.14.0",
+  "status": 1,
+  "originalIndexSha256": "edde12a4a4dbdbe8d27161cdd0853db0bab435d5dc6c15f9f4dedc27ee9bca60",
+  "currentTestSha256": "d0999b4a92161f0fd35c819d0c7554098260aaf54fdac908fe936194c1dc5587"
+}

@@ -512,7 +512,7 @@ test("工具行瘦身（2026-10-12 客户裁定）：只显示状态与目标—
   // 渲染侧接线：tool_call/accepted 与回放的工具行都过瘦身映射；`denied` 全量（治理信号）；detail 一律不渲染。
   assert.ok(RENDERER.includes("Tr.activityOf(ev)"), "实时工具行应经瘦身映射");
   assert.ok(RENDERER.includes("Tr.activityOf(row)"), "回放工具行应经瘦身映射");
-  assert.ok(RENDERER.includes("appendDenied(pane, ev.summary, failure.fullTarget)"), "denied 行保持全量（拒绝原因与允许路径）");
+  assert.ok(RENDERER.includes("appendActivity(pane, failure)") && RENDERER.includes("activity.deniedSummary || activity.visibleSummary"), "denied 行保持全量（拒绝原因与允许路径）");
   assert.ok(!/(?:innerHTML|textContent)\s*=.*ev\.detail|(?:esc|renderMarkdown)\(ev\.detail/.test(RENDERER), "detail 正文不进入 HTML/文本；只读取实际 outcome 和工具元数据");
   const index = fs.readFileSync(path.join(APP_DIR, "index.html"), "utf8");
   assert.ok(index.indexOf('src="tool-rows.js"') > 0 && index.indexOf('src="tool-rows.js"') < index.indexOf('src="renderer.js"'), "tool-rows.js 应先于 renderer.js 加载");
@@ -540,7 +540,7 @@ test("H-1 附录：系统投递输入单独样式——分类器（两名渲染�
   assert.ok(RENDERER.includes("Tr.classifyInjectedMessage"), "appendEvent/replay 应经分类器");
   assert.ok(RENDERER.includes("appendInjectedMessage") && RENDERER.includes("buildInjectedElement"), "应有注入样式渲染");
   assert.ok(RENDERER.includes("msg-injected") && RENDERER.includes("· 来自 "), "注入行应带来源标签");
-  assert.ok(RENDERER.includes("lastManualSend") && RENDERER.includes("recentManual") && RENDERER.includes("< 15000"), "手输防误伤判据（本端手发 + 同角色 + 15s）");
+  assert.ok(RENDERER.includes('ev.detail.source === "prompt-input"') && RENDERER.includes("bindManualTurn(env)"), "输入来源只认typed标记，客户气泡由原clientMessageId ACK绑定而不靠时间/文字猜测");
   assert.ok(/lastManualSend = \{ roleId: role\.roleId, text: text, at: Date\.now\(\) \}/.test(RENDERER), "onSend 应记录本端刚手发送");
   // **客户手输仍是普通用户气泡**（反向）：appendUser 的 `.msg-user` 产出路径未被动过。
   assert.ok(RENDERER.includes('div.className = "msg msg-user"'), "appendUser 仍产普通用户气泡（不被注入路径接管）");

@@ -83,3 +83,7 @@ flowchart TD
 导入前禁选与缺配置入口的最小修复已按客户确认 revision 1 实施；本侧配置专项实际 renderer 证据与独立真实主进程验收范围见[缺配置入口修复](../fix/2026-10-14_fix_runtime-missing-config-entry.md)。
 
 引擎选择器统一浅色样式与完整键盘行为已按客户确认 v1 实施，本侧单元51项、实际renderer选择器25项及配置20/运行时16项回归通过；[实现与候选证据](../change/2026-10-14_change_engine-selector.md)说明独立真实桌面与辅助技术覆盖界限。
+
+同一次可信工具阶段与typed输入现在按实际turn/call/phase或actualturn输入身份合并，特殊工具/请求卡只有一份生命周期表示；不同实际call/turn、blocked与result、失败/拒绝继续保留。实时/历史两向输入覆盖不靠正文猜重，未知旧记录保持事实，图文clientMessageId与阅读锚点原语义保留。必要生产源及历史字段由各属主修复，UI消费公共窗口结果；详见[重复展示修复r2](../fix/2026-10-15_fix_event-duplication.md)。
+
+新项目导入在首次绘制角色树前清理旧项目状态，随后按新项目pending历史呈现真实恢复事实；同项目普通刷新继续保留当前状态。当前实现及新字节回归见[项目状态清理顺序](../fix/2026-10-15_fix_project-status-reset-order.md)。

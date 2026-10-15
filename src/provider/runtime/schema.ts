@@ -21,12 +21,12 @@ export function describeTool(name: string): ToolDescription {
       parameters: {
         type: "object",
         properties: {
-          command: { type: "string", description: "Shell command to review and (only if allowed) execute" },
+          command: { type: "string", description: "One program and its arguments, reviewed before execution as argv without a shell. Shell operators (&&, ;, |, redirection), variable expansion and command substitution are not interpreted. Use separate tool calls for multiple commands." },
         },
         required: ["command"],
         additionalProperties: true,
       },
-      description: "受治理的 shell 命令工具。执行前必须过 ShellGate 审核；未获明确 allow 绝不执行。",
+      description: "受治理的程序执行工具。每次调用只执行一个程序及其参数，按 argv 直接启动，不经 shell。`&&`、`;`、`|`、重定向、变量展开和命令替换不会按 shell 语法执行；多条命令请分开调用。执行前必须过 ShellGate 审核；未获明确 allow 绝不执行。",
     };
   }
   if (name === "request_confirmation") {

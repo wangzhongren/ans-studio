@@ -2,7 +2,7 @@
 import { randomUUID } from "node:crypto";
 import type { ResolvedRole } from "../../model/role.ts";
 import type {
-  GovernedToolsOptions, PromptOptions, RoleSession, RuntimeAdapter, RuntimeKind, RuntimeProviderFactory,
+  GovernedToolsOptions, PromptInputEventDetail, PromptOptions, RoleSession, RuntimeAdapter, RuntimeKind, RuntimeProviderFactory,
   RuntimeProviderOptions, RuntimeReplayEntry, RuntimeSessionRecord, RuntimeTurnOutcome, SessionEvent, ToolCall, WriteGate,
 } from "../../model/runtime.ts";
 import { RUNTIME_KINDS } from "../../common/shared/runtime-shared.ts";
@@ -165,6 +165,9 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
             // A previously reported transient error is cleared after a real successful retry.
             persistenceError = undefined;
             if (turn.controller.signal.aborted) throw new Error("会话已中止");
+            const imageCount = promptOptions?.images?.length ?? 0;
+            const input: PromptInputEventDetail = { source: "prompt-input", text, ...(imageCount > 0 ? { imageCount } : {}) };
+            emit({ kind: "message", summary: imageCount > 0 ? `用户指令：${text}（附 ${imageCount} 张图片）` : `用户指令：${text}`, runtime: options.runtime, roleId: role.id, turnId: turn.id, detail: { ...input, turnId: turn.id } });
             underlying = Promise.resolve().then(() => inner.prompt(text, promptOptions));
             underlying.then(() => { underlyingFinished = true; if (!turn.cleanupFailed) quarantined = false; }, () => { underlyingFinished = true; if (!turn.cleanupFailed) quarantined = false; });
             const work = underlying.then(async () => { if (!streamEnded) await terminalPromise; });

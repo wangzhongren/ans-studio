@@ -1,0 +1,54 @@
+[
+  {
+    "root": "/private/tmp/ans-real-p-limit-20261014",
+    "gates": {
+      "index.js": false,
+      "test.js": false,
+      "角色卡/维护/memo.md": true
+    },
+    "pins": [
+      {
+        "path": "角色卡/governance-boundary.yaml",
+        "match": true
+      },
+      {
+        "path": "角色卡/测试/boundary.yaml",
+        "match": true
+      },
+      {
+        "path": "角色卡/维护/boundary.yaml",
+        "match": true
+      },
+      {
+        "path": "角色卡/项目管理/boundary.yaml",
+        "match": true
+      }
+    ]
+  },
+  {
+    "root": "/private/tmp/ans-real-p-limit-20261015-duplicate-retest",
+    "gates": {
+      "index.js": false,
+      "test.js": false,
+      "角色卡/维护/memo.md": true
+    },
+    "pins": [
+      {
+        "path": "角色卡/governance-boundary.yaml",
+        "match": true
+      },
+      {
+        "path": "角色卡/测试/boundary.yaml",
+        "match": true
+      },
+      {
+        "path": "角色卡/维护/boundary.yaml",
+        "match": true
+      },
+      {
+        "path": "角色卡/项目管理/boundary.yaml",
+        "match": true
+      }
+    ]
+  }
+]

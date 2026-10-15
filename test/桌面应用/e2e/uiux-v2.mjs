@@ -19,6 +19,8 @@ let pickDeferred=false, sendDeferred=false, withdrawMode='fail', interactiveRead
 const reports=[]; const errors=[]; const sends=[]; const opens=[]; const histories=[]; const stops=[]; const aborts=[]; const responses=[]; const configSaves=[]; const shellResponses=[]; const configApplications={};
 let saveMode="success", saveApplication="next-session";
 const CONFIG_ONLY=process.env.ANS_CONFIG_UI_ONLY==='1';
+const PROJECT_RESET_ONLY=process.env.ANS_PROJECT_RESET_UI_ONLY==='1';
+const DUP_ONLY=process.env.ANS_DUP_UI_ONLY==='1';
 const SELECTOR_ONLY=process.env.ANS_SELECTOR_UI_ONLY==='1';
 const configReads=[];
 let recoveryEnabled=!(CONFIG_ONLY||SELECTOR_ONLY), listFailure=false, pickResult=ROOT, configFailure=false, configMalformed=false, configDeferred=false, saveDeferred=false;
@@ -63,6 +65,116 @@ async function push(channel,payload){win.webContents.send(channel,payload);await
 function ownHistory(){return parseSessionJsonl([{type:'session'},{type:'message',message:{role:'assistant',content:[{type:'toolCall',id:'rs',name:'run_shell',arguments:{command:'ls missing'}}]}},{type:'message',message:{role:'toolResult',toolCallId:'rs',toolName:'run_shell',isError:false,content:[{type:'text',text:'run_shell 已执行：ls missing（exit 1）\nstdout:\nSECRET'}]}},{type:'message',message:{role:'toolResult',toolName:'read_file',isError:false,content:[{type:'text',text:'read_file 失败：lost.md（ENOENT）'}]}},{type:'message',message:{role:'assistant',content:[{type:'text',text:'历史助手答复。'}]}}].map(x=>JSON.stringify(x)).join('\n')).rows;}
 const viewportGeometry=`(() => { const root=document.documentElement,b=document.body,a=document.querySelector('.app'),c=document.querySelector('.composer').getBoundingClientRect(),d=document.getElementById('right-drawer').getBoundingClientRect(); const visible=id=>{let r=document.getElementById(id).getBoundingClientRect();return r.width>0&&r.left>=0&&r.right<=innerWidth&&r.bottom<=innerHeight&&r.top>=0;};return root.scrollWidth===root.clientWidth&&b.scrollWidth===b.clientWidth&&a.scrollWidth===a.clientWidth&&visible('btn-send')&&visible('btn-halt')&&visible('drawer-close')&&d.bottom<=c.top+1;})()`;
 async function reading(){return js(`(() => {let c=document.getElementById('chat'),t=c.getBoundingClientRect().top;let nodes=[...c.querySelectorAll('.msg,.tool-records,.sys-denied')];let n=nodes.find(x=>x.getBoundingClientRect().bottom>t&&x.getBoundingClientRect().top<c.getBoundingClientRect().bottom);return n?{text:n.textContent.slice(0,60),offset:n.getBoundingClientRect().top-t}:null;})()`);}
+async function projectResetChecks() {
+  await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRole('A')`);
+  await push('session:events',[{projectRoot:ROOT,roleId:'A',runtime:'pi',event:{kind:'settled',summary:'OLD_ROOT_FAILURE',detail:{outcome:'failed'}}}]);
+  await push('session:role-state',{projectRoot:ROOT,roleId:'B',runtime:'pi',busy:true,summaries:['OLD_ROOT_QUEUE'],queue:[{id:'old-q',kind:'message',summary:'OLD_ROOT_QUEUE'}]});
+  await push('session:history',{projectRoot:ROOT,roleId:'B',runtime:'codex',rows:[{kind:'assistant',text:'OLD_RUNTIME_HISTORY'}]});
+  await check('old project status fixture is visible',`!!document.querySelector('#role-tree .st-error')&&!!document.querySelector('#role-tree .st-working')`);
+  const next='/fresh-ui-project';await js(`await window.__ansRenderer.loadProject(${JSON.stringify(next)})`);
+  await check('new project first DOM clears old badges before events',`[...document.querySelectorAll('#role-tree .ti-status')].every(x=>x.classList.contains('st-off'))&&!document.getElementById('role-tree').innerHTML.includes('OLD_ROOT')&&!document.getElementById('role-tree').textContent.includes('已恢复')&&!document.getElementById('role-tree').textContent.includes('已停止')&&window.__ansRenderer.state.sessionOpenRoleId===null&&!document.getElementById('runtime-select').disabled`);
+  await push('session:role-state',{projectRoot:ROOT,roleId:'A',runtime:'pi',busy:true,summaries:['OLD_LATE'],queue:[]});
+  await check('old project late status is ignored',`!document.querySelector('#role-tree .st-working')&&!document.getElementById('role-tree').innerHTML.includes('OLD_LATE')`);
+  await push('session:role-state',{projectRoot:next,roleId:'A',runtime:'pi',busy:true,summaries:['NEW_ACTUAL_QUEUE'],queue:[{id:'new-q',kind:'message',summary:'NEW_ACTUAL_QUEUE'}]});
+  await check('new actual status immediately displayed',`document.querySelector('#role-tree .st-working')&&window.__ansRenderer.state.roleBusy.A===true&&window.__ansRenderer.state.queueByRole.A[0]==='NEW_ACTUAL_QUEUE'`);
+  await js(`await window.__ansRenderer.refreshProject()`);await pause(40);
+  await check('ordinary fresh false refresh preserves actual state',`document.querySelector('#role-tree .st-working')&&window.__ansRenderer.state.roleBusy.A===true&&window.__ansRenderer.state.queueByRole.A[0]==='NEW_ACTUAL_QUEUE'`);
+  await js(`await window.__ansRenderer.selectRuntime('codex')`);await pause(40);
+  await check('old project cached foreign runtime does not appear',`!document.getElementById('chat').textContent.includes('OLD_RUNTIME_HISTORY')&&!document.getElementById('role-tree').textContent.includes('已恢复')`);
+  const pending='/fresh-with-pending';
+  await push('session:history',{projectRoot:pending,roleId:'B',runtime:'codex',rows:[{kind:'assistant',text:'NEW_PENDING_HISTORY'}]});
+  await js(`await window.__ansRenderer.loadProject(${JSON.stringify(pending)})`);await pause(30);
+  await check('new pending history applied before first tree render',`[...document.querySelectorAll('#role-tree .tree-item')].find(x=>x.querySelector('.ti-name').textContent==='B').querySelector('.st-restored')!==null`);
+  for(const width of [1360,960]){win.setContentSize(width,width===960?620:860);await pause(50);fs.writeFileSync(path.join(OUT,'project-reset-'+width+'.png'),(await win.webContents.capturePage()).toPNG());}
+}
+async function duplicateChecks() {
+  const payload=(event,roleId='A',runtime='pi')=>({projectRoot:ROOT,roleId,runtime,event:{...event,runtime,roleId}});
+  const tool=(name,call,phase,turn='dup-turn',extra={})=>({kind:phase==='start'?'tool_call':phase==='blocked'?'denied':'accepted',turnId:turn,summary:name+' '+phase,detail:{toolName:name,toolCallId:call,phase,...(phase==='start'?{}:{ok:phase==='result'}),...extra}});
+  const historyRow=e=>({kind:e.kind==='denied'?'denied':'tool',text:e.summary,turnId:e.turnId,eventKind:e.kind,activity:e.detail});
+  let baselineRows=0;
+  const reset=async()=>{await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRole('A')`);await pause(40);baselineRows=await js(`window.__ansRenderer.rowModelDebug('A').count`);};
+  await reset();
+  const names=['read_file','write_file','edit_file','run_shell','request_confirmation','request_choice','dispatch_task','submit_report','report_shell_verdict'];
+  for(const [i,name] of names.entries()){
+    const start=tool(name,'all-'+i,'start'),result=tool(name,'all-'+i,'result');
+    await push('session:events',[payload(start),payload({...start,summary:'第二来源同一调用'}),payload(result),payload(result)]);
+    await check('one canonical lifecycle '+name,`(()=>{const text=document.getElementById('chat').textContent;return (text.match(/${name}/g)||[]).length===${i<4?2:1};})()`);
+  }
+  await reset();
+  const handback='[回交] 来自 维护 的报告（任务关联未知）\n结论：completed\n摘要：原报告';
+  const input=(turn,text)=>({kind:'message',turnId:turn,summary:'用户指令：'+text,detail:{source:'prompt-input',text}});
+  await push('session:events',[payload(input('delivery-one',handback)),payload(input('delivery-one',handback))]);
+  await check('typed input repeated live is single injected row',`document.querySelectorAll('#chat .msg-injected').length===1&&window.__ansRenderer.rowModelDebug('A').count===${baselineRows+1}`);
+  const row={kind:'user',text:handback,turnId:'delivery-one',input:{source:'prompt-input',text:handback}};
+  await push('session:history',{projectRoot:ROOT,roleId:'A',runtime:'pi',rows:[row]});
+  await check('live then history input remains one',`document.querySelectorAll('#chat .msg-injected').length===1&&window.__ansRenderer.rowModelDebug('A').count===1`);
+  await push('session:events',[payload(input('delivery-two',handback)),payload({kind:'message',turnId:'assistant',summary:'用户指令：'+handback})]);
+  await check('different actual turn retained and real assistant prefix not converted',`document.querySelectorAll('#chat .msg-injected').length===2&&document.querySelectorAll('#chat .msg-assistant').length===1`);
+  await push('session:history',{projectRoot:ROOT,roleId:'A',runtime:'pi',rows:[{kind:'assistant',text:'full prefix'},row]});
+  await check('full rebuild preserves uncovered second input and assistant',`document.querySelectorAll('#chat .msg-injected').length===2&&document.querySelectorAll('#chat .msg-assistant').length===2`);
+  await reset();await push('session:history',{projectRoot:ROOT,roleId:'A',runtime:'pi',rows:[row]});await push('session:events',[payload(input('delivery-one',handback))]);
+  await check('history first then typed live still one',`document.querySelectorAll('#chat .msg-injected').length===1`);
+  await reset();
+  const start=tool('dispatch_task','repeat','start'),result=tool('dispatch_task','repeat','result');
+  await push('session:events',[payload(start),payload(result),payload(tool('dispatch_task','repeat','blocked')),payload(tool('dispatch_task','repeat','result','dup-turn',{ok:false})),payload(result)]);
+  await check('blocked result and failure preserved without success downgrade',`document.getElementById('chat').textContent.includes('调用发起')&&document.getElementById('chat').textContent.includes('执行失败')&&window.__ansRenderer.rowModelDebug('A').count===${baselineRows+1}`);
+  await push('session:events',[payload({...start,detail:{toolName:'dispatch_task'}}),payload({...start,detail:{toolName:'dispatch_task'}}),payload(tool('dispatch_task','other-call','start')),payload(tool('dispatch_task','repeat','start','other-turn'))]);
+  await check('unknown legacy starts and true other call turn retained',`window.__ansRenderer.rowModelDebug('A').count===${baselineRows+5}`);
+  for(const order of ['tool-first','card-first']){
+    await reset();const id='answer-'+order,call='original-'+order,turn='request-'+order;
+    const request={projectRoot:ROOT,roleId:'A',runtime:'pi',id,turnId:turn,toolCallId:call,request:{kind:'confirm',title:'原请求标题'}};
+    if(order==='tool-first')await push('session:events',[payload(tool('request_confirmation',call,'start',turn))]);
+    await push('session:operator-request',request);
+    await push('session:events',[payload(tool('request_confirmation',call,'start',turn)),payload(tool('request_confirmation',call,'result',turn)),payload(tool('request_confirmation',call,'result',turn))]);
+    await check('card and lifecycle single '+order,`document.querySelectorAll('#chat .op-request').length===1&&window.__ansRenderer.rowModelDebug('A').count===${baselineRows+1}&&document.querySelector('.op-tool-lifecycle').textContent.includes('执行完成')`);
+    await js(`window.__originalDupCard=document.querySelector('[data-request-id="${id}"]');window.__originalDupCard.querySelector('.op-deny').click()`);await pause(50);
+    await push('session:operator-request',request);
+    const rows=[historyRow(tool('request_confirmation',call,'start',turn)),historyRow(tool('request_confirmation',call,'result',turn))];
+    await push('session:history',{projectRoot:ROOT,roleId:'A',runtime:'pi',rows});
+    await push('session:history',{projectRoot:ROOT,roleId:'A',runtime:'pi',rows:[{kind:'assistant',text:'full rebuild prefix'},...rows]});
+    await check('full rebuild retains original decided card '+order,`document.querySelector('[data-request-id="${id}"]')===window.__originalDupCard&&window.__originalDupCard.querySelector('.op-confirm').hidden&&document.querySelectorAll('#chat .op-request').length===1&&window.__ansRenderer.rowModelDebug('A').count===2`);
+    await push('session:operator-request',{...request,id:id+'-new',toolCallId:call+'-new'});
+    await check('same title distinct call request retained '+order,`document.querySelectorAll('#chat .op-request').length===2`);
+  }
+  await reset();
+  await js(`document.getElementById('inp-message').value='客户同文';document.getElementById('btn-send').click()`);await pause(40);
+  const sent=sends.at(-1);
+  await push('session:events',[{...payload(input('manual-actual','客户同文')),clientMessageId:sent.metadata.clientMessageId}]);
+  await check('manual clientMessage ack consumes typed input without duplicate',`document.querySelectorAll('#chat .msg-user').length===1&&document.querySelectorAll('#chat .msg-assistant').length===0`);
+  await reset();
+  const sameTool=tool('read_file','history-call','start');await push('session:events',[payload(sameTool),payload(tool('read_file','history-call','result'))]);
+  await push('session:history',{projectRoot:ROOT,roleId:'A',runtime:'pi',rows:[historyRow(sameTool),historyRow(tool('read_file','history-call','result'))]});
+  await check('normal tools live history share phase identities',`document.querySelectorAll('#chat .tool-activity').length===2`);
+  await push('session:events',[payload(tool('read_file','path-call','start','path-turn',{path:'original/path.md'})),payload(tool('read_file','path-call','start','path-turn'))]);
+  await check('duplicate sparse metadata retains original target',`[...document.querySelectorAll('#chat .tool-activity')].filter(x=>x.textContent.includes('original/path.md')).length===1`);
+  await reset();
+  const phases=[tool('report_shell_verdict','blocked-call','start'),tool('report_shell_verdict','blocked-call','blocked'),tool('report_shell_verdict','blocked-call','result','dup-turn',{ok:false})];
+  await push('session:history',{projectRoot:ROOT,roleId:'A',runtime:'pi',rows:phases.map(historyRow)});
+  await check('history same call start blocked result all retained',`(()=>{const t=document.getElementById('chat').textContent;return t.includes('调用发起')&&(t.match(/执行失败/g)||[]).length===2&&window.__ansRenderer.rowModelDebug('A').count===1;})()`);
+  await push('session:events',phases.map(e=>payload(e)));
+  await check('history then live phases still single lifecycle',`window.__ansRenderer.rowModelDebug('A').count===1`);
+
+  await reset();
+  await push('session:events',[payload(tool('read_file','failure-one','result','failure-turn',{ok:false})),payload(tool('read_file','failure-two','result','failure-turn',{ok:false}))]);
+  await check('same failed body different actual calls remain two failures',`document.querySelectorAll('#chat .sys-denied').length===2`);
+  await push('session:events',[payload(input('isolated','后台相同输入'),'B'),payload(input('isolated','后台相同输入'),'B'),payload(input('isolated','Codex同身份'),'A','codex')]);
+  await check('foreign role runtime identity never covers foreground',`!document.getElementById('chat').textContent.includes('后台相同输入')&&!document.getElementById('chat').textContent.includes('Codex同身份')`);
+  await js(`await window.__ansRenderer.selectRole('B')`);await pause(30);
+  await check('background role retains one canonical input',`[...document.querySelectorAll('#chat .msg-user')].filter(x=>x.textContent.trim()==='后台相同输入').length===1`);
+  await js(`await window.__ansRenderer.selectRuntime('codex')`);await pause(40);
+  await js(`await window.__ansRenderer.selectRole('A')`);await pause(30);
+  await check('background Codex input retained in own view',`document.getElementById('chat').textContent.includes('Codex同身份')`);
+  await js(`await window.__ansRenderer.selectRuntime('pi')`);await reset();
+  const longRows=Array.from({length:220},(_,i)=>({kind:'assistant',text:'reader-'+i+' 原阅读段落保持。'.repeat(10)}));
+  await push('session:history',{projectRoot:ROOT,roleId:'A',runtime:'pi',rows:longRows});
+  await js(`document.getElementById('chat').scrollTop=document.getElementById('chat').scrollHeight*.5`);await pause(80);
+  const readAnchor=await reading();
+  await push('session:events',[payload(input('read-input','远端程序化客户输入')),payload(tool('dispatch_task','read-call','start')),payload(tool('dispatch_task','read-call','start')),payload(tool('dispatch_task','read-call','result'))]);
+  const afterAnchor=await reading();
+  assert.equal(afterAnchor.text,readAnchor.text);assert.ok(Math.abs(afterAnchor.offset-readAnchor.offset)<2);
+  reports.push({name:'canonical input and tool updates preserve virtual reader anchor',value:true,before:readAnchor,after:afterAnchor});
+  for(const width of [1360,960]){win.setContentSize(width,width===960?620:860);await pause(50);fs.writeFileSync(path.join(OUT,'duplicate-'+width+'.png'),(await win.webContents.capturePage()).toPNG());}
+}
 async function selectorChecks() {
   const trigger=`document.getElementById('runtime-select')`, menu=`document.getElementById('runtime-options')`;
   await check('disabled combobox before import',`${trigger}.disabled&&${trigger}.getAttribute('aria-disabled')==='true'&&${trigger}.getAttribute('role')==='combobox'`);
@@ -240,7 +352,7 @@ async function mergeChecks() {
   await push('session:events',[live('pi','A','current','tool_call','read_file',{detail:{toolName:'read_file',toolCallId:'current-call',args:{path:'current.md'}}}),live('pi','A','current','denied','current rejection',{detail:{toolName:'read_file',toolCallId:'current-call',ok:false}}),live('pi','A','current','message','current answer'),live('pi','A','current','settled','current settled'),payload('pi','A',{event:{kind:'handback',summary:'handback',handback:{roleId:'A',turnId:'current',status:'unreported',summary:'current report remains',evidence:[],at:''}}})]);
   await push('session:operator-request',payload('pi','A',{id:'merge-confirm',request:{kind:'confirm',title:'merge pending card'}}));
   await js(`window.__mergeCard=document.querySelector('[data-request-id="merge-confirm"]')`);
-  const current=[row('current','user','current input'),{...row('current','tool','read_file','tool_call'),activity:{toolName:'read_file',toolCallId:'current-call',turnId:'current',target:'current.md',phase:'call',status:'call'}},{...row('current','denied','current rejection','denied'),activity:{toolName:'read_file',toolCallId:'current-call',turnId:'current',target:'current.md',phase:'result',status:'failed'}},row('current','assistant','current answer','message')];
+  const current=[row('current','user','current input'),{...row('current','tool','read_file','tool_call'),activity:{toolName:'read_file',toolCallId:'current-call',turnId:'current',target:'current.md',phase:'call',status:'call'}},{...row('current','denied','current rejection','denied'),activity:{toolName:'read_file',toolCallId:'current-call',turnId:'current',target:'current.md',phase:'blocked',status:'failed'}},row('current','assistant','current answer','message')];
   await history('pi','A',[...older,...current]);
   await check('same-turn live then history only one response rejection and old history',`[...document.querySelectorAll('#chat .msg-assistant')].filter(x=>x.textContent.trim()==='current answer').length===1&&[...document.querySelectorAll('#chat .sys-denied')].filter(x=>x.textContent.includes('current rejection')).length===1&&document.getElementById('chat').textContent.includes('old history retained')`);
   mergeReplayAfterList=true;await push('project:changed',{});
@@ -302,6 +414,8 @@ app.whenReady().then(async()=>{
   win=new BrowserWindow({width:1360,height:860,useContentSize:true,frame:false,show:INTERACTIVE,webPreferences:{preload:path.join(APP,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:false}});
   win.webContents.on('console-message',event=>{if(event.level==='error')errors.push(event.message);});
   await win.loadFile(path.join(APP,'renderer/index.html'));win.setTitle('ANS UI/UX 离线验收');await pause(150);
+  if(PROJECT_RESET_ONLY){await projectResetChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports},null,2));console.log('PROJECT_RESET_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
+  if(DUP_ONLY){await duplicateChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports},null,2));console.log('DUP_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(SELECTOR_ONLY){await selectorChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports,configReads},null,2));console.log('SELECTOR_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(CONFIG_ONLY){await configChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports},null,2));console.log('CONFIG_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(process.env.ANS_MERGE_UI_ONLY==='1'){await mergeChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports,sends:sends.map(x=>({text:x.text,target:x.target,clientMessageId:x.metadata&&x.metadata.clientMessageId}))},null,2));console.log('MERGE_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}

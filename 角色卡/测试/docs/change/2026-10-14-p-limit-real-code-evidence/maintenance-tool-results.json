@@ -1,0 +1,329 @@
+[
+  {
+    "id": "b69d1dd5",
+    "at": "2026-10-14T14:46:58.378Z",
+    "tool": "edit_file",
+    "toolCallId": "call_00_0UIbN4vFbuTzrrgQlZVa5294",
+    "details": {
+      "turnId": "3d851c48-3d48-468d-8646-a286cea19978",
+      "toolCallId": "call_00_0UIbN4vFbuTzrrgQlZVa5294",
+      "toolName": "edit_file",
+      "path": "test.js",
+      "ok": true,
+      "status": "completed",
+      "durationMs": 7
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "edit_file 已获准并落盘：test.js（12288 字节写入 /private/tmp/ans-real-p-limit-20261014/test.js）"
+      }
+    ]
+  },
+  {
+    "id": "d92c4a47",
+    "at": "2026-10-14T14:47:01.105Z",
+    "tool": "run_shell",
+    "toolCallId": "call_00_xW2ka4sw4ZHqOCu99rT49332",
+    "details": {
+      "turnId": "3d851c48-3d48-468d-8646-a286cea19978",
+      "toolCallId": "call_00_xW2ka4sw4ZHqOCu99rT49332",
+      "toolName": "run_shell",
+      "ok": true,
+      "status": "completed",
+      "durationMs": 26
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "run_shell 已执行：node -v（exit 0）\nstdout:\nv24.14.0\n\nstderr:\n"
+      }
+    ]
+  },
+  {
+    "id": "760ea2cc",
+    "at": "2026-10-14T14:47:01.105Z",
+    "tool": "run_shell",
+    "toolCallId": "call_01_QtHo81UlsiTwglVTgfDy0799",
+    "details": {
+      "turnId": "3d851c48-3d48-468d-8646-a286cea19978",
+      "toolCallId": "call_01_QtHo81UlsiTwglVTgfDy0799",
+      "toolName": "run_shell",
+      "ok": true,
+      "status": "completed",
+      "durationMs": 99
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "run_shell 已执行：npm -v（exit 0）\nstdout:\n11.9.0\n\nstderr:\nnpm warn Unknown env config \"electron-builder-binaries-mirror\". This will stop working in the next major version of npm.\nnpm warn Unknown env config \"electron-mirror\". This will stop working in the next major version of npm.\nnpm warn Unknown user config \"ELECTRON_MIRROR\". This will stop working in the next major version of npm.\nnpm warn Unknown user config \"ELECTRON_BUILDER_BINARIES_MIRROR\". This will stop working in the next major version of npm.\n"
+      }
+    ]
+  },
+  {
+    "id": "f02bd752",
+    "at": "2026-10-14T14:47:25.281Z",
+    "tool": "run_shell",
+    "toolCallId": "call_00_YnwDHfCh2UokJdENCHVN5251",
+    "details": {
+      "turnId": "3d851c48-3d48-468d-8646-a286cea19978",
+      "toolCallId": "call_00_YnwDHfCh2UokJdENCHVN5251",
+      "toolName": "run_shell",
+      "ok": false,
+      "status": "failed",
+      "durationMs": 23079,
+      "errorCode": "TOOL_FAILED"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "run_shell 已执行：npm test（exit 1）\nstdout:\n\n> p-limit@7.3.3 test\n> xo && ava && tsd\n\n\n  scripts/benchmarker.js:3:1\n  ⚠  3:1  Unexpected todo comment: TODO: I will move this to a proper....  no-warning-comments\n\n  1 warning\n\n\n  ✔ throws on invalid concurrency argument\n  ✘ [fail]: throws the concurrency validation error for null\n  ✔ clearQueue\n  ✔ accepts additional arguments\n  ✔ map rejects with the iterable error when it throws before the first item\n  ✔ continues after sync throw\n  ✔ runs all tasks asynchronously\n  ✔ map resolves to an empty array for an empty iterable\n  ✔ non-promise returning function\n  ✔ map accepts an iterable (set)\n  ✔ map accepts an iterable (array iterator)\n  ✔ map accepts array-like inputs\n  ✔ map passes sequential indexes for a generator\n  ✔ map rejects with the mapper error\n  ✔ map\n  ✔ propagates async execution context properly\n  ✔ limitFunction exposes clearQueue\n  ✔ shared context with a limited provider helper\n  ✔ map passes index and preserves order with concurrency\n  ✔ map works when detached from the limit\n  ✔ map does not leave unhandled rejections when the iterable throws\n  ✔ clearQueue rejects pending promises when enabled (105ms)\n  ✔ map rejects immediately with the iterable error and still runs already scheduled tasks (106ms)\n  ✔ accepts options object (106ms)\n  ✔ does not ignore errors (116ms)\n  ✔ change concurrency to bigger value (156ms)\n  ✔ change concurrency to smaller value (207ms)\n  ✔ concurrency: 1 (607ms)\n  ✔ limitFunction() (2.1s)\n  ✔ concurrency: 4 (2.3s)\n  ✔ activeCount and pendingCount properties (3s)\n  ─\n\n  throws the concurrency validation error for null\n\n  test.js:502\n\n   501:                                                                         \n   502:   t.is(error.message, 'Expected `concurrency` to be a number from 1 and…\n   503: });                                                                     \n\n  Difference (- actual, + expected):\n\n  - 'Cannot destructure property \\'concurrency\\' of \\'concurrency\\' as it is null.'\n  + 'Expected `concurrency` to be a number from 1 and up'\n\n  › file://test.js:502:4\n\n  ─\n\n  1 test failed\n\nstderr:\nnpm warn Unknown env config \"electron-builder-binaries-mirror\". This will stop working in the next major version of npm.\nnpm warn Unknown env config \"electron-mirror\". This will stop working in the next major version of npm.\nnpm warn Unknown user config \"ELECTRON_MIRROR\". This will stop working in the next major version of npm.\nnpm warn Unknown user config \"ELECTRON_BUILDER_BINARIES_MIRROR\". This will stop working in the next major version of npm.\n"
+      }
+    ]
+  },
+  {
+    "id": "dc9e2f96",
+    "at": "2026-10-14T14:47:30.207Z",
+    "tool": "edit_file",
+    "toolCallId": "call_00_2q8P6S9rhA1Vwd7u8xqU6071",
+    "details": {
+      "turnId": "3d851c48-3d48-468d-8646-a286cea19978",
+      "toolCallId": "call_00_2q8P6S9rhA1Vwd7u8xqU6071",
+      "toolName": "edit_file",
+      "path": "index.js",
+      "ok": true,
+      "status": "completed",
+      "durationMs": 9
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "edit_file 已获准并落盘：index.js（3892 字节写入 /private/tmp/ans-real-p-limit-20261014/index.js）"
+      }
+    ]
+  },
+  {
+    "id": "366df687",
+    "at": "2026-10-14T14:47:44.617Z",
+    "tool": "run_shell",
+    "toolCallId": "call_00_LL2dbNR5C4JiI9nnk2Zb2415",
+    "details": {
+      "turnId": "3d851c48-3d48-468d-8646-a286cea19978",
+      "toolCallId": "call_00_LL2dbNR5C4JiI9nnk2Zb2415",
+      "toolName": "run_shell",
+      "ok": true,
+      "status": "completed",
+      "durationMs": 13062
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "run_shell 已执行：npm test（exit 0）\nstdout:\n\n> p-limit@7.3.3 test\n> xo && ava && tsd\n\n\n  scripts/benchmarker.js:3:1\n  ⚠  3:1  Unexpected todo comment: TODO: I will move this to a proper....  no-warning-comments\n\n  1 warning\n\n\n  ✔ throws on invalid concurrency argument\n  ✔ throws the concurrency validation error for null\n  ✔ clearQueue\n  ✔ accepts additional arguments\n  ✔ map rejects with the iterable error when it throws before the first item\n  ✔ continues after sync throw\n  ✔ runs all tasks asynchronously\n  ✔ map resolves to an empty array for an empty iterable\n  ✔ non-promise returning function\n  ✔ map accepts an iterable (set)\n  ✔ map accepts an iterable (array iterator)\n  ✔ map accepts array-like inputs\n  ✔ map passes sequential indexes for a generator\n  ✔ map rejects with the mapper error\n  ✔ map\n  ✔ propagates async execution context properly\n  ✔ limitFunction exposes clearQueue\n  ✔ shared context with a limited provider helper\n  ✔ map passes index and preserves order with concurrency\n  ✔ map works when detached from the limit\n  ✔ map does not leave unhandled rejections when the iterable throws\n  ✔ clearQueue rejects pending promises when enabled (101ms)\n  ✔ map rejects immediately with the iterable error and still runs already scheduled tasks (102ms)\n  ✔ accepts options object (102ms)\n  ✔ does not ignore errors (112ms)\n  ✔ change concurrency to bigger value (153ms)\n  ✔ change concurrency to smaller value (203ms)\n  ✔ concurrency: 1 (605ms)\n  ✔ limitFunction() (2s)\n  ✔ concurrency: 4 (2.5s)\n  ✔ activeCount and pendingCount properties (3s)\n  ─\n\n  31 tests passed\n\nstderr:\nnpm warn Unknown env config \"electron-builder-binaries-mirror\". This will stop working in the next major version of npm.\nnpm warn Unknown env config \"electron-mirror\". This will stop working in the next major version of npm.\nnpm warn Unknown user config \"ELECTRON_MIRROR\". This will stop working in the next major version of npm.\nnpm warn Unknown user config \"ELECTRON_BUILDER_BINARIES_MIRROR\". This will stop working in the next major version of npm.\n"
+      }
+    ]
+  },
+  {
+    "id": "4fc72580",
+    "at": "2026-10-14T14:47:47.125Z",
+    "tool": "run_shell",
+    "toolCallId": "call_00_MUU3oEBcuXjmvmFYguTP1548",
+    "details": {
+      "turnId": "3d851c48-3d48-468d-8646-a286cea19978",
+      "toolCallId": "call_00_MUU3oEBcuXjmvmFYguTP1548",
+      "toolName": "run_shell",
+      "ok": true,
+      "status": "completed",
+      "durationMs": 18
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "run_shell 已执行：git diff -- index.js test.js（exit 0）\nstdout:\ndiff --git a/index.js b/index.js\nindex c24de57..b78e37a 100644\n--- a/index.js\n+++ b/index.js\n@@ -3,7 +3,7 @@ import Queue from 'yocto-queue';\n export default function pLimit(concurrency) {\n \tlet rejectOnClear = false;\n \n-\tif (typeof concurrency === 'object') {\n+\tif (typeof concurrency === 'object' && concurrency !== null) {\n \t\t({concurrency, rejectOnClear = false} = concurrency);\n \t}\n \ndiff --git a/test.js b/test.js\nindex 08e197e..a51ed58 100644\n--- a/test.js\n+++ b/test.js\n@@ -493,3 +493,11 @@ test('limitFunction()', async t => {\n \n \tawait Promise.all(input);\n });\n+\n+test('throws the concurrency validation error for null', t => {\n+\tconst error = t.throws(() => {\n+\t\tpLimit(null);\n+\t}, {instanceOf: TypeError});\n+\n+\tt.is(error.message, 'Expected `concurrency` to be a number from 1 and up');\n+});\n\nstderr:\n"
+      }
+    ]
+  },
+  {
+    "id": "cf7af0b6",
+    "at": "2026-10-14T14:47:50.326Z",
+    "tool": "run_shell",
+    "toolCallId": "call_00_wSRxkw7Po8z5KekXXeoW1505",
+    "details": {
+      "turnId": "3d851c48-3d48-468d-8646-a286cea19978",
+      "toolCallId": "call_00_wSRxkw7Po8z5KekXXeoW1505",
+      "toolName": "run_shell",
+      "ok": true,
+      "status": "completed",
+      "durationMs": 24
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "run_shell 已执行：git status --porcelain（exit 0）\nstdout:\n M index.js\n M test.js\n?? .ans/\n?? docs/\n?? \"\\350\\247\\222\\350\\211\\262\\345\\215\\241/\"\n\nstderr:\n"
+      }
+    ]
+  },
+  {
+    "id": "f1273465",
+    "at": "2026-10-14T14:48:40.048Z",
+    "tool": "run_shell",
+    "toolCallId": "call_00_44elp1UubXtVLWW7yQmj6320",
+    "details": {
+      "turnId": "3d851c48-3d48-468d-8646-a286cea19978",
+      "toolCallId": "call_00_44elp1UubXtVLWW7yQmj6320",
+      "toolName": "run_shell",
+      "ok": false,
+      "status": "failed",
+      "durationMs": 27,
+      "errorCode": "TOOL_FAILED"
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "run_shell 已执行：git status --porcelain && git diff --stat（exit 129）\nstdout:\n\nstderr:\nerror: unknown option `stat'\nusage: git status [<options>] [--] [<pathspec>...]\n\n    -v, --[no-]verbose    be verbose\n    -s, --[no-]short      show status concisely\n    -b, --[no-]branch     show branch information\n    --[no-]show-stash     show stash information\n    --[no-]ahead-behind   compute full ahead/behind values\n    --[no-]porcelain[=<version>]\n                          machine-readable output\n    --[no-]long           show status in long format (default)\n    -z, --[no-]null       terminate entries with NUL\n    -u, --[no-]untracked-files[=<mode>]\n                          show untracked files, optional modes: all, normal, no. (Default: all)\n    --[no-]ignored[=<mode>]\n                          show ignored files, optional modes: traditional, matching, no. (Default: traditional)\n    --[no-]ignore-submodules[=<when>]\n                          ignore changes to submodules, optional when: all, dirty, untracked. (Default: all)\n    --[no-]column[=<style>]\n                          list untracked files in columns\n    --no-renames          do not detect renames\n    --renames             opposite of --no-renames\n    -M, --find-renames[=<n>]\n                          detect renames, optionally set similarity index\n\n"
+      }
+    ]
+  },
+  {
+    "id": "6996c7cc",
+    "at": "2026-10-14T14:48:40.048Z",
+    "tool": "run_shell",
+    "toolCallId": "call_01_dPsdXmtlpq5L1VnBmQYx1609",
+    "details": {
+      "turnId": "3d851c48-3d48-468d-8646-a286cea19978",
+      "toolCallId": "call_01_dPsdXmtlpq5L1VnBmQYx1609",
+      "toolName": "run_shell",
+      "ok": true,
+      "status": "completed",
+      "durationMs": 8
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "run_shell 已执行：wc -c 角色卡/维护/docs/change/code-null-1-implementation.md 角色卡/维护/changelog.md 角色卡/维护/memo.md 角色卡/维护/functional-description.md 角色卡/维护/api-spec.md（exit 0）\nstdout:\n   10521 角色卡/维护/docs/change/code-null-1-implementation.md\n    3453 角色卡/维护/changelog.md\n    2260 角色卡/维护/memo.md\n    2633 角色卡/维护/functional-description.md\n    3067 角色卡/维护/api-spec.md\n   21934 total\n\nstderr:\n"
+      }
+    ]
+  },
+  {
+    "id": "d61e10a7",
+    "at": "2026-10-14T14:48:41.988Z",
+    "tool": "run_shell",
+    "toolCallId": "call_00_mUPbatUen9wzUmlADiWl5461",
+    "details": {
+      "turnId": "3d851c48-3d48-468d-8646-a286cea19978",
+      "toolCallId": "call_00_mUPbatUen9wzUmlADiWl5461",
+      "toolName": "run_shell",
+      "ok": true,
+      "status": "completed",
+      "durationMs": 21
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "run_shell 已执行：git status --porcelain（exit 0）\nstdout:\n M index.js\n M test.js\n?? .ans/\n?? docs/\n?? \"\\350\\247\\222\\350\\211\\262\\345\\215\\241/\"\n\nstderr:\n"
+      }
+    ]
+  },
+  {
+    "id": "d4e2ac86",
+    "at": "2026-10-14T14:48:41.988Z",
+    "tool": "run_shell",
+    "toolCallId": "call_01_MJiiJHgDxO2yxuXuTT8A4598",
+    "details": {
+      "turnId": "3d851c48-3d48-468d-8646-a286cea19978",
+      "toolCallId": "call_01_MJiiJHgDxO2yxuXuTT8A4598",
+      "toolName": "run_shell",
+      "ok": true,
+      "status": "completed",
+      "durationMs": 18
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "run_shell 已执行：git diff --stat（exit 0）\nstdout:\n index.js | 2 +-\n test.js  | 8 ++++++++\n 2 files changed, 9 insertions(+), 1 deletion(-)\n\nstderr:\n"
+      }
+    ]
+  },
+  {
+    "id": "b70fbe94",
+    "at": "2026-10-14T14:48:46.068Z",
+    "tool": "edit_file",
+    "toolCallId": "call_00_I2glka0YpegbatCXNG446869",
+    "details": {
+      "turnId": "3d851c48-3d48-468d-8646-a286cea19978",
+      "toolCallId": "call_00_I2glka0YpegbatCXNG446869",
+      "toolName": "edit_file",
+      "path": "角色卡/维护/docs/change/code-null-1-implementation.md",
+      "ok": true,
+      "status": "completed",
+      "durationMs": 8
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "edit_file 已获准并落盘：角色卡/维护/docs/change/code-null-1-implementation.md（10676 字节写入 /private/tmp/ans-real-p-limit-20261014/角色卡/维护/docs/change/code-null-1-implementation.md）"
+      }
+    ]
+  },
+  {
+    "id": "2544ec4a",
+    "at": "2026-10-14T14:48:46.076Z",
+    "tool": "edit_file",
+    "toolCallId": "call_01_6m3Lill5IqCXamVactvV3000",
+    "details": {
+      "turnId": "3d851c48-3d48-468d-8646-a286cea19978",
+      "toolCallId": "call_01_6m3Lill5IqCXamVactvV3000",
+      "toolName": "edit_file",
+      "path": "角色卡/维护/changelog.md",
+      "ok": true,
+      "status": "completed",
+      "durationMs": 7
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "edit_file 已获准并落盘：角色卡/维护/changelog.md（3525 字节写入 /private/tmp/ans-real-p-limit-20261014/角色卡/维护/changelog.md）"
+      }
+    ]
+  },
+  {
+    "id": "a8fdea7c",
+    "at": "2026-10-14T14:48:53.704Z",
+    "tool": "edit_file",
+    "toolCallId": "call_00_E5DtpzstMBpDGX8njM6b0168",
+    "details": {
+      "turnId": "3d851c48-3d48-468d-8646-a286cea19978",
+      "toolCallId": "call_00_E5DtpzstMBpDGX8njM6b0168",
+      "toolName": "edit_file",
+      "path": "角色卡/维护/docs/change/code-null-1-implementation.md",
+      "ok": true,
+      "status": "completed",
+      "durationMs": 11
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "edit_file 已获准并落盘：角色卡/维护/docs/change/code-null-1-implementation.md（11157 字节写入 /private/tmp/ans-real-p-limit-20261014/角色卡/维护/docs/change/code-null-1-implementation.md）"
+      }
+    ]
+  },
+  {
+    "id": "f596dff6",
+    "at": "2026-10-14T14:49:01.448Z",
+    "tool": "submit_report",
+    "toolCallId": "call_00_ET_jTHD9LunntXHaADuMzoX4447",
+    "details": {
+      "turnId": "3d851c48-3d48-468d-8646-a286cea19978",
+      "toolCallId": "call_00_ET_jTHD9LunntXHaADuMzoX4447",
+      "toolName": "submit_report",
+      "ok": true,
+      "status": "completed",
+      "durationMs": 1
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "submit_report：报告已交回（status: completed）——已把你要说的话交给编排汇总。"
+      }
+    ]
+  }
+]

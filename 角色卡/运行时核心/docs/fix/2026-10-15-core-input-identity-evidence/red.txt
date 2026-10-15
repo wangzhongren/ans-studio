@@ -1,0 +1,104 @@
+✖ confirmation passes original cancellation context; late yes cannot issue next-turn write permission (4.9705ms)
+✖ choice callback receives the captured original signal/turn and legacy single-argument callbacks remain valid (2.064417ms)
+✔ Service history operation returns scoped Model records/replay through the existing Provider (17.147875ms)
+✖ each actual runtime turn publishes one typed original input before native work and retains real assistant text (17.358ms)
+✖ input echo is absent for rejected or failed-start prompts; demo Core and standalone have one input producer (1.675625ms)
+✔ Service selects exactly chosen injected factory and executes real governed handler (2.358584ms)
+✔ Service failure never selects another engine and unknown runtime rejected (1.195667ms)
+✔ Service persists replay and adapter-confirmed deferred context result after prompt (8.409125ms)
+✔ customer wait pauses prompt deadline, abort invalidates late consent, next turn works (53.38975ms)
+✔ throw, native failed outcome and timeout each have one explicit terminal (19.814ms)
+✔ corrupt ANS index is rejected before native bind allocates a session (2.558792ms)
+✔ transient persistence failure is reported and repaired next prompt can succeed (10.653667ms)
+✔ Service event top/detail identity and report metadata share the captured turn (0.666833ms)
+✔ hanging native abort is bounded, called once, and leaves the session quarantined (1005.135667ms)
+✔ Service configured custom API key is stripped from the actual governed shell child (35.583375ms)
+✔ outer timeout remains timed_out when abort cleanup emits inner aborted terminals (16.2135ms)
+✔ outer aborted result stays aborted while failing cleanup remains honestly reported (2.780209ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 13
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1270.69975
+
+✖ failing tests:
+
+test at test/runtime-core/customer-input-context.test.ts:10:1
+✖ confirmation passes original cancellation context; late yes cannot issue next-turn write permission (4.9705ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + undefined
+  - 'original-confirm-call'
+  
+      at TestContext.<anonymous> (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/runtime-core/customer-input-context.test.ts:38:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 'original-confirm-call',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/runtime-core/customer-input-context.test.ts:53:1
+✖ choice callback receives the captured original signal/turn and legacy single-argument callbacks remain valid (2.064417ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + undefined
+  - 'original-choice-call'
+  
+      at TestContext.<anonymous> (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/runtime-core/customer-input-context.test.ts:66:10)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 'original-choice-call',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/runtime-core/session.test.ts:46:1
+✖ each actual runtime turn publishes one typed original input before native work and retains real assistant text (17.358ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 2
+  
+      at TestContext.<anonymous> (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/runtime-core/session.test.ts:83:14)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 2,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/runtime-core/session.test.ts:102:1
+✖ input echo is absent for rejected or failed-start prompts; demo Core and standalone have one input producer (1.675625ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+  +   turnId: '54ff2cb0-04e8-4591-b9d5-7fef716c23c0'
+  -   source: 'prompt-input',
+  -   text: 'actual input'
+    }
+  
+      at TestContext.<anonymous> (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/runtime-core/session.test.ts:114:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { turnId: '54ff2cb0-04e8-4591-b9d5-7fef716c23c0' },
+    expected: { source: 'prompt-input', text: 'actual input' },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

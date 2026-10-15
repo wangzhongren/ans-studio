@@ -1,0 +1,54 @@
+
+  ✔ throws on invalid concurrency argument
+  ✘ [fail]: throws the concurrency validation error for null
+  ✔ clearQueue
+  ✔ accepts additional arguments
+  ✔ map rejects with the iterable error when it throws before the first item
+  ✔ continues after sync throw
+  ✔ runs all tasks asynchronously
+  ✔ map resolves to an empty array for an empty iterable
+  ✔ non-promise returning function
+  ✔ map accepts an iterable (set)
+  ✔ map accepts an iterable (array iterator)
+  ✔ map accepts array-like inputs
+  ✔ map passes sequential indexes for a generator
+  ✔ map rejects with the mapper error
+  ✔ map
+  ✔ propagates async execution context properly
+  ✔ limitFunction exposes clearQueue
+  ✔ shared context with a limited provider helper
+  ✔ map passes index and preserves order with concurrency
+  ✔ map works when detached from the limit
+  ✔ map does not leave unhandled rejections when the iterable throws
+  ✔ clearQueue rejects pending promises when enabled (104ms)
+  ✔ map rejects immediately with the iterable error and still runs already scheduled tasks (105ms)
+  ✔ accepts options object (105ms)
+  ✔ does not ignore errors (115ms)
+  ✔ change concurrency to bigger value (156ms)
+  ✔ change concurrency to smaller value (206ms)
+  ✔ concurrency: 1 (607ms)
+  ✔ limitFunction() (2.3s)
+  ✔ concurrency: 4 (2.5s)
+  ✔ activeCount and pendingCount properties (3s)
+  ─
+
+  throws the concurrency validation error for null
+
+  test.js:502
+
+   501:                                                                         
+   502:   t.is(error.message, 'Expected `concurrency` to be a number from 1 and…
+   503: });                                                                     
+
+  Difference (- actual, + expected):
+
+  - 'Cannot destructure property \'concurrency\' of \'concurrency\' as it is null.'
+  + 'Expected `concurrency` to be a number from 1 and up'
+
+  › file://test.js:502:4
+
+  ─
+
+  1 test failed
+
+STDERR:

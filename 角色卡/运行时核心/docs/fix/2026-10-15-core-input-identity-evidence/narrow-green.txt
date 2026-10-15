@@ -1,0 +1,32 @@
+✔ confirmation passes original cancellation context; late yes cannot issue next-turn write permission (7.516417ms)
+✔ choice callback receives the captured original signal/turn and legacy single-argument callbacks remain valid (3.064083ms)
+✔ Service history operation returns scoped Model records/replay through the existing Provider (21.649958ms)
+✔ each actual runtime turn publishes one typed original input before native work and retains real assistant text (53.769958ms)
+✔ input echo is absent for rejected or failed-start prompts; demo Core and standalone have one input producer (0.732375ms)
+✔ Service selects exactly chosen injected factory and executes real governed handler (0.714167ms)
+✔ Service failure never selects another engine and unknown runtime rejected (0.381ms)
+✔ Service persists replay and adapter-confirmed deferred context result after prompt (10.03475ms)
+✔ customer wait pauses prompt deadline, abort invalidates late consent, next turn works (54.6195ms)
+✔ throw, native failed outcome and timeout each have one explicit terminal (17.602125ms)
+✔ corrupt ANS index is rejected before native bind allocates a session (2.355791ms)
+✔ transient persistence failure is reported and repaired next prompt can succeed (12.097166ms)
+✔ Service event top/detail identity and report metadata share the captured turn (0.748042ms)
+✔ hanging native abort is bounded, called once, and leaves the session quarantined (1004.164542ms)
+✔ Service configured custom API key is stripped from the actual governed shell child (23.436958ms)
+✔ outer timeout remains timed_out when abort cleanup emits inner aborted terminals (14.96475ms)
+✔ outer aborted result stays aborted while failing cleanup remains honestly reported (2.71875ms)
+✔ Model/schema: required write/edit fields, optionals, unknown names and injected capabilities (1.006708ms)
+✔ gate deny/throw and gate-triggered abort produce zero filesystem effects (2.031625ms)
+✔ real write/edit preserves UTF-8 BOM/CRLF and rejects missing match or symlink escape (17.96125ms)
+✔ pre-aborted edit and capability handlers never run or mutate (0.953208ms)
+✔ shell gate deny/throw/timeout have no effects; explicit allow runs argv without shell (34.550542ms)
+✔ abort running shell kills child before delayed write and returns failure (725.257292ms)
+✔ customer decline/abort and failed handbacks are honest; report/dispatch carry captured turn (4.548917ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 24
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1298.896458

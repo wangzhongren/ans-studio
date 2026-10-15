@@ -1,0 +1,119 @@
+{
+  "producer": "运行时核心",
+  "recordedAt": "2026-10-15T00:52:46.577Z",
+  "node": "v24.14.0",
+  "platform": "darwin",
+  "arch": "arm64",
+  "combinedSha256": "685f2d8cd312fb05c3d5d256a6dfcfab34ef260dd9eeb4e600b11f9f9e5d3804",
+  "files": [
+    {
+      "path": "src/model/runtime.ts",
+      "sha256": "d2cc30c5160371d17f88ec18b4fcdbfad422e9a8e147efd8e750d7dc57024cc5"
+    },
+    {
+      "path": "src/service/runtime/session.ts",
+      "sha256": "21c5d7eb93abeb8e23a1ffc8aaab54d89caa899d63a14556db9ed2de9583fb7d"
+    },
+    {
+      "path": "src/provider/runtime/tools.ts",
+      "sha256": "a67ab1375f8330d063e16d45d873c42d389c5406749d5ee2ba19851ff2e9cb36"
+    },
+    {
+      "path": "src/provider/runtime/schema.ts",
+      "sha256": "1b1ded078d67d775c8cd7a406de858d0aa34c4e863ba84f8a5c163ff9e4552d1"
+    },
+    {
+      "path": "test/runtime-core/session.test.ts",
+      "sha256": "d72de47ff62745b755f7eb7001f9af54c8c63c5380776921130c89fe4ab81d70"
+    },
+    {
+      "path": "test/runtime-core/customer-input-context.test.ts",
+      "sha256": "545c6ff658a99a64b4bd3b1e1768288da1872949bf0acd025b5b6e7d2af064ca"
+    }
+  ],
+  "validation": {
+    "red": "4 expected failures in actual Core/handler assertions",
+    "firstCandidate": "one existing top/detail.turnId failure; partial excerpt only",
+    "narrow": {
+      "command": "node --test test/runtime-core/session.test.ts test/runtime-core/customer-input-context.test.ts test/runtime-core/tools.test.ts",
+      "tests": 24,
+      "passed": 24,
+      "exit": 0
+    },
+    "regression": {
+      "command": "node --test 'test/runtime-core/*.test.ts' test/pi-adapter/run-shell.test.ts test/测试/wiring.test.ts",
+      "tests": 57,
+      "passed": 57,
+      "exit": 0
+    },
+    "typecheck": {
+      "command": "npm run typecheck",
+      "exit": 0
+    },
+    "independentDesktop": "pending original test owner"
+  },
+  "protected": "No splitCommand/spawn/classifier/gate logic, peer source/tests, p-limit project or prior reports edited",
+  "readonlyValidationInputs": [
+    {
+      "path": "src/provider/runtime/session-store.ts",
+      "sha256": "9fbdd32e5bb9df0aea64f2c8ac58dbdf3a1b19bd30cd74ace44e3830294548a2"
+    },
+    {
+      "path": "src/common/runtime-core/event-queue.ts",
+      "sha256": "ac3afa2e42fe82c8c49cf574764ae0c69a32fa61380e01a90f21a3effed9538d"
+    },
+    {
+      "path": "src/common/runtime-core/format-denial.ts",
+      "sha256": "6906f6da4a75913072493fc9e5a4a4c2c6832af171806c95cbcaddd104f2d9e8"
+    },
+    {
+      "path": "src/common/runtime-core/fs-write.ts",
+      "sha256": "bc134fc5b803ca30fcf57fda2778420c4a07a73df52f6218080da8ce174eb438"
+    },
+    {
+      "path": "src/common/runtime-core/timeout.ts",
+      "sha256": "e73a2c76ede16499c1f7da54725206eef63080fa5e76e33ef8f168c9587bbb47"
+    },
+    {
+      "path": "test/runtime-core/abort-failure-semantics.test.ts",
+      "sha256": "c8a40efbe148e689a5aaad0d3f5a98b3ed8937194a2b46212d369fc4ceb38e99"
+    },
+    {
+      "path": "test/runtime-core/customer-input-context.test.ts",
+      "sha256": "545c6ff658a99a64b4bd3b1e1768288da1872949bf0acd025b5b6e7d2af064ca"
+    },
+    {
+      "path": "test/runtime-core/effective-timeouts.test.ts",
+      "sha256": "c79e52b9008953f7735b07759336d3df6ff19559a900065623162350dfb16520"
+    },
+    {
+      "path": "test/runtime-core/fixtures.ts",
+      "sha256": "be1619f77b3f277ca6917a10b4a06653122f46bf08dd7045ab90bf586bc74f22"
+    },
+    {
+      "path": "test/runtime-core/prompt-start-acknowledgement.test.ts",
+      "sha256": "f2c28313283ec336e615a9eaf2765ad260df8e3ab2fe2b2fcffaada28a074304"
+    },
+    {
+      "path": "test/runtime-core/session-store.test.ts",
+      "sha256": "6251094f05e0f01ab35555f11e73e3f5778a88f38d40a94c489b58cab8b2c5b8"
+    },
+    {
+      "path": "test/runtime-core/session.test.ts",
+      "sha256": "d72de47ff62745b755f7eb7001f9af54c8c63c5380776921130c89fe4ab81d70"
+    },
+    {
+      "path": "test/runtime-core/tools.test.ts",
+      "sha256": "4c8a41cda1cffc5a6024a3041b19ad3c281480e5e732f30432205bc0a2d26a23"
+    },
+    {
+      "path": "test/pi-adapter/run-shell.test.ts",
+      "sha256": "e27788e73e6c1036ac73cf5d316442c6ec398228b2ab4f2c729bfb0a79ff4d22"
+    },
+    {
+      "path": "test/测试/wiring.test.ts",
+      "sha256": "9e81c5745a1f2a6f9cb351fc2c22731aac466bd585581fd11aa11f8a8446e9cf"
+    }
+  ],
+  "baselineHead": "27aa265ccb2092406edce6116e3b7c5bbfa6b6e8"
+}

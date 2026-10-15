@@ -29,3 +29,5 @@ Service 为每轮提供一个 ID，归一事件的顶层和 `detail.turnId`，�
 **C1P 失败语义兼容：** 公共工具入口中止时返回 `ok:false` 和各工具原有含义：确认/选项“未获客户同意”、报告/审读“未能交回”、派发“未能派发”、执行前shell“未执行”。await 后已有 handler 的真实失败保留；迟到的成功仍改为失败。停止检查、signal与gate规则不变；实际运行后被中止的shell保留自身失败信息，不能混同执行前拒绝。当前证据见 [C1P](docs/fix/2026-10-14_fix_tool-abort-failure-messages.md)。
 
 状态：C1 Model/工具/schema/store/Service 已实现，自有无网络测试通过；Pi/Codex/Claude 的 SDK 迁移与用户入口接线由各原属主独立完成，不能把这些核心结果当成最终整合验收。详见 [原始验证记录](docs/change/2026-10-14_change_runtime-core.md)。Adapter 个性化配置若需要新增字段，先交核心协调并补充本文件，不能各自增殖公共类型。
+
+**输入显示身份（2026-10-15）：** PromptInputEventDetail 的 source 固定为 prompt-input，text 为原文，imageCount 可选。Core 在实际开始通知/user持久化/取消检查后、native prompt前发一次 kind:message，顶层与 detail.turnId 都为 actualturn；非空图片只记数量，图片原对象继续透传。Pi 注入路径不再另发 echo，demo 有 Core turn 时同理；direct helper 兼容由原属主维护。Window/UI 按 actualturn 关联 replay user 与 typed echo，不按正文前缀猜输入，不补猜旧数据身份。CustomerInputMetadata.toolCallId 可选，只透传确认/选择 handler 原始 callId，缺席仍缺席，旧单参回调兼容，不新增许可。见[本次修复](docs/fix/2026-10-15_fix_run-shell-description.md)。

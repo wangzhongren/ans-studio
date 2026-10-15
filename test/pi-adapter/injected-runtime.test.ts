@@ -88,6 +88,8 @@ test("actual production bind registers injected tools only, freezes definition a
   await session.prompt("exercise injection");
   const events = await drain(session);
   assert.equal(calls, 1); assert.ok(originalSignal instanceof AbortSignal);
+  assert.equal(events.filter(e => (e.detail as { source?: string })?.source === "prompt-input").length, 0, "raw production Pi delegates input echo to Core");
+  assert.equal(events.filter(e => e.kind === "tool_call").length, 1);
   assert.equal(session.runtime, "pi"); assert.equal(session.contextSource, "in-memory");
   assert.equal(events.filter(e => e.kind === "settled").length, 1);
   const settled = events.find(e => e.kind === "settled")!;
@@ -111,6 +113,13 @@ test("Service -> real Pi native wiring shares injected wait gate, captured custo
   answer({ outcome: "answered", value: { confirmed: true } }); await work;
   const events = await drain(session);
   assert.equal(providerOpts!.interactionGate.isWaiting(), false);
+  const inputEchoes = events.filter(e => (e.detail as { source?: string })?.source === "prompt-input");
+  assert.equal(inputEchoes.length, 1, "Core and production Pi together emit exactly one actual input");
+  assert.equal(inputEchoes[0].turnId, turnId);
+  assert.equal((inputEchoes[0].detail as { text: string }).text, "wait for confirmation");
+  const start = events.find(e => e.kind === "tool_call")!;
+  assert.equal((start.detail as { toolCallId?: string }).toolCallId, metadata!.toolCallId);
+  assert.ok(metadata!.toolCallId);
   assert.equal(events.filter(e => e.kind === "settled").length, 1);
   assert.equal(events.at(-1)!.turnId, turnId);
   assert.equal((events.at(-1)!.detail as { outcome: string }).outcome, "completed");

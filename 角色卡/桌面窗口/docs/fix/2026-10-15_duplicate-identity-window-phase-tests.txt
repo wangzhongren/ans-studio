@@ -1,0 +1,46 @@
+✔ D1 shared registry: effective env/file/fallback sources, every secret masked, whitespace is unset (7.539041ms)
+✔ D1 configuration writes only selected string keys atomically, masks URL/userinfo failure and retains revision on failure (9.176958ms)
+✔ D1 same role and project across engines and same role across projects keep distinct handles and exact input targets (4.31775ms)
+✔ D1 background dispatch, queued customer input and handback pin the source engine after selection switches (7.513875ms)
+✔ D1 actual Pipeline/Service chooses demo, writes isolated replay and converts native context honestly (26.041625ms)
+✔ D1 actual Pipeline/Service chooses pi, writes isolated replay and converts native context honestly (19.51875ms)
+✔ D1 actual Pipeline/Service chooses codex, writes isolated replay and converts native context honestly (19.808417ms)
+✔ D1 actual Pipeline/Service chooses claude, writes isolated replay and converts native context honestly (17.996709ms)
+✔ D1 profile success rebuilds same engine after busy old Pi finishes; ambient token remains old until safe; failure is unchanged (8.506542ms)
+✔ D1 original customer signal cancels pending confirm/choice and old yes cannot settle a new card (0.535792ms)
+✔ D1 shell terminal failure/timeout and dispose invalidate exact handle card, old allow is expired (4.115709ms)
+✔ D1 state debouncing and constrained bridges preserve project/runtime identity (1.14225ms)
+✔ D1 last busy Pi in another project releases queued profile rebuild without changing ambient mid-turn (5.555917ms)
+✔ D1 confirmation bridge keeps original signal identity and an old disposed stream cannot cancel a new handle card (0.745667ms)
+✔ D1 old Pi JSONL is a display-only fallback and never becomes Codex/Claude history or native restore proof (4.752834ms)
+✔ D1R ANS history preserves authoritative turn/event identity, independent same text and delta order (2.962708ms)
+✔ D1R legacy Pi rows keep optional turn/event metadata absent (1.865042ms)
+✔ D1R2 direct and queued identical inputs retain original client ID through delayed old settled (9.713834ms)
+✔ D1R2 anonymous dispatch occupies its own origin and unknown/legacy events cannot borrow the next client (6.627667ms)
+✔ D1R2 actual Pipeline/Service returns original client IDs and real distinct turn IDs for same text (15.045292ms)
+✔ D1R2 actual ack preserves a failed delayed terminal and the next aborted original client (24.683541ms)
+✔ D1R2 no-ack failure and legacy/unknown events cannot lend an old client ID to a later acknowledged call (5.375542ms)
+✔ typed prompt input history joins only actual same-turn input sources and preserves legacy facts (2.457875ms)
+✔ operator payload preserves original call identity and leaves absent legacy IDs absent (0.204584ms)
+✔ history preserves canonical start/blocked/result phases for the same failed tool call (2.032875ms)
+✔ A-5 通道：confirm 作答 → answered/confirmed:true；「不同意」→ declined（未获同意） (0.926125ms)
+✔ A-5 通道（请求快照校验）：selected 必须 ⊆ 已给选项、单选恰一个、空选择不受理——非法回包不落三态 (0.132625ms)
+✔ A-5 通道：多选子集/去重合法；取消 → declined；窗口关闭 rejectAll → declined；未接线 → unavailable (0.143042ms)
+✔ A-5 通道（真机语义）：未知 id 回包 → 终态 expired；非法决定 → 可重试（无 expired） (0.115459ms)
+✔ A-5 注入判据：仅内置治理角色（su）会话注入 customerInput；roleId 闭包绑定；普通角色不注入 (5.52025ms)
+✔ A-5 未接通道：deps.customerInput 缺省 ⇒ 连 su 也不注入（无确认制——绝不悄悄放行） (0.607959ms)
+✔ D-1 目录契约 + 解析：header + user/assistant(含 toolCall)/toolResult(isError) → 规范化行（顺序与时间保留） (0.89475ms)
+✔ D-1 防御式：坏行/未知 entry/未知 role 跳过不抛（计入 skipped）；header 不合法 → 整体判失败 (0.19025ms)
+✔ D-1 pickLatestSessionFile：mtime 大者优先；并列取名字大者（确定性） (0.053959ms)
+✔ D-1 粗探 probeSessionFile：无文件=missing；header 合法=ok；坏文件=corrupt（打开会话时分类 contextSource 用） (10.274625ms)
+✔ D-1 readRoleSessionHistory：无目录=无历史（ok）；挑最近文件；坏文件→ok:false+error；**跨角色不串** (5.606292ms)
+✔ 锚点标识：request_confirmation 的调用行与结论行带同一 requestId/anchorKey（toolCallId 配对，不解析正文） (0.265667ms)
+✔ 锚点标识：request_choice 同样配对；非交互工具/缺 title/孤儿结论一概不着锚（其余行零变化） (0.205375ms)
+ℹ tests 38
+ℹ suites 0
+ℹ pass 38
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 357.858792

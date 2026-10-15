@@ -16,3 +16,5 @@
 
 2026-10-14 C1A：PromptOptions.onTurnStarted(metadata:PromptTurnStartedMetadata) sync optional callback，在Core prechecks通过新UUID/active/providerturn设置后try首句，persist/native前恰一次。三个readonly字段turnId/roleId/runtime，无clientID/signal/权限/Store/SDK变化，原opts/images reference透传adapter且adapter不调用。callbackthrow未开始underlying则不调用idle native.abort，单failed释放active。Window原invocation闭包捕获ack，删FIFO/latest猜测；本角色不修改Pipeline/UI/Window。当前38/38 whole tsc0原证据/manifest见prompt-start-ack fix。
 
+
+2026-10-15 C1I：Core统一input echo在ack/userpersist/signal后native前单emit，detail.source=prompt-input/text/imageCount?且detail.turnId=top actualturn；Pi生产注入false由Pi属主维护，demo有Coreturn不自echo。确认/选择metadata optional toolCallId入口原值透传，不猜ID/正文。schema两说明明确argv-noshell，执行不变。Core+Pi shell+wiring57/57、tsc0，独立桌面待联合验证；原red与首候选detail.turnId失败保留说明，见本次fix。

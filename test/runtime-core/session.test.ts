@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { createRuntimeAdapter, readRuntimeSessionHistory } from "../../src/service/runtime/session.ts";
 import { createRuntimeSessionStore } from "../../src/provider/runtime/session-store.ts";
+import { createDemoRuntimeAdapter } from "../../src/provider/runtime/tools.ts";
 import { createEventQueue } from "../../src/common/runtime-core/event-queue.ts";
 import type { RoleSession, RuntimeKind, RuntimeProviderFactory, RuntimeProviderOptions, SessionEvent } from "../../src/model/runtime.ts";
 import { allow, deny, role, until } from "./fixtures.ts";
@@ -41,6 +42,88 @@ async function collect(session: RoleSession) {
   const done = (async () => { for await (const event of session.events()) events.push(event); })();
   return { events, done };
 }
+
+test("each actual runtime turn publishes one typed original input before native work and retains real assistant text", async () => {
+  const root = await temp();
+  try {
+    for (const runtime of ["pi", "codex", "claude"] as const) {
+      const inputs: string[] = [];
+      const images = [{ type: "image" as const, data: "IMAGE_NOT_IN_ECHO", mimeType: "image/png" }];
+      const options = { images, onTurnStarted: (metadata: { turnId: string }) => { inputs.push(metadata.turnId); } };
+      let calls = 0;
+      const factory: RuntimeProviderFactory = (providerOptions) => ({
+        async composeContext() { return { systemPrompt: "fixture" }; },
+        async bindRole() {
+          const queue = createEventQueue<SessionEvent>();
+          return {
+            async prompt(text, received) {
+              calls++;
+              assert.equal(received, options);
+              assert.equal(received?.images, images);
+              const id = providerOptions.currentTurnId();
+              assert.equal(id, inputs.at(-1));
+              const saved = await providerOptions.storage!.readReplay();
+              const original = saved.filter((entry) => entry.kind === "user" && entry.turnId === id);
+              assert.equal(original.length, 1);
+              assert.equal(original[0].text, text);
+              queue.push({ kind: "message", summary: "用户指令：this is real assistant text" });
+              queue.push({ kind: "settled", summary: "done" });
+            },
+            events: () => queue.stream,
+            async dispose() { queue.close(); },
+          };
+        },
+      });
+      const session = await createRuntimeAdapter({ runtime, gate: allow, projectRoot: root, skillRoot: root, persistSession: true, providerFactories: { [runtime]: factory } }).bindRole(role());
+      const { events, done } = await collect(session);
+      await session.prompt("same original text", options);
+      await session.prompt("same original text", options);
+      await session.dispose(); await done;
+      const echoes = events.filter((event) => (event.detail as { source?: string } | undefined)?.source === "prompt-input");
+      assert.equal(echoes.length, 2);
+      assert.equal(calls, 2);
+      assert.equal(new Set(inputs).size, 2);
+      for (const [index, echo] of echoes.entries()) {
+        assert.equal(echo.kind, "message"); assert.equal(echo.runtime, runtime); assert.equal(echo.roleId, "core");
+        assert.equal(echo.turnId, inputs[index]);
+        assert.deepEqual(echo.detail, { source: "prompt-input", text: "same original text", imageCount: 1, turnId: inputs[index] });
+        const start = events.indexOf(echo);
+        assert.equal(events[start + 1]?.summary, "用户指令：this is real assistant text");
+      }
+      assert.equal(events.filter((event) => event.summary === "用户指令：this is real assistant text").length, 2);
+      const history = await readRuntimeSessionHistory({ projectRoot: root, roleId: "core", runtime });
+      assert.equal(history.entries.filter((entry) => entry.kind === "user").length, 2);
+      assert.equal(history.entries.filter((entry) => (entry.event?.detail as { source?: string } | undefined)?.source === "prompt-input").length, 2);
+      assert.ok(!JSON.stringify(history).includes(images[0].data));
+    }
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("input echo is absent for rejected or failed-start prompts; demo Core and standalone have one input producer", async () => {
+  const root = await temp();
+  try {
+    const session = await createRuntimeAdapter({ runtime: "demo", gate: allow, projectRoot: root, skillRoot: root, script: [] }).bindRole(role());
+    const { events, done } = await collect(session);
+    await assert.rejects(session.prompt("failed start", { onTurnStarted() { throw new Error("start callback failed"); } }), /start callback failed/);
+    assert.equal(events.filter((event) => event.kind === "message").length, 0);
+    await session.prompt("actual input");
+    await session.dispose(); await done;
+    await assert.rejects(session.prompt("disposed input"), /关闭/);
+    const messages = events.filter((event) => event.kind === "message");
+    assert.equal(messages.length, 1);
+    assert.deepEqual(messages[0].detail, { source: "prompt-input", text: "actual input", turnId: messages[0].turnId });
+    assert.ok(messages[0].turnId);
+
+    const direct = await createDemoRuntimeAdapter({ runtime: "demo", projectRoot: root, skillRoot: root, tools: [], interactionGate: { begin() {}, end() {}, isWaiting: () => false, onChange: () => () => {} }, currentTurnId: () => undefined }).bindRole(role());
+    const directEvents = await collect(direct);
+    await direct.prompt("legacy direct input"); await direct.dispose(); await directEvents.done;
+    const directMessages = directEvents.events.filter((event) => event.kind === "message");
+    assert.equal(directMessages.length, 1);
+    assert.equal(directMessages[0].summary, "用户指令：legacy direct input");
+    assert.deepEqual(directMessages[0].detail, { source: "prompt-input", text: "legacy direct input" });
+    assert.equal(directMessages[0].turnId, undefined);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
 
 test("Service selects exactly chosen injected factory and executes real governed handler", async () => {
   const root = await temp();

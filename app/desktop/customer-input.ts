@@ -47,6 +47,8 @@ export interface OperatorRequestPayload {
   roleId: string;
   projectRoot?: string;
   runtime?: CustomerInputMetadata["runtime"];
+  turnId?: CustomerInputMetadata["turnId"];
+  toolCallId?: CustomerInputMetadata["toolCallId"];
   /** 冻结形状的请求本体（**原样透传**，不加工）。 */
   request: CustomerInputRequest;
   /**
@@ -136,6 +138,8 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
       const payload: OperatorRequestPayload = { id, roleId: String((ctx && ctx.roleId) || ""), request: req, anchorKey: interactionAnchorKey(req.kind, req.title) };
       if (ctx.runtime !== undefined) payload.runtime = ctx.runtime;
       if (ctx.projectRoot !== undefined) payload.projectRoot = ctx.projectRoot;
+      if (typeof metadata?.turnId === "string" && metadata.turnId !== "") payload.turnId = metadata.turnId;
+      if (typeof metadata?.toolCallId === "string" && metadata.toolCallId !== "") payload.toolCallId = metadata.toolCallId;
       const signals = [metadata?.signal, ctx.sessionSignal].filter((signal): signal is AbortSignal => signal !== undefined);
       const cleanup = () => { for (const signal of signals) signal.removeEventListener("abort", cancel); };
       const finish = (outcome: CustomerInputOutcome) => { cleanup(); resolve(outcome); };

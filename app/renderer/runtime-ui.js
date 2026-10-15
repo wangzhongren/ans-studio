@@ -33,7 +33,18 @@
   function applicationLabel(application) {
     return { current: "当前配置已应用。", "next-session": "下一次开启会话时应用。", "after-active-turn": "当前轮次继续使用原配置；结束后下一次输入应用新配置。" }[application] || "配置应用时点未报告。";
   }
+  function canonicalKey(row) {
+    if (!row || typeof row.turnId !== "string" || row.turnId === "") return null;
+    var detail = row.input || row.detail || {};
+    if (row.kind === "user" || detail.source === "prompt-input" && typeof detail.text === "string") return JSON.stringify(["input", row.turnId]);
+    var activity = root.ANSToolRows && root.ANSToolRows.activityOf(row);
+    if (activity && activity.turnId && activity.callId && ["start", "result", "blocked"].indexOf(activity.identityPhase) >= 0)
+      return JSON.stringify(["tool", activity.turnId, activity.callId, activity.identityPhase]);
+    return null;
+  }
   function replayKey(row) {
+    var canonical = canonicalKey(row);
+    if (canonical) return canonical;
     if (!row || typeof row.turnId !== "string" || row.turnId === "") return null;
     var kind = row.kind === "user" ? "user" : row.eventKind;
     if (["user", "message", "tool_call", "accepted", "denied"].indexOf(kind) < 0) return null;
@@ -41,9 +52,9 @@
   }
   function replayCounts(rows) {
     var counts = Object.create(null);
-    (rows || []).forEach(function (row) { var key = replayKey(row); if (key) counts[key] = (counts[key] || 0) + 1; });
+    (rows || []).forEach(function (row) { var key = replayKey(row); if (key) counts[key] = canonicalKey(row) ? 1 : (counts[key] || 0) + 1; });
     return counts;
   }
   function tokenId(token) { return token ? JSON.stringify([token.key, token.occurrence]) : ""; }
-  root.ANSRuntimeUI = { runtimeLabel: runtimeLabel, viewKey: viewKey, matchesView: matchesView, roleGroups: roleGroups, sourceLabel: sourceLabel, applicationLabel: applicationLabel, replayKey: replayKey, replayCounts: replayCounts, tokenId: tokenId };
+  root.ANSRuntimeUI = { runtimeLabel: runtimeLabel, viewKey: viewKey, matchesView: matchesView, roleGroups: roleGroups, sourceLabel: sourceLabel, applicationLabel: applicationLabel, canonicalKey: canonicalKey, replayKey: replayKey, replayCounts: replayCounts, tokenId: tokenId };
 })(typeof window !== "undefined" ? window : globalThis);

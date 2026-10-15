@@ -21,6 +21,13 @@ export interface SessionEvent {
   detail?: unknown;
 }
 
+/** Trusted input echo identity; consumers use the event's actual turnId, never its summary text. */
+export interface PromptInputEventDetail {
+  source: "prompt-input";
+  text: string;
+  imageCount?: number;
+}
+
 export interface PromptImage {
   type: "image";
 
@@ -147,6 +154,8 @@ export interface CustomerInputMetadata {
   turnId?: string;
   roleId?: string;
   runtime?: RuntimeKind;
+  /** Original handler call identity for presentation only; missing legacy IDs stay missing. */
+  toolCallId?: string;
 }
 
 export type CustomerInputFn = (

@@ -104,3 +104,17 @@ test("引擎菜单定位：下开、上翻、限高与横向视口夹取", () =>
   assert.equal(tiny.down,false); assert.equal(tiny.maxHeight,36); assert.equal(tiny.top,8);
   assert.ok(tiny.top+tiny.maxHeight<=92);
 });
+
+test("可信输入与工具使用actual turn/call/phase，不靠正文和嵌套turn", () => {
+  const input={kind:"message",turnId:"actual",detail:{source:"prompt-input",text:"[回交] 原文"}};
+  assert.equal(Rt.replayKey(input),Rt.replayKey({kind:"user",turnId:"actual",text:"原审计正文"}));
+  assert.notEqual(Rt.replayKey(input),Rt.replayKey({...input,turnId:"another"}));
+  assert.notEqual(Rt.replayKey(input),Rt.replayKey({eventKind:"message",turnId:"actual",text:"[回交] 原文"}));
+  const call={kind:"tool_call",eventKind:"tool_call",turnId:"top",detail:{toolName:"dispatch_task",toolCallId:"one",turnId:"wrong",phase:"start"}};
+  assert.equal(Tr.activityOf(call).turnId,"top");
+  assert.equal(Rt.replayKey(call),Rt.replayKey({...call,text:"另一个摘要"}));
+  assert.notEqual(Rt.replayKey(call),Rt.replayKey({...call,detail:{...call.detail,phase:"result"}}));
+  assert.notEqual(Rt.replayKey(call),Rt.replayKey({...call,detail:{...call.detail,phase:"blocked"}}));
+  assert.notEqual(Rt.replayKey(call),Rt.replayKey({...call,detail:{...call.detail,toolCallId:"two"}}));
+  assert.equal(Rt.replayCounts([input,input])[Rt.replayKey(input)],1);
+});

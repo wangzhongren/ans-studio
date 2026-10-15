@@ -1,0 +1,74 @@
+✔ 未注入 ShellGate：run_shell 不在工具集里（能力缺席 = 最强 fail-closed，§7.5.1） (0.615084ms)
+✔ 未注入 ShellGate（仅配置 readRoot/writeRoot）：仍不注册 run_shell (0.064458ms)
+✔ 注入 ShellGate：run_shell 出现在工具集里 (0.072292ms)
+✔ allow:true → 真的执行命令，拿到 stdout 与 exit code (39.15425ms)
+✔ allow:true → 非 0 退出码被如实报告（ok:false 但确已执行） (20.842584ms)
+✔ allow:false → 绝不 spawn（痕迹文件不存在） (0.4545ms)
+✔ 审核抛错 → 绝不 spawn（痕迹文件不存在） (0.753458ms)
+✔ 审核超时 → 绝不 spawn（超时 = 拒绝，§7.5.2） (51.241041ms)
+✔ 审核返回 undefined / 非明确 allow → 一律不执行（无 token 可依，§7.5.2） (0.391625ms)
+✔ 缺少 command → 拒绝，且不调审核、不 spawn (0.211792ms)
+✔ kill-switch：非 run_shell 不由本判据处理（undefined） (0.044791ms)
+✔ kill-switch：run_shell 未 arm（未注入 ShellGate）→ block (0.037875ms)
+✔ kill-switch：run_shell 已 arm → 放行（undefined，交 execute 细审） (0.019125ms)
+✔ env 凭据剥离：spawn 的子进程看不到凭据变量（§7.9） (18.751417ms)
+✔ pre-aborted public tools retain specific failure semantics and invoke no capability (1.370875ms)
+✔ abort during public capability waits keeps actual handler failure wording instead of generic cancellation (14.9595ms)
+✔ success received as cancellation arrives is still converted to the tool-specific failure (0.485ms)
+✔ confirmation passes original cancellation context; late yes cannot issue next-turn write permission (21.211625ms)
+✔ choice callback receives the captured original signal/turn and legacy single-argument callbacks remain valid (2.543333ms)
+✔ Pi env 300s/310s values reach both actual Service timers and injected Provider options (21.41075ms)
+✔ Service explicit Pi timing overrides env, including the legacy disabled-timer values (0.398292ms)
+✔ Pi effective env parse matches legacy fallback/floor while explicit invalid values stay unchanged (0.330458ms)
+✔ other runtime defaults do not consume Pi env and Service gives their actual timers/provider the same default (0.510208ms)
+✔ actual turn has one synchronous acknowledgement before persisted input/native work and shares all identities (50.416375ms)
+✔ active and disposed prompt rejections have no turn acknowledgement (2.7225ms)
+✔ quarantined prompt rejection has no acknowledgement after one stopped actual turn (1.6885ms)
+✔ synchronous acknowledgement throw yields one failed terminal, zero native work, and releases the turn (0.55525ms)
+✔ acknowledged turns keep aborted/timed_out outcomes and single matching terminal (19.783208ms)
+✔ store: creation/read stay lazy; roles/runtimes never share index or replay (61.668416ms)
+✔ store: concurrent writes serialize; corrupt history fails honestly (34.154208ms)
+✔ store: traversal, mismatched scope and symlinked runtime directories rejected (5.860625ms)
+✔ store: native validation stays lazy and native symlink is rejected before effects (4.158ms)
+✔ Service history operation returns scoped Model records/replay through the existing Provider (28.726292ms)
+✔ each actual runtime turn publishes one typed original input before native work and retains real assistant text (60.279209ms)
+✔ input echo is absent for rejected or failed-start prompts; demo Core and standalone have one input producer (0.743584ms)
+✔ Service selects exactly chosen injected factory and executes real governed handler (0.858792ms)
+✔ Service failure never selects another engine and unknown runtime rejected (0.260167ms)
+✔ Service persists replay and adapter-confirmed deferred context result after prompt (9.918166ms)
+✔ customer wait pauses prompt deadline, abort invalidates late consent, next turn works (53.415084ms)
+✔ throw, native failed outcome and timeout each have one explicit terminal (18.719458ms)
+✔ corrupt ANS index is rejected before native bind allocates a session (2.235084ms)
+✔ transient persistence failure is reported and repaired next prompt can succeed (11.691417ms)
+✔ Service event top/detail identity and report metadata share the captured turn (0.62475ms)
+✔ hanging native abort is bounded, called once, and leaves the session quarantined (1004.375542ms)
+✔ Service configured custom API key is stripped from the actual governed shell child (28.015458ms)
+✔ outer timeout remains timed_out when abort cleanup emits inner aborted terminals (16.784583ms)
+✔ outer aborted result stays aborted while failing cleanup remains honestly reported (1.685875ms)
+✔ Model/schema: required write/edit fields, optionals, unknown names and injected capabilities (6.354166ms)
+✔ gate deny/throw and gate-triggered abort produce zero filesystem effects (11.235666ms)
+✔ real write/edit preserves UTF-8 BOM/CRLF and rejects missing match or symlink escape (20.720708ms)
+✔ pre-aborted edit and capability handlers never run or mutate (2.100333ms)
+✔ shell gate deny/throw/timeout have no effects; explicit allow runs argv without shell (35.080125ms)
+✔ abort running shell kills child before delayed write and returns failure (721.792875ms)
+✔ customer decline/abort and failed handbacks are honest; report/dispatch carry captured turn (3.544708ms)
+[message] 已解析角色 编排（kind=project），角色卡：角色卡/注入角色/role-card.md
+[message] 已解析边界，来源：角色卡/注入角色/boundary.yaml；acceptance=accepted（来源：test:injected）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T-1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+ans role run 无法启动：缺少 project 配置：runRoleCommand 需由装配入口经 deps.project 注入默认演示配置（编排不持有配置副本；契约 §6 配置数据单一来源在装配）。
+✔ 接线:编排使用装配**注入**的 project/scope(注入一份不同的边界,判定随之改变) (5.901667ms)
+✔ 接线:runRoleCommand 缺 project 注入 → 非 0(EXIT_USAGE),不自回退第二份配置 (0.191333ms)
+[message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md
+[message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T-1 写集 0 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+✔ 接线:门禁引擎的 F4 收窄经真实装配配置生效(判定来自 resolveWrite) (3.53625ms)
+ℹ tests 57
+ℹ suites 0
+ℹ pass 57
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1421.011

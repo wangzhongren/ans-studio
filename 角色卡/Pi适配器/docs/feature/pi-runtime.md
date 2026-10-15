@@ -66,3 +66,5 @@ flowchart TD
 旧 Pi public gate factory、tools export、原 describeTool/toPiTool 和显式 sessionDir 只作兼容；新用户链使用 Service 注入工具和隔离存储。内部旧 fs-write helper 不在生产工具执行链。SDK仍钉1.1.0；当前测试使用临时目录和本地 faux engine，未调用真实模型。
 
 演变历史：2026-10-14 [P1 设计与独立影响](../design/2026-10-14_design_pi-injected-runtime.md) → [迁移与验证](../change/2026-10-14_change_pi-injected-runtime.md)。先前图片/停止/诊断/工具变化仍见本角色既有 change/fix 与 changelog；本文件解释当前实际 Pi SDK路径，跨角色最终验收由各原属主完成。
+
+工具事件只有 SDK execution_start 一个开始出口，带实际turnId/toolCallId和phase=start。它表示模型请求，并不表示已获授权；治理hook拒绝phase=blocked、SDK结束phase=result均保留真实事实。Core生产路径统一typed prompt-input输入，Pi不再另发旧输入回显；direct helper默认保留兼容typed回显。见2026-10-15 [重复事件修复与SDK验证](../fix/2026-10-15_fix_canonical-tool-events.md)。

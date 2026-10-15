@@ -1,0 +1,21 @@
+{
+  "node": "v24.14.0",
+  "command": "/usr/local/bin/node -e 'process.stdout.write(JSON.stringify(process.argv.slice(1)))' && ; | > $HOME $(pwd)",
+  "reviewedArgv": [
+    [
+      "/usr/local/bin/node",
+      "-e",
+      "process.stdout.write(JSON.stringify(process.argv.slice(1)))",
+      "&&",
+      ";",
+      "|",
+      ">",
+      "$HOME",
+      "$(pwd)"
+    ]
+  ],
+  "result": {
+    "ok": true,
+    "message": "run_shell 已执行：/usr/local/bin/node -e 'process.stdout.write(JSON.stringify(process.argv.slice(1)))' && ; | > $HOME $(pwd)（exit 0）\nstdout:\n[\"&&\",\";\",\"|\",\">\",\"$HOME\",\"$(pwd)\"]\nstderr:\n"
+  }
+}

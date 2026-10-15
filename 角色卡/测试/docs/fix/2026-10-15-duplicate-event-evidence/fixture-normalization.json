@@ -1,0 +1,8 @@
+{
+  "source": "root fixture construction script compared with su finalized project.json",
+  "beforeBytes": 1491,
+  "afterBytes": 1492,
+  "semanticEqual": true,
+  "onlyTrailingLF": true,
+  "interpretation": "real config content change triggers real session rebuild; not duplicate notification"
+}

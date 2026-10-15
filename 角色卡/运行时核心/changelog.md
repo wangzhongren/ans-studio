@@ -16,3 +16,7 @@
 
 - 2026-10-14 C1A：PromptOptions可选onTurnStarted在actualturn创建后、persist/native前同步一次回传readonly轮次/角色/runtime；前置拒绝不通知，observerthrow单failed释放active且无native工作。Core38/38与全仓typecheck证据见 [prompt开始确认](docs/fix/2026-10-14_fix_prompt-start-acknowledgement.md)，桌面闭包映射和实际渲染验收由原属主接续。
 
+
+## 2026-10-15 输入与请求显示身份修复
+
+按客户既有缺陷修复授权及PM统一r1实施Core v2：统一typed输入、透传确认/选择原callId、demo生产单输入、run_shell两处argv说明。实际行为回归57/57、tsc0，独立消费者/桌面验收待续；无执行/门禁/权限变化。见[修复与原始证据](docs/fix/2026-10-15_fix_run-shell-description.md)。

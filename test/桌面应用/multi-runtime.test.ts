@@ -348,8 +348,11 @@ test("D1 confirmation bridge keeps original signal identity and an old disposed 
   try {
     await current.manager.open({ projectRoot: "/one", roleId: "su", runtime: "claude" });
     const first = current.opened[0];
-    const pending = first.input.customerInput!({ kind: "confirm", title: "old" }, { signal: original.signal, runtime: "claude", turnId: "original" });
+    const pending = first.input.customerInput!({ kind: "confirm", title: "old" }, { signal: original.signal, runtime: "claude", turnId: "original", toolCallId: "actual-call" });
     assert.equal(requests[0].runtime, "claude");
+    assert.equal(requests[0].turnId, "original");
+    assert.equal(requests[0].toolCallId, "actual-call");
+    assert.notEqual(requests[0].id, requests[0].toolCallId);
     original.abort();
     assert.equal((await pending)?.outcome, "unavailable");
     assert.equal(channel.respond({ id: requests[0].id, decision: { kind: "confirm", confirmed: true } }).expired, true);
@@ -624,4 +627,66 @@ test("D1R2 no-ack failure and legacy/unknown events cannot lend an old client ID
     await until(() => current.envelopes.some((event) => event.event.summary === "legacy without turn"));
     for (const summary of ["legacy with ID but no ack", "legacy without turn"]) assert.equal(Object.hasOwn(current.envelopes.find((event) => event.event.summary === summary)!, "clientMessageId"), false);
   } finally { await current.manager.stop(); }
+});
+
+
+test("typed prompt input history joins only actual same-turn input sources and preserves legacy facts", async () => {
+  const temp = fixture();
+  const directory = path.join(temp.root, ".ans", "sessions", "A", "claude", "ans");
+  fs.mkdirSync(directory, { recursive: true });
+  const user = (turnId: string, text: string, at = "user-time") => ({ kind: "user", turnId, text, at });
+  const echo = (turnId: string | undefined, text: string, roleId = "A") => ({ kind: "event", turnId, at: "echo-time", event: { kind: "message", summary: "readable echo", turnId, roleId, runtime: "claude", detail: { source: "prompt-input", text, imageCount: 2 } } });
+  const entries = [user("first", "original input"), echo("first", "original input"), echo("second", "same input"), user("second", "same input"),
+    user("third", "same input"), echo("third", "same input"), echo("first", "original input"),
+    { kind: "event", at: "legacy", turnId: "first", event: { kind: "message", summary: "用户指令：original input" } },
+    echo(undefined, "unknown"), user("", "unknown"), echo("foreign", "foreign input", "B")];
+  const replay = path.join(directory, "replay.jsonl");
+  const raw = entries.map(entry => JSON.stringify(entry)).join("\n") + "\n";
+  fs.writeFileSync(replay, raw);
+  try {
+    const history = await getSessionHistory({ projectRoot: temp.root, roleId: "A", runtime: "claude" });
+    assert.equal(history.error, null);
+    assert.equal(history.rows.length, 7);
+    assert.deepEqual(history.rows.slice(0, 3).map(row => [row.kind, row.text, row.at, row.turnId, row.input?.imageCount]), [
+      ["user", "original input", "user-time", "first", 2], ["user", "same input", "user-time", "second", 2], ["user", "same input", "user-time", "third", 2]]);
+    assert.equal(history.rows[3].kind, "assistant", "unknown legacy prefix stays an assistant fact");
+    assert.equal(history.rows[4].kind, "user", "typed input without turn remains independently visible");
+    assert.equal(history.rows[5].kind, "user", "unknown user is never guessed equal");
+    assert.equal(history.rows[6].kind, "assistant", "foreign scope marker is not trusted");
+    assert.equal(fs.readFileSync(replay, "utf8"), raw, "display mapping never rewrites audit history");
+  } finally { temp.cleanup(); }
+});
+
+test("operator payload preserves original call identity and leaves absent legacy IDs absent", async () => {
+  const requests: OperatorRequestPayload[] = [];
+  const channel = createCustomerInputChannel({ operatorId: "test", presenter: payload => requests.push(payload) });
+  const pending = channel.customerInput({ kind: "confirm", title: "same title" }, { roleId: "A", projectRoot: "/one", runtime: "claude" });
+  assert.equal(Object.hasOwn(requests[0], "turnId"), false);
+  assert.equal(Object.hasOwn(requests[0], "toolCallId"), false);
+  assert.equal(channel.respond({ id: requests[0].id, decision: { kind: "confirm", confirmed: true } }).ok, true);
+  assert.equal((await pending)?.outcome, "answered");
+  channel.rejectAllPending("cleanup");
+});
+
+
+test("history preserves canonical start/blocked/result phases for the same failed tool call", async () => {
+  const temp = fixture();
+  const directory = path.join(temp.root, ".ans", "sessions", "A", "pi", "ans");
+  fs.mkdirSync(directory, { recursive: true });
+  const entries = [
+    { phase: "start", kind: "tool_call", ok: undefined },
+    { phase: "blocked", kind: "denied", ok: false },
+    { phase: "result", kind: "denied", ok: false },
+    { phase: undefined, kind: "denied", ok: false },
+    { phase: undefined, kind: "accepted", ok: true },
+  ].map(({ phase, kind, ok }) => ({ kind: "event", turnId: "actual-turn", at: "same-time", event: { kind, summary: "same summary", detail: { toolName: "request_confirmation", toolCallId: "actual-call", phase, ok, args: { title: "same" } } } }));
+  fs.writeFileSync(path.join(directory, "replay.jsonl"), entries.map(entry => JSON.stringify(entry)).join("\n") + "\n");
+  try {
+    const history = await getSessionHistory({ projectRoot: temp.root, roleId: "A", runtime: "pi" });
+    assert.equal(history.rows.length, 5, "mapper retains blocked and SDK failure facts independently");
+    assert.deepEqual(history.rows.map(row => row.activity?.phase), ["start", "blocked", "result", "blocked", "result"]);
+    assert.deepEqual(history.rows.map(row => row.activity?.status), ["call", "failed", "failed", "failed", "completed"]);
+    assert.ok(history.rows.every(row => row.activity?.turnId === "actual-turn" && row.activity.toolCallId === "actual-call"));
+    assert.equal(history.rows[0].anchor, "request", "canonical start preserves request anchor");
+  } finally { temp.cleanup(); }
 });

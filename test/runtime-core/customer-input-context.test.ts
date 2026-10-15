@@ -31,10 +31,11 @@ test("confirmation passes original cancellation context; late yes cannot issue n
         return answer;
       },
     }).map((tool) => [tool.name, tool]));
-    const request = byName.get("request_confirmation")!.handler({ name: "request_confirmation", args: { title: "approve approved.txt", preview: "approved.txt" }, signal: controller.signal });
+    const request = byName.get("request_confirmation")!.handler({ name: "request_confirmation", args: { title: "approve approved.txt", preview: "approved.txt" }, signal: controller.signal, toolCallId: "original-confirm-call" });
     turnId = "later-turn-before-callback";
     await until(() => metadata !== undefined);
     assert.equal(metadata?.signal, controller.signal);
+    assert.equal(metadata?.toolCallId, "original-confirm-call");
     assert.deepEqual({ turnId: metadata?.turnId, roleId: metadata?.roleId, runtime: metadata?.runtime }, { turnId: "confirmation-turn", roleId: "core", runtime: "claude" });
     controller.abort();
     const result = await request; assert.equal(result.ok, false); assert.match(result.message, /未获客户同意|中止/);
@@ -58,12 +59,17 @@ test("choice callback receives the captured original signal/turn and legacy sing
     currentTurnId: () => turnId, roleId: "core", runtime: "codex",
     customerInput: (_request, metadata) => { context = metadata; return new Promise((resolve) => { reply = resolve; }); },
   }).find((tool) => tool.name === "request_choice")!;
-  const request = choice.handler({ name: choice.name, args: { title: "choose", options: [{ id: "a", label: "A" }] }, signal: controller.signal });
+  const request = choice.handler({ name: choice.name, args: { title: "choose", options: [{ id: "a", label: "A" }] }, signal: controller.signal, toolCallId: "original-choice-call" });
   turnId = "newer-choice-turn";
   await until(() => context !== undefined);
   assert.equal(context?.signal, controller.signal);
+  assert.equal(context?.toolCallId, "original-choice-call");
   assert.deepEqual({ turnId: context?.turnId, roleId: context?.roleId, runtime: context?.runtime }, { turnId: "choice-turn", roleId: "core", runtime: "codex" });
   reply({ outcome: "answered", value: { selected: ["a"] } }); assert.equal((await request).ok, true);
   const legacy = buildGovernedTools(allow, { customerInput: (_request) => ({ outcome: "answered", value: { confirmed: true } }) }).find((tool) => tool.name === "request_confirmation")!;
   assert.equal((await legacy.handler({ name: legacy.name, args: { title: "legacy" } })).ok, true);
+  let missing: CustomerInputMetadata | undefined;
+  const withoutId = buildGovernedTools(allow, { customerInput: (_request, metadata) => { missing = metadata; return { outcome: "declined" }; } }).find((tool) => tool.name === "request_confirmation")!;
+  await withoutId.handler({ name: withoutId.name, args: { title: "no call identity" } });
+  assert.equal(Object.hasOwn(missing!, "toolCallId"), false);
 });

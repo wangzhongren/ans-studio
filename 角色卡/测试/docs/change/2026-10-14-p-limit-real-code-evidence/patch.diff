@@ -1,0 +1,29 @@
+diff --git a/index.js b/index.js
+index c24de57..b78e37a 100644
+--- a/index.js
++++ b/index.js
+@@ -3,7 +3,7 @@ import Queue from 'yocto-queue';
+ export default function pLimit(concurrency) {
+ 	let rejectOnClear = false;
+ 
+-	if (typeof concurrency === 'object') {
++	if (typeof concurrency === 'object' && concurrency !== null) {
+ 		({concurrency, rejectOnClear = false} = concurrency);
+ 	}
+ 
+diff --git a/test.js b/test.js
+index 08e197e..a51ed58 100644
+--- a/test.js
++++ b/test.js
+@@ -493,3 +493,11 @@ test('limitFunction()', async t => {
+ 
+ 	await Promise.all(input);
+ });
++
++test('throws the concurrency validation error for null', t => {
++	const error = t.throws(() => {
++		pLimit(null);
++	}, {instanceOf: TypeError});
++
++	t.is(error.message, 'Expected `concurrency` to be a number from 1 and up');
++});

@@ -16,6 +16,7 @@ import assert from "node:assert/strict";
 import { makeRolePrompt, type PromptCapableSession } from "../../src/common/pi-adapter/real-adapter.ts";
 import { createFakeRuntimeAdapter } from "../../src/provider/pi/session.ts";
 import type { PromptImage, PromptOptions } from "../../src/provider/pi/session.ts";
+import type { SessionEvent } from "../../src/model/runtime.ts";
 import { createInteractionGate } from "../../src/common/pi-adapter/timeout.ts";
 import type { StageLogger } from "../../src/common/pi-adapter/logger.ts";
 import { makeGate, makeRole } from "./fixtures.ts";
@@ -73,6 +74,21 @@ test("契约：PromptImage 与 pi-ai ImageContent 结构兼容（编译期）且
 });
 
 // —————————————————————— 2. makeRolePrompt（桩件） ——————————————————————
+
+test("makeRolePrompt: standalone input echo has typed identity; Core production can suppress it without losing images", async () => {
+  for (const emitPromptInput of [undefined, false]) {
+    const stub = stubSession(); const events: SessionEvent[] = [];
+    const prompt = makeRolePrompt({ session: stub.session, promptMs: 1000, gate: createInteractionGate(), emit: e => events.push(e), log: silentLogger(), emitPromptInput });
+    const images = [PNG]; await prompt("same text", { images });
+    assert.equal(stub.calls[0].options?.images, images);
+    assert.equal(events.length, emitPromptInput === false ? 0 : 1);
+    if (events.length) {
+      const detail = events[0].detail as Record<string, unknown>;
+      assert.equal(detail.source, "prompt-input"); assert.equal(detail.text, "same text"); assert.equal(detail.imageCount, 1);
+      assert.equal(typeof detail.turnId, "string"); assert.equal("images" in detail, false);
+    }
+  }
+});
 
 test("makeRolePrompt：无图 → 逐字旧行为（不传 options；事件文案不变）", async () => {
   const stub = stubSession();
