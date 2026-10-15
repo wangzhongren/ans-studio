@@ -1,0 +1,27 @@
+Window: "ANS 治理会话工作台", App: ANS Studio.
+0 standard window ANS 治理会话工作台, Secondary Actions: Raise
+	1 container ANS 治理会话工作台
+		2 container
+			3 HTML content ANS 治理会话工作台, URL: file:///private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-packaged-smoke-9E5IQX/extracted/ANS%20Studio.app/Contents/Resources/app/app/renderer/index.html
+				4 container Claude 配置
+					5 text Claude 配置
+					6 button Description: 收起, Help: 收起（Esc）
+					7 container
+						8 text 保存位置 /Users/wangzhongren/Library/Application Support/ans-cli/.env 保存到上方显示的 .env 路径，只修改本引擎字段。当前配置已应用。 API 密钥 · 必填  机密
+						9 secure text field (settable) API 密钥 · 必填 机密 显示 ANTHROPIC_API_KEY · 未设置, Placeholder: 未设置
+						10 button 显示
+						11 text ANTHROPIC_API_KEY · 未设置 模型 · 可选
+						12 text field (settable) 模型 · 可选 ANS_CLAUDE_MODEL · 默认。留空使用 SDK 默认模型。
+						13 text ANS_CLAUDE_MODEL · 默认。留空使用 SDK 默认模型。 API 地址 · 可选
+						14 text field (settable) API 地址 · 可选 ANTHROPIC_BASE_URL · 默认。留空使用 SDK 默认服务。
+						15 text ANTHROPIC_BASE_URL · 默认。留空使用 SDK 默认服务。
+						16 button 保存到 .env
+						17 text Claude 配置不完整，缺：ANTHROPIC_API_KEY。请补齐后保存。
+18 menu bar
+	19 ANS Studio
+	20 File
+	21 Edit
+	22 View
+	23 Window
+
+The focused UI element is 6 button Description: 收起, Help: 收起（Esc）

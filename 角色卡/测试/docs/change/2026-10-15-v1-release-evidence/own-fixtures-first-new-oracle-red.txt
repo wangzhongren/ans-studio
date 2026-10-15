@@ -1,0 +1,37 @@
+✔ independent B: native grant, opaque reference, actual bounded file reads, revocation and project switch (13.360959ms)
+✖ independent B: accepted Windows restriction refuses native grants without issuing refs or reading bytes (1.385584ms)
+✔ T1 actual bin role/pi: actual adapter and registered handler reject an out-of-boundary write (709.708875ms)
+✔ T1 actual bin govern/pi: actual adapter and registered handler reject an out-of-boundary write (462.247834ms)
+✔ T1 actual bin role/codex: actual adapter and registered handler reject an out-of-boundary write (209.715625ms)
+✔ T1 actual bin govern/codex: actual adapter and registered handler reject an out-of-boundary write (222.197125ms)
+✔ T1 actual bin role/claude: actual adapter and registered handler reject an out-of-boundary write (200.420667ms)
+✔ T1 actual bin govern/claude: actual adapter and registered handler reject an out-of-boundary write (201.725459ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 7
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2084.771959
+
+✖ failing tests:
+
+test at test/测试/p1p7-document-integration.test.ts:112:1
+✖ independent B: accepted Windows restriction refuses native grants without issuing refs or reading bytes (1.385584ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + [Object: null prototype] {}
+  - {}
+  
+      at TestContext.<anonymous> (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%B5%8B%E8%AF%95/p1p7-document-integration.test.ts:123:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: {},
+    expected: {},
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

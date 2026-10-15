@@ -5,6 +5,8 @@ import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
 import { createProjectDocumentReader } from "../../src/pipeline/project-document/read-project-document.ts";
+import { createProjectDocumentService } from "../../src/service/project-document/public/read-project-document.ts";
+import { createProjectDocumentFileReader } from "../../src/provider/project-document/public/file-reader.ts";
 import type { ProjectDocumentRoleCandidates, ProjectDocumentRef } from "../../src/model/project-document.ts";
 
 test("independent B: native grant, opaque reference, actual bounded file reads, revocation and project switch", async () => {
@@ -41,6 +43,17 @@ test("independent B: native grant, opaque reference, actual bounded file reads, 
     assert.equal(Object.values(ungranted.documents).flat().length, 0);
     await reader.grantNativeSelection(root);
     const listing = reader.updateListing(reader.beginListing(root), root, roles);
+    if (process.platform === "win32") {
+      assert.equal(listing.documentReadUnavailable, "UNSUPPORTED_ENVIRONMENT");
+      assert.equal(listing.documentScope, undefined, "unsupported native selection must not issue a scope");
+      assert.equal(Object.values(listing.documents).flat().length, 0, "unsupported native selection must not mint refs");
+      const failed = await reader.read({ version: 1, projectViewId: "unissued", documentId: "unissued" });
+      assert.equal(failed.ok, false);
+      if (!failed.ok) { assert.equal(failed.code, "UNSUPPORTED_ENVIRONMENT"); assert.equal("text" in failed, false); }
+      assert.deepEqual({ sha: digest(base + "unicode.md"), mtime: fs.statSync(path.join(root, base + "unicode.md")).mtimeMs }, before);
+      assert.equal(fs.readFileSync(path.join(root, ".env"), "utf8"), "FIXTURE_ONLY=not-a-credential\n");
+      return;
+    }
     assert.ok(listing.documentScope);
     const refs = listing.documents.R;
     assert.ok(refs);
@@ -48,11 +61,6 @@ test("independent B: native grant, opaque reference, actual bounded file reads, 
     const ref = (name: string) => { const found = refs.find(item => item.relativePath === base + name); assert.ok(found); return found; };
     const unicode = ref("unicode.md");
     const result = await reader.read(request(unicode));
-    if (process.platform === "win32") {
-      assert.equal(result.ok, false);
-      if (!result.ok) assert.equal(result.code, "UNSUPPORTED_ENVIRONMENT");
-      return;
-    }
     assert.equal(result.ok, true, "supported local filesystem should read the listed UTF-8 document");
     if (result.ok) {
       assert.equal(result.text.replace(/^\uFEFF/, ""), "# Independent 🧪\n中文全文\n");
@@ -99,4 +107,24 @@ test("independent B: native grant, opaque reference, actual bounded file reads, 
     fs.rmSync(root, { recursive: true, force: true });
     fs.rmSync(nextRoot, { recursive: true, force: true });
   }
+});
+
+test("independent B: accepted Windows restriction refuses native grants without issuing refs or reading bytes", async () => {
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "ans-doc-unsupported-")));
+  const provider = createProjectDocumentFileReader({ platform: "win32" });
+  let reads = 0;
+  const reader = createProjectDocumentService({ fileReader: { ...provider, async read(...args) { reads++; return provider.read(...args); } } });
+  try {
+    fs.writeFileSync(path.join(root, "unchanged.md"), "must not be read or modified\n");
+    await reader.grantNativeSelection(root);
+    const listing = reader.updateListing(reader.beginListing(root), root, [{ roleId: "R", builtIn: false, cardPath: "角色卡/R/role-card.md", docs: [] }]);
+    assert.equal(listing.documentReadUnavailable, "UNSUPPORTED_ENVIRONMENT");
+    assert.equal(listing.documentScope, undefined);
+    assert.deepEqual(Object.entries(listing.documents), []);
+    const result = await reader.read({ version: 1, projectViewId: "forged", documentId: "forged" });
+    assert.equal(result.ok, false);
+    if (!result.ok) { assert.equal(result.code, "UNSUPPORTED_ENVIRONMENT"); assert.equal("text" in result, false); assert.equal(result.message.includes(root), false); }
+    assert.equal(reads, 0);
+    assert.equal(fs.readFileSync(path.join(root, "unchanged.md"), "utf8"), "must not be read or modified\n");
+  } finally { reader.dispose(); fs.rmSync(root, { recursive: true, force: true }); }
 });

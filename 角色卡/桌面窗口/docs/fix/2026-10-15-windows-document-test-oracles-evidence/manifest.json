@@ -1,0 +1,29 @@
+{
+  "stage": "Window CI1 Windows test precondition correction; native Windows CI2 pending",
+  "sourceRef": "83445ebcf24454c6107838cb7f2221882c6638ea",
+  "workspaceHead": "2bd0a606029286e884d5fd68840c13ebd1e023c2",
+  "host": "Darwin 25.6.0 arm64",
+  "testOverlay": {
+    "test/桌面应用/boundary-refresh.test.ts": "e8b1f96e59c4ac189d09d009e42ba20c438796f20c0cc8a735c50ddccbe34c87",
+    "test/桌面应用/interface.test.ts": "0d64e208b2651ec4a0118e822b6436a5c1a3fd1b36b7619fcd738a50126175f6",
+    "test/桌面应用/project-document.test.ts": "73677aa554327ba4e53d8d091404e48b93775e6168d2325e6995d2464a859b72"
+  },
+  "productionOverlayUnchanged": {
+    "app/main.ts": "8636e21df7892a6ad90718e909b1fea2d4f6a55a222896ae314a469f147a2610",
+    "app/desktop/pi-config.ts": "2e502cda5ff04949ea79507e4696ee9efa22406d2336a7521f9ce87576e8f7a0",
+    "app/desktop/packaged-smoke.ts": "32c79dc8503615d209569a7b7b4fbab66447c3767e3032d479607872c13be6eb"
+  },
+  "providerHashUnchangedByThisFix": "9a387b077f0142c49a4f3846f5af98611a7dee97f3d455bb42dcb585dbe1ae8a",
+  "ownerCommand": "node --test test/桌面应用/boundary-refresh.test.ts test/桌面应用/interface.test.ts test/桌面应用/project-document.test.ts",
+  "ownerPassed": 35,
+  "ownerFailed": 0,
+  "ownerSkipped": 0,
+  "typecheckExit": 0,
+  "diffCheckExit": 0,
+  "ci1Red": "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/ci1-win-regression-red.txt",
+  "noProductionOrProviderChanges": true,
+  "notCovered": [
+    "真实Windows运行新分支：由完整CI2验证",
+    "本机forced platform win32负例不等于Windows实机"
+  ]
+}

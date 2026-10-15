@@ -29,3 +29,25 @@ status: authorized
 70/70 装配测试、类型检查退出 0、JS/YAML 解析与 diff 检查通过。集合校验测试是合约夹具，覆盖成功及 actualTree 漂移、非 packaged、重复架构、ZIP 篡改、overlay 篡改，不能当真实平台结果。macOS arm64 本地 ZIP 已实际构建（使用已安装同版 Electron 避免受限网络重复下载），并在实际 packaged executable 的 Node 模式下成功导入 Pi/Claude SDK 和 Photon WASM；首次探针误用 CJS resolve 对 Pi import-only exports 报错已修正为固定版本 ESM 入口。macOS Info.plist 实测最低 13.0，已同步配置和说明；运行包沿用现有产品 PNG 图标。
 
 此时仍等待 root 候选 commit 后生成真实 source+overlay provenance、各 native CI 和 root 独立实际包测试；不将当前未提交工作树 ZIP 冒充最终 Release 产物。所有原始门槛由 root/PM 核对，尚未上传或发布。
+
+## 正式隔离源码的本机 arm64 包验证
+
+root 已创建构建提交 `2bd0a606029286e884d5fd68840c13ebd1e023c2` 并运行 prepare，`.release/source` 为固定 tag `83445ebcf24454c6107838cb7f2221882c6638ea` 加精确 overlay，实际 tree `5765af926576986fb8d740025191f8ccf73d1e5f`。本角色未修改该工作树 tracked 源，只给 node_modules 建指向既有锁定安装的临时 symlink；本机命令 `npm run package -- --mac --arm64 --publish never --config.electronDist=node_modules/electron/dist` 使用现有同版 44.7.0 发行目录。CI 仍执行 `npm ci` 及正常 Electron 下载；不能将这个本机缓存差异隐藏成已跑 CI。
+
+隔离工作树构建 ZIP 成功退出 0；`release-verify.mjs release-output arm64` 解压实际 ZIP 并执行，其中默认 sandbox 首次 GUI 子进程 SIGABRT、无 stdout/stderr，已原样保留首红。按完全相同代码/断言在允许原生进程启动的执行环境重新运行，退出 0，真实 `.app` 的 DOM/preload/IPC/导入前禁选/缺配置/设置开闭/userData 配置路径共 7 项全真；isPackaged=true、version=1.0.0、platform=darwin、arch=arm64。Pi/Claude SDK 与 Photon WASM 实际加载成功，Codex native CLI 0.162.1、Claude native CLI 2.1.299 运行版本检查通过。没有在线模型请求或读取开发机密钥。
+
+产物 `ANS-Studio-1.0.0-mac-arm64.zip`：404966172 字节，SHA256 `a4888bb0c6192c83df23125fd3c8016df12ed994c422e4213ec668af42bfd6d0`。[正式本机 manifest](2026-10-15-release-packaging-evidence/tag-overlay-mac-arm64-manifest.json)记录真实来源与各项观察；构建/红绿日志在同目录。这是本机 arm64 的真实结果，另外两平台仍须独立 native CI，root GUI 与最终 Release 验收尚待完成，未据此提前发布。
+
+## 首轮 Windows CI 输入修复
+
+CI run `38717918774` 的 Windows 回归失败已由 root 保留原日志。装配自身修复只改变测试/构建输入：所有 native runner 在 checkout 前设置 `core.autocrlf=false` / `core.eol=lf`，避免 Git 隐式换行转换破坏被 pin 的 Markdown 字节与既有源码匹配；`multi-runtime.test.ts` 的 `--import` loader 及 `-e` 内绝对 TS import 使用 `pathToFileURL(...).href`，让 Windows 盘符被正确解释为 file URL。原断言均保留。macOS 本机针对该文件 13/13、类型检查退出 0、diff 检查通过；Windows 仍待下一次 native CI，不能提前写通过。此轮未修改生产 bundle，也未重新打包。
+
+按 root 实际修复写集，overlay 精确新增两项其自有测试 `test/测试/t1-real-cli.test.ts`、`test/测试/p1p7-document-integration.test.ts`，没有 loader helper 变更；其他属主必要测试待其最终精确清单再纳入，不批量授权目录或生产代码。
+
+## 第二候选装配冻结
+
+按属主实际修复清单精确扩入 overlay 的测试为：`test/pi-adapter/tool-display-projection.test.ts`、`test/桌面应用/boundary-refresh.test.ts`、`interface.test.ts`、`project-document.test.ts`、`test/测试/t1-real-cli.test.ts`、`p1p7-document-integration.test.ts`；Codex session 测试仍在其已有专属测试目录覆盖内。未添加生产 Provider 路径，也没有移除未知生产改动的拒绝检查。
+
+README 与工作流 Release notes 已明确：Windows 暂不支持内置受限来源文档阅读；完整摘要和执行记录仍保留，来源文件可由操作者使用系统编辑器查看。没有声称提供尚未实现的一键外部打开按钮。此限制来自已经接受的 r2 安全 Provider 取舍，本轮不放松 fail-closed。
+
+第二候选装配窄验命令 `node --test test/装配/multi-runtime.test.ts test/装配/release-packaging.test.ts` 为 16/16，typecheck 和 diff 检查退出 0。此验证发生在 macOS，Windows 必须以后续相同 overlay SHA/tree 的三平台原生 CI 为准。生产功能六文件没有在本轮改变，未重打包。装配脚本、workflow 与说明现已冻结，交 root 合并属主测试后创建第二候选及再次派发全部门槛。

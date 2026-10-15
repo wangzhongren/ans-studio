@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { RUNTIME_CREDENTIAL_ENV_VARS } from "../../src/common/shared/runtime-shared.ts";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const loader = path.join(root, "test/测试/t1-loader.mjs");
@@ -20,7 +20,7 @@ for (const runtime of ["pi", "codex", "claude"] as const) for (const command of 
     const target = "src/t1-must-never-exist.ts";
     assert.equal(fs.existsSync(path.join(root, target)), false);
     try {
-      const result = spawnSync(process.execPath, ["--import", loader, path.join(root, "bin/ans.js"), ...(command === "role" ? ["role", "run", "编排", "--task", "T1"] : ["govern", tmp, "--task", "T1"]), "--runtime", runtime], {
+      const result = spawnSync(process.execPath, ["--import", pathToFileURL(loader).href, path.join(root, "bin/ans.js"), ...(command === "role" ? ["role", "run", "编排", "--task", "T1"] : ["govern", tmp, "--task", "T1"]), "--runtime", runtime], {
         cwd: root, encoding: "utf8", timeout: 15000,
         env: { ...isolatedEnv(), ANS_T1_TRACE: trace, ANS_T1_ACTIONS: JSON.stringify([{ name: "write_file", args: { path: target, content: "forbidden" } }]) },
       });

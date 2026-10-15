@@ -1,0 +1,42 @@
+{
+  "stage": "WINDOW packaged configuration and smoke entry; actual package verification pending",
+  "sourceRef": "83445ebcf24454c6107838cb7f2221882c6638ea",
+  "workspaceHeadAtEvidence": "2bd0a606029286e884d5fd68840c13ebd1e023c2",
+  "node": "v24.14.0",
+  "productionOverlay": {
+    "app/main.ts": "8636e21df7892a6ad90718e909b1fea2d4f6a55a222896ae314a469f147a2610",
+    "app/desktop/pi-config.ts": "2e502cda5ff04949ea79507e4696ee9efa22406d2336a7521f9ce87576e8f7a0",
+    "app/desktop/packaged-smoke.ts": "32c79dc8503615d209569a7b7b4fbab66447c3767e3032d479607872c13be6eb"
+  },
+  "testOverlay": {
+    "test/桌面应用/pi-config.test.ts": "ff324d29a6be57280c49827a70a78d962f5d445073e08700d82bb0eeac9d0fee"
+  },
+  "ownerCommand": "node --test test/桌面应用/pi-config.test.ts",
+  "ownerPassed": 15,
+  "ownerFailed": 0,
+  "typecheckExit": 0,
+  "diffCheckExit": 0,
+  "redCommand": "node --test --test-name-pattern='packaged configuration resolves' test/桌面应用/pi-config.test.ts",
+  "redExit": 1,
+  "greenExit": 0,
+  "smokeArgs": [
+    "--ans-packaged-smoke",
+    "<absolute-result.json>",
+    "--user-data-dir=<absolute-temp-dir>"
+  ],
+  "smokeResultFields": [
+    "ok",
+    "isPackaged",
+    "arch",
+    "platform",
+    "version",
+    "envPath",
+    "checks",
+    "missingKeys"
+  ],
+  "notCovered": [
+    "真实packaged macOS/Windows启动与preload/IPC，待装配重构最终包后运行",
+    "真实普通GUI非秘密配置保存和重启，待root",
+    "在线SDK/模型请求非本窗口适配测试"
+  ]
+}

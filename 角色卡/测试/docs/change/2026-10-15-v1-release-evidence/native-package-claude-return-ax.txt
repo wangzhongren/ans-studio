@@ -1,0 +1,66 @@
+Window: "ANS 治理会话工作台", App: ANS Studio.
+0 standard window ANS 治理会话工作台, Secondary Actions: Raise
+	1 container ANS 治理会话工作台
+		2 container
+			3 HTML content ANS 治理会话工作台, URL: file:///private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-packaged-smoke-9E5IQX/extracted/ANS%20Studio.app/Contents/Resources/app/app/renderer/index.html
+				4 container
+					5 text ANS
+					6 button 最小化
+					7 button 最大化
+					8 button 关闭
+				9 container
+					10 text ans AGENT WORKSPACE
+					11 text ans-p1p7-desktop-JqO4lM
+					12 text /private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-p1p7-desktop-JqO4lM
+					13 text 工作空间
+					14 container 角色列表
+						15 text 主入口
+						16 button s su Claude · 空闲
+							17 text s
+							18 text su
+							19 text Claude ·
+							20 text 空闲
+						21 text 其他角色（查看/调试）
+						22 button 测 测试 Claude · 未开启
+							23 text 测
+							24 text 测试
+							25 text Claude ·
+							26 text 未开启
+						27 button 维 维护 Claude · 未开启
+							28 text 维
+							29 text 维护
+							30 text Claude ·
+							31 text 未开启
+						32 button 项 项目管理 Claude · 未开启
+							33 text 项
+							34 text 项目管理
+							35 text Claude ·
+							36 text 未开启
+					37 button 切换项目
+					38 button Claude 设置
+					39 text 4 个角色 · 本地会话
+					40 container
+						41 text su 新会话
+						42 combo box (settable) Description: 会话引擎，当前 Claude, Value: Claude
+							43 text Claude
+						44 button 工作概览
+						45 button 角色资料
+					46 container
+						47 text Claude 配置不完整，缺：ANTHROPIC_API_KEY。
+						48 button 打开 Claude 设置
+					49 text 本次开启会话：新会话
+					50 container
+						51 text entry area (settable) Description: 发送给当前角色的消息, Value: 运行包验收：关闭设置后保留草稿, Placeholder: 给su发送消息…
+						52 button Description: 添加图片, Help: 添加图片（png / jpeg / webp / gif，≤5MB）
+						53 text su / Claude Enter 发送，Shift + Enter 换行
+						54 button Description: 发送, Help: 发送（Enter）
+					55 text 普通聊天不会自动产生任务报告
+					56 text 实际写入导入项目，角色边界外的写入会被拒绝。
+57 menu bar
+	58 ANS Studio
+	59 File
+	60 Edit
+	61 View
+	62 Window
+
+The focused UI element is 48 button 打开 Claude 设置

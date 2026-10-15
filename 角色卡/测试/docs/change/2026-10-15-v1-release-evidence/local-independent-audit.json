@@ -1,0 +1,39 @@
+{
+  "status": "passed",
+  "producer": "root fixed测试 independent file+native GUI",
+  "localArtifact": {
+    "file": "ANS-Studio-1.0.0-mac-arm64.zip",
+    "size": 404966172,
+    "sha256": "a4888bb0c6192c83df23125fd3c8016df12ed994c422e4213ec668af42bfd6d0"
+  },
+  "runtimeSha256": {
+    "app/main.ts": "8636e21df7892a6ad90718e909b1fea2d4f6a55a222896ae314a469f147a2610",
+    "app/desktop/pi-config.ts": "2e502cda5ff04949ea79507e4696ee9efa22406d2336a7521f9ce87576e8f7a0",
+    "app/desktop/packaged-smoke.ts": "32c79dc8503615d209569a7b7b4fbab66447c3767e3032d479607872c13be6eb",
+    "app/renderer/index.html": "7ca6bdfcbd093af7601717dbceea9a86b94efe7b890dead605d14dc109d12a6e",
+    "app/renderer/renderer.js": "35e2d289639dad05f4453ffe9a16649ea1d1a497d6380414e403a1660a5aceff",
+    "src/provider/codex/session.ts": "0b603897b281a693f3c7cbabba74c313ca1db1f4f6cdb9f249a2cb09c4891521"
+  },
+  "runtimeMatchesCurrentCandidate": true,
+  "forbiddenFiles": [],
+  "settings": {
+    "initialUserDataExisted": false,
+    "actualPath": "/Users/wangzhongren/Library/Application Support/ans-cli/.env",
+    "nonsecretModelSavedAndReloaded": true,
+    "testValueClearedViaUI": true,
+    "parentMode": "0700",
+    "envFileMode": "0644; userData parent restricts access",
+    "realDeveloperEnvUnchanged": true
+  },
+  "nativeGui": {
+    "preImportEngineDisabled": true,
+    "nativeFolderPickerImportedFixture": true,
+    "engineEndEnterClaude": true,
+    "claudeMissingKeyShown": true,
+    "missingConfigButtonOpensCorrespondingSettings": true,
+    "escapeReturnsActualButtonWithDraft": true,
+    "draftCleared": true,
+    "onlineModelRequests": 0
+  },
+  "note": "This local package was built from exact first candidate 2bd0a60; later CI fixture/checkout fixes do not change these six runtime file bytes. Final release artifacts will have their own CI SHA and manifests."
+}

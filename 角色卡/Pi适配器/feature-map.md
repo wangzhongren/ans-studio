@@ -25,3 +25,4 @@
 - 原生恢复成功是核心 resumed；恢复失败重建是 recovered+warning。桌面旧用语须显式转换，ANS 回放不代表恢复模型上下文。
 
 - 2026-10-15：工具与输入事件同源身份修复已实现，见[修复记录](docs/fix/2026-10-15_fix_canonical-tool-events.md)。
+- 2026-10-15：Windows Release 中 shell 自终止的测试改为直接子进程事实对照，保持 POSIX 信号断言和 Windows 实际退出码，见[测试修复记录](docs/fix/2026-10-15_fix_windows-shell-termination-oracle.md)。生产行为未改。

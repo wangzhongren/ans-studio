@@ -1,0 +1,16 @@
+✔ independent B: native grant, opaque reference, actual bounded file reads, revocation and project switch (13.413833ms)
+✔ independent B: accepted Windows restriction refuses native grants without issuing refs or reading bytes (1.811833ms)
+✔ T1 actual bin role/pi: actual adapter and registered handler reject an out-of-boundary write (462.511417ms)
+✔ T1 actual bin govern/pi: actual adapter and registered handler reject an out-of-boundary write (442.234583ms)
+✔ T1 actual bin role/codex: actual adapter and registered handler reject an out-of-boundary write (214.553625ms)
+✔ T1 actual bin govern/codex: actual adapter and registered handler reject an out-of-boundary write (210.644625ms)
+✔ T1 actual bin role/claude: actual adapter and registered handler reject an out-of-boundary write (192.854833ms)
+✔ T1 actual bin govern/claude: actual adapter and registered handler reject an out-of-boundary write (200.768833ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1788.366792

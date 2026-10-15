@@ -44,7 +44,7 @@ README 与桌面窗口、macOS 运行中 Dock 共用同一张透明背景 PNG。
 
 ## 桌面运行包与发布构建
 
-运行包由 [Release 工作流](.github/workflows/release.yml)分别在 macOS arm64、macOS x64 和 Windows x64 原生环境生成 ZIP；解压后打开 `ANS Studio.app` 或 `ANS Studio.exe`，无需另外安装 Node.js。macOS 最低版本为 **13.0**，Windows 为 **10/11 x64**。运行包不包含开发机的密钥或会话，首次运行从左下角「设置」填写引擎配置；安装版配置保存在用户数据目录的 `.env`，开发启动继续使用仓库根 `.env`。
+运行包由 [Release 工作流](.github/workflows/release.yml)分别在 macOS arm64、macOS x64 和 Windows x64 原生环境生成 ZIP；解压后打开 `ANS Studio.app` 或 `ANS Studio.exe`，无需另外安装 Node.js。macOS 最低版本为 **13.0**，Windows 为 **10/11 x64**。Windows 暂不支持内置受限来源文档阅读；完整摘要与执行记录仍可查看，来源文件可由系统编辑器查看。运行包不包含开发机的密钥或会话，首次运行从左下角「设置」填写引擎配置；安装版配置保存在用户数据目录的 `.env`，开发启动继续使用仓库根 `.env`。
 
 工作流默认生成待审核的 draft Release，全部平台验证后才发布到 [GitHub Releases](https://github.com/wangzhongren/ans-studio/releases)。当前构建来源为固定的 `v1.0.0` 加 manifest 明确列出的打包适配 overlay，既有 tag 不移动；每个平台同时提供来源、实际构建 tree、测试结果和 SHA256 清单。产物未签名、未公证，系统可能显示来源确认提示，下载后请先核对校验值。
 

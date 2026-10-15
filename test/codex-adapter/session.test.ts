@@ -5,6 +5,8 @@ import { existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import childProcess from "node:child_process";
+import { syncBuiltinESMExports } from "node:module";
 import { createCodexRuntimeAdapter } from "../../src/provider/codex/session.ts";
 import { buildGovernedTools } from "../../src/provider/runtime/tools.ts";
 import { createRuntimeSessionStore } from "../../src/provider/runtime/session-store.ts";
@@ -358,7 +360,7 @@ test("call IDs differ across restarts; all shared credential values are scrubbed
   assert.notEqual(identifiers[0], identifiers[1]);
 });
 
-test("actual native process JSON-RPC parser routes callbacks and serverRequest/resolved cancellation", async () => {
+test("actual native process JSON-RPC parser routes callbacks and serverRequest/resolved cancellation", async t => {
   let signal: AbortSignal | undefined;
   let invoked = 0;
   const tool: ToolDefinition = { name: "probe", description: "native process fixture", inputSchema: { type: "object" }, async handler(call) {
@@ -367,10 +369,25 @@ test("actual native process JSON-RPC parser routes callbacks and serverRequest/r
     signal = call.signal;
     return new Promise(resolve => call.signal!.addEventListener("abort", () => resolve({ ok: false, message: "upstream cancelled" }), { once: true }));
   } };
+  const fixture = fileURLToPath(new URL("./fixtures/native-cli.mjs", import.meta.url));
+  const originalSpawn = childProcess.spawn;
+  let launches = 0;
+  // Windows cannot execute a POSIX shebang. Change only this fixture's OS
+  // launch, retaining a real process and the production JSON-RPC transport.
+  t.mock.method(childProcess, "spawn", (...args: Parameters<typeof childProcess.spawn>) => {
+    if (args[0] !== fixture) return originalSpawn(...args);
+    launches++;
+    const child = originalSpawn(process.execPath, [fixture, ...(args[1] as readonly string[])], args[2]);
+    assert.ok(child.pid && child.pid > 0);
+    return child;
+  });
+  syncBuiltinESMExports();
+  t.after(() => { childProcess.spawn = originalSpawn; syncBuiltinESMExports(); });
   const session = await createCodexRuntimeAdapter(options("/fixture", harness(), {
     tools: [tool], engineFactory: undefined,
-    cliPath: fileURLToPath(new URL("./fixtures/native-cli.mjs", import.meta.url)),
+    cliPath: fixture,
   })).bindRole(role);
+  assert.equal(launches, 1);
   const events = collect(session);
   await session.prompt("normal");
   await assert.rejects(session.prompt("cancel-upstream"), /native tool request ended/);

@@ -1,0 +1,32 @@
+✖ packaged configuration resolves to persistent userData instead of source/resources while development keeps repo path (3.97875ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 122.281666
+
+✖ failing tests:
+
+test at test/桌面应用/pi-config.test.ts:305:1
+✖ packaged configuration resolves to persistent userData instead of source/resources while development keeps repo path (3.97875ms)
+  AssertionError [ERR_ASSERTION]: installed app must never use the source/resources .env path
+  + actual - expected
+  
+  + '/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/.env'
+  - '/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-piconf-yGW53O/.env'
+  
+      at TestContext.<anonymous> (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/pi-config.test.ts:309:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.start (node:internal/test_runner/test:1015:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: '/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/.env',
+    expected: '/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-piconf-yGW53O/.env',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

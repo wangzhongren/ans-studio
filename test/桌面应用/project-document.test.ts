@@ -6,21 +6,21 @@ import path from 'node:path';
 import { PROJECT_DOCUMENT_MAX_BYTES } from '../../src/model/project-document.ts';
 import { createProjectDocumentFileReader, DocumentFileError } from '../../src/provider/project-document/public/file-reader.ts';
 async function fixture() { const root = await fs.mkdtemp(path.join(os.tmpdir(),'ans-doc-')); return {root,cleanup:()=>fs.rm(root,{recursive:true,force:true})}; }
-test('B Model budget is raw bytes; Provider reads a checked local descriptor without changing bytes',async()=>{
- const f=await fixture();try { const p=createProjectDocumentFileReader();const root=await p.resolveRoot(f.root);const file=path.join(root,'a.md');const content=Buffer.alloc(PROJECT_DOCUMENT_MAX_BYTES,65);await fs.writeFile(file,content);const before=await fs.stat(file);assert.deepEqual(Buffer.from(await p.read(root,'a.md',PROJECT_DOCUMENT_MAX_BYTES)),content);const after=await fs.stat(file);assert.equal(after.mtimeMs,before.mtimeMs);await fs.appendFile(file,'x');await assert.rejects(p.read(root,'a.md',PROJECT_DOCUMENT_MAX_BYTES),(e:unknown)=>e instanceof DocumentFileError&&e.code==='TOO_LARGE');}finally{await f.cleanup();}
+test('B Model budget is raw bytes; Provider reads a checked local descriptor without changing bytes',async(t)=>{
+ const f=await fixture();try {if(process.platform==='win32'){await assertWindowsFailClosed(f.root);t.diagnostic('Windows B2 fail-closed asserted; POSIX read/race assertions remain active on supported platforms.');return;} const p=createProjectDocumentFileReader();const root=await p.resolveRoot(f.root);const file=path.join(root,'a.md');const content=Buffer.alloc(PROJECT_DOCUMENT_MAX_BYTES,65);await fs.writeFile(file,content);const before=await fs.stat(file);assert.deepEqual(Buffer.from(await p.read(root,'a.md',PROJECT_DOCUMENT_MAX_BYTES)),content);const after=await fs.stat(file);assert.equal(after.mtimeMs,before.mtimeMs);await fs.appendFile(file,'x');await assert.rejects(p.read(root,'a.md',PROJECT_DOCUMENT_MAX_BYTES),(e:unknown)=>e instanceof DocumentFileError&&e.code==='TOO_LARGE');}finally{await f.cleanup();}
 });
-test('B Provider refuses unsupported platforms, lexical escapes, directories and symlinks',async()=>{
- const f=await fixture();try{await assert.rejects(createProjectDocumentFileReader({platform:'win32'}).resolveRoot(f.root),(e:unknown)=>e instanceof DocumentFileError&&e.code==='UNSUPPORTED_ENVIRONMENT');const p=createProjectDocumentFileReader();const root=await p.resolveRoot(f.root);await fs.writeFile(path.join(root,'a.md'),'a');await fs.symlink('a.md',path.join(root,'link.md'));await fs.mkdir(path.join(root,'dir.md'));for(const [rel,code] of [['../a.md','OUTSIDE_PROJECT'],['link.md','SYMLINK_NOT_ALLOWED'],['dir.md','NOT_FILE'],['missing.md','NOT_FOUND']] as const) await assert.rejects(p.read(root,rel,10),(e:unknown)=>e instanceof DocumentFileError&&e.code===code);}finally{await f.cleanup();}
+test('B Provider refuses unsupported platforms, lexical escapes, directories and symlinks',async(t)=>{
+ const f=await fixture();try{if(process.platform==='win32'){await assertWindowsFailClosed(f.root);t.diagnostic('Windows B2 fail-closed asserted; POSIX read/race assertions remain active on supported platforms.');return;}await assert.rejects(createProjectDocumentFileReader({platform:'win32'}).resolveRoot(f.root),(e:unknown)=>e instanceof DocumentFileError&&e.code==='UNSUPPORTED_ENVIRONMENT');const p=createProjectDocumentFileReader();const root=await p.resolveRoot(f.root);await fs.writeFile(path.join(root,'a.md'),'a');await fs.symlink('a.md',path.join(root,'link.md'));await fs.mkdir(path.join(root,'dir.md'));for(const [rel,code] of [['../a.md','OUTSIDE_PROJECT'],['link.md','SYMLINK_NOT_ALLOWED'],['dir.md','NOT_FILE'],['missing.md','NOT_FOUND']] as const) await assert.rejects(p.read(root,rel,10),(e:unknown)=>e instanceof DocumentFileError&&e.code===code);}finally{await f.cleanup();}
 });
-test('B Provider detects check/open and opened/read file replacement and closes the original handle',async()=>{
- for(const phase of ['checked','opened','read'] as const){const f=await fixture();try{await fs.writeFile(path.join(f.root,'a.md'),'first');const p=createProjectDocumentFileReader({checkpoint:async(at,file)=>{if(at===phase){await fs.rename(file,file+'.old');await fs.writeFile(file,'other');}}});const root=await p.resolveRoot(f.root);await assert.rejects(p.read(root,'a.md',100),(e:unknown)=>e instanceof DocumentFileError&&e.code==='CHANGED_DURING_READ');}finally{await f.cleanup();}}
+test('B Provider detects check/open and opened/read file replacement and closes the original handle',async(t)=>{
+ for(const phase of ['checked','opened','read'] as const){const f=await fixture();try{if(process.platform==='win32'){await assertWindowsFailClosed(f.root);t.diagnostic('Windows B2 fail-closed asserted; POSIX read/race assertions remain active on supported platforms.');return;}await fs.writeFile(path.join(f.root,'a.md'),'first');const p=createProjectDocumentFileReader({checkpoint:async(at,file)=>{if(at===phase){await fs.rename(file,file+'.old');await fs.writeFile(file,'other');}}});const root=await p.resolveRoot(f.root);await assert.rejects(p.read(root,'a.md',100),(e:unknown)=>e instanceof DocumentFileError&&e.code==='CHANGED_DURING_READ');}finally{await f.cleanup();}}
 });
 
 import { createProjectDocumentService } from '../../src/service/project-document/public/read-project-document.ts';
 const roles = [{roleId:'A',builtIn:false,cardPath:'roles/A/role-card.md',changelogPath:'roles/A/changelog.md',docs:[{path:'docs/report.md',kind:'file' as const},{path:'docs/plain.txt',kind:'file' as const},{path:'docs/dir',kind:'directory' as const},{path:'docs/.env',kind:'file' as const},{path:'docs/bad.bin',kind:'file' as const}]}];
 async function prepare(){const f=await fixture();await fs.mkdir(path.join(f.root,'roles/A/docs'),{recursive:true});await fs.writeFile(path.join(f.root,'roles/A/role-card.md'),'card');await fs.writeFile(path.join(f.root,'roles/A/docs/report.md'),'报告😀');return f;}
-test('B Service issues opaque refs only after native grant, refresh revokes refs and scope switch rejects old requests',async()=>{
- const f=await prepare();const s=createProjectDocumentService();try{
+test('B Service issues opaque refs only after native grant, refresh revokes refs and scope switch rejects old requests',async(t)=>{
+ const f=await prepare();const s=createProjectDocumentService();try{if(process.platform==='win32'){await assertWindowsFailClosed(f.root);t.diagnostic('Windows B2 fail-closed asserted; POSIX read/race assertions remain active on supported platforms.');return;}
   let view=s.updateListing(s.beginListing(f.root),f.root,roles);assert.equal(view.documentReadUnavailable,'PROJECT_NOT_GRANTED');
   await s.grantNativeSelection(f.root);view=s.updateListing(s.beginListing(f.root),f.root,roles);assert.ok(view.documentScope);assert.equal(view.documents.A.length,4);
   const ref=view.documents.A.find(d=>d.relativePath.endsWith('/report.md'))!;const req={version:1,projectViewId:ref.projectViewId,documentId:ref.documentId};
@@ -32,8 +32,8 @@ test('B Service issues opaque refs only after native grant, refresh revokes refs
   await s.grantNativeSelection(f.root);s.updateListing(s.beginListing(f.root),f.root,roles);const stale=await s.read(req);assert.ok(!stale.ok);if(!stale.ok)assert.equal(stale.code,'STALE_SCOPE');
  }finally{s.dispose();await f.cleanup();}
 });
-test('B Service fatal UTF8, binary, BOM, absent file and bounded failure classification',async()=>{
- const f=await prepare();const s=createProjectDocumentService();try{await s.grantNativeSelection(f.root);const view=s.updateListing(s.beginListing(f.root),f.root,roles);const ref=view.documents.A.find(d=>d.relativePath.endsWith('report.md'))!;const request={version:1,projectViewId:ref.projectViewId,documentId:ref.documentId};
+test('B Service fatal UTF8, binary, BOM, absent file and bounded failure classification',async(t)=>{
+ const f=await prepare();const s=createProjectDocumentService();try{if(process.platform==='win32'){await assertWindowsFailClosed(f.root);t.diagnostic('Windows B2 fail-closed asserted; POSIX read/race assertions remain active on supported platforms.');return;}await s.grantNativeSelection(f.root);const view=s.updateListing(s.beginListing(f.root),f.root,roles);const ref=view.documents.A.find(d=>d.relativePath.endsWith('report.md'))!;const request={version:1,projectViewId:ref.projectViewId,documentId:ref.documentId};
   for(const [bytes,expected] of [[Buffer.from([0xc3]),'INVALID_UTF8'],[Buffer.from([65,0,66]),'BINARY_CONTENT'],[Buffer.alloc(PROJECT_DOCUMENT_MAX_BYTES+1,65),'TOO_LARGE']] as const){await fs.writeFile(path.join(f.root,ref.relativePath),bytes);const result=await s.read(request);assert.ok(!result.ok);if(!result.ok){assert.equal(result.code,expected);assert.equal(Object.hasOwn(result,'text'),false);}}
   await fs.writeFile(path.join(f.root,ref.relativePath),Buffer.from([0xef,0xbb,0xbf,65]));const bom=await s.read(request);assert.ok(bom.ok);if(bom.ok){assert.equal(bom.text,'A');assert.equal(bom.byteLength,4);}
   await fs.writeFile(path.join(f.root,ref.relativePath),'');const empty=await s.read(request);assert.ok(empty.ok);if(empty.ok)assert.equal(empty.text,'');
@@ -48,17 +48,17 @@ test('B Service late read never returns content after scope revoke; provider fai
 });
 
 import { createProjectDocumentReader } from '../../src/pipeline/project-document/read-project-document.ts';
-test('B Pipeline preserves trusted native grant and close sequencing over the real Service',async()=>{const f=await prepare();const reader=createProjectDocumentReader();try{await reader.grantNativeSelection(f.root);const listing=reader.updateListing(reader.beginListing(f.root),f.root,roles);const d=listing.documents.A[0];reader.dispose();const result=await reader.read({version:1,projectViewId:d.projectViewId,documentId:d.documentId});assert.ok(!result.ok);if(!result.ok)assert.equal(result.code,'PROJECT_NOT_ACTIVE');}finally{await f.cleanup();}});
+test('B Pipeline preserves trusted native grant and close sequencing over the real Service',async(t)=>{const f=await prepare();const reader=createProjectDocumentReader();try{if(process.platform==='win32'){await assertWindowsFailClosed(f.root);await reader.grantNativeSelection(f.root);const rejected=reader.updateListing(reader.beginListing(f.root),f.root,roles);assert.equal(rejected.documentReadUnavailable,'UNSUPPORTED_ENVIRONMENT');assert.equal(rejected.documentScope,undefined);reader.dispose();const closed=await reader.read({version:1,projectViewId:'unissued',documentId:'unissued'});assert.ok(!closed.ok);if(!closed.ok)assert.equal(closed.code,'PROJECT_NOT_ACTIVE');t.diagnostic('Windows B2 fail-closed asserted; POSIX read/race assertions remain active on supported platforms.');return;}await reader.grantNativeSelection(f.root);const listing=reader.updateListing(reader.beginListing(f.root),f.root,roles);const d=listing.documents.A[0];reader.dispose();const result=await reader.read({version:1,projectViewId:d.projectViewId,documentId:d.documentId});assert.ok(!result.ok);if(!result.ok)assert.equal(result.code,'PROJECT_NOT_ACTIVE');}finally{await f.cleanup();}});
 
-test('B Provider rejects symlink parents, escaped links and root replacement after grant',async()=>{
- const f=await prepare();const outside=await fixture();try{const p=createProjectDocumentFileReader();const root=await p.resolveRoot(f.root);await fs.writeFile(path.join(outside.root,'x.md'),'outside');await fs.symlink(outside.root,path.join(root,'escape'));await assert.rejects(p.read(root,'escape/x.md',100),(e:unknown)=>e instanceof DocumentFileError&&e.code==='SYMLINK_NOT_ALLOWED');
+test('B Provider rejects symlink parents, escaped links and root replacement after grant',async(t)=>{
+ const f=await prepare();const outside=await fixture();try{if(process.platform==='win32'){await assertWindowsFailClosed(f.root);t.diagnostic('Windows B2 fail-closed asserted; POSIX read/race assertions remain active on supported platforms.');return;}const p=createProjectDocumentFileReader();const root=await p.resolveRoot(f.root);await fs.writeFile(path.join(outside.root,'x.md'),'outside');await fs.symlink(outside.root,path.join(root,'escape'));await assert.rejects(p.read(root,'escape/x.md',100),(e:unknown)=>e instanceof DocumentFileError&&e.code==='SYMLINK_NOT_ALLOWED');
  await fs.rename(root,root+'.old');await fs.mkdir(root);await fs.writeFile(path.join(root,'x.md'),'replacement');await assert.rejects(p.read(root,'x.md',100),(e:unknown)=>e instanceof DocumentFileError&&e.code==='CHANGED_DURING_READ');await fs.rm(root+'.old',{recursive:true,force:true});}finally{await f.cleanup();await outside.cleanup();}
 });
-test('B Provider detects in-place growth and parent directory replacement around a descriptor read',async()=>{
- for(const mode of ['grow','parent'] as const){const f=await prepare();try{const p=createProjectDocumentFileReader({checkpoint:async(phase,file)=>{if(phase!=='read')return;if(mode==='grow')await fs.appendFile(file,'growth');else{const parent=path.dirname(file);await fs.rename(parent,parent+'.old');await fs.mkdir(parent);await fs.writeFile(file,'new');}}});const root=await p.resolveRoot(f.root);await assert.rejects(p.read(root,'roles/A/docs/report.md',100),(e:unknown)=>e instanceof DocumentFileError&&e.code==='CHANGED_DURING_READ');}finally{await f.cleanup();}}
+test('B Provider detects in-place growth and parent directory replacement around a descriptor read',async(t)=>{
+ for(const mode of ['grow','parent'] as const){const f=await prepare();try{if(process.platform==='win32'){await assertWindowsFailClosed(f.root);t.diagnostic('Windows B2 fail-closed asserted; POSIX read/race assertions remain active on supported platforms.');return;}const p=createProjectDocumentFileReader({checkpoint:async(phase,file)=>{if(phase!=='read')return;if(mode==='grow')await fs.appendFile(file,'growth');else{const parent=path.dirname(file);await fs.rename(parent,parent+'.old');await fs.mkdir(parent);await fs.writeFile(file,'new');}}});const root=await p.resolveRoot(f.root);await assert.rejects(p.read(root,'roles/A/docs/report.md',100),(e:unknown)=>e instanceof DocumentFileError&&e.code==='CHANGED_DURING_READ');}finally{await f.cleanup();}}
 });
-test('B refs cannot be minted for hidden, unknown formats or lexical escape listing entries',async()=>{
- const f=await prepare();const service=createProjectDocumentService();try{await service.grantNativeSelection(f.root);const view=service.updateListing(service.beginListing(f.root),f.root,[{...roles[0],docs:[...roles[0].docs,...['docs/../../secret.md','docs/sub/../bad.md','docs/sub\\secret.md','docs/C:secret.md'].map(p=>({path:p,kind:'file' as const}))]}]);assert.deepEqual(view.documents.A.map(d=>d.label).sort(),['changelog.md','plain.txt','report.md','role-card.md']);for(const request of [null,{version:2,projectViewId:'x',documentId:'x'},{version:1,projectViewId:'x',documentId:''}]){const result=await service.read(request);assert.ok(!result.ok);if(!result.ok)assert.equal(result.code,'INVALID_REQUEST');}}finally{service.dispose();await f.cleanup();}
+test('B refs cannot be minted for hidden, unknown formats or lexical escape listing entries',async(t)=>{
+ const f=await prepare();const service=createProjectDocumentService();try{if(process.platform==='win32'){await assertWindowsFailClosed(f.root);t.diagnostic('Windows B2 fail-closed asserted; POSIX read/race assertions remain active on supported platforms.');return;}await service.grantNativeSelection(f.root);const view=service.updateListing(service.beginListing(f.root),f.root,[{...roles[0],docs:[...roles[0].docs,...['docs/../../secret.md','docs/sub/../bad.md','docs/sub\\secret.md','docs/C:secret.md'].map(p=>({path:p,kind:'file' as const}))]}]);assert.deepEqual(view.documents.A.map(d=>d.label).sort(),['changelog.md','plain.txt','report.md','role-card.md']);for(const request of [null,{version:2,projectViewId:'x',documentId:'x'},{version:1,projectViewId:'x',documentId:''}]){const result=await service.read(request);assert.ok(!result.ok);if(!result.ok)assert.equal(result.code,'INVALID_REQUEST');}}finally{service.dispose();await f.cleanup();}
 });
 test('B actual preload exports only the restricted document invoke shape',async()=>{
  const vm=await import('node:vm');let api:any;const calls:unknown[]=[];const text=await fs.readFile(new URL('../../app/preload.cjs',import.meta.url),'utf8');
@@ -73,9 +73,9 @@ test('B out-of-order listings and root-grant failure cannot publish stale or uns
 });
 
 
-test('B failed/cancelled native imports retain active refs until a successful listing commits',async()=>{
+test('B failed/cancelled native imports retain active refs until a successful listing commits',async(t)=>{
  const a=await prepare();const b=await prepare();const service=createProjectDocumentService();
- try{
+ try{if(process.platform==='win32'){await assertWindowsFailClosed(a.root);t.diagnostic('Windows B2 fail-closed asserted; POSIX read/race assertions remain active on supported platforms.');return;}
   await service.grantNativeSelection(a.root);const av=service.updateListing(service.beginListing(a.root),a.root,roles);const ref=av.documents.A.find(d=>d.label==='report.md')!;const request={version:1,projectViewId:ref.projectViewId,documentId:ref.documentId};
   await service.grantNativeSelection(b.root);
   assert.equal((await service.read(request)).ok,true,'native selection is pending, not an active-scope commit');
@@ -97,4 +97,27 @@ test('B a newer native selection invalidates an older listing without revoking t
  await service.grantNativeSelection('/b');const older=service.beginListing('/b');await service.grantNativeSelection('/c');assert.equal(service.updateListing(older,'/b',roles).documentReadUnavailable,'STALE_SCOPE');assert.equal((await service.read(request)).ok,true);
  const current=service.updateListing(service.beginListing('/c'),'/c',roles);assert.ok(current.documentScope);const stale=await service.read(request);assert.ok(!stale.ok);if(!stale.ok)assert.equal(stale.code,'STALE_SCOPE');
  }finally{service.dispose();}
+});
+
+
+/** B2 deliberately does not enable native document reads on Windows. These are assertions, not skips. */
+async function assertWindowsFailClosed(root: string, platform = process.platform): Promise<void> {
+ const file=path.join(root,'roles/A/docs/report.md');await fs.mkdir(path.dirname(file),{recursive:true});await fs.writeFile(file,'private fixture must not be returned');
+ const before=await fs.readFile(file);const beforeStat=await fs.stat(file);let checkpoints=0,serviceReads=0;
+ const provider=createProjectDocumentFileReader({platform,checkpoint:()=>{checkpoints++;}});
+ await assert.rejects(provider.resolveRoot(root),(e:unknown)=>e instanceof DocumentFileError&&e.code==='UNSUPPORTED_ENVIRONMENT');
+ await assert.rejects(provider.read(root,'roles/A/docs/report.md',PROJECT_DOCUMENT_MAX_BYTES),(e:unknown)=>e instanceof DocumentFileError&&e.code==='UNSUPPORTED_ENVIRONMENT');
+ const service=createProjectDocumentService({fileReader:{...provider,async read(...args){serviceReads++;return provider.read(...args);}}});
+ try{
+  const ungranted=service.updateListing(service.beginListing(root),root,roles);assert.equal(ungranted.documentReadUnavailable,'PROJECT_NOT_GRANTED');
+  await service.grantNativeSelection(root);const view=service.updateListing(service.beginListing(root),root,roles);
+  assert.equal(view.documentReadUnavailable,'UNSUPPORTED_ENVIRONMENT');assert.equal(view.documentScope,undefined);assert.ok(Object.values(view.documents).every(refs=>refs.length===0),'no refs are minted without platform support');
+  const failure=await service.read({version:1,projectViewId:'never-issued',documentId:'never-issued'});assert.ok(!failure.ok);if(!failure.ok){assert.equal(failure.code,'UNSUPPORTED_ENVIRONMENT');assert.equal(Object.hasOwn(failure,'text'),false);}
+  assert.equal(serviceReads,0,'the Service never attempts content IO without a granted readable scope');assert.equal(checkpoints,0,'Windows refuses before file-open/read checkpoints');assert.deepEqual(await fs.readFile(file),before);assert.equal((await fs.stat(file)).mtimeMs,beforeStat.mtimeMs);
+ }finally{service.dispose();}
+}
+
+
+test('B Windows fail-closed Provider and Service reject without minting references or reading content on every host',async()=>{
+ const f=await fixture();try{await assertWindowsFailClosed(f.root,'win32');}finally{await f.cleanup();}
 });

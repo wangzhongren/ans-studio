@@ -568,7 +568,7 @@ test("A-5 customerInput：Interface 透传客户通道；仅内置治理角色�
   assert.equal((out as { outcome: string }).outcome, "declined", "替身裁决原样回转");
 });
 
-test('B Interface native picker alone grants document refs; renderer listing, cancel and another window cannot grant', async () => {
+test('B Interface native picker alone grants document refs; renderer listing, cancel and another window cannot grant', async (t) => {
  const fs=await import('node:fs/promises');const os=await import('node:os');
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'ans-doc-interface-'));
  await fs.mkdir(path.join(root,'角色卡/A/docs'),{recursive:true});
@@ -583,7 +583,15 @@ test('B Interface native picker alone grants document refs; renderer listing, ca
   assert.equal(await iface.pickProject(),null);
   assert.equal((await iface.listProject({projectRoot:root})).documentScope,undefined);
   selected=root;assert.equal(await iface.pickProject(),root);
-  const view=await iface.listProject({projectRoot:root});assert.ok(view.documentScope);
+  const view=await iface.listProject({projectRoot:root});
+  if(process.platform==='win32'){
+   await assertWindowsInterfaceClosed(iface,view,root);
+   assert.equal((await other.listProject({projectRoot:root})).documentReadUnavailable,'PROJECT_NOT_GRANTED');
+   const foreign=await other.readProjectDocument({version:1,projectViewId:'unissued',documentId:'unissued'});assert.ok(!foreign.ok);if(!foreign.ok)assert.equal(foreign.code,'PROJECT_NOT_GRANTED');
+   iface.disposeProjectDocuments();const closed=await iface.readProjectDocument({version:1,projectViewId:'unissued',documentId:'unissued'});assert.ok(!closed.ok);if(!closed.ok)assert.equal(closed.code,'PROJECT_NOT_ACTIVE');
+   t.diagnostic('Windows B2 rejects real document reads even after native import; cross-window and disposed guards also asserted.');return;
+  }
+  assert.ok(view.documentScope);
   const ref=view.roles[0].documents!.find(d=>d.label==='report.md')!;assert.ok(ref);
   const request={version:1,projectViewId:ref.projectViewId,documentId:ref.documentId};
   const content=await iface.readProjectDocument(request);assert.ok(content.ok);if(content.ok)assert.equal(content.text,'report body');
@@ -595,14 +603,25 @@ test('B Interface native picker alone grants document refs; renderer listing, ca
  }finally{iface.disposeProjectDocuments();other.disposeProjectDocuments();await fs.rm(root,{recursive:true,force:true});}
 });
 
-test('B failed listing or native cancel preserves the previous imported document scope',async()=>{
+test('B failed listing or native cancel preserves the previous imported document scope',async(t)=>{
  const fs=await import('node:fs/promises');const os=await import('node:os');
  const a=await fs.mkdtemp(path.join(os.tmpdir(),'ans-doc-active-'));const b=await fs.mkdtemp(path.join(os.tmpdir(),'ans-doc-pending-'));
  await fs.mkdir(path.join(a,'角色卡/A/docs'),{recursive:true});await fs.writeFile(path.join(a,'角色卡/A/role-card.md'),'card');await fs.writeFile(path.join(a,'角色卡/A/docs/report.md'),'active A');
  let selection:string|null=a;let failB=true;
  const iface=createDesktopInterface({pickDirectory:async()=>selection,emitEvent:()=>{},envFilePath:path.join(a,'absent-fake-env'),listProjectFn:async root=>{if(root===b&&failB)throw new Error('controlled enumeration failure');return {...FAKE_LISTING,projectRoot:root};}});
  try{
-  await iface.pickProject();const before=await iface.listProject({projectRoot:a});const ref=before.roles[0].documents!.find(d=>d.label==='report.md')!;const request={version:1,projectViewId:ref.projectViewId,documentId:ref.documentId};
+  await iface.pickProject();const before=await iface.listProject({projectRoot:a});
+  if(process.platform==='win32'){
+   await assertWindowsInterfaceClosed(iface,before,a);
+   const request={version:1,projectViewId:'unissued',documentId:'unissued'};
+   selection=b;await iface.pickProject();await assert.rejects(iface.listProject({projectRoot:b}),/controlled enumeration failure/);
+   const preserved=await iface.readProjectDocument(request);assert.ok(!preserved.ok);if(!preserved.ok)assert.equal(preserved.code,'UNSUPPORTED_ENVIRONMENT','failed import preserves the active A platform rejection instead of clearing its context');
+   selection=null;await iface.pickProject();const cancelled=await iface.readProjectDocument(request);assert.ok(!cancelled.ok);if(!cancelled.ok)assert.equal(cancelled.code,'UNSUPPORTED_ENVIRONMENT');
+   failB=false;const next=await iface.listProject({projectRoot:b});assert.equal(next.documentReadUnavailable,'PROJECT_NOT_GRANTED');assert.equal(next.documentScope,undefined);assert.ok(next.roles.every(role=>(role.documents??[]).length===0));
+   const switched=await iface.readProjectDocument(request);assert.ok(!switched.ok);if(!switched.ok)assert.equal(switched.code,'PROJECT_NOT_GRANTED');
+   t.diagnostic('Windows failed/cancelled import retains the existing fail-closed state; successful ungranted import changes scope without minting refs.');return;
+  }
+  const ref=before.roles[0].documents!.find(d=>d.label==='report.md')!;const request={version:1,projectViewId:ref.projectViewId,documentId:ref.documentId};
   selection=b;await iface.pickProject();assert.equal((await iface.readProjectDocument(request)).ok,true);
   await assert.rejects(iface.listProject({projectRoot:b}),/controlled enumeration failure/);
   const stillActive=await iface.readProjectDocument(request);assert.ok(stillActive.ok);if(stillActive.ok)assert.equal(stillActive.text,'active A');
@@ -628,3 +647,14 @@ test('C restricted Interface validates current scope and derives support from ac
   assert.equal((await iface.retryReportSave({ ...scope, reportId: 'forged' })).ok, false); assert.equal(calls, 0, 'invalid/unknown IDs never invoke even present proxies');
  } finally { await iface.stopSession(); iface.disposeProjectDocuments(); }
 });
+
+
+/** Actual Windows behavior, without pretending its Provider has POSIX descriptor guarantees. */
+async function assertWindowsInterfaceClosed(iface:ReturnType<typeof createDesktopInterface>,view:Awaited<ReturnType<ReturnType<typeof createDesktopInterface>['listProject']>>,root:string):Promise<void>{
+ const fs=await import('node:fs/promises');const file=path.join(root,'角色卡/A/docs/report.md');const before=await fs.readFile(file);const stat=await fs.stat(file);
+ assert.equal(view.documentReadUnavailable,'UNSUPPORTED_ENVIRONMENT');assert.equal(view.documentScope,undefined);assert.ok(view.roles.every(role=>(role.documents??[]).length===0),'Windows must not mint readable file refs');
+ const request={version:1,projectViewId:'unissued',documentId:'unissued'};const result=await iface.readProjectDocument(request);assert.ok(!result.ok);if(!result.ok){assert.equal(result.code,'UNSUPPORTED_ENVIRONMENT');assert.equal(Object.hasOwn(result,'text'),false);}
+ const forged=await iface.readProjectDocument({...request,path:'.env'});assert.ok(!forged.ok);if(!forged.ok)assert.equal(forged.code,'INVALID_REQUEST');
+ const refreshed=await iface.listProject({projectRoot:root});assert.equal(refreshed.documentReadUnavailable,'UNSUPPORTED_ENVIRONMENT');assert.equal(refreshed.documentScope,undefined);assert.ok(refreshed.roles.every(role=>(role.documents??[]).length===0));
+ assert.deepEqual(await fs.readFile(file),before);assert.equal((await fs.stat(file)).mtimeMs,stat.mtimeMs);
+}

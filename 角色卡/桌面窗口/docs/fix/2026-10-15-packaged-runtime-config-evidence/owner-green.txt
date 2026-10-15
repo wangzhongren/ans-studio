@@ -1,0 +1,23 @@
+✔ 面板键恰为 3+1（必填 token/端点/模型 + 可选 CONTEXT_WINDOW）；provider 不在面板里；默认路径为仓库根 .env (0.8675ms)
+✔ 载入：loadPiEnv 把假 .env 的值带进 env（补 --env-file） (7.049083ms)
+✔ 载入：.env 不存在 → 无操作、不抛（与 loadEnvFileInto 的 ENOENT 语义一致） (3.870125ms)
+✔ 掩码：getPiConfig 对机密键恒返空 value，只给 isSet；非机密键回填真实值 (2.662916ms)
+✔ 掩码：.env 不存在 → 视图为空、各键 isSet=false（不抛） (0.647541ms)
+✔ 保存：只动指定键、逐字节保留其余内容（注释/空行/未知键/其它键/顺序） (7.569792ms)
+✔ 保存：缺键追加到末尾（含机密键），且面板键过滤掉非面板键 (5.997125ms)
+✔ 保存：ANS_PI_PROVIDER 不再被写——即便提交它也被过滤；已存在的那行原样保留（只改相关键） (6.799584ms)
+✔ 凭据不回显：哨兵 token 绝不出现在保存回报或错误文本里（含写失败路径） (2.010625ms)
+✔ 保存：无面板键可写时恒等（不触碰文件、回报空 apply） (0.686917ms)
+✔ interface：getPiConfig/savePiConfig 经注入的临时路径读写（不碰真实仓库根 .env） (8.166666ms)
+✔ packaged configuration resolves to persistent userData instead of source/resources while development keeps repo path (1.004666ms)
+✔ packaged settings save and a fresh startup environment share the injected writable path without touching bundled config (8.237125ms)
+✔ packaged smoke requires explicit isolated absolute paths, while ordinary startup has no smoke request (1.282666ms)
+✔ packaged smoke script reads existing IPC and exercises settings without publishing configuration values or calling save/model APIs (2.4395ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 211.105916

@@ -1,0 +1,43 @@
+✔ O-1：边界文件内容变更 ⇒ 活会话作废重建（如实行含文件名与 D-1 措辞）；未变 ⇒ 不重建（不丢上下文） (338.98875ms)
+✔ O-1：su（内置治理角色）同样适用——`.ans` pin 刷新（.ans/project.json 内容变化）即触发重建 (186.318583ms)
+✔ O-1：投递路径同样检查——目标边界陈旧 ⇒ 重建后再投（队列不丢、不并发） (466.734291ms)
+✔ O-1 接线钉：信号=读盘内容哈希；检查点=发言/续接/投递/su-settle 扫描；措辞按 D-1 两分支 (0.1785ms)
+✔ listProject 映射为 RoleView（无 writeSet 字段） (3.972ms)
+✔ 内置角色 su：RoleView 标为 builtIn，且不去读文档索引（cardPath 为空串） (0.299791ms)
+✔ openSession 点角色即开：scope undefined、导入即授权；多轮 send 透传、stop 收口 (63.217833ms)
+✔ 切换角色（B-2）：open 新角色**不** dispose 旧会话（并存）；定向 stop 只关指定角色 (0.991917ms)
+✔ stopSession：无运行中会话时如实返回 (0.114208ms)
+✔ openSession：未先枚举项目则报错 (0.124667ms)
+✔ listProject：内置 su（已 bootstrap）不再带 readOnly 字段（只读徽标已移除） (0.088917ms)
+✔ listProject：**未 bootstrap**（创世态）内置 su 亦不再带 readOnly 字段 (0.070708ms)
+✔ listProject：可写的项目角色（非内置）亦不再带 readOnly 字段 (0.857459ms)
+✔ T17 listProject：hasRoles 与 primaryRoleId 原样转自门禁引擎（渲染侧据此设主位/默认选中，不硬编码 su） (0.156375ms)
+✔ T17 主入口角色一轮结束（settled）→ 触发 emitProjectChanged；非主入口角色不触发 (49.919208ms)
+✔ T20 handback 事件被外推：Interface 层的 emitEvent 收到编排的 handback 事件（类型已放宽到 OrchestrationEvent） (26.176083ms)
+✔ A-5 customerInput：Interface 透传客户通道；仅内置治理角色（su）会话被注入，且 roleId 经闭包绑定 (0.978959ms)
+✔ B Interface native picker alone grants document refs; renderer listing, cancel and another window cannot grant (5.530917ms)
+✔ B failed listing or native cancel preserves the previous imported document scope (5.476709ms)
+✔ C restricted Interface validates current scope and derives support from actual bound mode (1.0245ms)
+✔ B Model budget is raw bytes; Provider reads a checked local descriptor without changing bytes (9.344208ms)
+✔ B Provider refuses unsupported platforms, lexical escapes, directories and symlinks (4.094666ms)
+✔ B Provider detects check/open and opened/read file replacement and closes the original handle (8.349ms)
+✔ B Service issues opaque refs only after native grant, refresh revokes refs and scope switch rejects old requests (4.690125ms)
+✔ B Service fatal UTF8, binary, BOM, absent file and bounded failure classification (6.750583ms)
+✔ B Service late read never returns content after scope revoke; provider failures are fixed safe messages (0.2785ms)
+✔ B Pipeline preserves trusted native grant and close sequencing over the real Service (2.398375ms)
+✔ B Provider rejects symlink parents, escaped links and root replacement after grant (2.643625ms)
+✔ B Provider detects in-place growth and parent directory replacement around a descriptor read (4.677833ms)
+✔ B refs cannot be minted for hidden, unknown formats or lexical escape listing entries (1.732125ms)
+✔ B actual preload exports only the restricted document invoke shape (1.404ms)
+✔ B out-of-order listings and root-grant failure cannot publish stale or unsupported refs (0.300125ms)
+✔ B failed/cancelled native imports retain active refs until a successful listing commits (4.383709ms)
+✔ B a newer native selection invalidates an older listing without revoking the active project (0.147917ms)
+✔ B Windows fail-closed Provider and Service reject without minting references or reading content on every host (3.264833ms)
+ℹ tests 35
+ℹ suites 0
+ℹ pass 35
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1421.926458

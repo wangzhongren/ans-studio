@@ -152,7 +152,7 @@ test("O-1：边界文件内容变更 ⇒ 活会话作废重建（如实行含文
   assert.ok(h.sent.A.includes("二"), "发言落到新把手（按新边界）");
   const line = h.envelopes.map((e) => String(e.event.summary || "")).find((s) => s.includes("边界已更新"));
   assert.ok(line, "应有**如实**重建行（不静默）");
-  assert.ok(line!.includes("角色卡/A/boundary.yaml"), "行内含变更文件名");
+  assert.ok(line!.includes(path.join("角色卡", "A", "boundary.yaml")), "行内含变更文件名");
   assert.ok(line!.includes("按新边界重开"), "行内说明按新边界重开");
   assert.ok(line!.includes("上下文恢复结果以引擎实际返回为准"), "重开不根据任意文件存在猜原生恢复成功");
 
@@ -184,7 +184,7 @@ test("O-1：su（内置治理角色）同样适用——`.ans` pin 刷新（.ans
   assert.equal(r2.ok, true);
   assert.equal(h.openCalls.filter((r) => r === "su").length, 2, "su 的会话同样作废重建");
   const line = h.envelopes.map((e) => String(e.event.summary || "")).find((s) => s.includes("边界已更新"));
-  assert.ok(line && line.includes(".ans/project.json"), "如实行指出变化的是 .ans/project.json");
+  assert.ok(line && line.includes(path.join(".ans", "project.json")), "如实行指出变化的是 .ans/project.json");
   await h.mgr.stop(null);
 });
 

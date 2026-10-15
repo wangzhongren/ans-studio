@@ -4,6 +4,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
+import { pathToFileURL } from "node:url";
 import { main, resolveProjectRoot } from "../../src/index.ts";
 import { RUNTIME_KINDS, RUNTIME_CREDENTIAL_ENV_VARS } from "../../src/common/shared/runtime-shared.ts";
 import { resolveRuntime } from "../../src/common/装配/runtime.ts";
@@ -133,11 +134,11 @@ test("SDK loading is lazy for module import, help and doctor, including command 
   const hooks = path.join(dir, "deny-sdk.mjs");
   writeFileSync(hooks, `import { registerHooks } from 'node:module';\nregisterHooks({resolve(s,c,n){if(/^(?:@openai\\/codex|@anthropic-ai\\/(?:claude-agent-sdk|sdk)|@earendil-works\\/pi-|@modelcontextprotocol\\/sdk|zod(?:\\/|$))/.test(s))throw new Error('SDK loaded eagerly:'+s);return n(s,c);}});\n`);
   try {
-    const imported = spawnSync(process.execPath, ["--import", hooks, "--input-type=module", "-e", `await import(${JSON.stringify(path.join(root, "src/index.ts"))});`], { cwd: root, env: cleanEnv(), encoding: "utf8", timeout: 10000 });
+    const imported = spawnSync(process.execPath, ["--import", pathToFileURL(hooks).href, "--input-type=module", "-e", `await import(${JSON.stringify(pathToFileURL(path.join(root, "src/index.ts")).href)});`], { cwd: root, env: cleanEnv(), encoding: "utf8", timeout: 10000 });
     assert.equal(imported.status, 0, imported.stderr);
     assert.equal(imported.stdout, "", "import has no startup effects");
     for (const runtime of RUNTIME_KINDS) for (const args of [["help"], ["doctor"], ["role", "run", "--help"]]) {
-      const run = spawnSync(process.execPath, ["--import", hooks, bin, ...args, "--runtime", runtime], { cwd: root, env: cleanEnv(), encoding: "utf8", timeout: 10000 });
+      const run = spawnSync(process.execPath, ["--import", pathToFileURL(hooks).href, bin, ...args, "--runtime", runtime], { cwd: root, env: cleanEnv(), encoding: "utf8", timeout: 10000 });
       assert.equal(run.status, 0, run.stderr);
       assert.equal(run.signal, null);
       assert.doesNotMatch(run.stderr, /SDK loaded eagerly/);
@@ -158,7 +159,7 @@ test("actual bin missing SDK errors are honest and masked without starting model
   const env = { ...cleanEnv(), ANTHROPIC_AUTH_TOKEN: fakeKey, CODEX_API_KEY: fakeKey, ANTHROPIC_API_KEY: fakeKey, ANS_PI_MODEL: "offline", ANS_CODEX_MODEL: "offline", ANS_CLAUDE_MODEL: "offline", ANS_PI_BASE_URL: "http://127.0.0.1:1", ANS_CODEX_BASE_URL: "http://127.0.0.1:1", ANTHROPIC_BASE_URL: "http://127.0.0.1:1" };
   try {
     for (const runtime of ["pi", "codex", "claude"] as const) {
-      const run = spawnSync(process.execPath, ["--import", hooks, bin, "role", "run", "编排", "--task", "B1", "--runtime", runtime], { cwd: root, env, encoding: "utf8", timeout: 10000 });
+      const run = spawnSync(process.execPath, ["--import", pathToFileURL(hooks).href, bin, "role", "run", "编排", "--task", "B1", "--runtime", runtime], { cwd: root, env, encoding: "utf8", timeout: 10000 });
       assert.equal(run.signal, null, `${runtime}: ${run.stdout}\n${run.stderr}`);
       assert.equal(run.status, 1, run.stderr);
       assert.match(run.stderr, runtime === "codex" ? /Codex requires @modelcontextprotocol\/sdk@1\.32\.1/ : /assembly simulated missing SDK/);

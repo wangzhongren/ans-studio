@@ -1,0 +1,108 @@
+{
+  "sourceRef": "v1.0.0",
+  "sourceSha": "83445ebcf24454c6107838cb7f2221882c6638ea",
+  "overlaySha": "2bd0a606029286e884d5fd68840c13ebd1e023c2",
+  "actualTree": "5765af926576986fb8d740025191f8ccf73d1e5f",
+  "overlayPaths": [
+    ".github/workflows/release.yml",
+    "app/desktop/packaged-smoke.ts",
+    "app/desktop/pi-config.ts",
+    "app/main.ts",
+    "app/renderer/index.html",
+    "app/renderer/renderer.js",
+    "electron-builder.yml",
+    "package-lock.json",
+    "package.json",
+    "src/common/装配/release-assets.mjs",
+    "src/common/装配/release-policy.d.mts",
+    "src/common/装配/release-policy.mjs",
+    "src/common/装配/release-prepare.mjs",
+    "src/common/装配/release-provenance.mjs",
+    "src/common/装配/release-verify.mjs",
+    "src/provider/codex/session.ts",
+    "test/codex-adapter/electron-launch.test.ts",
+    "test/codex-adapter/electron-node-probe.mjs",
+    "test/桌面应用/pi-config.test.ts",
+    "test/装配/release-packaging.test.ts"
+  ],
+  "overlayPatchSha256": "38275f281ca79ddb1757c45a2167aab89a58491d7ebd5824427003803fc20cf4",
+  "excludedChanges": [
+    ".gitignore",
+    "README.md",
+    "角色卡/Codex适配器/docs/feature/codex-governed-session.md",
+    "角色卡/Codex适配器/docs/fix/2026-10-15_fix_packaged-electron-node-launch.md",
+    "角色卡/Codex适配器/memo.md",
+    "角色卡/桌面UI/docs/fix/2026-10-15_fix_packaged-env-path-hint.md",
+    "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/baseline.json",
+    "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/full-native-loopback-green.txt",
+    "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/full-sandbox-red.txt",
+    "角色卡/测试/docs/change/2026-10-15-v1-release-evidence/typecheck.txt",
+    "角色卡/测试/docs/change/2026-10-15_change_v1-release-verification.md",
+    "角色卡/装配/boundary.md",
+    "角色卡/装配/boundary.yaml",
+    "角色卡/装配/changelog.md",
+    "角色卡/装配/docs/change/2026-10-15-release-packaging-evidence/manifest.json",
+    "角色卡/装配/docs/change/2026-10-15_change_release-packaging-boundary.md",
+    "角色卡/装配/docs/change/2026-10-15_change_v1-release-packaging.md",
+    "角色卡/装配/docs/feature/desktop-release-packaging.md",
+    "角色卡/装配/feature-map.md",
+    "角色卡/装配/memo.md",
+    "角色卡/项目管理/docs/change/2026-10-15_change_v1-release-packaging.md"
+  ],
+  "platform": "darwin",
+  "arch": "arm64",
+  "node": "v24.14.0",
+  "npm": "11.9.0",
+  "lockSha256": "d20e6ba6f5e7b2074a662ecaf8228be00c5c537e3bc3c4f9a3bb85cdf2b31d98",
+  "builder": "26.15.3",
+  "startedAt": "2026-10-15T10:06:39.843Z",
+  "finishedAt": "2026-10-15T10:06:41.260Z",
+  "unsigned": true,
+  "smoke": {
+    "ok": true,
+    "isPackaged": true,
+    "arch": "arm64",
+    "platform": "darwin",
+    "version": "1.0.0",
+    "envPath": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-packaged-smoke-9E5IQX/home/userdata/.env",
+    "checks": {
+      "dom": true,
+      "preload": true,
+      "ipc": true,
+      "importDisabled": true,
+      "missingConfiguration": true,
+      "settings": true,
+      "envPathMatches": true
+    },
+    "missingKeys": {
+      "pi": [
+        "ANTHROPIC_AUTH_TOKEN",
+        "ANS_PI_BASE_URL",
+        "ANS_PI_MODEL"
+      ],
+      "codex": [
+        "CODEX_API_KEY",
+        "ANS_CODEX_MODEL"
+      ],
+      "claude": [
+        "ANTHROPIC_API_KEY"
+      ]
+    }
+  },
+  "nativeDependencies": {
+    "sdkImports": "PACKAGED_SDK_IMPORTS_OK",
+    "codexVersion": "codex-cli 0.162.1",
+    "claudeVersion": "2.1.299 (Claude Code)"
+  },
+  "process": {
+    "code": 0,
+    "signal": null,
+    "stdout": "",
+    "stderr": ""
+  },
+  "artifact": {
+    "file": "ANS-Studio-1.0.0-mac-arm64.zip",
+    "size": 404966172,
+    "sha256": "a4888bb0c6192c83df23125fd3c8016df12ed994c422e4213ec668af42bfd6d0"
+  }
+}

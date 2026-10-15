@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
 import type { RuntimeProviderOptions, RuntimeToolEventSource, SessionEvent, ToolDefinition } from '../../src/model/runtime.ts';
 import { createRuntimeAdapter } from '../../src/service/runtime/session.ts';
 import { createRealPiRuntimeAdapter, buildGovernanceExtension } from '../../src/common/pi-adapter/real-adapter.ts';
@@ -122,7 +123,20 @@ test('real Pi SDK receives original prompt and image reference only; Core-only m
 }));
 
 test('real Pi shell exit0, spawn failure, signal and review denial retain actual process facts without invented exit',async()=>fixture(async(dir,sdk)=>{
-  const commands=[`${process.execPath} -e 'process.stdout.write("exit-zero")'`,'ans_missing_binary_for_display_6ce07',`${process.execPath} -e 'process.kill(process.pid,"SIGTERM")'`,'deny_probe'];
+  const terminationProgram='require("node:fs").writeSync(1,"before-termination");process.kill(process.pid,"SIGTERM");setTimeout(()=>require("node:fs").writeSync(1,"forbidden-after-termination"),200)';
+  const nativeTermination=spawnSync(process.execPath,['-e',terminationProgram],{encoding:'utf8',timeout:5000});
+  assert.equal(nativeTermination.error,undefined,'reference child must terminate without timeout or spawn failure');
+  assert.equal(nativeTermination.stdout,'before-termination','child ran, terminated and never executed its later callback');
+  assert.equal(nativeTermination.stderr,'');
+  if(process.platform==='win32') {
+    assert.equal(nativeTermination.signal,null,'Windows reports its actual numeric termination status');
+    assert.equal(typeof nativeTermination.status,'number');
+    assert.notEqual(nativeTermination.status,0,'self termination cannot be a successful exit');
+  } else {
+    assert.equal(nativeTermination.signal,'SIGTERM');
+    assert.equal(nativeTermination.status,null,'POSIX signal termination has no numeric exit code');
+  }
+  const commands=[`${process.execPath} -e 'process.stdout.write("exit-zero")'`,'ans_missing_binary_for_display_6ce07',`${process.execPath} -e '${terminationProgram}'`,'deny_probe'];
   sdk.faux.setResponses([sdk.ai.fauxAssistantMessage(commands.map(command=>sdk.ai.fauxToolCall('run_shell',{command}))),sdk.ai.fauxAssistantMessage('done')]);
   const adapter=createRuntimeAdapter({runtime:'pi',projectRoot:dir,skillRoot:dir,gate:makeGate({project:[],skill:[]}),shellGate:async req=>req.command==='deny_probe'?{allow:false,reason:'review denied '+secret,by:'offline-test'}:{allow:true,by:'offline-test'},providerFactories:{pi:opts=>createRealPiRuntimeAdapter({...opts,config,logger},sdk.deps)}});
   const session=await adapter.bindRole(makeRole());await session.prompt('shell states');const events=await drain(session);
@@ -130,6 +144,11 @@ test('real Pi shell exit0, spawn failure, signal and review denial retain actual
   const find=(command:string)=>ends.find(d=>d.display.target.value.text===command)!;
   assert.equal(find(commands[0]).display.process.exitCode,0);assert.equal(find(commands[0]).ok,true);assert.equal(find(commands[0]).display.process.stdout.text,'exit-zero');
   assert.equal(find(commands[1]).ok,false);assert.equal(find(commands[1]).display.process,undefined);assert.match(find(commands[1]).display.error.text,/ENOENT/);
-  assert.equal(find(commands[2]).ok,false);assert.equal(find(commands[2]).display.process.signal,'SIGTERM');assert.equal(find(commands[2]).display.process.exitCode,undefined);
+  const termination=find(commands[2]);
+  assert.equal(termination.ok,false);
+  assert.equal(termination.display.process.signal,nativeTermination.signal??undefined);
+  assert.equal(termination.display.process.exitCode,nativeTermination.status??undefined);
+  assert.equal(termination.display.process.stdout.text,'before-termination');
+  assert.equal(termination.display.process.stderr.text,'');
   assert.equal(find(commands[3]).ok,false);assert.equal(find(commands[3]).display.process,undefined);assert.equal(JSON.stringify(ends).includes(secret),false);
 }));

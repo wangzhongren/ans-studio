@@ -122,3 +122,5 @@ A4 legacy provenance窄修：protected工具t.statusSource/target.source分别�
 ## 停止轮次的SendResult事实快照（WINDOW-STOP-TERMINAL-FIX-1）
 
 既有sendSession透明返回兼容可选turnId/clientMessageId/inputAccepted:true/outcome/sessionCurrent。turnId仅原调用ACK，inputAccepted仅同actualturn typed prompt-input已观察，outcome仅公开settled.detail.outcome首有效enum；无证据缺席。不解析错误文案、不等终态、不新IPC/Model。sessionCurrent是返回时原entry仍当前，不代表provider清理完成；false不等于没有新的当前会话。先拒后终态时UI经现session:event按actualturn+clientID合并，返回快照不被迟到事件修改；同client异turn不能互借。真正failed/timed_out与未接受输入的错误/草稿处理仍由真实事实决定，不将stop请求当完成。证据见[停止收口修复](docs/fix/2026-10-15_fix_stop-terminal-send-facts.md)。
+
+安装包配置路径修复：main.whenReady后只解析一次resolveDesktopEnvPath({isPackaged,userDataPath})，packaged=userData/.env，dev仍repo.env；启动共享loader和DesktopInterface.envFilePath同值，不复制env实现/不拷贝凭据。受控host CLI --ans-packaged-smoke <absolute.json> --user-data-dir=<temp>验证真实DOM/preload/既有只读IPC和设置开闭，结果含isPackaged，开发不算通过；无新renderer IPC。证据见docs/fix/2026-10-15_fix_packaged-runtime-config.md。

@@ -33,6 +33,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     steps:
+      - name: Preserve repository byte identity on native runners
+        run: |
+          git config --global core.autocrlf false
+          git config --global core.eol lf
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -107,7 +111,7 @@ jobs:
           if gh release view v1.0.0 --json isDraft --jq '.isDraft' > draft-state.txt; then
             test "$(cat draft-state.txt)" = true
           else
-            gh release create v1.0.0 --verify-tag --draft --title 'ANS Studio 1.0.0' --notes '基于固定 v1.0.0 源码及 manifest 列明的打包修复 overlay。macOS arm64、macOS x64、Windows x64 各由原生 runner 构建并实际启动验证。未签名、未公证：macOS Gatekeeper 或 Windows SmartScreen 可能提示，请先核对 SHA256。最低 macOS 13；Windows 10/11 x64。包内不含密钥，首次使用请在设置中填写。详细来源与测试见各平台 manifest。'
+            gh release create v1.0.0 --verify-tag --draft --title 'ANS Studio 1.0.0' --notes '基于固定 v1.0.0 源码及 manifest 列明的打包修复 overlay。macOS arm64、macOS x64、Windows x64 各由原生 runner 构建并实际启动验证。未签名、未公证：macOS Gatekeeper 或 Windows SmartScreen 可能提示，请先核对 SHA256。最低 macOS 13；Windows 10/11 x64。Windows 暂不支持内置受限来源文档阅读；保留完整摘要与执行记录，来源文件可由系统编辑器查看。包内不含密钥，首次使用请在设置中填写。详细来源与测试见各平台 manifest。'
           fi
           gh release upload v1.0.0 ./*.zip ./manifest-*.json ./SHA256SUMS-*.txt ./release-provenance.json ./overlay.patch
           if test "$RELEASE_PUBLISH" = true; then gh release edit v1.0.0 --draft=false; fi
