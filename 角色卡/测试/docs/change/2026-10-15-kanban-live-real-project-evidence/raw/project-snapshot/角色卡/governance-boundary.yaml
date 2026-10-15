@@ -1,0 +1,14 @@
+role: 治理边界
+entries:
+  - kind: directory
+    path: 角色卡/
+    root: project
+    purpose: 角色目录：新建/修改角色（role-card/boundary/memo/docs）与治理边界文档自身
+  - kind: directory
+    path: docs/
+    root: project
+    purpose: 项目文档
+  - kind: directory
+    path: .ans/
+    root: project
+    purpose: .ans/project.json（acceptance/pin 更新）

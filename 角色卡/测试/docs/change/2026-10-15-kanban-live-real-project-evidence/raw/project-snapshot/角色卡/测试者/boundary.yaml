@@ -1,0 +1,35 @@
+role: 测试者
+entries:
+  - kind: directory
+    path: test/
+    purpose: node --test 自动化测试套件与 fixtures（不得修改 test/实现者/）
+  - kind: directory
+    path: temp/测试者/
+    purpose: 未通过/返工产物暂存 + REVIEW.md，供审核对照
+  - kind: file
+    path: 角色卡/测试者/feature-map.md
+    purpose: 功能 / 用例地图
+  - kind: file
+    path: 角色卡/测试者/memo.md
+    purpose: 工作备忘录（进行中事项 / 待确认项）
+  - kind: file
+    path: 角色卡/测试者/changelog.md
+    purpose: 变更记录
+  - kind: file
+    path: 角色卡/测试者/functional-description.md
+    purpose: 测试范围与运行说明
+  - kind: file
+    path: 角色卡/测试者/api-spec.md
+    purpose: 契约核对结论（只读核对，不修改契约）
+  - kind: directory
+    path: 角色卡/测试者/docs/design/
+    purpose: 测试设计
+  - kind: directory
+    path: 角色卡/测试者/docs/feature/
+    purpose: 用例说明
+  - kind: directory
+    path: 角色卡/测试者/docs/change/
+    purpose: 变更文档
+  - kind: directory
+    path: 角色卡/测试者/docs/fix/
+    purpose: 缺陷文档

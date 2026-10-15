@@ -1,0 +1,87 @@
+{
+  "pid": 64618,
+  "executable": "/private/tmp/ans-taskboard-release-kn7tg1vm/extracted/ANS Studio.app/Contents/MacOS/ANS Studio",
+  "args": [
+    "--user-data-dir=/private/tmp/ans-kanban-live-7ae6156b/userdata",
+    "--remote-debugging-port=9444"
+  ],
+  "workspace": "/Users/wangzhongren/code/vibeingcode/ans-testbed/kanban-live",
+  "isolatedUserData": "/private/tmp/ans-kanban-live-7ae6156b/userdata",
+  "isolatedEnvAbsentBefore": true,
+  "injectedKeys": [
+    "ANTHROPIC_AUTH_TOKEN",
+    "ANS_PI_BASE_URL",
+    "ANS_PI_MODEL",
+    "ANS_PI_CONTEXT_WINDOW"
+  ],
+  "extraEnv": {
+    "ANS_PI_PROMPT_TIMEOUT_MS": "900000",
+    "ANS_PI_CONSTRUCT_TIMEOUT_MS": "300000",
+    "ANS_PI_SHELL_REVIEW_TIMEOUT_MS": "300000"
+  },
+  "repoEnvSha256": "3d7ecbd3b35a7f546d8e5ddd7f6d96afd190daae812c2010496aab6949b1724f",
+  "repoEnvUnchanged": true,
+  "defaults": [
+    {
+      "path": "/Users/wangzhongren/Library/Application Support/ANS Studio/.env",
+      "exists": false,
+      "keys": [
+        {
+          "key": "ANTHROPIC_AUTH_TOKEN",
+          "present": false,
+          "nonempty": false,
+          "equalsRepo": false
+        },
+        {
+          "key": "ANS_PI_BASE_URL",
+          "present": false,
+          "nonempty": false,
+          "equalsRepo": false
+        },
+        {
+          "key": "ANS_PI_MODEL",
+          "present": false,
+          "nonempty": false,
+          "equalsRepo": false
+        },
+        {
+          "key": "ANS_PI_CONTEXT_WINDOW",
+          "present": false,
+          "nonempty": false,
+          "equalsRepo": false
+        }
+      ]
+    },
+    {
+      "path": "/Users/wangzhongren/Library/Application Support/ans-cli/.env",
+      "exists": true,
+      "keys": [
+        {
+          "key": "ANTHROPIC_AUTH_TOKEN",
+          "present": false,
+          "nonempty": false,
+          "equalsRepo": false
+        },
+        {
+          "key": "ANS_PI_BASE_URL",
+          "present": false,
+          "nonempty": false,
+          "equalsRepo": false
+        },
+        {
+          "key": "ANS_PI_MODEL",
+          "present": true,
+          "nonempty": false,
+          "equalsRepo": false
+        },
+        {
+          "key": "ANS_PI_CONTEXT_WINDOW",
+          "present": false,
+          "nonempty": false,
+          "equalsRepo": false
+        }
+      ]
+    }
+  ],
+  "log": "/private/tmp/ans-kanban-live-7ae6156b/app.log"
+}

@@ -1,0 +1,35 @@
+{
+  "projectRoot": "/Users/wangzhongren/code/vibeingcode/ans-testbed/kanban-live",
+  "skillRoot": "/Users/wangzhongren/.claude/skills/ans-governed-construction",
+  "roles": {
+    "测试者": {
+      "card": "角色卡/测试者/role-card.md",
+      "boundary": "角色卡/测试者/boundary.yaml"
+    },
+    "实现者": {
+      "card": "角色卡/实现者/role-card.md",
+      "boundary": "角色卡/实现者/boundary.yaml"
+    }
+  },
+  "governanceBoundary": {
+    "path": "角色卡/governance-boundary.yaml",
+    "acceptance": {
+      "accepted": true,
+      "source": "desktop-app:操作者导入空文件夹并开启 su 对话 = 发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/）",
+      "pin": [
+        {
+          "path": "角色卡/governance-boundary.yaml",
+          "sha256": "a19ee561cac958c29ae4c1b4b8001f57303e17f48a83ab780bc87dde7f6fce93"
+        },
+        {
+          "path": "角色卡/测试者/boundary.yaml",
+          "sha256": "07b084c003cd44e3dd5b7c6d586ac08cda5e3900f1905c878c41959b9cf56201"
+        },
+        {
+          "path": "角色卡/实现者/boundary.yaml",
+          "sha256": "867520ece400642829ba31f45a83b0681de6af39cfe454b2b40f8a15ca879452"
+        }
+      ]
+    }
+  }
+}

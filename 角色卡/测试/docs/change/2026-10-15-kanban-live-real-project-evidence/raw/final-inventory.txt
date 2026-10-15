@@ -1,0 +1,97 @@
+== final inventory (2026-10-15 22:00 local) ==
+./.ans/project.json
+./.ans/sessions/su/pi/ans/index.json
+./.ans/sessions/su/pi/ans/replay.jsonl
+./.ans/sessions/su/pi/native/2026-10-15T13-16-24-069Z_01a13fb4-ec85-713c-8b5e-fcbf1afaaa1d.jsonl
+./.ans/sessions/实现者/pi/ans/index.json
+./.ans/sessions/实现者/pi/ans/replay.jsonl
+./.ans/sessions/实现者/pi/ans/reports/11bc0060579ebc3797d11fe74b3c9118994c9bcbe39bc1662432205d0208219f.json
+./.ans/sessions/实现者/pi/ans/reports/1ed0eeafb3e00beabd87749705750050e5324ebafc69187cf3867bc687d74136.json
+./.ans/sessions/实现者/pi/native/2026-10-15T13-21-38-389Z_01a13fb9-b854-713c-8b5e-fcc00e53e9a9.jsonl
+./.ans/sessions/测试者/pi/ans/index.json
+./.ans/sessions/测试者/pi/ans/replay.jsonl
+./.ans/sessions/测试者/pi/ans/reports/15ef7606218c868740fdb78d51455908e54d7b41eb220ad7d6d944f41d77439e.json
+./.ans/sessions/测试者/pi/ans/reports/26d61e5f777ac82dede509285031fed6114304ad56e54a9f207dee4e60b996be.json
+./.ans/sessions/测试者/pi/native/2026-10-15T13-28-32-587Z_01a13fc0-0a4b-713c-8b5e-fcda384bd5b6.jsonl
+./.gitignore
+./README.md
+./docs/audit/shell-gate.jsonl
+./docs/bootstrap-manifest.md
+./docs/su/changelog.md
+./docs/su/memo.md
+./package.json
+./src/core.js
+./src/public/app.js
+./src/public/index.html
+./src/public/style.css
+./src/server.js
+./src/store.js
+./temp/实现者/2026-10-15_server.js_修复前-v1.0.0.js
+./temp/实现者/REVIEW.md
+./temp/实现者/default-start-check.js
+./temp/实现者/run-data/tasks.json
+./temp/实现者/selfcheck-413.js
+./temp/实现者/selfcheck.js
+./temp/测试者/2026-10-15_413复核.md
+./temp/测试者/2026-10-15_413缺陷.md
+./temp/测试者/REVIEW.md
+./temp/测试者/pin-hashes.cjs
+./temp/测试者/probe-413-v2.cjs
+./temp/测试者/probe-413.cjs
+./temp/测试者/probe-regression-v2.cjs
+./test/01-core.test.js
+./test/02-store.test.js
+./test/03-http-api.test.js
+./test/04-corrupt-recovery.test.js
+./test/05-atomic-write.test.js
+./test/06-static-compliance.test.js
+./test/实现者/smoke.test.js
+./角色卡/governance-boundary.yaml
+./角色卡/实现者/api-spec.md
+./角色卡/实现者/boundary.yaml
+./角色卡/实现者/changelog.md
+./角色卡/实现者/docs/design/design.md
+./角色卡/实现者/feature-map.md
+./角色卡/实现者/functional-description.md
+./角色卡/实现者/memo.md
+./角色卡/实现者/role-card.md
+./角色卡/测试者/api-spec.md
+./角色卡/测试者/boundary.yaml
+./角色卡/测试者/changelog.md
+./角色卡/测试者/docs/design/测试设计.md
+./角色卡/测试者/docs/feature/用例说明.md
+./角色卡/测试者/docs/fix/KANBAN-DEF-001.md
+./角色卡/测试者/feature-map.md
+./角色卡/测试者/functional-description.md
+./角色卡/测试者/memo.md
+./角色卡/测试者/role-card.md
+
+== sha256 of product files ==
+4f366329eafbec441386169efb155fc012a4472bcb809325b9c46ed964e136d7  src/core.js
+bff1e3c4920d329a3818146253f8b417a195d0de555aafb7897f4b80acd8ed39  src/server.js
+44816a6237e814c1cce4de59c738723215092069517beb646ff40fa9e95b70d3  src/store.js
+09711789c585e73fbf1eb50cf30f06ed3a7b7e32072656e269b36087b59c8990  src/public/app.js
+4ce0adbbe1c348661da50c98139a38b3278dea23001bdb54435734196dd087c1  src/public/index.html
+718aabb8592102f31ed76a7c19dc7a51371ded50e83b985b3236367e43aec5cc  src/public/style.css
+859ffaca4f7863e092d922c22132b764aa9e0655bfd52c1e7c21f55f63a6eda4  package.json
+966258c2d0d88753b32ce8a5a5e3c137b880d8c361bb215bb6763bd8ef2d49fc  README.md
+be0146a6b0d5a90de11fbe8a766d3b66c8bbeedfc2a98f34978434bf08dac05b  test/01-core.test.js
+7c5cd4db596b8a2e353ebb3d43a08f775cda59b9c9a0e829463b4eeed5323391  test/02-store.test.js
+d424f37404569f0bb8837635ed41eddd0ab748b965464ba266e1c86a0cd4c48c  test/03-http-api.test.js
+fb5224992fa550b15d4f54a7fde03d3ac7724a7a1a343bfb40835365fba5345c  test/04-corrupt-recovery.test.js
+5a9813763e6a52f260070adba48ac823774025ec1dd0304aa31fb4d48d1f336c  test/05-atomic-write.test.js
+40ca13fcc8d2db18d2293e36a8b05ce9a0bd086a9a51b75fb2077d44a4ba5325  test/06-static-compliance.test.js
+2a969930bff9a6d0b56b40b10de35a17c861579ee1c1e3e513cb9f29bfc91786  test/实现者/smoke.test.js
+
+== git status ==
+?? .ans/
+?? .gitignore
+?? README.md
+?? docs/
+?? package.json
+?? src/
+?? test/
+?? "\350\247\222\350\211\262\345\215\241/"
+
+== git log ==
+9b39e5e test: empty project baseline

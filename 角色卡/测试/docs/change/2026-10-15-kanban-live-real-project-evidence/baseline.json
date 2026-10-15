@@ -1,0 +1,22 @@
+{
+  "status": "planned; empty workspace prepared; app launching",
+  "at": "2026-10-15T13:16:00Z",
+  "ansHead": "e3c0100f7c9999c0843e02a344c3f3b5f28520bb",
+  "software": "public v1.0.0 macOS arm64 ZIP (sha re-verified this round)",
+  "artifactSha256": "92118718ae34b1194c615d2c94c78b37d0324bce0b0ac9e31529431c0bc59270",
+  "packageDirectory": "/private/tmp/ans-taskboard-release-kn7tg1vm",
+  "applicationPath": "/private/tmp/ans-taskboard-release-kn7tg1vm/extracted/ANS Studio.app",
+  "workspace": "/Users/wangzhongren/code/vibeingcode/ans-testbed/kanban-live",
+  "emptyGitBaseline": "9b39e5e",
+  "targetProject": "离线中文任务看板（完整版）：新增/空标题拒绝、三状态、优先级与标签、编辑、删除、筛选排序、状态与标签统计、JSON 导出、刷新与重启保留、损坏数据文件明确报错且不丢原文件、文本 XSS 安全显示；纯 Node 内置模块、零外部依赖、无 CDN、仅监听 127.0.0.1",
+  "runConfig": {
+    "promptTimeoutMs": 900000,
+    "constructTimeoutMs": 300000,
+    "shellReviewTimeoutMs": 300000,
+    "note": "轮次硬超时通过产品环境变量放宽（默认 120000）；其余为默认"
+  },
+  "driveMethod": "CDP over --remote-debugging-port=9444（等价人点界面：导入、点角色、输入、发送、确认卡）；截图 + DOM 探针为证据",
+  "acceptancePlan": "root 在应用外独立验收：真实浏览器/HTTP 操作看板（新增、拒绝空白、状态切换、筛选统计、删除、刷新保留、XSS 标题安全显示、损坏文件恢复），并独立运行项目测试",
+  "model": "Pi with existing configured provider (repo .env, values withheld)",
+  "roundDir": "/private/tmp/ans-kanban-live-7ae6156b"
+}

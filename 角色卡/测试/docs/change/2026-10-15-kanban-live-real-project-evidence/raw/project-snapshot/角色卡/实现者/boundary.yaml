@@ -1,0 +1,50 @@
+role: 实现者
+entries:
+  - kind: directory
+    path: src/
+    purpose: 服务端与前端源码（Node 内置模块 + 原生 HTML/CSS/JS，含 src/public/ 静态页）
+  - kind: file
+    path: package.json
+    purpose: 零依赖脚本入口（start/test），不得含 dependencies
+  - kind: file
+    path: .gitignore
+    purpose: 忽略 data/ temp/ node_modules/
+  - kind: file
+    path: README.md
+    purpose: 启动命令、页面用法示例、API 契约、数据文件位置与损坏恢复、跑测命令
+  - kind: directory
+    path: data/
+    purpose: 运行时 JSON 数据目录（服务自身读写，草稿性质，非交付物、不参与 pin）
+  - kind: directory
+    path: test/实现者/
+    purpose: 实现者自查 smoke 测试；不替代交付测试套件，不得改动 test/ 其他内容
+  - kind: directory
+    path: temp/实现者/
+    purpose: 未通过/返工产物暂存，供审核对照
+  - kind: file
+    path: 角色卡/实现者/feature-map.md
+    purpose: 功能地图
+  - kind: file
+    path: 角色卡/实现者/memo.md
+    purpose: 工作备忘录（进行中事项 / 待确认项）
+  - kind: file
+    path: 角色卡/实现者/changelog.md
+    purpose: 变更记录
+  - kind: file
+    path: 角色卡/实现者/functional-description.md
+    purpose: 功能与流程说明
+  - kind: file
+    path: 角色卡/实现者/api-spec.md
+    purpose: 接口契约
+  - kind: directory
+    path: 角色卡/实现者/docs/design/
+    purpose: 设计文档
+  - kind: directory
+    path: 角色卡/实现者/docs/feature/
+    purpose: 功能文档
+  - kind: directory
+    path: 角色卡/实现者/docs/change/
+    purpose: 变更文档
+  - kind: directory
+    path: 角色卡/实现者/docs/fix/
+    purpose: 修复文档

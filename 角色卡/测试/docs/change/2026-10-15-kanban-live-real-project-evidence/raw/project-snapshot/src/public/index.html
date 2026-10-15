@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>离线中文任务看板</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="topbar">
+  <h1>离线中文任务看板</h1>
+  <div class="topbar-actions">
+    <button id="refresh-btn" type="button" class="btn">刷新</button>
+    <button id="export-btn" type="button" class="btn btn-primary">导出 JSON</button>
+  </div>
+</header>
+
+<div id="warning-banner" class="warning-banner" role="alert" hidden></div>
+<div id="notice" class="notice" role="status" hidden></div>
+
+<main class="layout">
+  <section class="panel stats-panel">
+    <h2>统计</h2>
+    <div id="stats-status" class="stats-row"></div>
+    <div id="stats-tags" class="stats-row"></div>
+  </section>
+
+  <section class="panel create-panel">
+    <h2>新增任务</h2>
+    <form id="create-form" autocomplete="off">
+      <div class="field">
+        <label for="create-title">标题（必填，最多 200 字）</label>
+        <input id="create-title" type="text" maxlength="200" placeholder="例如：修复登录页空白标题校验">
+      </div>
+      <div class="field">
+        <label for="create-priority">优先级</label>
+        <select id="create-priority">
+          <option value="low">低</option>
+          <option value="medium" selected>中</option>
+          <option value="high">高</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="create-tags">标签（多个用逗号分隔，最多 10 个）</label>
+        <input id="create-tags" type="text" placeholder="例如：前端,紧急">
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">添加任务</button>
+        <span id="create-error" class="form-error" role="alert"></span>
+      </div>
+    </form>
+  </section>
+
+  <section class="panel filter-panel">
+    <h2>筛选与排序</h2>
+    <div class="filter-grid">
+      <div class="field">
+        <label for="filter-status">状态</label>
+        <select id="filter-status">
+          <option value="all">全部</option>
+          <option value="todo">待办</option>
+          <option value="doing">进行中</option>
+          <option value="done">已完成</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="filter-tag">标签</label>
+        <select id="filter-tag">
+          <option value="all">全部</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="filter-q">关键字</label>
+        <input id="filter-q" type="text" placeholder="按标题或标签搜索">
+      </div>
+      <div class="field">
+        <label for="filter-sort">排序依据</label>
+        <select id="filter-sort">
+          <option value="createdAt">创建时间</option>
+          <option value="priority">优先级</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="filter-order">顺序</label>
+        <select id="filter-order">
+          <option value="desc">倒序</option>
+          <option value="asc">正序</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="filter-reset">&nbsp;</label>
+        <button id="filter-reset" type="button" class="btn">重置筛选</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="board" class="board" aria-live="polite"></section>
+</main>
+
+<div id="edit-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="edit-modal-title" hidden>
+  <div class="modal-card">
+    <h2 id="edit-modal-title">编辑任务</h2>
+    <form id="edit-form" autocomplete="off">
+      <div class="field">
+        <label for="edit-title">标题（必填，最多 200 字）</label>
+        <input id="edit-title" type="text" maxlength="200">
+      </div>
+      <div class="field">
+        <label for="edit-priority">优先级</label>
+        <select id="edit-priority">
+          <option value="low">低</option>
+          <option value="medium">中</option>
+          <option value="high">高</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="edit-tags">标签（多个用逗号分隔）</label>
+        <input id="edit-tags" type="text">
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">保存</button>
+        <button id="edit-cancel" type="button" class="btn">取消</button>
+        <span id="edit-error" class="form-error" role="alert"></span>
+      </div>
+    </form>
+  </div>
+</div>
+
+<footer class="footer">
+  <p>纯离线运行：仅使用 Node.js 内置模块与原生 HTML/CSS/JS，无任何第三方依赖与外链资源。</p>
+</footer>
+
+<script src="/app.js"></script>
+</body>
+</html>
