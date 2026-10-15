@@ -42,3 +42,9 @@
 - 2026-10-15（视觉收敛第二轮静态）：具体HTML c575bc45/说明82f8f8b7已读，V1–V5方向符合；静态发现工作概览无场景伪回交、资料→文档→正文→清单丢返回资料，发root待亲点/UX改。本context browsers[]、iab/edge不可用，初始化bundled受信runtime被auto-review以绕过不可用浏览器路径拒绝，遵守不再试替代surface，未打开新tab/动roottab/设置viewport。产品亲审缺口明确不代签，root正常IAB独立点验不归我。当前具体原型需修订，设计未实施。
 
 - 2026-10-15（视觉收敛V2最终静态回签）：实际HTML e95b363d/说明revision2 01bd3347核对，PV-R1 report场景条件/其它空态、PV-R2 docsFromInfo重建backInfo与返回焦点、完整summary与readingStates、缺配状态/清toast均已回应。recommend approval仅具体设计交用户确认；接受424模态暂禁后台、折任务请求、报告优先及504仅缩放演示取舍。不尝试被拒浏览器路径；动态结果归root正常IAB，产品亲审缺口仍保留，不代签、不实施。
+
+- 2026-10-15（发布后路线图）：基线main36fa5dd干净，Release实际83445eb+c3d1066；三平台ZIP离线smoke及本机包配置实测，不等于在线模型改代码。P1–P7/V2已实现，不复开旧UI问题。现dispatch仅role/task/reason逐条，已有typed report/receipt/provenance；evidence仍字符串、独立验收尚未确认。建议A新用户+运行包在线端到端、B单需求范围/差异/验证/接受串通、C证实瓶颈后最小依赖调度；O1签名安装/O2Windows安全阅读/O3本地诊断导出待选。release工作流/policy固定v1.0.0，新版先评审来源规则，不覆盖原tag/资产。见[评估](docs/design/2026-10-15_design_post-v1-product-roadmap.md)，仅产品文档，无实施授权。
+
+- 2026-10-15（路线图revision2）：回应PM简审，A先一个Pi发布ZIP任务建立最小基线；3样本/2独立完成是研究目标，不挡已复现缺陷补丁，缺用户/凭据/另一OS逐项未覆盖。B四独立事实owner与partial/unknown恢复在后续具体设计评估，范围版本和task标识不发行写权。推荐A→B→证据C与O1–O3待选不变。
+
+- 2026-10-15（README重写简审）：114行最终稿产品通过；导入前引擎禁选，首用统一导入→引擎/设置→su任务→证据。任务写集条件收口已由装配实改，不暗示每条dispatch发行写权。产品仅read-only检查，不操作GUI、不提交。

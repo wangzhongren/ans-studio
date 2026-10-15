@@ -16,7 +16,7 @@ CLI 四运行时的当前接线见 [稳定功能说明](docs/feature/cli-runtime
 | 构建与测试配置（`package.json`、`tsconfig.json`） | 包定义、依赖与脚本（`start` / `doctor` / `demo` / `app` / `test:assembly` / `typecheck`）；TS 编译配置（strict、`noEmit`、`nodenext`，覆盖 `src` / `test` / `app`）；类型门禁由「空承诺」改为真跑 | 已实现（typescript 7.0.2） | [README](../../README.md)（快速开始 / 两道门）、[changelog](changelog.md)（2026-10-11 类型门禁条目） |
 | 两道门（交付前必过） | ① 全量 `node --test "test/**/*.test.ts"`（**必须带引号**，走 Node glob、覆盖三层路径）② `npm run typecheck`——本角色每次交付的验证基线 | 已建立 | [README](../../README.md)（两道门） |
 | 装配测试（`test/装配/`，8 文件 54 例） | 启动冒烟与接线测试：命令解析、govern 注入、`.ans` 载入、入口收敛、演示运行时 | 67/67（2026-10-14 本次接线；详细原始结果见记录） | [test/装配/](../../test/装配/) |
-| README（安装与使用说明） | 当前CLI四值/桌面三选项、各引擎设置、角色/runtime存储与真实恢复、权限与上游等待限制 | 文档核对已verified，链接T1已通过的无网络候选 | [README.md](../../README.md)、[文档核对](docs/change/2026-10-14_change_readme-multi-runtime-desktop.md) |
+| README（安装与使用说明） | 新用户从下载、导入与配置到任务验收的使用路径，附开发入口与实际限制 | 2026-10-15 按读者任务重写，链接与命令文档核对通过 | [README.md](../../README.md)、[本次重写](docs/change/2026-10-15_change_readme-reader-flow.md)、[历史核对](docs/change/2026-10-14_change_readme-multi-runtime-desktop.md) |
 | `.env` / `.env.example`（本角色归属） | 仓库根环境配置：凭据只落 `.env`（已 gitignore）、示例只含占位符；读写唯一实现＝共享组件 `env-file.ts`（pm 属主；本角色为指定写入者，记档 G-2） | 已实现 | [共享组件目录](../项目管理/docs/architecture/shared-components.md) |
 | `.ans/`（条件目录 `project-init`） | 项目初始化产物写权（`.ans/project.json`：角色表、治理边界与接受证据的 SHA-256 pin）；条件目录——写入须在 TaskScope 声明条件，否则门禁按「命中条件目录但缺少条件」拒绝 | 已登记（Governance 授权、客户批准） | [Section 1 授权记档](../项目管理/docs/change/2026-10-11_change_governance-section1-grants.md) |
 
