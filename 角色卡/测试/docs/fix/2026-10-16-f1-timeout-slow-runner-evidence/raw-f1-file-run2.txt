@@ -1,0 +1,12 @@
+✔ F-1 env 2000ms：到期终止、如实文案、execution.timedOut；轮次信号不受影响、后续命令照常 (2041.415125ms)
+✔ F-1 孙进程终止：超时后进程组一并收口（孙进程 pid 消失） (2005.239334ms)
+✔ F-1 SIGKILL 升级：SIGTERM 免疫子进程不再有机会写入 late 文件 (5060.888416ms)
+✔ F-1 解析链与不误杀：显式选项优先于 env；快命令在大时限下照常完成 (35.886958ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9207.294875

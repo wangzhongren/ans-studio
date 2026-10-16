@@ -20,16 +20,28 @@ test('release refuses unreviewed production changes and similarly named private 
     ['package.json', 'test/装配/release-packaging.test.ts']);
 });
 
-// v1.1.0 轮按精确路径纳入的 Windows 测试小修已随冻结 tag 吸收；v1.2.0 overlay 按精确路径增列的 1 个经评审
-// 文件是生产侧修复（见下方专项用例），测试面零改动——未列名的 test/ 文件（含 test/runtime-core/**、
-// test/codex-adapter/**）一律 excluded、不随构建树分发；本用例锁死该边界，若版本又需测试文件随 overlay
-// （先例：v1.1.0 平台断言小修），须经评审显式列入。
-test('release overlay keeps the packaging surface exact: unreviewed test files stay excluded', () => {
+// v1.2.0 发布前 CI 检查（overlay-3，归因更正 2026-10-16）：CI（run 38881759770）macos-15-intel 两条 F-1
+// 计时用例红——逐字落点为 test/测试/kanban-fixes-verify/f1-timeout.test.ts:40/:76 的镜像用例（慢 runner
+// 微小时限未适配，非产品缺陷）；「测试」对该文件的同口径时序健壮化（不放松断言）经评审随本版 overlay
+// 进构建树——按精确路径列入 files（单文件路径、不开目录）。未列名的 test/ 文件（同目录 f2~f8、
+// test/runtime-core/**、test/codex-adapter/** 含 session.test.ts）一律 excluded、不随构建树分发；
+// 本用例锁死「按精确路径入选、不开目录」边界。
+test('release overlay includes exactly the reviewed f1-timeout slow-runner test by exact path', () => {
+  const result = selectOverlay(['package.json', 'test/测试/kanban-fixes-verify/f1-timeout.test.ts',
+    'test/测试/kanban-fixes-verify/f2-claim-release.test.ts', 'test/runtime-core/tools.test.ts', 'test/codex-adapter/electron-launch.test.ts']);
+  assert.deepEqual(result.selected, ['package.json', 'test/测试/kanban-fixes-verify/f1-timeout.test.ts']);
+  assert.deepEqual(result.excluded, ['test/测试/kanban-fixes-verify/f2-claim-release.test.ts', 'test/runtime-core/tools.test.ts', 'test/codex-adapter/electron-launch.test.ts']);
+});
+
+// 归因更正（2026-10-16）：上一版曾把 intel 2 红错误归属给 test/runtime-core/shell-exec-timeout.test.ts 并据此
+// 列入——该文件在同 run 7/7 全绿，本次核实后从 files 移除；其同口径硬化调用 fixtures.ts 新增的可选第二参
+// （只列测试不列夹具则构建树「新测试配旧夹具」、第二参被静默忽略），两文件随发布后 main 常规批次提交、
+// 不入本 overlay。本用例锁死「已移除」：该文件与 fixtures.ts 一并仍 excluded（精确集合、不开目录）。
+test('release overlay keeps the runtime-core hardened pair out after the attribution correction', () => {
   const result = selectOverlay(['package.json', 'test/runtime-core/shell-exec-timeout.test.ts',
-    'test/runtime-core/tools.test.ts', 'test/codex-adapter/electron-launch.test.ts']);
+    'test/runtime-core/fixtures.ts', 'test/runtime-core/tools.test.ts']);
   assert.deepEqual(result.selected, ['package.json']);
-  assert.deepEqual(result.excluded, ['test/runtime-core/shell-exec-timeout.test.ts',
-    'test/runtime-core/tools.test.ts', 'test/codex-adapter/electron-launch.test.ts']);
+  assert.deepEqual(result.excluded, ['test/runtime-core/shell-exec-timeout.test.ts', 'test/runtime-core/fixtures.ts', 'test/runtime-core/tools.test.ts']);
 });
 
 // v1.2.0 发布前 CI 追加：v1.2.0 CI（run 38879484184）Windows 仅 1 红——test/codex-adapter/session.test.ts 的

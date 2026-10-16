@@ -88,6 +88,22 @@ status: approved-implementation-dispatched
 - **登记待排（低-中、呈现层）**：回放路径的"手输仿前缀被归为注入行"残余——历史行缺投递身份（实时路径已有身份绑定保护、不成立）；最小修复需历史行携带投递身份（桌面窗口 + 编排侧），是否排期由客户/PM 后续定。
 - **工具行折叠（客户批准口径，2026-10-16 定稿）**：同一轮内连续工具行、**轮结束后折叠成一行**（「▸ 本轮 N 个调用：role_status / run_shell ×5 / …」）；**运行中不折叠**（实时可见）；点击展开为逐条一行完整列表（每条自身详情折叠保留，信息零丢失）；**折叠态显式标出未放行/失败调用**（如"含 1 条未放行"）。属主 桌面UI（口径微调如需 UIUX 复核）；**派发时机＝v1.2.0 CI 触发之后**（避免混入已冻结的发布 overlay，`app/` 路径会触发 release-prepare 未评审生产变更门禁）。
 
+## 候选 G-3「联网能力」（2026-10-16 探针实证后升级为实施方向）
+
+- **探针实证**（客户本机直连网关）：声明 Anthropic 服务端工具 `web_search_20250305` → HTTP 200，服务端真实执行（`server_tool_use`/`web_search_tool_result`/`max_uses_exceeded` 优雅；`usage.server_tool_use.web_search_requests` 计量）。**网关完整支持服务端工具族声明**。
+- **客户要求「其他的都要接上」**：不止 web_search——按**可配置的服务端工具集**接入（web_fetch、code_execution 等待追加探针确认）。
+- 派发：Pi适配器 出实施方案提案（SDK 注入点、块类型映射、能力位/计费/注入面策略、失败边界、测试与分期）；提案经 PM 评审与客户批准后实施。主属主 Pi适配器（+桌面UI 行样式、运行时核心 文案若需要）。
+
+**G-3 客户批准与实施派发（2026-10-16）**：三份提案到齐后客户「按推荐批准，开始实施」。批准口径：①默认关 + 开关开启（`ANS_PI_SERVER_TOOLS` / `ANS_CLAUDE_WEB_SEARCH` / `ANS_CODEX_WEB_SEARCH`）；②首批工具集 web_search + web_fetch（Pi 侧；Claude 侧 WebSearch，其 WebFetch 客户端形态另行评估；code_execution 缓）；③搜索查询串不进诊断落盘（会话内可见）；④网关不认声明时如实失败、不毁轮次（自动剥离重试后置）；⑤搜索行样式与工具行/折叠口径合流；⑥live 探针由客户在实施验证阶段运行。实施派发：Pi适配器、Claude适配器、Codex适配器 三个独立上下文（各自提案为实施规格）；行样式如需桌面UI 配合由适配器回交列出、PM 路由。随下一版运行包发布。
+
+## v1.2.0 发布解阻（overlay-3）与归因更正（2026-10-16）
+
+- CI run `38881759770`（overlay-2，headSha 21351a7）：**Windows ✅**（Codex EBUSY 生产修复生效）、mac arm64 ✅、**macos-15-intel ✗ 2 红**。
+- **归因更正**：2 红**不在** `test/runtime-core/shell-exec-timeout.test.ts`（该文件在同 run 7/7 全绿），而在 `test/测试/kanban-fixes-verify/f1-timeout.test.ts:40/76`——测试角色独立复验套件中**镜像**的 F-1 用例（250ms 微时限与 pid 消失等待窗未适配慢 runner；非产品缺陷）。overlay-2 白名单注释与任务书同款误归属，由装配随本批更正。
+- **overlay-3 最小差集口径（PM 裁定）**：白名单**增** `test/测试/kanban-fixes-verify/f1-timeout.test.ts`（真凶文件，经测试角色同口径时序健壮化：微时限抬高、有界轮询、语义零放松），**减** `test/runtime-core/shell-exec-timeout.test.ts`（原条目唯一依据＝误归属；该文件 intel 本就全绿；其硬化调用 `until(pred, boundMs)` 依赖 fixtures.ts 新增可选形参，若只列测试文件不列夹具则「新测试配旧夹具」静默失效——列两件又属非必需扩面，故整组随发布后 main 常规批次提交，不入本 overlay）。selected 预期：8 − 1 + 1 = 8。
+- **派发**：测试（f1-timeout 硬化）；装配（白名单增一减一 + 注释更正 + packaging 测试精确同步 + selected 复算）。运行时核心硬化件按上述口径延迟入 main。
+- **提交纪律（选择性提交）**：overlay-3 只含 policy/装配测试面/f1-timeout/相关角色文档；**排除**在飞的折叠批（app/renderer×3、test/桌面应用×3）与三平台搜索批（src/provider/*、test/*-adapter、相关角色卡）——`selectOverlay`（release-policy.mjs:19）对未列 `app/`、`src/` 路径**硬拒**（Unreviewed production overlay），混入即发布门禁失败。
+
 ## G-1 客户批准与 PM 裁定（2026-10-16）
 
 客户指示「这些开始启动」＝**批准 G-1 按提案实施** + 批准 G-2 细化 + 上下文窗口由 128K 调至 256K + 关闭 run-3 应用。PM 对提案 §十一 六项裁定（采纳提案推荐）：
