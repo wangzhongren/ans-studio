@@ -35,7 +35,9 @@ export function describeTool(name: string): ToolDescription {
     // 2026-10-16 客户裁定（su 写 `docs/su/**` 与 `docs/contracts/**` 免逐次审批；编排预置进 su
     // 会话初始 writeSet、门禁引擎同步 su 卡「确认制要点」）：本工具文案补「唯一例外（仅内置治理
     // 角色 su）——写盘许可已预置、免逐次确认、开会话与重建后均生效」；G-4（2026-10-16 批准）后
-    // 预授权再增 `docs/skills/**`、扩为**三棵**（与门禁引擎新卡文本同口径）；其余一切写盘仍逐条
+    // 预授权再增 `docs/skills/**`、扩为三棵；**G-4 V2（2026-10-16「按推荐批准，开始实施」）后
+    // 再增 `docs/mcp/**`、扩为四棵**（与门禁引擎 V2 新卡文本同口径；编排 `SU_PREAUTHORIZED_WRITE_DIRS`
+    // 同批已落——登记规则：「门禁引擎/编排若再调预置口径须回改本处文案与测试」）；其余一切写盘仍逐条
     // 确认，非 su 角色语义不变（例外不做 su 限定即会把普通角色带歪）。
     // executionMode:"sequential"（A-6）：防止同批的 write_file 抢跑于确认（Pi 缺省同批并行执行工具）。
     return {
@@ -56,8 +58,8 @@ export function describeTool(name: string): ToolDescription {
       description:
         "向客户请求确认并**挂起等待其回应**（前端渲染成交互卡）。已接受项目边界内、已授权任务的**读取与检查**" +
         "无需逐次确认；**写盘一律先经本工具确认**——把将写出的路径列入 preview，客户返回 `confirmed:true` 后系统才为这些路径发行写盘许可。" +
-        "**唯一例外（仅内置治理角色 su）**：`docs/su/**`（su 自己的工作笔记）、`docs/contracts/**`（跨角色契约文档）与 `docs/skills/**`（su 给角色安装的技能文档）的写盘许可**已预置**——" +
-        "写入这三棵目录树**无需逐次确认**、直接写即可（开会话与重建后均生效）；三棵树之外的一切写盘仍须逐条确认。" +
+        "**唯一例外（仅内置治理角色 su）**：`docs/su/**`（su 自己的工作笔记）、`docs/contracts/**`（跨角色契约文档）、`docs/skills/**`（su 给角色安装的技能文档）与 `docs/mcp/**`（su 给角色安装的 MCP 声明文档）的写盘许可**已预置**——" +
+        "写入这四棵目录树**无需逐次确认**、直接写即可（开会话与重建后均生效）；四棵树之外的一切写盘仍须逐条确认。" +
         "真正新建或扩张角色边界、治理写集时，须由 su 把变更呈给客户确认（角色卡全文与边界摘要放进 preview），" +
         "仅当返回「客户已确认」时才落盘。未获同意（拒绝/超时/通道不可用）→ **不要写盘**，如实告知客户，不得假设同意。" +
         "**preview 必须列出将要写出的具体路径**（项目内相对路径，如 `角色卡/示例/role-card.md`）——写盘许可依 preview 所列路径发行；" +
@@ -65,7 +67,7 @@ export function describeTool(name: string): ToolDescription {
       promptGuidelines: [
         "已接受项目边界内、已授权任务的**读取与检查**无需逐次确认；**写盘（write_file / edit_file 等）一律先经本工具确认**——" +
           "把将写出的路径逐条列入 preview，客户返回 `confirmed:true` 后系统才会为这些路径发行写盘许可；对话里的口头同意不是凭据。" +
-          "**唯一例外（仅内置治理角色 su）**：`docs/su/**`、`docs/contracts/**` 与 `docs/skills/**` 的写盘许可已预置——写这三棵目录树无需逐次确认、直接写即可（开会话与重建后均生效）；三棵树之外的一切写盘仍须逐条确认。" +
+          "**唯一例外（仅内置治理角色 su）**：`docs/su/**`、`docs/contracts/**`、`docs/skills/**` 与 `docs/mcp/**` 的写盘许可已预置——写这四棵目录树无需逐次确认、直接写即可（开会话与重建后均生效）；四棵树之外的一切写盘仍须逐条确认。" +
           "新建或扩张角色边界、治理写集须由 su 经 request_confirmation 取得客户的**明确同意**。未获该变更同意 → 不执行治理变更，不得假设同意。",
         "新建角色或扩张角色边界时：先把**角色卡全文 + 边界摘要**放进 request_confirmation 的 preview 请客户预览，同意后才写入治理变更。",
         "request_confirmation 的 preview **必须列出将要写出的具体路径**（每个待写文件一行，相对项目根、含目录，如 " +
@@ -383,6 +385,69 @@ export function describeTool(name: string): ToolDescription {
         "卸载技能**仅限客户明示**；不得自主发起；非客户消息发起的轮次会被拒绝（not-customer-turn）。",
         "**先改登记再卸载**：先把该角色条目从 `docs/skills/<name>/install.md` 移除（edit_file），再调 uninstall_skill；登记未变会被拒绝（防「说撤了、实际没撤」）。",
         "卸载只撤**登记效果**、**不删文件**（文件保留于 `docs/skills/<name>/`）；回执如实二分陈述「效果已撤／文件保留」，且卸载**不改变任何角色的写边界**。",
+      ],
+    };
+  }
+  if (name === "install_mcp") {
+    // 外来 MCP 安装工具（G-4 V2 wave A，只给 su 注入；客户 2026-10-16「按推荐批准，开始实施」）。
+    // 文案纪律（沿 install_skill 先例逐字体格）：仅客户明示时安装（不自主发起）/ 先落盘再激活 /
+    // 工具只校验+激活+回执、**不写盘** / **外来 MCP 工具在 ANS 门禁之外执行＝能力级授予**（§5.3
+    // 诚实面——不得宣称逐调用受审）/ 失败文案枚举沿技能版逐字体格（含护栏 not-customer-turn）/
+    // 不得暗示任何授权。
+    return {
+      parameters: {
+        type: "object",
+        properties: {
+          roleId: { type: "string", description: "Target project role id (must be a project role, not su itself)" },
+          name: { type: "string", description: "MCP server name (stable short slug matching docs/mcp/<name>.md)" },
+        },
+        required: ["roleId", "name"],
+        additionalProperties: true,
+      },
+      description:
+        "向目标角色**安装外来 MCP server**（只注入给治理角色 su；激活＝重建目标会话，使其新会话装配该 MCP 声明）。" +
+        "**仅客户明示时安装**——客户在会话中指令你安装才执行；**不得自主发起**；非客户消息发起的轮次调用会被**拒绝**（not-customer-turn：`本动作仅可在客户消息发起的轮次执行——未执行。`）。" +
+        "**先落盘再激活**：声明先由你经 write_file 落盘到 `docs/mcp/<name>.md`（用途/启动 command/参数/环境［只收字面量或 `env:NAME` 引用——凭据值不入声明文件］/适用角色/状态），**再**调本工具；" +
+        "本工具**不写盘、不做治理判定**——只**校验**（声明存在、含目标角色）、**激活**并**如实回执**。" +
+        "**外来 MCP 工具在 ANS 门禁之外执行**（在 server 进程内运行、不属于任何受治理写面）——安装一个 MCP＝给该角色开一片**门禁之外的新动作面**（动作面边界＝server 自己提供什么）＝**能力级授予**，**不是逐调用受审**；安装**不改变任何角色的写边界**。" +
+        "回执三态如实：`effective:\"rebuilt\"`＝目标会话已重建、即刻生效；`effective:\"next-session\"`＝目标正在跑轮次、不打断——新会话起生效（如实延迟态，不是错误）；" +
+        "失败（`ok:false`）一律**未执行、零副作用**，如实报因（枚举）：MCP 未登记＝`MCP 未登记：docs/mcp/<name>.md 不存在——先落盘再安装；未执行。`；" +
+        "登记未含目标角色＝`登记中未包含角色「<roleId>」——未执行；如确要安装请先更新登记。`；角色不存在或为 su 自身＝`角色「<roleId>」不是本项目项目角色（或为治理角色 su）——未执行。`。" +
+        "**不得**把失败或延迟说成已生效。",
+      promptGuidelines: [
+        "安装外来 MCP **仅限客户明示**（客户在会话中说「给<角色>装 MCP <name>」）：不得自主发起、不得把派发/看护等其它轮次的意图当许可；非客户消息发起的轮次会被拒绝（not-customer-turn）。",
+        "**先落盘再激活**：先 write_file 落盘 `docs/mcp/<name>.md`（声明：用途/启动/参数/环境［只收字面量或 `env:NAME` 引用——凭据值不入文件］/适用角色/状态），再调 install_mcp——本工具只校验/激活/回执，**不写盘**，也不放宽任何写权。",
+        "**外来 MCP 工具在 ANS 门禁之外执行＝能力级授予**（在 server 进程内运行、非逐调用受审）——安装前如实向客户说明这一点；安装**不改变任何角色的写边界**；回执如实转达：rebuilt＝已重建、即刻生效；next-session＝在跑不打断、新会话起生效；失败＝未执行、零副作用，如实报因。",
+      ],
+    };
+  }
+  if (name === "uninstall_mcp") {
+    // 外来 MCP 卸载工具（G-4 V2 wave A，只给 su 注入）。文案纪律（沿 uninstall_skill 先例逐字体格）：
+    // 仅客户明示时卸载 / **先改声明再卸载**（防「工具说撤了、声明没变」）/ 工具不写盘 / 声明保留
+    // （「效果已撤」与「文件仍在」如实二分）/ **卸载＝下次会话摘除、已发生的副作用不可撤** /
+    // 不改变任何角色写边界 / 失败文案枚举沿技能版（含 not-customer-turn 护栏）。
+    return {
+      parameters: {
+        type: "object",
+        properties: {
+          roleId: { type: "string", description: "Target project role id (must be a project role, not su itself)" },
+          name: { type: "string", description: "MCP server name (stable short slug matching docs/mcp/<name>.md)" },
+        },
+        required: ["roleId", "name"],
+        additionalProperties: true,
+      },
+      description:
+        "向目标角色**卸载外来 MCP**（只注入给治理角色 su；激活＝重建目标会话，使其新会话不再装配该 MCP 声明）。" +
+        "**仅客户明示时卸载**——客户在会话中指令你卸载才执行；**不得自主发起**；非客户消息发起的轮次调用会被**拒绝**（not-customer-turn：`本动作仅可在客户消息发起的轮次执行——未执行。`）。" +
+        "**先改登记再卸载**：先由你用 edit_file 把该角色条目从 `docs/mcp/<name>.md` 移除（或整份置 `status: uninstalled`），**再**调本工具；" +
+        "本工具**不写盘**——只**校验登记确已撤销**（未撤销即拒绝：`登记仍含角色「<roleId>」——先改登记再卸载；未执行。`——防「工具说撤了、声明没变」）、**激活**并**如实回执**。" +
+        "**卸载＝下次会话摘除**（server 进程随会话消亡、零平台残留）；**声明文件保留**——如实区分「效果已撤」与「文件仍在」。" +
+        "**已发生的副作用不可撤**：该 MCP 曾经执行过的动作不可收回（能力级授予的历史事实——如需清文件目前须客户手动删除）；**卸载不改变任何角色的写边界**。" +
+        "回执三态同 install_mcp：`effective:\"rebuilt\"`＝已重建、即刻生效；`\"next-session\"`＝在跑不打断、新会话起生效；`ok:false`＝**未执行、零副作用**，如实报因。",
+      promptGuidelines: [
+        "卸载外来 MCP **仅限客户明示**；不得自主发起；非客户消息发起的轮次会被拒绝（not-customer-turn）。",
+        "**先改登记再卸载**：先把该角色条目从 `docs/mcp/<name>.md` 移除（edit_file；或整份置 `status: uninstalled`），再调 uninstall_mcp；声明未变会被拒绝（防「说撤了、实际没撤」）。",
+        "卸载＝**下次会话摘除**、**声明文件保留**（如实二分「效果已撤／文件仍在」）；**已发生的副作用不可撤**（该 MCP 执行过的动作不可收回）——且卸载**不改变任何角色的写边界**。",
       ],
     };
   }

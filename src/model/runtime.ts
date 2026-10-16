@@ -396,6 +396,96 @@ export type UninstallSkillFn = (
   metadata?: ReportHandbackMetadata,
 ) => Promise<InstallSkillReceipt>;
 
+// —————————————— 角色能力安装：MCP 安装/卸载（G-4 V2 wave A；只给 su 注入，注入才注册） ——————————————
+//
+// 依据：客户 2026-10-16「按推荐批准，开始实施」＝V2（外来 MCP 按角色安装）分批实施（设计
+// `角色卡/产品/docs/design/2026-10-16_design_role-capability-install.md` §五/§九，实施 P1 Claude→P2 Codex→P3 Pi；
+// 本波 wave A＝契约层）。符号冻结（单一来源＝本模块）：读取器在 `src/common/runtime-core/mcp-declarations.ts`、
+// Service 在 providerFor 按角色读取并注入 `RuntimeProviderOptions.installedMcpServers`（适配器纯消费，
+// 三平台装配属各自批次）。两工具均**只给治理角色 su**——未注入 ⇒ 工具不存在（沿技能版「注入才注册」）。
+// 本层纪律同技能版：**工具不写盘**（落盘＝su 的 `write_file`，「先落盘再激活」的镜像）；工具只
+// **校验＋激活＋回执**（校验/激活在注入能力侧＝桌面 handler；激活复用既有重建，在跑不打断）。
+//
+// 诚实面（V2 定格，评估＋三平台 P0 探针实证；面向客户文案不得宣称逐调用受审）：外来 MCP 工具在
+// server 进程内执行、**不经过 ANS 门禁**（不属于 `write_file`/`run_shell` 任一受治理面）——安装一个
+// MCP＝给该角色开一片**门禁之外的新动作面**（动作面边界＝server 自己提供什么）＝**能力级授予**；
+// 卸载＝下次会话摘除（进程随会话消亡、零平台残留），但**已发生的副作用不可撤**。安装不改变任何
+// 角色的写边界（那是 ANS 门禁面的事，与 MCP 执行面是两个事实——回执与文案如实二分，不混说）。
+
+/**
+ * 已安装 MCP server 的中立声明视图（G-4 V2；**stdio 限定**——HTTP/URL 不列入，裁定③）。
+ * `env` 值只允许**字面量**或 `env:NAME` **引用**（真值由各平台适配器自持展开自进程环境，
+ * **绝不落声明文件**；`!` 开头形态＝坏件，读取器拒）；`name` 仅 `[A-Za-z0-9_-]`（读取器校验）。
+ * 消费面：Service 读取后随 `RuntimeProviderOptions.installedMcpServers` 注入（适配器纯消费、
+ * **不各自去找文件**——单一来源、三平台同形）。
+ */
+export interface InstalledMcpServerV1 {
+  name: string;
+  /** 可执行命令（按 argv 直接 spawn、**不经 shell**——沿 run_shell 先例；参数走 `args`）。 */
+  command: string;
+  args: readonly string[];
+  env?: Readonly<Record<string, string>>;
+}
+
+/** `install_mcp` / `uninstall_mcp` 载荷（G-4 V2 §5.1）：目标角色与 MCP 名（稳定短 slug，与 `docs/mcp/<name>.md` 一致）。 */
+export interface InstallMcpPayload {
+  /** 目标项目角色 id（不能是 su 自身；校验在能力实现侧）。 */
+  roleId: string;
+  /** MCP 名（稳定短 slug；声明文件位置 `docs/mcp/<name>.md`）。 */
+  name: string;
+}
+
+/**
+ * MCP 安装/卸载回执（G-4 V2，形状冻结、**沿 `InstallSkillReceipt` 体格**；测试逐条钉住）——三态如实：
+ * - `ok:true`＋`action:"installed"|"uninstalled"`＝**已校验（声明/含角色）且已尝试激活**；
+ *   `effective:"rebuilt"`＝目标会话已重建、即刻生效；`effective:"next-session"`＝目标正在跑轮次、
+ *   不打断——新会话起生效（**如实延迟态，不是错误**）；`path`＝声明文件路径（`docs/mcp/<name>.md`）、
+ *   `digest`＝声明文件**当刻字节** sha256（运行期算——「哈希只能由代码算」，展示可截前 12 位）；
+ *   `note` 为可选如实补充。
+ * - `ok:false`＋`reason`＋`message`＝**未执行、零副作用**。`reason` 机读标识（枚举沿技能版：
+ *   `not-registered` 声明文件不存在、`role-not-listed` 声明未含目标角色、`role-not-found`
+ *   角色不存在或为 su 自身、`not-customer-turn` 非客户消息发起的轮次（护栏）、
+ *   `registration-unchanged` 卸载时声明未撤销、`rebuild-failed` 激活失败）；`message` 一句人话，
+ *   文案枚举沿技能版逐字体格（`MCP 未登记：docs/mcp/<name>.md 不存在——先落盘再安装；未执行。` 等）。
+ */
+export type InstallMcpReceipt =
+  | {
+      ok: true;
+      action: "installed" | "uninstalled";
+      roleId: string;
+      name: string;
+      path: string;
+      digest: string;
+      effective: "rebuilt" | "next-session";
+      note?: string;
+    }
+  | { ok: false; reason: string; message: string };
+
+/**
+ * `install_mcp` 的注入能力（**只给 su**；未注入 ⇒ 工具不注册）。纪律同 `InstallSkillFn`：
+ * **工具不写盘**——本能力只**校验（角色/声明/含角色；护栏：仅客户消息发起的轮次可执行，非客户
+ * 轮次以 `not-customer-turn` 如实拒绝）→ 激活（复用既有重建；在跑不打断 ⇒ `effective:"next-session"`）
+ * → 回执**；失败一律 fail-closed＝**未执行、零副作用**。**安装不改变任何角色的写边界**；但安装
+ * 改变的是「该角色新会话装配哪些外来 MCP」——外来 MCP 工具本就在 ANS 门禁之外执行＝**能力级授予**
+ * （非逐调用受审，§5.3 诚实面）——能力实现与回执文案**不得宣称逐调用受审**。
+ */
+export type InstallMcpFn = (
+  payload: InstallMcpPayload,
+  metadata?: ReportHandbackMetadata,
+) => Promise<InstallMcpReceipt>;
+
+/**
+ * `uninstall_mcp` 的注入能力（**只给 su**；未注入 ⇒ 工具不注册）。
+ * 纪律同 `InstallMcpFn`；卸载专有两钉：**先改声明再卸载**——能力须校验声明确已撤销，未撤销以
+ * `registration-unchanged` 拒绝（防「工具说撤了、声明没变」）；**声明文件保留**——只撤装配语义、
+ * 不删 `docs/mcp/<name>.md`（「效果已撤」与「文件仍在」如实二分）。**卸载＝下次会话摘除**；已发生的
+ * 副作用不可撤（历史事实如实陈述）。**卸载不改变任何角色的写边界**。
+ */
+export type UninstallMcpFn = (
+  payload: InstallMcpPayload,
+  metadata?: ReportHandbackMetadata,
+) => Promise<InstallMcpReceipt>;
+
 export interface ShellVerdictPayload {
 
   verdict: "allow" | "deny" | "unsure";
@@ -477,6 +567,13 @@ export interface GovernedToolsOptions {
   installSkill?: InstallSkillFn;
   /** G-4/I2：`uninstall_skill` 能力（校验＋激活＋回执，不写盘）。只给 su 注入；未注入 ⇒ 工具不注册。 */
   uninstallSkill?: UninstallSkillFn;
+  /**
+   * G-4 V2：`install_mcp` 能力（校验＋激活＋回执，**不写盘**）。只给 su 注入（判据沿
+   * dispatch_task 的 suppressHandback 先例）；未注入 ⇒ 工具不注册（结构性 fail-closed）。
+   */
+  installMcp?: InstallMcpFn;
+  /** G-4 V2：`uninstall_mcp` 能力（校验＋激活＋回执，不写盘）。只给 su 注入；未注入 ⇒ 工具不注册。 */
+  uninstallMcp?: UninstallMcpFn;
 }
 
 export interface RuntimeSessionRecord {
@@ -541,6 +638,12 @@ export interface RuntimeProviderOptions {
   apiKeyEnvVar?: string;
   promptTimeoutMs?: number;
   constructTimeoutMs?: number;
+  /**
+   * G-4 V2：该角色会话构造时装配的外来 MCP 声明（Service 在 providerFor 读取 `docs/mcp/**` 后注入；
+   * **纯消费面**——适配器不得各自去找文件、不得写盘；缺省＝无声明可装配）。装配/放行/呈现属各平台
+   * 批次（P1 Claude→P2 Codex→P3 Pi），消费前本字段对既有行为零影响。
+   */
+  installedMcpServers?: readonly InstalledMcpServerV1[];
 }
 export type RuntimeProviderFactory = (options: RuntimeProviderOptions) => RuntimeAdapter | Promise<RuntimeAdapter>;
 

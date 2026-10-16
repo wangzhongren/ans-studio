@@ -27,6 +27,9 @@ import type {
   InstallSkillPayload,
   InstallSkillReceipt,
   UninstallSkillFn,
+  InstallMcpFn,
+  InstallMcpPayload,
+  UninstallMcpFn,
   ShellVerdictFn,
   ShellVerdictPayload,
   InteractionGate,
@@ -89,6 +92,12 @@ export const INSTALL_SKILL_TOOL_NAME = "install_skill";
 
 /** uninstall_skill 工具名（G-4/I2；su 技能卸载——校验＋激活＋回执，工具不写盘）。 */
 export const UNINSTALL_SKILL_TOOL_NAME = "uninstall_skill";
+
+/** install_mcp 工具名（G-4 V2；su 外来 MCP 安装——校验＋激活＋回执，工具不写盘）。 */
+export const INSTALL_MCP_TOOL_NAME = "install_mcp";
+
+/** uninstall_mcp 工具名（G-4 V2；su 外来 MCP 卸载——校验＋激活＋回执，工具不写盘）。 */
+export const UNINSTALL_MCP_TOOL_NAME = "uninstall_mcp";
 
 /** 扩展层对 run_shell 的能力级判定结果：非 undefined 即阻断（默认拒绝）。 */
 export interface ShellKillSwitchDecision {
@@ -736,6 +745,9 @@ function abortedToolResult(name: string): ToolResult {
   // G-4/I2：中止时**不假设已安装/已卸载**（零副作用面如实）。
   if (name === INSTALL_SKILL_TOOL_NAME) return { ok: false, message: `${name}：技能**未能安装**（原因：会话已中止）——**不要当它已安装**；如实告知客户。` };
   if (name === UNINSTALL_SKILL_TOOL_NAME) return { ok: false, message: `${name}：技能**未能卸载**（原因：会话已中止）——**不要当它已卸载**；如实告知客户。` };
+  // G-4 V2：中止时**不假设已安装/已卸载**（同技能版口径；零副作用面如实）。
+  if (name === INSTALL_MCP_TOOL_NAME) return { ok: false, message: `${name}：MCP**未能安装**（原因：会话已中止）——**不要当它已安装**；如实告知客户。` };
+  if (name === UNINSTALL_MCP_TOOL_NAME) return { ok: false, message: `${name}：MCP**未能卸载**（原因：会话已中止）——**不要当它已卸载**；如实告知客户。` };
   return { ok: false, message: `${name}：会话已中止，未执行` };
 }
 
@@ -1451,6 +1463,91 @@ function makeUninstallSkillTool(fn: UninstallSkillFn, currentTurnId?: () => stri
   return makeSkillReceiptTool("uninstall", fn, currentTurnId, scope);
 }
 
+// —————————————— 角色能力安装（G-4 V2；install_mcp / uninstall_mcp） ——————————————
+//
+// 依据：客户 2026-10-16「按推荐批准，开始实施」＝V2（外来 MCP 按角色安装）分批实施（设计
+// `角色卡/产品/docs/design/2026-10-16_design_role-capability-install.md` §五/§九；本波＝wave A
+// 契约层）。纪律与技能版**逐字同构**：两工具**只给 su**（调用方注入才注册，未注入 ⇒ 不存在）、
+// **不写盘**（落盘＝su 的 `write_file`，「先落盘再激活」）、只**路由载荷 `{roleId,name}`** 并
+// **如实转达回执**（契约两态：ok:true[rebuilt|next-session] / ok:false[reason+message]；契约外一律
+// fail-closed）。回执形状归一同技能版**共用 `skillReceiptOf`**（InstallMcpReceipt **沿
+// InstallSkillReceipt 体格**冻结——同一形状，不另立归一逻辑）。
+// MCP 专有如实面（回执与 schema 文案同口径；§5.3 诚实面）：**外来 MCP 工具在 ANS 门禁之外执行
+// ＝能力级授予**（非逐调用受审，不得宣称）；卸载＝下次会话摘除、**已发生的副作用不可撤**。
+
+/**
+ * install_mcp / uninstall_mcp 的共用 handler（与 `makeSkillReceiptTool` 逐字体格同构，仅名词与
+ * MCP 专有如实面不同）。纪律（与 dispatch_task 同）：**本层不写盘、不做治理判定、不改变任何
+ * 权限/写权**——handler 只把 `{roleId, name}` 交给注入的能力并**如实**转达回执：
+ * - `ok:true`（rebuilt/next-session）→ 如实「已安装/已卸载」＋声明 path/digest/生效态，并重申
+ *   「本次未改变任何角色的写边界」＋「外来 MCP 工具在 ANS 门禁之外执行（能力级授予），不是逐调用
+ *   受审」（防模型把安装当成替角色扩门禁内写权，也防把门禁外执行面说成受审）；
+ * - `ok:false`（含护栏拒绝 `not-customer-turn`、卸载「声明未变」等）→ `ok:false` 如实报因（reason＋
+ *   message 原样），明确**未执行、零副作用**；
+ * - 能力抛错 / 契约外回执（缺失/形状非法/action 与工具不符）→ `ok:false`「未能安装/未获明确结果」
+ *   ——**绝不**说成已安装/已卸载。
+ * 悬挂防护：`raceAbort`（会话中止即立即返回；本地调用，不设等待超时）。
+ */
+function makeMcpReceiptTool(kind: "install" | "uninstall", fn: InstallMcpFn | UninstallMcpFn, currentTurnId?: () => string | undefined, scope?: Pick<GovernedToolsOptions, "roleId" | "runtime">): ExecutableTool {
+  const name = kind === "install" ? INSTALL_MCP_TOOL_NAME : UNINSTALL_MCP_TOOL_NAME;
+  const verb = kind === "install" ? "安装" : "卸载";
+  const expectedAction = kind === "install" ? ("installed" as const) : ("uninstalled" as const);
+  return {
+    name,
+    async handler(call) {
+      const turnId = currentTurnId?.();
+      const roleId = readStringArg(call.args, ["roleId", "role_id", "role"]);
+      if (roleId === undefined || roleId.trim() === "") {
+        return { ok: false, message: `${name}: 缺少 roleId 参数（目标角色 id），无法${verb}MCP` };
+      }
+      const mcpName = readStringArg(call.args, ["name"]);
+      if (mcpName === undefined || mcpName.trim() === "") {
+        return { ok: false, message: `${name}: 缺少 name 参数（MCP 名，稳定短 slug），无法${verb}MCP` };
+      }
+      const payload: InstallMcpPayload = { roleId, name: mcpName };
+
+      let receipt: unknown;
+      try {
+        receipt = await raceAbort(Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return turnId === undefined ? fn(payload) : fn(payload, handbackMetadata(turnId, scope)); }), call.signal, `${name} ${verb}MCP`);
+      } catch (err) {
+        return { ok: false, message: `${name}：MCP**未能${verb}**（原因：${reasonOf(err)}）——**不要当它已${verb}**；如实向客户说明。` };
+      }
+      const normalized = skillReceiptOf(receipt, expectedAction);
+      if (normalized === undefined) {
+        return { ok: false, message: `${name}：能力未返回明确回执（回执缺失、形状非法或 action 与工具不符）——按**未执行**处理；**不要当它已${verb}**，如实告知客户。` };
+      }
+      if (normalized.ok === true) {
+        const detail = kind === "install"
+          ? `声明：${normalized.path}（sha256 ${normalized.digest.slice(0, 12)}）`
+          : `效果已撤；声明保留于 ${normalized.path}（sha256 ${normalized.digest.slice(0, 12)}）`;
+        const effectiveText = normalized.effective === "rebuilt" ? "已重建该角色会话、即刻生效" : "该角色正在运行轮次（不打断）——新会话起生效";
+        return {
+          ok: true,
+          message:
+            `${name}：MCP「${normalized.name}」已${verb} → 角色「${normalized.roleId}」。${detail}；生效：${effectiveText}。` +
+            `${normalized.note !== undefined ? ` ${normalized.note}` : ""}` +
+            `注意：本次${verb}**未改变任何角色的写边界**——外来 MCP 工具在 ANS 门禁之外执行（能力级授予），不是逐调用受审` +
+            `${kind === "uninstall" ? "；**已发生的副作用不可撤**" : ""}。`,
+        };
+      }
+      return {
+        ok: false,
+        message: `${name}：MCP${verb}**未执行**（${normalized.reason !== undefined ? `reason: ${normalized.reason}；` : ""}回执：${normalized.message ?? "能力侧未提供原因"}）——零副作用；**不要当它已${verb}**，如实告知客户。`,
+      };
+    },
+  };
+}
+
+/** install_mcp：**MCP 安装**工具（G-4 V2，**只给 su**；见 `makeMcpReceiptTool` §纪律）。 */
+function makeInstallMcpTool(fn: InstallMcpFn, currentTurnId?: () => string | undefined, scope?: Pick<GovernedToolsOptions, "roleId" | "runtime">): ExecutableTool {
+  return makeMcpReceiptTool("install", fn, currentTurnId, scope);
+}
+
+/** uninstall_mcp：**MCP 卸载**工具（G-4 V2，**只给 su**；见 `makeMcpReceiptTool` §纪律）。 */
+function makeUninstallMcpTool(fn: UninstallMcpFn, currentTurnId?: () => string | undefined, scope?: Pick<GovernedToolsOptions, "roleId" | "runtime">): ExecutableTool {
+  return makeMcpReceiptTool("uninstall", fn, currentTurnId, scope);
+}
+
 /**
  * 构造受治理工具集：
  * - 写入类 write_file / edit_file（先 gate，获准且配置了 writeRoot 时落盘）；
@@ -1538,6 +1635,17 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
   const uninstallSkill = options?.uninstallSkill;
   if (uninstallSkill !== undefined) {
     tools.push(makeUninstallSkillTool(uninstallSkill, options?.currentTurnId, { roleId: options?.roleId, runtime: options?.runtime }));
+  }
+  // 结构性保证（G-4 V2，同技能对先例）：**未注入 MCP 安装/卸载能力时对应工具不存在**。
+  // 只给 su——由调用方（注入端判据沿 dispatch_task 的 suppressHandback 先例）决定注入；
+  // 未注入 ⇒ 模型无法请求（能力缺席 = 最强 fail-closed）。两能力各自独立「注入才注册」。
+  const installMcp = options?.installMcp;
+  if (installMcp !== undefined) {
+    tools.push(makeInstallMcpTool(installMcp, options?.currentTurnId, { roleId: options?.roleId, runtime: options?.runtime }));
+  }
+  const uninstallMcp = options?.uninstallMcp;
+  if (uninstallMcp !== undefined) {
+    tools.push(makeUninstallMcpTool(uninstallMcp, options?.currentTurnId, { roleId: options?.roleId, runtime: options?.runtime }));
   }
   // Observe customer waits without storing titles, previews or selected values.
   return tools.map((tool) => {

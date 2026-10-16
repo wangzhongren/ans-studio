@@ -15,6 +15,7 @@ import { RUNTIME_KINDS } from "../../common/shared/runtime-shared.ts";
 import { buildGovernedTools, createDemoRuntimeAdapter } from "../../provider/runtime/tools.ts";
 import { createRuntimeSessionStore, readRuntimeSessionHistory as readStoredRuntimeSessionHistory } from "../../provider/runtime/session-store.ts";
 import { createToolDisplayContext, jsonBytes } from "../../common/runtime-core/tool-display.ts";
+import { listInstalledMcpServers } from "../../common/runtime-core/mcp-declarations.ts";
 import { REPORT_LIMITS, makeReportSnapshot, canonicalJson, reportIdFor, validateProvenance, validateLivePresentation, projectLiveReport, projectHandbackInput, validAttemptId } from "../../common/runtime-core/report-provenance.ts";
 import { createEventQueue } from "../../common/runtime-core/event-queue.ts";
 import { createInteractionGate, isAbortError, isTimeoutError, raceAbort, resolveRuntimeTimeouts, withPausableTimeout, withTimeout } from "../../common/runtime-core/timeout.ts";
@@ -121,6 +122,10 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
         tools, storage, interactionGate, currentTurnId: () => turnId,
         toolDisplayMode:"required-v1", projectToolEvent:display.projectToolEvent, registerToolDisplayProfile:display.registerToolDisplayProfile, toolDisplayCredentialEnvNames:display.credentialEnvNames,
         modelId: options.modelId, baseUrl: options.baseUrl, providerId: options.providerId, apiKeyEnvVar: options.apiKeyEnvVar,
+        // G-4 V2（wave A）：按角色读取 `docs/mcp/**` 声明并随会话注入（**纯读**——绝不建目录；坏件由
+        // 读取器跳过＋诊断，绝不影响开会话）。适配器对 `installedMcpServers` 纯消费（装配/放行/呈现
+        // 属各平台批次 P1–P3）；providerFor 每次重建即重读——「安装/卸载 ⇒ 下次开会话生效」。
+        installedMcpServers: listInstalledMcpServers(options.projectRoot, role.id),
         ...resolveRuntimeTimeouts(options.runtime, options),
       };
       const factory = options.providerFactories?.[options.runtime] ?? (options.runtime === "demo"
