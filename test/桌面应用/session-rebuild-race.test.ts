@@ -64,7 +64,12 @@ function makeHandle(roleId: string, opened: string[], disposed: string[], sent: 
 function makeProject(): { root: string; listing: ProjectListing } {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "ans-race-"));
   fs.mkdirSync(path.join(root, "角色卡", "A"), { recursive: true });
-  fs.writeFileSync(path.join(root, "角色卡", "A", "boundary.yaml"), "v: 1\n");
+  // ⚠ 初始内容刻意**长于**后续重写（"v: 2\n"）——「陈旧」触发必须**尺寸可判**：`filePrint` 的判据＝
+  // (mtimeMs, size)，等长重写在**平台时间戳粒度把两次写入 mtime 合并**时会命中缓存、漏检陈旧（CI run
+  // 38931760696 此用例红的判别＝时序脆弱＋Q-1 缓存已设计边界；受控实验与机制链见
+  // `docs/fix/2026-10-17_fix_session-rebuild-race-mtime-flake.md`）。**同尺寸检出**的正确性语义由
+  // `hot-path.test.ts` 的 Q-1 钉负责（其写入自带 ≥30ms 间隔，mtime 必不同）；本文件不再制造等长重写。
+  fs.writeFileSync(path.join(root, "角色卡", "A", "boundary.yaml"), "v: 1\n# 初始\n");
   fs.writeFileSync(path.join(root, "角色卡", "A", "role-card.md"), "# A\n");
   const listing: ProjectListing = {
     projectRoot: root,
@@ -246,7 +251,7 @@ function addRoleB(root: string, listing: ProjectListing) {
   const role = listing.roles[0];
   listing.roles.push({ ...role, roleId: "B", cardPath: "角色卡/B/role-card.md", boundaryPath: "角色卡/B/boundary.yaml" });
   fs.mkdirSync(path.join(root, "角色卡", "B"), { recursive: true });
-  fs.writeFileSync(path.join(root, "角色卡", "B", "boundary.yaml"), "v: 1\n");
+  fs.writeFileSync(path.join(root, "角色卡", "B", "boundary.yaml"), "v: 1\n# 初始\n"); // 同 makeProject：等长重写会落在 (mtimeMs,size) 缓存粒度合并的风险窗——尺寸可判
   fs.writeFileSync(path.join(root, "角色卡", "B", "role-card.md"), "# B\n");
 }
 
@@ -342,6 +347,51 @@ for (const phase of ["dispose", "open"] as const) {
     });
   }
 }
+
+test("夹具守卫（O-1 缓存口径）：makeProject 初始边界**比重写长**——(mtimeMs,size) 缓存下陈旧触发确定性检出，不落时间戳粒度合并窗", () => {
+  // 陈旧触发的重写统一为 5 字节（"v: 2\n"/"v: 3\n"）——初始边界须更长，使缓存**尺寸即可判**。
+  const { root } = makeProject();
+  try {
+    const initial = fs.readFileSync(path.join(root, "角色卡", "A", "boundary.yaml"), "utf8");
+    assert.ok(Buffer.byteLength(initial, "utf8") > Buffer.byteLength("v: 2\n", "utf8"), "初始须长于 5 字节重写（尺寸可判 ⇒ filePrint 缓存必失效，与 mtime 粒度无关）");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+  // 反向演示红因：旧夹具 v:1→v:2 恰等长——平台把两次写入 mtime 合并进同一时间戳粒度时缓存按「未变」命中
+  //（CI run 38931760696 此文件红的机制；受控实验与三分判定见 docs/fix/2026-10-17_fix_session-rebuild-race-mtime-flake.md）。
+  assert.equal(Buffer.byteLength("v: 1\n", "utf8"), Buffer.byteLength("v: 2\n", "utf8"), "等长＝缓存粒度窗风险（被替代的旧夹具形态）");
+});
+
+test("陈旧检出对平台 mtime 粒度合并免疫（尺寸可判）：即便 stat 报告与冻结完全相同的 mtime，陈旧仍被检出并如实失败", async () => {
+  const { root, listing } = makeProject();
+  const harness = makeHarness(root, listing, {
+    beforeOpen: async (_roleId, generation) => {
+      if (generation === 2) throw new Error("重开失败原文");
+    },
+  });
+  const bp = path.join(root, "角色卡", "A", "boundary.yaml");
+  const realStat = fs.promises.stat.bind(fs.promises) as (p: string, opts?: unknown) => Promise<object>;
+  try {
+    await harness.mgr.open({ projectRoot: root, roleId: "A", runtime: "demo" });
+    const frozenMtime = fs.statSync(bp).mtimeMs;
+    fs.writeFileSync(bp, "v: 2\n"); // 内容真变（与初始边界**不同长**：尺寸可判）
+    // 受控模拟粗粒度时间戳平台：stat 恒报告冻结时的 mtime（＝CI run 38931760696 的失败条件；
+    // filePrint 缓存此时试图按「(mtimeMs,size) 均未变」命中——尺寸差使其必失效）。
+    fs.promises.stat = (async (p: string, opts?: unknown) => {
+      const st = await realStat(p, opts);
+      if (String(p) === bp) Object.defineProperty(st, "mtimeMs", { value: frozenMtime, configurable: true });
+      return st;
+    }) as unknown as typeof fs.promises.stat;
+    const result = await harness.mgr.send("仍须检出陈旧");
+    assert.equal(result.ok, false, "尺寸差使缓存必失效 ⇒ 陈旧照常检出（不依赖 mtime 变）");
+    assert.match(result.error ?? "", /重开失败原文/);
+    assert.deepEqual(harness.sent, [], "本条消息未发送");
+  } finally {
+    fs.promises.stat = realStat as unknown as typeof fs.promises.stat;
+    await harness.mgr.stop(null);
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
 
 test("重开失败保留原错误，不恢复假活动目标、不发送消息", async () => {
   const { root, listing } = makeProject();

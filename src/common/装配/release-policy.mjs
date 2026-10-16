@@ -17,6 +17,9 @@ export const SOURCE_SHA = '16963ee3f59acc1f812141709858690f1a24501b';
 // test/测试/g4-skill-verify/b-render-double-check.test.ts、test/测试/g4-skill-verify/f-fingerprint.test.ts、
 // test/测试/g4v2-mcp-verify/g-claude-launcher.test.ts、test/测试/g4v2-mcp-verify/j-pi.test.ts、
 // test/测试/g5-reasoning-verify/h-scope-audit.test.ts。全部按**精确路径**列入（单文件、不开目录：同目录未列文件仍 excluded）。
+// overlay-5（第四跑 run 38931760696 Windows 新红）：test/桌面应用/session-rebuild-race.test.ts——首曝期**夹具时序
+// 脆性**（等长重写 × filePath 缓存 (mtimeMs,size) 命中 × 平台时间戳粒度合并；受控实验复现＋免疫证明）；修复＝
+// 夹具尺寸可判化＋守卫＋免疫回归钉，**产品零改**、原用例本体未动（桌面窗口属主）。按精确路径列入。
 const files = new Set(['package.json', 'package-lock.json', '.github/workflows/release.yml',
   'src/provider/codex/session.ts',
   'test/pi-adapter/installed-mcp-servers.test.ts',
@@ -24,7 +27,8 @@ const files = new Set(['package.json', 'package-lock.json', '.github/workflows/r
   'test/测试/g4-skill-verify/f-fingerprint.test.ts',
   'test/测试/g4v2-mcp-verify/g-claude-launcher.test.ts',
   'test/测试/g4v2-mcp-verify/j-pi.test.ts',
-  'test/测试/g5-reasoning-verify/h-scope-audit.test.ts']);
+  'test/测试/g5-reasoning-verify/h-scope-audit.test.ts',
+  'test/桌面应用/session-rebuild-race.test.ts']);
 const directories = ['src/common/装配/', 'test/装配/'];
 export function selectOverlay(paths) {
   const selected = [], excluded = [];

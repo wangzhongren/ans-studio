@@ -54,6 +54,16 @@ test('release overlay includes exactly the reviewed Windows-platform fix batch b
     'test/测试/g4-skill-verify/c-preauth.test.ts', 'test/测试/g5-reasoning-verify/a-contract.test.ts']);
 });
 
+// overlay-5（第四跑 run 38931760696 Windows 新红；桌面窗口修复、产品零改）：test/桌面应用/session-rebuild-race.test.ts
+// 的首曝期夹具时序脆性（等长重写 × filePath 缓存 (mtimeMs,size) 命中 × 平台时间戳粒度合并；原用例本体未动，
+// 修复＝夹具尺寸可判化＋守卫＋免疫回归钉）。按精确路径列入（单文件、不开目录——同目录未列文件仍 excluded）。
+test('release overlay includes exactly the reviewed session-rebuild-race fixture fix by exact path', () => {
+  const result = selectOverlay(['package.json', 'test/桌面应用/session-rebuild-race.test.ts',
+    'test/桌面应用/renderer.test.ts']);
+  assert.deepEqual(result.selected, ['package.json', 'test/桌面应用/session-rebuild-race.test.ts']);
+  assert.deepEqual(result.excluded, ['test/桌面应用/renderer.test.ts']);
+});
+
 import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
