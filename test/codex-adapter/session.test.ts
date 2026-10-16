@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readdir, readFile, rm, symlink } from "node:fs/promises";
+import { mkdtemp, mkdir, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
+import { createHash } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -38,6 +39,42 @@ test("loading/factory is lazy; model/key required, optional official URL, userin
   await session.dispose();
   const fallback = await createCodexRuntimeAdapter(options("/fixture", harness(), { env: { OPENAI_API_KEY: "only-fallback" } })).bindRole(role);
   await fallback.dispose();
+});
+
+test("G-4 installed-skills section splices verbatim as the last segment or renders nothing", async () => {
+  const root = await temporary();
+  try {
+    const engines = harness();
+    const adapter = createCodexRuntimeAdapter(options(root, engines));
+    const bare = (await adapter.composeContext(role)).systemPrompt;
+    assert.equal(bare.includes("本角色已安装技能"), false, "零技能 ⇒ 零渲染");
+    // 坏件（缺 SKILL.md）跳过、绝不拒开会话：提示逐字不变（诊断面在渲染单一来源内）。
+    await mkdir(path.join(root, "docs", "skills", "broken"), { recursive: true });
+    await writeFile(path.join(root, "docs", "skills", "broken", "install.md"), "- 用途：broken fixture\n- 适用角色：codex-fixture\n- 状态：installed\n- 安装日期：2026-10-16\n");
+    assert.equal((await adapter.composeContext(role)).systemPrompt, bare, "坏件 ⇒ 该条不注入、逐字不变");
+    const session = await adapter.bindRole(role);
+    await session.dispose();
+    await rm(path.join(root, "docs", "skills", "broken"), { recursive: true, force: true });
+    // 命中条目：整段逐字拼入（sha256 由测试独立按当刻字节算）。
+    await mkdir(path.join(root, "docs", "skills", "probe"), { recursive: true });
+    await writeFile(path.join(root, "docs", "skills", "probe", "install.md"), "- 用途：probe fixture 用途\n- 适用角色：codex-fixture\n- 状态：installed\n- 安装日期：2026-10-16\n");
+    const body = Buffer.from("probe skill body\n");
+    await writeFile(path.join(root, "docs", "skills", "probe", "SKILL.md"), body);
+    const digest = createHash("sha256").update(body).digest("hex");
+    const section = [
+      "## 本角色已安装技能（动手前先读，按序）",
+      `1. docs/skills/probe/SKILL.md（用途：probe fixture 用途；sha256:${digest}；安装于 2026-10-16）`,
+      "内容以文件当刻字节为准；读到与派发描述/版本不符 ⇒ 停止并交 blocked 报告（不得猜）。",
+    ].join("\n");
+    const wired = (await adapter.composeContext(role)).systemPrompt;
+    assert.equal(wired, `${bare}\n\n${section}`, "整段逐字追加、仅多一段");
+    // 假 engine 路径：bindRole 的 composeContext 同源，注入节经 thread/start developerInstructions 原样到达引擎。
+    const wiredEngines = harness();
+    const wiredSession = await createCodexRuntimeAdapter(options(root, wiredEngines)).bindRole(role);
+    const thread = wiredEngines.engine.requests.find(request => request.method === "thread/start")!;
+    assert.equal(thread.params.developerInstructions, wired);
+    await wiredSession.dispose();
+  } finally { await rm(root, { recursive: true, force: true }); }
 });
 
 test("optional API address blank values use official default; explicit nonblank wins environment and invalid values stay redacted", async () => {

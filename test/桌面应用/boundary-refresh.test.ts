@@ -302,3 +302,140 @@ test("F-5-opt1（桌面侧）：旧替身句柄**不带** queueModelNotice（可
   assert.equal(h.openCalls.filter((x) => x === "su").length, 2, "重建确已发生");
   await h.mgr.stop(null);
 });
+
+// ————— G-4 裁定⑤（2026-10-16 客户批准）：O-1 指纹集扩展——「该角色已安装技能」纳入活会话陈旧指纹 —————
+// 设计 `角色卡/产品/docs/design/2026-10-16_design_role-capability-install.md` §4.3；PM 裁定⑤＝本期做
+// （登记＋内容文件，settle 即收敛）。口径：把 `docs/skills/<name>/`（登记列出该角色且 installed）的
+// `SKILL.md`＋`install.md` 纳入 `boundaryPaths/Prints`；检查时刻**重新推导**当前集合（新增/移除/内容
+// 编辑 ⇒ 集合差/字节差 ⇒ 既有检查触发重建）；坏件跳过防御；**零技能＝无新增路径**（既有语义逐字不变）。
+
+/** G-4 裁定⑤ 夹具：落一条技能（install.md 登记＋SKILL.md 内容；落盘在开会话**之前**＝应被定格）。 */
+function writeSkill(dir: string, name: string, roles: string, status = "installed", content = "技能正文\n"): void {
+  const skillDir = path.join(dir, "docs", "skills", name);
+  fs.mkdirSync(skillDir, { recursive: true });
+  fs.writeFileSync(path.join(skillDir, "install.md"), `# 安装登记：${name}\n- 用途：演示用途\n- 适用角色：${roles}\n- 状态：${status}\n- 安装日期：2026-10-16\n`, "utf8");
+  fs.writeFileSync(path.join(skillDir, "SKILL.md"), content, "utf8");
+}
+
+test("G-4 裁定⑤（新增）：技能落盘（登记列本角色、installed）⇒ settle 扫描即作废重建；零技能逐字不变、重建后不振荡", async () => {
+  const dir = makeProject();
+  const h = makeHarness(listing(dir));
+  await h.mgr.open({ projectRoot: dir, roleId: "A", runtime: "demo" });
+  await tick(30);
+  await h.mgr.send("一");
+  h.streams.A.push({ kind: "settled", summary: "一轮结束" });
+  await tick(150);
+  assert.equal(h.openCalls.filter((r) => r === "A").length, 1, "零技能：不重建（既有语义逐字不变）");
+  assert.ok(!h.envelopes.some((e) => /已安装技能已变更/.test(String(e.event.summary || ""))), "零技能：无技能变更行");
+
+  // 落盘一条技能（登记列 A、installed）→ Interface 于 su 一轮结束触发的全量扫描（此处直调同一入口）。
+  writeSkill(dir, "lint", "A");
+  const rebuilt = await h.mgr.refreshStaleBoundaries();
+  assert.deepEqual(rebuilt, ["A"], "扫描检出「已安装技能集合」新增 ⇒ 作废重建（settle 即生效）");
+  assert.equal(h.openCalls.filter((r) => r === "A").length, 2, "重建确已发生（新会话带上注入节）");
+  const line = h.envelopes.map((e) => String(e.event.summary || "")).find((s) => s.includes("已安装技能已变更"));
+  assert.ok(line, "如实一行（技能变更措辞——不误称「边界」）");
+  assert.ok(line!.includes(path.join("docs", "skills", "lint", "SKILL.md")), "行内点名变化文件");
+  assert.ok(line!.includes("按新技能登记重开"), "行内说明按新技能登记重开");
+  assert.ok(line!.includes("上下文恢复结果以引擎实际返回为准"), "恢复口径不猜（沿既有 D-1 措辞）");
+
+  const again = await h.mgr.refreshStaleBoundaries();
+  assert.deepEqual(again, [], "重建后指纹已含技能文件 ⇒ 不重复重建（不振荡）");
+  assert.equal(h.openCalls.filter((r) => r === "A").length, 2);
+  await h.mgr.stop(null);
+});
+
+test("G-4 裁定⑤（内容编辑）：SKILL.md 字节变化 ⇒ 发言前既有检查触发重建；未变不重建", async () => {
+  const dir = makeProject();
+  writeSkill(dir, "lint", "A");
+  const h = makeHarness(listing(dir));
+  await h.mgr.open({ projectRoot: dir, roleId: "A", runtime: "demo" });
+  await tick(30);
+  await h.mgr.send("一");
+  h.streams.A.push({ kind: "settled", summary: "一轮结束" });
+  await tick(150);
+  assert.equal(h.openCalls.filter((r) => r === "A").length, 1, "技能文件未变：不重建（不误重开丢上下文）");
+
+  fs.writeFileSync(path.join(dir, "docs", "skills", "lint", "SKILL.md"), "技能正文 v2\n", "utf8");
+  const r2 = await h.mgr.send("二");
+  assert.equal(r2.ok, true, "重建后本条消息照常发出（落到新把手）");
+  assert.equal(h.openCalls.filter((r) => r === "A").length, 2, "内容编辑 ⇒ 陈旧 ⇒ 作废重建");
+  assert.ok(h.sent.A.includes("二"), "发言落到新会话");
+  const line = h.envelopes.map((e) => String(e.event.summary || "")).find((s) => s.includes("已安装技能已变更"));
+  assert.ok(line && line.includes(path.join("docs", "skills", "lint", "SKILL.md")), "点名 SKILL.md（当刻字节哈希差）");
+  await h.mgr.stop(null);
+});
+
+test("G-4 裁定⑤（移除）：登记取消角色（install.md 改写）⇒ 触发重建并点名 install.md", async () => {
+  const dir = makeProject();
+  writeSkill(dir, "lint", "A");
+  const h = makeHarness(listing(dir));
+  await h.mgr.open({ projectRoot: dir, roleId: "A", runtime: "demo" });
+  await tick(30);
+  await h.mgr.send("一");
+  h.streams.A.push({ kind: "settled", summary: "一轮结束" });
+  await tick(150);
+
+  fs.writeFileSync(path.join(dir, "docs", "skills", "lint", "install.md"), "# 安装登记：lint\n- 用途：演示用途\n- 适用角色：B\n- 状态：installed\n- 安装日期：2026-10-16\n", "utf8");
+  const r2 = await h.mgr.send("二");
+  assert.equal(r2.ok, true);
+  assert.equal(h.openCalls.filter((r) => r === "A").length, 2, "登记取消本角色 ⇒ 重建（新会话不再注入）");
+  const line = h.envelopes.map((e) => String(e.event.summary || "")).find((s) => s.includes("已安装技能已变更"));
+  assert.ok(line && line.includes(path.join("docs", "skills", "lint", "install.md")), "点名 install.md（登记改写即集合移除）");
+  await h.mgr.stop(null);
+});
+
+test("G-4 裁定⑤（移除·目录消失）：技能目录整体删除 ⇒ 触发重建（<missing> 哨兵参与比对）", async () => {
+  const dir = makeProject();
+  writeSkill(dir, "lint", "A");
+  const h = makeHarness(listing(dir));
+  await h.mgr.open({ projectRoot: dir, roleId: "A", runtime: "demo" });
+  await tick(30);
+  await h.mgr.send("一");
+  h.streams.A.push({ kind: "settled", summary: "一轮结束" });
+  await tick(150);
+
+  fs.rmSync(path.join(dir, "docs", "skills", "lint"), { recursive: true, force: true });
+  const r2 = await h.mgr.send("二");
+  assert.equal(r2.ok, true);
+  assert.equal(h.openCalls.filter((r) => r === "A").length, 2, "目录消失 ⇒ 重建");
+  const line = h.envelopes.map((e) => String(e.event.summary || "")).find((s) => s.includes("已安装技能已变更"));
+  assert.ok(line && line.includes(path.join("docs", "skills", "lint", "SKILL.md")), "点名缺失文件");
+  await h.mgr.stop(null);
+});
+
+test("G-4 裁定⑤（负例）：指纹只含「登记列出**本角色**且 installed」的技能——他角色技能 / uninstalled 件零影响", async () => {
+  const dir = makeProject();
+  writeSkill(dir, "forB", "B"); // 只列 B：不属于 A 的集合
+  writeSkill(dir, "off", "A", "uninstalled"); // 列 A 但已停用：不属于 A 的集合
+  const h = makeHarness(listing(dir));
+  await h.mgr.open({ projectRoot: dir, roleId: "A", runtime: "demo" });
+  await tick(30);
+  await h.mgr.send("一");
+  h.streams.A.push({ kind: "settled", summary: "一轮结束" });
+  await tick(150);
+
+  // 改他角色技能内容 / 改停用件内容——都不在本角色集合内。
+  fs.writeFileSync(path.join(dir, "docs", "skills", "forB", "SKILL.md"), "B 的技能 v2\n", "utf8");
+  fs.writeFileSync(path.join(dir, "docs", "skills", "off", "SKILL.md"), "停用件 v2\n", "utf8");
+  const r2 = await h.mgr.send("二");
+  assert.equal(r2.ok, true);
+  assert.equal(h.openCalls.filter((r) => r === "A").length, 1, "他角色技能/停用件不属本角色集合——不重建");
+  const scans = await h.mgr.refreshStaleBoundaries();
+  assert.deepEqual(scans, [], "全量扫描同样零触发（与渲染器过滤口径同集合）");
+  await h.mgr.stop(null);
+});
+
+test("G-4 接线钉（裁定④⑤＋I3）：集合重推导单一来源；注入才注册；护栏读活状态；重建行技能措辞", () => {
+  assert.ok(SESSION_SRC.includes("readSkillRegistration(projectRoot, entry.name)"), "指纹集合推导＝编排登记读取器（含角色/状态判据单一来源，不复制解析逻辑）");
+  assert.ok(SESSION_SRC.includes("private async currentSkillPaths("), "当刻重推导当前技能集合（新增/移除集合差）");
+  assert.ok(SESSION_SRC.includes("!frozen.has(f)") && SESSION_SRC.includes("!currentSet.has(f)"), "集合差双向（新增＋移除）");
+  assert.ok(SESSION_SRC.includes("const skillPaths = (await this.currentSkillPaths(req.projectRoot, req.roleId)) ?? [];"), "开会话定格技能文件集入快照（新建与重建同径）");
+  assert.ok(SESSION_SRC.includes("docs/skills/") && SESSION_SRC.includes("已安装技能已变更"), "陈旧重建行按技能变更如实分支（不误称「边界」）");
+  assert.ok(SESSION_SRC.includes("...(installSkill ? { installSkill } : {})") && SESSION_SRC.includes("...(uninstallSkill ? { uninstallSkill } : {})"), "能力注入（未注入 ⇒ 两工具不注册——最强 fail-closed）");
+  assert.ok(SESSION_SRC.includes('this.applySkillChange("installed"') && SESSION_SRC.includes('this.applySkillChange("uninstalled"'), "两工具同名同形（共用 handler）");
+  assert.ok(SESSION_SRC.includes("private isCustomerInitiatedTurn("), "裁定④ 轮次护栏（当刻读 activeDeliveries/busy——不靠界面推测）");
+  assert.ok(SESSION_SRC.includes('return active === undefined || active.kind === "message";'), "护栏判据：直接 send（客户直聊）与 kind:message（排队客户消息）放行，其余投递轮次拒绝");
+  assert.ok(IFACE_SRC.includes("installSkill?: import(\"../../src/model/runtime.ts\").InstallSkillFn"), "Interface 透传面镜像（编排透传落地前静默忽略——登记）");
+});
+

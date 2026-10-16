@@ -1519,3 +1519,44 @@ test("v3/W6b+S1/S4+折叠口径：渲染线——system 正文 displayBody、折
   // S1 依赖的纯映射在 tool-rows 唯一实现（不在渲染侧另写一份合并逻辑）。
   assert.ok(RENDERER.includes("Tr.mergePhases") && RENDERER.includes("Tr.callSummary"), "合并/计数只经 ANSToolRows 导出（无第二份实现）");
 });
+
+// ————— G-4/I7（2026-10-16 客户批准；设计 `2026-10-16_design_role-capability-install` §5.4/§九 I7）—————
+// 安装工具行（`install_skill`/`uninstall_skill` 调用本身成行）与 `[系统·安装]` 定格系统行的如实标注——
+// 复用既有工具行与 `[系统·<子类>]` 先例，不新造行体系。本测试＝**零特判实证**（沿 G-3「合流即桌面
+// 零改动」同款证据形态）：渲染平面（工具行渲染链四个源文件）对两工具名与子类标记**零引用**——无引用
+// ⇒ 无特判面 ⇒ 新名字按构造走通用链；行为覆盖由 tool-rows.test.ts 的纯函数用例同批钉住。
+
+test("G-4/I7：安装工具行/系统行零特判——渲染平面对新工具名与 [系统·安装] 标记零引用（按构造走通用链）", () => {
+  const stripJs = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+  const toolRows = fs.readFileSync(path.join(APP_DIR, "tool-rows.js"), "utf8");
+  const uiLabels = fs.readFileSync(path.join(APP_DIR, "ui-labels.js"), "utf8");
+  // 去注释后比对（未来注释里合法提及 G-4 措辞不误伤；代码里出现字面量=特判面=违约）。
+  const plane: Array<[string, string]> = [
+    ["renderer.js", RENDERER_CODE],
+    ["tool-rows.js", stripJs(toolRows)],
+    ["ui-labels.js", stripJs(uiLabels)],
+    ["styles.css", STYLES.replace(/\/\*[\s\S]*?\*\//g, "")],
+  ];
+  for (const [name, src] of plane) {
+    for (const literal of ["install_skill", "uninstall_skill", "[系统·安装]", "系统·安装"]) {
+      assert.ok(!src.includes(literal), `${name} 不得含「${literal}」字面量（特判=违约；新工具名/子类必须按构造走通用链）`);
+    }
+  }
+  // 分类器不逐子类登记（子类集合＝文案单一来源；判据只依赖 `[系统·<子类>] ` 标记形态）：
+  // 既有三子类名与新增「安装」都不得出现在归类模块的代码里（防未来把枚举偷偷写进渲染侧）。
+  const toolRowsCode = stripJs(toolRows);
+  for (const sub of ["看护", "收束", "恢复", "安装"]) {
+    assert.ok(!toolRowsCode.includes(sub), `tool-rows.js 代码不得含子类名「${sub}」（判据=标记形态，不逐子类登记）`);
+  }
+  // 样式体系零新增：系统行复用唯一 is-system 钩子（不得按子类派生样式变体）。
+  assert.ok(STYLES.includes(".msg-injected.is-system"), "复用既有系统行样式钩子（无新样式体系）");
+  assert.ok(!STYLES.includes(".is-system-"), "不得按子类派生样式类（不加新样式体系）");
+  // 通用接线单点（新名字必经此处；与 tool-rows.test.ts 纯函数用例互为因果）：
+  // ①特殊工具表（卡片/屏障）单点在 tool-rows（`SPECIAL_TOOLS`）——渲染侧不得持第二份名单
+  //（若为安装工具加第二份名单=引入特判面，本断言即红）。
+  assert.ok(!RENDERER_CODE.includes("SPECIAL_TOOLS"), "渲染侧不得持第二份特殊工具表（单点在 tool-rows.js）");
+  // ②生命周期/独立工具行的工具名直出（display 携带事件走此处——install_skill 实际呈现路径）。
+  assert.ok(RENDERER.includes("esc(activity.toolName)"), "生命周期行工具名直出（通用，无逐工具名映射）");
+  // ③折叠分解文案按工具名直出（既有 S4 单点，确认其对未知名无白名单依赖）。
+  assert.ok(RENDERER.includes("t.name + (t.count > 1 ? \" ×\" + t.count : \"\")"), "折叠分解按工具名直出（无白名单）");
+});

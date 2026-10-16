@@ -26,6 +26,8 @@ import { configureDiagnostics, flushDiagnostics, disposeDiagnostics } from "../.
 // 与恢复提议能力（经 openRoleSession 捕获——仅 su 注入）。
 import { createRecoveryConfirmPresenter, type RecoveryConfirmRequest, type RecoveryConfirmRequestInput } from "../../app/desktop/recovery-channel.ts";
 import type { ProposeRecoveryFn, RoleStatusFn, SessionTailFn } from "../../src/model/runtime.ts";
+// G-4/I3（2026-10-16 客户批准）：技能安装/卸载能力（经 openRoleSession 捕获——仅 su 注入）。
+import type { InstallSkillFn, UninstallSkillFn, InstallSkillReceipt } from "../../src/model/runtime.ts";
 
 const tick = (ms = 60) => new Promise((r) => setTimeout(r, ms));
 
@@ -87,11 +89,14 @@ interface Harness {
   proposeRecoveryOf: (roleId: string) => ProposeRecoveryFn | undefined;
   roleStatusOf: (roleId: string) => RoleStatusFn | undefined;
   sessionTailOf: (roleId: string) => SessionTailFn | undefined;
+  /** G-4/I3：打开会话时拿到的技能安装/卸载能力（仅 su 会话应注入）——测试直接调用以驱动 handler。 */
+  installSkillOf: (roleId: string) => InstallSkillFn | undefined;
+  uninstallSkillOf: (roleId: string) => UninstallSkillFn | undefined;
   /** G-2/W4：各角色 abort 被调次数（恢复桥「恰一次执行」判据）。 */
   aborts: Record<string, number>;
 }
 
-function makeHarness(opts: { failSends?: Record<string, number>; openDelayMs?: number; projectRoot?: string; recoveryConfirm?: ReturnType<typeof createRecoveryConfirmPresenter>; unsupportedAbort?: string[] } = {}): Harness {
+function makeHarness(opts: { failSends?: Record<string, number>; openDelayMs?: number; projectRoot?: string; recoveryConfirm?: ReturnType<typeof createRecoveryConfirmPresenter>; unsupportedAbort?: string[]; failOpensAfter?: Record<string, number> } = {}): Harness {
   const root = opts.projectRoot ?? "/proj";
   const l = listing(root);
   const streams: Record<string, OrchestrationEvent[]> = { su: [], A: [], B: [] };
@@ -100,7 +105,8 @@ function makeHarness(opts: { failSends?: Record<string, number>; openDelayMs?: n
   const envelopes: import("../../app/desktop/session.ts").SessionEventEnvelope[] = [];
   const roleStates: { roleId: string; summaries: string[] }[] = [];
   const openCalls: string[] = [];
-  const openInputs: Record<string, { dispatchTask?: DispatchTaskFn; proposeRecovery?: ProposeRecoveryFn; roleStatus?: RoleStatusFn; sessionTail?: SessionTailFn }> = {};
+  const openInputs: Record<string, { dispatchTask?: DispatchTaskFn; proposeRecovery?: ProposeRecoveryFn; roleStatus?: RoleStatusFn; sessionTail?: SessionTailFn; installSkill?: InstallSkillFn; uninstallSkill?: UninstallSkillFn }> = {};
+  const openCounts: Record<string, number> = {};
   const aborts: Record<string, number> = {};
   // 注：`stopped` 逐句柄闭包（不是按 roleId 共享）——G-2/W4 的 rebuildSession 会 dispose 旧句柄、重开新句柄：
   // 若按 roleId 共享，重开后的新迭代器会继承「已停」标记、consume 循环即时退出（重建后的事件全丢）。
@@ -170,13 +176,19 @@ function makeHarness(opts: { failSends?: Record<string, number>; openDelayMs?: n
   const mgr = new SessionManager({
     openRoleSession: async (input) => {
       openCalls.push(input.roleId);
-      const inputWithCapabilities = input as { dispatchTask?: DispatchTaskFn; proposeRecovery?: ProposeRecoveryFn; roleStatus?: RoleStatusFn; sessionTail?: SessionTailFn };
+      const inputWithCapabilities = input as { dispatchTask?: DispatchTaskFn; proposeRecovery?: ProposeRecoveryFn; roleStatus?: RoleStatusFn; sessionTail?: SessionTailFn; installSkill?: InstallSkillFn; uninstallSkill?: UninstallSkillFn };
       openInputs[input.roleId] = {
         dispatchTask: inputWithCapabilities.dispatchTask,
         proposeRecovery: inputWithCapabilities.proposeRecovery,
         roleStatus: inputWithCapabilities.roleStatus,
         sessionTail: inputWithCapabilities.sessionTail,
+        installSkill: inputWithCapabilities.installSkill,
+        uninstallSkill: inputWithCapabilities.uninstallSkill,
       };
+      // G-4 夹具：可控的「第 N 次之后开会话失败」（重建失败分支——rebuildSession 重开失败）。
+      const opens = (openCounts[input.roleId] = (openCounts[input.roleId] ?? 0) + 1);
+      const openLimit = opts.failOpensAfter?.[input.roleId];
+      if (openLimit !== undefined && opens > openLimit) throw new Error(`演示：${input.roleId} 会话开启失败`);
       // F-2-opt2 夹具：可选的开会话延迟——让并发 open 真正重叠（互斥未落地时必现双开）。
       if ((opts.openDelayMs ?? 0) > 0) await new Promise((r) => setTimeout(r, opts.openDelayMs));
       return makeHandle(input.roleId);
@@ -200,6 +212,8 @@ function makeHarness(opts: { failSends?: Record<string, number>; openDelayMs?: n
     proposeRecoveryOf: (roleId) => openInputs[roleId]?.proposeRecovery,
     roleStatusOf: (roleId) => openInputs[roleId]?.roleStatus,
     sessionTailOf: (roleId) => openInputs[roleId]?.sessionTail,
+    installSkillOf: (roleId) => openInputs[roleId]?.installSkill,
+    uninstallSkillOf: (roleId) => openInputs[roleId]?.uninstallSkill,
     hangNext, maxConcurrent, roleStates, aborts,
   };
 }
@@ -921,3 +935,262 @@ test("G-2/W2：system 投递失败 ⇒ 如实系统行＋放回队首保留（�
   assert.ok(h.sent.su.includes("[系统·看护] 失败重试钉子：角色「A」。"), "重试成功送达（同一份文本，不重渲染）");
   await h.mgr.stop(null);
 });
+
+// —————————————— G-4/I3（2026-10-16 客户批准）：技能安装/卸载 handler ——————————————
+// 设计 `角色卡/产品/docs/design/2026-10-16_design_role-capability-install.md` §3.2/§3.3/§4.3/§4.4/§6.4；
+// PM 裁定④（轮次护栏：仅客户消息发起的轮次可执行）与⑤（O-1 指纹集扩展——在 boundary-refresh.test.ts）。
+// 本组覆盖：「注入才注册」；护栏（客户直聊/排队客户消息放行；系统投递轮次/无轮次拒绝）；校验全分支（全部
+// 零副作用）；idle⇒rebuilt / 在跑⇒next-session 不打断 / 未开会话⇒next-session；重建失败⇒rebuild-failed；
+// `[系统·安装]` 系统行（kind:"system" 第四类真投递、不可撤回、如实二分）；卸载「先改登记再卸载」。
+
+/** G-4 夹具：真实临时项目目录（handler 读真盘：登记/内容件/digest）。 */
+async function writeSkillFixture(dir: string, name: string, roles: string, status = "installed", content = "技能正文\n"): Promise<void> {
+  const skillDir = path.join(dir, "docs", "skills", name);
+  await fs.mkdir(skillDir, { recursive: true });
+  await fs.writeFile(path.join(skillDir, "install.md"), `# 安装登记：${name}\n- 用途：演示用途\n- 适用角色：${roles}\n- 状态：${status}\n- 安装日期：2026-10-16\n`, "utf8");
+  await fs.writeFile(path.join(skillDir, "SKILL.md"), content, "utf8");
+}
+
+async function makeSkillProject(): Promise<string> {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "ans-g4-"));
+  await writeSkillFixture(dir, "lint", "A");
+  return dir;
+}
+
+test("G-4/I3 注入才注册：仅 su 会话拿到 install_skill / uninstall_skill 能力（项目角色零注入、零感知）", async () => {
+  const dir = await makeSkillProject();
+  const h = makeHarness({ projectRoot: dir });
+  await h.mgr.open({ projectRoot: dir, roleId: "su", runtime: "demo" });
+  await tick(30);
+  assert.equal(typeof h.installSkillOf("su"), "function", "su 会话注入 installSkill");
+  assert.equal(typeof h.uninstallSkillOf("su"), "function", "su 会话注入 uninstallSkill");
+  await h.mgr.open({ projectRoot: dir, roleId: "A", runtime: "demo" });
+  await tick(30);
+  assert.equal(h.installSkillOf("A"), undefined, "项目角色不注入（未注入 ⇒ 工具不注册）");
+  assert.equal(h.uninstallSkillOf("A"), undefined, "项目角色不注入 uninstallSkill");
+  await h.mgr.stop(null);
+});
+
+test("G-4/I3 安装成功（idle ⇒ rebuilt）：回执冻形/运行期 digest；[系统·安装] 经第四类通道真投递给 su（不可撤回）；目标会话已重建", async () => {
+  const dir = await makeSkillProject();
+  const h = makeHarness({ projectRoot: dir });
+  await h.mgr.open({ projectRoot: dir, roleId: "su", runtime: "demo" });
+  await tick(30);
+  await h.mgr.open({ projectRoot: dir, roleId: "A", runtime: "demo" });
+  await tick(30);
+  const opensA = () => h.openCalls.filter((r) => r === "A").length;
+  assert.equal(opensA(), 1);
+
+  // 客户消息发起的轮次（su 空闲 ⇒ 直接 send；显式目标 su——A 后开为活动角色）。
+  const r0 = await h.mgr.send("给 A 装技能 lint", undefined, { roleId: "su" });
+  assert.equal(r0.ok, true);
+
+  const install = h.installSkillOf("su")!;
+  const receipt = await install({ roleId: "A", name: "lint" });
+  assert.equal(receipt.ok, true, "安装成功");
+  if (receipt.ok) {
+    assert.equal(receipt.action, "installed");
+    assert.equal(receipt.roleId, "A");
+    assert.equal(receipt.name, "lint");
+    assert.equal(receipt.path, "docs/skills/lint/SKILL.md", "path＝项目相对 SKILL.md");
+    assert.equal(
+      receipt.digest,
+      createHash("sha256").update(await fs.readFile(path.join(dir, "docs", "skills", "lint", "SKILL.md"))).digest("hex"),
+      "digest＝当刻字节 sha256（与渲染器/finalize 同算法）",
+    );
+    assert.equal(receipt.effective, "rebuilt", "idle 目标 ⇒ 已重建、即刻生效");
+  }
+  assert.equal(opensA(), 2, "目标会话确已重建（即刻生效）");
+
+  // 系统行：su 正忙 ⇒ 先入队（kind:"system"）；不可撤回；settle 后经投递机真投递给 su。
+  const suState = h.roleStates.filter((s) => s.roleId === "su").at(-1) as unknown as { queue: { kind: string; summary: string; id: string; full: string }[] };
+  const row = suState.queue.find((q) => q.kind === "system");
+  assert.ok(row && row.summary.includes("系统·安装"), "队列快照含 [系统·安装] 行（kind:system）");
+  assert.ok(row!.full.startsWith("[系统·安装] ") && row!.full.includes("已安装技能「lint」") && row!.full.includes("角色「A」"), "入队即定格的正文如实：动作/技能名/角色");
+  const w = h.mgr.withdraw({ projectRoot: dir, roleId: "su", runtime: "demo" }, row!.id);
+  assert.equal(w.ok, false, "system 行不可撤回（治理流只读面）");
+  assert.ok(/不是客户消息/.test(w.error ?? ""), "驳回文案如实（与撤回判据同口径）");
+  h.streams.su.push({ kind: "settled", summary: "一轮结束" });
+  await tick(300);
+  const rowText = h.sent.su.find((t) => t.startsWith("[系统·安装] "));
+  assert.ok(rowText, "settle 后经 kind:system 通道真投递给 su（成功后仍未撤回）");
+  assert.ok(rowText!.includes("docs/skills/lint/SKILL.md") && rowText!.includes("sha256 "), "系统行含路径与 digest 摘要");
+  if (receipt.ok) assert.ok(rowText!.includes(receipt.digest.slice(0, 12)), "系统行 digest＝回执 digest（前 12 位）");
+  assert.ok(rowText!.includes("已重建该角色会话、即刻生效"), "生效态如实");
+  await h.mgr.stop(null);
+});
+
+test("G-4/I3 校验分支（全部拒绝⇒零副作用）：role-not-found（su 自身/未知）/ not-registered（缺件、未生效态、内容缺失）/ role-not-listed / registration-unchanged", async () => {
+  const dir = await makeSkillProject();
+  await writeSkillFixture(dir, "forB", "B"); // 只列 B
+  await writeSkillFixture(dir, "off", "A", "uninstalled"); // 列 A 但已停用
+  // 内容件缺失件（install.md 在、SKILL.md 缺）。
+  await fs.mkdir(path.join(dir, "docs", "skills", "empty"), { recursive: true });
+  await fs.writeFile(path.join(dir, "docs", "skills", "empty", "install.md"), "# 安装登记：empty\n- 用途：演示\n- 适用角色：A\n- 状态：installed\n- 安装日期：2026-10-16\n", "utf8");
+
+  const h = makeHarness({ projectRoot: dir });
+  await h.mgr.open({ projectRoot: dir, roleId: "su", runtime: "demo" });
+  await tick(30);
+  await h.mgr.send("装技能");
+  const install = h.installSkillOf("su")!;
+  const uninstall = h.uninstallSkillOf("su")!;
+  const expectFail = (r: InstallSkillReceipt, reason: string, frag: string): void => {
+    assert.equal(r.ok, false);
+    if (!r.ok) {
+      assert.equal(r.reason, reason, `reason=${reason}`);
+      assert.ok(r.message.includes(frag), `${reason} 文案如实：「${frag}」∈「${r.message}」`);
+    }
+  };
+  expectFail(await install({ roleId: "su", name: "lint" }), "role-not-found", "角色「su」不是本项目项目角色（或为治理角色 su）——未执行。");
+  expectFail(await install({ roleId: "ghost", name: "lint" }), "role-not-found", "角色「ghost」不是本项目项目角色（或为治理角色 su）——未执行。");
+  expectFail(await install({ roleId: "A", name: "nope" }), "not-registered", "技能未登记：docs/skills/nope/install.md 不存在——先落盘再安装；未执行。");
+  expectFail(await install({ roleId: "A", name: "forB" }), "role-not-listed", "登记中未包含角色「A」——未执行；如确要安装请先更新登记。");
+  expectFail(await install({ roleId: "A", name: "off" }), "not-registered", "状态为「uninstalled」——先改登记再安装；未执行。");
+  expectFail(await install({ roleId: "A", name: "empty" }), "not-registered", "技能内容缺失：docs/skills/empty/SKILL.md");
+  expectFail(await uninstall({ roleId: "A", name: "lint" }), "registration-unchanged", "登记仍含角色「A」——先改登记再卸载；未执行。");
+  expectFail(await uninstall({ roleId: "A", name: "nope" }), "not-registered", "没有可撤销的登记；未执行。");
+  // 零副作用：目标从未开会话/重建；无任何 [系统·安装] 行。
+  assert.equal(h.openCalls.filter((r) => r === "A").length, 0, "拒绝零副作用：未开目标会话");
+  assert.ok(!h.roleStates.some((s) => s.summaries.some((x) => x.includes("系统·安装"))), "拒绝不投系统行");
+  await h.mgr.stop(null);
+});
+
+test("G-4/I3 裁定④ 轮次护栏：无轮次/系统投递轮次 ⇒ not-customer-turn（零副作用）；客户直聊与排队客户消息轮次 ⇒ 放行到校验层", async () => {
+  const dir = await makeSkillProject();
+  const h = makeHarness({ projectRoot: dir });
+  await h.mgr.open({ projectRoot: dir, roleId: "su", runtime: "demo" });
+  await tick(30);
+  const install = h.installSkillOf("su")!;
+  const uninstall = h.uninstallSkillOf("su")!;
+
+  // ① 无在跑轮次（防御）⇒ 拒绝（PM 冻结文案逐字）。
+  const r1 = await install({ roleId: "A", name: "lint" });
+  assert.equal(r1.ok, false);
+  if (!r1.ok) {
+    assert.equal(r1.reason, "not-customer-turn");
+    assert.equal(r1.message, "本动作仅可在客户消息发起的轮次执行——未执行。");
+  }
+  assert.equal(h.openCalls.filter((r) => r === "A").length, 0, "零副作用：目标未开会话");
+
+  // ② 系统投递（[系统·看护] 经第四类通道打开的一轮）⇒ 拒绝。
+  h.mgr.watchdogDeliver(dir, { text: "[系统·看护] 测试告警：角色「A」。", summary: "系统·看护 · 测试", dedupKey: "watchdog\u0000test\u0000turn-guard" });
+  await tick(120);
+  const r2 = await install({ roleId: "A", name: "lint" });
+  assert.equal(r2.ok, false);
+  if (!r2.ok) assert.equal(r2.reason, "not-customer-turn", "非客户触发轮次（system）拒绝");
+  const r2u = await uninstall({ roleId: "A", name: "lint" });
+  assert.equal(r2u.ok, false);
+  if (!r2u.ok) assert.equal(r2u.reason, "not-customer-turn", "护栏对两工具同判据");
+  assert.equal(h.openCalls.filter((r) => r === "A").length, 0, "拒绝零副作用（仍未开目标）");
+  h.streams.su.push({ kind: "settled", summary: "一轮结束" });
+  await tick(150);
+
+  // ③ 客户直聊轮次（直接 send）⇒ 放行（拒绝原因走到校验层，而非护栏）。
+  const r3 = await h.mgr.send("装技能");
+  assert.equal(r3.ok, true);
+  const r4 = await install({ roleId: "A", name: "nope" });
+  assert.equal(r4.ok, false);
+  if (!r4.ok) assert.equal(r4.reason, "not-registered", "客户轮次放行到校验层");
+
+  // ④ 排队客户消息投出的一轮（kind:"message"）⇒ 放行。
+  const q1 = await h.mgr.send("一");
+  assert.equal(q1.queued, true, "su 忙 ⇒ 客户消息入队（kind:message）");
+  h.streams.su.push({ kind: "settled", summary: "一轮结束" });
+  await tick(300);
+  assert.ok(h.sent.su.includes("一"), "settle 后队列放行：客户消息投出、su 在跑 message 轮次");
+  const r6 = await uninstall({ roleId: "A", name: "nope" });
+  assert.equal(r6.ok, false);
+  if (!r6.ok) assert.equal(r6.reason, "not-registered", "排队客户消息轮次（kind:message）放行到校验层");
+  await h.mgr.stop(null);
+});
+
+test("G-4/I3 生效态三态如实：未开会话 ⇒ next-session＋note（不自动开目标会话）；在跑 ⇒ next-session（不打断）", async () => {
+  const dir = await makeSkillProject();
+  const h = makeHarness({ projectRoot: dir });
+  await h.mgr.open({ projectRoot: dir, roleId: "su", runtime: "demo" });
+  await tick(30);
+  await h.mgr.send("给 A 装 lint");
+  const install = h.installSkillOf("su")!;
+
+  // ① 目标未开会话 ⇒ next-session（无旧上下文可重建）＋如实 note；绝不自动开目标会话。
+  const r1 = await install({ roleId: "A", name: "lint" });
+  assert.equal(r1.ok, true, "未开会话 = 无需打断、登记即刻对后续会话生效（ok:true 延迟态）");
+  if (r1.ok) {
+    assert.equal(r1.effective, "next-session");
+    assert.ok((r1.note ?? "").includes("没有打开的会话"), "note 如实说明「未开会话」而非「在跑轮次」");
+  }
+  assert.equal(h.openCalls.filter((r) => r === "A").length, 0, "不自动开目标会话（激活≠开户）");
+  h.streams.su.push({ kind: "settled", summary: "结束" });
+  await tick(200);
+  h.streams.su.push({ kind: "settled", summary: "系统行轮次结束" }); // （① 的系统行投出后收尾）
+  await tick(150);
+
+  // ② 目标在跑轮次 ⇒ next-session：不打断、目标不重建。
+  await h.mgr.open({ projectRoot: dir, roleId: "A", runtime: "demo" });
+  await tick(30);
+  const release = h.hangNext("A");
+  void h.mgr.send("长任务", undefined, { roleId: "A" });
+  await tick(30);
+  const rS = await h.mgr.send("装 lint", undefined, { roleId: "su" });
+  assert.equal(rS.ok, true);
+  const r2 = await install({ roleId: "A", name: "lint" });
+  assert.equal(r2.ok, true, "在跑 = 如实延迟态（不是错误）");
+  if (r2.ok) {
+    assert.equal(r2.effective, "next-session");
+    assert.equal(r2.note, undefined, "在跑延迟不另附 note（生效文案由工具层按 effective 渲染）");
+  }
+  assert.equal(h.openCalls.filter((r) => r === "A").length, 1, "在跑不打断：目标会话未重建");
+  release();
+  await tick(60);
+  await h.mgr.stop(null);
+});
+
+test("G-4/I3 重建失败 ⇒ rebuild-failed（登记仍在、未假装已生效）；不投 [系统·安装] 行", async () => {
+  const dir = await makeSkillProject();
+  const h = makeHarness({ projectRoot: dir, failOpensAfter: { A: 1 } });
+  await h.mgr.open({ projectRoot: dir, roleId: "su", runtime: "demo" });
+  await tick(30);
+  await h.mgr.open({ projectRoot: dir, roleId: "A", runtime: "demo" });
+  await tick(30);
+  await h.mgr.send("装", undefined, { roleId: "su" });
+  const install = h.installSkillOf("su")!;
+  const receipt = await install({ roleId: "A", name: "lint" });
+  assert.equal(receipt.ok, false, "重开失败 ⇒ 不假装已生效");
+  if (!receipt.ok) {
+    assert.equal(receipt.reason, "rebuild-failed");
+    assert.ok(receipt.message.includes("重建") && receipt.message.includes("登记仍在"), "如实：登记仍在、会话未重建");
+    assert.ok(receipt.message.includes("会话开启失败"), "原因原文如实（不吞）");
+  }
+  assert.ok(!h.roleStates.some((s) => s.summaries.some((x) => x.includes("系统·安装"))), "失败不投 [系统·安装] 行（零副作用）");
+  await h.mgr.stop(null);
+});
+
+test("G-4/I3 卸载成功（先改登记再卸载 ⇒ rebuilt）：系统行如实二分「效果已撤／文件保留」；SKILL.md 文件本体保留", async () => {
+  const dir = await makeSkillProject();
+  const h = makeHarness({ projectRoot: dir });
+  await h.mgr.open({ projectRoot: dir, roleId: "su", runtime: "demo" });
+  await tick(30);
+  await h.mgr.open({ projectRoot: dir, roleId: "A", runtime: "demo" });
+  await tick(30);
+  await h.mgr.send("卸载 lint", undefined, { roleId: "su" });
+  // 先改登记：把 A 从适用角色移除（普通 edit——落盘永远由 su 侧完成，工具不写盘）。
+  await fs.writeFile(path.join(dir, "docs", "skills", "lint", "install.md"), "# 安装登记：lint\n- 用途：演示用途\n- 适用角色：B\n- 状态：installed\n- 安装日期：2026-10-16\n", "utf8");
+  const uninstall = h.uninstallSkillOf("su")!;
+  const receipt = await uninstall({ roleId: "A", name: "lint" });
+  assert.equal(receipt.ok, true, "登记确已撤销 ⇒ 卸载受理");
+  if (receipt.ok) {
+    assert.equal(receipt.action, "uninstalled");
+    assert.equal(receipt.path, "docs/skills/lint/SKILL.md");
+    assert.equal(receipt.digest.length, 64, "digest＝当刻字节 sha256");
+    assert.equal(receipt.effective, "rebuilt");
+  }
+  assert.equal(h.openCalls.filter((r) => r === "A").length, 2, "登记已撤 ⇒ 目标会话重建（新会话不再注入）");
+  assert.ok((await fs.readFile(path.join(dir, "docs", "skills", "lint", "SKILL.md"), "utf8")).includes("技能正文"), "文件保留：SKILL.md 本体未删（工具不写盘）");
+  h.streams.su.push({ kind: "settled", summary: "结束" });
+  await tick(300);
+  const row = h.sent.su.find((t) => t.startsWith("[系统·安装] "));
+  assert.ok(row, "卸载同样经第四类通道投 [系统·安装] 行");
+  assert.ok(row!.includes("已卸载技能「lint」") && row!.includes("效果已撤，文件保留于"), "如实二分陈述（效果已撤／文件保留）");
+  await h.mgr.stop(null);
+});
+

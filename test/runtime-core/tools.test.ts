@@ -19,8 +19,8 @@ test("Model/schema: required write/edit fields, optionals, unknown names and inj
   assert.deepEqual(describeTool("read_file").parameters.required, ["path"]);
   assert.throws(() => describeTool("native_shell"), /未知/);
   assert.deepEqual([...tools(allow).keys()], ["write_file", "edit_file", "read_file"]);
-  const all = tools(allow, { shellGate: async () => ({ allow: false, reason: "deny", by: "fixture" }), customerInput: () => ({ outcome: "declined" }), reportHandback: () => {}, dispatchTask: () => {}, shellVerdict: () => {}, roleStatus: () => ({ ok: true, text: "stub" }), sessionTail: () => ({ ok: true, text: "stub" }), proposeRecovery: () => ({ outcome: "declined" }) });
-  assert.equal(all.size, 12);
+  const all = tools(allow, { shellGate: async () => ({ allow: false, reason: "deny", by: "fixture" }), customerInput: () => ({ outcome: "declined" }), reportHandback: () => {}, dispatchTask: () => {}, shellVerdict: () => {}, roleStatus: () => ({ ok: true, text: "stub" }), sessionTail: () => ({ ok: true, text: "stub" }), proposeRecovery: () => ({ outcome: "declined" }), installSkill: async () => ({ ok: false, reason: "stub", message: "stub" }), uninstallSkill: async () => ({ ok: false, reason: "stub", message: "stub" }) });
+  assert.equal(all.size, 14);
   for (const tool of all.values()) {
     assert.equal(tool.inputSchema.type, "object");
     assert.ok(tool.description.length);
@@ -32,16 +32,19 @@ test("Model/schema: required write/edit fields, optionals, unknown names and inj
 test("schema 文案（客户 2026-10-16 su 预置裁定配套）：request_confirmation 写明 su 专属例外，写盘确认必备语义保留", () => {
   const confirm = describeTool("request_confirmation");
   const text = [confirm.description, ...(confirm.promptGuidelines ?? [])].join("\n");
-  // 例外与门禁引擎卡文本口径一致：仅内置治理角色 su、仅 docs/su/** 与 docs/contracts/**（已预置、
-  // 免逐次确认、开会话与重建后均生效）；两棵树之外的一切写盘仍须逐条确认——正向钉住「仅 su」限定句，
-  // 防把非 su 角色带歪。
+  // 例外与门禁引擎卡文本口径一致：仅内置治理角色 su；`docs/su/**`、`docs/contracts/**` 与
+  // `docs/skills/**`（G-4 扩列，2026-10-16 批准）已预置、免逐次确认、开会话与重建后均生效；
+  // 三棵树之外的一切写盘仍须逐条确认——正向钉住「仅 su」限定句，防把非 su 角色带歪。
   assert.match(text, /唯一例外（仅内置治理角色 su）/);
   assert.match(text, /docs\/su\/\*\*/);
   assert.match(text, /docs\/contracts\/\*\*/);
+  assert.match(text, /docs\/skills\/\*\*/, "G-4 扩列第三棵须点名");
   assert.match(text, /已预置/);
+  assert.match(text, /写入这三棵目录树\*\*无需逐次确认\*\*/, "写入句须按三棵计数（与门禁引擎新卡文本同口径）");
   assert.match(text, /无需逐次确认/);
   assert.match(text, /开会话与重建后均生效/);
-  assert.match(text, /两棵树之外的一切写盘仍须逐条确认/);
+  assert.match(text, /三棵树之外的一切写盘仍须逐条确认/);
+  assert.equal(/写入这两棵目录树|两棵树之外/.test(text), false, "旧「两棵」计数不得复现（防回退漂移）");
   // 必备语义逐字保留：写盘一律先经本工具确认 / preview 逐条列路径 / confirmed:true 唯一凭据 /
   // 未获同意不写盘 / 列出路径≠获准（后者即「列了不等于获准」，防反向措辞）。
   assert.match(text, /写盘一律先经本工具确认/);

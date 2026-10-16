@@ -51,3 +51,13 @@
 - **口径细则**（文案/默认态/会话内保持/窗口化交互/归属规则/「本轮」粒度）逐条写明于 fix 记录 §1.4。
 - **测试**：边界单测 **88/88**（tool-rows 18 / renderer 53 / markdown+runtime-ui 17；S4 用例与 v3 守卫按新口径修订并加固，修订表见 fix 记录 §2）；新增 e2e 段 **`TOOLFOLD_UI_PASS 19`**（运行中/折叠/零丢失/手动优先/失败标注/锚点/窗口化，含 5 张截图）＋ uiux-v2 全家族回归全过（默认 99/DUP 32/FLOW 41/VISUAL 36/G2 5/GHOST 9/RUNTIME 16/MERGE 12/CONFIG 20/SELECTOR 26/RESET 7/FRESH 4/ROLE_FOCUS 11/TERMINAL 10/SEND_FACTS 8/TERMINAL_MERGE 12）、ime exit 0、bench BENCH_DONE、审计 30/30；`npm run typecheck` **全仓 0 错**。
 - 指纹：`tool-rows.js 2fd2335f`、`renderer.js 27d72e8e`、`styles.css 7cf067d4`、`tool-rows.test.ts a599d1da`、`renderer.test.ts db80beee`、`uiux-v2.mjs 0a1439de`。Doc: docs/fix/2026-10-16_fix_toolrow-turn-collapse.md；证据：docs/fix/2026-10-16-toolrow-turn-collapse-evidence/
+
+## 2026-10-16：G-4/I7 安装工具行/系统行如实标注（角色能力安装·行样式批）——**零改动实证**＋断言守卫
+
+实施——客户 2026-10-16「都按推荐批准，开始实施」＝G-4（角色能力安装）V1 十项裁定全采纳、批准范围含 **I7（行样式，属主桌面UI）**（设计 `2026-10-16_design_role-capability-install` §5.4/§九：「复用既有工具行与 `[系统·…]` 先例，不新造行体系」）。核查结论＝**渲染平面零改动**（沿 G-3「合流即桌面零改动」先例）：
+- **系统行 `[系统·安装]`**：`tool-rows.js::classifySystemMessage` 判据只依赖 `[系统·<子类>] ` **标记形态**（不逐子类登记——`安装` 天然满足）；呈现＝`buildInjectedElement` 既有 `is-system` 单一族（shield 图标＋chip「系统消息 · 安装」＋W6b 定格 `displayBody` 去前缀）；回显/回放同解；队列「系统」标签与不可撤回面（只认 message 类）沿 G-2/U1 既有口径——逐环节零分支。
+- **工具行 `install_skill`/`uninstall_skill`**：经 `isToolActivity`/`activityOf` 按事件事实渲染（工具名直出、非 SPECIAL_TOOLS 屏障表成员；真实投影恒带 display ⇒ 生命周期独立行口径，legacy 路径进轮内工具组）；`slimToolRow` 的 `[\w.-]+` 含下划线零漂移；折叠分解 `callSummary` **按工具名计数**（新名字自动入「本轮 N 个调用：a / b ×k」摘要）——**确认无需特判**。
+- **零改动实证（三层）**：字节级——`app/renderer/**` 未触碰，五文件指纹与工具行折叠批逐位一致（renderer `27d72e8e` / tool-rows `2fd2335f` / ui-labels `564fdb9a` / styles `7cf067d4` / index `a39e3652`）；符号级——四源文件去注释后对两工具名与子类标记**全仓零命中**（新守卫可重跑复验）；行为级——新增纯函数断言证明通用链确有覆盖。
+- **测试**：`test/桌面应用/` 新增 **4 例**（tool-rows +3：`[系统·安装]` 归类/工具行两路径通用渲染/折叠分解含新名；renderer +1：零特判源码守卫）；桌面目录 **358/358**、`npm run typecheck` **全仓 0 错**；全量 **1814 计 / 1809 过 / 4 红 / 1 skipped**（4 红＝他域已登记预期红：`test/测试/g1-verify` ×3 待随 I5/I6 翻转＋`test/测试/g3-search-verify` 探针旧钉 ×1 待随 cleanPatterns 轻修同批翻转——与本批零交集）。
+- 未验边界：I3（桌面窗口）系统行产出未落树（真机/E2E 观测属 E2E 轮）；产出方若改标记形态归类静默回落普通气泡（单点＝`SYSTEM_HEAD`，注释即契约）；卸载行子类命名归属产出方（渲染侧零登记、两种形态均覆盖）；真机投影下两新工具实际走生命周期行还是轮内组未观测。
+- 指纹：`tool-rows.test.ts 52c2c4e7`（原 `a599d1da`）、`renderer.test.ts 3bce42fb`（原 `db80beee`）；`app/renderer/**` 零触碰（指纹见上）。Doc: docs/fix/2026-10-16_fix_g4-i7-install-row-annotation.md

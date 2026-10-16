@@ -17,6 +17,7 @@
 | **su 只读 shell（只读档）** | **su 的 `run_shell` 只执行 (c) 只读白名单命令；risky/review/deny 一律拒——不接 (b)/(a)、不弹框** | **已实现** | [su 只读 shell](docs/change/2026-10-12_change_su-readonly-shell.md)（稳定功能说明待补） |
 | 回交（任务报告） | 按真实ACK/turnId隔离来源、报告与证据，普通聊天不自动回交；正式任务未报告/失败如实回交，最终报告按真实bound档保存，失败仅保存恢复；主入口核对已收到报告后向客户汇总 | 编排已实现并验证 | [任务报告回交](docs/feature/task-handback.md) |
 | su 派发任务 | su 把任务派发给项目角色（前端路由：未开自动开/忙排队/去重）；派发 ≠ 授权 | 已实现（编排侧） | 功能文档待补（[派发接线](docs/change/2026-10-12_change_su-dispatch-wiring.md)、[派发回执](docs/change/2026-10-12_change_dispatch-receipt-queue.md)） |
+| 会话开局注入（已安装技能节，G-4 I4） | `renderInstalledSkillsSection(projectRoot, roleId)`：读 `docs/skills/<name>/install.md` 登记＋当刻字节 digest，渲染「本角色已安装技能（先读）」指针节；坏件跳过不拒会、零技能空串；三适配器系统提示各拼接一段（接线待其属主） | 编排侧已实现（渲染单一来源；三适配器接线待其属主） | [G-4 I4/I5 记录](docs/change/2026-10-16_change_g4-skill-injection-and-preauth.md) |
 | 交互工具 CLI 通道 | CLI 端的客户确认/操作者确认通道（stdin 问答；EOF/未识别一律 fail-closed） | 已实现 | 功能文档待补（[客户确认不设超时](docs/change/2026-10-12_change_customer-input-no-timeout.md)） |
 | 会话自持目录（重启恢复） | 会话数据按角色/runtime 隔离于 `.ans/sessions/<role>/<runtime>/`（Service 注入存储，实际持久化才建目录） | 已实现（编排侧） | 功能文档待补（[session-dir 接线](docs/change/2026-10-12_change_session-dir-restore-wiring.md)） |
 

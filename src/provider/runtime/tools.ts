@@ -23,6 +23,10 @@ import type {
   ProposeRecoveryFn,
   ProposeRecoveryPayload,
   RecoveryAction,
+  InstallSkillFn,
+  InstallSkillPayload,
+  InstallSkillReceipt,
+  UninstallSkillFn,
   ShellVerdictFn,
   ShellVerdictPayload,
   InteractionGate,
@@ -79,6 +83,12 @@ export const SESSION_TAIL_TOOL_NAME = "session_tail";
 
 /** propose_recovery 工具名（G-2/R2；su 恢复提议——只提议，客户一键确认后由应用执行）。 */
 export const PROPOSE_RECOVERY_TOOL_NAME = "propose_recovery";
+
+/** install_skill 工具名（G-4/I2；su 技能安装——校验＋激活＋回执，工具不写盘）。 */
+export const INSTALL_SKILL_TOOL_NAME = "install_skill";
+
+/** uninstall_skill 工具名（G-4/I2；su 技能卸载——校验＋激活＋回执，工具不写盘）。 */
+export const UNINSTALL_SKILL_TOOL_NAME = "uninstall_skill";
 
 /** 扩展层对 run_shell 的能力级判定结果：非 undefined 即阻断（默认拒绝）。 */
 export interface ShellKillSwitchDecision {
@@ -723,6 +733,9 @@ function abortedToolResult(name: string): ToolResult {
   if (name === DISPATCH_TASK_TOOL_NAME) return { ok: false, message: `${name}：任务**未能派发**（原因：会话已中止）` };
   // G-2/R2：中止时**不假设已执行**——等待被中止的提议其结果以系统回执为准（确认卡可能仍被处理）。
   if (name === PROPOSE_RECOVERY_TOOL_NAME) return { ok: false, message: `${name}：本次提议**未获结果**（原因：会话已中止）——**不要假设已执行**；如实告知客户。` };
+  // G-4/I2：中止时**不假设已安装/已卸载**（零副作用面如实）。
+  if (name === INSTALL_SKILL_TOOL_NAME) return { ok: false, message: `${name}：技能**未能安装**（原因：会话已中止）——**不要当它已安装**；如实告知客户。` };
+  if (name === UNINSTALL_SKILL_TOOL_NAME) return { ok: false, message: `${name}：技能**未能卸载**（原因：会话已中止）——**不要当它已卸载**；如实告知客户。` };
   return { ok: false, message: `${name}：会话已中止，未执行` };
 }
 
@@ -1331,6 +1344,113 @@ function makeProposeRecoveryTool(fn: ProposeRecoveryFn, currentTurnId?: () => st
   };
 }
 
+// —————————————— 角色能力安装（G-4；install_skill / uninstall_skill） ——————————————
+//
+// 依据：客户 2026-10-16 批准 G-4 V1（设计 `角色卡/产品/docs/design/2026-10-16_design_role-capability-install.md`
+// §3.2/§3.3；PM 派发「运行时核心＝I1/I2」）。两工具均**只给 su**——由调用方（注入端判据沿
+// dispatch_task 的 suppressHandback 先例）决定**注入才注册**（未注入 ⇒ 工具不存在 = 最强 fail-closed）。
+// 本层纪律：**工具不写盘**——落盘永远由 su 的 `write_file` 完成（「先落盘再激活」＝G-1「先落盘再派发」
+// 的镜像）；校验（角色/登记/含角色、卸前登记确已撤销、客户轮次护栏）与激活（复用既有重建；在跑
+// 不打断）都在注入能力侧（桌面 handler）；本层只**路由载荷**并**如实转达回执**（契约两态：
+// ok:true[rebuilt|next-session] / ok:false[reason+message]；契约外一律 fail-closed）。
+
+/** 技能安装/卸载 receipt 合法形状的字段归一（契约外套 fail-closed 的判据；两工具共用）。 */
+function skillReceiptOf(
+  value: unknown,
+  expectedAction: "installed" | "uninstalled",
+): { ok: true; action: "installed" | "uninstalled"; roleId: string; name: string; path: string; digest: string; effective: "rebuilt" | "next-session"; note?: string } | { ok: false; reason?: string; message?: string } | undefined {
+  if (value === null || typeof value !== "object") return undefined;
+  const record = value as Record<string, unknown>;
+  if (record["ok"] === true) {
+    const action = record["action"];
+    const effective = record["effective"];
+    const path = typeof record["path"] === "string" && record["path"] !== "" ? record["path"] : undefined;
+    const digest = typeof record["digest"] === "string" && record["digest"] !== "" ? record["digest"] : undefined;
+    const roleId = typeof record["roleId"] === "string" && record["roleId"] !== "" ? record["roleId"] : undefined;
+    const name = typeof record["name"] === "string" && record["name"] !== "" ? record["name"] : undefined;
+    if ((action !== "installed" && action !== "uninstalled") || action !== expectedAction || (effective !== "rebuilt" && effective !== "next-session") || path === undefined || digest === undefined || roleId === undefined || name === undefined) return undefined;
+    const note = typeof record["note"] === "string" && record["note"].trim() !== "" ? record["note"] : undefined;
+    return { ok: true, action, roleId, name, path, digest, effective, ...(note !== undefined ? { note } : {}) };
+  }
+  if (record["ok"] === false) {
+    const reason = typeof record["reason"] === "string" && record["reason"].trim() !== "" ? record["reason"] : undefined;
+    const message = typeof record["message"] === "string" && record["message"].trim() !== "" ? record["message"] : undefined;
+    return { ok: false, ...(reason !== undefined ? { reason } : {}), ...(message !== undefined ? { message } : {}) };
+  }
+  return undefined;
+}
+
+/**
+ * install_skill / uninstall_skill 的共用 handler：两工具同名同形，仅动词/期望 action/呈现细节不同。
+ * 纪律（与 dispatch_task 同）：**本层不写盘、不做治理判定、不改变任何权限/写权**——handler 只把
+ * `{roleId, name}` 交给注入的能力并**如实**转达回执：
+ * - `ok:true`（rebuilt/next-session）→ 如实「已安装/已卸载」＋ path/digest/生效态，并重申
+ *   「本次未改变任何角色的写边界」（防模型把安装当成替角色扩权）；
+ * - `ok:false`（含护栏拒绝 `not-customer-turn`、卸载「登记未变」等）→ `ok:false` 如实报因（reason＋
+ *   message 原样），明确**未执行、零副作用**；
+ * - 能力抛错 / 契约外回执（缺失/形状非法/action 与工具不符）→ `ok:false`「未能安装/未获明确结果」
+ *   ——**绝不**说成已安装/已卸载。
+ * 悬挂防护：`raceAbort`（会话中止即立即返回；本地调用，不设等待超时）。
+ */
+function makeSkillReceiptTool(kind: "install" | "uninstall", fn: InstallSkillFn | UninstallSkillFn, currentTurnId?: () => string | undefined, scope?: Pick<GovernedToolsOptions, "roleId" | "runtime">): ExecutableTool {
+  const name = kind === "install" ? INSTALL_SKILL_TOOL_NAME : UNINSTALL_SKILL_TOOL_NAME;
+  const verb = kind === "install" ? "安装" : "卸载";
+  const expectedAction = kind === "install" ? ("installed" as const) : ("uninstalled" as const);
+  return {
+    name,
+    async handler(call) {
+      const turnId = currentTurnId?.();
+      const roleId = readStringArg(call.args, ["roleId", "role_id", "role"]);
+      if (roleId === undefined || roleId.trim() === "") {
+        return { ok: false, message: `${name}: 缺少 roleId 参数（目标角色 id），无法${verb}技能` };
+      }
+      const skillName = readStringArg(call.args, ["name"]);
+      if (skillName === undefined || skillName.trim() === "") {
+        return { ok: false, message: `${name}: 缺少 name 参数（技能名，稳定短 slug），无法${verb}技能` };
+      }
+      const payload: InstallSkillPayload = { roleId, name: skillName };
+
+      let receipt: unknown;
+      try {
+        receipt = await raceAbort(Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return turnId === undefined ? fn(payload) : fn(payload, handbackMetadata(turnId, scope)); }), call.signal, `${name} ${verb}技能`);
+      } catch (err) {
+        return { ok: false, message: `${name}：技能**未能${verb}**（原因：${reasonOf(err)}）——**不要当它已${verb}**；如实向客户说明。` };
+      }
+      const normalized = skillReceiptOf(receipt, expectedAction);
+      if (normalized === undefined) {
+        return { ok: false, message: `${name}：能力未返回明确回执（回执缺失、形状非法或 action 与工具不符）——按**未执行**处理；**不要当它已${verb}**，如实告知客户。` };
+      }
+      if (normalized.ok === true) {
+        const detail = kind === "install"
+          ? `内容：${normalized.path}（sha256 ${normalized.digest.slice(0, 12)}）`
+          : `效果已撤；文件保留于 ${normalized.path}（sha256 ${normalized.digest.slice(0, 12)}）`;
+        const effectiveText = normalized.effective === "rebuilt" ? "已重建该角色会话、即刻生效" : "该角色正在运行轮次（不打断）——新会话起生效";
+        return {
+          ok: true,
+          message:
+            `${name}：技能「${normalized.name}」已${verb} → 角色「${normalized.roleId}」。${detail}；生效：${effectiveText}。` +
+            `${normalized.note !== undefined ? ` ${normalized.note}` : ""}` +
+            `注意：本次${verb}**未改变任何角色的写边界**——技能是必读资料，不是权限。`,
+        };
+      }
+      return {
+        ok: false,
+        message: `${name}：技能${verb}**未执行**（${normalized.reason !== undefined ? `reason: ${normalized.reason}；` : ""}回执：${normalized.message ?? "能力侧未提供原因"}）——零副作用；**不要当它已${verb}**，如实告知客户。`,
+      };
+    },
+  };
+}
+
+/** install_skill：**技能安装**工具（G-4，**只给 su**；见 `makeSkillReceiptTool` §纪律）。 */
+function makeInstallSkillTool(fn: InstallSkillFn, currentTurnId?: () => string | undefined, scope?: Pick<GovernedToolsOptions, "roleId" | "runtime">): ExecutableTool {
+  return makeSkillReceiptTool("install", fn, currentTurnId, scope);
+}
+
+/** uninstall_skill：**技能卸载**工具（G-4，**只给 su**；见 `makeSkillReceiptTool` §纪律）。 */
+function makeUninstallSkillTool(fn: UninstallSkillFn, currentTurnId?: () => string | undefined, scope?: Pick<GovernedToolsOptions, "roleId" | "runtime">): ExecutableTool {
+  return makeSkillReceiptTool("uninstall", fn, currentTurnId, scope);
+}
+
 /**
  * 构造受治理工具集：
  * - 写入类 write_file / edit_file（先 gate，获准且配置了 writeRoot 时落盘）；
@@ -1406,6 +1526,18 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
   const proposeRecovery = options?.proposeRecovery;
   if (proposeRecovery !== undefined) {
     tools.push(makeProposeRecoveryTool(proposeRecovery, options?.currentTurnId, options?.interactionGate, { roleId: options?.roleId, runtime: options?.runtime }));
+  }
+
+  // 结构性保证（G-4/I2，同 dispatch_task 先例）：**未注入安装/卸载能力时对应工具不存在**。
+  // 只给 su——由调用方（注入端判据沿 dispatch_task 的 suppressHandback 先例）决定注入；
+  // 未注入 ⇒ 模型无法请求（能力缺席 = 最强 fail-closed）。两能力各自独立「注入才注册」。
+  const installSkill = options?.installSkill;
+  if (installSkill !== undefined) {
+    tools.push(makeInstallSkillTool(installSkill, options?.currentTurnId, { roleId: options?.roleId, runtime: options?.runtime }));
+  }
+  const uninstallSkill = options?.uninstallSkill;
+  if (uninstallSkill !== undefined) {
+    tools.push(makeUninstallSkillTool(uninstallSkill, options?.currentTurnId, { roleId: options?.roleId, runtime: options?.runtime }));
   }
   // Observe customer waits without storing titles, previews or selected values.
   return tools.map((tool) => {

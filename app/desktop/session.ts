@@ -103,6 +103,12 @@ import { isRecoveryAction, type RecoveryConfirmPresenter } from "./recovery-chan
 import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputRequest, CustomerInputMetadata, PromptTurnStartedMetadata } from "../../src/model/runtime.ts";
 // H-1（2026-10-12）：派发能力的冻结契约（§4 冻结家；只读导入、不复制形状）。
 import type { DispatchTaskPayload, DispatchReceipt, DispatchTaskFn, PromptOptions } from "../../src/model/runtime.ts";
+// G-4/I3（2026-10-16 客户批准）：技能安装/卸载能力的冻结契约（设计 §3.2 冻结家 `src/model/runtime.ts`；
+// 只读导入、不复制形状——字段名即契约，任一侧改名/改形 = 工具静默零注册或 fail-closed）。
+import type { InstallSkillFn, InstallSkillPayload, InstallSkillReceipt, UninstallSkillFn, ReportHandbackMetadata } from "../../src/model/runtime.ts";
+// G-4/I3：登记解析**唯一来源**（编排属主 `common/编排/installed-skills.ts`）——handler 的「登记存在/
+// 含角色/状态」校验面与 O-1 指纹集重推导共用它；**绝不复制解析逻辑**（逐字同渲染器口径）。
+import { readSkillRegistration } from "../../src/common/编排/installed-skills.ts";
 // D-1/E-1：会话文件粗探（「在/不在/坏」）——打开会话时分类 `contextSource`（文案分支的事实来源）。
 // I-1 补丁（2026-10-12 客户重发授权）：(c) 规则集实件的形状（**只读转自** operator-channel.ts——它 `Omit`
 // 自编排的 `AssembleShellGateOptions`；同一契约只许一个形状，本模块不另立第二份）。
@@ -259,6 +265,11 @@ export interface SessionManagerDeps {
       roleStatus?: RoleStatusFn;
       /** **session_tail 数据源**（G-2/W1，仅 su 注入；形状＝契约家 `SessionTailFn`）。 */
       sessionTail?: SessionTailFn;
+      /** **技能安装能力**（G-4/I3，仅 su 注入；形状＝契约家 `InstallSkillFn`——检验/激活/回执、不写盘）。
+       *  编排透传（`AdapterCapabilities` 同名字段）落地前被静默忽略（我方透传就位，等待其承接——登记）。 */
+      installSkill?: InstallSkillFn;
+      /** **技能卸载能力**（G-4/I3，仅 su 注入；形状＝契约家 `UninstallSkillFn`）。 */
+      uninstallSkill?: UninstallSkillFn;
       /** **(a) 操作者确认通道（I-1 arm）**：仅**项目角色**会话注入（su **不接 (b)/(a)**——审读者不给自己开闸；
        *  编排据此装配 (c)/(b)/(a) ShellGate 并注册 `run_shell`；装配落地前被静默忽略——登记）。 */
       shellOperatorChannel?: OperatorChannelFn;
@@ -454,6 +465,13 @@ interface LiveSession {
    */
   boundaryPaths: string[];
   boundaryPrints: Record<string, string>;
+  /**
+   * **G-4 裁定⑤（2026-10-16 客户批准）**：本会话定格的「该角色已安装技能」参与文件集
+   * （`docs/skills/<name>/` 的 `SKILL.md`＋`install.md` **绝对路径**；开会话/重建当刻按登记推导一次，
+   * 检查时由 `boundaryDiff` 以**同一推导**重算当前集合、比对集合差——新增/移除/内容编辑 ⇒ 陈旧）。
+   * **零技能＝空数组**（既有指纹语义逐字不变）。
+   */
+  skillPaths: string[];
 }
 
 /** 一次**系统投递**（E-1 回交投 su / H-1 派发投目标角色 / L-1 客户消息）——投递机的队列条目（**一套机，多调用方**）。 */
@@ -520,6 +538,15 @@ async function filePrint(absPath: string): Promise<string> {
     return "<missing>";
   }
 }
+
+/**
+ * **`[系统·安装]`：安装/卸载完成后的定格系统行文首**（PM 冻结符号，G-4 2026-10-16）——形态契约＝
+ * 「`[系统·<子类>]` ＋一个 ASCII 空格」，与桌面UI `tool-rows.js::SYSTEM_HEAD`（`[系统·` 开头、子类闭合
+ * 于 `]`、≤12 字、后随空白或文末）的归类判据对齐（改形态 = 系统类静默回落普通气泡——单点在彼处注释）。
+ * 该行为 `kind:"system"` 第四类投递正文（G-2/W2 同一套投递机真投递给 su；不可撤回——「不可撤回面同
+ * system kind」）。
+ */
+export const SKILL_INSTALL_SYSTEM_PREFIX = "[系统·安装]";
 
 /**
  * 会话管理器（B-2：**每角色一个保活句柄** + 上限 LRU）：点角色即开、多轮直发；
@@ -799,13 +826,57 @@ export class SessionManager {
   // 开会话时解析的旧边界 ⇒ 写入被拒（「目标路径未匹配任何边界条目」）。信号只取**读盘内容哈希**
   // （可信信号，不用界面推测）；检出陈旧 ⇒ **作废重建**（dispose → 立即按新边界重开）并如实记一行。
 
-  /** 该会话的边界快照**哪一处**变了（返回变化的相对路径；未变 ⇒ null）。 */
+  /** 该会话的边界快照**哪一处**变了（返回变化的相对路径；未变 ⇒ null）。
+   *  **G-4 裁定⑤（2026-10-16 客户批准）**：第二段＝「该角色已安装技能」集合的**当刻重推导**比对——
+   *  ① 冻结路径逐字节（含技能文件的内容编辑）；② 集合差（新增：新技能落盘/登记改列本角色 ⇒ 冻结集里
+   *  没有的路径出现；移除：冻结集里的路径从当刻集合消失）。任一差异返回该相对路径。
+   *  `currentSkillPaths` 返回 `null`（读目录防御失败）⇒ 跳过本轮集合比对（坏件跳过——绝不误重建）；
+   *  零技能两侧皆空 ⇒ 无差（既有语义逐字不变）。 */
   private async boundaryDiff(entry: LiveSession): Promise<string | null> {
     for (const f of entry.boundaryPaths) {
       const rel = path.relative(entry.projectRoot, f);
       if (entry.boundaryPrints[rel] !== (await filePrint(f))) return rel;
     }
+    const current = await this.currentSkillPaths(entry.projectRoot, entry.roleId);
+    if (current !== null) {
+      const frozen = new Set(entry.skillPaths);
+      const currentSet = new Set(current);
+      const first = [...currentSet].filter((f) => !frozen.has(f)).sort()[0]
+        ?? [...frozen].filter((f) => !currentSet.has(f)).sort()[0];
+      if (first !== undefined) return path.relative(entry.projectRoot, first);
+    }
     return null;
+  }
+
+  /**
+   * **G-4 裁定⑤**：**当刻重新推导**该角色「已安装技能」的参与文件集（`SKILL.md`＋`install.md` 的绝对
+   * 路径）。判据与渲染器注入节**同集合**：
+   * · 登记读取/解析**唯一来源**＝编排 `readSkillRegistration`（**不复制解析逻辑**）——返回 `undefined`
+   *   （坏件/缺失/名非法）⇒ 跳过该条（与渲染器坏件跳过逐字同口径）；
+   * · `status !== "installed"` 跳过（`uninstalled` ＝已停用）；`roles` 不含本角色跳过；
+   * · `SKILL.md` 缺失**不**在此过滤：路径仍入集合（其指纹为 `<missing>`）——它后来出现即触发重建，
+   *   与渲染器「补好文件 ⇒ 新会话注入」收敛一致。
+   * 返回 `null`＝本轮**不可推导**（`docs/skills` 读目录失败且非 ENOENT——坏件跳过防御：绝不据此误判
+   * 集合差）；`[]`＝零技能（含目录不存在＝项目从未装过技能）。
+   */
+  private async currentSkillPaths(projectRoot: string, roleId: string): Promise<string[] | null> {
+    const skillsRoot = path.join(projectRoot, "docs", "skills");
+    let entries: import("node:fs").Dirent[];
+    try {
+      entries = await fs.promises.readdir(skillsRoot, { withFileTypes: true });
+    } catch (err) {
+      return (err as NodeJS.ErrnoException).code === "ENOENT" ? [] : null;
+    }
+    const paths: string[] = [];
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue; // docs/skills 下直接放的文件不是技能条目（渲染器同口径）
+      const registration = readSkillRegistration(projectRoot, entry.name);
+      if (registration === undefined || registration.status !== "installed" || !registration.roles.includes(roleId)) continue;
+      paths.push(path.join(skillsRoot, entry.name, "SKILL.md"));
+      paths.push(path.join(skillsRoot, entry.name, "install.md"));
+    }
+    paths.sort();
+    return paths;
   }
 
   /** 陈旧 ⇒ 作废重建（dispose → 立即重开 + 如实记行）。返回 undefined = 未陈旧/在跑/已被并发替换（不打断）；
@@ -855,7 +926,18 @@ export class SessionManager {
     diagnostic.record("session.rebuild.start");
     // dispose 保留 ANS 回放；模型上下文是否恢复只读新句柄实际返回。
     await this.disposeEntry(roleId, entry);
-    this.deps.emitEvent({ roleId: entry.roleId, projectRoot, runtime: entry.runtime, event: { kind: "message", summary: `该角色边界已更新或运行时配置已保存（${changed}），已作废旧会话，按新边界重开；上下文恢复结果以引擎实际返回为准。` } });
+    // 如实记行（哪个文件变的直接点名）：G-4 裁定⑤ 起陈旧源还有「已安装技能」——文档面不同、措辞分开
+    // （技能不是边界；既不夸大也不含糊），其余分支逐字沿用既有文案（测试已钉）。
+    const isSkillChange = changed.split(path.sep).join("/").startsWith("docs/skills/");
+    this.deps.emitEvent({
+      roleId: entry.roleId, projectRoot, runtime: entry.runtime,
+      event: {
+        kind: "message",
+        summary: isSkillChange
+          ? `该角色已安装技能已变更（${changed}），已作废旧会话，按新技能登记重开；上下文恢复结果以引擎实际返回为准。`
+          : `该角色边界已更新或运行时配置已保存（${changed}），已作废旧会话，按新边界重开；上下文恢复结果以引擎实际返回为准。`,
+      },
+    });
     // 重建不自行选择角色。仅成功且用户意图未改变时恢复被 dispose 清空的活动目标。
     // **F-2-opt2 防死锁**：本重开是**持锁方（openInternal 的续接前查陈旧）所等待的那条链**内的续段——
     // 必须直调 `openInternalUnsafe`（不再入 openChains）并带 `internalReopen`（不再查陈旧/不再入 rebuild 链，
@@ -1089,6 +1171,20 @@ export class SessionManager {
       role.builtIn === true ? (query: RoleStatusPayload) => this.roleStatusText(req.projectRoot, query) : undefined;
     const sessionTail: SessionTailFn | undefined =
       role.builtIn === true ? (query: SessionTailPayload) => this.sessionTailText(req.projectRoot, query) : undefined;
+    // G-4/I3（2026-10-16 客户批准；同 H-1/G-2 先例）：**技能安装/卸载能力**——**仅内置治理角色（su）**
+    // 会话注入；「未注入即不注册」= 最强 fail-closed（项目角色零感知）。工具 handler 只把 `{roleId,name}`
+    // 载荷交进来；护栏/校验/激活/回执/系统行全在本层（`applySkillChange`）。契约（字段名与形状）＝
+    // `model/runtime.ts::InstallSkillFn`/`UninstallSkillFn`（单一来源，本层不另立形状）。
+    // 护栏判据在调用**当刻**读活会话状态（`activeDeliveries`/busy——per-turn 权威信号）；工具层传来的
+    // metadata 仅供展示面，不作判定依据（不接收、不消费）。
+    const installSkill: InstallSkillFn | undefined =
+      role.builtIn === true
+        ? (d: InstallSkillPayload, _metadata?: ReportHandbackMetadata) => this.applySkillChange("installed", req.projectRoot, req.runtime, req.roleId, d)
+        : undefined;
+    const uninstallSkill: UninstallSkillFn | undefined =
+      role.builtIn === true
+        ? (d: InstallSkillPayload, _metadata?: ReportHandbackMetadata) => this.applySkillChange("uninstalled", req.projectRoot, req.runtime, req.roleId, d)
+        : undefined;
 
     // I-1（2026-10-12，客户裁定 arm）：**只对项目角色**把 (a) 操作者确认通道交给编排装配 (c)/(b)/(a)
     // `ShellGate`（判据 `role.builtIn`，数据驱动）。「审读者不给自己开闸」仍成立：su **不接 (b)/(a)**
@@ -1171,6 +1267,10 @@ export class SessionManager {
           ...(proposeRecovery ? { proposeRecovery } : {}),
           ...(roleStatus ? { roleStatus } : {}),
           ...(sessionTail ? { sessionTail } : {}),
+          // G-4/I3：技能安装/卸载能力（**仅 su 会话注入**——「未注入即不注册」；编排透传字段落地前
+          // 被其静默忽略，零行为影响；落地后即点亮两工具，见 change 文档的依赖登记）。
+          ...(installSkill ? { installSkill } : {}),
+          ...(uninstallSkill ? { uninstallSkill } : {}),
           // I-1：(a) 操作者确认通道（仅项目角色；编排据它装配 (c)/(b)/(a) ShellGate 并注册 run_shell——
           // 装配接线落地前本字段被静默忽略，登记在案）。
           ...(shellOperatorChannel ? { shellOperatorChannel } : {}),
@@ -1200,6 +1300,14 @@ export class SessionManager {
     boundaryPaths.push(path.resolve(req.projectRoot, ".ans", "project.json")); // 恒查（缺失记 `<missing>`——pin 刷新即变）
     const boundaryPrints: Record<string, string> = {};
     for (const f of boundaryPaths) boundaryPrints[path.relative(req.projectRoot, f)] = await filePrint(f);
+    // **G-4 裁定⑤（2026-10-16 客户批准）**：该角色「已安装技能」参与文件（`SKILL.md`＋`install.md`）纳入
+    // 同一快照——安装/卸载/编辑技能后，本会话在**既有检查点**（发言/续接/投递/su settle 扫描）检出
+    // 「已安装技能集合」变化 ⇒ 作废重建（在跑不打断）——`next-session` 语义由此收敛为 settle 即生效。
+    // 零技能 ⇒ 空集（无新增路径；既有指纹语义逐字不变）；推导防御失败（读目录异常）⇒ 按零处理不入表
+    // （检查时还会重推导——彼时若可读，集合差照常触发重建）。
+    const skillPaths = (await this.currentSkillPaths(req.projectRoot, req.roleId)) ?? [];
+    for (const f of skillPaths) boundaryPaths.push(f);
+    for (const f of skillPaths) boundaryPrints[path.relative(req.projectRoot, f)] = await filePrint(f);
 
     const entry: LiveSession = {
       handle,
@@ -1213,6 +1321,7 @@ export class SessionManager {
       confirmGated: customerInput !== undefined,
       boundaryPaths,
       boundaryPrints,
+      skillPaths,
     };
     this.sessions.set(key, entry);
     if (role.builtIn === true) this.lastSuRuntime.set(req.projectRoot, req.runtime); // G-2/W1：看护向 su 投递时择路用
@@ -2173,6 +2282,184 @@ export class SessionManager {
       dedupKey: `watchdog\u0000${projectRoot}\u0000recovery-receipt\u0000${receipt.at ?? this.now()}`,
     });
     return receipt;
+  }
+
+  // —————————————— G-4（2026-10-16 客户批准）：技能安装/卸载 handler（I3） ——————————————
+  //
+  // 设计 `角色卡/产品/docs/design/2026-10-16_design_role-capability-install.md` §3.2/§3.3/§4.3/§4.4/§6.4；
+  // PM 裁定④（轮次护栏：仅**客户消息**发起的轮次可执行，先判）与⑤（O-1 指纹集扩展——见 `boundaryDiff` /
+  // `currentSkillPaths`）。**工具不写盘**——落盘永远由 su 的 `write_file` 完成（「先落盘再激活」＝
+  // G-1「先落盘再派发」的镜像）；本层只 **护栏 → 校验（角色/登记/含角色/状态）→ 激活（复用既有重建；
+  // 在跑不打断 ⇒ `next-session`）→ 如实回执** ＋ `[系统·安装]` 系统行（`kind:"system"` 第四类通道
+  // 真投递给 su——不可撤回、与看护/恢复回执同一套投递机）＋ 诊断事件。失败一律 fail-closed＝**未执行、
+  // 零副作用**（登记不动、不重建、不投系统行）。**安装/卸载不改变任何角色的写边界**（技能是必读资料，
+  // 不是权限）。
+
+  /**
+   * ### 裁定④（G-4）：「su 当前轮次是否由**客户消息**发起」——安装/卸载护栏的唯一判据
+   * （设计 §6.4：「桌面 handler 读该角色当前 `activeDeliveries` 的 kind 即可判定」）。三态：
+   * · 该会话有在跑投递条目：`kind === "message"`（忙时排队的客户消息投出的一轮）⇒ 是；
+   *   `handback` / `dispatch` / `system`（回交验收/派发/看护系统消息等打开的一轮）⇒ 否；
+   * · 无在跑投递条目：**只有直接 `send`** 开跑的轮次如此（其唯一调用方＝客户聊天 `sendSession`）⇒ 是；
+   * · 会话不在 / 不在轮次中（防御——工具只可能在轮次内被调用）⇒ 否。
+   */
+  private isCustomerInitiatedTurn(projectRoot: string, runtime: RuntimeKind, roleId: string): boolean {
+    const entry = this.sessions.get(this.sessionKey(projectRoot, roleId, runtime));
+    if (!entry || entry.busy !== true) return false;
+    const active = this.activeDeliveries.get(this.queueKey(projectRoot, roleId, runtime));
+    return active === undefined || active.kind === "message";
+  }
+
+  /**
+   * `install_skill` / `uninstall_skill` 的共用实现（注入能力侧；回执形状冻结——`model/runtime.ts`）。
+   * 分支顺序（一切失败都先于任何副作用）：
+   * ① 护栏（`not-customer-turn`）→ ② 载荷防御 → ③ 目标角色（`role-not-found`）→ ④ 登记（`not-registered`
+   * / `role-not-listed`；卸载登记未变 ⇒ `registration-unchanged`）→ ⑤ 内容件与运行期哈希（缺件 ⇒
+   * `not-registered` 类如实）→ ⑥ 激活（`rebuilt` / `next-session`；重建失败 ⇒ `rebuild-failed`）→
+   * ⑦ 回执 ＋ `[系统·安装]` 系统行 ＋ 诊断。
+   */
+  private async applySkillChange(
+    action: "installed" | "uninstalled",
+    projectRoot: string,
+    runtime: RuntimeKind,
+    suRoleId: string,
+    d: InstallSkillPayload,
+  ): Promise<InstallSkillReceipt> {
+    const acting = action === "installed";
+    const verb = acting ? "安装" : "卸载";
+    const toolName = acting ? "install_skill" : "uninstall_skill";
+    const diagnostic = createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId: suRoleId });
+    const refuse = (reason: string, message: string): InstallSkillReceipt => {
+      diagnostic.record("skill.refused", { toolName, targetRoleId: typeof d?.roleId === "string" ? d.roleId : "", reasonCode: reason });
+      return { ok: false, reason, message };
+    };
+
+    // ① 裁定④ 轮次护栏（**先判**；拒绝零副作用——不触目标、不读登记、不投系统行）。
+    if (!this.isCustomerInitiatedTurn(projectRoot, runtime, suRoleId)) {
+      return refuse("not-customer-turn", "本动作仅可在客户消息发起的轮次执行——未执行。");
+    }
+
+    // ② 载荷防御（模型输入不可信——本层全量重校验，不依赖工具层的参数校验）。
+    const roleId = typeof d?.roleId === "string" ? d.roleId.trim() : "";
+    const name = typeof d?.name === "string" ? d.name.trim() : "";
+    if (roleId === "") return refuse("role-not-found", `角色「${roleId}」不是本项目项目角色（或为治理角色 su）——未执行。`);
+    if (name === "") return refuse("not-registered", `技能未登记：docs/skills/${name}/install.md 不存在——先落盘再${verb}；未执行。`);
+
+    // ③ 目标角色须是**本项目项目角色**（非内置治理角色 su 自身/同类）；缓存 miss ⇒ 实时重枚举一次
+    //   （首轮寻址先例：`routeDispatch` / `proposeRecovery` 同款——新建角色同轮安装不误拒）。
+    const findTarget = (): { builtIn?: boolean } | undefined => {
+      const listing = this.deps.getListing(projectRoot);
+      return listing ? listing.roles.find((r) => r.roleId === roleId) : undefined;
+    };
+    let target = findTarget();
+    if (!target && this.deps.refreshListing) {
+      try {
+        await this.deps.refreshListing(projectRoot);
+      } catch {
+        // 重枚举失败（读盘竞态等）：按原 miss 口径如实拒绝，不上抛。
+      }
+      target = findTarget();
+    }
+    if (!target || target.builtIn === true || roleId === suRoleId) {
+      return refuse("role-not-found", `角色「${roleId}」不是本项目项目角色（或为治理角色 su）——未执行。`);
+    }
+
+    // ④ 登记校验（**唯一来源**＝编排 `readSkillRegistration`——与渲染器坏件集逐字同口径，绝不复制解析）。
+    const registration = readSkillRegistration(projectRoot, name);
+    if (registration === undefined) {
+      return refuse(
+        "not-registered",
+        acting
+          ? `技能未登记：docs/skills/${name}/install.md 不存在——先落盘再安装；未执行。`
+          : `技能未登记：docs/skills/${name}/install.md 不存在或不可解析——没有可撤销的登记；未执行。`,
+      );
+    }
+    if (acting) {
+      if (!registration.roles.includes(roleId)) {
+        return refuse("role-not-listed", `登记中未包含角色「${roleId}」——未执行；如确要安装请先更新登记。`);
+      }
+      if (registration.status !== "installed") {
+        return refuse(
+          "not-registered",
+          `技能未登记为已安装：docs/skills/${name}/install.md 状态为「${registration.status}」——先改登记再安装；未执行。`,
+        );
+      }
+    } else if (registration.status === "installed" && registration.roles.includes(roleId)) {
+      // 卸载专有两钉之一：**先改登记再卸载**——登记仍含角色即拒绝（防「工具说撤了、登记没变」）。
+      return refuse("registration-unchanged", `登记仍含角色「${roleId}」——先改登记再卸载；未执行。`);
+    }
+
+    // ⑤ 内容件存在性与运行期哈希（sha256 **原始字节**——复用 `filePrint` 缓存件；与渲染器/`finalize.ts`
+    //   同算法：「哈希只能由代码算」）。缺件 ⇒ 如实拒绝（回执冻形要求 `path`＋`digest`——不拿哨兵充数）。
+    const skillRel = `docs/skills/${name}/SKILL.md`;
+    const digest = await filePrint(path.join(projectRoot, "docs", "skills", name, "SKILL.md"));
+    if (digest === "<missing>") {
+      return refuse(
+        "not-registered",
+        acting
+          ? `技能内容缺失：${skillRel} 不存在或不可读——先落盘再安装；未执行。`
+          : `技能内容缺失：${skillRel} 不存在或不可读——无法如实回执（sha256 与「文件保留」陈述）；未执行。`,
+      );
+    }
+
+    // ⑥ 激活（复用既有 `rebuildSession`：串行链＋在跑拒绝＋三态；**不打断**任何在跑轮次）：
+    //    idle ⇒ 重建（rebuilt＝即刻生效）；在跑 ⇒ next-session（如实延迟态，**不是错误**——settle 后
+    //    靠既有检查点（含裁定⑤ 指纹）收敛）；无会话 ⇒ next-session（无旧上下文可重建——新会话打开
+    //    即生效）；重建失败 ⇒ rebuild-failed（登记仍在，**不假装已生效**）。
+    const targetSessionKey = this.sessionKey(projectRoot, roleId, runtime);
+    let effective: "rebuilt" | "next-session" = "next-session";
+    let note: string | undefined;
+    const targetEntry = this.sessions.get(targetSessionKey);
+    if (!targetEntry) {
+      note = "该角色当前没有打开的会话（并非在跑轮次）——新会话打开即生效。";
+    } else if (targetEntry.busy) {
+      // 在跑轮次不打断（沿 G-2 语义）；本次回执如实延迟。
+    } else {
+      const rebuilt = await this.rebuildSession({ projectRoot, roleId, runtime });
+      if (rebuilt.ok) {
+        effective = "rebuilt";
+      } else if (this.sessions.get(targetSessionKey)?.busy === true) {
+        // 竞态：检查后目标开跑了一轮——按其如实延迟（不打断），不报失败。
+      } else {
+        const detail = rebuilt.error ?? "未知原因";
+        diagnostic.error("skill.rebuild.failed", new Error(detail), { toolName, targetRoleId: roleId });
+        return {
+          ok: false,
+          reason: "rebuild-failed",
+          message: `技能登记已${acting ? "变更" : "撤销"}，但按新登记重建角色「${roleId}」的会话失败：${detail}——登记仍在、会话未重建（未假装已生效；可在该角色下一次打开会话时生效，或重试）。`,
+        };
+      }
+    }
+
+    // ⑦ 如实回执（冻形）＋ `[系统·安装]` 定格系统行（`kind:"system"` 第四类通道真投递给 su——忙时排队、
+    //    未开自动开、失败保留重试全复用；不可撤回）＋诊断。**不写盘、不放行任何写入、不改任何写边界**。
+    const effectivePhrase =
+      effective === "rebuilt"
+        ? "已重建该角色会话、即刻生效"
+        : note !== undefined
+          ? "该角色当前未打开会话——新会话起生效"
+          : "该角色正在运行轮次（不打断）——新会话起生效";
+    const shortDigest = digest.slice(0, 12);
+    const rowText = acting
+      ? `${SKILL_INSTALL_SYSTEM_PREFIX} 已安装技能「${name}」→ 角色「${roleId}」；${effectivePhrase}；内容：${skillRel}（sha256 ${shortDigest}）。`
+      : `${SKILL_INSTALL_SYSTEM_PREFIX} 已卸载技能「${name}」（角色「${roleId}」）；效果已撤，文件保留于 ${skillRel}（sha256 ${shortDigest}）；${effectivePhrase}。`;
+    this.watchdogDeliver(projectRoot, {
+      text: rowText,
+      summary: `系统·安装 · 已${verb}技能「${name}」· 角色「${roleId}」· ${effective === "rebuilt" ? "即刻生效（已重建）" : "新会话起生效"}`,
+      // 命名空间同看护（`watchdog\0…`——与回交/派发键隔离）；每条动作独立（重装/重卸是合法事件，不去重）。
+      dedupKey: `watchdog\u0000${projectRoot}\u0000install-row\u0000${randomUUID()}`,
+    });
+    diagnostic.record(acting ? "skill.installed" : "skill.uninstalled", { toolName, targetRoleId: roleId, path: skillRel, state: effective });
+    return {
+      ok: true,
+      action,
+      roleId,
+      name,
+      path: skillRel,
+      digest,
+      effective,
+      ...(note !== undefined ? { note } : {}),
+    };
   }
 
   // ——————— G-2/W1：role_status / session_tail 的桌面侧数据源（契约＝`model/runtime.ts`；编排转发） ———————

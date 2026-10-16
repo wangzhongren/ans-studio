@@ -34,8 +34,9 @@ export function describeTool(name: string): ToolDescription {
     // 已授权项目任务可推进；扩张治理边界仍须客户确认。
     // 2026-10-16 客户裁定（su 写 `docs/su/**` 与 `docs/contracts/**` 免逐次审批；编排预置进 su
     // 会话初始 writeSet、门禁引擎同步 su 卡「确认制要点」）：本工具文案补「唯一例外（仅内置治理
-    // 角色 su）——两棵目录树写盘许可已预置、免逐次确认、开会话与重建后均生效」；其余一切写盘仍
-    // 逐条确认，非 su 角色语义不变（例外不做 su 限定即会把普通角色带歪）。
+    // 角色 su）——写盘许可已预置、免逐次确认、开会话与重建后均生效」；G-4（2026-10-16 批准）后
+    // 预授权再增 `docs/skills/**`、扩为**三棵**（与门禁引擎新卡文本同口径）；其余一切写盘仍逐条
+    // 确认，非 su 角色语义不变（例外不做 su 限定即会把普通角色带歪）。
     // executionMode:"sequential"（A-6）：防止同批的 write_file 抢跑于确认（Pi 缺省同批并行执行工具）。
     return {
       parameters: {
@@ -55,8 +56,8 @@ export function describeTool(name: string): ToolDescription {
       description:
         "向客户请求确认并**挂起等待其回应**（前端渲染成交互卡）。已接受项目边界内、已授权任务的**读取与检查**" +
         "无需逐次确认；**写盘一律先经本工具确认**——把将写出的路径列入 preview，客户返回 `confirmed:true` 后系统才为这些路径发行写盘许可。" +
-        "**唯一例外（仅内置治理角色 su）**：`docs/su/**`（su 自己的工作笔记）与 `docs/contracts/**`（跨角色契约文档）的写盘许可**已预置**——" +
-        "写入这两棵目录树**无需逐次确认**、直接写即可（开会话与重建后均生效）；两棵树之外的一切写盘仍须逐条确认。" +
+        "**唯一例外（仅内置治理角色 su）**：`docs/su/**`（su 自己的工作笔记）、`docs/contracts/**`（跨角色契约文档）与 `docs/skills/**`（su 给角色安装的技能文档）的写盘许可**已预置**——" +
+        "写入这三棵目录树**无需逐次确认**、直接写即可（开会话与重建后均生效）；三棵树之外的一切写盘仍须逐条确认。" +
         "真正新建或扩张角色边界、治理写集时，须由 su 把变更呈给客户确认（角色卡全文与边界摘要放进 preview），" +
         "仅当返回「客户已确认」时才落盘。未获同意（拒绝/超时/通道不可用）→ **不要写盘**，如实告知客户，不得假设同意。" +
         "**preview 必须列出将要写出的具体路径**（项目内相对路径，如 `角色卡/示例/role-card.md`）——写盘许可依 preview 所列路径发行；" +
@@ -64,7 +65,7 @@ export function describeTool(name: string): ToolDescription {
       promptGuidelines: [
         "已接受项目边界内、已授权任务的**读取与检查**无需逐次确认；**写盘（write_file / edit_file 等）一律先经本工具确认**——" +
           "把将写出的路径逐条列入 preview，客户返回 `confirmed:true` 后系统才会为这些路径发行写盘许可；对话里的口头同意不是凭据。" +
-          "**唯一例外（仅内置治理角色 su）**：`docs/su/**` 与 `docs/contracts/**` 的写盘许可已预置——写这两棵目录树无需逐次确认、直接写即可（开会话与重建后均生效）；两棵树之外的一切写盘仍须逐条确认。" +
+          "**唯一例外（仅内置治理角色 su）**：`docs/su/**`、`docs/contracts/**` 与 `docs/skills/**` 的写盘许可已预置——写这三棵目录树无需逐次确认、直接写即可（开会话与重建后均生效）；三棵树之外的一切写盘仍须逐条确认。" +
           "新建或扩张角色边界、治理写集须由 su 经 request_confirmation 取得客户的**明确同意**。未获该变更同意 → 不执行治理变更，不得假设同意。",
         "新建角色或扩张角色边界时：先把**角色卡全文 + 边界摘要**放进 request_confirmation 的 preview 请客户预览，同意后才写入治理变更。",
         "request_confirmation 的 preview **必须列出将要写出的具体路径**（每个待写文件一行，相对项目根、含目录，如 " +
@@ -322,6 +323,66 @@ export function describeTool(name: string): ToolDescription {
       promptGuidelines: [
         "propose_recovery 只用于**确认卡死**的恢复；提议前先核对（role_status，必要时 session_tail），并把核对结论写进 evidence。",
         "**提议 ≠ 执行**：无客户一键确认＝零执行；不得用本工具承诺任何执行或写权、不得替客户决定、**不得把未获执行当成功**。",
+      ],
+    };
+  }
+  if (name === "install_skill") {
+    // 技能安装工具（G-4/I1，只给 su 注入；客户 2026-10-16 批准）。文案纪律（沿 dispatch_task 先例）：
+    // 仅客户明示时安装（不自主发起）/ 先落盘再激活 / 工具只校验+激活+回执、**不写盘** /
+    // **安装不改变任何角色写边界**（技能是必读资料不是权限）/ 失败文案枚举沿产品设计 §3.3
+    // （含护栏拒绝 not-customer-turn）/ 不得暗示任何授权。
+    return {
+      parameters: {
+        type: "object",
+        properties: {
+          roleId: { type: "string", description: "Target project role id (must be a project role, not su itself)" },
+          name: { type: "string", description: "Skill name (stable short slug matching docs/skills/<name>/)" },
+        },
+        required: ["roleId", "name"],
+        additionalProperties: true,
+      },
+      description:
+        "向目标角色**安装技能**（只注入给治理角色 su；激活＝重建目标会话，使其新会话系统提示带「已安装技能」指针）。" +
+        "**仅客户明示时安装**——客户在会话中指令你安装才执行；**不得自主发起**；非客户消息发起的轮次调用会被**拒绝**（not-customer-turn：`本动作仅可在客户消息发起的轮次执行——未执行。`）。" +
+        "**先落盘再激活**：技能内容与登记先由你经 write_file 落盘到 `docs/skills/<name>/SKILL.md` 与 `docs/skills/<name>/install.md`（登记须含适用角色），**再**调本工具；" +
+        "本工具**不写盘、不做治理判定**——只**校验**（登记存在、含目标角色）、**激活**并**如实回执**。" +
+        "**安装不改变任何角色的写边界**——技能是必读资料，不是权限；目标角色的写权完全不变。" +
+        "回执三态如实：`effective:\"rebuilt\"`＝目标会话已重建、即刻生效；`effective:\"next-session\"`＝目标正在跑轮次、不打断——新会话起生效（如实延迟态，不是错误）；" +
+        "失败（`ok:false`）一律**未执行、零副作用**，如实报因（枚举）：技能未登记＝`技能未登记：docs/skills/<name>/install.md 不存在——先落盘再安装；未执行。`；" +
+        "登记未含目标角色＝`登记中未包含角色「<roleId>」——未执行；如确要安装请先更新登记。`；角色不存在或为 su 自身＝`角色「<roleId>」不是本项目项目角色（或为治理角色 su）——未执行。`。" +
+        "**不得**把失败或延迟说成已生效。",
+      promptGuidelines: [
+        "安装技能**仅限客户明示**（客户在会话中说「给<角色>装技能<name>」）：不得自主发起、不得把派发/看护等其它轮次的意图当许可；非客户消息发起的轮次会被拒绝（not-customer-turn）。",
+        "**先落盘再激活**：先 write_file 落盘 `docs/skills/<name>/SKILL.md`（技能内容）与 `docs/skills/<name>/install.md`（登记，含适用角色），再调 install_skill——本工具只校验/激活/回执，**不写盘**，也不放宽任何写权。",
+        "安装**不改变任何角色的写边界**（技能是必读资料，不是权限）；回执如实转达：rebuilt＝已重建、即刻生效；next-session＝在跑不打断、新会话起生效；失败＝未执行、零副作用，如实报因。",
+      ],
+    };
+  }
+  if (name === "uninstall_skill") {
+    // 技能卸载工具（G-4/I1，只给 su 注入；客户 2026-10-16 批准）。文案纪律：仅客户明示时卸载 /
+    // **先改登记再卸载**（防「工具说撤了、登记没变」）/ 工具不写盘 / 文件保留（「效果已撤」与
+    // 「文件仍在」如实二分）/ 不改变任何角色写边界 / 失败文案枚举沿 §3.3（含 not-customer-turn 护栏）。
+    return {
+      parameters: {
+        type: "object",
+        properties: {
+          roleId: { type: "string", description: "Target project role id (must be a project role, not su itself)" },
+          name: { type: "string", description: "Skill name (stable short slug matching docs/skills/<name>/)" },
+        },
+        required: ["roleId", "name"],
+        additionalProperties: true,
+      },
+      description:
+        "向目标角色**卸载技能**（只注入给治理角色 su；激活＝重建目标会话，使其新会话系统提示不再带该技能指针）。" +
+        "**仅客户明示时卸载**——客户在会话中指令你卸载才执行；**不得自主发起**；非客户消息发起的轮次调用会被**拒绝**（not-customer-turn：`本动作仅可在客户消息发起的轮次执行——未执行。`）。" +
+        "**先改登记再卸载**：先由你用 edit_file 把该角色条目从 `docs/skills/<name>/install.md` 移除（或整份置 `status: uninstalled`），**再**调本工具；" +
+        "本工具**不写盘**——只**校验登记确已撤销**（未撤销即拒绝：`登记仍含角色「<roleId>」——先改登记再卸载；未执行。`——防「工具说撤了、登记没变」）、**激活**并**如实回执**。" +
+        "**文件保留**：卸载只撤登记语义，**不删** `docs/skills/<name>/` 文件本体——如实区分「效果已撤」与「文件仍在」。**卸载不改变任何角色的写边界**。" +
+        "回执三态同 install_skill：`effective:\"rebuilt\"`＝已重建、即刻生效；`\"next-session\"`＝在跑不打断、新会话起生效；`ok:false`＝**未执行、零副作用**，如实报因。",
+      promptGuidelines: [
+        "卸载技能**仅限客户明示**；不得自主发起；非客户消息发起的轮次会被拒绝（not-customer-turn）。",
+        "**先改登记再卸载**：先把该角色条目从 `docs/skills/<name>/install.md` 移除（edit_file），再调 uninstall_skill；登记未变会被拒绝（防「说撤了、实际没撤」）。",
+        "卸载只撤**登记效果**、**不删文件**（文件保留于 `docs/skills/<name>/`）；回执如实二分陈述「效果已撤／文件保留」，且卸载**不改变任何角色的写边界**。",
       ],
     };
   }

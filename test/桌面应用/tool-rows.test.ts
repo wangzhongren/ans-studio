@@ -264,3 +264,79 @@ test('S4/折叠口径：callSummary——「N 个调用」+ 工具分解（首�
   assert.deepEqual(tools.callSummary([{ callId: 'x', turnId: 't', status: 'completed', toolName: 'role_status' }]), { calls: 1, denied: 0, failed: 0, unknown: false, tools: [{ name: 'role_status', count: 1 }] });
   assert.deepEqual(tools.callSummary([]), { calls: 0, denied: 0, failed: 0, unknown: false, tools: [] });
 });
+
+// ————— G-4/I7（2026-10-16 客户批准；设计 `2026-10-16_design_role-capability-install` §5.4/§九 I7）—————
+// I7＝行样式：安装/卸载（`install_skill`/`uninstall_skill`）工具行与 `[系统·安装]` 定格系统行的**如实标注**——
+// 复用既有工具行口径与 `[系统·<子类>]` 先例，不新造行体系。渲染平面对两工具名与子类标记**零引用**
+// （`renderer.test.ts` 同批钉「零特判」）——下述用例把「通用链确有覆盖」钉在纯函数层。系统行正文措辞
+// 属产出方（桌面窗口 handler / 文案单一来源）；本段只依赖**标记形态**与 classifier 契约字段，不钉全文。
+
+test('G-4/I7：`[系统·安装]` 定格系统行走既有 system 归类——判据只依赖 `[系统·<子类>] ` 标记形态（不逐子类登记）', () => {
+  // 实时回显路径（适配器回显为 `用户指令：<正文>`）。
+  const echo = tools.classifyInjectedMessage('用户指令：[系统·安装] 技能「t-plan」已安装 → 角色「实现者」（docs/skills/t-plan/SKILL.md）。');
+  assert.equal(echo?.kind, 'system', '安装系统行应归类为 system（沿 [系统·看护] 同族）');
+  assert.equal(echo?.label, '系统消息 · 安装', 'chip 标签=「系统消息 · <子类原文>」');
+  assert.equal(echo?.sourceRoleId, '', '来源=系统（非角色）——无角色来源可提取');
+  assert.ok(String(echo?.body).startsWith('[系统·安装] '), 'body 保持投递原文（判据来源不变）');
+  assert.equal(echo?.displayBody, '技能「t-plan」已安装 → 角色「实现者」（docs/skills/t-plan/SKILL.md）。', 'W6b 口径：正文展示剥离文首标记（chip 已承载）');
+  // 回放路径（无「用户指令：」前缀）同解；卸载完成行同用该子类（子类集合=文案单一来源，渲染侧不登记枚举）。
+  const replay = tools.classifyInjectedMessage('[系统·安装] 技能「t-plan」已卸载（效果已撤；文件保留于 docs/skills/t-plan/SKILL.md，sha256 0123456789ab）。');
+  assert.equal(replay?.kind, 'system', '回放原始投递文本同样归类（安装/卸载完成行同族）');
+  assert.equal(replay?.label, '系统消息 · 安装');
+  assert.ok(String(replay?.displayBody).startsWith('技能「t-plan」已卸载'), 'displayBody 剥离仅去标记与空白，不动正文');
+  // 仅标记无正文：displayBody 为空串（chip 已承载「安装」子类信息）。
+  assert.equal(tools.classifyInjectedMessage('[系统·安装]')?.displayBody, '');
+  // 「看起来像」仍不归类（沿 G-2 防误伤口径回归——行内提及不冒充投递）。
+  assert.equal(tools.classifyInjectedMessage('用户指令：我让你用 [系统·安装] 这种方式装'), null, '行内提及不算（标记必须在行首）');
+});
+
+test('G-4/I7：install_skill/uninstall_skill 工具行按事件事实通用渲染——结构化与 legacy 两路径零特判', () => {
+  // 调用发起（结构化事件，无 display）：工具名原样进事实；非屏障 ⇒ 属轮内工具组（折叠口径按工具名计数适用）。
+  const start = tools.activityOf({ kind: 'tool_call', turnId: 't-g4', detail: { toolName: 'install_skill', toolCallId: 'g4-call', phase: 'start' } });
+  assert.equal(start.toolName, 'install_skill', '工具名=事件事实（下划线命名不截断/不改写）');
+  assert.equal(start.status, 'call');
+  assert.equal(start.label, '调用发起');
+  assert.equal(start.barrier, false, '非 SPECIAL_TOOLS/无 display ⇒ 走轮内工具组（不发明卡片/屏障语义）');
+  // 结果（结构化、带 display——真实投影路径恒带）：状态/目标走既有点位（display.target 安全目标）。
+  const done = tools.activityOf({ kind: 'accepted', turnId: 't-g4', detail: { toolName: 'uninstall_skill', toolCallId: 'g4-call', phase: 'result', ok: true, status: 'completed', display: { version: 1, omissions: [], target: { kind: 'path', value: { text: 'docs/skills/t-plan/install.md' } } } } });
+  assert.equal(done.toolName, 'uninstall_skill');
+  assert.equal(done.status, 'completed');
+  assert.equal(done.label, '执行完成');
+  assert.equal(done.fullTarget, 'docs/skills/t-plan/install.md', '目标取 display 单点（不读原始参数）');
+  // 回执失败（ok:false＝未执行、零副作用）：走既有 failed 口径；护栏原因在可见首行如实保留（不吞因、不美化）。
+  const refused = tools.activityOf({ kind: 'denied', turnId: 't-g4', summary: 'install_skill：技能安装**未执行**（reason: not-customer-turn；回执：仅客户消息发起的轮次可执行）——零副作用；**不要当它已安装**，如实告知客户。', detail: { toolName: 'install_skill', toolCallId: 'g4-call2', phase: 'result', ok: false, status: 'failed' } });
+  assert.equal(refused.status, 'failed', 'ok:false 走既有失败口径（行分类单点）');
+  assert.equal(refused.exceptional, true);
+  assert.ok(refused.visibleSummary.includes('not-customer-turn'), '失败原因（护栏 reason）在可见首行如实保留');
+  // legacy 文本路径：`调用工具 install_skill` 可被既有正则识别（`[\w.-]+` 含下划线——命名不因字符集失配）。
+  const legacyCall = tools.activityOf({ kind: 'tool', text: '调用工具 install_skill' });
+  assert.equal(legacyCall.toolName, 'install_skill');
+  assert.equal(legacyCall.status, 'call');
+  // 瘦身映射（真实回执文本形状，tools.ts 单一来源）：冒号口径含下划线零漂移、含路径不折叠、硬上限照旧。
+  const slimmed = tools.slimToolRow('install_skill：技能「t-plan」已安装 → 角色「实现者」。内容：docs/skills/t-plan/SKILL.md（sha256 0123456789ab）；生效：已重建该角色会话、即刻生效。注意：本次安装**未改变任何角色的写边界**——技能是必读资料，不是权限。');
+  assert.ok(slimmed.startsWith('install_skill：'), '「工具名：」口径解析零漂移');
+  assert.ok(slimmed.includes('docs/skills/t-plan/SKILL.md'), '含路径样内容不折叠为「…」（既有「无路径才折叠」口径）');
+  assert.ok(slimmed.length <= tools.LIMIT + 1, '硬上限 140（超限截断加「…」——既有口径）');
+  assert.equal(tools.slimToolRow('uninstall_skill：uninstall_skill: docs/skills/t-plan/install.md'), 'uninstall_skill：docs/skills/t-plan/install.md', '重复工具名段去重沿既有口径');
+});
+
+test('G-4/I7：折叠分解按工具名计数——新工具名进「本轮 N 个调用：a / b ×k」摘要数据面（无白名单/特判）', () => {
+  const items = [
+    { callId: 'g1', turnId: 't', status: 'call', toolName: 'install_skill' },
+    { callId: 'g1', turnId: 't', status: 'completed', toolName: 'install_skill' },
+    { callId: 'g2', turnId: 't', status: 'call', toolName: 'uninstall_skill' },
+    { callId: 'g2', turnId: 't', status: 'completed', toolName: 'uninstall_skill' },
+    { callId: 'g3', turnId: 't', status: 'call', toolName: 'read_file' },
+  ];
+  // 同一 toolCallId 的发起+结果并一行（S1 口径对新工具名同解）；分解=首现序逐名计数。
+  assert.deepEqual(tools.callSummary(items), {
+    calls: 3, denied: 0, failed: 0, unknown: false,
+    tools: [ { name: 'install_skill', count: 1 }, { name: 'uninstall_skill', count: 1 }, { name: 'read_file', count: 1 } ],
+  }, '安装/卸载调用行与既有工具走同一条计数路径（装-看-用-撤链的折叠摘要可读）');
+  // ×k：同一工具多次调用 ⇒ ×2（装→撤复盘场景）；名字逐字为工具名（大小写/下划线原样，不美化不改写）。
+  assert.deepEqual(tools.callSummary([
+    { callId: 'x1', turnId: 't', status: 'completed', toolName: 'install_skill' },
+    { callId: 'x2', turnId: 't', status: 'completed', toolName: 'install_skill' },
+  ]).tools, [ { name: 'install_skill', count: 2 } ]);
+  // 折叠行文案形制「本轮 N 个调用：…」的通用性（t.name 直出）由 renderer.test.ts 同批守卫（本段钉数据面）。
+});

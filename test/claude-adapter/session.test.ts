@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { mkdtemp, readFile, access, rm, symlink } from "node:fs/promises";
+import { mkdtemp, readFile, access, rm, symlink, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
 import { setTimeout as delay, setImmediate as nextIO } from "node:timers/promises";
 import { createSdkMcpServer } from "@anthropic-ai/claude-agent-sdk";
 import type { Options, SDKMessage, SDKUserMessage, Query } from "@anthropic-ai/claude-agent-sdk";
@@ -943,4 +943,56 @@ test("web search on: native frames project one paired start/result per call; fai
   assert.equal(settled.length, 4);
   for (const row of settled) assert.equal((row.detail as { outcome: string }).outcome, "completed");
   await session.dispose();
+}));
+
+test("installed-skills section: non-empty splices the orchestration render verbatim; zero/broken stays the byte-identical old prompt and never fails the turn", async () => fixture(async (root) => {
+  // Frozen G-1/G-4 texts re-typed independently here: any drift in the orchestration render must go red here too.
+  const statusQuo = [role.cardText, `你始终绑定角色 ${role.id}。只能通过 mcp__ans__ 工具操作环境；所有写入、shell 和交互由 ANS 的注入能力判断。`, `当前角色边界：${JSON.stringify(role.boundary)}`].join("\n\n");
+  const section = (entries: string[]) => [
+    "## 本角色已安装技能（动手前先读，按序）",
+    ...entries,
+    "内容以文件当刻字节为准；读到与派发描述/版本不符 ⇒ 停止并交 blocked 报告（不得猜）。",
+  ].join("\n");
+  const line = (name: string, purpose: string, content: string) => `1. docs/skills/${name}/SKILL.md（用途：${purpose}；sha256:${createHash("sha256").update(Buffer.from(content)).digest("hex")}；安装于 2026-10-16）`;
+  const registration = (purpose: string, roles = "claude-fixture") => ["# skill", `- 用途：${purpose}`, `- 适用角色：${roles}`, "- 状态：installed", "- 安装日期：2026-10-16", ""].join("\n");
+  const put = async (name: string, installText: string, content?: string) => {
+    await mkdir(join(root, "docs", "skills", name), { recursive: true });
+    await writeFile(join(root, "docs", "skills", name, "install.md"), installText);
+    if (content !== undefined) await writeFile(join(root, "docs", "skills", name, "SKILL.md"), content);
+  };
+  const runPrompt = async (): Promise<{ systemPrompt: string; settledOutcome: string }> => {
+    const engine = fake(async () => undefined);
+    const session = await createClaudeRuntimeAdapter(options(root, []), engine.dependencies).bindRole(role);
+    const reading = collect(session, 1);
+    await session.prompt("skills probe");
+    const rows = await reading;
+    await session.dispose();
+    return { systemPrompt: engine.configurations[0]!.systemPrompt as string, settledOutcome: (rows.filter((row) => row.kind === "settled").at(-1)!.detail as { outcome: string }).outcome };
+  };
+  const composePrompt = async (): Promise<string> => (await createClaudeRuntimeAdapter(options(root, []), fake(async () => undefined).dependencies).composeContext(role)).systemPrompt;
+
+  // 1) Never installed: exactly the pre-G-4 assembly (no extra segment, no trailing newline).
+  assert.equal((await runPrompt()).systemPrompt, statusQuo);
+  assert.equal(await composePrompt(), statusQuo);
+
+  // 2) Registered role hit: the render is spliced verbatim as one final segment (digest recomputed over the bytes).
+  const tdd = "# TDD\n先写测试再改代码\n";
+  await put("tdd-fix", registration("先写测试再改代码"), tdd);
+  const withSection = await runPrompt();
+  assert.equal(withSection.systemPrompt, `${statusQuo}\n\n${section([line("tdd-fix", "先写测试再改代码", tdd)])}`);
+  assert.equal(withSection.systemPrompt.endsWith("\n"), false);
+  assert.equal(await composePrompt(), withSection.systemPrompt);
+
+  // 3) Broken entries only (unparseable registration, missing SKILL.md): zero rendering, and the turn still completes.
+  await rm(join(root, "docs", "skills", "tdd-fix"), { recursive: true });
+  await put("bad-fields", "# bad\n- 用途：缺字段\n");
+  await put("no-skill", registration("内容缺失"));
+  const broken = await runPrompt();
+  assert.equal(broken.systemPrompt, statusQuo);
+  assert.equal(broken.settledOutcome, "completed");
+
+  // 4) A good entry next to bad ones renders exactly the good one.
+  const good = "good content\n";
+  await put("good-skill", registration("旁路好件"), good);
+  assert.equal((await runPrompt()).systemPrompt, `${statusQuo}\n\n${section([line("good-skill", "旁路好件", good)])}`);
 }));

@@ -329,6 +329,73 @@ export type ProposeRecoveryFn = (
   metadata?: ReportHandbackMetadata,
 ) => RecoveryReceipt | null | undefined | void | Promise<RecoveryReceipt | null | undefined | void>;
 
+// —————————————— 角色能力安装：技能安装/卸载（G-4 V1；只给 su 注入，注入才注册） ——————————————
+//
+// 依据：客户 2026-10-16 批准 G-4 V1（设计 `角色卡/产品/docs/design/2026-10-16_design_role-capability-install.md`
+// §3.2/§3.3；PM 派发「运行时核心＝I1/I2」）。两工具均**只给治理角色 su**——由调用方注入能力表达
+// 「注入才注册」（未注入 ⇒ 工具不存在，沿 dispatch_task 先例）。本层纪律：**工具不写盘**——落盘
+// 永远由 su 的 `write_file` 完成（「先落盘再激活」＝G-1「先落盘再派发」的镜像）；工具只
+// **校验＋激活＋回执**（校验/激活在注入能力侧＝桌面 handler；激活复用既有重建，在跑不打断）。
+//
+// **形状单一来源＝本模块**（桌面窗口按此接线；三适配器经能力注入读取）。
+
+/** `install_skill` / `uninstall_skill` 载荷（G-4 §3.2）：目标角色与技能名（稳定短 slug，与目录名一致）。 */
+export interface InstallSkillPayload {
+  /** 目标项目角色 id（不能是 su 自身；校验在能力实现侧）。 */
+  roleId: string;
+  /** 技能名（稳定短 slug；落盘位置 `docs/skills/<name>/`）。 */
+  name: string;
+}
+
+/**
+ * 技能安装/卸载回执（G-4 §3.2，形状冻结；测试逐条钉住）——三态如实：
+ * - `ok:true`＋`action:"installed"|"uninstalled"`＝**已校验（登记/含角色）且已尝试激活**；
+ *   `effective:"rebuilt"`＝目标会话已重建、即刻生效；`effective:"next-session"`＝目标正在跑轮次、
+ *   不打断——新会话起生效（**如实延迟态，不是错误**）；`path`＝技能文件路径（`docs/skills/<name>/SKILL.md`）、
+ *   `digest`＝运行期算的 sha256（展示可截前 12 位）；`note` 为可选如实补充。
+ * - `ok:false`＋`reason`＋`message`＝**未执行、零副作用**。`reason` 机读标识（建议枚举：
+ *   `not-registered` 落盘/登记不存在、`role-not-listed` 登记未含目标角色、`role-not-found`
+ *   角色不存在或为 su 自身、`not-customer-turn` 非客户消息发起的轮次（护栏）、
+ *   `registration-unchanged` 卸载时登记未撤销、`rebuild-failed` 激活失败）；`message` 一句人话，
+ *   文案枚举沿产品设计 §3.3。
+ */
+export type InstallSkillReceipt =
+  | {
+      ok: true;
+      action: "installed" | "uninstalled";
+      roleId: string;
+      name: string;
+      path: string;
+      digest: string;
+      effective: "rebuilt" | "next-session";
+      note?: string;
+    }
+  | { ok: false; reason: string; message: string };
+
+/**
+ * `install_skill` 的注入能力（**只给 su**；未注入 ⇒ 工具不注册）。
+ * 纪律（沿 `dispatch_task` 先例）：**工具不写盘**——本能力只**校验（角色/登记/含角色；护栏①：仅
+ * 客户消息发起的轮次可执行，非客户轮次以 `not-customer-turn` 如实拒绝）→ 激活（复用既有重建；
+ * 在跑不打断 ⇒ `effective:"next-session"`）→ 回执**；失败一律 fail-closed＝**未执行、零副作用**。
+ * **安装不改变任何角色的写边界**（技能是必读资料，不是边界/写权）——能力实现不得据此授予任何写权。
+ */
+export type InstallSkillFn = (
+  payload: InstallSkillPayload,
+  metadata?: ReportHandbackMetadata,
+) => Promise<InstallSkillReceipt>;
+
+/**
+ * `uninstall_skill` 的注入能力（**只给 su**；未注入 ⇒ 工具不注册）。
+ * 纪律同 `InstallSkillFn`；卸载专有两钉：**先改登记再卸载**——能力须校验登记确已撤销，未撤销以
+ * `registration-unchanged` 拒绝（防「工具说撤了、登记没变」）；**文件保留**——只撤登记语义、不删
+ * `docs/skills/<name>/` 文件本体（「效果已撤」与「字节已清」如实二分陈述）。**卸载不改变任何角色的
+ * 写边界**。
+ */
+export type UninstallSkillFn = (
+  payload: InstallSkillPayload,
+  metadata?: ReportHandbackMetadata,
+) => Promise<InstallSkillReceipt>;
+
 export interface ShellVerdictPayload {
 
   verdict: "allow" | "deny" | "unsure";
@@ -403,6 +470,13 @@ export interface GovernedToolsOptions {
   sessionTail?: SessionTailFn;
   /** G-2/R2：恢复提议能力（只提交载荷、三态回执）。只给 su 注入；未注入 ⇒ 工具不注册。 */
   proposeRecovery?: ProposeRecoveryFn;
+  /**
+   * G-4/I2：`install_skill` 能力（校验＋激活＋回执，**不写盘**）。只给 su 注入（判据沿
+   * dispatch_task 的 suppressHandback 先例）；未注入 ⇒ 工具不注册（结构性 fail-closed）。
+   */
+  installSkill?: InstallSkillFn;
+  /** G-4/I2：`uninstall_skill` 能力（校验＋激活＋回执，不写盘）。只给 su 注入；未注入 ⇒ 工具不注册。 */
+  uninstallSkill?: UninstallSkillFn;
 }
 
 export interface RuntimeSessionRecord {

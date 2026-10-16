@@ -10,7 +10,8 @@
 // 本文件钉住 su 内置卡文本（`BUILT_IN_ROLE_CARD_TEXT`，单一来源）中的约定：
 //  1. 内置治理角色**没有角色目录**；工作文档固定写在 `docs/su/memo.md`（有进展或新挂起就更新，
 //     不等客户问）与 `docs/su/changelog.md`；**2026-10-16 客户裁定起 `docs/su/**` 与
-//     `docs/contracts/**` 免逐次确认**（预置豁免；其余一切写盘仍逐路径确认——见下第 5 节）；
+//     `docs/contracts/**` 免逐次确认、G-4 裁定起连同 `docs/skills/**` 共三棵**（预置豁免；
+//     其余一切写盘仍逐路径确认——见下第 5/8 节）；
 //  2. **红线**：不要在 `角色卡/` 下建 `su`（或任何非项目角色）目录——说明理由：该目录下每个目录
 //     都会被角色枚举按角色 id 解析（`su` 与内置角色 id 冲突 → 判「角色重复」跳过并告警；非角色
 //     目录 → 触发「缺少 role-card.md」告警）；
@@ -23,12 +24,13 @@
 //     本文件反向钉死其不再出现，且任何「写之前拒绝」小句必须带情形限定。分支行为本身已由
 //     `cold-start-genesis.test.ts`（创世可写）与 `built-in-section-equivalence.test.ts`（回退
 //     拒写）在运行时钉死，本文件只钉文案。
-//  5. **确认制要点段（F-5-main；2026-10-16 预置豁免修订）**：`docs/su/**` 与 `docs/contracts/**`
-//     的写盘许可已预置、**无需逐次确认**（客户原话「这个 su 可以写 docs/su 的目录，不需要我审批」
-//     ＋「还有个契约目录也可以给他写。」；机制＝编排给 su 会话初始 writeSet 预置这两棵目录树，
-//     开会话/重建均生效）；**其余一切写盘**（含 `角色卡/**`、`docs/` 其他路径）仍须 preview 逐条
-//     列路径 + `confirmed:true` 才发行；「按会话生效」只约束经确认发行的路径，预置两目录不受重建
-//     影响。卡文本措辞不用「授权」字面——J-1 守卫（`dispatch-after-landing-convention.test.ts:51`）
+//  5. **确认制要点段（F-5-main；2026-10-16 预置豁免修订；G-4 扩列三棵）**：`docs/su/**`、
+//     `docs/contracts/**` 与 `docs/skills/**`（G-4 预授权扩列，裁定①）的写盘许可已预置、
+//     **无需逐次确认**（客户原话「这个 su 可以写 docs/su 的目录，不需要我审批」＋「还有个契约
+//     目录也可以给他写。」；机制＝编排给 su 会话初始 writeSet 预置这三棵目录树，开会话/重建均
+//     生效）；**其余一切写盘**（含 `角色卡/**`、`docs/` 其他路径）仍须 preview 逐条列路径 +
+//     `confirmed:true` 才发行；「按会话生效」只约束经确认发行的路径，预置三棵不受重建影响。
+//     卡文本措辞不用「授权」字面——J-1 守卫（`dispatch-after-landing-convention.test.ts:51`）
 //     拦未否定的「授权/获准/放行」小句，沿用 2026-10-12 先例改用「许可/预置」。
 //  6. **规划纪律段（新增）+ J-1 扩展段（G-1/A3；设计 `2026-10-16_design_contract-workflow-dispatch.md`
 //     §三/§五/§六/§九 A3；客户 2026-10-16 批准 G-1 按提案实施、PM 派发 V1 最小闭环）**：多角色/跨角色工作
@@ -39,8 +41,8 @@
 //     ＝仅两目录、运行时核心 `dispatch_task` 文案「先落盘再派发」同口径）。派发任务文本**按地址引用**
 //     （不内嵌契约全文、不手算 sha256——「必读（按序）」块由投递系统在投递时附上并计算哈希；引用的契约
 //     不存在会被拒投）；契约变更＝新版本文件＋受影响回交作废＋重派。**反向断言**：凡含 `docs/workflow.md`
-//     的小句不得声称免确认/直接写（两目录预置句不得被扩成三目录）；「原地改 / 自己算或转抄哈希」类
-//     表述必须是否定式。
+//     的小句不得声称免确认/直接写（workflow.md 不属预置三棵——G-4 后预置＝docs/su、docs/contracts、
+//     docs/skills；不得被说成预置/免确认）；「原地改 / 自己算或转抄哈希」类表述必须是否定式。
 //  7. **看护职责段（G-2/G；设计 `2026-10-16_design_role-watchdog-and-closure.md` §二/§三/§五/§六/§七；
 //     客户 2026-10-16 批准 G-2 按提案实施、PM 派发 W1-W5/R1/R2/O1/G/U1）**：系统看护在异常态
 //     （轮次逼近超时 / 投递排队积压 / 命令超时限 / 重复失败）投 `[系统·看护]` 消息、完成静默态投
@@ -50,6 +52,16 @@
 //     字样「授权/获准/放行」——2026-10-12 先例）；是否处理由 su 判断、处理走既有 E-1 回交 / H-1 重派
 //     流程。**反向断言**：看护面小句不得出现守卫三词；「据此假设 / 自行执行」类表述必须是否定式。
 //     位置：J-1 段之后、末段「边界（三种情形）」之前。
+//  8. **安装纪律段（G-4/I6；设计 `2026-10-16_design_role-capability-install.md` §6.1/§6.2；
+//     客户 2026-10-16 批准 G-4 十项裁定、PM 派发 wave 1）**：仅客户明示时安装/卸载（su 不自主
+//     发起；仅在客户消息发起的轮次里执行——裁定④护栏）；不设二次确认卡；先落盘再激活（先写
+//     `docs/skills/` 再调 `install_skill`/`uninstall_skill`，工具自己不写盘）；装/卸如实报告
+//     （path/digest/生效态 rebuilt/next-session/撤销路径；「效果已撤」与「文件保留」二分陈述）；
+//     安装不改变任何角色任何写边界（技能是必读资料、不是权限）。**同批**：确认制要点段预授权
+//     扩列——`docs/skills/**` 并入预置（两棵→三棵；编排 `SU_PREAUTHORIZED_WRITE_DIRS` 同批）。
+//     **反向断言**：安装面小句段级零命中「授权/获准/放行」（沿看护段先例）；「不自主发起 / 合并
+//     陈述」类小句必须否定式（各带变异非空洞验证）。位置：J-1 派发块（派发失败/被拒）之后、
+//     看护职责段之前。
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -70,8 +82,8 @@ test("su 自己的文档面写死：`docs/su/memo.md`（进行中事项/待确�
   assert.ok(T.includes("变更记录"), "须点明 changelog.md 的定位（变更记录）");
   assert.ok(T.includes("跨角色契约文档"), "须点明 docs/contracts/** 的定位（跨角色契约文档）");
   assert.ok(
-    T.includes("`docs/su/**`") && T.includes("`docs/contracts/**`"),
-    "预置豁免须逐一点名两棵目录树：`docs/su/**` 与 `docs/contracts/**`（2026-10-16 客户裁定）",
+    T.includes("`docs/su/**`") && T.includes("`docs/contracts/**`") && T.includes("`docs/skills/**`"),
+    "预置豁免须逐一点名三棵目录树：`docs/su/**`、`docs/contracts/**` 与 `docs/skills/**`（2026-10-16 客户裁定＋G-4 扩列）",
   );
   assert.equal(
     T.includes("落盘前照常经"),
@@ -139,27 +151,31 @@ test("反向断言：不得再有无条件的普遍拒绝断言——凡「写�
 
 // ———————————— 5：确认制要点段（F-5-main + 2026-10-16 预置豁免修订） ————————————
 
-test("确认制要点·预置豁免（2026-10-16）：`docs/su/**` 与 `docs/contracts/**` 免逐次确认、开会话与重建均生效；其余一切写盘仍逐路径确认", () => {
+test("确认制要点·预置豁免（2026-10-16 裁定；G-4 扩列三棵）：`docs/su/**`、`docs/contracts/**` 与 `docs/skills/**` 免逐次确认、开会话与重建均生效；其余一切写盘仍逐路径确认", () => {
   assert.ok(T.includes("确认制要点"), "须有「确认制要点」段（F-5-main）");
   // 位置：在「docs/su 文档面」段之后（F-5 提案 §3.1；2026-10-16 修订后锚句改为文档面段首句）
   assert.ok(
     T.indexOf("没有角色目录") < T.indexOf("确认制要点"),
     "确认制要点须在文档面段（没有角色目录…）之后",
   );
-  // —— 预置豁免：两棵目录树逐一点名，明确「无需逐次确认」——
-  assert.ok(T.includes("`docs/su/**`") && T.includes("`docs/contracts/**`"), "豁免须逐一点名两棵目录树");
-  assert.ok(T.includes("无需逐次确认"), "两目录须写明无需逐次确认（否则 su 仍逐次请求、行为不变）");
+  // —— 预置豁免：三棵目录树逐一点名（G-4 后），明确「无需逐次确认」——
+  assert.ok(
+    T.includes("`docs/su/**`") && T.includes("`docs/contracts/**`") && T.includes("`docs/skills/**`"),
+    "豁免须逐一点名三棵目录树（含 G-4 新增 `docs/skills/**`）",
+  );
+  assert.ok(T.includes("写入这三棵目录树"), "写入句须按三棵计数（G-4 扩列）");
+  assert.ok(T.includes("无需逐次确认"), "三目录须写明无需逐次确认（否则 su 仍逐次请求、行为不变）");
   assert.ok(T.includes("已预置"), "须写明写盘许可已预置（措辞不用「预授权」：J-1 守卫拦未否定的「授权」小句）");
   assert.ok(T.includes("开会话与重建后均生效"), "须写明预置开会话与重建均生效（与编排机制口径一致）");
   assert.ok(
-    T.includes("预置的两棵目录树除外") && T.includes("不受重建影响"),
+    T.includes("预置的三棵目录树除外") && T.includes("不受重建影响"),
     "「重建/重开需重确认」句须回指预置目录的例外（不受重建影响、始终可直接写入）",
   );
-  // —— 其余一切写盘：仍逐路径确认（从严——仅这两棵目录树免确认）——
+  // —— 其余一切写盘：仍逐路径确认（从严——仅这三棵目录树免确认）——
   assert.ok(T.includes("其余一切写盘"), "须写明其余一切写盘仍逐路径确认");
   assert.ok(
     T.includes("`角色卡/**`") && T.includes("`docs/` 的其他路径"),
-    "其余范围须含 `角色卡/**` 与 `docs/` 的其他路径（从严口径：docs/ 下仅两目录例外）",
+    "其余范围须含 `角色卡/**` 与 `docs/` 的其他路径（从严口径：docs/ 下仅三目录例外）",
   );
   assert.ok(T.includes("每个路径逐条"), "须写明每个路径逐条列入（逐条是发行的前提——整段描述不发行）");
   assert.ok(T.includes("`request_confirmation` 的 preview"), "须点名 request_confirmation 的 preview");
@@ -220,7 +236,7 @@ test("规划纪律（G-1/A3）：先落盘再派发——冻结契约（版本�
     T.includes("契约写进已预置的 `docs/contracts/**`（直接写即可）"),
     "契约须写明属已预置目录、直接写",
   );
-  assert.ok(T.includes("不在预置两目录内"), "docs/workflow.md 须写明不属预置两目录");
+  assert.ok(T.includes("不在预置三目录内"), "docs/workflow.md 须写明不属预置三目录（G-4 后计数）");
   assert.ok(T.includes("同一次规划确认"), "workflow.md 须列入同一次规划确认");
   assert.ok(T.includes("的 preview、`confirmed:true` 后写入"), "workflow.md 须写明 preview+confirmed:true 后才写入");
   // —— 角色必读与 blocked 纪律 ——
@@ -255,7 +271,8 @@ test("J-1 扩展（G-1/A3）：派发按地址引用——不内嵌契约全文�
 });
 
 test("规划纪律·反向断言：凡含 `docs/workflow.md` 的小句不得声称免确认/直接写；「原地改 / 自己算或转抄」类表述否定式", () => {
-  // 两目录预置句（docs/su/** 与 docs/contracts/**）不得被新段扩成三棵目录：workflow.md 明确走确认制。
+  // 预置三棵（docs/su、docs/contracts、docs/skills——G-4 后）之外：workflow.md 明确走确认制，
+  // 不得被说成预置/免确认（防把「docs/skills 扩列」连带把 workflow.md 也捎进去）。
   const wfClauses = T.split(/[。；\n]/).filter((c) => c.includes("docs/workflow.md"));
   assert.ok(wfClauses.length >= 2, "`docs/workflow.md` 小句须存在（规划纪律段与 J-1 段各至少一处）");
   for (const c of wfClauses) {
@@ -354,4 +371,93 @@ test("看护职责·纪律与反向断言：仅如实告知、不得据此假设
   for (const c of selfExec) {
     assert.match(c, /不得|禁止|勿|严禁/, `「自行执行」小句必须是禁止式，实得：${c}`);
   }
+});
+
+// ———————————— 8：预授权扩列三棵 + 安装纪律段（G-4/I6） ————————————
+
+test("预授权扩列（G-4）：`docs/skills/**` 并入预置、两棵→三棵全卡口径一致；旧「两棵/两目录」计数逐字不得复现", () => {
+  assert.ok(
+    T.includes("`docs/su/**`") && T.includes("`docs/contracts/**`") && T.includes("`docs/skills/**`"),
+    "三棵目录树须逐一点名（含 G-4 新增 `docs/skills/**`）",
+  );
+  assert.ok(T.includes("你给角色安装的技能文档"), "docs/skills 的定位须点名（你给角色安装的技能文档）");
+  assert.ok(T.includes("见下「安装纪律」"), "确认制要点段须下引「安装纪律」段（两段互指）");
+  assert.ok(T.includes("写入这三棵目录树"), "写入句须为三棵");
+  assert.ok(T.includes("预置的三棵目录树除外"), "例外句须为三棵（不受重建影响）");
+  assert.ok(T.includes("不在预置三目录内"), "workflow.md 句须按三目录计数（仍不属预置）");
+  // 旧「两棵」计数不得复现（防回退漂移）。
+  assert.equal(T.includes("写入这两棵目录树"), false, "旧「写入这两棵目录树」不得保留");
+  assert.equal(T.includes("预置的两棵目录树除外"), false, "旧「预置的两棵目录树除外」不得保留");
+  assert.equal(T.includes("不在预置两目录内"), false, "旧「不在预置两目录内」不得保留");
+});
+
+test("安装纪律（G-4/I6）：仅客户明示时安装/卸载、不设二次确认卡；先落盘再激活（工具自己不写盘）；装/卸如实报告；位置在 J-1 派发块之后、看护职责段之前", () => {
+  assert.ok(T.includes("安装纪律（技能安装/卸载）"), "须有「安装纪律」段（G-4/I6）");
+  // 位置：J-1 派发块（落盘后自动开工…待客户指示）之后、看护职责段之前。
+  assert.ok(
+    T.indexOf("落盘后自动开工") < T.indexOf("安装纪律（技能安装/卸载）"),
+    "安装纪律须在 J-1 派发块之后",
+  );
+  assert.ok(T.indexOf("安装纪律（技能安装/卸载）") < T.indexOf("看护职责"), "安装纪律须在看护职责段之前");
+  // ① 仅客户明示时——su 不自主发起；轮次护栏（裁定④）；不设二次确认卡（客户裁定：不把摩擦加回来）。
+  assert.ok(T.includes("仅客户明示时"), "须写死「仅客户明示时」办理");
+  assert.ok(T.includes("不自主发起"), "须写明 su 不自主发起");
+  assert.ok(T.includes("仅在客户消息发起的轮次"), "须写明轮次护栏（仅客户消息发起的轮次；裁定④）");
+  assert.ok(T.includes("不设二次确认卡"), "须写明不设二次确认卡");
+  // ② 先落盘再激活——两文件形态、两只工具、工具自己不写盘。
+  assert.ok(T.includes("先落盘再激活"), "须写死「先落盘再激活」");
+  assert.ok(T.includes("`docs/skills/<name>/SKILL.md`"), "须写死技能内容文件路径（SKILL.md）");
+  assert.ok(T.includes("`docs/skills/<name>/install.md`"), "须写死安装登记文件路径（install.md）");
+  assert.ok(T.includes("`install_skill`") && T.includes("`uninstall_skill`"), "须点名两只工具");
+  assert.ok(T.includes("自己不写盘"), "须写明工具自己不写盘（落盘只经 write_file）");
+  assert.ok(T.includes("先落盘再安装"), "须写明登记不存在会被如实拒绝（先落盘再安装）");
+  // ③ 装/卸如实报告——path/digest/生效态/撤销路径；「效果已撤」与「文件保留」二分。
+  assert.ok(T.includes("如实报告"), "须写「如实报告」");
+  assert.ok(T.includes("`path`") && T.includes("`digest`"), "报告面须含 path/digest（以工具回执为准）");
+  assert.ok(T.includes("`rebuilt`") && T.includes("`next-session`"), "生效态须写 rebuilt/next-session 两态");
+  assert.ok(T.includes("不打断") && T.includes("下一会话起生效"), "next-session 须写明不打断、下一会话起生效");
+  assert.ok(T.includes("撤销路径"), "须写撤销路径");
+  assert.ok(T.includes("先改登记"), "卸载须先改登记再调工具");
+  assert.ok(
+    T.includes("「效果已撤」与「文件保留」是两个事实"),
+    "须写「效果已撤/文件保留」二分陈述（两个事实，不得合并）",
+  );
+  assert.ok(T.includes("本仓没有删除原语"), "须如实说明本仓没有删除原语（文件保留的原因）");
+  assert.ok(T.includes("不得合并成「已删除」"), "须明禁把二分合成「已删除」");
+  // ④ 安装不改变任何写边界（技能是必读资料、不是权限）。
+  assert.ok(T.includes("安装不改变任何角色的任何写边界"), "须写死「安装不改变任何角色的任何写边界」");
+  assert.ok(T.includes("技能是必读资料、不是权限"), "须写明技能是必读资料、不是权限");
+});
+
+test("安装纪律·反向断言：安装面小句段级零命中「授权/获准/放行」（含非空洞下限）；「不自主发起 / 合并」类小句必须否定式（各带变异捕获）", () => {
+  // 段级零命中（沿看护段先例）：凡含「安装 / 卸载 / 技能」的小句不得出现守卫三词（含小句数下限防空洞）。
+  const clauses = T.split(/[。；\n]/).filter((c) => /安装|卸载|技能/.test(c));
+  assert.ok(clauses.length >= 8, `安装面小句须在场（非空洞），实得 ${clauses.length}`);
+  for (const c of clauses) {
+    assert.doesNotMatch(c, /授权|获准|放行/, `安装面小句不得出现守卫字样（授权/获准/放行），实得：${c}`);
+  }
+  // 「不自主发起」小句必须带否定（防把「su 不自主发起」反写为肯定式）。
+  const selfStart = T.split(/[。；\n]/).filter((c) => /自主发起/.test(c));
+  assert.ok(selfStart.length >= 1, "「不自主发起」小句须在场（非空洞）");
+  for (const c of selfStart) {
+    assert.match(c, /不自主发起|不得|禁止|勿/, `「自主发起」类小句必须是否定式，实得：${c}`);
+  }
+  const mutSelf = T.replace("**你（su）不自主发起**", "**你可以自主发起**");
+  assert.notEqual(mutSelf, T, "「不自主发起」变异点须存在");
+  assert.ok(
+    mutSelf.split(/[。；\n]/).filter((c) => /自主发起/.test(c)).some((c) => !/不自主发起|不得|禁止|勿/.test(c)),
+    "肯定式「你可以自主发起」必须被小句级谓词捕获（非空洞）",
+  );
+  // 「合并陈述」类小句必须是否定式（防把「效果已撤/文件保留」二分反写成合并陈述）。
+  const mergeClauses = T.split(/[。；\n]/).filter((c) => /合并陈述|合并成/.test(c));
+  assert.ok(mergeClauses.length >= 1, "「不得合并」小句须在场（非空洞）");
+  for (const c of mergeClauses) {
+    assert.match(c, /不得|禁止|勿|严禁/, `「合并」类小句必须是否定式，实得：${c}`);
+  }
+  const mutMerge = T.replace("不得合并成「已删除」", "请合并成「已删除」");
+  assert.notEqual(mutMerge, T, "「不得合并成」变异点须存在");
+  assert.ok(
+    mutMerge.split(/[。；\n]/).filter((c) => /合并陈述|合并成/.test(c)).some((c) => !/不得|禁止|勿|严禁/.test(c)),
+    "肯定式「请合并成「已删除」」必须被小句级谓词捕获（非空洞）",
+  );
 });
