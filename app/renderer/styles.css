@@ -1057,6 +1057,8 @@ details.sys-denied[open] summary { padding-bottom: 6px; margin-bottom: 6px; bord
   font: 12px/1.65 var(--mono);
 }
 .pi-input::placeholder { color: var(--text-3); }
+/* G-5 wave 2 档位控件：选择控件同用 .pi-input 盒形（值域即选项），仅补光标态。 */
+select.pi-input { cursor: pointer; }
 .pi-actions { display: flex; align-items: center; gap: 11px; margin-top: 16px; }
 /* 保存行按钮（v2 .primary）：标准高度、圆角 5。 */
 .pi-actions .btn-mini { height: 34px; padding: 0 12px; border-radius: 5px; }
@@ -1443,6 +1445,15 @@ textarea:focus-visible,
 .tool-call-target { min-width: 0; overflow-wrap: anywhere; flex: 1 1 180px; }
 .tool-call-status { color: var(--text-2); font-size: 11px; }
 .tool-call-details { padding: 8px 0; }
+/* G-5 wave 2 推理折叠行：与工具行折叠同族（次要视觉层、弱于助手正文）；开合=details/summary，
+   chev 旋转沿既有语法（sec/sys-denied/op-preview 同款 0.12s transform，非新动效）。 */
+.reasoning-record { max-width: min(760px, 100%); color: #767D73; font-size: 12px; border-left: 2px solid #E1E6DD; padding: 4px 0 6px 13px; }
+.reasoning-record > summary { display: flex; align-items: center; gap: 6px; cursor: pointer; padding: 0; line-height: 22px; list-style: none; }
+.reasoning-record > summary::-webkit-details-marker { display: none; }
+.reasoning-record summary .chev { flex: 0 0 auto; color: #8D9387; transition: transform 0.12s ease; }
+.reasoning-record[open] summary .chev { transform: rotate(90deg); }
+.reasoning-record .reasoning-body { white-space: pre-wrap; overflow-wrap: anywhere; padding: 6px 0 2px; font: 11px/1.65 var(--mono, monospace); }
+.reasoning-record.is-plain .reasoning-line { line-height: 22px; }
 .tool-detail-field strong { font-size: 12px; }
 .tool-detail-field pre, .document-read-text pre, .safe-input-copy pre { max-width: 100%; overflow-x: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 11px/1.65 var(--mono,monospace); background: var(--bg-soft); padding: 8px; }
 .projection-flags { color: var(--text-2); font-size: 10px; margin-left: 6px; }

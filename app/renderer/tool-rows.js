@@ -168,6 +168,33 @@
     return { calls: rows.length, denied: denied, failed: failed, unknown: unknown, tools: tools };
   }
 
+  // —————— G-5 wave 2（推理折叠行；客户 2026-10-16 批准 G-5「按推荐批准，开始实施」）——————
+  // 消费面冻结形＝`RuntimeReasoningDisplayDetailV1.reasoning`（`{text: DisplayTextV1, status, durationMs?}`，
+  // 核心投影单点后的唯一呈现输入——脱敏/预算已在投影发生，本层只合成**文案**、不碰内容）。文案纪律
+  // （设计 §5.2 定格）：**有真实时长信号才显示秒数**（无信号不发明时间——「推理内容」类如实措辞）、
+  // **平台省略内容时不假装有内容**（omitted ⇒ 如实注明，绝不拿「发生」冒充「内容」）。文案终形＝桌面UI，
+  // 单一来源＝本两纯函数（renderer 只取用、不另写一份；改动只在此处）。
+  //   complete ＋ durationMs ⇒ 「已思考 N 秒」；complete 无时长 ⇒ 「推理内容」；
+  //   omitted ⇒ 「已思考（内容由平台省略）」/「已思考 N 秒（内容由平台省略）」。
+  // `N`＝四舍五入到整秒、**下限 1**（防「已思考 0 秒」措辞坏件；亚秒真实信号仍如实体现在「已思考过」）。
+  function reasoningSeconds(ms) {
+    var s = Math.round(ms / 1000);
+    return s < 1 ? 1 : s;
+  }
+  /** 折叠行文案（纯函数；非法/缺席 durationMs 按「无时长信号」——绝不猜测）。 */
+  function reasoningLabel(reasoning) {
+    var r = reasoning && typeof reasoning === "object" ? reasoning : {};
+    var ms = typeof r.durationMs === "number" && isFinite(r.durationMs) && r.durationMs >= 0 ? r.durationMs : null;
+    if (r.status === "omitted") return "已思考" + (ms === null ? "" : " " + reasoningSeconds(ms) + " 秒") + "（内容由平台省略）";
+    if (ms === null) return "推理内容";
+    return "已思考 " + reasoningSeconds(ms) + " 秒";
+  }
+  /** 可展开性：仅 **complete 且正文非空** 才给折叠开合——omitted/仅签名（空正文）无内容可展（不摆空展开器）。 */
+  function reasoningFoldable(reasoning) {
+    var r = reasoning && typeof reasoning === "object" ? reasoning : {};
+    return r.status === "complete" && !!r.text && typeof r.text.text === "string" && r.text.text !== "";
+  }
+
   // 展示事实只来自已存在的执行结果；accepted单独出现不是执行成功。
   var SPECIAL_TOOLS = ["request_confirmation", "request_choice", "submit_report", "dispatch_task", "report_shell_verdict"];
   function isToolActivity(input) {
@@ -228,7 +255,7 @@
       summary: slimToolRow(raw), at: typeof o.at === "string" ? o.at : "" };
   }
 
-  var api = { isToolActivity: isToolActivity, activityOf: activityOf, slimToolRow: slimToolRow, LIMIT: LIMIT, classifyInjectedMessage: classifyInjectedMessage, INJECT_PREFIXES: INJECT_PREFIXES, mergePhases: mergePhases, callSummary: callSummary };
+  var api = { isToolActivity: isToolActivity, activityOf: activityOf, slimToolRow: slimToolRow, LIMIT: LIMIT, classifyInjectedMessage: classifyInjectedMessage, INJECT_PREFIXES: INJECT_PREFIXES, mergePhases: mergePhases, callSummary: callSummary, reasoningLabel: reasoningLabel, reasoningFoldable: reasoningFoldable };
   root.ANSToolRows = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api; // 若将来以 CJS 装载
 })(typeof window !== "undefined" ? window : globalThis);

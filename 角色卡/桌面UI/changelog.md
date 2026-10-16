@@ -72,3 +72,12 @@
 - **测试**：`test/桌面应用/` 新增 **4 例**（tool-rows +3：下划线/清洗/缩短名形态解析＋折叠计数＋install_mcp 行与系统行子类复用；renderer +1：零特判源码守卫）；tool-rows **24/24**、renderer **55/55**、桌面目录 **375/375**（并行 wave A 窗口内复跑仍全绿）；`npm run typecheck` **全仓 0 错**；全量两快照 1884 计 / 1879→1872 过 / 4→11 红（**全部＝他域在飞翻转钉**：测试/门禁引擎/编排属主的 V2 wave A〔`docs/mcp` 预授权扩列、`install_mcp` 契约定型〕＋卡文本批过渡态，数量随并行落地变动，**与本批零交集**；跳过＝既有 Windows 用例）。
 - 未验边界：三平台适配器发射面未落树/未接（Claude 两发射点属 P1、Codex item 映射 wave B、Pi 属 P3）；Codex 呈现名选择与失败态映射文案归 wave B；display 投影面与系统行文案产出方未落树；真机 E2E 属 E2E 轮。
 - 指纹：`tool-rows.test.ts 225e69ae`（原 `52c2c4e7`）、`renderer.test.ts d06e7bfc`（原 `3bce42fb`）；`app/renderer/**` 零触碰（指纹见上）。Doc: docs/fix/2026-10-16_fix_g4v2-mcp-row-annotation.md
+
+## 2026-10-16：G-5 wave 2 推理强度档位控件＋推理折叠行（呈现面批）
+
+实施——客户 2026-10-16「按推荐批准，开始实施」＝G-5（推理与推理强度）；本批＝wave 2 呈现面（属主桌面UI；设计 `2026-10-16_design_reasoning-and-effort` §3.4/§5.2/§5.3；投影冻结点＝`RuntimeReasoningDisplayDetailV1`——Service 已过核心投影单点、经既有事件面到账）：
+- **档位控件**：设置面板对元数据 `choices` 非空字段（三平台推理强度——pi/claude 五档、codex 四档，值域逐字）以 `<select>` 呈现——首项「留空（平台默认）」＝未设态、选项逐字、手编非选项原值附项如实显示（保存由主进程按 choices 校验拒绝，值域判定不复制）；自由文本/机密字段路径逐字现状；预填/保存沿 `.value` 单点。旧注入替身路径（自建 fields 无 choices）回落文本输入（该路径已登记形状）。
+- **推理折叠行**：行形「已思考 N 秒 ▸」**默认折叠（含运行中——与工具行刻意差异）**、点击展开原文纯文本（esc/pre-wrap，不做 Markdown）；`omitted`⇒「已思考（内容由平台省略）」（±真实时长）、无时长⇒「推理内容」（不发明时间）、亚秒下限 1 秒、诊断形⇒「推理内容无法安全显示」（不可展开单行）；**不进工具组、不加 `[系统·]` 前缀、不新造样式体系**（chev/锚点/批尾语义全部沿工具行折叠同款）；**开合状态机复用**：手动态记 `activityOpen`（会话内保持、程序化守卫）、开合走 `captureChatReading→改→refreshActivityHeight` 锚点零位移、行走 registerRow 批尾落地（无计时器）；**live/回放同一入口**（回放行数据通道结构化字段 `row.reasoning`——契约已冻结，主进程行映射属桌面窗口域、未落树＝已具名对齐点）。文案/可展开性纯函数单点在 `tool-rows.js`（renderer 只取用）。
+- **测试**：`test/桌面应用/` 新增 **4 例**（tool-rows +2：文案边界/可展开性；renderer +2：控件守卫/折叠行接线含恰两处入口计数与状态机四点）；tool-rows **26/26**、renderer **57/57**、桌面目录 **388/388**；typecheck **本域 0 错**（全仓 6 错全在并行 Codex适配器 test 文件）；全量 **2044 计 / 2041 过 / 2 红 / 1 skip**（批内首快照 2036/2033，计数随并行落地增长）——两红均他域在飞（t29 面板键随 `pi-config.ts` 扩列待翻转；g3 审计④ Pi 扩展 handler 门位随 real-adapter 在飞重构），与本批零交集。
+- 未验边界：回放载体 `row.reasoning` 未落树（落树前回放面回落「已思考」文本行——现状行为；形状已冻结＋测试钉）；三平台适配器发射面在平行波；真机 E2E 属 E2E 轮。
+- 指纹：`renderer.js 7d18858b`（原 27d72e8e）、`tool-rows.js a116119e`（原 2fd2335f）、`styles.css 6029a281`（原 7cf067d4）、`tool-rows.test.ts fbca6143`（原 225e69ae）、`renderer.test.ts 6d164c91`（原 d06e7bfc）；ui-labels/index 零触碰。Doc: docs/fix/2026-10-16_fix_g5-wave2-effort-control-and-reasoning-row.md

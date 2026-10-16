@@ -1594,3 +1594,67 @@ test("G-4/V2-MCP：MCP 工具行/安装行零特判——渲染平面对 mcp__/i
   // 共用）——MCP 名 `mcp__<server>__<tool>`（含双下划线）不因字符集失配。
   assert.ok(toolRows.includes("[\\w.-]+"), "解析字符集 [\\w.-] 在 tool-rows（含下划线命名可命中）");
 });
+
+// ————— G-5 wave 2（2026-10-16 客户批准 G-5「按推荐批准，开始实施」）—————
+// ①档位控件：设置面板对元数据 `choices` 非空字段以致**选择控件**呈现（值域即选项；缺省/自由文本字段保持现状）；
+// ②推理折叠行：「已思考 N 秒 ▸」独立一行——默认折叠（含运行中）、点击展开原文纯文本、omitted 如实文案、
+// 时长仅真实信号才显示；复用工具行折叠状态机（手动开合优先/焦点保护/锚点零位移/批尾落地）、不进工具组、
+// 不加 [系统·] 前缀、不新造样式体系；回放/历史行同解（结构化行字段，不靠文本猜）。文案/可展开性纯函数
+// 断言见 tool-rows.test.ts 同批；此处钉**源码不变式**（单点、接线、退役项）。
+
+test("G-5/wave2：设置面板 choices 字段＝选择控件（值域即选项＋留空未设态）；自由文本字段逐字现状", () => {
+  // 判据＝元数据 choices 非空（单一来源；值域按运行时——Codex 无 off 档自动成立），非机密字段不走此支。
+  assert.ok(RENDERER_CODE.includes("Array.isArray(f.choices) && f.choices.length > 0"), "判据=choices 非空（元数据单一来源）");
+  // 选项＝choices 逐字（面板显示值＝保存接受值＝适配器认识值——不加别名映射、不美化）。
+  assert.ok(RENDERER_CODE.includes("choices.map(function (c) { return '<option value=\"' + esc(String(c)) + '\">' + esc(String(c)) + \"</option>\"; })"), "选项=choices 逐字（无第二份值域表）");
+  assert.ok(RENDERER_CODE.includes("'<option value=\"\">留空（平台默认）</option>'"), "留空项＝未设态（保存侧空串＝清除该键、维持平台默认）");
+  assert.ok(RENDERER_CODE.includes("f.value !== \"\" && choices.indexOf(f.value) < 0"), "现存非选项值（手编坏值）附原值选项如实显示——不静默改写、不假装未设");
+  assert.ok(RENDERER_CODE.includes("'<select id=\"pi-inp-' + esc(f.key) + '\" class=\"pi-input pi-select\">'"), "选择控件（<select>）走既有 pi-input 盒形");
+  // 自由文本字段（choices 缺席/空）＝既有 <input> 路径逐字保留；机密字段照旧（choices 字段均非机密）。
+  assert.ok(RENDERER_CODE.includes("'<input id=\"pi-inp-' + esc(f.key) + '\" class=\"pi-input\" type=\"'"), "自由文本字段保持现状（<input> 路径未动）");
+  assert.ok(RENDERER_CODE.includes('(f.secret ? \'<button id="pi-toggle-secret"'), "机密字段显示钮照旧");
+  // 预填与保存读取两路径对 <select> 同解（input/select 共用 .value 单点，无按控件类型分叉）。
+  assert.ok(RENDERER_CODE.includes("else inp.value = typeof f.value === \"string\" ? f.value : \"\";"), "预填经 .value 单点（select 同解）");
+  assert.ok(/if \(v !== "" \|\| f\.isSet\) updates\[f\.key\] = v;/.test(RENDERER_CODE), "保存收集经 .value 单点（select 同解）");
+  // 样式：选择控件仅补光标态（不新造控件样式体系）。
+  assert.ok(STYLES.includes("select.pi-input { cursor: pointer; }"), "select 光标态（盒形复用 .pi-input）");
+});
+
+test("G-5/wave2：推理折叠行接线——默认折叠含运行中、状态机复用、可展开性分支、回放同解（结构化字段不靠猜）", () => {
+  // live 入口：message ＋ detail.source（投影冻结形）；诊断形如实一行（不假装内容）。
+  assert.ok(RENDERER.includes('ev.detail.source === "reasoning") { appendReasoningFromDetail(pane, ev.detail, ev.turnId); return; }'), "live 推理事件→独立推理行（投影冻结形单点入口）");
+  assert.ok(RENDERER.includes('ev.detail.source === "reasoning-diagnostic"'), "投影失败诊断形走如实一行");
+  assert.ok(RENDERER.includes('label: String(ev.summary || "推理内容无法安全显示")'), "诊断文案取 Service 定格 summary（缺省兜底，不伪造内容）");
+  // 回放入口：行数据通道结构化字段 `row.reasoning`（同投递历史状态族）；无字段≠推理行（不靠摘要文本猜）。
+  assert.ok(RENDERER.includes('if (row.reasoning && typeof row.reasoning === "object") { appendReasoningFromDetail(pane, { reasoning: row.reasoning }, row.turnId); return; }'), "回放行携带 row.reasoning ⇒ 与 live 同一入口（同解）");
+  const entryCalls = (RENDERER.match(/appendReasoningFromDetail\(pane, /g) || []).length;
+  assert.equal(entryCalls, 3, "1 定义 + live/回放恰两处入口、同一函数（无第二份渲染）");
+  // 默认折叠（含运行中）：open 只在恢复「手动开合」时置位；行构造不读 roleBusy（无「运行中展开」分支——与工具行的刻意差异）。
+  assert.ok(RENDERER.includes("el.open = data.open === true; // 先 data 后 el"), "先 data 后 el（程序化守卫）");
+  assert.ok(RENDERER.includes("open: manual === true"), "初始开合态＝仅手动态（默认折叠、含运行中）");
+  const rowFn = RENDERER.slice(RENDERER.indexOf("  function appendReasoningRow("), RENDERER.indexOf("  /** live/replay 同解入口"));
+  assert.ok(rowFn.length > 0 && !rowFn.includes("roleBusy"), "行构造零 roleBusy 依赖（默认折叠不随运行态翻转）");
+  assert.ok(!rowFn.includes("activityGroup"), "不进工具组（不读写组状态；组切断由 registerRow 既有语义承担=真实序位）");
+  assert.ok(!rowFn.includes("appendActivity"), "不经工具活动路径（推理不是工具调用）");
+  assert.ok(rowFn.includes('}, 34, { kind: "reasoning", data: { id: id'), "行走行表（registerRow kind=reasoning）⇒ 批尾统一落地（无计时器）");
+  assert.ok(!rowFn.includes("updateVirtualWindow("), "布局走既有批尾/测量机制（不自行落定窗口）");
+  // 状态机复用：手动开合记 activityOpen（会话内保持）+ 程序化守卫 + 锚点捕获/恢复（与工具组同款）。
+  assert.ok(rowFn.includes("var manual = Object.prototype.hasOwnProperty.call(opens, id) ? opens[id] === true : null;"), "手动态读取（复用 activityOpen 会话内保持）");
+  assert.ok(rowFn.includes("if (data.open === el.open) return;"), "程序化改动守卫（不记成手动）");
+  assert.ok(/var reading = captureChatReading\(pane\);\n          data\.open = el\.open;\n          opens\[data\.id\] = el\.open;/.test(rowFn), "手动开合先读锚点再改并记档");
+  assert.ok(rowFn.includes("refreshActivityHeight(pane, record, reading)"), "改后实测+锚点恢复（阅读锚点零位移语义）");
+  // 可展开性分支：omitted/空正文＝如实单行（不摆空展开器）；展开＝原文纯文本（不做 Markdown）+ 投影如实标记。
+  assert.ok(rowFn.includes('el.className = "reasoning-record is-plain";'), "不可展开＝如实单行");
+  assert.ok(rowFn.includes("esc(data.text)") && !rowFn.includes("Md.renderMarkdown"), "展开正文=esc 纯文本（不做 Markdown 美化）");
+  assert.ok(rowFn.includes("esc(data.flags)") && RENDERER.includes("Rt.textFlags(facts.text)"), "脱敏/预算如实标记（已净化/已截断，既有单点）");
+  // 文案/可展开性纯函数单点在 tool-rows（renderer 只取用——不在渲染侧另写一份文案）。
+  const toolRows = fs.readFileSync(path.join(APP_DIR, "tool-rows.js"), "utf8");
+  assert.ok(RENDERER.includes("Tr.reasoningLabel") && RENDERER.includes("Tr.reasoningFoldable"), "取用纯函数单点");
+  assert.ok(toolRows.includes("function reasoningLabel(") && toolRows.includes("reasoningLabel: reasoningLabel"), "文案单点在 tool-rows 并导出");
+  const labelFn = toolRows.slice(toolRows.indexOf("  function reasoningLabel("), toolRows.indexOf("  /** 可展开性"));
+  assert.ok(!labelFn.includes("[系统·"), "不加 [系统·] 前缀（那是投递面定格标记；推理属助手输出面）");
+  // 样式：复用既有 details/summary 语法与 chev……无新动画（v3spin 恰两条由既有守卫钉住）。
+  assert.ok(STYLES.includes(".reasoning-record > summary { display: flex;") && STYLES.includes(".reasoning-record summary .chev"), "折叠行样式钩子齐备（同工具行折叠语法）");
+  assert.ok(!/\.reasoning-record[^{]*\{[^}]*animation:/.test(STYLES), "推理行不得引入新动效（chev 旋转＝既有 transition 语法）");
+  assert.ok(STYLES.includes(".reasoning-record .reasoning-body { white-space: pre-wrap;"), "展开正文 pre-wrap（原文换行如实）");
+});

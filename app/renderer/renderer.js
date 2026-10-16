@@ -951,6 +951,80 @@
     if (saved) restoreChatReading(pane, saved);
   }
 
+  // —————— G-5 wave 2（推理折叠行；客户 2026-10-16 批准 G-5「按推荐批准，开始实施」）——————
+  // 行形＝「已思考 N 秒 ▸」（文案单点在 `tool-rows.js::reasoningLabel`）：**默认折叠（含运行中）**——
+  // 与工具行「运行中默认展开」的刻意差异（设计 §5.2：推理是长文本，运行中就铺＝与去噪目相悖；尾行转轮
+  // 已在表达进行中）；点击展开＝`reasoning.text` **原文纯文本**（不做 Markdown——思考过程不是正式回复，
+  // 视觉层级低于助手正文）。**不进工具组**（组语义＝「本轮 N 个调用」计数，推理不是工具调用；`registerRow`
+  // 既有「非 activities 行切断组」语义即为「组外独立成行、真实序位」）、**不加 `[系统·]` 前缀**（那是投递面
+  // 定格标记；推理属助手输出面）。开合**复用工具行折叠状态机**同一套：手动开合记 `activityOpen`（会话内
+  // 保持、默认态不再覆盖该行）、程序化改动以 `data.open` 为守卫（不记成手动）、开合经
+  // captureChatReading → 改 → refreshActivityHeight 的**阅读锚点零位移**语义；键盘焦点在行内不被自动
+  // 动作打扰（无自动开合动作——本行到达即终形）。**批尾落地**：行走 `registerRow` 进场，布局由既有
+  // `flushBatchSideEffects`/`updateVirtualWindow` 批尾统一落定（无计时器）。「轮结束定型」在 wave 2
+  // 契约下无需动作：事实＝单段**完成**事件（complete/omitted＋可缺时长），行到达即终形（事件面无
+  // 「思考中」相位——不发明中间态）。
+  /** 行身份（供 `activityOpen` 手动开合会话内保持）：同轮第 N 段＝稳定序位（回放重建同序 ⇒ 同 id）；
+   *  无轮次身份（防御）⇒ ephemeral 计数（与工具组同款兜底）。 */
+  function reasoningRowId(rl, roleId, turnId) {
+    if (typeof turnId === "string" && turnId !== "") {
+      var ord = 1;
+      for (var i = 0; i < rl.rows.length; i += 1) {
+        if (rl.rows[i].kind === "reasoning" && rl.rows[i].data && rl.rows[i].data.turnId === turnId) ord += 1;
+      }
+      return "reasoning:" + turnId + ":" + ord;
+    }
+    return "reasoning-ephemeral-" + (groupSeqByRole[roleId] = (groupSeqByRole[roleId] || 0) + 1);
+  }
+  /** 追加一条推理行（entry＝{label, text, flags, foldable, turnId}——label/text 已由纯函数单点合成，
+   *  不在此另写文案）。foldable=false（omitted/空正文/诊断形）⇒ 如实单行、不摆空展开器。 */
+  function appendReasoningRow(pane, entry) {
+    var roleId = pane.dataset.roleId || "";
+    var rl = rowListFor(pane);
+    var id = reasoningRowId(rl, roleId, entry.turnId);
+    var opens = activityOpen[roleId] || (activityOpen[roleId] = Object.create(null));
+    var manual = Object.prototype.hasOwnProperty.call(opens, id) ? opens[id] === true : null;
+    var pin = streamShouldPin(pane); // S-1：先量后挂（在底部附近才贴底；上翻不打断）
+    var rec = registerRow(pane, function (record) {
+      var data = record.data;
+      var el;
+      if (data.foldable) {
+        el = document.createElement("details");
+        el.className = "reasoning-record";
+        el.open = data.open === true; // 先 data 后 el（toggle 监听以 data.open 为程序化改动守卫，不记成手动）
+        el.innerHTML =
+          '<summary><span class="reasoning-label">' + esc(data.label) + "</span>" + ICONS.chev + "</summary>" +
+          '<div class="reasoning-body">' + (data.flags ? '<span class="projection-flags">' + esc(data.flags) + "</span>" : "") + esc(data.text) + "</div>";
+        el.addEventListener("toggle", function () {
+          if (data.open === el.open) return;
+          var reading = captureChatReading(pane);
+          data.open = el.open;
+          opens[data.id] = el.open; // 手动开合（会话内保持；默认态不再覆盖该行）
+          refreshActivityHeight(pane, record, reading);
+        });
+      } else {
+        el = document.createElement("div");
+        el.className = "reasoning-record is-plain";
+        el.innerHTML = '<div class="reasoning-line"><span class="reasoning-label">' + esc(data.label) + "</span></div>";
+      }
+      return el;
+    }, 34, { kind: "reasoning", data: { id: id, turnId: entry.turnId, label: entry.label, text: entry.text, flags: entry.flags, foldable: entry.foldable === true, open: manual === true }, turnId: entry.turnId });
+    scrollBottom(pane, pin);
+    return rec;
+  }
+  /** live/replay 同解入口：从投影形 detail（或回放行携带的同形标量）渲染——文本一律 esc 纯文本。 */
+  function appendReasoningFromDetail(pane, detail, turnId) {
+    var facts = detail && detail.reasoning && typeof detail.reasoning === "object" ? detail.reasoning : null;
+    var foldable = Tr.reasoningFoldable ? Tr.reasoningFoldable(facts) === true : false;
+    appendReasoningRow(pane, {
+      label: Tr.reasoningLabel ? Tr.reasoningLabel(facts) : "推理内容",
+      text: foldable ? String(facts.text.text) : "",
+      flags: foldable && Rt.textFlags ? Rt.textFlags(facts.text) : "",
+      foldable: foldable,
+      turnId: typeof turnId === "string" ? turnId : "",
+    });
+  }
+
   // —————— 工具行折叠的状态机（2026-10-16 客户批准口径）——————
   // 口径：**分组依据 = turnId**（组 = 同一轮内**连续**的工具行；卡片/助手行/关联不上的未放行行打断即另起
   // 一组——`registerRow` 的 `rl.activityGroup` 语义不变）。开合三规则：
@@ -2448,6 +2522,14 @@
       if (ev.detail && ev.detail.source === "delivery-note") { sysRow(pane, "sys-call sys-delivery-note", ICONS.call, ev.summary); return; }
       if (ev.detail && ev.detail.source === "delivery-receipt") { applyDeliveryReceipt(pane, ev.detail.receipt); return; }
       if (ev.detail && ev.detail.source === "delivery-boundary") return;
+      // G-5 wave 2：推理事件（投影冻结点 `RuntimeReasoningDisplayDetailV1`——Service 已过核心投影单点；
+      // summary 已定格为「已思考」类常量、承载语义全在 detail）⇒ 推理折叠行**独立一行**（不进工具组、
+      // 不加 [系统·] 前缀、默认折叠含运行中）；投影失败的诊断形按如实一行呈现（不假装内容）。
+      if (ev.detail && ev.detail.source === "reasoning") { appendReasoningFromDetail(pane, ev.detail, ev.turnId); return; }
+      if (ev.detail && ev.detail.source === "reasoning-diagnostic") {
+        appendReasoningRow(pane, { label: String(ev.summary || "推理内容无法安全显示"), text: "", flags: "", foldable: false, turnId: typeof ev.turnId === "string" ? ev.turnId : "" });
+        return;
+      }
       // 事件流异常经外推层以 message 形式送来（session.ts consume 的 catch）——如实归为「错误」态。
       if (typeof ev.summary === "string" && ev.summary.indexOf("会话事件流异常") === 0) {
         metaFor(roleId).error = true;
@@ -2581,10 +2663,24 @@
     hint.textContent = "保存到上方显示的 .env 路径，只修改本引擎字段。" + Rt.applicationLabel(piView.application || "next-session");
     function fieldHtml(f) {
       var required = f.required === true || (state.runtime === "pi" && PI_REQUIRED_KEYS.indexOf(f.key) >= 0);
+      // G-5 wave 2（档位控件）：封闭值域字段（元数据 `choices` 非空）⇒ **选择控件**——值域即选项（面板
+      // 显示值＝保存接受值＝适配器认识值，单一来源；值域按运行时，如 Codex 无 off 档自动成立）。
+      // 「留空（平台默认）」＝未设态（保存侧空串＝清除该键＝维持平台默认）；现存值不在选项内（手编坏值）
+      // ⇒ 附一条原值选项**如实显示**（不静默改写/不假装未设；保存时由主进程按 choices 校验如实拒绝）。
+      // 自由文本字段（choices 缺席/空）逐字现状；机密字段不走此支（choices 字段均非机密）。
+      var choices = Array.isArray(f.choices) && f.choices.length > 0 ? f.choices : null;
+      var control;
+      if (choices) {
+        var opts = ['<option value="">留空（平台默认）</option>'].concat(choices.map(function (c) { return '<option value="' + esc(String(c)) + '">' + esc(String(c)) + "</option>"; }));
+        if (typeof f.value === "string" && f.value !== "" && choices.indexOf(f.value) < 0) opts.push('<option value="' + esc(f.value) + '">' + esc(f.value) + "</option>");
+        control = '<select id="pi-inp-' + esc(f.key) + '" class="pi-input pi-select">' + opts.join("") + "</select>";
+      } else {
+        control = '<input id="pi-inp-' + esc(f.key) + '" class="pi-input" type="' + (f.secret ? "password" : "text") +
+          '" autocomplete="off" spellcheck="false" />' + (f.secret ? '<button id="pi-toggle-secret" class="btn btn-ghost btn-mini" type="button">显示</button>' : "");
+      }
       return '<label class="pi-field" for="pi-inp-' + esc(f.key) + '"><span class="pi-field-label">' +
         esc(f.label || f.key) + ' · ' + (required ? "必填" : "可选") + (f.secret ? ' <span class="pi-secret-tag">机密</span>' : "") +
-        '</span><span class="pi-input-wrap"><input id="pi-inp-' + esc(f.key) + '" class="pi-input" type="' + (f.secret ? "password" : "text") +
-        '" autocomplete="off" spellcheck="false" />' + (f.secret ? '<button id="pi-toggle-secret" class="btn btn-ghost btn-mini" type="button">显示</button>' : "") +
+        '</span><span class="pi-input-wrap">' + control +
         '</span><span class="runtime-field-help">' + esc(f.key + " · " + Rt.sourceLabel(f) + (f.help ? "。" + f.help : "")) + '</span></label>';
     }
     var mainFields = fields.filter(function (f) { return f.key !== "ANS_PI_CONTEXT_WINDOW"; });
@@ -3341,6 +3437,10 @@
     var text = String(row.text == null ? "" : row.text);
     if (row.deliveryReceipt) { applyDeliveryReceipt(pane, row.deliveryReceipt); return; }
     if (row.deliveryBoundary) return;
+    // G-5 wave 2：推理行回放——行数据通道以结构化字段 `row.reasoning` 携带投影形（reasoning 子对象，
+    // 同「投递历史状态」族的结构化行字段；投影形幂等 ⇒ 实时/回放渲染同一行形）。**不靠摘要文本猜**
+    // （非启发式纪律：无该字段＝不是推理行，普通行路径逐字不变）。
+    if (row.reasoning && typeof row.reasoning === "object") { appendReasoningFromDetail(pane, { reasoning: row.reasoning }, row.turnId); return; }
     if (kind === "user" && appendDelivery(pane, { inputProvenance: row.inputProvenance, inputPresentation: row.inputPresentation }, text, row.inputTextProjection, row.turnId)) return;
     if (text === "") return;
     if (kind !== "assistant" && kind !== "user" && kind !== "tool" && kind !== "denied") return; // 未知 kind：跳过（防御式）

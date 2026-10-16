@@ -438,3 +438,41 @@ test('G-4/V2-MCP：install_mcp/uninstall_mcp 工具行通用渲染 + `[系统·�
   assert.equal(replay?.kind, 'system', '回放原始投递文本同解（卸载完成行同族）');
   assert.equal(replay?.label, '系统消息 · 安装');
 });
+
+// ————— G-5 wave 2（2026-10-16 客户批准 G-5「按推荐批准，开始实施」；设计 `2026-10-16_design_reasoning-and-effort` §5.2）—————
+// 推理折叠行文案/可展开性＝**纯函数单点**（`reasoningLabel`/`reasoningFoldable`，本模块唯一实现——renderer 只取用）。
+// 文案纪律：有真实时长信号才显示秒数（无信号不发明时间）、平台省略内容时不假装有内容；消费输入＝核心投影冻结形
+// `RuntimeReasoningDisplayDetailV1.reasoning`（脱敏/预算已在投影单点发生，本层不碰内容）。
+
+test('G-5/wave2：reasoningLabel 文案边界——时长仅真实信号才显示、省略不假装内容、无时长不发明时间', () => {
+  const t = (v: string) => ({ text: v, truncated: false, redacted: false });
+  // complete ＋ durationMs ⇒ 「已思考 N 秒」（四舍五入到整秒）。
+  assert.equal(tools.reasoningLabel({ text: t('想了一会儿'), status: 'complete', durationMs: 5200 }), '已思考 5 秒');
+  assert.equal(tools.reasoningLabel({ text: t('…'), status: 'complete', durationMs: 1500 }), '已思考 2 秒');
+  // complete 无时长 ⇒ 「推理内容」（不发明时间——没有真实起止就不显示秒数）。
+  assert.equal(tools.reasoningLabel({ text: t('…'), status: 'complete' }), '推理内容');
+  // omitted ⇒ 如实注明「内容由平台省略」（有真实时长则一并如实）；绝不拿「发生」冒充「内容」。
+  assert.equal(tools.reasoningLabel({ text: t(''), status: 'omitted', durationMs: 30000 }), '已思考 30 秒（内容由平台省略）');
+  assert.equal(tools.reasoningLabel({ text: t(''), status: 'omitted' }), '已思考（内容由平台省略）');
+  // 亚秒真实信号 ⇒ 下限 1 秒（防「已思考 0 秒」措辞坏件；round(999/1000)=1 自然命中、round(200/1000)=0 被下限接住）。
+  assert.equal(tools.reasoningLabel({ text: t('x'), status: 'complete', durationMs: 999 }), '已思考 1 秒');
+  assert.equal(tools.reasoningLabel({ text: t('x'), status: 'complete', durationMs: 200 }), '已思考 1 秒', '亚秒下限 1 秒（不出现 0 秒）');
+  // 非法时长（负/NaN/Infinity/非数字）按无信号——绝不猜测。
+  assert.equal(tools.reasoningLabel({ text: t('x'), status: 'complete', durationMs: -5 }), '推理内容');
+  assert.equal(tools.reasoningLabel({ text: t('x'), status: 'complete', durationMs: NaN }), '推理内容');
+  assert.equal(tools.reasoningLabel({ text: t('x'), status: 'complete', durationMs: Infinity }), '推理内容');
+  assert.equal(tools.reasoningLabel({ text: t('x'), status: 'complete', durationMs: '3000' as unknown as number }), '推理内容', '非数字不猜测');
+  // 防御：缺对象/坏件不抛、按无内容和无时长形态。
+  assert.equal(tools.reasoningLabel(null), '推理内容');
+  assert.equal(tools.reasoningLabel('complete' as unknown as object), '推理内容');
+});
+
+test('G-5/wave2：reasoningFoldable——仅 complete 且正文非空可展开；omitted/空正文/坏件＝如实单行', () => {
+  const t = (v: string) => ({ text: v, truncated: false, redacted: false });
+  assert.equal(tools.reasoningFoldable({ text: t('有正文'), status: 'complete' }), true);
+  assert.equal(tools.reasoningFoldable({ text: t('有正文'), status: 'complete', durationMs: 4000 }), true, '时长不影响可展开性');
+  assert.equal(tools.reasoningFoldable({ text: t(''), status: 'omitted' }), false, 'omitted 无内容可展（不摆空展开器）');
+  assert.equal(tools.reasoningFoldable({ text: t(''), status: 'complete' }), false, 'complete 但空正文（仅签名/零长）无内容可展');
+  assert.equal(tools.reasoningFoldable(null), false);
+  assert.equal(tools.reasoningFoldable({ status: 'complete' } as unknown as object), false, '缺 text 坏件防御');
+});
