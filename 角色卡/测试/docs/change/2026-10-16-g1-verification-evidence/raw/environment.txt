@@ -1,0 +1,7 @@
+HEAD: 89c95fed60ff99c2c6daf33f1516c929fcb252a6
+branch: main
+node: v24.14.0
+npm: 11.9.0
+uname: Darwin wangzhongrendeMacBook-Pro.local 25.6.0 Darwin Kernel Version 25.6.0: Fri Jul 31 19:16:20 PDT 2026; root:xnu-12377.161.14~5/RELEASE_ARM64_T8142 arm64
+date: 2026-10-16 11:08:15 +0800
+worktree: 37 条目（26 M + 11 ??，G-1 批次 + 相邻 G-2/PM 文档）

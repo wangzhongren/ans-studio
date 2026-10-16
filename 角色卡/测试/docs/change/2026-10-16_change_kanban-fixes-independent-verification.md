@@ -11,6 +11,9 @@ events:
   - date: "2026-10-16"
     kind: verified
     summary: 独立复验完成——冻结绑定（HEAD 27bc263 + 77 条目 sha256）、全量 1471/1470/0/1 + typecheck 0、范围审计无夹带无越界、25 条独立对抗用例全绿；发现 0 项不通过、4 项存疑/差异（详见文末）
+  - date: "2026-10-16"
+    kind: verified
+    summary: G-1 格式收口后金文本跟进——f2-claim-release 本地 dispatchTemplate 改接编排单一来源 renderDispatchPrompt（时序/行为断言零改动、非放松）；f2 2/2、test/测试 182/182、全量 1528/1527/0红/1skip、typecheck 0（详见文末追加节）
 ---
 
 # 2026-10-16 kanban 修复实施批次独立验证报告（测试角色）
@@ -172,3 +175,45 @@ node --test "test/测试/kanban-fixes-verify/"*.test.ts
 - 批准与收口：`角色卡/项目管理/docs/change/2026-10-15_change_kanban-fixes-pm-review.md`
 - 五份提案（含实施记录）：`角色卡/{运行时核心,桌面窗口,Pi适配器,门禁引擎,编排}/docs/fix/2026-10-15_fix_kanban-*.md`
 - 2026-10-15 真机证据目录：`角色卡/测试/docs/change/2026-10-15-kanban-live-real-project-evidence/`
+
+---
+
+## ⑥（追加，2026-10-16）G-1 格式收口后金文本跟进：`f2-claim-release.test.ts`
+
+**性质：批准范围内的格式收口跟进，非行为变更，非「为变绿改测试」。** 前文 §① 冻结绑定仅覆盖 2026-10-16 当时冻结版本；本节改动发生在其后，自带独立证据（`raw/g1-followup-*`）。
+
+### 6.1 背景与改前红态（实跑复现）
+
+客户 2026-10-16 批准 G-1 实施（PM 六项裁定）：派发文本渲染收口到单一来源 = 编排 `renderDispatchPrompt`（`角色卡/编排/docs/change/2026-10-16_change_contract-workflow-dispatch-a1.md` §三/§五），桌面窗口按 A2 接线并**按批准删除本地副本** `renderDispatchPromptLocal`（`角色卡/桌面窗口/docs/fix/2026-10-16_fix_g1-dispatch-required-reading.md`）。本套件 `dispatchTemplate`（原 :32）断言的正是**已删除的桌面旧单行内联模板**，故全量仅有的 2 红即 :125/:160 两处末段金文本比对——实施方与其登记依赖（「落地后必须切换」）的必然结果，桌面窗口 fix 记录 §六.1 亦交叉登记。
+
+改前本角色实测（仅此两处失败、时序断言全过）：actual = 单来源无引用旧格式三行逐字（`[派发] 来自 su 的任务`＋换行＋任务＋换行＋`完成后请交回报告（改了什么/结论/证据）。`）vs expected = 旧单行 `[派发] 来自 su 的任务：<task>——完成后请交回报告`。两例的**跨目标不阻塞 / 同目标排队 / 并发峰值 ≤1 等时序断言在改前即全部通过**。
+
+### 6.2 改了什么（行级；文件 sha256 `2d5acc90…3bbf444`；diff 存 `raw/g1-followup-diff.txt`，49 行）
+
+| 位置（改后行号） | 改动 |
+|---|---|
+| :11 | 新增值导入 `import { renderDispatchPrompt } from "../../../src/common/编排/handback.ts";`（与既有 `import type` 分行，循 `test/桌面应用/dispatch-fresh-enum.test.ts` 先例） |
+| :33-37（原 :32） | 本地 `dispatchTemplate` 由单行内联字面量改为单来源渲染一行：`const dispatchTemplate = (task: string) => renderDispatchPrompt({ roleId: "A", task });`＋4 行注释登记收口理由；`roleId` 不进入文案（handback.ts 注明「用于路由与校验」），取 `"A"` 与真实路由渲染逐字一致 |
+| :130/:135/:165（原 :125/:130/:160，共 4 处调用） | 签名跟进 `dispatchTemplate("su", X)` → `dispatchTemplate(X)`；四个任务文本与断言对象不变 |
+
+### 6.3 为什么不是放松
+
+- **行为断言一字未动**：两个用例的时序断言、并发峰值断言、自建夹具（可控挂起 send 的 SessionManager）与用例结构零改动。
+- **断言强度等价**：原先钉「投递实际文本 == 旧桌面模板」，现钉「投递实际文本 == 单一来源渲染文本」——后者即产品现状本身，且单一来源格式已由编排 14 例（`test/编排/dispatch-reads.test.ts`，「无引用逐字旧格式」逐行金文本）另行钉住；仍为逐字 `deepEqual`，未改包含匹配等弱化形式，未删任何断言。
+
+### 6.4 复跑结果（本角色实跑；Node v24.14.0 / Darwin 25.6.0）
+
+| 命令 | 结果 | 证据 |
+|---|---|---|
+| `node --test "test/测试/kanban-fixes-verify/f2-claim-release.test.ts"` | **2/2 过 / 0 红**，exit 0 | `raw/g1-followup-f2-file.txt` |
+| `node --test "test/测试/**/*.test.ts"`（28 文件；另以显式 28 文件清单双跑，均 182——覆盖无遗漏） | **182/182 过 / 0 红**，exit 0 | `raw/g1-followup-test-area.txt` |
+| `node --test "test/**/*.test.ts"`（全量） | **1528 计 / 1527 过 / 0 红 / 1 skip（Windows 专用）**，exit 0（此前 1525 过 / 2 红 → 现 0 红） | `raw/g1-followup-full-run.txt` |
+| `npm run typecheck` | **0 错**，exit 0 | `raw/g1-followup-typecheck.txt` |
+
+### 6.5 其他陈旧金文本扫描
+
+对 `test/测试/` 全目录（含 kanban-fixes-verify 7 文件）grep G-1 相关旧特征（`[派发]`、`renderDispatchPromptLocal`、`——完成后请交回报告`、`任务：`、`必读（按序`）：**除 f2 的这两处外零命中**——未发现本角色名下其他陈旧金文本，套件其余 6 文件无需跟进。
+
+### 6.6 边界
+
+只写 `test/测试/kanban-fixes-verify/f2-claim-release.test.ts`、本记录与 `raw/g1-followup-*` 证据文件；未改任何 src/app/他角色文件；未 git 提交；未碰 `ans-testbed/kanban-live-3`、`/private/tmp` 轮次目录与 2026-10-15 证据目录。

@@ -1,0 +1,4 @@
+test/桌面应用 :: ℹ tests 345 ℹ pass 345 ℹ fail 0 ℹ skipped 0 
+test/runtime-core :: ℹ tests 104 ℹ pass 104 ℹ fail 0 ℹ skipped 0 
+test/编排 :: ℹ tests 299 ℹ pass 299 ℹ fail 0 ℹ skipped 0 
+test/门禁引擎 :: ℹ tests 183 ℹ pass 182 ℹ fail 0 ℹ skipped 1 

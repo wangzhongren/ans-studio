@@ -1,5 +1,34 @@
 # 编排 变更记录
 
+## 2026-10-16 — G-2 / O1：看护三能力承载与透传（只 su 注入）＋ 告警/收束/恢复回执文案**单一来源**（含 U1 文首标记契约对齐）
+
+**来源**：客户 2026-10-16 按推荐批准 G-2 按提案实施（V1a+V1b 同轮；9 个待裁点全采纳）——`角色卡/项目管理/docs/change/2026-10-15_change_kanban-fixes-pm-review.md` §「G-2 客户批准与派发」；设计规格 `角色卡/产品/docs/design/2026-10-16_design_role-watchdog-and-closure.md` §十 表 O1 行（属主＝编排）。工具名以批准记录为准：`role_status` / `session_tail` / `propose_recovery`。**实施轮内与运行时核心 R1/R2 同树并行落位并完成对向对齐**（形状最终收敛为回执式，物理单一来源＝契约家 `model/runtime.ts`）；**桌面UI U1 的文首标记契约**经 PM 转达并对齐（见下）。
+
+**改了什么（全部在本角色 Section 1 内）**：
+- **新增 `src/common/编排/watchdog.ts`（文案单一来源＋契约转发）**：五件纯渲染器——`renderWatchdogAlert`（四信号告警：文首 `[系统·看护]`；信号/角色/事实/建议/纪律必含；建议按信号分派、#3 注明「F-1 已自动终止…通常无需动作」）、`renderWatchdogRecovery`（「期间共命中 N 次，抑制 M 条」）、`renderWatchdogStormGuard`、`renderClosurePrompt`（设计 §7.3 逐字；不强迫断言「完成」；非法 N 回退默认 5）、`renderRecoveryReceipt`（动作/角色/结果四值＋原因/`operator:<id>`/时间；未执行绝不假装已执行；输入＝契约 `RecoveryReceipt` ＋ action/targetRoleId/可注入 now）；常量 `WATCHDOG_ALERT/CLOSURE/RECOVERY_PREFIX`、`WATCHDOG_DISCIPLINE_LINE`、`WATCHDOG_DEFAULT_SILENT_MINUTES`、`RECOVERY_ACTIONS`、`WATCHDOG_PROMPT_GUIDELINES`（su 看护纪律三条：可自查／提议 ≠ 执行／不得据此假设任何写权——与门禁引擎 G 卡文本、R1/R2 schema 指南同口径）；十条契约类型经 `export type {…} from model/runtime.ts` **同一符号转发**（无第二份形状）。**文首标记契约**（U1 对齐）：`[系统·<子类>] `——ASCII 括号、中点 U+00B7、闭合于 `]` 且其后空白（改形态 = system 类静默回落普通气泡）；注释与测试逐字节钉住（与 `tool-rows.js::SYSTEM_HEAD` 一致）。事实行由检测侧如实传入——本层不触盘、不判定、不编造。
+- **改 `src/pipeline/orchestration/run-role.ts`**：`AdapterCapabilities` 增 `roleStatus?/sessionTail?/proposeRecovery?` 三能力位 + `openRoleSession` 输入增同名三可选参数（Fn 类型从契约家 `model/runtime.ts` 导入，同 `CustomerInputFn`/`DispatchTaskFn` 先例）；注入判据复用 `suppressHandback`（内置治理角色先例，同 dispatchTask）——**只给 su**、项目角色即便误给也不注入、未给不注入（能力缺席 = fail-closed）；`createRuntimeAdapterFactory` 显式并入适配器选项同名三字段（运行时核心 `GovernedToolsOptions` 同名能力位，「注入才注册」）。
+- **`test/编排/watchdog.test.ts`（新增 11 例）**：文首标记契约（全输出满足形态正则、中点 U+00B7 逐字节）；五渲染器逐字金文本＋N 边界/反向断言（不夹带授权语义）；四信号措辞各异＋#3「通常无需动作」；回执四值如实；promptGuidelines 三条钉住；**能力位只 su**（桩捕获：su 同引用/项目角色不给/未给不注入）；**端到端**（真实 Service 装配 + 演示替身：su 注册三工具且 handler 直达注入实现、declined 如实「未获执行」；项目角色零注册）。
+
+**证据**：`node --test "test/编排/"*.test.ts` → **299/299**（288 + 11）；`npm run typecheck` → **全仓 0 错**；全量 `node --test "test/**/*.test.ts"` → **终跑 1579 计 / 1578 过 / 0 红 / 1 skipped（全绿）**——中段一次 3 红全在 `test/桌面应用/`（F-5-opt1 桌面侧注记／F-4-opt1 replayPending／P1-1 UI 撤回）＝桌面窗口/桌面UI 并行在途，随其收口自消解、与本批零交集；跳过为既有 Windows 专用用例。既有用例零改动、未为变绿放松断言。环境：Node v24.14.0、Darwin 25.6.0。未 git 提交；未碰 `app/**`、`src/provider/**`、`src/model/**`、`src/common/shared/**`、其它角色文件与测试证据目录、kanban-live-3 / `/private/tmp` 轮次目录。详见[实施记录](docs/fix/2026-10-16_fix_g2-watchdog-wiring.md)。
+
+**跨角色（请 pm 转达）**：① **桌面窗口（W1/W3/W5）**——三类文案一律经本模块渲染（导入路径与接入要点见实施记录 §五；**勿在桌面另拼文首前缀**——标记形态是 U1 契约、本模块三前缀即单一来源）；三能力经 `openRoleSession` 入参字段名 `roleStatus` / `sessionTail` / `proposeRecovery` 注入（镜像补同名字段；字段名即契约）；两读工具返回 `WatchdogToolResult` 回执（失败**不要抛**——抛错由工具层如实转达「未完成」）；`propose_recovery` 返回 `RecoveryReceipt` 四值（declined/unsupported/error 一律未执行，绝不假装）。② **运行时核心（R1/R2）**——已同树落位并完成对向对齐（`GovernedToolsOptions` 同名能力位＋三工具注册＋schema 指南同口径；形状物理单一来源＝`model/runtime.ts`，其注释注明与 `watchdog.ts` 同名同形）。③ **门禁引擎（G）**——su 卡「看护职责段」同口径。④ **独立验证核对项**：三能力字段名、文首标记形态（二者改掉即静默失配/回落）。真机 E2E（「卡住有告警、完成会收束」）属测试/客户轮。
+
+## 2026-10-16 — G-1 / A1：派发「必读（按序）」引用块**单一来源**（`renderDispatchPrompt` 扩展 + 提取/判据纯函数；不碰 `app/**`）
+
+**来源**：客户 2026-10-16 批准 G-1 按提案实施（`角色卡/项目管理/docs/change/2026-10-15_change_kanban-fixes-pm-review.md` §「G-1 客户批准与 PM 裁定」，六项裁定全采纳提案推荐）；设计规格 `角色卡/产品/docs/design/2026-10-16_design_contract-workflow-dispatch.md` §四 + §九 A1（属主＝编排）。裁定 3 钉死失败口径：**契约缺失→拒投 + 如实回执（fail-closed）**；**workflow 缺失→降级标注**。关键约束（设计 §四.2）：**哈希只能由代码算**（su/角色都不会算 hash——`finalize.ts` 先例）——本角色只做**提取 + 渲染 + 判据**三件纯函数（不算哈希、不触盘），哈希由投递侧（桌面 `filePrint`）在投递时算。
+
+**改了什么（全部在本角色 Section 1 内）**：
+- **`src/common/编排/handback.ts`（唯一源码改动；H-1 节扩展为 H-1+G-1 共用件）**：
+  - **`renderDispatchPrompt(req, opts?)`** 扩展——**无引用时旧 3 行格式逐字不变**（既有断言/去重键语义零影响）；有引用时按设计 §四.1 渲染「必读（按序）」块（编号缩进、`path（sha256:<64hex>）` 逐字注入、`任务：` 前缀），完成句仅在**引用含 workflow.md** 时切「…完成口令见 workflow.md 第 2 节」变体（不指向不在场文件）。
+  - **`extractDispatchReadPaths(task)`**：固定提取——只认 `docs/workflow.md` 与 `docs/contracts/**.md`（长度守卫防 `docs/contracts/.md`）；产物路径等**不注入不校验**（§四.3 第 3 条）；token 剥离**复用** `confirmed-writes.ts::extractPathCandidates`（同源正则，不另写）；保序：workflow 置首（§五.3 阅读序）、契约首现序、去重。
+  - **`planDispatchDelivery(req, probes)`**：fail-closed 判据单一来源——契约探测值缺失/非法（`<missing>`/非 64 位小写 hex 一律按不存在）→ `{action:"reject",message,systemRow}`（**结构上无 `text`**；逐字回执「派发未受理：引用的契约 <path> 不存在——未投递。」+ 系统行 `**未投递**`；多缺报首现序第一个；拒投优先于降级）；workflow 缺失 → 降级放行（块内如实标注 `（本项目未提供 workflow.md）`，措辞照设计原文；契约编号重排）；未引用路径不参与。放行 `text` 内部调用同一 `renderDispatchPrompt`（**无第二份渲染**）。
+  - 新增导出类型 `DispatchReadRef` / `DispatchDeliveryPlan` / `DispatchPromptOptions`；矛盾输入（同路径既引用又标缺失）**引用为准**（测试钉住）。
+- **`test/编排/dispatch-reads.test.ts`（新增 14 例，纯函数不触盘）**：提取（置首/首现序/去重/嵌套正例；产物/URL/绝对/目录式/非 md/前缀串线/CJK 紧贴/名空负例）；渲染（旧格式逐字三对照组；workflow+契约逐行金文本 + 授权语义反向断言；仅契约；降级标注；矛盾输入）；判据（全齐放行且与 render 逐字一致＝**单一来源复用断言**；契约缺失 6 种探测值拒投 + 回执逐字 + 无投递文本；多缺报首；workflow 缺失降级；未引用放行；保序编号）。
+
+**证据**：`node --test "test/编排/"*.test.ts` → **288/288** 全绿（274 + 14）；`npm run typecheck` → **全仓 0 错**。既有用例零改动、未为变绿放松断言。环境：Node v24.14.0、Darwin 25.6.0。未 git 提交；未碰 `app/**`、`src/provider/**`、`src/common/shared/**`、其它角色文件与测试证据目录、kanban-live-3 / `/private/tmp` 轮次目录；未发真实模型请求。详见[实施记录](docs/change/2026-10-16_change_contract-workflow-dispatch-a1.md)。
+
+**跨角色（请 pm 转达）**：① **桌面窗口（A2）**——`routeDispatch` 接线：`extractDispatchReadPaths` → `filePrint` 逐个探测（`<missing>` 原样传入）→ `planDispatchDelivery`；**判据先于去重登记**（拒投不登记：桌面去重键在送达时才释放，先登记后拒投会让修好后的同文重派被误去重）；拒投走 `fail(plan.message, plan.systemRow)` 不入队；删除 `renderDispatchPromptLocal` 并按其金文本更新 `test/桌面应用/dispatch-delivery.test.ts`（布局从单行内联收敛为本模块三行）。接口说明要点见实施记录 §五。② **门禁引擎（A3）/运行时核心（A4）**——su 卡文本 / `dispatch_task` 工具描述改「按地址引用」由各自实施（本项只备好收文本侧能力；su 内嵌全文 V1 无机械拦截，属设计 §八已知残余登记）。③ 真机复验（kanban-live 同型）属测试/客户跑。
+
 ## 2026-10-16 — su 预授权写目录（客户裁定）：`docs/su/**` + `docs/contracts/**` 预置进初始 writeSet（免确认发行）
 
 **来源**：客户裁定 2026-10-16，原文两句——①「**这个 su 可以写 docs/su 的目录，不需要我审批**」；② 追加（经项目管理转达）「**还有个契约目录也可以给他写。**」（= `docs/contracts/**`，G-1 契约落盘目录约定；其本体落地时生效，本预授权先装好）。这是对 F-5-main 所载既有设计（「写盘许可按会话生效、只经 request_confirmation 发行、重建不自动保留」）的**客户例外**：预授权 = **初始集合的一部分**，不属「经确认发行的写权」。

@@ -1,0 +1,10 @@
+2f238ea7d44e193953526fe2d60fcc9e4c6cedf467a226091ffa75f22fd6963e  test/测试/g2-verify/contract-freeze.test.ts
+45530109fd9231d4048344208025e2ef62d23353e8d7416d59f7f85c09c0a8a8  test/测试/g2-verify/fixture.ts
+1a436d19ee5a3240fc62f20a340c415143f58b4c91eeb8a93004057f6b1f43ca  test/测试/g2-verify/r1-desktop-datasource.test.ts
+081879f328373351a156ac5271b14b475172b5b3013af69e0b41949bab206cd8  test/测试/g2-verify/r1-r2-tools.test.ts
+c281595fdfd230ecf0c47a76ace0a4b546248fa2cfc96abd5b1888d29431c85b  test/测试/g2-verify/scope-audit.test.ts
+dfe1c88848aa572b38c3e302e34219c3be35280d72664137b8f8daaadaf959d7  test/测试/g2-verify/u1-renderer.test.ts
+6413c18a3d45ee880881ed8aa1e05cbfb21514bc7629c14f869f054dbf0235d1  test/测试/g2-verify/w1-signals.test.ts
+5504b659570c543258979e03adc7cdf49e255dad3487bf1d91012525defde846  test/测试/g2-verify/w2-system-delivery.test.ts
+b3bce7fd4add2c47165c85b59e79b809b0fefc046d6dbe906fedb623c2b25789  test/测试/g2-verify/w3-closure.test.ts
+1afcb85147b9c19972ea3158f359cbcc6c62d1fe1cf3442edeb1149c7dc5ecf1  test/测试/g2-verify/w4-w5-recovery.test.ts

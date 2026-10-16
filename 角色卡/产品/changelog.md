@@ -1,5 +1,15 @@
 # 产品 变更记录
 
+## 2026-10-16 — G-2（角色看护与收束）细化提案
+
+按 PM 批次的派发行（来源：项目管理 `docs/change/2026-10-15_change_kanban-fixes-pm-review.md` §「新增候选」G-2，客户 2026-10-16「这些开始启动」批准细化）新增[设计提案](docs/design/2026-10-16_design_role-watchdog-and-closure.md)。
+
+**做了什么**：只读调研四类承载件并成文——①主进程权威状态快照（SessionManager 的 busy/deliveryQueues/activeDeliveries/notifyRoleState 同源通道）；②投递机全貌（三类 kind、去重集合、撤回判据、自动开会话、失败保留重试）与**模型可见通知的三种形态**（UI 系统行 / 真投递 / F-5-opt1 注记前缀）；③诊断模块（白名单字段、scrub、既有事件名）与会话文件受保护投影管线（session-history/runtime-history）；④时限信号基准（resolveRuntimeTimeouts、withPausableTimeout＋InteractionGate、F-1 display.process.timedOut 事实）与能力注入/确认卡两组先例（dispatch_task 只给 su；shell 卡与 su 交互卡 presenter）。
+
+**核心设计结论**：① 异常态四信号阈值表（轮次 90%／排队 age 10min 或深度 5／命令超时单次即报／重复失败 3 次 15min 窗）+ F-6 先例的去重冷却与「恢复行」+ 风暴护栏，经**既有投递机**投新增 `system` kind（不可撤回）给 su；② su 只读工具 `role_status`（同源快照 + lastTurn 小状态 + 可选诊断尾部）与 `session_tail`（复用受保护投影，脱敏截断），只读保证=调用前后快照逐字段相等；③ 恢复**不静默**：`propose_recovery` 只提议（带证据），复用确认卡通道机制出恢复卡、恰 allow:true 才由应用执行（abort-turn/rebuild-session/redeliver 全复用或最小包装既有动作），执行回执投回 su；④ 完成态：静默谓词＋滞回状态机（连续静默 N=5min 投收束提示一次；仅**真实活动**重新武装，排除看护自身投递与 su 对收束的回复），不强迫 su 断言完成。
+
+**边界与状态**：提案完成、**未实施/未测试**；V1a/V1b 拆分与属主建议（桌面窗口/运行时核心/编排/门禁引擎/桌面UI）与 9 个待客户/PM 裁定点见提案 §十/§十二。写集仅本角色设计文档、feature-map、memo、本文件；未改 `app/`、`src/`、`test/`、其他角色文件与证据目录（kanban-live-3、`/private/tmp` 与测试证据目录未触碰），未操作真实项目，未 git 提交。
+
 ## 2026-10-16 — G-1（契约与工作流落盘 + 派发按地址引用）细化提案
 
 按 PM 批次的派发行（来源：项目管理 `docs/change/2026-10-15_change_kanban-fixes-pm-review.md` §六，客户 2026-10-16 批准「G-1 一并细化」）新增[设计提案](docs/design/2026-10-16_design_contract-workflow-dispatch.md)。

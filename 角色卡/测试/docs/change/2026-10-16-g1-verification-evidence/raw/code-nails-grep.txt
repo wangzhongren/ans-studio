@@ -1,0 +1,16 @@
+$ grep -rn --include="*.ts" --include="*.js" -E "renderDispatchPromptLocal\s*\(" app src
+(exit=1 — 无输出＝零实现/调用)
+
+$ grep -rn "renderDispatchPromptLocal" app src（全部命中，佐证仅剩注释性指称）
+app/desktop/session.ts:74:// 本批已删除本地副本 `renderDispatchPromptLocal`（既有登记依赖收口——落地后必须切换、不得两处并存）。
+app/desktop/session.ts:1656:      // 注入；无引用 = 旧格式逐字）——本层不另写渲染（本地副本 `renderDispatchPromptLocal` 已删除）。
+
+$ grep -c "[派发] 来自" app/desktop/session.ts
+0
+
+$ grep -n "SU_PREAUTHORIZED_WRITE_DIRS.*=" src/pipeline/orchestration/run-role.ts
+871:const SU_PREAUTHORIZED_WRITE_DIRS: readonly string[] = ["docs/su", "docs/contracts"];
+885:  return SU_PREAUTHORIZED_WRITE_DIRS.some((dir) => isUnderOrEqual(rel, dir)) ? rel : undefined;
+
+$ git diff HEAD --stat 中 run-role.ts / finalize.ts / tools.ts（非本批改动面佐证）
+(三者均不在本批改动列表)

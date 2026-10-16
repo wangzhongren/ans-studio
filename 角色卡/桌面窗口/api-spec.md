@@ -124,3 +124,20 @@ A4 legacy provenance窄修：protected工具t.statusSource/target.source分别�
 既有sendSession透明返回兼容可选turnId/clientMessageId/inputAccepted:true/outcome/sessionCurrent。turnId仅原调用ACK，inputAccepted仅同actualturn typed prompt-input已观察，outcome仅公开settled.detail.outcome首有效enum；无证据缺席。不解析错误文案、不等终态、不新IPC/Model。sessionCurrent是返回时原entry仍当前，不代表provider清理完成；false不等于没有新的当前会话。先拒后终态时UI经现session:event按actualturn+clientID合并，返回快照不被迟到事件修改；同client异turn不能互借。真正failed/timed_out与未接受输入的错误/草稿处理仍由真实事实决定，不将stop请求当完成。证据见[停止收口修复](docs/fix/2026-10-15_fix_stop-terminal-send-facts.md)。
 
 安装包配置路径修复：main.whenReady后只解析一次resolveDesktopEnvPath({isPackaged,userDataPath})，packaged=userData/.env，dev仍repo.env；启动共享loader和DesktopInterface.envFilePath同值，不复制env实现/不拷贝凭据。受控host CLI --ans-packaged-smoke <absolute.json> --user-data-dir=<temp>验证真实DOM/preload/既有只读IPC和设置开闭，结果含isPackaged，开发不算通过；无新renderer IPC。证据见docs/fix/2026-10-15_fix_packaged-runtime-config.md。
+
+## G-2 看护与恢复（W1-W5，2026-10-16 客户批准；G-2 revision 1）
+
+模块：`app/desktop/watchdog.ts`（看护器——纯逻辑＋注入时钟/快照/投递端）、`app/desktop/confirm-card.ts`（确认卡 pending/replay/expire 通用件——shell 卡与恢复卡共享）、`app/desktop/recovery-channel.ts`（恢复确认卡呈现端）。文案与三能力形状的单一来源为编排 `src/common/编排/watchdog.ts` / 契约家 `src/model/runtime.ts`——本角色只读导入。
+
+| preload 方法 | IPC / 参数 | 返回 |
+| --- | --- | --- |
+| onRecoveryConfirm(cb) | 订阅 recovery:confirm-request（主→渲） | `{id, projectRoot?, runtime?, roleId, action, evidence, reason?, requestedBy?, requestedAt?, itemId?}`——evidence 逐字；恰 `{allow:true}` 才作为执行请求 |
+| recoveryConfirmRespond({id,allow}) | recovery:confirm-response | `{ok:true}` \| `{ok:false, expired:true}`（失效/旧回包——未获执行）\| `{ok:false, error}`（非法回包不受理） |
+
+桥与执行（`SessionManager` 公共/注入面）：`proposeRecovery` 能力（仅 su 会话经 `openRoleSession({proposeRecovery})` 注入；`ProposeRecoveryFn` 契约——返回 `RecoveryReceipt{outcome: executed|declined|unsupported|error, message?, operatorId?, at?}`，恰 executed 为已执行）；`rebuildSession(target)`（新公共入口；busy 拒绝；F-5-opt1 注记适用）；`redeliverNudge(target, itemId?)`；`abort` 复用既有。回执三路：工具返回＋UI 系统行＋经投递机投回 su（`kind:"system"`）。
+
+只读数据源（同判据仅 su 注入）：`roleStatus`（`RoleStatusPayload{roleId?,includeDiagnostics?}`→`WatchdogToolResult`——结构化文本；8KiB 截断在工具层）与 `sessionTail`（`SessionTailPayload{roleId,lines?}`→`WatchdogToolResult`——**受保护投影管线**产出，行数工具层归一、本层防御夹取）。两工具**纯读**（调用前后快照逐字段一致，有测试钉）。
+
+`system` 第四类投递：`DeliveryItem.kind` 增 `"system"`（看护告警/收束/恢复回执）；来源标注恒空、正文文首定格 `[系统·<子类>] `（U1 tool-rows.js 归类判据）；**不可撤回**；去重键看护自持命名空间（`watchdog\0…`）；失败保留待重试＋如实系统行。队列快照 `queue` 条目类型补 `id/full`（如实对齐运行时输出）。
+
+看护器：tick 默认 30s（`ANS_DESKTOP_WATCHDOG_TICK_MS`）、静默默认 5min（`ANS_DESKTOP_WATCHDOG_SILENCE_MS`）——**仅 env 可调**；信号 #1-#4（阈值表＝设计 §3.2 默认）；去重/冷却/风暴护栏（15min≤5＋通告＋`watchdog.suppressed`）；`watchdog.failed`／`watchdog.alert`／`watchdog.recovery`／`watchdog.closure` 诊断；`DesktopInterface.startWatchdog()/stopWatchdog()`（窗口注册后启动、窗关停止；看护缺席 ⇒ 一切照旧）。新增 deps：`recoveryConfirm`、`watchdogObserver`、`watchdogPendingConfirmations`、`watchdogStats`、`now`（注入时钟）。

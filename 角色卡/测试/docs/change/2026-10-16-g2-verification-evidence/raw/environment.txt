@@ -1,0 +1,84 @@
+HEAD=89c95fed60ff99c2c6daf33f1516c929fcb252a6
+branch=main
+node=v24.14.0
+uname=Darwin wangzhongrendeMacBook-Pro.local 25.6.0 Darwin Kernel Version 25.6.0: Fri Jul 31 19:16:20 PDT 2026; root:xnu-12377.161.14~5/RELEASE_ARM64_T8142 arm64
+date=2026-10-16T03:59:35Z
+---- git status (porcelain) ----
+ M app/desktop/customer-input.ts
+ M app/desktop/interface.ts
+ M app/desktop/operator-channel.ts
+ M app/desktop/session.ts
+ M app/main.ts
+ M app/preload.cjs
+ M app/renderer/index.html
+ M app/renderer/renderer.js
+ M app/renderer/styles.css
+ M app/renderer/tool-rows.js
+ M app/renderer/ui-labels.js
+ M "src/common/\347\274\226\346\216\222/handback.ts"
+ M "src/common/\351\227\250\347\246\201\345\274\225\346\223\216/boundary-core.ts"
+ M src/model/runtime.ts
+ M src/pipeline/orchestration/run-role.ts
+ M src/provider/runtime/schema.ts
+ M src/provider/runtime/tools.ts
+ M test/runtime-core/tools.test.ts
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/dispatch-delivery.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/dispatch-fresh-enum.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/e2e/uiux-v2.mjs"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/message-queue.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/operator-channel.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/queue-withdraw-lru.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/renderer.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/session.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/tool-rows.test.ts"
+ M "test/\346\265\213\350\257\225/kanban-fixes-verify/f2-claim-release.test.ts"
+ M "test/\351\227\250\347\246\201\345\274\225\346\223\216/su-doc-surface-convention.test.ts"
+ M "\350\247\222\350\211\262\345\215\241/\344\272\247\345\223\201/changelog.md"
+ M "\350\247\222\350\211\262\345\215\241/\344\272\247\345\223\201/feature-map.md"
+ M "\350\247\222\350\211\262\345\215\241/\344\272\247\345\223\201/memo.md"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/changelog.md"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/feature-map.md"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/memo.md"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/api-spec.md"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/changelog.md"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/memo.md"
+ M "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-16_change_kanban-fixes-independent-verification.md"
+ M "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/memo.md"
+ M "\350\247\222\350\211\262\345\215\241/\347\274\226\346\216\222/api-spec.md"
+ M "\350\247\222\350\211\262\345\215\241/\347\274\226\346\216\222/changelog.md"
+ M "\350\247\222\350\211\262\345\215\241/\347\274\226\346\216\222/memo.md"
+ M "\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/api-spec.md"
+ M "\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/changelog.md"
+ M "\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/feature-map.md"
+ M "\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/memo.md"
+ M "\350\247\222\350\211\262\345\215\241/\351\227\250\347\246\201\345\274\225\346\223\216/changelog.md"
+ M "\350\247\222\350\211\262\345\215\241/\351\227\250\347\246\201\345\274\225\346\223\216/memo.md"
+ M "\350\247\222\350\211\262\345\215\241/\351\241\271\347\233\256\347\256\241\347\220\206/docs/change/2026-10-15_change_kanban-fixes-pm-review.md"
+?? app/desktop/confirm-card.ts
+?? app/desktop/recovery-channel.ts
+?? app/desktop/watchdog.ts
+?? "src/common/\347\274\226\346\216\222/watchdog.ts"
+?? test/runtime-core/watchdog-tools.test.ts
+?? "test/\346\265\213\350\257\225/g1-verify/"
+?? "test/\346\265\213\350\257\225/g2-verify/"
+?? "test/\347\274\226\346\216\222/dispatch-reads.test.ts"
+?? "test/\347\274\226\346\216\222/watchdog.test.ts"
+?? "\350\247\222\350\211\262\345\215\241/\344\272\247\345\223\201/docs/design/2026-10-16_design_role-watchdog-and-closure.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/docs/fix/2026-10-16-g2-recovery-card-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/docs/fix/2026-10-16_fix_g2-recovery-card-and-system-rows.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/docs/fix/2026-10-16_fix_g1-dispatch-required-reading.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/docs/fix/2026-10-16_fix_g2-watchdog-and-recovery.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-16-g1-verification-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-16-g2-verification-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-16-kanban-fixes-verification-evidence/raw/g1-followup-diff.txt"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-16-kanban-fixes-verification-evidence/raw/g1-followup-f2-file.txt"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-16-kanban-fixes-verification-evidence/raw/g1-followup-full-run.txt"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-16-kanban-fixes-verification-evidence/raw/g1-followup-test-area.txt"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-16-kanban-fixes-verification-evidence/raw/g1-followup-typecheck.txt"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-10-16_change_g1-independent-verification.md"
+?? "\350\247\222\350\211\262\345\215\241/\347\274\226\346\216\222/docs/change/2026-10-16_change_contract-workflow-dispatch-a1.md"
+?? "\350\247\222\350\211\262\345\215\241/\347\274\226\346\216\222/docs/fix/2026-10-16_fix_g2-watchdog-wiring.md"
+?? "\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/docs/fix/2026-10-16_fix_dispatch-task-address-reference.md"
+?? "\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/docs/fix/2026-10-16_fix_g2-status-tools-recovery.md"
+?? "\350\247\222\350\211\262\345\215\241/\351\227\250\347\246\201\345\274\225\346\223\216/docs/fix/2026-10-16_fix_g2-su-watchdog-card.md"
+?? "\350\247\222\350\211\262\345\215\241/\351\227\250\347\246\201\345\274\225\346\223\216/docs/fix/2026-10-16_fix_su-planning-workflow-card.md"
