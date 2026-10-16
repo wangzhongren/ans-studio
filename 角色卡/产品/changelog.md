@@ -1,5 +1,15 @@
 # 产品 变更记录
 
+## 2026-10-16 — G-4（角色能力安装：技能＋MCP）细化提案
+
+按 PM 批次的派发行（来源：项目管理 `docs/change/2026-10-15_change_kanban-fixes-pm-review.md` §「候选 G-4『角色能力安装（技能＋MCP）』」，客户 2026-10-16 已定授权口径）新增[设计提案](docs/design/2026-10-16_design_role-capability-install.md)。
+
+**做了什么**：只读调研四条承载线并成文——①技能根机制（`ANS_SKILL_ROOT`/门禁独立写权根 project/skill、内置条目 root:"skill"、**各运行时原生技能通道全关**：Claude `skills:[]`＋Pi `noSkills`＋Codex 特性禁用）；②su 无卡授权的唯一机制出口＝预授权写目录（`SU_PREAUTHORIZED_WRITE_DIRS=["docs/su","docs/contracts"]`，`run-role.ts:912`）与「工具不写盘」纪律（write/edit 唯一写路径、dispatch_task 先例）；③角色加载路径现状三通道（系统提示＝角色卡＋边界、G-1 派发必读块「只认 docs/contracts+workflow.md」、`read_file` 不经过写门禁含绝对路径）＋O-1 指纹集不含角色卡与技能文件；④MCP 三平台封死机制逐行事实（Claude `strictMcpConfig`＋canUseTool deny-all＋Hook deny 兜底；Codex 全量 disable＋残留拒启＋空目录硬校验；Pi 无面；ANS 自身 MCP 管道已验证）与 G-2/W4 `rebuildSession` 公共入口、`system` kind、`filePrint` 等可复用件。
+
+**核心设计结论**：①工具面＝**技能与 MCP 分开**两对（`install_skill`/`uninstall_skill` V1；`install_mcp`/`uninstall_mcp` V2 占位）；工具＝**校验＋激活＋回执、不写盘**——「**先落盘再激活**」（镜像 G-1「先落盘再派发」）；只给 su 注入（「注入才注册」先例）；三态回执形状收敛契约家 `model/runtime.ts`；失败文案枚举逐条如实。②技能落项目内 `docs/skills/<name>/`（SKILL.md 内容＋install.md 登记）；加载路径**推荐会话开局注入**（系统提示「已安装技能（先读）」指针节：路径＋运行期 digest＋用途；覆盖派发/直聊/看护全触发面；派发必读块扩面为候选、角色卡方案不做——理由见 §4.2）；激活复用 `rebuildSession`（在跑不打断、`next-session` 如实）；技能**可迭代**（刻意区别于契约冻结版本化）；卸载＝登记改写＋校验＋重建（**效果已撤/文件保留**二分如实；无删除原语现状登记）。③MCP 落 `docs/mcp/<name>.md` 声明、按角色生效、**不写平台原生配置**（程序化注入，零平台残留）；三平台机制**全留占位标「待运行时核心评估回填」**；诚实面写明「外来 MCP 工具不经 ANS 写门禁＝新动作面」。④无卡口径机制落点＝预授权直写＋工具无确认通道＋`request_confirmation` 语义不变；装/卸如实话术模板＋四层偏离可见性（工具行/系统行/项目文件/诊断）＋可选机械护栏（仅客户消息发起的轮次可执行——待裁）。⑤**su 预授权写权是否扩列`docs/skills` 列为待裁项、不预设**；分期＝V1 技能全链（三运行时一致）、V2 MCP 分平台（评估回填后）。
+
+**边界与状态**：提案完成、**未实施/未测试**；MCP 三平台机制为占位（运行时核心并行评估回填后由 PM 汇总呈裁）。实施归属建议（桌面窗口/运行时核心/编排/门禁引擎/桌面UI 见 §九）与 10 个待裁点见 §十一。写集仅本角色设计文档、feature-map、memo、本文件；未改 `app/`、`src/`、`test/`、其他角色文件与证据目录（搜索批/折叠批/发布链在飞文件未触碰），未操作真实项目，未 git 提交。
+
 ## 2026-10-16 — G-2（角色看护与收束）细化提案
 
 按 PM 批次的派发行（来源：项目管理 `docs/change/2026-10-15_change_kanban-fixes-pm-review.md` §「新增候选」G-2，客户 2026-10-16「这些开始启动」批准细化）新增[设计提案](docs/design/2026-10-16_design_role-watchdog-and-closure.md)。

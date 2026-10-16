@@ -103,6 +103,32 @@ status: approved-implementation-dispatched
 - **overlay-3 最小差集口径（PM 裁定）**：白名单**增** `test/测试/kanban-fixes-verify/f1-timeout.test.ts`（真凶文件，经测试角色同口径时序健壮化：微时限抬高、有界轮询、语义零放松），**减** `test/runtime-core/shell-exec-timeout.test.ts`（原条目唯一依据＝误归属；该文件 intel 本就全绿；其硬化调用 `until(pred, boundMs)` 依赖 fixtures.ts 新增可选形参，若只列测试文件不列夹具则「新测试配旧夹具」静默失效——列两件又属非必需扩面，故整组随发布后 main 常规批次提交，不入本 overlay）。selected 预期：8 − 1 + 1 = 8。
 - **派发**：测试（f1-timeout 硬化）；装配（白名单增一减一 + 注释更正 + packaging 测试精确同步 + selected 复算）。运行时核心硬化件按上述口径延迟入 main。
 - **提交纪律（选择性提交）**：overlay-3 只含 policy/装配测试面/f1-timeout/相关角色文档；**排除**在飞的折叠批（app/renderer×3、test/桌面应用×3）与三平台搜索批（src/provider/*、test/*-adapter、相关角色卡）——`selectOverlay`（release-policy.mjs:19）对未列 `app/`、`src/` 路径**硬拒**（Unreviewed production overlay），混入即发布门禁失败。
+- **已执行**：提交 `2c70e5b`（19 文件）已推 main；提交后以同一 `selectOverlay` 复算 selected 恰 8（含 f1-timeout、不含 shell-exec，零意外路径）；CI 重跑 run `38894559186`（headSha 2c70e5b）**四 job 全绿**（build ×3 + release）。
+- **发布完成（2026-10-16 11:47Z）**：draft 12 资产独立验收全过——存证摘要逐项一致、mac-arm64 ZIP 三方摘要一致、三 manifest 同源且 smoke.ok=true、provenance overlayPaths 恰 8 / excludedChanges 30 项全文档面；公开后未登录核验（发布页/三平台 ZIP/SHA256SUMS 全 200；README 指向 v1.2.0）。验收记录：`角色卡/测试/docs/change/2026-10-16_change_v1.2-release-verification.md`。发布页 https://github.com/wangzhongren/ans-studio/releases/tag/v1.2.0 。**冻结解除**：此后 main 可接收发布后批次（搜索批/折叠批/运行时核心硬化对），下版发布换新 SOURCE_REF。
+
+## G-3 实施收口（2026-10-16）
+
+- **三上下文全部交回**（均工作树改动、零 git 提交；开关默认关、关时逐字旧行为）：
+  - Pi适配器：`ANS_PI_SERVER_TOOLS`（白名单解析；未知 id/非法 max_uses/重复 id 构造期抛错）；新 `src/common/pi-adapter/server-tools.ts` ＋ real-adapter 三 handler（**仅启用时注册、未启用零开销**）；专项 264/264、全量 0 新红、typecheck 0。
+  - Claude适配器：`ANS_CLAUDE_WEB_SEARCH` 三处（tools 声明＋PreToolUse 放行分支（**不注入 updatedInput**）＋消息泵 native-start/result 配对）；32/32；loopback probe 6/6 实证 PreToolUse 对内置 WebSearch **实分发**、侧查询形态、400 不毁轮次。
+  - Codex适配器：`ANS_CODEX_WEB_SEARCH`；键形态经 T3 回环矩阵实证＝顶层 `web_search="live"` → 出站 `{"type":"web_search","external_web_access":true}`；webSearch item→message 行＋`detail.source:"web-search"`；settled 附 searchCalls；33/33。
+- **实施轮关键修正（已入各记录）**：Pi 发现 `after_provider_response` 仅 2xx 后回调（非 2xx 在 fetch 层 throw）——降级判据改从 SDK 错误消息**前缀**取状码（不读正文、不落诊断）；服务端块流忠实通道＝loopback 真 SSE（faux 不经扩展事件）。
+- **跨边界登记（本轮不实施）**：桌面UI v1 三路径**零改动**（行经既有口径渲染；「查询作为行目标/搜索行图标徽标」列期 2 候选）；运行时核心 `serverTools?`/`webSearch?` 透传字段（v2 角色级授予）非 v1；`settled.searchCalls` 是否上 UI/计费面待裁定；Claude 路径发现的 `dispose()` 临时目录清理 ENOTEMPTY 竞态（≈2/36、既有问题、非本特性引入）→ 另行立项评估。
+- **客户 live 探针（Pi 路径，2026-10-16 客户本机实跑）**：`web_search` ✅ **真网关实时执行**（server_tool_use/web_search_tool_result/usage 计量 1–3 次/轮）；`web_fetch` ✗ 网关 500 拒（unknown variant；该网关支持变体仅 web_search 两版——**配置指引：本网关只应启用 web_search**）；`code_execution` ✗（维持不解缓）；**两轮复放 round2 被拒经 Pi适配器 判定为探针构造产物（高置信）**——探针丢失流式文本增量、组装空内容助手消息；真实链路 `convertMessages` 对空内容助手消息**整条跳过**（dist 只读实证）⇒ 该 500 形态不可构造；网关对剥离转录的接受度**仍属未验**（待探针修复后客户补跑 §②）；方案 P 维持未启动（条件性评估已归档）；残余风险登记：剥离后为空 ⇒ 相邻 user 消息形态未验。max_uses 未见强制（不构成成本护栏，计费以 usage 计量为准）、pause_turn 未见（如实登记）。证据：`角色卡/Pi适配器/docs/fix/2026-10-16_probe_server-side-tools-live-results.md`（端点/请求 id 已按公开仓库纪律隐去）。
+- **G-3 独立验证完成（测试角色）：整体通过（0 不通过、5 备注）**——报告 `角色卡/测试/docs/change/2026-10-16_change_g3-search-and-fold-independent-verification.md`；独立自建 50 例（含对抗）＋自建 Electron 折叠探针 16/16；冻结绑定 47 条目开工/收工逐字节一致；全量 1773/1772/0/1、typecheck 0。备注（均非不通过）：①`cleanPatterns` URL 贪婪匹配吞「URL 紧贴文本」——Pi 搜索行多条目（「；」连接）第 2 条起标题被吞（呈现面小缺陷、丢文本不泄文本；**已派运行时核心出轻修提案**）；②max_uses 经 Number() 宽容 0x2/1e2（值仍正整数、安全侧）；③server-tools.ts 注释「大小写不敏感」与实现不符（措辞误、行为安全侧）；④网关 start 回传 count=0 且响应含调用块时 from-blocks 兜底被抑制（记账窄界、已钉）；⑤Claude/Codex live 探针与真机 E2E 留白（如实）。
+- **探针修复完成（Pi适配器）**：两处构造偏差修复＋`--self-test` 离线自检 PASS（A/B 承重证明：注回旧偏差恰转红）＋守卫烟测与 typecheck 0；客户补跑命令不变（`node test/pi-adapter/server-tools-probe.ts`，读 .env、只打键名、结构化摘要可整段转达）；其证据文件「待办修复」条一行为**待排轻项**（下次该角色 docs 轮同步）。
+- **发布后批次入 main**：运行时核心时序健壮化对／G-3 搜索批（三适配器＋含修复后探针）／工具行折叠批／验证与验收记录／G-4 评审记录——按批提交推送（见仓库提交记录）；下版发布换新 SOURCE_REF。
+
+## 候选 G-4「角色能力安装（技能＋MCP）」（2026-10-16 客户讨论提出，已派细化）
+
+- **客户原问**：「这个 su 应该有个工具，可以给其他的角色安装 mcp……或者安装技能」。
+- **客户裁定（授权模型）**：**不设二次确认卡**——「这两个都是我确认他让他安装他才去给其他的角色安装，这个确认也没必要啊」＝客户会话中指令 su 安装即完成授权；su 不自主发起；安装可见、可撤即可。
+- **现状事实（PM 核）**：技能——`skillRoot` 机制已有（`ANS_SKILL_ROOT`、门禁独立写权根），G-1 裁定 #5「技能文档增补另行治理」为该方向已登记事项；MCP——ANS 自身即以 MCP 通道向 Claude/Codex 注入内置工具（管道已验证），外来 MCP 现被三重封死（Claude `strictMcpConfig`＋hook 兜底＋canUseTool deny-all；Codex 全量 disable＋空目录硬校验；Pi 无 MCP 面）。
+- **待解设计点**：su 工具面（install/uninstall、技能与 MCP 是否统一）；技能落盘位置与角色加载路径（含 su 预授权写权是否扩列）；MCP 三平台机制（Claude 放行面／Codex 白名单化／Pi 支持性）；产物可见性、留痕与卸载；第三方 MCP 进程的环境/凭据面。
+- **派发**：产品（正式设计提案，体格沿 G-2）＋运行时核心（MCP 跨平台可行性评估，行级实证）并行；经 PM 评审后呈客户批准。
+- **产品提案已交回（2026-10-16）**：`角色卡/产品/docs/design/2026-10-16_design_role-capability-install.md`（410 行）。核心设计：工具＝**校验＋激活＋回执、不写盘**（「先落盘再激活」镜像 G-1；write_file 仍唯一写路径）；技能落 `docs/skills/<name>/`＋**会话开局注入**加载（复用 G-2 rebuildSession 激活、在跑不打断）；技能**可迭代**（刻意区别于契约冻结版本化）；MCP 部分落 `docs/mcp/<name>.md` 声明白名单、程序化注入零平台残留，**三平台机制留占位待运行时核心评估回填**；未决点 ①–⑩（含 su 预授权是否扩列 `docs/skills`、轮次触发护栏、命名）列 §十一。运行时核心评估在跑——两份齐后 PM 评审并呈客户批准简表。
+- **运行时核心评估交回（2026-10-16）**：`角色卡/运行时核心/docs/fix/2026-10-16_assess_role-mcp-install.md`。三平台均**可行**；**事实更正入档：Pi 并非「无 MCP 面」**——SDK 内置 MCP 扩展（`createMcpExtension`/`registerMcpServer`），`bindExtensions` 全仓 0 调用＝现未加载；**Pi 默认传输把全量 env 交给第三方 server 子进程＝三平台中唯一默认不安全（V2 必须自持 transport 收窄）**。Claude 最小 4 处（注入面＋hook 放行分支[否则兜底 deny 会把外来工具一并拦掉]＋两审计发射点）；Codex 最小 4 处（白名单化＋`-c` 定义注入＋三处校验改「恰等」＋`mcpToolCall` item 映射），**原生 MCP 调用不经 ANS 门禁＝能力级授予**（批文与卡文案须如实，不得宣称逐调用受审）；P0 探针 12 条（§九）实施前先行。
+- **G-4 PM 评审完成、批准简表已呈客户（2026-10-16）**：评审结论——架构沿用既有先例（预授权直写／rebuildSession／注入才注册／系统提示单一来源）；零新增写路径；唯一写权变化＝预授权扩列（裁定①）。10 项推荐裁定随简表呈客户：①扩 `docs/skills`（候选 1；V2 再议 `docs/mcp`）；②加载＝会话开局注入、派发必读块扩面不做（登记候选）；③两文件登记（SKILL.md＋install.md）、按角色列表；④轮次触发护栏**加**（仅客户消息发起的轮次可执行，非卡）；⑤next-session 口径接受＋**O-1 指纹集扩展本期做**（登记＋内容文件，settle 即收敛）；⑥技能可迭代确认；⑦V1 卸载＝效果已撤/文件保留、删除原语登记；⑧V2 三平台分批（P0 探针→Claude→Codex→Pi）＋能力级授予如实＋Pi env 收窄为必须项＋放行粒度＝server 级白名单；⑨凭据值不入声明文件/对话/诊断（只收 `env:NAME` 引用与字面量）；⑩命名按提案。**批准范围**：V1 技能安装全链实施（I1–I4＋I6＋I7，含裁定①⑤）＋V2 先批口径与 P0 探针轮（实施分批另呈）。
 
 ## G-1 客户批准与 PM 裁定（2026-10-16）
 
