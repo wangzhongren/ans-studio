@@ -84,6 +84,8 @@ interface Harness {
   failLeft: Record<string, number>;
   /** 某角色**最近一次**真实状态快照（外推值；无则 undefined）。 */
   latest: (roleId: string) => RoleStateSnapshot | undefined;
+  /** F-2-T4 夹具：挂起某角色**下一次** send（release 前不 resolve）。 */
+  hangNext: (roleId: string) => () => void;
 }
 
 function makeHarness(): Harness {
@@ -95,6 +97,13 @@ function makeHarness(): Harness {
   const openCalls: string[] = [];
   const stopped: Record<string, boolean> = {};
   const failLeft: Record<string, number> = {};
+  // F-2-T4 夹具（2026-10-16）：可控挂起的 send——release 前 promise 不 resolve（模拟整轮在跑）。
+  const nextGate: Record<string, Promise<void> | undefined> = {};
+  const hangNext = (roleId: string): (() => void) => {
+    let release!: () => void;
+    nextGate[roleId] = new Promise<void>((resolve) => { release = resolve; });
+    return release;
+  };
 
   const makeHandle = (roleId: string): RoleSessionHandle => {
     let i = 0;
@@ -103,6 +112,11 @@ function makeHarness(): Harness {
         if ((failLeft[roleId] ?? 0) > 0) {
           failLeft[roleId] = (failLeft[roleId] ?? 0) - 1;
           throw new Error(`演示：${roleId} 投递通道瞬时失败`);
+        }
+        const gate = nextGate[roleId];
+        if (gate) {
+          nextGate[roleId] = undefined;
+          await gate;
         }
         (sent[roleId] = sent[roleId] || []).push(text);
       },
@@ -161,6 +175,7 @@ function makeHarness(): Harness {
     roleStates,
     openCalls,
     failLeft,
+    hangNext,
     latest: (roleId) => {
       for (let i = roleStates.length - 1; i >= 0; i -= 1) if (roleStates[i].roleId === roleId) return roleStates[i];
       return undefined;
@@ -396,4 +411,47 @@ test("接线钉子：role-state 通道两端齐备；忙态判据只在主进程
   assert.ok(!RENDERER.includes("metaFor(role.roleId).working"), "渲染侧不得由本端发送自设忙态");
   assert.ok(!RENDERER.includes(".working = true"), "渲染侧不得有任何 working=true 的界面推测");
   assert.ok(!RENDERER.includes("working: m.working"), "派生事实里不得再喂界面自设的 working");
+});
+
+// ————— F-2-T4（2026-10-16 客户批准）：长轮不阻塞客户消息投递 —————
+// 旧实现：su 的回交投递轮把串行链持有到整轮结束——期间 A settle 触发的「排队客户消息放行」被链压住。
+// 修复后：投递开跑即释放链，客户消息随 A settle **立即**送达；su 自己的队列仍按序放行（语义保真）。
+
+test("F-2-T4 长轮不阻塞客户消息：su 的回交投递轮挂起期间，A settle 后的排队客户消息**立即**放行；su 队列在放行+settle 后按序投递", async () => {
+  const h = makeHarness();
+  await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  await tick(30);
+
+  // ① su 的长轮：一条回交投递（自动开 su → 认领 → send 挂起）。
+  const releaseSu = h.hangNext("su");
+  h.streams.A.push({ kind: "handback", summary: "回交1", handback: HANDBACK_A });
+  await tick(150);
+  assert.ok(h.openCalls.includes("su"), "su 被自动开启");
+  assert.equal(h.sent.su.length, 0, "su 的回交投递挂起中（整轮在跑；send promise 未结）");
+
+  // ② A：直发置忙 + 再排一条客户消息（入队）。
+  await h.mgr.send("A 占位（在跑）");
+  const queued = await h.mgr.send("A 排队消息");
+  assert.equal(queued.queued, true);
+  // ③ su 挂起期间又推一条回交（su 忙 ⇒ 入队，等 su settle 后按序放行）。
+  h.streams.A.push({ kind: "handback", summary: "回交2", handback: { ...HANDBACK_A, taskId: "L2", summary: "第二件做完" } });
+  await tick(120);
+  assert.equal((h.latest("su")?.summaries.length ?? 0), 1, "第二条回交在 su 队列排队（su 忙——排队语义未变）");
+
+  // ④ A settle ⇒ 排队客户消息**立即**放行——不被 su 的长轮持有（旧实现：链被 su 持有贯穿其整轮）。
+  h.streams.A.push({ kind: "settled", summary: "A 一轮结束" });
+  await tick(200);
+  assert.deepEqual(h.sent.A, ["A 占位（在跑）", "A 排队消息"], "客户消息随 A settle 立即送达（chain 只属认领段）");
+  assert.equal(h.sent.su.length, 0, "对照面：此期间 su 仍挂起（不是因为 su 结束才送到 A）");
+
+  // ⑤ 放行 su + su settle ⇒ su 队列按序放行第二条回交（恰一次、不丢）。
+  releaseSu();
+  await tick(80);
+  assert.equal(h.sent.su.length, 1, "第一份回交结算");
+  assert.ok(h.sent.su[0].includes("做完了"), "第一份 = 先到的回交1");
+  h.streams.su.push({ kind: "settled", summary: "su 一轮结束" });
+  await tick(200);
+  assert.equal(h.sent.su.length, 2, "su settle 后第二份回交放行");
+  assert.ok(h.sent.su[1].includes("第二件做完"), "按到达序（回交2 在后）");
+  await h.mgr.stop(null);
 });

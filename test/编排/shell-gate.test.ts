@@ -41,6 +41,7 @@ import {
   createFileAuditSink,
   createMemoryAuditSink,
   type ShellAuditRecord,
+  type ShellAuditSink,
 } from "../../src/common/编排/shell-audit.ts";
 
 // 规则集用**严格形状**（来源 model/decision.ts；shell-gate 不再自定义宽松版本）。
@@ -256,6 +257,229 @@ test("硬要求负例：审计写门禁 scope **不含** shell-gate → 被门�
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
+});
+
+// —————————————————————— F-6 修复批（kanban-live）：刷新重试 + 提示去重 ——————————————————————
+//
+// 事故形态（F-6）：会话在创世过渡窗口内创建 ⇒ 持有**未接受**的边界快照 ⇒ 审计写被 F6 拒绝且
+// 无自愈通道（每条约审命令打印一次「未落盘」并丢条，直至会话重建）。本批：
+//   F-6-1 = 审计 sink 首查被拒时刷新边界快照、以新门禁重试一次（放行后切换活跃门禁）；
+//   F-6-2 = 失败提示按 reason 去重（首个一次、重复不逐条、变化/恢复各一行）+ 文案去除猜测性归因。
+
+/** 未接受边界（= 现场快照形态：无 parseError、acceptance 未接受 → F6 拒一切写入）。 */
+function makeUnacceptedBoundary(): BoundarySection1 {
+  return {
+    boundarySource: "<test:未接受快照>",
+    acceptance: { accepted: false, source: "" },
+    entries: [],
+  };
+}
+
+/** sink 直连用的最小记录（字段齐备即可）。 */
+function makeAuditRecord(toolCallId: string): ShellAuditRecord {
+  return {
+    timestamp: new Date().toISOString(),
+    toolCallId,
+    command: "ls -la",
+    argv: ["ls", "-la"],
+    cwd: "/proj",
+    conclusion: "allow",
+    branch: BRANCH_C_ALLOW,
+    by: `ruleset:${RULES_ID}`,
+    conditions: [SHELL_GATE_CONDITION],
+    execution: "未执行",
+  };
+}
+
+test("F-6-T1（刷新恢复）：未接受快照 + refreshGate 给出已接受边界 → 首查拒 → 重试落盘一条；此后直走新门禁", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ans-shellgate-"));
+  try {
+    const ctx = { skillRoot: root, projectRoot: root };
+    const staleGate = buildShellAuditGate(makeUnacceptedBoundary(), ctx);
+    const freshGate = buildShellAuditGate(makePmBoundary(), ctx);
+    let refreshCalls = 0;
+    const sink = createFileAuditSink({
+      projectRoot: root,
+      gate: staleGate,
+      refreshGate: async () => {
+        refreshCalls += 1;
+        return freshGate;
+      },
+    });
+    const shellGate = createShellGate({ classifyShell: () => "allow", rules: RULES, rulesId: RULES_ID, audit: sink });
+
+    const r = await shellGate({ command: "ls -la", argv: ["ls", "-la"], cwd: root, toolCallId: "tc-f6-1" });
+    assert.equal(r.allow, true, "审计失败不翻转判定（allow 照常）");
+    assert.equal(refreshCalls, 1, "首查被拒 → 刷新一次");
+
+    const auditPath = path.join(root, SHELL_AUDIT_REL_PATH);
+    assert.ok(fs.existsSync(auditPath), "重试放行 → 审计落盘");
+    const rec = JSON.parse(fs.readFileSync(auditPath, "utf8").trim().split("\n")[0]) as ShellAuditRecord;
+    assert.equal(rec.toolCallId, "tc-f6-1");
+    assert.equal(rec.branch, BRANCH_C_ALLOW);
+    assert.equal(rec.by, "ruleset:test-ruleset");
+    assert.ok(rec.conditions.includes(SHELL_GATE_CONDITION), "声明 shell-gate 条件");
+    assert.equal(rec.execution, "未执行");
+
+    // 活跃门禁已切换为新 gate：恢复后零额外开销（后续条目不触发刷新）。
+    await shellGate({ command: "ls", argv: ["ls"], cwd: root, toolCallId: "tc-f6-1b" });
+    assert.equal(refreshCalls, 1, "恢复后不再刷新");
+    assert.equal(fs.readFileSync(auditPath, "utf8").trim().split("\n").length, 2);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("F-6-T2（缺省无刷新 = 现状）：未接受快照、无 refreshGate → 拒且零副作用（不建目录、无文件）", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ans-shellgate-"));
+  try {
+    const sink = createFileAuditSink({
+      projectRoot: root,
+      gate: buildShellAuditGate(makeUnacceptedBoundary(), { skillRoot: root, projectRoot: root }),
+    });
+    const shellGate = createShellGate({ classifyShell: () => "allow", rules: RULES, rulesId: RULES_ID, audit: sink });
+    const r = await shellGate({ command: "ls", argv: ["ls"], cwd: root, toolCallId: "tc-f6-2" });
+    assert.equal(r.allow, true, "判定照常");
+    assert.equal(fs.existsSync(path.join(root, SHELL_AUDIT_REL_PATH)), false, "无刷新 → 不落盘（旧行为）");
+    assert.equal(fs.existsSync(path.join(root, "docs")), false, "零副作用（不建目录）");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("F-6-T3（刷新仍拒）：refreshGate 返回另一份未接受边界 → 拒、零副作用、原因含两段事实且无猜测性归因", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ans-shellgate-"));
+  try {
+    const ctx = { skillRoot: root, projectRoot: root };
+    let refreshCalls = 0;
+    const sink = createFileAuditSink({
+      projectRoot: root,
+      gate: buildShellAuditGate(makeUnacceptedBoundary(), ctx),
+      refreshGate: async () => {
+        refreshCalls += 1;
+        return buildShellAuditGate(makeUnacceptedBoundary(), ctx); // 收尾前：重解析仍是未接受
+      },
+    });
+    const res = await sink.append(makeAuditRecord("tc-f6-3"));
+    assert.equal(res.ok, false);
+    assert.equal(refreshCalls, 1, "首查被拒 → 恰好刷新一次");
+    const reason = res.reason ?? "";
+    assert.match(reason, /审计写被门禁拒绝/, "如实头");
+    assert.match(reason, /已刷新边界快照重试一次，仍被拒/, "链式原因：重解析后仍拒");
+    // 两段事实：原判 + 重解析后仍拒（同一 F6 原文各出现一次）。
+    assert.equal(reason.split("边界未被接受或缺少证据来源（F6）：拒绝一切写入。").length - 1, 2, "原判与重试原因都在");
+    assert.ok(!reason.includes("缺少 `shell-gate` 条件？"), "不再猜测「缺少条件」（现场反例）");
+    assert.equal(fs.existsSync(path.join(root, SHELL_AUDIT_REL_PATH)), false, "零副作用");
+    assert.equal(fs.existsSync(path.join(root, "docs")), false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("F-6-T3b（刷新失败）：refreshGate 未取得门禁/抛错 → 维持拒绝、原因如实、零副作用", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ans-shellgate-"));
+  try {
+    const stale = buildShellAuditGate(makeUnacceptedBoundary(), { skillRoot: root, projectRoot: root });
+    const missing = createFileAuditSink({ projectRoot: root, gate: stale, refreshGate: async () => undefined });
+    const res1 = await missing.append(makeAuditRecord("tc-f6-3b-1"));
+    assert.equal(res1.ok, false);
+    assert.match(res1.reason ?? "", /刷新边界快照未取得可用门禁，未重试/);
+
+    const throwing = createFileAuditSink({
+      projectRoot: root,
+      gate: stale,
+      refreshGate: async () => {
+        throw new Error("盘上读取失败");
+      },
+    });
+    const res2 = await throwing.append(makeAuditRecord("tc-f6-3b-2"));
+    assert.equal(res2.ok, false);
+    assert.match(res2.reason ?? "", /刷新边界快照失败（盘上读取失败），未重试/);
+    assert.equal(fs.existsSync(path.join(root, "docs")), false, "零副作用");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("F-6-T4（F-6-2 去重 + 如实话术）：同因仅报一次；变化/恢复/恢复后再失败各一行；判定不翻转", async () => {
+  let mode: "A" | "B" | "ok" = "A";
+  const audit: ShellAuditSink = {
+    async append() {
+      return mode === "ok" ? { ok: true } : { ok: false, reason: `测试拒绝原因${mode}` };
+    },
+  };
+  const gate = createShellGate({ classifyShell: () => "allow", rules: RULES, rulesId: RULES_ID, audit });
+  const reqN = (n: number) => ({ command: "ls", argv: ["ls"], cwd: "/p", toolCallId: `tc-f6-4-${n}` });
+
+  const captured: string[] = [];
+  const orig = process.stderr.write;
+  process.stderr.write = ((chunk: unknown) => {
+    captured.push(String(chunk));
+    return true;
+  }) as typeof process.stderr.write;
+  try {
+    const r1 = await gate(reqN(1));
+    assert.equal(r1.allow, true, "审计失败不翻转判定");
+    await gate(reqN(2));
+    await gate(reqN(3));
+    assert.equal(captured.length, 1, "同因重复**不逐条打印**（3 条失败 → 1 行）");
+    assert.equal(captured[0], "shell 闸审计未落盘：测试拒绝原因A\n", "首个完整打印一次（前缀保留）");
+
+    mode = "B";
+    await gate(reqN(4));
+    assert.equal(captured.length, 2, "reason 变化 → 再报一次");
+    assert.equal(captured[1], "shell 闸审计未落盘：测试拒绝原因B\n");
+
+    mode = "ok";
+    await gate(reqN(5));
+    assert.equal(captured.length, 3, "恢复落盘 → 一行「已恢复落盘」");
+    assert.equal(captured[2], "shell 闸审计已恢复落盘（此前未落盘 4 条）\n", "恢复行如实带累计条数");
+
+    mode = "A";
+    await gate(reqN(6));
+    assert.equal(captured.length, 4, "恢复后再失败 → 再报一次");
+    assert.equal(captured[3], "shell 闸审计未落盘：测试拒绝原因A\n");
+  } finally {
+    process.stderr.write = orig;
+  }
+});
+
+// —————————————————————— F-4-X1：操作者通道真实 reason 转达 ——————————————————————
+
+test("F-4-X1：unavailable → 转达通道真实 reason（「确认超时」/「轮次中止」可辨）；缺原因走如实兜底，不再固定「无人值守？」", async () => {
+  const reqN = (id: string) => ({ command: "mysterytool --flag", argv: ["mysterytool", "--flag"], cwd: "/proj", toolCallId: id });
+  const makeGate = (operatorChannel: import("../../src/provider/pi/session.ts").OperatorChannelFn, audit: ReturnType<typeof createMemoryAuditSink>) =>
+    createShellGate({ classifyShell: () => "review", rules: RULES, rulesId: RULES_ID, audit, operatorChannel });
+
+  // ① 桌面通道自超时（M2 文案）→ 模型看到「操作者确认超时（>Nms）」，不再被读成「无人值守」。
+  const audit1 = createMemoryAuditSink();
+  const g1 = makeGate(() => ({ outcome: "unavailable", reason: "操作者确认超时（>120000ms），拒绝执行（fail-closed）" }), audit1);
+  const r1 = await g1(reqN("tc-x1-1"));
+  assert.equal(r1.allow, false, "fail-closed 结论不变（拒绝）");
+  if (!r1.allow) {
+    assert.match(r1.reason, /操作者确认超时（>120000ms）/, "转达超时事实");
+    assert.ok(!r1.reason.includes("无人值守"), "不再固定「无人值守？」");
+  }
+  assert.equal(audit1.records[0].branch, "b-unavailable→a-unavailable", "归因码稳定（不按文本猜）");
+
+  // ② 轮次中止/重建（M2 的另一种来源）→ 原文转达（与超时可辨）。
+  const g2 = makeGate(() => ({ outcome: "unavailable", reason: "本轮已结束、停止或会话已重建，旧 shell 确认失效。" }), createMemoryAuditSink());
+  const r2 = await g2(reqN("tc-x1-2"));
+  assert.equal(r2.allow, false);
+  if (!r2.allow) assert.match(r2.reason, /本轮已结束、停止或会话已重建/, "转达轮次中止事实（超时/中止分流）");
+
+  // ③ 通道未给原因 / 未返回结果 → 如实兜底（不猜测「无人值守」）。
+  const g3 = makeGate(() => ({ outcome: "unavailable" }), createMemoryAuditSink());
+  const r3 = await g3(reqN("tc-x1-3"));
+  assert.equal(r3.allow, false);
+  if (!r3.allow) {
+    assert.match(r3.reason, /未给出原因/);
+    assert.ok(!r3.reason.includes("无人值守"));
+  }
+  const g4 = makeGate(() => null, createMemoryAuditSink());
+  const r4 = await g4(reqN("tc-x1-4"));
+  assert.equal(r4.allow, false);
+  if (!r4.allow) assert.match(r4.reason, /未给出原因/, "null 结果同兜底");
 });
 
 // —————————————————————— Pipeline 构造入口 + 注入路径 ——————————————————————

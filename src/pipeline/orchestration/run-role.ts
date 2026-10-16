@@ -16,6 +16,9 @@
 //     发行进本会话的 writeSet（`common/编排/confirmed-writes.ts`）；
 //   · 写入照旧经 gate——**F4 拒掉一切未确认路径**（writeSet 外 = 拒）。
 //   · 通道**不可用/拒绝/未确认** → 不发行 → 该路径写入被拒（fail-closed）。
+//   · **例外（客户裁定 2026-10-16）**：内置治理角色（su）的**初始** writeSet 恒含 `docs/su/**` 与
+//     `docs/contracts/**`（预授权写目录，不经发行器、随会话初始化计算；见 SU_PREAUTHORIZED_WRITE_DIRS）
+//     ——对其余一切路径以上三条逐字适用。
 // 【已登记的残余漏洞：内容漂移】本机制只保证「**路径**已预览且已确认」；「预览内容 ≠ 写出内容」
 // 关不住（O-A1 内容比对经客户 2026-10-12 裁定不采纳——如实登记，不实现）。
 // 未给 `customerInput` 的会话（无客户通道）保持旧语义：scope 原样传递（可为 undefined = 不收窄）。
@@ -81,6 +84,10 @@ import { repinIfBootstrapped, DEFAULT_GOVERNANCE_BOUNDARY_REL } from "../../comm
 import { conditionSlugsOf, createConfirmedWriteIssuer } from "../../common/编排/confirmed-writes.ts";
 import { CLI_POSITIONING } from "../../common/编排/cli-positioning.ts";
 import { createDiagnosticLogger } from "../../common/shared/diagnostics.ts";
+// 跨角色共享路径原语（**单一来源** = pm 属主 `src/common/shared/path-primitives.ts`；工程法案 §一.5
+// 消费方名单已含编排；同 `confirmed-writes.ts` 先例）——用于 su 预授权目录的**词法**归属判定：
+// 与 resolveWrite 同源取值规则，不从门禁引擎私有 common 另行导入/复制。
+import { absRel, isAbsoluteAny, isUnderOrEqual, normalizeLexical } from "../../common/shared/path-primitives.ts";
 
 /**
  * **适配器能力面**：编排构造、随 `deps.createAdapter(gate, capabilities)` 交给适配器工厂——
@@ -235,6 +242,15 @@ export interface RoleSessionAbortResult {
   error?: string;
 }
 
+/**
+ * **F-5-opt1 推荐注记文案**（2026-10-16 客户批准；会话因边界更新重建后写权清零的**如实告知**，
+ * **单一来源**）——由重建路径（桌面窗口 O-1）经 `RoleSessionHandle.queueModelNotice` 排入模型可见输入。
+ * 措辞要点：如实说明「重建」与「写权不自动保留」，指向**可行恢复路径**（`request_confirmation`）；
+ * **不夹带任何授权语义**（不是授权、不承诺放行——写入仍须逐条确认后发行）。
+ */
+export const REBUILT_SESSION_WRITE_PERMITS_NOTICE =
+  "会话已因边界更新重建；此前经确认发行的写权不会自动保留，如需写入请重新经 request_confirmation 确认。";
+
 /** Pipeline-only prompt intent; never forwarded as a Runtime option or write authorization. */
 export interface RoleSessionSendOptions extends PromptOptions {
   handback?: HandbackIntent;
@@ -283,6 +299,19 @@ export interface RoleSessionHandle {
    * **`openRoleSession` 返回的句柄恒实现本方法**（三态结果即真实回答，缺席只出现在替身）。
    */
   abort?(): Promise<RoleSessionAbortResult>;
+  /**
+   * **F-5-opt1（编排侧）：向模型注入一行「如实注记」**（2026-10-16 客户批准；kanban-live D1——
+   * 会话因边界更新**重建**后写权（已发行 writeSet）静默清零，模型上下文却被完整恢复 ⇒ 认知分叉）。
+   * 语义**钉死**：
+   * - 注记**排入下一次 `send()` 的输入前缀**（一行加换行分隔），**送达一次即消费**——不是用户消息、
+   *   **不单独开轮**、不触任何工具与任何判定（判定与写权不受影响，纯粹是给模型的如实输入）；
+   * - 该轮 `prompt` 失败且**未开轮（无 ACK）**时注记保留（下一轮重试仍带上）；开轮后失败则消费
+   *   （输入已送出，重排会重复）；
+   * - 推荐文本用 `REBUILT_SESSION_WRITE_PERMITS_NOTICE`（单一来源，防各写一份）。
+   * **可选方法**（同 `abort?` 先例）：旧替身不实现亦完全合法；由宿主（桌面窗口 O-1 重建路径）在
+   * 重建后对本会话句柄调用。**`openRoleSession` 返回的句柄恒实现本方法**。
+   */
+  queueModelNotice?(text: string): void;
   /**
    * 持续的事件流；跨多轮累积。产出 `OrchestrationEvent`（既有 `SessionEvent` + 编排在 `settled` 时
    * 追加的 `handback` 回交事件，设计 §10.8）——**治理角色（su）不自我回交**，故其会话只产出 SessionEvent。
@@ -373,18 +402,31 @@ export async function openRoleSession(
 
   // 底层只建**一个**会话：多轮 send 复用同一 RoleSession，绝不每轮重建。
   //
-  // gate（A-3）：有 `customerInput` ⇒ 确认制动态 writeSet（初始为空，发行器追加）；
-  // 无 ⇒ 原样传 input.scope（可为 undefined = 不收窄，旧语义逐字不变）。
+  // gate（A-3）：有 `customerInput` ⇒ 确认制动态 writeSet（发行器追加；**内置治理角色 su** 的初始
+  // 集额外含预授权写目录——客户裁定 2026-10-16，见 SU_PREAUTHORIZED_WRITE_DIRS）；
+  // 无 ⇒ 原样传 input.scope（可为 undefined = 不收窄，旧语义逐字不变；su 的静态 scope 同口径并入预授权）。
   const confirmationMode = input.customerInput !== undefined;
   const issued = new Set<string>();
   const conditions = conditionSlugsOf(setup.role.boundary);
+  const gateCtx = { skillRoot: input.project.skillRoot, projectRoot: input.project.projectRoot };
+  const staticScope = input.scope;
+  // su 预授权（客户裁定 2026-10-16）：判据 = **既有治理角色标记**（与 suppressHandback/dispatchTask
+  // 同一判据；本产品内置治理角色即 su，不另硬编码 id）。
+  const suPreauthorized = setup.role.kind === "built-in-governance";
   const gate: WriteGate = confirmationMode
     ? (p) =>
-        resolveWrite(p, setup.role.boundary, { writeSet: [...issued], conditions }, {
-          skillRoot: input.project.skillRoot,
-          projectRoot: input.project.projectRoot,
-        })
-    : buildGate(setup.role, input.project, input.scope);
+        resolveWrite(
+          p,
+          setup.role.boundary,
+          suPreauthorized
+            ? scopeWithSuPreauthorization({ writeSet: [...issued], conditions }, p, input.project.projectRoot)
+            : { writeSet: [...issued], conditions },
+          gateCtx,
+        )
+    : suPreauthorized && staticScope !== undefined
+      ? (p) =>
+          resolveWrite(p, setup.role.boundary, scopeWithSuPreauthorization(staticScope, p, input.project.projectRoot), gateCtx)
+      : buildGate(setup.role, input.project, input.scope);
 
   // 客户通道包装（A-3）：客户确认后，把「已预览且校验在边界内的具体路径」发行进 writeSet。
   // 只做「确认 → 发行」；裁决结果原样返回（不改答案、不写盘、不成败判定都在别处）。
@@ -507,6 +549,8 @@ export async function openRoleSession(
   const autoRepinEnabled = input.autoRepin ?? setup.role.kind === "built-in-governance";
 
   let disposed = false;
+  // F-5-opt1：排入的模型可见注记（下一次 send 的输入前缀；送达一次即消费——见 queueModelNotice 文档）。
+  let pendingModelNotice: string | undefined;
   const persistenceSubscriptions = new Set<() => void>();
   const boundRoleId = setup.role.id;
   const protectionContext = { credentialEnvNames: trustedCredentialNames(deps.runtimeOptions) };
@@ -615,6 +659,9 @@ export async function openRoleSession(
     get contextWarning() { return session.contextWarning; },
     async send(text: string, opts?: RoleSessionSendOptions): Promise<void> {
       legacyReport = undefined;
+      // F-5-opt1：排入的模型可见注记作为**本轮输入前缀**送出（不单独开轮、不改判定；送达一次即消费）。
+      const notice = pendingModelNotice;
+      const outbound = notice !== undefined && notice !== "" ? `${notice}\n\n${text}` : text;
       let intent: HandbackIntent;
       if (opts?.handback !== undefined) {
         intent = { required: opts.handback.required };
@@ -646,12 +693,16 @@ export async function openRoleSession(
       try {
       // 图片原引用保留；真实开轮绑定路径组合 ACK，并剥离 Pipeline 专用来源字段。
         if (promptOptions === undefined) {
-          await session.prompt(text);
+          await session.prompt(outbound);
         } else {
-          await session.prompt(text, promptOptions);
+          await session.prompt(outbound, promptOptions);
         }
         log.record("session.send.end");
+        // F-5-opt1：注记已随本轮输入送出 → 消费（期间若又排入新注记则保留新的那份）。
+        if (pendingModelNotice === notice) pendingModelNotice = undefined;
       } catch (err) {
+        // F-5-opt1：未开轮（无 ACK）→ 注记保留（输入未送达模型，下一轮重试仍带上）；开轮后失败 → 消费（避免重复投递）。
+        if (acknowledged && pendingModelNotice === notice) pendingModelNotice = undefined;
         if (!acknowledged && legacyIntent === intent) legacyIntent = undefined;
         log.error("session.send.failed", err);
         throw err;
@@ -672,6 +723,13 @@ export async function openRoleSession(
         // SDK 报错如实转达（错误原文进 error），不吞、不谎报已停；不销毁会话。
         return { ok: false, supported: true, error: errText(err) };
       }
+    },
+    // F-5-opt1：排入一行**模型可见注记**（下一次 send 的输入前缀；送达一次即消费）。
+    // 空串/非字符串忽略（不做一半的事）；语义与推荐文案见接口与 REBUILT_SESSION_WRITE_PERMITS_NOTICE。
+    queueModelNotice(text: string): void {
+      if (typeof text !== "string" || text.trim() === "") return;
+      pendingModelNotice = text;
+      log.record("session.notice.queued");
     },
     events(): AsyncIterable<OrchestrationEvent> {
       const stream = session.events();
@@ -789,6 +847,54 @@ function buildGate(
       skillRoot: project.skillRoot,
       projectRoot: project.projectRoot,
     });
+}
+
+/**
+ * **su 预授权写目录（客户裁定 2026-10-16）**——内置治理角色（su）会话的**初始 writeSet 恒含**的
+ * 「项目根相对、含子路径」目录树（两棵）。客户裁定原文：①「这个 su 可以写 docs/su 的目录，不需要
+ * 我审批」；② 追加「还有个契约目录也可以给他写。」（`docs/contracts/` = 跨角色契约落盘目录的全项目
+ * 约定；该约定本体落地时生效，本预授权先装好）。
+ *
+ * 语义与边界（钉死）：
+ * - **仅**内置治理角色（`kind === "built-in-governance"`——既有判据，同 suppressHandback/
+ *   dispatchTask 处）**仅**这两棵目录树；su 卡文本的配套修改由门禁引擎另行实施（不属本模块）。
+ * - 它是**初始集合的一部分**——不依赖确认发行器（`request_confirmation` 发行的是「**经确认发行**的
+ *   写权」，预授权不属此类）；每次开会话/会话重建都生效（本集合在会话初始化处的 gate 求值中计算，
+ *   随句柄生灭；桌面 O-1 重建路径按新开会话同口径获得。F-5-opt1 的重建提示说的是经确认发行的写权，
+ *   语义不受本机制影响、保持原样）。
+ * - 实现口径（F4 为**精确匹配**）：求值时把「目标路径本身」的项目根相对词法路径并入本次 writeSet
+ *   ——等价于该路径初始就在已发行集中。判定链其余环节（F6 接受门、F7 真实路径逃逸复核、边界条目
+ *   匹配、条件激活）**逐字不变**：不在边界内/未接受/逃逸的路径照拒，fail-closed 不放松。
+ * - 其余一切路径（`docs/` 其它子路径、`角色卡/`、`.ans/` …）照旧只认已发行集：未确认 = F4 拒。
+ * 背景/测试/回滚：`角色卡/编排/docs/fix/2026-10-16_fix_su-notes-preauth.md`。
+ */
+const SU_PREAUTHORIZED_WRITE_DIRS: readonly string[] = ["docs/su", "docs/contracts"];
+
+/**
+ * 目标路径落在预授权目录树内 → 返回其**项目根相对词法路径**；否则 `undefined`。
+ * 取值规则与 `resolveWrite` **同源**（绝对路径按项目根取相对、相对路径按项目根解释），且纯词法、
+ * 不触盘——真实路径逃逸（符号链接/junction）始终由 resolveWrite 的 F7 独立复核，本函数不放行任何
+ * 未经 F6/边界/条件判定的路径。`isUnderOrEqual` 按**段**比较（`docs/su2` 不被 `docs/su` 覆盖），
+ * 大小写口径沿用共享原语（Windows 不敏感）。空路径 / 取不到根内相对（含 skill 根目标）→ undefined。
+ */
+function suPreauthorizedRelOf(targetPath: string, projectRoot: string): string | undefined {
+  const raw = typeof targetPath === "string" ? targetPath.trim() : "";
+  if (raw === "") return undefined;
+  const rel = isAbsoluteAny(raw) ? absRel(normalizeLexical(raw), projectRoot) : normalizeLexical(raw);
+  if (rel === null || rel === "") return undefined;
+  return SU_PREAUTHORIZED_WRITE_DIRS.some((dir) => isUnderOrEqual(rel, dir)) ? rel : undefined;
+}
+
+/**
+ * su 会话 gate 求值入口：目标在预授权树内 ⇒ 把其项目根相对路径**并入本次 writeSet**（不经发行器）；
+ * 其余 ⇒ **原样返回 base**（逐字现状，零行为变化）。base 由调用方保证非 undefined（确认制动态集，
+ * 或静态 scope）；`scope === undefined` 的「不做任务收窄」会话**不经过本函数**——绝不因预授权凭空
+ * 造出 F4 收窄 scope（那会收窄而非放宽既有语义）。
+ */
+function scopeWithSuPreauthorization(base: TaskScope, targetPath: string, projectRoot: string): TaskScope {
+  const rel = suPreauthorizedRelOf(targetPath, projectRoot);
+  if (rel === undefined) return base;
+  return { writeSet: [...base.writeSet, rel], conditions: base.conditions };
 }
 
 /**

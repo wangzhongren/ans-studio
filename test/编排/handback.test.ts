@@ -362,6 +362,43 @@ test("openRoleSession（C-1）：治理角色 su 不注入 reportHandback（能�
   }
 });
 
+// —— F-3-d：截断事实随终态回交对 su 直读可见（仅 terminal-fallback 摘要附注） ——
+
+test("F-3-d：settle detail `truncation:length` → terminal-fallback 摘要附「（截断：stopReason=length）」；有报告/无截断字段不附", async () => {
+  const settledTruncated = {
+    kind: "settled",
+    summary: "会话结束",
+    detail: { turnId: "t1", outcome: "completed", truncation: "length" },
+  } as SessionEvent;
+  const settledPlain = { kind: "settled", summary: "会话结束" } as SessionEvent;
+
+  // ① 未交报告 + 截断 → 附注记（末位），供 su 直读。
+  async function* gen(a: SessionEvent): AsyncIterable<SessionEvent> {
+    yield { kind: "message", summary: "收尾轮被裁" } as SessionEvent;
+    yield a;
+  }
+  const out1: OrchestrationEvent[] = [];
+  for await (const ev of withHandback(gen(settledTruncated), { roleId: "X", taskId: "T-1" })) out1.push(ev);
+  const hb1 = (out1.find(isHandback) as HandbackEvent).handback;
+  assert.equal(hb1.origin, "terminal-fallback");
+  assert.match(hb1.summary, /（截断：stopReason=length）$/, "截断注记附在摘要末位");
+
+  // ② 有正式报告（模型自己写的权威摘要）→ 不代改。
+  const report: TaskReport = { status: "completed", summary: "报告：补发后已交报告" };
+  const out2: OrchestrationEvent[] = [];
+  for await (const ev of withHandback(gen(settledTruncated), { roleId: "X" }, { report: () => report })) out2.push(ev);
+  const hb2 = (out2.find(isHandback) as HandbackEvent).handback;
+  assert.equal(hb2.origin, "submitted-report");
+  assert.equal(hb2.summary, "报告：补发后已交报告", "submitted-report 摘要是权威值，不附注记");
+  assert.ok(!hb2.summary.includes("截断"));
+
+  // ③ 无 truncation 字段（旧适配器/未截断）→ 不附注记（追加字段、忽略安全）。
+  const out3: OrchestrationEvent[] = [];
+  for await (const ev of withHandback(gen(settledPlain), { roleId: "X" })) out3.push(ev);
+  const hb3 = (out3.find(isHandback) as HandbackEvent).handback;
+  assert.ok(!hb3.summary.includes("截断"), "无截断事实 → 无注记");
+});
+
 // —— E-1：投递文案（单一来源）与去重键 ——
 
 test("renderHandbackPrompt（E-1）：字段逐条 + 明示请验收；无任务号/无证据时如实呈现；不夹带权限语义", () => {

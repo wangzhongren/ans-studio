@@ -322,6 +322,12 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
   const operatorTimeoutMs = opts.operatorTimeoutMs ?? timeoutMs;
   const now = opts.now ?? (() => new Date());
 
+  // **F-6-2（2026-10-16 客户批准）：审计失败提示去重 + 如实话术**。同一 gate 实例内按 reason 去重——
+  // 首个完整打印一次；相同 reason 的重复只累计、不再逐条打印；reason 变化后再报一次；恢复落盘后
+  // 打印一行「已恢复落盘」（含本轮累计未落盘条数）。判定不受影响（「审计失败不翻转判定」语义不变）。
+  // （声明须在 `return` 之前——闭包在 createShellGate 返回后才执行，声明后置会落 TDZ。）
+  let auditFailure: { reason: string; total: number; suppressed: number } | undefined;
+
   // 规则集来源：包装为可 await 的加载器（加载失败由 decide 捕获 → 拒绝）。
   const loadRules = async (): Promise<ShellRules> =>
     typeof opts.rules === "function" ? await (opts.rules as () => ShellRules | Promise<ShellRules>)() : opts.rules;
@@ -560,10 +566,19 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
     }
 
     if (out === undefined || out === null || out.outcome === "unavailable") {
+      // **F-4-X1（2026-10-16 客户批准）**：不再固定「操作者通道不可用（无人值守？）」——**转达操作者通道
+      // 上报的真实 reason**（如「操作者确认超时（>Nms），拒绝执行（fail-closed）」与「本轮已结束、停止或
+      // 会话已重建，旧 shell 确认失效」可辨；桌面通道 M2 起在 reason 里分流「确认超时 / 轮次中止」）。
+      // 归因码保持稳定（仍落 `a-unavailable`；M-1 人话映射按码对号、不看文本猜）——fail-closed 结论
+      // 逐字不变（拒绝）。通道未回结果/未给原因时给如实的保守兜底句，不猜测「无人值守」。
+      const channelReason =
+        out !== undefined && out !== null && typeof out.reason === "string" && out.reason.trim() !== ""
+          ? out.reason
+          : "操作者通道不可用（未给出原因），拒绝（fail-closed）";
       return denyOutcome(
         escalateBranch(b.bBranch, BRANCH_A_UNAVAILABLE),
         `${b.bAttr} → operator:不可用`,
-        "操作者通道不可用（无人值守？），拒绝",
+        channelReason,
       );
     }
     if (out.outcome === "allow") {
@@ -613,6 +628,8 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
     return outcome.result;
   };
 
+  // **F-6-2（2026-10-16 客户批准）：审计失败提示去重 + 如实话术**（状态 `auditFailure` 声明在函数体前部，
+  // 见上——闭包在 `return` 之后才执行，状态必须提前声明）。判定不受影响（「审计失败不翻转判定」不变）。
   async function audit(req: ShellGateRequest, outcome: ReviewOutcome, at: Date): Promise<void> {
     const record: ShellAuditRecord = {
       timestamp: at.toISOString(),
@@ -628,7 +645,20 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
     };
     try {
       const res = await opts.audit.append(record);
-      if (!res.ok) process.stderr.write(`shell 闸审计未落盘：${res.reason ?? "未知原因"}\n`);
+      if (!res.ok) {
+        const reason = res.reason ?? "未知原因";
+        if (auditFailure !== undefined && auditFailure.reason === reason) {
+          auditFailure.total += 1;
+          auditFailure.suppressed += 1;
+        } else {
+          auditFailure = { reason, total: (auditFailure?.total ?? 0) + 1, suppressed: 0 };
+          process.stderr.write(`shell 闸审计未落盘：${reason}\n`);
+        }
+      } else if (auditFailure !== undefined) {
+        const total = auditFailure.total;
+        auditFailure = undefined;
+        process.stderr.write(`shell 闸审计已恢复落盘（此前未落盘 ${total} 条）\n`);
+      }
     } catch (err) {
       process.stderr.write(`shell 闸审计异常：${reasonOf(err)}\n`);
     }
@@ -673,6 +703,13 @@ export interface ShellGateBuildDeps {
   /** 覆盖审计 sink（测试用）；缺省写 `docs/audit/shell-gate.jsonl`。 */
   auditSink?: ShellAuditSink;
   /**
+   * **F-6-1 审计边界刷新闭包**（2026-10-16 客户批准）：缺省文件审计 sink 在首查被拒时调用它——
+   * **重读盘上最新接受证据**重新解析治理边界（装配方注入；`shell-arming.ts` 用共享载入器
+   * `loadEffectiveConfig` + 同一 `resolveGovernanceBoundary` 构造），并以新门禁**重试一次**
+   * （见 `shell-audit.ts::createFileAuditSink.refreshGate`）。**缺省不传 = 旧行为（无刷新，逐字不变）**。
+   */
+  auditBoundaryRefresh?: () => Promise<BoundarySection1>;
+  /**
    * **su 只读档**（见 `CreateShellGateOptions.readonlyOnly`）：`true` ⇒ 只映射 (c) 白名单，
    * `risky`/`review` 一律拒绝（`readonly-deny`），**(b)/(a) 即使注入了也永不调用**。
    * 缺省 `false` = 既有三层链行为逐字不变。
@@ -689,6 +726,15 @@ export function buildShellGate(deps: ShellGateBuildDeps): ShellGate {
         skillRoot: deps.skillRoot,
         projectRoot: deps.projectRoot,
       }),
+      // F-6-1：注入刷新闭包时，被拒路径重解析一次并以新门禁重试（缺省不传 = 旧行为逐字不变）。
+      ...(deps.auditBoundaryRefresh !== undefined
+        ? {
+            refreshGate: async () => {
+              const fresh = await deps.auditBoundaryRefresh!();
+              return buildShellAuditGate(fresh, { skillRoot: deps.skillRoot, projectRoot: deps.projectRoot });
+            },
+          }
+        : {}),
     });
   return createShellGate({
     projectRoot: deps.projectRoot,

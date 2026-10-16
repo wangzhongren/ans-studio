@@ -1014,7 +1014,8 @@
     var metadata = notes ? '<p class="projection-flags">' + esc(notes) + '</p>' : "";
     if (!display) return metadata + '<p class="muted">' + (activity.displayUnsupported ? "不支持此详情版本。" : "这条历史没有保存更多目标和错误详情。") + '</p>';
     var html = display.target ? displayField(display.target.kind === "command" ? "实际命令" : "目标文件", display.target.value) : '<p class="muted">目标未保存</p>';
-    html += displayField("错误", display.error) + displayField("结果", display.resultText);
+    // F-8-b（2026-10-16 批准）：非零退出中性类里 display.error 实为工具消息（投影回填），按「消息」如实标注——不叫「错误」。
+    html += displayField(activity.status === "exited-nonzero" ? "消息" : "错误", display.error) + displayField("结果", display.resultText);
     var process = display.process;
     if (process) {
       if (typeof process.exitCode === "number") html += '<p>退出码：' + esc(process.exitCode) + '</p>';
@@ -1038,7 +1039,9 @@
     var target = activity.fullTarget || stages.start && stages.start.fullTarget || "目标未保存";
     var timestamp = Rt.shortTime(activity.at);
     var label = all.map(function (phase) { return stages[phase].label; }).join(" → ");
-    var errorPreview = activity.display && activity.display.error ? reportText(activity.display.error).split(/\r?\n/)[0] : activity.errorCode || "";
+    // F-8-b（2026-10-16 批准）：非零退出中性类不摆红色错误预览——进程正常跑完，退出码已在状态标签如实给出；
+    // 其余类（失败/超时/拒绝）照旧显示首行原因/错误码。
+    var errorPreview = activity.status === "exited-nonzero" ? "" : activity.display && activity.display.error ? reportText(activity.display.error).split(/\r?\n/)[0] : activity.errorCode || "";
     record.el.innerHTML = '<details class="tool-call-record"' + (open ? ' open' : '') + '><summary><span class="tool-call-time" title="' + esc(activity.at || "时间未保存") + '">' + esc(timestamp) + '</span><strong>' + esc(activity.toolName) + '</strong><span class="tool-call-target">' + esc(target) + '</span><span class="tool-call-status">' + esc(label) + '</span>' + (errorPreview ? '<span class="tool-call-error">' + esc(errorPreview.length > 180 ? errorPreview.slice(0,180) + '…' : errorPreview) + '</span>' : '') + '</summary><div class="tool-call-details"></div></details>';
     var details = record.el.querySelector("details"), body = record.el.querySelector(".tool-call-details");
     function materialize() {

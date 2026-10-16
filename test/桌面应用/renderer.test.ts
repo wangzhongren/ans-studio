@@ -518,6 +518,14 @@ test("工具行瘦身（2026-10-12 客户裁定）：只显示状态与目标—
   assert.ok(index.indexOf('src="tool-rows.js"') > 0 && index.indexOf('src="tool-rows.js"') < index.indexOf('src="renderer.js"'), "tool-rows.js 应先于 renderer.js 加载");
 });
 
+// ————— F-8-b（2026-10-16 客户批准）：run_shell「进程跑完、退出码非零」中性类的渲染接线 —————
+
+test("F-8-b：非零退出中性类——红色错误预览让位、详情字段不假冒「错误」（判据单一来源在 tool-rows 结构化事实）", () => {
+  // 两处消费点都按 tool-rows 的 `status === "exited-nonzero"` 让位；渲染侧不自持第二份 exitCode 判定。
+  assert.ok(RENDERER.includes('activity.status === "exited-nonzero" ? "" : activity.display && activity.display.error'), "中性类不摆红色错误预览（退出码已在状态标签如实给出）");
+  assert.ok(RENDERER.includes('displayField(activity.status === "exited-nonzero" ? "消息" : "错误", display.error)'), "中性类的 display.error 按「消息」如实标注（其余类保持「错误」）");
+});
+
 test("H-1 附录：系统投递输入单独样式——分类器（两名渲染函数的前缀=单一来源）+ 手输防误伤 + 回放同类", async () => {
   const href = new URL("../../app/renderer/tool-rows.js", import.meta.url).href;
   await import(href);

@@ -18,6 +18,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { createHash } from "node:crypto";
 
 import type { ProjectConfig } from "../../src/model/role.ts";
 import type {
@@ -27,10 +28,21 @@ import type {
   WriteGate,
 } from "../../src/provider/pi/session.ts";
 import { openRoleSession, type AdapterCapabilities, type RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
-import { assembleProjectShellGate } from "../../src/pipeline/orchestration/shell-arming.ts";
+import { assembleProjectShellGate, assembleReadonlyShellGate } from "../../src/pipeline/orchestration/shell-arming.ts";
 import { createFakeRuntimeAdapter } from "../../src/provider/pi/session.ts";
 import { classifyShell, defaultShellRules } from "../../src/common/门禁引擎/classify-shell.ts";
-import type { ShellAuditRecord, ShellAuditSink } from "../../src/common/编排/shell-audit.ts";
+import { builtInBoundarySection } from "../../src/common/门禁引擎/boundary-core.ts";
+import { buildShellGate } from "../../src/common/编排/shell-gate.ts";
+import {
+  SHELL_AUDIT_REL_PATH,
+  SHELL_GATE_CONDITION,
+  type ShellAuditRecord,
+  type ShellAuditSink,
+} from "../../src/common/编排/shell-audit.ts";
+import {
+  DEFAULT_GOVERNANCE_BOUNDARY_REL,
+  renderGovernanceBoundaryDoc,
+} from "../../src/common/编排/finalize.ts";
 import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
 
 const RULES = defaultShellRules();
@@ -371,6 +383,130 @@ test("R-1 端到端：夹具模型经 shellVerdict 交回结构化结论 → 只
     const caps = reviewerCaps[reviewerCaps.length - 1];
     assert.equal(typeof caps?.shellVerdict, "function", "审读会话注入 shellVerdict（工具据此注册）");
     assert.equal(caps?.sessionDir, undefined, "审读会话不持久化（不恢复/不污染用户 su 会话）");
+  } finally {
+    cleanup(project);
+  }
+});
+
+// —————————————— F-6-1 事故回归 E2E（kanban-live 13:21:38 场景复刻；客户 2026-10-16 批准） ——————————————
+//
+// 事故时序：su 写完角色边界（hasRoles=true）之后、首次自动收尾（写 .ans + 治理边界文档 + pin）之前
+// 约 4 秒，「实现者」会话创建 ⇒ 快照 `governanceBoundary.path=""` ⇒ su 边界解析落**内置未接受** ⇒
+// 审计写被 F6 拒、且该快照在会话生命周期内无自愈通道（17 条命令的审计留痕缺口）。
+// 修复（F-6-1）：审计 sink 首查被拒时**重读盘上最新验收**（共享载入器 loadEffectiveConfig →
+// 同一 resolveGovernanceBoundary）并以新门禁重试一次 ⇒ 收尾落盘后的命令**自愈落盘**，无需等会话重建。
+
+/** 「创世过渡窗口」项目快照：角色边界已在盘上（hasRoles），但 `.ans` 尚未收尾 ⇒ gov.path=""。 */
+function makeTransitionProject(): ProjectConfig {
+  const project = makeTempProject();
+  return { ...project, governanceBoundary: { path: "", acceptance: { accepted: false, source: "" } } };
+}
+
+/** 复刻首次自动收尾的落盘形状：治理边界文档（**生产渲染器**）+ `.ans/project.json`（同算法 sha256 pin）。 */
+function writeFinalizedGovernance(root: string): void {
+  const govRel = DEFAULT_GOVERNANCE_BOUNDARY_REL;
+  const govAbs = path.join(root, govRel);
+  fs.mkdirSync(path.dirname(govAbs), { recursive: true });
+  fs.writeFileSync(govAbs, renderGovernanceBoundaryDoc(), "utf8");
+  const sha256 = createHash("sha256").update(fs.readFileSync(govAbs)).digest("hex");
+  const ansProject = {
+    projectRoot: root,
+    skillRoot: root,
+    roles: { X: { card: "角色卡/X/role-card.md", boundary: "角色卡/X/boundary.yaml" } },
+    governanceBoundary: {
+      path: govRel,
+      acceptance: { accepted: true, source: "test:f6-e2e-收尾", pin: [{ path: govRel, sha256 }] },
+    },
+  };
+  fs.mkdirSync(path.join(root, ".ans"), { recursive: true });
+  fs.writeFileSync(path.join(root, ".ans", "project.json"), JSON.stringify(ansProject, null, 2) + "\n", "utf8");
+}
+
+test("F-6-T6 事故回归 E2E：创世过渡窗口内的未接受快照，在收尾落盘后自愈（审计刷新重试）", async () => {
+  const project = makeTransitionProject();
+  const root = project.projectRoot;
+  try {
+    // ① 会话在过渡窗口内装配（gov.path="" ⇒ su 边界解析落内置未接受；无 genesis、无 parseError）→ 审核一条。
+    const gate = await assembleProjectShellGate({
+      project,
+      operatorChannel: () => ({ outcome: "deny", operatorId: "test" }),
+      classifyShell,
+      rules: RULES,
+      sessionDeps: { createAdapter: (g: WriteGate) => createFakeRuntimeAdapter({ gate: g, script: [] }) },
+    });
+    const r1 = await gate(req("ls -la", ["ls", "-la"]));
+    assert.equal(r1.allow, true, "判定照常（审计失败不翻转判定）");
+    const auditPath = path.join(root, SHELL_AUDIT_REL_PATH);
+    assert.equal(fs.existsSync(auditPath), false, "过渡窗口内：审计未落盘（无已接受证据，fail-closed 应有残留）");
+    assert.equal(fs.existsSync(path.join(root, "docs")), false, "零副作用（不建目录）");
+
+    // ② 首次自动收尾落盘（13:21:42 复刻）。
+    writeFinalizedGovernance(root);
+
+    // ③ 收尾后再审核一条 → 首查被拒 → 刷新边界快照（重读盘上 .ans）→ 重试落盘（F-6-1 生效）。
+    const r2 = await gate(req("ls", ["ls"]));
+    assert.equal(r2.allow, true);
+    assert.ok(fs.existsSync(auditPath), "收尾后：审计自愈落盘（无需等会话重建）");
+    const lines = fs.readFileSync(auditPath, "utf8").trim().split("\n");
+    assert.equal(lines.length, 1, "恰一条（第一条物理不可恢复——失败期间的命令不补记）");
+    const rec = JSON.parse(lines[0]) as ShellAuditRecord;
+    assert.equal(rec.toolCallId, "call-1");
+    assert.equal(rec.branch, "c-allow");
+    assert.ok(rec.conditions.includes(SHELL_GATE_CONDITION));
+    assert.equal(rec.execution, "未执行");
+
+    // ④ 恢复后零额外开销：第三条直走新门禁（不再刷新），连续追加。
+    const r3 = await gate(req("pwd", ["pwd"]));
+    assert.equal(r3.allow, true);
+    assert.equal(fs.readFileSync(auditPath, "utf8").trim().split("\n").length, 2, "追加式照常");
+  } finally {
+    cleanup(project);
+  }
+});
+
+test("F-6-T6b（对照组·旧行为）：不注入刷新闭包时，收尾落盘后第二条仍不落盘", async () => {
+  const project = makeTransitionProject();
+  const root = project.projectRoot;
+  try {
+    // 无 `auditBoundaryRefresh` ⇒ 与修复前逐字相同的缺省路径（快照 = 装配当时的内置未接受边界）。
+    const gate = buildShellGate({
+      classifyShell,
+      rules: RULES,
+      projectRoot: root,
+      skillRoot: root,
+      pmBoundary: builtInBoundarySection(),
+      operatorChannel: () => ({ outcome: "deny", operatorId: "test" }),
+    });
+    await gate(req("ls -la", ["ls", "-la"])); // 过渡窗口内
+    writeFinalizedGovernance(root); // 收尾落盘（盘上证据已接受）
+    await gate(req("ls", ["ls"])); // 收尾后
+    assert.equal(
+      fs.existsSync(path.join(root, SHELL_AUDIT_REL_PATH)),
+      false,
+      "旧行为（无刷新通道）：旧快照继续被 F6 拒、审计仍不落盘——对照组条件成立",
+    );
+    assert.equal(fs.existsSync(path.join(root, "docs")), false, "零副作用");
+  } finally {
+    cleanup(project);
+  }
+});
+
+test("F-6-T7（su 只读档同接线）：未接受快照在收尾落盘后同样自愈", async () => {
+  const project = makeTransitionProject();
+  const root = project.projectRoot;
+  try {
+    const gate = await assembleReadonlyShellGate({ project, classifyShell, rules: RULES });
+    const r1 = await gate(req("ls -la", ["ls", "-la"]));
+    assert.equal(r1.allow, true, "只读白名单照常放行（判定不因审计而变）");
+    const auditPath = path.join(root, SHELL_AUDIT_REL_PATH);
+    assert.equal(fs.existsSync(auditPath), false, "过渡窗口内：审计未落盘");
+
+    writeFinalizedGovernance(root);
+
+    const r2 = await gate(req("ls -la", ["ls", "-la"]));
+    assert.equal(r2.allow, true);
+    assert.ok(fs.existsSync(auditPath), "只读档审计同接线自愈落盘");
+    assert.equal(fs.readFileSync(auditPath, "utf8").trim().split("\n").length, 1);
   } finally {
     cleanup(project);
   }

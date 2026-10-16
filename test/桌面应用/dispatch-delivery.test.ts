@@ -6,6 +6,9 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 
 import { SessionManager } from "../../app/desktop/session.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
@@ -14,6 +17,7 @@ import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
 import type { DispatchTaskFn, DispatchReceipt } from "../../src/provider/pi/session.ts";
 import type { RoleSessionHandle, RoleSessionSendOptions } from "../../src/pipeline/orchestration/run-role.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
+import { configureDiagnostics, flushDiagnostics, disposeDiagnostics } from "../../src/common/shared/diagnostics.ts";
 
 const tick = (ms = 60) => new Promise((r) => setTimeout(r, ms));
 
@@ -64,9 +68,14 @@ interface Harness {
   openCalls: string[];
   /** 打开某角色时拿到的派发能力（仅 su 会话应注入）——测试直接调用以驱动路由。 */
   dispatchOf: (roleId: string) => DispatchTaskFn | undefined;
+  /** **F-2 夹具（2026-10-16）**：挂起某角色的**下一次** send——返回 release；在 release 前该 send 的
+   *  promise 不 resolve（模拟真实 Pi「prompt 随整轮 resolve」——立即 resolve 的旧桩天然掩盖 F-2 缺陷）。 */
+  hangNext: (roleId: string) => () => void;
+  /** 各角色 send 的**并发峰值**（对同会话并发 send 的钉子：恒应 ≤1）。 */
+  maxConcurrent: Record<string, number>;
 }
 
-function makeHarness(opts: { failSends?: Record<string, number> } = {}): Harness {
+function makeHarness(opts: { failSends?: Record<string, number>; openDelayMs?: number } = {}): Harness {
   const l = listing();
   const streams: Record<string, OrchestrationEvent[]> = { su: [], A: [], B: [] };
   const sent: Record<string, string[]> = { su: [], A: [], B: [] };
@@ -76,17 +85,36 @@ function makeHarness(opts: { failSends?: Record<string, number> } = {}): Harness
   const openInputs: Record<string, { dispatchTask?: DispatchTaskFn }> = {};
   const stopped: Record<string, boolean> = {};
   const failLeft: Record<string, number> = { ...(opts.failSends ?? {}) };
+  const nextGate: Record<string, Promise<void> | undefined> = {};
+  const activeSends: Record<string, number> = {};
+  const maxConcurrent: Record<string, number> = {};
+  const hangNext = (roleId: string): (() => void) => {
+    let release!: () => void;
+    nextGate[roleId] = new Promise<void>((resolve) => { release = resolve; });
+    return release;
+  };
 
   const makeHandle = (roleId: string): RoleSessionHandle => {
     let i = 0;
     return {
       async send(text: string, options?: RoleSessionSendOptions): Promise<void> {
-        (sendOptions[roleId] ??= []).push(options ?? {});
-        if ((failLeft[roleId] ?? 0) > 0) {
-          failLeft[roleId] = (failLeft[roleId] ?? 0) - 1;
-          throw new Error(`演示：${roleId} 投递通道瞬时失败`);
+        activeSends[roleId] = (activeSends[roleId] ?? 0) + 1;
+        maxConcurrent[roleId] = Math.max(maxConcurrent[roleId] ?? 0, activeSends[roleId]);
+        try {
+          (sendOptions[roleId] ??= []).push(options ?? {});
+          const gate = nextGate[roleId];
+          if (gate) {
+            nextGate[roleId] = undefined;
+            await gate; // F-2 夹具：可控挂起——release 前 promise 不 resolve（模拟整轮在跑）
+          }
+          if ((failLeft[roleId] ?? 0) > 0) {
+            failLeft[roleId] = (failLeft[roleId] ?? 0) - 1;
+            throw new Error(`演示：${roleId} 投递通道瞬时失败`);
+          }
+          (sent[roleId] = sent[roleId] || []).push(text);
+        } finally {
+          activeSends[roleId] -= 1;
         }
-        (sent[roleId] = sent[roleId] || []).push(text);
       },
       events(): AsyncIterable<OrchestrationEvent> {
         return {
@@ -115,6 +143,8 @@ function makeHarness(opts: { failSends?: Record<string, number> } = {}): Harness
     openRoleSession: async (input) => {
       openCalls.push(input.roleId);
       openInputs[input.roleId] = { dispatchTask: (input as { dispatchTask?: DispatchTaskFn }).dispatchTask };
+      // F-2-opt2 夹具：可选的开会话延迟——让并发 open 真正重叠（互斥未落地时必现双开）。
+      if ((opts.openDelayMs ?? 0) > 0) await new Promise((r) => setTimeout(r, opts.openDelayMs));
       return makeHandle(input.roleId);
     },
     createPiAdapterFactory: () => {
@@ -127,7 +157,7 @@ function makeHarness(opts: { failSends?: Record<string, number> } = {}): Harness
     getListing: (root) => (root === "/proj" ? l : undefined),
     emitEvent: (env) => envelopes.push(env),
   });
-  return { mgr, streams, sent, sendOptions, envelopes, openCalls, dispatchOf: (roleId) => openInputs[roleId]?.dispatchTask };
+  return { mgr, streams, sent, sendOptions, envelopes, openCalls, dispatchOf: (roleId) => openInputs[roleId]?.dispatchTask, hangNext, maxConcurrent };
 }
 
 test("H-1 路由：su 派发 → 目标未开**自动开**并收到派发输入（模板文案）；su 与目标两边都有系统行", async () => {
@@ -321,4 +351,128 @@ test('delivery notes are typed system messages, never ghost tools or extra promp
   for(const note of notes){assert.equal(note.projectRoot,'/proj');assert.equal(note.runtime,'demo');assert.equal(Object.hasOwn(note.event,'turnId'),false);assert.deepEqual((note.event as {detail:unknown}).detail,{source:'delivery-note'});}
   const actual=worker.find(e=>e.event.kind==='tool_call')!.event as {turnId?:string;detail?:{toolCallId?:string;phase?:string}};assert.equal(actual.turnId,'actual-turn');assert.equal(actual.detail?.toolCallId,'actual-call');assert.equal(actual.detail?.phase,'start');
  }finally{await h.mgr.stop();}
+});
+
+// ————— F-2（2026-10-16 客户批准）：投递链持有收窄到「认领段」—————
+// 真机实测：一条投递链被持有到目标**整轮**结束（16 分 55 秒），同项目其他角色的投递/回交/客户消息全被迫
+// 串行等待。本组用例用「可控挂起的 send」（release 前 promise 不 resolve——模拟真实 Pi prompt 随整轮 resolve）
+// 复现：旧实现在挂起期间**跨角色**投递必被压住；修复后投递开跑即释放链。
+
+test("F-2-T1 长轮不阻塞跨角色：A 的投递轮挂起期间，su 派发 B ⇒ **立即**送达（不待 A 轮结束）；放行后两边各恰一次", async () => {
+  const h = makeHarness();
+  await h.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
+  await tick(30);
+  const dispatch = h.dispatchOf("su")!;
+  const releaseA = h.hangNext("A");
+  const r1 = (await dispatch({ roleId: "A", task: "长活" })) as DispatchReceipt;
+  assert.equal(r1.ok, true);
+  await tick(100); // A 自动开、认领、send 已发起（挂起中）
+  assert.ok(h.openCalls.includes("A"), "A 会话被自动开启");
+  assert.equal(h.maxConcurrent.A, 1, "A 的 send 在飞（挂起=整轮在跑）");
+  assert.deepEqual(h.sent.A, [], "挂起期间 A 的投递尚未结算（send promise 未 resolve）");
+
+  const r2 = (await dispatch({ roleId: "B", task: "另一条" })) as DispatchReceipt;
+  assert.equal(r2.ok, true);
+  await tick(100);
+  assert.deepEqual(h.sent.B, [dispatchTemplate("su", "另一条")], "**B 立即收到**——不被 A 的长轮持有（旧实现：链被持有贯穿 A 整轮，B 只能干等）");
+  assert.deepEqual(h.sent.A, [], "此时 A 仍在挂起（对照面：不是靠 A 结束才送达 B）");
+
+  releaseA();
+  await tick(100);
+  assert.deepEqual(h.sent.A, [dispatchTemplate("su", "长活")], "放行后 A 的投递结算（恰一次）");
+  assert.deepEqual(h.sent.B, [dispatchTemplate("su", "另一条")], "B 无重复投递");
+  assert.equal(h.maxConcurrent.A, 1, "对 A 会话无并发 send");
+  assert.equal(h.maxConcurrent.B, 1, "对 B 会话无并发 send");
+  await h.mgr.stop(null);
+});
+
+test("F-2-T2 同目标仍严格排队：A 挂起期间再派 A ⇒ 排队（绝不并发 send）；放行 + settled 后按序投递", async () => {
+  const h = makeHarness();
+  await h.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
+  await tick(30);
+  const dispatch = h.dispatchOf("su")!;
+  const releaseA = h.hangNext("A");
+  await dispatch({ roleId: "A", task: "第一件" });
+  await tick(100);
+  assert.deepEqual(h.sent.A, [], "A 认领并挂起中");
+  const r2 = (await dispatch({ roleId: "A", task: "第二件" })) as DispatchReceipt;
+  assert.equal(r2.ok, true);
+  await tick(120);
+  assert.deepEqual(h.sent.A, [], "A 忙（send 未结）：第二件**排队**，不得并发投递");
+  assert.equal(h.maxConcurrent.A, 1, "同会话并发 send 恒 ≤1");
+
+  releaseA();
+  await tick(80);
+  assert.deepEqual(h.sent.A, [dispatchTemplate("su", "第一件")], "第一件送达");
+  h.streams.A.push({ kind: "settled", summary: "一轮结束" });
+  await tick(200);
+  assert.deepEqual(
+    h.sent.A,
+    [dispatchTemplate("su", "第一件"), dispatchTemplate("su", "第二件")],
+    "settled 后按到达序放行第二件（链释放后行为逐字保真）"
+  );
+  assert.equal(h.maxConcurrent.A, 1, "全程对同会话无并发 send");
+  await h.mgr.stop(null);
+});
+
+test("F-2-opt2 openInternal 按会话键互斥：并发两次 open 同一角色 ⇒ 恰一次建会话（第二次续接，不双开）；用户 open × 投递自动开同键同样恰一次", async () => {
+  // ① 两次用户 open 并发：旧实现双方并发穿过「已有会话?」检查后各自建会话（先建者被覆盖——句柄泄漏）。
+  const h = makeHarness({ openDelayMs: 30 });
+  const [r1, r2] = await Promise.all([
+    h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" }),
+    h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" }),
+  ]);
+  assert.equal(r1.ok && r2.ok, true);
+  assert.equal(h.openCalls.filter((r) => r === "A").length, 1, "**恰一次**建会话（互斥闭合双开窗口）");
+  assert.equal(r1.resumed, false, "先到者新建");
+  assert.equal(r2.resumed, true, "后到者按序等待后**续接**同一会话（不双开、不覆盖）");
+  assert.match(r2.note ?? "", /续接/, "续接说明如实");
+  await h.mgr.stop(null);
+
+  // ② 用户 open × 投递机自动开（§三论证的既有窗口①）：两者并发也不得双开。
+  const h2 = makeHarness({ openDelayMs: 30 });
+  await h2.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
+  await tick(30);
+  const dispatch = h2.dispatchOf("su")!;
+  const userOpen = h2.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" }); // 不 await：与投递自动开并发
+  const receipt = (await dispatch({ roleId: "A", task: "触发自动开" })) as DispatchReceipt;
+  assert.equal(receipt.ok, true);
+  assert.equal((await userOpen).ok, true);
+  await tick(200);
+  assert.equal(h2.openCalls.filter((x) => x === "A").length, 1, "用户 open 与投递自动开同键：**恰一次**建会话");
+  assert.deepEqual(h2.sent.A, [dispatchTemplate("su", "触发自动开")], "派发照常送达一次（互斥不丢投递）");
+  await h2.mgr.stop(null);
+});
+
+test("F-2-opt3 认领段起止诊断：delivery.claim.start/end 与 delivery.start/end 同场，顺序如实（claim.start < delivery.start < claim.end < delivery.end）", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "ans-f2-diagnostics-"));
+  configureDiagnostics({ directory: dir });
+  const h = makeHarness();
+  try {
+    await h.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
+    await tick(30);
+    const dispatch = h.dispatchOf("su")!;
+    await dispatch({ roleId: "A", task: "诊断活" });
+    await tick(200);
+    await flushDiagnostics();
+    const files = await fs.readdir(dir);
+    const records = (await Promise.all(files.map((f) => fs.readFile(path.join(dir, f), "utf8")))).join("").trim().split("\n").map((line) => JSON.parse(line) as { event: string; state?: string; queueDepth?: number; count?: number; ok?: boolean });
+    const at = (event: string) => records.findIndex((r) => r.event === event);
+    const start = records[at("delivery.claim.start")];
+    const end = records[at("delivery.claim.end")];
+    assert.ok(start, "认领段开始有诊断（delivery.claim.start）");
+    assert.equal(start?.state, "dispatch", "认领条目类型如实");
+    assert.equal(start?.queueDepth, 1, "认领时的队列深度如实");
+    assert.ok(end, "认领段结束有诊断（delivery.claim.end）");
+    assert.equal(end?.state, "dispatch");
+    assert.equal(end?.count, 1, "合批计数如实");
+    assert.ok(
+      at("delivery.claim.start") < at("delivery.start") && at("delivery.start") < at("delivery.claim.end") && at("delivery.claim.end") < at("delivery.end"),
+      "顺序如实：claim.start < delivery.start < claim.end < delivery.end（下一轮真机可据 claim 跨度区分「认领耗时」vs「轮次时长」）"
+    );
+  } finally {
+    await h.mgr.stop(null);
+    await disposeDiagnostics();
+    await fs.rm(dir, { recursive: true, force: true });
+  }
 });

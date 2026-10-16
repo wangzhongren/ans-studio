@@ -71,3 +71,41 @@ test('a source truncation flag alone is preserved without falsely attributing it
  const event=createToolDisplayContext().projectToolEvent(source({result:{ok:true,message:'short',execution:{stdout:'captured prefix',stdoutTruncated:true}}}));
  assert.equal(detail(event).display?.process?.stdout?.truncated,true);assert.equal(detail(event).display?.omissions.includes('budget'),false);
 });
+
+test('F-8-a handler-result: process finished with nonzero exit code reads as completed-with-exit-code while ok/status/kind/errorCode stay unchanged',()=>{
+  const event=createToolDisplayContext().projectToolEvent(source({result:{ok:false,message:'run_shell 已执行：grep -rn "http" src/public（exit 1）',execution:{exitCode:1,stdout:'',stderr:''}},error:{code:'TOOL_FAILED'}}));
+  assert.match(event.summary,/已执行完成（退出码 1）/);
+  assert.ok(!event.summary.includes('run_shell 执行失败'));
+  assert.equal(event.kind,'denied');assert.equal(detail(event).phase,'result');
+  assert.equal(detail(event).ok,false);assert.equal(detail(event).status,'failed');assert.equal(detail(event).errorCode,'TOOL_FAILED');
+  assert.equal(detail(event).display?.process?.exitCode,1);
+  // 消息文本（tools.ts 的「run_shell 已执行：…（exit N）」）原样回填——桌面侧既有正则依赖它，不改。
+  assert.match(detail(event).display?.resultText?.text ?? '',/^run_shell 已执行：[\s\S]*（exit 1）/);
+});
+test('F-8-a native-result shape: same nonzero-exit classification when outcome facts come from the native result',()=>{
+  const event=createToolDisplayContext().projectToolEvent(source({result:{ok:false,message:'run_shell 已执行：node -v（exit 1）\nstdout:\nstderr:',execution:{exitCode:1}},native:{isError:true,content:[{type:'text',text:'run_shell 已执行：node -v（exit 1）'}]}}));
+  assert.match(event.summary,/已执行完成（退出码 1）/);assert.equal(event.kind,'denied');assert.equal(detail(event).ok,false);
+  assert.equal(detail(event).display?.process?.exitCode,1);
+});
+test('F-1 timeout projection: timedOut wording is distinct and display.process.timedOut is exposed for structured consumers',()=>{
+  const event=createToolDisplayContext().projectToolEvent(source({result:{ok:false,message:'run_shell 超时已终止（600000 ms）：命令超过本次执行时限，已被终止。\nstdout:\npartial',execution:{timedOut:true,timeoutMs:600000,signal:'SIGTERM',stdout:'partial',stderr:''}}}));
+  assert.match(event.summary,/超时终止/);assert.ok(!event.summary.includes('执行失败'));
+  assert.equal(detail(event).display?.process?.timedOut,true);
+  assert.equal(detail(event).display?.process?.signal,'SIGTERM');
+  assert.equal(detail(event).display?.process?.exitCode,undefined);
+});
+test('F-8-a guard: spawn failure (execution.error) keeps the honest 执行失败 wording',()=>{
+  const event=createToolDisplayContext().projectToolEvent(source({result:{ok:false,message:'run_shell 执行失败（未能启动或运行）：spawn ENOENT',execution:{error:'spawn ENOENT'}}}));
+  assert.match(event.summary,/执行失败/);assert.ok(!event.summary.includes('已执行完成'));
+  assert.equal(detail(event).display?.process?.exitCode,undefined);assert.equal(detail(event).display?.process?.timedOut,undefined);
+});
+test('F-8-a re-projection keeps exitCode and timedOut through the persisted-event path',()=>{
+  const c=createToolDisplayContext();
+  const first=c.projectToolEvent(source({result:{ok:false,message:'run_shell 已执行：x（exit 7）',execution:{exitCode:7}}}));
+  const again=c.projectToolEvent({origin:'projected-event',event:first});
+  assert.equal(detail(again).display?.process?.exitCode,7);
+  const timed=c.projectToolEvent(source({result:{ok:false,message:'run_shell 超时已终止（300 ms）',execution:{timedOut:true,timeoutMs:300,signal:'SIGTERM'}}}));
+  const timedAgain=c.projectToolEvent({origin:'projected-event',event:timed});
+  assert.equal(detail(timedAgain).display?.process?.timedOut,true);
+  assert.equal(detail(timedAgain).display?.process?.signal,'SIGTERM');
+});

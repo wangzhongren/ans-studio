@@ -38,6 +38,11 @@ import {
 } from "../../common/编排/shell-gate.ts";
 import type { ShellAuditSink } from "../../common/编排/shell-audit.ts";
 import { createPmReviewer, type OpenSessionFn } from "./pm-reviewer.ts";
+// F-6-1：审计边界刷新用**共享载入器**（pm 主属的 `src/common/shared/config-loader.ts`）——只读导入，
+// 工程法案 §一.5 的消费方名单已含编排（同源先例：`src/common/编排/finalize.ts` 亦从此导入）。
+// 刷新的语义 = **重读盘上 `.ans/project.json` 的最新验收**（不是会话快照），再经下方同一
+// `resolveGovernanceBoundary` 重新解析——复用既有解析，不造第二份。
+import { loadEffectiveConfig } from "../../common/shared/config-loader.ts";
 // 仅类型（`import type` 运行期擦除）：能力面形状的单一来源在 `run-role.ts`（run-role → 本文件为值导入，
 // 本文件 → run-role 仅为类型——无运行期循环）。
 import type { AdapterCapabilities } from "./run-role.ts";
@@ -110,6 +115,21 @@ export async function assembleProjectShellGate(opts: AssembleShellGateOptions): 
         })
       : undefined;
 
+  // **F-6-1 审计边界刷新闭包**（客户 2026-10-16 批准）：审计写首查被拒时，重读盘上最新 `.ans` 验收
+  // （共享载入器只读导入；无 `.ans` → 回退本会话快照）→ 对 loaded.project **复用同一个**
+  // `resolveGovernanceBoundary`（含 `roleIdOverride`）→ 返回重解析后的边界，供 sink 以新门禁重试一次。
+  // 覆盖「会话在创世过渡窗口内创建、持有未接受快照」的留痕缺口（kanban-live F-6：收尾落盘后旧快照
+  // 无自愈通道）。安全语义不变：重试仍唯一经 `resolveWrite`（含 F6/pin 全链），失败即维持拒绝。
+  const refreshAuditBoundary = async (): Promise<BoundarySection1> => {
+    const loaded = await loadEffectiveConfig({
+      projectRoot: opts.project.projectRoot,
+      skillRoot: opts.project.skillRoot,
+      fallback: opts.project,
+    });
+    const { boundary } = await resolveGovernanceBoundary(loaded.project, opts.pmRoleId);
+    return boundary;
+  };
+
   return buildShellGate({
     ...(opts.classifyShell !== undefined ? { classifyShell: opts.classifyShell } : {}),
     // (c) 规则集未注入 → 加载器抛错 → createShellGate 判 `ruleset-load-failed` → 一律拒绝（fail-closed）。
@@ -127,6 +147,7 @@ export async function assembleProjectShellGate(opts: AssembleShellGateOptions): 
     projectRoot: opts.project.projectRoot,
     skillRoot: opts.project.skillRoot,
     pmBoundary: govBoundary,
+    auditBoundaryRefresh: refreshAuditBoundary,
     ...(opts.now !== undefined ? { now: opts.now } : {}),
     ...(opts.env !== undefined ? { env: opts.env } : {}),
     ...(opts.auditSink !== undefined ? { auditSink: opts.auditSink } : {}),
@@ -172,6 +193,20 @@ export async function assembleReadonlyShellGate(opts: AssembleReadonlyShellGateO
   // 审计边界 = 内置治理角色边界（枚举 builtIn → resolveRole；与三层链共用同一 helper，不造第二份解析）。
   const { boundary: govBoundary } = await resolveGovernanceBoundary(opts.project);
 
+  // **F-6-1 审计边界刷新闭包**（只读档同接线）：语义与三层链装配完全一致（重读盘上最新 `.ans` 验收 →
+  // `loaded.project` 经同一 `resolveGovernanceBoundary` 重解析；无 `.ans` → 回退快照）。只读档无
+  // `pmRoleId` 覆盖，故不传 roleIdOverride（与上方初次解析同口径）。**不接 (b)/(a) 的语义不变**——
+  // 刷新只服务审计通道，绝不放宽任何命令判定。
+  const refreshAuditBoundary = async (): Promise<BoundarySection1> => {
+    const loaded = await loadEffectiveConfig({
+      projectRoot: opts.project.projectRoot,
+      skillRoot: opts.project.skillRoot,
+      fallback: opts.project,
+    });
+    const { boundary } = await resolveGovernanceBoundary(loaded.project);
+    return boundary;
+  };
+
   return buildShellGate({
     ...(opts.classifyShell !== undefined ? { classifyShell: opts.classifyShell } : {}),
     // (c) 规则集未注入 → 加载器抛错 → createShellGate 判 `ruleset-load-failed` → 一律拒绝（fail-closed）。
@@ -186,6 +221,7 @@ export async function assembleReadonlyShellGate(opts: AssembleReadonlyShellGateO
     projectRoot: opts.project.projectRoot,
     skillRoot: opts.project.skillRoot,
     pmBoundary: govBoundary,
+    auditBoundaryRefresh: refreshAuditBoundary,
     ...(opts.now !== undefined ? { now: opts.now } : {}),
     ...(opts.env !== undefined ? { env: opts.env } : {}),
     ...(opts.auditSink !== undefined ? { auditSink: opts.auditSink } : {}),

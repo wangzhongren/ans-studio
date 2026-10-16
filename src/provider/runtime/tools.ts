@@ -29,7 +29,9 @@ import { describeTool } from "./schema.ts";
 import { formatDenialMessage } from "../../common/runtime-core/format-denial.ts";
 import {
   CUSTOMER_INPUT_TIMEOUT_ENV,
+  DEFAULT_SHELL_EXEC_TIMEOUT_MS,
   DEFAULT_SHELL_REVIEW_TIMEOUT_MS,
+  SHELL_EXEC_TIMEOUT_ENV,
   SHELL_REVIEW_TIMEOUT_ENV,
   raceAbort,
   readOptionalTimeoutMs,
@@ -296,17 +298,37 @@ function makeReadTool(readRoot: string): ExecutableTool {
 const MAX_SHELL_OUTPUT_BYTES = 1_048_576;
 
 /**
- * 把命令串拆成 argv（best-effort）。
+ * 把命令串拆成 argv 与「未加引号片段」（best-effort，口径**唯一**）。
  *
- * **这是信息性拆分**：仅供 ShellGate 参考（设计 §7 的 `classifyShell(argv)`）；**执行层不经 shell**
- * （见 runShell 的 `shell: false`），故即便拆分与真实语义有偏差，也不会造成 shell 元字符注入——
- * `echo x > f`、`$(...)`、管道等在此只是**普通参数**，没有 shell 去解释它们。
+ * **这是信息性拆分**：`argv` 仅供 ShellGate 参考（设计 §7 的 `classifyShell(argv)`）与执行；
+ * **执行层不经 shell**（见 runShell 的 `shell: false`），故即便拆分与真实语义有偏差，也不会造成
+ * shell 元字符注入——`echo x > f`、`$(...)`、管道等在此只是**普通参数**，没有 shell 去解释它们。
  * 拆分规则：按空白切分，单/双引号内不切分（引号本身移除）；不做变量展开、不做转义解释。
+ *
+ * `unquoted[i]` = argv[i] 中出现在**引号之外**的字符按序拼接——只服务于 F-7 执行层守卫的
+ * 「独立操作符 token」判定（引号内内容永不在其中 ⇒ 引号包裹的 `\|`、`|` 等字面量不被误杀）。
+ * 判定与执行**同源**：两者都来自本次拆分，不会各算各的。
  */
-function splitCommand(command: string): string[] {
-  const tokens: string[] = [];
+interface CommandTokenization {
+  /** 执行用 argv（与历史 splitCommand 的输出逐字一致）。 */
+  argv: string[];
+  /** argv[i] 的「未加引号片段」（引号内与引号本身不计）。 */
+  unquoted: string[];
+}
+
+function splitCommand(command: string): CommandTokenization {
+  const argv: string[] = [];
+  const unquoted: string[] = [];
   let cur: string | null = null;
+  let raw: string | null = null;
   let quote: string | null = null;
+  const push = (): void => {
+    if (cur === null) return;
+    argv.push(cur);
+    unquoted.push(raw ?? "");
+    cur = null;
+    raw = null;
+  };
   for (const ch of command) {
     if (quote !== null) {
       if (ch === quote) quote = null;
@@ -315,16 +337,96 @@ function splitCommand(command: string): string[] {
       quote = ch;
       cur = cur ?? "";
     } else if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") {
-      if (cur !== null) {
-        tokens.push(cur);
-        cur = null;
-      }
+      push();
     } else {
       cur = (cur ?? "") + ch;
+      raw = (raw ?? "") + ch;
     }
   }
-  if (cur !== null) tokens.push(cur);
-  return tokens;
+  push();
+  return { argv, unquoted };
+}
+
+// —————————————— F-7：执行层 shell 语法 UX 守卫（不触碰门禁引擎的 classify-shell 立场） ——————————————
+//
+// 背景（kanban-live 真机轮）：命令串→argv 在本文件唯一发生，`find . | head -50` 的 `|` 会变成
+// 普通参数喂给 find，报出误导性的 `unknown primary or operator`。门禁侧（门禁引擎
+// classify-shell.ts）明确设计为 argv-noshell 不扫元字符（避免假安全感与误杀正常参数）——
+// 本守卫**不是**门禁判定，而是 spawn 之前的**执行层 UX 兜底**：仅当 token 的**未加引号片段**
+// 以「独立操作符」或「变量展开/命令替换」形态出现时，**不调 gate、不 spawn**，直接以明确文案拒绝。
+// 口径与 splitCommand 同源；引号内内容永不明中；反斜杠前导的操作符字符视为字面量（与
+// `grep a\|b` 当前实际可用行为一致——BRE 里 `\|` 是 alternation，不能被误杀）。
+
+/** 「必需级」独立操作符 token：未加引号片段恰为其中之一 → 拒绝（F-7 本体）。 */
+const SHELL_OPERATOR_TOKENS: ReadonlySet<string> = new Set([
+  "|", "||", "&&", "&", ";", ">", ">>", "<", "<<", "2>", "2>>", "2>&1", "&>", "&>>", "1>", "1>>", ">&",
+]);
+
+interface ShellGuardHit {
+  /** 命中的 argv token 原文（如实回显给模型）。 */
+  token: string;
+  /** operator＝独立操作符/紧贴重定向（F-7 本体）；embedded＝内嵌操作符（opt1）；expansion＝变量展开（opt2）。 */
+  kind: "operator" | "embedded" | "expansion";
+}
+
+/** fragment[i] 是否被反斜杠前导（视作字面量，不判）。 */
+function isBackslashEscaped(fragment: string, index: number): boolean {
+  return index > 0 && fragment[index - 1] === "\\";
+}
+
+/** 「可选 & + 可选数字 + 重定向符号」开头且紧跟目标（紧贴形态：>out.txt、>>log、2>err.log、&>log、<in.txt）。 */
+function startsWithAttachedRedirection(fragment: string): boolean {
+  // 反斜杠前导（如 `\>x`）首字符即不匹配本形态，天然按字面量放行；`>` 等裸符号由 SHELL_OPERATOR_TOKENS 兜住。
+  return /^&?[0-9]?(?:>>?|<<?)./.test(fragment);
+}
+
+/** opt1：未加引号片段**内嵌**未转义的 `|`/`;`/反引号，或**结尾**未转义 `&`（词中 `&` 如 URL 查询串不判）。 */
+function hasEmbeddedOperator(fragment: string): boolean {
+  for (let i = 0; i < fragment.length; i++) {
+    const ch = fragment[i];
+    if ((ch === "|" || ch === ";" || ch === "`") && !isBackslashEscaped(fragment, i)) return true;
+  }
+  const last = fragment.length - 1;
+  return last >= 0 && fragment[last] === "&" && !isBackslashEscaped(fragment, last);
+}
+
+/** opt2：未加引号片段含未转义的 `$(`、`${`、反引号、或 `$NAME` 词法（变量展开/命令替换）。 */
+function hasExpansionSyntax(fragment: string): boolean {
+  for (let i = 0; i < fragment.length; i++) {
+    const ch = fragment[i];
+    if (ch === "`" && !isBackslashEscaped(fragment, i)) return true;
+    if (ch !== "$" || isBackslashEscaped(fragment, i)) continue;
+    const next = fragment[i + 1];
+    if (next === "(" || next === "{") return true;
+    if (next !== undefined && /[A-Za-z_]/.test(next)) return true;
+  }
+  return false;
+}
+
+/**
+ * 扫描拆分结果，返回首个命中的守卫项；无命中 → undefined。
+ * 必需级（F-7-a）：独立操作符 token / 紧贴重定向形态（仅未加引号时判中）。
+ * opt1（内嵌操作符）与 opt2（变量展开）为批准启用的加固项。
+ */
+function detectUnsupportedShellSyntax(split: CommandTokenization): ShellGuardHit | undefined {
+  for (let i = 0; i < split.argv.length; i++) {
+    const fragment = split.unquoted[i];
+    if (fragment === "") continue;
+    if (SHELL_OPERATOR_TOKENS.has(fragment) || startsWithAttachedRedirection(fragment)) {
+      return { token: split.argv[i], kind: "operator" };
+    }
+    if (hasEmbeddedOperator(fragment)) return { token: split.argv[i], kind: "embedded" };
+    if (hasExpansionSyntax(fragment)) return { token: split.argv[i], kind: "expansion" };
+  }
+  return undefined;
+}
+
+/** 守卫拒绝文案（必需文案逐字；内嵌/展开类附「加引号或拆分」指引）。 */
+function shellGuardMessage(name: string, hit: ShellGuardHit): string {
+  const head = `${name} 未执行：本环境命令未经 shell 解释，不支持管道/重定向/变量展开（检测到 "${hit.token}"）。`;
+  return hit.kind === "operator"
+    ? `${head}请拆分为多条命令，或把逻辑写成脚本文件后执行。`
+    : `${head}若这些符号是字面量，请加引号或改用等价写法（如 grep -e a -e b）；确需管道/重定向/变量展开，请拆分为多条命令，或把逻辑写成脚本文件后执行。`;
 }
 
 /**
@@ -366,8 +468,38 @@ interface ShellExecOutcome {
   stdout: string;
   stderr: string;
   error?: string;
+  /** 命令因**命令级执行时限**被终止（F-1；与「停止本轮」的 ABORTED 语义区分）。 */
+  timedOut?: boolean;
+  /** 触发终止的**生效**时限（毫秒）。 */
+  timeoutMs?: number;
   stdoutTruncated?: boolean;
   stderrTruncated?: boolean;
+}
+
+/**
+ * 平台分支的**进程树终止**（F-1-opt1）。
+ * - POSIX：spawn 时 `detached:true` 使子进程成为**进程组组长**，按 `-pid` 向整组发信号
+ *   （`npm test` 等派生的孙进程一并收掉，不留占端口/CPU 的孤儿）；组不可达（已退出/竞态）回退 `child.kill`。
+ * - Windows：`taskkill /pid <pid> /T /F` 终止整棵树；taskkill 不可用时回退 `child.kill`。
+ * 任何失败都不抛出——收口交由 close / 清理计时器（既有两条路径语义不变）。
+ */
+function killProcessTree(child: ReturnType<typeof spawn>, signal: NodeJS.Signals, useProcessGroup: boolean, env: Record<string, string>): void {
+  if (process.platform === "win32") {
+    const pid = child.pid;
+    if (pid !== undefined) {
+      try {
+        const killer = spawn("taskkill", ["/pid", String(pid), "/T", "/F"], { windowsHide: true, stdio: "ignore", env });
+        killer.on("error", () => { try { child.kill(signal); } catch { /* 已退出 */ } });
+        return;
+      } catch { /* 回退直接子进程 */ }
+    }
+    try { child.kill(signal); } catch { /* 已退出 */ }
+    return;
+  }
+  if (useProcessGroup && child.pid !== undefined) {
+    try { process.kill(-child.pid, signal); return; } catch { /* 组不可达 → 回退 */ }
+  }
+  try { child.kill(signal); } catch { /* 已退出 */ }
 }
 
 /**
@@ -375,13 +507,20 @@ interface ShellExecOutcome {
  * cwd **固定**为传入值（= projectRoot），不接受调用方指定（爆炸半径限制，§7.2）。
  * env **必须**是剥离凭据后的过滤环境（§7.9，见 buildShellEnv），**绝不**直接传 process.env。
  * 启动失败 / 得到错误 → 以 `error` 返回，绝不抛出（上层据此回 ok:false）。
+ *
+ * **命令级执行时限（F-1）**：spawn 成功后按 `execTimeoutMs` 挂**一次性 deadline 定时器**；
+ * 到期经共享的 `terminate()` 终止命令——与 AbortSignal 的「停止本轮」路径**共用同一终止函数**，
+ * 幂等（`settled` 或 `terminating` 后直接返回，先到先收口），SIGTERM→250ms→SIGKILL→1000ms
+ * 清理上限的**预算不变**。`settle()` 清除 deadline 定时器，并把 `timedOut/timeoutMs` 带进 outcome；
+ * 两路径竞争时结果只发一次、事件只发一次。
  */
-function runShell(argv: string[], cwd: string, env: Record<string, string>, signal?: AbortSignal): Promise<ShellExecOutcome> {
+function runShell(argv: string[], cwd: string, env: Record<string, string>, signal: AbortSignal | undefined, execTimeoutMs: number): Promise<ShellExecOutcome> {
   return new Promise((resolveOutcome) => {
     if (signal?.aborted) { resolveOutcome({ stdout: "", stderr: "", error: "会话已中止，命令未执行" }); return; }
     let child: ReturnType<typeof spawn>;
+    const useProcessGroup = process.platform !== "win32";
     try {
-      child = spawn(argv[0], argv.slice(1), { cwd, shell: false, windowsHide: true, env });
+      child = spawn(argv[0], argv.slice(1), { cwd, shell: false, windowsHide: true, env, ...(useProcessGroup ? { detached: true } : {}) });
     } catch (err) {
       resolveOutcome({ stdout: "", stderr: "", error: reasonOf(err) });
       return;
@@ -393,26 +532,43 @@ function runShell(argv: string[], cwd: string, env: Record<string, string>, sign
     let stdoutTruncated = false;
     let stderrTruncated = false;
     let settled = false;
-    let aborted = false;
+    let terminating: "abort" | "timeout" | undefined;
     let killTimer: ReturnType<typeof setTimeout> | undefined;
     let cleanupTimer: ReturnType<typeof setTimeout> | undefined;
+    let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
+    const collectOut = (): string => Buffer.concat(out).toString("utf8");
+    const collectErr = (): string => Buffer.concat(errOut).toString("utf8");
     const settle = (outcome: ShellExecOutcome): void => {
       if (settled) return;
       settled = true;
       signal?.removeEventListener("abort", abort);
+      if (deadlineTimer) clearTimeout(deadlineTimer);
       if (killTimer) clearTimeout(killTimer);
       if (cleanupTimer) clearTimeout(cleanupTimer);
-      const observed = { ...outcome, stdoutTruncated, stderrTruncated };
-      resolveOutcome(aborted ? { ...observed, error: outcome.error ?? "会话已中止，命令已请求终止" } : observed);
+      const observed: ShellExecOutcome = {
+        ...outcome,
+        stdoutTruncated,
+        stderrTruncated,
+        ...(terminating === "timeout" ? { timedOut: true, timeoutMs: execTimeoutMs } : {}),
+      };
+      resolveOutcome(terminating === "abort" ? { ...observed, error: outcome.error ?? "会话已中止，命令已请求终止" } : observed);
     };
-    const abort = (): void => {
-      aborted = true;
-      child.kill("SIGTERM");
-      killTimer = setTimeout(() => { if (!settled) child.kill("SIGKILL"); }, 250);
-      cleanupTimer = setTimeout(() => settle({ stdout: "", stderr: "", error: "命令中止清理超时" }), 1000);
+    // 共享终止路径（F-1-b）：超时与「停止本轮」共用；`settled`/`terminating` 后直接返回（幂等，先到先收口）。
+    const terminate = (origin: "abort" | "timeout"): void => {
+      if (settled || terminating !== undefined) return;
+      terminating = origin;
+      killProcessTree(child, "SIGTERM", useProcessGroup, env);
+      killTimer = setTimeout(() => { if (!settled) killProcessTree(child, "SIGKILL", useProcessGroup, env); }, 250);
+      cleanupTimer = setTimeout(() => settle(origin === "timeout"
+        ? { stdout: collectOut(), stderr: collectErr(), error: "命令超时清理超时" }
+        : { stdout: "", stderr: "", error: "命令中止清理超时" }), 1000);
     };
+    const abort = (): void => terminate("abort");
     signal?.addEventListener("abort", abort, { once: true });
     if (signal?.aborted) abort();
+    if (Number.isFinite(execTimeoutMs) && execTimeoutMs > 0) {
+      deadlineTimer = setTimeout(() => terminate("timeout"), execTimeoutMs);
+    }
     child.stdout?.on("data", (d: Buffer) => {
       if (outLen < MAX_SHELL_OUTPUT_BYTES) {
         out.push(d);
@@ -425,13 +581,13 @@ function runShell(argv: string[], cwd: string, env: Record<string, string>, sign
         errLen += d.length;
       } else { stderrTruncated = true; }
     });
-    child.on("error", (e) => settle({ stdout: Buffer.concat(out).toString("utf8"), stderr: Buffer.concat(errOut).toString("utf8"), error: reasonOf(e) }));
+    child.on("error", (e) => settle({ stdout: collectOut(), stderr: collectErr(), error: reasonOf(e) }));
     child.on("close", (code, signal) =>
       settle({
         code: code ?? undefined,
         signal,
-        stdout: Buffer.concat(out).toString("utf8"),
-        stderr: Buffer.concat(errOut).toString("utf8"),
+        stdout: collectOut(),
+        stderr: collectErr(),
       }),
     );
   });
@@ -439,13 +595,14 @@ function runShell(argv: string[], cwd: string, env: Record<string, string>, sign
 
 /**
  * run_shell：命令级闸工具（设计 §7.2）。顺序**必须**是：
- *   取 command → `await shellGate(req)`（超时包装）→ **仅当恰好 `allow:true`** 才 spawn → 收集结果。
+ *   取 command → `splitCommand` → **F-7 执行层守卫**（未加引号的操作符/展开 token → 直接以明确文案拒绝，
+ *   不调 gate、不 spawn）→ `await shellGate(req)`（超时包装）→ **仅当恰好 `allow:true`** 才 spawn → 收集结果。
  * `allow:false` / `undefined` / 抛错 / 超时 → **在任何 spawn 之前返回**，子进程**从不启动**（§7.5.2）。
  *
  * **审核与 spawn 同址**（§7.1 第 3 条）：这是**唯一** spawn 点，且**没有 token**——不再「登记票据交扩展层」，
  * 因为票据可由公开输入重算、证明不了审核发生过。此处就是每调用保证的唯一落点。
  */
-function makeRunShellTool(shellGate: ShellGate, shellCwd: string, reviewTimeoutMs: number, gate?: InteractionGate, diagnostics?: DiagnosticLog, currentTurnId?: () => string | undefined, extraCredentialEnvVars?: readonly string[]): ExecutableTool {
+function makeRunShellTool(shellGate: ShellGate, shellCwd: string, reviewTimeoutMs: number, execTimeoutMs: number, gate?: InteractionGate, diagnostics?: DiagnosticLog, currentTurnId?: () => string | undefined, extraCredentialEnvVars?: readonly string[]): ExecutableTool {
   const name = SHELL_TOOL_NAME;
   return {
     name,
@@ -454,14 +611,24 @@ function makeRunShellTool(shellGate: ShellGate, shellCwd: string, reviewTimeoutM
       if (command === undefined || command.trim() === "") {
         return { ok: false, message: `${name}: 缺少 command 参数，无法审核执行` };
       }
-      const argv = splitCommand(command);
-      if (argv.length === 0) return { ok: false, message: `${name}: command 为空，无命令可执行` };
+      const split = splitCommand(command);
+      if (split.argv.length === 0) return { ok: false, message: `${name}: command 为空，无命令可执行` };
+      const argv = split.argv;
       const cwd = shellCwd;
       const toolCallId = typeof call.toolCallId === "string" ? call.toolCallId : "";
+      const turnId = currentTurnId?.();
+
+      // —— F-7 执行层守卫（在 ShellGate 审核**之前**）：独立操作符 token（含内嵌/展开加固项）
+      //    命中 → **不调 gate、不 spawn**，以明确文案拒绝；被拒命令本就什么都不会执行，
+      //    治理判定链不变（是否对「被守卫拦截的尝试」留 shell-gate 审计属编排侧语义，本层只记 diagnostics）。
+      const guardHit = detectUnsupportedShellSyntax(split);
+      if (guardHit !== undefined) {
+        diagnostics?.record("shell.guard.blocked", { turnId, toolCallId, toolName: name, reasonCode: guardHit.token, excerpt: command.slice(0, 240) });
+        return { ok: false, message: shellGuardMessage(name, guardHit) };
+      }
 
       // —— 唯一的命令级闸：只有恰好 allow:true 才继续（判定与执行在同一条我们的代码路径上）——
       let review: ShellReviewResult | undefined;
-      const turnId = currentTurnId?.();
       const began = Date.now();
       gate?.begin();
       diagnostics?.record("shell.review.start", { turnId, toolCallId, toolName: name });
@@ -485,7 +652,33 @@ function makeRunShellTool(shellGate: ShellGate, shellCwd: string, reviewTimeoutM
       }
 
       // —— 恰好 allow:true：构造**剥离凭据后**的 env（§7.9），随后**才**启动子进程 ——
-      const outcome = await runShell(argv, cwd, buildShellEnv(process.env, extraCredentialEnvVars), call.signal);
+      //     观测（F-1-d）：`shell.exec.start` 携带**生效**的时限值，供观测与测试快速断言解析链（不必真等分钟级）。
+      const execBegan = Date.now();
+      diagnostics?.record("shell.exec.start", { turnId, toolCallId, toolName: name, timeoutMs: execTimeoutMs });
+      const outcome = await runShell(argv, cwd, buildShellEnv(process.env, extraCredentialEnvVars), call.signal, execTimeoutMs);
+      // —— 命令级超时（F-1-a）：如实返回「超时已终止（N ms）」+ 已收集的部分输出；**轮次继续**
+      //    （模型可重试/换脚本/如实报告）——与「停止本轮」的 ABORTED 语义明确区分。 ——
+      if (outcome.timedOut === true) {
+        const timeoutMs = outcome.timeoutMs ?? execTimeoutMs;
+        diagnostics?.record("shell.exec.timeout", { turnId, toolCallId, toolName: name, timeoutMs, durationMs: Date.now() - execBegan });
+        const head = outcome.error === undefined
+          ? `${name} 超时已终止（${timeoutMs} ms）：命令超过本次执行时限，已被终止。`
+          : `${name} 超时已触发（${timeoutMs} ms），但终止清理未在预算内完成（${outcome.error}）——进程可能仍在运行，请如实向客户说明。`;
+        return {
+          ok: false,
+          execution: {
+            timedOut: true,
+            timeoutMs,
+            ...(outcome.code !== undefined ? { exitCode: outcome.code } : {}),
+            ...(outcome.signal ? { signal: outcome.signal } : {}),
+            stdout: outcome.stdout,
+            stderr: outcome.stderr,
+            stdoutTruncated: outcome.stdoutTruncated === true,
+            stderrTruncated: outcome.stderrTruncated === true,
+          },
+          message: `${head}\nstdout:\n${outcome.stdout}\nstderr:\n${outcome.stderr}\n提示：可重试、拆分命令，或把逻辑写成脚本文件后执行；本轮可继续。`,
+        };
+      }
       if (outcome.error !== undefined) {
         return { ok: false, message: `${name} 执行失败（未能启动或运行）：${outcome.error}`, execution: { error: outcome.error, ...(outcome.code !== undefined ? { exitCode:outcome.code } : {}), ...(outcome.signal ? {signal:outcome.signal} : {}) } };
       }
@@ -922,7 +1115,11 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
     const shellCwd = options?.shellCwd ?? process.cwd();
     const reviewMs =
       options?.shellReviewTimeoutMs ?? readTimeoutMs(process.env, SHELL_REVIEW_TIMEOUT_ENV, DEFAULT_SHELL_REVIEW_TIMEOUT_MS);
-    tools.push(makeRunShellTool(shellGate, shellCwd, reviewMs, options?.interactionGate, options?.diagnostics, options?.currentTurnId, options?.extraCredentialEnvVars));
+    // 命令级执行时限（F-1-c）：显式选项 > env > 默认；非法/空缺回退默认（readTimeoutMs 语义，**不可禁用**）。
+    // 与 reviewMs 同址在构建时解析一次；`RuntimeSessionOptions` 以 `...options` 透传，桌面端经 env 即可起效。
+    const execMs =
+      options?.shellExecTimeoutMs ?? readTimeoutMs(process.env, SHELL_EXEC_TIMEOUT_ENV, DEFAULT_SHELL_EXEC_TIMEOUT_MS);
+    tools.push(makeRunShellTool(shellGate, shellCwd, reviewMs, execMs, options?.interactionGate, options?.diagnostics, options?.currentTurnId, options?.extraCredentialEnvVars));
   }
 
   // 结构性保证（设计 A-1，同 run_shell 先例）：**未注入客户通道时两交互工具根本不存在**。

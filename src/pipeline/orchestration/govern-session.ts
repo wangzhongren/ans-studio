@@ -253,7 +253,8 @@ export async function runGovernSession(
   record({
     kind: "message",
     summary: confirmationMode
-      ? "客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝。" +
+      ? "客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝" +
+        "（预授权目录 docs/su/、docs/contracts/ 除外——属初始写集、无需确认可直接写；客户裁定 2026-10-16）。" +
         (roleIds.length > 0 ? `（目标角色：${roleIds.join("、")}）` : "")
       : handle.scope
         ? `治理边界条件目录已声明：conditions=[${handle.scope.conditions.join(", ")}]；` +
@@ -329,7 +330,8 @@ function buildGovernPrompt(
   const confirmRule = opts.confirmFirst
     ? "\n**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（角色卡全文 + 边界摘要，" +
       "**并列出将要写出的具体路径**——路径是发行凭据，没列出的路径写不进去）请客户确认；" +
-      "拿到明确同意（confirmed:true）后才写；未获同意/通道不可用 → 不写盘、如实告知。"
+      "拿到明确同意（confirmed:true）后才写；未获同意/通道不可用 → 不写盘、如实告知。" +
+      "（例外：`docs/su/`、`docs/contracts/` 为预授权目录——属初始写集，可直接写、无需确认。）"
     : "";
   const head =
     `任务 ${taskId}：以治理身份在**项目治理边界**内工作。` +

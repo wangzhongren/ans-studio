@@ -74,17 +74,43 @@ interface Harness {
   envelopes: { roleId: string; event: import("../../app/desktop/session.ts").DesktopOrchestrationEvent }[];
   openCalls: string[];
   policies: { roleId: string; policy: unknown }[];
+  /** F-2-T3：su 会话拿到的派发能力（用于把某项目角色推入「投递开跑的长轮」）。 */
+  dispatchOf: (roleId: string) => import("../../src/model/runtime.ts").DispatchTaskFn | undefined;
+  /** F-2-T3 夹具：挂起某角色的**下一次** send，直到返回的 release 被调用（模拟异步整轮）。 */
+  hangNext: (roleId: string) => () => void;
 }
 
-/** 可脚本化假句柄：events() 从共享流拉（轮询；dispose 后立即收口）；send 记入 sent（可注入一次失败）。 */
-function makeHarness(opts: { failSuOpenAttempts?: number; failSuSendTimes?: number; failReportSendTimes?: number; customize?: (roleId: string, handle: RoleSessionHandle) => RoleSessionHandle } = {}): Harness {
+/** 可脚本化假句柄：events() 从共享流拉（轮询；dispose 后立即收口）；send 记入 sent（可注入一次失败或可控挂起）。 */
+function makeHarness(opts: { failSuOpenAttempts?: number; failSuSendTimes?: number; failReportSendTimes?: number; extraRoles?: string[]; customize?: (roleId: string, handle: RoleSessionHandle) => RoleSessionHandle } = {}): Harness {
   const listing = listingWithSuAndA();
   const streams: Record<string, OrchestrationEvent[]> = { su: [], A: [] };
   const sent: Record<string, string[]> = { su: [], A: [] };
+  for (const roleId of opts.extraRoles ?? []) {
+    listing.roles.push({
+      roleId,
+      cardPath: `角色卡/${roleId}/role-card.md`,
+      boundaryPath: `角色卡/${roleId}/boundary.yaml`,
+      cardText: roleId,
+      boundary: {
+        entries: [{ root: "project", path: `src/${roleId}.ts`, kind: "file", purpose: "p" }],
+        boundarySource: `角色卡/${roleId}/boundary.yaml`,
+        acceptance: { accepted: false, source: "" },
+      },
+    });
+    streams[roleId] = [];
+    sent[roleId] = [];
+  }
   const sendOptions: Record<string, RoleSessionSendOptions[]> = {};
   const envelopes: { roleId: string; event: import("../../app/desktop/session.ts").DesktopOrchestrationEvent }[] = [];
   const openCalls: string[] = [];
+  const openInputs: Record<string, { dispatchTask?: import("../../src/model/runtime.ts").DispatchTaskFn }> = {};
   const stopped: Record<string, boolean> = {};
+  const nextGate: Record<string, Promise<void> | undefined> = {};
+  const hangNext = (roleId: string): (() => void) => {
+    let release!: () => void;
+    nextGate[roleId] = new Promise<void>((resolve) => { release = resolve; });
+    return release;
+  };
   let suOpenAttempts = 0;
   let suSendFails = opts.failSuSendTimes ?? 0;
   let reportSendFails = opts.failReportSendTimes ?? 0;
@@ -102,6 +128,11 @@ function makeHarness(opts: { failSuOpenAttempts?: number; failSuSendTimes?: numb
         if (roleId === "su" && suSendFails > 0) {
           suSendFails -= 1;
           throw new Error("演示：投递通道瞬时失败");
+        }
+        const gate = nextGate[roleId];
+        if (gate) {
+          nextGate[roleId] = undefined;
+          await gate; // F-2 夹具：可控挂起（release 前 promise 不 resolve —— 模拟整轮在跑）
         }
         (sent[roleId] = sent[roleId] || []).push(text);
       },
@@ -132,6 +163,7 @@ function makeHarness(opts: { failSuOpenAttempts?: number; failSuSendTimes?: numb
     openRoleSession: async (input) => {
       policies.push({ roleId: input.roleId, policy: input.routineShellPolicy });
       openCalls.push(input.roleId);
+      openInputs[input.roleId] = { dispatchTask: (input as { dispatchTask?: import("../../src/model/runtime.ts").DispatchTaskFn }).dispatchTask };
       if (input.roleId === "su" && (opts.failSuOpenAttempts ?? 0) > suOpenAttempts) {
         suOpenAttempts += 1;
         throw new Error("演示：su 会话开启失败（凭据缺失）");
@@ -149,7 +181,7 @@ function makeHarness(opts: { failSuOpenAttempts?: number; failSuSendTimes?: numb
     getListing: (root) => (root === "/proj" ? listing : undefined),
     emitEvent: (env) => envelopes.push(env),
   });
-  return { mgr, streams, sent, sendOptions, envelopes, openCalls, policies };
+  return { mgr, streams, sent, sendOptions, envelopes, openCalls, policies, dispatchOf: (roleId) => openInputs[roleId]?.dispatchTask, hangNext };
 }
 
 test("E-1 投递：A 的回交到达 → **自动开启 su** 并把 `renderHandbackPrompt` 原文投给 su（单一来源）", async () => {
@@ -435,4 +467,38 @@ test('C disabled and unknown-live source facts preserve live delivery without in
  try{await h.mgr.open({projectRoot:'/proj',roleId:'A',runtime:'demo'});h.streams.A.push({kind:'handback',summary:'safe live',handback:HANDBACK_A1,liveReport:{source:{roleId:'A'},taskId:null,status:'completed',summary:safeText('safe'),evidence:[],evidenceOmitted:0,at:HANDBACK_A1.at},reportPersistence:{state,retryAvailable:false}});
  await waitUntil(()=>h.sent.su.length===1);const options=h.sendOptions.su[0];assert.equal(options.inputProvenance,undefined);assert.equal(options.inputPresentation?.durability,state==='disabled'?'memory-only':'unknown-live');assert.equal(Object.hasOwn(options.inputPresentation!.reports[0],'reportId'),false);assert.equal(h.envelopes.filter(e=>e.event.kind==='handback').length,1);
  }finally{await h.mgr.stop();}}
+});
+
+// ————— F-2-T3（2026-10-16 客户批准）：长轮不阻塞回交投递 —————
+// 旧实现：B 的投递轮把「每项目一条」的串行链持有到**整轮**结束——期间 A settle 产生的回交投递被链压住，
+// su 迟迟收不到（真机 16 分 55 秒的现场）。修复后投递开跑即释放链：su **立即**收到。
+
+test("F-2-T3 长轮不阻塞回交：B 的投递轮挂起期间，A settle 产生的回交 ⇒ su **立即**收到（不被 B 轮持有）；放行后两笔各恰一次", async () => {
+  const h = makeHarness({ extraRoles: ["B"] });
+  await h.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
+  await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  await tick(30);
+  const dispatch = h.dispatchOf("su");
+  assert.ok(typeof dispatch === "function", "su 会话应注入派发能力");
+  const releaseB = h.hangNext("B");
+  const receipt = (await dispatch!({ roleId: "B", task: "长活" })) as { ok: boolean };
+  assert.equal(receipt.ok, true);
+  await tick(120);
+  assert.ok(h.openCalls.includes("B"), "B 被自动开启");
+  assert.deepEqual(h.sent.B, [], "B 的投递挂起中（整轮在跑——send promise 未结）");
+
+  h.streams.A.push({ kind: "handback", summary: "回交 su：改完了 role-card", handback: HANDBACK_A1 });
+  await tick(150);
+  assert.deepEqual(
+    h.sent.su,
+    [renderHandbackPrompt(HANDBACK_A1)],
+    "**su 立即收到回交**——不被 B 的长轮持有（旧实现：链被持有贯穿 B 整轮，回交只能干等；B 挂起期间即达是判据）"
+  );
+
+  releaseB();
+  await tick(100);
+  assert.equal(h.sent.B.length, 1, "放行后 B 的投递结算");
+  assert.ok(String(h.sent.B[0]).includes("长活"), "B 收到的是那条派发（恰一次）");
+  assert.equal(h.sent.su.length, 1, "su 无重复投递");
+  await h.mgr.stop(null);
 });

@@ -110,12 +110,27 @@
     var hasDisplay = Object.prototype.hasOwnProperty.call(d, "display");
     var display = d.display && d.display.version === 1 ? d.display : null;
     if (hasDisplay) target = display && display.target && display.target.value && typeof display.target.value.text === "string" ? display.target.value.text : "";
+    // —— F-8-b（2026-10-16 客户批准）：run_shell「进程跑完、退出码非零」的行分类——**结构化事实优先** ——
+    // 判据只认 `display.process` 的结构化事实，不解析消息文本（旧 `knownFailure` 正则解析的
+    // 「run_shell 已执行：…（exit N）」消息**不改**，故与旧正则并存；本块命中即覆盖上面的文本推断，
+    // 未命中（无 display.process 的旧文本行）走既有路径，行为不变——过渡期兼容）：
+    //  · `timedOut === true` → 独立一类「超时终止」（命令被时限终止属异常终止，仍置 exceptional 标红）；
+    //  · `exitCode` 为数字、非 0、且无 `error`/`signal` → 「已执行完成（退出码 N）」中性类：进程正常跑完，
+    //    退出码非零可以是合法结果（如 grep 无匹配 exit 1）——不置 exceptional（红→中性）。
+    //    `display.process` 当前无 error 成员，此处防御式检查（未来生产者若携带则不判中性，绝不吞异常）。
+    // 消费方（renderer.js）据 `status === "exited-nonzero"` 让位错误预览/详情「错误」字段——同一判据，单处来源。
+    var process = display && display.process && typeof display.process === "object" ? display.process : null;
+    var processExitCode = process && typeof process.exitCode === "number" && isFinite(process.exitCode) ? process.exitCode : null;
+    if (process && process.timedOut === true) status = "timed-out";
+    else if (processExitCode !== null && processExitCode !== 0 && process.error === undefined && process.signal === undefined) status = "exited-nonzero";
+    var label = status === "failed" ? "执行失败" : status === "denied" ? "已拒绝" : status === "call" ? "调用发起" : status === "completed" ? "执行完成" : status === "returned" ? "工具返回" : status === "exited-nonzero" ? "已执行完成（退出码 " + processExitCode + "）" : status === "timed-out" ? "超时终止" : "状态未记录";
+    var exceptional = status === "exited-nonzero" ? false : status === "timed-out" ? true : (failed || o.kind === "denied" || identityPhase === "blocked");
     return { legacyTextProjection: o.textProjection && typeof o.textProjection.text === "string" ? o.textProjection : null, legacyStatusSource: o.legacyStatusSource || "", legacyTargetSource: o.legacyTargetSource || "", metadataOmissions: Array.isArray(o.metadataOmissions) ? o.metadataOmissions : [], display: display, hasDisplay: hasDisplay, displayUnsupported: hasDisplay && !display,
       errorCode: typeof d.errorCode === "string" ? d.errorCode : "", toolName: tool, target: slimToolRow(target), fullTarget: target, phase: phase, identityPhase: identityPhase, status: status,
-      label: status === "failed" ? "执行失败" : status === "denied" ? "已拒绝" : status === "call" ? "调用发起" : status === "completed" ? "执行完成" : status === "returned" ? "工具返回" : "状态未记录",
+      label: label,
       turnId: typeof o.turnId === "string" ? o.turnId : "", callId: typeof d.toolCallId === "string" ? d.toolCallId : typeof call.toolCallId === "string" ? call.toolCallId : typeof d.callId === "string" ? d.callId : "",
       runtime: typeof o.runtime === "string" ? o.runtime : typeof d.runtime === "string" ? d.runtime : "",
-      exceptional: failed || o.kind === "denied" || identityPhase === "blocked", deniedSummary: o.eventKind === "denied" || o.kind === "denied" && typeof o.summary === "string" ? raw : "", visibleSummary: head, barrier: hasDisplay || SPECIAL_TOOLS.indexOf(tool) >= 0 || !!o.anchorKey,
+      exceptional: exceptional, deniedSummary: o.eventKind === "denied" || o.kind === "denied" && typeof o.summary === "string" ? raw : "", visibleSummary: head, barrier: hasDisplay || SPECIAL_TOOLS.indexOf(tool) >= 0 || !!o.anchorKey,
       summary: slimToolRow(raw), at: typeof o.at === "string" ? o.at : "" };
   }
 

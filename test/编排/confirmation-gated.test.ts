@@ -14,6 +14,9 @@
 //   ④ 发行**精确性**：预览只列一部分 → 只那些可写（其余被拒；不足成角色 → 无物可 pin、不转正）；
 //   ⑤ 预览含**越界路径**（src/）→ 不发行 → 越界写被拒（写集有界）；
 //   ⑥ gate 直断言：确认后已发行路径放行、未发行路径被拒；
+//   ⑥b su 预授权写目录（客户裁定 2026-10-16）：docs/su/** 与 docs/contracts/** 是**初始 writeSet**
+//      的一部分——不经 request_confirmation 直接落盘（客户通道零调用）；docs/ 其它路径与 角色卡/
+//      未确认仍被 F4 拒、零副作用。
 //   ⑦ `request_choice` 的勾选经通道回传（多选，transcript 含「客户已选择」）；
 //   ⑧ CLI 终端映射单元：`parseChoiceInput`（单选 `1`、多选 `1,3`、非法/重复/越界 → 拒）、
 //      `createCliCustomerInput`（y/n/空/EOF）、`formatCustomerInputPrompt`、`extractPathCandidates`。
@@ -282,6 +285,35 @@ test("gate 直断言：确认后已发行路径放行、未发行路径（同目
     const other = gate("角色卡/X/role-cards.md");
     assert.equal(other.allowed, false, "F4 为精确集合：未确认的同目录其它文件仍拒");
     assert.match((other as { reason: string }).reason, /writeSet/);
+  });
+});
+
+// ————————— ⑥b su 预授权写目录（客户裁定 2026-10-16） —————————
+
+test("su 预授权：docs/su/** 与 docs/contracts/** **不经 request_confirmation** 直接落盘；docs/ 其它与 角色卡/ 未确认仍被 F4 拒", async () => {
+  await withTarget(async ({ target }) => {
+    mkdirSync(target, { recursive: true });
+    // 脚本**不发** request_confirmation：预授权 = 初始 writeSet 的一部分（不属「经确认发行的写权」）。
+    const script: ToolCall[] = [
+      { name: "write_file", args: { path: "docs/su/memo.md", content: "# su 备忘录（免确认）\n" } },
+      { name: "write_file", args: { path: "docs/contracts/api-v1.md", content: "# 契约（免确认）\n" } },
+      { name: "write_file", args: { path: "docs/其他.md", content: "应被 F4 拒\n" } },
+      { name: "write_file", args: { path: "角色卡/Y/role-card.md", content: "应被 F4 拒\n" } },
+    ];
+    const asked: CustomerInputRequest[] = [];
+    const shouldNotBeAsked: CustomerInputFn = (req) => {
+      asked.push(req);
+      return { outcome: "unavailable", reason: "本测试不应发起确认" };
+    };
+    const code = await governCommand(["govern", target], depsFor(genesisProject(target), script, {
+      customerInput: shouldNotBeAsked,
+    }));
+    assert.equal(code, EXIT_OK);
+    assert.equal(asked.length, 0, "预授权写入无需确认（客户通道零调用）");
+    assert.ok(existsSync(join(target, "docs", "su", "memo.md")), "docs/su/memo.md 免确认落盘");
+    assert.ok(existsSync(join(target, "docs", "contracts", "api-v1.md")), "docs/contracts/** 免确认落盘");
+    assert.equal(existsSync(join(target, "docs", "其他.md")), false, "docs/ 其它路径未确认 → F4 拒、零副作用");
+    assert.equal(existsSync(join(target, "角色卡")), false, "角色卡/ 未确认 → F4 拒且不得建目录");
   });
 });
 

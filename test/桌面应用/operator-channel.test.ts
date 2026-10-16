@@ -14,6 +14,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -24,11 +25,13 @@ import { listProject } from "../../src/service/role/resolve-role.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
 import { SessionManager } from "../../app/desktop/session.ts";
 import { openRoleSession, type RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
+import { configureDiagnostics, flushDiagnostics, disposeDiagnostics } from "../../src/common/shared/diagnostics.ts";
 import {
   buildDesktopShellArming,
   buildShellConfirmRequest,
   createDesktopOperatorChannel,
   createShellConfirmPresenter,
+  DEFAULT_OPERATOR_CONFIRM_TIMEOUT_MS,
   describeShellCommand,
   DESKTOP_SHELL_GATE_ARMED,
   plainReasonFor,
@@ -785,4 +788,141 @@ test("arm 只影响 pi 路径：demo 路径不构造 pi 工厂（无 shell 入�
   assert.equal(r.ok, true);
   assert.equal(piCalls, 0, "demo 路径不得走 pi 工厂（arm 与 demo 无关）");
   await mgr.stop();
+});
+
+// ————— F-4（2026-10-16 客户批准）：确认超时与 shell 审核预算对齐 + 超时/中止原因分流 + 诊断补录 —————
+// 真机 F-4：闸侧注入了 ANS_PI_SHELL_REVIEW_TIMEOUT_MS=300000，桌面通道内部 120s 独立默认把人工确认窗口
+// 静默钳制在 120s（presented→deny 恰 120.000s），超时又被误报成「无人值守？/本轮已结束」。
+
+test("F-4-T1 超时取值链：专用 env 优先 → 未设时**跟随 ANS_PI_SHELL_REVIEW_TIMEOUT_MS**（注入小值断言实际等待随之变化）→ 都未设 120000；非法值沿链回退", async () => {
+  // ① 专用 env 优先：40ms 生效（审核预算 5000ms 不生效）。
+  {
+    const presenter: OperatorPresenter = { present() { return new Promise<{ allow: boolean }>(() => {}); } };
+    const ch = createDesktopOperatorChannel({ presenter, operatorId: "t", env: { ANS_DESKTOP_OPERATOR_CONFIRM_TIMEOUT_MS: "40", ANS_PI_SHELL_REVIEW_TIMEOUT_MS: "5000" } });
+    const t0 = Date.now();
+    const res = await ch(req("ls", ["ls"]));
+    assert.equal(res.outcome, "unavailable", "超时 = 非放行（fail-closed 不变）");
+    assert.match((res as { reason: string }).reason, /超时（>40ms）/, "通道 reason 携带生效时限");
+    assert.ok(Date.now() - t0 < 2000, "实际等待 ≈40ms（不是 5000、也不是 120000）");
+  }
+  // ② 未设专用 env ⇒ 跟随 shell 审核预算——「审核预算放宽到 300s」从此真正覆盖人工确认等待。
+  {
+    const presenter: OperatorPresenter = { present() { return new Promise<{ allow: boolean }>(() => {}); } };
+    const ch = createDesktopOperatorChannel({ presenter, operatorId: "t", env: { ANS_PI_SHELL_REVIEW_TIMEOUT_MS: "60" } });
+    const t0 = Date.now();
+    const res = await ch(req("ls", ["ls"]));
+    assert.match((res as { reason: string }).reason, /超时（>60ms）/, "跟随审核预算（>60ms）");
+    assert.ok(Date.now() - t0 < 2000, "实际等待 ≈60ms（旧实现：恒 120000 静默钳制）");
+  }
+  // ③ 都未设 ⇒ 默认 120000（常量如实；即时作答的 presenter 不会真等到超时）。
+  {
+    assert.equal(DEFAULT_OPERATOR_CONFIRM_TIMEOUT_MS, 120000);
+    const ch = createDesktopOperatorChannel({ presenter: { async present() { return { allow: true }; } }, operatorId: "t", env: {} });
+    assert.equal((await ch(req("ls", ["ls"]))).outcome, "allow", "无超时发生、判定照常");
+  }
+  // ④ 非法值沿链回退：专用非法 → 落到审核预算；两者皆非法 → 默认；不炸、不放行面变化。
+  {
+    const presenter: OperatorPresenter = { present() { return new Promise<{ allow: boolean }>(() => {}); } };
+    const ch = createDesktopOperatorChannel({ presenter, operatorId: "t", env: { ANS_DESKTOP_OPERATOR_CONFIRM_TIMEOUT_MS: "nope", ANS_PI_SHELL_REVIEW_TIMEOUT_MS: "35" } });
+    const res = await ch(req("ls", ["ls"]));
+    assert.match((res as { reason: string }).reason, /超时（>35ms）/, "专用非法 ⇒ 沿链落到审核预算");
+  }
+  {
+    const ch = createDesktopOperatorChannel({ presenter: { async present() { return { allow: false }; } }, operatorId: "t", env: { ANS_DESKTOP_OPERATOR_CONFIRM_TIMEOUT_MS: "0", ANS_PI_SHELL_REVIEW_TIMEOUT_MS: "-5" } });
+    assert.equal((await ch(req("ls", ["ls"]))).outcome, "deny", "非法 env 不炸、判定照常（回退默认）");
+  }
+  // ⑤ 接线钉：env 名从编排单一来源只读导入（读取用常量、字面量只出现在 import 说明与注释里）；
+  // presenter 兜底缺省随同一取值链（+5000 给通道先手）。
+  const src = fs.readFileSync(path.join(APP_DIR, "desktop", "operator-channel.ts"), "utf8");
+  assert.ok(
+    src.includes('import { SHELL_REVIEW_TIMEOUT_ENV } from "../../src/common/编排/shell-deadline.ts"') &&
+      src.includes("env[SHELL_REVIEW_TIMEOUT_ENV]"),
+    "审核预算 env 名从 shell-deadline.ts 只读导入并用常量读取（单一来源，不自写字面量）"
+  );
+  assert.ok(/opts\.cleanupAfterMs \?\? readConfirmTimeoutMs\(env\) \+ 5000/.test(src), "presenter 清理兜底缺省随同一取值链（+5000 给通道先手）");
+});
+
+test("F-4-T2 到期原因分流：超时中止的失效文案 = 如实超时文案（含时限与恢复指引，不再误报「本轮已结束」）；轮次中止保留原文案（组合信号 reason 驱动，Node 24 传播首验）", async () => {
+  // ① 超时：通道在 timeoutMs 处以**带标记 reason** 中止组合信号 ⇒ presenter 的 cancel 按 reason 分流。
+  {
+    const sent: ShellConfirmRequest[] = [];
+    const expired: { reason?: string }[] = [];
+    const presenter = createShellConfirmPresenter({ present: (r) => sent.push(r), cleanupAfterMs: 60000, env: {}, onExpired: (p) => expired.push(p as { reason?: string }) });
+    const turn = new AbortController();
+    const ch = createDesktopOperatorChannel({ presenter: presenter.presenter, operatorId: "op", timeoutMs: 40 });
+    const started = ch(req("ls", ["ls"]), { roleId: "A", projectRoot: "/proj", runtime: "pi", signal: turn.signal });
+    const res = await started;
+    assert.equal(res.outcome, "unavailable", "超时仍落 unavailable（编排据此拒——fail-closed 逐字不变）");
+    assert.equal(expired.length, 1, "操作者侧收到失效通知（session:operator-expired 的数据面）");
+    assert.equal(expired[0]?.reason, "操作者确认超时（>40ms），未获放行——可让角色重新发起。", "到期文案如实指向**超时**（含实际时限与恢复指引）");
+    assert.equal(presenter.pendingCount(), 0, "超时后挂起清空（无泄漏）");
+    turn.abort(); // 收尾（此时 listener 已随 finish 移除）
+  }
+  // ② 轮次中止（无标记 reason ⇒ 默认 AbortError）：保留原文案；结论仍为非放行（deny —— 呈现侧以「不放行」解挂）。
+  {
+    const expired: { reason?: string }[] = [];
+    const presenter = createShellConfirmPresenter({ present: () => {}, cleanupAfterMs: 60000, env: {}, onExpired: (p) => expired.push(p as { reason?: string }) });
+    const turn = new AbortController();
+    const ch = createDesktopOperatorChannel({ presenter: presenter.presenter, operatorId: "op", timeoutMs: 60000 });
+    const started = ch(req("ls", ["ls"]), { roleId: "A", projectRoot: "/proj", runtime: "pi", signal: turn.signal });
+    await new Promise((r) => setTimeout(r, 30));
+    turn.abort();
+    const res = await started;
+    assert.equal(res.outcome, "deny", "轮次中止 ⇒ 呈现侧不放行（deny；旧语义逐字保留）");
+    assert.equal(expired[0]?.reason, "本轮已结束、停止或会话已重建，旧 shell 确认失效。", "轮次中止保留原文案（分流不误伤）");
+  }
+});
+
+test("F-4-T3 诊断补录（opt2）：超时 ⇒ shell-confirm.timeout（含时限）；轮次中止 ⇒ shell-confirm.cancelled——presented 之后的每种去向都可判定", async () => {
+  const dir = await fsp.mkdtemp(path.join(os.tmpdir(), "ans-f4-diagnostics-"));
+  configureDiagnostics({ directory: dir });
+  try {
+    {
+      const presenter = createShellConfirmPresenter({ present: () => {}, cleanupAfterMs: 60000, env: {} });
+      const turn = new AbortController();
+      const ch = createDesktopOperatorChannel({ presenter: presenter.presenter, operatorId: "op", timeoutMs: 30 });
+      await ch(req("ls", ["ls"]), { roleId: "A", projectRoot: "/proj", runtime: "pi", signal: turn.signal });
+      turn.abort();
+    }
+    {
+      const presenter = createShellConfirmPresenter({ present: () => {}, cleanupAfterMs: 60000, env: {} });
+      const turn = new AbortController();
+      const ch = createDesktopOperatorChannel({ presenter: presenter.presenter, operatorId: "op", timeoutMs: 60000 });
+      const p = ch(req("ls", ["ls"]), { roleId: "A", projectRoot: "/proj", runtime: "pi", signal: turn.signal });
+      await new Promise((r) => setTimeout(r, 20));
+      turn.abort();
+      await p;
+    }
+    await flushDiagnostics();
+    const files = await fsp.readdir(dir);
+    const records = (await Promise.all(files.map((f) => fsp.readFile(path.join(dir, f), "utf8")))).join("").trim().split("\n").map((line) => JSON.parse(line) as { event: string; requestId?: string; durationMs?: number });
+    const timeout = records.find((r) => r.event === "shell-confirm.timeout");
+    assert.ok(timeout && typeof timeout.requestId === "string", "超时路径有 shell-confirm.timeout 诊断（含 requestId）");
+    assert.equal(timeout?.durationMs, 30, "超时时限如实入诊断（durationMs=实际等待时限）");
+    const cancelled = records.find((r) => r.event === "shell-confirm.cancelled");
+    assert.ok(cancelled && typeof cancelled.requestId === "string", "轮次中止路径有 shell-confirm.cancelled 诊断");
+    assert.ok(records.some((r) => r.event === "shell-confirm.presented"), "既有 presented 记录照旧");
+  } finally {
+    await disposeDiagnostics();
+    await fsp.rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("F-4-opt1 接线钉与幂等行为：main.ts 在窗口 focus/show 时重推挂起确认卡（与 app:recovery-ready 同款）；replayPending 只推仍挂起者", async () => {
+  const mainSrc = fs.readFileSync(path.join(APP_DIR, "main.ts"), "utf8");
+  assert.ok(/win\.on\("focus", \(\) => shellConfirm\.replayPending\(\)\)/.test(mainSrc), "focus ⇒ 幂等重推挂起卡（渲染侧丢推的兜底）");
+  assert.ok(/win\.on\("show", \(\) => shellConfirm\.replayPending\(\)\)/.test(mainSrc), "show ⇒ 幂等重推挂起卡");
+  assert.ok(mainSrc.includes("shellConfirm.replayPending()"), "复用既有幂等重推入口");
+
+  // 行为面：只重推**仍挂起**的项；已决项绝不复活（重推不改判定）。
+  const sent: ShellConfirmRequest[] = [];
+  const presenter = createShellConfirmPresenter({ present: (r) => sent.push(r), cleanupAfterMs: 60000, env: {} });
+  const prompt = req("ls", ["ls"], "/proj");
+  const d1 = presenter.presenter.present(prompt, describeShellCommand(prompt));
+  void presenter.presenter.present(prompt, describeShellCommand(prompt));
+  assert.equal(presenter.replayPending(), 2, "两条挂起都重推");
+  presenter.respond({ id: sent[0].id, allow: false });
+  assert.deepEqual(await d1, { allow: false });
+  assert.equal(presenter.replayPending(), 1, "已决项不再重推（只推仍挂起者）");
+  presenter.rejectAllPending("清场");
 });

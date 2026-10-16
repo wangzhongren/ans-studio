@@ -55,6 +55,9 @@ import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import type { RoleSessionHandle, RoleSessionAbortResult, RoleSessionSendOptions } from "../../src/pipeline/orchestration/run-role.ts";
 import { createRuntimeAdapterFactory, type RuntimeAdapterFactoryBuilder, type RuntimeAdapterFactoryOptions, type RuntimeAdapterFactory } from "../../src/pipeline/orchestration/run-role.ts";
+// F-5-opt1（2026-10-16 客户批准）：确认制会话重建后写权清零的**模型可见注记文案**——**单一来源在编排**
+// （`run-role.ts` 的 `RoleSessionHandle.queueModelNotice` 配套文案）；本层只读导入、绝不各写一份。
+import { REBUILT_SESSION_WRITE_PERMITS_NOTICE } from "../../src/pipeline/orchestration/run-role.ts";
 // 会话事件流的类型：编排把 `RoleSessionHandle.events()` 放宽为 `OrchestrationEvent`（既有 `SessionEvent`
 // + 编排在 `settled` 时追加的 `handback` 回交事件，设计 §10.8）。**类型从编排的模块只读导入、不复制形状**
 // （单一来源：`src/common/编排/handback.ts`，也是 `run-role.ts` 导入它的位置）。
@@ -345,6 +348,12 @@ interface LiveSession {
   readonly config: EffectiveConfigInfo;
   /** LRU 使用序号（越大越近；open/续接时刷新）。 */
   lastUsed: number;
+  /**
+   * **本会话是否确认制**（内置治理角色 su + 客户交互通道已接线注入——见 `openInternal` 的判据）：
+   * 只有确认制会话的 gate 收窄到「客户确认才发行的 writeSet」，重建才会**清零已发行写权**。
+   * F-5-opt1（2026-10-16 客户批准）据此决定重建后是否向模型排「写权不自动保留」注记。
+   */
+  confirmGated: boolean;
   /** **是否有轮次在跑**（E-1/H-1 排队判据）：send 成功置真、收到该角色的 `settled` 事件置假。 */
   busy: boolean;
   /**
@@ -452,8 +461,22 @@ export class SessionManager {
    * 投递机**串行链**（每项目一条，2026-10-12 L-1 修正）：多触发点（入队/开尾/settled/派发/回交）可能
    * **并发**调 `drainQueue`——不串行则同一队列会被两个 drain 同时 shift/open（真机缺陷：su 被**重复开启**
    * 两个会话、坏条目误报「形状不符」）。串行后每个 `drainQueueUnsafe` 都在前一个跑完后才开始（各自重读队列）。
+   * **F-2-M1（2026-10-16 客户批准）**：链防的仍正是「同一队列的并发 shift/open 与认领竞态」；**持有已收窄到
+   * 认领段**——`drainQueueUnsafe` 在认领段（shift → 置忙 → 登记 → 调 `sendDelivery` 取 promise）后**立即释放链**，
+   * 不再覆盖目标**整轮**（旧实现链持有贯穿 `await sendDelivery` 完成＝把 send promise 挂到整轮结束——真机实测
+   * 单链持有 16 分 55 秒，同项目其他角色的投递/回交/客户消息全被迫串行等待）。
    */
   private readonly drainChains = new Map<string, Promise<void>>();
+  /**
+   * **`openInternal` 的按会话键互斥链（F-2-opt2，2026-10-16 客户批准）**：同一会话键的 `openInternal` 至多
+   * 一个在跑（其余按序等待）——闭合既有双开窗口（① 用户 open × 投递机自动开；② 两次用户 open）：旧实现
+   * 两方并发穿过 `sessions.get(key)` 的存在性检查后各自开会话，先建者被后建者覆盖（句柄泄漏）。
+   * **防死锁（与 rebuildChains 的关系）**：持锁方「续接前查陈旧」要等 `rebuildChains`；重建的**重开续段**
+   * （同一逻辑流）因此必须直调 `openInternalUnsafe`（**不再入本链**）——否则「持锁等 rebuild 链 ← rebuild
+   * 链等锁」成环。重建链内的重开与持锁方并发是安全的：持锁方此时必然正阻塞在等待该重建链（或旧条目已被
+   * dispose、重建链内重开走纯新建路径、不再触发任何 rebuild 检查）。
+   */
+  private readonly openChains = new Map<string, Promise<void>>();
   /**
    * **作废重建的按角色串行链（2026-10-13 状态机修复）**：`rebuildIfBoundaryStale` 经它串行化——
    * 同一角色任一时刻至多一个重建在跑（并发触发方按序等待，各自重查陈旧；见该方法注释）。
@@ -711,7 +734,26 @@ export class SessionManager {
     await this.disposeEntry(roleId, entry);
     this.deps.emitEvent({ roleId: entry.roleId, projectRoot, runtime: entry.runtime, event: { kind: "message", summary: `该角色边界已更新或运行时配置已保存（${changed}），已作废旧会话，按新边界重开；上下文恢复结果以引擎实际返回为准。` } });
     // 重建不自行选择角色。仅成功且用户意图未改变时恢复被 dispose 清空的活动目标。
-    const reopened = await this.openInternal({ projectRoot, roleId: entry.roleId, runtime: entry.runtime }, false);
+    // **F-2-opt2 防死锁**：本重开是**持锁方（openInternal 的续接前查陈旧）所等待的那条链**内的续段——
+    // 必须直调 `openInternalUnsafe`（不再入 openChains），否则「持锁等 rebuild 链 ← rebuild 链等锁」成环；
+    // 此处旧条目已 dispose（或纯新建），不会再触发任何 reopen 预检。
+    const reopened = await this.openInternalUnsafe({ projectRoot, roleId: entry.roleId, runtime: entry.runtime }, false);
+    if (reopened.ok) {
+      // **F-5-opt1（桌面侧，2026-10-16 客户批准）**：确认制会话（su）重建 ⇒ 编排闭包内「客户确认才发行」
+      // 的**已发行写权集随之清零**（内存态、不随新句柄保留）——对**模型**如实可见（除既有 UI 重建行外）。
+      // 经编排的 `queueModelNotice` 把注记排进**下一轮输入前缀**（送达一次即消费；不单独开轮、不改任何判定
+      // ——接口与语义见 run-role.ts；文案用其**单一来源**常量，绝不在此各写一份）。**非确认制会话没有发行过
+      // 任何写权**（gate 不收窄，连 request_confirmation 都未注册）⇒ 不排（绝不向模型说假话）。
+      // 旧替身句柄不带该方法 ⇒ no-op（可选方法先例；如实降级，不假装已送达）。
+      const rebuiltEntry = this.sessions.get(roleId);
+      if (rebuiltEntry?.confirmGated) {
+        try {
+          rebuiltEntry.handle.queueModelNotice?.(REBUILT_SESSION_WRITE_PERMITS_NOTICE);
+        } catch {
+          // 注记只是诚实提示，不是判定链的一环：排入失败不打断重建收尾（重建本身已如实记行）。
+        }
+      }
+    }
     if (reopened.ok && (wasActive || userInitiated) && this.selectionVersion === selectionVersion) {
       const current = this.sessions.get(roleId);
       if (current && current.projectRoot === projectRoot) this.activeRoleId = roleId;
@@ -763,8 +805,29 @@ export class SessionManager {
     return result;
   }
 
-  /** `open` 的实现（`userInitiated=false` = 投递机后台自动开启：不抢活动角色，其余逐字同）。 */
+  /**
+   * **按会话键互斥入口（F-2-opt2，2026-10-16 客户批准）**：同一会话键的 openInternal 至多一个在跑，
+   * 其余按序等待——闭合「用户 open × 投递机自动开」与「两次用户 open」的既有双开窗口（见 `openChains` 注释）。
+   * **防死锁**：链内重建续段直调 `openInternalUnsafe`（不再入链）——见 `rebuildIfBoundaryStaleUnsafe`。
+   */
   private async openInternal(req: SessionOpenRequest, userInitiated: boolean, selectionVersion = this.selectionVersion): Promise<OpenResult> {
+    const key = this.sessionKey(req.projectRoot, req.roleId, req.runtime);
+    const prev = this.openChains.get(key) ?? Promise.resolve();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const tail: Promise<void> = prev.then(() => gate);
+    this.openChains.set(key, tail);
+    try {
+      await prev;
+      return await this.openInternalUnsafe(req, userInitiated, selectionVersion);
+    } finally {
+      release();
+      if (this.openChains.get(key) === tail) this.openChains.delete(key); // 链尾清理（防泄漏）
+    }
+  }
+
+  /** `open` 的实现（`userInitiated=false` = 投递机后台自动开启：不抢活动角色，其余逐字同）。 */
+  private async openInternalUnsafe(req: SessionOpenRequest, userInitiated: boolean, selectionVersion = this.selectionVersion): Promise<OpenResult> {
     if (!req.projectRoot || !req.roleId) {
       return { ok: false, error: "缺少项目根或角色 id。" };
     }
@@ -980,6 +1043,8 @@ export class SessionManager {
       config,
       lastUsed: ++this.lruClock,
       busy: false,
+      // F-5-opt1：确认制判据与 `customerInput` 注入判据同处定格（仅内置治理角色且通道已接）。
+      confirmGated: customerInput !== undefined,
       boundaryPaths,
       boundaryPrints,
     };
@@ -1605,7 +1670,8 @@ export class SessionManager {
   /**
    * 投递机的**安全壳 + 串行门**（真机崩溃修复 + L-1 并发修正）：本方法经 `void` fire-and-forget 调用，
    * **绝不允许上抛**（上抛＝未捕获拒绝）；且同项目的多次调用**串行**（见 `drainChains`）——真正的投递
-   * 逻辑在 `drainQueueUnsafe`（逐字保留，串行门保证其不会被并发重入）。
+   * 逻辑在 `drainQueueUnsafe`。**F-2-M1 起串行只覆盖「认领段」**：投递开跑（`sendDelivery` 取到 promise）
+   * 后链即释放，成功/失败记账在**分离续段**执行（其自身带同款拦截——见 `drainQueueUnsafe` 尾部）。
    */
   private async drainQueue(projectRoot: string, targetRoleId: string | null, runtime: RuntimeKind): Promise<void> {
     const key = projectRoot;
@@ -1632,6 +1698,21 @@ export class SessionManager {
    * 尝试投递队首：目标 **忙** → 排队（settled 后按序放行，**绝不并发 send**）；目标 **未开** → **自动开启**再投；
    * 开启/投递失败 → **如实系统行 + 放回队首保留待重试**（下次时机：目标打开 / 下一次入队 / 一轮结束）。
    * 目标为空（回交入队时主入口暂未枚举到）→ 每次尝试重解析主入口；仍无 → 提示一次并保留。
+   *
+   * **F-2-M1（2026-10-16 客户批准）——链持有收窄到「认领段」**：本方法在**认领段**（读队首/合批 → shift →
+   * 形状防御 → 置忙 + 登记 `activeDeliveries` + `delivery.start` → 组装发送载荷 → **调用** `sendDelivery`
+   * 取得 promise）内同步完成全部队列/归属改动，随后**立即返回**（链释放）。成功/失败的全部记账
+   * （`delivery.end`/`delivery.failed`、去重键释放、失败回队首、忙态复位、如实系统行）移入**分离续段**
+   * ——IIFE 内的 try/catch 与旧代码**逐字同体**（含「成功支抛错也落失败支」的逐支语义）；旧实现把链持有
+   * 贯穿 `await sendDelivery` 完成＝目标**整轮**结束（真机实测：单链持有 16 分 55 秒，实现者一轮把同项目
+   * 测试者的投递整段压住）。续段整段**同步、无 await 断点**，不会与后续认领交错；其内共享状态改动均带
+   * 同一性守卫（settled 可能先于 send promise 的续段到达）。**防护逐条保真**（同队列不并发双 drain/双 shift
+   * ——认领段仍全在链上；不并发 send 同一会话——`busy=true` 在释放链**之前**同步置位；自动开目标不双开
+   * ——`openInternal` 调用仍在认领段内且另有 F-2-opt2 按会话键互斥；失败回队首 + 忙态复位——续段在同一
+   * settle 微任务链里同步完成，无中间窗口）。
+   *
+   * **F-2-opt3（2026-10-16 客户批准）**：认领段起止各记一条诊断（`delivery.claim.start/end`）——下一轮真机
+   * 可一眼区分「认领耗时」vs「轮次时长」（本轮 F-2 破案正是靠既有 `delivery.start/end`）。
    */
   private async drainQueueUnsafe(projectRoot: string, targetRoleId: string | null, runtime: RuntimeKind): Promise<void> {
     const resolvedTarget =
@@ -1687,6 +1768,8 @@ export class SessionManager {
       if (!entry || entry.projectRoot !== projectRoot) return; // 防御：重开后仍不可用
     }
 
+    // —— F-2-opt3：认领段开始（自此到 claim.end 之间的同步改动都在串行链内；随后链即释放）——
+    diagnostic.record("delivery.claim.start", { state: item.kind, queueDepth: q.length });
     // 仅 su 队首连续回交合批；客户消息/派发是屏障，正文仍由编排唯一生成。
     let batchCount = 1;
     if (resolvedTarget === this.suRoleIdOf(projectRoot) && item.kind === "handback" && item.handback && !item.deliveryId) {
@@ -1710,6 +1793,7 @@ export class SessionManager {
         "(投递机)",
         "投递条目形状不符（缺正文/来源）——已丢弃该条并如实记行（不崩）。"
       );
+      diagnostic.record("delivery.claim.end", { state: item.kind, count: batchCount });
       return;
     }
     // 先置忙再 await（防「open 尾部放行」与本次调用竞态导致并发 send）；失败则复位。
@@ -1719,7 +1803,10 @@ export class SessionManager {
     this.activeDeliveries.set(key, sent); // 与 busy 同时登记；settled/失败/dispose 精确撤销。
     diagnostic.record("delivery.start", { count: batchCount, queueDepth: q.length, state: sent.kind });
     this.notifyRoleState(projectRoot, resolvedTarget, runtime); // 状态准确性：投递开跑即外推「工作中」（shift 时快照尚为闲）
-    try {
+    // —— F-2-M1：分离续段（**不再持有串行链**）——IIFE 同步执行到 `await this.sendDelivery(...)` 即挂起，
+    // 本方法随后返回（链释放）。try/await/catch 与旧实现**逐字同体**：成功支抛错同样落失败支（逐支等价）。
+    void (async () => {
+      try {
       // P0-1：入队定格载荷与真实条目来源一起投递；图片数组保持原引用。
       let sendOptions = sent.opts;
       if (sent.kind === 'handback') {
@@ -1784,5 +1871,15 @@ export class SessionManager {
             : `排队消息投递失败（角色 ${resolvedTarget}）：${base}——**未丢弃**，已保留待重试（下次时机自动重试）。`
       );
     }
+    })().catch((err) => {
+      // 与 drainQueue 安全壳同款：续段已脱离链，其抛错必须**就地**拦截——绝不产生未捕获拒绝
+      // （旧实现里该抛错由 drainQueue 的 catch 收口；F-2-M1 后续段在链外，等价物移到这里）。
+      this.emitDeliveryNote(projectRoot, runtime,
+        this.suRoleIdOf(projectRoot),
+        "(投递机)",
+        `投递机异常已拦截（不产生未捕获拒绝）：${err instanceof Error ? err.message : String(err)}`
+      );
+    });
+    diagnostic.record("delivery.claim.end", { state: sent.kind, count: batchCount });
   }
 }

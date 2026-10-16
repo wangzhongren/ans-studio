@@ -303,7 +303,7 @@ test("(a) 拒绝 → 拒绝（分支 b-unsure→a-deny）", async () => {
   assert.equal(audit.records[0].branch, escalateBranch(BRANCH_B_UNSURE, BRANCH_A_DENY));
 });
 
-test("(a) 通道不可用（无人值守）→ 拒绝", async () => {
+test("(a) 通道不可用 → 转达通道真实 reason（F-4-X1）且拒绝", async () => {
   const audit = createMemoryAuditSink();
   const gate = createShellGate({
     classifyShell: () => "review",
@@ -316,7 +316,9 @@ test("(a) 通道不可用（无人值守）→ 拒绝", async () => {
   const r = await gate(REQ);
   assert.equal(r.allow, false);
   if (r.allow) return;
-  assert.match(r.reason, /不可用/);
+  // F-4-X1（2026-10-16 客户批准）：不再固定「操作者通道不可用（无人值守？）」——转达通道上报的真实 reason。
+  assert.match(r.reason, /无 TTY/, "转达通道真实 reason");
+  assert.ok(!r.reason.includes("无人值守"), "不再加固定猜因");
   assert.equal(audit.records[0].branch, escalateBranch(BRANCH_B_UNSURE, BRANCH_A_UNAVAILABLE));
 });
 

@@ -1,0 +1,174 @@
+// F-1 命令级执行时限：经批准的修复提案 §⑤ 测试计划（全部用短时限/桩子进程，不真等分钟级）。
+// 契约：到期经共享幂等 terminate() 终止（SIGTERM→250ms→SIGKILL→1000ms 清理上限不变），
+// 结果如实返回「超时已终止（N ms）」+ 部分输出 + execution.timedOut/timeoutMs；轮次继续；
+// 与「停止本轮」先到先收口、互斥幂等。诊断：shell.exec.start（含生效 timeoutMs）/ shell.exec.timeout。
+import test from "node:test";
+import assert from "node:assert/strict";
+import { mkdtemp, readdir, rm } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { buildGovernedTools } from "../../src/provider/runtime/tools.ts";
+import type { GovernedToolsOptions, WriteGate } from "../../src/model/runtime.ts";
+import { allow, until } from "./fixtures.ts";
+
+const tools = (gate: WriteGate, options?: GovernedToolsOptions) => new Map(buildGovernedTools(gate, options).map((tool) => [tool.name, tool]));
+const temp = () => mkdtemp(path.join(os.tmpdir(), "ans-runtime-core-"));
+const allowGate = async () => ({ allow: true as const, by: "fixture" });
+const hang = `${process.execPath} -e 'setInterval(()=>{},1000)'`;
+const quick = `${process.execPath} -e 'process.stdout.write("quick")'`;
+
+type DiagnosticLog = NonNullable<GovernedToolsOptions["diagnostics"]>;
+/** 捕获 diagnostics 事件与**原始字段**的替换件（生产 logger 另有字段白名单；本替身原样记录，供断言解析值）。 */
+function spyDiagnostics(): { log: DiagnosticLog; events: Array<{ event: string; fields?: Record<string, unknown> }> } {
+  const events: Array<{ event: string; fields?: Record<string, unknown> }> = [];
+  const log: DiagnosticLog = {
+    record(event, fields) { events.push({ event, fields }); },
+    error(event, _error, fields) { events.push({ event, fields }); },
+  };
+  return { log, events };
+}
+
+test("F-1-a：挂起命令在命令级时限内被终止，如实返回「超时已终止（300 ms）」+ timedOut/timeoutMs，耗时短收口", async () => {
+  const root = await temp();
+  try {
+    const diag = spyDiagnostics();
+    const shell = tools(allow, { shellGate: allowGate, shellCwd: root, shellExecTimeoutMs: 300, diagnostics: diag.log }).get("run_shell")!;
+    const began = Date.now();
+    const result = await shell.handler({ name: "run_shell", args: { command: hang }, toolCallId: "tc-timeout" });
+    const elapsed = Date.now() - began;
+    assert.equal(result.ok, false);
+    assert.match(result.message, /超时已终止（300 ms）/);
+    assert.match(result.message, /本轮可继续/);
+    assert.equal(result.execution?.timedOut, true);
+    assert.equal(result.execution?.timeoutMs, 300);
+    assert.equal(result.execution?.signal, "SIGTERM", "signal 如实（SIGTERM 生效）");
+    assert.ok(elapsed < 5000, `应在短时限内收口（实际 ${elapsed}ms）`);
+    assert.ok(diag.events.some((entry) => entry.event === "shell.exec.timeout" && entry.fields?.timeoutMs === 300), "应有 shell.exec.timeout 且带生效时限");
+    assert.ok(diag.events.some((entry) => entry.event === "shell.exec.start" && entry.fields?.timeoutMs === 300), "应有 shell.exec.start 且带生效时限");
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("F-1-a 部分输出保留：先写 stdout 再挂起 → 结果不吞已收集的证据", async () => {
+  const root = await temp();
+  try {
+    const shell = tools(allow, { shellGate: allowGate, shellCwd: root, shellExecTimeoutMs: 300 }).get("run_shell")!;
+    const result = await shell.handler({ name: "run_shell", args: { command: `${process.execPath} -e 'process.stdout.write("started");setInterval(()=>{},1000)'` } });
+    assert.equal(result.ok, false);
+    assert.equal(result.execution?.timedOut, true);
+    assert.equal(result.execution?.stdout, "started");
+    assert.match(result.message, /started/);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("F-1-opt1：SIGTERM 免疫子进程被 SIGKILL 升级收口；late 写入不出现，signal 如实", async () => {
+  const root = await temp();
+  try {
+    const shell = tools(allow, { shellGate: allowGate, shellCwd: root, shellExecTimeoutMs: 300 }).get("run_shell")!;
+    const running = shell.handler({
+      name: "run_shell",
+      args: { command: `${process.execPath} -e 'process.on("SIGTERM",()=>{});require("fs").writeFileSync("started","x");setTimeout(()=>require("fs").writeFileSync("late","x"),600)'` },
+    });
+    await until(() => existsSync(path.join(root, "started")));
+    const result = await running;
+    assert.equal(result.ok, false);
+    assert.equal(result.execution?.timedOut, true);
+    assert.equal(result.execution?.signal, "SIGKILL", "SIGTERM 免疫 → 升级 SIGKILL，signal 如实");
+    // 等到超过子进程原定写入时刻（600ms）再断言 late 未出现（SIGKILL 生效）。
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    assert.ok(!(await readdir(root)).includes("late"), "被终止的进程不得留下迟到写入");
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("F-1：快命令 + 大时限不误杀（ok:true、无 timedOut）", async () => {
+  const root = await temp();
+  try {
+    const shell = tools(allow, { shellGate: allowGate, shellCwd: root, shellExecTimeoutMs: 600000 }).get("run_shell")!;
+    const result = await shell.handler({ name: "run_shell", args: { command: quick } });
+    assert.equal(result.ok, true);
+    assert.equal(result.execution?.timedOut, undefined);
+    assert.equal(result.execution?.exitCode, 0);
+    assert.match(result.message, /quick/);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("F-1-c 解析链：env 生效且按该值收口；env 非法/0/负回退默认 600000（不可禁用）；显式选项优先于 env", async () => {
+  const root = await temp();
+  const key = "ANS_PI_SHELL_EXEC_TIMEOUT_MS";
+  const previous = process.env[key];
+  try {
+    // (a) env=250：解析值进 shell.exec.start，且超时按 250ms 收口
+    process.env[key] = "250";
+    const diagA = spyDiagnostics();
+    const shellA = tools(allow, { shellGate: allowGate, shellCwd: root, diagnostics: diagA.log }).get("run_shell")!;
+    const resultA = await shellA.handler({ name: "run_shell", args: { command: hang } });
+    assert.equal(diagA.events.find((entry) => entry.event === "shell.exec.start")?.fields?.timeoutMs, 250);
+    assert.match(resultA.message, /超时已终止（250 ms）/);
+    assert.equal(resultA.execution?.timeoutMs, 250);
+
+    // (b) env 非法与 0/负 → 回退默认 600000（只断言解析值，不等待分钟级）
+    for (const invalid of ["not-a-number", "0", "-10", ""]) {
+      process.env[key] = invalid;
+      const diagB = spyDiagnostics();
+      const shellB = tools(allow, { shellGate: allowGate, shellCwd: root, diagnostics: diagB.log }).get("run_shell")!;
+      const resultB = await shellB.handler({ name: "run_shell", args: { command: quick } });
+      assert.equal(diagB.events.find((entry) => entry.event === "shell.exec.start")?.fields?.timeoutMs, 600000, `env="${invalid}" 应回退默认`);
+      assert.equal(resultB.ok, true);
+    }
+
+    // (c) 显式选项优先于 env
+    process.env[key] = "250";
+    const diagC = spyDiagnostics();
+    const shellC = tools(allow, { shellGate: allowGate, shellCwd: root, shellExecTimeoutMs: 5000, diagnostics: diagC.log }).get("run_shell")!;
+    const resultC = await shellC.handler({ name: "run_shell", args: { command: quick } });
+    assert.equal(diagC.events.find((entry) => entry.event === "shell.exec.start")?.fields?.timeoutMs, 5000);
+    assert.equal(resultC.ok, true);
+  } finally {
+    if (previous === undefined) delete process.env[key];
+    else process.env[key] = previous;
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("F-1-b 竞争收口：中止优先（无 timedOut、中止文案）；超时先收口后再中止 → 幂等无二次结果", async () => {
+  const root = await temp();
+  try {
+    // (a) 大时限 + 100ms 后 abort → 中止语义，不得出现 timedOut
+    const controller = new AbortController();
+    const shell = tools(allow, { shellGate: allowGate, shellCwd: root, shellExecTimeoutMs: 600000 }).get("run_shell")!;
+    const running = shell.handler({ name: "run_shell", args: { command: hang }, signal: controller.signal });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    controller.abort();
+    const aborted = await running;
+    assert.equal(aborted.ok, false);
+    assert.match(aborted.message, /会话已中止，命令已请求终止/);
+    assert.equal(aborted.execution?.timedOut, undefined);
+
+    // (b) 超时先收口 → 结果恰一条；随后 abort() 不产生二次结果/异常（terminate 幂等，settled 后直接返回）
+    const controller2 = new AbortController();
+    const shell2 = tools(allow, { shellGate: allowGate, shellCwd: root, shellExecTimeoutMs: 300 }).get("run_shell")!;
+    const timed = await shell2.handler({ name: "run_shell", args: { command: hang }, signal: controller2.signal });
+    assert.equal(timed.execution?.timedOut, true);
+    assert.match(timed.message, /超时已终止（300 ms）/);
+    controller2.abort();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.equal(timed.execution?.timedOut, true, "结果对象不因迟到中止而改变");
+    assert.match(timed.message, /超时已终止（300 ms）/);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("F-1-b 与「停止本轮」既有语义回归：中止文案与清理预算不变（对照 tools.test.ts 的 abort 用例）", async () => {
+  const root = await temp();
+  try {
+    const controller = new AbortController();
+    const shell = tools(allow, { shellGate: allowGate, shellCwd: root, shellExecTimeoutMs: 600000 }).get("run_shell")!;
+    const running = shell.handler({ name: "run_shell", args: { command: `${process.execPath} -e 'require("fs").writeFileSync("started","x");setInterval(()=>{},1000)'` }, signal: controller.signal });
+    await until(() => existsSync(path.join(root, "started")));
+    controller.abort();
+    const result = await running;
+    assert.equal(result.ok, false);
+    assert.match(result.message, /会话已中止，命令已请求终止/);
+    assert.equal(result.execution?.signal, "SIGTERM");
+    assert.equal(result.execution?.timedOut, undefined);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});

@@ -107,7 +107,7 @@ export function createToolDisplayContext(options: { credentialEnvNames?: readonl
           if (target.kind==='path'||target.kind==='command') {const value=displayText(target.value,DISPLAY_LIMITS.target);if(value) projected.target={kind:target.kind,value};}
           projected.resultText=displayText(display.resultText,DISPLAY_LIMITS.result);
           projected.error=displayText(display.error,DISPLAY_LIMITS.error);
-          if (Object.keys(process).length) projected.process={...(finite(process.exitCode)&&Number.isInteger(process.exitCode)?{exitCode:process.exitCode}:{}),...(typeof process.signal==='string'?{signal:protectText(process.signal,128,undefined,redactText).text}:{}),...(displayText(process.stdout,DISPLAY_LIMITS.result)?{stdout:displayText(process.stdout,DISPLAY_LIMITS.result)}:{}),...(displayText(process.stderr,DISPLAY_LIMITS.result)?{stderr:displayText(process.stderr,DISPLAY_LIMITS.result)}:{})};
+          if (Object.keys(process).length) projected.process={...(finite(process.exitCode)&&Number.isInteger(process.exitCode)?{exitCode:process.exitCode}:{}),...(process.timedOut===true?{timedOut:true}:{}),...(typeof process.signal==='string'?{signal:protectText(process.signal,128,undefined,redactText).text}:{}),...(displayText(process.stdout,DISPLAY_LIMITS.result)?{stdout:displayText(process.stdout,DISPLAY_LIMITS.result)}:{}),...(displayText(process.stderr,DISPLAY_LIMITS.result)?{stderr:displayText(process.stderr,DISPLAY_LIMITS.result)}:{})};
           if(finite(display.durationMs)&&display.durationMs>=0)projected.durationMs=display.durationMs;
           projected.omissions=Array.isArray(display.omissions)?display.omissions.filter((x):x is ToolDisplayV1['omissions'][number]=>['budget','unsupported-input','unsupported-content'].includes(String(x))):[];
         } else {
@@ -128,6 +128,9 @@ export function createToolDisplayContext(options: { credentialEnvNames?: readonl
       if(source.input){const target=coreToolTarget(source.input.rule,source.input.args);if(target!==undefined)display.target={kind:source.input.rule==='core-command-v1'?'command':'path',value:protectText(target,DISPLAY_LIMITS.target,undefined,redactText)};else if(!source.input.rule)display.omissions.push('unsupported-input');}
       if(finite(source.durationMs)&&source.durationMs>=0)display.durationMs=source.durationMs;
       let kind: 'tool_call'|'accepted'|'denied' = 'tool_call';
+      // F-8-a / F-1 措辞分类：进程**跑完** + 退出码非零不再以「执行失败」呈现（grep 无匹配 exit 1 是合法结果）；
+      // timedOut 独立措辞「超时终止」；ok/status/kind/errorCode 契约不动，spawn 失败（execution.error）仍如实「执行失败」。
+      let outcomeWord = '调用发起';
       if(source.phase!=='start'){
         let ok:boolean|undefined;
         if(source.phase==='blocked')ok=false;
@@ -143,10 +146,13 @@ export function createToolDisplayContext(options: { credentialEnvNames?: readonl
         const error=source.error?.message??execution?.error??(!ok?message:undefined);
         if(error!==undefined)display.error=protectText(error,DISPLAY_LIMITS.error,undefined,redactText);
         if(source.error?.code!==undefined)detail.errorCode=source.error.code;
-        if(execution) display.process={...(finite(execution.exitCode)&&Number.isInteger(execution.exitCode)?{exitCode:execution.exitCode}:{}),...(execution.signal!==undefined?{signal:protectText(execution.signal,128,undefined,redactText).text}:{}),...(execution.stdout!==undefined?{stdout:protectText(execution.stdout,DISPLAY_LIMITS.result,{truncated:execution.stdoutTruncated},redactText)}:{}),...(execution.stderr!==undefined?{stderr:protectText(execution.stderr,DISPLAY_LIMITS.result,{truncated:execution.stderrTruncated},redactText)}:{})};
+        if(execution) display.process={...(finite(execution.exitCode)&&Number.isInteger(execution.exitCode)?{exitCode:execution.exitCode}:{}),...(execution.timedOut===true?{timedOut:true}:{}),...(execution.signal!==undefined?{signal:protectText(execution.signal,128,undefined,redactText).text}:{}),...(execution.stdout!==undefined?{stdout:protectText(execution.stdout,DISPLAY_LIMITS.result,{truncated:execution.stdoutTruncated},redactText)}:{}),...(execution.stderr!==undefined?{stderr:protectText(execution.stderr,DISPLAY_LIMITS.result,{truncated:execution.stderrTruncated},redactText)}:{})};
+        const exitCode=execution!==undefined&&finite(execution.exitCode)&&Number.isInteger(execution.exitCode)?execution.exitCode:undefined;
+        const exitedWithNonzeroCode=exitCode!==undefined&&execution!==undefined&&execution.error===undefined&&execution.signal===undefined&&execution.timedOut!==true;
+        outcomeWord=source.phase==='blocked'?'已阻断':ok?'执行完成':execution?.timedOut===true?'超时终止':exitedWithNonzeroCode?`已执行完成（退出码 ${exitCode}）`:'执行失败';
       }
       detail.display=display;
-      const summary=protectText(`${source.toolName} ${source.phase==='start'?'调用发起':source.phase==='blocked'?'已阻断':detail.ok?'执行完成':'执行失败'}${display.target?`：${display.target.value.text}`:''}${display.error?`（${display.error.text}）`:''}`,DISPLAY_LIMITS.summary,undefined,redactText).text;
+      const summary=protectText(`${source.toolName} ${outcomeWord}${display.target?`：${display.target.value.text}`:''}${display.error?`（${display.error.text}）`:''}`,DISPLAY_LIMITS.summary,undefined,redactText).text;
       return finish({...identity(source),kind,summary,detail});
     }catch{return diagnostic('PROJECTION_FAILED');}
   };

@@ -11,6 +11,7 @@ import os from "node:os";
 import path from "node:path";
 
 import {
+  classifyProcessOutcome,
   parseSessionJsonl,
   pickLatestSessionFile,
   probeSessionFile,
@@ -223,4 +224,47 @@ test("锚点标识：request_choice 同样配对；非交互工具/缺 title/孤
 test('legacy anchors keep exact original equivalence without sending raw titles or merging distinct calls',()=>{
  const a=interactionAnchorKey('confirm','secret-title-1');const b=interactionAnchorKey('confirm','secret-title-2');
  assert.match(a,/^legacy-anchor-v1:[0-9a-f]{64}$/);assert.notEqual(a,b);assert.notEqual(a,interactionAnchorKey('choice','secret-title-1'));assert.equal(a.includes('secret-title'),false);assert.equal(a,anchorKeyForToolCall('request_confirmation',{title:'secret-title-1'}));
+});
+
+// ————— F-8-b（2026-10-16 客户批准）：`display.process` 结构化事实优先的行分类 —————
+// 真机 F-8：`grep -rn "http" src/public` 无匹配 exit 1（命令**已正常执行完成**、非零退出是合法结果）被标成
+// 「执行失败 / 已拒绝」。判据与桌面UI 的 F-8-b 块**同源**（exitCode 非零且无 error/signal；timedOut 独立一类）；
+// 旧 JSONL 无结构化事实时行为逐字不变（过渡期兼容——既有模板分类保留）。
+
+test("F-8-b：display.process 结构化事实优先——非零退出与超时终止不归 denied；timedOut 独立一类；无事实的旧文本行行为不变", () => {
+  const entries = [
+    header(),
+    msgEntry("e1", { role: "assistant", content: [{ type: "toolCall", id: "g1", name: "run_shell", arguments: { command: 'grep -rn "http" src/public' } }] }),
+    // ① 真机证据形状 + 结构化事实（进程跑完、退出码 1、无 error/signal）：
+    msgEntry("e2", { role: "toolResult", toolCallId: "g1", toolName: "run_shell", isError: true, content: [{ type: "text", text: 'run_shell 已执行：grep -rn "http" src/public（exit 1）' }], details: { ok: false, status: "failed", display: { version: 1, omissions: [], process: { exitCode: 1 } } } }),
+    // ② 超时终止（F-1；timedOut 独立一类——不归 denied，status 保持 failed 以示异常终止）：
+    msgEntry("e3", { role: "toolResult", toolCallId: "g2", toolName: "run_shell", isError: true, content: [{ type: "text", text: "run_shell 超时已终止（600000 ms）" }], details: { ok: false, status: "failed", display: { version: 1, omissions: [], process: { timedOut: true, signal: "SIGTERM" } } } }),
+    // ③ 被信号终止（有 signal、无 timedOut）：**不落中性**——维持 denied（与桌面UI 判据一致）。
+    msgEntry("e4", { role: "toolResult", toolCallId: "g3", toolName: "run_shell", isError: true, content: [{ type: "text", text: "run_shell 已执行：x（exit 1，signal SIGKILL）" }], details: { ok: false, status: "failed", display: { version: 1, omissions: [], process: { exitCode: 1, signal: "SIGKILL" } } } }),
+    // ④ 无 display.process 的旧文本行（历史 isError=false + 模板 exit≠0）：行为**逐字不变**（既有分类保留）。
+    msgEntry("e5", { role: "toolResult", toolCallId: "g4", toolName: "run_shell", isError: false, content: [{ type: "text", text: "run_shell 已执行：ls missing（exit 1）" }] }),
+  ].join("\n");
+  const r = parseSessionJsonl(entries);
+  assert.equal(r.ok, true);
+  const rows = r.rows;
+  assert.equal(rows.length, 5, "assistant 调用行 + 4 条结论行");
+  assert.equal(rows[1].kind, "tool", "① 非零退出（结构化事实）⇒ **不归 denied**");
+  assert.equal(rows[1].activity?.status, "returned", "① status **不归 failed**（进程已正常执行完成）");
+  assert.equal(rows[1].activity?.ok, false, "① ok 事实照旧如实（契约面不动）");
+  assert.equal(rows[2].kind, "tool", "② 超时终止独立一类：不归 denied（异常终止而非拒绝）");
+  assert.equal(rows[2].activity?.status, "failed", "② status 保持 failed（显著；文案由投影摘要「超时已终止」如实给出）");
+  assert.equal(rows[3].kind, "denied", "③ 有 signal 的终止不落中性（防御式：绝不吞异常）");
+  assert.equal(rows[3].activity?.status, "failed");
+  assert.equal(rows[4].kind, "denied", "④ 无结构化事实的旧文本行：既有 knownFailure 分类保留（过渡期兼容）");
+  assert.equal(rows[4].legacyStatusSource, "legacy-classifier", "④ 旧文本行的来源标注照旧");
+
+  // 分类器直接单测（含 exit 0 / error 污染 / 版本不识别 / timedOut 优先）。
+  assert.equal(classifyProcessOutcome({ version: 1, process: { exitCode: 1 } }), "exited-nonzero");
+  assert.equal(classifyProcessOutcome({ version: 1, process: { exitCode: 0 } }), null, "exit 0 不属该类（正常完成另有措辞）");
+  assert.equal(classifyProcessOutcome({ version: 1, process: { exitCode: 1, error: "boom" } }), null, "带 error 事实不判中性（防御式）");
+  assert.equal(classifyProcessOutcome({ version: 1, process: { exitCode: 1, signal: "SIGTERM" } }), null, "带 signal 不判中性");
+  assert.equal(classifyProcessOutcome({ version: 1, process: { timedOut: true, exitCode: 1 } }), "timed-out", "timedOut 优先独立一类");
+  assert.equal(classifyProcessOutcome({ version: 99, process: { exitCode: 1 } }), null, "版本不识别不读内部字段");
+  assert.equal(classifyProcessOutcome({ version: 1 }), null);
+  assert.equal(classifyProcessOutcome(undefined), null);
 });

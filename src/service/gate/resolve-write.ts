@@ -7,6 +7,13 @@
 // 会话——任务是在对话里产生的，不该要求先声明范围。此时不做任务收窄，授权上界 = 角色边界本身。
 // 这**不是放松校验**：角色边界就是这个角色长期工作的常设授权；writeSet 只是"正式计划(plan/task_ops)"
 // 在常设授权之上再加的一层收窄，只在有计划时才有意义。缺 scope 不等于漏了 F4。
+//
+// 拒绝信息语义（F-5-main，kanban-live 真机：su 的治理笔记被 F4 硬拒、反馈不可操作）：allowedByRoot
+// 必须如实回答「此刻到底什么可写」——非 F4 分支＝边界覆盖（无任务收窄时即授权上界）；F4 分支＝
+// **当前已发行可写集**（writeSet 中仍在边界内且条件已激活的项，见 issuedByRootOf）——否则
+// 「允许写入的路径」列表会与「不在任务 writeSet 内」的拒绝原因自相矛盾。F4 分支 reason 另追加
+// 可操作指引（request_confirmation 的 preview + confirmed:true 发行路径）。**判定逻辑、放行/拒绝
+// 结果零变化**（fail-closed 不放松：未发行路径仍拒、无自动发行、无自动弹卡）。
 
 import type { BoundaryEntry, BoundarySection1, Root } from "../../model/boundary.ts";
 import { isValidConditionSlug } from "../../model/boundary.ts";
@@ -38,8 +45,11 @@ function pathCovers(e: BoundaryEntry, relTarget: string): boolean {
 }
 
 /**
- * F10：将边界内"此刻被允许"的路径按根分组，用于拒绝信息。
- * 未被条件激活的 conditional-directory 不计入（它此刻并未被允许）。
+ * F10：将边界内"此刻被允许"的路径按根分组，用于拒绝信息（**非 F4 分支**：F5 缺条件 / 未匹配 /
+ * 跨根混淆 / F7 逃逸 / 接受门等）。未被条件激活的 conditional-directory 不计入（它此刻并未被允许）。
+ * 注意（F-5-main）：F4 分支（在边界内但不在 writeSet 内）**不用本列表**——那里呈现的应是
+ * 「当前已发行可写集」（见 issuedByRootOf），否则「允许写入的路径」会与「不在任务 writeSet 内」
+ * 的拒绝语义自相矛盾（真机现场：列表列出的正是覆盖被拒路径的边界目录 `docs`）。
  */
 function allowedByRootOf(boundary: BoundarySection1, scope: TaskScope | undefined): AllowedPathsByRoot {
   const out: AllowedPathsByRoot = { skill: [], project: [] };
@@ -51,6 +61,39 @@ function allowedByRootOf(boundary: BoundarySection1, scope: TaskScope | undefine
   }
   return out;
 }
+
+/**
+ * F4 分支专用（F-5-main）：拒绝信息里的「允许写入的路径」＝**当前已发行可写集**——取 `scope.writeSet`
+ * 中**在边界内且条件已激活**的项（逐项用与判定同源的 `pathCovers`/`isActive` 过滤，不另造语义）。
+ * 合同上 writeSet 为本项目相对路径（`src/model/decision.ts`）⇒ 一律归 project 组。
+ * writeSet 为空（或全部被边界/条件滤掉）⇒ 两根皆空——如实呈现「此刻什么也写不了」，与 F4 原因一致。
+ */
+function issuedByRootOf(boundary: BoundarySection1, scope: TaskScope): AllowedPathsByRoot {
+  const out: AllowedPathsByRoot = { skill: [], project: [] };
+  const set = Array.isArray(scope.writeSet) ? scope.writeSet : [];
+  for (const w of set) {
+    const rel = normalizeLexical(w);
+    const inBoundary = boundary.entries.some(
+      (e) => e.root === "project" && pathCovers(e, rel) && isActive(e, scope),
+    );
+    if (inBoundary) out.project.push(rel);
+  }
+  return out;
+}
+
+/**
+ * F4 拒绝信息的可操作指引（F-5-main；kanban-live 真机：su 被 F4 拒后在该机制下不可能奏效的
+ * 「请客户聊天授权」上打转——聊天消息不进发行器）。指引必须与实现一致：发行只经
+ * `request_confirmation` 的 preview 逐条列路径 + 客户返回 confirmed:true（编排 confirmed-writes.ts），
+ * 且许可按会话生效（会话重建/重开即作废——真机正是重建把已发行集静默清零后同路径先过后拒）。
+ * 原头（`路径在角色边界内，但不在任务 writeSet 内（F4）：<rel>`）保持逐字不动，其后追加本段
+ * ——跨角色既有测试按原头子串断言（提案 §六.1）。
+ */
+const F4_DENIAL_GUIDANCE =
+  "\n如需写入该路径，请先取得写盘许可：若你的工具集中有 request_confirmation（确认制会话），" +
+  "把该路径逐条列入其 preview 呈客户确认——客户返回 confirmed:true 后该路径会被发行进 writeSet，" +
+  "再重试写入即可；任务型会话请把该路径加入任务 writeSet（或改在 writeSet 内选路径）。" +
+  "注意：许可按会话生效——会话重建/重开后不会自动保留，需重新确认。";
 
 function deny(reason: string, boundary: BoundarySection1, scope: TaskScope | undefined): WriteDecision {
   return { allowed: false, reason, allowedByRoot: allowedByRootOf(boundary, scope) };
@@ -134,7 +177,13 @@ export function resolveWrite(
   if (active.length > 0) {
     // F4：任务收窄 —— 仅当给了 scope 时，路径还须落在 writeSet 内；无 scope 则不做此收窄
     if (scope !== undefined && !writeSetContains(scope, rel)) {
-      return deny(`路径在角色边界内，但不在任务 writeSet 内（F4）：${rel}`, boundary, scope);
+      return {
+        allowed: false,
+        // 原头逐字保留（跨角色断言依赖）；其后追加可操作指引（F-5-main）
+        reason: `路径在角色边界内，但不在任务 writeSet 内（F4）：${rel}${F4_DENIAL_GUIDANCE}`,
+        // F-5-main：F4 分支的列表＝当前已发行可写集（不是边界条目——那会与拒绝原因自相矛盾）
+        allowedByRoot: issuedByRootOf(boundary, scope),
+      };
     }
     return { allowed: true, matchedEntry: active[0] };
   }

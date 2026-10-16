@@ -72,6 +72,35 @@ export interface RoleSessionHistory {
   skipped: number;
 }
 
+/**
+ * **F-8-b（2026-10-16 客户批准）**：`display.process` 结构化事实的行分类——判据与「运行时核心投影 /
+ * 桌面UI 行分类」的**冻结接口**一致（桌面UI 侧同判据见 `app/renderer/tool-rows.js` 的 F-8-b 块）：
+ *  · `exited-nonzero`：`exitCode` 为数字、**非 0**、且无 `error`/`signal`、未被时限终止 ⇒「进程跑完+
+ *    退出码非零」（命令已正常执行完成，非零退出码可以是合法结果，如 grep 无匹配 exit 1）——
+ *    **不归 kind='denied'/failed**（真机 F-8：这个类被标红「执行失败」是语义噪声）；
+ *  · `timed-out`：`timedOut === true`（命令级执行时限终止，F-1）——**独立一类**，不与上者混同
+ *    （行 status 保持 `failed` 以示异常终止；文案由投影摘要「超时已终止（N ms）」如实给出）；
+ *  · `null`：无结构化事实 / 版本不识别 / 其它情形 ⇒ 调用方维持既有分类（**过渡期兼容**：旧 JSONL 行
+ *    无 `display.process`，行为逐字不变）。
+ */
+export function classifyProcessOutcome(display: unknown): "exited-nonzero" | "timed-out" | null {
+  const d = asRecord(display);
+  if (!d || d.version !== 1) return null;
+  const process = asRecord(d.process);
+  if (!process) return null;
+  if (process.timedOut === true) return "timed-out";
+  if (
+    typeof process.exitCode === "number" &&
+    Number.isFinite(process.exitCode) &&
+    process.exitCode !== 0 &&
+    process.error === undefined &&
+    process.signal === undefined
+  ) {
+    return "exited-nonzero";
+  }
+  return null;
+}
+
 /** 该角色的会话目录（绝对路径）。 */
 export function sessionsDirFor(projectRoot: string, roleId: string): string {
   return path.join(projectRoot, ".ans", "sessions", roleId);
@@ -188,7 +217,13 @@ function rowsFromEntry(entry: unknown, interactionCalls: Map<string, string>, to
     const failed = m.isError === true || details?.ok === false || details?.status === "failed" || knownFailure;
     row.legacyStatusSource = knownFailure && m.isError !== true && details?.ok !== false && details?.status !== 'failed' ? 'legacy-classifier' : typeof m.isError === 'boolean' ? 'native-result' : typeof details?.ok === 'boolean' || typeof details?.status === 'string' ? 'tool-details' : 'legacy-classifier';
     if (failed) row.kind = "denied";
-    row.activity = { toolName: name, target, phase: "result", status: failed ? "failed" : details?.status === "completed" && details?.ok !== false ? "completed" : m.isError === false ? "returned" : "unknown",
+    // —— F-8-b（2026-10-16 客户批准）：**结构化事实优先**（判据见 `classifyProcessOutcome`）——
+    // 「进程跑完+退出码非零」与「超时终止」两类**都不归「已拒绝」**（前者是合法结果；后者是异常终止而非拒绝，
+    // 其 status 保持 failed 以示显著——文案由投影摘要如实给出）。旧 JSONL 不携带 `display.process` 时
+    // `processClass === null` ⇒ 既有模板分类逐字保留（过渡期口径：事实优先、无事实的旧文本行不变）。
+    const processClass = classifyProcessOutcome(details?.display);
+    if (processClass === "exited-nonzero" || processClass === "timed-out") row.kind = "tool";
+    row.activity = { toolName: name, target, phase: "result", status: processClass === "exited-nonzero" ? "returned" : failed ? "failed" : details?.status === "completed" && details?.ok !== false ? "completed" : m.isError === false ? "returned" : "unknown",
       ...(callId ? { toolCallId: callId } : {}), ...(typeof details?.turnId === "string" ? { turnId: details.turnId } : {}), ...(typeof details?.ok === "boolean" ? { ok: details.ok } : {}) };
     const anchorKey = callId !== "" ? interactionCalls.get(callId) : undefined;
     if (callId !== "" && anchorKey !== undefined) {

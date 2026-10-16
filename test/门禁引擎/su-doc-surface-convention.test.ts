@@ -9,7 +9,8 @@
 //
 // 本文件钉住 su 内置卡文本（`BUILT_IN_ROLE_CARD_TEXT`，单一来源）中的约定：
 //  1. 内置治理角色**没有角色目录**；工作文档固定写在 `docs/su/memo.md`（有进展或新挂起就更新，
-//     不等客户问）与 `docs/su/changelog.md`；落盘前照常经 `request_confirmation` 客户确认；
+//     不等客户问）与 `docs/su/changelog.md`；**2026-10-16 客户裁定起 `docs/su/**` 与
+//     `docs/contracts/**` 免逐次确认**（预置豁免；其余一切写盘仍逐路径确认——见下第 5 节）；
 //  2. **红线**：不要在 `角色卡/` 下建 `su`（或任何非项目角色）目录——说明理由：该目录下每个目录
 //     都会被角色枚举按角色 id 解析（`su` 与内置角色 id 冲突 → 判「角色重复」跳过并告警；非角色
 //     目录 → 触发「缺少 role-card.md」告警）；
@@ -22,6 +23,13 @@
 //     本文件反向钉死其不再出现，且任何「写之前拒绝」小句必须带情形限定。分支行为本身已由
 //     `cold-start-genesis.test.ts`（创世可写）与 `built-in-section-equivalence.test.ts`（回退
 //     拒写）在运行时钉死，本文件只钉文案。
+//  5. **确认制要点段（F-5-main；2026-10-16 预置豁免修订）**：`docs/su/**` 与 `docs/contracts/**`
+//     的写盘许可已预置、**无需逐次确认**（客户原话「这个 su 可以写 docs/su 的目录，不需要我审批」
+//     ＋「还有个契约目录也可以给他写。」；机制＝编排给 su 会话初始 writeSet 预置这两棵目录树，
+//     开会话/重建均生效）；**其余一切写盘**（含 `角色卡/**`、`docs/` 其他路径）仍须 preview 逐条
+//     列路径 + `confirmed:true` 才发行；「按会话生效」只约束经确认发行的路径，预置两目录不受重建
+//     影响。卡文本措辞不用「授权」字面——J-1 守卫（`dispatch-after-landing-convention.test.ts:51`）
+//     拦未否定的「授权/获准/放行」小句，沿用 2026-10-12 先例改用「许可/预置」。
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -40,7 +48,16 @@ test("su 自己的文档面写死：`docs/su/memo.md`（进行中事项/待确�
   assert.ok(T.includes("有进展或新挂起就更新"), "须写明更新时机（不等客户问）");
   assert.ok(T.includes("不等客户问"), "须写死「不等客户问」的持续维护口径");
   assert.ok(T.includes("变更记录"), "须点明 changelog.md 的定位（变更记录）");
-  assert.ok(T.includes("落盘前照常经") && T.includes("request_confirmation"), "落盘前照常经 request_confirmation 客户确认");
+  assert.ok(T.includes("跨角色契约文档"), "须点明 docs/contracts/** 的定位（跨角色契约文档）");
+  assert.ok(
+    T.includes("`docs/su/**`") && T.includes("`docs/contracts/**`"),
+    "预置豁免须逐一点名两棵目录树：`docs/su/**` 与 `docs/contracts/**`（2026-10-16 客户裁定）",
+  );
+  assert.equal(
+    T.includes("落盘前照常经"),
+    false,
+    "旧「su 笔记落盘一律先经 request_confirmation」句不得保留——两目录已免逐次确认，留着会让 su 仍逐次请求",
+  );
 });
 
 test("红线：不要在 `角色卡/` 下建 `su`（或任何非项目角色）目录——含两类告警的说明", () => {
@@ -97,5 +114,55 @@ test("反向断言：不得再有无条件的普遍拒绝断言——凡「写�
   assert.ok(denyClauses.length >= 1, "分支③的拒绝句须在（含「写之前拒绝」）");
   for (const c of denyClauses) {
     assert.match(c, /两者皆无|这一种|回退内置/, `「写之前拒绝」小句必须限定到回退情形，实得：${c}`);
+  }
+});
+
+// ———————————— 5：确认制要点段（F-5-main + 2026-10-16 预置豁免修订） ————————————
+
+test("确认制要点·预置豁免（2026-10-16）：`docs/su/**` 与 `docs/contracts/**` 免逐次确认、开会话与重建均生效；其余一切写盘仍逐路径确认", () => {
+  assert.ok(T.includes("确认制要点"), "须有「确认制要点」段（F-5-main）");
+  // 位置：在「docs/su 文档面」段之后（F-5 提案 §3.1；2026-10-16 修订后锚句改为文档面段首句）
+  assert.ok(
+    T.indexOf("没有角色目录") < T.indexOf("确认制要点"),
+    "确认制要点须在文档面段（没有角色目录…）之后",
+  );
+  // —— 预置豁免：两棵目录树逐一点名，明确「无需逐次确认」——
+  assert.ok(T.includes("`docs/su/**`") && T.includes("`docs/contracts/**`"), "豁免须逐一点名两棵目录树");
+  assert.ok(T.includes("无需逐次确认"), "两目录须写明无需逐次确认（否则 su 仍逐次请求、行为不变）");
+  assert.ok(T.includes("已预置"), "须写明写盘许可已预置（措辞不用「预授权」：J-1 守卫拦未否定的「授权」小句）");
+  assert.ok(T.includes("开会话与重建后均生效"), "须写明预置开会话与重建均生效（与编排机制口径一致）");
+  assert.ok(
+    T.includes("预置的两棵目录树除外") && T.includes("不受重建影响"),
+    "「重建/重开需重确认」句须回指预置目录的例外（不受重建影响、始终可直接写入）",
+  );
+  // —— 其余一切写盘：仍逐路径确认（从严——仅这两棵目录树免确认）——
+  assert.ok(T.includes("其余一切写盘"), "须写明其余一切写盘仍逐路径确认");
+  assert.ok(
+    T.includes("`角色卡/**`") && T.includes("`docs/` 的其他路径"),
+    "其余范围须含 `角色卡/**` 与 `docs/` 的其他路径（从严口径：docs/ 下仅两目录例外）",
+  );
+  assert.ok(T.includes("每个路径逐条"), "须写明每个路径逐条列入（逐条是发行的前提——整段描述不发行）");
+  assert.ok(T.includes("`request_confirmation` 的 preview"), "须点名 request_confirmation 的 preview");
+  assert.ok(T.includes("confirmed:true"), "须点名 confirmed:true（唯一发行凭据）");
+  assert.ok(T.includes("口头") && T.includes("不能作为写盘依据"), "须写明对话里口头同意不算（不能作为写盘依据）");
+  assert.ok(T.includes("按会话生效"), "须写明写盘许可按会话生效（只约束经确认发行的路径）");
+  assert.ok(T.includes("会话重建/重开"), "须点名会话重建/重开（确认许可不自动保留）");
+  assert.ok(T.includes("需重新确认"), "须写明重建/重开后需重新确认");
+  assert.ok(T.includes("已确认过的路径不必重复确认"), "须写明同一会话内已确认路径不必重复确认（防过度刷卡）");
+});
+
+test("确认制要点·反向断言：凡含 `docs/su` 的小句不得要求确认；旧「落盘前照常经…确认」句不得复现", () => {
+  // 旧句（对 docs/su 的普遍确认要求）已被 2026-10-16 裁定修正，逐字不得保留。
+  assert.equal(T.includes("落盘前照常经"), false, "旧「落盘前照常经 request_confirmation 客户确认」句不得保留");
+  // 小句级（。；换行切开）：凡含 `docs/su` 的小句不得出现「须/需要/照常/务必 (先|经|逐次)?确认」式要求
+  //（该目录树免逐次确认；防将来以别的措辞把「笔记也要先确认」塞回来）。
+  const suClauses = T.split(/[。；\n]/).filter((c) => c.includes("docs/su"));
+  assert.ok(suClauses.length >= 2, "`docs/su` 小句须存在（文档面段与确认制要点段各至少一处）");
+  for (const c of suClauses) {
+    assert.doesNotMatch(
+      c,
+      /(须|需要|照常|务必)[^，。]{0,10}(先|经|逐次)?确认/,
+      `含 docs/su 的小句不得要求确认，实得：${c}`,
+    );
   }
 });

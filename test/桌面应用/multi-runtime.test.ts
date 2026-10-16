@@ -692,6 +692,38 @@ test("history preserves canonical start/blocked/result phases for the same faile
   } finally { temp.cleanup(); }
 });
 
+test("F-8-b：ANS 历史行分类以 display.process 结构化事实为准——进程跑完+非零退出不归 denied；timedOut 独立一类（事实经读侧再投影保留）", async () => {
+  const temp = fixture();
+  const directory = path.join(temp.root, ".ans", "sessions", "A", "pi", "ans");
+  fs.mkdirSync(directory, { recursive: true });
+  const display = (process: Record<string, unknown>) => ({
+    version: 1, omissions: [],
+    target: { kind: "command", value: { text: 'grep -rn "http" src/public', truncated: false, redacted: false } },
+    resultText: { text: 'run_shell 已执行：grep -rn "http" src/public（exit 1）', truncated: false, redacted: false },
+    process,
+  });
+  const entries = [
+    { kind: "event", turnId: "t1", at: "2026-10-16T00:00:01Z", event: { kind: "denied", summary: "run_shell 已执行完成（退出码 1）：grep -rn \"http\" src/public", turnId: "t1", detail: { toolName: "run_shell", toolCallId: "c1", phase: "result", ok: false, status: "failed", errorCode: "TOOL_FAILED", display: display({ exitCode: 1 }) } } },
+    { kind: "event", turnId: "t1", at: "2026-10-16T00:00:02Z", event: { kind: "denied", summary: "run_shell 超时终止：grep -rn \"http\" src/public", turnId: "t1", detail: { toolName: "run_shell", toolCallId: "c2", phase: "result", ok: false, status: "failed", display: display({ timedOut: true, signal: "SIGTERM" }) } } },
+    { kind: "event", turnId: "t1", at: "2026-10-16T00:00:03Z", event: { kind: "denied", summary: "拒绝写入：目标不在角色允许范围", turnId: "t1", detail: { toolName: "write_file", toolCallId: "c3", phase: "blocked", ok: false, status: "failed" } } },
+  ];
+  fs.writeFileSync(path.join(directory, "replay.jsonl"), entries.map((entry) => JSON.stringify(entry)).join("\n") + "\n");
+  try {
+    const history = await getSessionHistory({ projectRoot: temp.root, roleId: "A", runtime: "pi" });
+    assert.equal(history.error, null);
+    assert.equal(history.rows.length, 3);
+    assert.equal(history.rows[0].kind, "tool", "① 非零退出（结构化事实）⇒ **不归 kind='denied'**（旧实现在此行归 denied）");
+    assert.equal(history.rows[0].activity?.status, "returned", "① status **不归 failed**");
+    assert.equal(history.rows[0].activity?.ok, false, "① ok 契约面照旧如实");
+    assert.equal((history.rows[0].activity?.display as { process?: { exitCode?: number } } | undefined)?.process?.exitCode, 1, "① 结构化事实随行（读侧再投影后 exitCode 保留——桌面UI 按其同判据块改标签/去红）");
+    assert.equal(history.rows[1].kind, "tool", "② timedOut 独立一类：不归 denied（不再与「已拒绝」混同）");
+    assert.equal(history.rows[1].activity?.status, "failed", "② status 保持 failed（异常终止显著）");
+    assert.equal((history.rows[1].activity?.display as { process?: { timedOut?: boolean } } | undefined)?.process?.timedOut, true, "② timedOut 事实经再投影保留");
+    assert.equal(history.rows[2].kind, "denied", "③ 治理拒绝（blocked）照旧 denied——分流不误伤");
+    assert.equal(history.rows[2].activity?.phase, "blocked", "③ blocked 阶段照旧");
+  } finally { temp.cleanup(); }
+});
+
 test('A native-only Pi fallback stays readable through pure protected projection without raw anchor or template facts',async()=>{
  const temp=fixture();const key='ANS_WINDOW_LEGACY_FAKE_'+Date.now();const secret='legacy-fixture-secret-unique';process.env[key]=secret;
  const dir=path.join(temp.root,'.ans','sessions','A');fs.mkdirSync(dir,{recursive:true});

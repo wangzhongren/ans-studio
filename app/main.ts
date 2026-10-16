@@ -258,6 +258,11 @@ function registerIpc(win: BrowserWindow): void {
     },
   });
   win.on("closed", () => shellConfirm.rejectAllPending("窗口已关闭，未获放行（fail-closed）"));
+  // F-4-opt1（2026-10-16 客户批准）：窗口重新获得焦点/重新显示（最小化还原、被遮挡后回到前台）时**幂等重推**
+  // 未决确认卡——若某次推达在渲染侧丢失，操作者一回到窗口即可再收到（复用既有幂等重推，与
+  // `app:recovery-ready` 同款；只重推**仍挂起**的项——过期/已决项绝无放行语义，重推不改变任何判定）。
+  win.on("focus", () => shellConfirm.replayPending());
+  win.on("show", () => shellConfirm.replayPending());
   registerHandler("app:recovery-ready", (event) => {
     if (event.sender !== win.webContents) return { ok: false };
     customerChannel.replayPending();

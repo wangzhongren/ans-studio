@@ -341,6 +341,13 @@ export async function* withHandback(
             handback.summary = `${why}${reason}，尚不能确认任务完成。`
               + (report !== undefined ? `中断前报告：${report.summary}` : handback.summary);
           }
+          // **F-3-d（2026-10-16 客户批准）**：截断事实随终态回交对 su **直读可见**——仅给
+          // **terminal-fallback** 摘要附注（未交报告、正式报告缺失正是截断的后果）；模型自己交的
+          // submitted-report 摘要是权威值，不代改。事实来源 = 适配器 settle detail 的
+          // `truncation:"length"`（F-3-b 外推；**追加字段**、旧适配器无此字段则无注记——忽略安全）。
+          if (report === undefined && detail.truncation === "length") {
+            handback.summary += "（截断：stopReason=length）";
+          }
           handback.round = round;
           if (report !== undefined) handback.origin = "submitted-report";
           else handback.origin = "terminal-fallback";

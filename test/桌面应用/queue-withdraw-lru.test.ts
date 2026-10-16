@@ -54,6 +54,8 @@ interface Harness {
   roleStates: { roleId: string; busy: boolean; queue: QueueViewItem[] }[];
   emitted: { roleId: string; kind: string; summary: string }[];
   latest: (roleId: string) => { roleId: string; busy: boolean; queue: QueueViewItem[] } | undefined;
+  /** F-2-T5 夹具：挂起某角色**下一次** send（release 前不 resolve）。 */
+  hangNext: (roleId: string) => () => void;
 }
 
 function makeHarness(l: ProjectListing): Harness {
@@ -62,12 +64,24 @@ function makeHarness(l: ProjectListing): Harness {
   const roleStates: Harness["roleStates"] = [];
   const emitted: Harness["emitted"] = [];
   const stopped: Record<string, boolean> = {};
+  // F-2-T5 夹具（2026-10-16）：可控挂起的 send——release 前 promise 不 resolve（模拟整轮在跑）。
+  const nextGate: Record<string, Promise<void> | undefined> = {};
+  const hangNext = (roleId: string): (() => void) => {
+    let release!: () => void;
+    nextGate[roleId] = new Promise<void>((resolve) => { release = resolve; });
+    return release;
+  };
   const makeHandle = (roleId: string): RoleSessionHandle => {
     let i = 0;
     streams[roleId] = streams[roleId] ?? [];
     sent[roleId] = sent[roleId] ?? [];
     return {
       async send(text: string): Promise<void> {
+        const gate = nextGate[roleId];
+        if (gate) {
+          nextGate[roleId] = undefined;
+          await gate;
+        }
         sent[roleId].push(text);
       },
       events(): AsyncIterable<OrchestrationEvent> {
@@ -117,6 +131,7 @@ function makeHarness(l: ProjectListing): Harness {
     sent,
     roleStates,
     emitted,
+    hangNext,
     latest: (roleId) => {
       for (let i = roleStates.length - 1; i >= 0; i -= 1) if (roleStates[i].roleId === roleId) return roleStates[i];
       return undefined;
@@ -246,4 +261,45 @@ test("P1-2 LRU 避开 busy：挑最久未用的非 busy 者；全忙暂超限；
   assert.deepEqual(h2.mgr.liveRoleIds().sort(), ["A", "C", "D"], "settled 后下一时机收 B（最久未用的非忙者；暂超限的账在此清零）");
   assert.equal(h2.latest("A")?.busy, true, "仍在跑的其余角色不受影响");
   await h2.mgr.stop(null);
+});
+
+// ————— F-2-T5（2026-10-16 客户批准）：认领已发生、send 尚未 resolve 的窗口语义 —————
+// F-2-M1 把投递的「认领（shift/置忙/activeDeliveries 登记）」与「send 结算」拆开——本用例钉住：
+// **认领已发生但 send promise 仍挂起**的条目，withdraw 仍如实「进行中，撤回无效」；放行后顺序与内容不损。
+
+test("F-2-T5 认领已发生（send 未结）⇒ withdraw 如实「进行中，撤回无效」；放行后两笔按序送达（撤回无效 ≠ 丢弃）", async () => {
+  const l = listing(["su", "A"], "su");
+  const h = makeHarness(l);
+  await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  await tick(30);
+
+  // 第一轮由直接消息开跑并挂起（send promise 未结——模拟真实 Pi 整轮在跑）：
+  const release1 = h.hangNext("A");
+  const p1 = h.mgr.send("在跑（挂起）");
+  await tick(30);
+  assert.equal(h.latest("A")?.busy, true, "第一轮在跑（真实快照忙）");
+
+  // 第二条客户消息（A 忙 ⇒ 入队）。
+  const r2 = await h.mgr.send("排队消息");
+  assert.equal(r2.queued, true);
+  const queued = h.latest("A")?.queue ?? [];
+  assert.equal(queued.length, 1);
+  const msg2Id = queued[0].id;
+
+  // A settle ⇒ drain **认领**第二条（activeDeliveries 登记、busy 保持）→ 其 send 再挂起。
+  const release2 = h.hangNext("A");
+  h.streams.A.push({ kind: "settled", summary: "第一轮结束" });
+  await tick(150);
+  assert.equal(h.latest("A")?.busy, true, "第二条已开跑（认领已发生、send 未结）");
+  const wd = h.mgr.withdraw("A", msg2Id);
+  assert.equal(wd.ok, false, "认领已发生（进行中）⇒ 撤回无效");
+  assert.match(wd.error ?? "", /进行中/, "如实说明（正在被执行）");
+
+  // 放行两笔（先第一笔、再第二笔）：顺序与内容不损（撤回无效 ≠ 丢弃）。
+  release1();
+  release2();
+  await p1;
+  await tick(80);
+  assert.deepEqual(h.sent.A, ["在跑（挂起）", "排队消息"], "两笔按序送达（链路收窄后语义逐字保真）");
+  await h.mgr.stop(null);
 });

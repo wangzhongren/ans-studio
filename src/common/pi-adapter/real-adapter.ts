@@ -58,6 +58,7 @@ import {
   PROMPT_TIMEOUT_ENV,
   type InteractionGate,
   isTimeoutError,
+  readOptionalTimeoutMs,
   readTimeoutMs,
   withPausableTimeout,
   withTimeout,
@@ -329,6 +330,8 @@ interface PiToolEventContext {
   callFacts?: Map<string, PiCallFacts>;
   inputRules?: ReadonlyMap<string, ToolDisplayInputRuleV1 | undefined>;
   roleId?: string;
+  /** F-3-a：成功 submit_report（`!isError`）时回调，附当时的 turnId——「本轮已交报告」记账（防重复催交）。 */
+  noteReportSubmitted?: (turnId: string | undefined) => void;
 }
 // Only display-eligible argument keys may be retained across the SDK hook boundary.
 function displayInput(rule: ToolDisplayInputRuleV1 | undefined, args: unknown): RuntimeToolInputFactsV1 {
@@ -524,6 +527,10 @@ export function buildGovernanceExtension(
         const call = facts.get(event.toolCallId);
         facts.delete(event.toolCallId);
         const result = event.result.details !== null && typeof event.result.details === "object" ? event.result.details as Record<string, unknown> : {};
+        // F-3-a：成功 submit_report 记账（「本轮已交报告」判据）——截断补发不再催一份已交的报告。
+        if (event.toolName === "submit_report" && !event.isError) {
+          context?.noteReportSubmitted?.((typeof result.turnId === "string" ? result.turnId : undefined) ?? metadata?.turnId ?? context?.currentTurnId?.());
+        }
         const detail = {
           turnId: typeof result.turnId === "string" ? result.turnId : metadata?.turnId,
           toolName: event.toolName, toolCallId: event.toolCallId, phase: "result",
@@ -602,6 +609,45 @@ function extractMessageText(message: unknown): string | undefined {
   return parts.join("");
 }
 
+// —————————————————————— F-3-a：截断收尾补发（kanban-live F-3 修复，客户已批准） ——————————————————————
+//
+// 背景（真机已证）：输出预算被钳到 1 token 的轮次以 stopReason=length 收场，模型来不及发出
+// submit_report；SDK 自带的「压缩并重试」在刚压完的场景会静默放弃。故适配器在**同一轮次内**、
+// **恰好一次**地补发一条简短收尾提示，让模型在正常预算的下一轮里补交报告或直接继续。
+// 语义纪律：绝不把截断当成功（outcome 不变）；绝不由系统合成报告（只认模型自己的 submit_report）；
+// 补发为 best-effort（失败只如实外推 + 有界清理，不改变本轮既有结果）。
+
+/** 显式关闭收尾补发的环境变量（`"0"/"false"/"no"/"off"` 显式关闭；缺省**开启**、可即时关）。 */
+export const LENGTH_FOLLOWUP_ENV = "ANS_PI_LENGTH_FOLLOWUP";
+/** 补发段独立时限的环境变量（毫秒；缺省 = 该会话的 promptMs）。 */
+export const LENGTH_FOLLOWUP_TIMEOUT_ENV = "ANS_PI_LENGTH_FOLLOWUP_TIMEOUT_MS";
+/** 触发补发时的事件行文案（先发本行、再补发）。 */
+export const LENGTH_FOLLOWUP_NOTICE_SUMMARY = "已自动补发一轮收尾提示（因上一轮输出被截断；限一次）。";
+/** 补发给模型的收尾提示文案（条件句写就：chat 轮最坏成本 = 一次短往返）。 */
+export const LENGTH_FOLLOWUP_TEXT = "【系统】上一轮回复因达到输出上限被截断，可能未完整收尾。若本轮任务已完成或你已确认无法完成，请立即调用 submit_report 交回简短报告（一句话结论＋关键证据）；若任务尚未完成，请直接继续（不要重复已完成的工作）。";
+
+/** 环境开关是否显式关闭收尾补发（缺省开启；仅显式关闭值才关，大小写/空白不敏感）。 */
+export function isLengthFollowupDisabled(env: Record<string, string | undefined>): boolean {
+  const raw = env[LENGTH_FOLLOWUP_ENV];
+  if (raw === undefined) return false;
+  const value = raw.trim().toLowerCase();
+  return value === "0" || value === "false" || value === "no" || value === "off";
+}
+
+/**
+ * F-3-a 收尾补发配置（内部接缝；**缺省不传 ⇒ 行为与旧版逐字一致**——直接调用方/旧测试无感）。
+ * `enabled` 的合成在 `bindRole`：env 开关（缺省开）∧ 注入工具集含 `submit_report`。
+ */
+export interface LengthFollowupOptions {
+  enabled: boolean;
+  /** 补发给模型的收尾提示文案（生产传 `LENGTH_FOLLOWUP_TEXT`）。 */
+  text: string;
+  /** 补发段独立硬超时；缺省 = 该会话 `promptMs`。 */
+  timeoutMs?: number;
+  /** 本轮是否已有成功 `submit_report`（同轮去重判据，由接线方按 turnId 记账）。 */
+  wasReportSubmitted: () => boolean;
+}
+
 // —————————————————————— 角色会话的 prompt 包装（设计 K-2 图片透传 / G-1 可暂停时限） ——————————————————————
 
 /** 包装所需的底层会话面（结构上兼容 AgentSession；导出工厂便于**接线测试用桩件替换**）。 */
@@ -636,6 +682,8 @@ export function makeRolePrompt(deps: {
   finishOnReturn?: boolean;
   /** Core owns the input echo on injected production sessions. Direct helpers retain compatibility. */
   emitPromptInput?: boolean;
+  /** F-3-a：截断收尾补发配置；**缺省不传 ⇒ 行为与旧版逐字一致**（见 LengthFollowupOptions）。 */
+  lengthFollowup?: LengthFollowupOptions;
 }): (text: string, opts?: PromptOptions) => Promise<void> {
   const { session, promptMs, gate, emit, log } = deps;
   const lifecycle = deps.lifecycle ?? createTurnLifecycle(emit, deps.diagnostics);
@@ -655,6 +703,33 @@ export function makeRolePrompt(deps: {
       // 每轮硬超时**可暂停**（G-1）：客户输入挂起期间计时停走，作答后续算剩余时间。
       const calling = images !== undefined ? session.prompt(text, { images }) : session.prompt(text);
       await withPausableTimeout(calling, promptMs, "prompt", gate);
+      // F-3-a（截断收尾补发）：仅在首个 prompt **正常返回后**考虑——「开关开启 ∧ 末条消息截断 ∧
+      // 本轮无成功 submit_report ∧ 生命周期未被强制锁定（abort/超时）」时，用**独立的**
+      // withPausableTimeout 段补发**恰一次**收尾提示。限一次是**结构性保证**：本分支每次 prompt()
+      // 调用只经过一次；补发直调底层 session.prompt，不递归本包装、不新增 settled/handback 发射点。
+      // 补发为 best-effort：失败只如实外推 + 有界清理，绝不把已完成的轮次改判（诚实降级由编排照旧处理）。
+      const followup = deps.lengthFollowup;
+      if (followup !== undefined && followup.enabled && lifecycle.wasTruncated() && !followup.wasReportSubmitted()) {
+        emit({ kind: "message", summary: LENGTH_FOLLOWUP_NOTICE_SUMMARY, detail: { turnId: lifecycle.currentTurnId(), source: "length-followup" } });
+        try {
+          await withPausableTimeout(session.prompt(followup.text), followup.timeoutMs ?? promptMs, "prompt", gate);
+        } catch (err) {
+          const timedOut = isTimeoutError(err);
+          const message = err instanceof Error ? err.message : String(err);
+          // 先**封存**本轮既有 outcome：随后的 abort 清理会引发迟到的 SDK agent_settled(aborted)/中止消息，
+          // 封存后它们不得把已完成的轮次改判为 aborted（「补发失败不改变 settled 的 outcome」）。
+          lifecycle.seal();
+          log.stage(`收尾补发失败：${message}`);
+          emit({ kind: "message", summary: `收尾补发失败：${message}`, detail: { turnId: lifecycle.currentTurnId(), source: "length-followup" } });
+          deps.diagnostics?.record(timedOut ? "prompt.length_followup_timeout" : "prompt.length_followup_failed", { turnId: lifecycle.currentTurnId(), errorType: err instanceof Error ? err.name : "Error", errorCode: timedOut ? "PROMPT_TIMEOUT" : "PROMPT_FAILED" });
+          try {
+            await (deps.requestAbort?.() ?? withTimeout(session.abort(), deps.abortTimeoutMs ?? 5000, "abort 清理"));
+          } catch (cleanupError) {
+            lifecycle.quarantine();
+            deps.diagnostics?.error("prompt.length_followup_cleanup_failed", cleanupError, { turnId: lifecycle.currentTurnId(), errorCode: isTimeoutError(cleanupError) ? "CLEANUP_TIMEOUT" : "CLEANUP_FAILED" });
+          }
+        }
+      }
       // The SDK emits settled from finally even when prompt rejects afterwards. Publish only
       // after the promise outcome is known, so consumers cannot receive an early false success.
       if (deps.finishOnReturn || lifecycle.hasSdkSettled()) lifecycle.finish();
@@ -702,6 +777,8 @@ export interface RoleSessionDeps {
   /** Native production sessions deduplicate per-turn abort and ignore idle stop. */
   strictLifecycle?: boolean;
   emitPromptInput?: boolean;
+  /** F-3-a：截断收尾补发配置（缺省不传 ⇒ 逐字旧行为）；形状见 makeRolePrompt deps / LengthFollowupOptions。 */
+  lengthFollowup?: LengthFollowupOptions;
 }
 
 /**
@@ -847,7 +924,9 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
         };
         lifecycle = createTurnLifecycle(emit, diagnostics, opts.currentTurnId);
         const callFacts = new Map<string, PiCallFacts>();
-        const turnContext: PiToolEventContext = { currentTurnId: lifecycle.currentTurnId, diagnostics, projectToolEvent: opts.projectToolEvent, callFacts, roleId: role.id, inputRules: new Map(governedTools.map(tool => [tool.name, tool.displayInputRule])) };
+        // F-3-a：成功 submit_report 的 turnId 记账（「本轮已交报告」判据；同轮 = 同一 turnId）。
+        let reportTurnId: string | undefined;
+        const turnContext: PiToolEventContext = { currentTurnId: lifecycle.currentTurnId, diagnostics, projectToolEvent: opts.projectToolEvent, callFacts, roleId: role.id, inputRules: new Map(governedTools.map(tool => [tool.name, tool.displayInputRule])), noteReportSubmitted: (submittedTurnId) => { if (submittedTurnId !== undefined) reportTurnId = submittedTurnId; } };
         // 缺失上下文窗口的可见提示也进入事件流，确保界面/用户看得到（不只留在日志里）。
         if (contextWindowNotice !== undefined) emit({ kind: "message", summary: contextWindowNotice });
 
@@ -945,7 +1024,22 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
 
         // 会话组装抽为 `makeRoleSession`（提案 P0-2「停当前轮次」）：prompt/events/dispose 逐字旧行为，
         // 另透传 abort（SDK session.abort()——语义与核实依据见该函数文档）。
-        const roleSession = makeRoleSession({ session, promptMs, gate: interactionGate, emit, log, queue, unsubscribe: () => { unsubscribe(); callFacts.clear(); }, lifecycle, diagnostics, abortTimeoutMs: 900, strictLifecycle: true, emitPromptInput: false });
+        // F-3-a：收尾补发配置——env 开关（缺省开；`ANS_PI_LENGTH_FOLLOWUP` 显式关闭值可即时停用）
+        // ∧ 注入工具集含 submit_report（无报告通道就无谓催交）；补发段时限缺省 = 本会话 promptMs。
+        const lengthFollowupTimeoutMs = readOptionalTimeoutMs(process.env, LENGTH_FOLLOWUP_TIMEOUT_ENV);
+        const lengthFollowup: LengthFollowupOptions | undefined =
+          !isLengthFollowupDisabled(process.env) && allowedToolNames.has("submit_report")
+            ? {
+                enabled: true,
+                text: LENGTH_FOLLOWUP_TEXT,
+                ...(lengthFollowupTimeoutMs !== undefined ? { timeoutMs: lengthFollowupTimeoutMs } : {}),
+                wasReportSubmitted: () => {
+                  const id = lifecycle.currentTurnId();
+                  return id !== undefined && reportTurnId === id;
+                },
+              }
+            : undefined;
+        const roleSession = makeRoleSession({ session, promptMs, gate: interactionGate, emit, log, queue, unsubscribe: () => { unsubscribe(); callFacts.clear(); }, lifecycle, diagnostics, abortTimeoutMs: 900, strictLifecycle: true, emitPromptInput: false, lengthFollowup });
         roleSession.runtime = "pi";
         roleSession.roleId = role.id;
         roleSession.contextSource = sessionSelection.contextSource ?? (sessionSelection.mode === "in-memory" ? "in-memory" : sessionSelection.mode === "resumed" ? "resumed" : sessionSelection.note ? "recovered" : "fresh");

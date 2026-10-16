@@ -34,6 +34,26 @@ test("未配置不写盘，配置后门面记录有序元数据", async () => {
   });
 });
 
+test("执行时限元数据落盘：timeoutMs 有限数值保留、非有限丢弃；命令正文摘要不入白名单", async () => fixture(async (root) => {
+  configureDiagnostics({ directory: root });
+  const log = createDiagnosticLogger({ component: "test" });
+  log.record("shell.exec.start", { turnId: "t1", timeoutMs: 250 });
+  log.record("shell.exec.timeout", { turnId: "t1", timeoutMs: 250, durationMs: 251 });
+  log.record("shell.guard.blocked", { turnId: "t1", reasonCode: "|", excerpt: "echo private-command-text | cat" });
+  log.record("bad-infinity", { timeoutMs: Number.POSITIVE_INFINITY });
+  log.record("bad-nan", { timeoutMs: Number.NaN });
+  await flushDiagnostics();
+  const data = await rows(root);
+  assert.equal(data[0]?.timeoutMs, 250);
+  assert.equal(data[1]?.timeoutMs, 250);
+  assert.equal(data[1]?.durationMs, 251);
+  // 守卫命中 token 经 reasonCode 落盘；命令正文摘要（excerpt）属设计契约禁入内容，不入库。
+  assert.equal(data[2]?.reasonCode, "|");
+  assert.equal(data[2]?.excerpt, undefined);
+  assert.equal(data[3]?.timeoutMs, undefined);
+  assert.equal(data[4]?.timeoutMs, undefined);
+}));
+
 test("精确滚动24h边界：旧行清除，边界行保留，不碰非诊断文件", async () => fixture(async (root) => {
   const now = Date.parse("2026-10-13T12:00:00Z");
   const at = (offset: number) => new Date(now - DIAGNOSTIC_RETENTION_MS + offset).toISOString();

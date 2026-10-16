@@ -18,8 +18,10 @@ import { SessionManager } from "../../app/desktop/session.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
 import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
 import type { RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
+import { REBUILT_SESSION_WRITE_PERMITS_NOTICE } from "../../src/pipeline/orchestration/run-role.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
 import type { DispatchTaskFn } from "../../src/provider/pi/session.ts";
+import type { DesktopCustomerInputFn } from "../../app/desktop/customer-input.ts";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SESSION_SRC = fs.readFileSync(path.resolve(HERE, "..", "..", "app", "desktop", "session.ts"), "utf8");
@@ -71,15 +73,18 @@ interface Harness {
   envelopes: { roleId: string; event: import("../../app/desktop/session.ts").DesktopOrchestrationEvent }[];
   openCalls: string[];
   dispatchOf: (roleId: string) => DispatchTaskFn | undefined;
+  /** F-5-opt1：各角色句柄收到的 `queueModelNotice` 注记（重建后写权清零的模型可见化）。 */
+  notices: Record<string, string[]>;
 }
 
-function makeHarness(l: ProjectListing): Harness {
+function makeHarness(l: ProjectListing, opts: { customerInput?: DesktopCustomerInputFn; omitNoticeMethod?: boolean } = {}): Harness {
   const streams: Record<string, OrchestrationEvent[]> = { su: [], A: [] };
   const sent: Record<string, string[]> = { su: [], A: [] };
   const envelopes: { roleId: string; event: import("../../app/desktop/session.ts").DesktopOrchestrationEvent }[] = [];
   const openCalls: string[] = [];
   const openInputs: Record<string, { dispatchTask?: DispatchTaskFn }> = {};
   const stopped: Record<string, boolean> = {};
+  const notices: Record<string, string[]> = {};
 
   const makeHandle = (roleId: string): RoleSessionHandle => {
     let i = 0;
@@ -107,6 +112,13 @@ function makeHarness(l: ProjectListing): Harness {
       async dispose(): Promise<void> {
         stopped[roleId] = true;
       },
+      ...(opts.omitNoticeMethod
+        ? {} // 旧替身形态：**不带** queueModelNotice（可选方法先例——重建路径须容缺）
+        : {
+            queueModelNotice(text: string): void {
+              (notices[roleId] ??= []).push(text);
+            },
+          }),
     };
   };
 
@@ -126,8 +138,9 @@ function makeHarness(l: ProjectListing): Harness {
     getListing: (root) => (root === l.projectRoot ? l : undefined),
     emitEvent: (env) => envelopes.push(env),
     loadEffectiveConfig: STUB_LOADER,
+    ...(opts.customerInput ? { customerInput: opts.customerInput } : {}),
   });
-  return { mgr, streams, sent, envelopes, openCalls, dispatchOf: (roleId) => openInputs[roleId]?.dispatchTask };
+  return { mgr, streams, sent, envelopes, openCalls, dispatchOf: (roleId) => openInputs[roleId]?.dispatchTask, notices };
 }
 
 test("O-1：边界文件内容变更 ⇒ 活会话作废重建（如实行含文件名与 D-1 措辞）；未变 ⇒ 不重建（不丢上下文）", async () => {
@@ -230,4 +243,62 @@ test("O-1 接线钉：信号=读盘内容哈希；检查点=发言/续接/投递
       SESSION_SRC.includes('handle.contextSource === "resumed"') && SESSION_SRC.includes('handle.contextSource === "recovered"'),
     "上下文来源只由引擎实际返回，native resumed/recovered 显式映射，不从文件存在猜恢复"
   );
+});
+
+// ————— F-5-opt1（桌面侧，2026-10-16 客户批准）：重建后写权清零对**模型**如实可见 —————
+// 真机 D1：会话因边界更新重建后，编排闭包内「客户确认才发行」的已发行写权集静默清零，而模型上下文被完整
+// 恢复 ⇒ 模型与门禁认知分叉（13:21:29 写成功、重建、13:28:22 同路径无预兆 F4）。修复：确认制会话重建后，
+// 桌面经编排的 `RoleSessionHandle.queueModelNotice` 把**单一来源**注记排进下一轮输入前缀（不单独开轮）。
+
+test("F-5-opt1（桌面侧）：确认制会话（su）重建 ⇒ 恰向新句柄排一条**单一来源**注记；非确认制角色不排（无写权可清零，绝不说假话）", async () => {
+  const dir = makeProject();
+  fs.mkdirSync(path.join(dir, ".ans"), { recursive: true });
+  fs.writeFileSync(path.join(dir, ".ans", "project.json"), '{"pins":[]}\n', "utf8");
+  const h = makeHarness(listing(dir), { customerInput: async () => ({ outcome: "declined", reason: "替身：不真弹卡" }) });
+  await h.mgr.open({ projectRoot: dir, roleId: "su", runtime: "demo" });
+  await tick(30);
+
+  // pin 刷新（.ans/project.json 变化）⇒ su 会话作废重建（内置角色同样适用）。
+  fs.writeFileSync(path.join(dir, ".ans", "project.json"), '{"pins":[{"path":"x","sha256":"y"}]}\n', "utf8");
+  const r = await h.mgr.send("继续");
+  assert.equal(r.ok, true);
+  assert.equal(h.openCalls.filter((x) => x === "su").length, 2, "su 已被作废重建");
+  assert.deepEqual(h.notices.su, [REBUILT_SESSION_WRITE_PERMITS_NOTICE], "重建后恰排一条注记（同一文案引用——单一来源在编排，绝不各写一份）");
+  assert.ok(
+    REBUILT_SESSION_WRITE_PERMITS_NOTICE.includes("重建") &&
+      REBUILT_SESSION_WRITE_PERMITS_NOTICE.includes("不会自动保留") &&
+      REBUILT_SESSION_WRITE_PERMITS_NOTICE.includes("request_confirmation"),
+    "注记含如实要点：重建事实 + 写权不自动保留 + 可行恢复路径（不含任何授权语义）"
+  );
+  // 未再重建 ⇒ 不重复排（注记只在重建收尾处排一次）。
+  const r2 = await h.mgr.send("再一轮");
+  assert.equal(r2.ok, true);
+  assert.deepEqual(h.notices.su, [REBUILT_SESSION_WRITE_PERMITS_NOTICE], "未重建不重复排注记");
+  await h.mgr.stop(null);
+
+  // 项目角色（非确认制；本用例给同一通道也无所谓——判据是 role.builtIn，见 openInternal）：重建去 denied 面不变，且不排注记。
+  const dir2 = makeProject();
+  const h2 = makeHarness(listing(dir2), { customerInput: async () => ({ outcome: "declined", reason: "替身" }) });
+  await h2.mgr.open({ projectRoot: dir2, roleId: "A", runtime: "demo" });
+  await tick(30);
+  fs.writeFileSync(path.join(dir2, "角色卡", "A", "boundary.yaml"), "entries:\n  - root: project\n", "utf8");
+  const r3 = await h2.mgr.send("继续");
+  assert.equal(r3.ok, true);
+  assert.equal(h2.openCalls.filter((x) => x === "A").length, 2, "项目角色同样被重建");
+  assert.deepEqual(h2.notices.A ?? [], [], "**非确认制会话不排注记**（gate 不收窄、从未发行写权——重建不清零任何东西，绝不向模型说假话）");
+  await h2.mgr.stop(null);
+});
+
+test("F-5-opt1（桌面侧）：旧替身句柄**不带** queueModelNotice（可选方法先例）⇒ 重建照常成功（防御式 `?.`，不炸、不假装）", async () => {
+  const dir = makeProject();
+  fs.mkdirSync(path.join(dir, ".ans"), { recursive: true });
+  fs.writeFileSync(path.join(dir, ".ans", "project.json"), '{"pins":[]}\n', "utf8");
+  const h = makeHarness(listing(dir), { customerInput: async () => ({ outcome: "declined" }), omitNoticeMethod: true });
+  await h.mgr.open({ projectRoot: dir, roleId: "su", runtime: "demo" });
+  await tick(30);
+  fs.writeFileSync(path.join(dir, ".ans", "project.json"), '{"pins":[{"path":"x","sha256":"y"}]}\n', "utf8");
+  const r = await h.mgr.send("继续");
+  assert.equal(r.ok, true, "句柄无法排注记（旧替身/可选方法缺席）⇒ 重建与续发照常成功");
+  assert.equal(h.openCalls.filter((x) => x === "su").length, 2, "重建确已发生");
+  await h.mgr.stop(null);
 });

@@ -16,6 +16,21 @@ export const DEFAULT_CONSTRUCT_TIMEOUT_MS = 120000;
  * **超时 = 拒绝**（设计 §7.5 第 2 条）——绝不让「审核没回」变成「放行」。
  */
 export const DEFAULT_SHELL_REVIEW_TIMEOUT_MS = 120000;
+/**
+ * 默认**命令级执行时限**（F-1，2026-10-16 客户批准）：600000ms（10 分钟）。
+ *
+ * 与「审核时限」是两把尺子：审核时限量的是「审核没回」（超时 = 拒绝，绝不放行），
+ * 本时限量的是 **spawn 之后命令自身的运行时长**——到期经共享 `terminate()` 终止命令，
+ * 工具以「超时已终止（N ms）」如实返回，**轮次继续**（区别于「停止本轮」的 ABORTED 整轮语义）。
+ *
+ * 默认值取舍（客户已批准 600000）：覆盖常见 `npm test`/构建时长上限；无人值守挂起最多兜底
+ * 10 分钟（相对「无任何时限」是量级改善）。更长的合法任务用 `ANS_PI_SHELL_EXEC_TIMEOUT_MS`
+ * 或 `GovernedToolsOptions.shellExecTimeoutMs` 显式调大。**不可禁用**：0/负数/非法一律回退默认
+ * （readTimeoutMs 语义）——P0「挂起命令使角色停摆」的意义就是永远有一条命令级兜底。
+ */
+export const DEFAULT_SHELL_EXEC_TIMEOUT_MS = 600000;
+/** 命令级执行时限环境变量（命名对齐既有 `ANS_PI_SHELL_REVIEW_TIMEOUT_MS`）。 */
+export const SHELL_EXEC_TIMEOUT_ENV = "ANS_PI_SHELL_EXEC_TIMEOUT_MS";
 //
 // —— 交互等待时限（设计 G-1，2026-10-12 客户裁定「没必要超时，就卡在这等客户同意」）——
 //

@@ -273,6 +273,12 @@ export interface GovernedToolsOptions {
   shellGate?: ShellGate;
   shellCwd?: string;
   shellReviewTimeoutMs?: number;
+  /**
+   * 命令级执行时限（F-1）：spawn 之后命令自身的最长运行时长（毫秒）。
+   * 生效链：本选项 ?? 环境变量 `ANS_PI_SHELL_EXEC_TIMEOUT_MS` ?? 默认 600000（非法/0/负一律回退默认，
+   * **不可禁用**）。到期命令被终止、工具如实返回「超时已终止（N ms）」，轮次继续。
+   */
+  shellExecTimeoutMs?: number;
   customerInput?: CustomerInputFn;
   customerInputTimeoutMs?: number;
   interactionGate?: InteractionGate;
@@ -359,6 +365,8 @@ export type ToolDisplayV1 = {
   error?: DisplayTextV1;
   process?: {
     exitCode?: number;
+    /** 进程因**命令级执行时限**被终止（F-1；与「停止本轮」的 ABORTED 语义区分）。 */
+    timedOut?: boolean;
     signal?: string;
     stdout?: DisplayTextV1;
     stderr?: DisplayTextV1;
@@ -378,6 +386,10 @@ export type RuntimeToolExecutionFactsV1 = {
   exitCode?:number; signal?:string;
   stdout?:string; stderr?:string; error?:string;
   stdoutTruncated?:boolean; stderrTruncated?:boolean;
+  /** 命令因**命令级执行时限**被终止（F-1，可选向后兼容字段；与「停止本轮」的 ABORTED 语义区分）。 */
+  timedOut?:boolean;
+  /** 触发终止的**生效**时限（毫秒；仅 timedOut 时携带）。 */
+  timeoutMs?:number;
 };
 export type RuntimeToolResultFactsV1 = {
   ok:boolean; message:string; execution?:RuntimeToolExecutionFactsV1;

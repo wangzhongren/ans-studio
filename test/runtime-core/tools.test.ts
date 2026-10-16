@@ -29,6 +29,29 @@ test("Model/schema: required write/edit fields, optionals, unknown names and inj
   assert.equal(all.get("request_confirmation")?.executionMode, "sequential");
 });
 
+test("schema 文案（客户 2026-10-16 su 预置裁定配套）：request_confirmation 写明 su 专属例外，写盘确认必备语义保留", () => {
+  const confirm = describeTool("request_confirmation");
+  const text = [confirm.description, ...(confirm.promptGuidelines ?? [])].join("\n");
+  // 例外与门禁引擎卡文本口径一致：仅内置治理角色 su、仅 docs/su/** 与 docs/contracts/**（已预置、
+  // 免逐次确认、开会话与重建后均生效）；两棵树之外的一切写盘仍须逐条确认——正向钉住「仅 su」限定句，
+  // 防把非 su 角色带歪。
+  assert.match(text, /唯一例外（仅内置治理角色 su）/);
+  assert.match(text, /docs\/su\/\*\*/);
+  assert.match(text, /docs\/contracts\/\*\*/);
+  assert.match(text, /已预置/);
+  assert.match(text, /无需逐次确认/);
+  assert.match(text, /开会话与重建后均生效/);
+  assert.match(text, /两棵树之外的一切写盘仍须逐条确认/);
+  // 必备语义逐字保留：写盘一律先经本工具确认 / preview 逐条列路径 / confirmed:true 唯一凭据 /
+  // 未获同意不写盘 / 列出路径≠获准（后者即「列了不等于获准」，防反向措辞）。
+  assert.match(text, /写盘一律先经本工具确认/);
+  assert.match(text, /必须列出.*路径/);
+  assert.match(text, /未列出的路径/);
+  assert.match(text, /获准的唯一凭据是 `confirmed:true`/);
+  assert.match(text, /未获同意/);
+  assert.match(text, /不等于/);
+});
+
 test("gate deny/throw and gate-triggered abort produce zero filesystem effects", async () => {
   const root = await temp();
   try {

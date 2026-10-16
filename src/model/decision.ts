@@ -4,7 +4,12 @@
 
 import type { BoundaryEntry } from "./boundary.ts";
 
-// F10：按根分组，拒绝信息无歧义
+// F10：按根分组，拒绝信息无歧义。
+// 语义澄清（F-5-main，kanban-live 真机）：**非 F4 拒绝分支**＝边界覆盖（角色边界条目里
+// 此刻被激活的那些；无任务收窄时即写权上界）；**F4 分支**（在边界内但不在任务 writeSet 内）
+// ＝**当前已发行可写集**（writeSet 中仍在边界内且条件已激活的项）。拒绝信息须如实回答
+// 「此刻到底什么可写」——F4 分支若列边界路径，会与拒绝原因自相矛盾（真机现场：列表列出的
+// 正是覆盖被拒路径的边界目录）。判定语义与类型形状均未因本注释改变。
 export interface AllowedPathsByRoot {
   skill: string[];
   project: string[];

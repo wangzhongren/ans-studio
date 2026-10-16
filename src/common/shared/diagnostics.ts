@@ -6,8 +6,10 @@ import { atomicWrite } from "./atomic-write.ts";
 export const DIAGNOSTIC_RETENTION_MS = 24 * 60 * 60 * 1000;
 export const DIAGNOSTIC_MAINTENANCE_MS = 60 * 1000;
 const FILE_PATTERN = /^ans-diagnostics-\d{4}-\d{2}-\d{2}\.jsonl$/;
+// 落盘白名单：仅元数据（标识/量值/判定）可入；命令原文、argv、prompt/源内容等正文依设计契约禁入
+// （如守卫命令摘要 excerpt 不列入）——字符串经 scrub 净化并限长，数值须为有限数。
 const FIELD_NAMES = new Set([
-  "turnId", "toolCallId", "toolName", "path", "outcome", "durationMs", "ok",
+  "turnId", "toolCallId", "toolName", "path", "outcome", "durationMs", "timeoutMs", "ok",
   "errorType", "errorCode", "errorMessage", "requestId", "decision", "reasonCode",
   "state", "count", "queueDepth", "reportSource", "pid", "sourceRoleId", "targetRoleId",
   "sessionId", "phase", "mode", "replayPlan", "rowCount", "firstRow", "lastRow",

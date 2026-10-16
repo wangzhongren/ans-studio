@@ -1,6 +1,6 @@
 import { readRoleSessionHistory, projectRoleLegacyHistory } from "../../src/pipeline/orchestration/run-role.ts";
 import type { RuntimeKind, PromptInputEventDetail, ToolEventDetailV1, RuntimeReportSnapshotV1, RuntimeDeliveryReceiptV1 } from "../../src/model/runtime.ts";
-import { readRoleSessionHistory as readLegacyPiHistory, toRuntimeLegacyEntries, type ReplayRow } from "./session-history.ts";
+import { readRoleSessionHistory as readLegacyPiHistory, toRuntimeLegacyEntries, classifyProcessOutcome, type ReplayRow } from "./session-history.ts";
 import { isRuntimeKind } from "./runtime-config.ts";
 
 export interface SessionHistoryView {
@@ -34,8 +34,12 @@ export async function getSessionHistory(input: { projectRoot: string; roleId: st
       const event = entry.event;
       if (!event || event.kind === 'settled') continue;
       const turnId = entry.turnId ?? event.turnId;
-      const row: ReplayRow = { kind: event.kind === 'message' ? 'assistant' : event.kind === 'denied' ? 'denied' : 'tool', text: event.summary, at: entry.at, eventKind: event.kind, ...(turnId ? { turnId } : {}) };
       const detail = event.detail as Partial<PromptInputEventDetail> & Partial<ToolEventDetailV1> & { receipt?: RuntimeDeliveryReceiptV1; version?: number; deliveryId?: string; attemptId?: string; turnId?: string; stage?: 'provider-may-start' } | undefined;
+      // F-8-b（2026-10-16 客户批准）：`display.process` 结构化事实（冻结接口，见 classifyProcessOutcome）——
+      // 「进程跑完+退出码非零」与「超时终止」两类**不归 kind='denied'**（事件 kind/status/ok 契约原样不变，
+      // 只调**行分类**；桌面UI 的行样式按其 display.process 同判据块处理，两处口径一致）。
+      const processClass = classifyProcessOutcome(detail?.display);
+      const row: ReplayRow = { kind: event.kind === 'message' ? 'assistant' : event.kind === 'denied' && processClass === null ? 'denied' : 'tool', text: event.summary, at: entry.at, eventKind: event.kind, ...(turnId ? { turnId } : {}) };
       if (detail?.source === 'delivery-receipt' as string && detail?.receipt) { row.kind = 'tool'; row.text = '投递历史状态'; row.deliveryReceipt = detail.receipt; base.rows.push(row); continue; }
       if (detail?.source === 'delivery-boundary' as string) {
         row.kind = 'tool'; row.text = '投递可能已开始';
@@ -60,11 +64,13 @@ export async function getSessionHistory(input: { projectRoot: string; roleId: st
       const key = turnId && callId ? `${turnId}\0${callId}` : undefined;
       const previous = key ? calls.get(key) : undefined;
       if (event.kind !== 'message' && (name || previous)) {
-        const phase = detail?.phase ?? (event.kind === 'tool_call' ? 'start' : event.kind === 'denied' ? 'blocked' : 'result');
+        const phase = detail?.phase ?? (event.kind === 'tool_call' ? 'start' : event.kind === 'denied' && processClass === null ? 'blocked' : 'result');
         const target = detail?.display?.target?.value.text ?? previous?.target ?? '';
         const toolName = name || previous!.toolName;
         if (event.kind === 'tool_call' && key) calls.set(key, { toolName, target });
-        row.activity = { toolName, target, phase, status: phase === 'start' ? 'call' : event.kind === 'denied' || detail?.ok === false ? 'failed' : detail?.ok === true ? 'completed' : 'returned', ...(callId ? { toolCallId: callId } : {}), ...(turnId ? { turnId } : {}), ...(detail?.ok !== undefined ? { ok: detail.ok } : {}), ...(detail?.display ? { display: detail.display } : {}) };
+        // F-8-b：`exited-nonzero`（进程跑完、退出码非零）⇒ status='returned'（**不归 failed**；ok 字段照旧如实为 false，
+        // 详情/样式判据在 display.process）；`timed-out` 保持 failed（异常终止，显著）；其余逐字不变。
+        row.activity = { toolName, target, phase, status: phase === 'start' ? 'call' : processClass === 'exited-nonzero' ? 'returned' : event.kind === 'denied' || detail?.ok === false ? 'failed' : detail?.ok === true ? 'completed' : 'returned', ...(callId ? { toolCallId: callId } : {}), ...(turnId ? { turnId } : {}), ...(detail?.ok !== undefined ? { ok: detail.ok } : {}), ...(detail?.display ? { display: detail.display } : {}) };
         if (turnId && callId && ['request_confirmation','request_choice'].includes(toolName)) { row.requestId = callId; row.anchor = phase === 'start' ? 'request' : 'conclusion'; }
       }
       base.rows.push(row);
@@ -75,9 +81,13 @@ export async function getSessionHistory(input: { projectRoot: string; roleId: st
       if (!protectedHistory.ok) { base.error = protectedHistory.message.text; return base; }
       base.error = protectedHistory.reader.ok ? null : protectedHistory.reader.error?.text ?? '旧历史读取失败。'; base.skipped = protectedHistory.reader.skipped; base.projection = protectedHistory.projection;
       base.rows = protectedHistory.entries.map(entry => {
-        const row: ReplayRow = { kind: entry.kind === 'user-text' ? 'user' : entry.kind === 'tool-record' ? entry.tool.reportedStatus === 'failed' ? 'denied' : 'tool' : 'assistant', text: entry.text.text, textProjection: entry.text, at: entry.at ?? '', metadataOmissions: entry.metadataOmissions };
+        // F-8-b：**同一结构化判据**在旧历史投影路径上防御式复读——当前核心投影不携带 `display.process`
+        // （旧文本永不变成执行事实，见 multi-runtime 的钉子），`processClass` 恒为 null、行为逐字不变；
+        // 将来若该投影携带事实，本路径与新版路径口径一致、无需再改。
+        const legacyProcessClass = entry.kind === 'tool-record' ? classifyProcessOutcome(entry.tool.display) : null;
+        const row: ReplayRow = { kind: entry.kind === 'user-text' ? 'user' : entry.kind === 'tool-record' ? entry.tool.reportedStatus === 'failed' && legacyProcessClass === null ? 'denied' : 'tool' : 'assistant', text: entry.text.text, textProjection: entry.text, at: entry.at ?? '', metadataOmissions: entry.metadataOmissions };
         if (entry.anchor) { row.anchorKey = entry.anchor.token; row.anchor = entry.anchor.position; row.requestId = entry.anchor.nativeCallId; }
-        if (entry.kind === 'tool-record') { const t = entry.tool; if (t.statusSource !== undefined) row.legacyStatusSource = t.statusSource; if (t.target) row.legacyTargetSource = t.target.source; row.activity = { toolName: t.toolName, target: t.target?.value.text ?? '', phase: t.phase === 'start' ? 'call' : 'result', status: t.phase === 'start' ? 'call' : t.reportedStatus ?? 'unknown', ...(t.toolCallId ? { toolCallId: t.toolCallId } : {}), ...(t.turnId ? { turnId: t.turnId } : {}), ...(t.ok !== undefined ? { ok: t.ok } : {}), ...(t.display ? { display: t.display } : {}) }; }
+        if (entry.kind === 'tool-record') { const t = entry.tool; if (t.statusSource !== undefined) row.legacyStatusSource = t.statusSource; if (t.target) row.legacyTargetSource = t.target.source; row.activity = { toolName: t.toolName, target: t.target?.value.text ?? '', phase: t.phase === 'start' ? 'call' : 'result', status: t.phase === 'start' ? 'call' : legacyProcessClass === 'exited-nonzero' ? 'returned' : t.reportedStatus ?? 'unknown', ...(t.toolCallId ? { toolCallId: t.toolCallId } : {}), ...(t.turnId ? { turnId: t.turnId } : {}), ...(t.ok !== undefined ? { ok: t.ok } : {}), ...(t.display ? { display: t.display } : {}) }; }
         return row;
       });
     }

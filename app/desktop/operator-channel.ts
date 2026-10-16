@@ -63,10 +63,14 @@ import type { AssembleShellGateOptions } from "../../src/pipeline/orchestration/
 // 已删除**（T23 收尾）：**不得有第二份实现**。
 import { normalizeArgv } from "../../src/common/shared/argv-primitives.ts";
 import { createDiagnosticLogger } from "../../src/common/shared/diagnostics.ts";
+// F-4-M1（2026-10-16 客户批准）：shell 审核预算的 env 名**单一来源**在编排（shell-deadline.ts——
+// shell-gate.ts 的同一引用）；本层**只读导入**，绝不在此另写 "ANS_PI_SHELL_REVIEW_TIMEOUT_MS" 字面量。
+import { SHELL_REVIEW_TIMEOUT_ENV } from "../../src/common/编排/shell-deadline.ts";
 
-/** 默认确认超时（毫秒）。**超时 = 拒绝**（fail-closed，§7.5）。可用环境变量覆盖。 */
+/** 默认确认超时（毫秒）。**超时 = 拒绝**（fail-closed，§7.5）。可用环境变量覆盖；未设时**跟随 shell 审核预算**
+ *  （F-4-M1：`ANS_DESKTOP_OPERATOR_CONFIRM_TIMEOUT_MS` → `ANS_PI_SHELL_REVIEW_TIMEOUT_MS` → 本默认）。 */
 export const DEFAULT_OPERATOR_CONFIRM_TIMEOUT_MS = 120000;
-/** 覆盖确认超时的环境变量名。 */
+/** 覆盖确认超时的环境变量名（显式专用覆盖，优先于 shell 审核预算）。 */
 export const OPERATOR_CONFIRM_TIMEOUT_ENV = "ANS_DESKTOP_OPERATOR_CONFIRM_TIMEOUT_MS";
 
 /**
@@ -225,7 +229,8 @@ export interface CreateOperatorChannelOptions {
   presenter?: OperatorPresenter;
   /** 操作者标识（随 `OperatorOutcome.operatorId` 交给编排，由其据以得审计 `by`）。空/缺失归为 `unknown`。 */
   operatorId: string;
-  /** 确认超时（毫秒）；缺省读 `ANS_DESKTOP_OPERATOR_CONFIRM_TIMEOUT_MS`，再缺省 120000。超时 = 拒绝。 */
+  /** 确认超时（毫秒）；缺省走 `readConfirmTimeoutMs` 取值链（专用 env → shell 审核预算 env → 120000，
+   *  见其注释）。超时 = 拒绝。 */
   timeoutMs?: number;
   /** 可注入环境（读取超时 env）；缺省 `process.env`。 */
   env?: Record<string, string | undefined>;
@@ -261,8 +266,13 @@ export function createDesktopOperatorChannel(opts: CreateOperatorChannelOptions)
       // 超时包装整个确认；超时 = 拒绝（§7.5 退路 3）。
       decision = await withConfirmTimeout(opts.presenter.present(prompt, display, displayMetadata), timeoutMs);
     } catch (err) {
-      timeoutController.abort();
       const timedOut = err instanceof Error && err.name === OPERATOR_CONFIRM_TIMEOUT_NAME;
+      // F-4-M2（2026-10-16 客户批准）：超时以**带标记的原因**中止组合信号——呈现侧（cancel）据
+      // `AbortSignal.any` 传播的 `signal.reason` 分流失效原因：超时 ⇒ 如实「操作者确认超时（>Nms）…」
+      // （此前被误报成「本轮已结束、停止或会话已重建」）；轮次中止/重建 ⇒ 原中止（reason 为默认 AbortError）。
+      // 判定不变：两者都落 unavailable（fail-closed），绝不默认放行。
+      if (timedOut) timeoutController.abort(confirmTimeoutError(timeoutMs));
+      else timeoutController.abort();
       return {
         outcome: "unavailable",
         reason: timedOut
@@ -410,7 +420,22 @@ export function createShellConfirmPresenter(opts: CreateShellConfirmPresenterOpt
             expire(id, "shell 确认超时，旧确认失效。");
             resolve({ allow: false }); // 兜底：清理 + 不放行（判定语义以通道先到者为准）
           }, cleanupAfterMs);
-          const cancel = () => expire(id, "本轮已结束、停止或会话已重建，旧 shell 确认失效。");
+          // F-4-M2 + F-4-opt2（2026-10-16 客户批准）：按组合信号传播的中止原因**分流**——超时 ⇒ 如实超时文案
+          // （「未获放行——可让角色重新发起」，不再误报「本轮已结束」）；轮次中止/重建 ⇒ 原文案。两路各补一条
+          // 诊断（`shell-confirm.timeout/cancelled`）——上一轮真机「是否渲染/为何消失」不可判定的直接原因即此处
+          // 无记录；此后卡片的每一种去向（responded/expired/timeout/cancelled）都可判定。
+          const cancel = () => {
+            const reason = metadata?.signal.reason as unknown;
+            if (reason instanceof Error && reason.name === OPERATOR_CONFIRM_TIMEOUT_NAME) {
+              const timeoutMs = (reason as Error & { timeoutMs?: unknown }).timeoutMs;
+              const n = typeof timeoutMs === "number" && Number.isFinite(timeoutMs) ? timeoutMs : undefined;
+              diagnostic.record("shell-confirm.timeout", { requestId: id, ...(n !== undefined ? { durationMs: n } : {}) });
+              expire(id, n !== undefined ? `操作者确认超时（>${n}ms），未获放行——可让角色重新发起。` : "操作者确认超时，未获放行——可让角色重新发起。");
+            } else {
+              diagnostic.record("shell-confirm.cancelled", { requestId: id });
+              expire(id, "本轮已结束、停止或会话已重建，旧 shell 确认失效。");
+            }
+          };
           const cleanup = () => metadata?.signal.removeEventListener("abort", cancel);
           pending.set(id, { resolve, timer, request, metadata, cleanup });
           metadata?.signal.addEventListener("abort", cancel, { once: true });
@@ -461,10 +486,12 @@ export function createShellConfirmPresenter(opts: CreateShellConfirmPresenterOpt
 
 const OPERATOR_CONFIRM_TIMEOUT_NAME = "OperatorConfirmTimeoutError";
 
-/** 构造带标记的超时错误（与 pi-adapter/timeout.ts 同风格，但**本角色自持**——不跨角色导入他人私有 common/）。 */
+/** 构造带标记的超时错误（与 pi-adapter/timeout.ts 同风格，但**本角色自持**——不跨角色导入他人私有 common/）。
+ *  **F-4-M2**：`timeoutMs` 随错误对象携带——中止组合信号后，呈现侧凭 `signal.reason` 写出含实际时限的如实文案。 */
 function confirmTimeoutError(timeoutMs: number): Error {
-  const err = new Error(`操作者确认超时（${timeoutMs}ms）：未在时限内得到操作者选择。`);
+  const err = new Error(`操作者确认超时（${timeoutMs}ms）：未在时限内得到操作者选择。`) as Error & { timeoutMs?: number };
   err.name = OPERATOR_CONFIRM_TIMEOUT_NAME;
+  err.timeoutMs = timeoutMs;
   return err;
 }
 
@@ -482,12 +509,29 @@ async function withConfirmTimeout<T>(work: Promise<T>, timeoutMs: number): Promi
   }
 }
 
-/** 从环境变量读取确认超时；缺失或非法则回退默认。 */
+/**
+ * 从环境变量读取确认超时，**取值链（F-4-M1，2026-10-16 客户批准）**：
+ *   ① 专用覆盖 `ANS_DESKTOP_OPERATOR_CONFIRM_TIMEOUT_MS`（显式优先）；
+ *   ② 未设（或非法）时**跟随 shell 审核预算** `ANS_PI_SHELL_REVIEW_TIMEOUT_MS`（env 名常量从既有单一来源
+ *      `src/common/编排/shell-deadline.ts` 只读导入——与 shell-gate 的同一引用，本层不另写字面量）；
+ *   ③ 都未设（或非法）⇒ 默认 `DEFAULT_OPERATOR_CONFIRM_TIMEOUT_MS`（120000）。
+ * 理由（真机 F-4）：审核预算放宽到 300s 时，桌面侧 120s 独立默认把「人工确认窗口」**静默钳制**在 120s——
+ * present→deny 恰好 120.000s。本项把「(a) 窗口跟随审核预算」从桌面侧恢复一致；**判定不变**：超时仍是
+ * unavailable（编排据此拒），fail-closed 逐字不动。
+ */
 function readConfirmTimeoutMs(env: Record<string, string | undefined>): number {
-  const raw = env[OPERATOR_CONFIRM_TIMEOUT_ENV];
-  if (raw === undefined || raw.trim() === "") return DEFAULT_OPERATOR_CONFIRM_TIMEOUT_MS;
+  return (
+    readPositiveMs(env[OPERATOR_CONFIRM_TIMEOUT_ENV]) ??
+    readPositiveMs(env[SHELL_REVIEW_TIMEOUT_ENV]) ??
+    DEFAULT_OPERATOR_CONFIRM_TIMEOUT_MS
+  );
+}
+
+/** 解析一个正整数毫秒值；缺失/空白/非数字/非正值 ⇒ undefined（沿链回退）。 */
+function readPositiveMs(raw: string | undefined): number | undefined {
+  if (raw === undefined || raw.trim() === "") return undefined;
   const parsed = Number(raw);
-  if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_OPERATOR_CONFIRM_TIMEOUT_MS;
+  if (!Number.isFinite(parsed) || parsed <= 0) return undefined;
   return Math.floor(parsed);
 }
 

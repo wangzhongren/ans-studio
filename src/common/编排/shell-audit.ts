@@ -85,6 +85,13 @@ export interface ShellAuditSink {
 /**
  * 文件审计落盘：写 `docs/audit/shell-gate.jsonl`。
  * 落盘前**先经 gate 判定**（绑定 pm 边界 + 声明 `shell-gate`）；gate 拒绝或抛错即零副作用。
+ *
+ * **F-6-1（刷新重试）**：可选 `refreshGate` 给出时，首查被拒后**重读盘上最新接受证据**（由装配注入的
+ * 刷新闭包重新解析边界）并**以新 gate 重试一次**——覆盖「会话在创世过渡窗口内创建、持有未接受快照，
+ * 收尾落盘后快照无自愈通道」的留痕缺口（kanban-live F-6）。安全语义不变：写入仍**唯一经 `resolveWrite`**
+ * （重试不绕过 F6/pin/条件/writeSet 任何一步）；重解析失败或仍拒 → 维持拒绝、零副作用（重试发生在触碰
+ * 文件系统之前，与现状同）。重试放行 → 落盘并把**活跃门禁切换为新 gate**（后续命令直接走新 gate，
+ * 恢复后零额外开销）。
  */
 export function createFileAuditSink(opts: {
   projectRoot: string;
@@ -92,8 +99,15 @@ export function createFileAuditSink(opts: {
   gate: WriteGate;
   /** 覆盖目标相对路径；缺省 `docs/audit/shell-gate.jsonl`。 */
   relPath?: string;
+  /**
+   * **F-6-1 刷新闭包**：首查被拒时调用，返回重解析后的新门禁（供重试一次）；返回 `undefined` 或抛错
+   * = 刷新失败（维持拒绝）。缺省不传 = 旧行为（无刷新，逐字不变）。
+   */
+  refreshGate?: () => Promise<WriteGate | undefined>;
 }): ShellAuditSink {
   const relPath = opts.relPath ?? SHELL_AUDIT_REL_PATH;
+  // 活跃门禁：初值 = 装配时快照；F-6-1 重试放行后切换为刷新所得的新 gate。
+  let activeGate = opts.gate;
   return {
     async append(record: ShellAuditRecord): Promise<ShellAuditOutcome> {
       const abs = resolve(opts.projectRoot, relPath);
@@ -102,14 +116,44 @@ export function createFileAuditSink(opts: {
       let allowed = false;
       let reason = "";
       try {
-        const decision = opts.gate(abs);
+        const decision = activeGate(abs);
         allowed = decision.allowed;
         if (!decision.allowed) reason = decision.reason;
       } catch (err) {
         return { ok: false, reason: `审计写门禁异常（未落盘）：${reasonOf(err)}` };
       }
       if (!allowed) {
-        return { ok: false, reason: `审计写被门禁拒绝（缺少 \`${SHELL_GATE_CONDITION}\` 条件？）：${reason}` };
+        // 文案（F-6-2）：不再猜测「缺少条件」——现场反例即条件已声明、缺的是**接受**；如实回
+        // resolveWrite 原文（F6/pin/条件/未匹配各有其自述原因）。
+        const firstReason = `审计写被门禁拒绝：${reason}`;
+        if (opts.refreshGate === undefined) {
+          return { ok: false, reason: firstReason };
+        }
+        // F-6-1：重解析一次、以新 gate 重试一次（判定仍唯一经 resolveWrite；重试不绕过任何一步）。
+        let fresh: WriteGate | undefined;
+        try {
+          fresh = await opts.refreshGate();
+        } catch (err) {
+          return { ok: false, reason: `${firstReason}；刷新边界快照失败（${reasonOf(err)}），未重试` };
+        }
+        if (fresh === undefined) {
+          return { ok: false, reason: `${firstReason}；刷新边界快照未取得可用门禁，未重试` };
+        }
+        let retryAllowed = false;
+        let retryReason = "";
+        try {
+          const decision = fresh(abs);
+          retryAllowed = decision.allowed;
+          if (!decision.allowed) retryReason = decision.reason;
+        } catch (err) {
+          retryReason = `刷新后的门禁异常：${reasonOf(err)}`;
+        }
+        if (!retryAllowed) {
+          // 如实拼接链式原因（原判 + 重解析后仍拒），不加猜测性归因。
+          return { ok: false, reason: `${firstReason}；已刷新边界快照重试一次，仍被拒：${retryReason}` };
+        }
+        // 重试放行 → 切换活跃门禁（后续命令直接走新 gate），落盘走下方同一路径。
+        activeGate = fresh;
       }
 
       // 2) 追加一行 JSON（仅 append，绝不改写既有记录）。
