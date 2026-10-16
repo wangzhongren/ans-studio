@@ -138,11 +138,14 @@ test("G1d 信号与性态：stdout 直通（JSON-RPC 通道）；SIGTERM 转发�
   const echo = await runLauncher([process.execPath, "-e", "process.stdout.write('PASSTHRU-MARKER\\n')"], env);
   assert.equal(echo.code, 0);
   assert.ok(echo.stdout.includes("PASSTHRU-MARKER"), "stdout 逐字直通");
-  // 真命令自 SIGTERM：POSIX＝launcher 以同信号退出；Windows＝无信号面（平台终止以实得退出码如实回传）。
+  // 真命令自 SIGTERM：POSIX＝launcher 以同信号退出；Windows＝观察者未发出 kill ⇒ 信号字段空、退出码原样。
   const selfKill = await runLauncher([process.execPath, "-e", "process.kill(process.pid,'SIGTERM')"], env);
   if (process.platform === "win32") {
-    assert.equal(selfKill.signal, null, "Windows 无信号面：终止不携带死因信号（沿 v1.1.0 先例，仅钉信号面真值）");
-    assert.equal(selfKill.code, 1, "Windows：真命令被平台终止（TerminateProcess 退出码 1）⇒ 启动器以实得退出码原样回传");
+    // Windows 真值①（CI 实得，逐值 exact-match）：stub 自毙＝uv_kill-by-pid（libuv v1.51.0 不记
+    // exit_signal）⇒ 观察者（启动器）只收到退出码（TerminateProcess 名义码 1）而无信号名；启动器
+    // 以该退出码回传 ⇒ 顶层观察 (code 1, signal null)。「观察者自己发出 kill」的记账语义另见转发分支。
+    assert.equal(selfKill.signal, null, "Windows：观察者未发出该 kill ⇒ 信号字段空（uv_kill-by-pid 不记 exit_signal）");
+    assert.equal(selfKill.code, 1, "Windows：TerminateProcess 名义退出码 1 原样回传");
   } else {
     assert.equal(selfKill.code, null);
     assert.equal(selfKill.signal, "SIGTERM", "真命令死于 SIGTERM ⇒ 启动器同信号退出（父进程看到一致死因）");
@@ -156,16 +159,22 @@ test("G1d 信号与性态：stdout 直通（JSON-RPC 通道）；SIGTERM 转发�
     const pid = Number(fs.readFileSync(pidFile, "utf8"));
     assert.ok(Number.isFinite(pid) && pid > 0, "真命令 pid 已记录");
     if (process.platform === "win32") {
-      // Windows 真值（如实钉、不假装转发成功）：无 POSIX 信号投递面——测试的终止只达**启动器**
-      // （信号处理器不参与），转发机制不存在；真命令的处置由 stdin EOF 继承（MCP 惯例：调用方关
-      // 管道即达真命令）与调用方进程树清理决定。本 stub 不读 stdin，故必然存活——如实断言存活并
-      // 自行清理，绝不断言「转发成功」。POSIX 语义断言（无孤儿＋同信号退出）保留在其平台分支。
+      // Windows 真值②（CI 实测 signal='SIGTERM'；机制链＝libuv v1.51.0 src/win/process.c ＋ node v24
+      // lib/internal/child_process.js，本机同版）：顶层观察＝「按 handle 发出的 kill」由 Node 如实回传
+      // **被请求的信号名**——libuv `uv_process_kill` 成功后记 `exit_signal = signum`（`uv__kill` 以
+      // `TerminateProcess(handle, 1)` 终止）；node JS 层两字段互斥（`if (signalCode) signalCode=… else
+      // exitCode=…`）⇒ 'exit' 事件实得 **(code null, signal 'SIGTERM')**。这是 libuv/node 记账语义，
+      // **不是 POSIX 死因**。
+      // 「无信号面」的正确落点是**启动器→真命令的转发**：被 TerminateProcess 的启动器无代码可执行，
+      // SIGTERM 不达其处理器，转发机制不可达；真命令的处置由 stdin EOF 继承（MCP 惯例：调用方关管道
+      // 即达真命令）与调用方进程树清理决定。本 stub 不读 stdin，故必然存活——如实断言存活并自行清理，
+      // 绝不断言「转发成功」。POSIX 语义断言（无孤儿＋同信号退出）保留在其平台分支。
       await new Promise((r) => setTimeout(r, 300));
-      assert.equal(run.signal, null, "Windows：启动器被平台终止（无信号面）");
-      assert.equal(run.code, 1, "Windows：启动器终止以实得退出码 1 如实回传");
+      assert.equal(run.signal, "SIGTERM", "Windows 实得真值：libuv 回传被请求的信号名（记账语义，非 OS 死因；无信号面的正确落点在转发侧）");
+      assert.equal(run.code, null, "Windows 实得真值：信号字段在场时退出码互斥为空（node：signalCode 真值 ⇒ exitCode 保持 null）");
       let alive = true;
       try { process.kill(pid, 0); } catch { alive = false; }
-      assert.equal(alive, true, "Windows 真值：无信号转发通道，忽略 stdin 的 stub 在启动器终止后存活（清理归调用方）");
+      assert.equal(alive, true, "Windows 真值：转发不可达（启动器被终止、无执行权），忽略 stdin 的 stub 存活（清理归调用方）");
       try { process.kill(pid); } catch { /* 已退出 */ }
     } else {
       const deadline = Date.now() + 5000;

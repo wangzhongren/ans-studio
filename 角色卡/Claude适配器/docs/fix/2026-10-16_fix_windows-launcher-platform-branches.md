@@ -29,12 +29,14 @@ CI 实得子进程键＝期望 10 键（基线∩在场 7＋声明 3）＋**十�
 
 **产品缺陷判定：无**。十键系 OS/libuv 级注入（`env` 参数无法阻止；macOS 无此现象的红不成立）；launcher 名字过滤平台中立且正确。**修法＝测试豁免适配**：`PLATFORM_INJECTED` 改为平台条件集（macOS＝`__CF_USER_TEXT_ENCODING`；win32＝上述十键，按大写归一比对——Windows env 名大小写不敏感属平台真值），`unexpected` 断言仍为「恰等 − 文档化平台集」，**本体零放宽**。`mcp-launcher.mjs` **未动**。
 
-### G1d：POSIX 信号语义在 Windows 的真值 —— **平台分支钉真值；无可行产品修法**
+### G1d：Windows 的「信号」观察值真值（重跑 `38927621909` 修正）—— **平台分支钉真值；无可行产品修法**
 
-- **无信号投递面**：Windows 无 POSIX 信号（`child.kill("SIGTERM")`＝`TerminateProcess`，只达目标进程、不运行其处理器）⇒ **launcher 的 SIGTERM→真命令转发在 Windows 不存在**（也不可能有：被硬杀的进程没有代码可执行；Job Object 非 Node 能力面）。
-- 真值实测（CI `:133` 实得 `1 !== null`）：真命令自 `SIGTERM`（TerminateProcess）⇒ 启动器读到 `(code=1, signal=null)` 并**以实得退出码原样回传**（`signal===null` 分支即既有实现，行为正确）。
-- 清理通道真值：真命令的处置依赖 (i) **stdin EOF 继承**（MCP 惯例；P0 探针实证生产 dispose 先关 stdin）与 (ii) 调用方（CLI）对进程树的清理；测试 stub 不读 stdin，故「无孤儿」断言的场景在 Windows **原理上不可满足**——分支如实钉「stub 存活＋启动器终止退出码 1＋signal null」，并自行清理 stub，**绝不断言转发成功**。
-- 残余（如实登记）：Windows 硬杀路径下，「CLI 只杀启动器且不关 stdin」时忽略 stdin 的第三方 server 可存活到管道关闭——包装器引入的间接层窗口；与本测试无关（stub 场景），正式批如有真机复现再议（Job Object/`taskkill /T` 类侧另有 Pi 先例）。
+首轮「无信号面」表述过强；按重跑 CI 实测＋机制考据修正为**两层真值**（libuv v1.51.0 `src/win/process.c`，本机 uv 同版）：
+
+- **顶层观察（测试侧对启动器）**：`child.kill("SIGTERM")` 走 `uv_process_kill`——`uv__kill` 以 `TerminateProcess(handle, 1)` 终止并**记账 `exit_signal = signum`** ⇒ node JS 层两字段互斥（`if (signalCode) signalCode=… else exitCode=…`）⇒ 'exit' 事件实得 **(code null, signal 'SIGTERM')**（signal CI 实测；code=null 由 node v24 lib/internal/child_process.js 互斥规则定钉）。**libuv/node 如实回传被请求的信号名＝记账语义、非 POSIX 死因**。win32 分支按 `(null, 'SIGTERM')` 逐值 exact-match。
+- **stub 自毙场景**：stub 的 `process.kill(process.pid,'SIGTERM')` 走 `uv_kill`-by-pid（**不记账 exit_signal**）⇒ 启动器只收到 (code 1, signal null) 并原样回传 ⇒ 顶层 (1, null)——CI 实测通过，逐值 exact-match 保留。
+- **「无信号面」的正确落点＝启动器→真命令的转发**：被 TerminateProcess 的启动器无代码可执行（SIGTERM 不达其处理器）⇒ 转发机制在 Windows **不可达**（Job Object 非 Node 能力面）；真命令处置依赖 stdin EOF 继承（MCP 惯例；P0 实证生产 dispose 先关 stdin）与调用方进程树清理；本 stub 不读 stdin，故必然存活——如实断言存活并自行清理，**绝不断言转发成功**。
+- 残余（如实登记）：Windows 硬杀路径下，「CLI 只杀启动器且不关 stdin」时忽略 stdin 的第三方 server 可存活到管道关闭——包装器引入的间接层窗口；与正常 MCP server（读 stdin）无关（关管道即 EOF 退出），正式批如有真机复现再议（`taskkill /T` 类侧另有 Pi 先例）。
 
 ## 二、改动文件（精确路径，发布 overlay-2 白名单用）
 
@@ -46,4 +48,4 @@ CI 实得子进程键＝期望 10 键（基线∩在场 7＋声明 3）＋**十�
 ## 三、验证
 
 - 本地（macOS，POSIX 分支全保留）：`node --test "test/测试/g4v2-mcp-verify/"*.test.ts` **64/64**；`test/claude-adapter/*.test.ts` **44/44**；`npm run typecheck` **0**；全量 **2110 计 / 2109 过 / 0 红 / 1 skip**（证据目录 `full-suite.txt`）；`git diff --check` 对本批文件干净（全仓快照唯一提示＝`角色卡/Pi适配器/memo.md:74` 行尾空行，属 Pi 属主在飞编辑，非本批）。
-- Windows 分支本地不可执行（平台条件代码路径）——**由下一次 CI Windows run 复验**（G1a 十键豁免与哨兵值断言、G1d 两处 win32 断言）。
+- Windows 分支本地不可执行（平台条件代码路径）——**由下一次 CI Windows run 复验**：G1a 十键豁免与哨兵值断言；G1d 两处 win32 逐值断言＝`(null, 'SIGTERM')`（顶层观察；signal 重跑实证、code 由 node 互斥规则定钉）与 `(1, null)`（stub 自毙，重跑已实证）。
