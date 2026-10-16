@@ -172,6 +172,12 @@ status: approved-implementation-dispatched
 - **wave 2 派发**：三适配器（各自 A 组探针先行→按映射表接请求强度→thinking 内容捕获发射 reasoning 事件→网关拒⇒恰一次去参数重发＋如实一行）；桌面窗口（设置保存链接受三新键[值域校验]＋旧 Pi 面板与注册表关系核实）；桌面UI（档位 select 控件＋折叠行「已思考 N 秒 ▸」[默认折叠含运行中、omitted 如实、纯文本展开、复用折叠状态机]）。
 - 完成后：独立验证 → B 探针（客户）→ 随运行包。
 
+## v1.3.0 发布（2026-10-16 客户「发布新运行包」）
+
+- **冻结源 = tag `v1.3.0` = `16963ee`**（已推送；含 G-3 三平台搜索＋工具行折叠＋G-4 全案[技能/MCP 安装]＋G-5 全案[推理与推理强度]＋cleanPatterns 修复——**源内已含全部产品代码**）。
+- overlay 准备（装配）＝版本 1.3.0＋README＋release-policy（SOURCE 改钉＋白名单重置基础集＋v1.2.0 一次性条目移除）＋装配测试/文档＋selected 复算与干跑。
+- 流程（沿 v1.1.0/v1.2.0 runbook）：root 审验 → 选择性提交 overlay → push → `gh workflow run … -f source_ref=v1.3.0 -f publish=false` → 三平台绿 → 资产独立验收（12 项/摘要/manifest/provenance/本地 ZIP 核验）→ 公开（notes＝功能摘要）→ 未登录核验。
+
 ## 候选 G-4「角色能力安装（技能＋MCP）」（2026-10-16 客户讨论提出，已派细化）
 
 - **客户原问**：「这个 su 应该有个工具，可以给其他的角色安装 mcp……或者安装技能」。

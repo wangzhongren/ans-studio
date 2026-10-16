@@ -1,0 +1,27 @@
+HEAD is now at 16963ee test+docs: G-5 独立验证（整体通过）+钉子翻新+PM 记录
+{
+  "sourceRef": "v1.3.0",
+  "sourceSha": "16963ee3f59acc1f812141709858690f1a24501b",
+  "overlaySha": "e9f005c33997db7fdfc3d2af048aac52609de0a5",
+  "actualTree": "bac2ea1f9d16241209c48dfbc7e87221a5939cd7",
+  "overlayPaths": [
+    ".github/workflows/release.yml",
+    "package-lock.json",
+    "package.json",
+    "src/common/装配/release-policy.d.mts",
+    "src/common/装配/release-policy.mjs",
+    "test/装配/release-packaging.test.ts"
+  ],
+  "overlayPatchSha256": "d4423d6996f816c473b4f9b96554629ae63542899881ef81479f3f1cb31a64f4",
+  "excludedChanges": [
+    "README.md",
+    "角色卡/装配/changelog.md",
+    "角色卡/装配/docs/change/2026-10-16-release-packaging-v1.3-evidence/full-suite.txt",
+    "角色卡/装配/docs/change/2026-10-16-release-packaging-v1.3-evidence/test-assembly.txt",
+    "角色卡/装配/docs/change/2026-10-16-release-packaging-v1.3-evidence/typecheck.txt",
+    "角色卡/装配/docs/change/2026-10-16_change_v1.3-release-packaging.md",
+    "角色卡/装配/docs/feature/desktop-release-packaging.md",
+    "角色卡/装配/memo.md",
+    "角色卡/项目管理/docs/change/2026-10-15_change_kanban-fixes-pm-review.md"
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "policy": "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/src/common/装配/release-policy.mjs",
+  "total": 17,
+  "selectedCount": 6,
+  "excludedCount": 11,
+  "selected": [
+    ".github/workflows/release.yml",
+    "package-lock.json",
+    "package.json",
+    "src/common/装配/release-policy.d.mts",
+    "src/common/装配/release-policy.mjs",
+    "test/装配/release-packaging.test.ts"
+  ],
+  "excluded": [
+    "README.md",
+    "角色卡/装配/changelog.md",
+    "角色卡/装配/docs/feature/desktop-release-packaging.md",
+    "角色卡/装配/memo.md",
+    "角色卡/项目管理/docs/change/2026-10-15_change_kanban-fixes-pm-review.md",
+    "角色卡/装配/docs/change/2026-10-16_change_v1.3-release-packaging.md",
+    "角色卡/装配/docs/change/2026-10-16-release-packaging-v1.3-evidence/full-suite.txt",
+    "角色卡/装配/docs/change/2026-10-16-release-packaging-v1.3-evidence/overlay-recompute.json",
+    "角色卡/装配/docs/change/2026-10-16-release-packaging-v1.3-evidence/sim-provenance.json",
+    "角色卡/装配/docs/change/2026-10-16-release-packaging-v1.3-evidence/test-assembly.txt",
+    "角色卡/装配/docs/change/2026-10-16-release-packaging-v1.3-evidence/typecheck.txt"
+  ]
+}
