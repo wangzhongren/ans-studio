@@ -17,8 +17,8 @@
 //   · 写入照旧经 gate——**F4 拒掉一切未确认路径**（writeSet 外 = 拒）。
 //   · 通道**不可用/拒绝/未确认** → 不发行 → 该路径写入被拒（fail-closed）。
 //   · **例外（客户裁定 2026-10-16）**：内置治理角色（su）的**初始** writeSet 恒含 `docs/su/**`、
-//     `docs/contracts/**` 与 `docs/skills/**`（预授权写目录，不经发行器、随会话初始化计算；见
-//     SU_PREAUTHORIZED_WRITE_DIRS）——对其余一切路径以上三条逐字适用。
+//     `docs/contracts/**`、`docs/skills/**` 与 `docs/mcp/**`（预授权写目录，不经发行器、随会话初始化
+//     计算；见 SU_PREAUTHORIZED_WRITE_DIRS）——对其余一切路径以上四条逐字适用。
 // 【已登记的残余漏洞：内容漂移】本机制只保证「**路径**已预览且已确认」；「预览内容 ≠ 写出内容」
 // 关不住（O-A1 内容比对经客户 2026-10-12 裁定不采纳——如实登记，不实现）。
 // 未给 `customerInput` 的会话（无客户通道）保持旧语义：scope 原样传递（可为 undefined = 不收窄）。
@@ -57,6 +57,8 @@ import type {
   ProposeRecoveryFn,
   InstallSkillFn,
   UninstallSkillFn,
+  InstallMcpFn,
+  UninstallMcpFn,
   OperatorChannelFn,
   PromptOptions,
   PromptTurnStartedMetadata,
@@ -126,6 +128,11 @@ import { absRel, isAbsoluteAny, isUnderOrEqual, normalizeLexical } from "../../c
  *   **只给治理角色 su**注入（判据复用 `suppressHandback`，同 `dispatchTask`/看护三能力）。
  *   形状单一来源＝契约家 `model/runtime.ts`（`InstallSkillFn`/`UninstallSkillFn`/`InstallSkillReceipt`）。
  *   **安装 ≠ 授权**：工具自己不写盘，能力只做校验/激活/回执；不得据此授予或改变任何写权。
+ * · `installMcp` / `uninstallMcp`（G-4 V2 MCP 安装两工具；未注入 ⇒ 对应工具不注册）——
+ *   **只给治理角色 su**注入（判据复用 `suppressHandback`，同技能两能力）。
+ *   形状单一来源＝契约家 `model/runtime.ts`（`InstallMcpFn`/`UninstallMcpFn`/`InstallMcpReceipt`）。
+ *   **能力级授予诚实面**：外来 MCP 工具在 ANS 门禁之外执行——回执/文案不得宣称逐调用受审；
+ *   **安装 ≠ 授权**：工具自己不写盘，能力只做校验/激活/回执；不得据此授予或改变任何写权。
  */
 export interface AdapterCapabilities {
   customerInput?: CustomerInputFn;
@@ -141,6 +148,8 @@ export interface AdapterCapabilities {
   proposeRecovery?: ProposeRecoveryFn;
   installSkill?: InstallSkillFn;
   uninstallSkill?: UninstallSkillFn;
+  installMcp?: InstallMcpFn;
+  uninstallMcp?: UninstallMcpFn;
 }
 
 export interface RunRoleInput {
@@ -407,6 +416,21 @@ export async function openRoleSession(
      */
     uninstallSkill?: UninstallSkillFn;
     /**
+     * **G-4 V2 MCP 安装能力（工具 `install_mcp`「注入才注册」）**——**只对治理角色会话（su）
+     * 转交**（判据复用 `suppressHandback`，同技能两能力）；项目角色会话即便调用方误给也不注入
+     * （工具不注册）。形状单一来源＝契约家 `model/runtime.ts`（`InstallMcpFn`/`InstallMcpReceipt`）。
+     * **工具自己不写盘**：能力只做校验（角色/声明/含角色；护栏：仅客户消息发起的轮次）→ 激活
+     * （重建；在跑不打断 ⇒ `next-session`）→ 回执。**能力级授予诚实面**：外来 MCP 在 ANS 门禁之外
+     * 执行——不得宣称逐调用受审；**安装不改变任何角色的写边界**（写权仍只来自角色边界与确认发行）。
+     */
+    installMcp?: InstallMcpFn;
+    /**
+     * **G-4 V2 MCP 卸载能力（工具 `uninstall_mcp`「注入才注册」）**——**只给 su**（同上一判据）。
+     * 先改声明再卸载（能力须校验声明确已撤销，未撤销以 `registration-unchanged` 如实拒绝）；
+     * **下次会话摘除**（在跑不打断）、**已发生副作用不可撤**（如实二分陈述）；同不改变任何写权。
+     */
+    uninstallMcp?: UninstallMcpFn;
+    /**
      * **I-1 开放 shell —— (a) 前端操作者确认通道（兼 arm 开关语义）**：给出 ⇒ 本会话（**仅项目角色**；
      * su 自身不接三层链——su 的 `run_shell` 走只读档 `shellReadonly`）由编排装配三层链（(c) 确定性硬地板
      * → (b) su 模型审读 → (a) 本通道；关窗/不答/超时 = **不放行**）并注入 `ShellGate` ⇒ `run_shell` 注册
@@ -553,6 +577,13 @@ export async function openRoleSession(
   const installSkill = suppressHandback ? input.installSkill : undefined;
   const uninstallSkill = suppressHandback ? input.uninstallSkill : undefined;
 
+  // G-4 V2 MCP 安装/卸载两能力（运行时核心 V2 契约落盘后收口，客户 2026-10-16 批准 V2 分批）：
+  // **只给治理角色（su）**转交——判据复用 `suppressHandback`，同技能两能力；项目角色会话即便调用方
+  // 误给也不注入（`install_mcp`/`uninstall_mcp` 不注册）。字段名**逐字**＝契约家能力名（错一名 ⇒
+  // 工具静默零注册，G-2 教训）；承载契约（字段名/形状）单一来源：`model/runtime.ts`。
+  const installMcp = suppressHandback ? input.installMcp : undefined;
+  const uninstallMcp = suppressHandback ? input.uninstallMcp : undefined;
+
   // I-1 开放 shell（项目角色三层链）+ **su 只读档**（客户裁定 2026-10-12）——两档共用同一个
   // `shellGate` 能力位（「注入才注册」：注入了 ⇒ Pi 适配器注册 `run_shell`；未注入/装配失败 ⇒
   // **不 arm**，能力缺席 = fail-closed，绝不放宽）。
@@ -596,6 +627,8 @@ export async function openRoleSession(
     ...(proposeRecovery !== undefined ? { proposeRecovery } : {}),
     ...(installSkill !== undefined ? { installSkill } : {}),
     ...(uninstallSkill !== undefined ? { uninstallSkill } : {}),
+    ...(installMcp !== undefined ? { installMcp } : {}),
+    ...(uninstallMcp !== undefined ? { uninstallMcp } : {}),
     ...(shellGate !== undefined ? { shellGate } : {}),
     ...(input.shellVerdict !== undefined ? { shellVerdict: input.shellVerdict } : {}),
   };
@@ -924,16 +957,18 @@ function buildGate(
 
 /**
  * **su 预授权写目录（客户裁定 2026-10-16）**——内置治理角色（su）会话的**初始 writeSet 恒含**的
- * 「项目根相对、含子路径」目录树（三棵）。客户裁定原文：①「这个 su 可以写 docs/su 的目录，不需要
+ * 「项目根相对、含子路径」目录树（四棵）。客户裁定原文：①「这个 su 可以写 docs/su 的目录，不需要
  * 我审批」；② 追加「还有个契约目录也可以给他写。」（`docs/contracts/` = 跨角色契约落盘目录的全项目
  * 约定；该约定本体落地时生效，本预授权先装好）；③ G-4（角色能力安装）V1 十项裁定全采纳
  * （2026-10-16 批准）——§4.6 候选 1＝预授权扩列 `docs/skills`（技能文档树：`docs/skills/<name>/`
- * install.md 登记 + SKILL.md 内容；安装＝「先落盘再激活」，无卡口径要求落盘在 su 初始 writeSet 内。
- * `docs/mcp` 未扩——MCP 面 V2 另议）。
+ * install.md 登记 + SKILL.md 内容；安装＝「先落盘再激活」，无卡口径要求落盘在 su 初始 writeSet 内）；
+ * ④ G-4 V2（MCP 安装）——客户 2026-10-16「按推荐批准，开始实施」（分批：P1 Claude→P2 Codex→P3 Pi），
+ * V1 裁定①「`docs/mcp` 未扩——V2 另议」的落点＝预授权扩列 `docs/mcp`（MCP 声明树：
+ * `docs/mcp/<name>.md` 声明文件；落盘同「先落盘再激活」口径——产品提案 §九 V2 范围①）。
  *
  * 语义与边界（钉死）：
  * - **仅**内置治理角色（`kind === "built-in-governance"`——既有判据，同 suppressHandback/
- *   dispatchTask 处）**仅**这三棵目录树；su 卡文本的配套修改由门禁引擎另行实施（不属本模块）。
+ *   dispatchTask 处）**仅**这四棵目录树；su 卡文本的配套修改由门禁引擎另行实施（不属本模块）。
  * - 它是**初始集合的一部分**——不依赖确认发行器（`request_confirmation` 发行的是「**经确认发行**的
  *   写权」，预授权不属此类）；每次开会话/会话重建都生效（本集合在会话初始化处的 gate 求值中计算，
  *   随句柄生灭；桌面 O-1 重建路径按新开会话同口径获得。F-5-opt1 的重建提示说的是经确认发行的写权，
@@ -942,17 +977,19 @@ function buildGate(
  *   ——等价于该路径初始就在已发行集中。判定链其余环节（F6 接受门、F7 真实路径逃逸复核、边界条目
  *   匹配、条件激活）**逐字不变**：不在边界内/未接受/逃逸的路径照拒，fail-closed 不放松。
  * - 其余一切路径（`docs/` 其它子路径、`角色卡/`、`.ans/` …）照旧只认已发行集：未确认 = F4 拒。
- * 背景/测试/回滚：`角色卡/编排/docs/fix/2026-10-16_fix_su-notes-preauth.md`（docs/su、docs/contracts）
- * 与 `角色卡/编排/docs/change/2026-10-16_change_g4-skill-injection-and-preauth.md`（docs/skills 扩列，G-4 I5）。
+ * 背景/测试/回滚：`角色卡/编排/docs/fix/2026-10-16_fix_su-notes-preauth.md`（docs/su、docs/contracts）、
+ * `角色卡/编排/docs/change/2026-10-16_change_g4-skill-injection-and-preauth.md`（docs/skills 扩列，G-4 I5）
+ * 与 `角色卡/编排/docs/change/2026-10-16_change_g4v2-mcp-preauth.md`（docs/mcp 扩列，G-4 V2 wave A）。
  */
-const SU_PREAUTHORIZED_WRITE_DIRS: readonly string[] = ["docs/su", "docs/contracts", "docs/skills"];
+const SU_PREAUTHORIZED_WRITE_DIRS: readonly string[] = ["docs/su", "docs/contracts", "docs/skills", "docs/mcp"];
 
 /**
  * 目标路径落在预授权目录树内 → 返回其**项目根相对词法路径**；否则 `undefined`。
  * 取值规则与 `resolveWrite` **同源**（绝对路径按项目根取相对、相对路径按项目根解释），且纯词法、
  * 不触盘——真实路径逃逸（符号链接/junction）始终由 resolveWrite 的 F7 独立复核，本函数不放行任何
- * 未经 F6/边界/条件判定的路径。`isUnderOrEqual` 按**段**比较（`docs/su2` 不被 `docs/su` 覆盖），
- * 大小写口径沿用共享原语（Windows 不敏感）。空路径 / 取不到根内相对（含 skill 根目标）→ undefined。
+ * 未经 F6/边界/条件判定的路径。`isUnderOrEqual` 按**段**比较（`docs/su2` 不被 `docs/su` 覆盖、
+ * `docs/mcp2` 不被 `docs/mcp` 覆盖），大小写口径沿用共享原语（Windows 不敏感）。空路径 / 取不到
+ * 根内相对（含 skill 根目标）→ undefined。
  */
 function suPreauthorizedRelOf(targetPath: string, projectRoot: string): string | undefined {
   const raw = typeof targetPath === "string" ? targetPath.trim() : "";
@@ -1044,6 +1081,11 @@ export function createRuntimeAdapterFactory(
     // `undefined` ⇒ 对应工具不注册（能力缺席 = 最强 fail-closed，同 dispatch_task 先例）。
     installSkill: capabilities?.installSkill,
     uninstallSkill: capabilities?.uninstallSkill,
+    // G-4/V2：MCP 安装/卸载两能力并入适配器选项——**契约字段名** `installMcp` / `uninstallMcp`
+    // （运行时核心 `GovernedToolsOptions` 同名能力位，形状同源 `model/runtime.ts`）；
+    // `undefined` ⇒ 对应工具不注册（能力缺席 = 最强 fail-closed，同 install_skill 先例）。
+    installMcp: capabilities?.installMcp,
+    uninstallMcp: capabilities?.uninstallMcp,
     shellGate: capabilities?.shellGate ?? options.shellGate,
     shellVerdict: capabilities?.shellVerdict,
   });

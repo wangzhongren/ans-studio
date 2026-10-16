@@ -434,8 +434,13 @@ test("G-4 接线钉（裁定④⑤＋I3）：集合重推导单一来源；注�
   assert.ok(SESSION_SRC.includes("docs/skills/") && SESSION_SRC.includes("已安装技能已变更"), "陈旧重建行按技能变更如实分支（不误称「边界」）");
   assert.ok(SESSION_SRC.includes("...(installSkill ? { installSkill } : {})") && SESSION_SRC.includes("...(uninstallSkill ? { uninstallSkill } : {})"), "能力注入（未注入 ⇒ 两工具不注册——最强 fail-closed）");
   assert.ok(SESSION_SRC.includes('this.applySkillChange("installed"') && SESSION_SRC.includes('this.applySkillChange("uninstalled"'), "两工具同名同形（共用 handler）");
+  assert.ok(SESSION_SRC.includes("...(installMcp ? { installMcp } : {})") && SESSION_SRC.includes("...(uninstallMcp ? { uninstallMcp } : {})"), "V2 MCP 两工具同款注入才注册");
+  assert.ok(SESSION_SRC.includes('this.applyMcpChange("installed"') && SESSION_SRC.includes('this.applyMcpChange("uninstalled"'), "V2 MCP 两工具同名同形（与技能版逐字同构）");
+  assert.ok(SESSION_SRC.includes("readMcpDeclaration(projectRoot, name)"), "V2 声明校验＝运行时核心读取器（单一解析来源，不复制）");
+  assert.ok(SESSION_SRC.includes("private async activateRoleRefresh("), "激活共用件（技能与 MCP 同款三态：rebuilt/next-session/rebuild-failed）");
   assert.ok(SESSION_SRC.includes("private isCustomerInitiatedTurn("), "裁定④ 轮次护栏（当刻读 activeDeliveries/busy——不靠界面推测）");
   assert.ok(SESSION_SRC.includes('return active === undefined || active.kind === "message";'), "护栏判据：直接 send（客户直聊）与 kind:message（排队客户消息）放行，其余投递轮次拒绝");
   assert.ok(IFACE_SRC.includes("installSkill?: import(\"../../src/model/runtime.ts\").InstallSkillFn"), "Interface 透传面镜像（编排透传落地前静默忽略——登记）");
+  assert.ok(IFACE_SRC.includes("installMcp?: import(\"../../src/model/runtime.ts\").InstallMcpFn"), "Interface 透传面镜像（V2 MCP 同款）");
 });
 

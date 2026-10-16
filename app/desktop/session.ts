@@ -106,9 +106,14 @@ import type { DispatchTaskPayload, DispatchReceipt, DispatchTaskFn, PromptOption
 // G-4/I3（2026-10-16 客户批准）：技能安装/卸载能力的冻结契约（设计 §3.2 冻结家 `src/model/runtime.ts`；
 // 只读导入、不复制形状——字段名即契约，任一侧改名/改形 = 工具静默零注册或 fail-closed）。
 import type { InstallSkillFn, InstallSkillPayload, InstallSkillReceipt, UninstallSkillFn, ReportHandbackMetadata } from "../../src/model/runtime.ts";
+// G-4 V2（2026-10-16 客户批准）：外来 MCP 安装/卸载能力的冻结契约（沿技能版体格；同冻结家）。
+import type { InstallMcpFn, InstallMcpPayload, InstallMcpReceipt, UninstallMcpFn } from "../../src/model/runtime.ts";
 // G-4/I3：登记解析**唯一来源**（编排属主 `common/编排/installed-skills.ts`）——handler 的「登记存在/
 // 含角色/状态」校验面与 O-1 指纹集重推导共用它；**绝不复制解析逻辑**（逐字同渲染器口径）。
 import { readSkillRegistration } from "../../src/common/编排/installed-skills.ts";
+// G-4 V2：MCP 声明解析**唯一来源**（运行时核心属主 `common/runtime-core/mcp-declarations.ts`——
+// `loadDeclaration` 单一解析，配置侧不得复制；`uninstalled`/角色不命中非坏件、原样返回视图）。
+import { readMcpDeclaration } from "../../src/common/runtime-core/mcp-declarations.ts";
 // D-1/E-1：会话文件粗探（「在/不在/坏」）——打开会话时分类 `contextSource`（文案分支的事实来源）。
 // I-1 补丁（2026-10-12 客户重发授权）：(c) 规则集实件的形状（**只读转自** operator-channel.ts——它 `Omit`
 // 自编排的 `AssembleShellGateOptions`；同一契约只许一个形状，本模块不另立第二份）。
@@ -270,6 +275,10 @@ export interface SessionManagerDeps {
       installSkill?: InstallSkillFn;
       /** **技能卸载能力**（G-4/I3，仅 su 注入；形状＝契约家 `UninstallSkillFn`）。 */
       uninstallSkill?: UninstallSkillFn;
+      /** **外来 MCP 安装能力**（G-4 V2，仅 su 注入；形状＝契约家 `InstallMcpFn`）。编排透传落地前被静默忽略。 */
+      installMcp?: InstallMcpFn;
+      /** **外来 MCP 卸载能力**（G-4 V2，仅 su 注入；形状＝契约家 `UninstallMcpFn`）。 */
+      uninstallMcp?: UninstallMcpFn;
       /** **(a) 操作者确认通道（I-1 arm）**：仅**项目角色**会话注入（su **不接 (b)/(a)**——审读者不给自己开闸；
        *  编排据此装配 (c)/(b)/(a) ShellGate 并注册 `run_shell`；装配落地前被静默忽略——登记）。 */
       shellOperatorChannel?: OperatorChannelFn;
@@ -540,13 +549,13 @@ async function filePrint(absPath: string): Promise<string> {
 }
 
 /**
- * **`[系统·安装]`：安装/卸载完成后的定格系统行文首**（PM 冻结符号，G-4 2026-10-16）——形态契约＝
- * 「`[系统·<子类>]` ＋一个 ASCII 空格」，与桌面UI `tool-rows.js::SYSTEM_HEAD`（`[系统·` 开头、子类闭合
- * 于 `]`、≤12 字、后随空白或文末）的归类判据对齐（改形态 = 系统类静默回落普通气泡——单点在彼处注释）。
- * 该行为 `kind:"system"` 第四类投递正文（G-2/W2 同一套投递机真投递给 su；不可撤回——「不可撤回面同
- * system kind」）。
+ * **`[系统·安装]`：能力安装/卸载完成后的定格系统行文首**（PM 冻结符号，G-4 2026-10-16）——**技能（I3）
+ * 与外来 MCP（V2）两类安装动作共用同一子类**。形态契约＝「`[系统·<子类>]` ＋一个 ASCII 空格」，与
+ * 桌面UI `tool-rows.js::SYSTEM_HEAD`（`[系统·` 开头、子类闭合于 `]`、≤12 字、后随空白或文末）的归类
+ * 判据对齐（改形态 = 系统类静默回落普通气泡——单点在彼处注释）。该行为 `kind:"system"` 第四类投递正文
+ * （G-2/W2 同一套投递机真投递给 su；不可撤回——「不可撤回面同 system kind」）。
  */
-export const SKILL_INSTALL_SYSTEM_PREFIX = "[系统·安装]";
+export const CAPABILITY_INSTALL_SYSTEM_PREFIX = "[系统·安装]";
 
 /**
  * 会话管理器（B-2：**每角色一个保活句柄** + 上限 LRU）：点角色即开、多轮直发；
@@ -1185,6 +1194,16 @@ export class SessionManager {
       role.builtIn === true
         ? (d: InstallSkillPayload, _metadata?: ReportHandbackMetadata) => this.applySkillChange("uninstalled", req.projectRoot, req.runtime, req.roleId, d)
         : undefined;
+    // G-4 V2（2026-10-16 客户批准；同处注入）：**外来 MCP 安装/卸载能力**——与技能两工具**逐字同构**
+    // （仅 su 注入；「未注入即不注册」）；护栏/校验（声明）/激活/回执/系统行全在本层（`applyMcpChange`）。
+    const installMcp: InstallMcpFn | undefined =
+      role.builtIn === true
+        ? (d: InstallMcpPayload, _metadata?: ReportHandbackMetadata) => this.applyMcpChange("installed", req.projectRoot, req.runtime, req.roleId, d)
+        : undefined;
+    const uninstallMcp: UninstallMcpFn | undefined =
+      role.builtIn === true
+        ? (d: InstallMcpPayload, _metadata?: ReportHandbackMetadata) => this.applyMcpChange("uninstalled", req.projectRoot, req.runtime, req.roleId, d)
+        : undefined;
 
     // I-1（2026-10-12，客户裁定 arm）：**只对项目角色**把 (a) 操作者确认通道交给编排装配 (c)/(b)/(a)
     // `ShellGate`（判据 `role.builtIn`，数据驱动）。「审读者不给自己开闸」仍成立：su **不接 (b)/(a)**
@@ -1271,6 +1290,9 @@ export class SessionManager {
           // 被其静默忽略，零行为影响；落地后即点亮两工具，见 change 文档的依赖登记）。
           ...(installSkill ? { installSkill } : {}),
           ...(uninstallSkill ? { uninstallSkill } : {}),
+          // G-4 V2：外来 MCP 安装/卸载能力（同款注入与登记）。
+          ...(installMcp ? { installMcp } : {}),
+          ...(uninstallMcp ? { uninstallMcp } : {}),
           // I-1：(a) 操作者确认通道（仅项目角色；编排据它装配 (c)/(b)/(a) ShellGate 并注册 run_shell——
           // 装配接线落地前本字段被静默忽略，登记在案）。
           ...(shellOperatorChannel ? { shellOperatorChannel } : {}),
@@ -2311,6 +2333,28 @@ export class SessionManager {
   }
 
   /**
+   * **激活共用件**（⑥；技能与外来 MCP 两族 handler 同款）：复用既有 `rebuildSession`（串行链＋在跑
+   * 拒绝＋三态），**不打断**任何在跑轮次。返回：
+   * · `{effective:"rebuilt"}`＝目标 idle、已重建（即刻生效）；
+   * · `{effective:"next-session", note?}`＝如实延迟态（在跑 ⇒ 无 note；**无会话** ⇒ note 说明「并非在跑
+   *   轮次」——无旧上下文可重建、**绝不自动开目标会话**（激活≠开户））；
+   * · `{effective:"next-session", error}`＝重开失败（调用方按各自登记面组成 `rebuild-failed` 回执——
+   *   登记/声明仍在，**不假装已生效**）。竞态（检查后目标开跑一轮）按其如实延迟、不报失败。
+   */
+  private async activateRoleRefresh(projectRoot: string, runtime: RuntimeKind, roleId: string): Promise<{ effective: "rebuilt" | "next-session"; note?: string; error?: string }> {
+    const targetSessionKey = this.sessionKey(projectRoot, roleId, runtime);
+    const targetEntry = this.sessions.get(targetSessionKey);
+    if (!targetEntry) {
+      return { effective: "next-session", note: "该角色当前没有打开的会话（并非在跑轮次）——新会话打开即生效。" };
+    }
+    if (targetEntry.busy) return { effective: "next-session" }; // 在跑轮次不打断（沿 G-2 语义）；本次回执如实延迟
+    const rebuilt = await this.rebuildSession({ projectRoot, roleId, runtime });
+    if (rebuilt.ok) return { effective: "rebuilt" };
+    if (this.sessions.get(targetSessionKey)?.busy === true) return { effective: "next-session" }; // 竞态：检查后开跑——不报失败
+    return { effective: "next-session", error: rebuilt.error ?? "未知原因" };
+  }
+
+  /**
    * `install_skill` / `uninstall_skill` 的共用实现（注入能力侧；回执形状冻结——`model/runtime.ts`）。
    * 分支顺序（一切失败都先于任何副作用）：
    * ① 护栏（`not-customer-turn`）→ ② 载荷防御 → ③ 目标角色（`role-not-found`）→ ④ 登记（`not-registered`
@@ -2402,34 +2446,21 @@ export class SessionManager {
       );
     }
 
-    // ⑥ 激活（复用既有 `rebuildSession`：串行链＋在跑拒绝＋三态；**不打断**任何在跑轮次）：
-    //    idle ⇒ 重建（rebuilt＝即刻生效）；在跑 ⇒ next-session（如实延迟态，**不是错误**——settle 后
-    //    靠既有检查点（含裁定⑤ 指纹）收敛）；无会话 ⇒ next-session（无旧上下文可重建——新会话打开
-    //    即生效）；重建失败 ⇒ rebuild-failed（登记仍在，**不假装已生效**）。
-    const targetSessionKey = this.sessionKey(projectRoot, roleId, runtime);
-    let effective: "rebuilt" | "next-session" = "next-session";
-    let note: string | undefined;
-    const targetEntry = this.sessions.get(targetSessionKey);
-    if (!targetEntry) {
-      note = "该角色当前没有打开的会话（并非在跑轮次）——新会话打开即生效。";
-    } else if (targetEntry.busy) {
-      // 在跑轮次不打断（沿 G-2 语义）；本次回执如实延迟。
-    } else {
-      const rebuilt = await this.rebuildSession({ projectRoot, roleId, runtime });
-      if (rebuilt.ok) {
-        effective = "rebuilt";
-      } else if (this.sessions.get(targetSessionKey)?.busy === true) {
-        // 竞态：检查后目标开跑了一轮——按其如实延迟（不打断），不报失败。
-      } else {
-        const detail = rebuilt.error ?? "未知原因";
-        diagnostic.error("skill.rebuild.failed", new Error(detail), { toolName, targetRoleId: roleId });
-        return {
-          ok: false,
-          reason: "rebuild-failed",
-          message: `技能登记已${acting ? "变更" : "撤销"}，但按新登记重建角色「${roleId}」的会话失败：${detail}——登记仍在、会话未重建（未假装已生效；可在该角色下一次打开会话时生效，或重试）。`,
-        };
-      }
+    // ⑥ 激活（共用件 `activateRoleRefresh`——复用既有 `rebuildSession` 三态，两族 handler 同款）：
+    //    idle ⇒ rebuilt（即刻生效）；在跑 ⇒ next-session（如实延迟态，**不是错误**——settle 后靠既有
+    //    检查点（含裁定⑤ 指纹）收敛）；无会话 ⇒ next-session（无旧上下文可重建）；重开失败 ⇒
+    //    rebuild-failed（登记仍在，**不假装已生效**）。
+    const activation = await this.activateRoleRefresh(projectRoot, runtime, roleId);
+    if (activation.error !== undefined) {
+      diagnostic.error("skill.rebuild.failed", new Error(activation.error), { toolName, targetRoleId: roleId });
+      return {
+        ok: false,
+        reason: "rebuild-failed",
+        message: `技能登记已${acting ? "变更" : "撤销"}，但按新登记重建角色「${roleId}」的会话失败：${activation.error}——登记仍在、会话未重建（未假装已生效；可在该角色下一次打开会话时生效，或重试）。`,
+      };
     }
+    const effective = activation.effective;
+    const note = activation.note;
 
     // ⑦ 如实回执（冻形）＋ `[系统·安装]` 定格系统行（`kind:"system"` 第四类通道真投递给 su——忙时排队、
     //    未开自动开、失败保留重试全复用；不可撤回）＋诊断。**不写盘、不放行任何写入、不改任何写边界**。
@@ -2441,8 +2472,8 @@ export class SessionManager {
           : "该角色正在运行轮次（不打断）——新会话起生效";
     const shortDigest = digest.slice(0, 12);
     const rowText = acting
-      ? `${SKILL_INSTALL_SYSTEM_PREFIX} 已安装技能「${name}」→ 角色「${roleId}」；${effectivePhrase}；内容：${skillRel}（sha256 ${shortDigest}）。`
-      : `${SKILL_INSTALL_SYSTEM_PREFIX} 已卸载技能「${name}」（角色「${roleId}」）；效果已撤，文件保留于 ${skillRel}（sha256 ${shortDigest}）；${effectivePhrase}。`;
+      ? `${CAPABILITY_INSTALL_SYSTEM_PREFIX} 已安装技能「${name}」→ 角色「${roleId}」；${effectivePhrase}；内容：${skillRel}（sha256 ${shortDigest}）。`
+      : `${CAPABILITY_INSTALL_SYSTEM_PREFIX} 已卸载技能「${name}」（角色「${roleId}」）；效果已撤，文件保留于 ${skillRel}（sha256 ${shortDigest}）；${effectivePhrase}。`;
     this.watchdogDeliver(projectRoot, {
       text: rowText,
       summary: `系统·安装 · 已${verb}技能「${name}」· 角色「${roleId}」· ${effective === "rebuilt" ? "即刻生效（已重建）" : "新会话起生效"}`,
@@ -2456,6 +2487,151 @@ export class SessionManager {
       roleId,
       name,
       path: skillRel,
+      digest,
+      effective,
+      ...(note !== undefined ? { note } : {}),
+    };
+  }
+
+  // —————————————— G-4 V2（2026-10-16 客户批准）：外来 MCP 安装/卸载 handler ——————————————
+  //
+  // 与技能两工具**逐字同构**（护栏/载荷/角色/激活共用件全同；仅校验面＝MCP 声明、名词与诚实面不同）。
+  // **工具不写盘**——声明落盘永远由 su 的 `write_file` 完成（「先落盘再激活」）；失败一律 fail-closed＝
+  // **未执行、零副作用**。**诚实面（不得宣称逐调用受审，§5.3）**：外来 MCP 工具在 ANS 门禁之外执行
+  // （server 进程内）＝**能力级授予**；安装/卸载**不改变任何角色的写边界**。卸载＝**下次会话摘除**
+  // （server 进程随会话消亡、零平台残留）、**已发生的副作用不可撤**；**声明文件保留**（「效果已撤」与
+  // 「文件仍在」如实二分）。
+
+  /**
+   * `install_mcp` / `uninstall_mcp` 的共用实现（注入能力侧；回执形状冻结——`model/runtime.ts`，沿技能版
+   * 体格）。分支顺序同技能版：① 护栏（`not-customer-turn`）→ ② 载荷防御 → ③ 目标角色（`role-not-found`）
+   * → ④ 声明（唯一来源＝运行时核心 `readMcpDeclaration`，**不复制解析逻辑**：`not-registered`／
+   * `role-not-listed`；卸载声明未变 ⇒ `registration-unchanged`）→ ⑤ 声明文件与运行期哈希（缺件 ⇒
+   * `not-registered` 类如实）→ ⑥ 激活（共用 `activateRoleRefresh`：`rebuilt`／`next-session`／
+   * `rebuild-failed`）→ ⑦ 回执 ＋ `[系统·安装]` 系统行 ＋ 诊断。
+   */
+  private async applyMcpChange(
+    action: "installed" | "uninstalled",
+    projectRoot: string,
+    runtime: RuntimeKind,
+    suRoleId: string,
+    d: InstallMcpPayload,
+  ): Promise<InstallMcpReceipt> {
+    const acting = action === "installed";
+    const verb = acting ? "安装" : "卸载";
+    const toolName = acting ? "install_mcp" : "uninstall_mcp";
+    const diagnostic = createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId: suRoleId });
+    const refuse = (reason: string, message: string): InstallMcpReceipt => {
+      diagnostic.record("mcp.refused", { toolName, targetRoleId: typeof d?.roleId === "string" ? d.roleId : "", reasonCode: reason });
+      return { ok: false, reason, message };
+    };
+
+    // ① 裁定④ 轮次护栏（**先判**；与技能两工具同判据同文案）。
+    if (!this.isCustomerInitiatedTurn(projectRoot, runtime, suRoleId)) {
+      return refuse("not-customer-turn", "本动作仅可在客户消息发起的轮次执行——未执行。");
+    }
+
+    // ② 载荷防御（模型输入不可信——本层全量重校验）。
+    const roleId = typeof d?.roleId === "string" ? d.roleId.trim() : "";
+    const name = typeof d?.name === "string" ? d.name.trim() : "";
+    if (roleId === "") return refuse("role-not-found", `角色「${roleId}」不是本项目项目角色（或为治理角色 su）——未执行。`);
+    if (name === "") return refuse("not-registered", `MCP 未登记：docs/mcp/${name}.md 不存在——先落盘再${verb}；未执行。`);
+
+    // ③ 目标角色须是**本项目项目角色**（非内置治理角色 su 自身/同类）；缓存 miss ⇒ 实时重枚举一次
+    //   （与技能版同口径；首轮寻址先例）。
+    const findTarget = (): { builtIn?: boolean } | undefined => {
+      const listing = this.deps.getListing(projectRoot);
+      return listing ? listing.roles.find((r) => r.roleId === roleId) : undefined;
+    };
+    let target = findTarget();
+    if (!target && this.deps.refreshListing) {
+      try {
+        await this.deps.refreshListing(projectRoot);
+      } catch {
+        // 重枚举失败（读盘竞态等）：按原 miss 口径如实拒绝，不上抛。
+      }
+      target = findTarget();
+    }
+    if (!target || target.builtIn === true || roleId === suRoleId) {
+      return refuse("role-not-found", `角色「${roleId}」不是本项目项目角色（或为治理角色 su）——未执行。`);
+    }
+
+    // ④ 声明校验（**唯一来源**＝运行时核心 `readMcpDeclaration`——与装配列表函数逐字同口径，绝不复制解析）。
+    const declaration = readMcpDeclaration(projectRoot, name);
+    if (declaration === undefined) {
+      return refuse(
+        "not-registered",
+        acting
+          ? `MCP 未登记：docs/mcp/${name}.md 不存在——先落盘再安装；未执行。`
+          : `MCP 未登记：docs/mcp/${name}.md 不存在或不可解析——没有可撤销的声明；未执行。`,
+      );
+    }
+    if (acting) {
+      if (!declaration.roles.includes(roleId)) {
+        return refuse("role-not-listed", `登记中未包含角色「${roleId}」——未执行；如确要安装请先更新登记。`);
+      }
+      if (declaration.status !== "installed") {
+        return refuse(
+          "not-registered",
+          `MCP 未登记为已安装：docs/mcp/${name}.md 状态为「${declaration.status}」——先改声明再安装；未执行。`,
+        );
+      }
+    } else if (declaration.status === "installed" && declaration.roles.includes(roleId)) {
+      // 卸载专有两钉之一：**先改声明再卸载**——声明仍含角色即拒绝（防「工具说撤了、声明没变」）。
+      return refuse("registration-unchanged", `登记仍含角色「${roleId}」——先改登记再卸载；未执行。`);
+    }
+
+    // ⑤ 声明文件存在性与运行期哈希（sha256 **原始字节**——复用 `filePrint`；与技能版同算法）。缺件 ⇒
+    //   如实拒绝（回执冻形要求 `path`＋`digest`；卸载须能如实作「文件保留」陈述——不拿哨兵充数）。
+    const declarationRel = `docs/mcp/${name}.md`; // ＝视图 `declaration.path` 同口径（回执/诊断同一路径）
+    const digest = await filePrint(path.join(projectRoot, "docs", "mcp", `${name}.md`));
+    if (digest === "<missing>") {
+      return refuse(
+        "not-registered",
+        acting
+          ? `MCP 未登记：${declarationRel} 不存在——先落盘再安装；未执行。`
+          : `MCP 声明缺失：${declarationRel} 不存在或不可读——无法如实回执（sha256 与「文件保留」陈述）；未执行。`,
+      );
+    }
+
+    // ⑥ 激活（共用件 `activateRoleRefresh`——同技能版三态与竞态语义）。
+    const activation = await this.activateRoleRefresh(projectRoot, runtime, roleId);
+    if (activation.error !== undefined) {
+      diagnostic.error("mcp.rebuild.failed", new Error(activation.error), { toolName, targetRoleId: roleId });
+      return {
+        ok: false,
+        reason: "rebuild-failed",
+        message: `MCP 声明已${acting ? "变更" : "撤销"}，但按新声明重建角色「${roleId}」的会话失败：${activation.error}——声明仍在、会话未重建（未假装已生效；可在该角色下一次打开会话时生效，或重试）。`,
+      };
+    }
+    const effective = activation.effective;
+    const note = activation.note;
+
+    // ⑦ 如实回执（冻形）＋ `[系统·安装]` 定格系统行（同技能版：kind:"system" 第四类通道真投递给 su——
+    //    不可撤回）＋诊断。**不写盘、不放行任何写入、不改任何写边界**；诚实面（门禁之外执行＝能力级
+    //    授予，**非逐调用受审**）写进系统行（不得宣称受审）。
+    const effectivePhrase =
+      effective === "rebuilt"
+        ? "已重建该角色会话、即刻生效"
+        : note !== undefined
+          ? "该角色当前未打开会话——新会话起生效"
+          : "该角色正在运行轮次（不打断）——新会话起生效";
+    const shortDigest = digest.slice(0, 12);
+    const rowText = acting
+      ? `${CAPABILITY_INSTALL_SYSTEM_PREFIX} 已安装 MCP「${name}」→ 角色「${roleId}」；${effectivePhrase}；声明：${declarationRel}（sha256 ${shortDigest}）；外来 MCP 工具在 ANS 门禁之外执行（能力级授予，非逐调用受审）。`
+      : `${CAPABILITY_INSTALL_SYSTEM_PREFIX} 已卸载 MCP「${name}」（角色「${roleId}」）；效果已撤，声明文件保留于 ${declarationRel}（sha256 ${shortDigest}）；已发生的副作用不可撤；${effectivePhrase}。`;
+    this.watchdogDeliver(projectRoot, {
+      text: rowText,
+      summary: `系统·安装 · 已${verb}MCP「${name}」· 角色「${roleId}」· ${effective === "rebuilt" ? "即刻生效（已重建）" : "新会话起生效"}`,
+      dedupKey: `watchdog\u0000${projectRoot}\u0000mcp-install-row\u0000${randomUUID()}`,
+    });
+    diagnostic.record(acting ? "mcp.installed" : "mcp.uninstalled", { toolName, targetRoleId: roleId, path: declarationRel, state: effective });
+    return {
+      ok: true,
+      action,
+      roleId,
+      name,
+      path: declarationRel,
       digest,
       effective,
       ...(note !== undefined ? { note } : {}),

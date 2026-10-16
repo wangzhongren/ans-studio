@@ -340,3 +340,101 @@ test('G-4/I7：折叠分解按工具名计数——新工具名进「本轮 N �
   ]).tools, [ { name: 'install_skill', count: 2 } ]);
   // 折叠行文案形制「本轮 N 个调用：…」的通用性（t.name 直出）由 renderer.test.ts 同批守卫（本段钉数据面）。
 });
+
+// ————— G-4/V2-MCP（2026-10-16 客户批准 V2 分批实施；设计 `2026-10-16_design_role-capability-install` §5.4/§九-V2）————
+// MCP 面的渲染最小确认面（沿 G-4/I7 体格）：①外来 MCP 工具名形态＝`mcp__<server>__<tool>`（探针定格——Claude
+// `mcp__probe__echo`；Pi 清洗 `[^A-Za-z0-9_]`→`_`、超长 `_<hash8>` 缩短在后部、前缀完整；Codex server 名 `-`→`_`；
+// 三平台到渲染侧的收口形态同款：kind tool_call/accepted/denied + detail.toolName——Claude＝hook start＋泵 result、
+// Codex＝`mcpToolCall` item 映射〔适配器 wave B 落地〕、Pi＝既有工具管道行）；②安装工具行 `install_mcp`/`uninstall_mcp`
+// （设计 §3.2 冻结名，V2 工具面）；③`[系统·安装]` 系统行＝既有子类路径复用（I7 已钉标记形态判据，此处以 MCP 语境复证——
+// 无需新登记）。渲染平面对三个新名字组**零引用**（renderer.test.ts 同批钉「零特判」）——下述用例把「通用链确有
+// 覆盖」钉在纯函数层；系统行正文措辞属产出方（文案单一来源），本段只钉标记形态与 classifier 契约字段。
+
+test('G-4/V2-MCP：mcp__<server>__<tool> 形态工具名走通用工具行链——名称解析/瘦身零特判（下划线/清洗/缩短形态全收）', () => {
+  // 结构化事件（三平台收口形态：Claude hook start/泵 result、Codex item 映射落点、Pi 管道行）：toolName 原样进事实。
+  const start = tools.activityOf({ kind: 'tool_call', turnId: 'mcp-turn', detail: { toolName: 'mcp__probe__echo', toolCallId: 'mcp-call', phase: 'start' } });
+  assert.equal(start.toolName, 'mcp__probe__echo', '双下划线工具名原样（不截断/不改写——名称=事件事实）');
+  assert.equal(start.status, 'call');
+  assert.equal(start.label, '调用发起');
+  assert.equal(start.barrier, false, '非 SPECIAL_TOOLS/无 display ⇒ 轮内工具组（不发明卡片/屏障语义）');
+  // 结果（带 display——真实投影路径恒带）：状态/目标走既有点位（display.target 安全目标单点）。
+  const done = tools.activityOf({ kind: 'accepted', turnId: 'mcp-turn', detail: { toolName: 'mcp__probe__echo', toolCallId: 'mcp-call', phase: 'result', ok: true, status: 'completed', display: { version: 1, omissions: [], target: { kind: 'command', value: { text: 'echo probe-input', truncated: false, redacted: false } } } } });
+  assert.equal(done.status, 'completed');
+  assert.equal(done.fullTarget, 'echo probe-input', '目标取 display 单点（不读原始参数）');
+  assert.equal(done.barrier, true, '真实投影事件恒带 display ⇒ 生命周期独立行（沿 I7 同款呈现路径）');
+  // blocked（白名单放行分支就位前，探针观测形态＝denied/blocked/mcp__probe__echo；放行后就位后该相位对未白名单名照旧）：
+  // 走既有治理信号口径——未放行如实、原因可见（行分类单点不在渲染侧）。
+  const blocked = tools.activityOf({ kind: 'denied', turnId: 'mcp-turn', summary: '拒绝执行：非白名单 MCP 工具', detail: { toolName: 'mcp__probe__echo', toolCallId: 'mcp-call2', phase: 'blocked' } });
+  assert.equal(blocked.status, 'denied');
+  assert.equal(blocked.label, '已拒绝');
+  assert.equal(blocked.exceptional, true);
+  // legacy 文本路径：`调用工具 mcp__probe__echo` 被既有正则识别（`[\w.-]+` 含下划线——命名不因字符集失配）；
+  // 结果行冒号口径同款（MCP 结果正文可含 JSON 花括号/内层冒号——首段解析不受影响）。
+  const legacyCall = tools.activityOf({ kind: 'tool', text: '调用工具 mcp__probe__echo' });
+  assert.equal(legacyCall.toolName, 'mcp__probe__echo');
+  assert.equal(legacyCall.status, 'call');
+  assert.equal(tools.activityOf({ kind: 'tool', text: 'mcp__probe__echo：{"echo":"probe-input"}' }).toolName, 'mcp__probe__echo');
+  // 清洗/缩短形态（Pi 探针实测逐字：`-`/`.`→`_`；超长名 `_<hash8>` 缩短在后部）＋server 名含连字符的防御面——全部 `[\w.-]` 内。
+  for (const name of ['mcp__probe_a__echo', 'mcp__probe_srv_v2__tool_name_that_is_quite_long_indeed__731aa8e9', 'mcp__probe-surface__echo']) {
+    assert.equal(tools.activityOf({ kind: 'tool_call', detail: { toolName: name, toolCallId: 'c', phase: 'start' } }).toolName, name, '名称逐字保留：' + name);
+  }
+  // 瘦身映射：冒号口径 + 重复工具名段去重 + 长无路径折叠为「…」+ 含路径不折叠——全部既有规则，零漂移。
+  assert.equal(tools.slimToolRow('mcp__probe__echo：mcp__probe__echo: {"echo":"probe-input"}'), 'mcp__probe__echo：{"echo":"probe-input"}', '重复工具名段去重沿既有口径');
+  assert.ok(tools.slimToolRow('mcp__probe__echo：' + 'x'.repeat(80)).endsWith('echo：…'), '长无路径内容折叠为「…」（既有 >60 无路径口径）');
+  assert.ok(tools.slimToolRow('mcp__probe__echo：结果已存：docs/mcp/probe-surface.md（原样）').includes('docs/mcp/probe-surface.md'), '含路径样内容不折叠（既有「无路径才折叠」口径）');
+  assert.ok(tools.slimToolRow('mcp__probe__echo：' + 'y'.repeat(200)).length <= tools.LIMIT + 1, '硬上限 140（超限截断加「…」——既有口径）');
+});
+
+test('G-4/V2-MCP：折叠分解按工具名计数——mcp__<server>__<tool> 名进「本轮 N 个调用：a / b ×k」数据面（无白名单）', () => {
+  const items = [
+    { callId: 'mc1', turnId: 't', status: 'call', toolName: 'mcp__probe__echo' },
+    { callId: 'mc1', turnId: 't', status: 'completed', toolName: 'mcp__probe__echo' },
+    { callId: 'mc2', turnId: 't', status: 'call', toolName: 'mcp__probe__echo' },
+    { callId: 'mc2', turnId: 't', status: 'completed', toolName: 'mcp__probe__echo' },
+    { callId: 'mc3', turnId: 't', status: 'call', toolName: 'read_file' },
+  ];
+  // 同一 toolCallId 的发起+结果并一行（S1 口径对 MCP 名同解）；分解=首现序逐名计数、×k 原样（装进既有折叠摘要）。
+  assert.deepEqual(tools.callSummary(items), {
+    calls: 3, denied: 0, failed: 0, unknown: false,
+    tools: [ { name: 'mcp__probe__echo', count: 2 }, { name: 'read_file', count: 1 } ],
+  }, 'MCP 调用与既有工具走同一条计数路径（名逐字、含下划线，不美化不改写）');
+  // 异常分桶照旧（未放行优先；timed-out 归失败）——MCP 名不改变任何分桶。
+  const mixed = [
+    { callId: 'md1', turnId: 't', status: 'call', toolName: 'mcp__probe__echo' },
+    { callId: 'md1', turnId: 't', status: 'denied', toolName: 'mcp__probe__echo' },
+    { callId: 'md2', turnId: 't', status: 'timed-out', toolName: 'mcp__probe__hang' },
+  ];
+  assert.deepEqual(tools.callSummary(mixed), {
+    calls: 2, denied: 1, failed: 1, unknown: false,
+    tools: [ { name: 'mcp__probe__echo', count: 1 }, { name: 'mcp__probe__hang', count: 1 } ],
+  });
+  // 折叠行文案形制（t.name 直出）的通用性由 renderer.test.ts 同批守卫（本段钉数据面）。
+});
+
+test('G-4/V2-MCP：install_mcp/uninstall_mcp 工具行通用渲染 + `[系统·安装]` 系统行＝既有子类复用（MCP 语境复证）', () => {
+  // 安装工具行（V2 工具面，设计 §3.2 冻结名）：调用发起/结果/护栏拒绝沿 I7 同款口径（事件事实，零特判）。
+  const start = tools.activityOf({ kind: 'tool_call', turnId: 'mcp-inst', detail: { toolName: 'install_mcp', toolCallId: 'im-1', phase: 'start' } });
+  assert.equal(start.toolName, 'install_mcp');
+  assert.equal(start.status, 'call');
+  assert.equal(start.barrier, false, '非 SPECIAL_TOOLS/无 display ⇒ 轮内工具组');
+  const done = tools.activityOf({ kind: 'accepted', turnId: 'mcp-inst', detail: { toolName: 'install_mcp', toolCallId: 'im-1', phase: 'result', ok: true, status: 'completed', display: { version: 1, omissions: [], target: { kind: 'path', value: { text: 'docs/mcp/probe-surface.md', truncated: false, redacted: false } } } } });
+  assert.equal(done.status, 'completed');
+  assert.equal(done.fullTarget, 'docs/mcp/probe-surface.md', '目标取 display 单点（声明文件路径）');
+  const refused = tools.activityOf({ kind: 'denied', turnId: 'mcp-inst', summary: 'install_mcp：MCP 安装**未执行**（reason: not-customer-turn；回执：仅客户消息发起的轮次可执行）——零副作用；**不要当它已安装**，如实告知客户。', detail: { toolName: 'install_mcp', toolCallId: 'im-2', phase: 'result', ok: false, status: 'failed' } });
+  assert.equal(refused.status, 'failed', 'ok:false 走既有失败口径（行分类单点）');
+  assert.equal(refused.exceptional, true);
+  assert.ok(refused.visibleSummary.includes('not-customer-turn'), '失败原因（护栏 reason）在可见首行如实保留');
+  assert.equal(tools.activityOf({ kind: 'tool', text: '调用工具 uninstall_mcp' }).toolName, 'uninstall_mcp', 'legacy 文本路径同款');
+  assert.equal(tools.slimToolRow('uninstall_mcp：uninstall_mcp: docs/mcp/probe-surface.md'), 'uninstall_mcp：docs/mcp/probe-surface.md', '瘦身/去重沿既有口径');
+  // 系统行：MCP 安装完成行同用 `[系统·安装]` 子类（沿 I7 冻结面「安装/卸载完成后的定格系统行」）——
+  // 判据只依赖 `[系统·<子类>] ` 标记形态 ⇒ **无需新登记**（渲染侧零改动达成「复用既有子类路径」）；
+  // 正文措辞属产出方，本段只钉形态/标签/displayBody 契约字段，不钉全文。
+  const echo = tools.classifyInjectedMessage('用户指令：[系统·安装] MCP server「probe-surface」已安装 → 角色「实现者」（docs/mcp/probe-surface.md）。');
+  assert.equal(echo?.kind, 'system', 'MCP 安装系统行归类 system（沿 [系统·安装] 既有子类路径）');
+  assert.equal(echo?.label, '系统消息 · 安装');
+  assert.equal(echo?.sourceRoleId, '', '来源=系统（非角色）');
+  assert.equal(echo?.displayBody, 'MCP server「probe-surface」已安装 → 角色「实现者」（docs/mcp/probe-surface.md）。', 'displayBody 剥离文首标记（W6b 口径）');
+  const replay = tools.classifyInjectedMessage('[系统·安装] MCP server「probe-surface」已卸载（效果已撤；声明保留于 docs/mcp/probe-surface.md）。');
+  assert.equal(replay?.kind, 'system', '回放原始投递文本同解（卸载完成行同族）');
+  assert.equal(replay?.label, '系统消息 · 安装');
+});

@@ -61,3 +61,14 @@
 - **测试**：`test/桌面应用/` 新增 **4 例**（tool-rows +3：`[系统·安装]` 归类/工具行两路径通用渲染/折叠分解含新名；renderer +1：零特判源码守卫）；桌面目录 **358/358**、`npm run typecheck` **全仓 0 错**；全量 **1814 计 / 1809 过 / 4 红 / 1 skipped**（4 红＝他域已登记预期红：`test/测试/g1-verify` ×3 待随 I5/I6 翻转＋`test/测试/g3-search-verify` 探针旧钉 ×1 待随 cleanPatterns 轻修同批翻转——与本批零交集）。
 - 未验边界：I3（桌面窗口）系统行产出未落树（真机/E2E 观测属 E2E 轮）；产出方若改标记形态归类静默回落普通气泡（单点＝`SYSTEM_HEAD`，注释即契约）；卸载行子类命名归属产出方（渲染侧零登记、两种形态均覆盖）；真机投影下两新工具实际走生命周期行还是轮内组未观测。
 - 指纹：`tool-rows.test.ts 52c2c4e7`（原 `a599d1da`）、`renderer.test.ts 3bce42fb`（原 `db80beee`）；`app/renderer/**` 零触碰（指纹见上）。Doc: docs/fix/2026-10-16_fix_g4-i7-install-row-annotation.md
+
+## 2026-10-16：G-4/V2-MCP MCP 工具行/安装行如实标注（MCP 安装·呈现行批）——**零改动实证**＋断言守卫
+
+实施——客户 2026-10-16 批准 G-4 V2（MCP 安装）分批实施（P1 Claude → P2 Codex → P3 Pi）；V2 范围⑤「呈现行」属主桌面UI（设计 `2026-10-16_design_role-capability-install` §5.4：`install_mcp` 调用按既有工具行渲染＋`[系统·<子类>]` 定格系统行，「与技能同链，不另造行体系」）。核查结论＝**渲染平面零改动**（沿 G-3/G-4-I7 先例）：
+- **`mcp__<server>__<tool>` 使用行**（三平台收口形态同款：Claude＝hook start＋泵 result、Codex＝`mcpToolCall` item 映射〔wave B 适配器〕、Pi＝既有工具管道行；渲染侧只认 `kind:tool_call/accepted/denied`＋`detail.toolName`）：名称解析逐字直出零改写（legacy 正则 `[\w.-]+` 含下划线全名命中）；屏障表不含 MCP 形态名（真实投影带 display ⇒ 生命周期独立行直出工具名，无 display ⇒ 轮内组）；折叠计数 `callSummary` 按名直出（下划线名入「本轮 N 个调用：a / b ×k」）；详情 `toolDetails` **零工具名引用**（display 驱动）。
+- **安装工具行 `install_mcp`/`uninstall_mcp`**（设计 §3.2 冻结名）：经 `isToolActivity`/`activityOf` 按事件事实渲染（与 I7 技能两工具逐环节同构）；小护栏拒绝沿既有 failed 口径、reason 保留。
+- **`[系统·安装]` 系统行**：MCP 安装/卸载完成行走既有子类路径（**子类已识别、无需新登记**——判据只依赖 `[系统·<子类>] ` 标记形态）；呈现/回显回放/队列/不可撤回面全部沿 I7 定格链。
+- **零改动实证（三层）**：字节级——`app/renderer/**` 未触碰，五文件指纹与 G-4/I7 批逐位一致（renderer `27d72e8e` / tool-rows `2fd2335f` / ui-labels `564fdb9a` / styles `7cf067d4` / index `a39e3652`）；符号级——四源文件去注释后对 `mcp__`/`install_mcp`/`uninstall_mcp` 零命中＋`toolDetails` 切片零 `toolName`（新守卫可重跑复验）；机制级——逐环节零新分支（fix 记录 §1）。
+- **测试**：`test/桌面应用/` 新增 **4 例**（tool-rows +3：下划线/清洗/缩短名形态解析＋折叠计数＋install_mcp 行与系统行子类复用；renderer +1：零特判源码守卫）；tool-rows **24/24**、renderer **55/55**、桌面目录 **375/375**（并行 wave A 窗口内复跑仍全绿）；`npm run typecheck` **全仓 0 错**；全量两快照 1884 计 / 1879→1872 过 / 4→11 红（**全部＝他域在飞翻转钉**：测试/门禁引擎/编排属主的 V2 wave A〔`docs/mcp` 预授权扩列、`install_mcp` 契约定型〕＋卡文本批过渡态，数量随并行落地变动，**与本批零交集**；跳过＝既有 Windows 用例）。
+- 未验边界：三平台适配器发射面未落树/未接（Claude 两发射点属 P1、Codex item 映射 wave B、Pi 属 P3）；Codex 呈现名选择与失败态映射文案归 wave B；display 投影面与系统行文案产出方未落树；真机 E2E 属 E2E 轮。
+- 指纹：`tool-rows.test.ts 225e69ae`（原 `52c2c4e7`）、`renderer.test.ts d06e7bfc`（原 `3bce42fb`）；`app/renderer/**` 零触碰（指纹见上）。Doc: docs/fix/2026-10-16_fix_g4v2-mcp-row-annotation.md

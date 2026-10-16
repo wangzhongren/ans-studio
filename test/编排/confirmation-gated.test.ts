@@ -15,9 +15,9 @@
 //   ⑤ 预览含**越界路径**（src/）→ 不发行 → 越界写被拒（写集有界）；
 //   ⑥ gate 直断言：确认后已发行路径放行、未发行路径被拒；
 //   ⑥b su 预授权写目录（客户裁定 2026-10-16）：docs/su/**、docs/contracts/** 与 docs/skills/**
-//      （第三棵＝G-4 角色能力安装 V1 裁定扩列，2026-10-16 批准）是**初始 writeSet**的一部分——
-//      不经 request_confirmation 直接落盘（客户通道零调用）；docs/ 其它路径与 角色卡/ 未确认仍被
-//      F4 拒、零副作用。
+//      （第三棵＝G-4 角色能力安装 V1 裁定扩列）与 docs/mcp/**（第四棵＝G-4 V2 裁定扩列，
+//      2026-10-16 批准）是**初始 writeSet**的一部分——不经 request_confirmation 直接落盘（客户
+//      通道零调用）；docs/ 其它路径与 角色卡/ 未确认仍被 F4 拒、零副作用。
 //   ⑦ `request_choice` 的勾选经通道回传（多选，transcript 含「客户已选择」）；
 //   ⑧ CLI 终端映射单元：`parseChoiceInput`（单选 `1`、多选 `1,3`、非法/重复/越界 → 拒）、
 //      `createCliCustomerInput`（y/n/空/EOF）、`formatCustomerInputPrompt`、`extractPathCandidates`。
@@ -291,7 +291,7 @@ test("gate 直断言：确认后已发行路径放行、未发行路径（同目
 
 // ————————— ⑥b su 预授权写目录（客户裁定 2026-10-16） —————————
 
-test("su 预授权：docs/su/**、docs/contracts/** 与 docs/skills/** **不经 request_confirmation** 直接落盘；docs/ 其它与 角色卡/ 未确认仍被 F4 拒", async () => {
+test("su 预授权：docs/su/**、docs/contracts/**、docs/skills/** 与 docs/mcp/** **不经 request_confirmation** 直接落盘；docs/ 其它与 角色卡/ 未确认仍被 F4 拒", async () => {
   await withTarget(async ({ target }) => {
     mkdirSync(target, { recursive: true });
     // 脚本**不发** request_confirmation：预授权 = 初始 writeSet 的一部分（不属「经确认发行的写权」）。
@@ -300,6 +300,8 @@ test("su 预授权：docs/su/**、docs/contracts/** 与 docs/skills/** **不经 
       { name: "write_file", args: { path: "docs/contracts/api-v1.md", content: "# 契约（免确认）\n" } },
       { name: "write_file", args: { path: "docs/skills/t1/install.md", content: "# 安装登记：t1（免确认）\n" } },
       { name: "write_file", args: { path: "docs/skills/t1/SKILL.md", content: "# 技能：t1（免确认）\n" } },
+      { name: "write_file", args: { path: "docs/mcp/echo.md", content: "# MCP 声明：echo（免确认）\n" } },
+      { name: "write_file", args: { path: "docs/mcp/sub/deep.md", content: "# MCP 声明子树（免确认）\n" } },
       { name: "write_file", args: { path: "docs/其他.md", content: "应被 F4 拒\n" } },
       { name: "write_file", args: { path: "角色卡/Y/role-card.md", content: "应被 F4 拒\n" } },
     ];
@@ -317,6 +319,8 @@ test("su 预授权：docs/su/**、docs/contracts/** 与 docs/skills/** **不经 
     assert.ok(existsSync(join(target, "docs", "contracts", "api-v1.md")), "docs/contracts/** 免确认落盘");
     assert.ok(existsSync(join(target, "docs", "skills", "t1", "install.md")), "docs/skills/** 免确认落盘（G-4 裁定扩列）");
     assert.ok(existsSync(join(target, "docs", "skills", "t1", "SKILL.md")), "技能内容文件同口径（含子路径）");
+    assert.ok(existsSync(join(target, "docs", "mcp", "echo.md")), "docs/mcp/** 免确认落盘（G-4 V2 裁定扩列）");
+    assert.ok(existsSync(join(target, "docs", "mcp", "sub", "deep.md")), "MCP 声明树含子路径同口径");
     assert.equal(existsSync(join(target, "docs", "其他.md")), false, "docs/ 其它路径未确认 → F4 拒、零副作用");
     assert.equal(existsSync(join(target, "角色卡")), false, "角色卡/ 未确认 → F4 拒且不得建目录");
   });

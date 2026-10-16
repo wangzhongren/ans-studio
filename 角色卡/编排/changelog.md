@@ -1,5 +1,22 @@
 # 编排 变更记录
 
+## 2026-10-16 — G-4 V2 wave A（客户批准 V2 分批实施「按推荐批准，开始实施」）：su 预授权扩列**第四棵** `docs/mcp`（常量＋话术＋测试面同步）
+
+**来源**：客户 2026-10-16「按推荐批准，开始实施」＝G-4 V2（MCP 安装）分批实施（PM 评审 `2026-10-15_change_kanban-fixes-pm-review.md` §「客户批准（2026-10-16）」；产品提案 revision 2 `2026-10-16_design_role-capability-install.md` §九 V2 范围①——V1 裁定①「`docs/mcp` 未扩——V2 再议」落点；PM 派发原文「编排（**预授权第四棵树 `docs/mcp`**＋话术同步）」）。本批＝**wave A 编排件**；能力位透传（`installMcp`/`uninstallMcp` 接线点亮）＝wave B、待运行时核心契约定形——**本批不做**。实施记录：`docs/change/2026-10-16_change_g4v2-mcp-preauth.md`。
+
+**改了什么（全部在本角色 Section 1 内）**：
+- `src/pipeline/orchestration/run-role.ts`：`SU_PREAUTHORIZED_WRITE_DIRS` 三棵 → **四棵**（+`"docs/mcp"`）；裁定注释块与文件头摘要同步（三棵→四棵；④ 段＝V2 来源＋提案 §九 V2 范围①；`suPreauthorizedRelOf` 段比较示例补 `docs/mcp2`）；背景指针补本批记录。
+- `src/pipeline/orchestration/govern-session.ts`：两处模型可见文案预授权清单并列加 `docs/mcp/`（`runGovernSession` 确认制说明行＋`buildGovernPrompt` confirmRule——与 V1 I5 先例同口径）。
+- **测试面**（沿 V1 I5 体格扩展）：`test/编排/session-handle.test.ts` 五例各加 `docs/mcp` 断言（开局免确认含子路径/绝对路径＋标题与段头注释四棵逐一点名；`docs/mcp2` 前缀负例；非 su 无预授权；静态 scope 同口径；重建后仍可写）；`test/编排/confirmation-gated.test.ts` ⑥b E2E 加两笔 `docs/mcp/{echo.md,sub/deep.md}` 真落盘断言（客户通道仍零调用；`docs/其他.md`/`角色卡/` 仍 F4 拒、零副作用）。既有断言零改动、未为变绿放松。
+
+**语义零变化（钉死）**：仅内置治理角色（su）；仅初始 writeSet（不经发行器、开会话/重建均生效）；**只放开 F4 一环**（F6/F7/边界/条件逐字不变）；`docs/mcp2` 前缀不覆盖（段比较）；其余一切路径照旧 F4 拒。
+
+**证据**：`node --test "test/编排/"*.test.ts` → **318/318** 全绿（收笔时含并行件工作树复跑同；只加断言未增用例）；`npm run typecheck` → **全仓 0 错**；全量测量点 → **1884 计 / 1879 过 / 4 红 / 1 skipped**——本批**直接归因 3 处**（`test/测试/`：g1-copy-and-nails:26 代码级钉子「恰为三棵」实测已得四棵；g4-skill-verify/c-preauth:113-114 ④；g4-skill-verify/h-scope-audit 范围①——均为旧态独立验证钉子、**本角色未动**、待测试角色同步翻转）；第 4 处（h-scope-audit 范围②）为 **V2 wave A 多上下文叠加**、随整体 wave 翻新。**并行实况**：wave A 其余属主正在同一工作树并行落盘（运行时核心 `model/runtime.ts`/`mcp-declarations.ts`、门禁引擎卡文本四棵+MCP 段、桌面UI）——全量为移动快照；收笔时复跑另见其批次自身红（g1 卡文本两条、su-doc-surface-convention 三条＝门禁引擎卡文本改写；范围② install_mcp 零命中＝运行时核心在途），各归各属主批次。翻转清单见实施记录 §六。
+
+**跨角色（请 pm 转达）**：① **测试角色**——本批直接归因 3 处＋wave A 叠加 1 处独立钉子待其验证轮同步翻转（位置与改法见实施记录 §六）；② **门禁引擎**——卡文本（`BUILT_IN_ROLE_CARD_TEXT`）MCP 安装纪律段＋预授权计数四棵属其 wave A 件（已在途；其卡文本断言由该批次自行同步）；③ **运行时核心/桌面UI**——wave A 其余件并行落盘、与本批互不触；**编排自身 wave B**（能力位透传点亮两工具）待契约落盘后另批。
+
+**附（PM 收口派发，同日落）：能力位透传收口——点亮 `install_mcp`/`uninstall_mcp`（节奏同 V1 I1/I2 末环）**——运行时核心 V2 契约落盘后，`run-role.ts` **六处逐名**收口：① import type `+ InstallMcpFn/UninstallMcpFn`（只读 model、名字逐字）；② `AdapterCapabilities` `+ installMcp?/uninstallMcp?`（注释＝只给 su＋能力级授予诚实面）；③ `openRoleSession` 输入型 `+` 同名两字段（JSDoc 同技能版体格）；④ 注入求值 `suppressHandback ? input.installMcp : undefined`（同 `uninstallMcp`）；⑤ capabilities 两条件展开；⑥ 工厂逐名并入会话构造（`undefined` ⇒ 工具不注册）。测试 `test/编排/installed-skills.test.ts` **+2**（桩捕获：su 同引用透传/项目角色误给不注入/未给不注入；端到端真实 Service 装配：su 注册两工具、载荷逐字直达、回执如实含「未改变任何角色的写边界」「能力级授予」，`registration-unchanged` 未执行如实转达；不注入/项目角色 ⇒ 零注册）→ 该文件 **20/20**、`test/编排/` **320** 全绿。evidence 全量对照**无本批新红**：收笔快照 1900 计/1891 过/8 红/1 skipped——8 红全部为 `test/测试/` 待翻新钉子（4 处＝V2 行为翻转目标〔g1-copy-and-nails 代码级钉子、c-preauth ④、h-scope-audit 范围①②〕、4 处＝门禁引擎卡文本批次〔g1 卡文本两条＋d-card-guard 两条〕）；typecheck 本批六处零错（工作树仅 `app/desktop/session.ts` 两处＝桌面UI批次在途、非本批）。至此**编排 V2 面收口**（wave A 预授权第四棵＋wave B 透传点亮）；桌面 handler/三适配器装配仍属各属主。详见实施记录 §八。
+
 ## 2026-10-16 — G-4 I4+I5（客户批准 V1，十项裁定全采纳）：开局注入渲染**单一来源** `renderInstalledSkillsSection` ＋ su 预授权扩列 `docs/skills`
 
 **来源**：客户 2026-10-16 批准 G-4（角色能力安装）V1 实施、十项裁定全采纳（提案 `角色卡/产品/docs/design/2026-10-16_design_role-capability-install.md` §九 I4/I5；呈批见提交 `d8eaa1c`）。裁定 1＝预授权扩列候选 1（`docs/skills`）→ I5；裁定 2＝加载路径终选 C「会话开局注入」→ I4；裁定 3＝两文件形态＋角色列表；裁定 6＝技能可迭代（当刻字节为准）。

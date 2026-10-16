@@ -12,6 +12,9 @@
 //   · G-4 能力位接线（I1/I2 工具末环）：`openRoleSession` 的 `installSkill`/`uninstallSkill` **只给 su**
 //     透传（桩捕获逐名核对注入引用）；端到端经真实装配注册两工具且 handler 直达注入实现；项目角色
 //     零感知（误给不注入、不注册；未给不注入）。
+//   · G-4 V2 能力位接线（MCP 安装工具末环，2026-10-16 客户批准 V2；同链同桩）：`openRoleSession` 的
+//     `installMcp`/`uninstallMcp` **只给 su** 透传；端到端经真实装配注册 `install_mcp`/`uninstall_mcp`
+//     且 handler 直达注入实现；项目角色零注册；未给不注入。
 //   · 判据链：扫 `docs/skills/<name>/` → 读 `install.md` 登记（用途/适用角色/状态/安装日期四字段）
 //     → 状态 installed 且角色命中 → 校验 `SKILL.md` 并按**当刻字节**算 sha256 → 按 name 排序、编号递增渲染。
 //   · 坏件（登记缺失/解析失败/SKILL.md 缺失/名非法/根不可读）⇒ 该条跳过＋诊断；**绝不拒开会话**
@@ -31,7 +34,7 @@ import type { InstalledSkillsDiagnostic } from "../../src/common/编排/installe
 import { configureDiagnostics, flushDiagnostics, disposeDiagnostics } from "../../src/common/shared/diagnostics.ts";
 import type { ProjectConfig } from "../../src/model/role.ts";
 import type { RoleSession, RuntimeAdapter, SessionEvent, WriteGate } from "../../src/provider/pi/session.ts";
-import type { InstallSkillFn, InstallSkillPayload, RuntimeProviderFactory, RuntimeProviderOptions, ToolResult, UninstallSkillFn } from "../../src/model/runtime.ts";
+import type { InstallSkillFn, InstallSkillPayload, RuntimeProviderFactory, RuntimeProviderOptions, ToolResult, UninstallSkillFn, InstallMcpFn, InstallMcpPayload, UninstallMcpFn } from "../../src/model/runtime.ts";
 import { openRoleSession } from "../../src/pipeline/orchestration/run-role.ts";
 import type { AdapterCapabilities } from "../../src/pipeline/orchestration/run-role.ts";
 
@@ -661,6 +664,119 @@ test("端到端（G-4）：su 会话经真实装配注册两工具且 handler �
     for await (const ev of xHandle.events()) if (ev.kind === "settled") break;
     const xTools = xProvider.calls[0]?.tools.map((tool) => tool.name) ?? [];
     assert.ok(!xTools.includes("install_skill") && !xTools.includes("uninstall_skill"), "项目角色会话不得注册两工具（只给 su）");
+    await xHandle.dispose();
+  } finally {
+    cleanup(project.projectRoot);
+  }
+});
+
+// —— G-4 V2 MCP 能力位接线（install_mcp/uninstall_mcp 末环；同链同桩——夹具/桩复用上组） ——
+
+test("openRoleSession（G-4 V2）：installMcp / uninstallMcp **只给治理角色 su** 透传；项目角色不给；未给不注入", async () => {
+  const project = makeWiringProject();
+  try {
+    const installMcp: InstallMcpFn = async () => ({
+      ok: true, action: "installed", roleId: "X", name: "echo",
+      path: "docs/mcp/echo.md", digest: "e".repeat(64), effective: "rebuilt",
+    });
+    const uninstallMcp: UninstallMcpFn = async () => ({
+      ok: false, reason: "registration-unchanged", message: "声明仍含角色「X」——先改声明再卸载",
+    });
+
+    // su 会话 → 两能力原引用透传（工具据此注册）。
+    const suStub = stubAdapter();
+    const suHandle = await openRoleSession(
+      { roleId: "su", project, installMcp, uninstallMcp },
+      { createAdapter: suStub.createAdapter },
+    );
+    assert.equal(suStub.caps()?.installMcp, installMcp, "su 会话应拿到 installMcp 能力（同引用）");
+    assert.equal(suStub.caps()?.uninstallMcp, uninstallMcp, "su 会话应拿到 uninstallMcp 能力（同引用）");
+    await suHandle.dispose();
+
+    // 项目角色会话（即便调用方误给）→ 一律不注入（两工具不注册——project 角色零感知）。
+    const xStub = stubAdapter();
+    const xHandle = await openRoleSession(
+      { roleId: "X", project, installMcp, uninstallMcp },
+      { createAdapter: xStub.createAdapter },
+    );
+    assert.equal(xStub.caps()?.installMcp, undefined, "项目角色会话不得注入 installMcp（只给 su）");
+    assert.equal(xStub.caps()?.uninstallMcp, undefined, "项目角色会话不得注入 uninstallMcp（只给 su）");
+    await xHandle.dispose();
+
+    // su 会话未给能力（CLI 一次性前端等）→ 不注入（能力缺席 = fail-closed，工具不注册）。
+    const bareStub = stubAdapter();
+    const bareHandle = await openRoleSession({ roleId: "su", project }, { createAdapter: bareStub.createAdapter });
+    assert.equal(bareStub.caps()?.installMcp, undefined, "未给能力 → 不注入");
+    assert.equal(bareStub.caps()?.uninstallMcp, undefined, "未给能力 → 不注入");
+    await bareHandle.dispose();
+  } finally {
+    cleanup(project.projectRoot);
+  }
+});
+
+test("端到端（G-4 V2）：su 会话经真实装配注册两工具且 handler 直达注入实现；不注入/项目角色 ⇒ 零注册", async () => {
+  const project = makeWiringProject();
+  const calls: InstallMcpPayload[] = [];
+  const installMcp: InstallMcpFn = async (payload) => {
+    calls.push(payload);
+    return {
+      ok: true, action: "installed", roleId: payload.roleId, name: payload.name,
+      path: `docs/mcp/${payload.name}.md`, digest: "b".repeat(64), effective: "rebuilt",
+    };
+  };
+  const uninstallMcp: UninstallMcpFn = async (payload) => {
+    calls.push(payload);
+    return { ok: false, reason: "registration-unchanged", message: `声明仍含角色「${payload.roleId}」——先改声明再卸载` };
+  };
+
+  const results: ToolResult[] = [];
+  const suProvider = fakeProvider(async (options, _text, signal) => {
+    results.push(await callTool(options, "install_mcp", { roleId: "X", name: "echo" }, signal));
+    results.push(await callTool(options, "uninstall_mcp", { roleId: "X", name: "echo" }, signal));
+  });
+  const bareSuProvider = fakeProvider();
+  const xProvider = fakeProvider();
+  const runtimeOptions = { providerFactories: { demo: suProvider.factory }, persistSession: false };
+  try {
+    // 注入 ⇒ 注册：su 会话两工具在场；handler 直达注入实现（载荷原样、回执如实转达）。
+    const suHandle = await openRoleSession(
+      { roleId: "su", project, runtime: "demo", installMcp, uninstallMcp },
+      { runtimeOptions },
+    );
+    await suHandle.send("给 X 装/卸 MCP echo");
+    for await (const ev of suHandle.events()) if (ev.kind === "settled") break;
+    const suTools = suProvider.calls[0]?.tools.map((tool) => tool.name) ?? [];
+    assert.ok(suTools.includes("install_mcp"), "su 会话应注册 install_mcp（注入才注册）");
+    assert.ok(suTools.includes("uninstall_mcp"), "su 会话应注册 uninstall_mcp（注入才注册）");
+    assert.deepEqual(calls, [{ roleId: "X", name: "echo" }, { roleId: "X", name: "echo" }], "载荷逐字（roleId/name）直达注入实现");
+    assert.equal(results[0]?.ok, true, "成功回执如实（ok:true）");
+    assert.ok(results[0]?.message.includes("docs/mcp/echo.md"), "回执含声明文件路径");
+    assert.ok(results[0]?.message.includes("未改变任何角色的写边界"), "成功回执重申不改变任何写边界（安装 ≠ 授权）");
+    assert.ok(results[0]?.message.includes("能力级授予"), "回执点名能力级授予（诚实面：不得宣称逐调用受审）");
+    assert.equal(results[1]?.ok, false, "「声明未撤销」回执如实（ok:false）");
+    assert.ok(results[1]?.message.includes("未执行"), "未执行、零副作用如实转达（绝不说成已卸载）");
+    await suHandle.dispose();
+
+    // 不注入 ⇒ 零注册：同为 su 会话、未给两能力（能力缺席 = fail-closed）。
+    const bareHandle = await openRoleSession(
+      { roleId: "su", project, runtime: "demo" },
+      { runtimeOptions: { providerFactories: { demo: bareSuProvider.factory }, persistSession: false } },
+    );
+    await bareHandle.send("普通对话");
+    for await (const ev of bareHandle.events()) if (ev.kind === "settled") break;
+    const bareTools = bareSuProvider.calls[0]?.tools.map((tool) => tool.name) ?? [];
+    assert.ok(!bareTools.includes("install_mcp") && !bareTools.includes("uninstall_mcp"), "未注入 ⇒ 两工具不注册");
+    await bareHandle.dispose();
+
+    // 项目角色零感知：即便误给两能力也不注册（只 su）。
+    const xHandle = await openRoleSession(
+      { roleId: "X", project, runtime: "demo", installMcp, uninstallMcp },
+      { runtimeOptions: { providerFactories: { demo: xProvider.factory }, persistSession: false } },
+    );
+    await xHandle.send("普通干活");
+    for await (const ev of xHandle.events()) if (ev.kind === "settled") break;
+    const xTools = xProvider.calls[0]?.tools.map((tool) => tool.name) ?? [];
+    assert.ok(!xTools.includes("install_mcp") && !xTools.includes("uninstall_mcp"), "项目角色会话不得注册两工具（只给 su）");
     await xHandle.dispose();
   } finally {
     cleanup(project.projectRoot);

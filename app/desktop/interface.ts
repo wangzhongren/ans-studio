@@ -158,6 +158,9 @@ export interface DesktopDeps {
        *  编排透传（`AdapterCapabilities` 同名字段）落地前被其静默忽略——桌面侧透传先就位（H-1 先例）。 */
       installSkill?: import("../../src/model/runtime.ts").InstallSkillFn;
       uninstallSkill?: import("../../src/model/runtime.ts").UninstallSkillFn;
+      /** G-4 V2：外来 MCP 安装/卸载能力（仅 su 注入；形状＝契约家）。同款透传与登记。 */
+      installMcp?: import("../../src/model/runtime.ts").InstallMcpFn;
+      uninstallMcp?: import("../../src/model/runtime.ts").UninstallMcpFn;
       /** (a) 操作者确认通道（I-1 arm）：经本层透传（**仅项目角色**消费——见 session.ts）。 */
       shellOperatorChannel?: DesktopOperatorChannelFn;
       /** (c) 规则集实件（I-1 补丁，2026-10-12）：经本层透传（**仅项目角色**消费——与 (a) 同判据走三层链）。 */

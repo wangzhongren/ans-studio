@@ -5,9 +5,9 @@
 //   - scope 可选：无 scope = 只用角色边界（不做任务收窄），有 scope 才做 F4 收窄——原样透传 resolveWrite；
 //   - 失败即抛错（未知角色）；
 //   - su 预授权（客户裁定 2026-10-16）：docs/su/**、docs/contracts/** 与 docs/skills/**
-//     （第三棵＝G-4 角色能力安装 V1 裁定扩列，2026-10-16 批准）属**初始 writeSet**——
-//     确认制下开局即可写（免确认，含子路径/绝对路径）、会话重建后仍可写；其余路径（docs/ 其它、
-//     角色卡/ …）与其它角色**无**此预授权（未确认 = F4 拒）。
+//     （第三棵＝G-4 角色能力安装 V1 裁定扩列）与 docs/mcp/**（第四棵＝G-4 V2 裁定扩列，
+//     2026-10-16 批准）属**初始 writeSet**——确认制下开局即可写（免确认，含子路径/绝对路径）、
+//     会话重建后仍可写；其余路径（docs/ 其它、角色卡/ …）与其它角色**无**此预授权（未确认 = F4 拒）。
 // 全程用桩适配器，不触网。
 
 import { test } from "node:test";
@@ -262,12 +262,14 @@ test("F-5-opt1：该轮 prompt 失败且未开轮（无 ACK）→ 注记保留�
   }
 });
 
-// —— su 预授权写目录（客户裁定 2026-10-16）：docs/su/** + docs/contracts/** + docs/skills/** ——
+// —— su 预授权写目录（客户裁定 2026-10-16）：docs/su/** + docs/contracts/** + docs/skills/** + docs/mcp/** ——
 // 客户裁定原文：①「这个 su 可以写 docs/su 的目录，不需要我审批」；②「还有个契约目录也可以给他写。」
 // ③ G-4（角色能力安装）V1 十项裁定全采纳（2026-10-16 批准；§4.6 候选 1）＝扩列 `docs/skills/**`
 // （技能文档树：install.md 登记 + SKILL.md 内容；安装＝先落盘再激活，无卡口径要求落盘在初始写集内）。
-// 语义（本组钉死）：内置治理角色（su）会话的**初始 writeSet 恒含**这三棵目录树（项目根、含子路径）
-// ——不依赖 request_confirmation 发行；每次开会话/会话重建都生效。严格范围：仅 su、仅这三棵树；
+// ④ G-4 V2（MCP 安装）客户 2026-10-16「按推荐批准，开始实施」＝V1 裁定①「V2 再议」落点＝扩列
+// `docs/mcp/**`（MCP 声明树：`docs/mcp/<name>.md`；落盘同「先落盘再激活」口径；提案 §九 V2 范围①）。
+// 语义（本组钉死）：内置治理角色（su）会话的**初始 writeSet 恒含**这四棵目录树（项目根、含子路径）
+// ——不依赖 request_confirmation 发行；每次开会话/会话重建都生效。严格范围：仅 su、仅这四棵树；
 // 其余路径（docs/ 其它子路径、角色卡/、.ans/ …）与其它角色照旧走确认（未确认 = F4 拒）。
 
 /** su 创世态 project：roles 空 + builtInRoles 声明 su + genesisBootstrap
@@ -292,7 +294,7 @@ function decliningChannel(calls: { n: number }): CustomerInputFn {
   };
 }
 
-test("su 预授权：确认制会话开局即可写 docs/su/**、docs/contracts/** 与 docs/skills/**（含子路径/绝对路径），零确认", async () => {
+test("su 预授权：确认制会话开局即可写 docs/su/**、docs/contracts/**、docs/skills/** 与 docs/mcp/**（含子路径/绝对路径），零确认", async () => {
   const project = makeSuProject();
   const { deps, state } = makeDeps();
   const calls = { n: 0 };
@@ -313,6 +315,13 @@ test("su 预授权：确认制会话开局即可写 docs/su/**、docs/contracts/
     assert.equal(state.gate!("docs/contracts/sub/deep.md").allowed, true, "含子路径");
     assert.equal(state.gate!("docs/skills/my-skill/install.md").allowed, true, "docs/skills/** 免确认可写（G-4 裁定扩列）");
     assert.equal(state.gate!("docs/skills/my-skill/SKILL.md").allowed, true, "含子路径（技能内容文件同口径）");
+    assert.equal(state.gate!("docs/mcp/echo.md").allowed, true, "docs/mcp/** 免确认可写（G-4 V2 裁定扩列）");
+    assert.equal(state.gate!("docs/mcp/sub/deep.md").allowed, true, "含子路径（MCP 声明树同口径）");
+    assert.equal(
+      state.gate!(path.join(project.projectRoot, "docs", "mcp", "echo.md")).allowed,
+      true,
+      "绝对路径同口径（第四棵）",
+    );
   } finally {
     cleanup(project);
   }
@@ -331,6 +340,7 @@ test("su 预授权严格边界：docs/ 其它路径与 角色卡/ 仍走确认�
     assert.equal(state.gate!("docs/su2/x.md").allowed, false, "docs/su2 不被 docs/su 覆盖（按段比较，非字符串前缀）");
     assert.equal(state.gate!("docs/contracts2/x.md").allowed, false);
     assert.equal(state.gate!("docs/skills2/x.md").allowed, false, "docs/skills2 不被 docs/skills 覆盖");
+    assert.equal(state.gate!("docs/mcp2/x.md").allowed, false, "docs/mcp2 不被 docs/mcp 覆盖（按段比较）");
     const card = state.gate!("角色卡/Y/role-card.md");
     assert.equal(card.allowed, false, "角色卡/ 不预授权");
     assert.match((card as { reason: string }).reason, /不在任务 writeSet 内/);
@@ -366,6 +376,7 @@ test("非 su 角色无预授权：同为确认制会话，docs/su/memo.md 在角
     assert.match((d as { reason: string }).reason, /不在任务 writeSet 内/);
     assert.equal(state.gate!("docs/contracts/x.md").allowed, false, "docs/contracts 同样只给 su");
     assert.equal(state.gate!("docs/skills/x/install.md").allowed, false, "docs/skills 同样只给 su");
+    assert.equal(state.gate!("docs/mcp/echo.md").allowed, false, "docs/mcp 同样只给 su");
   } finally {
     cleanup(project);
   }
@@ -384,6 +395,7 @@ test("su 静态 scope 会话同口径：预授权树并入初始 writeSet（scop
     assert.equal(state.gate!("docs/su/memo.md").allowed, true, "预授权树并进初始 writeSet");
     assert.equal(state.gate!("docs/contracts/x.md").allowed, true);
     assert.equal(state.gate!("docs/skills/t/install.md").allowed, true);
+    assert.equal(state.gate!("docs/mcp/echo.md").allowed, true, "第四棵同口径并入初始 writeSet");
     const other = state.gate!("docs/other.md");
     assert.equal(other.allowed, false, "其余路径仍受 F4 收窄");
     assert.match((other as { reason: string }).reason, /不在任务 writeSet 内/);
@@ -407,6 +419,7 @@ test("会话重建（新开会话）后预授权仍然生效——初始集合�
     assert.equal(rebuilt.state.gate!("docs/su/memo.md").allowed, true, "重建后仍可写（属初始集合，不随句柄丢失）");
     assert.equal(rebuilt.state.gate!("docs/contracts/y.md").allowed, true);
     assert.equal(rebuilt.state.gate!("docs/skills/t/SKILL.md").allowed, true, "第三棵目录树同口径（G-4 扩列）");
+    assert.equal(rebuilt.state.gate!("docs/mcp/echo.md").allowed, true, "第四棵目录树同口径（G-4 V2 扩列）");
     assert.equal(rebuilt.state.gate!("docs/other.md").allowed, false, "重建后其余路径照旧：发行为空、F4 拒");
     assert.equal(calls.n, 0, "全程未发起任何客户确认");
     await h2.dispose();

@@ -1560,3 +1560,37 @@ test("G-4/I7：安装工具行/系统行零特判——渲染平面对新工具�
   // ③折叠分解文案按工具名直出（既有 S4 单点，确认其对未知名无白名单依赖）。
   assert.ok(RENDERER.includes("t.name + (t.count > 1 ? \" ×\" + t.count : \"\")"), "折叠分解按工具名直出（无白名单）");
 });
+
+// ————— G-4/V2-MCP（2026-10-16 客户批准 V2 分批实施；设计 `2026-10-16_design_role-capability-install` §5.4/§九-V2）—————
+// 外来 MCP 工具行（`mcp__<server>__<tool>`——三平台探针定格形态：Claude＝hook start＋泵 result、Codex＝
+// `mcpToolCall` item 映射〔适配器 wave B〕、Pi＝既有工具管道行）与 MCP 安装工具行（`install_mcp`/`uninstall_mcp`，
+// 设计 §3.2 冻结名）的如实标注＝**渲染平面零改动**（沿 G-3「合流即桌面零改动」与 G-4/I7 同款证据形态）：
+// 渲染平面对三组新字面量**零引用**——无引用 ⇒ 无特判面 ⇒ 新名字按构造走通用链（名称解析/折叠计数/详情
+// 三面的行为覆盖见 tool-rows.test.ts 同批纯函数用例；`[系统·安装]` 子类复用面由 I7 守卫＋同批用例覆盖）。
+
+test("G-4/V2-MCP：MCP 工具行/安装行零特判——渲染平面对 mcp__/install_mcp/uninstall_mcp 零引用（按构造走通用链）", () => {
+  const stripJs = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+  const toolRows = fs.readFileSync(path.join(APP_DIR, "tool-rows.js"), "utf8");
+  const uiLabels = fs.readFileSync(path.join(APP_DIR, "ui-labels.js"), "utf8");
+  // 去注释后比对（未来注释里合法提及 MCP 措辞不误伤；代码里出现字面量=特判面=违约）。
+  const plane: Array<[string, string]> = [
+    ["renderer.js", RENDERER_CODE],
+    ["tool-rows.js", stripJs(toolRows)],
+    ["ui-labels.js", stripJs(uiLabels)],
+    ["styles.css", STYLES.replace(/\/\*[\s\S]*?\*\//g, "")],
+  ];
+  for (const [name, src] of plane) {
+    for (const literal of ["mcp__", "install_mcp", "uninstall_mcp"]) {
+      assert.ok(!src.includes(literal), `${name} 不得含「${literal}」字面量（特判=违约；MCP 名/安装名必须按构造走通用链）`);
+    }
+  }
+  // 详情面零工具名依赖：toolDetails（展开详情的唯一物化点）只读 display/状态契约，不比对工具名——
+  // 新工具名的详情按 display v1 通用呈现（「名称解析/折叠计数/详情」三面之详情面零特判）。
+  const detailStart = RENDERER_CODE.indexOf("function toolDetails(activity)");
+  const detailFn = RENDERER_CODE.slice(detailStart, RENDERER_CODE.indexOf("\n  }", detailStart));
+  assert.ok(detailStart > 0 && detailFn.includes("display"), "详情物化点存在且读 display（单点）");
+  assert.ok(!detailFn.includes("toolName"), "详情面不得按工具名分支（display 驱动——MCP 名无特判面）");
+  // 名称解析字符集含下划线：tool-rows 的解析正则用 `[\w.-]`（legacy「调用工具 X」识别与「名：目标」瘦身解析
+  // 共用）——MCP 名 `mcp__<server>__<tool>`（含双下划线）不因字符集失配。
+  assert.ok(toolRows.includes("[\\w.-]+"), "解析字符集 [\\w.-] 在 tool-rows（含下划线命名可命中）");
+});

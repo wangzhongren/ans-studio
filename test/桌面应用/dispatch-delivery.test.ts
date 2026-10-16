@@ -28,6 +28,8 @@ import { createRecoveryConfirmPresenter, type RecoveryConfirmRequest, type Recov
 import type { ProposeRecoveryFn, RoleStatusFn, SessionTailFn } from "../../src/model/runtime.ts";
 // G-4/I3（2026-10-16 客户批准）：技能安装/卸载能力（经 openRoleSession 捕获——仅 su 注入）。
 import type { InstallSkillFn, UninstallSkillFn, InstallSkillReceipt } from "../../src/model/runtime.ts";
+// G-4 V2：外来 MCP 安装/卸载能力（同款捕获）与回执（沿技能版体格）。
+import type { InstallMcpFn, UninstallMcpFn, InstallMcpReceipt } from "../../src/model/runtime.ts";
 
 const tick = (ms = 60) => new Promise((r) => setTimeout(r, ms));
 
@@ -92,6 +94,9 @@ interface Harness {
   /** G-4/I3：打开会话时拿到的技能安装/卸载能力（仅 su 会话应注入）——测试直接调用以驱动 handler。 */
   installSkillOf: (roleId: string) => InstallSkillFn | undefined;
   uninstallSkillOf: (roleId: string) => UninstallSkillFn | undefined;
+  /** G-4 V2：打开会话时拿到的 MCP 安装/卸载能力（仅 su 会话应注入）。 */
+  installMcpOf: (roleId: string) => InstallMcpFn | undefined;
+  uninstallMcpOf: (roleId: string) => UninstallMcpFn | undefined;
   /** G-2/W4：各角色 abort 被调次数（恢复桥「恰一次执行」判据）。 */
   aborts: Record<string, number>;
 }
@@ -105,7 +110,7 @@ function makeHarness(opts: { failSends?: Record<string, number>; openDelayMs?: n
   const envelopes: import("../../app/desktop/session.ts").SessionEventEnvelope[] = [];
   const roleStates: { roleId: string; summaries: string[] }[] = [];
   const openCalls: string[] = [];
-  const openInputs: Record<string, { dispatchTask?: DispatchTaskFn; proposeRecovery?: ProposeRecoveryFn; roleStatus?: RoleStatusFn; sessionTail?: SessionTailFn; installSkill?: InstallSkillFn; uninstallSkill?: UninstallSkillFn }> = {};
+  const openInputs: Record<string, { dispatchTask?: DispatchTaskFn; proposeRecovery?: ProposeRecoveryFn; roleStatus?: RoleStatusFn; sessionTail?: SessionTailFn; installSkill?: InstallSkillFn; uninstallSkill?: UninstallSkillFn; installMcp?: InstallMcpFn; uninstallMcp?: UninstallMcpFn }> = {};
   const openCounts: Record<string, number> = {};
   const aborts: Record<string, number> = {};
   // 注：`stopped` 逐句柄闭包（不是按 roleId 共享）——G-2/W4 的 rebuildSession 会 dispose 旧句柄、重开新句柄：
@@ -176,7 +181,7 @@ function makeHarness(opts: { failSends?: Record<string, number>; openDelayMs?: n
   const mgr = new SessionManager({
     openRoleSession: async (input) => {
       openCalls.push(input.roleId);
-      const inputWithCapabilities = input as { dispatchTask?: DispatchTaskFn; proposeRecovery?: ProposeRecoveryFn; roleStatus?: RoleStatusFn; sessionTail?: SessionTailFn; installSkill?: InstallSkillFn; uninstallSkill?: UninstallSkillFn };
+      const inputWithCapabilities = input as { dispatchTask?: DispatchTaskFn; proposeRecovery?: ProposeRecoveryFn; roleStatus?: RoleStatusFn; sessionTail?: SessionTailFn; installSkill?: InstallSkillFn; uninstallSkill?: UninstallSkillFn; installMcp?: InstallMcpFn; uninstallMcp?: UninstallMcpFn };
       openInputs[input.roleId] = {
         dispatchTask: inputWithCapabilities.dispatchTask,
         proposeRecovery: inputWithCapabilities.proposeRecovery,
@@ -184,6 +189,8 @@ function makeHarness(opts: { failSends?: Record<string, number>; openDelayMs?: n
         sessionTail: inputWithCapabilities.sessionTail,
         installSkill: inputWithCapabilities.installSkill,
         uninstallSkill: inputWithCapabilities.uninstallSkill,
+        installMcp: inputWithCapabilities.installMcp,
+        uninstallMcp: inputWithCapabilities.uninstallMcp,
       };
       // G-4 夹具：可控的「第 N 次之后开会话失败」（重建失败分支——rebuildSession 重开失败）。
       const opens = (openCounts[input.roleId] = (openCounts[input.roleId] ?? 0) + 1);
@@ -214,6 +221,8 @@ function makeHarness(opts: { failSends?: Record<string, number>; openDelayMs?: n
     sessionTailOf: (roleId) => openInputs[roleId]?.sessionTail,
     installSkillOf: (roleId) => openInputs[roleId]?.installSkill,
     uninstallSkillOf: (roleId) => openInputs[roleId]?.uninstallSkill,
+    installMcpOf: (roleId) => openInputs[roleId]?.installMcp,
+    uninstallMcpOf: (roleId) => openInputs[roleId]?.uninstallMcp,
     hangNext, maxConcurrent, roleStates, aborts,
   };
 }
@@ -1191,6 +1200,224 @@ test("G-4/I3 卸载成功（先改登记再卸载 ⇒ rebuilt）：系统行如�
   const row = h.sent.su.find((t) => t.startsWith("[系统·安装] "));
   assert.ok(row, "卸载同样经第四类通道投 [系统·安装] 行");
   assert.ok(row!.includes("已卸载技能「lint」") && row!.includes("效果已撤，文件保留于"), "如实二分陈述（效果已撤／文件保留）");
+  await h.mgr.stop(null);
+});
+
+// —————————————— G-4 V2（2026-10-16 客户批准）：外来 MCP 安装/卸载 handler ——————————————
+// 与技能组**逐字同构**（护栏/校验/三态/系统行同款）；仅校验面＝MCP 声明（`docs/mcp/<name>.md`，运行时核心
+// `readMcpDeclaration` 单一来源）与诚实面（门禁之外执行＝能力级授予，**非逐调用受审**）不同。夹具走真实
+// 临时目录（读取器读真盘）。
+
+/** G-4 V2 夹具：落一条 MCP 声明（`docs/mcp/<name>.md`；七键格式沿运行时核心读取器）。 */
+async function writeMcpFixture(dir: string, name: string, roles: string, status = "installed"): Promise<void> {
+  await fs.mkdir(path.join(dir, "docs", "mcp"), { recursive: true });
+  await fs.writeFile(path.join(dir, "docs", "mcp", `${name}.md`), `# MCP 声明：${name}\n- 用途：演示用途\n- 启动：node\n- 适用角色：${roles}\n- 状态：${status}\n- 安装日期：2026-10-16\n`, "utf8");
+}
+
+async function makeMcpProject(): Promise<string> {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "ans-g4mcp-"));
+  await writeMcpFixture(dir, "fetch", "A");
+  return dir;
+}
+
+test("G-4 V2 注入才注册：仅 su 会话拿到 install_mcp / uninstall_mcp 能力（项目角色零注入）", async () => {
+  const dir = await makeMcpProject();
+  const h = makeHarness({ projectRoot: dir });
+  await h.mgr.open({ projectRoot: dir, roleId: "su", runtime: "demo" });
+  await tick(30);
+  assert.equal(typeof h.installMcpOf("su"), "function", "su 会话注入 installMcp");
+  assert.equal(typeof h.uninstallMcpOf("su"), "function", "su 会话注入 uninstallMcp");
+  await h.mgr.open({ projectRoot: dir, roleId: "A", runtime: "demo" });
+  await tick(30);
+  assert.equal(h.installMcpOf("A"), undefined, "项目角色不注入（未注入 ⇒ 工具不注册）");
+  assert.equal(h.uninstallMcpOf("A"), undefined);
+  await h.mgr.stop(null);
+});
+
+test("G-4 V2 安装成功（idle ⇒ rebuilt）：回执冻形/声明文件 digest；[系统·安装] 系统行含诚实面（能力级授予，非逐调用受审）并真投递给 su", async () => {
+  const dir = await makeMcpProject();
+  const h = makeHarness({ projectRoot: dir });
+  await h.mgr.open({ projectRoot: dir, roleId: "su", runtime: "demo" });
+  await tick(30);
+  await h.mgr.open({ projectRoot: dir, roleId: "A", runtime: "demo" });
+  await tick(30);
+  const opensA = () => h.openCalls.filter((r) => r === "A").length;
+  assert.equal(opensA(), 1);
+  await h.mgr.send("给 A 装 MCP fetch", undefined, { roleId: "su" });
+
+  const receipt = await h.installMcpOf("su")!({ roleId: "A", name: "fetch" });
+  assert.equal(receipt.ok, true, "安装成功");
+  if (receipt.ok) {
+    assert.equal(receipt.action, "installed");
+    assert.equal(receipt.roleId, "A");
+    assert.equal(receipt.name, "fetch");
+    assert.equal(receipt.path, "docs/mcp/fetch.md", "path＝声明文件（项目相对）");
+    assert.equal(
+      receipt.digest,
+      createHash("sha256").update(await fs.readFile(path.join(dir, "docs", "mcp", "fetch.md"))).digest("hex"),
+      "digest＝声明文件当刻字节 sha256（测试侧独立复算）",
+    );
+    assert.equal(receipt.effective, "rebuilt", "idle 目标 ⇒ 已重建、即刻生效");
+  }
+  assert.equal(opensA(), 2, "目标会话确已重建");
+
+  h.streams.su.push({ kind: "settled", summary: "一轮结束" });
+  await tick(300);
+  const row = h.sent.su.find((t) => t.startsWith("[系统·安装] ") && t.includes("MCP「fetch」"));
+  assert.ok(row, "settle 后经 kind:system 通道真投递给 su");
+  assert.ok(row!.includes("docs/mcp/fetch.md") && row!.includes("sha256 "), "含声明路径与 digest 摘要");
+  assert.ok(row!.includes("能力级授予，非逐调用受审"), "诚实面在系统行如实（不得宣称逐调用受审）");
+  if (receipt.ok) assert.ok(row!.includes(receipt.digest.slice(0, 12)), "digest 与回执一致（前 12 位）");
+  await h.mgr.stop(null);
+});
+
+test("G-4 V2 校验分支（全部拒绝⇒零副作用）：role-not-found（su 自身/未知）/ not-registered（缺声明、保留名、坏名、未生效态）/ role-not-listed / registration-unchanged", async () => {
+  const dir = await makeMcpProject();
+  await writeMcpFixture(dir, "onlyB", "B"); // 只列 B
+  await writeMcpFixture(dir, "off", "A", "uninstalled"); // 列 A 但已停用
+
+  const h = makeHarness({ projectRoot: dir });
+  await h.mgr.open({ projectRoot: dir, roleId: "su", runtime: "demo" });
+  await tick(30);
+  await h.mgr.send("装 MCP");
+  const install = h.installMcpOf("su")!;
+  const uninstall = h.uninstallMcpOf("su")!;
+  const expectFail = (r: InstallMcpReceipt, reason: string, frag: string): void => {
+    assert.equal(r.ok, false);
+    if (!r.ok) {
+      assert.equal(r.reason, reason, `reason=${reason}`);
+      assert.ok(r.message.includes(frag), `${reason} 文案如实：「${frag}」∈「${r.message}」`);
+    }
+  };
+  expectFail(await install({ roleId: "su", name: "fetch" }), "role-not-found", "角色「su」不是本项目项目角色（或为治理角色 su）——未执行。");
+  expectFail(await install({ roleId: "ghost", name: "fetch" }), "role-not-found", "角色「ghost」不是本项目项目角色（或为治理角色 su）——未执行。");
+  expectFail(await install({ roleId: "A", name: "nope" }), "not-registered", "MCP 未登记：docs/mcp/nope.md 不存在——先落盘再安装；未执行。");
+  expectFail(await install({ roleId: "A", name: "ans" }), "not-registered", "MCP 未登记：docs/mcp/ans.md 不存在——先落盘再安装；未执行。");
+  expectFail(await install({ roleId: "A", name: "bad.name" }), "not-registered", "MCP 未登记：docs/mcp/bad.name.md 不存在——先落盘再安装；未执行。");
+  expectFail(await install({ roleId: "A", name: "onlyB" }), "role-not-listed", "登记中未包含角色「A」——未执行；如确要安装请先更新登记。");
+  expectFail(await install({ roleId: "A", name: "off" }), "not-registered", "状态为「uninstalled」——先改声明再安装；未执行。");
+  expectFail(await uninstall({ roleId: "A", name: "fetch" }), "registration-unchanged", "登记仍含角色「A」——先改登记再卸载；未执行。");
+  expectFail(await uninstall({ roleId: "A", name: "nope" }), "not-registered", "没有可撤销的声明；未执行。");
+  assert.equal(h.openCalls.filter((r) => r === "A").length, 0, "拒绝零副作用：未开目标会话");
+  assert.ok(!h.roleStates.some((s) => s.summaries.some((x) => x.includes("系统·安装"))), "拒绝不投系统行");
+  await h.mgr.stop(null);
+});
+
+test("G-4 V2 裁定④ 轮次护栏（与技能两工具同判据同文案）：无轮次/系统投递轮次 ⇒ not-customer-turn（零副作用）；客户轮次 ⇒ 放行到校验层", async () => {
+  const dir = await makeMcpProject();
+  const h = makeHarness({ projectRoot: dir });
+  await h.mgr.open({ projectRoot: dir, roleId: "su", runtime: "demo" });
+  await tick(30);
+  const install = h.installMcpOf("su")!;
+  const uninstall = h.uninstallMcpOf("su")!;
+
+  const r1 = await install({ roleId: "A", name: "fetch" });
+  assert.equal(r1.ok, false);
+  if (!r1.ok) {
+    assert.equal(r1.reason, "not-customer-turn");
+    assert.equal(r1.message, "本动作仅可在客户消息发起的轮次执行——未执行。");
+  }
+  assert.equal(h.openCalls.filter((r) => r === "A").length, 0, "零副作用：目标未开会话");
+
+  h.mgr.watchdogDeliver(dir, { text: "[系统·看护] 测试告警：角色「A」。", summary: "系统·看护 · 测试", dedupKey: "watchdog\u0000test\u0000mcp-guard" });
+  await tick(120);
+  const r2 = await uninstall({ roleId: "A", name: "fetch" });
+  assert.equal(r2.ok, false);
+  if (!r2.ok) assert.equal(r2.reason, "not-customer-turn", "系统投递轮次拒绝（两工具同判据）");
+  h.streams.su.push({ kind: "settled", summary: "一轮结束" });
+  await tick(150);
+
+  const r3 = await h.mgr.send("装 MCP fetch");
+  assert.equal(r3.ok, true, "客户直聊轮次");
+  const r4 = await install({ roleId: "A", name: "nope" });
+  assert.equal(r4.ok, false);
+  if (!r4.ok) assert.equal(r4.reason, "not-registered", "客户轮次放行到校验层");
+  await h.mgr.stop(null);
+});
+
+test("G-4 V2 生效态：未开会话 ⇒ next-session＋note（不自动开目标）；在跑 ⇒ next-session（不打断）", async () => {
+  const dir = await makeMcpProject();
+  const h = makeHarness({ projectRoot: dir });
+  await h.mgr.open({ projectRoot: dir, roleId: "su", runtime: "demo" });
+  await tick(30);
+  await h.mgr.send("给 A 装 MCP fetch");
+  const install = h.installMcpOf("su")!;
+
+  const r1 = await install({ roleId: "A", name: "fetch" });
+  assert.equal(r1.ok, true, "未开会话 = 登记即刻对后续会话生效（ok:true 延迟态）");
+  if (r1.ok) {
+    assert.equal(r1.effective, "next-session");
+    assert.ok((r1.note ?? "").includes("没有打开的会话"), "note 如实说明「未开会话」而非「在跑轮次」");
+  }
+  assert.equal(h.openCalls.filter((r) => r === "A").length, 0, "不自动开目标会话（激活≠开户）");
+  h.streams.su.push({ kind: "settled", summary: "结束" });
+  await tick(200);
+  h.streams.su.push({ kind: "settled", summary: "系统行轮次结束" });
+  await tick(150);
+
+  await h.mgr.open({ projectRoot: dir, roleId: "A", runtime: "demo" });
+  await tick(30);
+  const release = h.hangNext("A");
+  void h.mgr.send("长任务", undefined, { roleId: "A" });
+  await tick(30);
+  await h.mgr.send("装 fetch", undefined, { roleId: "su" });
+  const r2 = await install({ roleId: "A", name: "fetch" });
+  assert.equal(r2.ok, true, "在跑 = 如实延迟态（不是错误）");
+  if (r2.ok) {
+    assert.equal(r2.effective, "next-session");
+    assert.equal(r2.note, undefined);
+  }
+  assert.equal(h.openCalls.filter((r) => r === "A").length, 1, "在跑不打断：目标会话未重建");
+  release();
+  await tick(60);
+  await h.mgr.stop(null);
+});
+
+test("G-4 V2 重建失败 ⇒ rebuild-failed（声明仍在、未假装已生效）；不投 [系统·安装] 行", async () => {
+  const dir = await makeMcpProject();
+  const h = makeHarness({ projectRoot: dir, failOpensAfter: { A: 1 } });
+  await h.mgr.open({ projectRoot: dir, roleId: "su", runtime: "demo" });
+  await tick(30);
+  await h.mgr.open({ projectRoot: dir, roleId: "A", runtime: "demo" });
+  await tick(30);
+  await h.mgr.send("装", undefined, { roleId: "su" });
+  const receipt = await h.installMcpOf("su")!({ roleId: "A", name: "fetch" });
+  assert.equal(receipt.ok, false, "重开失败 ⇒ 不假装已生效");
+  if (!receipt.ok) {
+    assert.equal(receipt.reason, "rebuild-failed");
+    assert.ok(receipt.message.includes("重建") && receipt.message.includes("声明仍在"), "如实：声明仍在、会话未重建");
+    assert.ok(receipt.message.includes("会话开启失败"), "原因原文如实（不吞）");
+  }
+  assert.ok(!h.roleStates.some((s) => s.summaries.some((x) => x.includes("系统·安装"))), "失败不投 [系统·安装] 行（零副作用）");
+  await h.mgr.stop(null);
+});
+
+test("G-4 V2 卸载成功（先改声明再卸载 ⇒ rebuilt）：系统行如实二分「效果已撤；声明文件保留于 docs/mcp/fetch.md」；声明本体保留", async () => {
+  const dir = await makeMcpProject();
+  const h = makeHarness({ projectRoot: dir });
+  await h.mgr.open({ projectRoot: dir, roleId: "su", runtime: "demo" });
+  await tick(30);
+  await h.mgr.open({ projectRoot: dir, roleId: "A", runtime: "demo" });
+  await tick(30);
+  await h.mgr.send("卸载 fetch", undefined, { roleId: "su" });
+  // 先改声明：把 A 从适用角色移除（普通 edit——落盘永远由 su 侧完成，工具不写盘）。
+  await writeMcpFixture(dir, "fetch", "B");
+  const receipt = await h.uninstallMcpOf("su")!({ roleId: "A", name: "fetch" });
+  assert.equal(receipt.ok, true, "声明确已撤销 ⇒ 卸载受理");
+  if (receipt.ok) {
+    assert.equal(receipt.action, "uninstalled");
+    assert.equal(receipt.path, "docs/mcp/fetch.md");
+    assert.equal(receipt.digest.length, 64, "digest＝声明文件当刻字节 sha256");
+    assert.equal(receipt.effective, "rebuilt");
+  }
+  assert.equal(h.openCalls.filter((r) => r === "A").length, 2, "声明已撤 ⇒ 目标会话重建（新会话不再装配）");
+  assert.ok((await fs.readFile(path.join(dir, "docs", "mcp", "fetch.md"), "utf8")).includes("启动：node"), "文件保留：声明本体未删（工具不写盘）");
+  h.streams.su.push({ kind: "settled", summary: "结束" });
+  await tick(300);
+  const row = h.sent.su.find((t) => t.startsWith("[系统·安装] ") && t.includes("MCP「fetch」"));
+  assert.ok(row, "卸载同样经第四类通道投 [系统·安装] 行");
+  assert.ok(row!.includes("效果已撤，声明文件保留于 docs/mcp/fetch.md"), "如实二分陈述（效果已撤／文件保留）");
+  assert.ok(row!.includes("已发生的副作用不可撤"), "MCP 专有诚实面（卸载＝下次会话摘除；副作用不可撤）");
   await h.mgr.stop(null);
 });
 
