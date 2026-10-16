@@ -19,9 +19,15 @@ import { fileURLToPath } from "node:url";
 import {
   loadPiEnv,
   savePiConfig,
+  getPiConfig,
   resolveRepoEnvPath,
   PI_PANEL_KEYS,
 } from "../../app/desktop/pi-config.ts";
+import {
+  getRuntimeConfig,
+  saveRuntimeConfig,
+} from "../../app/desktop/runtime-config.ts";
+import { RUNTIME_SETTINGS } from "../../src/common/shared/runtime-settings.ts";
 import {
   loadEnvFileInto,
   readEnvFile,
@@ -84,10 +90,11 @@ test("T29 往返：临时 .env 载入后，进程 env 拿到正确值（含 toke
         "ANS_PI_PROVIDER",
       ].sort(),
     );
-    // 面板键集合（单一来源 = `pi-config.ts` 的 `PI_PANEL_KEYS`）：**3 必填 + 1 可选 = 4**。
+    // 面板键集合（单一来源 = `pi-config.ts` 的 `PI_PANEL_KEYS`；G-5 wave 2 起与注册表 `RUNTIME_SETTINGS.pi`
+    // 字段集对齐）：**3 必填 + 2 可选 = 5**（增 `ANS_PI_REASONING_EFFORT`）。
     assert.deepEqual(
       [...PI_PANEL_KEYS].sort(),
-      ["ANTHROPIC_AUTH_TOKEN", "ANS_PI_BASE_URL", "ANS_PI_CONTEXT_WINDOW", "ANS_PI_MODEL"].sort(),
+      ["ANTHROPIC_AUTH_TOKEN", "ANS_PI_BASE_URL", "ANS_PI_CONTEXT_WINDOW", "ANS_PI_MODEL", "ANS_PI_REASONING_EFFORT"].sort(),
     );
     // 反向守卫：`ANS_PI_PROVIDER` **不在**面板键里（代码里有默认值 `ans-gateway`，是内部标签、非用户该填）。
     // 用反向守卫（断言它**不在**）而非删行——防它悄悄长回面板。
@@ -209,6 +216,84 @@ test("T29 往返：旧值仍在（只改相关键——载入不因保存而丢�
     assert.equal(re["ANS_PI_CONTEXT_WINDOW"], "131072");
     assert.equal(re["ANTHROPIC_AUTH_TOKEN"], SENTINEL_TOKEN);
     assert.equal(re["ANS_PI_MODEL"], "changed");
+  } finally {
+    t.cleanup();
+  }
+});
+
+// —————————————————————— 3b) G-5 推理强度：往返 ＋ choices 透传 ＋ 值域单一来源 ——————————————————————
+//
+// 批准件＝PM 记录 §G-5 与桌面窗口/项目管理属主回交：`ANS_PI_REASONING_EFFORT` 纳入面板键（pi-config.ts
+// 「纳入」处理）并与注册表 `RUNTIME_SETTINGS.pi` 逐键对齐（漂移守卫）；choices 元数据经注册表读取链透传；
+// 值域校验**单一来源**在注册表保存链（`runtime-config.ts` 按 `field.choices` 判）——旧面板路径**不做**
+// 值域校验（如实钉：不复制第二份判定，沿单一来源纪律）。
+
+test("T29 G-5：ANS_PI_REASONING_EFFORT 往返（save→reload→get 视图）＋ 面板键与注册表逐键对齐（漂移守卫）", async () => {
+  // 漂移守卫：面板键集 ≡ 注册表 RUNTIME_SETTINGS.pi 字段键集（G-5 wave 2「纳入」口径）。
+  assert.deepEqual(
+    [...PI_PANEL_KEYS].sort(),
+    RUNTIME_SETTINGS.pi.fields.map((f) => f.key).sort(),
+    "面板键集须与 RUNTIME_SETTINGS.pi 字段集逐键对齐（防漂移）",
+  );
+  const t = makeTempEnv(FIXTURE);
+  try {
+    const env: Record<string, string | undefined> = {};
+    await loadEnvFileInto(env, t.envPath);
+    assert.equal(env["ANS_PI_REASONING_EFFORT"], undefined, "本夹具刻意不含推理强度（起点未设）");
+
+    const r = await savePiConfig({ envPath: t.envPath, updates: { ANS_PI_REASONING_EFFORT: "high" }, env });
+    assert.equal(r.ok, true, `保存应成功：${r.error ?? ""}`);
+    assert.deepEqual(r.appliedKeys, ["ANS_PI_REASONING_EFFORT"]);
+    // 甲) 保存后同一 env 已重载。
+    assert.equal(env["ANS_PI_REASONING_EFFORT"], "high");
+    // 乙) 另开 env 从盘上重载也拿到（确认真落盘）。
+    const env2: Record<string, string | undefined> = {};
+    await loadEnvFileInto(env2, t.envPath);
+    assert.equal(env2["ANS_PI_REASONING_EFFORT"], "high");
+    // 丙) get 面板视图含新键（非机密、值可见、isSet）。
+    const view = await getPiConfig(t.envPath);
+    const field = view.fields.find((f) => f.key === "ANS_PI_REASONING_EFFORT");
+    assert.ok(field, "get 视图须含新键");
+    assert.equal(field!.secret, false, "推理强度非机密");
+    assert.equal(field!.value, "high");
+    assert.equal(field!.isSet, true);
+  } finally {
+    t.cleanup();
+  }
+});
+
+test("T29 G-5：choices 元数据透传（注册表读取链）＋值域校验单一来源在注册表保存链（旧面板路径不复制判定，如实钉）", async () => {
+  const t = makeTempEnv(FIXTURE);
+  try {
+    // ① choices 透传：注册表视图把推理强度的封闭值域原样带出（Pi 含 off 档；控件据 choices 呈现）。
+    const view = await getRuntimeConfig("pi", { envPath: t.envPath, env: {} });
+    const field = view.fields.find((f) => f.key === "ANS_PI_REASONING_EFFORT");
+    assert.ok(field, "注册表视图须含推理强度字段");
+    assert.deepEqual(field!.choices, ["off", "low", "medium", "high", "xhigh"], "choices 元数据逐字透传");
+    assert.equal(field!.required, false, "推理强度为可选（留空＝维持平台默认）");
+
+    // ② 注册表保存链拒非法值（单一来源）：不落盘、错误不回显提交值原文。
+    const bad = await saveRuntimeConfig({ runtime: "pi", updates: { ANS_PI_REASONING_EFFORT: "bogus" } }, { envPath: t.envPath });
+    assert.equal(bad.ok, false, "非法档位由注册表保存链如实拒绝");
+    assert.ok(
+      bad.error?.includes("取值无效") === true && bad.error.includes("off / low / medium / high / xhigh"),
+      `错误须列出合法值域：${bad.error}`,
+    );
+    assert.equal((bad.error ?? "").includes("bogus"), false, "拒绝错误不得回显提交值原文");
+    assert.equal((await readEnvFile(t.envPath))["ANS_PI_REASONING_EFFORT"], undefined, "被拒 ⇒ 不落盘（零副作用）");
+
+    // ③ 注册表保存链收合法值：trim 后规范形写盘。
+    const good = await saveRuntimeConfig({ runtime: "pi", updates: { ANS_PI_REASONING_EFFORT: " xhigh " } }, { envPath: t.envPath });
+    assert.equal(good.ok, true, `合法档位应写入：${good.error ?? ""}`);
+    assert.deepEqual(good.appliedKeys, ["ANS_PI_REASONING_EFFORT"]);
+    assert.equal((await readEnvFile(t.envPath))["ANS_PI_REASONING_EFFORT"], "xhigh", "规范形（trim 后）写盘");
+
+    // ④ 旧面板路径不做值域校验（单一来源纪律，如实钉）：savePiConfig 只过滤键面、不复制第二份判定。
+    const env: Record<string, string | undefined> = {};
+    const legacy = await savePiConfig({ envPath: t.envPath, updates: { ANS_PI_REASONING_EFFORT: "bogus" }, env });
+    assert.equal(legacy.ok, true, "旧面板路径按键面直写（值域校验只在注册表保存链——不复制第二份）");
+    assert.deepEqual(legacy.appliedKeys, ["ANS_PI_REASONING_EFFORT"]);
+    assert.equal(env["ANS_PI_REASONING_EFFORT"], "bogus", "旧路径值原样落盘（如实钉：本路径无 choices 控件与值域校验）");
   } finally {
     t.cleanup();
   }

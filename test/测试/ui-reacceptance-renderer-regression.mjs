@@ -48,7 +48,7 @@ const handlers = {
   'session:operator-response': (_e, input) => { responses.push(input); return responseValue; },
   'session:withdraw': (_e, input) => { withdrawCalls.push(input); return new Promise((resolve, reject) => { deferredWithdraw = { resolve, reject }; }); },
   'app:pick-image': () => ({ ok: true, image: { name: 'independent.png', mime: 'image/png', size: 68, dataBase64: PNG } }),
-  'pi-config:get': () => ({ path: ROOT + '/' + 'independent-long-directory/'.repeat(10) + '.env', fields: ['ANTHROPIC_AUTH_TOKEN', 'ANS_PI_BASE_URL', 'ANS_PI_MODEL', 'ANS_PI_CONTEXT_WINDOW'].map(key => ({ key, secret: key === 'ANTHROPIC_AUTH_TOKEN', value: key === 'ANTHROPIC_AUTH_TOKEN' ? '' : 'fixture', isSet: true })) }),
+  'pi-config:get': () => ({ path: ROOT + '/' + 'independent-long-directory/'.repeat(10) + '.env', fields: ['ANTHROPIC_AUTH_TOKEN', 'ANS_PI_BASE_URL', 'ANS_PI_MODEL', 'ANS_PI_CONTEXT_WINDOW', 'ANS_PI_REASONING_EFFORT'].map(key => ({ key, secret: key === 'ANTHROPIC_AUTH_TOKEN', value: key === 'ANTHROPIC_AUTH_TOKEN' ? '' : 'fixture', isSet: true })) }),
   'pi-config:save': () => ({ ok: true, appliedKeys: [] }),
   'runtime-config:get': (_e, input) => {
     const definition = RUNTIME_SETTINGS[input.runtime];

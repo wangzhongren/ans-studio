@@ -1,5 +1,34 @@
 # 测试 变更记录
 
+## 2026-10-16 — G-5（推理与推理强度）独立验证：整体通过（0 不通过 / 6 备注）
+
+**范围**：契约与归一（五值冻结/三态归一/三 env 键/非法⇒按未设＋诊断不毁会话）、事实通道与投影单点（脱敏/16384 B 预算/omitted 恒空/durationMs 防伪/summary 定格/幂等/坏件诊断/emit 与历史兩路同单点）、Claude 接线（映射未设零参数·off disabled·四档直通·max 不收编/捕获不预脱敏/降级 4xx＋词元恰一次同输入重推）、Codex 接线（五值校验装配前抛/单条 `-c`/off 如实文案/reasoning 事件双信号时长/降级闸恰一次＋负例四格）、Pi 接线（off 前置修复假关闭消除/未设零调用/R1 自证网关三窗修复/捕获/降级终态前消费不二次/429 排除/中断守卫）、设置链（三字段 choices 单源/保存值域拒 trim 规范形空串清除批量原子/pi-config 漂移对齐＋旧路径如实现状）、桌面渲染（四态文案真实执行/select 控件/默认折叠 esc 纯文本/回放载体真驱动）、范围审计（探针纯本地/键读取面单点/零网络面）。
+
+**方法**：对抗性独立构造、不复用实施方断言——自建 `test/测试/g5-reasoning-verify/`（8 测试文件＋helpers 夹具）**65 例全绿**（真 Service 装配捕获工厂＋自建假 Claude SDK/假 Codex 引擎/loopback 假网关驱动真 Pi SDK＋真 tool-rows.js 执行＋真 getSessionHistory 回放驱动）。全量 **2112/2111/0红/1skip**（＝基线 2047/2046/0/1＋65；1 skip＝既有 Windows-only）、typecheck 0；G-5 改动面冻结 **33 条目**开工/收工逐字节一致（两次复算）。备注 6 条（零引用钉交互〔H1 按 g4v2 K3 先例动态枚举改写〕、R1 第三窗无需修复、429 SDK 层重试观测、Codex 增量帧计作已产出、summary 定格仅 kind=message、Claude 判据词元集）与未验边界（真网关/Electron e2e/真 CLI wire/aborted 竞态窗/细窗口/Windows）见报告。详见[报告](docs/change/2026-10-16_change_g5-reasoning-independent-verification.md)与[证据](docs/change/2026-10-16-g5-verification-evidence/)。未 commit/push。
+
+## 2026-10-16 — G-5（推理与推理强度）落树后：Pi 面板键 4→5 同步＋推理键往返/choices/值域单源新钉；g3 审计④核对
+
+**来源**：G-5 全链落树（契约层/三适配器接线与降级/设置保存/档位控件/推理折叠行/回放载体；批准件＝PM 记录 §G-5 与各属主回交）。本角色名下唯一红＝`test/测试/t29-pi-config-roundtrip.test.ts` 面板键 deepEqual（实际 5 键 vs 旧钉 4 键）；全量扫描 G-5 旧钉后共两处翻新＋两例新钉。边界：只写 `test/测试/**` 与本角色文档；未碰产品文件与探针；**未 commit**。
+
+### 同步清单（断言 → 旧值 → 新值 → 依据）
+
+1. `t29-pi-config-roundtrip.test.ts` :88-91 — `PI_PANEL_KEYS` deepEqual 4 键 → **5 键**（增 `ANS_PI_REASONING_EFFORT`；注释「3 必填 + 1 可选」→「3 必填 + 2 可选」）。依据：桌面窗口 G-5「纳入」处理——`app/desktop/pi-config.ts:60-66` 实况；与注册表 `RUNTIME_SETTINGS.pi` 逐键对齐（`app/desktop/pi-config.ts:43` 注）。
+2. 同文件**新增**「T29 G-5：ANS_PI_REASONING_EFFORT 往返＋漂移守卫」——①面板键集 ≡ `RUNTIME_SETTINGS.pi` 字段键集（钉对齐）；②save→同 env 重载→另开 env 重载→`getPiConfig` 视图（非机密、值可见、isSet）全链往返。
+3. 同文件**新增**「T29 G-5：choices 透传＋值域单源」——①`getRuntimeConfig("pi")` 视图 `choices` 逐字＝["off","low","medium","high","xhigh"]、required:false（元数据透传）；②注册表保存链拒非法值（ok:false、错误列出值域、不回显提交值、零落盘）；③合法值 trim 规范形写盘；④**旧面板路径不做值域校验**（`savePiConfig` 越值直写、原样落盘——单一来源纪律如实钉，防复制第二份判定）。
+4. `ui-reacceptance-renderer-regression.mjs` :51 — `pi-config:get` 桩的旧 4 键快照 → 加 `ANS_PI_REASONING_EFFORT`（桩与现行面板键集同形；无断言依赖该计数）。
+
+### 扫描范围与遗漏排查
+
+- 全量扫 `test/测试/**`（`推理|reasoning|思考|档位|effort|EFFORT|ANS_*_REASONING|RUNTIME_SETTINGS|已思考|xhigh`）：G-5 旧钉仅命中上述两文件（已翻新）；其余 `.mjs` 桩为动态取 `RUNTIME_SETTINGS`（无旧快照）、空 `fields: []` 桩或无键面（核对未改）。
+- `g3-search-verify/scope-audit-and-fold.test.ts` 审计④（Pi 属主已适配）单独复跑 13 例全绿——核对即可，未改。
+- 残留扫描 0 意外命中（仅负向/变异用旧串与既有无关 length 计数）；`t29-write-discipline.test.ts` 与新键不冲突（`ANS_PI_PROVIDER` 反向守卫仍真），未改。
+
+### 复跑（本角色独立执行）
+
+- `node --test "test/测试/**/*.test.ts"` → **437 pass / 0 fail / 0 skip**（改前 435 中 434/1，唯一红按预期消解；新增 2 例）。
+- `node --test "test/**/*.test.ts"`（全量）→ **2047 tests：2046 pass / 0 fail / 1 skip**（唯一 skip＝`test/门禁引擎/resolve-write.test.ts:173` 既有 Windows-only；单独复跑 21 pass/1 skip 确认）。
+- `npm run typecheck` → **0 错**。
+
 ## 2026-10-16 — G-4 V2（su 安装外来 MCP 全链）独立验证：整体通过（0 不通过 / 6 备注）
 
 **范围**：契约与读取器（`InstalledMcpServerV1`＋`mcp-declarations.ts`）、Service 接线（`providerFor` 按角色注入）、工具面（`install_mcp`/`uninstall_mcp`）、编排（第四棵树 `docs/mcp`＋能力位透传仅 su）、门禁卡文本（MCP 安装纪律段＋J-1 守卫全检）、桌面 handler（`applyMcpChange` 护栏/三态/系统行/诊断）、Claude P1（hook 五条件＋env 收窄启动器）、Codex P2（单条 root map＋三处名字集恰等＋`mcpToolCall` 映射）、Pi P3（前缀判据×2 同源＋tools-only＋自持 transport＋dispose 收口）、桌面UI 复用、范围审计（stdio 限定/名拒/零二次卡/诚实面/探针纯本地）。

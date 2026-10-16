@@ -1,0 +1,2 @@
+   1 test/claude-adapter/reasoning-loopback.probe.ts:http://127.0.0.1:
+   2 test/pi-adapter/reasoning-wire.probe.ts:http://127.0.0.1:

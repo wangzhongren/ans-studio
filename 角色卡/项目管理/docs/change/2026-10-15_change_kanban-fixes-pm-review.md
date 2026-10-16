@@ -151,6 +151,27 @@ status: approved-implementation-dispatched
 - **两文档交回与 PM 评审（2026-10-16）**：产品 `角色卡/产品/docs/design/2026-10-16_design_reasoning-and-effort.md`（322 行）＋运行时核心 `角色卡/运行时核心/docs/fix/2026-10-16_assess_reasoning-and-effort.md`（255 行，逐处行级实证）。**关键发现：Pi 现状已在隐式请求推理**（缺省 thinkingLevel=medium ⇒ 每轮 `budget_tokens:8192`＋max_tokens 抬升；thinking 块在 `real-adapter.ts:796-810` 丢弃）；Claude `Options.thinking`/`Options.effort` 现成、块在 `claude/session.ts:361` 丢弃；Codex pinned 0.162.1 确有 `model_reasoning_effort`（目录值 low/medium/high/xhigh/max/ultra，无 off/minimal；config 层不校验）＋完整 `item/reasoning/*` 事件面（适配器现忽略）。`forceAdaptiveThinking:false` 语义澄清＝不伪造 adaptive 形态、推理照发（非禁用）。建议字段：`reasoningEffort?: "off"|"low"|"medium"|"high"|"xhigh"`＋三 env 键（走 runtime-settings 面板链）。探针 A 组（loopback）＋B 组（客户真网关）分列；首要风险 R1＝Pi 预算抬升×上下文钳制可产非法组合（A5 先行定格）。
 - **PM 批准简表已呈客户**：档位六档（默认/关/低/中/高/极高；Codex 无「关」⇒该选项灰置如实）；未设＝逐字现状；每平台一字段；呈现＝折叠行「已思考 N 秒 ▸」（默认折叠含运行中，展开零丢失）；生效＝新会话生效/在跑不打断；按角色覆写 V1 不做（登记）；降级链＝网关拒有界一次去参数重发＋如实一行；计费如实（思考计入输出 tokens）；实施序＝A 探针→契约＋接线→独立验证→B 探针（客户）→随运行包。
 
+## G-4 V2 收口与提交（2026-10-16）
+
+- **V2 独立验证：整体通过（0 不通过、6 备注）**——报告 `角色卡/测试/docs/change/2026-10-16_change_g4v2-mcp-install-independent-verification.md`；自建 64 例（A–M 全过：契约/读取器/接线/工具/四棵树/卡文本/handler/三平台装配对抗/范围审计）；冻结绑定 82 条目逐字节一致；全量 1998/1997/0红/1skip、typecheck 0。
+- **提交入 main（四批）**：`bd97e53`（契约层与工具面）／`ff0fd44`（装配面：四棵树/透传/卡文本/handler/行确认）／`3951ed2`（三平台装配 P1/P2/P3＋pi-mcp 显式依赖）／`02747aa`（验证＋钉子翻新＋G-5 文档＋PM 记录）。**G-4 全案（V1＋V2）实施收口。**
+- **备注登记（6 条非不通过）**：其中⑥空 name 文案 `docs/mcp/.md` 小瑕列**待排轻项**；⑤Codex 碰撞判据大小写敏感（边界登记）；②`CAN_USE_TOOL_SHADOWED` 提示与设计一致（hook 先行）。
+- **G-4 全案待办**：真机 E2E（装-看-用-撤，含三平台；V1/V2）；Codex namespace 桥对真网关的接受性（验收轮）；B 组推理探针（归 G-5 实施序）；随下一版运行包发布。
+
+## 客户批准（2026-10-16）：「按推荐批准，开始实施」＝G-5（推理与推理强度）实施
+
+- **批准范围＝六项推荐裁定**（档位六档/未设＝逐字现状/每平台一字段/折叠行呈现/新会话生效/降级链＋计费如实）。
+- **冻结符号（PM 定，落盘即契约）**：`ReasoningEffortV1 = "off"|"low"|"medium"|"high"|"xhigh"`；`RuntimeProviderOptions.reasoningEffort?`（未设＝逐字现状）；env 键 `ANS_CLAUDE_REASONING_EFFORT`/`ANS_CODEX_REASONING_EFFORT`/`ANS_PI_REASONING_EFFORT`（Codex 字段 choices **无 off**——平台无该档，如实不假装）；推理呈现事实通道（折叠行数据面：内容/时长/平台省略态）单一来源 `model/runtime.ts`；行文案「已思考 N 秒 ▸」。
+- **Wave 1 派发**：运行时核心（契约＋Service env 归一注入[非法值＝视为未设＋诊断如实、不毁会话]＋推理事实通道契约＋Claude effort 值集映射按 sdk.d.ts 定格）；项目管理（`RUNTIME_SETTINGS` 增 `choices?` 元数据面＋三字段注册）。
+- **Wave 2（待 wave 1 落盘）**：三适配器（各自 A 组探针先行——Claude wire 捕获/Codex reasoning item/Pi 全档＋R1 预算×钳制非法组合定格→请求接线＋thinking 内容捕获发射＋网关拒⇒恰一次去参数重发＋如实一行）；桌面窗口（推理事实投递＋设置保存接受新字段）；桌面UI（面板档位控件[select]＋折叠行「已思考 N 秒 ▸」渲染）。
+- 完成后：独立验证 → B 组真网关探针（客户）→ 随下一版运行包。
+
+### G-5 wave 1 收口与 wave 2 派发（2026-10-16）
+
+- **wave 1 两件交回**：运行时核心（`ReasoningEffortV1`＋`RuntimeProviderOptions.reasoningEffort?`[未设=字段缺席＝逐字现状]；事实通道五符号冻结[`RuntimeReasoningFactsV1`/EventDetail/DisplayDetail/DiagnosticDetail/Projector，投影单点 `projectReasoningDetail` 于 tool-display.ts，protect/预算/omitted 归一/duration 防伪/幂等]；归一器 `runtime-core/reasoning.ts`[三 env 键/三态/非法＝按未设＋诊断不毁会]；Service 读注入＋emit/历史单点投影；**Claude 值集映射表冻结**：low/medium/high/xhigh 直通、`max` 不收编、Codex 无 off[不注入＋如实说明]、Pi off 需前置修 `thinkingLevelMap.off`[否则钳 minimal＝假关闭]；142/142、全量 2019/2018/0/1）＋项目管理（三字段＋`choices?` 元数据，2002/2001/0/1）。
+- **wave 2 派发**：三适配器（各自 A 组探针先行→按映射表接请求强度→thinking 内容捕获发射 reasoning 事件→网关拒⇒恰一次去参数重发＋如实一行）；桌面窗口（设置保存链接受三新键[值域校验]＋旧 Pi 面板与注册表关系核实）；桌面UI（档位 select 控件＋折叠行「已思考 N 秒 ▸」[默认折叠含运行中、omitted 如实、纯文本展开、复用折叠状态机]）。
+- 完成后：独立验证 → B 探针（客户）→ 随运行包。
+
 ## 候选 G-4「角色能力安装（技能＋MCP）」（2026-10-16 客户讨论提出，已派细化）
 
 - **客户原问**：「这个 su 应该有个工具，可以给其他的角色安装 mcp……或者安装技能」。
