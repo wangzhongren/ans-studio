@@ -1,0 +1,12 @@
+# 本地对照实验（macOS，2026-10-17）：启动器 SIGKILL（零执行路径＝同步模拟 Windows TerminateProcess 语义）
+# 命令（node -e，spawn 启动器 → 300ms 后 SIGKILL → 观察 stub 与 'close'）：
+#   spawn(process.execPath, [launcher, node, -e, "writeFileSync(pid); setInterval(...)"], {stdio:["ignore","pipe","pipe"]})
+#   setTimeout(() => child.kill('SIGKILL'), 300)
+# 观测（60s 内）：
+#   1) 子进程 'close' 事件**未触发**（runLauncher 式的 await 会挂起）——'close' 语义＝子进程结束且三流
+#      stdio 写端全闭；stub 持有 stdout/stderr 写端副本 ⇒ 未全闭。
+#   2) ps 实测：stub 进程在场存活（孤儿）：node -e "...setInterval..." 持续运行。
+#   ⇒ 启动器零执行路径下，stub 孤儿存活；启动器代码与夹具模式均非死因。
+# 收尾：实验进程已清理（kill stub + 实验父进程；无残留）。
+# 对照意义：CI Windows 上 stub 消亡且 'close' 已解析（写端全闭互证）⇒ 消亡归环境面（runner/环境树
+# 清理为可能类别，仓库侧不可判定）；不钉任一状态为产品真值。

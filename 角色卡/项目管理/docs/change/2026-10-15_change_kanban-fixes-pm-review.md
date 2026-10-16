@@ -180,6 +180,7 @@ status: approved-implementation-dispatched
 - **CI 首跑 run `38924209553`（headSha 74a34c9）：mac arm64 ✅、mac x64 ✅、Windows ❌（7 红）**——本批测试（G-3/G-4/G-5）**首次上 Windows CI**，红全为平台语义类：Claude launcher env 平台注入键＋POSIX 信号（×2）、Pi env 收窄平台注入键（×1）、Codex native 夹具（×1）、验证套件（双向核/指纹三触发路径分隔符/H2 键面扫描 ×3）。**修复四路已派**（各属主：先判别「测试适配 vs 产品缺口」，平台适配只做真值分支沿 v1.1.0 先例）；修复文件清单回收后由装配更新 overlay 白名单（overlay-2）→ 重跑 CI。release job 按设计跳过（未发布任何东西）。
 - **Windows 修复轮收口（2026-10-16）**：四路判别全部交回——**产品修复仅 1 处**（Codex win32 taskkill 上界 120ms→2000ms：CI 峰值负载下同秒姊妹用例 212ms 通过为证；仍为有界）；其余 6 处为验证套件平台真值分支（Windows 注入十键＝libuv required_vars 构造性强补[同 CI 三处互异 spawn 实现同集互证]、路径原生分隔符、无 POSIX 信号面、控制字符建盘）；断言本体零放宽。**流程备注（登记）**：`test/测试/g4v2-mcp-verify/g-claude-launcher.test.ts` 由 Claude适配器属主做 launcher 机制级平台分支（判别依赖 libuv 实证，合理分工、如实登记）。overlay-2 白名单＝基础 6＋本 7（1 生产＋6 测试）＝selected 13；装配准备中。
 - **overlay-2 重跑 run `38927621909`（headSha ef4a7fb）：7 红 → 1 红**（mac 双平台 ✅；Windows 剩 G1d win32 断言——首轮「无信号面」表述过强，CI 实测顶层回传 `signal:'SIGTERM'`）。**overlay-3（单文件，白名单已覆盖）**：G1d 按两层真值逐值钉准（顶层 `(code null, signal 'SIGTERM')`＝libuv `exit_signal` 记账语义、`code=null` 由 node v24 互斥规则定钉；stub 自毙层 `(1, null)` 原样；「无信号面」正确落点＝启动器→真命令转发不可达）。提交后重跑。
+- **overlay-3 重跑 run `38929587975`：仍剩 G1d（:164 已过、推进至 :177「stub 存续」）**——判定为**环境面（不确定）**：①Windows 父死不杀子（确定性）；②本地 SIGKILL 对照实验（同步模拟 TerminateProcess）证明 stub 孤儿存活且 close 挂起、夹具与启动器均非死因；③CI 观察与其语义互证⇒最可能为 runner/环境树清理，仓库侧不可判定。**overlay-4（单文件）**：win32 分支逐行三分（确定性真值 exact-match[含 :147-148/:191-192 源钉]、环境面登记不钉任一状态、新增 close 有界自愈与 POSIX 分支原样）；产品零改。
 
 ## 候选 G-4「角色能力安装（技能＋MCP）」（2026-10-16 客户讨论提出，已派细化）
 

@@ -38,6 +38,28 @@ CI 实得子进程键＝期望 10 键（基线∩在场 7＋声明 3）＋**十�
 - **「无信号面」的正确落点＝启动器→真命令的转发**：被 TerminateProcess 的启动器无代码可执行（SIGTERM 不达其处理器）⇒ 转发机制在 Windows **不可达**（Job Object 非 Node 能力面）；真命令处置依赖 stdin EOF 继承（MCP 惯例；P0 实证生产 dispose 先关 stdin）与调用方进程树清理；本 stub 不读 stdin，故必然存活——如实断言存活并自行清理，**绝不断言转发成功**。
 - 残余（如实登记）：Windows 硬杀路径下，「CLI 只杀启动器且不关 stdin」时忽略 stdin 的第三方 server 可存活到管道关闭——包装器引入的间接层窗口；与正常 MCP server（读 stdin）无关（关管道即 EOF 退出），正式批如有真机复现再议（`taskkill /T` 类侧另有 Pi 先例）。
 
+### G1d :177 追加判别（第三跑 `38929587975` 实测 stub 已消亡）—— **环境面（不确定）；不钉任一状态**
+
+三分结论：**环境面**（既非「确定性平台真值」可 exact-match，也非产品缺陷）。机制链三步：
+1. **Windows OS 层父死不杀子**（孤儿语义为确定性事实）⇒「stub 确定性消亡」不成立；
+2. **本地 macOS SIGKILL 对照**（启动器零执行路径＝同步模拟 Windows TerminateProcess 语义）：stub **孤儿存活**、`runLauncher` 的 `'close'` 因三流写端未全闭而**挂起**（实测进程在场）⇒ 启动器代码与本测试夹具模式均非死因；
+3. **CI 实测与语义互证**：`run 38929587975` stub 已消亡，且 `await runLauncher` 能解析（`'close'`＝各级 stdio 写端全闭）——两观察互相印证，死因归环境（runner／环境树清理为最可能类别；具体机制仓库侧不可判定）。
+
+处理（最小诚实形态）＝**钉不变量＋登记**：确定性面照旧钉住（启动器终止形态 `(null,'SIGTERM')`＝零处理器执行＝转发不可达）；**不钉「存活」（旧断言错误）也不钉「消亡」（环境依赖）**；win32 侧加**有界 `'close'` 等待＋夹具自愈**（若环境留存 stub，则由调用方清理以解除 stdio 写端阻塞——避免挂起、取回启动器报告；POSIX 分支不做自愈：转发若失效应挂起暴露，语义不变）。
+
+### G1d win32 分支逐行判定表（触发→收尾）
+
+| 位置 | 判定 | 钉法／登记 |
+| --- | --- | --- |
+| stdout 直通（`echo.code===0`＋MARKER 在场） | 确定性（平台中立） | exact-match；CI 通过 |
+| selfKill：`signal===null`＋`code===1` | 确定性平台真值（CI 重跑实测通过；uv_kill-by-pid 不记账机制） | exact-match |
+| forward gate：`'close'` 有界等待＋未闭自愈清 stub | 环境面健壮性（防挂起；非产品断言） | 登记（注释＋本文） |
+| `pid` 记录 `ok(Number.isFinite && >0)` | 确定性（夹具自证） | exact-match |
+| forward：`signal==='SIGTERM'` | 确定性平台真值（第三跑实测通过——失败点在其后 :177；libuv 记账 `exit_signal=signum`；机制双源实证） | exact-match |
+| forward：`code===null` | 确定性（第三跑实测通过；node v24 JS 互斥：signalCode 真值⇒exitCode 持 null） | exact-match |
+| forward：stub 存续（原 :177 `alive===true`） | **环境面（不确定）**：CI 实测消亡；OS 层无父死杀子；本地零执行对照存活 | **不钉任一状态**（登记于注释：三观察链＋机制类别） |
+| POSIX 分支全部断言 | 确定性（POSIX 语义） | 原样未动 |
+
 ## 二、改动文件（精确路径，发布 overlay-2 白名单用）
 
 1. `test/测试/g4v2-mcp-verify/g-claude-launcher.test.ts` —— 平台真值分支两处：`PLATFORM_INJECTED` 平台条件集（含注释：libuv required_vars 机制＋十键＋大小写归一）与 G1d `win32` 分支（自 SIGTERM 实得退出码、转发场景真值＋stub 自清理）。
@@ -48,4 +70,5 @@ CI 实得子进程键＝期望 10 键（基线∩在场 7＋声明 3）＋**十�
 ## 三、验证
 
 - 本地（macOS，POSIX 分支全保留）：`node --test "test/测试/g4v2-mcp-verify/"*.test.ts` **64/64**；`test/claude-adapter/*.test.ts` **44/44**；`npm run typecheck` **0**；全量 **2110 计 / 2109 过 / 0 红 / 1 skip**（证据目录 `full-suite.txt`）；`git diff --check` 对本批文件干净（全仓快照唯一提示＝`角色卡/Pi适配器/memo.md:74` 行尾空行，属 Pi 属主在飞编辑，非本批）。
-- Windows 分支本地不可执行（平台条件代码路径）——**由下一次 CI Windows run 复验**：G1a 十键豁免与哨兵值断言；G1d 两处 win32 逐值断言＝`(null, 'SIGTERM')`（顶层观察；signal 重跑实证、code 由 node 互斥规则定钉）与 `(1, null)`（stub 自毙，重跑已实证）。
+- **本地对照实验证据**：`kill-control-experiment.txt`（macOS SIGKILL 启动器＝零执行路径：stub 孤儿存活、`'close'` 挂起——:177 环境面判别的关键对照）。
+- Windows 分支本地不可执行（平台条件代码路径）——**由下一次 CI Windows run 复验**：G1a 十键豁免与哨兵值断言；G1d 两处 win32 逐值断言＝`(null, 'SIGTERM')`（顶层观察；两条均在第三跑`失败点之前`实测通过）与 `(1, null)`（stub 自毙，重跑已实证）；win32 `'close'` 有界等待＋自愈为新健壮化点。

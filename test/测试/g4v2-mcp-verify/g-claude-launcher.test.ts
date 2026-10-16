@@ -155,9 +155,22 @@ test("G1d 信号与性态：stdout 直通（JSON-RPC 通道）；SIGTERM 转发�
   try {
     const pidFile = path.join(dir, "pid.txt");
     const script = `require('node:fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid)); setInterval(()=>{},1000)`;
-    const run = await runLauncher([process.execPath, "-e", script], env, { killAfterMs: 150, waitForFile: pidFile });
-    const pid = Number(fs.readFileSync(pidFile, "utf8"));
+    const runPromise = runLauncher([process.execPath, "-e", script], env, { killAfterMs: 150, waitForFile: pidFile });
+    let pid = 0;
+    const pidDeadline = Date.now() + 5000;
+    while (pid === 0 && Date.now() < pidDeadline) {
+      try { pid = Number(fs.readFileSync(pidFile, "utf8")); } catch { await new Promise((r) => setTimeout(r, 25)); }
+    }
     assert.ok(Number.isFinite(pid) && pid > 0, "真命令 pid 已记录");
+    if (process.platform === "win32") {
+      // 'close'（runPromise 的解析）需三流写端全闭（node 'close' 语义）：Windows 上无转发路径（见下），
+      // stub 若被环境留存则 close 延迟/不来——有界等待；未闭则由调用方清理夹具 stub（本测试自己的进程，
+      // 清理归调用方），使 runPromise 得以解析、取回启动器死因报告。POSIX 分支不做自愈（保持原语义：
+      // 转发若失效应当挂起暴露）。
+      const closed = await Promise.race([runPromise.then(() => true), new Promise<boolean>((resolve) => { setTimeout(() => resolve(false), 8000).unref(); })]);
+      if (!closed) { try { process.kill(pid); } catch { /* 已退出 */ } }
+    }
+    const run = await runPromise;
     if (process.platform === "win32") {
       // Windows 真值②（CI 实测 signal='SIGTERM'；机制链＝libuv v1.51.0 src/win/process.c ＋ node v24
       // lib/internal/child_process.js，本机同版）：顶层观察＝「按 handle 发出的 kill」由 Node 如实回传
@@ -167,15 +180,16 @@ test("G1d 信号与性态：stdout 直通（JSON-RPC 通道）；SIGTERM 转发�
       // **不是 POSIX 死因**。
       // 「无信号面」的正确落点是**启动器→真命令的转发**：被 TerminateProcess 的启动器无代码可执行，
       // SIGTERM 不达其处理器，转发机制不可达；真命令的处置由 stdin EOF 继承（MCP 惯例：调用方关管道
-      // 即达真命令）与调用方进程树清理决定。本 stub 不读 stdin，故必然存活——如实断言存活并自行清理，
-      // 绝不断言「转发成功」。POSIX 语义断言（无孤儿＋同信号退出）保留在其平台分支。
-      await new Promise((r) => setTimeout(r, 300));
+      // 即达真命令）与调用方进程树清理决定——POSIX 语义断言（无孤儿＋同信号退出）保留在其平台分支。
+      // **stub 存续＝环境面变量（登记，不钉任一状态为产品真值）**：
+      //   · 确定性部分（上方已钉）：启动器终止形态＝零处理器执行 ⇒ 转发不可能是 stub 死因；
+      //   · 本地 macOS 对照（启动器 SIGKILL＝同为零执行路径）：stub 孤儿存活、'close' 因写端未全闭挂起
+      //     ⇒ 启动器代码与夹具模式均非死因；
+      //   · CI 实测（run 38929587975）：stub 已消亡，且 'close' 已解析（三流写端全闭）与之互证——属
+      //     环境面（Windows OS 层父死不杀子，「确定性消亡」不成立；runner/环境树清理为可能类别，
+      //     具体机制仓库侧不可判定）⇒ 既不断言存活（旧断言错误）也不断言消亡（环境依赖）。
       assert.equal(run.signal, "SIGTERM", "Windows 实得真值：libuv 回传被请求的信号名（记账语义，非 OS 死因；无信号面的正确落点在转发侧）");
       assert.equal(run.code, null, "Windows 实得真值：信号字段在场时退出码互斥为空（node：signalCode 真值 ⇒ exitCode 保持 null）");
-      let alive = true;
-      try { process.kill(pid, 0); } catch { alive = false; }
-      assert.equal(alive, true, "Windows 真值：转发不可达（启动器被终止、无执行权），忽略 stdin 的 stub 存活（清理归调用方）");
-      try { process.kill(pid); } catch { /* 已退出 */ }
     } else {
       const deadline = Date.now() + 5000;
       let alive = true;
