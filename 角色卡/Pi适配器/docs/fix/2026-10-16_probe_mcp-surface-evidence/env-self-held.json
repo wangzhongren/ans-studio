@@ -1,0 +1,11 @@
+{
+  "server": "probe-a",
+  "pid": 95666,
+  "ppid": 95665,
+  "envKeys": [
+    "PATH",
+    "PROBE_ENV_DUMP",
+    "PROBE_MARKER",
+    "__CF_USER_TEXT_ENCODING"
+  ]
+}

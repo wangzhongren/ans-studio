@@ -1,0 +1,365 @@
+[probe] scratch: /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-mcp-surface-probe-zrmxrT
+[probe] PI_CODING_AGENT_DIR（scratch）初始内容: []
+[probe] 宿主 env 键数: 89
+
+[probe] ===== A. 生产路径 bindExtensions ↔ MCP 接通 / 现状门禁 / 治理回归 =====
+[probe] A bindRole 后（bindExtensions 前）活动工具: ["edit_file","read_file","write_file"]
+[probe] A 加载的扩展: [{"path":"<inline:ans-governance>","handlers":["message_end","session_before_compact","session_compact","session_compact_failed","tool_call","tool_execution_end","tool_execution_start"]},{"path":"<inline:2>","handlers":["before_agent_start","mcp_servers_change","session_shutdown","session_start","tool_call","turn_start"]}]
+[probe] PASS A 绑定前活动工具＝仅注入（无 mcp__）
+[probe] A bindExtensions 后活动工具: ["edit_file","mcp__probe_a__echo","mcp__probe_a__pid","read_file","write_file"]
+[probe] A bindExtensions 后可被工具调用面（getCallableToolNames）: ["edit_file","mcp__probe_a__echo","mcp__probe_a__pid","read_file","write_file"]
+[probe] PASS A bindExtensions 后 MCP 接通、direct 工具进入声明面（恰 echo/pid 两只） — ["mcp__probe_a__echo","mcp__probe_a__pid"]
+[probe] A 映射 settled 行: ["completed","completed"]
+[probe] A 门禁拒绝行: ["非注入的 ANS 工具，拒绝执行：mcp__probe_a__echo"]
+[probe] PASS A 现状门禁（499-504 快照口径）拒绝 MCP 直连工具
+[probe] PASS A 被拒调用未到达服务端（call-log 为空 ⇒ 执行前阻断） — ""
+[probe] PASS A 拒绝理由进入转录（createErrorToolResult(reason)）
+[probe] PASS A 每轮映射 settled 恰 1（2 轮） — 2
+[probe] A dispose() 后子进程存活: true ；补发 session_shutdown 后退出: true
+
+[probe] ===== B. 判据草案（前缀面）模拟：可达/回归/1128 对照 =====
+[probe] B bindExtensions 后活动工具: ["edit_file","mcp__probe_b__echo","read_file","stray_tool","write_file"]
+[probe] PASS B 前缀面口径下 MCP 工具可达（direct 声明） — "mcp__probe_b__echo"
+[probe] B 快照式 1128 视作『非注入』: ["mcp__probe_b__echo","stray_tool"]
+[probe] B 前缀式 1128 残余（含脚手架 stray_tool）: ["stray_tool"]
+[probe] PASS B 快照式 1128 会把 MCP 工具当非注入（对照证据）
+[probe] PASS B 前缀式 1128：mcp__ 零残余（stray 为脚手架故意面外） — ["stray_tool"]
+[probe] B 判据样例: [{"name":"mcp__probe_b__echo","whitelist":["probe-b"],"expected":true,"got":true},{"name":"mcp__probe_b__echo","whitelist":[],"expected":false,"got":false},{"name":"mcp__probe_bx__echo","whitelist":["probe-b"],"expected":false,"got":false},{"name":"mcp__other__echo","whitelist":["probe-b"],"expected":false,"got":false},{"name":"write_file","whitelist":["probe-b"],"expected":false,"got":false},{"name":"mcp__probe-b__echo","whitelist":["probe-b"],"expected":false,"got":false}]
+[probe] PASS B 判据样例全部符合
+[probe] B 治理扩展 handler 键: ["before_provider_request","message_end","provider_stream_event","session_before_compact","session_compact","session_compact_failed","tool_call","tool_execution_end","tool_execution_start"]
+[probe] PASS B server-tools 观测 handler 已注册（before_provider_request/provider_stream_event）
+[probe] B 合成 provider_stream_event → 观测行: "模型请求调用 web_search（服务端工具）"
+[probe] B 合成 before_provider_request → 声明注入: {"tools":[{"type":"web_search_20250305","name":"web_search","max_uses":1}]}
+[probe] PASS B 合成观测经注册 handler 产出服务端工具行
+[probe] PASS B 合成声明注入改动请求 payload
+[probe] B 每轮 settled（raw / mapped 增量）: [{"raw":1,"mapped":1},{"raw":1,"mapped":1},{"raw":1,"mapped":1},{"raw":1,"mapped":1}]
+[probe] B call-log: ["echo\t2026-10-16T12:36:12.493Z"]
+[probe] B 拒绝行（stray）: ["非注入的 ANS 工具，拒绝执行：stray_tool"]
+[probe] B 写门禁拒绝（事件行/toolResult）: true true
+[probe] B 转录工具结果角色采样: ["system","user","assistant","toolResult","assistant","user","assistant","toolResult","assistant","user","assistant","toolResult","assistant","user","assistant","toolResult","assistant"]
+[probe] B toolResult[0]: {"role":"toolResult","toolCallId":"tool:1792154172490:4fhzsako83w","toolName":"mcp__probe_b__echo","content":[{"type":"text","text":"{\"echo\":{\"text\":\"PROBE_ECHO_MARKER\"}}"}],"details":{"server":"probe-b","tool":"echo"},"isError":false,"durationMs":1,"timestamp":1792154172494}
+[probe] B toolResult[1]: {"role":"toolResult","toolCallId":"tool:1792154172528:drl2fvpzb6q","toolName":"stray_tool","content":[{"type":"text","text":"非注入的 ANS 工具，拒绝执行：stray_tool"}],"details":{},"isError":true,"timestamp":1792154172530}
+[probe] B toolResult[2]: {"role":"toolResult","toolCallId":"tool:1792154172564:ji6bfhf3ycb","toolName":"write_file","content":[{"type":"text","text":"write_file 已获准并落盘：src/ok.ts（2 字节写入 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-mcp-surface-probe-zrmxrT/b/src/ok.ts）"}],"details":{"toolCallId":"tool:1792154172564:ji
+[probe] B toolResult[3]: {"role":"toolResult","toolCallId":"tool:1792154172612:8fhoa6mj6rb","toolName":"write_file","content":[{"type":"text","text":"写入被拒绝：目标路径不在允许写集内：/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-mcp-surface-probe-zrmxrT/b/src/evil.ts\n允许写入的路径（按根分组）：\n  skill: （无）\n  project: /var/folders/6z/2ldr5l1
+[probe] PASS B MCP echo 端到端：服务端收到调用
+[probe] PASS B MCP echo 端到端：结果进入转录（toolResult 面） — 4
+[probe] PASS B stray 被前缀面外拦截且未执行 — {"strayCalls":0}
+[probe] PASS B 写门禁照旧：允许写落盘
+[probe] PASS B 写门禁照旧：越界写拒绝且未落盘 — {"gateDeniedRow":true,"gateDeniedResult":true}
+[probe] PASS B 每轮 settled 恰 1（raw 与 mapped 双面，4 轮） — [{"raw":1,"mapped":1},{"raw":1,"mapped":1},{"raw":1,"mapped":1},{"raw":1,"mapped":1}]
+[probe] B dispose 后子进程存活: true ；补发 session_shutdown 后存活: false
+
+[probe] ===== B2. 工具名清洗/哈希路径 vs 前缀判据 =====
+[probe] B2 观察到的注册名（server=probe-srv.v2；tool=echo / echo.tool / 长名）: ["mcp__probe_srv_v2__echo","mcp__probe_srv_v2__echo_tool","mcp__probe_srv_v2__tool_name_that_is_quite_long_indeed__731aa8e9"]
+[probe] PASS B2 三只工具全部登记（清洗/哈希路径）
+[probe] B2 全部命中前缀白名单: true ；边界负例 mcp__probe_srv_v2x__ 命中: false
+[probe] PASS B2 清洗/哈希名仍被前缀判据命中；前缀边界（__）防近似串
+
+[probe] ===== C. startupWaitMs 首轮时延实测 =====
+[probe] C baseline（无 MCP server）首轮: 3 ms
+[probe] C fast：p1 = 69 ms（含等待接通）；p2 = 1 ms；p1 后已接通: true
+[probe] C slow(init-delay=3000)+startupWaitMs=800：p1 = 806 ms；p2 = 2 ms；接通时刻≈bind+ 3080 ms；p3（接通后）= 4 ms
+[probe] PASS C slow：首轮被钳到 ≈ startupWaitMs（800±400） — 806
+[probe] PASS C slow：次轮不再等待（waitedForStartup 已消费） — 2
+[probe] PASS C slow：后台继续接通、工具动态出现、p3 正常 — {"slowP3":4}
+[probe] C slow+startupWaitMs=0：p1 = 3 ms（不等待）
+[probe] PASS C startupWaitMs=0 ⇒ 首轮不等待（<400ms） — 3
+
+[probe] ===== D. 环境收窄对照（自持 transport vs 默认） =====
+[probe] D1 自持（inheritEnv:false，env={PATH,PROBE_ENV_DUMP,PROBE_MARKER}）子进程 env 键: ["PATH","PROBE_ENV_DUMP","PROBE_MARKER","__CF_USER_TEXT_ENCODING"]
+[probe] PASS D1 子进程 env 键＝自持最小集（3 键）∪ 平台注入（__CF_USER_TEXT_ENCODING） — ["PATH","PROBE_ENV_DUMP","PROBE_MARKER","__CF_USER_TEXT_ENCODING"]
+[probe] PASS D1 宿主哨兵键未泄漏
+[probe] D2 默认 transport 子进程 env 键数: 91 （宿主 env 键数: 90 ）；含哨兵: true
+[probe] D2 实测键名: ["AI_AGENT","ANS_PROBE_GATEWAY_SENTINEL","ANTHROPIC_BASE_URL","ANTHROPIC_DEFAULT_FABLE_MODEL","ANTHROPIC_DEFAULT_HAIKU_MODEL","ANTHROPIC_DEFAULT_MYTHOS_MODEL","ANTHROPIC_DEFAULT_OPUS_MODEL","ANTHROPIC_DEFAULT_SONNET_MODEL","API_TIMEOUT_MS","BAGGAGE","CLAUDECODE","CLAUDE_AGENT_SDK_MCP_NO_PREFIX","CLAUDE_AGENT_SDK_VERSION","CLAUDE_CODE_ATTRIBUTION_HEADER","CLAUDE_CODE_CHILD_SESSION","CLAUDE_CODE_CLASSIFIER_SUMMARY","CLAUDE_CODE_DESKTOP_APP_VERSION","CLAUDE_CODE_DESKTOP_SKILL_SWITCHES","CLAUDE_CODE_DIAGNOSTICS_FILE","CLAUDE_CODE_DISABLE_CRON","CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS","CLAUDE_CODE_DISABLE_FAST_MODE","CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC","CLAUDE_CODE_DISABLE_OFFICIAL_MARKETPLACE_AUTOINSTALL","CLAUDE_CODE_DISABLE_TERMINAL_TITLE","CLAUDE_CODE_EAGER_FLUSH","CLAUDE_CODE_EFFORT_LEVEL","CLAUDE_CODE_EMIT_TOOL_USE_SUMMARIES","CLAUDE_CODE_ENABLE_ASK_USER_QUESTION_TOOL","CLAUDE_CODE_ENABLE_AUTO_MODE","CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING","CLAUDE_CODE_ENTRYPOINT","CLAUDE_CODE_EXECPATH","CLAUDE_CODE_HOST_AUTH_ENV_VAR","CLAUDE_CODE_HOST_SESSION_ID","CLAUDE_CODE_MESSAGING_SOCKET","CLAUDE_CODE_MESSAGING_TOKEN","CLAUDE_CODE_MODEL_CATALOG","CLAUDE_CODE_OAUTH_SCOPES","CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST","CLAUDE_CODE_REPORT_FINDINGS","CLAUDE_CODE_SDK_HAS_HOST_AUTH_REFRESH","CLAUDE_CODE_SESSION_ATTENDED","CLAUDE_CODE_SESSION_ID","CLAUDE_CODE_SIMPLE","CLAUDE_CODE_TERMINAL_MCP_TOOLS","CLAUDE_CODE_USE_ANTHROPIC_AWS","CLAUDE_CODE_USE_ANTHROPIC_GOOGLE_CLOUD","CLAUDE_CODE_USE_BEDROCK","CLAUDE_CODE_USE_FOUNDRY","CLAUDE_CODE_USE_GATEWAY","CLAUDE_CODE_USE_MANTLE","CLAUDE_CODE_USE_VERTEX","CLAUDE_EFFORT","CLAUDE_PID","COMMAND_MODE","COREPACK_ENABLE_AUTO_PIN","DISABLE_AUTOUPDATER","DISABLE_ERROR_REPORTING","DISABLE_FEEDBACK_COMMAND","DISABLE_GROWTHBOOK","DISABLE_MICROCOMPACT","DISABLE_TELEMETRY","GIT_EDITOR","HOME","LOGNAME","MCP_CONNECTION_NONBLOCKING","MCP_SERVER_CONNECTION_BATCH_SIZE","MallocNanoZone","NODE_USE_SYSTEM_CA","NoDefaultCurrentDirectoryInExePath","OLDPWD","OSLogRateLimit","PATH","PI_CODING_AGENT_DIR","PROBE_MARKER","PWD","PYTHONDONTWRITEBYTECODE","SHELL","SHLVL","SSH_AUTH_SOCK","TMPDIR","USER","USE_LOCAL_OAUTH","USE_STAGING_OAUTH","XPC_FLAGS","XPC_SERVICE_NAME","_","__CFBundleIdentifier","__CF_USER_TEXT_ENCODING","hasCompleteOnBoarding"]
+[probe] PASS D2 默认 transport 继承全量宿主 env（键集 ⊇ 宿主）
+[probe] PASS D2 宿主哨兵键泄漏到第三方 server
+
+[probe] ===== E. HTTP server 路径（环回；如实注明风险差异） =====
+[probe] E 环回 HTTP：接通 = true ；工具 = ["mcp__probe_http__echo"]
+[probe] E 请求面（方法/rpcMethod/头键名）: [{"method":"POST","rpcMethod":"initialize","headerNames":["accept","accept-encoding","accept-language","connection","content-length","content-type","host","sec-fetch-mode","user-agent","x-probe-token"]},{"method":"POST","rpcMethod":"notifications/initialized","headerNames":["accept","accept-encoding","accept-language","connection","content-length","content-type","host","mcp-protocol-version","sec-fetch-mode","user-agent","x-probe-token"]},{"method":"GET","headerNames":["accept","accept-encoding","accept-language","connection","host","mcp-protocol-version","sec-fetch-mode","user-agent","x-probe-token"]},{"method":"POST","rpcMethod":"tools/list","headerNames":["accept","accept-encoding","accept-language","connection","content-length","content-type","host","mcp-protocol-version","sec-fetch-mode","user-agent","x-probe-token"]},{"method":"POST","rpcMethod":"tools/call","headerNames":["accept","accept-encoding","accept-language","connection","content-length","content-type","host","mcp-protocol-version","sec-fetch-mode","user-agent","x-probe-token"]}]
+[probe] E X-Probe-Token（${ANS_PROBE_HTTP_TOKEN} 解析）到达: true
+[probe] PASS E 环回 HTTP 接通且工具可达
+[probe] PASS E HTTP 端到端结果进入转录
+[probe] PASS E header `${VAR}` 逐键解析（只声明键自 process.env 读）
+[probe] scratch agent-dir 结束时内容: ["mcp-auth.json"]
+
+[probe] PROBE_RESULT {
+  "a": {
+    "preBindActive": [
+      "edit_file",
+      "read_file",
+      "write_file"
+    ],
+    "postBindActive": [
+      "edit_file",
+      "mcp__probe_a__echo",
+      "mcp__probe_a__pid",
+      "read_file",
+      "write_file"
+    ],
+    "callableNames": [
+      "edit_file",
+      "mcp__probe_a__echo",
+      "mcp__probe_a__pid",
+      "read_file",
+      "write_file"
+    ],
+    "mcpNames": [
+      "mcp__probe_a__echo",
+      "mcp__probe_a__pid"
+    ],
+    "deniedSummaries": [
+      "非注入的 ANS 工具，拒绝执行：mcp__probe_a__echo"
+    ],
+    "settledMappedPer2Turns": 2,
+    "callLogEmptyAfterBlockedCalls": true,
+    "disposeLeavesChildAlive": true,
+    "shutdownEventStopsChild": true,
+    "selfHeldEnvKeys": [
+      "PATH",
+      "PROBE_ENV_DUMP",
+      "PROBE_MARKER",
+      "__CF_USER_TEXT_ENCODING"
+    ]
+  },
+  "b": {
+    "activeNames": [
+      "edit_file",
+      "mcp__probe_b__echo",
+      "read_file",
+      "stray_tool",
+      "write_file"
+    ],
+    "mcpNames": [
+      "mcp__probe_b__echo"
+    ],
+    "snapshotUnexpected": [
+      "mcp__probe_b__echo",
+      "stray_tool"
+    ],
+    "surfaceUnexpected": [
+      "stray_tool"
+    ],
+    "predicateResults": [
+      {
+        "name": "mcp__probe_b__echo",
+        "whitelist": [
+          "probe-b"
+        ],
+        "expected": true,
+        "got": true
+      },
+      {
+        "name": "mcp__probe_b__echo",
+        "whitelist": [],
+        "expected": false,
+        "got": false
+      },
+      {
+        "name": "mcp__probe_bx__echo",
+        "whitelist": [
+          "probe-b"
+        ],
+        "expected": false,
+        "got": false
+      },
+      {
+        "name": "mcp__other__echo",
+        "whitelist": [
+          "probe-b"
+        ],
+        "expected": false,
+        "got": false
+      },
+      {
+        "name": "write_file",
+        "whitelist": [
+          "probe-b"
+        ],
+        "expected": false,
+        "got": false
+      },
+      {
+        "name": "mcp__probe-b__echo",
+        "whitelist": [
+          "probe-b"
+        ],
+        "expected": false,
+        "got": false
+      }
+    ],
+    "handlerKeys": [
+      "before_provider_request",
+      "message_end",
+      "provider_stream_event",
+      "session_before_compact",
+      "session_compact",
+      "session_compact_failed",
+      "tool_call",
+      "tool_execution_end",
+      "tool_execution_start"
+    ],
+    "perTurnSettled": [
+      {
+        "raw": 1,
+        "mapped": 1
+      },
+      {
+        "raw": 1,
+        "mapped": 1
+      },
+      {
+        "raw": 1,
+        "mapped": 1
+      },
+      {
+        "raw": 1,
+        "mapped": 1
+      }
+    ],
+    "serverCallLog": [
+      "echo\t2026-10-16T12:36:12.493Z"
+    ],
+    "strayCalls": 0,
+    "writeOkLanded": true,
+    "writeEvilBlocked": true,
+    "disposeLeavesChildAlive": true,
+    "shutdownEventStopsChild": true
+  },
+  "b2": {
+    "observedNames": [
+      "mcp__probe_srv_v2__echo",
+      "mcp__probe_srv_v2__echo_tool",
+      "mcp__probe_srv_v2__tool_name_that_is_quite_long_indeed__731aa8e9"
+    ],
+    "allMatch": true,
+    "closeInfo": {
+      "aliveAfterDispose": false
+    }
+  },
+  "c": {
+    "baselineNoMcpMs": 3,
+    "fastP1Ms": 69,
+    "fastP2Ms": 1,
+    "fastConnectedByP1": true,
+    "slowP1Ms": 806,
+    "slowP1DoneAtMs": 806,
+    "slowP2Ms": 2,
+    "slowConnectedAtMsAfterBind": 3080,
+    "slowP3Ms": 4,
+    "slowDisposeLeavesChildAlive": false,
+    "slowZeroP1Ms": 3
+  },
+  "d": {
+    "selfHeldKeys": [
+      "PATH",
+      "PROBE_ENV_DUMP",
+      "PROBE_MARKER",
+      "__CF_USER_TEXT_ENCODING"
+    ],
+    "platformInjectedKeys": [
+      "__CF_USER_TEXT_ENCODING"
+    ],
+    "selfHeldExactMinimalUnionPlatform": true,
+    "defaultKeyCount": 91,
+    "parentKeyCount": 90,
+    "defaultInheritsAll": true,
+    "sentinelLeakedToDefault": true,
+    "selfHeldDisposeLeavesChildAlive": false,
+    "defaultDisposeLeavesChildAlive": false
+  },
+  "e": {
+    "connected": true,
+    "mcpNames": [
+      "mcp__probe_http__echo"
+    ],
+    "transcriptHasHttpEcho": true,
+    "probeTokenSeen": true,
+    "requests": [
+      {
+        "method": "POST",
+        "rpcMethod": "initialize",
+        "headerNames": [
+          "accept",
+          "accept-encoding",
+          "accept-language",
+          "connection",
+          "content-length",
+          "content-type",
+          "host",
+          "sec-fetch-mode",
+          "user-agent",
+          "x-probe-token"
+        ]
+      },
+      {
+        "method": "POST",
+        "rpcMethod": "notifications/initialized",
+        "headerNames": [
+          "accept",
+          "accept-encoding",
+          "accept-language",
+          "connection",
+          "content-length",
+          "content-type",
+          "host",
+          "mcp-protocol-version",
+          "sec-fetch-mode",
+          "user-agent",
+          "x-probe-token"
+        ]
+      },
+      {
+        "method": "GET",
+        "headerNames": [
+          "accept",
+          "accept-encoding",
+          "accept-language",
+          "connection",
+          "host",
+          "mcp-protocol-version",
+          "sec-fetch-mode",
+          "user-agent",
+          "x-probe-token"
+        ]
+      },
+      {
+        "method": "POST",
+        "rpcMethod": "tools/list",
+        "headerNames": [
+          "accept",
+          "accept-encoding",
+          "accept-language",
+          "connection",
+          "content-length",
+          "content-type",
+          "host",
+          "mcp-protocol-version",
+          "sec-fetch-mode",
+          "user-agent",
+          "x-probe-token"
+        ]
+      },
+      {
+        "method": "POST",
+        "rpcMethod": "tools/call",
+        "headerNames": [
+          "accept",
+          "accept-encoding",
+          "accept-language",
+          "connection",
+          "content-length",
+          "content-type",
+          "host",
+          "mcp-protocol-version",
+          "sec-fetch-mode",
+          "user-agent",
+          "x-probe-token"
+        ]
+      }
+    ],
+    "notes": "HTTP 路径无子进程（StreamableHttpTransport 在宿主进程内 fetch；本探针的 server 本身就在驱动进程内运行——无子进程是结构性的）；风险差异：① header/env 引用 `${VAR}` 逐键自 process.env 解析（只读声明键，非全量继承）；② 无子进程即无 env 继承面，但有出站网络面与 OAuth 面（401→needs-auth，登录走浏览器/凭据存储——V1 未接）；③ GET SSE 流：本探针 server 以 405 关闭该流，客户端按『无 GET 流』处理。"
+  },
+  "failures": 0
+}
+[probe] 总失败项: 0

@@ -1,0 +1,6135 @@
+{
+ "probe": "codex-mcp-surface",
+ "pinnedCLI": "0.162.1",
+ "externalModelCalls": 0,
+ "credentials": "fake only (loopback SSE; CODEX_API_KEY=fake-mcp-probe-only)",
+ "selfChecks": [
+  {
+   "label": "A 无执行错误",
+   "pass": true
+  },
+  {
+   "label": "A 夹具已启动",
+   "pass": true
+  },
+  {
+   "label": "A args 逐字往返",
+   "pass": true
+  },
+  {
+   "label": "A probeEnv 往返",
+   "pass": true
+  },
+  {
+   "label": "A 直呼返回",
+   "pass": true
+  },
+  {
+   "label": "A catalog 条目存在",
+   "pass": true
+  },
+  {
+   "label": "A 直呼期间零 server request",
+   "pass": true
+  },
+  {
+   "label": "B turn 完成",
+   "pass": true
+  },
+  {
+   "label": "B 模型请求中携带 MCP 桥工具",
+   "pass": true
+  },
+  {
+   "label": "B 产生 mcpToolCall item",
+   "pass": true
+  },
+  {
+   "label": "B 默认审批模式下调用被拒（approval policy is never）",
+   "pass": true
+  },
+  {
+   "label": "B 调用全程零 server request",
+   "pass": true
+  },
+  {
+   "label": "审批模式扫描：三合法值格执行、`never` 被 strict-config 拒启（枚举被枚举）",
+   "pass": true
+  },
+  {
+   "label": "审批模式扫描（ANS 姿态格）全程零 server request",
+   "pass": true
+  },
+  {
+   "label": "E 非 ANS 姿态下审批请求经 mcpServer/elicitation/request 到达客户端（cancel 应答）",
+   "pass": true
+  },
+  {
+   "label": "C 线程存活（turn 完成）",
+   "pass": true
+  },
+  {
+   "label": "D 现状能力位下 elicitation 被 app-server 就地裁决（未达客户端）",
+   "pass": true
+  },
+  {
+   "label": "D2/D3 声明能力位后 elicitation 仍就地裁决（未达客户端）",
+   "pass": true
+  }
+ ],
+ "approvalModeScan": {
+  "executableModes": [
+   "approve"
+  ],
+  "outcomes": [
+   {
+    "mode": "auto",
+    "initError": null,
+    "enumRejected": false,
+    "completedItem": {
+     "type": "mcpToolCall",
+     "id": "fc_probe_1",
+     "server": "probe-surface",
+     "tool": "echo_probe",
+     "status": "failed",
+     "arguments": {
+      "text": "from fake model"
+     },
+     "appContext": null,
+     "mcpAppUi": null,
+     "pluginId": null,
+     "readOnlyHint": null,
+     "result": null,
+     "error": {
+      "message": "MCP tool call requires approval, but approval policy is never"
+     },
+     "durationMs": 0
+    },
+    "fixtureCalled": false
+   },
+   {
+    "mode": "approve",
+    "initError": null,
+    "enumRejected": false,
+    "completedItem": {
+     "type": "mcpToolCall",
+     "id": "fc_probe_1",
+     "server": "probe-surface",
+     "tool": "echo_probe",
+     "status": "completed",
+     "arguments": {
+      "text": "from fake model"
+     },
+     "appContext": null,
+     "mcpAppUi": null,
+     "pluginId": null,
+     "readOnlyHint": null,
+     "result": {
+      "content": [
+       {
+        "type": "text",
+        "text": "echo:{\"text\":\"from fake model\"}"
+       }
+      ],
+      "structuredContent": null,
+      "_meta": null
+     },
+     "error": null,
+     "durationMs": 1
+    },
+    "fixtureCalled": true
+   },
+   {
+    "mode": "writes",
+    "initError": null,
+    "enumRejected": false,
+    "completedItem": {
+     "type": "mcpToolCall",
+     "id": "fc_probe_1",
+     "server": "probe-surface",
+     "tool": "echo_probe",
+     "status": "failed",
+     "arguments": {
+      "text": "from fake model"
+     },
+     "appContext": null,
+     "mcpAppUi": null,
+     "pluginId": null,
+     "readOnlyHint": null,
+     "result": null,
+     "error": {
+      "message": "MCP tool call requires approval, but approval policy is never"
+     },
+     "durationMs": 0
+    },
+    "fixtureCalled": false
+   },
+   {
+    "mode": "never",
+    "initError": "Error: probe initialize timed out after 20000ms",
+    "enumRejected": true,
+    "completedItem": null,
+    "fixtureCalled": false
+   }
+  ]
+ },
+ "approvalRequestSurface": [
+  {
+   "method": "mcpServer/elicitation/request",
+   "params": {
+    "threadId": "01a144b8-07d9-7a61-9e22-696bc8217a30",
+    "turnId": "01a144b8-0816-7283-8e1c-e2e5f4306e02",
+    "serverName": "probe-surface",
+    "mode": "form",
+    "_meta": {
+     "codex_approval_kind": "mcp_tool_call",
+     "tool_description": "controlled echo",
+     "tool_params": {
+      "text": "from fake model"
+     },
+     "tool_params_display": [
+      {
+       "name": "text",
+       "value": "from fake model",
+       "display_name": "text"
+      }
+     ]
+    },
+    "message": "Allow the probe-surface MCP server to run tool \"echo_probe\"?",
+    "requestedSchema": {
+     "type": "object",
+     "properties": {}
+    }
+   }
+  }
+ ],
+ "cells": [
+  {
+   "name": "A-root-map-live",
+   "overrides": [
+    "features.shell_tool=false",
+    "features.hooks=false",
+    "features.apps=false",
+    "features.plugins=false",
+    "features.remote_plugin=false",
+    "features.browser_use=false",
+    "features.browser_use_external=false",
+    "features.browser_use_full_cdp_access=false",
+    "features.in_app_browser=false",
+    "features.computer_use=false",
+    "features.code_mode=false",
+    "features.code_mode_host=false",
+    "features.multi_agent=false",
+    "features.multi_agent_v2=false",
+    "features.request_permissions_tool=false",
+    "features.skill_mcp_dependency_install=false",
+    "sandbox_mode=\"read-only\"",
+    "approval_policy=\"never\"",
+    "approvals_reviewer=\"user\"",
+    "web_search=\"disabled\"",
+    "projects={\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-oRHaKi\"={trust_level=\"untrusted\"}}",
+    "model_providers.ans_probe={name=\"ANS Probe\",base_url=\"http://127.0.0.1:58663/v1\",env_key=\"CODEX_API_KEY\",wire_api=\"responses\",requires_openai_auth=false}",
+    "model_provider=\"ans_probe\"",
+    "model=\"probe-model\"",
+    "mcp_servers={\"probe-surface\"={command=\"/usr/local/bin/node\",args=[\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-stage-a-eEFG6d/spaces \\\"q\\\" 中文/echo \\\"mc\\\" 中文.mjs\",\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-stage-a-eEFG6d/spaces \\\"q\\\" 中文/capture 记录.json\",\"--label\",\" value with leading space\",\"quote\\\"q\",\"back\\\\slash\",\"中文值 空格\",\"two  spaces\"],env={\"PROBE_ENV_ONE\"=\"space value\",\"PROBE_ENV_TWO\"=\"quote\\\"q back\\\\b\"},startup_timeout_sec=5,tool_timeout_sec=0.25}}"
+   ],
+   "notices": [
+    {
+     "at": 1792154270169,
+     "method": "remoteControl/status/changed",
+     "params": {
+      "status": "disabled",
+      "serverName": "wangzhongrendeMacBook-Pro.local",
+      "installationId": "fa1911f6-9ad4-4459-af31-640928b094a4",
+      "environmentId": null
+     }
+    },
+    {
+     "at": 1792154270229,
+     "method": "thread/started",
+     "params": {
+      "thread": {
+       "id": "01a144b7-f9e5-7020-b55a-e18c8989a267",
+       "environments": [
+        {
+         "environmentId": "local",
+         "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-oRHaKi",
+         "runtimeWorkspaceRoots": [
+          "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-oRHaKi"
+         ]
+        }
+       ],
+       "extra": null,
+       "sessionId": "01a144b7-f9e5-7020-b55a-e18c8989a267",
+       "forkedFromId": null,
+       "parentThreadId": null,
+       "preview": "",
+       "ephemeral": true,
+       "section": null,
+       "sectionEnteredAt": null,
+       "projectId": null,
+       "historyMode": "paginated",
+       "modelProvider": "ans_probe",
+       "model": "probe-model",
+       "reasoningEffort": null,
+       "createdAt": 1792154270,
+       "updatedAt": 1792154270,
+       "recencyAt": 1792154270,
+       "status": {
+        "type": "idle"
+       },
+       "path": null,
+       "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-oRHaKi",
+       "cliVersion": "0.162.1",
+       "originator": "ans_mcp_probe",
+       "source": "vscode",
+       "canAcceptDirectInput": true,
+       "threadSource": null,
+       "agentNickname": null,
+       "agentRole": null,
+       "gitInfo": null,
+       "name": null,
+       "daybreakEnabled": null,
+       "turns": []
+      }
+     }
+    },
+    {
+     "at": 1792154270229,
+     "method": "mcpServer/startupStatus/updated",
+     "params": {
+      "threadId": "01a144b7-f9e5-7020-b55a-e18c8989a267",
+      "name": "probe-surface",
+      "status": "starting",
+      "error": null,
+      "failureReason": null
+     }
+    },
+    {
+     "at": 1792154270249,
+     "method": "mcpServer/startupStatus/updated",
+     "params": {
+      "threadId": "01a144b7-f9e5-7020-b55a-e18c8989a267",
+      "name": "probe-surface",
+      "status": "ready",
+      "error": null,
+      "failureReason": null
+     }
+    }
+   ],
+   "serverRequests": [],
+   "requests": [
+    {
+     "method": "initialize",
+     "params": {
+      "clientInfo": {
+       "name": "ans_mcp_probe",
+       "version": "0.0.0"
+      },
+      "capabilities": {
+       "experimentalApi": true,
+       "explicitGatewayOauth": true
+      }
+     }
+    },
+    {
+     "method": "config/read",
+     "params": {
+      "includeLayers": false,
+      "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-oRHaKi"
+     }
+    },
+    {
+     "method": "thread/start",
+     "params": {
+      "model": "probe-model",
+      "modelProvider": "ans_probe",
+      "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-oRHaKi",
+      "sandbox": "read-only",
+      "approvalPolicy": "never",
+      "approvalsReviewer": "user",
+      "config": {
+       "features": {
+        "shell_tool": false,
+        "hooks": false,
+        "apps": false,
+        "plugins": false,
+        "remote_plugin": false,
+        "browser_use": false,
+        "browser_use_external": false,
+        "browser_use_full_cdp_access": false,
+        "in_app_browser": false,
+        "computer_use": false,
+        "code_mode": false,
+        "code_mode_host": false,
+        "multi_agent": false,
+        "multi_agent_v2": false,
+        "request_permissions_tool": false,
+        "skill_mcp_dependency_install": false
+       },
+       "sandbox_mode": "read-only",
+       "approval_policy": "never",
+       "approvals_reviewer": "user",
+       "web_search": "disabled",
+       "projects": {
+        "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-oRHaKi": {
+         "trust_level": "untrusted"
+        }
+       }
+      },
+      "developerInstructions": "mcp surface probe",
+      "ephemeral": true
+     }
+    },
+    {
+     "method": "mcpServerStatus/list",
+     "params": {
+      "threadId": "01a144b7-f9e5-7020-b55a-e18c8989a267",
+      "detail": "toolsAndAuthOnly",
+      "limit": 100
+     }
+    },
+    {
+     "method": "mcpServer/tool/call",
+     "params": {
+      "threadId": "01a144b7-f9e5-7020-b55a-e18c8989a267",
+      "server": "probe-surface",
+      "tool": "echo_probe",
+      "arguments": {
+       "text": "direct call"
+      }
+     }
+    },
+    {
+     "method": "mcpServer/tool/call",
+     "params": {
+      "threadId": "01a144b7-f9e5-7020-b55a-e18c8989a267",
+      "server": "probe-surface",
+      "tool": "hang_probe",
+      "arguments": {}
+     }
+    }
+   ],
+   "preparation": null,
+   "readbackServers": {
+    "probe-surface": {
+     "command": "/usr/local/bin/node",
+     "args": [
+      "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-stage-a-eEFG6d/spaces \"q\" 中文/echo \"mc\" 中文.mjs",
+      "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-stage-a-eEFG6d/spaces \"q\" 中文/capture 记录.json",
+      "--label",
+      " value with leading space",
+      "quote\"q",
+      "back\\slash",
+      "中文值 空格",
+      "two  spaces"
+     ],
+     "env": {
+      "PROBE_ENV_TWO": "quote\"q back\\b",
+      "PROBE_ENV_ONE": "space value"
+     },
+     "environment_id": "local",
+     "enabled": true,
+     "startup_timeout_sec": 5,
+     "tool_timeout_sec": 0.25
+    }
+   },
+   "thread": {
+    "id": "01a144b7-f9e5-7020-b55a-e18c8989a267",
+    "sandbox": {
+     "type": "readOnly",
+     "networkAccess": false
+    },
+    "approvalPolicy": "never"
+   },
+   "fixtureStarted": true,
+   "fixtureCapture": {
+    "argv": [
+     "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-stage-a-eEFG6d/spaces \"q\" 中文/capture 记录.json",
+     "--label",
+     " value with leading space",
+     "quote\"q",
+     "back\\slash",
+     "中文值 空格",
+     "two  spaces"
+    ],
+    "cwd": "/private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-oRHaKi",
+    "envKeys": [
+     "PATH",
+     "PROBE_ENV_ONE",
+     "PROBE_ENV_TWO",
+     "__CF_USER_TEXT_ENCODING"
+    ],
+    "probeEnv": {
+     "PROBE_ENV_ONE": "space value",
+     "PROBE_ENV_TWO": "quote\"q back\\b"
+    }
+   },
+   "argRoundTrip": {
+    "expected": [
+     "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-stage-a-eEFG6d/spaces \"q\" 中文/capture 记录.json",
+     "--label",
+     " value with leading space",
+     "quote\"q",
+     "back\\slash",
+     "中文值 空格",
+     "two  spaces"
+    ],
+    "actual": [
+     "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-stage-a-eEFG6d/spaces \"q\" 中文/capture 记录.json",
+     "--label",
+     " value with leading space",
+     "quote\"q",
+     "back\\slash",
+     "中文值 空格",
+     "two  spaces"
+    ]
+   },
+   "catalog": {
+    "data": [
+     {
+      "name": "probe-surface",
+      "runtimeStatus": "connected",
+      "pluginId": null,
+      "httpOrigin": null,
+      "serverInfo": {
+       "name": "ans-probe-mcp",
+       "title": null,
+       "version": "0.0.0",
+       "description": null,
+       "icons": null,
+       "websiteUrl": null
+      },
+      "serverCapabilities": {
+       "tools": {}
+      },
+      "tools": {
+       "echo_probe": {
+        "name": "echo_probe",
+        "description": "controlled echo",
+        "inputSchema": {
+         "type": "object",
+         "properties": {
+          "text": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "text"
+         ]
+        }
+       },
+       "elicit_probe": {
+        "name": "elicit_probe",
+        "description": "sends an elicitation request while handling the call",
+        "inputSchema": {
+         "type": "object",
+         "properties": {}
+        }
+       },
+       "hang_probe": {
+        "name": "hang_probe",
+        "description": "never responds (timeout probe)",
+        "inputSchema": {
+         "type": "object",
+         "properties": {}
+        }
+       }
+      },
+      "toolsError": null,
+      "resources": [],
+      "resourceTemplates": [],
+      "authStatus": "unsupported"
+     }
+    ],
+    "nextCursor": null
+   },
+   "directCall": {
+    "content": [
+     {
+      "type": "text",
+      "text": "echo:{\"text\":\"direct call\"}"
+     }
+    ]
+   },
+   "callNotices": [],
+   "hang": {
+    "timedOutAtRpc": true,
+    "error": "Error: rpc mcpServer/tool/call error: {\"code\":-32603,\"message\":\"tool call failed for `probe-surface/hang_probe`: timed out awaiting tools/call after 250ms\"}",
+    "elapsedMs": 257
+   },
+   "fixtureAfterCalls": [
+    {
+     "name": "echo_probe",
+     "args": {
+      "text": "direct call"
+     }
+    },
+    {
+     "name": "hang_probe",
+     "args": {}
+    }
+   ],
+   "serverRequestsAfterCall": [],
+   "toolSpecs": [],
+   "functionItems": [],
+   "stderrTail": "",
+   "httpBodies": 0,
+   "modelRequestSummary": [],
+   "childExit": 0
+  },
+  {
+   "name": "A2a-single-override-edges",
+   "overrides": [
+    "features.shell_tool=false",
+    "features.hooks=false",
+    "features.apps=false",
+    "features.plugins=false",
+    "features.remote_plugin=false",
+    "features.browser_use=false",
+    "features.browser_use_external=false",
+    "features.browser_use_full_cdp_access=false",
+    "features.in_app_browser=false",
+    "features.computer_use=false",
+    "features.code_mode=false",
+    "features.code_mode_host=false",
+    "features.multi_agent=false",
+    "features.multi_agent_v2=false",
+    "features.request_permissions_tool=false",
+    "features.skill_mcp_dependency_install=false",
+    "sandbox_mode=\"read-only\"",
+    "approval_policy=\"never\"",
+    "approvals_reviewer=\"user\"",
+    "web_search=\"disabled\"",
+    "projects={\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-0mSsBj\"={trust_level=\"untrusted\"}}",
+    "model_providers.ans_probe={name=\"ANS Probe\",base_url=\"http://127.0.0.1:58663/v1\",env_key=\"CODEX_API_KEY\",wire_api=\"responses\",requires_openai_auth=false}",
+    "model_provider=\"ans_probe\"",
+    "model=\"probe-model\"",
+    "mcp_servers={\"probe surface\"={command=\"/bin/echo\"},\"probe\\\"q\"={command=\"/bin/echo\"},empty-args={command=\"/bin/echo\",args=[\"\",\"x\"]},dash-ok={command=\"/bin/echo\"}}"
+   ],
+   "notices": [
+    {
+     "at": 1792154271366,
+     "method": "remoteControl/status/changed",
+     "params": {
+      "status": "disabled",
+      "serverName": "wangzhongrendeMacBook-Pro.local",
+      "installationId": "b13fc28e-e9b1-4d28-9482-058c2de700b3",
+      "environmentId": null
+     }
+    }
+   ],
+   "serverRequests": [],
+   "requests": [
+    {
+     "method": "initialize",
+     "params": {
+      "clientInfo": {
+       "name": "ans_mcp_probe",
+       "version": "0.0.0"
+      },
+      "capabilities": {
+       "experimentalApi": true,
+       "explicitGatewayOauth": true
+      }
+     }
+    },
+    {
+     "method": "config/read",
+     "params": {
+      "includeLayers": false,
+      "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-0mSsBj"
+     }
+    }
+   ],
+   "preparation": null,
+   "readbackServers": {
+    "dash-ok": {
+     "command": "/bin/echo",
+     "args": [],
+     "environment_id": "local",
+     "enabled": true,
+     "tool_timeout_sec": null
+    },
+    "probe surface": {
+     "command": "/bin/echo",
+     "args": [],
+     "environment_id": "local",
+     "enabled": true,
+     "tool_timeout_sec": null
+    },
+    "probe\"q": {
+     "command": "/bin/echo",
+     "args": [],
+     "environment_id": "local",
+     "enabled": true,
+     "tool_timeout_sec": null
+    },
+    "empty-args": {
+     "command": "/bin/echo",
+     "args": [
+      "",
+      "x"
+     ],
+     "environment_id": "local",
+     "enabled": true,
+     "tool_timeout_sec": null
+    }
+   },
+   "noticeMethods": [
+    "remoteControl/status/changed"
+   ],
+   "toolSpecs": [],
+   "functionItems": [],
+   "stderrTail": "",
+   "httpBodies": 0,
+   "modelRequestSummary": [],
+   "childExit": 0
+  },
+  {
+   "name": "A2b-consecutive-overrides",
+   "overrides": [
+    "features.shell_tool=false",
+    "features.hooks=false",
+    "features.apps=false",
+    "features.plugins=false",
+    "features.remote_plugin=false",
+    "features.browser_use=false",
+    "features.browser_use_external=false",
+    "features.browser_use_full_cdp_access=false",
+    "features.in_app_browser=false",
+    "features.computer_use=false",
+    "features.code_mode=false",
+    "features.code_mode_host=false",
+    "features.multi_agent=false",
+    "features.multi_agent_v2=false",
+    "features.request_permissions_tool=false",
+    "features.skill_mcp_dependency_install=false",
+    "sandbox_mode=\"read-only\"",
+    "approval_policy=\"never\"",
+    "approvals_reviewer=\"user\"",
+    "web_search=\"disabled\"",
+    "projects={\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-jCU6AH\"={trust_level=\"untrusted\"}}",
+    "model_providers.ans_probe={name=\"ANS Probe\",base_url=\"http://127.0.0.1:58663/v1\",env_key=\"CODEX_API_KEY\",wire_api=\"responses\",requires_openai_auth=false}",
+    "model_provider=\"ans_probe\"",
+    "model=\"probe-model\"",
+    "mcp_servers={first-server={command=\"/bin/echo\"}}",
+    "mcp_servers={second-server={command=\"/bin/echo\"}}"
+   ],
+   "notices": [
+    {
+     "at": 1792154271443,
+     "method": "remoteControl/status/changed",
+     "params": {
+      "status": "disabled",
+      "serverName": "wangzhongrendeMacBook-Pro.local",
+      "installationId": "a5cd5290-1546-45ec-97b0-08d09b82ee50",
+      "environmentId": null
+     }
+    }
+   ],
+   "serverRequests": [],
+   "requests": [
+    {
+     "method": "initialize",
+     "params": {
+      "clientInfo": {
+       "name": "ans_mcp_probe",
+       "version": "0.0.0"
+      },
+      "capabilities": {
+       "experimentalApi": true,
+       "explicitGatewayOauth": true
+      }
+     }
+    },
+    {
+     "method": "config/read",
+     "params": {
+      "includeLayers": false,
+      "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-jCU6AH"
+     }
+    }
+   ],
+   "preparation": null,
+   "readbackServers": {
+    "second-server": {
+     "command": "/bin/echo",
+     "args": [],
+     "environment_id": "local",
+     "enabled": true,
+     "tool_timeout_sec": null
+    }
+   },
+   "toolSpecs": [],
+   "functionItems": [],
+   "stderrTail": "",
+   "httpBodies": 0,
+   "modelRequestSummary": [],
+   "childExit": 0
+  },
+  {
+   "name": "A3-env-inheritance",
+   "overrides": [
+    "features.shell_tool=false",
+    "features.hooks=false",
+    "features.apps=false",
+    "features.plugins=false",
+    "features.remote_plugin=false",
+    "features.browser_use=false",
+    "features.browser_use_external=false",
+    "features.browser_use_full_cdp_access=false",
+    "features.in_app_browser=false",
+    "features.computer_use=false",
+    "features.code_mode=false",
+    "features.code_mode_host=false",
+    "features.multi_agent=false",
+    "features.multi_agent_v2=false",
+    "features.request_permissions_tool=false",
+    "features.skill_mcp_dependency_install=false",
+    "sandbox_mode=\"read-only\"",
+    "approval_policy=\"never\"",
+    "approvals_reviewer=\"user\"",
+    "web_search=\"disabled\"",
+    "projects={\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-ey0IJ3\"={trust_level=\"untrusted\"}}",
+    "model_providers.ans_probe={name=\"ANS Probe\",base_url=\"http://127.0.0.1:58663/v1\",env_key=\"CODEX_API_KEY\",wire_api=\"responses\",requires_openai_auth=false}",
+    "model_provider=\"ans_probe\"",
+    "model=\"probe-model\"",
+    "mcp_servers={\"probe-surface\"={command=\"/usr/local/bin/node\",args=[\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-stage-a3-CzUX2P/echo-mcp.mjs\",\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-stage-a3-CzUX2P/capture-a3.json\"],startup_timeout_sec=5}}"
+   ],
+   "notices": [
+    {
+     "at": 1792154271521,
+     "method": "remoteControl/status/changed",
+     "params": {
+      "status": "disabled",
+      "serverName": "wangzhongrendeMacBook-Pro.local",
+      "installationId": "76db4f24-9f11-4b5b-8eda-9db668d1ebec",
+      "environmentId": null
+     }
+    },
+    {
+     "at": 1792154271533,
+     "method": "thread/started",
+     "params": {
+      "thread": {
+       "id": "01a144b7-ff23-7db1-861f-044d25d28ee0",
+       "environments": [
+        {
+         "environmentId": "local",
+         "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-ey0IJ3",
+         "runtimeWorkspaceRoots": [
+          "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-ey0IJ3"
+         ]
+        }
+       ],
+       "extra": null,
+       "sessionId": "01a144b7-ff23-7db1-861f-044d25d28ee0",
+       "forkedFromId": null,
+       "parentThreadId": null,
+       "preview": "",
+       "ephemeral": true,
+       "section": null,
+       "sectionEnteredAt": null,
+       "projectId": null,
+       "historyMode": "paginated",
+       "modelProvider": "ans_probe",
+       "model": "probe-model",
+       "reasoningEffort": null,
+       "createdAt": 1792154271,
+       "updatedAt": 1792154271,
+       "recencyAt": 1792154271,
+       "status": {
+        "type": "idle"
+       },
+       "path": null,
+       "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-ey0IJ3",
+       "cliVersion": "0.162.1",
+       "originator": "ans_mcp_probe",
+       "source": "vscode",
+       "canAcceptDirectInput": true,
+       "threadSource": null,
+       "agentNickname": null,
+       "agentRole": null,
+       "gitInfo": null,
+       "name": null,
+       "daybreakEnabled": null,
+       "turns": []
+      }
+     }
+    },
+    {
+     "at": 1792154271533,
+     "method": "mcpServer/startupStatus/updated",
+     "params": {
+      "threadId": "01a144b7-ff23-7db1-861f-044d25d28ee0",
+      "name": "probe-surface",
+      "status": "starting",
+      "error": null,
+      "failureReason": null
+     }
+    },
+    {
+     "at": 1792154271554,
+     "method": "mcpServer/startupStatus/updated",
+     "params": {
+      "threadId": "01a144b7-ff23-7db1-861f-044d25d28ee0",
+      "name": "probe-surface",
+      "status": "ready",
+      "error": null,
+      "failureReason": null
+     }
+    }
+   ],
+   "serverRequests": [],
+   "requests": [
+    {
+     "method": "initialize",
+     "params": {
+      "clientInfo": {
+       "name": "ans_mcp_probe",
+       "version": "0.0.0"
+      },
+      "capabilities": {
+       "experimentalApi": true,
+       "explicitGatewayOauth": true
+      }
+     }
+    },
+    {
+     "method": "thread/start",
+     "params": {
+      "model": "probe-model",
+      "modelProvider": "ans_probe",
+      "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-ey0IJ3",
+      "sandbox": "read-only",
+      "approvalPolicy": "never",
+      "approvalsReviewer": "user",
+      "config": {
+       "features": {
+        "shell_tool": false,
+        "hooks": false,
+        "apps": false,
+        "plugins": false,
+        "remote_plugin": false,
+        "browser_use": false,
+        "browser_use_external": false,
+        "browser_use_full_cdp_access": false,
+        "in_app_browser": false,
+        "computer_use": false,
+        "code_mode": false,
+        "code_mode_host": false,
+        "multi_agent": false,
+        "multi_agent_v2": false,
+        "request_permissions_tool": false,
+        "skill_mcp_dependency_install": false
+       },
+       "sandbox_mode": "read-only",
+       "approval_policy": "never",
+       "approvals_reviewer": "user",
+       "web_search": "disabled",
+       "projects": {
+        "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-ey0IJ3": {
+         "trust_level": "untrusted"
+        }
+       }
+      },
+      "developerInstructions": "mcp surface probe",
+      "ephemeral": true
+     }
+    }
+   ],
+   "preparation": null,
+   "fixtureStarted": true,
+   "fixtureEnvKeys": [
+    "PATH",
+    "__CF_USER_TEXT_ENCODING"
+   ],
+   "fixtureCwd": "/private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-ey0IJ3",
+   "toolSpecs": [],
+   "functionItems": [],
+   "stderrTail": "",
+   "httpBodies": 0,
+   "modelRequestSummary": [],
+   "childExit": 0
+  },
+  {
+   "name": "C-broken-server",
+   "overrides": [
+    "features.shell_tool=false",
+    "features.hooks=false",
+    "features.apps=false",
+    "features.plugins=false",
+    "features.remote_plugin=false",
+    "features.browser_use=false",
+    "features.browser_use_external=false",
+    "features.browser_use_full_cdp_access=false",
+    "features.in_app_browser=false",
+    "features.computer_use=false",
+    "features.code_mode=false",
+    "features.code_mode_host=false",
+    "features.multi_agent=false",
+    "features.multi_agent_v2=false",
+    "features.request_permissions_tool=false",
+    "features.skill_mcp_dependency_install=false",
+    "sandbox_mode=\"read-only\"",
+    "approval_policy=\"never\"",
+    "approvals_reviewer=\"user\"",
+    "web_search=\"disabled\"",
+    "projects={\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-QNFAWH\"={trust_level=\"untrusted\"}}",
+    "model_providers.ans_probe={name=\"ANS Probe\",base_url=\"http://127.0.0.1:58663/v1\",env_key=\"CODEX_API_KEY\",wire_api=\"responses\",requires_openai_auth=false}",
+    "model_provider=\"ans_probe\"",
+    "model=\"probe-model\"",
+    "mcp_servers={\"broken-server\"={command=\"/nonexistent/ans-probe-bin-xyz\",startup_timeout_sec=1}}"
+   ],
+   "notices": [
+    {
+     "at": 1792154271670,
+     "method": "remoteControl/status/changed",
+     "params": {
+      "status": "disabled",
+      "serverName": "wangzhongrendeMacBook-Pro.local",
+      "installationId": "f1a5ab4a-4d09-4bfd-87e3-2a05200013e0",
+      "environmentId": null
+     }
+    },
+    {
+     "at": 1792154271682,
+     "method": "thread/started",
+     "params": {
+      "thread": {
+       "id": "01a144b7-ffb9-7a41-9724-de3ed9e8339a",
+       "environments": [
+        {
+         "environmentId": "local",
+         "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-QNFAWH",
+         "runtimeWorkspaceRoots": [
+          "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-QNFAWH"
+         ]
+        }
+       ],
+       "extra": null,
+       "sessionId": "01a144b7-ffb9-7a41-9724-de3ed9e8339a",
+       "forkedFromId": null,
+       "parentThreadId": null,
+       "preview": "",
+       "ephemeral": true,
+       "section": null,
+       "sectionEnteredAt": null,
+       "projectId": null,
+       "historyMode": "paginated",
+       "modelProvider": "ans_probe",
+       "model": "probe-model",
+       "reasoningEffort": null,
+       "createdAt": 1792154271,
+       "updatedAt": 1792154271,
+       "recencyAt": 1792154271,
+       "status": {
+        "type": "idle"
+       },
+       "path": null,
+       "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-QNFAWH",
+       "cliVersion": "0.162.1",
+       "originator": "ans_mcp_probe",
+       "source": "vscode",
+       "canAcceptDirectInput": true,
+       "threadSource": null,
+       "agentNickname": null,
+       "agentRole": null,
+       "gitInfo": null,
+       "name": null,
+       "daybreakEnabled": null,
+       "turns": []
+      }
+     }
+    },
+    {
+     "at": 1792154271682,
+     "method": "mcpServer/startupStatus/updated",
+     "params": {
+      "threadId": "01a144b7-ffb9-7a41-9724-de3ed9e8339a",
+      "name": "broken-server",
+      "status": "starting",
+      "error": null,
+      "failureReason": null
+     }
+    },
+    {
+     "at": 1792154271682,
+     "method": "mcpServer/startupStatus/updated",
+     "params": {
+      "threadId": "01a144b7-ffb9-7a41-9724-de3ed9e8339a",
+      "name": "broken-server",
+      "status": "failed",
+      "error": "MCP client for `broken-server` failed to start: MCP startup failed: No such file or directory (os error 2)",
+      "failureReason": null
+     }
+    },
+    {
+     "at": 1792154271722,
+     "method": "warning",
+     "params": {
+      "threadId": "01a144b7-ffb9-7a41-9724-de3ed9e8339a",
+      "message": "Model metadata for `probe-model` not found. Defaulting to fallback metadata; this can degrade performance and cause issues."
+     }
+    },
+    {
+     "at": 1792154271725,
+     "method": "thread/status/changed",
+     "params": {
+      "threadId": "01a144b7-ffb9-7a41-9724-de3ed9e8339a",
+      "status": {
+       "type": "active",
+       "activeFlags": []
+      }
+     }
+    },
+    {
+     "at": 1792154271725,
+     "method": "turn/started",
+     "params": {
+      "threadId": "01a144b7-ffb9-7a41-9724-de3ed9e8339a",
+      "turn": {
+       "id": "01a144b7-ffe5-7131-b526-8c257aa36075",
+       "rootTurnId": "01a144b7-ffe5-7131-b526-8c257aa36075",
+       "items": [],
+       "itemsView": "notLoaded",
+       "status": "inProgress",
+       "error": null,
+       "startedAt": 1792154271,
+       "completedAt": null,
+       "durationMs": null
+      }
+     }
+    },
+    {
+     "at": 1792154271733,
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "userMessage",
+       "id": "01a144b7-fff4-7753-92a9-0e88ab85fd57",
+       "clientId": null,
+       "content": [
+        {
+         "type": "text",
+         "text": "alive check",
+         "text_elements": []
+        }
+       ]
+      },
+      "threadId": "01a144b7-ffb9-7a41-9724-de3ed9e8339a",
+      "turnId": "01a144b7-ffe5-7131-b526-8c257aa36075",
+      "startedAtMs": 1792154271732
+     }
+    },
+    {
+     "at": 1792154271733,
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "userMessage",
+       "id": "01a144b7-fff4-7753-92a9-0e88ab85fd57",
+       "clientId": null,
+       "content": [
+        {
+         "type": "text",
+         "text": "alive check",
+         "text_elements": []
+        }
+       ]
+      },
+      "threadId": "01a144b7-ffb9-7a41-9724-de3ed9e8339a",
+      "turnId": "01a144b7-ffe5-7131-b526-8c257aa36075",
+      "completedAtMs": 1792154271732
+     }
+    },
+    {
+     "at": 1792154271747,
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "agentMessage",
+       "id": "msg_probe_1",
+       "text": "",
+       "phase": null,
+       "memoryCitation": null,
+       "delivery": null,
+       "questions": null
+      },
+      "threadId": "01a144b7-ffb9-7a41-9724-de3ed9e8339a",
+      "turnId": "01a144b7-ffe5-7131-b526-8c257aa36075",
+      "startedAtMs": 1792154271746
+     }
+    },
+    {
+     "at": 1792154271747,
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "agentMessage",
+       "id": "msg_probe_1",
+       "text": "probe final message",
+       "phase": null,
+       "memoryCitation": null,
+       "delivery": null,
+       "questions": null
+      },
+      "threadId": "01a144b7-ffb9-7a41-9724-de3ed9e8339a",
+      "turnId": "01a144b7-ffe5-7131-b526-8c257aa36075",
+      "completedAtMs": 1792154271746
+     }
+    },
+    {
+     "at": 1792154271747,
+     "method": "thread/tokenUsage/updated",
+     "params": {
+      "threadId": "01a144b7-ffb9-7a41-9724-de3ed9e8339a",
+      "turnId": "01a144b7-ffe5-7131-b526-8c257aa36075",
+      "tokenUsage": {
+       "total": {
+        "totalTokens": 2,
+        "inputTokens": 1,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 1,
+        "reasoningOutputTokens": 0
+       },
+       "last": {
+        "totalTokens": 2,
+        "inputTokens": 1,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 1,
+        "reasoningOutputTokens": 0
+       },
+       "modelContextWindow": 258400
+      }
+     }
+    },
+    {
+     "at": 1792154271747,
+     "method": "account/rateLimits/updated",
+     "params": {
+      "rateLimits": {
+       "limitId": "codex",
+       "limitName": null,
+       "normalModelSlug": null,
+       "primary": null,
+       "secondary": null,
+       "credits": null,
+       "individualLimit": null,
+       "spendControlReached": null,
+       "planType": null,
+       "rateLimitReachedType": null
+      }
+     }
+    },
+    {
+     "at": 1792154271747,
+     "method": "thread/status/changed",
+     "params": {
+      "threadId": "01a144b7-ffb9-7a41-9724-de3ed9e8339a",
+      "status": {
+       "type": "idle"
+      }
+     }
+    },
+    {
+     "at": 1792154271747,
+     "method": "turn/completed",
+     "params": {
+      "threadId": "01a144b7-ffb9-7a41-9724-de3ed9e8339a",
+      "turn": {
+       "id": "01a144b7-ffe5-7131-b526-8c257aa36075",
+       "rootTurnId": "01a144b7-ffe5-7131-b526-8c257aa36075",
+       "items": [
+        {
+         "type": "agentMessage",
+         "id": "msg_probe_1",
+         "text": "probe final message",
+         "phase": null,
+         "memoryCitation": null,
+         "delivery": null,
+         "questions": null
+        }
+       ],
+       "itemsView": "summary",
+       "status": "completed",
+       "error": null,
+       "startedAt": 1792154271,
+       "completedAt": 1792154271,
+       "durationMs": 25
+      }
+     }
+    }
+   ],
+   "serverRequests": [],
+   "requests": [
+    {
+     "method": "initialize",
+     "params": {
+      "clientInfo": {
+       "name": "ans_mcp_probe",
+       "version": "0.0.0"
+      },
+      "capabilities": {
+       "experimentalApi": true,
+       "explicitGatewayOauth": true
+      }
+     }
+    },
+    {
+     "method": "config/read",
+     "params": {
+      "includeLayers": false,
+      "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-QNFAWH"
+     }
+    },
+    {
+     "method": "thread/start",
+     "params": {
+      "model": "probe-model",
+      "modelProvider": "ans_probe",
+      "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-QNFAWH",
+      "sandbox": "read-only",
+      "approvalPolicy": "never",
+      "approvalsReviewer": "user",
+      "config": {
+       "features": {
+        "shell_tool": false,
+        "hooks": false,
+        "apps": false,
+        "plugins": false,
+        "remote_plugin": false,
+        "browser_use": false,
+        "browser_use_external": false,
+        "browser_use_full_cdp_access": false,
+        "in_app_browser": false,
+        "computer_use": false,
+        "code_mode": false,
+        "code_mode_host": false,
+        "multi_agent": false,
+        "multi_agent_v2": false,
+        "request_permissions_tool": false,
+        "skill_mcp_dependency_install": false
+       },
+       "sandbox_mode": "read-only",
+       "approval_policy": "never",
+       "approvals_reviewer": "user",
+       "web_search": "disabled",
+       "projects": {
+        "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-QNFAWH": {
+         "trust_level": "untrusted"
+        }
+       }
+      },
+      "developerInstructions": "mcp surface probe",
+      "ephemeral": true
+     }
+    },
+    {
+     "method": "mcpServerStatus/list",
+     "params": {
+      "threadId": "01a144b7-ffb9-7a41-9724-de3ed9e8339a",
+      "detail": "toolsAndAuthOnly",
+      "limit": 100
+     }
+    },
+    {
+     "method": "turn/start",
+     "params": {
+      "threadId": "01a144b7-ffb9-7a41-9724-de3ed9e8339a",
+      "input": [
+       {
+        "type": "text",
+        "text": "alive check",
+        "text_elements": []
+       }
+      ],
+      "approvalPolicy": "never",
+      "approvalsReviewer": "user",
+      "sandboxPolicy": {
+       "type": "readOnly",
+       "networkAccess": false
+      },
+      "model": "probe-model"
+     }
+    }
+   ],
+   "preparation": null,
+   "readbackServers": {
+    "broken-server": {
+     "command": "/nonexistent/ans-probe-bin-xyz",
+     "args": [],
+     "environment_id": "local",
+     "enabled": true,
+     "startup_timeout_sec": 1,
+     "tool_timeout_sec": null
+    }
+   },
+   "thread": {
+    "id": "01a144b7-ffb9-7a41-9724-de3ed9e8339a"
+   },
+   "startupNoticed": true,
+   "startupNotices": [
+    {
+     "threadId": "01a144b7-ffb9-7a41-9724-de3ed9e8339a",
+     "name": "broken-server",
+     "status": "starting",
+     "error": null,
+     "failureReason": null
+    },
+    {
+     "threadId": "01a144b7-ffb9-7a41-9724-de3ed9e8339a",
+     "name": "broken-server",
+     "status": "failed",
+     "error": "MCP client for `broken-server` failed to start: MCP startup failed: No such file or directory (os error 2)",
+     "failureReason": null
+    }
+   ],
+   "catalog": {
+    "data": [
+     {
+      "name": "broken-server",
+      "runtimeStatus": "failed",
+      "pluginId": null,
+      "httpOrigin": null,
+      "serverInfo": null,
+      "serverCapabilities": null,
+      "tools": {},
+      "toolsError": "MCP startup failed: No such file or directory (os error 2)",
+      "resources": [],
+      "resourceTemplates": [],
+      "authStatus": "unsupported"
+     }
+    ],
+    "nextCursor": null
+   },
+   "turn": {
+    "id": "01a144b7-ffe5-7131-b526-8c257aa36075",
+    "status": "inProgress"
+   },
+   "turnCompleted": true,
+   "turnOutcome": "completed",
+   "serverRequestsDuringTurn": [],
+   "toolSpecs": [],
+   "functionItems": [],
+   "stderrTail": "",
+   "httpBodies": 1,
+   "modelRequestSummary": [
+    {
+     "tools": [
+      "list_mcp_resources",
+      "list_mcp_resource_templates",
+      "read_mcp_resource",
+      "request_user_input",
+      "view_image",
+      "get_goal",
+      "create_goal",
+      "update_goal"
+     ],
+     "inputKinds": [
+      "message",
+      "message",
+      "message",
+      "message"
+     ],
+     "mcpBridgeTool": null
+    }
+   ],
+   "childExit": 0
+  },
+  {
+   "name": "D-elicitation",
+   "overrides": [
+    "features.shell_tool=false",
+    "features.hooks=false",
+    "features.apps=false",
+    "features.plugins=false",
+    "features.remote_plugin=false",
+    "features.browser_use=false",
+    "features.browser_use_external=false",
+    "features.browser_use_full_cdp_access=false",
+    "features.in_app_browser=false",
+    "features.computer_use=false",
+    "features.code_mode=false",
+    "features.code_mode_host=false",
+    "features.multi_agent=false",
+    "features.multi_agent_v2=false",
+    "features.request_permissions_tool=false",
+    "features.skill_mcp_dependency_install=false",
+    "sandbox_mode=\"read-only\"",
+    "approval_policy=\"never\"",
+    "approvals_reviewer=\"user\"",
+    "web_search=\"disabled\"",
+    "projects={\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-zzi89d\"={trust_level=\"untrusted\"}}",
+    "model_providers.ans_probe={name=\"ANS Probe\",base_url=\"http://127.0.0.1:58663/v1\",env_key=\"CODEX_API_KEY\",wire_api=\"responses\",requires_openai_auth=false}",
+    "model_provider=\"ans_probe\"",
+    "model=\"probe-model\"",
+    "mcp_servers={\"probe-surface\"={command=\"/usr/local/bin/node\",args=[\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-stage-d-Fpx7QQ/echo-mcp.mjs\",\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-stage-d-Fpx7QQ/capture-d.json\"],startup_timeout_sec=5}}"
+   ],
+   "notices": [
+    {
+     "at": 1792154271826,
+     "method": "remoteControl/status/changed",
+     "params": {
+      "status": "disabled",
+      "serverName": "wangzhongrendeMacBook-Pro.local",
+      "installationId": "72358106-4d3d-4b05-89ac-c481c68a473c",
+      "environmentId": null
+     }
+    },
+    {
+     "at": 1792154271835,
+     "method": "thread/started",
+     "params": {
+      "thread": {
+       "id": "01a144b8-0053-7460-ae5d-d07ee3219a28",
+       "environments": [
+        {
+         "environmentId": "local",
+         "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-zzi89d",
+         "runtimeWorkspaceRoots": [
+          "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-zzi89d"
+         ]
+        }
+       ],
+       "extra": null,
+       "sessionId": "01a144b8-0053-7460-ae5d-d07ee3219a28",
+       "forkedFromId": null,
+       "parentThreadId": null,
+       "preview": "",
+       "ephemeral": true,
+       "section": null,
+       "sectionEnteredAt": null,
+       "projectId": null,
+       "historyMode": "paginated",
+       "modelProvider": "ans_probe",
+       "model": "probe-model",
+       "reasoningEffort": null,
+       "createdAt": 1792154271,
+       "updatedAt": 1792154271,
+       "recencyAt": 1792154271,
+       "status": {
+        "type": "idle"
+       },
+       "path": null,
+       "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-zzi89d",
+       "cliVersion": "0.162.1",
+       "originator": "ans_mcp_probe",
+       "source": "vscode",
+       "canAcceptDirectInput": true,
+       "threadSource": null,
+       "agentNickname": null,
+       "agentRole": null,
+       "gitInfo": null,
+       "name": null,
+       "daybreakEnabled": null,
+       "turns": []
+      }
+     }
+    },
+    {
+     "at": 1792154271835,
+     "method": "mcpServer/startupStatus/updated",
+     "params": {
+      "threadId": "01a144b8-0053-7460-ae5d-d07ee3219a28",
+      "name": "probe-surface",
+      "status": "starting",
+      "error": null,
+      "failureReason": null
+     }
+    },
+    {
+     "at": 1792154271853,
+     "method": "mcpServer/startupStatus/updated",
+     "params": {
+      "threadId": "01a144b8-0053-7460-ae5d-d07ee3219a28",
+      "name": "probe-surface",
+      "status": "ready",
+      "error": null,
+      "failureReason": null
+     }
+    }
+   ],
+   "serverRequests": [],
+   "requests": [
+    {
+     "method": "initialize",
+     "params": {
+      "clientInfo": {
+       "name": "ans_mcp_probe",
+       "version": "0.0.0"
+      },
+      "capabilities": {
+       "experimentalApi": true,
+       "explicitGatewayOauth": true
+      }
+     }
+    },
+    {
+     "method": "thread/start",
+     "params": {
+      "model": "probe-model",
+      "modelProvider": "ans_probe",
+      "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-zzi89d",
+      "sandbox": "read-only",
+      "approvalPolicy": "never",
+      "approvalsReviewer": "user",
+      "config": {
+       "features": {
+        "shell_tool": false,
+        "hooks": false,
+        "apps": false,
+        "plugins": false,
+        "remote_plugin": false,
+        "browser_use": false,
+        "browser_use_external": false,
+        "browser_use_full_cdp_access": false,
+        "in_app_browser": false,
+        "computer_use": false,
+        "code_mode": false,
+        "code_mode_host": false,
+        "multi_agent": false,
+        "multi_agent_v2": false,
+        "request_permissions_tool": false,
+        "skill_mcp_dependency_install": false
+       },
+       "sandbox_mode": "read-only",
+       "approval_policy": "never",
+       "approvals_reviewer": "user",
+       "web_search": "disabled",
+       "projects": {
+        "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-zzi89d": {
+         "trust_level": "untrusted"
+        }
+       }
+      },
+      "developerInstructions": "mcp surface probe",
+      "ephemeral": true
+     }
+    },
+    {
+     "method": "mcpServer/tool/call",
+     "params": {
+      "threadId": "01a144b8-0053-7460-ae5d-d07ee3219a28",
+      "server": "probe-surface",
+      "tool": "elicit_probe",
+      "arguments": {}
+     }
+    }
+   ],
+   "preparation": null,
+   "thread": {
+    "id": "01a144b8-0053-7460-ae5d-d07ee3219a28"
+   },
+   "directCall": {
+    "content": [
+     {
+      "type": "text",
+      "text": "elicitation outcome:{\"action\":\"decline\"}"
+     }
+    ]
+   },
+   "callNotices": [],
+   "elicitationRequests": [],
+   "otherServerRequests": [],
+   "fixtureElicitations": [
+    {
+     "id": "fixture-elicit-1",
+     "response": {
+      "jsonrpc": "2.0",
+      "id": "fixture-elicit-1",
+      "result": {
+       "action": "decline"
+      }
+     }
+    }
+   ],
+   "toolSpecs": [],
+   "functionItems": [],
+   "stderrTail": "",
+   "httpBodies": 0,
+   "modelRequestSummary": [],
+   "childExit": 0
+  },
+  {
+   "name": "D2-elicitation-optin",
+   "overrides": [
+    "features.shell_tool=false",
+    "features.hooks=false",
+    "features.apps=false",
+    "features.plugins=false",
+    "features.remote_plugin=false",
+    "features.browser_use=false",
+    "features.browser_use_external=false",
+    "features.browser_use_full_cdp_access=false",
+    "features.in_app_browser=false",
+    "features.computer_use=false",
+    "features.code_mode=false",
+    "features.code_mode_host=false",
+    "features.multi_agent=false",
+    "features.multi_agent_v2=false",
+    "features.request_permissions_tool=false",
+    "features.skill_mcp_dependency_install=false",
+    "sandbox_mode=\"read-only\"",
+    "approval_policy=\"never\"",
+    "approvals_reviewer=\"user\"",
+    "web_search=\"disabled\"",
+    "projects={\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-GFRhsd\"={trust_level=\"untrusted\"}}",
+    "model_providers.ans_probe={name=\"ANS Probe\",base_url=\"http://127.0.0.1:58663/v1\",env_key=\"CODEX_API_KEY\",wire_api=\"responses\",requires_openai_auth=false}",
+    "model_provider=\"ans_probe\"",
+    "model=\"probe-model\"",
+    "mcp_servers={\"probe-surface\"={command=\"/usr/local/bin/node\",args=[\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-stage-d2-n65eeD/echo-mcp.mjs\",\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-stage-d2-n65eeD/capture-d2.json\"],startup_timeout_sec=5}}"
+   ],
+   "notices": [
+    {
+     "at": 1792154272417,
+     "method": "remoteControl/status/changed",
+     "params": {
+      "status": "disabled",
+      "serverName": "wangzhongrendeMacBook-Pro.local",
+      "installationId": "dd0ec447-7ccb-4a35-afd5-6fc76ed49444",
+      "environmentId": null
+     }
+    },
+    {
+     "at": 1792154272460,
+     "method": "thread/started",
+     "params": {
+      "thread": {
+       "id": "01a144b8-02be-7233-82db-709ff18064c6",
+       "environments": [
+        {
+         "environmentId": "local",
+         "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-GFRhsd",
+         "runtimeWorkspaceRoots": [
+          "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-GFRhsd"
+         ]
+        }
+       ],
+       "extra": null,
+       "sessionId": "01a144b8-02be-7233-82db-709ff18064c6",
+       "forkedFromId": null,
+       "parentThreadId": null,
+       "preview": "",
+       "ephemeral": true,
+       "section": null,
+       "sectionEnteredAt": null,
+       "projectId": null,
+       "historyMode": "paginated",
+       "modelProvider": "ans_probe",
+       "model": "probe-model",
+       "reasoningEffort": null,
+       "createdAt": 1792154272,
+       "updatedAt": 1792154272,
+       "recencyAt": 1792154272,
+       "status": {
+        "type": "idle"
+       },
+       "path": null,
+       "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-GFRhsd",
+       "cliVersion": "0.162.1",
+       "originator": "ans_mcp_probe",
+       "source": "vscode",
+       "canAcceptDirectInput": true,
+       "threadSource": null,
+       "agentNickname": null,
+       "agentRole": null,
+       "gitInfo": null,
+       "name": null,
+       "daybreakEnabled": null,
+       "turns": []
+      }
+     }
+    },
+    {
+     "at": 1792154272460,
+     "method": "mcpServer/startupStatus/updated",
+     "params": {
+      "threadId": "01a144b8-02be-7233-82db-709ff18064c6",
+      "name": "probe-surface",
+      "status": "starting",
+      "error": null,
+      "failureReason": null
+     }
+    },
+    {
+     "at": 1792154272488,
+     "method": "mcpServer/startupStatus/updated",
+     "params": {
+      "threadId": "01a144b8-02be-7233-82db-709ff18064c6",
+      "name": "probe-surface",
+      "status": "ready",
+      "error": null,
+      "failureReason": null
+     }
+    }
+   ],
+   "serverRequests": [],
+   "requests": [
+    {
+     "method": "initialize",
+     "params": {
+      "clientInfo": {
+       "name": "ans_mcp_probe",
+       "version": "0.0.0"
+      },
+      "capabilities": {
+       "experimentalApi": true,
+       "explicitGatewayOauth": true
+      }
+     }
+    },
+    {
+     "method": "thread/start",
+     "params": {
+      "model": "probe-model",
+      "modelProvider": "ans_probe",
+      "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-GFRhsd",
+      "sandbox": "read-only",
+      "approvalPolicy": "never",
+      "approvalsReviewer": "user",
+      "config": {
+       "features": {
+        "shell_tool": false,
+        "hooks": false,
+        "apps": false,
+        "plugins": false,
+        "remote_plugin": false,
+        "browser_use": false,
+        "browser_use_external": false,
+        "browser_use_full_cdp_access": false,
+        "in_app_browser": false,
+        "computer_use": false,
+        "code_mode": false,
+        "code_mode_host": false,
+        "multi_agent": false,
+        "multi_agent_v2": false,
+        "request_permissions_tool": false,
+        "skill_mcp_dependency_install": false
+       },
+       "sandbox_mode": "read-only",
+       "approval_policy": "never",
+       "approvals_reviewer": "user",
+       "web_search": "disabled",
+       "projects": {
+        "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-GFRhsd": {
+         "trust_level": "untrusted"
+        }
+       }
+      },
+      "developerInstructions": "mcp surface probe",
+      "ephemeral": true
+     }
+    },
+    {
+     "method": "mcpServer/tool/call",
+     "params": {
+      "threadId": "01a144b8-02be-7233-82db-709ff18064c6",
+      "server": "probe-surface",
+      "tool": "elicit_probe",
+      "arguments": {}
+     }
+    }
+   ],
+   "preparation": null,
+   "thread": {
+    "id": "01a144b8-02be-7233-82db-709ff18064c6"
+   },
+   "directCall": {
+    "content": [
+     {
+      "type": "text",
+      "text": "elicitation outcome:{\"action\":\"decline\"}"
+     }
+    ]
+   },
+   "elicitationRequests": [],
+   "otherServerRequests": [],
+   "fixtureElicitations": [
+    {
+     "id": "fixture-elicit-1",
+     "response": {
+      "jsonrpc": "2.0",
+      "id": "fixture-elicit-1",
+      "result": {
+       "action": "decline"
+      }
+     }
+    }
+   ],
+   "toolSpecs": [],
+   "functionItems": [],
+   "stderrTail": "",
+   "httpBodies": 0,
+   "modelRequestSummary": [],
+   "childExit": 0
+  },
+  {
+   "name": "D3-elicitation-extensions",
+   "overrides": [
+    "features.shell_tool=false",
+    "features.hooks=false",
+    "features.apps=false",
+    "features.plugins=false",
+    "features.remote_plugin=false",
+    "features.browser_use=false",
+    "features.browser_use_external=false",
+    "features.browser_use_full_cdp_access=false",
+    "features.in_app_browser=false",
+    "features.computer_use=false",
+    "features.code_mode=false",
+    "features.code_mode_host=false",
+    "features.multi_agent=false",
+    "features.multi_agent_v2=false",
+    "features.request_permissions_tool=false",
+    "features.skill_mcp_dependency_install=false",
+    "sandbox_mode=\"read-only\"",
+    "approval_policy=\"never\"",
+    "approvals_reviewer=\"user\"",
+    "web_search=\"disabled\"",
+    "projects={\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-tuqHF2\"={trust_level=\"untrusted\"}}",
+    "model_providers.ans_probe={name=\"ANS Probe\",base_url=\"http://127.0.0.1:58663/v1\",env_key=\"CODEX_API_KEY\",wire_api=\"responses\",requires_openai_auth=false}",
+    "model_provider=\"ans_probe\"",
+    "model=\"probe-model\"",
+    "mcp_servers={\"probe-surface\"={command=\"/usr/local/bin/node\",args=[\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-stage-d3-SK1SRT/echo-mcp.mjs\",\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-stage-d3-SK1SRT/capture-d3.json\"],startup_timeout_sec=5}}"
+   ],
+   "notices": [
+    {
+     "at": 1792154273028,
+     "method": "remoteControl/status/changed",
+     "params": {
+      "status": "disabled",
+      "serverName": "wangzhongrendeMacBook-Pro.local",
+      "installationId": "0840ebb1-ac16-4fa5-a8b1-9f106d5002fd",
+      "environmentId": null
+     }
+    },
+    {
+     "at": 1792154273042,
+     "method": "thread/started",
+     "params": {
+      "thread": {
+       "id": "01a144b8-0505-7ef2-9fdc-2eaa6223acf5",
+       "environments": [
+        {
+         "environmentId": "local",
+         "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-tuqHF2",
+         "runtimeWorkspaceRoots": [
+          "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-tuqHF2"
+         ]
+        }
+       ],
+       "extra": null,
+       "sessionId": "01a144b8-0505-7ef2-9fdc-2eaa6223acf5",
+       "forkedFromId": null,
+       "parentThreadId": null,
+       "preview": "",
+       "ephemeral": true,
+       "section": null,
+       "sectionEnteredAt": null,
+       "projectId": null,
+       "historyMode": "paginated",
+       "modelProvider": "ans_probe",
+       "model": "probe-model",
+       "reasoningEffort": null,
+       "createdAt": 1792154273,
+       "updatedAt": 1792154273,
+       "recencyAt": 1792154273,
+       "status": {
+        "type": "idle"
+       },
+       "path": null,
+       "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-tuqHF2",
+       "cliVersion": "0.162.1",
+       "originator": "ans_mcp_probe",
+       "source": "vscode",
+       "canAcceptDirectInput": true,
+       "threadSource": null,
+       "agentNickname": null,
+       "agentRole": null,
+       "gitInfo": null,
+       "name": null,
+       "daybreakEnabled": null,
+       "turns": []
+      }
+     }
+    },
+    {
+     "at": 1792154273042,
+     "method": "mcpServer/startupStatus/updated",
+     "params": {
+      "threadId": "01a144b8-0505-7ef2-9fdc-2eaa6223acf5",
+      "name": "probe-surface",
+      "status": "starting",
+      "error": null,
+      "failureReason": null
+     }
+    },
+    {
+     "at": 1792154273065,
+     "method": "mcpServer/startupStatus/updated",
+     "params": {
+      "threadId": "01a144b8-0505-7ef2-9fdc-2eaa6223acf5",
+      "name": "probe-surface",
+      "status": "ready",
+      "error": null,
+      "failureReason": null
+     }
+    }
+   ],
+   "serverRequests": [],
+   "requests": [
+    {
+     "method": "initialize",
+     "params": {
+      "clientInfo": {
+       "name": "ans_mcp_probe",
+       "version": "0.0.0"
+      },
+      "capabilities": {
+       "experimentalApi": true,
+       "explicitGatewayOauth": true
+      }
+     }
+    },
+    {
+     "method": "thread/start",
+     "params": {
+      "model": "probe-model",
+      "modelProvider": "ans_probe",
+      "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-tuqHF2",
+      "sandbox": "read-only",
+      "approvalPolicy": "never",
+      "approvalsReviewer": "user",
+      "config": {
+       "features": {
+        "shell_tool": false,
+        "hooks": false,
+        "apps": false,
+        "plugins": false,
+        "remote_plugin": false,
+        "browser_use": false,
+        "browser_use_external": false,
+        "browser_use_full_cdp_access": false,
+        "in_app_browser": false,
+        "computer_use": false,
+        "code_mode": false,
+        "code_mode_host": false,
+        "multi_agent": false,
+        "multi_agent_v2": false,
+        "request_permissions_tool": false,
+        "skill_mcp_dependency_install": false
+       },
+       "sandbox_mode": "read-only",
+       "approval_policy": "never",
+       "approvals_reviewer": "user",
+       "web_search": "disabled",
+       "projects": {
+        "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-tuqHF2": {
+         "trust_level": "untrusted"
+        }
+       }
+      },
+      "developerInstructions": "mcp surface probe",
+      "ephemeral": true
+     }
+    },
+    {
+     "method": "mcpServer/tool/call",
+     "params": {
+      "threadId": "01a144b8-0505-7ef2-9fdc-2eaa6223acf5",
+      "server": "probe-surface",
+      "tool": "elicit_probe",
+      "arguments": {}
+     }
+    }
+   ],
+   "preparation": null,
+   "thread": {
+    "id": "01a144b8-0505-7ef2-9fdc-2eaa6223acf5"
+   },
+   "directCall": {
+    "content": [
+     {
+      "type": "text",
+      "text": "elicitation outcome:{\"action\":\"decline\"}"
+     }
+    ]
+   },
+   "elicitationRequests": [],
+   "fixtureElicitations": [
+    {
+     "id": "fixture-elicit-1",
+     "response": {
+      "jsonrpc": "2.0",
+      "id": "fixture-elicit-1",
+      "result": {
+       "action": "decline"
+      }
+     }
+    }
+   ],
+   "toolSpecs": [],
+   "functionItems": [],
+   "stderrTail": "",
+   "httpBodies": 0,
+   "modelRequestSummary": [],
+   "childExit": 0
+  },
+  {
+   "name": "B-model-driven-turn",
+   "overrides": [
+    "features.shell_tool=false",
+    "features.hooks=false",
+    "features.apps=false",
+    "features.plugins=false",
+    "features.remote_plugin=false",
+    "features.browser_use=false",
+    "features.browser_use_external=false",
+    "features.browser_use_full_cdp_access=false",
+    "features.in_app_browser=false",
+    "features.computer_use=false",
+    "features.code_mode=false",
+    "features.code_mode_host=false",
+    "features.multi_agent=false",
+    "features.multi_agent_v2=false",
+    "features.request_permissions_tool=false",
+    "features.skill_mcp_dependency_install=false",
+    "sandbox_mode=\"read-only\"",
+    "approval_policy=\"never\"",
+    "approvals_reviewer=\"user\"",
+    "web_search=\"disabled\"",
+    "projects={\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-ryANnQ\"={trust_level=\"untrusted\"}}",
+    "model_providers.ans_probe={name=\"ANS Probe\",base_url=\"http://127.0.0.1:58663/v1\",env_key=\"CODEX_API_KEY\",wire_api=\"responses\",requires_openai_auth=false}",
+    "model_provider=\"ans_probe\"",
+    "model=\"probe-model\"",
+    "mcp_servers={\"probe-surface\"={command=\"/usr/local/bin/node\",args=[\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-stage-b-Ra9CKw/echo-mcp.mjs\",\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-stage-b-Ra9CKw/capture-b.json\"],startup_timeout_sec=5,tool_timeout_sec=5}}"
+   ],
+   "notices": [
+    {
+     "at": 1792154273580,
+     "method": "remoteControl/status/changed",
+     "params": {
+      "status": "disabled",
+      "serverName": "wangzhongrendeMacBook-Pro.local",
+      "installationId": "8947ca68-eec0-450b-bfdb-049b5594c538",
+      "environmentId": null
+     }
+    },
+    {
+     "at": 1792154273591,
+     "method": "thread/started",
+     "params": {
+      "thread": {
+       "id": "01a144b8-072d-75b3-ba19-d6fb98c6f9a8",
+       "environments": [
+        {
+         "environmentId": "local",
+         "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-ryANnQ",
+         "runtimeWorkspaceRoots": [
+          "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-ryANnQ"
+         ]
+        }
+       ],
+       "extra": null,
+       "sessionId": "01a144b8-072d-75b3-ba19-d6fb98c6f9a8",
+       "forkedFromId": null,
+       "parentThreadId": null,
+       "preview": "",
+       "ephemeral": true,
+       "section": null,
+       "sectionEnteredAt": null,
+       "projectId": null,
+       "historyMode": "paginated",
+       "modelProvider": "ans_probe",
+       "model": "probe-model",
+       "reasoningEffort": null,
+       "createdAt": 1792154273,
+       "updatedAt": 1792154273,
+       "recencyAt": 1792154273,
+       "status": {
+        "type": "idle"
+       },
+       "path": null,
+       "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-ryANnQ",
+       "cliVersion": "0.162.1",
+       "originator": "ans_mcp_probe",
+       "source": "vscode",
+       "canAcceptDirectInput": true,
+       "threadSource": null,
+       "agentNickname": null,
+       "agentRole": null,
+       "gitInfo": null,
+       "name": null,
+       "daybreakEnabled": null,
+       "turns": []
+      }
+     }
+    },
+    {
+     "at": 1792154273591,
+     "method": "mcpServer/startupStatus/updated",
+     "params": {
+      "threadId": "01a144b8-072d-75b3-ba19-d6fb98c6f9a8",
+      "name": "probe-surface",
+      "status": "starting",
+      "error": null,
+      "failureReason": null
+     }
+    },
+    {
+     "at": 1792154273610,
+     "method": "mcpServer/startupStatus/updated",
+     "params": {
+      "threadId": "01a144b8-072d-75b3-ba19-d6fb98c6f9a8",
+      "name": "probe-surface",
+      "status": "ready",
+      "error": null,
+      "failureReason": null
+     }
+    },
+    {
+     "at": 1792154273643,
+     "method": "warning",
+     "params": {
+      "threadId": "01a144b8-072d-75b3-ba19-d6fb98c6f9a8",
+      "message": "Model metadata for `probe-model` not found. Defaulting to fallback metadata; this can degrade performance and cause issues."
+     }
+    },
+    {
+     "at": 1792154273645,
+     "method": "thread/status/changed",
+     "params": {
+      "threadId": "01a144b8-072d-75b3-ba19-d6fb98c6f9a8",
+      "status": {
+       "type": "active",
+       "activeFlags": []
+      }
+     }
+    },
+    {
+     "at": 1792154273645,
+     "method": "turn/started",
+     "params": {
+      "threadId": "01a144b8-072d-75b3-ba19-d6fb98c6f9a8",
+      "turn": {
+       "id": "01a144b8-076a-7bc1-94d9-b3b63cae342b",
+       "rootTurnId": "01a144b8-076a-7bc1-94d9-b3b63cae342b",
+       "items": [],
+       "itemsView": "notLoaded",
+       "status": "inProgress",
+       "error": null,
+       "startedAt": 1792154273,
+       "completedAt": null,
+       "durationMs": null
+      }
+     }
+    },
+    {
+     "at": 1792154273645,
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "userMessage",
+       "id": "01a144b8-076d-7ce1-b255-4c9d51411eea",
+       "clientId": null,
+       "content": [
+        {
+         "type": "text",
+         "text": "call the echo probe",
+         "text_elements": []
+        }
+       ]
+      },
+      "threadId": "01a144b8-072d-75b3-ba19-d6fb98c6f9a8",
+      "turnId": "01a144b8-076a-7bc1-94d9-b3b63cae342b",
+      "startedAtMs": 1792154273645
+     }
+    },
+    {
+     "at": 1792154273645,
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "userMessage",
+       "id": "01a144b8-076d-7ce1-b255-4c9d51411eea",
+       "clientId": null,
+       "content": [
+        {
+         "type": "text",
+         "text": "call the echo probe",
+         "text_elements": []
+        }
+       ]
+      },
+      "threadId": "01a144b8-072d-75b3-ba19-d6fb98c6f9a8",
+      "turnId": "01a144b8-076a-7bc1-94d9-b3b63cae342b",
+      "completedAtMs": 1792154273645
+     }
+    },
+    {
+     "at": 1792154273651,
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "mcpToolCall",
+       "id": "fc_probe_1",
+       "server": "probe-surface",
+       "tool": "echo_probe",
+       "status": "inProgress",
+       "arguments": {
+        "text": "from fake model"
+       },
+       "appContext": null,
+       "mcpAppUi": null,
+       "pluginId": null,
+       "readOnlyHint": null,
+       "result": null,
+       "error": null,
+       "durationMs": null
+      },
+      "threadId": "01a144b8-072d-75b3-ba19-d6fb98c6f9a8",
+      "turnId": "01a144b8-076a-7bc1-94d9-b3b63cae342b",
+      "startedAtMs": 1792154273650
+     }
+    },
+    {
+     "at": 1792154273651,
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "mcpToolCall",
+       "id": "fc_probe_1",
+       "server": "probe-surface",
+       "tool": "echo_probe",
+       "status": "failed",
+       "arguments": {
+        "text": "from fake model"
+       },
+       "appContext": null,
+       "mcpAppUi": null,
+       "pluginId": null,
+       "readOnlyHint": null,
+       "result": null,
+       "error": {
+        "message": "MCP tool call requires approval, but approval policy is never"
+       },
+       "durationMs": 0
+      },
+      "threadId": "01a144b8-072d-75b3-ba19-d6fb98c6f9a8",
+      "turnId": "01a144b8-076a-7bc1-94d9-b3b63cae342b",
+      "completedAtMs": 1792154273651
+     }
+    },
+    {
+     "at": 1792154273651,
+     "method": "thread/tokenUsage/updated",
+     "params": {
+      "threadId": "01a144b8-072d-75b3-ba19-d6fb98c6f9a8",
+      "turnId": "01a144b8-076a-7bc1-94d9-b3b63cae342b",
+      "tokenUsage": {
+       "total": {
+        "totalTokens": 2,
+        "inputTokens": 1,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 1,
+        "reasoningOutputTokens": 0
+       },
+       "last": {
+        "totalTokens": 2,
+        "inputTokens": 1,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 1,
+        "reasoningOutputTokens": 0
+       },
+       "modelContextWindow": 258400
+      }
+     }
+    },
+    {
+     "at": 1792154273651,
+     "method": "account/rateLimits/updated",
+     "params": {
+      "rateLimits": {
+       "limitId": "codex",
+       "limitName": null,
+       "normalModelSlug": null,
+       "primary": null,
+       "secondary": null,
+       "credits": null,
+       "individualLimit": null,
+       "spendControlReached": null,
+       "planType": null,
+       "rateLimitReachedType": null
+      }
+     }
+    },
+    {
+     "at": 1792154273654,
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "agentMessage",
+       "id": "msg_probe_1",
+       "text": "",
+       "phase": null,
+       "memoryCitation": null,
+       "delivery": null,
+       "questions": null
+      },
+      "threadId": "01a144b8-072d-75b3-ba19-d6fb98c6f9a8",
+      "turnId": "01a144b8-076a-7bc1-94d9-b3b63cae342b",
+      "startedAtMs": 1792154273654
+     }
+    },
+    {
+     "at": 1792154273654,
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "agentMessage",
+       "id": "msg_probe_1",
+       "text": "probe final message",
+       "phase": null,
+       "memoryCitation": null,
+       "delivery": null,
+       "questions": null
+      },
+      "threadId": "01a144b8-072d-75b3-ba19-d6fb98c6f9a8",
+      "turnId": "01a144b8-076a-7bc1-94d9-b3b63cae342b",
+      "completedAtMs": 1792154273654
+     }
+    },
+    {
+     "at": 1792154273654,
+     "method": "thread/tokenUsage/updated",
+     "params": {
+      "threadId": "01a144b8-072d-75b3-ba19-d6fb98c6f9a8",
+      "turnId": "01a144b8-076a-7bc1-94d9-b3b63cae342b",
+      "tokenUsage": {
+       "total": {
+        "totalTokens": 4,
+        "inputTokens": 2,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 2,
+        "reasoningOutputTokens": 0
+       },
+       "last": {
+        "totalTokens": 2,
+        "inputTokens": 1,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 1,
+        "reasoningOutputTokens": 0
+       },
+       "modelContextWindow": 258400
+      }
+     }
+    },
+    {
+     "at": 1792154273654,
+     "method": "account/rateLimits/updated",
+     "params": {
+      "rateLimits": {
+       "limitId": "codex",
+       "limitName": null,
+       "normalModelSlug": null,
+       "primary": null,
+       "secondary": null,
+       "credits": null,
+       "individualLimit": null,
+       "spendControlReached": null,
+       "planType": null,
+       "rateLimitReachedType": null
+      }
+     }
+    },
+    {
+     "at": 1792154273654,
+     "method": "thread/status/changed",
+     "params": {
+      "threadId": "01a144b8-072d-75b3-ba19-d6fb98c6f9a8",
+      "status": {
+       "type": "idle"
+      }
+     }
+    },
+    {
+     "at": 1792154273654,
+     "method": "turn/completed",
+     "params": {
+      "threadId": "01a144b8-072d-75b3-ba19-d6fb98c6f9a8",
+      "turn": {
+       "id": "01a144b8-076a-7bc1-94d9-b3b63cae342b",
+       "rootTurnId": "01a144b8-076a-7bc1-94d9-b3b63cae342b",
+       "items": [
+        {
+         "type": "agentMessage",
+         "id": "msg_probe_1",
+         "text": "probe final message",
+         "phase": null,
+         "memoryCitation": null,
+         "delivery": null,
+         "questions": null
+        }
+       ],
+       "itemsView": "summary",
+       "status": "completed",
+       "error": null,
+       "startedAt": 1792154273,
+       "completedAt": 1792154273,
+       "durationMs": 11
+      }
+     }
+    }
+   ],
+   "serverRequests": [],
+   "requests": [
+    {
+     "method": "initialize",
+     "params": {
+      "clientInfo": {
+       "name": "ans_mcp_probe",
+       "version": "0.0.0"
+      },
+      "capabilities": {
+       "experimentalApi": true,
+       "explicitGatewayOauth": true
+      }
+     }
+    },
+    {
+     "method": "thread/start",
+     "params": {
+      "model": "probe-model",
+      "modelProvider": "ans_probe",
+      "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-ryANnQ",
+      "sandbox": "read-only",
+      "approvalPolicy": "never",
+      "approvalsReviewer": "user",
+      "config": {
+       "features": {
+        "shell_tool": false,
+        "hooks": false,
+        "apps": false,
+        "plugins": false,
+        "remote_plugin": false,
+        "browser_use": false,
+        "browser_use_external": false,
+        "browser_use_full_cdp_access": false,
+        "in_app_browser": false,
+        "computer_use": false,
+        "code_mode": false,
+        "code_mode_host": false,
+        "multi_agent": false,
+        "multi_agent_v2": false,
+        "request_permissions_tool": false,
+        "skill_mcp_dependency_install": false
+       },
+       "sandbox_mode": "read-only",
+       "approval_policy": "never",
+       "approvals_reviewer": "user",
+       "web_search": "disabled",
+       "projects": {
+        "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-ryANnQ": {
+         "trust_level": "untrusted"
+        }
+       }
+      },
+      "developerInstructions": "mcp surface probe",
+      "ephemeral": true
+     }
+    },
+    {
+     "method": "turn/start",
+     "params": {
+      "threadId": "01a144b8-072d-75b3-ba19-d6fb98c6f9a8",
+      "input": [
+       {
+        "type": "text",
+        "text": "call the echo probe",
+        "text_elements": []
+       }
+      ],
+      "approvalPolicy": "never",
+      "approvalsReviewer": "user",
+      "sandboxPolicy": {
+       "type": "readOnly",
+       "networkAccess": false
+      },
+      "model": "probe-model"
+     }
+    }
+   ],
+   "preparation": null,
+   "thread": {
+    "id": "01a144b8-072d-75b3-ba19-d6fb98c6f9a8"
+   },
+   "turn": {
+    "id": "01a144b8-076a-7bc1-94d9-b3b63cae342b",
+    "status": "inProgress"
+   },
+   "turnCompleted": true,
+   "turnOutcome": "completed",
+   "itemLifecycle": [
+    {
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "userMessage",
+       "id": "01a144b8-076d-7ce1-b255-4c9d51411eea",
+       "clientId": null,
+       "content": [
+        {
+         "type": "text",
+         "text": "call the echo probe",
+         "text_elements": []
+        }
+       ]
+      },
+      "threadId": "01a144b8-072d-75b3-ba19-d6fb98c6f9a8",
+      "turnId": "01a144b8-076a-7bc1-94d9-b3b63cae342b",
+      "startedAtMs": 1792154273645
+     }
+    },
+    {
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "userMessage",
+       "id": "01a144b8-076d-7ce1-b255-4c9d51411eea",
+       "clientId": null,
+       "content": [
+        {
+         "type": "text",
+         "text": "call the echo probe",
+         "text_elements": []
+        }
+       ]
+      },
+      "threadId": "01a144b8-072d-75b3-ba19-d6fb98c6f9a8",
+      "turnId": "01a144b8-076a-7bc1-94d9-b3b63cae342b",
+      "completedAtMs": 1792154273645
+     }
+    },
+    {
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "mcpToolCall",
+       "id": "fc_probe_1",
+       "server": "probe-surface",
+       "tool": "echo_probe",
+       "status": "inProgress",
+       "arguments": {
+        "text": "from fake model"
+       },
+       "appContext": null,
+       "mcpAppUi": null,
+       "pluginId": null,
+       "readOnlyHint": null,
+       "result": null,
+       "error": null,
+       "durationMs": null
+      },
+      "threadId": "01a144b8-072d-75b3-ba19-d6fb98c6f9a8",
+      "turnId": "01a144b8-076a-7bc1-94d9-b3b63cae342b",
+      "startedAtMs": 1792154273650
+     }
+    },
+    {
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "mcpToolCall",
+       "id": "fc_probe_1",
+       "server": "probe-surface",
+       "tool": "echo_probe",
+       "status": "failed",
+       "arguments": {
+        "text": "from fake model"
+       },
+       "appContext": null,
+       "mcpAppUi": null,
+       "pluginId": null,
+       "readOnlyHint": null,
+       "result": null,
+       "error": {
+        "message": "MCP tool call requires approval, but approval policy is never"
+       },
+       "durationMs": 0
+      },
+      "threadId": "01a144b8-072d-75b3-ba19-d6fb98c6f9a8",
+      "turnId": "01a144b8-076a-7bc1-94d9-b3b63cae342b",
+      "completedAtMs": 1792154273651
+     }
+    },
+    {
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "agentMessage",
+       "id": "msg_probe_1",
+       "text": "",
+       "phase": null,
+       "memoryCitation": null,
+       "delivery": null,
+       "questions": null
+      },
+      "threadId": "01a144b8-072d-75b3-ba19-d6fb98c6f9a8",
+      "turnId": "01a144b8-076a-7bc1-94d9-b3b63cae342b",
+      "startedAtMs": 1792154273654
+     }
+    },
+    {
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "agentMessage",
+       "id": "msg_probe_1",
+       "text": "probe final message",
+       "phase": null,
+       "memoryCitation": null,
+       "delivery": null,
+       "questions": null
+      },
+      "threadId": "01a144b8-072d-75b3-ba19-d6fb98c6f9a8",
+      "turnId": "01a144b8-076a-7bc1-94d9-b3b63cae342b",
+      "completedAtMs": 1792154273654
+     }
+    }
+   ],
+   "mcpItems": [
+    {
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "mcpToolCall",
+       "id": "fc_probe_1",
+       "server": "probe-surface",
+       "tool": "echo_probe",
+       "status": "inProgress",
+       "arguments": {
+        "text": "from fake model"
+       },
+       "appContext": null,
+       "mcpAppUi": null,
+       "pluginId": null,
+       "readOnlyHint": null,
+       "result": null,
+       "error": null,
+       "durationMs": null
+      },
+      "threadId": "01a144b8-072d-75b3-ba19-d6fb98c6f9a8",
+      "turnId": "01a144b8-076a-7bc1-94d9-b3b63cae342b",
+      "startedAtMs": 1792154273650
+     }
+    },
+    {
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "mcpToolCall",
+       "id": "fc_probe_1",
+       "server": "probe-surface",
+       "tool": "echo_probe",
+       "status": "failed",
+       "arguments": {
+        "text": "from fake model"
+       },
+       "appContext": null,
+       "mcpAppUi": null,
+       "pluginId": null,
+       "readOnlyHint": null,
+       "result": null,
+       "error": {
+        "message": "MCP tool call requires approval, but approval policy is never"
+       },
+       "durationMs": 0
+      },
+      "threadId": "01a144b8-072d-75b3-ba19-d6fb98c6f9a8",
+      "turnId": "01a144b8-076a-7bc1-94d9-b3b63cae342b",
+      "completedAtMs": 1792154273651
+     }
+    }
+   ],
+   "otherMcpNotices": [],
+   "fixtureCalls": [],
+   "finalMessages": [
+    "",
+    "probe final message"
+   ],
+   "serverRequestsDuringTurn": [],
+   "toolSpecs": [
+    {
+     "type": "namespace",
+     "name": "mcp__probe_surface",
+     "description": "Tools in the mcp__probe_surface namespace.",
+     "tools": [
+      {
+       "type": "function",
+       "name": "echo_probe",
+       "description": "controlled echo",
+       "strict": false,
+       "parameters": {
+        "type": "object",
+        "properties": {
+         "text": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "text"
+        ]
+       }
+      },
+      {
+       "type": "function",
+       "name": "elicit_probe",
+       "description": "sends an elicitation request while handling the call",
+       "strict": false,
+       "parameters": {
+        "type": "object",
+        "properties": {}
+       }
+      },
+      {
+       "type": "function",
+       "name": "hang_probe",
+       "description": "never responds (timeout probe)",
+       "strict": false,
+       "parameters": {
+        "type": "object",
+        "properties": {}
+       }
+      }
+     ]
+    },
+    {
+     "type": "namespace",
+     "name": "mcp__probe_surface",
+     "description": "Tools in the mcp__probe_surface namespace.",
+     "tools": [
+      {
+       "type": "function",
+       "name": "echo_probe",
+       "description": "controlled echo",
+       "strict": false,
+       "parameters": {
+        "type": "object",
+        "properties": {
+         "text": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "text"
+        ]
+       }
+      },
+      {
+       "type": "function",
+       "name": "elicit_probe",
+       "description": "sends an elicitation request while handling the call",
+       "strict": false,
+       "parameters": {
+        "type": "object",
+        "properties": {}
+       }
+      },
+      {
+       "type": "function",
+       "name": "hang_probe",
+       "description": "never responds (timeout probe)",
+       "strict": false,
+       "parameters": {
+        "type": "object",
+        "properties": {}
+       }
+      }
+     ]
+    }
+   ],
+   "functionItems": [
+    {
+     "type": "function_call",
+     "id": "fc_probe_1",
+     "name": "echo_probe",
+     "namespace": "mcp__probe_surface",
+     "arguments": "{\"text\":\"from fake model\"}",
+     "call_id": "fc_probe_1"
+    },
+    {
+     "type": "function_call_output",
+     "id": "fco_01a144b8-0773-79e2-9234-906e355e41be",
+     "call_id": "fc_probe_1",
+     "output": [
+      {
+       "type": "input_text",
+       "text": "Wall time: 0.0011 seconds\nOutput:"
+      },
+      {
+       "type": "input_text",
+       "text": "MCP tool call requires approval, but approval policy is never"
+      }
+     ]
+    }
+   ],
+   "stderrTail": "",
+   "httpBodies": 2,
+   "modelRequestSummary": [
+    {
+     "tools": [
+      "list_mcp_resources",
+      "list_mcp_resource_templates",
+      "read_mcp_resource",
+      "request_user_input",
+      "view_image",
+      "mcp__probe_surface",
+      "get_goal",
+      "create_goal",
+      "update_goal"
+     ],
+     "inputKinds": [
+      "message",
+      "message",
+      "message",
+      "message"
+     ],
+     "mcpBridgeTool": "mcp__probe_surface"
+    },
+    {
+     "tools": [
+      "list_mcp_resources",
+      "list_mcp_resource_templates",
+      "read_mcp_resource",
+      "request_user_input",
+      "view_image",
+      "mcp__probe_surface",
+      "get_goal",
+      "create_goal",
+      "update_goal"
+     ],
+     "inputKinds": [
+      "message",
+      "message",
+      "message",
+      "message",
+      "function_call",
+      "function_call_output"
+     ],
+     "mcpBridgeTool": "mcp__probe_surface"
+    }
+   ],
+   "childExit": 0
+  },
+  {
+   "name": "E-approval-request-surface",
+   "overrides": [
+    "features.shell_tool=false",
+    "features.hooks=false",
+    "features.apps=false",
+    "features.plugins=false",
+    "features.remote_plugin=false",
+    "features.browser_use=false",
+    "features.browser_use_external=false",
+    "features.browser_use_full_cdp_access=false",
+    "features.in_app_browser=false",
+    "features.computer_use=false",
+    "features.code_mode=false",
+    "features.code_mode_host=false",
+    "features.multi_agent=false",
+    "features.multi_agent_v2=false",
+    "features.request_permissions_tool=false",
+    "features.skill_mcp_dependency_install=false",
+    "sandbox_mode=\"read-only\"",
+    "approval_policy=\"never\"",
+    "approvals_reviewer=\"user\"",
+    "web_search=\"disabled\"",
+    "projects={\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-L2hlIP\"={trust_level=\"untrusted\"}}",
+    "model_providers.ans_probe={name=\"ANS Probe\",base_url=\"http://127.0.0.1:58663/v1\",env_key=\"CODEX_API_KEY\",wire_api=\"responses\",requires_openai_auth=false}",
+    "model_provider=\"ans_probe\"",
+    "model=\"probe-model\"",
+    "mcp_servers={\"probe-surface\"={command=\"/usr/local/bin/node\",args=[\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-stage-e-nWAOfe/echo-mcp.mjs\",\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-stage-e-nWAOfe/capture-e.json\"],startup_timeout_sec=5,tool_timeout_sec=5,default_tools_approval_mode=\"prompt\"}}"
+   ],
+   "notices": [
+    {
+     "at": 1792154273752,
+     "method": "remoteControl/status/changed",
+     "params": {
+      "status": "disabled",
+      "serverName": "wangzhongrendeMacBook-Pro.local",
+      "installationId": "9c6c6d87-3cf4-478a-aec1-b75abdc29680",
+      "environmentId": null
+     }
+    },
+    {
+     "at": 1792154273763,
+     "method": "thread/started",
+     "params": {
+      "thread": {
+       "id": "01a144b8-07d9-7a61-9e22-696bc8217a30",
+       "environments": [
+        {
+         "environmentId": "local",
+         "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-L2hlIP",
+         "runtimeWorkspaceRoots": [
+          "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-L2hlIP"
+         ]
+        }
+       ],
+       "extra": null,
+       "sessionId": "01a144b8-07d9-7a61-9e22-696bc8217a30",
+       "forkedFromId": null,
+       "parentThreadId": null,
+       "preview": "",
+       "ephemeral": true,
+       "section": null,
+       "sectionEnteredAt": null,
+       "projectId": null,
+       "historyMode": "paginated",
+       "modelProvider": "ans_probe",
+       "model": "probe-model",
+       "reasoningEffort": null,
+       "createdAt": 1792154273,
+       "updatedAt": 1792154273,
+       "recencyAt": 1792154273,
+       "status": {
+        "type": "idle"
+       },
+       "path": null,
+       "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-L2hlIP",
+       "cliVersion": "0.162.1",
+       "originator": "ans_mcp_probe",
+       "source": "vscode",
+       "canAcceptDirectInput": true,
+       "threadSource": null,
+       "agentNickname": null,
+       "agentRole": null,
+       "gitInfo": null,
+       "name": null,
+       "daybreakEnabled": null,
+       "turns": []
+      }
+     }
+    },
+    {
+     "at": 1792154273763,
+     "method": "mcpServer/startupStatus/updated",
+     "params": {
+      "threadId": "01a144b8-07d9-7a61-9e22-696bc8217a30",
+      "name": "probe-surface",
+      "status": "starting",
+      "error": null,
+      "failureReason": null
+     }
+    },
+    {
+     "at": 1792154273782,
+     "method": "mcpServer/startupStatus/updated",
+     "params": {
+      "threadId": "01a144b8-07d9-7a61-9e22-696bc8217a30",
+      "name": "probe-surface",
+      "status": "ready",
+      "error": null,
+      "failureReason": null
+     }
+    },
+    {
+     "at": 1792154273815,
+     "method": "warning",
+     "params": {
+      "threadId": "01a144b8-07d9-7a61-9e22-696bc8217a30",
+      "message": "Model metadata for `probe-model` not found. Defaulting to fallback metadata; this can degrade performance and cause issues."
+     }
+    },
+    {
+     "at": 1792154273816,
+     "method": "thread/status/changed",
+     "params": {
+      "threadId": "01a144b8-07d9-7a61-9e22-696bc8217a30",
+      "status": {
+       "type": "active",
+       "activeFlags": []
+      }
+     }
+    },
+    {
+     "at": 1792154273816,
+     "method": "turn/started",
+     "params": {
+      "threadId": "01a144b8-07d9-7a61-9e22-696bc8217a30",
+      "turn": {
+       "id": "01a144b8-0816-7283-8e1c-e2e5f4306e02",
+       "rootTurnId": "01a144b8-0816-7283-8e1c-e2e5f4306e02",
+       "items": [],
+       "itemsView": "notLoaded",
+       "status": "inProgress",
+       "error": null,
+       "startedAt": 1792154273,
+       "completedAt": null,
+       "durationMs": null
+      }
+     }
+    },
+    {
+     "at": 1792154273816,
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "userMessage",
+       "id": "01a144b8-0818-7750-878f-32bfd0eb19f1",
+       "clientId": null,
+       "content": [
+        {
+         "type": "text",
+         "text": "call the echo probe",
+         "text_elements": []
+        }
+       ]
+      },
+      "threadId": "01a144b8-07d9-7a61-9e22-696bc8217a30",
+      "turnId": "01a144b8-0816-7283-8e1c-e2e5f4306e02",
+      "startedAtMs": 1792154273816
+     }
+    },
+    {
+     "at": 1792154273816,
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "userMessage",
+       "id": "01a144b8-0818-7750-878f-32bfd0eb19f1",
+       "clientId": null,
+       "content": [
+        {
+         "type": "text",
+         "text": "call the echo probe",
+         "text_elements": []
+        }
+       ]
+      },
+      "threadId": "01a144b8-07d9-7a61-9e22-696bc8217a30",
+      "turnId": "01a144b8-0816-7283-8e1c-e2e5f4306e02",
+      "completedAtMs": 1792154273816
+     }
+    },
+    {
+     "at": 1792154273819,
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "mcpToolCall",
+       "id": "fc_probe_1",
+       "server": "probe-surface",
+       "tool": "echo_probe",
+       "status": "inProgress",
+       "arguments": {
+        "text": "from fake model"
+       },
+       "appContext": null,
+       "mcpAppUi": null,
+       "pluginId": null,
+       "readOnlyHint": null,
+       "result": null,
+       "error": null,
+       "durationMs": null
+      },
+      "threadId": "01a144b8-07d9-7a61-9e22-696bc8217a30",
+      "turnId": "01a144b8-0816-7283-8e1c-e2e5f4306e02",
+      "startedAtMs": 1792154273819
+     }
+    },
+    {
+     "at": 1792154273820,
+     "method": "thread/status/changed",
+     "params": {
+      "threadId": "01a144b8-07d9-7a61-9e22-696bc8217a30",
+      "status": {
+       "type": "active",
+       "activeFlags": [
+        "waitingOnApproval"
+       ]
+      }
+     }
+    },
+    {
+     "at": 1792154273821,
+     "method": "serverRequest/resolved",
+     "params": {
+      "threadId": "01a144b8-07d9-7a61-9e22-696bc8217a30",
+      "requestId": 0
+     }
+    },
+    {
+     "at": 1792154273821,
+     "method": "thread/status/changed",
+     "params": {
+      "threadId": "01a144b8-07d9-7a61-9e22-696bc8217a30",
+      "status": {
+       "type": "active",
+       "activeFlags": []
+      }
+     }
+    },
+    {
+     "at": 1792154273822,
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "mcpToolCall",
+       "id": "fc_probe_1",
+       "server": "probe-surface",
+       "tool": "echo_probe",
+       "status": "failed",
+       "arguments": {
+        "text": "from fake model"
+       },
+       "appContext": null,
+       "mcpAppUi": null,
+       "pluginId": null,
+       "readOnlyHint": null,
+       "result": null,
+       "error": {
+        "message": "user cancelled MCP tool call"
+       },
+       "durationMs": 0
+      },
+      "threadId": "01a144b8-07d9-7a61-9e22-696bc8217a30",
+      "turnId": "01a144b8-0816-7283-8e1c-e2e5f4306e02",
+      "completedAtMs": 1792154273821
+     }
+    },
+    {
+     "at": 1792154273822,
+     "method": "thread/tokenUsage/updated",
+     "params": {
+      "threadId": "01a144b8-07d9-7a61-9e22-696bc8217a30",
+      "turnId": "01a144b8-0816-7283-8e1c-e2e5f4306e02",
+      "tokenUsage": {
+       "total": {
+        "totalTokens": 2,
+        "inputTokens": 1,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 1,
+        "reasoningOutputTokens": 0
+       },
+       "last": {
+        "totalTokens": 2,
+        "inputTokens": 1,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 1,
+        "reasoningOutputTokens": 0
+       },
+       "modelContextWindow": 258400
+      }
+     }
+    },
+    {
+     "at": 1792154273822,
+     "method": "account/rateLimits/updated",
+     "params": {
+      "rateLimits": {
+       "limitId": "codex",
+       "limitName": null,
+       "normalModelSlug": null,
+       "primary": null,
+       "secondary": null,
+       "credits": null,
+       "individualLimit": null,
+       "spendControlReached": null,
+       "planType": null,
+       "rateLimitReachedType": null
+      }
+     }
+    },
+    {
+     "at": 1792154273824,
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "agentMessage",
+       "id": "msg_probe_1",
+       "text": "",
+       "phase": null,
+       "memoryCitation": null,
+       "delivery": null,
+       "questions": null
+      },
+      "threadId": "01a144b8-07d9-7a61-9e22-696bc8217a30",
+      "turnId": "01a144b8-0816-7283-8e1c-e2e5f4306e02",
+      "startedAtMs": 1792154273824
+     }
+    },
+    {
+     "at": 1792154273824,
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "agentMessage",
+       "id": "msg_probe_1",
+       "text": "probe final message",
+       "phase": null,
+       "memoryCitation": null,
+       "delivery": null,
+       "questions": null
+      },
+      "threadId": "01a144b8-07d9-7a61-9e22-696bc8217a30",
+      "turnId": "01a144b8-0816-7283-8e1c-e2e5f4306e02",
+      "completedAtMs": 1792154273824
+     }
+    },
+    {
+     "at": 1792154273824,
+     "method": "thread/tokenUsage/updated",
+     "params": {
+      "threadId": "01a144b8-07d9-7a61-9e22-696bc8217a30",
+      "turnId": "01a144b8-0816-7283-8e1c-e2e5f4306e02",
+      "tokenUsage": {
+       "total": {
+        "totalTokens": 4,
+        "inputTokens": 2,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 2,
+        "reasoningOutputTokens": 0
+       },
+       "last": {
+        "totalTokens": 2,
+        "inputTokens": 1,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 1,
+        "reasoningOutputTokens": 0
+       },
+       "modelContextWindow": 258400
+      }
+     }
+    },
+    {
+     "at": 1792154273824,
+     "method": "account/rateLimits/updated",
+     "params": {
+      "rateLimits": {
+       "limitId": "codex",
+       "limitName": null,
+       "normalModelSlug": null,
+       "primary": null,
+       "secondary": null,
+       "credits": null,
+       "individualLimit": null,
+       "spendControlReached": null,
+       "planType": null,
+       "rateLimitReachedType": null
+      }
+     }
+    },
+    {
+     "at": 1792154273824,
+     "method": "thread/status/changed",
+     "params": {
+      "threadId": "01a144b8-07d9-7a61-9e22-696bc8217a30",
+      "status": {
+       "type": "idle"
+      }
+     }
+    },
+    {
+     "at": 1792154273824,
+     "method": "turn/completed",
+     "params": {
+      "threadId": "01a144b8-07d9-7a61-9e22-696bc8217a30",
+      "turn": {
+       "id": "01a144b8-0816-7283-8e1c-e2e5f4306e02",
+       "rootTurnId": "01a144b8-0816-7283-8e1c-e2e5f4306e02",
+       "items": [
+        {
+         "type": "agentMessage",
+         "id": "msg_probe_1",
+         "text": "probe final message",
+         "phase": null,
+         "memoryCitation": null,
+         "delivery": null,
+         "questions": null
+        }
+       ],
+       "itemsView": "summary",
+       "status": "completed",
+       "error": null,
+       "startedAt": 1792154273,
+       "completedAt": 1792154273,
+       "durationMs": 9
+      }
+     }
+    }
+   ],
+   "serverRequests": [
+    {
+     "method": "mcpServer/elicitation/request",
+     "params": {
+      "threadId": "01a144b8-07d9-7a61-9e22-696bc8217a30",
+      "turnId": "01a144b8-0816-7283-8e1c-e2e5f4306e02",
+      "serverName": "probe-surface",
+      "mode": "form",
+      "_meta": {
+       "codex_approval_kind": "mcp_tool_call",
+       "tool_description": "controlled echo",
+       "tool_params": {
+        "text": "from fake model"
+       },
+       "tool_params_display": [
+        {
+         "name": "text",
+         "value": "from fake model",
+         "display_name": "text"
+        }
+       ]
+      },
+      "message": "Allow the probe-surface MCP server to run tool \"echo_probe\"?",
+      "requestedSchema": {
+       "type": "object",
+       "properties": {}
+      }
+     }
+    }
+   ],
+   "requests": [
+    {
+     "method": "initialize",
+     "params": {
+      "clientInfo": {
+       "name": "ans_mcp_probe",
+       "version": "0.0.0"
+      },
+      "capabilities": {
+       "experimentalApi": true,
+       "explicitGatewayOauth": true
+      }
+     }
+    },
+    {
+     "method": "thread/start",
+     "params": {
+      "model": "probe-model",
+      "modelProvider": "ans_probe",
+      "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-L2hlIP",
+      "sandbox": "read-only",
+      "approvalPolicy": "on-request",
+      "approvalsReviewer": "user",
+      "config": {
+       "features": {
+        "shell_tool": false,
+        "hooks": false,
+        "apps": false,
+        "plugins": false,
+        "remote_plugin": false,
+        "browser_use": false,
+        "browser_use_external": false,
+        "browser_use_full_cdp_access": false,
+        "in_app_browser": false,
+        "computer_use": false,
+        "code_mode": false,
+        "code_mode_host": false,
+        "multi_agent": false,
+        "multi_agent_v2": false,
+        "request_permissions_tool": false,
+        "skill_mcp_dependency_install": false
+       },
+       "sandbox_mode": "read-only",
+       "approval_policy": "never",
+       "approvals_reviewer": "user",
+       "web_search": "disabled",
+       "projects": {
+        "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-L2hlIP": {
+         "trust_level": "untrusted"
+        }
+       }
+      },
+      "developerInstructions": "mcp surface probe",
+      "ephemeral": true
+     }
+    },
+    {
+     "method": "turn/start",
+     "params": {
+      "threadId": "01a144b8-07d9-7a61-9e22-696bc8217a30",
+      "input": [
+       {
+        "type": "text",
+        "text": "call the echo probe",
+        "text_elements": []
+       }
+      ],
+      "approvalPolicy": "on-request",
+      "approvalsReviewer": "user",
+      "sandboxPolicy": {
+       "type": "readOnly",
+       "networkAccess": false
+      },
+      "model": "probe-model"
+     }
+    }
+   ],
+   "preparation": null,
+   "thread": {
+    "id": "01a144b8-07d9-7a61-9e22-696bc8217a30"
+   },
+   "turn": {
+    "id": "01a144b8-0816-7283-8e1c-e2e5f4306e02",
+    "status": "inProgress"
+   },
+   "turnCompleted": true,
+   "turnOutcome": "completed",
+   "mcpItems": [
+    {
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "mcpToolCall",
+       "id": "fc_probe_1",
+       "server": "probe-surface",
+       "tool": "echo_probe",
+       "status": "inProgress",
+       "arguments": {
+        "text": "from fake model"
+       },
+       "appContext": null,
+       "mcpAppUi": null,
+       "pluginId": null,
+       "readOnlyHint": null,
+       "result": null,
+       "error": null,
+       "durationMs": null
+      },
+      "threadId": "01a144b8-07d9-7a61-9e22-696bc8217a30",
+      "turnId": "01a144b8-0816-7283-8e1c-e2e5f4306e02",
+      "startedAtMs": 1792154273819
+     }
+    },
+    {
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "mcpToolCall",
+       "id": "fc_probe_1",
+       "server": "probe-surface",
+       "tool": "echo_probe",
+       "status": "failed",
+       "arguments": {
+        "text": "from fake model"
+       },
+       "appContext": null,
+       "mcpAppUi": null,
+       "pluginId": null,
+       "readOnlyHint": null,
+       "result": null,
+       "error": {
+        "message": "user cancelled MCP tool call"
+       },
+       "durationMs": 0
+      },
+      "threadId": "01a144b8-07d9-7a61-9e22-696bc8217a30",
+      "turnId": "01a144b8-0816-7283-8e1c-e2e5f4306e02",
+      "completedAtMs": 1792154273821
+     }
+    }
+   ],
+   "fixtureCalls": [],
+   "serverRequestsDuringTurn": [
+    "mcpServer/elicitation/request"
+   ],
+   "toolSpecs": [
+    {
+     "type": "namespace",
+     "name": "mcp__probe_surface",
+     "description": "Tools in the mcp__probe_surface namespace.",
+     "tools": [
+      {
+       "type": "function",
+       "name": "echo_probe",
+       "description": "controlled echo",
+       "strict": false,
+       "parameters": {
+        "type": "object",
+        "properties": {
+         "text": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "text"
+        ]
+       }
+      },
+      {
+       "type": "function",
+       "name": "elicit_probe",
+       "description": "sends an elicitation request while handling the call",
+       "strict": false,
+       "parameters": {
+        "type": "object",
+        "properties": {}
+       }
+      },
+      {
+       "type": "function",
+       "name": "hang_probe",
+       "description": "never responds (timeout probe)",
+       "strict": false,
+       "parameters": {
+        "type": "object",
+        "properties": {}
+       }
+      }
+     ]
+    },
+    {
+     "type": "namespace",
+     "name": "mcp__probe_surface",
+     "description": "Tools in the mcp__probe_surface namespace.",
+     "tools": [
+      {
+       "type": "function",
+       "name": "echo_probe",
+       "description": "controlled echo",
+       "strict": false,
+       "parameters": {
+        "type": "object",
+        "properties": {
+         "text": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "text"
+        ]
+       }
+      },
+      {
+       "type": "function",
+       "name": "elicit_probe",
+       "description": "sends an elicitation request while handling the call",
+       "strict": false,
+       "parameters": {
+        "type": "object",
+        "properties": {}
+       }
+      },
+      {
+       "type": "function",
+       "name": "hang_probe",
+       "description": "never responds (timeout probe)",
+       "strict": false,
+       "parameters": {
+        "type": "object",
+        "properties": {}
+       }
+      }
+     ]
+    }
+   ],
+   "functionItems": [
+    {
+     "type": "function_call",
+     "id": "fc_probe_1",
+     "name": "echo_probe",
+     "namespace": "mcp__probe_surface",
+     "arguments": "{\"text\":\"from fake model\"}",
+     "call_id": "fc_probe_1"
+    },
+    {
+     "type": "function_call_output",
+     "id": "fco_01a144b8-081d-7a21-86c0-c3904d9dfcd0",
+     "call_id": "fc_probe_1",
+     "output": [
+      {
+       "type": "input_text",
+       "text": "Wall time: 0.0022 seconds\nOutput:"
+      },
+      {
+       "type": "input_text",
+       "text": "user cancelled MCP tool call"
+      }
+     ]
+    }
+   ],
+   "stderrTail": "",
+   "httpBodies": 2,
+   "modelRequestSummary": [
+    {
+     "tools": [
+      "list_mcp_resources",
+      "list_mcp_resource_templates",
+      "read_mcp_resource",
+      "request_user_input",
+      "view_image",
+      "mcp__probe_surface",
+      "get_goal",
+      "create_goal",
+      "update_goal"
+     ],
+     "inputKinds": [
+      "message",
+      "message",
+      "message",
+      "message"
+     ],
+     "mcpBridgeTool": "mcp__probe_surface"
+    },
+    {
+     "tools": [
+      "list_mcp_resources",
+      "list_mcp_resource_templates",
+      "read_mcp_resource",
+      "request_user_input",
+      "view_image",
+      "mcp__probe_surface",
+      "get_goal",
+      "create_goal",
+      "update_goal"
+     ],
+     "inputKinds": [
+      "message",
+      "message",
+      "message",
+      "message",
+      "function_call",
+      "function_call_output"
+     ],
+     "mcpBridgeTool": "mcp__probe_surface"
+    }
+   ],
+   "childExit": 0
+  },
+  {
+   "name": "B-mode-approve",
+   "overrides": [
+    "features.shell_tool=false",
+    "features.hooks=false",
+    "features.apps=false",
+    "features.plugins=false",
+    "features.remote_plugin=false",
+    "features.browser_use=false",
+    "features.browser_use_external=false",
+    "features.browser_use_full_cdp_access=false",
+    "features.in_app_browser=false",
+    "features.computer_use=false",
+    "features.code_mode=false",
+    "features.code_mode_host=false",
+    "features.multi_agent=false",
+    "features.multi_agent_v2=false",
+    "features.request_permissions_tool=false",
+    "features.skill_mcp_dependency_install=false",
+    "sandbox_mode=\"read-only\"",
+    "approval_policy=\"never\"",
+    "approvals_reviewer=\"user\"",
+    "web_search=\"disabled\"",
+    "projects={\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-i15fIk\"={trust_level=\"untrusted\"}}",
+    "model_providers.ans_probe={name=\"ANS Probe\",base_url=\"http://127.0.0.1:58663/v1\",env_key=\"CODEX_API_KEY\",wire_api=\"responses\",requires_openai_auth=false}",
+    "model_provider=\"ans_probe\"",
+    "model=\"probe-model\"",
+    "mcp_servers={\"probe-surface\"={command=\"/usr/local/bin/node\",args=[\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-stage-bm-approve-Ii3jBP/echo-mcp.mjs\",\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-stage-bm-approve-Ii3jBP/capture-approve.json\"],startup_timeout_sec=5,tool_timeout_sec=5,default_tools_approval_mode=\"approve\"}}"
+   ],
+   "notices": [
+    {
+     "at": 1792154273922,
+     "method": "remoteControl/status/changed",
+     "params": {
+      "status": "disabled",
+      "serverName": "wangzhongrendeMacBook-Pro.local",
+      "installationId": "eab5995d-698d-4b45-89d1-8f411534d341",
+      "environmentId": null
+     }
+    },
+    {
+     "at": 1792154273934,
+     "method": "thread/started",
+     "params": {
+      "thread": {
+       "id": "01a144b8-0885-77d3-b783-5994af933e25",
+       "environments": [
+        {
+         "environmentId": "local",
+         "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-i15fIk",
+         "runtimeWorkspaceRoots": [
+          "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-i15fIk"
+         ]
+        }
+       ],
+       "extra": null,
+       "sessionId": "01a144b8-0885-77d3-b783-5994af933e25",
+       "forkedFromId": null,
+       "parentThreadId": null,
+       "preview": "",
+       "ephemeral": true,
+       "section": null,
+       "sectionEnteredAt": null,
+       "projectId": null,
+       "historyMode": "paginated",
+       "modelProvider": "ans_probe",
+       "model": "probe-model",
+       "reasoningEffort": null,
+       "createdAt": 1792154273,
+       "updatedAt": 1792154273,
+       "recencyAt": 1792154273,
+       "status": {
+        "type": "idle"
+       },
+       "path": null,
+       "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-i15fIk",
+       "cliVersion": "0.162.1",
+       "originator": "ans_mcp_probe",
+       "source": "vscode",
+       "canAcceptDirectInput": true,
+       "threadSource": null,
+       "agentNickname": null,
+       "agentRole": null,
+       "gitInfo": null,
+       "name": null,
+       "daybreakEnabled": null,
+       "turns": []
+      }
+     }
+    },
+    {
+     "at": 1792154273934,
+     "method": "mcpServer/startupStatus/updated",
+     "params": {
+      "threadId": "01a144b8-0885-77d3-b783-5994af933e25",
+      "name": "probe-surface",
+      "status": "starting",
+      "error": null,
+      "failureReason": null
+     }
+    },
+    {
+     "at": 1792154273952,
+     "method": "mcpServer/startupStatus/updated",
+     "params": {
+      "threadId": "01a144b8-0885-77d3-b783-5994af933e25",
+      "name": "probe-surface",
+      "status": "ready",
+      "error": null,
+      "failureReason": null
+     }
+    },
+    {
+     "at": 1792154273986,
+     "method": "warning",
+     "params": {
+      "threadId": "01a144b8-0885-77d3-b783-5994af933e25",
+      "message": "Model metadata for `probe-model` not found. Defaulting to fallback metadata; this can degrade performance and cause issues."
+     }
+    },
+    {
+     "at": 1792154273987,
+     "method": "thread/status/changed",
+     "params": {
+      "threadId": "01a144b8-0885-77d3-b783-5994af933e25",
+      "status": {
+       "type": "active",
+       "activeFlags": []
+      }
+     }
+    },
+    {
+     "at": 1792154273987,
+     "method": "turn/started",
+     "params": {
+      "threadId": "01a144b8-0885-77d3-b783-5994af933e25",
+      "turn": {
+       "id": "01a144b8-08c1-7511-bba8-88b9858c755d",
+       "rootTurnId": "01a144b8-08c1-7511-bba8-88b9858c755d",
+       "items": [],
+       "itemsView": "notLoaded",
+       "status": "inProgress",
+       "error": null,
+       "startedAt": 1792154273,
+       "completedAt": null,
+       "durationMs": null
+      }
+     }
+    },
+    {
+     "at": 1792154273987,
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "userMessage",
+       "id": "01a144b8-08c3-73e2-a39d-60f5af6dccc1",
+       "clientId": null,
+       "content": [
+        {
+         "type": "text",
+         "text": "call the echo probe",
+         "text_elements": []
+        }
+       ]
+      },
+      "threadId": "01a144b8-0885-77d3-b783-5994af933e25",
+      "turnId": "01a144b8-08c1-7511-bba8-88b9858c755d",
+      "startedAtMs": 1792154273987
+     }
+    },
+    {
+     "at": 1792154273987,
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "userMessage",
+       "id": "01a144b8-08c3-73e2-a39d-60f5af6dccc1",
+       "clientId": null,
+       "content": [
+        {
+         "type": "text",
+         "text": "call the echo probe",
+         "text_elements": []
+        }
+       ]
+      },
+      "threadId": "01a144b8-0885-77d3-b783-5994af933e25",
+      "turnId": "01a144b8-08c1-7511-bba8-88b9858c755d",
+      "completedAtMs": 1792154273987
+     }
+    },
+    {
+     "at": 1792154273991,
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "mcpToolCall",
+       "id": "fc_probe_1",
+       "server": "probe-surface",
+       "tool": "echo_probe",
+       "status": "inProgress",
+       "arguments": {
+        "text": "from fake model"
+       },
+       "appContext": null,
+       "mcpAppUi": null,
+       "pluginId": null,
+       "readOnlyHint": null,
+       "result": null,
+       "error": null,
+       "durationMs": null
+      },
+      "threadId": "01a144b8-0885-77d3-b783-5994af933e25",
+      "turnId": "01a144b8-08c1-7511-bba8-88b9858c755d",
+      "startedAtMs": 1792154273990
+     }
+    },
+    {
+     "at": 1792154273992,
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "mcpToolCall",
+       "id": "fc_probe_1",
+       "server": "probe-surface",
+       "tool": "echo_probe",
+       "status": "completed",
+       "arguments": {
+        "text": "from fake model"
+       },
+       "appContext": null,
+       "mcpAppUi": null,
+       "pluginId": null,
+       "readOnlyHint": null,
+       "result": {
+        "content": [
+         {
+          "type": "text",
+          "text": "echo:{\"text\":\"from fake model\"}"
+         }
+        ],
+        "structuredContent": null,
+        "_meta": null
+       },
+       "error": null,
+       "durationMs": 1
+      },
+      "threadId": "01a144b8-0885-77d3-b783-5994af933e25",
+      "turnId": "01a144b8-08c1-7511-bba8-88b9858c755d",
+      "completedAtMs": 1792154273991
+     }
+    },
+    {
+     "at": 1792154273992,
+     "method": "thread/tokenUsage/updated",
+     "params": {
+      "threadId": "01a144b8-0885-77d3-b783-5994af933e25",
+      "turnId": "01a144b8-08c1-7511-bba8-88b9858c755d",
+      "tokenUsage": {
+       "total": {
+        "totalTokens": 2,
+        "inputTokens": 1,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 1,
+        "reasoningOutputTokens": 0
+       },
+       "last": {
+        "totalTokens": 2,
+        "inputTokens": 1,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 1,
+        "reasoningOutputTokens": 0
+       },
+       "modelContextWindow": 258400
+      }
+     }
+    },
+    {
+     "at": 1792154273992,
+     "method": "account/rateLimits/updated",
+     "params": {
+      "rateLimits": {
+       "limitId": "codex",
+       "limitName": null,
+       "normalModelSlug": null,
+       "primary": null,
+       "secondary": null,
+       "credits": null,
+       "individualLimit": null,
+       "spendControlReached": null,
+       "planType": null,
+       "rateLimitReachedType": null
+      }
+     }
+    },
+    {
+     "at": 1792154273993,
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "agentMessage",
+       "id": "msg_probe_1",
+       "text": "",
+       "phase": null,
+       "memoryCitation": null,
+       "delivery": null,
+       "questions": null
+      },
+      "threadId": "01a144b8-0885-77d3-b783-5994af933e25",
+      "turnId": "01a144b8-08c1-7511-bba8-88b9858c755d",
+      "startedAtMs": 1792154273993
+     }
+    },
+    {
+     "at": 1792154273993,
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "agentMessage",
+       "id": "msg_probe_1",
+       "text": "probe final message",
+       "phase": null,
+       "memoryCitation": null,
+       "delivery": null,
+       "questions": null
+      },
+      "threadId": "01a144b8-0885-77d3-b783-5994af933e25",
+      "turnId": "01a144b8-08c1-7511-bba8-88b9858c755d",
+      "completedAtMs": 1792154273993
+     }
+    },
+    {
+     "at": 1792154273993,
+     "method": "thread/tokenUsage/updated",
+     "params": {
+      "threadId": "01a144b8-0885-77d3-b783-5994af933e25",
+      "turnId": "01a144b8-08c1-7511-bba8-88b9858c755d",
+      "tokenUsage": {
+       "total": {
+        "totalTokens": 4,
+        "inputTokens": 2,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 2,
+        "reasoningOutputTokens": 0
+       },
+       "last": {
+        "totalTokens": 2,
+        "inputTokens": 1,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 1,
+        "reasoningOutputTokens": 0
+       },
+       "modelContextWindow": 258400
+      }
+     }
+    },
+    {
+     "at": 1792154273993,
+     "method": "account/rateLimits/updated",
+     "params": {
+      "rateLimits": {
+       "limitId": "codex",
+       "limitName": null,
+       "normalModelSlug": null,
+       "primary": null,
+       "secondary": null,
+       "credits": null,
+       "individualLimit": null,
+       "spendControlReached": null,
+       "planType": null,
+       "rateLimitReachedType": null
+      }
+     }
+    },
+    {
+     "at": 1792154273994,
+     "method": "thread/status/changed",
+     "params": {
+      "threadId": "01a144b8-0885-77d3-b783-5994af933e25",
+      "status": {
+       "type": "idle"
+      }
+     }
+    },
+    {
+     "at": 1792154273994,
+     "method": "turn/completed",
+     "params": {
+      "threadId": "01a144b8-0885-77d3-b783-5994af933e25",
+      "turn": {
+       "id": "01a144b8-08c1-7511-bba8-88b9858c755d",
+       "rootTurnId": "01a144b8-08c1-7511-bba8-88b9858c755d",
+       "items": [
+        {
+         "type": "agentMessage",
+         "id": "msg_probe_1",
+         "text": "probe final message",
+         "phase": null,
+         "memoryCitation": null,
+         "delivery": null,
+         "questions": null
+        }
+       ],
+       "itemsView": "summary",
+       "status": "completed",
+       "error": null,
+       "startedAt": 1792154273,
+       "completedAt": 1792154273,
+       "durationMs": 7
+      }
+     }
+    }
+   ],
+   "serverRequests": [],
+   "requests": [
+    {
+     "method": "initialize",
+     "params": {
+      "clientInfo": {
+       "name": "ans_mcp_probe",
+       "version": "0.0.0"
+      },
+      "capabilities": {
+       "experimentalApi": true,
+       "explicitGatewayOauth": true
+      }
+     }
+    },
+    {
+     "method": "config/read",
+     "params": {
+      "includeLayers": false,
+      "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-i15fIk"
+     }
+    },
+    {
+     "method": "thread/start",
+     "params": {
+      "model": "probe-model",
+      "modelProvider": "ans_probe",
+      "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-i15fIk",
+      "sandbox": "read-only",
+      "approvalPolicy": "never",
+      "approvalsReviewer": "user",
+      "config": {
+       "features": {
+        "shell_tool": false,
+        "hooks": false,
+        "apps": false,
+        "plugins": false,
+        "remote_plugin": false,
+        "browser_use": false,
+        "browser_use_external": false,
+        "browser_use_full_cdp_access": false,
+        "in_app_browser": false,
+        "computer_use": false,
+        "code_mode": false,
+        "code_mode_host": false,
+        "multi_agent": false,
+        "multi_agent_v2": false,
+        "request_permissions_tool": false,
+        "skill_mcp_dependency_install": false
+       },
+       "sandbox_mode": "read-only",
+       "approval_policy": "never",
+       "approvals_reviewer": "user",
+       "web_search": "disabled",
+       "projects": {
+        "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-i15fIk": {
+         "trust_level": "untrusted"
+        }
+       }
+      },
+      "developerInstructions": "mcp surface probe",
+      "ephemeral": true
+     }
+    },
+    {
+     "method": "turn/start",
+     "params": {
+      "threadId": "01a144b8-0885-77d3-b783-5994af933e25",
+      "input": [
+       {
+        "type": "text",
+        "text": "call the echo probe",
+        "text_elements": []
+       }
+      ],
+      "approvalPolicy": "never",
+      "approvalsReviewer": "user",
+      "sandboxPolicy": {
+       "type": "readOnly",
+       "networkAccess": false
+      },
+      "model": "probe-model"
+     }
+    }
+   ],
+   "preparation": null,
+   "readbackServers": {
+    "probe-surface": {
+     "command": "/usr/local/bin/node",
+     "args": [
+      "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-stage-bm-approve-Ii3jBP/echo-mcp.mjs",
+      "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-stage-bm-approve-Ii3jBP/capture-approve.json"
+     ],
+     "environment_id": "local",
+     "enabled": true,
+     "startup_timeout_sec": 5,
+     "tool_timeout_sec": 5,
+     "default_tools_approval_mode": "approve"
+    }
+   },
+   "thread": {
+    "id": "01a144b8-0885-77d3-b783-5994af933e25"
+   },
+   "turn": {
+    "id": "01a144b8-08c1-7511-bba8-88b9858c755d",
+    "status": "inProgress"
+   },
+   "turnCompleted": true,
+   "turnOutcome": "completed",
+   "mcpItems": [
+    {
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "mcpToolCall",
+       "id": "fc_probe_1",
+       "server": "probe-surface",
+       "tool": "echo_probe",
+       "status": "inProgress",
+       "arguments": {
+        "text": "from fake model"
+       },
+       "appContext": null,
+       "mcpAppUi": null,
+       "pluginId": null,
+       "readOnlyHint": null,
+       "result": null,
+       "error": null,
+       "durationMs": null
+      },
+      "threadId": "01a144b8-0885-77d3-b783-5994af933e25",
+      "turnId": "01a144b8-08c1-7511-bba8-88b9858c755d",
+      "startedAtMs": 1792154273990
+     }
+    },
+    {
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "mcpToolCall",
+       "id": "fc_probe_1",
+       "server": "probe-surface",
+       "tool": "echo_probe",
+       "status": "completed",
+       "arguments": {
+        "text": "from fake model"
+       },
+       "appContext": null,
+       "mcpAppUi": null,
+       "pluginId": null,
+       "readOnlyHint": null,
+       "result": {
+        "content": [
+         {
+          "type": "text",
+          "text": "echo:{\"text\":\"from fake model\"}"
+         }
+        ],
+        "structuredContent": null,
+        "_meta": null
+       },
+       "error": null,
+       "durationMs": 1
+      },
+      "threadId": "01a144b8-0885-77d3-b783-5994af933e25",
+      "turnId": "01a144b8-08c1-7511-bba8-88b9858c755d",
+      "completedAtMs": 1792154273991
+     }
+    }
+   ],
+   "fixtureCalls": [
+    {
+     "name": "echo_probe",
+     "args": {
+      "text": "from fake model"
+     }
+    }
+   ],
+   "serverRequestsDuringTurn": [],
+   "toolSpecs": [
+    {
+     "type": "namespace",
+     "name": "mcp__probe_surface",
+     "description": "Tools in the mcp__probe_surface namespace.",
+     "tools": [
+      {
+       "type": "function",
+       "name": "echo_probe",
+       "description": "controlled echo",
+       "strict": false,
+       "parameters": {
+        "type": "object",
+        "properties": {
+         "text": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "text"
+        ]
+       }
+      },
+      {
+       "type": "function",
+       "name": "elicit_probe",
+       "description": "sends an elicitation request while handling the call",
+       "strict": false,
+       "parameters": {
+        "type": "object",
+        "properties": {}
+       }
+      },
+      {
+       "type": "function",
+       "name": "hang_probe",
+       "description": "never responds (timeout probe)",
+       "strict": false,
+       "parameters": {
+        "type": "object",
+        "properties": {}
+       }
+      }
+     ]
+    },
+    {
+     "type": "namespace",
+     "name": "mcp__probe_surface",
+     "description": "Tools in the mcp__probe_surface namespace.",
+     "tools": [
+      {
+       "type": "function",
+       "name": "echo_probe",
+       "description": "controlled echo",
+       "strict": false,
+       "parameters": {
+        "type": "object",
+        "properties": {
+         "text": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "text"
+        ]
+       }
+      },
+      {
+       "type": "function",
+       "name": "elicit_probe",
+       "description": "sends an elicitation request while handling the call",
+       "strict": false,
+       "parameters": {
+        "type": "object",
+        "properties": {}
+       }
+      },
+      {
+       "type": "function",
+       "name": "hang_probe",
+       "description": "never responds (timeout probe)",
+       "strict": false,
+       "parameters": {
+        "type": "object",
+        "properties": {}
+       }
+      }
+     ]
+    }
+   ],
+   "functionItems": [
+    {
+     "type": "function_call",
+     "id": "fc_probe_1",
+     "name": "echo_probe",
+     "namespace": "mcp__probe_surface",
+     "arguments": "{\"text\":\"from fake model\"}",
+     "call_id": "fc_probe_1"
+    },
+    {
+     "type": "function_call_output",
+     "id": "fco_01a144b8-08c8-7141-803d-9db08211e7a7",
+     "call_id": "fc_probe_1",
+     "output": [
+      {
+       "type": "input_text",
+       "text": "Wall time: 0.0012 seconds\nOutput:"
+      },
+      {
+       "type": "input_text",
+       "text": "echo:{\"text\":\"from fake model\"}"
+      }
+     ]
+    }
+   ],
+   "stderrTail": "",
+   "httpBodies": 2,
+   "modelRequestSummary": [
+    {
+     "tools": [
+      "list_mcp_resources",
+      "list_mcp_resource_templates",
+      "read_mcp_resource",
+      "request_user_input",
+      "view_image",
+      "mcp__probe_surface",
+      "get_goal",
+      "create_goal",
+      "update_goal"
+     ],
+     "inputKinds": [
+      "message",
+      "message",
+      "message",
+      "message"
+     ],
+     "mcpBridgeTool": "mcp__probe_surface"
+    },
+    {
+     "tools": [
+      "list_mcp_resources",
+      "list_mcp_resource_templates",
+      "read_mcp_resource",
+      "request_user_input",
+      "view_image",
+      "mcp__probe_surface",
+      "get_goal",
+      "create_goal",
+      "update_goal"
+     ],
+     "inputKinds": [
+      "message",
+      "message",
+      "message",
+      "message",
+      "function_call",
+      "function_call_output"
+     ],
+     "mcpBridgeTool": "mcp__probe_surface"
+    }
+   ],
+   "childExit": 0
+  },
+  {
+   "name": "B-mode-writes",
+   "overrides": [
+    "features.shell_tool=false",
+    "features.hooks=false",
+    "features.apps=false",
+    "features.plugins=false",
+    "features.remote_plugin=false",
+    "features.browser_use=false",
+    "features.browser_use_external=false",
+    "features.browser_use_full_cdp_access=false",
+    "features.in_app_browser=false",
+    "features.computer_use=false",
+    "features.code_mode=false",
+    "features.code_mode_host=false",
+    "features.multi_agent=false",
+    "features.multi_agent_v2=false",
+    "features.request_permissions_tool=false",
+    "features.skill_mcp_dependency_install=false",
+    "sandbox_mode=\"read-only\"",
+    "approval_policy=\"never\"",
+    "approvals_reviewer=\"user\"",
+    "web_search=\"disabled\"",
+    "projects={\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-Gh2Yxf\"={trust_level=\"untrusted\"}}",
+    "model_providers.ans_probe={name=\"ANS Probe\",base_url=\"http://127.0.0.1:58663/v1\",env_key=\"CODEX_API_KEY\",wire_api=\"responses\",requires_openai_auth=false}",
+    "model_provider=\"ans_probe\"",
+    "model=\"probe-model\"",
+    "mcp_servers={\"probe-surface\"={command=\"/usr/local/bin/node\",args=[\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-stage-bm-writes-ISbRcq/echo-mcp.mjs\",\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-stage-bm-writes-ISbRcq/capture-writes.json\"],startup_timeout_sec=5,tool_timeout_sec=5,default_tools_approval_mode=\"writes\"}}"
+   ],
+   "notices": [
+    {
+     "at": 1792154274089,
+     "method": "remoteControl/status/changed",
+     "params": {
+      "status": "disabled",
+      "serverName": "wangzhongrendeMacBook-Pro.local",
+      "installationId": "f48286f7-2cbd-4982-b129-5546e150132f",
+      "environmentId": null
+     }
+    },
+    {
+     "at": 1792154274100,
+     "method": "thread/started",
+     "params": {
+      "thread": {
+       "id": "01a144b8-092b-7c50-a20a-5f75c9c6359d",
+       "environments": [
+        {
+         "environmentId": "local",
+         "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-Gh2Yxf",
+         "runtimeWorkspaceRoots": [
+          "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-Gh2Yxf"
+         ]
+        }
+       ],
+       "extra": null,
+       "sessionId": "01a144b8-092b-7c50-a20a-5f75c9c6359d",
+       "forkedFromId": null,
+       "parentThreadId": null,
+       "preview": "",
+       "ephemeral": true,
+       "section": null,
+       "sectionEnteredAt": null,
+       "projectId": null,
+       "historyMode": "paginated",
+       "modelProvider": "ans_probe",
+       "model": "probe-model",
+       "reasoningEffort": null,
+       "createdAt": 1792154274,
+       "updatedAt": 1792154274,
+       "recencyAt": 1792154274,
+       "status": {
+        "type": "idle"
+       },
+       "path": null,
+       "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-Gh2Yxf",
+       "cliVersion": "0.162.1",
+       "originator": "ans_mcp_probe",
+       "source": "vscode",
+       "canAcceptDirectInput": true,
+       "threadSource": null,
+       "agentNickname": null,
+       "agentRole": null,
+       "gitInfo": null,
+       "name": null,
+       "daybreakEnabled": null,
+       "turns": []
+      }
+     }
+    },
+    {
+     "at": 1792154274100,
+     "method": "mcpServer/startupStatus/updated",
+     "params": {
+      "threadId": "01a144b8-092b-7c50-a20a-5f75c9c6359d",
+      "name": "probe-surface",
+      "status": "starting",
+      "error": null,
+      "failureReason": null
+     }
+    },
+    {
+     "at": 1792154274118,
+     "method": "mcpServer/startupStatus/updated",
+     "params": {
+      "threadId": "01a144b8-092b-7c50-a20a-5f75c9c6359d",
+      "name": "probe-surface",
+      "status": "ready",
+      "error": null,
+      "failureReason": null
+     }
+    },
+    {
+     "at": 1792154274153,
+     "method": "warning",
+     "params": {
+      "threadId": "01a144b8-092b-7c50-a20a-5f75c9c6359d",
+      "message": "Model metadata for `probe-model` not found. Defaulting to fallback metadata; this can degrade performance and cause issues."
+     }
+    },
+    {
+     "at": 1792154274154,
+     "method": "thread/status/changed",
+     "params": {
+      "threadId": "01a144b8-092b-7c50-a20a-5f75c9c6359d",
+      "status": {
+       "type": "active",
+       "activeFlags": []
+      }
+     }
+    },
+    {
+     "at": 1792154274154,
+     "method": "turn/started",
+     "params": {
+      "threadId": "01a144b8-092b-7c50-a20a-5f75c9c6359d",
+      "turn": {
+       "id": "01a144b8-0968-74e1-bac9-f4e57a66e7eb",
+       "rootTurnId": "01a144b8-0968-74e1-bac9-f4e57a66e7eb",
+       "items": [],
+       "itemsView": "notLoaded",
+       "status": "inProgress",
+       "error": null,
+       "startedAt": 1792154274,
+       "completedAt": null,
+       "durationMs": null
+      }
+     }
+    },
+    {
+     "at": 1792154274155,
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "userMessage",
+       "id": "01a144b8-096a-7dc3-acbf-d6d3bf8fdfc5",
+       "clientId": null,
+       "content": [
+        {
+         "type": "text",
+         "text": "call the echo probe",
+         "text_elements": []
+        }
+       ]
+      },
+      "threadId": "01a144b8-092b-7c50-a20a-5f75c9c6359d",
+      "turnId": "01a144b8-0968-74e1-bac9-f4e57a66e7eb",
+      "startedAtMs": 1792154274154
+     }
+    },
+    {
+     "at": 1792154274155,
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "userMessage",
+       "id": "01a144b8-096a-7dc3-acbf-d6d3bf8fdfc5",
+       "clientId": null,
+       "content": [
+        {
+         "type": "text",
+         "text": "call the echo probe",
+         "text_elements": []
+        }
+       ]
+      },
+      "threadId": "01a144b8-092b-7c50-a20a-5f75c9c6359d",
+      "turnId": "01a144b8-0968-74e1-bac9-f4e57a66e7eb",
+      "completedAtMs": 1792154274154
+     }
+    },
+    {
+     "at": 1792154274159,
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "mcpToolCall",
+       "id": "fc_probe_1",
+       "server": "probe-surface",
+       "tool": "echo_probe",
+       "status": "inProgress",
+       "arguments": {
+        "text": "from fake model"
+       },
+       "appContext": null,
+       "mcpAppUi": null,
+       "pluginId": null,
+       "readOnlyHint": null,
+       "result": null,
+       "error": null,
+       "durationMs": null
+      },
+      "threadId": "01a144b8-092b-7c50-a20a-5f75c9c6359d",
+      "turnId": "01a144b8-0968-74e1-bac9-f4e57a66e7eb",
+      "startedAtMs": 1792154274158
+     }
+    },
+    {
+     "at": 1792154274159,
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "mcpToolCall",
+       "id": "fc_probe_1",
+       "server": "probe-surface",
+       "tool": "echo_probe",
+       "status": "failed",
+       "arguments": {
+        "text": "from fake model"
+       },
+       "appContext": null,
+       "mcpAppUi": null,
+       "pluginId": null,
+       "readOnlyHint": null,
+       "result": null,
+       "error": {
+        "message": "MCP tool call requires approval, but approval policy is never"
+       },
+       "durationMs": 0
+      },
+      "threadId": "01a144b8-092b-7c50-a20a-5f75c9c6359d",
+      "turnId": "01a144b8-0968-74e1-bac9-f4e57a66e7eb",
+      "completedAtMs": 1792154274159
+     }
+    },
+    {
+     "at": 1792154274159,
+     "method": "thread/tokenUsage/updated",
+     "params": {
+      "threadId": "01a144b8-092b-7c50-a20a-5f75c9c6359d",
+      "turnId": "01a144b8-0968-74e1-bac9-f4e57a66e7eb",
+      "tokenUsage": {
+       "total": {
+        "totalTokens": 2,
+        "inputTokens": 1,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 1,
+        "reasoningOutputTokens": 0
+       },
+       "last": {
+        "totalTokens": 2,
+        "inputTokens": 1,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 1,
+        "reasoningOutputTokens": 0
+       },
+       "modelContextWindow": 258400
+      }
+     }
+    },
+    {
+     "at": 1792154274159,
+     "method": "account/rateLimits/updated",
+     "params": {
+      "rateLimits": {
+       "limitId": "codex",
+       "limitName": null,
+       "normalModelSlug": null,
+       "primary": null,
+       "secondary": null,
+       "credits": null,
+       "individualLimit": null,
+       "spendControlReached": null,
+       "planType": null,
+       "rateLimitReachedType": null
+      }
+     }
+    },
+    {
+     "at": 1792154274161,
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "agentMessage",
+       "id": "msg_probe_1",
+       "text": "",
+       "phase": null,
+       "memoryCitation": null,
+       "delivery": null,
+       "questions": null
+      },
+      "threadId": "01a144b8-092b-7c50-a20a-5f75c9c6359d",
+      "turnId": "01a144b8-0968-74e1-bac9-f4e57a66e7eb",
+      "startedAtMs": 1792154274160
+     }
+    },
+    {
+     "at": 1792154274161,
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "agentMessage",
+       "id": "msg_probe_1",
+       "text": "probe final message",
+       "phase": null,
+       "memoryCitation": null,
+       "delivery": null,
+       "questions": null
+      },
+      "threadId": "01a144b8-092b-7c50-a20a-5f75c9c6359d",
+      "turnId": "01a144b8-0968-74e1-bac9-f4e57a66e7eb",
+      "completedAtMs": 1792154274160
+     }
+    },
+    {
+     "at": 1792154274161,
+     "method": "thread/tokenUsage/updated",
+     "params": {
+      "threadId": "01a144b8-092b-7c50-a20a-5f75c9c6359d",
+      "turnId": "01a144b8-0968-74e1-bac9-f4e57a66e7eb",
+      "tokenUsage": {
+       "total": {
+        "totalTokens": 4,
+        "inputTokens": 2,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 2,
+        "reasoningOutputTokens": 0
+       },
+       "last": {
+        "totalTokens": 2,
+        "inputTokens": 1,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 1,
+        "reasoningOutputTokens": 0
+       },
+       "modelContextWindow": 258400
+      }
+     }
+    },
+    {
+     "at": 1792154274161,
+     "method": "account/rateLimits/updated",
+     "params": {
+      "rateLimits": {
+       "limitId": "codex",
+       "limitName": null,
+       "normalModelSlug": null,
+       "primary": null,
+       "secondary": null,
+       "credits": null,
+       "individualLimit": null,
+       "spendControlReached": null,
+       "planType": null,
+       "rateLimitReachedType": null
+      }
+     }
+    },
+    {
+     "at": 1792154274161,
+     "method": "thread/status/changed",
+     "params": {
+      "threadId": "01a144b8-092b-7c50-a20a-5f75c9c6359d",
+      "status": {
+       "type": "idle"
+      }
+     }
+    },
+    {
+     "at": 1792154274161,
+     "method": "turn/completed",
+     "params": {
+      "threadId": "01a144b8-092b-7c50-a20a-5f75c9c6359d",
+      "turn": {
+       "id": "01a144b8-0968-74e1-bac9-f4e57a66e7eb",
+       "rootTurnId": "01a144b8-0968-74e1-bac9-f4e57a66e7eb",
+       "items": [
+        {
+         "type": "agentMessage",
+         "id": "msg_probe_1",
+         "text": "probe final message",
+         "phase": null,
+         "memoryCitation": null,
+         "delivery": null,
+         "questions": null
+        }
+       ],
+       "itemsView": "summary",
+       "status": "completed",
+       "error": null,
+       "startedAt": 1792154274,
+       "completedAt": 1792154274,
+       "durationMs": 7
+      }
+     }
+    }
+   ],
+   "serverRequests": [],
+   "requests": [
+    {
+     "method": "initialize",
+     "params": {
+      "clientInfo": {
+       "name": "ans_mcp_probe",
+       "version": "0.0.0"
+      },
+      "capabilities": {
+       "experimentalApi": true,
+       "explicitGatewayOauth": true
+      }
+     }
+    },
+    {
+     "method": "config/read",
+     "params": {
+      "includeLayers": false,
+      "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-Gh2Yxf"
+     }
+    },
+    {
+     "method": "thread/start",
+     "params": {
+      "model": "probe-model",
+      "modelProvider": "ans_probe",
+      "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-Gh2Yxf",
+      "sandbox": "read-only",
+      "approvalPolicy": "never",
+      "approvalsReviewer": "user",
+      "config": {
+       "features": {
+        "shell_tool": false,
+        "hooks": false,
+        "apps": false,
+        "plugins": false,
+        "remote_plugin": false,
+        "browser_use": false,
+        "browser_use_external": false,
+        "browser_use_full_cdp_access": false,
+        "in_app_browser": false,
+        "computer_use": false,
+        "code_mode": false,
+        "code_mode_host": false,
+        "multi_agent": false,
+        "multi_agent_v2": false,
+        "request_permissions_tool": false,
+        "skill_mcp_dependency_install": false
+       },
+       "sandbox_mode": "read-only",
+       "approval_policy": "never",
+       "approvals_reviewer": "user",
+       "web_search": "disabled",
+       "projects": {
+        "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-Gh2Yxf": {
+         "trust_level": "untrusted"
+        }
+       }
+      },
+      "developerInstructions": "mcp surface probe",
+      "ephemeral": true
+     }
+    },
+    {
+     "method": "turn/start",
+     "params": {
+      "threadId": "01a144b8-092b-7c50-a20a-5f75c9c6359d",
+      "input": [
+       {
+        "type": "text",
+        "text": "call the echo probe",
+        "text_elements": []
+       }
+      ],
+      "approvalPolicy": "never",
+      "approvalsReviewer": "user",
+      "sandboxPolicy": {
+       "type": "readOnly",
+       "networkAccess": false
+      },
+      "model": "probe-model"
+     }
+    }
+   ],
+   "preparation": null,
+   "readbackServers": {
+    "probe-surface": {
+     "command": "/usr/local/bin/node",
+     "args": [
+      "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-stage-bm-writes-ISbRcq/echo-mcp.mjs",
+      "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-stage-bm-writes-ISbRcq/capture-writes.json"
+     ],
+     "environment_id": "local",
+     "enabled": true,
+     "startup_timeout_sec": 5,
+     "tool_timeout_sec": 5,
+     "default_tools_approval_mode": "writes"
+    }
+   },
+   "thread": {
+    "id": "01a144b8-092b-7c50-a20a-5f75c9c6359d"
+   },
+   "turn": {
+    "id": "01a144b8-0968-74e1-bac9-f4e57a66e7eb",
+    "status": "inProgress"
+   },
+   "turnCompleted": true,
+   "turnOutcome": "completed",
+   "mcpItems": [
+    {
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "mcpToolCall",
+       "id": "fc_probe_1",
+       "server": "probe-surface",
+       "tool": "echo_probe",
+       "status": "inProgress",
+       "arguments": {
+        "text": "from fake model"
+       },
+       "appContext": null,
+       "mcpAppUi": null,
+       "pluginId": null,
+       "readOnlyHint": null,
+       "result": null,
+       "error": null,
+       "durationMs": null
+      },
+      "threadId": "01a144b8-092b-7c50-a20a-5f75c9c6359d",
+      "turnId": "01a144b8-0968-74e1-bac9-f4e57a66e7eb",
+      "startedAtMs": 1792154274158
+     }
+    },
+    {
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "mcpToolCall",
+       "id": "fc_probe_1",
+       "server": "probe-surface",
+       "tool": "echo_probe",
+       "status": "failed",
+       "arguments": {
+        "text": "from fake model"
+       },
+       "appContext": null,
+       "mcpAppUi": null,
+       "pluginId": null,
+       "readOnlyHint": null,
+       "result": null,
+       "error": {
+        "message": "MCP tool call requires approval, but approval policy is never"
+       },
+       "durationMs": 0
+      },
+      "threadId": "01a144b8-092b-7c50-a20a-5f75c9c6359d",
+      "turnId": "01a144b8-0968-74e1-bac9-f4e57a66e7eb",
+      "completedAtMs": 1792154274159
+     }
+    }
+   ],
+   "fixtureCalls": [],
+   "serverRequestsDuringTurn": [],
+   "toolSpecs": [
+    {
+     "type": "namespace",
+     "name": "mcp__probe_surface",
+     "description": "Tools in the mcp__probe_surface namespace.",
+     "tools": [
+      {
+       "type": "function",
+       "name": "echo_probe",
+       "description": "controlled echo",
+       "strict": false,
+       "parameters": {
+        "type": "object",
+        "properties": {
+         "text": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "text"
+        ]
+       }
+      },
+      {
+       "type": "function",
+       "name": "elicit_probe",
+       "description": "sends an elicitation request while handling the call",
+       "strict": false,
+       "parameters": {
+        "type": "object",
+        "properties": {}
+       }
+      },
+      {
+       "type": "function",
+       "name": "hang_probe",
+       "description": "never responds (timeout probe)",
+       "strict": false,
+       "parameters": {
+        "type": "object",
+        "properties": {}
+       }
+      }
+     ]
+    },
+    {
+     "type": "namespace",
+     "name": "mcp__probe_surface",
+     "description": "Tools in the mcp__probe_surface namespace.",
+     "tools": [
+      {
+       "type": "function",
+       "name": "echo_probe",
+       "description": "controlled echo",
+       "strict": false,
+       "parameters": {
+        "type": "object",
+        "properties": {
+         "text": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "text"
+        ]
+       }
+      },
+      {
+       "type": "function",
+       "name": "elicit_probe",
+       "description": "sends an elicitation request while handling the call",
+       "strict": false,
+       "parameters": {
+        "type": "object",
+        "properties": {}
+       }
+      },
+      {
+       "type": "function",
+       "name": "hang_probe",
+       "description": "never responds (timeout probe)",
+       "strict": false,
+       "parameters": {
+        "type": "object",
+        "properties": {}
+       }
+      }
+     ]
+    }
+   ],
+   "functionItems": [
+    {
+     "type": "function_call",
+     "id": "fc_probe_1",
+     "name": "echo_probe",
+     "namespace": "mcp__probe_surface",
+     "arguments": "{\"text\":\"from fake model\"}",
+     "call_id": "fc_probe_1"
+    },
+    {
+     "type": "function_call_output",
+     "id": "fco_01a144b8-096f-7370-b37d-0b37998854b1",
+     "call_id": "fc_probe_1",
+     "output": [
+      {
+       "type": "input_text",
+       "text": "Wall time: 0.0001 seconds\nOutput:"
+      },
+      {
+       "type": "input_text",
+       "text": "MCP tool call requires approval, but approval policy is never"
+      }
+     ]
+    }
+   ],
+   "stderrTail": "",
+   "httpBodies": 2,
+   "modelRequestSummary": [
+    {
+     "tools": [
+      "list_mcp_resources",
+      "list_mcp_resource_templates",
+      "read_mcp_resource",
+      "request_user_input",
+      "view_image",
+      "mcp__probe_surface",
+      "get_goal",
+      "create_goal",
+      "update_goal"
+     ],
+     "inputKinds": [
+      "message",
+      "message",
+      "message",
+      "message"
+     ],
+     "mcpBridgeTool": "mcp__probe_surface"
+    },
+    {
+     "tools": [
+      "list_mcp_resources",
+      "list_mcp_resource_templates",
+      "read_mcp_resource",
+      "request_user_input",
+      "view_image",
+      "mcp__probe_surface",
+      "get_goal",
+      "create_goal",
+      "update_goal"
+     ],
+     "inputKinds": [
+      "message",
+      "message",
+      "message",
+      "message",
+      "function_call",
+      "function_call_output"
+     ],
+     "mcpBridgeTool": "mcp__probe_surface"
+    }
+   ],
+   "childExit": 0
+  },
+  {
+   "name": "B-mode-never",
+   "overrides": [
+    "features.shell_tool=false",
+    "features.hooks=false",
+    "features.apps=false",
+    "features.plugins=false",
+    "features.remote_plugin=false",
+    "features.browser_use=false",
+    "features.browser_use_external=false",
+    "features.browser_use_full_cdp_access=false",
+    "features.in_app_browser=false",
+    "features.computer_use=false",
+    "features.code_mode=false",
+    "features.code_mode_host=false",
+    "features.multi_agent=false",
+    "features.multi_agent_v2=false",
+    "features.request_permissions_tool=false",
+    "features.skill_mcp_dependency_install=false",
+    "sandbox_mode=\"read-only\"",
+    "approval_policy=\"never\"",
+    "approvals_reviewer=\"user\"",
+    "web_search=\"disabled\"",
+    "projects={\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-SZi6MX\"={trust_level=\"untrusted\"}}",
+    "model_providers.ans_probe={name=\"ANS Probe\",base_url=\"http://127.0.0.1:58663/v1\",env_key=\"CODEX_API_KEY\",wire_api=\"responses\",requires_openai_auth=false}",
+    "model_provider=\"ans_probe\"",
+    "model=\"probe-model\"",
+    "mcp_servers={\"probe-surface\"={command=\"/usr/local/bin/node\",args=[\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-stage-bm-never-90eoyE/echo-mcp.mjs\",\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-stage-bm-never-90eoyE/capture-never.json\"],startup_timeout_sec=5,tool_timeout_sec=5,default_tools_approval_mode=\"never\"}}"
+   ],
+   "notices": [],
+   "serverRequests": [],
+   "requests": [
+    {
+     "method": "initialize",
+     "params": {
+      "clientInfo": {
+       "name": "ans_mcp_probe",
+       "version": "0.0.0"
+      },
+      "capabilities": {
+       "experimentalApi": true,
+       "explicitGatewayOauth": true
+      }
+     }
+    }
+   ],
+   "preparation": null,
+   "error": "Error: probe initialize timed out after 20000ms",
+   "toolSpecs": [],
+   "functionItems": [],
+   "stderrTail": "Error: unknown variant `never`, expected one of `auto`, `prompt`, `writes`, `approve`\nin `mcp_servers.probe-surface.default_tools_approval_mode`\n\n",
+   "httpBodies": 0,
+   "modelRequestSummary": [],
+   "childExit": 1
+  },
+  {
+   "name": "B2-model-driven-auto-approval",
+   "overrides": [
+    "features.shell_tool=false",
+    "features.hooks=false",
+    "features.apps=false",
+    "features.plugins=false",
+    "features.remote_plugin=false",
+    "features.browser_use=false",
+    "features.browser_use_external=false",
+    "features.browser_use_full_cdp_access=false",
+    "features.in_app_browser=false",
+    "features.computer_use=false",
+    "features.code_mode=false",
+    "features.code_mode_host=false",
+    "features.multi_agent=false",
+    "features.multi_agent_v2=false",
+    "features.request_permissions_tool=false",
+    "features.skill_mcp_dependency_install=false",
+    "sandbox_mode=\"read-only\"",
+    "approval_policy=\"never\"",
+    "approvals_reviewer=\"user\"",
+    "web_search=\"disabled\"",
+    "projects={\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-0QhaEH\"={trust_level=\"untrusted\"}}",
+    "model_providers.ans_probe={name=\"ANS Probe\",base_url=\"http://127.0.0.1:58663/v1\",env_key=\"CODEX_API_KEY\",wire_api=\"responses\",requires_openai_auth=false}",
+    "model_provider=\"ans_probe\"",
+    "model=\"probe-model\"",
+    "mcp_servers={\"probe-surface\"={command=\"/usr/local/bin/node\",args=[\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-stage-b2-SrDalK/echo-mcp.mjs\",\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-stage-b2-SrDalK/capture-b2.json\"],startup_timeout_sec=5,tool_timeout_sec=5,default_tools_approval_mode=\"auto\"}}"
+   ],
+   "notices": [
+    {
+     "at": 1792154298372,
+     "method": "remoteControl/status/changed",
+     "params": {
+      "status": "disabled",
+      "serverName": "wangzhongrendeMacBook-Pro.local",
+      "installationId": "72c90ec4-aff5-43ed-b96f-d5061ae05e38",
+      "environmentId": null
+     }
+    },
+    {
+     "at": 1792154298431,
+     "method": "thread/started",
+     "params": {
+      "thread": {
+       "id": "01a144b8-6810-7ab0-908d-34ff0d17599b",
+       "environments": [
+        {
+         "environmentId": "local",
+         "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-0QhaEH",
+         "runtimeWorkspaceRoots": [
+          "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-0QhaEH"
+         ]
+        }
+       ],
+       "extra": null,
+       "sessionId": "01a144b8-6810-7ab0-908d-34ff0d17599b",
+       "forkedFromId": null,
+       "parentThreadId": null,
+       "preview": "",
+       "ephemeral": true,
+       "section": null,
+       "sectionEnteredAt": null,
+       "projectId": null,
+       "historyMode": "paginated",
+       "modelProvider": "ans_probe",
+       "model": "probe-model",
+       "reasoningEffort": null,
+       "createdAt": 1792154298,
+       "updatedAt": 1792154298,
+       "recencyAt": 1792154298,
+       "status": {
+        "type": "idle"
+       },
+       "path": null,
+       "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-0QhaEH",
+       "cliVersion": "0.162.1",
+       "originator": "ans_mcp_probe",
+       "source": "vscode",
+       "canAcceptDirectInput": true,
+       "threadSource": null,
+       "agentNickname": null,
+       "agentRole": null,
+       "gitInfo": null,
+       "name": null,
+       "daybreakEnabled": null,
+       "turns": []
+      }
+     }
+    },
+    {
+     "at": 1792154298431,
+     "method": "mcpServer/startupStatus/updated",
+     "params": {
+      "threadId": "01a144b8-6810-7ab0-908d-34ff0d17599b",
+      "name": "probe-surface",
+      "status": "starting",
+      "error": null,
+      "failureReason": null
+     }
+    },
+    {
+     "at": 1792154298449,
+     "method": "mcpServer/startupStatus/updated",
+     "params": {
+      "threadId": "01a144b8-6810-7ab0-908d-34ff0d17599b",
+      "name": "probe-surface",
+      "status": "ready",
+      "error": null,
+      "failureReason": null
+     }
+    },
+    {
+     "at": 1792154298489,
+     "method": "warning",
+     "params": {
+      "threadId": "01a144b8-6810-7ab0-908d-34ff0d17599b",
+      "message": "Model metadata for `probe-model` not found. Defaulting to fallback metadata; this can degrade performance and cause issues."
+     }
+    },
+    {
+     "at": 1792154298496,
+     "method": "thread/status/changed",
+     "params": {
+      "threadId": "01a144b8-6810-7ab0-908d-34ff0d17599b",
+      "status": {
+       "type": "active",
+       "activeFlags": []
+      }
+     }
+    },
+    {
+     "at": 1792154298496,
+     "method": "turn/started",
+     "params": {
+      "threadId": "01a144b8-6810-7ab0-908d-34ff0d17599b",
+      "turn": {
+       "id": "01a144b8-6874-7733-bbe2-6e3878e4e788",
+       "rootTurnId": "01a144b8-6874-7733-bbe2-6e3878e4e788",
+       "items": [],
+       "itemsView": "notLoaded",
+       "status": "inProgress",
+       "error": null,
+       "startedAt": 1792154298,
+       "completedAt": null,
+       "durationMs": null
+      }
+     }
+    },
+    {
+     "at": 1792154298501,
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "userMessage",
+       "id": "01a144b8-6884-7d83-92be-5bf39ed76105",
+       "clientId": null,
+       "content": [
+        {
+         "type": "text",
+         "text": "call the echo probe",
+         "text_elements": []
+        }
+       ]
+      },
+      "threadId": "01a144b8-6810-7ab0-908d-34ff0d17599b",
+      "turnId": "01a144b8-6874-7733-bbe2-6e3878e4e788",
+      "startedAtMs": 1792154298501
+     }
+    },
+    {
+     "at": 1792154298501,
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "userMessage",
+       "id": "01a144b8-6884-7d83-92be-5bf39ed76105",
+       "clientId": null,
+       "content": [
+        {
+         "type": "text",
+         "text": "call the echo probe",
+         "text_elements": []
+        }
+       ]
+      },
+      "threadId": "01a144b8-6810-7ab0-908d-34ff0d17599b",
+      "turnId": "01a144b8-6874-7733-bbe2-6e3878e4e788",
+      "completedAtMs": 1792154298501
+     }
+    },
+    {
+     "at": 1792154298516,
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "mcpToolCall",
+       "id": "fc_probe_1",
+       "server": "probe-surface",
+       "tool": "echo_probe",
+       "status": "inProgress",
+       "arguments": {
+        "text": "from fake model"
+       },
+       "appContext": null,
+       "mcpAppUi": null,
+       "pluginId": null,
+       "readOnlyHint": null,
+       "result": null,
+       "error": null,
+       "durationMs": null
+      },
+      "threadId": "01a144b8-6810-7ab0-908d-34ff0d17599b",
+      "turnId": "01a144b8-6874-7733-bbe2-6e3878e4e788",
+      "startedAtMs": 1792154298515
+     }
+    },
+    {
+     "at": 1792154298516,
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "mcpToolCall",
+       "id": "fc_probe_1",
+       "server": "probe-surface",
+       "tool": "echo_probe",
+       "status": "failed",
+       "arguments": {
+        "text": "from fake model"
+       },
+       "appContext": null,
+       "mcpAppUi": null,
+       "pluginId": null,
+       "readOnlyHint": null,
+       "result": null,
+       "error": {
+        "message": "MCP tool call requires approval, but approval policy is never"
+       },
+       "durationMs": 0
+      },
+      "threadId": "01a144b8-6810-7ab0-908d-34ff0d17599b",
+      "turnId": "01a144b8-6874-7733-bbe2-6e3878e4e788",
+      "completedAtMs": 1792154298516
+     }
+    },
+    {
+     "at": 1792154298516,
+     "method": "thread/tokenUsage/updated",
+     "params": {
+      "threadId": "01a144b8-6810-7ab0-908d-34ff0d17599b",
+      "turnId": "01a144b8-6874-7733-bbe2-6e3878e4e788",
+      "tokenUsage": {
+       "total": {
+        "totalTokens": 2,
+        "inputTokens": 1,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 1,
+        "reasoningOutputTokens": 0
+       },
+       "last": {
+        "totalTokens": 2,
+        "inputTokens": 1,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 1,
+        "reasoningOutputTokens": 0
+       },
+       "modelContextWindow": 258400
+      }
+     }
+    },
+    {
+     "at": 1792154298516,
+     "method": "account/rateLimits/updated",
+     "params": {
+      "rateLimits": {
+       "limitId": "codex",
+       "limitName": null,
+       "normalModelSlug": null,
+       "primary": null,
+       "secondary": null,
+       "credits": null,
+       "individualLimit": null,
+       "spendControlReached": null,
+       "planType": null,
+       "rateLimitReachedType": null
+      }
+     }
+    },
+    {
+     "at": 1792154298519,
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "agentMessage",
+       "id": "msg_probe_1",
+       "text": "",
+       "phase": null,
+       "memoryCitation": null,
+       "delivery": null,
+       "questions": null
+      },
+      "threadId": "01a144b8-6810-7ab0-908d-34ff0d17599b",
+      "turnId": "01a144b8-6874-7733-bbe2-6e3878e4e788",
+      "startedAtMs": 1792154298519
+     }
+    },
+    {
+     "at": 1792154298519,
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "agentMessage",
+       "id": "msg_probe_1",
+       "text": "probe final message",
+       "phase": null,
+       "memoryCitation": null,
+       "delivery": null,
+       "questions": null
+      },
+      "threadId": "01a144b8-6810-7ab0-908d-34ff0d17599b",
+      "turnId": "01a144b8-6874-7733-bbe2-6e3878e4e788",
+      "completedAtMs": 1792154298519
+     }
+    },
+    {
+     "at": 1792154298519,
+     "method": "thread/tokenUsage/updated",
+     "params": {
+      "threadId": "01a144b8-6810-7ab0-908d-34ff0d17599b",
+      "turnId": "01a144b8-6874-7733-bbe2-6e3878e4e788",
+      "tokenUsage": {
+       "total": {
+        "totalTokens": 4,
+        "inputTokens": 2,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 2,
+        "reasoningOutputTokens": 0
+       },
+       "last": {
+        "totalTokens": 2,
+        "inputTokens": 1,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 1,
+        "reasoningOutputTokens": 0
+       },
+       "modelContextWindow": 258400
+      }
+     }
+    },
+    {
+     "at": 1792154298519,
+     "method": "account/rateLimits/updated",
+     "params": {
+      "rateLimits": {
+       "limitId": "codex",
+       "limitName": null,
+       "normalModelSlug": null,
+       "primary": null,
+       "secondary": null,
+       "credits": null,
+       "individualLimit": null,
+       "spendControlReached": null,
+       "planType": null,
+       "rateLimitReachedType": null
+      }
+     }
+    },
+    {
+     "at": 1792154298520,
+     "method": "thread/status/changed",
+     "params": {
+      "threadId": "01a144b8-6810-7ab0-908d-34ff0d17599b",
+      "status": {
+       "type": "idle"
+      }
+     }
+    },
+    {
+     "at": 1792154298520,
+     "method": "turn/completed",
+     "params": {
+      "threadId": "01a144b8-6810-7ab0-908d-34ff0d17599b",
+      "turn": {
+       "id": "01a144b8-6874-7733-bbe2-6e3878e4e788",
+       "rootTurnId": "01a144b8-6874-7733-bbe2-6e3878e4e788",
+       "items": [
+        {
+         "type": "agentMessage",
+         "id": "msg_probe_1",
+         "text": "probe final message",
+         "phase": null,
+         "memoryCitation": null,
+         "delivery": null,
+         "questions": null
+        }
+       ],
+       "itemsView": "summary",
+       "status": "completed",
+       "error": null,
+       "startedAt": 1792154298,
+       "completedAt": 1792154298,
+       "durationMs": 30
+      }
+     }
+    }
+   ],
+   "serverRequests": [],
+   "requests": [
+    {
+     "method": "initialize",
+     "params": {
+      "clientInfo": {
+       "name": "ans_mcp_probe",
+       "version": "0.0.0"
+      },
+      "capabilities": {
+       "experimentalApi": true,
+       "explicitGatewayOauth": true
+      }
+     }
+    },
+    {
+     "method": "config/read",
+     "params": {
+      "includeLayers": false,
+      "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-0QhaEH"
+     }
+    },
+    {
+     "method": "thread/start",
+     "params": {
+      "model": "probe-model",
+      "modelProvider": "ans_probe",
+      "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-0QhaEH",
+      "sandbox": "read-only",
+      "approvalPolicy": "never",
+      "approvalsReviewer": "user",
+      "config": {
+       "features": {
+        "shell_tool": false,
+        "hooks": false,
+        "apps": false,
+        "plugins": false,
+        "remote_plugin": false,
+        "browser_use": false,
+        "browser_use_external": false,
+        "browser_use_full_cdp_access": false,
+        "in_app_browser": false,
+        "computer_use": false,
+        "code_mode": false,
+        "code_mode_host": false,
+        "multi_agent": false,
+        "multi_agent_v2": false,
+        "request_permissions_tool": false,
+        "skill_mcp_dependency_install": false
+       },
+       "sandbox_mode": "read-only",
+       "approval_policy": "never",
+       "approvals_reviewer": "user",
+       "web_search": "disabled",
+       "projects": {
+        "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-work-0QhaEH": {
+         "trust_level": "untrusted"
+        }
+       }
+      },
+      "developerInstructions": "mcp surface probe",
+      "ephemeral": true
+     }
+    },
+    {
+     "method": "turn/start",
+     "params": {
+      "threadId": "01a144b8-6810-7ab0-908d-34ff0d17599b",
+      "input": [
+       {
+        "type": "text",
+        "text": "call the echo probe",
+        "text_elements": []
+       }
+      ],
+      "approvalPolicy": "never",
+      "approvalsReviewer": "user",
+      "sandboxPolicy": {
+       "type": "readOnly",
+       "networkAccess": false
+      },
+      "model": "probe-model"
+     }
+    }
+   ],
+   "preparation": null,
+   "readbackServers": {
+    "probe-surface": {
+     "command": "/usr/local/bin/node",
+     "args": [
+      "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-stage-b2-SrDalK/echo-mcp.mjs",
+      "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-mcp-probe-stage-b2-SrDalK/capture-b2.json"
+     ],
+     "environment_id": "local",
+     "enabled": true,
+     "startup_timeout_sec": 5,
+     "tool_timeout_sec": 5,
+     "default_tools_approval_mode": "auto"
+    }
+   },
+   "thread": {
+    "id": "01a144b8-6810-7ab0-908d-34ff0d17599b"
+   },
+   "turn": {
+    "id": "01a144b8-6874-7733-bbe2-6e3878e4e788",
+    "status": "inProgress"
+   },
+   "turnCompleted": true,
+   "turnOutcome": "completed",
+   "itemLifecycle": [
+    {
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "userMessage",
+       "id": "01a144b8-6884-7d83-92be-5bf39ed76105",
+       "clientId": null,
+       "content": [
+        {
+         "type": "text",
+         "text": "call the echo probe",
+         "text_elements": []
+        }
+       ]
+      },
+      "threadId": "01a144b8-6810-7ab0-908d-34ff0d17599b",
+      "turnId": "01a144b8-6874-7733-bbe2-6e3878e4e788",
+      "startedAtMs": 1792154298501
+     }
+    },
+    {
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "userMessage",
+       "id": "01a144b8-6884-7d83-92be-5bf39ed76105",
+       "clientId": null,
+       "content": [
+        {
+         "type": "text",
+         "text": "call the echo probe",
+         "text_elements": []
+        }
+       ]
+      },
+      "threadId": "01a144b8-6810-7ab0-908d-34ff0d17599b",
+      "turnId": "01a144b8-6874-7733-bbe2-6e3878e4e788",
+      "completedAtMs": 1792154298501
+     }
+    },
+    {
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "mcpToolCall",
+       "id": "fc_probe_1",
+       "server": "probe-surface",
+       "tool": "echo_probe",
+       "status": "inProgress",
+       "arguments": {
+        "text": "from fake model"
+       },
+       "appContext": null,
+       "mcpAppUi": null,
+       "pluginId": null,
+       "readOnlyHint": null,
+       "result": null,
+       "error": null,
+       "durationMs": null
+      },
+      "threadId": "01a144b8-6810-7ab0-908d-34ff0d17599b",
+      "turnId": "01a144b8-6874-7733-bbe2-6e3878e4e788",
+      "startedAtMs": 1792154298515
+     }
+    },
+    {
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "mcpToolCall",
+       "id": "fc_probe_1",
+       "server": "probe-surface",
+       "tool": "echo_probe",
+       "status": "failed",
+       "arguments": {
+        "text": "from fake model"
+       },
+       "appContext": null,
+       "mcpAppUi": null,
+       "pluginId": null,
+       "readOnlyHint": null,
+       "result": null,
+       "error": {
+        "message": "MCP tool call requires approval, but approval policy is never"
+       },
+       "durationMs": 0
+      },
+      "threadId": "01a144b8-6810-7ab0-908d-34ff0d17599b",
+      "turnId": "01a144b8-6874-7733-bbe2-6e3878e4e788",
+      "completedAtMs": 1792154298516
+     }
+    },
+    {
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "agentMessage",
+       "id": "msg_probe_1",
+       "text": "",
+       "phase": null,
+       "memoryCitation": null,
+       "delivery": null,
+       "questions": null
+      },
+      "threadId": "01a144b8-6810-7ab0-908d-34ff0d17599b",
+      "turnId": "01a144b8-6874-7733-bbe2-6e3878e4e788",
+      "startedAtMs": 1792154298519
+     }
+    },
+    {
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "agentMessage",
+       "id": "msg_probe_1",
+       "text": "probe final message",
+       "phase": null,
+       "memoryCitation": null,
+       "delivery": null,
+       "questions": null
+      },
+      "threadId": "01a144b8-6810-7ab0-908d-34ff0d17599b",
+      "turnId": "01a144b8-6874-7733-bbe2-6e3878e4e788",
+      "completedAtMs": 1792154298519
+     }
+    }
+   ],
+   "mcpItems": [
+    {
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "mcpToolCall",
+       "id": "fc_probe_1",
+       "server": "probe-surface",
+       "tool": "echo_probe",
+       "status": "inProgress",
+       "arguments": {
+        "text": "from fake model"
+       },
+       "appContext": null,
+       "mcpAppUi": null,
+       "pluginId": null,
+       "readOnlyHint": null,
+       "result": null,
+       "error": null,
+       "durationMs": null
+      },
+      "threadId": "01a144b8-6810-7ab0-908d-34ff0d17599b",
+      "turnId": "01a144b8-6874-7733-bbe2-6e3878e4e788",
+      "startedAtMs": 1792154298515
+     }
+    },
+    {
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "mcpToolCall",
+       "id": "fc_probe_1",
+       "server": "probe-surface",
+       "tool": "echo_probe",
+       "status": "failed",
+       "arguments": {
+        "text": "from fake model"
+       },
+       "appContext": null,
+       "mcpAppUi": null,
+       "pluginId": null,
+       "readOnlyHint": null,
+       "result": null,
+       "error": {
+        "message": "MCP tool call requires approval, but approval policy is never"
+       },
+       "durationMs": 0
+      },
+      "threadId": "01a144b8-6810-7ab0-908d-34ff0d17599b",
+      "turnId": "01a144b8-6874-7733-bbe2-6e3878e4e788",
+      "completedAtMs": 1792154298516
+     }
+    }
+   ],
+   "fixtureCalls": [],
+   "finalMessages": [
+    "",
+    "probe final message"
+   ],
+   "serverRequestsDuringTurn": [],
+   "toolSpecs": [
+    {
+     "type": "namespace",
+     "name": "mcp__probe_surface",
+     "description": "Tools in the mcp__probe_surface namespace.",
+     "tools": [
+      {
+       "type": "function",
+       "name": "echo_probe",
+       "description": "controlled echo",
+       "strict": false,
+       "parameters": {
+        "type": "object",
+        "properties": {
+         "text": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "text"
+        ]
+       }
+      },
+      {
+       "type": "function",
+       "name": "elicit_probe",
+       "description": "sends an elicitation request while handling the call",
+       "strict": false,
+       "parameters": {
+        "type": "object",
+        "properties": {}
+       }
+      },
+      {
+       "type": "function",
+       "name": "hang_probe",
+       "description": "never responds (timeout probe)",
+       "strict": false,
+       "parameters": {
+        "type": "object",
+        "properties": {}
+       }
+      }
+     ]
+    },
+    {
+     "type": "namespace",
+     "name": "mcp__probe_surface",
+     "description": "Tools in the mcp__probe_surface namespace.",
+     "tools": [
+      {
+       "type": "function",
+       "name": "echo_probe",
+       "description": "controlled echo",
+       "strict": false,
+       "parameters": {
+        "type": "object",
+        "properties": {
+         "text": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "text"
+        ]
+       }
+      },
+      {
+       "type": "function",
+       "name": "elicit_probe",
+       "description": "sends an elicitation request while handling the call",
+       "strict": false,
+       "parameters": {
+        "type": "object",
+        "properties": {}
+       }
+      },
+      {
+       "type": "function",
+       "name": "hang_probe",
+       "description": "never responds (timeout probe)",
+       "strict": false,
+       "parameters": {
+        "type": "object",
+        "properties": {}
+       }
+      }
+     ]
+    }
+   ],
+   "functionItems": [
+    {
+     "type": "function_call",
+     "id": "fc_probe_1",
+     "name": "echo_probe",
+     "namespace": "mcp__probe_surface",
+     "arguments": "{\"text\":\"from fake model\"}",
+     "call_id": "fc_probe_1"
+    },
+    {
+     "type": "function_call_output",
+     "id": "fco_01a144b8-6894-7523-bf7f-0a5331c50db6",
+     "call_id": "fc_probe_1",
+     "output": [
+      {
+       "type": "input_text",
+       "text": "Wall time: 0.0013 seconds\nOutput:"
+      },
+      {
+       "type": "input_text",
+       "text": "MCP tool call requires approval, but approval policy is never"
+      }
+     ]
+    }
+   ],
+   "stderrTail": "",
+   "httpBodies": 2,
+   "modelRequestSummary": [
+    {
+     "tools": [
+      "list_mcp_resources",
+      "list_mcp_resource_templates",
+      "read_mcp_resource",
+      "request_user_input",
+      "view_image",
+      "mcp__probe_surface",
+      "get_goal",
+      "create_goal",
+      "update_goal"
+     ],
+     "inputKinds": [
+      "message",
+      "message",
+      "message",
+      "message"
+     ],
+     "mcpBridgeTool": "mcp__probe_surface"
+    },
+    {
+     "tools": [
+      "list_mcp_resources",
+      "list_mcp_resource_templates",
+      "read_mcp_resource",
+      "request_user_input",
+      "view_image",
+      "mcp__probe_surface",
+      "get_goal",
+      "create_goal",
+      "update_goal"
+     ],
+     "inputKinds": [
+      "message",
+      "message",
+      "message",
+      "message",
+      "function_call",
+      "function_call_output"
+     ],
+     "mcpBridgeTool": "mcp__probe_surface"
+    }
+   ],
+   "childExit": 0
+  }
+ ]
+}

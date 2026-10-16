@@ -1,5 +1,13 @@
 # 产品 变更记录
 
+## 2026-10-16 — G-4 §五回填（MCP：评估＋三平台 P0 探针逐项定格）
+
+按 PM 派发（客户已批「V2 口径＋P0 探针轮」），把[设计提案](docs/design/2026-10-16_design_role-capability-install.md) §五 MCP 占位以运行时核心评估＋三平台 P0 探针结论回填（revision 2）——供 PM 汇总呈客户批准 V2 分批实施。
+
+**回填节**：§5.3（机制表＝探针定格事实＋V2 必做项＋实施轮/验收轮待定；三平台必做项：**Claude**＝hook 白名单放行分支＋审计两发射点＋status 如实行＋**env 收窄**（实测未收窄、方案实施轮定）；**Codex**＝白名单化三处恰等（目录级＝**名字集恰等**）＋**单条 root map**（连续 `-c` 同根键覆盖非合并；含 `default_tools_approval_mode:"approve"`）＋`mcpToolCall` 行映射＋降级行；**Pi**＝扩展接入＋`bindExtensions` 补调＋**自持 transport**＋**dispose 收口**＋放行判据前缀化）＋§5.4（使用行形态定格：Claude＝hook start＋泵 result；Codex＝`mcpToolCall` item 映射；Pi＝既有工具管道行）＋残余未决（Pi 资源工具三名／清洗碰撞配置侧拒绝／Codex 真机网关 namespace 桥前置／HTTP-OAuth 面）＋§九分期（**P1 Claude → P2 Codex → P3 Pi**，可并行实施、验证分批；V2 范围含 `docs/mcp` 预授权扩列与 `install_mcp`/`uninstall_mcp`——**回执形状沿 `InstallSkillReceipt` 体格**、V2 轮由运行时核心冻结）＋§5.1/§5.2/§八/§十/§十一同步（严格面钉实、失败面填实、风险四条、未决点 8/9 收敛＋新增 11）。
+
+**边界与状态**：定格事实逐字取用探针记录、未改其事实；写集仅本角色四件（提案 revision 2、feature-map、memo、本文件）；未改 `app/`、`src/`、`test/`、其他角色文件与证据目录（V1 独立验证轮在飞，`test/测试/**` 未触碰）；未 git 提交。MCP 面呈批中——批准前不实施、不承诺。
+
 ## 2026-10-16 — G-4（角色能力安装：技能＋MCP）细化提案
 
 按 PM 批次的派发行（来源：项目管理 `docs/change/2026-10-15_change_kanban-fixes-pm-review.md` §「候选 G-4『角色能力安装（技能＋MCP）』」，客户 2026-10-16 已定授权口径）新增[设计提案](docs/design/2026-10-16_design_role-capability-install.md)。

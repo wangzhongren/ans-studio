@@ -1,0 +1,3245 @@
+{
+  "fixture": {
+    "node": "v24.14.0",
+    "sdk": "0.3.299",
+    "bundledCli": "2.1.299",
+    "loopbackOnly": true,
+    "externalApiCalls": 0,
+    "credentials": "fake-only"
+  },
+  "phases": [
+    {
+      "name": "baseline-connected",
+      "spawn": {
+        "argv": [
+          "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+        ],
+        "cwd": "/private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-claude-mcp-surface-6gB9Pz",
+        "pid": 94649,
+        "ppid": 94641,
+        "envKeys": [
+          "AI_AGENT",
+          "ANTHROPIC_API_KEY",
+          "ANTHROPIC_BASE_URL",
+          "CLAUDECODE",
+          "CLAUDE_AGENT_SDK_VERSION",
+          "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+          "CLAUDE_CODE_ENTRYPOINT",
+          "CLAUDE_CODE_MCP_AUTO_BACKGROUND_MS",
+          "CLAUDE_CODE_MESSAGING_SOCKET",
+          "CLAUDE_CODE_MESSAGING_TOKEN",
+          "CLAUDE_CODE_SESSION_ID",
+          "CLAUDE_CONFIG_DIR",
+          "CLAUDE_PROJECT_DIR",
+          "COREPACK_ENABLE_AUTO_PIN",
+          "DISABLE_AUTOUPDATER",
+          "DISABLE_ERROR_REPORTING",
+          "DISABLE_TELEMETRY",
+          "FAKE_MCP_DELAY_MS",
+          "FAKE_MCP_MODE",
+          "FAKE_MCP_RECORD_DIR",
+          "HOME",
+          "NoDefaultCurrentDirectoryInExePath",
+          "PATH",
+          "TMPDIR",
+          "__CF_USER_TEXT_ENCODING"
+        ],
+        "startedAt": 1792154057015
+      },
+      "events": [
+        {
+          "t": 0,
+          "event": "process-start"
+        },
+        {
+          "t": 2,
+          "event": "message",
+          "method": "server/discover",
+          "hasId": true
+        },
+        {
+          "t": 2,
+          "event": "message",
+          "method": "initialize",
+          "hasId": true
+        },
+        {
+          "t": 3,
+          "event": "initialize-answered"
+        },
+        {
+          "t": 3,
+          "event": "message",
+          "method": "notifications/initialized",
+          "hasId": false
+        },
+        {
+          "t": 3,
+          "event": "message",
+          "method": "tools/list",
+          "hasId": true
+        }
+      ],
+      "prompts": [
+        {
+          "turn": 0,
+          "pushedAt": 1792154056828
+        }
+      ],
+      "statuses": [
+        [
+          {
+            "name": "probe",
+            "status": "connected",
+            "serverInfo": {
+              "name": "fake-probe-server",
+              "version": "0.0.1"
+            },
+            "config": {
+              "type": "stdio",
+              "command": "/usr/local/bin/node",
+              "args": [
+                "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+              ]
+            },
+            "scope": "dynamic",
+            "source": "dynamic",
+            "tools": [
+              {
+                "name": "echo",
+                "annotations": {}
+              }
+            ]
+          },
+          {
+            "name": "ans",
+            "status": "connected",
+            "serverInfo": {
+              "name": "ans",
+              "version": "1.0.0"
+            },
+            "scope": "dynamic",
+            "source": "sdk",
+            "tools": [
+              {
+                "name": "probe_tool",
+                "annotations": {
+                  "destructive": true
+                }
+              }
+            ]
+          }
+        ]
+      ],
+      "rows": [
+        {
+          "kind": "message"
+        },
+        {
+          "kind": "message"
+        },
+        {
+          "kind": "settled"
+        }
+      ],
+      "settledOutcomes": [
+        "completed"
+      ],
+      "requests": [
+        {
+          "phase": "baseline-connected",
+          "index": 0,
+          "arrivedAt": 1792154057049,
+          "toolNames": [
+            "mcp__ans__probe_tool",
+            "mcp__probe__echo"
+          ],
+          "hasProbeEcho": true,
+          "toolResults": [],
+          "arrivedAfterPromptMs": 221
+        }
+      ]
+    },
+    {
+      "name": "tool-call-production-hook",
+      "spawn": {
+        "argv": [
+          "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+        ],
+        "cwd": "/private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-claude-mcp-surface-6gB9Pz",
+        "pid": 94663,
+        "ppid": 94655,
+        "envKeys": [
+          "AI_AGENT",
+          "ANTHROPIC_API_KEY",
+          "ANTHROPIC_BASE_URL",
+          "CLAUDECODE",
+          "CLAUDE_AGENT_SDK_VERSION",
+          "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+          "CLAUDE_CODE_ENTRYPOINT",
+          "CLAUDE_CODE_MCP_AUTO_BACKGROUND_MS",
+          "CLAUDE_CODE_MESSAGING_SOCKET",
+          "CLAUDE_CODE_MESSAGING_TOKEN",
+          "CLAUDE_CODE_SESSION_ID",
+          "CLAUDE_CONFIG_DIR",
+          "CLAUDE_PROJECT_DIR",
+          "COREPACK_ENABLE_AUTO_PIN",
+          "DISABLE_AUTOUPDATER",
+          "DISABLE_ERROR_REPORTING",
+          "DISABLE_TELEMETRY",
+          "FAKE_MCP_DELAY_MS",
+          "FAKE_MCP_MODE",
+          "FAKE_MCP_RECORD_DIR",
+          "HOME",
+          "NoDefaultCurrentDirectoryInExePath",
+          "PATH",
+          "TMPDIR",
+          "__CF_USER_TEXT_ENCODING"
+        ],
+        "startedAt": 1792154057222
+      },
+      "events": [
+        {
+          "t": 0,
+          "event": "process-start"
+        },
+        {
+          "t": 2,
+          "event": "message",
+          "method": "server/discover",
+          "hasId": true
+        },
+        {
+          "t": 2,
+          "event": "message",
+          "method": "initialize",
+          "hasId": true
+        },
+        {
+          "t": 2,
+          "event": "initialize-answered"
+        },
+        {
+          "t": 3,
+          "event": "message",
+          "method": "notifications/initialized",
+          "hasId": false
+        },
+        {
+          "t": 3,
+          "event": "message",
+          "method": "tools/list",
+          "hasId": true
+        }
+      ],
+      "prompts": [
+        {
+          "turn": 0,
+          "pushedAt": 1792154057058
+        }
+      ],
+      "statuses": [
+        [
+          {
+            "name": "probe",
+            "status": "connected",
+            "serverInfo": {
+              "name": "fake-probe-server",
+              "version": "0.0.1"
+            },
+            "config": {
+              "type": "stdio",
+              "command": "/usr/local/bin/node",
+              "args": [
+                "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+              ]
+            },
+            "scope": "dynamic",
+            "source": "dynamic",
+            "tools": [
+              {
+                "name": "echo",
+                "annotations": {}
+              }
+            ]
+          },
+          {
+            "name": "ans",
+            "status": "connected",
+            "serverInfo": {
+              "name": "ans",
+              "version": "1.0.0"
+            },
+            "scope": "dynamic",
+            "source": "sdk",
+            "tools": [
+              {
+                "name": "probe_tool",
+                "annotations": {
+                  "destructive": true
+                }
+              }
+            ]
+          }
+        ]
+      ],
+      "rows": [
+        {
+          "kind": "message"
+        },
+        {
+          "kind": "denied",
+          "phase": "blocked",
+          "toolName": "mcp__probe__echo"
+        },
+        {
+          "kind": "message"
+        },
+        {
+          "kind": "settled"
+        }
+      ],
+      "settledOutcomes": [
+        "completed"
+      ],
+      "requests": [
+        {
+          "phase": "tool-call-production-hook",
+          "index": 0,
+          "arrivedAt": 1792154057254,
+          "toolNames": [
+            "mcp__ans__probe_tool",
+            "mcp__probe__echo"
+          ],
+          "hasProbeEcho": true,
+          "toolResults": [],
+          "arrivedAfterPromptMs": 196
+        },
+        {
+          "phase": "tool-call-production-hook",
+          "index": 1,
+          "arrivedAt": 1792154057265,
+          "toolNames": [
+            "mcp__ans__probe_tool",
+            "mcp__probe__echo"
+          ],
+          "hasProbeEcho": true,
+          "toolResults": [
+            {
+              "toolUseId": "toolu_mcp_loopback",
+              "isError": true,
+              "textHead": "PreToolUse:mcp__probe__echo hook error: 仅允许当前轮注册的 ANS MCP 工具\n\n<system-reminder>\n<total_tokens>14999890 tokens left</total_tokens>\n</system-reminder>"
+            }
+          ],
+          "arrivedAfterPromptMs": 207
+        }
+      ]
+    },
+    {
+      "name": "hook-allow-canuse-delegate",
+      "spawn": {
+        "argv": [
+          "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+        ],
+        "cwd": "/private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-claude-mcp-surface-6gB9Pz",
+        "pid": 94676,
+        "ppid": 94668,
+        "envKeys": [
+          "AI_AGENT",
+          "ANTHROPIC_API_KEY",
+          "ANTHROPIC_BASE_URL",
+          "CLAUDECODE",
+          "CLAUDE_AGENT_SDK_VERSION",
+          "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+          "CLAUDE_CODE_ENTRYPOINT",
+          "CLAUDE_CODE_MCP_AUTO_BACKGROUND_MS",
+          "CLAUDE_CODE_MESSAGING_SOCKET",
+          "CLAUDE_CODE_MESSAGING_TOKEN",
+          "CLAUDE_CODE_SESSION_ID",
+          "CLAUDE_CONFIG_DIR",
+          "CLAUDE_PROJECT_DIR",
+          "COREPACK_ENABLE_AUTO_PIN",
+          "DISABLE_AUTOUPDATER",
+          "DISABLE_ERROR_REPORTING",
+          "DISABLE_TELEMETRY",
+          "FAKE_MCP_DELAY_MS",
+          "FAKE_MCP_MODE",
+          "FAKE_MCP_RECORD_DIR",
+          "HOME",
+          "NoDefaultCurrentDirectoryInExePath",
+          "PATH",
+          "TMPDIR",
+          "__CF_USER_TEXT_ENCODING"
+        ],
+        "startedAt": 1792154057435
+      },
+      "events": [
+        {
+          "t": 0,
+          "event": "process-start"
+        },
+        {
+          "t": 1,
+          "event": "message",
+          "method": "server/discover",
+          "hasId": true
+        },
+        {
+          "t": 2,
+          "event": "message",
+          "method": "initialize",
+          "hasId": true
+        },
+        {
+          "t": 2,
+          "event": "initialize-answered"
+        },
+        {
+          "t": 3,
+          "event": "message",
+          "method": "notifications/initialized",
+          "hasId": false
+        },
+        {
+          "t": 3,
+          "event": "message",
+          "method": "tools/list",
+          "hasId": true
+        },
+        {
+          "t": 39,
+          "event": "message",
+          "method": "tools/call",
+          "hasId": true
+        },
+        {
+          "t": 39,
+          "event": "tools-call-received",
+          "name": "echo",
+          "argumentKeys": [
+            "text"
+          ]
+        }
+      ],
+      "prompts": [
+        {
+          "turn": 0,
+          "pushedAt": 1792154057269
+        }
+      ],
+      "statuses": [
+        [
+          {
+            "name": "probe",
+            "status": "connected",
+            "serverInfo": {
+              "name": "fake-probe-server",
+              "version": "0.0.1"
+            },
+            "config": {
+              "type": "stdio",
+              "command": "/usr/local/bin/node",
+              "args": [
+                "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+              ]
+            },
+            "scope": "dynamic",
+            "source": "dynamic",
+            "tools": [
+              {
+                "name": "echo",
+                "annotations": {}
+              }
+            ]
+          },
+          {
+            "name": "ans",
+            "status": "connected",
+            "serverInfo": {
+              "name": "ans",
+              "version": "1.0.0"
+            },
+            "scope": "dynamic",
+            "source": "sdk",
+            "tools": [
+              {
+                "name": "probe_tool",
+                "annotations": {
+                  "destructive": true
+                }
+              }
+            ]
+          }
+        ]
+      ],
+      "rows": [
+        {
+          "kind": "message"
+        },
+        {
+          "kind": "denied",
+          "phase": "blocked",
+          "toolName": "mcp__probe__echo"
+        },
+        {
+          "kind": "message"
+        },
+        {
+          "kind": "settled"
+        }
+      ],
+      "settledOutcomes": [
+        "completed"
+      ],
+      "requests": [
+        {
+          "phase": "hook-allow-canuse-delegate",
+          "index": 0,
+          "arrivedAt": 1792154057467,
+          "toolNames": [
+            "mcp__ans__probe_tool",
+            "mcp__probe__echo"
+          ],
+          "hasProbeEcho": true,
+          "toolResults": [],
+          "arrivedAfterPromptMs": 198
+        },
+        {
+          "phase": "hook-allow-canuse-delegate",
+          "index": 1,
+          "arrivedAt": 1792154057480,
+          "toolNames": [
+            "mcp__ans__probe_tool",
+            "mcp__probe__echo"
+          ],
+          "hasProbeEcho": true,
+          "toolResults": [
+            {
+              "toolUseId": "toolu_mcp_loopback",
+              "isError": false,
+              "textHead": "fake-echo:probe-input\n\n<system-reminder>\n<total_tokens>14999890 tokens left</total_tokens>\n</system-reminder>"
+            }
+          ],
+          "arrivedAfterPromptMs": 211
+        }
+      ]
+    },
+    {
+      "name": "hook-allow-canuse-allow",
+      "spawn": {
+        "argv": [
+          "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+        ],
+        "cwd": "/private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-claude-mcp-surface-6gB9Pz",
+        "pid": 94689,
+        "ppid": 94681,
+        "envKeys": [
+          "AI_AGENT",
+          "ANTHROPIC_API_KEY",
+          "ANTHROPIC_BASE_URL",
+          "CLAUDECODE",
+          "CLAUDE_AGENT_SDK_VERSION",
+          "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+          "CLAUDE_CODE_ENTRYPOINT",
+          "CLAUDE_CODE_MCP_AUTO_BACKGROUND_MS",
+          "CLAUDE_CODE_MESSAGING_SOCKET",
+          "CLAUDE_CODE_MESSAGING_TOKEN",
+          "CLAUDE_CODE_SESSION_ID",
+          "CLAUDE_CONFIG_DIR",
+          "CLAUDE_PROJECT_DIR",
+          "COREPACK_ENABLE_AUTO_PIN",
+          "DISABLE_AUTOUPDATER",
+          "DISABLE_ERROR_REPORTING",
+          "DISABLE_TELEMETRY",
+          "FAKE_MCP_DELAY_MS",
+          "FAKE_MCP_MODE",
+          "FAKE_MCP_RECORD_DIR",
+          "HOME",
+          "NoDefaultCurrentDirectoryInExePath",
+          "PATH",
+          "TMPDIR",
+          "__CF_USER_TEXT_ENCODING"
+        ],
+        "startedAt": 1792154057649
+      },
+      "events": [
+        {
+          "t": 0,
+          "event": "process-start"
+        },
+        {
+          "t": 2,
+          "event": "message",
+          "method": "server/discover",
+          "hasId": true
+        },
+        {
+          "t": 3,
+          "event": "message",
+          "method": "initialize",
+          "hasId": true
+        },
+        {
+          "t": 3,
+          "event": "initialize-answered"
+        },
+        {
+          "t": 4,
+          "event": "message",
+          "method": "notifications/initialized",
+          "hasId": false
+        },
+        {
+          "t": 4,
+          "event": "message",
+          "method": "tools/list",
+          "hasId": true
+        },
+        {
+          "t": 39,
+          "event": "message",
+          "method": "tools/call",
+          "hasId": true
+        },
+        {
+          "t": 40,
+          "event": "tools-call-received",
+          "name": "echo",
+          "argumentKeys": [
+            "text"
+          ]
+        }
+      ],
+      "prompts": [
+        {
+          "turn": 0,
+          "pushedAt": 1792154057485
+        }
+      ],
+      "statuses": [
+        [
+          {
+            "name": "probe",
+            "status": "connected",
+            "serverInfo": {
+              "name": "fake-probe-server",
+              "version": "0.0.1"
+            },
+            "config": {
+              "type": "stdio",
+              "command": "/usr/local/bin/node",
+              "args": [
+                "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+              ]
+            },
+            "scope": "dynamic",
+            "source": "dynamic",
+            "tools": [
+              {
+                "name": "echo",
+                "annotations": {}
+              }
+            ]
+          },
+          {
+            "name": "ans",
+            "status": "connected",
+            "serverInfo": {
+              "name": "ans",
+              "version": "1.0.0"
+            },
+            "scope": "dynamic",
+            "source": "sdk",
+            "tools": [
+              {
+                "name": "probe_tool",
+                "annotations": {
+                  "destructive": true
+                }
+              }
+            ]
+          }
+        ]
+      ],
+      "rows": [
+        {
+          "kind": "message"
+        },
+        {
+          "kind": "denied",
+          "phase": "blocked",
+          "toolName": "mcp__probe__echo"
+        },
+        {
+          "kind": "message"
+        },
+        {
+          "kind": "settled"
+        }
+      ],
+      "settledOutcomes": [
+        "completed"
+      ],
+      "requests": [
+        {
+          "phase": "hook-allow-canuse-allow",
+          "index": 0,
+          "arrivedAt": 1792154057681,
+          "toolNames": [
+            "mcp__ans__probe_tool",
+            "mcp__probe__echo"
+          ],
+          "hasProbeEcho": true,
+          "toolResults": [],
+          "arrivedAfterPromptMs": 196
+        },
+        {
+          "phase": "hook-allow-canuse-allow",
+          "index": 1,
+          "arrivedAt": 1792154057694,
+          "toolNames": [
+            "mcp__ans__probe_tool",
+            "mcp__probe__echo"
+          ],
+          "hasProbeEcho": true,
+          "toolResults": [
+            {
+              "toolUseId": "toolu_mcp_loopback",
+              "isError": false,
+              "textHead": "fake-echo:probe-input\n\n<system-reminder>\n<total_tokens>14999890 tokens left</total_tokens>\n</system-reminder>"
+            }
+          ],
+          "arrivedAfterPromptMs": 209
+        }
+      ]
+    },
+    {
+      "name": "alwaysload-delay3s",
+      "spawn": {
+        "argv": [
+          "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+        ],
+        "cwd": "/private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-claude-mcp-surface-6gB9Pz",
+        "pid": 94703,
+        "ppid": 94696,
+        "envKeys": [
+          "AI_AGENT",
+          "ANTHROPIC_API_KEY",
+          "ANTHROPIC_BASE_URL",
+          "CLAUDECODE",
+          "CLAUDE_AGENT_SDK_VERSION",
+          "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+          "CLAUDE_CODE_ENTRYPOINT",
+          "CLAUDE_CODE_MCP_AUTO_BACKGROUND_MS",
+          "CLAUDE_CODE_MESSAGING_SOCKET",
+          "CLAUDE_CODE_MESSAGING_TOKEN",
+          "CLAUDE_CODE_SESSION_ID",
+          "CLAUDE_CONFIG_DIR",
+          "CLAUDE_PROJECT_DIR",
+          "COREPACK_ENABLE_AUTO_PIN",
+          "DISABLE_AUTOUPDATER",
+          "DISABLE_ERROR_REPORTING",
+          "DISABLE_TELEMETRY",
+          "FAKE_MCP_DELAY_MS",
+          "FAKE_MCP_MODE",
+          "FAKE_MCP_RECORD_DIR",
+          "HOME",
+          "NoDefaultCurrentDirectoryInExePath",
+          "PATH",
+          "TMPDIR",
+          "__CF_USER_TEXT_ENCODING"
+        ],
+        "startedAt": 1792154057845
+      },
+      "events": [
+        {
+          "t": 0,
+          "event": "process-start"
+        },
+        {
+          "t": 2,
+          "event": "message",
+          "method": "server/discover",
+          "hasId": true
+        },
+        {
+          "t": 4,
+          "event": "message",
+          "method": "initialize",
+          "hasId": true
+        },
+        {
+          "t": 3007,
+          "event": "initialize-answered"
+        },
+        {
+          "t": 3011,
+          "event": "message",
+          "method": "notifications/initialized",
+          "hasId": false
+        },
+        {
+          "t": 3011,
+          "event": "message",
+          "method": "tools/list",
+          "hasId": true
+        }
+      ],
+      "prompts": [
+        {
+          "turn": 0,
+          "pushedAt": 1792154057699
+        },
+        {
+          "turn": 1,
+          "pushedAt": 1792154060927
+        }
+      ],
+      "statuses": [
+        [
+          {
+            "name": "probe",
+            "status": "connected",
+            "serverInfo": {
+              "name": "fake-probe-server",
+              "version": "0.0.1"
+            },
+            "config": {
+              "type": "stdio",
+              "command": "/usr/local/bin/node",
+              "args": [
+                "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+              ]
+            },
+            "scope": "dynamic",
+            "source": "dynamic",
+            "tools": [
+              {
+                "name": "echo",
+                "annotations": {}
+              }
+            ]
+          },
+          {
+            "name": "ans",
+            "status": "connected",
+            "serverInfo": {
+              "name": "ans",
+              "version": "1.0.0"
+            },
+            "scope": "dynamic",
+            "source": "sdk",
+            "tools": [
+              {
+                "name": "probe_tool",
+                "annotations": {
+                  "destructive": true
+                }
+              }
+            ]
+          }
+        ]
+      ],
+      "rows": [
+        {
+          "kind": "message"
+        },
+        {
+          "kind": "message"
+        },
+        {
+          "kind": "settled"
+        },
+        {
+          "kind": "message"
+        },
+        {
+          "kind": "message"
+        },
+        {
+          "kind": "settled"
+        }
+      ],
+      "settledOutcomes": [
+        "completed",
+        "completed"
+      ],
+      "requests": [
+        {
+          "phase": "alwaysload-delay3s",
+          "index": 0,
+          "arrivedAt": 1792154060922,
+          "toolNames": [
+            "mcp__ans__probe_tool",
+            "mcp__probe__echo"
+          ],
+          "hasProbeEcho": true,
+          "toolResults": [],
+          "arrivedAfterPromptMs": 3223
+        },
+        {
+          "phase": "alwaysload-delay3s",
+          "index": 1,
+          "arrivedAt": 1792154060935,
+          "toolNames": [
+            "mcp__ans__probe_tool",
+            "mcp__probe__echo"
+          ],
+          "hasProbeEcho": true,
+          "toolResults": [],
+          "arrivedAfterPromptMs": 3236
+        }
+      ]
+    },
+    {
+      "name": "default-delay3s",
+      "spawn": {
+        "argv": [
+          "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+        ],
+        "cwd": "/private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-claude-mcp-surface-6gB9Pz",
+        "pid": 94728,
+        "ppid": 94720,
+        "envKeys": [
+          "AI_AGENT",
+          "ANTHROPIC_API_KEY",
+          "ANTHROPIC_BASE_URL",
+          "CLAUDECODE",
+          "CLAUDE_AGENT_SDK_VERSION",
+          "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+          "CLAUDE_CODE_ENTRYPOINT",
+          "CLAUDE_CODE_MCP_AUTO_BACKGROUND_MS",
+          "CLAUDE_CODE_MESSAGING_SOCKET",
+          "CLAUDE_CODE_MESSAGING_TOKEN",
+          "CLAUDE_CODE_SESSION_ID",
+          "CLAUDE_CONFIG_DIR",
+          "CLAUDE_PROJECT_DIR",
+          "COREPACK_ENABLE_AUTO_PIN",
+          "DISABLE_AUTOUPDATER",
+          "DISABLE_ERROR_REPORTING",
+          "DISABLE_TELEMETRY",
+          "FAKE_MCP_DELAY_MS",
+          "FAKE_MCP_MODE",
+          "FAKE_MCP_RECORD_DIR",
+          "HOME",
+          "NoDefaultCurrentDirectoryInExePath",
+          "PATH",
+          "TMPDIR",
+          "__CF_USER_TEXT_ENCODING"
+        ],
+        "startedAt": 1792154061107
+      },
+      "events": [
+        {
+          "t": 0,
+          "event": "process-start"
+        },
+        {
+          "t": 2,
+          "event": "message",
+          "method": "server/discover",
+          "hasId": true
+        },
+        {
+          "t": 3,
+          "event": "message",
+          "method": "initialize",
+          "hasId": true
+        },
+        {
+          "t": 3005,
+          "event": "initialize-answered"
+        },
+        {
+          "t": 3009,
+          "event": "message",
+          "method": "notifications/initialized",
+          "hasId": false
+        },
+        {
+          "t": 3009,
+          "event": "message",
+          "method": "tools/list",
+          "hasId": true
+        }
+      ],
+      "prompts": [
+        {
+          "turn": 0,
+          "pushedAt": 1792154060939
+        },
+        {
+          "turn": 1,
+          "pushedAt": 1792154064175
+        }
+      ],
+      "statuses": [
+        [
+          {
+            "name": "probe",
+            "status": "connected",
+            "serverInfo": {
+              "name": "fake-probe-server",
+              "version": "0.0.1"
+            },
+            "config": {
+              "type": "stdio",
+              "command": "/usr/local/bin/node",
+              "args": [
+                "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+              ]
+            },
+            "scope": "dynamic",
+            "source": "dynamic",
+            "tools": [
+              {
+                "name": "echo",
+                "annotations": {}
+              }
+            ]
+          },
+          {
+            "name": "ans",
+            "status": "connected",
+            "serverInfo": {
+              "name": "ans",
+              "version": "1.0.0"
+            },
+            "scope": "dynamic",
+            "source": "sdk",
+            "tools": [
+              {
+                "name": "probe_tool",
+                "annotations": {
+                  "destructive": true
+                }
+              }
+            ]
+          }
+        ]
+      ],
+      "rows": [
+        {
+          "kind": "message"
+        },
+        {
+          "kind": "message"
+        },
+        {
+          "kind": "settled"
+        },
+        {
+          "kind": "message"
+        },
+        {
+          "kind": "message"
+        },
+        {
+          "kind": "settled"
+        }
+      ],
+      "settledOutcomes": [
+        "completed",
+        "completed"
+      ],
+      "requests": [
+        {
+          "phase": "default-delay3s",
+          "index": 0,
+          "arrivedAt": 1792154064169,
+          "toolNames": [
+            "mcp__ans__probe_tool",
+            "mcp__probe__echo"
+          ],
+          "hasProbeEcho": true,
+          "toolResults": [],
+          "arrivedAfterPromptMs": 3230
+        },
+        {
+          "phase": "default-delay3s",
+          "index": 1,
+          "arrivedAt": 1792154064183,
+          "toolNames": [
+            "mcp__ans__probe_tool",
+            "mcp__probe__echo"
+          ],
+          "hasProbeEcho": true,
+          "toolResults": [],
+          "arrivedAfterPromptMs": 3244
+        }
+      ]
+    },
+    {
+      "name": "broken-command",
+      "events": [],
+      "prompts": [
+        {
+          "turn": 0,
+          "pushedAt": 1792154064187
+        }
+      ],
+      "statuses": [
+        [
+          {
+            "name": "probe",
+            "status": "failed",
+            "error": "ENOENT: no such file or directory, posix_spawn 'stdio'",
+            "config": {
+              "type": "stdio",
+              "command": "/nonexistent/ans-probe-missing-binary",
+              "args": []
+            },
+            "scope": "dynamic",
+            "source": "dynamic"
+          },
+          {
+            "name": "ans",
+            "status": "connected",
+            "serverInfo": {
+              "name": "ans",
+              "version": "1.0.0"
+            },
+            "scope": "dynamic",
+            "source": "sdk",
+            "tools": [
+              {
+                "name": "probe_tool",
+                "annotations": {
+                  "destructive": true
+                }
+              }
+            ]
+          }
+        ]
+      ],
+      "rows": [
+        {
+          "kind": "message"
+        },
+        {
+          "kind": "message"
+        },
+        {
+          "kind": "settled"
+        }
+      ],
+      "settledOutcomes": [
+        "completed"
+      ],
+      "requests": [
+        {
+          "phase": "broken-command",
+          "index": 0,
+          "arrivedAt": 1792154064355,
+          "toolNames": [
+            "mcp__ans__probe_tool"
+          ],
+          "hasProbeEcho": false,
+          "toolResults": [],
+          "arrivedAfterPromptMs": 168
+        }
+      ]
+    },
+    {
+      "name": "allowedtools-server-level",
+      "spawn": {
+        "argv": [
+          "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+        ],
+        "cwd": "/private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-claude-mcp-surface-6gB9Pz",
+        "pid": 94758,
+        "ppid": 94750,
+        "envKeys": [
+          "AI_AGENT",
+          "ANTHROPIC_API_KEY",
+          "ANTHROPIC_BASE_URL",
+          "CLAUDECODE",
+          "CLAUDE_AGENT_SDK_VERSION",
+          "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+          "CLAUDE_CODE_ENTRYPOINT",
+          "CLAUDE_CODE_MCP_AUTO_BACKGROUND_MS",
+          "CLAUDE_CODE_MESSAGING_SOCKET",
+          "CLAUDE_CODE_MESSAGING_TOKEN",
+          "CLAUDE_CODE_SESSION_ID",
+          "CLAUDE_CONFIG_DIR",
+          "CLAUDE_PROJECT_DIR",
+          "COREPACK_ENABLE_AUTO_PIN",
+          "DISABLE_AUTOUPDATER",
+          "DISABLE_ERROR_REPORTING",
+          "DISABLE_TELEMETRY",
+          "FAKE_MCP_DELAY_MS",
+          "FAKE_MCP_MODE",
+          "FAKE_MCP_RECORD_DIR",
+          "HOME",
+          "NoDefaultCurrentDirectoryInExePath",
+          "PATH",
+          "TMPDIR",
+          "__CF_USER_TEXT_ENCODING"
+        ],
+        "startedAt": 1792154064524
+      },
+      "events": [
+        {
+          "t": 0,
+          "event": "process-start"
+        },
+        {
+          "t": 2,
+          "event": "message",
+          "method": "server/discover",
+          "hasId": true
+        },
+        {
+          "t": 2,
+          "event": "message",
+          "method": "initialize",
+          "hasId": true
+        },
+        {
+          "t": 2,
+          "event": "initialize-answered"
+        },
+        {
+          "t": 3,
+          "event": "message",
+          "method": "notifications/initialized",
+          "hasId": false
+        },
+        {
+          "t": 3,
+          "event": "message",
+          "method": "tools/list",
+          "hasId": true
+        },
+        {
+          "t": 38,
+          "event": "message",
+          "method": "tools/call",
+          "hasId": true
+        },
+        {
+          "t": 38,
+          "event": "tools-call-received",
+          "name": "echo",
+          "argumentKeys": [
+            "text"
+          ]
+        }
+      ],
+      "prompts": [
+        {
+          "turn": 0,
+          "pushedAt": 1792154064362
+        }
+      ],
+      "statuses": [
+        [
+          {
+            "name": "probe",
+            "status": "connected",
+            "serverInfo": {
+              "name": "fake-probe-server",
+              "version": "0.0.1"
+            },
+            "config": {
+              "type": "stdio",
+              "command": "/usr/local/bin/node",
+              "args": [
+                "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+              ]
+            },
+            "scope": "dynamic",
+            "source": "dynamic",
+            "tools": [
+              {
+                "name": "echo",
+                "annotations": {}
+              }
+            ]
+          },
+          {
+            "name": "ans",
+            "status": "connected",
+            "serverInfo": {
+              "name": "ans",
+              "version": "1.0.0"
+            },
+            "scope": "dynamic",
+            "source": "sdk",
+            "tools": [
+              {
+                "name": "probe_tool",
+                "annotations": {
+                  "destructive": true
+                }
+              }
+            ]
+          }
+        ]
+      ],
+      "rows": [
+        {
+          "kind": "message"
+        },
+        {
+          "kind": "denied",
+          "phase": "blocked",
+          "toolName": "mcp__probe__echo"
+        },
+        {
+          "kind": "message"
+        },
+        {
+          "kind": "settled"
+        }
+      ],
+      "settledOutcomes": [
+        "completed"
+      ],
+      "requests": [
+        {
+          "phase": "allowedtools-server-level",
+          "index": 0,
+          "arrivedAt": 1792154064555,
+          "toolNames": [
+            "mcp__ans__probe_tool",
+            "mcp__probe__echo"
+          ],
+          "hasProbeEcho": true,
+          "toolResults": [],
+          "arrivedAfterPromptMs": 193
+        },
+        {
+          "phase": "allowedtools-server-level",
+          "index": 1,
+          "arrivedAt": 1792154064567,
+          "toolNames": [
+            "mcp__ans__probe_tool",
+            "mcp__probe__echo"
+          ],
+          "hasProbeEcho": true,
+          "toolResults": [
+            {
+              "toolUseId": "toolu_mcp_loopback",
+              "isError": false,
+              "textHead": "fake-echo:probe-input\n\n<system-reminder>\n<total_tokens>14999890 tokens left</total_tokens>\n</system-reminder>"
+            }
+          ],
+          "arrivedAfterPromptMs": 205
+        }
+      ]
+    },
+    {
+      "name": "allowedtools-tool-level",
+      "spawn": {
+        "argv": [
+          "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+        ],
+        "cwd": "/private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-claude-mcp-surface-6gB9Pz",
+        "pid": 94771,
+        "ppid": 94763,
+        "envKeys": [
+          "AI_AGENT",
+          "ANTHROPIC_API_KEY",
+          "ANTHROPIC_BASE_URL",
+          "CLAUDECODE",
+          "CLAUDE_AGENT_SDK_VERSION",
+          "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+          "CLAUDE_CODE_ENTRYPOINT",
+          "CLAUDE_CODE_MCP_AUTO_BACKGROUND_MS",
+          "CLAUDE_CODE_MESSAGING_SOCKET",
+          "CLAUDE_CODE_MESSAGING_TOKEN",
+          "CLAUDE_CODE_SESSION_ID",
+          "CLAUDE_CONFIG_DIR",
+          "CLAUDE_PROJECT_DIR",
+          "COREPACK_ENABLE_AUTO_PIN",
+          "DISABLE_AUTOUPDATER",
+          "DISABLE_ERROR_REPORTING",
+          "DISABLE_TELEMETRY",
+          "FAKE_MCP_DELAY_MS",
+          "FAKE_MCP_MODE",
+          "FAKE_MCP_RECORD_DIR",
+          "HOME",
+          "NoDefaultCurrentDirectoryInExePath",
+          "PATH",
+          "TMPDIR",
+          "__CF_USER_TEXT_ENCODING"
+        ],
+        "startedAt": 1792154064736
+      },
+      "events": [
+        {
+          "t": 1,
+          "event": "process-start"
+        },
+        {
+          "t": 2,
+          "event": "message",
+          "method": "server/discover",
+          "hasId": true
+        },
+        {
+          "t": 3,
+          "event": "message",
+          "method": "initialize",
+          "hasId": true
+        },
+        {
+          "t": 3,
+          "event": "initialize-answered"
+        },
+        {
+          "t": 4,
+          "event": "message",
+          "method": "notifications/initialized",
+          "hasId": false
+        },
+        {
+          "t": 4,
+          "event": "message",
+          "method": "tools/list",
+          "hasId": true
+        },
+        {
+          "t": 39,
+          "event": "message",
+          "method": "tools/call",
+          "hasId": true
+        },
+        {
+          "t": 39,
+          "event": "tools-call-received",
+          "name": "echo",
+          "argumentKeys": [
+            "text"
+          ]
+        }
+      ],
+      "prompts": [
+        {
+          "turn": 0,
+          "pushedAt": 1792154064572
+        }
+      ],
+      "statuses": [
+        [
+          {
+            "name": "probe",
+            "status": "connected",
+            "serverInfo": {
+              "name": "fake-probe-server",
+              "version": "0.0.1"
+            },
+            "config": {
+              "type": "stdio",
+              "command": "/usr/local/bin/node",
+              "args": [
+                "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+              ]
+            },
+            "scope": "dynamic",
+            "source": "dynamic",
+            "tools": [
+              {
+                "name": "echo",
+                "annotations": {}
+              }
+            ]
+          },
+          {
+            "name": "ans",
+            "status": "connected",
+            "serverInfo": {
+              "name": "ans",
+              "version": "1.0.0"
+            },
+            "scope": "dynamic",
+            "source": "sdk",
+            "tools": [
+              {
+                "name": "probe_tool",
+                "annotations": {
+                  "destructive": true
+                }
+              }
+            ]
+          }
+        ]
+      ],
+      "rows": [
+        {
+          "kind": "message"
+        },
+        {
+          "kind": "denied",
+          "phase": "blocked",
+          "toolName": "mcp__probe__echo"
+        },
+        {
+          "kind": "message"
+        },
+        {
+          "kind": "settled"
+        }
+      ],
+      "settledOutcomes": [
+        "completed"
+      ],
+      "requests": [
+        {
+          "phase": "allowedtools-tool-level",
+          "index": 0,
+          "arrivedAt": 1792154064768,
+          "toolNames": [
+            "mcp__ans__probe_tool",
+            "mcp__probe__echo"
+          ],
+          "hasProbeEcho": true,
+          "toolResults": [],
+          "arrivedAfterPromptMs": 196
+        },
+        {
+          "phase": "allowedtools-tool-level",
+          "index": 1,
+          "arrivedAt": 1792154064781,
+          "toolNames": [
+            "mcp__ans__probe_tool",
+            "mcp__probe__echo"
+          ],
+          "hasProbeEcho": true,
+          "toolResults": [
+            {
+              "toolUseId": "toolu_mcp_loopback",
+              "isError": false,
+              "textHead": "fake-echo:probe-input\n\n<system-reminder>\n<total_tokens>14999890 tokens left</total_tokens>\n</system-reminder>"
+            }
+          ],
+          "arrivedAfterPromptMs": 209
+        }
+      ]
+    },
+    {
+      "name": "allowedtools-absent",
+      "spawn": {
+        "argv": [
+          "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+        ],
+        "cwd": "/private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-claude-mcp-surface-6gB9Pz",
+        "pid": 94794,
+        "ppid": 94777,
+        "envKeys": [
+          "AI_AGENT",
+          "ANTHROPIC_API_KEY",
+          "ANTHROPIC_BASE_URL",
+          "CLAUDECODE",
+          "CLAUDE_AGENT_SDK_VERSION",
+          "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+          "CLAUDE_CODE_ENTRYPOINT",
+          "CLAUDE_CODE_MCP_AUTO_BACKGROUND_MS",
+          "CLAUDE_CODE_MESSAGING_SOCKET",
+          "CLAUDE_CODE_MESSAGING_TOKEN",
+          "CLAUDE_CODE_SESSION_ID",
+          "CLAUDE_CONFIG_DIR",
+          "CLAUDE_PROJECT_DIR",
+          "COREPACK_ENABLE_AUTO_PIN",
+          "DISABLE_AUTOUPDATER",
+          "DISABLE_ERROR_REPORTING",
+          "DISABLE_TELEMETRY",
+          "FAKE_MCP_DELAY_MS",
+          "FAKE_MCP_MODE",
+          "FAKE_MCP_RECORD_DIR",
+          "HOME",
+          "NoDefaultCurrentDirectoryInExePath",
+          "PATH",
+          "TMPDIR",
+          "__CF_USER_TEXT_ENCODING"
+        ],
+        "startedAt": 1792154064959
+      },
+      "events": [
+        {
+          "t": 0,
+          "event": "process-start"
+        },
+        {
+          "t": 2,
+          "event": "message",
+          "method": "server/discover",
+          "hasId": true
+        },
+        {
+          "t": 3,
+          "event": "message",
+          "method": "initialize",
+          "hasId": true
+        },
+        {
+          "t": 3,
+          "event": "initialize-answered"
+        },
+        {
+          "t": 4,
+          "event": "message",
+          "method": "notifications/initialized",
+          "hasId": false
+        },
+        {
+          "t": 4,
+          "event": "message",
+          "method": "tools/list",
+          "hasId": true
+        }
+      ],
+      "prompts": [
+        {
+          "turn": 0,
+          "pushedAt": 1792154064785
+        }
+      ],
+      "statuses": [
+        [
+          {
+            "name": "probe",
+            "status": "connected",
+            "serverInfo": {
+              "name": "fake-probe-server",
+              "version": "0.0.1"
+            },
+            "config": {
+              "type": "stdio",
+              "command": "/usr/local/bin/node",
+              "args": [
+                "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+              ]
+            },
+            "scope": "dynamic",
+            "source": "dynamic",
+            "tools": [
+              {
+                "name": "echo",
+                "annotations": {}
+              }
+            ]
+          },
+          {
+            "name": "ans",
+            "status": "connected",
+            "serverInfo": {
+              "name": "ans",
+              "version": "1.0.0"
+            },
+            "scope": "dynamic",
+            "source": "sdk",
+            "tools": [
+              {
+                "name": "probe_tool",
+                "annotations": {
+                  "destructive": true
+                }
+              }
+            ]
+          }
+        ]
+      ],
+      "rows": [
+        {
+          "kind": "message"
+        },
+        {
+          "kind": "denied",
+          "phase": "blocked",
+          "toolName": "mcp__probe__echo"
+        },
+        {
+          "kind": "message"
+        },
+        {
+          "kind": "settled"
+        }
+      ],
+      "settledOutcomes": [
+        "completed"
+      ],
+      "requests": [
+        {
+          "phase": "allowedtools-absent",
+          "index": 0,
+          "arrivedAt": 1792154064993,
+          "toolNames": [
+            "mcp__ans__probe_tool",
+            "mcp__probe__echo"
+          ],
+          "hasProbeEcho": true,
+          "toolResults": [],
+          "arrivedAfterPromptMs": 208
+        },
+        {
+          "phase": "allowedtools-absent",
+          "index": 1,
+          "arrivedAt": 1792154065002,
+          "toolNames": [],
+          "hasProbeEcho": false,
+          "toolResults": [],
+          "arrivedAfterPromptMs": 217
+        },
+        {
+          "phase": "allowedtools-absent",
+          "index": 2,
+          "arrivedAt": 1792154065007,
+          "toolNames": [
+            "mcp__ans__probe_tool",
+            "mcp__probe__echo"
+          ],
+          "hasProbeEcho": true,
+          "toolResults": [
+            {
+              "toolUseId": "toolu_mcp_loopback",
+              "isError": true,
+              "textHead": "claude-sonnet-4-6 is temporarily unavailable, so auto mode cannot determine the safety of mcp__probe__echo right now. Wait a moment and then try this action aga"
+            }
+          ],
+          "arrivedAfterPromptMs": 222
+        }
+      ]
+    },
+    {
+      "name": "alwaysload-hang",
+      "spawn": {
+        "argv": [
+          "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+        ],
+        "cwd": "/private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-claude-mcp-surface-6gB9Pz",
+        "pid": 94806,
+        "ppid": 94799,
+        "envKeys": [
+          "AI_AGENT",
+          "ANTHROPIC_API_KEY",
+          "ANTHROPIC_BASE_URL",
+          "CLAUDECODE",
+          "CLAUDE_AGENT_SDK_VERSION",
+          "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+          "CLAUDE_CODE_ENTRYPOINT",
+          "CLAUDE_CODE_MCP_AUTO_BACKGROUND_MS",
+          "CLAUDE_CODE_MESSAGING_SOCKET",
+          "CLAUDE_CODE_MESSAGING_TOKEN",
+          "CLAUDE_CODE_SESSION_ID",
+          "CLAUDE_CONFIG_DIR",
+          "CLAUDE_PROJECT_DIR",
+          "COREPACK_ENABLE_AUTO_PIN",
+          "DISABLE_AUTOUPDATER",
+          "DISABLE_ERROR_REPORTING",
+          "DISABLE_TELEMETRY",
+          "FAKE_MCP_DELAY_MS",
+          "FAKE_MCP_MODE",
+          "FAKE_MCP_RECORD_DIR",
+          "HOME",
+          "NoDefaultCurrentDirectoryInExePath",
+          "PATH",
+          "TMPDIR",
+          "__CF_USER_TEXT_ENCODING"
+        ],
+        "startedAt": 1792154065168
+      },
+      "events": [
+        {
+          "t": 0,
+          "event": "process-start"
+        },
+        {
+          "t": 2,
+          "event": "message",
+          "method": "server/discover",
+          "hasId": true
+        },
+        {
+          "t": 5,
+          "event": "message",
+          "method": "initialize",
+          "hasId": true
+        },
+        {
+          "t": 27007,
+          "event": "message",
+          "method": "notifications/cancelled",
+          "hasId": false
+        },
+        {
+          "t": 27033,
+          "event": "stdin-closed"
+        }
+      ],
+      "prompts": [
+        {
+          "turn": 0,
+          "pushedAt": 1792154065012
+        }
+      ],
+      "statuses": [
+        [
+          {
+            "name": "probe",
+            "status": "failed",
+            "error": "Request timed out",
+            "config": {
+              "type": "stdio",
+              "command": "/usr/local/bin/node",
+              "args": [
+                "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+              ]
+            },
+            "scope": "dynamic",
+            "source": "dynamic"
+          },
+          {
+            "name": "ans",
+            "status": "connected",
+            "serverInfo": {
+              "name": "ans",
+              "version": "1.0.0"
+            },
+            "scope": "dynamic",
+            "source": "sdk",
+            "tools": [
+              {
+                "name": "probe_tool",
+                "annotations": {
+                  "destructive": true
+                }
+              }
+            ]
+          }
+        ]
+      ],
+      "rows": [
+        {
+          "kind": "message"
+        },
+        {
+          "kind": "message"
+        },
+        {
+          "kind": "settled"
+        }
+      ],
+      "settledOutcomes": [
+        "completed"
+      ],
+      "requests": [
+        {
+          "phase": "alwaysload-hang",
+          "index": 0,
+          "arrivedAt": 1792154092236,
+          "toolNames": [
+            "mcp__ans__probe_tool"
+          ],
+          "hasProbeEcho": false,
+          "toolResults": [],
+          "arrivedAfterPromptMs": 27224
+        }
+      ]
+    },
+    {
+      "name": "default-hang",
+      "spawn": {
+        "argv": [
+          "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+        ],
+        "cwd": "/private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-claude-mcp-surface-6gB9Pz",
+        "pid": 95330,
+        "ppid": 95320,
+        "envKeys": [
+          "AI_AGENT",
+          "ANTHROPIC_API_KEY",
+          "ANTHROPIC_BASE_URL",
+          "CLAUDECODE",
+          "CLAUDE_AGENT_SDK_VERSION",
+          "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+          "CLAUDE_CODE_ENTRYPOINT",
+          "CLAUDE_CODE_MCP_AUTO_BACKGROUND_MS",
+          "CLAUDE_CODE_MESSAGING_SOCKET",
+          "CLAUDE_CODE_MESSAGING_TOKEN",
+          "CLAUDE_CODE_SESSION_ID",
+          "CLAUDE_CONFIG_DIR",
+          "CLAUDE_PROJECT_DIR",
+          "COREPACK_ENABLE_AUTO_PIN",
+          "DISABLE_AUTOUPDATER",
+          "DISABLE_ERROR_REPORTING",
+          "DISABLE_TELEMETRY",
+          "FAKE_MCP_DELAY_MS",
+          "FAKE_MCP_MODE",
+          "FAKE_MCP_RECORD_DIR",
+          "HOME",
+          "NoDefaultCurrentDirectoryInExePath",
+          "PATH",
+          "TMPDIR",
+          "__CF_USER_TEXT_ENCODING"
+        ],
+        "startedAt": 1792154092426
+      },
+      "events": [
+        {
+          "t": 0,
+          "event": "process-start"
+        },
+        {
+          "t": 2,
+          "event": "message",
+          "method": "server/discover",
+          "hasId": true
+        },
+        {
+          "t": 3,
+          "event": "message",
+          "method": "initialize",
+          "hasId": true
+        },
+        {
+          "t": 27006,
+          "event": "message",
+          "method": "notifications/cancelled",
+          "hasId": false
+        },
+        {
+          "t": 27033,
+          "event": "stdin-closed"
+        }
+      ],
+      "prompts": [
+        {
+          "turn": 0,
+          "pushedAt": 1792154092246
+        }
+      ],
+      "statuses": [
+        [
+          {
+            "name": "probe",
+            "status": "failed",
+            "error": "Request timed out",
+            "config": {
+              "type": "stdio",
+              "command": "/usr/local/bin/node",
+              "args": [
+                "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+              ]
+            },
+            "scope": "dynamic",
+            "source": "dynamic"
+          },
+          {
+            "name": "ans",
+            "status": "connected",
+            "serverInfo": {
+              "name": "ans",
+              "version": "1.0.0"
+            },
+            "scope": "dynamic",
+            "source": "sdk",
+            "tools": [
+              {
+                "name": "probe_tool",
+                "annotations": {
+                  "destructive": true
+                }
+              }
+            ]
+          }
+        ]
+      ],
+      "rows": [
+        {
+          "kind": "message"
+        },
+        {
+          "kind": "message"
+        },
+        {
+          "kind": "settled"
+        }
+      ],
+      "settledOutcomes": [
+        "completed"
+      ],
+      "requests": [
+        {
+          "phase": "default-hang",
+          "index": 0,
+          "arrivedAt": 1792154119497,
+          "toolNames": [
+            "mcp__ans__probe_tool"
+          ],
+          "hasProbeEcho": false,
+          "toolResults": [],
+          "arrivedAfterPromptMs": 27251
+        }
+      ]
+    },
+    {
+      "name": "alwaysload-hang-no-ab",
+      "spawn": {
+        "argv": [
+          "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+        ],
+        "cwd": "/private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-claude-mcp-surface-6gB9Pz",
+        "pid": 95440,
+        "ppid": 95433,
+        "envKeys": [
+          "AI_AGENT",
+          "ANTHROPIC_API_KEY",
+          "ANTHROPIC_BASE_URL",
+          "CLAUDECODE",
+          "CLAUDE_AGENT_SDK_VERSION",
+          "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+          "CLAUDE_CODE_ENTRYPOINT",
+          "CLAUDE_CODE_MESSAGING_SOCKET",
+          "CLAUDE_CODE_MESSAGING_TOKEN",
+          "CLAUDE_CODE_SESSION_ID",
+          "CLAUDE_CONFIG_DIR",
+          "CLAUDE_PROJECT_DIR",
+          "COREPACK_ENABLE_AUTO_PIN",
+          "DISABLE_AUTOUPDATER",
+          "DISABLE_ERROR_REPORTING",
+          "DISABLE_TELEMETRY",
+          "FAKE_MCP_DELAY_MS",
+          "FAKE_MCP_MODE",
+          "FAKE_MCP_RECORD_DIR",
+          "HOME",
+          "NoDefaultCurrentDirectoryInExePath",
+          "PATH",
+          "TMPDIR",
+          "__CF_USER_TEXT_ENCODING"
+        ],
+        "startedAt": 1792154119680
+      },
+      "events": [
+        {
+          "t": 0,
+          "event": "process-start"
+        },
+        {
+          "t": 2,
+          "event": "message",
+          "method": "server/discover",
+          "hasId": true
+        },
+        {
+          "t": 4,
+          "event": "message",
+          "method": "initialize",
+          "hasId": true
+        },
+        {
+          "t": 27011,
+          "event": "message",
+          "method": "notifications/cancelled",
+          "hasId": false
+        },
+        {
+          "t": 27042,
+          "event": "stdin-closed"
+        }
+      ],
+      "prompts": [
+        {
+          "turn": 0,
+          "pushedAt": 1792154119507
+        }
+      ],
+      "statuses": [
+        [
+          {
+            "name": "probe",
+            "status": "failed",
+            "error": "Request timed out",
+            "config": {
+              "type": "stdio",
+              "command": "/usr/local/bin/node",
+              "args": [
+                "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+              ]
+            },
+            "scope": "dynamic",
+            "source": "dynamic"
+          },
+          {
+            "name": "ans",
+            "status": "connected",
+            "serverInfo": {
+              "name": "ans",
+              "version": "1.0.0"
+            },
+            "scope": "dynamic",
+            "source": "sdk",
+            "tools": [
+              {
+                "name": "probe_tool",
+                "annotations": {
+                  "destructive": true
+                }
+              }
+            ]
+          }
+        ]
+      ],
+      "rows": [
+        {
+          "kind": "message"
+        },
+        {
+          "kind": "message"
+        },
+        {
+          "kind": "settled"
+        }
+      ],
+      "settledOutcomes": [
+        "completed"
+      ],
+      "requests": [
+        {
+          "phase": "alwaysload-hang-no-ab",
+          "index": 0,
+          "arrivedAt": 1792154146758,
+          "toolNames": [
+            "mcp__ans__probe_tool"
+          ],
+          "hasProbeEcho": false,
+          "toolResults": [],
+          "arrivedAfterPromptMs": 27251
+        }
+      ]
+    },
+    {
+      "name": "default-hang-no-ab",
+      "spawn": {
+        "argv": [
+          "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+        ],
+        "cwd": "/private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-claude-mcp-surface-6gB9Pz",
+        "pid": 95574,
+        "ppid": 95564,
+        "envKeys": [
+          "AI_AGENT",
+          "ANTHROPIC_API_KEY",
+          "ANTHROPIC_BASE_URL",
+          "CLAUDECODE",
+          "CLAUDE_AGENT_SDK_VERSION",
+          "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+          "CLAUDE_CODE_ENTRYPOINT",
+          "CLAUDE_CODE_MESSAGING_SOCKET",
+          "CLAUDE_CODE_MESSAGING_TOKEN",
+          "CLAUDE_CODE_SESSION_ID",
+          "CLAUDE_CONFIG_DIR",
+          "CLAUDE_PROJECT_DIR",
+          "COREPACK_ENABLE_AUTO_PIN",
+          "DISABLE_AUTOUPDATER",
+          "DISABLE_ERROR_REPORTING",
+          "DISABLE_TELEMETRY",
+          "FAKE_MCP_DELAY_MS",
+          "FAKE_MCP_MODE",
+          "FAKE_MCP_RECORD_DIR",
+          "HOME",
+          "NoDefaultCurrentDirectoryInExePath",
+          "PATH",
+          "TMPDIR",
+          "__CF_USER_TEXT_ENCODING"
+        ],
+        "startedAt": 1792154146959
+      },
+      "events": [
+        {
+          "t": 0,
+          "event": "process-start"
+        },
+        {
+          "t": 2,
+          "event": "message",
+          "method": "server/discover",
+          "hasId": true
+        },
+        {
+          "t": 2,
+          "event": "message",
+          "method": "initialize",
+          "hasId": true
+        },
+        {
+          "t": 27008,
+          "event": "message",
+          "method": "notifications/cancelled",
+          "hasId": false
+        },
+        {
+          "t": 27035,
+          "event": "stdin-closed"
+        }
+      ],
+      "prompts": [
+        {
+          "turn": 0,
+          "pushedAt": 1792154146767
+        }
+      ],
+      "statuses": [
+        [
+          {
+            "name": "probe",
+            "status": "failed",
+            "error": "Request timed out",
+            "config": {
+              "type": "stdio",
+              "command": "/usr/local/bin/node",
+              "args": [
+                "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+              ]
+            },
+            "scope": "dynamic",
+            "source": "dynamic"
+          },
+          {
+            "name": "ans",
+            "status": "connected",
+            "serverInfo": {
+              "name": "ans",
+              "version": "1.0.0"
+            },
+            "scope": "dynamic",
+            "source": "sdk",
+            "tools": [
+              {
+                "name": "probe_tool",
+                "annotations": {
+                  "destructive": true
+                }
+              }
+            ]
+          }
+        ]
+      ],
+      "rows": [
+        {
+          "kind": "message"
+        },
+        {
+          "kind": "message"
+        },
+        {
+          "kind": "settled"
+        }
+      ],
+      "settledOutcomes": [
+        "completed"
+      ],
+      "requests": [
+        {
+          "phase": "default-hang-no-ab",
+          "index": 0,
+          "arrivedAt": 1792154174030,
+          "toolNames": [
+            "mcp__ans__probe_tool"
+          ],
+          "hasProbeEcho": false,
+          "toolResults": [],
+          "arrivedAfterPromptMs": 27263
+        }
+      ]
+    }
+  ],
+  "hookRecords": [
+    {
+      "phase": "tool-call-production-hook",
+      "tool": "mcp__probe__echo",
+      "promptBound": true,
+      "provenance": {
+        "name": "probe",
+        "source": "dynamic"
+      },
+      "inputKeys": [
+        "text"
+      ],
+      "productionDecision": "deny"
+    },
+    {
+      "phase": "hook-allow-canuse-delegate",
+      "tool": "mcp__probe__echo",
+      "promptBound": true,
+      "provenance": {
+        "name": "probe",
+        "source": "dynamic"
+      },
+      "inputKeys": [
+        "text"
+      ],
+      "productionDecision": "deny"
+    },
+    {
+      "phase": "hook-allow-canuse-allow",
+      "tool": "mcp__probe__echo",
+      "promptBound": true,
+      "provenance": {
+        "name": "probe",
+        "source": "dynamic"
+      },
+      "inputKeys": [
+        "text"
+      ],
+      "productionDecision": "deny"
+    },
+    {
+      "phase": "allowedtools-server-level",
+      "tool": "mcp__probe__echo",
+      "promptBound": true,
+      "provenance": {
+        "name": "probe",
+        "source": "dynamic"
+      },
+      "inputKeys": [
+        "text"
+      ],
+      "productionDecision": "deny"
+    },
+    {
+      "phase": "allowedtools-tool-level",
+      "tool": "mcp__probe__echo",
+      "promptBound": true,
+      "provenance": {
+        "name": "probe",
+        "source": "dynamic"
+      },
+      "inputKeys": [
+        "text"
+      ],
+      "productionDecision": "deny"
+    },
+    {
+      "phase": "allowedtools-absent",
+      "tool": "mcp__probe__echo",
+      "promptBound": true,
+      "provenance": {
+        "name": "probe",
+        "source": "dynamic"
+      },
+      "inputKeys": [
+        "text"
+      ],
+      "productionDecision": "deny"
+    }
+  ],
+  "canUseToolRecords": [],
+  "catalogs": [
+    {
+      "phase": "baseline-connected",
+      "tools": [
+        "mcp__ans__probe_tool",
+        "mcp__probe__echo"
+      ],
+      "servers": [
+        {
+          "name": "probe",
+          "status": "connected",
+          "source": "dynamic"
+        },
+        {
+          "name": "ans",
+          "status": "connected",
+          "source": "sdk"
+        }
+      ]
+    },
+    {
+      "phase": "tool-call-production-hook",
+      "tools": [
+        "mcp__ans__probe_tool",
+        "mcp__probe__echo"
+      ],
+      "servers": [
+        {
+          "name": "probe",
+          "status": "connected",
+          "source": "dynamic"
+        },
+        {
+          "name": "ans",
+          "status": "connected",
+          "source": "sdk"
+        }
+      ]
+    },
+    {
+      "phase": "hook-allow-canuse-delegate",
+      "tools": [
+        "mcp__ans__probe_tool",
+        "mcp__probe__echo"
+      ],
+      "servers": [
+        {
+          "name": "probe",
+          "status": "connected",
+          "source": "dynamic"
+        },
+        {
+          "name": "ans",
+          "status": "connected",
+          "source": "sdk"
+        }
+      ]
+    },
+    {
+      "phase": "hook-allow-canuse-allow",
+      "tools": [
+        "mcp__ans__probe_tool",
+        "mcp__probe__echo"
+      ],
+      "servers": [
+        {
+          "name": "probe",
+          "status": "connected",
+          "source": "dynamic"
+        },
+        {
+          "name": "ans",
+          "status": "connected",
+          "source": "sdk"
+        }
+      ]
+    },
+    {
+      "phase": "alwaysload-delay3s",
+      "tools": [
+        "mcp__ans__probe_tool",
+        "mcp__probe__echo"
+      ],
+      "servers": [
+        {
+          "name": "probe",
+          "status": "connected",
+          "source": "dynamic"
+        },
+        {
+          "name": "ans",
+          "status": "connected",
+          "source": "sdk"
+        }
+      ]
+    },
+    {
+      "phase": "alwaysload-delay3s",
+      "tools": [
+        "mcp__ans__probe_tool",
+        "mcp__probe__echo"
+      ],
+      "servers": [
+        {
+          "name": "probe",
+          "status": "connected",
+          "source": "dynamic"
+        },
+        {
+          "name": "ans",
+          "status": "connected",
+          "source": "sdk"
+        }
+      ]
+    },
+    {
+      "phase": "default-delay3s",
+      "tools": [
+        "mcp__ans__probe_tool",
+        "mcp__probe__echo"
+      ],
+      "servers": [
+        {
+          "name": "probe",
+          "status": "connected",
+          "source": "dynamic"
+        },
+        {
+          "name": "ans",
+          "status": "connected",
+          "source": "sdk"
+        }
+      ]
+    },
+    {
+      "phase": "default-delay3s",
+      "tools": [
+        "mcp__ans__probe_tool",
+        "mcp__probe__echo"
+      ],
+      "servers": [
+        {
+          "name": "probe",
+          "status": "connected",
+          "source": "dynamic"
+        },
+        {
+          "name": "ans",
+          "status": "connected",
+          "source": "sdk"
+        }
+      ]
+    },
+    {
+      "phase": "broken-command",
+      "tools": [
+        "mcp__ans__probe_tool"
+      ],
+      "servers": [
+        {
+          "name": "probe",
+          "status": "failed",
+          "source": "dynamic"
+        },
+        {
+          "name": "ans",
+          "status": "connected",
+          "source": "sdk"
+        }
+      ]
+    },
+    {
+      "phase": "allowedtools-server-level",
+      "tools": [
+        "mcp__ans__probe_tool",
+        "mcp__probe__echo"
+      ],
+      "servers": [
+        {
+          "name": "probe",
+          "status": "connected",
+          "source": "dynamic"
+        },
+        {
+          "name": "ans",
+          "status": "connected",
+          "source": "sdk"
+        }
+      ]
+    },
+    {
+      "phase": "allowedtools-tool-level",
+      "tools": [
+        "mcp__ans__probe_tool",
+        "mcp__probe__echo"
+      ],
+      "servers": [
+        {
+          "name": "probe",
+          "status": "connected",
+          "source": "dynamic"
+        },
+        {
+          "name": "ans",
+          "status": "connected",
+          "source": "sdk"
+        }
+      ]
+    },
+    {
+      "phase": "allowedtools-absent",
+      "tools": [
+        "mcp__ans__probe_tool",
+        "mcp__probe__echo"
+      ],
+      "servers": [
+        {
+          "name": "probe",
+          "status": "connected",
+          "source": "dynamic"
+        },
+        {
+          "name": "ans",
+          "status": "connected",
+          "source": "sdk"
+        }
+      ]
+    },
+    {
+      "phase": "alwaysload-hang",
+      "tools": [
+        "mcp__ans__probe_tool"
+      ],
+      "servers": [
+        {
+          "name": "probe",
+          "status": "failed",
+          "source": "dynamic"
+        },
+        {
+          "name": "ans",
+          "status": "connected",
+          "source": "sdk"
+        }
+      ]
+    },
+    {
+      "phase": "default-hang",
+      "tools": [
+        "mcp__ans__probe_tool"
+      ],
+      "servers": [
+        {
+          "name": "probe",
+          "status": "failed",
+          "source": "dynamic"
+        },
+        {
+          "name": "ans",
+          "status": "connected",
+          "source": "sdk"
+        }
+      ]
+    },
+    {
+      "phase": "alwaysload-hang-no-ab",
+      "tools": [
+        "mcp__ans__probe_tool"
+      ],
+      "servers": [
+        {
+          "name": "probe",
+          "status": "failed",
+          "source": "dynamic"
+        },
+        {
+          "name": "ans",
+          "status": "connected",
+          "source": "sdk"
+        }
+      ]
+    },
+    {
+      "phase": "default-hang-no-ab",
+      "tools": [
+        "mcp__ans__probe_tool"
+      ],
+      "servers": [
+        {
+          "name": "probe",
+          "status": "failed",
+          "source": "dynamic"
+        },
+        {
+          "name": "ans",
+          "status": "connected",
+          "source": "sdk"
+        }
+      ]
+    }
+  ],
+  "statusSnapshots": [
+    {
+      "phase": "baseline-connected",
+      "at": 1792154057056,
+      "entries": [
+        {
+          "name": "probe",
+          "status": "connected",
+          "serverInfo": {
+            "name": "fake-probe-server",
+            "version": "0.0.1"
+          },
+          "config": {
+            "type": "stdio",
+            "command": "/usr/local/bin/node",
+            "args": [
+              "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+            ]
+          },
+          "scope": "dynamic",
+          "source": "dynamic",
+          "tools": [
+            {
+              "name": "echo",
+              "annotations": {}
+            }
+          ]
+        },
+        {
+          "name": "ans",
+          "status": "connected",
+          "serverInfo": {
+            "name": "ans",
+            "version": "1.0.0"
+          },
+          "scope": "dynamic",
+          "source": "sdk",
+          "tools": [
+            {
+              "name": "probe_tool",
+              "annotations": {
+                "destructive": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "phase": "tool-call-production-hook",
+      "at": 1792154057268,
+      "entries": [
+        {
+          "name": "probe",
+          "status": "connected",
+          "serverInfo": {
+            "name": "fake-probe-server",
+            "version": "0.0.1"
+          },
+          "config": {
+            "type": "stdio",
+            "command": "/usr/local/bin/node",
+            "args": [
+              "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+            ]
+          },
+          "scope": "dynamic",
+          "source": "dynamic",
+          "tools": [
+            {
+              "name": "echo",
+              "annotations": {}
+            }
+          ]
+        },
+        {
+          "name": "ans",
+          "status": "connected",
+          "serverInfo": {
+            "name": "ans",
+            "version": "1.0.0"
+          },
+          "scope": "dynamic",
+          "source": "sdk",
+          "tools": [
+            {
+              "name": "probe_tool",
+              "annotations": {
+                "destructive": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "phase": "hook-allow-canuse-delegate",
+      "at": 1792154057484,
+      "entries": [
+        {
+          "name": "probe",
+          "status": "connected",
+          "serverInfo": {
+            "name": "fake-probe-server",
+            "version": "0.0.1"
+          },
+          "config": {
+            "type": "stdio",
+            "command": "/usr/local/bin/node",
+            "args": [
+              "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+            ]
+          },
+          "scope": "dynamic",
+          "source": "dynamic",
+          "tools": [
+            {
+              "name": "echo",
+              "annotations": {}
+            }
+          ]
+        },
+        {
+          "name": "ans",
+          "status": "connected",
+          "serverInfo": {
+            "name": "ans",
+            "version": "1.0.0"
+          },
+          "scope": "dynamic",
+          "source": "sdk",
+          "tools": [
+            {
+              "name": "probe_tool",
+              "annotations": {
+                "destructive": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "phase": "hook-allow-canuse-allow",
+      "at": 1792154057698,
+      "entries": [
+        {
+          "name": "probe",
+          "status": "connected",
+          "serverInfo": {
+            "name": "fake-probe-server",
+            "version": "0.0.1"
+          },
+          "config": {
+            "type": "stdio",
+            "command": "/usr/local/bin/node",
+            "args": [
+              "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+            ]
+          },
+          "scope": "dynamic",
+          "source": "dynamic",
+          "tools": [
+            {
+              "name": "echo",
+              "annotations": {}
+            }
+          ]
+        },
+        {
+          "name": "ans",
+          "status": "connected",
+          "serverInfo": {
+            "name": "ans",
+            "version": "1.0.0"
+          },
+          "scope": "dynamic",
+          "source": "sdk",
+          "tools": [
+            {
+              "name": "probe_tool",
+              "annotations": {
+                "destructive": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "phase": "alwaysload-delay3s",
+      "at": 1792154060938,
+      "entries": [
+        {
+          "name": "probe",
+          "status": "connected",
+          "serverInfo": {
+            "name": "fake-probe-server",
+            "version": "0.0.1"
+          },
+          "config": {
+            "type": "stdio",
+            "command": "/usr/local/bin/node",
+            "args": [
+              "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+            ]
+          },
+          "scope": "dynamic",
+          "source": "dynamic",
+          "tools": [
+            {
+              "name": "echo",
+              "annotations": {}
+            }
+          ]
+        },
+        {
+          "name": "ans",
+          "status": "connected",
+          "serverInfo": {
+            "name": "ans",
+            "version": "1.0.0"
+          },
+          "scope": "dynamic",
+          "source": "sdk",
+          "tools": [
+            {
+              "name": "probe_tool",
+              "annotations": {
+                "destructive": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "phase": "default-delay3s",
+      "at": 1792154064186,
+      "entries": [
+        {
+          "name": "probe",
+          "status": "connected",
+          "serverInfo": {
+            "name": "fake-probe-server",
+            "version": "0.0.1"
+          },
+          "config": {
+            "type": "stdio",
+            "command": "/usr/local/bin/node",
+            "args": [
+              "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+            ]
+          },
+          "scope": "dynamic",
+          "source": "dynamic",
+          "tools": [
+            {
+              "name": "echo",
+              "annotations": {}
+            }
+          ]
+        },
+        {
+          "name": "ans",
+          "status": "connected",
+          "serverInfo": {
+            "name": "ans",
+            "version": "1.0.0"
+          },
+          "scope": "dynamic",
+          "source": "sdk",
+          "tools": [
+            {
+              "name": "probe_tool",
+              "annotations": {
+                "destructive": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "phase": "broken-command",
+      "at": 1792154064361,
+      "entries": [
+        {
+          "name": "probe",
+          "status": "failed",
+          "error": "ENOENT: no such file or directory, posix_spawn 'stdio'",
+          "config": {
+            "type": "stdio",
+            "command": "/nonexistent/ans-probe-missing-binary",
+            "args": []
+          },
+          "scope": "dynamic",
+          "source": "dynamic"
+        },
+        {
+          "name": "ans",
+          "status": "connected",
+          "serverInfo": {
+            "name": "ans",
+            "version": "1.0.0"
+          },
+          "scope": "dynamic",
+          "source": "sdk",
+          "tools": [
+            {
+              "name": "probe_tool",
+              "annotations": {
+                "destructive": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "phase": "allowedtools-server-level",
+      "at": 1792154064571,
+      "entries": [
+        {
+          "name": "probe",
+          "status": "connected",
+          "serverInfo": {
+            "name": "fake-probe-server",
+            "version": "0.0.1"
+          },
+          "config": {
+            "type": "stdio",
+            "command": "/usr/local/bin/node",
+            "args": [
+              "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+            ]
+          },
+          "scope": "dynamic",
+          "source": "dynamic",
+          "tools": [
+            {
+              "name": "echo",
+              "annotations": {}
+            }
+          ]
+        },
+        {
+          "name": "ans",
+          "status": "connected",
+          "serverInfo": {
+            "name": "ans",
+            "version": "1.0.0"
+          },
+          "scope": "dynamic",
+          "source": "sdk",
+          "tools": [
+            {
+              "name": "probe_tool",
+              "annotations": {
+                "destructive": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "phase": "allowedtools-tool-level",
+      "at": 1792154064784,
+      "entries": [
+        {
+          "name": "probe",
+          "status": "connected",
+          "serverInfo": {
+            "name": "fake-probe-server",
+            "version": "0.0.1"
+          },
+          "config": {
+            "type": "stdio",
+            "command": "/usr/local/bin/node",
+            "args": [
+              "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+            ]
+          },
+          "scope": "dynamic",
+          "source": "dynamic",
+          "tools": [
+            {
+              "name": "echo",
+              "annotations": {}
+            }
+          ]
+        },
+        {
+          "name": "ans",
+          "status": "connected",
+          "serverInfo": {
+            "name": "ans",
+            "version": "1.0.0"
+          },
+          "scope": "dynamic",
+          "source": "sdk",
+          "tools": [
+            {
+              "name": "probe_tool",
+              "annotations": {
+                "destructive": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "phase": "allowedtools-absent",
+      "at": 1792154065011,
+      "entries": [
+        {
+          "name": "probe",
+          "status": "connected",
+          "serverInfo": {
+            "name": "fake-probe-server",
+            "version": "0.0.1"
+          },
+          "config": {
+            "type": "stdio",
+            "command": "/usr/local/bin/node",
+            "args": [
+              "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+            ]
+          },
+          "scope": "dynamic",
+          "source": "dynamic",
+          "tools": [
+            {
+              "name": "echo",
+              "annotations": {}
+            }
+          ]
+        },
+        {
+          "name": "ans",
+          "status": "connected",
+          "serverInfo": {
+            "name": "ans",
+            "version": "1.0.0"
+          },
+          "scope": "dynamic",
+          "source": "sdk",
+          "tools": [
+            {
+              "name": "probe_tool",
+              "annotations": {
+                "destructive": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "phase": "alwaysload-hang",
+      "at": 1792154092245,
+      "entries": [
+        {
+          "name": "probe",
+          "status": "failed",
+          "error": "Request timed out",
+          "config": {
+            "type": "stdio",
+            "command": "/usr/local/bin/node",
+            "args": [
+              "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+            ]
+          },
+          "scope": "dynamic",
+          "source": "dynamic"
+        },
+        {
+          "name": "ans",
+          "status": "connected",
+          "serverInfo": {
+            "name": "ans",
+            "version": "1.0.0"
+          },
+          "scope": "dynamic",
+          "source": "sdk",
+          "tools": [
+            {
+              "name": "probe_tool",
+              "annotations": {
+                "destructive": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "phase": "default-hang",
+      "at": 1792154119505,
+      "entries": [
+        {
+          "name": "probe",
+          "status": "failed",
+          "error": "Request timed out",
+          "config": {
+            "type": "stdio",
+            "command": "/usr/local/bin/node",
+            "args": [
+              "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+            ]
+          },
+          "scope": "dynamic",
+          "source": "dynamic"
+        },
+        {
+          "name": "ans",
+          "status": "connected",
+          "serverInfo": {
+            "name": "ans",
+            "version": "1.0.0"
+          },
+          "scope": "dynamic",
+          "source": "sdk",
+          "tools": [
+            {
+              "name": "probe_tool",
+              "annotations": {
+                "destructive": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "phase": "alwaysload-hang-no-ab",
+      "at": 1792154146766,
+      "entries": [
+        {
+          "name": "probe",
+          "status": "failed",
+          "error": "Request timed out",
+          "config": {
+            "type": "stdio",
+            "command": "/usr/local/bin/node",
+            "args": [
+              "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+            ]
+          },
+          "scope": "dynamic",
+          "source": "dynamic"
+        },
+        {
+          "name": "ans",
+          "status": "connected",
+          "serverInfo": {
+            "name": "ans",
+            "version": "1.0.0"
+          },
+          "scope": "dynamic",
+          "source": "sdk",
+          "tools": [
+            {
+              "name": "probe_tool",
+              "annotations": {
+                "destructive": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "phase": "default-hang-no-ab",
+      "at": 1792154174038,
+      "entries": [
+        {
+          "name": "probe",
+          "status": "failed",
+          "error": "Request timed out",
+          "config": {
+            "type": "stdio",
+            "command": "/usr/local/bin/node",
+            "args": [
+              "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+            ]
+          },
+          "scope": "dynamic",
+          "source": "dynamic"
+        },
+        {
+          "name": "ans",
+          "status": "connected",
+          "serverInfo": {
+            "name": "ans",
+            "version": "1.0.0"
+          },
+          "scope": "dynamic",
+          "source": "sdk",
+          "tools": [
+            {
+              "name": "probe_tool",
+              "annotations": {
+                "destructive": true
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "cleanupNotes": [],
+  "phaseErrors": []
+}

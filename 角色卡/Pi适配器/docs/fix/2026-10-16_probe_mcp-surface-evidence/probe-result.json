@@ -1,0 +1,279 @@
+{
+  "a": {
+    "preBindActive": [
+      "edit_file",
+      "read_file",
+      "write_file"
+    ],
+    "postBindActive": [
+      "edit_file",
+      "mcp__probe_a__echo",
+      "mcp__probe_a__pid",
+      "read_file",
+      "write_file"
+    ],
+    "callableNames": [
+      "edit_file",
+      "mcp__probe_a__echo",
+      "mcp__probe_a__pid",
+      "read_file",
+      "write_file"
+    ],
+    "mcpNames": [
+      "mcp__probe_a__echo",
+      "mcp__probe_a__pid"
+    ],
+    "deniedSummaries": [
+      "非注入的 ANS 工具，拒绝执行：mcp__probe_a__echo"
+    ],
+    "settledMappedPer2Turns": 2,
+    "callLogEmptyAfterBlockedCalls": true,
+    "disposeLeavesChildAlive": true,
+    "shutdownEventStopsChild": true,
+    "selfHeldEnvKeys": [
+      "PATH",
+      "PROBE_ENV_DUMP",
+      "PROBE_MARKER",
+      "__CF_USER_TEXT_ENCODING"
+    ]
+  },
+  "b": {
+    "activeNames": [
+      "edit_file",
+      "mcp__probe_b__echo",
+      "read_file",
+      "stray_tool",
+      "write_file"
+    ],
+    "mcpNames": [
+      "mcp__probe_b__echo"
+    ],
+    "snapshotUnexpected": [
+      "mcp__probe_b__echo",
+      "stray_tool"
+    ],
+    "surfaceUnexpected": [
+      "stray_tool"
+    ],
+    "predicateResults": [
+      {
+        "name": "mcp__probe_b__echo",
+        "whitelist": [
+          "probe-b"
+        ],
+        "expected": true,
+        "got": true
+      },
+      {
+        "name": "mcp__probe_b__echo",
+        "whitelist": [],
+        "expected": false,
+        "got": false
+      },
+      {
+        "name": "mcp__probe_bx__echo",
+        "whitelist": [
+          "probe-b"
+        ],
+        "expected": false,
+        "got": false
+      },
+      {
+        "name": "mcp__other__echo",
+        "whitelist": [
+          "probe-b"
+        ],
+        "expected": false,
+        "got": false
+      },
+      {
+        "name": "write_file",
+        "whitelist": [
+          "probe-b"
+        ],
+        "expected": false,
+        "got": false
+      },
+      {
+        "name": "mcp__probe-b__echo",
+        "whitelist": [
+          "probe-b"
+        ],
+        "expected": false,
+        "got": false
+      }
+    ],
+    "handlerKeys": [
+      "before_provider_request",
+      "message_end",
+      "provider_stream_event",
+      "session_before_compact",
+      "session_compact",
+      "session_compact_failed",
+      "tool_call",
+      "tool_execution_end",
+      "tool_execution_start"
+    ],
+    "perTurnSettled": [
+      {
+        "raw": 1,
+        "mapped": 1
+      },
+      {
+        "raw": 1,
+        "mapped": 1
+      },
+      {
+        "raw": 1,
+        "mapped": 1
+      },
+      {
+        "raw": 1,
+        "mapped": 1
+      }
+    ],
+    "serverCallLog": [
+      "echo\t2026-10-16T12:36:12.493Z"
+    ],
+    "strayCalls": 0,
+    "writeOkLanded": true,
+    "writeEvilBlocked": true,
+    "disposeLeavesChildAlive": true,
+    "shutdownEventStopsChild": true
+  },
+  "b2": {
+    "observedNames": [
+      "mcp__probe_srv_v2__echo",
+      "mcp__probe_srv_v2__echo_tool",
+      "mcp__probe_srv_v2__tool_name_that_is_quite_long_indeed__731aa8e9"
+    ],
+    "allMatch": true,
+    "closeInfo": {
+      "aliveAfterDispose": false
+    }
+  },
+  "c": {
+    "baselineNoMcpMs": 3,
+    "fastP1Ms": 69,
+    "fastP2Ms": 1,
+    "fastConnectedByP1": true,
+    "slowP1Ms": 806,
+    "slowP1DoneAtMs": 806,
+    "slowP2Ms": 2,
+    "slowConnectedAtMsAfterBind": 3080,
+    "slowP3Ms": 4,
+    "slowDisposeLeavesChildAlive": false,
+    "slowZeroP1Ms": 3
+  },
+  "d": {
+    "selfHeldKeys": [
+      "PATH",
+      "PROBE_ENV_DUMP",
+      "PROBE_MARKER",
+      "__CF_USER_TEXT_ENCODING"
+    ],
+    "platformInjectedKeys": [
+      "__CF_USER_TEXT_ENCODING"
+    ],
+    "selfHeldExactMinimalUnionPlatform": true,
+    "defaultKeyCount": 91,
+    "parentKeyCount": 90,
+    "defaultInheritsAll": true,
+    "sentinelLeakedToDefault": true,
+    "selfHeldDisposeLeavesChildAlive": false,
+    "defaultDisposeLeavesChildAlive": false
+  },
+  "e": {
+    "connected": true,
+    "mcpNames": [
+      "mcp__probe_http__echo"
+    ],
+    "transcriptHasHttpEcho": true,
+    "probeTokenSeen": true,
+    "requests": [
+      {
+        "method": "POST",
+        "rpcMethod": "initialize",
+        "headerNames": [
+          "accept",
+          "accept-encoding",
+          "accept-language",
+          "connection",
+          "content-length",
+          "content-type",
+          "host",
+          "sec-fetch-mode",
+          "user-agent",
+          "x-probe-token"
+        ]
+      },
+      {
+        "method": "POST",
+        "rpcMethod": "notifications/initialized",
+        "headerNames": [
+          "accept",
+          "accept-encoding",
+          "accept-language",
+          "connection",
+          "content-length",
+          "content-type",
+          "host",
+          "mcp-protocol-version",
+          "sec-fetch-mode",
+          "user-agent",
+          "x-probe-token"
+        ]
+      },
+      {
+        "method": "GET",
+        "headerNames": [
+          "accept",
+          "accept-encoding",
+          "accept-language",
+          "connection",
+          "host",
+          "mcp-protocol-version",
+          "sec-fetch-mode",
+          "user-agent",
+          "x-probe-token"
+        ]
+      },
+      {
+        "method": "POST",
+        "rpcMethod": "tools/list",
+        "headerNames": [
+          "accept",
+          "accept-encoding",
+          "accept-language",
+          "connection",
+          "content-length",
+          "content-type",
+          "host",
+          "mcp-protocol-version",
+          "sec-fetch-mode",
+          "user-agent",
+          "x-probe-token"
+        ]
+      },
+      {
+        "method": "POST",
+        "rpcMethod": "tools/call",
+        "headerNames": [
+          "accept",
+          "accept-encoding",
+          "accept-language",
+          "connection",
+          "content-length",
+          "content-type",
+          "host",
+          "mcp-protocol-version",
+          "sec-fetch-mode",
+          "user-agent",
+          "x-probe-token"
+        ]
+      }
+    ],
+    "notes": "HTTP 路径无子进程（StreamableHttpTransport 在宿主进程内 fetch；本探针的 server 本身就在驱动进程内运行——无子进程是结构性的）；风险差异：① header/env 引用 `${VAR}` 逐键自 process.env 解析（只读声明键，非全量继承）；② 无子进程即无 env 继承面，但有出站网络面与 OAuth 面（401→needs-auth，登录走浏览器/凭据存储——V1 未接）；③ GET SSE 流：本探针 server 以 405 关闭该流，客户端按『无 GET 流』处理。"
+  },
+  "failures": 0
+}

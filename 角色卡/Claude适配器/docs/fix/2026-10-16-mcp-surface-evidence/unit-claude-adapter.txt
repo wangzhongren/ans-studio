@@ -1,0 +1,41 @@
+✔ SDK stays lazy through composition/bind; actual MCP schema/options isolate all native abilities and credentials (50.755459ms)
+✔ schema preserves required/optional/union/nested object and rejects unsupported keywords (1.511292ms)
+✔ actual MCP exposes union and nested required schema without losing optional/extra parameters (12.772875ms)
+✔ late old MCP callback after next prompt, replay/missing/unknown nonce all fail before effects (14.846292ms)
+✔ reserved context supports additionalProperties false, never reaches core, and schema collision rejects (4.512333ms)
+✔ same text twice has unique wire identity; old/unknown/missing/duplicate UserPromptSubmit cannot borrow next turn (4.846583ms)
+✔ auth/endpoint/model and redaction share construction-time env snapshot (3.20475ms)
+✔ private wire marker echoed by tool/error never leaks into public events or messages (3.166916ms)
+✔ missing dependency/API key and URL userinfo fail before query, explicit settings map to actual SDK options (1.845334ms)
+✔ actual shell tool deny prevents marker and allow returns actual command output (25.134792ms)
+✔ real MCP rejects missing write arguments, gate denial and gate throw produce zero effects (18.733375ms)
+✔ actual write/edit MCP handlers execute in call order even concurrent transport calls (77.879291ms)
+✔ multiple input turns retain the same query and map images; exactly one settled has each turnId (12.688333ms)
+✔ SDK/result errors and handler exceptions redact secrets and fail honestly (7.436334ms)
+✔ InteractionGate pauses deadline; answer returns and sequential write waits behind confirmation (16.054584ms)
+✔ the same Claude controlled clock expires at 50ms outside customer waiting (2.83475ms)
+✔ stop pending confirmation cancels queued write and late answer cannot report/effect in a new turn (38.599834ms)
+✔ active prompt deadline emits timed_out once and disposal closes event stream (17.531083ms)
+✔ actual native resume succeeds only after matching successful SDK result; failed resume clears ID and next explicit input rebuilds (19.393375ms)
+✔ native symlink and storage runtime mismatch fail before SDK query (4.994625ms)
+✔ core Service receives real Claude MCP reports/dispatch receipts and saves replay with actual metadata (63.03375ms)
+✔ required-v1 rejects each missing display capability before SDK load; profile registers bind snapshot only (3.816625ms)
+✔ real Core projector receives actual args/rule/result execution while SDK content and opaque identities stay unchanged (10.160708ms)
+✔ actual handler thrown Error projects protected message, unknown throw stays opaque, model retains original generic failure (17.745875ms)
+✔ unknown and old PreToolUse never borrow active turn; real original hook denial alone is blocked (7.642917ms)
+✔ projector failure yields only bounded diagnostic without changing tool result or successful turn (2.129791ms)
+✔ Core strips C metadata before Claude and preserves exact SDK prompt/images while publishing safe display copy (97.315583ms)
+✔ thin projected outlet never redacts supplied opaque identities or restores suppressed oversized identity (3.2125ms)
+✔ required production path displays real read ENOENT and Node shell output without parsing result messages (50.797417ms)
+✔ web search capability bit off (default/explicit): tools/allowedTools keep the pre-existing surface, WebSearch stays hook-denied and frames stay unconsumed (9.229542ms)
+✔ web search capability bit on: builtin declared and auto-allowed only for the live bound turn, input never rewritten (5.900666ms)
+✔ web search on: native frames project one paired start/result per call; failure, unsupported content and budget text stay truthful and never fail the turn (6.414417ms)
+✔ installed-skills section: non-empty splices the orchestration render verbatim; zero/broken stays the byte-identical old prompt and never fails the turn (14.870875ms)
+ℹ tests 33
+ℹ suites 0
+ℹ pass 33
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 939.516417

@@ -1,0 +1,63 @@
+{
+ "task": "G-4 V2 MCP P0 探针（Codex 面）+ 同批 G-4 注入节拼接",
+ "role": "Codex适配器",
+ "at": "2026-10-16T00:00:00.000Z",
+ "node": "v24.14.0",
+ "platform": "darwin-arm64",
+ "production": [
+  {
+   "path": "src/provider/codex/session.ts",
+   "sha256": "e988bbb443d072c7f8766439c41c004014ae4259af5ded277b83b30f055f25fd"
+  }
+ ],
+ "tests": [
+  {
+   "path": "test/codex-adapter/session.test.ts",
+   "sha256": "2ae467fa7dc05be6440fb547094e7fa9b9e87d903d6dc7f75c006f8e7af16a7d"
+  }
+ ],
+ "evidence": {
+  "角色卡/Codex适配器/docs/change/2026-10-16-mcp-surface-evidence/mcp-surface.probe.mjs": "c7861d8ecfea6c67705082ede544d2a27b9fe11aff229079d2579424446a434e",
+  "角色卡/Codex适配器/docs/change/2026-10-16-mcp-surface-evidence/fixtures/echo-mcp.mjs": "b6ef7d8a8a598ee81f25c03b5adee41fc819f14655547d40be29b7fb1c264f3d",
+  "角色卡/Codex适配器/docs/change/2026-10-16-mcp-surface-evidence/mcp-surface.raw.json": "a765f31bcbf3fcaac2b4b55f29fd3ac7d1d5a3a41d7be065ea3be0fd79fc00ef",
+  "角色卡/Codex适配器/docs/change/2026-10-16-mcp-surface-evidence/mcp-surface.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "角色卡/Codex适配器/docs/change/2026-10-16-mcp-surface-evidence/schema/InitializeCapabilities.ts": "dee58273861971585e0615804eaf50ba4690cd4846f02ed352ed211887a022a5",
+  "角色卡/Codex适配器/docs/change/2026-10-16-mcp-surface-evidence/schema/McpServerInfo.ts": "a0ddc79efd0eaa7a348dd88a74743f5c3dbac5869b51e09d120098c9be7200e7",
+  "角色卡/Codex适配器/docs/change/2026-10-16-mcp-surface-evidence/schema/ServerNotification.ts": "5e0d56b131445f17424d88bf26f33135cd3c4c2c0fc2a1c84b4cc528d0a224de",
+  "角色卡/Codex适配器/docs/change/2026-10-16-mcp-surface-evidence/schema/ServerRequest.ts": "1c5837adbfbdd005f387478ba87840808d1353b47b82dcf63739a78bb1c8d3be",
+  "角色卡/Codex适配器/docs/change/2026-10-16-mcp-surface-evidence/schema/Tool.ts": "d5e9e622156040df012f8a0769258093132854b64e30b6ec45c8831c11231d92",
+  "角色卡/Codex适配器/docs/change/2026-10-16-mcp-surface-evidence/schema/v2/ItemCompletedNotification.ts": "f995b1554728867f7464f6f26154e0a0a947f0e6b7b247bdcd24214484cfa836",
+  "角色卡/Codex适配器/docs/change/2026-10-16-mcp-surface-evidence/schema/v2/ItemStartedNotification.ts": "99f52740d4e34f5c2b9850953ef8b41aaf3283ff3a733021d04a2dcec3681cce",
+  "角色卡/Codex适配器/docs/change/2026-10-16-mcp-surface-evidence/schema/v2/ListMcpServerStatusParams.ts": "8f769ff4fc224f9ac29ea76d568500bb07b3d959ecc3cc67abf203e753ea616e",
+  "角色卡/Codex适配器/docs/change/2026-10-16-mcp-surface-evidence/schema/v2/ListMcpServerStatusResponse.ts": "30a823dce1d1f7a8d94e03e4716c1a8bf7dab253d222286ee5316f2982c1df27",
+  "角色卡/Codex适配器/docs/change/2026-10-16-mcp-surface-evidence/schema/v2/McpServerConnectionStatus.ts": "e8a1ab81bca6c3623e08d8c62cdce50cf98d7a68ea406e711eceb1c890c5045c",
+  "角色卡/Codex适配器/docs/change/2026-10-16-mcp-surface-evidence/schema/v2/McpServerElicitationAction.ts": "2f0de09e3c4bf2e4afe28eb1175c73286270f5fdf527f4658bb0a7d43c03a7ab",
+  "角色卡/Codex适配器/docs/change/2026-10-16-mcp-surface-evidence/schema/v2/McpServerElicitationRequestParams.ts": "16ab3fb70ebd4b68522432f718cc49a6e43cd78e03ee7734e2bdb7c2a101df4c",
+  "角色卡/Codex适配器/docs/change/2026-10-16-mcp-surface-evidence/schema/v2/McpServerElicitationRequestResponse.ts": "391007144a7dac5cdc57a065de5aaab130d4f7a45b5c9d7fae801c674498a3ee",
+  "角色卡/Codex适配器/docs/change/2026-10-16-mcp-surface-evidence/schema/v2/McpServerStartupFailureReason.ts": "a946867153147b6da20aa839dfa9a63b48e4a36dd836971ba51e1002179decd8",
+  "角色卡/Codex适配器/docs/change/2026-10-16-mcp-surface-evidence/schema/v2/McpServerStartupState.ts": "23449b2d30c4a64892667f783a41cd4b88fe87f5eff2cb6c69f420c39dfa330f",
+  "角色卡/Codex适配器/docs/change/2026-10-16-mcp-surface-evidence/schema/v2/McpServerStatus.ts": "983c21342eb43aaa3bd534e62912403c3e20c59a69678d5c4b3642f56bfe00dc",
+  "角色卡/Codex适配器/docs/change/2026-10-16-mcp-surface-evidence/schema/v2/McpServerStatusDetail.ts": "8faec4faebac7fa38696408b4f1386bbf8b07ae721242ce475a2b6d7a894aee0",
+  "角色卡/Codex适配器/docs/change/2026-10-16-mcp-surface-evidence/schema/v2/McpServerStatusUpdatedNotification.ts": "a7259d28ad5c9efbaa691b49ff0aaf79b53d31a499cae5350746ad15bf3958ab",
+  "角色卡/Codex适配器/docs/change/2026-10-16-mcp-surface-evidence/schema/v2/McpServerToolCallParams.ts": "bc2c9772b2b5e59a1c91d2b57b259616aae409b56cd04d6acd2394eb2888ddda",
+  "角色卡/Codex适配器/docs/change/2026-10-16-mcp-surface-evidence/schema/v2/McpServerToolCallResponse.ts": "6846847691a9239c8fab35c8ad094a5f2e2e88a0fbb2884a9fd75a1e89efb195",
+  "角色卡/Codex适配器/docs/change/2026-10-16-mcp-surface-evidence/schema/v2/McpToolCallError.ts": "639a626f2b8932812fd0c94c027b35aea0dd8fad18bcc720d690ef5f824d2c75",
+  "角色卡/Codex适配器/docs/change/2026-10-16-mcp-surface-evidence/schema/v2/McpToolCallProgressNotification.ts": "39ff4bfe3cbd0d2b886dbba70e4916182c9e75802217e3ae2a5e4914569c6e16",
+  "角色卡/Codex适配器/docs/change/2026-10-16-mcp-surface-evidence/schema/v2/McpToolCallResult.ts": "12c5eea02e7f24e3c64114837dc070186e6a807694034e746bac2f8d03d50fbd",
+  "角色卡/Codex适配器/docs/change/2026-10-16-mcp-surface-evidence/schema/v2/McpToolCallStatus.ts": "cd64f4dbfbeccfd1c5a5c5982ccddd803b6ea1a909c8756e0b9274bbf34e515c",
+  "角色卡/Codex适配器/docs/change/2026-10-16-mcp-surface-evidence/schema/v2/ThreadItem.ts": "9eec6b2ee0ce090fa0c8976e0afa5eca07cc3b529bbbe75ead5520291ec9f7f0"
+ },
+ "checks": {
+  "ownTests": "35/35 pass, 0 skip（codex-adapter 全目录；新增 1 例）",
+  "typecheck": "exit0（全仓 tsc --noEmit）",
+  "probeSelfChecks": "18/18 pass（probe exit 0）",
+  "probeEnvironment": "pinned CLI 0.162.1 real app-server + local fixtures + loopback fake Responses SSE; externalModelCalls 0; credentials fake (CODEX_API_KEY=fake-mcp-probe-only)"
+ },
+ "limitations": [
+  "真实 ANS 网关对 type:\"namespace\" 桥工具的下发/回传接受性未验（禁真实网关；本地假 SSE 绿）",
+  "item/mcpToolCall/progress 实际触发未实跑（schema 有方法；夹具不发 progress 通知）",
+  "server→client 主动 elicitation（非审批路径）三种能力位组合均被 app-server 就地 decline，未定格其到达客户端的条件",
+  "审批模式 approve 的完整语义（对 write 型工具/guardian 复核的边界）未深挖；auto 依赖 auto-review（本 posture 无）",
+  "A3 对照格中 PATH 仍被注入（来源=codex 注入或 spawn 实现，未再区分层级）；__CF_USER_TEXT_ENCODING 为 darwin 运行期产物"
+ ]
+}

@@ -1,5 +1,22 @@
 # Pi适配器 变更记录
 
+## 2026-10-16 — ①G-4 注入节接线（Pi 三处拼装点）②V2 MCP P0 探针（scratch 逐项定格）
+
+**来源**：客户 2026-10-16 批准 G-4 V1＋V2 口径与 P0 探针轮（本上下文两任务派发）。①＝G-4 编排侧契约（`角色卡/编排/docs/change/2026-10-16_change_g4-skill-injection-and-preauth.md` §五；渲染单一来源 `src/common/编排/installed-skills.ts`）的 Pi 侧接线；②＝运行时核心评估 `2026-10-16_assess_role-mcp-install.md` §九.3。零 git 提交；未发任何真实网关请求。
+
+**① G-4 注入节接线（小）**
+- `src/common/pi-adapter/real-adapter.ts`：`:44` 导入 `renderInstalledSkillsSection`；`renderSystemPrompt`（`:329` 起）改签名为 `(role, projectRoot)`——非空 ⇒ `base + "\n\n" + section` **整段拼入（逐字不改写）**、空串 ⇒ **逐字零渲染**；两调用点（`:971` composeContext、`:1072` bindRole→resourceLoader.systemPrompt）传 `opts.projectRoot`。
+- `src/provider/pi/session.ts`：`:19` 导入同函数；`renderSystemPrompt`（`:46` 起）改 `(role, projectRoot?)` 同口径（缺 projectRoot/空 `""` ⇒ 渲染器返空串 ⇒ 零渲染）；假适配器新增可选 `projectRoot`（`:83`；**缺省不注入 ⇒ 全部既有调用与对照会话逐字无变化**）；防真外壳 composeContext 传 `input.projectRoot`。
+- 新 `test/pi-adapter/installed-skills-injection.test.ts`（**6 例**）：假适配器拼接逐字（前缀＝旧提示、节文本＝渲染器输出逐字、digest 独立重算、节只出现一次）/零渲染三分支（未给 root、无技能树、空目录）/别角色过滤零渲染/坏件不拒会；防真外壳 composeContext（providerRoot 流入）；真实适配器 `bindRole` 实际会话（faux）——`sdk.native.systemPrompt` 含节标题＋digest＋冻结尾句、节位于「边界来源」之后、空目录零渲染。
+- **验证**：`node --test "test/pi-adapter/"*.test.ts` → **270/270 绿**（基线 264 + 6）；`npm run typecheck` → 全仓 0 错。
+
+**② V2 MCP P0 探针（scratch；不入产品路径；零产品代码改动）**
+- 新 scratch：`test/pi-adapter/mcp-surface.probe.ts`（驱动 A–E）＋ `test/pi-adapter/mcp-probe-server.probe.ts`（最小 stdio MCP server 夹具；`--dump-env` 只写键名）。纯本地（faux 模型进程内＋本地夹具；`PI_CODING_AGENT_DIR` 覆盖到 scratch、结尾自清）。记录＝`docs/fix/2026-10-16_probe_mcp-surface.md`（逐项结论）；证据＝`docs/fix/2026-10-16_probe_mcp-surface-evidence/`（driver-output 全文 **32/32 PASS、0 失败**；env 键名清单；服务端调用单）。
+- **逐项结论（摘要）**：①`bindExtensions` 接通成立（session_start→loadConfig→后台建连；direct 工具进「声明面＋可被工具调用面」；现状门禁对 MCP 直连工具的拒绝路径实测，执行前阻断、服务端零调用）；治理回归钉住（settled 恰 1/轮＝原生＋映射双面、写门禁双向、server-tools 注册面＋合成观测＋声明注入在 bindExtensions 在链下行为不变）；**新发现：`session.dispose()` 不收回 MCP 子进程**（`session_shutdown` 由 AgentSessionRuntime 发射、本链无发射点；V2 收口建议＝dispose 前补发 `extensionRunner.emit({type:"session_shutdown",reason:"quit"})` 或自持 transport 主动 close——两者均本角色文件内可落）。②**判据草案**＝`mcp__<清洗后白名单 server>__*` 前缀面 ∪ 精确注入名（1128 与 499-504 共用；快照式误伤/前缀式零残余实测对照；边界负例 6/6 全拒；清洗与 `_<hash8>` 缩短名仍命中；「中途声明面变化」网关风险**静态闭环**——本仓 compat 收窄下 pi-ai 走普通 tools 整份列表、不产 `tool_addition/removal` 块）。③`startupWaitMs` 实测：slow(init 延迟 3000)+800 ⇒ 首轮 806ms 钳位、次轮 2ms、后台 3080ms 接通后工具动态出现；0 ⇒ 3ms 不等；无 MCP baseline 3ms。④env 收窄实测：自持 `inheritEnv:false` 子进程键＝自持 3 键＋macOS 平台注入 1 键（`__CF_USER_TEXT_ENCODING`，`env -i` 亦见——与 transport 无关）；默认 transport 全量继承实锤（子进程 91 键 ⊇ 宿主 90 键、plant 哨兵泄漏）。⑤HTTP 环回接通（无子进程为结构性；`${VAR}` 逐键解析实测；OAuth/出站策略未接未验）。
+- **未定格（如实）**：资源工具族（`list_mcp_resources` 等三名，direct+resources 场景）、工具就绪按需等待时延、真实第三方 server／Windows 清理、OAuth/HTTP 出站策略、`session_shutdown` 补发完整副作用面。
+
+**边界声明**：全部落点在本角色 boundary.yaml Section 1 内（`src/common/pi-adapter/**`、`src/provider/pi/**`、`test/pi-adapter/**`、本角色 docs）；未碰运行时核心/门禁引擎/其它角色在飞文件；scratch 临时目录已自清（无遗留进程/目录）。
+
 ## 2026-10-16 — 服务端工具族 live 探针第一批结果：归档＋评估（客户实跑；②判定＝探针构造产物）
 
 **来源**：G-3 验证阶段客户本机实跑（PM 转达）。归档＋评估记录（证据）：`docs/fix/2026-10-16_probe_server-side-tools-live-results.md`（含原始输出逐字归档、端点/request_id 已隐去，全文无凭据/查询串）。**本角色未发任何 live 请求**；本轮**只写 docs 面**（未改任何 src/test 代码）。
