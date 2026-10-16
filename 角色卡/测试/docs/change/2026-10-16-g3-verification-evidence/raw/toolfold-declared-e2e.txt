@@ -1,0 +1,4 @@
+# 声明的产品 e2e 复跑（TOOLFOLD 段）——本角色复跑
+$ ANS_TOOLFOLD_UI_ONLY=1 ANS_UIUX_OUTDIR=/private/tmp/ans-g3-toolfold node_modules/.bin/electron test/桌面应用/e2e/uiux-v2.mjs
+TOOLFOLD_UI_PASS 19 /private/tmp/ans-g3-toolfold
+（exit 0；report.json 全量见 raw/toolfold-declared-e2e-report.json）

@@ -1,0 +1,8 @@
+[pi-adapter] ℹ tests 264 ℹ pass 264 ℹ fail 0 ℹ skipped 0 
+[claude-adapter] ℹ tests 32 ℹ pass 32 ℹ fail 0 ℹ skipped 0 
+[codex-adapter] ℹ tests 33 ℹ pass 33 ℹ fail 0 ℹ skipped 0 
+[runtime-core] ℹ tests 104 ℹ pass 104 ℹ fail 0 ℹ skipped 0 
+[桌面应用] ℹ tests 354 ℹ pass 354 ℹ fail 0 ℹ skipped 0 
+[编排] ℹ tests 300 ℹ pass 300 ℹ fail 0 ℹ skipped 0 
+[门禁引擎] ℹ tests 183 ℹ pass 182 ℹ fail 0 ℹ skipped 1 
+[测试(含本批50)] ℹ tests 320 ℹ pass 320 ℹ fail 0 ℹ skipped 0 

@@ -1,0 +1,21 @@
+# 声明专项复跑（本角色复跑，原始计数）
+## node --test test/pi-adapter/server-tools.test.ts test/pi-adapter/server-tools-wire.test.ts
+ℹ tests 32
+ℹ pass 32
+ℹ fail 0
+ℹ skipped 0
+## node --test test/claude-adapter/*.test.ts
+ℹ tests 32
+ℹ pass 32
+ℹ fail 0
+ℹ skipped 0
+## node --test test/codex-adapter/*.test.ts
+ℹ tests 33
+ℹ pass 33
+ℹ fail 0
+ℹ skipped 0
+## node --test test/桌面应用/tool-rows.test.ts test/桌面应用/renderer.test.ts
+ℹ tests 71
+ℹ pass 71
+ℹ fail 0
+ℹ skipped 0

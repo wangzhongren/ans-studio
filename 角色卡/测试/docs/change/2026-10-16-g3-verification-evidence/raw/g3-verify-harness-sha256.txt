@@ -1,0 +1,7 @@
+# 本角色验证产物指纹（test/测试/g3-search-verify/，6 文件）
+907270673e566a7cd26b1db0fbbcc7792846cde35fa43b04dd52498abc430e4d  test/测试/g3-search-verify/claude-websearch-verify.test.ts
+d8769813d091540c0bbadce21c447b76dabdc42e8950490c775e986142da6058  test/测试/g3-search-verify/codex-websearch-verify.test.ts
+6c9b9812d0ffa75e11076a2965438675258997a4fdfc1d1b7379be010f663809  test/测试/g3-search-verify/fold-probe.mjs
+12e99bf7c4ab60d7ce44b7c95e771c3100eddf0c083d1dea598c9e96cbaba58a  test/测试/g3-search-verify/pi-loopback-verify.test.ts
+96e842c005af8c807e7489d4dfdd322eca629a775401aacfeb1747af9b3bdcfe  test/测试/g3-search-verify/pi-parse-verify.test.ts
+fdeffdcfd1f10540b03935d8d9e01d832e92ee964817a244f74f74191ba0655a  test/测试/g3-search-verify/scope-audit-and-fold.test.ts

@@ -1,0 +1,277 @@
+(node:71863) [CLAUDE_SDK_CAN_USE_TOOL_SHADOWED] Warning: canUseTool will not be invoked for: mcp__ans__native_probe, WebSearch. Bare allowedTools entries auto-approve the whole tool before the callback is consulted. To gate every tool call, use a PreToolUse hook; or remove the bare names from allowedTools so they fall through to canUseTool. Allow rules from settings files can also shadow the callback but are not visible here.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:71863) [CLAUDE_SDK_CAN_USE_TOOL_SHADOWED] Warning: canUseTool will not be invoked for: mcp__ans__native_probe, WebSearch. Bare allowedTools entries auto-approve the whole tool before the callback is consulted. To gate every tool call, use a PreToolUse hook; or remove the bare names from allowedTools so they fall through to canUseTool. Allow rules from settings files can also shadow the callback but are not visible here.
+(node:71863) [CLAUDE_SDK_CAN_USE_TOOL_SHADOWED] Warning: canUseTool will not be invoked for: mcp__ans__native_probe. Bare allowedTools entries auto-approve the whole tool before the callback is consulted. To gate every tool call, use a PreToolUse hook; or remove the bare names from allowedTools so they fall through to canUseTool. Allow rules from settings files can also shadow the callback but are not visible here.
+{
+  "bundledCli": "2.1.299",
+  "sdk": "0.3.299",
+  "webSearchHookDispatched": 1,
+  "webSearchHookRecords": [
+    {
+      "phase": "enabled",
+      "event": "PreToolUse",
+      "tool": "WebSearch",
+      "promptId": "5027deca-2cc6-428e-b8ba-ec523805f82e",
+      "decision": "allow",
+      "updatedInput": false
+    }
+  ],
+  "sideQueryCounts": {
+    "enabled": 1,
+    "side-query-fail": 2
+  },
+  "requests": [
+    {
+      "phase": "enabled",
+      "kind": "main",
+      "toolNames": [
+        "WebSearch",
+        "mcp__ans__native_probe"
+      ],
+      "hasWebSearchDeclaration": false,
+      "toolChoice": null,
+      "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+      "messageCount": 1,
+      "firstUserText": "<system-reminder>\n# Environment\nYou have been invoked in the following … NPUT_CONTEXT:fc6b6190-97e0-4d42-bf4f-1338356b0e18]\nsearch the loopback"
+    },
+    {
+      "phase": "enabled",
+      "kind": "side-query",
+      "toolNames": [
+        "web_search"
+      ],
+      "hasWebSearchDeclaration": true,
+      "maxUses": 8,
+      "toolChoice": {
+        "type": "tool",
+        "name": "web_search"
+      },
+      "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,dangerous-tool-use-2026-09-03",
+      "messageCount": 1,
+      "firstUserText": "Perform a web search for the query: ans loopback web search"
+    },
+    {
+      "phase": "enabled",
+      "kind": "main",
+      "toolNames": [
+        "WebSearch",
+        "mcp__ans__native_probe"
+      ],
+      "hasWebSearchDeclaration": false,
+      "toolChoice": null,
+      "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+      "messageCount": 3,
+      "firstUserText": "<system-reminder>\n# Environment\nYou have been invoked in the following … NPUT_CONTEXT:fc6b6190-97e0-4d42-bf4f-1338356b0e18]\nsearch the loopback"
+    },
+    {
+      "phase": "side-query-fail",
+      "kind": "main",
+      "toolNames": [
+        "WebSearch",
+        "mcp__ans__native_probe"
+      ],
+      "hasWebSearchDeclaration": false,
+      "toolChoice": null,
+      "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+      "messageCount": 1,
+      "firstUserText": "<system-reminder>\n# Environment\nYou have been invoked in the following … NPUT_CONTEXT:bb4b611a-2069-4fb3-ad46-824ed273f44c]\nsearch the loopback"
+    },
+    {
+      "phase": "side-query-fail",
+      "kind": "side-query",
+      "toolNames": [
+        "web_search"
+      ],
+      "hasWebSearchDeclaration": true,
+      "maxUses": 8,
+      "toolChoice": {
+        "type": "tool",
+        "name": "web_search"
+      },
+      "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,dangerous-tool-use-2026-09-03",
+      "messageCount": 1,
+      "firstUserText": "Perform a web search for the query: ans loopback web search"
+    },
+    {
+      "phase": "side-query-fail",
+      "kind": "side-query",
+      "toolNames": [
+        "web_search"
+      ],
+      "hasWebSearchDeclaration": true,
+      "maxUses": 8,
+      "toolChoice": {
+        "type": "tool",
+        "name": "web_search"
+      },
+      "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24",
+      "messageCount": 1,
+      "firstUserText": "Perform a web search for the query: ans loopback web search"
+    },
+    {
+      "phase": "side-query-fail",
+      "kind": "main",
+      "toolNames": [
+        "WebSearch",
+        "mcp__ans__native_probe"
+      ],
+      "hasWebSearchDeclaration": false,
+      "toolChoice": null,
+      "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+      "messageCount": 3,
+      "firstUserText": "<system-reminder>\n# Environment\nYou have been invoked in the following … NPUT_CONTEXT:bb4b611a-2069-4fb3-ad46-824ed273f44c]\nsearch the loopback"
+    },
+    {
+      "phase": "control",
+      "kind": "main",
+      "toolNames": [
+        "mcp__ans__native_probe"
+      ],
+      "hasWebSearchDeclaration": false,
+      "toolChoice": null,
+      "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+      "messageCount": 1,
+      "firstUserText": "<system-reminder>\n# Environment\nYou have been invoked in the following … :e43e2082-1fd6-4769-9120-61b24969647d]\ncontrol turn without web search"
+    }
+  ],
+  "hookRecords": [
+    {
+      "phase": "enabled",
+      "event": "UserPromptSubmit"
+    },
+    {
+      "phase": "enabled",
+      "event": "PreToolUse",
+      "tool": "WebSearch",
+      "promptId": "5027deca-2cc6-428e-b8ba-ec523805f82e",
+      "decision": "allow",
+      "updatedInput": false
+    },
+    {
+      "phase": "side-query-fail",
+      "event": "UserPromptSubmit"
+    },
+    {
+      "phase": "side-query-fail",
+      "event": "PreToolUse",
+      "tool": "WebSearch",
+      "promptId": "f7c59f1e-ba6a-47b1-8d52-15f7b7596212",
+      "decision": "allow",
+      "updatedInput": false
+    },
+    {
+      "phase": "control",
+      "event": "UserPromptSubmit"
+    }
+  ],
+  "catalogs": [
+    {
+      "phase": "enabled",
+      "tools": [
+        "WebSearch",
+        "mcp__ans__native_probe"
+      ],
+      "servers": [
+        "ans"
+      ]
+    },
+    {
+      "phase": "side-query-fail",
+      "tools": [
+        "WebSearch",
+        "mcp__ans__native_probe"
+      ],
+      "servers": [
+        "ans"
+      ]
+    },
+    {
+      "phase": "control",
+      "tools": [
+        "mcp__ans__native_probe"
+      ],
+      "servers": [
+        "ans"
+      ]
+    }
+  ],
+  "enabledToolRows": [
+    {
+      "kind": "tool_call",
+      "detail": {
+        "toolName": "WebSearch",
+        "phase": "start",
+        "toolCallId": "da0b8ccc-f42a-43c2-81d1-f6f23e5a9a78:toolu_ws_loopback",
+        "turnId": "da0b8ccc-f42a-43c2-81d1-f6f23e5a9a78",
+        "display": {
+          "version": 1,
+          "omissions": []
+        }
+      }
+    },
+    {
+      "kind": "accepted",
+      "detail": {
+        "toolName": "WebSearch",
+        "phase": "result",
+        "toolCallId": "da0b8ccc-f42a-43c2-81d1-f6f23e5a9a78:toolu_ws_loopback",
+        "turnId": "da0b8ccc-f42a-43c2-81d1-f6f23e5a9a78",
+        "ok": true,
+        "status": "completed",
+        "display": {
+          "version": 1,
+          "omissions": [],
+          "resultText": {
+            "text": "Web search results for query: \"ans loopback web search\"\n\nLinks: [{\"title\":\"Loopback Evidence\",\"url\":\"https://example.test/loopback\"}]\n\nfixture search summary\n\n\nREMINDER: You MUST include the sources above in your response to the user using markdown hyperlinks.",
+            "truncated": false,
+            "redacted": false
+          }
+        }
+      }
+    }
+  ],
+  "failureToolRows": [
+    {
+      "kind": "tool_call",
+      "detail": {
+        "toolName": "WebSearch",
+        "phase": "start",
+        "toolCallId": "16d6bd02-5480-4523-82ca-0f3293d1a83a:toolu_ws_loopback",
+        "turnId": "16d6bd02-5480-4523-82ca-0f3293d1a83a",
+        "display": {
+          "version": 1,
+          "omissions": []
+        }
+      }
+    },
+    {
+      "kind": "denied",
+      "detail": {
+        "toolName": "WebSearch",
+        "phase": "result",
+        "toolCallId": "16d6bd02-5480-4523-82ca-0f3293d1a83a:toolu_ws_loopback",
+        "turnId": "16d6bd02-5480-4523-82ca-0f3293d1a83a",
+        "ok": false,
+        "status": "failed",
+        "display": {
+          "version": 1,
+          "omissions": [],
+          "resultText": {
+            "text": "API Error: 400 fixture gateway rejects the server tool declaration",
+            "truncated": false,
+            "redacted": false
+          },
+          "error": {
+            "text": "API Error: 400 fixture gateway rejects the server tool declaration",
+            "truncated": false,
+            "redacted": false
+          }
+        }
+      }
+    }
+  ],
+  "controlSettled": "completed",
+  "cleanupNotes": [],
+  "externalApiCalls": 0,
+  "credentials": "fake-only"
+}

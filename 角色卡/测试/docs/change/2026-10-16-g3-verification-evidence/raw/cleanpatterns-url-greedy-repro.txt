@@ -1,0 +1,9 @@
+# cleanPatterns 贪吃 URL 紧贴文本——最小复现（无关产品改动面；tool-display.ts 本批未改）
+
+$ node --input-type=module -e "protectText(raw)"
+raw  = 查询「独立对抗查询-ZX9」 → 2 条结果：独立标题-ALPHA — https://verify.test/entry?token=对抗参数-绝不外泄#frag；独立标题-BETA — https://verify.test/beta
+out  = 查询「独立对抗查询-ZX9」 → 2 条结果：独立标题-ALPHA — https://verify.test/entry — https://verify.test/beta
+注意：URL 的 [^\s<>"']+ 贪婪匹配把紧跟的「；独立标题-BETA」一并吞掉并用归一 URL 替换（全角「；」非空白字符）。
+属性：丢文本、不泄文本；cleanPatterns 为既有显示层口径（runtime-core，本批无改动）。
+
+git-status: （空=未改动）

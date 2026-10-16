@@ -1,0 +1,20 @@
+{
+  "reports": [
+    "PASS S1 运行中不折叠：恰一组且展开 | [{\"open\":true,\"summary\":\"本轮 2 个调用：role_status / run_shell · 含 1 条未放行\"}]",
+    "PASS S2 摘要：恰「本轮 2 个调用：role_status / run_shell」＋「含 1 条未放行」 | \"本轮 2 个调用：role_status / run_shell · 含 1 条未放行\"",
+    "PASS S2 未放行相位并入：行 2 同时含「调用发起」与「已拒绝」（组未切断、仍 2 行）",
+    "PASS S2 独立未放行行直显（治理信号不折叠） | [\"未执行：命令被拒绝（原因：g3 探针受控拒绝）ans status未执行：命令被拒绝（原因：g3 探针受控拒绝）\"]",
+    "PASS S3 轮结束折叠成一行：open=false、摘要不变 | [{\"open\":false,\"summary\":\"本轮 2 个调用：role_status / run_shell · 含 1 条未放行\"}]",
+    "PASS S3 折叠后独立未放行行仍在",
+    "PASS S3 手动展开：逐条零丢失（下标/相位/文本全等） | [{\"idx\":\"0\",\"ph\":\"0 1\",\"text\":\"role_status目标未记录调用发起 → 执行完成\"},{\"idx\":\"2\",\"ph\":\"2 3\",\"text\":\"run_shellans status调用发起 → 已拒绝\"}]",
+    "PASS S4 新轮自成一组且运行中展开 | [{\"open\":true,\"summary\":\"本轮 2 个调用：role_status / run_shell · 含 1 条未放行\"},{\"open\":true,\"summary\":\"本轮 2 个调用：role_status / read_file\"}]",
+    "PASS S4 运行中手工收起：追加后不自动展开、摘要更新为 3 个调用 | {\"open\":false,\"summary\":\"本轮 3 个调用：role_status / read_file / session_tail\"}",
+    "PASS S4 settled 后手工收起仍被尊重（不自动展开） | {\"open\":false,\"summary\":\"本轮 3 个调用：role_status / read_file / session_tail\"}",
+    "PASS S5 前置：焦点确在组摘要上（场景为真）",
+    "PASS S5 焦点在组内：settled 不自动折叠（自动动作不吞焦点） | {\"open\":true,\"summary\":\"本轮 1 个调用：role_status\"}",
+    "PASS S6 失败相位并入并在摘要标注「含 1 条失败」 | {\"open\":true,\"summary\":\"本轮 1 个调用：write_file · 含 1 条失败\"}",
+    "PASS S6 失败相位独立行直显（含失败文本）",
+    "PASS S6 无 callId 独立未放行：不发明身份、切断组（后续调用另起一组）并直显 | [{\"open\":true,\"summary\":\"本轮 2 个调用：role_status / run_shell · 含 1 条未放行\"},{\"open\":false,\"summary\":\"本轮 3 个调用：role_status / read_file / session_tail\"},{\"open\":true,\"summary\":\"本轮 1 个调用：role_status\"},{\"open\":true,\"summary\":\"本轮 1 个调用：write_file · 含 1 条失败\"},{\"open\":true,\"summary\":\"本轮 1 个调用：role_status\"}]",
+    "PASS S6 独立未放行行直显（g3-orphan 文本在）"
+  ]
+}
