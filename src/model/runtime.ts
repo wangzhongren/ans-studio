@@ -220,6 +220,115 @@ export type DispatchTaskFn = (
   metadata?: ReportHandbackMetadata,
 ) => DispatchReceipt | null | undefined | void | Promise<DispatchReceipt | null | undefined | void>;
 
+// —————————————— 看护只读工具与恢复提议（G-2；只给 su 注入，注入才注册） ——————————————
+//
+// 依据：客户 2026-10-16 批准 G-2（设计 `角色卡/产品/docs/design/2026-10-16_design_role-watchdog-and-closure.md`
+// §四/§六）。三个工具均**只给治理角色 su**——由调用方（编排注入端，判据沿 dispatch_task 的
+// suppressHandback 先例）决定「注入才注册」；未注入 ⇒ 工具不存在（最强 fail-closed）。
+// 本层纪律：role_status / session_tail **纯读**（无任何副作用）；propose_recovery **只提交载荷、如实
+// 转达回执**——提议 ≠ 执行、执行以客户确认为准、不得承诺。
+//
+// **形状单一来源＝本模块**（编排 `common/编排/watchdog.ts` 转发出同一符号、不另立第二份形状；编排
+// `withWatchdogCapabilities` 把桌面实现的能力并入 `GovernedToolsOptions` 的同名能力位——字段名即契约，
+// 任一侧改名/改形 = 工具静默零注册或 fail-closed，不放大权限）。
+
+/** `role_status` 查询载荷（G-2 §4.1）：`roleId` 缺省＝全项目角色概览；给出＝单角色详情。 */
+export interface RoleStatusPayload {
+  roleId?: string;
+  /** true ⇒ 附该角色近日志尾部（≤20 条，白名单元数据——写盘时已 scrub，读侧不扩面）。 */
+  includeDiagnostics?: boolean;
+}
+
+/** `session_tail` 查询载荷（G-2 §4.2）：`lines` 由工具层归一为 1..200（缺省 40）后传入——实现无需再判缺省。 */
+export interface SessionTailPayload {
+  roleId: string;
+  lines?: number;
+}
+
+/**
+ * `role_status` / `session_tail` 的如实回执（纯读两工具共用）。
+ * `ok:true` 时 `text` 为结构化输出（超限由工具层截断并如实标注 `truncated`）；
+ * `ok:false` 时 `message` 为如实原因（「无会话历史」「读坏」等——不抛、不猜）。
+ */
+export interface WatchdogToolResult {
+  ok: boolean;
+  text?: string;
+  message?: string;
+}
+
+/**
+ * `role_status` 的注入数据源（桌面主进程按**同源快照**渲染结构化文本；G-2 §4.1）。契约（实现方＝桌面窗口 W1）：
+ * - **纯读**：调用无任何副作用（不写盘、不入队、不改 busy、不动任何判定链）；
+ * - 输出为结构化文本（项目/时间/各角色 busy·队列·最近一轮/待确认数/看护状态），超 **8 KiB** 由
+ *   工具层按字节截断并如实标注 `truncated`；
+ * - 数据层失败（如诊断写盘故障）以 `{ok:false, message}` 如实表达（「不可用＋lastError」），**不要抛**
+ *   ——抛出的异常由工具层按「读取未完成」如实转达，绝不编造状态。
+ */
+export type RoleStatusFn = (
+  query: RoleStatusPayload,
+  metadata?: ReportHandbackMetadata,
+) => WatchdogToolResult | null | undefined | void | Promise<WatchdogToolResult | null | undefined | void>;
+
+/**
+ * `session_tail` 的注入数据源（桌面主进程经**受保护投影管线**产出；G-2 §4.2）。契约（实现方＝桌面窗口 W5）：
+ * - **纯读**；必须沿既有受保护投影（凭据清洗 / display 保护，`runtime-history.ts::getSessionHistory`
+ *   同路径）产出——**不得**直读裸 JSONL、不得输出未脱敏的原文敏感面；
+ * - 返回该角色会话文件**尾部规范化行**（`<at> [user|assistant|tool] <一行文本，≤200 字/行、超长截断标注>`），
+ *   头部**如实**给「来源文件 / 总行数 / 跳过的坏行数」；
+ * - 「无会话历史」「读坏 / header 非法」以 `{ok:false, message}` 如实表达，**不抛、不猜**。
+ */
+export type SessionTailFn = (
+  query: SessionTailPayload,
+  metadata?: ReportHandbackMetadata,
+) => WatchdogToolResult | null | undefined | void | Promise<WatchdogToolResult | null | undefined | void>;
+
+/** 恢复动作集（G-2 §6.3，客户批准恰三值；不含禁用角色/删会话/改边界类动作）。 */
+export type RecoveryAction = "abort-turn" | "rebuild-session" | "redeliver";
+
+/** `propose_recovery` 载荷（G-2 §6.1）：su 只能**提议**——校验、确认卡与执行都在注入能力侧。 */
+export interface ProposeRecoveryPayload {
+  roleId: string;
+  action: RecoveryAction;
+  /** 支撑提议的证据（非空才提交；无证据不提议）。 */
+  evidence: string;
+  reason?: string;
+  /** 仅 `redeliver` 有意义：针对该排队条目（队列期去重键类 id）。 */
+  itemId?: string;
+}
+
+/**
+ * 恢复回执结果（G-2 §6.3/§九）——四值中**恰 `executed` 为已执行**、其余三值一律**未执行**：
+ * · `executed`＝客户已确认且已执行（成功）；
+ * · `declined`＝**未执行**——客户取消/关窗/未确认（fail-closed，**绝不当「没人问就执行」**）；
+ * · `unsupported`＝**未执行**——运行时不支持该动作（绝不假装已执行）；
+ * · `error`＝**未执行**——执行失败/前提不满足（如 rebuild 遇在跑轮次拒绝），原因进 `message`。
+ */
+export type RecoveryOutcome = "executed" | "declined" | "unsupported" | "error";
+
+/** 恢复提议回执（G-2 §6.1）：`executed` 仅在**客户已确认且已执行**（恰一次）时给出。 */
+export interface RecoveryReceipt {
+  outcome: RecoveryOutcome;
+  /** 如实说明（成功细节 / 未执行原因 / 不支持原因 / 错误原文）。 */
+  message?: string;
+  /** 确认者标识（操作者 id 先例，`operator-channel.ts`）。 */
+  operatorId?: string;
+  /** 回执时间（ISO 8601）。 */
+  at?: string;
+}
+
+/**
+ * `propose_recovery` 的注入能力（桌面窗口 W4/W5 路由：校验 → 恢复确认卡 →（恰 allow:true 才）执行
+ * → 回执；G-2 §6）。
+ *
+ * 纪律（沿 `dispatch_task` 先例）：本工具**只提交载荷、如实转达回执**——**提议 ≠ 执行**，无客户
+ * 确认＝零执行；能力实现方不得据此授予任何写权、不得静默执行、不得把未执行当作已执行。契约外返回
+ * （`null`/`undefined`/未知 outcome）由工具层按「未获明确结果」fail-closed 处理，绝不当已执行。
+ */
+export type ProposeRecoveryFn = (
+  proposal: ProposeRecoveryPayload,
+  metadata?: ReportHandbackMetadata,
+) => RecoveryReceipt | null | undefined | void | Promise<RecoveryReceipt | null | undefined | void>;
+
 export interface ShellVerdictPayload {
 
   verdict: "allow" | "deny" | "unsure";
@@ -285,6 +394,15 @@ export interface GovernedToolsOptions {
   reportHandback?: ReportHandbackFn;
   dispatchTask?: DispatchTaskFn;
   shellVerdict?: ShellVerdictFn;
+  /**
+   * G-2/R1：`role_status` 数据源（看护只读快照）。**只给 su 会话注入**（编排注入端判据沿
+   * dispatch_task 的 suppressHandback 先例）；未注入 ⇒ 工具不注册（结构性 fail-closed）。
+   */
+  roleStatus?: RoleStatusFn;
+  /** G-2/R1：`session_tail` 数据源（受保护投影后的会话尾线）。只给 su 注入；未注入 ⇒ 工具不注册。 */
+  sessionTail?: SessionTailFn;
+  /** G-2/R2：恢复提议能力（只提交载荷、三态回执）。只给 su 注入；未注入 ⇒ 工具不注册。 */
+  proposeRecovery?: ProposeRecoveryFn;
 }
 
 export interface RuntimeSessionRecord {

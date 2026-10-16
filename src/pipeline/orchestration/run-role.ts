@@ -52,6 +52,9 @@ import type {
   ShellGate,
   CustomerInputFn,
   DispatchTaskFn,
+  RoleStatusFn,
+  SessionTailFn,
+  ProposeRecoveryFn,
   OperatorChannelFn,
   PromptOptions,
   PromptTurnStartedMetadata,
@@ -112,6 +115,11 @@ import { absRel, isAbsoluteAny, isUnderOrEqual, normalizeLexical } from "../../c
  *   「su 也要有 shell，但是只读」）。比工厂第二参优先（`capabilities?.shellGate ?? shellGate`）。
  * · `shellVerdict`（R-1 shell 审读结论工具；未注入 ⇒ `report_shell_verdict` 不注册）——**审读会话专用**
  *   （由 `pm-reviewer` 注入；形状单一来源 `common/编排/shell-gate.ts`）。
+ * · `roleStatus` / `sessionTail` / `proposeRecovery`（G-2 看护三工具；未注入 ⇒ 对应工具不注册）——
+ *   **只给治理角色 su**注入（判据复用内置治理角色先例 `suppressHandback`，同 `dispatchTask`）。
+ *   载荷/回执形状的单一来源＝契约家 `model/runtime.ts`（R1/R2 属主，同 `DispatchTaskFn` 先例；
+ *   文案契约在 `common/编排/watchdog.ts`）。**提议 ≠ 执行**：三能力不得授予或改变任何写权；
+ *   `role_status`/`session_tail` 纯读。
  */
 export interface AdapterCapabilities {
   customerInput?: CustomerInputFn;
@@ -122,6 +130,9 @@ export interface AdapterCapabilities {
   dispatchTask?: DispatchTaskFn;
   shellGate?: ShellGate;
   shellVerdict?: ShellVerdictFn;
+  roleStatus?: RoleStatusFn;
+  sessionTail?: SessionTailFn;
+  proposeRecovery?: ProposeRecoveryFn;
 }
 
 export interface RunRoleInput {
@@ -354,6 +365,25 @@ export async function openRoleSession(
      */
     dispatchTask?: DispatchTaskFn;
     /**
+     * **G-2 看护自查能力（R1；`role_status`「注入才注册」）**：前端提供的实现（主进程读同源快照＋
+     * 诊断尾部 → 结构化文本）。**只对治理角色会话（su）转交**（判据同 `dispatchTask`）；形状单一来源
+     * ＝契约家 `model/runtime.ts`（R1 属主；文案契约在 `common/编排/watchdog.ts`）。**纯读**：不写盘、
+     * 不入队、不改 busy、不动任何判定链；不扩大任何写权。
+     */
+    roleStatus?: RoleStatusFn;
+    /**
+     * **G-2 会话巡检能力（R1；`session_tail`「注入才注册」）**——**只给 su**（同上一判据）。
+     * 复用受保护投影管线返回尾部规范化行（凭据清洗/display 保护已在链上）；失败如实（不抛、不猜）。
+     */
+    sessionTail?: SessionTailFn;
+    /**
+     * **G-2 恢复提议能力（R2；`propose_recovery`「注入才注册」）**——**只给 su**（同上一判据）。
+     * 前端路由：校验（角色/枚举/证据非空）→ 客户一键确认卡 →（**恰 allow:true 才**）执行既有动作
+     * → 回执四值如实（executed/declined/unsupported/error；恰 executed 为已执行）。**su 只能提议**：
+     * 无确认 ＝ 不执行；能力实现方不得据此授予任何写权。
+     */
+    proposeRecovery?: ProposeRecoveryFn;
+    /**
      * **I-1 开放 shell —— (a) 前端操作者确认通道（兼 arm 开关语义）**：给出 ⇒ 本会话（**仅项目角色**；
      * su 自身不接三层链——su 的 `run_shell` 走只读档 `shellReadonly`）由编排装配三层链（(c) 确定性硬地板
      * → (b) su 模型审读 → (a) 本通道；关窗/不答/超时 = **不放行**）并注入 `ShellGate` ⇒ `run_shell` 注册
@@ -485,6 +515,14 @@ export async function openRoleSession(
   // H-1 派发任务：**只给治理角色（su）**转交前端路由能力——项目角色会话不注入（`dispatch_task` 只给 su）。
   const dispatchTask = suppressHandback ? input.dispatchTask : undefined;
 
+  // G-2 看护三能力（R1/R2，2026-10-16 客户批准）：**只给治理角色（su）**转交——判据复用上文
+  // `suppressHandback`（内置治理角色）；项目角色会话即便调用方误给也不注入（工具不注册）。未给 ⇒
+  // 不注入（能力缺席 = 最强 fail-closed，同 run_shell/customerInput/dispatch_task 先例）。
+  // 承载契约（字段名/形状）单一来源：`common/编排/watchdog.ts`。
+  const roleStatus = suppressHandback ? input.roleStatus : undefined;
+  const sessionTail = suppressHandback ? input.sessionTail : undefined;
+  const proposeRecovery = suppressHandback ? input.proposeRecovery : undefined;
+
   // I-1 开放 shell（项目角色三层链）+ **su 只读档**（客户裁定 2026-10-12）——两档共用同一个
   // `shellGate` 能力位（「注入才注册」：注入了 ⇒ Pi 适配器注册 `run_shell`；未注入/装配失败 ⇒
   // **不 arm**，能力缺席 = fail-closed，绝不放宽）。
@@ -523,6 +561,9 @@ export async function openRoleSession(
     ...(input.runtime !== undefined ? { runtime: input.runtime } : {}),
     ...(input.persistSession !== undefined ? { persistSession: input.persistSession } : {}),
     ...(dispatchTask !== undefined ? { dispatchTask } : {}),
+    ...(roleStatus !== undefined ? { roleStatus } : {}),
+    ...(sessionTail !== undefined ? { sessionTail } : {}),
+    ...(proposeRecovery !== undefined ? { proposeRecovery } : {}),
     ...(shellGate !== undefined ? { shellGate } : {}),
     ...(input.shellVerdict !== undefined ? { shellVerdict: input.shellVerdict } : {}),
   };
@@ -956,6 +997,12 @@ export function createRuntimeAdapterFactory(
     customerInput: capabilities?.customerInput,
     reportHandback: capabilities?.reportHandback,
     dispatchTask: capabilities?.dispatchTask,
+    // G-2/R1-R2：看护三能力并入适配器选项——**契约字段名** `roleStatus` / `sessionTail` /
+    // `proposeRecovery`（运行时核心 `GovernedToolsOptions` 同名能力位，形状同源 `model/runtime.ts`）；
+    // `undefined` ⇒ 对应工具不注册（能力缺席 = 最强 fail-closed，同 dispatch_task 先例）。
+    roleStatus: capabilities?.roleStatus,
+    sessionTail: capabilities?.sessionTail,
+    proposeRecovery: capabilities?.proposeRecovery,
     shellGate: capabilities?.shellGate ?? options.shellGate,
     shellVerdict: capabilities?.shellVerdict,
   });

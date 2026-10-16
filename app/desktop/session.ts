@@ -19,7 +19,8 @@ import type { SessionEvent, RuntimeTurnOutcome, RuntimePersistenceChangeV1, Repo
 //  - **回交自动投递 su 验收 + su 派发任务路由（E-1 / H-1，2026-10-12 设计；客户裁定全自动、无开关）**：
 //    E-1——某角色（≠su）的回交事件到达时，经编排的 `renderHandbackPrompt`（**单一来源**）自动投递进 su 的
 //    会话；H-1——su 经适配器 `dispatch_task` 能力（`dispatchTask`，**仅 su 会话注入**）把任务路由进**目标角色**
-//    的会话（文本 = 编排 `renderDispatchPrompt`；未落地前见 `renderDispatchPromptLocal` 的登记，**不得两处并存**）。
+//    的会话（文本 = 编排 `renderDispatchPrompt`（**单一来源**——G-1/A2 已收口删除本地副本）；G-1 必读块由
+//    编排三件套（`extractDispatchReadPaths`/`planDispatchDelivery`/`renderDispatchPrompt`）产出，本层只接线）。
 //    两者**共用一套投递机**：去重（回交=handbackKey 永不重投；派发=**队列期**窗口去重、送达即释放以保返工）+
 //    忙时排队（按序、绝不并发 send）+ 目标未开**自动开启** + 失败**如实系统行 + 保留待重试**（绝不静默丢）。
 //    校验：`routeDispatch` 拒非本项目角色与内置治理角色（含 su 自身）——**如实回执给工具**，绝不静默。
@@ -64,8 +65,41 @@ import { REBUILT_SESSION_WRITE_PERMITS_NOTICE } from "../../src/pipeline/orchest
 import type { OrchestrationEvent, HandbackEvent } from "../../src/common/编排/handback.ts";
 // E-1（2026-10-12）：「回交后的 su 验收」的两件**单一来源**（编排提供，只读导入、不复制）——
 // `renderHandbackPrompt`（投递给 su 的输入文案）与 `handbackKey`（去重键）。**两前端共用、不得各写一份**。
-import { renderHandbackPrompt, renderHandbackBatchPrompt, handbackKey, type TaskHandback } from "../../src/common/编排/handback.ts";
-import { createDiagnosticLogger } from "../../src/common/shared/diagnostics.ts";
+import { renderHandbackPrompt, renderHandbackBatchPrompt, handbackKey, extractDispatchReadPaths, planDispatchDelivery, type TaskHandback } from "../../src/common/编排/handback.ts";
+// ↑ G-1／A2（2026-10-16 客户批准；设计 `2026-10-16_design_contract-workflow-dispatch.md` §四/§九 A2；
+// 编排 A1 交回接口见 `角色卡/编排/docs/change/2026-10-16_change_contract-workflow-dispatch-a1.md` §五）：
+// 派发必读块的**提取**（`extractDispatchReadPaths`）、**判据**（`planDispatchDelivery`：契约缺失 ⇒ fail-closed
+// 拒投；workflow 缺失 ⇒ 降级照投）、**渲染**（`renderDispatchPrompt`，经判据产出的定格文本）都是编排的
+// **单一来源**——本层**只做接线**（投递时用 `filePrint` 探测各引用、按判据拒投或入队），不得各写一份。
+// 本批已删除本地副本 `renderDispatchPromptLocal`（既有登记依赖收口——落地后必须切换、不得两处并存）。
+import { createDiagnosticLogger, getDiagnosticsStatus } from "../../src/common/shared/diagnostics.ts";
+// G-2/W1：role_status 的会话尾部数据面**复用受保护投影管线**（`getSessionHistory` 同路径——凭据清洗、
+// display 保护已在链上；su 不直接读裸 JSONL）。
+import { getSessionHistory } from "./runtime-history.ts";
+// F-8-b（2026-10-16 客户批准）：`display.process` 结构化事实的行分类——G-2/W1 信号 #3「命令超时限」
+// （F-1 事实）复用**同一判据实现**（session-history.ts 导出；与运行时核心投影/桌面UI 行分类同源）——
+// 不在本层另写第二份 timedOut 判定。
+import { classifyProcessOutcome, pickLatestSessionFile, sessionsDirFor } from "./session-history.ts";
+// G-2（2026-10-16 客户批准；设计 `2026-10-16_design_role-watchdog-and-closure.md`）：W1 看护观察的形状与
+// 事件转发（settled/命令超时/真实活动 → 看护器）；W5 恢复回执与看护三能力的**形状单一来源**：
+// 契约家 `model/runtime.ts`（编排 `common/编排/watchdog.ts` 同名转发）＋ 回执文案也收敛在编排单一来源
+// （`renderRecoveryReceipt`——本层只读导入，不复制第二份）。
+import { recoveryActionLabel, recoveryReceiptSummary, type WatchdogObservation, type WatchdogProjectSnapshot } from "./watchdog.ts";
+import {
+  renderRecoveryReceipt,
+  type ProposeRecoveryFn,
+  type ProposeRecoveryPayload,
+  type RecoveryReceipt,
+  type RoleStatusFn,
+  type RoleStatusPayload,
+  type SessionTailFn,
+  type SessionTailPayload,
+  type WatchdogToolResult,
+} from "../../src/common/编排/watchdog.ts";
+// G-2/W5：恢复确认卡通道（presenter 的 pending/replay/expire 与 shell 卡共享 `confirm-card.ts` 通用件）。
+// 形状为**桌面侧暂定契约**（设计 §6.1 的 propose_recovery 载荷 / §6.2 的确认流）——编排 O1 透传与
+// 运行时核心 R2 handler 落树后按需重定向（interface 点见 api-spec；本层不复制第二份判定）。
+import { isRecoveryAction, type RecoveryConfirmPresenter } from "./recovery-channel.ts";
 import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputRequest, CustomerInputMetadata, PromptTurnStartedMetadata } from "../../src/model/runtime.ts";
 // H-1（2026-10-12）：派发能力的冻结契约（§4 冻结家；只读导入、不复制形状）。
 import type { DispatchTaskPayload, DispatchReceipt, DispatchTaskFn, PromptOptions } from "../../src/model/runtime.ts";
@@ -218,6 +252,13 @@ export interface SessionManagerDeps {
       customerInput?: CustomerInputFn;
       /** **派发任务能力**（H-1）：仅内置治理角色（su）会话注入（见 SessionManager.open 与 routeDispatch）。 */
       dispatchTask?: DispatchTaskFn;
+      /** **恢复提议能力**（G-2/W5）：仅内置治理角色（su）会话注入（见 SessionManager.proposeRecovery；
+       *  字段名/形状＝契约家 `ProposeRecoveryFn`——编排 O1 按 `suppressHandback` 判据透传、R2 落工具）。 */
+      proposeRecovery?: ProposeRecoveryFn;
+      /** **role_status 数据源**（G-2/W1，仅 su 注入；形状＝契约家 `RoleStatusFn`）。 */
+      roleStatus?: RoleStatusFn;
+      /** **session_tail 数据源**（G-2/W1，仅 su 注入；形状＝契约家 `SessionTailFn`）。 */
+      sessionTail?: SessionTailFn;
       /** **(a) 操作者确认通道（I-1 arm）**：仅**项目角色**会话注入（su **不接 (b)/(a)**——审读者不给自己开闸；
        *  编排据此装配 (c)/(b)/(a) ShellGate 并注册 `run_shell`；装配落地前被静默忽略——登记）。 */
       shellOperatorChannel?: OperatorChannelFn;
@@ -275,8 +316,9 @@ export interface SessionManagerDeps {
     contextWarning?: string;
     busy: boolean;
     summaries: string[];
-    /** 结构化的排队条目（右栏「待办 / 队列」组用；来源/摘要/入队时间——**与 summaries 同源**，不另造数据源）。 */
-    queue: { kind: string; sourceRoleId: string; summary: string; at: string }[];
+    /** 结构化的排队条目（右栏「待办 / 队列」组用；来源/摘要/入队时间＋**撤回/展开定位键** `id`（= dedupKey）
+     *  与入队即定格的全文 `full`——**与 summaries 同源**，不另造数据源；G-2 起 `kind` 含第四类 `system`）。 */
+    queue: { kind: string; sourceRoleId: string; summary: string; at: string; id: string; full: string }[];
     /** **正在跑的那条投递**（若该轮由队列投递开跑且未结束）；null = 无（直接 send 的一轮不属于队列条目）。 */
     running: { kind: string; sourceRoleId: string; summary: string; at: string } | null;
   }) => void;
@@ -324,6 +366,49 @@ export interface SessionManagerDeps {
    * 缺省 ⇒ miss 时按原口径如实拒绝（不重枚举；测试替身可省）。
    */
   refreshListing?: (projectRoot: string) => Promise<void>;
+  /**
+   * **恢复确认卡通道（G-2/W5，2026-10-16 客户批准）**——su 经 `propose_recovery` 提议恢复动作时，
+   * 由本层校验载荷、把卡摆给客户（恰 allow:true 才执行）。**缺省 ⇒ 恢复提议一律「未接线、未获执行」
+   * 如实回执（fail-closed，绝不「没人问就执行」）**。主进程用 `recovery-channel.ts` 构造后注入。
+   */
+  recoveryConfirm?: RecoveryConfirmPresenter;
+  /**
+   * **看护观察转发（G-2/W1）**：事件消费循环里的结构化事实（settled 终局 / 命令超时限 F-1 事实 / 真实活动）
+   * 同步转发给看护器（`watchdog.ts` 的 `observe`）。**缺省 ⇒ 无看护**（核心治理零依赖——一切照旧）。
+   * 本层绝不因看护回调抛错而影响会话/投递（调用点自带隔离）。
+   */
+  watchdogObserver?: (projectRoot: string, observation: WatchdogObservation) => void;
+  /**
+   * **挂起确认数快照（G-2/W1）**：两确认通道（su 交互卡 / shell 卡）＋恢复卡的按角色挂起视图（主进程合并
+   * 注入；静默谓词与「正确等待不报」排除用）。**缺省 ⇒ 恒 0**（测试替身可省）。
+   */
+  watchdogPendingConfirmations?: () => { total: number; byRole: Map<string, number> };
+  /** **看护只读统计**（G-2/W1；role_status 的「看护」行数据面——`watchdog.ts` 的 `stats`）。缺省 ⇒ 该行
+   *  如实记「未接线」。 */
+  watchdogStats?: (projectRoot: string) => import("./watchdog.ts").WatchdogStats | undefined;
+  /** **时钟（G-2；注入以便单测）**；缺省 `Date.now`。 */
+  now?: () => number;
+}
+
+// —————————————— G-2/W5：恢复提议（`propose_recovery`）的载荷与回执 ——————————————
+//
+// **形状单一来源＝契约家 `src/model/runtime.ts`**（`ProposeRecoveryPayload` / `RecoveryReceipt` /
+// `ProposeRecoveryFn` / `RoleStatusFn` / `SessionTailFn`；编排 `common/编排/watchdog.ts` 同名转发——
+// 本文件从彼处只读导入，**不自立第二份形状**）。模型输入一律不可信：本层对载荷**全量重校验**。
+
+/** `rebuild-session` 恢复动作的结果（W4 公共入口）。 */
+export interface RebuildSessionResult {
+  ok: boolean;
+  error?: string;
+  resumed?: boolean;
+  contextSource?: OpenResult["contextSource"];
+  contextWarning?: string;
+}
+
+/** `redeliver` 恢复动作的结果（W4 队列重试 nudge）。 */
+export interface RedeliverResult {
+  ok: boolean;
+  message: string;
 }
 
 /** 一个**保活**中的角色会话（B-2：每角色一个句柄 + LRU）。 */
@@ -357,6 +442,12 @@ interface LiveSession {
   /** **是否有轮次在跑**（E-1/H-1 排队判据）：send 成功置真、收到该角色的 `settled` 事件置假。 */
   busy: boolean;
   /**
+   * **本轮起始时刻**（ms epoch；G-2/W1）：busy 置真时同步定格——看护信号 #1「轮次逼近超时」的 elapsed 基准
+   * （90% × 生效时限；求值与运行时核心 `resolveRuntimeTimeouts` 单一来源同源，见 watchdog.ts）。
+   * 读取方一律以 `busy === true` 为先决条件（置假路径不强制清零——防漏改不引入误报）。
+   */
+  busySince?: number;
+  /**
    * **O-1（2026-10-12）：本会话持有的边界快照**——开会话时定格的参与文件（绝对路径）与各自**内容哈希**。
    * 任一处变了 ⇒ 本会话的规则集已陈旧（真机：su 改好 boundary.yaml 后，活会话仍按开会话时解析的旧边界
    * 拒写）——`boundaryDiff` 检出后**作废重建**。信号只来自读盘哈希（**不得**靠界面推测）。
@@ -375,7 +466,13 @@ interface DeliveryItem {
   attemptId?: string;
   clientMessageId?: string;
   runtime: RuntimeKind;
-  kind: "handback" | "dispatch" | "message";
+  /**
+   * 投递类别：`handback` 回交 / `dispatch` 派发 / `message` 客户消息 / **`system` 系统消息**
+   * （G-2/W2，2026-10-16 客户批准——看护告警、收束提示与恢复回执，经**同一套投递机**真投递给 su；
+   * **不可撤回**（归入治理流只读面）、去重键由看护自持命名空间（`watchdog\0…`）与 handback/dispatch 键隔离；
+   * 来源标注恒空（呈现面按文首 `[系统·<子类>] ` 定格标记归类——桌面UI tool-rows.js 已在树））。
+   */
+  kind: "handback" | "dispatch" | "message" | "system";
   /** 目标角色 id（回交→su；派发/客户消息→被派角色）。 */
   targetRoleId: string;
   /** 发起者（回交=产出角色；派发=派发者 su；客户消息=本端的当前角色）。 */
@@ -398,16 +495,6 @@ interface DeliveryItem {
   batchItems?: readonly DeliveryItem[];
 }
 
-/**
- * H-1 派发输入文案的**临时**实现——**单一来源应为编排的 `renderDispatchPrompt`**（设计 H-1；
- * 本层届时只读导入、删掉本函数）。编排尚未落地该导出（本次实现时点：`src/**` 无此符号），
- * 先按设计 H-1 的模板逐字内置；**依赖已登记**（见 change 文档）——落地后必须切换，**不得两处并存**。
- */
-function renderDispatchPromptLocal(fromRoleId: string, d: DispatchTaskPayload): string {
-  const reason = d.reason !== undefined && d.reason !== "" ? `（原因：${d.reason}）` : "";
-  return `[派发] 来自 ${fromRoleId} 的任务：${d.task}${reason}——完成后请交回报告`;
-}
-
 /** 队列摘要用的一句短句（L-1 可见性；仅呈现，不参与任何判定）。 */
 function shortenText(s: string, n: number): string {
   const flat = String(s == null ? "" : s).replace(/\s+/g, " ").trim();
@@ -428,6 +515,8 @@ async function filePrint(absPath: string): Promise<string> {
     return print;
   } catch {
     filePrintCache.delete(absPath);
+    // `<missing>` 哨兵：G-1 必读引用同用本函数探测——非 sha256 值（含本哨兵）在 `planDispatchDelivery`
+    // 判据内天然按「文件不存在」处理（fail-closed；投递侧无需再映射）。
     return "<missing>";
   }
 }
@@ -503,10 +592,43 @@ export class SessionManager {
   private readonly activeDispatchKeys = new Set<string>();
   /** 「队列受阻」（枚举不到目标）只如实提示**一次**（避免每次触发刷同一行）。 */
   private readonly suDeliveryBlockedNoted = new Set<string>();
+  /**
+   * **各角色最近一轮的终局**（G-2/W1「lastTurn 小状态」）：settled 时在事件消费循环里顺带落表
+   * （outcome + 时刻；只记四值终局——旧来源缺事实不猜）。看护 `role_status` 的「最近一轮」行与未来
+   * 其他只读消费方取用；不参与任何判定。
+   */
+  private readonly lastTurns = new Map<string, { outcome: RuntimeTurnOutcome; at: string }>();
+  /**
+   * su 最近一次开会话所用 runtime（G-2/W1）：看护向 su 投系统消息时 queueKey 需要 runtime——优先活会话，
+   * 其次本记录，最后 `"pi"`（真实产品默认；demo 是开发替身）。仅为投递择路，不改任何判定。
+   */
+  private readonly lastSuRuntime = new Map<string, RuntimeKind>();
 
   constructor(deps: SessionManagerDeps) {
     this.deps = deps;
     this.loadEffectiveConfig = deps.loadEffectiveConfig ?? defaultLoadEffectiveConfig;
+  }
+
+  // —————————————— G-2（W1）：看护的观察/活动转发与时钟 ——————————————
+
+  /** 时钟（注入以便单测；缺省 Date.now——与会话时间戳、投递入队时间同源）。 */
+  private now(): number {
+    return this.deps.now ? this.deps.now() : Date.now();
+  }
+
+  /** 转发一条结构化事件给看护器（隔离：看护回调抛错绝不影响会话/投递——看护永不阻断判定链）。 */
+  private observeWatchdog(projectRoot: string, observation: WatchdogObservation): void {
+    try {
+      this.deps.watchdogObserver?.(projectRoot, observation);
+    } catch {
+      // 看护观察失败 = 无看护（fail-safe toward 现状），不记录也不上抛（回调自身已带诊断）。
+    }
+  }
+
+  /** 记一次**真实活动**（W3 滞回重武装信号；由本层判定后转发——`kind:"system"` 投递相关一律不记，防骚扰回路）。 */
+  private noteWatchdogActivity(projectRoot: string, reason: string): void {
+    if (!projectRoot) return;
+    this.observeWatchdog(projectRoot, { kind: "activity", reason });
   }
 
   private sessionKey(projectRoot: string, roleId: string, runtime: RuntimeKind): string {
@@ -633,6 +755,7 @@ export class SessionManager {
     // 状态准确性：dispose 即真实信号（会话已移出保活表，busy 判据随之恒 false）——外推快照，
     // 徽标/队列行随之转「已停止」；**不删其投递队列**（未投的待办仍如实保留可见）。
     this.notifyRoleState(entry.projectRoot, entry.roleId, entry.runtime);
+    this.noteWatchdogActivity(entry.projectRoot, "session-close"); // G-2/W3：会话关 = 真实活动
     entry.origins.byTurn.clear();
     delete entry.origins.running;
     entry.interactionState.lifetime.abort();
@@ -735,25 +858,10 @@ export class SessionManager {
     this.deps.emitEvent({ roleId: entry.roleId, projectRoot, runtime: entry.runtime, event: { kind: "message", summary: `该角色边界已更新或运行时配置已保存（${changed}），已作废旧会话，按新边界重开；上下文恢复结果以引擎实际返回为准。` } });
     // 重建不自行选择角色。仅成功且用户意图未改变时恢复被 dispose 清空的活动目标。
     // **F-2-opt2 防死锁**：本重开是**持锁方（openInternal 的续接前查陈旧）所等待的那条链**内的续段——
-    // 必须直调 `openInternalUnsafe`（不再入 openChains），否则「持锁等 rebuild 链 ← rebuild 链等锁」成环；
-    // 此处旧条目已 dispose（或纯新建），不会再触发任何 reopen 预检。
-    const reopened = await this.openInternalUnsafe({ projectRoot, roleId: entry.roleId, runtime: entry.runtime }, false);
-    if (reopened.ok) {
-      // **F-5-opt1（桌面侧，2026-10-16 客户批准）**：确认制会话（su）重建 ⇒ 编排闭包内「客户确认才发行」
-      // 的**已发行写权集随之清零**（内存态、不随新句柄保留）——对**模型**如实可见（除既有 UI 重建行外）。
-      // 经编排的 `queueModelNotice` 把注记排进**下一轮输入前缀**（送达一次即消费；不单独开轮、不改任何判定
-      // ——接口与语义见 run-role.ts；文案用其**单一来源**常量，绝不在此各写一份）。**非确认制会话没有发行过
-      // 任何写权**（gate 不收窄，连 request_confirmation 都未注册）⇒ 不排（绝不向模型说假话）。
-      // 旧替身句柄不带该方法 ⇒ no-op（可选方法先例；如实降级，不假装已送达）。
-      const rebuiltEntry = this.sessions.get(roleId);
-      if (rebuiltEntry?.confirmGated) {
-        try {
-          rebuiltEntry.handle.queueModelNotice?.(REBUILT_SESSION_WRITE_PERMITS_NOTICE);
-        } catch {
-          // 注记只是诚实提示，不是判定链的一环：排入失败不打断重建收尾（重建本身已如实记行）。
-        }
-      }
-    }
+    // 必须直调 `openInternalUnsafe`（不再入 openChains）并带 `internalReopen`（不再查陈旧/不再入 rebuild 链，
+    // 防「链内等待自身尾」的自死锁）；此处旧条目已 dispose（或纯新建），不会再触发任何 reopen 预检。
+    const reopened = await this.openInternalUnsafe({ projectRoot, roleId: entry.roleId, runtime: entry.runtime }, false, this.selectionVersion, true);
+    if (reopened.ok) this.queueRebuildWritePermitsNotice(roleId); // 入参＝会话键（本函数参数即键）
     if (reopened.ok && (wasActive || userInitiated) && this.selectionVersion === selectionVersion) {
       const current = this.sessions.get(roleId);
       if (current && current.projectRoot === projectRoot) this.activeRoleId = roleId;
@@ -767,6 +875,26 @@ export class SessionManager {
     }
     diagnostic.record("session.rebuild.end", { ok: reopened.ok });
     return { changed, reopened };
+  }
+
+  /**
+   * **F-5-opt1（桌面侧，2026-10-16 客户批准）**：确认制会话（su）重建 ⇒ 编排闭包内「客户确认才发行」的
+   * **已发行写权集随之清零**（内存态、不随新句柄保留）——对**模型**如实可见（除既有 UI 重建行外）。
+   * 经编排的 `queueModelNotice` 把注记排进**下一轮输入前缀**（送达一次即消费；不单独开轮、不改任何判定——
+   * 接口与语义见 run-role.ts；文案用其**单一来源**常量，绝不在此各写一份）。**非确认制会话没有发行过任何
+   * 写权**（gate 不收窄，连 request_confirmation 都未注册）⇒ 不排（绝不向模型说假话）。旧替身句柄不带该
+   * 方法；如实降级，不假装已送达）。**陈旧重建（O-1）与人工重建（G-2/W4）共用本件**。
+   * ⚠ 入参是 `sessions` 表的**会话键**（`sessionKey`）——不是裸 roleId（`rebuildChains` 同以键索引）。
+   */
+  private queueRebuildWritePermitsNotice(sessionKey: string): void {
+    const rebuiltEntry = this.sessions.get(sessionKey);
+    if (rebuiltEntry?.confirmGated) {
+      try {
+        rebuiltEntry.handle.queueModelNotice?.(REBUILT_SESSION_WRITE_PERMITS_NOTICE);
+      } catch {
+        // 注记只是诚实提示，不是判定链的一环：排入失败不打断重建收尾（重建本身已如实记行）。
+      }
+    }
   }
 
   /**
@@ -826,8 +954,12 @@ export class SessionManager {
     }
   }
 
-  /** `open` 的实现（`userInitiated=false` = 投递机后台自动开启：不抢活动角色，其余逐字同）。 */
-  private async openInternalUnsafe(req: SessionOpenRequest, userInitiated: boolean, selectionVersion = this.selectionVersion): Promise<OpenResult> {
+  /** `open` 的实现（`userInitiated=false` = 投递机后台自动开启：不抢活动角色，其余逐字同）。
+   *  `internalReopen=true`（G-2/W4；仅重建链内续段使用——陈旧重建与人工 `rebuildSession`）：
+   *  **不再查陈旧、不再入 rebuild 链**——① 防「链内等待自身尾」的自死锁（rebuildIfBoundaryStaleUnsafe 的
+   * 重开处于该角色的 rebuild 链内，再入链会等自己）；② 此时旧条目已被本链 dispose；若并发方已重建出新会话，
+   *  如实按续接返回（不重复重建——重开目标已达成）。 */
+  private async openInternalUnsafe(req: SessionOpenRequest, userInitiated: boolean, selectionVersion = this.selectionVersion, internalReopen = false): Promise<OpenResult> {
     if (!req.projectRoot || !req.roleId) {
       return { ok: false, error: "缺少项目根或角色 id。" };
     }
@@ -836,6 +968,22 @@ export class SessionManager {
     // B-2：该角色已有**同项目**的保活会话 → 续接（句柄与模型上下文原样保留）。
     const existing = this.sessions.get(key);
     if (existing && existing.projectRoot === req.projectRoot) {
+      if (internalReopen) {
+        // 重建链内的重开（见方法头注）：当前条目即并发方刚建好的新会话（或本链尚未 dispose 的防御路径）——
+        // 按续接如实返回，不再触发任何 reopen 预检。
+        existing.lastUsed = ++this.lruClock;
+        if (userInitiated && this.selectionVersion === selectionVersion) this.activeRoleId = key;
+        this.notifyRoleState(req.projectRoot, req.roleId, req.runtime);
+        this.noteWatchdogActivity(req.projectRoot, "session-open");
+        return {
+          ok: true,
+          note: "会话已就绪，续接当前会话。",
+          config: existing.config,
+          resumed: true,
+          contextSource: "resumed",
+          runtime: req.runtime, projectRoot: req.projectRoot, profileRevision: existing.profileRevision,
+        };
+      }
       // O-1（2026-10-12）：续接前先查**边界快照**——陈旧 ⇒ 作废并按下方**新建**路径重开（历史按 D-1 恢复）；
       // 未陈旧 ⇒ 逐字续接（**绝不**误重开丢上下文）。在跑的轮次不打断（busy 时跳过，下一时机再查）。
       const rebuilt = await this.rebuildIfBoundaryStale(key, userInitiated, selectionVersion);
@@ -929,6 +1077,18 @@ export class SessionManager {
       role.builtIn === true
         ? (d: DispatchTaskPayload) => this.routeDispatch(req.projectRoot, req.runtime, req.roleId, d) // Promise<DispatchReceipt>——契约允许（工具侧 await）
         : undefined;
+    // G-2/W5（2026-10-16 客户批准）：**恢复提议能力**（`propose_recovery`——同 H-1 先例，**仅内置治理角色（su）**
+    // 会话注入；「未注入即不注册」= 最强 fail-closed）。工具 handler 只把载荷交进来；校验/呈现/执行/如实
+    // 回执全在本层（`proposeRecovery`）。契约（字段名与形状）＝ `model/runtime.ts::ProposeRecoveryFn`——
+    // 经编排 `common/编排/watchdog.ts` 同名转发（单一来源，本层不另立形状）。
+    const proposeRecovery: ProposeRecoveryFn | undefined =
+      role.builtIn === true ? (d: ProposeRecoveryPayload) => this.proposeRecovery(req.projectRoot, req.runtime, req.roleId, d) : undefined;
+    // G-2/W1（同处注入）：`role_status` / `session_tail` 两只读工具的桌面侧数据源（**仅 su 会话注入**；
+    // 快照/lastTurn 都是本层同源事实，不在工具层另造）。契约＝ `model/runtime.ts::RoleStatusFn/SessionTailFn`。
+    const roleStatus: RoleStatusFn | undefined =
+      role.builtIn === true ? (query: RoleStatusPayload) => this.roleStatusText(req.projectRoot, query) : undefined;
+    const sessionTail: SessionTailFn | undefined =
+      role.builtIn === true ? (query: SessionTailPayload) => this.sessionTailText(req.projectRoot, query) : undefined;
 
     // I-1（2026-10-12，客户裁定 arm）：**只对项目角色**把 (a) 操作者确认通道交给编排装配 (c)/(b)/(a)
     // `ShellGate`（判据 `role.builtIn`，数据驱动）。「审读者不给自己开闸」仍成立：su **不接 (b)/(a)**
@@ -1005,6 +1165,12 @@ export class SessionManager {
             : {}),
           // H-1：派发能力（仅 su 会话注入；契约字段名 `dispatchTask`——编排落地后由其转发给适配器）。
           ...(dispatchTask ? { dispatchTask } : {}),
+          // G-2/W5+W1（2026-10-16 客户批准；**仅 su 会话注入**——「未注入即不注册」）：恢复提议能力与两只读
+          // 工具的数据面。**待接 O1/R2**（字段名暂定，see 上方注入点注释）：编排透传落树前这些字段被静默忽略，
+          // 零行为影响（fail-safe toward 现状）。
+          ...(proposeRecovery ? { proposeRecovery } : {}),
+          ...(roleStatus ? { roleStatus } : {}),
+          ...(sessionTail ? { sessionTail } : {}),
           // I-1：(a) 操作者确认通道（仅项目角色；编排据它装配 (c)/(b)/(a) ShellGate 并注册 run_shell——
           // 装配接线落地前本字段被静默忽略，登记在案）。
           ...(shellOperatorChannel ? { shellOperatorChannel } : {}),
@@ -1049,6 +1215,7 @@ export class SessionManager {
       boundaryPrints,
     };
     this.sessions.set(key, entry);
+    if (role.builtIn === true) this.lastSuRuntime.set(req.projectRoot, req.runtime); // G-2/W1：看护向 su 投递时择路用
     entry.unsubscribePersistence = entry.handle.onPersistenceChange?.(change => {
       if (this.sessions.get(key) !== entry || change.scope.roleId !== entry.roleId || change.scope.runtime !== entry.runtime) return;
       if (change.kind === 'report-save') this.mergeReportState(entry, undefined, change.state, change.reportId);
@@ -1065,6 +1232,7 @@ export class SessionManager {
     // （真机每次开会话/切角色都出现，被客户点名）。**异常提示保留**：contextWarning（渲染侧按
     // contextSource 如实分支）、O-1 边界重建行、投递失败/受阻行等均不受影响。
     // 投递机（E-1/H-1）：本会话开好后，尝试放行积压的投递（目标=本角色的队列；为空则 no-op）。
+    this.noteWatchdogActivity(req.projectRoot, "session-open"); // G-2/W3：会话开 = 真实活动
     void this.drainQueue(req.projectRoot, req.roleId, req.runtime);
     return { ok: true, config, resumed: false, runtime: req.runtime, projectRoot: req.projectRoot, profileRevision: entry.profileRevision, ...this.contextInfo(handle) };
   }
@@ -1104,11 +1272,35 @@ export class SessionManager {
             entry.interactionState.turn.abort();
             const en = this.sessions.get(key);
             if (en) {
+              const wasBusy = en.busy; // G-2：只有真实「忙→闲」翻转才产生看护观察（重复/迟到的 settled 不重复计数）
               en.busy = false;
+              en.busySince = undefined;
+              // G-2/W1+W3：先读「进行中」条目再撤销——本轮是否由 `kind:"system"` 投递持有（看护自身的告警/
+              // 收束/恢复回执）决定该 settle 是否算**真实活动**（刻意排除 ⇒ 防「总结完→5 分钟又催」的骚扰回路）。
+              const finishedDelivery = this.activeDeliveries.get(this.queueKey(en.projectRoot, roleId, runtime));
               this.activeDeliveries.delete(this.queueKey(en.projectRoot, roleId, runtime)); // 「进行中」随本轮结束撤销
               // 状态准确性：settled = 「本角色离开工作中」的**真实信号**（B-2 下切走的后台轮次结束也走这里）
               // ——先外推再放行队列（放行时 busy 复位已可见）。
               this.notifyRoleState(en.projectRoot, roleId, runtime);
+              // G-2/W1：转发放行前的结构化事实（lastTurn 落表 + 看护观察；outcome 只认四值终局——缺事实不猜）。
+              if (wasBusy) {
+                const settledOutcomeRaw = origin?.outcome ?? (ev.detail as { outcome?: unknown } | undefined)?.outcome;
+                const settledOutcome =
+                  settledOutcomeRaw === "completed" || settledOutcomeRaw === "failed" || settledOutcomeRaw === "aborted" || settledOutcomeRaw === "timed_out"
+                    ? settledOutcomeRaw
+                    : undefined;
+                if (settledOutcome !== undefined) {
+                  this.lastTurns.set(this.queueKey(en.projectRoot, roleId, runtime), { outcome: settledOutcome, at: new Date(this.now()).toISOString() });
+                }
+                this.observeWatchdog(en.projectRoot, {
+                  kind: "settled",
+                  roleId,
+                  ...(settledOutcome !== undefined ? { outcome: settledOutcome } : {}),
+                  at: this.now(),
+                  fromSystemDelivery: finishedDelivery?.kind === "system",
+                });
+                if (finishedDelivery?.kind !== "system") this.noteWatchdogActivity(en.projectRoot, "settled");
+              }
               void this.drainAllQueuesFor(en.projectRoot);
               if (runtime === "pi") void this.drainPiQueuesAcrossProjects();
               // P1-2：某会话离开 busy = LRU 回收的「下一时机」（暂超限的账在这里还——只收非 busy 者）。
@@ -1129,6 +1321,11 @@ export class SessionManager {
             if (detail?.source === 'delivery-receipt' && detail.receipt) this.rememberReceipt(entry, detail.receipt);
             if (detail?.source === 'delivery-boundary' || detail?.source === 'delivery-receipt') envelope.event = { ...ev, summary: '投递历史状态' };
           }
+          // G-2/W1 信号 #3：命令超时限（F-1 事实）——只认 `display.process` 结构化投影（`timedOut === true`），
+          // 判据复用 session-history.ts 的同一实现（不解析文本、不另写一份）；低频高信号 ⇒ 看护侧单次即报。
+          if ((ev.kind === "accepted" || ev.kind === "denied") && classifyProcessOutcome((ev.detail as { display?: unknown } | undefined)?.display) === "timed-out") {
+            this.observeWatchdog(projectRoot, { kind: "command-timed-out", roleId, at: this.now() });
+          }
           try {
             this.deps.emitEvent(envelope);
           } catch {
@@ -1140,6 +1337,7 @@ export class SessionManager {
         if (this.sessions.get(key) !== entry) return;
         entry.interactionState.turn.abort();
         entry.busy = false;
+        entry.busySince = undefined;
         this.notifyRoleState(projectRoot, roleId, runtime);
         this.deps.emitEvent({
           roleId, projectRoot, runtime,
@@ -1183,6 +1381,7 @@ export class SessionManager {
     // 并发重建可能把活动指针清掉（dispose 置 null、后台重开不抢位）——用户意图仍指向 targetRoleId：复位。
     // （若用户期间开了**别的**角色，activeRoleId 非 null，不动它——不抢位。）
     if (this.activeRoleId === null && this.selectionVersion === selectionVersion) this.activeRoleId = targetRoleId;
+    this.noteWatchdogActivity(entry.projectRoot, "customer-send"); // G-2/W3：客户消息 = 真实活动（无论直发还是入队，都在此定格）
     if (entry.busy || (entry.runtime === "pi" && entry.profileRevision !== this.profileRevision("pi") && this.hasBusyRuntime("pi"))) {
       const roleId = entry.roleId;
       this.enqueueDelivery(entry.projectRoot, roleId, {
@@ -1209,6 +1408,7 @@ export class SessionManager {
     const origin = this.beginDeliveryOrigin(entry, clientMessageId);
     entry.interactionState.turn = new AbortController();
     entry.busy = true;
+    entry.busySince = this.now(); // G-2/W1：本轮起点定格（看护信号 #1 的 elapsed 基准；busy 期间才被读取）
     // P0-2 前置修正（2026-10-13，随停止入口同批）：**开跑即外推 busy=true**——与投递机同款
     //（先置忙即推快照）。旧版只在 round 结束后推：长轮次（真实 pi 一轮数分钟）期间界面根本收不到
     // 「工作中」快照——停止钮与左树徽标都无从在轮次**进行中**出现（快适配器掩盖了这条缝；停止入口
@@ -1228,6 +1428,7 @@ export class SessionManager {
       if (ownsRunningDelivery) {
         entry.interactionState.turn.abort();
         entry.busy = false;
+        entry.busySince = undefined;
       }
       this.notifyRoleState(entry.projectRoot, entry.roleId, entry.runtime);
       return { ok: false, error: err instanceof Error ? err.message : String(err), ...this.sendFacts(entry, origin) };
@@ -1346,8 +1547,11 @@ export class SessionManager {
   private enqueueDelivery(projectRoot: string, targetRoleId: string, item: Omit<DeliveryItem, "enqueuedAt">): void {
     const key = this.queueKey(projectRoot, targetRoleId, item.runtime);
     const q = this.deliveryQueues.get(key) ?? [];
-    q.push({ ...item, enqueuedAt: new Date().toISOString() }); // 入队时间**入队即定格**（显示用，非执行时间）
+    q.push({ ...item, enqueuedAt: new Date(this.now()).toISOString() }); // 入队时间**入队即定格**（显示用，非执行时间；经注入时钟——与看护同源）
     this.deliveryQueues.set(key, q);
+    // G-2/W3：派发/回交/客户消息**入队** = 真实活动（重武装）；`kind:"system"`（看护自身投递）**不记**——
+    // 否则「告警/收束投递本身」会把静默窗口反复重置或反过来触发骚扰回路。
+    if (item.kind !== "system") this.noteWatchdogActivity(projectRoot, `enqueue-${item.kind}`);
     this.notifyRoleState(projectRoot, targetRoleId, item.runtime); // L-1：入队即外推（队列行/徽标如实可见）
   }
 
@@ -1388,6 +1592,9 @@ export class SessionManager {
       if (idx < 0) continue;
       const item = q[idx];
       if (item.kind !== "message") {
+        // G-2/W2：`system`（看护告警/收束/恢复回执）与派发/回交同归**治理流只读**面——本判据已覆盖第四类，
+        // 不可撤回（呈现与语义同口径：界面侧对非 message 条目不给撤回钮）；文案保持原文（渲染侧源码钉在
+        // 桌面UI 的 test/桌面应用/renderer.test.ts，本角色不改动他角色断言）。
         return { ok: false, error: "该条不是客户消息（派发/回交属治理流）——只读，不可撤回。" };
       }
       q.splice(idx, 1);
@@ -1581,6 +1788,17 @@ export class SessionManager {
    * `deps.refreshListing` **实时重枚举一次**（与界面 `listProject` 同一路径、刷**同一份**共享缓存——
    * 后续 `openInternal` 自动开会话读的也是它）再判；重枚举失败/仍无 ⇒ 按原口径如实拒绝（不静默、不重试风暴）。
    * 异步回执：契约 `DispatchTaskFn` 本就允许 `Promise<DispatchReceipt>`（工具侧 await）。
+   *
+   * **G-1／A2（2026-10-16 客户批准；设计 `2026-10-16_design_contract-workflow-dispatch.md` §四/§八；编排 A1
+   * 接口交回 §五）——必读块接线**：提取/判据/渲染的**单一来源** = 编排 `extractDispatchReadPaths` /
+   * `planDispatchDelivery` / `renderDispatchPrompt`（只读导入，本层**只做接线**）。投递时对任务文本提取的
+   * 引用路径逐个 `filePrint` 探测（复用带缓存的 sha256 指纹；`<missing>` 原样传入——判据天然按缺失处理）；
+   * **判据紧挨去重登记（`activeDispatchKeys.add`）之前**：拒投**不登记、不入队、不开目标会话**（登记在
+   * 「送达」时才释放——若先登记后拒投，键永不释放 ⇒ 契约修好后重派同一任务文本会被误去重）；**契约缺失
+   * ⇒ fail-closed 拒投**（`fail(plan.message, plan.systemRow)`：回执给工具 + 系统行进 su 聊天流，绝不静默）；
+   * **workflow 缺失 ⇒ 降级标注（照投）**；无引用 ⇒ 文本 = 单一来源 `renderDispatchPrompt` 旧格式逐字。
+   * 放行文本**入队即定格**（重试复用同一份——绑定「派发那一刻的契约版本」）。回交与客户消息**不经过**本段
+   * （不受必读块影响）。
    */
   private async routeDispatch(projectRoot: string, runtime: RuntimeKind, fromRoleId: string, d: DispatchTaskPayload): Promise<DispatchReceipt> {
     const targetRoleId = d && typeof d.roleId === "string" ? d.roleId.trim() : "";
@@ -1619,6 +1837,19 @@ export class SessionManager {
       );
     }
     const reason = d && typeof d.reason === "string" ? d.reason : undefined;
+    // —— G-1／A2：必读引用接线（提取/判据/渲染 = 编排三件套单一来源；本层只探测 + 按判据分流）——
+    // 探测：逐引用算文件**当刻字节**的内容 sha256（复用 `filePrint`；缺失/读失败返回 `<missing>`——
+    // `planDispatchDelivery` 判据内天然按缺失处理，无需本层再映射）。
+    const probes = new Map<string, string | undefined>();
+    for (const readPath of extractDispatchReadPaths(task)) {
+      probes.set(readPath, await filePrint(path.join(projectRoot, readPath)));
+    }
+    // 判据必须**紧挨去重登记之前**（见方法注释：拒投不登记——防「键在送达才释放」被拒投项拖成残留误去重）。
+    const plan = planDispatchDelivery({ roleId: targetRoleId, task, reason }, probes);
+    if (plan.action === "reject") {
+      // fail-closed 拒投：不入队、不登记去重键、不开目标会话；如实回执（工具）+ 系统行（su 聊天流）。
+      return fail(plan.message, plan.systemRow);
+    }
     const dedupKey = `${projectRoot}\u0000${runtime}\u0000${targetRoleId}\u0000${task}\u0000${reason ?? ""}`;
     if (this.activeDispatchKeys.has(dedupKey)) {
       return { ok: true, message: `该派发（目标 ${targetRoleId}，同任务文本）已在投递队列中——已去重，不重复投递。` };
@@ -1629,8 +1860,9 @@ export class SessionManager {
       runtime,
       targetRoleId,
       sourceRoleId: fromRoleId,
-      // 文案单一来源应为编排 `renderDispatchPrompt`（未落地，见 `renderDispatchPromptLocal` 的登记）。
-      text: renderDispatchPromptLocal(fromRoleId, { roleId: targetRoleId, task, reason }),
+      // 文本：编排 `planDispatchDelivery` 产出的定格文本（必读块已由**同一单一来源** `renderDispatchPrompt`
+      // 注入；无引用 = 旧格式逐字）——本层不另写渲染（本地副本 `renderDispatchPromptLocal` 已删除）。
+      text: plan.text,
       summary: `派发 · 来自 ${fromRoleId}：${shortenText(task, 40)}`,
       dedupKey,
     });
@@ -1642,6 +1874,454 @@ export class SessionManager {
         (this.sessions.get(this.sessionKey(projectRoot, targetRoleId, runtime)) ? "" : "（其会话未开——将自动开启）") +
         `；投递结果/失败会在其聊天流与 su 的聊天流如实显示（受理≠已完成）。`,
     };
+  }
+
+  // —————————————— G-2（2026-10-16 客户批准）：看护数据面 / 系统投递 / 恢复执行桥 ——————————————
+  //
+  // 设计 `2026-10-16_design_role-watchdog-and-closure.md`（W1 快照与观察、W2 system 投递、W4 恢复执行桥、
+  // W5 恢复确认桥）。**一条原则**：本段全部是「读快照＋经既有投递机投文本＋（客户一键确认后）复用既有
+  // 人工动作」——不写项目文件、不放行任何命令/写入、不改任何 gate/队列语义；一切失败路径 fail-closed
+  // （最坏情形退化为「没有看护时的现状」）。
+
+  /** **同源看护快照**（W1）：全部直读本层内存结构（busy/队列/在途/链/pending）——**不造第二数据源**、
+   *  同步读、不引锁（JS 单线程 tick 内读完）。项目未知且无任何运行态 ⇒ undefined（看护跳过）。 */
+  watchdogSnapshot(projectRoot: string): WatchdogProjectSnapshot | undefined {
+    if (typeof projectRoot !== "string" || projectRoot === "") return undefined;
+    const hasSessions = [...this.sessions.values()].some((entry) => entry.projectRoot === projectRoot);
+    const hasQueues = [...this.deliveryQueues.entries()].some(([key, items]) => key.startsWith(`${projectRoot}\u0000`) && items.length > 0);
+    const listing = this.deps.getListing(projectRoot);
+    if (!listing && !hasSessions && !hasQueues) return undefined;
+    const roles: WatchdogProjectSnapshot["roles"] = [];
+    for (const entry of this.sessions.values()) {
+      if (entry.projectRoot !== projectRoot) continue;
+      roles.push({
+        roleId: entry.roleId,
+        runtime: entry.runtime,
+        busy: entry.busy,
+        ...(entry.busy && typeof entry.busySince === "number" ? { turnStartedAt: entry.busySince } : {}),
+        ...(entry.origins.running?.turnId !== undefined ? { turnId: entry.origins.running.turnId } : {}),
+      });
+    }
+    const queues: WatchdogProjectSnapshot["queues"] = [];
+    for (const [key, items] of this.deliveryQueues) {
+      if (items.length === 0) continue;
+      const parts = key.split("\u0000");
+      if (parts[0] !== projectRoot) continue;
+      queues.push({
+        targetRoleId: parts[1] ?? "",
+        runtime: (parts[2] as RuntimeKind) ?? "pi",
+        items: items.map((item) => {
+          const parsed = Date.parse(item.enqueuedAt);
+          return { kind: item.kind, dedupKey: item.dedupKey, sourceRoleId: item.sourceRoleId, summary: item.summary, enqueuedAtMs: Number.isFinite(parsed) ? parsed : this.now() };
+        }),
+      });
+    }
+    let activeDeliveries = 0;
+    for (const key of this.activeDeliveries.keys()) if (key.startsWith(`${projectRoot}\u0000`)) activeDeliveries += 1;
+    let chainsActive = false;
+    for (const key of this.openChains.keys()) if (key.startsWith(`${projectRoot}\u0000`)) { chainsActive = true; break; }
+    if (!chainsActive) for (const key of this.rebuildChains.keys()) if (key.startsWith(`${projectRoot}\u0000`)) { chainsActive = true; break; }
+    const pending = this.deps.watchdogPendingConfirmations?.() ?? { total: 0, byRole: new Map<string, number>() };
+    return {
+      projectRoot,
+      suRoleId: this.suRoleIdOf(projectRoot),
+      roles,
+      queues,
+      activeDeliveries,
+      chainsActive,
+      pendingConfirmationsTotal: pending.total,
+      pendingConfirmationsByRole: pending.byRole,
+    };
+  }
+
+  /** 有运行态的项目根（活会话 ∪ 非空队列）——看护的服务对象之一（Interface 再并入已导入项目）。 */
+  projectRootsWithActivity(): string[] {
+    const roots = new Set<string>();
+    for (const entry of this.sessions.values()) roots.add(entry.projectRoot);
+    for (const [key, items] of this.deliveryQueues) if (items.length > 0) roots.add(key.split("\u0000")[0] ?? "");
+    roots.delete("");
+    return [...roots];
+  }
+
+  /** 某角色**最近一轮终局**（W1 的 `lastTurn` 小状态；纯读。消费方：role_status 等只读面）。 */
+  lastTurnOf(projectRoot: string, roleId: string, runtime: RuntimeKind): { outcome: RuntimeTurnOutcome; at: string } | undefined {
+    return this.lastTurns.get(this.queueKey(projectRoot, roleId, runtime));
+  }
+
+  /**
+   * **系统消息投递**（W2）：看护的告警/收束/恢复回执经**同一套投递机**真投递给 su——忙时排队、未开自动开、
+   * 失败保留重试全部复用（`kind:"system"`；来源标注恒空——呈现层按文首 `[系统·<子类>] ` 定格标记归类）。
+   * 目标 su 未枚举到 ⇒ 入 `""` 目标队列（投递机既有的一次性提示 + 保留待重试；**绝不静默丢**）。
+   */
+  watchdogDeliver(projectRoot: string, message: { text: string; summary: string; dedupKey: string }): void {
+    const suRoleId = this.suRoleIdOf(projectRoot);
+    let runtime: RuntimeKind | undefined;
+    if (suRoleId !== null) {
+      for (const entry of this.sessions.values()) {
+        if (entry.projectRoot === projectRoot && entry.roleId === suRoleId) { runtime = entry.runtime; break; }
+      }
+    }
+    if (runtime === undefined) runtime = this.lastSuRuntime.get(projectRoot) ?? "pi";
+    const target = suRoleId ?? "";
+    this.enqueueDelivery(projectRoot, target, {
+      kind: "system",
+      runtime,
+      targetRoleId: target,
+      sourceRoleId: "", // U1 已落树契约：system 来源标注恒空（「系统」非角色）——不得填假角色
+      text: message.text,
+      summary: message.summary,
+      dedupKey: message.dedupKey,
+    });
+    void this.drainQueue(projectRoot, suRoleId, runtime);
+  }
+
+  /**
+   * **`rebuild-session` 恢复动作**（W4，2026-10-16 客户批准；设计 §6.3）——新公共入口：
+   * dispose＋重开（保留 ANS 回放；F-5-opt1 注记适用）；**在跑轮次不打断**（busy ⇒ 拒绝并如实回执）。
+   * 与陈旧重建（O-1）同链串行（`rebuildChains` 按会话键——同一角色至多一个重建在跑）。
+   */
+  async rebuildSession(target: string | SessionTarget): Promise<RebuildSessionResult> {
+    const key = this.targetKey(target);
+    if (key === undefined) return { ok: false, error: "未找到匹配的会话（请指定项目与运行时）。" };
+    const prev = this.rebuildChains.get(key) ?? Promise.resolve();
+    const run = prev.then(() => this.rebuildSessionUnsafe(key));
+    const tail = run.then(() => undefined, () => undefined);
+    this.rebuildChains.set(key, tail);
+    void tail.then(() => {
+      if (this.rebuildChains.get(key) === tail) this.rebuildChains.delete(key);
+    });
+    return await run;
+  }
+
+  /** `rebuildSession` 的链内实现（同 `rebuildIfBoundaryStaleUnsafe` 同款步骤，**去掉陈旧判据**——手动触发）。 */
+  private async rebuildSessionUnsafe(key: string): Promise<RebuildSessionResult> {
+    const entry = this.sessions.get(key);
+    if (!entry) return { ok: false, error: "该角色没有打开的会话——无可重建的会话（可先在界面点开该角色，或改用其他动作）。" };
+    if (entry.busy) return { ok: false, error: "该角色有轮次在跑——不打断（可先 abort-turn 停止本轮，或等其结束后重试）。" };
+    if (this.sessions.get(key) !== entry || entry.busy) return { ok: false, error: "会话状态已变化（并发开启/重建）——本次重建未执行，请核对后重试。" }; // TOCTOU
+    const { projectRoot, roleId, runtime } = entry;
+    const diagnostic = createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId });
+    diagnostic.record("session.rebuild.start", { state: "manual" });
+    await this.disposeEntry(key, entry);
+    this.deps.emitEvent({
+      roleId, projectRoot, runtime,
+      event: { kind: "message", summary: `已按要求（客户确认的恢复动作）重建角色 ${roleId} 的会话（保留 ANS 回放）；上下文恢复结果以引擎实际返回为准。` },
+    });
+    const selectionVersion = this.selectionVersion;
+    const reopened = await this.openInternalUnsafe({ projectRoot, roleId, runtime }, true, selectionVersion, true);
+    if (reopened.ok) {
+      this.queueRebuildWritePermitsNotice(key); // 入参＝会话键
+      void this.drainQueue(projectRoot, roleId, runtime);
+    }
+    diagnostic.record("session.rebuild.end", { ok: reopened.ok, state: "manual" });
+    if (!reopened.ok) return { ok: false, error: reopened.error ?? "重开失败" };
+    return {
+      ok: true,
+      resumed: reopened.resumed,
+      ...(reopened.contextSource !== undefined ? { contextSource: reopened.contextSource } : {}),
+      ...(reopened.contextWarning !== undefined ? { contextWarning: reopened.contextWarning } : {}),
+    };
+  }
+
+  /**
+   * **`redeliver` 恢复动作**（W4）——队列重试 nudge：包装既有 `drainQueue`（不新造投递路径）。
+   * 给 `itemId` 时针对该排队条目：**条目已投出/不存在 ⇒ 如实回执**；触发后按**触发后的真实队列状态**
+   * 如实回报（仍排队 ⇒ 目标忙/未开，保留待重试——绝不把「已触发重试」写成「已投出」）。
+   */
+  async redeliverNudge(target: string | SessionTarget, itemId?: string): Promise<RedeliverResult> {
+    const key = this.targetKey(target);
+    if (key === undefined) return { ok: false, message: "未找到匹配的会话/队列（请指定项目与运行时）。" };
+    const [projectRoot = "", roleId = "", runtime = "pi"] = key.split("\u0000");
+    const qKey = this.queueKey(projectRoot, roleId, runtime as RuntimeKind);
+    const queue = this.deliveryQueues.get(qKey) ?? [];
+    const inFlight = this.activeDeliveries.get(qKey);
+    if (typeof itemId === "string" && itemId !== "") {
+      const idxBefore = queue.findIndex((i) => i.dedupKey === itemId);
+      if (idxBefore < 0) {
+        if (inFlight?.dedupKey === itemId) return { ok: true, message: "该条目已进入「进行中」（正在投递/执行）——无需重投（其收尾按既有 settled 语义）。" };
+        return { ok: false, message: "条目不在排队中（可能已投出、已撤回或 id 不符）——未触发重试。" };
+      }
+      await this.drainQueue(projectRoot, roleId, runtime as RuntimeKind);
+      const after = this.deliveryQueues.get(qKey) ?? [];
+      const idxAfter = after.findIndex((i) => i.dedupKey === itemId);
+      if (idxAfter >= 0) {
+        return { ok: true, message: `已触发队列重试；该条目仍在队列第 ${idxAfter + 1} 位（目标忙或未开——保留待重试，下次时机自动再试）。` };
+      }
+      const nowInFlight = this.activeDeliveries.get(qKey);
+      return nowInFlight?.dedupKey === itemId
+        ? { ok: true, message: "已触发队列重试；该条目已出队投出（进行中）。" }
+        : { ok: true, message: "已触发队列重试；该条目已不在队列（已在本次重试中投出，或已被处理/撤回）。" };
+    }
+    await this.drainQueue(projectRoot, roleId, runtime as RuntimeKind);
+    const after = this.deliveryQueues.get(qKey) ?? [];
+    const nowInFlight = this.activeDeliveries.get(qKey);
+    if (after.length === 0) {
+      return nowInFlight !== undefined
+        ? { ok: true, message: "已触发队列重试；队列已清空，该角色的投递已在途（进行中）。" }
+        : { ok: true, message: "已触发队列重试；该角色的投递队列已空。" };
+    }
+    return { ok: true, message: `已触发队列重试；仍有 ${after.length} 条在队列（目标忙或未开——保留待重试），${nowInFlight !== undefined ? "1 条在途" : "无在途"}。` };
+  }
+
+  /**
+   * **恢复提议桥**（W5；注入 su 会话的 `propose_recovery` 能力——工具 handler 只把载荷交进来，见
+   * `makeProposeRecoveryTool`）。流程（设计 §6.2/§6.3）：校验（角色在本项目、action 枚举、evidence 非空）
+   * → 推确认卡 → 等待客户 → **恰 allow:true 才执行**（复用 `abort`/`rebuildSession`/`redeliverNudge`）→
+   * 回执（契约 `RecoveryReceipt`：四值中**恰 `executed` 为已执行**）如实回拒工具侧 ＋ UI 系统行 ＋
+   * **回执经既有投递机投回 su**（kind:"system"）＋ 诊断。取消/关窗/通道失效 = **未获执行**（declined，
+   * fail-closed——绝不「没人问就执行」）。
+   */
+  private async proposeRecovery(projectRoot: string, runtime: RuntimeKind, proposerRoleId: string, d: ProposeRecoveryPayload): Promise<RecoveryReceipt> {
+    const diagnostic = createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId: proposerRoleId });
+    const operatorId = this.deps.recoveryConfirm?.operatorId ?? "unknown";
+    // 回执构造（契约形状；`executed` 仅在确已执行时使用——其余一律如实未执行）。
+    const receiptOf = (outcome: RecoveryReceipt["outcome"], message: string): RecoveryReceipt => ({
+      outcome,
+      message,
+      operatorId,
+      at: new Date(this.now()).toISOString(),
+    });
+    const refuse = (message: string, reasonCode: string): RecoveryReceipt => {
+      diagnostic.record("recovery.refused", { reasonCode });
+      this.emitDeliveryNote(projectRoot, runtime, proposerRoleId, proposerRoleId, `恢复提议未受理：${message}`);
+      return receiptOf("error", `恢复提议未受理：${message}`);
+    };
+    // 模型输入一律不可信：即使契约标了必填，也按运行时值全量重校验（不靠类型吃饭）。
+    const targetRoleId = typeof d?.roleId === "string" ? d.roleId.trim() : "";
+    const action = d?.action as unknown;
+    const evidenceRaw = typeof d?.evidence === "string" ? d.evidence : "";
+    const reason = typeof d?.reason === "string" && d.reason !== "" ? d.reason : undefined;
+    const itemId = typeof d?.itemId === "string" && d.itemId !== "" ? d.itemId : undefined;
+    if (targetRoleId === "") return refuse("roleId 必须非空。", "missing-role");
+    if (!isRecoveryAction(action)) return refuse(`action 必须是 abort-turn / rebuild-session / redeliver（收到 ${typeof action === "string" ? action : typeof action}）。`, "bad-action");
+    if (evidenceRaw.trim() === "") return refuse("evidence（证据）必须非空——恢复动作必须有事实依据。", "missing-evidence");
+    // 目标须是**本项目角色**且**不是内置治理角色**（沿 routeDispatch 的校验先例；缓存 miss ⇒ 实时重枚举一次）。
+    const findTarget = (): { builtIn?: boolean } | undefined => {
+      const listing = this.deps.getListing(projectRoot);
+      return listing ? listing.roles.find((r) => r.roleId === targetRoleId) : undefined;
+    };
+    let target = findTarget();
+    if (!target && this.deps.refreshListing) {
+      try {
+        await this.deps.refreshListing(projectRoot);
+      } catch {
+        // 重枚举失败：按原 miss 口径如实拒绝，不上抛。
+      }
+      target = findTarget();
+    }
+    if (!target) return refuse(`角色 ${targetRoleId} 不在本项目（未枚举到）——未推送任何确认卡。`, "target-missing");
+    if (target.builtIn === true) return refuse(`${targetRoleId} 是内置治理角色——恢复动作只针对项目角色（未推送任何确认卡）。`, "target-builtin");
+
+    const presenter = this.deps.recoveryConfirm;
+    if (presenter === undefined) {
+      diagnostic.record("recovery.refused", { reasonCode: "channel-unavailable" });
+      return receiptOf("declined", "恢复确认通道未接线——未获执行（fail-closed），没有任何动作发生。");
+    }
+    const suEntry = this.sessions.get(this.sessionKey(projectRoot, proposerRoleId, runtime));
+    const signal = suEntry?.interactionState.turn.signal;
+    let allowed = false;
+    try {
+      allowed = await presenter.present(
+        {
+          // 渲染侧（U1 已落树）消费面：`{id, projectRoot?, runtime?, roleId, action, evidence, reason?, requestedBy?, requestedAt?, itemId?}`。
+          projectRoot,
+          runtime,
+          roleId: targetRoleId,
+          action,
+          evidence: evidenceRaw, // 逐字（校验按 trim，呈现按原文——不加工、不截断）
+          ...(reason !== undefined ? { reason } : {}),
+          requestedBy: proposerRoleId,
+          requestedAt: new Date(this.now()).toISOString(),
+          ...(itemId !== undefined ? { itemId } : {}),
+        },
+        { roleId: proposerRoleId, projectRoot, runtime, ...(signal !== undefined ? { signal } : {}) },
+      );
+    } catch (err) {
+      // 推达失败（窗口已关等）⇒ 未获执行（fail-closed；presenter 已记诊断）。
+      diagnostic.error("recovery.present.failed", err);
+      allowed = false;
+    }
+
+    let receipt: RecoveryReceipt;
+    if (!allowed) {
+      receipt = receiptOf("declined", `客户未确认（拒绝/取消，或确认通道失效）——「${recoveryActionLabel(action)}」没有执行，也没有任何动作发生。`);
+    } else if (action === "abort-turn") {
+      const res = await this.abort({ projectRoot, roleId: targetRoleId, runtime });
+      receipt = res.ok
+        ? receiptOf("executed", `已请求停止角色「${targetRoleId}」的当前轮次——轮次仍以既有 settled 收尾（不制造「已停止」假象）。`)
+        : res.supported
+          ? receiptOf("error", res.error ?? "停止失败（未知原因）——未假装已执行。")
+          : receiptOf("unsupported", res.error ?? "当前运行时不支持停止。");
+    } else if (action === "rebuild-session") {
+      const res = await this.rebuildSession({ projectRoot, roleId: targetRoleId, runtime });
+      receipt = res.ok
+        ? receiptOf("executed", `角色「${targetRoleId}」的会话已重建（保留历史回放；上下文恢复结果以引擎实际返回为准）。`)
+        : receiptOf("error", res.error ?? "重建失败（未知原因）——没有任何动作发生。");
+    } else {
+      const res = await this.redeliverNudge({ projectRoot, roleId: targetRoleId, runtime }, itemId);
+      receipt = res.ok ? receiptOf("executed", res.message) : receiptOf("error", res.message);
+    }
+
+    // —— 回执三路如实落地（设计 §6.2）：工具返回（上方 return）＋ UI 系统行 ＋ **经既有投递机投回 su** ＋ 诊断 ——
+    const executed = receipt.outcome === "executed";
+    diagnostic.record("recovery.receipt", { targetRoleId, outcome: receipt.outcome, ok: executed, state: receipt.outcome });
+    this.emitDeliveryNote(projectRoot, runtime, proposerRoleId, proposerRoleId, `恢复回执（${recoveryActionLabel(action)} · 角色 ${targetRoleId}）：${receipt.message ?? ""}`);
+    this.watchdogDeliver(projectRoot, {
+      text: renderRecoveryReceipt({ ...receipt, action, targetRoleId }), // 回执文案＝编排单一来源（O1）
+      summary: recoveryReceiptSummary(targetRoleId, action, executed),
+      dedupKey: `watchdog\u0000${projectRoot}\u0000recovery-receipt\u0000${receipt.at ?? this.now()}`,
+    });
+    return receipt;
+  }
+
+  // ——————— G-2/W1：role_status / session_tail 的桌面侧数据源（契约＝`model/runtime.ts`；编排转发） ———————
+
+  /** `role_status` 结构化文本（设计 §4.1：su 行 + 各角色行 + 队列明细 + 可选诊断节；**纯读**、无副作用；
+   *  数据层失败以 `{ok:false, message}` 如实表达（不抛——抛错由工具层按「读取未完成」如实转达）；
+   *  8 KiB 截断由工具层执行（本层不预截断）。 */
+  private async roleStatusText(projectRoot: string, query: RoleStatusPayload): Promise<WatchdogToolResult> {
+    try {
+      const at = this.now();
+      const snapshot = this.watchdogSnapshot(projectRoot);
+      const lines: string[] = [`role_status（项目 ${projectRoot}，${new Date(at).toISOString()}）`];
+      if (!snapshot) {
+        lines.push("（尚无运行态：项目未导入，或还没有任何会话/队列——先导入项目并点开角色。）");
+        return { ok: true, text: lines.join("\n") };
+      }
+      const suRoleId = snapshot.suRoleId;
+      const pendingFor = (rid: string): number => snapshot.pendingConfirmationsByRole.get(rid) ?? 0;
+      const suBusy = suRoleId !== null && snapshot.roles.some((r) => r.roleId === suRoleId && r.busy);
+      const stats = this.deps.watchdogStats?.(projectRoot);
+      const watchdogLine = stats
+        ? `看护：活跃告警 ${stats.activeAlerts}，最近触发 ${stats.lastAlertAt !== null ? new Date(stats.lastAlertAt).toISOString() : "null"}，已抑制 ${stats.suppressedTotal}`
+        : "看护：未接线";
+      lines.push(`su：busy=${suBusy} ｜ 待确认卡 ${suRoleId !== null ? pendingFor(suRoleId) : 0} ｜ ${watchdogLine}`);
+      const listing = this.deps.getListing(projectRoot);
+      const knownRoles = listing ? listing.roles.map((r) => r.roleId) : [...new Set([...snapshot.roles.map((r) => r.roleId), ...snapshot.queues.map((q) => q.targetRoleId)])].filter((r) => r !== "");
+      const wantedRoleId = typeof query?.roleId === "string" ? query.roleId.trim() : "";
+      const includeDiagnostics = query?.includeDiagnostics === true;
+      const wanted = wantedRoleId !== "" ? [wantedRoleId] : knownRoles;
+      for (const rid of wanted) {
+        if (listing && !knownRoles.includes(rid)) {
+          lines.push(`角色 ${rid}：不在本项目（未枚举到）。`);
+          continue;
+        }
+        const live = snapshot.roles.find((r) => r.roleId === rid);
+        const queue = snapshot.queues.find((q) => q.targetRoleId === rid);
+        let liveText = "未开";
+        if (live) {
+          const entry = this.sessions.get(this.sessionKey(projectRoot, rid, live.runtime));
+          const ctx = entry ? this.contextInfo(entry.handle).contextSource ?? "fresh" : "fresh";
+          liveText = `已开（contextSource=${ctx}）`;
+        }
+        let runningKind: string | undefined;
+        for (const [key, item] of this.activeDeliveries) if (key.startsWith(`${projectRoot}\u0000${rid}\u0000`)) { runningKind = item.kind; break; }
+        const depth = queue?.items.length ?? 0;
+        lines.push(`角色 ${rid}：busy=${live?.busy === true} ｜ 会话 ${liveText} ｜ 队列 ${depth} ｜ 进行中 ${runningKind ?? "—"}`);
+        let last: { outcome: RuntimeTurnOutcome; at: string } | undefined;
+        for (const [key, value] of this.lastTurns) if (key.startsWith(`${projectRoot}\u0000${rid}\u0000`)) { last = value; break; }
+        if (last) lines.push(`  最近一轮：${last.outcome} @ ${last.at}（该角色近 15 分钟 failed/timed_out 计 ${stats?.failuresByRole.get(rid) ?? 0}）`);
+        for (const item of queue?.items ?? []) {
+          lines.push(`  队列明细：- [${item.kind}] 来自 ${item.sourceRoleId === "" ? "（系统）" : item.sourceRoleId}：${shortenText(item.summary, 80)}（入队 ${new Date(item.enqueuedAtMs).toISOString()}，id=${item.dedupKey}）`);
+        }
+        if (includeDiagnostics && wantedRoleId !== "") lines.push(await this.diagnosticsTailText(rid));
+      }
+      if (includeDiagnostics && wantedRoleId === "") lines.push("（诊断节需要指定 roleId——未附。）");
+      return { ok: true, text: lines.join("\n") };
+    } catch (err) {
+      return { ok: false, message: `role_status 数据面读取失败：${err instanceof Error ? err.message : String(err)}` };
+    }
+  }
+
+  /** 该角色**近日志尾部 ≤20 条**（只读诊断文件；字段为写盘白名单内的元数据）。失败如实（不抛、不猜）。 */
+  private async diagnosticsTailText(roleId: string): Promise<string> {
+    try {
+      const status = getDiagnosticsStatus();
+      if (!status.directory) return `  [diagnostics] 不可用（诊断目录未配置${status.lastError ? `；lastError：${status.lastError}` : ""}）。`;
+      const names = (await fs.promises.readdir(status.directory)).filter((n) => /^ans-diagnostics-\d{4}-\d{2}-\d{2}\.jsonl$/.test(n)).sort();
+      const newest = names[names.length - 1];
+      if (newest === undefined) return "  [diagnostics] 不可用（暂无诊断文件）。";
+      const file = path.join(status.directory, newest);
+      const st = await fs.promises.stat(file);
+      const start = Math.max(0, st.size - 256 * 1024); // 尾读 ≤256KiB（不整读大文件）
+      const fh = await fs.promises.open(file, "r");
+      let chunk = "";
+      try {
+        const buf = Buffer.alloc(st.size - start);
+        const { bytesRead } = await fh.read(buf, 0, buf.length, start);
+        chunk = buf.subarray(0, bytesRead).toString("utf8");
+      } finally {
+        await fh.close();
+      }
+      const rows: string[] = [];
+      for (const line of chunk.split("\n")) {
+        const trimmed = line.trim();
+        if (trimmed === "" || rows.length >= 20) continue;
+        try {
+          const row = JSON.parse(trimmed) as Record<string, unknown>;
+          if (row.roleId !== roleId) continue;
+          const fields = Object.entries(row)
+            .filter(([k]) => k !== "at" && k !== "level" && k !== "pid" && k !== "projectRoot" && k !== "roleId")
+            .map(([k, v]) => `${k}=${String(v)}`)
+            .join(" ");
+          rows.push(`  [diagnostics] ${String(row.at ?? "")} ${String(row.event ?? "?")}${fields ? ` ${fields}` : ""}`);
+        } catch {
+          // 坏行跳过（尾读切半行也走这里）——如实不猜。
+        }
+      }
+      return rows.length > 0 ? rows.join("\n") : "  [diagnostics] 该角色近日志无可显示条目。";
+    } catch (err) {
+      return `  [diagnostics] 不可用（读取失败）：${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
+  /** `session_tail` 规范化尾行文本（设计 §4.2）：**复用受保护投影管线**（getSessionHistory 同路径——凭据
+   *  清洗/display 保护已在链上）；行数由工具层归一（本层沿用其值，防御再夹一道）；「无会话历史」「读坏」
+   *  以 `{ok:false, message}` 如实表达——不抛、不猜。 */
+  private async sessionTailText(projectRoot: string, query: SessionTailPayload): Promise<WatchdogToolResult> {
+    const rid = typeof query?.roleId === "string" ? query.roleId.trim() : "";
+    if (rid === "") return { ok: false, message: "session_tail：roleId 必须非空。" };
+    const n = typeof query?.lines === "number" && Number.isFinite(query.lines) ? Math.min(200, Math.max(1, Math.floor(query.lines))) : 40;
+    try {
+      let source = "无会话文件";
+      try {
+        const dir = sessionsDirFor(projectRoot, rid);
+        const names = await fs.promises.readdir(dir);
+        const files: { name: string; mtimeMs: number }[] = [];
+        for (const name of names) {
+          try {
+            const st = await fs.promises.stat(path.join(dir, name));
+            if (st.isFile()) files.push({ name, mtimeMs: st.mtimeMs });
+          } catch {
+            // 单文件 stat 失败：跳过（不阻断其它候选）
+          }
+        }
+        const latest = pickLatestSessionFile(files);
+        if (latest !== null) source = latest;
+      } catch {
+        // 无目录 = 无历史
+      }
+      let runtime: RuntimeKind = "pi";
+      for (const entry of this.sessions.values()) {
+        if (entry.projectRoot === projectRoot && entry.roleId === rid) { runtime = entry.runtime; break; }
+      }
+      const view = await getSessionHistory(
+        { projectRoot, roleId: rid, runtime },
+        { credentialEnvNames: [...(this.deps.runtimeOptions?.extraCredentialEnvVars ?? []), ...(this.deps.runtimeOptions?.apiKeyEnvVar ? [this.deps.runtimeOptions.apiKeyEnvVar] : [])] },
+      );
+      if (view.error) {
+        return { ok: false, message: `会话历史读取未完成：${view.error}（来源 ${source}；跳过 ${view.skipped} 行）` };
+      }
+      const taken = view.rows.slice(-n);
+      if (taken.length === 0) {
+        return { ok: false, message: `无会话历史（来源 ${source}；规范行 0 条，跳过 ${view.skipped} 行）` };
+      }
+      const head = `session_tail（角色 ${rid}，runtime=${runtime}）：来源 ${source}；规范行 ${view.rows.length} 条，跳过 ${view.skipped} 行${view.rows.length > taken.length ? `（已按行数上限 ${n} 取尾部）` : ""}`;
+      const body = taken.map((row) => `${row.at !== "" ? row.at : "（无时间）"} [${row.kind}] ${shortenText(row.text, 200)}`);
+      return { ok: true, text: [head, ...body].join("\n") };
+    } catch (err) {
+      return { ok: false, message: `session_tail 读取失败（如实返回，不猜）：${err instanceof Error ? err.message : String(err)}` };
+    }
   }
 
   /** 某项目**全部**队列的放行尝试（settled 触发的重试时机——投递触发不挑目标，各队列自判忙/开）。 */
@@ -1800,8 +2480,11 @@ export class SessionManager {
     const origin = this.beginDeliveryOrigin(entry, sent.clientMessageId);
     entry.interactionState.turn = new AbortController();
     entry.busy = true;
+    entry.busySince = this.now(); // G-2/W1：本轮起点定格（看护信号 #1 的 elapsed 基准）
     this.activeDeliveries.set(key, sent); // 与 busy 同时登记；settled/失败/dispose 精确撤销。
     diagnostic.record("delivery.start", { count: batchCount, queueDepth: q.length, state: sent.kind });
+    // G-2/W3：drain 出队投出 = 真实活动（重武装）；`kind:"system"`（看护自身投递）不记（同 enqueueDelivery 口径）。
+    if (sent.kind !== "system") this.noteWatchdogActivity(projectRoot, "delivery-claim");
     this.notifyRoleState(projectRoot, resolvedTarget, runtime); // 状态准确性：投递开跑即外推「工作中」（shift 时快照尚为闲）
     // —— F-2-M1：分离续段（**不再持有串行链**）——IIFE 同步执行到 `await this.sendDelivery(...)` 即挂起，
     // 本方法随后返回（链释放）。try/await/catch 与旧实现**逐字同体**：成功支抛错同样落失败支（逐支等价）。
@@ -1852,6 +2535,7 @@ export class SessionManager {
       if (en === entry && ownsRunningDelivery && !mayBeActive) {
         en.interactionState.turn.abort();
         en.busy = false;
+        en.busySince = undefined;
       }
       if (this.activeDeliveries.get(key) === sent && !mayBeActive) this.activeDeliveries.delete(key);
       const waiting = this.deliveryQueues.get(key) ?? q;
@@ -1868,7 +2552,9 @@ export class SessionManager {
           ? `回交投递失败（来自 ${sent.sourceRoleId}）：${base}${!cAttempt ? "——未丢弃，已保留待重试（下次时机自动重试）。" : ""}`
           : sent.kind === "dispatch"
             ? `派发投递失败（目标 ${resolvedTarget}）：${base}——**未丢弃**，已保留待重试（下次时机自动重试）。`
-            : `排队消息投递失败（角色 ${resolvedTarget}）：${base}——**未丢弃**，已保留待重试（下次时机自动重试）。`
+            : sent.kind === "system"
+              ? `系统消息投递失败（目标 ${resolvedTarget}）：${base}——**未丢弃**，已保留待重试（下次时机自动重试）。`
+              : `排队消息投递失败（角色 ${resolvedTarget}）：${base}——**未丢弃**，已保留待重试（下次时机自动重试）。`
       );
     }
     })().catch((err) => {

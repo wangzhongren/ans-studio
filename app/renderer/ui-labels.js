@@ -17,12 +17,15 @@
 
   /**
    * 队列条目**来源标签**（右栏「待办 / 队列」组；客户语言三条固定映射）：
-   * dispatch=「su 派发」（派发者结构性为治理主入口）、message=「客户消息」、handback=「回交投递」。
+   * dispatch=「su 派发」（派发者结构性为治理主入口）、message=「客户消息」、handback=「回交投递」、
+   * system=「系统」（G-2 看护告警/收束提示/恢复回执——来源=系统，非角色；**不可撤回呈现**的判据在
+   * 渲染侧 `canWithdraw`（只认 message 类），本函数只管来源文案）。
    */
   function queueSourceLabel(kind) {
     if (kind === "dispatch") return "su 派发";
     if (kind === "message") return "客户消息";
     if (kind === "handback") return "回交投递";
+    if (kind === "system") return "系统";
     return "投递";
   }
 
@@ -105,6 +108,20 @@
     return n > 0 ? "有 " + n + " 条待确认 · 定位" : "";
   }
 
+  /**
+   * G-2 恢复确认卡的**动作文案**（纯映射，2026-10-16 客户批准；设计
+   * `2026-10-16_design_role-watchdog-and-closure` §6.2/§6.3）。动作枚举**冻结**为
+   * {abort-turn, rebuild-session, redeliver}——本函数只做「动作 token → 人话标签 + 后果说明」的纯转写
+   * （说明与设计 §6.3 钉死的语义同向；渲染侧不新增任何判定）；**未知动作 ⇒ null**——渲染侧只呈现
+   * 原始 token（不假装认识、不编语义）。
+   */
+  function recoveryActionView(action) {
+    if (action === "abort-turn") return { label: "停止本轮", note: "停该角色当前轮次；不销毁会话。" };
+    if (action === "rebuild-session") return { label: "重建会话", note: "重建该角色会话（保留 ANS 回放）；目标正忙时不会执行。" };
+    if (action === "redeliver") return { label: "重新投递", note: "触发该角色投递队列立即重试。" };
+    return null;
+  }
+
   // —————— D-1 回放去重（2026-10-13 真机「同一段消息渲染两遍」修复）——————
   // 真机链路：su 一轮结束 → `project:changed` → 渲染侧 refreshProject → 主进程对每角色**重推**会话历史
   // → 旧实现对同一 pane **无守卫地整份再回放** ⇒ 转录重复（轮次越多重复越多）。本函数给出**纯策略**：
@@ -155,6 +172,7 @@
     queueItemViews: queueItemViews,
     arrivalScrolls: arrivalScrolls,
     pendingChipLabel: pendingChipLabel,
+    recoveryActionView: recoveryActionView,
     stickToBottom: stickToBottom,
     replayPlan: replayPlan,
     AUTO_SCROLL_THRESHOLD_PX: AUTO_SCROLL_THRESHOLD_PX,

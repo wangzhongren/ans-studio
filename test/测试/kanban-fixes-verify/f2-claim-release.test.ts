@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { SessionManager } from "../../../app/desktop/session.ts";
 import { buildProjectConfig } from "../../../app/desktop/project.ts";
+import { renderDispatchPrompt } from "../../../src/common/编排/handback.ts";
 import type { OrchestrationEvent } from "../../../src/common/编排/handback.ts";
 import type { DispatchTaskFn, DispatchReceipt } from "../../../src/provider/pi/session.ts";
 import type { RoleSessionHandle, RoleSessionSendOptions } from "../../../src/pipeline/orchestration/run-role.ts";
@@ -29,7 +30,11 @@ function listing(): ProjectListing {
   return { projectRoot: "/proj", roles: [mk("su", true), mk("A"), mk("B")], warnings: [], hasRoles: true, primaryRoleId: "su" };
 }
 
-const dispatchTemplate = (from: string, task: string) => `[派发] 来自 ${from} 的任务：${task}——完成后请交回报告`;
+// G-1 格式收口后可跟进的金文本（批准范围内的格式变更，非行为变更）：投递文本的单一来源 =
+// 编排 `renderDispatchPrompt`（桌面本地旧模板已按批准删除——落地后必须切换、不得两处并存）。
+// 本套件四个任务均无契约/workflow 引用 ⇒ 单来源渲染为旧格式三行逐字（无引用时逐字不变）；
+// `roleId` 不进入文案（handback.ts 注明「用于路由与校验」），此处取 "A" 与真实路由渲染逐字一致。
+const dispatchTemplate = (task: string) => renderDispatchPrompt({ roleId: "A", task });
 
 function makeHarness() {
   const l = listing();
@@ -122,12 +127,12 @@ test("F-2 场景 1（跨目标不阻塞）：A 的 send 挂起期间派发 B ⇒
   assert.equal(h.done.A.length, 0, "断言前提：A 的 send 此刻仍未 resolve（修复前链会被它持有）");
   assert.equal(delivered, true, "B 必须在 A 轮未结束时收到投递（认领段后链已释放）");
   assert.ok(elapsed < 1000, `B 的送达须为秒级以下（实际 ${elapsed}ms）`);
-  assert.deepEqual(h.done.B, [dispatchTemplate("su", "B 的独立活")]);
+  assert.deepEqual(h.done.B, [dispatchTemplate("B 的独立活")]);
 
   // 放行 A：其投递照常收尾，两边各恰一次、同会话无并发。
   releaseA();
   await tick(150);
-  assert.deepEqual(h.done.A, [dispatchTemplate("su", "A 的长活动")]);
+  assert.deepEqual(h.done.A, [dispatchTemplate("A 的长活动")]);
   assert.equal(h.maxConcurrent.A ?? 0, 1, "同会话并发 send 峰值须 ≤1");
   assert.equal(h.maxConcurrent.B ?? 0, 1);
   await h.mgr.stop(null);
@@ -157,7 +162,7 @@ test("F-2 场景 2（同目标仍排队）：投递进行中再派同目标 ⇒ 
   h.streams.A.push({ kind: "settled", summary: "A 第一轮结束" });
   const t1 = Date.now();
   while (h.done.A.length < 2 && Date.now() - t1 < 2000) await tick(10);
-  assert.deepEqual(h.done.A, [dispatchTemplate("su", "先到的活"), dispatchTemplate("su", "后续的活")], "同目标按序投递、不丢不换序");
+  assert.deepEqual(h.done.A, [dispatchTemplate("先到的活"), dispatchTemplate("后续的活")], "同目标按序投递、不丢不换序");
   assert.equal(h.maxConcurrent.A ?? 0, 1, "同会话并发 send 峰值须 ≤1（排队防护未失真）");
   await h.mgr.stop(null);
 });

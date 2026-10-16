@@ -801,6 +801,28 @@ body { display: flex; flex-direction: column; }
 .sc-hint { margin: 0; color: var(--text-3); font-size: 11.5px; }
 .sc-card.is-expired .sc-command { opacity: 0.75; }
 
+/* 恢复确认卡（G-2/U1，2026-10-16 客户批准）：复用 shell 确认卡组件族（.sc-overlay/.sc-card/…）——
+   动作/目标角色行 + 证据**逐字**块（pre-wrap 可滚，长证据不铺开整卡）；失效态同 shell 卡降淡。 */
+.rc-action { margin: 0; color: var(--text); font-weight: 600; }
+.rc-role { margin: 0; color: var(--text-2); }
+.rc-note { margin: 0; color: var(--text-3); font-size: 11.5px; }
+.rc-evidence-label { margin: 0; color: var(--text-3); font-size: 11.5px; }
+.rc-evidence {
+  margin: 0;
+  padding: 10px 12px;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 240px;
+  overflow: auto;
+}
+.sc-card.is-expired .rc-evidence { opacity: 0.75; }
+
 /* 回交卡片（§10.8）：浅底块 + 极淡边框（可折叠结果块式的呈现）；镜像时虚线边框区分。 */
 .msg-handback {
   align-self: stretch;
@@ -848,6 +870,10 @@ body { display: flex; flex-direction: column; }
 }
 .msg-injected .mi-body { color: var(--text-2); }
 .msg-injected.is-dispatch .mi-body { color: var(--text); }
+/* G-2/U1（2026-10-16 客户批准）：`system` 类投递（看护告警 / 收束提示 / 恢复回执）——来源=**系统**
+   （非任何角色）：实线边框 + 左侧竖条与角色投递的虚线框拉开（如实标注，绝不当客户发的消息）。 */
+.msg-injected.is-system { border-style: solid; border-left: 3px solid var(--border-strong); }
+.msg-injected.is-system .mi-body { color: var(--text); }
 .hb-head { display: flex; align-items: center; gap: 7px; }
 .hb-ico { display: flex; color: var(--text-2); }
 .hb-title { font-weight: 600; color: var(--text); font-size: 12.5px; }

@@ -38,6 +38,10 @@ import {
 // 客户交互通道（A-5，2026-10-12）：su 的 request_confirmation / request_choice 经它摆到聊天流里的交互卡
 // 并取回客户裁决（per-window pending Map + **按请求快照校验回包**——渲染进程输入不可信）。
 import { createCustomerInputChannel } from "./desktop/customer-input.ts";
+// G-2/W5（2026-10-16 客户批准）：恢复确认卡呈现端——su 经 `propose_recovery` 提议恢复动作时，把卡经
+// `recovery:confirm-request` 推给渲染侧（桌面UI 已落树消费面）、回包经 `recovery:confirm-response` 受理；
+// **恰 allow:true 才是执行请求**；关窗 `rejectAllPending` = 未获执行（fail-closed）。**等待不设限**（裁定 4）。
+import { createRecoveryConfirmPresenter } from "./desktop/recovery-channel.ts";
 // 运行时历史：Pipeline 按 project/role/runtime 读 ANS 回放，转换为界面行。
 // 只有 Pi 无 ANS 回放时保留旧 JSONL 展示 fallback；历史不证明模型上下文恢复。
 import { RUNTIME_KINDS, type RuntimeKind } from "../src/common/shared/runtime-shared.ts";
@@ -258,18 +262,37 @@ function registerIpc(win: BrowserWindow): void {
     },
   });
   win.on("closed", () => shellConfirm.rejectAllPending("窗口已关闭，未获放行（fail-closed）"));
+
+  // —————— G-2/W5（2026-10-16 客户批准）：恢复确认卡的呈现端 ——————
+  // su 经 `propose_recovery` 提议恢复动作（停止本轮 / 重建会话 / 重投任务）→ 主进程校验后把卡推渲染侧
+  // （`recovery:confirm-request`——桌面UI 已落树消费面：恰 {allow:true} 才作为执行请求，取消为默认焦点）；
+  // 回包经 `recovery:confirm-response` 受理（通道内按请求快照校验、恰 allow:true 才为真）。
+  // fail-closed：窗口已关时推达抛错 ⇒ 恢复桥归「未获执行」如实回执；关窗 ⇒ 全部挂起未获执行。
+  // **等待不设限**（裁定 4，沿 G-1）：本卡**无**兜底计时器——唯一失效＝关窗/会话重建（组合信号中止）。
+  const recoveryConfirm = createRecoveryConfirmPresenter({
+    present: (request) => {
+      if (win.isDestroyed()) throw new Error("窗口已关闭，无法呈现恢复确认请求");
+      win.webContents.send("recovery:confirm-request", request);
+    },
+    onExpired: (payload) => { if (!win.isDestroyed()) win.webContents.send("session:operator-expired", payload); },
+    operatorId: desktopOperatorId(),
+  });
+  win.on("closed", () => recoveryConfirm.rejectAllPending("窗口已关闭，未获执行（fail-closed）"));
   // F-4-opt1（2026-10-16 客户批准）：窗口重新获得焦点/重新显示（最小化还原、被遮挡后回到前台）时**幂等重推**
   // 未决确认卡——若某次推达在渲染侧丢失，操作者一回到窗口即可再收到（复用既有幂等重推，与
   // `app:recovery-ready` 同款；只重推**仍挂起**的项——过期/已决项绝无放行语义，重推不改变任何判定）。
-  win.on("focus", () => shellConfirm.replayPending());
-  win.on("show", () => shellConfirm.replayPending());
+  win.on("focus", () => { shellConfirm.replayPending(); recoveryConfirm.replayPending(); });
+  win.on("show", () => { shellConfirm.replayPending(); recoveryConfirm.replayPending(); });
   registerHandler("app:recovery-ready", (event) => {
     if (event.sender !== win.webContents) return { ok: false };
     customerChannel.replayPending();
     shellConfirm.replayPending();
+    recoveryConfirm.replayPending();
     return { ok: true };
   });
   registerHandler("shell:confirm-response", (_e, input) => shellConfirm.respond(input));
+  // G-2/W5：恢复确认卡回包——通道内**恰 allow:true 才为真**；未知/已失效 id → expired（绝不当执行）。
+  registerHandler("recovery:confirm-response", (_e, input) => recoveryConfirm.respond(input));
 
   // I-1（2026-10-12，客户裁定 arm——「现在开放 shell…如果 su 觉得危险可以让客户决定」）+ I-1 补丁
   // （2026-10-12 客户**重发授权**：接上 (c) 规则集实件）：arm 的**两件**——(c) 实件（`classifyShell` +
@@ -318,6 +341,19 @@ function registerIpc(win: BrowserWindow): void {
     },
     // 客户交互通道（A-5）：仅内置治理角色（su）会话消费（见 session.ts 的注入判据）。
     customerInput: customerChannel.customerInput,
+    // G-2/W5（2026-10-16 客户批准）：恢复确认卡通道（仅 su 的 propose_recovery 桥消费；缺省 ⇒ 未接线
+    // 即「未获执行」如实回执——fail-closed，绝不「没人问就执行」）。
+    recoveryConfirm,
+    // G-2/W1：三通道（su 交互卡 / shell 卡 / 恢复卡）按角色挂起数**合并视图**——看护静默谓词与
+    // 「正确等待不报」排除用（缺省 ⇒ 恒 0「无待确认」；本应用内恒提供）。
+    watchdogPendingSnapshot: () => {
+      const byRole = new Map<string, number>();
+      const merge = (m: Map<string, number>): void => { for (const [rid, n] of m) byRole.set(rid, (byRole.get(rid) ?? 0) + n); };
+      merge(customerChannel.pendingRoles());
+      merge(shellConfirm.pendingRoles());
+      merge(recoveryConfirm.pendingRoles());
+      return { total: customerChannel.pendingCount() + shellConfirm.pendingCount() + recoveryConfirm.pendingCount(), byRole };
+    },
     // B-1：Markdown 链接外开——**校验在 Interface 层**（仅 http/https），此处只接系统浏览器（表现层）。
     openExternalFn: (url) => shell.openExternal(url),
     // I-1：arm 的 (a) 层（仅项目角色会话消费——su 不接 (b)/(a)；见 session.ts）。未 arm 时为 undefined（等同不注入）。
@@ -340,7 +376,9 @@ function registerIpc(win: BrowserWindow): void {
     },
   });
   iface = desktop;
+  desktop.startWatchdog(); // G-2/W1：看护周期 tick（默认 30s，仅 env 可调）——窗口注册后启动
   win.on("closed", () => {
+    desktop.stopWatchdog(); // G-2/W1：窗关停 tick（看护绝不跨窗口残留）
     desktop.disposeProjectDocuments();
     void desktop.stopSession({ roleId: null }).catch((error) => mainDiagnostic.error("window.sessions.close.failed", error));
   });

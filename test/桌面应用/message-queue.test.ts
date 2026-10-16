@@ -24,6 +24,9 @@ import { renderHandbackPrompt, type TaskHandback } from "../../src/common/编排
 import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
 import type { RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
+// G-2（2026-10-16 客户批准）：W2 `system` 第四类投递（快照/队列视图/撤回/投递机复用）＋ W3 完成态收束的
+// **SessionManager 集成**（真看护服务＋注入时钟＋同源快照——不起真实模型）。
+import { createWatchdogService, type WatchdogObservation } from "../../app/desktop/watchdog.ts";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const APP_DIR = path.resolve(HERE, "..", "..", "app");
@@ -453,5 +456,205 @@ test("F-2-T4 长轮不阻塞客户消息：su 的回交投递轮挂起期间，A
   await tick(200);
   assert.equal(h.sent.su.length, 2, "su settle 后第二份回交放行");
   assert.ok(h.sent.su[1].includes("第二件做完"), "按到达序（回交2 在后）");
+  await h.mgr.stop(null);
+});
+
+// ————————————————— G-2（2026-10-16 客户批准）：W2 system 投递 ＋ W3 收束集成 —————————————————
+
+interface G2Harness {
+  mgr: SessionManager;
+  streams: Record<string, OrchestrationEvent[]>;
+  sent: Record<string, string[]>;
+  roleStates: { roleId: string; busy: boolean; summaries: string[]; queue: { kind: string; sourceRoleId: string; summary: string; at: string; id: string; full: string }[]; running: { kind: string; sourceRoleId: string; summary: string; at: string } | null }[];
+  observations: { projectRoot: string; observation: WatchdogObservation }[];
+  service: ReturnType<typeof createWatchdogService>;
+  advance: (ms: number) => void;
+  latest: (roleId: string) => G2Harness["roleStates"][number] | undefined;
+  release: (roleId: string) => void;
+  hangNext: (roleId: string) => void;
+}
+
+function makeG2Harness(): G2Harness {
+  const l = listing();
+  const streams: Record<string, OrchestrationEvent[]> = { su: [], A: [] };
+  const sent: Record<string, string[]> = { su: [], A: [] };
+  const roleStates: G2Harness["roleStates"] = [];
+  const observations: { projectRoot: string; observation: WatchdogObservation }[] = [];
+  const stopped: Record<string, boolean> = {};
+  const gates: Record<string, Promise<void> | undefined> = {};
+  const releases: Record<string, (() => void) | undefined> = {};
+  let ms = 1_700_000_000_000;
+  const hangNext = (roleId: string): void => {
+    gates[roleId] = new Promise<void>((resolve) => { releases[roleId] = resolve; });
+  };
+  const release = (roleId: string): void => {
+    const r = releases[roleId];
+    gates[roleId] = undefined;
+    releases[roleId] = undefined;
+    r?.();
+  };
+  const makeHandle = (roleId: string): RoleSessionHandle => {
+    let i = 0;
+    return {
+      async send(text: string): Promise<void> {
+        const gate = gates[roleId];
+        if (gate) {
+          gates[roleId] = undefined;
+          await gate;
+        }
+        (sent[roleId] = sent[roleId] || []).push(text);
+      },
+      events(): AsyncIterable<OrchestrationEvent> {
+        return {
+          [Symbol.asyncIterator]() {
+            return {
+              async next(): Promise<IteratorResult<OrchestrationEvent>> {
+                for (let tries = 0; tries < 120; tries += 1) {
+                  if (stopped[roleId]) return { value: undefined as unknown as OrchestrationEvent, done: true };
+                  const arr = streams[roleId] || [];
+                  if (i < arr.length) return { value: arr[i++], done: false };
+                  await new Promise((r) => setTimeout(r, 5));
+                }
+                return { value: undefined as unknown as OrchestrationEvent, done: true };
+              },
+            };
+          },
+        };
+      },
+      async dispose(): Promise<void> { stopped[roleId] = true; },
+    };
+  };
+  let mgr!: SessionManager;
+  const service = createWatchdogService({
+    projects: () => ["/proj"],
+    snapshot: (root) => mgr.watchdogSnapshot(root),
+    deliver: (root, message) => mgr.watchdogDeliver(root, message),
+    now: () => ms,
+    config: { env: {}, silenceMs: 5 * 60 * 1000, tickMs: 30 * 1000 },
+  });
+  mgr = new SessionManager({
+    openRoleSession: async (input) => makeHandle(input.roleId),
+    createPiAdapterFactory: () => { throw new Error("本用例不应构造 pi 适配器"); },
+    createDemoAdapter: () => { throw new Error("本用例不应构造 demo 适配器"); },
+    buildProjectConfig,
+    getListing: (root) => (root === "/proj" ? l : undefined),
+    emitEvent: () => {},
+    emitRoleState: (info) => roleStates.push({
+      roleId: info.roleId,
+      busy: info.busy,
+      summaries: [...info.summaries],
+      queue: (info.queue ?? []).map((x) => ({ ...x })),
+      running: info.running ? { ...info.running } : null,
+    }),
+    // 真接线：观察转发给看护服务（与 interface.ts 生产装配同款）＋留证供断言。
+    watchdogObserver: (projectRoot, observation) => {
+      observations.push({ projectRoot, observation });
+      service.observe(projectRoot, observation);
+    },
+    now: () => ms,
+  });
+  return {
+    mgr, streams, sent, roleStates, observations, service,
+    advance: (delta) => { ms += delta; },
+    latest: (roleId) => {
+      for (let i = roleStates.length - 1; i >= 0; i -= 1) if (roleStates[i].roleId === roleId) return roleStates[i];
+      return undefined;
+    },
+    release,
+    hangNext,
+  };
+}
+
+test("G-2/W2：`system` 第四类投递——su 忙时入队（快照 kind=system、来源空白、无第二数据源）；不可撤回；settled 后按既有投递机送达", async () => {
+  const h = makeG2Harness();
+  await h.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
+  h.hangNext("su");
+  const send = h.mgr.send("占住 su 本轮");
+  await tick(30);
+  // 看护系统消息（kind:"system"——告警/收束/回执都走这里）：su 忙 ⇒ 入队。
+  h.mgr.watchdogDeliver("/proj", { text: "[系统·看护] 测试告警：角色「A」。", summary: "系统·看护 · 测试告警 · 角色 A", dedupKey: "watchdog\u0000/proj\u0000test\u00000" });
+  await tick(30);
+  const q = h.latest("su");
+  assert.equal(q?.summaries.length, 1, "系统消息入队（同一套投递机）");
+  assert.equal(q?.queue[0].kind, "system", "快照 kind=system（W2 第四类——渲染侧据此显示「系统」）");
+  assert.equal(q?.queue[0].sourceRoleId, "", "来源标注恒空（U1 已落树契约：系统非角色）");
+  assert.ok(q?.queue[0].id.startsWith("watchdog\u0000"), "去重键＝看护自持命名空间（与 handback/dispatch 键隔离）");
+  // 撤回判据：system 归治理流只读面——不可撤回（与界面「无撤回钮」同语义）。
+  const wd = h.mgr.withdraw("su", q!.queue[0].id);
+  assert.equal(wd.ok, false, "system 不可撤回");
+  assert.match(wd.error ?? "", /只读|不可撤回/, "如实说明");
+  // 放行本轮 → settled → 投递机按序送达。
+  h.release("su");
+  await send;
+  h.streams.su.push({ kind: "settled", summary: "su 一轮结束" });
+  await tick(150);
+  assert.ok(h.sent.su.includes("[系统·看护] 测试告警：角色「A」。"), "系统消息真投递给 su（同机送达）");
+  assert.equal(h.latest("su")?.queue.length, 0, "送达后队列清空");
+  await h.mgr.stop(null);
+});
+
+test("G-2/W3 集成：完成静默 ≥N ⇒ su 收到收束提示（恰一条）；su 的收束回复不重武装；真实活动重武装", async () => {
+  const h = makeG2Harness();
+  await h.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
+  await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  await tick(30);
+  // 跑一轮真实 turn（预热条件：至少一轮 settled；settle 观察只在「忙→闲」翻转时发生——沿真实语义）。
+  const s1 = h.mgr.send("干点活");
+  await tick(20);
+  h.streams.A.push({ kind: "settled", summary: "A 一轮结束" });
+  await s1;
+  await tick(150);
+  assert.ok(h.observations.some((o) => o.observation.kind === "settled" && o.observation.roleId === "A"), "settled 观察已转发（wasBusy 翻转）");
+  // 静默打点 → 满 N（假时钟）→ tick ⇒ 收束提示经投递机送达 su。
+  h.service.tick();
+  h.advance(5 * 60 * 1000 + 2000);
+  h.service.tick();
+  await tick(150);
+  const closured = h.sent.su.filter((t) => t.startsWith("[系统·收束]"));
+  assert.equal(closured.length, 1, "静默满 N：su 收到恰一条收束提示（真投递，不是系统行）");
+  // su 处理收束提示的那一轮（由 system 投递持有）：settle **不算真实活动**（不重新武装）。
+  h.streams.su.push({ kind: "settled", summary: "su 收束回复结束", detail: { outcome: "completed" } });
+  await tick(150);
+  h.advance(30 * 60 * 1000);
+  h.service.tick();
+  await tick(150);
+  assert.equal(h.sent.su.filter((t) => t.startsWith("[系统·收束]")).length, 1, "静默窗口内至多一条（不催第二次）");
+  // 真实活动（客户消息）⇒ 重新武装：再静默满 N ⇒ 新一条。
+  const s2 = h.mgr.send("还有一件事", undefined, { roleId: "su" });
+  await tick(20);
+  h.streams.su.push({ kind: "settled", summary: "su 一轮结束" });
+  await s2;
+  await tick(150);
+  h.service.tick(); // 静默起点
+  h.advance(5 * 60 * 1000 + 2000);
+  h.service.tick();
+  await tick(150);
+  assert.equal(h.sent.su.filter((t) => t.startsWith("[系统·收束]")).length, 2, "真实活动后新静默窗口 ⇒ 新一条收束提示");
+  await h.mgr.stop(null);
+});
+
+test("G-2/W1 集成：同源快照（busy/busySince/队列/在途）＋观察转发（命令超时限＝结构化 display.process）＋lastTurn", async () => {
+  const h = makeG2Harness();
+  await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  await tick(30);
+  const s1 = h.mgr.send("长活");
+  await tick(20);
+  const snap = h.mgr.watchdogSnapshot("/proj");
+  assert.ok(snap, "快照可读（同源：会话/队列直读，不造第二数据源）");
+  assert.equal(snap!.suRoleId, "su", "su 判据来自门禁枚举（primaryRoleId）");
+  const roleA = snap!.roles.find((r) => r.roleId === "A");
+  assert.equal(roleA?.busy, true, "busy 事实");
+  assert.equal(typeof roleA?.turnStartedAt, "number", "本轮起点（看护 #1 的 elapsed 基准）");
+  // 命令超时限：事件流里带 display.process.timedOut 的结构化事实（F-1）——复用同一判据转发观察。
+  h.streams.A.push({ kind: "denied", summary: "run_shell 超时终止", detail: { toolName: "run_shell", phase: "result", display: { version: 1, omissions: [], process: { timedOut: true } } } });
+  await tick(50);
+  assert.ok(h.observations.some((o) => o.observation.kind === "command-timed-out" && o.observation.roleId === "A"), "命令超时观察已转发（classifyProcessOutcome 单一判据）");
+  h.streams.A.push({ kind: "settled", summary: "结束", detail: { outcome: "failed" } });
+  await s1;
+  await tick(150);
+  const last = h.mgr.lastTurnOf("/proj", "A", "demo");
+  assert.equal(last?.outcome, "failed", "lastTurn 小状态（W1；settled 顺带落表）");
+  const settledObs = h.observations.find((o) => o.observation.kind === "settled" && o.observation.roleId === "A");
+  assert.equal(settledObs && settledObs.observation.kind === "settled" ? settledObs.observation.fromSystemDelivery : undefined, false, "普通轮 settle：fromSystemDelivery=false（真实活动）");
   await h.mgr.stop(null);
 });

@@ -17,6 +17,17 @@ import { listProject, type ProjectListing } from "../../src/service/role/resolve
 import { buildProjectConfig } from "../../app/desktop/project.ts";
 import { createChatDemoAdapter, firstProjectFilePath } from "../../app/desktop/chat-adapter.ts";
 import { SessionManager, MAX_LIVE_SESSIONS, type SessionEventEnvelope } from "../../app/desktop/session.ts";
+// G-2（2026-10-16 客户批准）：看护器纯逻辑（W1 信号/去重/冷却/风暴护栏 + W3 滞回收束）——**假快照＋注入
+// 时钟**，不起真实会话（集成面在 message-queue/dispatch-delivery 的 G-2 块）。
+import {
+  createWatchdogService,
+  resolveWatchdogConfig,
+  WATCHDOG_SILENCE_ENV,
+  WATCHDOG_TICK_ENV,
+  type WatchdogProjectSnapshot,
+  type WatchdogRoleView,
+  type WatchdogService,
+} from "../../app/desktop/watchdog.ts";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "..", "..");
@@ -436,4 +447,306 @@ test("T20 handback 事件被外推：会话句柄产出的回交事件经 emitEv
   assert.equal(payload.taskId, "T20", "回交应携带任务 id");
   assert.deepEqual(payload.evidence.map(e => e.text), ["角色卡/桌面窗口/feature-map.md"], "回交只搬证据（产物路径）");
   await mgr.stop();
+});
+
+// ——————————————————————————————————————————————————————————————————————————————————————
+// G-2（2026-10-16 客户批准；设计 2026-10-16_design_role-watchdog-and-closure.md §三/§七/§十一）：
+// **看护器（W1 信号 #1-#4 + W3 滞回收束）纯逻辑**——假快照＋注入时钟，node 下直接单测。
+// 覆盖：阈值边界、排除项（挂起确认卡角色 / su 自身忙）、去重与冷却、F-6 形态「看护恢复」行、
+// 风暴护栏、watchdog.failed 隔离、滞回状态机（恰一次 / su 回复不重武装 / 真实活动重武装 / 预热）。
+// 文案是**编排单一来源**（common/编排/watchdog.ts）——本组只钉关键不变式（文首/计数/次数），不逐字抄。
+// ——————————————————————————————————————————————————————————————————————————————————————
+
+interface WatchdogHarness {
+  service: WatchdogService;
+  delivered: { projectRoot: string; text: string; summary: string; dedupKey: string }[];
+  setSnapshot: (root: string, snapshot: WatchdogProjectSnapshot | undefined) => void;
+  advance: (ms: number) => void;
+  nowMs: () => number;
+  /** 令下一次 deliver 抛错（「投递端异常 ⇏ 消费窗口」钉子）；一次性。 */
+  failNextDeliver: () => void;
+}
+
+function makeWatchdogHarness(): WatchdogHarness {
+  let ms = 1_700_000_000_000;
+  const delivered: WatchdogHarness["delivered"] = [];
+  const snapshots = new Map<string, WatchdogProjectSnapshot>();
+  let failNext = false;
+  const service = createWatchdogService({
+    projects: () => [...snapshots.keys()],
+    snapshot: (root) => snapshots.get(root),
+    deliver: (root, message) => {
+      if (failNext) {
+        failNext = false;
+        throw new Error("替身：投递端异常");
+      }
+      delivered.push({ projectRoot: root, ...message });
+    },
+    now: () => ms,
+    config: { env: {}, silenceMs: 5 * 60 * 1000, tickMs: 30 * 1000 },
+  });
+  return {
+    service,
+    delivered,
+    setSnapshot: (root, snapshot) => {
+      if (snapshot === undefined) snapshots.delete(root);
+      else snapshots.set(root, snapshot);
+    },
+    advance: (delta) => { ms += delta; },
+    nowMs: () => ms,
+    failNextDeliver: () => { failNext = true; },
+  };
+}
+
+function wdRole(roleId: string, extra: Partial<WatchdogRoleView> = {}): WatchdogRoleView {
+  return { roleId, runtime: "demo", busy: false, ...extra };
+}
+
+function wdSnapshot(over: Partial<WatchdogProjectSnapshot> = {}): WatchdogProjectSnapshot {
+  return {
+    projectRoot: "/p",
+    suRoleId: "su",
+    roles: [],
+    queues: [],
+    activeDeliveries: 0,
+    chainsActive: false,
+    pendingConfirmationsTotal: 0,
+    pendingConfirmationsByRole: new Map(),
+    ...over,
+  };
+}
+
+test("G-2 配置：tick/静默仅 env 可调（非法/缺失回退默认 30s/5min）；阈值表取 §3.2 默认", () => {
+  const defaults = resolveWatchdogConfig({});
+  assert.equal(defaults.tickMs, 30000, "默认 tick 30s");
+  assert.equal(defaults.silenceMs, 5 * 60 * 1000, "默认静默 5min");
+  assert.equal(defaults.turnDeadlineRatio, 0.9, "阈值 #1：90%");
+  assert.equal(defaults.queueHeadAgeMs, 10 * 60 * 1000, "阈值 #2：队首 age 10min");
+  assert.equal(defaults.queueDepth, 5, "阈值 #2 辅判：深度 5");
+  assert.equal(defaults.repeatFailCount, 3, "阈值 #4：15min ≥3");
+  const overridden = resolveWatchdogConfig({ [WATCHDOG_TICK_ENV]: "5000", [WATCHDOG_SILENCE_ENV]: "180000" });
+  assert.equal(overridden.tickMs, 5000, "env 覆盖 tick");
+  assert.equal(overridden.silenceMs, 180000, "env 覆盖静默");
+  assert.equal(resolveWatchdogConfig({ [WATCHDOG_TICK_ENV]: "0", [WATCHDOG_SILENCE_ENV]: "abc" }).tickMs, 30000, "非法值回退默认（不炸）");
+});
+
+test("G-2/W1 #1：轮次 90% 生效时限才报（demo=120s → 108s 边界）；每轮一次；正常结束投「看护恢复」行", () => {
+  const h = makeWatchdogHarness();
+  const started = h.nowMs();
+  h.setSnapshot("/p", wdSnapshot({ roles: [wdRole("A", { busy: true, turnStartedAt: started, turnId: "t1" })] }));
+  h.advance(107_000); // 107s < 108s
+  h.service.tick();
+  assert.equal(h.delivered.length, 0, "未到 90% 线不报（边界之下）");
+  h.advance(1_000); // 恰 108s
+  h.service.tick();
+  assert.equal(h.delivered.length, 1, "到 90% 线即报（含边界）");
+  assert.ok(h.delivered[0].text.startsWith("[系统·看护]") && h.delivered[0].text.includes("轮次逼近超时") && h.delivered[0].text.includes("A"), "文案＝编排单一来源（文首/信号/角色）");
+  h.advance(30_000);
+  h.service.tick();
+  assert.equal(h.delivered.length, 1, "同一活跃期内重复命中只累计（不重复打扰）");
+  // 该轮正常结束（settled, completed）⇒ 条件解除 ⇒ 一条「看护恢复」（含命中/抑制计数）。
+  h.setSnapshot("/p", wdSnapshot({ roles: [wdRole("A")] }));
+  h.service.observe("/p", { kind: "settled", roleId: "A", outcome: "completed", at: h.nowMs(), fromSystemDelivery: false });
+  h.service.tick();
+  assert.equal(h.delivered.length, 2, "解除时恰一条恢复行");
+  assert.ok(h.delivered[1].text.includes("看护恢复") && h.delivered[1].text.includes("轮次逼近超时"), "F-6 形态恢复行");
+  // 新一轮（新身份）⇒ 允许再次告警（「每轮一次」≠ 一生一次）。
+  const restart = h.nowMs();
+  h.setSnapshot("/p", wdSnapshot({ roles: [wdRole("A", { busy: true, turnStartedAt: restart, turnId: "t2" })] }));
+  h.advance(108_000);
+  h.service.tick();
+  assert.equal(h.delivered.length, 3, "新一轮到线再次告警（t2 独立去重身份）");
+});
+
+test("G-2/W1 「正确等待不报」：#1 对带挂起确认卡的角色排除；su 自身忙不触发任何告警", () => {
+  const h = makeWatchdogHarness();
+  let t = h.nowMs();
+  // 角色 A 过 90% 但带一张挂起确认卡 ⇒ 不报。
+  h.setSnapshot("/p", wdSnapshot({
+    roles: [wdRole("A", { busy: true, turnStartedAt: t, turnId: "t1" })],
+    pendingConfirmationsTotal: 1,
+    pendingConfirmationsByRole: new Map([["A", 1]]),
+  }));
+  h.advance(110_000);
+  h.service.tick();
+  assert.equal(h.delivered.length, 0, "挂起确认卡 = 正确等待（不计入 #1）");
+  // 卡解除后到线 ⇒ 报。
+  h.setSnapshot("/p", wdSnapshot({ roles: [wdRole("A", { busy: true, turnStartedAt: t, turnId: "t1" })] }));
+  h.service.tick();
+  assert.equal(h.delivered.length, 1, "卡解除后恢复检测");
+  // su 自身忙：su 过 90% 不报；su 忙时对 su 的命令超时（#3 事件）也不报。
+  t = h.nowMs();
+  h.setSnapshot("/p", wdSnapshot({ roles: [wdRole("su", { busy: true, turnStartedAt: t, turnId: "st" })] }));
+  h.advance(110_000);
+  h.service.tick();
+  h.service.observe("/p", { kind: "command-timed-out", roleId: "su", at: h.nowMs() });
+  const before = h.delivered.length;
+  h.service.tick();
+  assert.equal(h.delivered.length, before, "su 自身忙（正在处理）不触发任何告警");
+});
+
+test("G-2/W1 #2：投递排队积压（age ≥10min 或深度 ≥5）；冷却 10min；队列清空投恢复行", () => {
+  const h = makeWatchdogHarness();
+  const now = h.nowMs();
+  const item = (at: number, id: string) => ({ kind: "dispatch", dedupKey: id, sourceRoleId: "su", summary: "跑任务", enqueuedAtMs: at });
+  // 深度 5（age 新——depth 辅判即触发）。
+  h.setSnapshot("/p", wdSnapshot({ queues: [{ targetRoleId: "A", runtime: "demo", items: [1, 2, 3, 4, 5].map((i) => item(now, `d${i}`)) }] }));
+  h.service.tick();
+  assert.equal(h.delivered.length, 1, "深度 ≥5 触发（age 优先/depth 辅判——§3.2 #2）");
+  assert.ok(h.delivered[0].text.includes("投递排队积压") && h.delivered[0].text.includes("队列深度 5"), "事实行含深度");
+  // 队列清空 ⇒ 恢复行；随后又积压（10min 冷却内）⇒ 不再报。
+  h.setSnapshot("/p", wdSnapshot());
+  h.service.tick();
+  assert.equal(h.delivered.length, 2, "清空 ⇒ 恢复行");
+  h.advance(60_000);
+  h.setSnapshot("/p", wdSnapshot({ queues: [{ targetRoleId: "A", runtime: "demo", items: [item(h.nowMs(), "d9")] }] }));
+  h.service.tick();
+  assert.equal(h.delivered.length, 2, "10min 冷却内的再次积压：抑制（不重复打扰）");
+  // age 通道：单条但队首 age ≥10min ⇒ 触发（跨过冷却后）。
+  h.setSnapshot("/p", wdSnapshot());
+  h.service.tick();
+  h.advance(10 * 60 * 1000);
+  const old = h.nowMs() - 10 * 60 * 1000;
+  h.setSnapshot("/p", wdSnapshot({ queues: [{ targetRoleId: "A", runtime: "demo", items: [item(old, "dA")] }] }));
+  h.service.tick();
+  assert.equal(h.delivered.length, 3, "冷却过后：队首 age ≥10min 触发（age 优先）");
+});
+
+test("G-2/W1 #3：命令超时（F-1 事实）单次即报；10min 冷却内抑制；无恢复行", () => {
+  const h = makeWatchdogHarness();
+  h.setSnapshot("/p", wdSnapshot({ roles: [wdRole("A")] }));
+  h.service.observe("/p", { kind: "command-timed-out", roleId: "A", at: h.nowMs() });
+  assert.equal(h.delivered.length, 1, "单次即报（低频高信号）");
+  assert.ok(h.delivered[0].text.includes("命令超时"), "文案＝编排单一来源信号名");
+  h.service.observe("/p", { kind: "command-timed-out", roleId: "A", at: h.nowMs() });
+  assert.equal(h.delivered.length, 1, "冷却内的重复：只累计抑制");
+  h.advance(11 * 60 * 1000);
+  h.service.tick();
+  h.service.tick();
+  assert.equal(h.delivered.length, 1, "瞬时事件无「解除」可言——不投恢复行");
+});
+
+test("G-2/W1 #4：15min 窗口 failed/timed_out ≥3 才报；窗口滑出投恢复行；aborted/completed 不计", () => {
+  const h = makeWatchdogHarness();
+  h.setSnapshot("/p", wdSnapshot({ roles: [wdRole("A")] }));
+  h.service.observe("/p", { kind: "settled", roleId: "A", outcome: "aborted", at: h.nowMs(), fromSystemDelivery: false });
+  h.service.observe("/p", { kind: "settled", roleId: "A", outcome: "completed", at: h.nowMs(), fromSystemDelivery: false });
+  h.service.observe("/p", { kind: "settled", roleId: "A", outcome: "failed", at: h.nowMs(), fromSystemDelivery: false });
+  h.service.observe("/p", { kind: "settled", roleId: "A", outcome: "timed_out", at: h.nowMs(), fromSystemDelivery: false });
+  h.service.tick();
+  assert.equal(h.delivered.length, 0, "2 次（aborted/completed 不计）不达阈值 3");
+  h.service.observe("/p", { kind: "settled", roleId: "A", outcome: "failed", at: h.nowMs(), fromSystemDelivery: false });
+  h.service.tick();
+  assert.equal(h.delivered.length, 1, "3 次即报");
+  assert.ok(h.delivered[0].text.includes("重复失败"), "信号名");
+  h.advance(15 * 60 * 1000 + 1000);
+  h.service.tick();
+  assert.equal(h.delivered.filter((d) => d.text.includes("看护恢复")).length, 1, "窗口滑出（计数低于阈值）⇒ 恰一条恢复行");
+  // （同 tick 可能另有一条收束提示——settled 已满足预热且此刻全静默：这是设计内行为，与本用例无关。）
+});
+
+test("G-2/W1 风暴护栏：15min 窗口 ≤5 条；超限投一条抑制通告（不占额度、每风暴期恰一条）＋诊断", () => {
+  const h = makeWatchdogHarness();
+  const now = h.nowMs();
+  // 7 个角色同轮一起到 90% —— 第 6/7 条被风暴护栏抑制。
+  h.setSnapshot("/p", wdSnapshot({ roles: "ABCDEFG".split("").map((r) => wdRole(r, { busy: true, turnStartedAt: now, turnId: `t-${r}` })) }));
+  h.advance(110_000);
+  h.service.tick();
+  const alerts = h.delivered.filter((d) => d.text.includes("轮次逼近超时"));
+  assert.equal(alerts.length, 5, "窗口内恰 5 条告警（上限）");
+  assert.equal(h.delivered.length, 6, "第 6 条 = 风暴护栏抑制通告（不占额度）");
+  assert.ok(h.delivered[5].text.includes("看护告警已抑制"), "通告文案＝编排单一来源");
+  const stats = h.service.stats("/p");
+  assert.equal(stats.suppressedTotal, 2, "被抑制 2 条（7 告警 − 5 额度）");
+  assert.equal(stats.activeAlerts, 5, "统计：活跃且已投出告警 = 5");
+  // 条件解除（角色全空闲）＋窗口滑出（额度恢复）⇒ 5 个投出过告警的活跃期各投一条恢复行；被抑制者不投。
+  h.setSnapshot("/p", wdSnapshot({ roles: "ABCDEFG".split("").map((r) => wdRole(r)) }));
+  h.advance(15 * 60 * 1000 + 1000);
+  h.service.tick();
+  const recoveries = h.delivered.filter((d) => d.text.includes("看护恢复"));
+  assert.equal(recoveries.length, 5, "解除时恰 5 条恢复行（仅有告警投出过的活跃期；同样过风暴护栏）");
+});
+
+test("G-2/W1 看护器自身故障：快照抛错 ⇒ 只记诊断、不炸、不投递；下个 tick 自动恢复", () => {
+  const h = makeWatchdogHarness();
+  h.setSnapshot("/p", wdSnapshot());
+  // 让 snapshot 抛错：用一个会抛的假快照函数替代。
+  const failing = createWatchdogService({
+    projects: () => ["/p"],
+    snapshot: () => { throw new Error("替身：快照读取爆炸"); },
+    deliver: () => { throw new Error("不该走到投递"); },
+    now: () => h.nowMs(),
+    config: { env: {} },
+  });
+  assert.doesNotThrow(() => failing.tick(), "看护器异常在 tick 内隔离（绝不上抛）——会话/投递不受影响");
+  // 恢复正常快照后下个 tick 照常（看护暂停 ≠ 看护死亡）。
+  const healed = makeWatchdogHarness();
+  healed.setSnapshot("/p", wdSnapshot({ roles: [wdRole("A", { busy: true, turnStartedAt: healed.nowMs(), turnId: "t1" })] }));
+  healed.advance(110_000);
+  healed.service.tick();
+  assert.equal(healed.delivered.length, 1, "下个 tick 重试即恢复工作");
+});
+
+test("G-2/W3 收束滞回：静默 ≥5min 恰一条；su 回复（system 投递持有的 settled）不重武装；真实活动重新武装", () => {
+  const h = makeWatchdogHarness();
+  h.setSnapshot("/p", wdSnapshot({ roles: [wdRole("A")] }));
+  // 预热未满足（从未 settled）⇒ 静默再久也不触发。
+  h.advance(30 * 60 * 1000);
+  h.service.tick();
+  assert.equal(h.delivered.length, 0, "预热：自导入以来至少一轮 settled（防空项目一进来就触发）");
+  h.service.observe("/p", { kind: "settled", roleId: "A", outcome: "completed", at: h.nowMs(), fromSystemDelivery: false });
+  h.service.tick(); // 静默起点 = 本 tick
+  h.advance(5 * 60 * 1000 - 1000);
+  h.service.tick();
+  assert.equal(h.delivered.length, 0, "未满 N 不触发");
+  h.advance(2000);
+  h.service.tick();
+  assert.equal(h.delivered.length, 1, "满 N 恰一条收束提示");
+  assert.ok(h.delivered[0].text.startsWith("[系统·收束]"), "文首＝编排单一来源（U1 归类判据）");
+  // su 对收束提示的那一轮回复：settled 由 system 投递持有 ⇒ **不算真实活动**（防骚扰回路）。
+  h.service.observe("/p", { kind: "settled", roleId: "su", outcome: "completed", at: h.nowMs(), fromSystemDelivery: true });
+  h.service.tick();
+  h.advance(30 * 60 * 1000);
+  h.service.tick();
+  assert.equal(h.delivered.length, 1, "静默窗口内至多一条：su 的收束回复不重新武装（5 分钟后不再催）");
+  // 真实活动（客户消息/派发等）⇒ 重新武装；随后再次静默满 N ⇒ 第二条。
+  h.service.observe("/p", { kind: "activity", reason: "customer-send" });
+  h.service.tick(); // 起点重记
+  h.advance(5 * 60 * 1000 + 2000);
+  h.service.tick();
+  assert.equal(h.delivered.length, 2, "真实活动开启新静默窗口 ⇒ 新一条收束提示");
+});
+
+test("G-2/W3 静默谓词：任一非静默事实都拦（busy/队列/在途/待确认/链在跑）", () => {
+  const cases: Partial<WatchdogProjectSnapshot>[] = [
+    { roles: [wdRole("A", { busy: true, turnStartedAt: 0 })] },
+    { queues: [{ targetRoleId: "A", runtime: "demo", items: [{ kind: "dispatch", dedupKey: "k", sourceRoleId: "su", summary: "s", enqueuedAtMs: 0 }] }] },
+    { activeDeliveries: 1 },
+    { pendingConfirmationsTotal: 1 },
+    { chainsActive: true },
+    { roles: [wdRole("su", { busy: true, turnStartedAt: 0 })] },
+  ];
+  for (const extra of cases) {
+    const h = makeWatchdogHarness();
+    h.service.observe("/p", { kind: "settled", roleId: "A", outcome: "completed", at: h.nowMs(), fromSystemDelivery: false });
+    h.setSnapshot("/p", wdSnapshot(extra));
+    h.advance(30 * 60 * 1000);
+    h.service.tick();
+    assert.equal(h.delivered.filter((d) => d.text.includes("收束")).length, 0, `非静默事实拦下收束：${JSON.stringify(Object.keys(extra))}`);
+  }
+});
+
+test("G-2/W3 投递端异常：收束投不出去 ⇒ 不标已投——下个 tick 重试成功后才恰一条", () => {
+  const h = makeWatchdogHarness();
+  h.setSnapshot("/p", wdSnapshot());
+  h.service.observe("/p", { kind: "settled", roleId: "A", outcome: "completed", at: h.nowMs(), fromSystemDelivery: false });
+  h.service.tick();
+  h.advance(5 * 60 * 1000 + 2000);
+  h.failNextDeliver();
+  h.service.tick();
+  assert.equal(h.delivered.length, 0, "投递端异常：未投出（不假装已投）");
+  h.service.tick();
+  assert.equal(h.delivered.filter((d) => d.text.includes("收束")).length, 1, "下个 tick 重试成功——恰一条");
+  h.service.tick();
+  assert.equal(h.delivered.filter((d) => d.text.includes("收束")).length, 1, "此后不重发");
 });

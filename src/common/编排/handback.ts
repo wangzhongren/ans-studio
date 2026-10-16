@@ -8,6 +8,8 @@ import type { RuntimeKind, ReportHandbackPayload, SessionEvent, DispatchTaskPayl
 import type { ProjectConfig } from "../../model/role.ts";
 import { createHash } from "node:crypto";
 import { createDiagnosticLogger } from "../shared/diagnostics.ts";
+// G-1 提取规则复用既有保守路径提取（同角色私有 `common/编排/` 内；单一实现，不另写正则）。
+import { extractPathCandidates } from "./confirmed-writes.ts";
 
 /** 角色完成一次任务后的结构化回交（设计 §10.8）。 */
 export interface TaskHandback {
@@ -225,18 +227,158 @@ export function handbackKey(hb: TaskHandback): string {
 
 // —————————————— H-1：su 派发任务（dispatch_task）的编排侧共用件 ——————————————
 
+// —————————————— G-1：派发「必读（按序）」引用块（契约与工作流；设计 2026-10-16 §四；A1） ——————————————
+//
+// 背景（设计 §四）：跨角色冻结契约与项目工作流落盘为 `docs/contracts/<name>-v<N>.md` 与 `docs/workflow.md`
+// 后，派发文本只**按地址引用**（路径 + sha256），不内嵌全文。**哈希只能由代码算**——su 与项目角色都
+// 「不会算 hash」（`finalize.ts:2-3` 先例）；投递侧（桌面投递机，复用其带缓存的 `filePrint`）在**投递时**
+// 逐个算哈希后交本模块的**判据**（`planDispatchDelivery`）与**渲染**（`renderDispatchPrompt`）。
+// 本模块是「必读块」的**单一来源**：提取（哪些路径算必读）、判据（缺失怎么处理）、渲染（怎么呈现）都在此；
+// 前端只做接线（探测文件、按判据拒投/入队），**不得各写一份**。
+
+/** 稳定文件名（设计 §五：项目级 `docs/workflow.md`，不按版本堆文件）。 */
+const WORKFLOW_REL = "docs/workflow.md";
+/** 契约目录前缀（设计 §三.1：`docs/contracts/<name>-v<N>.md`，版本号进文件名）。 */
+const CONTRACTS_PREFIX = "docs/contracts/";
+
+/**
+ * 「必读（按序）」引用（G-1 设计 §四.1）：路径 + **由代码在投递时算出**的 sha256。
+ * 本模块**不算哈希、不触盘**——`sha256` 由投递侧代码对文件**当刻字节**计算后传入（探针值）。
+ */
+export interface DispatchReadRef {
+  /** 项目相对路径（posix），形如 `docs/workflow.md` / `docs/contracts/<name>-v<N>.md`。 */
+  path: string;
+  /** 文件**当刻字节**的 sha256（64 位小写 hex；投递侧代码计算）。 */
+  sha256: string;
+}
+
+/** 投递判据结论（G-1 §四.3 fail-closed 单一来源）。 */
+export type DispatchDeliveryPlan =
+  | {
+      /** **拒投**：不产生任何可投递文本（目标角色会话不见此任务），回执如实给 su（§四.3）。 */
+      action: "reject";
+      /** 工具回执 message（`dispatch_task` 如实转达 su）。 */
+      message: string;
+      /** 聊天系统行（su 流内如实显示；沿用桌面 `fail()` 的 message/systemRow 两段式）。 */
+      systemRow: string;
+    }
+  | {
+      /** 放行：投递给目标角色的**定格文本**（必读块已由 `renderDispatchPrompt` 注入）。 */
+      action: "deliver";
+      text: string;
+    };
+
+/** sha256 直读形状（64 位小写 hex）。非法/缺失探测值一律按「文件不存在」处理——fail-closed 不注入可疑哈希。 */
+function isSha256Hex(v: string | undefined): v is string {
+  return typeof v === "string" && /^[0-9a-f]{64}$/.test(v);
+}
+
+/**
+ * 从 su 任务文本提取「必读」引用路径——**固定规则**（设计 §四.2），纯函数：
+ * · 只认 `docs/workflow.md`（稳定文件名）与 `docs/contracts/` 前缀的 `.md` 文件（token 剥离复用
+ *   既有保守提取 `extractPathCandidates`——反引号/markdown/中文标点等分隔与去重同源）；
+ * · 其余路径（产物路径 `temp/…`、`src/…` 等）**不注入、不校验**（§四.3 第 3 条——避免把「将要创建的
+ *   输出」误判为必读输入）；
+ * · 保序去重：`docs/workflow.md` 置首（§五.3 阅读序：1) 本文件 2) 契约），契约按**首现序**。
+ * 提取本身**未经存在性校验**——存在性与哈希由投递侧逐个探测后交 `planDispatchDelivery` 判据。
+ */
+export function extractDispatchReadPaths(task: string): string[] {
+  const contracts: string[] = [];
+  let workflow: string | undefined;
+  for (const candidate of extractPathCandidates(task)) {
+    if (candidate === WORKFLOW_REL) {
+      workflow = candidate; // extractPathCandidates 已按首现位去重——同 token 只到一次
+      continue;
+    }
+    if (candidate.startsWith(CONTRACTS_PREFIX) && candidate.endsWith(".md")
+      && candidate.length > CONTRACTS_PREFIX.length + ".md".length) {
+      contracts.push(candidate); // 同上：上游已去重
+    }
+  }
+  return workflow !== undefined ? [workflow, ...contracts] : contracts;
+}
+
+/**
+ * 投递判据（G-1 §四.2/§四.3）——**fail-closed 单一来源**，纯函数：
+ * · 任务引用了 `docs/contracts/…` 但文件不存在（探测值缺失/非法）→ **拒投** + 如实回执
+ *   （§四.3；多个缺失报**首现序第一个**；**不回退为「无块投递」**）；
+ * · 任务引用了 `docs/workflow.md` 但文件不存在 → **降级**：块内如实标注「（本项目未提供 workflow.md）」、
+ *   省略该行，**不拒投**（V1 过渡期老项目向后兼容，§四.3 第 2 条）；
+ * · 未引用的路径不参与判据（提取阶段已排除——产物路径不校验）。
+ * `probes` 由**投递侧代码**在投递时对 `extractDispatchReadPaths(task)` 的每个路径逐个探测
+ * （桌面 `filePrint`——`<missing>` 等非法值天然按缺失处理，无需投递侧再映射）。
+ * 放行结论的 `text` 由 `renderDispatchPrompt` 生成（**同一单一来源**，本函数不另写渲染）。
+ */
+export function planDispatchDelivery(
+  req: DispatchTaskPayload,
+  probes: ReadonlyMap<string, string | undefined>,
+): DispatchDeliveryPlan {
+  const references: DispatchReadRef[] = [];
+  let workflowMissing = false;
+  let missingContract: string | undefined;
+  for (const path of extractDispatchReadPaths(req.task)) {
+    const probe = probes.get(path);
+    if (isSha256Hex(probe)) {
+      references.push({ path, sha256: probe });
+      continue;
+    }
+    if (path === WORKFLOW_REL) workflowMissing = true;
+    else missingContract ??= path; // 首个缺失契约（首现序；拒投优先于降级）
+  }
+  if (missingContract !== undefined) {
+    return {
+      action: "reject",
+      message: `派发未受理：引用的契约 ${missingContract} 不存在——未投递。`,
+      systemRow: `派发未受理：引用的契约 ${missingContract} 不存在——**未投递**（不静默；su 修正后重派）。`,
+    };
+  }
+  return { action: "deliver", text: renderDispatchPrompt(req, { references, workflowMissing }) };
+}
+
+/** `renderDispatchPrompt` 的 G-1 选项（可选——缺省 = 旧格式逐字不变）。 */
+export interface DispatchPromptOptions {
+  /** 已由代码算好哈希的必读引用（调用方保证已过 `planDispatchDelivery` 判据）；**按给定序**编号渲染。 */
+  references?: readonly DispatchReadRef[];
+  /**
+   * 任务引用了 `docs/workflow.md` 但文件缺失的**降级**标注（§四.3 第 2 条）。
+   * 仅当 `references` 里**没有** `docs/workflow.md` 时生效（引用为准——矛盾输入以探测后的事实渲染）。
+   */
+  workflowMissing?: boolean;
+}
+
 /**
  * **投递给目标角色会话的派发文案——单一来源（H-1，设计 `2026-10-12_design_governed-interaction-and-chat-ux.md` §H-1）**。
  * 前端把 su 的 `dispatch_task` 路由成目标角色会话的一条输入时，用本函数生成文本（两前端共用，**不各写一份**）。
+ *
+ * **G-1 扩展（设计 `2026-10-16_design_contract-workflow-dispatch.md` §四；A1）**：
+ * 任务文本引用了契约/工作流时，`opts.references` 给**已由代码在投递时算好哈希**的必读引用（判据见
+ * `planDispatchDelivery`），本函数按其**给定序**渲染「必读（按序）」块；**无引用时逐字保持旧格式**
+ * （多数派发未引用契约/工作流——旧三行不变；文本是去重键之外的事实，去重键不受影响）。哈希**不在此计算**
+ * （su 与项目角色都不会算 hash——`finalize.ts` 先例；本函数是纯渲染，不触盘）。
  *
  * 措辞约束（守 SKILL.md 交接语义）：**不得夹带任何授权语义**——**派发 ≠ 授权**，目标角色的写权仍只来自
  * 它自己的 Section 1 与 `request_confirmation` 的 `confirmed:true`；派发只把「任务与上下文」送过去。
  * `task` 原文**逐字保留**（契约要求任务文本自足：做什么 / 依据哪份文档 / 完成标准）。
  * `roleId` 用于路由与校验，**不进入文案**（这是投递进**目标角色自己**的会话，自指冗余）。
  */
-export function renderDispatchPrompt(req: DispatchTaskPayload): string {
+export function renderDispatchPrompt(req: DispatchTaskPayload, opts?: DispatchPromptOptions): string {
   const reason = req.reason !== undefined && req.reason !== "" ? `（原因：${req.reason}）` : "";
-  return [`[派发] 来自 su 的任务${reason}`, req.task, "完成后请交回报告（改了什么/结论/证据）。"].join("\n");
+  const references = opts?.references ?? [];
+  // 引用为准：同路径既在 references 又有缺失标注（矛盾输入）→ 以探测后的事实渲染，抑制标注。
+  const workflowMissing = opts?.workflowMissing === true && !references.some((r) => r.path === WORKFLOW_REL);
+  if (references.length === 0 && !workflowMissing) {
+    // 无必读引用：旧格式**逐字不变**（设计 §四.1 的引用块是「加」出来的，不是重排版式的理由）。
+    return [`[派发] 来自 su 的任务${reason}`, req.task, "完成后请交回报告（改了什么/结论/证据）。"].join("\n");
+  }
+  const lines = [`[派发] 来自 su 的任务${reason}`];
+  lines.push("必读（按序，先读完再动手；哈希由系统在投递时计算，与文件当刻字节绑定）：");
+  if (workflowMissing) lines.push("  （本项目未提供 workflow.md）"); // 如实标注（§四.3 第 2 条，措辞照设计原文）
+  references.forEach((ref, i) => lines.push(`  ${i + 1}. ${ref.path}（sha256:${ref.sha256}）`));
+  lines.push(`任务：${req.task}`);
+  lines.push(references.some((r) => r.path === WORKFLOW_REL)
+    ? "完成后请交回报告（改了什么 / 结论 / 证据；完成口令见 workflow.md 第 2 节）。"
+    : "完成后请交回报告（改了什么/结论/证据）。");
+  return lines.join("\n");
 }
 
 /**

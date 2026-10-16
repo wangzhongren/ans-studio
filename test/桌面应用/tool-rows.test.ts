@@ -156,3 +156,32 @@ test('F-8-b：timedOut 独立一类；signal/error 事实与 spawn 失败不落�
   assert.equal(cleanZero.label,'执行完成');
   assert.equal(cleanZero.exceptional,false);
 });
+
+// ————— G-2/U1（2026-10-16 客户批准；设计 2026-10-16_design_role-watchdog-and-closure §3.3/§7.3）—————
+// `system` 类投递（看护告警 / 收束提示 / 恢复回执）的聊天流归类：文首定格标记 `[系统·<子类>] `
+// （单一来源 = 编排 O1 的文案文件；判据只依赖标记形态，不逐子类登记——子类集合随 O1 落树扩充）。
+
+test('G-2：system 投递归类——[系统·<子类>] 文首标记（回显/回放同解）；来源=系统（sourceRoleId 恒空）', () => {
+  const alert = tools.classifyInjectedMessage('用户指令：[系统·看护] 投递排队积压：角色「实现者」队首任务已排队 12 分钟（深度 3）。\n事实：…\n建议：…');
+  assert.equal(alert?.kind, 'system', '看护告警回显应归类为 system');
+  assert.equal(alert?.label, '系统消息 · 看护', '标签=「系统消息 · <子类原文>」');
+  assert.equal(alert?.sourceRoleId, '', '来源=系统（非角色）——无角色来源可提取');
+  assert.ok(String(alert?.body).startsWith('[系统·看护] '), '正文原样（含标记）交给呈现层');
+  const closure = tools.classifyInjectedMessage('[系统·收束] 已无进行中任务：全部角色空闲、投递队列为空、无待确认，已持续 5 分钟。');
+  assert.equal(closure?.kind, 'system', '回放原始投递文本（无「用户指令：」前缀）同样归类');
+  assert.equal(closure?.label, '系统消息 · 收束');
+  assert.equal(tools.classifyInjectedMessage('用户指令：[系统·恢复] 已执行：abort-turn（目标角色 实现者）')?.kind, 'system', '恢复回执同族（子类集合随 O1 落树扩充——不逐子类登记）');
+});
+
+test('G-2：system 归类不误伤——行内提及 / 未闭合 / 空子类 / 无空白衔接一律 null；既有两类回归不变', () => {
+  assert.equal(tools.classifyInjectedMessage('用户指令：帮我看下 [系统·看护] 这个词'), null, '行内提及不算（标记必须在行首）');
+  assert.equal(tools.classifyInjectedMessage('[系统·未闭合 普通消息'), null, '未闭合的标记不算');
+  assert.equal(tools.classifyInjectedMessage('[系统·] 空子类'), null, '空子类不算');
+  assert.equal(tools.classifyInjectedMessage('[系统·看护]紧接着无空白'), null, '闭合后须为空白或文末（杜绝「看起来像」）');
+  assert.equal(tools.classifyInjectedMessage('[系统·' + '长'.repeat(13) + '] x'), null, '子类长度有界（定格格式防御）');
+  assert.equal(tools.classifyInjectedMessage('[系统·[嵌]套] x'), null, '子类内不得嵌括号');
+  assert.equal(tools.classifyInjectedMessage('普通一句话'), null);
+  // 既有角色投递归类不受影响（回归）。
+  assert.equal(tools.classifyInjectedMessage('[回交] 来自 A 的报告')?.kind, 'handback');
+  assert.equal(tools.classifyInjectedMessage('[派发] 来自 su 的任务：x')?.kind, 'dispatch');
+});

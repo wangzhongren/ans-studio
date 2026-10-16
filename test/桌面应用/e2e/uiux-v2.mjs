@@ -30,6 +30,7 @@ const FLOW_ONLY=process.env.ANS_COMPLETE_FLOW_UI_ONLY==='1'||FRESH_CONTEXT_ONLY|
 const PROJECT_RESET_ONLY=process.env.ANS_PROJECT_RESET_UI_ONLY==='1';
 const DUP_ONLY=process.env.ANS_DUP_UI_ONLY==='1';
 const SELECTOR_ONLY=process.env.ANS_SELECTOR_UI_ONLY==='1';
+const G2_ONLY=process.env.ANS_G2_RECOVERY_UI_ONLY==='1';
 const configReads=[];
 let recoveryEnabled=!(CONFIG_ONLY||SELECTOR_ONLY||FLOW_ONLY), listFailure=false, pickResult=ROOT, configFailure=false, configMalformed=false, configDeferred=false, saveDeferred=false;
 let configMissing={}, configPending=[], savePending=[];
@@ -783,6 +784,32 @@ async function mergeChecks() {
   await js(`await window.__ansRenderer.selectRole('A')`);
   for(const width of [1360,960]){win.setContentSize(width,width===960?620:860);await pause(80);fs.writeFileSync(path.join(OUT,'merge-'+width+'.png'),(await win.webContents.capturePage()).toPNG());}
 }
+// ————— G-2/U1（2026-10-16 客户批准；设计 2026-10-16_design_role-watchdog-and-closure）：恢复确认卡 + `[系统]` 消息行 —————
+// ① `[系统·<子类>]` 投递输入（看护告警/收束提示）在聊天流呈**单独样式**（来源=系统——绝不与客户气泡同款），
+//    实时与回放同解（同一分类器单一来源）。② 恢复确认卡：动作/目标角色/证据**逐字**、取消为默认焦点、
+//    Esc=不执行；回包通道按 W5 落树前缺席 ⇒ 如实终态「未能回传……不执行」（绝不呈现为已执行）。
+async function g2RecoveryChecks(){
+  await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRole('A')`);
+  const payload=(runtime,roleId,extra={})=>({projectRoot:ROOT,roleId,runtime,...extra});
+  // ① 实时：看护告警真投递回显（适配器 `用户指令：` 前缀）→ 注入样式 + 系统来源标签 + 正文原样。
+  const alertText='用户指令：[系统·看护] 投递排队积压：角色「实现者」队首任务已排队 12 分钟（深度 3）。';
+  await push('session:events',[payload('pi','A',{event:{turnId:'g2-alert',kind:'message',summary:'[系统·看护] 投递排队积压',detail:{source:'prompt-input',text:alertText}}})]);
+  await check('G2 system alert renders as own injected style with system source chip',`(()=>{const el=document.querySelector('#chat .msg-injected.is-system');return !!el&&el.querySelector('.mi-chip').textContent==='系统消息 · 看护'&&!el.classList.contains('msg-user')&&el.querySelector('.mi-body').textContent.includes('投递排队积压');})()`);
+  // 回放：历史 kind user 行原文同样归类（同一前缀表；收束提示子类）。
+  await push('session:history',{projectRoot:ROOT,roleId:'A',runtime:'pi',rows:[{kind:'user',text:'[系统·收束] 已无进行中任务：全部角色空闲、投递队列为空、无待确认，已持续 5 分钟。',at:''}],error:null,skipped:0});
+  await check('G2 closure notice replay classified by the same single source',`[...document.querySelectorAll('#chat .msg-injected.is-system .mi-chip')].some(x=>x.textContent==='系统消息 · 收束')`);
+  // ② 恢复确认卡（探针注入数据面，按 IPC 契约形状；回包通道 W5 落树前缺席）：逐字证据 + 取消默认焦点。
+  const evidence='role_status：角色「实现者」busy=true 已 583s；队列 0；最近一轮 timed_out 无 settled。';
+  await js(`window.__ansRenderer.onRecoveryConfirm(${JSON.stringify({id:'rp-1',projectRoot:ROOT,runtime:'pi',roleId:'实现者',action:'abort-turn',evidence,reason:'疑似卡死',requestedBy:'su',requestedAt:'2026-10-16T02:10:03.000Z'})})`);
+  await check('G2 recovery card shows action role and verbatim evidence with cancel default focus',`(()=>{const o=document.getElementById('recovery-confirm');return !o.hidden&&document.getElementById('rc-action').textContent==='动作：停止本轮（abort-turn）'&&document.getElementById('rc-role').textContent==='目标角色：实现者'&&document.getElementById('rc-evidence').textContent===${JSON.stringify(evidence)}&&document.getElementById('rc-reason').textContent.includes('疑似卡死')&&document.activeElement===document.getElementById('rc-deny')&&document.getElementById('rc-details').open===false;})()`);
+  for(const width of [1360,960]){win.setContentSize(width,860);await pause(100);fs.writeFileSync(path.join(OUT,'g2-recovery-card-'+width+'.png'),(await win.webContents.capturePage()).toPNG());}
+  // Esc = 不执行（fail-closed）。通道缺席 ⇒ 不假装裁决：如实终态「未获执行」。
+  await key('Escape');await pause(60);
+  await check('G2 recovery Esc is deny and channel-absent terminal never claims execution',`(()=>{const o=document.getElementById('recovery-confirm');return !o.hidden&&o.classList.contains('is-expired')&&document.getElementById('rc-allow').disabled&&!document.getElementById('rc-close').disabled&&document.getElementById('rc-hint').textContent.includes('按 fail-closed 不执行');})()`);
+  await js(`document.getElementById('rc-close').click()`);
+  await check('G2 expired recovery card dismisses without execution illusion',`document.getElementById('recovery-confirm').hidden&&window.__ansRenderer.state.recoveryConfirm===null`);
+}
+
 app.whenReady().then(async()=>{
  const watchdog=setTimeout(()=>{fs.writeFileSync(path.join(OUT,'watchdog.txt'),'timeout');app.exit(1);},60000);
  try {
@@ -796,6 +823,7 @@ app.whenReady().then(async()=>{
   if(PROJECT_RESET_ONLY){await projectResetChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports},null,2));console.log('PROJECT_RESET_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(DUP_ONLY){await duplicateChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports},null,2));console.log('DUP_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(SELECTOR_ONLY){await selectorChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports,configReads},null,2));console.log('SELECTOR_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
+  if(G2_ONLY){await g2RecoveryChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports},null,2));console.log('G2_RECOVERY_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(CONFIG_ONLY){await configChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports},null,2));console.log('CONFIG_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(process.env.ANS_MERGE_UI_ONLY==='1'){await mergeChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports,sends:sends.map(x=>({text:x.text,target:x.target,clientMessageId:x.metadata&&x.metadata.clientMessageId}))},null,2));console.log('MERGE_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(process.env.ANS_RUNTIME_UI_ONLY==='1'){await runtimeChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports,sends},null,2));console.log('RUNTIME_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}

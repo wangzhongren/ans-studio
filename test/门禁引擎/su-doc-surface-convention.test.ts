@@ -30,6 +30,26 @@
 //     列路径 + `confirmed:true` 才发行；「按会话生效」只约束经确认发行的路径，预置两目录不受重建
 //     影响。卡文本措辞不用「授权」字面——J-1 守卫（`dispatch-after-landing-convention.test.ts:51`）
 //     拦未否定的「授权/获准/放行」小句，沿用 2026-10-12 先例改用「许可/预置」。
+//  6. **规划纪律段（新增）+ J-1 扩展段（G-1/A3；设计 `2026-10-16_design_contract-workflow-dispatch.md`
+//     §三/§五/§六/§九 A3；客户 2026-10-16 批准 G-1 按提案实施、PM 派发 V1 最小闭环）**：多角色/跨角色工作
+//     「先落盘再派发」——① 冻结契约 `docs/contracts/<name>-v1.md`（冻结后不可变、任何内容变化都出
+//     新版本文件、不原地改 v1）；② 项目工作流 `docs/workflow.md`（步骤表 / 完成口令 / 变更与重验流程）。
+//     写盘口径与第 5 节两目录预置句**不冲突**：契约属已预置目录（直接写）；`docs/workflow.md` 不属预置
+//     两目录、列入同一次规划确认的 preview + `confirmed:true`（与编排 `SU_PREAUTHORIZED_WRITE_DIRS`
+//     ＝仅两目录、运行时核心 `dispatch_task` 文案「先落盘再派发」同口径）。派发任务文本**按地址引用**
+//     （不内嵌契约全文、不手算 sha256——「必读（按序）」块由投递系统在投递时附上并计算哈希；引用的契约
+//     不存在会被拒投）；契约变更＝新版本文件＋受影响回交作废＋重派。**反向断言**：凡含 `docs/workflow.md`
+//     的小句不得声称免确认/直接写（两目录预置句不得被扩成三目录）；「原地改 / 自己算或转抄哈希」类
+//     表述必须是否定式。
+//  7. **看护职责段（G-2/G；设计 `2026-10-16_design_role-watchdog-and-closure.md` §二/§三/§五/§六/§七；
+//     客户 2026-10-16 批准 G-2 按提案实施、PM 派发 W1-W5/R1/R2/O1/G/U1）**：系统看护在异常态
+//     （轮次逼近超时 / 投递排队积压 / 命令超时限 / 重复失败）投 `[系统·看护]` 消息、完成静默态投
+//     「收束提示」——su **先核查再动作**（`role_status`/`session_tail` 只读核对、结论留证 `docs/su/**`）；
+//     恢复**只能提议**（`propose_recovery`）、**执行与否由客户一键确认**、由应用侧执行——不得自行执行、
+//     不得承诺结果；看护消息仅如实告知、**不得据此假设任何写权**（措辞用「写权」，段级零命中 J-1 守卫
+//     字样「授权/获准/放行」——2026-10-12 先例）；是否处理由 su 判断、处理走既有 E-1 回交 / H-1 重派
+//     流程。**反向断言**：看护面小句不得出现守卫三词；「据此假设 / 自行执行」类表述必须是否定式。
+//     位置：J-1 段之后、末段「边界（三种情形）」之前。
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -164,5 +184,174 @@ test("确认制要点·反向断言：凡含 `docs/su` 的小句不得要求确�
       /(须|需要|照常|务必)[^，。]{0,10}(先|经|逐次)?确认/,
       `含 docs/su 的小句不得要求确认，实得：${c}`,
     );
+  }
+});
+
+// ———————————— 6：规划纪律段 + J-1 扩展（G-1/A3） ————————————
+
+test("规划纪律（G-1/A3）：先落盘再派发——冻结契约（版本化不可变）＋项目工作流（步骤表/完成口令/变更与重验）；位置在确认制要点之后、J-1 之前", () => {
+  assert.ok(T.includes("规划纪律"), "须有「规划纪律」段（G-1/A3）");
+  assert.ok(T.includes("多角色/跨角色工作"), "须框定适用面：多角色/跨角色工作");
+  // 位置：紧接「确认制要点」段之后（与既有确认制要点同段衔接），且在 J-1 段之前（规划先于派发）。
+  assert.ok(
+    T.indexOf("确认制要点") < T.indexOf("规划纪律"),
+    "规划纪律须在确认制要点段之后",
+  );
+  assert.ok(
+    T.indexOf("规划纪律") < T.indexOf("落盘后自动开工"),
+    "规划纪律须在 J-1 段（落盘后自动开工）之前",
+  );
+  assert.ok(T.includes("先落盘再派发"), "须写明「先落盘再派发」");
+  // —— ① 冻结契约 ——
+  assert.ok(T.includes("`docs/contracts/<name>-v1.md`"), "须写死契约路径形状（版本号进文件名）");
+  assert.ok(T.includes("稳定短 slug"), "须写 <name> 的命名口径（稳定短 slug）");
+  assert.ok(T.includes("冻结后不可变"), "须写死「冻结后不可变」");
+  assert.ok(T.includes("新版本文件"), "须写明任何变化都出新版本文件");
+  assert.ok(T.includes("不原地改 v1"), "须明禁原地改 v1（否则派发地址的哈希永久失配）");
+  assert.ok(T.includes("旧版保留可读"), "须写明旧版保留可读");
+  // —— ② 项目工作流 ——
+  assert.ok(T.includes("`docs/workflow.md`"), "须写死工作流路径 docs/workflow.md");
+  assert.ok(T.includes("步骤表"), "工作流须含步骤表");
+  assert.ok(T.includes("完成口令"), "工作流须含完成口令");
+  assert.ok(T.includes("变更与重验"), "工作流须含变更与重验流程");
+  assert.ok(T.includes("改动依赖后重测调用方"), "变更与重验须对应治理不变量「改动依赖后重测调用方」");
+  // —— 写盘口径：契约直接写；workflow.md 不属预置、列规划确认 preview ——
+  assert.ok(
+    T.includes("契约写进已预置的 `docs/contracts/**`（直接写即可）"),
+    "契约须写明属已预置目录、直接写",
+  );
+  assert.ok(T.includes("不在预置两目录内"), "docs/workflow.md 须写明不属预置两目录");
+  assert.ok(T.includes("同一次规划确认"), "workflow.md 须列入同一次规划确认");
+  assert.ok(T.includes("的 preview、`confirmed:true` 后写入"), "workflow.md 须写明 preview+confirmed:true 后才写入");
+  // —— 角色必读与 blocked 纪律 ——
+  assert.ok(T.includes("动手前先读"), "须写被派发角色动手前先读（按序）");
+  assert.ok(T.includes("角色卡必读资料"), "必读序须含角色卡必读资料（工作流 → 契约 → 角色卡）");
+  assert.ok(T.includes("blocked"), "读到与派发描述不符须停止并交 blocked 报告");
+  assert.ok(T.includes("不得猜、不得改契约"), "须明禁猜与改契约");
+  // —— 契约变更 ——
+  assert.ok(T.includes("受影响步骤的既有回交"), "契约变更须写明受影响步骤的既有回交作废");
+  assert.ok(T.includes("作废") && T.includes("重派"), "受影响回交作废并向受影响角色重派");
+  assert.ok(T.includes("未受影响的步骤不回滚、不重跑"), "未受影响步骤不回滚、不重跑（防过度反应）");
+});
+
+test("J-1 扩展（G-1/A3）：派发按地址引用——不内嵌契约全文、不手算 sha256、「必读（按序）」块由系统投递时附上；契约缺失拒投", () => {
+  assert.ok(T.includes("按地址引用"), "任务文本须按地址引用契约与工作流");
+  assert.ok(T.includes("不内嵌契约全文"), "不得把契约全文内嵌进派发文本");
+  assert.ok(T.includes("必读（按序）"), "必读块名须为「必读（按序）」");
+  assert.ok(T.includes("先读完再动手"), "必读块语义：先读完再动手");
+  assert.ok(T.includes("由系统在投递时计算的 sha256"), "sha256 须写明由系统在投递时计算");
+  assert.ok(T.includes("不要自己算或转抄哈希"), "须明禁 su 自己算/转抄哈希");
+  assert.ok(T.includes("拒投"), "引用的契约不存在须写明拒投（fail-closed）");
+  assert.ok(T.includes("补落盘后重派"), "拒投后处置：补落盘后重派");
+  // 位置：按地址指引在 J-1 派发句之后、且仍属派发纪律（在「派发 ≠ 授权」段之前）。
+  assert.ok(
+    T.indexOf("不等客户手动转达") < T.indexOf("按地址引用"),
+    "按地址引用须在 J-1 派发句（不等客户手动转达）之后",
+  );
+  assert.ok(
+    T.indexOf("按地址引用") < T.indexOf("派发 ≠ 授权"),
+    "按地址引用须在「派发 ≠ 授权」段之前（同属派发纪律，不跨段漂移）",
+  );
+});
+
+test("规划纪律·反向断言：凡含 `docs/workflow.md` 的小句不得声称免确认/直接写；「原地改 / 自己算或转抄」类表述否定式", () => {
+  // 两目录预置句（docs/su/** 与 docs/contracts/**）不得被新段扩成三棵目录：workflow.md 明确走确认制。
+  const wfClauses = T.split(/[。；\n]/).filter((c) => c.includes("docs/workflow.md"));
+  assert.ok(wfClauses.length >= 2, "`docs/workflow.md` 小句须存在（规划纪律段与 J-1 段各至少一处）");
+  for (const c of wfClauses) {
+    assert.doesNotMatch(
+      c,
+      /直接写|无需(逐次)?确认|免(逐次)?确认|已预置/,
+      `含 docs/workflow.md 的小句不得声称免确认/直接写（非预置路径），实得：${c}`,
+    );
+  }
+  // 「原地改」小句必须是否定式（防把「契约变更出新版本文件」反写成原地改）。
+  const inPlaceClauses = T.split(/[。；\n]/).filter((c) => /原地改/.test(c));
+  assert.ok(inPlaceClauses.length >= 1, "「不原地改 v1」小句须存在（契约不可变的落点）");
+  for (const c of inPlaceClauses) {
+    assert.match(c, /不|不得|勿|禁止/, `含「原地改」的小句必须是否定式，实得：${c}`);
+  }
+  // 定向反面模式：任何「应/须/要/请/可以/可…原地改（v1）」或「（请/应/须/要/可以/可）自己算/手算/转抄（哈希）」
+  // 的肯定式指令都不得存在。先把「不要」替换为「不」——否则禁令句自身的「要」会被本模式误抓
+  //（与 temp-staging / document-surface 测试同法避误判）。
+  const A = T.replaceAll("不要", "不");
+  assert.equal(
+    /(?:应|须|要|请|可以|可将|可)[^。\n]{0,10}原地改/.test(A),
+    false,
+    "不得出现「原地改 v1」式肯定指令",
+  );
+  assert.equal(
+    /(?:请|应|须|要|可以|可将|可)[^。\n]{0,10}(自己算|手算|转抄)/.test(A),
+    false,
+    "不得出现要求 su 自己算/手算/转抄哈希的肯定指令",
+  );
+});
+
+// ———————————— 7：看护职责段（G-2/G） ————————————
+
+test("看护职责（G-2/G）：异常态投 `[系统·看护]`、完成静默态投「收束提示」；先核查再动作（role_status/session_tail）；位置在 J-1 段之后、末段「边界（三种情形）」之前", () => {
+  assert.ok(T.includes("看护职责"), "须有「看护职责」段（G-2/G）");
+  // —— 告警与收束：两条消息路径逐一点名 ——
+  assert.ok(T.includes("`[系统·看护]`"), "异常告警须点名 `[系统·看护]` 消息前缀");
+  assert.ok(T.includes("异常态"), "须框定异常态");
+  for (const s of ["轮次逼近超时", "投递排队积压", "命令超时限", "重复失败"]) {
+    assert.ok(T.includes(s), `异常态信号须逐项列明：${s}`);
+  }
+  assert.ok(T.includes("完成静默态"), "须点明完成静默态");
+  assert.ok(T.includes("收束提示"), "完成静默须投「收束提示」");
+  // —— 先核查再动作（只读核对；结论留证） ——
+  assert.ok(T.includes("先核查、再动作"), "须写死「先核查、再动作」");
+  assert.ok(
+    T.includes("`role_status`") && T.includes("`session_tail`"),
+    "核对须用两只读工具 role_status / session_tail",
+  );
+  assert.ok(T.includes("仅凭告警文本") && T.includes("下结论"), "须明禁仅凭告警文本下结论");
+  assert.ok(T.includes("核查结论记入你自己的文档面"), "核查结论须留证（你自己的文档面）");
+  // —— 位置：J-1 段之后、末段「边界（三种情形）」之前 ——
+  assert.ok(
+    T.indexOf("落盘后自动开工") < T.indexOf("看护职责"),
+    "看护职责须在 J-1 段（落盘后自动开工）之后",
+  );
+  assert.ok(
+    T.indexOf("看护职责") < T.indexOf("边界（三种情形）"),
+    "看护职责须在末段「边界（三种情形）」之前",
+  );
+});
+
+test("看护职责·恢复只能提议（propose_recovery）：执行与否由客户一键确认；不得自行执行、不得承诺结果", () => {
+  assert.ok(T.includes("`propose_recovery`"), "须点名 propose_recovery");
+  assert.ok(T.includes("只能提议"), "恢复须写死「只能提议」");
+  assert.ok(T.includes("执行与否由客户一键确认"), "须写明执行与否由客户一键确认");
+  assert.ok(T.includes("不得自行执行"), "须明禁自行执行");
+  assert.ok(T.includes("不得承诺结果"), "须明禁承诺结果");
+  assert.ok(T.includes("未获确认即未执行"), "须写明未获确认即未执行（fail-closed）");
+  assert.ok(T.includes("取消亦如实回执"), "客户取消须如实回执（不假装已执行）");
+});
+
+test("看护职责·纪律与反向断言：仅如实告知、不得据此假设任何写权；处理走既有回交/重派；看护面段级零命中「授权/获准/放行」守卫字样", () => {
+  assert.ok(T.includes("仅如实告知"), "看护消息须定位为「仅如实告知」");
+  assert.ok(T.includes("不得据此假设任何写权"), "须明禁据此假设任何写权");
+  assert.ok(T.includes("是否处理由你判断"), "是否处理由 su 判断（不强迫动作）");
+  assert.ok(T.includes("合法结局"), "「状态正常，忽略」须写明为合法结局");
+  assert.ok(T.includes("E-1 回交与 H-1 派发"), "处理动作须走既有回交/重派流程（E-1 / H-1）");
+  // 反向（J-1 守卫口径的段级余量）：凡含「看护 / 收束 / propose_recovery / 告警」的小句，不得出现
+  // 「授权 / 获准 / 放行」——新段按 2026-10-12 先例避让守卫字样（改用「写权」），三词只允许出现在
+  // 既有否定式小句里；本过滤同时钉非空洞（小句数下限）。
+  const clauses = T.split(/[。；\n]/).filter((c) => /看护|收束|propose_recovery|告警/.test(c));
+  assert.ok(clauses.length >= 6, `看护面小句须在场（非空洞），实得 ${clauses.length}`);
+  for (const c of clauses) {
+    assert.doesNotMatch(c, /授权|获准|放行/, `看护面小句不得出现守卫字样（授权/获准/放行），实得：${c}`);
+  }
+  // 小句级：「据此假设（写权）」与「自行执行（恢复）」类小句必须带否定/禁止标记
+  //（不用「触发词 + 窗口」定向模式——「由应用侧执行」的「应」会误触「…自行执行」窗口，如实登记该假阳性规避）。
+  const assume = T.split(/[。；\n]/).filter((c) => /据此假设/.test(c));
+  assert.ok(assume.length >= 1, "「据此假设」小句须在场（非空洞）");
+  for (const c of assume) {
+    assert.match(c, /不得|禁止|勿|严禁|不是/, `「据此假设」小句必须是禁止式，实得：${c}`);
+  }
+  const selfExec = T.split(/[。；\n]/).filter((c) => /自行执行/.test(c));
+  assert.ok(selfExec.length >= 1, "「自行执行」小句须在场（非空洞）");
+  for (const c of selfExec) {
+    assert.match(c, /不得|禁止|勿|严禁/, `「自行执行」小句必须是禁止式，实得：${c}`);
   }
 });

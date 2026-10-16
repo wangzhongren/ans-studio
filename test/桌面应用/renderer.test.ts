@@ -774,6 +774,69 @@ test("M-1：shell 确认卡——命令在 <pre>、摘要/人话原因、折叠�
   assert.ok(/\.sc-command\s*\{[^}]*white-space: pre;/.test(STYLES) && /\.sc-command\s*\{[^}]*overflow-x: auto;/.test(STYLES), "命令块：不折行、可横向滚动");
 });
 
+// ————————————————— G-2/U1（2026-10-16 客户批准；设计 2026-10-16_design_role-watchdog-and-closure）—————————————————
+// 恢复确认卡（§6.2：提议 → 一键确认 → 恰 allow:true 执行 → 回执）与 `[系统]` 消息行样式（§3.3/§7.3）。
+
+test("G-2 U1：恢复确认卡——动作/目标角色/证据逐字；恰「执行」=allow:true；取消/Esc/关闭=不执行；等待不设限（无计时器）", () => {
+  // 结构（index.html）：复用 shell 卡组件族（sc-overlay/sc-card/sc-actions/sc-hint）；证据 <pre> 逐字块。
+  assert.ok(INDEX.includes('id="recovery-confirm"') && INDEX.includes('class="sc-overlay"'), "应有应用内弹层 #recovery-confirm.sc-overlay（复用确认卡组件族）");
+  assert.ok(INDEX.includes("恢复操作请求"), "标题应为「恢复操作请求」");
+  assert.ok(INDEX.includes('id="rc-action"') && INDEX.includes('id="rc-role"'), "应有动作行与目标角色行");
+  assert.ok(/<pre[^>]*id="rc-evidence"/.test(INDEX), "证据应是 <pre> 逐字块");
+  assert.ok(INDEX.includes('id="rc-allow"') && INDEX.includes('id="rc-deny"') && INDEX.includes('id="rc-close"'), "执行/取消/关闭三键齐备");
+  assert.ok(/<button id="rc-deny"[^>]*class="btn btn-primary"/.test(INDEX), "取消为默认焦点样式（fail-closed 同向）");
+  assert.ok(INDEX.includes('id="rc-hint"') && INDEX.includes("仅点「执行」才会执行"), "fail-closed 提示行如实：默认不执行");
+  // 渲染侧接线：订阅（通道缺席 ⇒ 不订阅、零影响——W5 未落树前的 fail-closed）；填充经 textContent（无 HTML 注入口）。
+  assert.ok(RENDERER.includes("d.onRecoveryConfirm") && RENDERER.includes("function onRecoveryConfirm"), "渲染侧应订阅恢复确认请求（具备时）");
+  assert.ok(RENDERER.includes('$("rc-evidence").textContent'), "证据原文应经 textContent 落入（逐字——不美化/不改写/不截断）");
+  assert.ok(RENDERER.includes('$("rc-deny").focus()'), "取消为默认焦点（fail-closed 的 UI 侧同向）");
+  // fail-closed：Esc / 关闭（×）/「取消」= allow:false；恰 allow:true 才作为执行请求回传。
+  assert.ok(/e\.key === "Escape"[\s\S]{0,160}respondRecoveryConfirm\(false\)/.test(RENDERER), "Esc ⇒ 不执行");
+  assert.ok(RENDERER.includes('$("rc-close").addEventListener("click", function () { respondRecoveryConfirm(false); })'), "关闭键（×）⇒ 不执行");
+  assert.ok(RENDERER.includes('$("rc-deny").addEventListener("click", function () { respondRecoveryConfirm(false); })'), "取消键 ⇒ 不执行");
+  assert.ok(/recoveryConfirmRespond\(\{ id: cur\.id, allow: allow === true \}\)/.test(RENDERER), "恰 allow:true 才作为执行请求回传（其余一律 false）");
+  // 失效/通道异常如实终态（绝不呈现为已执行）；等待不设限 = 无计时器（同 G-1 钉子口径）。
+  assert.ok(RENDERER.includes("未获执行") && RENDERER.includes("请让提议方重新发起"), "失效态如实（未获执行 + 出路）");
+  assert.ok(RENDERER.includes("按 fail-closed 不执行"), "通道异常态如实（未接通道 ≠ 已执行）");
+  assert.ok(!RENDERER_CODE.includes("setTimeout") && !RENDERER_CODE.includes("setInterval"), "恢复卡不得有任何计时器（等待不设限——裁定 4）");
+  // 动作人话标签=纯映射（未知动作只呈现原始 token——不假装认识）；渲染侧不自写第二份语义。
+  assert.ok(RENDERER.includes("UiLabels.recoveryActionView"), "动作标签应经纯映射取");
+  // 样式钩子 + 证据块换行/可滚。
+  for (const cls of [".rc-action", ".rc-role", ".rc-evidence", ".rc-evidence-label"]) {
+    assert.ok(STYLES.includes(cls), "styles.css 应有 " + cls);
+  }
+  assert.ok(/\.rc-evidence\s*\{[^}]*white-space: pre-wrap;/.test(STYLES), "证据块 pre-wrap（逐字、不横滚丢内容）");
+});
+
+test("G-2 U1：恢复动作纯映射——三枚冻结枚举的人话标签+后果说明；未知动作 null（不假装认识）", async () => {
+  const href = new URL("../../app/renderer/ui-labels.js", import.meta.url).href;
+  await import(href);
+  const UL = (globalThis as Record<string, unknown>).ANSUiLabels as {
+    recoveryActionView: (a: unknown) => { label: string; note: string } | null;
+  };
+  assert.ok(UL && typeof UL.recoveryActionView === "function", "应挂 recoveryActionView（纯函数）");
+  assert.equal(UL.recoveryActionView("abort-turn")?.label, "停止本轮");
+  assert.equal(UL.recoveryActionView("rebuild-session")?.label, "重建会话");
+  assert.equal(UL.recoveryActionView("redeliver")?.label, "重新投递");
+  for (const a of ["abort-turn", "rebuild-session", "redeliver"]) {
+    assert.ok((UL.recoveryActionView(a)?.note || "").length > 0, a + " 应带后果说明（客户看卡所需）");
+  }
+  assert.equal(UL.recoveryActionView("disable-role"), null, "未冻结的动作 ⇒ null（渲染侧只呈现原始 token）");
+  assert.equal(UL.recoveryActionView(""), null);
+  assert.equal(UL.recoveryActionView(null), null);
+});
+
+test("G-2 U1：`[系统]` 消息行——聊天流单独样式（来源=系统）；队列视图来源标签与不可撤回呈现", () => {
+  // 聊天流：system 类注入行按 kind 出类名（is-system 落点）+ 系统图标 + 标签（分类器单一来源）。
+  assert.ok(RENDERER.includes('"msg msg-injected is-" + inj.kind'), "注入行类名按 kind 生成（is-system 落点）");
+  assert.ok(RENDERER.includes('inj.kind === "system" ? ICONS.shield : ICONS.send'), "系统消息用系统图标（区分来源）");
+  assert.ok(RENDERER.includes('Tr.classifyInjectedMessage'), "聊天流归类经 tool-rows 单一来源（含 system）");
+  // 队列视图：撤回判据只认 message 类 ⇒ system 行**不出现撤回钮**（不可撤回呈现；与派发/回交同款只读面）。
+  assert.ok(RENDERER.includes('var canWithdraw = v.kind === "message" && !running;'), "system 不满足撤回判据（不可撤回呈现）");
+  // 样式钩子。
+  assert.ok(STYLES.includes(".msg-injected.is-system"), "styles.css 应有系统消息样式钩子");
+});
+
 // ————————————————— N-1（2026-10-12 客户裁定）：导入项目按钮文案两态 —————————————————
 
 test("N-1：「导入项目 / 切换项目」按钮文案——纯函数两态 + 导入→清空回退；判据用已有状态（不靠界面猜测）", async () => {
@@ -842,31 +905,34 @@ test("N-3：右栏「待办 / 队列」——夹具逐条渲染（来源/摘要/
   const UL = (globalThis as Record<string, unknown>).ANSUiLabels as {
     queueSourceLabel: (k: string) => string;
     shortenQueueItem: (t: string, n?: number) => string;
-    queueItemViews: (q: unknown, r: unknown) => { pos: string; source: string; text: string; at: string }[];
+    queueItemViews: (q: unknown, r: unknown) => { pos: string; source: string; text: string; at: string; kind: string; id: string; full: string }[];
   };
   assert.ok(UL && typeof UL.queueItemViews === "function", "应挂 queueItemViews（纯函数）");
-  // 来源三条固定映射（客户语言）+ 未知保守占位。
+  // 来源固定映射（客户语言）+ 未知保守占位；system（G-2 看护/收束/恢复回执）= 来源「系统」（非角色）。
   assert.equal(UL.queueSourceLabel("dispatch"), "su 派发");
   assert.equal(UL.queueSourceLabel("message"), "客户消息");
   assert.equal(UL.queueSourceLabel("handback"), "回交投递");
+  assert.equal(UL.queueSourceLabel("system"), "系统");
   assert.equal(UL.queueSourceLabel("其它"), "投递");
   // 长内容不铺开：有界截断（默认 80 + …）。
   const cut = UL.shortenQueueItem("长".repeat(500));
   assert.ok(cut.length <= 81 && cut.endsWith("…"), "超长摘要截断（长内容不铺开）");
   assert.equal(UL.shortenQueueItem("短 句"), "短 句", "短内容原样（只压空白）");
-  // 夹具：进行中一条 + 排队两条 → 视图行逐条（位置/来源/文本/入队时间原样转出）。
+  // 夹具：进行中一条 + 排队三条（含 system）→ 视图行逐条（位置/来源/文本/入队时间原样转出）。
   const views = UL.queueItemViews(
     [
       { kind: "message", sourceRoleId: "A", summary: "你：排队一", at: "2026-10-12T03:00:00.000Z" },
       { kind: "dispatch", sourceRoleId: "su", summary: "派发 · 来自 su：做X", at: "2026-10-12T03:01:00.000Z" },
+      { kind: "system", sourceRoleId: "", summary: "[系统·看护] 投递排队积压：…", at: "2026-10-12T03:02:00.000Z" },
     ],
     { kind: "handback", sourceRoleId: "A", summary: "回交投递 · 来自 A", at: "2026-10-12T02:59:00.000Z" }
   );
-  assert.equal(views.length, 3, "进行中 + 排队两条");
-  assert.deepEqual(views.map((v) => v.pos), ["进行中", "1", "2"], "进行中在最前；排队位置 1..N（**排队 ≠ 已执行**）");
-  assert.deepEqual(views.map((v) => v.source), ["回交投递", "客户消息", "su 派发"], "逐条来源标签");
+  assert.equal(views.length, 4, "进行中 + 排队三条");
+  assert.deepEqual(views.map((v) => v.pos), ["进行中", "1", "2", "3"], "进行中在最前；排队位置 1..N（**排队 ≠ 已执行**）");
+  assert.deepEqual(views.map((v) => v.source), ["回交投递", "客户消息", "su 派发", "系统"], "逐条来源标签（system ⇒ 「系统」）");
   assert.equal(views[1].text, "你：排队一");
   assert.equal(views[1].at, "2026-10-12T03:00:00.000Z", "入队时间原样转出");
+  assert.equal(views[3].kind, "system", "system 条目按原 kind 转出（渲染侧撤回判据据此不摆撤回钮）");
   assert.deepEqual(UL.queueItemViews([], null), [], "空队列 ⇒ 无行（渲染侧走占位）");
   // 渲染侧接线：随 role-state 快照**定点更新**（不重排手风琴）；仅当前查看角色；切角色经 renderRight 取数。
   assert.ok(RENDERER.includes("d.onRoleState") && RENDERER.includes("function updateRightQueue("), "随真实快照更新右栏待办组（不造第二套数据源）");

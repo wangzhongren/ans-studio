@@ -48,17 +48,43 @@
     return s;
   }
 
-  // —————— 系统投递输入的归类（H-1 附录，2026-10-12 客户观察：投递输入不得长得像"客户发的消息"）——————
-  // 判据（**单一来源依赖**，注释即契约）：投递正文由编排的两名函数**唯一生成**——
+  // —————— 系统投递输入的归类（H-1 附录，2026-10-12 客户观察：投递输入不得长得像"客户发的消息"；
+  //           G-2，2026-10-16 客户批准：新增 `system` 类，判据块见下方）——————
+  // 判据（**单一来源依赖**，注释即契约）：投递正文由编排 `src/common/编排/handback.ts` 的两名函数**唯一生成**——
   //   · `renderHandbackPrompt`：首行固定 `[回交] 来自 <角色> 的报告…`
-  //   · `renderDispatchPrompt`：固定 `[派发] 来自 <角色> 的任务：…`（本仓落地前同模板，见 session.ts 的登记）
+  //   · `renderDispatchPrompt`：首行固定 `[派发] 来自 su 的任务…`（G-1/A2 已收口：桌面本地副本已删除、
+  //     不得两处并存；原因段/必读块等扩展均不改变本归类依赖的前缀特征）
   // 适配器把**程序化输入**回显为 `用户指令：<正文>` 的 message 事件，故归类 =（剥掉可选的 `用户指令：`
-  // 前缀后）以 `[回交] ` / `[派发] ` **开头**。**这不是"看起来像"的启发式**：前缀就是两个渲染函数的定格
-  // 格式；格式若变，只改下表 `INJECT_PREFIXES`（唯一改动点），并同步渲染侧注释。
+  // 前缀后）以 `[回交] ` / `[派发] ` / `[系统·` **开头**——分类只依赖该前缀特征（`来自 X 的` 仅用于
+  // 提取来源角色），不解析正文其余部分。**这不是"看起来像"的启发式**：前缀就是各渲染函数首行的定格
+  // 格式；格式若变，只改下表 `INJECT_PREFIXES`（角色投递归类唯一改动点）与下方 `SYSTEM_HEAD`（系统类
+  // 唯一改动点），并同步渲染侧注释。
   var INJECT_PREFIXES = [
     { kind: "handback", prefix: "[回交] ", label: "回交投递" },
     { kind: "dispatch", prefix: "[派发] ", label: "派发" },
   ];
+
+  // —————— `system` 类投递输入的归类（G-2，2026-10-16 客户批准；设计 §3.3/§6.2/§7.3）——————
+  // 看护告警 / 收束提示 / 恢复回执都经既有投递机以 `kind:"system"` 真投递给 su，回显与回放路径与上面
+  // 两类同款。判据（**单一来源依赖**，注释即契约）：`system` 类投递正文的**文首定格标记**统一为
+  // `[系统·<子类>] `（设计 §3.3 `[系统·看护]`、§7.3 `[系统·收束]`；子类集合随编排 O1 的文案单一来源
+  // 落树扩充——判据只依赖该标记形态，不逐子类登记）。归类 =（剥掉可选 `用户指令：` 前缀后）以
+  // `[系统·` 开头、`<子类>` 闭合于 `]` 且其后为空白或文末（子类内无括号/换行、长度有界——
+  // 「看起来像」不归类）。来源标注 = **系统**（非角色）：`sourceRoleId` 恒空、标签带子类原文。
+  var SYSTEM_HEAD = "[系统·";
+  var SYSTEM_SUB_MAX = 12;
+
+  function classifySystemMessage(body) {
+    if (body.indexOf(SYSTEM_HEAD) !== 0) return null;
+    var rest = body.slice(SYSTEM_HEAD.length);
+    var end = rest.indexOf("]");
+    if (end < 1 || end > SYSTEM_SUB_MAX) return null;
+    var sub = rest.slice(0, end);
+    if (/[\[\]\r\n]/.test(sub)) return null;
+    var after = rest.slice(end + 1);
+    if (after !== "" && !/^\s/.test(after)) return null;
+    return { kind: "system", label: "系统消息 · " + sub, sourceRoleId: "", body: body };
+  }
 
   /** 识别"系统投递输入"的 message 事件/回放文本；非投递 → null（普通气泡路径不受影响）。 */
   function classifyInjectedMessage(raw) {
@@ -71,7 +97,7 @@
         return { kind: p.kind, label: p.label, sourceRoleId: m ? m[1] : "", body: body };
       }
     }
-    return null;
+    return classifySystemMessage(body);
   }
 
   // 展示事实只来自已存在的执行结果；accepted单独出现不是执行成功。

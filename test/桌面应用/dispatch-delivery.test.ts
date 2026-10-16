@@ -3,21 +3,29 @@
 // 路由（目标未开→自动开 / 忙→排队按序 / 失败→如实系统行+保留待重投）；校验（非本项目角色/su 自身/
 // 空参数 → **如实回执**给工具 + 系统行）；去重（**队列期窗口**，送达即释放以保返工可再派）；闭环
 // （su 派发 → 角色回交 → su 收到报告；不重复、不空转）。
+// G-1／A2（2026-10-16 客户批准；设计 2026-10-16 §四；编排 A1 接口交回 §五）：派发文本切编排单一来源
+// `renderDispatchPrompt`（本地副本 `renderDispatchPromptLocal` 已收口删除）；必读块接线（投递时探测
+// 哈希 → `planDispatchDelivery` 判据：契约缺失 fail-closed 拒投 / workflow 缺失降级照投）见文末 G-1 组。
 
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
 import { SessionManager } from "../../app/desktop/session.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
-import { renderHandbackPrompt, type TaskHandback } from "../../src/common/编排/handback.ts";
+import { renderHandbackPrompt, renderDispatchPrompt, extractDispatchReadPaths, type TaskHandback } from "../../src/common/编排/handback.ts";
 import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
 import type { DispatchTaskFn, DispatchReceipt } from "../../src/provider/pi/session.ts";
 import type { RoleSessionHandle, RoleSessionSendOptions } from "../../src/pipeline/orchestration/run-role.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
 import { configureDiagnostics, flushDiagnostics, disposeDiagnostics } from "../../src/common/shared/diagnostics.ts";
+// G-2/W5（2026-10-16 客户批准）：恢复确认卡（卡侧真件——present 收集 + respond 驱动「恰 allow:true 才执行」）
+// 与恢复提议能力（经 openRoleSession 捕获——仅 su 注入）。
+import { createRecoveryConfirmPresenter, type RecoveryConfirmRequest, type RecoveryConfirmRequestInput } from "../../app/desktop/recovery-channel.ts";
+import type { ProposeRecoveryFn, RoleStatusFn, SessionTailFn } from "../../src/model/runtime.ts";
 
 const tick = (ms = 60) => new Promise((r) => setTimeout(r, ms));
 
@@ -30,12 +38,12 @@ const HANDBACK_A: TaskHandback = {
   at: "2026-10-12T03:00:00.000Z",
 };
 
-/** 派发输入文案（与 session.ts 的 `renderDispatchPromptLocal` 同模板；编排 `renderDispatchPrompt`
- *  落地后，本期望改用它——见 change 文档的依赖登记）。 */
-const dispatchTemplate = (from: string, task: string, reason?: string) =>
-  `[派发] 来自 ${from} 的任务：${task}${reason ? `（原因：${reason}）` : ""}——完成后请交回报告`;
+/** 派发输入文案（无必读引用时）= 编排单一来源 `renderDispatchPrompt` 原文——G-1/A2 收口：桌面本地
+ *  模板（`renderDispatchPromptLocal`）已删除；现行格式为**三行**（首行含原因段 / 任务独占一行 /
+ *  末句带句号），与旧单行内联模板**不同布局**（金文本按单一来源重写，见各断言）。 */
+const dispatchTemplate = (task: string, reason?: string) => renderDispatchPrompt({ roleId: "目标", task, reason });
 
-function listing(): ProjectListing {
+function listing(projectRoot = "/proj"): ProjectListing {
   const mk = (roleId: string, builtIn = false): ProjectListing["roles"][number] => ({
     roleId,
     cardPath: builtIn ? "" : `角色卡/${roleId}/role-card.md`,
@@ -51,7 +59,7 @@ function listing(): ProjectListing {
     builtIn: builtIn ? true : undefined,
   });
   return {
-    projectRoot: "/proj",
+    projectRoot,
     roles: [mk("su", true), mk("A"), mk("B")],
     warnings: [],
     hasRoles: true,
@@ -73,17 +81,30 @@ interface Harness {
   hangNext: (roleId: string) => () => void;
   /** 各角色 send 的**并发峰值**（对同会话并发 send 的钉子：恒应 ≤1）。 */
   maxConcurrent: Record<string, number>;
+  /** 队列/状态快照外推（emitRoleState 捕获）——G-1 拒投「零入队」判据用（不造第二套数据源，直接收线上通道）。 */
+  roleStates: { roleId: string; summaries: string[] }[];
+  /** G-2/W5：打开会话时拿到的恢复提议/只读能力（仅 su 会话应注入）——测试直接调用以驱动桥。 */
+  proposeRecoveryOf: (roleId: string) => ProposeRecoveryFn | undefined;
+  roleStatusOf: (roleId: string) => RoleStatusFn | undefined;
+  sessionTailOf: (roleId: string) => SessionTailFn | undefined;
+  /** G-2/W4：各角色 abort 被调次数（恢复桥「恰一次执行」判据）。 */
+  aborts: Record<string, number>;
 }
 
-function makeHarness(opts: { failSends?: Record<string, number>; openDelayMs?: number } = {}): Harness {
-  const l = listing();
+function makeHarness(opts: { failSends?: Record<string, number>; openDelayMs?: number; projectRoot?: string; recoveryConfirm?: ReturnType<typeof createRecoveryConfirmPresenter>; unsupportedAbort?: string[] } = {}): Harness {
+  const root = opts.projectRoot ?? "/proj";
+  const l = listing(root);
   const streams: Record<string, OrchestrationEvent[]> = { su: [], A: [], B: [] };
   const sent: Record<string, string[]> = { su: [], A: [], B: [] };
   const sendOptions: Record<string, RoleSessionSendOptions[]> = {};
   const envelopes: import("../../app/desktop/session.ts").SessionEventEnvelope[] = [];
+  const roleStates: { roleId: string; summaries: string[] }[] = [];
   const openCalls: string[] = [];
-  const openInputs: Record<string, { dispatchTask?: DispatchTaskFn }> = {};
-  const stopped: Record<string, boolean> = {};
+  const openInputs: Record<string, { dispatchTask?: DispatchTaskFn; proposeRecovery?: ProposeRecoveryFn; roleStatus?: RoleStatusFn; sessionTail?: SessionTailFn }> = {};
+  const aborts: Record<string, number> = {};
+  // 注：`stopped` 逐句柄闭包（不是按 roleId 共享）——G-2/W4 的 rebuildSession 会 dispose 旧句柄、重开新句柄：
+  // 若按 roleId 共享，重开后的新迭代器会继承「已停」标记、consume 循环即时退出（重建后的事件全丢）。
+  // 生产语义：每句柄各有一条独立事件流（旧句柄停、新句柄活）——本夹具按生产语义建模。
   const failLeft: Record<string, number> = { ...(opts.failSends ?? {}) };
   const nextGate: Record<string, Promise<void> | undefined> = {};
   const activeSends: Record<string, number> = {};
@@ -96,6 +117,7 @@ function makeHarness(opts: { failSends?: Record<string, number>; openDelayMs?: n
 
   const makeHandle = (roleId: string): RoleSessionHandle => {
     let i = 0;
+    let stopped = false;
     return {
       async send(text: string, options?: RoleSessionSendOptions): Promise<void> {
         activeSends[roleId] = (activeSends[roleId] ?? 0) + 1;
@@ -122,7 +144,7 @@ function makeHarness(opts: { failSends?: Record<string, number>; openDelayMs?: n
             return {
               async next(): Promise<IteratorResult<OrchestrationEvent>> {
                 for (let tries = 0; tries < 120; tries += 1) {
-                  if (stopped[roleId]) return { value: undefined as unknown as OrchestrationEvent, done: true };
+                  if (stopped) return { value: undefined as unknown as OrchestrationEvent, done: true };
                   const arr = streams[roleId] || [];
                   if (i < arr.length) return { value: arr[i++], done: false };
                   await new Promise((r) => setTimeout(r, 5));
@@ -134,7 +156,13 @@ function makeHarness(opts: { failSends?: Record<string, number>; openDelayMs?: n
         };
       },
       async dispose(): Promise<void> {
-        stopped[roleId] = true;
+        stopped = true;
+      },
+      // G-2/W4：恢复桥 abort-turn 的调用面（三态契约与真实句柄同形；`unsupportedAbort` 角色模拟运行时不支持）。
+      async abort() {
+        aborts[roleId] = (aborts[roleId] ?? 0) + 1;
+        if ((opts.unsupportedAbort ?? []).includes(roleId)) return { ok: false, supported: false, error: "当前运行时不支持停止" };
+        return { ok: true, supported: true };
       },
     };
   };
@@ -142,7 +170,13 @@ function makeHarness(opts: { failSends?: Record<string, number>; openDelayMs?: n
   const mgr = new SessionManager({
     openRoleSession: async (input) => {
       openCalls.push(input.roleId);
-      openInputs[input.roleId] = { dispatchTask: (input as { dispatchTask?: DispatchTaskFn }).dispatchTask };
+      const inputWithCapabilities = input as { dispatchTask?: DispatchTaskFn; proposeRecovery?: ProposeRecoveryFn; roleStatus?: RoleStatusFn; sessionTail?: SessionTailFn };
+      openInputs[input.roleId] = {
+        dispatchTask: inputWithCapabilities.dispatchTask,
+        proposeRecovery: inputWithCapabilities.proposeRecovery,
+        roleStatus: inputWithCapabilities.roleStatus,
+        sessionTail: inputWithCapabilities.sessionTail,
+      };
       // F-2-opt2 夹具：可选的开会话延迟——让并发 open 真正重叠（互斥未落地时必现双开）。
       if ((opts.openDelayMs ?? 0) > 0) await new Promise((r) => setTimeout(r, opts.openDelayMs));
       return makeHandle(input.roleId);
@@ -154,10 +188,20 @@ function makeHarness(opts: { failSends?: Record<string, number>; openDelayMs?: n
       throw new Error("本用例不应构造 demo 适配器");
     },
     buildProjectConfig,
-    getListing: (root) => (root === "/proj" ? l : undefined),
+    getListing: (r) => (r === root ? l : undefined),
     emitEvent: (env) => envelopes.push(env),
+    emitRoleState: (info) => roleStates.push(info),
+    // G-2/W5：恢复确认卡通道（缺省 ⇒ 恢复桥「未接线、未获执行」fail-closed——本组两条路径都钉）。
+    recoveryConfirm: opts.recoveryConfirm,
   });
-  return { mgr, streams, sent, sendOptions, envelopes, openCalls, dispatchOf: (roleId) => openInputs[roleId]?.dispatchTask, hangNext, maxConcurrent };
+  return {
+    mgr, streams, sent, sendOptions, envelopes, openCalls,
+    dispatchOf: (roleId) => openInputs[roleId]?.dispatchTask,
+    proposeRecoveryOf: (roleId) => openInputs[roleId]?.proposeRecovery,
+    roleStatusOf: (roleId) => openInputs[roleId]?.roleStatus,
+    sessionTailOf: (roleId) => openInputs[roleId]?.sessionTail,
+    hangNext, maxConcurrent, roleStates, aborts,
+  };
 }
 
 test("H-1 路由：su 派发 → 目标未开**自动开**并收到派发输入（模板文案）；su 与目标两边都有系统行", async () => {
@@ -174,7 +218,7 @@ test("H-1 路由：su 派发 → 目标未开**自动开**并收到派发输入�
   await tick(150);
   assert.deepEqual(h.sendOptions.A.map(o => o.handback), [{ required: true }]);
   assert.ok(h.openCalls.includes("A"), "目标未开会话 ⇒ **自动开启**");
-  assert.deepEqual(h.sent.A, [dispatchTemplate("su", "给 A 的活", "因为排期")], "目标收到派发输入（模板文案）");
+  assert.deepEqual(h.sent.A, [dispatchTemplate("给 A 的活", "因为排期")], "目标收到派发输入（模板文案）");
   assert.ok(
     h.envelopes.some((e) => e.roleId === "su" && e.event.kind === "message" && (e.event.detail as {source?: string} | undefined)?.source === "delivery-note" && /已派发任务给 A/.test(e.event.summary)),
     "su 的 pane 有受理回执行"
@@ -200,7 +244,7 @@ test("H-1 排队：目标忙 ⇒ 入队；其 settled 后按序放行（绝不�
   h.streams.A.push({ kind: "settled", summary: "A 一轮结束" });
   await tick(150);
   assert.deepEqual(h.sendOptions.A.map(o => o.handback), [{ required: false }, { required: true }]);
-  assert.deepEqual(h.sent.A, ["A 先忙一会儿", dispatchTemplate("su", "排队活")], "settled 后按序放行派发");
+  assert.deepEqual(h.sent.A, ["A 先忙一会儿", dispatchTemplate("排队活")], "settled 后按序放行派发");
   await h.mgr.stop(null);
 });
 
@@ -221,7 +265,7 @@ test("H-1 失败保留：投递失败 ⇒ 如实系统行（未丢弃）+ 放回
   await tick(150);
   assert.ok(h.sendOptions.A.length >= 3);
   assert.ok(h.sendOptions.A.every(o => o.handback?.required === true), "每次重试保持正式任务来源");
-  assert.deepEqual(h.sent.A, [dispatchTemplate("su", "会失败一次")], "保留的派发在下次时机成功送达");
+  assert.deepEqual(h.sent.A, [dispatchTemplate("会失败一次")], "保留的派发在下次时机成功送达");
   await h.mgr.stop(null);
 });
 
@@ -265,7 +309,7 @@ test("H-1 去重：同一派发在**队列期**重复调用 → 去重（只投�
   assert.ok(/去重/.test(r2.message || ""), "在途窗口内重复调用 → 如实去重回执");
   h.streams.A.push({ kind: "settled", summary: "一轮结束" });
   await tick(150);
-  assert.deepEqual(h.sent.A, ["A 忙", dispatchTemplate("su", "返工：改 X")], "在途窗口内**只投一次**");
+  assert.deepEqual(h.sent.A, ["A 忙", dispatchTemplate("返工：改 X")], "在途窗口内**只投一次**");
 
   // 送达即释放窗口去重：同文再派（返工）应作为**新的一次**放行。
   const r3 = (await dispatch({ roleId: "A", task: "返工：改 X" })) as DispatchReceipt;
@@ -274,7 +318,7 @@ test("H-1 去重：同一派发在**队列期**重复调用 → 去重（只投�
   h.streams.A.push({ kind: "settled", summary: "又一轮结束" });
   await tick(150);
   assert.deepEqual(h.sendOptions.A.map(o => o.handback?.required), [false, true, true]);
-  assert.equal(h.sent.A.filter((t) => t === dispatchTemplate("su", "返工：改 X")).length, 2, "返工可再派（共两次投递）");
+  assert.equal(h.sent.A.filter((t) => t === dispatchTemplate("返工：改 X")).length, 2, "返工可再派（共两次投递）");
   await h.mgr.stop(null);
 });
 
@@ -293,7 +337,7 @@ test("真机崩溃修复（钉子）：派发条目**不走 handback 渲染**；
     await tick(120);
     assert.deepEqual(
       h.sent.A,
-      [dispatchTemplate("su", "正常派发")],
+      [dispatchTemplate("正常派发")],
       "dispatch 条目按**入队定格的派发文本**投递（不经 renderHandbackPrompt——真机崩溃根因即两者混走）"
     );
     // 同机并入一条**坏形状**回交（缺载荷）：应如实拦截，绝不产生未捕获拒绝。
@@ -319,7 +363,7 @@ test("H-1 闭环：su 派发 → 角色回交 → su 收到报告；不重复、
   const dispatch = h.dispatchOf("su")!;
   await dispatch({ roleId: "A", task: "做闭环" });
   await tick(120);
-  assert.deepEqual(h.sent.A, [dispatchTemplate("su", "做闭环")], "A 收到派发输入");
+  assert.deepEqual(h.sent.A, [dispatchTemplate("做闭环")], "A 收到派发输入");
 
   h.streams.A.push({ kind: "handback", summary: "回交 su：做完了", handback: HANDBACK_A });
   await tick(150);
@@ -343,7 +387,7 @@ test('delivery notes are typed system messages, never ghost tools or extra promp
   await tick(100);
   const worker=h.envelopes.filter(e=>e.roleId==='A');
   assert.equal(worker.filter(e=>e.event.kind==='tool_call').length,1,'the dispatch progress note must not add a second tool row');
-  assert.deepEqual(h.sent.A,[dispatchTemplate('su','one actual dispatch')]);assert.equal(h.sent.su.length,0,'notes never prompt the coordinator');
+  assert.deepEqual(h.sent.A,[dispatchTemplate('one actual dispatch')]);assert.equal(h.sent.su.length,0,'notes never prompt the coordinator');
   const notes=h.envelopes.filter(e=>e.event.kind==='message'&&(e.event.detail as {source?:string}|undefined)?.source==='delivery-note');
   assert.equal(notes.length,2);
   assert.ok(notes.some(e=>e.roleId==='A'&&e.event.summary==='已接收来自 su 的派发任务——请按任务文本执行，完成后交回报告。'));
@@ -374,13 +418,13 @@ test("F-2-T1 长轮不阻塞跨角色：A 的投递轮挂起期间，su 派发 B
   const r2 = (await dispatch({ roleId: "B", task: "另一条" })) as DispatchReceipt;
   assert.equal(r2.ok, true);
   await tick(100);
-  assert.deepEqual(h.sent.B, [dispatchTemplate("su", "另一条")], "**B 立即收到**——不被 A 的长轮持有（旧实现：链被持有贯穿 A 整轮，B 只能干等）");
+  assert.deepEqual(h.sent.B, [dispatchTemplate("另一条")], "**B 立即收到**——不被 A 的长轮持有（旧实现：链被持有贯穿 A 整轮，B 只能干等）");
   assert.deepEqual(h.sent.A, [], "此时 A 仍在挂起（对照面：不是靠 A 结束才送达 B）");
 
   releaseA();
   await tick(100);
-  assert.deepEqual(h.sent.A, [dispatchTemplate("su", "长活")], "放行后 A 的投递结算（恰一次）");
-  assert.deepEqual(h.sent.B, [dispatchTemplate("su", "另一条")], "B 无重复投递");
+  assert.deepEqual(h.sent.A, [dispatchTemplate("长活")], "放行后 A 的投递结算（恰一次）");
+  assert.deepEqual(h.sent.B, [dispatchTemplate("另一条")], "B 无重复投递");
   assert.equal(h.maxConcurrent.A, 1, "对 A 会话无并发 send");
   assert.equal(h.maxConcurrent.B, 1, "对 B 会话无并发 send");
   await h.mgr.stop(null);
@@ -403,12 +447,12 @@ test("F-2-T2 同目标仍严格排队：A 挂起期间再派 A ⇒ 排队（绝�
 
   releaseA();
   await tick(80);
-  assert.deepEqual(h.sent.A, [dispatchTemplate("su", "第一件")], "第一件送达");
+  assert.deepEqual(h.sent.A, [dispatchTemplate("第一件")], "第一件送达");
   h.streams.A.push({ kind: "settled", summary: "一轮结束" });
   await tick(200);
   assert.deepEqual(
     h.sent.A,
-    [dispatchTemplate("su", "第一件"), dispatchTemplate("su", "第二件")],
+    [dispatchTemplate("第一件"), dispatchTemplate("第二件")],
     "settled 后按到达序放行第二件（链释放后行为逐字保真）"
   );
   assert.equal(h.maxConcurrent.A, 1, "全程对同会话无并发 send");
@@ -440,7 +484,7 @@ test("F-2-opt2 openInternal 按会话键互斥：并发两次 open 同一角色 
   assert.equal((await userOpen).ok, true);
   await tick(200);
   assert.equal(h2.openCalls.filter((x) => x === "A").length, 1, "用户 open 与投递自动开同键：**恰一次**建会话");
-  assert.deepEqual(h2.sent.A, [dispatchTemplate("su", "触发自动开")], "派发照常送达一次（互斥不丢投递）");
+  assert.deepEqual(h2.sent.A, [dispatchTemplate("触发自动开")], "派发照常送达一次（互斥不丢投递）");
   await h2.mgr.stop(null);
 });
 
@@ -475,4 +519,405 @@ test("F-2-opt3 认领段起止诊断：delivery.claim.start/end 与 delivery.sta
     await disposeDiagnostics();
     await fs.rm(dir, { recursive: true, force: true });
   }
+});
+
+// ————— G-1／A2（2026-10-16 客户批准）：派发必读块投递侧接线 —————
+// 设计 `2026-10-16_design_contract-workflow-dispatch.md` §四/§八；编排 A1 接口交回 §五。
+// 分层：提取/判据/渲染 = 编排单一来源（`extractDispatchReadPaths`/`planDispatchDelivery`/
+// `renderDispatchPrompt`）；桌面只做：投递时 `filePrint` 探测 → 判据（**紧挨去重登记之前**）→
+// 拒投（fail-closed）或入队（文本定格）。以下用例全部走真实 SessionManager 接线。
+
+const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
+
+test("G-1/A2-1 必读块：任务引用 workflow+契约 ⇒ 投递文本带当刻哈希（按序：workflow 第 1、契约首现序、去重）；文本 = 编排单一来源渲染", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "ans-g1-reads-"));
+  const h = makeHarness({ projectRoot: dir });
+  try {
+    await fs.mkdir(path.join(dir, "docs", "contracts"), { recursive: true });
+    const contractBytes = "# 契约 v1：kanban-api\n接口：…\n";
+    const wfBytes = "# 项目工作流 W1\n## 2. 完成口令\n";
+    await fs.writeFile(path.join(dir, "docs", "contracts", "kanban-api-v1.md"), contractBytes, "utf8");
+    await fs.writeFile(path.join(dir, "docs", "workflow.md"), wfBytes, "utf8");
+    const contractHash = sha256(contractBytes);
+    const wfHash = sha256(wfBytes);
+
+    await h.mgr.open({ projectRoot: dir, roleId: "su", runtime: "demo" });
+    await tick(30);
+    const task = "实现 kanban。契约 `docs/contracts/kanban-api-v1.md` 为准；先读 docs/workflow.md；再引一次 docs/contracts/kanban-api-v1.md（去重）。";
+    const r = (await h.dispatchOf("su")!({ roleId: "A", task })) as DispatchReceipt;
+    assert.equal(r.ok, true);
+    await tick(150);
+    assert.equal(h.sent.A.length, 1, "目标收到恰一条派发");
+    const text = h.sent.A[0];
+
+    // ① 必读块在投递文本中；哈希为**测试独立计算**的当刻文件字节哈希；顺序/去重如实。
+    assert.ok(text.includes("必读（按序，先读完再动手；哈希由系统在投递时计算，与文件当刻字节绑定）："), "必读块在场");
+    assert.ok(text.includes(`  1. docs/workflow.md（sha256:${wfHash}）`), "workflow 条目第 1、哈希正确");
+    assert.ok(text.includes(`  2. docs/contracts/kanban-api-v1.md（sha256:${contractHash}）`), "契约条目第 2、哈希正确");
+    assert.equal(text.split("docs/contracts/kanban-api-v1.md（sha256:").length, 2, "重复引用去重（恰一条）");
+    // ② 单一来源断言：投递文本与编排 `renderDispatchPrompt`（同一 references）渲染**逐字一致**——本层不另写渲染。
+    assert.equal(
+      text,
+      renderDispatchPrompt({ roleId: "A", task }, {
+        references: [
+          { path: "docs/workflow.md", sha256: wfHash },
+          { path: "docs/contracts/kanban-api-v1.md", sha256: contractHash },
+        ],
+      }),
+      "投递文本 = 单一来源渲染（无本地模板——renderDispatchPromptLocal 已删）"
+    );
+    await h.mgr.stop(null);
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("G-1/A2-2 契约缺失 ⇒ fail-closed 拒投：如实回执（逐字）+ 系统行含 **未投递**；零入队/零开会话/目标零投递；补齐后重派**同一文本**必须受理（拒投不登记去重键）", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "ans-g1-reject-"));
+  const h = makeHarness({ projectRoot: dir });
+  try {
+    await h.mgr.open({ projectRoot: dir, roleId: "su", runtime: "demo" });
+    await tick(30);
+    const task = "按契约 docs/contracts/nope-v1.md 实施。";
+    const r = (await h.dispatchOf("su")!({ roleId: "A", task })) as DispatchReceipt;
+    assert.equal(r.ok, false, "契约缺失：派发未受理（fail-closed 拒投）");
+    assert.equal(r.message, "派发未受理：引用的契约 docs/contracts/nope-v1.md 不存在——未投递。", "回执逐字（单一来源 message）");
+    assert.ok(
+      h.envelopes.some((e) => e.roleId === "su" && e.event.kind === "message" && (e.event.detail as { source?: string } | undefined)?.source === "delivery-note"
+        && /引用的契约 docs\/contracts\/nope-v1\.md 不存在/.test(e.event.summary) && e.event.summary.includes("**未投递**")),
+      "su 聊天流有如实系统行（含 **未投递**，不静默）"
+    );
+    await tick(150);
+    assert.equal(h.sent.A.length, 0, "目标会话零投递");
+    assert.ok(!h.openCalls.includes("A"), "拒投不开目标会话");
+    assert.equal(h.roleStates.filter((s) => s.roleId === "A").length, 0, "队列零条目（拒投不入队——队列显示无幽灵行）");
+
+    // su 修正（落盘契约）后重派**同一任务文本**：拒投未登记去重键 ⇒ 本次必须受理（防「先登记后拒投」的键残留误去重）。
+    await fs.mkdir(path.join(dir, "docs", "contracts"), { recursive: true });
+    const fixedBytes = "# 修正后的契约\n";
+    await fs.writeFile(path.join(dir, "docs", "contracts", "nope-v1.md"), fixedBytes, "utf8");
+    const r2 = (await h.dispatchOf("su")!({ roleId: "A", task })) as DispatchReceipt;
+    assert.equal(r2.ok, true, "契约补齐后重派同一文本：受理");
+    assert.ok(!/去重/.test(r2.message ?? ""), "不是被误去重（键无残留）");
+    await tick(150);
+    assert.equal(h.sent.A.length, 1, "修正后投递成功（恰一条）");
+    assert.ok(h.sent.A[0].includes(`docs/contracts/nope-v1.md（sha256:${sha256(fixedBytes)}）`), "投递文本带修正后契约的必读条目（当刻哈希）");
+    await h.mgr.stop(null);
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("G-1/A2-3 workflow 缺失 ⇒ 降级标注照投（不拒投；块内如实注「本项目未提供 workflow.md」、不指向不在场文件）", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "ans-g1-degrade-"));
+  const h = makeHarness({ projectRoot: dir });
+  try {
+    await h.mgr.open({ projectRoot: dir, roleId: "su", runtime: "demo" });
+    await tick(30);
+    const task = "按 docs/workflow.md 的步骤表开工。";
+    const r = (await h.dispatchOf("su")!({ roleId: "A", task })) as DispatchReceipt;
+    assert.equal(r.ok, true, "workflow 缺失不拒投（V1 过渡期老项目向后兼容）");
+    await tick(150);
+    assert.equal(h.sent.A.length, 1, "照常投递");
+    const text = h.sent.A[0];
+    assert.ok(text.includes("（本项目未提供 workflow.md）"), "如实标注缺失（设计 §四.3 措辞）");
+    assert.ok(!text.includes("docs/workflow.md（sha256:"), "缺失行被省略（不指向不在场文件）");
+    assert.equal(text, renderDispatchPrompt({ roleId: "A", task }, { workflowMissing: true }), "降级文本 = 单一来源渲染");
+    await h.mgr.stop(null);
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("G-1/A2-4 不误捕：产物路径/普通 docs 路径/目录式 token 不产生引用 ⇒ 不注入必读块，文本 = 单一来源旧格式逐字", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "ans-g1-nocatch-"));
+  const h = makeHarness({ projectRoot: dir });
+  try {
+    const task = "产出写到 temp/out/report.md 并更新 docs/notes.md（均不在 docs/contracts/ 目录内）。";
+    assert.deepEqual(extractDispatchReadPaths(task), [], "提取器不误捕（单一来源；产物/普通 docs/目录式 token）");
+    await h.mgr.open({ projectRoot: dir, roleId: "su", runtime: "demo" });
+    await tick(30);
+    const r = (await h.dispatchOf("su")!({ roleId: "A", task })) as DispatchReceipt;
+    assert.equal(r.ok, true);
+    await tick(150);
+    assert.equal(h.sent.A[0], dispatchTemplate(task), "无引用 ⇒ 旧格式逐字（不注入必读块——不重排式的理由）");
+    assert.ok(!h.sent.A[0].includes("必读（按序"), "无必读块");
+    await h.mgr.stop(null);
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("G-1/A2-5 哈希定格于派发时刻：排队期间契约变更 ⇒ 已入队条目按旧哈希投递（重试复用同一文本）；送达后同文再派才用新哈希", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "ans-g1-freeze-"));
+  const h = makeHarness({ projectRoot: dir });
+  try {
+    await fs.mkdir(path.join(dir, "docs", "contracts"), { recursive: true });
+    const contractPath = path.join(dir, "docs", "contracts", "freeze-v1.md");
+    await fs.writeFile(contractPath, "C1\n", "utf8");
+    const hashC1 = sha256("C1\n");
+
+    await h.mgr.open({ projectRoot: dir, roleId: "A", runtime: "demo" });
+    await tick(30);
+    await h.mgr.send("A 先忙"); // A busy ⇒ 派发排队
+    await h.mgr.open({ projectRoot: dir, roleId: "su", runtime: "demo" });
+    await tick(30);
+    const task = "读契约 docs/contracts/freeze-v1.md 执行。";
+    const r1 = (await h.dispatchOf("su")!({ roleId: "A", task })) as DispatchReceipt;
+    assert.equal(r1.ok, true);
+    await tick(120);
+    assert.deepEqual(h.sent.A, ["A 先忙"], "A 忙：派发排队中（尚未投递）");
+
+    // 排队期间契约变更（对应「契约变更 ⇒ 调用方重验」的机械信号）；已入队条目按「派发那一刻」的版本投递。
+    await fs.writeFile(contractPath, "C2——内容已变更且更长\n", "utf8");
+    const hashC2 = sha256("C2——内容已变更且更长\n");
+    h.streams.A.push({ kind: "settled", summary: "一轮结束" });
+    await tick(200);
+    assert.equal(h.sent.A.length, 2, "settled 后按序放行");
+    assert.ok(h.sent.A[1].includes(`sha256:${hashC1}`), "已入队条目：定格旧哈希（绑定「派发那一刻的契约版本」）");
+    assert.ok(!h.sent.A[1].includes(`sha256:${hashC2}`), "不因文件变更而重算（重试用同一份）");
+
+    // 送达即释放去重窗口：同文再派 ⇒ 新一次投递，使用**当刻**内容哈希。
+    const r2 = (await h.dispatchOf("su")!({ roleId: "A", task })) as DispatchReceipt;
+    assert.equal(r2.ok, true);
+    await tick(120);
+    h.streams.A.push({ kind: "settled", summary: "又一轮结束" });
+    await tick(200);
+    assert.equal(h.sent.A.length, 3, "同文再派送达（返工回路不受必读块影响）");
+    assert.ok(h.sent.A[2].includes(`sha256:${hashC2}`), "新派发：当刻内容哈希（新版本地址）");
+    await h.mgr.stop(null);
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("G-1/A2-6 单一来源收口（代码级钉子）：本地副本已删除；session.ts 走编排三件套接线，不内嵌派发模板", async () => {
+  const SESS = await fs.readFile(new URL("../../app/desktop/session.ts", import.meta.url), "utf8");
+  // 函数定义/调用级判据（注释里保留了对已删副本的登记说明——那是合法的收口记录，不算「两处并存」）。
+  assert.ok(!SESS.includes("renderDispatchPromptLocal("), "本地副本 renderDispatchPromptLocal 的**实现/调用**已收口删除（不得两处并存）");
+  assert.ok(SESS.includes("extractDispatchReadPaths") && SESS.includes("planDispatchDelivery"), "接线走编排单一来源（提取/判据）");
+  assert.ok(!SESS.includes("[派发] 来自"), "session.ts 不再内嵌派发文案模板");
+});
+
+// ————————————————— G-2（2026-10-16 客户批准）：W5 恢复桥 / W4 恢复执行 / W1 数据源 / W2 system 投递机 —————————————————
+
+function makeRecoveryStub(): { presenter: ReturnType<typeof createRecoveryConfirmPresenter>; cards: (RecoveryConfirmRequestInput & { id: string })[] } {
+  const cards: (RecoveryConfirmRequestInput & { id: string })[] = [];
+  const presenter = createRecoveryConfirmPresenter({ present: (r) => cards.push(r), operatorId: "ops" });
+  return { presenter, cards };
+}
+
+test("G-2/W5 恢复桥：恰 allow:true 才执行（abort-turn 恰一次）；回执三路（工具回执/系统行/投递 su）；取消=未获执行", async () => {
+  const stub = makeRecoveryStub();
+  const h = makeHarness({ recoveryConfirm: stub.presenter });
+  await h.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
+  await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  await tick(30);
+  const propose = h.proposeRecoveryOf("su");
+  assert.ok(typeof propose === "function", "su 会话应注入恢复提议能力（proposeRecovery）");
+  assert.equal(h.proposeRecoveryOf("A"), undefined, "普通角色会话不注入（未取过即 undefined）");
+  assert.equal(h.roleStatusOf("A"), undefined, "role_status 数据源同判据（仅 su）");
+  assert.equal(h.sessionTailOf("A"), undefined, "session_tail 数据源同判据（仅 su）");
+  // —— 推卡：字段逐字/随带（U1 消费面形状）——
+  const pending = propose!({ roleId: "A", action: "abort-turn", evidence: "role_status：A 583s 无 settled", reason: "疑似卡死" });
+  await tick(20);
+  assert.equal(stub.cards.length, 1, "校验通过 ⇒ 恰推一张确认卡");
+  assert.equal(stub.cards[0].roleId, "A", "目标角色");
+  assert.equal(stub.cards[0].action, "abort-turn", "动作");
+  assert.equal(stub.cards[0].evidence, "role_status：A 583s 无 settled", "证据逐字");
+  assert.equal(stub.cards[0].requestedBy, "su", "提议者（呈现「由 su 提议」）");
+  assert.equal(stub.cards[0].projectRoot, "/proj", "随带 projectRoot（渲染侧视图过滤）");
+  assert.equal(stub.cards[0].runtime, "demo", "随带 runtime");
+  // 恰 allow:true ⇒ 执行（abort 恰一次）＋ 回执。
+  assert.equal(stub.presenter.respond({ id: stub.cards[0].id, allow: true }).ok, true);
+  const receipt = (await pending)!;
+  assert.equal(receipt.outcome, "executed", "恰 allow:true 才 executed");
+  assert.equal(h.aborts.A, 1, "动作恰执行一次");
+  assert.equal(receipt.operatorId, "ops", "确认者标识（回执字段）");
+  await tick(150);
+  assert.ok(h.sent.su.some((t) => t.startsWith("[系统·恢复]") && t.includes("abort-turn") && t.includes("A")), "回执经既有投递机投回 su（kind:system，文案＝编排单一来源）");
+  assert.ok(h.envelopes.some((e) => e.roleId === "su" && e.event.kind === "message" && (e.event.detail as { source?: string } | undefined)?.source === "delivery-note" && /恢复回执/.test(e.event.summary)), "UI 系统行如实");
+  // 同 id 迟到回包 → expired（幂等：恰执行一次）。
+  assert.equal(h.aborts.A, 1, "总数仍 1");
+  // —— 取消 = 未获执行（fail-closed）——
+  const pending2 = propose!({ roleId: "A", action: "abort-turn", evidence: "证据二" });
+  await tick(20);
+  stub.presenter.respond({ id: stub.cards[1].id, allow: false });
+  const receipt2 = (await pending2)!;
+  assert.equal(receipt2.outcome, "declined", "拒绝 ⇒ declined（未获执行）");
+  assert.equal(h.aborts.A, 1, "未获执行：动作**没有**发生");
+  await h.mgr.stop(null);
+});
+
+test("G-2/W5 恢复桥 fail-closed：通道未接线 ⇒ declined；非法载荷/内置角色 ⇒ error 且**不推卡**；拒绝式推达失败 ⇒ declined", async () => {
+  // —— 通道未接线（deps 缺省）——
+  const h = makeHarness();
+  await h.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
+  await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  await tick(30);
+  const propose = h.proposeRecoveryOf("su")!;
+  const r1 = (await propose({ roleId: "A", action: "rebuild-session", evidence: "e" }))!;
+  assert.equal(r1.outcome, "declined", "通道未接线 ⇒ 未获执行（fail-closed，绝不「没人问就执行」）");
+  assert.match(r1.message ?? "", /未接线|未获执行/, "如实文案");
+  // —— 非法载荷（模型输入不可信：全量重校验）——
+  const r2 = (await propose({ roleId: "su", action: "abort-turn", evidence: "e" }))!;
+  assert.equal(r2.outcome, "error", "内置治理角色目标 ⇒ error");
+  assert.match(r2.message ?? "", /内置治理角色|未受理/, "如实原因");
+  const r3 = (await propose({ roleId: "A", action: "bad-action" as never, evidence: "e" }))!;
+  assert.equal(r3.outcome, "error", "action 非枚举 ⇒ error");
+  const r4 = (await propose({ roleId: "A", action: "abort-turn", evidence: "   " }))!;
+  assert.equal(r4.outcome, "error", "evidence 空白 ⇒ error（无证据不提议）");
+  const r5 = (await propose({ roleId: "不存在", action: "abort-turn", evidence: "e" }))!;
+  assert.equal(r5.outcome, "error", "非本项目角色 ⇒ error");
+  // —— 推达失败（窗口已关等）⇒ 未获执行 ——
+  const stub = makeRecoveryStub();
+  const h2 = makeHarness({
+    recoveryConfirm: createRecoveryConfirmPresenter({
+      present: () => { throw new Error("窗口已关闭"); },
+      operatorId: "ops",
+    }),
+  });
+  await h2.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
+  await h2.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  await tick(30);
+  const r6 = (await h2.proposeRecoveryOf("su")!({ roleId: "A", action: "abort-turn", evidence: "e" }))!;
+  assert.equal(r6.outcome, "declined", "推达失败 ⇒ 未获执行（fail-closed）");
+  assert.equal(h2.aborts.A ?? 0, 0, "零执行（从未 abort）");
+  assert.ok(stub.cards.length === 0);
+  await h.mgr.stop(null);
+  await h2.mgr.stop(null);
+});
+
+test("G-2/W5 桥三态：运行时不支持 ⇒ outcome=unsupported（绝不假装已执行）；rebuild 在跑 ⇒ outcome=error（前提不满足）", async () => {
+  const stub = makeRecoveryStub();
+  const h = makeHarness({ recoveryConfirm: stub.presenter, unsupportedAbort: ["B"] });
+  await h.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
+  await h.mgr.open({ projectRoot: "/proj", roleId: "B", runtime: "demo" });
+  await tick(30);
+  const propose = h.proposeRecoveryOf("su")!;
+  const pending = propose({ roleId: "B", action: "abort-turn", evidence: "证据" });
+  await tick(20);
+  stub.presenter.respond({ id: stub.cards[0].id, allow: true });
+  const receipt = (await pending)!;
+  assert.equal(receipt.outcome, "unsupported", "三态如实：unsupported ≠ executed");
+  assert.match(receipt.message ?? "", /不支持/, "原因进回执");
+  // rebuild 遇在跑轮次拒绝 ⇒ error（设计 §九：前提不满足）。
+  await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  await tick(30);
+  const release = h.hangNext("A");
+  const busy = h.mgr.send("占住 A", undefined, { roleId: "A" });
+  await tick(20);
+  const pending2 = propose({ roleId: "A", action: "rebuild-session", evidence: "证据2" });
+  await tick(20);
+  stub.presenter.respond({ id: stub.cards[1].id, allow: true });
+  const receipt2 = (await pending2)!;
+  assert.equal(receipt2.outcome, "error", "在跑轮次不打断 ⇒ error（未执行，如实原因）");
+  assert.match(receipt2.message ?? "", /在跑|不打断/, "原因进回执");
+  release();
+  await busy;
+  await h.mgr.stop(null);
+});
+
+test("G-2/W4：rebuildSession——在跑轮次不打断（busy 拒绝）；空闲重建（保留回放；drain 续投）；redeliverNudge 条目不存在如实/触发重试", async () => {
+  const h = makeHarness();
+  await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  await tick(30);
+  // —— busy ⇒ 拒绝（不打断）——
+  const release = h.hangNext("A");
+  const busy = h.mgr.send("占住 A");
+  await tick(20);
+  const denied = await h.mgr.rebuildSession({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  assert.equal(denied.ok, false, "在跑轮次不打断（busy ⇒ 拒绝并如实回执）");
+  assert.match(denied.error ?? "", /在跑|不打断/, "如实原因");
+  release();
+  await busy;
+  h.streams.A.push({ kind: "settled", summary: "结束" });
+  await tick(150);
+  // —— 空闲重建 ——
+  const rebuilt = await h.mgr.rebuildSession({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  assert.equal(rebuilt.ok, true, "空闲 ⇒ dispose＋重开");
+  assert.equal(h.openCalls.filter((r) => r === "A").length, 2, "重开 = 再开一次会话（保留 ANS 回放）");
+  assert.ok(h.envelopes.some((e) => e.roleId === "A" && e.event.kind === "message" && /已按要求（客户确认的恢复动作）重建/.test(e.event.summary)), "UI 行如实");
+  // —— redeliverNudge：条目不存在 ⇒ 如实；存在 ⇒ 触发 drain 投出 ——
+  const missing = await h.mgr.redeliverNudge({ projectRoot: "/proj", roleId: "A", runtime: "demo" }, "不存在");
+  assert.equal(missing.ok, false, "条目不在排队中 ⇒ 如实回执");
+  assert.match(missing.message, /不在排队中/, "未触发重试");
+  // A 忙时向 A 派发（进队列）——再用 redeliverNudge 触发即时重试。
+  const release2 = h.hangNext("A");
+  const busy2 = h.mgr.send("再占住");
+  await tick(20);
+  const dispatch = h.dispatchOf("su");
+  // su 会话未开：先开 su 拿派发能力（打开不动 A）。
+  await h.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
+  await tick(30);
+  await h.dispatchOf("su")!({ roleId: "A", task: "排队活" });
+  await tick(60);
+  const qView = h.roleStates.filter((s) => s.roleId === "A").at(-1);
+  const queuedId = (qView as unknown as { queue?: { id: string }[] } | undefined)?.queue?.[0]?.id ?? "";
+  const nudgeQueued = await h.mgr.redeliverNudge({ projectRoot: "/proj", roleId: "A", runtime: "demo" }, queuedId);
+  assert.equal(nudgeQueued.ok, true, "触发队列重试（目标忙 ⇒ 保留待重试——如实）");
+  assert.match(nudgeQueued.message, /仍在队列|保留待重试/, "不把「已触发重试」写成「已投出」");
+  release2();
+  await busy2;
+  h.streams.A.push({ kind: "settled", summary: "结束" });
+  await tick(150);
+  assert.ok(h.sent.A.includes(dispatchTemplate("排队活")), "settled 后按既有语义投出（redeliver 不新造投递路径）");
+  await h.mgr.stop(null);
+});
+
+test("G-2/W1 数据源：role_status 结构化文本（busy/队列/最近一轮/看护行）；session_tail 无历史如实；两工具**纯读**（前后快照逐字段一致）", async () => {
+  const h = makeHarness();
+  await h.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
+  await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  await tick(30);
+  const roleStatus = h.roleStatusOf("su")!;
+  const sessionTail = h.sessionTailOf("su")!;
+  const s1 = h.mgr.send("干活");
+  await tick(20);
+  const busyView = (await roleStatus({ roleId: "A" }))!;
+  assert.equal(busyView.ok, true, "纯读成功");
+  assert.ok((busyView.text ?? "").includes("角色 A") && /busy=true/.test(busyView.text ?? ""), "角色行含 busy 事实");
+  assert.ok((busyView.text ?? "").includes("su："), "su 概览行");
+  h.streams.A.push({ kind: "settled", summary: "结束", detail: { outcome: "completed" } });
+  await s1;
+  await tick(150);
+  const afterView = (await roleStatus({}))!;
+  assert.ok(/最近一轮：completed @/.test(afterView.text ?? ""), "最近一轮（lastTurn 小状态）");
+  // 队列明细：忙时入队的客户消息。
+  await h.mgr.send("排队甲");
+  const queuedView = (await roleStatus({ roleId: "su" }))!;
+  assert.ok(/队列 \d/.test(queuedView.text ?? ""), "队列行");
+  // session_tail：本项目角色从无会话文件 ⇒ 如实「无会话历史」（不抛不猜）。
+  const tail = (await sessionTail({ roleId: "A", lines: 10 }))!;
+  assert.equal(tail.ok, false, "无历史 ⇒ ok:false + 如实 message");
+  assert.match(tail.message ?? "", /无会话历史|读取未完成/, "如实文本");
+  // 纯读保证：只读调用的直接前后快照逐字段一致（无副作用）。先稳定到空闲，再夹住两次只读调用。
+  await tick(200);
+  const beforeReads = JSON.stringify({ snap: h.mgr.watchdogSnapshot("/proj"), last: h.mgr.lastTurnOf("/proj", "A", "demo") ?? null });
+  await roleStatus({ roleId: "A" });
+  await roleStatus({ includeDiagnostics: true });
+  await sessionTail({ roleId: "A", lines: 5 });
+  const afterReads = JSON.stringify({ snap: h.mgr.watchdogSnapshot("/proj"), last: h.mgr.lastTurnOf("/proj", "A", "demo") ?? null });
+  assert.equal(afterReads, beforeReads, "role_status/session_tail 调用不改任何运行态（纯读）");
+  await h.mgr.stop(null);
+});
+
+test("G-2/W2：system 投递失败 ⇒ 如实系统行＋放回队首保留（未丢弃）；下次时机自动重试成功", async () => {
+  const h = makeHarness({ failSends: { su: 1 } });
+  await h.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
+  await tick(30);
+  h.mgr.watchdogDeliver("/proj", { text: "[系统·看护] 失败重试钉子：角色「A」。", summary: "系统·看护 · 钉子", dedupKey: "watchdog\u0000/proj\u0000retry\u00000" });
+  await tick(150);
+  assert.ok(
+    h.envelopes.some((e) => e.event.kind === "message" && (e.event.detail as { source?: string } | undefined)?.source === "delivery-note" && /系统消息投递失败/.test(e.event.summary)),
+    "失败如实系统行（绝不静默丢）",
+  );
+  const q = h.roleStates.filter((s) => s.roleId === "su").at(-1) as unknown as { queue: { kind: string; summary: string }[] };
+  assert.equal(q.queue.length, 1, "放回队首保留（summary 还原）");
+  assert.equal(q.queue[0].kind, "system", "第四类 kind 保留");
+  // 下次时机（settled 触发的放行）→ 成功送达。
+  h.streams.su.push({ kind: "settled", summary: "时机" });
+  await tick(200);
+  assert.ok(h.sent.su.includes("[系统·看护] 失败重试钉子：角色「A」。"), "重试成功送达（同一份文本，不重渲染）");
+  await h.mgr.stop(null);
 });

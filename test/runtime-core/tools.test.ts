@@ -19,8 +19,8 @@ test("Model/schema: required write/edit fields, optionals, unknown names and inj
   assert.deepEqual(describeTool("read_file").parameters.required, ["path"]);
   assert.throws(() => describeTool("native_shell"), /未知/);
   assert.deepEqual([...tools(allow).keys()], ["write_file", "edit_file", "read_file"]);
-  const all = tools(allow, { shellGate: async () => ({ allow: false, reason: "deny", by: "fixture" }), customerInput: () => ({ outcome: "declined" }), reportHandback: () => {}, dispatchTask: () => {}, shellVerdict: () => {} });
-  assert.equal(all.size, 9);
+  const all = tools(allow, { shellGate: async () => ({ allow: false, reason: "deny", by: "fixture" }), customerInput: () => ({ outcome: "declined" }), reportHandback: () => {}, dispatchTask: () => {}, shellVerdict: () => {}, roleStatus: () => ({ ok: true, text: "stub" }), sessionTail: () => ({ ok: true, text: "stub" }), proposeRecovery: () => ({ outcome: "declined" }) });
+  assert.equal(all.size, 12);
   for (const tool of all.values()) {
     assert.equal(tool.inputSchema.type, "object");
     assert.ok(tool.description.length);
@@ -50,6 +50,41 @@ test("schema 文案（客户 2026-10-16 su 预置裁定配套）：request_confi
   assert.match(text, /获准的唯一凭据是 `confirmed:true`/);
   assert.match(text, /未获同意/);
   assert.match(text, /不等于/);
+});
+
+test("schema 文案（G-1/A4）：dispatch_task 钉住「先落盘再派发」与「必读（按序）」按地址引用；必备语义逐字保留", () => {
+  const dispatch = describeTool("dispatch_task");
+  const text = [dispatch.description, ...(dispatch.promptGuidelines ?? [])].join("\n");
+  // G-1 新增（设计 2026-10-16_design_contract-workflow-dispatch.md §四，A4）：多角色/跨角色协作先落盘再派发
+  // （契约 docs/contracts/<name>-v<N>.md、工作流 docs/workflow.md）；任务文本按地址引用、不内嵌契约全文；
+  // 「必读（按序）」块由投递系统附上、sha256 投递时算（su 不手算/不转抄）；契约缺失拒投（fail-closed）、
+  // workflow 缺失降级（不拒投、如实标注）。
+  assert.match(text, /先落盘再派发/, "须写明「先落盘再派发」");
+  assert.match(text, /docs\/contracts\/<name>-v<N>\.md/, "须给出契约落盘位置的版本化命名");
+  assert.match(text, /docs\/workflow\.md/, "须给出工作流落盘位置");
+  assert.match(text, /按地址引用/, "任务文本须按地址引用契约与工作流");
+  assert.match(text, /不内嵌契约全文/, "不得把契约全文内嵌进派发文本");
+  assert.match(text, /必读（按序）/, "必读块名须为「必读（按序）」");
+  assert.match(text, /先读完再动手/, "必读块语义：先读完再动手");
+  assert.match(text, /不要自己算或转抄哈希/, "哈希由投递系统在投递时计算——su 不得手算/转抄");
+  assert.match(text, /引用的契约文件不存在时投递会被\*\*拒绝\*\*/, "契约缺失须写明 fail-closed 拒投");
+  assert.match(text, /不拒投/, "workflow.md 缺失须按降级口径（不拒投）");
+  assert.match(text, /未提供/, "workflow.md 缺失须如实标注「未提供」");
+  // 必备语义逐字保留（与 test/pi-adapter/dispatch-task.test.ts 的 H-1 断言面同源）：派发≠授权 /
+  // 不代授权 / 任务自足三要素 / 返工带证据；反向断言不得暗示派发携带授权。
+  assert.match(text, /派发 ≠ 授权/);
+  assert.match(text, /自足/);
+  assert.match(text, /看不到你的上下文/);
+  assert.match(text, /返工/);
+  assert.match(text, /不改变任何角色的写权/);
+  assert.equal(
+    /已获授权|已放行写盘|授予写权|授权写盘|代为授权成功/.test(text),
+    false,
+    `不得暗示派发携带授权：${text}`,
+  );
+  // 参数形状与执行模式不变（只动文案，不动判定/权限）。
+  assert.deepEqual(dispatch.parameters.required, ["roleId", "task"]);
+  assert.equal(dispatch.executionMode, undefined);
 });
 
 test("gate deny/throw and gate-triggered abort produce zero filesystem effects", async () => {

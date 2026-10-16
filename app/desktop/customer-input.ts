@@ -102,6 +102,11 @@ export interface CustomerInputChannel {
   rejectAllPending(reason: string): void;
   /** 当前挂起数（测试/如实呈现用）。 */
   pendingCount(): number;
+  /**
+   * **按角色挂起数**（G-2/W1 依赖项，2026-10-16 客户批准）：看护信号 #1「轮次逼近超时」对**带挂起确认卡的
+   * 角色**不计入（正确等待不报）——主进程把本视图与 shell 卡/恢复卡的按角色视图合并后交看护。纯读。
+   */
+  pendingRoles(): Map<string, number>;
   replayPending(): number;
 }
 
@@ -253,7 +258,17 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     diagnostic.record("interaction.replayed", { count });
     return count;
   }
-  return { customerInput, respond, rejectAllPending, pendingCount: () => pending.size, replayPending };
+
+  /** 按角色挂起数（G-2/W1；纯读——请求本体不带 roleId，取每会话闭包绑定的 `payload.roleId`）。 */
+  function pendingRoles(): Map<string, number> {
+    const counts = new Map<string, number>();
+    for (const entry of pending.values()) {
+      const roleId = entry.payload.roleId;
+      if (typeof roleId === "string" && roleId !== "") counts.set(roleId, (counts.get(roleId) ?? 0) + 1);
+    }
+    return counts;
+  }
+  return { customerInput, respond, rejectAllPending, pendingCount: () => pending.size, pendingRoles, replayPending };
 }
 
 function reasonOf(err: unknown): string {

@@ -17,6 +17,12 @@ import type {
   ReportHandbackPayload,
   DispatchTaskFn,
   DispatchTaskPayload,
+  RoleStatusFn,
+  RoleStatusPayload,
+  SessionTailFn,
+  ProposeRecoveryFn,
+  ProposeRecoveryPayload,
+  RecoveryAction,
   ShellVerdictFn,
   ShellVerdictPayload,
   InteractionGate,
@@ -64,6 +70,15 @@ export const DISPATCH_TASK_TOOL_NAME = "dispatch_task";
 
 /** report_shell_verdict 工具名（R-1；审读会话交回结构化审读结论；与编排 shell-gate.ts:206 同串）。 */
 export const SHELL_VERDICT_TOOL_NAME = "report_shell_verdict";
+
+/** role_status 工具名（G-2/R1；su 只读状态查询——看护回路自查入口，纯读无副作用）。 */
+export const ROLE_STATUS_TOOL_NAME = "role_status";
+
+/** session_tail 工具名（G-2/R1；su 只读会话尾线——受保护投影后的规范化行，纯读无副作用）。 */
+export const SESSION_TAIL_TOOL_NAME = "session_tail";
+
+/** propose_recovery 工具名（G-2/R2；su 恢复提议——只提议，客户一键确认后由应用执行）。 */
+export const PROPOSE_RECOVERY_TOOL_NAME = "propose_recovery";
 
 /** 扩展层对 run_shell 的能力级判定结果：非 undefined 即阻断（默认拒绝）。 */
 export interface ShellKillSwitchDecision {
@@ -706,6 +721,8 @@ function abortedToolResult(name: string): ToolResult {
   if (name === SUBMIT_REPORT_TOOL_NAME) return { ok: false, message: `${name}：报告**未能交回**（原因：会话已中止）` };
   if (name === SHELL_VERDICT_TOOL_NAME) return { ok: false, message: `${name}：审读结论**未能交回**（原因：会话已中止）` };
   if (name === DISPATCH_TASK_TOOL_NAME) return { ok: false, message: `${name}：任务**未能派发**（原因：会话已中止）` };
+  // G-2/R2：中止时**不假设已执行**——等待被中止的提议其结果以系统回执为准（确认卡可能仍被处理）。
+  if (name === PROPOSE_RECOVERY_TOOL_NAME) return { ok: false, message: `${name}：本次提议**未获结果**（原因：会话已中止）——**不要假设已执行**；如实告知客户。` };
   return { ok: false, message: `${name}：会话已中止，未执行` };
 }
 
@@ -1091,6 +1108,229 @@ function makeReportShellVerdictTool(fn: ShellVerdictFn): ExecutableTool {
   };
 }
 
+// —————————————— 看护只读工具 + 恢复提议（G-2；role_status / session_tail / propose_recovery） ——————————————
+//
+// 依据：客户 2026-10-16 批准 G-2（设计 `角色卡/产品/docs/design/2026-10-16_design_role-watchdog-and-closure.md`
+// §四/§六；PM 派发「运行时核心＝R1/R2」）。三工具均**只给 su**——由调用方（编排注入端，判据沿
+// dispatch_task 的 suppressHandback 先例）决定**注入才注册**（未注入 ⇒ 工具不存在 = 最强 fail-closed）。
+// 本层纪律：role_status / session_tail **纯读**（无任何副作用；数据源由桌面窗口按同源快照/受保护投影提供）；
+// propose_recovery **只提交载荷、如实转达三态回执**——提议 ≠ 执行、执行以客户确认为准、不得承诺。
+
+/** role_status 输出上限（G-2 §4.1：8 KiB；超限按字节截断并如实标注 truncated）。 */
+const ROLE_STATUS_MAX_BYTES = 8 * 1024;
+
+/** 截断标注（含设计规定的 `truncated` 字样；按字节预留后保证总输出 ≤ 8 KiB）。 */
+const ROLE_STATUS_TRUNCATED_MARKER = "\n[truncated：状态输出超过 8 KiB 上限，已按 UTF-8 字节截断]";
+
+/** 按 UTF-8 **字节**上限截断（不劈开多字节码点与代理对）；未超限原样返回。 */
+function truncateUtf8(text: string, maxBytes: number): { text: string; truncated: boolean } {
+  if (Buffer.byteLength(text, "utf8") <= maxBytes) return { text, truncated: false };
+  let lo = 0;
+  let hi = text.length;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (Buffer.byteLength(text.slice(0, mid), "utf8") <= maxBytes) lo = mid;
+    else hi = mid - 1;
+  }
+  let cut = lo;
+  if (cut > 0) {
+    const last = text.charCodeAt(cut - 1);
+    if (last >= 0xd800 && last <= 0xdbff) cut -= 1; // 不劈开代理对
+  }
+  return { text: text.slice(0, cut), truncated: true };
+}
+
+/**
+ * 读类回执归一（G-2/R1）：接受契约 `WatchdogToolResult` 形状；**契约外**（null/非对象/ok 非布尔）
+ * → `undefined`，由调用方按「未获明确结果」fail-closed 如实转达——**绝不把不明结果当成功或编造内容**。
+ */
+function watchdogResultOf(value: unknown): { ok: true; text: unknown } | { ok: false; message: unknown } | undefined {
+  if (value === null || typeof value !== "object") return undefined;
+  const record = value as Record<string, unknown>;
+  if (record["ok"] === true) return { ok: true, text: record["text"] };
+  if (record["ok"] === false) return { ok: false, message: record["message"] };
+  return undefined;
+}
+
+/** 读类 ok:false 的如实转达（数据源 message 原样；未提供原因则如实标注）。 */
+function watchdogFailureMessage(name: string, message: unknown): string {
+  return typeof message === "string" && message.trim() !== "" ? message : `${name}：数据源如实报告失败（未提供原因）`;
+}
+
+/**
+ * role_status：su 的**只读**状态查询（G-2 §4.1）。本层只做三件事：归一查询 → 调注入数据源
+ * （`raceAbort`：会话中止即立即返回，不挂起）→ 如实转达（≤8 KiB；超限截断并标注 truncated）。
+ * **绝无副作用**：不写盘、不入队、不改任何状态、不动任何判定链；数据源抛错/回执缺失如实回报
+ * 「读取未完成/结果不明」，**绝不编造状态**。
+ */
+function makeRoleStatusTool(fn: RoleStatusFn, currentTurnId?: () => string | undefined, scope?: Pick<GovernedToolsOptions, "roleId" | "runtime">): ExecutableTool {
+  const name = ROLE_STATUS_TOOL_NAME;
+  return {
+    name,
+    async handler(call) {
+      const turnId = currentTurnId?.();
+      const roleId = readStringArg(call.args, ["roleId", "role_id", "role"]);
+      // 给了 roleId 键但值不是字符串 → 拒绝（本工具「缺省＝概览」意味着静默丢弃会给 su 错误的全景）；
+      // 空字符串视作缺省（＝概览，无副作用无歧义）。
+      if (roleId === undefined && ["roleId", "role_id", "role"].some((key) => call.args[key] !== undefined && call.args[key] !== null)) {
+        return { ok: false, message: `${name}: roleId 参数非法（应为字符串；缺省＝全项目概览）` };
+      }
+      const includeRaw = call.args["includeDiagnostics"];
+      // 空字符串 roleId 视作缺省（＝概览）；includeDiagnostics 非布尔视作未提供（沿 request_choice
+      // `multiple` 先例：辅助布尔不猜、不因类型不合就打断查询）。
+      const query: RoleStatusPayload = {
+        ...(roleId !== undefined && roleId.trim() !== "" ? { roleId } : {}),
+        ...(includeRaw === true ? { includeDiagnostics: true } : {}),
+      };
+      let result: unknown;
+      try {
+        result = await raceAbort(Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return turnId === undefined ? fn(query) : fn(query, handbackMetadata(turnId, scope)); }), call.signal, `${name} 读取状态`);
+      } catch (err) {
+        return { ok: false, message: `${name}：状态读取**未完成**（原因：${reasonOf(err)}）——没有拿到快照就**不要推断项目状态**；如确需，可稍后重试。` };
+      }
+      const receipt = watchdogResultOf(result);
+      if (receipt === undefined) {
+        return { ok: false, message: `${name}：数据源未返回明确结果（回执缺失或非法）——**不要据此判断任何状态**。` };
+      }
+      if (!receipt.ok) return { ok: false, message: watchdogFailureMessage(name, receipt.message) };
+      if (typeof receipt.text !== "string" || receipt.text === "") {
+        return { ok: false, message: `${name}：数据源未返回文本（结果不明）——**不要据此判断任何状态**。` };
+      }
+      const text = receipt.text;
+      if (Buffer.byteLength(text, "utf8") <= ROLE_STATUS_MAX_BYTES) return { ok: true, message: text };
+      const capped = truncateUtf8(text, ROLE_STATUS_MAX_BYTES - Buffer.byteLength(ROLE_STATUS_TRUNCATED_MARKER, "utf8"));
+      return { ok: true, message: `${capped.text}${ROLE_STATUS_TRUNCATED_MARKER}` };
+    },
+  };
+}
+
+/** session_tail 行数（G-2 §4.2）：缺省 40、上限 200（工具层归一后传给数据源）。 */
+const SESSION_TAIL_DEFAULT_LINES = 40;
+const SESSION_TAIL_MAX_LINES = 200;
+
+/**
+ * session_tail：su 的**只读**会话尾线（G-2 §4.2）。行数归一（缺省 40、上限 200——超上限按上限取并
+ * 如实标注）→ 调注入数据源（受保护投影链上产出）→ 原样转达。**绝无副作用**：不重放、不恢复、不修改
+ * 任何会话；数据源抛错/回执缺失如实回报，不编造会话内容。
+ */
+function makeSessionTailTool(fn: SessionTailFn, currentTurnId?: () => string | undefined, scope?: Pick<GovernedToolsOptions, "roleId" | "runtime">): ExecutableTool {
+  const name = SESSION_TAIL_TOOL_NAME;
+  return {
+    name,
+    async handler(call) {
+      const turnId = currentTurnId?.();
+      const roleId = readStringArg(call.args, ["roleId", "role_id", "role"]);
+      if (roleId === undefined || roleId.trim() === "") {
+        return { ok: false, message: `${name}: 缺少 roleId 参数（目标角色 id），无法读取会话尾部` };
+      }
+      const linesRaw = call.args["lines"];
+      if (linesRaw !== undefined && linesRaw !== null && (typeof linesRaw !== "number" || !Number.isInteger(linesRaw) || linesRaw < 1)) {
+        return { ok: false, message: `${name}: lines 参数非法（应为 ≥1 的整数；缺省 ${SESSION_TAIL_DEFAULT_LINES}，上限 ${SESSION_TAIL_MAX_LINES}）` };
+      }
+      const requested = typeof linesRaw === "number" ? linesRaw : SESSION_TAIL_DEFAULT_LINES;
+      const lines = Math.min(requested, SESSION_TAIL_MAX_LINES);
+      let result: unknown;
+      try {
+        result = await raceAbort(Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return turnId === undefined ? fn({ roleId, lines }) : fn({ roleId, lines }, handbackMetadata(turnId, scope)); }), call.signal, `${name} 读取会话尾部`);
+      } catch (err) {
+        return { ok: false, message: `${name}：会话尾部读取**未完成**（原因：${reasonOf(err)}）——不要凭空推断该角色会话内容。` };
+      }
+      const receipt = watchdogResultOf(result);
+      if (receipt === undefined) {
+        return { ok: false, message: `${name}：数据源未返回明确结果（回执缺失或非法）——不要据此判断会话内容。` };
+      }
+      if (!receipt.ok) return { ok: false, message: watchdogFailureMessage(name, receipt.message) };
+      if (typeof receipt.text !== "string" || receipt.text === "") {
+        return { ok: false, message: `${name}：数据源未返回文本（结果不明）——不要据此判断会话内容。` };
+      }
+      const clampNote = requested > SESSION_TAIL_MAX_LINES ? `[已按上限取尾：请求 ${requested} 行 → 取 ${SESSION_TAIL_MAX_LINES} 行]\n` : "";
+      return { ok: true, message: `${clampNote}${receipt.text}` };
+    },
+  };
+}
+
+/** 恢复动作三值（G-2 §6.3，客户批准）。工具层严格校验（非法 → 拒绝且**不调用能力**，沿 report_shell_verdict 先例）。 */
+const RECOVERY_ACTIONS: readonly RecoveryAction[] = ["abort-turn", "rebuild-session", "redeliver"];
+
+/**
+ * propose_recovery：**恢复提议**工具（G-2 §6，**只给 su**）。把 `{roleId, action, evidence, reason?, itemId?}`
+ * 交给注入的能力（桌面路由：校验 → 恢复确认卡 →（恰 allow:true 才）执行 → 三态回执）。
+ *
+ * 纪律（与 dispatch_task 同）：**本层不执行任何动作、不做治理判定、不改变任何权限/写权**——handler 只把
+ * 载荷交给注入的能力并**如实**转达**回执**（契约 `RecoveryOutcome`，恰四值、**后三值一律未执行**）：
+ * - `executed` →「客户已确认，恢复动作已执行」——**唯一**可称已执行的路径；
+ * - `declined` → `ok:false`「**未获执行**」（取消/关窗/通道关闭，fail-closed，零执行），**绝不当成功**；
+ * - `unsupported` → `ok:false`「**未执行**——当前运行时不支持」（绝不假装已执行）；
+ * - `error` → `ok:false`「**未执行**——执行失败/前提不满足」（原因在 message，绝不假装已执行）；
+ * - 契约外（无回执/未知 outcome）→ `ok:false`「未获明确结果」——fail-closed，**绝不**当已执行。
+ * 等待客户期间挂**活动闸**（G-1 语义适用，§6.2）：su 的等待轮次不吃整轮硬超时；会话中止用 `raceAbort`
+ * 即刻返回「未获结果」——不承诺执行与否（确认卡可能仍被处理，最终结果以系统回执为准）。
+ */
+function makeProposeRecoveryTool(fn: ProposeRecoveryFn, currentTurnId?: () => string | undefined, gate?: InteractionGate, scope?: Pick<GovernedToolsOptions, "roleId" | "runtime">): ExecutableTool {
+  const name = PROPOSE_RECOVERY_TOOL_NAME;
+  return {
+    name,
+    async handler(call) {
+      const turnId = currentTurnId?.();
+      const roleId = readStringArg(call.args, ["roleId", "role_id", "role"]);
+      if (roleId === undefined || roleId.trim() === "") {
+        return { ok: false, message: `${name}: 缺少 roleId 参数（目标角色 id），无法提议恢复` };
+      }
+      const actionRaw = call.args["action"];
+      if (typeof actionRaw !== "string" || !RECOVERY_ACTIONS.includes(actionRaw as RecoveryAction)) {
+        return { ok: false, message: `${name}: action 参数非法（应为 "abort-turn" / "rebuild-session" / "redeliver" 之一——本工具不提议任何其他动作）` };
+      }
+      const evidence = readStringArg(call.args, ["evidence"]);
+      if (evidence === undefined || evidence.trim() === "") {
+        return { ok: false, message: `${name}: 缺少 evidence 参数（支撑提议的事实：状态快照/时间线/会话行）——无证据不提议` };
+      }
+      const reason = readStringArg(call.args, ["reason"]);
+      const itemId = readStringArg(call.args, ["itemId", "item_id"]);
+      const payload: ProposeRecoveryPayload = {
+        roleId,
+        action: actionRaw as RecoveryAction,
+        evidence,
+        ...(reason !== undefined ? { reason } : {}),
+        ...(itemId !== undefined ? { itemId } : {}),
+      };
+
+      gate?.begin();
+      try {
+        let receipt: unknown;
+        try {
+          receipt = await raceAbort(Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return turnId === undefined ? fn(payload) : fn(payload, handbackMetadata(turnId, scope)); }), call.signal, `${name} 等待客户确认`);
+        } catch (err) {
+          return { ok: false, message: `${name}：本次提议**未获结果**（原因：${reasonOf(err)}）——**不要假设已执行**；如实告知客户。` };
+        }
+        const record = receipt !== null && typeof receipt === "object" ? receipt as { outcome?: unknown; message?: unknown; operatorId?: unknown } : undefined;
+        const outcome = record?.outcome;
+        const detail = typeof record?.message === "string" ? record.message : undefined;
+        if (outcome === "executed") {
+          const operator = typeof record?.operatorId === "string" ? record.operatorId : undefined;
+          return {
+            ok: true,
+            message:
+              `${name}：客户已确认（${operatorTag(operator)}），恢复动作已执行：${payload.action} → 角色「${roleId}」。` +
+              `${detail !== undefined ? ` ${detail}` : ""}请据回执继续处理（既有回交/重派路径）。`,
+          };
+        }
+        if (outcome === "declined") {
+          return { ok: false, message: `${name}：**未获执行**——客户未确认（取消/关闭/通道不可用，fail-closed，零执行）。${detail !== undefined ? `${detail} ` : ""}**不要当它已执行**；如实告知客户。` };
+        }
+        if (outcome === "unsupported") {
+          return { ok: false, message: `${name}：恢复动作**未执行**——当前运行时**不支持**该动作（unsupported）。${detail !== undefined ? `${detail} ` : ""}**不要当它已执行**；如实告知客户。` };
+        }
+        if (outcome === "error") {
+          return { ok: false, message: `${name}：恢复动作**未执行**——执行失败或前提不满足（error）。${detail ?? "原因未提供"} **不要当它已执行**；如实告知客户。` };
+        }
+        return { ok: false, message: `${name}：能力未返回明确的回执结果（回执缺失或四值之外）——按**未获明确结果**处理；**不要当它已执行**，如实告知客户。` };
+      } finally {
+        gate?.end();
+      }
+    },
+  };
+}
+
 /**
  * 构造受治理工具集：
  * - 写入类 write_file / edit_file（先 gate，获准且配置了 writeRoot 时落盘）；
@@ -1152,6 +1392,20 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
   const shellVerdict = options?.shellVerdict;
   if (shellVerdict !== undefined) {
     tools.push(makeReportShellVerdictTool(shellVerdict));
+  }
+
+  // 结构性保证（G-2/R1，同 run_shell / dispatchTask 先例）：**未注入数据源时看护只读工具不存在**。
+  // 只给 su——由调用方（编排注入端，判据沿 dispatch_task 的 suppressHandback 先例）决定注入；
+  // 未注入 ⇒ 模型无法请求（能力缺席 = 最强 fail-closed）。metadata 同 dispatch_task 先例（turnId 捕获）。
+  const roleStatus = options?.roleStatus;
+  if (roleStatus !== undefined) tools.push(makeRoleStatusTool(roleStatus, options?.currentTurnId, { roleId: options?.roleId, runtime: options?.runtime }));
+  const sessionTail = options?.sessionTail;
+  if (sessionTail !== undefined) tools.push(makeSessionTailTool(sessionTail, options?.currentTurnId, { roleId: options?.roleId, runtime: options?.runtime }));
+
+  // 结构性保证（G-2/R2，同 dispatch_task 先例）：**未注入恢复提议能力时 `propose_recovery` 不存在**。
+  const proposeRecovery = options?.proposeRecovery;
+  if (proposeRecovery !== undefined) {
+    tools.push(makeProposeRecoveryTool(proposeRecovery, options?.currentTurnId, options?.interactionGate, { roleId: options?.roleId, runtime: options?.runtime }));
   }
   // Observe customer waits without storing titles, previews or selected values.
   return tools.map((tool) => {

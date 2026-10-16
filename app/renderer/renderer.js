@@ -90,6 +90,10 @@
     // shell 命令确认卡（M-1，2026-10-12）：当前挂起的一张 `{id, busy}`；无则 null。**无计时器**（G-1 纪律）——
     // 卡片不按时间自我定格；失效只来自主进程回包（`expired`）或正常裁决。
     shellConfirm: null,
+    // 恢复确认卡（G-2/U1，2026-10-16 客户批准；设计 §6.2）：当前挂起的一张 `{id, busy}`；无则 null。
+    // 与 shell 卡同纪律：**等待不设限**（裁定 4；无计时器）；恰 `{allow:true}`（点「执行」）才作为
+    // 执行请求回传；失效/通道异常如实标记（`markRecoveryConfirmExpired`——**绝不**呈现为已执行）。
+    recoveryConfirm: null,
     // 客户裁定（2026-10-13）：右栏改**抽屉**——当前展开的右上角图标 tab（null=全收起）；
     // 第二轮裁定（同日）：簇只留两枚，待办/队列**归角色**——"card"=角色资料（角色卡 md + 待办/队列两节 +
     // 边界/变更/文档），"pi"=Pi 配置（面板本体原样迁入抽屉）。同一时刻至多一块；内容跟随当前选中角色。
@@ -274,7 +278,7 @@
   function captureRuntimeView() {
     return { liveRoles: state.liveRoles, roleMeta: state.roleMeta, roleBusy: state.roleBusy,
       queueByRole: state.queueByRole, queueItemsByRole: state.queueItemsByRole, runningByRole: state.runningByRole,
-      sessionOpenRoleId: state.sessionOpenRoleId, shellConfirm: state.shellConfirm, chatPanes: chatPanes, paneRowLists: paneRowLists, paneAnchors: paneAnchors,
+      sessionOpenRoleId: state.sessionOpenRoleId, shellConfirm: state.shellConfirm, recoveryConfirm: state.recoveryConfirm, chatPanes: chatPanes, paneRowLists: paneRowLists, paneAnchors: paneAnchors,
       opRequests: opRequests, replayState: replayState, activityOpen: activityOpen, groupSeqByRole: groupSeqByRole,
       groupIdentitiesByRole: groupIdentitiesByRole, drawerReading: drawerReading, composerDrafts: composerDrafts,
       withdrawPending: withdrawPending, withdrawFeedback: withdrawFeedback, lastManualSend: lastManualSend,
@@ -287,6 +291,7 @@
     ["roleMeta", "roleBusy", "queueByRole", "queueItemsByRole", "runningByRole"].forEach(function (key) { state[key] = v[key] || Object.create(null); });
     state.sessionOpenRoleId = v.sessionOpenRoleId || null;
     state.shellConfirm = v.shellConfirm || null;
+    state.recoveryConfirm = v.recoveryConfirm || null;
     chatPanes = v.chatPanes || Object.create(null); paneRowLists = v.paneRowLists || Object.create(null);
     paneAnchors = v.paneAnchors || Object.create(null); opRequests = v.opRequests || Object.create(null);
     replayState = v.replayState || Object.create(null); activityOpen = v.activityOpen || Object.create(null);
@@ -341,6 +346,8 @@
     engineSelector.sync(runtime, !state.projectRoot);
     $("shell-confirm").hidden = true;
     if (state.shellConfirm) renderShellConfirm(state.shellConfirm);
+    $("recovery-confirm").hidden = true;
+    if (state.recoveryConfirm) renderRecoveryConfirm(state.recoveryConfirm);
     restoreComposerDraft(state.selectedRoleId);
     showPane(state.selectedRoleId); renderRoleTree(); renderRight(); renderTabs(); updateControls(); setChatHeader(selectedRole());
     void loadPiConfig();
@@ -448,6 +455,7 @@
   /** 重置所有 pane（换项目）：老项目的历史**不跨项目保留**；#chat 恢复为默认空状态。 */
   function resetPanes() {
     closeShellConfirm();
+    closeRecoveryConfirm();
     Object.keys(runtimeViews).forEach(function (key) {
       var drafts = runtimeViews[key].composerDrafts || {};
       Object.keys(drafts).forEach(function (roleId) { releaseImages(drafts[roleId].images || []); });
@@ -1500,6 +1508,127 @@
     });
   }
 
+  // —————— 恢复确认卡（G-2/U1，2026-10-16 客户批准；设计 §6.2「提议 → 一键确认 → 应用执行 → 回执」）——————
+  // su 只能**提议**恢复动作（{abort-turn / rebuild-session / redeliver}）；本卡是客户的一键确认处——
+  // **恰 `{allow:true}`（点「执行」）才可能执行**；取消 / Esc / 关闭（×）一律回 `{allow:false}` = 未获执行
+  // （fail-closed；取消为默认焦点）。呈现面 = 主进程推来的数据面：动作 / 目标角色 / 证据**逐字**
+  // （textContent 落入，无 HTML 注入口）；动作人话标签与后果说明走 `ui-labels.js` 的纯映射
+  // （未知动作只呈现原始 token——不假装认识）。**等待不设限**（裁定 4；无计时器——G-1 纪律）。
+  //
+  // 数据形状（**以桌面窗口 W5 交回说明为准**；未落树前按设计 §6.1/§6.2 提案形状实现，交回已标注待接）：
+  //   `recovery:confirm-request`（preload `onRecoveryConfirm(cb)`）推：
+  //   `{ id, projectRoot?, runtime?, roleId, action, evidence, reason?, requestedBy?, requestedAt?, itemId? }`
+  //   ——`evidence` 逐字；`requestedBy`/`requestedAt`/`itemId` 可选（缺省则对应位隐藏，不假装有值）。
+  //   `recovery:confirm-response`（preload `recoveryConfirmRespond({id, allow})`）回报：
+  //   `{ ok:true }` | `{ ok:false, expired:true }` | `{ ok:false, error }`——同 shell 卡回包口径。
+  //   通道缺席（W5 未落树）⇒ 不订阅、零影响（fail-closed：无卡可点即无执行路径）。
+  var RECOVERY_CONFIRM_DEFAULT_HINT = "点「取消」、按 Esc 或关闭本框 = 不执行；仅点「执行」才会执行。";
+
+  function onRecoveryConfirm(payload) {
+    if (!payload || typeof payload !== "object" || typeof payload.id !== "string" || payload.id === "") return;
+    if (!Rt.matchesView(payload, state.projectRoot, state.runtime)) return;
+    var cur = state.recoveryConfirm;
+    if (!cur || cur.id !== payload.id) cur = { id: payload.id, busy: false, runtime: state.runtime, projectRoot: state.projectRoot, roleId: payload.roleId, payload: payload };
+    state.recoveryConfirm = cur;
+    if (!backgroundDelivery) renderRecoveryConfirm(cur);
+  }
+
+  /** 时间本地化（同 queueTimeText 口径：解析不了 ⇒ 空——不假装有时间）。 */
+  function recoveryTimeText(at) {
+    if (typeof at !== "string" || at === "") return "";
+    var t = new Date(at);
+    return isNaN(t.getTime()) ? "" : t.toLocaleString();
+  }
+
+  function renderRecoveryConfirm(cur) {
+    var payload = cur.payload;
+    var action = typeof payload.action === "string" ? payload.action : "";
+    var view = typeof UiLabels.recoveryActionView === "function" ? UiLabels.recoveryActionView(action) : null;
+    // 动作行：有人话标签 ⇒ 标签 + 原始 token；未知动作 ⇒ **只**呈现原始 token（不编语义）。
+    $("rc-action").textContent = view ? "动作：" + view.label + "（" + action + "）" : "动作：" + action;
+    $("rc-note").textContent = view ? view.note : "";
+    $("rc-note").hidden = !view;
+    $("rc-role").textContent = "目标角色：" + (typeof payload.roleId === "string" && payload.roleId !== "" ? payload.roleId : "(未标识)");
+    // 证据**逐字**：textContent 落入（无 HTML 注入口——不美化、不改写、不截断）。
+    $("rc-evidence").textContent = typeof payload.evidence === "string" ? payload.evidence : "";
+    var reason = typeof payload.reason === "string" && payload.reason !== "" ? "原因（提议方提供）：" + payload.reason : "";
+    var reasonEl = $("rc-reason");
+    reasonEl.textContent = reason;
+    reasonEl.hidden = reason === "";
+    // 可选元数据（仅呈现主进程推来的值；缺省即隐藏——不假装有值）。
+    var by = typeof payload.requestedBy === "string" && payload.requestedBy !== "" ? "提议方：" + payload.requestedBy : "";
+    var at = recoveryTimeText(payload.requestedAt);
+    at = at === "" ? "" : "提议时间：" + at;
+    var item = typeof payload.itemId === "string" && payload.itemId !== "" ? "目标条目：" + payload.itemId : "";
+    [["rc-by", by], ["rc-at", at], ["rc-item", item]].forEach(function (pair) {
+      $(pair[0]).textContent = pair[1];
+      $(pair[0]).hidden = pair[1] === "";
+    });
+    $("rc-details").hidden = by === "" && at === "" && item === "";
+    $("rc-details").open = false; // 技术详情**默认收起**（每次来新请求都复位）
+
+    var overlay = $("recovery-confirm");
+    overlay.hidden = false;
+    syncDrawerModal();
+    overlay.classList.remove("is-expired");
+    $("rc-hint").textContent = RECOVERY_CONFIRM_DEFAULT_HINT;
+    $("rc-deny").disabled = cur.busy;
+    $("rc-allow").disabled = cur.busy;
+    $("rc-close").disabled = cur.busy;
+    if (cur.expiredReason) markRecoveryConfirmExpired(cur.expiredReason);
+    $("rc-deny").focus(); // 取消为默认焦点（fail-closed 的 UI 侧同向：默认不执行）
+  }
+
+  function closeRecoveryConfirm() {
+    if (!backgroundDelivery) $("recovery-confirm").hidden = true;
+    state.recoveryConfirm = null;
+    syncDrawerModal();
+    if (!backgroundDelivery && state.rightTab !== null) $("drawer-close").focus({ preventScroll: true });
+  }
+
+  /** 卡片终态（失效/回传失败）：禁用全部动作键 + 如实一行——**绝不**呈现为「已执行」。 */
+  function markRecoveryConfirmExpired(text) {
+    if (!state.recoveryConfirm) return;
+    state.recoveryConfirm.busy = true;
+    state.recoveryConfirm.expiredReason = text;
+    if (backgroundDelivery) return;
+    $("recovery-confirm").classList.add("is-expired");
+    $("rc-deny").disabled = true;
+    $("rc-allow").disabled = true;
+    $("rc-close").disabled = false; // 失效后只可关闭展示，不回传执行。
+    $("rc-hint").textContent = text;
+  }
+
+  /** 回传决定（**恰 allow:true 才作为执行请求**；取消/Esc/关闭均为 false）。受理 ⇒ 收起卡片；
+   *  失效/通道失败 ⇒ 如实终态（不假装已裁决、更不假装已执行）。 */
+  function respondRecoveryConfirm(allow) {
+    var cur = state.recoveryConfirm;
+    if (!cur) return;
+    if (cur.busy) { if (cur.expiredReason && allow !== true) closeRecoveryConfirm(); return; }
+    cur.busy = true;
+    var done = function (res) {
+      deliverRuntimePayload(cur, function () {
+      if (state.recoveryConfirm !== cur) return;
+      if (res && res.ok === true) {
+        closeRecoveryConfirm();
+        return;
+      }
+      if (res && res.expired === true) {
+        markRecoveryConfirmExpired("此确认已失效（应用重启或请求已结束），未获执行——请让提议方重新发起。");
+        return;
+      }
+      markRecoveryConfirmExpired("未能回传你的决定（通道未接或异常）——按 fail-closed 不执行；请让提议方重新发起。");
+      });
+    };
+    if (!d.recoveryConfirmRespond) {
+      done(null);
+      return;
+    }
+    Promise.resolve(d.recoveryConfirmRespond({ id: cur.id, allow: allow === true })).then(done, function () {
+      done(null);
+    });
+  }
+
   // —————— 客户交互卡（A-5，2026-10-12）：确认 / 单选 / 多选 / 带预览的确认 ——————
   // 客户裁定（设计 A-1/A-5）：「客户确定了才加、才落盘」——su 的 `request_confirmation` / `request_choice`
   // 挂起等客户作答时，主进程经 `session:operator-request` 把请求推来；本函数把它渲染为**该角色聊天流里
@@ -1989,7 +2118,9 @@
   // 开头，其回显也不得被当成"系统投递"，一律走普通气泡路径）。
   var lastManualSend = { roleId: null, text: "", at: 0 };
 
-  /** 系统投递输入（E-1 回交 / H-1 派发）的**单独样式**元素：图标 + 来源标签 + 正文（Markdown/esc 单一来源）。 */
+  /** 系统投递输入（E-1 回交 / H-1 派发 / G-2 `system`）的**单独样式**元素：图标 + 来源标签 + 正文
+   *  （Markdown/esc 单一来源）。`system` 类（看护告警/收束提示/恢复回执）来源=**系统**（非角色）——
+   *  图标取 shield 区分、标签带子类原文（`tool-rows.js::classifySystemMessage` 单一来源）。 */
   function buildInjectedElement(inj, isReplay) {
     var el = document.createElement("div");
     el.className = "msg msg-injected is-" + inj.kind + (isReplay ? " is-replay" : "");
@@ -1998,7 +2129,7 @@
     if (inj.kind === "handback") body = '<details class="mi-report-detail"><summary>交接内容（结构化来源未保存）</summary>' + body + "</details>";
     el.innerHTML =
       '<div class="mi-head">' +
-      '<span class="mi-ico">' + (inj.kind === "handback" ? ICONS.handback : ICONS.send) + "</span>" +
+      '<span class="mi-ico">' + (inj.kind === "handback" ? ICONS.handback : inj.kind === "system" ? ICONS.shield : ICONS.send) + "</span>" +
       '<span class="mi-chip">' + esc(label) + "</span>" +
       "</div>" +
       body;
@@ -3566,6 +3697,12 @@
   // tab → 抽屉标题；同一时刻至多开一块（state.rightTab）；"pi" tab 展示迁入抽屉的既有 Pi 面板
   // （面板本体、保存/掩码纪律一字不动）。内容跟随当前选中角色（打开状态下随 selectRole/applyListing 重渲染）。
 
+  /** 任一应用内模态确认卡可见（shell 命令确认卡 M-1 / 恢复确认卡 G-2；同开时都算——抽屉让位）。
+   *  供抽屉 inert、focusin 归位与 Tab 焦点圈共用（单一判据，不逐卡重写）。 */
+  function anyConfirmOverlayOpen() {
+    return !$("shell-confirm").hidden || !$("recovery-confirm").hidden;
+  }
+
   /** 右上角图标簇的**角标**：第二轮裁定（2026-10-13）待办/队列归角色、簇只留两枚——「角色资料」图标角标 =
    *  当前选中角色的待办深度（进行中+排队视图行数；继承原待办图标角标语义；同一 role-state 快照，无新数据源）。 */
   function syncDrawerModal() {
@@ -3574,7 +3711,7 @@
     [document.querySelector(".col-left"), document.querySelector(".col-mid")].forEach(function (element) { if (element) element.inert = open; });
     $("drawer-backdrop").hidden = !open;
     drawer.setAttribute("aria-hidden", String(!open));
-    drawer.inert = !open || !$("shell-confirm").hidden;
+    drawer.inert = !open || anyConfirmOverlayOpen();
   }
   function drawerFocusables() {
     return Array.from($("right-drawer").querySelectorAll('button,input,textarea,select,a[href],summary,[tabindex]')).filter(function (element) { return !element.disabled && element.tabIndex >= 0 && element.getClientRects().length && !element.closest('[hidden]'); });
@@ -4228,17 +4365,28 @@
   $("sc-deny").addEventListener("click", function () { respondShellConfirm(false); });
   $("sc-allow").addEventListener("click", function () { respondShellConfirm(true); });
   $("sc-close").addEventListener("click", function () { respondShellConfirm(false); });
+  // 恢复确认卡（G-2/U1）：同款 fail-closed——取消为默认焦点；关闭（×）/ Esc / 「取消」= **不执行**。
+  $("rc-deny").addEventListener("click", function () { respondRecoveryConfirm(false); });
+  $("rc-allow").addEventListener("click", function () { respondRecoveryConfirm(true); });
+  $("rc-close").addEventListener("click", function () { respondRecoveryConfirm(false); });
   $("drawer-backdrop").addEventListener("click", closeRightDrawer);
   document.addEventListener("focusin", function (event) {
-    if (state.rightTab !== null && $("shell-confirm").hidden && !$("right-drawer").contains(event.target) && !event.target.closest(".win-btn")) $("drawer-close").focus({ preventScroll: true });
+    if (state.rightTab !== null && !anyConfirmOverlayOpen() && !$("right-drawer").contains(event.target) && !event.target.closest(".win-btn")) $("drawer-close").focus({ preventScroll: true });
   });
   document.addEventListener("keydown", function (e) {
+    // 两卡同开时 Esc 先答**上层**那张（recovery 在 DOM 里声明于 shell 之后 ⇒ 视觉在上；
+    // 两者 Esc 都 = 否决——fail-closed 优先级不受顺序影响）。
+    if (e.key === "Escape" && state.recoveryConfirm) {
+      e.preventDefault();
+      respondRecoveryConfirm(false);
+      return;
+    }
     if (e.key === "Escape" && state.shellConfirm) {
       e.preventDefault();
       respondShellConfirm(false);
       return;
     }
-    if (e.key === "Tab" && state.rightTab !== null && $("shell-confirm").hidden) {
+    if (e.key === "Tab" && state.rightTab !== null && !anyConfirmOverlayOpen()) {
       var focusable = drawerFocusables(), index = focusable.indexOf(document.activeElement);
       if (!focusable.length) { e.preventDefault(); $("right-drawer").focus(); }
       else if (e.shiftKey && index <= 0) { e.preventDefault(); focusable[focusable.length - 1].focus(); }
@@ -4265,6 +4413,9 @@
   if (d.onOperatorExpired) d.onOperatorExpired(function (payload) { deliverRuntimePayload(payload, onOperatorExpired); });
   // shell 命令确认卡（M-1）：主进程推来的数据面 → 应用内卡片（拒绝为默认；Esc/关闭 = 不放行）。
   if (d.onShellConfirm) d.onShellConfirm(function (payload) { deliverRuntimePayload(payload, onShellConfirm); });
+  // 恢复确认卡（G-2/U1，2026-10-16 客户批准）：su 提议的恢复动作数据面 → 应用内卡片
+  // （取消为默认；恰「执行」= allow:true；Esc/关闭 = 不执行）。通道缺席（W5 未落树）⇒ 不订阅、零影响。
+  if (d.onRecoveryConfirm) d.onRecoveryConfirm(function (payload) { deliverRuntimePayload(payload, onRecoveryConfirm); });
   // 会话记录恢复（D-1）：主进程推来的规范化界面行 → 回放进该角色的 pane（解析在主进程；渲染侧不碰 SDK）。
   if (d.onSessionHistory) d.onSessionHistory(function (payload) {
     if (!state.projectRoot || payload.projectRoot && payload.projectRoot !== state.projectRoot) { pendingHistories.push(payload); return; }
@@ -4310,6 +4461,9 @@
     onOperatorExpired: function (payload) { deliverRuntimePayload(payload, onOperatorExpired); },
     // M-1：供探针直接注入 shell 确认数据面（按 IPC 契约 `{id, command, summary, reasonPlain, …}`）。
     onShellConfirm: onShellConfirm,
+    // G-2/U1：供探针直接注入恢复确认数据面（按 IPC 契约 `{id, roleId, action, evidence, …}`；
+    // 回包仍走 `d.recoveryConfirmRespond`——通道缺席时如实终态「未能回传……不执行」）。
+    onRecoveryConfirm: onRecoveryConfirm,
     // 真机缺陷修复（锚点物化，2026-10-12）探针：读**行模型**（每行 kind/序位/交互卡行）与**回放锚点表**——
     // e2e 断言「卡的行序索引落在锚点而非行表尾」用（仅渲染进程内，无副作用）。
     rowModelDebug: function (roleId) {

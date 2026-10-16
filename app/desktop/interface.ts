@@ -53,6 +53,11 @@ import type { DesktopOperatorChannelFn, DesktopShellArming } from "./operator-ch
 import type { AssembleReadonlyShellGateOptions } from "../../src/pipeline/orchestration/shell-arming.ts";
 // 客户确认制交互（A-5）：桌面侧的客户通道形状（带角色上下文）——本层只透传，实现在 `customer-input.ts`。
 import type { DesktopCustomerInputFn } from "./customer-input.ts";
+// G-2（2026-10-16 客户批准）：恢复确认卡通道（W5——presenter/回包/关窗清帐在 main 接线，本层只透传）与
+// 看护服务（W1+W3——同源快照/系统投递/观察转发都在 SessionManager，本层装配并起停 tick）。
+import type { RecoveryConfirmPresenter } from "./recovery-channel.ts";
+import { createDiagnosticLogger } from "../../src/common/shared/diagnostics.ts";
+import { createWatchdogService, type WatchdogConfig } from "./watchdog.ts";
 // 输入区图片附件（K-2）：校验/解码/嗅探的**纯逻辑**（渲染进程不碰文件；字节交主进程校验——内容为准）。
 import {
   decodeImageBase64,
@@ -144,6 +149,11 @@ export interface DesktopDeps {
       customerInput?: CustomerInputFn;
       /** 派发任务能力（H-1）：仅内置治理角色（su）会话注入（见 session.ts::routeDispatch）。 */
       dispatchTask?: DispatchTaskFn;
+      /** G-2/W5（2026-10-16 客户批准）：恢复提议能力（仅 su 注入；形状＝契约家，编排 O1 透传）。 */
+      proposeRecovery?: import("../../src/common/编排/watchdog.ts").ProposeRecoveryFn;
+      /** G-2/W1：role_status / session_tail 数据源（仅 su 注入；形状＝契约家）。 */
+      roleStatus?: import("../../src/common/编排/watchdog.ts").RoleStatusFn;
+      sessionTail?: import("../../src/common/编排/watchdog.ts").SessionTailFn;
       /** (a) 操作者确认通道（I-1 arm）：经本层透传（**仅项目角色**消费——见 session.ts）。 */
       shellOperatorChannel?: DesktopOperatorChannelFn;
       /** (c) 规则集实件（I-1 补丁，2026-10-12）：经本层透传（**仅项目角色**消费——与 (a) 同判据走三层链）。 */
@@ -231,6 +241,22 @@ export interface DesktopDeps {
   savePiConfigFn?: (opts: { envPath: string; updates: Record<string, string>; env?: PiConfigEnv }) => Promise<PiConfigSaveResult>;
   /** 保存后重载所用的环境目标（缺省 `process.env`；注入以便单测不污染真实进程环境）。 */
   piConfigEnv?: PiConfigEnv;
+  /**
+   * **恢复确认卡通道（G-2/W5，2026-10-16 客户批准）**：主进程用 `recovery-channel.ts` 构造后注入
+   * （`present` 推 `recovery:confirm-request`、回包 `recovery:confirm-response` 走 `respond`）。
+   * **缺省 ⇒ 恢复提议一律「未接线、未获执行」如实回执（fail-closed）**。
+   */
+  recoveryConfirm?: RecoveryConfirmPresenter;
+  /**
+   * **挂起确认数合并视图（G-2/W1）**：主进程把 su 交互卡 / shell 卡 / 恢复卡三通道的按角色挂起数合并后注入
+   * （看护静默谓词与「正确等待不报」排除用）。**缺省 ⇒ 恒 0**。
+   */
+  watchdogPendingSnapshot?: () => { total: number; byRole: Map<string, number> };
+  /**
+   * **看护服务的注入项（G-2/W1；测试用）**：时钟与配置覆盖（生产走 env＋默认常量——tick 30s、静默 5min
+   * 仅 env 可调）。看护的服务对象＝listing 已导入项目 ∪ 有会话语/队列的项目。
+   */
+  watchdogOptions?: { now?: () => number; config?: Partial<WatchdogConfig> };
 }
 
 export interface DesktopInterface {
@@ -292,6 +318,13 @@ export interface DesktopInterface {
   getPiConfig(): Promise<PiConfigView>;
   /** 保存 Pi 配置到 `.env`（只改面板键、原子；成功后重载 env，下一会话生效）。 */
   savePiConfig(input: { updates: Record<string, string> }): Promise<PiConfigSaveResult>;
+  /**
+   * **看护器起停（G-2/W1）**：主进程在窗口注册后 `startWatchdog()`（周期 tick＝30s，仅 env 可调）、
+   * 窗口关闭时 `stopWatchdog()`。**看护缺席/故障 ⇒ 核心治理零依赖（一切照旧）**——本层绝不因看护
+   * 影响任何会话/投递路径。
+   */
+  startWatchdog(): void;
+  stopWatchdog(): void;
 }
 
 /**
@@ -341,6 +374,23 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   let runtimeFactory = deps.createRuntimeAdapterFactoryFn;
   if (runtimeFactory === undefined && deps.createPiAdapterFactoryFn === undefined && deps.createDemoAdapterFn === undefined) runtimeFactory = realCreateRuntimeAdapterFactory;
 
+  // —————— G-2/W1+W3：看护服务（纯逻辑；快照/投递都在 SessionManager——本层只装配与起停 tick） ——————
+  // **看护不可用 ⇒ 核心治理零依赖**：构造失败只记诊断，watchdogService 保持 undefined（下方各注入点随之
+  // 缺席——观察不转发、stats 不提供、tick 不起）；会话/投递/判定链完全不受影响（＝没有看护时的现状）。
+  let watchdogService: ReturnType<typeof createWatchdogService> | undefined;
+  try {
+    watchdogService = createWatchdogService({
+      // 看护对象 = 已导入（listProject 见过）的项目 ∪ 有活会话/非空队列的项目。
+      projects: () => [...new Set([...listingCache.keys(), ...manager.projectRootsWithActivity()])],
+      snapshot: (root) => manager.watchdogSnapshot(root),
+      deliver: (root, message) => manager.watchdogDeliver(root, message),
+      ...(deps.watchdogOptions ?? {}),
+    });
+  } catch (error) {
+    createDiagnosticLogger({ component: "desktop.watchdog" }).error("watchdog.failed", error);
+    watchdogService = undefined;
+  }
+
   const manager = new SessionManager({
     openRoleSession: openRoleSessionFn,
     createPiAdapterFactory: createPiAdapterFactoryFn,
@@ -366,6 +416,13 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     // 客户交互通道（A-5）：su 的 request_confirmation/request_choice 经它摆到界面并取回裁决
     // （仅内置治理角色会话消费；缺省未接 ⇒ 不注入 ⇒ 无确认制——绝不悄悄放行）。
     customerInput: deps.customerInput,
+    // G-2/W5：恢复确认卡通道（缺省 ⇒ 恢复提议「未接线、未获执行」如实回执——fail-closed）。
+    recoveryConfirm: deps.recoveryConfirm,
+    // G-2/W1：看护的观察转发（settled/命令超时/真实活动）与只读统计；看护缺席 ⇒ 不转发（一切照旧）。
+    watchdogObserver: watchdogService !== undefined ? (root, observation) => watchdogService!.observe(root, observation) : undefined,
+    watchdogPendingConfirmations: deps.watchdogPendingSnapshot,
+    watchdogStats: watchdogService !== undefined ? (root) => watchdogService!.stats(root) : undefined,
+    now: deps.watchdogOptions?.now,
     // 首轮寻址修复（2026-10-13 真机 bootstrap J-1 缺陷）：派发路由缓存 miss 时**实时重枚举一次**——
     // 与界面 listProject 同一路径（同一 listProjectFn）、刷**同一份**共享缓存（后续 openInternal 自动
     // 开会话读的也是它）。全新空项目 bootstrap 首轮：su 建好角色后同一轮内派发即可寻址。
@@ -532,6 +589,10 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     async listLiveSessions(): Promise<string[]> {
       return manager.liveRoleIds();
     },
+
+    // G-2/W1：看护器的起停（主进程窗口注册后启动、窗关停止；看护缺席 ⇒ 两个方法都是 no-op）。
+    startWatchdog() { watchdogService?.start(); },
+    stopWatchdog() { watchdogService?.stop(); },
 
     async openExternal(input: { url: string }): Promise<{ ok: boolean; error?: string }> {
       const url = input && typeof input.url === "string" ? input.url.trim() : "";

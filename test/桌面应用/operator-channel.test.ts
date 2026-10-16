@@ -39,6 +39,9 @@ import {
   type OperatorPresenter,
   type ShellConfirmRequest,
 } from "../../app/desktop/operator-channel.ts";
+// G-2/W5（2026-10-16 客户批准）：恢复确认卡呈现端（与 shell 卡共享 `confirm-card.ts` 通用件——本组钉住
+// **恰 allow:true 才为真、等待不设限（裁定 4）、关窗/中止=未获执行** 的卡侧语义；执行桥在 dispatch-delivery 组）。
+import { createRecoveryConfirmPresenter } from "../../app/desktop/recovery-channel.ts";
 
 /** 造一个请求（`OperatorPrompt`）——命令原文含 shell 元字符（本执行模型下只是普通参数，但人仍应逐字看到）。 */
 function req(command: string, argv: string[], cwd = "D:/proj", reason?: string): OperatorPrompt {
@@ -910,8 +913,10 @@ test("F-4-T3 诊断补录（opt2）：超时 ⇒ shell-confirm.timeout（含时�
 
 test("F-4-opt1 接线钉与幂等行为：main.ts 在窗口 focus/show 时重推挂起确认卡（与 app:recovery-ready 同款）；replayPending 只推仍挂起者", async () => {
   const mainSrc = fs.readFileSync(path.join(APP_DIR, "main.ts"), "utf8");
-  assert.ok(/win\.on\("focus", \(\) => shellConfirm\.replayPending\(\)\)/.test(mainSrc), "focus ⇒ 幂等重推挂起卡（渲染侧丢推的兜底）");
-  assert.ok(/win\.on\("show", \(\) => shellConfirm\.replayPending\(\)\)/.test(mainSrc), "show ⇒ 幂等重推挂起卡");
+  // G-2/W5（2026-10-16）起同一重推点同时覆盖恢复确认卡（recoveryConfirm）——接线形状按现行实文钉住
+  // （行为不变：**幂等**重推、只推仍挂起者；新增的 recoveryConfirm.replayPending() 见 recovery 通道用例）。
+  assert.ok(/win\.on\("focus", \(\) => \{ shellConfirm\.replayPending\(\); recoveryConfirm\.replayPending\(\); \}\)/.test(mainSrc), "focus ⇒ 幂等重推挂起卡（shell＋恢复；渲染侧丢推的兜底）");
+  assert.ok(/win\.on\("show", \(\) => \{ shellConfirm\.replayPending\(\); recoveryConfirm\.replayPending\(\); \}\)/.test(mainSrc), "show ⇒ 幂等重推挂起卡（shell＋恢复）");
   assert.ok(mainSrc.includes("shellConfirm.replayPending()"), "复用既有幂等重推入口");
 
   // 行为面：只重推**仍挂起**的项；已决项绝不复活（重推不改判定）。
@@ -925,4 +930,78 @@ test("F-4-opt1 接线钉与幂等行为：main.ts 在窗口 focus/show 时重推
   assert.deepEqual(await d1, { allow: false });
   assert.equal(presenter.replayPending(), 1, "已决项不再重推（只推仍挂起者）");
   presenter.rejectAllPending("清场");
+});
+
+// ————————————————— G-2/W5：恢复确认卡（与 shell 卡共享 pending/replay/expire 通用件） —————————————————
+//
+// 卡侧语义（渲染侧与通道契约）：**恰 `{allow:true}` 才为真**（其余含缺字段/取消/Esc = 不执行）；幂等 by id；
+// **等待不设限**（裁定 4——无任何兜底计时器）；关窗 rejectAllPending / 组合信号中止 = **未获执行**；
+// 未知/失效 id → `{ok:false, expired:true}`（绝不当执行）。执行动作本身在 SessionManager（W5 执行桥）。
+
+test("G-2/W5 恢复卡：恰 allow:true 才为真；缺字段/取消 → false；未知 id → expired（未获执行文案）；id 前缀 rp-", async () => {
+  const sent: import("../../app/desktop/recovery-channel.ts").RecoveryConfirmRequest[] = [];
+  const presenter = createRecoveryConfirmPresenter({ present: (r) => sent.push(r), operatorId: "ops" });
+  const requestInput = { roleId: "A", action: "abort-turn" as const, evidence: "role_status：A 已 583s 无 settled", reason: "疑似卡死", projectRoot: "/proj", runtime: "demo" as const, requestedBy: "su", requestedAt: new Date(0).toISOString() };
+  const d1 = presenter.present(requestInput, { roleId: "su", projectRoot: "/proj", runtime: "demo" });
+  assert.equal(sent.length, 1, "推达渲染侧");
+  assert.ok(sent[0].id.startsWith("rp-"), "id 前缀 rp-（卡族标识）");
+  assert.equal(sent[0].evidence, requestInput.evidence, "证据逐字透传（不加工、不截断）");
+  assert.equal(sent[0].requestedBy, "su", "提议者随带（呈现「由 su 提议」）");
+  assert.equal(presenter.pendingCount(), 1);
+  assert.deepEqual(presenter.pendingRoles(), new Map([["su", 1]]), "按角色 pending 视图（挂在提议者 su 轮内）");
+  assert.equal(presenter.respond({ id: sent[0].id, allow: true }).ok, true, "回包受理");
+  assert.equal(await d1, true, "恰 allow:true ⇒ 真（＝执行请求；执行由应用侧做）");
+  // 缺字段 / allow:false ⇒ false（「未获执行」方向）。
+  const d2 = presenter.present(requestInput);
+  assert.equal(presenter.respond({ id: sent[1].id }).ok, true, "缺 allow 字段的回包也受理（行为＝false）");
+  assert.equal(await d2, false, "缺字段 → 不执行");
+  const d3 = presenter.present(requestInput);
+  assert.equal(presenter.respond({ id: sent[2].id, allow: false }).ok, true);
+  assert.equal(await d3, false, "拒绝 → 不执行");
+  // 未知/失效 id：expired（旧回包绝无执行语义）。
+  const exp = presenter.respond({ id: "rp-旧回包", allow: true });
+  assert.equal(exp.expired, true, "未知 id → expired");
+  assert.ok((exp.error ?? "").includes("未获执行"), "如实文案（未获执行——可让 su 重新提议）");
+  assert.equal(presenter.pendingCount(), 0);
+});
+
+test("G-2/W5 恢复卡：等待不设限（零计时器）；关窗/中止 = 未获执行；replayPending 只推仍挂起者", async () => {
+  const sent: import("../../app/desktop/recovery-channel.ts").RecoveryConfirmRequest[] = [];
+  const expired: { reason?: string }[] = [];
+  const presenter = createRecoveryConfirmPresenter({ present: (r) => sent.push(r), operatorId: "ops", onExpired: (p) => expired.push(p) });
+  const input = { roleId: "A", action: "rebuild-session" as const, evidence: "e", requestedBy: "su" };
+  // —— 不设限：实现上无兜底计时器（裁定 4）——借源码钉 + 行为钉（推后挂起数保持，不自动清理）。
+  const src = fs.readFileSync(path.join(APP_DIR, "desktop", "recovery-channel.ts"), "utf8");
+  assert.ok(/present: \(request, metadata\) => core\.mount\(\(id\) => \(\{ id, \.\.\.request \}\), metadata\), \/\/ \*\*不设限\*\*/.test(src), "零计时器：mount 不带 cleanupAfterMs（等待客户不设限，裁定 4）");
+  const d1 = presenter.present(input);
+  assert.equal(presenter.pendingCount(), 1, "推后保持挂起（无超时清理）");
+  assert.equal(presenter.replayPending(), 1, "重推仍挂起者（focus/show/recovery-ready 先例）");
+  assert.equal(sent.length, 2, "重推 = 同一请求再推一次");
+  // —— 组合信号中止（su 轮次停止/会话重建）⇒ 未获执行 + 如实失效通知。
+  const ac = new AbortController();
+  const d2 = presenter.present(input, { roleId: "su", projectRoot: "/proj", signal: ac.signal });
+  ac.abort(new Error("turn aborted"));
+  assert.equal(await d2, false, "轮次中止 ⇒ 未获执行（fail-closed）");
+  assert.equal(expired.length, 1, "失效如实通知");
+  assert.ok((expired[0].reason ?? "").includes("未获执行") || (expired[0].reason ?? "").includes("失效"), "失效原因如实");
+  // —— 关窗 rejectAllPending ⇒ 全部未获执行。
+  const d3 = presenter.present(input);
+  presenter.rejectAllPending("窗口已关闭，未获执行（fail-closed）");
+  assert.equal(await d3, false, "关窗 ⇒ 未获执行");
+  assert.equal(presenter.pendingCount(), 0, "关窗后无挂起残留");
+  assert.equal(await d1, false, "先前挂起项同样未获执行");
+  assert.equal(presenter.respond({ id: sent[0].id, allow: true }).expired, true, "关窗后迟到回包 → expired（绝不当执行）");
+});
+
+test("G-2/W5 shell 卡按角色 pending 视图（W1 依赖项）：metadata.roleId 聚合；无 metadata 不计角色", () => {
+  const sent: ShellConfirmRequest[] = [];
+  const p = createShellConfirmPresenter({ present: (r) => sent.push(r), cleanupAfterMs: 60000, env: {} });
+  const prompt = req("ls", ["ls"], "/proj");
+  void p.presenter.present(prompt, describeShellCommand(prompt), { roleId: "A", projectRoot: "/proj", runtime: "pi", signal: new AbortController().signal });
+  void p.presenter.present(prompt, describeShellCommand(prompt), { roleId: "A", projectRoot: "/proj", runtime: "pi", signal: new AbortController().signal });
+  void p.presenter.present(prompt, describeShellCommand(prompt), { roleId: "B", projectRoot: "/proj", runtime: "pi", signal: new AbortController().signal });
+  assert.deepEqual(p.pendingRoles(), new Map([["A", 2], ["B", 1]]), "按角色聚合（看护「正确等待不报」排除数据面）");
+  assert.equal(p.pendingCount(), 3);
+  p.rejectAllPending("清场");
+  assert.equal(p.pendingRoles().size, 0, "清场后视图清空");
 });

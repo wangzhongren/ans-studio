@@ -142,6 +142,30 @@ contextBridge.exposeInMainWorld("desktop", {
     }),
 
   /**
+   * 订阅「恢复确认请求」（G-2/W5，2026-10-16 客户批准）：su 经 `propose_recovery` 提议恢复动作
+   * （停止本轮 / 重建会话 / 重投任务，带逐字证据）时，主进程把卡推来——渲染侧渲染为确认卡
+   * （**取消为默认焦点**）。载荷 `{id, projectRoot?, runtime?, roleId, action, evidence, reason?,
+   * requestedBy?, requestedAt?, itemId?}`——`evidence` 逐字；缺省位隐藏、不假装有值。
+   * 返回取消订阅函数。（通道缺席 = 未接线：无卡可点即无执行路径——fail-closed。）
+   */
+  onRecoveryConfirm: (cb) => {
+    const listener = (_event, payload) => cb(payload);
+    ipcRenderer.on("recovery:confirm-request", listener);
+    return () => ipcRenderer.removeListener("recovery:confirm-request", listener);
+  },
+
+  /**
+   * 回传对恢复确认卡的决定（G-2/W5）：`{id, allow}`——**恰 `allow:true` 才作为执行请求**；
+   * 取消 / Esc / 关闭 = 不执行（fail-closed 的 UI 侧同向）。回报 `{ok:true}` | `{ok:false, expired:true}`
+   * （失效/旧回包——**未获执行**）| `{ok:false, error}`（非法回包不受理）。
+   */
+  recoveryConfirmRespond: (input) =>
+    ipcRenderer.invoke("recovery:confirm-response", {
+      id: input && typeof input.id === "string" ? input.id : "",
+      allow: !!(input && input.allow === true),
+    }),
+
+  /**
    * 读取 Pi 配置面板视图（设计 §11/T28）：返回 `{ path, fields:[{key,secret,value,isSet}] }`。
    * **机密键（ANTHROPIC_AUTH_TOKEN）的值恒为空串**——值绝不外发到渲染进程（只给 isSet 布尔）。
    */

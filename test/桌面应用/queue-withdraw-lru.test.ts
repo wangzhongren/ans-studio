@@ -303,3 +303,25 @@ test("F-2-T5 认领已发生（send 未结）⇒ withdraw 如实「进行中，�
   assert.deepEqual(h.sent.A, ["在跑（挂起）", "排队消息"], "两笔按序送达（链路收窄后语义逐字保真）");
   await h.mgr.stop(null);
 });
+
+test("G-2/W2：`system` 类（看护告警/收束/回执）不可撤回——归治理流只读面（与派发/回交同语义）", async () => {
+  const l = listing(["su", "A"], "su");
+  const h = makeHarness(l);
+  await h.mgr.open({ projectRoot: l.projectRoot, roleId: "su", runtime: "demo" });
+  const release = h.hangNext("su");
+  const send = h.mgr.send("占住 su 本轮");
+  await tick(80);
+  // 看护系统消息（kind:"system"——同一套投递机）：su 忙 ⇒ 入队。
+  h.mgr.watchdogDeliver(l.projectRoot, { text: "[系统·看护] 钉子：角色「A」。", summary: "系统·看护 · 钉子", dedupKey: "watchdog\u0000/proj\u0000pin\u00000" });
+  await tick(80);
+  const states = h.roleStates.filter((s) => s.roleId === "su");
+  const q = states[states.length - 1].queue;
+  assert.equal(q.length, 1, "系统消息入队（同源快照可见）");
+  assert.equal(q[0].kind, "system", "第四类 kind");
+  const wd = h.mgr.withdraw("su", q[0].id);
+  assert.equal(wd.ok, false, "system 不可撤回（治理流只读面——按钮不出现、语义同拒）");
+  assert.match(wd.error ?? "", /只读|不可撤回/, "如实说明");
+  release();
+  await send;
+  await h.mgr.stop(null);
+});

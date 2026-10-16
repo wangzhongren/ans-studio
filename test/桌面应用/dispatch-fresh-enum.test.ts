@@ -21,6 +21,8 @@ import { SessionManager } from "../../app/desktop/session.ts";
 import { createDesktopInterface } from "../../app/desktop/interface.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
 import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
+// G-1/A2（2026-10-16）：派发文案 = 编排单一来源（本地模板已收口删除）——断言按单一来源原文。
+import { renderDispatchPrompt } from "../../src/common/编排/handback.ts";
 import type { RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
 import type { DispatchTaskPayload, DispatchReceipt } from "../../src/provider/pi/session.ts";
 
@@ -125,8 +127,8 @@ test("首轮寻址①（管理器）：缓存 miss ⇒ 实时重枚举一次 ⇒
   await tick(240);
   assert.ok(opened.includes("开发"), "drain 自动开启目标角色（openInternal 读到的是刷新后的共享缓存）");
   assert.ok(
-    (sent["开发"] ?? []).some((t) => t.includes("[派发] 来自 su 的任务：开工")),
-    "派发文本实际投递到「开发」的会话"
+    (sent["开发"] ?? []).some((t) => t === renderDispatchPrompt({ roleId: "开发", task: "开工" })),
+    "派发文本实际投递到「开发」的会话（编排单一来源原文——G-1/A2 后本层不内嵌模板）"
   );
 
   // 派发给**确实不存在**的角色：重枚举一次后仍无 ⇒ 如实拒绝（不重试风暴）。

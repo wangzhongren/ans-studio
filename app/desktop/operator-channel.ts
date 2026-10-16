@@ -62,7 +62,9 @@ import type { AssembleShellGateOptions } from "../../src/pipeline/orchestration/
 // 与编排侧（写审计）同源，故「操作者所见」与「审计所记」不可能漂移。此前本模块的**本地副本（逐字镜像）
 // 已删除**（T23 收尾）：**不得有第二份实现**。
 import { normalizeArgv } from "../../src/common/shared/argv-primitives.ts";
-import { createDiagnosticLogger } from "../../src/common/shared/diagnostics.ts";
+// G-2/W5（2026-10-16 客户批准）：确认卡的 pending/replay/expire 机制抽入**共享通用件**
+// （`confirm-card.ts`，与恢复确认卡同件——设计 §6.2「实现建议」）；本文件的行为逐字保留（见下方注释）。
+import { createConfirmCardCore } from "./confirm-card.ts";
 // F-4-M1（2026-10-16 客户批准）：shell 审核预算的 env 名**单一来源**在编排（shell-deadline.ts——
 // shell-gate.ts 的同一引用）；本层**只读导入**，绝不在此另写 "ANS_PI_SHELL_REVIEW_TIMEOUT_MS" 字面量。
 import { SHELL_REVIEW_TIMEOUT_ENV } from "../../src/common/编排/shell-deadline.ts";
@@ -377,108 +379,80 @@ export interface ShellConfirmPresenter {
   rejectAllPending(_reason: string): void;
   /** 当前挂起数（测试/诊断）。 */
   pendingCount(): number;
+  /** **按角色挂起数**（G-2/W1 依赖项：看护信号 #1「正确等待不报」的按角色 pending 视图——
+   *  带挂起 shell 确认卡的角色不计入「轮次逼近超时」预警）。 */
+  pendingRoles(): Map<string, number>;
   replayPending(): number;
 }
 
+/**
+ * 构造 shell 确认卡呈现端。**G-2/W5（2026-10-16）**：pending/replay/expire 机制抽入共享通用件
+ * `confirm-card.ts`（与恢复确认卡同件）；本函数的**对外行为逐字保留**——恰 allow:true 才放行、未知 id
+ * expired、兜底清理计时（`cleanupAfterMs`）、超时/中止两个来源的失效分流（带标记 reason）与诊断事件名
+ * （`shell-confirm.presented/responded/expired/timeout/cancelled/replayed/replay.failed/expiration.failed`）全部不变。
+ */
 export function createShellConfirmPresenter(opts: CreateShellConfirmPresenterOptions): ShellConfirmPresenter {
   const env = opts.env ?? process.env;
   const cleanupAfterMs = opts.cleanupAfterMs ?? readConfirmTimeoutMs(env) + 5000;
-  let seq = 0;
-  const pending = new Map<string, { resolve: (d: OperatorDecision) => void; timer: ReturnType<typeof setTimeout>; request: ShellConfirmRequest; metadata?: DesktopOperatorMetadata; cleanup: () => void }>();
-  const diagnostic = createDiagnosticLogger({ component: "desktop.shell-confirm" });
-
-  const finish = (id: string, decision: OperatorDecision): boolean => {
-    const entry = pending.get(id);
-    if (entry === undefined) return false;
-    pending.delete(id);
-    clearTimeout(entry.timer);
-    entry.cleanup();
-    entry.resolve(decision);
-    return true;
-  };
-
-  const expire = (id: string, reason: string) => {
-    const entry = pending.get(id);
-    if (!entry) return;
-    finish(id, { allow: false });
-    try { opts.onExpired?.({ id, roleId: entry.metadata?.roleId ?? "", projectRoot: entry.metadata?.projectRoot, runtime: entry.metadata?.runtime, reason }); }
-    catch (error) { diagnostic.error("shell-confirm.expiration.failed", error, { requestId: id }); }
-  };
+  const core = createConfirmCardCore<ShellConfirmRequest>({
+    idPrefix: "sc-",
+    eventPrefix: "shell-confirm",
+    component: "desktop.shell-confirm",
+    present: opts.present,
+    expiredResponse: "此确认已失效（超时或应用重启），未获放行——请让角色重新发起。",
+    onExpired: (payload) => {
+      opts.onExpired?.({
+        id: payload.id,
+        roleId: payload.metadata?.roleId ?? "",
+        projectRoot: payload.metadata?.projectRoot,
+        runtime: payload.metadata?.runtime,
+        reason: payload.reason,
+      });
+    },
+  });
   return {
     presenter: {
       async present(_prompt: OperatorPrompt, display: ShellCommandDisplay, metadata?: DesktopOperatorMetadata): Promise<OperatorDecision> {
-        const id = `sc-${++seq}`;
-        const request = buildShellConfirmRequest(id, display);
-        if (metadata) {
-          request.roleId = metadata.roleId;
-          request.projectRoot = metadata.projectRoot;
-          request.runtime = metadata.runtime;
-        }
-        return await new Promise<OperatorDecision>((resolve) => {
-          const timer = setTimeout(() => {
-            diagnostic.record("shell-confirm.expired", { requestId: id });
-            expire(id, "shell 确认超时，旧确认失效。");
-            resolve({ allow: false }); // 兜底：清理 + 不放行（判定语义以通道先到者为准）
-          }, cleanupAfterMs);
-          // F-4-M2 + F-4-opt2（2026-10-16 客户批准）：按组合信号传播的中止原因**分流**——超时 ⇒ 如实超时文案
-          // （「未获放行——可让角色重新发起」，不再误报「本轮已结束」）；轮次中止/重建 ⇒ 原文案。两路各补一条
-          // 诊断（`shell-confirm.timeout/cancelled`）——上一轮真机「是否渲染/为何消失」不可判定的直接原因即此处
-          // 无记录；此后卡片的每一种去向（responded/expired/timeout/cancelled）都可判定。
-          const cancel = () => {
-            const reason = metadata?.signal.reason as unknown;
-            if (reason instanceof Error && reason.name === OPERATOR_CONFIRM_TIMEOUT_NAME) {
-              const timeoutMs = (reason as Error & { timeoutMs?: unknown }).timeoutMs;
-              const n = typeof timeoutMs === "number" && Number.isFinite(timeoutMs) ? timeoutMs : undefined;
-              diagnostic.record("shell-confirm.timeout", { requestId: id, ...(n !== undefined ? { durationMs: n } : {}) });
-              expire(id, n !== undefined ? `操作者确认超时（>${n}ms），未获放行——可让角色重新发起。` : "操作者确认超时，未获放行——可让角色重新发起。");
-            } else {
-              diagnostic.record("shell-confirm.cancelled", { requestId: id });
-              expire(id, "本轮已结束、停止或会话已重建，旧 shell 确认失效。");
+        const allowed = await core.mount(
+          (id) => {
+            const request = buildShellConfirmRequest(id, display);
+            if (metadata) {
+              request.roleId = metadata.roleId;
+              request.projectRoot = metadata.projectRoot;
+              request.runtime = metadata.runtime;
             }
-          };
-          const cleanup = () => metadata?.signal.removeEventListener("abort", cancel);
-          pending.set(id, { resolve, timer, request, metadata, cleanup });
-          metadata?.signal.addEventListener("abort", cancel, { once: true });
-          if (metadata?.signal.aborted) { cancel(); return; }
-          try {
-            opts.present(request);
-            diagnostic.record("shell-confirm.presented", { requestId: id, pendingCount: pending.size });
-          } catch (err) {
-            clearTimeout(timer);
-            pending.delete(id);
-            cleanup();
-            throw err; // → 通道 unavailable（fail-closed，绝不当「没人问就放行」）
-          }
-        });
+            return request;
+          },
+          metadata,
+          {
+            cleanupAfterMs,
+            // F-4-M2 + F-4-opt2（2026-10-16 客户批准）：按组合信号传播的中止原因**分流**——超时 ⇒ 如实超时文案
+            // （「未获放行——可让角色重新发起」，不再误报「本轮已结束」）；轮次中止/重建 ⇒ 原文案。两路各补一条
+            // 诊断（`shell-confirm.timeout/cancelled`）——上一轮真机「是否渲染/为何消失」不可判定的直接原因即此处
+            // 无记录；此后卡片的每一种去向（responded/expired/timeout/cancelled）都可判定。
+            abortDisposition: (reason) => {
+              if (reason instanceof Error && reason.name === OPERATOR_CONFIRM_TIMEOUT_NAME) {
+                const timeoutMs = (reason as Error & { timeoutMs?: unknown }).timeoutMs;
+                const n = typeof timeoutMs === "number" && Number.isFinite(timeoutMs) ? timeoutMs : undefined;
+                return {
+                  reason: n !== undefined ? `操作者确认超时（>${n}ms），未获放行——可让角色重新发起。` : "操作者确认超时，未获放行——可让角色重新发起。",
+                  diagnosticEvent: "shell-confirm.timeout",
+                  ...(n !== undefined ? { fields: { durationMs: n } } : {}),
+                };
+              }
+              return { reason: "本轮已结束、停止或会话已重建，旧 shell 确认失效。", diagnosticEvent: "shell-confirm.cancelled" };
+            },
+          },
+        );
+        // 恰 allow:true 才放行；其余（含缺字段/非布尔/失效）= 拒绝。
+        return { allow: allowed };
       },
     },
-    respond(input) {
-      const req = input && typeof input === "object" ? (input as { id?: unknown; allow?: unknown }) : {};
-      const id = typeof req.id === "string" ? req.id : "";
-      if (id === "" || !pending.has(id)) {
-        return { ok: false, expired: true, error: "此确认已失效（超时或应用重启），未获放行——请让角色重新发起。" };
-      }
-      finish(id, { allow: req.allow === true }); // 恰 allow:true 才放行；其余一律拒绝
-      diagnostic.record("shell-confirm.responded", { requestId: id, decision: req.allow === true });
-      return { ok: true };
-    },
-    rejectAllPending(_reason) {
-      for (const id of [...pending.keys()]) expire(id, _reason);
-    },
-    pendingCount: () => pending.size,
-    replayPending() {
-      let count = 0;
-      for (const entry of pending.values()) {
-        try {
-          opts.present(entry.request);
-          count += 1;
-        } catch (error) {
-          diagnostic.error("shell-confirm.replay.failed", error, { requestId: entry.request.id });
-        }
-      }
-      diagnostic.record("shell-confirm.replayed", { count });
-      return count;
-    },
+    respond: core.respond,
+    rejectAllPending: core.rejectAllPending,
+    pendingCount: core.pendingCount,
+    pendingRoles: core.pendingRoles,
+    replayPending: core.replayPending,
   };
 }
 

@@ -162,6 +162,11 @@ export function describeTool(name: string): ToolDescription {
   }
   if (name === "dispatch_task") {
     // 派发任务工具（设计 H-1，只给 su）：无 path、无写权。文案写死三条——派发≠授权 / 任务自足 / 返工带证据。
+    // G-1/A4（设计 2026-10-16_design_contract-workflow-dispatch.md §四；PM 派发 V1 最小闭环 2026-10-16）：
+    // 增两条——多角色/跨角色协作「先落盘再派发」（契约 docs/contracts/<name>-v<N>.md、工作流 docs/workflow.md）、
+    // 任务文本「按地址引用」（不内嵌契约全文；「必读（按序）」块由投递系统附上、sha256 投递时算，su 不手算/不转抄）。
+    // 与门禁引擎 su 卡文本（规划落盘契约/工作流、派发引用地址）同口径；既有必备语义（H-1 三条 + 不代授权 +
+    // 反向断言面）逐字保留——test/pi-adapter/dispatch-task.test.ts 与 test/runtime-core/tools.test.ts 双向钉住。
     return {
       parameters: {
         type: "object",
@@ -170,7 +175,9 @@ export function describeTool(name: string): ToolDescription {
           task: {
             type: "string",
             description:
-              "Self-contained task text: what to do, which document to follow, and the acceptance criteria " +
+              "Self-contained task text: what to do, which document to follow (give the project path, " +
+              "e.g. docs/contracts/<name>-v1.md or docs/workflow.md — don't paste the document's full text; " +
+              "the delivery attaches a required-reading block), and the acceptance criteria " +
               "(the target role cannot see your context); for rework, restate the requirements and include the evidence",
           },
           reason: { type: "string", description: "Optional: why you are dispatching this task" },
@@ -183,11 +190,20 @@ export function describeTool(name: string): ToolDescription {
         "**派发 ≠ 授权**——你只能转移「任务与上下文」，**不能**授予或改变对方的写权：对方写入仍只来自它自己的" +
         "已接受边界和已授权任务；普通操作无需逐次确认，新建或扩张边界、治理写集仍由 su 请求客户确认。任务文本必须**自足**（对方看不到你的上下文）：" +
         "写清要做什么、依据哪份文档、完成标准；**返工**时把要求与证据一并写进任务文本。" +
+        "多角色/跨角色协作时**先落盘再派发**：先把冻结契约落盘到 `docs/contracts/<name>-v<N>.md`" +
+        "（写盘许可已预置、直接写即可），工作流落盘到 `docs/workflow.md`（写盘经确认制：把路径列入规划确认的 preview），**再**派发任务。" +
+        "任务文本**按地址引用**契约与工作流——「依据哪份文档」给项目内路径即可（如 `docs/contracts/<name>-v1.md`），**不内嵌契约全文**；" +
+        "投递时系统会据此自动附上「**必读（按序）**」块（先读完再动手），其中的 sha256 由投递系统在投递当刻计算——**不要自己算或转抄哈希**。" +
+        "引用的契约文件不存在时投递会被**拒绝**（回执如实报错；补落盘后重派）；`docs/workflow.md` 缺失（旧项目过渡期）不拒投、必读块如实标注「未提供」。" +
         "roleId 必须是本项目角色（不能是你 su 自己）；本工具**不写盘、不做治理判定、不改变任何角色的写权**。",
       promptGuidelines: [
         "派发的是**任务与上下文**；**派发 ≠ 授权**——目标角色只在自己的已接受边界内执行已授权任务，普通操作无需逐次确认；" +
           "不得在任务文本里代授写权；真正新建或扩张边界、治理写集仍由 su 请求客户确认。",
         "dispatch_task 的任务文本要**自足**：目标角色看不到你的上下文——写清要做什么、依据哪份文档、完成标准。",
+        "**多角色/跨角色协作先落盘再派发**：契约落盘到 `docs/contracts/<name>-v<N>.md`（预置写盘目录、直接写即可）、" +
+          "工作流落盘到 `docs/workflow.md`（路径列入规划确认的 preview），**再**派发。" +
+          "任务文本**按地址引用**契约与工作流（给项目内路径），**不内嵌契约全文**——投递时系统会自动附上「**必读（按序）**」块并计算其中的 sha256；" +
+          "**不要自己算或转抄哈希**。引用的契约文件不存在时投递会被**拒绝**（如实回执），补落盘后重派。",
         "返工时把**要求与证据**一并写进任务文本（复述返工要求 + 相关证据/路径），避免对方凭猜返工。",
       ],
     };
@@ -216,6 +232,96 @@ export function describeTool(name: string): ToolDescription {
       promptGuidelines: [
         "审读结论**必须**以 report_shell_verdict 工具调用交回（verdict: allow / deny / unsure）；在正文里写结论不算数。",
         "本工具不授予任何权限、也不构成对任何命令的放行——它只记录你给出的结论；实际放行由编排的既有审读链决定。",
+      ],
+    };
+  }
+  if (name === "role_status") {
+    // 看护只读工具（G-2/R1，只给 su 注入）：读取主进程权威快照的结构化文本。文案纪律：只读/8 KiB 截断如实/
+    // 失败不编造/不做任何恢复（「注入才注册」由 tools.ts 结构性保证；本处只写语义与取用口径）。
+    // 与设计 §3.3 告警文案口径联动：su 收 `[系统·看护]` 后先核对（role_status→必要时 session_tail），
+    // 确认卡死才 propose_recovery（需客户一键确认）。
+    return {
+      parameters: {
+        type: "object",
+        properties: {
+          roleId: { type: "string", description: "Optional target role id; omit for a whole-project overview" },
+          includeDiagnostics: { type: "boolean", description: "true = also append that role's recent diagnostics tail (≤20 entries; metadata whitelist fields only)" },
+        },
+        required: [],
+        additionalProperties: true,
+      },
+      description:
+        "**只读**状态查询（看护工具，只注入给治理角色 su）：读取本项目**权威状态快照**——各角色忙/闲、" +
+        "投递队列积压、会话开合、最近一轮结果、待确认数与看护告警状态；includeDiagnostics=true 时附该角色近日志尾部（≤20 条元数据）。" +
+        "**纯读：不写盘、不入队、不改任何状态、不改变任何权限**；本工具本身不做任何恢复。输出为结构化文本，" +
+        "超 **8 KiB** 会截断并如实标注 `truncated`；数据不可用（如诊断写盘故障）时如实给出「不可用＋原因」，**绝不编造状态**。",
+      promptGuidelines: [
+        "roleId 缺省＝全项目概览；给出＝单角色详情。输出超 8 KiB 会被截断（truncated）——需要更多事实时收窄查询。",
+        "收到 `[系统·看护]` 告警时：先用 role_status 核对卡点事实（必要时再用 session_tail 看会话尾部），再决定处理——" +
+          "告警仅告知、不改变任何判定；仅在确认卡死时提议恢复（propose_recovery，需客户一键确认后由应用执行）。",
+      ],
+    };
+  }
+  if (name === "session_tail") {
+    // 看护只读工具（G-2/R1，只给 su 注入）：角色会话文件尾部规范化行（受保护投影链上产出）。
+    // 文案纪律：只读/脱敏如实（内容可能含此前会话原文要点，已过投影）/行数上限/无历史与读坏如实不猜。
+    return {
+      parameters: {
+        type: "object",
+        properties: {
+          roleId: { type: "string", description: "Target role id (required)" },
+          lines: { type: "number", description: "How many tail lines to return; default 40, cap 200" },
+        },
+        required: ["roleId"],
+        additionalProperties: true,
+      },
+      description:
+        "**只读**会话尾线（看护工具，只注入给治理角色 su）：返回该角色 ANS 会话文件的**尾部规范化行**" +
+        "（每行形如 `<时间> [user|assistant|tool] 一行文本`，超长行截断标注；头部如实给来源文件/总行数/跳过坏行数）。" +
+        "内容已经**受保护投影与脱敏管线**（凭据清洗、显示保护）——但仍可能含该角色此前会话原文要点，按排查最小必要读取。" +
+        "**纯读：不写盘、不改任何状态、不扩大任何写权**；无会话历史、文件读坏等如实报告，**不抛、不猜、不编造**。" +
+        "缺省 40 行、上限 200 行（超上限按上限取并如实标注）。",
+      promptGuidelines: [
+        "session_tail 只读现有落盘会话的尾部——它不重放、不恢复、不修改任何会话；需要核对某角色近期在做什么时按其尾部按需读取。",
+        "行列内容来自受保护投影（已脱敏），但仍是会话原文要点：只用于排查，不要转抄敏感细节，不要据此假设任何写权。",
+      ],
+    };
+  }
+  if (name === "propose_recovery") {
+    // 恢复提议工具（G-2/R2，只给 su 注入）：只交载荷、如实转达三态回执。文案纪律（沿 dispatch_task 先例）：
+    // 提议 ≠ 执行 / 无客户确认＝零执行 / 三态如实（executed/declined/failed）/ 不得承诺 / evidence 必填 /
+    // 不放行任何命令、不改变任何权限或写权；动作集恰三值（客户批准，§6.3）。
+    return {
+      parameters: {
+        type: "object",
+        properties: {
+          roleId: { type: "string", description: "Target project role id (must be a project role, not su itself)" },
+          action: {
+            type: "string",
+            enum: ["abort-turn", "rebuild-session", "redeliver"],
+            description:
+              "abort-turn = stop the target's current turn (same as the UI's stop-turn); " +
+              "rebuild-session = dispose and reopen the target's session (refused while a turn is running); " +
+              "redeliver = retry the target's delivery queue now",
+          },
+          evidence: { type: "string", description: "Facts supporting the proposal (state snapshot / timeline / session lines); required" },
+          reason: { type: "string", description: "Optional: why you propose this recovery" },
+          itemId: { type: "string", description: "Optional, redeliver only: the specific queued item id to retry" },
+        },
+        required: ["roleId", "action", "evidence"],
+        additionalProperties: true,
+      },
+      description:
+        "**提议**一次恢复动作（看护工具，只注入给治理角色 su）：把 {roleId, action, evidence} 交给应用路由" +
+        "→ 生成**客户一键确认卡** → 客户确认后**由应用执行** → 结果**回执如实**（executed / declined / unsupported / error——后三值一律**未执行**）。" +
+        "`action` 恰为三值：`abort-turn`（停止目标角色当前轮次，＝UI「停止本轮」）/ `rebuild-session`（作废并重开其会话；" +
+        "在跑轮次不打断、会被拒绝）/ `redeliver`（触发其投递队列立即重试；可用 itemId 指单条）。" +
+        "你**只能提议**：**提议 ≠ 执行**——无客户确认＝零执行；本工具**不执行任何动作、不放行任何命令、不改变任何权限或写权**，" +
+        "也**不得承诺**执行或其结果。`evidence` **必填**——无证据不提议；仅在确认卡死（据 role_status / session_tail 的核对结论）时提议。" +
+        "回执如实转达：executed＝客户已确认且已执行；declined＝未获确认（零执行）；unsupported＝运行时不支持（未执行）；error＝执行失败/前提不满足（未执行）——**未获执行不得当成功**。",
+      promptGuidelines: [
+        "propose_recovery 只用于**确认卡死**的恢复；提议前先核对（role_status，必要时 session_tail），并把核对结论写进 evidence。",
+        "**提议 ≠ 执行**：无客户一键确认＝零执行；不得用本工具承诺任何执行或写权、不得替客户决定、**不得把未获执行当成功**。",
       ],
     };
   }
