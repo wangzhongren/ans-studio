@@ -3,14 +3,37 @@ id: fix-kanban-delivery-and-operator
 type: fix
 title: kanban-live 真机轮 F-2 投递机整轮串行阻塞 / F-4 操作者确认不可用 修复提案
 created: "2026-10-15"
-status: 提案（未实施 / 未测试）
+updated: "2026-10-16"
+status: 已实施待验证（单测全绿；真机复验待测试/root）
 ---
 
 # F-2 / F-4 修复提案（桌面窗口）
 
-来源：PM 派发件 [2026-10-15_change_kanban-runtime-fixes-dispatch.md](../../../项目管理/docs/change/2026-10-15_change_kanban-runtime-fixes-dispatch.md)（提案轮：只写提案、不改任何 src/app/test 代码）。本文档状态：**未实施 / 未测试**；所有可选件待客户裁定。
+来源：PM 派发件 [2026-10-15_change_kanban-runtime-fixes-dispatch.md](../../../项目管理/docs/change/2026-10-15_change_kanban-runtime-fixes-dispatch.md)（提案轮：只写提案、不改任何 src/app/test 代码）。~~本文档状态：**未实施 / 未测试**；所有可选件待客户裁定。~~ **状态更新（2026-10-16）：客户已按 PM 推荐批准（F-2-M1 + opt2 + opt3；F-4-M1 + M2 + opt1 + opt2；另承接 F-8-b 桌面侧与 F-5-opt1 桌面侧——见 PM 评审件 §客户批准记录），本角色实施轮已完成实施，单测与 typecheck 全绿，真机复验待测试/root——见下方实施摘要。**
 
-本轮在既有证据之外，**只读**复核了当时运行的诊断日志（本轮隔离用户目录仍在：`/private/tmp/ans-kanban-live-7ae6156b/userdata/ans/diagnostics/ans-diagnostics-2026-10-15.jsonl`，下称「诊断日志」），它把两条问题的时序钉到了毫秒级——**建议 PM 安排把该文件（及其所在目录）纳入证据保全，`/private/tmp` 会被系统清理**。本文未复制、未改动该文件与 `角色卡/测试/docs/change/2026-10-15-kanban-live-real-project-evidence/` 下任何内容。
+本轮在既有证据之外，**只读**复核了当时运行的诊断日志（本轮隔离用户目录仍在：`/private/tmp/ans-kanban-live-7ae6156b/userdata/ans/diagnostics/ans-diagnostics-2026-10-15.jsonl`，下称「诊断日志」），它把两条问题的时序钉到了毫秒级——**建议 PM 安排把该文件（及其所在目录）纳入证据保全**，`/private/tmp` 会被系统清理。本文未复制、未改动该文件与 `角色卡/测试/docs/change/2026-10-15-kanban-live-real-project-evidence/` 下任何内容。
+
+---
+
+## 实施摘要（2026-10-16，实施轮）
+
+**状态：已实施（本角色全部改动落在 Section 1 边界内）／单测已过／真机未复验。** 按 §三「最小拟改动」与 §五「测试计划」实施；未勾选项（F-2-opt1、F-4-opt3）未实施；fail-closed 全链未放松。
+
+| 项 | 落点（本角色文件） | 要点 |
+|---|---|---|
+| F-2-M1 | `app/desktop/session.ts` `drainQueueUnsafe` | 认领段（shift→置忙→登记 activeDeliveries→`delivery.start`→组装载荷→调 `sendDelivery` 取 promise）后**立即释放链**；成功/失败记账移入分离续段（IIFE 内 try/await/catch 与旧代码**逐字同体**，含「成功支抛错也落失败支」逐支等价）；续段自带与 `drainQueue` 安全壳同款的**就地拒收**（绝不产生未捕获拒绝）；注释写明「链防的是同队列并发 shift/open 与认领竞态，持有收窄到认领段」 |
+| F-2-opt2 | 同上（新增 `openChains`） | `openInternal` 按会话键互斥（等待链 + finally 释放 + 链尾清理）；**防死锁**：重建续段（`rebuildIfBoundaryStaleUnsafe` 的重开）直调 `openInternalUnsafe`，不入链 |
+| F-2-opt3 | 同上 | 认领段起止诊断 `delivery.claim.start/end`（字段用诊断 FIELD_NAMES 白名单内的 `state`/`queueDepth`/`count`）；形状防御丢弃路径也配对收尾 |
+| F-4-M1 | `app/desktop/operator-channel.ts` `readConfirmTimeoutMs` | 取值链：专用 env `ANS_DESKTOP_OPERATOR_CONFIRM_TIMEOUT_MS` → 未设时**跟随** `ANS_PI_SHELL_REVIEW_TIMEOUT_MS`（env 名从编排 `shell-deadline.ts` 只读导入，不写字面量）→ 否则 120000；presenter 兜底 `+5000` 同步跟随；判定不变（超时仍 unavailable） |
+| F-4-M2 | 同上 | 超时分支以**带标记 reason**（`confirmTimeoutError`，携带 `timeoutMs`）中止组合信号；presenter `cancel` 读 `signal.reason` 分流：超时 ⇒「操作者确认超时（>Nms），未获放行——可让角色重新发起。」；轮次中止/重建 ⇒ 原文案。**组合信号 reason 传播（Node 24 / Electron 44 实施轮首验项）已由单测钉住通过** |
+| F-4-opt1 | `app/main.ts` | `win.on("focus"/"show") → shellConfirm.replayPending()`（幂等；只重推仍挂起者） |
+| F-4-opt2 | `operator-channel.ts` presenter | cancel/超时路径补诊断 `shell-confirm.timeout`（含 `durationMs`=生效时限）/`shell-confirm.cancelled`——presented 之后每种去向（responded/expired/timeout/cancelled）均可判定 |
+| F-8-b（桌面侧） | `app/desktop/session-history.ts`（新增导出 `classifyProcessOutcome`）、`app/desktop/runtime-history.ts` | 判据只认 `display.process` 结构化事实（与运行时核心投影 / 桌面UI `tool-rows.js` F-8-b 块同源）：`exitCode` 非零且无 `error`/`signal` ⇒ 不归 kind='denied'/failed（activity.status='returned'）；`timedOut` 独立一类（不归 denied；status 保持 failed）；无结构化事实的旧文本行**行为逐字不变**（过渡期口径） |
+| F-5-opt1（桌面侧） | `app/desktop/session.ts` 重建路径 | 确认制会话（`confirmGated`＝内置治理角色+客户通道已接）重建后，对新句柄调 `handle.queueModelNotice?.(REBUILT_SESSION_WRITE_PERMITS_NOTICE)`（编排侧已实施落地的接口与单一来源文案；防御式 `?.`，旧替身缺席为 no-op；非确认制会话不排——绝不说假话） |
+
+**测试证据（2026-10-16，本机 Node v24.14.0）**：本角色全部 23 个授权单测文件 **235/235 绿**（新增：F-2-T1..T5、F-2-opt2、F-2-opt3、F-4-T1..T3、F-4-opt1 接线+行为、F-5-opt1 两条、F-8-b 单测与全管线各一条）；`npm run typecheck` 0 错；全仓全量 `node --test "test/**/*.test.ts"` **1470 计 1469 过 / 1 skipped / 0 红**（记忆中的 2 条基线红本次未出现）。跨角色回归抽查：桌面UI `tool-rows.test.ts` 13/13 绿（其 F-8-b 判据块与我的行输出互认）。
+
+**未含（如实）**：真机 E2E 复跑（按 PM 评审 §七 由测试角色/root 执行，含 F-2/F-4 断点观测项）；F-4-V1 渲染复验为回归项（客户已亲历证实卡片渲染存在，见 PM 评审 §四.1）；本实施未改 `src/**`、`app/renderer/**` 与任何他角色文件。
 
 ---
 

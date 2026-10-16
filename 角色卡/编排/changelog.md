@@ -1,5 +1,39 @@
 # 编排 变更记录
 
+## 2026-10-16 — su 预授权写目录（客户裁定）：`docs/su/**` + `docs/contracts/**` 预置进初始 writeSet（免确认发行）
+
+**来源**：客户裁定 2026-10-16，原文两句——①「**这个 su 可以写 docs/su 的目录，不需要我审批**」；② 追加（经项目管理转达）「**还有个契约目录也可以给他写。**」（= `docs/contracts/**`，G-1 契约落盘目录约定；其本体落地时生效，本预授权先装好）。这是对 F-5-main 所载既有设计（「写盘许可按会话生效、只经 request_confirmation 发行、重建不自动保留」）的**客户例外**：预授权 = **初始集合的一部分**，不属「经确认发行的写权」。
+
+**改了什么（全部在本角色 Section 1 内）**：
+- **`src/pipeline/orchestration/run-role.ts`（主改动）**：新增私有常量 `SU_PREAUTHORIZED_WRITE_DIRS = ["docs/su", "docs/contracts"]` 与两个辅助——`suPreauthorizedRelOf`（目标在预授权树内 → 返回其项目根相对**词法**路径；取值规则与 `resolveWrite` 同源；`isUnderOrEqual` **段式**比较防 `docs/su2` 串线）与 `scopeWithSuPreauthorization`（树内 ⇒ 该路径**并入本次 writeSet**；树外 ⇒ **原样 base**，逐字现状）。`openRoleSession` 的 gate 构造处按既有判据 **`setup.role.kind === "built-in-governance"`**（与 suppressHandback/dispatchTask 同一判据，不硬编码 id）在**确认制动态集**与**静态 scope**两分支同口径求值；`scope === undefined` 会话不新增任何收窄/放宽。新增只读导入共享路径原语 `src/common/shared/path-primitives.ts`（§一.5 消费方名单已含编排，`confirmed-writes.ts` 同源先例）。**实现口径（如实登记）**：F4 是**精确匹配**（放目录不覆盖子路径——`govern-session.ts` 既有注释同一结论），故「预置进初始 writeSet」实现为「**求值时把目标路径本身并入 writeSet**，等价于它初始就在已发行集中」；判定链其余环节（F6 接受、F7 逃逸、边界条目、条件）**逐字不变**，fail-closed 不放松。
+- **会话重建覆盖**：预授权在**会话初始化处的 gate 求值中计算**（闭包在角色上，不写入 `issued`、不经发行器、不落状态）⇒ 每次开会话/桌面 O-1 重建（重开一次会话）都同口径获得，**不随句柄/重建丢失**（测试钉住）。**F-5-opt1 重建提示 `REBUILT_SESSION_WRITE_PERMITS_NOTICE` 逐字未动**——它说的是「经确认发行的写权」，预授权不属此类，提示保持准确。
+- **`src/pipeline/orchestration/govern-session.ts`（两处模型可见文案同步，各加一短句）**：`runGovernSession` 确认制说明行与 `buildGovernPrompt` 的 confirmRule 补预授权例外（「docs/su/、docs/contracts/ 属初始写集、可直接写、无需确认」）——F-5-main 先例（文案须与实现一致且可操作；否则 CLI 会继续驱动 su 为笔记发确认卡，与客户裁定相悖）。**su 卡文本的配套修改由门禁引擎另行实施（本角色不做，已登记）。**
+
+**严格范围（复核过）**：仅内置治理角色、仅这两棵目录树；`docs/` 其它子路径、`角色卡/`、`.ans/`、`src/` 等一切其余写盘行为不变（未确认 = F4 照拒）；其他角色零变化（非 su 角色边界覆盖 `docs/` 亦无预授权——测试控变量钉住）；不改 `resolve-write.ts`/`confirmed-writes.ts`/任何 `app/**`/门禁引擎文件。
+
+**测试**：`test/编排/session-handle.test.ts` **+5 例**（开局免确认可写含子路径/绝对路径且客户通道零调用；严格边界含 `docs/su2` 类前缀负例与 F4 理由断言；非 su 角色无预授权；静态 scope 同口径；**重建后再开仍可写**）；`test/编排/confirmation-gated.test.ts` **+1 例**（E2E：`governCommand` + 假适配器——不发 `request_confirmation` 即刻落盘 `docs/su/memo.md` 与 `docs/contracts/api-v1.md`、客户通道零调用；`docs/其他.md` 与 `角色卡/` 未确认被 F4 拒、零副作用）。既有断言零改动、未为变绿放松。
+
+**结果**：`node --test "test/编排/"*.test.ts` → **274/274 全绿**（268 + 6）；`npm run typecheck` → **0 错**；全量 `node --test "test/**/*.test.ts"` → **1503 计 / 1502 过 / 0 红 / 1 skipped**（skip 为既有 Windows 专用用例；未见历史 2 基线红）。环境：Node v24.14.0、Darwin 25.6.0。未 git 提交；未碰真机轮目录（`ans-testbed/kanban-live-3`、`/private/tmp/ans-kanban-dev3-ad1bdf3b` 只读）与测试角色证据目录。详见[实施记录](docs/fix/2026-10-16_fix_su-notes-preauth.md)。
+
+**跨角色（请 pm 转达）**：① **门禁引擎**——su 卡文本「确认制要点」段补预授权例外（F-5-main 段落对两棵预授权树已不必要；文本归其属主）。② **桌面窗口**——无需改动（`role.builtIn` 判据与编排 `kind` 判据同集合；O-1 重建路径无需新调用即得预授权）。③ **G-1**——契约目录本体落地时确保治理边界覆盖 `docs/`（现状种子/治理边界文档均已覆盖；预授权本身不制造边界覆盖，未覆盖时照旧「未匹配」拒）。④ 真机复验（测试/客户）：su 写 `docs/su/memo.md` 不弹确认卡且落盘；写 `docs/` 其它路径仍弹卡/未确认被拒。
+
+## 2026-10-16 — kanban-live 修复批（实施轮）：F-6-1 审计刷新重试 + F-6-2 提示去重与如实话术；F-4-X1 操作者真实 reason 转达；F-3-d 回交截断注记；F-5-opt1 编排侧注记注入渠道
+
+**来源**：客户 2026-10-16 按推荐批准（`角色卡/项目管理/docs/change/2026-10-15_change_kanban-fixes-pm-review.md` §客户批准记录），本角色实施项 = F-6-1 + F-6-2（本角色提案 `docs/fix/2026-10-15_fix_kanban-shell-audit-f6.md`）+ F-4-X1（桌面窗口提案 §六）+ F-3-d（Pi适配器提案 §六）+ F-5-opt1 编排侧（门禁引擎提案 §四）。**F-6-opt2/opt3 不实施**（批准范围外）。
+
+**改了什么（全部在本角色 Section 1 内）**：
+- **F-6-1 审计写刷新重试**（3 文件）：`shell-audit.ts::createFileAuditSink` 增可选 `refreshGate`——`append()` 首查被拒时**重解析一次、以新 gate 重试一次**；重试放行 → 落盘并**切换活跃门禁**（恢复后零额外开销）；重试仍拒/刷新失败 → 链式原因（原判+重解析后仍拒）、**零副作用**（重试仍在触碰文件系统之前，判定唯一经 `resolveWrite`，fail-closed 全链不绕）。`shell-gate.ts::ShellGateBuildDeps` 增可选 `auditBoundaryRefresh`（缺省不传 = 旧行为逐字）。`shell-arming.ts` 两装配入口各自注入刷新闭包：共享载入器 `loadEffectiveConfig`（只读导入）+ **同一个** `resolveGovernanceBoundary`（三层链含 `roleIdOverride`；只读档同口径）——刷新的语义 = **重读盘上 `.ans` 最新验收**，不是会话快照。
+- **F-6-2 提示去重 + 如实话术**：`audit()` 按 reason 去重（同一 gate 实例：首个完整打印一次；相同 reason 只累计）；reason 变化再报一次；恢复落盘打印一行 `已恢复落盘（此前未落盘 N 条）`——本次事故 17 行噪音 → **1 行失败 + 1 行恢复**。拒绝文案去掉错误的「（缺少 `shell-gate` 条件？）」猜测（现场反例：条件已声明、缺的是接受）→ `审计写被门禁拒绝：<resolveWrite 原文>`。「审计失败不翻转判定」不变。
+- **F-4-X1（跨边界小项）**：`shell-gate.ts::runA` 的 unavailable 分支**转达 `OperatorOutcome.reason` 原文**（桌面 M2 起「操作者确认超时（>Nms）…」与「本轮已结束、停止或会话已重建…」可辨）；缺原因/未回结果 → 如实兜底「操作者通道不可用（未给出原因），拒绝（fail-closed）」——**「无人值守？」固定句退场**。归因码保持 `a-unavailable`（评估结论：M-1 人话映射据码对号不看文本猜；如实性由 reason 层兑现，不引入文本嗅探改码）。既有断言更新一处：`shell-review-chain.test.ts` 的 (a) 通道不可用用例改为断言**转达真实 reason**。
+- **F-3-d（跨边界小项）**：`handback.ts::withHandback` 终态回交路径——**仅 terminal-fallback** 且 settle detail `truncation==="length"` 时，摘要附 **`（截断：stopReason=length）`**（submitted-report 是模型权威值不代改；旧适配器无字段则无注记）。
+- **F-5-opt1 编排侧（跨边界小项）**：`run-role.ts` 给 `RoleSessionHandle` 增**可选** `queueModelNotice?(text)`（同 `abort?` 先例，`openRoleSession` 句柄恒实现）——注记**排入下一次 send 的输入前缀**（一行加换行分隔），**送达一次即消费**（未开轮失败 → 保留随重试轮带上；开轮后失败 → 消费防重复）；不单独开轮、不触任何判定；空串忽略。导出推荐文案**单一来源** `REBUILT_SESSION_WRITE_PERMITS_NOTICE`（「会话已因边界更新重建；此前经确认发行的写权不会自动保留，如需写入请重新经 request_confirmation 确认。」——不夹带授权语义）。**桌面调用归其重建路径**（见下跨角色）。
+
+**测试**：`shell-gate.test.ts` +7（F-6-T1 刷新恢复/字段齐备/恢复后直走新门禁；F-6-T2 缺省无刷新=现状；F-6-T3 刷新仍拒链式原因+无猜测归因；F-6-T3b 刷新失败如实；F-6-T4 去重 4 行序列（同因 3 连=1 行、变化/恢复/再失败各一行，stderr 捕获+try/finally 恢复）；F-4-X1 三态转达）；`shell-arming.test.ts` +3（**F-6-T6 事故回归 E2E**：gov.path="" 快照→审核→零副作用→按生产渲染器+同算法 sha256 写收尾物→再审**自愈落盘**恰一条→连续追加；**F-6-T6b 对照组**：不传刷新闭包→收尾后仍不落盘=旧行为；**F-6-T7** su 只读档同接线）；`handback.test.ts` +1（F-3-d 三态）；`session-handle.test.ts` +2（F-5-opt1 前缀送达/消费一次/空串忽略、未开轮失败保留）。**实施中发现并修复自身缺陷**：去重状态初版声明在 `createShellGate` 的 `return` 之后（闭包返回后才执行 ⇒ TDZ，被容错 catch 吞成「审计异常」行）——已前移声明并注释，测试捕获钉住。
+
+**结果**：`test/编排/` **268/268**（原 256 + 12）；`npm run typecheck` **0 错**（实施中另见 `src/provider/runtime/tools.ts` 三处错=**运行时核心**并行 F-7 在途、非本批，其自消解）；全量 `node --test "test/**/*.test.ts"` **终跑 1455 计 / 1454 过 / 0 红 / 1 skipped（全绿）**——中段一次 4 红全在 `test/runtime-core/`（F-7-opt1/opt2 + F-8-a=运行时核心在途、与本批零交集），随其属主收口自消解；本次跑未再见历史 2 条基线红（其文件已被并行改动覆盖）。**本角色零红**。环境：Node v24.14.0、Darwin 25.6.0。未 git 提交；未改 kanban-live 项目与测试角色证据目录；未真跑命令、未发真实模型请求。详见[实施记录](docs/fix/2026-10-15_fix_kanban-shell-audit-f6.md#十实施记录2026-10-16-实施轮)。
+
+**跨角色（请 pm 转达）**：① **桌面窗口（F-5-opt1 桌面侧）**——O-1 重建路径在重建后调 `handle.queueModelNotice?.(REBUILT_SESSION_WRITE_PERMITS_NOTICE)` 即闭环（可选方法，旧替身不实现亦合法）。② **Pi适配器**——F-3-d 依赖 settle detail 的 `truncation:"length"`（F-3-b 承诺字段；本侧按追加、忽略安全消费）。③ **真机复验（测试/客户）**——空文件夹 bootstrap → su 派发后紧接互动跑命令 → 日志无「未落盘」批量重复、`docs/audit/shell-gate.jsonl` 条目连续（17→1 行失败 + 1 行恢复；第 1 条物理不可恢复=fail-closed 应有残留）。
+
 ## 2026-10-15 — ORCHESTRATION-C-1 最终报告与安全历史消费
 
 按批准A4/C2.tp1/consumer2，三源码接真实bound报告保存/ID恢复查询、治理透明代理、安全live与纯legacy投影；Window唯一enqueue，原模型text/图片不变，新显示副本不raw旁路。A4写证据与旧兼容同步。自身256/256、typecheck0；下游实际投递和真实桌面待属主。见[实施记录](docs/change/2026-10-15_change_report-provenance-consumer.md)。

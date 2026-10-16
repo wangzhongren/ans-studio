@@ -94,15 +94,26 @@
 | **名称与用途** | 为应用、会话、工具、审核和回交提供同一条可追溯的本地诊断链，避免各角色自造存储/清理规则。 |
 | **代码与公共入口** | `src/common/shared/diagnostics.ts`：`configureDiagnostics`、`createDiagnosticLogger`、`getDiagnosticsStatus`、`flushDiagnostics`、`disposeDiagnostics`；常量 `DIAGNOSTIC_RETENTION_MS=86400000`。 |
 | **属主与消费方** | **项目管理**维护实现和专属测试。桌面 main 初始化目录；桌面、编排、Pi适配器只读消费 logger。消费者已接线并完成独立组合验证。 |
-| **契约与示例** | `createDiagnosticLogger({component:'session',roleId:'A'}).record('send.start',{turnId:'t1'})`；未配置时 no-op。元数据 JSONL 串行落盘，未知字段丢弃、凭据净化；异常用 `.error(event,error,fields)`。IO失败通过 status.lastError 如实反馈，不让业务抛错。 |
+| **契约与示例** | `createDiagnosticLogger({component:'session',roleId:'A'}).record('send.start',{turnId:'t1'})`；未配置时 no-op。元数据（落盘白名单，2026-10-16 起含 `timeoutMs`）JSONL 串行落盘，未知字段丢弃、凭据净化；命令原文/argv/prompt 等正文依设计契约禁入。异常用 `.error(event,error,fields)`。IO失败通过 status.lastError 如实反馈，不让业务抛错。 |
 | **留存与目录** | 桌面目录 `app.getPath('userData')/ans/diagnostics`。记录按时间滚动保留24小时，启动清理、写入检查维护期限、每分钟维护清理；扫描最多每分钟一次，避免每条记录扫描整天日志。只处理本模块诊断文件，不修改会话历史、治理审计或用户文件。维护 timer 不阻止正常退出。 |
-| **测试与影响** | `test/项目管理/shared/diagnostics.test.ts` 8/8：精确过期边界、维护自动清理、有序追加、敏感字段净化、IO失败及正常退出。共享接口变动需重跑桌面/编排/Pi消费方；不记录 prompt、源码、原始工具/API正文。依据[统一方案](../design/2026-10-13_design_runtime-diagnostics-and-reporting.md)。 |
+| **测试与影响** | `test/项目管理/shared/diagnostics.test.ts` 9/9：精确过期边界、维护自动清理、有序追加、白名单元数据（`timeoutMs` 落盘、非有限数值丢弃、正文摘要 `excerpt` 不入）、敏感字段净化、IO失败及正常退出。共享接口变动需重跑桌面/编排/Pi消费方；不记录 prompt、源码、原始工具/API正文。依据[统一方案](../design/2026-10-13_design_runtime-diagnostics-and-reporting.md)。 |
 
 ## 组件 8：运行时设置目录（`runtime-settings`）
 
 `src/common/shared/runtime-settings.ts` 由项目管理单一维护，桌面窗口通过只读导入 `RUNTIME_SETTINGS/getRuntimeSettingsDefinition` 组装掩码设置视图；renderer 接收 IPC 视图，不直接引用 Node/TypeScript 文件。字段登记真实 SDK 的 `key/label/required/secret/fallbackKeys?/help?`，不包含凭据值、不推断 SDK/账户可用。Pi、Codex、Claude 各自真实字段和默认行为见 [实现报告](../../api-spec.md)；SDK 实际支持变化须由原属主报告后更新并重测消费方。测试 `test/项目管理/shared/runtime-settings.test.ts` 2/2，验证所有 credential alias 都被秘密键目录覆盖，以及各引擎 required/default 语义。依据 [ANS-RUNTIME-V2](../design/2026-10-14_design_multi-runtime-integration.md)。
 
 ## 变更（本文件）
+
+- 2026-10-16：组件 7 `diagnostics` 落盘白名单增列 **`timeoutMs`**（元数据；`shell.exec.start` /
+  `shell.exec.timeout` 观测**生效**命令级执行时限，kanban-live 修复批次 F-1-d，客户 2026-10-16 批准）。
+  代码：`src/common/shared/diagnostics.ts` FIELD_NAMES（数值须有限，与既有 `durationMs` 同一路径）；
+  白名单新增准入注释（仅元数据可入；命令原文/argv/prompt/源内容等正文依设计契约禁入）。
+  **评估不纳入 `excerpt`**（F-7 `shell.guard.blocked` 的 `command.slice(0,240)` 命令摘要）：属设计契约
+  明令禁入的「命令原文」类内容，模式化 `scrub` 净化保证不了任意命令内容安全；命中 token 已经 `reasonCode`
+  落盘、`excerpt` 在 record 层原样传递（注入 logger/测试可断言），差异已回报 PM 裁定。
+  测试：`test/项目管理/shared/diagnostics.test.ts` **9/9**（+1 白名单例）；本组 110/110；消费方
+  diagnostics 测试 7/7 与 runtime-core shell 测试 12/12 重跑通过；`npm run typecheck` 0 错。
+  未 git 提交。
 
 - 2026-10-13：新增组件7 `diagnostics`，日志存储、净化、24小时清理只有共享实现。角色接线、独立组合验收及实际应用启动日志确认完成，详见统一方案的最终证据。
 

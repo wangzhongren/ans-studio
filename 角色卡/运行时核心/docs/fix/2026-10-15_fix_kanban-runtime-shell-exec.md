@@ -3,15 +3,17 @@ id: core-kanban-shell-exec-proposal
 type: fix
 title: "kanban-live 真机轮修复提案：F-1 命令级执行时限、F-7 shell 语法 UX 守卫、F-8 非零退出语义"
 created: "2026-10-15"
-updated: "2026-10-15"
+updated: "2026-10-16"
 timezone: Asia/Shanghai
-status: proposed
+status: implemented-pending-verification
 related: [kanban-runtime-fixes-dispatch]
 ---
 
-# F-1 / F-7 / F-8 修复提案（未实施 / 未测试）
+# F-1 / F-7 / F-8 修复提案（已实施待验证）
 
-> **状态：提案（未实施、未测试、未部署）。** 本轮为提案轮：不改任何 src/app/test 代码，不提交 git，不改 `/Users/wangzhongren/code/vibeingcode/ans-testbed/kanban-live` 与测试角色的证据目录。以下「拟改动」全部是待客户批准后才实施的候选；涉及其他角色边界的内容只做只读定位与影响列举，绝不修改。
+> **2026-10-16 实施轮更新：** 客户已按推荐批准（见 `角色卡/项目管理/docs/change/2026-10-15_change_kanban-fixes-pm-review.md` §客户批准记录）；本提案 F-1 必需全套 + opt1、F-7 必需 + opt1 + opt2、F-8-a 已按批准范围实施（另含跨提案的 F-3-c / F-5-opt2 两处 schema 文案，见文末「实施摘要」）。状态＝**已实施待验证（未部署）**；独立验证与真机复跑待后续轮次。以下正文保留提案轮原文（历史记录）。
+>
+> **提案轮原文（未实施 / 未测试）：** 本轮为提案轮：不改任何 src/app/test 代码，不提交 git，不改 `/Users/wangzhongren/code/vibeingcode/ans-testbed/kanban-live` 与测试角色的证据目录。以下「拟改动」全部是待客户批准后才实施的候选；涉及其他角色边界的内容只做只读定位与影响列举，绝不修改。
 >
 > 来源派发：`角色卡/项目管理/docs/change/2026-10-15_change_kanban-runtime-fixes-dispatch.md`（F-1/F-7/F-8 属主＝运行时核心）。证据目录：`角色卡/测试/docs/change/2026-10-15-kanban-live-real-project-evidence/`。
 
@@ -259,3 +261,53 @@ related: [kanban-runtime-fixes-dispatch]
 ## 附录 B：状态标注
 
 - **未实施 / 未测试 / 未部署。** 本文档为提案；未运行任何被测改动（无改动可测）。基线说明：全量测试 2 条已知红（检出目录名 ans-cli 断言、macOS `/var` 符号链接）为基线非回归；本角色 `test/runtime-core/` 当时证据 77/77 绿，实施轮将重跑并列新指纹。
+
+---
+
+## 实施摘要（2026-10-16 实施轮）
+
+**状态：已实施待验证（未部署）。** 批准依据：客户 2026-10-16 按推荐批准（PM 评审文档 §客户批准记录与 §三）；派发项＝F-1 必需全套（F-1-a/b/c/d）+ F-1-opt1、F-7 必需 + opt1 + opt2、F-8-a；另按批准实施跨提案小项 **F-3-c**（submit_report 提示词引导，Pi适配器提案 §4.1）与 **F-5-opt2**（request_confirmation 误导文案，门禁引擎提案 §四）——两处落点均在本角色文件 `schema.ts`。**F-9-opt2** 评估文档另出（`docs/design/2026-10-16_design_f9-opt2-tool-result-size-window-linkage.md`），无代码改动。
+
+### 改动文件清单（全部在本角色 boundary.yaml Section 1 内）
+
+| 文件 | 实施内容 |
+|---|---|
+| `src/common/runtime-core/timeout.ts` | 新增 `DEFAULT_SHELL_EXEC_TIMEOUT_MS = 600000` 与 `SHELL_EXEC_TIMEOUT_ENV = "ANS_PI_SHELL_EXEC_TIMEOUT_MS"`（注释记录默认值取舍；非法/0/负回退默认＝不可禁用） |
+| `src/model/runtime.ts` | `GovernedToolsOptions.shellExecTimeoutMs?`（对齐 shellReviewTimeoutMs）；`RuntimeToolExecutionFactsV1` 增可选 `timedOut?/timeoutMs?`；`ToolDisplayV1.process` 增可选 `timedOut?` |
+| `src/provider/runtime/tools.ts` | ①`splitCommand` 重构为「argv ＋ 每 token 未加引号片段」同源返回（执行用 argv 逐字不变）；②F-7 守卫：独立操作符 token 集（`\|`、`\|\|`、`&&`、`&`、`;`、`>`、`>>`、`<`、`<<`、`2>`、`2>>`、`2>&1`、`&>`、`&>>`、`1>`、`1>>`、`>&`）＋紧贴/复合重定向前缀（`>out.txt`、`2>err.log`、`&>>log`、`<in.txt` 等）＋opt1（内嵌未转义 `\|`/`;`/反引号、结尾 `&`）＋opt2（`$(`、`${`、反引号、`$NAME`）；引号内永不明中、反斜杠前导按字面量；命中在 ShellGate **之前**返回（不调 gate、不 spawn）＋逐字文案＋diagnostics `shell.guard.blocked`；③`runShell` 增 `execTimeoutMs`：spawn 成功后一次性 deadline 定时器；`abort()` 重构为共享幂等 `terminate(origin)`（SIGTERM→250ms→SIGKILL→1000ms 清理上限预算不变，先到先收口）；settle 清定时器并带 `timedOut/timeoutMs`；④F-1-opt1 进程树终止：POSIX `detached:true`＋`process.kill(-pid)`（失败回退 `child.kill`）、Windows `taskkill /pid <pid> /T /F`（不可用回退）；⑤handler 超时分支（在 error 分支之前）：「超时已终止（N ms）」＋部分 stdout/stderr＋中性指引，`execution` 携带 `{timedOut:true, timeoutMs, signal, stdout, stderr, …Truncated}`；⑥diagnostics `shell.exec.start`（含生效 `timeoutMs`）/ `shell.exec.timeout`（含 `timeoutMs/durationMs`）；⑦构建时解析链＝显式选项 ?? env ?? 默认（readTimeoutMs 语义，与 reviewMs 同址） |
+| `src/common/runtime-core/tool-display.ts` | F-8-a 措辞分类：进程跑完＋退出码非零＋无 error/signal/未超时 → 「已执行完成（退出码 N）」（ok/status/kind/errorCode 与工具消息文本全不变）；`execution.timedOut===true` → 「超时终止」；`display.process` 增 `timedOut`（正向投影与再投影两处） |
+| `src/provider/runtime/schema.ts` | F-5-opt2：request_confirmation 描述与 guideline[0] 改为「读取与检查无需逐次确认；**写盘一律先经本工具确认**」（保留「preview 必须列出路径」与「confirmed:true 是唯一凭据」两句；「无需逐次确认」子串保留，既有断言兼容）；F-3-c：submit_report 增第三条 promptGuideline（接近输出上限前优先交报告）；**同日配套修订**（客户 su 预置裁定，见下「配套修订」）：补「唯一例外（仅内置治理角色 su）」的预置许可句 |
+| `test/runtime-core/shell-exec-timeout.test.ts`（新，7 用例） | 短时限收口（300ms）/部分输出保留/SIGTERM 免疫→SIGKILL 升级且 late 不出现/快命令不误杀/解析链（env=250 生效；非法/0/负回退 600000；显式优先）/中止优先与超时后迟到中止幂等/「停止本轮」既有语义回归 |
+| `test/runtime-core/shell-guard.test.ts`（新，5 用例） | 阻断集（含紧贴与复合重定向；gate 零调用、diagnostics 记 `shell.guard.blocked` 且无 `shell.review.start`、零副作用）/放行集（引号内 `\|` 证据命令、`grep -F '|'`、未加引号反斜杠前导、引号内 `\|` 实执行）/opt1（内嵌与结尾 `&` 阻断；URL 词中 `&` 与转义 `&` 放行）/opt2（`$HOME`、`${HOME}`、`$(pwd)`、反引号阻断；引号内与常规 argv 放行）/守卫先于审核不 spawn |
+| `test/runtime-core/tool-display.test.ts`（扩充，+5 用例） | handler-result 退出码 1 →「已执行完成（退出码 1）」且 ok/status/kind/errorCode 与消息文本原样；native-result 同形；timedOut → 「超时终止」＋`process.timedOut`；spawn 失败仍「执行失败」；再投影保留 `exitCode/timedOut` |
+
+### 实测结果（2026-10-16，Node v24.14.0 / macOS arm64；本工作树最终状态）
+
+- `node --test 'test/runtime-core/**/*.test.ts'`：**94 用例 / 94 通过 / 0 失败**（提案轮基线 77；本实施新增 17）。
+- `npm run typecheck`：**0 错误**。
+- 全量 `node --test 'test/**/*.test.ts'`：**0 失败**（最终复跑 1459 用例 / 1458 通过 / 1 跳过；工作树同时含其他角色并行实施中的改动，用例数随其新增；记忆中「检出目录名 ans-cli、macOS /var 符号链接」两条基线红在本检出、本次运行未复现）。
+- 既有回归确认：exit 7 结构化用例、abort 杀子进程用例、gate deny/throw/timeout 零副作用用例、run_shell 描述/argv 断言、request_confirmation 文案断言（`无需逐次确认`/`必须列出.*路径`/`confirmed:true`/`不等于`）、submit_report 文案断言全部保持通过。
+- 未 git 提交；未部署。
+
+### 与提案的差异与如实标注
+
+1. **超时清理边缘**：cleanup 计时器兜底时（SIGKILL 后 1000ms 仍未确认退出）文案为「超时已触发（N ms），但终止清理未在预算内完成（…）——进程可能仍在运行，请如实向客户说明」，不宣称「已终止」；`execution.timedOut` 仍为 true（如实：终止已触发）。正常超时路径为「超时已终止（N ms）」逐字。
+2. **守卫文案**：必需级逐字（`run_shell 未执行：本环境命令未经 shell 解释，不支持管道/重定向/变量展开（检测到 "<token>"）。请拆分为多条命令，或把逻辑写成脚本文件后执行。`）；opt1/opt2 命中在保持上述前缀的同时附「若这些符号是字面量，请加引号或改用等价写法（如 grep -e a -e b）」指引句（对应 PM 勾选说明「文案给「加引号或拆分」指引」）。
+3. **紧贴/复合重定向**：实现覆盖 `>x`、`>>x`、`2>x`、`&>x`、`&>>x`、`<x`、`<<x` 等「符号＋紧贴目标」形态；词中 `&`（URL 查询串）不判、反斜杠前导不判——与提案口径一致。
+4. **F-1-opt1 Windows 分支未真机执行**：本机为 darwin；`taskkill /T /F` 分支为代码路径存在＋类型检查通过，**未实际跑过**；POSIX 进程组分支有真实用例（SIGTERM 免疫子进程被 SIGKILL 升级收口、late 写入不出现）。
+5. **diagnostics 字段**：`shell.exec.start.timeoutMs` 与 `shell.exec.timeout.timeoutMs`、守卫的 `excerpt` 经注入 logger 原样传递并可断言；共享 `src/common/shared/diagnostics.ts` 的 FIELD_NAMES 白名单当前**不含** `timeoutMs`/`excerpt`，生产落盘会丢弃这两个字段（`reasonCode` 已含守卫命中 token；`durationMs` 正常落盘）——共享文件属项目管理，**只回报不改**。
+6. **F-8-a 保真边界**：只改投影措辞与结构化字段；`display.error` 回填（消息在摘要括号里再现）**未动**——该同文重复的去重属可选优化、不在批准范围（桌面UI 已确认两种行为都兼容）。F-8-b 需要的结构化事实已如实提供：`display.process.exitCode`（既有）与 `timedOut`（本实施新增，正向与再投影两处）。
+7. **`detached: true`（POSIX）的行为说明**：run_shell 子进程成为新进程组组长（这正是进程组终止的实现基础）；ANS 对子进程的终止路径不变（仍只经 AbortSignal/超时显式 kill），未发现对既有用例的可见影响（全量回归已跑）。
+
+### 跨边界备注（只读定位、未改）
+
+- 桌面窗口/桌面UI（F-8-b 消费方）：`display.process` 结构化字段为冻结接口——`exitCode`/`signal`/`stdout`/`stderr` 既有，`timedOut` 本实施新增。
+- 门禁引擎 `src/common/门禁引擎/classify-shell.ts:220-222`（argv-noshell 不扫元字符）立场未触碰；F-7 守卫是执行层 UX 兜底（gate 之前），被拦尝试默认只进本角色 diagnostics、不进 shell-gate 审计。
+- Pi适配器提案（F-3-c）与门禁引擎提案（F-5-opt2）的**文档状态回填属各自角色**；本实施仅在其指出的本角色文件落文案，未改他角色文档/代码。
+- `schema.ts` 中 request_choice / dispatch_task 文案里的同类「无需（逐次/重复）确认」措辞不在 F-5-opt2 范围内，未改（登记观察）。
+- `src/common/shared/diagnostics.ts` FIELD_NAMES 建议增列 `timeoutMs`（如需 `shell.exec.start/timeout` 生产落盘观测）——属项目管理共享文件。
+
+### 配套修订（2026-10-16，客户 su 预置许可裁定的文案衔接）
+
+- 客户 2026-10-16 裁定 su 写 `docs/su/**` 与 `docs/contracts/**` 免逐次审批（编排预置机制、门禁引擎 su 卡「确认制要点」文本同日各自落地）后，F-5-opt2 落点的 `src/provider/runtime/schema.ts` request_confirmation 描述与 guideline[0] 同步补「**唯一例外（仅内置治理角色 su）**：两棵目录树写盘许可**已预置**——无需逐次确认、直接写即可（开会话与重建后均生效）；两棵树之外的一切写盘仍须逐条确认」；既有必备语义（写盘一律先经本工具确认、preview 逐条列路径、`confirmed:true` 唯一凭据、未获同意不写盘、列出路径≠获准）逐字保留，非 su 角色语义不变（例外显式限定 su）。
+- 同步 `test/runtime-core/tools.test.ts` 新增 1 例文案断言（钉住 su 专属例外 + 必备语义 + 「其余仍须确认」）。实测（2026-10-16）：`node --test 'test/runtime-core/**/*.test.ts'` **95/95**；`npm run typecheck` **0 错**；pi-adapter 既有文案断言用例（`必须列出.*路径`/`未列出的路径`/`不等于`/`confirmed:true`/`无需逐次确认`/`扩张.*边界`，未改属其边界）**5/5** 不回归；全量 `node --test 'test/**/*.test.ts'` **1504 计 / 1503 过 / 0 红 / 1 skipped**。未 git 提交；未触碰真机轮目录（`kanban-live-3`、`/private/tmp/ans-kanban-dev3-ad1bdf3b`）。

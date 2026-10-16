@@ -43,3 +43,11 @@ U1R2本侧冻结：原卡按真实request/conclusion重插与显式null token保
 
 
 2026-10-15 原生V2空态仍指右上角首红后，仅按root授权改三处设置/资料指路字符串，当前index7beda47c、renderer5b80a727、styles56d2ff9e。无新Electron，静态67/语法/diff0；结构版full/visual等保bb5/b5执行版本，root独占GUI重载实际词句，不能将旧图当新native证明。
+
+## 2026-10-16 F-8-b 非零退出行分类（实施轮）
+
+客户按推荐批准（2026-10-15 评审批次，F-8-a+b 全数）。本侧实施 F-8-b：`activityOf` 结构化事实优先——`display.process.timedOut===true` → `status:"timed-out"`/「超时终止」/exceptional:true；`display.process.exitCode` 数字且≠0 且无 error/signal → `status:"exited-nonzero"`/「已执行完成（退出码 N）」/exceptional:false；无 process 事实走原路径（旧 `knownFailure` 正则保留，**事实优先**）。`renderer.js` 两处按 `status === "exited-nonzero"` 让位：error preview（L1044 一带）不摆、详情字段「消息」替「错误」（L1018）。新增状态值 `exited-nonzero`/`timed-out` 为渲染侧呈现分类，`ok/status/kind/errorCode` 契约面不动。
+
+续接线索（事实与判断，供复验）：① 真机命中形状（证据 `角色卡/测试/docs/change/2026-10-15-kanban-live-real-project-evidence/…/实现者/replay.jsonl` L89）**必然带 `display.error`**（=工具消息回填、与 resultText 同文），故判据**不能**读 `display.error` 缺席——否则功能在真机全失效；「无 error」按派发映射为「exitCode 存在＋无 signal＋（防御式）process.error」。② `display.process.timedOut` 由运行时核心（F-1/F-8-a）在飞添加，本侧防御式读取，落地前恒缺省。③ 桌面窗口侧 session-history/runtime-history 的行归类归其 F-8-b，未同步时其行仍可能 kind:'denied'（但带 display 事实的行经本侧 activityOf 已按事实分类）。④ 已知观察项：中性类详情「消息/结果」在真机投影下同文（上游回填），未动，若消除由运行时核心评估。
+
+证据与指纹：单测 13/13、边界内 62/62、Electron e2e 41+9 全过（`01-tool-detail.png` 见「调用发起 → 已执行完成（退出码 2）」）；`tool-rows.js 3eef5bfd`、`renderer.js 74e24c7f`、`tool-rows.test.ts d2432c7a`、`renderer.test.ts 41485c5d`、`uiux-v2.mjs d9f56499`。typecheck 本侧 0 错（两测）；全仓现存红随并行上下文在飞变化（tools.ts×3→编排 shell-gate.test.ts×1），均非本侧。Doc: docs/fix/2026-10-16_fix_kanban-f8b-tool-rows-exit-classification.md

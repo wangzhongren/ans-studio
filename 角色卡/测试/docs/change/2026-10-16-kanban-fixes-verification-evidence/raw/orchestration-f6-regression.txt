@@ -1,0 +1,49 @@
+✔ I-1：项目角色给 (a) 通道 ⇒ 装配并注入 ShellGate（注入即注册）；不给 ⇒ 无；su 给了也不 arm (9.290333ms)
+shell 闸审计未落盘：审计写被门禁拒绝：目标路径未匹配任何边界条目（根：project）：docs/audit/shell-gate.jsonl；已刷新边界快照重试一次，仍被拒：目标路径未匹配任何边界条目（根：project）：docs/audit/shell-gate.jsonl
+✔ I-1（c）：硬拒（re-shell）→ 不执行、不打扰 (b)/(a)；白名单 → 直接放行 (5.325458ms)
+shell 闸审计未落盘：审计写被门禁拒绝：目标路径未匹配任何边界条目（根：project）：docs/audit/shell-gate.jsonl；已刷新边界快照重试一次，仍被拒：目标路径未匹配任何边界条目（根：project）：docs/audit/shell-gate.jsonl
+✔ I-1（b/a）：review + (b) allow → 可达执行且不经 (a)；risky + (b) allow → 必过 (a)；a 拒 → 不执行 (4.247541ms)
+shell 闸审计未落盘：审计写被门禁拒绝：目标路径未匹配任何边界条目（根：project）：docs/audit/shell-gate.jsonl；已刷新边界快照重试一次，仍被拒：目标路径未匹配任何边界条目（根：project）：docs/audit/shell-gate.jsonl
+shell 闸审计未落盘：审计写被门禁拒绝：目标路径未匹配任何边界条目（根：project）：docs/audit/shell-gate.jsonl；已刷新边界快照重试一次，仍被拒：目标路径未匹配任何边界条目（根：project）：docs/audit/shell-gate.jsonl
+shell 闸审计未落盘：审计写被门禁拒绝：目标路径未匹配任何边界条目（根：project）：docs/audit/shell-gate.jsonl；已刷新边界快照重试一次，仍被拒：目标路径未匹配任何边界条目（根：project）：docs/audit/shell-gate.jsonl
+✔ I-1（b 不可解析 → **直接拒绝**（M-2，不进 (a)）；b 拿不准 → 升 (a)；(a) 不可用/超时 → 不执行（关窗等价，fail-closed） (37.080625ms)
+✔ I-1：留痕——审计 sink 收到每条请求（command/判定/branch/by）；事件流含 run_shell 的 tool_call 与 denied (3.754458ms)
+✔ R-1 端到端：夹具模型经 shellVerdict 交回结构化结论 → 只读/测试类命令（review）放行、不打扰客户；审读会话不持久化 (2.648542ms)
+shell 闸审计未落盘：审计写被门禁拒绝：边界未被接受或缺少证据来源（F6）：拒绝一切写入。；已刷新边界快照重试一次，仍被拒：边界未被接受或缺少证据来源（F6）：拒绝一切写入。
+shell 闸审计已恢复落盘（此前未落盘 1 条）
+shell 闸审计未落盘：审计写被门禁拒绝：边界未被接受或缺少证据来源（F6）：拒绝一切写入。
+✔ F-6-T6 事故回归 E2E：创世过渡窗口内的未接受快照，在收尾落盘后自愈（审计刷新重试） (3.832166ms)
+✔ F-6-T6b（对照组·旧行为）：不注入刷新闭包时，收尾落盘后第二条仍不落盘 (1.03ms)
+shell 闸审计未落盘：审计写被门禁拒绝：边界未被接受或缺少证据来源（F6）：拒绝一切写入。；已刷新边界快照重试一次，仍被拒：边界未被接受或缺少证据来源（F6）：拒绝一切写入。
+shell 闸审计已恢复落盘（此前未落盘 1 条）
+✔ F-6-T7（su 只读档同接线）：未接受快照在收尾落盘后同样自愈 (3.218375ms)
+✔ allow → 放行（**不产出 token**），by 为 ruleset:<id>，审计记 c-allow (1.275209ms)
+✔ deny → 拒绝（硬拒终结），审计记 c-deny (0.15575ms)
+✔ review → 第一步**默认拒绝**（未接入 (b)/(a)，绝不因缺下一闸而放行） (0.116125ms)
+✔ review 对任意命令都默认拒绝（不因命令看似无害而放行） (0.126791ms)
+✔ 审核超时 → 拒绝（超时包装；退路 3） (31.94025ms)
+✔ 规则集加载失败 → 整条命令拒绝（绝不「规则没了就一律放行」） (0.171042ms)
+✔ 未注入 classifyShell → 一律拒绝（能力缺席即 fail-closed） (0.06625ms)
+✔ classifyShell 抛错 → 拒绝（保守，不把异常当放行） (0.075208ms)
+✔ 审计记录被追加到 docs/audit/shell-gate.jsonl，含要求字段且声明 shell-gate 条件 (2.260084ms)
+shell 闸审计未落盘：审计写被门禁拒绝：命中条件目录但缺少条件 `shell-gate`：任务未在 conditions 声明该条件（拒绝）：docs/audit/shell-gate.jsonl
+✔ 审计是追加式：两条记录追加为两行（不改写既有） (1.980791ms)
+✔ 硬要求负例：审计写门禁 scope **不含** shell-gate → 被门禁拒绝、零副作用（不落盘） (0.650792ms)
+shell 闸审计未落盘：审计写被门禁拒绝：边界未被接受或缺少证据来源（F6）：拒绝一切写入。
+✔ F-6-T1（刷新恢复）：未接受快照 + refreshGate 给出已接受边界 → 首查拒 → 重试落盘一条；此后直走新门禁 (1.805083ms)
+✔ F-6-T2（缺省无刷新 = 现状）：未接受快照、无 refreshGate → 拒且零副作用（不建目录、无文件） (0.349708ms)
+✔ F-6-T3（刷新仍拒）：refreshGate 返回另一份未接受边界 → 拒、零副作用、原因含两段事实且无猜测性归因 (0.345959ms)
+✔ F-6-T3b（刷新失败）：refreshGate 未取得门禁/抛错 → 维持拒绝、原因如实、零副作用 (0.371584ms)
+✔ F-6-T4（F-6-2 去重 + 如实话术）：同因仅报一次；变化/恢复/恢复后再失败各一行；判定不翻转 (0.106583ms)
+✔ F-4-X1：unavailable → 转达通道真实 reason（「确认超时」/「轮次中止」可辨）；缺原因走如实兜底，不再固定「无人值守？」 (0.248625ms)
+✔ buildShellGate（Pipeline 构造入口）→ 判定 + 自动审计落盘 docs/audit/shell-gate.jsonl (1.104708ms)
+✔ 注入路径：selectAdapterFactory 把编排构造的 shellGate 转发给 pi 工厂 (0.069167ms)
+✔ 注入路径：不传 shellGate → pi 工厂收到 undefined（run_shell 将不注册，fail-closed） (0.027333ms)
+ℹ tests 29
+ℹ suites 0
+ℹ pass 29
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 188.108917

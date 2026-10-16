@@ -1,0 +1,5 @@
+# 项目管理 changelog
+
+本角色治理变更记录（边界内文件；新条目置顶）。工程全项目规则见 [docs/project-rules.md](docs/project-rules.md)，共享组件现行目录见 [docs/architecture/shared-components.md](docs/architecture/shared-components.md)。
+
+- 2026-10-16：kanban-live 修复批次收尾——共享 `src/common/shared/diagnostics.ts` 落盘白名单（FIELD_NAMES）增列 **`timeoutMs`**（F-1-d：`shell.exec.start`/`shell.exec.timeout` 携带**生效**命令级执行时限，供生产落盘观测与断言解析链；客户 2026-10-16 批准范围。有限数值校验，与既有 `durationMs` 同路径；增量前该字段在生产落盘被静默丢弃）。**评估不纳入 `excerpt`**（F-7 `shell.guard.blocked` 的 `command.slice(0,240)` 命令摘要）：属 2026-10-13 已核验设计契约「禁止命令原文、argv、prompt、源内容、token、原始API响应」明令禁入的内容类；模式化 `scrub` 净化仅为尽力而为，保证不了任意命令内容（凭证/内部信息）不落盘。命中 token（被拦操作符）已经 `reasonCode` 落盘；`excerpt` 在 record 层仍原样传递，注入 logger/测试可断言。**该评估差异已回报 PM 裁定**：如需生产落盘，须先修订设计契约（或改走 shell-gate 审计，属编排侧语义）。白名单新增准入注释（仅元数据可入、正文禁入）。测试：`test/项目管理/shared/diagnostics.test.ts` **9/9**（+1 白名单例：`timeoutMs` 落盘、非有限数值丢弃、`excerpt` 不入）；本组 110/110；消费方 diagnostics 测试（桌面窗口/Pi适配器）7/7、runtime-core shell-guard/exec-timeout 12/12 重跑通过；`npm run typecheck` 全仓 0 错。登记见 `docs/architecture/shared-components.md` 组件 7 及本文件「变更」。未 git 提交。

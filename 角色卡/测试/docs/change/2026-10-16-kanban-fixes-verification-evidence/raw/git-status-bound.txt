@@ -1,0 +1,77 @@
+ M|app/desktop/operator-channel.ts
+ M|app/desktop/runtime-history.ts
+ M|app/desktop/session-history.ts
+ M|app/desktop/session.ts
+ M|app/main.ts
+ M|app/renderer/renderer.js
+ M|app/renderer/tool-rows.js
+ M|src/common/pi-adapter/lifecycle.ts
+ M|src/common/pi-adapter/real-adapter.ts
+ M|src/common/runtime-core/timeout.ts
+ M|src/common/runtime-core/tool-display.ts
+ M|src/common/shared/diagnostics.ts
+ M|src/common/编排/handback.ts
+ M|src/common/编排/shell-audit.ts
+ M|src/common/编排/shell-gate.ts
+ M|src/common/门禁引擎/boundary-core.ts
+ M|src/model/decision.ts
+ M|src/model/runtime.ts
+ M|src/pipeline/orchestration/run-role.ts
+ M|src/pipeline/orchestration/shell-arming.ts
+ M|src/provider/runtime/schema.ts
+ M|src/provider/runtime/tools.ts
+ M|src/service/gate/resolve-write.ts
+ M|test/runtime-core/tool-display.test.ts
+ M|test/桌面应用/boundary-refresh.test.ts
+ M|test/桌面应用/dispatch-delivery.test.ts
+ M|test/桌面应用/e2e/uiux-v2.mjs
+ M|test/桌面应用/handback-delivery.test.ts
+ M|test/桌面应用/message-queue.test.ts
+ M|test/桌面应用/multi-runtime.test.ts
+ M|test/桌面应用/operator-channel.test.ts
+ M|test/桌面应用/queue-withdraw-lru.test.ts
+ M|test/桌面应用/renderer.test.ts
+ M|test/桌面应用/session-history.test.ts
+ M|test/桌面应用/tool-rows.test.ts
+ M|test/编排/handback.test.ts
+ M|test/编排/session-handle.test.ts
+ M|test/编排/shell-arming.test.ts
+ M|test/编排/shell-gate.test.ts
+ M|test/编排/shell-review-chain.test.ts
+ M|test/门禁引擎/su-doc-surface-convention.test.ts
+ M|test/项目管理/shared/diagnostics.test.ts
+ M|角色卡/Claude适配器/memo.md
+ M|角色卡/Codex适配器/memo.md
+ M|角色卡/Pi适配器/changelog.md
+ M|角色卡/Pi适配器/docs/fix/2026-10-15_fix_kanban-turn-truncation.md
+ M|角色卡/Pi适配器/memo.md
+ M|角色卡/产品/changelog.md
+ M|角色卡/产品/feature-map.md
+ M|角色卡/产品/memo.md
+ M|角色卡/桌面UI/changelog.md
+ M|角色卡/桌面UI/memo.md
+ M|角色卡/桌面窗口/changelog.md
+ M|角色卡/桌面窗口/docs/fix/2026-10-15_fix_kanban-delivery-and-operator.md
+ M|角色卡/桌面窗口/memo.md
+ M|角色卡/编排/changelog.md
+ M|角色卡/编排/docs/fix/2026-10-15_fix_kanban-shell-audit-f6.md
+ M|角色卡/编排/memo.md
+ M|角色卡/运行时核心/changelog.md
+ M|角色卡/运行时核心/docs/fix/2026-10-15_fix_kanban-runtime-shell-exec.md
+ M|角色卡/运行时核心/memo.md
+ M|角色卡/门禁引擎/changelog.md
+ M|角色卡/门禁引擎/docs/fix/2026-10-15_fix_kanban-f4-governance-note.md
+ M|角色卡/门禁引擎/memo.md
+ M|角色卡/项目管理/docs/architecture/shared-components.md
+ M|角色卡/项目管理/docs/change/2026-10-15_change_kanban-fixes-pm-review.md
+ M|角色卡/项目管理/memo.md
+??|test/pi-adapter/length-followup.test.ts
+??|test/runtime-core/shell-exec-timeout.test.ts
+??|test/runtime-core/shell-guard.test.ts
+??|test/门禁引擎/f4-denial-guidance.test.ts
+??|角色卡/Claude适配器/docs/fix/2026-10-16_assess-truncation-parity.md
+??|角色卡/Codex适配器/docs/fix/2026-10-16_assess-truncation-parity.md
+??|角色卡/产品/docs/design/2026-10-16_design_contract-workflow-dispatch.md
+??|角色卡/桌面UI/docs/fix/2026-10-16_fix_kanban-f8b-tool-rows-exit-classification.md
+??|角色卡/运行时核心/docs/design/2026-10-16_design_f9-opt2-tool-result-size-window-linkage.md
+??|角色卡/项目管理/changelog.md

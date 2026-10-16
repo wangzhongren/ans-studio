@@ -3,21 +3,31 @@ id: kanban-f4-governance-note-fix
 type: fix
 title: F-5 修复提案：su 治理笔记被 F4 硬拒——拒绝反馈不可操作 + 确认许可靠会话发行与重建的未登记交互
 created: "2026-10-15"
-updated: "2026-10-15"
+updated: "2026-10-16"
 timezone: Asia/Shanghai
-status: proposed
-related: [kanban-runtime-fixes-dispatch, boundary-refresh, boundary-prose-silent-empty-fix]
+status: implemented-pending-verification
+related: [kanban-runtime-fixes-dispatch, kanban-fixes-pm-review, boundary-refresh, boundary-prose-silent-empty-fix]
 events:
   - date: "2026-10-15"
     kind: created
     summary: 只读复现 kanban-live 真机 F-5；轮内两步核查发现「13:21:29 同路径写入曾成功、13:28:22 被 F4 拒」= 会话重建静默重置发行集（截图+replay 佐证）；出提案（必需 1 项 + 可选加固 3 项），未实施/未测试
+  - date: "2026-10-16"
+    kind: approved
+    summary: 客户按推荐批准（含 F-5-main）；PM 评审记录 §客户批准记录：opt1 派桌面窗口/编排、opt2 派运行时核心、opt3 未勾选；本角色本任务只做 F-5-main
+  - date: "2026-10-16"
+    kind: implemented
+    summary: F-5-main 落地（resolve-write.ts：F4 reason 追加可操作指引＋F4 分支 allowedByRoot 改「当前已发行可写集」；decision.ts 仅注释；su 卡文本补「确认制要点」段；新 f4-denial-guidance.test.ts 6 例 + su-doc 追加 1 例）；判定语义零变化；本角色套件 176 计/175 过/0 红/1 skipped；全量 1408 计/1407 过/0 红/1 skipped；typecheck 0 错；未 commit；待独立验证与真机复验
 ---
 
 # F-5 修复提案：su 治理笔记被 F4 硬拒、反馈不可操作（kanban-live 真机轮）
 
-> **状态：未实施 / 未测试。** 本文件是提案（只读复现、根因分类、拟案与测试计划），不含任何已生效改动。
-> 是否实施、可选加固项勾选，待客户裁定后由项目管理派发。本文件写作未改任何 `src/` `app/` `test/` 代码，
-> 未改 kanban-live 项目与测试角色证据目录，未 commit。
+> **状态：已实施待验证（F-5-main，2026-10-16，未 commit）。** 客户 2026-10-16 按推荐批准（PM 评审
+> §客户批准记录）；本角色按 §三「最小拟改动」与 §五「测试计划」实施 F-5-main——实施摘要与测试证据
+> 见文末「实施记录（2026-10-16）」；真机验证（§五.5）留待客户/独立验证上下文。可选件中 F-5-opt1
+> （桌面窗口/编排）、F-5-opt2（运行时核心）派往各自属主、不在本任务；F-5-opt3 未勾选、未实施。
+> 下文正文保留提案期原文（提案期原文自述：**未实施 / 未测试**、只读复现、根因分类、拟案与测试计划，
+> 不含任何已生效改动；是否实施、可选加固项勾选，待客户裁定后由项目管理派发；本文件写作未改任何
+> `src/` `app/` `test/` 代码，未改 kanban-live 项目与测试角色证据目录，未 commit）。
 
 来源：PM 派发 `角色卡/项目管理/docs/change/2026-10-15_change_kanban-runtime-fixes-dispatch.md`（F-5，P1，属主＝门禁引擎）；问题原文 `角色卡/测试/docs/change/2026-10-15-kanban-live-real-project-evidence/problem-summary.md` §B1。
 
@@ -173,3 +183,34 @@ events:
 - 证据引用：replay 行号基于 kanban-live `replay.jsonl`（134 行）；截图为 `角色卡/测试/docs/change/2026-10-15-kanban-live-real-project-evidence/shots/` 下 `sent-su-1792070185185.png`（13:16:25，头部「新会话」）与 `settled-1792070511747.png`（13:21:51，头部「已从本地恢复模型上下文」＋重建行残段）。
 - **待确认（标「待确认」，如实不猜测）**：① 重建的**精确触发时点**（settle 扫描 vs 下一次 send 前检查）按截图区间推断为「13:21:42-51 之间、「su 一轮结束时」扫描」，未取得带时间戳的桌面日志佐证；② 13:17 确认卡的 **preview 原文**未入证据（replay 未记录该工具参数字段）——「六文件路径均在 preview 中被列出」由「13:21:29 六写入全部 accepted」反推；③ `app-redacted.log` 无时间戳，未用于时点判定。
 - 基线：全量测试 2 条既有红（检出目录名 `ans-cli`、macOS `/var`）为基线、非回归。
+
+## 实施记录（2026-10-16，F-5-main，本角色）
+
+> 依据：PM 评审 §客户批准记录（客户 2026-10-16 按推荐批准）与 PM 实施派发（本角色 = F-5-main）。
+> **状态：已实施待验证**（独立验证上下文复验与真机 E2E 复跑未进行；本记录不声称已验）。未 commit。
+
+### 实施内容（严格按 §三 最小拟改动；判定语义零放宽）
+
+| 文件 | 改动 |
+|---|---|
+| `src/service/gate/resolve-write.ts` | ① F4 分支 reason 保留原头逐字、其后追加 `F4_DENIAL_GUIDANCE`（可操作指引：request_confirmation 的 preview 逐条列路径 → confirmed:true 发行 → 重试；任务型会话加任务 writeSet；许可按会话生效、重建/重开不自动保留）；② F4 分支 `allowedByRoot` 改为 `issuedByRootOf`＝**当前已发行可写集**（`scope.writeSet` 中逐项用与判定同源的 `pathCovers`/`isActive` 过滤；writeSet 合同为项目相对 ⇒ 归 project）；③ `allowedByRootOf` 注释限定为「非 F4 分支」并反指 issuedByRootOf；文件头补拒绝信息语义段 |
+| `src/model/decision.ts` | **仅注释**（`AllowedPathsByRoot` 语义澄清：非 F4＝边界覆盖；F4＝当前已发行可写集）。类型形状零变化——按法案 §一.5 属单一主属主敏感面，本次经 PM 评审→客户批准后实施 |
+| `src/common/门禁引擎/boundary-core.ts` | `BUILT_IN_ROLE_CARD_TEXT` 在「docs/su 文档面」段后追加「确认制要点」段（拟文案 §3.2 逐字）：每个路径逐条入 preview、confirmed:true 才发行、口头同意不算、许可按会话生效、重建/重开需重新确认；头注同步登记来源与 J-1 措辞避让（未引入未否定的「授权/获准/放行」小句） |
+| `test/门禁引擎/f4-denial-guidance.test.ts` | **新增（6 例）**：F4 仍拒绝＋原头逐字＋指引子串（request_confirmation/preview/confirmed:true/任务 writeSet/按会话生效/重建）＋不含旧快照线索＋对照面放行；F4 分支 allowedByRoot 空集/恰列已发行项/条件未激活不计入；非 F4 分支（F5 缺条件、未匹配）列表仍为边界覆盖（回归）；渲染链 formatDenialMessage 项目行＝当前可写集、指引与 reason 同现 |
+| `test/门禁引擎/su-doc-surface-convention.test.ts` | 追加 1 例：确认制要点段关键词与位置（在文档面段之后）；既有断言未动 |
+
+**不动的**（复核确认）：`resolveWrite` 判定顺序与分支条件、发行器、`format-denial` 两份渲染器（代码零改、内容随动）、任何桌面/编排/运行时核心文件。零判定变化对照证据：`f4-denial-guidance.test.ts` 内「同路径在 writeSet 内照常放行」断言 + 全量回归。
+
+### 测试证据（实跑，2026-10-16）
+
+- `node --test 'test/门禁引擎/**/*.test.ts'` → **176 计 / 175 过 / 0 红 / 1 skipped**（Windows 专用用例 skip；较实施前 169 + 新 7：f4-denial-guidance 6 + su-doc 1）。
+- `node --test 'test/门禁引擎/f4-denial-guidance.test.ts'` → **6/6 过**。
+- `npm run typecheck` → **0 错**。
+- 全量 `node --test "test/**/*.test.ts"` → **1408 计 / 1407 过 / 0 红 / 1 skipped**。**如实登记**：派发/提案所载「2 条基线红（`test/桌面应用/pi-config.test.ts` 检出目录名、`test/项目管理/shared/path-primitives.test.ts` macOS `/var` 符号链接）」在当前 HEAD **未复现**（这两个文件单独跑 36/36 全过；两域均不 import 本次改动模块，不可能由本次改动翻绿）——基线红应已在提案轮与本实施轮之间的既有提交中修复；本次**零新红**。
+- 跨角色断言兼容复核（只读）：`test/编排/session-handle.test.ts:132`（`/不在任务 writeSet 内/`）、`test/编排/confirmation-gated.test.ts:160`（`/writeSet/`）、`test/测试/boundary-matrix.test.ts`（`/F4/`＋形状）、`test/桌面应用/session.test.ts`（`/按根分组/`）所依赖的原头/标题子串均逐字保留；全量复跑证实无跨边界红。
+
+### 未做 / 待验证（如实分列）
+
+- **未做**：F-5-opt1（重建可见化——桌面窗口/编排属主）、F-5-opt2（schema.ts 文案——运行时核心属主）、F-5-opt3（未勾选）。
+- **待验证**：独立验证上下文复验；§五.5 真机验证三项（su 经 request_confirmation 更新自己笔记成功；F4 拒绝后模型能依指引自行恢复；重建后拒绝信息能把模型导回确认通道）。
+- **跨边界发现（回报，未改）**：F4 拒绝信息语义变化后，任何**逐字引用旧 F4 完整消息文本**的既有证据（含 kanban-live 现场）在文本上不再逐字有效（判定语义未动）——已知在案（§六.1），实测各断言方均按子串兼容；`writeSetContains` 跨根字符串比对观察项维持「登记观察、不动」（PM 评审 §四.3）。

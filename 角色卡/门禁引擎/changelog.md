@@ -1,5 +1,104 @@
 # 门禁引擎 变更记录
 
+## 2026-10-16（二）— su 卡配套修订：`docs/su/**` + `docs/contracts/**` 免逐次确认（客户 2026-10-16 裁定；编排预置机制并行）
+
+客户裁定原文：「这个 su 可以写 docs/su 的目录，不需要我审批」＋同日追加「还有个契约目录也可以给他写。」
+⇒ 预授权范围＝ `docs/su/**` + `docs/contracts/**`（后者为 G-1 提案约定的跨角色契约落盘目录；目录约定随
+G-1 本体实施，预授权先行装好）。机制侧（su 会话初始 writeSet 预置两目录树，开会话/重建均生效；仅 su、
+仅该两目录树；其余写盘与其角色行为不变，fail-closed 不放松）由**编排**在其边界内并行实施；本角色按 PM
+派发只做**卡文本侧**配套修订——不改这段，su 仍会逐次请求确认、客户裁定落地后行为不变（原「落盘前照常经
+`request_confirmation` 客户确认」句即此问题）。**判定逻辑一行未改。**
+
+- **边界**：`src/common/门禁引擎/boundary-core.ts`（卡文本两段 + 头注）、
+  `test/门禁引擎/su-doc-surface-convention.test.ts`（更新 2 例 + 新增反向断言 1 例）、本文件、`memo.md`、
+  `docs/fix/2026-10-16_fix_su-notes-preauth-card.md`（新）。**未碰** `app/**`、
+  `src/pipeline|provider|service/其余`、`src/common` 他角色目录、他角色 tests/docs、真机轮目录
+  （`ans-testbed/kanban-live-3`、`/private/tmp/ans-kanban-dev3-ad1bdf3b`，只读不写）；不 commit。
+- **卡文本修订（`BUILT_IN_ROLE_CARD_TEXT`）**：①「文档面」段删除旧句「…落盘前照常经
+  `request_confirmation` 客户确认」（对 docs/su 已不成立），点明跨角色契约文档目录 `docs/contracts/**`；
+  ②「确认制要点」段改写——`docs/su/**` 与 `docs/contracts/**` 写盘许可**已预置**（无需逐次确认、直接写
+  即可、**开会话与重建后均生效**）；**其余一切写盘**（含 `角色卡/**` 与 `docs/` 其他路径，逐一列明——
+  从严口径：`docs/` 下仅这两棵目录树例外）仍须把每个路径逐条列入 `request_confirmation` 的 preview ＋
+  `confirmed:true` 才发行；「按会话生效/会话重建重开需重确认」限定到**经确认发行**的路径，**预置的两棵
+  目录树除外**（不受重建影响、始终可直接写入）。措辞不用「预授权」字面——J-1 守卫拦未否定的「授权」
+  小句，沿用 2026-10-12 先例改用「许可/预置」（语义＝客户已预先同意、免逐次审批）。
+- **测试**：`su-doc-surface-convention.test.ts`——文档面用例：删「落盘前照常经」正面断言，改断两目录
+  逐一点名 + 契约文档定位，＋**反向断言旧句不得保留**；「确认制要点」用例改写（预置豁免关键词、位置
+  锚句改「没有角色目录…」之后；原关键词断言全保留）＋**新增反向断言**（凡含 `docs/su` 的小句不得出现
+  「须/需要/照常/务必…确认」式要求，防「笔记也要先确认」以别的措辞回塞）。**未放宽任何既有断言**。
+- **测试与门禁（实跑）**：`node --test "test/门禁引擎/**/*.test.ts"` → **177 计 / 176 过 / 0 红 /
+  1 skipped**（Windows 专用；较上条 176 计 + 新增反向断言 1 例）；`npm run typecheck` → **0 错**（复跑
+  两次，第二次含编排当日落树改动的工作区，仍 0 错）；全量 `node --test "test/**/*.test.ts"` → 复跑两次
+  均 **0 红**（**1497 → 1502 计**，计数随并行角色持续新增用例；最新 **1502 计 / 1501 过 / 0 红 /
+  1 skipped**；较上条 1408 的增量全为并行角色新用例，**零新红**）。环境：Node v24.14.0 / macOS /
+  工作区含他角色未提交改动。
+- **跨边界发现（回报、未改）**：① 运行时核心 F-5-opt2（`schema.ts` 文案，并行中）应与本口径对齐——
+  su 写两目录已免确认，该处「写盘一律先确认」式表述同属误导；② 编排预置机制**同日已见落树**（只读
+  核读：`run-role.ts` `SU_PREAUTHORIZED_WRITE_DIRS = ["docs/su", "docs/contracts"]`、按
+  `kind === "built-in-governance"` 仅 su、每次 gate 求值并入目标路径、开会话/重建同口径——与本卡文本
+  一致；其 dated 记录同日撰写时未见、属其同批交付）；日后其口径再变须回改本卡文本与测试（核对登记于
+  fix 文档 §二/§五.2）；③ G-1 本体若改契约目录名/结构，须同步卡文本「跨角色契约文档写在
+  `docs/contracts/**`」句。
+- **未做/待验证（如实分列）**：机制侧（编排预置）由编排属主并行实施，本任务未碰；真机端到端复验
+  （su 对两目录免确认写盘成功、其余路径仍触发确认卡）**未进行**；独立验证上下文复验未进行；本条目
+  **不声称已验**。
+
+## 2026-10-16 — F-5-main：F4 拒绝信息可操作化 + `allowedByRoot` 语义修正（客户按推荐批准；PM 派发实施轮）
+
+kanban-live 真机轮：su 的治理笔记（`docs/su/memo.md` / `docs/su/changelog.md`）落盘后被 F4 硬拒——
+拒绝原文只说「不在任务 writeSet 内」，却把**边界条目**列在「允许写入的路径」下（覆盖被拒路径的 `docs`
+目录赫然在列）⇒ 列表与拒绝语义**自相矛盾**、全文**零恢复指引**；su 遂请求「客户聊天授权」——该路径在
+机制上不可能奏效（发行只经 `request_confirmation` 的 preview 逐条列路径 + confirmed:true，聊天消息不
+进发行器）。真根因中「重建静默清零已发行集」为跨角色未登记交互（D1，桌面窗口 O-1 × 编排 issued）；
+本条目实施的是**本角色文件内的 F-5-main**（D2 修复 + 模型侧指引；判定语义零放宽）。提案与完整根因链
+见 `docs/fix/2026-10-15_fix_kanban-f4-governance-note.md`（§实施记录）；批准与派发见
+`角色卡/项目管理/docs/change/2026-10-15_change_kanban-fixes-pm-review.md` §客户批准记录（F-5-opt1
+派桌面窗口/编排、opt2 派运行时核心、opt3 未勾选——均不在本任务）。
+
+- **边界**：`src/service/gate/resolve-write.ts`、`src/model/decision.ts`（**仅注释、零形状变化**——
+  单一主属主敏感面，按法案 §一.5 经 PM 评审→客户批准后实施）、`src/common/门禁引擎/boundary-core.ts`、
+  `test/门禁引擎/f4-denial-guidance.test.ts`（新，6 例）、`test/门禁引擎/su-doc-surface-convention.test.ts`
+  （追加 1 例）、本文件、`memo.md`、上述提案文档（状态更新＋实施记录）。**未碰** `app/**`、
+  `src/provider|pipeline|service/其余`、`src/common` 他角色目录、他角色 tests/docs、kanban-live 项目与
+  测试角色证据目录；不 commit。
+- **改动 ①（F4 reason 可操作化）**：原头 `路径在角色边界内，但不在任务 writeSet 内（F4）：<rel>`
+  **逐字保留**（跨角色既有断言按该子串），其后追加指引：如需写入，把该路径逐条列入
+  `request_confirmation` 的 preview 呈客户确认——`confirmed:true` 后该路径被发行进 writeSet、再重试；
+  任务型会话把路径加入任务 writeSet；**许可按会话生效**（重建/重开后不自动保留，需重新确认）。
+- **改动 ②（F4 分支 `allowedByRoot`＝当前已发行可写集）**：新增 `issuedByRootOf`——取 `scope.writeSet`
+  中**在边界内且条件已激活**的项（逐项用与判定同源的 `pathCovers`/`isActive` 过滤；writeSet 合同为
+  项目相对 ⇒ 归 project 组）；writeSet 空（或全被滤掉）⇒ 两根皆空、如实呈现「此刻什么也写不了」。
+  非 F4 分支（F5 缺条件 / 未匹配 / 跨根 / F7 / 接受门）仍走 `allowedByRootOf`（边界覆盖）**逐字不变**；
+  `allowedByRootOf` 注释同步限定并反指新函数。**渲染器代码零改、内容随动**（两份 `format-denial.ts`
+  与编排 `output.ts` 未动）。
+- **改动 ③（su 卡文本「确认制要点」段）**：`BUILT_IN_ROLE_CARD_TEXT` 在「docs/su 文档面」段后追加：
+  每个路径逐条入 preview、`confirmed:true` 才发行、对话里口头同意**不算**（不能作为写盘依据）、
+  写盘许可按会话生效（同会话内已确认路径不必重复确认；重建/重开需重新确认）。措辞避开 J-1 守卫的
+  「授权/获准/放行」小句（本段零命中，守卫测试全绿）；头注同步登记来源。**判定逻辑一行未改。**
+- **改动 ④（`decision.ts` 语义澄清注释）**：`AllowedPathsByRoot` = 非 F4 分支→边界覆盖（无任务收窄时
+  即写权上界）；F4 分支→当前已发行可写集。**类型形状零变化**（引用方证据仅注释级影响）。
+- **测试**：新增 `test/门禁引擎/f4-denial-guidance.test.ts`（6 例）——F4 仍拒（fail-closed）＋原头逐字
+  ＋指引子串（request_confirmation/preview/confirmed:true/任务 writeSet/按会话生效/重建）＋不含旧快照
+  线索＋「同路径在 writeSet 内照常放行」对照；F4 分支列表：空集⇒两空、恰列已发行项（越界/条件未激活
+  不计入、边界目录本身不再出现）；非 F4 分支回归（F5/未匹配列表仍为边界覆盖）；渲染链（formatDenialMessage
+  项目行＝当前可写集、指引与 reason 同现）。`su-doc-surface-convention.test.ts` 追加 1 例（要点段关键词
+  ＋位置在文档面段之后；既有断言未动）。**跨角色兼容只读复核**：编排 `session-handle.test.ts:132`
+  （`/不在任务 writeSet 内/`）、`confirmation-gated.test.ts:160`（`/writeSet/`）、测试 `boundary-matrix.test.ts`
+  （`/F4/`＋形状）、桌面 `session.test.ts`（`/按根分组/`）依赖的原头/标题子串全部逐字保留；全量复跑证实
+  零跨边界红。
+- **测试与门禁（实跑）**：`node --test 'test/门禁引擎/**/*.test.ts'` → **176 计 / 175 过 / 0 红 /
+  1 skipped**（Windows 专用；较实施前 169 + 新 7）；`npm run typecheck` → **0 错**；全量
+  `node --test "test/**/*.test.ts"` → **1408 计 / 1407 过 / 0 红 / 1 skipped**。**如实登记**：派发/提案
+  所载「2 条基线红（`test/桌面应用/pi-config.test.ts` 检出目录名、`test/项目管理/shared/path-primitives.test.ts`
+  macOS `/var` 符号链接）」在当前 HEAD **未复现**——两文件单独跑 36/36 全过，且两域均不 import 本次改动
+  的任何模块（不可能由本次翻绿），应为提案轮与本轮之间的既有提交已修复；全量**零新红**。
+  环境：Node v24.14.0 / macOS 26.6.0 / HEAD `27bc263`（工作区含本角色未提交改动）。
+- **未做/待验证（如实分列）**：opt1/opt2/opt3 不在本任务（opt1 与 opt2 派他角色、opt3 未勾选）；
+  §五.5 真机验证三项（su 经 request_confirmation 更新自己笔记成功；F4 拒绝后模型能依指引自行恢复；
+  重建后拒绝信息能把模型导回确认通道）与独立验证上下文复验**未进行**；本条目**不声称已验**。
+  跨边界发现（回报、未改）：F4 完整消息文本变化使逐字引用旧文案的既有证据在文本上不再逐字有效
+  （判定语义未动）；`writeSetContains` 跨根字符串比对维持「登记观察、不动」（PM 评审 §四.3）。
+
 ## 2026-10-14（三）— 补建功能导航 `feature-map.md`（客户要求统一补建；修复 role-card 死链）
 
 - **背景**：`role-card.md`「系统功能导航」的链接「当前导航见[门禁引擎功能导航](feature-map.md)」自建角色

@@ -28,3 +28,13 @@
 ### 2026-10-15 普通引擎失败的显示边界
 
 修复无工具事实的accepted/denied被当工具的问题，live/history共用结构判断；保真实失败、身份与安全文本，丢未知raw侧车，不修改原工具投影或公共API。Core77/77、原独验1/1；[修复与依赖指纹](docs/fix/2026-10-15_fix_non-tool-event-routing.md)。
+
+## 2026-10-16 kanban-live 修复实施轮（F-1 命令级执行时限 / F-7 shell 语法守卫 / F-8-a 非零退出语义）
+
+按客户 2026-10-16 批准（PM 评审 §客户批准记录）实施：[F-1 命令级执行时限](docs/fix/2026-10-15_fix_kanban-runtime-shell-exec.md)——`ANS_PI_SHELL_EXEC_TIMEOUT_MS`/选项 `shellExecTimeoutMs`/默认 600000（只可调大不可禁用），到期经与「停止本轮」共享的幂等 `terminate()` 终止（SIGTERM→250ms→SIGKILL→1000ms 预算不变；F-1-opt1 进程树：POSIX 进程组、Windows `taskkill /T /F`），结果如实「超时已终止（N ms）」+部分输出+`execution.timedOut/timeoutMs`，**轮次继续**；新 diagnostics `shell.exec.start/timeout`。F-7 执行层 UX 守卫（必需+opt1+opt2）：独立操作符 token 与内嵌/展开检测在 ShellGate **之前**拒绝（不 spawn+明确文案+`shell.guard.blocked`），口径与 splitCommand 同源——引号内与反斜杠前导不误杀（`grep "a\|b"`/`grep a\|b` 回归在案）。F-8-a 投影措辞：进程跑完+退出码非零 → 「已执行完成（退出码 N）」，ok/status/kind/errorCode 与消息文本不变；`display.process.timedOut` 供桌面结构化消费。另按批准落两处 schema 文案：F-5-opt2（request_confirmation「写盘一律先经本工具确认」）与 F-3-c（submit_report 输出上限引导）。F-9-opt2 立项评估另出[评估文档](docs/design/2026-10-16_design_f9-opt2-tool-result-size-window-linkage.md)（无改动）。
+
+实测：`node --test 'test/runtime-core/**/*.test.ts'` **94/94**（基线 77+新 17）；`npm run typecheck` 0 错；全量 `node --test 'test/**/*.test.ts'` **0 失败**（最终复跑 1459/1458 通过、1 跳过；工作树另含其他角色并行实施改动）。Windows taskkill 分支未真机执行（本机 darwin）；`shell.exec.*` 的 `timeoutMs` 字段在共享 diagnostics FIELD_NAMES 增列前生产落盘会被丢弃（只回报不改）。状态：**已实施待验证（未部署）**；独立验证与真机复跑待后续轮次。
+
+### 2026-10-16 su 预置许可例外（客户裁定配套）
+
+按客户 2026-10-16 裁定（su 写 `docs/su/**` 与 `docs/contracts/**` 免逐次审批；编排预置机制、门禁引擎 su 卡文本同日各自落地）同步 `request_confirmation` 工具文案：描述与 guideline[0] 补「**唯一例外（仅内置治理角色 su）**——两棵目录树写盘许可已预置、无需逐次确认、直接写即可（开会话与重建后均生效）；两棵树之外的一切写盘仍须逐条确认」；必备语义（写盘一律先经本工具确认 / preview 逐条列路径 / `confirmed:true` 唯一凭据 / 未获同意不写盘 / 列出路径≠获准）逐字保留，例外显式限定 su、非 su 语义不变。登记见 [kanban 修复实施记录·配套修订](docs/fix/2026-10-15_fix_kanban-runtime-shell-exec.md)。实测 runtime-core 95/95、typecheck 0 错、全量 1504/1503 过 0 红；未 commit。

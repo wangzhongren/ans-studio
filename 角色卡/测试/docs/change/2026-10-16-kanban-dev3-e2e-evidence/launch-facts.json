@@ -1,0 +1,21 @@
+{
+  "run": 3,
+  "mode": "dev-build (electron app/main.ts) with fixes",
+  "pid": 6024,
+  "executable": "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/node_modules/.bin/electron",
+  "args": [
+    "--remote-debugging-port=9444",
+    "--user-data-dir=/private/tmp/ans-kanban-dev3-ad1bdf3b/userdata",
+    "app/main.ts"
+  ],
+  "cwd": "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime",
+  "extraEnv": {
+    "ANS_PI_PROMPT_TIMEOUT_MS": "900000",
+    "ANS_PI_CONSTRUCT_TIMEOUT_MS": "300000",
+    "ANS_PI_SHELL_REVIEW_TIMEOUT_MS": "300000",
+    "ANS_DESKTOP_OPERATOR_CONFIRM_TIMEOUT_MS": "300000"
+  },
+  "repoEnvSha256": "3d7ecbd3b35a7f546d8e5ddd7f6d96afd190daae812c2010496aab6949b1724f",
+  "repoEnvUnchanged": true,
+  "log": "/private/tmp/ans-kanban-dev3-ad1bdf3b/app.log"
+}

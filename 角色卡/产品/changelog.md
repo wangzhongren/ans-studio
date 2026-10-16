@@ -1,5 +1,15 @@
 # 产品 变更记录
 
+## 2026-10-16 — G-1（契约与工作流落盘 + 派发按地址引用）细化提案
+
+按 PM 批次的派发行（来源：项目管理 `docs/change/2026-10-15_change_kanban-fixes-pm-review.md` §六，客户 2026-10-16 批准「G-1 一并细化」）新增[设计提案](docs/design/2026-10-16_design_contract-workflow-dispatch.md)。
+
+**做了什么**：只读调研四类内容并成文——①su 指令载体定位（`boundary-core.ts` 内置角色卡文本 J-1 派发句 / `schema.ts` dispatch_task 与 request_confirmation 说明 / `govern-session.ts` 确认制提示 / `renderDispatchPrompt` 及其桌面本地副本）；②既有机制盘点（per-role api-spec.md、`.ans/project.json` pin 与自动重 pin、确认卡 preview 列路径 + confirmed-writes 发行、回交键/派发去重、投递机、O-1 会话陈旧检测）；③技能既有约定（仓库外：scheduler.md 的执行图、project-role.md 集成设计六项表、api-spec.md、task-operations.md 的 pin 纪律）；④重跑轮证据（三角色 46ms 严格串行、契约在派发文本内未落盘为项目内单一来源）。
+
+**核心设计结论**：契约落 `docs/contracts/<name>-v1.md` 版本化不可变、单一主属主推荐 **su**（提供方只以 api-spec.md 报偏差）；派发文本只给「路径+sha256」必读（按序）块，**哈希只能由代码在投递时算**（su 不会算 hash 的产品先例），契约缺失 fail-closed 拒投、workflow.md 缺失降级；`docs/workflow.md` 给出可直接照抄的骨架（步骤表/完成口令/变更与重验），并作为「自动调度」的先行输入；与 pin/回交/O-1 的衔接逐条写明，建议契约**不并入** `.ans pin` 集合。
+
+**边界与状态**：提案完成、**未实施/未测试**；V1 最小闭环与属主建议（编排/桌面窗口/门禁引擎/运行时核心）与 6 个待客户/PM 裁定点见提案 §九/§十一。写集仅本角色设计文档、feature-map、memo、本文件；未改 `app/`、`src/`、`test/`、其他角色文件与证据目录（kanban-live-2 / 证据目录未触碰），未操作真实项目，未 git 提交。
+
 ## 2026-10-15 — P3/P4接口最小入口产品短评
 
 [原产品记录](docs/design/2026-10-15_design_desktop-complete-walkthrough.md)追加接口补充，推荐“查看来源角色文档→用户显选受限ref→正文”，暂不新增typed artifact；明确多一步选择与尚不能准确一键报告、返回原回交/不切聊天上下文、未知/无ref的真实说明。客户简报必须明示Windows暂不可读、重启原生重选、可信本地威胁范围与md/txt256KiB限制。本轮只读规范，无桌面/原型/生产/测试操作，同批更新导航与memo。

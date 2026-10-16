@@ -1,5 +1,25 @@
 # Pi适配器 变更记录
 
+## 2026-10-16 — kanban-live F-3-a/F-3-b 已实施：截断事实外推 + 限一次收尾补发（客户已批准）
+
+**来源**：客户按推荐批准（`角色卡/项目管理/docs/change/2026-10-15_change_kanban-fixes-pm-review.md` §客户批准记录——本角色批准项：F-3-a + F-3-b，补发默认开启、env 可关）。属主提案：`docs/fix/2026-10-15_fix_kanban-turn-truncation.md`（状态已改 `implemented-pending-verification` 并附实施记录）。零 git 提交；`kanban-live` 项目与证据目录全程只读。
+
+**背景（一句话）**：kanban-live 真机轮收尾回复被输出上限截断（输出预算被钳到 1 token），`submit_report` 没发出，系统诚实降级 `unreported/terminal-fallback`；且截断事实只在 Pi native 可见，replay/UI 看不到。
+
+**改了什么（全部本角色 boundary.yaml Section 1 内）**
+- `src/common/pi-adapter/lifecycle.ts`：`observe()` 记 `lastStopReason`（`begin()` 归零）；`stopReason==="length"` 每轮**首次**发恰一条系统行（导出常量 `LENGTH_TRUNCATION_SUMMARY`，detail `{turnId, truncation:"length"}`）+ 诊断 `prompt.truncated`；`finish()` 的 settled detail 追加 `truncation:"length"`（仅当末条 assistant 消息截断，**按原样事实**；outcome 枚举不变）；新增只读谓词 `wasTruncated()`（含 forced 守卫——abort/超时锁定轮不触发补发）与内部接缝 `seal()`（补发失败后封存 outcome，防迟到的 SDK `agent_settled(aborted)` 改判）。
+- `src/common/pi-adapter/real-adapter.ts`：`makeRolePrompt` 首个 prompt 正常返回后，若「开关开 ∧ 末条消息截断 ∧ 本轮无成功 `submit_report`」→ 先发通知行、再以独立 `withPausableTimeout` 段补发**恰一次**收尾提示（直调底层 `session.prompt`；不递归本包装、不新增 settled/handback 发射点）；补发失败 best-effort（如实事件行 + 诊断记录 + 复用既有 `requestAbort` 有界清理；不抛出、不改判 outcome）。env：`ANS_PI_LENGTH_FOLLOWUP`（`"0"/"false"/"no"/"off"` 显式关；缺省**开启**）、可选 `ANS_PI_LENGTH_FOLLOWUP_TIMEOUT_MS`（缺省=promptMs）；`LengthFollowupOptions` 经 `RoleSessionDeps.lengthFollowup?` 可选传入（缺省不传=逐字旧行为）；扩展层 `tool_execution_end` 跟踪成功 `submit_report`（turnId 记账、防重复催交）；`bindRole` 合成配置（env 开关 ∧ 注入工具集含 `submit_report`）。
+- `test/pi-adapter/length-followup.test.ts`（新增，**15 用例**）：A lifecycle 4 + B 桩件接线 8（触发且限一次/env 关不补/已交不催/再截断不二补/首轮失败不补/补发失败 best-effort 不改判/abort 锁定不补（含竞态）/缺省逐字旧行为）+ C 真实 SDK faux 2（开关开：截断→补发→报告落同一 turnId、settled 恰一；开关关：report 0 次、`truncation` 在场）+ D env 解析 1。
+- **未动**：`src/provider/pi/session.ts` 契约、`timeout.ts`、`settings.ts`、`provider-config.ts`；假适配器不加截断模拟（提案 §五.D：stub+faux 两层已覆盖）。
+
+**fail-honest 不变量（未松）**：不把截断当成功（outcome 不变）；绝不由系统合成报告（只认模型自己的 `submit_report`）；不重复投递（同轮判据 + 既有去重链不变）；补发失败不劣化现状。
+
+**验证（本角色执行）**
+- `node --test 'test/pi-adapter/**/*.test.ts'` → **232 用例 / 232 通过 / 0 失败**（基线 217 + 新增 15）。
+- 承重 A/B（seal）：临时移除 `lifecycle.seal()` → B6 恰转红（14/1）；恢复后全绿——防改判用例非空转。
+- `npm run typecheck` → 本角色文件**零错误**；如实登记：当时全仓仅存 TS 错误在**他角色并行在途**文件（先为 `src/provider/runtime/tools.ts`、随后消失；后为 `test/编排/shell-gate.test.ts:405`），均非本角色引入、与本角色无依赖。
+- `git diff --check`（本角色文件）无空白问题。真机复跑与独立验证上下文复验归后续轮。
+
 ## 2026-10-14 — 补建功能导航 `feature-map.md`（修复 role-card 死链）
 
 **来源**：客户要求（PM 派发）——`role-card.md` 的「当前导航见[Pi适配器功能导航](feature-map.md)」原为**死链**（该文件从未建立；全项目 5 个角色同缺、统一补建）。

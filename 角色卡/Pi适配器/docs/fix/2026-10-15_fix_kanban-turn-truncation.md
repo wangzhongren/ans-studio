@@ -3,24 +3,50 @@ id: pi-kanban-turn-truncation-fix-proposal
 type: fix
 title: 输出上限截断吞正式报告（F-3）与压缩频次观察（F-9）——修复提案
 created: "2026-10-15"
-updated: "2026-10-15"
+updated: "2026-10-16"
 timezone: Asia/Shanghai
-status: proposed
+status: implemented-pending-verification
 revision: 1
 ---
 
 # 输出上限截断吞正式报告（F-3）与压缩频次观察（F-9）——修复提案
 
-本上下文固定为 Pi 适配器（boundary.yaml Section 1）。本轮为**提案轮**：只写提案文档，**未改任何 src/app/test 代码、未写测试、未 git 提交**；`kanban-live` 项目与 `角色卡/测试/docs/change/2026-10-15-kanban-live-real-project-evidence/` 下文件全程只读。两个问题的派发来源：`角色卡/项目管理/docs/change/2026-10-15_change_kanban-runtime-fixes-dispatch.md`（F-3 属主＝Pi适配器；F-9 属主＝Pi适配器，观察项）。
+本上下文固定为 Pi 适配器（boundary.yaml Section 1）。提案轮（2026-10-15）：只写提案文档，**未改任何 src/app/test 代码、未写测试、未 git 提交**；2026-10-16 实施轮按客户批准实施 F-3-a + F-3-b（**实施记录见下节**）。两个问题的派发来源：`角色卡/项目管理/docs/change/2026-10-15_change_kanban-runtime-fixes-dispatch.md`（F-3 属主＝Pi适配器；F-9 属主＝Pi适配器，观察项）。
 
 证据锚点（真机、只读）：
 - replay（ANS 回放层）：`~/code/vibeingcode/ans-testbed/kanban-live/.ans/sessions/测试者/pi/ans/replay.jsonl`（下称 replay，按行号引用）。
 - native（Pi 原始会话）：同项目 `.../pi/native/2026-10-15T13-28-32-587Z_01a13fc0-….jsonl`（下称 native，按 0 基行号引用）。
 - 终态报告 JSON：证据目录 `raw/26d61e5f777ac82dede509285031fed6114304ad56e54a9f207dee4e60b996be.json`。
 - 被测模型：`ans-gateway / deepseek-v4-flash[1m]`（api=anthropic-messages，thinkingLevel=medium，native idx 1）。
-- 被测代码版本：本仓 HEAD `e3c0100`（与测试轮 baseline.json 的 `ansHead` 一致）。
+- 被测代码版本：提案轮时本仓 HEAD `e3c0100`（与测试轮 baseline.json 的 `ansHead` 一致）。
 
-**状态：未实施 / 未测试。** 文中一切「拟改」均为方案；标注「待确认」处为证据不足项。
+**状态：已实施 / 待验证（2026-10-16 实施轮；实施记录见下）。** 文中「拟改」即已实施内容；标注「待确认」处为证据不足项。
+
+---
+
+## 实施记录（2026-10-16，实施轮）
+
+**依据**：客户按推荐批准（F-3-a + F-3-b；`角色卡/项目管理/docs/change/2026-10-15_change_kanban-fixes-pm-review.md` §客户批准记录与实施派发记录）。本角色按本文 §四.2「最小拟改动」与 §五「测试计划」实施；零 git 提交；`kanban-live` 项目与证据目录全程只读。
+
+**改动文件（全部在本角色 boundary.yaml Section 1 内）**
+- `src/common/pi-adapter/lifecycle.ts`：`observe()` 识别 `stopReason==="length"`——记 `lastStopReason`（`begin()` 归零），每轮**首次**截断发**恰一条**系统行（文案＝新导出常量 `LENGTH_TRUNCATION_SUMMARY`，detail `{turnId, truncation:"length"}`）+ 一条诊断记录（`prompt.truncated`）；`finish()` 的 settled detail 追加 `truncation:"length"`（仅当末条 assistant 消息为截断，**按原样事实**；outcome 枚举不变）；新增只读谓词 `wasTruncated()` 供补发判据；新增内部接缝 `seal()`（封存既有 outcome——见下「实现裁定 1」）。
+- `src/common/pi-adapter/real-adapter.ts`：新导出 `LENGTH_FOLLOWUP_ENV`（`ANS_PI_LENGTH_FOLLOWUP`，显式关闭值才关、缺省开启）、`LENGTH_FOLLOWUP_TIMEOUT_ENV`、`LENGTH_FOLLOWUP_NOTICE_SUMMARY`、`LENGTH_FOLLOWUP_TEXT`、`isLengthFollowupDisabled()` 与 `LengthFollowupOptions`；`makeRolePrompt` 首个 prompt 正常返回后按判据（开关 ∧ `wasTruncated()` ∧ 本轮无成功 `submit_report`）先发通知行、再以**独立 `withPausableTimeout` 段**补发**恰一次**（限一次为结构性保证：该分支每次 prompt() 调用只经过一次；补发直调底层 `session.prompt`，不递归本包装、不新增 settled/handback 发射点；缺省时限=该会话 promptMs）；补发失败 best-effort（`seal()` → 如实事件行 + 诊断记录 + 复用既有 `requestAbort` 有界清理；不抛出、不改判 outcome）；`RoleSessionDeps` 增可选 `lengthFollowup?`（缺省不传 ⇒ 逐字旧行为）；扩展层 `tool_execution_end` 跟踪成功 `submit_report`（`!isError`）并按 turnId 记账（`noteReportSubmitted`，`wasReportSubmitted` 判据）；`bindRole` 合成配置（env 开关 ∧ `allowedToolNames.has("submit_report")`）。
+- `test/pi-adapter/length-followup.test.ts`（**新增，15 用例**）：A 生命周期 4 条（截断行恰一次/begin 归零/settled detail/outcome 映射回归）；B 桩件接线 8 条（补发恰一次且文案=常量、enabled:false 不补、已交报告不催、补发轮再截断不二次补、第一轮 reject 不补、补发 reject/超时 best-effort 不改判（含**清理期间迟到 aborted settle** 的 seal 防护）、abort/超时锁定不补（含「截断消息晚于锁定」竞态）、缺省不传逐字旧行为）；C 真实 SDK faux 端到端 2 条（开关开：截断→补发→`submit_report` 落同一 turnId、settled 恰一、模型请求恰 +2；开关关：report 0 次、settled 含 `truncation:"length"`、截断行在场）；D env 解析 1 条。
+- **未动**（与 §四.2 一致）：`src/provider/pi/session.ts`（契约不新增类型）、`timeout.ts`、`settings.ts`、`provider-config.ts`。
+
+**测试与结果（2026-10-16，本角色执行）**
+- `node --test 'test/pi-adapter/**/*.test.ts'` → **232 用例 / 232 通过 / 0 失败**（基线 217 + 新增 15）。
+- 承重 A/B（seal）：临时移除 `real-adapter.ts` 的 `lifecycle.seal()` → B6 恰转红（14 pass / 1 fail）；恢复后全绿——「补发失败不改判 outcome」的用例非空转。
+- `npm run typecheck` → 本角色文件**零错误**。如实登记：实施期间全仓出现的 TS 错误均在**他角色并行实施的在途文件**（先为 `src/provider/runtime/tools.ts` 3 条、随其修复消失；后为 `test/编排/shell-gate.test.ts:405` 的 `ShellAuditSink`）——与本角色无依赖，非本角色引入。
+- `git diff --check`（本角色文件）→ 无空白问题。
+
+**实现裁定（相对提案的两处最小增补，如实登记）**
+1. **新增内部接缝 `lifecycle.seal()`**：§四.3-3 要求「补发失败**不改变** settled 的 outcome」，但补发失败后的 `requestAbort` 清理会引发**迟到**的 SDK `agent_settled(aborted:true)`——`noteSdkSettled` 的既有守卫仅在 `forced` 时挡下，若不封存会把已完成的轮次**改判为 aborted**（编排 `withHandback` 据此改写 `status:"aborted"` 的回交，违反「不改变既有对第一轮的语义」）。`seal()` 将当前 outcome 置为既成事实（`forced=true`），迟到 settle/中止消息随即被忽略；`begin()` 重置。属提案「拟新增接缝」清单之外的**内部**增补（不改冻结契约、不改 outcome 枚举），依据为实现提案已明文要求的语义不变量；未加此接缝则明文语义在真实链路上不成立。
+2. **`wasTruncated()` 含 `forced` 守卫**：§四.3-4 的「被中止/超时的轮次不触发补发」直接落在谓词里（覆盖「截断消息已落地后才被中止」的竞态）；settled detail 的 `truncation` 字段仍按 §四.3-1「末条 assistant 消息为截断」的**原样事实**口径——即使轮次随后被 seal/锁定，已落地的截断事实仍保留。
+
+**尚未验证（如实）**
+- 真机复跑（「截断→补发→正式报告」无模型端到端）与独立验证上下文复验归后续轮（§九 转 `verified` 的条件）；补发触发轮的真实 token/墙钟成本（§七 风险 1）待真机量取。
+- F-9（观察项）与 F-9-opt1/opt2/opt3 均未实施（客户未勾选 opt1；opt2 归运行时核心评估）。
 
 ---
 

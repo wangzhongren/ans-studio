@@ -2,6 +2,8 @@
 
 记录本角色掌握的事实、待核实事项与续接线索。不写全局规则（进 `docs/project-rules.md`），不抄任务状态。
 
+- 2026-10-16：kanban-live 修复批次收尾（共享 diagnostics 白名单）。FIELD_NAMES 增列 `timeoutMs`（F-1-d：`shell.exec.start`/`shell.exec.timeout` 生产落盘观测生效时限；有限数值，与 `durationMs` 同路径；此前被静默丢弃）。**`excerpt` 评估不纳入**：其为 `command.slice(0,240)` 命令正文摘要，与 2026-10-13 已核验设计契约「禁止命令原文、argv、prompt、源内容」冲突——`scrub` 是尽力脱敏，保不了任意命令内容；命中 token（操作符）已由 `reasonCode` 落盘。`excerpt` 仍在 record 层原样传递（注入 logger/测试可断言）。**已回报 PM 待裁**：如需生产落盘须先改设计契约（或改走 shell-gate 审计路径——属编排侧语义）。测试：`test/项目管理/shared/diagnostics.test.ts` 9/9、本组 110/110、消费方 diagnostics 7/7、runtime-core shell 12/12、`npm run typecheck` 0 错。登记见 `docs/architecture/shared-components.md` 组件 7；未 git 提交。
+
 - 2026-10-14：多运行时唯一对接设计是 [ANS-RUNTIME-V2 revision 1](docs/design/2026-10-14_design_multi-runtime-integration.md)；中立实际接口在运行时核心 `api-spec.md`/Model。核心 contextSource 与旧桌面同名值含义不同，须显式转换。Codex SDK MCP map 实测会合并外部 server，必要 app-server 路径必须有效配置预检，不能用流事件当写前闸。共享 atomicWrite 新 optional signal 用于 stop 后不提交 rename。后续消费方变更必须重测，历史测试不代替最终合并验证。
 
 - 2026-10-13：客户要求产品/UIUX重新验收提交9e50aac，两角色实际看两档生产renderer及真机图后均不通过。五项返工为未决主动作完整可处理、普通全文横溢出/对齐及点击区域、默认异常已有目标、就地撤回失败回执、治理说明去重。汇总见 [当前页面重验收](docs/design/2026-10-13_design_ui-reacceptance-summary.md)。本轮仅验收文档/证据，未改生产，已恢复正式ANS的ssh-tool/su空闲历史且无草稿；未发模型任务。完整键盘与本轮失败返回未亲拍，保留限制。
