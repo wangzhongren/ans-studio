@@ -1,5 +1,22 @@
 # Pi适配器 变更记录
 
+## 2026-10-16 — G-5 wave 2（Pi）已实施待验证：推理强度接线／off 前置修复／思考捕获／R1 修复／降级恰一次重发
+
+**来源**：客户 2026-10-16 批准 G-5；先探针后接线（探针记录＝`docs/fix/2026-10-16_probe_reasoning-wire.md`＋证据目录；实施记录＝`docs/change/2026-10-16_change_reasoning-effort-pi.md`）。纯本地（loopback；零真实网关请求）；未 git 提交。
+
+**探针定格（摘要）**：A5——未设 wire＝`{enabled,8192}`（medium 隐式对照）；**off 修复前被钳到 minimal（budget 1024）＝假关闭（R6 实锤）**，修复后 wire `{type:"disabled"}` 且 beta 头消失；low/high/xhigh⇒2048/16384/16384（xhigh 钳预算、档位语义保留）。**R1 实锤可达（两种非法形）**：cw=5000⇒`budget 1024 ≥ max_tokens 854`；cw=5700⇒`budget 530 < 1024`（API 下限）——机制＝预算钳到 `max_tokens−1024` 后 `||1024` 回落（`anthropic-messages.js:962`）。A6——thinking 正文在 `extractMessageText` 丢弃**复证成立**；`message_update` part 事件（thinking_start/end）可达 ⇒ durationMs 真实信号成立。A7——思考参数被 400 ⇒ SDK **恰 1 请求**、`prompt()` 正常 resolve、failed 终态在 finish 才发射（降级重发插入点的依据）。
+
+**改了什么（`real-adapter.ts`＋`lifecycle.ts`；`session.ts`/契约/运行时核心零改动）**
+- **请求接线**：未设＝**不调用** `setThinkingLevel`（逐字现状）；off/low/medium/high⇒对应档；xhigh⇒直映射（预算钳到 high）；诊断如实。**off 前置修复**＝克隆模型 `thinkingLevelMap.off` null→undefined（`real-adapter.ts:150`）。
+- **思考捕获**（无条件、`buildGovernanceExtension` 内）：`message_end` 产契约定形 `{version:1, source:"reasoning", reasoning:{text,status,durationMs?}}`（redacted⇒omitted 空正文；durationMs 取 part 事件真实起止、0ms 亦为真、无信号不携带）；**既有 text 提取零改动**、思考行先于文本行。
+- **R1 最小修复**（同批实施）：`ans-reasoning` 扩展 `before_provider_request` 逐请求修复非法组合（钳预算入 `[1024, max_tokens)` 或改 disabled；诊断 `reasoning.repaired`）——仅设档会话装配。
+- **降级链（恰一次去参数重发）**：检测（携带思考 ∧ error ∧ `requestRejectionStatus`）→ `makeRolePrompt` 终态前消费 → suppress→如实一行（`source:"reasoning-degrade"`）→ 同文本直调底层重发（settled 单点；不二次）；`lifecycle.isInterrupted()` 守卫；诊断 `reasoning.degraded{GATEWAY_REJECTED_HTTP_<码>}`。
+- `RoleSessionDeps`/`makeRolePrompt` 各加 `reasoningDegrade?` 接缝（缺省不传＝逐字旧行为）。
+
+**验证**：新 `test/pi-adapter/reasoning-effort.test.ts`（8 例；含自证网关 R1 修复、降级成功/不二次/未设零降级对照、投影单点保真、stub 接缝）→ 8/8；pi-adapter 专项 **286/286**；typecheck 本角色 0 错（全仓仅余 Codex 角色在飞文件 6 错）；全量 **2042/2044、1 红 1 跳**——唯一红＝T29（桌面窗口在飞 `pi-config.ts` 加 `ANS_PI_REASONING_EFFORT` 键 × 测试旧钉，非本批）。排查修复一处本批触碰的测试角色钉（审计④文件序断言 ⇒ G-5 节移至 `buildGovernanceExtension` 之后，转绿）。
+
+**未验边界**：真网关接受面（disabled 形态/beta 头/预算组合＝B1 真网关探针）；adaptive 方向未翻旗；`reasoning.repaired` 静默诊断；R1 修复仅设档会话（未设路径同窗如实登记）；真机端到端属后续轮。
+
 ## 2026-10-16 — G-4 V2（P3 Pi）已实施待验证：按角色安装的外来 MCP（装配／前缀放行／env 收窄／dispose 收口）
 
 **来源**：客户 2026-10-16 批准 G-4 V2；本轮 PM 派发 P3（P0 探针 32/32 PASS 后落地，探针结论逐项转正）。契约面＝`RuntimeProviderOptions.installedMcpServers`（已落盘，Service 注入、适配器纯消费）。记录＝`docs/change/2026-10-16_change_role-mcp-install-pi.md`。零 git 提交；未发任何真实网关请求。

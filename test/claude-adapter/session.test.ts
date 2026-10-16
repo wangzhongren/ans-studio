@@ -29,7 +29,7 @@ const gate = (): InteractionGate => {
   return { begin() { waiting++; emit(); }, end() { waiting--; emit(); }, isWaiting: () => waiting > 0, onChange(listener) { listeners.add(listener); return () => { listeners.delete(listener); }; } };
 };
 const environment = { PATH: process.env.PATH, HOME: process.env.HOME, ANTHROPIC_API_KEY: "fixture-api-secret", CODEX_API_KEY: "fixture-codex-secret", CLAUDE_CODE_OAUTH_TOKEN: "fixture-oauth-secret", ANTHROPIC_AUTH_TOKEN: "fixture-auth-secret", CLAUDE_CODE_USE_BEDROCK: "1" };
-type Script = (client: Client, options: Options, user: SDKUserMessage, queryIndex: number, rawCall: Client["callTool"]) => Promise<{ fail?: boolean; id?: string; frames?: SDKMessage[] } | void>;
+type Script = (client: Client, options: Options, user: SDKUserMessage, queryIndex: number, rawCall: Client["callTool"]) => Promise<{ fail?: boolean; id?: string; resultText?: string; frames?: SDKMessage[] } | void>;
 
 /** A real MCP Client/Server pair drives production registration, parsing and handlers; only query is fake. */
 function fake(script: Script, statuses: unknown[] | (() => Promise<unknown[]>) = []) {
@@ -74,7 +74,7 @@ function fake(script: Script, statuses: unknown[] | (() => Promise<unknown[]>) =
         const result = await script(client, opts, user, queryIndex, (params, schema, requestOptions) => actualCallTool(params, schema, { ...requestOptions, timeout: server.timeout }));
         if (closed) break;
         for (const frame of result?.frames ?? []) yield frame;
-        yield { type: "result", subtype: result?.fail ? "error_during_execution" : "success", is_error: !!result?.fail, session_id: result?.id ?? nativeId, user_message_uuid: user.uuid } as SDKMessage;
+        yield { type: "result", subtype: result?.fail ? "error_during_execution" : "success", is_error: !!result?.fail, session_id: result?.id ?? nativeId, user_message_uuid: user.uuid, ...(result?.resultText !== undefined ? { result: result.resultText } : {}) } as SDKMessage;
       }
     })();
     return Object.assign(generator, {
@@ -1137,4 +1137,96 @@ test("installed MCP status pass: failed/needs-auth report one honest category li
   assert.equal((failingRows.filter((row) => row.kind === "settled").at(-1)!.detail as { outcome: string }).outcome, "completed");
   assert.equal(failing.statusCalls, 1);
   await failingSession.dispose();
+}));
+
+test("reasoning effort wiring: unset keeps zero parameters; off maps to ThinkingDisabled; four levels map to EffortLevel", async () => fixture(async (root) => {
+  const cases: Array<{ reasoningEffort?: RuntimeProviderOptions["reasoningEffort"]; thinking?: { type: string }; expectedEffort?: string }> = [
+    {},
+    { reasoningEffort: "off", thinking: { type: "disabled" } },
+    { reasoningEffort: "low", expectedEffort: "low" },
+    { reasoningEffort: "medium", expectedEffort: "medium" },
+    { reasoningEffort: "high", expectedEffort: "high" },
+    { reasoningEffort: "xhigh", expectedEffort: "xhigh" },
+  ];
+  for (const entry of cases) {
+    const engine = fake(async () => undefined);
+    const session = await createClaudeRuntimeAdapter({ ...options(root, [probeTool()]), ...(entry.reasoningEffort !== undefined ? { reasoningEffort: entry.reasoningEffort } : {}) }, engine.dependencies).bindRole(role);
+    const reading = collect(session, 1);
+    await session.prompt("wiring");
+    await reading;
+    const config = engine.configurations[0]!;
+    if (entry.thinking !== undefined) assert.deepEqual(config.thinking, entry.thinking);
+    else assert.equal("thinking" in config, false, `unexpected thinking for ${String(entry.reasoningEffort)}`);
+    if (entry.expectedEffort !== undefined) assert.equal(config.effort, entry.expectedEffort);
+    else assert.equal("effort" in config, false, `unexpected effort for ${String(entry.reasoningEffort)}`);
+    await session.dispose();
+  }
+}));
+
+test("thinking frames produce raw reasoning facts (complete/omitted), never adapter-redacted, duration never guessed", async () => fixture(async (root) => {
+  const engine = fake(async () => ({
+    frames: [assistantFrame([
+      { type: "thinking", thinking: "raw chain of thought mentioning fixture-api-secret verbatim", signature: "sig-1" },
+      { type: "redacted_thinking", data: "opaque-redacted" },
+      { type: "thinking", thinking: "", signature: "sig-2" },
+      { type: "text", text: "visible answer" },
+    ])],
+  }));
+  const session = await createClaudeRuntimeAdapter(options(root, [probeTool()]), engine.dependencies).bindRole(role);
+  const reading = collect(session, 1);
+  await session.prompt("capture");
+  const rows = await reading;
+  const reasoning = rows.filter((row) => (row.detail as { source?: string } | undefined)?.source === "reasoning");
+  assert.equal(reasoning.length, 3);
+  for (const row of reasoning) {
+    assert.equal(row.kind, "message");
+    assert.equal((row.detail as { version?: number }).version, 1);
+    assert.equal(row.summary, "已思考");
+  }
+  const facts = reasoning.map((row) => (row.detail as { reasoning: { text: string; status: string } }).reasoning);
+  assert.deepEqual(facts[0], { text: "raw chain of thought mentioning fixture-api-secret verbatim", status: "complete" });
+  assert.deepEqual(facts[1], { text: "", status: "omitted" });
+  assert.deepEqual(facts[2], { text: "", status: "omitted" });
+  // The adapter must NOT pre-redact (the single projection point lives in the Service) and must not guess durations.
+  assert.equal(facts[0]!.text.includes("fixture-api-secret"), true);
+  for (const fact of facts) assert.equal("durationMs" in fact, false);
+  assert.equal(rows.some((row) => row.kind === "message" && row.summary === "visible answer"), true);
+  await session.dispose();
+}));
+
+test("reasoning rejection degrades exactly once: engine rebuilds without reasoning options, same input repushed, later turns stay paramless", async () => fixture(async (root) => {
+  const engine = fake(async (_client, _config, _user, queryIndex) => {
+    if (queryIndex === 0) return { fail: true, resultText: "API Error: 400 fixture gateway rejects effort on this endpoint" };
+    return undefined;
+  });
+  const session = await createClaudeRuntimeAdapter({ ...options(root, [probeTool()]), reasoningEffort: "high" }, engine.dependencies).bindRole(role);
+  const reading = collect(session, 2);
+  await session.prompt("first with reasoning");
+  await session.prompt("second turn");
+  const rows = await reading;
+  assert.equal(engine.configurations.length, 2);
+  assert.equal(engine.configurations[0]!.effort, "high");
+  assert.equal("effort" in engine.configurations[1]!, false);
+  assert.equal("thinking" in engine.configurations[1]!, false);
+  assert.equal(rows.some((row) => row.kind === "message" && row.summary.includes("网关不支持推理参数")), true);
+  assert.deepEqual(rows.filter((row) => row.kind === "settled").map((row) => (row.detail as { outcome: string }).outcome), ["completed", "completed"]);
+  // The failed attempt and the retry pushed the same input byte-identically (same wire uuid).
+  assert.equal(engine.users.length, 3);
+  assert.equal(JSON.stringify(engine.users[0]!.message), JSON.stringify(engine.users[1]!.message));
+  assert.equal(engine.users[0]!.uuid, engine.users[1]!.uuid);
+  await session.dispose();
+}));
+
+test("unrecognized failures never trigger the reasoning retry (5xx, and 4xx without a reasoning token)", async () => fixture(async (root) => {
+  for (const resultText of ["API Error: 500 fixture gateway rejects thinking on this endpoint", "API Error: 400 plain rate limit exceeded"]) {
+    const engine = fake(async () => ({ fail: true, resultText }));
+    const session = await createClaudeRuntimeAdapter({ ...options(root, [probeTool()]), reasoningEffort: "low" }, engine.dependencies).bindRole(role);
+    const reading = collect(session, 1);
+    await assert.rejects(session.prompt("boom"), /失败/);
+    const rows = await reading;
+    assert.equal(engine.configurations.length, 1, resultText);
+    assert.equal(rows.some((row) => row.kind === "message" && row.summary.includes("网关不支持推理参数")), false, resultText);
+    assert.equal((rows.filter((row) => row.kind === "settled").at(-1)!.detail as { outcome: string }).outcome, "failed");
+    await session.dispose();
+  }
 }));

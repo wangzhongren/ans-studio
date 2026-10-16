@@ -142,6 +142,12 @@ export async function buildExplicitRuntime(
     baseUrl: cfg.baseUrl,
     provider: cfg.providerId,
     contextWindow: cfg.contextWindow,
+    // —— G-5（off 档前置修复；评估 §4.3/R6）：模板 `thinkingLevelMap.off` 为 `null`，SDK 的
+    // `getSupportedThinkingLevels` 会把 off 视为「该档不支持」⇒ `setThinkingLevel("off")` 被
+    // `clampThinkingLevel` 钳到 minimal（预算 1024）＝**假关闭**（P0 探针 A5 实锤：off ⇒ effective=minimal）。
+    // 收窄为 `undefined` 后 off 档可用：agent 侧 off ⇒ 不发思考；渲染侧 `map.off !== null` 成立 ⇒
+    // wire 出 `thinking:{type:"disabled"}`。仅影响 off 档（xhigh/max 等原样；模板无 sampling 面，无旁路）。
+    thinkingLevelMap: { ...templateModel.thinkingLevelMap, off: undefined },
     // —— compat 显式收窄（2026-10-12 根因修复；客户知情并要求修）——
     // 模板 compat **实测值**（本机 claude-fable-5）：`supportsMidConvoSystemMessages:true`、
     // `supportsMidConvoToolChanges:true`、`forceAdaptiveThinking:true`、`supportsStrictTools:true`、
@@ -668,7 +674,38 @@ export function buildGovernanceExtension(
         });
       });
 
+      // G-5 呈现面：思考事实捕获（**不改既有 text 提取行为**——text 行在下方原样保留）。
+      // durationMs 取**真实 part 事件**起止（thinking_start/thinking_end，A6 探针实测可达；无信号不携带）。
+      const thinkingStartedAt = new Map<number, number>();
+      let thinkingMsTotal = 0;
+      let thinkingMeasured = false; // 有真实起止信号（即便测得 0ms——瞬时回环也是真事实，不得当「无信号」丢）
+      pi.on("message_start", (): void => { thinkingStartedAt.clear(); thinkingMsTotal = 0; thinkingMeasured = false; });
+      pi.on("message_update", (event): void => {
+        const part = event.assistantMessageEvent as { type?: unknown; contentIndex?: unknown } | undefined;
+        if (part === undefined) return;
+        if (part.type === "thinking_start" && typeof part.contentIndex === "number") thinkingStartedAt.set(part.contentIndex, Date.now());
+        else if (part.type === "thinking_end" && typeof part.contentIndex === "number") {
+          const started = thinkingStartedAt.get(part.contentIndex);
+          if (started !== undefined) { thinkingMsTotal += Date.now() - started; thinkingMeasured = true; thinkingStartedAt.delete(part.contentIndex); }
+        }
+      });
       pi.on("message_end", (event): void => {
+        // 思考事实（契约定形：`{version:1, source:"reasoning", reasoning:{text,status,durationMs?}}`；
+        // Service 在投影单点脱敏＋预算并**强制覆盖 summary**——此处 summary 只是无投影路径的如实标签）。
+        const reasoning = extractReasoningFacts(event.message);
+        if (reasoning !== undefined) {
+          emit({
+            kind: "message",
+            summary: REASONING_SUMMARY,
+            detail: {
+              version: 1,
+              source: "reasoning",
+              reasoning: { text: reasoning.text, status: reasoning.status, ...(thinkingMeasured ? { durationMs: thinkingMsTotal } : {}) },
+            },
+          });
+          thinkingMsTotal = 0;
+          thinkingMeasured = false;
+        }
         const text = extractMessageText(event.message);
         if (text !== undefined && text.length > 0) {
           emit({ kind: "message", summary: text });
@@ -792,6 +829,134 @@ export function buildGovernanceExtension(
   };
 }
 
+// —————————————————————— G-5：推理强度（请求面）与思考事实（呈现面） ——————————————————————
+//
+// 来源：客户 2026-10-16 批准 G-5。契约面＝`src/model/runtime.ts` 的 `ReasoningEffortV1`／
+// `RuntimeProviderOptions.reasoningEffort`／`RuntimeReasoningFactsV1`／`RuntimeReasoningEventDetailV1`
+// （形状一律以契约为准，Service 做投影单点）。P0 探针定格（`docs/fix/2026-10-16_probe_reasoning-wire.md`）：
+// · 请求映射：**未设＝不调用 `setThinkingLevel`**（现状 medium 隐式路径原样）；off/low/medium/high 直映射；
+//   xhigh ⇒ `setThinkingLevel("xhigh")`（预算钳到 high=16384，档位语义保留——探针实测）；
+//   off 前置修复＝`buildExplicitRuntime` 把 `thinkingLevelMap.off` 收窄为 undefined（否则钳到 minimal＝假关闭）；
+// · R1（**实锤可达**）：预算抬升 × contextWindow 钳到极小 ⇒ wire 出现 `budget_tokens=1024 ≥ max_tokens`（≤1024）
+//   或 `budget_tokens < 1024` 两种**非法组合**（API 规则：1024 ≤ budget < max_tokens）⇒ 请求前修复（见下）。
+// · 降级（A7 定格：400 ⇒ SDK 恰 1 请求、prompt 正常 resolve、事件面 failed 终态）⇒ **恰一次**去参数重发。
+
+/** 思考事实行的回退 summary（Service 投影单点以定格文案覆盖；此处只作无投影路径的如实标签）。 */
+export const REASONING_SUMMARY = "已思考";
+
+/** G-5 降级（网关拒绝思考参数）如实行文案（恰一次去参数重发；沿 server-tools 降级行先例）。 */
+export const REASONING_DEGRADED_SUMMARY =
+  "网关拒绝了含思考参数的请求——本会话已停用思考参数并按原样重发本轮（恰一次）；后续轮次不再附带思考参数。";
+
+/**
+ * 从助手消息抽取思考事实（纯函数；导出供单测）。规则（契约逐字）：
+ * · 无 thinking 块 ⇒ undefined；`redacted:true` 块＝平台省略正文 ⇒ `{text:"", status:"omitted"}`（正文义务为空串）；
+ * · 有可读块 ⇒ `{text: 各块拼接（"\n\n"）, status:"complete"}`（正文可为空串——仅签名/零长正文亦为 complete）。
+ * **不改动**既有 `extractMessageText` 的 text 提取行为（本函数独立）。
+ */
+export function extractReasoningFacts(message: unknown): { text: string; status: "complete" | "omitted" } | undefined {
+  if (message === null || typeof message !== "object") return undefined;
+  const record = message as Record<string, unknown>;
+  if (record["role"] !== "assistant") return undefined;
+  const content = record["content"];
+  if (!Array.isArray(content)) return undefined;
+  const blocks: { text: string; redacted: boolean }[] = [];
+  for (const block of content) {
+    if (block === null || typeof block !== "object") continue;
+    const b = block as Record<string, unknown>;
+    if (b["type"] !== "thinking") continue;
+    blocks.push({ text: typeof b["thinking"] === "string" ? b["thinking"] : "", redacted: b["redacted"] === true });
+  }
+  if (blocks.length === 0) return undefined;
+  const visible = blocks.filter((b) => !b.redacted);
+  if (visible.length === 0) return { text: "", status: "omitted" };
+  return { text: visible.map((b) => b.text).join("\n\n"), status: "complete" };
+}
+
+/** G-5 降级共享态（ans-reasoning 扩展 ↔ prompt 包装层；仅装配 reasoningEffort 时启用）。 */
+export interface ReasoningDegradeState {
+  /** 本轮（turnId）已检测到「思考参数被拒」请求降级重发（恰一次；consume 后清）。 */
+  retryRequested: boolean;
+  retryTurnId: string | undefined;
+  /** 会话级：思考参数已停用（请求前剥离生效；检测随之停用）。 */
+  suppressed: boolean;
+}
+
+/** prompt 包装层的降级接缝（形状沿 `LengthFollowupOptions` 先例；缺省不传＝逐字旧行为）。 */
+export interface ReasoningDegradeOptions {
+  /** 是否消费一次重发（恰一次；turnId 匹配防跨轮误触发）。 */
+  consumeRetry(turnId: string | undefined): boolean;
+  /** 重发前停用思考参数（后续请求不再附带）。 */
+  suppress(): void;
+  /** 如实一行文案。 */
+  noticeText: string;
+}
+
+/**
+ * ans-reasoning 扩展（**仅在 `reasoningEffort` 显式设置时装配**——未设＝零注册、逐字现状）：
+ * · `before_provider_request`：①降级剥离（suppressed ⇒ 删 `thinking`）；②**R1 请求前修复**——enabled 形态
+ *   且 `budget`/`max_tokens` 不满足 `1024 ≤ budget < max_tokens` 时：`max_tokens > 1024` ⇒ 钳预算到
+ *   `[1024, max_tokens-1]`；`max_tokens ≤ 1024`（无合法 enabled 组合）⇒ 改 `{type:"disabled"}`（诊断如实）。
+ *   并逐请求记录「本请求是否携带思考参数」（降级识别的保守前提）。
+ * · `message_end`：降级识别——本轮请求带思考参数 ∧ `stopReason=error` ∧ 错误前缀为拒绝类状态（同
+ *   server-tools 的 `requestRejectionStatus` 口径：≥400 排除 408/429）∧ 未降级过 ⇒ 置位恰一次重发请求。
+ */
+export function buildReasoningExtension(opts: {
+  state: ReasoningDegradeState;
+  diagnostics?: DiagnosticLog;
+  currentTurnId?: () => string | undefined;
+}): { name: string; factory: (pi: ExtensionAPI) => void } {
+  let lastRequestHadReasoning = false;
+  return {
+    name: "ans-reasoning",
+    factory: (pi: ExtensionAPI): void => {
+      pi.on("before_provider_request", (event): unknown => {
+        const payload = event.payload as Record<string, unknown> | undefined;
+        if (payload === null || typeof payload !== "object") return undefined;
+        let changed = false;
+        if (opts.state.suppressed && "thinking" in payload) {
+          delete payload["thinking"];
+          changed = true;
+        }
+        const thinking = payload["thinking"] as Record<string, unknown> | undefined;
+        if (thinking !== undefined && thinking["type"] === "enabled" && typeof payload["max_tokens"] === "number") {
+          const maxTokens = payload["max_tokens"];
+          const budget = thinking["budget_tokens"];
+          const legal = typeof budget === "number" && Number.isFinite(budget) && budget >= 1024 && budget < maxTokens;
+          if (!legal) {
+            if (maxTokens > 1024) {
+              thinking["budget_tokens"] = Math.min(Math.max(typeof budget === "number" && Number.isFinite(budget) ? budget : 1024, 1024), maxTokens - 1);
+              opts.diagnostics?.record("reasoning.repaired", { turnId: opts.currentTurnId?.(), state: "budget-clamped" });
+            } else {
+              payload["thinking"] = { type: "disabled" };
+              opts.diagnostics?.record("reasoning.repaired", { turnId: opts.currentTurnId?.(), state: "thinking-disabled" });
+            }
+            changed = true;
+          }
+        }
+        lastRequestHadReasoning = payload["thinking"] !== undefined;
+        return changed ? payload : undefined;
+      });
+      pi.on("message_end", (event): void => {
+        if (opts.state.suppressed || opts.state.retryRequested) return;
+        const record = event.message !== null && typeof event.message === "object" ? (event.message as Record<string, unknown>) : undefined;
+        if (record === undefined || record["stopReason"] !== "error") return;
+        if (!lastRequestHadReasoning) return; // 本请求未带思考参数 ⇒ 与本降级无关（保守不触发）
+        const errorMessage = typeof record["errorMessage"] === "string" ? record["errorMessage"] : "";
+        const status = requestRejectionStatus(errorMessage);
+        if (status === undefined) return;
+        opts.state.retryRequested = true;
+        opts.state.retryTurnId = opts.currentTurnId?.();
+        opts.diagnostics?.record("reasoning.degraded", {
+          turnId: opts.currentTurnId?.(),
+          errorCode: `GATEWAY_REJECTED_HTTP_${String(status)}`,
+          state: "retry-once",
+        });
+      });
+    },
+  };
+}
+
 /** 从 AgentMessage 中防御性地抽取助手文本。 */
 function extractMessageText(message: unknown): string | undefined {
   if (message === null || typeof message !== "object") return undefined;
@@ -884,6 +1049,8 @@ export function makeRolePrompt(deps: {
   emitPromptInput?: boolean;
   /** F-3-a：截断收尾补发配置；**缺省不传 ⇒ 行为与旧版逐字一致**（见 LengthFollowupOptions）。 */
   lengthFollowup?: LengthFollowupOptions;
+  /** G-5：降级重发配置（仅装配 reasoningEffort 时传入；**缺省不传 ⇒ 逐字旧行为**，见 ReasoningDegradeOptions）。 */
+  reasoningDegrade?: ReasoningDegradeOptions;
 }): (text: string, opts?: PromptOptions) => Promise<void> {
   const { session, promptMs, gate, emit, log } = deps;
   const lifecycle = deps.lifecycle ?? createTurnLifecycle(emit, deps.diagnostics);
@@ -901,8 +1068,21 @@ export function makeRolePrompt(deps: {
     log.stage("prompt 发出");
     try {
       // 每轮硬超时**可暂停**（G-1）：客户输入挂起期间计时停走，作答后续算剩余时间。
-      const calling = images !== undefined ? session.prompt(text, { images }) : session.prompt(text);
-      await withPausableTimeout(calling, promptMs, "prompt", gate);
+      const startCall = (): Promise<void> => (images !== undefined ? session.prompt(text, { images }) : session.prompt(text));
+      await withPausableTimeout(startCall(), promptMs, "prompt", gate);
+
+      // G-5 降级（**恰一次**去参数重发；A7 定格：思考参数被拒 ⇒ prompt 正常 resolve、失败终态在下方
+      // finish 才发——故在终态发射前收口，settled 仍恰一次）：检测位由 ans-reasoning 扩展在 message_end
+      // 置位（保守：本轮请求带思考参数 ∧ 拒绝类状态 ∧ 未降级过）；consume 即消费；suppress 先于重发
+      // （重发的请求不再携带思考参数）。重发为 best-effort 的如实重试：失败则走既有失败路径（不二次重发）。
+      const degrade = deps.reasoningDegrade;
+      if (degrade !== undefined && !lifecycle.isInterrupted() && degrade.consumeRetry(lifecycle.currentTurnId())) {
+        degrade.suppress();
+        emit({ kind: "message", summary: degrade.noticeText, detail: { turnId: lifecycle.currentTurnId(), source: "reasoning-degrade" } });
+        log.stage(degrade.noticeText);
+        // 重发直调底层 session.prompt：不递归本包装、不新增 settled/终态发射点（沿 F-3-a 补发先例）。
+        await withPausableTimeout(startCall(), promptMs, "prompt", gate);
+      }
       // F-3-a（截断收尾补发）：仅在首个 prompt **正常返回后**考虑——「开关开启 ∧ 末条消息截断 ∧
       // 本轮无成功 submit_report ∧ 生命周期未被强制锁定（abort/超时）」时，用**独立的**
       // withPausableTimeout 段补发**恰一次**收尾提示。限一次是**结构性保证**：本分支每次 prompt()
@@ -979,6 +1159,8 @@ export interface RoleSessionDeps {
   emitPromptInput?: boolean;
   /** F-3-a：截断收尾补发配置（缺省不传 ⇒ 逐字旧行为）；形状见 makeRolePrompt deps / LengthFollowupOptions。 */
   lengthFollowup?: LengthFollowupOptions;
+  /** G-5：降级重发配置（缺省不传 ⇒ 逐字旧行为）；形状见 makeRolePrompt deps / ReasoningDegradeOptions。 */
+  reasoningDegrade?: ReasoningDegradeOptions;
   /**
    * G-4 V2 dispose 收口（**仅装配 MCP 时提供**；缺省不传 ⇒ dispose 逐字旧行为）：在 SDK
    * `session.dispose()` **之前**执行——补发 `session_shutdown` 让 MCP 扩展关闭全部连接/子进程
@@ -1222,10 +1404,16 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
           },
         );
 
+        // G-5 降级共享态与扩展（**仅显式设置 reasoningEffort 时装配**；未设 ⇒ 零注册、逐字现状）。
+        const reasoningState: ReasoningDegradeState = { retryRequested: false, retryTurnId: undefined, suppressed: false };
+        const reasoningExtension = opts.reasoningEffort !== undefined
+          ? buildReasoningExtension({ state: reasoningState, diagnostics, currentTurnId: lifecycle.currentTurnId })
+          : undefined;
+
         const resourceLoader = new DefaultResourceLoader({
           cwd: opts.projectRoot,
           agentDir: opts.projectRoot,
-          extensionFactories: [extension, ...(mcpExtension !== undefined ? [mcpExtension] : [])],
+          extensionFactories: [extension, ...(reasoningExtension !== undefined ? [reasoningExtension] : []), ...(mcpExtension !== undefined ? [mcpExtension] : [])],
           noExtensions: true,
           systemPrompt: renderSystemPrompt(role, opts.projectRoot),
           noSkills: true,
@@ -1294,6 +1482,16 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
           "createAgentSession",
         );
 
+        // G-5 请求面（映射见 model/runtime.ts 冻结表）：**未设＝不调用**（现状 medium 隐式路径原样）；
+        // off/low/medium/high 直映射；xhigh 直映射（预算由 SDK 钳到 high=16384，档位语义保留——P0 探针实测）。
+        // off 可用性由 buildExplicitRuntime 的 thinkingLevelMap.off 收窄前置保证（否则钳到 minimal＝假关闭）。
+        // 如实注记：setThinkingLevel 是 SDK 会话级 API——档位变化会进转录（thinking_level_change），
+        // 恢复会话时按 SDK 原生恢复面沿用该档（与模型选择恢复同族语义）。
+        if (opts.reasoningEffort !== undefined) {
+          session.setThinkingLevel(opts.reasoningEffort);
+          diagnostics.record("session.thinking_level", { state: opts.reasoningEffort });
+        }
+
         // G-4 V2：硬校验按放行面判（前缀面参数化）。置于 bindExtensions **之前**⇒构造期快照只可能看到
         // 注入名（MCP 尚未建连）——确定性安全；前缀面为「未来把 bindExtensions 挪到校验前」留防。
         // 运行期唯一活口闸＝门禁（499-504 同判据，逐调用执行前拦）。
@@ -1346,7 +1544,20 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
         const sessionShutdown = mcpExtension !== undefined
           ? (): Promise<unknown> => session.extensionRunner.emit({ type: "session_shutdown", reason: "quit" })
           : undefined;
-        const roleSession = makeRoleSession({ session, promptMs, gate: interactionGate, emit, log, queue, unsubscribe: () => { unsubscribe(); callFacts.clear(); }, lifecycle, diagnostics, abortTimeoutMs: 900, strictLifecycle: true, emitPromptInput: false, lengthFollowup, sessionShutdown });
+        // G-5 降级接缝（仅装配 reasoningEffort 时提供；缺省不传 ⇒ 逐字旧行为）。
+        const reasoningDegrade: ReasoningDegradeOptions | undefined = reasoningExtension !== undefined
+          ? {
+              consumeRetry: (turnId: string | undefined): boolean => {
+                const hit = reasoningState.retryRequested && (reasoningState.retryTurnId === undefined || reasoningState.retryTurnId === turnId);
+                reasoningState.retryRequested = false;
+                reasoningState.retryTurnId = undefined;
+                return hit;
+              },
+              suppress: (): void => { reasoningState.suppressed = true; },
+              noticeText: REASONING_DEGRADED_SUMMARY,
+            }
+          : undefined;
+        const roleSession = makeRoleSession({ session, promptMs, gate: interactionGate, emit, log, queue, unsubscribe: () => { unsubscribe(); callFacts.clear(); }, lifecycle, diagnostics, abortTimeoutMs: 900, strictLifecycle: true, emitPromptInput: false, lengthFollowup, sessionShutdown, reasoningDegrade });
         roleSession.runtime = "pi";
         roleSession.roleId = role.id;
         roleSession.contextSource = sessionSelection.contextSource ?? (sessionSelection.mode === "in-memory" ? "in-memory" : sessionSelection.mode === "resumed" ? "resumed" : sessionSelection.note ? "recovered" : "fresh");

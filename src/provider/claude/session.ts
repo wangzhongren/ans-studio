@@ -7,8 +7,10 @@ import { fileURLToPath } from "node:url";
 import type * as SDK from "@anthropic-ai/claude-agent-sdk";
 import type * as Zod from "zod";
 import type { ResolvedRole } from "../../model/role.ts";
-import type { RuntimeAdapter, RuntimeProviderOptions, RoleSession, SessionEvent, RuntimeTurnOutcome, PromptOptions, RuntimeToolEventFactsV1 } from "../../model/runtime.ts";
+import type { RuntimeAdapter, RuntimeProviderOptions, RoleSession, SessionEvent, RuntimeTurnOutcome, PromptOptions, RuntimeToolEventFactsV1, RuntimeReasoningFactsV1 } from "../../model/runtime.ts";
 import { RUNTIME_CREDENTIAL_ENV_VARS } from "../../common/shared/runtime-shared.ts";
+import { createDiagnosticLogger } from "../../common/shared/diagnostics.ts";
+import { REASONING_EVENT_SUMMARY } from "../../common/runtime-core/reasoning.ts";
 import { toClaudeSchema } from "../../common/claude-adapter/schema.ts";
 import { abortError, createQueue, waitForTurn } from "../../common/claude-adapter/lifecycle.ts";
 import { renderInstalledSkillsSection } from "../../common/编排/installed-skills.ts";
@@ -52,6 +54,12 @@ const INSTALLED_MCP_TOOL_TIMEOUT_MS = 60_000;
 const MCP_ENV_LAUNCHER = fileURLToPath(new URL("../../common/claude-adapter/mcp-launcher.mjs", import.meta.url));
 const CALL_CONTEXT_ARG = "__ans_call_context";
 const INPUT_CONTEXT_PREFIX = /^\[ANS_INPUT_CONTEXT:([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})\]\n/;
+// G-5 wave 2 degradation identification (probe A2, docs/fix/2026-10-16_probe_reasoning-wire.md): a
+// gateway rejecting the reasoning parameters surfaces the API failure as text ("API Error: 4xx …")
+// after the CLI's own retries (which never drop the parameters). Deliberately conservative: only an
+// API 4xx that names a reasoning parameter is identified; anything unrecognized stays a plain failure.
+const isReasoningRejection = (text: string | undefined): boolean =>
+  typeof text === "string" && /API Error: 4\d\d/.test(text) && /\b(thinking|effort|output_config)\b/i.test(text);
 
 export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, dependencies: ClaudeAdapterDependencies = {}): RuntimeAdapter {
   if (options.runtime !== "claude") throw new Error("Claude 适配器只接受 runtime=claude");
@@ -132,10 +140,22 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
       let engine: Engine | undefined;
       let temporaryDirectory: string | undefined;
       let teardownError: Error | undefined;
+      // G-5 wave 2 reasoning state (session-scoped): once a gateway rejects the reasoning parameters
+      // every later engine of this session is built without them (degrade-once, exactly one retry);
+      // `lastFailureText` carries the failed-result text from the pump to the prompt catch.
+      let reasoningDegraded = false;
+      let lastFailureText: string | undefined;
+      const diagnostics = createDiagnosticLogger({ component: "provider.claude", projectRoot: options.projectRoot, roleId: role.id });
       const events = createQueue<SessionEvent>();
       const emit = (turn: Turn, kind: SessionEvent["kind"], summary: string, detail?: unknown) => {
         if (turn.controller.signal.aborted && kind !== "settled") return;
         events.push({ runtime: "claude", roleId: role.id, turnId: turn.id, kind, summary: redact(summary), detail });
+      };
+      // G-5 reasoning facts: raw only — the Service's single projection point (projectReasoningDetail)
+      // does redaction/budgeting; the adapter never pre-redacts and never renders. The bundled CLI
+      // 2.1.299 frames carry no real per-segment duration signal (probe A1), so durationMs is never set.
+      const emitReasoning = (turn: Turn, facts: RuntimeReasoningFactsV1) => {
+        emit(turn, "message", REASONING_EVENT_SUMMARY, { version: 1, source: "reasoning", reasoning: facts });
       };
       // A projection is already protected. Never feed its identities back through redact/emit.
       const projectionDiagnostic = (code: "PROJECTION_FAILED" | "CALL_CONTEXT_UNATTRIBUTED") => {
@@ -198,6 +218,16 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
         contextSource = "recovered";
         warning = "Claude 原生会话恢复未确认，当前轮失败；当前输入未自动重试，下一条输入将新建上下文。ANS 历史仅为可读回放。";
         current.resumeId = undefined;
+      };
+      // G-5 wave 2 frozen mapping (src/model/runtime.ts:728-738): unset ⇒ zero parameters (verbatim
+      // status quo); `off` ⇒ ThinkingDisabled; low/medium/high/xhigh ⇒ EffortLevel passthrough
+      // (`max` is not in ReasoningEffortV1). After a gateway rejection the session builds paramless.
+      const reasoningOptions = (): Pick<SDK.Options, "thinking" | "effort"> => {
+        if (reasoningDegraded) return {};
+        const configured = options.reasoningEffort;
+        if (configured === "off") return { thinking: { type: "disabled" } };
+        if (configured === "low" || configured === "medium" || configured === "high" || configured === "xhigh") return { effort: configured };
+        return {};
       };
       const startEngine = async (turn: Turn): Promise<Engine> => {
         if (engine && !engine.closed) return engine;
@@ -297,6 +327,7 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
           mcpServers: { ans: server, ...installedMcpConfigs }, env: childEnv, abortController: controller,
           persistSession: !!storage, ...(nativeId ? { resume: nativeId } : {}),
           ...(options.modelId?.trim() || env.ANS_CLAUDE_MODEL?.trim() ? { model: options.modelId?.trim() || env.ANS_CLAUDE_MODEL?.trim() } : {}),
+          ...reasoningOptions(),
           canUseTool: async () => ({ behavior: "deny", message: "仅允许已注册且预批准的 ANS MCP 工具" }),
           hooks: {
             UserPromptSubmit: [{ hooks: [async (hook, _toolUseID, hookOptions) => {
@@ -360,6 +391,8 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
               if (message.type === "assistant") {
                 for (const block of message.message.content) {
                   if (block.type === "text") emit(callTurn, "message", block.text);
+                  else if (block.type === "thinking") emitReasoning(callTurn, block.thinking === "" ? { text: "", status: "omitted" } : { text: block.thinking, status: "complete" });
+                  else if (block.type === "redacted_thinking") emitReasoning(callTurn, { text: "", status: "omitted" });
                   else if (webSearchEnabled && block.type === "tool_use" && block.name === "WebSearch") {
                     // Native call surface only; the query itself stays inside the tool facts (never a message line).
                     const toolCallId = `${callTurn.id}:${block.id}`;
@@ -389,6 +422,9 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
               } else if (message.type === "result") {
                 if (message.user_message_uuid && message.user_message_uuid !== callTurn.sdkUuid && !message.user_message_uuids?.includes(callTurn.sdkUuid)) continue;
                 if (message.subtype !== "success" || message.is_error) {
+                  // G-5: carry the failed-result text (probe A2: "API Error: 4xx …") for the conservative
+                  // degradation identification in prompt(); closed after closeEngine so no late writers.
+                  lastFailureText = typeof (message as { result?: unknown }).result === "string" ? (message as { result: string }).result : undefined;
                   resumeFailed(current);
                   callTurn.reject(new Error("Claude SDK 本轮返回失败结果"));
                   closeEngine(current);
@@ -408,7 +444,11 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
             }
             if (!current.closed && active) active.reject(new Error("Claude SDK 事件流结束，未返回当前轮结果"));
           } catch (error) {
-            if (!current.closed) { resumeFailed(current); active?.reject(safeFailure(error)); }
+            if (!current.closed) {
+              lastFailureText ??= error instanceof Error ? error.message : String(error);
+              resumeFailed(current);
+              active?.reject(safeFailure(error));
+            }
           } finally { closeEngine(current); }
         })();
         return current;
@@ -429,20 +469,45 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
           void done.catch(() => {});
           const turn: Turn = { id: options.currentTurnId() ?? randomUUID(), sdkUuid: randomUUID(), controller: new AbortController(), done, resolve, reject };
           active = turn;
+          lastFailureText = undefined;
           let outcome: RuntimeTurnOutcome = "completed";
           let failure: Error | undefined;
           try {
-            const start = startEngine(turn);
-            const current = await waitForTurn(start, turn.controller.signal, options.constructTimeoutMs ?? 30000, options.interactionGate);
             const images = promptOptions?.images ?? [];
             if (images.some((image) => !["image/png", "image/jpeg", "image/gif", "image/webp"].includes(image.mimeType))) throw new Error("Claude 不支持此输入图片类型");
-            if (!current.statusReported) { current.statusReported = true; await reportInstalledServerStatus(current, turn); }
-            current.pendingInputs.set(turn.sdkUuid, turn);
-            const wireText = `[ANS_INPUT_CONTEXT:${turn.sdkUuid}]\n${text}`;
-            current.input.push({ type: "user", uuid: turn.sdkUuid, session_id: nativeId ?? "", parent_tool_use_id: null, message: {
-              role: "user", content: images.length ? [{ type: "text", text: wireText }, ...images.map((image) => ({ type: "image" as const, source: { type: "base64" as const, media_type: image.mimeType as "image/png" | "image/jpeg" | "image/gif" | "image/webp", data: image.data } }))] : wireText,
-            } });
-            await waitForTurn(done.then(() => current.toolTail), turn.controller.signal, options.promptTimeoutMs ?? 120000, options.interactionGate);
+            // G-5 degradation loop: at most one reasoning-parameter-drop retry per session (probe A2 —
+            // the CLI's own 400 retries never drop the parameters). Each attempt gets a fresh
+            // done/resolve/reject triple because the pump rejects the previous one when it fails.
+            for (;;) {
+              let attemptResolve!: () => void;
+              let attemptReject!: (error: Error) => void;
+              const attemptDone = new Promise<void>((pass, fail) => { attemptResolve = pass; attemptReject = fail; });
+              void attemptDone.catch(() => {});
+              turn.done = attemptDone; turn.resolve = attemptResolve; turn.reject = attemptReject;
+              lastFailureText = undefined;
+              try {
+                const start = startEngine(turn);
+                const current = await waitForTurn(start, turn.controller.signal, options.constructTimeoutMs ?? 30000, options.interactionGate);
+                if (!current.statusReported) { current.statusReported = true; await reportInstalledServerStatus(current, turn); }
+                current.pendingInputs.set(turn.sdkUuid, turn);
+                const wireText = `[ANS_INPUT_CONTEXT:${turn.sdkUuid}]\n${text}`;
+                current.input.push({ type: "user", uuid: turn.sdkUuid, session_id: nativeId ?? "", parent_tool_use_id: null, message: {
+                  role: "user", content: images.length ? [{ type: "text", text: wireText }, ...images.map((image) => ({ type: "image" as const, source: { type: "base64" as const, media_type: image.mimeType as "image/png" | "image/jpeg" | "image/gif" | "image/webp", data: image.data } }))] : wireText,
+                } });
+                await waitForTurn(attemptDone.then(() => current.toolTail), turn.controller.signal, options.promptTimeoutMs ?? 120000, options.interactionGate);
+                break;
+              } catch (error) {
+                // Conservative identification (probe A2 facts); unrecognized failures stay plain failures.
+                if (!reasoningDegraded && options.reasoningEffort !== undefined && isReasoningRejection(lastFailureText)) {
+                  reasoningDegraded = true;
+                  if (engine) closeEngine(engine);
+                  emit(turn, "message", "网关不支持推理参数，已去掉参数重试一次（本会话之后不再携带）");
+                  diagnostics.record("reasoning.degraded", { mode: "claude", reasonCode: "gateway-rejected-parameters", decision: "retry-without-reasoning", attempt: 1 });
+                  continue;
+                }
+                throw error;
+              }
+            }
           } catch (error) {
             failure = safeFailure(error);
             outcome = failure.name === "TimeoutError" ? "timed_out" : turn.controller.signal.aborted || failure.name === "AbortError" ? "aborted" : "failed";

@@ -1,0 +1,3814 @@
+{
+ "probe": "codex-reasoning-surface",
+ "pinnedCLI": "0.162.1",
+ "externalModelCalls": 0,
+ "credentials": "fake only (loopback SSE; CODEX_API_KEY=fake-reasoning-probe)",
+ "selfChecks": [
+  {
+   "label": "R0 未设 ⇒ 上游无 effort 键（summary:\"auto\" 为平台缺省，随现状记录）",
+   "pass": true
+  },
+  {
+   "label": "R1 reasoning 通知到达",
+   "pass": true
+  },
+  {
+   "label": "R1 reasoning item 完成态到达",
+   "pass": true
+  },
+  {
+   "label": "R2 回读 high + 上游 high",
+   "pass": true
+  },
+  {
+   "label": "R3 bogus 回读原样 + 上游原样/钳制（记录）",
+   "pass": true
+  },
+  {
+   "label": "R4 拒绝面通知捕获（error/turn-completed）",
+   "pass": true
+  },
+  {
+   "label": "R4 同线程续跑事实已定格（成败均记录）",
+   "pass": true
+  },
+  {
+   "label": "R5/R6 覆盖语义记录",
+   "pass": true
+  }
+ ],
+ "cells": [
+  {
+   "name": "R0-control-no-effort",
+   "overrides": [
+    "features.shell_tool=false",
+    "features.hooks=false",
+    "features.apps=false",
+    "features.plugins=false",
+    "features.remote_plugin=false",
+    "features.browser_use=false",
+    "features.browser_use_external=false",
+    "features.browser_use_full_cdp_access=false",
+    "features.in_app_browser=false",
+    "features.computer_use=false",
+    "features.code_mode=false",
+    "features.code_mode_host=false",
+    "features.multi_agent=false",
+    "features.multi_agent_v2=false",
+    "features.request_permissions_tool=false",
+    "features.skill_mcp_dependency_install=false",
+    "sandbox_mode=\"read-only\"",
+    "approval_policy=\"never\"",
+    "approvals_reviewer=\"user\"",
+    "web_search=\"disabled\"",
+    "projects={\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-bobm53\"={trust_level=\"untrusted\"}}",
+    "model_providers.ans_probe={name=\"ANS Probe\",base_url=\"http://127.0.0.1:62006/v1\",env_key=\"CODEX_API_KEY\",wire_api=\"responses\",requires_openai_auth=false}",
+    "model_provider=\"ans_probe\"",
+    "model=\"probe-model\""
+   ],
+   "notices": [
+    {
+     "at": 1792160784363,
+     "method": "remoteControl/status/changed",
+     "params": {
+      "status": "disabled",
+      "serverName": "wangzhongrendeMacBook-Pro.local",
+      "installationId": "29ab011b-8458-4c98-bcaf-cbd149a7dfa3",
+      "environmentId": null
+     }
+    },
+    {
+     "at": 1792160784375,
+     "method": "thread/started",
+     "params": {
+      "thread": {
+       "id": "01a1451b-5fee-7ff2-ad87-b2ae0020454a",
+       "environments": [
+        {
+         "environmentId": "local",
+         "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-bobm53",
+         "runtimeWorkspaceRoots": [
+          "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-bobm53"
+         ]
+        }
+       ],
+       "extra": null,
+       "sessionId": "01a1451b-5fee-7ff2-ad87-b2ae0020454a",
+       "forkedFromId": null,
+       "parentThreadId": null,
+       "preview": "",
+       "ephemeral": true,
+       "section": null,
+       "sectionEnteredAt": null,
+       "projectId": null,
+       "historyMode": "paginated",
+       "modelProvider": "ans_probe",
+       "model": "probe-model",
+       "reasoningEffort": null,
+       "createdAt": 1792160784,
+       "updatedAt": 1792160784,
+       "recencyAt": 1792160784,
+       "status": {
+        "type": "idle"
+       },
+       "path": null,
+       "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-bobm53",
+       "cliVersion": "0.162.1",
+       "originator": "ans_reasoning_probe",
+       "source": "vscode",
+       "canAcceptDirectInput": true,
+       "threadSource": null,
+       "agentNickname": null,
+       "agentRole": null,
+       "gitInfo": null,
+       "name": null,
+       "daybreakEnabled": null,
+       "turns": []
+      }
+     }
+    },
+    {
+     "at": 1792160784376,
+     "method": "warning",
+     "params": {
+      "threadId": "01a1451b-5fee-7ff2-ad87-b2ae0020454a",
+      "message": "Model metadata for `probe-model` not found. Defaulting to fallback metadata; this can degrade performance and cause issues."
+     }
+    },
+    {
+     "at": 1792160784377,
+     "method": "thread/status/changed",
+     "params": {
+      "threadId": "01a1451b-5fee-7ff2-ad87-b2ae0020454a",
+      "status": {
+       "type": "active",
+       "activeFlags": []
+      }
+     }
+    },
+    {
+     "at": 1792160784377,
+     "method": "turn/started",
+     "params": {
+      "threadId": "01a1451b-5fee-7ff2-ad87-b2ae0020454a",
+      "turn": {
+       "id": "01a1451b-5ff7-7843-95a3-67da26f0a50c",
+       "rootTurnId": "01a1451b-5ff7-7843-95a3-67da26f0a50c",
+       "items": [],
+       "itemsView": "notLoaded",
+       "status": "inProgress",
+       "error": null,
+       "startedAt": 1792160784,
+       "completedAt": null,
+       "durationMs": null
+      }
+     }
+    },
+    {
+     "at": 1792160784378,
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "userMessage",
+       "id": "01a1451b-5ff9-7601-aedd-24c0b7b64289",
+       "clientId": null,
+       "content": [
+        {
+         "type": "text",
+         "text": "control turn",
+         "text_elements": []
+        }
+       ]
+      },
+      "threadId": "01a1451b-5fee-7ff2-ad87-b2ae0020454a",
+      "turnId": "01a1451b-5ff7-7843-95a3-67da26f0a50c",
+      "startedAtMs": 1792160784377
+     }
+    },
+    {
+     "at": 1792160784378,
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "userMessage",
+       "id": "01a1451b-5ff9-7601-aedd-24c0b7b64289",
+       "clientId": null,
+       "content": [
+        {
+         "type": "text",
+         "text": "control turn",
+         "text_elements": []
+        }
+       ]
+      },
+      "threadId": "01a1451b-5fee-7ff2-ad87-b2ae0020454a",
+      "turnId": "01a1451b-5ff7-7843-95a3-67da26f0a50c",
+      "completedAtMs": 1792160784377
+     }
+    },
+    {
+     "at": 1792160784383,
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "agentMessage",
+       "id": "msg_probe_1",
+       "text": "",
+       "phase": null,
+       "memoryCitation": null,
+       "delivery": null,
+       "questions": null
+      },
+      "threadId": "01a1451b-5fee-7ff2-ad87-b2ae0020454a",
+      "turnId": "01a1451b-5ff7-7843-95a3-67da26f0a50c",
+      "startedAtMs": 1792160784383
+     }
+    },
+    {
+     "at": 1792160784383,
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "agentMessage",
+       "id": "msg_probe_1",
+       "text": "probe final message",
+       "phase": null,
+       "memoryCitation": null,
+       "delivery": null,
+       "questions": null
+      },
+      "threadId": "01a1451b-5fee-7ff2-ad87-b2ae0020454a",
+      "turnId": "01a1451b-5ff7-7843-95a3-67da26f0a50c",
+      "completedAtMs": 1792160784383
+     }
+    },
+    {
+     "at": 1792160784383,
+     "method": "thread/tokenUsage/updated",
+     "params": {
+      "threadId": "01a1451b-5fee-7ff2-ad87-b2ae0020454a",
+      "turnId": "01a1451b-5ff7-7843-95a3-67da26f0a50c",
+      "tokenUsage": {
+       "total": {
+        "totalTokens": 2,
+        "inputTokens": 1,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 1,
+        "reasoningOutputTokens": 0
+       },
+       "last": {
+        "totalTokens": 2,
+        "inputTokens": 1,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 1,
+        "reasoningOutputTokens": 0
+       },
+       "modelContextWindow": 258400
+      }
+     }
+    },
+    {
+     "at": 1792160784383,
+     "method": "account/rateLimits/updated",
+     "params": {
+      "rateLimits": {
+       "limitId": "codex",
+       "limitName": null,
+       "normalModelSlug": null,
+       "primary": null,
+       "secondary": null,
+       "credits": null,
+       "individualLimit": null,
+       "spendControlReached": null,
+       "planType": null,
+       "rateLimitReachedType": null
+      }
+     }
+    },
+    {
+     "at": 1792160784383,
+     "method": "thread/status/changed",
+     "params": {
+      "threadId": "01a1451b-5fee-7ff2-ad87-b2ae0020454a",
+      "status": {
+       "type": "idle"
+      }
+     }
+    },
+    {
+     "at": 1792160784383,
+     "method": "turn/completed",
+     "params": {
+      "threadId": "01a1451b-5fee-7ff2-ad87-b2ae0020454a",
+      "turn": {
+       "id": "01a1451b-5ff7-7843-95a3-67da26f0a50c",
+       "rootTurnId": "01a1451b-5ff7-7843-95a3-67da26f0a50c",
+       "items": [
+        {
+         "type": "agentMessage",
+         "id": "msg_probe_1",
+         "text": "probe final message",
+         "phase": null,
+         "memoryCitation": null,
+         "delivery": null,
+         "questions": null
+        }
+       ],
+       "itemsView": "summary",
+       "status": "completed",
+       "error": null,
+       "startedAt": 1792160784,
+       "completedAt": 1792160784,
+       "durationMs": 6
+      }
+     }
+    }
+   ],
+   "serverRequests": [],
+   "requests": [
+    {
+     "method": "initialize",
+     "params": {
+      "clientInfo": {
+       "name": "ans_reasoning_probe",
+       "version": "0.0.0"
+      },
+      "capabilities": {
+       "experimentalApi": true,
+       "explicitGatewayOauth": true
+      }
+     }
+    },
+    {
+     "method": "config/read",
+     "params": {
+      "includeLayers": false,
+      "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-bobm53"
+     }
+    },
+    {
+     "method": "thread/start",
+     "params": {
+      "model": "probe-model",
+      "modelProvider": "ans_probe",
+      "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-bobm53",
+      "sandbox": "read-only",
+      "approvalPolicy": "never",
+      "approvalsReviewer": "user",
+      "config": {
+       "features": {
+        "shell_tool": false,
+        "hooks": false,
+        "apps": false,
+        "plugins": false,
+        "remote_plugin": false,
+        "browser_use": false,
+        "browser_use_external": false,
+        "browser_use_full_cdp_access": false,
+        "in_app_browser": false,
+        "computer_use": false,
+        "code_mode": false,
+        "code_mode_host": false,
+        "multi_agent": false,
+        "multi_agent_v2": false,
+        "request_permissions_tool": false,
+        "skill_mcp_dependency_install": false
+       },
+       "sandbox_mode": "read-only",
+       "approval_policy": "never",
+       "approvals_reviewer": "user",
+       "web_search": "disabled",
+       "projects": {
+        "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-bobm53": {
+         "trust_level": "untrusted"
+        }
+       }
+      },
+      "developerInstructions": "reasoning surface probe",
+      "ephemeral": true
+     }
+    },
+    {
+     "method": "turn/start",
+     "params": {
+      "threadId": "01a1451b-5fee-7ff2-ad87-b2ae0020454a",
+      "input": [
+       {
+        "type": "text",
+        "text": "control turn",
+        "text_elements": []
+       }
+      ],
+      "approvalPolicy": "never",
+      "approvalsReviewer": "user",
+      "sandboxPolicy": {
+       "type": "readOnly",
+       "networkAccess": false
+      },
+      "model": "probe-model"
+     }
+    }
+   ],
+   "preparation": null,
+   "readbackEffort": null,
+   "turnCompleted": true,
+   "stderrTail": "",
+   "modelRequests": 1,
+   "rejections": 0,
+   "requestBodies": [
+    {
+     "model": "probe-model",
+     "reasoning": {
+      "summary": "auto"
+     },
+     "hasReasoningKey": true,
+     "streamKeys": {
+      "stream": true
+     }
+    }
+   ],
+   "childExit": 0
+  },
+  {
+   "name": "R1-reasoning-item-frames",
+   "overrides": [
+    "features.shell_tool=false",
+    "features.hooks=false",
+    "features.apps=false",
+    "features.plugins=false",
+    "features.remote_plugin=false",
+    "features.browser_use=false",
+    "features.browser_use_external=false",
+    "features.browser_use_full_cdp_access=false",
+    "features.in_app_browser=false",
+    "features.computer_use=false",
+    "features.code_mode=false",
+    "features.code_mode_host=false",
+    "features.multi_agent=false",
+    "features.multi_agent_v2=false",
+    "features.request_permissions_tool=false",
+    "features.skill_mcp_dependency_install=false",
+    "sandbox_mode=\"read-only\"",
+    "approval_policy=\"never\"",
+    "approvals_reviewer=\"user\"",
+    "web_search=\"disabled\"",
+    "projects={\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-oVgDpD\"={trust_level=\"untrusted\"}}",
+    "model_providers.ans_probe={name=\"ANS Probe\",base_url=\"http://127.0.0.1:62006/v1\",env_key=\"CODEX_API_KEY\",wire_api=\"responses\",requires_openai_auth=false}",
+    "model_provider=\"ans_probe\"",
+    "model=\"probe-model\""
+   ],
+   "notices": [
+    {
+     "at": 1792160784483,
+     "method": "remoteControl/status/changed",
+     "params": {
+      "status": "disabled",
+      "serverName": "wangzhongrendeMacBook-Pro.local",
+      "installationId": "044ac299-3748-47fe-9f2e-314afaaeddca",
+      "environmentId": null
+     }
+    },
+    {
+     "at": 1792160784493,
+     "method": "thread/started",
+     "params": {
+      "thread": {
+       "id": "01a1451b-6064-7192-add1-f4e0d88f74a0",
+       "environments": [
+        {
+         "environmentId": "local",
+         "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-oVgDpD",
+         "runtimeWorkspaceRoots": [
+          "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-oVgDpD"
+         ]
+        }
+       ],
+       "extra": null,
+       "sessionId": "01a1451b-6064-7192-add1-f4e0d88f74a0",
+       "forkedFromId": null,
+       "parentThreadId": null,
+       "preview": "",
+       "ephemeral": true,
+       "section": null,
+       "sectionEnteredAt": null,
+       "projectId": null,
+       "historyMode": "paginated",
+       "modelProvider": "ans_probe",
+       "model": "probe-model",
+       "reasoningEffort": null,
+       "createdAt": 1792160784,
+       "updatedAt": 1792160784,
+       "recencyAt": 1792160784,
+       "status": {
+        "type": "idle"
+       },
+       "path": null,
+       "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-oVgDpD",
+       "cliVersion": "0.162.1",
+       "originator": "ans_reasoning_probe",
+       "source": "vscode",
+       "canAcceptDirectInput": true,
+       "threadSource": null,
+       "agentNickname": null,
+       "agentRole": null,
+       "gitInfo": null,
+       "name": null,
+       "daybreakEnabled": null,
+       "turns": []
+      }
+     }
+    },
+    {
+     "at": 1792160784494,
+     "method": "warning",
+     "params": {
+      "threadId": "01a1451b-6064-7192-add1-f4e0d88f74a0",
+      "message": "Model metadata for `probe-model` not found. Defaulting to fallback metadata; this can degrade performance and cause issues."
+     }
+    },
+    {
+     "at": 1792160784495,
+     "method": "thread/status/changed",
+     "params": {
+      "threadId": "01a1451b-6064-7192-add1-f4e0d88f74a0",
+      "status": {
+       "type": "active",
+       "activeFlags": []
+      }
+     }
+    },
+    {
+     "at": 1792160784495,
+     "method": "turn/started",
+     "params": {
+      "threadId": "01a1451b-6064-7192-add1-f4e0d88f74a0",
+      "turn": {
+       "id": "01a1451b-606d-7823-ac61-dc87fbc406ea",
+       "rootTurnId": "01a1451b-606d-7823-ac61-dc87fbc406ea",
+       "items": [],
+       "itemsView": "notLoaded",
+       "status": "inProgress",
+       "error": null,
+       "startedAt": 1792160784,
+       "completedAt": null,
+       "durationMs": null
+      }
+     }
+    },
+    {
+     "at": 1792160784495,
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "userMessage",
+       "id": "01a1451b-606f-7370-a95d-71e09e1ecb66",
+       "clientId": null,
+       "content": [
+        {
+         "type": "text",
+         "text": "reasoning turn",
+         "text_elements": []
+        }
+       ]
+      },
+      "threadId": "01a1451b-6064-7192-add1-f4e0d88f74a0",
+      "turnId": "01a1451b-606d-7823-ac61-dc87fbc406ea",
+      "startedAtMs": 1792160784495
+     }
+    },
+    {
+     "at": 1792160784495,
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "userMessage",
+       "id": "01a1451b-606f-7370-a95d-71e09e1ecb66",
+       "clientId": null,
+       "content": [
+        {
+         "type": "text",
+         "text": "reasoning turn",
+         "text_elements": []
+        }
+       ]
+      },
+      "threadId": "01a1451b-6064-7192-add1-f4e0d88f74a0",
+      "turnId": "01a1451b-606d-7823-ac61-dc87fbc406ea",
+      "completedAtMs": 1792160784495
+     }
+    },
+    {
+     "at": 1792160784498,
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "reasoning",
+       "id": "rs_probe_1",
+       "summary": [],
+       "content": []
+      },
+      "threadId": "01a1451b-6064-7192-add1-f4e0d88f74a0",
+      "turnId": "01a1451b-606d-7823-ac61-dc87fbc406ea",
+      "startedAtMs": 1792160784498
+     }
+    },
+    {
+     "at": 1792160784499,
+     "method": "item/reasoning/summaryPartAdded",
+     "params": {
+      "threadId": "01a1451b-6064-7192-add1-f4e0d88f74a0",
+      "turnId": "01a1451b-606d-7823-ac61-dc87fbc406ea",
+      "itemId": "rs_probe_1",
+      "summaryIndex": 0
+     }
+    },
+    {
+     "at": 1792160784499,
+     "method": "item/reasoning/summaryTextDelta",
+     "params": {
+      "threadId": "01a1451b-6064-7192-add1-f4e0d88f74a0",
+      "turnId": "01a1451b-606d-7823-ac61-dc87fbc406ea",
+      "itemId": "rs_probe_1",
+      "delta": "probe summary part one",
+      "summaryIndex": 0
+     }
+    },
+    {
+     "at": 1792160784499,
+     "method": "item/reasoning/summaryPartAdded",
+     "params": {
+      "threadId": "01a1451b-6064-7192-add1-f4e0d88f74a0",
+      "turnId": "01a1451b-606d-7823-ac61-dc87fbc406ea",
+      "itemId": "rs_probe_1",
+      "summaryIndex": 1
+     }
+    },
+    {
+     "at": 1792160784499,
+     "method": "item/reasoning/summaryTextDelta",
+     "params": {
+      "threadId": "01a1451b-6064-7192-add1-f4e0d88f74a0",
+      "turnId": "01a1451b-606d-7823-ac61-dc87fbc406ea",
+      "itemId": "rs_probe_1",
+      "delta": "probe summary part two",
+      "summaryIndex": 1
+     }
+    },
+    {
+     "at": 1792160784499,
+     "method": "item/reasoning/textDelta",
+     "params": {
+      "threadId": "01a1451b-6064-7192-add1-f4e0d88f74a0",
+      "turnId": "01a1451b-606d-7823-ac61-dc87fbc406ea",
+      "itemId": "rs_probe_1",
+      "delta": "probe reasoning body",
+      "contentIndex": 0
+     }
+    },
+    {
+     "at": 1792160784499,
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "reasoning",
+       "id": "rs_probe_1",
+       "summary": [
+        "probe summary part one",
+        "probe summary part two"
+       ],
+       "content": [
+        "probe reasoning body"
+       ]
+      },
+      "threadId": "01a1451b-6064-7192-add1-f4e0d88f74a0",
+      "turnId": "01a1451b-606d-7823-ac61-dc87fbc406ea",
+      "completedAtMs": 1792160784498
+     }
+    },
+    {
+     "at": 1792160784499,
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "agentMessage",
+       "id": "msg_probe_1",
+       "text": "",
+       "phase": null,
+       "memoryCitation": null,
+       "delivery": null,
+       "questions": null
+      },
+      "threadId": "01a1451b-6064-7192-add1-f4e0d88f74a0",
+      "turnId": "01a1451b-606d-7823-ac61-dc87fbc406ea",
+      "startedAtMs": 1792160784498
+     }
+    },
+    {
+     "at": 1792160784499,
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "agentMessage",
+       "id": "msg_probe_1",
+       "text": "probe final message",
+       "phase": null,
+       "memoryCitation": null,
+       "delivery": null,
+       "questions": null
+      },
+      "threadId": "01a1451b-6064-7192-add1-f4e0d88f74a0",
+      "turnId": "01a1451b-606d-7823-ac61-dc87fbc406ea",
+      "completedAtMs": 1792160784498
+     }
+    },
+    {
+     "at": 1792160784499,
+     "method": "thread/tokenUsage/updated",
+     "params": {
+      "threadId": "01a1451b-6064-7192-add1-f4e0d88f74a0",
+      "turnId": "01a1451b-606d-7823-ac61-dc87fbc406ea",
+      "tokenUsage": {
+       "total": {
+        "totalTokens": 2,
+        "inputTokens": 1,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 1,
+        "reasoningOutputTokens": 7
+       },
+       "last": {
+        "totalTokens": 2,
+        "inputTokens": 1,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 1,
+        "reasoningOutputTokens": 7
+       },
+       "modelContextWindow": 258400
+      }
+     }
+    },
+    {
+     "at": 1792160784499,
+     "method": "account/rateLimits/updated",
+     "params": {
+      "rateLimits": {
+       "limitId": "codex",
+       "limitName": null,
+       "normalModelSlug": null,
+       "primary": null,
+       "secondary": null,
+       "credits": null,
+       "individualLimit": null,
+       "spendControlReached": null,
+       "planType": null,
+       "rateLimitReachedType": null
+      }
+     }
+    },
+    {
+     "at": 1792160784499,
+     "method": "thread/status/changed",
+     "params": {
+      "threadId": "01a1451b-6064-7192-add1-f4e0d88f74a0",
+      "status": {
+       "type": "idle"
+      }
+     }
+    },
+    {
+     "at": 1792160784499,
+     "method": "turn/completed",
+     "params": {
+      "threadId": "01a1451b-6064-7192-add1-f4e0d88f74a0",
+      "turn": {
+       "id": "01a1451b-606d-7823-ac61-dc87fbc406ea",
+       "rootTurnId": "01a1451b-606d-7823-ac61-dc87fbc406ea",
+       "items": [
+        {
+         "type": "agentMessage",
+         "id": "msg_probe_1",
+         "text": "probe final message",
+         "phase": null,
+         "memoryCitation": null,
+         "delivery": null,
+         "questions": null
+        }
+       ],
+       "itemsView": "summary",
+       "status": "completed",
+       "error": null,
+       "startedAt": 1792160784,
+       "completedAt": 1792160784,
+       "durationMs": 4
+      }
+     }
+    }
+   ],
+   "serverRequests": [],
+   "requests": [
+    {
+     "method": "initialize",
+     "params": {
+      "clientInfo": {
+       "name": "ans_reasoning_probe",
+       "version": "0.0.0"
+      },
+      "capabilities": {
+       "experimentalApi": true,
+       "explicitGatewayOauth": true
+      }
+     }
+    },
+    {
+     "method": "thread/start",
+     "params": {
+      "model": "probe-model",
+      "modelProvider": "ans_probe",
+      "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-oVgDpD",
+      "sandbox": "read-only",
+      "approvalPolicy": "never",
+      "approvalsReviewer": "user",
+      "config": {
+       "features": {
+        "shell_tool": false,
+        "hooks": false,
+        "apps": false,
+        "plugins": false,
+        "remote_plugin": false,
+        "browser_use": false,
+        "browser_use_external": false,
+        "browser_use_full_cdp_access": false,
+        "in_app_browser": false,
+        "computer_use": false,
+        "code_mode": false,
+        "code_mode_host": false,
+        "multi_agent": false,
+        "multi_agent_v2": false,
+        "request_permissions_tool": false,
+        "skill_mcp_dependency_install": false
+       },
+       "sandbox_mode": "read-only",
+       "approval_policy": "never",
+       "approvals_reviewer": "user",
+       "web_search": "disabled",
+       "projects": {
+        "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-oVgDpD": {
+         "trust_level": "untrusted"
+        }
+       }
+      },
+      "developerInstructions": "reasoning surface probe",
+      "ephemeral": true
+     }
+    },
+    {
+     "method": "turn/start",
+     "params": {
+      "threadId": "01a1451b-6064-7192-add1-f4e0d88f74a0",
+      "input": [
+       {
+        "type": "text",
+        "text": "reasoning turn",
+        "text_elements": []
+       }
+      ],
+      "approvalPolicy": "never",
+      "approvalsReviewer": "user",
+      "sandboxPolicy": {
+       "type": "readOnly",
+       "networkAccess": false
+      },
+      "model": "probe-model"
+     }
+    }
+   ],
+   "preparation": null,
+   "turnCompleted": true,
+   "reasoningNotices": [
+    {
+     "method": "item/reasoning/summaryPartAdded",
+     "params": {
+      "threadId": "01a1451b-6064-7192-add1-f4e0d88f74a0",
+      "turnId": "01a1451b-606d-7823-ac61-dc87fbc406ea",
+      "itemId": "rs_probe_1",
+      "summaryIndex": 0
+     }
+    },
+    {
+     "method": "item/reasoning/summaryTextDelta",
+     "params": {
+      "threadId": "01a1451b-6064-7192-add1-f4e0d88f74a0",
+      "turnId": "01a1451b-606d-7823-ac61-dc87fbc406ea",
+      "itemId": "rs_probe_1",
+      "delta": "probe summary part one",
+      "summaryIndex": 0
+     }
+    },
+    {
+     "method": "item/reasoning/summaryPartAdded",
+     "params": {
+      "threadId": "01a1451b-6064-7192-add1-f4e0d88f74a0",
+      "turnId": "01a1451b-606d-7823-ac61-dc87fbc406ea",
+      "itemId": "rs_probe_1",
+      "summaryIndex": 1
+     }
+    },
+    {
+     "method": "item/reasoning/summaryTextDelta",
+     "params": {
+      "threadId": "01a1451b-6064-7192-add1-f4e0d88f74a0",
+      "turnId": "01a1451b-606d-7823-ac61-dc87fbc406ea",
+      "itemId": "rs_probe_1",
+      "delta": "probe summary part two",
+      "summaryIndex": 1
+     }
+    },
+    {
+     "method": "item/reasoning/textDelta",
+     "params": {
+      "threadId": "01a1451b-6064-7192-add1-f4e0d88f74a0",
+      "turnId": "01a1451b-606d-7823-ac61-dc87fbc406ea",
+      "itemId": "rs_probe_1",
+      "delta": "probe reasoning body",
+      "contentIndex": 0
+     }
+    }
+   ],
+   "itemLifecycle": [
+    {
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "reasoning",
+       "id": "rs_probe_1",
+       "summary": [],
+       "content": []
+      },
+      "threadId": "01a1451b-6064-7192-add1-f4e0d88f74a0",
+      "turnId": "01a1451b-606d-7823-ac61-dc87fbc406ea",
+      "startedAtMs": 1792160784498
+     }
+    },
+    {
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "reasoning",
+       "id": "rs_probe_1",
+       "summary": [
+        "probe summary part one",
+        "probe summary part two"
+       ],
+       "content": [
+        "probe reasoning body"
+       ]
+      },
+      "threadId": "01a1451b-6064-7192-add1-f4e0d88f74a0",
+      "turnId": "01a1451b-606d-7823-ac61-dc87fbc406ea",
+      "completedAtMs": 1792160784498
+     }
+    }
+   ],
+   "allItemMethods": [
+    "item/started",
+    "item/completed",
+    "item/reasoning/summaryPartAdded",
+    "item/reasoning/summaryTextDelta",
+    "item/reasoning/textDelta"
+   ],
+   "stderrTail": "",
+   "modelRequests": 1,
+   "rejections": 0,
+   "requestBodies": [
+    {
+     "model": "probe-model",
+     "reasoning": {
+      "summary": "auto"
+     },
+     "hasReasoningKey": true,
+     "streamKeys": {
+      "stream": true
+     }
+    }
+   ],
+   "childExit": 0
+  },
+  {
+   "name": "R2-effort-high",
+   "overrides": [
+    "features.shell_tool=false",
+    "features.hooks=false",
+    "features.apps=false",
+    "features.plugins=false",
+    "features.remote_plugin=false",
+    "features.browser_use=false",
+    "features.browser_use_external=false",
+    "features.browser_use_full_cdp_access=false",
+    "features.in_app_browser=false",
+    "features.computer_use=false",
+    "features.code_mode=false",
+    "features.code_mode_host=false",
+    "features.multi_agent=false",
+    "features.multi_agent_v2=false",
+    "features.request_permissions_tool=false",
+    "features.skill_mcp_dependency_install=false",
+    "sandbox_mode=\"read-only\"",
+    "approval_policy=\"never\"",
+    "approvals_reviewer=\"user\"",
+    "web_search=\"disabled\"",
+    "projects={\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-J8B3Fb\"={trust_level=\"untrusted\"}}",
+    "model_providers.ans_probe={name=\"ANS Probe\",base_url=\"http://127.0.0.1:62006/v1\",env_key=\"CODEX_API_KEY\",wire_api=\"responses\",requires_openai_auth=false}",
+    "model_provider=\"ans_probe\"",
+    "model=\"probe-model\"",
+    "model_reasoning_effort=\"high\""
+   ],
+   "notices": [
+    {
+     "at": 1792160784598,
+     "method": "remoteControl/status/changed",
+     "params": {
+      "status": "disabled",
+      "serverName": "wangzhongrendeMacBook-Pro.local",
+      "installationId": "c01bfa16-969f-4f9a-85ed-3188b4b1f653",
+      "environmentId": null
+     }
+    },
+    {
+     "at": 1792160784609,
+     "method": "thread/started",
+     "params": {
+      "thread": {
+       "id": "01a1451b-60d9-7d21-9412-da94d70de94f",
+       "environments": [
+        {
+         "environmentId": "local",
+         "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-J8B3Fb",
+         "runtimeWorkspaceRoots": [
+          "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-J8B3Fb"
+         ]
+        }
+       ],
+       "extra": null,
+       "sessionId": "01a1451b-60d9-7d21-9412-da94d70de94f",
+       "forkedFromId": null,
+       "parentThreadId": null,
+       "preview": "",
+       "ephemeral": true,
+       "section": null,
+       "sectionEnteredAt": null,
+       "projectId": null,
+       "historyMode": "paginated",
+       "modelProvider": "ans_probe",
+       "model": "probe-model",
+       "reasoningEffort": "high",
+       "createdAt": 1792160784,
+       "updatedAt": 1792160784,
+       "recencyAt": 1792160784,
+       "status": {
+        "type": "idle"
+       },
+       "path": null,
+       "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-J8B3Fb",
+       "cliVersion": "0.162.1",
+       "originator": "ans_reasoning_probe",
+       "source": "vscode",
+       "canAcceptDirectInput": true,
+       "threadSource": null,
+       "agentNickname": null,
+       "agentRole": null,
+       "gitInfo": null,
+       "name": null,
+       "daybreakEnabled": null,
+       "turns": []
+      }
+     }
+    },
+    {
+     "at": 1792160784610,
+     "method": "warning",
+     "params": {
+      "threadId": "01a1451b-60d9-7d21-9412-da94d70de94f",
+      "message": "Model metadata for `probe-model` not found. Defaulting to fallback metadata; this can degrade performance and cause issues."
+     }
+    },
+    {
+     "at": 1792160784611,
+     "method": "thread/status/changed",
+     "params": {
+      "threadId": "01a1451b-60d9-7d21-9412-da94d70de94f",
+      "status": {
+       "type": "active",
+       "activeFlags": []
+      }
+     }
+    },
+    {
+     "at": 1792160784611,
+     "method": "turn/started",
+     "params": {
+      "threadId": "01a1451b-60d9-7d21-9412-da94d70de94f",
+      "turn": {
+       "id": "01a1451b-60e1-7b30-9844-a7371f8bc25c",
+       "rootTurnId": "01a1451b-60e1-7b30-9844-a7371f8bc25c",
+       "items": [],
+       "itemsView": "notLoaded",
+       "status": "inProgress",
+       "error": null,
+       "startedAt": 1792160784,
+       "completedAt": null,
+       "durationMs": null
+      }
+     }
+    },
+    {
+     "at": 1792160784612,
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "userMessage",
+       "id": "01a1451b-60e4-7f81-bbf6-09409a46cac7",
+       "clientId": null,
+       "content": [
+        {
+         "type": "text",
+         "text": "high effort turn",
+         "text_elements": []
+        }
+       ]
+      },
+      "threadId": "01a1451b-60d9-7d21-9412-da94d70de94f",
+      "turnId": "01a1451b-60e1-7b30-9844-a7371f8bc25c",
+      "startedAtMs": 1792160784612
+     }
+    },
+    {
+     "at": 1792160784612,
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "userMessage",
+       "id": "01a1451b-60e4-7f81-bbf6-09409a46cac7",
+       "clientId": null,
+       "content": [
+        {
+         "type": "text",
+         "text": "high effort turn",
+         "text_elements": []
+        }
+       ]
+      },
+      "threadId": "01a1451b-60d9-7d21-9412-da94d70de94f",
+      "turnId": "01a1451b-60e1-7b30-9844-a7371f8bc25c",
+      "completedAtMs": 1792160784612
+     }
+    },
+    {
+     "at": 1792160784615,
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "agentMessage",
+       "id": "msg_probe_1",
+       "text": "",
+       "phase": null,
+       "memoryCitation": null,
+       "delivery": null,
+       "questions": null
+      },
+      "threadId": "01a1451b-60d9-7d21-9412-da94d70de94f",
+      "turnId": "01a1451b-60e1-7b30-9844-a7371f8bc25c",
+      "startedAtMs": 1792160784615
+     }
+    },
+    {
+     "at": 1792160784615,
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "agentMessage",
+       "id": "msg_probe_1",
+       "text": "probe final message",
+       "phase": null,
+       "memoryCitation": null,
+       "delivery": null,
+       "questions": null
+      },
+      "threadId": "01a1451b-60d9-7d21-9412-da94d70de94f",
+      "turnId": "01a1451b-60e1-7b30-9844-a7371f8bc25c",
+      "completedAtMs": 1792160784615
+     }
+    },
+    {
+     "at": 1792160784615,
+     "method": "thread/tokenUsage/updated",
+     "params": {
+      "threadId": "01a1451b-60d9-7d21-9412-da94d70de94f",
+      "turnId": "01a1451b-60e1-7b30-9844-a7371f8bc25c",
+      "tokenUsage": {
+       "total": {
+        "totalTokens": 2,
+        "inputTokens": 1,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 1,
+        "reasoningOutputTokens": 0
+       },
+       "last": {
+        "totalTokens": 2,
+        "inputTokens": 1,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 1,
+        "reasoningOutputTokens": 0
+       },
+       "modelContextWindow": 258400
+      }
+     }
+    },
+    {
+     "at": 1792160784615,
+     "method": "account/rateLimits/updated",
+     "params": {
+      "rateLimits": {
+       "limitId": "codex",
+       "limitName": null,
+       "normalModelSlug": null,
+       "primary": null,
+       "secondary": null,
+       "credits": null,
+       "individualLimit": null,
+       "spendControlReached": null,
+       "planType": null,
+       "rateLimitReachedType": null
+      }
+     }
+    },
+    {
+     "at": 1792160784615,
+     "method": "thread/status/changed",
+     "params": {
+      "threadId": "01a1451b-60d9-7d21-9412-da94d70de94f",
+      "status": {
+       "type": "idle"
+      }
+     }
+    },
+    {
+     "at": 1792160784615,
+     "method": "turn/completed",
+     "params": {
+      "threadId": "01a1451b-60d9-7d21-9412-da94d70de94f",
+      "turn": {
+       "id": "01a1451b-60e1-7b30-9844-a7371f8bc25c",
+       "rootTurnId": "01a1451b-60e1-7b30-9844-a7371f8bc25c",
+       "items": [
+        {
+         "type": "agentMessage",
+         "id": "msg_probe_1",
+         "text": "probe final message",
+         "phase": null,
+         "memoryCitation": null,
+         "delivery": null,
+         "questions": null
+        }
+       ],
+       "itemsView": "summary",
+       "status": "completed",
+       "error": null,
+       "startedAt": 1792160784,
+       "completedAt": 1792160784,
+       "durationMs": 4
+      }
+     }
+    }
+   ],
+   "serverRequests": [],
+   "requests": [
+    {
+     "method": "initialize",
+     "params": {
+      "clientInfo": {
+       "name": "ans_reasoning_probe",
+       "version": "0.0.0"
+      },
+      "capabilities": {
+       "experimentalApi": true,
+       "explicitGatewayOauth": true
+      }
+     }
+    },
+    {
+     "method": "config/read",
+     "params": {
+      "includeLayers": false,
+      "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-J8B3Fb"
+     }
+    },
+    {
+     "method": "thread/start",
+     "params": {
+      "model": "probe-model",
+      "modelProvider": "ans_probe",
+      "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-J8B3Fb",
+      "sandbox": "read-only",
+      "approvalPolicy": "never",
+      "approvalsReviewer": "user",
+      "config": {
+       "features": {
+        "shell_tool": false,
+        "hooks": false,
+        "apps": false,
+        "plugins": false,
+        "remote_plugin": false,
+        "browser_use": false,
+        "browser_use_external": false,
+        "browser_use_full_cdp_access": false,
+        "in_app_browser": false,
+        "computer_use": false,
+        "code_mode": false,
+        "code_mode_host": false,
+        "multi_agent": false,
+        "multi_agent_v2": false,
+        "request_permissions_tool": false,
+        "skill_mcp_dependency_install": false
+       },
+       "sandbox_mode": "read-only",
+       "approval_policy": "never",
+       "approvals_reviewer": "user",
+       "web_search": "disabled",
+       "projects": {
+        "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-J8B3Fb": {
+         "trust_level": "untrusted"
+        }
+       }
+      },
+      "developerInstructions": "reasoning surface probe",
+      "ephemeral": true
+     }
+    },
+    {
+     "method": "turn/start",
+     "params": {
+      "threadId": "01a1451b-60d9-7d21-9412-da94d70de94f",
+      "input": [
+       {
+        "type": "text",
+        "text": "high effort turn",
+        "text_elements": []
+       }
+      ],
+      "approvalPolicy": "never",
+      "approvalsReviewer": "user",
+      "sandboxPolicy": {
+       "type": "readOnly",
+       "networkAccess": false
+      },
+      "model": "probe-model"
+     }
+    }
+   ],
+   "preparation": null,
+   "readbackEffort": "high",
+   "turnCompleted": true,
+   "stderrTail": "",
+   "modelRequests": 1,
+   "rejections": 0,
+   "requestBodies": [
+    {
+     "model": "probe-model",
+     "reasoning": {
+      "effort": "high",
+      "summary": "auto"
+     },
+     "hasReasoningKey": true,
+     "streamKeys": {
+      "stream": true
+     }
+    }
+   ],
+   "childExit": 0
+  },
+  {
+   "name": "R3-effort-bogus",
+   "overrides": [
+    "features.shell_tool=false",
+    "features.hooks=false",
+    "features.apps=false",
+    "features.plugins=false",
+    "features.remote_plugin=false",
+    "features.browser_use=false",
+    "features.browser_use_external=false",
+    "features.browser_use_full_cdp_access=false",
+    "features.in_app_browser=false",
+    "features.computer_use=false",
+    "features.code_mode=false",
+    "features.code_mode_host=false",
+    "features.multi_agent=false",
+    "features.multi_agent_v2=false",
+    "features.request_permissions_tool=false",
+    "features.skill_mcp_dependency_install=false",
+    "sandbox_mode=\"read-only\"",
+    "approval_policy=\"never\"",
+    "approvals_reviewer=\"user\"",
+    "web_search=\"disabled\"",
+    "projects={\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-Nz3jY4\"={trust_level=\"untrusted\"}}",
+    "model_providers.ans_probe={name=\"ANS Probe\",base_url=\"http://127.0.0.1:62006/v1\",env_key=\"CODEX_API_KEY\",wire_api=\"responses\",requires_openai_auth=false}",
+    "model_provider=\"ans_probe\"",
+    "model=\"probe-model\"",
+    "model_reasoning_effort=\"bogus\""
+   ],
+   "notices": [
+    {
+     "at": 1792160784713,
+     "method": "remoteControl/status/changed",
+     "params": {
+      "status": "disabled",
+      "serverName": "wangzhongrendeMacBook-Pro.local",
+      "installationId": "d30507c0-81ae-45bf-8c94-e2d6747a8edf",
+      "environmentId": null
+     }
+    },
+    {
+     "at": 1792160784724,
+     "method": "thread/started",
+     "params": {
+      "thread": {
+       "id": "01a1451b-614b-7050-9ae5-8919430378c7",
+       "environments": [
+        {
+         "environmentId": "local",
+         "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-Nz3jY4",
+         "runtimeWorkspaceRoots": [
+          "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-Nz3jY4"
+         ]
+        }
+       ],
+       "extra": null,
+       "sessionId": "01a1451b-614b-7050-9ae5-8919430378c7",
+       "forkedFromId": null,
+       "parentThreadId": null,
+       "preview": "",
+       "ephemeral": true,
+       "section": null,
+       "sectionEnteredAt": null,
+       "projectId": null,
+       "historyMode": "paginated",
+       "modelProvider": "ans_probe",
+       "model": "probe-model",
+       "reasoningEffort": "bogus",
+       "createdAt": 1792160784,
+       "updatedAt": 1792160784,
+       "recencyAt": 1792160784,
+       "status": {
+        "type": "idle"
+       },
+       "path": null,
+       "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-Nz3jY4",
+       "cliVersion": "0.162.1",
+       "originator": "ans_reasoning_probe",
+       "source": "vscode",
+       "canAcceptDirectInput": true,
+       "threadSource": null,
+       "agentNickname": null,
+       "agentRole": null,
+       "gitInfo": null,
+       "name": null,
+       "daybreakEnabled": null,
+       "turns": []
+      }
+     }
+    },
+    {
+     "at": 1792160784725,
+     "method": "warning",
+     "params": {
+      "threadId": "01a1451b-614b-7050-9ae5-8919430378c7",
+      "message": "Model metadata for `probe-model` not found. Defaulting to fallback metadata; this can degrade performance and cause issues."
+     }
+    },
+    {
+     "at": 1792160784726,
+     "method": "thread/status/changed",
+     "params": {
+      "threadId": "01a1451b-614b-7050-9ae5-8919430378c7",
+      "status": {
+       "type": "active",
+       "activeFlags": []
+      }
+     }
+    },
+    {
+     "at": 1792160784726,
+     "method": "turn/started",
+     "params": {
+      "threadId": "01a1451b-614b-7050-9ae5-8919430378c7",
+      "turn": {
+       "id": "01a1451b-6154-7603-b838-c9f42029b6fd",
+       "rootTurnId": "01a1451b-6154-7603-b838-c9f42029b6fd",
+       "items": [],
+       "itemsView": "notLoaded",
+       "status": "inProgress",
+       "error": null,
+       "startedAt": 1792160784,
+       "completedAt": null,
+       "durationMs": null
+      }
+     }
+    },
+    {
+     "at": 1792160784726,
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "userMessage",
+       "id": "01a1451b-6156-7a62-a66b-fc2aa99b1686",
+       "clientId": null,
+       "content": [
+        {
+         "type": "text",
+         "text": "bogus effort turn",
+         "text_elements": []
+        }
+       ]
+      },
+      "threadId": "01a1451b-614b-7050-9ae5-8919430378c7",
+      "turnId": "01a1451b-6154-7603-b838-c9f42029b6fd",
+      "startedAtMs": 1792160784726
+     }
+    },
+    {
+     "at": 1792160784726,
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "userMessage",
+       "id": "01a1451b-6156-7a62-a66b-fc2aa99b1686",
+       "clientId": null,
+       "content": [
+        {
+         "type": "text",
+         "text": "bogus effort turn",
+         "text_elements": []
+        }
+       ]
+      },
+      "threadId": "01a1451b-614b-7050-9ae5-8919430378c7",
+      "turnId": "01a1451b-6154-7603-b838-c9f42029b6fd",
+      "completedAtMs": 1792160784726
+     }
+    },
+    {
+     "at": 1792160784729,
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "agentMessage",
+       "id": "msg_probe_1",
+       "text": "",
+       "phase": null,
+       "memoryCitation": null,
+       "delivery": null,
+       "questions": null
+      },
+      "threadId": "01a1451b-614b-7050-9ae5-8919430378c7",
+      "turnId": "01a1451b-6154-7603-b838-c9f42029b6fd",
+      "startedAtMs": 1792160784729
+     }
+    },
+    {
+     "at": 1792160784729,
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "agentMessage",
+       "id": "msg_probe_1",
+       "text": "probe final message",
+       "phase": null,
+       "memoryCitation": null,
+       "delivery": null,
+       "questions": null
+      },
+      "threadId": "01a1451b-614b-7050-9ae5-8919430378c7",
+      "turnId": "01a1451b-6154-7603-b838-c9f42029b6fd",
+      "completedAtMs": 1792160784729
+     }
+    },
+    {
+     "at": 1792160784729,
+     "method": "thread/tokenUsage/updated",
+     "params": {
+      "threadId": "01a1451b-614b-7050-9ae5-8919430378c7",
+      "turnId": "01a1451b-6154-7603-b838-c9f42029b6fd",
+      "tokenUsage": {
+       "total": {
+        "totalTokens": 2,
+        "inputTokens": 1,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 1,
+        "reasoningOutputTokens": 0
+       },
+       "last": {
+        "totalTokens": 2,
+        "inputTokens": 1,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 1,
+        "reasoningOutputTokens": 0
+       },
+       "modelContextWindow": 258400
+      }
+     }
+    },
+    {
+     "at": 1792160784729,
+     "method": "account/rateLimits/updated",
+     "params": {
+      "rateLimits": {
+       "limitId": "codex",
+       "limitName": null,
+       "normalModelSlug": null,
+       "primary": null,
+       "secondary": null,
+       "credits": null,
+       "individualLimit": null,
+       "spendControlReached": null,
+       "planType": null,
+       "rateLimitReachedType": null
+      }
+     }
+    },
+    {
+     "at": 1792160784729,
+     "method": "thread/status/changed",
+     "params": {
+      "threadId": "01a1451b-614b-7050-9ae5-8919430378c7",
+      "status": {
+       "type": "idle"
+      }
+     }
+    },
+    {
+     "at": 1792160784730,
+     "method": "turn/completed",
+     "params": {
+      "threadId": "01a1451b-614b-7050-9ae5-8919430378c7",
+      "turn": {
+       "id": "01a1451b-6154-7603-b838-c9f42029b6fd",
+       "rootTurnId": "01a1451b-6154-7603-b838-c9f42029b6fd",
+       "items": [
+        {
+         "type": "agentMessage",
+         "id": "msg_probe_1",
+         "text": "probe final message",
+         "phase": null,
+         "memoryCitation": null,
+         "delivery": null,
+         "questions": null
+        }
+       ],
+       "itemsView": "summary",
+       "status": "completed",
+       "error": null,
+       "startedAt": 1792160784,
+       "completedAt": 1792160784,
+       "durationMs": 4
+      }
+     }
+    }
+   ],
+   "serverRequests": [],
+   "requests": [
+    {
+     "method": "initialize",
+     "params": {
+      "clientInfo": {
+       "name": "ans_reasoning_probe",
+       "version": "0.0.0"
+      },
+      "capabilities": {
+       "experimentalApi": true,
+       "explicitGatewayOauth": true
+      }
+     }
+    },
+    {
+     "method": "config/read",
+     "params": {
+      "includeLayers": false,
+      "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-Nz3jY4"
+     }
+    },
+    {
+     "method": "thread/start",
+     "params": {
+      "model": "probe-model",
+      "modelProvider": "ans_probe",
+      "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-Nz3jY4",
+      "sandbox": "read-only",
+      "approvalPolicy": "never",
+      "approvalsReviewer": "user",
+      "config": {
+       "features": {
+        "shell_tool": false,
+        "hooks": false,
+        "apps": false,
+        "plugins": false,
+        "remote_plugin": false,
+        "browser_use": false,
+        "browser_use_external": false,
+        "browser_use_full_cdp_access": false,
+        "in_app_browser": false,
+        "computer_use": false,
+        "code_mode": false,
+        "code_mode_host": false,
+        "multi_agent": false,
+        "multi_agent_v2": false,
+        "request_permissions_tool": false,
+        "skill_mcp_dependency_install": false
+       },
+       "sandbox_mode": "read-only",
+       "approval_policy": "never",
+       "approvals_reviewer": "user",
+       "web_search": "disabled",
+       "projects": {
+        "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-Nz3jY4": {
+         "trust_level": "untrusted"
+        }
+       }
+      },
+      "developerInstructions": "reasoning surface probe",
+      "ephemeral": true
+     }
+    },
+    {
+     "method": "turn/start",
+     "params": {
+      "threadId": "01a1451b-614b-7050-9ae5-8919430378c7",
+      "input": [
+       {
+        "type": "text",
+        "text": "bogus effort turn",
+        "text_elements": []
+       }
+      ],
+      "approvalPolicy": "never",
+      "approvalsReviewer": "user",
+      "sandboxPolicy": {
+       "type": "readOnly",
+       "networkAccess": false
+      },
+      "model": "probe-model"
+     }
+    }
+   ],
+   "preparation": null,
+   "readbackEffort": "bogus",
+   "turnCompleted": true,
+   "turnOutcome": "completed",
+   "stderrTail": "",
+   "modelRequests": 1,
+   "rejections": 0,
+   "requestBodies": [
+    {
+     "model": "probe-model",
+     "reasoning": {
+      "effort": "bogus",
+      "summary": "auto"
+     },
+     "hasReasoningKey": true,
+     "streamKeys": {
+      "stream": true
+     }
+    }
+   ],
+   "childExit": 0
+  },
+  {
+   "name": "R4-rejection-surface",
+   "overrides": [
+    "features.shell_tool=false",
+    "features.hooks=false",
+    "features.apps=false",
+    "features.plugins=false",
+    "features.remote_plugin=false",
+    "features.browser_use=false",
+    "features.browser_use_external=false",
+    "features.browser_use_full_cdp_access=false",
+    "features.in_app_browser=false",
+    "features.computer_use=false",
+    "features.code_mode=false",
+    "features.code_mode_host=false",
+    "features.multi_agent=false",
+    "features.multi_agent_v2=false",
+    "features.request_permissions_tool=false",
+    "features.skill_mcp_dependency_install=false",
+    "sandbox_mode=\"read-only\"",
+    "approval_policy=\"never\"",
+    "approvals_reviewer=\"user\"",
+    "web_search=\"disabled\"",
+    "projects={\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-nUyhdp\"={trust_level=\"untrusted\"}}",
+    "model_providers.ans_probe={name=\"ANS Probe\",base_url=\"http://127.0.0.1:62006/v1\",env_key=\"CODEX_API_KEY\",wire_api=\"responses\",requires_openai_auth=false}",
+    "model_provider=\"ans_probe\"",
+    "model=\"probe-model\"",
+    "model_reasoning_effort=\"high\""
+   ],
+   "notices": [
+    {
+     "at": 1792160784830,
+     "method": "remoteControl/status/changed",
+     "params": {
+      "status": "disabled",
+      "serverName": "wangzhongrendeMacBook-Pro.local",
+      "installationId": "5af9c180-91fc-4eff-a2b9-f0c78280263d",
+      "environmentId": null
+     }
+    },
+    {
+     "at": 1792160784838,
+     "method": "thread/started",
+     "params": {
+      "thread": {
+       "id": "01a1451b-61be-7712-8e66-78fd8e1e26ff",
+       "environments": [
+        {
+         "environmentId": "local",
+         "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-nUyhdp",
+         "runtimeWorkspaceRoots": [
+          "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-nUyhdp"
+         ]
+        }
+       ],
+       "extra": null,
+       "sessionId": "01a1451b-61be-7712-8e66-78fd8e1e26ff",
+       "forkedFromId": null,
+       "parentThreadId": null,
+       "preview": "",
+       "ephemeral": true,
+       "section": null,
+       "sectionEnteredAt": null,
+       "projectId": null,
+       "historyMode": "paginated",
+       "modelProvider": "ans_probe",
+       "model": "probe-model",
+       "reasoningEffort": "high",
+       "createdAt": 1792160784,
+       "updatedAt": 1792160784,
+       "recencyAt": 1792160784,
+       "status": {
+        "type": "idle"
+       },
+       "path": null,
+       "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-nUyhdp",
+       "cliVersion": "0.162.1",
+       "originator": "ans_reasoning_probe",
+       "source": "vscode",
+       "canAcceptDirectInput": true,
+       "threadSource": null,
+       "agentNickname": null,
+       "agentRole": null,
+       "gitInfo": null,
+       "name": null,
+       "daybreakEnabled": null,
+       "turns": []
+      }
+     }
+    },
+    {
+     "at": 1792160784840,
+     "method": "warning",
+     "params": {
+      "threadId": "01a1451b-61be-7712-8e66-78fd8e1e26ff",
+      "message": "Model metadata for `probe-model` not found. Defaulting to fallback metadata; this can degrade performance and cause issues."
+     }
+    },
+    {
+     "at": 1792160784840,
+     "method": "thread/status/changed",
+     "params": {
+      "threadId": "01a1451b-61be-7712-8e66-78fd8e1e26ff",
+      "status": {
+       "type": "active",
+       "activeFlags": []
+      }
+     }
+    },
+    {
+     "at": 1792160784840,
+     "method": "turn/started",
+     "params": {
+      "threadId": "01a1451b-61be-7712-8e66-78fd8e1e26ff",
+      "turn": {
+       "id": "01a1451b-61c7-72b3-84a3-da146be5b159",
+       "rootTurnId": "01a1451b-61c7-72b3-84a3-da146be5b159",
+       "items": [],
+       "itemsView": "notLoaded",
+       "status": "inProgress",
+       "error": null,
+       "startedAt": 1792160784,
+       "completedAt": null,
+       "durationMs": null
+      }
+     }
+    },
+    {
+     "at": 1792160784841,
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "userMessage",
+       "id": "01a1451b-61c9-72c2-a012-e2341277eb03",
+       "clientId": null,
+       "content": [
+        {
+         "type": "text",
+         "text": "rejected turn",
+         "text_elements": []
+        }
+       ]
+      },
+      "threadId": "01a1451b-61be-7712-8e66-78fd8e1e26ff",
+      "turnId": "01a1451b-61c7-72b3-84a3-da146be5b159",
+      "startedAtMs": 1792160784841
+     }
+    },
+    {
+     "at": 1792160784841,
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "userMessage",
+       "id": "01a1451b-61c9-72c2-a012-e2341277eb03",
+       "clientId": null,
+       "content": [
+        {
+         "type": "text",
+         "text": "rejected turn",
+         "text_elements": []
+        }
+       ]
+      },
+      "threadId": "01a1451b-61be-7712-8e66-78fd8e1e26ff",
+      "turnId": "01a1451b-61c7-72b3-84a3-da146be5b159",
+      "completedAtMs": 1792160784841
+     }
+    },
+    {
+     "at": 1792160784844,
+     "method": "thread/status/changed",
+     "params": {
+      "threadId": "01a1451b-61be-7712-8e66-78fd8e1e26ff",
+      "status": {
+       "type": "systemError"
+      }
+     }
+    },
+    {
+     "at": 1792160784844,
+     "method": "error",
+     "params": {
+      "error": {
+       "message": "{\"error\":{\"message\":\"Unsupported parameter: reasoning\",\"type\":\"invalid_request_error\",\"param\":\"reasoning\"}}",
+       "codexErrorInfo": "other",
+       "additionalDetails": null,
+       "misalignment": null
+      },
+      "willRetry": false,
+      "threadId": "01a1451b-61be-7712-8e66-78fd8e1e26ff",
+      "turnId": "01a1451b-61c7-72b3-84a3-da146be5b159"
+     }
+    },
+    {
+     "at": 1792160784844,
+     "method": "turn/completed",
+     "params": {
+      "threadId": "01a1451b-61be-7712-8e66-78fd8e1e26ff",
+      "turn": {
+       "id": "01a1451b-61c7-72b3-84a3-da146be5b159",
+       "rootTurnId": "01a1451b-61c7-72b3-84a3-da146be5b159",
+       "items": [],
+       "itemsView": "notLoaded",
+       "status": "failed",
+       "error": {
+        "message": "{\"error\":{\"message\":\"Unsupported parameter: reasoning\",\"type\":\"invalid_request_error\",\"param\":\"reasoning\"}}",
+        "codexErrorInfo": "other",
+        "additionalDetails": null,
+        "misalignment": null
+       },
+       "startedAt": 1792160784,
+       "completedAt": 1792160784,
+       "durationMs": 3
+      }
+     }
+    },
+    {
+     "at": 1792160784872,
+     "method": "warning",
+     "params": {
+      "threadId": "01a1451b-61be-7712-8e66-78fd8e1e26ff",
+      "message": "Model metadata for `probe-model` not found. Defaulting to fallback metadata; this can degrade performance and cause issues."
+     }
+    },
+    {
+     "at": 1792160784872,
+     "method": "thread/status/changed",
+     "params": {
+      "threadId": "01a1451b-61be-7712-8e66-78fd8e1e26ff",
+      "status": {
+       "type": "active",
+       "activeFlags": []
+      }
+     }
+    },
+    {
+     "at": 1792160784873,
+     "method": "turn/started",
+     "params": {
+      "threadId": "01a1451b-61be-7712-8e66-78fd8e1e26ff",
+      "turn": {
+       "id": "01a1451b-61e7-74d3-bbd1-e8c894864a38",
+       "rootTurnId": "01a1451b-61e7-74d3-bbd1-e8c894864a38",
+       "items": [],
+       "itemsView": "notLoaded",
+       "status": "inProgress",
+       "error": null,
+       "startedAt": 1792160784,
+       "completedAt": null,
+       "durationMs": null
+      }
+     }
+    },
+    {
+     "at": 1792160784873,
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "userMessage",
+       "id": "01a1451b-61e9-72b0-87c2-b1595bf3ba2b",
+       "clientId": null,
+       "content": [
+        {
+         "type": "text",
+         "text": "after rejection turn",
+         "text_elements": []
+        }
+       ]
+      },
+      "threadId": "01a1451b-61be-7712-8e66-78fd8e1e26ff",
+      "turnId": "01a1451b-61e7-74d3-bbd1-e8c894864a38",
+      "startedAtMs": 1792160784873
+     }
+    },
+    {
+     "at": 1792160784873,
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "userMessage",
+       "id": "01a1451b-61e9-72b0-87c2-b1595bf3ba2b",
+       "clientId": null,
+       "content": [
+        {
+         "type": "text",
+         "text": "after rejection turn",
+         "text_elements": []
+        }
+       ]
+      },
+      "threadId": "01a1451b-61be-7712-8e66-78fd8e1e26ff",
+      "turnId": "01a1451b-61e7-74d3-bbd1-e8c894864a38",
+      "completedAtMs": 1792160784873
+     }
+    },
+    {
+     "at": 1792160784875,
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "agentMessage",
+       "id": "msg_probe_1",
+       "text": "",
+       "phase": null,
+       "memoryCitation": null,
+       "delivery": null,
+       "questions": null
+      },
+      "threadId": "01a1451b-61be-7712-8e66-78fd8e1e26ff",
+      "turnId": "01a1451b-61e7-74d3-bbd1-e8c894864a38",
+      "startedAtMs": 1792160784874
+     }
+    },
+    {
+     "at": 1792160784875,
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "agentMessage",
+       "id": "msg_probe_1",
+       "text": "probe final message",
+       "phase": null,
+       "memoryCitation": null,
+       "delivery": null,
+       "questions": null
+      },
+      "threadId": "01a1451b-61be-7712-8e66-78fd8e1e26ff",
+      "turnId": "01a1451b-61e7-74d3-bbd1-e8c894864a38",
+      "completedAtMs": 1792160784875
+     }
+    },
+    {
+     "at": 1792160784875,
+     "method": "thread/tokenUsage/updated",
+     "params": {
+      "threadId": "01a1451b-61be-7712-8e66-78fd8e1e26ff",
+      "turnId": "01a1451b-61e7-74d3-bbd1-e8c894864a38",
+      "tokenUsage": {
+       "total": {
+        "totalTokens": 2,
+        "inputTokens": 1,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 1,
+        "reasoningOutputTokens": 0
+       },
+       "last": {
+        "totalTokens": 2,
+        "inputTokens": 1,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 1,
+        "reasoningOutputTokens": 0
+       },
+       "modelContextWindow": 258400
+      }
+     }
+    },
+    {
+     "at": 1792160784875,
+     "method": "account/rateLimits/updated",
+     "params": {
+      "rateLimits": {
+       "limitId": "codex",
+       "limitName": null,
+       "normalModelSlug": null,
+       "primary": null,
+       "secondary": null,
+       "credits": null,
+       "individualLimit": null,
+       "spendControlReached": null,
+       "planType": null,
+       "rateLimitReachedType": null
+      }
+     }
+    },
+    {
+     "at": 1792160784875,
+     "method": "thread/status/changed",
+     "params": {
+      "threadId": "01a1451b-61be-7712-8e66-78fd8e1e26ff",
+      "status": {
+       "type": "idle"
+      }
+     }
+    },
+    {
+     "at": 1792160784875,
+     "method": "turn/completed",
+     "params": {
+      "threadId": "01a1451b-61be-7712-8e66-78fd8e1e26ff",
+      "turn": {
+       "id": "01a1451b-61e7-74d3-bbd1-e8c894864a38",
+       "rootTurnId": "01a1451b-61e7-74d3-bbd1-e8c894864a38",
+       "items": [
+        {
+         "type": "agentMessage",
+         "id": "msg_probe_1",
+         "text": "probe final message",
+         "phase": null,
+         "memoryCitation": null,
+         "delivery": null,
+         "questions": null
+        }
+       ],
+       "itemsView": "summary",
+       "status": "completed",
+       "error": null,
+       "startedAt": 1792160784,
+       "completedAt": 1792160784,
+       "durationMs": 2
+      }
+     }
+    }
+   ],
+   "serverRequests": [],
+   "requests": [
+    {
+     "method": "initialize",
+     "params": {
+      "clientInfo": {
+       "name": "ans_reasoning_probe",
+       "version": "0.0.0"
+      },
+      "capabilities": {
+       "experimentalApi": true,
+       "explicitGatewayOauth": true
+      }
+     }
+    },
+    {
+     "method": "thread/start",
+     "params": {
+      "model": "probe-model",
+      "modelProvider": "ans_probe",
+      "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-nUyhdp",
+      "sandbox": "read-only",
+      "approvalPolicy": "never",
+      "approvalsReviewer": "user",
+      "config": {
+       "features": {
+        "shell_tool": false,
+        "hooks": false,
+        "apps": false,
+        "plugins": false,
+        "remote_plugin": false,
+        "browser_use": false,
+        "browser_use_external": false,
+        "browser_use_full_cdp_access": false,
+        "in_app_browser": false,
+        "computer_use": false,
+        "code_mode": false,
+        "code_mode_host": false,
+        "multi_agent": false,
+        "multi_agent_v2": false,
+        "request_permissions_tool": false,
+        "skill_mcp_dependency_install": false
+       },
+       "sandbox_mode": "read-only",
+       "approval_policy": "never",
+       "approvals_reviewer": "user",
+       "web_search": "disabled",
+       "projects": {
+        "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-nUyhdp": {
+         "trust_level": "untrusted"
+        }
+       }
+      },
+      "developerInstructions": "reasoning surface probe",
+      "ephemeral": true
+     }
+    },
+    {
+     "method": "turn/start",
+     "params": {
+      "threadId": "01a1451b-61be-7712-8e66-78fd8e1e26ff",
+      "input": [
+       {
+        "type": "text",
+        "text": "rejected turn",
+        "text_elements": []
+       }
+      ],
+      "approvalPolicy": "never",
+      "approvalsReviewer": "user",
+      "sandboxPolicy": {
+       "type": "readOnly",
+       "networkAccess": false
+      },
+      "model": "probe-model"
+     }
+    },
+    {
+     "method": "turn/start",
+     "params": {
+      "threadId": "01a1451b-61be-7712-8e66-78fd8e1e26ff",
+      "input": [
+       {
+        "type": "text",
+        "text": "after rejection turn",
+        "text_elements": []
+       }
+      ],
+      "approvalPolicy": "never",
+      "approvalsReviewer": "user",
+      "sandboxPolicy": {
+       "type": "readOnly",
+       "networkAccess": false
+      },
+      "model": "probe-model"
+     }
+    }
+   ],
+   "preparation": null,
+   "threadId": "01a1451b-61be-7712-8e66-78fd8e1e26ff",
+   "turnCompleted": true,
+   "turnOutcome": {
+    "threadId": "01a1451b-61be-7712-8e66-78fd8e1e26ff",
+    "turn": {
+     "id": "01a1451b-61c7-72b3-84a3-da146be5b159",
+     "rootTurnId": "01a1451b-61c7-72b3-84a3-da146be5b159",
+     "items": [],
+     "itemsView": "notLoaded",
+     "status": "failed",
+     "error": {
+      "message": "{\"error\":{\"message\":\"Unsupported parameter: reasoning\",\"type\":\"invalid_request_error\",\"param\":\"reasoning\"}}",
+      "codexErrorInfo": "other",
+      "additionalDetails": null,
+      "misalignment": null
+     },
+     "startedAt": 1792160784,
+     "completedAt": 1792160784,
+     "durationMs": 3
+    }
+   },
+   "errorNotices": [
+    {
+     "error": {
+      "message": "{\"error\":{\"message\":\"Unsupported parameter: reasoning\",\"type\":\"invalid_request_error\",\"param\":\"reasoning\"}}",
+      "codexErrorInfo": "other",
+      "additionalDetails": null,
+      "misalignment": null
+     },
+     "willRetry": false,
+     "threadId": "01a1451b-61be-7712-8e66-78fd8e1e26ff",
+     "turnId": "01a1451b-61c7-72b3-84a3-da146be5b159"
+    }
+   ],
+   "statusChanges": [
+    {
+     "type": "active",
+     "activeFlags": []
+    },
+    {
+     "type": "systemError"
+    }
+   ],
+   "rejectionsAtFirstFailure": 1,
+   "modelRequestsAtFirstFailure": 1,
+   "attemptedSecondTurn": true,
+   "secondTurnStartResult": {
+    "turn": {
+     "id": "01a1451b-61e7-74d3-bbd1-e8c894864a38",
+     "rootTurnId": "01a1451b-61e7-74d3-bbd1-e8c894864a38",
+     "items": [],
+     "itemsView": "notLoaded",
+     "status": "inProgress",
+     "error": null,
+     "startedAt": null,
+     "completedAt": null,
+     "durationMs": null
+    }
+   },
+   "secondTurnCompleted": true,
+   "completionOutcomes": [
+    "failed",
+    "completed"
+   ],
+   "rejectionsTotal": 1,
+   "modelRequestsTotal": 2,
+   "stderrTail": "",
+   "modelRequests": 2,
+   "rejections": 1,
+   "requestBodies": [
+    {
+     "model": "probe-model",
+     "reasoning": {
+      "effort": "high",
+      "summary": "auto"
+     },
+     "hasReasoningKey": true,
+     "streamKeys": {
+      "stream": true
+     }
+    },
+    {
+     "model": "probe-model",
+     "reasoning": {
+      "effort": "high",
+      "summary": "auto"
+     },
+     "hasReasoningKey": true,
+     "streamKeys": {
+      "stream": true
+     }
+    }
+   ],
+   "childExit": 0
+  },
+  {
+   "name": "R5-thread-config-override",
+   "overrides": [
+    "features.shell_tool=false",
+    "features.hooks=false",
+    "features.apps=false",
+    "features.plugins=false",
+    "features.remote_plugin=false",
+    "features.browser_use=false",
+    "features.browser_use_external=false",
+    "features.browser_use_full_cdp_access=false",
+    "features.in_app_browser=false",
+    "features.computer_use=false",
+    "features.code_mode=false",
+    "features.code_mode_host=false",
+    "features.multi_agent=false",
+    "features.multi_agent_v2=false",
+    "features.request_permissions_tool=false",
+    "features.skill_mcp_dependency_install=false",
+    "sandbox_mode=\"read-only\"",
+    "approval_policy=\"never\"",
+    "approvals_reviewer=\"user\"",
+    "web_search=\"disabled\"",
+    "projects={\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-xH9byG\"={trust_level=\"untrusted\"}}",
+    "model_providers.ans_probe={name=\"ANS Probe\",base_url=\"http://127.0.0.1:62006/v1\",env_key=\"CODEX_API_KEY\",wire_api=\"responses\",requires_openai_auth=false}",
+    "model_provider=\"ans_probe\"",
+    "model=\"probe-model\"",
+    "model_reasoning_effort=\"high\""
+   ],
+   "notices": [
+    {
+     "at": 1792160784976,
+     "method": "remoteControl/status/changed",
+     "params": {
+      "status": "disabled",
+      "serverName": "wangzhongrendeMacBook-Pro.local",
+      "installationId": "82aded8b-5d5a-4eb6-b4cc-3e0c388a85da",
+      "environmentId": null
+     }
+    },
+    {
+     "at": 1792160784985,
+     "method": "thread/started",
+     "params": {
+      "thread": {
+       "id": "01a1451b-6251-7231-bae9-f8d765cfbbcd",
+       "environments": [
+        {
+         "environmentId": "local",
+         "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-xH9byG",
+         "runtimeWorkspaceRoots": [
+          "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-xH9byG"
+         ]
+        }
+       ],
+       "extra": null,
+       "sessionId": "01a1451b-6251-7231-bae9-f8d765cfbbcd",
+       "forkedFromId": null,
+       "parentThreadId": null,
+       "preview": "",
+       "ephemeral": true,
+       "section": null,
+       "sectionEnteredAt": null,
+       "projectId": null,
+       "historyMode": "paginated",
+       "modelProvider": "ans_probe",
+       "model": "probe-model",
+       "reasoningEffort": "low",
+       "createdAt": 1792160784,
+       "updatedAt": 1792160784,
+       "recencyAt": 1792160784,
+       "status": {
+        "type": "idle"
+       },
+       "path": null,
+       "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-xH9byG",
+       "cliVersion": "0.162.1",
+       "originator": "ans_reasoning_probe",
+       "source": "vscode",
+       "canAcceptDirectInput": true,
+       "threadSource": null,
+       "agentNickname": null,
+       "agentRole": null,
+       "gitInfo": null,
+       "name": null,
+       "daybreakEnabled": null,
+       "turns": []
+      }
+     }
+    },
+    {
+     "at": 1792160784987,
+     "method": "warning",
+     "params": {
+      "threadId": "01a1451b-6251-7231-bae9-f8d765cfbbcd",
+      "message": "Model metadata for `probe-model` not found. Defaulting to fallback metadata; this can degrade performance and cause issues."
+     }
+    },
+    {
+     "at": 1792160784987,
+     "method": "thread/status/changed",
+     "params": {
+      "threadId": "01a1451b-6251-7231-bae9-f8d765cfbbcd",
+      "status": {
+       "type": "active",
+       "activeFlags": []
+      }
+     }
+    },
+    {
+     "at": 1792160784987,
+     "method": "turn/started",
+     "params": {
+      "threadId": "01a1451b-6251-7231-bae9-f8d765cfbbcd",
+      "turn": {
+       "id": "01a1451b-6259-73f3-a28a-276ea1dce25b",
+       "rootTurnId": "01a1451b-6259-73f3-a28a-276ea1dce25b",
+       "items": [],
+       "itemsView": "notLoaded",
+       "status": "inProgress",
+       "error": null,
+       "startedAt": 1792160784,
+       "completedAt": null,
+       "durationMs": null
+      }
+     }
+    },
+    {
+     "at": 1792160784988,
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "userMessage",
+       "id": "01a1451b-625c-7e72-8984-143bda37a916",
+       "clientId": null,
+       "content": [
+        {
+         "type": "text",
+         "text": "thread override turn",
+         "text_elements": []
+        }
+       ]
+      },
+      "threadId": "01a1451b-6251-7231-bae9-f8d765cfbbcd",
+      "turnId": "01a1451b-6259-73f3-a28a-276ea1dce25b",
+      "startedAtMs": 1792160784988
+     }
+    },
+    {
+     "at": 1792160784988,
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "userMessage",
+       "id": "01a1451b-625c-7e72-8984-143bda37a916",
+       "clientId": null,
+       "content": [
+        {
+         "type": "text",
+         "text": "thread override turn",
+         "text_elements": []
+        }
+       ]
+      },
+      "threadId": "01a1451b-6251-7231-bae9-f8d765cfbbcd",
+      "turnId": "01a1451b-6259-73f3-a28a-276ea1dce25b",
+      "completedAtMs": 1792160784988
+     }
+    },
+    {
+     "at": 1792160784991,
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "agentMessage",
+       "id": "msg_probe_1",
+       "text": "",
+       "phase": null,
+       "memoryCitation": null,
+       "delivery": null,
+       "questions": null
+      },
+      "threadId": "01a1451b-6251-7231-bae9-f8d765cfbbcd",
+      "turnId": "01a1451b-6259-73f3-a28a-276ea1dce25b",
+      "startedAtMs": 1792160784991
+     }
+    },
+    {
+     "at": 1792160784991,
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "agentMessage",
+       "id": "msg_probe_1",
+       "text": "probe final message",
+       "phase": null,
+       "memoryCitation": null,
+       "delivery": null,
+       "questions": null
+      },
+      "threadId": "01a1451b-6251-7231-bae9-f8d765cfbbcd",
+      "turnId": "01a1451b-6259-73f3-a28a-276ea1dce25b",
+      "completedAtMs": 1792160784991
+     }
+    },
+    {
+     "at": 1792160784991,
+     "method": "thread/tokenUsage/updated",
+     "params": {
+      "threadId": "01a1451b-6251-7231-bae9-f8d765cfbbcd",
+      "turnId": "01a1451b-6259-73f3-a28a-276ea1dce25b",
+      "tokenUsage": {
+       "total": {
+        "totalTokens": 2,
+        "inputTokens": 1,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 1,
+        "reasoningOutputTokens": 0
+       },
+       "last": {
+        "totalTokens": 2,
+        "inputTokens": 1,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 1,
+        "reasoningOutputTokens": 0
+       },
+       "modelContextWindow": 258400
+      }
+     }
+    },
+    {
+     "at": 1792160784991,
+     "method": "account/rateLimits/updated",
+     "params": {
+      "rateLimits": {
+       "limitId": "codex",
+       "limitName": null,
+       "normalModelSlug": null,
+       "primary": null,
+       "secondary": null,
+       "credits": null,
+       "individualLimit": null,
+       "spendControlReached": null,
+       "planType": null,
+       "rateLimitReachedType": null
+      }
+     }
+    },
+    {
+     "at": 1792160784991,
+     "method": "thread/status/changed",
+     "params": {
+      "threadId": "01a1451b-6251-7231-bae9-f8d765cfbbcd",
+      "status": {
+       "type": "idle"
+      }
+     }
+    },
+    {
+     "at": 1792160784991,
+     "method": "turn/completed",
+     "params": {
+      "threadId": "01a1451b-6251-7231-bae9-f8d765cfbbcd",
+      "turn": {
+       "id": "01a1451b-6259-73f3-a28a-276ea1dce25b",
+       "rootTurnId": "01a1451b-6259-73f3-a28a-276ea1dce25b",
+       "items": [
+        {
+         "type": "agentMessage",
+         "id": "msg_probe_1",
+         "text": "probe final message",
+         "phase": null,
+         "memoryCitation": null,
+         "delivery": null,
+         "questions": null
+        }
+       ],
+       "itemsView": "summary",
+       "status": "completed",
+       "error": null,
+       "startedAt": 1792160784,
+       "completedAt": 1792160784,
+       "durationMs": 4
+      }
+     }
+    }
+   ],
+   "serverRequests": [],
+   "requests": [
+    {
+     "method": "initialize",
+     "params": {
+      "clientInfo": {
+       "name": "ans_reasoning_probe",
+       "version": "0.0.0"
+      },
+      "capabilities": {
+       "experimentalApi": true,
+       "explicitGatewayOauth": true
+      }
+     }
+    },
+    {
+     "method": "thread/start",
+     "params": {
+      "model": "probe-model",
+      "modelProvider": "ans_probe",
+      "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-xH9byG",
+      "sandbox": "read-only",
+      "approvalPolicy": "never",
+      "approvalsReviewer": "user",
+      "config": {
+       "features": {
+        "shell_tool": false,
+        "hooks": false,
+        "apps": false,
+        "plugins": false,
+        "remote_plugin": false,
+        "browser_use": false,
+        "browser_use_external": false,
+        "browser_use_full_cdp_access": false,
+        "in_app_browser": false,
+        "computer_use": false,
+        "code_mode": false,
+        "code_mode_host": false,
+        "multi_agent": false,
+        "multi_agent_v2": false,
+        "request_permissions_tool": false,
+        "skill_mcp_dependency_install": false
+       },
+       "sandbox_mode": "read-only",
+       "approval_policy": "never",
+       "approvals_reviewer": "user",
+       "web_search": "disabled",
+       "projects": {
+        "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-xH9byG": {
+         "trust_level": "untrusted"
+        }
+       },
+       "model_reasoning_effort": "low"
+      },
+      "developerInstructions": "reasoning surface probe",
+      "ephemeral": true
+     }
+    },
+    {
+     "method": "turn/start",
+     "params": {
+      "threadId": "01a1451b-6251-7231-bae9-f8d765cfbbcd",
+      "input": [
+       {
+        "type": "text",
+        "text": "thread override turn",
+        "text_elements": []
+       }
+      ],
+      "approvalPolicy": "never",
+      "approvalsReviewer": "user",
+      "sandboxPolicy": {
+       "type": "readOnly",
+       "networkAccess": false
+      },
+      "model": "probe-model"
+     }
+    }
+   ],
+   "preparation": null,
+   "turnCompleted": true,
+   "stderrTail": "",
+   "modelRequests": 1,
+   "rejections": 0,
+   "requestBodies": [
+    {
+     "model": "probe-model",
+     "reasoning": {
+      "effort": "low",
+      "summary": "auto"
+     },
+     "hasReasoningKey": true,
+     "streamKeys": {
+      "stream": true
+     }
+    }
+   ],
+   "childExit": 0
+  },
+  {
+   "name": "R6-turn-effort-override",
+   "overrides": [
+    "features.shell_tool=false",
+    "features.hooks=false",
+    "features.apps=false",
+    "features.plugins=false",
+    "features.remote_plugin=false",
+    "features.browser_use=false",
+    "features.browser_use_external=false",
+    "features.browser_use_full_cdp_access=false",
+    "features.in_app_browser=false",
+    "features.computer_use=false",
+    "features.code_mode=false",
+    "features.code_mode_host=false",
+    "features.multi_agent=false",
+    "features.multi_agent_v2=false",
+    "features.request_permissions_tool=false",
+    "features.skill_mcp_dependency_install=false",
+    "sandbox_mode=\"read-only\"",
+    "approval_policy=\"never\"",
+    "approvals_reviewer=\"user\"",
+    "web_search=\"disabled\"",
+    "projects={\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-vf26Ua\"={trust_level=\"untrusted\"}}",
+    "model_providers.ans_probe={name=\"ANS Probe\",base_url=\"http://127.0.0.1:62006/v1\",env_key=\"CODEX_API_KEY\",wire_api=\"responses\",requires_openai_auth=false}",
+    "model_provider=\"ans_probe\"",
+    "model=\"probe-model\"",
+    "model_reasoning_effort=\"high\""
+   ],
+   "notices": [
+    {
+     "at": 1792160785091,
+     "method": "remoteControl/status/changed",
+     "params": {
+      "status": "disabled",
+      "serverName": "wangzhongrendeMacBook-Pro.local",
+      "installationId": "2ec1a63b-f624-4b6e-926e-0ccbff339194",
+      "environmentId": null
+     }
+    },
+    {
+     "at": 1792160785100,
+     "method": "thread/started",
+     "params": {
+      "thread": {
+       "id": "01a1451b-62c4-7491-b208-5f5418d5495e",
+       "environments": [
+        {
+         "environmentId": "local",
+         "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-vf26Ua",
+         "runtimeWorkspaceRoots": [
+          "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-vf26Ua"
+         ]
+        }
+       ],
+       "extra": null,
+       "sessionId": "01a1451b-62c4-7491-b208-5f5418d5495e",
+       "forkedFromId": null,
+       "parentThreadId": null,
+       "preview": "",
+       "ephemeral": true,
+       "section": null,
+       "sectionEnteredAt": null,
+       "projectId": null,
+       "historyMode": "paginated",
+       "modelProvider": "ans_probe",
+       "model": "probe-model",
+       "reasoningEffort": "high",
+       "createdAt": 1792160785,
+       "updatedAt": 1792160785,
+       "recencyAt": 1792160785,
+       "status": {
+        "type": "idle"
+       },
+       "path": null,
+       "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-vf26Ua",
+       "cliVersion": "0.162.1",
+       "originator": "ans_reasoning_probe",
+       "source": "vscode",
+       "canAcceptDirectInput": true,
+       "threadSource": null,
+       "agentNickname": null,
+       "agentRole": null,
+       "gitInfo": null,
+       "name": null,
+       "daybreakEnabled": null,
+       "turns": []
+      }
+     }
+    },
+    {
+     "at": 1792160785102,
+     "method": "thread/settings/updated",
+     "params": {
+      "threadId": "01a1451b-62c4-7491-b208-5f5418d5495e",
+      "threadSettings": {
+       "disabledPluginIds": [],
+       "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-vf26Ua",
+       "approvalPolicy": "never",
+       "approvalsReviewer": "user",
+       "sandboxPolicy": {
+        "type": "readOnly",
+        "networkAccess": false
+       },
+       "activePermissionProfile": null,
+       "model": "probe-model",
+       "modelProvider": "ans_probe",
+       "serviceTier": null,
+       "effort": "low",
+       "summary": null,
+       "collaborationMode": {
+        "mode": "default",
+        "settings": {
+         "model": "probe-model",
+         "reasoning_effort": "low",
+         "developer_instructions": null
+        }
+       },
+       "multiAgentMode": "explicitRequestOnly",
+       "personality": null
+      }
+     }
+    },
+    {
+     "at": 1792160785102,
+     "method": "warning",
+     "params": {
+      "threadId": "01a1451b-62c4-7491-b208-5f5418d5495e",
+      "message": "Model metadata for `probe-model` not found. Defaulting to fallback metadata; this can degrade performance and cause issues."
+     }
+    },
+    {
+     "at": 1792160785102,
+     "method": "thread/status/changed",
+     "params": {
+      "threadId": "01a1451b-62c4-7491-b208-5f5418d5495e",
+      "status": {
+       "type": "active",
+       "activeFlags": []
+      }
+     }
+    },
+    {
+     "at": 1792160785102,
+     "method": "turn/started",
+     "params": {
+      "threadId": "01a1451b-62c4-7491-b208-5f5418d5495e",
+      "turn": {
+       "id": "01a1451b-62cd-7151-9ec7-09f7e85019d6",
+       "rootTurnId": "01a1451b-62cd-7151-9ec7-09f7e85019d6",
+       "items": [],
+       "itemsView": "notLoaded",
+       "status": "inProgress",
+       "error": null,
+       "startedAt": 1792160785,
+       "completedAt": null,
+       "durationMs": null
+      }
+     }
+    },
+    {
+     "at": 1792160785103,
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "userMessage",
+       "id": "01a1451b-62cf-7410-98c4-fe7c32b496aa",
+       "clientId": null,
+       "content": [
+        {
+         "type": "text",
+         "text": "turn override turn",
+         "text_elements": []
+        }
+       ]
+      },
+      "threadId": "01a1451b-62c4-7491-b208-5f5418d5495e",
+      "turnId": "01a1451b-62cd-7151-9ec7-09f7e85019d6",
+      "startedAtMs": 1792160785103
+     }
+    },
+    {
+     "at": 1792160785103,
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "userMessage",
+       "id": "01a1451b-62cf-7410-98c4-fe7c32b496aa",
+       "clientId": null,
+       "content": [
+        {
+         "type": "text",
+         "text": "turn override turn",
+         "text_elements": []
+        }
+       ]
+      },
+      "threadId": "01a1451b-62c4-7491-b208-5f5418d5495e",
+      "turnId": "01a1451b-62cd-7151-9ec7-09f7e85019d6",
+      "completedAtMs": 1792160785103
+     }
+    },
+    {
+     "at": 1792160785106,
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "agentMessage",
+       "id": "msg_probe_1",
+       "text": "",
+       "phase": null,
+       "memoryCitation": null,
+       "delivery": null,
+       "questions": null
+      },
+      "threadId": "01a1451b-62c4-7491-b208-5f5418d5495e",
+      "turnId": "01a1451b-62cd-7151-9ec7-09f7e85019d6",
+      "startedAtMs": 1792160785106
+     }
+    },
+    {
+     "at": 1792160785106,
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "agentMessage",
+       "id": "msg_probe_1",
+       "text": "probe final message",
+       "phase": null,
+       "memoryCitation": null,
+       "delivery": null,
+       "questions": null
+      },
+      "threadId": "01a1451b-62c4-7491-b208-5f5418d5495e",
+      "turnId": "01a1451b-62cd-7151-9ec7-09f7e85019d6",
+      "completedAtMs": 1792160785106
+     }
+    },
+    {
+     "at": 1792160785106,
+     "method": "thread/tokenUsage/updated",
+     "params": {
+      "threadId": "01a1451b-62c4-7491-b208-5f5418d5495e",
+      "turnId": "01a1451b-62cd-7151-9ec7-09f7e85019d6",
+      "tokenUsage": {
+       "total": {
+        "totalTokens": 2,
+        "inputTokens": 1,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 1,
+        "reasoningOutputTokens": 0
+       },
+       "last": {
+        "totalTokens": 2,
+        "inputTokens": 1,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 1,
+        "reasoningOutputTokens": 0
+       },
+       "modelContextWindow": 258400
+      }
+     }
+    },
+    {
+     "at": 1792160785106,
+     "method": "account/rateLimits/updated",
+     "params": {
+      "rateLimits": {
+       "limitId": "codex",
+       "limitName": null,
+       "normalModelSlug": null,
+       "primary": null,
+       "secondary": null,
+       "credits": null,
+       "individualLimit": null,
+       "spendControlReached": null,
+       "planType": null,
+       "rateLimitReachedType": null
+      }
+     }
+    },
+    {
+     "at": 1792160785106,
+     "method": "thread/status/changed",
+     "params": {
+      "threadId": "01a1451b-62c4-7491-b208-5f5418d5495e",
+      "status": {
+       "type": "idle"
+      }
+     }
+    },
+    {
+     "at": 1792160785106,
+     "method": "turn/completed",
+     "params": {
+      "threadId": "01a1451b-62c4-7491-b208-5f5418d5495e",
+      "turn": {
+       "id": "01a1451b-62cd-7151-9ec7-09f7e85019d6",
+       "rootTurnId": "01a1451b-62cd-7151-9ec7-09f7e85019d6",
+       "items": [
+        {
+         "type": "agentMessage",
+         "id": "msg_probe_1",
+         "text": "probe final message",
+         "phase": null,
+         "memoryCitation": null,
+         "delivery": null,
+         "questions": null
+        }
+       ],
+       "itemsView": "summary",
+       "status": "completed",
+       "error": null,
+       "startedAt": 1792160785,
+       "completedAt": 1792160785,
+       "durationMs": 4
+      }
+     }
+    }
+   ],
+   "serverRequests": [],
+   "requests": [
+    {
+     "method": "initialize",
+     "params": {
+      "clientInfo": {
+       "name": "ans_reasoning_probe",
+       "version": "0.0.0"
+      },
+      "capabilities": {
+       "experimentalApi": true,
+       "explicitGatewayOauth": true
+      }
+     }
+    },
+    {
+     "method": "thread/start",
+     "params": {
+      "model": "probe-model",
+      "modelProvider": "ans_probe",
+      "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-vf26Ua",
+      "sandbox": "read-only",
+      "approvalPolicy": "never",
+      "approvalsReviewer": "user",
+      "config": {
+       "features": {
+        "shell_tool": false,
+        "hooks": false,
+        "apps": false,
+        "plugins": false,
+        "remote_plugin": false,
+        "browser_use": false,
+        "browser_use_external": false,
+        "browser_use_full_cdp_access": false,
+        "in_app_browser": false,
+        "computer_use": false,
+        "code_mode": false,
+        "code_mode_host": false,
+        "multi_agent": false,
+        "multi_agent_v2": false,
+        "request_permissions_tool": false,
+        "skill_mcp_dependency_install": false
+       },
+       "sandbox_mode": "read-only",
+       "approval_policy": "never",
+       "approvals_reviewer": "user",
+       "web_search": "disabled",
+       "projects": {
+        "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-vf26Ua": {
+         "trust_level": "untrusted"
+        }
+       }
+      },
+      "developerInstructions": "reasoning surface probe",
+      "ephemeral": true
+     }
+    },
+    {
+     "method": "turn/start",
+     "params": {
+      "threadId": "01a1451b-62c4-7491-b208-5f5418d5495e",
+      "input": [
+       {
+        "type": "text",
+        "text": "turn override turn",
+        "text_elements": []
+       }
+      ],
+      "approvalPolicy": "never",
+      "approvalsReviewer": "user",
+      "sandboxPolicy": {
+       "type": "readOnly",
+       "networkAccess": false
+      },
+      "model": "probe-model",
+      "effort": "low"
+     }
+    }
+   ],
+   "preparation": null,
+   "turnCompleted": true,
+   "stderrTail": "",
+   "modelRequests": 1,
+   "rejections": 0,
+   "requestBodies": [
+    {
+     "model": "probe-model",
+     "reasoning": {
+      "effort": "low",
+      "summary": "auto"
+     },
+     "hasReasoningKey": true,
+     "streamKeys": {
+      "stream": true
+     }
+    }
+   ],
+   "childExit": 0
+  },
+  {
+   "name": "R7-cancel-null-thread",
+   "overrides": [
+    "features.shell_tool=false",
+    "features.hooks=false",
+    "features.apps=false",
+    "features.plugins=false",
+    "features.remote_plugin=false",
+    "features.browser_use=false",
+    "features.browser_use_external=false",
+    "features.browser_use_full_cdp_access=false",
+    "features.in_app_browser=false",
+    "features.computer_use=false",
+    "features.code_mode=false",
+    "features.code_mode_host=false",
+    "features.multi_agent=false",
+    "features.multi_agent_v2=false",
+    "features.request_permissions_tool=false",
+    "features.skill_mcp_dependency_install=false",
+    "sandbox_mode=\"read-only\"",
+    "approval_policy=\"never\"",
+    "approvals_reviewer=\"user\"",
+    "web_search=\"disabled\"",
+    "projects={\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-6ruAp6\"={trust_level=\"untrusted\"}}",
+    "model_providers.ans_probe={name=\"ANS Probe\",base_url=\"http://127.0.0.1:62006/v1\",env_key=\"CODEX_API_KEY\",wire_api=\"responses\",requires_openai_auth=false}",
+    "model_provider=\"ans_probe\"",
+    "model=\"probe-model\"",
+    "model_reasoning_effort=\"high\""
+   ],
+   "notices": [
+    {
+     "at": 1792160785204,
+     "method": "remoteControl/status/changed",
+     "params": {
+      "status": "disabled",
+      "serverName": "wangzhongrendeMacBook-Pro.local",
+      "installationId": "c537e7d2-6719-4bee-b481-f3d5ca352ab4",
+      "environmentId": null
+     }
+    }
+   ],
+   "serverRequests": [],
+   "requests": [
+    {
+     "method": "initialize",
+     "params": {
+      "clientInfo": {
+       "name": "ans_reasoning_probe",
+       "version": "0.0.0"
+      },
+      "capabilities": {
+       "experimentalApi": true,
+       "explicitGatewayOauth": true
+      }
+     }
+    },
+    {
+     "method": "thread/start",
+     "params": {
+      "model": "probe-model",
+      "modelProvider": "ans_probe",
+      "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-6ruAp6",
+      "sandbox": "read-only",
+      "approvalPolicy": "never",
+      "approvalsReviewer": "user",
+      "config": {
+       "features": {
+        "shell_tool": false,
+        "hooks": false,
+        "apps": false,
+        "plugins": false,
+        "remote_plugin": false,
+        "browser_use": false,
+        "browser_use_external": false,
+        "browser_use_full_cdp_access": false,
+        "in_app_browser": false,
+        "computer_use": false,
+        "code_mode": false,
+        "code_mode_host": false,
+        "multi_agent": false,
+        "multi_agent_v2": false,
+        "request_permissions_tool": false,
+        "skill_mcp_dependency_install": false
+       },
+       "sandbox_mode": "read-only",
+       "approval_policy": "never",
+       "approvals_reviewer": "user",
+       "web_search": "disabled",
+       "projects": {
+        "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-6ruAp6": {
+         "trust_level": "untrusted"
+        }
+       },
+       "model_reasoning_effort": null
+      },
+      "developerInstructions": "reasoning surface probe",
+      "ephemeral": true
+     }
+    }
+   ],
+   "preparation": null,
+   "error": "Error: rpc thread/start error: {\"code\":-32600,\"message\":\"failed to load configuration: reasoning_effort must not be empty\\nin `model_reasoning_effort`\\n\"}",
+   "stderrTail": "",
+   "modelRequests": 0,
+   "rejections": 0,
+   "requestBodies": [],
+   "childExit": 0
+  },
+  {
+   "name": "R7b-cancel-null-turn",
+   "overrides": [
+    "features.shell_tool=false",
+    "features.hooks=false",
+    "features.apps=false",
+    "features.plugins=false",
+    "features.remote_plugin=false",
+    "features.browser_use=false",
+    "features.browser_use_external=false",
+    "features.browser_use_full_cdp_access=false",
+    "features.in_app_browser=false",
+    "features.computer_use=false",
+    "features.code_mode=false",
+    "features.code_mode_host=false",
+    "features.multi_agent=false",
+    "features.multi_agent_v2=false",
+    "features.request_permissions_tool=false",
+    "features.skill_mcp_dependency_install=false",
+    "sandbox_mode=\"read-only\"",
+    "approval_policy=\"never\"",
+    "approvals_reviewer=\"user\"",
+    "web_search=\"disabled\"",
+    "projects={\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-e2SF1j\"={trust_level=\"untrusted\"}}",
+    "model_providers.ans_probe={name=\"ANS Probe\",base_url=\"http://127.0.0.1:62006/v1\",env_key=\"CODEX_API_KEY\",wire_api=\"responses\",requires_openai_auth=false}",
+    "model_provider=\"ans_probe\"",
+    "model=\"probe-model\"",
+    "model_reasoning_effort=\"high\""
+   ],
+   "notices": [
+    {
+     "at": 1792160785277,
+     "method": "remoteControl/status/changed",
+     "params": {
+      "status": "disabled",
+      "serverName": "wangzhongrendeMacBook-Pro.local",
+      "installationId": "08fbf1cb-d47f-4565-ac8d-793923067e42",
+      "environmentId": null
+     }
+    },
+    {
+     "at": 1792160785286,
+     "method": "thread/started",
+     "params": {
+      "thread": {
+       "id": "01a1451b-637e-7602-9bec-6c06144ebfec",
+       "environments": [
+        {
+         "environmentId": "local",
+         "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-e2SF1j",
+         "runtimeWorkspaceRoots": [
+          "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-e2SF1j"
+         ]
+        }
+       ],
+       "extra": null,
+       "sessionId": "01a1451b-637e-7602-9bec-6c06144ebfec",
+       "forkedFromId": null,
+       "parentThreadId": null,
+       "preview": "",
+       "ephemeral": true,
+       "section": null,
+       "sectionEnteredAt": null,
+       "projectId": null,
+       "historyMode": "paginated",
+       "modelProvider": "ans_probe",
+       "model": "probe-model",
+       "reasoningEffort": "high",
+       "createdAt": 1792160785,
+       "updatedAt": 1792160785,
+       "recencyAt": 1792160785,
+       "status": {
+        "type": "idle"
+       },
+       "path": null,
+       "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-e2SF1j",
+       "cliVersion": "0.162.1",
+       "originator": "ans_reasoning_probe",
+       "source": "vscode",
+       "canAcceptDirectInput": true,
+       "threadSource": null,
+       "agentNickname": null,
+       "agentRole": null,
+       "gitInfo": null,
+       "name": null,
+       "daybreakEnabled": null,
+       "turns": []
+      }
+     }
+    },
+    {
+     "at": 1792160785288,
+     "method": "warning",
+     "params": {
+      "threadId": "01a1451b-637e-7602-9bec-6c06144ebfec",
+      "message": "Model metadata for `probe-model` not found. Defaulting to fallback metadata; this can degrade performance and cause issues."
+     }
+    },
+    {
+     "at": 1792160785289,
+     "method": "thread/status/changed",
+     "params": {
+      "threadId": "01a1451b-637e-7602-9bec-6c06144ebfec",
+      "status": {
+       "type": "active",
+       "activeFlags": []
+      }
+     }
+    },
+    {
+     "at": 1792160785289,
+     "method": "turn/started",
+     "params": {
+      "threadId": "01a1451b-637e-7602-9bec-6c06144ebfec",
+      "turn": {
+       "id": "01a1451b-6387-7633-b1c0-1e2549db9f45",
+       "rootTurnId": "01a1451b-6387-7633-b1c0-1e2549db9f45",
+       "items": [],
+       "itemsView": "notLoaded",
+       "status": "inProgress",
+       "error": null,
+       "startedAt": 1792160785,
+       "completedAt": null,
+       "durationMs": null
+      }
+     }
+    },
+    {
+     "at": 1792160785289,
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "userMessage",
+       "id": "01a1451b-6389-7ce0-bf3c-37b7f4940cab",
+       "clientId": null,
+       "content": [
+        {
+         "type": "text",
+         "text": "null turn override turn",
+         "text_elements": []
+        }
+       ]
+      },
+      "threadId": "01a1451b-637e-7602-9bec-6c06144ebfec",
+      "turnId": "01a1451b-6387-7633-b1c0-1e2549db9f45",
+      "startedAtMs": 1792160785289
+     }
+    },
+    {
+     "at": 1792160785289,
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "userMessage",
+       "id": "01a1451b-6389-7ce0-bf3c-37b7f4940cab",
+       "clientId": null,
+       "content": [
+        {
+         "type": "text",
+         "text": "null turn override turn",
+         "text_elements": []
+        }
+       ]
+      },
+      "threadId": "01a1451b-637e-7602-9bec-6c06144ebfec",
+      "turnId": "01a1451b-6387-7633-b1c0-1e2549db9f45",
+      "completedAtMs": 1792160785289
+     }
+    },
+    {
+     "at": 1792160785292,
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "agentMessage",
+       "id": "msg_probe_1",
+       "text": "",
+       "phase": null,
+       "memoryCitation": null,
+       "delivery": null,
+       "questions": null
+      },
+      "threadId": "01a1451b-637e-7602-9bec-6c06144ebfec",
+      "turnId": "01a1451b-6387-7633-b1c0-1e2549db9f45",
+      "startedAtMs": 1792160785292
+     }
+    },
+    {
+     "at": 1792160785292,
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "agentMessage",
+       "id": "msg_probe_1",
+       "text": "probe final message",
+       "phase": null,
+       "memoryCitation": null,
+       "delivery": null,
+       "questions": null
+      },
+      "threadId": "01a1451b-637e-7602-9bec-6c06144ebfec",
+      "turnId": "01a1451b-6387-7633-b1c0-1e2549db9f45",
+      "completedAtMs": 1792160785292
+     }
+    },
+    {
+     "at": 1792160785292,
+     "method": "thread/tokenUsage/updated",
+     "params": {
+      "threadId": "01a1451b-637e-7602-9bec-6c06144ebfec",
+      "turnId": "01a1451b-6387-7633-b1c0-1e2549db9f45",
+      "tokenUsage": {
+       "total": {
+        "totalTokens": 2,
+        "inputTokens": 1,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 1,
+        "reasoningOutputTokens": 0
+       },
+       "last": {
+        "totalTokens": 2,
+        "inputTokens": 1,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 1,
+        "reasoningOutputTokens": 0
+       },
+       "modelContextWindow": 258400
+      }
+     }
+    },
+    {
+     "at": 1792160785292,
+     "method": "account/rateLimits/updated",
+     "params": {
+      "rateLimits": {
+       "limitId": "codex",
+       "limitName": null,
+       "normalModelSlug": null,
+       "primary": null,
+       "secondary": null,
+       "credits": null,
+       "individualLimit": null,
+       "spendControlReached": null,
+       "planType": null,
+       "rateLimitReachedType": null
+      }
+     }
+    },
+    {
+     "at": 1792160785292,
+     "method": "thread/status/changed",
+     "params": {
+      "threadId": "01a1451b-637e-7602-9bec-6c06144ebfec",
+      "status": {
+       "type": "idle"
+      }
+     }
+    },
+    {
+     "at": 1792160785292,
+     "method": "turn/completed",
+     "params": {
+      "threadId": "01a1451b-637e-7602-9bec-6c06144ebfec",
+      "turn": {
+       "id": "01a1451b-6387-7633-b1c0-1e2549db9f45",
+       "rootTurnId": "01a1451b-6387-7633-b1c0-1e2549db9f45",
+       "items": [
+        {
+         "type": "agentMessage",
+         "id": "msg_probe_1",
+         "text": "probe final message",
+         "phase": null,
+         "memoryCitation": null,
+         "delivery": null,
+         "questions": null
+        }
+       ],
+       "itemsView": "summary",
+       "status": "completed",
+       "error": null,
+       "startedAt": 1792160785,
+       "completedAt": 1792160785,
+       "durationMs": 4
+      }
+     }
+    }
+   ],
+   "serverRequests": [],
+   "requests": [
+    {
+     "method": "initialize",
+     "params": {
+      "clientInfo": {
+       "name": "ans_reasoning_probe",
+       "version": "0.0.0"
+      },
+      "capabilities": {
+       "experimentalApi": true,
+       "explicitGatewayOauth": true
+      }
+     }
+    },
+    {
+     "method": "thread/start",
+     "params": {
+      "model": "probe-model",
+      "modelProvider": "ans_probe",
+      "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-e2SF1j",
+      "sandbox": "read-only",
+      "approvalPolicy": "never",
+      "approvalsReviewer": "user",
+      "config": {
+       "features": {
+        "shell_tool": false,
+        "hooks": false,
+        "apps": false,
+        "plugins": false,
+        "remote_plugin": false,
+        "browser_use": false,
+        "browser_use_external": false,
+        "browser_use_full_cdp_access": false,
+        "in_app_browser": false,
+        "computer_use": false,
+        "code_mode": false,
+        "code_mode_host": false,
+        "multi_agent": false,
+        "multi_agent_v2": false,
+        "request_permissions_tool": false,
+        "skill_mcp_dependency_install": false
+       },
+       "sandbox_mode": "read-only",
+       "approval_policy": "never",
+       "approvals_reviewer": "user",
+       "web_search": "disabled",
+       "projects": {
+        "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-e2SF1j": {
+         "trust_level": "untrusted"
+        }
+       }
+      },
+      "developerInstructions": "reasoning surface probe",
+      "ephemeral": true
+     }
+    },
+    {
+     "method": "turn/start",
+     "params": {
+      "threadId": "01a1451b-637e-7602-9bec-6c06144ebfec",
+      "input": [
+       {
+        "type": "text",
+        "text": "null turn override turn",
+        "text_elements": []
+       }
+      ],
+      "approvalPolicy": "never",
+      "approvalsReviewer": "user",
+      "sandboxPolicy": {
+       "type": "readOnly",
+       "networkAccess": false
+      },
+      "model": "probe-model",
+      "effort": null
+     }
+    }
+   ],
+   "preparation": null,
+   "turnCompleted": true,
+   "stderrTail": "",
+   "modelRequests": 1,
+   "rejections": 0,
+   "requestBodies": [
+    {
+     "model": "probe-model",
+     "reasoning": {
+      "effort": "high",
+      "summary": "auto"
+     },
+     "hasReasoningKey": true,
+     "streamKeys": {
+      "stream": true
+     }
+    }
+   ],
+   "childExit": 0
+  },
+  {
+   "name": "R7c-cancel-empty-thread",
+   "overrides": [
+    "features.shell_tool=false",
+    "features.hooks=false",
+    "features.apps=false",
+    "features.plugins=false",
+    "features.remote_plugin=false",
+    "features.browser_use=false",
+    "features.browser_use_external=false",
+    "features.browser_use_full_cdp_access=false",
+    "features.in_app_browser=false",
+    "features.computer_use=false",
+    "features.code_mode=false",
+    "features.code_mode_host=false",
+    "features.multi_agent=false",
+    "features.multi_agent_v2=false",
+    "features.request_permissions_tool=false",
+    "features.skill_mcp_dependency_install=false",
+    "sandbox_mode=\"read-only\"",
+    "approval_policy=\"never\"",
+    "approvals_reviewer=\"user\"",
+    "web_search=\"disabled\"",
+    "projects={\"/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-MGA2Nb\"={trust_level=\"untrusted\"}}",
+    "model_providers.ans_probe={name=\"ANS Probe\",base_url=\"http://127.0.0.1:62006/v1\",env_key=\"CODEX_API_KEY\",wire_api=\"responses\",requires_openai_auth=false}",
+    "model_provider=\"ans_probe\"",
+    "model=\"probe-model\"",
+    "model_reasoning_effort=\"high\""
+   ],
+   "notices": [
+    {
+     "at": 1792160785428,
+     "method": "remoteControl/status/changed",
+     "params": {
+      "status": "disabled",
+      "serverName": "wangzhongrendeMacBook-Pro.local",
+      "installationId": "69562b2c-7ab1-425b-ad19-b86276315617",
+      "environmentId": null
+     }
+    }
+   ],
+   "serverRequests": [],
+   "requests": [
+    {
+     "method": "initialize",
+     "params": {
+      "clientInfo": {
+       "name": "ans_reasoning_probe",
+       "version": "0.0.0"
+      },
+      "capabilities": {
+       "experimentalApi": true,
+       "explicitGatewayOauth": true
+      }
+     }
+    },
+    {
+     "method": "thread/start",
+     "params": {
+      "model": "probe-model",
+      "modelProvider": "ans_probe",
+      "cwd": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-MGA2Nb",
+      "sandbox": "read-only",
+      "approvalPolicy": "never",
+      "approvalsReviewer": "user",
+      "config": {
+       "features": {
+        "shell_tool": false,
+        "hooks": false,
+        "apps": false,
+        "plugins": false,
+        "remote_plugin": false,
+        "browser_use": false,
+        "browser_use_external": false,
+        "browser_use_full_cdp_access": false,
+        "in_app_browser": false,
+        "computer_use": false,
+        "code_mode": false,
+        "code_mode_host": false,
+        "multi_agent": false,
+        "multi_agent_v2": false,
+        "request_permissions_tool": false,
+        "skill_mcp_dependency_install": false
+       },
+       "sandbox_mode": "read-only",
+       "approval_policy": "never",
+       "approvals_reviewer": "user",
+       "web_search": "disabled",
+       "projects": {
+        "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/codex-reasoning-probe-work-MGA2Nb": {
+         "trust_level": "untrusted"
+        }
+       },
+       "model_reasoning_effort": ""
+      },
+      "developerInstructions": "reasoning surface probe",
+      "ephemeral": true
+     }
+    }
+   ],
+   "preparation": null,
+   "error": "Error: rpc thread/start error: {\"code\":-32600,\"message\":\"failed to load configuration: reasoning_effort must not be empty\\nin `model_reasoning_effort`\\n\"}",
+   "stderrTail": "",
+   "modelRequests": 0,
+   "rejections": 0,
+   "requestBodies": [],
+   "childExit": 0
+  }
+ ]
+}

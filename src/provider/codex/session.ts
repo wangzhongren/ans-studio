@@ -7,9 +7,13 @@ import os from "node:os";
 import { randomUUID } from "node:crypto";
 import type { ResolvedRole } from "../../model/role.ts";
 import type { RuntimeAdapter, RuntimeProviderOptions, RoleSession, SessionEvent, ToolResult, RuntimeTurnOutcome, RuntimeToolEventFactsV1, RuntimeToolErrorFactsV1, InstalledMcpServerV1 } from "../../model/runtime.ts";
-import { object, deferred, eventQueue, pausedDeadline, bounded, webSearchRow, mcpToolName, mcpToolCallNative } from "../../common/codex-adapter/protocol.ts";
+import { object, deferred, eventQueue, pausedDeadline, bounded, webSearchRow, mcpToolName, mcpToolCallNative, isReasoningParamRejection } from "../../common/codex-adapter/protocol.ts";
 import type { CodexRpcConnection, CodexEngineInput, CodexEngineFactory } from "../../common/codex-adapter/protocol.ts";
-import { settings, safetyConfig, safetyOverrides, effectiveConfig, verifyThread } from "../../common/codex-adapter/config.ts";
+import { settings, safetyConfig, safetyOverrides, effectiveConfig, verifyThread, reasoningEffortOverride } from "../../common/codex-adapter/config.ts";
+// G-5：推理事实通道（适配器只产事实；投影单点在 Service）+ 降级链诊断（沿 installed-skills 先例）。事件 summary
+// 用核心定格常量（Service 在投影单点强制覆盖——适配器不随载荷携带自由文本上 summary 位）。
+import { REASONING_EVENT_SUMMARY } from "../../common/runtime-core/reasoning.ts";
+import { createDiagnosticLogger } from "../../common/shared/diagnostics.ts";
 // Windows 瞬时句柄占用（`EBUSY`/`EPERM`/`EACCES`）的**有界重试**单一来源（§一.5 不得第二份实现）：
 // 收尾删除 workRoot 时，刚退出的原生进程/在途句柄可能短暂未释放——沿原子写原语同一口径处置。
 import { retryOnTransient } from "../../common/shared/atomic-write.ts";
@@ -271,6 +275,10 @@ interface TurnState {
   stopping?: Promise<void>;
   calls: Set<string>;
   searchCalls: number;
+  /** G-5 降级闸：该轮是否已产出任何模型内容（产出前才允许「去参数重发」——设计 §七）。 */
+  outputSeen: boolean;
+  /** G-5：reasoning item 的真实起点（item/started.startedAtMs，按 item id——durationMs 只取真实信号）。 */
+  reasoningStarted: Map<string, number>;
 }
 
 export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): RuntimeAdapter {
@@ -312,6 +320,10 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
       // G-4 V2：已安装 MCP 的校验/展开（装配前、零副作用）与白名单名集（进程/线程/目录三处恰等、降级面共用）。
       const installedServers = prepareInstalledMcpServers(options.installedMcpServers ?? [], environmentSnapshot);
       const allowedServers = new Set(installedServers.map(server => server.name));
+      // G-5：推理强度接线面（注入判定＝会话级；off＝无该档不注入另有如实行）+ 降级闸（会话级恰一次）+ 降级诊断。
+      const reasoningInjected = reasoningEffortOverride(config.reasoningEffort) !== undefined;
+      let reasoningDegraded = false;
+      const diagnosticLog = createDiagnosticLogger({ component: "codex-adapter", projectRoot: options.projectRoot, roleId: role.id });
       await storage?.validateNativeDirectory?.();
       const previous = await storage?.readLatest();
       if (previous && (previous.runtime !== "codex" || previous.roleId !== role.id)) throw new Error("Codex native session record role/runtime mismatch");
@@ -385,9 +397,11 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
         const providerDefinition = `model_providers.${provider}={name="ANS Codex",base_url=${JSON.stringify(config.baseUrl)},env_key="CODEX_API_KEY",wire_api="responses",requires_openai_auth=false}`;
         const environment = { PATH: environmentSnapshot.PATH ?? path.dirname(process.execPath), CODEX_HOME: nativeHome, CODEX_API_KEY: config.key };
         const engineFactory = options.engineFactory ?? ((input: CodexEngineInput) => nativeEngine(input, options.cliPath));
-        const connect = async (disabled: readonly string[]) => {
+        const connect = async (disabled: readonly string[], injectReasoning = true) => {
           // G-4 V2：白名单定义＋禁用集编入**同一条** `-c mcp_servers={…}`（P0 探针铁律：连续 -c 同根键覆盖不合并）。
-          const connected = await engineFactory({ cwd, nativeHome, env: environment, configOverrides: [...safetyOverrides(cwd, disabled, config.webSearch, installedServers), providerDefinition, `model_provider=${JSON.stringify(provider)}`], timeoutMs: options.constructTimeoutMs ?? 30000 });
+          // G-5：`model_reasoning_effort` 为顶层标量键、独立一条（探针实证叠加无冲突）；去参数重发＝该条缺席。
+          const reasoningOverride = injectReasoning ? reasoningEffortOverride(config.reasoningEffort) : undefined;
+          const connected = await engineFactory({ cwd, nativeHome, env: environment, configOverrides: [...safetyOverrides(cwd, disabled, config.webSearch, installedServers), ...(reasoningOverride !== undefined ? [reasoningOverride] : []), providerDefinition, `model_provider=${JSON.stringify(provider)}`], timeoutMs: options.constructTimeoutMs ?? 30000 });
           // Preflight has no model, thread, MCP connections, or native approval handlers.
           try {
             await connected.request("initialize", { clientInfo: { name: "ans_codex_adapter", version: "2.0.0" }, capabilities: { experimentalApi: true, explicitGatewayOauth: true } });
@@ -462,7 +476,8 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
         if (advertised.tools.length !== options.tools.length || advertised.tools.some(tool => !toolMap.has(String(tool.name)))) {
           throw new Error("Codex local MCP tool catalog differs from injected ANS tools");
         }
-        engine.onServerRequest(async (method, input, requestContext) => {
+        // G-5：处理器具名化——去参数重发重建引擎后需在同一位置重挂（不第二份实现）。
+        const nativeToolHandler: Parameters<CodexRpcConnection["onServerRequest"]>[0] = async (method, input, requestContext) => {
           if (method === "item/commandExecution/requestApproval" || method === "item/fileChange/requestApproval") return { decision: "decline" };
           if (method === "item/permissions/requestApproval") return { permissions: {}, scope: "turn" };
           if (method === "mcpServer/elicitation/request") return { action: "cancel", content: null };
@@ -472,6 +487,7 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
           const original = active;
           const denied = (message: unknown) => ({ success: false, contentItems: [{ type: "inputText", text: config.redact(message) }] });
           if (!original || original.controller.signal.aborted || original.completed || params.threadId !== nativeId || typeof params.turnId !== "string" || params.namespace != null) return denied("ANS refused unknown or stale native tool call");
+          original.outputSeen = true; // G-5 降级闸：模型已发起原生工具调用＝请求面被接受（不可能再算「产出任何内容前」）。
           // Requests that precede the turn/start response wait for that response, keeping this state.
           const expectedTurn = await original.ready.promise;
           if (params.turnId !== expectedTurn || active !== original || original.controller.signal.aborted || original.completed) return denied("ANS refused unknown or stale native turn");
@@ -494,106 +510,150 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
             return { success: !result.isError, contentItems: result.content.filter(item => item.type === "text").map(item => ({ type: "inputText", text: config.redact(item.text ?? "") })) };
           } catch (error) { return denied(error); }
           finally { calls.delete(token); requestContext?.signal.removeEventListener("abort", cancelledUpstream); }
-        });
+        };
+        engine.onServerRequest(nativeToolHandler);
         const context = await composeContext(role);
         // G-4 V2：线程级恰等——白名单外显式 enabled=false 不变；白名单内 enabled=true（白名单空＝逐字现状）。
         const threadConfig = { ...safetyConfig(cwd, config.webSearch), mcp_servers: Object.fromEntries(allServers.map(name => [name, { enabled: allowedServers.has(name) }])) };
         const threadParams = { model: config.model, modelProvider: provider, cwd, sandbox: "read-only", approvalPolicy: "never", approvalsReviewer: "user", config: threadConfig, developerInstructions: context.systemPrompt };
         let contextSource: RoleSession["contextSource"] = storage ? "fresh" : "in-memory";
         let contextWarning: string | undefined;
-        if (previous?.nativeSessionId) {
-          await storage?.validateNativeDirectory?.();
-          let response: unknown;
-          try { response = await engine.request("thread/resume", { ...threadParams, threadId: previous.nativeSessionId, excludeTurns: true }); }
-          catch (error) { contextWarning = `Codex native resume failed: ${config.redact(error)}`; contextSource = "recovered"; }
-          if (response !== undefined) { nativeId = verifyThread(response); contextSource = "resumed"; }
-        }
-        if (!nativeId) nativeId = verifyThread(await engine.request("thread/start", { ...threadParams, ephemeral: !storage, dynamicTools: options.tools.map(tool => ({ type: "function", name: `ans_${tool.name}`, description: tool.description, inputSchema: tool.inputSchema })) }));
-        // 通知面订阅提前到目录复核之前：白名单 server 的启动状态（mcpServer/startupStatus/updated，
-        // P0 探针：starting→failed 两帧）可能先于会话就绪到达——缩小「状态先于监听」的丢失窗；
-        // 会话末段不再二次订阅（unsubscribe 仍由 cleanup 首步收口）。
-        unsubscribe = engine.onNotification((method, raw) => {
-          if (method === "mcpServer/startupStatus/updated") {
-            // 会话级通知（无轮次身份）：白名单 server 启动失败/取消 ⇒ 降级行（去重单点；慢失败路径）。
-            try {
-              const status = object(raw ?? {}, "startup status");
-              if (typeof status.name === "string" && allowedServers.has(status.name) && (status.status === "failed" || status.status === "cancelled")) {
-                reportMcpDegraded(status.name, status.status, status.error);
-              }
-            } catch { /* 坏通知不毁会话 */ }
-            return;
+        // G-5 降级链与会话构造共用三段（同源，不第二份实现）：
+        // · establishThread＝线程建立（resume→recovered→start 语义逐字沿旧内联实现）；
+        // · subscribeNotifications＝通知面订阅（订阅点在目录复核之前——缩小「状态先于监听」丢失窗）；
+        // · inspectCatalog＝目录级名字集恰等复核＋已 failed/cancelled 白名单条目降级行（去重单点）。
+        const establishThread = async (connection: CodexRpcConnection, resumeSessionId: string | undefined): Promise<void> => {
+          if (resumeSessionId !== undefined) {
+            await storage?.validateNativeDirectory?.();
+            let response: unknown;
+            try { response = await connection.request("thread/resume", { ...threadParams, threadId: resumeSessionId, excludeTurns: true }); }
+            catch (error) { contextWarning = `Codex native resume failed: ${config.redact(error)}`; contextSource = "recovered"; }
+            if (response !== undefined) { nativeId = verifyThread(response); contextSource = "resumed"; }
           }
-          const turn = active;
-          if (!turn || turn.completed) return;
-          let params: Record<string, unknown>;
-          try { params = object(raw ?? {}, "notification"); } catch { return; }
-          if (method === "ans/transportClosed") {
-            quarantined = true; turn.failure = config.redact(params.message); turn.reason ??= "failed"; turn.done.resolve(turn.reason); return;
-          }
-          if (params.threadId !== nativeId) return;
-          const notifyId = method === "turn/completed" ? object(params.turn, "completed native turn").id : params.turnId;
-          void turn.ready.promise.then(expected => {
-            if (typeof notifyId !== "string" || notifyId !== expected || active !== turn || turn.completed) return;
-            if (method === "item/completed") {
-              const item = object(params.item, "native item");
-              if (item.type === "agentMessage") emit(turn, "message", String(item.text ?? ""), { text: item.text });
-              // Server-side (gateway-executed) search: always mapped, never quarantined, never inferred as failure.
-              if (item.type === "webSearch") {
-                turn.searchCalls += 1;
-                const row = webSearchRow(item);
-                emit(turn, "message", row.summary, row.detail);
-              }
-              // G-4 V2 使用行（P0 探针字段全集；status/error/result 三态如实）：走核心投影单点
-              // （native-result 事实），白名单调用＝已授予能力的执行事实——**不进隔离**（非越权信号）。
-              if (item.type === "mcpToolCall") {
-                const name = mcpToolName(typeof item.server === "string" ? item.server : "", typeof item.tool === "string" ? item.tool : "");
-                const native = mcpToolCallNative(item);
-                const args = item.arguments !== null && typeof item.arguments === "object" && !Array.isArray(item.arguments) ? item.arguments as Record<string, unknown> : {};
-                const durationMs = typeof item.durationMs === "number" ? item.durationMs : undefined;
-                const text = native.content.flatMap(block => block.type === "text" ? [block.text] : []).join("\n");
-                const legacyText = native.isError ? native.errorText ?? name : text || name;
-                emitTool(turn, {
-                  origin: "native-result", phase: "result", toolName: name,
-                  ...(typeof item.id === "string" ? { toolCallId: item.id } : {}),
-                  input: { rule: "none", args },
-                  native: { isError: native.isError, content: native.content },
-                  ...(native.isError && native.errorText !== undefined ? { error: { message: native.errorText } } : {}),
-                  ...(durationMs !== undefined ? { durationMs } : {}),
-                }, native.isError ? "denied" : "accepted", legacyText.length > 1024 ? `${legacyText.slice(0, 1024)}…` : legacyText,
-                  { toolName: name, native: true, ...(typeof item.status === "string" ? { status: item.status } : {}), ...(durationMs !== undefined ? { durationMs } : {}) });
-              }
-              if (item.type === "commandExecution" || item.type === "fileChange") {
-                turn.failure = "Codex reported a forbidden native command/file tool; session quarantined";
-                quarantined = true; turn.reason = "failed"; turn.controller.abort(); turn.done.resolve("failed");
-                void engine!.close().catch(error => { turn.failure = config.redact(error); });
-              }
-            } else if (method === "turn/completed") {
-              const completed = object(params.turn);
-              const outcome = turn.reason ?? (completed.status === "completed" ? "completed" : completed.status === "interrupted" ? "aborted" : "failed");
-              turn.reason = outcome;
-              if (completed.error) turn.failure = config.redact(object(completed.error).message ?? "Codex turn failed");
-              turn.done.resolve(outcome);
-            } else if (method === "error" && params.willRetry !== true) {
-              turn.reason = "failed"; turn.failure = config.redact(object(params.error ?? {}).message ?? "Codex turn failed"); turn.done.resolve("failed");
+          if (!nativeId) nativeId = verifyThread(await connection.request("thread/start", { ...threadParams, ephemeral: !storage, dynamicTools: options.tools.map(tool => ({ type: "function", name: `ans_${tool.name}`, description: tool.description, inputSchema: tool.inputSchema })) }));
+        };
+        const subscribeNotifications = (connection: CodexRpcConnection): void => {
+          unsubscribe = connection.onNotification((method, raw) => {
+            if (method === "mcpServer/startupStatus/updated") {
+              // 会话级通知（无轮次身份）：白名单 server 启动失败/取消 ⇒ 降级行（去重单点；慢失败路径）。
+              try {
+                const status = object(raw ?? {}, "startup status");
+                if (typeof status.name === "string" && allowedServers.has(status.name) && (status.status === "failed" || status.status === "cancelled")) {
+                  reportMcpDegraded(status.name, status.status, status.error);
+                }
+              } catch { /* 坏通知不毁会话 */ }
+              return;
             }
-          }).catch(error => { turn.failure = config.redact(error); turn.reason = "failed"; turn.done.resolve("failed"); });
-        });
-        // P2 恰等（目录级）：catalog 名字集必须恰等于白名单名集（P0 探针修正——失败的白名单条目
-        // 仍在 data（runtimeStatus:"failed"），「data 必须为空」判据不能沿用）；随后对已
-        // failed/cancelled 的白名单条目如实降级一行（慢失败留给 startupStatus 通知路径，去重单点防双报）。
-        const catalog = object(await engine.request("mcpServerStatus/list", { threadId: nativeId, detail: "toolsAndAuthOnly", limit: 100 }), "native MCP catalog");
-        const catalogEntries = Array.isArray(catalog.data) ? catalog.data.map(entry => object(entry, "native MCP catalog entry")) : undefined;
-        if (catalogEntries === undefined || catalog.nextCursor || catalogEntries.some(entry => typeof entry.name !== "string" || entry.name === "")) {
-          throw new Error("Codex native MCP catalog does not match the installed whitelist");
-        }
-        const catalogNames = catalogEntries.map(entry => String(entry.name)).sort();
-        if (catalogNames.length !== expectedEnabled.length || catalogNames.some((name, index) => name !== expectedEnabled[index])) {
-          throw new Error("Codex native MCP catalog does not match the installed whitelist");
-        }
-        for (const entry of catalogEntries) {
-          if (entry.runtimeStatus !== "failed" && entry.runtimeStatus !== "cancelled") continue;
-          const name = String(entry.name);
-          if (allowedServers.has(name)) reportMcpDegraded(name, entry.runtimeStatus, entry.toolsError);
+            const turn = active;
+            if (!turn || turn.completed) return;
+            let params: Record<string, unknown>;
+            try { params = object(raw ?? {}, "notification"); } catch { return; }
+            if (method === "ans/transportClosed") {
+              quarantined = true; turn.failure = config.redact(params.message); turn.reason ??= "failed"; turn.done.resolve(turn.reason); return;
+            }
+            if (params.threadId !== nativeId) return;
+            const notifyId = method === "turn/completed" ? object(params.turn, "completed native turn").id : params.turnId;
+            void turn.ready.promise.then(expected => {
+              if (typeof notifyId !== "string" || notifyId !== expected || active !== turn || turn.completed) return;
+              if (method === "item/completed") {
+                const item = object(params.item, "native item");
+                if (item.type === "agentMessage") { turn.outputSeen = true; emit(turn, "message", String(item.text ?? ""), { text: item.text }); }
+                // Server-side (gateway-executed) search: always mapped, never quarantined, never inferred as failure.
+                if (item.type === "webSearch") {
+                  turn.outputSeen = true;
+                  turn.searchCalls += 1;
+                  const row = webSearchRow(item);
+                  emit(turn, "message", row.summary, row.detail);
+                }
+                // G-4 V2 使用行（P0 探针字段全集；status/error/result 三态如实）：走核心投影单点
+                // （native-result 事实），白名单调用＝已授予能力的执行事实——**不进隔离**（非越权信号）。
+                if (item.type === "mcpToolCall") {
+                  turn.outputSeen = true;
+                  const name = mcpToolName(typeof item.server === "string" ? item.server : "", typeof item.tool === "string" ? item.tool : "");
+                  const native = mcpToolCallNative(item);
+                  const args = item.arguments !== null && typeof item.arguments === "object" && !Array.isArray(item.arguments) ? item.arguments as Record<string, unknown> : {};
+                  const durationMs = typeof item.durationMs === "number" ? item.durationMs : undefined;
+                  const text = native.content.flatMap(block => block.type === "text" ? [block.text] : []).join("\n");
+                  const legacyText = native.isError ? native.errorText ?? name : text || name;
+                  emitTool(turn, {
+                    origin: "native-result", phase: "result", toolName: name,
+                    ...(typeof item.id === "string" ? { toolCallId: item.id } : {}),
+                    input: { rule: "none", args },
+                    native: { isError: native.isError, content: native.content },
+                    ...(native.isError && native.errorText !== undefined ? { error: { message: native.errorText } } : {}),
+                    ...(durationMs !== undefined ? { durationMs } : {}),
+                  }, native.isError ? "denied" : "accepted", legacyText.length > 1024 ? `${legacyText.slice(0, 1024)}…` : legacyText,
+                    { toolName: name, native: true, ...(typeof item.status === "string" ? { status: item.status } : {}), ...(durationMs !== undefined ? { durationMs } : {}) });
+                }
+                // G-5 推理事实（A3 探针逐字：完成态 item `{type:"reasoning", summary:string[], content:string[]}`；
+                // 增量帧不产行——完成态先行）：适配器只产事实（text/status/durationMs），呈现归核心投影单点。
+                if (item.type === "reasoning") {
+                  turn.outputSeen = true;
+                  const summary = Array.isArray(item.summary) ? item.summary.filter((part): part is string => typeof part === "string") : [];
+                  const content = Array.isArray(item.content) ? item.content.filter((part): part is string => typeof part === "string") : [];
+                  // 平台给什么就是什么：正文本位优先；仅摘要时取摘要（v1 事实通道单一正文位——不合成、不发明）；
+                  // 两者皆空＝平台省略正文（status:"omitted"，如实不假装）。
+                  const text = content.length ? content.join("\n") : summary.join("\n");
+                  const startedAt = typeof item.id === "string" ? turn.reasoningStarted.get(item.id) : undefined;
+                  if (typeof item.id === "string") turn.reasoningStarted.delete(item.id);
+                  const completedAt = typeof params.completedAtMs === "number" && Number.isFinite(params.completedAtMs) ? params.completedAtMs : undefined;
+                  // durationMs 只取真实信号（item/started.startedAtMs → item/completed.completedAtMs）；无则不携带、绝不猜测。
+                  const durationMs = startedAt !== undefined && completedAt !== undefined ? Math.max(0, completedAt - startedAt) : undefined;
+                  emit(turn, "message", REASONING_EVENT_SUMMARY, { version: 1, source: "reasoning", reasoning: { text, status: text === "" ? "omitted" : "complete", ...(durationMs !== undefined ? { durationMs } : {}) } });
+                }
+                if (item.type === "commandExecution" || item.type === "fileChange") {
+                  turn.failure = "Codex reported a forbidden native command/file tool; session quarantined";
+                  quarantined = true; turn.reason = "failed"; turn.controller.abort(); turn.done.resolve("failed");
+                  void engine!.close().catch(error => { turn.failure = config.redact(error); });
+                }
+              } else if (method === "item/started") {
+                // G-5：reasoning item 的真实起点（durationMs 信号面）；其余 item/started 不映射（沿既有先例）。
+                const item = object(params.item, "native item");
+                if (item.type === "reasoning") {
+                  turn.outputSeen = true;
+                  if (typeof item.id === "string" && typeof params.startedAtMs === "number" && Number.isFinite(params.startedAtMs)) turn.reasoningStarted.set(item.id, params.startedAtMs);
+                }
+              } else if (method === "item/reasoning/summaryPartAdded" || method === "item/reasoning/summaryTextDelta" || method === "item/reasoning/textDelta") {
+                // G-5 增量帧＝消费（「已产出内容」证据——降级闸依赖）但不产行：行由完成态 item 给（完成态先行）。
+                turn.outputSeen = true;
+              } else if (method === "turn/completed") {
+                const completed = object(params.turn);
+                const outcome = turn.reason ?? (completed.status === "completed" ? "completed" : completed.status === "interrupted" ? "aborted" : "failed");
+                turn.reason = outcome;
+                if (completed.error) turn.failure = config.redact(object(completed.error).message ?? "Codex turn failed");
+                turn.done.resolve(outcome);
+              } else if (method === "error" && params.willRetry !== true) {
+                turn.reason = "failed"; turn.failure = config.redact(object(params.error ?? {}).message ?? "Codex turn failed"); turn.done.resolve("failed");
+              }
+            }).catch(error => { turn.failure = config.redact(error); turn.reason = "failed"; turn.done.resolve("failed"); });
+          });
+        };
+        const inspectCatalog = async (connection: CodexRpcConnection): Promise<void> => {
+          // P2 恰等（目录级）：catalog 名字集必须恰等于白名单名集（P0 探针修正——失败的白名单条目
+          // 仍在 data（runtimeStatus:"failed"），「data 必须为空」判据不能沿用）；随后对已
+          // failed/cancelled 的白名单条目如实降级一行（慢失败留给 startupStatus 通知路径，去重单点防双报）。
+          const catalog = object(await connection.request("mcpServerStatus/list", { threadId: nativeId, detail: "toolsAndAuthOnly", limit: 100 }), "native MCP catalog");
+          const catalogEntries = Array.isArray(catalog.data) ? catalog.data.map(entry => object(entry, "native MCP catalog entry")) : undefined;
+          if (catalogEntries === undefined || catalog.nextCursor || catalogEntries.some(entry => typeof entry.name !== "string" || entry.name === "")) {
+            throw new Error("Codex native MCP catalog does not match the installed whitelist");
+          }
+          const catalogNames = catalogEntries.map(entry => String(entry.name)).sort();
+          if (catalogNames.length !== expectedEnabled.length || catalogNames.some((name, index) => name !== expectedEnabled[index])) {
+            throw new Error("Codex native MCP catalog does not match the installed whitelist");
+          }
+          for (const entry of catalogEntries) {
+            if (entry.runtimeStatus !== "failed" && entry.runtimeStatus !== "cancelled") continue;
+            const name = String(entry.name);
+            if (allowedServers.has(name)) reportMcpDegraded(name, entry.runtimeStatus, entry.toolsError);
+          }
+        };
+        await establishThread(engine, previous?.nativeSessionId);
+        subscribeNotifications(engine);
+        await inspectCatalog(engine);
+        // G-5：Codex 无「off」档——显式「关」不注入任何参数（`reasoningEffortOverride` 对 off 返回 undefined）
+        // 并如实一行说明（不假装关闭；会话级恰一次，在构造期）。
+        if (config.reasoningEffort === "off") {
+          emit(undefined, "message", "Codex 平台无「关」档：未注入推理强度参数（维持平台默认，推理未关闭）", { version: 1, source: "reasoning-effort", reason: "off-unsupported" });
         }
         const session: RoleSession = {
           runtime: "codex", roleId: role.id, contextSource, nativeSessionId: nativeId,
@@ -601,7 +661,7 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
           async prompt(text, promptOptions) {
             if (disposed || quarantined) throw new Error("Codex session is disposed or quarantined; create a new session");
             if (active) throw new Error("Codex session already has an active turn");
-            const turn: TurnState = { ansId: options.currentTurnId() ?? randomUUID(), controller: new AbortController(), ready: deferred<string>(), done: deferred<RuntimeTurnOutcome>(), completed: false, calls: new Set(), searchCalls: 0 };
+            const turn: TurnState = { ansId: options.currentTurnId() ?? randomUUID(), controller: new AbortController(), ready: deferred<string>(), done: deferred<RuntimeTurnOutcome>(), completed: false, calls: new Set(), searchCalls: 0, outputSeen: false, reasoningStarted: new Map() };
             // Abort can resolve ready before turn/start so early tool requests fail closed.
             active = turn;
             const stopTimer = pausedDeadline(options.interactionGate, options.promptTimeoutMs ?? 0, () => { void stop(turn, "timed_out").catch(error => { turn.failure = config.redact(error); }); });
@@ -622,7 +682,14 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
               if (typeof id !== "string" || !id) throw new Error("Codex native turn has no ID");
               turn.nativeId = id; turn.ready.resolve(id);
               if (turn.controller.signal.aborted) await stop(turn, turn.reason ?? "aborted");
-              const outcome = await turn.done.promise;
+              let outcome = await turn.done.promise;
+              // G-5 降级链闸（保守＋有界恰一次）：首请求即失败（产出任何内容前）＋本会话曾注入推理强度＋
+              // 错误命中推理参数拒绝判据 ⇒ 恰一次去参数重发（degradeReasoning 内部重建引擎/线程并以同一输入重发）。
+              if (outcome === "failed" && !reasoningDegraded && reasoningInjected && !turn.outputSeen && !turn.controller.signal.aborted
+                  && isReasoningParamRejection(turn.failure)) {
+                await degradeReasoning(turn, input);
+                outcome = await turn.done.promise;
+              }
               if (outcome === "failed" || outcome === "timed_out") throw new Error(turn.failure ?? `Codex turn ${outcome}`);
             } catch (error) {
               turn.reason ??= "failed";
@@ -667,6 +734,37 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
             }
           })();
           return turn.stopping;
+        }
+        // G-5 降级链核心（有界恰一次；会话级）：网关因推理参数拒绝首请求 ⇒ 去掉该参数、其余覆盖逐字不变
+        // （连进程重建——0.162.1 探针：thread config 置 null/空被拒、轮级 effort=null 不生效，无轻量取消路径）、
+        // 重建线程（有 storage 先试续接当前线程，失败或非持久会话走新线程）并以同一输入重发；成功后本轮继续。
+        // 中途中止：清 nativeId 转既有 early-abort 语义（quarantine——沿既有纪律，不拿死引擎发 interrupt）。
+        async function degradeReasoning(turn: TurnState, input: readonly Record<string, unknown>[]): Promise<void> {
+          reasoningDegraded = true; // 恰一次（会话级：此后本会话引擎不再携带该参数，也不会再次重发）
+          const resumableThreadId = storage ? nativeId : "";
+          turn.nativeId = undefined;
+          emit(turn, "message", "本网关不支持所设推理强度，本轮已按默认执行", { version: 1, source: "reasoning-effort", reason: "gateway-rejected" });
+          try { diagnosticLog.record("reasoning.effort.degraded", { runtime: "codex", retried: true }); } catch { /* 诊断绝不改变执行 */ }
+          unsubscribe?.();
+          await engine!.close();
+          if (turn.controller.signal.aborted) return;
+          const reconnected = await connect(foreignServers, false);
+          engine = reconnected.connected;
+          engine.onServerRequest(nativeToolHandler);
+          subscribeNotifications(engine);
+          if (turn.controller.signal.aborted) return;
+          await establishThread(engine, resumableThreadId !== "" ? resumableThreadId : undefined);
+          await inspectCatalog(engine);
+          if (turn.controller.signal.aborted) return;
+          // 重臂轮状态并以同一输入重发（reason/failure 清空——首次失败不再算数；ready/done 重挂到重发轮）。
+          turn.reason = undefined; turn.failure = undefined;
+          turn.calls.clear(); turn.reasoningStarted.clear();
+          turn.ready = deferred<string>(); turn.done = deferred<RuntimeTurnOutcome>();
+          const restarted = object(await engine.request("turn/start", { threadId: nativeId, input, approvalPolicy: "never", approvalsReviewer: "user", sandboxPolicy: { type: "readOnly", networkAccess: false }, model: config.model }), "turn/start");
+          const retried = object(restarted.turn, "native turn").id;
+          if (typeof retried !== "string" || !retried) throw new Error("Codex native turn has no ID");
+          turn.nativeId = retried; turn.ready.resolve(retried);
+          if (turn.controller.signal.aborted) await stop(turn, turn.reason ?? "aborted");
         }
         return session;
       } catch (error) {

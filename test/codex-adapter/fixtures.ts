@@ -115,6 +115,16 @@ export class FakeEngine implements CodexRpcConnection {
   startup(name: string, status: string, error?: string | null) { for (const listener of this.listeners) listener("mcpServer/startupStatus/updated", { threadId: this.nativeId, name, status, error: error ?? null, failureReason: null }); }
   /** G-4 V2：mcpToolCall item（item/completed，P0 探针字段全集形状）。 */
   mcpToolCall(item: Record<string, unknown> = {}) { this.event("item/completed", { type: "mcpToolCall", id: "mcp-fixture-1", server: "fixture-mcp", tool: "echo", status: "completed", arguments: {}, result: { content: [{ type: "text", text: "fixture result" }] }, error: null, durationMs: 1, ...item }); }
+  /** G-5：推理帧（A3 探针形状——item/started+item/completed，时间戳走真实通知字段）。 */
+  reasoningItem(item: Record<string, unknown> = {}, times: { startedAtMs?: number; completedAtMs?: number } = {}) {
+    const full = { type: "reasoning", id: "rs-fixture-1", summary: [], content: [], ...item };
+    for (const listener of this.listeners) listener("item/started", { threadId: this.nativeId, turnId: this.turnId, item: { ...full, summary: [], content: [] }, ...(times.startedAtMs !== undefined ? { startedAtMs: times.startedAtMs } : {}) });
+    for (const listener of this.listeners) listener("item/completed", { threadId: this.nativeId, turnId: this.turnId, item: full, ...(times.completedAtMs !== undefined ? { completedAtMs: times.completedAtMs } : {}) });
+  }
+  /** G-5：推理增量帧（三个方法名之一；增量不产行——仅消费）。 */
+  reasoningDelta(method: string, params: Record<string, unknown> = {}) { for (const listener of this.listeners) listener(method, { threadId: this.nativeId, turnId: this.turnId, itemId: "rs-fixture-1", ...params }); }
+  /** G-5：轮失败（error 通知，willRetry=false——与 A4 探针拒绝面同形）。 */
+  failTurn(message: string, willRetry = false) { for (const listener of this.listeners) listener("error", { threadId: this.nativeId, turnId: this.turnId, error: { message }, willRetry }); }
   async call(name: string, args: Record<string, unknown>, override: Record<string, unknown> = {}, requestController = new AbortController()) {
     if (!this.handler) throw new Error("fixture handler missing");
     return this.handler("item/tool/call", { threadId: this.nativeId, turnId: this.turnId, callId: `call-${Math.random()}`, namespace: null, tool: `ans_${name}`, arguments: args, ...override }, { signal: requestController.signal });

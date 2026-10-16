@@ -1,0 +1,1542 @@
+{
+  "fixture": {
+    "node": "v24.14.0",
+    "sdk": "0.3.299",
+    "bundledCli": "2.1.299",
+    "loopbackOnly": true,
+    "externalApiCalls": 0
+  },
+  "reports": [
+    {
+      "name": "control-unset",
+      "requests": [
+        {
+          "phase": "control-unset",
+          "index": 0,
+          "arrivedAt": 1792160946160,
+          "thinking": {
+            "type": "adaptive",
+            "display": "updates"
+          },
+          "outputConfig": {
+            "effort": "medium"
+          },
+          "effortFlat": null,
+          "maxTokens": 128000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,per-turn-control-2026-07-01,mid-conversation-tool-changes-2026-07-01,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+          "model": "claude-opus-5-5"
+        }
+      ],
+      "frames": [
+        {
+          "kind": "system",
+          "subtype": "ui_invalidate",
+          "head": "{\"type\":\"system\",\"subtype\":\"ui_invalidate\",\"event\":\"ui.render\",\"uuid\":\"027426c3-10e0-434d-a941-04132e9f2283\",\"session_id\":\"77eb2b1c-5df4-4679-ac24-6dd6f2e894ae\"}"
+        },
+        {
+          "kind": "system",
+          "subtype": "init",
+          "head": "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"/private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-claude-reasoning-loopback-GJ5fEu\",\"session_id\":\"77eb2b1c-5df4-4679-ac24-6dd6f2e894ae\",\"tools\":[],\"mcp_servers\":[],\"model\":\"claude-opus-5-5"
+        },
+        {
+          "kind": "system",
+          "subtype": "thinking_tokens",
+          "head": "{\"type\":\"system\",\"subtype\":\"thinking_tokens\",\"estimated_tokens\":6,\"estimated_tokens_delta\":6,\"session_id\":\"77eb2b1c-5df4-4679-ac24-6dd6f2e894ae\",\"uuid\":\"0fa759d6-f2a9-4eaa-8963-3cd8b174ca72\"}"
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "thinking",
+              "thinkingLen": 24,
+              "thinking": "fixture chain of thought",
+              "hasSignature": true,
+              "signatureLen": 23,
+              "keys": [
+                "signature",
+                "thinking",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "redacted_thinking",
+              "dataLen": 21,
+              "keys": [
+                "data",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "text",
+              "textHead": "control-unset loopback completed"
+            }
+          ]
+        },
+        {
+          "kind": "system",
+          "subtype": "informational",
+          "head": "{\"type\":\"system\",\"subtype\":\"informational\",\"content\":\"We're changing auto mode to no longer charge for classifier requests in Claude Code. However, this session isn't eligible because your requests go through 127.0.0.1:62554, which isn't co"
+        }
+      ],
+      "result": {
+        "subtype": "success",
+        "isError": false,
+        "textHead": "control-unset loopback completed",
+        "numTurns": 1
+      }
+    },
+    {
+      "name": "thinking-disabled",
+      "requests": [
+        {
+          "phase": "thinking-disabled",
+          "index": 0,
+          "arrivedAt": 1792160946319,
+          "thinking": null,
+          "outputConfig": {
+            "effort": "medium"
+          },
+          "effortFlat": null,
+          "maxTokens": 128000,
+          "bodyKeys": [
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,per-turn-control-2026-07-01,mid-conversation-tool-changes-2026-07-01,effort-2025-11-24,dangerous-tool-use-2026-09-03,afk-mode-2026-01-31",
+          "model": "claude-opus-5-5"
+        }
+      ],
+      "frames": [
+        {
+          "kind": "system",
+          "subtype": "ui_invalidate",
+          "head": "{\"type\":\"system\",\"subtype\":\"ui_invalidate\",\"event\":\"ui.render\",\"uuid\":\"34cc0cf6-6479-4287-a0b3-214cd0425119\",\"session_id\":\"0de95d70-690d-4e4b-96fd-b836eb2955d3\"}"
+        },
+        {
+          "kind": "system",
+          "subtype": "init",
+          "head": "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"/private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-claude-reasoning-loopback-GJ5fEu\",\"session_id\":\"0de95d70-690d-4e4b-96fd-b836eb2955d3\",\"tools\":[],\"mcp_servers\":[],\"model\":\"claude-opus-5-5"
+        },
+        {
+          "kind": "system",
+          "subtype": "thinking_tokens",
+          "head": "{\"type\":\"system\",\"subtype\":\"thinking_tokens\",\"estimated_tokens\":6,\"estimated_tokens_delta\":6,\"session_id\":\"0de95d70-690d-4e4b-96fd-b836eb2955d3\",\"uuid\":\"f3d34f88-2ba0-477b-a7a3-8231d526c590\"}"
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "thinking",
+              "thinkingLen": 24,
+              "thinking": "fixture chain of thought",
+              "hasSignature": true,
+              "signatureLen": 23,
+              "keys": [
+                "signature",
+                "thinking",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "redacted_thinking",
+              "dataLen": 21,
+              "keys": [
+                "data",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "text",
+              "textHead": "thinking-disabled loopback completed"
+            }
+          ]
+        },
+        {
+          "kind": "system",
+          "subtype": "informational",
+          "head": "{\"type\":\"system\",\"subtype\":\"informational\",\"content\":\"We're changing auto mode to no longer charge for classifier requests in Claude Code. However, this session isn't eligible because your requests go through 127.0.0.1:62554, which isn't co"
+        }
+      ],
+      "result": {
+        "subtype": "success",
+        "isError": false,
+        "textHead": "thinking-disabled loopback completed",
+        "numTurns": 1
+      }
+    },
+    {
+      "name": "thinking-enabled-budget",
+      "requests": [
+        {
+          "phase": "thinking-enabled-budget",
+          "index": 0,
+          "arrivedAt": 1792160946478,
+          "thinking": {
+            "type": "adaptive",
+            "display": "updates"
+          },
+          "outputConfig": {
+            "effort": "medium"
+          },
+          "effortFlat": null,
+          "maxTokens": 128000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,per-turn-control-2026-07-01,mid-conversation-tool-changes-2026-07-01,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+          "model": "claude-opus-5-5"
+        }
+      ],
+      "frames": [
+        {
+          "kind": "system",
+          "subtype": "ui_invalidate",
+          "head": "{\"type\":\"system\",\"subtype\":\"ui_invalidate\",\"event\":\"ui.render\",\"uuid\":\"8cf211aa-9b19-4ab4-b0ca-7e6aa8d32c2a\",\"session_id\":\"e0c44fee-944e-4a50-9c10-2ae5e57ffc9f\"}"
+        },
+        {
+          "kind": "system",
+          "subtype": "init",
+          "head": "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"/private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-claude-reasoning-loopback-GJ5fEu\",\"session_id\":\"e0c44fee-944e-4a50-9c10-2ae5e57ffc9f\",\"tools\":[],\"mcp_servers\":[],\"model\":\"claude-opus-5-5"
+        },
+        {
+          "kind": "system",
+          "subtype": "thinking_tokens",
+          "head": "{\"type\":\"system\",\"subtype\":\"thinking_tokens\",\"estimated_tokens\":6,\"estimated_tokens_delta\":6,\"session_id\":\"e0c44fee-944e-4a50-9c10-2ae5e57ffc9f\",\"uuid\":\"671dc141-3295-4979-a086-b0c95fd445fa\"}"
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "thinking",
+              "thinkingLen": 24,
+              "thinking": "fixture chain of thought",
+              "hasSignature": true,
+              "signatureLen": 23,
+              "keys": [
+                "signature",
+                "thinking",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "redacted_thinking",
+              "dataLen": 21,
+              "keys": [
+                "data",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "text",
+              "textHead": "thinking-enabled-budget loopback completed"
+            }
+          ]
+        },
+        {
+          "kind": "system",
+          "subtype": "informational",
+          "head": "{\"type\":\"system\",\"subtype\":\"informational\",\"content\":\"We're changing auto mode to no longer charge for classifier requests in Claude Code. However, this session isn't eligible because your requests go through 127.0.0.1:62554, which isn't co"
+        }
+      ],
+      "result": {
+        "subtype": "success",
+        "isError": false,
+        "textHead": "thinking-enabled-budget loopback completed",
+        "numTurns": 1
+      }
+    },
+    {
+      "name": "thinking-enabled-budget-sonnet",
+      "requests": [
+        {
+          "phase": "thinking-enabled-budget-sonnet",
+          "index": 0,
+          "arrivedAt": 1792160946635,
+          "thinking": {
+            "type": "adaptive",
+            "display": "updates"
+          },
+          "outputConfig": {
+            "effort": "high"
+          },
+          "effortFlat": null,
+          "maxTokens": 32000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+          "model": "claude-sonnet-4-6"
+        }
+      ],
+      "frames": [
+        {
+          "kind": "system",
+          "subtype": "ui_invalidate",
+          "head": "{\"type\":\"system\",\"subtype\":\"ui_invalidate\",\"event\":\"ui.render\",\"uuid\":\"f021dcf7-5508-4e6f-9eb3-800a4308c272\",\"session_id\":\"bc2a0f99-d77f-4bd2-9dd2-e4ec94742b8b\"}"
+        },
+        {
+          "kind": "system",
+          "subtype": "init",
+          "head": "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"/private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-claude-reasoning-loopback-GJ5fEu\",\"session_id\":\"bc2a0f99-d77f-4bd2-9dd2-e4ec94742b8b\",\"tools\":[],\"mcp_servers\":[],\"model\":\"claude-sonnet-4"
+        },
+        {
+          "kind": "system",
+          "subtype": "thinking_tokens",
+          "head": "{\"type\":\"system\",\"subtype\":\"thinking_tokens\",\"estimated_tokens\":6,\"estimated_tokens_delta\":6,\"session_id\":\"bc2a0f99-d77f-4bd2-9dd2-e4ec94742b8b\",\"uuid\":\"c8eeba5f-9c53-4840-8fbb-58f76fb143e5\"}"
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "thinking",
+              "thinkingLen": 24,
+              "thinking": "fixture chain of thought",
+              "hasSignature": true,
+              "signatureLen": 23,
+              "keys": [
+                "signature",
+                "thinking",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "redacted_thinking",
+              "dataLen": 21,
+              "keys": [
+                "data",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "text",
+              "textHead": "thinking-enabled-budget-sonnet loopback completed"
+            }
+          ]
+        },
+        {
+          "kind": "system",
+          "subtype": "informational",
+          "head": "{\"type\":\"system\",\"subtype\":\"informational\",\"content\":\"We're changing auto mode to no longer charge for classifier requests in Claude Code. However, this session isn't eligible because your requests go through 127.0.0.1:62554, which isn't co"
+        }
+      ],
+      "result": {
+        "subtype": "success",
+        "isError": false,
+        "textHead": "thinking-enabled-budget-sonnet loopback completed",
+        "numTurns": 1
+      }
+    },
+    {
+      "name": "thinking-adaptive",
+      "requests": [
+        {
+          "phase": "thinking-adaptive",
+          "index": 0,
+          "arrivedAt": 1792160946790,
+          "thinking": {
+            "type": "adaptive",
+            "display": "updates"
+          },
+          "outputConfig": {
+            "effort": "medium"
+          },
+          "effortFlat": null,
+          "maxTokens": 128000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,per-turn-control-2026-07-01,mid-conversation-tool-changes-2026-07-01,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+          "model": "claude-opus-5-5"
+        }
+      ],
+      "frames": [
+        {
+          "kind": "system",
+          "subtype": "ui_invalidate",
+          "head": "{\"type\":\"system\",\"subtype\":\"ui_invalidate\",\"event\":\"ui.render\",\"uuid\":\"fcc7df15-8dc8-4147-a8ce-c96b84063361\",\"session_id\":\"fa91ec9c-fe3b-49db-b8d1-9aed5bd4a341\"}"
+        },
+        {
+          "kind": "system",
+          "subtype": "init",
+          "head": "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"/private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-claude-reasoning-loopback-GJ5fEu\",\"session_id\":\"fa91ec9c-fe3b-49db-b8d1-9aed5bd4a341\",\"tools\":[],\"mcp_servers\":[],\"model\":\"claude-opus-5-5"
+        },
+        {
+          "kind": "system",
+          "subtype": "thinking_tokens",
+          "head": "{\"type\":\"system\",\"subtype\":\"thinking_tokens\",\"estimated_tokens\":6,\"estimated_tokens_delta\":6,\"session_id\":\"fa91ec9c-fe3b-49db-b8d1-9aed5bd4a341\",\"uuid\":\"8d47dbf4-5541-49cd-b58e-169950ef41ee\"}"
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "thinking",
+              "thinkingLen": 24,
+              "thinking": "fixture chain of thought",
+              "hasSignature": true,
+              "signatureLen": 23,
+              "keys": [
+                "signature",
+                "thinking",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "redacted_thinking",
+              "dataLen": 21,
+              "keys": [
+                "data",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "text",
+              "textHead": "thinking-adaptive loopback completed"
+            }
+          ]
+        },
+        {
+          "kind": "system",
+          "subtype": "informational",
+          "head": "{\"type\":\"system\",\"subtype\":\"informational\",\"content\":\"We're changing auto mode to no longer charge for classifier requests in Claude Code. However, this session isn't eligible because your requests go through 127.0.0.1:62554, which isn't co"
+        }
+      ],
+      "result": {
+        "subtype": "success",
+        "isError": false,
+        "textHead": "thinking-adaptive loopback completed",
+        "numTurns": 1
+      }
+    },
+    {
+      "name": "thinking-adaptive-display-omitted",
+      "requests": [
+        {
+          "phase": "thinking-adaptive-display-omitted",
+          "index": 0,
+          "arrivedAt": 1792160946945,
+          "thinking": {
+            "type": "adaptive",
+            "display": "updates"
+          },
+          "outputConfig": {
+            "effort": "medium"
+          },
+          "effortFlat": null,
+          "maxTokens": 128000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,per-turn-control-2026-07-01,mid-conversation-tool-changes-2026-07-01,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+          "model": "claude-opus-5-5"
+        }
+      ],
+      "frames": [
+        {
+          "kind": "system",
+          "subtype": "ui_invalidate",
+          "head": "{\"type\":\"system\",\"subtype\":\"ui_invalidate\",\"event\":\"ui.render\",\"uuid\":\"d2a94909-7bf2-4019-91ef-7774cfd8bcee\",\"session_id\":\"a801352d-a564-442a-9bf4-a040985dc0f5\"}"
+        },
+        {
+          "kind": "system",
+          "subtype": "init",
+          "head": "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"/private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-claude-reasoning-loopback-GJ5fEu\",\"session_id\":\"a801352d-a564-442a-9bf4-a040985dc0f5\",\"tools\":[],\"mcp_servers\":[],\"model\":\"claude-opus-5-5"
+        },
+        {
+          "kind": "system",
+          "subtype": "thinking_tokens",
+          "head": "{\"type\":\"system\",\"subtype\":\"thinking_tokens\",\"estimated_tokens\":6,\"estimated_tokens_delta\":6,\"session_id\":\"a801352d-a564-442a-9bf4-a040985dc0f5\",\"uuid\":\"bdcc4a4d-28bd-4256-a32f-c2de731006dd\"}"
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "thinking",
+              "thinkingLen": 24,
+              "thinking": "fixture chain of thought",
+              "hasSignature": true,
+              "signatureLen": 23,
+              "keys": [
+                "signature",
+                "thinking",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "redacted_thinking",
+              "dataLen": 21,
+              "keys": [
+                "data",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "text",
+              "textHead": "thinking-adaptive-display-omitted loopback completed"
+            }
+          ]
+        },
+        {
+          "kind": "system",
+          "subtype": "informational",
+          "head": "{\"type\":\"system\",\"subtype\":\"informational\",\"content\":\"We're changing auto mode to no longer charge for classifier requests in Claude Code. However, this session isn't eligible because your requests go through 127.0.0.1:62554, which isn't co"
+        }
+      ],
+      "result": {
+        "subtype": "success",
+        "isError": false,
+        "textHead": "thinking-adaptive-display-omitted loopback completed",
+        "numTurns": 1
+      }
+    },
+    {
+      "name": "effort-low",
+      "requests": [
+        {
+          "phase": "effort-low",
+          "index": 0,
+          "arrivedAt": 1792160947112,
+          "thinking": {
+            "type": "adaptive",
+            "display": "updates"
+          },
+          "outputConfig": {
+            "effort": "low"
+          },
+          "effortFlat": null,
+          "maxTokens": 128000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,per-turn-control-2026-07-01,mid-conversation-tool-changes-2026-07-01,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+          "model": "claude-opus-5-5"
+        }
+      ],
+      "frames": [
+        {
+          "kind": "system",
+          "subtype": "ui_invalidate",
+          "head": "{\"type\":\"system\",\"subtype\":\"ui_invalidate\",\"event\":\"ui.render\",\"uuid\":\"bc2f7603-8f6c-401b-b601-e92b03504405\",\"session_id\":\"7de61eb8-1349-4f33-856b-11451e718d46\"}"
+        },
+        {
+          "kind": "system",
+          "subtype": "init",
+          "head": "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"/private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-claude-reasoning-loopback-GJ5fEu\",\"session_id\":\"7de61eb8-1349-4f33-856b-11451e718d46\",\"tools\":[],\"mcp_servers\":[],\"model\":\"claude-opus-5-5"
+        },
+        {
+          "kind": "system",
+          "subtype": "thinking_tokens",
+          "head": "{\"type\":\"system\",\"subtype\":\"thinking_tokens\",\"estimated_tokens\":6,\"estimated_tokens_delta\":6,\"session_id\":\"7de61eb8-1349-4f33-856b-11451e718d46\",\"uuid\":\"7c158bcb-6141-4f37-a4a8-e2fc2476b13e\"}"
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "thinking",
+              "thinkingLen": 24,
+              "thinking": "fixture chain of thought",
+              "hasSignature": true,
+              "signatureLen": 23,
+              "keys": [
+                "signature",
+                "thinking",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "redacted_thinking",
+              "dataLen": 21,
+              "keys": [
+                "data",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "text",
+              "textHead": "effort-low loopback completed"
+            }
+          ]
+        },
+        {
+          "kind": "system",
+          "subtype": "informational",
+          "head": "{\"type\":\"system\",\"subtype\":\"informational\",\"content\":\"We're changing auto mode to no longer charge for classifier requests in Claude Code. However, this session isn't eligible because your requests go through 127.0.0.1:62554, which isn't co"
+        }
+      ],
+      "result": {
+        "subtype": "success",
+        "isError": false,
+        "textHead": "effort-low loopback completed",
+        "numTurns": 1
+      }
+    },
+    {
+      "name": "effort-medium",
+      "requests": [
+        {
+          "phase": "effort-medium",
+          "index": 0,
+          "arrivedAt": 1792160947277,
+          "thinking": {
+            "type": "adaptive",
+            "display": "updates"
+          },
+          "outputConfig": {
+            "effort": "medium"
+          },
+          "effortFlat": null,
+          "maxTokens": 128000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,per-turn-control-2026-07-01,mid-conversation-tool-changes-2026-07-01,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+          "model": "claude-opus-5-5"
+        }
+      ],
+      "frames": [
+        {
+          "kind": "system",
+          "subtype": "ui_invalidate",
+          "head": "{\"type\":\"system\",\"subtype\":\"ui_invalidate\",\"event\":\"ui.render\",\"uuid\":\"9c9ba75b-75d2-4ca3-8882-499764971468\",\"session_id\":\"5c217999-55d5-452b-aabe-b2deb8dbde10\"}"
+        },
+        {
+          "kind": "system",
+          "subtype": "init",
+          "head": "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"/private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-claude-reasoning-loopback-GJ5fEu\",\"session_id\":\"5c217999-55d5-452b-aabe-b2deb8dbde10\",\"tools\":[],\"mcp_servers\":[],\"model\":\"claude-opus-5-5"
+        },
+        {
+          "kind": "system",
+          "subtype": "thinking_tokens",
+          "head": "{\"type\":\"system\",\"subtype\":\"thinking_tokens\",\"estimated_tokens\":6,\"estimated_tokens_delta\":6,\"session_id\":\"5c217999-55d5-452b-aabe-b2deb8dbde10\",\"uuid\":\"eac5b7c6-b2ac-4e73-82f0-799187b32d61\"}"
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "thinking",
+              "thinkingLen": 24,
+              "thinking": "fixture chain of thought",
+              "hasSignature": true,
+              "signatureLen": 23,
+              "keys": [
+                "signature",
+                "thinking",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "redacted_thinking",
+              "dataLen": 21,
+              "keys": [
+                "data",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "text",
+              "textHead": "effort-medium loopback completed"
+            }
+          ]
+        },
+        {
+          "kind": "system",
+          "subtype": "informational",
+          "head": "{\"type\":\"system\",\"subtype\":\"informational\",\"content\":\"We're changing auto mode to no longer charge for classifier requests in Claude Code. However, this session isn't eligible because your requests go through 127.0.0.1:62554, which isn't co"
+        }
+      ],
+      "result": {
+        "subtype": "success",
+        "isError": false,
+        "textHead": "effort-medium loopback completed",
+        "numTurns": 1
+      }
+    },
+    {
+      "name": "effort-high",
+      "requests": [
+        {
+          "phase": "effort-high",
+          "index": 0,
+          "arrivedAt": 1792160947437,
+          "thinking": {
+            "type": "adaptive",
+            "display": "updates"
+          },
+          "outputConfig": {
+            "effort": "high"
+          },
+          "effortFlat": null,
+          "maxTokens": 128000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,per-turn-control-2026-07-01,mid-conversation-tool-changes-2026-07-01,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+          "model": "claude-opus-5-5"
+        }
+      ],
+      "frames": [
+        {
+          "kind": "system",
+          "subtype": "ui_invalidate",
+          "head": "{\"type\":\"system\",\"subtype\":\"ui_invalidate\",\"event\":\"ui.render\",\"uuid\":\"285dcad6-b139-439f-bb2c-14206a912ff7\",\"session_id\":\"85cdee38-a810-4b9a-906b-449fa47ed076\"}"
+        },
+        {
+          "kind": "system",
+          "subtype": "init",
+          "head": "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"/private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-claude-reasoning-loopback-GJ5fEu\",\"session_id\":\"85cdee38-a810-4b9a-906b-449fa47ed076\",\"tools\":[],\"mcp_servers\":[],\"model\":\"claude-opus-5-5"
+        },
+        {
+          "kind": "system",
+          "subtype": "thinking_tokens",
+          "head": "{\"type\":\"system\",\"subtype\":\"thinking_tokens\",\"estimated_tokens\":6,\"estimated_tokens_delta\":6,\"session_id\":\"85cdee38-a810-4b9a-906b-449fa47ed076\",\"uuid\":\"4da054c6-d25d-422f-8424-69fa813505d9\"}"
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "thinking",
+              "thinkingLen": 24,
+              "thinking": "fixture chain of thought",
+              "hasSignature": true,
+              "signatureLen": 23,
+              "keys": [
+                "signature",
+                "thinking",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "redacted_thinking",
+              "dataLen": 21,
+              "keys": [
+                "data",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "text",
+              "textHead": "effort-high loopback completed"
+            }
+          ]
+        },
+        {
+          "kind": "system",
+          "subtype": "informational",
+          "head": "{\"type\":\"system\",\"subtype\":\"informational\",\"content\":\"We're changing auto mode to no longer charge for classifier requests in Claude Code. However, this session isn't eligible because your requests go through 127.0.0.1:62554, which isn't co"
+        }
+      ],
+      "result": {
+        "subtype": "success",
+        "isError": false,
+        "textHead": "effort-high loopback completed",
+        "numTurns": 1
+      }
+    },
+    {
+      "name": "effort-xhigh",
+      "requests": [
+        {
+          "phase": "effort-xhigh",
+          "index": 0,
+          "arrivedAt": 1792160947594,
+          "thinking": {
+            "type": "adaptive",
+            "display": "updates"
+          },
+          "outputConfig": {
+            "effort": "xhigh"
+          },
+          "effortFlat": null,
+          "maxTokens": 128000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,per-turn-control-2026-07-01,mid-conversation-tool-changes-2026-07-01,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+          "model": "claude-opus-5-5"
+        }
+      ],
+      "frames": [
+        {
+          "kind": "system",
+          "subtype": "ui_invalidate",
+          "head": "{\"type\":\"system\",\"subtype\":\"ui_invalidate\",\"event\":\"ui.render\",\"uuid\":\"8a69c00d-ff35-4609-920f-f6402d72d278\",\"session_id\":\"339a2de1-899e-4cfe-b58c-cc4e530747b8\"}"
+        },
+        {
+          "kind": "system",
+          "subtype": "init",
+          "head": "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"/private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-claude-reasoning-loopback-GJ5fEu\",\"session_id\":\"339a2de1-899e-4cfe-b58c-cc4e530747b8\",\"tools\":[],\"mcp_servers\":[],\"model\":\"claude-opus-5-5"
+        },
+        {
+          "kind": "system",
+          "subtype": "thinking_tokens",
+          "head": "{\"type\":\"system\",\"subtype\":\"thinking_tokens\",\"estimated_tokens\":6,\"estimated_tokens_delta\":6,\"session_id\":\"339a2de1-899e-4cfe-b58c-cc4e530747b8\",\"uuid\":\"0d0565ac-ad7f-402a-bf99-f33b33b1fb71\"}"
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "thinking",
+              "thinkingLen": 24,
+              "thinking": "fixture chain of thought",
+              "hasSignature": true,
+              "signatureLen": 23,
+              "keys": [
+                "signature",
+                "thinking",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "redacted_thinking",
+              "dataLen": 21,
+              "keys": [
+                "data",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "text",
+              "textHead": "effort-xhigh loopback completed"
+            }
+          ]
+        },
+        {
+          "kind": "system",
+          "subtype": "informational",
+          "head": "{\"type\":\"system\",\"subtype\":\"informational\",\"content\":\"We're changing auto mode to no longer charge for classifier requests in Claude Code. However, this session isn't eligible because your requests go through 127.0.0.1:62554, which isn't co"
+        }
+      ],
+      "result": {
+        "subtype": "success",
+        "isError": false,
+        "textHead": "effort-xhigh loopback completed",
+        "numTurns": 1
+      }
+    },
+    {
+      "name": "effort-xhigh-sonnet",
+      "requests": [
+        {
+          "phase": "effort-xhigh-sonnet",
+          "index": 0,
+          "arrivedAt": 1792160947752,
+          "thinking": {
+            "type": "adaptive",
+            "display": "updates"
+          },
+          "outputConfig": {
+            "effort": "high"
+          },
+          "effortFlat": null,
+          "maxTokens": 32000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+          "model": "claude-sonnet-4-6"
+        }
+      ],
+      "frames": [
+        {
+          "kind": "system",
+          "subtype": "ui_invalidate",
+          "head": "{\"type\":\"system\",\"subtype\":\"ui_invalidate\",\"event\":\"ui.render\",\"uuid\":\"1350c4d7-2ccb-4c25-819e-20dded89bc57\",\"session_id\":\"851b8c88-9bdb-4b4c-90ba-3d59d4e61fdc\"}"
+        },
+        {
+          "kind": "system",
+          "subtype": "init",
+          "head": "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"/private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-claude-reasoning-loopback-GJ5fEu\",\"session_id\":\"851b8c88-9bdb-4b4c-90ba-3d59d4e61fdc\",\"tools\":[],\"mcp_servers\":[],\"model\":\"claude-sonnet-4"
+        },
+        {
+          "kind": "system",
+          "subtype": "thinking_tokens",
+          "head": "{\"type\":\"system\",\"subtype\":\"thinking_tokens\",\"estimated_tokens\":6,\"estimated_tokens_delta\":6,\"session_id\":\"851b8c88-9bdb-4b4c-90ba-3d59d4e61fdc\",\"uuid\":\"90e446c4-a152-4dcd-9101-3e3f69f7e8c3\"}"
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "thinking",
+              "thinkingLen": 24,
+              "thinking": "fixture chain of thought",
+              "hasSignature": true,
+              "signatureLen": 23,
+              "keys": [
+                "signature",
+                "thinking",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "redacted_thinking",
+              "dataLen": 21,
+              "keys": [
+                "data",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "text",
+              "textHead": "effort-xhigh-sonnet loopback completed"
+            }
+          ]
+        },
+        {
+          "kind": "system",
+          "subtype": "informational",
+          "head": "{\"type\":\"system\",\"subtype\":\"informational\",\"content\":\"We're changing auto mode to no longer charge for classifier requests in Claude Code. However, this session isn't eligible because your requests go through 127.0.0.1:62554, which isn't co"
+        }
+      ],
+      "result": {
+        "subtype": "success",
+        "isError": false,
+        "textHead": "effort-xhigh-sonnet loopback completed",
+        "numTurns": 1
+      }
+    },
+    {
+      "name": "capture-empty-thinking",
+      "requests": [
+        {
+          "phase": "capture-empty-thinking",
+          "index": 0,
+          "arrivedAt": 1792160947912,
+          "thinking": {
+            "type": "adaptive",
+            "display": "updates"
+          },
+          "outputConfig": {
+            "effort": "medium"
+          },
+          "effortFlat": null,
+          "maxTokens": 128000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,per-turn-control-2026-07-01,mid-conversation-tool-changes-2026-07-01,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+          "model": "claude-opus-5-5"
+        }
+      ],
+      "frames": [
+        {
+          "kind": "system",
+          "subtype": "ui_invalidate",
+          "head": "{\"type\":\"system\",\"subtype\":\"ui_invalidate\",\"event\":\"ui.render\",\"uuid\":\"5cb7fa56-ef18-4219-bda9-d790f9974692\",\"session_id\":\"b6d611ae-bade-42c8-9236-31816cdb7e37\"}"
+        },
+        {
+          "kind": "system",
+          "subtype": "init",
+          "head": "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"/private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-claude-reasoning-loopback-GJ5fEu\",\"session_id\":\"b6d611ae-bade-42c8-9236-31816cdb7e37\",\"tools\":[],\"mcp_servers\":[],\"model\":\"claude-opus-5-5"
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "thinking",
+              "thinkingLen": 0,
+              "thinking": "",
+              "hasSignature": true,
+              "signatureLen": 23,
+              "keys": [
+                "signature",
+                "thinking",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "redacted_thinking",
+              "dataLen": 21,
+              "keys": [
+                "data",
+                "type"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "text",
+              "textHead": "capture-empty-thinking loopback completed"
+            }
+          ]
+        },
+        {
+          "kind": "system",
+          "subtype": "informational",
+          "head": "{\"type\":\"system\",\"subtype\":\"informational\",\"content\":\"We're changing auto mode to no longer charge for classifier requests in Claude Code. However, this session isn't eligible because your requests go through 127.0.0.1:62554, which isn't co"
+        }
+      ],
+      "result": {
+        "subtype": "success",
+        "isError": false,
+        "textHead": "capture-empty-thinking loopback completed",
+        "numTurns": 1
+      }
+    },
+    {
+      "name": "reject-thinking-400",
+      "requests": [
+        {
+          "phase": "reject-thinking-400",
+          "index": 0,
+          "arrivedAt": 1792160948072,
+          "thinking": {
+            "type": "adaptive",
+            "display": "updates"
+          },
+          "outputConfig": {
+            "effort": "medium"
+          },
+          "effortFlat": null,
+          "maxTokens": 128000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,per-turn-control-2026-07-01,mid-conversation-tool-changes-2026-07-01,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+          "model": "claude-opus-5-5"
+        },
+        {
+          "phase": "reject-thinking-400",
+          "index": 1,
+          "arrivedAt": 1792160948074,
+          "thinking": {
+            "type": "adaptive"
+          },
+          "outputConfig": {
+            "effort": "medium"
+          },
+          "effortFlat": null,
+          "maxTokens": 128000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,per-turn-control-2026-07-01,mid-conversation-tool-changes-2026-07-01,effort-2025-11-24,dangerous-tool-use-2026-09-03,afk-mode-2026-01-31",
+          "model": "claude-opus-5-5"
+        },
+        {
+          "phase": "reject-thinking-400",
+          "index": 2,
+          "arrivedAt": 1792160948075,
+          "thinking": {
+            "type": "adaptive"
+          },
+          "outputConfig": {
+            "effort": "medium"
+          },
+          "effortFlat": null,
+          "maxTokens": 128000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,per-turn-control-2026-07-01,mid-conversation-tool-changes-2026-07-01,effort-2025-11-24,afk-mode-2026-01-31",
+          "model": "claude-opus-5-5"
+        }
+      ],
+      "frames": [
+        {
+          "kind": "system",
+          "subtype": "ui_invalidate",
+          "head": "{\"type\":\"system\",\"subtype\":\"ui_invalidate\",\"event\":\"ui.render\",\"uuid\":\"855e15f4-1395-4cc3-9575-26801f830d26\",\"session_id\":\"7fbe80fc-6d31-4dd9-8600-8c8037c7f858\"}"
+        },
+        {
+          "kind": "system",
+          "subtype": "init",
+          "head": "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"/private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-claude-reasoning-loopback-GJ5fEu\",\"session_id\":\"7fbe80fc-6d31-4dd9-8600-8c8037c7f858\",\"tools\":[],\"mcp_servers\":[],\"model\":\"claude-opus-5-5"
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "text",
+              "textHead": "API Error: 400 fixture gateway rejects thinking on this endpoint"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "subtype": "success",
+        "isError": true,
+        "textHead": "API Error: 400 fixture gateway rejects thinking on this endpoint",
+        "numTurns": 1
+      },
+      "streamError": "Claude Code returned an error result: API Error: 400 fixture gateway rejects thinking on this endpoint"
+    },
+    {
+      "name": "reject-effort-400",
+      "requests": [
+        {
+          "phase": "reject-effort-400",
+          "index": 0,
+          "arrivedAt": 1792160948231,
+          "thinking": {
+            "type": "adaptive",
+            "display": "updates"
+          },
+          "outputConfig": {
+            "effort": "high"
+          },
+          "effortFlat": null,
+          "maxTokens": 128000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,per-turn-control-2026-07-01,mid-conversation-tool-changes-2026-07-01,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+          "model": "claude-opus-5-5"
+        },
+        {
+          "phase": "reject-effort-400",
+          "index": 1,
+          "arrivedAt": 1792160948233,
+          "thinking": {
+            "type": "adaptive"
+          },
+          "outputConfig": {
+            "effort": "high"
+          },
+          "effortFlat": null,
+          "maxTokens": 128000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "safeguards",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,per-turn-control-2026-07-01,mid-conversation-tool-changes-2026-07-01,effort-2025-11-24,dangerous-tool-use-2026-09-03,afk-mode-2026-01-31",
+          "model": "claude-opus-5-5"
+        },
+        {
+          "phase": "reject-effort-400",
+          "index": 2,
+          "arrivedAt": 1792160948233,
+          "thinking": {
+            "type": "adaptive"
+          },
+          "outputConfig": {
+            "effort": "high"
+          },
+          "effortFlat": null,
+          "maxTokens": 128000,
+          "bodyKeys": [
+            "context_management",
+            "max_tokens",
+            "messages",
+            "metadata",
+            "model",
+            "output_config",
+            "stream",
+            "system",
+            "thinking",
+            "tools"
+          ],
+          "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,per-turn-control-2026-07-01,mid-conversation-tool-changes-2026-07-01,effort-2025-11-24,afk-mode-2026-01-31",
+          "model": "claude-opus-5-5"
+        }
+      ],
+      "frames": [
+        {
+          "kind": "system",
+          "subtype": "ui_invalidate",
+          "head": "{\"type\":\"system\",\"subtype\":\"ui_invalidate\",\"event\":\"ui.render\",\"uuid\":\"c003b654-c938-44a7-8b1e-e205209df28c\",\"session_id\":\"e89172d5-2fb2-4042-b1e6-9eb2c8ba8233\"}"
+        },
+        {
+          "kind": "system",
+          "subtype": "init",
+          "head": "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"/private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-claude-reasoning-loopback-GJ5fEu\",\"session_id\":\"e89172d5-2fb2-4042-b1e6-9eb2c8ba8233\",\"tools\":[],\"mcp_servers\":[],\"model\":\"claude-opus-5-5"
+        },
+        {
+          "kind": "assistant",
+          "blocks": [
+            {
+              "type": "text",
+              "textHead": "API Error: 400 fixture gateway rejects effort on this endpoint"
+            }
+          ]
+        }
+      ],
+      "result": {
+        "subtype": "success",
+        "isError": true,
+        "textHead": "API Error: 400 fixture gateway rejects effort on this endpoint",
+        "numTurns": 1
+      },
+      "streamError": "Claude Code returned an error result: API Error: 400 fixture gateway rejects effort on this endpoint"
+    }
+  ],
+  "adapterReport": {
+    "name": "adapter-wiring-high",
+    "requests": [
+      {
+        "phase": "adapter-wiring-high",
+        "index": 0,
+        "arrivedAt": 1792160948426,
+        "thinking": {
+          "type": "adaptive",
+          "display": "updates"
+        },
+        "outputConfig": {
+          "effort": "high"
+        },
+        "effortFlat": null,
+        "maxTokens": 32000,
+        "bodyKeys": [
+          "context_management",
+          "max_tokens",
+          "messages",
+          "metadata",
+          "model",
+          "output_config",
+          "safeguards",
+          "stream",
+          "system",
+          "thinking",
+          "tools"
+        ],
+        "beta": "claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,effort-2025-11-24,dangerous-tool-use-2026-09-03,thinking-display-updates-2026-08-18,afk-mode-2026-01-31",
+        "model": "claude-sonnet-4-6"
+      }
+    ],
+    "rows": [
+      {
+        "kind": "message",
+        "summary": "用户指令：adapter wiring turn",
+        "detail": {
+          "source": "prompt-input",
+          "text": "adapter wiring turn",
+          "turnId": "0537e36e-b322-42a7-9e0d-51911dd81b7b"
+        }
+      },
+      {
+        "kind": "message",
+        "summary": "已思考",
+        "detail": {
+          "version": 1,
+          "source": "reasoning",
+          "reasoning": {
+            "text": {
+              "text": "fixture chain of thought",
+              "truncated": false,
+              "redacted": false
+            },
+            "status": "complete"
+          },
+          "turnId": "0537e36e-b322-42a7-9e0d-51911dd81b7b"
+        }
+      },
+      {
+        "kind": "message",
+        "summary": "已思考",
+        "detail": {
+          "version": 1,
+          "source": "reasoning",
+          "reasoning": {
+            "text": {
+              "text": "",
+              "truncated": false,
+              "redacted": false
+            },
+            "status": "omitted"
+          },
+          "turnId": "0537e36e-b322-42a7-9e0d-51911dd81b7b"
+        }
+      },
+      {
+        "kind": "message",
+        "summary": "adapter-wiring-high loopback completed",
+        "detail": {
+          "turnId": "0537e36e-b322-42a7-9e0d-51911dd81b7b"
+        }
+      },
+      {
+        "kind": "settled",
+        "summary": "会话结束",
+        "detail": {
+          "turnId": "0537e36e-b322-42a7-9e0d-51911dd81b7b",
+          "outcome": "completed"
+        }
+      }
+    ],
+    "settled": "completed"
+  }
+}

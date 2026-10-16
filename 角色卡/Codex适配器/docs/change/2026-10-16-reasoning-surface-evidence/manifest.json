@@ -1,0 +1,55 @@
+{
+ "task": "G-5 wave 2（Codex）：推理强度接线 + 推理事件面 + 降级链（先探针后接线）",
+ "role": "Codex适配器",
+ "at": "2026-10-16T00:00:00.000Z",
+ "node": "v24.14.0",
+ "platform": "darwin-arm64",
+ "production": [
+  {
+   "path": "src/common/codex-adapter/config.ts",
+   "sha256": "4194d3f430e0563c99befa70f887c785994554a5b6651980076b3a712f2347e7"
+  },
+  {
+   "path": "src/common/codex-adapter/protocol.ts",
+   "sha256": "c1ec9ce94aa38b7a619cc670b932e3462beca9c463a32b8026396065392612a9"
+  },
+  {
+   "path": "src/provider/codex/session.ts",
+   "sha256": "8328ed6c5ada770f5f728a1ab081f96e4cc96a0b6880c77035269c7cc09f0c31"
+  }
+ ],
+ "tests": [
+  {
+   "path": "test/codex-adapter/reasoning.test.ts",
+   "sha256": "7f745a6312fa9ef31e2170bb90b65d17efb19ba597d0bf2a13493de2345a2937"
+  },
+  {
+   "path": "test/codex-adapter/fixtures.ts",
+   "sha256": "bd1663efca4f3a1f812fd80cdbb443c4e100237b98f1a1e30ecef7075aa3f7ac"
+  }
+ ],
+ "evidence": {
+  "角色卡/Codex适配器/docs/change/2026-10-16-reasoning-surface-evidence/reasoning-surface.probe.mjs": "a1010dc683c4033aa0122a2d3d755a7c937f843f1f0b509966c5fa59ea73f8b8",
+  "角色卡/Codex适配器/docs/change/2026-10-16-reasoning-surface-evidence/reasoning-surface.raw.json": "0076adbdb6900bbc7cf6502a7e9289b35dd5190f228d32bf5f1d0e130325abd0",
+  "角色卡/Codex适配器/docs/change/2026-10-16-reasoning-surface-evidence/reasoning-surface.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "角色卡/Codex适配器/docs/change/2026-10-16-reasoning-surface-evidence/schema/ReasoningSummary.ts": "1d56c8b72bf6806438e612e1a14a567ceab91be91a4bcb0ca192f898fe0bf9bc",
+  "角色卡/Codex适配器/docs/change/2026-10-16-reasoning-surface-evidence/schema/v2/ReasoningSummaryPartAddedNotification.ts": "beeae50a6a6f7a3438d7cb6e49e4353228f92c554e5331bf6f288ff7a50b1932",
+  "角色卡/Codex适配器/docs/change/2026-10-16-reasoning-surface-evidence/schema/v2/ReasoningSummaryTextDeltaNotification.ts": "46edaeb45c009106583d4793419b1a60b621cf93aecba734b7ef103178416261",
+  "角色卡/Codex适配器/docs/change/2026-10-16-reasoning-surface-evidence/schema/v2/ReasoningTextDeltaNotification.ts": "be86447b21cca238370ec3074d903dbedd6f28f298b482d2938e46f39fd1c2ae",
+  "角色卡/Codex适配器/docs/change/2026-10-16-reasoning-surface-evidence/schema/v2/TurnStartParams.ts": "849401f5c04842391cb2838c5bfa315b92c6ce85a059a8f032201ce83baa07ed"
+ },
+ "checks": {
+  "ownTests": "54/54 pass, 0 skip（codex-adapter 全目录；本批新 7 例）",
+  "typecheck": "exit0（全仓 tsc --noEmit）",
+  "probeSelfChecks": "8/8 pass（probe exit 0）",
+  "fullSuite": "2036 tests / 2033 pass / 2 fail / 1 skip——2 红均在他方在飞面（Pi real-adapter 审计门文本、T29 Pi env 夹具键表），本批文件零红",
+  "probeEnvironment": "pinned CLI 0.162.1 real app-server + loopback fake Responses SSE; externalModelCalls 0; credentials fake"
+ },
+ "limitations": [
+  "真实网关对 reasoning 参数的接受面与拒绝文案（B3）未验——降级识别按 A4 形状保守匹配，未命中即不识别（宁少一次重发）",
+  "非持久会话（无 storage）降级重建为新线程（探针：0.162.1 无轻量取消路径）——本轮按默认执行达成；跨轮上下文在非持久形态下随进程（登记）",
+  "model_reasoning_summary 未接线（v1 不暴露开关）；摘要面以平台返回的 summary/content 数组为准",
+  "durationMs 依赖 item/started.startedAtMs 与 item/completed.completedAtMs 双真实信号；两者缺一不携带",
+  "Windows 未跑；降级中途中止 ⇒ 走既有 early-abort quarantine 语义（沿既有纪律）"
+ ]
+}

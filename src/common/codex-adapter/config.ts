@@ -1,5 +1,7 @@
 import { RUNTIME_CREDENTIAL_ENV_VARS } from "../shared/runtime-shared.ts";
 import type { RuntimeProviderOptions, InstalledMcpServerV1 } from "../../model/runtime.ts";
+import type { ReasoningEffortV1 } from "../../model/runtime.ts";
+import { isReasoningEffortV1 } from "../runtime-core/reasoning.ts";
 import { object } from "./protocol.ts";
 
 // Verified from the official config schema and codex 0.162.0-alpha.17.2 features list.
@@ -38,6 +40,9 @@ export function settings(options: RuntimeProviderOptions & { webSearch?: boolean
     throw new Error("Codex API base URL must be HTTP(S) without credentials");
   }
   const secrets = [...RUNTIME_CREDENTIAL_ENV_VARS, keyName].map(name => env[name]).filter((value): value is string => !!value);
+  // G-5：档位校验（纵深防御——Service 已归一五值；越界＝上游契约破坏，装配前抛错、零副作用）。
+  const effort = options.reasoningEffort;
+  if (effort !== undefined && !isReasoningEffortV1(effort)) throw new Error("Codex invalid reasoning effort option");
   const redact = (input: unknown): string => {
     let result = input instanceof Error ? input.message : String(input);
     for (const secret of [...new Set(secrets)].sort((a, b) => b.length - a.length)) result = result.split(secret).join("[REDACTED]");
@@ -50,7 +55,19 @@ export function settings(options: RuntimeProviderOptions & { webSearch?: boolean
     });
     return result;
   };
-  return { model, key, keyName, baseUrl: url.toString().replace(/\/$/, ""), redact, webSearch: webSearchEnabled(options.webSearch, env.ANS_CODEX_WEB_SEARCH) };
+  return { model, key, keyName, baseUrl: url.toString().replace(/\/$/, ""), redact, webSearch: webSearchEnabled(options.webSearch, env.ANS_CODEX_WEB_SEARCH), reasoningEffort: effort };
+}
+
+/**
+ * G-5 单一编码来源：`model_reasoning_effort` 进程覆盖串（冻结映射＝`src/model/runtime.ts`
+ * `reasoningEffort` 字段注释）。`low/medium/high/xhigh` ⇒ `-c model_reasoning_effort="<值>"`
+ * （顶层标量键，独立一条安全——P0 探针铁律只约束根 map 键）；**`off`＝平台无该档，不注入**
+ * （适配器会话面另有如实说明行，不假装关闭）；未设 ⇒ 不产（逐字现状）。0.162.1 真 CLI 探针实证：
+ * 回读原样、上游 `reasoning:{effort:"<值>",summary:"auto"}` 落点生效；无效值 config 层不拦（本仓前置校验）。
+ */
+export function reasoningEffortOverride(effort: ReasoningEffortV1 | undefined): string | undefined {
+  if (effort === undefined || effort === "off") return undefined;
+  return `model_reasoning_effort=${JSON.stringify(effort)}`;
 }
 
 /** Pin 1: thread configuration. Top-level web_search="live" is the verified injection key (T3 matrix, 2026-10-16). */

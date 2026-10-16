@@ -1,0 +1,211 @@
+{
+  "a5": {
+    "unset(capture)": {
+      "thinking": {
+        "type": "enabled",
+        "budget_tokens": 8192,
+        "display": "summarized"
+      },
+      "max_tokens": 126925,
+      "anthropicBeta": "interleaved-thinking-2025-05-14",
+      "stream": true
+    },
+    "unset.thinkingLevel": "medium",
+    "off": {
+      "requested": "off",
+      "effective": "off",
+      "wire": {
+        "thinking": {
+          "type": "disabled"
+        },
+        "max_tokens": 126959,
+        "anthropicBeta": null,
+        "stream": true
+      }
+    },
+    "minimal": {
+      "requested": "minimal",
+      "effective": "minimal",
+      "wire": {
+        "thinking": {
+          "type": "enabled",
+          "budget_tokens": 1024,
+          "display": "summarized"
+        },
+        "max_tokens": 126958,
+        "anthropicBeta": "interleaved-thinking-2025-05-14",
+        "stream": true
+      }
+    },
+    "low": {
+      "requested": "low",
+      "effective": "low",
+      "wire": {
+        "thinking": {
+          "type": "enabled",
+          "budget_tokens": 2048,
+          "display": "summarized"
+        },
+        "max_tokens": 126959,
+        "anthropicBeta": "interleaved-thinking-2025-05-14",
+        "stream": true
+      }
+    },
+    "medium": {
+      "requested": "medium",
+      "effective": "medium",
+      "wire": {
+        "thinking": {
+          "type": "enabled",
+          "budget_tokens": 8192,
+          "display": "summarized"
+        },
+        "max_tokens": 126958,
+        "anthropicBeta": "interleaved-thinking-2025-05-14",
+        "stream": true
+      }
+    },
+    "high": {
+      "requested": "high",
+      "effective": "high",
+      "wire": {
+        "thinking": {
+          "type": "enabled",
+          "budget_tokens": 16384,
+          "display": "summarized"
+        },
+        "max_tokens": 126959,
+        "anthropicBeta": "interleaved-thinking-2025-05-14",
+        "stream": true
+      }
+    },
+    "xhigh": {
+      "requested": "xhigh",
+      "effective": "xhigh",
+      "wire": {
+        "thinking": {
+          "type": "enabled",
+          "budget_tokens": 16384,
+          "display": "summarized"
+        },
+        "max_tokens": 126958,
+        "anthropicBeta": "interleaved-thinking-2025-05-14",
+        "stream": true
+      }
+    },
+    "max": {
+      "requested": "max",
+      "effective": "max",
+      "wire": {
+        "thinking": {
+          "type": "enabled",
+          "budget_tokens": 16384,
+          "display": "summarized"
+        },
+        "max_tokens": 126959,
+        "anthropicBeta": "interleaved-thinking-2025-05-14",
+        "stream": true
+      }
+    },
+    "r1-boundary": {
+      "cw-5000": {
+        "contextWindow": 5000,
+        "wire": {
+          "thinking": {
+            "type": "enabled",
+            "budget_tokens": 1024,
+            "display": "summarized"
+          },
+          "max_tokens": 854,
+          "anthropicBeta": "interleaved-thinking-2025-05-14",
+          "stream": true
+        },
+        "verdict": "非法：budget ≥ max_tokens"
+      },
+      "cw-5700": {
+        "contextWindow": 5700,
+        "wire": {
+          "thinking": {
+            "type": "enabled",
+            "budget_tokens": 530,
+            "display": "summarized"
+          },
+          "max_tokens": 1554,
+          "anthropicBeta": "interleaved-thinking-2025-05-14",
+          "stream": true
+        },
+        "verdict": "非法：budget < 1024（API 下限）"
+      },
+      "cw-6200": {
+        "contextWindow": 6200,
+        "wire": {
+          "thinking": {
+            "type": "enabled",
+            "budget_tokens": 1030,
+            "display": "summarized"
+          },
+          "max_tokens": 2054,
+          "anthropicBeta": "interleaved-thinking-2025-05-14",
+          "stream": true
+        },
+        "verdict": "合法"
+      }
+    }
+  },
+  "a6": {
+    "roleEvents": [
+      {
+        "kind": "message",
+        "summary": "已思考",
+        "detailSource": "reasoning"
+      },
+      {
+        "kind": "message",
+        "summary": "PROBE-ANSWER-TEXT"
+      },
+      {
+        "kind": "settled",
+        "summary": "会话结束"
+      }
+    ],
+    "thoughtInEvents": false,
+    "answerInEvents": true,
+    "nativeRawEventTypes": {
+      "agent_start": 1,
+      "turn_start": 1,
+      "message_start": 3,
+      "message_end": 3,
+      "message_update": 6,
+      "turn_end": 1,
+      "agent_end": 1,
+      "agent_settled": 1
+    },
+    "assistantPartEventTypes": {
+      "thinking_start": 1,
+      "thinking_delta": 1,
+      "thinking_end": 1,
+      "text_start": 1,
+      "text_delta": 1,
+      "text_end": 1
+    }
+  },
+  "a7": {
+    "promptOutcome": "resolved",
+    "requestCount": 1,
+    "requestHasThinking": [
+      true
+    ],
+    "events": [
+      {
+        "kind": "denied",
+        "summary": "本轮模型运行失败",
+        "outcome": "failed"
+      },
+      {
+        "kind": "settled",
+        "summary": "本轮运行失败",
+        "outcome": "failed"
+      }
+    ]
+  }
+}

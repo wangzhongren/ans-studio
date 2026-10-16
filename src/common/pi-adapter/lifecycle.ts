@@ -29,6 +29,11 @@ export function createTurnLifecycle(emit: (event: SessionEvent) => void, diagnos
   let truncationNotified = false;
   return {
     currentTurnId: (): string | undefined => turnId,
+    /**
+     * 本轮是否已被锁定（显式 fail——abort/超时/失败路径——或已 finish 终态）。G-5 降级重发的守卫：
+     * 被中断的轮次不得重发（降级只在「网关拒绝思考参数、轮次本体未被外部打断」时发生）。
+     */
+    isInterrupted: (): boolean => forced || settled,
     begin(): void {
       if (quarantined) throw new Error("会话中止清理未完成，请重新建立会话后重试。");
       active = true;

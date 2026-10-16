@@ -140,3 +140,15 @@ export function mcpToolCallNative(item: Record<string, unknown>): { isError: boo
   const errorText = typeof error?.message === "string" && error.message !== "" ? error.message : undefined;
   return { isError: item.status === "failed" || errorText !== undefined, content, ...(errorText !== undefined ? { errorText } : {}) };
 }
+
+/**
+ * G-5 降级链保守识别：网关因推理参数拒绝的判据（0.162.1 A4 探针：上游 400 体逐字进
+ * `error.message`/`turn.error.message`，例 `{"error":{"message":"Unsupported parameter: reasoning",…}}`）。
+ * **保守优先**（设计 §七：不确定就不识别）：须同时命中「推理锚」与「拒绝词」两类——宁可少见降级、
+ * 不多发一次请求；真实网关文案未定格（B3），未命中即按既有失败口径如实收场。
+ */
+export function isReasoningParamRejection(message: unknown): boolean {
+  const text = typeof message === "string" ? message : "";
+  if (text === "") return false;
+  return /reasoning|effort/i.test(text) && /unsupported|not supported|unrecognized|unknown|invalid/i.test(text);
+}
