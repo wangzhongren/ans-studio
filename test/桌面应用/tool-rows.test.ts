@@ -185,3 +185,63 @@ test('G-2：system 归类不误伤——行内提及 / 未闭合 / 空子类 / �
   assert.equal(tools.classifyInjectedMessage('[回交] 来自 A 的报告')?.kind, 'handback');
   assert.equal(tools.classifyInjectedMessage('[派发] 来自 su 的任务：x')?.kind, 'dispatch');
 });
+
+// ————— 视觉收敛 v3（2026-10-16 客户批准：「按推荐批准，开始实施」）—————
+// W6b：system 行正文去重复前缀（chip「系统消息 · <子类>」已承载）；分类判据仍在投递原文，不改判据。
+
+test('W6b：system 展示正文剥离文首标记（displayBody）——判据/原文不变，仅呈现层取用', () => {
+  const alert = tools.classifyInjectedMessage('用户指令：[系统·看护] 投递排队积压：角色「实现者」队首任务已排队 12 分钟（深度 3）。');
+  assert.equal(alert?.body, '[系统·看护] 投递排队积压：角色「实现者」队首任务已排队 12 分钟（深度 3）。', 'body 仍为投递原文（判据来源不变）');
+  assert.equal(alert?.displayBody, '投递排队积压：角色「实现者」队首任务已排队 12 分钟（深度 3）。', 'displayBody 去掉「[系统·<子类>] 」前缀');
+  const closure = tools.classifyInjectedMessage('[系统·收束] 已无进行中任务：全部角色空闲。');
+  assert.equal(closure?.displayBody, '已无进行中任务：全部角色空闲。', '回放路径同解');
+  const bare = tools.classifyInjectedMessage('[系统·看护]');
+  assert.equal(bare?.displayBody, '', '仅标记无正文 ⇒ 展示正文为空（chip 已承载信息）');
+  const multi = tools.classifyInjectedMessage('[系统·看护]   多空白后接正文');
+  assert.equal(multi?.displayBody, '多空白后接正文', '剥前缀后仅去掉空白，不动正文');
+  // 非 system 类不带 displayBody（回交/派发正文含各自首行格式，按各自契约呈现）。
+  assert.equal(tools.classifyInjectedMessage('[回交] 来自 A 的报告')?.displayBody, undefined);
+});
+
+// S1/S4：工具调用相位合并（同一 toolCallId 的「调用发起 + 结果」并一行；不折叠重复调用）与组摘要口径「N 个调用」。
+
+test('S1：mergePhases——同一 toolCallId 两相位并入一行（首相位定位，相位按到达序）；不同调用/无 callId 不并', () => {
+  const items = [
+    { callId: 'a', turnId: 't1', phase: 'call', toolName: 'run_shell' },
+    { callId: 'a', turnId: 't1', phase: 'result', toolName: 'run_shell' },
+    { callId: 'b', turnId: 't1', phase: 'call', toolName: 'read_file' },
+    { callId: '', turnId: 't1', phase: 'call', toolName: 'legacy' },
+    { callId: 'b', turnId: 't1', phase: 'result', toolName: 'read_file' },
+  ];
+  assert.deepEqual(tools.mergePhases(items), [
+    { index: 0, phases: [0, 1] },
+    { index: 2, phases: [2, 4] },
+    { index: 3, phases: [3] },
+  ], '行序=首相位位置；同调用相位按到达序；无 callId 独立成行');
+  // 不折叠重复调用：同工具不同 callId 各占一行；同 callId 不同 turn 不并（身份=turn+call）。
+  const dup = [
+    { callId: 'c', turnId: 't1', phase: 'call' },
+    { callId: 'c', turnId: 't2', phase: 'call' },
+    { callId: 'd', turnId: 't1', phase: 'call' },
+  ];
+  assert.deepEqual(tools.mergePhases(dup).map((r: { phases: number[] }) => r.phases), [[0], [1], [2]]);
+  // 缺 callId 的相位沿用「一次事件一行」（缺一不并——不发明身份）。
+  const sparse = [{ toolName: 'x' }, { toolName: 'x' }];
+  assert.deepEqual(tools.mergePhases(sparse).map((r: { phases: number[] }) => r.phases), [[0], [1]]);
+  assert.deepEqual(tools.mergePhases([]), []);
+  assert.deepEqual(tools.mergePhases(null), []);
+});
+
+test('S4：callSummary——「N 个调用」；异常 M=含异常相位的行数；未知照旧如实（含状态未记录）', () => {
+  const items = [
+    { callId: 'a', turnId: 't', status: 'call', exceptional: false },
+    { callId: 'a', turnId: 't', status: 'completed', exceptional: false },
+    { callId: 'b', turnId: 't', status: 'call', exceptional: false },
+    { callId: 'b', turnId: 't', status: 'unknown', exceptional: false },
+    { callId: 'c', turnId: 't', status: 'call', exceptional: false },
+    { callId: 'c', turnId: 't', status: 'failed', exceptional: true },
+  ];
+  assert.deepEqual(tools.callSummary(items), { calls: 3, exceptional: 1, unknown: true }, '3 个调用、1 行含异常、含未记录');
+  assert.deepEqual(tools.callSummary([{ callId: 'x', turnId: 't', status: 'completed' }]), { calls: 1, exceptional: 0, unknown: false });
+  assert.deepEqual(tools.callSummary([]), { calls: 0, exceptional: 0, unknown: false });
+});

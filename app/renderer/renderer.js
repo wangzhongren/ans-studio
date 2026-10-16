@@ -137,7 +137,37 @@
   // （原本地 `esc` 实现已在 B-1 删除：转义是 `markdown.js` 的**单一来源**——见文件头。）
 
   var currentHintSource = null;
-  function setHint(text, source) { $("composer-hint").textContent = text || ""; currentHintSource = source || null; }
+  /** **U1（2026-10-16 桌面窗口 e2e 定位，dist=18px）**：聊天区上方 `.session-notice` 提示条
+   *  （`#composer-hint` + `#history-projection-note`，空时 `display:none`）出现/增高会**改变 `#chat`
+   *  的可见高度**——「先贴底、后出提示」的时序（典型：selectRole 异步尾部 `setHint(res.note)` 的
+   *  「续接当前会话。」≈19px）会把已贴底内容整体顶上去且无补滚。
+   *  口径：改文案**前**按 S-1 同款距底判据（`STICK_THRESHOLD_PX`）记「是否在底部附近」；改后
+   *  **提示条高度确有变化**且原在底部 ⇒ 补一次贴底。上翻者不打扰（超出阈值绝不动）；高度不变不动
+   *  （重复写同值零副作用，不引入滚动抖动）；批量期（`batchDepth`）照 Q-1 口径只登记一次，
+   *  收尾统一贴底（不逐条布局）。 */
+  function noticeLayoutPin() {
+    var chat = $("chat");
+    if (!chat || backgroundDelivery) return null;
+    var bar = document.querySelector(".session-notice");
+    return {
+      chat: chat, bar: bar, h: bar ? bar.getBoundingClientRect().height : 0,
+      pinned: UiLabels.stickToBottom(chat.scrollHeight - chat.scrollTop - chat.clientHeight, UiLabels.STICK_THRESHOLD_PX),
+    };
+  }
+  function restickAfterNoticeChange(pin) {
+    if (!pin || !pin.pinned || backgroundDelivery || !pin.chat.isConnected) return;
+    var h = pin.bar ? pin.bar.getBoundingClientRect().height : 0;
+    if (h === pin.h) return; // 提示条高度未变：不动（防抖动）
+    var pane = pin.chat.querySelector(".chat-pane");
+    if (batchDepth > 0) { if (pane) batchSuppressedScroll = pane; return; } // Q-1：批量期抑制，收尾统一贴底
+    pin.chat.scrollTop = pin.chat.scrollHeight;
+  }
+  function setHint(text, source) {
+    var pin = noticeLayoutPin(); // U1：提示条高度变化会把已贴底内容顶起——改前记「在底部附近」，改后补滚
+    $("composer-hint").textContent = text || "";
+    currentHintSource = source || null;
+    restickAfterNoticeChange(pin);
+  }
   function clearQueueHint(roleId, clientMessageId) {
     if (backgroundDelivery || state.selectedRoleId !== roleId) return;
     var source = currentHintSource;
@@ -387,7 +417,8 @@
     chat.scrollTop = sums[rec.index];
     updateVirtualWindow(pane, { preferIndex: rec.index });
     if (!rec.el || rec.el.parentNode !== pane) attachRow(rl, rec);
-    var el = saved.sub != null ? rec.el.querySelector('[data-activity-index="' + saved.sub + '"]') : null;
+    // S1：合并行以首相位下标承载 data-activity-index（捕获口径不变）；phases 属性兜底任一相位下标。
+    var el = saved.sub != null ? rec.el.querySelector('[data-activity-index="' + saved.sub + '"], [data-activity-phases~="' + saved.sub + '"]') : null;
     chat.scrollTop += (el || rec.el).getBoundingClientRect().top - chat.getBoundingClientRect().top - saved.offset;
     updateVirtualWindow(pane, null);
   }
@@ -921,15 +952,32 @@
 
   function fillActivities(rec) {
     var data = rec.data;
-    var unknown = data.items.some(function (a) { return a.status === "unknown"; });
-    rec.el.innerHTML = '<summary>查看执行记录<span class="record-count">' + data.items.length + ' 条活动' +
-      (unknown ? ' · 含状态未记录' : '') + '</span></summary>' + data.items.map(function (a, i) {
-        // v2 对齐（2026-10-13）：三列 = 42px 时间 / 操作名+目标 / 状态；未知状态带 is-unknown（琥珀色）。
-        return '<div class="tool-activity" title="' + esc(a.at || '') + '" data-activity-index="' + i + '">' +
-          '<span class="activity-time">' + esc(Rt.shortTime(a.at)) + '</span>' +
-          '<span class="activity-op">' + esc(a.toolName) +
-          '<span class="activity-target">' + esc(a.target || '目标未记录') + '</span></span>' +
-          '<span class="activity-state' + (a.status === "unknown" ? ' is-unknown' : '') + '">' + esc(a.label) + (a.legacyStatusSource === 'legacy-classifier' ? ' · 旧文本分类' : '') + '</span></div>' + ((a.hasDisplay || a.legacyTextProjection) ? '<details class="legacy-tool-detail" data-legacy-index="' + i + '"' + (a.legacyOpen ? ' open' : '') + '><summary>查看已保存的安全详情</summary><div></div></details>' : '');
+    // S1/S4（2026-10-16 客户批准）：同一 toolCallId 的「调用发起 + 结果」两相位并成**一行**（`Tr.mergePhases`
+    // 给出下标映射——`data.items` 本体与身份不动：token→行映射、回放锚点、`data-legacy-index` 展开/物化
+    // 全按下标照旧取用）；组摘要口径改「N 个调用」（异常补「· 异常 M」；未知照旧「· 含状态未记录」——
+    // 失败/未知在**折叠摘要**仍可见；行态/目标以**终态为准**，未返回时即「调用发起」）。
+    var sum = Tr.callSummary(data.items);
+    rec.el.innerHTML = '<summary>查看执行记录<span class="record-count">' + sum.calls + ' 个调用' +
+      (sum.exceptional > 0 ? ' · 异常 ' + sum.exceptional : '') +
+      (sum.unknown ? ' · 含状态未记录' : '') + '</span></summary>' + Tr.mergePhases(data.items).map(function (row) {
+        // 相位按到达序；终态 = 末相位（其结果/标签为准，目标为空时回退首相位）。
+        var phases = row.phases.map(function (i) { return data.items[i]; });
+        var terminal = phases[phases.length - 1] || {};
+        var first = phases[0] || terminal;
+        var at = terminal.at || first.at || "";
+        var target = terminal.target || first.target || "";
+        var stateText = phases.map(function (a) { return a.label + (a.legacyStatusSource === 'legacy-classifier' ? ' · 旧文本分类' : ''); }).join(' → ');
+        var isUnknown = phases.some(function (a) { return a.status === "unknown"; });
+        return '<div class="tool-activity" title="' + esc(at || '') + '" data-activity-index="' + row.index + '" data-activity-phases="' + row.phases.join(' ') + '">' +
+          '<span class="activity-time">' + esc(Rt.shortTime(at)) + '</span>' +
+          '<span class="activity-op">' + esc(terminal.toolName || first.toolName) +
+          '<span class="activity-target">' + esc(target || '目标未记录') + '</span></span>' +
+          '<span class="activity-state' + (isUnknown ? ' is-unknown' : '') + '">' + esc(stateText) + '</span></div>' +
+          // 各相位信息保留可展开：每相位（有安全详情/原记录投影者）各带自己的「折叠摘要」details（原下标，物化单点不变）。
+          row.phases.map(function (i) {
+            var a = data.items[i] || {};
+            return (a.hasDisplay || a.legacyTextProjection) ? '<details class="legacy-tool-detail" data-legacy-index="' + i + '"' + (a.legacyOpen ? ' open' : '') + '><summary>查看已保存的安全详情</summary><div></div></details>' : '';
+          }).join("");
       }).join("");
     rec.el.open = data.open;
     rec.el.querySelectorAll("[data-legacy-index]").forEach(function (details) {
@@ -1833,8 +1881,17 @@
     var el = ensureOpChip();
     var viewing = state.selectedRoleId === roleId && paneFor(roleId).parentNode === $("chat");
     var ids = openRequestIdsFor(roleId);
-    if (!viewing || ids.length === 0) {
+    // S3（2026-10-16 客户批准）：chip 与尾行**同一刷新点**——本函数每次落定 chip 可见性后回呼
+    // renderCurrentWork(roleId)，让尾行据此让位/兜底（不设第二处状态源、防两处漂移）。
+    // 非当前查看角色：chip 承载的是**当前查看角色**的状态，后台角色的刷新**不得动它**（历史缺陷：
+    // 后台请求到达会顺手隐藏正在显示的 chip）——只回呼该角色自己的尾行。
+    if (!viewing) {
+      renderCurrentWork(roleId);
+      return;
+    }
+    if (ids.length === 0) {
       el.hidden = true;
+      renderCurrentWork(roleId);
       return;
     }
     if (opChipState.roleId !== roleId || opChipState.count !== ids.length) {
@@ -1846,6 +1903,7 @@
     el.querySelector(".op-chip-text").textContent = pendingLabel === "待确认" ? UiLabels.pendingChipLabel(ids.length) : "有 " + ids.length + " 条" + pendingLabel + " · 定位";
     el.hidden = false;
     $("chat").appendChild(el); // 保持在 #chat 尾部（sticky 贴底）——空状态/重挂把它清掉后由本处复位
+    renderCurrentWork(roleId);
   }
 
   /** 交互请求到达：**严格路由** + 幂等物化 + 徽标 + （未查看时的）只读指针。 */
@@ -2120,12 +2178,15 @@
 
   /** 系统投递输入（E-1 回交 / H-1 派发 / G-2 `system`）的**单独样式**元素：图标 + 来源标签 + 正文
    *  （Markdown/esc 单一来源）。`system` 类（看护告警/收束提示/恢复回执）来源=**系统**（非角色）——
-   *  图标取 shield 区分、标签带子类原文（`tool-rows.js::classifySystemMessage` 单一来源）。 */
+   *  图标取 shield 区分、标签带子类原文（`tool-rows.js::classifySystemMessage` 单一来源）。
+   *  W6b（2026-10-16 客户批准）：`system` 类正文取 `displayBody`——文首标记（`[系统·<子类>] `）已由
+   *  chip「系统消息 · <子类>」承载，正文不再重复（回放/实时同解；归类判据仍在投递原文，不改判据）。 */
   function buildInjectedElement(inj, isReplay) {
     var el = document.createElement("div");
     el.className = "msg msg-injected is-" + inj.kind + (isReplay ? " is-replay" : "");
     var label = inj.kind === "handback" ? "原始交接内容 · 来源未确认" : inj.label + (inj.sourceRoleId ? " · 来自 " + inj.sourceRoleId : "");
-    var body = '<div class="mi-body">' + Md.renderMarkdown(inj.body) + "</div>";
+    var bodyText = typeof inj.displayBody === "string" ? inj.displayBody : inj.body;
+    var body = '<div class="mi-body">' + Md.renderMarkdown(bodyText) + "</div>";
     if (inj.kind === "handback") body = '<details class="mi-report-detail"><summary>交接内容（结构化来源未保存）</summary>' + body + "</details>";
     el.innerHTML =
       '<div class="mi-head">' +
@@ -2278,7 +2339,11 @@
       }
       // 系统投递输入（E-1 回交 / H-1 派发）**单独样式**：判据＝编排两名渲染函数的定格前缀
       // （`tool-rows.js::INJECT_PREFIXES`；**非启发式**——格式若变只改那张表）＋剥离 `用户指令：` 回显前缀。
-      // **手输防误伤**：若该回显正是本端刚手发送的文本（同角色、15s 内），一律不当投递——普通气泡路径。
+      // **手输防误伤**（fca8f6b 起为**身份绑定**；旧的「同角色 15s 时间窗」启发式已在 fca8f6b 删除）：
+      // 本端手发送的气泡在 `bindManualTurn` 以 canonical 键 `["input", turnId]` 绑定身份（并置 live 计数），
+      // 其同轮回显事件在 `appendOneEvent` 判到同键已 live ⇒ 整条去重、**不进入本归类**——手输即便字面
+      // 像投递前缀也不当投递（普通气泡路径）。注意该保护**只覆盖实时回显**；回放侧历史行无身份可依
+      // （残余边界见 `appendReplayRow` 的 `kind === "user"` 归类注释）。
       var input = ev.detail && ev.detail.source === "prompt-input" && typeof ev.detail.text === "string" ? ev.detail : null;
       if (input) {
         if (appendDelivery(pane, input, input.text, input.inputTextProjection, ev.turnId)) return;
@@ -2812,7 +2877,10 @@
   }
 
   /** 状态徽标的渲染 HTML：**图标 + 短标签**（待办数 > 0 时带「 · N 待办」后缀）；悬停 = 完整描述 +
-   *  最近事件（若有）。图标/文案/样式/描述均来自 `St.statusBadge` 的**唯一映射**。 */
+   *  最近事件（若有）。图标/文案/样式/描述均来自 `St.statusBadge` 的**唯一映射**。
+   *  W9（2026-10-16 客户批准）：working 态图标经 `iconHtml` 输出 SVG 弧线转轮（图源 = role-status.js
+   *  的编译期常量 `SPINNER_SVG`，非外部输入——此处**不转义**是单点决策；其余态/缺省一律照旧 esc 文本字形。
+   *  **不得**对徽标做 DOM 注入实现转轮：左树重绘会抹掉注入（本批审计已实地验证），唯一落点是本单点。 */
   function statusBadgeHtml(roleId) {
     var pending = (state.queueByRole[roleId] || []).length;
     var waitingKinds = openRequestIdsFor(roleId).map(function (id) { return opRequests[id].request.kind; });
@@ -2821,7 +2889,7 @@
     var hover = badge.title + (m.lastSummary ? " ｜ 最近事件（" + m.lastAt + "）：" + m.lastSummary : "");
     return (
       '<span class="ti-status ' + badge.className + '" title="' + esc(hover) + '">' +
-      '<span class="ts-ico" aria-hidden="true">' + esc(badge.icon) + "</span>" +
+      '<span class="ts-ico" aria-hidden="true">' + (badge.iconHtml || esc(badge.icon)) + "</span>" +
       esc(badge.label) +
       "</span>"
     );
@@ -2886,13 +2954,31 @@
     });
   }
 
+  /** 待确认 chip 当前是否**在屏可见**（唯一写方 = updateOpChip；chip 是 #chat 的 sticky 尾元素）。
+   *  S3 判据（2026-10-16 客户批准）：chip 可见 ⇒ 尾行不再重复「等待你确认」（同一状态源，见下）。 */
+  function opChipShown() {
+    var chip = document.getElementById("op-chip");
+    return !!chip && !chip.hidden && chip.parentNode === $("chat");
+  }
+
+  /** 聊天尾行（`.tool-current`）。S3（2026-10-16 客户批准）：**chip 可见时不显示「等待你确认」**——
+   *  chip 已承载同一状态与计数（F4 去重；B2 消除）；**「正在工作」保留**（W10：文本前加同款转轮）；
+   *  chip 不可见时状态词仍兜底。刷新点与 updateOpChip 同源联动（updateOpChip 每次改可见性后回呼本函数）。 */
   function renderCurrentWork(roleId) {
     var pane = paneFor(roleId);
     var el = pane.querySelector(".tool-current");
     var awaiting = openRequestIdsFor(roleId).length > 0;
+    if (awaiting && opChipShown()) { if (el) el.remove(); return; }
     if (!awaiting && state.roleBusy[roleId] !== true) { if (el) el.remove(); return; }
     if (!el) { el = document.createElement("div"); el.className = "tool-current"; }
-    el.textContent = awaiting ? St.pendingKindLabel(openRequestIdsFor(roleId).map(function (id) { return opRequests[id].request.kind; })).replace("待", "等待你") : "正在工作";
+    if (awaiting) {
+      el.textContent = St.pendingKindLabel(openRequestIdsFor(roleId).map(function (id) { return opRequests[id].request.kind; })).replace("待", "等待你");
+    } else if (!el.querySelector(".spin-arc")) {
+      // W10（2026-10-16 客户批准）：尾行「正在工作」= 同款 12px SVG 转轮 + 原文案（不新造词；
+      // 行高不因图标增加——图标为 flex 子项，文本行高照旧）。**等待确认场景不加任何动效**（长期约束）。
+      // 已有转轮时不重写 innerHTML——不打断旋转帧（重复刷新只保内容不重置动画）。
+      el.innerHTML = St.SPINNER_SVG + "<span>正在工作</span>";
+    }
     pane.appendChild(el);
   }
 
@@ -3143,7 +3229,11 @@
     if (kind === "user" && appendDelivery(pane, { inputProvenance: row.inputProvenance, inputPresentation: row.inputPresentation }, text, row.inputTextProjection, row.turnId)) return;
     if (text === "") return;
     if (kind !== "assistant" && kind !== "user" && kind !== "tool" && kind !== "denied") return; // 未知 kind：跳过（防御式）
-    // D-1 回放同样归类：投递输入在回放里也呈**注入样式**（判据=同一张前缀表）；手输的历史行不受影响。
+    // D-1 回放同样归类：投递输入在回放里也呈**注入样式**（判据=同一张前缀表）。
+    // **已知残余边界（2026-10-16 桌面窗口实核、桌面UI核对）**：历史行（session-history 的 user 行）只带
+    // 文本、不携「手输/投递」身份——**手输**的仿前缀文本在回放里会被归成注入行（实时回显路径有身份绑定
+    // 防误伤，见 prompt-input 分支；回放侧无身份可依）。彻底修复需历史行携带投递身份（跨角色边界），
+    // 本轮只如实标注、不改行为（定性见 docs/fix 记录）。
     if (kind === "denied" && !Tr.isToolActivity(row)) {
       if (!knownTerminal || !appendTurnTerminal(pane, { kind: "denied", turnId: knownTerminal.turnId, summary: text, detail: { outcome: knownTerminal.outcome } }, knownTerminal)) sysRow(pane, "sys-call", ICONS.deny, text);
       return;
@@ -3320,7 +3410,9 @@
     var hasHistory = !pane.querySelector(".chat-empty");
     var loading = hasHistory
       ? null
-      : sysRow(pane, "sys-loading", '<span class="spinner"></span>', "正在开启与角色 " + roleId + " 的会话…");
+      // W11（2026-10-16 客户批准）：开会话 loading 行改用**同一枚** SVG 弧线转轮（图源 = role-status.js
+      // 的 SPINNER_SVG 单点；边框转轮 .spinner/`spin 0.8s` 已退役——全应用只有一种转轮）。
+      : sysRow(pane, "sys-loading", St.SPINNER_SVG, "正在开启与角色 " + roleId + " 的会话…");
     setHint("");
 
     try {
@@ -3397,7 +3489,12 @@
     var meta = roleId && state.roleMeta[roleId];
     el.textContent = meta && meta.contextText || "尚未开启会话";
     el.title = meta && meta.contextWarning || "";
-    var history = $("history-projection-note"); if (history) history.textContent = meta && meta.historyNotice || "";
+    var history = $("history-projection-note");
+    if (history) { // U1：历史投影注记与 composer-hint 同住提示条——出现在贴底之后同样补滚（同一口径）
+      var pin = noticeLayoutPin();
+      history.textContent = meta && meta.historyNotice || "";
+      restickAfterNoticeChange(pin);
+    }
   }
   function showSessionContext(roleId, info, fromOpen, readableHistoryAtOpen) {
     var meta = metaFor(roleId);
@@ -4108,8 +4205,9 @@
     // 补开失败/用户已切换时保留输入和附件，不追加假发送气泡、不调用 sendSession。
     if (state.projectRoot !== projectRoot || state.runtime !== runtime || state.selectedRoleId !== role.roleId || state.sessionOpenRoleId !== role.roleId) return;
     var pane = paneFor(role.roleId);
-    // H-1 附录：记「本端手发送的最近一条」——投递回显归类据此**防误伤**（手输即便字面像投递前缀，
-    // 其回显也不得被当成系统投递）；普通气泡路径不受影响。
+    // H-1 附录：记「本端手发送的最近一条」（随运行时视图捕获/恢复）。**仅是记录**：回显防误伤的判据
+    // 已改为身份绑定（本函数下方 `manualMessages[clientMessageId]` + `bindManualTurn` 的 canonical 键
+    // `["input", turnId]`，去重在 `appendOneEvent`）——不再有读取方，勿据此记录做归类判断。
     lastManualSend = { roleId: role.roleId, text: text, at: Date.now() };
     // 带图时在用户气泡上保留**如实记录**（附件行发送成功后清空——图已定格进载荷/队列）。
     var clientMessageId = window.crypto.randomUUID();

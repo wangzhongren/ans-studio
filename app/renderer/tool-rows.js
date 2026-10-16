@@ -83,7 +83,10 @@
     if (/[\[\]\r\n]/.test(sub)) return null;
     var after = rest.slice(end + 1);
     if (after !== "" && !/^\s/.test(after)) return null;
-    return { kind: "system", label: "系统消息 · " + sub, sourceRoleId: "", body: body };
+    // W6b（2026-10-16 客户批准）：正文**展示**去掉文首标记（chip「系统消息 · <子类>」已承载）——`displayBody`
+    // 仅供呈现层取用；`body` 保持投递原文（归类判据/身份不因此改变：判据仍在原文上）。
+    var displayBody = after.replace(/^\s+/, "");
+    return { kind: "system", label: "系统消息 · " + sub, sourceRoleId: "", body: body, displayBody: displayBody };
   }
 
   /** 识别"系统投递输入"的 message 事件/回放文本；非投递 → null（普通气泡路径不受影响）。 */
@@ -98,6 +101,50 @@
       }
     }
     return classifySystemMessage(body);
+  }
+
+  // —————— S1（2026-10-16 客户批准）：工具调用相位合并 ——————
+  // 同一 `toolCallId`（带 turnId 时同 turn）的「调用发起 + 结果」两相位并成**一行**展示（终态为准；
+  // 未返回时只有「调用发起」）；**不折叠重复调用**——不同 callId 永远各占一行，行序 = 该调用**首相位**
+  // 在条目序中的位置（合并只发生在同一身份的两相位之间，实际身份与顺序逐条保留）。仅返回下标映射
+  // （纯函数）：`[{ index: 首相位下标, phases: [各相位下标(到达序)] }]`——行内各相位的身份、详情
+  // 展开与 legacy 投影由呈现层按原下标继续取用（`data.items` 本体不动——虚拟窗口行高缓存、
+  // token→行映射、回放锚点全部不受影响）。无 callId 的条目各成一行（缺一不并）。
+  function mergePhases(items) {
+    var list = Array.isArray(items) ? items : [];
+    var byCall = Object.create(null);
+    var rows = [];
+    for (var i = 0; i < list.length; i += 1) {
+      var a = list[i] && typeof list[i] === "object" ? list[i] : {};
+      var callId = typeof a.callId === "string" && a.callId !== "" ? a.callId : "";
+      var turnId = typeof a.turnId === "string" ? a.turnId : "";
+      var key = callId ? turnId + "\u0000" + callId : "";
+      if (key && byCall[key]) { byCall[key].phases.push(i); continue; }
+      var row = { index: i, phases: [i] };
+      if (key) byCall[key] = row;
+      rows.push(row);
+    }
+    return rows;
+  }
+
+  /** S4（2026-10-16 客户批准）：组摘要口径 = **调用数**（`mergePhases` 行数）——「N 个调用」；
+   *  `exceptional` = 含异常相位的行数（异常时补「· 异常 M」）；`unknown` = 任一条目状态未记录
+   *  （保留既有「· 含状态未记录」如实计数）。纯计数，不改变任何条目事实。 */
+  function callSummary(items) {
+    var list = Array.isArray(items) ? items : [];
+    var rows = mergePhases(list);
+    var exceptional = 0;
+    var unknown = false;
+    for (var i = 0; i < rows.length; i += 1) {
+      var hasExceptional = false;
+      for (var j = 0; j < rows[i].phases.length; j += 1) {
+        var a = list[rows[i].phases[j]] || {};
+        if (a.exceptional === true) hasExceptional = true;
+        if (a.status === "unknown") unknown = true;
+      }
+      if (hasExceptional) exceptional += 1;
+    }
+    return { calls: rows.length, exceptional: exceptional, unknown: unknown };
   }
 
   // 展示事实只来自已存在的执行结果；accepted单独出现不是执行成功。
@@ -160,7 +207,7 @@
       summary: slimToolRow(raw), at: typeof o.at === "string" ? o.at : "" };
   }
 
-  var api = { isToolActivity: isToolActivity, activityOf: activityOf, slimToolRow: slimToolRow, LIMIT: LIMIT, classifyInjectedMessage: classifyInjectedMessage, INJECT_PREFIXES: INJECT_PREFIXES };
+  var api = { isToolActivity: isToolActivity, activityOf: activityOf, slimToolRow: slimToolRow, LIMIT: LIMIT, classifyInjectedMessage: classifyInjectedMessage, INJECT_PREFIXES: INJECT_PREFIXES, mergePhases: mergePhases, callSummary: callSummary };
   root.ANSToolRows = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api; // 若将来以 CJS 装载
 })(typeof window !== "undefined" ? window : globalThis);

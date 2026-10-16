@@ -1164,6 +1164,40 @@ test("U-1：点角色到底部（取代 B-2「恢复位置」；scrollMemo 删�
   assert.ok(RENDERER.includes("if (nearBottomAtArrival) scrollBottomForced(pane);"), "P-1 到达即达仍在（卡到达例外）");
 });
 
+// ————————————————— U1（2026-10-16 桌面窗口 e2e 定位 dist=18px）：提示出现后仍贴底 —————————————————
+
+test("U1：会话提示条（.session-notice）出现/增高——「在底部者」补一次贴底；上翻者不打扰；高度不变不动", () => {
+  // 病灶（V2 批 fd0ac73 引入）：提示（#composer-hint + #history-projection-note）从聊天区下方移成**上方**
+  // 的条（.session-notice，空时 display:none）；selectRole 异步尾部 setHint(res.note)（「续接当前会话。」
+  // ≈19px）在贴底**之后**把条展开 ⇒ #chat 高度 -18px、已贴底内容被顶起且无补滚——桌面窗口 e2e
+  // U1_WINDOWED_TO_BOTTOM 实测 dist=18px。修法：**先量后写**——改前按 S-1 同款距底判据记「是否在
+  // 底部附近」，改后条高确有变化且原在底部才补贴底（上翻者绝不动；高度不变不动，防抖动）。
+  assert.ok(RENDERER.includes("function noticeLayoutPin()") && RENDERER.includes("function restickAfterNoticeChange(pin)"), "应有提示条布局粘性助手（先量后写）");
+  // ① setHint 与历史投影注记两个写方都走「量—写—补」：写法在文案落定之前，补滚在之后。
+  assert.ok(
+    /function setHint\(text, source\) \{\s*var pin = noticeLayoutPin\(\)[\s\S]{0,240}\$\("composer-hint"\)\.textContent = text \|\| "";[\s\S]{0,200}restickAfterNoticeChange\(pin\);/.test(RENDERER),
+    "setHint：改前记位、改后补滚（U1 主路径）"
+  );
+  assert.ok(
+    /var pin = noticeLayoutPin\(\);[\s\S]{0,160}history\.textContent = meta && meta\.historyNotice \|\| "";[\s\S]{0,120}restickAfterNoticeChange\(pin\);/.test(RENDERER),
+    "历史投影注记同住提示条——同款「量—写—补」（不设第二套口径）"
+  );
+  // ② 粘性口径复用 S-1（在底部附近才贴底——上翻者不打扰），并守 backgroundDelivery（后台视图不得动可见视口）。
+  assert.ok(
+    /function noticeLayoutPin\(\) \{[\s\S]{0,400}backgroundDelivery\) return null;[\s\S]{0,400}UiLabels\.stickToBottom\(chat\.scrollHeight - chat\.scrollTop - chat\.clientHeight, UiLabels\.STICK_THRESHOLD_PX\)/.test(RENDERER),
+    "记位：backgroundDelivery 直接放弃 + S-1 同款阈值判「在底部附近」"
+  );
+  // ③ 补滚四道闸：原在底部、高度确有变化、批量期抑制（Q-1 收尾统一）、收尾即真贴底。
+  assert.ok(
+    /function restickAfterNoticeChange\(pin\) \{[\s\S]{0,300}if \(h === pin\.h\) return; \/\/ 提示条高度未变：不动（防抖动）[\s\S]{0,300}batchSuppressedScroll = pane; return; \} \/\/ Q-1：批量期抑制，收尾统一贴底[\s\S]{0,120}pin\.chat\.scrollTop = pin\.chat\.scrollHeight;/.test(RENDERER),
+    "补滚：高度未变不动 / 批量期只登记 / 收尾贴底"
+  );
+  assert.ok(/if \(!pin \|\| !pin\.pinned \|\| backgroundDelivery \|\| !pin\.chat\.isConnected\) return;/.test(RENDERER), "补滚前置闸：原在底部 + 非后台 + 视图仍在");
+  // ④ 不新增计时器（本批纪律保持——纯同步量写，不引延迟/抖动）。
+  const code = RENDERER.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+  assert.ok(!code.includes("setTimeout") && !code.includes("setInterval"), "提示条补滚不得引入计时器");
+});
+
 // ————————————————— 真机缺陷修复（2026-10-12）：交互卡锚点物化（已决卡切走切回跑到流尾） —————————————————
 
 test("锚点物化：重物化复用既有行（不重建落尾）；registerRow 支持锚点插入；回放锚点表登记与消费；兜底落尾写明且不丢卡", () => {
@@ -1382,4 +1416,96 @@ test("cold report snapshots sort copied list by valid actual times only, keeping
     assert.deepEqual(order([newer,unknown,older]),[newer,unknown,older]);
   }
   assert.equal((RENDERER.match(/orderedHistoryReports\(payload\.reports\)/g)||[]).length,2,'both cold replay paths use copy ordering');
+});
+
+// ————————————————— 视觉收敛 v3（2026-10-16 客户「按推荐批准，开始实施」）—————————————————
+// 批准面：W1–W6（默认档数值）/ W6b / S1–S4 / W9–W11（SVG 弧线转轮）；W7 行高不动；
+// 「等待确认卡零动效、不打字光标」为长期约束。数值断言见 e2e（uiux-design-audit.mjs v3 段）；
+// 此处钉住**源码不变式**（单点、退役项、防回潮）。
+
+test("v3/W9–W11：全应用唯一一枚 12px SVG 弧线转轮——图源在 role-status.js 单点，字形/边框转轮退役", async () => {
+  const href = new URL("../../app/renderer/role-status.js", import.meta.url).href;
+  await import(href);
+  const St = (globalThis as Record<string, unknown>).ANSRoleStatus as {
+    SPINNER_SVG: string;
+    statusBadge: (s: string) => { icon: string; iconHtml?: string; label: string };
+  };
+  // 图源唯一：SPINNER_SVG 常量按批准规格（弧线转轮：约 270° 弧、圆头线端、currentColor、12px）。
+  const SVG = St.SPINNER_SVG;
+  assert.ok(typeof SVG === "string" && SVG.includes('class="spin-arc"'), "转轮 SVG 带 .spin-arc 钩子（唯一图源）");
+  for (const frag of ['viewBox="0 0 12 12"', 'width="12"', 'height="12"', 'cx="6"', 'cy="6"', 'r="4.6"', 'fill="none"', 'stroke="currentColor"', 'stroke-width="1.5"', 'stroke-linecap="round"', 'stroke-dasharray="21.7 7.2"', 'aria-hidden="true"']) {
+    assert.ok(SVG.includes(frag), "转轮 SVG 应含批准规格 " + frag);
+  }
+  // W9：工作徽标经映射带 iconHtml（SVG）；文本字形保留（其余上下文/测试锚点用——非转轮实现）。
+  const working = St.statusBadge("working");
+  assert.equal(working.iconHtml, SVG, "working 徽标 iconHtml = SPINNER_SVG（映射单一来源）");
+  assert.equal(working.icon, "◐", "文本字形字段保留（一态一图标断言不变）");
+  const idle = St.statusBadge("idle");
+  assert.ok(!idle.iconHtml, "其余状态不给 iconHtml（照旧文本字形）");
+  // 渲染单点：statusBadgeHtml 以 iconHtml 优先、缺省 esc 文本字形（不得 DOM 注入——左树重绘会抹掉注入）。
+  assert.ok(RENDERER.includes("(badge.iconHtml || esc(badge.icon))"), "渲染侧 iconHtml 优先、缺省 esc（唯一决胜点）");
+  assert.ok(RENDERER.includes("St.SPINNER_SVG"), "尾行/loading 复用同一图源（St.SPINNER_SVG）");
+  assert.ok(RENDERER.includes('sysRow(pane, "sys-loading", St.SPINNER_SVG'), "W11：开会话 loading 行用同款 SVG 转轮");
+  // 退役：边框转轮（.spinner 元素/类、spin 0.8s 关键帧）不得回潮。
+  assert.ok(!RENDERER.includes('class="spinner"'), "renderer.js 不得再产 .spinner 元素");
+  assert.ok(!STYLES.includes("animation: spin 0.8s") && !STYLES.includes("@keyframes spin {"), "styles.css 边框转轮动画已退役");
+  // 动画仅批准的两条规则 + 全局 reduced-motion 兜底（静止弧）。
+  assert.ok(STYLES.includes("@keyframes v3spin { to { transform: rotate(360deg); } }"), "转轮关键帧 v3spin");
+  assert.ok(STYLES.includes(".ti-status.st-working .ts-ico .spin-arc { animation: v3spin 0.9s linear infinite; transform-origin: 50% 50%; }"), "W9 侧栏动画（0.9s linear、transform 合成）");
+  assert.ok(STYLES.includes(".tool-current .spin-arc, .sys-loading .spin-arc { animation: v3spin 0.9s linear infinite; transform-origin: 50% 50%; }"), "W10/W11 复用动画（同款、唯一实现）");
+  assert.ok(STYLES.includes(".ti-status .ts-ico { font-size: 10px; line-height: 1; color: var(--text-3); display: inline-flex; width: 12px; height: 12px;"), "W9 图标盒 12px 见方");
+  assert.ok(/@media \(prefers-reduced-motion: reduce\)[\s\S]*animation-duration: 0\.001ms !important[\s\S]*animation-iteration-count: 1 !important/.test(STYLES), "reduced-motion 全局兜底（静止弧——验收 #12 数值口径）");
+  // 长期约束（第⑦项）：仅 working 态出现转轮；等待确认/恢复卡/chip 不得引入忙碌动效（源码面检查：动效规则只此两条）。
+  const animRules = STYLES.match(/animation: v3spin/g) || [];
+  assert.equal(animRules.length, 2, "v3spin 动画恰两条规则（其余位置不引入）");
+  assert.ok(!/op-chip[^{]*\{[^}]*v3spin/.test(STYLES) && !/op-request[^{]*\{[^}]*v3spin/.test(STYLES) && !/recovery[^{]*\{[^}]*v3spin/.test(STYLES), "op-chip/op-request/恢复卡不得带转轮动效");
+});
+
+test("v3/W10+S3：尾行——「正在工作」带同款转轮；chip 可见时不显示「等待你确认」（同一刷新点联动）", () => {
+  assert.ok(RENDERER.includes('el.innerHTML = St.SPINNER_SVG + "<span>正在工作</span>"'), "W10：尾行转轮 + 原文案（不新造词）");
+  assert.ok(RENDERER.includes("!el.querySelector(\".spin-arc\")"), "W10：重复刷新不重写 innerHTML（不打断旋转帧）");
+  // S3：判据 = chip 在屏可见；renderCurrentWork 与 updateOpChip 同源联动（updateOpChip 每次落定可见性后回呼）。
+  assert.ok(RENDERER.includes("function opChipShown()"), "S3 判据单点 opChipShown()（读 chip 实际可见性，不设第二状态源）");
+  assert.ok(RENDERER.includes("if (awaiting && opChipShown()) { if (el) el.remove(); return; }"), "S3：chip 可见 ⇒ 尾行让位（「正在工作」保留、无 chip 时兜底）");
+  const linked = (RENDERER.match(/renderCurrentWork\(roleId\);/g) || []).length;
+  assert.ok(linked >= 6, "updateOpChip 三个出口（非 viewing/无请求/可见）均回呼 renderCurrentWork（同源联动）");
+  assert.ok(RENDERER.includes("非当前查看角色：chip 承载的是**当前查看角色**的状态"), "updateOpChip 不再被后台角色刷新顺手动到（S3 正确性前提）");
+});
+
+test("v3/W1–W6/W6b/S2：样式数值按批准默认档落位（实测口径见 e2e v3 段）", () => {
+  // W1 行距 16 / W2 段距 10、h3 16/6 / W3 气泡 9/14+24 / W4 输入区 14/32/12、胶囊 10/14、空框 28、脚注 6 / W5 活动行 5、首行 6、摘要 22 / W6 注入盒 1.6。
+  assert.ok(STYLES.includes(".chat-pane { max-width:800px; gap:16px; }"), "W1：行距 16px（V2 值 24 的基线修订）");
+  assert.ok(STYLES.includes(".msg p { margin: 0 0 10px; }"), "W2：p 段距 10px");
+  assert.ok(STYLES.includes(".msg h1, .msg h2, .msg h3 { margin: 16px 0 6px;"), "W2：h1–h3 边距 16/6");
+  assert.ok(STYLES.includes(".msg-user { background:#f0f3ed; border-radius:10px; padding:9px 14px; line-height:24px; }"), "W3：气泡 pad 9/14、行高 24（单行 42px 口径）");
+  assert.ok(STYLES.includes(".composer { padding:14px 32px 12px; min-height:0; border-top:0; }"), "W4：输入区 pad 14/32/12");
+  assert.ok(STYLES.includes(".capsule { display:flex; flex-direction:column; align-items:stretch; padding:10px 14px;"), "W4：胶囊 pad 10/14");
+  assert.ok(STYLES.includes("background:#fff; border-color:#ccd6cb; gap:6px; }"), "W4：胶囊 gap 6");
+  assert.ok(STYLES.includes(".capsule textarea { display:block; width:100%; min-height:28px;"), "W4：空输入框 min-height 28");
+  assert.ok(STYLES.includes(".compose-note { max-width:800px; margin:6px auto 0;"), "W4：脚注上距 6");
+  assert.ok(STYLES.includes("line-height: 22px; list-style: none;"), "W5：组摘要行高 22");
+  assert.ok(STYLES.includes(".tool-activity { display: grid;") && STYLES.includes("gap: 10px; align-items: start; padding: 5px 0;"), "W5：活动行 pad 5");
+  assert.ok(STYLES.includes(".tool-activity:first-of-type { margin-top: 6px; }"), "W5：首行上距 6");
+  assert.ok(STYLES.includes(".msg-injected .mi-body { color: var(--text-2); line-height: 1.6; }"), "W6：注入盒正文行高 1.6");
+  // W7（批准②：不动）与 W8（不在批准清单）：正文行高/空态文案保持 v2。
+  assert.ok(STYLES.includes(".msg { font-size:15px; line-height:1.8; }"), "W7 未做：正文 15px/1.8 不动（批准②）");
+  // S2：chip 左缘对齐阅读列（自适应；验收=左缘差 ≤8px）。
+  assert.ok(STYLES.includes("#chat > .op-chip { margin-left: calc((100% - min(800px, 100%)) / 2); }"), "S2：chip 随阅读列左缘（仅定位规则）");
+  assert.ok(STYLES.includes(".op-chip { align-self: flex-start; min-height: 30px;"), "S2 未动 chip 卡样式（仅加定位规则）");
+});
+
+test("v3/W6b+S1/S4：渲染线——system 正文 displayBody、活动组「N 个调用」经纯函数单点", () => {
+  assert.ok(RENDERER.includes("var bodyText = typeof inj.displayBody === \"string\" ? inj.displayBody : inj.body;"), "W6b：注入行正文取 displayBody（缺省原文——回交/派发不受影响）");
+  assert.ok(RENDERER.includes("Md.renderMarkdown(bodyText)"), "W6b：正文渲染经 displayBody 单点");
+  assert.ok(RENDERER.includes("var sum = Tr.callSummary(data.items);"), "S4：组摘要口径经 Tr.callSummary（纯函数单点）");
+  assert.ok(RENDERER.includes("sum.calls + ' 个调用'"), "S4：文案「N 个调用」");
+  assert.ok(RENDERER.includes("' · 异常 ' + sum.exceptional"), "S4：异常时补「· 异常 M」");
+  assert.ok(RENDERER.includes("' · 含状态未记录'"), "S1：未知如实标注保留（折叠摘要可见）");
+  assert.ok(RENDERER.includes("Tr.mergePhases(data.items)"), "S1：合并经 Tr.mergePhases（下标映射——data.items 本体不动）");
+  assert.ok(RENDERER.includes("data-activity-phases"), "S1：合并行携带相位下标（捕获/恢复与逐条身份保留）");
+  assert.ok(RENDERER.includes("terminal.toolName || first.toolName"), "S1：终态为准（目标/标签以终态为主、首相位兜底）");
+  assert.ok(RENDERER.includes("esc(stateText) + '</span></div>'"), "S1：行态按相位链呈现（各相位信息保留）");
+  assert.ok(RENDERER.includes("data-legacy-index=\"' + i + '\""), "S1：各相位折叠详情按下标保留可展开（物化单点不变）");
+  // S1 依赖的纯映射在 tool-rows 唯一实现（不在渲染侧另写一份合并逻辑）。
+  assert.ok(RENDERER.includes("Tr.mergePhases") && RENDERER.includes("Tr.callSummary"), "合并/计数只经 ANSToolRows 导出（无第二份实现）");
 });

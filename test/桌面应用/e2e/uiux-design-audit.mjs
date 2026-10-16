@@ -1,9 +1,12 @@
-// 离线设计对齐测量夹具（只读测量，不改页面）：真实 renderer/preload + 受控 IPC 替身。
-// 目的：在 1360×860 / 960×620 两档记录关键组件 rect 与计算样式，供与 UIUX v2 设计规范/原型逐项对照。
+// 离线设计对齐测量夹具（只读测量 + v3 验收断言）：真实 renderer/preload + 受控 IPC 替身。
+// 目的：在 1360×860 / 960×620 两档记录关键组件 rect 与计算样式，供与 UIUX v2 设计规范/原型逐项对照；
+// 2026-10-16 追加「v3 验收段」：按视觉收敛 v3 设计 §二(d) 的 12 条数值断言 + S1–S4 结构断言（同源口径 =
+// UIUX audit-v3.mjs 的 DENSITY 段；截图 v3-after-* 与 UIUX 证据的 v3-*/ind-before-* 对照）。断言失败 ⇒ 非零退出。
 // 运行：ANS_UIUX_OUTDIR=/tmp/ans-design-audit node_modules/.bin/electron test/桌面应用/e2e/uiux-design-audit.mjs
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow, ipcMain } from 'electron';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -14,8 +17,9 @@ app.setPath('userData', path.join(OUT, 'user-data'));
 const ROOT = '/offline-design-audit';
 const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=';
 let win;
+let lastJs = '';
 const pause = ms => new Promise(r => setTimeout(r, ms));
-const js = code => win.webContents.executeJavaScript(code.includes('await ') ? '(async()=>{' + code + '})()' : code);
+const js = code => { lastJs = String(code).slice(0, 160); return win.webContents.executeJavaScript(code.includes('await ') ? '(async()=>{' + code + '})()' : code); };
 const roles = ['su', '示例角色'].map(roleId => ({ roleId, cardPath: ROOT + '/角色卡/' + roleId + '/role-card.md', cardText: '# ' + roleId + '\n\n完整角色职责与边界说明。\n\n' + ('资料内容用于检查阅读态。\n\n'.repeat(40)), boundary: { entries: [] }, boundaryPath: '', changelog: null, docs: [] }));
 const listing = { projectRoot: ROOT, primaryRoleId: 'su', hasRoles: true, warnings: [], roles };
 const longFull = '全文 ' + '排队消息详细内容与来源。\n'.repeat(30) + '长连续文本 ' + 'ordinaryword'.repeat(100);
@@ -26,12 +30,19 @@ const queue = [
 ];
 let activeQueue = queue.slice();
 const snapshot = (busy = true) => ({ roleId: 'su', busy, summaries: activeQueue.map(x => x.summary), queue: activeQueue, running: busy ? { id: 'running', kind: 'message', summary: '正在处理当前请求', full: '', at: '2026-10-13T10:00:00Z' } : null });
+// v3 验收段：可延迟的 session:open（抓取开会话 loading 行；W11 转轮）——默认路径逐字不变。
+let deferOpenRole = null, deferredOpen = null;
 const handlers = {
   'app:renderer-diagnostic': () => ({ ok: true }), 'app:recovery-state': () => ({ projectRoot: ROOT, roleId: 'su' }), 'app:recovery-ready': () => ({ ok: true }),
   'window:is-maximized': () => false, 'app:list-project': () => listing, 'app:pick-project': () => ROOT,
   'session:history-get':(_e,input)=>({...input,rows:[],error:null,skipped:0}), 'session:live-views':()=>[{projectRoot:ROOT,roleId:'su',runtime:'pi'}],
-  'runtime-config:get':()=>handlers['pi-config:get'](), 'runtime-config:save':()=>({ok:true,appliedKeys:[]}),
-  'session:open': () => ({ ok: true, resumed: true, contextSource: 'resumed' }), 'session:live': () => ['su'], 'session:stop': () => ({ ok: true }),
+  // runtime-config 新形状（含 runtime/missingKeys——旧 pi-config 直出形状会被摘要校验拒绝、顶出顶部告警条，
+// 挤压聊天视口；UIUX 侧亦记录过该夹具过期提示）。字段内容仍为受控替身。
+  'runtime-config:get':()=>({ runtime: 'pi', label: 'Pi', path: ROOT + '/' + ('a-very-long-path/'.repeat(12)) + '.env', revision: 0, application: 'next-session', missingKeys: [], fields: ['ANTHROPIC_AUTH_TOKEN', 'ANS_PI_BASE_URL', 'ANS_PI_MODEL', 'ANS_PI_CONTEXT_WINDOW'].map(key => ({ key, secret: key === 'ANTHROPIC_AUTH_TOKEN', required: key !== 'ANS_PI_CONTEXT_WINDOW', value: key === 'ANTHROPIC_AUTH_TOKEN' ? '' : 'fixture', isSet: true, source: 'environment' })) }),
+  'runtime-config:save':()=>({ok:true,appliedKeys:[]}),
+  'session:open': (_e, input) => (input && input.roleId === deferOpenRole
+    ? new Promise(resolve => { deferredOpen = () => resolve({ ok: true, resumed: true, contextSource: 'resumed' }); })
+    : ({ ok: true, resumed: true, contextSource: 'resumed' })), 'session:live': () => ['su'], 'session:stop': () => ({ ok: true }),
   'session:abort': () => ({ ok: true, supported: true }),
   'session:operator-response': () => ({ ok: true }),
   'pi-config:get': () => ({ path: ROOT + '/' + ('a-very-long-path/'.repeat(12)) + '.env', fields: ['ANTHROPIC_AUTH_TOKEN', 'ANS_PI_BASE_URL', 'ANS_PI_MODEL', 'ANS_PI_CONTEXT_WINDOW'].map(key => ({ key, secret: key === 'ANTHROPIC_AUTH_TOKEN', value: key === 'ANTHROPIC_AUTH_TOKEN' ? '' : 'fixture', isSet: true })) }),
@@ -104,14 +115,84 @@ const measurement = `(() => {
   return m;
 })()`;
 
+// ————— v3 验收段模板（2026-10-16 客户批准）—————
+// DENSITY：同源口径 = UIUX audit-v3.mjs 的 DENSITY 段（逐项同名）+ transcriptH（转录总高：
+// 末行底 − 首个真实行顶——与设计文档「945→823」同口径）+ recordsSummary（折叠摘要文本）。
+const DENSITY_V3 = `(() => {
+  const q = s => document.querySelector(s);
+  const pane = q('#chat .chat-pane'); const chat = q('#chat');
+  const rect = el => { const b = el.getBoundingClientRect(); return { y: +b.y.toFixed(1), h: +b.height.toFixed(1), x: +b.x.toFixed(1), w: +b.width.toFixed(1), bottom: +b.bottom.toFixed(1) }; };
+  const st = (el) => getComputedStyle(el);
+  const m = {};
+  m.viewport = { w: innerWidth, h: innerHeight, bodyScrollW: document.body.scrollWidth };
+  m.paneGap = pane ? st(pane).gap : null;
+  const rows = pane ? [...pane.children].filter(el => el.className !== 'chat-empty') : [];
+  m.rows = rows.map(el => ({ cls: String(el.className).slice(0, 48), ...rect(el) }));
+  m.gaps = [];
+  for (let i = 1; i < rows.length; i += 1) {
+    const a = rows[i-1].getBoundingClientRect(), b = rows[i].getBoundingClientRect();
+    m.gaps.push(+(b.y - a.bottom).toFixed(1));
+  }
+  m.transcriptH = rows.length > 1 ? +(rows[rows.length-1].getBoundingClientRect().bottom - rows[1].getBoundingClientRect().top).toFixed(1) : null;
+  const view = chat.getBoundingClientRect();
+  const top = view.top + 1, bottom = view.bottom - 1;
+  m.chatViewportH = +view.height.toFixed(1);
+  m.fullyVisibleRows = rows.filter(el => { const b = el.getBoundingClientRect(); return b.top >= top && b.bottom <= bottom; }).length;
+  m.msg = q('.chat-pane .msg-assistant') ? { fontSize: st(q('.chat-pane .msg-assistant')).fontSize, lineHeight: st(q('.chat-pane .msg-assistant')).lineHeight } : null;
+  m.msgP = q('.chat-pane .msg-assistant p') ? { margin: st(q('.chat-pane .msg-assistant p')).margin } : null;
+  m.msgH3 = q('.chat-pane .msg-assistant h3') ? { fontSize: st(q('.chat-pane .msg-assistant h3')).fontSize, margin: st(q('.chat-pane .msg-assistant h3')).margin } : null;
+  m.userBubble = q('.chat-pane .msg-user') ? { rect: rect(q('.chat-pane .msg-user')), padding: st(q('.chat-pane .msg-user')).padding, lineHeight: st(q('.chat-pane .msg-user')).lineHeight } : null;
+  const rec = q('.chat-pane .tool-records');
+  m.records = rec ? { summaryH: +rec.querySelector('summary').getBoundingClientRect().height.toFixed(1), summaryLineHeight: st(rec.querySelector('summary')).lineHeight, open: rec.open, summary: rec.querySelector('summary').textContent } : null;
+  const acts = [...document.querySelectorAll('.chat-pane .tool-activity')];
+  m.activityCount = acts.length;
+  m.activityAvgH = acts.length ? +(acts.reduce((s, a) => s + a.getBoundingClientRect().height, 0) / acts.length).toFixed(1) : null;
+  m.activityMaxH = acts.length ? +Math.max(...acts.map(a => a.getBoundingClientRect().height)).toFixed(1) : null;
+  m.activityTotalH = +acts.reduce((s, a) => s + a.getBoundingClientRect().height, 0).toFixed(1);
+  m.activity = acts.length ? { text: acts[0].textContent, state: (acts[0].querySelector('.activity-state')||{}).textContent || '', unknownCls: acts[0].querySelector('.activity-state').classList.contains('is-unknown') } : null;
+  const inj = q('.chat-pane .msg-injected');
+  m.injected = inj ? { rect: rect(inj), bodyText: (inj.querySelector('.mi-body')||{}).textContent || '', chip: (inj.querySelector('.mi-chip')||{}).textContent || '', bodyLineHeight: st(inj.querySelector('.mi-body')).lineHeight } : null;
+  const comp = q('.composer');
+  m.composer = { rect: rect(comp), padding: st(comp).padding };
+  m.capsule = q('#composer-capsule') ? { rect: rect(q('#composer-capsule')), padding: st(q('#composer-capsule')).padding, gap: st(q('#composer-capsule')).gap } : null;
+  m.textarea = q('#inp-message') ? { minHeight: st(q('#inp-message')).minHeight, rect: rect(q('#inp-message')) } : null;
+  m.composeNote = q('.compose-note') ? { rect: rect(q('.compose-note')), marginTop: st(q('.compose-note')).marginTop } : null;
+  m.chip = (() => { const c = q('#op-chip'); if (!c || c.hidden) return { hidden: true }; const r = c.getBoundingClientRect(); return { hidden: false, x: +r.x.toFixed(1), y: +r.y.toFixed(1) }; })();
+  m.current = q('#chat .tool-current') ? { rect: rect(q('#chat .tool-current')), text: q('#chat .tool-current').textContent } : null;
+  m.deniedVisible = !!q('#chat .sys-denied');
+  return m;
+})()`;
+
+// INDICATORS：同源口径 = UIUX indicators 专项夹具（工作徽标 / 尾行 / loading / 零动效检查）。
+const INDICATORS_V3 = `(() => {
+  const anim = el => el ? getComputedStyle(el).animationName + ' ' + getComputedStyle(el).animationDuration : null;
+  const ico = document.querySelector('.ti-status.st-working .ts-ico .spin-arc');
+  const icoBox = document.querySelector('.ti-status.st-working .ts-ico');
+  const tc = document.querySelector('#chat .tool-current');
+  const tcSvg = tc ? tc.querySelector('.spin-arc') : null;
+  const loadSvg = document.querySelector('#chat .sys-loading .spin-arc');
+  const opChip = document.getElementById('op-chip');
+  const opCard = document.querySelector('#chat .op-request');
+  return {
+    workingIco: { hasSvg: !!ico, boxW: icoBox ? +icoBox.getBoundingClientRect().width.toFixed(1) : null, svgCssW: ico ? getComputedStyle(ico).width : null, svgCssH: ico ? getComputedStyle(ico).height : null, anim: anim(ico) },
+    toolCurrent: tc ? { text: tc.textContent, height: +tc.getBoundingClientRect().height.toFixed(1), hasSvg: !!tcSvg, anim: anim(tcSvg) } : null,
+    loading: loadSvg ? { tag: loadSvg.tagName, anim: anim(loadSvg) } : null,
+    spinnerElems: document.querySelectorAll('.spinner').length,
+    spinArcTotal: document.querySelectorAll('.spin-arc').length,
+    opChipAnim: opChip && !opChip.hidden ? getComputedStyle(opChip).animationName : null,
+    opCardAnim: opCard ? getComputedStyle(opCard).animationName : null,
+    opCardIter: opCard ? getComputedStyle(opCard).animationIterationCount : null,
+  };
+})()`;
+
 app.whenReady().then(async () => {
-  const watchdog = setTimeout(() => { fs.writeFileSync(path.join(OUT, 'watchdog.txt'), 'timeout'); app.exit(1); }, 60000);
+  const watchdog = setTimeout(() => { fs.writeFileSync(path.join(OUT, 'watchdog.txt'), 'timeout'); app.exit(1); }, 120000);
   try {
     win = new BrowserWindow({ width: 1360, height: 860, useContentSize: true, frame: false, show: false, webPreferences: { preload: path.join(APP, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: false } });
     await win.loadFile(path.join(APP, 'renderer/index.html'));
     await pause(200);
     const push = async (ch, payload) => { win.webContents.send(ch, payload); await pause(120); };
-    const shot = async name => { const img = await win.webContents.capturePage(); fs.writeFileSync(path.join(OUT, name + '.png'), img.toPNG()); };
+    const shot = async (name, rect) => { const img = await win.webContents.capturePage(rect); fs.writeFileSync(path.join(OUT, name + '.png'), img.toPNG()); };
     const report = { electron: process.versions.electron, node: process.versions.node, widths: {} };
     await push('session:role-state', snapshot(true));
     await push('session:history', { roleId: 'su', projectRoot: ROOT, rows: historyRows });
@@ -140,12 +221,186 @@ app.whenReady().then(async () => {
       await js(`document.getElementById('drawer-close').click()`); await pause(150);
       report.widths[w] = entry;
     }
+
+    // ————————————— v3 实施验收段（2026-10-16 客户批准「按推荐批准，开始实施」）—————————————
+    // 按设计 §二(d)：12 条数值断言（1360×860 同一转录滚到底；#9–#12 走 indicators 口径）+ S1–S3 结构
+    // 断言。截图 v3-after-* 与 UIUX v3 证据对照（before 基准以其 canonical 截图为准）。
+    const v3 = { results: {}, measures: {} };
+    const v3check = (name, ok, detail) => { v3.results[name] = { ok: !!ok, detail: String(detail == null ? '' : detail) }; };
+    win.setContentSize(1360, 860); await pause(250);
+    // 注意：renderer 以 `app:list-project` 返回的 projectRoot 为唯一事实根——v3 段全部推达用 ROOT（勿用别名根，否则被项目门丢弃）。
+    const densityRows = [
+      { kind: 'user', text: '请先汇总现状，然后给出下一步建议。', at: '' },
+      { kind: 'tool', text: '调用工具 run_shell', at: '15:02', activity: { toolName: 'run_shell', target: 'ans status --json', toolCallId: 'd1', phase: 'call', status: 'call' } },
+      { kind: 'tool', text: 'run_shell 已执行：ans status --json（exit 0）', at: '15:02', activity: { toolName: 'run_shell', target: 'ans status --json · exit 0', toolCallId: 'd1', phase: 'result', status: 'result' } },
+      { kind: 'tool', text: '调用工具 read_file', at: '15:03', activity: { toolName: 'read_file', target: '角色卡/编排/memo.md', toolCallId: 'd2', phase: 'call', status: 'call' } },
+      { kind: 'tool', text: 'read_file 返回：角色卡/编排/memo.md', at: '15:03', activity: { toolName: 'read_file', target: '角色卡/编排/memo.md · 读取返回', toolCallId: 'd2', phase: 'result', status: 'result' } },
+      { kind: 'assistant', text: '已核对队列与看护记录。\n\n### 结论\n\n- 队首任务排队时间超过阈值，已由看护产生告警\n- 目标角色最近一轮未见 settled 记录\n\n建议先核对队列来源，再决定是否停掉卡死轮次。', at: '' },
+      { kind: 'user', text: '同意，把两边的 memo 各核一遍。', at: '' },
+      { kind: 'denied', text: 'read_file 执行失败：角色卡/编排/watchdog.log（ENOENT）\nfile not found', at: '' },
+      { kind: 'assistant', text: '读取失败已记录：watchdog.log 不存在（ENOENT）。其余两项核对完成，未发现新的越界写入。', at: '' },
+    ];
+    await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRole('su')`); await pause(250);
+    await push('session:role-state', { roleId: 'su', busy: true, summaries: [], queue: [], running: { id: 'v3-running', kind: 'message', summary: '正在处理当前请求', full: '', at: '' } });
+    // 顺序与 UIUX audit-v3 密度段同构（卡/系统行先到达、随后全量回放）：保留行（keepEl）在回放后仍在其原位置
+    // （上区），回放行在下——**注意**：全量回放会重建 pane 并清空 #chat 子节点（既有行为），chip 元素随之离场；
+    // 尾行按 S3「无 chip 时兜底」呈现「等待你确认」（与设计 sim 的 823px/9 行同口径）。chip 可见态的 S2/S3
+    // 在下方 A2 子段用同角色重选（showPane→updateOpChip 复位）单独验证。
+    await push('session:operator-request', { id: 'v3-pending', roleId: 'su', request: { kind: 'confirm', title: '需要你确认：是否按看护建议先停掉卡死的轮次？', preview: '预览：role_status 摘要（受控夹具）。\n队列 3；最近一轮 timed_out。' } });
+    const sysAlertEvent = turn => ({ projectRoot: ROOT, roleId: 'su', runtime: 'pi', event: { turnId: turn, kind: 'message', summary: '[系统·看护] 投递排队积压', detail: { source: 'prompt-input', text: '用户指令：[系统·看护] 投递排队积压：角色「编排」队首任务已排队 12 分钟（深度 3）。' } } });
+    await push('session:events', [sysAlertEvent('v3-alert-1')]);
+    await push('session:history', { projectRoot: ROOT, roleId: 'su', runtime: 'pi', rows: densityRows, error: null, skipped: 0 });
+    await push('session:events', [sysAlertEvent('v3-alert-2')]);
+    await pause(250);
+    await js(`document.getElementById('chat').scrollTop = document.getElementById('chat').scrollHeight;`); await pause(200);
+    const densityClosed = await js(DENSITY_V3);
+    const indicatorsA = await js(INDICATORS_V3);
+    await shot('v3-after-density-bottom-1360');
+    v3.measures.densityClosed = densityClosed;
+    v3.measures.indicatorsA = indicatorsA;
+
+    // ① W1 行距 16±1px
+    const gapPx = parseFloat(densityClosed.paneGap);
+    v3check('1-W1-行距16±1', Math.abs(gapPx - 16) <= 1, 'paneGap=' + densityClosed.paneGap);
+    // ② W2 p 段距 10±1；h3 纵值 16/6（±1）——margin 简写 3 值：上/横/下。
+    const pParts = ((densityClosed.msgP || {}).margin || '').split(' ');
+    const pBottom = parseFloat(pParts.length === 3 ? pParts[2] : (pParts[1] || pParts[0]));
+    const h3m = ((densityClosed.msgH3 || {}).margin || '').split(' ');
+    v3check('2-W2-p10±1', Math.abs(pBottom - 10) <= 1, 'p margin=' + (densityClosed.msgP || {}).margin);
+    v3check('2-W2-h3-16/6±1', Math.abs(parseFloat(h3m[0]) - 16) <= 1 && Math.abs(parseFloat(h3m[2] || h3m[0]) - 6) <= 1, 'h3 margin=' + (densityClosed.msgH3 || {}).margin);
+    // ③ W3 单行用户气泡 ≤44（目标 42）
+    const bubbleH = ((densityClosed.userBubble || {}).rect || {}).h;
+    v3check('3-W3-气泡≤44', bubbleH != null && bubbleH <= 44, 'bubble h=' + bubbleH + ' pad=' + (densityClosed.userBubble || {}).padding + ' lh=' + (densityClosed.userBubble || {}).lineHeight);
+    // ④ W4 输入区总高 ≤140、空输入框 ≤30（目标 137.6 / 28）
+    const compH = ((densityClosed.composer || {}).rect || {}).h;
+    const taH = ((densityClosed.textarea || {}).rect || {}).h;
+    v3check('4-W4-输入区≤140', compH != null && compH <= 140, 'composer h=' + compH + ' pad=' + (densityClosed.composer || {}).padding);
+    v3check('4-W4-空框≤30', taH != null && taH <= 30, 'textarea h=' + taH + ' minHeight=' + (densityClosed.textarea || {}).minHeight);
+    // ⑤ W1–W6 汇总：转录总高 ≤850（现 945）
+    v3check('5-转录总高≤850', densityClosed.transcriptH != null && densityClosed.transcriptH <= 850, 'transcriptH=' + densityClosed.transcriptH + '（基线 945）');
+    // ⑥ 完整可见行 ≥9（现 7）
+    v3check('6-可见行≥9', densityClosed.fullyVisibleRows >= 9, 'fullyVisibleRows=' + densityClosed.fullyVisibleRows + ' viewportH=' + densityClosed.chatViewportH);
+    // ⑧ bodyScrollW == 视口宽（1360 档；960 档在后段）
+    v3check('8-无横向溢出-1360', densityClosed.viewport.bodyScrollW === densityClosed.viewport.w, 'bodyScrollW=' + densityClosed.viewport.bodyScrollW + ' vs ' + densityClosed.viewport.w);
+    // S3（兜底半边）：全量回放后 chip 离场（既有行为）⇒ 尾行按「无 chip 时状态词兜底」呈现「等待你确认」。
+    v3check('S3-无chip时尾行兜底', densityClosed.chip && densityClosed.chip.hidden === true && densityClosed.current && densityClosed.current.text === '等待你确认', 'chip=' + JSON.stringify(densityClosed.chip) + ' current=' + JSON.stringify(densityClosed.current));
+    // W6b：系统行正文无重复前缀（chip 已承载）；W6 盒内行高 1.6
+    const injBody = (densityClosed.injected || {}).bodyText || '';
+    v3check('W6b-系统正文去前缀', densityClosed.injected && injBody.startsWith('投递排队积压：') && !injBody.includes('[系统·看护]'), 'chip=' + (densityClosed.injected || {}).chip + ' body=' + injBody.slice(0, 40));
+    v3check('W6-注入盒行高1.6', (densityClosed.injected || {}).bodyLineHeight === '24px', 'mi-body lineHeight=' + (densityClosed.injected || {}).bodyLineHeight);
+    // ⑨ W9（工作徽标，须 busy 且无未决 —— su 此刻是 awaiting-confirm，working 徽标用后段「示例角色」测）。
+
+    // S1/S4：工具组展开——同调用两相位并一行（4 条活动 → 2 个调用）、行高 ≤48、总高 ≤ 现状 60%（4×53.1=212.4）
+    await js(`(()=>{const g=document.querySelector('#chat .tool-records'); if(g) g.open=true;})()`); await pause(200);
+    await js(`document.getElementById('chat').scrollTop = document.getElementById('chat').scrollHeight;`); await pause(150);
+    const densityOpen = await js(DENSITY_V3);
+    v3.measures.densityOpen = densityOpen;
+    await shot('v3-after-density-records-1360');
+    v3check('S1-合并为2个调用', densityOpen.activityCount === 2, 'activityCount=' + densityOpen.activityCount + '（现状 4）');
+    v3check('S1-合并行高≤48', densityOpen.activityMaxH != null && densityOpen.activityMaxH <= 48, 'maxH=' + densityOpen.activityMaxH + ' avgH=' + densityOpen.activityAvgH + '（现状 53.1）');
+    v3check('S1-展开组≤60%现状', densityOpen.activityTotalH <= 0.6 * 212.4, 'totalH=' + densityOpen.activityTotalH + ' vs 0.6×212.4=127.44');
+    v3check('S1-相位链保留', !!densityOpen.activity && densityOpen.activity.state.includes('调用发起') && densityOpen.activity.state.includes('状态未记录'), 'state=' + (densityOpen.activity || {}).state);
+    v3check('S4-口径「N个调用」', !!densityOpen.records && densityOpen.records.summary.includes('2 个调用') && densityOpen.records.summary.includes('含状态未记录'), 'summary=' + (densityOpen.records || {}).summary);
+    // 折叠摘要仍可见：失败行（回放拒绝行的文字呈现）与未知标注（含状态未记录）在组折叠时同样可见
+    await js(`(()=>{const g=document.querySelector('#chat .tool-records'); if(g) g.open=false;})()`); await pause(150);
+    const closedCheck = await js(`(()=>{const g=document.querySelector('#chat .tool-records');return {open:g.open,summary:g.querySelector('summary').textContent,failureVisible:document.getElementById('chat').textContent.includes('read_file 执行失败')};})()`);
+    v3.measures.folded = closedCheck;
+    v3check('S1-折叠摘要失败/未知可见', !closedCheck.open && closedCheck.summary.includes('2 个调用') && closedCheck.summary.includes('含状态未记录') && closedCheck.failureVisible, JSON.stringify(closedCheck));
+
+    // A2 子段（S2/S3 chip 半边）：同角色重选 ⇒ showPane→updateOpChip 复位 chip（全量回放后 chip 元素曾离场）
+    // ——「chip 可见 ⇒ 尾行让位」与「chip 左缘对齐阅读列」一次验证；零动效长期约束（chip/确认卡不得有忙动效）。
+    await js(`await window.__ansRenderer.selectRole('su')`); await pause(250);
+    await js(`document.getElementById('chat').scrollTop = document.getElementById('chat').scrollHeight;`); await pause(150);
+    const chipVisible = await js(`(() => { const chip=document.getElementById('op-chip'); const pane=document.querySelector('#chat .chat-pane'); const tc=document.querySelector('#chat .tool-current'); if(!chip) return null; const a=chip.getBoundingClientRect(), b=pane.getBoundingClientRect(); return { hidden: chip.hidden, chipX:+a.x.toFixed(1), paneX:+b.x.toFixed(1), diff:+Math.abs(a.x-b.x).toFixed(1), tail: tc?tc.textContent:null }; })()`);
+    v3.measures.chipVisible = chipVisible;
+    await shot('v3-after-chip-align-1360');
+    v3check('S3-chip可见无尾行', !!chipVisible && chipVisible.hidden === false && chipVisible.tail === null, JSON.stringify(chipVisible));
+    v3check('S2-chip对齐阅读列≤8', !!chipVisible && chipVisible.diff <= 8, JSON.stringify(chipVisible));
+    const indicatorsC = await js(INDICATORS_V3);
+    v3.measures.indicatorsC = indicatorsC;
+    // 零动效（长期约束⑦）：chip 不得有任何动画；确认卡至多允许**定位一次性高亮**（op-flash，1 迭代、无计时器 ——
+    // 系既有「点 chip 定位」机制，非忙碌动效；其间不得出现循环/忙碌类动画）。
+    const cardAnimOk = indicatorsC.opCardAnim === 'none' || (indicatorsC.opCardAnim === 'op-flash' && Number(indicatorsC.opCardIter) === 1);
+    v3check('零动效-chip/确认卡', indicatorsC.opChipAnim === 'none' && cardAnimOk, 'chipAnim=' + indicatorsC.opChipAnim + ' cardAnim=' + indicatorsC.opCardAnim + ' cardIter=' + indicatorsC.opCardIter);
+
+    // ⑧（960 档）+ 960 截图对照 v3-sim-960/v3-chat-960
+    win.setContentSize(960, 620); await pause(250);
+    await js(`document.getElementById('chat').scrollTop = document.getElementById('chat').scrollHeight;`); await pause(150);
+    const density960 = await js(DENSITY_V3);
+    v3.measures.density960 = density960;
+    await shot('v3-after-960');
+    v3check('8-无横向溢出-960', density960.viewport.bodyScrollW === density960.viewport.w, 'bodyScrollW=' + density960.viewport.bodyScrollW + ' vs ' + density960.viewport.w);
+    win.setContentSize(1360, 860); await pause(250);
+
+    // S1 附验（截断可见，设计 §二(d)「失败/未知/截断在折叠摘要可见」的截断半边）：超长无路径目标经瘦身截断
+    // （… 结尾）——同一调用两相位仍并一行、目标截断标记如实呈现，不被组摘要口径吞掉。
+    await push('session:history', { projectRoot: ROOT, roleId: 'su', runtime: 'pi', rows: [
+      { kind: 'tool', text: '调用工具 run_shell', at: '15:05', activity: { toolName: 'run_shell', target: 'ordinaryword'.repeat(30), toolCallId: 'd3', phase: 'call', status: 'call' } },
+      { kind: 'tool', text: 'run_shell 已执行：长目标（exit 0）', at: '15:05', activity: { toolName: 'run_shell', target: 'ordinaryword'.repeat(30), toolCallId: 'd3', phase: 'result', status: 'result' } },
+    ], error: null, skipped: 0 });
+    await pause(200);
+    const truncCheck = await js(`(()=>{const g=document.querySelector('#chat .tool-records'); if(!g) return null; g.open=true; const rows=[...g.querySelectorAll('.tool-activity')]; const target=(rows[0]&&rows[0].querySelector('.activity-target')||{}).textContent||''; const out={rows:rows.length, truncated:target.endsWith('…'), summary:g.querySelector('summary').textContent}; g.open=false; return out;})()`);
+    v3.measures.truncatedTarget = truncCheck;
+    v3check('S1-截断目标仍可见', !!truncCheck && truncCheck.rows === 1 && truncCheck.truncated, JSON.stringify(truncCheck));
+
+    // ⑪ W11：开会话 loading 行 = 同一枚 SVG 转轮（全应用无第二实现；.spinner 元素退役）
+    deferOpenRole = '示例角色';
+    await js(`window.__ansRenderer.selectRole('示例角色');'fired';`); await pause(400);
+    const loadingM = await js(INDICATORS_V3);
+    v3.measures.loading = loadingM;
+    const loadR = await js(`(() => { const el=document.querySelector('#chat .sys-loading'); if(!el) return null; const b=el.getBoundingClientRect(); return { x:Math.max(0,+b.x.toFixed(0)-8), y:Math.max(0,+b.y.toFixed(0)-8), width:+b.width.toFixed(0)+16, height:+b.height.toFixed(0)+16 }; })()`);
+    await shot('v3-after-loading-1360', loadR || undefined);
+    v3check('11-W11-loading同款转轮', !!loadingM.loading && loadingM.loading.tag === 'svg' && String(loadingM.loading.anim).startsWith('v3spin'), JSON.stringify(loadingM.loading));
+    v3check('11-无第二转轮实现', loadingM.spinnerElems === 0, 'spinnerElems=' + loadingM.spinnerElems + '（.spinner 已退役）');
+    if (deferredOpen) { deferredOpen(); deferredOpen = null; }
+    await pause(300);
+
+    // ⑩ W10：尾行「正在工作」转轮——行高 26.6±2 不因图标增加、含转轮且动画生效（示例角色：忙碌、无请求 ⇒ chip 隐藏、尾行兜底可见）
+    await push('session:role-state', { roleId: '示例角色', busy: true, summaries: [], queue: [], running: null });
+    await pause(200);
+    const indicatorsB = await js(INDICATORS_V3);
+    v3.measures.indicatorsB = indicatorsB;
+    // ⑨ W9：工作徽标（示例角色：busy、无未决 ⇒ st-working）——12px±1 SVG、动画 v3spin 0.9±0.2s
+    const ico = indicatorsB.workingIco || {};
+    const icoAnim = ico.anim || '';
+    const icoDur = parseFloat((icoAnim.split(' ')[1] || 'NaN'));
+    v3check('9-W9-徽标12pxSVG', ico.hasSvg && Math.abs(ico.boxW - 12) <= 1 && ico.svgCssW === '12px' && ico.svgCssH === '12px', JSON.stringify(ico));
+    v3check('9-W9-转轮0.9±0.2s', icoAnim.startsWith('v3spin') && Math.abs(icoDur - 0.9) <= 0.2, 'anim=' + icoAnim);
+    const sideR = await js(`(b=>({x:Math.max(0,+b.x.toFixed(0)-4),y:Math.max(0,+b.y.toFixed(0)-4),width:+b.width.toFixed(0)+8,height:+b.height.toFixed(0)+8}))(document.querySelector('.tree').getBoundingClientRect())`);
+    const tcR = await js(`(() => { const el=document.querySelector('#chat .tool-current'); if(!el) return null; const b=el.getBoundingClientRect(); return { x:Math.max(0,+b.x.toFixed(0)-6), y:Math.max(0,+b.y.toFixed(0)-6), width:+b.width.toFixed(0)+12, height:+b.height.toFixed(0)+12 }; })()`);
+    await shot('v3-after-sidebar-1360', sideR);
+    if (tcR) await shot('v3-after-tail-1360', tcR);
+    const tc = indicatorsB.toolCurrent || {};
+    v3check('10-W10-尾行26.6±2', tc.height != null && Math.abs(tc.height - 26.6) <= 2, 'height=' + tc.height + ' text=' + tc.text);
+    v3check('10-W10-尾行含转轮', tc.hasSvg === true && String(tc.anim).startsWith('v3spin'), 'anim=' + tc.anim);
+
+    // ⑫ W9–W11：prefers-reduced-motion: reduce（CDP 模拟）⇒ 静止弧（animation-duration ≤0.01s 且 iteration ≤1）
+    try {
+      win.webContents.debugger.attach('1.3');
+      await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
+      await pause(250);
+      const rm = await js(`(() => { const el = document.querySelector('.ti-status.st-working .ts-ico .spin-arc') || document.querySelector('#chat .tool-current .spin-arc'); if (!el) return null; const st = getComputedStyle(el); return { matchesReduce: matchMedia('(prefers-reduced-motion: reduce)').matches, animationDuration: st.animationDuration, animationIterationCount: st.animationIterationCount }; })()`);
+      v3.measures.reducedMotion = rm;
+      await shot('v3-after-rm-sidebar-1360', sideR);
+      await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', { features: [] });
+      win.webContents.debugger.detach();
+      const rmDur = rm ? parseFloat(rm.animationDuration) : NaN;
+      v3check('12-reduced-motion静止弧', !!rm && rm.matchesReduce === true && rmDur <= 0.01 && Number(rm.animationIterationCount) <= 1, JSON.stringify(rm));
+    } catch (error) {
+      v3check('12-reduced-motion静止弧', false, 'CDP 模拟失败：' + String(error && error.message || error));
+    }
+
+    report.v3 = v3;
+    fs.writeFileSync(path.join(OUT, 'report.json'), JSON.stringify(report, null, 2));
+    const v3Failed = Object.entries(v3.results).filter(([, r]) => !r.ok);
+    assert.equal(v3Failed.length, 0, 'v3 验收断言未过（' + v3Failed.length + ' 条）：' + v3Failed.map(([k, r]) => k + ' ⇒ ' + r.detail).join('；'));
+
     fs.writeFileSync(path.join(OUT, 'report.json'), JSON.stringify(report, null, 2));
     console.log('AUDIT_DONE ' + OUT);
     clearTimeout(watchdog);
     app.quit();
   } catch (error) {
-    fs.writeFileSync(path.join(OUT, 'error.txt'), String(error && error.stack || error));
+    fs.writeFileSync(path.join(OUT, 'error.txt'), 'lastJs=' + lastJs + '\n' + String(error && error.stack || error));
     console.error(error); clearTimeout(watchdog); app.exit(1);
   }
 });

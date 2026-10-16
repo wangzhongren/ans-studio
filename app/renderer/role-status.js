@@ -50,12 +50,21 @@
   /** 「已停止」——**全应用唯一的「停止」措辞**（测试反向断言钉死；渲染侧不得自写同义词）。 */
   var STOPPED_LABEL = "已停止";
 
+  // 运行/思考状态转轮（W9–W11，2026-10-16 客户批准——「正在思考，没有动画」「运行中的图标太丑了」）：
+  // **全应用唯一一枚** 12px SVG 弧线转轮（约 270° 弧；静止时弧线本身可读为「运行中」，不依赖动画传达状态）。
+  // 本常量是**唯一图源**：工作徽标（下方 BADGES）、聊天尾行「正在工作」、开会话 loading 行共用（渲染侧经
+  // `St.SPINNER_SVG` 取用；不得出现第二份图标/第二枚转轮——样式动画 `v3spin` 见 styles.css 两条规则）。
+  // 颜色走 currentColor（随所在状态的既有颜色规则，不新增颜色）；prefers-reduced-motion 由全局规则兜底
+  // （animation-duration 压到近零、iteration 1 ⇒ 静止弧）。
+  var SPINNER_SVG = '<svg class="spin-arc" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><circle cx="6" cy="6" r="4.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="21.7 7.2"/></svg>';
+
   // 状态 → 徽标（**唯一映射**：图标 + 短标签 + 样式类 + 悬停完整描述；渲染侧只用本表，不再自写判断）。
-  // 图标为单字符文本字形（非 emoji；macOS/Windows 均可渲染）。
+  // 图标为单字符文本字形（非 emoji；macOS/Windows 均可渲染）；`iconHtml` 为该状态的**SVG 图源**
+  // （可选；目前仅 working——W9 批准，渲染侧以 `iconHtml || esc(icon)` 单点决胜，见 renderer.js::statusBadgeHtml）。
   var BADGES = {
     "not-opened": { icon: "○", label: "未开启", className: "st-off", title: "尚未开启会话（点它即可开启）" },
     "idle": { icon: "●", label: "空闲", className: "st-idle", title: "会话已开启，当前没有在跑的任务" },
-    "working": { icon: "◐", label: "工作中", className: "st-working", title: "有轮次在跑（切走后仍在后台跑的轮次同样计入）或队列有待办" },
+    "working": { icon: "◐", iconHtml: SPINNER_SVG, label: "工作中", className: "st-working", title: "有轮次在跑（切走后仍在后台跑的轮次同样计入）或队列有待办" },
     "awaiting-confirm": { icon: "?", label: "等待你确认", className: "st-confirm", title: "有交互请求挂起，等你在会话流里作答" },
     "stopped": { icon: "■", label: STOPPED_LABEL, className: "st-stopped", title: "会话已停止（历史保留在界面上；再点开为新会话）" },
     "error": { icon: "✕", label: "错误", className: "st-error", title: "最近一次轮次或会话以错误结束" },
@@ -63,7 +72,8 @@
   };
 
   /**
-   * 状态 id → 徽标 `{icon, label, className, title}`（未知状态给保守占位——不假装认识）。
+   * 状态 id → 徽标 `{icon, iconHtml, label, className, title}`（未知状态给保守占位——不假装认识）。
+   * `iconHtml`：该状态的 SVG 图源（仅 working——`SPINNER_SVG`；其余状态缺省），渲染侧以它为优先单点。
    * `pendingCount`（队列待办数，可选）：> 0 时短标签带「 · N 待办」后缀（**如实**——有排队待办不得只显示忙闲）；
    * 悬停描述同时带上待办说明。计数非法（非正数/非有限数）按 0 处理。
    */
@@ -83,7 +93,7 @@
           ? "；另有 " + n + " 项已入队，当前任务完成后依次处理"
           : "；另有 " + n + " 项待办在队列中（完成后依次处理）";
     }
-    return { icon: b.icon, label: label, className: b.className, title: title };
+    return { icon: b.icon, iconHtml: b.iconHtml, label: label, className: b.className, title: title };
   }
 
   /**
@@ -121,6 +131,7 @@
     deriveRoleStatus: deriveRoleStatus,
     statusBadge: statusBadge,
     sessionContextNotice: sessionContextNotice,
+    SPINNER_SVG: SPINNER_SVG,
     STOPPED_LABEL: STOPPED_LABEL,
     ROLE_STATUSES: Object.keys(BADGES),
   };

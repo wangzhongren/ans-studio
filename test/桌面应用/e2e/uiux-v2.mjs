@@ -473,7 +473,9 @@ async function duplicateChecks() {
   for(const [i,name] of names.entries()){
     const start=tool(name,'all-'+i,'start'),result=tool(name,'all-'+i,'result');
     await push('session:events',[payload(start),payload({...start,summary:'第二来源同一调用'}),payload(result),payload(result)]);
-    await check('one canonical lifecycle '+name,`(()=>{const text=document.getElementById('chat').textContent;return (text.match(/${name}/g)||[]).length===${i<4?2:1};})()`);
+    // v3/S1（2026-10-16 客户批准）：同一 toolCallId 的「调用发起+结果」合并为**一行**——工具名在聊天流恰出现
+    // 一次（原断言：活动组工具=两行 2 次、屏障/生命周期工具=一行 1 次；现状统一为合并行 1 次，两相位标签保留在内）。
+    await check('one canonical lifecycle '+name,`(()=>{const text=document.getElementById('chat').textContent;return (text.match(/${name}/g)||[]).length===1;})()`);
   }
   await reset();
   const handback='[回交] 来自 维护 的报告（任务关联未知）\n结论：completed\n摘要：原报告';
@@ -519,7 +521,9 @@ async function duplicateChecks() {
   await reset();
   const sameTool=tool('read_file','history-call','start');await push('session:events',[payload(sameTool),payload(tool('read_file','history-call','result'))]);
   await push('session:history',{projectRoot:ROOT,roleId:'A',runtime:'pi',rows:[historyRow(sameTool),historyRow(tool('read_file','history-call','result'))]});
-  await check('normal tools live history share phase identities',`document.querySelectorAll('#chat .tool-activity').length===2`);
+  // v3/S1（2026-10-16 客户批准「按推荐批准，开始实施」）：同一调用两相位合并为**一行**（原断言 = 两行
+  // 「共享相位身份」；现状=合并行同时含「调用发起」「执行完成」——相位身份仍逐条保留在合并行内）。
+  await check('normal tools live history share phase identities',`(()=>{const rows=[...document.querySelectorAll('#chat .tool-activity')];return rows.length===1&&rows[0].textContent.includes('调用发起')&&rows[0].textContent.includes('执行完成');})()`);
   await push('session:events',[payload(tool('read_file','path-call','start','path-turn',{path:'original/path.md'})),payload(tool('read_file','path-call','start','path-turn'))]);
   await check('duplicate sparse metadata retains original target',`[...document.querySelectorAll('#chat .tool-activity')].filter(x=>x.textContent.includes('original/path.md')).length===1`);
   await reset();
@@ -839,7 +843,9 @@ app.whenReady().then(async()=>{
   await check('live failed reason visible in summary',`document.querySelector('#chat .sys-denied > summary').textContent.includes('文件不存在')`);
   await push('session:events',[event('denied','拒绝写入：目标不在角色允许范围',{toolName:'write_file',path:'outside.md'})]);
   await check('before-execution rejection keeps visible reason',`[...document.querySelectorAll('#chat .sys-denied > summary')].some(x=>x.textContent.includes('目标不在角色允许范围')&&!x.textContent.includes('执行失败'))`);
-  await check('unknown is honest count',`document.querySelector('#chat .tool-records summary').textContent.includes('3 条活动')&&document.querySelector('#chat .tool-records summary').textContent.includes('状态未记录')`);
+  // v3/S4（2026-10-16 客户批准）：摘要口径「N 条活动」→「N 个调用」（无 callId 的三条事件各成一行 ⇒ 计数不变=3；
+  // 未知如实标注「· 含状态未记录」保留）。
+  await check('unknown is honest count',`document.querySelector('#chat .tool-records summary').textContent.includes('3 个调用')&&document.querySelector('#chat .tool-records summary').textContent.includes('状态未记录')`);
   await js(`document.getElementById('tab-work').click()`);await pause(160);
   await check('one independent work list without duplicated role documents',`document.querySelectorAll('#right-body #right-queue-body').length===1&&document.querySelectorAll('#right-body .q-item').length===4&&!document.querySelector('#right-body details[data-section]')&&!document.getElementById('right-queue-overview')&&document.getElementById('drawer-title').textContent.includes('工作概览')`);
   await js(`document.querySelector('#right-body .q-toggle').click();document.getElementById('inp-message').value='A draft';document.getElementById('inp-message').dispatchEvent(new Event('input'));`);
@@ -972,7 +978,9 @@ app.whenReady().then(async()=>{
   await js(`await window.__ansRenderer.selectRole('B');await window.__ansRenderer.selectRole('A')`);await pause(80);
   await check('pending locator visible after role click',`(()=>{let x=document.querySelector('#chat .op-request'),c=document.getElementById('chat').getBoundingClientRect(),r=x?.getBoundingClientRect();return !!r&&r.top>=c.top&&r.bottom<=c.bottom;})()`);
   await push('session:role-state',snapshot(true));
-  await check('open pending supersedes true busy',`document.querySelector('#chat .tool-current').textContent==='等待你确认'&&window.__ansRenderer.state.roleBusy.A===true`);
+  // v3/S3（2026-10-16 客户批准）：chip 可见时尾行不再重复「等待你确认」——原断言=尾行文本为「等待你确认」；
+  // 现状=chip（唯一状态指示）可见、尾行让位；busy 真实信号仍如实记录（不做界面推测的断言不变）。
+  await check('open pending supersedes true busy',`(()=>{const chip=document.getElementById('op-chip');return !!chip&&!chip.hidden&&!document.querySelector('#chat .tool-current')&&window.__ansRenderer.state.roleBusy.A===true;})()`);
   for(const mode of ['card','pi']) {
     await js(`document.getElementById('tab-${mode}').click()`);await pause(160);
     await check(`pending entry fully reachable with ${mode} 960`,`(()=>{let e=document.getElementById('op-chip'),r=e.getBoundingClientRect(),d=document.getElementById('right-drawer').getBoundingClientRect();return e.tagName==='BUTTON'&&!e.hidden&&document.querySelector('.col-mid').inert&&!document.getElementById('drawer-backdrop').hidden&&r.left>=document.getElementById('chat').getBoundingClientRect().left&&r.top>=36&&r.bottom<=innerHeight;})()`);
@@ -990,7 +998,8 @@ app.whenReady().then(async()=>{
   await key('Tab');await check('keyboard reaches retained image removal',`document.activeElement.classList.contains('attach-rm')`);await key('Tab');await check('keyboard returns to input above toolbar',`document.activeElement.id==='inp-message'`);await key('Tab');await check('keyboard returns to composer image toolbar',`document.activeElement.id==='btn-attach-image'`);
   operatorMode='expired';await push('session:role-state',snapshot(true));await js(`document.getElementById('tab-card').click()`);
   await push('session:operator-request',{id:'expired-fixture',roleId:'A',request:{kind:'confirm',title:'失效回执检查'}});
-  await check('pending arrival preserves drawer',`document.getElementById('right-drawer').classList.contains('open')&&document.querySelector('#chat .tool-current').textContent==='等待你确认'`);
+  // v3/S3（同上）：到达的未决指示=chip（同状态源）；尾行让位（原断言=尾行「等待你确认」）。
+  await check('pending arrival preserves drawer',`document.getElementById('right-drawer').classList.contains('open')&&!document.getElementById('op-chip').hidden&&!document.querySelector('#chat .tool-current')`);
   await js(`document.getElementById('op-chip').click();document.querySelector('[data-request-id="expired-fixture"] .op-deny').click()`);await pause(80);
   await check('expired request restores actual true busy',`document.getElementById('op-chip').hidden&&document.querySelector('#chat .tool-current').textContent==='正在工作'&&document.querySelector('[data-request-id="expired-fixture"] .op-confirm').hidden`);
   operatorMode='normal';await push('session:role-state',snapshot(false));

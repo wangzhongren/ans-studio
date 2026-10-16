@@ -415,8 +415,10 @@ body { display: flex; flex-direction: column; }
   color: var(--text-2);
   white-space: nowrap;
 }
-/* 图标（单字符文本字形，非 emoji）：颜色随状态（下列 st-* 规则）。 */
-.ti-status .ts-ico { font-size: 10px; line-height: 1; color: var(--text-3); }
+/* 图标（单字符文本字形，非 emoji）：颜色随状态（下列 st-* 规则）。
+   W9（2026-10-16 客户批准）：图标盒统一 12px 见方（SVG 转轮 = 12px「运行中」图标；文本字形居中同盒）——
+   盒宽实测 12±1（旧 ◐ 字形盒 9.2px）。 */
+.ti-status .ts-ico { font-size: 10px; line-height: 1; color: var(--text-3); display: inline-flex; width: 12px; height: 12px; align-items: center; justify-content: center; }
 .ti-status.st-idle .ts-ico { color: var(--success); }
 .ti-status.st-working .ts-ico { color: var(--text); }
 .ti-status.st-working { color: var(--text); }
@@ -576,10 +578,11 @@ body { display: flex; flex-direction: column; }
   flex: 1 0 auto;
 }
 
-/* ———————— Markdown 渲染元素（B-1）：浅色、近单色；块间距收敛在气泡内（v2：p 14px、h 21/7、ul 4/18） ———————— */
-.msg p { margin: 0 0 14px; }
+/* ———————— Markdown 渲染元素（B-1）：浅色、近单色；块间距收敛在气泡内（v2：p 14px、h 21/7、ul 4/18；
+   W2/2026-10-16 客户批准：p 14→10px、h1–h3 上下 21/7→16/6——段间 14px 与 16px 行距同量级会吃掉层级） ———————— */
+.msg p { margin: 0 0 10px; }
 .msg p:last-child { margin-bottom: 0; }
-.msg h1, .msg h2, .msg h3 { margin: 21px 0 7px; line-height: 1.4; font-weight: 650; }
+.msg h1, .msg h2, .msg h3 { margin: 16px 0 6px; line-height: 1.4; font-weight: 650; }
 .msg h4, .msg h5, .msg h6 { margin: 14px 0 6px; line-height: 1.4; }
 .msg h1:first-child, .msg h2:first-child, .msg h3:first-child,
 .msg h4:first-child, .msg h5:first-child, .msg h6:first-child { margin-top: 0; }
@@ -868,7 +871,8 @@ body { display: flex; flex-direction: column; }
   padding: 0 7px;
   background: var(--bg-soft);
 }
-.msg-injected .mi-body { color: var(--text-2); }
+/* W6（2026-10-16 客户批准）：注入盒 body 行高 1.8→1.6（盒高 71.9→68.9px 实测口径；回交/派发/系统同解）。 */
+.msg-injected .mi-body { color: var(--text-2); line-height: 1.6; }
 .msg-injected.is-dispatch .mi-body { color: var(--text); }
 /* G-2/U1（2026-10-16 客户批准）：`system` 类投递（看护告警 / 收束提示 / 恢复回执）——来源=**系统**
    （非任何角色）：实线边框 + 左侧竖条与角色投递的虚线框拉开（如实标注，绝不当客户发的消息）。 */
@@ -906,17 +910,16 @@ body { display: flex; flex-direction: column; }
 .hb-ev.hb-ev-empty { font-family: var(--sans); color: var(--text-3); font-style: italic; padding-left: 0; }
 .hb-ev.hb-ev-empty::before { display: none; }
 
-/* 加载指示（纯 CSS，无依赖） */
-.spinner {
-  width: 12px;
-  height: 12px;
-  margin-top: 2px;
-  border: 1.5px solid var(--border-strong);
-  border-top-color: var(--text-2);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
+/* 运行/思考状态转轮（W9–W11，2026-10-16 客户批准——「正在思考，没有动画」「运行中的图标太丑了」）：
+   **全应用唯一一枚** 12px SVG 弧线转轮（图源唯一 = role-status.js::SPINNER_SVG——工作徽标 / 聊天尾行
+   「正在工作」/ 开会话 loading 行共用；边框转轮 `.spinner` + `spin 0.8s` 已退役，全应用只有一种转轮）。
+   动效仅两条规则（工作徽标图标、尾行与 loading 复用）；`transform: rotate` 纯合成、0.9s linear——静止帧下
+   弧线本身仍可读为「运行中」；`prefers-reduced-motion` 由文末全局规则兜底（duration≈0、iteration 1 ⇒ 静止弧）。
+   **等待确认卡/恢复卡/op-chip 不得加任何忙碌动效**（长期约束，防把「等你确认」误示为「机器在忙」）。 */
+@keyframes v3spin { to { transform: rotate(360deg); } }
+.ti-status.st-working .ts-ico .spin-arc { animation: v3spin 0.9s linear infinite; transform-origin: 50% 50%; }
+.tool-current .spin-arc, .sys-loading .spin-arc { animation: v3spin 0.9s linear infinite; transform-origin: 50% 50%; }
+.ts-ico svg { width: 12px; height: 12px; display: block; }
 
 /* 拒绝/失败（v2 对齐）：**浅红底 + 左侧 3px 红竖条**（无全框、无圆角）；标题 12px 红、目标行 mono 11px 中性；
    「异常依文字而非堆图标」（摘要去图标，保留统一 '›' 展开箭头）。 */
@@ -1367,19 +1370,23 @@ ul.idx li.dir { color: var(--text-2); }
 .runtime-note .rt-text { overflow-wrap: anywhere; }
 /* 执行记录组（v2 对齐）：左侧 2px 细线 + 13px 缩进；'›' 箭头（统一收纳语法，open 旋转 90°）；行内 42px 时间列。 */
 .tool-records { max-width: min(760px, 100%); color: #767D73; font-size: 12px; border-left: 2px solid #E1E6DD; padding: 4px 0 6px 13px; }
-.tool-records > summary { display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 0; line-height: 26px; list-style: none; }
+.tool-records > summary { display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 0; line-height: 22px; list-style: none; }
 .tool-records > summary::-webkit-details-marker { display: none; }
 .tool-records > summary::before { content: '\203A'; font-size: 18px; line-height: 16px; color: #8D9387; transform: rotate(0); transition: transform 0.12s ease; }
 .tool-records[open] > summary::before { transform: rotate(90deg); }
 .tool-records .record-count { margin-left: 10px; color: #91978B; font-size: 11px; }
-.tool-activity { display: grid; grid-template-columns: 42px minmax(0,1fr) auto; gap: 10px; align-items: start; padding: 8px 0; border-bottom: none; border-top: 1px solid #EFF1EB; font-size: 11px; }
-.tool-activity:first-of-type { margin-top: 9px; }
+/* W5（2026-10-16 客户批准）：活动行 pad 8→5、首行上距 9→6、摘要行高 26→22（行高 53.1→47.1px，实测口径）。 */
+.tool-activity { display: grid; grid-template-columns: 42px minmax(0,1fr) auto; gap: 10px; align-items: start; padding: 5px 0; border-bottom: none; border-top: 1px solid #EFF1EB; font-size: 11px; }
+.tool-activity:first-of-type { margin-top: 6px; }
 .tool-activity .activity-op { font-family: var(--mono); color: #5F6859; overflow-wrap: anywhere; }
 .tool-activity .activity-target { display: block; overflow-wrap: anywhere; font: 11px/1.55 var(--mono); color: #888F80; margin-top: 2px; }
 .tool-activity .activity-state { font-size: 10px; color: #738469; white-space: nowrap; }
 .tool-activity .activity-state.is-unknown { color: var(--amber); }
 .tool-activity .activity-time { color: #767D73; }
-.tool-current { font-size: 12px; color: var(--text-2); padding: 4px 0; }
+/* W10（2026-10-16 客户批准）：尾行「正在工作」= 12px SVG 转轮 + 文本（flex 子项，文本行高照旧 26.6px）；
+   转轮颜色走现行规则（var(--text-2)）。等待确认兜底态（chip 不可见时）为纯文本、无动效（长期约束）。 */
+.tool-current { font-size: 12px; color: var(--text-2); padding: 4px 0; display: flex; align-items: center; gap: 6px; }
+.tool-current .spin-arc { flex: 0 0 auto; }
 .role-work { padding: 0 0 16px; border-bottom: 1px solid var(--border); }
 .work-heading { font-size: 12px; font-weight: 650; margin: 12px 0 9px; }
 .role-work .work-heading:first-child { margin-top: 0; }
@@ -1400,6 +1407,10 @@ ul.idx li.dir { color: var(--text-2); }
 .denied-copy { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .denied-target { font: 11px/1.55 var(--mono); color: #73625D; overflow-wrap: anywhere; }
 .op-chip { align-self: flex-start; min-height: 30px; max-width: 100%; font-family: var(--sans); text-align: left; }
+/* S2（2026-10-16 客户批准）：chip 左缘对齐阅读列（`.chat-pane` 左缘；1360 档实测 x 240→目标 384±4，
+   验收口径 = 两者左缘差 ≤8px）——按列宽自适应（列窄于 800px 时 margin 归零、随列同走）。仅定位规则，
+   卡样式与遮挡取舍不变。 */
+#chat > .op-chip { margin-left: calc((100% - min(800px, 100%)) / 2); }
 
 
 /* 半遮卡不提供可误点的作答；原定位button始终可达，关闭/定位后恢复原动作。 */
@@ -1479,9 +1490,13 @@ textarea:focus-visible,
 .runtime-note { font-size:11px; }
 .context-state { font-size:12px; color:var(--text-2); }
 .chat { padding:24px 32px 32px; }
-.chat-pane { max-width:800px; gap:24px; }
+/* W1（2026-10-16 客户批准）：聊天行距 24→16px（客户「聊天那块感觉太松散了」的基线修订；行距实读
+   由虚拟窗口口径动态读取，无硬编码）。 */
+.chat-pane { max-width:800px; gap:16px; }
 .msg { font-size:15px; line-height:1.8; }
-.msg-user { background:#f0f3ed; border-radius:10px; padding:12px 16px; }
+/* W3（2026-10-16 客户批准）：用户气泡是短确认语句，不需要 1.8 行高——pad 12/16→9/14、行高 24px
+   （单行气泡 51→42px 实测口径；多行跟随该行高）。 */
+.msg-user { background:#f0f3ed; border-radius:10px; padding:9px 14px; line-height:24px; }
 .composer { padding:16px 32px 20px; min-height:96px; }
 .capsule, .attach-row { max-width:800px; margin-left:auto; margin-right:auto; }
 .capsule { border-radius:12px; min-height:56px; padding:8px 12px; gap:8px; }
@@ -1564,9 +1579,12 @@ button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus
 .session-actions .tab-badge[hidden] { display:none; }
 .session-notice { display:flex; gap:12px; padding:0 32px; color:var(--amber); font-size:12px; }
 .session-notice:has(.composer-hint:empty):has(#history-projection-note:empty) { display:none; }
-.composer { padding:20px 32px 14px; min-height:0; border-top:0; }
-.capsule { display:flex; flex-direction:column; align-items:stretch; padding:12px 16px; border-radius:10px; background:#fff; border-color:#ccd6cb; gap:8px; }
-.capsule textarea { display:block; width:100%; min-height:40px; padding:0; font-size:14px; line-height:1.6; }
+/* W4（2026-10-16 客户批准）：输入区让出垂直空间——pad 20/32/14→14/32/12、胶囊 pad 12/16→10/14、
+   gap 8→6、空输入框 min-height 40→28（= 单行 22.4 + 5.6；autoGrow 按新 min-height 自然生效，无 JS 改动）、
+   脚注上距 8→6。输入区总高 165.6→实测 137.6px（验收 ≤140）。 */
+.composer { padding:14px 32px 12px; min-height:0; border-top:0; }
+.capsule { display:flex; flex-direction:column; align-items:stretch; padding:10px 14px; border-radius:10px; background:#fff; border-color:#ccd6cb; gap:6px; }
+.capsule textarea { display:block; width:100%; min-height:28px; padding:0; font-size:14px; line-height:1.6; }
 .composer-bottom { display:flex; align-items:center; gap:8px; min-width:0; font-size:11px; color:var(--text-3); }
 .composer-scope { color:var(--text-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .composer-keyboard { font-size:11px; color:var(--text-3); white-space:nowrap; }
@@ -1574,7 +1592,7 @@ button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus
 .composer-actions .cap-send, .composer-actions .cap-halt { width:auto; min-width:64px; height:32px; padding:4px 12px; border-radius:7px; font:600 13px/1.4 var(--sans); }
 .composer-actions .cap-send { background:var(--success); color:#fff; }
 .composer-actions .cap-halt { background:var(--danger-bg); color:var(--danger); border:1px solid var(--danger-border); }
-.compose-note { max-width:800px; margin:8px auto 0; display:flex; justify-content:space-between; gap:16px; font-size:11px; line-height:1.6; color:var(--text-3); }
+.compose-note { max-width:800px; margin:6px auto 0; display:flex; justify-content:space-between; gap:16px; font-size:11px; line-height:1.6; color:var(--text-3); }
 .compose-note .runtime-note { font-size:11px; color:var(--text-3); }
 .reply-original { width:100%; border-top:1px solid var(--border); padding:8px 0; }
 .reply-original > summary { cursor:pointer; font-size:12px; color:var(--text-2); line-height:24px; padding:4px 0; min-height:32px; }
@@ -1604,7 +1622,8 @@ button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus
  .col-left { padding:22px 12px 14px; }
  .chat-head { height:68px; min-height:68px; padding:0 24px; }
  .session-notice { padding:0 24px; }
- .composer { padding:16px 24px 14px; }
+ /* W4 窄档同值收敛：上下随基础档（14/12），横向保留窄档 24px 留白。 */
+ .composer { padding:14px 24px 12px; }
  .report-top { padding:18px 20px; }
  .report-top .report-title { font-size:20px; }
  .report-body { padding:18px 20px; }
