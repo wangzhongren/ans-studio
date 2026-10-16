@@ -5,8 +5,10 @@ export function role(id = "core"): ResolvedRole {
 }
 export const allow: WriteGate = (target) => ({ allowed: true, matchedEntry: { root: "project", path: target, kind: "file", purpose: "fixture" } });
 export const deny: WriteGate = () => ({ allowed: false, reason: "fixture denied", allowedByRoot: { project: [], skill: [] } });
-export async function until(predicate: () => boolean): Promise<void> {
-  const end = Date.now() + 1500;
+/** 有界等待：predicate 为真即返回，超时抛错如实红。默认 1500ms 保持不变（其余调用方行为逐字不变）；
+ *  慢 runner 上「子进程先写盘再挂起」类场景由调用方显式放宽（见 shell-exec-timeout.test.ts 的 boundMs）。 */
+export async function until(predicate: () => boolean, timeoutMs = 1500): Promise<void> {
+  const end = Date.now() + timeoutMs;
   while (!predicate()) { if (Date.now() > end) throw new Error("fixture wait timed out"); await new Promise<void>((resolve) => setTimeout(resolve, 2)); }
 }
 
