@@ -154,6 +154,32 @@ events:
 - 复验套件：`raw/g2-verify-suite.txt`（64/64）｜`raw/g2-verify-harness-sha256.txt`（我方 10 文件指纹）
 - 设计/批准依据：`角色卡/产品/docs/design/2026-10-16_design_role-watchdog-and-closure.md`；`角色卡/项目管理/docs/change/2026-10-15_change_kanban-fixes-pm-review.md` §G-2
 
+## 附：裁定修订后审计块刷新（2026-10-16，run-5 复裁跟进）
+
+**触发**：客户 2026-10-16 run-5 真机观察后复裁——完成态收束静默阈值默认 **5 min → 30 s**（推理：全角色空闲＋队列全空＋无在途＋无待确认时系统已不可能产生新的自动活动，5 分钟纯属延迟；30 s ＝一个 tick 的最小防抖）；冻结接口改 **`renderClosurePrompt(silentMs)`**（毫秒入参、floor 自适应「N 秒 / N 分钟」）；编排常量**保名改值** `WATCHDOG_DEFAULT_SILENT_MINUTES` 5 → **0.5**（名字沿「分钟」口径＝30 000 ms）；桌面 `WATCHDOG_SILENCE_MS` → **30_000**（env `ANS_DESKTOP_WATCHDOG_SILENCE_MS` 可调保留）。PM 记档：`角色卡/项目管理/docs/change/2026-10-15_change_kanban-fixes-pm-review.md`「客户裁定修订」。本角色独立验证套件原钉旧裁定值 ⇒ 4 条断言红（裁定 1 审计块 1 条、W3 3 条），按复裁刷新。
+
+**改了什么**（只动本角色 `test/测试/g2-verify/` 3 文件的旧裁定钉；值全部改指新批准值）：
+
+| 文件 | 刷新点 |
+|---|---|
+| `scope-audit.test.ts` | 裁定 1 块：`WATCHDOG_SILENCE_MS === 30_000`；`WATCHDOG_DEFAULT_SILENT_MINUTES === 0.5`；**新增**未设 env 回落恰 30_000 断言；**新增**跨模块一致性断言 `0.5 × 60 000 === WATCHDOG_SILENCE_MS`（桌面判定与编排文案回退＝同一复裁值，单侧漂移即红）；零授权语义扫描的 `renderClosurePrompt(5)` → `renderClosurePrompt(30_000)`（真实投递形态） |
+| `w3-closure.test.ts` | rig 阈值常量 `SILENCE = 5 * 60 * 1000` → `30_000`（rig 传空 env、不覆盖 `silenceMs` ⇒ **真默认驱动判定**；30_000 与新批准值精确对偶——默认再漂移，差 1 ms 边界即红）；边界文案断言「已持续 5 分钟」→「**已持续 30 秒**」；相关标题/注释同步 |
+| `contract-freeze.test.ts` | 两处 `renderClosurePrompt(5)` → `renderClosurePrompt(30_000)`（前缀＋ASCII 空格起始、U1 归类断言原样）——两处旧参本未红（仅前缀断言），按新毫秒语义一并改指（旧参在新语义下渲染「0 秒」，属误导样本，非判定变化） |
+
+**为何是跟进而非放松**：三处均为**同一条断言对新批准值的重钉**——判据与强度逐条保持原样：恰值 `===` 等值断言、差 1 ms 开区间边界（29999 不投 / 30000 投恰一条）、每窗口恰一条计数、前缀/归类判定（契约冻结面）、预热/重武装/投递失败重试等断言零改动。且**净加强 2 条**：① 跨模块默认一致性（0.5 分钟 × 60 000 ＝ `WATCHDOG_SILENCE_MS`）；② 未设 env 的解析默认恰 30 000。`w3` 阈值为**硬编码** 30_000（未改为引用实现常量——引用即随实现放水；硬编码使默认漂移必红）。`w2-system-delivery` 的 `silenceMs: 60_000` 为显式注入的测试口径（非默认钉），新旧裁定下语义均成立，未动。
+
+**复跑计数（刷新后；原始输出 `raw/refresh-*.txt`）**：
+
+| 命令 | 计数 | 结果 |
+|---|---|---|
+| `node --test "test/测试/g2-verify/*.test.ts"` | **64 / 64 / 0 红** | exit 0（`refresh-g2-verify-suite.txt`） |
+| `node --test "test/测试/**/*.test.ts"` | **270 / 270 / 0 红** | exit 0（`refresh-tests-scope.txt`） |
+| `node --test "test/**/*.test.ts"`（全量） | **1670 / 1669 / 0 红 / 1 skip / exit 0** | `refresh-full-suite.txt` |
+| `npm run typecheck` | **0 错**（exit 0） | `refresh-typecheck.txt` |
+
+- 全量对账：分目录逐位自洽（346+300+104+183+232+29+25+71+110+270 ＝ 1670）；较 G-2 首验记录 1667 计 **+3**——首验之后**接线修复批次与 30 s 修订轮**中两属主（编排/桌面窗口）测试面更新的净增；本角色 64 例与 `test/测试` 目录 270 例计数均未变。1 skip 仍为既有 Windows 专用用例。
+- 命令形态注记：字面 `node --test "test/测试/**"` 除测试文件外还命中 4 个目录与 15 个 `.mjs` 手动探针（**非测试文件**）——node 将命中目录当测试文件执行（`Cannot find module`）＋ 9 个探针需真模型凭据/Electron 运行时而非零退出，**13 条非测试条目失败**，与本次刷新及裁定修订无关（`refresh-suites-literal-glob.txt`；逐类定性 `refresh-noise-categorization.txt`）。**测试文件子集**即上表 270/270 全绿。
+
 ---
 
 **签署**：测试角色（独立验证上下文，2026-10-16）。本报告只证明「测过的场景通过」，不代替客户的业务确认；未跑真机 E2E 的观测项按上表留白如实交付。

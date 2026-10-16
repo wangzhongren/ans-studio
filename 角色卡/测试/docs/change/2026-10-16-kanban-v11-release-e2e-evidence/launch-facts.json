@@ -1,0 +1,33 @@
+{
+  "run": 5,
+  "mode": "public v1.1.0 release package (mac-arm64)",
+  "artifact": {
+    "zip": "/private/tmp/ans-v11-release-run/ANS-Studio-1.1.0-mac-arm64.zip",
+    "sha256": "baed9f84cb5dba0594c35804ee3bd33756bd90c9e52f89c33661fa18e3e81eaa (verified against SHA256SUMS-darwin-arm64.txt + GitHub digest)"
+  },
+  "pid": 95353,
+  "executable": "/private/tmp/ans-v11-release-run/extracted/ANS Studio.app/Contents/MacOS/ANS Studio",
+  "args": [
+    "--user-data-dir=/private/tmp/ans-kanban-v11-9d2e5c41/userdata",
+    "--remote-debugging-port=9444"
+  ],
+  "workspace": "/Users/wangzhongren/code/vibeingcode/ans-testbed/kanban-live-5",
+  "isolatedUserData": "/private/tmp/ans-kanban-v11-9d2e5c41/userdata",
+  "isolatedEnvAbsentBefore": true,
+  "injectedKeys": [
+    "ANTHROPIC_AUTH_TOKEN",
+    "ANS_PI_BASE_URL",
+    "ANS_PI_MODEL",
+    "ANS_PI_CONTEXT_WINDOW"
+  ],
+  "extraEnv": {
+    "ANS_PI_PROMPT_TIMEOUT_MS": "900000",
+    "ANS_PI_CONSTRUCT_TIMEOUT_MS": "300000",
+    "ANS_PI_SHELL_REVIEW_TIMEOUT_MS": "300000",
+    "ANS_DESKTOP_OPERATOR_CONFIRM_TIMEOUT_MS": "300000",
+    "ANS_PI_SHELL_EXEC_TIMEOUT_MS": "180000"
+  },
+  "repoEnvSha256": "651880204f12b327da5139866b6c3aa4a34d9b2188735fcc313c112a10c637a7",
+  "repoEnvUnchanged": true,
+  "log": "/private/tmp/ans-kanban-v11-9d2e5c41/app.log"
+}

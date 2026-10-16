@@ -24,3 +24,5 @@
 2026-10-15 客户已授权视觉V2实施，新增[落地独立评审](docs/design/2026-10-15_design_visual-v2-implementation-review.md)。仅自身新文档/证据写权；accepted视觉规范/原型与r2冻结不改。当前首轮只读准备、待稳定候选与root串行GUI，未签通过。
 
 2026-10-15 V2正式落地严格UIUX范围通过：renderer5324b786/stylesdf554f87/index7beda，SV1–SV13及真实batch/资料阅读差距均关闭。依据本角色源码/看图与root真实native截图/AX，未冒签亲操作；accepted原件不变，详见[最终评审](docs/design/2026-10-15_design_visual-v2-implementation-review.md)。无新增设计项或明确待修阻点。
+
+2026-10-16 视觉收敛 v3（审计+提案，未实施/未测试）：客户「聊天太松散/思考没动画/运行图标丑」。产出[审计与收敛提案](docs/design/2026-10-16_design_visual-convergence-v3.md)（快速赢 W1–W11 + 结构级 S1–S4 + 不动作清单 + 12 条数值验收断言）与[证据清单](docs/design/2026-10-16-visual-convergence-v3-evidence/manifest.json)（38 件：before/after 示意截图、逐值度量、renderer 哈希）。等 PM 评审与客户逐项勾选后由桌面UI 实施。

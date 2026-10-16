@@ -1,5 +1,16 @@
 # 编排 变更记录
 
+## 2026-10-16 — 收束默认阈值 5 min → 30 秒（客户复裁）：`renderClosurePrompt` 改**毫秒**接口 + 两档自适应文案；常量保名改值
+
+**来源**：客户 run-5 真机观察后复裁「没有任务就应该直接收束」——完成态收束静默阈值默认值 5 min → **30 秒**（＝一个 tick 的最小防抖），env 可调保留；**冻结接口 `renderClosurePrompt(silentMs)`**（分钟参数作废）。记档＝`角色卡/项目管理/docs/change/2026-10-15_change_kanban-fixes-pm-review.md` §「客户裁定修订（2026-10-16，run-5 观察后）」。派发：编排＝**文案渲染器与常量**（桌面窗口并行改默认值与判定，其侧已按冻结接口直传毫秒）。
+
+**改了什么（全部在本角色 Section 1 内）**：
+- `src/common/编排/watchdog.ts`：`renderClosurePrompt(silentMinutes)` → **`renderClosurePrompt(silentMs)`**（毫秒；JSDoc 注明接口/取整/回退口径）；文案两档自适应——≥ 60 000 ms「N 分钟」、< 60 000 ms「N 秒」，两档**一律 floor**（显示值为静默时长**下界**，杜绝夸大；90 500 ms→「1 分钟」、亚秒→「0 秒」）；非法输入（非有限/≤0）回退默认 **30 秒**；**首行时长短语外其余四行逐字未动**（不强迫断言「完成」/文首标记不变）。
+- 常量**保名改值**：`WATCHDOG_DEFAULT_SILENT_MINUTES = 0.5`（＝30 000 ms）。客户裁定「改名毫秒常量 / 保名改值」两法皆可——选保名：`test/测试/g2-verify/scope-audit.test.ts` 按名导入（越界不自改），改名即破其编译 ⇒ 全仓 typecheck 0 错不可保；**导出名零变化**，语义值 5→0.5 及其影响面已登记（见实施记录 §六）。
+- `test/编排/watchdog.test.ts`：收束块重写并拆两例（300 s 金文本＋30 s/59 999/60 000/600 000 边界；floor 与亚秒；六类非法回退；常量自洽 0.5×60 000＝30 000）。
+
+**证据**：`node --test "test/编排/"*.test.ts` → **300/300**（基线 299 +1）；`npm run typecheck` → **全仓 0 错**。未 git 提交；未碰 `app/desktop/**`（仅只读核对）、`test/测试/**`、kanban-live-* 与 `/private/tmp` 真机轮目录。**跨角色待 pm 转达**：① 测试角色 g2-verify 随复裁刷新（`scope-audit.test.ts:53` 常量断言 5→0.5 将红——属旧裁定 1 审计块，桌面侧断言亦过期；`scope-audit:184`/`contract-freeze:64,85` 的 `renderClosurePrompt(5)` 数字语义过期但不红）；② 独立验证口径随裁定修订更新。见[实施记录](docs/fix/2026-10-16_fix_closure-30s-ms-interface.md)。
+
 ## 2026-10-16 — G-2 / O1：看护三能力承载与透传（只 su 注入）＋ 告警/收束/恢复回执文案**单一来源**（含 U1 文首标记契约对齐）
 
 **来源**：客户 2026-10-16 按推荐批准 G-2 按提案实施（V1a+V1b 同轮；9 个待裁点全采纳）——`角色卡/项目管理/docs/change/2026-10-15_change_kanban-fixes-pm-review.md` §「G-2 客户批准与派发」；设计规格 `角色卡/产品/docs/design/2026-10-16_design_role-watchdog-and-closure.md` §十 表 O1 行（属主＝编排）。工具名以批准记录为准：`role_status` / `session_tail` / `propose_recovery`。**实施轮内与运行时核心 R1/R2 同树并行落位并完成对向对齐**（形状最终收敛为回执式，物理单一来源＝契约家 `model/runtime.ts`）；**桌面UI U1 的文首标记契约**经 PM 转达并对齐（见下）。

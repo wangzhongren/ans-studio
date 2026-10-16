@@ -88,3 +88,11 @@ R1–R5 经测试角色最终复测（119/11/14 全绿、锚点红转绿）与�
 2026-10-15 客户已授权视觉V2实施，新增[落地独立评审](docs/design/2026-10-15_design_visual-v2-implementation-review.md)。仅自身新文档/证据写权；accepted视觉规范/原型与r2冻结不改。当前首轮只读准备、待稳定候选与root串行GUI，未签通过。
 
 2026-10-15 V2正式落地严格UIUX范围通过：renderer5324b786/stylesdf554f87/index7beda，SV1–SV13及真实batch/资料阅读差距均关闭。依据本角色源码/看图与root真实native截图/AX，未冒签亲操作；accepted原件不变，详见[最终评审](docs/design/2026-10-15_design_visual-v2-implementation-review.md)。无新增设计项或明确待修阻点。
+
+## 2026-10-16 — 视觉收敛 v3 审计与提案（聊天松散度 + 运行/思考状态反馈）
+
+客户「界面还是有点乱」、PM 追加「聊天那块感觉太松散」（第一焦点）与「正在思考，没有动画 / 运行中的图标太丑了」。本轮**只审计+提案**：未实施、未测试、未部署，未改 app/src/test，未提交 git。
+
+方法：临时目录自建只读夹具（`/tmp/ans-uiux-v3/ext/audit-v3.mjs`、`indicators5.mjs`，未改仓库 test/ 任何文件）驱动真实 `app/renderer`+`preload.cjs`（受控 IPC、无模型/网络/真实项目），另有界既有 `uiux-v2.mjs` G2/视觉/完整流三模式与 `uiux-design-audit.mjs` 只读运行；产出 38 件证据（截图+度量 JSON+manifest，含 renderer SHA-256、Electron 44.7.0、HEAD `1c8a489`），入 `docs/design/2026-10-16-visual-convergence-v3-evidence/`。非 CUA 亲操作；「after」为夹具内 CSS/DOM 示意。
+
+实况要点（逐值证据在[提案](docs/design/2026-10-16_design_visual-convergence-v3.md)）：行距一律 24px（12/12 实测）、正文 15/27、输入区 165.6px（空框 40px）、1360×860 聊天视口 586px（边框组件占 274px=32%）、同转录完整可见 7 行；工具一次调用=2 行×53.1px；未决状态四处重复（侧栏/尾行/chip/工作概览）；系统行 chip 与正文重复 `[系统·X]` 前缀、chip 脱离阅读列（x240 vs 384）；忙碌呈现全静态（◐ 10px 无动画），全应用唯一动画=开会话 `.spinner` 0.8s。提案：快速赢 W1–W11（16px 行距、10px 段距、输入区 ≤137.6、工具行 ≤47.1、12px SVG 弧线转轮统一三处等，汇总效果 转录 945→823px、可见行 7→9）；结构级 S1–S4（工具调用相位合并、chip 对齐、尾行去重、摘要口径）；reduced-motion 经 CDP 实测 1e-06s 静止弧。需客户逐项勾选（含 v2 基线间距收紧属基线修订）。等 PM 评审后由桌面UI 实施。

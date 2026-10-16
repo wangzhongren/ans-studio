@@ -1,0 +1,83 @@
+# 字面 glob `node --test "test/测试/**"` 中 13 条失败条目的逐类定性（2026-10-16，刷新后）
+
+## A. 4 个目录条目（node 将 glob 命中的目录当测试文件执行 ⇒ Cannot find module（目录）⇒ 'test failed'；各目录内 .test.ts 均已在 270/270 内通过）
+--- node --test "test/测试/"
+Error: Cannot find module '/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/测试'
+ℹ tests 1
+ℹ pass 0
+ℹ fail 1
+  'test failed'
+--- node --test "test/测试/g1-verify/"
+Error: Cannot find module '/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/测试/g1-verify'
+ℹ tests 1
+ℹ pass 0
+ℹ fail 1
+  'test failed'
+--- node --test "test/测试/g2-verify/"
+Error: Cannot find module '/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/测试/g2-verify'
+ℹ tests 1
+ℹ pass 0
+ℹ fail 1
+  'test failed'
+--- node --test "test/测试/kanban-fixes-verify/"
+Error: Cannot find module '/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/测试/kanban-fixes-verify'
+ℹ tests 1
+ℹ pass 0
+ℹ fail 1
+  'test failed'
+
+## B. 9 个 .mjs 手动探针（非测试文件；脱离真实环境即失败——真模型凭据缺失 / Electron 运行时缺失 / 依赖子包缺失；逐条记录真实退出码）
+--- test/测试/pi-probe.mjs
+file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/src/common/pi-adapter/provider-config.ts:133
+    throw new Error(
+          ^
+
+  (exit=1)
+--- test/测试/pi-turn-probe.mjs
+file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/src/common/pi-adapter/provider-config.ts:133
+    throw new Error(
+          ^
+
+  (exit=1)
+--- test/测试/t1-actual-main.mjs
+file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%B5%8B%E8%AF%95/t1-actual-main.mjs:9
+import { app, BrowserWindow, dialog } from 'electron';
+              ^^^^^^^^^^^^^
+SyntaxError: Named export 'BrowserWindow' not found. The requested module 'electron' is a CommonJS module, which may not support all module.exports as named exports.
+  (exit=1)
+--- test/测试/t1-pi-sdk.mjs
+node:internal/modules/package_json_reader:301
+  throw new ERR_MODULE_NOT_FOUND(packageName, fileURLToPath(base), null);
+        ^
+
+  (exit=1)
+--- test/测试/ui-reacceptance-renderer-regression.mjs
+file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%B5%8B%E8%AF%95/ui-reacceptance-renderer-regression.mjs:9
+import { app, BrowserWindow, ipcMain } from 'electron';
+              ^^^^^^^^^^^^^
+SyntaxError: Named export 'BrowserWindow' not found. The requested module 'electron' is a CommonJS module, which may not support all module.exports as named exports.
+  (exit=1)
+--- test/测试/uiux-anchor-drift-probe.mjs
+file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%B5%8B%E8%AF%95/uiux-anchor-drift-probe.mjs:21
+import { app, BrowserWindow, ipcMain } from 'electron';
+              ^^^^^^^^^^^^^
+SyntaxError: Named export 'BrowserWindow' not found. The requested module 'electron' is a CommonJS module, which may not support all module.exports as named exports.
+  (exit=1)
+--- test/测试/uiux-anchor-probe.mjs
+file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%B5%8B%E8%AF%95/uiux-anchor-probe.mjs:6
+import { app, BrowserWindow, ipcMain } from 'electron';
+              ^^^^^^^^^^^^^
+SyntaxError: Named export 'BrowserWindow' not found. The requested module 'electron' is a CommonJS module, which may not support all module.exports as named exports.
+  (exit=1)
+--- test/测试/uiux-rowgap-detached-probe.mjs
+file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%B5%8B%E8%AF%95/uiux-rowgap-detached-probe.mjs:14
+import { app, BrowserWindow, ipcMain } from 'electron';
+              ^^^^^^^^^^^^^
+SyntaxError: Named export 'BrowserWindow' not found. The requested module 'electron' is a CommonJS module, which may not support all module.exports as named exports.
+  (exit=1)
+--- test/测试/uiux-v2-renderer-regression.mjs
+file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%B5%8B%E8%AF%95/uiux-v2-renderer-regression.mjs:6
+import { app, BrowserWindow, ipcMain } from 'electron';
+              ^^^^^^^^^^^^^
+SyntaxError: Named export 'BrowserWindow' not found. The requested module 'electron' is a CommonJS module, which may not support all module.exports as named exports.
+  (exit=1)

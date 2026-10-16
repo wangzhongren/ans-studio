@@ -1,0 +1,42 @@
+{
+  "role": "UIUX设计师",
+  "round": "visual-convergence-v3",
+  "date": "2026-10-16",
+  "title": "聊天区松散度审计 + 整体观感 v3 取证清单",
+  "method": "受控 IPC 夹具驱动真实 app/renderer + app/preload.cjs（离线：无模型请求、无网络、不读用户项目/凭据）；非 CUA 亲操作；正式验收仍需真机点击",
+  "environment": {
+    "electron": "44.7.0",
+    "os": "darwin (本机)",
+    "repoHead": "1c8a489",
+    "rendererHashes": {
+      "app/renderer/index.html": "a39e36528767298eb0568203233c4326986f6e86ba8893b8e1c9c2ba3fb8c2fb",
+      "app/renderer/styles.css": "dbbb66f014cab3e0fa4d98d63d4a5fa721948500f8710954ddbc67f75fdbcf51",
+      "app/renderer/renderer.js": "928ffacd5c0db0f4c6858dd9b018a8099f32f5d9374e895b4701c42d3b773f8c",
+      "app/renderer/tool-rows.js": "02d75fb25de1dd6167a5b4fc7c012078c4a3da1b45ccee8aa6262c1d8dace4da",
+      "app/renderer/ui-labels.js": "564fdb9a66778da567391009868a3c030b4f63a4f5724eb700e010f66104d9fd",
+      "app/renderer/role-status.js": "2daab2f108e3351f6143270f18d7f07dddeb48ae9408ba545fda6ffc5c7aeec5",
+      "app/preload.cjs": "d7c9fd99341731ee601aaa133655426a711e53a9dc20b50f6e8e5d6fa1b6437d"
+    }
+  },
+  "provenance": [
+    "v3-*/g2-recovery-* 截图与 audit-v3-report.json：临时目录自建夹具 /tmp/ans-uiux-v3/ext/audit-v3.mjs（不改仓库 test/ 任何文件），输出 /tmp/ans-uiux-v3/ext-final2；多角色/系统行/恢复卡队列等受控数据均为夹具内固定演示数据",
+    "v3-sim-*：候选间距『示意』——在真实 renderer 上经 webContents.insertCSS 注入候选 CSS 覆盖（仅临时夹具内，非正式应用改动）；因页面 CSP 禁内联样式，insertCSS 按来源顺序生效，候选选择器已加同双类提升特异性；textarea 高度需触发一次 input（autoGrow）才按新 min-height 重算",
+    "g2-recovery-card-1360/960.png 与 fixture-g2-report.json：仓库既有夹具 uiux-v2.mjs 只读运行（ANS_G2_RECOVERY_UI_ONLY=1）",
+    "visual-v2-*.png 与 fixture-visual-v2-report.json：uiux-v2.mjs（ANS_VISUAL_V2_UI_ONLY=1）",
+    "01-tool-detail.png / 03-document-read.png 与 fixture-flow-report.json：uiux-v2.mjs（ANS_COMPLETE_FLOW_UI_ONLY=1）",
+    "另有只读运行 uiux-design-audit.mjs（补充对照；其 Pi 配置提示为夹具形状过期所致，不作为产品问题）",
+    "ind-* 截图与 indicators-report.json：运行/思考状态指示器专项夹具 /tmp/ans-uiux-v3/ext/indicators5.mjs（临时目录自建）；ind-after-* 为候选 SVG 转轮的 DOM/CSS 示意（夹具内），非正式实现；reduced-motion 经 CDP Emulation.setEmulatedMedia 模拟实测"
+  ],
+  "keyShots": {
+    "beforeChatDensity": "v3-density-bottom-1360.png / v3-density-records-1360.png",
+    "afterSimDensity": "v3-sim-bottom-1360.png / v3-sim-records-1360.png / v3-sim-960.png",
+    "multiRoleAndPending": "v3-chat-bottom-1360.png / v3-system-live-1360.png",
+    "workQueueWithSystem": "v3-work-1360.png / v3-work-960.png",
+    "systemReplay": "v3-system-replay-1360.png",
+    "emptyState": "v3-empty-1360.png",
+    "recoveryCard": "g2-recovery-card-1360.png / g2-recovery-card-960.png",
+    "workingIconBeforeAfter": "ind-before-working-ico-1360.png ↔ ind-after-working-ico-1360.png",
+    "thinkingTailBeforeAfter": "ind-before-tail-1360.png ↔ ind-after-tail-1360.png",
+    "loadingSpinnerBeforeAfter": "ind-before-loading-1360.png ↔ ind-after-loading-1360.png"
+  }
+}

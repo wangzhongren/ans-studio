@@ -13,6 +13,8 @@ related: [role-watchdog-and-closure, kanban-fixes-pm-review, handback, run-role]
 
 **状态：已实施 / 待验证**（独立验证与真机 E2E 未进行；未 git 提交）。全部落点在**编排**角色 `boundary.yaml` Section 1 内：`src/common/编排/watchdog.ts`（新增，文案单一来源＋能力契约转发）、`src/pipeline/orchestration/run-role.ts`（三能力位＋只 su 注入＋适配器选项透传）、`test/编排/watchdog.test.ts`（新增 11 例）。
 
+> **【后记 · 2026-10-16】** 客户 run-5 观察后复裁：收束默认阈值 5 min → **30 秒**，接口冻结为 `renderClosurePrompt(silentMs)`（毫秒参数、两档自适应文案）；常量保名改值为 `WATCHDOG_DEFAULT_SILENT_MINUTES = 0.5`（＝30 000 ms）。本文以下出现的「`renderClosurePrompt(silentMinutes)`」「`WATCHDOG_DEFAULT_SILENT_MINUTES=5`」「回退批准默认值 5」均为**当时记录**；现行口径见 [`2026-10-16_fix_closure-30s-ms-interface.md`](2026-10-16_fix_closure-30s-ms-interface.md)。
+
 ## 一、来源与权限
 
 - 客户 2026-10-16 按推荐批准 **G-2 实施**（V1a+V1b 同轮；9 个待裁点全部采纳提案推荐）——`角色卡/项目管理/docs/change/2026-10-15_change_kanban-fixes-pm-review.md` §「G-2 客户批准与派发」。设计规格＝`角色卡/产品/docs/design/2026-10-16_design_role-watchdog-and-closure.md`（下称「设计」）。

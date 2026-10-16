@@ -53,3 +53,5 @@
 2026-10-15 客户已授权视觉V2实施，新增[落地独立评审](docs/design/2026-10-15_design_visual-v2-implementation-review.md)。仅自身新文档/证据写权；accepted视觉规范/原型与r2冻结不改。当前首轮只读准备、待稳定候选与root串行GUI，未签通过。
 
 2026-10-15 V2正式落地严格UIUX范围通过：renderer5324b786/stylesdf554f87/index7beda，SV1–SV13及真实batch/资料阅读差距均关闭。依据本角色源码/看图与root真实native截图/AX，未冒签亲操作；accepted原件不变，详见[最终评审](docs/design/2026-10-15_design_visual-v2-implementation-review.md)。无新增设计项或明确待修阻点。
+
+- 2026-10-16 v3审计+提案：客户「界面乱/聊天太松散/思考没动画/运行图标丑」。本角色临时目录自建只读夹具（/tmp/ans-uiux-v3/ext，未改 test/）驱动真实 renderer+preload：多角色忙碌/长转录/系统行/恢复卡/工作概览/空态/960 全量截图+逐值度量；既有 uiux-v2.mjs 的 G2/视觉/完整流三模式只读复跑。「松散」实测：行距 24px×12/12、正文 15/27、输入区 165.6（空框 40）、视口 586/860、同转录完整可见行 7；sim 注入候选 CSS（16px 行距等）后 823px 转录/9 行/输入区 137.6。状态反馈实测：忙碌全静态（◐ 10px 字形无动画、尾行纯文本），唯一动画=开会话 .spinner 0.8s；候选 12px SVG 弧线转轮 0.9s（含尾行/loading 统一与 reduced-motion CDP 实测 1e-06s）。产出[设计提案](docs/design/2026-10-16_design_visual-convergence-v3.md)+[evidence](docs/design/2026-10-16-visual-convergence-v3-evidence/manifest.json)（38 文件，含 renderer 哈希）。状态：未实施/未测试；等 PM 评审与客户逐项勾选。
