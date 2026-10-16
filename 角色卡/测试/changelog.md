@@ -1,5 +1,46 @@
 # 测试 变更记录
 
+## 2026-10-16 — G-4 V1（su 技能安装全链）＋ cleanPatterns 轻修：独立验证**整体通过**（0 不通过、5 备注）
+
+**来源**：PM 派发「独立验证轮」（V1 全链＋cleanPatterns 轻修＋范围审计＋冻结绑定）。本角色**独立构造**自建用例套件 `test/测试/g4-skill-verify/`（9 测试文件＋2 夹具，**51 例全绿**；对抗性构造、不复用实施方断言）；报告 [2026-10-16_change_g4-skill-install-and-cleanpatterns-independent-verification.md](docs/change/2026-10-16_change_g4-skill-install-and-cleanpatterns-independent-verification.md)，证据 `docs/change/2026-10-16-g4-verification-evidence/`。边界：只写 `test/测试/**` 与本角色文档；未碰产品文件与探针脚本；未 git 提交；零真实网关请求。
+
+- **逐域通过**：A 工具面（注入才注册矩阵/回执冻形/契约外 fail-closed/schema 冻结句逐字/零写盘切片＋盘快照）｜B 渲染单一来源（双向核/原始字节 digest/坏件防御/穿越大防御/∅）｜C 预授权（真装配 gate：树内免确认、树外仍逐条、前缀负例、docs/mcp 未预授、非 su 不变、重建仍有效）｜D 卡文本四要点＋J-1 全文小句级零违规｜E handler（护栏六格矩阵：无轮次/回交/系统/派发[私有面直注]拒、直聊/排队客户消息放行；拒绝全分支 reason 映射＋零副作用；三态如实；`[系统·安装]` 真投递且 withdraw 拒；诊断落盘）｜F 裁定⑤指纹（三触发/零技能负例/坏登记不误重建/缺件收敛/隔离）｜G 拼接 ×3＋假适配器（恰一段差分、独立重打节文本、坏件不拒会）｜H 范围审计（MCP V2 零实施、零二次卡、无删除原语、能力位仅 su、探针纯本地）｜I cleanPatterns（复现转正/零泄漏 battery/ASCII `;` 不回归/flags 不变/Codex redact 同口径）。
+- **冻结绑定**：26 条目 sha256 开工/收工/终次三份**逐字节一致**（清单写入报告 §四）。
+- **全量**：`node --test "test/**/*.test.ts"` → **1880 计/1879 过/0 红/1 skip**（＝基线 1829＋本批 51；skip＝既有「仅 Windows」）；`npm run typecheck` 0 错。翻转钉子（loopback L255）与 g1 三棵同步复跑 **12/12** 绿。
+- **备注（非不通过）**：① rebuilt 支复用 rebuildSession 既有事件文案含「客户确认的恢复动作」——安装场景措辞不精确（单一来源复用，非本批改动面）；② Codex redact hash 口径原样保留（只紧不松，如实登记）；③「无分隔符紧贴 CJK」残余按裁定保留；④登记由好转坏触发一次重建后收敛（语义细节）；⑤派发轮护栏分支以私有面直注检验（真实装配下 su 不为派发目标）。
+- **未验边界**：Electron 真机 E2E；Claude/Codex/Pi 的 SDK 级会话注入（实施方测试覆盖、本角色复跑绿）；卸载×在跑组合（同 code path）；`app/desktop/interface.ts` 真渲染链路；探针脚本行为（按约束不执行，仅静态审计）。
+
+## 2026-10-16 — G-4 四项已批准变更落盘后：名下钉子逐字对表新事实同步（三棵 / 新卡文本 / cleanPatterns 翻转）
+
+**来源**：四项已批准变更落盘（裁定①预授权三棵树＋编排 I5、门禁引擎 I6 卡文本增「安装纪律」段＋三棵话术、运行时核心 A-base cleanPatterns 收窄）。本角色名下 3 条 g1 钉子与 1 条 pi-loopback 钉子钉的是旧事实，本轮**逐字对表新事实同步**（不是放宽断言：等值/在场性/非空洞强度一字不降，旧值→新值）。边界：只写 `test/测试/**` 与本角色文档；未碰产品文件、未碰他角色在飞（三适配器/桌面 UI）；**未 commit**。
+
+### 同步清单（断言 → 旧值 → 新值 → 依据）
+
+1. `test/测试/g1-verify/g1-copy-and-nails.test.ts`「su 预授权写目录」钉子（:26/:31）：
+   - 用例名：`恰为两棵（docs/su + docs/contracts）` → `恰为三棵（docs/su + docs/contracts + docs/skills）`；
+   - `assert.deepEqual(dirs, ["docs/su","docs/contracts"])` → `assert.deepEqual(dirs, ["docs/su","docs/contracts","docs/skills"])`（deepEqual 全等强度不变；`some(workflow)` 反向断言不动）。
+   - **依据**：裁定①预授权三棵树＋编排 I5——`src/pipeline/orchestration/run-role.ts:916` 实况 `SU_PREAUTHORIZED_WRITE_DIRS = ["docs/su","docs/contracts","docs/skills"]`。
+2. 同文件「卡文本独立反向断言」非空洞变异锚点（:49）：`T.replace("`docs/workflow.md` 不在预置两目录内", v)` → `…不在预置三目录内…`。防漂移断言（`mutated !== T`）与三个违规变体的逐一捕获断言均未动；锚点是对新卡文本的实际子串。
+   - **依据**：门禁引擎 I6——`boundary-core.ts:162` 新句「`docs/workflow.md` 不在预置三目录内」。
+3. 同文件「正向在场性短语清单」（:103）：`"不在预置两目录内"` → `"不在预置三目录内"`（逐字在场性强度不变）。
+   - **依据**：同上 I6。
+4. 同文件 ④ 段口径注释「恰两棵预授权目录」→「恰三棵预授权目录」（注释同步，断言零变化）。
+5. `test/测试/g3-search-verify/pi-loopback-verify.test.ts`「开启成功往返」第 2 条标题断言**翻转**（:255）：
+   - 旧：`assert.equal(resultText.includes(TITLE_B), false, "（备注）第 2 条标题被既有 URL 贪吃口径吞掉——如实登记")`；
+   - 新：`assert.equal(resultText.includes(TITLE_B), true, "第 2 条标题不再被 URL 口径吞并——完整可见（A-base 收窄后）")`（布尔等值强度不变；注释改为记录翻转来源与依据）。
+   - **依据**：运行时核心 A-base——`src/common/runtime-core/tool-display.ts:43` URL 匹配排除集追加 CJK 标点块 `　-〿` 与全角形式块 `＀-￯`；组内「；」连接下归一替换止于标点，第 2 条起标题完整可见。
+
+### 扫描范围与遗漏排查（先全量再改）
+
+- 全量扫 `test/测试/**`（`两棵|两目录|预置两|恰为两|确认制要点|写盘许可已预置`）：旧值仅命中本文件 4 处，已全部同步；g2-verify/scope-audit.test.ts 两条引用卡文本的断言（工具名在场、看护职责段位置/关键词）与新文本不冲突，未改。
+- 他角色已含新钉（不重复）：`test/门禁引擎/su-doc-surface-convention.test.ts:378`「预授权扩列（G-4）两棵→三棵」、`test/runtime-core/tools.test.ts:47` 旧计数防复现——均为其属主文件，本角色未碰。
+
+### 复跑（本角色独立执行）
+
+- `node --test "test/测试/**/*.test.ts"` → **320 pass / 0 fail / 0 skip**（改前 316/4，4 红＝本轮 3 条同步＋1 条翻转，全部按预期消解）。
+- `node --test "test/**/*.test.ts"`（全量）→ **1814 tests：1813 pass / 0 fail / 1 skip**（唯一 skip＝`test/门禁引擎/resolve-write.test.ts:173` 既有 Windows-only，非本轮引入）。
+- `npm run typecheck` → **0 错**（tsc --noEmit）。
+
 ## 2026-10-14 — 补建角色功能导航 feature-map.md（修复 role-card 死链；客户要求）
 
 **来源**：客户普查发现含本角色在内 5 个角色缺 `feature-map.md`，role-card 中「当前导航见[测试功能导航](feature-map.md)」为死链；客户要求统一补建。边界：只写本角色边界 Section 1 内文件（本页 + changelog/memo，Section 1 已列）。

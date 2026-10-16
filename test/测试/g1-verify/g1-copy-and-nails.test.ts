@@ -23,12 +23,12 @@ test("代码级钉子（独立）：session.ts 无本地副本实现/调用、�
   assert.ok(sess.includes("plan.text"), "入队文本须取自判据产出（定格文本）");
 });
 
-test("代码级钉子（独立）：su 预授权写目录恰为两棵（docs/su + docs/contracts）——workflow.md 不在其中", async () => {
+test("代码级钉子（独立）：su 预授权写目录恰为三棵（docs/su + docs/contracts + docs/skills）——workflow.md 不在其中", async () => {
   const src = await read("../../../src/pipeline/orchestration/run-role.ts");
   const m = src.match(/const SU_PREAUTHORIZED_WRITE_DIRS[^=]*=\s*\[([^\]]*)\]/);
   assert.ok(m, "须能定位 SU_PREAUTHORIZED_WRITE_DIRS 定义");
   const dirs = [...m![1].matchAll(/"([^"]+)"/g)].map((x) => x[1]);
-  assert.deepEqual(dirs, ["docs/su", "docs/contracts"], "恰为两棵目录树（客户裁定范围；两分写盘口径的机制实况）");
+  assert.deepEqual(dirs, ["docs/su", "docs/contracts", "docs/skills"], "恰为三棵目录树（客户裁定范围；G-4 扩列后＝三棵；两分写盘口径的机制实况）");
   assert.equal(dirs.some((d) => d.includes("workflow")), false, "docs/workflow.md 不在预授权内（走规划确认）");
 });
 
@@ -46,7 +46,7 @@ test("卡文本独立反向断言（含非空洞验证）：含 docs/workflow.md
     "`docs/workflow.md` 为预授权目录",
   ];
   for (const [i, v] of violations.entries()) {
-    const mutated = T.replace("`docs/workflow.md` 不在预置两目录内", v);
+    const mutated = T.replace("`docs/workflow.md` 不在预置三目录内", v);
     assert.notEqual(mutated, T, `变体 ${i} 应真实发生替换（防变异点漂移）`);
     const caught = splitClauses(mutated).filter((c) => c.includes("docs/workflow.md")).some((c) => banned.test(c));
     assert.equal(caught, true, `变体 ${i} 必须被谓词捕获：${v}`);
@@ -100,7 +100,7 @@ test("卡文本正向在场性（独立短语清单）：G-1/A3 关键纪律逐�
   for (const phrase of [
     "规划纪律", "先落盘再派发", "冻结后不可变", "不原地改 v1", "旧版保留可读",
     "docs/workflow.md", "步骤表", "完成口令", "变更与重验", "改动依赖后重测调用方",
-    "已预置的 `docs/contracts/**`（直接写即可）", "不在预置两目录内", "同一次规划确认",
+    "已预置的 `docs/contracts/**`（直接写即可）", "不在预置三目录内", "同一次规划确认",
     "动手前先读", "blocked", "不得猜、不得改契约",
     "按地址引用", "不内嵌契约全文", "必读（按序）", "不要自己算或转抄哈希", "拒投", "补落盘后重派",
     "受影响步骤的既有回交", "未受影响的步骤不回滚、不重跑",
@@ -136,7 +136,7 @@ test("四处文案口径一致性抽查（独立）：渲染块 / 卡文本 / �
     assert.ok(t.includes("先落盘再派发"), "两处同写「先落盘再派发」");
   }
 
-  // ④ 写盘口径两分（契约直接写；workflow.md 走规划确认）——四处一致；机制实况（恰两棵预授权目录）互证
+  // ④ 写盘口径两分（契约直接写；workflow.md 走规划确认）——四处一致；机制实况（恰三棵预授权目录）互证
   assert.ok(T.includes("已预置的 `docs/contracts/**`（直接写即可）"), "卡：契约直接写（预置）");
   assert.ok(toolText.includes("写盘许可已预置、直接写即可"), "工具：契约直接写（预置）");
   assert.ok(T.includes("同一次规划确认"), "卡：workflow 走规划确认 preview");

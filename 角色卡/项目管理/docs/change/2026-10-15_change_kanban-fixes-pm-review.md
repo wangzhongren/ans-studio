@@ -117,7 +117,23 @@ status: approved-implementation-dispatched
 - **客户 live 探针（Pi 路径，2026-10-16 客户本机实跑）**：`web_search` ✅ **真网关实时执行**（server_tool_use/web_search_tool_result/usage 计量 1–3 次/轮）；`web_fetch` ✗ 网关 500 拒（unknown variant；该网关支持变体仅 web_search 两版——**配置指引：本网关只应启用 web_search**）；`code_execution` ✗（维持不解缓）；**两轮复放 round2 被拒经 Pi适配器 判定为探针构造产物（高置信）**——探针丢失流式文本增量、组装空内容助手消息；真实链路 `convertMessages` 对空内容助手消息**整条跳过**（dist 只读实证）⇒ 该 500 形态不可构造；网关对剥离转录的接受度**仍属未验**（待探针修复后客户补跑 §②）；方案 P 维持未启动（条件性评估已归档）；残余风险登记：剥离后为空 ⇒ 相邻 user 消息形态未验。max_uses 未见强制（不构成成本护栏，计费以 usage 计量为准）、pause_turn 未见（如实登记）。证据：`角色卡/Pi适配器/docs/fix/2026-10-16_probe_server-side-tools-live-results.md`（端点/请求 id 已按公开仓库纪律隐去）。
 - **G-3 独立验证完成（测试角色）：整体通过（0 不通过、5 备注）**——报告 `角色卡/测试/docs/change/2026-10-16_change_g3-search-and-fold-independent-verification.md`；独立自建 50 例（含对抗）＋自建 Electron 折叠探针 16/16；冻结绑定 47 条目开工/收工逐字节一致；全量 1773/1772/0/1、typecheck 0。备注（均非不通过）：①`cleanPatterns` URL 贪婪匹配吞「URL 紧贴文本」——Pi 搜索行多条目（「；」连接）第 2 条起标题被吞（呈现面小缺陷、丢文本不泄文本；**已派运行时核心出轻修提案**）；②max_uses 经 Number() 宽容 0x2/1e2（值仍正整数、安全侧）；③server-tools.ts 注释「大小写不敏感」与实现不符（措辞误、行为安全侧）；④网关 start 回传 count=0 且响应含调用块时 from-blocks 兜底被抑制（记账窄界、已钉）；⑤Claude/Codex live 探针与真机 E2E 留白（如实）。
 - **探针修复完成（Pi适配器）**：两处构造偏差修复＋`--self-test` 离线自检 PASS（A/B 承重证明：注回旧偏差恰转红）＋守卫烟测与 typecheck 0；客户补跑命令不变（`node test/pi-adapter/server-tools-probe.ts`，读 .env、只打键名、结构化摘要可整段转达）；其证据文件「待办修复」条一行为**待排轻项**（下次该角色 docs 轮同步）。
-- **发布后批次入 main**：运行时核心时序健壮化对／G-3 搜索批（三适配器＋含修复后探针）／工具行折叠批／验证与验收记录／G-4 评审记录——按批提交推送（见仓库提交记录）；下版发布换新 SOURCE_REF。
+- **发布后批次入 main（2026-10-16）**：运行时核心时序健壮化对／G-3 搜索批（三适配器＋含修复后探针）／工具行折叠批／验证与验收记录／G-4 评审记录——按批提交推送（`9c42651`/`3826f76`/`f1da234`/`56de09a`/`d8eaa1c`）；下版发布换新 SOURCE_REF。
+- **备注①轻修提案已交回（运行时核心，2026-10-16）**：`角色卡/运行时核心/docs/fix/2026-10-16_proposal_cleanpatterns-url-greedy.md`——推荐**核心收窄排除集**（`tool-display.ts:38` 单行正则增 CJK 标点块 `　-〿` 与全角块 `＀-￯`；纯非贪婪实测剥除整体失效不可行；正向 ASCII 字符集被模拟证伪——URL 含非 ASCII 查询值时漏真 secret，违反零泄漏口径）。影响面＝唯一生产消费方为显示投影（历史/实时/报告/回交全走 protectText）、唯一钉住旧行为处＝测试角色 loopback 用例 L255（须翻转，归测试角色同批）。**未决点 PM 口径（呈客户）**：A-base 范围（A-ext 通用标点登记备用）；无分隔符紧贴 CJK 的固有歧义**保留现状**；Codex 诊断 redact（config.ts L44）同类贪婪模式**同批检查（只紧不松）**；Pi 连接符间距（B）不做。**已呈客户，与 G-4 简表同轮批准。**
+
+## 客户批准（2026-10-16）：「都按推荐批准，开始实施」＝G-4 十项裁定全采纳 ＋ cleanPatterns 轻修批准
+
+- **G-4 V1（技能安装全链）实施派发——wave 1（契约层先行）**：①运行时核心（I1/I2：`src/model/runtime.ts` 契约单一来源＝`InstallSkillFn`/`UninstallSkillFn`＋回执形状＋`GovernedToolsOptions.installSkill`/`uninstallSkill`；schema 两工具；tools 两 maker[只路由载荷、不写盘]）；②编排（I4 `renderInstalledSkillsSection(projectRoot, roleId)` 渲染单一来源[读登记、算 digest、坏件跳过、零技能空串]＋I5 `SU_PREAUTHORIZED_WRITE_DIRS` 增 `docs/skills`）；③门禁引擎（I6 su 卡「安装纪律」段，J-1 守卫避让）。
+- **wave 2（契约落盘后派）**：桌面窗口（I3 handler[校验/激活复用 rebuildSession/三态回执/系统行/诊断]＋裁定④轮次护栏[仅客户消息发起的轮次可执行]＋裁定⑤ O-1 指纹扩展[登记＋内容文件，settle 收敛]）；三适配器（系统提示各拼一行＋**V2 P0 探针轮**，各自离线/loopback）；桌面UI（I7 行样式最小面）。
+- **冻结符号（PM 定，落盘即契约）**：工具名 `install_skill`/`uninstall_skill`；能力位/字段 `installSkill`/`uninstallSkill`；回执三态形状 `{ok:true, action:"installed"|"uninstalled", roleId, name, path, digest, effective:"rebuilt"|"next-session", note?}` / `{ok:false, reason, message}`；护栏拒绝 `reason:"not-customer-turn"`；系统行 `[系统·安装]`；注入节标题「## 本角色已安装技能（动手前先读，按序）」；登记文件 `docs/skills/<name>/{SKILL.md,install.md}`。
+- **cleanPatterns 轻修实施派发**：运行时核心（A-base 收窄＋Codex 诊断同批检查[只紧不松]＋单测增补[复现转正/后缀/括号/对抗零泄漏/`;`不回归]）→ 测试角色（loopback L255 断言随修翻转＋补跑复验）。
+- 两者完成后：**独立验证轮**（测试角色，含 V1 全链与轻修）→ 随下一版运行包发布。
+
+### G-4 V1 实施收口（2026-10-16）
+
+- **九件全部交回**：运行时核心（cleanPatterns A-base 收窄＋Codex 诊断同批＋G-4 I1/I2 契约[`InstallSkillFn`/`InstallSkillReceipt`/`installSkill?` 等，`src/model/runtime.ts` 单一来源]＋schema/n工具 maker[只路由载荷、不写盘]＋request_confirmation 三棵树文案同步）；编排（I4 `renderInstalledSkillsSection(projectRoot, roleId, onDiagnostic?)` 单一来源＋`readSkillRegistration` 读取器[与渲染器同解析、双向核]＋I5 三棵树预授权＋收口件[`AdapterCapabilities`/输入型/工厂六处逐名透传点亮两工具]）；门禁引擎（I6 卡「安装纪律」段＋三棵树话术，J-1 守卫 185/186 全过）；桌面窗口（I3 handler 全分支[护栏→校验→激活→回执＋`[系统·安装]` 系统行＋诊断]＋裁定④轮次护栏＋裁定⑤ O-1 指纹扩展[登记＋内容文件、settle 收敛、坏件不误重建]）；三适配器（注入节拼接×3＋**V2 P0 探针轮**）；桌面UI（I7 三层实证零改动）；测试（4 处钉子同步/翻转，强度未放宽）。
+- 全量定格 **1829/1828/0 红/1 skip**（各上下文终跑一致）、typecheck 0 错；两工具自此**注册点亮**（未注入仍零注册）。
+- **三平台 P0 探针结论（V2 输入要点）**：Claude——spawn 成立但**子进程 env 未收窄**（含网关凭据，V2 必修为自持收窄）；`mcp_server.source="dynamic"`（放行判据以此为准）；hook-allow 后 `canUseTool` 不被咨询（`:239` 无需动）；首轮等待受 CLI 内部 ~27s 界。Codex——连续 `-c` 同根键**覆盖非合并**（定义与禁用集须编入单条）；namespace 桥＋`mcpToolCall` item 形状定格；ANS 姿态下白名单 server 需 `default_tools_approval_mode:"approve"` 才可执行、零审批请求；env 无全量继承（三平台中安全）。Pi——`bindExtensions` 接通＋治理回归钉住；**`dispose()` 不收回 MCP 子进程（V2 必做）**；放行判据草案（前缀式，快照式实测误伤）；自持传输收窄实证（91→3 键）。
+- **下一步**：独立验证轮（已派：V1 全链＋cleanPatterns 轻修＋范围审计＋冻结绑定）→ 提交入 main → **V2 分批呈批**（用探针结论回填产品提案 §五占位后按平台呈裁）。
 
 ## 候选 G-4「角色能力安装（技能＋MCP）」（2026-10-16 客户讨论提出，已派细化）
 

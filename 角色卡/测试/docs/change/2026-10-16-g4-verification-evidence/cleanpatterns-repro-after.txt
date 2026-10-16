@@ -1,0 +1,7 @@
+raw   = 查询「独立对抗查询-ZX9」 → 2 条结果：独立标题-ALPHA — https://verify.test/entry?token=对抗参数-绝不外泄#frag；独立标题-BETA — https://verify.test/beta
+out   = 查询「独立对抗查询-ZX9」 → 2 条结果：独立标题-ALPHA — https://verify.test/entry；独立标题-BETA — https://verify.test/beta
+flags = {"redacted":true,"truncated":false}
+leak  = false
+suffix= T2 — https://verify.test/b；…（共 20 条） | %EF%BC: false
+paren = （https://a.test/x）后文
+ascii;= 见 https://a.test/p;jsessionid=abc123 后续

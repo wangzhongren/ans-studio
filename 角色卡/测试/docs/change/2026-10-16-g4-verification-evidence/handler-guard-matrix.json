@@ -1,0 +1,21 @@
+{
+  "noTurn": {
+    "ok": false,
+    "reason": "not-customer-turn",
+    "message": "本动作仅可在客户消息发起的轮次执行——未执行。"
+  },
+  "systemTurn": {
+    "ok": false,
+    "reason": "not-customer-turn",
+    "message": "本动作仅可在客户消息发起的轮次执行——未执行。"
+  },
+  "customerTurn": {
+    "ok": true,
+    "action": "installed",
+    "roleId": "X",
+    "name": "k1",
+    "path": "docs/skills/k1/SKILL.md",
+    "digest": "0c7882332fecc73677eb4a064fe511514db8994ad273a52e16f28482a83b1451",
+    "effective": "rebuilt"
+  }
+}

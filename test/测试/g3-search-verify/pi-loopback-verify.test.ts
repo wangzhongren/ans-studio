@@ -248,11 +248,11 @@ test("开启成功往返：声明尾部上 wire、恰一对 start/result、查�
         assert.ok(resultText.includes("https://verify.test/entry"), "URL host+path 可见");
         assert.equal(resultText.includes(URL_SECRET), false, "URL query 被显示 profile 剥除");
         assert.equal(resultText.includes("#frag"), false, "URL fragment 被剥除");
-        // 备注项（既有显示层口径，非本批改动面；minimal repro 见证据 raw/cleanpatterns-url-greedy-repro.txt）：
-        // cleanPatterns 的 URL 贪婪匹配 `https?://[^\s<>"']+` 把**与 URL 紧贴（无 ASCII 空白）的后续文本**一并
-        // 吞掉并以归一 URL 替换——组内以「；」连接、URL 后无空格 ⇒ 第 2 条起标题被吞（丢文本、不泄文本）。
-        // 本断言如实钉住当前可观察行为（实施记录未覆盖该交互；缺陷候选上报 PM，本角色不修）。
-        assert.equal(resultText.includes(TITLE_B), false, "（备注）第 2 条标题被既有 URL 贪吃口径吞掉——如实登记");
+        // 翻转项（运行时核心 A-base，2026-10-16 提案 core-cleanpatterns-url-boundary 实施；本断言由旧行为
+        // 如实登记项翻转而来）：cleanPatterns 的 URL 匹配排除集已追加 CJK 标点块 `　-〿`（　。〈〉「」…）
+        // 与全角形式块 `＀-￯`（；：，（）？！）——组内以「；」连接、URL 后无 ASCII 空白时，归一替换止于
+        // 标点、不再吞并其后文本 ⇒ 第 2 条起标题完整可见；旧贪婪吞并行为不得复现。等值钉新事实。
+        assert.equal(resultText.includes(TITLE_B), true, "第 2 条标题不再被 URL 口径吞并——完整可见（A-base 收窄后）");
         assert.ok(events.some((event) => event.kind === "message" && event.summary === "检索完成。"));
 
         // ③ 零泄漏（spy 全量断言）：事件流与诊断落盘都不含查询串/标题/加密诱饵/URL 秘密参数。
