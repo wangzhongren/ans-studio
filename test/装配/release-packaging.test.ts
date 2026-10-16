@@ -14,21 +14,34 @@ test('release overlay preserves Chinese build paths and excludes private data an
 test('release refuses unreviewed production changes and similarly named private directories', () => {
   assert.throws(() => selectOverlay(['app/desktop/interface.ts']), /Unreviewed production overlay/);
   assert.throws(() => selectOverlay(['src/common/装配-other/secret.mjs']), /Unreviewed production overlay/);
-  assert.throws(() => selectOverlay(['src/provider/codex/session.ts']), /Unreviewed production overlay/);
+  assert.throws(() => selectOverlay(['src/provider/claude/session.ts']), /Unreviewed production overlay/);
   assert.throws(() => selectOverlay(['app/main.ts']), /Unreviewed production overlay/);
   assert.deepEqual(selectOverlay(['package.json', 'test/装配/release-packaging.test.ts', 'test/codex-adapter/electron-launch.test.ts']).selected,
     ['package.json', 'test/装配/release-packaging.test.ts']);
 });
 
-// v1.1.0 轮按精确路径纳入的 Windows 测试小修已随冻结 tag 吸收；v1.2.0 overlay 回到纯打包面——
-// 未列名的 test/ 文件（含 test/runtime-core/**）一律 excluded、不随构建树分发；本用例锁死该边界，
-// 若未来版本又需测试文件随 overlay（先例：v1.1.0 按精确路径纳入 Windows 平台断言小修），须经评审显式列入。
+// v1.1.0 轮按精确路径纳入的 Windows 测试小修已随冻结 tag 吸收；v1.2.0 overlay 按精确路径增列的 1 个经评审
+// 文件是生产侧修复（见下方专项用例），测试面零改动——未列名的 test/ 文件（含 test/runtime-core/**、
+// test/codex-adapter/**）一律 excluded、不随构建树分发；本用例锁死该边界，若版本又需测试文件随 overlay
+// （先例：v1.1.0 平台断言小修），须经评审显式列入。
 test('release overlay keeps the packaging surface exact: unreviewed test files stay excluded', () => {
   const result = selectOverlay(['package.json', 'test/runtime-core/shell-exec-timeout.test.ts',
     'test/runtime-core/tools.test.ts', 'test/codex-adapter/electron-launch.test.ts']);
   assert.deepEqual(result.selected, ['package.json']);
   assert.deepEqual(result.excluded, ['test/runtime-core/shell-exec-timeout.test.ts',
     'test/runtime-core/tools.test.ts', 'test/codex-adapter/electron-launch.test.ts']);
+});
+
+// v1.2.0 发布前 CI 追加：v1.2.0 CI（run 38879484184）Windows 仅 1 红——test/codex-adapter/session.test.ts 的
+// EBUSY 清理竞态；根因在产品清理路径（workRoot 删除早于进程 stdio 全闭、Windows 瞬时句柄占用）。「Codex适配器」
+// 经评审的随版修复落在 src/provider/codex/session.ts（等 stdio close ＋ rm 瞬时重试 retryOnTransient；测试健壮性
+// 同源：真机进程清理更稳），按 v1.0.0 先例（旧白名单本就精确含此文件）精确列入 files——单文件授权、不开目录。
+// 锁定：该文件按精确路径入选；测试面零改动（该测试文件仍 excluded、不随构建树）；同目录其余路径仍 fail-closed。
+test('release overlay includes exactly the reviewed codex session production fix by exact path', () => {
+  const result = selectOverlay(['package.json', 'src/provider/codex/session.ts', 'test/codex-adapter/session.test.ts']);
+  assert.deepEqual(result.selected, ['package.json', 'src/provider/codex/session.ts']);
+  assert.deepEqual(result.excluded, ['test/codex-adapter/session.test.ts']);
+  assert.throws(() => selectOverlay(['src/provider/codex/client.ts']), /Unreviewed production overlay/);
 });
 
 import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';

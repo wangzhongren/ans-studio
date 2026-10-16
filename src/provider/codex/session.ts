@@ -10,6 +10,9 @@ import type { RuntimeAdapter, RuntimeProviderOptions, RoleSession, SessionEvent,
 import { object, deferred, eventQueue, pausedDeadline, bounded } from "../../common/codex-adapter/protocol.ts";
 import type { CodexRpcConnection, CodexEngineInput, CodexEngineFactory } from "../../common/codex-adapter/protocol.ts";
 import { settings, safetyConfig, safetyOverrides, effectiveConfig, verifyThread } from "../../common/codex-adapter/config.ts";
+// Windows 瞬时句柄占用（`EBUSY`/`EPERM`/`EACCES`）的**有界重试**单一来源（§一.5 不得第二份实现）：
+// 收尾删除 workRoot 时，刚退出的原生进程/在途句柄可能短暂未释放——沿原子写原语同一口径处置。
+import { retryOnTransient } from "../../common/shared/atomic-write.ts";
 
 export type { CodexRpcConnection, CodexEngineInput, CodexEngineFactory } from "../../common/codex-adapter/protocol.ts";
 
@@ -76,6 +79,9 @@ async function nativeEngine(input: CodexEngineInput, cliPath?: string): Promise<
   let stderr = "";
   let closePromise: Promise<void> | undefined;
   const exit = deferred<void>();
+  // 'close' 仅在进程退出**且**全部 stdio 管道关闭后触发；删 cwd/workRoot 前必须等它，
+  // 否则 Windows 上在途句柄未释放，rmdir 会瞬时 EBUSY（见 test/codex-adapter 真机红与 fix 记录）。
+  const stdioClosed = deferred<void>();
   let exited = false;
   const groupExists = () => {
     if (!child.pid) return false;
@@ -113,6 +119,7 @@ async function nativeEngine(input: CodexEngineInput, cliPath?: string): Promise<
   };
   child.on("error", error => { exited = true; rejectPending(error); exit.resolve(); });
   child.on("exit", code => { exited = true; rejectPending(new Error(`Codex app-server exited (${code ?? "signal"}): ${stderr}`)); exit.resolve(); });
+  child.on("close", () => stdioClosed.resolve());
   const lines = createInterface({ input: child.stdout });
   const send = (value: Record<string, unknown>) => {
     if (closed || !child.stdin.writable) throw new Error("Codex app-server transport is closed");
@@ -182,6 +189,8 @@ async function nativeEngine(input: CodexEngineInput, cliPath?: string): Promise<
           }
           child.stdin.destroy();
           await bounded(exit.promise, 80, "Windows process exit");
+          // 等 stdio 管道全关（'close' 蕴含 'exit'）；此后 workRoot 的目录锁才可能被 OS 释放。
+          await bounded(stdioClosed.promise, 80, "Windows stdio close");
           return;
         }
         signalOwnedGroup("SIGTERM");
@@ -192,6 +201,8 @@ async function nativeEngine(input: CodexEngineInput, cliPath?: string): Promise<
           catch (forceError) { throw new Error(`${String(graceError)}; ${String(forceError)}`); }
           await waitOwnedGroup(80);
         }
+        // 与 Windows 分支同序：进程组已消失后仍等 stdio 管道关闭再允许删目录。
+        await bounded(stdioClosed.promise, 80, "process stdio close");
       }
       finally { lines.close(); }
     })(); },
@@ -285,7 +296,10 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
       const cleanup = () => cleanupPromise ??= (async () => {
         unsubscribe?.();
         const results = await Promise.allSettled([client?.close(), server?.close(), engine?.close()]);
-        await rm(workRoot, { recursive: true, force: true });
+        // engine.close 已等进程 exit+stdio close；Windows 仍可能被内核/索引器/实时防护
+        // 瞬时占用 workRoot（EBUSY/EPERM/EACCES，CI 实证）——照 src/common/shared/atomic-write.ts
+        // 先例做有界重试：仅瞬时码、setImmediate 让出、非瞬时立即抛、上界耗尽照抛（不吞）。
+        await retryOnTransient(() => rm(workRoot, { recursive: true, force: true }));
         const failed = results.find((entry): entry is PromiseRejectedResult => entry.status === "rejected");
         if (failed) throw new Error(config.redact(failed.reason));
       })();
