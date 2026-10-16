@@ -1,0 +1,1 @@
+efc147b55fd025093f90f422be2d7eeb91e5b870b86d9db06ca6185ca4172905  ANS-Studio-1.1.0-mac-arm64.zip

@@ -20,13 +20,13 @@ ANS Studio 面向希望在真实项目中使用多个 AI 角色协作的开发�
 
 ## 下载与运行
 
-当前版本：[v1.0.0](https://github.com/wangzhongren/ans-studio/releases/tag/v1.0.0)。运行包自带运行环境，启动应用无需另装 Node.js；执行项目的 `npm test`、Git 等命令，仍需安装该项目所需的开发工具链。
+当前版本：[v1.1.0](https://github.com/wangzhongren/ans-studio/releases/tag/v1.1.0)。运行包自带运行环境，启动应用无需另装 Node.js；执行项目的 `npm test`、Git 等命令，仍需安装该项目所需的开发工具链。
 
 | 系统 | 下载 | 启动方式 |
 | --- | --- | --- |
-| macOS 13+ · Apple Silicon | [mac-arm64.zip](https://github.com/wangzhongren/ans-studio/releases/download/v1.0.0/ANS-Studio-1.0.0-mac-arm64.zip) | 完整解压，打开 `ANS Studio.app` |
-| macOS 13+ · Intel | [mac-x64.zip](https://github.com/wangzhongren/ans-studio/releases/download/v1.0.0/ANS-Studio-1.0.0-mac-x64.zip) | 完整解压，打开 `ANS Studio.app` |
-| Windows 10/11 · x64 | [win-x64.zip](https://github.com/wangzhongren/ans-studio/releases/download/v1.0.0/ANS-Studio-1.0.0-win-x64.zip) | 完整解压，打开 `ANS Studio.exe`，保留同目录资源文件 |
+| macOS 13+ · Apple Silicon | [mac-arm64.zip](https://github.com/wangzhongren/ans-studio/releases/download/v1.1.0/ANS-Studio-1.1.0-mac-arm64.zip) | 完整解压，打开 `ANS Studio.app` |
+| macOS 13+ · Intel | [mac-x64.zip](https://github.com/wangzhongren/ans-studio/releases/download/v1.1.0/ANS-Studio-1.1.0-mac-x64.zip) | 完整解压，打开 `ANS Studio.app` |
+| Windows 10/11 · x64 | [win-x64.zip](https://github.com/wangzhongren/ans-studio/releases/download/v1.1.0/ANS-Studio-1.1.0-win-x64.zip) | 完整解压，打开 `ANS Studio.exe`，保留同目录资源文件 |
 
 运行包尚未签名或公证，系统可能提示来源未验证。请从上述 Release 下载，并核对页面中的 `SHA256SUMS-*.txt`。
 

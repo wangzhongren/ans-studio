@@ -1,5 +1,6 @@
 # 装配 变更记录
 
+- 2026-10-16：按客户「发布新运行包」指示制作 **v1.1.0 发布配方**（机制沿用：冻结 tag ＋后置 overlay；既有 v1.0.0 tag 与证据不动）。冻结源＝`e4556cc`（tag `v1.1.0` 由 root 打）；overlay 仅本角色打包面：policy 指 v1.1.0 且白名单**收敛为精确集合**（生产白名单清零；`app/`·`src/` 未知变更 fail-closed 不变）、`release-prepare` 错误文案参数化、版本 1.0.0→1.1.0（package/lock 根两处）、workflow `source_ref` 默认/concurrency/发布段→v1.1.0、README 下载表→v1.1.0、release-packaging 测试断言同步。验证：typecheck 退出 0；`node --test "test/装配/**/*.test.ts"` **70/70**；机制在临时 clone 预演通过（无参/显式 v1.1.0 的 prepare 产出 7 文件 overlay、错误 ref 明确拒绝；真实仓库**未** tag/提交/推送）；本机 mac arm64 模拟构建树打包＋`release-verify` 解压实跑**退出 0**（`version=1.1.0`、7 项 UI 检查、SDK/WASM、Codex 0.162.1、Claude 2.1.299；ZIP SHA256 `efc147b5…`），本机结果不替代 Windows/x64。tag/overlay 提交/触发/发布全部交 root 按 runbook 执行。见[变更记录](docs/change/2026-10-16_change_v1.1-release-packaging.md)（含[证据目录](docs/change/2026-10-16-release-packaging-evidence/)）。
 - 2026-10-15：ANS Governance 依据客户“让相关角色配置打包流程，基于 v1.0.0 编译 macOS 和 Windows 运行包，测试通过后上传 Release”明确授权，新增 `.github/workflows/release.yml` 与 `electron-builder.yml` 两个精确单文件；同步 MD 中漏列的现有 YAML 条目，不放开 `.github/` 目录、不修改 tag/pin 或应用代码。见[治理记录](docs/change/2026-10-15_change_release-packaging-boundary.md)。
 
 ## 2026-10-14 — README 过时表述核改（客户指示「修改一下，并且提交」；PM 转达漂移点，逐条实读核实）

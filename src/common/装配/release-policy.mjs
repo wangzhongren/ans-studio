@@ -1,9 +1,8 @@
-export const SOURCE_REF = 'v1.0.0';
-export const SOURCE_SHA = '83445ebcf24454c6107838cb7f2221882c6638ea';
-const files = new Set(['package.json', 'package-lock.json', 'electron-builder.yml', '.github/workflows/release.yml',
-  'app/renderer/index.html', 'app/renderer/renderer.js', 'app/main.ts', 'app/desktop/pi-config.ts', 'app/desktop/packaged-smoke.ts', 'src/provider/codex/session.ts',
-  'test/桌面应用/pi-config.test.ts', 'test/桌面应用/boundary-refresh.test.ts', 'test/桌面应用/interface.test.ts', 'test/桌面应用/project-document.test.ts', 'test/pi-adapter/tool-display-projection.test.ts', 'test/claude-adapter/session.test.ts', 'test/测试/t1-real-cli.test.ts', 'test/测试/t1-pipeline-integration.test.ts', 'test/测试/p1p7-document-integration.test.ts']);
-const directories = ['src/common/装配/', 'test/装配/', 'test/codex-adapter/'];
+export const SOURCE_REF = 'v1.1.0';
+export const SOURCE_SHA = 'e4556cc43311adf7bda056fe071b9a389a85cf40';
+// v1.1.0 overlay 仅限打包/版本/发布面：全部产品修复已在冻结 tag 内，生产源码零改动。
+const files = new Set(['package.json', 'package-lock.json', '.github/workflows/release.yml']);
+const directories = ['src/common/装配/', 'test/装配/'];
 export function selectOverlay(paths) {
   const selected = [], excluded = [];
   for (const name of paths) {

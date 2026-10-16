@@ -1,0 +1,2481 @@
+✔ SDK stays lazy through composition/bind; actual MCP schema/options isolate all native abilities and credentials (54.176041ms)
+✔ schema preserves required/optional/union/nested object and rejects unsupported keywords (7.997792ms)
+✔ actual MCP exposes union and nested required schema without losing optional/extra parameters (28.363333ms)
+✔ late old MCP callback after next prompt, replay/missing/unknown nonce all fail before effects (17.12325ms)
+✔ reserved context supports additionalProperties false, never reaches core, and schema collision rejects (11.576666ms)
+✔ same text twice has unique wire identity; old/unknown/missing/duplicate UserPromptSubmit cannot borrow next turn (5.685125ms)
+✔ auth/endpoint/model and redaction share construction-time env snapshot (3.475875ms)
+✔ private wire marker echoed by tool/error never leaks into public events or messages (9.048708ms)
+✔ missing dependency/API key and URL userinfo fail before query, explicit settings map to actual SDK options (4.153ms)
+✔ actual shell tool deny prevents marker and allow returns actual command output (16.923708ms)
+✔ real MCP rejects missing write arguments, gate denial and gate throw produce zero effects (3.869833ms)
+✔ actual write/edit MCP handlers execute in call order even concurrent transport calls (14.358166ms)
+✔ multiple input turns retain the same query and map images; exactly one settled has each turnId (2.149ms)
+✔ SDK/result errors and handler exceptions redact secrets and fail honestly (1.704334ms)
+✔ InteractionGate pauses deadline; answer returns and sequential write waits behind confirmation (9.714833ms)
+✔ the same Claude controlled clock expires at 50ms outside customer waiting (1.7245ms)
+✔ stop pending confirmation cancels queued write and late answer cannot report/effect in a new turn (35.500041ms)
+✔ active prompt deadline emits timed_out once and disposal closes event stream (19.087375ms)
+✔ actual native resume succeeds only after matching successful SDK result; failed resume clears ID and next explicit input rebuilds (32.543334ms)
+✔ native symlink and storage runtime mismatch fail before SDK query (10.520292ms)
+✔ core Service receives real Claude MCP reports/dispatch receipts and saves replay with actual metadata (65.398958ms)
+✔ required-v1 rejects each missing display capability before SDK load; profile registers bind snapshot only (0.853167ms)
+✔ real Core projector receives actual args/rule/result execution while SDK content and opaque identities stay unchanged (3.485583ms)
+✔ actual handler thrown Error projects protected message, unknown throw stays opaque, model retains original generic failure (3.71725ms)
+✔ unknown and old PreToolUse never borrow active turn; real original hook denial alone is blocked (1.845334ms)
+✔ projector failure yields only bounded diagnostic without changing tool result or successful turn (4.955417ms)
+✔ Core strips C metadata before Claude and preserves exact SDK prompt/images while publishing safe display copy (54.562042ms)
+✔ thin projected outlet never redacts supplied opaque identities or restores suppressed oversized identity (2.125834ms)
+✔ required production path displays real read ENOENT and Node shell output without parsing result messages (31.599709ms)
+✔ Node default JS entry keeps isolated environment (106.115666ms)
+✔ Electron default JS entry starts its child in Node mode (7.769959ms)
+✔ Electron explicit native CLI keeps argv and environment (1.69325ms)
+✔ loading/factory is lazy; model/key required, optional official URL, userinfo rejected (236.029084ms)
+✔ optional API address blank values use official default; explicit nonblank wins environment and invalid values stay redacted (36.148ms)
+✔ bound model/address/key and error redaction keep the same captured environment after async transport starts (15.441459ms)
+✔ config enumeration/verification occurs before thread, no unsafe config/catalog fallback (9.925084ms)
+✔ real MCP callbacks use injected schemas and gates: deny/throw have zero writes, allow writes (59.866083ms)
+✔ shell deny/unknown native tool never executes and optional capabilities only come from injection (8.397542ms)
+✔ sequential MCP calls keep original turn signal, queued writes and late old-turn requests cannot cross abort (14.683334ms)
+✔ customer wait pauses deadline; abort and late confirmed do not authorize, next turn can continue (163.416958ms)
+✔ upstream tool-request cancellation invalidates original signal; timeout/failed turn settle exactly once (65.237792ms)
+✔ stop is idempotent and bounded; hanging interrupt quarantines rather than claiming continued session (762.241083ms)
+✔ exact role/runtime native store checks, confirmed resume vs recovered; later model failure retains resumed (33.134083ms)
+✔ native directory symlink rejected before engine, absent persistence creates no .ans, images stay temporary (9.4685ms)
+✔ all injected ANS capability callbacks keep receipts/turn metadata; denied customer and failed report stay failed (6.186625ms)
+✔ call IDs differ across restarts; all shared credential values are scrubbed from model/tool outputs (11.463125ms)
+✔ actual native process JSON-RPC parser routes callbacks and serverRequest/resolved cancellation (65.964625ms)
+✔ owned native process group cleanup kills a wrapper and child that ignore SIGTERM (1160.811791ms)
+✔ required display capabilities reject at factory before any native, MCP or storage effects (0.204375ms)
+✔ profile registers selected credential and named extras from the same immutable bind snapshot before effects (1.701709ms)
+✔ injected display receives real handler facts, rules, error and execution; opaque identities bypass legacy scrub (7.39325ms)
+✔ projector failure emits bounded diagnostic without raw fallback or changing model receipt and settled outcome (5.983708ms)
+✔ provider prompt keeps exact model text and image bytes while ignoring Core-only delivery metadata (5.819542ms)
+✔ projection never attributes unknown, repeated, queued stopped or late callbacks to a new turn (11.308666ms)
+✔ 契约形状钉：abort 可选——无 abort 的会话对象（含假适配器替身）仍满足 RoleSession（既有实现不破坏） (1.127292ms)
+✔ 契约形状钉：abort 返回型允许「同步 void」与「Promise<void>」两态（P0-2 冻结形状） (0.321792ms)
+✔ makeRoleSession（桩件）：abort() 透传底层 session.abort()；反复调用不抛错 (12.926167ms)
+✔ makeRoleSession（桩件）：dispose 顺序与提取前逐字一致（退订 → SDK dispose → queue.close）；events 流不变 (1.623208ms)
+✔ P0-2 主用例（faux 离线）：确认卡挂起中 abort → settled 恰 1 收尾 + 等待中的交互 fail-closed 返回 + prompt promise 正常返回 + 会话可继续 (666.645333ms)
+✔ P0-2：无进行中轮次 abort = no-op 不抛错（prompt 前 / 两轮之间），会话随后照常工作（faux 离线） (16.028334ms)
+✔ 未注入客户通道：request_confirmation / request_choice 都不在工具集里（能力缺席 = 最强 fail-closed，A-1） (12.191959ms)
+✔ 注入客户通道：两工具出现在工具集里（判据是「有客户通道」，非「创世态」） (0.127125ms)
+✔ request_confirmation：请求形状逐字传递（kind/title/preview/detail），confirmed:true → 明确「客户已确认」 (0.516959ms)
+✔ request_confirmation：confirmed:false（明确选「否」）→ ok:false，「未获客户同意」且不谎报 (0.108792ms)
+✔ request_confirmation：answered 但 confirmed 缺失（undefined）→ 同样视为未获同意（只认 true） (0.0855ms)
+✔ request_confirmation：declined（客户拒绝）→ ok:false，附原因 (0.069084ms)
+✔ request_confirmation：unavailable（通道不可用/超时）→ ok:false，如实转达原因 (18.27175ms)
+✔ request_confirmation：fn 返回 null/undefined（通道没给出结果）→ ok:false 视为通道不可用 (0.448708ms)
+✔ request_confirmation：fn 抛错 → fail-closed（不抛给上层），文案含原因 (0.28775ms)
+✔ request_choice：请求形状逐字传递（options/multiple/question），selected → ok:true 且列出所选项 (0.481125ms)
+✔ request_choice：declined / unavailable → 未获客户同意（不得据此写盘或代选） (0.167458ms)
+✔ request_choice：通道返回**未提供过**的选项 id → 视为未获同意（fail-closed，不猜） (0.106291ms)
+✔ 参数校验：确认缺 title / 选择缺 options 或非法 → ok:false 且注入的 fn 未被调用 (0.1235ms)
+✔ 超时：注入 fn 不返回时，handler 在配置时限内以「未获客户同意」返回（绝不假设同意） (60.851917ms)
+✔ 中止：AbortSignal 触发后 handler **立即** fail-closed 返回，不等通道 (34.697417ms)
+✔ 中止：signal 已中止时立即返回（即便通道会立刻同意） (0.220833ms)
+✔ 不写盘：即便 writeRoot 就绪、gate 放行、客户同意，工具层也不产生任何文件系统变化 (2.34125ms)
+✔ readOptionalTimeoutMs：未设/空串/非法 → undefined（不限时）；显式正数 → 取整生效 (0.065166ms)
+✔ 缺省不设限（G-1）：虚拟等待 180s（超过旧缺省 110s）仍等到答复；110s 时尚未超时（mock 时钟，不真等） (2.922292ms)
+✔ 显式配置仍计时（env）：虚拟走到配置时限即「未获客户同意（超时）」 (2.22725ms)
+✔ CustomerInputRequest / CustomerInputOutcome / CustomerInputFn 可从冻结契约家 session.ts 导入并使用 (0.495542ms)
+✔ G-1 主组：客户 250ms 后才作答，而每轮硬超时 120ms——因等待挂起时限被暂停，该轮不被掐断 (948.217541ms)
+✔ G-1 对照组：同一场景**不挂闸** → 每轮硬超时到点掐断（证明挂起暂停是承重机制） (125.36025ms)
+✔ G-1：等待期间会话 = 忙——第二次 send 被拒（SDK「Agent is already processing」，核实并钉住） (8.971167ms)
+✔ tool, report and interaction diagnostics contain metadata without argument or result bodies (2.201958ms)
+✔ model error diagnostics omit raw API error responses and prompt input (1.224958ms)
+✔ 未注入派发能力：dispatch_task 不在工具集里（只给 su；能力缺席 = 最强 fail-closed，H-1） (25.894958ms)
+✔ 注入派发能力：dispatch_task 出现在工具集里（同 run_shell / customerInput 的注入先例） (0.111334ms)
+✔ handler 把载荷逐字交给 fn；回执 ok:true → 「任务已派发」并重申「派发 ≠ 授权」 (0.45975ms)
+✔ handler：reason 省略时载荷不含 reason；void 回执（fire-and-forget）视为已受理 (0.089042ms)
+✔ 参数校验：roleId / task 缺失或空白 → ok:false 且 fn 未被调用 (0.092ms)
+✔ 回执 ok:false（如「不是本项目角色 / 指向 su 自身」）→ ok:false「未能派发」+ 原因，绝不谎报 (0.070125ms)
+✔ fn 抛错 → fail-closed「未能派发」+ 原因，绝不谎报 (0.319583ms)
+✔ describeTool 文案：写死「派发≠授权 / 任务自足 / 返工带证据」；反向断言不得暗示授权 (0.156667ms)
+✔ 中止：signal 已中止 → 立即 fail-closed 返回（不等注入 fn） (0.117792ms)
+✔ 不写盘：即便 writeRoot 就绪、gate 放行、派发成功，工具层零文件系统副作用 (2.834834ms)
+✔ DispatchTaskPayload / DispatchReceipt / DispatchTaskFn 可从冻结契约家 session.ts 导入并使用 (0.079791ms)
+✔ composeContext 返回含角色与边界来源的系统提示 (4.882625ms)
+✔ 缺省脚本：一次越界写 src/evil.ts，在写入前被拒，拒绝信息按根分组 (1.985792ms)
+✔ 自定义脚本：允许的路径走 accepted（未配置 writeRoot 时只判定、不落盘） (0.298041ms)
+✔ 自定义脚本：配置 writeRoot 后，允许的写入真正落盘到该写根 (36.1245ms)
+✔ 未知工具被拒 (0.325917ms)
+✔ finalize_bootstrap 已删除：任何构造下都不在工具集里（含注入客户通道的构造） (2.455417ms)
+✔ finalize_bootstrap 已删除：tools.ts 不再导出 FINALIZE_BOOTSTRAP_TOOL_NAME (0.209375ms)
+✔ finalize_bootstrap 已删除：FinalizeBootstrapFn 的编译期墓碑在位（@ts-expect-error 由 typecheck 执行） (0.084583ms)
+✔ FinalizeStatus / FinalizeResult 仍可从冻结契约家 session.ts 导入并使用（编排仍消费） (0.084375ms)
+✔ injected schema/description/executionMode override legacy name lookup and exact SDK signal reaches handler (0.658583ms)
+✔ production hook denies every native or unregistered tool and permits only injected names (0.243375ms)
+✔ actual production bind registers injected tools only, freezes definition and emits exact Service turn (631.282041ms)
+✔ Service -> real Pi native wiring shares injected wait gate, captured customer context and one terminal (438.44125ms)
+✔ Pi cancellation forwards original customer signal; late consent stays aborted across next turn (17.720416ms)
+✔ native Pi storage starts fresh then restores actual native context, separate from ANS replay (34.57975ms)
+✔ Pi legacy file migrates to native copy, retains original ID/context and never appends old role file (23.787125ms)
+✔ malformed native history rebuilds with recovered warning; never reads sibling Codex/Claude files (28.539084ms)
+✔ store validate callback rejects directory symlink before Pi parse or new native write (11.495833ms)
+✔ Pi storage refuses file symlink and role/runtime mismatch without touching other storage (22.919083ms)
+[pi] 未配置上下文窗口（opts.contextWindow 与 ANS_PI_CONTEXT_WINDOW 均未给出）：已采用保守默认值 32768 tokens。默认偏小 → 压缩可能提前触发（良性）；如需精确值，请设置 ANS_PI_CONTEXT_WINDOW 或传入 opts.contextWindow。
+[pi] 加载 Pi 包…
+[pi] 构造显式 provider…
+[pi] resourceLoader.reload…
+[pi] createAgentSession…
+[pi] bindRole 完成
+✔ public injected factory accepts Model shape and keeps compose/load free of filesystem effects (5.032041ms)
+✔ migrated Service/Pi timers honor legacy env once and native timeout normalizes to one timed_out terminal (57.051125ms)
+✔ native stop cleanup rejects promptly and quarantines actual bound session when SDK cannot finish (907.885459ms)
+✔ Service saves actual fresh/resumed/recovered Pi metadata and public replay remains runtime-isolated (91.907ms)
+✔ InteractionGate：引用计数（可重入）、onChange 只在 0↔1 通知、多余 end 为 no-op、退订生效 (6.719708ms)
+✔ withPausableTimeout：无闸 = 普通硬超时（到点即拒，TimeoutError） (0.399959ms)
+✔ withPausableTimeout：闸等待中计时停走；恢复后按剩余时间到期才拒 (0.111334ms)
+✔ withPausableTimeout：work 先完成 → 按时返回；timeoutMs 非正 → 不加超时 (0.091083ms)
+✔ describeTool：两交互工具带 executionMode:'sequential' 与 promptGuidelines；其余工具不带 (0.971375ms)
+✔ describeTool 文案（A-3 配合）：两工具都要求 preview 列出将写出的具体路径，且列路径≠获准 (0.254625ms)
+✔ describeTool：request_confirmation 的 schema 含 title 必填与 preview；request_choice 含 options 必填 (0.639917ms)
+✔ 实测（faux provider，离线）：同批 request_confirmation + write_file 时，write_file 在确认完成之后才执行 (732.420125ms)
+ℹ 实测顺序：confirm:start > confirm:end > gate(/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-pi-seq-DhNqTM/role.md)
+✔ 对照组（抹掉 executionMode）：write_file 抢跑于确认——证明该字段承重，不是环境巧合 (132.101333ms)
+ℹ 对照组实测顺序：gate(/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-pi-seq-td6f2h/role.md) > confirm:start > confirm:end
+✔ A1 observe(length)：恰一条截断系统行 + 诊断记录；同轮第二条不重复；settled detail 含 truncation（outcome 不变） (0.771625ms)
+✔ A2 observe(length) 后 observe(stop)（模拟补发成功轮）：settled detail 不含 truncation；通知仍只一条 (0.346375ms)
+✔ A3 begin() 归零：新一轮 wasTruncated()==false；新截断重新计数通知 (0.062166ms)
+✔ A4 回归底线：length 不影响既有 outcome 映射（length→completed；其后 error→failed；forced 后 length 被忽略） (0.081708ms)
+✔ B1 开关开 + 未交报告：补发恰一次（第 2 次文本=拟文案常量）；settled 恰一；两条新增系统行在场 (0.4325ms)
+✔ B2 enabled:false（等价 env 关闭）→ 恰 1 次、无补发行；settled 如实标 truncation (0.079084ms)
+✔ B3 本轮已有成功 submit_report → 不重复催交（恰 1 次） (0.077416ms)
+✔ B4 补发轮再次截断 → 仍恰 2 次（限次=1）；截断通知不重复；settled 含 truncation (0.0865ms)
+✔ B5 第一轮 prompt reject（API 错误）→ 无补发；既有 catch/fail 语义不变 (0.234708ms)
+✔ B6 补发轮 reject/超时 → settled 仍恰一、outcome 不被改判；补发失败行在场；requestAbort 被调用且不抛 (42.446875ms)
+✔ B7 abort/超时锁定 → 无补发（forced 守卫）；截断消息晚于锁定时亦被挡下 (0.331208ms)
+✔ B8 缺省不传 lengthFollowup（旧直接调用方）→ 行为与旧版逐字一致 (0.179625ms)
+✔ C 真实 SDK（faux）开关开：截断→补发→submit_report 落同一 turnId；settled 恰一、模型请求 +2 (579.017209ms)
+✔ C 真实 SDK（faux）开关关：不补发（report 0 次）；settled 如实标 truncation、截断行在场 (15.868584ms)
+✔ D 环境开关 ANS_PI_LENGTH_FOLLOWUP：显式关闭值才关（大小写/空白不敏感）；缺省与其它值开启 (0.172666ms)
+✔ 真 logger 门槛：默认 stage 打印、trace 不打印；ANS_PI_TRACE=1 时 trace 打印 (1.156625ms)
+✔ 新会话：提示走 log.trace、不走 log.stage（默认终端不出现该行） (596.927583ms)
+✔ 会话恢复：提示走 log.trace、不走 log.stage；**事件流不含**恢复提示（客户二次裁定，原保留决定已推翻） (18.138084ms)
+✔ 异常行不降噪：全污染 ⇒ note 仍走 log.stage 与事件流（跳过恢复并新建） (15.294459ms)
+✔ 异常行不降噪：恢复时跳过污染档（note 为 undefined）也如实告知——stage + 事件流；恢复本身仍不上聊天流 (10.65925ms)
+✔ 契约：PromptImage 与 pi-ai ImageContent 结构兼容（编译期）且键恰为 {type,data,mimeType} (0.789584ms)
+✔ makeRolePrompt: standalone input echo has typed identity; Core production can suppress it without losing images (0.923083ms)
+✔ makeRolePrompt: SDK option allowlist strips Core provenance, presentation and progress while preserving original text/images (0.210417ms)
+✔ makeRolePrompt：无图 → 逐字旧行为（不传 options；事件文案不变） (0.088667ms)
+✔ makeRolePrompt：带图 → 原样透传（同一数组引用）+ 事件可见「附 N 张图片」 (0.089959ms)
+✔ makeRolePrompt：空数组 = 无图（不传 options、文案不变） (0.073542ms)
+✔ makeRolePrompt：失败 → 事件「pi 适配器中止」+ abort 底层 + 原错误上抛（既有语义不变） (0.467334ms)
+✔ fake 适配器：带图不破（事件可见张数）；文本路径事件逐字不变 (0.756ms)
+✔ SDK 级（faux provider，离线）：有效图进入 LLM 转录；无效图被**显式省略**（注记可见，非静默） (547.0935ms)
+ℹ 有效图逐字进转录；无效图显式省略（注记可见）
+✔ 缺失 baseUrl → 抛错，绝不回落到默认端点 (0.847042ms)
+✔ 缺失 modelId → 抛错 (0.068084ms)
+✔ 缺失凭据（指定环境变量未设）→ 抛错 (0.059208ms)
+✔ 完整配置 → 解析成功；返回值不含凭据值 (0.1045ms)
+✔ 可从环境变量取 base URL 与 model（ANS_PI_BASE_URL / ANS_PI_MODEL） (0.079709ms)
+✔ createPiRuntimeAdapter 构造时缺失配置即抛错（不等网络） (0.2015ms)
+✔ contextWindow：未配置 → 采用保守默认值，**不抛错**（不再把查窗口的负担转嫁用户） (0.057875ms)
+✔ contextWindow：默认值被钉死为 32768（防被人悄悄改动） (0.033208ms)
+✔ contextWindow：缺失时的可见提示——提到默认值、并说明如何覆盖 (0.132125ms)
+✔ contextWindow：构造适配器时缺失**不再抛错**（用默认值；不等网络） (0.115167ms)
+✔ contextWindow：显式值与环境变量都能取到（并如实标注来源） (0.049292ms)
+✔ contextWindow：显式值优先于环境变量（含显式非法时不回落到环境变量） (0.047042ms)
+✔ contextWindow：非法值明确失败，不静默吞掉配置错误（0/负/非数） (0.07875ms)
+[pi] 加载 Pi 包…
+[pi] 构造显式 provider…
+[pi] resourceLoader.reload…
+[pi] createAgentSession…
+[pi] bindRole 完成
+✔ 真实适配器：composeContext 懒加载 Pi 包成功 (393.312667ms)
+ℹ composeContext 经懒加载加载 real-adapter.ts 成功
+✔ 真实适配器：bindRole 构造 Pi 会话（无模型/凭证时如实记录） (48.216625ms)
+ℹ bindRole 成功：Pi 会话已构造
+[pi] 加载 Pi 包…
+[pi] 构造显式 provider…
+[pi] resourceLoader.reload…
+[pi] createAgentSession…
+[pi] bindRole 完成
+[pi] prompt 发出
+[pi] prompt 中止：prompt 超时（800ms）：底层操作未在时限内返回，已中止以免无限挂起。
+✔ prompt 超时：对永不响应的本地服务，prompt 在时限内中止并报可读原因 (1208.886375ms)
+ℹ prompt 在 806ms 内被中止（设定时限 800ms）
+✔ 未注入 ShellGate：run_shell 不在工具集里（能力缺席 = 最强 fail-closed，§7.5.1） (0.549959ms)
+✔ 未注入 ShellGate（仅配置 readRoot/writeRoot）：仍不注册 run_shell (0.058125ms)
+✔ 注入 ShellGate：run_shell 出现在工具集里 (0.072125ms)
+✔ allow:true → 真的执行命令，拿到 stdout 与 exit code (29.276084ms)
+✔ allow:true → 非 0 退出码被如实报告（ok:false 但确已执行） (23.481209ms)
+✔ allow:false → 绝不 spawn（痕迹文件不存在） (1.731042ms)
+✔ 审核抛错 → 绝不 spawn（痕迹文件不存在） (0.790833ms)
+✔ 审核超时 → 绝不 spawn（超时 = 拒绝，§7.5.2） (51.263542ms)
+✔ 审核返回 undefined / 非明确 allow → 一律不执行（无 token 可依，§7.5.2） (0.671125ms)
+✔ 缺少 command → 拒绝，且不调审核、不 spawn (0.23075ms)
+✔ kill-switch：非 run_shell 不由本判据处理（undefined） (0.05125ms)
+✔ kill-switch：run_shell 未 arm（未注入 ShellGate）→ block (0.034667ms)
+✔ kill-switch：run_shell 已 arm → 放行（undefined，交 execute 细审） (0.021209ms)
+✔ env 凭据剥离：spawn 的子进程看不到凭据变量（§7.9） (25.899334ms)
+✔ handler failure is a Pi error with safe identifiable details (0.513625ms)
+✔ terminal outcome uses the final retry response and emits exactly once (0.463333ms)
+✔ prompt timeout is locked before SDK aborted settle, with no duplicate terminal (22.792667ms)
+✔ abort cleanup is bounded and quarantines an unresponsive session (23.63375ms)
+✔ SDK finally-settled followed by prompt rejection cannot publish an early completed turn (0.767709ms)
+✔ report captures entry turnId even if the current turn changes before callback (0.470125ms)
+✔ an already aborted report never calls the receiving capability (0.156584ms)
+✔ tool guidance preserves governance confirmation and permits authorized routine work (0.474ms)
+✔ real faux SDK: failed handler emits denied; accepted report precedes same-turn settled (446.338333ms)
+✔ 不给 sessionDir：选 in-memory（逐字旧行为），追加消息也不落盘 (397.502042ms)
+✔ 给 sessionDir：新建会话；首条消息前惰性不落盘，追加后文件存在、非空、含该消息 (4.79675ms)
+✔ 同目录再选：恢复（同一文件），messages 非空且含原文（entry 往返） (7.64075ms)
+✔ 目录内多个会话：恢复最近的一个（按 modified） (26.365083ms)
+✔ 会话目录不可写：明确抛错（含目录与原因），绝不静默退化成「不落盘」 (1.273584ms)
+✔ 端到端（faux provider，离线）：关掉再开（同 sessionDir 重建会话）后，恢复出的模型上下文含上一轮内容 (24.961708ms)
+✔ ANS_SETTINGS_OVERRIDES：压缩被显式钉住为启用 + Pi 内置缺省阈值 (0.490417ms)
+✔ 封闭的 settings manager：getCompactionSettings 恒为我们钉住的值 (399.942583ms)
+✔ 封闭的 settings manager 不读项目内 .pi/settings.json（对照：文件式合并会漏进来） (1.356709ms)
+✔ wireSettledOnce（stub）：同轮重复settle只发一次；新轮再发；退订生效 (0.775583ms)
+✔ A 修复前接线（扩展含 agent_settled 映射 + subscribe）→ 一轮 **2** 个 settled（复现） (509.43ms)
+✔ B 修复后接线（**出厂扩展** + wireSettledOnce）→ 一轮 **恰 1** 个 settled；且扩展不含 agent_settled、仍含 tool_call (5.193167ms)
+✔ 中止路径回归：出厂接线下一轮 abort → 仍**恰 1** 个 settled（消费方不挂起） (178.027625ms)
+✔ 未注入审读结论能力：report_shell_verdict 不在工具集里（只给审读会话；能力缺席 = 最强 fail-closed） (0.543125ms)
+✔ 注入审读结论能力：report_shell_verdict 出现在工具集里（同 run_shell / customerInput 的注入先例） (0.073875ms)
+✔ handler 把载荷逐字交给 fn；三值都通；成功 → 「审读结论已交回」+ 回显 verdict (0.199875ms)
+✔ handler：省略 reason → 载荷不含 reason 字段 (0.301583ms)
+✔ 参数校验：verdict 缺失或非三值 → ok:false 且 fn 未被调用 (0.102916ms)
+✔ fn 抛错 → fail-closed「未能交回」+ 原因，绝不说成「已交回」；并提示「正文里写不算」 (0.094375ms)
+✔ 中止：signal 已中止 → 立即 fail-closed 返回（不等注入 fn） (0.072125ms)
+✔ describeTool 文案：schema 三值枚举 + verdict 必填；写死「结论以工具调用为准」；反向断言不得暗示授权 (0.103833ms)
+✔ 不写盘：即便 writeRoot 就绪、gate 放行、交回成功，工具层零文件系统副作用 (0.573625ms)
+✔ ShellVerdictPayload / ShellVerdictFn 可从冻结契约家导入；且与编排形状（void | Promise<void>）结构兼容 (0.099709ms)
+✔ shell review waiting pauses prompt budget while retaining its separate deadline (63.278792ms)
+✔ unresponsive shell reviewer fails closed at its own deadline (20.734584ms)
+✔ abort releases review wait immediately; late allow cannot execute command (0.747667ms)
+✔ 未注入回交能力：submit_report 不在工具集里（只给项目角色；能力缺席 = 最强 fail-closed，C-1） (0.577292ms)
+✔ 注入回交能力：submit_report 出现在工具集里（同 run_shell / customerInput 的注入先例） (0.081375ms)
+✔ handler 把载荷逐字交给 fn；回执 ok:true → 「报告已交回」并回显 status (0.443958ms)
+✔ handler：status=blocked 与省略 evidence 的载荷也逐字传递（evidence 缺省不出现在载荷里） (0.085417ms)
+✔ fire-and-forget（void 返回）能力可注入：编排的 (report) => void | Promise<void> 形态 → 「报告已交回」 (0.112917ms)
+✔ 参数校验：status 非法 / 缺 summary / evidence 非法 → ok:false 且 fn 未被调用 (0.117708ms)
+✔ fn 抛错 → fail-closed「未能交回」+ 原因，绝不谎报「已交回」 (0.091375ms)
+✔ 回执 ok:false（回交被拒）→ ok:false + 回执原因，绝不谎报 (0.06325ms)
+✔ 中止：signal 已中止 → 立即 fail-closed 返回（不等注入 fn；防悬挂，A-6 纪律） (0.106375ms)
+✔ 不写盘：即便 writeRoot 就绪、gate 放行、交报告成功，工具层零文件系统副作用 (0.351958ms)
+✔ describeTool 文案：写死「必须交报告、不得只在正文里说」，且不得暗示任何写权 (0.125125ms)
+✔ ReportHandbackPayload / ReportHandbackReceipt / ReportHandbackFn 可从冻结契约家 session.ts 导入并使用 (0.046583ms)
+✔ withTimeout：永不返回的桩在时限内被中止（核心证据） (154.475417ms)
+✔ withTimeout：正常返回时透传结果 (1.2975ms)
+✔ withTimeout：非正时限表示不加超时 (0.102917ms)
+✔ timeoutError/isTimeoutError 标记正确 (0.084167ms)
+✔ readTimeoutMs：缺省回退、非法回退、合法解析 (0.121875ms)
+✔ real SDK nine tool names, sequential: handler once/start once/result once (503.675667ms)
+✔ real SDK nine tool names, parallel: handler once/start once/result once (31.010583ms)
+✔ real SDK whitelist: no handler effect, canonical start and true failure remain (14.634792ms)
+✔ real SDK write-denied: no handler effect, canonical start and true failure remain (13.801083ms)
+✔ real SDK shell-denied: no handler effect, canonical start and true failure remain (12.781792ms)
+✔ real SDK missing: no handler effect, canonical start and true failure remain (52.238666ms)
+✔ real SDK invalid: no handler effect, canonical start and true failure remain (15.035042ms)
+✔ real SDK throw: no handler effect, canonical start and true failure remain (14.807708ms)
+✔ mapping preserves different turns, duplicate/late failed ends and legacy missing identity without text guesses (0.185584ms)
+✔ required-v1 missing capabilities rejects before SDK; actual config override profile registers first (424.7875ms)
+✔ Core -> actual Pi -> real read/ENOENT/shell: display projected, execution remains private, SDK content unchanged (107.319416ms)
+✔ native bridge preserves handler result/throw and unsupported content, call identity and rule; metadata is not SDK options (20.122417ms)
+✔ injected projector throw emits safe diagnostic without failing actual handler or model (13.771667ms)
+✔ all nine injected names project start/result once; real declared rule wins over tool name; blocked and failed native end coexist (108.414459ms)
+✔ real Pi SDK receives original prompt and image reference only; Core-only metadata never enters SDK/transcript (39.788834ms)
+✔ real Pi shell exit0, spawn failure, signal and review denial retain actual process facts without invented exit (103.597209ms)
+✔ buildGovernedTools 至少含 write_file 与 edit_file (0.876167ms)
+✔ buildGovernedTools 含 read_file（工具集具备读能力） (0.061625ms)
+✔ read_file 读取真实文件，且**不经过**写门禁 (17.597917ms)
+✔ read_file 读取失败返回可读错误（不抛异常） (0.802583ms)
+✔ write_file 获准：相对路径落在 writeRoot 下，盘上字节等于 content (8.808542ms)
+✔ write_file 获准：绝对路径（在 writeRoot 内）落到同一位置 (6.108542ms)
+✔ write_file：传给 gate 的是解析后的**绝对路径**（写根与判定同源） (6.049042ms)
+✔ write_file 拒绝（越界）：返回按根分组的可读信息，且盘上无文件、父目录未创建 (0.538541ms)
+✔ write_file 拒绝：对已存在文件，内容与 mtime 均不变 (0.427625ms)
+✔ write_file 词法越界（../ 逃出写根）：拒绝且写根外无文件 (0.463958ms)
+✔ edit_file 命中 old_string：回写后内容等于预期 (6.447042ms)
+✔ edit_file old_string 不存在：ok:false 且文件不变 (1.959167ms)
+✔ edit_file 越界：经同一治理路径被拒 (0.148667ms)
+✔ edit_file 保留 UTF-8 BOM：写回后 BOM 仍在且替换正确 (6.894167ms)
+✔ edit_file 目标不存在：ok:false（不写、不建） (0.712291ms)
+✔ write_file：gate 抛错 → ok:false，盘上无文件、无目录 (0.414584ms)
+✔ edit_file：gate 抛错 → ok:false，既有文件未被触碰 (0.552292ms)
+✔ junction/目录符号链接逃逸出 writeRoot：拒绝且链接目标未被触碰 (1.606ms)
+✔ 目标本身是符号链接/junction：拒绝（即便链接指向写根之内），链接指向处不被写 (3.662ms)
+✔ 未配置 writeRoot：写入获准（ok:true）但不落盘 (0.460583ms)
+✔ 缺少 path 参数：拒绝且不判定 (0.049708ms)
+✔ write_file 缺少 content：拒绝且不落盘 (0.194416ms)
+✔ buildExplicitRuntime：克隆模型 compat 已显式收窄（两能力位 false；strict/adaptive/fallbacks 收窄；其余保留） (410.033167ms)
+✔ wire 级：收窄后**不再生成** tool_removal/tool_addition 块；对照组（两能力位改回 true）能复现该块 (36.541667ms)
+✔ 存量防御：检测只认 system 消息里的字面块（用户正文提及同名串不误报） (1.216334ms)
+✔ 存量防御：全污染目录 → 跳过恢复、新建并如实 note；污染+干净 → 恢复干净旧档并记 skipped (29.799375ms)
+✔ 存量防御：干净会话恢复逐字不变（无 note / 无 skipped） (2.059875ms)
+✔ describeTool：write_file / edit_file 钉 executionMode:'sequential'；read_file / run_shell 不加 (0.376875ms)
+✔ A 对照组（抹掉 executionMode，= 修复前）：同批 write+edit 丢写复现（3 连跑全中） (5434.981375ms)
+ℹ A 对照组第 1 轮：丢写复现 {"hasWrite":true,"hasEditEffect":false}
+ℹ A 对照组第 2 轮：丢写复现 {"hasWrite":true,"hasEditEffect":false}
+ℹ A 对照组第 3 轮：丢写复现 {"hasWrite":true,"hasEditEffect":false}
+✔ B 主组（修复后原样）：同批 write+edit 顺序执行、无丢写（3 连跑全中） (7089.346416ms)
+ℹ B 主组第 1 轮：顺序执行、无丢写 {"hasWrite":true,"hasEditEffect":true}
+ℹ B 主组第 2 轮：顺序执行、无丢写 {"hasWrite":true,"hasEditEffect":true}
+ℹ B 主组第 3 轮：顺序执行、无丢写 {"hasWrite":true,"hasEditEffect":true}
+✔ pre-aborted public tools retain specific failure semantics and invoke no capability (0.675791ms)
+✔ abort during public capability waits keeps actual handler failure wording instead of generic cancellation (16.472958ms)
+✔ success received as cancellation arrives is still converted to the tool-specific failure (0.431625ms)
+✔ confirmation passes original cancellation context; late yes cannot issue next-turn write permission (10.128541ms)
+✔ choice callback receives the captured original signal/turn and legacy single-argument callbacks remain valid (3.371375ms)
+✔ Pi env 300s/310s values reach both actual Service timers and injected Provider options (3.464416ms)
+✔ Service explicit Pi timing overrides env, including the legacy disabled-timer values (0.431042ms)
+✔ Pi effective env parse matches legacy fallback/floor while explicit invalid values stay unchanged (0.326166ms)
+✔ other runtime defaults do not consume Pi env and Service gives their actual timers/provider the same default (0.529625ms)
+✔ native-only values are protected without a provider, retain real IDs/token and keep reader counts separate (1.922125ms)
+✔ raw title anchors and invalid dates are omitted; no turn/call or execution is inferred from body (0.319958ms)
+✔ return budget selects a continuous recent suffix, preserves order and reports omissions (78.507ms)
+✔ reader failure and malformed bridge are distinct and cannot raw-fallback (0.390375ms)
+✔ actual turn has one synchronous acknowledgement before persisted input/native work and shares all identities (23.799041ms)
+✔ active and disposed prompt rejections have no turn acknowledgement (2.053416ms)
+✔ quarantined prompt rejection has no acknowledgement after one stopped actual turn (3.784917ms)
+✔ synchronous acknowledgement throw yields one failed terminal, zero native work, and releases the turn (0.582833ms)
+✔ acknowledged turns keep aborted/timed_out outcomes and single matching terminal (19.293541ms)
+✔ actual bound mode, final source identity, idempotent safe report save and conflict are independent of model execution (46.247417ms)
+✔ source retry only saves the first frozen snapshot, duplicate clicks share one operation and disposal expires it (49.218875ms)
+✔ target stores safe text but Provider receives original model text and images; final receipt survives a new handle (47.973792ms)
+✔ ACK is not delivery: user failure has exact Provider count and history retry never invokes it (45.759833ms)
+✔ ACK is not delivery: boundary failure has exact Provider count and history retry never invokes it (54.424458ms)
+✔ ACK is not delivery: index failure has exact Provider count and history retry never invokes it (67.797666ms)
+✔ partial replay is not silently repaired or replayed; later foreign records also block repair (40.827792ms)
+✔ disabled bound mode does not create directories; live-only views do not become durable report snapshots (1.769125ms)
+✔ live optional delivery identity is all-or-none and target-bound; disabled mode has real in-memory receipts without directories (1.253167ms)
+✔ foreign later replay records block history repair without altering the replay or invoking Provider again (69.763458ms)
+✔ no final receipt cannot be reconstructed from boundary or nearby settled after reopening (35.583708ms)
+✔ 128 detailed receipt bound does not forget seen disabled attempts or re-execute one after eviction (7.052167ms)
+✔ 16MiB frozen recovery budget expires oldest failed source snapshots rather than keeping unbounded material (1891.742875ms)
+✔ an ambiguously successful final receipt write is idempotently confirmed, not appended twice (32.630833ms)
+✔ unknown persisted C versions do not become a final receipt or permit a new automatic attempt (2.67025ms)
+✔ unknown report file versions are listed as read errors and not silently upgraded (14.24725ms)
+✔ public live and report projections whitelist values rather than carrying arbitrary sidecars (0.211458ms)
+✔ same-attempt known execution is monotonic even if the replay becomes an unreadable directory (20.005125ms)
+✔ reopened live-only delivery uses its actual user/turn record for inputSaved without claiming durable source reports (11.314666ms)
+✔ store: creation/read stay lazy; roles/runtimes never share index or replay (30.116417ms)
+✔ store: concurrent writes serialize; corrupt history fails honestly (52.761042ms)
+✔ store: traversal, mismatched scope and symlinked runtime directories rejected (6.18775ms)
+✔ store: native validation stays lazy and native symlink is rejected before effects (10.889ms)
+✔ Service history operation returns scoped Model records/replay through the existing Provider (26.360209ms)
+✔ each actual runtime turn publishes one typed original input before native work and retains real assistant text (126.720875ms)
+✔ input echo is absent for rejected or failed-start prompts; demo Core and standalone have one input producer (1.421292ms)
+✔ Service selects exactly chosen injected factory and executes real governed handler (2.684333ms)
+✔ Service failure never selects another engine and unknown runtime rejected (1.456458ms)
+✔ Service persists replay and adapter-confirmed deferred context result after prompt (28.448334ms)
+✔ customer wait pauses prompt deadline, abort invalidates late consent, next turn works (56.48675ms)
+✔ throw, native failed outcome and timeout each have one explicit terminal (19.444125ms)
+✔ corrupt ANS index is rejected before native bind allocates a session (6.44875ms)
+✔ transient persistence failure is reported and repaired next prompt can succeed (57.378042ms)
+✔ Service event top/detail identity and report metadata share the captured turn (1.044625ms)
+✔ hanging native abort is bounded, called once, and leaves the session quarantined (1006.026875ms)
+✔ Service configured custom API key is stripped from the actual governed shell child (24.875375ms)
+✔ outer timeout remains timed_out when abort cleanup emits inner aborted terminals (15.0875ms)
+✔ outer aborted result stays aborted while failing cleanup remains honestly reported (1.689584ms)
+✔ Core-managed binding rejects a provider that did not register its display profile before first prompt (0.139334ms)
+✔ ordinary engine failure stays a non-tool fact in live, stored and reloaded events while actual tools retain projections (20.840541ms)
+✔ history does not resurrect an old empty-name synthetic tool phase on an engine failure (9.67225ms)
+✔ F-1-a：挂起命令在命令级时限内被终止，如实返回「超时已终止（300 ms）」+ timedOut/timeoutMs，耗时短收口 (313.798292ms)
+✔ F-1-a 部分输出保留：先写 stdout 再挂起 → 结果不吞已收集的证据 (310.20125ms)
+✔ F-1-opt1：SIGTERM 免疫子进程被 SIGKILL 升级收口；late 写入不出现，signal 如实 (955.916875ms)
+✔ F-1：快命令 + 大时限不误杀（ok:true、无 timedOut） (20.158209ms)
+✔ F-1-c 解析链：env 生效且按该值收口；env 非法/0/负回退默认 600000（不可禁用）；显式选项优先于 env (349.778792ms)
+✔ F-1-b 竞争收口：中止优先（无 timedOut、中止文案）；超时先收口后再中止 → 幂等无二次结果 (456.998375ms)
+✔ F-1-b 与「停止本轮」既有语义回归：中止文案与清理预算不变（对照 tools.test.ts 的 abort 用例） (18.939583ms)
+✔ F-7 阻断集：未加引号的独立操作符/紧贴重定向在审核之前被拒，正文含命中 token，零副作用 (3.825375ms)
+✔ F-7 放行集：引号内与反斜杠前导的操作符照旧可用（含证据命令），普通 argv 不受影响 (26.402041ms)
+✔ F-7-opt1：内嵌未加引号操作符与结尾 & 阻断；词中 &（URL 查询串）不判 (0.374708ms)
+✔ F-7-opt2：未加引号的变量展开/命令替换阻断；引号内与常规 argv 放行 (0.542875ms)
+✔ F-7-c 守卫先于审核且不 spawn：diagnostics 记 shell.guard.blocked，normalize 不产生 shell.exec.start (0.087167ms)
+✔ real fields survive projection; nonzero exit is not parsed from message, block is a separate fact (3.040458ms)
+✔ target selection is exactly the actual Core alias contract; custom names do not imply rules (0.300167ms)
+✔ native fallback only takes explicit text; native outcome wins and unsupported objects never serialize (0.246458ms)
+✔ profile capture is required, custom actual credentials are registered in memory and cannot rebind (0.523291ms)
+✔ known values and patterns are protected before truncation; IDs never pass through a redactor (0.932083ms)
+✔ UTF-8 and encoded JSON budgets use independent byte counts and survive a second projection (4.139333ms)
+✔ projection faults and oversize identity produce messages without fabricated business conclusions (2.5105ms)
+✔ control characters use a visible replacement independently of Unicode clipping (0.096542ms)
+✔ a source truncation flag alone is preserved without falsely attributing it to the display budget (0.087958ms)
+✔ F-8-a handler-result: process finished with nonzero exit code reads as completed-with-exit-code while ok/status/kind/errorCode stay unchanged (0.305792ms)
+✔ F-8-a native-result shape: same nonzero-exit classification when outcome facts come from the native result (0.184333ms)
+✔ F-1 timeout projection: timedOut wording is distinct and display.process.timedOut is exposed for structured consumers (0.081375ms)
+✔ F-8-a guard: spawn failure (execution.error) keeps the honest 执行失败 wording (0.05875ms)
+✔ F-8-a re-projection keeps exitCode and timedOut through the persisted-event path (0.110709ms)
+✔ Model/schema: required write/edit fields, optionals, unknown names and injected capabilities (1.965875ms)
+✔ schema 文案（客户 2026-10-16 su 预置裁定配套）：request_confirmation 写明 su 专属例外，写盘确认必备语义保留 (0.148416ms)
+✔ schema 文案（G-1/A4）：dispatch_task 钉住「先落盘再派发」与「必读（按序）」按地址引用；必备语义逐字保留 (0.259417ms)
+✔ gate deny/throw and gate-triggered abort produce zero filesystem effects (4.55725ms)
+✔ real write/edit preserves UTF-8 BOM/CRLF and rejects missing match or symlink escape (21.555625ms)
+✔ pre-aborted edit and capability handlers never run or mutate (2.339208ms)
+✔ shell gate deny/throw/timeout have no effects; explicit allow runs argv without shell (45.236375ms)
+✔ abort running shell kills child before delayed write and returns failure (744.110542ms)
+✔ customer decline/abort and failed handbacks are honest; report/dispatch carry captured turn (2.031584ms)
+✔ shell exposes actual structured execution and observed collection truncation without parsing model text (39.319875ms)
+✔ accepted-memory report receipt states final persistence and delivery are still pending (0.140834ms)
+✔ G-2/R1+R2 能力位：三工具各自「注入才注册」（未注入⇒不存在）；schema 形状与枚举恰三值 (3.224416ms)
+✔ schema 文案（G-2/R1）：role_status 钉住只读/8 KiB 截断如实/失败不编造/先核对再提议；不得暗示任何权限 (0.165458ms)
+✔ schema 文案（G-2/R1）：session_tail 钉住只读/受保护投影与脱敏/行数上限/无历史与读坏如实不猜 (0.071958ms)
+✔ schema 文案（G-2/R2）：propose_recovery 钉住「提议 ≠ 执行」/无确认零执行/回执如实四值/不得承诺/evidence 必填 (0.110875ms)
+✔ G-2/R1：role_status 纯读接口——只调注入数据源（查询归一、无副作用、无编造）、8 KiB 按字节截断如实标注 (0.707917ms)
+✔ G-2/R1：session_tail 纯读接口——行数归一（缺省 40/上限 200 如实标注/非法拒绝且不调数据源）、原样转达、失败如实 (0.683625ms)
+✔ G-2/R2：propose_recovery 只提交载荷、回执如实——executed 才可称已执行；declined/unsupported/error/契约外一律 fail-closed (0.603833ms)
+✔ G-2/R2：propose_recovery 携带轮次 metadata；等待客户期间挂起活动闸（begin/end 恰好成对、异常也收口） (0.407ms)
+✔ 有带 pin 的 .ans → pin 生效：会话用其 pin-backed acceptance，边界内写入被接受 (57.31675ms)
+✔ .ans 的 pin 与文件 hash 不符 → 门禁判未接受（fail-closed，会话被拒） (4.454417ms)
+✔ .ans 存在但不可解析 → 未接受、不回退运行期同意（界面据 config 如实呈现） (43.341125ms)
+✔ 无 .ans → 回退运行期同意（登记的非-pin 例外，行为不变） (45.698708ms)
+✔ O-1：边界文件内容变更 ⇒ 活会话作废重建（如实行含文件名与 D-1 措辞）；未变 ⇒ 不重建（不丢上下文） (343.607917ms)
+✔ O-1：su（内置治理角色）同样适用——`.ans` pin 刷新（.ans/project.json 内容变化）即触发重建 (183.482583ms)
+✔ O-1：投递路径同样检查——目标边界陈旧 ⇒ 重建后再投（队列不丢、不并发） (466.812875ms)
+✔ O-1 接线钉：信号=读盘内容哈希；检查点=发言/续接/投递/su-settle 扫描；措辞按 D-1 两分支 (0.206958ms)
+✔ F-5-opt1（桌面侧）：确认制会话（su）重建 ⇒ 恰向新句柄排一条**单一来源**注记；非确认制角色不排（无写权可清零，绝不说假话） (64.062333ms)
+✔ F-5-opt1（桌面侧）：旧替身句柄**不带** queueModelNotice（可选方法先例）⇒ 重建照常成功（防御式 `?.`，不炸、不假装） (32.88675ms)
+✔ K-2 纯逻辑：类型白名单/命名 MIME；尺寸上限；base64 严格解码；**魔数嗅探以内容为准** (0.909792ms)
+✔ K-2 Interface（attachImage）：以**真实字节**判定——声明谎报也按内容；失败逐类如实 (7.247791ms)
+✔ K-2 Interface（pickImage）：选图经注入替身（主进程读文件）；取消安静；失败/未接如实 (1.048084ms)
+✔ 窄诊断桥：关键节点落入统一sink，拒任意事件/路径，凭据净化且不存正文 (7.275958ms)
+✔ 窗口关闭只释放自有IPC，再建窗可注册同名handler，不删其他通道 (0.158542ms)
+✔ 客户请求恢复：重放同id不作答，仍可答旧请求，已结束请求不复活 (0.442833ms)
+✔ shell确认恢复：不重置时限、不代答，失效请求不能复活 (10.645ms)
+✔ C actual preload saving/query bridges and typed subscriptions are cancellable and do not send model text (1.535708ms)
+✔ H-1 路由：su 派发 → 目标未开**自动开**并收到派发输入（模板文案）；su 与目标两边都有系统行 (189.60325ms)
+✔ H-1 排队：目标忙 ⇒ 入队；其 settled 后按序放行（绝不并发 send） (310.713541ms)
+✔ H-1 失败保留：投递失败 ⇒ 如实系统行（未丢弃）+ 放回队首；下次时机成功送达 (330.798042ms)
+✔ H-1 校验（如实回执，不静默）：非本项目角色 / 内置治理角色（含 su 自身）/ 空参数 → {ok:false} + 系统行 (34.782459ms)
+✔ H-1 去重：同一派发在**队列期**重复调用 → 去重（只投一次）；送达后同文再派 → 放行（返工回路） (362.446167ms)
+✔ 真机崩溃修复（钉子）：派发条目**不走 handback 渲染**；坏回交并入同一机也不炸、零未捕获拒绝 (402.367834ms)
+✔ H-1 闭环：su 派发 → 角色回交 → su 收到报告；不重复、不空转（EC-1 后无自激） (422.555625ms)
+✔ delivery notes are typed system messages, never ghost tools or extra prompts on the actual dispatch path (202.464542ms)
+✔ F-2-T1 长轮不阻塞跨角色：A 的投递轮挂起期间，su 派发 B ⇒ **立即**送达（不待 A 轮结束）；放行后两边各恰一次 (333.7485ms)
+✔ F-2-T2 同目标仍严格排队：A 挂起期间再派 A ⇒ 排队（绝不并发 send）；放行 + settled 后按序投递 (533.870709ms)
+✔ F-2-opt2 openInternal 按会话键互斥：并发两次 open 同一角色 ⇒ 恰一次建会话（第二次续接，不双开）；用户 open × 投递自动开同键同样恰一次 (323.671959ms)
+✔ F-2-opt3 认领段起止诊断：delivery.claim.start/end 与 delivery.start/end 同场，顺序如实（claim.start < delivery.start < claim.end < delivery.end） (233.563125ms)
+✔ G-1/A2-1 必读块：任务引用 workflow+契约 ⇒ 投递文本带当刻哈希（按序：workflow 第 1、契约首现序、去重）；文本 = 编排单一来源渲染 (182.756041ms)
+✔ G-1/A2-2 契约缺失 ⇒ fail-closed 拒投：如实回执（逐字）+ 系统行含 **未投递**；零入队/零开会话/目标零投递；补齐后重派**同一文本**必须受理（拒投不登记去重键） (333.353333ms)
+✔ G-1/A2-3 workflow 缺失 ⇒ 降级标注照投（不拒投；块内如实注「本项目未提供 workflow.md」、不指向不在场文件） (181.964792ms)
+✔ G-1/A2-4 不误捕：产物路径/普通 docs 路径/目录式 token 不产生引用 ⇒ 不注入必读块，文本 = 单一来源旧格式逐字 (181.069917ms)
+✔ G-1/A2-5 哈希定格于派发时刻：排队期间契约变更 ⇒ 已入队条目按旧哈希投递（重试复用同一文本）；送达后同文再派才用新哈希 (708.880375ms)
+✔ G-1/A2-6 单一来源收口（代码级钉子）：本地副本已删除；session.ts 走编排三件套接线，不内嵌派发模板 (1.3585ms)
+✔ G-2/W5 恢复桥：恰 allow:true 才执行（abort-turn 恰一次）；回执三路（工具回执/系统行/投递 su）；取消=未获执行 (225.713292ms)
+✔ G-2/W5 恢复桥 fail-closed：通道未接线 ⇒ declined；非法载荷/内置角色 ⇒ error 且**不推卡**；拒绝式推达失败 ⇒ declined (66.151916ms)
+✔ G-2/W5 桥三态：运行时不支持 ⇒ outcome=unsupported（绝不假装已执行）；rebuild 在跑 ⇒ outcome=error（前提不满足） (125.06975ms)
+✔ G-2/W4：rebuildSession——在跑轮次不打断（busy 拒绝）；空闲重建（保留回放；drain 续投）；redeliverNudge 条目不存在如实/触发重试 (473.909708ms)
+✔ G-2/W1 数据源：role_status 结构化文本（busy/队列/最近一轮/看护行）；session_tail 无历史如实；两工具**纯读**（前后快照逐字段一致） (469.714417ms)
+✔ G-2/W2：system 投递失败 ⇒ 如实系统行＋放回队首保留（未丢弃）；下次时机自动重试成功 (382.953167ms)
+✔ 首轮寻址①（管理器）：缓存 miss ⇒ 实时重枚举一次 ⇒ 受理 + drain 自动开启新角色并投递；仍无/重枚举抛错都如实 (243.937459ms)
+✔ 首轮寻址②（Interface 集成）：真实接线——导入时空项目、角色随后落盘，同一轮派发照样寻址（刷同一份共享缓存） (241.952084ms)
+✔ 未 bootstrap（hasRoles:false）→ ProjectConfig 带 genesisBootstrap，source 如实记录操作者授权来源 (5.262959ms)
+✔ 已 bootstrap（hasRoles:true，真实仓库根）→ ProjectConfig **不带** genesisBootstrap（切换条件） (32.506041ms)
+✔ 未 bootstrap：su 的 gate 放行治理产物 角色卡/<新角色>/{role-card.md,boundary.yaml}（scope:undefined 下命中即放行） (1.36675ms)
+✔ 未 bootstrap：su 的 gate 放行 docs/ 与 .ans/ 治理产物 (0.564334ms)
+✔ 未 bootstrap：su 的 gate **拒绝** src/**（非治理产物）与项目根之外的绝对路径 (0.406792ms)
+✔ 已 bootstrap（有角色）：su 的 gate 拒绝 角色卡/<新角色>/role-card.md（不再有创世授权） (9.569417ms)
+✔ E-1 投递：A 的回交到达 → **自动开启 su** 并把 `renderHandbackPrompt` 原文投给 su（单一来源） (183.5035ms)
+✔ E-1 去重：同一条回交重复到达（重放）→ **只投递一次** (180.618625ms)
+✔ E-1 排队：su 忙时保留，settle 后连续回交按原序合成一次验收输入 (462.29875ms)
+✔ 连续回交投递失败：整批保留同序，重试送达一次，原报告键不丢 (27.833292ms)
+✔ 客户消息屏障：A报告→客户消息→B报告，不跨消息合批或改变顺序 (42.989291ms)
+✔ 常规检查宿主政策实际注入项目角色，su不接委托免确认 (0.55175ms)
+✔ E-1 开启失败：如实系统行（含原因与重试时机）+ **保留回交**；下次时机成功投递（绝不静默丢） (332.872125ms)
+✔ 真机崩溃修复：坏形状回交事件（缺载荷/缺 roleId）→ 不投递、如实系统行、**零未捕获拒绝** (283.344042ms)
+✔ E-1 投递失败：如实系统行（含原因）+ 放回队首保留；重试成功后送达（顺序与内容不损） (333.042958ms)
+✔ C Window merges source saved-before-business and retry Promise/change orders into one enqueue (25.070166ms)
+✔ C frozen batch retries keep members and delivery ID while later reports stay separate (40.38225ms)
+✔ C possible provider start and unknown failure do not automatically prompt again (145.309166ms)
+✔ C target history retry is one storage operation, read-only queries do not prompt, replaced handles expire (13.350417ms)
+✔ C disabled and unknown-live source facts preserve live delivery without inventing durable report IDs (23.019666ms)
+✔ F-2-T3 长轮不阻塞回交：B 的投递轮挂起期间，A settle 产生的回交 ⇒ su **立即**收到（不被 B 轮持有）；放行后两笔各恰一次 (402.149333ms)
+✔ Q-1 push-batcher：事件窗口合并（N 推 → 1 次 send、顺序不变）；flush/dispose 语义；角色状态去抖只留最新 (133.695083ms)
+✔ Q-1 事件风暴（300 事件，假适配器）：管理器侧处理耗时护栏 + 事件仍逐条外推（批量在 main 层） (22.712167ms)
+✔ Q-1 O-1 哈希缓存：未变文件只 stat（mtime+size 命中）；内容真变仍被检出——判据不回退 (41.259583ms)
+✔ Q-2 Markdown 成本护栏：典型 200 行 < 1200ms（惰性化后每轮解析次数=挂载窗口 + 一轮一次批量，而非每事件） (12.839625ms)
+✔ listProject 映射为 RoleView（无 writeSet 字段） (2.517833ms)
+✔ 内置角色 su：RoleView 标为 builtIn，且不去读文档索引（cardPath 为空串） (0.147708ms)
+✔ openSession 点角色即开：scope undefined、导入即授权；多轮 send 透传、stop 收口 (62.976625ms)
+✔ 切换角色（B-2）：open 新角色**不** dispose 旧会话（并存）；定向 stop 只关指定角色 (0.922208ms)
+✔ stopSession：无运行中会话时如实返回 (0.107625ms)
+✔ openSession：未先枚举项目则报错 (0.127458ms)
+✔ listProject：内置 su（已 bootstrap）不再带 readOnly 字段（只读徽标已移除） (0.088083ms)
+✔ listProject：**未 bootstrap**（创世态）内置 su 亦不再带 readOnly 字段 (0.06675ms)
+✔ listProject：可写的项目角色（非内置）亦不再带 readOnly 字段 (0.44225ms)
+✔ T17 listProject：hasRoles 与 primaryRoleId 原样转自门禁引擎（渲染侧据此设主位/默认选中，不硬编码 su） (0.117291ms)
+✔ T17 主入口角色一轮结束（settled）→ 触发 emitProjectChanged；非主入口角色不触发 (51.880792ms)
+✔ T20 handback 事件被外推：Interface 层的 emitEvent 收到编排的 handback 事件（类型已放宽到 OrchestrationEvent） (25.623541ms)
+✔ A-5 customerInput：Interface 透传客户通道；仅内置治理角色（su）会话被注入，且 roleId 经闭包绑定 (0.8185ms)
+✔ B Interface native picker alone grants document refs; renderer listing, cancel and another window cannot grant (14.994875ms)
+✔ B failed listing or native cancel preserves the previous imported document scope (9.534292ms)
+✔ C restricted Interface validates current scope and derives support from actual bound mode (1.312042ms)
+✔ 语法：标题/粗斜/行内码/引用/列表/围栏码/链接/段落换行（markdown-it 输出形状） (2.923ms)
+✔ XSS 负例（护栏）：<script>/<img onerror>/javascript: 链接/引号注入 href/图片/表格单元格——一律不产可执行 HTML (0.681542ms)
+✔ 配置钉子：options.html 必须为 false（误开成 true 本测试必红）；并现场演示「开了会怎样」 (0.373ms)
+✔ 库文件 pin：vendor 的 markdown-it 单文件 sha256 与记录一致（静默换文件/升级未同步必红） (1.105333ms)
+✔ B受限文档仍静态呈现：原文可读且不建立图片脚本或本地文件资源 (0.296334ms)
+✔ L-1 入队：忙时客户消息**入队**（不再直接失败）——位次如实、settled 后按到达序自动放行、摘要入快照 (338.185583ms)
+✔ L-1 位次与摘要截断：第 1、2 位如实；超长文本摘要截断（不铺全文） (31.1745ms)
+✔ L-1 失败语义不变：排队消息投递失败 ⇒ 如实系统行（未丢弃）+ 放回队首；下次时机成功送达 (331.210334ms)
+✔ L-1 传输失败仍如实回错：空闲路径的 send 失败 = {ok:false,error}（并**不**虚报忙态） (31.065541ms)
+✔ 状态准确性（复现 vs 修后）：投递开跑的后台轮次——旧事实组合派生「空闲」（复现），真实快照 busy 派生「工作中」（修后） (699.622875ms)
+✔ 状态准确性：队列待办的角色不得显示「空闲」——快照(queueDepth) + 徽标「工作中 · N 待办」 (31.038792ms)
+✔ 接线钉子：role-state 通道两端齐备；忙态判据只在主进程（会话 busy × 队列深度）；渲染侧**无**界面侧推测 (0.722416ms)
+✔ F-2-T4 长轮不阻塞客户消息：su 的回交投递轮挂起期间，A settle 后的排队客户消息**立即**放行；su 队列在放行+settle 后按序投递 (783.107667ms)
+✔ G-2/W2：`system` 第四类投递——su 忙时入队（快照 kind=system、来源空白、无第二数据源）；不可撤回；settled 后按既有投递机送达 (211.889708ms)
+✔ G-2/W3 集成：完成静默 ≥N ⇒ su 收到收束提示（恰一条）；su 的收束回复不重武装；真实活动重武装 (976.340083ms)
+✔ G-2/W1 集成：同源快照（busy/busySince/队列/在途）＋观察转发（命令超时限＝结构化 display.process）＋lastTurn (251.437416ms)
+✔ D1 shared registry: effective env/file/fallback sources, every secret masked, whitespace is unset (7.948625ms)
+✔ D1 configuration writes only selected string keys atomically, masks URL/userinfo failure and retains revision on failure (6.310916ms)
+✔ D1 same role and project across engines and same role across projects keep distinct handles and exact input targets (4.944666ms)
+✔ D1 background dispatch, queued customer input and handback pin the source engine after selection switches (8.8065ms)
+✔ D1 actual Pipeline/Service chooses demo, writes isolated replay and converts native context honestly (41.550791ms)
+✔ D1 actual Pipeline/Service chooses pi, writes isolated replay and converts native context honestly (33.298083ms)
+✔ D1 actual Pipeline/Service chooses codex, writes isolated replay and converts native context honestly (25.165375ms)
+✔ D1 actual Pipeline/Service chooses claude, writes isolated replay and converts native context honestly (25.886084ms)
+✔ D1 profile success rebuilds same engine after busy old Pi finishes; ambient token remains old until safe; failure is unchanged (12.906833ms)
+✔ D1 original customer signal cancels pending confirm/choice and old yes cannot settle a new card (0.43775ms)
+✔ D1 shell terminal failure/timeout and dispose invalidate exact handle card, old allow is expired (3.601584ms)
+✔ D1 state debouncing and constrained bridges preserve project/runtime identity (1.113458ms)
+✔ D1 last busy Pi in another project releases queued profile rebuild without changing ambient mid-turn (6.008125ms)
+✔ D1 confirmation bridge keeps original signal identity and an old disposed stream cannot cancel a new handle card (0.504542ms)
+✔ D1 old Pi JSONL is a display-only fallback and never becomes Codex/Claude history or native restore proof (8.009666ms)
+✔ D1R ANS history preserves authoritative turn/event identity, independent same text and delta order (3.087958ms)
+✔ D1R legacy Pi rows keep optional turn/event metadata absent (5.423792ms)
+✔ D1R2 direct and queued identical inputs retain original client ID through delayed old settled (9.554541ms)
+✔ D1R2 anonymous dispatch occupies its own origin and unknown/legacy events cannot borrow the next client (7.458583ms)
+✔ D1R2 actual Pipeline/Service returns original client IDs and real distinct turn IDs for same text (25.966916ms)
+✔ D1R2 actual ack preserves a failed delayed terminal and the next aborted original client (36.672625ms)
+✔ D1R2 no-ack failure and legacy/unknown events cannot lend an old client ID to a later acknowledged call (5.153958ms)
+✔ typed prompt input history joins only actual same-turn input sources and preserves legacy facts (10.330083ms)
+✔ operator payload preserves original call identity and leaves absent legacy IDs absent (0.107166ms)
+✔ history preserves canonical start/blocked/result phases for the same failed tool call (4.934958ms)
+✔ F-8-b：ANS 历史行分类以 display.process 结构化事实为准——进程跑完+非零退出不归 denied；timedOut 独立一类（事实经读侧再投影保留） (2.637167ms)
+✔ A native-only Pi fallback stays readable through pure protected projection without raw anchor or template facts (7.07575ms)
+✔ A legacy provenance and authoritative metadata omissions survive the protected Window mapping (6.109ms)
+✔ stop send facts use the original ACK/input/terminal, never the rejection text, and keep the current session (8.072166ms)
+✔ send rejection before public events remains unknown; later same-client different turns do not borrow outcomes (2.499708ms)
+✔ no ACK and mismatched/unknown terminal metadata cannot manufacture accepted input or a stop outcome (2.612042ms)
+✔ send result reports the original handle is no longer current after replacement while its turn rejects (2.695584ms)
+✔ actual Core request_choice abort preserves accepted/current facts, expires the old decision and allows one explicit next prompt (26.685458ms)
+✔ same client IDs across sequential actual turns retain separate first public outcomes (5.184417ms)
+✔ foreign scope terminal and typed input cannot lend facts to a correctly acknowledged turn (2.915625ms)
+✔ describeShellCommand：命令原文逐字呈现（不加工、不截断），argv 逐项、cwd 原样 (0.664791ms)
+✔ describeShellCommand：reason 有值时被展示（(b) 为何交人确认） (0.052875ms)
+✔ describeShellCommand：对不可信输入稳健（argv 含非字符串项被过滤，缺字段不炸） (0.043042ms)
+✔ 操作者放行：presenter 返回 allow → {outcome:'allow', operatorId}，且 presenter 收到原文 (0.188625ms)
+✔ 操作者拒绝：presenter 返回 deny → {outcome:'deny', operatorId}，reason 可读 (0.101334ms)
+✔ 拒绝带上 note（如操作者附言）时如实带出为 reason (0.060583ms)
+✔ 仅 outcome:'allow' 放行：presenter 返回非布尔/false → 一律 deny（绝不默认放行） (0.050667ms)
+✔ fail-closed·不可用：presenter 抛错 → unavailable（编排据此拒绝） (0.095208ms)
+✔ fail-closed·未配置：无 presenter → unavailable（能力缺席即 fail-closed） (0.061042ms)
+✔ fail-closed·超时：presenter 不返回 → 超时即 unavailable（编排据此拒绝） (21.837625ms)
+✔ 超时 env 可覆盖（非法值回退默认，不炸） (0.139666ms)
+✔ arm 决策（I-1 + 补丁）：DESKTOP_SHELL_GATE_ARMED === true——(c) 实件与 (a) 通道**同处接线**（两件同备才 arm） (1.191ms)
+✔ I-1 补丁：(c) 实件构造——只读导入的两件**引用同一性**（classifyShell 同一函数引用；rules 原样透传）；失败 ⇒ 不 arm (0.373708ms)
+✔ I-1 补丁（**真正接通**核查）：真实 openRoleSession + 真实装配——(c) 实件在场时能力面产出 ShellGate（Pi 适配器 run_shell 注册条件成立） (42.159833ms)
+✔ su 只读档（**真正接通**核查）：真实 openRoleSession + 真实装配——su 会话能力面产出**只读档** ShellGate（ls 放行 / rm 拒、不弹框） (9.219416ms)
+✔ M-1 数据面：白话摘要只取命令首词（不编意图）；升级原因译人话（行话不外露）；命令原文逐字 (0.341334ms)
+✔ M-1 presenter：恰 allow:true 才放行；拒绝/缺字段 → 不放行；未知 id → expired；关窗 ⇒ 全部不放行 (0.317125ms)
+✔ M-1 presenter 兜底与失败：清理兜底解析为不放行（无泄漏）；推送抛错（窗口已关）⇒ 上抛（通道归 unavailable） (29.774ms)
+✔ M-1：shell 确认**不再用原生对话框**——(a) 层为应用内卡（通道两端齐备；旧文本墙路径退役） (0.280291ms)
+✔ arm 接缝（历史形状）：不提供已装配 shellGate → pi 工厂收到 undefined（该接缝缺省即不合闸） (0.419084ms)
+✔ arm 接缝（历史形状）：提供已装配 shellGate → 原样透传给 pi 工厂（保留给直接持 gate 的调用方） (0.256375ms)
+✔ I-1 注入判据：**项目角色**会话收到 (a) 通道 + (c) 实件（三层链）；su（内置治理角色）不接 (b)/(a)——改收**只读档**（同一份 (c) 实件） (0.412292ms)
+✔ I-1 补丁：未 arm（未配置两件）时**什么都不传**——输入里不出现两个字段（等同不注入） (0.228917ms)
+✔ su 只读档 fail-closed：deps.shellArming 缺省 ⇒ su 连 shellReadonly 都不注入（能力缺席 = 不 arm，绝不放宽） (0.285292ms)
+✔ arm 只影响 pi 路径：demo 路径不构造 pi 工厂（无 shell 入口） (0.231ms)
+✔ F-4-T1 超时取值链：专用 env 优先 → 未设时**跟随 ANS_PI_SHELL_REVIEW_TIMEOUT_MS**（注入小值断言实际等待随之变化）→ 都未设 120000；非法值沿链回退 (136.815ms)
+✔ F-4-T2 到期原因分流：超时中止的失效文案 = 如实超时文案（含时限与恢复指引，不再误报「本轮已结束」）；轮次中止保留原文案（组合信号 reason 驱动，Node 24 传播首验） (70.906458ms)
+✔ F-4-T3 诊断补录（opt2）：超时 ⇒ shell-confirm.timeout（含时限）；轮次中止 ⇒ shell-confirm.cancelled——presented 之后的每种去向都可判定 (55.782167ms)
+✔ F-4-opt1 接线钉与幂等行为：main.ts 在窗口 focus/show 时重推挂起确认卡（与 app:recovery-ready 同款）；replayPending 只推仍挂起者 (0.312542ms)
+✔ G-2/W5 恢复卡：恰 allow:true 才为真；缺字段/取消 → false；未知 id → expired（未获执行文案）；id 前缀 rp- (0.186ms)
+✔ G-2/W5 恢复卡：等待不设限（零计时器）；关窗/中止 = 未获执行；replayPending 只推仍挂起者 (0.166583ms)
+✔ G-2/W5 shell 卡按角色 pending 视图（W1 依赖项）：metadata.roleId 聚合；无 metadata 不计角色 (0.076416ms)
+✔ A-5 通道：confirm 作答 → answered/confirmed:true；「不同意」→ declined（未获同意） (0.938958ms)
+✔ A-5 通道（请求快照校验）：selected 必须 ⊆ 已给选项、单选恰一个、空选择不受理——非法回包不落三态 (0.153375ms)
+✔ A-5 通道：多选子集/去重合法；取消 → declined；窗口关闭 rejectAll → declined；未接线 → unavailable (0.148042ms)
+✔ A-5 通道（真机语义）：未知 id 回包 → 终态 expired；非法决定 → 可重试（无 expired） (0.114292ms)
+✔ A-5 注入判据：仅内置治理角色（su）会话注入 customerInput；roleId 闭包绑定；普通角色不注入 (4.6695ms)
+✔ A-5 未接通道：deps.customerInput 缺省 ⇒ 连 su 也不注入（无确认制——绝不悄悄放行） (0.317542ms)
+✔ P0-2 abort 三态：demo 替身 ⇒ supported:false（「当前运行时不支持停止」如实，绝不假装已停） (36.526667ms)
+✔ P0-2 abort 三态：句柄正常 ⇒ 透传同一结果；抛错 ⇒ {ok:false, supported:true, error:<原文>} 不吞；旧式替身（无 abort 方法）与未知角色都如实 (4.046584ms)
+✔ P0-1 重校验拒绝路径：坏 MIME（真字节非图）与超 5MB 都**整条拒发**（句柄不被触碰；错误如实） (9.563375ms)
+✔ P0-1 合法图：组契约 PromptOptions（mimeType 以**嗅探**为准）→ 句柄图片载荷保真并明确聊天来源 (201.948875ms)
+✔ P0-1 队列入队**定格**：忙时带图入队、settled 放行后图片数组**同一引用**投递（排队后到投递都带原图） (232.834375ms)
+✔ 面板键恰为 3+1（必填 token/端点/模型 + 可选 CONTEXT_WINDOW）；provider 不在面板里；默认路径为仓库根 .env (0.586333ms)
+✔ 载入：loadPiEnv 把假 .env 的值带进 env（补 --env-file） (2.294375ms)
+✔ 载入：.env 不存在 → 无操作、不抛（与 loadEnvFileInto 的 ENOENT 语义一致） (0.337667ms)
+✔ 掩码：getPiConfig 对机密键恒返空 value，只给 isSet；非机密键回填真实值 (0.62475ms)
+✔ 掩码：.env 不存在 → 视图为空、各键 isSet=false（不抛） (0.556083ms)
+✔ 保存：只动指定键、逐字节保留其余内容（注释/空行/未知键/其它键/顺序） (8.871958ms)
+✔ 保存：缺键追加到末尾（含机密键），且面板键过滤掉非面板键 (8.460709ms)
+✔ 保存：ANS_PI_PROVIDER 不再被写——即便提交它也被过滤；已存在的那行原样保留（只改相关键） (4.512583ms)
+✔ 凭据不回显：哨兵 token 绝不出现在保存回报或错误文本里（含写失败路径） (0.678042ms)
+✔ 保存：无面板键可写时恒等（不触碰文件、回报空 apply） (0.623875ms)
+✔ interface：getPiConfig/savePiConfig 经注入的临时路径读写（不碰真实仓库根 .env） (8.868084ms)
+✔ packaged configuration resolves to persistent userData instead of source/resources while development keeps repo path (0.3395ms)
+✔ packaged settings save and a fresh startup environment share the injected writable path without touching bundled config (9.151834ms)
+✔ packaged smoke requires explicit isolated absolute paths, while ordinary startup has no smoke request (0.886541ms)
+✔ packaged smoke script reads existing IPC and exercises settings without publishing configuration values or calling save/model APIs (0.659291ms)
+✔ B Model budget is raw bytes; Provider reads a checked local descriptor without changing bytes (4.872417ms)
+✔ B Provider refuses unsupported platforms, lexical escapes, directories and symlinks (4.901417ms)
+✔ B Provider detects check/open and opened/read file replacement and closes the original handle (7.382584ms)
+✔ B Service issues opaque refs only after native grant, refresh revokes refs and scope switch rejects old requests (16.012167ms)
+✔ B Service fatal UTF8, binary, BOM, absent file and bounded failure classification (7.309916ms)
+✔ B Service late read never returns content after scope revoke; provider failures are fixed safe messages (0.282833ms)
+✔ B Pipeline preserves trusted native grant and close sequencing over the real Service (1.38675ms)
+✔ B Provider rejects symlink parents, escaped links and root replacement after grant (5.246583ms)
+✔ B Provider detects in-place growth and parent directory replacement around a descriptor read (6.702792ms)
+✔ B refs cannot be minted for hidden, unknown formats or lexical escape listing entries (1.407375ms)
+✔ B actual preload exports only the restricted document invoke shape (0.976708ms)
+✔ B out-of-order listings and root-grant failure cannot publish stale or unsupported refs (0.089666ms)
+✔ B failed/cancelled native imports retain active refs until a successful listing commits (7.501916ms)
+✔ B a newer native selection invalidates an older listing without revoking the active project (0.150792ms)
+✔ B Windows fail-closed Provider and Service reject without minting references or reading content on every host (5.375584ms)
+✔ resolveSkillRoot：优先 ANS_SKILL_ROOT (0.35575ms)
+✔ posixDirname：取目录名 (0.057834ms)
+✔ buildProjectConfig：由枚举结果构造角色表，acceptance 透传 (26.324459ms)
+✔ readRoleDocsIndex：列出 docs 目录并读到设计稿；读到 changelog.md (1.323708ms)
+✔ su：枚举结果里排第一且标为内置，且不进 ProjectConfig 的 roles 映射 (8.527958ms)
+✔ su：resolveRole 下沉为 built-in-governance，走内置边界、不抛错 (9.096334ms)
+✔ P1-1 撤回：忙时入队两条 → 撤第 2 条（ok+摘要、位次前移、id/full 在快照里）；进行中/回交/不存在都如实回错 (597.454ms)
+✔ P1-2 LRU 避开 busy：挑最久未用的非 busy 者；全忙暂超限；settled 后下一时机再收；在跑的全程不被掐断 (619.487042ms)
+✔ F-2-T5 认领已发生（send 未结）⇒ withdraw 如实「进行中，撤回无效」；放行后两笔按序送达（撤回无效 ≠ 丢弃） (291.0615ms)
+✔ G-2/W2：`system` 类（看护告警/收束/回执）不可撤回——归治理流只读面（与派发/回交同语义） (160.887208ms)
+✔ 写入语义（桌面一律 pi）：明示写入真实落到导入项目，但受角色边界约束（越界写被拒） (0.6775ms)
+✔ V2r1：真实 Pi/Codex/Claude 可选，保留单一写入语义和退役 DOM 守卫 (0.350041ms)
+✔ 不再有一概而论的「V1 桌面：只判不写」（该说法仅 demo 路径成立） (0.114208ms)
+✔ 生效配置来源如实呈现（T13）：.ans 不可用/缺 pin → 内联明示「未授权」，绝不静默 (0.170125ms)
+✔ T17：su 主位/默认选中由 listProject 的 primaryRoleId 驱动（渲染侧不硬编码 "su"） (0.317375ms)
+✔ T17：未-bootstrap 状态据 hasRoles===false 显示（客户裁定：此事只说一遍，且只在中栏正中） (0.290875ms)
+✔ T17：左树可刷新——订阅 project:changed 重取枚举；主入口/次级分组与主 CTA 齐备 (0.196875ms)
+✔ T20：来源角色保留报告，主入口不提前镜像，真实投递默认折叠 (0.473541ms)
+✔ T28：Pi 配置面板存在——3 项必填 + 1 项「高级」（可折叠、可留空）；provider 不在面板；token 掩码 (0.700458ms)
+✔ A-5：交互卡（确认/单选/多选/预览）取代收口确认卡；作答经 operatorRespond 回传（主进程按请求快照校验） (0.523792ms)
+✔ A-5：收口面已删（断言「它不在」）——交互卡与确认制取代之，防回潮 (0.431625ms)
+✔ 自绘标题栏：窗口无边框 + 去掉默认菜单栏（断言「它不在」） (0.050667ms)
+✔ 自绘标题栏：三个窗口按钮经 IPC 接主进程（最小化 / 最大化-还原 / 关闭） (0.42375ms)
+✔ B-1：消息经最小子集 Markdown 渲染（先转义后解析）；sys-* 状态行保持转义 (0.269125ms)
+✔ B-1（XSS 红线冒烟）：纯函数可独立断言——语法渲染 + `<script>`/`<img onerror>` 保持转义文本 (4.491542ms)
+✔ B-2：selectRole 不得无条件 clearChat；每角色一个 pane；事件按 roleId 信封分发 (0.420083ms)
+✔ B-3 + 状态准确性（2026-10-12 客户裁定）：状态→徽标纯函数（**图标 + 短标签**）；working 只由**真实信号**（busy/队列深度）派生 (1.607ms)
+✔ 真机缺陷修复：交互卡严格投递所属 pane（不回落当前查看角色）+ 登记表补挂 + 跨 pane 只读指针 + 过期终态 (0.629833ms)
+✔ 工具行瘦身（2026-10-12 客户裁定）：只显示状态与目标——长内容/读取正文的反向断言 (1.37875ms)
+✔ F-8-b：非零退出中性类——红色错误预览让位、详情字段不假冒「错误」（判据单一来源在 tool-rows 结构化事实） (0.036292ms)
+✔ H-1 附录：系统投递输入单独样式——分类器（两名渲染函数的前缀=单一来源）+ 手输防误伤 + 回放同类 (0.464375ms)
+✔ K-1：输入区为**圆角胶囊**、发送箭头**内嵌框内**；快捷键与状态位保持可达（旧行结构退役） (0.249041ms)
+✔ P0-1 图片接线：附件随消息**带载荷上送**（IPC→Interface 重校验→队列定格→句柄透传）；旧「未发送」提示退役 (1.787458ms)
+✔ P0-2 停止入口：#btn-halt 在输入框区（发送钮左侧）仅忙碌时出现；与发送钮并存；三态如实行；结束会话按钮不回归 (0.953167ms)
+✔ D-1：会话记录恢复——主进程只读解析并推规范化行；渲染侧回放进该角色 pane（分隔提示 + is-replay） (0.513959ms)
+✔ D-1 文案分支（pm 2026-10-12 契约钉死）：resumed→无提示；文件在→「已从本地会话文件恢复」；缺失/损坏→（有历史才）「新会话」——唯一映射 (0.11425ms)
+✔ M-1：shell 确认卡——命令在 <pre>、摘要/人话原因、折叠详情、拒绝默认焦点；Esc 与关闭 = 不放行；无原生对话框 (0.549833ms)
+✔ G-2 U1：恢复确认卡——动作/目标角色/证据逐字；恰「执行」=allow:true；取消/Esc/关闭=不执行；等待不设限（无计时器） (0.621875ms)
+✔ G-2 U1：恢复动作纯映射——三枚冻结枚举的人话标签+后果说明；未知动作 null（不假装认识） (0.529583ms)
+✔ G-2 U1：`[系统]` 消息行——聊天流单独样式（来源=系统）；队列视图来源标签与不可撤回呈现 (0.111458ms)
+✔ N-1：「导入项目 / 切换项目」按钮文案——纯函数两态 + 导入→清空回退；判据用已有状态（不靠界面猜测） (0.233417ms)
+✔ N-2：右栏角色卡走既有 Markdown 管线（同 esc 单一来源）；XSS 反向用例照旧；边界/变更/文档三组未动 (0.703208ms)
+✔ N-3：右栏「待办 / 队列」——夹具逐条渲染（来源/摘要/位置/进行中）、长内容不铺开、空占位、切角色切数据 (0.699959ms)
+✔ N-4：变更记录/文档索引/回交卡摘要一并 Markdown 化（同一管线与卡-md 钩子；XSS 反向；证据列表仍 esc） (0.735375ms)
+✔ P-1：待确认卡可达性——到达即达（底部阈值内滚到卡/上翻不打断，阈值 120px）+ 常驻 chip（计数/逐张定位/终态灭）+ 切回滚到卡；三处指示同源 (1.312ms)
+✔ Q-2：窗口化行模型（阈值 150 / 缓冲 30 / spacer / rAF 合帧）；四条滚动语义逐条钉（贴底/卡定位/切回恢复/回放惰性） (1.240917ms)
+✔ S-1：流式输出双向语义——在底部才贴底（先量后挂）、上翻不拽回；窗口化下贴底在窗口更新**之后** (0.244708ms)
+✔ U-1：点角色到底部（取代 B-2「恢复位置」；scrollMemo 删净）；有卡仍滚到卡（P-1 保留）；与 S-1 双向语义不互相污染 (0.439459ms)
+✔ 锚点物化：重物化复用既有行（不重建落尾）；registerRow 支持锚点插入；回放锚点表登记与消费；兜底落尾写明且不丢卡 (0.519ms)
+✔ 右栏抽屉：默认不占屏（col-right 退役）；图标簇两枚（待办/队列归角色）；点开展示/再点收起/Esc；角标=选中角色待办深度；Pi 面板迁入抽屉且抽屉内不溢出 (1.470833ms)
+✔ D-1 修复：回放去重——同一份历史幂等（skip）、增长走增量（append）、其余全量重建；重推不再叠加副本 (0.40725ms)
+✔ data-state 修复：轮末回 idle——data-state 只随 role-state 真实快照（run/idle） (0.155625ms)
+✔ P1-1 UI：待办「全文」展开与「撤回」——仅客户消息且未投递者；派发/回交无撤回钮；撤回/无效各有如实行 (1.265125ms)
+✔ P1-2：LRU 淘汰跳过 busy + 正在开启者不淘汰；settled 后下一时机再收（源码钉） (0.694375ms)
+✔ P1-3：切换项目一次性防呆——有 busy 才出内联确认条（#chat 之外、不落聊天历史）；无 busy 逐字不变 (0.296958ms)
+✔ V2 target batch receipt uses one compact factual dl without per-report execution claims (0.198084ms)
+✔ SV13 received reply folding uses exact receiver turn independently of report source turn (0.127291ms)
+✔ cold report snapshots sort copied list by valid actual times only, keeping ties and unknown wire order (0.332166ms)
+✔ 三元视图身份不串项目或引擎，旧缺身份只兼容 Pi (0.398083ms)
+✔ 只按 IPC 组摘要分组：组长置前、未知职责原文保留、缺组不推权限 (0.298459ms)
+✔ 设置来源和应用时点只呈现窗口实际字段 (0.092375ms)
+✔ 上下文未知/只读历史不冒充原生恢复；重建原因准确呈现 (0.07075ms)
+✔ 实际工具元数据保留 turn/call/runtime；未报告结果不称完成 (0.277459ms)
+✔ 实际 Codex args/ok 和 Core call/result 消费明确目标与结果，Claude未报告继续未知 (0.210042ms)
+✔ renderer 仅消费 IPC，机密为空且无持久化，切引擎不停止后台任务 (0.487583ms)
+✔ 权威turn/event/完整文本与逐次出现计数：不同轮同文、同轮重复、未知legacy不混 (0.219708ms)
+✔ 客户端气泡只按窗口clientMessageId与真实turnId绑定，不猜最新/同文 (0.155166ms)
+✔ 引擎菜单定位：下开、上翻、限高与横向视口夹取 (0.133208ms)
+✔ 可信输入与工具使用actual turn/call/phase，不靠正文和嵌套turn (0.110792ms)
+✔ P7选择与确认根据真实kind，保存状态不等于验收或重新投递 (10.281209ms)
+✔ D-1 目录契约 + 解析：header + user/assistant(含 toolCall)/toolResult(isError) → 规范化行（顺序与时间保留） (2.290542ms)
+✔ D-1 防御式：坏行/未知 entry/未知 role 跳过不抛（计入 skipped）；header 不合法 → 整体判失败 (0.46275ms)
+✔ D-1 pickLatestSessionFile：mtime 大者优先；并列取名字大者（确定性） (0.177375ms)
+✔ D-1 粗探 probeSessionFile：无文件=missing；header 合法=ok；坏文件=corrupt（打开会话时分类 contextSource 用） (5.441542ms)
+✔ D-1 readRoleSessionHistory：无目录=无历史（ok）；挑最近文件；坏文件→ok:false+error；**跨角色不串** (4.622292ms)
+✔ 锚点标识：request_confirmation 的调用行与结论行带同一 requestId/anchorKey（toolCallId 配对，不解析正文） (0.794167ms)
+✔ 锚点标识：request_choice 同样配对；非交互工具/缺 title/孤儿结论一概不着锚（其余行零变化） (0.4505ms)
+✔ legacy anchors keep exact original equivalence without sending raw titles or merging distinct calls (0.367083ms)
+✔ F-8-b：display.process 结构化事实优先——非零退出与超时终止不归 denied；timedOut 独立一类；无事实的旧文本行行为不变 (0.389917ms)
+✔ 并发作废重建（settle 触发的 refreshStaleBoundaries × 用户 send）——身份守卫下：恰一次作废/重建、条目保活、轮次不被误删 (99.4545ms)
+✔ 在跑轮次不被作废重建打断：busy 期间 refreshStaleBoundaries/send 的陈旧检查都跳过（不误删、不误复位） (92.310292ms)
+✔ 后台重建完成后再发送：恢复活动目标，消息恰一次送达重建后的句柄 (2.067917ms)
+✔ 非活动角色后台重建不抢位 (2.185584ms)
+✔ 重建 dispose 等待窗口：select B 保持用户目标/关闭契约 (2.652709ms)
+✔ 重建 dispose 等待窗口：failed select 保持用户目标/关闭契约 (2.127125ms)
+✔ 重建 dispose 等待窗口：stop A 保持用户目标/关闭契约 (1.863417ms)
+✔ 重建 dispose 等待窗口：stop all 保持用户目标/关闭契约 (2.940459ms)
+✔ 重建 dispose 等待窗口：stop B 保持用户目标/关闭契约 (1.969709ms)
+✔ 重建 open 等待窗口：select B 保持用户目标/关闭契约 (2.828541ms)
+✔ 重建 open 等待窗口：failed select 保持用户目标/关闭契约 (1.766417ms)
+✔ 重建 open 等待窗口：stop A 保持用户目标/关闭契约 (3.970917ms)
+✔ 重建 open 等待窗口：stop all 保持用户目标/关闭契约 (2.987041ms)
+✔ 重建 open 等待窗口：stop B 保持用户目标/关闭契约 (2.035583ms)
+✔ 重开失败保留原错误，不恢复假活动目标、不发送消息 (1.97425ms)
+✔ 关闭全部与双角色刷新扫描交接：停止返回后没有后续重开或投递 (2.085584ms)
+✔ firstProjectFilePath：取边界内首个项目根 file 条目 (28.51575ms)
+✔ 点角色即开：open 直接建会话（无摘要/nonce），多轮 send、越界被拒且含按根分组 (145.510083ms)
+✔ 同一角色重复点击：续接当前会话，不重建 (109.52475ms)
+✔ B-2 切换并存：A→B→A 不 dispose 旧会话，切回直接续（open 计数=2） (2.040708ms)
+✔ B-2 LRU 上限：第 MAX_LIVE_SESSIONS+1 个会话淘汰最久未用者；被淘汰者切回是新建 (1.174ms)
+✔ B-2 事件信封：每会话事件带自己的 roleId；切走/在别的会话期间，后台仍持续拉取（不串消息） (91.756ms)
+✔ 未导入项目就点角色：open 如实失败 (16.643541ms)
+✔ 未知角色：open 如实失败 (19.583083ms)
+✔ send 在未开启会话时如实失败 (18.166417ms)
+✔ 运行期同意：登记的非-pin 例外——accepted:true 且不带 pin，来源如实标注（行为不变） (14.698667ms)
+[watchdog] tick 失败（已暂停本 tick，下个 tick 重试）：替身：快照读取爆炸
+✔ T20 handback 事件被外推：会话句柄产出的回交事件经 emitEvent 原样送达（§10.8） (53.356291ms)
+✔ G-2 配置：tick/静默仅 env 可调（非法/缺失回退默认 30s/5min）；阈值表取 §3.2 默认 (0.153334ms)
+✔ G-2/W1 #1：轮次 90% 生效时限才报（demo=120s → 108s 边界）；每轮一次；正常结束投「看护恢复」行 (0.697959ms)
+✔ G-2/W1 「正确等待不报」：#1 对带挂起确认卡的角色排除；su 自身忙不触发任何告警 (0.1105ms)
+✔ G-2/W1 #2：投递排队积压（age ≥10min 或深度 ≥5）；冷却 10min；队列清空投恢复行 (0.18125ms)
+✔ G-2/W1 #3：命令超时（F-1 事实）单次即报；10min 冷却内抑制；无恢复行 (0.059042ms)
+✔ G-2/W1 #4：15min 窗口 failed/timed_out ≥3 才报；窗口滑出投恢复行；aborted/completed 不计 (0.145625ms)
+✔ G-2/W1 风暴护栏：15min 窗口 ≤5 条；超限投一条抑制通告（不占额度、每风暴期恰一条）＋诊断 (0.188916ms)
+✔ G-2/W1 看护器自身故障：快照抛错 ⇒ 只记诊断、不炸、不投递；下个 tick 自动恢复 (0.138583ms)
+✔ G-2/W3 收束滞回：静默 ≥5min 恰一条；su 回复（system 投递持有的 settled）不重武装；真实活动重新武装 (0.057458ms)
+✔ G-2/W3 静默谓词：任一非静默事实都拦（busy/队列/在途/待确认/链在跑） (0.118541ms)
+✔ G-2/W3 投递端异常：收束投不出去 ⇒ 不标已投——下个 tick 重试成功后才恰一条 (0.048875ms)
+✔ 已 bootstrap + 有效 .ans（治理边界 pin-backed）→ 界面不再派生「只读」标记（RoleView 无该字段） (8.567833ms)
+✔ 已 bootstrap + 有效 .ans → 引擎为 su 解析出的生效边界为**已接受**（治理边界覆盖） (2.471917ms)
+✔ 已 bootstrap + 有效 .ans → su 的 gate 放行其**治理边界内**的写、拒绝边界外的写 (3.078291ms)
+✔ 已 bootstrap 但**无** .ans → su 回退内置未接受（写入被拒；该路径不变） (1.636417ms)
+✔ activity facts: accepted alone is unknown; explicit result succeeds; old call remains call (0.724292ms)
+✔ known own tool first-line failures remain visible even with historical isError=false (0.836667ms)
+✔ tool replay state changes invalidate equality without exposing body (0.170125ms)
+✔ execution-before-denial never claims execution failed; known failures keep exact visible first line (0.109333ms)
+✔ full known target survives slim summary for default failure location (0.09525ms)
+✔ orphan own read_file failure keeps explicit first-line target without inspecting body (0.11925ms)
+✔ canonical start/result/blocked各自保留真实状态与实际工具名 (0.102084ms)
+✔ A4 consumer only reads public safe display target and rejects unknown versions (0.057459ms)
+✔ tool identity never inferred for ordinary aborted terminal (0.088917ms)
+✔ delivery notes are not tool activities; known legacy and trusted tool metadata stay tools (0.079125ms)
+✔ actual protected worker history retains all ten calls and failure result without adding a generic (0.959125ms)
+✔ F-8-b：非零退出（结构化事实）→ 中性「已执行完成（退出码 N）」；事实优先于旧文本正则，旧文本行兼容不变 (0.103708ms)
+✔ F-8-b：timedOut 独立一类；signal/error 事实与 spawn 失败不落中性；exit 0 仍「执行完成」 (0.070583ms)
+✔ G-2：system 投递归类——[系统·<子类>] 文首标记（回显/回放同解）；来源=系统（sourceRoleId 恒空） (0.118209ms)
+✔ G-2：system 归类不误伤——行内提及 / 未闭合 / 空子类 / 无空白衔接一律 null；既有两类回归不变 (0.058292ms)
+✔ 边界矩阵:项目管理 (9.908833ms)
+✔ 边界矩阵:编排 (4.108625ms)
+✔ 边界矩阵:门禁引擎 (3.612875ms)
+✔ 边界矩阵:Pi适配器 (5.1225ms)
+✔ 边界矩阵:装配 (4.945875ms)
+✔ 边界矩阵:测试 (2.775291ms)
+✔ independent pi: real Desktop → Pipeline → Core separates chat, queued chat, dispatch and explicit reports (36.597625ms)
+✔ independent codex: real Desktop → Pipeline → Core separates chat, queued chat, dispatch and explicit reports (18.535791ms)
+✔ independent claude: real Desktop → Pipeline → Core separates chat, queued chat, dispatch and explicit reports (19.798458ms)
+✔ 创世判定面：空目录注入的 su 边界恰 3 条；src/**、词法/真实路径逃逸、根外绝对路径全拒 (2.270917ms)
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-cli-genesis-h2PRSG/chain-tIUvdk
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/su/、docs/contracts/ 除外——属初始写集、无需确认可直接写；客户裁定 2026-10-16）。
+[message] 用户指令：任务 T-GOV-1：以治理身份在**项目治理边界**内工作。越出治理边界（`角色卡/`、`docs/`、`.ans/` 之外，如项目的 `src/`，或项目根以外）的写入会在写入之前被门禁拒绝。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（角色卡全文 + 边界摘要，**并列出将要写出的具体路径**——路径是发行凭据，没列出的路径写不进去）请客户确认；拿到明确同意（confirmed:true）后才写；未获同意/通道不可用 → 不写盘、如实告知。（例外：`docs/su/`、`docs/contracts/` 为预授权目录——属初始写集，可直接写、无需确认。）
+未指定目标角色：请**据对话决定要建哪些角色**，逐一向客户确认后写出治理产物——`角色卡/<角色>/role-card.md`、`角色卡/<角色>/boundary.yaml`、`角色卡/<角色>/memo.md`。项目治理边界文档 `角色卡/governance-boundary.yaml` 由编排的自动收尾写出，无需你写。
+[tool_call] 模型请求调用 write_file
+[denied] 写入被拒绝：目标路径未匹配任何边界条目（根：project）：src/evil.ts
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: 角色卡, docs, .ans
+[tool_call] 模型请求调用 request_confirmation
+[accepted] request_confirmation：客户已确认「创建角色 X（预览）」（confirmed:true；操作者：test:测试确认桩）——已获明确同意。可按已同意的内容继续（如写盘，写入须与向客户预览的内容一致）。
+[tool_call] 模型请求调用 write_file
+[accepted] write_file 已获准并落盘：角色卡/X/role-card.md（13 字节写入 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-cli-genesis-h2PRSG/chain-tIUvdk/角色卡/X/role-card.md）
+[tool_call] 模型请求调用 write_file
+[accepted] write_file 已获准并落盘：角色卡/X/boundary.yaml（20 字节写入 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-cli-genesis-h2PRSG/chain-tIUvdk/角色卡/X/boundary.yaml）
+[settled] 会话结束
+✔ 创世链路面（确认制）：governCommand + 假适配器 + 确认桩——越界写入不落盘、确认后的治理产物真落盘并经自动收尾转正、命令以 0 结束 (24.493208ms)
+✔ 角落（O1，客户 2026-10-12 裁定维持现状）：有 角色卡/ 但无 .ans → CLI 仍 arm 创世；可写面仍只落三处治理产物 (3.98075ms)
+✔ F5:声明条件 → 条件目录下路径放行(仍须过 writeSet) (5.1185ms)
+✔ F5:未声明条件 → 拒绝,理由为独立'缺少条件'且 allowedByRoot 不含该目录 (2.01275ms)
+✔ F5:声明了**另一个**条件 → 仍拒绝 (1.180625ms)
+✔ F5:条件目录激活但不在 writeSet → F4 收窄拒绝 (1.602209ms)
+✔ F5 对照:普通 file 不受 conditions 影响 (1.141416ms)
+✔ F6:边界未被接受(accepted=false) → 拒绝一切写入 (0.656917ms)
+✔ independent pi: one input per real turn, same-text turns and genuine assistant quote survive history merge (30.498541ms)
+✔ independent codex: one input per real turn, same-text turns and genuine assistant quote survive history merge (19.587042ms)
+✔ independent claude: one input per real turn, same-text turns and genuine assistant quote survive history merge (19.625417ms)
+✔ F7:经 junction/符号链接逃逸出根 → 拒绝 (0.677541ms)
+✔ F7 对照:根内的普通路径仍允许 (0.150375ms)
+✔ fail-closed:未知顶层键 → 整份解析失败且一切写入被拒 (5.192416ms)
+✔ fail-closed:entries 非数组 → 整份解析失败且一切写入被拒 (1.51075ms)
+✔ fail-closed:缺必填 purpose → 整份解析失败且一切写入被拒 (1.837541ms)
+✔ fail-closed:条目含未知键 → 整份解析失败且一切写入被拒 (1.358708ms)
+✔ fail-closed:kind 非法 → 整份解析失败且一切写入被拒 (2.414625ms)
+✔ fail-closed:root 非法 → 整份解析失败且一切写入被拒 (1.890583ms)
+✔ fail-closed:conditional-directory 缺 condition → 整份解析失败且一切写入被拒 (1.63075ms)
+✔ fail-closed:condition 格式非法 → 整份解析失败且一切写入被拒 (2.510708ms)
+✔ fail-closed:YAML 语法错误 → 整份解析失败且一切写入被拒 (1.650875ms)
+✔ fail-closed 对照:同样含 src/good.ts 的**合法**边界 → src/good.ts 允许 (0.899583ms)
+✔ 代码级钉子（独立）：session.ts 无本地副本实现/调用、无内嵌派发模板；接线走编排三件套 (3.21375ms)
+✔ 代码级钉子（独立）：su 预授权写目录恰为两棵（docs/su + docs/contracts）——workflow.md 不在其中 (2.883084ms)
+✔ 卡文本独立反向断言（含非空洞验证）：含 docs/workflow.md 的小句不得声称免确认/直接写/预授权 (0.5315ms)
+✔ 卡文本独立复核（J-1 守卫语义）：含 授权/获准/放行 的小句全部为否定式；「原地改」小句全部为否定式（各带非空洞验证） (0.643541ms)
+✔ 卡文本正向在场性（独立短语清单）：G-1/A3 关键纪律逐字落卡 (0.12725ms)
+✔ 四处文案口径一致性抽查（独立）：渲染块 / 卡文本 / 工具描述 / 治理会话文案 关键短语互对 (1.8915ms)
+✔ 对抗-接线：无引用派发（含原因段）逐字 = 独立金文本；单来源无 opts 输出与之一致（f2 收口同源） (185.906375ms)
+✔ 对抗-接线（关键）：拒投 → 补齐契约 → 重派**同一任务文本**必须受理且恰投一次（拒投不污染去重键） (335.322167ms)
+✔ 对抗-接线：常规队列期去重未受 G-1 接线影响（目标忙 ⇒ 入队；同文重派 ⇒ 去重回执；恰投一次） (312.618167ms)
+✔ 对抗-接线：排队期间契约变更 ⇒ 已入队条目按**派发那一刻**的旧哈希投递；送达后同文再派才用新哈希 (707.583084ms)
+✔ 对抗-接线：workflow 缺失 ⇒ 降级照投逐字（标注在场；契约照常带哈希；不拒投） (182.571625ms)
+✔ 对抗-提取：嵌套契约路径捕捉（契约目录整树）；`docs/contracts/.md` 空名防串 (1.404083ms)
+✔ 对抗-提取：产物路径/目录式/URL/绝对路径/contracts2 前缀/中文紧贴——一律不误捕 (0.26775ms)
+✔ 对抗-提取：workflow 恒置首（文本后段出现亦然）；契约首现序；重复引用去重 (0.103708ms)
+✔ 对抗-渲染：无引用派发逐字 = 无引用旧格式三行（我的独立金文本；含原因段/多行任务对照组） (0.203792ms)
+✔ 对抗-渲染：引用仅来自 opts（本函数不提取/不触盘）——任务文本提到契约而 opts 缺省 ⇒ 不注入块 (0.079166ms)
+✔ 对抗-渲染：必读块逐字金文本（workflow 第 1、契约第 2、哈希逐字、「任务：」前缀、完成口令指向第 2 节） (0.676333ms)
+✔ 对抗-渲染：完成句变体仅在 workflow 引用在场——仅契约 ⇒ 全文不出现 workflow.md / 第 2 节 (0.207042ms)
+✔ 对抗-渲染：workflow 缺失降级逐字（标注在场/该行缺席/编号重排/不指向不在场文件——两形态） (0.2365ms)
+✔ 对抗-渲染：矛盾输入（引用在场 + 缺失标注）→ 引用为准（抑制标注、完成句指回第 2 节） (0.144167ms)
+✔ 对抗-判据：契约缺失（含 <missing>/空/非法/大写 hex）一律拒投——回执逐字、结构上无投递文本 (0.28425ms)
+✔ 对抗-判据：多缺报首现序第一个；契约缺失优先于 workflow（即便 workflow 在场仍拒） (0.641583ms)
+✔ 对抗-判据：workflow 缺失降级照投（编号重排/标注在场）；多余探测项被忽略——不触发拒投 (0.09725ms)
+✔ 对抗-判据：全齐放行——文本逐字等于独立手写的完整金文本（plan 与 render 无第二份渲染） (0.069958ms)
+✔ G-2 契约①：三前缀逐字节＝ASCII `[`＋`系统`＋U+00B7 中点＋子类＋ASCII `]` (0.323958ms)
+✔ G-2 契约①：四渲染器输出恒以「前缀＋一个 ASCII 空格」起始（U1 归类判据依赖） (0.723667ms)
+✔ G-2 契约①：渲染侧 tool-rows.js 归类面——三前缀＋扩充子类均为 system；形态变体不误归类 (0.313334ms)
+✔ G-2 契约②：字段名 roleStatus/sessionTail/proposeRecovery 五面同名的源码精确钉 (1.617833ms)
+✔ G-2 契约③：openRoleSession——su 拿三能力原引用；项目角色即便误给也零注入；未给零注入 (12.856792ms)
+✔ G-2 契约④：桌面注入闭包经 真 openRoleSession＋真 createRuntimeAdapter 端到端连通（handler 直达 manager 数据面） (97.413708ms)
+✔ R1 纯读保证：role_status/session_tail 调用前后——同源快照逐字段相等、零外推、零投递、零事件 (149.727625ms)
+✔ R1 role_status 文本结构：项目/时间、su 行（busy/待确认/看护行）、角色行（忙闲/会话/队列/进行中）、队列明细含 id、最近一轮 (209.075208ms)
+✔ R1 session_tail：无历史如实（来源/规范行/跳过 结构）；失败不抛；行数归一在工具层（此处复验实现防御） (47.668292ms)
+✔ R1/R2 注入才注册：缺省三工具均不存在；各自注入才注册自己 (0.603125ms)
+✔ R1 role_status：纯读接口（只触达注入数据源一次、查询逐字段传对）＋ ok:false 如实原样 (0.516792ms)
+✔ R1 role_status：8 KiB 字节级截断边界（恰 8192 不截 / 8193 截且总字节 ≤ 8192、truncated 标注、不劈码点） (0.314292ms)
+✔ R1 role_status：契约外回执 fail-honest；抛错如实「读取未完成」；非法 roleId 拒绝且不触达数据源；预中止不调数据源 (0.329625ms)
+✔ R1 session_tail：行数归一（缺省 40/显式/恰 200/超限如实标注）；非法参数拒绝且不触达；失败如实 (1.038542ms)
+✔ R2 propose_recovery：动作集恰三值（其余拒绝且不调能力）；evidence 必填；载荷逐字段转交（含 reason/itemId/metadata） (0.505542ms)
+✔ R2 propose_recovery：回执四值如实——恰 executed 可称已执行；declined/unsupported/error 一律未执行；契约外 fail-closed (0.218458ms)
+✔ R2 propose_recovery：活动闸 begin/end 恰一次（含能力抛错路径）；预中止/中途中止「未获结果」不承诺 (0.256709ms)
+✔ 裁定 1：静默 5min / tick 30s——缺省常量恰批准值；**仅 env 可调**（覆盖名唯一、非法回落）；UI/设置面板零暴露 (1.330541ms)
+✔ 裁定 2：阈值表＝§3.2 批准默认（90%/10min/5/10min-10min-15min×3-30min/15min≤5） (0.054792ms)
+✔ 裁定 3：恢复动作集恰 {abort-turn, rebuild-session, redeliver}——编排/通道/schema 三面同一三值；增/减即拒绝 (0.579083ms)
+✔ 裁定 4：恢复卡**不设限**——行为钉（挂起 1.2s 真实时间仍 pending、无计时器触发）+ 源码钉（mount 不带 cleanupAfterMs） (1200.038458ms)
+✔ 裁定 6：工具名 role_status / session_tail / propose_recovery——schema 可描述、su 卡引用同名（无别名漂移） (0.13275ms)
+✔ 裁定 8：完成态判定**不排除客户活跃**——静默谓词项恰六项、无客户活跃项 (0.240416ms)
+✔ 裁定 9：V1 无界面级告警——无 OS 通知/托盘/新角标；watchdog 不进入渲染侧代码；告警只进 su 会话与聊天流系统行 (3.149709ms)
+✔ 非目标零实施：看护器不自动做恢复（无 abort/rebuild/drain 调用）；源码导入面不含任何判定/门禁件 (1.200583ms)
+✔ 看护永不改判定：四类渲染输出的正文零授权语义（行为面——逐字检视） (0.980625ms)
+✔ G：su 卡「看护职责」段——三要素齐备；位置（J-1 段之后、末段边界之前）；段级零命中授权词 (0.10025ms)
+✔ 范围落点：W1-W5/R1/R2/O1/G/U1 逐项文件与关键符号在位（存在性审计） (3.824791ms)
+✔ U1：queueSourceLabel——system=「系统」（非角色）；既有三类不回归 (0.267333ms)
+✔ U1：recoveryActionView——恰三枚冻结枚举映射；未知动作 ⇒ null（只呈现原始 token，不编语义） (0.094584ms)
+✔ U1 恢复卡源码钉：恰 allow:true 才作为执行请求回传；取消/Esc/关闭均 false；默认焦点＝取消；零计时器 (1.243083ms)
+✔ U1 系统消息行源码钉：is-system 类＋shield 图标＋标签分类器单一来源＋样式钩子；撤回判据只认 message (1.325ms)
+✔ U1 归类与编排契约一致性（独立复核）：三真实前缀回放/回显均归 system；既有两类仍归原类 (0.502667ms)
+[watchdog] tick 失败（已暂停本 tick，下个 tick 重试）：夹具：快照读取失败
+✔ W1#1：恰 90% 边界——差 1ms 不报、恰 108000ms 报一条；每轮一次 (1.424375ms)
+✔ W1#1 排除：带挂起确认卡的角色不触发；解除后按真实已耗触发 (0.117917ms)
+✔ W1#1 排除：su 自身忙 ⇒ 关于 su 的告警不触发；项目角色照报 (0.075875ms)
+✔ W1#1 身份更替：旧轮次解除投恢复行（计数如实），新一轮独立起算 (0.150375ms)
+✔ W1#2：age 恰 10min 边界——599999ms 不报、600000ms 报；depth 恰 5 辅判触发、depth 4 不触发 (0.201833ms)
+✔ W1#2：活跃期单报＋累计；恢复行 N/M 如实；冷却恰 10min 边界（自告警投出时刻起算） (0.109333ms)
+✔ W1#2 排除：su 自身忙 ⇒ 关于 su 的目标队列不报；空目标队列跳过 (0.111791ms)
+✔ W1#3：单次即报；冷却恰边界；su 忙抑制；无恢复行 (0.207167ms)
+✔ W1#4：15min 窗口恰 3 次边界；completed/aborted 不计；恰 15min 剪枝；冷却 30min 内不报 (0.203ms)
+✔ W1#4：outcome 缺事实不猜（不计入） (0.096708ms)
+✔ 风暴护栏：15min 窗口 ≤5 条；第 6 条起只投「已抑制 N 条」通告恰一条；统计如实；窗口滑出恢复 (0.186ms)
+✔ 恢复行只在告警确实投出过时投：仅被风暴抑制（从未投出）的活跃期解除不产生恢复行 (0.093958ms)
+✔ 看护器异常隔离：快照抛错 ⇒ tick 不抛；下一时机恢复工作 (0.317708ms)
+✔ 投递端抛错 ⇒ 该告警视为未投出（不崩）；条件仍在时重试投出（前次失败未占用冷却） (0.089334ms)
+✔ W2：system 投递——su 忙时入队（快照 kind=system/来源空/看护键）；不可撤回且不丢；settled 后按既有语义逐字送达 (270.983667ms)
+✔ W2：system 投递失败 ⇒ 如实系统行「未丢弃」＋放回队首；下次时机重试送达 (445.203166ms)
+✔ W1 集成：busySince 同源快照；lastTurn 落表（role_status 文本）；命令超时观察＝display.process 结构化事实；fromSystemDelivery 标记 (377.440708ms)
+✔ W3 集成：静默满 N ⇒ su 真收到收束提示恰一条；su 回复不重武装；真实活动重武装后再投 (670.175166ms)
+✔ W3 预热：无 settled ⇒ 即使静默超 N 也永不触发 (0.652708ms)
+✔ W3：静默恰 5min 边界——差 1ms 不投；恰值投恰一条（文案「已持续 5 分钟」） (0.240417ms)
+✔ W3：每静默窗口至多一条——投出后再静默 20min 不重发 (0.081209ms)
+✔ W3：system 投递的 settle 不算真实活动（su 回复收束提示 → 不重武装） (0.068375ms)
+✔ W3：真实活动（activity / 非 system settled）重新武装——再次静默满 N 才可再投 (0.074375ms)
+✔ W3 静默谓词：busy / 队列 / 在途 / 待确认 / 链在跑——任一非静默即重置静默起点 (0.880834ms)
+✔ W3：投递失败不消费窗口——下个 tick 重试恰一条（投不出 ≠ 已投） (0.115042ms)
+✔ W5：propose→卡（字段逐字段）→恰 allow:true 执行 abort-turn 恰一次；回执三路如实；幂等 by id (202.612833ms)
+✔ W5：取消 / allow 非布尔 / 关窗 ⇒ declined 如实——未执行、绝不呈已执行 (223.247917ms)
+✔ W5：通道未接线 ⇒ declined（零执行）；非法载荷 ⇒ error 且零推卡 (84.351041ms)
+✔ W5：unsupported（句柄不带 abort）与 error（rebuild 在跑拒绝）如实；rebuild 空闲 ⇒ executed（旧句柄 dispose＋新一代） (679.511208ms)
+✔ W4/W5：redeliver——itemId 不存在如实报错；目标忙 ⇒ 如实「仍在队列」不谎报已投出 (236.018833ms)
+✔ W5 只读保证：propose 全过程不写项目文件、不动队列语义（看护永不改判定） (125.908583ms)
+✔ F-1 env 250ms：到期终止、如实文案、execution.timedOut；轮次信号不受影响、后续命令照常 (274.446542ms)
+✔ F-1 孙进程终止：超时后进程组一并收口（孙进程 pid 消失） (404.796583ms)
+✔ F-1 SIGKILL 升级：SIGTERM 免疫子进程不再有机会写入 late 文件 (1808.335042ms)
+✔ F-1 解析链与不误杀：显式选项优先于 env；快命令在大时限下照常完成 (29.360209ms)
+✔ F-2 场景 1（跨目标不阻塞）：A 的 send 挂起期间派发 B ⇒ B 立即收到（不待 A 轮结束） (215.665958ms)
+✔ F-2 场景 2（同目标仍排队）：投递进行中再派同目标 ⇒ 排队不并发；settled 后按序放行 (580.621792ms)
+✔ F-3 截断→恰一次补发：第二轮文本=常量；截断行与补发通知行各恰一条；settled 恰一次 (1.433334ms)
+✔ F-3 env 关闭即不补：显式关闭值解析为关；enabled:false → 恰一轮、无补发通知；settled 携截断事实 (0.128ms)
+✔ F-3 已成功交报告不催交：wasReportSubmitted=true → 恰一轮、无补发行 (0.086041ms)
+✔ F-4-M1：未设专用 env 时确认超时**跟随** ANS_PI_SHELL_REVIEW_TIMEOUT_MS（不再被静默钉在 120s） (201.897209ms)
+✔ F-4-M1 专用覆盖优先：ANS_DESKTOP_OPERATOR_CONFIRM_TIMEOUT_MS 压过 shell 审核预算 (151.503333ms)
+✔ F-4-M2：超时以带标记原因经组合信号传播到呈现侧（presenter 可据此分流文案） (172.076625ms)
+✔ F-5 F4：拒绝如实 + 可操作指引；「允许写入的路径」= 当前已发行可写集（多 issued + 越界滤除） (1.070208ms)
+✔ F-5 F4：条件未激活的已发行项不计入「当前可写」；条件激活后计入并可真实放行 (0.246916ms)
+✔ F-5 非 F4 分支回归：未匹配为目标拒绝时列表仍为边界覆盖（语义未被 F4 修改波及） (0.165292ms)
+✔ F-6-1 刷新恢复：首查拒 → 刷新一次 → 重试放行落盘；恢复后直走新门禁（不再刷新） (2.689166ms)
+✔ F-6-1 仍拒：链式原因两段事实（原判 + 重试仍拒）、零副作用；刷新失败/无闭包同样如实 (0.535541ms)
+✔ F-7 阻断：独立操作符与紧贴重定向 token 一律「未执行」拒绝、不调 gate、不 spawn (2.556375ms)
+✔ F-7 放行并真实执行：引号内 `\|` 与未加引号反斜杠前导 `\|` 的 grep（真机证据命令口径） (5.767ms)
+✔ F-7-opt1：内嵌未加引号 `x|sort` 拒绝（附加引号指引）；词中 &（URL）不判 (0.216042ms)
+✔ F-7-opt2：未加引号 $HOME / $(...) 拒绝；'$HOME' 引号态放行并真实执行出字面量 (2.842875ms)
+✔ F-8 链一致性（非零退出）：投影措辞=已执行完成（退出码 3）；classify=exited-nonzero；activityOf 中性标签 (1.230542ms)
+✔ F-8 链一致性（超时终止）：投影「超时终止」+ process.timedOut；classify=timed-out；activityOf 独立一类且仍显著 (0.211375ms)
+✔ F-8 链一致性（spawn 失败不被吞）：投影仍「执行失败」；classify=null（无结构化完成事实）；activityOf 仍标红 (0.099416ms)
+✔ F-8 旧行兼容（无结构化事实）：classify=null、activityOf 文本口径逐字保留（过渡期不误伤） (0.078ms)
+✔ independent B: native grant, opaque reference, actual bounded file reads, revocation and project switch (14.811667ms)
+✔ independent B: accepted Windows restriction refuses native grants without issuing refs or reading bytes (1.0415ms)
+✔ independent C pi: one durable member, safe input history, raw model text, real target receipt and no duplicate prompt (41.307584ms)
+✔ independent C codex: one durable member, safe input history, raw model text, real target receipt and no duplicate prompt (35.516166ms)
+✔ independent C claude: one durable member, safe input history, raw model text, real target receipt and no duplicate prompt (51.151708ms)
+✔ independent C: failure after real ACK but before input save invokes no model and cannot repair by prompting (25.165583ms)
+✔ independent C: history failure after a real model call cannot turn storage retry into another prompt (33.824375ms)
+✔ independent C: an injected report storage failure retries the frozen member once without rerunning its model (19.983417ms)
+✔ independent pi: real shell effects, failures and protected details survive Core to Window history (92.119541ms)
+✔ independent codex: real shell effects, failures and protected details survive Core to Window history (90.798958ms)
+✔ independent claude: real shell effects, failures and protected details survive Core to Window history (95.302541ms)
+✔ independent A: a real non-tool engine failure must not become a tool display diagnostic (38.590667ms)
+✔ independent A legacy: protected native-only history preserves classification and target provenance without promoting template execution facts (5.846709ms)
+✔ independent C Window: failed source save and concurrent recovery continue one original delivery without source replay or raw IPC (72.902625ms)
+✔ independent C Window: initial source save and its notification continue one original delivery without source replay or raw IPC (69.347208ms)
+✔ independent C Window: failed target receipt and history-only recovery continue one original delivery without source replay or raw IPC (101.390833ms)
+✔ 真实入口:ans role run 编排 --task T-1 以 0 结束 (123.680333ms)
+✔ 真实入口:演示输出含角色/边界来源、两笔写入、按根分组、settled (104.663042ms)
+✔ 真实入口:演示**不产生** docs/scheduling 记录(F3) (109.446834ms)
+✔ 真实入口失败路径非 0:未知角色 (91.049417ms)
+✔ 真实入口失败路径非 0:缺角色 id (63.707125ms)
+✔ 真实入口失败路径非 0:缺 --task (59.106833ms)
+✔ 真实入口失败路径非 0:--task 缺值 (63.910583ms)
+✔ 真实入口失败路径非 0:多余参数 (139.535084ms)
+✔ 真实入口失败路径非 0:未知命令 (70.796458ms)
+✔ 真实入口失败路径非 0:未知 role 子命令 (66.613916ms)
+✔ 真实入口失败路径非 0:govern 缺真实 Pi 适配器 provider 配置（环境已擦洗：ANS_PI_*/凭据/ANS_RUNTIME 不入子进程） (159.170583ms)
+✔ 真实入口:help/doctor 以 0 结束 (145.24025ms)
+✔ 真实入口:ans init 已废除(作为未知命令以非 0 结束,且不再生成骨架) (177.502958ms)
+✔ 真实入口:doctor 打印装配自检与六个角色 (66.2675ms)
+✔ 真实入口:ans govern <空目录> → 非 0、不再报治理边界解析失败、如实报缺 provider 配置、目标目录零残留 (146.749208ms)
+✔ 真实入口:runCli 默认擦洗——跑测进程的 ANS_RUNTIME 与 Pi 凭据不传给子进程（哨兵值实测） (277.487792ms)
+✔ T1 pi: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report (140.866375ms)
+✔ T1 pi: the same controlled Core clock expires exactly 100ms outside customer waiting (4.233125ms)
+✔ T1 codex: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report (142.026375ms)
+✔ T1 codex: the same controlled Core clock expires exactly 100ms outside customer waiting (5.235958ms)
+✔ T1 claude: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report (113.25775ms)
+✔ T1 claude: the same controlled Core clock expires exactly 100ms outside customer waiting (6.60325ms)
+✔ T1 real outer failed remains one terminal and truthful handback after external cleanup completion (5.89075ms)
+✔ T1 real outer timed_out remains one terminal and truthful handback after external cleanup completion (35.98525ms)
+✔ T1 actual bin role/pi: actual adapter and registered handler reject an out-of-boundary write (725.849583ms)
+✔ T1 actual bin govern/pi: actual adapter and registered handler reject an out-of-boundary write (871.822042ms)
+✔ T1 actual bin role/codex: actual adapter and registered handler reject an out-of-boundary write (414.053958ms)
+✔ T1 actual bin govern/codex: actual adapter and registered handler reject an out-of-boundary write (720.1395ms)
+✔ T1 actual bin role/claude: actual adapter and registered handler reject an out-of-boundary write (335.59775ms)
+✔ T1 actual bin govern/claude: actual adapter and registered handler reject an out-of-boundary write (360.105125ms)
+✔ T29 往返：临时 .env 载入后，进程 env 拿到正确值（含 token），且回报只含键名 (5.5925ms)
+✔ T29 往返：载入后 resolvePiProviderConfig 成功构造（baseUrl/modelId/contextWindow/provider 正确） (1.115458ms)
+✔ T29 往返：ANS_PI_CONTEXT_WINDOW 缺失 → 不硬失败，采用保守默认值（新语义） (1.20475ms)
+✔ T29 往返：savePiConfig 改值 → 立即重载生效 + 新开 env 重载生效 + 适配器构造取到新值 (19.014875ms)
+✔ T29 往返：旧值仍在（只改相关键——载入不因保存而丢其它键） (18.557875ms)
+✔ T29 单一来源：parse/merge/atomicWrite/read/save/loadEnvFileInto 只在 env-file.ts 定义 (7.859041ms)
+✔ T29 单一来源：桌面侧只读导入共享模块（无第二份实现） (0.324125ms)
+✔ T29 签名：resolvePiProviderConfig 与 createPiAdapterFactory 形参未扩（均为 2 参） (0.052583ms)
+✔ T29 签名：默认 .env 路径指向仓库根（只取字符串，不读该文件） (0.0685ms)
+✔ T29 纪律①：只改相关键——除目标键的值外，其余内容逐字节不变（自比对） (38.647875ms)
+✔ T29 纪律②：已存在 → 就地替换值，键名/`=`/两侧空白/内联注释均不变 (8.543375ms)
+✔ T29 纪律②：键不存在 → 追加到末尾（前文逐字节不变；沿用原行尾符） (7.408875ms)
+✔ T29 纪律②：CRLF 原文 → 追加沿用 CRLF 行尾（不混行尾） (6.760541ms)
+✔ T29 纪律③：值含 = 空格 引号 # 反斜杠 → 写后读回逐字一致 (9.096417ms)
+✔ T29 纪律③：ANS_PI_PROVIDER 不是面板键——提交被忽略（不采纳、不落盘、已存在行原样保留） (12.52425ms)
+✔ T29 纪律④：写入后目录内无 temp 残留，目标内容完整（非半写） (9.144791ms)
+✔ T29 纪律④：atomicWriteText 直接调用——内容完整、无 temp 残留、覆盖原子 (18.090375ms)
+✔ T29 纪律⑤：目标目录不存在 → savePiConfig 显式失败，且不创建任何文件 (4.062708ms)
+✔ T29 纪律⑤：saveEnvFile 目标目录不存在 → 抛错（不静默） (7.058625ms)
+✔ T29 纪律⑤：readEnvFile 目标不存在 → 抛错（读取失败显式，不返回空） (0.684959ms)
+✔ T29 纪律⑤：目标是一个目录 → 抛错，且该目录不被损坏 (1.296417ms)
+✔ T29 纪律⑥：哨兵 token —— 只进 env；回报/错误/视图文本一律不含其值 (15.869917ms)
+✔ T29 纪律⑥：非面板键被忽略——不越界写入（哨兵值不得落盘） (5.592958ms)
+✔ 用户入口/空文件夹：IPC listProject 不抛错，返回内置 su + hasRoles:false + primaryRoleId (7.705709ms)
+✔ 用户入口/空文件夹对照：项目根不存在 / 是文件 → 仍是**真错误**（抛错），不伪装成空项目 (5.909083ms)
+✔ 用户入口/创世边界：未 bootstrap 时 su 的 gate **放行** 治理产物（角色卡//docs//.ans/） (3.527834ms)
+✔ 用户入口/创世边界：未 bootstrap 时 su 的 gate **拒绝** src/** 与项目根外（非治理产物） (5.556375ms)
+✔ 用户入口/切回：项目一有角色（hasRoles:true）→ 桌面**不再设** genesisBootstrap，su 回普通边界（拒一切） (31.225708ms)
+✔ 用户入口/自终止：项目治理边界就位并 pin 后，创世放行**结构性**失效（即便 genesisBootstrap 残留） (5.869084ms)
+✔ 旧形态退场：openGovernanceSession **不预先创建** 角色卡//docs//.ans/（空脚本 → 无任何骨架落盘） (2.3135ms)
+✔ 新形态：su **直接写出**角色（经创世边界）→ 真实落盘且字节相等；越界写被拒零副作用；可被 listProject 枚举 (45.71075ms)
+✔ 用户入口/确认制未获同意：客户**拒绝** / 通道**不可用** → 未确认路径被 F4 拒、零副作用（.ans / 治理边界文档 / manifest 都不写） (6.176292ms)
+✔ 用户入口/确认制确认通过：su 先经 request_confirmation 预览并获确认 → 写入真落盘并经**自动收尾**转正（治理边界文档 + .ans + manifest）；pin 与我独立重算一致；载入器验为 pin-backed accepted (45.633416ms)
+✔ 用户入口/收尾负例：**把授权拿掉**（边界未接受）→ su 写入被 F6 拒、自动收尾被门禁拒且零副作用（不凭代码身份绕门） (4.328709ms)
+✔ 块2/允许写：write_file→盘上文件存在且**字节等于** content；mkdir -p 父目录 (35.681792ms)
+✔ 块2/允许编辑：edit_file 命中 old_string → 回写内容等于预期 (16.561583ms)
+✔ 块2/edit_file：old_string 未命中 → ok:false 且文件保持不变 (8.497917ms)
+✔ 块2/拒绝写：越界路径 → 文件不存在、父目录不建（零副作用） (2.65675ms)
+✔ 块2/拒绝编辑：对已存在但越界的文件 edit_file → 内容与 mtime 不变（零副作用） (14.206542ms)
+✔ 块2/负例：gate 抛错 → 在任何副作用之前 fail-closed，无文件/目录产生 (5.102083ms)
+✔ 块2/负例：符号链接/junction 逃逸出写根 → 拒绝且链接目标未被触碰 (2.72475ms)
+✔ 块2/第二边界（§3.8）：gate 放行写根之外（skill 根）的写 → 写层仍拒、无文件产生 (4.92775ms)
+✔ 块2/同源（行为）：gate 收到的绝对路径 === 文件落盘的绝对路径（写根解释一致） (14.370292ms)
+✔ 块2/同源（静态）：写层与门禁引擎的路径原语来自**同一共享模块**（单一来源） (0.39775ms)
+✔ 块3/pin 匹配 → accepted，src/a.ts 可写 (12.540041ms)
+✔ 块3/pin 不匹配（篡改边界文件）→ 未接受 → 拒一切写 (2.925208ms)
+✔ 块3/.ans 存在但 accepted:true 无 pin → 载入方置未接受（fail-closed）→ 拒一切写 (2.958ms)
+✔ 块3/无 .ans → 回退内置（未接受）→ 拒一切写 (0.696833ms)
+✔ 块3/调度记录（boundary 级）：pm 边界覆盖 docs/scheduling/；审计 docs/audit/ 须声明 shell-gate (1.69025ms)
+✔ 块3/V3(c) 白名单 → 放行，且 (b)/(a) **未被调用** (2.264542ms)
+✔ 块3/V3(c) 硬拒（sh -c）→ 拒绝、终结，**且 (b)/(a) 未被调用**（硬地板不可翻案：桩本会放行） (0.265ms)
+✔ 块3/V3(c) risky + (b) 放行 + (a) 放行 → 放行（走 b-allow→a-allow） (0.471042ms)
+✔ 块3/V3(c) risky + (b) 放行 + (a) 拒绝 → **拒绝**（★ 最要害：pm 不是终审，客户才是） (0.176458ms)
+✔ 块3/V3(c) risky + (b) 拒绝 → 拒绝、终结，**且 (a) 未被调用**（pm 说不该跑就不打扰人） (0.182375ms)
+✔ 块3/V3(c) risky 且 (b)/(a) 均未接入 → 拒绝（fail-closed：risky 必过 (a)，a 缺席即拒） (0.090584ms)
+✔ 块3/V3 (c) review → (b) 放行即终结；(b) 拒绝亦终结 (0.195958ms)
+✔ 块3/V3 (b) 拿不准 → 升 (a)；无会话 → 升 (a)；超时 → 升 (a)；JSON 非法（不可解析）→ **直接拒绝、不升 (a)** (21.635084ms)
+✔ 块3/V3 (a) 超时 / 不可用 → 一律拒绝（只往更严的层退） (21.835708ms)
+✔ 块3/V3 (c)-only（未接 (b)/(a)）：review 默认拒绝（不因缺下一闸而放行） (0.232417ms)
+✔ 块3/fail-closed：规则集加载失败 → 整条拒绝（绝不「没规则就放行」） (0.152583ms)
+✔ 块3/fail-closed：classifyShell 收到版本未知的规则集 → deny（不因未知而放行） (1.873333ms)
+✔ 块3/未 arm → run_shell 根本不被注册（能力缺席 = 最强 fail-closed） (4.208375ms)
+✔ 块3/run_shell：审核未返回 allow:true → **绝不执行**；恰好 allow:true → 才执行 (15.530958ms)
+✔ 块3/shellKillSwitch：未 arm 的 run_shell → block；已 arm / 其它工具 → 放行 (0.184667ms)
+✔ 独立UI2：正文声称成功不把缺状态的历史结果变成成功 (3.402458ms)
+✔ 独立UI2：交错调用结果按callId保持目标，isError=false只证明工具返回 (0.474958ms)
+✔ 独立UI2：可靠失败优先于冲突成功字段，必须保留异常和目标 (0.172084ms)
+✔ 独立UI2：实时accepted无结果诚实降级；明确结果和回放口径一致 (0.110166ms)
+✔ 独立UI2：交互调用和结论保留同一锚点，不被普通工具聚合 (0.327459ms)
+✔ 独立UI2：回放正文不变但事实变化时必须重建，不能把未知留成旧状态 (0.168375ms)
+✔ 独立UI2：目标、交互锚点和明确失败更新同样触发回放重建 (0.066042ms)
+✔ 独立UI2：没有对应callId的结果不偷取相邻路径 (0.0455ms)
+✔ 独立UI2：shell失败保留可信首行exit，stdout中的exit或成功不是结果依据 (0.16725ms)
+✔ 独立UI2：无执行结果的门禁拒绝不能被映射为执行失败 (0.177167ms)
+✔ 独立S1：孤立read_file失败只从可靠首行补目标，空结构目标也不抹掉它 (0.160334ms)
+[message] 已解析角色 编排（kind=project），角色卡：角色卡/注入角色/role-card.md
+[message] 已解析边界，来源：角色卡/注入角色/boundary.yaml；acceptance=accepted（来源：test:injected）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T-1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+ans role run 无法启动：缺少 project 配置：runRoleCommand 需由装配入口经 deps.project 注入默认演示配置（编排不持有配置副本；契约 §6 配置数据单一来源在装配）。
+✔ 接线:编排使用装配**注入**的 project/scope(注入一份不同的边界,判定随之改变) (11.253875ms)
+✔ 接线:runRoleCommand 缺 project 注入 → 非 0(EXIT_USAGE),不自回退第二份配置 (0.391375ms)
+[message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md
+[message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T-1 写集 0 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+✔ 接线:门禁引擎的 F4 收窄经真实装配配置生效(判定来自 resolveWrite) (36.494375ms)
+✔ real ACK binds task → Q1/Q2 chat → next task even with delayed consumption; chat report drops old taskId (12.959167ms)
+✔ task failed keeps handback; chat failed without report does not invent task (2.782208ms)
+✔ task timed_out keeps handback; chat timed_out without report does not invent task (8.173084ms)
+✔ task aborted keeps handback; chat aborted without report does not invent task (2.216916ms)
+✔ taskId compatibility, ordinary default chat, invalid chat report and explicit chat failed report (4.74ms)
+✔ unknown real turn without ACK cannot borrow task intent; report is still explicit (2.538542ms)
+✔ pre-opening rejection clears legacy intent; serial legacy task/chat consumes once (4.400958ms)
+✔ chat writes and denials are passed through, not converted to fallback; next task keeps its own evidence (0.353959ms)
+ans role run —— 运行一个受治理角色会话
+
+用法：ans role run <角色> --task <任务> [--runtime demo|pi|codex|claude]
+
+本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+ans role run —— 运行一个受治理角色会话
+
+用法：ans role run <角色> --task <任务> [--runtime demo|pi|codex|claude]
+
+本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+ans role run —— 运行一个受治理角色会话
+
+用法：ans role run <角色> --task <任务> [--runtime demo|pi|codex|claude]
+
+本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+✔ P1-4 指路句：不提供 shell 与会话保持 + 桌面应用，两点写实 (0.319709ms)
+✔ runRoleCommand --help → 0：stdout 含用法与指路句；不开会话（工厂零调用） (1.052333ms)
+✔ runRoleCommand -h → 0：stdout 含用法与指路句；不开会话（工厂零调用） (0.742459ms)
+✔ runRoleCommand --help 不依赖注入（缺 project/scope 也可用） (0.097791ms)
+[message] 已解析角色 X（kind=project），角色卡：角色卡/X/role-card.md
+[message] 已解析边界，来源：角色卡/X/boundary.yaml；acceptance=accepted（来源：test:fixture）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T-1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[settled] 完成
+ans role run 用法错误：缺少角色 id；缺少 --task
+✔ 一次性会话启动打印轻量指路行（[message] 事件，位于既有启动提示处；每场恰一次） (10.963083ms)
+✔ 用法错误路径不打印指路（只在真正开跑时出现，不夹带新噪音） (0.113583ms)
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-confirm-sHYSZc/proj
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/su/、docs/contracts/ 除外——属初始写集、无需确认可直接写；客户裁定 2026-10-16）。
+[message] 用户指令：任务 T-GOV-1：以治理身份在**项目治理边界**内工作。越出治理边界（`角色卡/`、`docs/`、`.ans/` 之外，如项目的 `src/`，或项目根以外）的写入会在写入之前被门禁拒绝。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（角色卡全文 + 边界摘要，**并列出将要写出的具体路径**——路径是发行凭据，没列出的路径写不进去）请客户确认；拿到明确同意（confirmed:true）后才写；未获同意/通道不可用 → 不写盘、如实告知。（例外：`docs/su/`、`docs/contracts/` 为预授权目录——属初始写集，可直接写、无需确认。）
+未指定目标角色：请**据对话决定要建哪些角色**，逐一向客户确认后写出治理产物——`角色卡/<角色>/role-card.md`、`角色卡/<角色>/boundary.yaml`、`角色卡/<角色>/memo.md`。项目治理边界文档 `角色卡/governance-boundary.yaml` 由编排的自动收尾写出，无需你写。
+[tool_call] 模型请求调用 write_file
+[denied] 写入被拒绝：路径在角色边界内，但不在任务 writeSet 内（F4）：角色卡/X/role-card.md
+如需写入该路径，请先取得写盘许可：若你的工具集中有 request_confirmation（确认制会话），把该路径逐条列入其 preview 呈客户确认——客户返回 confirmed:true 后该路径会被发行进 writeSet，再重试写入即可；任务型会话请把该路径加入任务 writeSet（或改在 writeSet 内选路径）。注意：许可按会话生效——会话重建/重开后不会自动保留，需重新确认。
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）
+[tool_call] 模型请求调用 write_file
+[denied] 写入被拒绝：路径在角色边界内，但不在任务 writeSet 内（F4）：角色卡/X/boundary.yaml
+如需写入该路径，请先取得写盘许可：若你的工具集中有 request_confirmation（确认制会话），把该路径逐条列入其 preview 呈客户确认——客户返回 confirmed:true 后该路径会被发行进 writeSet，再重试写入即可；任务型会话请把该路径加入任务 writeSet（或改在 writeSet 内选路径）。注意：许可按会话生效——会话重建/重开后不会自动保留，需重新确认。
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）
+[tool_call] 模型请求调用 write_file
+[denied] 写入被拒绝：路径在角色边界内，但不在任务 writeSet 内（F4）：角色卡/X/memo.md
+如需写入该路径，请先取得写盘许可：若你的工具集中有 request_confirmation（确认制会话），把该路径逐条列入其 preview 呈客户确认——客户返回 confirmed:true 后该路径会被发行进 writeSet，再重试写入即可；任务型会话请把该路径加入任务 writeSet（或改在 writeSet 内选路径）。注意：许可按会话生效——会话重建/重开后不会自动保留，需重新确认。
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）
+[settled] 会话结束
+✔ 未确认：脚本直接 write（没有 request_confirmation）→ F4 拒、不落盘、零收尾 (10.371833ms)
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-confirm-1EGbRm/proj
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/su/、docs/contracts/ 除外——属初始写集、无需确认可直接写；客户裁定 2026-10-16）。
+[message] 用户指令：任务 T-GOV-1：以治理身份在**项目治理边界**内工作。越出治理边界（`角色卡/`、`docs/`、`.ans/` 之外，如项目的 `src/`，或项目根以外）的写入会在写入之前被门禁拒绝。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（角色卡全文 + 边界摘要，**并列出将要写出的具体路径**——路径是发行凭据，没列出的路径写不进去）请客户确认；拿到明确同意（confirmed:true）后才写；未获同意/通道不可用 → 不写盘、如实告知。（例外：`docs/su/`、`docs/contracts/` 为预授权目录——属初始写集，可直接写、无需确认。）
+未指定目标角色：请**据对话决定要建哪些角色**，逐一向客户确认后写出治理产物——`角色卡/<角色>/role-card.md`、`角色卡/<角色>/boundary.yaml`、`角色卡/<角色>/memo.md`。项目治理边界文档 `角色卡/governance-boundary.yaml` 由编排的自动收尾写出，无需你写。
+[tool_call] 模型请求调用 request_confirmation
+[accepted] request_confirmation：客户已确认「创建角色 X（请预览）」（confirmed:true；操作者：test-客户）——已获明确同意。可按已同意的内容继续（如写盘，写入须与向客户预览的内容一致）。
+[tool_call] 模型请求调用 write_file
+[accepted] write_file 已获准并落盘：角色卡/X/role-card.md（13 字节写入 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-confirm-1EGbRm/proj/角色卡/X/role-card.md）
+[tool_call] 模型请求调用 write_file
+[accepted] write_file 已获准并落盘：角色卡/X/boundary.yaml（20 字节写入 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-confirm-1EGbRm/proj/角色卡/X/boundary.yaml）
+[tool_call] 模型请求调用 write_file
+[accepted] write_file 已获准并落盘：角色卡/X/memo.md（14 字节写入 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-confirm-1EGbRm/proj/角色卡/X/memo.md）
+[settled] 会话结束
+✔ 确认：预览列出路径 + 客户同意 → 写入落盘 + 自动收尾（.ans/治理边界文档/manifest） (88.3085ms)
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-confirm-3oFjkA/proj
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/su/、docs/contracts/ 除外——属初始写集、无需确认可直接写；客户裁定 2026-10-16）。
+[message] 用户指令：任务 T-GOV-1：以治理身份在**项目治理边界**内工作。越出治理边界（`角色卡/`、`docs/`、`.ans/` 之外，如项目的 `src/`，或项目根以外）的写入会在写入之前被门禁拒绝。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（角色卡全文 + 边界摘要，**并列出将要写出的具体路径**——路径是发行凭据，没列出的路径写不进去）请客户确认；拿到明确同意（confirmed:true）后才写；未获同意/通道不可用 → 不写盘、如实告知。（例外：`docs/su/`、`docs/contracts/` 为预授权目录——属初始写集，可直接写、无需确认。）
+未指定目标角色：请**据对话决定要建哪些角色**，逐一向客户确认后写出治理产物——`角色卡/<角色>/role-card.md`、`角色卡/<角色>/boundary.yaml`、`角色卡/<角色>/memo.md`。项目治理边界文档 `角色卡/governance-boundary.yaml` 由编排的自动收尾写出，无需你写。
+[tool_call] 模型请求调用 request_confirmation
+[denied] request_confirmation：未获客户同意（原因：客户拒绝（不同意））→ 不要写盘；如实告知客户，不得假设同意。
+[tool_call] 模型请求调用 write_file
+[denied] 写入被拒绝：路径在角色边界内，但不在任务 writeSet 内（F4）：角色卡/X/role-card.md
+如需写入该路径，请先取得写盘许可：若你的工具集中有 request_confirmation（确认制会话），把该路径逐条列入其 preview 呈客户确认——客户返回 confirmed:true 后该路径会被发行进 writeSet，再重试写入即可；任务型会话请把该路径加入任务 writeSet（或改在 writeSet 内选路径）。注意：许可按会话生效——会话重建/重开后不会自动保留，需重新确认。
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）
+[tool_call] 模型请求调用 write_file
+[denied] 写入被拒绝：路径在角色边界内，但不在任务 writeSet 内（F4）：角色卡/X/boundary.yaml
+如需写入该路径，请先取得写盘许可：若你的工具集中有 request_confirmation（确认制会话），把该路径逐条列入其 preview 呈客户确认——客户返回 confirmed:true 后该路径会被发行进 writeSet，再重试写入即可；任务型会话请把该路径加入任务 writeSet（或改在 writeSet 内选路径）。注意：许可按会话生效——会话重建/重开后不会自动保留，需重新确认。
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）
+[tool_call] 模型请求调用 write_file
+[denied] 写入被拒绝：路径在角色边界内，但不在任务 writeSet 内（F4）：角色卡/X/memo.md
+如需写入该路径，请先取得写盘许可：若你的工具集中有 request_confirmation（确认制会话），把该路径逐条列入其 preview 呈客户确认——客户返回 confirmed:true 后该路径会被发行进 writeSet，再重试写入即可；任务型会话请把该路径加入任务 writeSet（或改在 writeSet 内选路径）。注意：许可按会话生效——会话重建/重开后不会自动保留，需重新确认。
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）
+[settled] 会话结束
+✔ 确认被拒：客户 declined → 不发行 → 写被拒、零收尾 (2.955708ms)
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-confirm-J4Wlqp/proj
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/su/、docs/contracts/ 除外——属初始写集、无需确认可直接写；客户裁定 2026-10-16）。
+[message] 用户指令：任务 T-GOV-1：以治理身份在**项目治理边界**内工作。越出治理边界（`角色卡/`、`docs/`、`.ans/` 之外，如项目的 `src/`，或项目根以外）的写入会在写入之前被门禁拒绝。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（角色卡全文 + 边界摘要，**并列出将要写出的具体路径**——路径是发行凭据，没列出的路径写不进去）请客户确认；拿到明确同意（confirmed:true）后才写；未获同意/通道不可用 → 不写盘、如实告知。（例外：`docs/su/`、`docs/contracts/` 为预授权目录——属初始写集，可直接写、无需确认。）
+未指定目标角色：请**据对话决定要建哪些角色**，逐一向客户确认后写出治理产物——`角色卡/<角色>/role-card.md`、`角色卡/<角色>/boundary.yaml`、`角色卡/<角色>/memo.md`。项目治理边界文档 `角色卡/governance-boundary.yaml` 由编排的自动收尾写出，无需你写。
+[tool_call] 模型请求调用 request_confirmation
+[denied] request_confirmation：未获客户同意（原因：无人值守）→ 不要写盘；如实告知客户，不得假设同意。
+[tool_call] 模型请求调用 write_file
+[denied] 写入被拒绝：路径在角色边界内，但不在任务 writeSet 内（F4）：角色卡/X/role-card.md
+如需写入该路径，请先取得写盘许可：若你的工具集中有 request_confirmation（确认制会话），把该路径逐条列入其 preview 呈客户确认——客户返回 confirmed:true 后该路径会被发行进 writeSet，再重试写入即可；任务型会话请把该路径加入任务 writeSet（或改在 writeSet 内选路径）。注意：许可按会话生效——会话重建/重开后不会自动保留，需重新确认。
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）
+[tool_call] 模型请求调用 write_file
+[denied] 写入被拒绝：路径在角色边界内，但不在任务 writeSet 内（F4）：角色卡/X/boundary.yaml
+如需写入该路径，请先取得写盘许可：若你的工具集中有 request_confirmation（确认制会话），把该路径逐条列入其 preview 呈客户确认——客户返回 confirmed:true 后该路径会被发行进 writeSet，再重试写入即可；任务型会话请把该路径加入任务 writeSet（或改在 writeSet 内选路径）。注意：许可按会话生效——会话重建/重开后不会自动保留，需重新确认。
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）
+[tool_call] 模型请求调用 write_file
+[denied] 写入被拒绝：路径在角色边界内，但不在任务 writeSet 内（F4）：角色卡/X/memo.md
+如需写入该路径，请先取得写盘许可：若你的工具集中有 request_confirmation（确认制会话），把该路径逐条列入其 preview 呈客户确认——客户返回 confirmed:true 后该路径会被发行进 writeSet，再重试写入即可；任务型会话请把该路径加入任务 writeSet（或改在 writeSet 内选路径）。注意：许可按会话生效——会话重建/重开后不会自动保留，需重新确认。
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）
+[settled] 会话结束
+✔ 通道不可用（无人值守等价）：不发行 → 写被拒、零收尾 (2.186458ms)
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-confirm-v5MeAS/proj
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/su/、docs/contracts/ 除外——属初始写集、无需确认可直接写；客户裁定 2026-10-16）。
+[message] 用户指令：任务 T-GOV-1：以治理身份在**项目治理边界**内工作。越出治理边界（`角色卡/`、`docs/`、`.ans/` 之外，如项目的 `src/`，或项目根以外）的写入会在写入之前被门禁拒绝。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（角色卡全文 + 边界摘要，**并列出将要写出的具体路径**——路径是发行凭据，没列出的路径写不进去）请客户确认；拿到明确同意（confirmed:true）后才写；未获同意/通道不可用 → 不写盘、如实告知。（例外：`docs/su/`、`docs/contracts/` 为预授权目录——属初始写集，可直接写、无需确认。）
+未指定目标角色：请**据对话决定要建哪些角色**，逐一向客户确认后写出治理产物——`角色卡/<角色>/role-card.md`、`角色卡/<角色>/boundary.yaml`、`角色卡/<角色>/memo.md`。项目治理边界文档 `角色卡/governance-boundary.yaml` 由编排的自动收尾写出，无需你写。
+[tool_call] 模型请求调用 request_confirmation
+[accepted] request_confirmation：客户已确认「创建角色 X」（confirmed:true；操作者：test-客户）——已获明确同意。可按已同意的内容继续（如写盘，写入须与向客户预览的内容一致）。
+[tool_call] 模型请求调用 write_file
+[accepted] write_file 已获准并落盘：角色卡/X/role-card.md（13 字节写入 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-confirm-v5MeAS/proj/角色卡/X/role-card.md）
+[tool_call] 模型请求调用 write_file
+[denied] 写入被拒绝：路径在角色边界内，但不在任务 writeSet 内（F4）：角色卡/X/boundary.yaml
+如需写入该路径，请先取得写盘许可：若你的工具集中有 request_confirmation（确认制会话），把该路径逐条列入其 preview 呈客户确认——客户返回 confirmed:true 后该路径会被发行进 writeSet，再重试写入即可；任务型会话请把该路径加入任务 writeSet（或改在 writeSet 内选路径）。注意：许可按会话生效——会话重建/重开后不会自动保留，需重新确认。
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: 角色卡/X/role-card.md
+[tool_call] 模型请求调用 write_file
+[denied] 写入被拒绝：路径在角色边界内，但不在任务 writeSet 内（F4）：角色卡/X/memo.md
+如需写入该路径，请先取得写盘许可：若你的工具集中有 request_confirmation（确认制会话），把该路径逐条列入其 preview 呈客户确认——客户返回 confirmed:true 后该路径会被发行进 writeSet，再重试写入即可；任务型会话请把该路径加入任务 writeSet（或改在 writeSet 内选路径）。注意：许可按会话生效——会话重建/重开后不会自动保留，需重新确认。
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: 角色卡/X/role-card.md
+[settled] 会话结束
+✔ 发行精确性：预览只列出 role-card.md → boundary.yaml 仍被拒（精确集合，不扩权） (8.287375ms)
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-confirm-syCS2F/proj
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/su/、docs/contracts/ 除外——属初始写集、无需确认可直接写；客户裁定 2026-10-16）。
+[message] 用户指令：任务 T-GOV-1：以治理身份在**项目治理边界**内工作。越出治理边界（`角色卡/`、`docs/`、`.ans/` 之外，如项目的 `src/`，或项目根以外）的写入会在写入之前被门禁拒绝。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（角色卡全文 + 边界摘要，**并列出将要写出的具体路径**——路径是发行凭据，没列出的路径写不进去）请客户确认；拿到明确同意（confirmed:true）后才写；未获同意/通道不可用 → 不写盘、如实告知。（例外：`docs/su/`、`docs/contracts/` 为预授权目录——属初始写集，可直接写、无需确认。）
+未指定目标角色：请**据对话决定要建哪些角色**，逐一向客户确认后写出治理产物——`角色卡/<角色>/role-card.md`、`角色卡/<角色>/boundary.yaml`、`角色卡/<角色>/memo.md`。项目治理边界文档 `角色卡/governance-boundary.yaml` 由编排的自动收尾写出，无需你写。
+[tool_call] 模型请求调用 request_confirmation
+[accepted] request_confirmation：客户已确认「创建角色 X（另附一份草稿文件）」（confirmed:true；操作者：test-客户）——已获明确同意。可按已同意的内容继续（如写盘，写入须与向客户预览的内容一致）。
+[tool_call] 模型请求调用 write_file
+[accepted] write_file 已获准并落盘：角色卡/X/role-card.md（13 字节写入 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-confirm-syCS2F/proj/角色卡/X/role-card.md）
+[tool_call] 模型请求调用 write_file
+[denied] 写入被拒绝：目标路径未匹配任何边界条目（根：project）：src/evil.ts
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: 角色卡, docs, .ans
+[settled] 会话结束
+✔ 越界不发行：预览里的 src/ 路径被校验拒绝（写集有界，非 blanket） (7.890542ms)
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/su/、docs/contracts/ 除外——属初始写集、无需确认可直接写；客户裁定 2026-10-16）。
+[message] 用户指令：任务 T-CONF：以治理身份在**项目治理边界**内工作。越出治理边界（`角色卡/`、`docs/`、`.ans/` 之外，如项目的 `src/`，或项目根以外）的写入会在写入之前被门禁拒绝。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（角色卡全文 + 边界摘要，**并列出将要写出的具体路径**——路径是发行凭据，没列出的路径写不进去）请客户确认；拿到明确同意（confirmed:true）后才写；未获同意/通道不可用 → 不写盘、如实告知。（例外：`docs/su/`、`docs/contracts/` 为预授权目录——属初始写集，可直接写、无需确认。）
+未指定目标角色：请**据对话决定要建哪些角色**，逐一向客户确认后写出治理产物——`角色卡/<角色>/role-card.md`、`角色卡/<角色>/boundary.yaml`、`角色卡/<角色>/memo.md`。项目治理边界文档 `角色卡/governance-boundary.yaml` 由编排的自动收尾写出，无需你写。
+[tool_call] 模型请求调用 request_confirmation
+[accepted] request_confirmation：客户已确认「创建角色 X（请预览）」（confirmed:true；操作者：test-客户）——已获明确同意。可按已同意的内容继续（如写盘，写入须与向客户预览的内容一致）。
+[tool_call] 模型请求调用 write_file
+[accepted] write_file 已获准并落盘：角色卡/X/role-card.md（13 字节写入 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-confirm-ZxgidT/proj/角色卡/X/role-card.md）
+[tool_call] 模型请求调用 write_file
+[accepted] write_file 已获准并落盘：角色卡/X/boundary.yaml（20 字节写入 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-confirm-ZxgidT/proj/角色卡/X/boundary.yaml）
+[tool_call] 模型请求调用 write_file
+[accepted] write_file 已获准并落盘：角色卡/X/memo.md（14 字节写入 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-confirm-ZxgidT/proj/角色卡/X/memo.md）
+[settled] 会话结束
+✔ gate 直断言：确认后已发行路径放行、未发行路径（同目录其它文件）仍拒 (53.776833ms)
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-confirm-UkDRFT/proj
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/su/、docs/contracts/ 除外——属初始写集、无需确认可直接写；客户裁定 2026-10-16）。
+[message] 用户指令：任务 T-GOV-1：以治理身份在**项目治理边界**内工作。越出治理边界（`角色卡/`、`docs/`、`.ans/` 之外，如项目的 `src/`，或项目根以外）的写入会在写入之前被门禁拒绝。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（角色卡全文 + 边界摘要，**并列出将要写出的具体路径**——路径是发行凭据，没列出的路径写不进去）请客户确认；拿到明确同意（confirmed:true）后才写；未获同意/通道不可用 → 不写盘、如实告知。（例外：`docs/su/`、`docs/contracts/` 为预授权目录——属初始写集，可直接写、无需确认。）
+未指定目标角色：请**据对话决定要建哪些角色**，逐一向客户确认后写出治理产物——`角色卡/<角色>/role-card.md`、`角色卡/<角色>/boundary.yaml`、`角色卡/<角色>/memo.md`。项目治理边界文档 `角色卡/governance-boundary.yaml` 由编排的自动收尾写出，无需你写。
+[tool_call] 模型请求调用 write_file
+[accepted] write_file 已获准并落盘：docs/su/memo.md（30 字节写入 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-confirm-UkDRFT/proj/docs/su/memo.md）
+[tool_call] 模型请求调用 write_file
+[accepted] write_file 已获准并落盘：docs/contracts/api-v1.md（24 字节写入 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-confirm-UkDRFT/proj/docs/contracts/api-v1.md）
+[tool_call] 模型请求调用 write_file
+[denied] 写入被拒绝：路径在角色边界内，但不在任务 writeSet 内（F4）：docs/其他.md
+如需写入该路径，请先取得写盘许可：若你的工具集中有 request_confirmation（确认制会话），把该路径逐条列入其 preview 呈客户确认——客户返回 confirmed:true 后该路径会被发行进 writeSet，再重试写入即可；任务型会话请把该路径加入任务 writeSet（或改在 writeSet 内选路径）。注意：许可按会话生效——会话重建/重开后不会自动保留，需重新确认。
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）
+[tool_call] 模型请求调用 write_file
+[denied] 写入被拒绝：路径在角色边界内，但不在任务 writeSet 内（F4）：角色卡/Y/role-card.md
+如需写入该路径，请先取得写盘许可：若你的工具集中有 request_confirmation（确认制会话），把该路径逐条列入其 preview 呈客户确认——客户返回 confirmed:true 后该路径会被发行进 writeSet，再重试写入即可；任务型会话请把该路径加入任务 writeSet（或改在 writeSet 内选路径）。注意：许可按会话生效——会话重建/重开后不会自动保留，需重新确认。
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: （无）
+[settled] 会话结束
+✔ su 预授权：docs/su/** 与 docs/contracts/** **不经 request_confirmation** 直接落盘；docs/ 其它与 角色卡/ 未确认仍被 F4 拒 (24.757958ms)
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/su/、docs/contracts/ 除外——属初始写集、无需确认可直接写；客户裁定 2026-10-16）。
+[message] 用户指令：任务 T-CHOICE：以治理身份在**项目治理边界**内工作。越出治理边界（`角色卡/`、`docs/`、`.ans/` 之外，如项目的 `src/`，或项目根以外）的写入会在写入之前被门禁拒绝。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（角色卡全文 + 边界摘要，**并列出将要写出的具体路径**——路径是发行凭据，没列出的路径写不进去）请客户确认；拿到明确同意（confirmed:true）后才写；未获同意/通道不可用 → 不写盘、如实告知。（例外：`docs/su/`、`docs/contracts/` 为预授权目录——属初始写集，可直接写、无需确认。）
+未指定目标角色：请**据对话决定要建哪些角色**，逐一向客户确认后写出治理产物——`角色卡/<角色>/role-card.md`、`角色卡/<角色>/boundary.yaml`、`角色卡/<角色>/memo.md`。项目治理边界文档 `角色卡/governance-boundary.yaml` 由编排的自动收尾写出，无需你写。
+[tool_call] 模型请求调用 request_choice
+[accepted] request_choice：客户已选择（操作者：test-客户）：a（选项 A）、c（选项 C）。请按客户的选择继续；**未选中的项不得擅自代选**。
+[settled] 会话结束
+✔ request_choice：多选勾选经通道回传（transcript 如实呈现客户选择） (1.895084ms)
+✔ parseChoiceInput：单选 `1`、多选 `1,3`；非法/重复/越界/空 → 拒绝 (0.548667ms)
+✔ createCliCustomerInput：y/n/空/EOF 与拖号选择；fail-closed (0.247167ms)
+✔ createCliCustomerInput（G-1）：**不设超时**——延迟作答仍生效；EOF → unavailable（fail-closed 不变） (508.946666ms)
+✔ formatCustomerInputPrompt：确认 y/n 提示；选择列出编号（含多选提示）；extractPathCandidates 提取路径 (0.290541ms)
+✔ extractDispatchReadPaths（G-1）：只认 workflow 与 contracts/*.md；workflow 置首、契约按首现序、去重 (0.884125ms)
+✔ extractDispatchReadPaths（G-1）：产物路径/其它 docs/非 .md/目录式/URL/绝对路径/契约目录之外的都不捕获 (0.135125ms)
+✔ extractDispatchReadPaths（G-1）：句尾 ASCII 标点剥离（role-card.md. 式）；空文本 → 空 (0.057167ms)
+✔ renderDispatchPrompt（G-1）：无引用 → 旧格式逐字不变（引用块是「加」出来的；去重键不受影响） (0.080958ms)
+✔ renderDispatchPrompt（G-1）：workflow+契约 → 逐行必读块（编号/缩进/哈希逐字/完成口令指向）；无授权语义 (0.094541ms)
+✔ renderDispatchPrompt（G-1）：仅契约 → 无 workflow 行、（未引用 workflow 时）完成句为旧句；多行 task 逐字保留 (0.042333ms)
+✔ renderDispatchPrompt（G-1）：workflow 缺失降级 → 块内如实标注、省略该行、不拒投口吻；有契约时契约照常编号 (0.040833ms)
+✔ renderDispatchPrompt（G-1）：标注与引用同路径矛盾 → 引用为准（探测后的事实），抑制标注、保留完成口令行 (0.033917ms)
+✔ planDispatchDelivery（G-1 单一来源复用）：全齐 → 放行；放行文本与 renderDispatchPrompt 逐字一致（无第二份渲染） (0.104875ms)
+✔ planDispatchDelivery（G-1）：契约缺失（未探测/`<missing>`/非法值）→ 拒投 + 逐字回执；**不产生可投递文本** (0.119917ms)
+✔ planDispatchDelivery（G-1）：多个契约缺失 → 报首现序第一个；workflow 也缺时拒投优先（契约 > 降级） (0.250708ms)
+✔ planDispatchDelivery（G-1）：仅 workflow 缺失 → 降级放行（不拒投）；编号重排；旧完成句；workflow 恢复后指向其在场版本 (6.591208ms)
+✔ planDispatchDelivery（G-1）：未引用任何必读 → 放行旧文案逐字；probes 多余项不参与、不影响 (1.230125ms)
+✔ planDispatchDelivery（G-1）：提取与整理保序——workflow 在文本后段出现也置首编号；哈希逐字透传 (0.821625ms)
+ans role run 用法错误：缺少角色 id；缺少 --task
+ans role run 用法错误：未知参数：--bogus
+ans role run 无法启动：缺少 project 配置：runRoleCommand 需由装配入口经 deps.project 注入默认演示配置（编排不持有配置副本；契约 §6 配置数据单一来源在装配）。
+ans role run 无法启动：缺少 scope 配置：runRoleCommand 需由装配入口经 deps.scope 注入任务写集（编排不持有配置副本；契约 §6 配置数据单一来源在装配）。
+ans role run 失败：未知角色：不存在的角色（未登记在 project.roles）
+ans role run 失败：未知角色：不存在的角色（未登记在 project.roles）
+✔ 退出码约定：0 = 成功；EXIT_USAGE / EXIT_FAILURE 均为非 0 (0.343541ms)
+✔ runRoleCommand 用法错误（空 argv：缺角色、缺 --task）→ 非 0 (0.304792ms)
+✔ runRoleCommand 未知参数 → 非 0 (0.059375ms)
+✔ runRoleCommand 缺少注入 project → 非 0 (0.059958ms)
+✔ runRoleCommand 缺少注入 scope → 非 0 (0.756875ms)
+✔ runRoleCommand 未知角色 → 非 0 (0.83475ms)
+✔ runRole 未知角色（未登记 project.roles）→ 非 0 (4.590542ms)
+ans role run 失败：边界解析失败：读取边界文件失败：ENOENT: no such file or directory, open '/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-bianpai-p96ekP/角色卡/X/boundary.yaml'
+✔ runRole 边界解析失败（boundary 文件缺失→parseError）→ 非 0 (3.577125ms)
+[message] 已解析角色 X（kind=project），角色卡：角色卡/X/role-card.md
+[message] 已解析边界，来源：角色卡/X/boundary.yaml；acceptance=accepted（来源：test:fixture）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T-1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+ans role run 会话失败：bindRole 故意失败
+✔ runRole bindRole 失败 → 非 0 (9.11225ms)
+[message] 已解析角色 X（kind=project），角色卡：角色卡/X/role-card.md
+[message] 已解析边界，来源：角色卡/X/boundary.yaml；acceptance=accepted（来源：test:fixture）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T-1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[settled] 完成
+✔ runRole 正常会话 → 0（对照基线） (7.397125ms)
+✔ 自动收尾：创世 su 会话 settle 后**自动**写出治理边界文档 + .ans(pin) + manifest；pin 与实算一致 (66.943416ms)
+✔ 自动收尾守卫：settle 但无可 pin 之物（无角色、无既存治理边界文档）→ 零副作用，不凭空转正 (6.77875ms)
+✔ 自动重 pin：首次收尾后再建角色 B → 下一轮 settle 自动纳入 pin（与磁盘重新一致） (51.326791ms)
+✔ 负例（单元）：边界不接受 → finalizeBootstrap 拒绝且零副作用 (2.46125ms)
+✔ finalizeBootstrap（单元）：写出治理边界文档 + .ans；pin 覆盖两者；无可 pin 之物 → 拒绝 (11.959416ms)
+✔ isGenesisState：无 .ans 为创世态；有 .ans 为非创世态 (8.744042ms)
+✔ openGovernanceSession：句柄含治理角色/边界来源/scope；gate 对项目治理边界求值 (16.648791ms)
+✔ openGovernanceSession：驱动句柄（send + 事件流）能建出 角色卡/X/ 并落盘 (64.220166ms)
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：test:fixture governance boundary）
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/su/、docs/contracts/ 除外——属初始写集、无需确认可直接写；客户裁定 2026-10-16）。（目标角色：X）
+[message] 用户指令：任务 T-ENG-1：以治理身份在**项目治理边界**内工作。越出治理边界（`角色卡/`、`docs/`、`.ans/` 之外，如项目的 `src/`，或项目根以外）的写入会在写入之前被门禁拒绝。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（角色卡全文 + 边界摘要，**并列出将要写出的具体路径**——路径是发行凭据，没列出的路径写不进去）请客户确认；拿到明确同意（confirmed:true）后才写；未获同意/通道不可用 → 不写盘、如实告知。（例外：`docs/su/`、`docs/contracts/` 为预授权目录——属初始写集，可直接写、无需确认。）
+具体改动要求：请为角色 X 建出标准骨架文件：角色卡/X/（role-card.md / boundary.yaml / memo.md）。先经 request_confirmation 预览（含这些路径）获客户确认，再写；未确认路径会被拒。
+[tool_call] 模型请求调用 request_confirmation
+[accepted] request_confirmation：客户已确认「建角色 X」（confirmed:true；操作者：test-客户）——已获明确同意。可按已同意的内容继续（如写盘，写入须与向客户预览的内容一致）。
+[tool_call] 模型请求调用 write_file
+[accepted] write_file 已获准并落盘：角色卡/X/role-card.md（13 字节写入 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-engine-0kGnHy/proj/角色卡/X/role-card.md）
+[settled] 会话结束
+✔ runGovernSession：CLI 前端复用同一引擎（同一边界来源/scope）并以码返回 (14.531791ms)
+✔ openGovernanceSession：不预建骨架（无 bootstrap 选项）→ 空项目上仍能开会话（创世种子边界） (1.135ms)
+✔ openGovernanceSession：targetDir 原样透传到句柄（供装配据它设 projectRoot / T33 finalize） (6.046458ms)
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：test:fixture governance boundary）
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/su/、docs/contracts/ 除外——属初始写集、无需确认可直接写；客户裁定 2026-10-16）。（目标角色：X）
+[message] 用户指令：任务 T-GOV-1：以治理身份在**项目治理边界**内工作。越出治理边界（`角色卡/`、`docs/`、`.ans/` 之外，如项目的 `src/`，或项目根以外）的写入会在写入之前被门禁拒绝。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（角色卡全文 + 边界摘要，**并列出将要写出的具体路径**——路径是发行凭据，没列出的路径写不进去）请客户确认；拿到明确同意（confirmed:true）后才写；未获同意/通道不可用 → 不写盘、如实告知。（例外：`docs/su/`、`docs/contracts/` 为预授权目录——属初始写集，可直接写、无需确认。）
+具体改动要求：请为角色 X 建出标准骨架文件：角色卡/X/（role-card.md / boundary.yaml / memo.md）。先经 request_confirmation 预览（含这些路径）获客户确认，再写；未确认路径会被拒。
+[tool_call] 模型请求调用 request_confirmation
+[accepted] request_confirmation：客户已确认「预览并请求确认」（confirmed:true；操作者：test-客户）——已获明确同意。可按已同意的内容继续（如写盘，写入须与向客户预览的内容一致）。
+[settled] 会话结束
+✔ 正例：客户确认（预览列出路径）→ 发行进 writeSet → 角色卡/X/… 可写；未确认路径仍 F4 拒 (21.087416ms)
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：test:fixture governance boundary）
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/su/、docs/contracts/ 除外——属初始写集、无需确认可直接写；客户裁定 2026-10-16）。（目标角色：X）
+[settled] 完成
+✔ 负例：治理会话写项目 src/ 或项目根以外 → 写之前被拒 (10.825458ms)
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：test:fixture governance boundary）
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/su/、docs/contracts/ 除外——属初始写集、无需确认可直接写；客户裁定 2026-10-16）。（目标角色：X）
+[message] 用户指令：任务 T-GOV-1：以治理身份在**项目治理边界**内工作。越出治理边界（`角色卡/`、`docs/`、`.ans/` 之外，如项目的 `src/`，或项目根以外）的写入会在写入之前被门禁拒绝。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（角色卡全文 + 边界摘要，**并列出将要写出的具体路径**——路径是发行凭据，没列出的路径写不进去）请客户确认；拿到明确同意（confirmed:true）后才写；未获同意/通道不可用 → 不写盘、如实告知。（例外：`docs/su/`、`docs/contracts/` 为预授权目录——属初始写集，可直接写、无需确认。）
+具体改动要求：请为角色 X 建出标准骨架文件：角色卡/X/（role-card.md / boundary.yaml / memo.md）。先经 request_confirmation 预览（含这些路径）获客户确认，再写；未确认路径会被拒。
+[tool_call] 模型请求调用 request_confirmation
+[accepted] request_confirmation：客户已确认「预览并请求确认」（confirmed:true；操作者：test-客户）——已获明确同意。可按已同意的内容继续（如写盘，写入须与向客户预览的内容一致）。
+[tool_call] 模型请求调用 write_file
+[accepted] write_file 已获准并落盘：角色卡/X/role-card.md（39 字节写入 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-govern-mcG97h/proj/角色卡/X/role-card.md）
+[tool_call] 模型请求调用 write_file
+[accepted] write_file 已获准并落盘：角色卡/X/boundary.yaml（83 字节写入 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-govern-mcG97h/proj/角色卡/X/boundary.yaml）
+[tool_call] 模型请求调用 write_file
+[accepted] write_file 已获准并落盘：角色卡/X/memo.md（14 字节写入 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-govern-mcG97h/proj/角色卡/X/memo.md）
+[settled] 会话结束
+✔ 正例：治理会话真落盘建 角色卡/X/ → listProject 能枚举到 X（无 parseError） (29.111709ms)
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：test:fixture governance boundary）
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/su/、docs/contracts/ 除外——属初始写集、无需确认可直接写；客户裁定 2026-10-16）。（目标角色：X）
+[message] 用户指令：任务 T-GOV-1：以治理身份在**项目治理边界**内工作。越出治理边界（`角色卡/`、`docs/`、`.ans/` 之外，如项目的 `src/`，或项目根以外）的写入会在写入之前被门禁拒绝。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（角色卡全文 + 边界摘要，**并列出将要写出的具体路径**——路径是发行凭据，没列出的路径写不进去）请客户确认；拿到明确同意（confirmed:true）后才写；未获同意/通道不可用 → 不写盘、如实告知。（例外：`docs/su/`、`docs/contracts/` 为预授权目录——属初始写集，可直接写、无需确认。）
+具体改动要求：请为角色 X 建出标准骨架文件：角色卡/X/（role-card.md / boundary.yaml / memo.md）。先经 request_confirmation 预览（含这些路径）获客户确认，再写；未确认路径会被拒。
+[tool_call] 模型请求调用 write_file
+[denied] 写入被拒绝：目标路径未匹配任何边界条目（根：project）：src/evil.ts
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: 角色卡, docs, .ans
+[settled] 会话结束
+✔ 负例：治理会话写项目 src/ → 写之前被拒、零副作用（不落盘、不建目录） (15.95775ms)
+ans govern 失败：治理边界解析失败：边界未通过 SHA-256 pin 校验：边界文件的 SHA-256 与 pin 不符：角色卡/governance-boundary.yaml
+错误：缺少注入配置（ConfigInjection）。ans govern 需由装配入口（src/index.ts）注入 project/configSource；编排不自备配置副本（契约 §6 配置数据单一来源在装配）。
+ans govern 用法错误：未知参数：--bogus
+用法：ans govern [<目录>] [--task <任务>] [--role <角色id>]… [--runtime demo|pi|codex|claude]
+ans govern 用法错误：选项 --task 缺少值
+用法：ans govern [<目录>] [--task <任务>] [--role <角色id>]… [--runtime demo|pi|codex|claude]
+✔ 负例：改治理边界文件致 pin 失配 → 拒写（命令非 0，不落盘） (3.722583ms)
+✔ governCommand：缺注入配置（ConfigInjection）→ 非 0 (0.851459ms)
+✔ governCommand：用法错误（未知参数 / 缺值）→ 非 0 (0.138458ms)
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：test:fixture governance boundary）
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/su/、docs/contracts/ 除外——属初始写集、无需确认可直接写；客户裁定 2026-10-16）。（目标角色：X）
+[message] 用户指令：任务 T-GOV-1：以治理身份在**项目治理边界**内工作。越出治理边界（`角色卡/`、`docs/`、`.ans/` 之外，如项目的 `src/`，或项目根以外）的写入会在写入之前被门禁拒绝。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（角色卡全文 + 边界摘要，**并列出将要写出的具体路径**——路径是发行凭据，没列出的路径写不进去）请客户确认；拿到明确同意（confirmed:true）后才写；未获同意/通道不可用 → 不写盘、如实告知。（例外：`docs/su/`、`docs/contracts/` 为预授权目录——属初始写集，可直接写、无需确认。）
+具体改动要求：请为角色 X 建出标准骨架文件：角色卡/X/（role-card.md / boundary.yaml / memo.md）。先经 request_confirmation 预览（含这些路径）获客户确认，再写；未确认路径会被拒。
+[tool_call] 模型请求调用 request_confirmation
+[accepted] request_confirmation：客户已确认「预览并请求确认」（confirmed:true；操作者：test-客户）——已获明确同意。可按已同意的内容继续（如写盘，写入须与向客户预览的内容一致）。
+[tool_call] 模型请求调用 write_file
+[accepted] write_file 已获准并落盘：角色卡/X/role-card.md（13 字节写入 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-govern-5lkP48/proj/角色卡/X/role-card.md）
+[tool_call] 模型请求调用 write_file
+[accepted] write_file 已获准并落盘：角色卡/X/boundary.yaml（83 字节写入 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-govern-5lkP48/proj/角色卡/X/boundary.yaml）
+[settled] 会话结束
+✔ governCommand：接收并使用注入配置 + 适配器 → 运行治理会话并落盘 (15.5155ms)
+✔ parseGovernArgs：可选位置参数解析为目标目录；缺省 undefined；第二个裸词计用法错误 (0.711292ms)
+✔ resolveGovernTargetDir：argv 位置参数优先，其次 deps.targetDir，都无则 undefined (0.135083ms)
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：test:fixture governance boundary）；目标目录 ./orders-service
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/su/、docs/contracts/ 除外——属初始写集、无需确认可直接写；客户裁定 2026-10-16）。（目标角色：X）
+[settled] 完成
+✔ 目标目录经 deps/会话输入传递：runGovernSession 原样带出 targetDir (3.784042ms)
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：test:fixture governance boundary）；目标目录 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-govern-pawQKm/proj
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/su/、docs/contracts/ 除外——属初始写集、无需确认可直接写；客户裁定 2026-10-16）。（目标角色：X）
+[message] 用户指令：任务 T-GOV-1：以治理身份在**项目治理边界**内工作。越出治理边界（`角色卡/`、`docs/`、`.ans/` 之外，如项目的 `src/`，或项目根以外）的写入会在写入之前被门禁拒绝。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（角色卡全文 + 边界摘要，**并列出将要写出的具体路径**——路径是发行凭据，没列出的路径写不进去）请客户确认；拿到明确同意（confirmed:true）后才写；未获同意/通道不可用 → 不写盘、如实告知。（例外：`docs/su/`、`docs/contracts/` 为预授权目录——属初始写集，可直接写、无需确认。）
+具体改动要求：请为角色 X 建出标准骨架文件：角色卡/X/（role-card.md / boundary.yaml / memo.md）。先经 request_confirmation 预览（含这些路径）获客户确认，再写；未确认路径会被拒。
+[tool_call] 模型请求调用 request_confirmation
+[accepted] request_confirmation：客户已确认「预览并请求确认」（confirmed:true；操作者：test-客户）——已获明确同意。可按已同意的内容继续（如写盘，写入须与向客户预览的内容一致）。
+[tool_call] 模型请求调用 write_file
+[accepted] write_file 已获准并落盘：角色卡/X/role-card.md（13 字节写入 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-govern-pawQKm/proj/角色卡/X/role-card.md）
+[settled] 会话结束
+✔ governCommand：接受位置参数目标目录（argv）→ 解析不报错并驱动会话 (32.97375ms)
+✔ 真实轮次事件交错仍分离文件证据；重复终局夹迟到事件也只回交一次 (2.323708ms)
+✔ failed 压过同轮较早 completed 报告，并保留中断前证据 (0.16725ms)
+✔ aborted 压过同轮较早 completed 报告，并保留中断前证据 (0.066625ms)
+✔ timed_out 压过同轮较早 completed 报告，并保留中断前证据 (0.07125ms)
+✔ 正常同轮正式报告原样优先，不混入工具事实；工具失败不形成fallback产物 (0.122292ms)
+✔ 无metadata旧替身每轮证据也清空；泛化写入完成不能充当成果 (0.164833ms)
+✔ events延迟至两次send结束后消费，报告仍按metadata关联且非法/迟到报告不覆盖 (11.226333ms)
+✔ 批次提示保留每份来源与完整证据，未知任务不冒充收齐；稳定key使用真实turnId (0.38025ms)
+✔ 回交诊断记录真实来源/状态，不记录任务正文与证据内容 (6.932958ms)
+✔ A4完整成功写入路径形成兜底证据；隐藏/截断与新summary/raw别名不能绕过 (0.451167ms)
+✔ buildTaskHandback：形状正确（roleId/taskId/status/summary/evidence/at） (1.376959ms)
+✔ buildTaskHandback：无写入被接受且有拒绝 → blocked；无 taskId 时省略该字段 (0.071708ms)
+✔ withHandback：透传 SessionEvent；在 settled **之前**发 handback 事件 (0.335541ms)
+✔ openRoleSession：普通角色 settle → 发出 handback（形状正确） (11.725166ms)
+✔ openRoleSession：内置治理角色（su）→ **不**自我回交（事件流无 handback） (5.772416ms)
+✔ buildTaskHandback（C-1 噪音修正）：证据只取写类 accepted；读事件（三种实际形状）一律不进证据 (0.16525ms)
+✔ normalizeTaskReport / buildReportHandback：合法报告取报告值（evidence 缺省 []）；非法 → undefined（回退） (0.114834ms)
+✔ withHandback（C-1）：收到报告 → 回交内容=报告值（即使与推导结论相反）；未见报告 → 回退推导 (0.140292ms)
+✔ openRoleSession（C-1）：项目角色注入 reportHandback；交报告 → handback=报告值；未交 → 回退推导（读事件不进证据） (5.668875ms)
+✔ openRoleSession（C-1）：治理角色 su 不注入 reportHandback（能力面为空；事件流无 handback） (2.553541ms)
+✔ F-3-d：settle detail `truncation:length` → terminal-fallback 摘要附「（截断：stopReason=length）」；有报告/无截断字段不附 (0.517792ms)
+✔ renderHandbackPrompt（E-1）：字段逐条 + 明示请验收；无任务号/无证据时如实呈现；不夹带权限语义 (0.253ms)
+✔ handbackKey（X-2 稳定键）：不含时间戳——同内容不同 at 恒等；角色/任务/轮次/内容任一不同即不同 (0.812917ms)
+✔ withHandback（X-2）：一轮**双 settled** → 恰一份回交；第二份 settled 仅透传（次序保持） (0.350417ms)
+✔ withHandback（X-2）：同轮三份 settled（其间无事件）→ 仍一份；真返工（两轮、文本逐字相同）→ 两份且键不同 (0.360791ms)
+✔ renderDispatchPrompt（H-1）：逐行文案；task 原文逐字保留；无 reason 不写原因段；不夹带授权语义 (0.205833ms)
+✔ isDispatchableRoleId（H-1）：登记项目角色 → true；su 自身/未登记/空 → false（fail-closed；快照语义如实） (1.024958ms)
+✔ openRoleSession（H-1）：dispatchTask **只给治理角色 su** 透传；项目角色会话不给；未给路由不注入 (4.065041ms)
+✔ formatDispatchReceipt（L-1）：目标忙 → 明写入队与位置（受理 ≠ 完成）；空闲 → 现状文案（未开则如实提示将自动开启） (0.213041ms)
+✔ L-1（到达序，假件驱动）：两条派发经同一目标队列 → 位置 1、2；出队按到达序 (0.087542ms)
+✔ parseRoleRunArgs 解析角色与任务（带 role/run 前导词） (0.57925ms)
+✔ parseRoleRunArgs 支持 --task= 形式且可省略前导词 (0.054875ms)
+✔ parseRoleRunArgs 解析 --runtime（两种写法），非法值记为用法错误 (0.349083ms)
+✔ parseRoleRunArgs 缺角色与缺 --task 记为用法错误（不再回退演示值） (0.173666ms)
+✔ parseRoleRunArgs 未知参数与多余裸词记为用法错误 (0.290042ms)
+✔ parseRoleRunArgs 选项缺值记为用法错误 (0.111833ms)
+✔ parseTaskId 取 --task，缺省回退 (0.097042ms)
+✔ requireProjectConfig 有注入值即原样返回 (0.37925ms)
+✔ requireProjectConfig 缺注入抛清晰错误（不回退演示副本） (0.374792ms)
+✔ requireTaskScope 缺注入抛清晰错误（不回退演示副本） (0.101167ms)
+✔ 夹具（模拟装配演示配置）六个角色且边界路径用 .yaml (0.127125ms)
+✔ 夹具任务写集是编排边界的子集 (0.038083ms)
+✔ formatEvent 拒绝事件按根分组列出允许路径 (0.093ms)
+✔ formatEvent 无 detail 时只输出一行 (0.024417ms)
+✔ actual bound source saves only final outcome; safe report/accepted-memory/unknown task and query keep origin (86.257125ms)
+✔ source save failure preserves terminal and snapshot; concurrent save retries run storage once and never prompt (27.359084ms)
+✔ actual disabled source remains live and creates no store; persistence updates unsubscribe with original handle (9.363959ms)
+✔ governance target keeps raw SDK input/images but stores safe text; history repair has no second Provider call (275.038291ms)
+✔ target input failure after real ACK and before Provider is preserved without automatic retry (41.552125ms)
+✔ A4 native-only pure wrapper keeps reader failure and actual facts protected with trusted custom key names (0.459292ms)
+✔ disabled live target preserves all-or-none optional delivery identity, safe input and no directories (8.768375ms)
+✔ custom adapter without bound persistence remains unknown-live and exposes only unsupported save proxies (5.623583ms)
+✔ O1 runtime values are the exact shared enum; govern validates explicit selection (0.967791ms)
+[message] 已解析角色 X（kind=project），角色卡：角色卡/X/role-card.md
+[message] 已解析边界，来源：角色卡/X/boundary.yaml；acceptance=accepted（来源：test:O1）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] 用户指令：任务 T：请在批准的写集内工作；越界或写集外的写入会在写入之前被门禁拒绝。
+具体改动要求：请编辑文件 src/a.ts，在其顶部新增一行注释「// [T] 受治理会话运行时确认」，并**用 write_file 或 edit_file 实际发起这次写入**（这是本任务可判定的验收点；不要只回答计划）。
+[settled] 会话结束
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/X/boundary.yaml；acceptance=accepted（来源：test:O1）
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/su/、docs/contracts/ 除外——属初始写集、无需确认可直接写；客户裁定 2026-10-16）。
+[message] 用户指令：任务 T-GOV-1：以治理身份在**项目治理边界**内工作。越出治理边界（`角色卡/`、`docs/`、`.ans/` 之外，如项目的 `src/`，或项目根以外）的写入会在写入之前被门禁拒绝。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（角色卡全文 + 边界摘要，**并列出将要写出的具体路径**——路径是发行凭据，没列出的路径写不进去）请客户确认；拿到明确同意（confirmed:true）后才写；未获同意/通道不可用 → 不写盘、如实告知。（例外：`docs/su/`、`docs/contracts/` 为预授权目录——属初始写集，可直接写、无需确认。）
+未指定目标角色：请**据对话决定要建哪些角色**，逐一向客户确认后写出治理产物——`角色卡/<角色>/role-card.md`、`角色卡/<角色>/boundary.yaml`、`角色卡/<角色>/memo.md`。项目治理边界文档 `角色卡/governance-boundary.yaml` 由编排的自动收尾写出，无需你写。
+[settled] 会话结束
+✔ O1 role/govern commands select demo through the actual Service and preserve capability rules (37.488209ms)
+[message] 已解析角色 X（kind=project），角色卡：角色卡/X/role-card.md
+[message] 已解析边界，来源：角色卡/X/boundary.yaml；acceptance=accepted（来源：test:O1）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] 用户指令：任务 T：请在批准的写集内工作；越界或写集外的写入会在写入之前被门禁拒绝。
+具体改动要求：请编辑文件 src/a.ts，在其顶部新增一行注释「// [T] 受治理会话运行时确认」，并**用 write_file 或 edit_file 实际发起这次写入**（这是本任务可判定的验收点；不要只回答计划）。
+[settled] 会话结束
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/X/boundary.yaml；acceptance=accepted（来源：test:O1）
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/su/、docs/contracts/ 除外——属初始写集、无需确认可直接写；客户裁定 2026-10-16）。
+[message] 用户指令：任务 T-GOV-1：以治理身份在**项目治理边界**内工作。越出治理边界（`角色卡/`、`docs/`、`.ans/` 之外，如项目的 `src/`，或项目根以外）的写入会在写入之前被门禁拒绝。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（角色卡全文 + 边界摘要，**并列出将要写出的具体路径**——路径是发行凭据，没列出的路径写不进去）请客户确认；拿到明确同意（confirmed:true）后才写；未获同意/通道不可用 → 不写盘、如实告知。（例外：`docs/su/`、`docs/contracts/` 为预授权目录——属初始写集，可直接写、无需确认。）
+未指定目标角色：请**据对话决定要建哪些角色**，逐一向客户确认后写出治理产物——`角色卡/<角色>/role-card.md`、`角色卡/<角色>/boundary.yaml`、`角色卡/<角色>/memo.md`。项目治理边界文档 `角色卡/governance-boundary.yaml` 由编排的自动收尾写出，无需你写。
+[settled] 会话结束
+✔ O1 role/govern commands select pi through the actual Service and preserve capability rules (7.011125ms)
+[message] 已解析角色 X（kind=project），角色卡：角色卡/X/role-card.md
+[message] 已解析边界，来源：角色卡/X/boundary.yaml；acceptance=accepted（来源：test:O1）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] 用户指令：任务 T：请在批准的写集内工作；越界或写集外的写入会在写入之前被门禁拒绝。
+具体改动要求：请编辑文件 src/a.ts，在其顶部新增一行注释「// [T] 受治理会话运行时确认」，并**用 write_file 或 edit_file 实际发起这次写入**（这是本任务可判定的验收点；不要只回答计划）。
+[settled] 会话结束
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/X/boundary.yaml；acceptance=accepted（来源：test:O1）
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/su/、docs/contracts/ 除外——属初始写集、无需确认可直接写；客户裁定 2026-10-16）。
+[message] 用户指令：任务 T-GOV-1：以治理身份在**项目治理边界**内工作。越出治理边界（`角色卡/`、`docs/`、`.ans/` 之外，如项目的 `src/`，或项目根以外）的写入会在写入之前被门禁拒绝。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（角色卡全文 + 边界摘要，**并列出将要写出的具体路径**——路径是发行凭据，没列出的路径写不进去）请客户确认；拿到明确同意（confirmed:true）后才写；未获同意/通道不可用 → 不写盘、如实告知。（例外：`docs/su/`、`docs/contracts/` 为预授权目录——属初始写集，可直接写、无需确认。）
+未指定目标角色：请**据对话决定要建哪些角色**，逐一向客户确认后写出治理产物——`角色卡/<角色>/role-card.md`、`角色卡/<角色>/boundary.yaml`、`角色卡/<角色>/memo.md`。项目治理边界文档 `角色卡/governance-boundary.yaml` 由编排的自动收尾写出，无需你写。
+[settled] 会话结束
+✔ O1 role/govern commands select codex through the actual Service and preserve capability rules (10.521625ms)
+[message] 已解析角色 X（kind=project），角色卡：角色卡/X/role-card.md
+[message] 已解析边界，来源：角色卡/X/boundary.yaml；acceptance=accepted（来源：test:O1）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] 用户指令：任务 T：请在批准的写集内工作；越界或写集外的写入会在写入之前被门禁拒绝。
+具体改动要求：请编辑文件 src/a.ts，在其顶部新增一行注释「// [T] 受治理会话运行时确认」，并**用 write_file 或 edit_file 实际发起这次写入**（这是本任务可判定的验收点；不要只回答计划）。
+[settled] 会话结束
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/X/boundary.yaml；acceptance=accepted（来源：test:O1）
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/su/、docs/contracts/ 除外——属初始写集、无需确认可直接写；客户裁定 2026-10-16）。
+[message] 用户指令：任务 T-GOV-1：以治理身份在**项目治理边界**内工作。越出治理边界（`角色卡/`、`docs/`、`.ans/` 之外，如项目的 `src/`，或项目根以外）的写入会在写入之前被门禁拒绝。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（角色卡全文 + 边界摘要，**并列出将要写出的具体路径**——路径是发行凭据，没列出的路径写不进去）请客户确认；拿到明确同意（confirmed:true）后才写；未获同意/通道不可用 → 不写盘、如实告知。（例外：`docs/su/`、`docs/contracts/` 为预授权目录——属初始写集，可直接写、无需确认。）
+未指定目标角色：请**据对话决定要建哪些角色**，逐一向客户确认后写出治理产物——`角色卡/<角色>/role-card.md`、`角色卡/<角色>/boundary.yaml`、`角色卡/<角色>/memo.md`。项目治理边界文档 `角色卡/governance-boundary.yaml` 由编排的自动收尾写出，无需你写。
+[settled] 会话结束
+ans role run 用法错误：未知运行时 unknown
+ans govern 用法错误：未知运行时 unknown
+✔ O1 role/govern commands select claude through the actual Service and preserve capability rules (16.158833ms)
+✔ O1 invalid injected runtime fails without constructing any engine (0.839792ms)
+[message] 已解析角色 X（kind=project），角色卡：角色卡/X/role-card.md
+[message] 已解析边界，来源：角色卡/X/boundary.yaml；acceptance=accepted（来源：test:O1）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T 未声明 scope（仅按角色边界，不做任务收窄）
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] 用户指令：任务 T：请在角色的授权边界内工作；越界写入会在写入之前被门禁拒绝。
+[settled] 会话结束
+[message] 已解析角色 X（kind=project），角色卡：角色卡/X/role-card.md
+[message] 已解析边界，来源：角色卡/X/boundary.yaml；acceptance=accepted（来源：test:O1）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T 未声明 scope（仅按角色边界，不做任务收窄）
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] 用户指令：任务 T：请在角色的授权边界内工作；越界写入会在写入之前被门禁拒绝。
+[settled] 会话结束
+✔ O1 actual write handler targets projectRoot; demo keeps legacy no-write behavior (14.099167ms)
+✔ O1 original confirmation waits → abort → old yes → next turn actual write remains denied (3.733917ms)
+[message] 已解析角色 X（kind=project），角色卡：角色卡/X/role-card.md
+[message] 已解析边界，来源：角色卡/X/boundary.yaml；acceptance=accepted（来源：test:O1）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T 未声明 scope（仅按角色边界，不做任务收窄）
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] 用户指令：任务 T：请在角色的授权边界内工作；越界写入会在写入之前被门禁拒绝。
+[settled] 本轮运行失败
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/X/boundary.yaml；acceptance=accepted（来源：test:O1）
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/su/、docs/contracts/ 除外——属初始写集、无需确认可直接写；客户裁定 2026-10-16）。
+[message] 用户指令：任务 T：以治理身份在**项目治理边界**内工作。越出治理边界（`角色卡/`、`docs/`、`.ans/` 之外，如项目的 `src/`，或项目根以外）的写入会在写入之前被门禁拒绝。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（角色卡全文 + 边界摘要，**并列出将要写出的具体路径**——路径是发行凭据，没列出的路径写不进去）请客户确认；拿到明确同意（confirmed:true）后才写；未获同意/通道不可用 → 不写盘、如实告知。（例外：`docs/su/`、`docs/contracts/` 为预授权目录——属初始写集，可直接写、无需确认。）
+未指定目标角色：请**据对话决定要建哪些角色**，逐一向客户确认后写出治理产物——`角色卡/<角色>/role-card.md`、`角色卡/<角色>/boundary.yaml`、`角色卡/<角色>/memo.md`。项目治理边界文档 `角色卡/governance-boundary.yaml` 由编排的自动收尾写出，无需你写。
+[settled] 本轮运行失败
+✔ O1 settled failed returns CLI failure for both role and govern (10.14ms)
+[message] 已解析角色 X（kind=project），角色卡：角色卡/X/role-card.md
+[message] 已解析边界，来源：角色卡/X/boundary.yaml；acceptance=accepted（来源：test:O1）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T 未声明 scope（仅按角色边界，不做任务收窄）
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] 用户指令：任务 T：请在角色的授权边界内工作；越界写入会在写入之前被门禁拒绝。
+[settled] 本轮已中止
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/X/boundary.yaml；acceptance=accepted（来源：test:O1）
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/su/、docs/contracts/ 除外——属初始写集、无需确认可直接写；客户裁定 2026-10-16）。
+[message] 用户指令：任务 T：以治理身份在**项目治理边界**内工作。越出治理边界（`角色卡/`、`docs/`、`.ans/` 之外，如项目的 `src/`，或项目根以外）的写入会在写入之前被门禁拒绝。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（角色卡全文 + 边界摘要，**并列出将要写出的具体路径**——路径是发行凭据，没列出的路径写不进去）请客户确认；拿到明确同意（confirmed:true）后才写；未获同意/通道不可用 → 不写盘、如实告知。（例外：`docs/su/`、`docs/contracts/` 为预授权目录——属初始写集，可直接写、无需确认。）
+未指定目标角色：请**据对话决定要建哪些角色**，逐一向客户确认后写出治理产物——`角色卡/<角色>/role-card.md`、`角色卡/<角色>/boundary.yaml`、`角色卡/<角色>/memo.md`。项目治理边界文档 `角色卡/governance-boundary.yaml` 由编排的自动收尾写出，无需你写。
+[settled] 本轮已中止
+✔ O1 settled aborted returns CLI failure for both role and govern (12.746167ms)
+[message] 已解析角色 X（kind=project），角色卡：角色卡/X/role-card.md
+[message] 已解析边界，来源：角色卡/X/boundary.yaml；acceptance=accepted（来源：test:O1）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T 未声明 scope（仅按角色边界，不做任务收窄）
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] 用户指令：任务 T：请在角色的授权边界内工作；越界写入会在写入之前被门禁拒绝。
+[settled] 本轮运行超时
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/X/boundary.yaml；acceptance=accepted（来源：test:O1）
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/su/、docs/contracts/ 除外——属初始写集、无需确认可直接写；客户裁定 2026-10-16）。
+[message] 用户指令：任务 T：以治理身份在**项目治理边界**内工作。越出治理边界（`角色卡/`、`docs/`、`.ans/` 之外，如项目的 `src/`，或项目根以外）的写入会在写入之前被门禁拒绝。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（角色卡全文 + 边界摘要，**并列出将要写出的具体路径**——路径是发行凭据，没列出的路径写不进去）请客户确认；拿到明确同意（confirmed:true）后才写；未获同意/通道不可用 → 不写盘、如实告知。（例外：`docs/su/`、`docs/contracts/` 为预授权目录——属初始写集，可直接写、无需确认。）
+未指定目标角色：请**据对话决定要建哪些角色**，逐一向客户确认后写出治理产物——`角色卡/<角色>/role-card.md`、`角色卡/<角色>/boundary.yaml`、`角色卡/<角色>/memo.md`。项目治理边界文档 `角色卡/governance-boundary.yaml` 由编排的自动收尾写出，无需你写。
+[settled] 本轮运行超时
+✔ O1 settled timed_out returns CLI failure for both role and govern (9.234ms)
+✔ O1 role/runtime store isolation and live native context getters; ANS history through Service facade (204.663708ms)
+✔ O1 governance forwards native getters and abort; reviewer retains source runtime and no persistence (22.684625ms)
+✔ O1 tool report metadata, terminal event and handback use the same actual Service turn (7.151875ms)
+ans role run 无法建立会话适配器：selected engine unavailable
+ans govern 无法建立会话适配器：selected engine unavailable
+✔ O1 shell arming creates its reviewer on source runtime with a verdict tool and no native shell (4.981709ms)
+✔ O1 provider selection failure returns nonzero without a fallback engine (3.861291ms)
+✔ selectAdapterFactory：pi 走注入的 piFactory（记录调用），不动 demo 工厂 (1.325458ms)
+✔ selectAdapterFactory：demo 原样沿用注入的 createAdapter，不触 pi (1.108ms)
+✔ selectAdapterFactory：pi 无注入探针时默认落到真实 createPiAdapterFactory（非 demo 工厂） (0.686625ms)
+[message] 已解析角色 X（kind=project），角色卡：角色卡/X/role-card.md
+[message] 已解析边界，来源：角色卡/X/boundary.yaml；acceptance=accepted（来源：test:fixture）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T-1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[settled] 完成
+✔ runRoleCommand：argv --runtime pi → 走到 pi 工厂（探针记录）→ 0 (10.271291ms)
+[message] 已解析角色 X（kind=project），角色卡：角色卡/X/role-card.md
+[message] 已解析边界，来源：角色卡/X/boundary.yaml；acceptance=accepted（来源：test:fixture）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T-1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[settled] 完成
+✔ runRoleCommand：注入 runtime=pi（无 argv 旗标）→ 走到 pi 工厂 → 0 (3.030709ms)
+[message] 已解析角色 X（kind=project），角色卡：角色卡/X/role-card.md
+[message] 已解析边界，来源：角色卡/X/boundary.yaml；acceptance=accepted（来源：test:fixture）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T-1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[settled] 完成
+✔ runRoleCommand：未指定 runtime → 默认 demo，沿注入 createAdapter，不触 pi (14.601333ms)
+[message] 已解析角色 X（kind=project），角色卡：角色卡/X/role-card.md
+[message] 已解析边界，来源：角色卡/X/boundary.yaml；acceptance=accepted（来源：test:fixture）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T-1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+ans role run 会话失败：缺少 Pi 凭据：prompt 阶段失败（无 API key）
+✔ runRoleCommand：--runtime pi 且适配器 prompt 缺凭据失败 → 非 0（EXIT_FAILURE） (7.87825ms)
+✔ P0-2 abort：会话有 abort ⇒ 透传（ok:true supported:true），不销毁会话，下一条照发 (9.200125ms)
+✔ P0-2 abort：会话 abort 为同步 void（契约允许 Promise<void>|void）⇒ ok:true supported:true (4.965291ms)
+✔ P0-2 abort：会话不带 abort（demo 替身形状）⇒ supported:false，如实文案，绝不假装已停 (7.487041ms)
+✔ P0-2 abort：SDK 报错 ⇒ ok:false supported:true，error 为错误原文（不吞、不谎报） (7.714ms)
+✔ P0-2 abort：假适配器（createFakeRuntimeAdapter，无 abort 字段）端到端 ⇒ supported:false 如实 (3.367916ms)
+✔ P0-1 send：opts 原样透传给 prompt(text, opts)——逐字相等且同一引用（不克隆） (2.04525ms)
+✔ P0-1 send：空数组 = 无图，同样原样透传（不吞字段） (2.30375ms)
+✔ P0-1 send：不传 opts ⇒ 旧行为逐字不变（prompt 恰 1 个实参） (3.49925ms)
+✔ 逐轮来源只由编排消费，真实ACK链回一次且图片数组原引用保留 (9.208417ms)
+✔ D-1：项目角色会话传入约定路径 `<projectRoot>/.ans/sessions/<roleId>/`；编排**不预建**目录 (13.504458ms)
+✔ D-1：治理角色 su 的会话**同样**拿到 sessionDir（「对每个角色」） (2.216209ms)
+✔ D-1：projectRoot 为空 → 不传 sessionDir（旧行为） (0.188417ms)
+✔ D-1：roleId 不安全（含路径分隔符 / ..）→ 不传 sessionDir（防御，防目录逃逸） (2.727666ms)
+[message] 已解析角色 X（kind=project），角色卡：角色卡/X/role-card.md
+[message] 已解析边界，来源：角色卡/X/boundary.yaml；acceptance=accepted（来源：test:fixture）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T-1 未声明 scope（仅按角色边界，不做任务收窄）
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[settled] 会话结束
+✔ D-1：一次性路径 runRole **不传**能力面（一局即止，无持久化/恢复语义） (4.623292ms)
+✔ openRoleSession：send 两次都生效，底层会话只建一次，dispose 收口且幂等 (18.827208ms)
+✔ openRoleSession：未知角色 → 抛错（句柄式接口无退出码） (4.386375ms)
+✔ openRoleSession：scope 可选——无 scope 仅按角色边界（允许），有 scope 才做 F4 收窄 (12.253917ms)
+ans role run 失败：未知角色：su（未登记在 project.roles）
+✔ openRoleSession：project.builtInRoles 声明 su → 内置角色可开（不抛错，建会话一次） (2.206708ms)
+✔ openRoleSession：未声明 builtInRoles → 同 roleId 被拒（未知角色） (2.304916ms)
+✔ runRole：即便配置声明了 builtInRoles，CLI 一次性路径仍拒绝内置角色（EXIT_USAGE） (5.708167ms)
+✔ F-5-opt1：queueModelNotice 的注记作为**下一轮输入前缀**送达并消费一次；失败且未开轮则保留；空串忽略 (21.17175ms)
+✔ F-5-opt1：该轮 prompt 失败且未开轮（无 ACK）→ 注记保留，下一轮重试仍带上 (7.483667ms)
+✔ su 预授权：确认制会话开局即可写 docs/su/** 与 docs/contracts/**（含子路径/绝对路径），零确认 (0.713959ms)
+✔ su 预授权严格边界：docs/ 其它路径与 角色卡/ 仍走确认（未确认 = F4 拒）；相近前缀不算覆盖；边界外照拒 (0.571708ms)
+✔ 非 su 角色无预授权：同为确认制会话，docs/su/memo.md 在角色 X 的边界内仍被 F4 拒 (2.481791ms)
+✔ su 静态 scope 会话同口径：预授权树并入初始 writeSet（scope 内照常、树外仍 F4 拒） (3.428ms)
+✔ 会话重建（新开会话）后预授权仍然生效——初始集合的一部分，不依赖发行器/前一句柄 (0.585333ms)
+[message] 已解析角色 X（kind=project），角色卡：角色卡/X/role-card.md
+[message] 已解析边界，来源：角色卡/X/boundary.yaml；acceptance=accepted（来源：test:fixture）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T-1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[settled] 完成
+✔ runRole 在事件流不自行结束时仍收敛返回（以 settled 为终止信号） (18.074125ms)
+[message] 已解析角色 X（kind=project），角色卡：角色卡/X/role-card.md
+[message] 已解析边界，来源：角色卡/X/boundary.yaml；acceptance=accepted（来源：test:fixture）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T-1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[settled] 完成
+✔ runRole 事件流自然结束（含 settled）也收敛，并 dispose 一次 (11.59325ms)
+[message] 已解析角色 X（kind=project），角色卡：角色卡/X/role-card.md
+[message] 已解析边界，来源：角色卡/X/boundary.yaml；acceptance=accepted（来源：test:fixture）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T-1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+ans role run 会话失败：prompt 故意失败
+✔ runRole 异常路径（prompt 抛错）→ 非 0，且仍 dispose (10.622958ms)
+[message] 已解析角色 X（kind=project），角色卡：角色卡/X/role-card.md
+[message] 已解析边界，来源：角色卡/X/boundary.yaml；acceptance=accepted（来源：test:fixture）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T-1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[settled] 完成
+ans role run 释放会话失败：dispose 故意失败
+✔ runRole dispose 出错：如实报并非 0（原成功被翻为失败） (15.126917ms)
+[message] 已解析角色 X（kind=project），角色卡：角色卡/X/role-card.md
+[message] 已解析边界，来源：角色卡/X/boundary.yaml；acceptance=accepted（来源：test:fixture）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T-1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+ans role run 会话失败：prompt 故意失败
+ans role run 释放会话失败：dispose 故意失败
+✔ runRole dispose 出错不掩盖原始错误（原已失败仍为非 0） (15.498458ms)
+[message] 已解析角色 X（kind=project），角色卡：角色卡/X/role-card.md
+[message] 已解析边界，来源：角色卡/X/boundary.yaml；acceptance=accepted（来源：test:fixture）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T-1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+ans role run 会话失败：缺少 base URL：测试构造失败
+✔ runRole 适配器构造期抛错（如缺 provider 配置）→ 非 0，无会话可释放 (2.236625ms)
+[message] 已解析角色 X（kind=project），角色卡：角色卡/X/role-card.md
+[message] 已解析边界，来源：角色卡/X/boundary.yaml；acceptance=accepted（来源：test:fixture）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T-1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[settled] 完成
+✔ runRole 任务提示词含指向 writeSet 内文件的**具体改动要求** (6.664125ms)
+✔ I-1：项目角色给 (a) 通道 ⇒ 装配并注入 ShellGate（注入即注册）；不给 ⇒ 无；su 给了也不 arm (66.646625ms)
+shell 闸审计未落盘：审计写被门禁拒绝：目标路径未匹配任何边界条目（根：project）：docs/audit/shell-gate.jsonl；已刷新边界快照重试一次，仍被拒：目标路径未匹配任何边界条目（根：project）：docs/audit/shell-gate.jsonl
+✔ I-1（c）：硬拒（re-shell）→ 不执行、不打扰 (b)/(a)；白名单 → 直接放行 (12.895333ms)
+shell 闸审计未落盘：审计写被门禁拒绝：目标路径未匹配任何边界条目（根：project）：docs/audit/shell-gate.jsonl；已刷新边界快照重试一次，仍被拒：目标路径未匹配任何边界条目（根：project）：docs/audit/shell-gate.jsonl
+✔ I-1（b/a）：review + (b) allow → 可达执行且不经 (a)；risky + (b) allow → 必过 (a)；a 拒 → 不执行 (11.362208ms)
+shell 闸审计未落盘：审计写被门禁拒绝：目标路径未匹配任何边界条目（根：project）：docs/audit/shell-gate.jsonl；已刷新边界快照重试一次，仍被拒：目标路径未匹配任何边界条目（根：project）：docs/audit/shell-gate.jsonl
+shell 闸审计未落盘：审计写被门禁拒绝：目标路径未匹配任何边界条目（根：project）：docs/audit/shell-gate.jsonl；已刷新边界快照重试一次，仍被拒：目标路径未匹配任何边界条目（根：project）：docs/audit/shell-gate.jsonl
+shell 闸审计未落盘：审计写被门禁拒绝：目标路径未匹配任何边界条目（根：project）：docs/audit/shell-gate.jsonl；已刷新边界快照重试一次，仍被拒：目标路径未匹配任何边界条目（根：project）：docs/audit/shell-gate.jsonl
+✔ I-1（b 不可解析 → **直接拒绝**（M-2，不进 (a)）；b 拿不准 → 升 (a)；(a) 不可用/超时 → 不执行（关窗等价，fail-closed） (56.772ms)
+✔ I-1：留痕——审计 sink 收到每条请求（command/判定/branch/by）；事件流含 run_shell 的 tool_call 与 denied (8.03675ms)
+✔ R-1 端到端：夹具模型经 shellVerdict 交回结构化结论 → 只读/测试类命令（review）放行、不打扰客户；审读会话不持久化 (4.680625ms)
+shell 闸审计未落盘：审计写被门禁拒绝：边界未被接受或缺少证据来源（F6）：拒绝一切写入。；已刷新边界快照重试一次，仍被拒：边界未被接受或缺少证据来源（F6）：拒绝一切写入。
+shell 闸审计已恢复落盘（此前未落盘 1 条）
+shell 闸审计未落盘：审计写被门禁拒绝：边界未被接受或缺少证据来源（F6）：拒绝一切写入。
+✔ F-6-T6 事故回归 E2E：创世过渡窗口内的未接受快照，在收尾落盘后自愈（审计刷新重试） (10.114625ms)
+✔ F-6-T6b（对照组·旧行为）：不注入刷新闭包时，收尾落盘后第二条仍不落盘 (2.072ms)
+shell 闸审计未落盘：审计写被门禁拒绝：边界未被接受或缺少证据来源（F6）：拒绝一切写入。；已刷新边界快照重试一次，仍被拒：边界未被接受或缺少证据来源（F6）：拒绝一切写入。
+shell 闸审计已恢复落盘（此前未落盘 1 条）
+✔ F-6-T7（su 只读档同接线）：未接受快照在收尾落盘后同样自愈 (10.617ms)
+✔ 宿主委托+b允许：npm test 放行且不重复询问a (8.889375ms)
+✔ 宿主委托+b允许：npm run typecheck 放行且不重复询问a (0.278375ms)
+✔ 宿主委托+b允许：node --test 放行且不重复询问a (4.821083ms)
+✔ 宿主委托+b允许：node --test test/编排/handback.test.ts 放行且不重复询问a (0.160334ms)
+✔ 宿主委托+b允许：node --test test/**/*.test.ts 放行且不重复询问a (0.14325ms)
+✔ 没有宿主委托或cwd项目不一致时，pm允许仍保留a (0.268375ms)
+✔ 分类为risky的非匹配node路径/flags不会借普通检查政策免a (0.338292ms)
+✔ 非精确常规检查不继承政策：npm install (0.420834ms)
+✔ 非精确常规检查不继承政策：npm ci (0.130041ms)
+✔ 非精确常规检查不继承政策：npm run arbitrary (0.162209ms)
+✔ 非精确常规检查不继承政策：npm test -- --update (0.102041ms)
+✔ 非精确常规检查不继承政策：rm -rf test (0.087041ms)
+✔ 非精确常规检查不继承政策：node --test ../outside.test.ts (0.105708ms)
+✔ 非精确常规检查不继承政策：node --test /outside.test.ts (4.301458ms)
+✔ 非精确常规检查不继承政策：node --test src/main.ts (0.142125ms)
+✔ 非精确常规检查不继承政策：node --test --import src/execute.ts (0.10275ms)
+✔ c硬拒组合即终结；su只读档即使误注入政策也不免审核 (0.099416ms)
+✔ 常规检查的b=deny 不会被宿主政策擅自允许 (0.066334ms)
+✔ 常规检查的b=invalid 不会被宿主政策擅自允许 (0.074709ms)
+✔ 常规检查的b=unsure 不会被宿主政策擅自允许 (0.080541ms)
+✔ 常规检查的b=error 不会被宿主政策擅自允许 (0.067292ms)
+✔ 常规检查的b=timeout 不会被宿主政策擅自允许 (24.04075ms)
+✔ node test外指符号链接路径不获委托；项目内测试路径获委托 (0.935292ms)
+✔ openRoleSession真正把宿主政策传到shell装配，su仍只读 (39.907333ms)
+✔ shell诊断明确委托来源与实际审核分支，不存命令/argv (3.927458ms)
+✔ allow → 放行（**不产出 token**），by 为 ruleset:<id>，审计记 c-allow (1.281333ms)
+✔ deny → 拒绝（硬拒终结），审计记 c-deny (0.151959ms)
+✔ review → 第一步**默认拒绝**（未接入 (b)/(a)，绝不因缺下一闸而放行） (0.17125ms)
+✔ review 对任意命令都默认拒绝（不因命令看似无害而放行） (0.120125ms)
+✔ 审核超时 → 拒绝（超时包装；退路 3） (31.5335ms)
+✔ 规则集加载失败 → 整条命令拒绝（绝不「规则没了就一律放行」） (0.326916ms)
+✔ 未注入 classifyShell → 一律拒绝（能力缺席即 fail-closed） (0.159417ms)
+✔ classifyShell 抛错 → 拒绝（保守，不把异常当放行） (0.216834ms)
+✔ 审计记录被追加到 docs/audit/shell-gate.jsonl，含要求字段且声明 shell-gate 条件 (4.399667ms)
+shell 闸审计未落盘：审计写被门禁拒绝：命中条件目录但缺少条件 `shell-gate`：任务未在 conditions 声明该条件（拒绝）：docs/audit/shell-gate.jsonl
+✔ 审计是追加式：两条记录追加为两行（不改写既有） (5.502167ms)
+✔ 硬要求负例：审计写门禁 scope **不含** shell-gate → 被门禁拒绝、零副作用（不落盘） (0.459292ms)
+shell 闸审计未落盘：审计写被门禁拒绝：边界未被接受或缺少证据来源（F6）：拒绝一切写入。
+✔ F-6-T1（刷新恢复）：未接受快照 + refreshGate 给出已接受边界 → 首查拒 → 重试落盘一条；此后直走新门禁 (2.136625ms)
+✔ F-6-T2（缺省无刷新 = 现状）：未接受快照、无 refreshGate → 拒且零副作用（不建目录、无文件） (0.588125ms)
+✔ F-6-T3（刷新仍拒）：refreshGate 返回另一份未接受边界 → 拒、零副作用、原因含两段事实且无猜测性归因 (0.229583ms)
+✔ F-6-T3b（刷新失败）：refreshGate 未取得门禁/抛错 → 维持拒绝、原因如实、零副作用 (0.201834ms)
+✔ F-6-T4（F-6-2 去重 + 如实话术）：同因仅报一次；变化/恢复/恢复后再失败各一行；判定不翻转 (0.129292ms)
+✔ F-4-X1：unavailable → 转达通道真实 reason（「确认超时」/「轮次中止」可辨）；缺原因走如实兜底，不再固定「无人值守？」 (0.251958ms)
+✔ buildShellGate（Pipeline 构造入口）→ 判定 + 自动审计落盘 docs/audit/shell-gate.jsonl (1.811417ms)
+✔ 注入路径：selectAdapterFactory 把编排构造的 shellGate 转发给 pi 工厂 (0.251916ms)
+✔ 注入路径：不传 shellGate → pi 工厂收到 undefined（run_shell 将不注册，fail-closed） (0.110041ms)
+✔ 只读档四档：allow → 执行；risky/review → readonly-deny（reason 写明命中档）；deny → c-deny (9.967625ms)
+✔ 只读档：注入 (b) pmAsk / (a) operatorChannel 也**从不调用**（一调用即抛错的桩；四档全覆盖） (0.237666ms)
+✔ 只读档 fail-closed：rules 未注入 ⇒ 一律拒绝（ruleset-load-failed）；classifyShell 未注入 ⇒ 一律拒绝 (19.522834ms)
+✔ 只读档审计：真落 docs/audit/shell-gate.jsonl（逐字命令 / branch / execution 恒「未执行」） (11.353042ms)
+✔ 只读档集成（门禁引擎实件）：ls/git status/node --version 放行；rm→readonly-deny；node --test→readonly-deny（不在白名单，本任务接受的现状）；sh -c→c-deny (6.842458ms)
+✔ run-role：su 给 shellReadonly ⇒ 只读档 gate 到达 adapter（run_shell 注册）；不给 ⇒ 不 arm（既有行为不变） (9.024833ms)
+✔ run-role：shellReadonly 与三层链同时出现 ⇒ readonly 优先（(a)/(b) 均不被调用） (6.299459ms)
+✔ run-role 端到端（假适配器事件流）：su 的 run_shell 请求经只读档判定——risky 进事件流为 denied、消息为「未执行」，绝不真跑 (9.960583ms)
+✔ (c) 白名单 → 放行，且**不经 (b)/(a)**（桩未被调用） (1.566583ms)
+✔ (c) 硬拒 → 拒绝、终结，**(b)/(a) 未被调用**（硬地板不可被翻案） (0.25375ms)
+✔ (c) review → 进 (b)；(b) 放行 → 放行（审计 b-allow，by 记 pm 会话/模型） (0.602291ms)
+✔ (c) review → (b) 拒绝 → 拒绝（审计 b-deny） (0.368833ms)
+✔ (b) 拿不准 → 升级 (a) → (a) 放行 = 放行（升级链 b-unsure→a-allow 可辨识） (0.594084ms)
+✔ (b) 审读超时 → 升级 (a)（分支 b-timeout→…；绝不视为放行） (21.642541ms)
+✔ (b) 无 pm 会话（未注入 pmAsk）→ 升级 (a)（分支 b-unavailable→…） (0.272541ms)
+✔ (b) 输出不可解析 → **直接拒绝**（M-2：fail-closed；**不升 (a)、不重试、不打扰客户**） (0.226042ms)
+✔ (b) 围栏包裹的合法 JSON → 解析容错照旧生效（提示收紧之外的解析侧容错仍在） (0.234292ms)
+✔ (b) 报错（会话打不开）→ 升级 (a)（分支 b-unavailable→…） (0.196375ms)
+✔ (a) 拒绝 → 拒绝（分支 b-unsure→a-deny） (0.113417ms)
+✔ (a) 通道不可用 → 转达通道真实 reason（F-4-X1）且拒绝 (0.103125ms)
+✔ (a) 确认超时 → 拒绝（分支 b-unsure→a-timeout） (21.33975ms)
+✔ (a) 通道未接入（注入了 (b) 但无 (a)）→ 拒绝（绝不视为放行） (0.289625ms)
+✔ 审计记录含 by 与 branch，且每层分支可辨识（c→b→a 逐层分别核对） (1.745333ms)
+✔ parsePmVerdict：合法/围栏/夹带文字/非法/缺字段/null 的解析 (0.683958ms)
+✔ createCliOperatorChannel：y→放行、n→拒绝、空/未识别→拒绝、EOF→不可用 (0.391625ms)
+✔ createPmReviewer：注入 openSession 桩 → 返回 pm 回复原文、发审核提示、收口 dispose (0.501666ms)
+✔ createPmReviewer：openSession 抛错 → 透传抛错（由 shell-gate 判 (b) 不可用 → 升级到 (a)） (2.375541ms)
+✔ defaultExtractReply：取最后一条 message（跳过「用户指令：」回显）；无 message → 空串 (0.064708ms)
+✔ R-1：审读者调工具 → 闸读到结构化 verdict 并按结论走（review+allow 放行；deny 拒；unsure/risky 升 (a)）；审读会话不持久化 (0.336875ms)
+✔ R-1：工具参数非法（verdict 不在域内）→ 视同未调用；无正文兜底 → b-unparseable-deny（fail-closed，不升 (a)） (0.065666ms)
+✔ R-1 降级路径：未调工具但正文写了 JSON → 文本宽松解析兜底仍生效（围栏亦可） (0.065417ms)
+✔ 次序表行 1：`allow` → **放行**，**不进 (b)/(a)**（桩未被调用） (1.337458ms)
+✔ 次序表行 2：`deny` → **终结拒**，**不进 (b)/(a)**（硬拒不可被翻案） (0.274ms)
+✔ 次序表行 3（review）：(b) 判放行 → **终结放行，(a) 未被调用**（不打扰人） (0.724541ms)
+✔ 次序表行 3（review）：(b) 判拒绝 → **终结拒绝，(a) 未被调用**（不打扰人） (0.463208ms)
+✔ 次序表行 3（review）：(b) 拿不准 → 升 (a)；(a) 放行 → 放行 (1.094416ms)
+✔ 次序表行 3（review）：(b) 拿不准 → 升 (a)；(a) 拒绝 → 拒绝 (0.321542ms)
+✔ ★次序表行 4（risky）要害：**(b) 判放行 + (a) 拒绝 → 最终拒绝**（pm 不是终审，客户才是） (0.14725ms)
+✔ ★次序表行 4（risky）：(b) 放行 + (a) 放行 → **放行，且 (a) 被调用过** (0.09875ms)
+✔ ★次序表行 4（risky）：**(b) 判拒绝 → 终结拒绝，且 (a) 未被调用**（pm 说不该跑就不打扰人） (0.104584ms)
+✔ 次序表行 4（risky）：(b) 拿不准 → 升 (a)；(a) 放行 → 放行 / (a) 拒绝 → 拒绝 (0.157917ms)
+✔ 次序表行 4（risky）：(b) **无会话**（未注入 pmAsk）→ 升 (a)；(a) 放行 → 放行 (0.069708ms)
+✔ 次序表行 4（risky）：(b) 审读**超时** → 升 (a)；(a) 拒绝 → 拒绝 (30.074334ms)
+✔ 次序表行 4（risky，M-2 改判）：(b) 输出**不可解析** → **直接拒绝**（fail-closed；**不升 (a)、不打扰客户**） (0.144292ms)
+✔ (a) 不可用 / 通道未接 / 确认超时 → **拒绝**（fail-closed，risky 亦不例外） (21.859834ms)
+✔ (c)=risky 且 (b)/(a) 均未接入 → 默认拒绝（fail-closed，分支 risky-default-deny） (0.140459ms)
+✔ (c)=review 且 (b)/(a) 均未接入 → 默认拒绝（分支 review-default-deny，未因本轮改动而变） (0.057042ms)
+✔ ★差别证明：同「(b) 判放行」下——review **不打扰人**；risky **必过 (a)**（唯一差别） (0.077458ms)
+✔ 集成：门禁引擎真判 `rm -rf build`=risky → (b) 放行 + (a) 拒绝 → **最终拒绝** (0.499625ms)
+✔ 集成：`sh -c "…"`（re-shell）门禁真判=deny → **终结拒，(b)/(a) 未被调用** (0.084209ms)
+✔ 集成：`ls -la` 门禁真判=allow → 放行，**不进 (b)/(a)** (0.096834ms)
+✔ 文首标记契约（U1 对齐）：三前缀与全部渲染输出满足 `[系统·<子类>] `+空白；中点为 U+00B7 (1.342333ms)
+✔ renderWatchdogAlert：投递排队积压逐行金文本（文首/信号/角色/事实/建议/纪律；事实如实拼接） (0.081209ms)
+✔ renderWatchdogAlert：四信号各有信号名与建议；#3 明确「通常无需动作」；空/空白事实剔除 (0.076125ms)
+✔ renderWatchdogAlert：事实为空 → 如实标注（不编造）；renderWatchdogRecovery / 风暴护栏逐字 (0.047666ms)
+✔ renderClosurePrompt：5 分钟逐字金文本（不强迫断言「完成」）；N 参数化；非法 N 回退批准默认值 (0.048542ms)
+✔ renderRecoveryReceipt：executed 逐行金文本；确认者 operator:<id>；时间可注入 (0.045458ms)
+✔ renderRecoveryReceipt：四值如实（declined/unsupported/error 不假装已执行；恰 executed 为已执行） (0.048042ms)
+✔ renderRecoveryReceipt：operatorId 缺省/空白 → operator:未知操作者；message 缺省不出现说明行；now 可注入 (0.04575ms)
+✔ WATCHDOG_PROMPT_GUIDELINES：三条纪律钉住（可自查／只提议不执行／不得据此假设写权） (0.050125ms)
+✔ openRoleSession（O1/G-2）：roleStatus / sessionTail / proposeRecovery **只给治理角色 su** 透传；项目角色不给；未给路由不注入 (37.786208ms)
+✔ 端到端（G-2/O1）：su 会话经真实装配注册三工具且 handler 直达注入实现；项目角色不注册 (43.370625ms)
+✔ 空参数 -> help (0.559334ms)
+✔ --help / -h / help -> help (0.057ms)
+✔ doctor -> doctor (0.034458ms)
+✔ role run 编排 --task T-1 -> role-run（argv 为指令后的剩余参数） (0.060875ms)
+✔ --task= 等号写法同样可解析 (0.036792ms)
+✔ role run 缺角色 / 缺 --task -> unknown (0.046125ms)
+✔ P1-4 配套：role run 见 -h/--help 整段放行 -> role-run（--task 缺失/存在均可） (0.06275ms)
+✔ 防放宽过度：无 help 时缺 --task 仍是 unknown「缺少 --task」；裸 help 令牌不放行 (0.07125ms)
+✔ govern 透传剩余参数 (0.04525ms)
+✔ init 子命令已移除 -> unknown（客户废除 init，见编排 T16） (0.066084ms)
+✔ 未知命令 -> unknown (1.082667ms)
+✔ ansProjectPath：项目根下 .ans/project.json (0.318459ms)
+✔ .ans 合法（带 pin）→ 注入 roles/governanceBoundary/acceptance，pin 保留 (6.753708ms)
+✔ .ans 声明 accepted:true 无 pin → 载入方置为未接受（fail-closed，§3.3） (1.157334ms)
+✔ 终态规则纯函数：accepted:true 无 pin → 降级；有 pin / accepted:false → 不变 (0.209291ms)
+✔ pin 与 hash 不符 → 载入层保留（pin 存在），引擎 verifyPins 判未接受 (8.406625ms)
+✔ .ans 合法且 pin 匹配 → 引擎解析后仍 accepted=true（对照） (3.297875ms)
+✔ 无 .ans/project.json → 回退入参 fallback（原样、不崩） (0.689375ms)
+✔ 无 .ans：role run 仍走内置演示配置（未放松，既有行为保持） (83.453917ms)
+✔ 内嵌配置含原六个及三个运行时角色的真实 card/boundary 映射 (1.390875ms)
+✔ projectRoot 解析到仓库根（含 package.json 与 src/index.ts） (0.198375ms)
+✔ T-1 的 writeSet 是演示角色“编排”边界的真子集（用于演示 F4） (45.968666ms)
+✔ 演示任务 scope 携带 conditions（门禁引擎新增字段），编排边界无 conditional-directory 故为空 (0.218167ms)
+✔ 演示脚本两笔写入分别演示 F5/F10 与 F4 (1.56875ms)
+✔ 边界接受证据如实标注演示来源，且不由程序自行判定 (1.61725ms)
+✔ 默认脚本：两笔越界写入都在写之前被拒，逐笔给出按根分组的允许路径 (0.468541ms)
+✔ 脚本事件顺序：先 tool_call，再判定，最后 settled (0.105167ms)
+✔ gate 允许时产出 accepted 且不发写入（替身不落盘） (0.074917ms)
+✔ resolveEntryTimeoutMs：默认 5 分钟，合法覆盖生效，非法值回退默认 (0.630375ms)
+✔ 入口确定性收敛：doctor 不挂起、以 0 退出、无 unsettled TLA 警告 (79.832792ms)
+✔ 入口退出码可靠：--help 以 0 退出 (74.096791ms)
+✔ 入口退出码可靠：无凭据的 pi 路径以非 0 退出（真实结果，非默认 0） (93.699542ms)
+✔ 入口退出码可靠：demo 路径以 0 退出且无警告 (248.198667ms)
+✔ loadInjection(目标目录) → 注入的 projectRoot 即该目录（绝对化） (3.163916ms)
+✔ loadInjection(相对路径) → 绝对化（相对 cwd） (73.932375ms)
+✔ loadInjection() 缺省 → projectRoot 仍为 ans-cli 自身（行为不变） (0.374792ms)
+✔ loadInjection(空目录) → 不注入 ans-cli 自身的演示数据；带 CLI 操作的创世授权（genesisBootstrap） (0.706667ms)
+✔ loadInjection(ans-cli 根，显式给出) → 与缺省同款：演示配置原样（自身行为逐字不变） (0.333792ms)
+✔ 目标目录含 .ans/project.json → 角色载入，projectRoot 仍取目标目录 (8.362417ms)
+✔ 显式目标目录优先于 .ans 自带的 projectRoot (13.24225ms)
+✔ ans govern <不存在的目录> → 明确报错、非 0，不静默回退到 ans-cli (0.475375ms)
+✔ ans govern <非目录（文件）> → 明确报错、非 0 (0.249ms)
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-govern-target-gSh4DG/ok-LhEuhd
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/su/、docs/contracts/ 除外——属初始写集、无需确认可直接写；客户裁定 2026-10-16）。
+[message] 用户指令：任务 T-GOV-1：以治理身份在**项目治理边界**内工作。越出治理边界（`角色卡/`、`docs/`、`.ans/` 之外，如项目的 `src/`，或项目根以外）的写入会在写入之前被门禁拒绝。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（角色卡全文 + 边界摘要，**并列出将要写出的具体路径**——路径是发行凭据，没列出的路径写不进去）请客户确认；拿到明确同意（confirmed:true）后才写；未获同意/通道不可用 → 不写盘、如实告知。（例外：`docs/su/`、`docs/contracts/` 为预授权目录——属初始写集，可直接写、无需确认。）
+未指定目标角色：请**据对话决定要建哪些角色**，逐一向客户确认后写出治理产物——`角色卡/<角色>/role-card.md`、`角色卡/<角色>/boundary.yaml`、`角色卡/<角色>/memo.md`。项目治理边界文档 `角色卡/governance-boundary.yaml` 由编排的自动收尾写出，无需你写。
+[tool_call] 模型请求调用 request_confirmation
+[accepted] request_confirmation：客户已确认「确认写出角色 X 的骨架文件」（confirmed:true；操作者：test:装配放行桩）——已获明确同意。可按已同意的内容继续（如写盘，写入须与向客户预览的内容一致）。
+[tool_call] 模型请求调用 write_file
+[accepted] write_file 已获准并落盘：角色卡/X/role-card.md（13 字节写入 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-govern-target-gSh4DG/ok-LhEuhd/角色卡/X/role-card.md）
+[tool_call] 模型请求调用 write_file
+[accepted] write_file 已获准并落盘：角色卡/X/boundary.yaml（20 字节写入 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-govern-target-gSh4DG/ok-LhEuhd/角色卡/X/boundary.yaml）
+[settled] 会话结束
+✔ ans govern <空目录>（经 governCommand + 假适配器）→ EXIT_OK，边界解析不再失败，创世授权下 su 骨架写入真落盘 (31.771834ms)
+✔ ans govern <存在的目录>（main 入口；环境已清空 Pi 配置）→ 目录校验放行、不再报边界解析失败；如实非 0 报缺 provider 配置 (2.897083ms)
+✔ doctor 显示运行时来源（env ANS_RUNTIME=pi） (0.3395ms)
+✔ --help 显示当前运行时选择（命令行来源，压过默认） (0.073666ms)
+✔ 无效 --runtime 值返回 2 并非 0 报错 (0.042333ms)
+✔ role run 选 pi 且无凭据时非 0 退出、如实报错、绝不退回 demo (0.131375ms)
+✔ runtime resolution preserves each command default and explicit selection priority (0.575041ms)
+[message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md
+[message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] 用户指令：任务 B1：请在批准的写集内工作；越界或写集外的写入会在写入之前被门禁拒绝。
+具体改动要求：请编辑文件 src/interface/cli/run.ts，在其顶部新增一行注释「// [B1] 受治理会话运行时确认」，并**用 write_file 或 edit_file 实际发起这次写入**（这是本任务可判定的验收点；不要只回答计划）。
+[message] offline factory:demo
+[settled] 会话结束
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-assembly-b1-kdrfXb
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/su/、docs/contracts/ 除外——属初始写集、无需确认可直接写；客户裁定 2026-10-16）。
+[message] 用户指令：任务 B1：以治理身份在**项目治理边界**内工作。越出治理边界（`角色卡/`、`docs/`、`.ans/` 之外，如项目的 `src/`，或项目根以外）的写入会在写入之前被门禁拒绝。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（角色卡全文 + 边界摘要，**并列出将要写出的具体路径**——路径是发行凭据，没列出的路径写不进去）请客户确认；拿到明确同意（confirmed:true）后才写；未获同意/通道不可用 → 不写盘、如实告知。（例外：`docs/su/`、`docs/contracts/` 为预授权目录——属初始写集，可直接写、无需确认。）
+未指定目标角色：请**据对话决定要建哪些角色**，逐一向客户确认后写出治理产物——`角色卡/<角色>/role-card.md`、`角色卡/<角色>/boundary.yaml`、`角色卡/<角色>/memo.md`。项目治理边界文档 `角色卡/governance-boundary.yaml` 由编排的自动收尾写出，无需你写。
+[message] offline factory:demo
+[settled] 会话结束
+[message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md
+[message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] 用户指令：任务 B1：请在批准的写集内工作；越界或写集外的写入会在写入之前被门禁拒绝。
+具体改动要求：请编辑文件 src/interface/cli/run.ts，在其顶部新增一行注释「// [B1] 受治理会话运行时确认」，并**用 write_file 或 edit_file 实际发起这次写入**（这是本任务可判定的验收点；不要只回答计划）。
+[message] offline factory:demo
+[settled] 会话结束
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-assembly-b1-kdrfXb
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/su/、docs/contracts/ 除外——属初始写集、无需确认可直接写；客户裁定 2026-10-16）。
+[message] 用户指令：任务 B1：以治理身份在**项目治理边界**内工作。越出治理边界（`角色卡/`、`docs/`、`.ans/` 之外，如项目的 `src/`，或项目根以外）的写入会在写入之前被门禁拒绝。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（角色卡全文 + 边界摘要，**并列出将要写出的具体路径**——路径是发行凭据，没列出的路径写不进去）请客户确认；拿到明确同意（confirmed:true）后才写；未获同意/通道不可用 → 不写盘、如实告知。（例外：`docs/su/`、`docs/contracts/` 为预授权目录——属初始写集，可直接写、无需确认。）
+未指定目标角色：请**据对话决定要建哪些角色**，逐一向客户确认后写出治理产物——`角色卡/<角色>/role-card.md`、`角色卡/<角色>/boundary.yaml`、`角色卡/<角色>/memo.md`。项目治理边界文档 `角色卡/governance-boundary.yaml` 由编排的自动收尾写出，无需你写。
+[message] offline factory:demo
+[settled] 会话结束
+✔ root flag and env reach demo through actual Interface/Pipeline/Service handlers in both commands (149.876125ms)
+[message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md
+[message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] 用户指令：任务 B1：请在批准的写集内工作；越界或写集外的写入会在写入之前被门禁拒绝。
+具体改动要求：请编辑文件 src/interface/cli/run.ts，在其顶部新增一行注释「// [B1] 受治理会话运行时确认」，并**用 write_file 或 edit_file 实际发起这次写入**（这是本任务可判定的验收点；不要只回答计划）。
+[message] offline factory:pi
+[settled] 会话结束
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-assembly-b1-ZWr4sf
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/su/、docs/contracts/ 除外——属初始写集、无需确认可直接写；客户裁定 2026-10-16）。
+[message] 用户指令：任务 B1：以治理身份在**项目治理边界**内工作。越出治理边界（`角色卡/`、`docs/`、`.ans/` 之外，如项目的 `src/`，或项目根以外）的写入会在写入之前被门禁拒绝。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（角色卡全文 + 边界摘要，**并列出将要写出的具体路径**——路径是发行凭据，没列出的路径写不进去）请客户确认；拿到明确同意（confirmed:true）后才写；未获同意/通道不可用 → 不写盘、如实告知。（例外：`docs/su/`、`docs/contracts/` 为预授权目录——属初始写集，可直接写、无需确认。）
+未指定目标角色：请**据对话决定要建哪些角色**，逐一向客户确认后写出治理产物——`角色卡/<角色>/role-card.md`、`角色卡/<角色>/boundary.yaml`、`角色卡/<角色>/memo.md`。项目治理边界文档 `角色卡/governance-boundary.yaml` 由编排的自动收尾写出，无需你写。
+[message] offline factory:pi
+[settled] 会话结束
+[message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md
+[message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] 用户指令：任务 B1：请在批准的写集内工作；越界或写集外的写入会在写入之前被门禁拒绝。
+具体改动要求：请编辑文件 src/interface/cli/run.ts，在其顶部新增一行注释「// [B1] 受治理会话运行时确认」，并**用 write_file 或 edit_file 实际发起这次写入**（这是本任务可判定的验收点；不要只回答计划）。
+[message] offline factory:pi
+[settled] 会话结束
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-assembly-b1-ZWr4sf
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/su/、docs/contracts/ 除外——属初始写集、无需确认可直接写；客户裁定 2026-10-16）。
+[message] 用户指令：任务 B1：以治理身份在**项目治理边界**内工作。越出治理边界（`角色卡/`、`docs/`、`.ans/` 之外，如项目的 `src/`，或项目根以外）的写入会在写入之前被门禁拒绝。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（角色卡全文 + 边界摘要，**并列出将要写出的具体路径**——路径是发行凭据，没列出的路径写不进去）请客户确认；拿到明确同意（confirmed:true）后才写；未获同意/通道不可用 → 不写盘、如实告知。（例外：`docs/su/`、`docs/contracts/` 为预授权目录——属初始写集，可直接写、无需确认。）
+未指定目标角色：请**据对话决定要建哪些角色**，逐一向客户确认后写出治理产物——`角色卡/<角色>/role-card.md`、`角色卡/<角色>/boundary.yaml`、`角色卡/<角色>/memo.md`。项目治理边界文档 `角色卡/governance-boundary.yaml` 由编排的自动收尾写出，无需你写。
+[message] offline factory:pi
+[settled] 会话结束
+✔ root flag and env reach pi through actual Interface/Pipeline/Service handlers in both commands (81.303292ms)
+[message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md
+[message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] 用户指令：任务 B1：请在批准的写集内工作；越界或写集外的写入会在写入之前被门禁拒绝。
+具体改动要求：请编辑文件 src/interface/cli/run.ts，在其顶部新增一行注释「// [B1] 受治理会话运行时确认」，并**用 write_file 或 edit_file 实际发起这次写入**（这是本任务可判定的验收点；不要只回答计划）。
+[message] offline factory:codex
+[settled] 会话结束
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-assembly-b1-yqT6Ah
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/su/、docs/contracts/ 除外——属初始写集、无需确认可直接写；客户裁定 2026-10-16）。
+[message] 用户指令：任务 B1：以治理身份在**项目治理边界**内工作。越出治理边界（`角色卡/`、`docs/`、`.ans/` 之外，如项目的 `src/`，或项目根以外）的写入会在写入之前被门禁拒绝。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（角色卡全文 + 边界摘要，**并列出将要写出的具体路径**——路径是发行凭据，没列出的路径写不进去）请客户确认；拿到明确同意（confirmed:true）后才写；未获同意/通道不可用 → 不写盘、如实告知。（例外：`docs/su/`、`docs/contracts/` 为预授权目录——属初始写集，可直接写、无需确认。）
+未指定目标角色：请**据对话决定要建哪些角色**，逐一向客户确认后写出治理产物——`角色卡/<角色>/role-card.md`、`角色卡/<角色>/boundary.yaml`、`角色卡/<角色>/memo.md`。项目治理边界文档 `角色卡/governance-boundary.yaml` 由编排的自动收尾写出，无需你写。
+[message] offline factory:codex
+[settled] 会话结束
+[message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md
+[message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] 用户指令：任务 B1：请在批准的写集内工作；越界或写集外的写入会在写入之前被门禁拒绝。
+具体改动要求：请编辑文件 src/interface/cli/run.ts，在其顶部新增一行注释「// [B1] 受治理会话运行时确认」，并**用 write_file 或 edit_file 实际发起这次写入**（这是本任务可判定的验收点；不要只回答计划）。
+[message] offline factory:codex
+[settled] 会话结束
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-assembly-b1-yqT6Ah
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/su/、docs/contracts/ 除外——属初始写集、无需确认可直接写；客户裁定 2026-10-16）。
+[message] 用户指令：任务 B1：以治理身份在**项目治理边界**内工作。越出治理边界（`角色卡/`、`docs/`、`.ans/` 之外，如项目的 `src/`，或项目根以外）的写入会在写入之前被门禁拒绝。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（角色卡全文 + 边界摘要，**并列出将要写出的具体路径**——路径是发行凭据，没列出的路径写不进去）请客户确认；拿到明确同意（confirmed:true）后才写；未获同意/通道不可用 → 不写盘、如实告知。（例外：`docs/su/`、`docs/contracts/` 为预授权目录——属初始写集，可直接写、无需确认。）
+未指定目标角色：请**据对话决定要建哪些角色**，逐一向客户确认后写出治理产物——`角色卡/<角色>/role-card.md`、`角色卡/<角色>/boundary.yaml`、`角色卡/<角色>/memo.md`。项目治理边界文档 `角色卡/governance-boundary.yaml` 由编排的自动收尾写出，无需你写。
+[message] offline factory:codex
+[settled] 会话结束
+✔ root flag and env reach codex through actual Interface/Pipeline/Service handlers in both commands (33.895666ms)
+[message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md
+[message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] 用户指令：任务 B1：请在批准的写集内工作；越界或写集外的写入会在写入之前被门禁拒绝。
+具体改动要求：请编辑文件 src/interface/cli/run.ts，在其顶部新增一行注释「// [B1] 受治理会话运行时确认」，并**用 write_file 或 edit_file 实际发起这次写入**（这是本任务可判定的验收点；不要只回答计划）。
+[message] offline factory:claude
+[settled] 会话结束
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-assembly-b1-PSBdSB
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/su/、docs/contracts/ 除外——属初始写集、无需确认可直接写；客户裁定 2026-10-16）。
+[message] 用户指令：任务 B1：以治理身份在**项目治理边界**内工作。越出治理边界（`角色卡/`、`docs/`、`.ans/` 之外，如项目的 `src/`，或项目根以外）的写入会在写入之前被门禁拒绝。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（角色卡全文 + 边界摘要，**并列出将要写出的具体路径**——路径是发行凭据，没列出的路径写不进去）请客户确认；拿到明确同意（confirmed:true）后才写；未获同意/通道不可用 → 不写盘、如实告知。（例外：`docs/su/`、`docs/contracts/` 为预授权目录——属初始写集，可直接写、无需确认。）
+未指定目标角色：请**据对话决定要建哪些角色**，逐一向客户确认后写出治理产物——`角色卡/<角色>/role-card.md`、`角色卡/<角色>/boundary.yaml`、`角色卡/<角色>/memo.md`。项目治理边界文档 `角色卡/governance-boundary.yaml` 由编排的自动收尾写出，无需你写。
+[message] offline factory:claude
+[settled] 会话结束
+[message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md
+[message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] 用户指令：任务 B1：请在批准的写集内工作；越界或写集外的写入会在写入之前被门禁拒绝。
+具体改动要求：请编辑文件 src/interface/cli/run.ts，在其顶部新增一行注释「// [B1] 受治理会话运行时确认」，并**用 write_file 或 edit_file 实际发起这次写入**（这是本任务可判定的验收点；不要只回答计划）。
+[message] offline factory:claude
+[settled] 会话结束
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-assembly-b1-PSBdSB
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/su/、docs/contracts/ 除外——属初始写集、无需确认可直接写；客户裁定 2026-10-16）。
+[message] 用户指令：任务 B1：以治理身份在**项目治理边界**内工作。越出治理边界（`角色卡/`、`docs/`、`.ans/` 之外，如项目的 `src/`，或项目根以外）的写入会在写入之前被门禁拒绝。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（角色卡全文 + 边界摘要，**并列出将要写出的具体路径**——路径是发行凭据，没列出的路径写不进去）请客户确认；拿到明确同意（confirmed:true）后才写；未获同意/通道不可用 → 不写盘、如实告知。（例外：`docs/su/`、`docs/contracts/` 为预授权目录——属初始写集，可直接写、无需确认。）
+未指定目标角色：请**据对话决定要建哪些角色**，逐一向客户确认后写出治理产物——`角色卡/<角色>/role-card.md`、`角色卡/<角色>/boundary.yaml`、`角色卡/<角色>/memo.md`。项目治理边界文档 `角色卡/governance-boundary.yaml` 由编排的自动收尾写出，无需你写。
+[message] offline factory:claude
+[settled] 会话结束
+✔ root flag and env reach claude through actual Interface/Pipeline/Service handlers in both commands (56.062ms)
+[message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md
+[message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] 用户指令：任务 B1：请在批准的写集内工作；越界或写集外的写入会在写入之前被门禁拒绝。
+具体改动要求：请编辑文件 src/interface/cli/run.ts，在其顶部新增一行注释「// [B1] 受治理会话运行时确认」，并**用 write_file 或 edit_file 实际发起这次写入**（这是本任务可判定的验收点；不要只回答计划）。
+[message] offline factory:demo
+[settled] 会话结束
+[message] 治理会话：内置治理角色 su，边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-assembly-default-gY5tZs
+[message] 客户确认制：su 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/su/、docs/contracts/ 除外——属初始写集、无需确认可直接写；客户裁定 2026-10-16）。
+[message] 用户指令：任务 T-GOV-1：以治理身份在**项目治理边界**内工作。越出治理边界（`角色卡/`、`docs/`、`.ans/` 之外，如项目的 `src/`，或项目根以外）的写入会在写入之前被门禁拒绝。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（角色卡全文 + 边界摘要，**并列出将要写出的具体路径**——路径是发行凭据，没列出的路径写不进去）请客户确认；拿到明确同意（confirmed:true）后才写；未获同意/通道不可用 → 不写盘、如实告知。（例外：`docs/su/`、`docs/contracts/` 为预授权目录——属初始写集，可直接写、无需确认。）
+未指定目标角色：请**据对话决定要建哪些角色**，逐一向客户确认后写出治理产物——`角色卡/<角色>/role-card.md`、`角色卡/<角色>/boundary.yaml`、`角色卡/<角色>/memo.md`。项目治理边界文档 `角色卡/governance-boundary.yaml` 由编排的自动收尾写出，无需你写。
+[message] offline factory:pi
+[settled] 会话结束
+✔ root command defaults reach demo and Pi respectively through actual Service injection (28.840916ms)
+[message] 已解析角色 运行时核心（kind=project），角色卡：角色卡/运行时核心/role-card.md
+[message] 已解析边界，来源：角色卡/运行时核心/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] [装配演示假 runtime] 角色=运行时核心，脚本化发起 2 次写入（不经真实 Pi SDK，每次写入前经 gate 判定）。
+[tool_call] runtime 请求 write_file -> src/evil.ts
+[denied] 拒绝写入 src/evil.ts：目标路径未匹配任何边界条目（根：project）：src/evil.ts
+允许路径（按根分组）：
+  skill:
+    (无)
+  project:
+    - src/model/runtime.ts
+    - src/service/runtime/session.ts
+    - src/provider/runtime/tools.ts
+    - src/provider/runtime/schema.ts
+    - src/provider/runtime/session-store.ts
+    - src/common/runtime-core
+    - test/runtime-core
+    - 角色卡/运行时核心/feature-map.md
+    - 角色卡/运行时核心/memo.md
+    - 角色卡/运行时核心/changelog.md
+    - 角色卡/运行时核心/functional-description.md
+    - 角色卡/运行时核心/api-spec.md
+    - 角色卡/运行时核心/docs/design
+    - 角色卡/运行时核心/docs/feature
+    - 角色卡/运行时核心/docs/change
+    - 角色卡/运行时核心/docs/fix
+[tool_call] runtime 请求 write_file -> src/common/编排/output.ts
+[denied] 拒绝写入 src/common/编排/output.ts：目标路径未匹配任何边界条目（根：project）：src/common/编排/output.ts
+允许路径（按根分组）：
+  skill:
+    (无)
+  project:
+    - src/model/runtime.ts
+    - src/service/runtime/session.ts
+    - src/provider/runtime/tools.ts
+    - src/provider/runtime/schema.ts
+    - src/provider/runtime/session-store.ts
+    - src/common/runtime-core
+    - test/runtime-core
+    - 角色卡/运行时核心/feature-map.md
+    - 角色卡/运行时核心/memo.md
+    - 角色卡/运行时核心/changelog.md
+    - 角色卡/运行时核心/functional-description.md
+    - 角色卡/运行时核心/api-spec.md
+    - 角色卡/运行时核心/docs/design
+    - 角色卡/运行时核心/docs/feature
+    - 角色卡/运行时核心/docs/change
+    - 角色卡/运行时核心/docs/fix
+[settled] 会话结束（settled）
+[message] 已解析角色 Codex适配器（kind=project），角色卡：角色卡/Codex适配器/role-card.md
+[message] 已解析边界，来源：角色卡/Codex适配器/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] [装配演示假 runtime] 角色=Codex适配器，脚本化发起 2 次写入（不经真实 Pi SDK，每次写入前经 gate 判定）。
+[tool_call] runtime 请求 write_file -> src/evil.ts
+[denied] 拒绝写入 src/evil.ts：目标路径未匹配任何边界条目（根：project）：src/evil.ts
+允许路径（按根分组）：
+  skill:
+    (无)
+  project:
+    - src/provider/codex/session.ts
+    - src/common/codex-adapter
+    - test/codex-adapter
+    - 角色卡/Codex适配器/feature-map.md
+    - 角色卡/Codex适配器/memo.md
+    - 角色卡/Codex适配器/changelog.md
+    - 角色卡/Codex适配器/functional-description.md
+    - 角色卡/Codex适配器/api-spec.md
+    - 角色卡/Codex适配器/docs/design
+    - 角色卡/Codex适配器/docs/feature
+    - 角色卡/Codex适配器/docs/change
+    - 角色卡/Codex适配器/docs/fix
+[tool_call] runtime 请求 write_file -> src/common/编排/output.ts
+[denied] 拒绝写入 src/common/编排/output.ts：目标路径未匹配任何边界条目（根：project）：src/common/编排/output.ts
+允许路径（按根分组）：
+  skill:
+    (无)
+  project:
+    - src/provider/codex/session.ts
+    - src/common/codex-adapter
+    - test/codex-adapter
+    - 角色卡/Codex适配器/feature-map.md
+    - 角色卡/Codex适配器/memo.md
+    - 角色卡/Codex适配器/changelog.md
+    - 角色卡/Codex适配器/functional-description.md
+    - 角色卡/Codex适配器/api-spec.md
+    - 角色卡/Codex适配器/docs/design
+    - 角色卡/Codex适配器/docs/feature
+    - 角色卡/Codex适配器/docs/change
+    - 角色卡/Codex适配器/docs/fix
+[settled] 会话结束（settled）
+[message] 已解析角色 Claude适配器（kind=project），角色卡：角色卡/Claude适配器/role-card.md
+[message] 已解析边界，来源：角色卡/Claude适配器/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] [装配演示假 runtime] 角色=Claude适配器，脚本化发起 2 次写入（不经真实 Pi SDK，每次写入前经 gate 判定）。
+[tool_call] runtime 请求 write_file -> src/evil.ts
+[denied] 拒绝写入 src/evil.ts：目标路径未匹配任何边界条目（根：project）：src/evil.ts
+允许路径（按根分组）：
+  skill:
+    (无)
+  project:
+    - src/provider/claude/session.ts
+    - src/common/claude-adapter
+    - test/claude-adapter
+    - 角色卡/Claude适配器/feature-map.md
+    - 角色卡/Claude适配器/memo.md
+    - 角色卡/Claude适配器/changelog.md
+    - 角色卡/Claude适配器/functional-description.md
+    - 角色卡/Claude适配器/api-spec.md
+    - 角色卡/Claude适配器/docs/design
+    - 角色卡/Claude适配器/docs/feature
+    - 角色卡/Claude适配器/docs/change
+    - 角色卡/Claude适配器/docs/fix
+[tool_call] runtime 请求 write_file -> src/common/编排/output.ts
+[denied] 拒绝写入 src/common/编排/output.ts：目标路径未匹配任何边界条目（根：project）：src/common/编排/output.ts
+允许路径（按根分组）：
+  skill:
+    (无)
+  project:
+    - src/provider/claude/session.ts
+    - src/common/claude-adapter
+    - test/claude-adapter
+    - 角色卡/Claude适配器/feature-map.md
+    - 角色卡/Claude适配器/memo.md
+    - 角色卡/Claude适配器/changelog.md
+    - 角色卡/Claude适配器/functional-description.md
+    - 角色卡/Claude适配器/api-spec.md
+    - 角色卡/Claude适配器/docs/design
+    - 角色卡/Claude适配器/docs/feature
+    - 角色卡/Claude适配器/docs/change
+    - 角色卡/Claude适配器/docs/fix
+[settled] 会话结束（settled）
+✔ new accepted runtime role cards can be reached from root fallback without adding task writes (16.712583ms)
+✔ actual bin default pi Provider fails honestly for missing configuration in role and govern (597.934708ms)
+✔ actual bin default codex Provider fails honestly for missing configuration in role and govern (434.428458ms)
+✔ actual bin default claude Provider fails honestly for missing configuration in role and govern (723.567625ms)
+✔ SDK loading is lazy for module import, help and doctor, including command help (805.687625ms)
+✔ root source depends only on Interface entry, Model and support modules (0.238875ms)
+✔ actual bin missing SDK errors are honest and masked without starting model requests (2543.874917ms)
+✔ release overlay preserves Chinese build paths and excludes private data and documentation (1.9205ms)
+✔ release refuses unreviewed production changes and similarly named private directories (0.734625ms)
+✔ release collection accepts three bound native results and rejects tampering or cross-platform drift (234.032833ms)
+✔ extractRuntimeArg：抽出 --runtime <值> 并从 argv 剔除（两段式） (0.51925ms)
+✔ extractRuntimeArg：支持 --runtime=<值> 等号写法，任意位置 (0.058083ms)
+✔ extractRuntimeArg：未出现时为 present:false；出现但缺值为空串 (0.050833ms)
+✔ resolveRuntime：命令行 > 环境变量 > 默认 (0.098458ms)
+✔ resolveRuntime：非法取值（含缺值）一律 ok:false，不静默忽略 (0.052291ms)
+✔ hasPiCredential：任一凭据变量非空即为真，空白视为无 (0.066375ms)
+✔ 解析：archived: true 为合法顶层键；条目照常解析、标记经 loadBoundaryFile 回传 (7.715667ms)
+✔ 解析：archived 仅接受布尔；false / 缺省不产生归档标记 (2.104833ms)
+✔ listProject：archived: true 的目录静默跳过——不枚举、不产生任何警告（与活角色共存） (11.6775ms)
+✔ listProject：目录全部为归档 → 与「无有效角色」同等静默（无逐条警告、无汇总提示） (1.855875ms)
+✔ listProject：归档目录缺 role-card.md 也静默（归档探测先于缺卡检查） (2.008042ms)
+✔ listProject：不带 archived 键的目录行为不变——缺 boundary 仍逐条告警（归档不吞旁告警） (2.921792ms)
+✔ resolveRole：归档角色 fail-closed 拒绝开启（「角色 X 已归档，不可开启」）；活角色照常解析 (3.120834ms)
+✔ 防御深度：绕过开启入口按 id 解析归档角色的边界 → 未接受 + parseError；resolveWrite 拒绝一切写入 (1.464542ms)
+✔ A：散文 boundary.md（存在、被读到、解析 0 条）→ parseError，文案含原因与出路（改写为 boundary.yaml） (6.130958ms)
+✔ A：listProject 对散文边界角色记 warning（既有通道）并跳过；一切被列角色都无「0 条且无 parseError」 (6.156667ms)
+✔ A：闸链贯通——resolveBoundarySection(角色) 得 parseError；resolveWrite 拒绝理由与 format-denial 渲染均呈现原因 (2.695167ms)
+✔ A 反向：代码合成边界（内置 / 治理种子 / 未知角色回退）一律无 parseError——修复只针对文件解析 (0.472375ms)
+✔ A 反向：YAML 显式 entries: []（作者按声明格式明确表达空集）→ 无 parseError，角色仍可枚举（O1 角落语义） (19.539667ms)
+✔ A 兼容：.md 带合法 legacy 表格仍解析出条目；散文写成 boundary.yaml 走严格 YAML 报错（既响亮路径） (13.714792ms)
+✔ C：su 内置卡文本写死「角色边界必须是 boundary.yaml（YAML）」+ 最小可抄示例 + 散文不会被解析 (0.121292ms)
+✔ C：治理种子（governanceBoundaryEntries）的角色卡条目 purpose 明示 boundary.yaml（YAML：role+entries） (0.044667ms)
+✔ YAML 合法：解析出三条，root 缺省 project，condition 保留 (3.147875ms)
+✔ YAML：root 可显式指定 skill (0.239083ms)
+✔ YAML 非法：语法错误 → 抛错 (0.614917ms)
+✔ YAML 非法：未知顶层键 → 抛错 (0.121125ms)
+✔ YAML 非法：未知 kind → 抛错 (0.151542ms)
+✔ YAML 非法：缺 path → 抛错 (1.202708ms)
+✔ YAML 非法：缺 purpose → 抛错 (0.198375ms)
+✔ YAML 非法：conditional-directory 缺 condition → 抛错 (0.147375ms)
+✔ YAML 非法：condition slug 非法 → 抛错 (0.186833ms)
+✔ YAML 非法：条目含未知键 → 抛错 (0.179625ms)
+✔ resolveBoundary：非法 YAML → 未接受且带 parseError；resolveWrite 理由含边界解析失败 (7.338292ms)
+✔ resolveBoundary+resolveWrite：合法 YAML 三条路径判定正确 (7.1755ms)
+✔ Markdown 回退：.md 走 legacy 表格解析 (1.035584ms)
+✔ builtInRoles：声明 su 不改变 resolveRole 的解析结果（仍下沉为内置治理角色且不抛错） (0.348667ms)
+✔ builtInRoles：未设置时行为不变——未登记角色照样下沉为内置治理角色 (0.056417ms)
+✔ 等价性：builtInBoundarySection() 与内置分支的金标准字面量逐字段一致（含无 parseError） (1.1075ms)
+✔ 等价性：resolveBoundarySection 分支 3 与 builtInBoundarySection() 返回内容完全一致（su 与任意未知角色皆然） (0.437541ms)
+✔ 等价性：accepted 恒为 false 且 source 为空串（fail-closed 的证据来源恒定） (0.149792ms)
+✔ 等价性：每次调用返回全新数组，互不共享可变状态（与改动前内联构造一致） (0.135709ms)
+✔ fail-closed 未被破坏：对内置角色 su 的边界，resolveWrite 拒绝一切写入（F6） (0.589834ms)
+✔ 四档：allow / deny / risky / review 各有一条可达用例 (0.781292ms)
+✔ 白名单：只读命令 → allow (0.255208ms)
+✔ 执行模型（argv-noshell）：`>` 是普通参数，白名单程序照常放行（不再误判为重定向） (0.085625ms)
+✔ 执行模型（argv-noshell）：`|`/`;`/`$()`/反引号 是普通参数，不再过头拦截 (0.112ms)
+✔ 执行模型（argv-noshell）：换行只是普通字节，多行参数不被拒 (0.047541ms)
+✔ 执行模型（shell-string）：元字符规则恢复拦截（`>`/`|`/`$()`/换行） (0.090834ms)
+✔ 执行模型（缺省）：省略 executionModel ⇒ 保守假定 shell 解释，元字符仍生效（fail-closed 缺省） (0.055917ms)
+✔ 执行模型（shell-string）：硬拒记号先于白名单（echo 在白名单但含 `>` → deny） (0.047875ms)
+✔ fail-closed：executionModel 未知 → deny (0.047667ms)
+✔ 硬拒：外壳 sh -c / bash -c / cmd /c / pwsh（argv 藏命令）→ deny (0.107333ms)
+✔ 反向守卫：sh -c 仍硬拒——**不是** risky、**不是** allow（防止后人顺手放宽，§14.4） (0.092666ms)
+✔ 硬拒：eval / exec / source / command（求值内建）→ deny；同样不得是 risky/allow (0.067583ms)
+✔ 硬拒：解释器内联求值 node -e / --eval、python -c、perl -e、ruby -e、php -r、deno eval → deny (0.102208ms)
+✔ 反向守卫：node -e / python -c 仍 deny——不是 risky、不是 allow（argv 里没有可读程序名） (0.093792ms)
+✔ 硬拒：awk/gawk（可 system()/重定向）→ deny；不得是 risky/allow (0.056792ms)
+✔ 硬拒：提权 sudo/doas/su/pkexec → deny (0.059083ms)
+✔ 硬拒：系统级破坏/控制 mkfs/diskpart/wipefs/fdisk/shutdown/reboot/halt → deny (0.078667ms)
+✔ 硬拒：Windows 脚本宿主/LOLBin mshta/wscript/cscript/rundll32/certutil/bitsadmin → deny (0.080542ms)
+✔ risky：删除/截断 rm/rmdir/del/shred/truncate/dd → risky（删临时文件等正当） (0.088042ms)
+✔ risky：原地改写 sed -i / perl -i；普通 sed → review（只读式） (0.069459ms)
+✔ risky：编辑器 vi/vim/nano/notepad → risky (0.059833ms)
+✔ risky：进程/服务 kill/systemctl/reg/schtasks → risky (0.081459ms)
+✔ risky：网络抓取/远程 curl/wget/ssh/scp → risky (0.063584ms)
+✔ risky：间接执行器 xargs/env/nohup/timeout → risky（程序名在 argv 里可见，区别于 A-1 藏进 string） (0.072ms)
+✔ risky：构建/任务运行器 make/gradle/cargo/dotnet → risky (0.073625ms)
+✔ risky：包管理 npm run / npm install / npx → risky；npm ls（只读）→ allow (0.091083ms)
+✔ risky：文件写入/创建/权限 cp/mv/mkdir/touch/chmod/tee → risky（正当写盘，程序名可见） (0.551042ms)
+✔ risky：git 写子命令与 `--output` 写盘 flag → risky；只读子命令 → allow (0.133583ms)
+✔ risky：程序名大小写与 .exe 归一（Windows），路径前缀剥除 (0.056417ms)
+✔ 常规未命中命令 → review (0.08975ms)
+✔ fail-closed：规则集缺失 → deny（不是 allow） (0.024333ms)
+✔ fail-closed：规则集非对象 / 版本未知 / 形状非法 → deny (0.056875ms)
+✔ fail-closed：riskyPrograms 缺失（v3 必需）→ deny（不静默降级为 review） (0.027209ms)
+✔ fail-closed：id 若存在但非法（空串/非字符串）→ deny (0.03575ms)
+✔ fail-closed：即使规则集有效，空白名单也不放行任何命令 (0.039875ms)
+✔ fail-closed：argv 非法（空/非数组/非字符串元素）→ deny (0.044542ms)
+✔ argv[0] 含空白（整条命令串塞进一个元素）→ deny (0.043291ms)
+✔ 规则集是数据：自定义 denyToken / 白名单被实际消费 (0.03275ms)
+✔ 规则集是数据：自定义 risky 程序被实际消费（→ risky） (0.0255ms)
+✔ 规则集是数据：argv-noshell 下自定义 denyToken 也不生效（记号是参数字符） (0.023875ms)
+✔ 默认规则集每次返回全新对象（无共享可变状态）；带 id、执行模型与三段规则 (0.064792ms)
+✔ 已知缺口：任意解释器运行『脚本文件』→ review（不是 deny） (0.067ms)
+✔ 已知缺口：JVM/其它运行器与项目内脚本 → review (0.056125ms)
+✔ 已知缺口：间接执行类整体不可穷尽（命名模式已覆盖，其余如实列缺） (1.487375ms)
+✔ classifyShellDetailed 给出原因与命中规则 id（审计可用） (0.142166ms)
+✔ T31：空项目 + 操作者 bootstrap → su 的边界为项目根治理种子（普通目录，accepted，source=操作者指令） (0.671167ms)
+✔ T15：创世只作用于**内置治理角色**；项目角色不受益（仍回退内置未接受） (0.083666ms)
+✔ T15：genesisBootstrap.source 为空 → 边界 accepted 但 F6 仍拒一切写（fail-closed） (0.238042ms)
+✔ T31 要害：genesisBootstrap 设、scope:undefined → su 对 角色卡/<任意新角色>/…、docs/…、.ans/project.json 判 allowed (0.645917ms)
+✔ T31 负面：scope:undefined → src/**、项目根外、README.md/package.json 一律拒 (0.539041ms)
+✔ T31 回归：不设 genesisBootstrap → su 仍回退内置未接受边界（skill 根），拒一切写 (3.591791ms)
+✔ T31 自终止：项目治理边界写出并 pin 后，genesisBootstrap 残留也不再生效（项目覆盖接管） (40.521875ms)
+✔ T31 自终止（对照）：同项目**不设** genesisBootstrap 时结果一致——证明创世非放行因素 (19.164416ms)
+✔ T31 留痕：acceptance.source 携操作者指令，且 scope:undefined 下 docs/bootstrap-manifest.md 可写 (0.247834ms)
+✔ J-1：落盘之后「立刻派发」——用 dispatch_task，task 自足，不等客户手动转达 (0.813125ms)
+✔ J-1：派发 ≠ 授权——写权来源措辞与 H-1 逐字一致；不得在任务文本里代授权限 (0.111375ms)
+✔ J-1：失败语义——派发被拒/失败如实告知、不得假设已开工；无可派发角色停在「待客户指示」 (0.087166ms)
+✔ J-1 反向断言：任何涉及「授权/获准/放行」的小句必须是禁止式/否定义，不得出现「已获授权」式表述 (0.380542ms)
+✔ 文档面清单逐项在卡文本中（五文件 + 四目录 + 测试目录 + temp；kind 按项标注） (1.171458ms)
+✔ 交付纪律：每次交付同步文档、代码与文档同批交回、不得靠「下次补」 (0.086125ms)
+✔ 反向断言：不得暗示文档路径可选/可后补；不得出现「未列即默认可写」式表述 (0.199042ms)
+✔ F4：仍拒绝（fail-closed）；原头逐字保留；追加可操作指引（request_confirmation/preview/confirmed:true） (0.791375ms)
+✔ F4 分支 allowedByRoot：writeSet 空 ⇒ 两根皆空（如实呈现此刻什么也写不了） (0.327291ms)
+✔ F4 分支 allowedByRoot：恰列出经边界+条件过滤后的 writeSet 项（project）；边界目录本身不再出现 (0.110125ms)
+✔ F4 分支 allowedByRoot：条件未激活的 writeSet 项不计入（与判定同源过滤） (0.193417ms)
+✔ 非 F4 分支语义回归：F5 缺条件分支与未匹配分支的列表仍为边界覆盖（用例期望不改） (0.228084ms)
+✔ 渲染链：F4 决策渲染后项目行＝当前已发行可写集；指引与 reason 同现 (0.117042ms)
+✔ listProject：枚举真实项目（本仓库）全部角色，边界均解析成功且无警告 (107.481166ms)
+✔ listProject：内置治理角色 su 永远排在第一位，无角色目录，边界为内置（未接受） (67.4115ms)
+✔ listProject：英文 role-cards/，坏边界进 warnings，其余照常返回 (5.748875ms)
+✔ listProject：中文 角色卡/ 目录名可识别 (3.312625ms)
+✔ listProject：真实项目级错误仍抛出（不存在 / 不是目录） (2.133208ms)
+✔ T14：导入空目录 → 不抛错、返回内置 su + 空 warnings + hasRoles:false + primaryRoleId (0.935459ms)
+✔ T14：有角色目录但全无效角色 → hasRoles:false + 提示可用 su 发起 bootstrap（不抛错） (1.617ms)
+✔ Model：BoundarySection1 结构可构造且字段正确 (0.390417ms)
+✔ parse：抽取 Section 1 表格，遇后续标题停止；条件目录带合法 slug (0.985833ms)
+✔ parse：条件目录缺合法 slug（仅散文）→ 解析失败，条目被丢弃 (6.065ms)
+✔ parse：条件目录 slug 格式非法 → 解析失败，条目被丢弃 (0.066709ms)
+✔ resolveBoundary：项目覆盖（已接受）优先，用角色边界文件并标 project 根 (5.097542ms)
+✔ resolveBoundary：无治理接受证据 → 内置且未接受 (0.129416ms)
+✔ resolveRole：路径取自 project.roles（F8），含 cardText 与 boundary (1.257792ms)
+✔ resolveRole：未配置角色 → 内置治理角色 (0.081666ms)
+✔ pin 匹配 → accepted=true，边界内写入放行 (12.235625ms)
+✔ pin 不匹配 → 未接受（source 清空）+ parseError → resolveWrite 拒一切写 (2.144083ms)
+✔ 无 pin（acceptance 未给 pin）→ 沿用配置自称来源，行为不改变 (1.727583ms)
+✔ 无 .ans / 无治理边界 → 回退内置（未接受）→ 拒一切写 (0.309625ms)
+✔ pin 指向的文件不存在 → fail-closed（未接受），即便另有 pin 命中当前文件 (1.738083ms)
+✔ pin 未覆盖当前边界文件 → 未接受 (1.662209ms)
+✔ pin 形状非法（空数组 / 缺 sha256 / 非数组）→ 未接受 (3.331ms)
+✔ 展示路径（listProject 式）：accepted=false + 无 pin → 返回条目且未接受 (1.229333ms)
+✔ pin 按原始字节计算（含 BOM）：剥 BOM 的文本哈希不匹配 → 未接受；原始字节哈希 → 通过 (2.908125ms)
+✔ F6：acceptance.accepted 非 true → 拒绝 (7.725584ms)
+✔ F6：accepted 为 true 但 source 为空 → 拒绝 (0.097708ms)
+✔ F6：accepted 为 true 且 source 非空 → 通过接受门 (0.24775ms)
+✔ file：精确匹配允许，同目录其他文件不匹配 (0.250625ms)
+✔ directory：目录下任意路径（含目录自身）允许 (0.131333ms)
+✔ F5：条件目录 + 任务未声明该条件 → 拒绝，理由含缺失 slug，allowedByRoot 不含该目录 (0.123917ms)
+✔ F5：条件目录 + 任务声明该条件 → 放行（仍须过 F4 writeSet） (0.141875ms)
+✔ F5：缺失条件与‘未匹配任何条目’是两种不同拒绝理由 (0.150333ms)
+✔ F5 对照：普通 directory 不受 conditions 影响 (0.086417ms)
+✔ F5：condition slug 格式不合法 → 不激活（不放行） (0.108333ms)
+✔ F4：边界内但不在 writeSet 内 → 拒绝；在 writeSet 内 → 允许 (0.125042ms)
+✔ 跨根混淆：项目相对路径命中技能条目 → 拒绝 (0.073166ms)
+✔ 跨根混淆：技能绝对路径命中项目条目 → 拒绝 (0.997375ms)
+✔ 规范化：../ 穿越与绝对路径越根 (0.6475ms)
+✔ 规范化：Windows 反斜杠等价 (0.387792ms)
+﹣ 规范化：Windows 大小写不敏感（仅 win32） (4.046333ms) # 仅 Windows
+✔ 规范化：绝对与相对混合一致 (0.440834ms)
+✔ F7：符号链接/junction 逃逸出根 → 拒绝 (0.753875ms)
+✔ F10：拒绝信息按根分组列出允许路径 (1.870666ms)
+✔ scope 可选：无 scope 时仅按边界判定（边界内允许，边界外拒绝） (0.218917ms)
+✔ scope 可选：有 scope 时 F4 照旧（回归）；无 scope 不抛错 (0.1505ms)
+✔ scope 可选：无 scope 时条件目录仍需声明条件（无声明即不激活，fail-closed） (0.19225ms)
+✔ listProject：实际已接受的四份运行时组卡返回组别，13 个活项目角色和归档约定保留 (151.7745ms)
+✔ resolveRole：实际四份角色卡与枚举字段同源，既有 kind / location / boundarySource 保留 (88.629875ms)
+✔ 公开入口：中文/英文独立字段与英文技能粗体模板使用同一摘要契约 (27.786125ms)
+✔ 公开入口：第一条非空字段生效，重复别名不覆盖，空字段与单字段不制造默认值 (6.875625ms)
+✔ 公开入口：旧卡缺字段仍无属性、无 warning；正文提及与边界用途不会成为组声明 (18.052209ms)
+✔ Model / 公开入口：未知组名和职责保持字符串，HTML 字符不转义，JSON 回传保持原值 (8.849292ms)
+✔ 组长元数据不会改变边界、接受或写权结果，同组不获得额外路径权限 (27.6145ms)
+✔ 带组字段的归档卡仍静默排除/拒绝开启，内置和未知角色不继承项目组 (1.968916ms)
+✔ 公开再导出与私有源同源：两符号均为同一函数引用（逐字转出，非复制实现） (0.559333ms)
+✔ 公开入口可用冒烟：classifyShell(argv, defaultShellRules()) 恒返回四态之一，且样本覆盖多种判定 (1.135959ms)
+✔ 旧快照线索：盘上边界已含该路径而快照不含 → 理由追加线索，结论仍是拒绝 (3.602625ms)
+✔ 旧快照线索：条件目录按同一套语义对照——快照重开仍不激活时不加线索 (0.702459ms)
+✔ 旧快照线索（反向断言）：无法判定/不触发时原文案逐字不变，不得猜测 (1.41775ms)
+✔ 旧快照线索：只在最终「未匹配任何边界条目」分支——F4 收窄等其它拒绝理由不加 (0.152666ms)
+✔ 缓存：未变 → 只 stat 不重读；同尺寸内容变更（mtime 变）仍被检出；坏文件与内置标签行为不变 (2.862791ms)
+✔ 缓存经 resolveWrite 透明：连续两次同盘面线索一致；盘面变更后立即失效（端到端） (1.670667ms)
+✔ su 自己的文档面写死：`docs/su/memo.md`（进行中事项/待确认项）+ `docs/su/changelog.md` (0.370792ms)
+✔ 红线：不要在 `角色卡/` 下建 `su`（或任何非项目角色）目录——含两类告警的说明 (0.055333ms)
+✔ 反向断言：涉「在 `角色卡/` 下建 `su`」的小句必须是否定/禁止式，不得出现肯定式指令 (0.175458ms)
+✔ 末段改写：三分支写清——创世可写 / 项目边界自终止 / 两者皆无才 fail-closed (0.056708ms)
+✔ 反向断言：不得再有无条件的普遍拒绝断言——凡「写之前拒绝」小句必须带情形限定 (0.075083ms)
+✔ 确认制要点·预置豁免（2026-10-16）：`docs/su/**` 与 `docs/contracts/**` 免逐次确认、开会话与重建均生效；其余一切写盘仍逐路径确认 (0.064875ms)
+✔ 确认制要点·反向断言：凡含 `docs/su` 的小句不得要求确认；旧「落盘前照常经…确认」句不得复现 (0.097375ms)
+✔ 规划纪律（G-1/A3）：先落盘再派发——冻结契约（版本化不可变）＋项目工作流（步骤表/完成口令/变更与重验）；位置在确认制要点之后、J-1 之前 (0.067542ms)
+✔ J-1 扩展（G-1/A3）：派发按地址引用——不内嵌契约全文、不手算 sha256、「必读（按序）」块由系统投递时附上；契约缺失拒投 (0.05225ms)
+✔ 规划纪律·反向断言：凡含 `docs/workflow.md` 的小句不得声称免确认/直接写；「原地改 / 自己算或转抄」类表述否定式 (0.192417ms)
+✔ 看护职责（G-2/G）：异常态投 `[系统·看护]`、完成静默态投「收束提示」；先核查再动作（role_status/session_tail）；位置在 J-1 段之后、末段「边界（三种情形）」之前 (0.069083ms)
+✔ 看护职责·恢复只能提议（propose_recovery）：执行与否由客户一键确认；不得自行执行、不得承诺结果 (0.038209ms)
+✔ 看护职责·纪律与反向断言：仅如实告知、不得据此假设任何写权；处理走既有回交/重派；看护面段级零命中「授权/获准/放行」守卫字样 (0.154459ms)
+✔ T-1：su 卡文本写死——每角色边界应含 temp/<角色 id>/（directory，purpose 供审核对照） (0.300083ms)
+✔ T-1：su 卡文本写死退回/返工流程——先存档（日期+版本）→ REVIEW.md 记三问 → 再改主交付物 (0.085083ms)
+✔ T-1：红线与定位——不得存被拒内容（拒绝=零副作用）；temp 是草稿区、不参与 pin (0.042292ms)
+✔ T-1 反向断言：任何涉及「拒绝」与 temp 的表述都必须是**禁止**式，不得出现「把被拒内容存 temp」式指令 (0.152791ms)
+✔ T-1：治理种子 purpose 同步点明 temp 用途；种子仍恰为三条（文案派工，不动创世写集） (0.060417ms)
+✔ 空数组 → [] (1.127125ms)
+✔ 非数组入参一律 → []（null/undefined/标量/对象；绝不抛错） (0.172958ms)
+✔ 只保留字符串项，丢弃数字/布尔/null/undefined/对象/嵌套数组 (0.150458ms)
+✔ 保序：字符串项按出现顺序保留 (0.07025ms)
+✔ 空串是合法字符串项，**保留**（不丢弃、不视为非字符串） (0.072167ms)
+✔ 含空格/引号的项**逐字保留**（不裁剪空白、不加转义） (0.096792ms)
+✔ Windows 与 POSIX 路径**原样保留**（不规范化分隔符/大小写） (0.32025ms)
+✔ **不去重**：重复项全部保留（每次出现都留） (0.081542ms)
+✔ 选项/旗标形态（含前导 - 与 --）逐字保留 (0.050542ms)
+✔ Unicode 与 emoji 逐字保留 (0.077125ms)
+✔ 不修改入参数组（纯函数；不改可变入参的长度或元素） (0.057667ms)
+✔ 返回值是新数组（与入参非同一引用） (0.049167ms)
+✔ ① 瞬时 EPERM 连续 5 次后被兜住：op 第 6 次成功即返回 (4.181084ms)
+✔ ① 同一瞬时集合：EBUSY / EACCES 亦被重试（非只认 EPERM） (21.745ms)
+✔ ① 非瞬时错**立即抛**、绝不重试（ENOENT/EISDIR/EROFS/无 code） (0.353125ms)
+✔ ① 有界：持续瞬时错耗尽上界后**照抛**（不吞、不伪装成功） (12.504208ms)
+✔ ① 边界：上界-1 次瞬时后成功（恰好用满上界即返回，非超界） (5.473375ms)
+✔ ① 次数之间**让出事件循环**（setImmediate），非忙等 / 非固定 sleep (1.298042ms)
+✔ ② atomicWrite 写 string：内容完整、目录内**无 temp 残留** (13.830833ms)
+✔ ② atomicWrite 写 Buffer：内容逐字节完整（供 Pi适配器复用字节语义） (13.506541ms)
+✔ ② atomicWrite **覆盖已存在目标**：整体替换、无残留（真实经历 rename 覆盖分支） (39.432875ms)
+✔ ② atomicWrite 目标目录不存在 → 显式抛错、不创建目录、无残留 (11.939833ms)
+✔ ② renameReplacingExisting 覆盖已存在目标成功（原语直测） (44.984625ms)
+✔ ② 已中止的原子写与 rename 不产生临时文件或替换目标 (3.113917ms)
+✔ ② temp fsync 后中止：保留旧目标，清理未提交的完整 temp (16.014625ms)
+✔ ③ 并发自争用：多路 atomicWrite 反复覆盖**同一目标**，全部成功、无 temp 残留 (8500.585791ms)
+✔ ③ 失败路径安全：目标不可被替换时 atomicWrite 显式抛出、temp 已清、目标未受损 (6.660542ms)
+✔ ③ 上界常量与实测一致（RENAME_MAX_ATTEMPTS=200，由实测尾部≈63 留 ~3x 余量） (0.072208ms)
+✔ ansProjectPath：项目根下 .ans/project.json；常量导出不变 (0.359875ms)
+✔ .ans 合法（带 pin）→ 注入 roles/governanceBoundary/acceptance，pin 保留 (14.696292ms)
+✔ .ans 声明 accepted:true 无 pin → 未接受且 source 清空（fail-closed，§3.3） (9.290583ms)
+✔ 终态规则纯函数：accepted:true 无 pin → 降级并清空 source；有 pin / accepted:false → 不变 (0.074417ms)
+✔ 终态规则：pin 为空数组（声明了但无条目）同样降级（无有效证据） (0.038708ms)
+✔ pin 与 hash 不符 → 载入层保留（pin 存在），引擎 verifyPins 判未接受 (12.587709ms)
+✔ .ans 合法且 pin 匹配 → 引擎解析后仍 accepted=true（对照） (28.571875ms)
+✔ 无 .ans/project.json → 回退入参 fallback（原样、不崩） (7.218167ms)
+✔ 无 .ans 且回退配置自称 accepted:true（演示路径）→ 原样带出、不崩 (8.023291ms)
+✔ .ans 存在但 JSON 不可解析 → fail-closed 未接受，不回退演示 acceptance (4.556125ms)
+✔ .ans 存在但顶层非对象（如数组）→ fail-closed 未接受，不回退 (1.030834ms)
+✔ ansDirName 覆盖：从自定义目录载入（不影响默认 .ans） (6.628625ms)
+✔ 未配置不写盘，配置后门面记录有序元数据 (10.200459ms)
+✔ 执行时限元数据落盘：timeoutMs 有限数值保留、非有限丢弃；命令正文摘要不入白名单 (20.611209ms)
+✔ 精确滚动24h边界：旧行清除，边界行保留，不碰非诊断文件 (18.689ms)
+✔ 写入时清除24h前的最后一条旧日志 (12.24875ms)
+✔ 清理和日志追加串行，不丢并发事件 (354.769291ms)
+✔ 错误日志净化凭据和Bearer，不存原对象或源内容 (32.632166ms)
+[ans-diagnostics] Error: EEXIST: file already exists, mkdir '/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-diagnostics-3x3PUt/occupied'
+[ans-diagnostics] Error: EEXIST: file already exists, mkdir '/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-diagnostics-3x3PUt/occupied'
+✔ 存储失败不抛业务异常，状态可查且仍固定24h (15.000166ms)
+✔ 维护定时器自动清理24h前记录 (80.24975ms)
+✔ 真实维护定时器不阻止进程正常退出 (75.934ms)
+✔ ① 只改相关键：仅目标值行变化，其余（注释/空行/未知键/无关键）逐字节保留 (1.122375ms)
+✔ ① 一次更新多个键：只改这些键的行，其余不变（顺序不变） (0.162833ms)
+✔ ① 更新为空 → 恒等（返回原文） (0.042083ms)
+✔ ② 键不存在 → 追加到末尾，原有内容逐字节不变 (0.063542ms)
+✔ ② 键不存在 → 追加；原文件无尾随换行时先补行尾，不粘连 (0.078834ms)
+✔ ② 已存在 → 就地替换（行序不变）；同键多行 → 全部替换保持一致 (0.034917ms)
+✔ ② 空文件 → 直接写出新键 (0.307792ms)
+✔ ② 保留 `export ` 前缀与 `=` 两侧空白格式 (0.044625ms)
+✔ ③ 值含 `=`：不加引号即可，读回原样（值取自首个 `=` 之后） (0.04825ms)
+✔ ③ 值含 空格 / `#` / 双引号 / 单引号 / 反斜杠：加引号转义，读回**逐字**一致 (0.118458ms)
+✔ ③ 替换已存在的带引号值：保留原引号风格，且可读回 (0.449833ms)
+✔ ③ 保留内联注释（替换值时注释不丢） (0.034167ms)
+✔ ③ parse：基本形态（注释/空行/export/引号/内联注释/重复后者胜） (0.059084ms)
+✔ ③ 空值往返：`KEY=` 与原样 `KEY=` 保持一致 (0.029584ms)
+✔ ③ CRLF 行尾保留（不把 \r\n 变成 \n） (0.027083ms)
+✔ ④ atomicWriteText 写入内容完整，且目录内无临时文件残留 (21.894459ms)
+✔ ④ 原子写覆盖已存在文件：内容整体替换、无残留 (12.05925ms)
+✔ ④ saveEnvFile 新建 / 覆盖均原子落盘，且无 temp 残留 (25.193375ms)
+✔ ④ 并发自争用：多路 atomicWriteText 反复覆盖同一目标，全部成功、无 temp 残留（瞬时 EPERM 由共享原语有界重试兜住） (6381.799458ms)
+✔ ⑤ 目标目录不存在 → saveEnvFile 抛错（显式），不创建任何文件 (0.943ms)
+✔ ⑤ 读取失败（目标是目录）→ saveEnvFile 抛错（显式），原目标（目录）不受损 (19.837458ms)
+✔ ⑤ readEnvFile 对不存在的文件明确抛错（不静默返回空） (0.834167ms)
+✔ ⑤ saveEnvFile 失败时原 `.env` 内容完全不变 (19.582459ms)
+✔ ⑥ 写入失败的错误信息**不含** sentinel 值（只含键名/路径） (2.831542ms)
+✔ ⑥ loadEnvFileInto 回报**只含键名**、不含值（哨兵不回显） (23.750375ms)
+✔ ⑥ readEnvFile 的错误信息不含文件内任何值 (12.603167ms)
+✔ ⑦ loadEnvFileInto：文件不存在 → 无操作、不抛错、applied 为空 (7.616583ms)
+✔ ⑦ loadEnvFileInto：同名键以 `.env` 覆盖（保存后重载即生效，设计 §11.3） (21.362625ms)
+✔ ⑧ 机密键名单含 ANTHROPIC_AUTH_TOKEN；isSecretKey 判定一致 (0.282958ms)
+✔ ⑨ 往返：只改一个键后，其余内容完整无损（读回校验） (37.668458ms)
+✔ ⑨ 往返：修改已存在键，未知键/注释/顺序全保留 (27.90875ms)
+✔ toPosix：反斜杠统一为正斜杠（Windows 分隔符） (0.338625ms)
+✔ normalizeLexical：折叠重复斜杠、解析 . 与 ..，不触碰文件系统 (0.112167ms)
+✔ normalizeLexical：绝对路径越过根的多余 .. 被丢弃；相对路径开头的 .. 保留 (0.053625ms)
+✔ normalizeLexical：Windows 盘符保留且不越过盘根 (0.037375ms)
+✔ normalizeLexical：尾点/空格是**词法保留**的（剥离是写入层 checkRelativePathSafe 的职责，不在此） (0.03625ms)
+✔ normalizeLexical：保留内部空格与中文段 (0.046875ms)
+✔ compareKey：Windows 折叠大小写、POSIX 原样（与平台一致） (0.036542ms)
+✔ absRel：在 base 之下返回相对路径；相等返回空串；不在其下返回 null (0.042875ms)
+✔ absRel：前缀陷阱——/r/bc 不在 /r/b 之下（必须按路径段边界，非字符串前缀） (0.037208ms)
+✔ absRel：Windows 大小写不敏感匹配（大小写不同仍算在根内） (0.059042ms)
+✔ isWithinReal：等于 root 或在其下为真，否则假 (0.050708ms)
+✔ isUnderOrEqual：空 base 恒真；按段边界判定 (0.04275ms)
+✔ isAbsoluteAny：POSIX 前导斜杠、Windows 盘符为真；相对/UNC 裸形为假 (0.047625ms)
+✔ 逐字同源：normalizeLexical / toPosix / compareKey 与门禁引擎旧实现逐字相同 (0.109833ms)
+✔ 逐字同源：absRel 与门禁引擎 absRel 逐字相同 (0.053ms)
+✔ 逐字同源：isUnderOrEqual 与门禁引擎逐字相同 (0.038666ms)
+✔ 逐字同源：absRel == Pi适配器旧实现 absRelLexical（同一函数、两处曾各自维护） (0.038792ms)
+✔ 逐字同源：shared.realResolve == 门禁引擎旧 realResolve（同输入同答案） (0.2845ms)
+✔ 逐字同源：shared.realResolveAsync == Pi适配器旧 realResolveAsync（同输入同答案） (6.911ms)
+✔ 两处旧实现同答案（要害）：门禁 realResolve(sync) 与 Pi适配器 realResolveAsync(async) 对同输入同输出 (1.683333ms)
+✔ realResolve 解析 junction 逃逸：经链接到达的真实路径落在链接目标之下 (0.115625ms)
+✔ 真实引擎的设置秘密键全部由同一掩码名单覆盖，别名亦不回显 (0.296917ms)
+✔ 设置需求忠于真实适配器：Pi 显式 endpoint/model，Claude 可用 SDK 默认模型 (0.2915ms)
+✔ RuntimeKind 取值单一来源：shared 与编排旧副本一致 (0.5025ms)
+✔ RuntimeKind 取值单一来源：shared 与装配旧副本（RUNTIME_VALUES / DEFAULT_RUNTIME）一致 (0.061334ms)
+✔ PI_CREDENTIAL_ENV_VARS：shared 与装配、Pi适配器两处旧副本**逐条相同**（安全相关，不得分叉） (0.063375ms)
+✔ resolveSkillRoot：优先 ANS_SKILL_ROOT（取非空值） (0.040083ms)
+✔ 跨引擎秘密键包含旧 Pi 凭据与 SDK CODEX_API_KEY，保持 Pi 旧名单兼容 (0.044375ms)
+✔ resolveSkillRoot：缺省回退默认技能目录，且与桌面旧副本同值 (0.180625ms)
+✔ resolveSkillRoot：空串视为未设置（回退默认），与桌面旧副本同值 (5.047958ms)
+ℹ tests 1667
+ℹ suites 0
+ℹ pass 1666
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 19448.911792

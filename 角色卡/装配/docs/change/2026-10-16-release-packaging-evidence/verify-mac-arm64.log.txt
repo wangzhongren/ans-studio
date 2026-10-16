@@ -1,0 +1,78 @@
+WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/" (codex_home: AbsolutePathBuf("/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-packaged-smoke-svNjT0/home/.codex"))
+npm warn Unknown user config "ELECTRON_MIRROR". This will stop working in the next major version of npm.
+npm warn Unknown user config "ELECTRON_BUILDER_BINARIES_MIRROR". This will stop working in the next major version of npm.
+{
+  "sourceRef": "v1.1.0",
+  "sourceSha": "e4556cc43311adf7bda056fe071b9a389a85cf40",
+  "overlaySha": "9aa253a8187f6bf8480b1409c59b99ff3842dea9",
+  "actualTree": "8fc5b8e901b8530b31c6226c6fba7da196b2dd7b",
+  "overlayPaths": [
+    ".github/workflows/release.yml",
+    "package-lock.json",
+    "package.json",
+    "src/common/装配/release-policy.d.mts",
+    "src/common/装配/release-policy.mjs",
+    "src/common/装配/release-prepare.mjs",
+    "test/装配/release-packaging.test.ts"
+  ],
+  "overlayPatchSha256": "181b872eed5c996c77ab139301c6aea81ca7c06508d45bce4178e38969fc121b",
+  "excludedChanges": [
+    "README.md"
+  ],
+  "platform": "darwin",
+  "arch": "arm64",
+  "node": "v24.14.0",
+  "npm": "11.9.0",
+  "lockSha256": "3f9c0fffdf2b69be0ecbb4febfe7d963136a48d9d6c97f62b688807503adb216",
+  "builder": "26.15.3",
+  "startedAt": "2026-10-16T05:50:48.821Z",
+  "finishedAt": "2026-10-16T05:50:49.502Z",
+  "unsigned": true,
+  "smoke": {
+    "ok": true,
+    "isPackaged": true,
+    "arch": "arm64",
+    "platform": "darwin",
+    "version": "1.1.0",
+    "envPath": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-packaged-smoke-svNjT0/home/userdata/.env",
+    "checks": {
+      "dom": true,
+      "preload": true,
+      "ipc": true,
+      "importDisabled": true,
+      "missingConfiguration": true,
+      "settings": true,
+      "envPathMatches": true
+    },
+    "missingKeys": {
+      "pi": [
+        "ANTHROPIC_AUTH_TOKEN",
+        "ANS_PI_BASE_URL",
+        "ANS_PI_MODEL"
+      ],
+      "codex": [
+        "CODEX_API_KEY",
+        "ANS_CODEX_MODEL"
+      ],
+      "claude": [
+        "ANTHROPIC_API_KEY"
+      ]
+    }
+  },
+  "nativeDependencies": {
+    "sdkImports": "PACKAGED_SDK_IMPORTS_OK",
+    "codexVersion": "codex-cli 0.162.1",
+    "claudeVersion": "2.1.299 (Claude Code)"
+  },
+  "process": {
+    "code": 0,
+    "signal": null,
+    "stdout": "",
+    "stderr": ""
+  },
+  "artifact": {
+    "file": "ANS-Studio-1.1.0-mac-arm64.zip",
+    "size": 405058924,
+    "sha256": "efc147b55fd025093f90f422be2d7eeb91e5b870b86d9db06ca6185ca4172905"
+  }
+}

@@ -4,19 +4,20 @@ import { selectOverlay, SOURCE_REF, SOURCE_SHA } from '../../src/common/装配/r
 
 test('release overlay preserves Chinese build paths and excludes private data and documentation', () => {
   const result = selectOverlay(['src/common/装配/release-prepare.mjs', 'test/装配/release-packaging.test.ts',
-    'app/main.ts', '.env', '.ans/sessions/private.jsonl', 'README.md', '角色卡/装配/docs/change/release.md']);
-  assert.deepEqual(result.selected, ['src/common/装配/release-prepare.mjs', 'test/装配/release-packaging.test.ts', 'app/main.ts']);
+    'package.json', '.env', '.ans/sessions/private.jsonl', 'README.md', '角色卡/装配/docs/change/release.md']);
+  assert.deepEqual(result.selected, ['src/common/装配/release-prepare.mjs', 'test/装配/release-packaging.test.ts', 'package.json']);
   assert.deepEqual(result.excluded, ['.env', '.ans/sessions/private.jsonl', 'README.md', '角色卡/装配/docs/change/release.md']);
-  assert.equal(SOURCE_REF, 'v1.0.0');
-  assert.equal(SOURCE_SHA, '83445ebcf24454c6107838cb7f2221882c6638ea');
+  assert.equal(SOURCE_REF, 'v1.1.0');
+  assert.equal(SOURCE_SHA, 'e4556cc43311adf7bda056fe071b9a389a85cf40');
 });
 
 test('release refuses unreviewed production changes and similarly named private directories', () => {
   assert.throws(() => selectOverlay(['app/desktop/interface.ts']), /Unreviewed production overlay/);
   assert.throws(() => selectOverlay(['src/common/装配-other/secret.mjs']), /Unreviewed production overlay/);
-  assert.throws(() => selectOverlay(['src/provider/claude/session.ts']), /Unreviewed production overlay/);
-  assert.deepEqual(selectOverlay(['src/provider/codex/session.ts', 'test/codex-adapter/electron-launch.test.ts']).selected,
-    ['src/provider/codex/session.ts', 'test/codex-adapter/electron-launch.test.ts']);
+  assert.throws(() => selectOverlay(['src/provider/codex/session.ts']), /Unreviewed production overlay/);
+  assert.throws(() => selectOverlay(['app/main.ts']), /Unreviewed production overlay/);
+  assert.deepEqual(selectOverlay(['package.json', 'test/装配/release-packaging.test.ts', 'test/codex-adapter/electron-launch.test.ts']).selected,
+    ['package.json', 'test/装配/release-packaging.test.ts']);
 });
 
 import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
