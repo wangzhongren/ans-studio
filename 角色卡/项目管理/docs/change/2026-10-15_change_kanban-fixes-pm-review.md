@@ -177,6 +177,8 @@ status: approved-implementation-dispatched
 - **冻结源 = tag `v1.3.0` = `16963ee`**（已推送；含 G-3 三平台搜索＋工具行折叠＋G-4 全案[技能/MCP 安装]＋G-5 全案[推理与推理强度]＋cleanPatterns 修复——**源内已含全部产品代码**）。
 - overlay 准备（装配）＝版本 1.3.0＋README＋release-policy（SOURCE 改钉＋白名单重置基础集＋v1.2.0 一次性条目移除）＋装配测试/文档＋selected 复算与干跑。
 - 流程（沿 v1.1.0/v1.2.0 runbook）：root 审验 → 选择性提交 overlay → push → `gh workflow run … -f source_ref=v1.3.0 -f publish=false` → 三平台绿 → 资产独立验收（12 项/摘要/manifest/provenance/本地 ZIP 核验）→ 公开（notes＝功能摘要）→ 未登录核验。
+- **CI 首跑 run `38924209553`（headSha 74a34c9）：mac arm64 ✅、mac x64 ✅、Windows ❌（7 红）**——本批测试（G-3/G-4/G-5）**首次上 Windows CI**，红全为平台语义类：Claude launcher env 平台注入键＋POSIX 信号（×2）、Pi env 收窄平台注入键（×1）、Codex native 夹具（×1）、验证套件（双向核/指纹三触发路径分隔符/H2 键面扫描 ×3）。**修复四路已派**（各属主：先判别「测试适配 vs 产品缺口」，平台适配只做真值分支沿 v1.1.0 先例）；修复文件清单回收后由装配更新 overlay 白名单（overlay-2）→ 重跑 CI。release job 按设计跳过（未发布任何东西）。
+- **Windows 修复轮收口（2026-10-16）**：四路判别全部交回——**产品修复仅 1 处**（Codex win32 taskkill 上界 120ms→2000ms：CI 峰值负载下同秒姊妹用例 212ms 通过为证；仍为有界）；其余 6 处为验证套件平台真值分支（Windows 注入十键＝libuv required_vars 构造性强补[同 CI 三处互异 spawn 实现同集互证]、路径原生分隔符、无 POSIX 信号面、控制字符建盘）；断言本体零放宽。**流程备注（登记）**：`test/测试/g4v2-mcp-verify/g-claude-launcher.test.ts` 由 Claude适配器属主做 launcher 机制级平台分支（判别依赖 libuv 实证，合理分工、如实登记）。overlay-2 白名单＝基础 6＋本 7（1 生产＋6 测试）＝selected 13；装配准备中。
 
 ## 候选 G-4「角色能力安装（技能＋MCP）」（2026-10-16 客户讨论提出，已派细化）
 

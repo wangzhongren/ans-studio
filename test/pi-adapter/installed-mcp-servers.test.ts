@@ -226,7 +226,17 @@ test("env 收窄：自持 transport inheritEnv:false＋最小集；env:NAME 真�
       assert.ok(connected, "接通且落盘 env 清单（env:NAME 展开为真路径 ⇒ 文件存在）");
       const dumpJson = JSON.parse(readFileSync(dump, "utf8")) as { envKeys: string[] };
       const expectedSelf = ["PATH", "PROBE_ENV_DUMP", "PROBE_MARKER"];
-      const platformInjected = ["__CF_USER_TEXT_ENCODING"]; // macOS 平台级注入（env -i 亦见；探针已单核）
+      // 平台级注入（**平台真值豁免**——与 transport 无关、OS 在进程创建时补入；「哨兵不泄漏」断言不受影响）：
+      // · macOS：`__CF_USER_TEXT_ENCODING`（`env -i` 亦见；P0 探针单核）。
+      // · Windows（CI run 38924209553 实据）：`HOMEDRIVE/HOMEPATH/LOGONSERVER/SYSTEMDRIVE/SYSTEMROOT/TEMP/USERDOMAIN/USERNAME/USERPROFILE/WINDIR`
+      //   —— 整组为登录会话级真值（身份/系统目录/临时目录，CreateProcess 语义补入）；**三平台适配器各自独立的
+      //   收窄测试在同一次 Windows CI 中实得同一键集**（本角色/Claude端/Codex端三处 spawn 实现互异）⇒ 平台级、非栈级；
+      //   该次实得同时证：宿主哨兵键零泄漏、名单外业务键为零。
+      const platformInjected = process.platform === "win32"
+        ? ["HOMEDRIVE", "HOMEPATH", "LOGONSERVER", "SYSTEMDRIVE", "SYSTEMROOT", "TEMP", "USERDOMAIN", "USERNAME", "USERPROFILE", "WINDIR"]
+        : process.platform === "darwin"
+          ? ["__CF_USER_TEXT_ENCODING"]
+          : [];
       const extra = dumpJson.envKeys.filter((k) => !expectedSelf.includes(k) && !platformInjected.includes(k));
       assert.deepEqual(extra, [], `子进程 env 键＝自持最小集∪平台注入；实得 ${JSON.stringify(dumpJson.envKeys)}`);
       assert.ok(expectedSelf.every((k) => dumpJson.envKeys.includes(k)), "自持三键在场");

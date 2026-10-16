@@ -83,7 +83,12 @@ test("双向核（自建逐目录表）：登记级坏件集＝读取器 undefin
     fs.mkdirSync(path.join(root, "docs", "skills", "no-reg"), { recursive: true });
     putSkill(root, "bad-fields", { install: "# 缺字段\n- 用途：只有用途\n" });
     putSkill(root, "bad-status", { install: ["- 用途：p", "- 适用角色：X", "- 状态：paused", "- 安装日期：2026-10-16"].join("\n") });
-    putSkill(root, "ctl\u0001name", {});
+    // 控制字符名（name-invalid）：POSIX 可建盘、经渲染器**枚举面**复核；Windows 文件系统禁止 0x00–0x1F
+    // 控制字符（mkdir 直接 ENOENT）——该夹具**不可建盘**（v1.3.0 CI Windows 红修复；平台真值分支）。
+    // 读取器侧（判据先于盘面、直调名）两平台均照常覆盖（见下 badNames 循环）。
+    const CONTROL_NAME = "ctl\u0001name";
+    const controlCreatable = process.platform !== "win32";
+    if (controlCreatable) putSkill(root, CONTROL_NAME, {});
     // 非坏件两种：uninstalled / 别角色
     putSkill(root, "off", { install: ["- 用途：p", "- 适用角色：X", "- 状态：uninstalled", "- 安装日期：2026-10-16"].join("\n") });
     putSkill(root, "for-b", { install: ["- 用途：p", "- 适用角色：B", "- 状态：installed", "- 安装日期：2026-10-16"].join("\n") });
@@ -93,20 +98,20 @@ test("双向核（自建逐目录表）：登记级坏件集＝读取器 undefin
     const diags: InstalledSkillsDiagnostic[] = [];
     const text = renderInstalledSkillsSection(root, "X", (d) => diags.push(d));
 
-    const badNames = ["bad-fields", "bad-status", "ctl\u0001name", "no-reg"];
+    const badNames = ["bad-fields", "bad-status", CONTROL_NAME, "no-reg"];
     for (const name of badNames) {
-      assert.equal(readSkillRegistration(root, name), undefined, `${name}：读取器应 undefined（登记级坏件）`);
+      assert.equal(readSkillRegistration(root, name), undefined, `${name}：读取器应 undefined（登记级坏件——名判据先于盘面，Windows 无盘夹具亦覆盖）`);
     }
     assert.deepEqual(
       diags.map((d) => [d.path, d.reason]).sort(),
       [
         ["docs/skills/bad-fields/install.md", "registration-parse-failed"],
         ["docs/skills/bad-status/install.md", "registration-parse-failed"],
-        ["docs/skills/ctl\u0001name/install.md", "name-invalid"],
+        ...(controlCreatable ? [["docs/skills/ctl\u0001name/install.md", "name-invalid"]] : []),
         ["docs/skills/no-content/SKILL.md", "skill-file-missing"],
         ["docs/skills/no-reg/install.md", "registration-missing"],
       ].sort(),
-      "渲染器诊断集＝登记级坏件集＋内容件缺失（逐条同口径）",
+      `渲染器诊断集＝登记级坏件集＋内容件缺失（逐条同口径${controlCreatable ? "" : "；Windows 无控制字符名盘夹具——枚举面该格不可达、读取器面仍覆盖"}）`,
     );
 
     // 非坏件：读取器返回视图（判读归调用方）；渲染器静默过滤（无诊断）。

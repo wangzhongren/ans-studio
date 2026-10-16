@@ -1,5 +1,9 @@
 # 测试 变更记录
 
+## 2026-10-16 — v1.3.0 CI Windows 红修复：验证套件平台适配（6 红全为测试侧；产品修复需求零）
+
+**来源**：CI run `38924209553` Windows job（regression tests 8 红，其中 test/测试 面 6 红＝本角色验证套件；另 2 红属 Pi适配器/Codex适配器角色）。逐条判别：**双向核**（控制字符 `0x01` 夹具目录不可建盘＝Windows 文件系统真值；读取器名判据先于盘面、直调名覆盖保留）、**① 三触发**（通知点名＝平台原生分隔符真值——桌面窗口属主自有测试已用 `path.join` 冻结同口径且 Windows CI 通过）、**H2**（自扫描面 `path.relative` 反斜杠未归一——**非第四处直读**）、**G1a/G1d/J3**（Windows 对自定义环境块强制补齐的十键 OS/libuv 真值——同一 CI 三处互异 spawn 实现实得相同十键集；SIGTERM＝TerminateProcess 无信号面）。**产品修复需求零**；平台分支只替换平台真值值面、断言本体零放宽。改动 4 文件：`test/测试/g4-skill-verify/b-render-double-check.test.ts`、`test/测试/g4-skill-verify/f-fingerprint.test.ts`、`test/测试/g4v2-mcp-verify/j-pi.test.ts`、`test/测试/g5-reasoning-verify/h-scope-audit.test.ts`（另 `g-claude-launcher.test.ts` 由 Claude适配器角色并发修复，已复核）。复跑：`test/测试/**` **502/502**、全量 **2110/2109/0红/1skip**、typecheck 0；win32 分支经进程内仿真（b-render 7/7）与 `path.win32` 变换证明。详见[修复记录](docs/fix/2026-10-16_fix_windows-ci-platform-branches.md)。未 commit/push。
+
 ## 2026-10-16 — G-5（推理与推理强度）独立验证：整体通过（0 不通过 / 6 备注）
 
 **范围**：契约与归一（五值冻结/三态归一/三 env 键/非法⇒按未设＋诊断不毁会话）、事实通道与投影单点（脱敏/16384 B 预算/omitted 恒空/durationMs 防伪/summary 定格/幂等/坏件诊断/emit 与历史兩路同单点）、Claude 接线（映射未设零参数·off disabled·四档直通·max 不收编/捕获不预脱敏/降级 4xx＋词元恰一次同输入重推）、Codex 接线（五值校验装配前抛/单条 `-c`/off 如实文案/reasoning 事件双信号时长/降级闸恰一次＋负例四格）、Pi 接线（off 前置修复假关闭消除/未设零调用/R1 自证网关三窗修复/捕获/降级终态前消费不二次/429 排除/中断守卫）、设置链（三字段 choices 单源/保存值域拒 trim 规范形空串清除批量原子/pi-config 漂移对齐＋旧路径如实现状）、桌面渲染（四态文案真实执行/select 控件/默认折叠 esc 纯文本/回放载体真驱动）、范围审计（探针纯本地/键读取面单点/零网络面）。

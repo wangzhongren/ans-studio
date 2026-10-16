@@ -1,5 +1,11 @@
 # Pi适配器 变更记录
 
+## 2026-10-16 — v1.3.0 CI（Windows run 38924209553）环境收窄断言红修复：Windows 平台真值豁免（逐键判别）
+
+**来源**：协调函转 CI 红（Windows job）——`test/pi-adapter/installed-mcp-servers.test.ts`「env 收窄」例断言红。**逐键判别（CI 实得键集为准）**：实得＝自持 3 键（PATH/PROBE_ENV_DUMP/PROBE_MARKER）＋ `["HOMEDRIVE","HOMEPATH","LOGONSERVER","SYSTEMDRIVE","SYSTEMROOT","TEMP","USERDOMAIN","USERNAME","USERPROFILE","WINDIR"]`。判定：**十键全为 Windows 平台级注入（真值豁免，沿 macOS `__CF_USER_TEXT_ENCODING` 先例）**——整组为登录会话级真值（身份/系统目录/临时目录，进程创建语义补入）；**同一次 CI 中另两处独立实现**（Claude 端 G1a、Codex 端 J3 的收窄断言）实得**同一键集**（三处 spawn 实现互异）⇒ 平台级、非栈级。**哨兵键零泄漏**（实得键集不含 `P3_MCP_GATEWAY_SENTINEL`）；**名单外业务键为零**——无产品缺口。**修复**：仅测试的平台真值分支——`platformInjected` 按 `process.platform` 选集（win32＝上述十键／darwin＝`__CF_USER_TEXT_ENCODING`／其余＝空），**断言本体零放宽**（「自持键在场」「哨兵不泄漏」字面保留）。与 CI 实得键集程序化比对：**exact match**。产品代码（自持 transport/收窄语义）零改动。
+
+**验证**：本域 `node --test test/pi-adapter/installed-mcp-servers.test.ts` → 8/8；pi-adapter 专项 **286/286**；**全量 2109/2110 过、0 红、1 跳**；`npm run typecheck` **全仓 0 错**。**改动文件（唯一）**：`test/pi-adapter/installed-mcp-servers.test.ts`（工作树 M；余量已被聚合提交）。未 git 提交。
+
 ## 2026-10-16 — G-5 wave 2（Pi）已实施待验证：推理强度接线／off 前置修复／思考捕获／R1 修复／降级恰一次重发
 
 **来源**：客户 2026-10-16 批准 G-5；先探针后接线（探针记录＝`docs/fix/2026-10-16_probe_reasoning-wire.md`＋证据目录；实施记录＝`docs/change/2026-10-16_change_reasoning-effort-pi.md`）。纯本地（loopback；零真实网关请求）；未 git 提交。

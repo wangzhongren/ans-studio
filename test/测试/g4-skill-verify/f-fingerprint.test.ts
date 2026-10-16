@@ -33,7 +33,9 @@ test("① 三触发：新增 / 内容编辑 / 移除——逐触发重建并如�
     const digest1 = writeSkill(h.root, "k1", { roles: "X", content: "v1\n" });
     assert.deepEqual(await h.mgr.refreshStaleBoundaries(), ["X"], "新增技能 ⇒ X 陈旧重建");
     assert.equal(h.disposed("X"), 1);
-    assert.ok(skillEnvelope(h)?.includes("docs/skills/k1/SKILL.md"), `如实点名变化文件：${skillEnvelope(h)}`);
+    // 平台真值（v1.3.0 CI Windows 红修复）：产品按 `changed` 原样点名（Windows 为反斜杠原生分隔符）——
+    // 桌面窗口属主测试同口径（boundary-refresh 用 path.join 冻结）。此处期望值＝平台原生形，断言本体不变。
+    assert.ok(skillEnvelope(h)?.includes(path.join("docs", "skills", "k1", "SKILL.md")), `如实点名变化文件：${skillEnvelope(h)}`);
     assert.ok(skillEnvelope(h)?.includes("已作废旧会话，按新技能登记重开"), "措辞＝技能面（不是边界面）");
 
     // 内容编辑：SKILL.md 字节变化 ⇒ 再触发（此时 X 新会话冻结了旧 digest）。

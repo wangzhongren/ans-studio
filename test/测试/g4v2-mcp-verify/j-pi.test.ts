@@ -224,9 +224,16 @@ test("J3 自持收窄：子进程 env 键＝PATH＋声明键（平台注入除�
       const ok = await until(() => mcpNamesOf(sdk.native).length >= 1 && existsSync(state), 8000);
       assert.ok(ok, "接通且 state 落盘（env:NAME 真值展开 ⇒ 路径有效）");
       const dumped = JSON.parse(readFileSync(state, "utf8")) as { pid: number; envKeys: string[] };
-      const platform = ["__CF_USER_TEXT_ENCODING"];
-      const allowed = new Set(["PATH", "PROBE_STATE", "MARK", ...platform]);
-      const unexpected = dumped.envKeys.filter((k) => !allowed.has(k));
+      // 平台级注入（OS/libuv 真值，与实现无关；v1.3.0 CI Windows 红修复，沿 v1.1.0 平台真值分支先例）：
+      // · macOS：`__CF_USER_TEXT_ENCODING`（CF 运行时注入，env -i 亦见）；· Windows：libuv uv_spawn
+      // 强制补齐的十键（loader/winsock 依赖，env 参数无法阻止）——同一 CI 中本套件 G1a／J3 与
+      // pi-adapter 自有套件三处互异 spawn 实现实得**相同十键集** ⇒ 平台级真值，非泄漏面。
+      // Windows env 名大小写不敏感 ⇒ 按大写归一比对；断言本体零放宽（仍为「恰等−平台真值集」）。
+      const platform = process.platform === "win32"
+        ? ["HOMEDRIVE", "HOMEPATH", "USERDOMAIN", "USERNAME", "USERPROFILE", "LOGONSERVER", "SYSTEMROOT", "SYSTEMDRIVE", "WINDIR", "TEMP"]
+        : ["__CF_USER_TEXT_ENCODING"];
+      const allowed = new Set(["PATH", "PROBE_STATE", "MARK", ...platform].map((name) => name.toUpperCase()));
+      const unexpected = dumped.envKeys.filter((k) => !allowed.has(k.toUpperCase()));
       assert.deepEqual(unexpected, [], `子进程 env 键＝自持最小集∪平台注入；实得 ${JSON.stringify(dumped.envKeys)}`);
       assert.ok(dumped.envKeys.includes("PROBE_STATE") && dumped.envKeys.includes("MARK"), "声明键在场");
       assert.equal(dumped.envKeys.includes(sentinelKey), false, "宿主哨兵绝不泄漏");

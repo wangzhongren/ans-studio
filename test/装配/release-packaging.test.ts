@@ -15,24 +15,43 @@ test('release refuses unreviewed production changes and similarly named private 
   assert.throws(() => selectOverlay(['app/desktop/interface.ts']), /Unreviewed production overlay/);
   assert.throws(() => selectOverlay(['src/common/装配-other/secret.mjs']), /Unreviewed production overlay/);
   assert.throws(() => selectOverlay(['src/provider/claude/session.ts']), /Unreviewed production overlay/);
-  assert.throws(() => selectOverlay(['src/provider/codex/session.ts']), /Unreviewed production overlay/);
   assert.throws(() => selectOverlay(['src/provider/codex/client.ts']), /Unreviewed production overlay/);
   assert.throws(() => selectOverlay(['app/main.ts']), /Unreviewed production overlay/);
   assert.deepEqual(selectOverlay(['package.json', 'test/装配/release-packaging.test.ts', 'test/codex-adapter/electron-launch.test.ts']).selected,
     ['package.json', 'test/装配/release-packaging.test.ts']);
 });
 
-// v1.3.0：白名单**重置为基础集**（打包/版本/发布面——冻结源 tag v1.3.0 已含全部产品代码，本版无随版
-// 修复需求）。v1.2.0 曾按精确路径一次性纳入的两项均已随冻结源吸收、整批移除：src/provider/codex/session.ts
-// 回到 fail-closed 反例位（见上用例）；test/测试/kanban-fixes-verify/f1-timeout.test.ts 及其余未列名
-// test/ 文件（test/runtime-core/** 硬化对等、test/codex-adapter/**）一律 excluded、不随构建树分发。
-// 本用例锁死重置后的「纯打包面精确性」边界（先例：v1.2.0 overlay-1 首次收敛纯打包面）。
+// v1.3.0：白名单**重置为基础集**（打包/版本/发布面——冻结源 tag v1.3.0 已含全部产品代码）。
+// v1.2.0 曾按精确路径一次性纳入的两项均已随冻结源吸收、整批移除（src/provider/codex/session.ts 随后因
+// overlay-2 平台修复**再次**精确列入——见下用例）；test/测试/kanban-fixes-verify/f1-timeout.test.ts 及其余
+// 未列名 test/ 文件（test/runtime-core/** 硬化对等、test/codex-adapter/**）一律 excluded、不随构建树分发。
+// 本用例锁死 test/ 排除面总边界（overlay-2 增列 7 条为精确白名单，不影响未列名文件）。
 test('release overlay keeps the packaging surface exact: unreviewed test files stay excluded', () => {
   const result = selectOverlay(['package.json', 'test/测试/kanban-fixes-verify/f1-timeout.test.ts',
     'test/runtime-core/shell-exec-timeout.test.ts', 'test/runtime-core/fixtures.ts', 'test/codex-adapter/session.test.ts']);
   assert.deepEqual(result.selected, ['package.json']);
   assert.deepEqual(result.excluded, ['test/测试/kanban-fixes-verify/f1-timeout.test.ts',
     'test/runtime-core/shell-exec-timeout.test.ts', 'test/runtime-core/fixtures.ts', 'test/codex-adapter/session.test.ts']);
+});
+
+// overlay-2（首跑 Windows CI run 38924209553 的 8 红处置）：仅 1 处产品修复——src/provider/codex/session.ts
+// （win32 taskkill 清收上界 120ms→2000ms，仍为有界；姊妹用例峰值负载 212ms 通过为证）；其余 6 条为验证套件
+// 平台真值分支（Windows libuv 十键豁免/路径分隔符原生形/POSIX 信号无面/控制字符名不可建盘；断言本体零放宽）。
+// 7 条均按精确路径列入、不开目录——本用例同时锁死入选面与**同目录排除面**（未列名的同目录文件仍 excluded）。
+test('release overlay includes exactly the reviewed Windows-platform fix batch by exact path', () => {
+  const result = selectOverlay(['package.json', 'src/provider/codex/session.ts',
+    'test/pi-adapter/installed-mcp-servers.test.ts', 'test/pi-adapter/installed-skills-injection.test.ts',
+    'test/测试/g4-skill-verify/b-render-double-check.test.ts', 'test/测试/g4-skill-verify/c-preauth.test.ts',
+    'test/测试/g4-skill-verify/f-fingerprint.test.ts',
+    'test/测试/g4v2-mcp-verify/g-claude-launcher.test.ts', 'test/测试/g4v2-mcp-verify/j-pi.test.ts',
+    'test/测试/g5-reasoning-verify/h-scope-audit.test.ts', 'test/测试/g5-reasoning-verify/a-contract.test.ts']);
+  assert.deepEqual(result.selected, ['package.json', 'src/provider/codex/session.ts',
+    'test/pi-adapter/installed-mcp-servers.test.ts',
+    'test/测试/g4-skill-verify/b-render-double-check.test.ts', 'test/测试/g4-skill-verify/f-fingerprint.test.ts',
+    'test/测试/g4v2-mcp-verify/g-claude-launcher.test.ts', 'test/测试/g4v2-mcp-verify/j-pi.test.ts',
+    'test/测试/g5-reasoning-verify/h-scope-audit.test.ts']);
+  assert.deepEqual(result.excluded, ['test/pi-adapter/installed-skills-injection.test.ts',
+    'test/测试/g4-skill-verify/c-preauth.test.ts', 'test/测试/g5-reasoning-verify/a-contract.test.ts']);
 });
 
 import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';

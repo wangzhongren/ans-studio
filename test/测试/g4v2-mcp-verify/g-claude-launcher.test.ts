@@ -14,8 +14,18 @@ import { fileURLToPath } from "node:url";
 
 const LAUNCHER = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "src", "common", "claude-adapter", "mcp-launcher.mjs");
 const BASE_ENV_NAMES = ["PATH", "HOME", "TMPDIR", "TEMP", "TMP", "SystemRoot", "WINDIR", "LANG", "LC_ALL", "SHELL", "USER", "LOGNAME", "TERM"];
-/** macOS 平台级注入（env -i 亦见；P0 探针已单核）——收窄断言以此为唯一允许例外。 */
-const PLATFORM_INJECTED = new Set(["__CF_USER_TEXT_ENCODING"]);
+/**
+ * 平台级环境注入（OS/libuv 真值，与 env 参数、spawn 实现无关）——收窄断言以此为**唯一**允许例外，
+ * 断言本体零放宽（仍为「恰等」，仅扣除此文档化平台集；沿 v1.1.0 平台真值分支先例）。
+ * · macOS：`__CF_USER_TEXT_ENCODING`（CoreFoundation 运行时注入；`env -i` 亦见；P0 探针已单核）。
+ * · Windows：libuv `uv_spawn` required_vars 缺则强制补齐（winsock/loader 依赖，env 参数无法阻止）——
+ *   恰十键（HOMEDRIVE/HOMEPATH/USERDOMAIN/USERNAME/USERPROFILE/LOGONSERVER/SYSTEMROOT/SYSTEMDRIVE/WINDIR/TEMP）；
+ *   同一 CI 中三处互异 spawn 实现实得完全相同十键集（Pi 自持 transport / 本 launcher / Codex 端）⇒ 平台级真值。
+ *   Windows env 名大小写不敏感 ⇒ 按大写归一比对。
+ */
+const PLATFORM_INJECTED = new Set((process.platform === "win32"
+  ? ["HOMEDRIVE", "HOMEPATH", "USERDOMAIN", "USERNAME", "USERPROFILE", "LOGONSERVER", "SYSTEMROOT", "SYSTEMDRIVE", "WINDIR", "TEMP"]
+  : ["__CF_USER_TEXT_ENCODING"]).map((name) => name.toUpperCase()));
 
 interface Run {
   code: number | null;
@@ -79,7 +89,7 @@ test("G1a 收窄洽等：子进程 env 键＝基线键（在场者）∪ 声明�
   const report = JSON.parse(run.stdout.trim().split("\n").at(-1)!) as { keys: string[]; [k: string]: unknown };
   const expectedBase = BASE_ENV_NAMES.filter((name) => launcherEnv[name] !== undefined);
   const allowed = new Set([...expectedBase, ...["TOK", "LIT", "SECOND"]]);
-  const unexpected = report.keys.filter((k) => !allowed.has(k) && !PLATFORM_INJECTED.has(k));
+  const unexpected = report.keys.filter((k) => !allowed.has(k) && !PLATFORM_INJECTED.has(k.toUpperCase()));
   assert.deepEqual(unexpected, [], `子进程不得出现名单外键：${JSON.stringify(report.keys)}`);
   assert.equal(report["tok"], "declared-token-value", "声明名单键值在场");
   assert.equal(report["lit"], "literal-marker");
@@ -128,11 +138,16 @@ test("G1d 信号与性态：stdout 直通（JSON-RPC 通道）；SIGTERM 转发�
   const echo = await runLauncher([process.execPath, "-e", "process.stdout.write('PASSTHRU-MARKER\\n')"], env);
   assert.equal(echo.code, 0);
   assert.ok(echo.stdout.includes("PASSTHRU-MARKER"), "stdout 逐字直通");
-  // 真命令自 SIGTERM：launcher 以同信号退出
+  // 真命令自 SIGTERM：POSIX＝launcher 以同信号退出；Windows＝无信号面（平台终止以实得退出码如实回传）。
   const selfKill = await runLauncher([process.execPath, "-e", "process.kill(process.pid,'SIGTERM')"], env);
-  assert.equal(selfKill.code, null);
-  assert.equal(selfKill.signal, "SIGTERM", "真命令死于 SIGTERM ⇒ 启动器同信号退出（父进程看到一致死因）");
-  // 转发：先让真命令写 pid 文件，再 SIGTERM 启动器；真命令须随之死亡
+  if (process.platform === "win32") {
+    assert.equal(selfKill.signal, null, "Windows 无信号面：终止不携带死因信号（沿 v1.1.0 先例，仅钉信号面真值）");
+    assert.equal(selfKill.code, 1, "Windows：真命令被平台终止（TerminateProcess 退出码 1）⇒ 启动器以实得退出码原样回传");
+  } else {
+    assert.equal(selfKill.code, null);
+    assert.equal(selfKill.signal, "SIGTERM", "真命令死于 SIGTERM ⇒ 启动器同信号退出（父进程看到一致死因）");
+  }
+  // 转发：先让真命令写 pid 文件，再 SIGTERM 启动器；POSIX 下真命令须随之死亡。
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "g4v2-launcher-"));
   try {
     const pidFile = path.join(dir, "pid.txt");
@@ -140,13 +155,27 @@ test("G1d 信号与性态：stdout 直通（JSON-RPC 通道）；SIGTERM 转发�
     const run = await runLauncher([process.execPath, "-e", script], env, { killAfterMs: 150, waitForFile: pidFile });
     const pid = Number(fs.readFileSync(pidFile, "utf8"));
     assert.ok(Number.isFinite(pid) && pid > 0, "真命令 pid 已记录");
-    const deadline = Date.now() + 5000;
-    let alive = true;
-    while (Date.now() < deadline) {
-      try { process.kill(pid, 0); await new Promise((r) => setTimeout(r, 30)); } catch { alive = false; break; }
+    if (process.platform === "win32") {
+      // Windows 真值（如实钉、不假装转发成功）：无 POSIX 信号投递面——测试的终止只达**启动器**
+      // （信号处理器不参与），转发机制不存在；真命令的处置由 stdin EOF 继承（MCP 惯例：调用方关
+      // 管道即达真命令）与调用方进程树清理决定。本 stub 不读 stdin，故必然存活——如实断言存活并
+      // 自行清理，绝不断言「转发成功」。POSIX 语义断言（无孤儿＋同信号退出）保留在其平台分支。
+      await new Promise((r) => setTimeout(r, 300));
+      assert.equal(run.signal, null, "Windows：启动器被平台终止（无信号面）");
+      assert.equal(run.code, 1, "Windows：启动器终止以实得退出码 1 如实回传");
+      let alive = true;
+      try { process.kill(pid, 0); } catch { alive = false; }
+      assert.equal(alive, true, "Windows 真值：无信号转发通道，忽略 stdin 的 stub 在启动器终止后存活（清理归调用方）");
+      try { process.kill(pid); } catch { /* 已退出 */ }
+    } else {
+      const deadline = Date.now() + 5000;
+      let alive = true;
+      while (Date.now() < deadline) {
+        try { process.kill(pid, 0); await new Promise((r) => setTimeout(r, 30)); } catch { alive = false; break; }
+      }
+      assert.equal(alive, false, "启动器收到 SIGTERM 后真命令退出（转发生效、无孤儿）");
+      assert.equal(run.signal, "SIGTERM", "启动器自身同信号退出");
     }
-    assert.equal(alive, false, "启动器收到 SIGTERM 后真命令退出（转发生效、无孤儿）");
-    assert.equal(run.signal, "SIGTERM", "启动器自身同信号退出");
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

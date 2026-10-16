@@ -234,12 +234,17 @@ async function nativeEngine(input: CodexEngineInput, cliPath?: string): Promise<
       try {
         if (process.platform === "win32") {
           // Kill the tree before terminating its wrapper; Windows SIGTERM does not forward.
+          // 平台真值（v1.3.0 CI 实证，run 38924209553）：windows-2025 全量测试峰值并行时，
+          // taskkill.exe 的 spawn+kill+exit 超出过原 120ms 上界（同 CI 内同 close 路径的姊妹
+          // 原生进程用例轻负载时序位通过）——120ms 是过紧的假失败源（杀树本身未失败，是等待
+          // 上限误伤）。放宽到平台现实值 2000ms，仍为**有界**（真挂起照限如实失败）；后续
+          // 80/80ms 等待为 EBUSY 修复的有意收紧、沿用不动。
           if (!exited && child.pid) {
             const killer = spawn("taskkill.exe", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
             await bounded(new Promise<void>((resolve, reject) => {
               killer.once("error", reject);
               killer.once("exit", code => { if (code === 0) resolve(); else reject(new Error("Codex owned Windows process tree cleanup failed")); });
-            }), 120, "Windows process cleanup");
+            }), 2000, "Windows process cleanup");
           }
           child.stdin.destroy();
           await bounded(exit.promise, 80, "Windows process exit");

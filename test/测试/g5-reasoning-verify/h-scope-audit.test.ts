@@ -47,7 +47,9 @@ test("H2 env 键读取面单点：三键字面量仅出现在定义（reasoning.
   const scan = (dir: string, filter: (file: string) => boolean) => {
     for (const entry of fs.readdirSync(path.join(REPO, dir), { recursive: true, withFileTypes: true })) {
       if (!entry.isFile()) continue;
-      const relative = path.relative(REPO, path.join(entry.parentPath, entry.name));
+      // 平台归一：path.relative 在 Windows 产出反斜杠分隔的相对路径——登记面（expected）为正斜杠形，
+      // 扫描面统一归一到 "/"（v1.3.0 CI Windows 红修复；断言本体不变，仅平台真值归一）。
+      const relative = path.relative(REPO, path.join(entry.parentPath, entry.name)).split(path.sep).join("/");
       if (!filter(relative)) continue;
       const source = fs.readFileSync(path.join(REPO, relative), "utf8");
       for (const [runtime, key] of Object.entries(REASONING_EFFORT_ENV_KEYS)) {
