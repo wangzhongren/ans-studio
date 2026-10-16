@@ -63,3 +63,21 @@ U1R2本侧冻结：原卡按真实request/conclusion重插与显式null token保
 待接线索（重要）：**W5（presenter/执行桥）与 O1（文案单一来源）均未落树**——渲染侧按「以 W5 交回为准」防御式接线（`if (d.onRecoveryConfirm)` 缺席零影响）；推达 payload 建议随带 projectRoot/runtime（沿 shell:confirm-request 先例，否则异引擎视图会被 Rt.matchesView 丢弃）；回包口径 {ok}/{expired:true}/{error}。**O1 若改掉 `[系统·` 标记形态，归类会静默回落普通气泡**——唯一改动点=SYSTEM_HEAD 一带（注释即契约）。W2 的队列快照 `kind:"system"` 渲染侧已就绪（summaries 短句由主进程产，无新数据源）。
 
 测试：边界 80/80、桌面目录 321/321、e2e G2 5 项 + COMPLETE_FLOW 41 + 默认台 99、typecheck 全仓 0 错。指纹：renderer 928ffacd / tool-rows 02d75fb2 / ui-labels 564fdb9a / index a39e3652 / styles dbbb66f0 / tool-rows.test 6881dc34 / renderer.test 606e5287 / uiux-v2 aa8565bb。证据：`docs/fix/2026-10-16-g2-recovery-card-evidence/`（卡面两档截图 + 三份 report）。Doc: docs/fix/2026-10-16_fix_g2-recovery-card-and-system-rows.md
+
+## 2026-10-16 视觉收敛 v3 实施轮（间距/密度/相位合并/转轮）
+
+客户「按推荐批准，开始实施」（只做 ①–⑦；**W8 不在批准清单，未做**；§二(c) 不动清单零触碰）。设计 2026-10-16_design_visual-convergence-v3.md。本侧落地：W1–W6 按默认档（gap16/p10/h3 16-6/气泡9-14+24/输入区14-32-12+空框28/活动行5/注入盒1.6）、W6b 系统行 `displayBody` 去前缀、S1 相位合并（`tool-rows.js::mergePhases` 下标映射 + `fillActivities` 终态渲染，`data.items` 本体不动）、S4 `callSummary`「N 个调用/· 异常 M」、S2 chip margin-left calc（实测 x 240→384 diff 0）、S3 chip 可见⇒尾行让位（`opChipShown()` 判据、updateOpChip 三口回呼联动）、W9–W11 `role-status.js::SPINNER_SVG` 单点（iconHtml 决胜 + 尾行 + loading；`.spinner` 退役；v3spin 0.9s 恰两条规则；reduced-motion 全局兜底）。
+
+续接线索（重要，供复验）：① e2e 验收段在 `uiux-design-audit.mjs` 的 **v3 段**（30 断言，失败即非零退出）；其 runtime-config:get 夹具已修为新形状（旧形状会顶 48px 顶部告警条挤压视口——UIUX 亦记录过该过期提示）；**密度转录顺序敏感**：全量回放会重建 pane 并清空 #chat 子节点（chip 元素随之离场，直到下次 updateOpChip）——夹具按「卡/系统行先到达、回放后、live 系统行垫底」构型；chip 可见态另以同角色重选单验。② `_activity-phases`/`data-activity-index` 口径：捕获用首相位下标，恢复选择器已加 `[data-activity-phases~=]` 兜底。③ 已知跨边界：main.mjs 的 `ROLE_STATE_BADGE_HAS_ICON` 因纯 SVG ts-ico 失效（需桌面窗口侧改查 `.ts-ico svg.spin-arc`）；main.mjs 另有存量过期红（badge 已挂 tab-work 却查 tab-card，且在此空指针崩溃）——非本批引入但需同步。④ v2 基线修订 5 处断言（旧→新与理由见 fix 记录 §4），不属「放松断言」而系批准的口径变更；后续若客户回滚 v3，按记录 §5 分项还原。⑤ 工作概览队列条目的 `[系统·X]` 前缀未动（W6b 只含聊天流系统行；主进程 summaries 原文）。
+
+证据与指纹：`docs/fix/2026-10-16-visual-convergence-v3-evidence/`（v3-after-*.png + audit-report.json）；role-status ba3051c8 / tool-rows 3f851983 / renderer 0d704b44 / styles 7f83b2bc / tool-rows.test a0915e71 / renderer.test 74630b45 / uiux-v2 08aa1845 / uiux-design-audit 9d1b05c9。Doc: docs/fix/2026-10-16_fix_visual-convergence-v3-implementation.md
+
+## 2026-10-16 U1 提示条补滚（桌面窗口 e2e 路由缺陷修复轮）
+
+桌面窗口自检台定位、PM 路由：`U1_WINDOWED_TO_BOTTOM` 确定性 false（dist=18px），V2 批 fd0ac73 引入。根因链：V2 把提示从聊天区下方搬到上方 `.session-notice` 条（空时 display:none 零高）→ 点角色立即贴底（dist=0）→ selectRole **异步尾部**的 `setHint(res.note)`（「…续接当前会话。」）让条 0→≈19px 展开、#chat 变矮 18px 且无补滚 ⇒ 距底恰 18px。
+
+本侧修法（最小、保持既有滚动语义）：`renderer.js` 新增 `noticeLayoutPin()`+`restickAfterNoticeChange(pin)`（L148/L157），包住同一根条**两个写方**（`setHint`、`renderContextState` 的 `#history-projection-note` 写入）「先量后写」——改前按 S-1 同款判据（`UiLabels.stickToBottom`+`STICK_THRESHOLD_PX=24`）记「是否在底部附近」＋条高；改后**条高确有变化且原在底部**才补 `chat.scrollTop=chat.scrollHeight`（上翻者不打扰/高度不变不动/`batchDepth>0` 照 Q-1 只登记/`backgroundDelivery` 放弃）。强制贴底与 S-1 流式粘性逐字未动；无计时器。
+
+续接线索（事实与判断，供复验）：① 判据挂在「**条高变化**」而非任一事件上——若未来把提示条改回零高驻留/并入别处，助手行为自然失效为 no-op，需随设计重定；② 同族两条（`#runtime-config-notice`/`#switch-confirm`）出现时同样使 #chat 变矮，本轮**范围外未动**，同一「量—写—补」范式可平移（建议单独批次）；③ 手输仿前缀：实时路径已由身份绑定保护（`bindManualTurn` canonical `["input",turnId]` + `appendOneEvent` 同键去重）；**回放路径为残余边界**（历史行无身份 ⇒ 仿前缀手输行回放时归成注入行，呈现层来源张冠李戴、无数据/授权面影响）；最小修复=历史行携带投递身份（落点 `app/desktop/session-history.ts` + 编排 `handback.ts` 族，**跨本侧边界**，未实施、建议路由）；④ 过时注释已同步三处（L2325/L4208/L3233 一带，含「15s 防误伤」启发式 fca8f6b 已删→身份绑定；`lastManualSend` 无读取方、仅记录——勿据此记录做归类判断）；⑤ 2026-10-14 changelog 旧「U1 偶发/夹具时序、无法复现」定性就此被确定性机制替换；⑥ 桌面窗口 main.mjs 只读运行、未改。
+
+证据与指纹：桌面窗口 e2e `E2E_DONE=1`、U1_WINDOWED_TO_BOTTOM dist 18→0 转 true（U1_NORMAL/U1_REPEAT、S-1 五组粘性断言全 true 不变）；边界 354/354；全仓 1678（1677 过/0 败/1 跳过）；typecheck 全仓 0 错；uiux-v2 默认 99。`docs/fix/2026-10-16-u1-notice-restick-evidence/`（before/after 关键行 + 修复轮完整报告）。renderer.js 3179388f（原 0d704b44）/ renderer.test.ts d2c267f6（原 74630b45）；其余文件零触碰。Doc: docs/fix/2026-10-16_fix_u1-notice-restick.md

@@ -1,0 +1,146 @@
+{
+  "electron": "44.7.0",
+  "fixtures": {
+    "before": {
+      "rows": [
+        {
+          "status": "工作中",
+          "ico": ""
+        },
+        {
+          "status": "工作中 · 1 待办",
+          "ico": ""
+        },
+        {
+          "status": "?待选择",
+          "ico": "?"
+        },
+        {
+          "status": "●空闲",
+          "ico": "●"
+        }
+      ],
+      "toolCurrent": {
+        "text": "正在工作",
+        "height": 26.6,
+        "hasSvg": true,
+        "anim": "v3spin 0.9s"
+      },
+      "workingIco": {
+        "hasSvg": true,
+        "boxW": 12,
+        "svgW": 16.1,
+        "svgH": 16.1,
+        "anim": "v3spin 0.9s"
+      },
+      "spinner": null
+    },
+    "loadingBefore": {
+      "rows": [
+        {
+          "status": "工作中",
+          "ico": ""
+        },
+        {
+          "status": "工作中 · 1 待办",
+          "ico": ""
+        },
+        {
+          "status": "?待选择",
+          "ico": "?"
+        },
+        {
+          "status": "●空闲",
+          "ico": "●"
+        }
+      ],
+      "toolCurrent": null,
+      "workingIco": {
+        "hasSvg": true,
+        "boxW": 12,
+        "svgW": 16.1,
+        "svgH": 16.1,
+        "anim": "v3spin 0.9s"
+      },
+      "spinner": {
+        "tag": "svg",
+        "cls": {},
+        "anim": "v3spin 0.9s",
+        "w": 16.1
+      }
+    },
+    "loadingAfter": {
+      "rows": [
+        {
+          "status": "工作中",
+          "ico": ""
+        },
+        {
+          "status": "工作中 · 1 待办",
+          "ico": ""
+        },
+        {
+          "status": "?待选择",
+          "ico": "?"
+        },
+        {
+          "status": "●空闲",
+          "ico": "●"
+        }
+      ],
+      "toolCurrent": null,
+      "workingIco": {
+        "hasSvg": true,
+        "boxW": 12,
+        "svgW": 13.9,
+        "svgH": 13.9,
+        "anim": "v3spin 0.9s"
+      },
+      "spinner": {
+        "tag": "svg",
+        "cls": {},
+        "anim": "v3spin 0.9s",
+        "w": 13.9
+      }
+    },
+    "after": {
+      "rows": [
+        {
+          "status": "工作中",
+          "ico": ""
+        },
+        {
+          "status": "工作中 · 1 待办",
+          "ico": ""
+        },
+        {
+          "status": "?待选择",
+          "ico": "?"
+        },
+        {
+          "status": "●空闲",
+          "ico": "●"
+        }
+      ],
+      "toolCurrent": {
+        "text": "正在工作",
+        "height": 26.6,
+        "hasSvg": true,
+        "anim": "v3spin 0.9s"
+      },
+      "workingIco": {
+        "hasSvg": true,
+        "boxW": 12,
+        "svgW": 16.4,
+        "svgH": 16.4,
+        "anim": "v3spin 0.9s"
+      },
+      "spinner": null
+    },
+    "reducedMotion": {
+      "matchesReduce": true,
+      "animationDuration": "1e-06s",
+      "animationIterationCount": "1"
+    }
+  }
+}

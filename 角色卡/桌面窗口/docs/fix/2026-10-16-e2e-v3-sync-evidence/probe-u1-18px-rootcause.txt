@@ -1,0 +1,13 @@
+AFTER_SELECT={"count":2,"kids":3,"sel":"桌面窗口","empty":false}
+AFTER_FILLS={"count":202,"kids":43,"sel":"桌面窗口","empty":false} dist=0 meta={"sh":9756,"st":9190,"ch":566}
+ON_SU dist=0
+NOTICE_ON_SU={"sn":0,"snText":"","hint":"","proj":"","head":72}
+T0 dist=18 meta={"sh":9756,"st":9190,"ch":548} kids=43
+NOTICE_T120={"sn":19,"snText":"已在该角色的会话中，续接当前会话。","hint":"已在该角色的会话中，续接当前会话。","proj":"","head":72}
+T120 dist=18 meta={"sh":9756,"st":9190,"ch":548} kids=43
+NOTICE_T720={"sn":19,"snText":"已在该角色的会话中，续接当前会话。","hint":"已在该角色的会话中，续接当前会话。","proj":"","head":72}
+T720 dist=18 meta={"sh":9756,"st":9190,"ch":548}
+T2.2s dist=18 meta={"sh":9756,"st":9190,"ch":548}
+T5.2s dist=18 meta={"sh":9756,"st":9190,"ch":548} kids=43
+PANE_H=9700
+TAIL_CLASSES=["tool-records","tool-records","tool-records","tool-records","virt-spacer"]

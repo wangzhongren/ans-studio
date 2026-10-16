@@ -1,0 +1,12 @@
+242c242
+< P1_ARRIVAL_DEBUG={"hasCard":true,"dist":46,"st":2831,"sh":3491,"ch":614,"crTop":518,"crBottom":641,"ccTop":108,"ccBottom":722,"chipHidden":false}
+---
+> P1_ARRIVAL_DEBUG={"hasCard":true,"dist":46,"st":2879,"sh":3491,"ch":566,"crTop":518,"crBottom":641,"ccTop":156,"ccBottom":722,"chipHidden":false}
+279c279
+< U1_WINDOWED_TO_BOTTOM_DIST=0
+---
+> U1_WINDOWED_TO_BOTTOM_DIST=18
+281c281
+< U1_WINDOWED_TO_BOTTOM=true
+---
+> U1_WINDOWED_TO_BOTTOM=false

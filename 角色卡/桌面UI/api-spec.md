@@ -78,3 +78,27 @@ work、card、pi、document复用424模态抽屉。仅导航/会话业务面iner
 源与received报告共享reportBody：来源眉题/标题/声明，真实summary有界视图预览，完整可用safe summary/evidence可展开；source保存与独立验收分开，target回执在batch层。公开typedflags与unknown/省略照留，不改预算/modelPromptText。原文折叠仅实际report/source-turn关联：live等真实settled，cold非活动历史仅中性入口；无turn legacy不猜。记录自己的explicit open与既有replaytoken，保原位置，不合并工具/系统诊断/决定/终态。
 
 布局按accepted V2（208/176、800、424、32）及180px右对齐引擎菜单；菜单只调用既有公开ANSEngineSelector.placement，未修改readonly selector模块或复制其viewport规则。当前字节/实际测试/有效图与排除图见本轮own evidence manifest；普通chat不生成报告、报告声明不等独立验收仍为不变量。
+
+## 2026-10-16 视觉收敛 v3 实施面（批准①–⑦）
+
+新增/变化的**渲染侧导出**（node 同源加载面）：
+- `app/renderer/role-status.js`（`ANSRoleStatus`）：新增 `SPINNER_SVG`（全应用唯一一枚 12px SVG 弧线转轮图源，
+  静止可读；`.spin-arc` 钩子）；`statusBadge()` 返回新增 `iconHtml`（目前仅 `working` 带 = `SPINNER_SVG`；
+  `icon` 文本字形字段保留——一态一图标断言不变）。
+- `app/renderer/tool-rows.js`（`ANSToolRows`）：新增 `mergePhases(items)`（S1 相位合并下标映射
+  `[{index, phases[]}]`；同 toolCallId+turn 合并、无 callId 不并、不折叠重复调用）与 `callSummary(items)`
+  （S4 计数 `{calls, exceptional, unknown}`）；`classifyInjectedMessage` 的 system 结果新增 `displayBody`
+  （W6b 展示正文，剥离 `[系统·<子类>] ` 前缀；`body` 原文与判据不改）。
+
+**DOM/呈现契约**（e2e 与源码守卫按此断言；旧钩子全部保留）：
+- 执行记录组：合并行 `.tool-activity` 携带 `data-activity-index`（首相位下标，读取捕获口径不变）与新增
+  `data-activity-phases`（空格分隔的各相位下标，恢复兜底选择器）；行态为相位标签链（「调用发起 → …」），
+  各相位安全详情仍以 `data-legacy-index`（原下标）折叠呈现；组摘要为「N 个调用（· 异常 M）（· 含状态未记录）」。
+- `#chat > .op-chip` 新增定位规则（左缘对齐 `.chat-pane`，随列宽自适应）；chip 可见时 `.tool-current`
+  「等待你确认」不渲染（`renderCurrentWork`↔`updateOpChip` 同源联动；「正在工作」保留且带转轮）。
+- 转轮类 `.spin-arc`（12px SVG）出现在：`.ti-status.st-working .ts-ico`（工作徽标）、`.tool-current`
+  （正在工作尾行）、`.sys-loading`（开会话 loading）；动画唯二规则 `v3spin 0.9s linear infinite`；边框转轮
+  `.spinner` 与 `@keyframes spin` **已退役**（不得回潮，守卫钉死）；reduced-motion 走全局既有规则（静止弧）。
+
+**契约边界**：以上均为渲染侧内部呈现面；IPC 通道、事件形状与主进程契约**零变化**（跨边界需求仍走桌面窗口）。
+验收与证据：`docs/fix/2026-10-16_fix_visual-convergence-v3-implementation.md`（§4 逐条断言 + 截图对照）。

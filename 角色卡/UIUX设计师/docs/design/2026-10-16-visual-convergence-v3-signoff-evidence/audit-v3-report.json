@@ -1,0 +1,2218 @@
+{
+  "electron": "44.7.0",
+  "fixtures": {
+    "empty": {
+      "viewport": {
+        "w": 1360,
+        "h": 860,
+        "bodyScrollW": 1360,
+        "rootScrollW": 1360
+      },
+      "sidebar": {
+        "items": []
+      },
+      "tabs": {
+        "work": "工作概览",
+        "card": "角色资料",
+        "badge": ""
+      },
+      "chatHead": {
+        "role": "未选择角色",
+        "sub": {
+          "text": "",
+          "hidden": true
+        },
+        "note": "实际写入导入项目，角色边界外的写入会被拒绝。"
+      },
+      "sessionNotice": {
+        "text": "",
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0,
+          "right": 0,
+          "bottom": 0
+        }
+      },
+      "sysInjected": [],
+      "sysInjectedChip": null,
+      "records": {
+        "present": false,
+        "summary": null,
+        "open": null
+      },
+      "denied": null,
+      "opCard": null,
+      "opChip": null,
+      "queueDrawer": null,
+      "recoveryCard": null,
+      "emptyState": {
+        "title": "导入项目后，点击左侧任意角色即可开始聊天",
+        "sub": "引擎配置可在左下角设置中查看。写入由治理引擎把关，越界操作会在对话中直接提示。"
+      },
+      "composeNote": "普通聊天不会自动产生任务报告实际写入导入项目，角色边界外的写入会被拒绝。"
+    },
+    "chatA": {
+      "viewport": {
+        "w": 1360,
+        "h": 860,
+        "bodyScrollW": 1360,
+        "rootScrollW": 1360
+      },
+      "sidebar": {
+        "items": [
+          {
+            "text": "ssuPi · ?等待你确认 · 3 待办",
+            "status": "?等待你确认 · 3 待办",
+            "title": "有交互请求挂起，等你在会话流里作答；另有 3 项待办在队列中（完成后依次处理） ｜ 最近事件（16:08:14）：[系统·看护] 投递排队积压"
+          },
+          {
+            "text": "产产品Pi · ?待选择 · 1 待办",
+            "status": "?待选择 · 1 待办",
+            "title": "有交互请求挂起，等你在会话流里作答；另有 1 项待办在队列中（完成后依次处理）"
+          },
+          {
+            "text": "编编排Pi · ✕错误",
+            "status": "✕错误",
+            "title": "最近一次轮次或会话以错误结束 ｜ 最近事件（16:08:13）：本轮已结束（失败）"
+          },
+          {
+            "text": "桌桌面UIPi · ●空闲",
+            "status": "●空闲",
+            "title": "会话已开启，当前没有在跑的任务"
+          }
+        ]
+      },
+      "tabs": {
+        "work": "工作概览 4",
+        "card": "角色资料",
+        "badge": "4"
+      },
+      "chatHead": {
+        "role": "su",
+        "sub": {
+          "text": "",
+          "hidden": true
+        },
+        "note": "实际写入导入项目，角色边界外的写入会被拒绝。"
+      },
+      "sessionNotice": {
+        "text": "",
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0,
+          "right": 0,
+          "bottom": 0
+        }
+      },
+      "sysInjected": [
+        {
+          "cls": "msg msg-injected is-system",
+          "chip": "系统消息 · 看护",
+          "bodyHead": "投递排队积压：角色「编排」队首任务已排队 12 分钟（深度 3）。\n",
+          "rect": {
+            "x": 552.9,
+            "y": 558.6,
+            "w": 462.2,
+            "h": 68.9
+          },
+          "style": {
+            "border": "",
+            "borderLeft": "3px solid rgb(205, 215, 206)",
+            "bg": "rgb(255, 255, 255)",
+            "radius": "10px",
+            "padding": "9px 12px"
+          }
+        }
+      ],
+      "sysInjectedChip": {
+        "background-color": "rgb(245, 246, 242)",
+        "color": "rgb(93, 104, 98)",
+        "border-radius": "999px",
+        "padding": "0px 7px",
+        "font-size": "10.5px",
+        "line-height": "18.9px",
+        "font-weight": "400",
+        "border": "1px solid rgb(221, 226, 220)",
+        "border-left": "1px solid rgb(221, 226, 220)",
+        "border-top": "1px solid rgb(221, 226, 220)",
+        "border-bottom": "1px solid rgb(221, 226, 220)",
+        "margin": "0px",
+        "max-width": "none",
+        "display": "block",
+        "align-items": "normal",
+        "gap": "normal",
+        "grid-template-columns": "none",
+        "width": "88.3125px",
+        "height": "20.8906px",
+        "white-space": "normal"
+      },
+      "records": {
+        "present": true,
+        "summary": "查看执行记录2 个调用 · 含状态未记录",
+        "open": false
+      },
+      "denied": null,
+      "opCard": {
+        "rect": {
+          "x": 384,
+          "y": 406.2,
+          "w": 800,
+          "h": 136.4,
+          "right": 1184,
+          "bottom": 542.6
+        },
+        "title": "需要你确认：是否按看护建议先停掉卡死的轮次？",
+        "buttons": [
+          "确认",
+          "不同意"
+        ]
+      },
+      "opChip": {
+        "rect": {
+          "x": 384,
+          "y": 650.4,
+          "w": 154.6,
+          "h": 30,
+          "right": 538.6,
+          "bottom": 680.4
+        },
+        "text": "有 1 条待确认 · 定位"
+      },
+      "queueDrawer": null,
+      "recoveryCard": null,
+      "emptyState": null,
+      "composeNote": "普通聊天不会自动产生任务报告实际写入导入项目，角色边界外的写入会被拒绝。"
+    },
+    "work": {
+      "viewport": {
+        "w": 1360,
+        "h": 860,
+        "bodyScrollW": 1360,
+        "rootScrollW": 1360
+      },
+      "sidebar": {
+        "items": [
+          {
+            "text": "ssuPi · ?等待你确认 · 3 待办",
+            "status": "?等待你确认 · 3 待办",
+            "title": "有交互请求挂起，等你在会话流里作答；另有 3 项待办在队列中（完成后依次处理） ｜ 最近事件（16:08:14）：[系统·看护] 投递排队积压"
+          },
+          {
+            "text": "产产品Pi · ?待选择 · 1 待办",
+            "status": "?待选择 · 1 待办",
+            "title": "有交互请求挂起，等你在会话流里作答；另有 1 项待办在队列中（完成后依次处理）"
+          },
+          {
+            "text": "编编排Pi · ✕错误",
+            "status": "✕错误",
+            "title": "最近一次轮次或会话以错误结束 ｜ 最近事件（16:08:13）：本轮已结束（失败）"
+          },
+          {
+            "text": "桌桌面UIPi · ●空闲",
+            "status": "●空闲",
+            "title": "会话已开启，当前没有在跑的任务"
+          }
+        ]
+      },
+      "tabs": {
+        "work": "工作概览 5",
+        "card": "角色资料",
+        "badge": "5"
+      },
+      "chatHead": {
+        "role": "su",
+        "sub": {
+          "text": "",
+          "hidden": true
+        },
+        "note": "实际写入导入项目，角色边界外的写入会被拒绝。"
+      },
+      "sessionNotice": {
+        "text": "",
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0,
+          "right": 0,
+          "bottom": 0
+        }
+      },
+      "sysInjected": [
+        {
+          "cls": "msg msg-injected is-system",
+          "chip": "系统消息 · 看护",
+          "bodyHead": "投递排队积压：角色「编排」队首任务已排队 12 分钟（深度 3）。\n",
+          "rect": {
+            "x": 552.9,
+            "y": 658.8,
+            "w": 462.2,
+            "h": 68.9
+          },
+          "style": {
+            "border": "",
+            "borderLeft": "3px solid rgb(205, 215, 206)",
+            "bg": "rgb(255, 255, 255)",
+            "radius": "10px",
+            "padding": "9px 12px"
+          }
+        }
+      ],
+      "sysInjectedChip": {
+        "background-color": "rgb(245, 246, 242)",
+        "color": "rgb(93, 104, 98)",
+        "border-radius": "999px",
+        "padding": "0px 7px",
+        "font-size": "10.5px",
+        "line-height": "18.9px",
+        "font-weight": "400",
+        "border": "1px solid rgb(221, 226, 220)",
+        "border-left": "1px solid rgb(221, 226, 220)",
+        "border-top": "1px solid rgb(221, 226, 220)",
+        "border-bottom": "1px solid rgb(221, 226, 220)",
+        "margin": "0px",
+        "max-width": "none",
+        "display": "block",
+        "align-items": "normal",
+        "gap": "normal",
+        "grid-template-columns": "none",
+        "width": "88.3125px",
+        "height": "20.8906px",
+        "white-space": "normal"
+      },
+      "records": {
+        "present": true,
+        "summary": "查看执行记录2 个调用 · 含状态未记录",
+        "open": true
+      },
+      "denied": null,
+      "opCard": {
+        "rect": {
+          "x": 384,
+          "y": 506.4,
+          "w": 800,
+          "h": 136.4,
+          "right": 1184,
+          "bottom": 642.8
+        },
+        "title": "需要你确认：是否按看护建议先停掉卡死的轮次？",
+        "buttons": [
+          "确认",
+          "不同意"
+        ]
+      },
+      "opChip": {
+        "rect": {
+          "x": 384,
+          "y": 650.4,
+          "w": 154.6,
+          "h": 30,
+          "right": 538.6,
+          "bottom": 680.4
+        },
+        "text": "有 1 条待确认 · 定位"
+      },
+      "queueDrawer": {
+        "title": "su · 工作概览",
+        "headings": [
+          "待处理 1",
+          "当前工作",
+          "排队"
+        ],
+        "items": [
+          {
+            "cls": "q-item is-running",
+            "src": "客户消息",
+            "pos": "",
+            "meta": "15:00:00",
+            "text": "正在处理当前请求",
+            "actions": []
+          },
+          {
+            "cls": "q-item",
+            "src": "客户消息",
+            "pos": "1",
+            "meta": "15:01:00",
+            "text": "客户消息：请检查投递队列并汇报。",
+            "actions": [
+              "全文",
+              "撤回"
+            ]
+          },
+          {
+            "cls": "q-item",
+            "src": "系统",
+            "pos": "2",
+            "meta": "15:03:00",
+            "text": "[系统·看护] 投递排队积压：角色「编排」队首任务已排队 12 分钟（深度 3）。",
+            "actions": []
+          },
+          {
+            "cls": "q-item",
+            "src": "su 派发",
+            "pos": "3",
+            "meta": "15:04:00",
+            "text": "派发任务：核对看护告警闭环。",
+            "actions": []
+          }
+        ]
+      },
+      "recoveryCard": null,
+      "emptyState": null,
+      "composeNote": "普通聊天不会自动产生任务报告实际写入导入项目，角色边界外的写入会被拒绝。"
+    },
+    "work960": {
+      "viewport": {
+        "w": 960,
+        "h": 620,
+        "bodyScrollW": 960,
+        "rootScrollW": 960
+      },
+      "sidebar": {
+        "items": [
+          {
+            "text": "ssuPi · ?等待你确认 · 3 待办",
+            "status": "?等待你确认 · 3 待办",
+            "title": "有交互请求挂起，等你在会话流里作答；另有 3 项待办在队列中（完成后依次处理） ｜ 最近事件（16:08:14）：[系统·看护] 投递排队积压"
+          },
+          {
+            "text": "产产品Pi · ?待选择 · 1 待办",
+            "status": "?待选择 · 1 待办",
+            "title": "有交互请求挂起，等你在会话流里作答；另有 1 项待办在队列中（完成后依次处理）"
+          },
+          {
+            "text": "编编排Pi · ✕错误",
+            "status": "✕错误",
+            "title": "最近一次轮次或会话以错误结束 ｜ 最近事件（16:08:13）：本轮已结束（失败）"
+          },
+          {
+            "text": "桌桌面UIPi · ●空闲",
+            "status": "●空闲",
+            "title": "会话已开启，当前没有在跑的任务"
+          }
+        ]
+      },
+      "tabs": {
+        "work": "工作概览 5",
+        "card": "角色资料",
+        "badge": "5"
+      },
+      "chatHead": {
+        "role": "su",
+        "sub": {
+          "text": "",
+          "hidden": true
+        },
+        "note": "实际写入导入项目，角色边界外的写入会被拒绝。"
+      },
+      "sessionNotice": {
+        "text": "",
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0,
+          "right": 0,
+          "bottom": 0
+        }
+      },
+      "sysInjected": [
+        {
+          "cls": "msg msg-injected is-system",
+          "chip": "系统消息 · 看护",
+          "bodyHead": "投递排队积压：角色「编排」队首任务已排队 12 分钟（深度 3）。\n",
+          "rect": {
+            "x": 336.9,
+            "y": 330.8,
+            "w": 462.2,
+            "h": 68.9
+          },
+          "style": {
+            "border": "",
+            "borderLeft": "3px solid rgb(205, 215, 206)",
+            "bg": "rgb(255, 255, 255)",
+            "radius": "10px",
+            "padding": "9px 12px"
+          }
+        }
+      ],
+      "sysInjectedChip": {
+        "background-color": "rgb(245, 246, 242)",
+        "color": "rgb(93, 104, 98)",
+        "border-radius": "999px",
+        "padding": "0px 7px",
+        "font-size": "10.5px",
+        "line-height": "18.9px",
+        "font-weight": "400",
+        "border": "1px solid rgb(221, 226, 220)",
+        "border-left": "1px solid rgb(221, 226, 220)",
+        "border-top": "1px solid rgb(221, 226, 220)",
+        "border-bottom": "1px solid rgb(221, 226, 220)",
+        "margin": "0px",
+        "max-width": "none",
+        "display": "block",
+        "align-items": "normal",
+        "gap": "normal",
+        "grid-template-columns": "none",
+        "width": "88.3125px",
+        "height": "20.8906px",
+        "white-space": "normal"
+      },
+      "records": {
+        "present": true,
+        "summary": "查看执行记录2 个调用 · 含状态未记录",
+        "open": true
+      },
+      "denied": null,
+      "opCard": {
+        "rect": {
+          "x": 200,
+          "y": 178.4,
+          "w": 736,
+          "h": 136.4,
+          "right": 936,
+          "bottom": 314.8
+        },
+        "title": "需要你确认：是否按看护建议先停掉卡死的轮次？",
+        "buttons": [
+          "确认",
+          "不同意"
+        ]
+      },
+      "opChip": {
+        "rect": {
+          "x": 200,
+          "y": 422.4,
+          "w": 154.6,
+          "h": 30,
+          "right": 354.6,
+          "bottom": 452.4
+        },
+        "text": "有 1 条待确认 · 定位"
+      },
+      "queueDrawer": {
+        "title": "su · 工作概览",
+        "headings": [
+          "待处理 1",
+          "当前工作",
+          "排队"
+        ],
+        "items": [
+          {
+            "cls": "q-item is-running",
+            "src": "客户消息",
+            "pos": "",
+            "meta": "15:00:00",
+            "text": "正在处理当前请求",
+            "actions": []
+          },
+          {
+            "cls": "q-item",
+            "src": "客户消息",
+            "pos": "1",
+            "meta": "15:01:00",
+            "text": "客户消息：请检查投递队列并汇报。",
+            "actions": [
+              "全文",
+              "撤回"
+            ]
+          },
+          {
+            "cls": "q-item",
+            "src": "系统",
+            "pos": "2",
+            "meta": "15:03:00",
+            "text": "[系统·看护] 投递排队积压：角色「编排」队首任务已排队 12 分钟（深度 3）。",
+            "actions": []
+          },
+          {
+            "cls": "q-item",
+            "src": "su 派发",
+            "pos": "3",
+            "meta": "15:04:00",
+            "text": "派发任务：核对看护告警闭环。",
+            "actions": []
+          }
+        ]
+      },
+      "recoveryCard": null,
+      "emptyState": null,
+      "composeNote": "普通聊天不会自动产生任务报告实际写入导入项目，角色边界外的写入会被拒绝。"
+    },
+    "densityClosed": {
+      "paneGap": "16px",
+      "chatPadding": "24px 22px 32px 32px",
+      "rows": [
+        {
+          "cls": "virt-spacer",
+          "y": -149,
+          "h": 0,
+          "x": 384,
+          "w": 800
+        },
+        {
+          "cls": "sys sys-call",
+          "y": -133,
+          "h": 17.8,
+          "x": 384,
+          "w": 760
+        },
+        {
+          "cls": "op-request op-kind-preview",
+          "y": -99.2,
+          "h": 136.4,
+          "x": 384,
+          "w": 800
+        },
+        {
+          "cls": "msg msg-injected is-system",
+          "y": 53.2,
+          "h": 68.9,
+          "x": 552.9,
+          "w": 462.2
+        },
+        {
+          "cls": "msg msg-user is-replay",
+          "y": 138.1,
+          "h": 42,
+          "x": 901,
+          "w": 283
+        },
+        {
+          "cls": "tool-records",
+          "y": 196.1,
+          "h": 32,
+          "x": 384,
+          "w": 760
+        },
+        {
+          "cls": "msg msg-assistant is-replay",
+          "y": 244.1,
+          "h": 167.6,
+          "x": 384,
+          "w": 800
+        },
+        {
+          "cls": "msg msg-user is-replay",
+          "y": 427.7,
+          "h": 42,
+          "x": 925.4,
+          "w": 258.6
+        },
+        {
+          "cls": "sys sys-call",
+          "y": 485.7,
+          "h": 17.8,
+          "x": 384,
+          "w": 760
+        },
+        {
+          "cls": "msg msg-assistant is-replay",
+          "y": 519.5,
+          "h": 27,
+          "x": 384,
+          "w": 800
+        },
+        {
+          "cls": "msg msg-injected is-system",
+          "y": 562.5,
+          "h": 68.9,
+          "x": 552.9,
+          "w": 462.2
+        },
+        {
+          "cls": "virt-spacer",
+          "y": 647.4,
+          "h": 0,
+          "x": 384,
+          "w": 800
+        },
+        {
+          "cls": "tool-current",
+          "y": 663.4,
+          "h": 26.6,
+          "x": 384,
+          "w": 800
+        }
+      ],
+      "gaps": [
+        {
+          "from": "virt-spacer",
+          "to": "sys sys-call",
+          "gap": 16
+        },
+        {
+          "from": "sys sys-call",
+          "to": "op-request op-kind-preview",
+          "gap": 16
+        },
+        {
+          "from": "op-request op-kind-preview",
+          "to": "msg msg-injected is-system",
+          "gap": 16
+        },
+        {
+          "from": "msg msg-injected is-system",
+          "to": "msg msg-user is-replay",
+          "gap": 16
+        },
+        {
+          "from": "msg msg-user is-replay",
+          "to": "tool-records",
+          "gap": 16
+        },
+        {
+          "from": "tool-records",
+          "to": "msg msg-assistant is-replay",
+          "gap": 16
+        },
+        {
+          "from": "msg msg-assistant is-replay",
+          "to": "msg msg-user is-replay",
+          "gap": 16
+        },
+        {
+          "from": "msg msg-user is-replay",
+          "to": "sys sys-call",
+          "gap": 16
+        },
+        {
+          "from": "sys sys-call",
+          "to": "msg msg-assistant is-replay",
+          "gap": 16
+        },
+        {
+          "from": "msg msg-assistant is-replay",
+          "to": "msg msg-injected is-system",
+          "gap": 16
+        },
+        {
+          "from": "msg msg-injected is-system",
+          "to": "virt-spacer",
+          "gap": 16
+        },
+        {
+          "from": "virt-spacer",
+          "to": "tool-current",
+          "gap": 16
+        }
+      ],
+      "chatViewportH": 614.4,
+      "fullyVisibleRows": 9,
+      "partialRows": 10,
+      "msg": {
+        "fontSize": "15px",
+        "lineHeight": "27px"
+      },
+      "msgP": {
+        "margin": "0px 0px 10px"
+      },
+      "msgH3": {
+        "fontSize": "14px",
+        "margin": "16px 0px 6px"
+      },
+      "userBubble": {
+        "rect": {
+          "y": 138.1,
+          "h": 42,
+          "x": 901,
+          "w": 283
+        },
+        "padding": "9px 14px",
+        "lineHeight": "24px"
+      },
+      "records": {
+        "summaryH": 22,
+        "summaryLineHeight": "22px",
+        "open": false
+      },
+      "activity": {
+        "rect": {
+          "y": 228.1,
+          "h": 47.1,
+          "x": 399,
+          "w": 745
+        },
+        "padding": "5px 0px",
+        "grid": "42px 577.953px 105.047px",
+        "font": "11px",
+        "lineHeight": "17.05px",
+        "time": {
+          "text": "",
+          "fontSize": "11px"
+        },
+        "op": {
+          "fontSize": "11px",
+          "fontFamily": "ui-monospace, \"Cascadia Mono\","
+        },
+        "target": {
+          "fontSize": "11px",
+          "lineHeight": "17.05px",
+          "marginTop": "2px"
+        },
+        "state": {
+          "fontSize": "10px"
+        }
+      },
+      "activityCount": 2,
+      "activityAvgH": 47.1,
+      "sysRow": {
+        "rect": {
+          "y": -133,
+          "h": 17.8,
+          "x": 384,
+          "w": 760
+        },
+        "fontSize": "12.5px",
+        "lineHeight": "19.375px",
+        "text": "【待确认】角色 产品 有一条交互请求等你作答——点左侧该角色查看。"
+      },
+      "injected": {
+        "rect": {
+          "y": 53.2,
+          "h": 68.9,
+          "x": 552.9,
+          "w": 462.2
+        },
+        "padding": "9px 12px",
+        "gap": "4px",
+        "bodyFont": "15px",
+        "bodyLineHeight": "24px"
+      },
+      "opCard": {
+        "rect": {
+          "y": -99.2,
+          "h": 136.4,
+          "x": 384,
+          "w": 800
+        },
+        "padding": "15px",
+        "gap": "8px"
+      },
+      "composer": {
+        "rect": {
+          "y": 722.4,
+          "h": 137.6,
+          "x": 208,
+          "w": 1152
+        },
+        "padding": "14px 32px 12px",
+        "minHeight": "0px"
+      },
+      "capsule": {
+        "rect": {
+          "y": 736.4,
+          "h": 88,
+          "x": 384,
+          "w": 800
+        },
+        "padding": "10px 14px",
+        "gap": "6px"
+      },
+      "textarea": {
+        "minHeight": "28px",
+        "fontSize": "14px",
+        "lineHeight": "22.4px",
+        "rect": {
+          "y": 747.4,
+          "h": 28,
+          "x": 399,
+          "w": 770
+        }
+      },
+      "composeNote": {
+        "rect": {
+          "y": 830.4,
+          "h": 17.6,
+          "x": 384,
+          "w": 800
+        },
+        "marginTop": "6px",
+        "fontSize": "11px"
+      },
+      "chatHead": {
+        "rect": {
+          "y": 36,
+          "h": 72,
+          "x": 208,
+          "w": 1152
+        }
+      },
+      "bottomWhitespace": 0.4
+    },
+    "densityOpen": {
+      "paneGap": "16px",
+      "chatPadding": "24px 22px 32px 32px",
+      "rows": [
+        {
+          "cls": "virt-spacer",
+          "y": -249,
+          "h": 0,
+          "x": 384,
+          "w": 800
+        },
+        {
+          "cls": "sys sys-call",
+          "y": -233,
+          "h": 17.8,
+          "x": 384,
+          "w": 760
+        },
+        {
+          "cls": "op-request op-kind-preview",
+          "y": -199.2,
+          "h": 136.4,
+          "x": 384,
+          "w": 800
+        },
+        {
+          "cls": "msg msg-injected is-system",
+          "y": -46.8,
+          "h": 68.9,
+          "x": 552.9,
+          "w": 462.2
+        },
+        {
+          "cls": "msg msg-user is-replay",
+          "y": 38.1,
+          "h": 42,
+          "x": 901,
+          "w": 283
+        },
+        {
+          "cls": "tool-records",
+          "y": 96.1,
+          "h": 132.2,
+          "x": 384,
+          "w": 760
+        },
+        {
+          "cls": "msg msg-assistant is-replay",
+          "y": 244.3,
+          "h": 167.6,
+          "x": 384,
+          "w": 800
+        },
+        {
+          "cls": "msg msg-user is-replay",
+          "y": 427.9,
+          "h": 42,
+          "x": 925.4,
+          "w": 258.6
+        },
+        {
+          "cls": "sys sys-call",
+          "y": 485.9,
+          "h": 17.8,
+          "x": 384,
+          "w": 760
+        },
+        {
+          "cls": "msg msg-assistant is-replay",
+          "y": 519.7,
+          "h": 27,
+          "x": 384,
+          "w": 800
+        },
+        {
+          "cls": "msg msg-injected is-system",
+          "y": 562.7,
+          "h": 68.9,
+          "x": 552.9,
+          "w": 462.2
+        },
+        {
+          "cls": "virt-spacer",
+          "y": 647.6,
+          "h": 0,
+          "x": 384,
+          "w": 800
+        },
+        {
+          "cls": "tool-current",
+          "y": 663.6,
+          "h": 26.6,
+          "x": 384,
+          "w": 800
+        }
+      ],
+      "gaps": [
+        {
+          "from": "virt-spacer",
+          "to": "sys sys-call",
+          "gap": 16
+        },
+        {
+          "from": "sys sys-call",
+          "to": "op-request op-kind-preview",
+          "gap": 16
+        },
+        {
+          "from": "op-request op-kind-preview",
+          "to": "msg msg-injected is-system",
+          "gap": 16
+        },
+        {
+          "from": "msg msg-injected is-system",
+          "to": "msg msg-user is-replay",
+          "gap": 16
+        },
+        {
+          "from": "msg msg-user is-replay",
+          "to": "tool-records",
+          "gap": 16
+        },
+        {
+          "from": "tool-records",
+          "to": "msg msg-assistant is-replay",
+          "gap": 16
+        },
+        {
+          "from": "msg msg-assistant is-replay",
+          "to": "msg msg-user is-replay",
+          "gap": 16
+        },
+        {
+          "from": "msg msg-user is-replay",
+          "to": "sys sys-call",
+          "gap": 16
+        },
+        {
+          "from": "sys sys-call",
+          "to": "msg msg-assistant is-replay",
+          "gap": 16
+        },
+        {
+          "from": "msg msg-assistant is-replay",
+          "to": "msg msg-injected is-system",
+          "gap": 16
+        },
+        {
+          "from": "msg msg-injected is-system",
+          "to": "virt-spacer",
+          "gap": 16
+        },
+        {
+          "from": "virt-spacer",
+          "to": "tool-current",
+          "gap": 16
+        }
+      ],
+      "chatViewportH": 614.4,
+      "fullyVisibleRows": 7,
+      "partialRows": 8,
+      "msg": {
+        "fontSize": "15px",
+        "lineHeight": "27px"
+      },
+      "msgP": {
+        "margin": "0px 0px 10px"
+      },
+      "msgH3": {
+        "fontSize": "14px",
+        "margin": "16px 0px 6px"
+      },
+      "userBubble": {
+        "rect": {
+          "y": 38.1,
+          "h": 42,
+          "x": 901,
+          "w": 283
+        },
+        "padding": "9px 14px",
+        "lineHeight": "24px"
+      },
+      "records": {
+        "summaryH": 22,
+        "summaryLineHeight": "22px",
+        "open": true
+      },
+      "activity": {
+        "rect": {
+          "y": 128.1,
+          "h": 47.1,
+          "x": 399,
+          "w": 745
+        },
+        "padding": "5px 0px",
+        "grid": "42px 577.953px 105.047px",
+        "font": "11px",
+        "lineHeight": "17.05px",
+        "time": {
+          "text": "",
+          "fontSize": "11px"
+        },
+        "op": {
+          "fontSize": "11px",
+          "fontFamily": "ui-monospace, \"Cascadia Mono\","
+        },
+        "target": {
+          "fontSize": "11px",
+          "lineHeight": "17.05px",
+          "marginTop": "2px"
+        },
+        "state": {
+          "fontSize": "10px"
+        }
+      },
+      "activityCount": 2,
+      "activityAvgH": 47.1,
+      "sysRow": {
+        "rect": {
+          "y": -233,
+          "h": 17.8,
+          "x": 384,
+          "w": 760
+        },
+        "fontSize": "12.5px",
+        "lineHeight": "19.375px",
+        "text": "【待确认】角色 产品 有一条交互请求等你作答——点左侧该角色查看。"
+      },
+      "injected": {
+        "rect": {
+          "y": -46.8,
+          "h": 68.9,
+          "x": 552.9,
+          "w": 462.2
+        },
+        "padding": "9px 12px",
+        "gap": "4px",
+        "bodyFont": "15px",
+        "bodyLineHeight": "24px"
+      },
+      "opCard": {
+        "rect": {
+          "y": -199.2,
+          "h": 136.4,
+          "x": 384,
+          "w": 800
+        },
+        "padding": "15px",
+        "gap": "8px"
+      },
+      "composer": {
+        "rect": {
+          "y": 722.4,
+          "h": 137.6,
+          "x": 208,
+          "w": 1152
+        },
+        "padding": "14px 32px 12px",
+        "minHeight": "0px"
+      },
+      "capsule": {
+        "rect": {
+          "y": 736.4,
+          "h": 88,
+          "x": 384,
+          "w": 800
+        },
+        "padding": "10px 14px",
+        "gap": "6px"
+      },
+      "textarea": {
+        "minHeight": "28px",
+        "fontSize": "14px",
+        "lineHeight": "22.4px",
+        "rect": {
+          "y": 747.4,
+          "h": 28,
+          "x": 399,
+          "w": 770
+        }
+      },
+      "composeNote": {
+        "rect": {
+          "y": 830.4,
+          "h": 17.6,
+          "x": 384,
+          "w": 800
+        },
+        "marginTop": "6px",
+        "fontSize": "11px"
+      },
+      "chatHead": {
+        "rect": {
+          "y": 36,
+          "h": 72,
+          "x": 208,
+          "w": 1152
+        }
+      },
+      "bottomWhitespace": 0.2
+    },
+    "densityTop": {
+      "paneGap": "16px",
+      "chatPadding": "24px 22px 32px 32px",
+      "rows": [
+        {
+          "cls": "virt-spacer",
+          "y": 132,
+          "h": 0,
+          "x": 384,
+          "w": 800
+        },
+        {
+          "cls": "sys sys-call",
+          "y": 148,
+          "h": 17.8,
+          "x": 384,
+          "w": 760
+        },
+        {
+          "cls": "op-request op-kind-preview",
+          "y": 181.8,
+          "h": 136.4,
+          "x": 384,
+          "w": 800
+        },
+        {
+          "cls": "msg msg-injected is-system",
+          "y": 334.2,
+          "h": 68.9,
+          "x": 552.9,
+          "w": 462.2
+        },
+        {
+          "cls": "msg msg-user is-replay",
+          "y": 419.1,
+          "h": 42,
+          "x": 901,
+          "w": 283
+        },
+        {
+          "cls": "tool-records",
+          "y": 477.1,
+          "h": 132.2,
+          "x": 384,
+          "w": 760
+        },
+        {
+          "cls": "msg msg-assistant is-replay",
+          "y": 625.3,
+          "h": 167.6,
+          "x": 384,
+          "w": 800
+        },
+        {
+          "cls": "msg msg-user is-replay",
+          "y": 808.9,
+          "h": 42,
+          "x": 925.4,
+          "w": 258.6
+        },
+        {
+          "cls": "sys sys-call",
+          "y": 866.9,
+          "h": 17.8,
+          "x": 384,
+          "w": 760
+        },
+        {
+          "cls": "msg msg-assistant is-replay",
+          "y": 900.7,
+          "h": 27,
+          "x": 384,
+          "w": 800
+        },
+        {
+          "cls": "msg msg-injected is-system",
+          "y": 943.7,
+          "h": 68.9,
+          "x": 552.9,
+          "w": 462.2
+        },
+        {
+          "cls": "virt-spacer",
+          "y": 1028.6,
+          "h": 0,
+          "x": 384,
+          "w": 800
+        },
+        {
+          "cls": "tool-current",
+          "y": 1044.6,
+          "h": 26.6,
+          "x": 384,
+          "w": 800
+        }
+      ],
+      "gaps": [
+        {
+          "from": "virt-spacer",
+          "to": "sys sys-call",
+          "gap": 16
+        },
+        {
+          "from": "sys sys-call",
+          "to": "op-request op-kind-preview",
+          "gap": 16
+        },
+        {
+          "from": "op-request op-kind-preview",
+          "to": "msg msg-injected is-system",
+          "gap": 16
+        },
+        {
+          "from": "msg msg-injected is-system",
+          "to": "msg msg-user is-replay",
+          "gap": 16
+        },
+        {
+          "from": "msg msg-user is-replay",
+          "to": "tool-records",
+          "gap": 16
+        },
+        {
+          "from": "tool-records",
+          "to": "msg msg-assistant is-replay",
+          "gap": 16
+        },
+        {
+          "from": "msg msg-assistant is-replay",
+          "to": "msg msg-user is-replay",
+          "gap": 16
+        },
+        {
+          "from": "msg msg-user is-replay",
+          "to": "sys sys-call",
+          "gap": 16
+        },
+        {
+          "from": "sys sys-call",
+          "to": "msg msg-assistant is-replay",
+          "gap": 16
+        },
+        {
+          "from": "msg msg-assistant is-replay",
+          "to": "msg msg-injected is-system",
+          "gap": 16
+        },
+        {
+          "from": "msg msg-injected is-system",
+          "to": "virt-spacer",
+          "gap": 16
+        },
+        {
+          "from": "virt-spacer",
+          "to": "tool-current",
+          "gap": 16
+        }
+      ],
+      "chatViewportH": 614.4,
+      "fullyVisibleRows": 6,
+      "partialRows": 7,
+      "msg": {
+        "fontSize": "15px",
+        "lineHeight": "27px"
+      },
+      "msgP": {
+        "margin": "0px 0px 10px"
+      },
+      "msgH3": {
+        "fontSize": "14px",
+        "margin": "16px 0px 6px"
+      },
+      "userBubble": {
+        "rect": {
+          "y": 419.1,
+          "h": 42,
+          "x": 901,
+          "w": 283
+        },
+        "padding": "9px 14px",
+        "lineHeight": "24px"
+      },
+      "records": {
+        "summaryH": 22,
+        "summaryLineHeight": "22px",
+        "open": true
+      },
+      "activity": {
+        "rect": {
+          "y": 509.1,
+          "h": 47.1,
+          "x": 399,
+          "w": 745
+        },
+        "padding": "5px 0px",
+        "grid": "42px 577.953px 105.047px",
+        "font": "11px",
+        "lineHeight": "17.05px",
+        "time": {
+          "text": "",
+          "fontSize": "11px"
+        },
+        "op": {
+          "fontSize": "11px",
+          "fontFamily": "ui-monospace, \"Cascadia Mono\","
+        },
+        "target": {
+          "fontSize": "11px",
+          "lineHeight": "17.05px",
+          "marginTop": "2px"
+        },
+        "state": {
+          "fontSize": "10px"
+        }
+      },
+      "activityCount": 2,
+      "activityAvgH": 47.1,
+      "sysRow": {
+        "rect": {
+          "y": 148,
+          "h": 17.8,
+          "x": 384,
+          "w": 760
+        },
+        "fontSize": "12.5px",
+        "lineHeight": "19.375px",
+        "text": "【待确认】角色 产品 有一条交互请求等你作答——点左侧该角色查看。"
+      },
+      "injected": {
+        "rect": {
+          "y": 334.2,
+          "h": 68.9,
+          "x": 552.9,
+          "w": 462.2
+        },
+        "padding": "9px 12px",
+        "gap": "4px",
+        "bodyFont": "15px",
+        "bodyLineHeight": "24px"
+      },
+      "opCard": {
+        "rect": {
+          "y": 181.8,
+          "h": 136.4,
+          "x": 384,
+          "w": 800
+        },
+        "padding": "15px",
+        "gap": "8px"
+      },
+      "composer": {
+        "rect": {
+          "y": 722.4,
+          "h": 137.6,
+          "x": 208,
+          "w": 1152
+        },
+        "padding": "14px 32px 12px",
+        "minHeight": "0px"
+      },
+      "capsule": {
+        "rect": {
+          "y": 736.4,
+          "h": 88,
+          "x": 384,
+          "w": 800
+        },
+        "padding": "10px 14px",
+        "gap": "6px"
+      },
+      "textarea": {
+        "minHeight": "28px",
+        "fontSize": "14px",
+        "lineHeight": "22.4px",
+        "rect": {
+          "y": 747.4,
+          "h": 28,
+          "x": 399,
+          "w": 770
+        }
+      },
+      "composeNote": {
+        "rect": {
+          "y": 830.4,
+          "h": 17.6,
+          "x": 384,
+          "w": 800
+        },
+        "marginTop": "6px",
+        "fontSize": "11px"
+      },
+      "chatHead": {
+        "rect": {
+          "y": 36,
+          "h": 72,
+          "x": 208,
+          "w": 1152
+        }
+      },
+      "bottomWhitespace": -380.8
+    },
+    "simChrome": {
+      "chipHidden": null,
+      "chipRect": null,
+      "toolCurrentCount": 1,
+      "textareaH": 28
+    },
+    "simClosed": {
+      "paneGap": "16px",
+      "chatPadding": "24px 22px 32px 32px",
+      "rows": [
+        {
+          "cls": "virt-spacer",
+          "y": -149,
+          "h": 0,
+          "x": 384,
+          "w": 800
+        },
+        {
+          "cls": "sys sys-call",
+          "y": -133,
+          "h": 17.8,
+          "x": 384,
+          "w": 760
+        },
+        {
+          "cls": "op-request op-kind-preview",
+          "y": -99.2,
+          "h": 136.4,
+          "x": 384,
+          "w": 800
+        },
+        {
+          "cls": "msg msg-injected is-system",
+          "y": 53.2,
+          "h": 68.9,
+          "x": 552.9,
+          "w": 462.2
+        },
+        {
+          "cls": "msg msg-user is-replay",
+          "y": 138.1,
+          "h": 42,
+          "x": 901,
+          "w": 283
+        },
+        {
+          "cls": "tool-records",
+          "y": 196.1,
+          "h": 32,
+          "x": 384,
+          "w": 760
+        },
+        {
+          "cls": "msg msg-assistant is-replay",
+          "y": 244.1,
+          "h": 167.6,
+          "x": 384,
+          "w": 800
+        },
+        {
+          "cls": "msg msg-user is-replay",
+          "y": 427.7,
+          "h": 42,
+          "x": 925.4,
+          "w": 258.6
+        },
+        {
+          "cls": "sys sys-call",
+          "y": 485.7,
+          "h": 17.8,
+          "x": 384,
+          "w": 760
+        },
+        {
+          "cls": "msg msg-assistant is-replay",
+          "y": 519.5,
+          "h": 27,
+          "x": 384,
+          "w": 800
+        },
+        {
+          "cls": "msg msg-injected is-system",
+          "y": 562.5,
+          "h": 68.9,
+          "x": 552.9,
+          "w": 462.2
+        },
+        {
+          "cls": "virt-spacer",
+          "y": 647.4,
+          "h": 0,
+          "x": 384,
+          "w": 800
+        },
+        {
+          "cls": "tool-current",
+          "y": 663.4,
+          "h": 26.6,
+          "x": 384,
+          "w": 800
+        }
+      ],
+      "gaps": [
+        {
+          "from": "virt-spacer",
+          "to": "sys sys-call",
+          "gap": 16
+        },
+        {
+          "from": "sys sys-call",
+          "to": "op-request op-kind-preview",
+          "gap": 16
+        },
+        {
+          "from": "op-request op-kind-preview",
+          "to": "msg msg-injected is-system",
+          "gap": 16
+        },
+        {
+          "from": "msg msg-injected is-system",
+          "to": "msg msg-user is-replay",
+          "gap": 16
+        },
+        {
+          "from": "msg msg-user is-replay",
+          "to": "tool-records",
+          "gap": 16
+        },
+        {
+          "from": "tool-records",
+          "to": "msg msg-assistant is-replay",
+          "gap": 16
+        },
+        {
+          "from": "msg msg-assistant is-replay",
+          "to": "msg msg-user is-replay",
+          "gap": 16
+        },
+        {
+          "from": "msg msg-user is-replay",
+          "to": "sys sys-call",
+          "gap": 16
+        },
+        {
+          "from": "sys sys-call",
+          "to": "msg msg-assistant is-replay",
+          "gap": 16
+        },
+        {
+          "from": "msg msg-assistant is-replay",
+          "to": "msg msg-injected is-system",
+          "gap": 16
+        },
+        {
+          "from": "msg msg-injected is-system",
+          "to": "virt-spacer",
+          "gap": 16
+        },
+        {
+          "from": "virt-spacer",
+          "to": "tool-current",
+          "gap": 16
+        }
+      ],
+      "chatViewportH": 614.4,
+      "fullyVisibleRows": 9,
+      "partialRows": 10,
+      "msg": {
+        "fontSize": "15px",
+        "lineHeight": "27px"
+      },
+      "msgP": {
+        "margin": "0px 0px 10px"
+      },
+      "msgH3": {
+        "fontSize": "14px",
+        "margin": "16px 0px 6px"
+      },
+      "userBubble": {
+        "rect": {
+          "y": 138.1,
+          "h": 42,
+          "x": 901,
+          "w": 283
+        },
+        "padding": "9px 14px",
+        "lineHeight": "24px"
+      },
+      "records": {
+        "summaryH": 22,
+        "summaryLineHeight": "22px",
+        "open": false
+      },
+      "activity": {
+        "rect": {
+          "y": 228.1,
+          "h": 47.1,
+          "x": 399,
+          "w": 745
+        },
+        "padding": "5px 0px",
+        "grid": "42px 577.953px 105.047px",
+        "font": "11px",
+        "lineHeight": "17.05px",
+        "time": {
+          "text": "",
+          "fontSize": "11px"
+        },
+        "op": {
+          "fontSize": "11px",
+          "fontFamily": "ui-monospace, \"Cascadia Mono\","
+        },
+        "target": {
+          "fontSize": "11px",
+          "lineHeight": "17.05px",
+          "marginTop": "2px"
+        },
+        "state": {
+          "fontSize": "10px"
+        }
+      },
+      "activityCount": 2,
+      "activityAvgH": 47.1,
+      "sysRow": {
+        "rect": {
+          "y": -133,
+          "h": 17.8,
+          "x": 384,
+          "w": 760
+        },
+        "fontSize": "12.5px",
+        "lineHeight": "19.375px",
+        "text": "【待确认】角色 产品 有一条交互请求等你作答——点左侧该角色查看。"
+      },
+      "injected": {
+        "rect": {
+          "y": 53.2,
+          "h": 68.9,
+          "x": 552.9,
+          "w": 462.2
+        },
+        "padding": "9px 12px",
+        "gap": "4px",
+        "bodyFont": "15px",
+        "bodyLineHeight": "24px"
+      },
+      "opCard": {
+        "rect": {
+          "y": -99.2,
+          "h": 136.4,
+          "x": 384,
+          "w": 800
+        },
+        "padding": "15px",
+        "gap": "8px"
+      },
+      "composer": {
+        "rect": {
+          "y": 722.4,
+          "h": 137.6,
+          "x": 208,
+          "w": 1152
+        },
+        "padding": "14px 32px 12px",
+        "minHeight": "0px"
+      },
+      "capsule": {
+        "rect": {
+          "y": 736.4,
+          "h": 88,
+          "x": 384,
+          "w": 800
+        },
+        "padding": "10px 14px",
+        "gap": "6px"
+      },
+      "textarea": {
+        "minHeight": "28px",
+        "fontSize": "14px",
+        "lineHeight": "22.4px",
+        "rect": {
+          "y": 747.4,
+          "h": 28,
+          "x": 399,
+          "w": 770
+        }
+      },
+      "composeNote": {
+        "rect": {
+          "y": 830.4,
+          "h": 17.6,
+          "x": 384,
+          "w": 800
+        },
+        "marginTop": "6px",
+        "fontSize": "11px"
+      },
+      "chatHead": {
+        "rect": {
+          "y": 36,
+          "h": 72,
+          "x": 208,
+          "w": 1152
+        }
+      },
+      "bottomWhitespace": 0.4
+    },
+    "simOpen": {
+      "paneGap": "16px",
+      "chatPadding": "24px 22px 32px 32px",
+      "rows": [
+        {
+          "cls": "virt-spacer",
+          "y": -249,
+          "h": 0,
+          "x": 384,
+          "w": 800
+        },
+        {
+          "cls": "sys sys-call",
+          "y": -233,
+          "h": 17.8,
+          "x": 384,
+          "w": 760
+        },
+        {
+          "cls": "op-request op-kind-preview",
+          "y": -199.2,
+          "h": 136.4,
+          "x": 384,
+          "w": 800
+        },
+        {
+          "cls": "msg msg-injected is-system",
+          "y": -46.8,
+          "h": 68.9,
+          "x": 552.9,
+          "w": 462.2
+        },
+        {
+          "cls": "msg msg-user is-replay",
+          "y": 38.1,
+          "h": 42,
+          "x": 901,
+          "w": 283
+        },
+        {
+          "cls": "tool-records",
+          "y": 96.1,
+          "h": 132.2,
+          "x": 384,
+          "w": 760
+        },
+        {
+          "cls": "msg msg-assistant is-replay",
+          "y": 244.3,
+          "h": 167.6,
+          "x": 384,
+          "w": 800
+        },
+        {
+          "cls": "msg msg-user is-replay",
+          "y": 427.9,
+          "h": 42,
+          "x": 925.4,
+          "w": 258.6
+        },
+        {
+          "cls": "sys sys-call",
+          "y": 485.9,
+          "h": 17.8,
+          "x": 384,
+          "w": 760
+        },
+        {
+          "cls": "msg msg-assistant is-replay",
+          "y": 519.7,
+          "h": 27,
+          "x": 384,
+          "w": 800
+        },
+        {
+          "cls": "msg msg-injected is-system",
+          "y": 562.7,
+          "h": 68.9,
+          "x": 552.9,
+          "w": 462.2
+        },
+        {
+          "cls": "virt-spacer",
+          "y": 647.6,
+          "h": 0,
+          "x": 384,
+          "w": 800
+        },
+        {
+          "cls": "tool-current",
+          "y": 663.6,
+          "h": 26.6,
+          "x": 384,
+          "w": 800
+        }
+      ],
+      "gaps": [
+        {
+          "from": "virt-spacer",
+          "to": "sys sys-call",
+          "gap": 16
+        },
+        {
+          "from": "sys sys-call",
+          "to": "op-request op-kind-preview",
+          "gap": 16
+        },
+        {
+          "from": "op-request op-kind-preview",
+          "to": "msg msg-injected is-system",
+          "gap": 16
+        },
+        {
+          "from": "msg msg-injected is-system",
+          "to": "msg msg-user is-replay",
+          "gap": 16
+        },
+        {
+          "from": "msg msg-user is-replay",
+          "to": "tool-records",
+          "gap": 16
+        },
+        {
+          "from": "tool-records",
+          "to": "msg msg-assistant is-replay",
+          "gap": 16
+        },
+        {
+          "from": "msg msg-assistant is-replay",
+          "to": "msg msg-user is-replay",
+          "gap": 16
+        },
+        {
+          "from": "msg msg-user is-replay",
+          "to": "sys sys-call",
+          "gap": 16
+        },
+        {
+          "from": "sys sys-call",
+          "to": "msg msg-assistant is-replay",
+          "gap": 16
+        },
+        {
+          "from": "msg msg-assistant is-replay",
+          "to": "msg msg-injected is-system",
+          "gap": 16
+        },
+        {
+          "from": "msg msg-injected is-system",
+          "to": "virt-spacer",
+          "gap": 16
+        },
+        {
+          "from": "virt-spacer",
+          "to": "tool-current",
+          "gap": 16
+        }
+      ],
+      "chatViewportH": 614.4,
+      "fullyVisibleRows": 7,
+      "partialRows": 8,
+      "msg": {
+        "fontSize": "15px",
+        "lineHeight": "27px"
+      },
+      "msgP": {
+        "margin": "0px 0px 10px"
+      },
+      "msgH3": {
+        "fontSize": "14px",
+        "margin": "16px 0px 6px"
+      },
+      "userBubble": {
+        "rect": {
+          "y": 38.1,
+          "h": 42,
+          "x": 901,
+          "w": 283
+        },
+        "padding": "9px 14px",
+        "lineHeight": "24px"
+      },
+      "records": {
+        "summaryH": 22,
+        "summaryLineHeight": "22px",
+        "open": true
+      },
+      "activity": {
+        "rect": {
+          "y": 128.1,
+          "h": 47.1,
+          "x": 399,
+          "w": 745
+        },
+        "padding": "5px 0px",
+        "grid": "42px 577.953px 105.047px",
+        "font": "11px",
+        "lineHeight": "17.05px",
+        "time": {
+          "text": "",
+          "fontSize": "11px"
+        },
+        "op": {
+          "fontSize": "11px",
+          "fontFamily": "ui-monospace, \"Cascadia Mono\","
+        },
+        "target": {
+          "fontSize": "11px",
+          "lineHeight": "17.05px",
+          "marginTop": "2px"
+        },
+        "state": {
+          "fontSize": "10px"
+        }
+      },
+      "activityCount": 2,
+      "activityAvgH": 47.1,
+      "sysRow": {
+        "rect": {
+          "y": -233,
+          "h": 17.8,
+          "x": 384,
+          "w": 760
+        },
+        "fontSize": "12.5px",
+        "lineHeight": "19.375px",
+        "text": "【待确认】角色 产品 有一条交互请求等你作答——点左侧该角色查看。"
+      },
+      "injected": {
+        "rect": {
+          "y": -46.8,
+          "h": 68.9,
+          "x": 552.9,
+          "w": 462.2
+        },
+        "padding": "9px 12px",
+        "gap": "4px",
+        "bodyFont": "15px",
+        "bodyLineHeight": "24px"
+      },
+      "opCard": {
+        "rect": {
+          "y": -199.2,
+          "h": 136.4,
+          "x": 384,
+          "w": 800
+        },
+        "padding": "15px",
+        "gap": "8px"
+      },
+      "composer": {
+        "rect": {
+          "y": 722.4,
+          "h": 137.6,
+          "x": 208,
+          "w": 1152
+        },
+        "padding": "14px 32px 12px",
+        "minHeight": "0px"
+      },
+      "capsule": {
+        "rect": {
+          "y": 736.4,
+          "h": 88,
+          "x": 384,
+          "w": 800
+        },
+        "padding": "10px 14px",
+        "gap": "6px"
+      },
+      "textarea": {
+        "minHeight": "28px",
+        "fontSize": "14px",
+        "lineHeight": "22.4px",
+        "rect": {
+          "y": 747.4,
+          "h": 28,
+          "x": 399,
+          "w": 770
+        }
+      },
+      "composeNote": {
+        "rect": {
+          "y": 830.4,
+          "h": 17.6,
+          "x": 384,
+          "w": 800
+        },
+        "marginTop": "6px",
+        "fontSize": "11px"
+      },
+      "chatHead": {
+        "rect": {
+          "y": 36,
+          "h": 72,
+          "x": 208,
+          "w": 1152
+        }
+      },
+      "bottomWhitespace": 0.2
+    },
+    "replay": {
+      "viewport": {
+        "w": 1360,
+        "h": 860,
+        "bodyScrollW": 1360,
+        "rootScrollW": 1360
+      },
+      "sidebar": {
+        "items": [
+          {
+            "text": "ssuPi · ?等待你确认 · 3 待办",
+            "status": "?等待你确认 · 3 待办",
+            "title": "有交互请求挂起，等你在会话流里作答；另有 3 项待办在队列中（完成后依次处理） ｜ 最近事件（16:08:16）：[系统·看护] 投递排队积压"
+          },
+          {
+            "text": "产产品Pi · ?待选择 · 1 待办",
+            "status": "?待选择 · 1 待办",
+            "title": "有交互请求挂起，等你在会话流里作答；另有 1 项待办在队列中（完成后依次处理）"
+          },
+          {
+            "text": "编编排Pi · ✕错误",
+            "status": "✕错误",
+            "title": "最近一次轮次或会话以错误结束 ｜ 最近事件（16:08:13）：本轮已结束（失败）"
+          },
+          {
+            "text": "桌桌面UIPi · ●空闲",
+            "status": "●空闲",
+            "title": "会话已开启，当前没有在跑的任务"
+          }
+        ]
+      },
+      "tabs": {
+        "work": "工作概览 5",
+        "card": "角色资料",
+        "badge": "5"
+      },
+      "chatHead": {
+        "role": "su",
+        "sub": {
+          "text": "",
+          "hidden": true
+        },
+        "note": "实际写入导入项目，角色边界外的写入会被拒绝。"
+      },
+      "sessionNotice": {
+        "text": "",
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0,
+          "right": 0,
+          "bottom": 0
+        }
+      },
+      "sysInjected": [
+        {
+          "cls": "msg msg-injected is-system",
+          "chip": "系统消息 · 看护",
+          "bodyHead": "投递排队积压：角色「编排」队首任务已排队 12 分钟（深度 3）。\n",
+          "rect": {
+            "x": 552.9,
+            "y": 334.2,
+            "w": 462.2,
+            "h": 68.9
+          },
+          "style": {
+            "border": "",
+            "borderLeft": "3px solid rgb(205, 215, 206)",
+            "bg": "rgb(255, 255, 255)",
+            "radius": "10px",
+            "padding": "9px 12px"
+          }
+        },
+        {
+          "cls": "msg msg-injected is-system",
+          "chip": "系统消息 · 看护",
+          "bodyHead": "投递排队积压：角色「编排」队首任务已排队 12 分钟（深度 3）。\n",
+          "rect": {
+            "x": 552.9,
+            "y": 419.1,
+            "w": 462.2,
+            "h": 68.9
+          },
+          "style": {
+            "border": "",
+            "borderLeft": "3px solid rgb(205, 215, 206)",
+            "bg": "rgb(255, 255, 255)",
+            "radius": "10px",
+            "padding": "9px 12px"
+          }
+        },
+        {
+          "cls": "msg msg-injected is-system is-replay",
+          "chip": "系统消息 · 收束",
+          "bodyHead": "已无进行中任务：全部角色空闲、投递队列为空、无待确认，已持续 5 分钟。\n",
+          "rect": {
+            "x": 514,
+            "y": 504,
+            "w": 540,
+            "h": 68.9
+          },
+          "style": {
+            "border": "",
+            "borderLeft": "3px solid rgb(205, 215, 206)",
+            "bg": "rgb(255, 255, 255)",
+            "radius": "10px",
+            "padding": "9px 12px"
+          }
+        }
+      ],
+      "sysInjectedChip": {
+        "background-color": "rgb(245, 246, 242)",
+        "color": "rgb(93, 104, 98)",
+        "border-radius": "999px",
+        "padding": "0px 7px",
+        "font-size": "10.5px",
+        "line-height": "18.9px",
+        "font-weight": "400",
+        "border": "1px solid rgb(221, 226, 220)",
+        "border-left": "1px solid rgb(221, 226, 220)",
+        "border-top": "1px solid rgb(221, 226, 220)",
+        "border-bottom": "1px solid rgb(221, 226, 220)",
+        "margin": "0px",
+        "max-width": "none",
+        "display": "block",
+        "align-items": "normal",
+        "gap": "normal",
+        "grid-template-columns": "none",
+        "width": "88.3125px",
+        "height": "20.8906px",
+        "white-space": "normal"
+      },
+      "records": {
+        "present": false,
+        "summary": null,
+        "open": null
+      },
+      "denied": null,
+      "opCard": {
+        "rect": {
+          "x": 384,
+          "y": 181.8,
+          "w": 800,
+          "h": 136.4,
+          "right": 1184,
+          "bottom": 318.2
+        },
+        "title": "需要你确认：是否按看护建议先停掉卡死的轮次？",
+        "buttons": [
+          "确认",
+          "不同意"
+        ]
+      },
+      "opChip": null,
+      "queueDrawer": null,
+      "recoveryCard": null,
+      "emptyState": null,
+      "composeNote": "普通聊天不会自动产生任务报告实际写入导入项目，角色边界外的写入会被拒绝。"
+    }
+  }
+}

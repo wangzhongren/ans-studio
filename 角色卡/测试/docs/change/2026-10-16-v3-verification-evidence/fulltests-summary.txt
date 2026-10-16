@@ -1,0 +1,35 @@
+✔ RuntimeKind 取值单一来源：shared 与装配旧副本（RUNTIME_VALUES / DEFAULT_RUNTIME）一致 (0.060958ms)
+✔ PI_CREDENTIAL_ENV_VARS：shared 与装配、Pi适配器两处旧副本**逐条相同**（安全相关，不得分叉） (0.060834ms)
+✔ resolveSkillRoot：优先 ANS_SKILL_ROOT（取非空值） (0.042791ms)
+✔ 跨引擎秘密键包含旧 Pi 凭据与 SDK CODEX_API_KEY，保持 Pi 旧名单兼容 (0.044125ms)
+✔ resolveSkillRoot：缺省回退默认技能目录，且与桌面旧副本同值 (0.121083ms)
+✔ resolveSkillRoot：空串视为未设置（回退默认），与桌面旧副本同值 (0.062208ms)
+ℹ tests 1678
+ℹ suites 0
+ℹ pass 1677
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 19822.212958
+EXIT=0
+ℹ 实测顺序：confirm:start > confirm:end > gate(/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-pi-seq-7j97FF/role.md)
+ℹ 对照组实测顺序：gate(/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-pi-seq-oOs9lk/role.md) > confirm:start > confirm:end
+ℹ 有效图逐字进转录；无效图显式省略（注记可见）
+ℹ composeContext 经懒加载加载 real-adapter.ts 成功
+ℹ bindRole 成功：Pi 会话已构造
+ℹ prompt 在 804ms 内被中止（设定时限 800ms）
+ℹ A 对照组第 1 轮：丢写复现 {"hasWrite":true,"hasEditEffect":false}
+ℹ A 对照组第 2 轮：丢写复现 {"hasWrite":true,"hasEditEffect":false}
+ℹ A 对照组第 3 轮：丢写复现 {"hasWrite":true,"hasEditEffect":false}
+ℹ B 主组第 1 轮：顺序执行、无丢写 {"hasWrite":true,"hasEditEffect":true}
+ℹ B 主组第 2 轮：顺序执行、无丢写 {"hasWrite":true,"hasEditEffect":true}
+ℹ B 主组第 3 轮：顺序执行、无丢写 {"hasWrite":true,"hasEditEffect":true}
+ℹ tests 1678
+ℹ suites 0
+ℹ pass 1677
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 19822.212958

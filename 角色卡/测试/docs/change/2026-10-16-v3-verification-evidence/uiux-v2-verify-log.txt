@@ -1,0 +1,5 @@
+Error occurred in handler for 'session:withdraw': Error: 离线受控网络不可用
+    at withdrawResolve (file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:75:176)
+    at file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:897:129
+UIUX_V2_PASS 99 /private/tmp/ans-v3-verify-v2
+EXIT=0

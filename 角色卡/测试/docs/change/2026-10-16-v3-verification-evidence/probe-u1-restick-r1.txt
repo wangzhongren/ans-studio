@@ -1,0 +1,25 @@
+PASS setup-窗口化行数≥160 | rowCount=163
+PASS setup-提示条为空（barH=0） | barH=0 hint=""
+PASS setup-初始贴底 | dist=0
+PASS setup-窗口化生效（挂载行<总行数） | mounted=41 total=163
+PASS A1-提示落定且条高>0 | barH=18.59 saw=true
+PASS A2-切回后仍贴底 dist==0（U1 修复核心） | dist=0 st=7350 sh=7898 ch=548
+PASS A3-视口压缩量恰=条高（证明补滚=条高补偿） | ch0=566 ch1=548 barH=18.59 Δ=18.00
+PASS B0-预备：提示条已清空 | hint=""
+PASS B1-已在底部之外（dist>24） | dist=320 hint=""
+PASS B2-上翻·条高增大（非点击）→ scrollTop 逐字节不变 | st0=7012 st1=7012 barH=0→18.59
+PASS B3-对照：条高确已增大且未触底（仍在底部之外） | barH=18.59 dist=338
+PASS B4-上翻·条高缩矮（非点击）→ scrollTop 逐字节不变 | st1=7012 st2=7012 barH=18.59→0
+PASS B5-上翻·同高重写（非点击）→ scrollTop 逐字节不变 | st=7012→7012 barH=18.59→18.59
+PASS B6-控制项：复点角色 ⇒ 到底部（U-1 显式动作语义，与提示修法无关） | dist=0 st=7332
+PASS C0-底部·错误提示落定且贴底 | dist=0 barH=18.59
+PASS C1-底部·同高重写 → scrollTop 不变（零抖动） | st0=7350 st1=7350 sh0=7898 sh1=7898
+PASS C2-底部·仍贴底 | dist=0
+PASS D1-提示清空落定 | hint=""
+PASS D2-底部·条高缩小（复点路径）→ 仍贴底 dist==0 | dist=0 barH=0
+PASS D3-非点击清空·无滚动副作用（st 不变） | st0=7350 st1=7350 barH=0
+PASS D3b-余距=附件行增高−条高（算术闭合，非补滚失守） | dist=46 Δcomposer=64 barH0=18.59 expect≈45.41
+PASS E1-dist=40(>阈值)·条高增大（非点击）→ 不打扰（scrollTop 不变） | dist0=40 st0=7292 st1=7292
+PASS E2-dist>阈值·条高缩矮（非点击）→ 不打扰（scrollTop 不变） | st1=7292 st2=7292
+PASS E3-dist=20(≤阈值)·条高增大（非点击）→ 重贴底 dist==0 | dist_before=20 dist_after=0 barH=18.59
+PROBE_DONE failures=0

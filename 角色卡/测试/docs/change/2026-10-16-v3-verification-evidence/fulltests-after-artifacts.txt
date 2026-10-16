@@ -1,0 +1,8 @@
+ℹ suites 0
+ℹ pass 1677
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 18803.542166
+EXIT=0

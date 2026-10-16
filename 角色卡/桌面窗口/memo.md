@@ -2,6 +2,8 @@
 
 记录本角色掌握的事实、待核实事项与续接线索。不写全局规则，不抄任务状态。
 
+- 2026-10-16：**e2e 自检台对齐 v3/V2 完成（已实施待验证）**，Doc: `docs/fix/2026-10-16_fix_e2e-selfcheck-v3-sync.md`（含 26 类逐处「原→新+理由」对照表；证据 `docs/fix/2026-10-16-e2e-v3-sync-evidence/`）。可复用事实：① **harness 主进程 `registerIpc` 必须跟 `app/main.ts` 的现行通道表**——本轮补 9 条（`session:live-views`/`session:history-get`/`runtime-config:get|save`/报告投递持久化查询组）；缺通道的后果各有其形：live-views 缺 ⇒ `liveRoles` 清空徽标全显「已停止」；history-get 缺 ⇒ 「读取历史失败」分支**全量重建清掉已回放行**（锚点表登记与 RESTORE_* 连锁假）。② **工具事件夹具现行形状 = envelope 顶层 `turnId`**（v3 后 `tool-rows.js::activityOf.turnId` 只认顶层；detail 冗余一份）——只给 detail.turnId 的旧形状会被并组、行数饿死、窗口化空转（2026-10-14 旧钉法已失效，S-1/TOOLROW 夹具已补）。③ **注入样式判据 = typed 标记**（`detail.source==="prompt-input"`）；15s 时间启发式防误伤已由 fca8f6b 移除、改 clientMessageId 身份绑定——手输「伪前缀」的 typed 回显分类走向未钉，已留痕交 PM/桌面UI（另 renderer.js:2312 注释陈旧同步报）。④ **`U1_WINDOWED_TO_BOTTOM` 18px 确定性缺陷（V2 引入，`app/renderer/**` 属主）**：切回已开会话角色时 `.session-notice`（「续接当前会话。」19px）在贴底滚动**之后**撑起、无后随补滚；探针（最小复现）在手；建议修法 = setHint 后对「在底部者」补 `scrollBottomForced`；本台**未放松阈值（≤8）**，修后复跑即可验证。⑤ 现行渲染器下 200 条逐条 `session:event` 渲完约 4.4s——长夹具断言前用有界等待（新辅助 `waitUntil`），勿死睡。⑥ 报告卡/投递卡现行事件形状 = `event.report`（`RuntimeReportSnapshotV1`）与投递机 `prompt-input`+`inputProvenance.reports`；旧 `handback:` 裸载荷安全降级为系统行（不崩、不呈现）。⑦ 本批证据：e2e 两轮逐字一致、除 U1 外全绿、stdout 噪声 287→1 行；边界 266/266；typecheck 0。
+
 - 2026-10-14：客户确认换用「双括号字印」，当前 `APP_ICON_PATH` = `app/desktop/assets/ans-bracket-seal.png`，README 直接引用同一PNG；macOS Electron 独立检查及typecheck通过。[记录](docs/change/2026-10-14_change_bracket-seal-icon.md)。下条悬桥 A 是先前设计历史。
 
 - 2026-10-14：图标由 `app/main.ts` 的 `APP_ICON_PATH` 定位到 `app/desktop/assets/ans-suspended-bridge-a.png`；窗口与 macOS ready 后的 Dock 共用。真实 Electron 独立检查可解码并成功建窗/设置 Dock，完整应用与其他平台外观未验证。[记录](docs/change/2026-10-14_change_suspended-bridge-icon.md)。

@@ -1,0 +1,5 @@
+Error occurred in handler for 'session:send': Error: 修复探针：发送异常原文
+    at file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/main.mjs:155:32
+    at file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/app/desktop/diagnostics.ts:18:30
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:119988)
+    at Session.emit (node:events:514:28)

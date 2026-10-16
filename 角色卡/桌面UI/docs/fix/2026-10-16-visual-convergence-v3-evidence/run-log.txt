@@ -1,0 +1,31 @@
+# 视觉收敛 v3 实施验收 · 运行记录（2026-10-16，桌面UI）
+# 环境：本机 darwin，Electron 44.7.0，离线（受控 IPC 替身：无模型请求/无网络/不读用户项目凭据）
+
+## 1) v3 验收段（12 设计数值断言 + S1–S3/W6b/W6/零动效/兜底/截断 共 30 条，全过）
+ANS_UIUX_OUTDIR=/tmp/ans-v3-final node_modules/.bin/electron test/桌面应用/e2e/uiux-design-audit.mjs
+=> AUDIT_DONE /tmp/ans-v3-final（29/29；追加 S1 截断附验后重跑 /tmp/ans-v3-final2 => AUDIT_DONE 30/30）
+=> v3.results 30/30 ok（逐条数值见 audit-report.json 的 v3.results / v3.measures）
+
+## 2) 边界内单测（node --test）
+test/桌面应用/{markdown,renderer,tool-rows,runtime-ui}.test.ts => tests 87 / pass 87 / fail 0
+
+## 3) 离线 Electron e2e（uiux-v2.mjs 全家族 + IME + bench + 原型测量）
+uiux-v2.mjs（默认全量）        => UIUX_V2_PASS 99
+uiux-v2.mjs ANS_DUP_UI_ONLY=1  => DUP_UI_PASS 32
+uiux-v2.mjs ANS_G2_RECOVERY_UI_ONLY=1   => G2_RECOVERY_UI_PASS 5
+uiux-v2.mjs ANS_COMPLETE_FLOW_UI_ONLY=1 => COMPLETE_FLOW_UI_PASS 41
+uiux-v2.mjs ANS_VISUAL_V2_UI_ONLY=1     => VISUAL_V2_PASS 36
+uiux-v2.mjs ANS_RUNTIME_UI_ONLY=1       => RUNTIME_UI_PASS 16
+uiux-v2.mjs ANS_DELIVERY_NOTE_UI_ONLY=1 => DELIVERY_NOTE_PASS 9
+ime-enter.mjs（ANS_IME_OUTDIR）         => E2E_DONE=1（全断言 true）
+bench-storm.mjs（BENCH_OUT）            => BENCH_DONE=1（stormA/B、2000 行回放、滚底均正常）
+uiux-prototype-measure.mjs              => PROTO_MEASURE_DONE（UIUX 原型只读测量）
+
+## 4) 全仓类型检查
+npm run typecheck => tsc --noEmit，0 error
+
+## 5) 桌面窗口自检台（非本角色文件，仅记录现状；详见 fix 记录 §6）
+ANS_E2E_OUTDIR=/tmp/ans-v3-main node_modules/.bin/electron test/桌面应用/e2e/main.mjs
+=> 既有红（非本批引入）：12 处过期断言 =false（badge 已挂 #tab-work 而 main.mjs 查 #tab-card；
+   QUEUE_* 等右栏改版后未同步），并在 '#tab-card .tab-badge' 空指针崩溃 E2E_ERROR（流程止于第 6 节）。
+   本批新增一处需其同步：ROLE_STATE_BADGE_HAS_ICON（.ts-ico 现为纯 SVG，应改查 .ts-ico svg.spin-arc）。
