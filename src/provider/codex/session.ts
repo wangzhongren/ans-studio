@@ -13,6 +13,8 @@ import { settings, safetyConfig, safetyOverrides, effectiveConfig, verifyThread 
 // Windows 瞬时句柄占用（`EBUSY`/`EPERM`/`EACCES`）的**有界重试**单一来源（§一.5 不得第二份实现）：
 // 收尾删除 workRoot 时，刚退出的原生进程/在途句柄可能短暂未释放——沿原子写原语同一口径处置。
 import { retryOnTransient } from "../../common/shared/atomic-write.ts";
+// G-4「已安装技能」注入节：渲染单一来源在编排（installed-skills.ts）——本适配器只做「非空则整段拼接」。
+import { renderInstalledSkillsSection } from "../../common/编排/installed-skills.ts";
 
 export type { CodexRpcConnection, CodexEngineInput, CodexEngineFactory } from "../../common/codex-adapter/protocol.ts";
 
@@ -233,13 +235,20 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
   if (options.toolDisplayMode === "required-v1" && (typeof options.projectToolEvent !== "function" || typeof options.registerToolDisplayProfile !== "function")) {
     throw new Error("Codex required-v1 tool display requires projector/register capabilities");
   }
-  const composeContext = async (role: ResolvedRole) => ({ systemPrompt: [
-    role.cardText,
-    `固定角色：${role.id}。实际项目目录：${options.projectRoot}。`,
-    "只通过 ans_ 前缀工具执行项目读取、修改、命令、交互和回交；原生运行环境只读。派发不转移授权。",
-    `角色写入边界：${JSON.stringify(role.boundary)}`,
-    ...options.tools.flatMap(tool => tool.promptGuidelines ?? []),
-  ].join("\n\n") });
+  // G-4 installed-skills section: the render is the single orchestration source (hash/matching/bad-file
+  // handling all live there). Non-empty splices the whole section verbatim as one prompt segment; empty
+  // string renders nothing (zero-skill status quo stays byte-identical).
+  const composeContext = async (role: ResolvedRole) => {
+    const installedSkills = renderInstalledSkillsSection(options.projectRoot, role.id);
+    return { systemPrompt: [
+      role.cardText,
+      `固定角色：${role.id}。实际项目目录：${options.projectRoot}。`,
+      "只通过 ans_ 前缀工具执行项目读取、修改、命令、交互和回交；原生运行环境只读。派发不转移授权。",
+      `角色写入边界：${JSON.stringify(role.boundary)}`,
+      ...options.tools.flatMap(tool => tool.promptGuidelines ?? []),
+      ...(installedSkills === "" ? [] : [installedSkills]),
+    ].join("\n\n") };
+  };
 
   return {
     composeContext,

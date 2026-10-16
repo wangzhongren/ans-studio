@@ -16,6 +16,7 @@ import { buildGovernedTools } from "./tools.ts";
 import { createInteractionGate } from "../../common/pi-adapter/timeout.ts";
 import { createEventQueue } from "../../common/pi-adapter/event-queue.ts";
 import { resolvePiProviderConfig, type PiProviderConfigInput } from "../../common/pi-adapter/provider-config.ts";
+import { renderInstalledSkillsSection } from "../../common/编排/installed-skills.ts";
 
 // The neutral Model is the sole contract owner. Explicit old-path compatibility exports.
 export type {
@@ -33,17 +34,26 @@ import type {
 
 // —————————————————————— 公共辅助 ——————————————————————
 
-/** 由角色卡文本与边界来源拼出系统提示（不做任何判定，只做呈现）。 */
-function renderSystemPrompt(role: ResolvedRole): string {
-  const lines = [
+/**
+ * 由角色卡文本与边界来源拼出系统提示（不做任何判定，只做呈现）。
+ *
+ * G-4（客户 2026-10-16 批准）：追加「已安装技能」注入节——`renderInstalledSkillsSection`
+ * （`src/common/编排/installed-skills.ts`）是这段文本的**渲染单一来源**；本函数只做一件事：
+ * **非空 ⇒ 整段拼接**（逐字不改写、不重排、不另写模板）；空串（零技能/从未安装/空 projectRoot）
+ * ⇒ 逐字零渲染（对照会话与未装技能角色系统提示零变化）。判据与坏件处置全在渲染器内，
+ * 调用侧不预扫 `docs/skills`。假适配器与防真外壳共用本函数（测试面跨运行时逐字一致）。
+ */
+function renderSystemPrompt(role: ResolvedRole, projectRoot?: string): string {
+  const base = [
     `# 角色：${role.id}`,
     "",
     role.cardText.trim(),
     "",
     `## 边界来源`,
     role.boundarySource,
-  ];
-  return lines.join("\n");
+  ].join("\n");
+  const skills = renderInstalledSkillsSection(projectRoot ?? "", role.id);
+  return skills === "" ? base : `${base}\n\n${skills}`;
 }
 
 // —————————————————————— 假适配器（仅单元测试） ——————————————————————
@@ -65,6 +75,12 @@ const DEFAULT_FAKE_SCRIPT: ToolCall[] = [
 export function createFakeRuntimeAdapter(opts: {
   gate: WriteGate;
   script?: ToolCall[];
+  /**
+   * 项目根（G-4 注入节基准）：给出时系统提示追加「已安装技能」注入节（非空才拼、逐字原样；
+   * 渲染单一来源＝编排 `renderInstalledSkillsSection`）。**缺省不注入**（空 projectRoot ⇒
+   * 渲染器返回空串 ⇒ 逐字零渲染，旧行为逐字不变）。
+   */
+  projectRoot?: string;
   /** 读根（read_file 相对路径基准）；缺省 process.cwd()。 */
   readRoot?: string;
   /** 写根（write_file/edit_file 落盘安全基准）；缺省不落盘。 */
@@ -103,7 +119,7 @@ export function createFakeRuntimeAdapter(opts: {
 
   return {
     async composeContext(role: ResolvedRole): Promise<{ systemPrompt: string }> {
-      return { systemPrompt: renderSystemPrompt(role) };
+      return { systemPrompt: renderSystemPrompt(role, opts.projectRoot) };
     },
 
     async bindRole(role: ResolvedRole): Promise<RoleSession> {
@@ -243,7 +259,7 @@ export function createPiRuntimeAdapter(opts: RuntimeProviderOptions | PiRuntimeA
   return {
     async composeContext(role) {
       // No SDK initialization is needed to render this text.
-      return { systemPrompt: renderSystemPrompt(role) };
+      return { systemPrompt: renderSystemPrompt(role, input.projectRoot) };
     },
     async bindRole(role) {
       const mod = await load();

@@ -10,6 +10,7 @@ import type { RuntimeAdapter, RuntimeProviderOptions, RoleSession, SessionEvent,
 import { RUNTIME_CREDENTIAL_ENV_VARS } from "../../common/shared/runtime-shared.ts";
 import { toClaudeSchema } from "../../common/claude-adapter/schema.ts";
 import { abortError, createQueue, waitForTurn } from "../../common/claude-adapter/lifecycle.ts";
+import { renderInstalledSkillsSection } from "../../common/编排/installed-skills.ts";
 
 /** Tests replace only transport; MCP server/schema/handlers can remain the actual SDK implementation. */
 export interface ClaudeAdapterDependencies {
@@ -59,12 +60,19 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
       .replace(/(Bearer\s+|(?:api[_-]?key|auth[_-]?token|oauth[_-]?token)\s*[=:]\s*)[^\s,;]+/gi, "$1[REDACTED]")
       .replace(/(https?:\/\/)[^\s/@]+(?::[^\s/@]*)?@/gi, "$1[REDACTED]@");
   };
-  const systemPrompt = (role: ResolvedRole) => [
-    role.cardText,
-    `你始终绑定角色 ${role.id}。只能通过 mcp__ans__ 工具操作环境；所有写入、shell 和交互由 ANS 的注入能力判断。`,
-    `当前角色边界：${JSON.stringify(role.boundary)}`,
-    ...options.tools.flatMap((tool) => tool.promptGuidelines ?? []),
-  ].join("\n\n");
+  // G-4 installed-skills section: the render is the single orchestration source (hash/matching/bad-file
+  // handling all live there). Non-empty splices the whole section verbatim as one prompt segment; empty
+  // string renders nothing (zero-skill status quo stays byte-identical).
+  const systemPrompt = (role: ResolvedRole) => {
+    const installedSkills = renderInstalledSkillsSection(options.projectRoot, role.id);
+    return [
+      role.cardText,
+      `你始终绑定角色 ${role.id}。只能通过 mcp__ans__ 工具操作环境；所有写入、shell 和交互由 ANS 的注入能力判断。`,
+      `当前角色边界：${JSON.stringify(role.boundary)}`,
+      ...options.tools.flatMap((tool) => tool.promptGuidelines ?? []),
+      ...(installedSkills === "" ? [] : [installedSkills]),
+    ].join("\n\n");
+  };
 
   return {
     async composeContext(role) { return { systemPrompt: systemPrompt(role) }; },

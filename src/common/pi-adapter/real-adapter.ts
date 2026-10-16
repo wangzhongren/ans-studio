@@ -41,6 +41,7 @@ export { describeTool } from "./tool-compat.ts";
 export type { ToolPiDescription } from "./tool-compat.ts";
 import { formatDenialMessage } from "./format-denial.ts";
 import { createEventQueue, type EventQueue } from "./event-queue.ts";
+import { renderInstalledSkillsSection } from "../编排/installed-skills.ts";
 import {
   resolvePiProviderConfig,
   renderContextWindowNotice,
@@ -317,8 +318,18 @@ function extractCallPath(input: unknown): string | undefined {
 
 // —————————————————————— 系统提示 ——————————————————————
 
-function renderSystemPrompt(role: ResolvedRole): string {
-  return [`# 角色：${role.id}`, "", role.cardText.trim(), "", "## 边界来源", role.boundarySource].join("\n");
+/**
+ * 由角色卡文本与边界来源拼出系统提示（不做任何判定，只做呈现）。
+ *
+ * G-4（客户 2026-10-16 批准）：追加「已安装技能」注入节——`renderInstalledSkillsSection`
+ * （`src/common/编排/installed-skills.ts`）是这段文本的**渲染单一来源**；本函数只做一件事：
+ * **非空 ⇒ 整段拼接**（逐字不改写、不重排、不另写模板）；空串（零技能/从未安装/空 projectRoot）
+ * ⇒ 逐字零渲染。判据与坏件处置全在渲染器内，调用侧不预扫 `docs/skills`。
+ */
+function renderSystemPrompt(role: ResolvedRole, projectRoot: string): string {
+  const base = [`# 角色：${role.id}`, "", role.cardText.trim(), "", "## 边界来源", role.boundarySource].join("\n");
+  const skills = renderInstalledSkillsSection(projectRoot, role.id);
+  return skills === "" ? base : `${base}\n\n${skills}`;
 }
 
 // —————————————————————— 受治理工具 → Pi 自定义工具 ——————————————————————
@@ -957,7 +968,7 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
   const opts = { ...input };
   return {
     async composeContext(role: ResolvedRole): Promise<{ systemPrompt: string }> {
-      return { systemPrompt: renderSystemPrompt(role) };
+      return { systemPrompt: renderSystemPrompt(role, opts.projectRoot) };
     },
 
     async bindRole(role: ResolvedRole): Promise<RoleSession> {
@@ -1058,7 +1069,7 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
           agentDir: opts.projectRoot,
           extensionFactories: [extension],
           noExtensions: true,
-          systemPrompt: renderSystemPrompt(role),
+          systemPrompt: renderSystemPrompt(role, opts.projectRoot),
           noSkills: true,
           noPromptTemplates: true,
           noThemes: true,
