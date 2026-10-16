@@ -1,5 +1,30 @@
 # Pi适配器 变更记录
 
+## 2026-10-16 — 服务端工具族 live 探针第一批结果：归档＋评估（客户实跑；②判定＝探针构造产物）
+
+**来源**：G-3 验证阶段客户本机实跑（PM 转达）。归档＋评估记录（证据）：`docs/fix/2026-10-16_probe_server-side-tools-live-results.md`（含原始输出逐字归档、端点/request_id 已隐去，全文无凭据/查询串）。**本角色未发任何 live 请求**；本轮**只写 docs 面**（未改任何 src/test 代码）。
+
+**网关结论（登记）**：`web_search_20250305` ✅ 200、服务端真实执行（`server_tool_use`/`web_search_tool_result`/`usage.web_search_requests` 计量 1–3 次/轮）；`web_fetch_20250910` ✗ 500 `unknown variant`（网关仅支持 `web_search_20250305`/`web_search_20260209`）⇒ **配置指引：本网关 `ANS_PI_SERVER_TOOLS` 只应启用 web_search**，配 web_fetch 会 500 并触发会话级声明降级（路径 C 行为正确、该工具在本网关不可用；注册表暂保留 web_fetch——其他网关可能支持）；`code_execution` ✗ **维持缓不解缓**；`web_search_20260209` 网关支持——**仅登记观察、不加**（客户口径）；`max_uses` **本网关未见强制**（声明 1 仍执行 2–3 次、无上限类错误码 ⇒ 声明不构成成本护栏，计费以 usage 计量透传为准）；`pause_turn` 未见（如实记未见）。
+
+**②两轮复放判定：探针构造产物（高置信）**：round2 的 500（`messages.1: all messages must have non-empty content`）由探针脚本两处构造偏差造成——①流式文本未捕获（`server-tools-probe.ts:124/:128-129` 对「start 空文本 + text_delta 增量」标准形态全丢；证据自证＝round1 blocks 含 `text` 块而 `strippedTranscriptTextBlocks=0`）；②把空捕获结果组装成 `{role:"assistant",content:[]}` 直接发出。真实链路**不会发送空内容助手消息**——pi-ai `convertMessages` 对空转换结果**整条跳过**（dist `anthropic-messages.js:1145-1146`）⇒ 该 500 请求形态在真实链路**不可构造**。网关对剥离转录的接受度**待探针修复后补验**（补验亦覆盖残留观察：助手消息剥离后为空被整条省略时的**相邻 user 消息**）。方案 P（§4.5-1 回填）维持**未启动**（条件性适用性与改动面评估已归档：触发条件＝补验仍拒；内存缓存面与按序配对失配风险已列）。**后续**：探针两处修复（建议下轮派发，本角色）+ 客户补跑 §② → 结论回填证据文件。
+
+**验证**：本轮纯 docs（未动代码）；绿证沿用同日实施轮——专项 264/264、`npm run typecheck` 全仓 0 错误、全量 1723 计/1722 过/0 红/1 跳。
+
+## 2026-10-16 — 服务端工具族（web_search/web_fetch）已实施待验证：声明注入 + 原始流观测 + 路径 C 降级（客户已批准）
+
+**来源**：客户 2026-10-16「按推荐批准，开始实施」（裁定：`角色卡/项目管理/docs/change/2026-10-15_change_kanban-fixes-pm-review.md` §「G-3 客户批准与实施派发」）；实施规格＝本角色提案 `docs/fix/2026-10-16_proposal_server-side-tools.md`（状态已改 `implemented-pending-verification`，文末附**实施记录**：批准口径逐条落实、与提案的差异、未验边界、live 探针清单）。零 git 提交；未发任何真实网关请求（live 探针由客户在验证阶段运行）。
+
+**改了什么（全部本角色 boundary.yaml Section 1 内）**
+- **新** `src/common/pi-adapter/server-tools.ts`（不 import Pi）：`SERVER_TOOL_ENV="ANS_PI_SERVER_TOOLS"` 解析（默认关；`id[:max_uses]`；未知 id/非法 max_uses/重复 id ⇒ 构造期抛错；注册表首批仅 `web_search_20250305`/`web_fetch_20250910`，**code_execution 缓、未列入**）；`appendServerToolDeclarations`（幂等、`payload.tools` 尾部追加、返回新对象）；`createServerToolObserver`（原始 SSE 事件 → 观测命令：`server_tool_use` start/`*_tool_result` 两形状容忍、结果错误变体（max_uses_exceeded 等）→ denied、`usage.server_tool_use` 两来源（`from-usage`/`from-blocks`）、pause_turn、未知 stop_reason；白名单字段只取 title/url/error_code/计数，**encrypted_content 与文档正文一律不读**）；启用/降级/pause 文案；`requestRejectionStatus`（错误消息前缀取 `>=400 排除 408/429`）。
+- `src/common/pi-adapter/real-adapter.ts`：扩展内注册**三个** handler——`before_provider_request`（声明注入）、`provider_stream_event`（`api==="anthropic-messages"` 过滤 → 观测 → 行经既有 `projectToolEvent`（native-start/native-result、rule "none"）/legacy emit + 诊断 `server_tool.call/usage/degraded/paused/unknown_stop_reason`）、`message_end`（**V1 路径 C 降级**：本请求含声明 ∧ stopReason=error ∧ 错误前缀为拒绝状态 ⇒ 会话级停用后续声明 + 如实行 + `server_tool.degraded{state:"suppressed"}`；**不自动剥离重试**）。未启用时**零注册、零开销、行为逐字旧版**。`bindRole`：构造期解析配置（未知 id 即抛，网络请求之前）＋启用行（log.stage + 聊天流 + `server_tool.declare`）。
+- **新** `test/pi-adapter/server-tools.test.ts`（24 用例）＋ `test/pi-adapter/server-tools-wire.test.ts`（8 用例；bindRole 构造期未知 id 抛错 + T2 离线捕获真实 params；T3-T8 全 loopback 127.0.0.1——成功往返/max_uses_exceeded/400 降级/pause_turn/默认关/usage 兜底）。
+- **新** `test/pi-adapter/server-tools-probe.ts`：live 探针（**客户运行**；读仓库 `.env` 只报键名；输出只含形状/计数、不含查询串/正文；含两轮复放/max_uses 形状/usage 回传/code_execution 追加探针）。
+- **未动**：`src/provider/pi/session.ts` 契约、`settings.ts`、`timeout.ts`、`lifecycle.ts`、`src/common/shared/diagnostics.ts`（白名单字段足够，未扩）。
+
+**实现轮关键修正（如实登记，依据＝已安装 dist 只读核实 + loopback 实证）**：提案 §4.2 原拟用扩展事件 `after_provider_response` 记录状态——实测其**只在 2xx 后回调**（非 2xx 时 Anthropic SDK 直接 throw，`asResponse()` reject），**看不到 4xx/5xx**；实现改为从 SDK 错误消息前缀取状态（不读正文、不落诊断），并因此覆盖 5xx（历史「不认声明」的 tool_removal 500 案例同属降级面）。`agent_before_settle` 剥离重试（候选 A）未实施（批准口径 ④ 已裁 V1 路径 C）。
+
+**验证（本角色执行）**：`node --test 'test/pi-adapter/**/*.test.ts'` → **264/264 绿**（连跑多次；其间一次负载性 250ms 限时红已单跑复现为绿澄清，非本项引入）；`npm run typecheck` → **全仓 0 错误**；全量 `node --test "test/**/*.test.ts"` → **1723 计/1722 过/0 红/1 跳**（0 新红）。真机/live 网关行为属客户验证阶段（探针清单已附提案实施记录）。
+
 ## 2026-10-16 — kanban-live F-3-a/F-3-b 已实施：截断事实外推 + 限一次收尾补发（客户已批准）
 
 **来源**：客户按推荐批准（`角色卡/项目管理/docs/change/2026-10-15_change_kanban-fixes-pm-review.md` §客户批准记录——本角色批准项：F-3-a + F-3-b，补发默认开启、env 可关）。属主提案：`docs/fix/2026-10-15_fix_kanban-turn-truncation.md`（状态已改 `implemented-pending-verification` 并附实施记录）。零 git 提交；`kanban-live` 项目与证据目录全程只读。

@@ -52,6 +52,17 @@ import { createStageLogger, type StageLogger } from "./logger.ts";
 import { createDiagnosticLogger } from "../shared/diagnostics.ts";
 import { createTurnLifecycle, type TurnLifecycle, type DiagnosticLog } from "./lifecycle.ts";
 import {
+  appendServerToolDeclarations,
+  createServerToolObserver,
+  parseServerToolConfig,
+  renderServerToolDegradedSummary,
+  renderServerToolEnableNotice,
+  requestRejectionStatus,
+  SERVER_TOOL_PAUSED_SUMMARY,
+  type ServerToolExtensionOptions,
+  type ServerToolObservation,
+} from "./server-tools.ts";
+import {
   CONSTRUCT_TIMEOUT_ENV,
   DEFAULT_CONSTRUCT_TIMEOUT_MS,
   DEFAULT_PROMPT_TIMEOUT_MS,
@@ -451,12 +462,18 @@ const GOVERNED_WRITE_TOOLS = new Set(["write", "edit", "write_file", "edit_file"
  * 我们的自定义工具 run_shell」，扩展层对它只剩**能力级 kill-switch**：未 arm（未注入 ShellGate）时整只
  * `{block:true}`；**arm 了即放行、交 execute 做每调用细审**。它**不做**每调用 token 校验（票据已废，§7.1
  * 第 3 条），**绝不喂 resolveWrite**（run_shell 的 input 无 path；从命令串解析路径是启发式当判据，见 §7.7）。
+ *
+ * **服务端工具族（web_search/web_fetch；客户已批准 2026-10-16，默认关）**：仅当 `context.serverTools`
+ * 给出非空声明时注册三个 handler（声明注入 / 原始流观测 / 4xx 降级判定）——未启用时
+ * **零注册、零开销、行为逐字与旧版一致**。注入与观测的通道依据见 server-tools.ts 头部（扩展事件
+ * `before_provider_request` / `provider_stream_event`，均为已安装 SDK dist 的只读核实）。V1 路径 C：
+ * 网关 4xx 疑似拒声明时**不自动剥离重试**（本轮如实收场 + 停用后续声明），剥离重试后置。
  */
 export function buildGovernanceExtension(
   gate: WriteGate,
   emit: (event: SessionEvent) => void,
   shellArmed: boolean,
-  context?: PiToolEventContext & { allowedToolNames?: ReadonlySet<string> },
+  context?: PiToolEventContext & { allowedToolNames?: ReadonlySet<string>; serverTools?: ServerToolExtensionOptions },
 ): { name: string; factory: (pi: ExtensionAPI) => void } {
   return {
     name: "ans-governance",
@@ -588,6 +605,89 @@ export function buildGovernanceExtension(
           detail: { reason: event.reason, aborted: event.aborted, errorMessage: event.errorMessage },
         });
       });
+
+      // ———————— 服务端工具族（web_search/web_fetch）扩展 handler（**仅启用时注册**） ————————
+      //
+      // 依据与白名单纪律见 server-tools.ts 头部；此处只做「观测命令 → 行/诊断」的接线：
+      // - 行经既有 projectToolEvent（与客户端工具行同一形状/净化/预算/回放路径，桌面 v1 零改动）
+      //   或无 projector 时的 legacy emit（沿本文件既有两条路径先例）；
+      // - 诊断字段全部落在共享白名单内（toolName/count/turnId/state/errorCode/reasonCode/ok），
+      //   **查询串与结果正文不进诊断**（客户批准口径 ③：usage 只进计数类）。
+      const serverTools = context?.serverTools;
+      if (serverTools !== undefined && serverTools.declarations.length > 0) {
+        const observer = createServerToolObserver();
+        // 降级判定状态（每请求重置；suppressed 为**会话级**——一旦疑似拒声明，后续请求不再附带）。
+        let requestHadDeclarations = false;
+        let suppressed = false;
+        const recordObservation = (observation: ServerToolObservation): void => {
+          const turnId = context?.currentTurnId?.();
+          if (observation.kind === "call-start") {
+            context?.diagnostics?.record("server_tool.call", { turnId, toolName: observation.toolName, toolCallId: observation.toolCallId, count: 1 });
+            if (context?.projectToolEvent) {
+              emit(projectToolEvent(context.projectToolEvent, { origin: "native-start", phase: "start", runtime: "pi", roleId: context.roleId, turnId, toolName: observation.toolName, toolCallId: observation.toolCallId, input: { rule: "none", args: {} } }));
+            } else {
+              emit({ kind: "tool_call", summary: `模型请求调用 ${observation.toolName}（服务端工具）`, detail: { turnId, toolName: observation.toolName, toolCallId: observation.toolCallId, phase: "start" } });
+            }
+            return;
+          }
+          if (observation.kind === "call-result" || observation.kind === "call-denied") {
+            const ok = observation.kind === "call-result";
+            if (!ok) context?.diagnostics?.record("server_tool.degraded", { turnId, toolName: observation.toolName, toolCallId: observation.toolCallId, ok: false, errorCode: observation.errorCode });
+            if (context?.projectToolEvent) {
+              emit(projectToolEvent(context.projectToolEvent, { origin: "native-result", phase: "result", runtime: "pi", roleId: context.roleId, turnId, toolName: observation.toolName, toolCallId: observation.toolCallId, result: { ok, message: observation.message } }));
+            } else {
+              emit({ kind: ok ? "accepted" : "denied", summary: observation.message, detail: { turnId, toolName: observation.toolName, toolCallId: observation.toolCallId, phase: "result", ok } });
+            }
+            return;
+          }
+          if (observation.kind === "usage") {
+            context?.diagnostics?.record("server_tool.usage", { turnId, toolName: observation.toolName, count: observation.count, state: observation.state });
+            return;
+          }
+          if (observation.kind === "paused") {
+            context?.diagnostics?.record("server_tool.paused", { turnId, reasonCode: "pause_turn" });
+            emit({ kind: "message", summary: SERVER_TOOL_PAUSED_SUMMARY, detail: { source: "server-tools" } });
+            return;
+          }
+          // unknown-stop-reason：轮次失败由 pi-ai 既有 throw 路径如实呈现（此处不改）；仅补一条诊断归属。
+          context?.diagnostics?.record("server_tool.unknown_stop_reason", { turnId, reasonCode: observation.reason.slice(0, 64) });
+        };
+
+        pi.on("before_provider_request", (event): unknown => {
+          // 每请求重置配对状态（降级判据 = 本请求含声明 ∧ 该请求以 error 收场 ∧ 错误前缀给出拒绝状态）。
+          requestHadDeclarations = false;
+          if (suppressed) return undefined;
+          const result = appendServerToolDeclarations(event.payload, serverTools.declarations);
+          requestHadDeclarations = result.present;
+          return result.changed ? result.payload : undefined;
+        });
+
+        pi.on("provider_stream_event", (event): void => {
+          // 仅本适配器所用协议路径（其余 api 的原始事件形状不同，O(1) 早退；早退纪律见提案 §2.7）。
+          if (event.api !== "anthropic-messages") return;
+          for (const observation of observer.observe(event.data)) recordObservation(observation);
+        });
+
+        pi.on("message_end", (event): void => {
+          // —— V1 路径 C（客户批准口径 ④：如实失败、不毁轮次；不自动剥离重试）——
+          // 判据：本请求含声明 ∧ 该请求以 stopReason=error 收场 ∧ 错误消息前缀给出**确定性拒绝**状态
+          // （>= 400；排除 408/429 两类与声明无关的瞬时态——见 requestRejectionStatus 文档）。
+          // 状态来源（实现轮核实修正提案 §4.2 的探测通道）：扩展事件 `after_provider_response` 只在 2xx 后
+          // 回调——非 2xx 时 Anthropic SDK 直接 throw（client.js:583-614），该事件**看不到 4xx/5xx**；
+          // 故状态改从错误消息前缀取（只在内存用于判定，**不落诊断**——沿「只存错误类别」纪律）。
+          // 轮次失败语义不变（既有 lifecycle 照常收尾）；我们只**停用后续请求的声明** + 如实行 + 诊断。
+          if (suppressed || !requestHadDeclarations) return;
+          const message = event.message as unknown;
+          const record = message !== null && typeof message === "object" ? (message as Record<string, unknown>) : undefined;
+          if (record === undefined || record["stopReason"] !== "error") return;
+          const errorMessage = typeof record["errorMessage"] === "string" ? record["errorMessage"] : "";
+          const status = requestRejectionStatus(errorMessage);
+          if (status === undefined) return;
+          suppressed = true;
+          context?.diagnostics?.record("server_tool.degraded", { turnId: context?.currentTurnId?.(), errorCode: `GATEWAY_REJECTED_HTTP_${String(status)}`, state: "suppressed" });
+          emit({ kind: "message", summary: renderServerToolDegradedSummary(status), detail: { source: "server-tools" } });
+        });
+      }
     },
   };
 }
@@ -878,6 +978,9 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
         if (opts.toolDisplayMode === "required-v1" && (typeof opts.projectToolEvent !== "function" || typeof opts.registerToolDisplayProfile !== "function")) throw new Error("Pi required-v1 tool display capabilities are missing");
         const profileEnv = { ...process.env };
         const cfg = opts.config ?? resolvePiProviderConfig(opts, profileEnv);
+        // 服务端工具配置（客户已批准 2026-10-16；**默认关**）。未知 id / 非法 max_uses ⇒ 构造期抛错
+        // （一句话明确、不静默半开；与「缺 baseUrl 即抛」同口径）——在任何网络请求发生之前失败。
+        const serverToolConfig = parseServerToolConfig(profileEnv);
         opts.registerToolDisplayProfile?.({ apiKeyEnvVar: cfg.apiKeyEnvVar, credentials: [...new Set([cfg.apiKeyEnvVar, ...(opts.toolDisplayCredentialEnvNames ?? [])])].map(name => ({ name, value: profileEnv[name] })) });
         log.trace(`构造单步时限=${constructMs}ms，prompt 时限=${promptMs}ms`);
 
@@ -929,13 +1032,25 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
         const turnContext: PiToolEventContext = { currentTurnId: lifecycle.currentTurnId, diagnostics, projectToolEvent: opts.projectToolEvent, callFacts, roleId: role.id, inputRules: new Map(governedTools.map(tool => [tool.name, tool.displayInputRule])), noteReportSubmitted: (submittedTurnId) => { if (submittedTurnId !== undefined) reportTurnId = submittedTurnId; } };
         // 缺失上下文窗口的可见提示也进入事件流，确保界面/用户看得到（不只留在日志里）。
         if (contextWindowNotice !== undefined) emit({ kind: "message", summary: contextWindowNotice });
+        // 服务端工具启用行（一次）：日志 + 聊天流各一条 + 诊断（只落计数与状态，不落工具清单外任何内容）。
+        if (serverToolConfig.enabled.length > 0) {
+          const notice = renderServerToolEnableNotice(serverToolConfig.enabled);
+          log.stage(notice);
+          emit({ kind: "message", summary: notice, detail: { source: "server-tools" } });
+          diagnostics.record("server_tool.declare", { count: serverToolConfig.enabled.length, state: "enabled" });
+        }
 
         // Injected definitions and the exact shared waiting gate are the production capability source.
         const allowedToolNames = new Set(governedTools.map((tool) => tool.name));
         const customTools = governedTools.map((tool) => toPiTool(tool, turnContext));
         const extension = buildGovernanceExtension(
           () => { throw new Error("生产工具判定必须由注入 handler 执行"); },
-          emit, allowedToolNames.has("run_shell"), { ...turnContext, allowedToolNames },
+          emit, allowedToolNames.has("run_shell"),
+          {
+            ...turnContext, allowedToolNames,
+            // 未启用（默认）时不传 serverTools ⇒ 扩展层零注册、零开销、行为逐字与旧版一致。
+            ...(serverToolConfig.enabled.length > 0 ? { serverTools: { declarations: serverToolConfig.enabled } } : {}),
+          },
         );
 
         const resourceLoader = new DefaultResourceLoader({

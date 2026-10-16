@@ -74,3 +74,39 @@ export async function bounded<T>(promise: Promise<T>, milliseconds: number, labe
     })]);
   } finally { clearTimeout(timer); }
 }
+
+/** Bounded projection of the opaque native `results` list into the row detail; longer lists are marked, never silently cut. */
+const WEB_SEARCH_RESULTS_CAP = 20;
+
+/**
+ * Projects one native `webSearch` thread item (item/completed) into a single ANS message row.
+ * Detail v1 (2026-10-16 web-search implementation): only fields the app-server actually reported
+ * are carried; missing fields stay missing; nothing is invented. Tolerant by contract — a
+ * malformed item still yields the fallback row and never throws.
+ */
+export function webSearchRow(item: Record<string, unknown>): { summary: string; detail: Record<string, unknown> } {
+  const query = typeof item.query === "string" && item.query ? item.query : undefined;
+  const detail: Record<string, unknown> = { version: 1, source: "web-search" };
+  if (typeof item.id === "string" && item.id) detail.itemId = item.id;
+  if (query !== undefined) detail.query = query;
+  const action = item.action && typeof item.action === "object" && !Array.isArray(item.action) ? item.action as Record<string, unknown> : undefined;
+  if (action && typeof action.type === "string" && action.type) {
+    const projected: Record<string, unknown> = { type: action.type };
+    if (typeof action.url === "string") projected.url = action.url;
+    if (typeof action.pattern === "string") projected.pattern = action.pattern;
+    if (Array.isArray(action.queries) && action.queries.every(value => typeof value === "string")) projected.queries = [...action.queries];
+    detail.action = projected;
+  }
+  if (Array.isArray(item.results)) {
+    detail.results = item.results.slice(0, WEB_SEARCH_RESULTS_CAP).map(entry => {
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) return {};
+      const record = entry as Record<string, unknown>;
+      const row: Record<string, unknown> = {};
+      if (typeof record.title === "string") row.title = record.title;
+      if (typeof record.url === "string") row.url = record.url;
+      return row;
+    });
+    if (item.results.length > WEB_SEARCH_RESULTS_CAP) detail.resultsTruncated = true;
+  }
+  return { summary: query === undefined ? "联网搜索" : `联网搜索：${query}`, detail };
+}

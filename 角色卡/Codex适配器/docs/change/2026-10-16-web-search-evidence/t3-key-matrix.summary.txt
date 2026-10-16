@@ -1,0 +1,24 @@
+=== off-baseline  overrides=["web_search=\"disabled\""]
+configRead: {"web_search":"disabled","tools":null}
+outboundToolTypes: ["function","function","function","function","namespace","function","function","function"]
+turnCompleted: true  error: none
+
+=== t1-top-level-live  overrides=["web_search=\"live\""]
+configRead: {"web_search":"live","tools":null}
+outboundToolTypes: ["function","function","function","function","namespace","function","function","function","web_search"]
+turnCompleted: true  error: none
+
+=== t2-tools-key-only  overrides=["web_search=\"disabled\"","tools.web_search=true"]
+configRead: {"web_search":"disabled","tools":{"web_search":null}}
+outboundToolTypes: ["function","function","function","function","namespace","function","function","function"]
+turnCompleted: true  error: none
+
+=== t3-both-keys  overrides=["web_search=\"live\"","tools.web_search=true"]
+configRead: {"web_search":"live","tools":{"web_search":null}}
+outboundToolTypes: ["function","function","function","function","namespace","function","function","function","web_search"]
+turnCompleted: true  error: none
+
+=== t1-cap-external-web-access  overrides=["web_search=\"live\""]
+configRead: {"web_search":"live","tools":null}
+outboundToolTypes: ["function","function","function","function","namespace","function","function","function","web_search"]
+turnCompleted: true  error: none

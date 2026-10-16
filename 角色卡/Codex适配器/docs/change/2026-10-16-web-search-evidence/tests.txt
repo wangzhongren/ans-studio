@@ -1,0 +1,41 @@
+✔ Node default JS entry keeps isolated environment (6.855542ms)
+✔ Electron default JS entry starts its child in Node mode (2.453375ms)
+✔ Electron explicit native CLI keeps argv and environment (2.419458ms)
+✔ loading/factory is lazy; model/key required, optional official URL, userinfo rejected (193.457209ms)
+✔ optional API address blank values use official default; explicit nonblank wins environment and invalid values stay redacted (16.862208ms)
+✔ bound model/address/key and error redaction keep the same captured environment after async transport starts (6.506ms)
+✔ config enumeration/verification occurs before thread, no unsafe config/catalog fallback (6.969542ms)
+✔ real MCP callbacks use injected schemas and gates: deny/throw have zero writes, allow writes (31.581667ms)
+✔ shell deny/unknown native tool never executes and optional capabilities only come from injection (8.139541ms)
+✔ sequential MCP calls keep original turn signal, queued writes and late old-turn requests cannot cross abort (16.702083ms)
+✔ customer wait pauses deadline; abort and late confirmed do not authorize, next turn can continue (165.134667ms)
+✔ upstream tool-request cancellation invalidates original signal; timeout/failed turn settle exactly once (56.883708ms)
+✔ stop is idempotent and bounded; hanging interrupt quarantines rather than claiming continued session (758.398292ms)
+✔ exact role/runtime native store checks, confirmed resume vs recovered; later model failure retains resumed (25.940458ms)
+✔ native directory symlink rejected before engine, absent persistence creates no .ans, images stay temporary (9.32025ms)
+✔ all injected ANS capability callbacks keep receipts/turn metadata; denied customer and failed report stay failed (7.833833ms)
+✔ call IDs differ across restarts; all shared credential values are scrubbed from model/tool outputs (12.1645ms)
+✔ actual native process JSON-RPC parser routes callbacks and serverRequest/resolved cancellation (65.635458ms)
+✔ owned native process group cleanup kills a wrapper and child that ignore SIGTERM (1164.956167ms)
+✔ required display capabilities reject at factory before any native, MCP or storage effects (0.315041ms)
+✔ profile registers selected credential and named extras from the same immutable bind snapshot before effects (2.434208ms)
+✔ injected display receives real handler facts, rules, error and execution; opaque identities bypass legacy scrub (7.238792ms)
+✔ projector failure emits bounded diagnostic without raw fallback or changing model receipt and settled outcome (5.928375ms)
+✔ provider prompt keeps exact model text and image bytes while ignoring Core-only delivery metadata (3.6045ms)
+✔ projection never attributes unknown, repeated, queued stopped or late callbacks to a new turn (10.785916ms)
+✔ web search capability: default off, env whitelist, explicit option wins, invalid values rejected (0.628667ms)
+✔ default-off posture is byte-identical; capability on moves all three pins together (no tools key) (0.439125ms)
+✔ adapter moves process overrides, thread config and readback expectation with the capability; readback mismatch fails closed (137.010833ms)
+✔ webSearch item becomes one message row (real 0.162.1 payload shape) and settled carries searchCalls (7.771125ms)
+✔ webSearch tolerance: missing or malformed fields keep the fallback row, never throw, never quarantine, results capped (11.313792ms)
+✔ item/started webSearch is not mapped; settled without searches has no searchCalls key (6.842917ms)
+✔ search text and result URLs stay redacted and conservatively stripped in rows and details (7.483875ms)
+✔ actual native process fixture accepts the web search on-posture and completes a governed turn (45.731417ms)
+ℹ tests 33
+ℹ suites 0
+ℹ pass 33
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2698.70575

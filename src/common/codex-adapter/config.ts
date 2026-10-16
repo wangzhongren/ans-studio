@@ -10,7 +10,20 @@ export const DISABLED_NATIVE_FEATURES = [
   "skill_mcp_dependency_install",
 ] as const;
 
-export function settings(options: RuntimeProviderOptions, env: Record<string, string | undefined>) {
+/** Server-side web search capability: explicit option wins, ANS_CODEX_WEB_SEARCH (on|off) is the fallback, both default off. */
+export function webSearchEnabled(option: unknown, environment: string | undefined): boolean {
+  if (option !== undefined) {
+    if (typeof option !== "boolean") throw new Error("Codex invalid web search option");
+    return option;
+  }
+  const value = environment?.trim();
+  if (!value) return false;
+  if (value === "on") return true;
+  if (value === "off") return false;
+  throw new Error("Codex ANS_CODEX_WEB_SEARCH must be on or off");
+}
+
+export function settings(options: RuntimeProviderOptions & { webSearch?: boolean }, env: Record<string, string | undefined>) {
   if (options.runtime !== "codex") throw new Error("Codex adapter requires runtime codex");
   const model = (options.modelId ?? env.ANS_CODEX_MODEL)?.trim();
   if (!model) throw new Error("Codex requires ANS_CODEX_MODEL or modelId");
@@ -33,22 +46,23 @@ export function settings(options: RuntimeProviderOptions, env: Record<string, st
     });
     return result;
   };
-  return { model, key, keyName, baseUrl: url.toString().replace(/\/$/, ""), redact };
+  return { model, key, keyName, baseUrl: url.toString().replace(/\/$/, ""), redact, webSearch: webSearchEnabled(options.webSearch, env.ANS_CODEX_WEB_SEARCH) };
 }
 
-export function safetyConfig(cwd: string): Record<string, unknown> {
+/** Pin 1: thread configuration. Top-level web_search="live" is the verified injection key (T3 matrix, 2026-10-16). */
+export function safetyConfig(cwd: string, webSearch = false): Record<string, unknown> {
   return {
     features: Object.fromEntries(DISABLED_NATIVE_FEATURES.map(name => [name, false])),
     sandbox_mode: "read-only", approval_policy: "never", approvals_reviewer: "user",
-    web_search: "disabled", projects: { [cwd]: { trust_level: "untrusted" } },
+    web_search: webSearch ? "live" : "disabled", projects: { [cwd]: { trust_level: "untrusted" } },
   };
 }
 
-/** CLI TOML overrides stay structural; never interpolate these strings into a shell. */
-export function safetyOverrides(cwd: string, disabledServers: readonly string[] = []): string[] {
+/** CLI TOML overrides stay structural; never interpolate these strings into a shell. Pin 2: process-level overlay moves with pin 1. */
+export function safetyOverrides(cwd: string, disabledServers: readonly string[] = [], webSearch = false): string[] {
   return [
     ...DISABLED_NATIVE_FEATURES.map(name => `features.${name}=false`),
-    'sandbox_mode="read-only"', 'approval_policy="never"', 'approvals_reviewer="user"', 'web_search="disabled"',
+    'sandbox_mode="read-only"', 'approval_policy="never"', 'approvals_reviewer="user"', `web_search="${webSearch ? "live" : "disabled"}"`,
     // CLI dotted override parsing does not preserve quoted arbitrary map keys.
     // Root TOML maps merge, so explicitly overlay enabled=false for every discovered ID.
     `projects={${JSON.stringify(cwd)}={trust_level="untrusted"}}`,
@@ -56,13 +70,14 @@ export function safetyOverrides(cwd: string, disabledServers: readonly string[] 
   ];
 }
 
-export function effectiveConfig(response: unknown) {
+/** Pin 3: config/read readback must match the requested posture (capability on = "live"), fail-closed otherwise. */
+export function effectiveConfig(response: unknown, webSearch = false) {
   const config = object(object(response, "config/read response").config, "effective config");
   const features = object(config.features, "features");
   for (const name of DISABLED_NATIVE_FEATURES) {
     if (features[name] !== false) throw new Error(`Codex native feature ${name} was not disabled`);
   }
-  if (config.sandbox_mode !== "read-only" || config.approval_policy !== "never" || config.web_search !== "disabled") {
+  if (config.sandbox_mode !== "read-only" || config.approval_policy !== "never" || config.web_search !== (webSearch ? "live" : "disabled")) {
     throw new Error("Codex effective sandbox/approval/search restrictions were not applied");
   }
   const servers = object(config.mcp_servers ?? {}, "MCP config");

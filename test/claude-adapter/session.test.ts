@@ -28,7 +28,7 @@ const gate = (): InteractionGate => {
   return { begin() { waiting++; emit(); }, end() { waiting--; emit(); }, isWaiting: () => waiting > 0, onChange(listener) { listeners.add(listener); return () => { listeners.delete(listener); }; } };
 };
 const environment = { PATH: process.env.PATH, HOME: process.env.HOME, ANTHROPIC_API_KEY: "fixture-api-secret", CODEX_API_KEY: "fixture-codex-secret", CLAUDE_CODE_OAUTH_TOKEN: "fixture-oauth-secret", ANTHROPIC_AUTH_TOKEN: "fixture-auth-secret", CLAUDE_CODE_USE_BEDROCK: "1" };
-type Script = (client: Client, options: Options, user: SDKUserMessage, queryIndex: number, rawCall: Client["callTool"]) => Promise<{ fail?: boolean; id?: string } | void>;
+type Script = (client: Client, options: Options, user: SDKUserMessage, queryIndex: number, rawCall: Client["callTool"]) => Promise<{ fail?: boolean; id?: string; frames?: SDKMessage[] } | void>;
 
 /** A real MCP Client/Server pair drives production registration, parsing and handlers; only query is fake. */
 function fake(script: Script) {
@@ -71,6 +71,7 @@ function fake(script: Script) {
         await opts.hooks!.UserPromptSubmit![0]!.hooks[0]!({ hook_event_name: "UserPromptSubmit", prompt_id: nativePromptId, prompt: promptText, session_id: "fixture", transcript_path: "fixture", cwd: opts.cwd! }, undefined, { signal: opts.abortController!.signal });
         const result = await script(client, opts, user, queryIndex, (params, schema, requestOptions) => actualCallTool(params, schema, { ...requestOptions, timeout: server.timeout }));
         if (closed) break;
+        for (const frame of result?.frames ?? []) yield frame;
         yield { type: "result", subtype: result?.fail ? "error_during_execution" : "success", is_error: !!result?.fail, session_id: result?.id ?? nativeId, user_message_uuid: user.uuid } as SDKMessage;
       }
     })();
@@ -94,6 +95,18 @@ async function collect(session: { events(): AsyncIterable<SessionEvent> }, until
   for await (const event of session.events()) { output.push(event); if (output.filter((row) => row.kind === "settled").length === until) return output; }
   return output;
 }
+/** Synthesized SDK stream frames for pump tests; only the fields the adapter consumes are populated. */
+const assistantFrame = (blocks: unknown[]): SDKMessage => ({
+  type: "assistant",
+  message: { id: "msg_fixture", type: "message", role: "assistant", model: "fixture", content: blocks, stop_reason: null, stop_sequence: null, usage: { input_tokens: 1, output_tokens: 1 } },
+  parent_tool_use_id: null, session_id: "fixture", uuid: randomUUID(),
+}) as unknown as SDKMessage;
+const toolResultFrame = (toolUseId: string, content: unknown, isError: boolean): SDKMessage => ({
+  type: "user",
+  message: { role: "user", content: [{ type: "tool_result", tool_use_id: toolUseId, content, is_error: isError }] },
+  parent_tool_use_id: null, session_id: "fixture", uuid: randomUUID(),
+}) as unknown as SDKMessage;
+const probeTool = (): ToolDefinition => ({ name: "probe", description: "fixture", inputSchema: { type: "object", properties: {} }, handler: async () => ({ ok: true, message: "probe" }) });
 
 test("SDK stays lazy through composition/bind; actual MCP schema/options isolate all native abilities and credentials", async () => fixture(async (root) => {
   const engine = fake(async (client, config, user) => {
@@ -797,5 +810,137 @@ test("required production path displays real read ENOENT and Node shell output w
   assert.equal(shell.display!.process!.stdout!.text, "actual out");
   assert.equal(shell.display!.process!.stderr!.text, "actual err");
   assert.equal(rows.some((row) => (row.detail as { phase?: string })?.phase === "blocked"), false);
+  await session.dispose();
+}));
+
+test("web search capability bit off (default/explicit): tools/allowedTools keep the pre-existing surface, WebSearch stays hook-denied and frames stay unconsumed", async () => fixture(async (root) => {
+  for (const value of [undefined, "0", "off"]) {
+    const engine = fake(async (_client, config, user) => {
+      assert.deepEqual(config.tools, []);
+      assert.deepEqual(config.allowedTools, ["mcp__ans__probe"]);
+      const hook = config.hooks!.PreToolUse![0]!.hooks[0]!;
+      const decision = await hook({ hook_event_name: "PreToolUse", prompt_id: user.uuid, tool_name: "WebSearch", tool_input: { query: "off" }, tool_use_id: "toolu_off", session_id: "fixture", transcript_path: "fixture", cwd: root }, "toolu_off", { signal: new AbortController().signal });
+      assert.equal((decision as { hookSpecificOutput: { permissionDecision: string } }).hookSpecificOutput.permissionDecision, "deny");
+      // Frames that would drive native events when enabled must stay unconsumed while off.
+      return { frames: [assistantFrame([{ type: "tool_use", id: "toolu_off", name: "WebSearch", input: { query: "off" } }]), toolResultFrame("toolu_off", [{ type: "text", text: "fixture denied result" }], true)] };
+    });
+    const dependencies = value === undefined ? engine.dependencies : { ...engine.dependencies, env: { ...environment, ANS_CLAUDE_WEB_SEARCH: value } };
+    const session = await createClaudeRuntimeAdapter(options(root, [probeTool()]), dependencies).bindRole(role);
+    const reading = collect(session, 1);
+    await session.prompt(`off ${String(value)}`);
+    const rows = await reading;
+    assert.deepEqual(rows.map((row) => row.kind), ["denied", "settled"]);
+    assert.equal((rows[0]!.detail as { toolName?: string }).toolName, "WebSearch");
+    await session.dispose();
+  }
+}));
+
+test("web search capability bit on: builtin declared and auto-allowed only for the live bound turn, input never rewritten", async () => fixture(async (root) => {
+  let firstPromptId: string | undefined;
+  let turnIndex = 0;
+  const engine = fake(async (_client, config, user) => {
+    const index = turnIndex++;
+    const hook = config.hooks!.PreToolUse![0]!.hooks[0]!;
+    const call = (name: string, promptId: string | undefined, mcpServer?: { name: string; source: "sdk" }) => hook(
+      { hook_event_name: "PreToolUse", prompt_id: promptId, tool_name: name, tool_input: { query: "fixture query" }, tool_use_id: "toolu_on", session_id: "fixture", transcript_path: "fixture", cwd: root, ...(mcpServer ? { mcp_server: mcpServer } : {}) },
+      "toolu_on", { signal: new AbortController().signal });
+    if (index === 0) {
+      firstPromptId = user.uuid;
+      assert.deepEqual(config.tools, ["WebSearch"]);
+      assert.deepEqual(config.allowedTools, ["mcp__ans__probe", "WebSearch"]);
+      const allowed = await call("WebSearch", user.uuid) as { hookSpecificOutput: { permissionDecision: string; updatedInput?: Record<string, unknown> } };
+      assert.equal(allowed.hookSpecificOutput.permissionDecision, "allow");
+      assert.equal("updatedInput" in allowed.hookSpecificOutput, false);
+      assert.equal(JSON.stringify(allowed).includes("__ans_call_context"), false);
+      for (const promptId of [undefined, "unknown-native"]) assert.equal(((await call("WebSearch", promptId)) as { hookSpecificOutput: { permissionDecision: string } }).hookSpecificOutput.permissionDecision, "deny");
+      assert.equal(((await call("Bash", user.uuid)) as { hookSpecificOutput: { permissionDecision: string } }).hookSpecificOutput.permissionDecision, "deny");
+      assert.equal(((await call("WebSearch", user.uuid, { name: "foreign", source: "sdk" })) as { hookSpecificOutput: { permissionDecision: string } }).hookSpecificOutput.permissionDecision, "deny");
+      const ans = await call("mcp__ans__probe", user.uuid, { name: "ans", source: "sdk" }) as { hookSpecificOutput: { permissionDecision: string; updatedInput?: Record<string, unknown> } };
+      assert.equal(ans.hookSpecificOutput.permissionDecision, "allow");
+      assert.equal(typeof ans.hookSpecificOutput.updatedInput!.__ans_call_context, "string");
+      const permission = await config.canUseTool!("WebSearch", { query: "fixture query" }, { signal: new AbortController().signal, toolUseID: "toolu_on", requestId: "fixture" });
+      assert.equal(permission?.behavior, "deny");
+      return;
+    }
+    // A late WebSearch bound to the previous turn must not borrow the live turn.
+    const late = await call("WebSearch", firstPromptId) as { hookSpecificOutput: { permissionDecision: string } };
+    assert.equal(late.hookSpecificOutput.permissionDecision, "deny");
+  });
+  const session = await createClaudeRuntimeAdapter(options(root, [probeTool()]), { ...engine.dependencies, env: { ...environment, ANS_CLAUDE_WEB_SEARCH: "1" } }).bindRole(role);
+  const reading = collect(session, 2);
+  await session.prompt("enable surfaces");
+  await session.prompt("late web search");
+  await reading;
+  await session.dispose();
+}));
+
+test("web search on: native frames project one paired start/result per call; failure, unsupported content and budget text stay truthful and never fail the turn", async () => fixture(async (root) => {
+  const searchText = 'Web search results for query: "ans governance"\nLinks: [Example](https://example.test/actual)\n\nREMINDER: You MUST include the sources above in your response to the user using markdown hyperlinks.';
+  const queries = ["ans governance", "gateway rejection", "no links", "budget"];
+  const sources: import("../../src/model/runtime.ts").RuntimeToolEventSource[] = [];
+  let turnIndex = 0;
+  const engine = fake(async (_client, config, user) => {
+    const index = turnIndex++;
+    const id = `toolu_ws_${index}`;
+    const hook = config.hooks!.PreToolUse![0]!.hooks[0]!;
+    const decision = await hook({ hook_event_name: "PreToolUse", prompt_id: user.uuid, tool_name: "WebSearch", tool_input: { query: queries[index] }, tool_use_id: id, session_id: "fixture", transcript_path: "fixture", cwd: root }, id, { signal: new AbortController().signal });
+    assert.equal((decision as { hookSpecificOutput: { permissionDecision: string } }).hookSpecificOutput.permissionDecision, "allow");
+    const use = { type: "tool_use", id, name: "WebSearch", input: { query: queries[index] } };
+    if (index === 0) return { frames: [assistantFrame([use]), toolResultFrame(id, [{ type: "text", text: searchText }], false)] };
+    if (index === 1) return { frames: [assistantFrame([use]), toolResultFrame(id, "web-search-side-query-api-error: fixture gateway rejected the server tool declaration", true)] };
+    if (index === 2) return { frames: [assistantFrame([use]), toolResultFrame(id, [{ type: "text", text: "No links found." }, { type: "image", source: { type: "base64", media_type: "image/png", data: "AA==" } }], false)] };
+    return { frames: [assistantFrame([use, { type: "tool_use", id: "toolu_bash", name: "Bash", input: { command: "echo fixture" } }]), toolResultFrame(id, "Web search was not performed: this session's search budget is used up (200/200).", false)] };
+  });
+  const service = createRuntimeAdapter({ runtime: "claude", projectRoot: root, skillRoot: root, gate: allow,
+    providerFactories: { claude: (config) => createClaudeRuntimeAdapter({ ...config,
+      projectToolEvent: (source, redact) => { sources.push(source); return config.projectToolEvent!(source, redact); } },
+      { ...engine.dependencies, env: { ...environment, ANS_CLAUDE_WEB_SEARCH: "1" } }) } });
+  const session = await service.bindRole(role);
+  const reading = collect(session, 4);
+  for (const text of ["one", "two", "three", "four"]) await session.prompt(text);
+  const rows = await reading;
+  const phases = (phase: string, id?: string) => rows.filter((row) => (row.detail as { phase?: string })?.phase === phase && (row.detail as { toolName?: string })?.toolName === "WebSearch" && (id === undefined || (row.detail as { toolCallId?: string }).toolCallId?.endsWith(`:${id}`)));
+  assert.equal(phases("blocked").length, 0);
+  assert.equal(phases("start").length, 4);
+  assert.equal(phases("result").length, 4);
+  const start = phases("start", "toolu_ws_0")[0]!;
+  const success = phases("result", "toolu_ws_0")[0]!;
+  const startDetail = start.detail as import("../../src/model/runtime.ts").ToolEventDetailV1;
+  const successDetail = success.detail as import("../../src/model/runtime.ts").ToolEventDetailV1;
+  assert.equal(start.kind, "tool_call");
+  assert.equal(success.kind, "accepted");
+  assert.equal(startDetail.toolCallId, `${start.turnId}:toolu_ws_0`);
+  assert.equal(successDetail.toolCallId, startDetail.toolCallId);
+  assert.equal(successDetail.turnId, startDetail.turnId);
+  assert.equal(successDetail.ok, true);
+  assert.equal(successDetail.status, "completed");
+  assert.equal(startDetail.display!.target, undefined);
+  assert.deepEqual(startDetail.display!.omissions, []);
+  assert.match(successDetail.display!.resultText!.text, /Web search results for query: "ans governance"/);
+  assert.match(successDetail.display!.resultText!.text, /https:\/\/example\.test\/actual/);
+  const startFact = sources.find((source): source is Extract<import("../../src/model/runtime.ts").RuntimeToolEventFactsV1, { phase: "start" }> => source.origin === "native-start");
+  assert.ok(startFact);
+  assert.equal(startFact.toolName, "WebSearch");
+  assert.deepEqual(startFact.input, { rule: "none", args: { query: "ans governance" } });
+  const failure = phases("result", "toolu_ws_1")[0]!;
+  const failureDetail = failure.detail as import("../../src/model/runtime.ts").ToolEventDetailV1;
+  assert.equal(failure.kind, "denied");
+  assert.equal(failureDetail.ok, false);
+  assert.equal(failureDetail.status, "failed");
+  assert.match(failureDetail.display!.resultText!.text, /web-search-side-query-api-error/);
+  assert.match(failureDetail.display!.error!.text, /fixture gateway rejected/);
+  const partial = phases("result", "toolu_ws_2")[0]!;
+  const partialDetail = partial.detail as import("../../src/model/runtime.ts").ToolEventDetailV1;
+  assert.equal(partial.kind, "accepted");
+  assert.equal(partialDetail.display!.resultText!.text, "No links found.");
+  assert.deepEqual(partialDetail.display!.omissions, ["unsupported-content"]);
+  const budget = phases("result", "toolu_ws_3")[0]!;
+  const budgetDetail = budget.detail as import("../../src/model/runtime.ts").ToolEventDetailV1;
+  assert.equal(budget.kind, "accepted");
+  assert.match(budgetDetail.display!.resultText!.text, /budget is used up/);
+  assert.equal(rows.some((row) => (row.detail as { toolCallId?: string })?.toolCallId?.endsWith(":toolu_bash")), false);
+  const settled = rows.filter((row) => row.kind === "settled");
+  assert.equal(settled.length, 4);
+  for (const row of settled) assert.equal((row.detail as { outcome: string }).outcome, "completed");
   await session.dispose();
 }));

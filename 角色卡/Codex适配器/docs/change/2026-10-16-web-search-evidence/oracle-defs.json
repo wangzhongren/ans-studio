@@ -1,0 +1,402 @@
+{
+ "source": "codex app-server generate-json-schema --out …（pinned @openai/codex 0.162.1，2026-10-16 离线运行，无模型无网络）；全量产物已裁剪，此文件为其 bundle (codex_app_server_protocol.v2.schemas.json) 中联网搜索相关定义的原样摘录",
+ "definitions": {
+  "WebSearchAction": {
+   "oneOf": [
+    {
+     "properties": {
+      "queries": {
+       "items": {
+        "type": "string"
+       },
+       "type": [
+        "array",
+        "null"
+       ]
+      },
+      "query": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "type": {
+       "enum": [
+        "search"
+       ],
+       "title": "SearchWebSearchActionType",
+       "type": "string"
+      }
+     },
+     "required": [
+      "type"
+     ],
+     "title": "SearchWebSearchAction",
+     "type": "object"
+    },
+    {
+     "properties": {
+      "type": {
+       "enum": [
+        "openPage"
+       ],
+       "title": "OpenPageWebSearchActionType",
+       "type": "string"
+      },
+      "url": {
+       "type": [
+        "string",
+        "null"
+       ]
+      }
+     },
+     "required": [
+      "type"
+     ],
+     "title": "OpenPageWebSearchAction",
+     "type": "object"
+    },
+    {
+     "properties": {
+      "pattern": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "type": {
+       "enum": [
+        "findInPage"
+       ],
+       "title": "FindInPageWebSearchActionType",
+       "type": "string"
+      },
+      "url": {
+       "type": [
+        "string",
+        "null"
+       ]
+      }
+     },
+     "required": [
+      "type"
+     ],
+     "title": "FindInPageWebSearchAction",
+     "type": "object"
+    },
+    {
+     "properties": {
+      "type": {
+       "enum": [
+        "other"
+       ],
+       "title": "OtherWebSearchActionType",
+       "type": "string"
+      }
+     },
+     "required": [
+      "type"
+     ],
+     "title": "OtherWebSearchAction",
+     "type": "object"
+    }
+   ]
+  },
+  "ResponsesApiWebSearchAction": {
+   "oneOf": [
+    {
+     "properties": {
+      "queries": {
+       "items": {
+        "type": "string"
+       },
+       "type": [
+        "array",
+        "null"
+       ]
+      },
+      "query": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "type": {
+       "enum": [
+        "search"
+       ],
+       "title": "SearchResponsesApiWebSearchActionType",
+       "type": "string"
+      }
+     },
+     "required": [
+      "type"
+     ],
+     "title": "SearchResponsesApiWebSearchAction",
+     "type": "object"
+    },
+    {
+     "properties": {
+      "type": {
+       "enum": [
+        "open_page"
+       ],
+       "title": "OpenPageResponsesApiWebSearchActionType",
+       "type": "string"
+      },
+      "url": {
+       "type": [
+        "string",
+        "null"
+       ]
+      }
+     },
+     "required": [
+      "type"
+     ],
+     "title": "OpenPageResponsesApiWebSearchAction",
+     "type": "object"
+    },
+    {
+     "properties": {
+      "pattern": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "type": {
+       "enum": [
+        "find_in_page"
+       ],
+       "title": "FindInPageResponsesApiWebSearchActionType",
+       "type": "string"
+      },
+      "url": {
+       "type": [
+        "string",
+        "null"
+       ]
+      }
+     },
+     "required": [
+      "type"
+     ],
+     "title": "FindInPageResponsesApiWebSearchAction",
+     "type": "object"
+    },
+    {
+     "properties": {
+      "type": {
+       "enum": [
+        "other"
+       ],
+       "title": "OtherResponsesApiWebSearchActionType",
+       "type": "string"
+      }
+     },
+     "required": [
+      "type"
+     ],
+     "title": "OtherResponsesApiWebSearchAction",
+     "type": "object"
+    }
+   ]
+  },
+  "WebSearchMode": {
+   "enum": [
+    "disabled",
+    "cached",
+    "indexed",
+    "live"
+   ],
+   "type": "string"
+  },
+  "WebSearchToolConfig": {
+   "additionalProperties": false,
+   "properties": {
+    "allowed_domains": {
+     "items": {
+      "type": "string"
+     },
+     "type": [
+      "array",
+      "null"
+     ]
+    },
+    "context_size": {
+     "anyOf": [
+      {
+       "$ref": "#/definitions/WebSearchContextSize"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "location": {
+     "anyOf": [
+      {
+       "$ref": "#/definitions/WebSearchLocation"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    }
+   },
+   "type": "object"
+  },
+  "WebSearchContextSize": {
+   "enum": [
+    "low",
+    "medium",
+    "high"
+   ],
+   "type": "string"
+  },
+  "WebSearchLocation": {
+   "additionalProperties": false,
+   "properties": {
+    "city": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "country": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "region": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "timezone": {
+     "type": [
+      "string",
+      "null"
+     ]
+    }
+   },
+   "type": "object"
+  },
+  "ToolsV2": {
+   "properties": {
+    "web_search": {
+     "anyOf": [
+      {
+       "$ref": "#/definitions/WebSearchToolConfig"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    }
+   },
+   "type": "object"
+  },
+  "ItemStartedNotification": {
+   "$schema": "http://json-schema.org/draft-07/schema#",
+   "properties": {
+    "item": {
+     "$ref": "#/definitions/ThreadItem"
+    },
+    "startedAtMs": {
+     "description": "Unix timestamp (in milliseconds) when this item lifecycle started.",
+     "format": "int64",
+     "type": "integer"
+    },
+    "threadId": {
+     "type": "string"
+    },
+    "turnId": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "item",
+    "startedAtMs",
+    "threadId",
+    "turnId"
+   ],
+   "title": "ItemStartedNotification",
+   "type": "object"
+  },
+  "ItemCompletedNotification": {
+   "$schema": "http://json-schema.org/draft-07/schema#",
+   "properties": {
+    "completedAtMs": {
+     "description": "Unix timestamp (in milliseconds) when this item lifecycle completed.",
+     "format": "int64",
+     "type": "integer"
+    },
+    "item": {
+     "$ref": "#/definitions/ThreadItem"
+    },
+    "threadId": {
+     "type": "string"
+    },
+    "turnId": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "completedAtMs",
+    "item",
+    "threadId",
+    "turnId"
+   ],
+   "title": "ItemCompletedNotification",
+   "type": "object"
+  },
+  "ThreadItem.webSearchVariant": {
+   "properties": {
+    "action": {
+     "anyOf": [
+      {
+       "$ref": "#/definitions/WebSearchAction"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "id": {
+     "type": "string"
+    },
+    "query": {
+     "type": "string"
+    },
+    "results": {
+     "default": null,
+     "description": "Structured search results returned out-of-band by standalone web search.\n\nThese stay as opaque JSON at the extension/app-server boundary so new result fields and result types can pass through without a Codex release.",
+     "items": true,
+     "type": [
+      "array",
+      "null"
+     ]
+    },
+    "type": {
+     "enum": [
+      "webSearch"
+     ],
+     "title": "WebSearchThreadItemType",
+     "type": "string"
+    }
+   },
+   "required": [
+    "id",
+    "query",
+    "type"
+   ],
+   "title": "WebSearchThreadItem",
+   "type": "object"
+  }
+ },
+ "note": "threadItem variants total=19"
+}

@@ -1,0 +1,61 @@
+{
+  "task": "G-3 Codex侧联网搜索实施（R1）",
+  "role": "Codex适配器",
+  "at": "2026-10-16T11:30:43.876Z",
+  "node": "v24.14.0",
+  "platform": "darwin-arm64",
+  "production": [
+    {
+      "path": "src/common/codex-adapter/config.ts",
+      "sha256": "f73cf1b7c57e2c0baf194cad967174007844ba79b4a794b52d851210c1e32d79"
+    },
+    {
+      "path": "src/common/codex-adapter/protocol.ts",
+      "sha256": "d16d2ea4446c7e8485528f4c155741e7a77bf1e39d7b6a460d2eb6be09d7369d"
+    },
+    {
+      "path": "src/provider/codex/session.ts",
+      "sha256": "4af2577254beb4ada7f610ce1587bc20a0fb5cfc9e6e34981ddbece97b2f3b48"
+    }
+  ],
+  "tests": [
+    {
+      "path": "test/codex-adapter/fixtures.ts",
+      "sha256": "22a9c3a27461e46caacd52554d36d14d0a4db0e6dfc799f506d5f13ed3e226d6"
+    },
+    {
+      "path": "test/codex-adapter/fixtures/native-cli.mjs",
+      "sha256": "9b5205d267a58eb1a883779dce2009ea3ea063e9d1c95276d03730b5c61251b3"
+    },
+    {
+      "path": "test/codex-adapter/web-search.test.ts",
+      "sha256": "bad626d0d7760a85d90ca052141b4eeb70e1cfee017f576339f5f5ce1a43da9a"
+    }
+  ],
+  "evidence": {
+    "角色卡/Codex适配器/docs/change/2026-10-16-web-search-evidence/t3-key-matrix.probe.mjs": "c4d5b69d068e79682d2653fdaa8c79226f83dd2be0202e8398d636f0843a0945",
+    "角色卡/Codex适配器/docs/change/2026-10-16-web-search-evidence/t3-key-matrix.summary.txt": "3aa6876b16608b4696e44fb8f0d6dcd29058f72e24c03ec24bae4cd5e236df18",
+    "角色卡/Codex适配器/docs/change/2026-10-16-web-search-evidence/t3-key-matrix.raw.json": "541f0e2ac69696121fa7f14875a8b3843aa217a33cb9c27725d43640321d4668",
+    "角色卡/Codex适配器/docs/change/2026-10-16-web-search-evidence/t3-item-notification.probe.mjs": "0f51a755bf04c41b5a91a546646a2b1e80d26b2f1c6240406b76ffd6ee2d0855",
+    "角色卡/Codex适配器/docs/change/2026-10-16-web-search-evidence/t3-item-notification.raw.json": "e2b6081b4860a4606e084129d5b40f2344efa9d9d399c9e8000bd1cc05e38df0",
+    "角色卡/Codex适配器/docs/change/2026-10-16-web-search-evidence/t3-adapter-mapping.probe.ts": "f03660305fb4af96c595ed048ab1137b650b394bf6ca103bdecfb5c634e4dd48",
+    "角色卡/Codex适配器/docs/change/2026-10-16-web-search-evidence/t3-adapter-mapping.txt": "0453d219244e20775c9cb518bfa72a735eb87a28ddf471bb4befc712bb361543",
+    "角色卡/Codex适配器/docs/change/2026-10-16-web-search-evidence/tests.txt": "297cb31793d2b2cad04fb009bfd31825822c07352ffc4f56639bf1788afa8b8f",
+    "角色卡/Codex适配器/docs/change/2026-10-16-web-search-evidence/typecheck.txt": "371542e1307f0a98c44e7212a77a9c2256bf3e2508033dd10cc2d3ad98e8880f",
+    "角色卡/Codex适配器/docs/change/2026-10-16-web-search-evidence/full-tests.txt": "659f9d5c424a20827bd0353a19f67528369d9cbe3f09de7e8e54f42be73a31f7",
+    "角色卡/Codex适配器/docs/change/2026-10-16-web-search-evidence/oracle-defs.json": "1304201f471990e107427d32183889a0fc9d41a1e35baca6b13a100e634f3d73"
+  },
+  "checks": {
+    "ownTests": "33/33 pass,0 skip",
+    "fullTests": "1722 tests, 1721 pass, 0 fail, 1 skip",
+    "typecheck": "exit0",
+    "pinnedLoopback": "0.162.1 T3 matrix 5 cells + item notification 2 cells + adapter end-to-end 1 run; externalModelCalls 0; credentials fake"
+  },
+  "limitations": [
+    "真实网关 Responses 端点接受/执行 web_search 声明未验（客户探针 P1–P3）",
+    "在线模型真机验收未做",
+    "桌面UI搜索行样式跨边界待排发",
+    "Windows 未动态验证（沿用既有边界）",
+    "T3③ 仅实测一帧 in_progress 子事件形态"
+  ]
+}

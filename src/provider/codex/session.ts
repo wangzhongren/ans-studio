@@ -7,7 +7,7 @@ import os from "node:os";
 import { randomUUID } from "node:crypto";
 import type { ResolvedRole } from "../../model/role.ts";
 import type { RuntimeAdapter, RuntimeProviderOptions, RoleSession, SessionEvent, ToolResult, RuntimeTurnOutcome, RuntimeToolEventFactsV1, RuntimeToolErrorFactsV1 } from "../../model/runtime.ts";
-import { object, deferred, eventQueue, pausedDeadline, bounded } from "../../common/codex-adapter/protocol.ts";
+import { object, deferred, eventQueue, pausedDeadline, bounded, webSearchRow } from "../../common/codex-adapter/protocol.ts";
 import type { CodexRpcConnection, CodexEngineInput, CodexEngineFactory } from "../../common/codex-adapter/protocol.ts";
 import { settings, safetyConfig, safetyOverrides, effectiveConfig, verifyThread } from "../../common/codex-adapter/config.ts";
 // Windows 瞬时句柄占用（`EBUSY`/`EPERM`/`EACCES`）的**有界重试**单一来源（§一.5 不得第二份实现）：
@@ -42,6 +42,12 @@ export interface CodexRuntimeAdapterOptions extends RuntimeProviderOptions {
   env?: Record<string, string | undefined>;
   /** Explicit executable override; default resolves the pinned @openai/codex package lazily. */
   cliPath?: string;
+  /**
+   * Server-side web search capability (R1). Fail-closed default off; explicit value overrides
+   * ANS_CODEX_WEB_SEARCH (on|off). Gates only the request declaration — the webSearch item
+   * mapping is always on so gateway-reported search activity is never silently dropped.
+   */
+  webSearch?: boolean;
 }
 
 async function loadMcp(): Promise<CodexMcpModules> {
@@ -220,6 +226,7 @@ interface TurnState {
   completed: boolean;
   stopping?: Promise<void>;
   calls: Set<string>;
+  searchCalls: number;
 }
 
 export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): RuntimeAdapter {
@@ -314,12 +321,12 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
         const environment = { PATH: environmentSnapshot.PATH ?? path.dirname(process.execPath), CODEX_HOME: nativeHome, CODEX_API_KEY: config.key };
         const engineFactory = options.engineFactory ?? ((input: CodexEngineInput) => nativeEngine(input, options.cliPath));
         const connect = async (disabled: readonly string[]) => {
-          const connected = await engineFactory({ cwd, nativeHome, env: environment, configOverrides: [...safetyOverrides(cwd, disabled), providerDefinition, `model_provider=${JSON.stringify(provider)}`], timeoutMs: options.constructTimeoutMs ?? 30000 });
+          const connected = await engineFactory({ cwd, nativeHome, env: environment, configOverrides: [...safetyOverrides(cwd, disabled, config.webSearch), providerDefinition, `model_provider=${JSON.stringify(provider)}`], timeoutMs: options.constructTimeoutMs ?? 30000 });
           // Preflight has no model, thread, MCP connections, or native approval handlers.
           try {
             await connected.request("initialize", { clientInfo: { name: "ans_codex_adapter", version: "2.0.0" }, capabilities: { experimentalApi: true, explicitGatewayOauth: true } });
             connected.notify("initialized", {});
-            const inspected = effectiveConfig(await connected.request("config/read", { includeLayers: false, cwd }));
+            const inspected = effectiveConfig(await connected.request("config/read", { includeLayers: false, cwd }), config.webSearch);
             return { connected, inspected };
           } catch (error) { await connected.close(); throw error; }
         };
@@ -416,7 +423,7 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
           finally { calls.delete(token); requestContext?.signal.removeEventListener("abort", cancelledUpstream); }
         });
         const context = await composeContext(role);
-        const threadConfig = { ...safetyConfig(cwd), mcp_servers: Object.fromEntries(allServers.map(name => [name, { enabled: false }])) };
+        const threadConfig = { ...safetyConfig(cwd, config.webSearch), mcp_servers: Object.fromEntries(allServers.map(name => [name, { enabled: false }])) };
         const threadParams = { model: config.model, modelProvider: provider, cwd, sandbox: "read-only", approvalPolicy: "never", approvalsReviewer: "user", config: threadConfig, developerInstructions: context.systemPrompt };
         let contextSource: RoleSession["contextSource"] = storage ? "fresh" : "in-memory";
         let contextWarning: string | undefined;
@@ -437,7 +444,7 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
           async prompt(text, promptOptions) {
             if (disposed || quarantined) throw new Error("Codex session is disposed or quarantined; create a new session");
             if (active) throw new Error("Codex session already has an active turn");
-            const turn: TurnState = { ansId: options.currentTurnId() ?? randomUUID(), controller: new AbortController(), ready: deferred<string>(), done: deferred<RuntimeTurnOutcome>(), completed: false, calls: new Set() };
+            const turn: TurnState = { ansId: options.currentTurnId() ?? randomUUID(), controller: new AbortController(), ready: deferred<string>(), done: deferred<RuntimeTurnOutcome>(), completed: false, calls: new Set(), searchCalls: 0 };
             // Abort can resolve ready before turn/start so early tool requests fail closed.
             active = turn;
             const stopTimer = pausedDeadline(options.interactionGate, options.promptTimeoutMs ?? 0, () => { void stop(turn, "timed_out").catch(error => { turn.failure = config.redact(error); }); });
@@ -468,7 +475,7 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
               if (turn.reason !== "aborted") throw new Error(turn.failure);
             } finally {
               stopTimer(); turn.completed = true; turn.controller.abort(); turn.ready.resolve("");
-              emit(turn, "settled", `Codex turn ${turn.reason ?? "completed"}`, { outcome: turn.reason ?? "completed", ...(turn.failure ? { error: turn.failure } : {}) });
+              emit(turn, "settled", `Codex turn ${turn.reason ?? "completed"}`, { outcome: turn.reason ?? "completed", ...(turn.failure ? { error: turn.failure } : {}), ...(turn.searchCalls ? { searchCalls: turn.searchCalls } : {}) });
               if (active === turn) active = undefined;
             }
           },
@@ -519,6 +526,12 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
             if (method === "item/completed") {
               const item = object(params.item, "native item");
               if (item.type === "agentMessage") emit(turn, "message", String(item.text ?? ""), { text: item.text });
+              // Server-side (gateway-executed) search: always mapped, never quarantined, never inferred as failure.
+              if (item.type === "webSearch") {
+                turn.searchCalls += 1;
+                const row = webSearchRow(item);
+                emit(turn, "message", row.summary, row.detail);
+              }
               if (item.type === "commandExecution" || item.type === "fileChange") {
                 turn.failure = "Codex reported a forbidden native command/file tool; session quarantined";
                 quarantined = true; turn.reason = "failed"; turn.controller.abort(); turn.done.resolve("failed");

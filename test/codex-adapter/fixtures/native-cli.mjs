@@ -6,9 +6,12 @@ const lines = createInterface({ input: process.stdin });
 const output = value => process.stdout.write(JSON.stringify(value) + '\n');
 let turn = 0;
 const features = {};
+let webSearch = 'disabled';
 for (const arg of process.argv) {
   const match = /^features\.([a-z_0-9]+)=false$/.exec(arg);
   if (match) features[match[1]] = false;
+  const search = /^web_search="([^"]*)"$/.exec(arg);
+  if (search) webSearch = search[1];
 }
 let task = '';
 const completed = status => output({ method: 'turn/completed', params: { threadId: 'process-thread', turn: { id: `process-turn-${turn}`, status } } });
@@ -18,7 +21,7 @@ lines.on('line', raw => {
   if (input.id === undefined) return;
   const reply = result => output({ id: input.id, result });
   if (input.method === 'initialize') return reply({});
-  if (input.method === 'config/read') return reply({ config: { features, sandbox_mode: 'read-only', approval_policy: 'never', web_search: 'disabled', mcp_servers: {} } });
+  if (input.method === 'config/read') return reply({ config: { features, sandbox_mode: 'read-only', approval_policy: 'never', web_search: webSearch, mcp_servers: {} } });
   if (input.method === 'thread/start') return reply({ thread: { id: 'process-thread' }, sandbox: { type: 'readOnly' }, approvalPolicy: 'never' });
   if (input.method === 'mcpServerStatus/list') return reply({ data: [], nextCursor: null });
   if (input.method === 'turn/start') {

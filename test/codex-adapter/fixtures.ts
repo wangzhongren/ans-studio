@@ -32,6 +32,8 @@ interface Behavior {
   resumeFails?: boolean;
   catalogForeign?: boolean;
   interruptHangs?: boolean;
+  /** Forces a config/read web_search readback value (simulates requirements pinning the mode back). */
+  webSearchReadback?: string;
 }
 export class FakeEngine implements CodexRpcConnection {
   input: CodexEngineInput;
@@ -50,7 +52,9 @@ export class FakeEngine implements CodexRpcConnection {
     if (method === "config/read") {
       if (this.behavior.configFails) throw new Error("fake config read failure");
       const disabled = this.input.configOverrides.includes('mcp_servers={"foreign"={enabled=false}}');
-      return { config: { features: Object.fromEntries(DISABLED_NATIVE_FEATURES.map(name => [name, false])), sandbox_mode: "read-only", approval_policy: "never", web_search: "disabled", mcp_servers: { foreign: { enabled: this.behavior.foreignRemains || !disabled } } } };
+      const override = this.input.configOverrides.find(value => value.startsWith("web_search="));
+      const mode = /^web_search="([^"]*)"$/.exec(override ?? "")?.[1] ?? "disabled";
+      return { config: { features: Object.fromEntries(DISABLED_NATIVE_FEATURES.map(name => [name, false])), sandbox_mode: "read-only", approval_policy: "never", web_search: this.behavior.webSearchReadback ?? mode, mcp_servers: { foreign: { enabled: this.behavior.foreignRemains || !disabled } } } };
     }
     if (method === "thread/start" || method === "thread/resume") {
       if (method === "thread/resume" && this.behavior.resumeFails) throw new Error("fake native resume failure");
@@ -77,6 +81,8 @@ export class FakeEngine implements CodexRpcConnection {
     for (const listener of this.listeners) listener("turn/completed", { threadId: this.nativeId, turn: { id: this.turnId, status, ...(error ? { error: { message: error } } : {}) } });
   }
   message(text: string) { for (const listener of this.listeners) listener("item/completed", { threadId: this.nativeId, turnId: this.turnId, item: { type: "agentMessage", text } }); }
+  event(method: string, item: Record<string, unknown>) { for (const listener of this.listeners) listener(method, { threadId: this.nativeId, turnId: this.turnId, item }); }
+  webSearch(item: Record<string, unknown> = {}) { this.event("item/completed", { type: "webSearch", id: "ws-fixture-1", query: "fixture query", ...item }); }
   async call(name: string, args: Record<string, unknown>, override: Record<string, unknown> = {}, requestController = new AbortController()) {
     if (!this.handler) throw new Error("fixture handler missing");
     return this.handler("item/tool/call", { threadId: this.nativeId, turnId: this.turnId, callId: `call-${Math.random()}`, namespace: null, tool: `ans_${name}`, arguments: args, ...override }, { signal: requestController.signal });

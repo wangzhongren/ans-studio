@@ -25,3 +25,9 @@
 required-v1 缺注入 projector/register 时在任何外部初始化前拒绝；bindRole 同一 env 快照解析认证并纯内存登记选中键与 Core 指定键。真实 handler 的 start/result、displayInputRule、原args、Error.message 和 execution 只交注入投影，净化后事件走薄出口，opaque turn/call不scrub；无独立hook不造blocked。投影失败只固定诊断。模型 text/content/images 与既有profile/url保护保持，delivery选项不进app-server。
 
 自有22/22、独立测试角色实际命令入口6/6、固定Codex CLI0.162.1本地假SSE回环通过（2请求/1handler/2投影，外部模型0）。最终全仓typecheck0。详见[本次实施及候选证据](docs/change/2026-10-15_change_tool-display-projection.md)。在线与真实桌面仍待独验，原16/16/typecheck0是历史候选结果。
+
+## 2026-10-16 G-3：联网搜索能力位与 webSearch 行（R1）
+
+支持设置新增（默认关，fail-closed）：`CodexRuntimeAdapterOptions.webSearch?: boolean` 显式优先；env `ANS_CODEX_WEB_SEARCH` 白名单 `on|off` 兜底；非法值显式失败。开启＝三钉同翻（线程配置/进程 `-c`/config/read 回读期望 `web_search:"live"`，回读不符仍 fail-closed）；落点键由本地回环实证＝顶层键（`[tools].web_search` 不注入）。`turn/start` 沙箱 `networkAccess:false` 保持（搜索在网关侧执行）。
+
+事件面：`item/completed` 的 `webSearch` item → 一条 `kind:"message"` 行（摘要 `联网搜索：<query>`；detail v1 `{version:1, source:"web-search", itemId?, query?, action?, results?, resultsTruncated?}`，只外推真实字段、cap 20、容错不抛、不进隔离、恒映射不随能力位关闭）；settled detail 计数 >0 时附 `searchCalls`。查询串不进诊断。自有33/33、typecheck0、全量0fail；真实网关接受性未验（客户探针 P1–P3）。详见[实施记录](docs/change/2026-10-16_change_web-search.md)。

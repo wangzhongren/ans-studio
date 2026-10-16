@@ -1,0 +1,272 @@
+{
+ "pinnedCLI": "0.162.1",
+ "externalModelCalls": 0,
+ "credentials": "fake only",
+ "httpRequests": 2,
+ "cells": [
+  {
+   "name": "websearch-call-item",
+   "childEventFrame": false,
+   "turnId": "01a14472-e843-7b41-b674-2ff0d5daf18a",
+   "turnCompleted": true,
+   "completedStatus": "completed",
+   "itemNotifications": [
+    {
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "userMessage",
+       "id": "01a14472-e846-7b40-bc91-16f2962c4ab4",
+       "clientId": null,
+       "content": [
+        {
+         "type": "text",
+         "text": "t3b probe turn",
+         "text_elements": []
+        }
+       ]
+      },
+      "threadId": "01a14472-e837-7e02-8890-5ada47be195e",
+      "turnId": "01a14472-e843-7b41-b674-2ff0d5daf18a",
+      "startedAtMs": 1792149743686
+     }
+    },
+    {
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "userMessage",
+       "id": "01a14472-e846-7b40-bc91-16f2962c4ab4",
+       "clientId": null,
+       "content": [
+        {
+         "type": "text",
+         "text": "t3b probe turn",
+         "text_elements": []
+        }
+       ]
+      },
+      "threadId": "01a14472-e837-7e02-8890-5ada47be195e",
+      "turnId": "01a14472-e843-7b41-b674-2ff0d5daf18a",
+      "completedAtMs": 1792149743686
+     }
+    },
+    {
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "webSearch",
+       "id": "ws_probe_1",
+       "query": "controlled probe query",
+       "action": {
+        "type": "search",
+        "query": "controlled probe query",
+        "queries": null
+       },
+       "results": null
+      },
+      "threadId": "01a14472-e837-7e02-8890-5ada47be195e",
+      "turnId": "01a14472-e843-7b41-b674-2ff0d5daf18a",
+      "startedAtMs": 1792149743692
+     }
+    },
+    {
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "webSearch",
+       "id": "ws_probe_1",
+       "query": "controlled probe query",
+       "action": {
+        "type": "search",
+        "query": "controlled probe query",
+        "queries": null
+       },
+       "results": null
+      },
+      "threadId": "01a14472-e837-7e02-8890-5ada47be195e",
+      "turnId": "01a14472-e843-7b41-b674-2ff0d5daf18a",
+      "completedAtMs": 1792149743692
+     }
+    },
+    {
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "agentMessage",
+       "id": "msg_probe_1",
+       "text": "",
+       "phase": null,
+       "memoryCitation": null,
+       "delivery": null,
+       "questions": null
+      },
+      "threadId": "01a14472-e837-7e02-8890-5ada47be195e",
+      "turnId": "01a14472-e843-7b41-b674-2ff0d5daf18a",
+      "startedAtMs": 1792149743692
+     }
+    },
+    {
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "agentMessage",
+       "id": "msg_probe_1",
+       "text": "controlled result text",
+       "phase": null,
+       "memoryCitation": null,
+       "delivery": null,
+       "questions": null
+      },
+      "threadId": "01a14472-e837-7e02-8890-5ada47be195e",
+      "turnId": "01a14472-e843-7b41-b674-2ff0d5daf18a",
+      "completedAtMs": 1792149743692
+     }
+    }
+   ],
+   "errorNotifications": [],
+   "otherMethods": [
+    "remoteControl/status/changed",
+    "thread/started",
+    "warning",
+    "thread/status/changed",
+    "turn/started",
+    "thread/tokenUsage/updated",
+    "account/rateLimits/updated"
+   ],
+   "stderrTail": ""
+  },
+  {
+   "name": "child-event-in-progress",
+   "childEventFrame": true,
+   "turnId": "01a14472-e8b2-7e71-abcc-d8b232e19d07",
+   "turnCompleted": true,
+   "completedStatus": "completed",
+   "itemNotifications": [
+    {
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "userMessage",
+       "id": "01a14472-e8b4-75f1-b432-de9e0e5d239a",
+       "clientId": null,
+       "content": [
+        {
+         "type": "text",
+         "text": "t3b probe turn",
+         "text_elements": []
+        }
+       ]
+      },
+      "threadId": "01a14472-e8a8-7c62-ae12-371fe2bc4348",
+      "turnId": "01a14472-e8b2-7e71-abcc-d8b232e19d07",
+      "startedAtMs": 1792149743796
+     }
+    },
+    {
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "userMessage",
+       "id": "01a14472-e8b4-75f1-b432-de9e0e5d239a",
+       "clientId": null,
+       "content": [
+        {
+         "type": "text",
+         "text": "t3b probe turn",
+         "text_elements": []
+        }
+       ]
+      },
+      "threadId": "01a14472-e8a8-7c62-ae12-371fe2bc4348",
+      "turnId": "01a14472-e8b2-7e71-abcc-d8b232e19d07",
+      "completedAtMs": 1792149743796
+     }
+    },
+    {
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "webSearch",
+       "id": "ws_probe_1",
+       "query": "controlled probe query",
+       "action": {
+        "type": "search",
+        "query": "controlled probe query",
+        "queries": null
+       },
+       "results": null
+      },
+      "threadId": "01a14472-e8a8-7c62-ae12-371fe2bc4348",
+      "turnId": "01a14472-e8b2-7e71-abcc-d8b232e19d07",
+      "startedAtMs": 1792149743798
+     }
+    },
+    {
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "webSearch",
+       "id": "ws_probe_1",
+       "query": "controlled probe query",
+       "action": {
+        "type": "search",
+        "query": "controlled probe query",
+        "queries": null
+       },
+       "results": null
+      },
+      "threadId": "01a14472-e8a8-7c62-ae12-371fe2bc4348",
+      "turnId": "01a14472-e8b2-7e71-abcc-d8b232e19d07",
+      "completedAtMs": 1792149743798
+     }
+    },
+    {
+     "method": "item/started",
+     "params": {
+      "item": {
+       "type": "agentMessage",
+       "id": "msg_probe_1",
+       "text": "",
+       "phase": null,
+       "memoryCitation": null,
+       "delivery": null,
+       "questions": null
+      },
+      "threadId": "01a14472-e8a8-7c62-ae12-371fe2bc4348",
+      "turnId": "01a14472-e8b2-7e71-abcc-d8b232e19d07",
+      "startedAtMs": 1792149743798
+     }
+    },
+    {
+     "method": "item/completed",
+     "params": {
+      "item": {
+       "type": "agentMessage",
+       "id": "msg_probe_1",
+       "text": "controlled result text",
+       "phase": null,
+       "memoryCitation": null,
+       "delivery": null,
+       "questions": null
+      },
+      "threadId": "01a14472-e8a8-7c62-ae12-371fe2bc4348",
+      "turnId": "01a14472-e8b2-7e71-abcc-d8b232e19d07",
+      "completedAtMs": 1792149743798
+     }
+    }
+   ],
+   "errorNotifications": [],
+   "otherMethods": [
+    "remoteControl/status/changed",
+    "thread/started",
+    "warning",
+    "thread/status/changed",
+    "turn/started",
+    "thread/tokenUsage/updated",
+    "account/rateLimits/updated"
+   ],
+   "stderrTail": ""
+  }
+ ]
+}

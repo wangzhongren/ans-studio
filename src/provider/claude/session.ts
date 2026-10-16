@@ -35,6 +35,8 @@ type Engine = {
   contexts: Map<string, { turn: Turn; toolName: string; toolUseId: string; signal: AbortSignal }>;
   nativeTurns: Map<string, { turn: Turn; signal: AbortSignal }>;
   pendingInputs: Map<string, Turn>;
+  /** Built-in WebSearch calls observed on the message pump, keyed by the model's tool_use id. */
+  nativeCalls: Map<string, { turn: Turn; toolCallId: string }>;
 };
 // MCP has a hard upstream ceiling; max Node timer buys ~24.8 days, never infinity.
 const MCP_TOOL_TIMEOUT_MS = 2_147_483_647;
@@ -122,6 +124,7 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
         current.contexts.clear();
         current.nativeTurns.clear();
         current.pendingInputs.clear();
+        current.nativeCalls.clear();
         current.controller.abort();
         current.input.close();
         if (engine === current) engine = undefined;
@@ -180,7 +183,7 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
         // cannot preserve additionalProperties at the root; MCP registerTool accepts a Zod object.
         const server = sdk.createSdkMcpServer({ name: "ans", version: "1.0.0", tools: [] });
         server.timeout = MCP_TOOL_TIMEOUT_MS;
-        const current: Engine = { query: undefined as unknown as SDK.Query, input, controller, closed: false, resumeId: nativeId, toolTail: Promise.resolve(), contexts: new Map(), nativeTurns: new Map(), pendingInputs: new Map() };
+        const current: Engine = { query: undefined as unknown as SDK.Query, input, controller, closed: false, resumeId: nativeId, toolTail: Promise.resolve(), contexts: new Map(), nativeTurns: new Map(), pendingInputs: new Map(), nativeCalls: new Map() };
         for (const tool of options.tools) {
           const properties = (tool.inputSchema.properties ?? {}) as Record<string, unknown>;
           if (Object.hasOwn(properties, CALL_CONTEXT_ARG)) throw new Error("Claude ANS 工具 schema 包含保留的请求上下文字段");
@@ -221,9 +224,14 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
             return run;
           });
         }
+        // Web search capability bit (construction-time env snapshot). Default off is fail-closed:
+        // unset/0/off/unknown keeps tools/allowedTools/hooks exactly as before.
+        const webSearchEnabled = ["1", "on"].includes((env.ANS_CLAUDE_WEB_SEARCH ?? "").trim().toLowerCase());
         const queryOptions: SDK.Options = {
           cwd: options.projectRoot, systemPrompt: systemPrompt(role),
-          tools: [], allowedTools: [...names], settingSources: [], strictMcpConfig: true,
+          tools: webSearchEnabled ? ["WebSearch"] : [],
+          allowedTools: webSearchEnabled ? [...names, "WebSearch"] : [...names],
+          settingSources: [], strictMcpConfig: true,
           skills: [], plugins: [], settings: { disableAllHooks: true }, extraArgs: { "disable-slash-commands": null },
           mcpServers: { ans: server }, env: childEnv, abortController: controller,
           persistSession: !!storage, ...(nativeId ? { resume: nativeId } : {}),
@@ -252,6 +260,13 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
               current.contexts.set(token, { turn: originalTurn, toolName: hook.tool_name.slice("mcp__ans__".length), toolUseId: hook.tool_use_id, signal: AbortSignal.any([original!.signal, hookOptions.signal]) });
               return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow", updatedInput: { ...hook.tool_input as Record<string, unknown>, [CALL_CONTEXT_ARG]: token } } };
             }
+            // Built-in WebSearch auto-allow (capability bit on, bound live turn only). This branch is
+            // REQUIRED even though allowedTools lists WebSearch: hook deny precedes allowedTools, so
+            // without it the fallback below would kill every search. No updatedInput — the model's
+            // query must reach the tool unchanged.
+            if (webSearchEnabled && hook.tool_name === "WebSearch" && !hook.mcp_server && originalTurn && originalTurn === active && !originalTurn.controller.signal.aborted && !original!.signal.aborted && !controller.signal.aborted && !hookOptions.signal.aborted) {
+              return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow" } };
+            }
             if (originalTurn) {
               const tool = options.tools.find((candidate) => `mcp__ans__${candidate.name}` === hook.tool_name);
               emitTool(originalTurn, { origin: "governance-hook", phase: "blocked", toolName: tool?.name ?? hook.tool_name,
@@ -270,7 +285,30 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
               const callTurn = active;
               if (current.closed || !callTurn || callTurn.controller.signal.aborted) continue;
               if (message.type === "assistant") {
-                for (const block of message.message.content) if (block.type === "text") emit(callTurn, "message", block.text);
+                for (const block of message.message.content) {
+                  if (block.type === "text") emit(callTurn, "message", block.text);
+                  else if (webSearchEnabled && block.type === "tool_use" && block.name === "WebSearch") {
+                    // Native call surface only; the query itself stays inside the tool facts (never a message line).
+                    const toolCallId = `${callTurn.id}:${block.id}`;
+                    current.nativeCalls.set(block.id, { turn: callTurn, toolCallId });
+                    emitTool(callTurn, { origin: "native-start", phase: "start", toolName: "WebSearch", toolCallId,
+                      input: { rule: "none", args: block.input !== null && typeof block.input === "object" && !Array.isArray(block.input) ? block.input as Record<string, unknown> : {} } }, "tool_call", "WebSearch");
+                  }
+                }
+              } else if (message.type === "user") {
+                // Built-in tool results arrive as user tool_result blocks; only tracked WebSearch calls are consumed.
+                if (webSearchEnabled && typeof message.message.content !== "string") for (const block of message.message.content) {
+                  if (block.type !== "tool_result") continue;
+                  const call = current.nativeCalls.get(block.tool_use_id);
+                  if (!call) continue;
+                  current.nativeCalls.delete(block.tool_use_id);
+                  const content: ({ type: "text"; text: string } | { type: "unsupported" })[] = [];
+                  if (typeof block.content === "string") content.push({ type: "text", text: block.content });
+                  else if (Array.isArray(block.content)) for (const item of block.content) content.push(item.type === "text" && typeof item.text === "string" ? { type: "text", text: item.text } : { type: "unsupported" });
+                  const text = content.filter((item): item is { type: "text"; text: string } => item.type === "text").map((item) => item.text).join("\n");
+                  emitTool(call.turn, { origin: "native-result", phase: "result", toolName: "WebSearch", toolCallId: call.toolCallId,
+                    native: { isError: block.is_error === true, content } }, block.is_error === true ? "denied" : "accepted", text || "WebSearch");
+                }
               } else if (message.type === "result") {
                 if (message.user_message_uuid && message.user_message_uuid !== callTurn.sdkUuid && !message.user_message_uuids?.includes(callTurn.sdkUuid)) continue;
                 if (message.subtype !== "success" || message.is_error) {
@@ -336,6 +374,7 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
           } finally {
             turn.controller.abort();
             if (engine) for (const [token, context] of engine.contexts) if (context.turn === turn) engine.contexts.delete(token);
+            if (engine) for (const [id, call] of engine.nativeCalls) if (call.turn === turn) engine.nativeCalls.delete(id);
             engine?.pendingInputs.delete(turn.sdkUuid);
             if (active === turn) active = undefined;
             emit(turn, "settled", `Claude 本轮${outcome}`, { outcome, turnId: turn.id, ...(teardownError ? { cleanupError: teardownError.message } : {}) });

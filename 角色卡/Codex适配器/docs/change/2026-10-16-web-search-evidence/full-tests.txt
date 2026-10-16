@@ -1,0 +1,11 @@
+== summary ==
+✔ resolveSkillRoot：空串视为未设置（回退默认），与桌面旧副本同值 (0.06525ms)
+ℹ tests 1722
+ℹ suites 0
+ℹ pass 1721
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 36681.813083
+== failing markers: 0 ==

@@ -5,8 +5,8 @@ title: Codex 路径联网搜索（服务端 web_search）接入实施方案提�
 created: "2026-10-16"
 updated: "2026-10-16"
 timezone: Asia/Shanghai
-status: proposal-only（未实施 / 未测试）
-revision: 1
+status: 已实施待验证（implemented-unverified；2026-10-16 实施轮完成，客户探针 P1–P3 与真机验收待做）
+revision: 2
 ---
 
 # Codex 路径联网搜索（服务端 web_search）接入实施方案提案
@@ -159,3 +159,12 @@ revision: 1
 - 状态：**未实施 / 未测试**。如需推进，请 PM 派发实施轮（R1）与跨边界件（R2）；网关探针（R3）由客户执行。
 
 （2026-10-16 提案轮：零代码改动、零测试、零 git 提交。）
+
+## 实施摘要（2026-10-16 实施轮追加；上文提案原文保留不动）
+
+客户「按推荐批准，开始实施」，实施规格＝本提案。R1 已实施（6 文件：config.ts / protocol.ts / session.ts / fixtures.ts / native-cli.mjs / 新 web-search.test.ts），详见[实施记录](../change/2026-10-16_change_web-search.md)与[证据目录](../change/2026-10-16-web-search-evidence/manifest.json)。
+
+- **待确认项落地**：T4 oracle（generate-json-schema / generate-ts 产物入库）＋ T3 本地回环矩阵（pinned CLI 0.162.1＋假 Responses SSE，外部模型 0）回答全部 6 项——①开关落点＝**顶层 `web_search="live"`**（进程 `-c`＋thread config 双落点）；`[tools].web_search=true` 不注入、不用；②无需 provider 能力声明；③载荷＝`{type:"webSearch", id, query, action, results}` 经 `item/started`＋`item/completed`；④`results` 为不透明 JSON、服务端内置工具路径恒 `null`；⑤0.162.1 容忍 `response.web_search_call.in_progress` 子帧；⑥回读形态＝顶层键精确回显，pin3 只断言该键。
+- **批准口径落地**：①默认关（env `ANS_CODEX_WEB_SEARCH=on|off` 白名单＋options 能力位，显式优先、缺省 off、非法拒）；②只 web_search；③查询串仅进会话行、不进诊断；④失败走既有诚实路径（不剥离不重试）；⑤行＝message＋detail v1（`source:"web-search"`，cap 20）；⑥键形态已实证定型。
+- **验证**：自有 33/33（0 skip）、typecheck exit 0、全量 1722/1721 pass、0 fail、0 新红；真实 CLI 端到端回环绿（声明注入＋行映射＋searchCalls＋子帧容忍）。
+- **未验边界**：真实网关接受/执行声明（客户探针 P1–P3 清单见实施记录）；在线模型真机；桌面UI 行样式（跨边界，PM 路由）。

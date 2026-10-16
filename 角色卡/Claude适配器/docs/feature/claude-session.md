@@ -3,7 +3,7 @@ id: claude-session
 type: feature
 title: 选择 Claude 后继续受治理的角色对话
 created: "2026-10-14"
-updated: "2026-10-15"
+updated: "2026-10-16"
 timezone: Asia/Shanghai
 status: verified
 related: [multi-runtime-integration-v2, claude-governed-session-v2-a1]
@@ -11,6 +11,9 @@ events:
   - date: "2026-10-14"
     kind: implemented
     summary: Claude Provider 已实现并通过临时实际 SDK/MCP 离线测试，待项目装配复测
+  - date: "2026-10-16"
+    kind: implemented
+    summary: G-3 联网搜索能力位（默认关）实施；本角色 32/32 与本地回环 probe 通过，真网关 side-query 与桌面呈现待验
 ---
 
 # 选择 Claude 后继续受治理的角色对话
@@ -56,6 +59,8 @@ flowchart TD
 
 API 最短使用方式是由核心 `createRuntimeAdapter({runtime:'claude', gate, projectRoot, skillRoot})` 选择本工厂；provider 直接调用只用于已注入完整能力的调用方和测试，详见[公开接口](../../api-spec.md)。配置 `ANTHROPIC_API_KEY` 为必需；模型 `ANS_CLAUDE_MODEL` 和 endpoint `ANTHROPIC_BASE_URL` 可选。只接受 API key，不尝试订阅登录。
 
+2026-10-16（G-3 期1）：新增联网搜索能力位 `ANS_CLAUDE_WEB_SEARCH`（默认关，关时工具面/钩子/事件逐字不变）。开启时内置 `WebSearch` 可用并由 PreToolUse 放行分支自动批准（不注入 `updatedInput`、不改写模型输入；hook deny 先于 allowedTools，故该分支为必需项）；搜索执行经 CLI 同端点 side-query（服务端工具声明 `web_search_20250305`），成功/网关错误/预算文案均如实进工具事件（`native-start`/`native-result`，失败不毁轮次，query 成功时在结果文本可见）。客户真网关 side-query 与桌面行呈现待验；见[实施记录](../fix/2026-10-16_impl_web-search.md)。
+
 当前正式包28项测试、接入Core required-v1的真实bundledCLI本地回环probe及整仓类型检查通过；真实账号、外部模型和最终项目组合尚未验证。工具start/result携带真实输入规则与可选execution，原MCP content不变；只有原Turn可证明的hook拒绝有blocked，未知hook只发诊断。C新元数据由Core先剥离，Claude收到的模型原文/图片不变。详见[本轮验证](../change/2026-10-15_change_tool-display-projection.md)。
 
 | 日期 | 类型 | 状态 | 变化 | 详细记录 |
@@ -68,3 +73,5 @@ API 最短使用方式是由核心 `createRuntimeAdapter({runtime:'claude', gate
 | 2026-10-15 | 修改 | 本角色验证通过，完整流待集成 | A4工具展示与C2.tp1 SDK运输保护 | [实施证据](../change/2026-10-15_change_tool-display-projection.md) |
 
 | 2026-10-15 | 测试修复 | 本角色29/29、tsc通过 | 发布高负载确认等待夹具用显式逻辑时钟保留50ms/100ms契约，并加精确超时负对照；生产不变 | [记录](../fix/2026-10-15_fix_release-test-clock.md) |
+
+| 2026-10-16 | 修改 | 已实施待验证 | G-3 联网搜索能力位（默认关）：PreToolUse 放行分支、工具声明与 native 事件消费；32/32、类型检查与本地回环 probe 通过，真网关/桌面待验 | [实施记录](../fix/2026-10-16_impl_web-search.md) |
