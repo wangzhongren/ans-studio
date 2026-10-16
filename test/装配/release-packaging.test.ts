@@ -20,6 +20,15 @@ test('release refuses unreviewed production changes and similarly named private 
     ['package.json', 'test/装配/release-packaging.test.ts']);
 });
 
+// 发布前 CI Windows 检查：shell-exec-timeout 的 3 条断言假定 Unix 信号名语义（运行时核心的平台自适应小修），
+// 经评审按精确路径纳入 overlay；同目录其余文件与其余 test/ 仍不入选（不开目录，保持最小授权）。
+test('release overlay includes the reviewed runtime-core Windows test fix by exact path only', () => {
+  const result = selectOverlay(['package.json', 'test/runtime-core/shell-exec-timeout.test.ts',
+    'test/runtime-core/tools.test.ts', 'test/codex-adapter/electron-launch.test.ts']);
+  assert.deepEqual(result.selected, ['package.json', 'test/runtime-core/shell-exec-timeout.test.ts']);
+  assert.deepEqual(result.excluded, ['test/runtime-core/tools.test.ts', 'test/codex-adapter/electron-launch.test.ts']);
+});
+
 import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';

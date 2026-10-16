@@ -18,6 +18,17 @@ const allowGate = async () => ({ allow: true as const, by: "fixture" });
 const hang = `${process.execPath} -e 'setInterval(()=>{},1000)'`;
 const quick = `${process.execPath} -e 'process.stdout.write("quick")'`;
 
+// F-1 信号断言的**平台分支**（CI Windows 实证，2026-10-16）。Windows 语义：taskkill /T /F 与 child.kill() 均走
+// TerminateProcess，进程一旦被终止，Node close 事件的 signal 恒为 null（结果里 execution.signal 缺省），也不存在
+// SIGTERM 处理器「免疫」——无 POSIX 信号名可断言。Windows 分支因此只断言「signal 为空」；**进程确已终止**由各用例
+// 既有的等价证据承担（F-1-a「超时已终止（300 ms）」文案仅 close 事件路径产出 + 短收口耗时；F-1-opt1 late 写入不出现；
+// F-1-b 中止文案）。用例不 skip，实质断言全平台照跑，只把「信号名」这一点分支化。
+const onWindows = process.platform === "win32";
+function assertKillSignal(actual: string | undefined, posixExpected: "SIGTERM" | "SIGKILL", why: string): void {
+  if (onWindows) assert.equal(actual, undefined, `${why}（Windows 语义：TerminateProcess 无信号名，signal 应为空）`);
+  else assert.equal(actual, posixExpected, why);
+}
+
 type DiagnosticLog = NonNullable<GovernedToolsOptions["diagnostics"]>;
 /** 捕获 diagnostics 事件与**原始字段**的替换件（生产 logger 另有字段白名单；本替身原样记录，供断言解析值）。 */
 function spyDiagnostics(): { log: DiagnosticLog; events: Array<{ event: string; fields?: Record<string, unknown> }> } {
@@ -42,7 +53,7 @@ test("F-1-a：挂起命令在命令级时限内被终止，如实返回「超时
     assert.match(result.message, /本轮可继续/);
     assert.equal(result.execution?.timedOut, true);
     assert.equal(result.execution?.timeoutMs, 300);
-    assert.equal(result.execution?.signal, "SIGTERM", "signal 如实（SIGTERM 生效）");
+    assertKillSignal(result.execution?.signal, "SIGTERM", "signal 如实（SIGTERM 生效）");
     assert.ok(elapsed < 5000, `应在短时限内收口（实际 ${elapsed}ms）`);
     assert.ok(diag.events.some((entry) => entry.event === "shell.exec.timeout" && entry.fields?.timeoutMs === 300), "应有 shell.exec.timeout 且带生效时限");
     assert.ok(diag.events.some((entry) => entry.event === "shell.exec.start" && entry.fields?.timeoutMs === 300), "应有 shell.exec.start 且带生效时限");
@@ -73,7 +84,7 @@ test("F-1-opt1：SIGTERM 免疫子进程被 SIGKILL 升级收口；late 写入�
     const result = await running;
     assert.equal(result.ok, false);
     assert.equal(result.execution?.timedOut, true);
-    assert.equal(result.execution?.signal, "SIGKILL", "SIGTERM 免疫 → 升级 SIGKILL，signal 如实");
+    assertKillSignal(result.execution?.signal, "SIGKILL", "SIGTERM 免疫 → 升级 SIGKILL，signal 如实");
     // 等到超过子进程原定写入时刻（600ms）再断言 late 未出现（SIGKILL 生效）。
     await new Promise((resolve) => setTimeout(resolve, 400));
     assert.ok(!(await readdir(root)).includes("late"), "被终止的进程不得留下迟到写入");
@@ -168,7 +179,7 @@ test("F-1-b 与「停止本轮」既有语义回归：中止文案与清理预�
     const result = await running;
     assert.equal(result.ok, false);
     assert.match(result.message, /会话已中止，命令已请求终止/);
-    assert.equal(result.execution?.signal, "SIGTERM");
+    assertKillSignal(result.execution?.signal, "SIGTERM", "signal 如实（SIGTERM 生效）");
     assert.equal(result.execution?.timedOut, undefined);
   } finally { await rm(root, { recursive: true, force: true }); }
 });
