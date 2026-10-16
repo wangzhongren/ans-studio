@@ -10,6 +10,7 @@ import type {
   RuntimeInputProvenanceV1, RuntimeLiveHandbackPresentationV1, RuntimeInputTextProjectionV1, RuntimeDeliveryReceiptV1,
   RuntimeReplayCheckpoint, RuntimePersistenceChangeV1, ReportSaveResultV1, ReportSaveStateV1, DeliverySaveResultV1,
   DeliveryReceiptQueryV1, RuntimePersistenceErrorCode, RuntimeDeliveryProgressV1,
+  RuntimeReasoningEventDetailV1,
 } from "../../model/runtime.ts";
 import { RUNTIME_KINDS } from "../../common/shared/runtime-shared.ts";
 import { buildGovernedTools, createDemoRuntimeAdapter } from "../../provider/runtime/tools.ts";
@@ -19,6 +20,7 @@ import { listInstalledMcpServers } from "../../common/runtime-core/mcp-declarati
 import { REPORT_LIMITS, makeReportSnapshot, canonicalJson, reportIdFor, validateProvenance, validateLivePresentation, projectLiveReport, projectHandbackInput, validAttemptId } from "../../common/runtime-core/report-provenance.ts";
 import { createEventQueue } from "../../common/runtime-core/event-queue.ts";
 import { createInteractionGate, isAbortError, isTimeoutError, raceAbort, resolveRuntimeTimeouts, withPausableTimeout, withTimeout } from "../../common/runtime-core/timeout.ts";
+import { REASONING_DIAGNOSTIC_SUMMARY, REASONING_EVENT_SUMMARY, resolveReasoningEffort } from "../../common/runtime-core/reasoning.ts";
 
 export interface RuntimeSessionOptions extends Omit<GovernedToolsOptions, "currentTurnId" | "roleId" | "runtime" | "interactionGate"> {
   runtime: RuntimeKind;
@@ -62,7 +64,11 @@ export async function readRuntimeSessionHistory(options: {
     const event=entry.event!;
     if(event.kind === "tool_call" || event.kind === "accepted" || event.kind === "denied") return {...entry,event:routeRuntimeDisplayEvent(event,display,"legacy-event")};
     const detail=event.detail && typeof event.detail === "object" ? event.detail as Record<string,unknown> : {};
-    const safeDetail = detail.source === "prompt-input" && typeof detail.text === "string" ? {...detail,text:display.protectText(detail.text,16384).text} : detail;
+    // G-5：历史读取对 `detail.source==="reasoning"` 过**同一投影单点**（存量投影形＝幂等归一；
+    // 手编/旧版原始事实＝同管道脱敏＋预算——回放面与实时面形状唯一）。
+    const safeDetail = detail.source === "prompt-input" && typeof detail.text === "string" ? {...detail,text:display.protectText(detail.text,16384).text}
+      : detail.source === "reasoning" ? {...display.projectReasoningDetail(detail as unknown as RuntimeReasoningEventDetailV1), ...(typeof detail.turnId === "string" ? {turnId: detail.turnId} : {})}
+      : detail;
     return {...entry,event:{...event,summary:display.protectText(event.summary,16384).text,detail:safeDetail}};
   })};
 }
@@ -117,6 +123,14 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
         if (turnId === undefined || signal?.aborted) return { ok: false, message: `${tool.name}：本轮未运行或已中止，未执行` };
         return tool.handler({ ...call, signal: signal && call.signal ? AbortSignal.any([signal, call.signal]) : signal ?? call.signal });
       } }));
+      // G-5：推理强度（wave 1 接线）——按运行时读 env（`ANS_CLAUDE/CODEX/PI_REASONING_EFFORT`）并
+      // 归一（**纯读**，providerFor 每次重建即重读＝「改设置 ⇒ 下次开会话生效」沿既有语义）。非法值＝
+      // **按未设处理**（零参数、零行为变化）＋诊断如实；**绝不因偏好值坏件拒开会话/毁轮次**（偏好不是
+      // 承载件）。未设＝不注入字段（逐字现状；三平台原生消费属适配器批次＝wave 2）。
+      const reasoningEffort = resolveReasoningEffort(options.runtime);
+      if (reasoningEffort.state === "invalid") {
+        try { options.diagnostics?.record("reasoning.effort.invalid", { mode: options.runtime, supported: false, reasonCode: "invalid-value" }); } catch { /* 诊断绝不能改变执行 */ }
+      }
       const providerOptions: RuntimeProviderOptions = {
         runtime: options.runtime, projectRoot: options.projectRoot, skillRoot: options.skillRoot,
         tools, storage, interactionGate, currentTurnId: () => turnId,
@@ -126,6 +140,8 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
         // 读取器跳过＋诊断，绝不影响开会话）。适配器对 `installedMcpServers` 纯消费（装配/放行/呈现
         // 属各平台批次 P1–P3）；providerFor 每次重建即重读——「安装/卸载 ⇒ 下次开会话生效」。
         installedMcpServers: listInstalledMcpServers(options.projectRoot, role.id),
+        // G-5：仅 `set` 态注入字段；`unset`/`invalid` 保持**字段缺席**（逐字现状的机读形态）。
+        ...(reasoningEffort.state === "set" ? { reasoningEffort: reasoningEffort.effort } : {}),
         ...resolveRuntimeTimeouts(options.runtime, options),
       };
       const factory = options.providerFactories?.[options.runtime] ?? (options.runtime === "demo"
@@ -171,7 +187,16 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
         return turn.abortPromise;
       };
       const emit = (inputEvent: SessionEvent, plan:DeliveryPlan|undefined=active?.plan, visible=true) => {
-        const event = inputEvent.kind === "tool_call" || inputEvent.kind === "accepted" || inputEvent.kind === "denied" ? routeRuntimeDisplayEvent(inputEvent,provider.display,"projected-event") : inputEvent;
+        let event = inputEvent.kind === "tool_call" || inputEvent.kind === "accepted" || inputEvent.kind === "denied" ? routeRuntimeDisplayEvent(inputEvent,provider.display,"projected-event") : inputEvent;
+        // G-5 推理事实通道**单点**：`detail.source==="reasoning"` 的原始事实在此恰一次过核心投影
+        // （脱敏＋预算，实现＝display context 的 projectReasoningDetail）——队列/持久化/桌面所见一律为
+        // 投影形（或如实诊断形）；原始正文绝不外流。summary 定格为常量（承载语义全在 detail；杜绝
+        // 未脱敏的随载荷文本借 summary 外流）；`turnId` 由 pump 并入 detail，投影后原样保留。
+        const reasoningCarrier = event.detail && typeof event.detail === "object" && !Array.isArray(event.detail) && (event.detail as { source?: unknown }).source === "reasoning" ? event.detail as Record<string, unknown> : undefined;
+        if (reasoningCarrier) {
+          const projected = provider.display.projectReasoningDetail(reasoningCarrier as unknown as RuntimeReasoningEventDetailV1);
+          event = { ...event, summary: event.kind === "message" ? (projected.source === "reasoning" ? REASONING_EVENT_SUMMARY : REASONING_DIAGNOSTIC_SUMMARY) : event.summary, detail: { ...projected, ...(typeof reasoningCarrier.turnId === "string" ? { turnId: reasoningCarrier.turnId } : {}) } };
+        }
         if(plan && event.kind==='message' && (event.detail as {source?:string}|undefined)?.source==='prompt-input' && jsonBytes(event)>REPORT_LIMITS.input)throw Error('PROVENANCE_TOO_LARGE');
         if(visible)queue.push(event);
         if(storage){

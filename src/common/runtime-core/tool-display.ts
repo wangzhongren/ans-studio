@@ -6,6 +6,7 @@ import type {
   RuntimeToolDisplayDiagnosticDetailV1, RuntimeToolDisplayProfileV1,
   RuntimeLegacyHistoryProjectionInputV1, RuntimeLegacyHistoryProjectionV1,
   RuntimeProtectedLegacyHistoryEntryV1, RuntimeLegacyHistoryEntryV1, SessionEvent,
+  RuntimeReasoningDetailProjector, RuntimeReasoningDisplayDetailV1, RuntimeReasoningDisplayDiagnosticDetailV1,
 } from '../../model/runtime.ts';
 
 export const DISPLAY_LIMITS = Object.freeze({ target:4096, result:16384, error:4096, summary:1024, display:57344, event:65536, history:1048576, historyRows:4096 });
@@ -204,6 +205,35 @@ export function createToolDisplayContext(options: { credentialEnvNames?: readonl
       return output;
     }catch{return fail('PROJECTION_FAILED');}
   }
-  return {projectToolEvent,protectText,registerToolDisplayProfile,credentialEnvNames:names,assertReady(){if(!ready)throw new Error('Core-managed tool display profile was not registered');},projectLegacyHistory};
+  // —————————————— G-5 推理事实通道：**核心投影单点** ——————————————
+  //
+  // 唯一入口：原始事实（`text: string`）→ 脱敏＋预算（与工具面同管道：凭据值替换/cleanPatterns/
+  // UTF-8 字节裁剪）→ 呈现详情（`text: DisplayTextV1`）。Service 在 emit/历史读取对
+  // `detail.source==="reasoning"` 恰一次调用本函数；**重复投影幂等**（已投影形按 prior 标记再归一时
+  // 形状不变）——历史读取路径对存量投影形再投影走的就是这条。坏件一律返回如实诊断形，**绝不抛**；
+  // 不依赖 profile 就绪（历史读路径无 profile 注册；正文在 emit 时已全量脱敏，重投影只是同管道归一）。
+  const reasoningDiagnostic: RuntimeReasoningDisplayDiagnosticDetailV1 = {version:1,source:'reasoning-diagnostic',code:'PROJECTION_FAILED'};
+  const projectReasoningDetail: RuntimeReasoningDetailProjector = (detail, redactText) => {
+    try {
+      const d = record(detail);
+      if (d.version !== 1 || d.source !== 'reasoning') return reasoningDiagnostic;
+      const facts = record(d.reasoning);
+      const status = facts.status === 'complete' ? 'complete' as const : facts.status === 'omitted' ? 'omitted' as const : undefined;
+      if (status === undefined) return reasoningDiagnostic;
+      let text: DisplayTextV1;
+      if (typeof facts.text === 'string') text = protectText(facts.text, DISPLAY_LIMITS.result, undefined, redactText);
+      else {
+        const projected = record(facts.text);
+        if (typeof projected.text !== 'string') return reasoningDiagnostic;
+        text = protectText(projected.text, DISPLAY_LIMITS.result, { truncated: projected.truncated === true, redacted: projected.redacted === true }, redactText);
+      }
+      // omitted＝平台省略正文：正文一律不呈现（即便载荷违规带了正文——如实优先于保留违规内容）。
+      if (status === 'omitted') text = { text: '', truncated: false, redacted: false };
+      // 时长只透传**真实信号**：有限且非负；缺失/非法（含负数、NaN、非数字）一律不携带——绝不发明时间。
+      const durationMs = typeof facts.durationMs === 'number' && Number.isFinite(facts.durationMs) && facts.durationMs >= 0 ? facts.durationMs : undefined;
+      return { version: 1, source: 'reasoning', reasoning: { text, status, ...(durationMs !== undefined ? { durationMs } : {}) } };
+    } catch { return reasoningDiagnostic; }
+  };
+  return {projectToolEvent,projectReasoningDetail,protectText,registerToolDisplayProfile,credentialEnvNames:names,assertReady(){if(!ready)throw new Error('Core-managed tool display profile was not registered');},projectLegacyHistory};
 }
 function identity(value:{runtime?:unknown;roleId?:unknown;turnId?:unknown}):Pick<SessionEvent,'runtime'|'roleId'|'turnId'>{return{...(typeof value.runtime==='string'?{runtime:value.runtime as SessionEvent['runtime']}:{}),...(typeof value.roleId==='string'?{roleId:value.roleId}:{}),...(typeof value.turnId==='string'?{turnId:value.turnId}:{})};}

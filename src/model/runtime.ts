@@ -486,6 +486,81 @@ export type UninstallMcpFn = (
   metadata?: ReportHandbackMetadata,
 ) => Promise<InstallMcpReceipt>;
 
+// —————————————— 推理与推理强度（G-5 wave 1 契约层；冻结符号，单一来源＝本模块） ——————————————
+//
+// 依据：客户 2026-10-16「按推荐批准，开始实施」＝ G-5（推理与推理强度）；评估
+// `角色卡/运行时核心/docs/fix/2026-10-16_assess_reasoning-and-effort.md`（§五 请求面/§六 呈现面）、
+// 产品设计 `角色卡/产品/docs/design/2026-10-16_design_reasoning-and-effort.md`。两层：
+//
+// ①请求面＝中立档位 `ReasoningEffortV1`（PM 冻结恰五值）＋`RuntimeProviderOptions.reasoningEffort`。
+// Service 在 providerFor 按运行时读 env（`ANS_CLAUDE_REASONING_EFFORT`/`ANS_CODEX_REASONING_EFFORT`
+// /`ANS_PI_REASONING_EFFORT`）、归一（合法五值，trim＋忽略大小写；未设/空串＝未设；其余＝按未设处理
+// ＋诊断，**绝不毁会话**）后注入。**未设（字段缺席）＝逐字现状**——适配器不得因字段缺席改变任何既有
+// 行为；适配器**纯消费**（三平台原生接线属各适配器批次＝wave 2；各平台落点见
+// `RuntimeProviderOptions.reasoningEffort` 注释）。
+//
+// ②呈现面＝推理事实通道（三段式，沿工具事件"事实→核心投影→呈现"纪律）：
+// · 适配器只产事实 `RuntimeReasoningFactsV1`（经 `kind:"message"` 事件的 `detail` 承载，
+//   `RuntimeReasoningEventDetailV1`；**绝不直上屏、绝不自行脱敏**）；
+// · **核心投影单点**＝`createToolDisplayContext().projectReasoningDetail`（实现于
+//   `src/common/runtime-core/tool-display.ts`），Service 在 emit/历史读取对 `detail.source==="reasoning"`
+//   恰一次调用——脱敏＋预算在此发生；
+// · 消费方（桌面渲染/回放）只渲染投影形 `RuntimeReasoningDisplayDetailV1`（或如实诊断形
+//   `RuntimeReasoningDisplayDiagnosticDetailV1`）。折叠行文案「已思考 N 秒 ▸」由消费方从
+//   `status`/`durationMs` 合成：**有真实时长信号才显示秒数、平台省略内容时不假装有内容**
+//   （无时长文案用「推理内容 ▸」类如实措辞；文案终形归桌面UI，本层只冻数据面）。
+
+/** 中立推理强度档位（PM 冻结；v1 恰五值。`off`＝显式关闭扩展思考（各平台落点见上）；`xhigh`＝「极高」）。 */
+export type ReasoningEffortV1 = "off" | "low" | "medium" | "high" | "xhigh";
+
+/** 单段推理完成事实（适配器只产事实；呈现前必须过核心投影单点，绝不直上屏）。 */
+export interface RuntimeReasoningFactsV1 {
+  /** 平台给出的推理正文（可能为空串——仅签名/零长正文）；`status:"omitted"` 时契约义务为空串。 */
+  text: string;
+  /**
+   * `complete`＝平台给出的正文已完整送达；`omitted`＝平台省略正文（只有「发生过」，
+   * 如 Claude `display:'omitted'`/redacted 块）——如实不假装（绝不拿摘要冒充原文、绝不拿「发生」冒充「内容」）。
+   */
+  status: "complete" | "omitted";
+  /** 仅**真实**起止信号时携带（毫秒，有限且 ≥0）；无真实信号不携带、绝不猜测。 */
+  durationMs?: number;
+}
+
+/** 推理事件的原始载荷（适配器 → 核心投影单点的入参形状；经 message 事件 `detail` 承载）。 */
+export interface RuntimeReasoningEventDetailV1 {
+  version: 1;
+  source: "reasoning";
+  reasoning: RuntimeReasoningFactsV1;
+}
+
+/** 投影后的推理呈现详情（桌面渲染/回放消费的**冻结点**；`text` 已经核心脱敏＋预算）。 */
+export interface RuntimeReasoningDisplayDetailV1 {
+  version: 1;
+  source: "reasoning";
+  reasoning: {
+    text: DisplayTextV1;
+    status: "complete" | "omitted";
+    durationMs?: number;
+  };
+}
+
+/** 推理投影失败诊断（绝不抛、绝不伪造内容；消费方按如实文案呈现「推理内容无法安全显示」）。 */
+export interface RuntimeReasoningDisplayDiagnosticDetailV1 {
+  version: 1;
+  source: "reasoning-diagnostic";
+  code: "PROJECTION_FAILED";
+}
+
+/**
+ * 推理投影单点签名（实现＝core display context 的 `projectReasoningDetail`）。
+ * 入参接受原始事实或已投影详情（重复投影幂等——历史读取路径对存量投影形再投影不改变形状）。
+ * 坏件一律返回 `RuntimeReasoningDisplayDiagnosticDetailV1`，**绝不抛**。
+ */
+export type RuntimeReasoningDetailProjector = (
+  detail: RuntimeReasoningEventDetailV1 | RuntimeReasoningDisplayDetailV1,
+  redactText?: (value: string) => string,
+) => RuntimeReasoningDisplayDetailV1 | RuntimeReasoningDisplayDiagnosticDetailV1;
+
 export interface ShellVerdictPayload {
 
   verdict: "allow" | "deny" | "unsure";
@@ -644,6 +719,22 @@ export interface RuntimeProviderOptions {
    * 批次（P1 Claude→P2 Codex→P3 Pi），消费前本字段对既有行为零影响。
    */
   installedMcpServers?: readonly InstalledMcpServerV1[];
+  /**
+   * G-5：会话级推理强度（Service 在 providerFor 按运行时读 env 并归一后注入；**未设＝字段缺席＝
+   * 逐字现状**——适配器不得因字段缺席改变任何既有行为；**纯消费面**，三平台原生接线属各适配器批次）。
+   *
+   * 冻结映射（中立值 → 各平台原生落点；依据＝评估 `2026-10-16_assess_reasoning-and-effort.md`
+   * §五 与 sdk.d.ts 实据）：
+   * · `off`：Claude＝`queryOptions.thinking:{type:'disabled'}`（sdk.d.ts ThinkingDisabled）；
+   *   Pi＝`setThinkingLevel("off")`（**前置**把克隆模型 `thinkingLevelMap.off` 由 null 收窄为
+   *   undefined，否则被 SDK 钳到 minimal＝假关闭——Pi适配器角色实施注记，评估 §4.3/R6）；
+   *   Codex＝平台无「关」档——**不注入 `model_reasoning_effort`（零参数）＋如实说明**（不假装关闭）。
+   * · `low`/`medium`/`high`/`xhigh`：Claude＝`queryOptions.effort:'<值>'`（EffortLevel 直通，thinking
+   *   缺省＝支持模型的 adaptive）；Codex＝`-c model_reasoning_effort="<值>"`（目录面含此四档）；
+   *   Pi＝`setThinkingLevel("<值>")`（预算映射 2048/8192/16384/16384——`xhigh` 预算钳到 high 但档位
+   *   语义保留）。
+   */
+  reasoningEffort?: ReasoningEffortV1;
 }
 export type RuntimeProviderFactory = (options: RuntimeProviderOptions) => RuntimeAdapter | Promise<RuntimeAdapter>;
 
