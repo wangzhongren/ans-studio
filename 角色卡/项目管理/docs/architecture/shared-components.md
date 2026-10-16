@@ -100,9 +100,18 @@
 
 ## 组件 8：运行时设置目录（`runtime-settings`）
 
-`src/common/shared/runtime-settings.ts` 由项目管理单一维护，桌面窗口通过只读导入 `RUNTIME_SETTINGS/getRuntimeSettingsDefinition` 组装掩码设置视图；renderer 接收 IPC 视图，不直接引用 Node/TypeScript 文件。字段登记真实 SDK 的 `key/label/required/secret/fallbackKeys?/help?`，不包含凭据值、不推断 SDK/账户可用。Pi、Codex、Claude 各自真实字段和默认行为见 [实现报告](../../api-spec.md)；SDK 实际支持变化须由原属主报告后更新并重测消费方。测试 `test/项目管理/shared/runtime-settings.test.ts` 2/2，验证所有 credential alias 都被秘密键目录覆盖，以及各引擎 required/default 语义。依据 [ANS-RUNTIME-V2](../design/2026-10-14_design_multi-runtime-integration.md)。
+`src/common/shared/runtime-settings.ts` 由项目管理单一维护，桌面窗口通过只读导入 `RUNTIME_SETTINGS/getRuntimeSettingsDefinition` 组装掩码设置视图；renderer 接收 IPC 视图，不直接引用 Node/TypeScript 文件。字段登记真实 SDK 的 `key/label/required/secret/fallbackKeys?/choices?/help?`，不包含凭据值、不推断 SDK/账户可用。`choices?`（2026-10-16 G-5 增，客户批准）：有（非空）则该字段值域即选项、应以致选择控件呈现，缺省/空＝自由文本——只描述设置、不描述控件实现。Pi、Codex、Claude 各自真实字段和默认行为见 [实现报告](../../api-spec.md)；SDK 实际支持变化须由原属主报告后更新并重测消费方。测试 `test/项目管理/shared/runtime-settings.test.ts` 6/6，验证所有 credential alias 都被秘密键目录覆盖、各引擎 required/default 语义，及 G-5 推理强度三字段（键/label 逐字/choices 值域[Codex 无 off]/help 逐字统一/choices 纪律）。依据 [ANS-RUNTIME-V2](../design/2026-10-14_design_multi-runtime-integration.md)。
 
 ## 变更（本文件）
+
+- 2026-10-16：组件 8 `runtime-settings` 增可选 **`choices?: readonly string[]`**（有、非空＝值域即选项、
+  应以致选择控件呈现；缺省/空＝自由文本）＋三平台「推理强度」字段（`ANS_PI_REASONING_EFFORT`
+  off/low/medium/high/xhigh；`ANS_CODEX_REASONING_EFFORT` low/medium/high/xhigh，**无 off**——平台无该档、
+  如实不假装；`ANS_CLAUDE_REASONING_EFFORT` off/low/medium/high/xhigh；label 逐字「推理强度」、可选、
+  非机密；help 三平台逐字统一）。G-5 Wave 1 PM 切片，客户 2026-10-16 批准；测试
+  `test/项目管理/shared/runtime-settings.test.ts` **2→6**；本组 114/114、全量 2002/2001/0红/1skip、
+  typecheck 0；消费方（三适配器接线/桌面窗口/桌面UI）为 wave 2，落地后须重测。依据
+  [变更记录](../change/2026-10-16_change_reasoning-effort-metadata.md)。
 
 - 2026-10-16：组件 7 `diagnostics` 落盘白名单增列 **`timeoutMs`**（元数据；`shell.exec.start` /
   `shell.exec.timeout` 观测**生效**命令级执行时限，kanban-live 修复批次 F-1-d，客户 2026-10-16 批准）。

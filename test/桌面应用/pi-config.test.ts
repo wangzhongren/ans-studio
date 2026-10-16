@@ -30,6 +30,8 @@ import {
   resolveRepoEnvPath,
 } from "../../app/desktop/pi-config.ts";
 import { createDesktopInterface } from "../../app/desktop/interface.ts";
+// G-5 漂移守卫：面板键集与注册表 `RUNTIME_SETTINGS.pi` 字段集逐键对齐（只读导入）。
+import { RUNTIME_SETTINGS } from "../../src/common/shared/runtime-settings.ts";
 
 /** 哨兵 token 值——用于断言它绝不出现在视图/回报/错误文本里。 */
 const SENTINEL_TOKEN = "SENTINEL-TOKEN-9f3a1c-DO-NOT-LEAK";
@@ -42,21 +44,28 @@ function makeTempEnv(initial?: string): { dir: string; envPath: string; cleanup:
   return { dir, envPath, cleanup: () => fs.rmSync(dir, { recursive: true, force: true }) };
 }
 
-test("面板键恰为 3+1（必填 token/端点/模型 + 可选 CONTEXT_WINDOW）；provider 不在面板里；默认路径为仓库根 .env", () => {
+test("面板键恰为 3+2（必填 token/端点/模型 + 可选 CONTEXT_WINDOW/REASONING_EFFORT）；provider 不在面板里；默认路径为仓库根 .env", () => {
   // 客户 2026-10-11：其实不是 5 个，真正必须你填的是 3 个 —— 端点 / 模型 / token（必填）+ 上下文窗口（可选）。
+  // G-5 wave 2：纳入 ANS_PI_REASONING_EFFORT（注册表带 choices 值域；生产面已由注册表路径承载，
+  // 本列表纳入是为旧路径不静默失去写入面）。
   assert.deepEqual(PI_PANEL_KEYS, [
     "ANTHROPIC_AUTH_TOKEN",
     "ANS_PI_BASE_URL",
     "ANS_PI_MODEL",
     "ANS_PI_CONTEXT_WINDOW",
+    "ANS_PI_REASONING_EFFORT",
   ]);
+  // G-5 漂移守卫：面板键集与注册表 `RUNTIME_SETTINGS.pi` 字段集**逐键对齐**（不等即须显式评审——
+  // 防「注册表新增字段、旧面板静默不可写」再现）。
+  assert.deepEqual([...PI_PANEL_KEYS].sort(), RUNTIME_SETTINGS.pi.fields.map((f) => f.key).sort());
   // 反向守卫：`ANS_PI_PROVIDER` **不在**面板键集合里（它在代码里有默认值 ans-gateway、是内部标签，
   // 不是用户该做的决定；底层仍支持该环境变量，只是不再占一个输入框）。
   assert.ok(!PI_PANEL_KEYS.includes("ANS_PI_PROVIDER"), "provider 绝不进面板键集合");
-  // 必填键恰为 3 项，且都是面板键；CONTEXT_WINDOW 是可选（不在必填列）。
+  // 必填键恰为 3 项，且都是面板键；CONTEXT_WINDOW / REASONING_EFFORT 是可选（不在必填列）。
   assert.deepEqual(PI_REQUIRED_KEYS, ["ANTHROPIC_AUTH_TOKEN", "ANS_PI_BASE_URL", "ANS_PI_MODEL"]);
   assert.ok(PI_REQUIRED_KEYS.every((k) => PI_PANEL_KEYS.includes(k)), "必填键应含于面板键集合");
   assert.ok(!PI_REQUIRED_KEYS.includes("ANS_PI_CONTEXT_WINDOW"), "上下文窗口是可选，不在必填列");
+  assert.ok(!PI_REQUIRED_KEYS.includes("ANS_PI_REASONING_EFFORT"), "推理强度是可选，不在必填列");
   // 默认路径指向仓库根（app/desktop 上两级）下的 .env——与 CLI `--env-file=.env` 同一文件。
   assert.equal(path.basename(resolveRepoEnvPath()), ".env");
   assert.equal(resolveRepoEnvPath(), path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", ".env"));
@@ -218,6 +227,25 @@ test("保存：ANS_PI_PROVIDER 不再被写——即便提交它也被过滤；�
     assert.ok(after.includes("ANS_PI_PROVIDER=ans-gateway"), "已存在的 provider 行原样保留（未被动过）");
     assert.ok(!after.includes("should-not-write"), "提交的 provider 值绝不写入 .env");
     assert.ok(after.includes("ANS_PI_MODEL=changed"));
+  } finally {
+    t.cleanup();
+  }
+});
+
+test("G-5：旧面板路径可读写 ANS_PI_REASONING_EFFORT（纳入面板键；值域校验单一来源在注册表保存链——旧路径不复制第二份判定）", async () => {
+  const t = makeTempEnv(["ANS_PI_MODEL=m", ""].join("\n"));
+  try {
+    const env: Record<string, string | undefined> = {};
+    const res = await savePiConfig({ envPath: t.envPath, updates: { ANS_PI_REASONING_EFFORT: "high" }, env });
+    assert.equal(res.ok, true);
+    assert.deepEqual(res.appliedKeys, ["ANS_PI_REASONING_EFFORT"]);
+    assert.ok(fs.readFileSync(t.envPath, "utf8").includes("ANS_PI_REASONING_EFFORT=high"));
+    assert.equal(env.ANS_PI_REASONING_EFFORT, "high", "保存后重载（下一会话用新值）");
+    const view = await getPiConfig(t.envPath);
+    const field = view.fields.find((f) => f.key === "ANS_PI_REASONING_EFFORT");
+    assert.ok(field && field.isSet && field.value === "high" && field.secret === false, "非机密、回填真实值");
+    // 缺项判定不受影响（可选键不入必填列）。
+    assert.ok(!missingPiKeys(view).includes("ANS_PI_REASONING_EFFORT"));
   } finally {
     t.cleanup();
   }

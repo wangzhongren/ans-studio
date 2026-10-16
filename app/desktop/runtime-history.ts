@@ -40,6 +40,17 @@ export async function getSessionHistory(input: { projectRoot: string; roleId: st
       // 只调**行分类**；桌面UI 的行样式按其 display.process 同判据块处理，两处口径一致）。
       const processClass = classifyProcessOutcome(detail?.display);
       const row: ReplayRow = { kind: event.kind === 'message' ? 'assistant' : event.kind === 'denied' && processClass === null ? 'denied' : 'tool', text: event.summary, at: entry.at, eventKind: event.kind, ...(turnId ? { turnId } : {}) };
+      // G-5 wave 2（PM 补派）：**推理行的回放载体**——`detail.source==="reasoning"` 的 message 事件，行携带
+      // **投影形**子对象 `row.reasoning`（逐字 `{text: DisplayTextV1, status, durationMs?}`＝
+      // `RuntimeReasoningDisplayDetailV1.reasoning`，`model/runtime.ts` 冻结；脱敏/预算已在 Service 投影
+      // 单点发生——本层**只透传、不重投影、不碰内容**）。桌面UI 已按「行有该字段 ⇒ 推理折叠行」接入回放
+      // 分支（实时/回放同解）；缺该字段（旧数据/坏件——Service 读取侧对坏件归投影为 reasoning-diagnostic）
+      // ⇒ 下落图况逐字回落既有「已思考」assistant 文本行。**其余行字段（kind/text/at/turnId…）逐字不变**。
+      const reasoningCarrier = detail as { source?: unknown; reasoning?: unknown } | undefined;
+      if (event.kind === 'message' && reasoningCarrier?.source === 'reasoning'
+        && typeof reasoningCarrier.reasoning === 'object' && reasoningCarrier.reasoning !== null) {
+        row.reasoning = reasoningCarrier.reasoning as ReplayRow['reasoning'];
+      }
       if (detail?.source === 'delivery-receipt' as string && detail?.receipt) { row.kind = 'tool'; row.text = '投递历史状态'; row.deliveryReceipt = detail.receipt; base.rows.push(row); continue; }
       if (detail?.source === 'delivery-boundary' as string) {
         row.kind = 'tool'; row.text = '投递可能已开始';

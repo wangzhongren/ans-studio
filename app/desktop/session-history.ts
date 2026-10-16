@@ -41,6 +41,14 @@ export interface ReplayRow {
   inputTextProjection?: import("../../src/model/runtime.ts").RuntimeInputTextProjectionV1;
   deliveryReceipt?: import("../../src/model/runtime.ts").RuntimeDeliveryReceiptV1;
   deliveryBoundary?: { version: 1; deliveryId: string; attemptId: string; turnId: string; stage: 'provider-may-start' };
+  /**
+   * **G-5 wave 2（PM 补派）：推理折叠行的回放载体**——`detail.source==="reasoning"` 的 message 事件，
+   * 行携带**投影形**子对象（逐字＝`RuntimeReasoningDisplayDetailV1.reasoning`：`{text: DisplayTextV1,
+   * status, durationMs?}`；`model/runtime.ts` 冻结；脱敏/预算已在 Service 投影单点发生——本层只透传）。
+   * 渲染侧判据＝「行有该字段 ⇒ 推理折叠行」（实时/回放同解）；旧数据/坏件无该字段 ⇒ 原行为逐字
+   * （「已思考」assistant 文本行回落）。
+   */
+  reasoning?: import("../../src/model/runtime.ts").RuntimeReasoningDisplayDetailV1["reasoning"];
   textProjection?: import("../../src/model/runtime.ts").DisplayTextV1;
   /** Only parser facts, never text-template targets, qualify for the neutral projection. */
   legacyTargetSource?: 'argument' | 'tool-detail' | 'same-call' | 'template-only';

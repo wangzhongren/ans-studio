@@ -123,6 +123,54 @@ test("D1 configuration writes only selected string keys atomically, masks URL/us
   } finally { temp.cleanup(); }
 });
 
+test("G-5 推理强度设置：三键往返（合法值规范形写盘＋读侧 file 来源＋choices 元数据）；非法值如实拒绝、不落盘、不回显；codex 无 off 档（值域按运行时）；空串清除合法", async () => {
+  const temp = fixture();
+  try {
+    // 合法：pi 用值域端点 off（提交带空白 ⇒ 按 trim 规范形写盘）。
+    const piSave = await saveRuntimeConfig({ runtime: "pi", updates: { ANS_PI_REASONING_EFFORT: " off " } }, { envPath: temp.envPath });
+    assert.equal(piSave.ok, true);
+    assert.deepEqual(piSave.appliedKeys, ["ANS_PI_REASONING_EFFORT"]);
+    assert.ok(fs.readFileSync(temp.envPath, "utf8").includes("ANS_PI_REASONING_EFFORT=off"), "合法值按规范形写盘");
+
+    // 往返：读侧 file 来源＋choices 元数据透传（渲染侧据它呈现值域；呈现控件属桌面UI）。
+    const piView = await getRuntimeConfig("pi", { envPath: temp.envPath, env: {} });
+    const piField = piView.fields.find((f) => f.key === "ANS_PI_REASONING_EFFORT")!;
+    assert.equal(piField.value, "off");
+    assert.equal(piField.source, "file");
+    assert.equal(piField.isSet, true);
+    assert.equal(piField.required, false, "留空＝平台默认（可选）");
+    assert.deepEqual(piField.choices, ["off", "low", "medium", "high", "xhigh"]);
+    const claudeDefault = await getRuntimeConfig("claude", { envPath: path.join(temp.root, "absent.env"), env: {} });
+    assert.equal(claudeDefault.fields.find((f) => f.key === "ANS_CLAUDE_REASONING_EFFORT")!.source, "default", "未设＝平台默认态");
+
+    // 非法：拒绝＋如实提示（含值域）＋不落盘＋revision 保留＋**不回显提交值原文**。
+    const before = fs.readFileSync(temp.envPath, "utf8");
+    const bad = await saveRuntimeConfig({ runtime: "pi", updates: { ANS_PI_REASONING_EFFORT: "max" } }, { envPath: temp.envPath, revision: 5 });
+    assert.equal(bad.ok, false);
+    assert.equal(bad.revision, 5);
+    assert.ok((bad.error ?? "").includes("推理强度取值无效") && (bad.error ?? "").includes("off / low / medium / high / xhigh"), "如实提示值域");
+    assert.ok(!(bad.error ?? "").includes("max"), "错误不回显提交值原文");
+    assert.equal(fs.readFileSync(temp.envPath, "utf8"), before, "拒绝零副作用（文件未动）");
+    // 写侧只收规范形：读侧的大小写宽松归一属读取态，不借道写盘。
+    const upper = await saveRuntimeConfig({ runtime: "pi", updates: { ANS_PI_REASONING_EFFORT: "HIGH" } }, { envPath: temp.envPath });
+    assert.equal(upper.ok, false, "非规范形拒绝");
+
+    // 值域按运行时：codex 无 off 档 ⇒ off 拒绝；high 接受。
+    const codexOff = await saveRuntimeConfig({ runtime: "codex", updates: { ANS_CODEX_REASONING_EFFORT: "off" } }, { envPath: temp.envPath });
+    assert.equal(codexOff.ok, false);
+    assert.ok((codexOff.error ?? "").includes("low / medium / high / xhigh"), "codex 值域不含 off");
+    const codexHigh = await saveRuntimeConfig({ runtime: "codex", updates: { ANS_CODEX_REASONING_EFFORT: "high" } }, { envPath: temp.envPath });
+    assert.equal(codexHigh.ok, true);
+    assert.ok(fs.readFileSync(temp.envPath, "utf8").includes("ANS_CODEX_REASONING_EFFORT=high"));
+
+    // 空串/纯空白＝清除该键（合法：留空维持平台默认）。
+    const cleared = await saveRuntimeConfig({ runtime: "codex", updates: { ANS_CODEX_REASONING_EFFORT: "   " } }, { envPath: temp.envPath });
+    assert.equal(cleared.ok, true);
+    const afterClear = await getRuntimeConfig("codex", { envPath: temp.envPath, env: {} });
+    assert.equal(afterClear.fields.find((f) => f.key === "ANS_CODEX_REASONING_EFFORT")!.isSet, false, "清除后未设");
+  } finally { temp.cleanup(); }
+});
+
 test("D1 same role and project across engines and same role across projects keep distinct handles and exact input targets", async () => {
   const current = harness();
   try {
@@ -405,6 +453,39 @@ test("D1R ANS history preserves authoritative turn/event identity, independent s
     for (const row of history.rows.filter((row) => row.activity)) assert.equal(row.activity!.turnId, row.turnId, "activity and top-level ID have the same authoritative precedence");
     assert.equal(history.rows[4].activity?.target, "src/a.ts", "existing target inheritance remains intact");
     assert.equal(Object.hasOwn(history.rows.at(-1)!, "turnId"), false, "absent authoritative ID remains absent");
+  } finally { temp.cleanup(); }
+});
+
+test("G-5 wave 2：推理行回放载体——reasoning message 事件的回放行携带投影形 row.reasoning（逐字/幂等）；坏件与旧数据无该字段 ⇒ 原行为逐字", async () => {
+  const temp = fixture();
+  const directory = path.join(temp.root, ".ans", "sessions", "A", "claude", "ans");
+  fs.mkdirSync(directory, { recursive: true });
+  // 存量**投影形**（Service 投影单点写盘后的形状；读取侧再投影＝幂等归一，形状不变）。
+  const projected = { version: 1, source: "reasoning", reasoning: { text: { text: "先看调用点，再改边界。", truncated: false, redacted: false }, status: "complete", durationMs: 5200 }, turnId: "t1" };
+  const entries = [
+    { kind: "user", text: "问", at: "2026-10-16T00:00:01Z", turnId: "t1" },
+    { kind: "event", at: "2026-10-16T00:00:02Z", turnId: "t1", event: { kind: "message", summary: "已思考", turnId: "t1", detail: projected } },
+    // 坏件（source=reasoning 但缺投影载荷）——Service 读取侧归投影为 reasoning-diagnostic ⇒ 不携带新字段。
+    { kind: "event", at: "2026-10-16T00:00:03Z", turnId: "t1", event: { kind: "message", summary: "已思考", turnId: "t1", detail: { version: 1, source: "reasoning" } } },
+    // 普通 message 行（无 reasoning 身份）⇒ 逐字不变。
+    { kind: "event", at: "2026-10-16T00:00:04Z", turnId: "t1", event: { kind: "message", summary: "普通回复", turnId: "t1", detail: { type: "assistant_delta" } } },
+  ];
+  fs.writeFileSync(path.join(directory, "replay.jsonl"), entries.map((entry) => JSON.stringify(entry)).join("\n") + "\n");
+  try {
+    const history = await getSessionHistory({ projectRoot: temp.root, roleId: "A", runtime: "claude" });
+    assert.equal(history.error, null);
+    const withReasoning = history.rows.filter((row) => Object.hasOwn(row, "reasoning"));
+    assert.equal(withReasoning.length, 1, "恰 reasoning 投影行携带 row.reasoning（幂等透传）");
+    assert.deepEqual(withReasoning[0].reasoning, projected.reasoning, "逐字＝RuntimeReasoningDisplayDetailV1.reasoning（text DisplayTextV1/status/durationMs）");
+    assert.equal(withReasoning[0].kind, "assistant", "其余行字段逐字不变（kind/text 回落面保留）");
+    assert.equal(withReasoning[0].text, "已思考");
+    assert.equal(withReasoning[0].turnId, "t1", "turnId 保留（渲染侧行身份用）");
+    // 坏件/旧数据（无该字段）：行为逐字——仍是 assistant 文本行，且对象上不新增 reasoning 键。
+    const fallbacks = history.rows.filter((row) => row.text === "已思考");
+    assert.equal(fallbacks.length, 2, "投影行 + 坏件行都保留「已思考」摘要文本");
+    assert.equal(Object.hasOwn(fallbacks[1], "reasoning"), false, "无投影载荷 ⇒ 不携带新字段（原行为逐字）");
+    assert.equal(history.rows.at(-1)!.text, "普通回复");
+    assert.equal(Object.hasOwn(history.rows.at(-1)!, "reasoning"), false, "普通行不受影响");
   } finally { temp.cleanup(); }
 });
 

@@ -40,11 +40,16 @@ import {
 } from "../../src/common/shared/env-file.ts";
 
 /**
- * 面板纳入的键（设计 §11.2）——**3 项必填 + 1 项可选（「高级」）**：
+ * 面板纳入的键（设计 §11.2；**G-5 wave 2 起与注册表 `RUNTIME_SETTINGS.pi` 字段集对齐**——3 项必填 + 2 项可选）：
  *  · 必填：`ANTHROPIC_AUTH_TOKEN`（**机密，掩码**）、`ANS_PI_BASE_URL`（**必需**——拒绝回落任何默认端点，
  *    故必须显式给）、`ANS_PI_MODEL`；
  *  · 可选（收进「高级」、**可留空**）：`ANS_PI_CONTEXT_WINDOW`（客户起点正是它要手查手填；Pi适配器已改为
- *    **可选 + 保守默认**，留空 = 不下发该键，缺失不再硬失败）。
+ *    **可选 + 保守默认**，留空 = 不下发该键，缺失不再硬失败）；`ANS_PI_REASONING_EFFORT`（G-5：推理强度，
+ *    注册表带 `choices` 值域——**本列表纳入该键是为旧路径不静默失去写入面**：现行生产面的
+ *    `pi-config:*` IPC 在未注入替身时**已委托注册表路径**（`interface.ts` → `getRuntimeConfig`/
+ *    `saveRuntimeConfig`，读取/校验/生效全在彼处；本模块的 get/save 仅注入替身与直接导入者使用）。
+ *    旧路径无 `choices` 控件与值域校验——值域校验**单一来源**在注册表保存链（`runtime-config.ts`），
+ *    此处**不复制**第二份判定）。
  *
  * **`ANS_PI_PROVIDER` 不在面板里**（客户 2026-10-11 裁定）：它在代码里**有默认值**（`ans-gateway`）、是
  * **内部标签**，不是用户该做的决定。底层仍支持该环境变量（`resolvePiProviderConfig` 照读），**只是不再占
@@ -57,6 +62,7 @@ export const PI_PANEL_KEYS: readonly string[] = [
   "ANS_PI_BASE_URL",
   "ANS_PI_MODEL",
   "ANS_PI_CONTEXT_WINDOW",
+  "ANS_PI_REASONING_EFFORT",
 ];
 
 const HERE = path.dirname(fileURLToPath(import.meta.url)); // <repo>/app/desktop

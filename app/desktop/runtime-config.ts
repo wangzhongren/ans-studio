@@ -103,7 +103,8 @@ export async function saveRuntimeConfig(input: { runtime: RuntimeKind; updates: 
   if (!input.updates || typeof input.updates !== "object" || Array.isArray(input.updates)) return { ...base, ok: false, error: "设置必须是键值对象。" };
   const filtered: EnvMap = {};
   for (const [key, value] of Object.entries(input.updates)) {
-    if (!definition.fields.some((field) => field.key === key)) continue;
+    const field = definition.fields.find((candidate) => candidate.key === key);
+    if (field === undefined) continue;
     if (typeof value !== "string") return { ...base, ok: false, error: "设置值必须是字符串。" };
     if (key.includes("URL") && value.trim() !== "") {
       try {
@@ -112,6 +113,18 @@ export async function saveRuntimeConfig(input: { runtime: RuntimeKind; updates: 
       } catch (error) {
         return { ...base, ok: false, error: "API 地址格式无效。" };
       }
+    }
+    // G-5 wave 2：**封闭值域字段按 `choices` 校验**（注册表元数据；值域按运行时——如 Codex 无 off 档）。
+    // 非法值 ⇒ 如实拒绝、不落盘（错误**不回显提交值原文**，沿凭据不回显纪律）；空串/纯空白＝清除该键
+    // （合法：留空维持平台默认）。合法值按 trim 后的**规范形**写盘（写侧只收规范值；读侧的大小写宽松
+    // 归一属读取态，不借道写盘）。
+    const canonical = value.trim();
+    if (field.choices !== undefined && field.choices.length > 0) {
+      if (canonical !== "" && !field.choices.includes(canonical)) {
+        return { ...base, ok: false, error: `${field.label}取值无效：仅接受 ${field.choices.join(" / ")}（或留空维持平台默认）。` };
+      }
+      filtered[key] = canonical;
+      continue;
     }
     filtered[key] = value;
   }

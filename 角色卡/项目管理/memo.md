@@ -2,6 +2,8 @@
 
 记录本角色掌握的事实、待核实事项与续接线索。不写全局规则（进 `docs/project-rules.md`），不抄任务状态。
 
+- 2026-10-16：**G-5（推理与推理强度）Wave 1 PM 切片：设置元数据注册**（客户 2026-10-16 批准；G-5 批准记录＝`docs/change/2026-10-15_change_kanban-fixes-pm-review.md`「客户批准（2026-10-16）」节）。`runtime-settings.ts` 增 `choices?`（有＝值域即选项、应以致选择控件呈现；空/缺省＝自由文本）＋三字段：`ANS_PI_REASONING_EFFORT`（off/low/medium/high/xhigh）、`ANS_CODEX_REASONING_EFFORT`（**无 off**——平台无该档）、`ANS_CLAUDE_REASONING_EFFORT`（off/low/medium/high/xhigh）；label 逐字「推理强度」、可选、非机密；help 三平台逐字统一：「留空＝维持平台默认（现状零变化）；档位依次为 关/低/中/高/极高（缺省档语义见平台）；思考计入输出 tokens。」测试 2→6、本组 114/114、全量 2002/2001/0红/1skip（基线 1998/1997/0/1，+4、零新红）、typecheck 0。**续接**：wave 2＝三适配器 env 读取/归一接线＋桌面窗口设置保存接受新字段＋桌面UI 面板档位控件（均他角色；落地后须重测消费方）；旧 Pi 面板 `PI_PANEL_KEYS` 不经本注册表、未动。变更记录 `docs/change/2026-10-16_change_reasoning-effort-metadata.md`；未 git 提交。
+
 - 2026-10-16：kanban-live 修复批次收尾（共享 diagnostics 白名单）。FIELD_NAMES 增列 `timeoutMs`（F-1-d：`shell.exec.start`/`shell.exec.timeout` 生产落盘观测生效时限；有限数值，与 `durationMs` 同路径；此前被静默丢弃）。**`excerpt` 评估不纳入**：其为 `command.slice(0,240)` 命令正文摘要，与 2026-10-13 已核验设计契约「禁止命令原文、argv、prompt、源内容」冲突——`scrub` 是尽力脱敏，保不了任意命令内容；命中 token（操作符）已由 `reasonCode` 落盘。`excerpt` 仍在 record 层原样传递（注入 logger/测试可断言）。**已回报 PM 待裁**：如需生产落盘须先改设计契约（或改走 shell-gate 审计路径——属编排侧语义）。测试：`test/项目管理/shared/diagnostics.test.ts` 9/9、本组 110/110、消费方 diagnostics 7/7、runtime-core shell 12/12、`npm run typecheck` 0 错。登记见 `docs/architecture/shared-components.md` 组件 7；未 git 提交。
 
 - 2026-10-14：多运行时唯一对接设计是 [ANS-RUNTIME-V2 revision 1](docs/design/2026-10-14_design_multi-runtime-integration.md)；中立实际接口在运行时核心 `api-spec.md`/Model。核心 contextSource 与旧桌面同名值含义不同，须显式转换。Codex SDK MCP map 实测会合并外部 server，必要 app-server 路径必须有效配置预检，不能用流事件当写前闸。共享 atomicWrite 新 optional signal 用于 stop 后不提交 rename。后续消费方变更必须重测，历史测试不代替最终合并验证。
