@@ -1,6 +1,6 @@
 // test/测试/g4-skill-verify/d-card-guard.test.ts —— G-4 独立验证 D 域：**su 卡文本（安装纪律段）＋ J-1 守卫**。
 //
-// 对抗性独立构造：四要点＋三棵树话术以**自建关键词清单**核在场；J-1 守卫词表（授权/获准/放行）
+// 对抗性独立构造：四要点＋四棵树话术以**自建关键词清单**核在场；J-1 守卫词表（授权/获准/放行）
 // 对**全文小句级**零违规检查（含安装纪律段**段级零命中**）；非空洞验证（内存变异必须被谓词捕获）。
 
 import test from "node:test";
@@ -47,20 +47,24 @@ test("安装纪律四要点在场（自建关键词清单）：仅客户明示/�
   assert.ok(/技能是必读资料、不是权限/.test(section), "④须写明技能是资料不是权限");
 });
 
-test("三棵树话术：确认制要点段列全 docs/su＋docs/contracts＋docs/skills；workflow 不在预置内（反向）", () => {
+test("四棵树话术：确认制要点段列全 docs/su＋docs/contracts＋docs/skills＋docs/mcp；workflow 不在预置内（反向）", () => {
   const clauseStart = T.indexOf("确认制要点：");
   const clauseEnd = T.indexOf("规划纪律（多角色/跨角色工作）");
   assert.ok(clauseStart >= 0 && clauseEnd > clauseStart, "须能定位确认制要点段");
   const seg = T.slice(clauseStart, clauseEnd);
-  assert.ok(seg.includes("`docs/su/**`") && seg.includes("`docs/contracts/**`") && seg.includes("`docs/skills/**`"), "三棵目录树均点名");
-  assert.ok(/写入这三棵目录树\*\*无需逐次确认\*\*/.test(seg), "三棵树免逐次确认话术在场");
+  assert.ok(seg.includes("`docs/su/**`") && seg.includes("`docs/contracts/**`") && seg.includes("`docs/skills/**`") && seg.includes("`docs/mcp/**`"), "四棵目录树均点名");
+  assert.ok(/写入这四棵目录树\*\*无需逐次确认\*\*/.test(seg), "四棵树免逐次确认话术在场");
   assert.ok(seg.includes("**其余一切写盘**"), "其余一切写盘仍须确认（边界钉）");
-  assert.ok(/预置的三棵目录树除外/.test(seg), "按会话生效的范围句含「三棵预置除外」");
+  assert.ok(/预置的四棵目录树除外/.test(seg), "按会话生效的范围句含「四棵预置除外」");
   // 反向：凡含 docs/workflow.md 且涉「预置/预授权」的小句必须是否定式（不在）。
   for (const c of splitClauses(T)) {
     if (c.includes("docs/workflow.md") && /预置|预授权/.test(c)) {
       assert.ok(/不在|不属/.test(c), `workflow 小句不得称预置（须否定式）：${c}`);
     }
+  }
+  // 旧计数防回退负向：两棵/三棵（含三目录）话术逐字不得复现。
+  for (const stale of ["写入这两棵目录树", "写入这三棵目录树", "预置的两棵目录树除外", "预置的三棵目录树除外", "不在预置两目录内", "不在预置三目录内"]) {
+    assert.equal(T.includes(stale), false, `旧话术「${stale}」不得复现`);
   }
 });
 
@@ -84,11 +88,11 @@ test("非空洞验证（变异必须被谓词捕获）：反向断言与守卫�
   assert.equal(guardViolations("本动作已放行。").length, 1);
   assert.equal(guardViolations("不得暗示任何授权。").length, 0, "带否定标记的合法句不误报");
   // 真实文本变异：给「无需逐次确认」句注入阳性「已获授权」——必须被抓。
-  const mutated = T.replace("写入这三棵目录树**无需逐次确认**", "写入这三棵目录树**已获授权**、无需逐次确认");
+  const mutated = T.replace("写入这四棵目录树**无需逐次确认**", "写入这四棵目录树**已获授权**、无需逐次确认");
   assert.notEqual(mutated, T, "变异点须真实存在（防漂移）");
   assert.ok(guardViolations(mutated).length >= 1, "变异必须被守卫谓词捕获");
   // 反向断言变异：把 workflow 否定句改成肯定——self guard 必须抓到。
-  const mutatedWf = T.replace("`docs/workflow.md` 不在预置三目录内", "`docs/workflow.md` 也在预置三目录内");
+  const mutatedWf = T.replace("`docs/workflow.md` 不在预置四目录内", "`docs/workflow.md` 也在预置四目录内");
   assert.notEqual(mutatedWf, T, "workflow 变异点须真实存在");
   const wfViolation = splitClauses(mutatedWf).filter((c) => c.includes("docs/workflow.md") && /预置/.test(c)).some((c) => !/不在|不属/.test(c));
   assert.equal(wfViolation, true, "workflow 肯定式变异必须被反向谓词捕获");

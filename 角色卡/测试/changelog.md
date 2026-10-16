@@ -1,5 +1,40 @@
 # 测试 变更记录
 
+## 2026-10-16 — G-4 V2（su 安装外来 MCP 全链）独立验证：整体通过（0 不通过 / 6 备注）
+
+**范围**：契约与读取器（`InstalledMcpServerV1`＋`mcp-declarations.ts`）、Service 接线（`providerFor` 按角色注入）、工具面（`install_mcp`/`uninstall_mcp`）、编排（第四棵树 `docs/mcp`＋能力位透传仅 su）、门禁卡文本（MCP 安装纪律段＋J-1 守卫全检）、桌面 handler（`applyMcpChange` 护栏/三态/系统行/诊断）、Claude P1（hook 五条件＋env 收窄启动器）、Codex P2（单条 root map＋三处名字集恰等＋`mcpToolCall` 映射）、Pi P3（前缀判据×2 同源＋tools-only＋自持 transport＋dispose 收口）、桌面UI 复用、范围审计（stdio 限定/名拒/零二次卡/诚实面/探针纯本地）。
+
+**方法**：对抗性独立构造、不复用实施方断言——自建 `test/测试/g4v2-mcp-verify/`（11 测试文件＋3 夹具）**64 例全绿**（真实临时项目盘＋可控 SessionManager 假件＋自建假 Claude SDK/假 Codex 引擎/自建 Pi stdio 夹具 server＋真实 launcher 子进程＋真实 Pi SDK faux 模型＋自写 mini TOML 解析器做转义往返）。复跑证据：实施方 V2 六文件 72/72；翻转钉子 13 文件 223/223；V1 范围⑥钉 7/7；真 CLI 复跑两枚（Claude installed-loopback exit 0、Codex native-probe exit 0）——均零真实网关请求。全量 **1998/1997/0红/1skip**（基线 1934/1933/0/1＋64）、typecheck 0；V2 面冻结 **82 条目**开工/收工逐字节一致（两次复算）。备注 6 条（并发非 V2 面、`CAN_USE_TOOL_SHADOWED` 提示、schema 占位符互核、系统子类符号更名、Codex 碰撞判据大小写敏感、空 name 文案小瑕）与未验边界见报告。详见[报告](docs/change/2026-10-16_change_g4v2-mcp-install-independent-verification.md)与[证据](docs/change/2026-10-16-g4v2-verification-evidence/)。未 commit/push。
+
+## 2026-10-16 — G-4 V2（MCP 安装）落树后：名下钉子翻新（三→四棵机械同步＋预授权/零实施两处行为翻转）
+
+**来源**：G-4 V2（MCP 安装）全链实施已落树（合同/读取器/Service/工具/桌面 handler/三适配器 P1-P3/卡文本四棵；批准件＝PM 记录 V2 裁定「按推荐批准，开始实施」与各属主回交）。V2 落树使本角色名下 8 条旧钉转红（371 tests 中 363 pass/8 fail），本轮逐字对表新事实翻新：机械项强度不改（deepEqual/正则/变异锚点等值），行为项按批准事实翻转（非放宽）。边界：只写 `test/测试/**` 与本角色文档；未碰产品文件与探针；**未 commit**。
+
+### 同步清单（断言 → 旧值 → 新值 → 依据）
+
+**A. 机械 三→四棵**（依据：V2 第四棵，`run-role.ts:984` 实况 `SU_PREAUTHORIZED_WRITE_DIRS = [… "docs/mcp"]`）
+1. `g1-copy-and-nails.test.ts` :26/:31 — deepEqual `["docs/su","docs/contracts","docs/skills"]` → 追加 `"docs/mcp"`（用例名「恰为三棵」→「恰为四棵」）。
+2. 同文件 :49 — 非空洞变异锚点 `「不在预置三目录内」`→`「不在预置四目录内」`（防漂移与三变体逐一捕获未动）。
+3. 同文件 :103 — 正向短语清单同串替换；:139 口径注释「恰三棵」→「恰四棵」。
+4. 同文件 :111 与 `d-card-guard.test.ts` :66 — **新增**「旧计数防回退负向」：`写入这两棵/三棵目录树`、`预置的两棵/三棵目录树除外`、`不在预置两/三目录内` 六串逐字不得复现。
+5. `d-card-guard.test.ts` — 用例名「三棵树话术」→「四棵树话术」；:55 核查四棵均点名（加 `docs/mcp/**`）；:56 `写入这四棵目录树**无需逐次确认**`；:58 `预置的四棵目录树除外`；:87 变异锚点四棵；:91 变异锚点四目录（含变异目标串）。依据＝V2 卡文本（`boundary-core.ts:160/161/167/174`）。
+
+**B. 行为翻转**（依据：PM 记录 V2 裁定＋门禁引擎/运行时核心/桌面属主回交的落树实况）
+6. `c-preauth.test.ts` — 「docs/mcp 未预授权」翻转为**预授权直写**：①直写矩阵加 mcp 相对/嵌套/绝对三路径（零确认）；④ `docs/mcp/any.md` allowed false→true（免确认）＋前缀负例 `docs/mcp2/any.md`⇒false（段比较）＋零新增确认（asked 仍恰 1）；⑥ 重建后 mcp 仍生效；⑤ 非 su 角色 `docs/mcp/t9.md`⇒false（预授权四棵均不扩散）。
+7. `h-scope-audit.test.ts` 范围① — 「字面量恰为三棵（docs/mcp 未入）」→「恰为四棵（＋docs/mcp）」deepEqual 四元素。
+8. 同文件 范围② — 「MCP V2 零产品实施」（全仓零命中/schema 拒绝/仅注释提及）**翻转为 V2 已实施**四事实：`install_mcp`/`uninstall_mcp` 工具名常量＋maker 在位且 schema 可描述（原 `assert.throws` 翻转）；`docs/mcp` 并入预授权且被声明读取器消费（`mcp-declarations.ts` `MCP_REL = "docs/mcp"`）；三适配器装配 `installedMcpServers`（claude/codex/pi-real-adapter）＋服务层 `listInstalledMcpServers` 注入；能力位仅 su（编排 `suppressHandback` 判据＋桌面 `role.builtIn === true` 两注入判据）。
+
+### 扫描范围与遗漏排查
+
+- 全量扫 `test/测试/**`（`两棵|两目录|三棵|三目录|零实施|零命中|未预授权|V2 另议|install_mcp|uninstall_mcp|docs/mcp`）：V2 旧钉仅命中上述两文件（已全翻新）；`g2/g3-verify/scope-audit` 的「零实施」属看护/G3 域（非 MCP），核对后未改；残留扫描 0 意外命中（仅新增的防回退负向清单两处）。
+- 探针（`.probe.ts`）未碰——范围⑥ 既有零引用审计继续全绿。
+
+### 复跑（本角色独立执行）
+
+- `node --test "test/测试/**/*.test.ts"` → **371 pass / 0 fail / 0 skip**（改前 363/8；8 红如上述清单逐条归因、全部本轮回绿，无他域新红）。
+- `node --test "test/**/*.test.ts"`（全量）→ **1934 tests：1933 pass / 0 fail / 1 skip**（唯一 skip＝`test/门禁引擎/resolve-write.test.ts:173` 既有 Windows-only；单独复跑该文件 21 pass/1 skip 确认非本轮引入）。
+- `npm run typecheck` → **0 错**（tsc --noEmit）。
+
 ## 2026-10-16 — G-4 V1（su 技能安装全链）＋ cleanPatterns 轻修：独立验证**整体通过**（0 不通过、5 备注）
 
 **来源**：PM 派发「独立验证轮」（V1 全链＋cleanPatterns 轻修＋范围审计＋冻结绑定）。本角色**独立构造**自建用例套件 `test/测试/g4-skill-verify/`（9 测试文件＋2 夹具，**51 例全绿**；对抗性构造、不复用实施方断言）；报告 [2026-10-16_change_g4-skill-install-and-cleanpatterns-independent-verification.md](docs/change/2026-10-16_change_g4-skill-install-and-cleanpatterns-independent-verification.md)，证据 `docs/change/2026-10-16-g4-verification-evidence/`。边界：只写 `test/测试/**` 与本角色文档；未碰产品文件与探针脚本；未 git 提交；零真实网关请求。

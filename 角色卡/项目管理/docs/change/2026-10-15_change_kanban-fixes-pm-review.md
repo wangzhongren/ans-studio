@@ -135,6 +135,22 @@ status: approved-implementation-dispatched
 - **三平台 P0 探针结论（V2 输入要点）**：Claude——spawn 成立但**子进程 env 未收窄**（含网关凭据，V2 必修为自持收窄）；`mcp_server.source="dynamic"`（放行判据以此为准）；hook-allow 后 `canUseTool` 不被咨询（`:239` 无需动）；首轮等待受 CLI 内部 ~27s 界。Codex——连续 `-c` 同根键**覆盖非合并**（定义与禁用集须编入单条）；namespace 桥＋`mcpToolCall` item 形状定格；ANS 姿态下白名单 server 需 `default_tools_approval_mode:"approve"` 才可执行、零审批请求；env 无全量继承（三平台中安全）。Pi——`bindExtensions` 接通＋治理回归钉住；**`dispose()` 不收回 MCP 子进程（V2 必做）**；放行判据草案（前缀式，快照式实测误伤）；自持传输收窄实证（91→3 键）。
 - **下一步**：独立验证轮（已派：V1 全链＋cleanPatterns 轻修＋范围审计＋冻结绑定）→ 提交入 main → **V2 分批呈批**（用探针结论回填产品提案 §五占位后按平台呈裁）。
 
+## 客户批准（2026-10-16）：「按推荐批准，开始实施」＝V2（MCP 安装）分批实施
+
+- **四项裁定全采纳**：①Pi 资源工具三名 V1 不接（限 tools-only）；②server 名含特殊字符**直接拒绝安装**（防清洗碰撞，名仅 `[A-Za-z0-9_-]`）；③HTTP/OAuth 型 V1 **只接 stdio**；④分期 P1 Claude→P2 Codex→P3 Pi（可并行实施、验证分批）。批准件＝产品提案 revision 2（§五已回填探针结论）。
+- **V2 wave A 派发（契约/独立面并行）**：运行时核心（契约：`InstalledMcpServerV1`[stdio：name/command/args/env 引用式、值不出文件]＋`InstallMcpFn`/`UninstallMcpFn`＋回执[沿 InstallSkillReceipt 体格；path＝`docs/mcp/<name>.md`、digest＝声明文件 sha256]＋`GovernedToolsOptions.installMcp?/uninstallMcp?`＋`RuntimeProviderOptions.installedMcpServers?`；**声明读取器单一来源** `src/common/runtime-core/mcp-declarations.ts`（`readMcpDeclaration`/`listInstalledMcpServers`，坏件防御）；**Service 接线**（providerFor 按角色注入、坏件跳过）；schema 两工具[能力级授予如实文案]；tools 两 maker）；编排（**预授权第四棵树 `docs/mcp`**＋话术同步）；门禁引擎（卡文本增 MCP 安装纪律段：能力级授予如实/先落盘再激活/卸载下次会话摘除且已发生副作用不可撤，J-1 避让）；桌面UI（MCP 使用/安装行渲染最小确认面）。
+- **V2 wave B（待 A 落盘）**：编排（能力位透传链点亮两工具）；桌面窗口（MCP handler，沿技能 handler 同构）；三适配器（**P1 Claude**：hook 放行[source="dynamic"]＋审计两行＋status 行＋env 收窄方案定实；**P2 Codex**：白名单化＋单条 root map＋名字集恰等＋`mcpToolCall` 映射＋`default_tools_approval_mode:"approve"`；**P3 Pi**：扩展接入＋bindExtensions＋前缀判据＋自持 transport＋dispose 收口）。
+- 完成后：独立验证（按平台分批）→ 提交 → 随运行包发布。
+
+## 候选 G-5「推理与推理强度」（2026-10-16 客户提出，已派细化）
+
+- **客户原话**：「你这个需要支持推理，需要支持推理强度。」
+- **PM 现状核（2026-10-16）**：Pi 路径模型响应**已有 thinking 块**（G-3 探针实证）但 ANS 观察面只取白名单字段⇒**不呈现**；Claude 路径 `queryOptions` **零 thinking 配置**（SDK 支持面未接线）；Codex 路径**无 `model_reasoning_effort` 配置面**（走 CLI 默认）；设置面（`RUNTIME_SETTINGS`）仅凭据/地址/模型/上下文窗口——**无推理强度字段**。`forceAdaptiveThinking:false`（Pi compat 收窄）为请求格式安全值，与「能否请求推理」待评估区分。
+- **三件配套**：①三平台推理请求接线（Claude thinking 选项／Codex reasoning effort 键／Pi thinking 级）；②推理强度档位（设置面板落位、档位语汇与默认口径）；③思考内容的聊天呈现（现状仅「正在思考」指示、无内容）。
+- **派发**：产品（设计提案：档位与默认、设置面落位、呈现形态、按角色覆写候选）＋运行时核心（跨平台机制评估：三 SDK 实据、配置注入面、事件面事实、探针清单——loopback 可决项与需客户真网关项分列）；经 PM 评审后呈客户批准。
+- **两文档交回与 PM 评审（2026-10-16）**：产品 `角色卡/产品/docs/design/2026-10-16_design_reasoning-and-effort.md`（322 行）＋运行时核心 `角色卡/运行时核心/docs/fix/2026-10-16_assess_reasoning-and-effort.md`（255 行，逐处行级实证）。**关键发现：Pi 现状已在隐式请求推理**（缺省 thinkingLevel=medium ⇒ 每轮 `budget_tokens:8192`＋max_tokens 抬升；thinking 块在 `real-adapter.ts:796-810` 丢弃）；Claude `Options.thinking`/`Options.effort` 现成、块在 `claude/session.ts:361` 丢弃；Codex pinned 0.162.1 确有 `model_reasoning_effort`（目录值 low/medium/high/xhigh/max/ultra，无 off/minimal；config 层不校验）＋完整 `item/reasoning/*` 事件面（适配器现忽略）。`forceAdaptiveThinking:false` 语义澄清＝不伪造 adaptive 形态、推理照发（非禁用）。建议字段：`reasoningEffort?: "off"|"low"|"medium"|"high"|"xhigh"`＋三 env 键（走 runtime-settings 面板链）。探针 A 组（loopback）＋B 组（客户真网关）分列；首要风险 R1＝Pi 预算抬升×上下文钳制可产非法组合（A5 先行定格）。
+- **PM 批准简表已呈客户**：档位六档（默认/关/低/中/高/极高；Codex 无「关」⇒该选项灰置如实）；未设＝逐字现状；每平台一字段；呈现＝折叠行「已思考 N 秒 ▸」（默认折叠含运行中，展开零丢失）；生效＝新会话生效/在跑不打断；按角色覆写 V1 不做（登记）；降级链＝网关拒有界一次去参数重发＋如实一行；计费如实（思考计入输出 tokens）；实施序＝A 探针→契约＋接线→独立验证→B 探针（客户）→随运行包。
+
 ## 候选 G-4「角色能力安装（技能＋MCP）」（2026-10-16 客户讨论提出，已派细化）
 
 - **客户原问**：「这个 su 应该有个工具，可以给其他的角色安装 mcp……或者安装技能」。

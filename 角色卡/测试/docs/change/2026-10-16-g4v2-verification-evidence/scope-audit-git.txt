@@ -1,0 +1,16 @@
+## app/renderer 改动清单（应为零）
+(end)
+
+## 全仓 install_mcp/uninstall_mcp 命中（src/app，非测试）
+"src/common/\351\227\250\347\246\201\345\274\225\346\223\216/boundary-core.ts":104: * 绝不写入文件——再调 `install_mcp`/`uninstall_mcp`；工具自己不写盘）＋**诚实告知口径**（三平台
+"src/common/\351\227\250\347\246\201\345\274\225\346\223\216/boundary-core.ts":222:  "**凭据值与一切秘密的值绝不写入文件**（只记 `env:NAME` 引用；值由客户在本机环境提供）——**再**调 `install_mcp`/`uninstall_mcp`；",
+"src/common/\351\227\250\347\246\201\345\274\225\346\223\216/boundary-core.ts":228:  "卸载＝**先改声明**（从适用角色列表移除该角色条目、或置 `status: uninstalled`）**再**调 `uninstall_mcp`——**下次会话摘除**（在跑不打断）；",
+src/pipeline/orchestration/run-role.ts:419:     * **G-4 V2 MCP 安装能力（工具 `install_mcp`「注入才注册」）**——**只对治理角色会话（su）
+src/pipeline/orchestration/run-role.ts:428:     * **G-4 V2 MCP 卸载能力（工具 `uninstall_mcp`「注入才注册」）**——**只给 su**（同上一判据）。
+src/pipeline/orchestration/run-role.ts:582:  // 误给也不注入（`install_mcp`/`uninstall_mcp` 不注册）。字段名**逐字**＝契约家能力名（错一名 ⇒
+
+## SKILL_INSTALL_SYSTEM_PREFIX 旧符号引用（应为零）
+(zero)
+
+## 真实网关字面量（V2 涉及面：src/app 的新增行）
+(zero)

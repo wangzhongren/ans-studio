@@ -1,5 +1,15 @@
 # 产品 变更记录
 
+## 2026-10-16 — G-5（推理与推理强度）细化提案
+
+按 PM 评审批次的派发行（来源：项目管理 `docs/change/2026-10-15_change_kanban-fixes-pm-review.md` §「候选 G-5『推理与推理强度』」，客户原话「你这个需要支持推理，需要支持推理强度。」）新增[设计提案](docs/design/2026-10-16_design_reasoning-and-effort.md)。
+
+**做了什么**：只读调研四条承载线并成文——①设置面与生效链（`RUNTIME_SETTINGS` 元数据体格＝key/label/required/secret/fallbackKeys/help、保存白名单过滤＋URL 键校验先例、应用级 `.env`（开发=仓库根/打包=userData，非按项目非按角色）、会话构造应用点、O-1「运行时配置」陈旧重建收敛、`applicationLabel` 三态文案、面板主区+高级区形态）；②三平台推理请求面现状（Claude `queryOptions` 零 thinking 配置；Codex 无 `model_reasoning_effort`、`-c` 注入与 `effectiveConfig` 回读校验先例；Pi `forceAdaptiveThinking:false` 收窄注释群）＋SDK 类型面只读登记（Claude `EffortLevel low/medium/high/xhigh/max`、`ThinkingConfig adaptive/enabled/disabled`、thinking 显示模式 `summarized/omitted/highlights`；Pi `ThinkingLevel minimal/low/medium/high/xhigh/max`＋`off`）；③思考内容呈现面（Pi thinking 块 G-3 探针实证存在但 `extractMessageText` 白名单丢弃、Codex `item/completed` 只映射三类、Claude 零接线；`SessionEvent.kind` 冻结集合）；④可复用承载件（工具行折叠状态机三规则＋锚点零位移＋批尾落地；`[系统·]` 行口径；核心投影单点；截断补发如实行先例；脱敏/预算链）。
+
+**核心设计结论**：①**档位语汇**＝默认（不设置）/关/低/中/高，「极」档（xhigh/max 更高层）列待评估回填；「关」（显式请求不思考）与「默认」（零参数）必须两分；档位映射表全留**占位待运行时核心评估回填**。②**默认口径**＝未设逐字现状（零参数、零行为变化、零新增失败面）、客户显式选才生效——推荐确认。③**落位**＝**每平台一字段**（沿 `RUNTIME_SETTINGS` 体格增补；推荐，理由＝面板本就按引擎打开、诚实面可逐平台写支持集、与「模型」字段三键先例同构）；全局单字段仅对照。④**按角色覆写**＝登记不承诺（候选 A `.ans/project.json` 扩展/B 新项目内文件/C 角色卡 frontmatter 不推荐/D 推荐 V1 不做）；与 G-4 安装工具面**无关**（配置面属设置链）。⑤**呈现形态推荐②折叠行**（「已思考 N 秒 ▸」默认折叠、点击展开原文纯文本、信息零丢失、视觉低调）：运行中**默认折叠**（与工具行默认展开的刻意差异＋理由）、手动开合优先、轮结束定型、批尾落地、锚点零位移——全套复用工具行折叠机制；**不进工具组、不加 `[系统·]` 前缀**；时长只在有真实信号时显示（不发明时间）；平台内容不可得时如实（「内容由平台省略」类）；三平台内容可达性**占位待评估回填**（Claude 显示模式面已是直接输入）。⑥**生效语义**＝保存即写 `.env`＋既有三态文案如实；新会话生效、已开空闲会话经既有陈旧重建 settle 收敛（无需手动）、在跑不打断；不含热生效承诺；手编 .env 坏值按未设＋诊断（不拒开会话）。⑦**失败面**＝**不毁轮次**（沿 G-4 先例）：网关拒绝推理参数 ⇒ **有界恰一次「去参数重发」**＋如实一行＋诊断；识别判据保守优先（待评估＋探针分列）；绝不静默/绝不循环/绝不改判定。
+
+**边界与状态**：提案完成、**未实施/未测试**；三平台机制细节（请求接线/档位映射/内容可达性/错误识别）为占位（运行时核心并行评估回填后由 PM 汇总呈裁）。实施归属建议（I1–I8 见 §九）与 11 个未决点见 §十一。写集仅本角色设计文档、feature-map、memo、本文件；未改 `app/`、`src/`、`test/`、其他角色文件与证据目录（V2 独立验证轮在飞，`test/测试/**` 未触碰），未操作真实项目与轮次目录，未 git 提交。
+
 ## 2026-10-16 — G-4 §五回填（MCP：评估＋三平台 P0 探针逐项定格）
 
 按 PM 派发（客户已批「V2 口径＋P0 探针轮」），把[设计提案](docs/design/2026-10-16_design_role-capability-install.md) §五 MCP 占位以运行时核心评估＋三平台 P0 探针结论回填（revision 2）——供 PM 汇总呈客户批准 V2 分批实施。

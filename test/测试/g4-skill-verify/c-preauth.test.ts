@@ -2,11 +2,11 @@
 //
 // 对抗性独立构造：**经 `openRoleSession` 真实装配**捕获 gate（与 implementer 的 governCommand/CLI
 // 入口不同的路径：会话式入口），自建项目夹具（创世态 su / 普通项目角色 X），直接对 gate 做矩阵探测：
-// ① docs/skills 树内免确认直写（含子路径/绝对路径）；
+// ① docs/skills 与 docs/mcp 树内免确认直写（含子路径/绝对路径）；
 // ② 树外仍 F4 拒 → 经确认发行后才放行（被拒在确认之前，逐条确认语义未变）；
 // ③ 前缀负例（docs/skills2 / docs/skill）与 `..` 归一穿越不在预授权内；
-// ④ docs/mcp 未预授权（H 域范围审计的行为侧）；
-// ⑤ 非 su 角色不变；⑥ 重建后仍有效。
+// ④ docs/mcp 已并入预授权（V2 第四棵——旧「未预授权」断言已翻转，含零新增确认与 docs/mcp2 前缀负例）；
+// ⑤ 非 su 角色不变（docs/mcp 同样不扩散）；⑥ 重建后仍有效。
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -66,7 +66,7 @@ function projectWithRole(root: string): ProjectConfig {
   };
 }
 
-test("su 预授权矩阵：docs/skills 树内免确认直写；树外/前缀负例/穿越注释拒绝；docs/mcp 未预授权", async () => {
+test("su 预授权矩阵：docs/skills 与 docs/mcp 树内免确认直写；树外/前缀负例/穿越注释拒绝", async () => {
   const { root } = await makeTempProject();
   const asked: CustomerInputRequest[] = [];
   const switchable = async (req: CustomerInputRequest) => {
@@ -88,6 +88,9 @@ test("su 预授权矩阵：docs/skills 树内免确认直写；树外/前缀负�
       "docs/skills/t1/install.md",
       "docs/skills/a/b/深层.md",
       path.join(root, "docs", "skills", "t1", "SKILL.md"),
+      "docs/mcp/t1.md",
+      "docs/mcp/a/b/嵌套.md",
+      path.join(root, "docs", "mcp", "t1.md"),
     ]) {
       const d = gate(p);
       assert.equal(d.allowed, true, `预授权树内应放行：${p}`);
@@ -110,8 +113,10 @@ test("su 预授权矩阵：docs/skills 树内免确认直写；树外/前缀负�
     assert.equal(gate("docs/skills/../su2/x.md").allowed, false, "「..」归一逃出其外 ⇒ 拒");
     assert.equal(gate("docs/skills/../skills/合法.md").allowed, true, "「..」归一回到树内 ⇒ 按归一后判放行");
 
-    // ④ docs/mcp 未预授权（G-4 裁定①：MCP 树 V2 再议）。
-    assert.equal(gate("docs/mcp/any.md").allowed, false, "docs/mcp 不在预授权三棵之内");
+    // ④ docs/mcp 已并入预授权（G-4 V2 裁定：第四棵）——树内直写零新增确认；前缀负例同技能口径。
+    assert.equal(gate("docs/mcp/any.md").allowed, true, "docs/mcp 已预授权（四棵之内）——免确认直写");
+    assert.equal(gate("docs/mcp2/any.md").allowed, false, "docs/mcp2 不被 docs/mcp 前缀覆盖（段比较）");
+    assert.equal(asked.length, 1, "docs/mcp 直写不触确认通道（零新增卡——与 ② 的恰一次合计）");
 
     await handle.dispose();
 
@@ -122,6 +127,7 @@ test("su 预授权矩阵：docs/skills 树内免确认直写；树外/前缀负�
       { createAdapter: captureAdapter(sink2) },
     );
     assert.equal(sink2.gate!("docs/skills/t2/SKILL.md").allowed, true, "重建后预授权仍生效（新会话同口径）");
+    assert.equal(sink2.gate!("docs/mcp/t2.md").allowed, true, "重建后 MCP 预授权同样仍生效");
     assert.equal(asked.length, 1, "重建后直写仍零新增确认");
     await handle2.dispose();
   } finally {
@@ -143,6 +149,7 @@ test("非 su 角色不变：项目角色写自己的边界可以、写 docs/skil
     // 无 customerInput ⇒ 静态 scope undefined（不收窄到「客户确认才发行」）——按角色边界直判。
     assert.equal(gate("src/X.ts").allowed, true, "项目角色写自己的边界条目照常放行");
     assert.equal(gate("docs/skills/t9/SKILL.md").allowed, false, "docs/skills 不在 X 的边界内 ⇒ 拒（预授权只属 su）");
+    assert.equal(gate("docs/mcp/t9.md").allowed, false, "docs/mcp 同样不属 X（预授权只属 su，四棵均不扩散）");
     assert.equal(gate("docs/su/memo.md").allowed, false, "docs/su 同样不属 X");
     await handle.dispose();
   } finally {

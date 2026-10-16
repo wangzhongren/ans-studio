@@ -1,7 +1,7 @@
 // test/测试/g4-skill-verify/h-scope-audit.test.ts —— G-4 独立验证 H 域：**范围审计**。
 //
-// 独立构造：① 预授权恰三棵（docs/mcp 未入——源码字面量抽取＋C 域行为侧互证）；
-// ② MCP V2 零产品实施（install_mcp 全仓 src/app 零命中；schema 层拒绝；docs/mcp 仅注释提及）；
+// 独立构造：① 预授权恰四棵（docs/su＋docs/contracts＋docs/skills＋docs/mcp——源码字面量抽取＋C 域行为侧互证）；
+// ② MCP V2 已实施（install_mcp/uninstall_mcp 在 src 工具面＋schema 可描述；docs/mcp 预授权且被声明读取器消费；三适配器装配；能力位仅 su）；
 // ③ 安装链零 request_confirmation（源码切片＋真实装配行为侧：全链客户通道零调用）；
 // ④ 无删除原语（工具面集合＋卸载链源码切片＋E 域行为侧互证）；
 // ⑤ 能力位仅 su（桌面注入判据/builtIn；编排 suppressHandback；行为侧项目角色零注册）；
@@ -24,38 +24,45 @@ const read = (rel: string): string => fs.readFileSync(path.join(REPO, rel), "utf
 
 // —————————————————————— ① 预授权范围 ——————————————————————
 
-test("范围①：SU_PREAUTHORIZED_WRITE_DIRS 字面量恰为三棵（docs/su＋docs/contracts＋docs/skills）；docs/mcp 未预授权", () => {
+test("范围①：SU_PREAUTHORIZED_WRITE_DIRS 字面量恰为四棵（docs/su＋docs/contracts＋docs/skills＋docs/mcp）", () => {
   const src = read("src/pipeline/orchestration/run-role.ts");
   const m = src.match(/const SU_PREAUTHORIZED_WRITE_DIRS[^=]*=\s*\[([^\]]*)\]/);
   assert.ok(m, "须能定位预授权常量");
   const dirs = [...m![1].matchAll(/"([^"]+)"/g)].map((x) => x[1]);
-  assert.deepEqual(dirs, ["docs/su", "docs/contracts", "docs/skills"], "预授权恰三棵、顺序与集合固定");
-  assert.equal(dirs.some((d) => d.includes("mcp")), false, "docs/mcp 未入预授权（V2 另议）");
+  assert.deepEqual(dirs, ["docs/su", "docs/contracts", "docs/skills", "docs/mcp"], "预授权恰四棵、顺序与集合固定");
+  assert.equal(dirs.includes("docs/workflow.md"), false, "workflow.md 仍不在预授权内（走规划确认）");
 });
 
 // —————————————————————— ② MCP V2 零产品实施 ——————————————————————
 
-test("范围②：MCP V2 零产品实施——install_mcp/uninstall_mcp 在 src/app 零命中；schema 层未知工具拒绝", () => {
-  const walk = (dir: string): string[] => {
-    const out: string[] = [];
-    for (const entry of fs.readdirSync(path.join(REPO, dir), { withFileTypes: true })) {
-      const rel = `${dir}/${entry.name}`;
-      if (entry.isDirectory()) out.push(...walk(rel));
-      else if (/\.(ts|tsx|js|mjs)$/.test(entry.name)) out.push(rel);
-    }
-    return out;
-  };
-  const productFiles = [...walk("src"), ...walk("app")];
-  const hits = productFiles.filter((f) => /install_mcp|uninstall_mcp/.test(fs.readFileSync(path.join(REPO, f), "utf8")));
-  assert.deepEqual(hits, [], "产品路径不得出现 MCP 安装工具名（V2 未实施）");
-  // docs/mcp 仅注释提及（无任何代码路径写入/解析 docs/mcp）。
-  const mcpPathUsers = productFiles.filter((f) => {
-    const text = fs.readFileSync(path.join(REPO, f), "utf8");
-    return text.split("\n").some((line) => line.includes("docs/mcp") && !/^\s*(\/\/|\*|\/\*)/.test(line.trim()) && !/`docs\/mcp` 未扩/.test(line));
-  });
-  assert.deepEqual(mcpPathUsers, [], "docs/mcp 不得被任何产品代码路径使用");
-  // schema 层：未注册工具名直接拒绝（结构性零注册）。
-  assert.throws(() => describeTool("install_mcp"), /未知 ANS 工具：install_mcp/, "install_mcp 不在 schema（零注册）");
+test("范围②：MCP V2 已实施——install_mcp/uninstall_mcp 在 src（工具＋schema 可描述）；docs/mcp 预授权且被声明读取器消费；三适配器装配；能力位仅 su", () => {
+  // 工具面与 schema：两工具名在场（注入才注册——工具面集合钉见范围④）；已注册 ⇒ 可描述。
+  const tools = read("src/provider/runtime/tools.ts");
+  assert.ok(tools.includes('INSTALL_MCP_TOOL_NAME = "install_mcp"'), "install_mcp 工具名常量在位");
+  assert.ok(tools.includes('UNINSTALL_MCP_TOOL_NAME = "uninstall_mcp"'), "uninstall_mcp 工具名常量在位");
+  assert.ok(tools.includes("function makeInstallMcpTool(") && tools.includes("function makeUninstallMcpTool("), "两工具 maker 在位");
+  for (const name of ["install_mcp", "uninstall_mcp"]) {
+    const d = describeTool(name);
+    assert.ok(typeof d.description === "string" && d.description.length > 0, `${name} schema 可描述（V2 已注册，非未知工具）`);
+  }
+  // docs/mcp 预授权（与范围① 互证）＋声明读取器单一来源。
+  const src = read("src/pipeline/orchestration/run-role.ts");
+  const m = src.match(/const SU_PREAUTHORIZED_WRITE_DIRS[^=]*=\s*\[([^\]]*)\]/)!;
+  const dirs = [...m[1].matchAll(/"([^"]+)"/g)].map((x) => x[1]);
+  assert.ok(dirs.includes("docs/mcp"), "docs/mcp 并入预授权（第四棵）");
+  assert.ok(read("src/common/runtime-core/mcp-declarations.ts").includes('const MCP_REL = "docs/mcp";'), "声明读取器树根＝docs/mcp（单一解析来源）");
+  // 三适配器装配：各自消费注入的 installedMcpServers（服务层按角色读取）。
+  for (const f of ["src/provider/claude/session.ts", "src/provider/codex/session.ts", "src/common/pi-adapter/real-adapter.ts"]) {
+    assert.ok(read(f).includes("installedMcpServers"), `适配器装配 installedMcpServers：${f}`);
+  }
+  assert.ok(read("src/service/runtime/session.ts").includes("listInstalledMcpServers(options.projectRoot"), "服务层按角色读取并注入 installedMcpServers");
+  // 能力位仅 su：编排透传判据＝suppressHandback；桌面注入判据＝role.builtIn === true。
+  assert.ok(/const installMcp = suppressHandback \? input\.installMcp : undefined;/.test(src), "installMcp 透传判据＝suppressHandback（唯一）");
+  assert.ok(/const uninstallMcp = suppressHandback \? input\.uninstallMcp : undefined;/.test(src), "uninstallMcp 同判据");
+  const sess = read("app/desktop/session.ts");
+  for (const [fn, ty] of [["installMcp", "InstallMcpFn"], ["uninstallMcp", "UninstallMcpFn"]] as const) {
+    assert.ok(new RegExp(`const ${fn}: ${ty} \\| undefined =\\s*\\n\\s*role\\.builtIn === true`).test(sess), `${fn} 桌面注入判据＝role.builtIn === true（仅 su）`);
+  }
 });
 
 // —————————————————————— ③ 安装链零 request_confirmation ——————————————————————
