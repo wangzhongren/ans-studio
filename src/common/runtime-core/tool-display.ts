@@ -35,7 +35,12 @@ function cleanPatterns(text: string): string {
     .replace(/\[ANS_INPUT_CONTEXT:[a-f0-9-]{36}\]\n?/gi, '')
     .replace(/\bBearer\s+[^\s,;]+/gi, 'Bearer [REDACTED]')
     .replace(/((?:--)?\b(?:api[_-]?key|access_token|auth_token|oauth_token|password|secret|authorization|cookie)\b\s*(?:[=:]\s*|\s+))("[^"\r\n]*"|'[^'\r\n]*'|"[^\r\n]*|'[^\r\n]*|[^\s,;]+)/gi, '$1[REDACTED]')
-    .replace(/https?:\/\/[^\s<>"']+/gi, value => {
+    // A-base 收窄（2026-10-16 提案 core-cleanpatterns-url-boundary 实施）：排除集追加 CJK 标点块
+    // `　-〿`（　。〈〉「」…）与全角形式块 `＀-￯`（；：，（）？！）——URL 紧贴此类
+    // 标点（无 ASCII 空白）时不再把标点及其后文本一并吞入归一（旧行为＝丢文本 / percent-encode
+    // mojibake）；匹配后的归一处理（剥 userinfo/query/hash）逐字不变，零泄漏口径不放松。ASCII `;`
+    // （如路径参数 jsessionid）不在排除集内，行为保持。
+    .replace(/https?:\/\/[^\s<>"'　-〿＀-￯]+/gi, value => {
       try { const url = new URL(value); url.username=''; url.password=''; url.search=''; url.hash=''; return url.toString(); }
       catch { return '[URL]'; }
     })

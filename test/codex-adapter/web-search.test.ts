@@ -160,6 +160,19 @@ test("search text and result URLs stay redacted and conservatively stripped in r
   assert.equal((row.detail as { results: Array<{ url: string }> }).results[0].url, "https://example.test/page");
 });
 
+test("config.redact shares the tool-display A-base URL boundary: full-width punctuation is no longer swallowed; redaction itself unchanged", () => {
+  // 同批检查（2026-10-16，运行时核心）：与 `cleanPatterns` 同类贪婪模式（同一 `https?://[^\s<>"']+` 类）收窄
+  // ——URL 紧贴全角标点（无 ASCII 空白）时不再把标点及其后文本吞入归一（旧行为：吞入 path/hash 并
+  // percent-encode——诊断文本 mojibake/丢尾）。收窄＝排除集只增全角块，匹配后的归一逐字不变。
+  const redact = settings(options("/fixture", harness()), credentials).redact;
+  assert.equal(redact("https://user:pw@a.test/p?token=秘密#frag）后文"), "https://a.test/p#frag）后文", "userinfo/query 照剥、hash 保留（既有语义）、「）后文」完整");
+  assert.equal(redact("请求 https://user:pw@a.test/p?token=秘密#frag）超时"), "请求 https://a.test/p#frag）超时");
+  // 零泄漏不放松：CJK 查询值 + 全角分隔符紧贴——秘密仍剥除、分隔符后文本完整。
+  assert.equal(redact("https://a.test/x?token=对抗参数-绝不外泄；后文"), "https://a.test/x；后文");
+  // ASCII `;` 路径参数不回归（不在排除集内）。
+  assert.equal(redact("https://a.test/p;jsessionid=abc"), "https://a.test/p;jsessionid=abc");
+});
+
 test("actual native process fixture accepts the web search on-posture and completes a governed turn", async t => {
   const fixture = fileURLToPath(new URL("./fixtures/native-cli.mjs", import.meta.url));
   const originalSpawn = childProcess.spawn;

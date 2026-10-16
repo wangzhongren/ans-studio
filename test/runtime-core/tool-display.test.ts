@@ -109,3 +109,54 @@ test('F-8-a re-projection keeps exitCode and timedOut through the persisted-even
   assert.equal(detail(timedAgain).display?.process?.timedOut,true);
   assert.equal(detail(timedAgain).display?.process?.signal,'SIGTERM');
 });
+
+test('cleanPatterns URL boundary (A-base): reproduction turns positive — 2nd title, entry-cap suffix and bracket tail stay complete',()=>{
+  const c=createToolDisplayContext();
+  // ① 复现转正（提案 §二 逐字复现行）：`；` 紧贴 URL ⇒ 修复前第 2 条起标题被吞；修复后逐字完整、URL 归一不变。
+  const repro=c.protectText('查询「独立对抗查询-ZX9」 → 2 条结果：独立标题-ALPHA — https://verify.test/entry?token=对抗参数-绝不外泄#frag；独立标题-BETA — https://verify.test/beta',16384);
+  assert.equal(repro.text,'查询「独立对抗查询-ZX9」 → 2 条结果：独立标题-ALPHA — https://verify.test/entry；独立标题-BETA — https://verify.test/beta','第 2 条起标题完整、两条 URL 均已归一（剥 query/hash）');
+  assert.equal(repro.text.includes('独立标题-BETA'),true);
+  assert.equal(repro.text.includes('对抗参数-绝不外泄'),false,'URL query 秘密仍剥除（零泄漏不放松）');
+  assert.equal(repro.text.includes('#frag'),false,'URL fragment 仍剥除');
+  assert.equal(repro.text.includes('%EF%BC'),false,'无 mojibake');
+  assert.equal(repro.redacted,true,'URL 归一仍在发生 ⇒ redacted 如实标注');
+  assert.equal(repro.truncated,false);
+  // ② 条目上限后缀 `；…（共 N 条）` 完整（修复前被吞入 path 并 percent-encode）。
+  const suffix=c.protectText('独立标题-ALPHA — https://verify.test/a；独立标题-BETA — https://verify.test/b；…（共 20 条）',16384);
+  assert.ok(suffix.text.includes('https://verify.test/b；…（共 20 条）'),'上限后缀完整悬于 URL 之后');
+  assert.equal(suffix.text.includes('%EF%BC'),false);
+  assert.equal(suffix.text.includes('%E2%80%A6'),false);
+  // ③ 括号后文完整（修复前 `）后文` 被吞入 path）。
+  const bracket=c.protectText('（https://a.test/x）后文',16384);
+  assert.equal(bracket.text,'（https://a.test/x）后文');
+  assert.equal(bracket.redacted,false);
+});
+
+test('cleanPatterns URL boundary (A-base): adversarial zero-leak battery — CJK query values stay stripped across full-width separators',()=>{
+  const c=createToolDisplayContext();
+  const secret='对抗参数-绝不外泄';
+  const encoded=encodeURIComponent(secret);
+  for(const separator of ['；','）','。','，','：']){
+    const value=c.protectText(`https://verify.test/entry?token=${secret}#frag${separator}后文`,16384);
+    assert.equal(value.text.includes(secret),false,`秘密不得泄漏（分隔符 ${separator}）`);
+    assert.equal(value.text.includes(encoded),false,`秘密不得以 percent-encoded 形式出现（分隔符 ${separator}）`);
+    assert.equal(value.text,`https://verify.test/entry${separator}后文`,`分隔符后文本完整（${separator}）`);
+  }
+  // 裸 URL 对照（无紧贴文本）：归一逐字不变。
+  const bare=c.protectText(`https://verify.test/entry?token=${secret}#frag`,16384);
+  assert.equal(bare.text,'https://verify.test/entry');
+  assert.equal(bare.text.includes(secret),false);
+});
+
+test('cleanPatterns URL boundary (A-base): ASCII semicolon path params stay inside the URL; redacted/truncated markers unchanged',()=>{
+  const c=createToolDisplayContext();
+  // 不回归：ASCII `;` 不在排除集内（如 jsessionid 路径参数）与常行文本逐字保留。
+  const jsession=c.protectText('见 https://a.test/p;jsessionid=abc 后文',16384);
+  assert.equal(jsession.text,'见 https://a.test/p;jsessionid=abc 后文','ASCII `;` 路径参数完整保留在 URL 内');
+  assert.equal(jsession.redacted,false);
+  // 标记语义不变：URL 归一如实标 redacted、不标 truncated（复现行）；截断照旧标 truncated。
+  const trim=c.protectText('前缀'.repeat(100)+' https://u:p@host/path?q=secret#frag',64);
+  assert.equal(trim.truncated,true);
+  assert.equal(trim.redacted,true,'URL 剥除先于截断 —— redacted 与 truncated 各自如实');
+  assert.equal(trim.text.includes('secret'),false);
+});

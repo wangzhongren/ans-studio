@@ -41,7 +41,11 @@ export function settings(options: RuntimeProviderOptions & { webSearch?: boolean
   const redact = (input: unknown): string => {
     let result = input instanceof Error ? input.message : String(input);
     for (const secret of [...new Set(secrets)].sort((a, b) => b.length - a.length)) result = result.split(secret).join("[REDACTED]");
-    result = result.replace(/https?:\/\/[^\s<>"']+/g, matched => {
+    // 与 tool-display `cleanPatterns` 同口径 A-base 收窄（2026-10-16 同批检查：确为同类贪婪模式——
+    // 同一 `https?://[^\s<>"']+` 类，URL 紧贴全角标点（无 ASCII 空白）时吞其后文本；收窄＝排除集只增
+    // CJK 标点块　-〿与全角形式块＀-￯，匹配范围只紧不松）。URL 紧贴全角标点时不再吞其后文本（诊断
+    // 文本防丢尾/mojibake）；匹配后的归一处理（剥 userinfo/query）逐字不变。
+    result = result.replace(/https?:\/\/[^\s<>"'　-〿＀-￯]+/g, matched => {
       try { const address = new URL(matched); address.username = ""; address.password = ""; address.search = ""; return address.toString(); } catch { return "[URL]"; }
     });
     return result;
