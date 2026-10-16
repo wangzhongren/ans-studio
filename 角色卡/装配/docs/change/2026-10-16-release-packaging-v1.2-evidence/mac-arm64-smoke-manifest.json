@@ -1,0 +1,88 @@
+{
+  "sourceRef": "v1.2.0",
+  "sourceSha": "ecca2d38500c8626cf2833eecb9d85d59f26c680",
+  "overlaySha": "7296527b226478e57977e209763e05402994bc1c",
+  "actualTree": "c64e7d2f00c250fc965b9d8a6e1d9cb49c2c063b",
+  "overlayPaths": [
+    ".github/workflows/release.yml",
+    "package-lock.json",
+    "package.json",
+    "src/common/装配/release-policy.d.mts",
+    "src/common/装配/release-policy.mjs",
+    "test/装配/release-packaging.test.ts"
+  ],
+  "overlayPatchSha256": "e87fb1f3116f533354f474e06e5be562a5680d40b3030a0d0608294f26aa4965",
+  "excludedChanges": [
+    "README.md",
+    "角色卡/装配/changelog.md",
+    "角色卡/装配/docs/change/2026-10-16-release-packaging-v1.2-evidence/SHA256SUMS-darwin-arm64.txt",
+    "角色卡/装配/docs/change/2026-10-16-release-packaging-v1.2-evidence/full-suite-local.txt",
+    "角色卡/装配/docs/change/2026-10-16-release-packaging-v1.2-evidence/mac-arm64-smoke-manifest.json",
+    "角色卡/装配/docs/change/2026-10-16-release-packaging-v1.2-evidence/package-mac-arm64.log.txt",
+    "角色卡/装配/docs/change/2026-10-16-release-packaging-v1.2-evidence/sim-provenance.json",
+    "角色卡/装配/docs/change/2026-10-16-release-packaging-v1.2-evidence/test-assembly.txt",
+    "角色卡/装配/docs/change/2026-10-16-release-packaging-v1.2-evidence/typecheck.txt",
+    "角色卡/装配/docs/change/2026-10-16-release-packaging-v1.2-evidence/verify-mac-arm64.log.txt",
+    "角色卡/装配/docs/change/2026-10-16_change_v1.2-release-packaging.md",
+    "角色卡/装配/docs/feature/desktop-release-packaging.md",
+    "角色卡/装配/feature-map.md",
+    "角色卡/装配/memo.md",
+    "角色卡/项目管理/docs/change/2026-10-15_change_kanban-fixes-pm-review.md"
+  ],
+  "platform": "darwin",
+  "arch": "arm64",
+  "node": "v24.14.0",
+  "npm": "11.9.0",
+  "lockSha256": "32741fcddd8a84e9e4eb063b6448c172758181be5eb7f6d5b53773d93f60eb0b",
+  "builder": "26.15.3",
+  "startedAt": "2026-10-16T09:15:12.308Z",
+  "finishedAt": "2026-10-16T09:15:13.074Z",
+  "unsigned": true,
+  "smoke": {
+    "ok": true,
+    "isPackaged": true,
+    "arch": "arm64",
+    "platform": "darwin",
+    "version": "1.2.0",
+    "envPath": "/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-packaged-smoke-CbgJJ9/home/userdata/.env",
+    "checks": {
+      "dom": true,
+      "preload": true,
+      "ipc": true,
+      "importDisabled": true,
+      "missingConfiguration": true,
+      "settings": true,
+      "envPathMatches": true
+    },
+    "missingKeys": {
+      "pi": [
+        "ANTHROPIC_AUTH_TOKEN",
+        "ANS_PI_BASE_URL",
+        "ANS_PI_MODEL"
+      ],
+      "codex": [
+        "CODEX_API_KEY",
+        "ANS_CODEX_MODEL"
+      ],
+      "claude": [
+        "ANTHROPIC_API_KEY"
+      ]
+    }
+  },
+  "nativeDependencies": {
+    "sdkImports": "PACKAGED_SDK_IMPORTS_OK",
+    "codexVersion": "codex-cli 0.162.1",
+    "claudeVersion": "2.1.299 (Claude Code)"
+  },
+  "process": {
+    "code": 0,
+    "signal": null,
+    "stdout": "",
+    "stderr": ""
+  },
+  "artifact": {
+    "file": "ANS-Studio-1.2.0-mac-arm64.zip",
+    "size": 405066956,
+    "sha256": "4291d00c4bf9f20e9ece438c5d1778b70288993d61509aa6afddfe2960da333a"
+  }
+}

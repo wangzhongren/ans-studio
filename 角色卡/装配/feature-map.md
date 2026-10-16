@@ -15,7 +15,7 @@ CLI 四运行时的当前接线见 [稳定功能说明](docs/feature/cli-runtime
 | 演示运行时与运行时接线（`src/common/装配/demo-runtime.ts`、`runtime.ts`） | role run 默认 demo、govern 默认 Pi；显式 flag/env 可选 demo/Pi/Codex/Claude，选定引擎失败不降级；类型引用统一 Model，枚举引用共享实现 | 自有启动与真实核心接线已验证 | [当前功能](docs/feature/cli-runtime-assembly.md)、[原证据](docs/change/2026-10-14_change_multi-runtime-assembly.md) |
 | 构建与测试配置（`package.json`、`tsconfig.json`） | 包定义、依赖与脚本（`start` / `doctor` / `demo` / `app` / `test:assembly` / `typecheck`）；TS 编译配置（strict、`noEmit`、`nodenext`，覆盖 `src` / `test` / `app`）；类型门禁由「空承诺」改为真跑 | 已实现（typescript 7.0.2） | [README](../../README.md)（快速开始 / 两道门）、[changelog](changelog.md)（2026-10-11 类型门禁条目） |
 | 两道门（交付前必过） | ① 全量 `node --test "test/**/*.test.ts"`（**必须带引号**，走 Node glob、覆盖三层路径）② `npm run typecheck`——本角色每次交付的验证基线 | 已建立 | [README](../../README.md)（两道门） |
-| 装配测试（`test/装配/`，10 文件 70 例） | 启动冒烟与接线测试：命令解析、govern 注入、`.ans` 载入、入口收敛、演示运行时、发布 overlay 与集合校验合约 | 70/70（2026-10-16 发布配方批；历史 67/67 见记录） | [test/装配/](../../test/装配/) |
+| 装配测试（`test/装配/`，10 文件 71 例） | 启动冒烟与接线测试：命令解析、govern 注入、`.ans` 载入、入口收敛、演示运行时、发布 overlay 与集合校验合约 | 71/71（2026-10-16 v1.2.0 发布配方批；历史 70/70、67/67 见记录） | [test/装配/](../../test/装配/) |
 | README（安装与使用说明） | 新用户从下载、导入与配置到任务验收的使用路径，附开发入口与实际限制 | 2026-10-15 按读者任务重写，链接与命令文档核对通过 | [README.md](../../README.md)、[本次重写](docs/change/2026-10-15_change_readme-reader-flow.md)、[历史核对](docs/change/2026-10-14_change_readme-multi-runtime-desktop.md) |
 | `.env` / `.env.example`（本角色归属） | 仓库根环境配置：凭据只落 `.env`（已 gitignore）、示例只含占位符；读写唯一实现＝共享组件 `env-file.ts`（pm 属主；本角色为指定写入者，记档 G-2） | 已实现 | [共享组件目录](../项目管理/docs/architecture/shared-components.md) |
 | `.ans/`（条件目录 `project-init`） | 项目初始化产物写权（`.ans/project.json`：角色表、治理边界与接受证据的 SHA-256 pin）；条件目录——写入须在 TaskScope 声明条件，否则门禁按「命中条件目录但缺少条件」拒绝 | 已登记（Governance 授权、客户批准） | [Section 1 授权记档](../项目管理/docs/change/2026-10-11_change_governance-section1-grants.md) |
@@ -27,4 +27,4 @@ CLI 四运行时的当前接线见 [稳定功能说明](docs/feature/cli-runtime
 - 用户可操作的系统功能属于各能力角色，见各自 `角色卡/<角色>/feature-map.md`（与装配接线最相关的：[编排](../编排/feature-map.md)、[桌面UI](../桌面UI/feature-map.md)、[桌面窗口](../桌面窗口/feature-map.md)）。
 - 装配的启动检查与冒烟不替代测试角色的跨角色联调与回归。
 
-- [桌面运行包构建与发布](docs/feature/desktop-release-packaging.md)：固定 tag 加精确 overlay、三原生架构 ZIP、实际解压程序启动、来源与校验清单。v1.0.0 已发布实测（CI3 run 38728387848）；v1.1.0 配方（冻结 `e4556cc`，白名单收敛、本机 arm64 冒烟通过，待 tag/CI/发布）见[本次变更](docs/change/2026-10-16_change_v1.1-release-packaging.md)。
+- [桌面运行包构建与发布](docs/feature/desktop-release-packaging.md)：固定 tag 加精确 overlay、三原生架构 ZIP、实际解压程序启动、来源与校验清单。v1.0.0、v1.1.0 已发布实测（v1.1.0：修复后 run 38860421363 四 job 全绿、独立验收后 2026-10-16 公开，验收见[测试角色记录](../../测试/docs/change/2026-10-16_change_v1.1-release-verification.md)）；v1.2.0 配方（冻结 `ecca2d3`，白名单**回到纯打包面**，本机 arm64 冒烟通过，待 tag/CI/发布）见[本次变更](docs/change/2026-10-16_change_v1.2-release-packaging.md)。

@@ -1,6 +1,6 @@
 # 桌面运行包构建与发布
 
-维护者需要从已确认的版本生成能直接启动的 macOS/Windows ZIP，同时明确包内源码和本地凭据的边界。客户已授权基于 v1.0.0 增加必要打包适配，既有 tag 保持不变；v1.1.0（2026-10-16）沿用同一机制：冻结 `e4556cc`（tag `v1.1.0`）＋后置打包 overlay，v1.0.0 tag 与证据保持不动。
+维护者需要从已确认的版本生成能直接启动的 macOS/Windows ZIP，同时明确包内源码和本地凭据的边界。客户已授权基于 v1.0.0 增加必要打包适配，既有 tag 保持不变；v1.0.0、v1.1.0、v1.2.0 沿用同一机制：冻结 tag（v1.1.0＝`e4556cc`、v1.2.0＝`ecca2d3`）＋后置打包 overlay，此前各 tag 与证据均保持不动。
 
 ```mermaid
 flowchart TD
@@ -24,10 +24,16 @@ flowchart TD
 
 实现与三平台原生 CI 已验证：run `38728387848`、source `83445eb` + overlay `c3d1066`，实际 tree `15427e074c23ad1d4b52d0b191f57fe3bdeb5167`。macOS 两架构均为 1401 项中 1400 通过/0 失败/1 平台跳过，Windows 为 1399 通过/0 失败/2 平台跳过；三份实际解压程序及 SDK/WASM/原生 CLI/7 项窗口检查均通过。集合来源和 SHA 校验已通过，12 项分发资产已公开发布；root 已在未登录页面确认可下载，GitHub 保存的三份 ZIP SHA256 与 CI3 manifest 逐项一致。
 
-## v1.1.0 配方（2026-10-16，待构建/未发布）
+## v1.1.0 配方（2026-10-16，已发布）
 
-客户指示「发布新运行包」；机制原样沿用（冻结 tag ＋ 精确 overlay，默认 draft、独立验收后公开）。冻结源＝`e4556cc`（含 F 批次八项真机修复、su 免审批预授权、G-1/G-2 批次），tag `v1.1.0` 已在本仓成立（annotated，2026-10-16 创建、解析回 `e4556cc`）；后置 overlay 仅打包/版本/发布面：policy 指 v1.1.0、白名单**收敛为精确集合**（`package.json`/`package-lock.json`/`release.yml` ＋ `src/common/装配/`、`test/装配/`，另含发布前检查经评审精确纳入的单文件 `test/runtime-core/shell-exec-timeout.test.ts`（Windows 平台断言小修，单文件、不开目录），v1.0.0 遗留的生产白名单整批移除、此后未知 `app/`·`src/` 变更 fail-closed）、版本 1.1.0（package/lock，工件名随之 `ANS-Studio-1.1.0-*`）、workflow `source_ref` 默认/concurrency/发布段改 v1.1.0、README 下载表 1.1.0。本地验证：typecheck 0 错、`test/装配/` 71/71（发布前检查复跑）；机制在临时 clone 预演通过（prepare 产出 `sourceRef v1.1.0`＋7 文件 overlay、错误 ref 明确拒绝；其后经评审增列 1 个测试文件，实际 overlay 将选 8 文件）；本机 mac arm64 模拟构建树打包＋解压实跑通过（`version=1.1.0`、7 项 UI/IPC/配置检查、SDK/WASM 加载、Codex 0.162.1、Claude 2.1.299），ZIP SHA256 `efc147b5…`。**macOS x64 与 Windows x64 必须由 CI 原生 runner 实测；overlay 提交、CI 触发与发布尚未执行。**详见[本次变更](../change/2026-10-16_change_v1.1-release-packaging.md)。
+客户指示「发布新运行包」；机制原样沿用（冻结 tag ＋ 精确 overlay，默认 draft、独立验收后公开）。冻结源＝`e4556cc`（含 F 批次八项真机修复、su 免审批预授权、G-1/G-2 批次），tag `v1.1.0` 已在本仓成立（annotated，2026-10-16 创建、解析回 `e4556cc`）；后置 overlay 仅打包/版本/发布面：policy 指 v1.1.0、白名单**收敛为精确集合**（`package.json`/`package-lock.json`/`release.yml` ＋ `src/common/装配/`、`test/装配/`，另含发布前检查经评审精确纳入的单文件 `test/runtime-core/shell-exec-timeout.test.ts`（Windows 平台断言小修，单文件、不开目录），v1.0.0 遗留的生产白名单整批移除、此后未知 `app/`·`src/` 变更 fail-closed）、版本 1.1.0（package/lock，工件名随之 `ANS-Studio-1.1.0-*`）、workflow `source_ref` 默认/concurrency/发布段改 v1.1.0、README 下载表 1.1.0。本地验证：typecheck 0 错、`test/装配/` 71/71（发布前检查复跑）；机制在临时 clone 预演通过（prepare 产出 `sourceRef v1.1.0`＋7 文件 overlay、错误 ref 明确拒绝；其后经评审增列 1 个测试文件，实际 overlay 将选 8 文件）；本机 mac arm64 模拟构建树打包＋解压实跑通过（`version=1.1.0`、7 项 UI/IPC/配置检查、SDK/WASM 加载、Codex 0.162.1、Claude 2.1.299），ZIP SHA256 `efc147b5…`。**macOS x64 与 Windows x64 必须由 CI 原生 runner 实测；overlay 提交、CI 触发与发布尚未执行。**（此为配方收尾时状态。）详见[本次变更](../change/2026-10-16_change_v1.1-release-packaging.md)；随后已收口，见下段。
+
+后续（已收口）：发布前 CI 实测发现 Windows 平台 `test/runtime-core/shell-exec-timeout.test.ts` 三断言假定 Unix 信号名语义（产品行为无缺陷），该文件经评审按精确路径纳入 overlay（selected 7→8）；修复后重跑 run `38860421363` 四 job 全绿并生成 draft，root 独立验收（12 项资产、SHA 逐项一致）后于 2026-10-16T06:27:14Z 公开发布。详见[测试角色 v1.1.0 发布验收](../../测试/docs/change/2026-10-16_change_v1.1-release-verification.md)。
+
+## v1.2.0 配方（2026-10-16，待构建/未发布）
+
+客户指示「发布」；机制原样沿用（冻结 tag ＋ 精确 overlay，默认 draft、独立验收后公开）。冻结源＝`ecca2d3`（含 v3 界面收敛、U1 贴底修复、收束静默 30 秒、自检台同步），tag `v1.2.0` 由 root 打（annotated、指向 `ecca2d3`）。后置 overlay **回到纯打包面**——policy 指 v1.2.0，白名单＝`package.json`/`package-lock.json`/`release.yml` ＋ `src/common/装配/`、`test/装配/`；v1.1.0 的 runtime-core 测试文件条目**移除**（其平台小修已含于冻结 tag，本轮无任何产品/测试文件入列；`app/`·`src/` 未知变更 fail-closed 不变）。版本 1.1.0→1.2.0（工件名随之 `ANS-Studio-1.2.0-*`）、workflow `source_ref` 默认/concurrency `release-v1.2.0`/发布段 → v1.2.0、README 下载表 → v1.2.0（另补 v1.1.0 历史验收链接、保留 v1.0.0 链接）。本地验证：typecheck 0 错、`test/装配/` 71/71、全量 1678/1677/0/1（1 平台跳过）；机制在临时 clone 预演通过（prepare 产出 `sourceRef v1.2.0`＋selected 恰 6 文件、错误 ref 明确拒绝）；本机 mac arm64 模拟构建树打包＋解压实跑通过（`version=1.2.0`、7 项 UI/IPC/配置检查、SDK/WASM 加载、Codex 0.162.1、Claude 2.1.299），ZIP SHA256 `4291d00c…`。**macOS x64 与 Windows x64 必须由 CI 原生 runner 实测；overlay 提交、CI 触发与发布尚未执行。**详见[本次变更](../change/2026-10-16_change_v1.2-release-packaging.md)。
 
 Windows 内置受限来源文档阅读依照 r2 保持不支持；摘要和执行记录仍可查看，可由操作者使用系统编辑器查看文件，不增加不存在的一键打开入口。
 
-[下载页面](https://github.com/wangzhongren/ans-studio/releases/tag/v1.0.0)与三平台 CI/Release 的实际状态见[本次变更](../change/2026-10-15_change_v1-release-packaging.md)，不得将本机 arm64 构建或 owner 冒烟代替 Windows/x64 实测。
+[下载页面](https://github.com/wangzhongren/ans-studio/releases/tag/v1.2.0)与三平台 CI/Release 的实际状态见[本次变更](../change/2026-10-16_change_v1.2-release-packaging.md)（历史版本见[装配 v1.1.0 记录](../change/2026-10-16_change_v1.1-release-packaging.md)与[测试角色 v1.1.0 发布验收](../../测试/docs/change/2026-10-16_change_v1.1-release-verification.md)），不得将本机 arm64 构建或 owner 冒烟代替 Windows/x64 实测。

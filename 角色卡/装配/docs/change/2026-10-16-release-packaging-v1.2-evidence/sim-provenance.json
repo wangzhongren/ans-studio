@@ -1,0 +1,32 @@
+{
+  "sourceRef": "v1.2.0",
+  "sourceSha": "ecca2d38500c8626cf2833eecb9d85d59f26c680",
+  "overlaySha": "7296527b226478e57977e209763e05402994bc1c",
+  "actualTree": "c64e7d2f00c250fc965b9d8a6e1d9cb49c2c063b",
+  "overlayPaths": [
+    ".github/workflows/release.yml",
+    "package-lock.json",
+    "package.json",
+    "src/common/装配/release-policy.d.mts",
+    "src/common/装配/release-policy.mjs",
+    "test/装配/release-packaging.test.ts"
+  ],
+  "overlayPatchSha256": "e87fb1f3116f533354f474e06e5be562a5680d40b3030a0d0608294f26aa4965",
+  "excludedChanges": [
+    "README.md",
+    "角色卡/装配/changelog.md",
+    "角色卡/装配/docs/change/2026-10-16-release-packaging-v1.2-evidence/SHA256SUMS-darwin-arm64.txt",
+    "角色卡/装配/docs/change/2026-10-16-release-packaging-v1.2-evidence/full-suite-local.txt",
+    "角色卡/装配/docs/change/2026-10-16-release-packaging-v1.2-evidence/mac-arm64-smoke-manifest.json",
+    "角色卡/装配/docs/change/2026-10-16-release-packaging-v1.2-evidence/package-mac-arm64.log.txt",
+    "角色卡/装配/docs/change/2026-10-16-release-packaging-v1.2-evidence/sim-provenance.json",
+    "角色卡/装配/docs/change/2026-10-16-release-packaging-v1.2-evidence/test-assembly.txt",
+    "角色卡/装配/docs/change/2026-10-16-release-packaging-v1.2-evidence/typecheck.txt",
+    "角色卡/装配/docs/change/2026-10-16-release-packaging-v1.2-evidence/verify-mac-arm64.log.txt",
+    "角色卡/装配/docs/change/2026-10-16_change_v1.2-release-packaging.md",
+    "角色卡/装配/docs/feature/desktop-release-packaging.md",
+    "角色卡/装配/feature-map.md",
+    "角色卡/装配/memo.md",
+    "角色卡/项目管理/docs/change/2026-10-15_change_kanban-fixes-pm-review.md"
+  ]
+}

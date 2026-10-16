@@ -7,8 +7,8 @@ test('release overlay preserves Chinese build paths and excludes private data an
     'package.json', '.env', '.ans/sessions/private.jsonl', 'README.md', '角色卡/装配/docs/change/release.md']);
   assert.deepEqual(result.selected, ['src/common/装配/release-prepare.mjs', 'test/装配/release-packaging.test.ts', 'package.json']);
   assert.deepEqual(result.excluded, ['.env', '.ans/sessions/private.jsonl', 'README.md', '角色卡/装配/docs/change/release.md']);
-  assert.equal(SOURCE_REF, 'v1.1.0');
-  assert.equal(SOURCE_SHA, 'e4556cc43311adf7bda056fe071b9a389a85cf40');
+  assert.equal(SOURCE_REF, 'v1.2.0');
+  assert.equal(SOURCE_SHA, 'ecca2d38500c8626cf2833eecb9d85d59f26c680');
 });
 
 test('release refuses unreviewed production changes and similarly named private directories', () => {
@@ -20,13 +20,15 @@ test('release refuses unreviewed production changes and similarly named private 
     ['package.json', 'test/装配/release-packaging.test.ts']);
 });
 
-// 发布前 CI Windows 检查：shell-exec-timeout 的 3 条断言假定 Unix 信号名语义（运行时核心的平台自适应小修），
-// 经评审按精确路径纳入 overlay；同目录其余文件与其余 test/ 仍不入选（不开目录，保持最小授权）。
-test('release overlay includes the reviewed runtime-core Windows test fix by exact path only', () => {
+// v1.1.0 轮按精确路径纳入的 Windows 测试小修已随冻结 tag 吸收；v1.2.0 overlay 回到纯打包面——
+// 未列名的 test/ 文件（含 test/runtime-core/**）一律 excluded、不随构建树分发；本用例锁死该边界，
+// 若未来版本又需测试文件随 overlay（先例：v1.1.0 按精确路径纳入 Windows 平台断言小修），须经评审显式列入。
+test('release overlay keeps the packaging surface exact: unreviewed test files stay excluded', () => {
   const result = selectOverlay(['package.json', 'test/runtime-core/shell-exec-timeout.test.ts',
     'test/runtime-core/tools.test.ts', 'test/codex-adapter/electron-launch.test.ts']);
-  assert.deepEqual(result.selected, ['package.json', 'test/runtime-core/shell-exec-timeout.test.ts']);
-  assert.deepEqual(result.excluded, ['test/runtime-core/tools.test.ts', 'test/codex-adapter/electron-launch.test.ts']);
+  assert.deepEqual(result.selected, ['package.json']);
+  assert.deepEqual(result.excluded, ['test/runtime-core/shell-exec-timeout.test.ts',
+    'test/runtime-core/tools.test.ts', 'test/codex-adapter/electron-launch.test.ts']);
 });
 
 import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
