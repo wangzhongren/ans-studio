@@ -127,24 +127,45 @@
     return rows;
   }
 
-  /** S4（2026-10-16 客户批准）：组摘要口径 = **调用数**（`mergePhases` 行数）——「N 个调用」；
-   *  `exceptional` = 含异常相位的行数（异常时补「· 异常 M」）；`unknown` = 任一条目状态未记录
-   *  （保留既有「· 含状态未记录」如实计数）。纯计数，不改变任何条目事实。 */
+  /** 组摘要口径（S4，2026-10-16 客户批准；工具行折叠口径，2026-10-16 客户批准修订）：
+   *  `calls` = **调用数**（`mergePhases` 行数）——「N 个调用」；`tools` = 按**调用行**的
+   *  **工具分解**（首现序 `[{name, count}]`，名字取终态相位、回退首相位）——「a / b ×k / c」；
+   *  `denied` = 含**未放行**相位的行数 / `failed` = 含**失败或超时终止**相位的行数（同一行既有未放行
+   *  又有失败相位时记入未放行——一笔调用只进一类；未放行 = 门禁未放行，从未执行，「未放行优先」如实）；
+   *  `unknown` = 任一条目状态未记录（保留既有「· 含状态未记录」如实计数）。
+   *  **旧「exceptional」计数由本修订拆分为 denied/failed**（口径见折叠行文案：含 X 条未放行 / 含 Y 条失败）——
+   *  拆分口径逐行走同一 `status` 事实（tool-rows 单点），渲染侧不另判。纯计数，不改变任何条目事实。 */
   function callSummary(items) {
     var list = Array.isArray(items) ? items : [];
     var rows = mergePhases(list);
-    var exceptional = 0;
+    var denied = 0;
+    var failed = 0;
     var unknown = false;
+    var tools = [];
+    var toolIndex = Object.create(null);
     for (var i = 0; i < rows.length; i += 1) {
-      var hasExceptional = false;
+      var rowDenied = false;
+      var rowFailed = false;
+      var first = null;
+      var terminal = null;
       for (var j = 0; j < rows[i].phases.length; j += 1) {
         var a = list[rows[i].phases[j]] || {};
-        if (a.exceptional === true) hasExceptional = true;
+        if (a.status === "denied") rowDenied = true;
+        if (a.status === "failed" || a.status === "timed-out") rowFailed = true;
         if (a.status === "unknown") unknown = true;
+        if (!first) first = a;
+        terminal = a;
       }
-      if (hasExceptional) exceptional += 1;
+      if (rowDenied) denied += 1;
+      else if (rowFailed) failed += 1;
+      var name = (terminal && terminal.toolName) || (first && first.toolName) || "工具";
+      if (toolIndex[name] === undefined) {
+        toolIndex[name] = tools.length;
+        tools.push({ name: name, count: 0 });
+      }
+      tools[toolIndex[name]].count += 1;
     }
-    return { calls: rows.length, exceptional: exceptional, unknown: unknown };
+    return { calls: rows.length, denied: denied, failed: failed, unknown: unknown, tools: tools };
   }
 
   // 展示事实只来自已存在的执行结果；accepted单独出现不是执行成功。

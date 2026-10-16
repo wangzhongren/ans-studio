@@ -31,6 +31,7 @@ const PROJECT_RESET_ONLY=process.env.ANS_PROJECT_RESET_UI_ONLY==='1';
 const DUP_ONLY=process.env.ANS_DUP_UI_ONLY==='1';
 const SELECTOR_ONLY=process.env.ANS_SELECTOR_UI_ONLY==='1';
 const G2_ONLY=process.env.ANS_G2_RECOVERY_UI_ONLY==='1';
+const TOOLFOLD_ONLY=process.env.ANS_TOOLFOLD_UI_ONLY==='1';
 const configReads=[];
 let recoveryEnabled=!(CONFIG_ONLY||SELECTOR_ONLY||FLOW_ONLY), listFailure=false, pickResult=ROOT, configFailure=false, configMalformed=false, configDeferred=false, saveDeferred=false;
 let configMissing={}, configPending=[], savePending=[];
@@ -475,7 +476,13 @@ async function duplicateChecks() {
     await push('session:events',[payload(start),payload({...start,summary:'第二来源同一调用'}),payload(result),payload(result)]);
     // v3/S1（2026-10-16 客户批准）：同一 toolCallId 的「调用发起+结果」合并为**一行**——工具名在聊天流恰出现
     // 一次（原断言：活动组工具=两行 2 次、屏障/生命周期工具=一行 1 次；现状统一为合并行 1 次，两相位标签保留在内）。
-    await check('one canonical lifecycle '+name,`(()=>{const text=document.getElementById('chat').textContent;return (text.match(/${name}/g)||[]).length===1;})()`);
+    // 折叠口径（2026-10-16 客户批准）修订：并入工具组者的**折叠行文案带工具分解**——名称文本出现
+    // 1（合并行）+1（组摘要分解）=2，「恰一行」的意图改为**按行断言**（.tool-activity 恰 1 行含该名 +
+    // 摘要含该名——比纯文本计数更强）；生命周期/屏障类工具（不并入工具组）照旧恰 1 次（无组摘要分解）。
+    const foldTool=['read_file','write_file','edit_file','run_shell'].includes(name);
+    await check('one canonical lifecycle '+name, foldTool
+      ? `(()=>{const text=document.getElementById('chat').textContent;return (text.match(/${name}/g)||[]).length===2&&[...document.querySelectorAll('#chat .tool-activity')].filter(x=>x.textContent.includes('${name}')).length===1&&document.querySelector('#chat .tool-records summary').textContent.includes('${name}');})()`
+      : `(()=>{const text=document.getElementById('chat').textContent;return (text.match(/${name}/g)||[]).length===1;})()`);
   }
   await reset();
   const handback='[回交] 来自 维护 的报告（任务关联未知）\n结论：completed\n摘要：原报告';
@@ -814,6 +821,126 @@ async function g2RecoveryChecks(){
   await check('G2 expired recovery card dismisses without execution illusion',`document.getElementById('recovery-confirm').hidden&&window.__ansRenderer.state.recoveryConfirm===null`);
 }
 
+// ——— 工具行折叠（2026-10-16 客户批准口径）离线验收段：分组依据=turnId；运行中逐条实时（组展开）；
+// settled 折叠成一行「本轮 N 个调用：a / b ×k / c（· 含 X 条未放行 / 含 Y 条失败 / 含状态未记录）」；
+// 展开逐条零丢失；未放行行照旧直显（治理信号）；手动开合优先且会话内保持；窗口化（挂载中折叠保锚点 /
+// 视窗外折叠后挂回来仍折叠）。 ———
+async function toolFoldChecks(){
+  const scoped={projectRoot:ROOT,roleId:'A',runtime:'pi'};
+  const payload=(event,roleId='A',runtime='pi')=>({projectRoot:ROOT,roleId,runtime,event:{...event,roleId,runtime}});
+  const start=(turn,id,tool,args={})=>({kind:'tool_call',turnId:turn,summary:'调用工具 '+tool,detail:{toolName:tool,toolCallId:id,phase:'start',...args}});
+  const result=(turn,id,tool,extra={})=>({kind:'accepted',turnId:turn,summary:tool+' 执行完成',detail:{toolName:tool,toolCallId:id,phase:'result',ok:true,status:'completed',...extra}});
+  const settled=(turn)=>({kind:'settled',turnId:turn,summary:'本轮已完成',detail:{outcome:'completed'}});
+  const rowsMap=()=>js(`[...document.querySelectorAll('#chat .tool-activity')].map(x=>({idx:x.dataset.activityIndex,ph:x.dataset.activityPhases,text:x.textContent}))`);
+  await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRole('A')`);await pause(60);
+  await push('session:role-state',{...scoped,busy:true,summaries:[],queue:[]});
+  // —— t1：运行中逐条实时（组展开、失败/未放行相位并入同轮组行不切断组）——
+  await push('session:events',[
+    payload(start('fold-t1','fc1','role_status')),
+    payload(result('fold-t1','fc1','role_status')),
+    payload(start('fold-t1','fc2','run_shell',{args:{command:'ans status'}})),
+    payload({kind:'denied',turnId:'fold-t1',summary:'未执行：命令被拒绝（原因：runs outside sandbox）',detail:{toolName:'run_shell',toolCallId:'fc2',phase:'blocked'}}),
+  ]);
+  await check('fold running stays expanded with live rows',`(()=>{const g=document.querySelector('#chat .tool-records');return document.querySelectorAll('#chat .tool-records').length===1&&g.open===true&&[...document.querySelectorAll('#chat .tool-activity')].every(x=>x.getBoundingClientRect().height>0);})()`);
+  await check('fold running summary carries calls breakdown and not-released mark',`(()=>{const s=document.querySelector('#chat .tool-records summary').textContent;return s.includes('本轮 2 个调用：role_status / run_shell')&&s.includes('含 1 条未放行');})()`);
+  await check('denied phase merges into its own call row and group is not cut',`(()=>{const t=[...document.querySelectorAll('#chat .tool-activity')].map(x=>x.textContent);return t.length===2&&t[0].includes('调用发起')&&t[0].includes('执行完成')&&t[1].includes('调用发起')&&t[1].includes('已拒绝')&&document.querySelector('#chat .sys-denied').textContent.includes('runs outside sandbox');})()`);
+  const runningRows=await rowsMap();
+  fs.writeFileSync(path.join(OUT,'toolfold-1-running-1360.png'),(await win.webContents.capturePage()).toPNG());
+  // —— settled：折叠成一行（摘要不变、未放行行直显、展开零丢失）——
+  await push('session:events',[payload(settled('fold-t1'))]);
+  await check('settled folds the turn group with summary intact and denied row still direct',`(()=>{const g=document.querySelector('#chat .tool-records');const s=g.querySelector('summary').textContent;return g.open===false&&s.includes('本轮 2 个调用：role_status / run_shell')&&s.includes('含 1 条未放行')&&document.querySelector('#chat .sys-denied').textContent.includes('runs outside sandbox');})()`);
+  fs.writeFileSync(path.join(OUT,'toolfold-2-folded-1360.png'),(await win.webContents.capturePage()).toPNG());
+  await js(`document.querySelector('#chat .tool-records').open=true`);await pause(80);
+  const expandedRows=await rowsMap();
+  const sameRows=JSON.stringify(runningRows.map(x=>[x.idx,x.ph,x.text]))===JSON.stringify(expandedRows.map(x=>[x.idx,x.ph,x.text]));
+  await check('manual expand after fold restores every row identity zero loss',`document.querySelector('#chat .tool-records').open===true&&document.querySelectorAll('#chat .tool-activity').length===2&&${sameRows}`);
+  fs.writeFileSync(path.join(OUT,'toolfold-3-expanded-1360.png'),(await win.webContents.capturePage()).toPNG());
+  // —— t2：手动开合优先——运行中用户收起后，追加与 settled 都不再自动展开；摘要照常更新 ——
+  await push('session:events',[
+    payload(start('fold-t2','fc3','role_status')),payload(result('fold-t2','fc3','role_status')),
+    payload(start('fold-t2','fc4','read_file',{args:{path:'README.md'}})),payload(result('fold-t2','fc4','read_file')),
+  ]);
+  await check('second turn opens its own group while running',`document.querySelectorAll('#chat .tool-records').length===2&&document.querySelectorAll('#chat .tool-records')[1].open===true`);
+  await js(`document.querySelectorAll('#chat .tool-records')[1].open=false`);await pause(60);
+  await push('session:events',[payload(start('fold-t2','fc5','session_tail'))]);
+  await check('manual collapse during running survives later appends',`document.querySelectorAll('#chat .tool-records').length===2&&document.querySelectorAll('#chat .tool-records')[1].open===false&&document.querySelectorAll('#chat .tool-records')[1].querySelector('summary').textContent.includes('本轮 3 个调用：role_status / read_file / session_tail')`);
+  await push('session:events',[payload(settled('fold-t2'))]);
+  await check('manual collapse survives settle auto fold',`document.querySelectorAll('#chat .tool-records').length===2&&document.querySelectorAll('#chat .tool-records')[1].open===false`);
+  // —— t3：失败相位并入组行并在折叠摘要标出（含 N 条失败）——
+  await push('session:events',[
+    payload(start('fold-t3','fc6','write_file',{args:{path:'README.md'}})),
+    payload({kind:'accepted',turnId:'fold-t3',summary:'write_file 执行失败：README.md（EACCES）',detail:{toolName:'write_file',toolCallId:'fc6',phase:'result',ok:false,status:'failed'}}),
+  ]);
+  await check('failed phase marks the fold summary with failure count',`(()=>{const g=[...document.querySelectorAll('#chat .tool-records')].at(-1);const s=g.querySelector('summary').textContent;return s.includes('本轮 1 个调用：write_file')&&s.includes('含 1 条失败')&&g.open===true&&[...document.querySelectorAll('#chat .sys-denied')].some(x=>x.textContent.includes('EACCES'));})()`);
+  await push('session:events',[payload(settled('fold-t3'))]);
+  await check('failed turn folds with failure mark retained',`(()=>{const g=[...document.querySelectorAll('#chat .tool-records')].at(-1);return g.open===false&&g.querySelector('summary').textContent.includes('含 1 条失败');})()`);
+  // —— 窗口化：长转录中挂载态折叠保阅读锚点；视窗外（已脱挂）折叠后挂回仍折叠 ——
+  const bPayload=(event)=>payload(event,'B');
+  const longRowsB=[];
+  for(let i=0;i<200;i++){
+    longRowsB.push({kind:'assistant',text:'brow-'+i+' 长聊天折叠验证。'.repeat(10),at:'',turnId:'fold-b-hist'});
+    if(i===98)for(let j=0;j<8;j++)longRowsB.push({kind:'tool',text:'调用工具 read_file',at:'',turnId:'fold-b-hist',activity:{toolName:'read_file',target:'hist-'+j+'.md',toolCallId:'lb-'+j,phase:'start',status:'call'}});
+  }
+  longRowsB.push({kind:'assistant',text:'fold-anchor 折前正文',at:'',turnId:'fold-b-hist'});
+  await js(`await window.__ansRenderer.selectRole('B')`);await pause(80);
+  await push('session:role-state',{projectRoot:ROOT,roleId:'B',runtime:'pi',busy:true,summaries:[],queue:[]});
+  await push('session:history',{projectRoot:ROOT,roleId:'B',runtime:'pi',rows:longRowsB,error:null,skipped:0});await pause(60);
+  const anchorOffset=()=>js(`(()=>{const c=document.getElementById('chat'),n=[...document.querySelectorAll('#chat .msg')].find(e=>e.textContent.startsWith('fold-anchor'));if(!n)return null;return +(n.getBoundingClientRect().top-c.getBoundingClientRect().top).toFixed(2);})()`);
+  // t4（尾部阅读态）：一组 12 个调用 + 组后助手正文（真实流形态）。阅读锚点摆到距顶 150px——折叠把
+  // 文档尾缩短到锚点下方不足一屏 ⇒ 边界处按上限夹取（断言之「有界」半边），严格「零位移」半边由 t7 校。
+  const t4Events=[];
+  for(let k=1;k<=12;k++){t4Events.push(bPayload(start('fold-t4','lb-live-'+k,'role_status')),bPayload(result('fold-t4','lb-live-'+k,'role_status')));}
+  t4Events.push(bPayload({kind:'message',turnId:'fold-t4',summary:'已核对完成。'+'继续整理结果。'.repeat(60)}));
+  await push('session:events',t4Events);
+  await js(`document.getElementById('chat').scrollTop=document.getElementById('chat').scrollHeight`);await pause(120);
+  await check('windowed tail group open while its turn runs',`(()=>{const g=[...document.querySelectorAll('#chat .tool-records')].at(-1);return !!g&&g.open===true&&g.querySelector('summary').textContent.includes('本轮 12 个调用：role_status ×12');})()`);
+  // 阅读态（非贴底）：锚点行摆到距顶 150px 再 settled（贴底场景由浏览器夹取自然保持贴底，不属"阅读位移"）。
+  await js(`(()=>{const c=document.getElementById('chat'),n=[...document.querySelectorAll('#chat .msg')].find(e=>e.textContent.startsWith('fold-anchor'));c.scrollTop+=n.getBoundingClientRect().top-c.getBoundingClientRect().top-150;})()`);await pause(140);
+  const anchorBefore=await anchorOffset();
+  await check('reader anchor row is real and visible before fold',`${JSON.stringify(anchorBefore)}!==null`);
+  const firstReading=()=>js(`(()=>{const c=document.getElementById('chat'),t=c.getBoundingClientRect().top;const n=[...c.querySelectorAll('.msg,.tool-records,.sys-denied')].find(x=>x.getBoundingClientRect().bottom>t);return n?{text:n.textContent.slice(0,24),offset:+(n.getBoundingClientRect().top-t).toFixed(2),scrollTop:c.scrollTop}:null;})()`);
+  const readingBeforeProbe=await firstReading();
+  await push('session:events',[bPayload(settled('fold-t4'))]);await pause(80);
+  const anchorAfter=await anchorOffset();
+  await pause(400);
+  const anchorLater=await anchorOffset();
+  const readingAfter=await firstReading();
+  reports.push({name:'fold anchor offsets',anchorBefore,anchorAfter,anchorLater,readingBefore:readingBeforeProbe,readingAfter});
+  const autoDelta=Math.abs(anchorLater-anchorBefore);
+  // 尾部阅读态（阅读锚点距文档尾不足一个视口）：折叠缩短文档尾，浏览器按上限夹取——断言=位移有界
+  //（≤20px，半行内）且不逐次累积（after===later）且正在读的行仍在视口内（文本未换页）。这是**物理边界**
+  //（任何文档尾收缩同此），非折叠语义误差；「阅读不被打断」的严格不变量在下一段（文档中部态）校验。
+  await check('tail fold movement bounded and non accumulating with the reading row still in view',`(()=>{const g=[...document.querySelectorAll('#chat .tool-records')].at(-1);const c=document.getElementById('chat'),r=c.getBoundingClientRect();const n=[...document.querySelectorAll('#chat .msg')].find(e=>e.textContent.startsWith('brow-198 '));const visible=!!n&&n.getBoundingClientRect().bottom>r.top&&n.getBoundingClientRect().top<r.bottom;return g.open===false&&g.querySelector('summary').textContent.includes('本轮 12 个调用：role_status ×12')&&${JSON.stringify(autoDelta)}<=20&&${JSON.stringify(anchorAfter)}===${JSON.stringify(anchorLater)}&&visible;})()`);
+  // 文档中部阅读态（阅读锚点下方仍有远超一屏的内容）：折叠**不得**让正在读的正文位移（与 toggleDrift
+  // 同一标准 <2px）——t7 在尾部再起一轮（12 个调用 + 组后正文），随后再推多行正文垫长尾段，再 settled。
+  const t7Events=[];
+  for(let k=1;k<=12;k++){t7Events.push(bPayload(start('fold-t7','lb-seven-'+k,'role_status')),bPayload(result('fold-t7','lb-seven-'+k,'role_status')));}
+  t7Events.push(bPayload({kind:'message',turnId:'fold-t7',summary:'已完成核对。'}));
+  for(let k=0;k<6;k++)t7Events.push(bPayload({kind:'message',turnId:'fold-t7',summary:'尾段正文 '+k+' '+'行内填充内容用于垫长折叠锚点下方。'.repeat(14)}));
+  await push('session:events',t7Events);await pause(60);
+  await js(`document.getElementById('chat').scrollTop=document.getElementById('chat').scrollHeight`);await pause(120);
+  await js(`(()=>{const c=document.getElementById('chat'),n=[...document.querySelectorAll('#chat .msg')].find(e=>e.textContent.startsWith('fold-anchor'));c.scrollTop+=n.getBoundingClientRect().top-c.getBoundingClientRect().top-150;})()`);await pause(140);
+  const midBefore=await anchorOffset();
+  await push('session:events',[bPayload(settled('fold-t7'))]);await pause(120);
+  const midAfter=await anchorOffset();
+  await pause(300);
+  const midLater=await anchorOffset();
+  reports.push({name:'mid document fold anchor',midBefore,midAfter,midLater});
+  await check('mid document fold keeps the reading anchor within two pixels and stable',`(()=>{const g=[...document.querySelectorAll('#chat .tool-records')].at(-1);return g.open===false&&g.querySelector('summary').textContent.includes('本轮 12 个调用：role_status ×12')&&Math.abs(${JSON.stringify(midAfter)}-${JSON.stringify(midBefore)})<2&&${JSON.stringify(midLater)}===${JSON.stringify(midAfter)};})()`);
+  fs.writeFileSync(path.join(OUT,'toolfold-4-windowed-fold-1360.png'),(await win.webContents.capturePage()).toPNG());
+  await js(`document.getElementById('chat').scrollTop=0`);await pause(150);
+  await check('scrolled away the group is windowed out (no attached group rows)',`document.querySelectorAll('#chat .tool-records').length===0`);
+  await push('session:events',[
+    bPayload(start('fold-t5','lb-live2','session_tail')),
+    bPayload(result('fold-t5','lb-live2','session_tail')),
+  ]);
+  await check('live group created off screen stays unmounted until scrolled back',`document.querySelectorAll('#chat .tool-records').length===0`);
+  await push('session:events',[bPayload(settled('fold-t5'))]);await pause(60);
+  await js(`document.getElementById('chat').scrollTop=document.getElementById('chat').scrollHeight`);await pause(150);
+  await check('off screen settled group attaches already folded with summary',`(()=>{const g=[...document.querySelectorAll('#chat .tool-records')].at(-1);return !!g&&g.open===false&&g.querySelector('summary').textContent.includes('本轮 1 个调用：session_tail');})()`);
+  fs.writeFileSync(path.join(OUT,'toolfold-5-offscreen-settled-1360.png'),(await win.webContents.capturePage()).toPNG());
+}
+
 app.whenReady().then(async()=>{
  const watchdog=setTimeout(()=>{fs.writeFileSync(path.join(OUT,'watchdog.txt'),'timeout');app.exit(1);},60000);
  try {
@@ -828,6 +955,7 @@ app.whenReady().then(async()=>{
   if(DUP_ONLY){await duplicateChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports},null,2));console.log('DUP_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(SELECTOR_ONLY){await selectorChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports,configReads},null,2));console.log('SELECTOR_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(G2_ONLY){await g2RecoveryChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports},null,2));console.log('G2_RECOVERY_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
+  if(TOOLFOLD_ONLY){await toolFoldChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports},null,2));console.log('TOOLFOLD_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(CONFIG_ONLY){await configChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports},null,2));console.log('CONFIG_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(process.env.ANS_MERGE_UI_ONLY==='1'){await mergeChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports,sends:sends.map(x=>({text:x.text,target:x.target,clientMessageId:x.metadata&&x.metadata.clientMessageId}))},null,2));console.log('MERGE_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(process.env.ANS_RUNTIME_UI_ONLY==='1'){await runtimeChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports,sends},null,2));console.log('RUNTIME_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}

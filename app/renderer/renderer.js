@@ -585,6 +585,7 @@
     if (forcePane && forcePane.parentNode === $("chat")) target = forcePane;
     else if (streamPin && streamPin.pin === true && streamPin.pane && streamPin.pane.parentNode === $("chat")) target = streamPin.pane;
     if (target !== null) $("chat").scrollTop = $("chat").scrollHeight; // 贴底（窗口/高度已落定）
+    flushDeferredFolds(); // 工具行折叠口径：轮结束折叠在该批尾、贴底之后落地（批内折叠会撞中间态布局，见 foldTurnGroups）
   }
 
   // Q-2 **窗口化行模型**：每个 pane 一张 append-only **行表**——行 = {build(rec)→元素, el|null, h, keepEl, …}。
@@ -950,16 +951,107 @@
     if (saved) restoreChatReading(pane, saved);
   }
 
+  // —————— 工具行折叠的状态机（2026-10-16 客户批准口径）——————
+  // 口径：**分组依据 = turnId**（组 = 同一轮内**连续**的工具行；卡片/助手行/关联不上的未放行行打断即另起
+  // 一组——`registerRow` 的 `rl.activityGroup` 语义不变）。开合三规则：
+  //   · **运行中不折叠**：该轮实时到达（live）、未 settled、本角色 busy ⇒ 默认**展开**（逐条实时可见）；
+  //   · **轮结束后折叠成一行**：settled 到达 ⇒ 未手动开合过的组收为「本轮 N 个调用：…」一行（foldTurnGroups）；
+  //   · **手动开合优先并在会话内保持**：用户点开/收起记入 `activityOpen`（既有机制），默认态不再覆盖
+  //     （含 settled 折叠：读过的人不被自动收起）；键盘焦点在组内时同样不收（自动动作不吞焦点）。
+  function groupManualOpen(roleId, id) {
+    var opens = activityOpen[roleId];
+    return opens && Object.prototype.hasOwnProperty.call(opens, id) ? opens[id] === true : null;
+  }
+  /** 默认开合：仅「实时到达（live）且该轮未 settled 且本角色 busy」的组默认展开——与流式 Markdown
+   *  （`appendAssistant` 的 roleBusy + settledTurns）同族判据；回放/无轮次身份/已 settle ⇒ 默认折叠。 */
+  function groupDefaultOpen(pane, activity, rl) {
+    var turnId = activity.turnId || "";
+    if (activity.origin !== "live" || turnId === "") return false;
+    if (rl.settledTurns && rl.settledTurns[turnId]) return false;
+    return state.roleBusy[pane.dataset.roleId || ""] === true;
+  }
+  /** 组创建/追加后同步默认开合：手动开合过 ⇒ 不动；运行中被折叠（busy 快照晚到/回放重建）⇒ 重开。 */
+  function syncGroupOpen(pane, rl, rec, activity) {
+    if (groupManualOpen(pane.dataset.roleId || "", rec.data.id) !== null) return;
+    var want = groupDefaultOpen(pane, activity, rl);
+    if (rec.data.open === want) return;
+    rec.data.open = want; // 先 data 后 el：toggle 监听以 data.open 为程序化改动守卫（不记成手动）
+    if (rec.el) rec.el.open = want;
+  }
+  /** 轮结束折叠（settled 事件触发）：该轮所有仍展开的组收为折叠一行——先读锚点后改（captureChatReading →
+   *  折叠 → 实测 → restoreChatReading，与手动开合同一套锚点语义）；组自身作锚时锚组行首（折叠一行形态）。
+   *  **批内推迟到批尾**（2026-10-16 离线 e2e 实测）：折叠是布局变更——批内做会撞上「spacer 未落定」的
+   *  中间态（阅读锚点恢复偏 6px）且折叠收缩尾段会令 appendTurnTerminal 的贴底判定误读「在底部」而强制
+   *  贴底；改在 `flushBatchSideEffects` 收尾（贴底/窗口落定之后）落地，与手动开合（天然在批外）同一条件，
+   *  锚点恢复精确（无计时器——renderer 无计时器纪律）。 */
+  var deferredFolds = [];
+  /** 批尾挂点：flushBatchSideEffects 的收尾（与贴底/窗口落定同一批尾，绝不用计时器——renderer 无计时器纪律）。 */
+  function flushDeferredFolds() {
+    if (!deferredFolds.length) return;
+    var pending = deferredFolds;
+    deferredFolds = [];
+    for (var i = 0; i < pending.length; i += 1) foldTurnGroupsNow(pending[i].pane, pending[i].turnId);
+  }
+  function foldTurnGroups(pane, turnId) {
+    if (!turnId) return;
+    if (batchDepth > 0) { deferredFolds.push({ pane: pane, turnId: turnId }); return; }
+    foldTurnGroupsNow(pane, turnId);
+  }
+  function foldTurnGroupsNow(pane, turnId) {
+    if (!turnId) return;
+    var rl = paneRowLists[pane.dataset.roleId];
+    if (!rl) return;
+    var changed = [];
+    for (var i = 0; i < rl.rows.length; i += 1) {
+      var rec = rl.rows[i];
+      if (rec.kind !== "activities" || !rec.data || rec.data.turnId !== turnId) continue;
+      if (rec.data.open !== true) continue;
+      if (groupManualOpen(pane.dataset.roleId || "", rec.data.id) !== null) continue;
+      if (rec.el && rec.el.contains(document.activeElement)) continue; // 键盘焦点在组内：自动动作不吞焦点
+      changed.push(rec);
+    }
+    if (!changed.length) return;
+    // 与手动开合**同序**（既有 toggle 路径：浏览器先翻转 `el.open`、监听器随后捕获阅读锚点再刷新）——
+    // 先折叠（先 data 后 el：toggle 监听以 data.open 为程序化改动守卫），再捕获、再实测与恢复。
+    // 离线 e2e（2026-10-16）：文档中部阅读态折叠锚点零位移（<2px，与既有开合标准同款）；尾部阅读态
+    //（锚点下方不足一屏）按下限夹取自然移动（物理边界，任何文档尾收缩同此），不逐次累积。
+    changed.forEach(function (rec) {
+      rec.data.open = false;
+      if (rec.el && rec.el.parentNode === pane) rec.el.open = false;
+    });
+    var reading = pane.parentNode === $("chat") ? captureChatReading(pane) : null;
+    if (reading && reading.sub != null && changed.indexOf(reading.rec) >= 0) reading.sub = null;
+    changed.forEach(function (rec, index) {
+      if (index === changed.length - 1) refreshActivityHeight(pane, rec, reading);
+      else {
+        if (rec.el && rec.el.parentNode === pane) { var h = rowFootprint(rl, rec.el); if (h > 0) rec.h = h; }
+        rec.measured = false;
+      }
+    });
+  }
+
+  /** 工具行折叠（2026-10-16 客户批准口径）：折叠行**文案**——「本轮 N 个调用：a / b ×k / c」+
+   *  标注「 · 含 X 条未放行」「 · 含 Y 条失败」「 · 含状态未记录」（计数均来自 `Tr.callSummary` 单点，
+   *  每次仅一条；信息零丢失：展开即逐条完整列表）。 */
+  function foldSummaryText(sum) {
+    var tools = sum.tools.map(function (t) { return t.name + (t.count > 1 ? " ×" + t.count : ""); }).join(" / ");
+    var text = "本轮 " + (sum.calls + ' 个调用') + (tools ? "：" + tools : "");
+    if (sum.denied > 0) text += " · 含 " + sum.denied + " 条未放行";
+    if (sum.failed > 0) text += " · 含 " + sum.failed + " 条失败";
+    if (sum.unknown) text += ' · 含状态未记录';
+    return text;
+  }
+
   function fillActivities(rec) {
     var data = rec.data;
-    // S1/S4（2026-10-16 客户批准）：同一 toolCallId 的「调用发起 + 结果」两相位并成**一行**（`Tr.mergePhases`
-    // 给出下标映射——`data.items` 本体与身份不动：token→行映射、回放锚点、`data-legacy-index` 展开/物化
-    // 全按下标照旧取用）；组摘要口径改「N 个调用」（异常补「· 异常 M」；未知照旧「· 含状态未记录」——
-    // 失败/未知在**折叠摘要**仍可见；行态/目标以**终态为准**，未返回时即「调用发起」）。
+    // S1/S4（2026-10-16 客户批准）+ 工具行折叠口径（2026-10-16 客户批准）：同一 toolCallId 的「调用发起 +
+    // 结果（含未放行/失败相位）」并成**一行**（`Tr.mergePhases` 给出下标映射——`data.items` 本体与身份不动：
+    // token→行映射、回放锚点、`data-legacy-index` 展开/物化全按下标照旧取用）；折叠行文案 =「本轮 N 个调用：
+    // 工具分解」+ 未放行/失败/未知标注（`Tr.callSummary` 纯计数单点，失败/未知在**折叠摘要**仍可见；
+    // 行态/目标以**终态为准**，未返回时即「调用发起」）。折叠/展开的默认态与时机见 `syncGroupOpen`/
+    // `foldTurnGroups`（运行中展开·轮结束折叠；手动开合优先并在会话内保持）。
     var sum = Tr.callSummary(data.items);
-    rec.el.innerHTML = '<summary>查看执行记录<span class="record-count">' + sum.calls + ' 个调用' +
-      (sum.exceptional > 0 ? ' · 异常 ' + sum.exceptional : '') +
-      (sum.unknown ? ' · 含状态未记录' : '') + '</span></summary>' + Tr.mergePhases(data.items).map(function (row) {
+    rec.el.innerHTML = '<summary><span class="record-count">' + esc(foldSummaryText(sum)) + '</span></summary>' + Tr.mergePhases(data.items).map(function (row) {
         // 相位按到达序；终态 = 末相位（其结果/标签为准，目标为空时回退首相位）。
         var phases = row.phases.map(function (i) { return data.items[i]; });
         var terminal = phases[phases.length - 1] || {};
@@ -1162,9 +1254,30 @@
       else if (targets[targetKey]) { activity.fullTarget = targets[targetKey].fullTarget; activity.target = targets[targetKey].target; }
     }
     if (activity.exceptional) {
-      rl.activityGroup = null;
+      // 工具行折叠口径（2026-10-16 客户批准）：**未放行/失败相位属同一次调用的相位**——该调用已有行在
+      // 本组（同轮同 callId）时，相位并入该组行（S1 相位合并的完整形态：折叠行如实计「含 N 条未放行/
+      // 失败」），组**不**因此切断（同轮后续调用仍并入同一条折叠行）；独立未放行行照旧（治理信号全量
+      // 呈现：原因与允许路径不折叠）。无法关联（无 callId / 组内无该调用）⇒ 维持原行为：切断组 + 独立行。
+      var assocGroup = null;
+      if (activity.callId && rl.activityGroup && rl.activityGroup.data && rl.activityGroup.data.turnId === activity.turnId) {
+        for (var ai = 0; ai < rl.activityGroup.data.items.length; ai += 1) {
+          var assocItem = rl.activityGroup.data.items[ai];
+          if (assocItem && assocItem.callId === activity.callId && assocItem.turnId === activity.turnId) { assocGroup = rl.activityGroup; break; }
+        }
+      }
+      if (!assocGroup) rl.activityGroup = null;
       appendDenied(pane, activity.deniedSummary || activity.visibleSummary || activity.toolName + ' · ' + activity.label, activity.fullTarget, activity);
       var deniedRec = rl.rows[rl.rows.length - 1]; deniedRec.toolActivity = activity; rememberActivities(rl, deniedRec);
+      if (assocGroup) {
+        var assocPin = streamShouldPin(pane), assocReading = !assocPin ? captureChatReading(pane) : null;
+        assocGroup.data.items.push(activity);
+        if (activity.replayToken) (rl.tokenRows || (rl.tokenRows = Object.create(null)))[Rt.tokenId(activity.replayToken)] = assocGroup;
+        syncGroupOpen(pane, rl, assocGroup, activity);
+        if (assocGroup.el) fillActivities(assocGroup);
+        rememberActivities(rl, assocGroup); // 身份映射以组为准：该调用的再投递走组内就地更新（不重复独立行）
+        refreshActivityHeight(pane, assocGroup, assocReading);
+        scrollBottom(pane, assocPin);
+      }
       return deniedRec;
     }
     if (activity.barrier) {
@@ -1183,6 +1296,7 @@
       var id = identity ? 'activity:' + identity + ':' + (counts[identity] = (counts[identity] || 0) + 1) :
         'ephemeral-' + (groupSeqByRole[roleId] = (groupSeqByRole[roleId] || 0) + 1);
       var opens = activityOpen[roleId] || (activityOpen[roleId] = Object.create(null));
+      var manual = Object.prototype.hasOwnProperty.call(opens, id) ? opens[id] === true : null;
       rec = registerRow(pane, function (record) {
         var el = document.createElement("details");
         el.className = "tool-records";
@@ -1192,16 +1306,17 @@
           if (record.data.open === el.open) return;
           var reading = captureChatReading(pane);
           record.data.open = el.open;
-          opens[record.data.id] = el.open;
+          opens[record.data.id] = el.open; // 手动开合（会话内保持；默认态不再覆盖该组）
           refreshActivityHeight(pane, record, reading);
         });
         return el;
-      }, 38, { kind: "activities", data: { id: id, items: [activity], open: opens[id] === true, turnId: activity.turnId } });
+      }, 38, { kind: "activities", data: { id: id, items: [activity], open: manual !== null ? manual : groupDefaultOpen(pane, activity, rl), turnId: activity.turnId } });
       rl.activityGroup = rec;
     } else {
       rec.data.items.push(activity);
       if (activity.replayToken) (rl.tokenRows || (rl.tokenRows = Object.create(null)))[Rt.tokenId(activity.replayToken)] = rec;
       if (!rec.data.turnId && activity.turnId) rec.data.turnId = activity.turnId;
+      syncGroupOpen(pane, rl, rec, activity); // 运行中保持逐条实时（展开）；手动开合优先
       if (rec.el) fillActivities(rec);
       refreshActivityHeight(pane, rec, saved);
     }
@@ -2365,7 +2480,7 @@
       metaFor(roleId).error = outcome === "failed" || outcome === "timed_out";
       // Q-1/Q-2：流式段的**一次性 Markdown 化**（本轮期间到达的助手消息先是纯文本——见 appendAssistant）。
       upgradeStreamingMarkdown(roleId);
-      if (typeof ev.turnId === "string" && ev.turnId) { var settledList = rowListFor(pane); (settledList.settledTurns || (settledList.settledTurns = Object.create(null)))[ev.turnId] = true; if ((settledList.reportedTurns && settledList.reportedTurns[ev.turnId] || settledList.deliveryTurns && settledList.deliveryTurns[ev.turnId])) applyReportedTask(pane, ev.turnId); }
+      if (typeof ev.turnId === "string" && ev.turnId) { var settledList = rowListFor(pane); (settledList.settledTurns || (settledList.settledTurns = Object.create(null)))[ev.turnId] = true; if ((settledList.reportedTurns && settledList.reportedTurns[ev.turnId] || settledList.deliveryTurns && settledList.deliveryTurns[ev.turnId])) applyReportedTask(pane, ev.turnId); foldTurnGroups(pane, ev.turnId); } // 工具行折叠口径：轮结束 ⇒ 该轮工具组折叠成一行（手动开合/焦点在内者除外）
       if (!appendTurnTerminal(pane, ev)) sysRow(pane, "sys-settled", ICONS.call, ev.summary);
     }
     else sysRow(pane, "sys-settled", ICONS.call, ev.summary);

@@ -87,13 +87,21 @@ work、card、pi、document复用424模态抽屉。仅导航/会话业务面iner
   `icon` 文本字形字段保留——一态一图标断言不变）。
 - `app/renderer/tool-rows.js`（`ANSToolRows`）：新增 `mergePhases(items)`（S1 相位合并下标映射
   `[{index, phases[]}]`；同 toolCallId+turn 合并、无 callId 不并、不折叠重复调用）与 `callSummary(items)`
-  （S4 计数 `{calls, exceptional, unknown}`）；`classifyInjectedMessage` 的 system 结果新增 `displayBody`
+  （**折叠口径修订 2026-10-16**：`{calls, denied, failed, unknown, tools}`——`tools` 为按调用行的工具分解
+  `[{name, count}]`（首现序）；`denied`=含未放行相位的行数、`failed`=含失败/超时终止相位的行数（同一行
+  两类皆有 ⇒ 未放行优先）；旧 `exceptional` 字段按批准口径拆分为 denied/failed）；
+  `classifyInjectedMessage` 的 system 结果新增 `displayBody`
   （W6b 展示正文，剥离 `[系统·<子类>] ` 前缀；`body` 原文与判据不改）。
 
 **DOM/呈现契约**（e2e 与源码守卫按此断言；旧钩子全部保留）：
 - 执行记录组：合并行 `.tool-activity` 携带 `data-activity-index`（首相位下标，读取捕获口径不变）与新增
   `data-activity-phases`（空格分隔的各相位下标，恢复兜底选择器）；行态为相位标签链（「调用发起 → …」），
-  各相位安全详情仍以 `data-legacy-index`（原下标）折叠呈现；组摘要为「N 个调用（· 异常 M）（· 含状态未记录）」。
+  各相位安全详情仍以 `data-legacy-index`（原下标）折叠呈现。**组开合与摘要（工具行折叠口径，2026-10-16
+  客户批准）**：摘要文案＝「本轮 N 个调用：a / b ×k / c（· 含 X 条未放行）（· 含 Y 条失败）（· 含状态未
+  记录）」（计数经 `Tr.callSummary` 单点）；**运行中该轮（live 且未 settled 且 `roleBusy`）默认展开（逐条
+  实时）**，**settled 收为折叠一行**（`foldTurnGroups`，批尾挂点 `flushDeferredFolds`——批内不折、不用
+  计时器）；用户手动开合记入 `activityOpen[roleId][组 id]` 并在会话内**优先于默认态**（settled 也不收），
+  键盘焦点在组内时不收；未放行/失败相位（同轮同 callId）并入组行且**独立未放行行照旧直显**（治理信号）。
 - `#chat > .op-chip` 新增定位规则（左缘对齐 `.chat-pane`，随列宽自适应）；chip 可见时 `.tool-current`
   「等待你确认」不渲染（`renderCurrentWork`↔`updateOpChip` 同源联动；「正在工作」保留且带转轮）。
 - 转轮类 `.spin-arc`（12px SVG）出现在：`.ti-status.st-working .ts-ico`（工作徽标）、`.tool-current`

@@ -1374,7 +1374,7 @@ ul.idx li.dir { color: var(--text-2); }
 .tool-records > summary::-webkit-details-marker { display: none; }
 .tool-records > summary::before { content: '\203A'; font-size: 18px; line-height: 16px; color: #8D9387; transform: rotate(0); transition: transform 0.12s ease; }
 .tool-records[open] > summary::before { transform: rotate(90deg); }
-.tool-records .record-count { margin-left: 10px; color: #91978B; font-size: 11px; }
+.tool-records .record-count { min-width: 0; overflow-wrap: anywhere; color: #91978B; font-size: 11px; }
 /* W5（2026-10-16 客户批准）：活动行 pad 8→5、首行上距 9→6、摘要行高 26→22（行高 53.1→47.1px，实测口径）。 */
 .tool-activity { display: grid; grid-template-columns: 42px minmax(0,1fr) auto; gap: 10px; align-items: start; padding: 5px 0; border-bottom: none; border-top: 1px solid #EFF1EB; font-size: 11px; }
 .tool-activity:first-of-type { margin-top: 6px; }

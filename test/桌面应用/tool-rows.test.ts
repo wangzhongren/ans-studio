@@ -232,16 +232,35 @@ test('S1：mergePhases——同一 toolCallId 两相位并入一行（首相位�
   assert.deepEqual(tools.mergePhases(null), []);
 });
 
-test('S4：callSummary——「N 个调用」；异常 M=含异常相位的行数；未知照旧如实（含状态未记录）', () => {
+// 折叠口径（2026-10-16 客户批准）修订：callSummary 增「未放行/失败」拆分与工具分解——旧「exceptional 计数」
+// 按新口径拆为 denied/failed（客户格式「含 X 条未放行 / 含 Y 条失败」+「a / b ×k」分解）；断言强度不降：
+// 调用数/未知照旧全等，异常事实拆类后**逐类全等**（非放松——字段替换按批准口径）。
+test('S4/折叠口径：callSummary——「N 个调用」+ 工具分解（首现序、×k）+ 未放行/失败拆分（未放行优先）+ 未知照旧如实', () => {
   const items = [
-    { callId: 'a', turnId: 't', status: 'call', exceptional: false },
-    { callId: 'a', turnId: 't', status: 'completed', exceptional: false },
-    { callId: 'b', turnId: 't', status: 'call', exceptional: false },
-    { callId: 'b', turnId: 't', status: 'unknown', exceptional: false },
-    { callId: 'c', turnId: 't', status: 'call', exceptional: false },
-    { callId: 'c', turnId: 't', status: 'failed', exceptional: true },
+    { callId: 'a', turnId: 't', status: 'call', toolName: 'read_file' },
+    { callId: 'a', turnId: 't', status: 'completed', toolName: 'read_file' },
+    { callId: 'b', turnId: 't', status: 'call', toolName: 'run_shell' },
+    { callId: 'b', turnId: 't', status: 'unknown', toolName: 'run_shell' },
+    { callId: 'c', turnId: 't', status: 'call', toolName: 'write_file' },
+    { callId: 'c', turnId: 't', status: 'failed', toolName: 'write_file' },
   ];
-  assert.deepEqual(tools.callSummary(items), { calls: 3, exceptional: 1, unknown: true }, '3 个调用、1 行含异常、含未记录');
-  assert.deepEqual(tools.callSummary([{ callId: 'x', turnId: 't', status: 'completed' }]), { calls: 1, exceptional: 0, unknown: false });
-  assert.deepEqual(tools.callSummary([]), { calls: 0, exceptional: 0, unknown: false });
+  assert.deepEqual(tools.callSummary(items), {
+    calls: 3, denied: 0, failed: 1, unknown: true,
+    tools: [ { name: 'read_file', count: 1 }, { name: 'run_shell', count: 1 }, { name: 'write_file', count: 1 } ],
+  }, '3 个调用、1 行失败、含未记录、分解按首现序');
+  // 未放行/失败拆分：denied 相位记入未放行；timed-out 归失败；同一行既有未放行又有失败相位 ⇒ 未放行优先（一笔调用只进一类）。
+  const mixed = [
+    { callId: 'd', turnId: 't', status: 'call', toolName: 'run_shell' },
+    { callId: 'd', turnId: 't', status: 'denied', toolName: 'run_shell' },
+    { callId: 'e', turnId: 't', status: 'call', toolName: 'run_shell' },
+    { callId: 'e', turnId: 't', status: 'timed-out', toolName: 'run_shell' },
+    { callId: 'f', turnId: 't', status: 'call', toolName: 'run_shell' },
+    { callId: 'f', turnId: 't', status: 'failed', toolName: 'run_shell' },
+    { callId: 'g', turnId: 't', status: 'call', toolName: 'run_shell' },
+    { callId: 'g', turnId: 't', status: 'denied', toolName: 'run_shell' },
+    { callId: 'g', turnId: 't', status: 'failed', toolName: 'run_shell' },
+  ];
+  assert.deepEqual(tools.callSummary(mixed), { calls: 4, denied: 2, failed: 2, unknown: false, tools: [{ name: 'run_shell', count: 4 }] }, '未放行 2（含两相位行优先归未放行）、失败 2（failed 与 timed-out）、×4 分解');
+  assert.deepEqual(tools.callSummary([{ callId: 'x', turnId: 't', status: 'completed', toolName: 'role_status' }]), { calls: 1, denied: 0, failed: 0, unknown: false, tools: [{ name: 'role_status', count: 1 }] });
+  assert.deepEqual(tools.callSummary([]), { calls: 0, denied: 0, failed: 0, unknown: false, tools: [] });
 });

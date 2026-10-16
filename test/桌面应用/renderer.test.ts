@@ -1494,14 +1494,24 @@ test("v3/W1–W6/W6b/S2：样式数值按批准默认档落位（实测口径见
   assert.ok(STYLES.includes(".op-chip { align-self: flex-start; min-height: 30px;"), "S2 未动 chip 卡样式（仅加定位规则）");
 });
 
-test("v3/W6b+S1/S4：渲染线——system 正文 displayBody、活动组「N 个调用」经纯函数单点", () => {
+test("v3/W6b+S1/S4+折叠口径：渲染线——system 正文 displayBody、折叠行文案与开合状态机经纯函数/单点", () => {
   assert.ok(RENDERER.includes("var bodyText = typeof inj.displayBody === \"string\" ? inj.displayBody : inj.body;"), "W6b：注入行正文取 displayBody（缺省原文——回交/派发不受影响）");
   assert.ok(RENDERER.includes("Md.renderMarkdown(bodyText)"), "W6b：正文渲染经 displayBody 单点");
   assert.ok(RENDERER.includes("var sum = Tr.callSummary(data.items);"), "S4：组摘要口径经 Tr.callSummary（纯函数单点）");
   assert.ok(RENDERER.includes("sum.calls + ' 个调用'"), "S4：文案「N 个调用」");
-  assert.ok(RENDERER.includes("' · 异常 ' + sum.exceptional"), "S4：异常时补「· 异常 M」");
+  // 折叠口径（2026-10-16 客户批准）修订：旧「· 异常 M」按新口径拆为「含 X 条未放行 / 含 Y 条失败」+
+  // 「本轮 N 个调用：a / b ×k / c」分解；未知标注保留。字段来源仍 Tr.callSummary 单点（拆分判据在 tool-rows）。
+  assert.ok(RENDERER.includes("\" · 含 \" + sum.denied + \" 条未放行\""), "折叠口径：未放行标注「含 X 条未放行」（sum.denied 单点）");
+  assert.ok(RENDERER.includes("\" · 含 \" + sum.failed + \" 条失败\""), "折叠口径：失败标注「含 Y 条失败」（sum.failed 单点）");
   assert.ok(RENDERER.includes("' · 含状态未记录'"), "S1：未知如实标注保留（折叠摘要可见）");
+  assert.ok(RENDERER.includes('"本轮 " + (sum.calls + \' 个调用\')'), "折叠口径：折叠行以「本轮 N 个调用：」起头（客户定稿格式）");
+  assert.ok(RENDERER.includes("t.name + (t.count > 1 ? \" ×\" + t.count : \"\")"), "折叠口径：工具分解「a / b ×k」（count>1 才带 ×k）");
   assert.ok(RENDERER.includes("Tr.mergePhases(data.items)"), "S1：合并经 Tr.mergePhases（下标映射——data.items 本体不动）");
+  // 折叠口径（2026-10-16 客户批准）：运行中默认展开、settled 收为折叠一行、手动开合优先——三个单点接线。
+  assert.ok(RENDERER.includes("return state.roleBusy[pane.dataset.roleId || \"\"] === true;"), "折叠口径：运行中默认展开以 roleBusy+settledTurns 同族判据（groupDefaultOpen）");
+  assert.ok(RENDERER.includes("foldTurnGroups(pane, ev.turnId)"), "折叠口径：settled 事件收折该轮工具组（foldTurnGroups 接线）");
+  assert.ok(RENDERER.includes("groupManualOpen(pane.dataset.roleId || \"\", rec.data.id) !== null") && RENDERER.includes("rec.el.contains(document.activeElement)"), "折叠口径：手动开合优先、组内焦点不吞（foldTurnGroups 守卫）");
+  assert.ok(RENDERER.includes("var assocGroup = null;"), "折叠口径：未放行/失败相位并入同调用组行（关联判据在 appendActivity 单点）");
   assert.ok(RENDERER.includes("data-activity-phases"), "S1：合并行携带相位下标（捕获/恢复与逐条身份保留）");
   assert.ok(RENDERER.includes("terminal.toolName || first.toolName"), "S1：终态为准（目标/标签以终态为主、首相位兜底）");
   assert.ok(RENDERER.includes("esc(stateText) + '</span></div>'"), "S1：行态按相位链呈现（各相位信息保留）");
