@@ -253,8 +253,9 @@ export interface DesktopDeps {
    */
   watchdogPendingSnapshot?: () => { total: number; byRole: Map<string, number> };
   /**
-   * **看护服务的注入项（G-2/W1；测试用）**：时钟与配置覆盖（生产走 env＋默认常量——tick 30s、静默 5min
-   * 仅 env 可调）。看护的服务对象＝listing 已导入项目 ∪ 有会话语/队列的项目。
+   * **看护服务的注入项（G-2/W1；测试用）**：时钟与配置覆盖（生产走 env＋默认常量——tick 30s、
+   * 静默 30s〔客户 2026-10-16 run-5 裁定：5min → 30s〕仅 env 可调）。看护的服务对象＝listing 已导入
+   * 项目 ∪ 有会话语/队列的项目。
    */
   watchdogOptions?: { now?: () => number; config?: Partial<WatchdogConfig> };
 }

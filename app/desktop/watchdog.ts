@@ -28,9 +28,12 @@
 // su 自身忙（正在处理）时，**关于 su 的**任何信号都不触发（它本来就在做工）。
 //
 // —— 完成态收束（W3，§七）——
-// 静默谓词（每 tick 评估）＋滞回：静默连续 ≥ N（默认 5 min，仅 env 可调）投**一条**收束提示（恰一次）；
+// 静默谓词（每 tick 评估）＋滞回：静默连续 ≥ N（默认 30 s＝**一个 tick 的最小防抖**，仅 env 可调）投
+// **一条**收束提示（恰一次；客户 2026-10-16 run-5 裁定 5 min → 30 s：静默谓词成立时已不可能再有自动
+// 活动，5 min 纯属延迟——原文与推理见 `角色卡/项目管理/docs/change/2026-10-15_change_kanban-fixes-pm-review.md`
+// 「客户裁定修订」及本角色 `docs/fix/2026-10-16_fix_closure-silence-30s.md`）；
 // 此后**只有真实活动**才重新武装——**刻意排除**看护自身的告警/收束/回执投递，以及 su 对收束提示的那一轮
-// 回复（防「总结完 → 5 分钟又催」的骚扰回路；由 SessionManager 按「该轮由 system 投递持有」判定并过滤）。
+// 回复（防「总结完 → 又被立即催」的骚扰回路；由 SessionManager 按「该轮由 system 投递持有」判定并过滤）。
 // 收束提示**不强迫 su 断言「完成」**：仅供 su 自行判断是否收尾。
 
 import { resolveRuntimeTimeouts } from "../../src/common/runtime-core/timeout.ts";
@@ -52,8 +55,17 @@ import {
 export const WATCHDOG_TICK_MS = 30000;
 /** tick 周期覆盖 env。 */
 export const WATCHDOG_TICK_ENV = "ANS_DESKTOP_WATCHDOG_TICK_MS";
-/** 完成静默阈值 N（毫秒；默认 5 min）。 */
-export const WATCHDOG_SILENCE_MS = 5 * 60 * 1000;
+/**
+ * 完成静默阈值 N（毫秒；默认 30 s）。
+ * 客户裁定（2026-10-16，run-5 真机观察后；原文与 PM 记档见
+ * `角色卡/项目管理/docs/change/2026-10-15_change_kanban-fixes-pm-review.md`「客户裁定修订」）：
+ * 「没有任务就应该直接收束——还等 5 分钟是尬，应该 su 自动收束」——默认值 5 min → **30 s**。
+ * 推理：静默谓词成立时（全角色空闲＋投递队列全空＋无在途＋无待确认＋无链在跑）系统已**不可能**再产生
+ * 新的自动活动——5 min 纯属延迟；30 s ＝ **一个 tick 的最小防抖**，足以防同一事件簇（如收束前最后一轮
+ * settled 与 tick 同刻到达）竞态。env `ANS_DESKTOP_WATCHDOG_SILENCE_MS` 可调保留（裁定明确）；
+ * 其余收束语义（滞回、反骚扰重武装、不强迫 su 断言）不变。
+ */
+export const WATCHDOG_SILENCE_MS = 30_000;
 /** 静默阈值覆盖 env。 */
 export const WATCHDOG_SILENCE_ENV = "ANS_DESKTOP_WATCHDOG_SILENCE_MS";
 /** #1 轮次逼近超时：有效已耗 ≥ 90% × 生效时限（默认 120s → 108s；放宽 900s → 810s）。 */
@@ -583,11 +595,15 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
       return;
     }
     closure.silenceSince ??= at;
-    if (at - closure.silenceSince >= config.silenceMs) {
-      const silentMinutes = Math.max(1, Math.round((at - closure.silenceSince) / 60000));
-      if (outbound(projectRoot, { text: renderClosurePrompt(silentMinutes), summary: `系统·收束 · 已无进行中任务（静默 ${silentMinutes} 分钟）` }, "closure")) {
+    const silentMs = at - closure.silenceSince;
+    if (silentMs >= config.silenceMs) {
+      // 冻结接口（PM 2026-10-16，随客户 5 min → 30 s 裁定）：文案渲染器改收**静默毫秒数**——
+      // `renderClosurePrompt(silentMs)`，自适应「N 秒/N 分钟」（编排单一来源）。此处**直接**传毫秒，
+      // 不再做分钟取整（旧的 `Math.max(1, …)` 会把 30 s 静默谎报成「已持续 1 分钟」）。
+      // summary 为呈现面（本模块自持）：同口径自适应时长；行文本不逐字抄编排文案。
+      if (outbound(projectRoot, { text: renderClosurePrompt(silentMs), summary: `系统·收束 · 已无进行中任务（静默 ${formatDurationMs(silentMs)}）` }, "closure")) {
         closure.fired = true;
-        loggerFor(projectRoot).record("watchdog.closure", { durationMs: at - closure.silenceSince });
+        loggerFor(projectRoot).record("watchdog.closure", { durationMs: silentMs });
       }
       // 投不出去（投递端异常）：silenceSince 保持不变——下个 tick 重试（投递机失败保留待重试的另一层已覆盖网络式失败）。
     }

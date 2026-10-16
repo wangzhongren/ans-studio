@@ -28,6 +28,10 @@ import {
   type WatchdogRoleView,
   type WatchdogService,
 } from "../../app/desktop/watchdog.ts";
+// W3 冻结接口钉（PM 2026-10-16，随客户 5min→30s 裁定）：`renderClosurePrompt(silentMs)`——桌面把**静默
+// 毫秒数直接**传入（不取整到分钟）。断言以「与同一渲染器同参直调逐字相等」钉 wiring，不抄文案
+// （文案逐字金文本归编排测试；编排并行切换 ms 口径后本钉自动升级为「30 秒」sub-minute 文案核对）。
+import { renderClosurePrompt } from "../../src/common/编排/watchdog.ts";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "..", "..");
@@ -453,8 +457,10 @@ test("T20 handback 事件被外推：会话句柄产出的回交事件经 emitEv
 // G-2（2026-10-16 客户批准；设计 2026-10-16_design_role-watchdog-and-closure.md §三/§七/§十一）：
 // **看护器（W1 信号 #1-#4 + W3 滞回收束）纯逻辑**——假快照＋注入时钟，node 下直接单测。
 // 覆盖：阈值边界、排除项（挂起确认卡角色 / su 自身忙）、去重与冷却、F-6 形态「看护恢复」行、
-// 风暴护栏、watchdog.failed 隔离、滞回状态机（恰一次 / su 回复不重武装 / 真实活动重武装 / 预热）。
-// 文案是**编排单一来源**（common/编排/watchdog.ts）——本组只钉关键不变式（文首/计数/次数），不逐字抄。
+// 风暴护栏、watchdog.failed 隔离、滞回状态机（静默恰 30s 恰一条 / 两 tick 内不重复 / su 回复不重武装 /
+// 真实活动重置 / 预热）。
+// 文案是**编排单一来源**（common/编排/watchdog.ts）——本组只钉关键不变式（文首/计数/次数/ms 直传），
+// 不逐字抄正文；收束 summary（本模块自持呈现面）按自适应时长逐字钉。
 // ——————————————————————————————————————————————————————————————————————————————————————
 
 interface WatchdogHarness {
@@ -483,7 +489,8 @@ function makeWatchdogHarness(): WatchdogHarness {
       delivered.push({ projectRoot: root, ...message });
     },
     now: () => ms,
-    config: { env: {}, silenceMs: 5 * 60 * 1000, tickMs: 30 * 1000 },
+    // 与生产默认同值（客户 2026-10-16 裁定：静默 30s＝一个 tick 的最小防抖）。
+    config: { env: {}, silenceMs: 30 * 1000, tickMs: 30 * 1000 },
   });
   return {
     service,
@@ -516,18 +523,43 @@ function wdSnapshot(over: Partial<WatchdogProjectSnapshot> = {}): WatchdogProjec
   };
 }
 
-test("G-2 配置：tick/静默仅 env 可调（非法/缺失回退默认 30s/5min）；阈值表取 §3.2 默认", () => {
+test("G-2 配置：tick/静默仅 env 可调（非法/缺失回退默认 30s/30s）；阈值表取 §3.2 默认", () => {
   const defaults = resolveWatchdogConfig({});
   assert.equal(defaults.tickMs, 30000, "默认 tick 30s");
-  assert.equal(defaults.silenceMs, 5 * 60 * 1000, "默认静默 5min");
+  assert.equal(defaults.silenceMs, 30_000, "默认静默 30s（客户 2026-10-16 run-5 裁定：5min → 30s）");
   assert.equal(defaults.turnDeadlineRatio, 0.9, "阈值 #1：90%");
   assert.equal(defaults.queueHeadAgeMs, 10 * 60 * 1000, "阈值 #2：队首 age 10min");
   assert.equal(defaults.queueDepth, 5, "阈值 #2 辅判：深度 5");
   assert.equal(defaults.repeatFailCount, 3, "阈值 #4：15min ≥3");
   const overridden = resolveWatchdogConfig({ [WATCHDOG_TICK_ENV]: "5000", [WATCHDOG_SILENCE_ENV]: "180000" });
   assert.equal(overridden.tickMs, 5000, "env 覆盖 tick");
-  assert.equal(overridden.silenceMs, 180000, "env 覆盖静默");
+  assert.equal(overridden.silenceMs, 180000, "env 覆盖静默（ANS_DESKTOP_WATCHDOG_SILENCE_MS 按裁定保留）");
+  assert.equal(resolveWatchdogConfig({ [WATCHDOG_TICK_ENV]: "5000", [WATCHDOG_SILENCE_ENV]: "5000" }).silenceMs, 5000, "env 毫秒口径：sub-minute（5s）同样合法");
   assert.equal(resolveWatchdogConfig({ [WATCHDOG_TICK_ENV]: "0", [WATCHDOG_SILENCE_ENV]: "abc" }).tickMs, 30000, "非法值回退默认（不炸）");
+  assert.equal(resolveWatchdogConfig({ [WATCHDOG_TICK_ENV]: "0", [WATCHDOG_SILENCE_ENV]: "abc" }).silenceMs, 30_000, "非法静默值回退默认 30s（不炸）");
+});
+
+test("G-2/W3 env 覆盖经服务生效：ANS_DESKTOP_WATCHDOG_SILENCE_MS=5000 ⇒ 满 5s 即投（sub-minute 自适应；不改默认常量）", () => {
+  let ms = 1_700_000_000_000;
+  const delivered: { text: string; summary: string }[] = [];
+  const service = createWatchdogService({
+    projects: () => ["/p"],
+    snapshot: () => wdSnapshot({ roles: [wdRole("A")] }),
+    deliver: (_root, message) => { delivered.push({ text: message.text, summary: message.summary }); },
+    now: () => ms,
+    // 沿生产口径：只经 env 注入（不传 silenceMs 覆盖）——覆盖链路 env → resolveWatchdogConfig → 判定。
+    config: { env: { [WATCHDOG_SILENCE_ENV]: "5000" }, tickMs: 30 * 1000 },
+  });
+  service.observe("/p", { kind: "settled", roleId: "A", outcome: "completed", at: ms, fromSystemDelivery: false });
+  service.tick(); // 静默起点
+  ms += 4_999;
+  service.tick();
+  assert.equal(delivered.length, 0, "未满 env 覆盖值（4.999s）不投");
+  ms += 1;
+  service.tick();
+  assert.equal(delivered.length, 1, "env 覆盖（5s）经服务生效：恰满即投");
+  assert.equal(delivered[0].text, renderClosurePrompt(5_000), "ms 直传（5_000）");
+  assert.equal(delivered[0].summary, "系统·收束 · 已无进行中任务（静默 5 秒）", "sub-minute env 值同口径自适应（5 秒）");
 });
 
 test("G-2/W1 #1：轮次 90% 生效时限才报（demo=120s → 108s 边界）；每轮一次；正常结束投「看护恢复」行", () => {
@@ -687,7 +719,7 @@ test("G-2/W1 看护器自身故障：快照抛错 ⇒ 只记诊断、不炸、�
   assert.equal(healed.delivered.length, 1, "下个 tick 重试即恢复工作");
 });
 
-test("G-2/W3 收束滞回：静默 ≥5min 恰一条；su 回复（system 投递持有的 settled）不重武装；真实活动重新武装", () => {
+test("G-2/W3 收束滞回：静默恰 30s 触发恰一条；两 tick 内不重复；su 回复（system 投递持有的 settled）不重武装；真实活动重置", () => {
   const h = makeWatchdogHarness();
   h.setSnapshot("/p", wdSnapshot({ roles: [wdRole("A")] }));
   // 预热未满足（从未 settled）⇒ 静默再久也不触发。
@@ -695,26 +727,40 @@ test("G-2/W3 收束滞回：静默 ≥5min 恰一条；su 回复（system 投递
   h.service.tick();
   assert.equal(h.delivered.length, 0, "预热：自导入以来至少一轮 settled（防空项目一进来就触发）");
   h.service.observe("/p", { kind: "settled", roleId: "A", outcome: "completed", at: h.nowMs(), fromSystemDelivery: false });
-  h.service.tick(); // 静默起点 = 本 tick
-  h.advance(5 * 60 * 1000 - 1000);
+  h.service.tick(); // 静默起点 = 本 tick（30s 阈值下首个静默 tick 只记起点，不投）
+  h.advance(30_000 - 1_000);
   h.service.tick();
-  assert.equal(h.delivered.length, 0, "未满 N 不触发");
-  h.advance(2000);
+  assert.equal(h.delivered.length, 0, "未满 N（29s）不触发");
+  h.advance(1_000);
   h.service.tick();
-  assert.equal(h.delivered.length, 1, "满 N 恰一条收束提示");
+  assert.equal(h.delivered.length, 1, "静默恰 30s（含边界）→ 满 N 恰一条收束提示");
   assert.ok(h.delivered[0].text.startsWith("[系统·收束]"), "文首＝编排单一来源（U1 归类判据）");
+  // 冻结接口钉（PM 2026-10-16）：桌面把**静默毫秒数直接**传入 renderClosurePrompt——与同参直调逐字相等
+  // （旧的「Math.max(1, …) 分钟取整」在此不成立：那会得到 renderClosurePrompt(1)，与 30_000 不等）。
+  assert.equal(h.delivered[0].text, renderClosurePrompt(30_000), "text ＝ renderClosurePrompt(静默毫秒数 30_000)——ms 口径不取整");
+  assert.ok(h.delivered[0].text.includes("30 秒") && !h.delivered[0].text.includes("1 分钟"), "sub-minute 文案＝「30 秒」（冻结接口自适应；旧 Math.max(1,…) 取整会谎报「1 分钟」）");
+  // summary＝本模块自持呈现面：自适应时长（sub-minute 说「30 秒」，不得再出现「1 分钟」式取整谎报）。
+  assert.equal(h.delivered[0].summary, "系统·收束 · 已无进行中任务（静默 30 秒）", "summary 自适应 sub-minute 表述");
+  // 两 tick 内不重复（fired 滞回：此后只等真实活动重武装）。
+  h.advance(30_000);
+  h.service.tick();
+  h.advance(30_000);
+  h.service.tick();
+  assert.equal(h.delivered.length, 1, "已投后两个 tick 内不重复（恰一次）");
   // su 对收束提示的那一轮回复：settled 由 system 投递持有 ⇒ **不算真实活动**（防骚扰回路）。
   h.service.observe("/p", { kind: "settled", roleId: "su", outcome: "completed", at: h.nowMs(), fromSystemDelivery: true });
   h.service.tick();
   h.advance(30 * 60 * 1000);
   h.service.tick();
-  assert.equal(h.delivered.length, 1, "静默窗口内至多一条：su 的收束回复不重新武装（5 分钟后不再催）");
-  // 真实活动（客户消息/派发等）⇒ 重新武装；随后再次静默满 N ⇒ 第二条。
+  assert.equal(h.delivered.length, 1, "静默窗口内至多一条：su 的收束回复不重新武装（30 秒过去也不再催）");
+  // 真实活动（客户消息/派发等）⇒ 重置（重新武装）；随后再次静默满 N ⇒ 第二条。
   h.service.observe("/p", { kind: "activity", reason: "customer-send" });
   h.service.tick(); // 起点重记
-  h.advance(5 * 60 * 1000 + 2000);
+  h.advance(30_000 + 2_000);
   h.service.tick();
-  assert.equal(h.delivered.length, 2, "真实活动开启新静默窗口 ⇒ 新一条收束提示");
+  assert.equal(h.delivered.length, 2, "真实活动重置 ⇒ 新静默窗口满 N ⇒ 新一条收束提示");
+  assert.equal(h.delivered[1].text, renderClosurePrompt(32_000), "第二条按新窗口实际静默毫秒数（32s）渲染");
+  assert.equal(h.delivered[1].summary, "系统·收束 · 已无进行中任务（静默 32 秒）", "summary 同口径自适应");
 });
 
 test("G-2/W3 静默谓词：任一非静默事实都拦（busy/队列/在途/待确认/链在跑）", () => {
@@ -741,12 +787,13 @@ test("G-2/W3 投递端异常：收束投不出去 ⇒ 不标已投——下个 t
   h.setSnapshot("/p", wdSnapshot());
   h.service.observe("/p", { kind: "settled", roleId: "A", outcome: "completed", at: h.nowMs(), fromSystemDelivery: false });
   h.service.tick();
-  h.advance(5 * 60 * 1000 + 2000);
+  h.advance(30_000 + 2_000);
   h.failNextDeliver();
   h.service.tick();
   assert.equal(h.delivered.length, 0, "投递端异常：未投出（不假装已投）");
   h.service.tick();
-  assert.equal(h.delivered.filter((d) => d.text.includes("收束")).length, 1, "下个 tick 重试成功——恰一条");
+  assert.equal(h.delivered.filter((d) => d.text.includes("收束")).length, 1, "下个 tick 重试成功——恰一条（32s 静默毫秒数原样重渲染）");
+  assert.equal(h.delivered[0].text, renderClosurePrompt(32_000), "重试复用同一静默毫秒数（32_000）");
   h.service.tick();
   assert.equal(h.delivered.filter((d) => d.text.includes("收束")).length, 1, "此后不重发");
 });

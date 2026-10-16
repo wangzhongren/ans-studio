@@ -61,7 +61,8 @@ test("G-2 契约①：三前缀逐字节＝ASCII `[`＋`系统`＋U+00B7 中点�
 test("G-2 契约①：四渲染器输出恒以「前缀＋一个 ASCII 空格」起始（U1 归类判据依赖）", () => {
   const outs: [string, string, string][] = [
     ["告警", WATCHDOG_ALERT_PREFIX, renderWatchdogAlert({ signal: "queue-stuck", roleId: "X", facts: ["队首已排队 12 分 0 秒（队列深度 3）"] })],
-    ["收束", WATCHDOG_CLOSURE_PREFIX, renderClosurePrompt(5)],
+    // 复裁后渲染器收毫秒（`renderClosurePrompt(silentMs)`）；30_000＝批准默认（静默 30s）——真实投递形态。
+    ["收束", WATCHDOG_CLOSURE_PREFIX, renderClosurePrompt(30_000)],
     ["恢复回执", WATCHDOG_RECOVERY_PREFIX, renderRecoveryReceipt({ outcome: "declined", action: "abort-turn", targetRoleId: "X", message: "客户取消" })],
   ];
   for (const [name, prefix, text] of outs) {
@@ -82,7 +83,7 @@ test("G-2 契约①：渲染侧 tool-rows.js 归类面——三前缀＋扩充�
     assert.equal(r!.sourceRoleId, "", "来源恒空（系统非角色）");
   }
   // 真实渲染输出（含「用户指令：」回显前缀）也归 system。
-  const echoed = ToolRows.classifyInjectedMessage(`用户指令：${renderClosurePrompt(5)}`);
+  const echoed = ToolRows.classifyInjectedMessage(`用户指令：${renderClosurePrompt(30_000)}`);
   assert.equal(echoed?.kind, "system", "回显前缀剥离后按标记归类");
   // 不误伤矩阵（独立构造）：全角括号/无闭合/空子类/无空白衔接/超长子类/U+30FB 冒牌中点 ⇒ null（回落普通气泡）。
   const negatives = [

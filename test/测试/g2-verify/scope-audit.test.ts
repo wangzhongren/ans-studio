@@ -2,6 +2,9 @@
 // ① 9 项客户批准裁定逐条落地核实；② 未批准项/设计非目标零实施；③ 看护永不改判定（源码/导入面审计）；
 // ④ su 卡「看护职责」段（门禁引擎 G）诚实性与授权词避让；⑤ 恢复卡零计时器（行为钉，真等 1.2s）；
 // ⑥ V1 无界面级告警（裁定 9，多维审计）。
+// 注：裁定 1 经客户 2026-10-16 run-5 真机观察后复裁（静默默认 5min → 30s；渲染器接口改毫秒
+// `renderClosurePrompt(silentMs)`；「保名改值」WATCHDOG_DEFAULT_SILENT_MINUTES 5 → 0.5）——
+// 本文件已按复裁刷新为对新批准值的严格断言（非放松；修订记录见 PM 记档「客户裁定修订」）。
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -45,13 +48,19 @@ const read = (rel: string): string => fs.readFileSync(path.join(REPO, rel), "utf
 
 // ————————————————— ① 9 项裁定逐条 —————————————————
 
-test("裁定 1：静默 5min / tick 30s——缺省常量恰批准值；**仅 env 可调**（覆盖名唯一、非法回落）；UI/设置面板零暴露", () => {
-  assert.equal(WATCHDOG_SILENCE_MS, 5 * 60 * 1000, "静默缺省 5min");
+test("裁定 1（2026-10-16 复裁）：静默 30s / tick 30s——缺省常量恰批准值；**仅 env 可调**（覆盖名唯一、未设/非法回落）；UI/设置面板零暴露", () => {
+  assert.equal(WATCHDOG_SILENCE_MS, 30_000, "静默缺省 30s（复裁修订：5min → 30s＝一个 tick 最小防抖）");
   assert.equal(WATCHDOG_TICK_MS, 30 * 1000, "tick 缺省 30s");
   assert.equal(WATCHDOG_SILENCE_ENV, "ANS_DESKTOP_WATCHDOG_SILENCE_MS");
   assert.equal(WATCHDOG_TICK_ENV, "ANS_DESKTOP_WATCHDOG_TICK_MS");
-  assert.equal(WATCHDOG_DEFAULT_SILENT_MINUTES, 5, "批准默认值（文案回退）");
-  // env 覆盖生效 + 非法回落默认（不静默改口径）
+  assert.equal(WATCHDOG_DEFAULT_SILENT_MINUTES, 0.5, "批准默认值（保名改值：0.5 分钟＝30 秒——文案回退单一来源）");
+  assert.equal(
+    WATCHDOG_DEFAULT_SILENT_MINUTES * 60_000,
+    WATCHDOG_SILENCE_MS,
+    "两模块默认一致：0.5 分钟 × 60 000 ＝ 30 000 ms（桌面判定与编排文案回退＝同一复裁值，不许单侧漂移）",
+  );
+  // env 覆盖生效 + 未设/非法回落默认（不静默改口径）
+  assert.equal(resolveWatchdogConfig({}).silenceMs, 30_000, "未设 env ⇒ 默认 30 000（复裁值）");
   assert.equal(resolveWatchdogConfig({ [WATCHDOG_SILENCE_ENV]: "60000", [WATCHDOG_TICK_ENV]: "5000" }).silenceMs, 60000);
   assert.equal(resolveWatchdogConfig({ [WATCHDOG_SILENCE_ENV]: "5000" }).tickMs, WATCHDOG_TICK_MS, "未设 tick ⇒ 默认");
   for (const bad of ["0", "-1", "abc", "NaN", " "]) {
@@ -181,7 +190,7 @@ test("看护永不改判定：四类渲染输出的正文零授权语义（行�
     renderWatchdogAlert({ signal: "cmd-timeout", roleId: "X", facts: ["02:10:03（结构化事实 display.process.timedOut=true）"] }),
     renderWatchdogRecovery({ signal: "queue-stuck", roleId: "X", hits: 3, suppressed: 2 }),
     renderWatchdogStormGuard(4),
-    renderClosurePrompt(5),
+    renderClosurePrompt(30_000),
     renderRecoveryReceipt({ outcome: "executed", action: "abort-turn", targetRoleId: "X", operatorId: "op", at: "2026-10-16T00:00:00.000Z" }),
     renderRecoveryReceipt({ outcome: "declined", action: "redeliver", targetRoleId: "X", operatorId: "op" }),
   ];

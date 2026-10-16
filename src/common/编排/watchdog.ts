@@ -39,8 +39,15 @@ export const WATCHDOG_RECOVERY_PREFIX = "[系统·恢复]";
  */
 export const WATCHDOG_DISCIPLINE_LINE = "看护仅如实告知——是否处理由你判断；不得据此假设任何写权。";
 
-/** 收束阈值的**批准默认值**（客户 2026-10-16 裁定：静默 5 min / tick 30 s，V1 仅 env）。 */
-export const WATCHDOG_DEFAULT_SILENT_MINUTES = 5;
+/**
+ * 收束阈值的**批准默认值**（客户 2026-10-16 **复裁：静默 30 秒**——＝一个 tick 的最小防抖，
+ * 取代原「5 min」默认；V1 仍仅 env 可调，阈值判定归桌面窗口）。
+ * **保名改值**：名字沿用「分钟」口径（**0.5 分钟 ＝ 30 000 ms**）——`test/测试/g2-verify/` 等外部
+ * 消费方**按名导入**本常量，改名即越界破坏其编译；客户裁定两法（改名毫秒常量 / 保名改值）皆可，
+ * 本项选后者（导出名未变，语义值 5 → 0.5，影响面登记于实施记录）。
+ * 渲染器接口以毫秒计（`renderClosurePrompt(silentMs)`）：非法输入回退 = 本值 × 60 000 ms。
+ */
+export const WATCHDOG_DEFAULT_SILENT_MINUTES = 0.5;
 
 // —————————————— 支柱一 a)：异常告警（设计 §3.2/§3.3） ——————————————
 
@@ -123,14 +130,19 @@ export function renderWatchdogStormGuard(suppressedCount: number): string {
 // —————————————— 支柱二：完成态收束提示（设计 §7.3） ——————————————
 
 /**
- * **收束提示文案——单一来源**（设计 §7.3 草案；`silentMinutes` = 生效的静默阈值 N）。
- * **不强迫 su 断言「完成」**——提示明确「仅为系统侧静默判定，不代表任何验收结论」；
- * 非法/非正的 N 按批准默认值（5）渲染（不编造小数、不静默改变口径）。
+ * **收束提示文案——单一来源**（设计 §7.3 草案；客户 2026-10-16 复裁：冻结接口
+ * `renderClosurePrompt(silentMs)`，参数单位**毫秒**——原分钟参数作废）。
+ * 时长自适应两档：≥ 60 000 ms 用「N 分钟」、< 60 000 ms 用「N 秒」；两档**一律向下取整（floor）**
+ * ——显示值为已静默时长的**下界**（只说「至少这么久」，读数恒不超出实际，杜绝夸大；亚秒输入渲染
+ * 「0 秒」，不编造、不上抛）。**不强迫 su 断言「完成」**——提示明确「仅为系统侧静默判定，不代表
+ * 任何验收结论」；非法输入（非有限或 ≤ 0）回退批准默认值 30 秒（＝`WATCHDOG_DEFAULT_SILENT_MINUTES`
+ * 0.5 分钟 × 60 000 ＝ 30 000 ms）。
  */
-export function renderClosurePrompt(silentMinutes: number): string {
-  const n = Number.isFinite(silentMinutes) && silentMinutes > 0 ? silentMinutes : WATCHDOG_DEFAULT_SILENT_MINUTES;
+export function renderClosurePrompt(silentMs: number): string {
+  const ms = Number.isFinite(silentMs) && silentMs > 0 ? silentMs : WATCHDOG_DEFAULT_SILENT_MINUTES * 60_000;
+  const duration = ms >= 60_000 ? `${Math.floor(ms / 60_000)} 分钟` : `${Math.floor(ms / 1000)} 秒`;
   return [
-    `${WATCHDOG_CLOSURE_PREFIX} 已无进行中任务：全部角色空闲、投递队列为空、无待确认，已持续 ${n} 分钟。`,
+    `${WATCHDOG_CLOSURE_PREFIX} 已无进行中任务：全部角色空闲、投递队列为空、无待确认，已持续 ${duration}。`,
     "请核对是否达到收尾条件：",
     "· 若确认完成——请给客户最终总结（交付物／验证结论／遗留项）；",
     "· 若还有未了事项（含你正在等待的客户答复之外的口头承诺）——继续处理或派发。",

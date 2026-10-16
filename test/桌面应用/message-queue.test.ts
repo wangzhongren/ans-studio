@@ -530,7 +530,8 @@ function makeG2Harness(): G2Harness {
     snapshot: (root) => mgr.watchdogSnapshot(root),
     deliver: (root, message) => mgr.watchdogDeliver(root, message),
     now: () => ms,
-    config: { env: {}, silenceMs: 5 * 60 * 1000, tickMs: 30 * 1000 },
+    // 与生产默认同值（客户 2026-10-16 run-5 裁定：静默 30s＝一个 tick 的最小防抖，5min → 30s）。
+    config: { env: {}, silenceMs: 30 * 1000, tickMs: 30 * 1000 },
   });
   mgr = new SessionManager({
     openRoleSession: async (input) => makeHandle(input.roleId),
@@ -593,7 +594,7 @@ test("G-2/W2：`system` 第四类投递——su 忙时入队（快照 kind=syste
   await h.mgr.stop(null);
 });
 
-test("G-2/W3 集成：完成静默 ≥N ⇒ su 收到收束提示（恰一条）；su 的收束回复不重武装；真实活动重武装", async () => {
+test("G-2/W3 集成：完成静默恰 30s ⇒ su 收到收束提示（恰一条）；su 的收束回复不重武装；真实活动重武装", async () => {
   const h = makeG2Harness();
   await h.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
   await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
@@ -605,13 +606,13 @@ test("G-2/W3 集成：完成静默 ≥N ⇒ su 收到收束提示（恰一条）
   await s1;
   await tick(150);
   assert.ok(h.observations.some((o) => o.observation.kind === "settled" && o.observation.roleId === "A"), "settled 观察已转发（wasBusy 翻转）");
-  // 静默打点 → 满 N（假时钟）→ tick ⇒ 收束提示经投递机送达 su。
+  // 静默打点 → 满 N（假时钟；30s 阈值）→ tick ⇒ 收束提示经投递机送达 su。
   h.service.tick();
-  h.advance(5 * 60 * 1000 + 2000);
+  h.advance(30 * 1000 + 2_000);
   h.service.tick();
   await tick(150);
   const closured = h.sent.su.filter((t) => t.startsWith("[系统·收束]"));
-  assert.equal(closured.length, 1, "静默满 N：su 收到恰一条收束提示（真投递，不是系统行）");
+  assert.equal(closured.length, 1, "静默满 N（30s）：su 收到恰一条收束提示（真投递，不是系统行）");
   // su 处理收束提示的那一轮（由 system 投递持有）：settle **不算真实活动**（不重新武装）。
   h.streams.su.push({ kind: "settled", summary: "su 收束回复结束", detail: { outcome: "completed" } });
   await tick(150);
@@ -626,10 +627,10 @@ test("G-2/W3 集成：完成静默 ≥N ⇒ su 收到收束提示（恰一条）
   await s2;
   await tick(150);
   h.service.tick(); // 静默起点
-  h.advance(5 * 60 * 1000 + 2000);
+  h.advance(30 * 1000 + 2_000);
   h.service.tick();
   await tick(150);
-  assert.equal(h.sent.su.filter((t) => t.startsWith("[系统·收束]")).length, 2, "真实活动后新静默窗口 ⇒ 新一条收束提示");
+  assert.equal(h.sent.su.filter((t) => t.startsWith("[系统·收束]")).length, 2, "真实活动后新静默窗口满 N（30s）⇒ 新一条收束提示");
   await h.mgr.stop(null);
 });
 

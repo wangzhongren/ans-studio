@@ -148,7 +148,7 @@ test("文首标记契约（U1 对齐）：三前缀与全部渲染输出满足 `
     renderWatchdogAlert({ signal: "queue-stuck", roleId: "X", facts: ["f"] }),
     renderWatchdogRecovery({ signal: "queue-stuck", roleId: "X", hits: 1, suppressed: 0 }),
     renderWatchdogStormGuard(1),
-    renderClosurePrompt(5),
+    renderClosurePrompt(30_000),
     renderRecoveryReceipt({ action: "abort-turn", targetRoleId: "X", outcome: "executed" }),
   ];
   for (const text of outputs) {
@@ -221,10 +221,10 @@ test("renderWatchdogAlert：事实为空 → 如实标注（不编造）；rende
   assert.equal(renderWatchdogStormGuard(-1), "[系统·看护] 看护告警已抑制 0 条（风暴护栏）。", "负数归零");
 });
 
-// —— 文案单一来源：收束提示（设计 §7.3） ——
+// —— 文案单一来源：收束提示（设计 §7.3；客户 2026-10-16 复裁：默认 30 秒、接口毫秒） ——
 
-test("renderClosurePrompt：5 分钟逐字金文本（不强迫断言「完成」）；N 参数化；非法 N 回退批准默认值", () => {
-  const five = renderClosurePrompt(5);
+test("renderClosurePrompt(silentMs)：两档自适应逐字金文本（300s＝5 分钟；30s＝30 秒）；60s 恰跨档；不强迫断言「完成」", () => {
+  const five = renderClosurePrompt(300_000);
   assert.equal(
     five,
     [
@@ -238,10 +238,25 @@ test("renderClosurePrompt：5 分钟逐字金文本（不强迫断言「完成�
   assert.ok(five.startsWith(`${WATCHDOG_CLOSURE_PREFIX} `), "文首统一 [系统·收束] + 空格");
   assert.ok(five.includes("不代表任何验收结论"), "不强迫 su 断言「完成」");
 
-  assert.ok(renderClosurePrompt(3).includes("已持续 3 分钟"), "N 参数化（静默阈值仅 env 配置）");
-  assert.equal(WATCHDOG_DEFAULT_SILENT_MINUTES, 5, "批准默认 5 分钟");
-  assert.ok(renderClosurePrompt(0).includes("已持续 5 分钟"), "非正 N → 批准默认值");
-  assert.ok(renderClosurePrompt(Number.NaN).includes("已持续 5 分钟"), "非有限 N → 批准默认值");
+  assert.ok(renderClosurePrompt(30_000).includes("已持续 30 秒"), "复裁默认 30 s → 「30 秒」（< 60 s 秒档）");
+  assert.ok(renderClosurePrompt(45_000).includes("已持续 45 秒"), "N 参数化（秒档）");
+  assert.ok(renderClosurePrompt(59_999).includes("已持续 59 秒"), "60 s 边界内侧一点仍为秒档");
+  assert.ok(renderClosurePrompt(60_000).includes("已持续 1 分钟"), "60 s 边界：恰跨入分钟档");
+  assert.ok(renderClosurePrompt(300_000).includes("已持续 5 分钟"), "300 s → 「5 分钟」");
+  assert.ok(renderClosurePrompt(600_000).includes("已持续 10 分钟"), "分钟档无上限（V1 恰两档：秒/分钟）");
+});
+
+test("renderClosurePrompt(silentMs)：floor 下界口径（90500→1 分钟；亚秒→0 秒）；非法输入回退默认 30 秒；常量自洽", () => {
+  assert.ok(renderClosurePrompt(90_500).includes("已持续 1 分钟"), "分钟档 floor：显示值为时长下界，绝不夸大（90500 ms 不渲染「2 分钟」）");
+  assert.ok(renderClosurePrompt(500).includes("已持续 0 秒"), "秒档 floor：亚秒渲染「0 秒」（不编造、不上抛）");
+
+  const fallback = renderClosurePrompt(WATCHDOG_DEFAULT_SILENT_MINUTES * 60_000);
+  assert.ok(fallback.includes("已持续 30 秒"), "默认常量 × 60000 ≡ 30000 ms → 渲染「30 秒」");
+  assert.equal(WATCHDOG_DEFAULT_SILENT_MINUTES, 0.5, "复裁默认值：0.5 分钟（＝30 秒）——保名改值（外部按名导入面不破坏）");
+  assert.equal(WATCHDOG_DEFAULT_SILENT_MINUTES * 60_000, 30_000, "常量自洽：0.5 分钟恰 30 000 ms（精确、无浮点尾差）");
+  for (const bad of [0, -1, -0.5, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+    assert.equal(renderClosurePrompt(bad), fallback, `非法输入 ${String(bad)} → 回退默认 30 秒渲染`);
+  }
 });
 
 // —— 文案单一来源：恢复回执（设计 §六） ——
