@@ -4,6 +4,7 @@ import { mkdtemp, readFile, access, rm, symlink, mkdir, writeFile } from "node:f
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { randomUUID, createHash } from "node:crypto";
+import { fileURLToPath } from "node:url";
 import { setTimeout as delay, setImmediate as nextIO } from "node:timers/promises";
 import { createSdkMcpServer } from "@anthropic-ai/claude-agent-sdk";
 import type { Options, SDKMessage, SDKUserMessage, Query } from "@anthropic-ai/claude-agent-sdk";
@@ -31,12 +32,13 @@ const environment = { PATH: process.env.PATH, HOME: process.env.HOME, ANTHROPIC_
 type Script = (client: Client, options: Options, user: SDKUserMessage, queryIndex: number, rawCall: Client["callTool"]) => Promise<{ fail?: boolean; id?: string; frames?: SDKMessage[] } | void>;
 
 /** A real MCP Client/Server pair drives production registration, parsing and handlers; only query is fake. */
-function fake(script: Script) {
+function fake(script: Script, statuses: unknown[] | (() => Promise<unknown[]>) = []) {
   const configurations: Options[] = [];
   const users: SDKUserMessage[] = [];
   let loadCount = 0;
   let interrupts = 0;
   let closes = 0;
+  let statusCalls = 0;
   const query = ({ prompt, options }: { prompt: string | AsyncIterable<SDKUserMessage>; options?: Options }) => {
     assert.equal(typeof prompt, "object");
     const opts = options!;
@@ -78,10 +80,11 @@ function fake(script: Script) {
     return Object.assign(generator, {
       async interrupt() { interrupts++; },
       close() { closed = true; closes++; void connected.then(() => client.close()).catch(() => {}); },
+      async mcpServerStatus() { statusCalls++; return typeof statuses === "function" ? await statuses() : statuses; },
     }) as unknown as Query;
   };
   return {
-    configurations, users, get loadCount() { return loadCount; }, get interrupts() { return interrupts; }, get closes() { return closes; },
+    configurations, users, get loadCount() { return loadCount; }, get interrupts() { return interrupts; }, get closes() { return closes; }, get statusCalls() { return statusCalls; },
     dependencies: { env: environment, loadSdk: async () => { loadCount++; return { createSdkMcpServer, query }; }, loadZod: async () => z },
   };
 }
@@ -995,4 +998,143 @@ test("installed-skills section: non-empty splices the orchestration render verba
   const good = "good content\n";
   await put("good-skill", registration("旁路好件"), good);
   assert.equal((await runPrompt()).systemPrompt, `${statusQuo}\n\n${section([line("good-skill", "旁路好件", good)])}`);
+}));
+
+test("installed MCP declarations assemble only when injected: launcher-wrapped command, env:NAME resolved, server-level allowedTools", async () => fixture(async (root) => {
+  const launcherPath = fileURLToPath(new URL("../../src/common/claude-adapter/mcp-launcher.mjs", import.meta.url));
+  await access(launcherPath); // plain on-disk file (electron-builder asar: false) — the spawned path must exist
+
+  // Absent: the pre-P1 mcpServers/allowedTools surface is byte-identical.
+  const base = fake(async () => undefined);
+  const baseSession = await createClaudeRuntimeAdapter(options(root, [probeTool()]), base.dependencies).bindRole(role);
+  const baseReading = collect(baseSession, 1);
+  await baseSession.prompt("no installed");
+  await baseReading;
+  assert.deepEqual(Object.keys(base.configurations[0]!.mcpServers!), ["ans"]);
+  assert.deepEqual(base.configurations[0]!.allowedTools, ["mcp__ans__probe"]);
+  assert.equal(base.statusCalls, 0);
+  await baseSession.dispose();
+
+  // Injected: launcher-wrapped command; env:NAME expanded from the construction-time snapshot; a
+  // missing reference target is omitted; alwaysLoad + finite timeout; server-level auto-allow.
+  const engine = fake(async () => undefined);
+  const session = await createClaudeRuntimeAdapter({ ...options(root, [probeTool()]), installedMcpServers: [{
+    name: "ext_tool", command: "/usr/bin/env", args: ["node", "-e", "0"],
+    env: { LITERAL: "plain-value", FROM_ENV: "env:PROBE_REF", MISSING: "env:PROBE_ABSENT" },
+  }] }, { ...engine.dependencies, env: { ...environment, PROBE_REF: "probe-ref-value" } }).bindRole(role);
+  const reading = collect(session, 1);
+  await session.prompt("installed");
+  await reading;
+  const config = engine.configurations[0]!;
+  assert.deepEqual(config.mcpServers!.ext_tool, {
+    type: "stdio", command: process.execPath, args: [launcherPath, "/usr/bin/env", "node", "-e", "0"],
+    env: { LITERAL: "plain-value", FROM_ENV: "probe-ref-value", ANS_MCP_LAUNCHER_PASSTHROUGH: '["LITERAL","FROM_ENV"]' },
+    alwaysLoad: true, timeout: 60000,
+  });
+  assert.equal(JSON.stringify(config.mcpServers!.ext_tool).includes("ELECTRON_RUN_AS_NODE"), false);
+  assert.deepEqual(config.allowedTools, ["mcp__ans__probe", "mcp__ext_tool"]);
+  assert.equal(config.strictMcpConfig, true);
+  await session.dispose();
+}));
+
+test("installed MCP allow branch: name+dynamic source+live turn only, args pass unchanged, adversarials stay denied", async () => fixture(async (root) => {
+  const engine = fake(async (_client, config, user) => {
+    const hook = config.hooks!.PreToolUse![0]!.hooks[0]!;
+    const decision = (result: Awaited<ReturnType<typeof hook>>) => (result as { hookSpecificOutput?: { permissionDecision?: string } }).hookSpecificOutput?.permissionDecision;
+    const call = (toolName: string, promptId: string | undefined, mcpServer: { name: string; source: string } | undefined, input: unknown = { text: "model-input" }) => hook(
+      { hook_event_name: "PreToolUse", prompt_id: promptId, tool_name: toolName, tool_input: input, tool_use_id: "toolu_ext", session_id: "fixture", transcript_path: "fixture", cwd: root, ...(mcpServer ? { mcp_server: mcpServer } : {}) },
+      "toolu_ext", { signal: new AbortController().signal });
+    const allowed = await call("mcp__ext__echo", user.uuid, { name: "ext", source: "dynamic" }) as { hookSpecificOutput: { permissionDecision: string; updatedInput?: Record<string, unknown> } };
+    assert.equal(allowed.hookSpecificOutput.permissionDecision, "allow");
+    assert.equal("updatedInput" in allowed.hookSpecificOutput, false);
+    assert.equal(JSON.stringify(allowed).includes("__ans_call_context"), false);
+    for (const [toolName, promptId, mcpServer] of [
+      ["mcp__ext__echo", user.uuid, { name: "other", source: "dynamic" }],
+      ["mcp__ext__echo", user.uuid, { name: "ext", source: "sdk" }],
+      ["mcp__ext__echo", user.uuid, { name: "ext", source: "user" }],
+      ["mcp__ext__echo", user.uuid, undefined],
+      ["mcp__ext__echo", undefined, { name: "ext", source: "dynamic" }],
+      ["mcp__ext__echo", "unknown-native", { name: "ext", source: "dynamic" }],
+      ["mcp__extother__probe", user.uuid, { name: "ext", source: "dynamic" }],
+      ["Bash", user.uuid, undefined],
+      ["WebSearch", user.uuid, undefined],
+    ] as Array<[string, string | undefined, { name: string; source: string } | undefined]>) {
+      assert.equal(decision(await call(toolName, promptId, mcpServer)), "deny", `${toolName}/${mcpServer?.name ?? "none"}`);
+    }
+    // The ANS in-process branch is untouched.
+    const ans = await call("mcp__ans__probe", user.uuid, { name: "ans", source: "sdk" }) as { hookSpecificOutput: { permissionDecision: string; updatedInput?: Record<string, unknown> } };
+    assert.equal(ans.hookSpecificOutput.permissionDecision, "allow");
+    assert.equal(typeof ans.hookSpecificOutput.updatedInput!.__ans_call_context, "string");
+    return;
+  });
+  const session = await createClaudeRuntimeAdapter({ ...options(root, [probeTool()]), installedMcpServers: [{ name: "ext", command: "/bin/echo", args: [] }] }, engine.dependencies).bindRole(role);
+  const reading = collect(session, 1);
+  await session.prompt("allow branch");
+  const rows = await reading;
+  const starts = rows.filter((row) => row.kind === "tool_call" && (row.detail as { toolName?: string }).toolName === "mcp__ext__echo");
+  assert.equal(starts.length, 1);
+  assert.equal((starts[0]!.detail as { toolCallId: string }).toolCallId.endsWith(":toolu_ext"), true);
+  await session.dispose();
+}));
+
+test("installed MCP frames pair start/result like WebSearch; unregistered late results stay unconsumed", async () => fixture(async (root) => {
+  let turnIndex = 0;
+  const engine = fake(async (_client, config, user) => {
+    const index = turnIndex++;
+    if (index === 0) {
+      const hook = config.hooks!.PreToolUse![0]!.hooks[0]!;
+      const result = await hook({ hook_event_name: "PreToolUse", prompt_id: user.uuid, tool_name: "mcp__ext__echo", tool_input: { text: "pair-probe" }, tool_use_id: "toolu_ext_pair", session_id: "fixture", transcript_path: "fixture", cwd: root, mcp_server: { name: "ext", source: "dynamic" } }, "toolu_ext_pair", { signal: new AbortController().signal });
+      assert.equal((result as { hookSpecificOutput: { permissionDecision: string } }).hookSpecificOutput.permissionDecision, "allow");
+      return { frames: [assistantFrame([{ type: "tool_use", id: "toolu_ext_pair", name: "mcp__ext__echo", input: { text: "pair-probe" } }]), toolResultFrame("toolu_ext_pair", [{ type: "text", text: "fake-echo:pair-probe" }], false)] };
+    }
+    // A late result whose call frame was never seen must never be consumed or attributed.
+    return { frames: [toolResultFrame("toolu_ext_unknown", "late stray result", false)] };
+  });
+  const session = await createClaudeRuntimeAdapter({ ...options(root, [probeTool()]), installedMcpServers: [{ name: "ext", command: "/bin/echo", args: [] }] }, engine.dependencies).bindRole(role);
+  const reading = collect(session, 2);
+  await session.prompt("native call");
+  await session.prompt("stray result");
+  const rows = await reading;
+  const starts = rows.filter((row) => row.kind === "tool_call" && (row.detail as { toolName?: string }).toolName === "mcp__ext__echo");
+  const results = rows.filter((row) => row.kind === "accepted");
+  assert.equal(starts.length, 1);
+  assert.equal(results.length, 1);
+  assert.equal((results[0]!.detail as { toolCallId: string }).toolCallId, (starts[0]!.detail as { toolCallId: string }).toolCallId);
+  assert.equal((starts[0]!.detail as { toolCallId: string }).toolCallId.endsWith(":toolu_ext_pair"), true);
+  assert.equal(results[0]!.summary, "fake-echo:pair-probe");
+  assert.equal(rows.some((row) => row.kind === "denied"), false);
+  await session.dispose();
+}));
+
+test("installed MCP status pass: failed/needs-auth report one honest category line per engine; connected silent; status errors never fail the turn", async () => fixture(async (root) => {
+  const statuses = [
+    { name: "ext", status: "failed", error: "ENOENT: no such file or directory, posix_spawn 'stdio'" },
+    { name: "authy", status: "needs-auth" },
+    { name: "ext2", status: "connected", serverInfo: { name: "fake", version: "1.0.0" }, tools: [{ name: "echo" }] },
+    { name: "ans", status: "connected", tools: [] },
+  ];
+  const installed = [{ name: "ext", command: "/bin/echo", args: [] }, { name: "authy", command: "/bin/echo", args: [] }, { name: "ext2", command: "/bin/echo", args: [] }];
+  const engine = fake(async () => undefined, statuses);
+  const session = await createClaudeRuntimeAdapter({ ...options(root, [probeTool()]), installedMcpServers: installed }, engine.dependencies).bindRole(role);
+  const reading = collect(session, 2);
+  await session.prompt("one");
+  await session.prompt("two");
+  const rows = await reading;
+  const messages = rows.filter((row) => row.kind === "message").map((row) => row.summary);
+  assert.equal(messages.filter((message) => message === "已安装 MCP「ext」未连接：ENOENT").length, 1);
+  assert.equal(messages.some((message) => message === "已安装 MCP「authy」未连接：needs-auth"), true);
+  assert.equal(messages.some((message) => message.includes("ext2")), false);
+  assert.equal(messages.some((message) => message.includes("posix_spawn")), false);
+  assert.equal(engine.statusCalls, 1);
+  await session.dispose();
+
+  // A failing status query is swallowed; the turn still completes and reports nothing.
+  const failing = fake(async () => undefined, () => { throw new Error("status query exploded"); });
+  const failingSession = await createClaudeRuntimeAdapter({ ...options(root, [probeTool()]), installedMcpServers: [installed[0]!] }, failing.dependencies).bindRole(role);
+  const failingReading = collect(failingSession, 1);
+  await failingSession.prompt("status failure");
+  const failingRows = await failingReading;
+  assert.equal((failingRows.filter((row) => row.kind === "settled").at(-1)!.detail as { outcome: string }).outcome, "completed");
+  assert.equal(failing.statusCalls, 1);
+  await failingSession.dispose();
 }));

@@ -1,5 +1,5 @@
 import { RUNTIME_CREDENTIAL_ENV_VARS } from "../shared/runtime-shared.ts";
-import type { RuntimeProviderOptions } from "../../model/runtime.ts";
+import type { RuntimeProviderOptions, InstalledMcpServerV1 } from "../../model/runtime.ts";
 import { object } from "./protocol.ts";
 
 // Verified from the official config schema and codex 0.162.0-alpha.17.2 features list.
@@ -62,15 +62,47 @@ export function safetyConfig(cwd: string, webSearch = false): Record<string, unk
   };
 }
 
+/**
+ * G-4 V2（P2）：已安装 MCP 的 per-call 超时（秒；评估 R6——外来 server 单调用不得挂到轮级时限；
+ * P0 探针实证 `tool_timeout_sec` 为 per-call 键且 0.25s 生效）。策略值，集中单点可调。
+ */
+export const INSTALLED_MCP_TOOL_TIMEOUT_SEC = 300;
+
+/**
+ * G-4 V2（P2）单一编码来源：`mcp_servers` 根 map 覆盖串——白名单定义＋禁用集**必须编入同一条**
+ * （P0 探针铁律：连续两条 `-c` 同根键＝后者整体覆盖、不合并）。全部字符串 `JSON.stringify`
+ * 编码＝TOML 基本字符串（探针逐字实证：空格/引号/反斜杠/中文/空串全往返）。白名单定义携带
+ * `default_tools_approval_mode="approve"`（探针：不配则 `approval_policy:"never"` 下内核直接
+ * 拒调用——「装什么≈能跑什么」＝白名单＋approve 两键）与 `tool_timeout_sec`。
+ * 零条目 ⇒ `undefined`（不产覆盖——逐字现状）。
+ */
+export function mcpServersOverride(disabledServers: readonly string[], installed: readonly InstalledMcpServerV1[] = []): string | undefined {
+  if (disabledServers.length === 0 && installed.length === 0) return undefined;
+  const quote = (value: string) => JSON.stringify(value);
+  const entries: string[] = [];
+  for (const server of installed) {
+    const fields = [`command=${quote(server.command)}`];
+    if (server.args.length) fields.push(`args=[${server.args.map(quote).join(",")}]`);
+    if (server.env && Object.keys(server.env).length) fields.push(`env={${Object.entries(server.env).map(([name, value]) => `${quote(name)}=${quote(value)}`).join(",")}}`);
+    fields.push(`default_tools_approval_mode="approve"`);
+    fields.push(`tool_timeout_sec=${INSTALLED_MCP_TOOL_TIMEOUT_SEC}`);
+    entries.push(`${quote(server.name)}={${fields.join(",")}}`);
+  }
+  for (const name of disabledServers) entries.push(`${quote(name)}={enabled=false}`);
+  return `mcp_servers={${entries.join(",")}}`;
+}
+
 /** CLI TOML overrides stay structural; never interpolate these strings into a shell. Pin 2: process-level overlay moves with pin 1. */
-export function safetyOverrides(cwd: string, disabledServers: readonly string[] = [], webSearch = false): string[] {
+export function safetyOverrides(cwd: string, disabledServers: readonly string[] = [], webSearch = false, installed: readonly InstalledMcpServerV1[] = []): string[] {
+  const mcpMap = mcpServersOverride(disabledServers, installed);
   return [
     ...DISABLED_NATIVE_FEATURES.map(name => `features.${name}=false`),
     'sandbox_mode="read-only"', 'approval_policy="never"', 'approvals_reviewer="user"', `web_search="${webSearch ? "live" : "disabled"}"`,
     // CLI dotted override parsing does not preserve quoted arbitrary map keys.
-    // Root TOML maps merge, so explicitly overlay enabled=false for every discovered ID.
+    // Root TOML maps overlay by key; one `-c` value must carry the whole `mcp_servers`
+    // map (P0 probe: consecutive `-c` values with the same root key replace, not merge).
     `projects={${JSON.stringify(cwd)}={trust_level="untrusted"}}`,
-    ...(disabledServers.length ? [`mcp_servers={${disabledServers.map(name => `${JSON.stringify(name)}={enabled=false}`).join(",")}}`] : []),
+    ...(mcpMap !== undefined ? [mcpMap] : []),
   ];
 }
 

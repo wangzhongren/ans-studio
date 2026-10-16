@@ -1,0 +1,420 @@
+{
+  "fixture": {
+    "node": "v24.14.0",
+    "sdk": "0.3.299",
+    "bundledCli": "2.1.299",
+    "loopbackOnly": true,
+    "externalApiCalls": 0,
+    "credentials": "fake-only"
+  },
+  "launcherPath": "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/src/common/claude-adapter/mcp-launcher.mjs",
+  "reports": [
+    {
+      "name": "installed-execute",
+      "spawn": {
+        "argv": [
+          "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+        ],
+        "cwd": "/private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-claude-mcp-installed-CDu5y9/installed-execute",
+        "pid": 19508,
+        "ppid": 19506,
+        "envKeys": [
+          "FAKE_MCP_DELAY_MS",
+          "FAKE_MCP_ECHO_REF",
+          "FAKE_MCP_MODE",
+          "FAKE_MCP_RECORD_DIR",
+          "HOME",
+          "PATH",
+          "TMPDIR",
+          "__CF_USER_TEXT_ENCODING"
+        ],
+        "startedAt": 1792157502828
+      },
+      "events": [
+        {
+          "t": 0,
+          "event": "process-start"
+        },
+        {
+          "t": 4,
+          "event": "message",
+          "method": "server/discover",
+          "hasId": true
+        },
+        {
+          "t": 7,
+          "event": "message",
+          "method": "initialize",
+          "hasId": true
+        },
+        {
+          "t": 8,
+          "event": "initialize-answered"
+        },
+        {
+          "t": 9,
+          "event": "message",
+          "method": "notifications/initialized",
+          "hasId": false
+        },
+        {
+          "t": 9,
+          "event": "message",
+          "method": "tools/list",
+          "hasId": true
+        },
+        {
+          "t": 122,
+          "event": "message",
+          "method": "tools/call",
+          "hasId": true
+        },
+        {
+          "t": 122,
+          "event": "tools-call-received",
+          "name": "echo",
+          "argumentKeys": [
+            "text"
+          ]
+        }
+      ],
+      "requests": [
+        {
+          "phase": "installed-execute",
+          "index": 0,
+          "arrivedAt": 1792157502936,
+          "promptPushedAt": 1792157502292,
+          "toolNames": [
+            "mcp__ans__probe_tool",
+            "mcp__probe__echo"
+          ],
+          "toolResults": []
+        },
+        {
+          "phase": "installed-execute",
+          "index": 1,
+          "arrivedAt": 1792157502960,
+          "promptPushedAt": 1792157502292,
+          "toolNames": [
+            "mcp__ans__probe_tool",
+            "mcp__probe__echo"
+          ],
+          "toolResults": [
+            {
+              "isError": false,
+              "textHead": "fake-echo:probe-input\n\n<system-reminder>\n<total_tokens>14999890 tokens left</total_tokens>\n</system-reminder>"
+            }
+          ]
+        }
+      ],
+      "statuses": [
+        [
+          {
+            "name": "probe",
+            "status": "connected",
+            "serverInfo": {
+              "name": "fake-probe-server",
+              "version": "0.0.1"
+            },
+            "config": {
+              "type": "stdio",
+              "command": "/usr/local/bin/node",
+              "args": [
+                "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/src/common/claude-adapter/mcp-launcher.mjs",
+                "/usr/local/bin/node",
+                "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+              ]
+            },
+            "scope": "dynamic",
+            "source": "dynamic",
+            "tools": [
+              {
+                "name": "echo",
+                "annotations": {}
+              }
+            ]
+          },
+          {
+            "name": "ans",
+            "status": "connected",
+            "serverInfo": {
+              "name": "ans",
+              "version": "1.0.0"
+            },
+            "scope": "dynamic",
+            "source": "sdk",
+            "tools": [
+              {
+                "name": "probe_tool",
+                "annotations": {
+                  "destructive": true
+                }
+              }
+            ]
+          }
+        ]
+      ],
+      "rows": [
+        {
+          "kind": "message",
+          "summary": "用户指令：installed-execute turn"
+        },
+        {
+          "kind": "tool_call",
+          "phase": "start",
+          "toolName": "mcp__probe__echo",
+          "summary": "mcp__probe__echo 调用发起"
+        },
+        {
+          "kind": "accepted",
+          "phase": "result",
+          "toolName": "mcp__probe__echo",
+          "summary": "mcp__probe__echo 执行完成"
+        },
+        {
+          "kind": "message",
+          "summary": "installed-execute loopback completed"
+        },
+        {
+          "kind": "settled",
+          "summary": "会话结束"
+        }
+      ],
+      "settled": "completed"
+    },
+    {
+      "name": "installed-broken",
+      "events": [],
+      "requests": [
+        {
+          "phase": "installed-broken",
+          "index": 0,
+          "arrivedAt": 1792157503346,
+          "promptPushedAt": 1792157502973,
+          "toolNames": [
+            "mcp__ans__probe_tool"
+          ],
+          "toolResults": []
+        }
+      ],
+      "statuses": [
+        [
+          {
+            "name": "brokenprobe",
+            "status": "failed",
+            "error": "Connection closed",
+            "config": {
+              "type": "stdio",
+              "command": "/usr/local/bin/node",
+              "args": [
+                "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/src/common/claude-adapter/mcp-launcher.mjs",
+                "/nonexistent/ans-probe-missing-binary"
+              ]
+            },
+            "scope": "dynamic",
+            "source": "dynamic"
+          },
+          {
+            "name": "ans",
+            "status": "connected",
+            "serverInfo": {
+              "name": "ans",
+              "version": "1.0.0"
+            },
+            "scope": "dynamic",
+            "source": "sdk",
+            "tools": [
+              {
+                "name": "probe_tool",
+                "annotations": {
+                  "destructive": true
+                }
+              }
+            ]
+          }
+        ]
+      ],
+      "rows": [
+        {
+          "kind": "message",
+          "summary": "用户指令：installed-broken turn"
+        },
+        {
+          "kind": "message",
+          "summary": "已安装 MCP「brokenprobe」未连接：Connection closed"
+        },
+        {
+          "kind": "message",
+          "summary": "installed-broken loopback completed"
+        },
+        {
+          "kind": "settled",
+          "summary": "会话结束"
+        }
+      ],
+      "settled": "completed"
+    },
+    {
+      "name": "installed-hang",
+      "spawn": {
+        "argv": [
+          "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+        ],
+        "cwd": "/private/var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-claude-mcp-installed-CDu5y9/installed-hang",
+        "pid": 19565,
+        "ppid": 19562,
+        "envKeys": [
+          "FAKE_MCP_DELAY_MS",
+          "FAKE_MCP_MODE",
+          "FAKE_MCP_RECORD_DIR",
+          "HOME",
+          "PATH",
+          "TMPDIR",
+          "__CF_USER_TEXT_ENCODING"
+        ],
+        "startedAt": 1792157503693
+      },
+      "events": [
+        {
+          "t": 1,
+          "event": "process-start"
+        },
+        {
+          "t": 3,
+          "event": "message",
+          "method": "server/discover",
+          "hasId": true
+        },
+        {
+          "t": 11,
+          "event": "message",
+          "method": "initialize",
+          "hasId": true
+        },
+        {
+          "t": 27014,
+          "event": "message",
+          "method": "notifications/cancelled",
+          "hasId": false
+        },
+        {
+          "t": 27040,
+          "event": "stdin-closed"
+        }
+      ],
+      "requests": [
+        {
+          "phase": "installed-hang",
+          "index": 0,
+          "arrivedAt": 1792157530766,
+          "promptPushedAt": 1792157503365,
+          "toolNames": [
+            "mcp__ans__probe_tool"
+          ],
+          "toolResults": []
+        }
+      ],
+      "statuses": [
+        [
+          {
+            "name": "hangprobe",
+            "status": "failed",
+            "error": "Request timed out",
+            "config": {
+              "type": "stdio",
+              "command": "/usr/local/bin/node",
+              "args": [
+                "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/src/common/claude-adapter/mcp-launcher.mjs",
+                "/usr/local/bin/node",
+                "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/test/claude-adapter/mcp-fake-stdio-server.probe.ts"
+              ]
+            },
+            "scope": "dynamic",
+            "source": "dynamic"
+          },
+          {
+            "name": "ans",
+            "status": "connected",
+            "serverInfo": {
+              "name": "ans",
+              "version": "1.0.0"
+            },
+            "scope": "dynamic",
+            "source": "sdk",
+            "tools": [
+              {
+                "name": "probe_tool",
+                "annotations": {
+                  "destructive": true
+                }
+              }
+            ]
+          }
+        ]
+      ],
+      "rows": [
+        {
+          "kind": "message",
+          "summary": "用户指令：installed-hang turn"
+        },
+        {
+          "kind": "message",
+          "summary": "installed-hang loopback completed"
+        },
+        {
+          "kind": "settled",
+          "summary": "会话结束"
+        }
+      ],
+      "settled": "completed"
+    }
+  ],
+  "catalogs": [
+    {
+      "phase": "installed-execute",
+      "servers": [
+        {
+          "name": "probe",
+          "status": "connected",
+          "source": "dynamic"
+        },
+        {
+          "name": "ans",
+          "status": "connected",
+          "source": "sdk"
+        }
+      ]
+    },
+    {
+      "phase": "installed-broken",
+      "servers": [
+        {
+          "name": "brokenprobe",
+          "status": "failed",
+          "source": "dynamic"
+        },
+        {
+          "name": "ans",
+          "status": "connected",
+          "source": "sdk"
+        }
+      ]
+    },
+    {
+      "phase": "installed-hang",
+      "servers": [
+        {
+          "name": "hangprobe",
+          "status": "failed",
+          "source": "dynamic"
+        },
+        {
+          "name": "ans",
+          "status": "connected",
+          "source": "sdk"
+        }
+      ]
+    }
+  ],
+  "cleanupNotes": []
+}

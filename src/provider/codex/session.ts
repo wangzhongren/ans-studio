@@ -6,8 +6,8 @@ import path from "node:path";
 import os from "node:os";
 import { randomUUID } from "node:crypto";
 import type { ResolvedRole } from "../../model/role.ts";
-import type { RuntimeAdapter, RuntimeProviderOptions, RoleSession, SessionEvent, ToolResult, RuntimeTurnOutcome, RuntimeToolEventFactsV1, RuntimeToolErrorFactsV1 } from "../../model/runtime.ts";
-import { object, deferred, eventQueue, pausedDeadline, bounded, webSearchRow } from "../../common/codex-adapter/protocol.ts";
+import type { RuntimeAdapter, RuntimeProviderOptions, RoleSession, SessionEvent, ToolResult, RuntimeTurnOutcome, RuntimeToolEventFactsV1, RuntimeToolErrorFactsV1, InstalledMcpServerV1 } from "../../model/runtime.ts";
+import { object, deferred, eventQueue, pausedDeadline, bounded, webSearchRow, mcpToolName, mcpToolCallNative } from "../../common/codex-adapter/protocol.ts";
 import type { CodexRpcConnection, CodexEngineInput, CodexEngineFactory } from "../../common/codex-adapter/protocol.ts";
 import { settings, safetyConfig, safetyOverrides, effectiveConfig, verifyThread } from "../../common/codex-adapter/config.ts";
 // Windows 瞬时句柄占用（`EBUSY`/`EPERM`/`EACCES`）的**有界重试**单一来源（§一.5 不得第二份实现）：
@@ -36,6 +36,48 @@ export interface CodexMcpModules {
   InMemoryTransport: { createLinkedPair(): [unknown, unknown] };
   ListToolsRequestSchema: unknown;
   CallToolRequestSchema: unknown;
+}
+
+/**
+ * G-4 V2（P2）：已安装 MCP 声明 → 可装配定义（本角色全部校验/展开的单一位置）。校验面与
+ * 读取器（`mcp-declarations.ts`）同口径（读者已过滤；此处纵深防御，任何越界＝上游契约破坏，
+ * 装配前抛错、零副作用——沿 tools 名校验先例）。三件事：
+ * · 名字 `[A-Za-z0-9_-]`、非保留（`ans`/`ans_codex` 及**规范化后**同形态）；
+ * · **清洗碰撞拒绝**（P0 探针 §5.3 残余 2 的 P2 落点）：namespace 清洗 `-`→`_` 后重名（如
+ *   `a-b` 与 `a_b`）⇒ 模型面 `mcp__<server>` 桥无法区分——配置侧直接拒（fail closed）；
+ * · env 值展开：字面量原样；`env:NAME` 引用取 **bind 时环境快照**真值（声明文件零凭据面，
+ *   真值不落盘）；引用真值缺失/空 ⇒ 该变量不带入（server 自会以启动失败走降级行，不拦会话）。
+ */
+export function prepareInstalledMcpServers(declared: readonly InstalledMcpServerV1[], environment: Readonly<Record<string, string | undefined>>): InstalledMcpServerV1[] {
+  const normalized = new Map<string, string>();
+  const prepared: InstalledMcpServerV1[] = [];
+  for (const server of declared) {
+    if (typeof server.name !== "string" || !/^[A-Za-z0-9_-]+$/.test(server.name)) throw new Error("Codex installed MCP server name is invalid");
+    const key = server.name.replaceAll("-", "_");
+    const lowered = key.toLowerCase();
+    if (lowered === "ans" || lowered === "ans_codex") throw new Error(`Codex installed MCP server name is reserved: ${server.name}`);
+    const collision = normalized.get(key);
+    if (collision !== undefined) throw new Error(`Codex installed MCP server names collide after namespace normalization: ${collision} / ${server.name}`);
+    normalized.set(key, server.name);
+    if (typeof server.command !== "string" || server.command.trim() === "" || /[\u0000-\u001f\u007f]/.test(server.command)) throw new Error(`Codex installed MCP server command is invalid: ${server.name}`);
+    if (!Array.isArray(server.args) || server.args.some(argument => typeof argument !== "string")) throw new Error(`Codex installed MCP server args are invalid: ${server.name}`);
+    let env: Record<string, string> | undefined;
+    if (server.env !== undefined) {
+      env = {};
+      for (const [name, value] of Object.entries(server.env)) {
+        if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name) || typeof value !== "string" || value === "") throw new Error(`Codex installed MCP server env is invalid: ${server.name}`);
+        if (value.startsWith("env:")) {
+          const truth = environment[value.slice(4)];
+          if (truth === undefined || truth === "") continue; // 真值缺失 ⇒ 不带入（server 自会降级；不拦会话）
+          env[name] = truth;
+        } else {
+          env[name] = value;
+        }
+      }
+    }
+    prepared.push({ name: server.name, command: server.command, args: [...server.args], ...(env !== undefined ? { env } : {}) });
+  }
+  return prepared;
 }
 export interface CodexRuntimeAdapterOptions extends RuntimeProviderOptions {
   engineFactory?: CodexEngineFactory;
@@ -267,6 +309,9 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
       if (toolMap.size !== options.tools.length || options.tools.some(tool => !/^[A-Za-z0-9_-]{1,60}$/.test(tool.name))) {
         throw new Error("Codex tools require unique valid ANS names");
       }
+      // G-4 V2：已安装 MCP 的校验/展开（装配前、零副作用）与白名单名集（进程/线程/目录三处恰等、降级面共用）。
+      const installedServers = prepareInstalledMcpServers(options.installedMcpServers ?? [], environmentSnapshot);
+      const allowedServers = new Set(installedServers.map(server => server.name));
       await storage?.validateNativeDirectory?.();
       const previous = await storage?.readLatest();
       if (previous && (previous.runtime !== "codex" || previous.roleId !== role.id)) throw new Error("Codex native session record role/runtime mismatch");
@@ -309,6 +354,17 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
             detail: { version: 1, source: "tool-display-diagnostic", code: "PROJECTION_FAILED" } });
         }
       };
+      // G-4 V2 降级面：白名单 server 未连接＝如实一行（类别化；error 只进 detail、经 scrub 且截断）。
+      // 去重单点：同一会话内每个 server 至多一行（catalog 扫掠与 startupStatus 通知两路共用——不双报）。
+      const reportedDegradedMcp = new Set<string>();
+      const reportMcpDegraded = (name: string, state: "failed" | "cancelled", error?: unknown): void => {
+        if (reportedDegradedMcp.has(name)) return;
+        reportedDegradedMcp.add(name);
+        const detail: Record<string, unknown> = { version: 1, source: "mcp-startup", name, state };
+        const text = typeof error === "string" && error.trim() !== "" ? error : undefined;
+        if (text !== undefined) detail.error = text.slice(0, 300);
+        emit(undefined, "message", `已安装 MCP「${name}」未连接：${state === "failed" ? "启动失败" : "已取消"}`, detail);
+      };
       const cleanup = () => cleanupPromise ??= (async () => {
         unsubscribe?.();
         const results = await Promise.allSettled([client?.close(), server?.close(), engine?.close()]);
@@ -330,7 +386,8 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
         const environment = { PATH: environmentSnapshot.PATH ?? path.dirname(process.execPath), CODEX_HOME: nativeHome, CODEX_API_KEY: config.key };
         const engineFactory = options.engineFactory ?? ((input: CodexEngineInput) => nativeEngine(input, options.cliPath));
         const connect = async (disabled: readonly string[]) => {
-          const connected = await engineFactory({ cwd, nativeHome, env: environment, configOverrides: [...safetyOverrides(cwd, disabled, config.webSearch), providerDefinition, `model_provider=${JSON.stringify(provider)}`], timeoutMs: options.constructTimeoutMs ?? 30000 });
+          // G-4 V2：白名单定义＋禁用集编入**同一条** `-c mcp_servers={…}`（P0 探针铁律：连续 -c 同根键覆盖不合并）。
+          const connected = await engineFactory({ cwd, nativeHome, env: environment, configOverrides: [...safetyOverrides(cwd, disabled, config.webSearch, installedServers), providerDefinition, `model_provider=${JSON.stringify(provider)}`], timeoutMs: options.constructTimeoutMs ?? 30000 });
           // Preflight has no model, thread, MCP connections, or native approval handlers.
           try {
             await connected.request("initialize", { clientInfo: { name: "ans_codex_adapter", version: "2.0.0" }, capabilities: { experimentalApi: true, explicitGatewayOauth: true } });
@@ -342,12 +399,19 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
         let connection = await connect([]);
         engine = connection.connected;
         const allServers = Object.keys(connection.inspected.servers);
-        if (allServers.length) {
+        const foreignServers = allServers.filter(name => !allowedServers.has(name));
+        if (foreignServers.length) {
           await engine.close();
-          connection = await connect(allServers);
+          connection = await connect(foreignServers);
           engine = connection.connected;
         }
-        if (connection.inspected.enabled.length) throw new Error("Codex foreign native MCP remained enabled; refusing to start a thread");
+        // P2 恰等（进程级）：生效 enabled 集必须恰等于白名单名集（白名单外残留＝隔离不放松，拒开工；
+        // 白名单自身缺失＝装配面破损，同样拒——与旧「全量 disable 后必须全空」同势、白名单空时同义）。
+        const expectedEnabled = [...allowedServers].sort();
+        const enabledServers = [...connection.inspected.enabled].sort();
+        if (enabledServers.length !== expectedEnabled.length || enabledServers.some((name, index) => name !== expectedEnabled[index])) {
+          throw new Error("Codex native MCP enabled set differs from the installed whitelist");
+        }
         const modules = await (options.mcpLoader ?? loadMcp)();
         server = new modules.Server({ name: "ans_codex", version: "2.0.0" }, { capabilities: { tools: {} } });
         client = new modules.Client({ name: "ans_codex_proxy", version: "2.0.0" });
@@ -432,7 +496,8 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
           finally { calls.delete(token); requestContext?.signal.removeEventListener("abort", cancelledUpstream); }
         });
         const context = await composeContext(role);
-        const threadConfig = { ...safetyConfig(cwd, config.webSearch), mcp_servers: Object.fromEntries(allServers.map(name => [name, { enabled: false }])) };
+        // G-4 V2：线程级恰等——白名单外显式 enabled=false 不变；白名单内 enabled=true（白名单空＝逐字现状）。
+        const threadConfig = { ...safetyConfig(cwd, config.webSearch), mcp_servers: Object.fromEntries(allServers.map(name => [name, { enabled: allowedServers.has(name) }])) };
         const threadParams = { model: config.model, modelProvider: provider, cwd, sandbox: "read-only", approvalPolicy: "never", approvalsReviewer: "user", config: threadConfig, developerInstructions: context.systemPrompt };
         let contextSource: RoleSession["contextSource"] = storage ? "fresh" : "in-memory";
         let contextWarning: string | undefined;
@@ -444,9 +509,92 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
           if (response !== undefined) { nativeId = verifyThread(response); contextSource = "resumed"; }
         }
         if (!nativeId) nativeId = verifyThread(await engine.request("thread/start", { ...threadParams, ephemeral: !storage, dynamicTools: options.tools.map(tool => ({ type: "function", name: `ans_${tool.name}`, description: tool.description, inputSchema: tool.inputSchema })) }));
-        // All native MCP were disabled before thread creation; inspect without discovery outside it.
+        // 通知面订阅提前到目录复核之前：白名单 server 的启动状态（mcpServer/startupStatus/updated，
+        // P0 探针：starting→failed 两帧）可能先于会话就绪到达——缩小「状态先于监听」的丢失窗；
+        // 会话末段不再二次订阅（unsubscribe 仍由 cleanup 首步收口）。
+        unsubscribe = engine.onNotification((method, raw) => {
+          if (method === "mcpServer/startupStatus/updated") {
+            // 会话级通知（无轮次身份）：白名单 server 启动失败/取消 ⇒ 降级行（去重单点；慢失败路径）。
+            try {
+              const status = object(raw ?? {}, "startup status");
+              if (typeof status.name === "string" && allowedServers.has(status.name) && (status.status === "failed" || status.status === "cancelled")) {
+                reportMcpDegraded(status.name, status.status, status.error);
+              }
+            } catch { /* 坏通知不毁会话 */ }
+            return;
+          }
+          const turn = active;
+          if (!turn || turn.completed) return;
+          let params: Record<string, unknown>;
+          try { params = object(raw ?? {}, "notification"); } catch { return; }
+          if (method === "ans/transportClosed") {
+            quarantined = true; turn.failure = config.redact(params.message); turn.reason ??= "failed"; turn.done.resolve(turn.reason); return;
+          }
+          if (params.threadId !== nativeId) return;
+          const notifyId = method === "turn/completed" ? object(params.turn, "completed native turn").id : params.turnId;
+          void turn.ready.promise.then(expected => {
+            if (typeof notifyId !== "string" || notifyId !== expected || active !== turn || turn.completed) return;
+            if (method === "item/completed") {
+              const item = object(params.item, "native item");
+              if (item.type === "agentMessage") emit(turn, "message", String(item.text ?? ""), { text: item.text });
+              // Server-side (gateway-executed) search: always mapped, never quarantined, never inferred as failure.
+              if (item.type === "webSearch") {
+                turn.searchCalls += 1;
+                const row = webSearchRow(item);
+                emit(turn, "message", row.summary, row.detail);
+              }
+              // G-4 V2 使用行（P0 探针字段全集；status/error/result 三态如实）：走核心投影单点
+              // （native-result 事实），白名单调用＝已授予能力的执行事实——**不进隔离**（非越权信号）。
+              if (item.type === "mcpToolCall") {
+                const name = mcpToolName(typeof item.server === "string" ? item.server : "", typeof item.tool === "string" ? item.tool : "");
+                const native = mcpToolCallNative(item);
+                const args = item.arguments !== null && typeof item.arguments === "object" && !Array.isArray(item.arguments) ? item.arguments as Record<string, unknown> : {};
+                const durationMs = typeof item.durationMs === "number" ? item.durationMs : undefined;
+                const text = native.content.flatMap(block => block.type === "text" ? [block.text] : []).join("\n");
+                const legacyText = native.isError ? native.errorText ?? name : text || name;
+                emitTool(turn, {
+                  origin: "native-result", phase: "result", toolName: name,
+                  ...(typeof item.id === "string" ? { toolCallId: item.id } : {}),
+                  input: { rule: "none", args },
+                  native: { isError: native.isError, content: native.content },
+                  ...(native.isError && native.errorText !== undefined ? { error: { message: native.errorText } } : {}),
+                  ...(durationMs !== undefined ? { durationMs } : {}),
+                }, native.isError ? "denied" : "accepted", legacyText.length > 1024 ? `${legacyText.slice(0, 1024)}…` : legacyText,
+                  { toolName: name, native: true, ...(typeof item.status === "string" ? { status: item.status } : {}), ...(durationMs !== undefined ? { durationMs } : {}) });
+              }
+              if (item.type === "commandExecution" || item.type === "fileChange") {
+                turn.failure = "Codex reported a forbidden native command/file tool; session quarantined";
+                quarantined = true; turn.reason = "failed"; turn.controller.abort(); turn.done.resolve("failed");
+                void engine!.close().catch(error => { turn.failure = config.redact(error); });
+              }
+            } else if (method === "turn/completed") {
+              const completed = object(params.turn);
+              const outcome = turn.reason ?? (completed.status === "completed" ? "completed" : completed.status === "interrupted" ? "aborted" : "failed");
+              turn.reason = outcome;
+              if (completed.error) turn.failure = config.redact(object(completed.error).message ?? "Codex turn failed");
+              turn.done.resolve(outcome);
+            } else if (method === "error" && params.willRetry !== true) {
+              turn.reason = "failed"; turn.failure = config.redact(object(params.error ?? {}).message ?? "Codex turn failed"); turn.done.resolve("failed");
+            }
+          }).catch(error => { turn.failure = config.redact(error); turn.reason = "failed"; turn.done.resolve("failed"); });
+        });
+        // P2 恰等（目录级）：catalog 名字集必须恰等于白名单名集（P0 探针修正——失败的白名单条目
+        // 仍在 data（runtimeStatus:"failed"），「data 必须为空」判据不能沿用）；随后对已
+        // failed/cancelled 的白名单条目如实降级一行（慢失败留给 startupStatus 通知路径，去重单点防双报）。
         const catalog = object(await engine.request("mcpServerStatus/list", { threadId: nativeId, detail: "toolsAndAuthOnly", limit: 100 }), "native MCP catalog");
-        if (!Array.isArray(catalog.data) || catalog.data.length || catalog.nextCursor) throw new Error("Codex native MCP catalog was not empty");
+        const catalogEntries = Array.isArray(catalog.data) ? catalog.data.map(entry => object(entry, "native MCP catalog entry")) : undefined;
+        if (catalogEntries === undefined || catalog.nextCursor || catalogEntries.some(entry => typeof entry.name !== "string" || entry.name === "")) {
+          throw new Error("Codex native MCP catalog does not match the installed whitelist");
+        }
+        const catalogNames = catalogEntries.map(entry => String(entry.name)).sort();
+        if (catalogNames.length !== expectedEnabled.length || catalogNames.some((name, index) => name !== expectedEnabled[index])) {
+          throw new Error("Codex native MCP catalog does not match the installed whitelist");
+        }
+        for (const entry of catalogEntries) {
+          if (entry.runtimeStatus !== "failed" && entry.runtimeStatus !== "cancelled") continue;
+          const name = String(entry.name);
+          if (allowedServers.has(name)) reportMcpDegraded(name, entry.runtimeStatus, entry.toolsError);
+        }
         const session: RoleSession = {
           runtime: "codex", roleId: role.id, contextSource, nativeSessionId: nativeId,
           ...(contextWarning ? { contextWarning } : {}),
@@ -520,43 +668,6 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
           })();
           return turn.stopping;
         }
-        unsubscribe = engine.onNotification((method, raw) => {
-          const turn = active;
-          if (!turn || turn.completed) return;
-          let params: Record<string, unknown>;
-          try { params = object(raw ?? {}, "notification"); } catch { return; }
-          if (method === "ans/transportClosed") {
-            quarantined = true; turn.failure = config.redact(params.message); turn.reason ??= "failed"; turn.done.resolve(turn.reason); return;
-          }
-          if (params.threadId !== nativeId) return;
-          const notifyId = method === "turn/completed" ? object(params.turn, "completed native turn").id : params.turnId;
-          void turn.ready.promise.then(expected => {
-            if (typeof notifyId !== "string" || notifyId !== expected || active !== turn || turn.completed) return;
-            if (method === "item/completed") {
-              const item = object(params.item, "native item");
-              if (item.type === "agentMessage") emit(turn, "message", String(item.text ?? ""), { text: item.text });
-              // Server-side (gateway-executed) search: always mapped, never quarantined, never inferred as failure.
-              if (item.type === "webSearch") {
-                turn.searchCalls += 1;
-                const row = webSearchRow(item);
-                emit(turn, "message", row.summary, row.detail);
-              }
-              if (item.type === "commandExecution" || item.type === "fileChange") {
-                turn.failure = "Codex reported a forbidden native command/file tool; session quarantined";
-                quarantined = true; turn.reason = "failed"; turn.controller.abort(); turn.done.resolve("failed");
-                void engine!.close().catch(error => { turn.failure = config.redact(error); });
-              }
-            } else if (method === "turn/completed") {
-              const completed = object(params.turn);
-              const outcome = turn.reason ?? (completed.status === "completed" ? "completed" : completed.status === "interrupted" ? "aborted" : "failed");
-              turn.reason = outcome;
-              if (completed.error) turn.failure = config.redact(object(completed.error).message ?? "Codex turn failed");
-              turn.done.resolve(outcome);
-            } else if (method === "error" && params.willRetry !== true) {
-              turn.reason = "failed"; turn.failure = config.redact(object(params.error ?? {}).message ?? "Codex turn failed"); turn.done.resolve("failed");
-            }
-          }).catch(error => { turn.failure = config.redact(error); turn.reason = "failed"; turn.done.resolve("failed"); });
-        });
         return session;
       } catch (error) {
         try { await cleanup(); } catch (cleanupError) { throw new Error(`${config.redact(error)}; cleanup: ${config.redact(cleanupError)}`); }

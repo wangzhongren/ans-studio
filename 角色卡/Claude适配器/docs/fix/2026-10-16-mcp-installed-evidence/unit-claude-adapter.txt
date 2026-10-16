@@ -1,0 +1,48 @@
+✔ env scrub: only base locators + declared passthrough names reach the real command (41.959333ms)
+✔ malformed passthrough lists widen nothing beyond the base set (42.090833ms)
+✔ exit codes propagate and a spawn failure exits 127 with a bounded stderr note (60.159166ms)
+✔ SDK stays lazy through composition/bind; actual MCP schema/options isolate all native abilities and credentials (14.521375ms)
+✔ schema preserves required/optional/union/nested object and rejects unsupported keywords (0.951542ms)
+✔ actual MCP exposes union and nested required schema without losing optional/extra parameters (4.27825ms)
+✔ late old MCP callback after next prompt, replay/missing/unknown nonce all fail before effects (8.544917ms)
+✔ reserved context supports additionalProperties false, never reaches core, and schema collision rejects (2.278291ms)
+✔ same text twice has unique wire identity; old/unknown/missing/duplicate UserPromptSubmit cannot borrow next turn (1.872333ms)
+✔ auth/endpoint/model and redaction share construction-time env snapshot (1.287292ms)
+✔ private wire marker echoed by tool/error never leaks into public events or messages (1.878042ms)
+✔ missing dependency/API key and URL userinfo fail before query, explicit settings map to actual SDK options (1.330917ms)
+✔ actual shell tool deny prevents marker and allow returns actual command output (5.537375ms)
+✔ real MCP rejects missing write arguments, gate denial and gate throw produce zero effects (3.736958ms)
+✔ actual write/edit MCP handlers execute in call order even concurrent transport calls (12.443083ms)
+✔ multiple input turns retain the same query and map images; exactly one settled has each turnId (0.92775ms)
+✔ SDK/result errors and handler exceptions redact secrets and fail honestly (0.924041ms)
+✔ InteractionGate pauses deadline; answer returns and sequential write waits behind confirmation (6.963833ms)
+✔ the same Claude controlled clock expires at 50ms outside customer waiting (0.99375ms)
+✔ stop pending confirmation cancels queued write and late answer cannot report/effect in a new turn (33.04525ms)
+✔ active prompt deadline emits timed_out once and disposal closes event stream (18.161375ms)
+✔ actual native resume succeeds only after matching successful SDK result; failed resume clears ID and next explicit input rebuilds (11.780041ms)
+✔ native symlink and storage runtime mismatch fail before SDK query (1.555375ms)
+✔ core Service receives real Claude MCP reports/dispatch receipts and saves replay with actual metadata (20.110292ms)
+✔ required-v1 rejects each missing display capability before SDK load; profile registers bind snapshot only (0.405959ms)
+✔ real Core projector receives actual args/rule/result execution while SDK content and opaque identities stay unchanged (5.58025ms)
+✔ actual handler thrown Error projects protected message, unknown throw stays opaque, model retains original generic failure (4.1335ms)
+✔ unknown and old PreToolUse never borrow active turn; real original hook denial alone is blocked (0.985917ms)
+✔ projector failure yields only bounded diagnostic without changing tool result or successful turn (1.122458ms)
+✔ Core strips C metadata before Claude and preserves exact SDK prompt/images while publishing safe display copy (21.512167ms)
+✔ thin projected outlet never redacts supplied opaque identities or restores suppressed oversized identity (1.193458ms)
+✔ required production path displays real read ENOENT and Node shell output without parsing result messages (21.523417ms)
+✔ web search capability bit off (default/explicit): tools/allowedTools keep the pre-existing surface, WebSearch stays hook-denied and frames stay unconsumed (2.302625ms)
+✔ web search capability bit on: builtin declared and auto-allowed only for the live bound turn, input never rewritten (0.972708ms)
+✔ web search on: native frames project one paired start/result per call; failure, unsupported content and budget text stay truthful and never fail the turn (2.047792ms)
+✔ installed-skills section: non-empty splices the orchestration render verbatim; zero/broken stays the byte-identical old prompt and never fails the turn (6.355542ms)
+✔ installed MCP declarations assemble only when injected: launcher-wrapped command, env:NAME resolved, server-level allowedTools (1.802167ms)
+✔ installed MCP allow branch: name+dynamic source+live turn only, args pass unchanged, adversarials stay denied (0.915042ms)
+✔ installed MCP frames pair start/result like WebSearch; unregistered late results stay unconsumed (0.820417ms)
+✔ installed MCP status pass: failed/needs-auth report one honest category line per engine; connected silent; status errors never fail the turn (3.394791ms)
+ℹ tests 40
+ℹ suites 0
+ℹ pass 40
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 392.02875

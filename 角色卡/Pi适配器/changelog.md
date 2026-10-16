@@ -1,5 +1,22 @@
 # Pi适配器 变更记录
 
+## 2026-10-16 — G-4 V2（P3 Pi）已实施待验证：按角色安装的外来 MCP（装配／前缀放行／env 收窄／dispose 收口）
+
+**来源**：客户 2026-10-16 批准 G-4 V2；本轮 PM 派发 P3（P0 探针 32/32 PASS 后落地，探针结论逐项转正）。契约面＝`RuntimeProviderOptions.installedMcpServers`（已落盘，Service 注入、适配器纯消费）。记录＝`docs/change/2026-10-16_change_role-mcp-install-pi.md`。零 git 提交；未发任何真实网关请求。
+
+**改了什么（唯一产品文件 `src/common/pi-adapter/real-adapter.ts`；`src/provider/pi/session.ts` 零改动）**
+- 新节 **G-4 V2（:478-540）**：导出**放行判据** `mcpToolAllowedByWhitelistedServer`（`mcp__<清洗后白名单名>__*` 前缀面；清洗 `[^A-Za-z0-9_]`→`_` 与 SDK 同名）＋ `resolveInstalledMcpServers`（`env:NAME` **只自进程环境**展开、缺失即抛、**绝不落盘**）；`loadPiMcp()`（:106，pi-mcp 动态 import；**依赖声明归装配角色、已上报**）。
+- **bindRole 装配块（:1171-1229）**：注入声明 ⇒ 逐一 `exposure:"direct"` 映射进 `createMcpExtension({loadConfig（不读盘上任何来源）, createTransport（自持 `StdioTransport{inheritEnv:false}`＋最小 env＝PATH＋声明 env）, startupWaitMs（可选接缝）})`；`extensionFactories=[governance,+mcp]`；**放行面＝精确注入名 ∪ 前缀面**（`allowedSurface`，**1128 与门禁 499-504 同一判据**）；`buildGovernanceExtension` 的 `allowedToolNames` 类型放宽为结构面 `{has}`（:570-577，只消费 .has）。**无声明 ⇒ 零装配、逐字旧行为**。
+- **bindExtensions（:1306-1317）**：仅装配 MCP 时补调（全仓此前 0 调用），**置于 1128 之后**（构造期快照只可能看到注入名——确定性安全；前缀面为顺序变化留防），失败先 dispose 再抛。
+- **dispose 收口（必做项；:1041-1052 / :1346-1349）**：`RoleSessionDeps.sessionShutdown` 接缝——dispose 在 SDK `session.dispose()` 前补发 `extensionRunner.emit({type:"session_shutdown",reason:"quit"})`（有界 5s、best-effort、失败只记诊断）⇒ **MCP 子进程随 dispose 退出**（P0 探针缺口已补）。
+- **tools-only（裁定①）**：资源工具三名不在放行面（调用一律门禁拒）；**如实登记**：server 自报 resources 时 SDK 会把三名声明给模型（实测定格）——「不接」的保证面＝不可执行；模型面不可见需另裁。
+
+**证据（探针单元格转正，`test/pi-adapter/installed-mcp-servers.test.ts` 8 例）**：接通＋端到端（门禁放行 ⇒ 服务端 call-log＋转录）；无声明零变化（扩展清单仅治理）；env 收窄（子进程键＝自持 3 键∪平台注入 1 键、哨兵不泄漏、`env:NAME` 展开）；env 缺失构造期抛错；tools-only（资源工具被拒、tools 同轮照常）；**dispose 后子进程退出**；startupWaitMs 钳位（707ms/次轮 2ms/0=不等）。新夹具 `test/pi-adapter/mcp-fixture-server.ts`（**非探针**——测试角色新钉「*.test.ts 不得引用 .probe」触发，已按其口径分立）。
+
+**验证**：pi-adapter 专项 **278/278**（270＋8）；typecheck 全仓 0 错；全量 **1921/1931 过、9 红 1 跳**——9 红全部归因他处（8×`test/测试/` 旧钉待翻新＝PM 已明示不处理；1×`test/codex-adapter/mcp-whitelist.test.ts`＝Codex 角色 P2 在飞），本批文件零红。
+
+**未验边界**：Windows 子进程路径、真实第三方 server、resources 模型面可见性（已实测声明行为，收敛需另裁）、真机装-连-用-卸全链、pi-mcp 依赖声明（归装配角色）。
+
 ## 2026-10-16 — ①G-4 注入节接线（Pi 三处拼装点）②V2 MCP P0 探针（scratch 逐项定格）
 
 **来源**：客户 2026-10-16 批准 G-4 V1＋V2 口径与 P0 探针轮（本上下文两任务派发）。①＝G-4 编排侧契约（`角色卡/编排/docs/change/2026-10-16_change_g4-skill-injection-and-preauth.md` §五；渲染单一来源 `src/common/编排/installed-skills.ts`）的 Pi 侧接线；②＝运行时核心评估 `2026-10-16_assess_role-mcp-install.md` §九.3。零 git 提交；未发任何真实网关请求。

@@ -110,3 +110,33 @@ export function webSearchRow(item: Record<string, unknown>): { summary: string; 
   }
   return { summary: query === undefined ? "联网搜索" : `联网搜索：${query}`, detail };
 }
+
+/**
+ * G-4 V2（P2）模型面工具名：P0 探针实证 0.162.1 把 MCP 工具经 `type:"namespace"` 桥
+ * `mcp__<server>`（`-`→`_`）下发、回传须 `name`＋`namespace` 双字段；行名沿三平台
+ * `mcp__<server>__<tool>` 家族形态（§5.4 行内容面统一）。
+ */
+export function mcpToolName(server: string, tool: string): string {
+  return `mcp__${server.replace(/[^A-Za-z0-9_]/g, "_")}__${tool}`;
+}
+
+/**
+ * G-4 V2（P2）：`mcpToolCall` item（item/completed）→ native-result 事实块（探针字段全集：
+ * server/tool/status/arguments/result.content/error/durationMs）。文本块保真、其余块如实
+ * 标 `unsupported`（沿核心 `RuntimeNativeToolResultFactsV1` 纪律）；`status:"failed"` 或
+ * 带 error 即 `isError`。纯函数、容错不抛（坏形状 ⇒ 空 content＋按字段可得性取）。
+ */
+export function mcpToolCallNative(item: Record<string, unknown>): { isError: boolean; content: Array<{ type: "text"; text: string } | { type: "unsupported" }>; errorText?: string } {
+  const result = item.result && typeof item.result === "object" && !Array.isArray(item.result) ? item.result as Record<string, unknown> : undefined;
+  const content: Array<{ type: "text"; text: string } | { type: "unsupported" }> = [];
+  if (Array.isArray(result?.content)) {
+    for (const block of result.content) {
+      const record = block && typeof block === "object" && !Array.isArray(block) ? block as Record<string, unknown> : undefined;
+      if (record?.type === "text" && typeof record.text === "string") content.push({ type: "text", text: record.text });
+      else content.push({ type: "unsupported" });
+    }
+  }
+  const error = item.error && typeof item.error === "object" && !Array.isArray(item.error) ? item.error as Record<string, unknown> : undefined;
+  const errorText = typeof error?.message === "string" && error.message !== "" ? error.message : undefined;
+  return { isError: item.status === "failed" || errorText !== undefined, content, ...(errorText !== undefined ? { errorText } : {}) };
+}

@@ -34,6 +34,12 @@ interface Behavior {
   interruptHangs?: boolean;
   /** Forces a config/read web_search readback value (simulates requirements pinning the mode back). */
   webSearchReadback?: string;
+  /** G-4 V2：config/read 枚举的 server 名集（enabled 从进程 `-c mcp_servers={…}` 覆盖推导；缺省＝旧 foreign 探针形态）。 */
+  mcpServers?: readonly string[];
+  /** G-4 V2：mcpServerStatus/list 的 data（缺省＝旧空目录/foreign 形态）。 */
+  mcpCatalog?: Array<Record<string, unknown>>;
+  /** G-4 V2：目录 nextCursor（缺省 null）。 */
+  catalogNextCursor?: string;
 }
 export class FakeEngine implements CodexRpcConnection {
   input: CodexEngineInput;
@@ -51,17 +57,39 @@ export class FakeEngine implements CodexRpcConnection {
     if (method === "initialize") return {};
     if (method === "config/read") {
       if (this.behavior.configFails) throw new Error("fake config read failure");
-      const disabled = this.input.configOverrides.includes('mcp_servers={"foreign"={enabled=false}}');
       const override = this.input.configOverrides.find(value => value.startsWith("web_search="));
       const mode = /^web_search="([^"]*)"$/.exec(override ?? "")?.[1] ?? "disabled";
-      return { config: { features: Object.fromEntries(DISABLED_NATIVE_FEATURES.map(name => [name, false])), sandbox_mode: "read-only", approval_policy: "never", web_search: this.behavior.webSearchReadback ?? mode, mcp_servers: { foreign: { enabled: this.behavior.foreignRemains || !disabled } } } };
+      let servers: Record<string, { enabled: boolean }>;
+      if (this.behavior.mcpServers !== undefined) {
+        // G-4 V2：从进程 `-c mcp_servers={…}` 覆盖里读 `"name"={enabled=false}` 词条（生产编码器形态）。
+        const declared = this.input.configOverrides.filter(value => value.startsWith("mcp_servers=")).join("\n");
+        const disabled = new Set([...declared.matchAll(/"([^"]+)"=\{enabled=false\}/g)].map(match => match[1] ?? ""));
+        servers = Object.fromEntries(this.behavior.mcpServers.map(name => [name, { enabled: this.behavior.foreignRemains === true || !disabled.has(name) }]));
+      } else {
+        const disabled = this.input.configOverrides.includes('mcp_servers={"foreign"={enabled=false}}');
+        servers = { foreign: { enabled: this.behavior.foreignRemains === true || !disabled } };
+      }
+      return { config: { features: Object.fromEntries(DISABLED_NATIVE_FEATURES.map(name => [name, false])), sandbox_mode: "read-only", approval_policy: "never", web_search: this.behavior.webSearchReadback ?? mode, mcp_servers: servers } };
     }
     if (method === "thread/start" || method === "thread/resume") {
       if (method === "thread/resume" && this.behavior.resumeFails) throw new Error("fake native resume failure");
       if (method === "thread/resume") this.nativeId = String(params.threadId);
       return { thread: { id: this.nativeId }, sandbox: { type: this.behavior.unsafeSandbox ? "workspaceWrite" : "readOnly" }, approvalPolicy: "never" };
     }
-    if (method === "mcpServerStatus/list") return { data: this.behavior.catalogForeign ? [{ name: "foreign" }] : [], nextCursor: null };
+    if (method === "mcpServerStatus/list") {
+      if (this.behavior.mcpCatalog !== undefined) return { data: this.behavior.mcpCatalog, nextCursor: this.behavior.catalogNextCursor ?? null };
+      if (this.behavior.mcpServers !== undefined) {
+        // P0 探针：目录＝线程 enabled 集（线程级 {enabled:false} 的 server 不进 catalog）——从最后一次 thread/* 推导。
+        const threadRequest = [...this.requests].reverse().find(entry => entry.method === "thread/start" || entry.method === "thread/resume");
+        const rawConfig = threadRequest?.params.config;
+        const config = rawConfig !== null && typeof rawConfig === "object" && !Array.isArray(rawConfig) ? rawConfig as Record<string, unknown> : {};
+        const rawServers = config.mcp_servers;
+        const threadServers = rawServers !== null && typeof rawServers === "object" && !Array.isArray(rawServers) ? rawServers as Record<string, { enabled?: unknown }> : undefined;
+        const enabled = this.behavior.mcpServers.filter(name => threadServers === undefined || threadServers[name] === undefined || threadServers[name]?.enabled !== false);
+        return { data: enabled.map(name => ({ name, runtimeStatus: "connected" })), nextCursor: null };
+      }
+      return { data: this.behavior.catalogForeign ? [{ name: "foreign" }] : [], nextCursor: null };
+    }
     if (method === "turn/start") {
       this.turnId = `native-turn-${++this.turns}`;
       return { turn: { id: this.turnId, status: "inProgress" } };
@@ -83,6 +111,10 @@ export class FakeEngine implements CodexRpcConnection {
   message(text: string) { for (const listener of this.listeners) listener("item/completed", { threadId: this.nativeId, turnId: this.turnId, item: { type: "agentMessage", text } }); }
   event(method: string, item: Record<string, unknown>) { for (const listener of this.listeners) listener(method, { threadId: this.nativeId, turnId: this.turnId, item }); }
   webSearch(item: Record<string, unknown> = {}) { this.event("item/completed", { type: "webSearch", id: "ws-fixture-1", query: "fixture query", ...item }); }
+  /** G-4 V2：白名单 server 启动状态通知（会话级、无轮次身份；P0 探针形状）。 */
+  startup(name: string, status: string, error?: string | null) { for (const listener of this.listeners) listener("mcpServer/startupStatus/updated", { threadId: this.nativeId, name, status, error: error ?? null, failureReason: null }); }
+  /** G-4 V2：mcpToolCall item（item/completed，P0 探针字段全集形状）。 */
+  mcpToolCall(item: Record<string, unknown> = {}) { this.event("item/completed", { type: "mcpToolCall", id: "mcp-fixture-1", server: "fixture-mcp", tool: "echo", status: "completed", arguments: {}, result: { content: [{ type: "text", text: "fixture result" }] }, error: null, durationMs: 1, ...item }); }
   async call(name: string, args: Record<string, unknown>, override: Record<string, unknown> = {}, requestController = new AbortController()) {
     if (!this.handler) throw new Error("fixture handler missing");
     return this.handler("item/tool/call", { threadId: this.nativeId, turnId: this.turnId, callId: `call-${Math.random()}`, namespace: null, tool: `ans_${name}`, arguments: args, ...override }, { signal: requestController.signal });

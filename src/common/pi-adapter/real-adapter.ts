@@ -33,6 +33,7 @@ import type {
   RuntimeProviderOptions, RuntimeSessionStorage, RuntimeContextSource,
   ToolDefinition as GovernedTool, RuntimeToolEventProjector, RuntimeToolResultFactsV1,
   RuntimeToolErrorFactsV1, RuntimeToolInputFactsV1, ToolDisplayInputRuleV1, RuntimeToolEventSource,
+  InstalledMcpServerV1,
 } from "../../model/runtime.ts";
 import { selectNativeSessionManager, sessionFileHasForeignToolChangeBlocks } from "./native-session.ts";
 export { sessionFileHasForeignToolChangeBlocks } from "./native-session.ts";
@@ -78,6 +79,8 @@ import {
 import type { Api, Model } from "@earendil-works/pi-ai";
 import type {
   ExtensionAPI,
+  McpServerEntry,
+  McpTransportFactory,
   ModelRuntime,
   SessionInfo,
   SessionManager,
@@ -92,6 +95,16 @@ import type {
 /** 动态加载 Pi 主包（不缓存也无妨，Node 模块缓存已足够）。 */
 async function loadPi(): Promise<typeof import("@earendil-works/pi-coding-agent")> {
   return import("@earendil-works/pi-coding-agent");
+}
+
+/**
+ * 动态加载 pi-mcp 包（G-4 V2 自持 StdioTransport 用；同 `loadPi`——仅本文件 import Pi 包、全走动态）。
+ * 实据：该包是 `pi-coding-agent` 的**传递依赖**（其内置 MCP 扩展同源加载，`extensions/mcp/runtime.js` 有引用），
+ * 运行期必然可解析；**依赖声明面归装配角色**——如日后打包裁剪传递依赖，需在 package.json 显式加
+ * `@earendil-works/pi-mcp`（本轮已上报，未越界改 package.json）。
+ */
+async function loadPiMcp(): Promise<typeof import("@earendil-works/pi-mcp")> {
+  return import("@earendil-works/pi-mcp");
 }
 
 // —————————————————————— 显式 provider 构造（方案 b） ——————————————————————
@@ -459,9 +472,78 @@ export function wireSettledOnce(
  */
 const GOVERNED_WRITE_TOOLS = new Set(["write", "edit", "write_file", "edit_file"]);
 
+// —————————————————————— G-4 V2：按角色安装的外来 MCP（stdio 限定） ——————————————————————
+//
+// 来源：客户 2026-10-16 批准 G-4 V2（契约面＝`src/model/runtime.ts` 的 `InstalledMcpServerV1`/
+// `RuntimeProviderOptions.installedMcpServers`；实施批次 P3＝Pi）。P0 探针定格（bindExtensions 接通、
+// 放行判据、env 收窄、dispose 收口）见 `角色卡/Pi适配器/docs/fix/2026-10-16_probe_mcp-surface.md`。
+//
+// 纪律（钉死）：
+// · **纯消费**——只用注入的 `installedMcpServers`；绝不读盘上来源（不读 mcp.json/~/.pi/项目信任面）、绝不写盘；
+// · **环境收窄自持**——自建 `StdioTransport({inheritEnv:false, env:最小集})`；`env:NAME` 真值只在
+//   构造期自 `process.env` 展开、只进内存与子进程环境，**绝不落文件/日志/诊断**；
+// · **放行判据＝前缀面**（P0 探针草案；1128 硬校验与门禁 499-504 **同一判据**）：
+//   精确注入名 ∪ `mcp__<清洗后白名单 server>__*`；白名单＝本次装配的声明名（单一来源＝注入面）；
+// · **tools-only**（V2 裁定①）：资源工具三名（`list_mcp_resources` 等）**不在放行面**——SDK 若因 server
+//   自报 resources 而把三名登记/声明（SDK 行为，见探针 §六），对它们的调用一律被门禁拒绝（不接＝不放行）。
+
 /**
- * 构造执行前扩展：生产带 allowedToolNames，拒绝任何未注入名称；授权交原 injected handler。
- * 不带白名单的旧直接测试保留写 gate 与 shell kill-switch 的兼容行为。
+ * 放行判据（P0 探针草案逐字；**导出供接线测试**）：`mcp__<清洗后白名单名>__*` 前缀匹配。
+ * 清洗公式与 SDK 同名（`dist/extensions/mcp/tools.js:46`：`mcp__${server}__${tool}` 后 `[^A-Za-z0-9_]`→`_`；
+ * 超长/同名冲突走 `_<hash8>` 缩短路径时前缀仍完整——探针实测）。`__` 分隔防近似串（`mcp__srvx__` 不中 `srv`）。
+ */
+export function mcpToolAllowedByWhitelistedServer(toolName: string, whitelistedServerNames: readonly string[]): boolean {
+  if (!toolName.startsWith("mcp__")) return false;
+  return whitelistedServerNames.some((server) => {
+    const sanitized = server.replace(/[^A-Za-z0-9_]/g, "_");
+    return sanitized !== "" && toolName.startsWith(`mcp__${sanitized}__`);
+  });
+}
+
+/** 展开后的 server 定义（env 值均为真值；仅存活于内存，绝不落盘）。 */
+export interface ResolvedInstalledMcpServer {
+  name: string;
+  command: string;
+  args: readonly string[];
+  env: Readonly<Record<string, string>>;
+}
+
+/**
+ * `env:NAME` 引用展开（**纯函数，导出供测试**）：
+ * · 值以 `env:` 开头 ⇒ 取自 `env` 映射（生产传 `process.env`）；**缺失即抛错**（构造期 fail-closed，
+ *   先于任何子进程/网络——绝不静默省略该键：那会让 server 拿不到凭据而失败在更晚、更难归因处）；
+ * · 其余值＝字面量原样。
+ * name/command/args 原样透传（name 字符集由读取器校验——V2 裁定②：构造侧直接信任）。
+ */
+export function resolveInstalledMcpServers(
+  servers: readonly InstalledMcpServerV1[],
+  env: Record<string, string | undefined>,
+): ResolvedInstalledMcpServer[] {
+  return servers.map((server) => {
+    const resolved: Record<string, string> = {};
+    for (const [key, value] of Object.entries(server.env ?? {})) {
+      if (value.startsWith("env:")) {
+        const referenced = value.slice(4);
+        const real = referenced === "" ? undefined : env[referenced];
+        if (real === undefined) {
+          throw new Error(
+            `已安装 MCP server「${server.name}」的环境引用 env:${referenced} 在进程环境中不存在——` +
+              `不会静默省略（该 server 将拿不到这一步凭据）；请先设置该环境变量再开会话。`,
+          );
+        }
+        resolved[key] = real;
+      } else {
+        resolved[key] = value;
+      }
+    }
+    return { name: server.name, command: server.command, args: [...server.args], env: resolved };
+  });
+}
+
+/**
+ * 构造执行前扩展：生产带 allowedToolNames 放行面，拒绝面外一切名称（G-4 V2 起放行面＝精确注入名
+ * ∪ `mcp__<白名单>__*` 前缀面——与构造期 1128 校验同一判据）；授权交原 injected handler。
+ * 不带放行面的旧直接测试保留写 gate 与 shell kill-switch 的兼容行为。
  * **导出供接线测试**（X-1：断言本扩展**不含** agent_settled 映射——settled 的唯一发射点是
  * `wireSettledOnce`，防重复发射点漂移回）。
  * 同时把事件经 emit 推给 RoleSession.events()。
@@ -484,7 +566,14 @@ export function buildGovernanceExtension(
   gate: WriteGate,
   emit: (event: SessionEvent) => void,
   shellArmed: boolean,
-  context?: PiToolEventContext & { allowedToolNames?: ReadonlySet<string>; serverTools?: ServerToolExtensionOptions },
+  context?: PiToolEventContext & {
+    /**
+     * 放行面（只消费 `.has`——G-4 V2 起可为组合面对象：精确注入名 ∪ `mcp__` 前缀面；`ReadonlySet` 天然满足）。
+     * 未给出＝旧直接测试路径（保留写 gate 与 shell kill-switch 的兼容行为）。
+     */
+    allowedToolNames?: { has(name: string): boolean };
+    serverTools?: ServerToolExtensionOptions;
+  },
 ): { name: string; factory: (pi: ExtensionAPI) => void } {
   return {
     name: "ans-governance",
@@ -890,6 +979,12 @@ export interface RoleSessionDeps {
   emitPromptInput?: boolean;
   /** F-3-a：截断收尾补发配置（缺省不传 ⇒ 逐字旧行为）；形状见 makeRolePrompt deps / LengthFollowupOptions。 */
   lengthFollowup?: LengthFollowupOptions;
+  /**
+   * G-4 V2 dispose 收口（**仅装配 MCP 时提供**；缺省不传 ⇒ dispose 逐字旧行为）：在 SDK
+   * `session.dispose()` **之前**执行——补发 `session_shutdown` 让 MCP 扩展关闭全部连接/子进程
+   * （P0 探针 §一.4 实据：dispose 本身不收回子进程）。有界（5s）且 best-effort：失败只记诊断、不抛出。
+   */
+  sessionShutdown?: () => Promise<unknown>;
 }
 
 /**
@@ -943,6 +1038,18 @@ export function makeRoleSession(deps: RoleSessionDeps): RoleSession {
     async dispose(): Promise<void> {
       deps.diagnostics?.record("session.dispose", { turnId: lifecycle.currentTurnId() });
       deps.unsubscribe();
+      if (deps.sessionShutdown !== undefined) {
+        // G-4 V2：先补发 session_shutdown（MCP 收口）再 dispose SDK 会话；**有界 + best-effort**——
+        // 超时/失败只记诊断不抛出（子进程最终兜底＝宿主退出时 pi-mcp 的 exit-hook 杀进程组）。
+        try {
+          await withTimeout(Promise.resolve(deps.sessionShutdown()), 5000, "session_shutdown 收口");
+          deps.diagnostics?.record("session.shutdown.end", { ok: true });
+        } catch (error) {
+          deps.diagnostics?.error("session.shutdown.failed", error, {
+            errorCode: isTimeoutError(error) ? "SHUTDOWN_TIMEOUT" : "SHUTDOWN_FAILED",
+          });
+        }
+      }
       deps.session.dispose();
       deps.queue.close();
     },
@@ -956,6 +1063,11 @@ export interface RealPiAdapterOptions extends RuntimeProviderOptions, PiProvider
   sessionDir?: string;
   config?: PiProviderConfig;
   logger?: StageLogger;
+  /**
+   * （G-4 V2；缺省不传＝SDK 默认 10000）MCP direct server 的**首轮启动等待上限**（毫秒）。
+   * 显式给出可调——慢 server 场景与「首轮被钳位」回归用（P0 探针 §三 实测）。
+   */
+  mcpStartupWaitMs?: number;
 }
 
 /** Private offline seam; normal construction uses the pinned real SDK and explicit model runtime. */
@@ -1007,7 +1119,7 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
         // 分段进度：加载 Pi 包。
         diagnostics.record("session.construct.step", { state: "load_pi" });
         log.stage("加载 Pi 包…");
-        const { createAgentSession, DefaultResourceLoader, SessionManager, SettingsManager } = await withTimeout(
+        const { createAgentSession, createMcpExtension, DefaultResourceLoader, SessionManager, SettingsManager } = await withTimeout(
           (dependencies.loadPi ?? loadPi)(),
           constructMs,
           "加载 Pi 包",
@@ -1054,11 +1166,57 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
         // Injected definitions and the exact shared waiting gate are the production capability source.
         const allowedToolNames = new Set(governedTools.map((tool) => tool.name));
         const customTools = governedTools.map((tool) => toPiTool(tool, turnContext));
+
+        // —— G-4 V2：按角色安装的外来 MCP（stdio 限定；纯消费注入面——不读任何盘上来源）——
+        // 缺省（无声明）⇒ 零装配：MCP 扩展不加载、bindExtensions 不调用、放行面＝原快照集 ⇒ 既有行为逐字不变。
+        const installedMcp = Array.isArray(opts.installedMcpServers) ? [...opts.installedMcpServers] : [];
+        const mcpActive = installedMcp.length > 0;
+        // env:NAME 展开（只自 process.env；缺失即抛——先于任何子进程/网络）。值只进内存与子进程环境。
+        const resolvedMcpServers = mcpActive ? resolveInstalledMcpServers(installedMcp, process.env) : [];
+        const mcpWhitelist = resolvedMcpServers.map((server) => server.name);
+        let mcpExtension: ReturnType<typeof createMcpExtension> | undefined;
+        if (mcpActive) {
+          diagnostics.record("session.construct.step", { state: "mcp_support", count: resolvedMcpServers.length });
+          const mcpLib = await withTimeout(loadPiMcp(), constructMs, "加载 pi-mcp 包");
+          // 自持 transport（P0 探针实据）：默认 transport 会把**全量宿主 env** 交给第三方 server（凭据泄漏面）；
+          // 这里 inheritEnv:false + 最小集（PATH＋声明 env）——命令解析由 cross-spawn 在宿主侧完成，PATH 供
+          // server 自身工具链用。`options.env` 为构造期已展开的真值（只存活于内存）。
+          const createTransport: McpTransportFactory = (entry, cwd) => {
+            const config = entry.config as { command?: unknown; args?: unknown; env?: Record<string, string> };
+            return new mcpLib.StdioTransport({
+              command: String(config.command),
+              args: Array.isArray(config.args) ? (config.args as string[]) : [],
+              cwd,
+              env: { PATH: process.env.PATH ?? "", ...(config.env ?? {}) },
+              inheritEnv: false,
+              stderr: "pipe",
+            });
+          };
+          mcpExtension = createMcpExtension({
+            // 配置单一来源＝注入声明（绝不回落 mcp.json/~/.pi/项目信任面）；逐一显式 direct（V1 最小接入）。
+            loadConfig: () => ({
+              servers: resolvedMcpServers.map((server) => ({
+                name: server.name,
+                config: { type: "stdio", command: server.command, args: [...server.args], env: { ...server.env }, exposure: "direct" },
+                source: "ans-installed",
+              })),
+              errors: [],
+            }),
+            createTransport,
+            ...(opts.mcpStartupWaitMs !== undefined ? { startupWaitMs: opts.mcpStartupWaitMs } : {}),
+          });
+        }
+        // 放行面（P0 探针草案；构造期 1128 与门禁 499-504 **同一判据**）：精确注入名 ∪ mcp__<白名单>__*；
+        // 无 MCP 时就是原快照集（同一 Set——零行为变化）。只消费 .has，故以结构面传参。
+        const allowedSurface: { has(name: string): boolean } = mcpActive
+          ? { has: (name: string): boolean => allowedToolNames.has(name) || mcpToolAllowedByWhitelistedServer(name, mcpWhitelist) }
+          : allowedToolNames;
+
         const extension = buildGovernanceExtension(
           () => { throw new Error("生产工具判定必须由注入 handler 执行"); },
           emit, allowedToolNames.has("run_shell"),
           {
-            ...turnContext, allowedToolNames,
+            ...turnContext, allowedToolNames: allowedSurface,
             // 未启用（默认）时不传 serverTools ⇒ 扩展层零注册、零开销、行为逐字与旧版一致。
             ...(serverToolConfig.enabled.length > 0 ? { serverTools: { declarations: serverToolConfig.enabled } } : {}),
           },
@@ -1067,7 +1225,7 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
         const resourceLoader = new DefaultResourceLoader({
           cwd: opts.projectRoot,
           agentDir: opts.projectRoot,
-          extensionFactories: [extension],
+          extensionFactories: [extension, ...(mcpExtension !== undefined ? [mcpExtension] : [])],
           noExtensions: true,
           systemPrompt: renderSystemPrompt(role, opts.projectRoot),
           noSkills: true,
@@ -1136,10 +1294,27 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
           "createAgentSession",
         );
 
-        const unexpected = session.getActiveToolNames().filter((name) => !allowedToolNames.has(name));
+        // G-4 V2：硬校验按放行面判（前缀面参数化）。置于 bindExtensions **之前**⇒构造期快照只可能看到
+        // 注入名（MCP 尚未建连）——确定性安全；前缀面为「未来把 bindExtensions 挪到校验前」留防。
+        // 运行期唯一活口闸＝门禁（499-504 同判据，逐调用执行前拦）。
+        const unexpected = session.getActiveToolNames().filter((name) => !allowedSurface.has(name));
         if (unexpected.length) {
           session.dispose();
           throw new Error(`Pi 注册了非注入工具：${unexpected.join(", ")}`);
+        }
+
+        // —— G-4 V2：MCP 扩展靠 `session_start` 建连（全仓此前 0 调用——见 P0 探针 §一.1）——
+        // **仅在装配 MCP 时补调**（无声明 ⇒ 不调用 ⇒ 既有链路逐字不变）；失败＝构造期如实抛错
+        // （不静默降级），并先 dispose 会话（防悬挂的会话/子进程）。
+        if (mcpExtension !== undefined) {
+          diagnostics.record("session.construct.step", { state: "bind_extensions" });
+          log.stage("session.bindExtensions…");
+          try {
+            await withTimeout(session.bindExtensions({}), constructMs, "session.bindExtensions");
+          } catch (error) {
+            session.dispose();
+            throw error;
+          }
         }
 
         // settled 的**唯一**发射点（X-1）：见 wireSettledOnce 的理由注释。
@@ -1165,7 +1340,13 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
                 },
               }
             : undefined;
-        const roleSession = makeRoleSession({ session, promptMs, gate: interactionGate, emit, log, queue, unsubscribe: () => { unsubscribe(); callFacts.clear(); }, lifecycle, diagnostics, abortTimeoutMs: 900, strictLifecycle: true, emitPromptInput: false, lengthFollowup });
+        // G-4 V2 dispose 收口（P0 探针 §一.4）：SDK 只在走 AgentSessionRuntime（print/rpc/tui 壳）时才发
+        // `session_shutdown`；本链直接持有 AgentSession——不补发则 dispose 后 MCP 子进程存活到宿主退出。
+        // 仅在装配 MCP 时提供（无 MCP ⇒ undefined ⇒ dispose 逐字旧行为）。
+        const sessionShutdown = mcpExtension !== undefined
+          ? (): Promise<unknown> => session.extensionRunner.emit({ type: "session_shutdown", reason: "quit" })
+          : undefined;
+        const roleSession = makeRoleSession({ session, promptMs, gate: interactionGate, emit, log, queue, unsubscribe: () => { unsubscribe(); callFacts.clear(); }, lifecycle, diagnostics, abortTimeoutMs: 900, strictLifecycle: true, emitPromptInput: false, lengthFollowup, sessionShutdown });
         roleSession.runtime = "pi";
         roleSession.roleId = role.id;
         roleSession.contextSource = sessionSelection.contextSource ?? (sessionSelection.mode === "in-memory" ? "in-memory" : sessionSelection.mode === "resumed" ? "resumed" : sessionSelection.note ? "recovered" : "fresh");

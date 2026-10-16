@@ -4,3 +4,5 @@
 
 本角色属于运行时接入组，本次开发沿用客户既有授权；[接口和原证据](api-spec.md)说明实际依赖、配置与验证范围。
 
+
+- [外来 MCP 白名单化（G-4 V2/P2）](docs/change/2026-10-16_change_g4-v2-mcp-whitelist.md)：`installedMcpServers` 纯消费——白名单定义＋禁用集单条 `-c mcp_servers={…}`（approve＋per-call 超时）、三处恰等（进程/线程/目录名字集）、`mcpToolCall` 行映射与坏 server 降级行；真 CLI 0.162.1 编码器校验绿。真实网关 namespace 桥接受性与真机 E2E 属验收轮。

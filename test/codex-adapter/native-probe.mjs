@@ -33,8 +33,8 @@ async function execute(args) {
   } finally { clearTimeout(timer); }
 }
 
-async function readConfiguration(disabledServers) {
-  const child = spawn(cli.command, [...cli.prefix, 'app-server', '--listen', 'stdio://', '--strict-config', ...safetyOverrides(work, disabledServers).flatMap(value => ['-c', value])], { cwd: work, env: environment });
+async function readConfiguration(disabledServers, installed = []) {
+  const child = spawn(cli.command, [...cli.prefix, 'app-server', '--listen', 'stdio://', '--strict-config', ...safetyOverrides(work, disabledServers, false, installed).flatMap(value => ['-c', value])], { cwd: work, env: environment });
   const pending = new Map(); let sequence = 0;
   const lines = createInterface({ input: child.stdout });
   child.stderr.resume();
@@ -71,6 +71,21 @@ try {
   let launched = false;
   try { await access(marker); launched = true; } catch {}
   assert.equal(launched, false);
+  // G-4 V2（P2）：生产编码器（白名单定义＋禁用集**合并单条** root map）的真 CLI 校验——定义携带
+  // approve/tool_timeout_sec，readback 逐字往返；任何转义/解析破损 ⇒ --strict-config 拒启（进程非零退出）。
+  const installed = [{ name: 'ans_probe_whitelist', command: process.execPath, args: [fakeServer, ' arg with spaces', 'quote"q', 'back\\slash'], env: { PROBE_LIT: 'lit"v' } }];
+  const third = await readConfiguration(Object.keys(first.servers), installed);
+  assert.deepEqual(third.enabled, [installed[0].name]);
+  const entry = third.servers[installed[0].name];
+  assert.equal(entry.command, process.execPath);
+  assert.deepEqual(entry.args, [fakeServer, ' arg with spaces', 'quote"q', 'back\\slash']);
+  assert.equal(entry.env.PROBE_LIT, 'lit"v');
+  assert.equal(entry.default_tools_approval_mode, 'approve');
+  assert.equal(entry.tool_timeout_sec, 300);
+  assert.equal(third.servers.foreign_user.enabled, false);
+  let whitelistLaunched = false;
+  try { await access(marker); whitelistLaunched = true; } catch {}
+  assert.equal(whitelistLaunched, false, 'config 面不启动白名单 server（应在线程期）；夹具未被 spawn');
   const schema = path.join(root, 'schema');
   await execute(['app-server', 'generate-ts', '--experimental', '--out', schema]);
   const fields = await readFile(path.join(schema, 'v2/DynamicToolCallParams.ts'), 'utf8');
@@ -79,5 +94,5 @@ try {
   for (const name of ['name', 'description', 'inputSchema']) assert.match(functionSpec, new RegExp(`${name}:`));
   assert.match(await readFile(path.join(schema, 'v2/DynamicToolSpec.ts'), 'utf8'), /"type": "function"/);
   assert.match(await readFile(path.join(schema, 'InitializeCapabilities.ts'), 'utf8'), /experimentalApi: boolean/);
-  console.log(JSON.stringify({ version, mode: 'no model or auth calls', nativeMcpEnabled: second.enabled, projectConfigExcluded: true, foreignMcpStarted: launched, sandbox: second.config.sandbox_mode, approval: second.config.approval_policy, shellTool: second.config.features.shell_tool, dynamicRequestIdentities: ['threadId', 'turnId', 'callId'], experimentalApi: 'initialize accepted and schema verified' }));
+  console.log(JSON.stringify({ version, mode: 'no model or auth calls', nativeMcpEnabled: second.enabled, projectConfigExcluded: true, foreignMcpStarted: launched, sandbox: second.config.sandbox_mode, approval: second.config.approval_policy, shellTool: second.config.features.shell_tool, dynamicRequestIdentities: ['threadId', 'turnId', 'callId'], experimentalApi: 'initialize accepted and schema verified', whitelistMap: { enabledAfter: third.enabled, disabledForeign: third.servers.foreign_user.enabled, approvalMode: entry.default_tools_approval_mode, toolTimeoutSec: entry.tool_timeout_sec, argsRoundTrip: entry.args.length } }));
 } finally { await rm(root, { recursive: true, force: true }); }

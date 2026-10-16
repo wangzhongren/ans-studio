@@ -25,6 +25,8 @@ const toolNames = (arg("tools") ?? "echo").split(",").map((s) => s.trim()).filte
 const dumpEnvPath = arg("dump-env");
 const callLogPath = arg("call-log");
 const initDelayMs = Number(arg("init-delay") ?? "0") || 0;
+/** `--resources`：声明 resources 能力并提供一条资源（tools-only 强制回归用）。 */
+const withResources = argv.includes("--resources");
 
 // 环境收窄证据：只写键名（绝不写值）。
 if (dumpEnvPath !== undefined) {
@@ -57,12 +59,20 @@ function handle(message: Record<string, unknown>): void {
         id,
         result: {
           protocolVersion: (message["params"] as Record<string, unknown> | undefined)?.["protocolVersion"] ?? "2025-11-25",
-          capabilities: { tools: {} },
+          capabilities: { tools: {}, ...(withResources ? { resources: {} } : {}) },
           serverInfo: { name: serverName, version: "0.0.1-probe" },
         },
       });
     if (initDelayMs > 0) setTimeout(respond, initDelayMs);
     else respond();
+    return;
+  }
+  if (method === "resources/list" && isRequest) {
+    send({ jsonrpc: "2.0", id, result: { resources: withResources ? [{ uri: "probe://fixture/resource", name: "fixture-resource", mimeType: "text/plain" }] : [] } });
+    return;
+  }
+  if (method === "resources/templates/list" && isRequest) {
+    send({ jsonrpc: "2.0", id, result: { resourceTemplates: [] } });
     return;
   }
   if (method === "ping" && isRequest) {

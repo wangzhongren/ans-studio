@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type * as SDK from "@anthropic-ai/claude-agent-sdk";
 import type * as Zod from "zod";
 import type { ResolvedRole } from "../../model/role.ts";
@@ -32,15 +33,23 @@ type Engine = {
   controller: AbortController;
   closed: boolean;
   resumeId?: string;
+  /** One honest installed-MCP status pass per engine (G-4 V2 P1). */
+  statusReported: boolean;
   toolTail: Promise<void>;
   contexts: Map<string, { turn: Turn; toolName: string; toolUseId: string; signal: AbortSignal }>;
   nativeTurns: Map<string, { turn: Turn; signal: AbortSignal }>;
   pendingInputs: Map<string, Turn>;
-  /** Built-in WebSearch calls observed on the message pump, keyed by the model's tool_use id. */
-  nativeCalls: Map<string, { turn: Turn; toolCallId: string }>;
+  /** Native tool calls observed on the message pump (built-in WebSearch + installed foreign MCP), keyed by the model's tool_use id. */
+  nativeCalls: Map<string, { turn: Turn; toolCallId: string; toolName: string }>;
 };
 // MCP has a hard upstream ceiling; max Node timer buys ~24.8 days, never infinity.
 const MCP_TOOL_TIMEOUT_MS = 2_147_483_647;
+// Installed foreign servers get a finite per-call timeout: one hung third-party call must not ride the
+// whole turn (ANS's own server keeps the upstream ceiling — its handlers enforce their own deadlines).
+const INSTALLED_MCP_TOOL_TIMEOUT_MS = 60_000;
+// Env-scrubbing launcher that wraps every installed server command (see mcp-launcher.mjs; the P0 probe
+// proved the CLI otherwise hands its full env, including the gateway key, to the process server).
+const MCP_ENV_LAUNCHER = fileURLToPath(new URL("../../common/claude-adapter/mcp-launcher.mjs", import.meta.url));
 const CALL_CONTEXT_ARG = "__ans_call_context";
 const INPUT_CONTEXT_PREFIX = /^\[ANS_INPUT_CONTEXT:([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})\]\n/;
 
@@ -73,6 +82,34 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
       ...(installedSkills === "" ? [] : [installedSkills]),
     ].join("\n\n");
   };
+
+  // G-4 V2 P1: installed foreign MCP servers ride the same options.mcpServers channel as `ans`. The
+  // declaration reader (runtime-core/mcp-declarations) already rejected invalid/reserved names and the
+  // command-reference env form, so this adapter consumes the list as-is. Every command is re-wrapped
+  // through the env-scrubbing launcher: the only process the CLI spawns is our launcher, which re-spawns
+  // the declared command with a minimal environment (base locators + exactly the declared env names).
+  // `env:NAME` references expand against the construction-time env snapshot; a missing target is
+  // omitted (the server then reports its own failure through mcpServerStatus).
+  const resolveInstalledEnv = (declared?: Readonly<Record<string, string>>): Record<string, string> => {
+    const resolved: Record<string, string> = {};
+    for (const [name, value] of Object.entries(declared ?? {})) {
+      const target = value.startsWith("env:") ? env[value.slice(4).trim()] : value;
+      if (target !== undefined) resolved[name] = target;
+    }
+    return resolved;
+  };
+  const installedServers = options.installedMcpServers ?? [];
+  const installedNames = new Set(installedServers.map((declared) => declared.name));
+  const installedToolPrefixes = installedServers.map((declared) => `mcp__${declared.name}__`);
+  const installedAllowedTools = installedServers.map((declared) => `mcp__${declared.name}`);
+  const installedMcpConfigs: Record<string, SDK.McpServerConfig> = Object.fromEntries(installedServers.map((declared) => {
+    const resolvedEnv = resolveInstalledEnv(declared.env);
+    return [declared.name, {
+      type: "stdio" as const, command: process.execPath, args: [MCP_ENV_LAUNCHER, declared.command, ...declared.args],
+      env: { ...resolvedEnv, ANS_MCP_LAUNCHER_PASSTHROUGH: JSON.stringify(Object.keys(resolvedEnv)), ...(process.versions.electron ? { ELECTRON_RUN_AS_NODE: "1" } : {}) },
+      alwaysLoad: true, timeout: INSTALLED_MCP_TOOL_TIMEOUT_MS,
+    } satisfies SDK.McpStdioServerConfig];
+  }));
 
   return {
     async composeContext(role) { return { systemPrompt: systemPrompt(role) }; },
@@ -123,6 +160,22 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
           // No active-turn fallback: an unknown hook does not identify a business call.
           events.push(event);
         } catch { projectionDiagnostic("PROJECTION_FAILED"); }
+      };
+      // One honest status pass per engine (G-4 V2 P1, assessment §2.5): failed/needs-auth installed
+      // servers surface a category-classified line; the turn proceeds regardless and a status query
+      // failure is swallowed. Only the error category (leading CODE token, else a bounded first
+      // segment) is reported — never the full error body. Servers still pending at this instant
+      // (e.g. a hanging connect) stay silent this round; their tools are simply absent.
+      const reportInstalledServerStatus = async (current: Engine, turn: Turn): Promise<void> => {
+        if (installedNames.size === 0) return;
+        let entries: SDK.McpServerStatus[];
+        try { entries = await current.query.mcpServerStatus(); } catch { return; }
+        for (const entry of entries) {
+          if (!installedNames.has(entry.name) || (entry.status !== "failed" && entry.status !== "needs-auth")) continue;
+          const error = typeof entry.error === "string" ? entry.error.trim() : "";
+          const category = /^([A-Z][A-Z0-9_]*)\b/.exec(error)?.[1] ?? (error === "" ? entry.status : error.split(/[\n(,]/)[0]!.slice(0, 80));
+          emit(turn, "message", `已安装 MCP「${entry.name}」未连接：${category}`);
+        }
       };
       const safeFailure = (error: unknown) => error instanceof Error && ["AbortError", "TimeoutError"].includes(error.name)
         ? error : new Error(`Claude SDK 运行失败：${redact(error instanceof Error ? error.message : String(error))}`);
@@ -191,7 +244,7 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
         // cannot preserve additionalProperties at the root; MCP registerTool accepts a Zod object.
         const server = sdk.createSdkMcpServer({ name: "ans", version: "1.0.0", tools: [] });
         server.timeout = MCP_TOOL_TIMEOUT_MS;
-        const current: Engine = { query: undefined as unknown as SDK.Query, input, controller, closed: false, resumeId: nativeId, toolTail: Promise.resolve(), contexts: new Map(), nativeTurns: new Map(), pendingInputs: new Map(), nativeCalls: new Map() };
+        const current: Engine = { query: undefined as unknown as SDK.Query, input, controller, closed: false, resumeId: nativeId, statusReported: false, toolTail: Promise.resolve(), contexts: new Map(), nativeTurns: new Map(), pendingInputs: new Map(), nativeCalls: new Map() };
         for (const tool of options.tools) {
           const properties = (tool.inputSchema.properties ?? {}) as Record<string, unknown>;
           if (Object.hasOwn(properties, CALL_CONTEXT_ARG)) throw new Error("Claude ANS 工具 schema 包含保留的请求上下文字段");
@@ -238,10 +291,10 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
         const queryOptions: SDK.Options = {
           cwd: options.projectRoot, systemPrompt: systemPrompt(role),
           tools: webSearchEnabled ? ["WebSearch"] : [],
-          allowedTools: webSearchEnabled ? [...names, "WebSearch"] : [...names],
+          allowedTools: [...names, ...installedAllowedTools, ...(webSearchEnabled ? ["WebSearch"] : [])],
           settingSources: [], strictMcpConfig: true,
           skills: [], plugins: [], settings: { disableAllHooks: true }, extraArgs: { "disable-slash-commands": null },
-          mcpServers: { ans: server }, env: childEnv, abortController: controller,
+          mcpServers: { ans: server, ...installedMcpConfigs }, env: childEnv, abortController: controller,
           persistSession: !!storage, ...(nativeId ? { resume: nativeId } : {}),
           ...(options.modelId?.trim() || env.ANS_CLAUDE_MODEL?.trim() ? { model: options.modelId?.trim() || env.ANS_CLAUDE_MODEL?.trim() } : {}),
           canUseTool: async () => ({ behavior: "deny", message: "仅允许已注册且预批准的 ANS MCP 工具" }),
@@ -267,6 +320,18 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
               const token = randomUUID();
               current.contexts.set(token, { turn: originalTurn, toolName: hook.tool_name.slice("mcp__ans__".length), toolUseId: hook.tool_use_id, signal: AbortSignal.any([original!.signal, hookOptions.signal]) });
               return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow", updatedInput: { ...hook.tool_input as Record<string, unknown>, [CALL_CONTEXT_ARG]: token } } };
+            }
+            // Installed foreign MCP allow branch (G-4 V2 P1). The P0 probe froze process-server
+            // provenance as source "dynamic" (test/claude-adapter/mcp-surface-loopback.probe.ts);
+            // strictMcpConfig + empty settings/plugins/agents means a provenance name can only be one
+            // we injected. No updatedInput — the model's arguments must reach the third-party server
+            // unchanged and the ANS call-context token must never leak outside mcp__ans__ (WebSearch
+            // branch precedent). allowedTools only carries the server-level auto-allow fallback.
+            if (hook.mcp_server && installedNames.has(hook.mcp_server.name) && hook.mcp_server.source === "dynamic" && hook.tool_name.startsWith(`mcp__${hook.mcp_server.name}__`) && originalTurn && originalTurn === active && !originalTurn.controller.signal.aborted && !original!.signal.aborted && !controller.signal.aborted && !hookOptions.signal.aborted) {
+              emitTool(originalTurn, { origin: "native-start", phase: "start", toolName: hook.tool_name,
+                toolCallId: `${originalTurn.id}:${hook.tool_use_id}`,
+                input: { rule: "none", args: hook.tool_input !== null && typeof hook.tool_input === "object" && !Array.isArray(hook.tool_input) ? hook.tool_input as Record<string, unknown> : {} } }, "tool_call", hook.tool_name);
+              return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow" } };
             }
             // Built-in WebSearch auto-allow (capability bit on, bound live turn only). This branch is
             // REQUIRED even though allowedTools lists WebSearch: hook deny precedes allowedTools, so
@@ -298,14 +363,18 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
                   else if (webSearchEnabled && block.type === "tool_use" && block.name === "WebSearch") {
                     // Native call surface only; the query itself stays inside the tool facts (never a message line).
                     const toolCallId = `${callTurn.id}:${block.id}`;
-                    current.nativeCalls.set(block.id, { turn: callTurn, toolCallId });
+                    current.nativeCalls.set(block.id, { turn: callTurn, toolCallId, toolName: "WebSearch" });
                     emitTool(callTurn, { origin: "native-start", phase: "start", toolName: "WebSearch", toolCallId,
                       input: { rule: "none", args: block.input !== null && typeof block.input === "object" && !Array.isArray(block.input) ? block.input as Record<string, unknown> : {} } }, "tool_call", "WebSearch");
+                  } else if (block.type === "tool_use" && installedToolPrefixes.some((prefix) => block.name.startsWith(prefix))) {
+                    // Frame-truth registration only: the PreToolUse allow branch already emitted the start
+                    // row; this arms the tool_result pairing through the same nativeCalls mechanism.
+                    current.nativeCalls.set(block.id, { turn: callTurn, toolCallId: `${callTurn.id}:${block.id}`, toolName: block.name });
                   }
                 }
               } else if (message.type === "user") {
-                // Built-in tool results arrive as user tool_result blocks; only tracked WebSearch calls are consumed.
-                if (webSearchEnabled && typeof message.message.content !== "string") for (const block of message.message.content) {
+                // Native tool results arrive as user tool_result blocks; only tracked native calls are consumed.
+                if ((webSearchEnabled || installedToolPrefixes.length > 0) && typeof message.message.content !== "string") for (const block of message.message.content) {
                   if (block.type !== "tool_result") continue;
                   const call = current.nativeCalls.get(block.tool_use_id);
                   if (!call) continue;
@@ -314,8 +383,8 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
                   if (typeof block.content === "string") content.push({ type: "text", text: block.content });
                   else if (Array.isArray(block.content)) for (const item of block.content) content.push(item.type === "text" && typeof item.text === "string" ? { type: "text", text: item.text } : { type: "unsupported" });
                   const text = content.filter((item): item is { type: "text"; text: string } => item.type === "text").map((item) => item.text).join("\n");
-                  emitTool(call.turn, { origin: "native-result", phase: "result", toolName: "WebSearch", toolCallId: call.toolCallId,
-                    native: { isError: block.is_error === true, content } }, block.is_error === true ? "denied" : "accepted", text || "WebSearch");
+                  emitTool(call.turn, { origin: "native-result", phase: "result", toolName: call.toolName, toolCallId: call.toolCallId,
+                    native: { isError: block.is_error === true, content } }, block.is_error === true ? "denied" : "accepted", text || call.toolName);
                 }
               } else if (message.type === "result") {
                 if (message.user_message_uuid && message.user_message_uuid !== callTurn.sdkUuid && !message.user_message_uuids?.includes(callTurn.sdkUuid)) continue;
@@ -367,6 +436,7 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
             const current = await waitForTurn(start, turn.controller.signal, options.constructTimeoutMs ?? 30000, options.interactionGate);
             const images = promptOptions?.images ?? [];
             if (images.some((image) => !["image/png", "image/jpeg", "image/gif", "image/webp"].includes(image.mimeType))) throw new Error("Claude 不支持此输入图片类型");
+            if (!current.statusReported) { current.statusReported = true; await reportInstalledServerStatus(current, turn); }
             current.pendingInputs.set(turn.sdkUuid, turn);
             const wireText = `[ANS_INPUT_CONTEXT:${turn.sdkUuid}]\n${text}`;
             current.input.push({ type: "user", uuid: turn.sdkUuid, session_id: nativeId ?? "", parent_tool_use_id: null, message: {
