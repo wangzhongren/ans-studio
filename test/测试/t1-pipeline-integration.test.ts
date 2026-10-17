@@ -70,12 +70,12 @@ for (const runtime of ["pi", "codex", "claude"] as const) {
         if (phase) return { outcome: "answered", value: { confirmed: true } };
         metadata = context; return new Promise<CustomerInputOutcome>(r => { answer = r; });
       },
-    }, { runtimeOptions: { providerFactories: { [runtime]: provider.factory }, promptTimeoutMs: 100, persistSession: true } });
+    }, { runtimeOptions: { providerFactories: { [runtime]: provider.factory }, turnLastResortMs: 100, promptTimeoutMs: 100, persistSession: true } });
     const pump = (async () => { for await (const event of handle.events()) events.push(event); })();
     try {
       const first = handle.send("confirm"); const rejected = assert.rejects(first);
       await untilIO(() => answer !== undefined); t.mock.timers.tick(180); await nextIO();
-      assert.equal(events.filter(e => e.kind === "settled").length, 0, "actual waiting gate pauses the 100ms deadline during 180ms explicit logical customer wait");
+      assert.equal(events.filter(e => e.kind === "settled").length, 0, "actual waiting gate pauses the 100ms last-resort deadline during 180ms explicit logical customer wait");
       assert.equal(metadata?.runtime, runtime); assert.equal(metadata?.roleId, "X"); assert.ok(metadata?.turnId);
       assert.equal(metadata?.signal?.aborted, false);
       assert.deepEqual(await handle.abort?.(), { ok: true, supported: true }); await rejected;
@@ -101,7 +101,7 @@ for (const runtime of ["pi", "codex", "claude"] as const) {
       assert.equal(fs.existsSync(path.join(project.projectRoot, ".ans/sessions/X", runtime === "pi" ? "codex" : "pi")), false);
     } finally { await handle.dispose(); await pump; fs.rmSync(project.projectRoot, { recursive: true, force: true }); }
   });
-  test(`T1 ${runtime}: the same controlled Core clock expires exactly 100ms outside customer waiting`, { timeout: 10000 }, async (t) => {
+  test(`T1 ${runtime}: the same controlled Core clock triggers the 100ms last resort outside customer waiting`, { timeout: 10000 }, async (t) => {
     t.mock.timers.enable({ apis: ["Date", "setTimeout"], now: Date.now() });
     const project = fixture(), events: OrchestrationEvent[] = [];
     let active = false;
@@ -110,18 +110,19 @@ for (const runtime of ["pi", "codex", "claude"] as const) {
       await new Promise<void>(resolve => signal.addEventListener("abort", () => resolve(), { once: true }));
     });
     const handle = await openRoleSession({ roleId: "X", taskId: "T1-clock-control", project, runtime, persistSession: false },
-      { runtimeOptions: { providerFactories: { [runtime]: provider.factory }, promptTimeoutMs: 100 } });
+      { runtimeOptions: { providerFactories: { [runtime]: provider.factory }, turnLastResortMs: 100, promptTimeoutMs: 100 } });
     const pump = (async () => { for await (const event of handle.events()) events.push(event); })();
     try {
       const rejected = assert.rejects(handle.send("no customer wait"), /超时.*100ms/);
       await untilIO(() => active);
       t.mock.timers.tick(99); await nextIO();
-      assert.equal(events.filter(event => event.kind === "settled").length, 0, "99 active milliseconds remain below the unchanged deadline");
+      assert.equal(events.filter(event => event.kind === "settled").length, 0, "99 active milliseconds remain below the 100ms last-resort deadline");
       t.mock.timers.tick(1); await rejected;
       await untilIO(() => events.some(event => event.kind === "handback") && events.some(event => event.kind === "settled"));
       const terminals = events.filter((event): event is SessionEvent => event.kind === "settled");
       assert.equal(terminals.length, 1);
       assert.equal((terminals[0].detail as { outcome: string }).outcome, "timed_out");
+      assert.match(terminals[0].summary, /最后兜底/, "settled 摘要须明确为「最后兜底」，与到点检查区分");
       const reports = events.filter(event => event.kind === "handback");
       assert.equal(reports.length, 1);
       assert.equal(reports[0].handback!.status, "failed");
@@ -136,7 +137,7 @@ for (const outcome of ["failed", "timed_out"] as const) test(`T1 real outer ${ou
     await new Promise<void>(r => signal.addEventListener("abort", () => r(), { once: true }));
   });
   const runtime: RuntimeKind = "codex";
-  const handle = await openRoleSession({ roleId: "X", taskId: "T1", runtime, project, persistSession: false }, { runtimeOptions: { providerFactories: { codex: provider.factory }, promptTimeoutMs: 30 } });
+  const handle = await openRoleSession({ roleId: "X", taskId: "T1", runtime, project, persistSession: false }, { runtimeOptions: { providerFactories: { codex: provider.factory }, turnLastResortMs: 30 } });
   const pump = (async () => { for await (const event of handle.events()) events.push(event); })();
   try {
     await assert.rejects(handle.send("fail")); await until(() => events.some(e => e.kind === "settled"));

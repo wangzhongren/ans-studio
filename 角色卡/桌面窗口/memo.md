@@ -2,6 +2,10 @@
 
 记录本角色掌握的事实、待核实事项与续接线索。不写全局规则，不抄任务状态。
 
+- 2026-10-17：**同步运行时新默认（`promptTimeoutMs` 默认 300000/5 分钟）＋到点检查不投恢复行**：watchdog 测试夹具**显式注入** `promptTimeoutOverrideMs: 120_000` 与 `turnLastResortOverrideMs: 3_600_000`（新增的 config 覆盖位），不再依赖默认值；`TURN_DEADLINE_RATIO=1.0`、facts/role_status 文案见上条。`resolveEpisode` 对 `turn-deadline` **不投「看护恢复」行**（只复位＋诊断），其它信号恢复行不变——避免 su 误以为发生过超时/中止。multi-runtime 的 choiceLabels 默认档改「系统默认（5 分钟）」、字段 label＝「看护检查时限」；e2e 期望 label 同步。合跑 143/143，typecheck 本批 0 错。
+
+- 2026-10-17：**看护 #1＝到点检查 + 1 小时兜底（客户裁定；运行时核心 `promptTimeoutMs` 不再 abort）**：`TURN_DEADLINE_RATIO=1.0`；事实行只说到点检查/不中止/核对与 propose_recovery 指引/`turnLastResortMs` 1 小时兜底；**禁止**旧话术「逼近/尚未超时/未中止/硬超时/剩余约」。`turnTimeoutMs`＝`resolveRuntimeTimeouts(...).promptTimeoutMs`（检查时限），最后兜底取同一次 resolve 的 `turnLastResortMs`（整小时显示「N 小时」，否则 `formatDurationMs`）。role_status 当前轮行：`已耗 X / 看护检查时限 Y；turnId=…；1 小时最后兜底`。测试边界 demo 注入 120s：119999 不报、120000 报；排除/风暴/su 忙夹具统一 120000。两文件 63/63，typecheck 本批 0 错。
+
 - 2026-10-17：**su 审批档接线（PM 评审 §3.5）**：① `SessionManager` 的 (a) 通道**对 su 也构造**（判据只剩 `deps.shellOperatorChannel`）；su 经 `openRoleSession({shellOperatorOnly:{classifyShell,rules,operatorChannel}})` 走编排 `assembleOperatorShellGate`（(c)+(a) 同备；缺件不传）；**不再传 `shellReadonly`**。项目角色 `shellArming`+`shellOperatorChannel` 不变；main.ts 零改动（已验证缺 arming ⇒ 无 channel）。② `ShellConfirmRequest` 增 `tier`（`risky/review/deny/null`）与 `policy`（`su-approval/project`）；`parseSuApprovalTier` **行首**匹配 `su-审批档[tier]`（前缀从 `shell-arming.ts` 公共导出，禁止导入私有 common），且必须先于既有 `/risky/i` 泛匹配——否则 su 的 reason 会被翻成项目角色的泛 risky 文案。③ 卡片 plain reason 三档文案含三条必备披露；deny 用「硬拒类（deny）」。④ 测试坑：源码钉子 `if (this.deps.shellOperatorChannel) {`（su 与项目角色共用构造）与 `...shellOperatorOnly` spread；`import type { AssembleOperatorShellGateOptions, AssembleReadonlyShellGateOptions, RoutineShellPolicy }` 逐字被钉。相关五文件 **86/86**，typecheck 本批 0 错。
 
 - 2026-10-17：**e2e label 读取兼容 range 控件**：range 字段的 label `for` 指向 `pi-range-<key>`（hidden `pi-inp-<key>` 持规范值）——e2e 面板求值改为 `label[for="pi-inp-<key>"] || label[for="pi-range-<key>"]`，label 文本仍逐字对齐；hidden 输入仍在，故 `fieldCount`/`cw`/`tw` 不变。真机 e2e 退出 0、`E2E_DONE=1`，`PI_KEYS_ARE_FIVE`/`PI_FIELDS_MATCH_REGISTRY`/两个 `*_IN_ADVANCED` 全 true。

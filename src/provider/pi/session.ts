@@ -241,8 +241,17 @@ export interface PiRuntimeAdapterOptions extends PiProviderConfigInput {
    * **缺省** ⇒ 逐字保留旧行为（`SessionManager.inMemory`，不落盘）。适配器只读写该目录，不碰 `~/.pi`。
    */
   sessionDir?: string;
-  /** prompt 硬超时（毫秒）；缺省读 ANS_PI_PROMPT_TIMEOUT_MS，再缺省 120000。 */
+  /**
+   * **到点检查**时限（毫秒；历史字段名）：缺省读 ANS_PI_PROMPT_TIMEOUT_MS，再缺省 120000。
+   * 客户裁定 2026-10-17 后**不再用于中止整轮**——只供看护/`role_status` 到点检查；
+   * 主 prompt 的硬上限见 `turnLastResortMs`。截断收尾补发段仍按本值有界。
+   */
   promptTimeoutMs?: number;
+  /**
+   * **整轮最后兜底**（毫秒）：缺省 `DEFAULT_TURN_LAST_RESORT_MS`（1 小时，固定、无 env）；
+   * 测试可注入小值。确认卡挂起期间暂停（有效运行时间）。
+   */
+  turnLastResortMs?: number;
   /** 构造期单步硬超时（毫秒）；缺省读 ANS_PI_CONSTRUCT_TIMEOUT_MS，再缺省 120000。 */
   constructTimeoutMs?: number;
   /** shell 审核硬超时（毫秒）；缺省读 ANS_PI_SHELL_REVIEW_TIMEOUT_MS，再缺省 120000。超时 = 拒绝。 */

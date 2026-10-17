@@ -1,5 +1,25 @@
 # 测试 变更记录
 
+## 2026-10-17（复审）— 到点检查偏差修复后 reverified：三项修复全落地，全量 2246/2150/94红/2skip，桌面 5 条旧红消失
+
+**修复复审**：① 运行时核心 `resolveRuntimeTimeouts` 改为**全运行时**读 `ANS_PI_PROMPT_TIMEOUT_MS`（env=60000 → pi/claude/codex 均 60000）；② 设置 help 补齐「仍在推进则不动作」「留空＝系统默认（5 分钟）」；③ 桌面 `turn-deadline` 解除**不再投「看护恢复」行**（仅诊断），5 条属主测试已用显式注入同步。
+
+**本角色同步**：`g2-verify/w1-signals.test.ts` 身份更替用例由「投恢复行」改为「不投恢复行、新一轮独立告警」；`turn-watch-verify` A1 同步；C1 增加三 runtime env 断言、C2 增加 help 两项措辞断言。
+
+**复审结果**：独立套件 **15/15**、w1 **14/14**、t1 **8/8**、scope-audit 通过；全量 **2246 / 2150 pass / 94 fail / 2 skip**（上轮 2245/2144/99/2；**桌面窗口 5 条旧红全部消失**；94＝既有 93＋Codex 缺 MCP SDK 1 条环境红；无其他新增/消失）；typecheck **85 错**（本批/同步文件 0）。报告 revision 2 + `reverified` 事件；证据补 `reverify-*`。未改产品代码，未 commit/push。
+
+## 2026-10-17 — 到点检查 + 1 小时兜底独立验证：核心行为通过；1 项功能性偏差 + 2 项文案/建议偏差（列属主）
+
+**范围**：客户 2026-10-17「整轮不应该有超时…到了时间 su 去看是否卡死…保留 1 小时兜底」；PM 评审 `2026-10-17_design_turn-watch-and-recover-review.md`。运行时核心/服务/Pi/Claude/Codex/桌面看护/编排文案/门禁 su 卡/PM 设置。
+
+**方法**：自建 `test/测试/turn-watch-verify/`（**15 例** 4 文件＋夹具：看护 rig/挂起 provider/SessionManager/桩恢复）；同步本角色旧断言 3 处（t1 4 条红→8/8、w1 90%→100%→14/14、g2 scope-audit ratio 0.9→1.0）。不真等 1h、不跑真实模型/破坏性命令。
+
+**结论**：① 到点不中止（检查 40ms/兜底 300ms 注入：100ms 零 settled）；文案「轮次到点检查」+不中止/不动作/卡死才 propose/1 小时兜底，旧措辞零命中；每轮恰一条、下一轮独立；挂起卡/su 忙排除。② 1h 兜底到点才中止；settled 摘要「最后兜底」、与检查可区分；确认卡挂起 2× 时限不中止（同一 withPausableTimeout 原语）。③ 非整轮时限 600000/120000/120000 不变。④ 设置 label/档位/默认标签/1h 不暴露；role_status「看护检查时限 5 分 0 秒 / 1 小时最后兜底」；su 卡命令纪律齐备。⑤ propose_recovery 未确认=未执行、确认=已执行；watchdog 不自动执行。⑥ 三适配器+服务整轮均接 turnLastResortMs。
+
+**偏差（不修，列属主）**：1）**功能性**：非 Pi runtime 不读 `ANS_PI_PROMPT_TIMEOUT_MS`（实测 pi 60000 / claude 300000 / codex 300000），评审 §3.1/§3.3/§5.9 要求全运行时读取——属主运行时核心。2）设置 help 与评审 §3.3 非逐字（核心语义在位）——属主 PM。3）turn-deadline 解除仍投「看护恢复」行（评审建议不投/改文案）——属主桌面窗口，不阻塞。
+
+**复跑**：本批 15/15；全量 **2245/2144 pass/99 fail/2 skip**（上轮 2215/2120/93/2；+30 测试 / +6 红：既有 93（依赖缺件 75、EPERM 8、CRLF 9、计时竞态 1）＋桌面窗口属主 5 条未同步新默认（session 4 按 120s、multi-runtime 1 条 choiceLabels）＋Codex 新用例 1 条缺 MCP SDK）；typecheck **85 错**（本批 0）。详见[报告](docs/change/2026-10-17_change_turn-watch-recover-verify.md)与[证据](docs/change/2026-10-17-turn-watch-recover-verify-evidence/)。未 commit/push。
+
 ## 2026-10-17 — su 的 run_shell 审批策略独立验证：整体通过（0 不通过 / 6 备注）
 
 **范围**：客户 2026-10-17「只读的免审批，其他的要客户审批」＋「deny 也走客户审批」；PM 评审 `2026-10-17_design_su-shell-approval-review.md`。编排（operatorOnly/approveDeny/分支/守卫、assembleOperatorShellGate、run-role su-only 与互斥、CLI 模式文案）、门禁引擎（内置卡命令纪律）、桌面窗口（su 注入 + tier/policy/plain reason）、桌面UI（SU 卡）。

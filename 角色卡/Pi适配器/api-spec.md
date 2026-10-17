@@ -14,9 +14,9 @@
 
 `RoleSession.runtime/roleId/nativeSessionId/contextSource/contextWarning` 在真实 SDK 构造完成后给出，Service 可保存实际状态。in-memory=没有持久化；fresh=无可用历史新建；resumed=SDK 管理器投影包含模型上下文并成功构造；recovered=恢复失败/无效历史后重建并附 warning。桌面旧词汇不能直接透传：核心 resumed 对应桌面“已恢复”，核心 recovered 对应“上下文已重建”。ANS replay 不表示恢复成功。
 
-production prompt/abort：Service turn ID 注入到 Pi lifecycle，事件顶层及 detail 使用同一 ID。SDK settled 只暂存，prompt promise 结果确定后才发一次终态；首次明确中止/超时/失败不被清理错误改名。同一轮共享一次 native abort，空闲 stop 为 no-op，原生清理最多900ms，失败隔离会话；legacy direct helper 无 strictLifecycle 仍保留原 fixture 透传行为。等待客户或审核用原注入 InteractionGate 暂停 prompt deadline。
+production prompt/abort：Service turn ID 注入到 Pi lifecycle，事件顶层及 detail 使用同一 ID。SDK settled 只暂存，prompt promise 结果确定后才发一次终态；首次明确中止/超时/失败不被清理错误改名。同一轮共享一次 native abort，空闲 stop 为 no-op，原生清理最多900ms，失败隔离会话；legacy direct helper 无 strictLifecycle 仍保留原 fixture 透传行为。等待客户或审核用原注入 InteractionGate 暂停整轮最后兜底。
 
-Pi 时限显式值优先，缺省读旧 ANS_PI_PROMPT_TIMEOUT_MS/ANS_PI_CONSTRUCT_TIMEOUT_MS，再缺省120000；Core C1T 现将同值一次注入 inner/outer。Pi配置的 contextWindow 仍接受旧显式字段或 ANS_PI_CONTEXT_WINDOW，缺省 500000（系统默认值；2026-10-17 客户裁定）并提示。
+Pi 时限显式值优先，缺省读旧 ANS_PI_PROMPT_TIMEOUT_MS/ANS_PI_CONSTRUCT_TIMEOUT_MS，再缺省 **300000（检查时限 5 分钟）** / 120000（构造）；Core C1T 现将同值一次注入 inner/outer。**整轮两层时限（客户裁定 2026-10-17）**：`promptTimeoutMs`/`ANS_PI_PROMPT_TIMEOUT_MS` 仅作看护到点检查，**不中止**主 prompt；主 prompt 与 G-5 重发用 `turnLastResortMs`（缺省 3600000，固定无 env，测试可注入），到点错误标记 `TURN_LAST_RESORT`、outcome 仍 `timed_out`；F-3-a 截断收尾补发段仍用检查时限有界。Pi配置的 contextWindow 仍接受旧显式字段或 ANS_PI_CONTEXT_WINDOW，缺省 500000（系统默认值；2026-10-17 客户裁定）并提示。
 
 当前：迁移已实现，Pi 全部199/199（原185+新增14）与全仓strict tsc exit0，最终候选指纹见原记录。跨角色合并验收由各原属主完成。SDK固定 `@earendil-works/pi-coding-agent@1.1.0`，没有真实模型调用、真实 .env/持久凭据写入或提交。原始证据最终见 [P1 记录](docs/change/2026-10-14_change_pi-injected-runtime.md)，当前流程见 [Pi 功能](docs/feature/pi-runtime.md)。
 

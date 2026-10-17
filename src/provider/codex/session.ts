@@ -13,6 +13,9 @@ import { settings, safetyConfig, safetyOverrides, effectiveConfig, verifyThread,
 // G-5：推理事实通道（适配器只产事实；投影单点在 Service）+ 降级链诊断（沿 installed-skills 先例）。事件 summary
 // 用核心定格常量（Service 在投影单点强制覆盖——适配器不随载荷携带自由文本上 summary 位）。
 import { REASONING_EVENT_SUMMARY } from "../../common/runtime-core/reasoning.ts";
+// 整轮时限（客户裁定 2026-10-17）：`promptTimeoutMs` 只是看护到点检查时限，**不中止整轮**；
+// 适配器自己的整轮上限只认「最后兜底」（缺省 1 小时、固定无 env；测试/宿主可经 `turnLastResortMs` 注入小值）。
+import { DEFAULT_TURN_LAST_RESORT_MS } from "../../common/runtime-core/timeout.ts";
 import { createDiagnosticLogger } from "../../common/shared/diagnostics.ts";
 // Windows 瞬时句柄占用（`EBUSY`/`EPERM`/`EACCES`）的**有界重试**单一来源（§一.5 不得第二份实现）：
 // 收尾删除 workRoot 时，刚退出的原生进程/在途句柄可能短暂未释放——沿原子写原语同一口径处置。
@@ -669,7 +672,15 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
             const turn: TurnState = { ansId: options.currentTurnId() ?? randomUUID(), controller: new AbortController(), ready: deferred<string>(), done: deferred<RuntimeTurnOutcome>(), completed: false, calls: new Set(), searchCalls: 0, outputSeen: false, reasoningStarted: new Map() };
             // Abort can resolve ready before turn/start so early tool requests fail closed.
             active = turn;
-            const stopTimer = pausedDeadline(options.interactionGate, options.promptTimeoutMs ?? 0, () => { void stop(turn, "timed_out").catch(error => { turn.failure = config.redact(error); }); });
+            // 整轮**最后兜底**（唯一自动整轮上限；缺省 1 小时）：`promptTimeoutMs` 只看护到点检查，绝不在这里 abort。
+            // 计时沿 InteractionGate 可暂停＝按有效运行时间计（确认卡等待不触发兜底）。文案与「到点检查」明确区分；
+            // outcome 仍走既有 `timed_out` 枚举（契约不变），诊断由 failure 文本承载。
+            const lastResortMs = options.turnLastResortMs ?? DEFAULT_TURN_LAST_RESORT_MS;
+            const stopTimer = pausedDeadline(options.interactionGate, lastResortMs, () => {
+              if (turn.completed || turn.stopping) return;
+              turn.failure ??= `Codex 本轮运行超过最后兜底（${lastResortMs}ms），已中止以免无限挂起。`;
+              void stop(turn, "timed_out").catch(error => { turn.failure = config.redact(error); });
+            });
             try {
               await storage?.validateNativeDirectory?.();
               const input: Record<string, unknown>[] = [{ type: "text", text, text_elements: [] }];

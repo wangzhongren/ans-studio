@@ -88,7 +88,7 @@ function fake(script: Script, statuses: unknown[] | (() => Promise<unknown[]>) =
     dependencies: { env: environment, loadSdk: async () => { loadCount++; return { createSdkMcpServer, query }; }, loadZod: async () => z },
   };
 }
-const options = (root: string, tools: readonly ToolDefinition[], interactionGate = gate()): RuntimeProviderOptions => ({ runtime: "claude", projectRoot: root, skillRoot: root, tools, interactionGate, currentTurnId: () => undefined, promptTimeoutMs: 1000 });
+const options = (root: string, tools: readonly ToolDefinition[], interactionGate = gate()): RuntimeProviderOptions => ({ runtime: "claude", projectRoot: root, skillRoot: root, tools, interactionGate, currentTurnId: () => undefined });
 async function fixture(run: (root: string) => Promise<void>) {
   const root = await mkdtemp(join(tmpdir(), "ans-claude-test-"));
   try { await run(root); } finally { await rm(root, { recursive: true, force: true }); }
@@ -416,7 +416,7 @@ async function untilIO(predicate: () => boolean): Promise<void> {
   }
 }
 
-test("InteractionGate pauses deadline; answer returns and sequential write waits behind confirmation", { timeout: 10000 }, async (t) => fixture(async (root) => {
+test("InteractionGate pauses the last-resort deadline; answer returns and sequential write waits behind confirmation", { timeout: 10000 }, async (t) => fixture(async (root) => {
   t.mock.timers.enable({ apis: ["Date", "setTimeout"], now: Date.now() });
   const interactionGate = gate();
   let answer: ((value: { outcome: "answered"; value: { confirmed: boolean } }) => void) | undefined;
@@ -426,7 +426,7 @@ test("InteractionGate pauses deadline; answer returns and sequential write waits
     const write = client.callTool({ name: "write_file", arguments: { path: "after.txt", content: "yes" } });
     await Promise.all([confirmation, write]);
   });
-  const session = await createClaudeRuntimeAdapter({ ...options(root, tools, interactionGate), promptTimeoutMs: 50 }, engine.dependencies).bindRole(role);
+  const session = await createClaudeRuntimeAdapter({ ...options(root, tools, interactionGate), turnLastResortMs: 50 }, engine.dependencies).bindRole(role);
   const events: SessionEvent[] = [];
   const pump = (async () => { for await (const event of session.events()) events.push(event); })();
   try {
@@ -434,7 +434,7 @@ test("InteractionGate pauses deadline; answer returns and sequential write waits
     await untilIO(() => answer !== undefined);
     assert.equal(interactionGate.isWaiting(), true);
     t.mock.timers.tick(100); await nextIO();
-    assert.equal(events.filter(event => event.kind === "settled").length, 0, "100ms logical customer wait does not consume the unchanged 50ms active deadline");
+    assert.equal(events.filter(event => event.kind === "settled").length, 0, "100ms logical customer wait does not consume the unchanged 50ms last-resort deadline");
     await assert.rejects(access(join(root, "after.txt")));
     answer!({ outcome: "answered", value: { confirmed: true } });
     await prompt;
@@ -446,28 +446,50 @@ test("InteractionGate pauses deadline; answer returns and sequential write waits
   } finally { await session.dispose(); await pump; }
 }));
 
-test("the same Claude controlled clock expires at 50ms outside customer waiting", { timeout: 10000 }, async (t) => fixture(async (root) => {
+test("inspect deadline never aborts; only the last resort ends the turn at 50ms outside customer waiting", { timeout: 10000 }, async (t) => fixture(async (root) => {
   t.mock.timers.enable({ apis: ["Date", "setTimeout"], now: Date.now() });
   let active = false;
   let release!: () => void;
   const work = new Promise<void>(resolve => { release = resolve; });
   const engine = fake(async () => { active = true; await work; });
-  const session = await createClaudeRuntimeAdapter({ ...options(root, []), promptTimeoutMs: 50 }, engine.dependencies).bindRole(role);
+  const session = await createClaudeRuntimeAdapter({ ...options(root, []), promptTimeoutMs: 10, turnLastResortMs: 50 }, engine.dependencies).bindRole(role);
   const events: SessionEvent[] = [];
   const pump = (async () => { for await (const event of session.events()) events.push(event); })();
   try {
-    const rejected = assert.rejects(session.prompt("active without customer wait"), { name: "TimeoutError", message: "Claude 本轮超时（50ms）" });
+    const rejected = assert.rejects(session.prompt("active without customer wait"), {
+      name: "TimeoutError",
+      message: "本轮运行超过最后兜底（50ms），已中止以免无限挂起。",
+      label: "本轮最后兜底",
+      code: "TURN_LAST_RESORT",
+    });
     await untilIO(() => active);
-    t.mock.timers.tick(49); await nextIO();
+    t.mock.timers.tick(9); await nextIO();
+    assert.equal(events.filter(event => event.kind === "settled").length, 0);
+    t.mock.timers.tick(1); await nextIO();
+    assert.equal(events.filter(event => event.kind === "settled").length, 0, "10ms inspect deadline passed without aborting");
+    t.mock.timers.tick(39); await nextIO();
     assert.equal(events.filter(event => event.kind === "settled").length, 0);
     t.mock.timers.tick(1); await rejected;
     await untilIO(() => events.some(event => event.kind === "settled"));
     const terminals = events.filter(event => event.kind === "settled");
     assert.equal(terminals.length, 1);
     assert.equal((terminals[0]!.detail as { outcome: string }).outcome, "timed_out");
+    assert.equal(terminals[0]!.summary, "Claude 本轮超过最后兜底（50ms），已中止");
     assert.equal(engine.closes, 1);
     assert.equal(engine.configurations[0]!.abortController!.signal.aborted, true);
   } finally { release(); await session.dispose(); await pump; }
+}));
+
+test("inspect deadline alone never aborts a progressing turn", async () => fixture(async (root) => {
+  const engine = fake(async () => { await delay(60); });
+  const session = await createClaudeRuntimeAdapter({ ...options(root, []), promptTimeoutMs: 10 }, engine.dependencies).bindRole(role);
+  const read = collect(session, 1);
+  await session.prompt("inspect only");
+  const terminal = (await read).at(-1)!;
+  assert.equal(terminal.kind, "settled");
+  assert.equal((terminal.detail as { outcome: string }).outcome, "completed");
+  assert.equal(terminal.summary, "Claude 本轮completed");
+  await session.dispose();
 }));
 
 test("stop pending confirmation cancels queued write and late answer cannot report/effect in a new turn", async () => fixture(async (root) => {
@@ -504,11 +526,11 @@ test("stop pending confirmation cancels queued write and late answer cannot repo
   await session.dispose();
 }));
 
-test("active prompt deadline emits timed_out once and disposal closes event stream", async () => fixture(async (root) => {
+test("last-resort deadline emits timed_out once and disposal closes event stream", async () => fixture(async (root) => {
   const engine = fake(async () => { await delay(60); });
-  const session = await createClaudeRuntimeAdapter({ ...options(root, []), promptTimeoutMs: 15 }, engine.dependencies).bindRole(role);
+  const session = await createClaudeRuntimeAdapter({ ...options(root, []), turnLastResortMs: 15 }, engine.dependencies).bindRole(role);
   const read = collect(session, 1);
-  await assert.rejects(session.prompt("timeout"), { name: "TimeoutError" });
+  await assert.rejects(session.prompt("timeout"), { name: "TimeoutError", label: "本轮最后兜底", code: "TURN_LAST_RESORT" });
   assert.equal(((await read).at(-1)!.detail as { outcome: string }).outcome, "timed_out");
   await session.dispose();
   await session.dispose();

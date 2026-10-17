@@ -1,15 +1,35 @@
 import type { InteractionGate, RuntimeKind } from "../../model/runtime.ts";
-// 硬超时工具（契约 §4 修复：prompt / 构造不得无限期挂起）。
+// 时限工具（契约 §4 修复：构造/交互/命令不得无限期挂起）。
 //
 // 归属：运行时核心私有辅助（src/common/runtime-core/）。
 // 不 import 任何 Pi 包，可在纯单测中加载。
 //
+// 两层整轮时限（客户裁定 2026-10-17）：
+// · **到点检查**（`promptTimeoutMs`／`ANS_PI_PROMPT_TIMEOUT_MS`，历史字段名）——只供看护到点检查，
+//   **不中止整轮**；本文件不再把它交给整轮 abort 路径。
+// · **最后兜底**（`DEFAULT_TURN_LAST_RESORT_MS`＝1 小时，固定、无 env）——唯一的自动整轮上限。
+// 其余时限（shell 命令 10 分钟、审核/确认 120 秒、构造 120 秒）保持不变。
+//
 // 设计：用工厂函数产出带标记的 Error（避免自定义 class 的字段擦除歧义），
 // 并提供 withTimeout 与从环境变量读取时限的工具。
 
-/** 默认 prompt 时限：120000ms。 */
-export const DEFAULT_PROMPT_TIMEOUT_MS = 120000;
-/** 默认构造期单步时限：与 prompt 同量级，避免构造阶段无声挂起。 */
+/**
+ * **到点检查时限**默认值：300000ms（5 分钟；历史字段名 prompt；客户裁定 2026-10-17，PM 确认系统默认 5 分钟）。
+ *
+ * 语义已改为「看护到点检查」：到点**不中止整轮**，只供看护向 su 发一条「轮次到点检查」，
+ * 由 su 核对是否卡死（仍在推进 → 不动作；卡死 → `propose_recovery` 提议）。
+ * 适配器/服务运行时**不得**再用本值作为整轮 abort 时限；整轮上限见 `DEFAULT_TURN_LAST_RESORT_MS`。
+ */
+export const DEFAULT_PROMPT_TIMEOUT_MS = 300000;
+/**
+ * **整轮最后兜底**：3600000ms（1 小时）——唯一的自动整轮上限（客户裁定 2026-10-17）。
+ *
+ * **固定值，不暴露 env**；测试可经 `turnLastResortMs` 注入小值。按**有效运行时间**计
+ * （确认卡挂起期间暂停，语义沿 `InteractionGate` / `withPausableTimeout`）；到点才中止整轮。
+ * 错误 label 固定为「本轮最后兜底」，与「到点检查」明确区分。
+ */
+export const DEFAULT_TURN_LAST_RESORT_MS = 3600000;
+/** 默认构造期单步时限：与检查时限同量级，避免构造阶段无声挂起。 */
 export const DEFAULT_CONSTRUCT_TIMEOUT_MS = 120000;
 /**
  * 默认 shell 审核时限：120000ms。审核（含 §7.3 的 b 问 pm、a 问操作者）用**超时包装**，
@@ -42,6 +62,7 @@ export const SHELL_EXEC_TIMEOUT_ENV = "ANS_PI_SHELL_EXEC_TIMEOUT_MS";
 // 两者已删除——改由「**等待期间暂停每轮硬超时**」（见下 `InteractionGate` / `withPausableTimeout`）承接，
 // 从根上消除「长等待被整轮掐断」的问题，而非把等待压在整轮预算之内。
 
+/** 到点检查时限环境变量（历史键名；客户裁定后不再作为整轮 abort 时限）。 */
 export const PROMPT_TIMEOUT_ENV = "ANS_PI_PROMPT_TIMEOUT_MS";
 export const CONSTRUCT_TIMEOUT_ENV = "ANS_PI_CONSTRUCT_TIMEOUT_MS";
 export const SHELL_REVIEW_TIMEOUT_ENV = "ANS_PI_SHELL_REVIEW_TIMEOUT_MS";
@@ -97,14 +118,22 @@ export function readTimeoutMs(
   return Math.floor(parsed);
 }
 
-/** Preserve legacy Pi env parsing and explicit-option precedence for both timer layers. */
+/**
+ * 解析一次有效时限（Provider composition 时调用）：
+ * - `promptTimeoutMs`：**到点检查时限**（历史字段名；客户裁定 2026-10-17 起不用于 abort）。
+ *   显式 option 以 `??` 优先；未给时**所有运行时**（Pi/Claude/Codex）都读同一
+ *   `ANS_PI_PROMPT_TIMEOUT_MS`（历史键名），缺省 `DEFAULT_PROMPT_TIMEOUT_MS`（300000＝5 分钟）。
+ * - `turnLastResortMs`：**整轮最后兜底**（默认 1 小时，固定、无 env；可显式 option 覆盖供测试注入）。
+ * - `constructTimeoutMs`：构造期单步时限（120 秒；Pi 读 `ANS_PI_CONSTRUCT_TIMEOUT_MS`）。
+ */
 export function resolveRuntimeTimeouts(
   runtime: RuntimeKind,
-  options: { promptTimeoutMs?: number; constructTimeoutMs?: number },
+  options: { promptTimeoutMs?: number; turnLastResortMs?: number; constructTimeoutMs?: number },
   env: Record<string, string | undefined> = process.env,
-): { promptTimeoutMs: number; constructTimeoutMs: number } {
+): { promptTimeoutMs: number; turnLastResortMs: number; constructTimeoutMs: number } {
   return {
-    promptTimeoutMs: options.promptTimeoutMs ?? (runtime === "pi" ? readTimeoutMs(env, PROMPT_TIMEOUT_ENV, DEFAULT_PROMPT_TIMEOUT_MS) : DEFAULT_PROMPT_TIMEOUT_MS),
+    promptTimeoutMs: options.promptTimeoutMs ?? readTimeoutMs(env, PROMPT_TIMEOUT_ENV, DEFAULT_PROMPT_TIMEOUT_MS),
+    turnLastResortMs: options.turnLastResortMs ?? DEFAULT_TURN_LAST_RESORT_MS,
     constructTimeoutMs: options.constructTimeoutMs ?? (runtime === "pi" ? readTimeoutMs(env, CONSTRUCT_TIMEOUT_ENV, DEFAULT_CONSTRUCT_TIMEOUT_MS) : DEFAULT_CONSTRUCT_TIMEOUT_MS),
   };
 }
@@ -176,9 +205,9 @@ export async function raceAbort<T>(work: Promise<T>, signal: AbortSignal | undef
  * （**引用计数**，可重入——同一轮多个交互工具 / 嵌套等待都正确）；外部（如**每轮硬超时**）据此
  * 暂停/恢复自己的计时（见 `withPausableTimeout`）。
  *
- * **为什么需要它**：G-1 裁定等待客户**不设时限**，但每轮 prompt 仍有硬超时（缺省 120s）——
- * 若不做挂起联动，「等你点头」的轮次会被整轮超时杀掉。有了本闸，**客户输入挂起期间该轮时限暂停**，
- * 作答后按**剩余时间**恢复。
+ * **为什么需要它**：G-1 裁定等待客户**不设时限**；整轮另有**最后兜底**（缺省 1 小时，客户裁定
+ * 2026-10-17）——若不做挂起联动，「等你点头」的轮次会被兜底杀掉。有了本闸，**客户输入挂起期间
+ * 该轮兜底暂停**，作答后按**剩余时间**恢复；等待 2 小时也不会触发 1 小时兜底。
  */
 
 /** 构造交互挂起活动闸。 */

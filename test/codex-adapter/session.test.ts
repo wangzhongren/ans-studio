@@ -243,7 +243,7 @@ test("customer wait pauses deadline; abort and late confirmed do not authorize, 
   let waiting = false;
   const engines = harness();
   const tools = buildGovernedTools(deny, { interactionGate: gate, customerInput: () => { waiting = true; return new Promise(resolve => { answer = resolve; }); } });
-  const session = await createCodexRuntimeAdapter(options("/fixture", engines, { tools, interactionGate: gate, promptTimeoutMs: 100 })).bindRole(role);
+  const session = await createCodexRuntimeAdapter(options("/fixture", engines, { tools, interactionGate: gate, turnLastResortMs: 100 })).bindRole(role);
   const first = await start(session, engines.engine);
   const confirmation = engines.engine.call("request_confirmation", { title: "fixture approval" });
   await until(() => waiting);
@@ -278,12 +278,32 @@ test("upstream tool-request cancellation invalidates original signal; timeout/fa
   assert.equal(events.entries.filter(event => event.kind === "settled").length, 2);
   assert.equal(JSON.stringify(events.entries).includes("fake-codex-key"), false);
   const timeoutEngine = harness();
-  const timed = await createCodexRuntimeAdapter(options("/fixture", timeoutEngine, { promptTimeoutMs: 40 })).bindRole(role);
+  const timed = await createCodexRuntimeAdapter(options("/fixture", timeoutEngine, { turnLastResortMs: 40 })).bindRole(role);
   const timedEvents = collect(timed);
   const timeoutTurn = await start(timed, timeoutEngine.engine);
-  await assert.rejects(timeoutTurn.completion, /timed_out/);
+  await assert.rejects(timeoutTurn.completion, /Codex 本轮运行超过最后兜底（40ms）/);
   await timed.dispose(); await timedEvents.done;
   assert.equal((timedEvents.entries.at(-1)!.detail as { outcome: string }).outcome, "timed_out");
+  assert.match(JSON.stringify(timedEvents.entries.at(-1)!.detail), /最后兜底/);
+});
+
+test("inspect timeout never aborts the turn; only the injected last resort aborts, with distinguishing text", async () => {
+  const engines = harness();
+  // 到点检查时限（promptTimeoutMs）刻意设得远小于兜底：若仍被当作整轮 abort 时限，120ms 内必中止。
+  const session = await createCodexRuntimeAdapter(options("/fixture", engines, { promptTimeoutMs: 20, turnLastResortMs: 300 })).bindRole(role);
+  const events = collect(session);
+  const turn = await start(session, engines.engine);
+  let settled = false;
+  void turn.completion.then(() => { settled = true; }, () => { settled = true; });
+  await tick(120);
+  assert.equal(engines.engine.requests.some(request => request.method === "turn/interrupt"), false, "到点检查不得中止整轮");
+  assert.equal(settled, false, "到点检查时限不得结束整轮");
+  await assert.rejects(turn.completion, /Codex 本轮运行超过最后兜底（300ms）/);
+  assert.equal(engines.engine.requests.filter(request => request.method === "turn/interrupt").length, 1);
+  await session.dispose(); await events.done;
+  assert.equal((events.entries.at(-1)!.detail as { outcome: string }).outcome, "timed_out");
+  assert.match((events.entries.at(-1)!.detail as { error?: string }).error ?? "", /最后兜底/);
+  assert.equal(JSON.stringify(events.entries).includes("prompt 超时"), false);
 });
 
 test("stop is idempotent and bounded; hanging interrupt quarantines rather than claiming continued session", async () => {

@@ -1334,7 +1334,7 @@ async function run() {
     ["ANS_PI_BASE_URL", "API 地址"],
     ["ANS_PI_MODEL", "模型"],
     ["ANS_PI_CONTEXT_WINDOW", "上下文窗口"],
-    ["ANS_PI_PROMPT_TIMEOUT_MS", "整轮超时（ms）"],
+    ["ANS_PI_PROMPT_TIMEOUT_MS", "看护检查时限"],
   ];
   const piKeysMatch =
     panel.keyCount === PI_PANEL_EXPECTED.length &&

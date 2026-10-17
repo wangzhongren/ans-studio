@@ -14,7 +14,7 @@
 
 默认 CLI launcher 会再启动原生程序，POSIX 以本次专属进程组整体清理；TERM 不结束时 KILL 全组，确认 group/exit 或如实报清理失败。Windows 使用 owned PID 的 taskkill/T/F 先清树，该 OS 分支在当前 macOS 未动态验证。自有测试证明 wrapper/native 同时忽略 TERM 后也没有迟到写入或存活 native PID。
 
-本地 MCP request timeout 为 `2147483647ms`，prompt 计时在 interactionGate 等待暂停。服务器 dynamicTool deadline 未由官方/types 建立，不宣称无限等待；上游提前 serverRequest/resolved 立即取消原轮。错误/一般模型失败如实外推，不把一般失败改写成原生恢复失败。
+本地 MCP request timeout 为 `2147483647ms`。整轮计时在 interactionGate 等待期间暂停（按有效运行时间计）。服务器 dynamicTool deadline 未由官方/types 建立，不宣称无限等待；上游提前 serverRequest/resolved 立即取消原轮。错误/一般模型失败如实外推，不把一般失败改写成原生恢复失败。
 
 自有命令：`node --test 'test/codex-adapter/**/*.test.ts'` 与 `npm run typecheck`，X1S 当前均通过。`node test/codex-adapter/native-probe.mjs` 稳定结果由装配记录；本次仅设置解析变化，没有重跑运输探针。早期临时 harness 的原始命令见实施记录，生产没有临时包路径 fallback。
 
@@ -31,3 +31,7 @@ required-v1 缺注入 projector/register 时在任何外部初始化前拒绝；
 支持设置新增（默认关，fail-closed）：`CodexRuntimeAdapterOptions.webSearch?: boolean` 显式优先；env `ANS_CODEX_WEB_SEARCH` 白名单 `on|off` 兜底；非法值显式失败。开启＝三钉同翻（线程配置/进程 `-c`/config/read 回读期望 `web_search:"live"`，回读不符仍 fail-closed）；落点键由本地回环实证＝顶层键（`[tools].web_search` 不注入）。`turn/start` 沙箱 `networkAccess:false` 保持（搜索在网关侧执行）。
 
 事件面：`item/completed` 的 `webSearch` item → 一条 `kind:"message"` 行（摘要 `联网搜索：<query>`；detail v1 `{version:1, source:"web-search", itemId?, query?, action?, results?, resultsTruncated?}`，只外推真实字段、cap 20、容错不抛、不进隔离、恒映射不随能力位关闭）；settled detail 计数 >0 时附 `searchCalls`。查询串不进诊断。自有33/33、typecheck0、全量0fail；真实网关接受性未验（客户探针 P1–P3）。详见[实施记录](docs/change/2026-10-16_change_web-search.md)。
+
+## 2026-10-17 整轮最后兜底（到点检查/兜底两层时限）
+
+`promptTimeoutMs` 语义改为**看护到点检查**（历史字段名；不中止整轮）；Codex 适配器自身的整轮上限只认 `options.turnLastResortMs ?? DEFAULT_TURN_LAST_RESORT_MS`（运行时核心常量，固定 1 小时、不暴露 env；测试/宿主可注入小值）。`pausedDeadline` 仍挂 `interactionGate`：确认卡等待期间暂停，按有效运行时间计——等待客户超过 1 小时不会触发兜底。到点仍走既有 `stop(turn,"timed_out")`（`outcome` 枚举不变），但 `turn.failure` 文案为「Codex 本轮运行超过最后兜底（Nms），已中止以免无限挂起。」并随 settled `detail.error` 外推，与到点检查/普通失败可区分；不再出现「prompt 超时」旧文案。shell 命令 10 分钟、确认卡 120 秒、构造 120 秒不变。测试：注入小 `turnLastResortMs` 到点才中止；单独设很小的 `promptTimeoutMs` 不中止、不产生 `turn/interrupt`。详见[变更记录](changelog.md)。

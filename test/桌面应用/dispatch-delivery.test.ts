@@ -944,7 +944,9 @@ test("G-2/W1 role_status 呈现消歧（实机反馈 2026-10-17）：busy 时「
   const view = (await roleStatus({ roleId: "A" }))!;
   assert.equal(view.ok, true);
   const text = view.text ?? "";
-  assert.match(text, /当前轮：进行中（已耗 .+ \/ 硬超时 .+；turnId=/, "busy 且有起始时刻 ⇒ 当前轮事实行");
+  assert.match(text, /当前轮：进行中（已耗 .+ \/ 看护检查时限 .+；turnId=/, "busy 且有起始时刻 ⇒ 当前轮事实行");
+  assert.ok(text.includes("1 小时最后兜底"), "当前轮行注明「1 小时最后兜底」（2026-10-17 到点检查语义）");
+  assert.equal(text.includes("硬超时"), false, "不再使用「硬超时」话术");
   assert.match(
     text,
     /上一轮终局：timed_out @ .+（不表示当前轮；该角色近 15 分钟 failed\/timed_out 计 \d+）/,

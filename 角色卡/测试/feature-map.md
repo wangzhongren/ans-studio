@@ -4,6 +4,7 @@
 
 | 交付物 | 一句话用途 | 状态 | 文档 |
 | --- | --- | --- | --- |
+| 到点检查 + 1 小时兜底（整轮不设超时） | 检查时限到点只提示不中止；每轮一次；1h 兜底可区分；非整轮时限不变；设置/su 卡/role_status；恢复需客户确认 | verified（2026-10-17，套件 15/15；全量 2246/2150/94/2；三项偏差修复后复审通过） | [用例](../../test/测试/turn-watch-verify/)、[报告](docs/change/2026-10-17_change_turn-watch-recover-verify.md)、[证据](docs/change/2026-10-17-turn-watch-recover-verify-evidence/) |
 | su 命令审批策略（run_shell） | 只读免审批、risky/review/deny 逐条客户批准；分支/审计、su-only 与构造守卫、桌面注入、SU 卡、零执行哨兵 | verified（2026-10-17，套件 36/36＋卡片探针 9/9；全量 2215/2120/93/2） | [用例](../../test/测试/su-shell-approval-verify/)、[报告](docs/change/2026-10-17_change_su-shell-approval-verify.md)、[证据](docs/change/2026-10-17-su-shell-approval-verify-evidence/) |
 | 已有角色但无治理记录兼容（B+C V1） | S1 状态/预览/建立、su 解卡（确定性 gate）、角色不受影响、零副作用/V6b、幂等、并发、F6 恢复指引、确认卡不被误用、权限审计 | verified（2026-10-17，独立套件 42/42；0 不通过/7 备注；文案修正后复审仍 42/42） | [用例](../../test/测试/existing-project-compat-verify/)、[报告](docs/change/2026-10-17_change_existing-project-compat-verify.md)、[证据](docs/change/2026-10-17-existing-project-compat-verify-evidence/) |
 | 助手消息即时 Markdown（渲染轮复审） | `appendAssistant` 恒 `mdReady:true`；未 settled 即 `<h2>/<table>`；旧行安全网在位；e2e 剩余红经 HEAD A/B 证明既有 | verified（2026-10-17，Electron 探针 6/6；全量 2153/2058/93/2） | [探针](../../test/测试/render-md-ready-probe.mjs)、[摘要](docs/change/2026-10-17-existing-project-compat-verify-evidence/renderer-round-summary.md)、[报告 §⑧](docs/change/2026-10-17_change_existing-project-compat-verify.md) |

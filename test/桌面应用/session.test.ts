@@ -491,7 +491,9 @@ function makeWatchdogHarness(): WatchdogHarness {
     },
     now: () => ms,
     // 与生产默认同值（客户 2026-10-16 裁定：静默 30s＝一个 tick 的最小防抖）。
-    config: { env: {}, silenceMs: 30 * 1000, tickMs: 30 * 1000 },
+    // 2026-10-17 起检查时限默认改为 5 分钟（`resolveRuntimeTimeouts().promptTimeoutMs`）——本夹具**显式注入**
+    // 120s 检查时限与 1 小时最后兜底，避免依赖默认值（阈值边界断言保持可读、稳定）。
+    config: { env: {}, silenceMs: 30 * 1000, tickMs: 30 * 1000, promptTimeoutOverrideMs: 120_000, turnLastResortOverrideMs: 3_600_000 },
   });
   return {
     service,
@@ -528,7 +530,7 @@ test("G-2 配置：tick/静默仅 env 可调（非法/缺失回退默认 30s/30s
   const defaults = resolveWatchdogConfig({});
   assert.equal(defaults.tickMs, 30000, "默认 tick 30s");
   assert.equal(defaults.silenceMs, 30_000, "默认静默 30s（客户 2026-10-16 run-5 裁定：5min → 30s）");
-  assert.equal(defaults.turnDeadlineRatio, 0.9, "阈值 #1：90%");
+  assert.equal(defaults.turnDeadlineRatio, 1.0, "阈值 #1：到点检查（100% 检查时限，客户 2026-10-17 裁定）");
   assert.equal(defaults.queueHeadAgeMs, 10 * 60 * 1000, "阈值 #2：队首 age 10min");
   assert.equal(defaults.queueDepth, 5, "阈值 #2 辅判：深度 5");
   assert.equal(defaults.repeatFailCount, 3, "阈值 #4：15min ≥3");
@@ -563,59 +565,65 @@ test("G-2/W3 env 覆盖经服务生效：ANS_DESKTOP_WATCHDOG_SILENCE_MS=5000 �
   assert.equal(delivered[0].summary, "系统·收束 · 已无进行中任务（静默 5 秒）", "sub-minute env 值同口径自适应（5 秒）");
 });
 
-test("G-2/W1 #1：轮次 90% 生效时限才报（demo=120s → 108s 边界）；每轮一次；正常结束投「看护恢复」行", () => {
+test("G-2/W1 #1：轮次**到点检查**（demo 检查时限 120s → 120s 边界，只提示不中止）；每轮一次；正常完成自动解除", () => {
   const h = makeWatchdogHarness();
   const started = h.nowMs();
   h.setSnapshot("/p", wdSnapshot({ roles: [wdRole("A", { busy: true, turnStartedAt: started, turnId: "t1" })] }));
-  h.advance(107_000); // 107s < 108s
+  h.advance(119_999); // < 120s
   h.service.tick();
-  assert.equal(h.delivered.length, 0, "未到 90% 线不报（边界之下）");
-  h.advance(1_000); // 恰 108s
+  assert.equal(h.delivered.length, 0, "未到检查时限不报（边界之下）");
+  h.advance(1); // 恰 120s
   h.service.tick();
-  assert.equal(h.delivered.length, 1, "到 90% 线即报（含边界）");
-  assert.ok(h.delivered[0].text.startsWith("[系统·看护]") && h.delivered[0].text.includes("轮次逼近超时") && h.delivered[0].text.includes("A"), "文案＝编排单一来源（文首/信号/角色）");
-  // 实机反馈（2026-10-17）：事实行必须写明「尚未超时、系统未中止」与到硬超时的剩余量——
-  // summary/文首仍为「轮次逼近超时」，不得让 su 转述成「已超时」。
-  assert.match(h.delivered[0].text, /尚未超时、系统未中止；剩余约 12 秒（距整轮硬超时）/, "90% 预警：尚未超时＋剩余量（demo 120s，108s 时剩 12s）");
-  assert.equal(h.delivered[0].text.includes("已超时"), false, "不得出现「已超时」（系统未中止该轮）");
-  assert.ok(h.delivered[0].summary.includes("轮次逼近超时"), "summary 仍保留「轮次逼近超时」");
+  assert.equal(h.delivered.length, 1, "到点即检查（含边界）");
+  assert.ok(h.delivered[0].text.startsWith("[系统·看护]") && h.delivered[0].text.includes("轮次到点检查") && h.delivered[0].text.includes("A"), "文案＝编排单一来源（文首/信号/角色）");
+  // 客户裁定 2026-10-17：到点**只提示、不中止本轮**——事实行给出核对/恢复指引与 1 小时最后兜底；
+  // 不得再出现「逼近超时/已超时/硬超时/剩余约」等旧硬超时话术。
+  assert.match(h.delivered[0].text, /看护检查时限 120000ms；到点仅检查、不中止本轮/, "到点检查语义（100% 检查时限，不中止）");
+  assert.ok(h.delivered[0].text.includes("role_status / session_tail") && h.delivered[0].text.includes("仍在推进则不动作"), "核对指引：仍在推进不动作");
+  assert.ok(h.delivered[0].text.includes("propose_recovery"), "卡死才 propose_recovery");
+  assert.ok(h.delivered[0].text.includes("整轮最后兜底 1 小时"), "1 小时最后兜底说明");
+  for (const forbidden of ["逼近", "已超时", "硬超时", "剩余约", "尚未超时", "系统未中止"]) {
+    assert.equal(h.delivered[0].text.includes(forbidden), false, `不得出现旧话术「${forbidden}」`);
+  }
+  assert.ok(h.delivered[0].summary.includes("轮次到点检查"), "summary 用「轮次到点检查」");
   h.advance(30_000);
   h.service.tick();
   assert.equal(h.delivered.length, 1, "同一活跃期内重复命中只累计（不重复打扰）");
-  // 该轮正常结束（settled, completed）⇒ 条件解除 ⇒ 一条「看护恢复」（含命中/抑制计数）。
+  // 该轮正常结束（settled, completed）⇒ 条件解除。**到点检查不是故障：不投「看护恢复」行**
+  // （评审建议 2026-10-17——恢复行会让 su 误以为发生过一次超时/中止）。
   h.setSnapshot("/p", wdSnapshot({ roles: [wdRole("A")] }));
   h.service.observe("/p", { kind: "settled", roleId: "A", outcome: "completed", at: h.nowMs(), fromSystemDelivery: false });
   h.service.tick();
-  assert.equal(h.delivered.length, 2, "解除时恰一条恢复行");
-  assert.ok(h.delivered[1].text.includes("看护恢复") && h.delivered[1].text.includes("轮次逼近超时"), "F-6 形态恢复行");
+  assert.equal(h.delivered.length, 1, "解除时不投「看护恢复」行（到点检查不是故障）");
+  assert.equal(h.delivered.some((d) => d.text.includes("看护恢复")), false, "全程无「看护恢复」行");
   // 新一轮（新身份）⇒ 允许再次告警（「每轮一次」≠ 一生一次）。
   const restart = h.nowMs();
   h.setSnapshot("/p", wdSnapshot({ roles: [wdRole("A", { busy: true, turnStartedAt: restart, turnId: "t2" })] }));
-  h.advance(108_000);
+  h.advance(120_000);
   h.service.tick();
-  assert.equal(h.delivered.length, 3, "新一轮到线再次告警（t2 独立去重身份）");
+  assert.equal(h.delivered.length, 2, "新一轮到点再次告警（t2 独立去重身份；无恢复行插入）");
 });
 
 test("G-2/W1 「正确等待不报」：#1 对带挂起确认卡的角色排除；su 自身忙不触发任何告警", () => {
   const h = makeWatchdogHarness();
   let t = h.nowMs();
-  // 角色 A 过 90% 但带一张挂起确认卡 ⇒ 不报。
+  // 角色 A 到点检查但带一张挂起确认卡 ⇒ 不报。
   h.setSnapshot("/p", wdSnapshot({
     roles: [wdRole("A", { busy: true, turnStartedAt: t, turnId: "t1" })],
     pendingConfirmationsTotal: 1,
     pendingConfirmationsByRole: new Map([["A", 1]]),
   }));
-  h.advance(110_000);
+  h.advance(120_000);
   h.service.tick();
   assert.equal(h.delivered.length, 0, "挂起确认卡 = 正确等待（不计入 #1）");
   // 卡解除后到线 ⇒ 报。
   h.setSnapshot("/p", wdSnapshot({ roles: [wdRole("A", { busy: true, turnStartedAt: t, turnId: "t1" })] }));
   h.service.tick();
   assert.equal(h.delivered.length, 1, "卡解除后恢复检测");
-  // su 自身忙：su 过 90% 不报；su 忙时对 su 的命令超时（#3 事件）也不报。
+  // su 自身忙：su 到点也不报；su 忙时对 su 的命令超时（#3 事件）也不报。
   t = h.nowMs();
   h.setSnapshot("/p", wdSnapshot({ roles: [wdRole("su", { busy: true, turnStartedAt: t, turnId: "st" })] }));
-  h.advance(110_000);
+  h.advance(120_000);
   h.service.tick();
   h.service.observe("/p", { kind: "command-timed-out", roleId: "su", at: h.nowMs() });
   const before = h.delivered.length;
@@ -686,23 +694,25 @@ test("G-2/W1 #4：15min 窗口 failed/timed_out ≥3 才报；窗口滑出投恢
 test("G-2/W1 风暴护栏：15min 窗口 ≤5 条；超限投一条抑制通告（不占额度、每风暴期恰一条）＋诊断", () => {
   const h = makeWatchdogHarness();
   const now = h.nowMs();
-  // 7 个角色同轮一起到 90% —— 第 6/7 条被风暴护栏抑制。
+  // 7 个角色同轮到点 —— 第 6/7 条被风暴护栏抑制。
   h.setSnapshot("/p", wdSnapshot({ roles: "ABCDEFG".split("").map((r) => wdRole(r, { busy: true, turnStartedAt: now, turnId: `t-${r}` })) }));
-  h.advance(110_000);
+  h.advance(120_000);
   h.service.tick();
-  const alerts = h.delivered.filter((d) => d.text.includes("轮次逼近超时"));
+  const alerts = h.delivered.filter((d) => d.text.includes("轮次到点检查"));
   assert.equal(alerts.length, 5, "窗口内恰 5 条告警（上限）");
   assert.equal(h.delivered.length, 6, "第 6 条 = 风暴护栏抑制通告（不占额度）");
   assert.ok(h.delivered[5].text.includes("看护告警已抑制"), "通告文案＝编排单一来源");
   const stats = h.service.stats("/p");
   assert.equal(stats.suppressedTotal, 2, "被抑制 2 条（7 告警 − 5 额度）");
   assert.equal(stats.activeAlerts, 5, "统计：活跃且已投出告警 = 5");
-  // 条件解除（角色全空闲）＋窗口滑出（额度恢复）⇒ 5 个投出过告警的活跃期各投一条恢复行；被抑制者不投。
+  // 条件解除（角色全空闲）＋窗口滑出（额度恢复）⇒ **到点检查不投恢复行**（2026-10-17 评审建议）：
+  // 恢复行会让 su 误以为发生过超时/中止；活跃期照常复位。
   h.setSnapshot("/p", wdSnapshot({ roles: "ABCDEFG".split("").map((r) => wdRole(r)) }));
   h.advance(15 * 60 * 1000 + 1000);
   h.service.tick();
   const recoveries = h.delivered.filter((d) => d.text.includes("看护恢复"));
-  assert.equal(recoveries.length, 5, "解除时恰 5 条恢复行（仅有告警投出过的活跃期；同样过风暴护栏）");
+  assert.equal(recoveries.length, 0, "turn-deadline 解除不投恢复行（到点检查不是故障）");
+  assert.equal(h.service.stats("/p").activeAlerts, 0, "解除后活跃告警清零");
 });
 
 test("G-2/W1 看护器自身故障：快照抛错 ⇒ 只记诊断、不炸、不投递；下个 tick 自动恢复", () => {
@@ -720,7 +730,7 @@ test("G-2/W1 看护器自身故障：快照抛错 ⇒ 只记诊断、不炸、�
   // 恢复正常快照后下个 tick 照常（看护暂停 ≠ 看护死亡）。
   const healed = makeWatchdogHarness();
   healed.setSnapshot("/p", wdSnapshot({ roles: [wdRole("A", { busy: true, turnStartedAt: healed.nowMs(), turnId: "t1" })] }));
-  healed.advance(110_000);
+  healed.advance(120_000);
   healed.service.tick();
   assert.equal(healed.delivered.length, 1, "下个 tick 重试即恢复工作");
 });

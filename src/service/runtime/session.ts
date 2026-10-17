@@ -19,7 +19,7 @@ import { createToolDisplayContext, jsonBytes } from "../../common/runtime-core/t
 import { listInstalledMcpServers } from "../../common/runtime-core/mcp-declarations.ts";
 import { REPORT_LIMITS, makeReportSnapshot, canonicalJson, reportIdFor, validateProvenance, validateLivePresentation, projectLiveReport, projectHandbackInput, validAttemptId } from "../../common/runtime-core/report-provenance.ts";
 import { createEventQueue } from "../../common/runtime-core/event-queue.ts";
-import { createInteractionGate, isAbortError, isTimeoutError, raceAbort, resolveRuntimeTimeouts, withPausableTimeout, withTimeout } from "../../common/runtime-core/timeout.ts";
+import { DEFAULT_TURN_LAST_RESORT_MS, createInteractionGate, isAbortError, isTimeoutError, raceAbort, resolveRuntimeTimeouts, withPausableTimeout, withTimeout } from "../../common/runtime-core/timeout.ts";
 import { REASONING_DIAGNOSTIC_SUMMARY, REASONING_EVENT_SUMMARY, resolveReasoningEffort } from "../../common/runtime-core/reasoning.ts";
 
 export interface RuntimeSessionOptions extends Omit<GovernedToolsOptions, "currentTurnId" | "roleId" | "runtime" | "interactionGate"> {
@@ -34,7 +34,10 @@ export interface RuntimeSessionOptions extends Omit<GovernedToolsOptions, "curre
   baseUrl?: string;
   providerId?: string;
   apiKeyEnvVar?: string;
+  /** 到点检查时限（历史字段名）：看护到点检查用，**不中止整轮**。 */
   promptTimeoutMs?: number;
+  /** 整轮最后兜底（毫秒；缺省 1 小时）；测试/宿主可注入小值。 */
+  turnLastResortMs?: number;
   constructTimeoutMs?: number;
   /** Demo-only script; no SDK and no fallback for another runtime. */
   script?: ToolCall[];
@@ -258,6 +261,7 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
           provider.setTurn(turn.id, turn.controller);
           let underlyingFinished = false;
           let failure: unknown;
+          let lastResortExpired = false;
           let underlying: Promise<void> | undefined;
           try {
             persistenceError=undefined;
@@ -286,9 +290,13 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
             underlying = Promise.resolve().then(() => inner.prompt(text, nativeOptions));
             underlying.then(() => { underlyingFinished = true; if (!turn.cleanupFailed) quarantined = false; }, () => { underlyingFinished = true; if (!turn.cleanupFailed) quarantined = false; });
             const work = underlying.then(async () => { if (!streamEnded) await terminalPromise; });
-            await withPausableTimeout(raceAbort(work, turn.controller.signal, "本轮运行"), provider.options.promptTimeoutMs ?? 120000, `${options.runtime} 运行`, provider.options.interactionGate);
+            // 整轮上限＝最后兜底（客户裁定 2026-10-17）：promptTimeoutMs 仅属看护到点检查，**不再**用于 abort。
+            // InteractionGate 暂停语义不变——确认卡等待期间按有效运行时间暂停计时。
+            await withPausableTimeout(raceAbort(work, turn.controller.signal, "本轮运行"), provider.options.turnLastResortMs ?? DEFAULT_TURN_LAST_RESORT_MS, "本轮最后兜底", provider.options.interactionGate);
           } catch (error) {
             failure = error;
+            // 只有本层「最后兜底」到点才用兜底文案；适配器自身的 timed_out 保持原摘要（不冒充兜底）。
+            lastResortExpired = isTimeoutError(error) && (error as { label?: string }).label === "本轮最后兜底";
             if(plan?.capture && error instanceof Error && ["INVALID","PROVENANCE_TOO_LARGE","TEXT_PROJECTION_FAILED"].includes(error.message))plan.capture.receipt.code=error.message as RuntimePersistenceErrorCode;
             turn.outcome = isTimeoutError(error) ? "timed_out" : turn.controller.signal.aborted || isAbortError(error) ? "aborted" : "failed";
             turn.outcomeLocked = true;
@@ -303,7 +311,7 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
             active = undefined;
             endedTurns.add(turn.id);
             provider.setTurn();
-            const event: SessionEvent = { kind: "settled", summary: turn.outcome === "completed" ? "会话结束" : turn.outcome === "aborted" ? "本轮已中止" : turn.outcome === "timed_out" ? "本轮运行超时" : "本轮运行失败", runtime: options.runtime, roleId: role.id, turnId: turn.id, detail: { turnId: turn.id, outcome: turn.outcome } };
+            const event: SessionEvent = { kind: "settled", summary: turn.outcome === "completed" ? "会话结束" : turn.outcome === "aborted" ? "本轮已中止" : turn.outcome === "timed_out" ? (lastResortExpired ? "本轮超过最后兜底，已中止" : "本轮运行超时") : "本轮运行失败", runtime: options.runtime, roleId: role.id, turnId: turn.id, detail: { turnId: turn.id, outcome: turn.outcome } };
             emit(event,plan,!plan);
             await pendingPersist;
             const record: RuntimeSessionRecord = { version: 1, id: recordId, roleId: role.id, runtime: options.runtime, contextSource: wrapper.contextSource ?? "fresh", nativeSessionId: wrapper.nativeSessionId, contextWarning: plan&&wrapper.contextWarning?provider.display.protectText(wrapper.contextWarning,4096).text:wrapper.contextWarning, createdAt, updatedAt: new Date().toISOString() };

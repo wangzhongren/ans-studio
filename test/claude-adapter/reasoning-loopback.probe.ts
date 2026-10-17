@@ -143,7 +143,7 @@ const runAdapterPhase = async () => {
   const role: ResolvedRole = { id: "reasoning-probe", kind: "project", cardText: "# Reasoning loopback fixture", boundary: { entries: [], boundarySource: "fixture", acceptance: { accepted: true, source: "fixture" } }, boundarySource: "fixture", location: { card: "fixture", boundary: "fixture" } };
   const service = createRuntimeAdapter({ runtime: "claude", projectRoot: root, skillRoot: root,
     gate: () => ({ allowed: false, reason: "probe has no write effects", allowedByRoot: { project: [], skill: [] } }),
-    modelId: "claude-sonnet-4-6", baseUrl: endpoint, constructTimeoutMs: 15000, promptTimeoutMs: 20000,
+    modelId: "claude-sonnet-4-6", baseUrl: endpoint, constructTimeoutMs: 15000, turnLastResortMs: 20000,
     providerFactories: { claude: (input) => {
       assert.equal(input.reasoningEffort, "high"); // Service resolved the env into the neutral field
       return createClaudeRuntimeAdapter({ ...input,

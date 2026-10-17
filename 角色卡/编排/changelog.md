@@ -1,5 +1,20 @@
 # 编排 变更记录
 
+## 2026-10-17 — 看护信号 `turn-deadline` 改为「轮次到点检查」（整轮不设超时；1 小时为最后兜底）
+
+**来源**：PM 评审/任务书 `角色卡/项目管理/docs/design/2026-10-17_design_turn-watch-and-recover-review.md`（status: approved；客户裁定「整轮不应该有超时，应该是到了时间，su 要去看下是否卡死了……如果没卡死，就不管他」＋保留 1 小时兜底）§3.2、§4、§5.1。本轮只改编排的看护信号标签/建议；检测阈值、适配器时限、桌面/门禁卡文本归各属主。
+
+**改了什么（全部在本角色 Section 1 内）**：
+- `src/common/编排/watchdog.ts`：
+  - `SIGNAL_LABELS["turn-deadline"]`：`轮次逼近超时` → **`轮次到点检查`**。
+  - `SIGNAL_SUGGESTIONS["turn-deadline"]` → **`到点检查不中止本轮；请用 role_status 核对是否卡死；仍在推进则不动作；只有卡死才 propose_recovery（客户确认后应用执行）；1 小时为最后兜底。`**
+  - 信号 kind 仍为 `turn-deadline`（契约不变）；`renderWatchdogRecovery` 随 label 自动变化，不改渲染结构；其余三信号文案逐字未动；不放宽任何判定。
+- `test/编排/watchdog.test.ts`：四信号用例的 turn-deadline label 改为「轮次到点检查」；新增一条金文本断言（到点检查/不中止本轮/role_status 核对/没卡死不动作/只有卡死才提议/客户确认后应用执行/1 小时兜底/无「逼近超时·已超时·硬超时·剩余量」；恢复行随 label 变化）。
+
+**证据**：`node --test "test/编排/watchdog.test.ts"` → **13/13**；`node --test "test/编排/**/*.test.ts"` → **349 计 / 348 过 / 1 红**——唯一红仍是 `shell-authorized-routine.test.ts:103` 的 Windows 符号链接 EPERM（既有环境红，与本批无关）；`npm run typecheck` 本批文件零错。
+
+**未做/边界**：未 git 提交；未碰 `app/**`、适配器/运行时核心/门禁卡文本、其他角色文件、客户项目；未读 `.env`。跨角色待 pm 转达：桌面窗口的阈值/事实行/每轮一次/解除语义按评审 §3.2 实施；门禁引擎 su 卡「看护职责」按 §3.4 同步。
+
 ## 2026-10-17 — su 的 `run_shell` 改为「只读免审批、其余含 deny 逐条客户批准」（`operatorOnly` + `approveDeny`，编排侧）
 
 **来源**：PM 评审/任务书 `角色卡/项目管理/docs/design/2026-10-17_design_su-shell-approval-review.md`（status: approved；客户裁定「这个su 的命令也改一下，不是只读，是只读的免审批，其他的要客户审批」＋「deny 也走客户审批」）§3.1–§3.4、§4、§5.1。本轮只做编排侧；桌面/门禁卡文本/运行时核心未碰。

@@ -68,6 +68,7 @@ import {
   CONSTRUCT_TIMEOUT_ENV,
   DEFAULT_CONSTRUCT_TIMEOUT_MS,
   DEFAULT_PROMPT_TIMEOUT_MS,
+  DEFAULT_TURN_LAST_RESORT_MS,
   PROMPT_TIMEOUT_ENV,
   type InteractionGate,
   isTimeoutError,
@@ -1036,7 +1037,13 @@ export interface PromptCapableSession {
  */
 export function makeRolePrompt(deps: {
   session: PromptCapableSession;
+  /** **到点检查**时限（历史名 `promptMs`）：只用于截断收尾补发段，**不**用于主 prompt 的 abort。 */
   promptMs: number;
+  /**
+   * **整轮最后兜底**（毫秒；缺省 `DEFAULT_TURN_LAST_RESORT_MS`＝1 小时）：主 prompt 与 G-5 重发
+   * 的唯一硬上限。确认卡挂起期间暂停（沿 `InteractionGate`）。测试注入小值。
+   */
+  turnLastResortMs?: number;
   gate: InteractionGate;
   emit: (event: SessionEvent) => void;
   log: StageLogger;
@@ -1053,6 +1060,7 @@ export function makeRolePrompt(deps: {
   reasoningDegrade?: ReasoningDegradeOptions;
 }): (text: string, opts?: PromptOptions) => Promise<void> {
   const { session, promptMs, gate, emit, log } = deps;
+  const turnLastResortMs = deps.turnLastResortMs ?? DEFAULT_TURN_LAST_RESORT_MS;
   const lifecycle = deps.lifecycle ?? createTurnLifecycle(emit, deps.diagnostics);
   let running = false;
   return async function prompt(text: string, opts?: PromptOptions): Promise<void> {
@@ -1067,9 +1075,10 @@ export function makeRolePrompt(deps: {
     });
     log.stage("prompt 发出");
     try {
-      // 每轮硬超时**可暂停**（G-1）：客户输入挂起期间计时停走，作答后续算剩余时间。
+      // 主 prompt 只用**最后兜底**（客户裁定 2026-10-17）：`promptMs` 属看护到点检查，**不再**用于
+      // 中止整轮；到检查时限后轮次继续，只有 1 小时兜底（或注入值）才中止。可暂停语义不变。
       const startCall = (): Promise<void> => (images !== undefined ? session.prompt(text, { images }) : session.prompt(text));
-      await withPausableTimeout(startCall(), promptMs, "prompt", gate);
+      await withPausableTimeout(startCall(), turnLastResortMs, "本轮最后兜底", gate);
 
       // G-5 降级（**恰一次**去参数重发；A7 定格：思考参数被拒 ⇒ prompt 正常 resolve、失败终态在下方
       // finish 才发——故在终态发射前收口，settled 仍恰一次）：检测位由 ans-reasoning 扩展在 message_end
@@ -1081,12 +1090,16 @@ export function makeRolePrompt(deps: {
         emit({ kind: "message", summary: degrade.noticeText, detail: { turnId: lifecycle.currentTurnId(), source: "reasoning-degrade" } });
         log.stage(degrade.noticeText);
         // 重发直调底层 session.prompt：不递归本包装、不新增 settled/终态发射点（沿 F-3-a 补发先例）。
-        await withPausableTimeout(startCall(), promptMs, "prompt", gate);
+        // 时限同为**最后兜底**（重发属于主轮，不该被检查时限掐断）。
+        await withPausableTimeout(startCall(), turnLastResortMs, "本轮最后兜底", gate);
       }
       // F-3-a（截断收尾补发）：仅在首个 prompt **正常返回后**考虑——「开关开启 ∧ 末条消息截断 ∧
       // 本轮无成功 submit_report ∧ 生命周期未被强制锁定（abort/超时）」时，用**独立的**
       // withPausableTimeout 段补发**恰一次**收尾提示。限一次是**结构性保证**：本分支每次 prompt()
       // 调用只经过一次；补发直调底层 session.prompt，不递归本包装、不新增 settled/handback 发射点。
+      // **时限口径（PM 评审 2026-10-17）**：补发段仍用**到点检查时限**（`promptMs` /
+      // `ANS_PI_PROMPT_TIMEOUT_MS`，或 `LengthFollowupOptions.timeoutMs` 显式值），不继承 1 小时兜底——
+      // 主轮已完成，不能让补发把它拖住；外层最后兜底仍是总上限。
       // 补发为 best-effort：失败只如实外推 + 有界清理，绝不把已完成的轮次改判（诚实降级由编排照旧处理）。
       const followup = deps.lengthFollowup;
       if (followup !== undefined && followup.enabled && lifecycle.wasTruncated() && !followup.wasReportSubmitted()) {
@@ -1116,12 +1129,15 @@ export function makeRolePrompt(deps: {
       log.stage("prompt 返回");
     } catch (err) {
       const timedOut = isTimeoutError(err);
-      lifecycle.fail(timedOut ? "timed_out" : "failed", timedOut ? "PROMPT_TIMEOUT" : "PROMPT_FAILED");
+      // 最后兜底与到点检查区分（客户裁定 2026-10-17）：仅 label「本轮最后兜底」才是整轮上限。
+      // outcome 仍用既有 timed_out（契约枚举不变），诊断码用 TURN_LAST_RESORT。
+      const lastResort = timedOut && (err as { label?: string }).label === "本轮最后兜底";
+      lifecycle.fail(timedOut ? "timed_out" : "failed", lastResort ? "TURN_LAST_RESORT" : timedOut ? "PROMPT_TIMEOUT" : "PROMPT_FAILED");
       // SDK error messages may embed an API response. Diagnostics store the error category only.
-      deps.diagnostics?.record(timedOut ? "prompt.timeout" : "prompt.failed", { turnId: lifecycle.currentTurnId(), errorType: err instanceof Error ? err.name : "Error", errorCode: timedOut ? "PROMPT_TIMEOUT" : "PROMPT_FAILED" });
+      deps.diagnostics?.record(lastResort ? "prompt.turn_last_resort" : timedOut ? "prompt.timeout" : "prompt.failed", { turnId: lifecycle.currentTurnId(), errorType: err instanceof Error ? err.name : "Error", errorCode: lastResort ? "TURN_LAST_RESORT" : timedOut ? "PROMPT_TIMEOUT" : "PROMPT_FAILED" });
       const message = err instanceof Error ? err.message : String(err);
-      log.stage(`prompt 中止：${message}`);
-      emit({ kind: "message", summary: `pi 适配器中止：${message}` });
+      log.stage(lastResort ? `本轮超过最后兜底，已中止：${message}` : `prompt 中止：${message}`);
+      emit({ kind: "message", summary: lastResort ? `本轮超过最后兜底，已中止：${message}` : `pi 适配器中止：${message}` });
       // 超时/失败后主动中止底层请求，避免悬挂的流继续占用，然后向上抛出，
       // 以便编排层以非 0 退出（不静默挂起）。
       try {
@@ -1143,7 +1159,10 @@ export function makeRolePrompt(deps: {
 /** `makeRoleSession` 的依赖（bindRole 组装与测试桩件共用；同 `makeRolePrompt` 的接缝先例）。 */
 export interface RoleSessionDeps {
   session: PromptCapableSession;
+  /** **到点检查**时限（历史名）：只用于截断收尾补发段，**不**用于主 prompt 的 abort。 */
   promptMs: number;
+  /** **整轮最后兜底**（缺省 `DEFAULT_TURN_LAST_RESORT_MS`）；透传给 `makeRolePrompt`。 */
+  turnLastResortMs?: number;
   gate: InteractionGate;
   emit: (event: SessionEvent) => void;
   log: StageLogger;
@@ -1280,6 +1299,8 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
           opts.constructTimeoutMs ?? readTimeoutMs(process.env, CONSTRUCT_TIMEOUT_ENV, DEFAULT_CONSTRUCT_TIMEOUT_MS);
         const promptMs =
           opts.promptTimeoutMs ?? readTimeoutMs(process.env, PROMPT_TIMEOUT_ENV, DEFAULT_PROMPT_TIMEOUT_MS);
+        // 整轮最后兜底（客户裁定 2026-10-17）：固定 1 小时，可经 `turnLastResortMs` 注入（测试）；不读 env。
+        const turnLastResortMs = opts.turnLastResortMs ?? DEFAULT_TURN_LAST_RESORT_MS;
         if (opts.toolDisplayMode === "required-v1" && (typeof opts.projectToolEvent !== "function" || typeof opts.registerToolDisplayProfile !== "function")) throw new Error("Pi required-v1 tool display capabilities are missing");
         const profileEnv = { ...process.env };
         const cfg = opts.config ?? resolvePiProviderConfig(opts, profileEnv);
@@ -1287,11 +1308,11 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
         // （一句话明确、不静默半开；与「缺 baseUrl 即抛」同口径）——在任何网络请求发生之前失败。
         const serverToolConfig = parseServerToolConfig(profileEnv);
         opts.registerToolDisplayProfile?.({ apiKeyEnvVar: cfg.apiKeyEnvVar, credentials: [...new Set([cfg.apiKeyEnvVar, ...(opts.toolDisplayCredentialEnvNames ?? [])])].map(name => ({ name, value: profileEnv[name] })) });
-        log.trace(`构造单步时限=${constructMs}ms，prompt 时限=${promptMs}ms`);
+        log.trace(`构造单步时限=${constructMs}ms，检查时限=${promptMs}ms，最后兜底=${turnLastResortMs}ms`);
 
-        // 直接使用 Service 注入的交互闸（设计 G-1）：等待客户期间暂停每轮硬超时，
-        // 使「卡在这等客户同意」的轮次不被 prompt 时限掐断。等待本身**缺省不设限**（见 tools.ts）；
-        // prompt 时限只约束「非等待」的计算与生成时间。
+        // 直接使用 Service 注入的交互闸（设计 G-1）：等待客户期间暂停整轮最后兜底，
+        // 使「卡在这等客户同意」的轮次不被兜底掐断。等待本身**缺省不设限**（见 tools.ts）；
+        // 1 小时兜底只约束「非等待」的有效运行时间。
         const interactionGate = opts.interactionGate;
 
         // 上下文窗口缺失时**不再硬失败**：采用系统默认值，并给出**可见**提示（日志 + 事件流，见下）。
@@ -1557,7 +1578,7 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
               noticeText: REASONING_DEGRADED_SUMMARY,
             }
           : undefined;
-        const roleSession = makeRoleSession({ session, promptMs, gate: interactionGate, emit, log, queue, unsubscribe: () => { unsubscribe(); callFacts.clear(); }, lifecycle, diagnostics, abortTimeoutMs: 900, strictLifecycle: true, emitPromptInput: false, lengthFollowup, sessionShutdown, reasoningDegrade });
+        const roleSession = makeRoleSession({ session, promptMs, turnLastResortMs, gate: interactionGate, emit, log, queue, unsubscribe: () => { unsubscribe(); callFacts.clear(); }, lifecycle, diagnostics, abortTimeoutMs: 900, strictLifecycle: true, emitPromptInput: false, lengthFollowup, sessionShutdown, reasoningDegrade });
         roleSession.runtime = "pi";
         roleSession.roleId = role.id;
         roleSession.contextSource = sessionSelection.contextSource ?? (sessionSelection.mode === "in-memory" ? "in-memory" : sessionSelection.mode === "resumed" ? "resumed" : sessionSelection.note ? "recovered" : "fresh");

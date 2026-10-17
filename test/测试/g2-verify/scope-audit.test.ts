@@ -74,8 +74,8 @@ test("裁定 1（2026-10-16 复裁）：静默 30s / tick 30s——缺省常量�
   }
 });
 
-test("裁定 2：阈值表＝§3.2 批准默认（90%/10min/5/10min-10min-15min×3-30min/15min≤5）", () => {
-  assert.equal(TURN_DEADLINE_RATIO, 0.9, "#1 90%");
+test("裁定 2：阈值表＝§3.2 批准默认（100%/10min/5/10min-10min-15min×3-30min/15min≤5）；#1 由 90% 改 100%（2026-10-17 到点检查）", () => {
+  assert.equal(TURN_DEADLINE_RATIO, 1.0, "#1 100%（到点即检查；客户 2026-10-17 去掉 90% 预警）");
   assert.equal(QUEUE_HEAD_AGE_MS, 10 * 60 * 1000, "#2 age 10min");
   assert.equal(QUEUE_DEPTH, 5, "#2 depth 5");
   assert.equal(QUEUE_STUCK_COOLDOWN_MS, 10 * 60 * 1000, "#2 冷却 10min");

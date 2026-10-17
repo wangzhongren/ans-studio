@@ -226,9 +226,9 @@ test("migrated Service/Pi timers honor legacy env once and native timeout normal
         return result;
       } };
     };
-    const adapter = createRuntimeAdapter({ runtime: "pi", gate: makeGate({ project: [], skill: [] }), projectRoot: dir, skillRoot: dir, providerFactories: { pi: opts => { providerInput = opts; return createRealPiRuntimeAdapter({ ...opts, config, logger: log }, sdk.dependencies); } } });
+    const adapter = createRuntimeAdapter({ runtime: "pi", gate: makeGate({ project: [], skill: [] }), projectRoot: dir, skillRoot: dir, turnLastResortMs: 45, providerFactories: { pi: opts => { providerInput = opts; return createRealPiRuntimeAdapter({ ...opts, config, logger: log }, sdk.dependencies); } } });
     const session = await adapter.bindRole(makeRole());
-    assert.equal(providerInput!.promptTimeoutMs, 45); assert.equal(providerInput!.constructTimeoutMs, 5000);
+    assert.equal(providerInput!.promptTimeoutMs, 45); assert.equal(providerInput!.turnLastResortMs, 45); assert.equal(providerInput!.constructTimeoutMs, 5000);
     const began = Date.now(); await assert.rejects(session.prompt("timing fixture"), /超时/);
     assert.ok(Date.now() - began < 1000);
     assert.equal(abortCalls, 1, "Service and Pi cleanup reuse the same per-turn native abort");
@@ -252,7 +252,7 @@ test("native stop cleanup rejects promptly and quarantines actual bound session 
       return result;
     } };
   };
-  const session = await createRealPiRuntimeAdapter({ ...options(dir), promptTimeoutMs: 10, config, logger: log }, sdk.dependencies).bindRole(makeRole());
+  const session = await createRealPiRuntimeAdapter({ ...options(dir), promptTimeoutMs: 5, turnLastResortMs: 10, config, logger: log }, sdk.dependencies).bindRole(makeRole());
   const prompt = session.prompt("cleanup fixture"); await entered;
   const began = Date.now(); const stops = await Promise.allSettled([session.abort!(), session.abort!()]);
   assert.ok(Date.now() - began < 1200); assert.equal(abortCalls, 1);

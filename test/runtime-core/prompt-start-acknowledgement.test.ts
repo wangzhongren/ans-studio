@@ -128,11 +128,11 @@ test("acknowledged turns keep aborted/timed_out outcomes and single matching ter
       const queue = createEventQueue<SessionEvent>();
       return { async prompt() { entered = true; await new Promise<void>((resolve) => { complete = resolve; }); }, events: () => queue.stream, async abort() { queue.push({ kind: "settled", summary: "inner cleanup", detail: { outcome: "aborted" } }); complete(); await Promise.resolve(); }, async dispose() { queue.close(); } };
     } });
-    const session = await createRuntimeAdapter({ runtime: "pi", gate: allow, projectRoot: process.cwd(), skillRoot: process.cwd(), promptTimeoutMs: expected === "timed_out" ? 15 : 120000, providerFactories: { pi: factory } }).bindRole(role());
+    const session = await createRuntimeAdapter({ runtime: "pi", gate: allow, projectRoot: process.cwd(), skillRoot: process.cwd(), turnLastResortMs: expected === "timed_out" ? 15 : 60000, providerFactories: { pi: factory } }).bindRole(role());
     const { events, done } = collect(session);
     const metadata: PromptTurnStartedMetadata[] = [];
     const run = session.prompt("outcome", { onTurnStarted(value) { metadata.push(value); } });
-    const rejected = assert.rejects(run, expected === "timed_out" ? /超时/ : /中止/);
+    const rejected = assert.rejects(run, expected === "timed_out" ? /最后兜底/ : /中止/);
     await until(() => entered); if (expected === "aborted") await session.abort?.();
     await rejected; await session.dispose(); await done;
     assert.equal(metadata.length, 1);

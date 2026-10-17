@@ -123,7 +123,7 @@ const runPhase = async (config: PhaseConfig) => {
   const actualQueries: SDK.Query[] = [];
   const service = createRuntimeAdapter({ runtime: "claude", projectRoot, skillRoot: projectRoot,
     gate: () => ({ allowed: false, reason: "probe has no write effects", allowedByRoot: { project: [], skill: [] } }),
-    modelId: "claude-sonnet-4-6", baseUrl: endpoint, constructTimeoutMs: 15000, promptTimeoutMs: config.timeoutMs ?? 25000,
+    modelId: "claude-sonnet-4-6", baseUrl: endpoint, constructTimeoutMs: 15000, turnLastResortMs: config.timeoutMs ?? 25000,
     providerFactories: { claude: (input) => {
       assert.equal(input.toolDisplayMode, "required-v1");
       assert.equal(input.installedMcpServers?.length, 1);

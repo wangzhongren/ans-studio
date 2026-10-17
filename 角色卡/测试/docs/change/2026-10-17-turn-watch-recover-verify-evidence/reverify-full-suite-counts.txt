@@ -1,0 +1,12 @@
+reverify full-suite (node --test "test/**/*.test.ts") 2026-10-17
+tests 2246
+pass 2150
+fail 94
+skipped 2
+exit 1
+composition:
+  inherited-existing 93  (missing-dep 75, windows-EPERM 8, CRLF 9, flaky 1)
+  new-environment 1      (codex-adapter/session.test.ts "inspect timeout never aborts..." — @modelcontextprotocol/sdk missing)
+desktop-window 5 stale reds from previous run: FIXED (all gone)
+new reds vs 93-base: only the codex missing-SDK test
+typecheck: 85 errors (existing dependency gaps; batch 0)

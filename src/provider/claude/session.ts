@@ -13,6 +13,7 @@ import { createDiagnosticLogger } from "../../common/shared/diagnostics.ts";
 import { REASONING_EVENT_SUMMARY } from "../../common/runtime-core/reasoning.ts";
 import { toClaudeSchema } from "../../common/claude-adapter/schema.ts";
 import { abortError, createQueue, waitForTurn } from "../../common/claude-adapter/lifecycle.ts";
+import { DEFAULT_TURN_LAST_RESORT_MS } from "../../common/runtime-core/timeout.ts";
 import { renderInstalledSkillsSection } from "../../common/编排/installed-skills.ts";
 
 /** Tests replace only transport; MCP server/schema/handlers can remain the actual SDK implementation. */
@@ -54,6 +55,22 @@ const INSTALLED_MCP_TOOL_TIMEOUT_MS = 60_000;
 const MCP_ENV_LAUNCHER = fileURLToPath(new URL("../../common/claude-adapter/mcp-launcher.mjs", import.meta.url));
 const CALL_CONTEXT_ARG = "__ans_call_context";
 const INPUT_CONTEXT_PREFIX = /^\[ANS_INPUT_CONTEXT:([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})\]\n/;
+// Whole-turn last resort (客户裁定 2026-10-17): `promptTimeoutMs` is the watchdog's inspect
+// deadline and never aborts a Claude turn. Only this fixed (option-injectable) deadline ends it;
+// the tag lets the terminal row distinguish it from the non-aborting inspect deadline.
+const TURN_LAST_RESORT_LABEL = "本轮最后兜底";
+const TURN_LAST_RESORT_CODE = "TURN_LAST_RESORT";
+type TaggedTimeout = Error & { label?: string; code?: string; timeoutMs?: number };
+const turnLastResortError = (timeoutMs: number): Error => {
+  const error = new Error(`本轮运行超过最后兜底（${timeoutMs}ms），已中止以免无限挂起。`) as TaggedTimeout;
+  error.name = "TimeoutError";
+  error.label = TURN_LAST_RESORT_LABEL;
+  error.code = TURN_LAST_RESORT_CODE;
+  error.timeoutMs = timeoutMs;
+  return error;
+};
+const isTurnLastResortError = (error: unknown): boolean =>
+  error instanceof Error && error.name === "TimeoutError" && (error as TaggedTimeout).code === TURN_LAST_RESORT_CODE;
 // G-5 wave 2 degradation identification (probe A2, docs/fix/2026-10-16_probe_reasoning-wire.md): a
 // gateway rejecting the reasoning parameters surfaces the API failure as text ("API Error: 4xx …")
 // after the CLI's own retries (which never drop the parameters). Deliberately conservative: only an
@@ -66,6 +83,8 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
   if (options.toolDisplayMode === "required-v1" && (typeof options.projectToolEvent !== "function" || typeof options.registerToolDisplayProfile !== "function")) {
     throw new Error("Claude required-v1 工具展示缺少 projector/register 能力");
   }
+  // One hour by default; tests/hosts may inject a smaller value. Never read from promptTimeoutMs.
+  const turnLastResortMs = options.turnLastResortMs ?? DEFAULT_TURN_LAST_RESORT_MS;
   // Auth, endpoint and redaction must use the same immutable profile snapshot.
   const env = { ...(dependencies.env ?? process.env) };
   const credentialName = options.apiKeyEnvVar ?? "ANTHROPIC_API_KEY";
@@ -494,11 +513,17 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
                 current.input.push({ type: "user", uuid: turn.sdkUuid, session_id: nativeId ?? "", parent_tool_use_id: null, message: {
                   role: "user", content: images.length ? [{ type: "text", text: wireText }, ...images.map((image) => ({ type: "image" as const, source: { type: "base64" as const, media_type: image.mimeType as "image/png" | "image/jpeg" | "image/gif" | "image/webp", data: image.data } }))] : wireText,
                 } });
-                await waitForTurn(attemptDone.then(() => current.toolTail), turn.controller.signal, options.promptTimeoutMs ?? 120000, options.interactionGate);
+                try {
+                  await waitForTurn(attemptDone.then(() => current.toolTail), turn.controller.signal, turnLastResortMs, options.interactionGate);
+                } catch (error) {
+                  // waitForTurn's own deadline is the only untagged TimeoutError here; tag it so
+                  // the error/terminal text names the last resort (inspect deadlines never abort).
+                  throw isTurnLastResortError(error) ? error : error instanceof Error && error.name === "TimeoutError" ? turnLastResortError(turnLastResortMs) : error;
+                }
                 break;
               } catch (error) {
                 // Conservative identification (probe A2 facts); unrecognized failures stay plain failures.
-                if (!reasoningDegraded && options.reasoningEffort !== undefined && isReasoningRejection(lastFailureText)) {
+                if (!isTurnLastResortError(error) && !reasoningDegraded && options.reasoningEffort !== undefined && isReasoningRejection(lastFailureText)) {
                   reasoningDegraded = true;
                   if (engine) closeEngine(engine);
                   emit(turn, "message", "网关不支持推理参数，已去掉参数重试一次（本会话之后不再携带）");
@@ -520,7 +545,10 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
             if (engine) for (const [id, call] of engine.nativeCalls) if (call.turn === turn) engine.nativeCalls.delete(id);
             engine?.pendingInputs.delete(turn.sdkUuid);
             if (active === turn) active = undefined;
-            emit(turn, "settled", `Claude 本轮${outcome}`, { outcome, turnId: turn.id, ...(teardownError ? { cleanupError: teardownError.message } : {}) });
+            const settledSummary = outcome === "timed_out" && isTurnLastResortError(failure)
+              ? `Claude 本轮超过最后兜底（${turnLastResortMs}ms），已中止`
+              : `Claude 本轮${outcome}`;
+            emit(turn, "settled", settledSummary, { outcome, turnId: turn.id, ...(teardownError ? { cleanupError: teardownError.message } : {}) });
           }
           if (failure) throw failure;
         },

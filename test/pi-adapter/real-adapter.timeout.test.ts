@@ -16,7 +16,7 @@ async function piInstalled(): Promise<boolean> {
   }
 }
 
-test("prompt 超时：对永不响应的本地服务，prompt 在时限内中止并报可读原因", async (t) => {
+test("整轮最后兜底：检查时限到点不中止；last-resort 到点才中止（本地服务永不响应）", async (t) => {
   if (!(await piInstalled())) {
     t.skip("未安装 @earendil-works/pi-coding-agent");
     return;
@@ -43,7 +43,9 @@ test("prompt 超时：对永不响应的本地服务，prompt 在时限内中止
       modelId: "deepseek-v4-flash",
       contextWindow: 131072,
       apiKeyEnvVar: "ANTHROPIC_AUTH_TOKEN",
-      promptTimeoutMs: 800,
+      // 客户裁定 2026-10-17：检查时限（旧 promptTimeoutMs）不再中止整轮；整轮上限是 last-resort。
+      promptTimeoutMs: 200,
+      turnLastResortMs: 1200,
       constructTimeoutMs: 30000,
     });
 
@@ -52,12 +54,16 @@ test("prompt 超时：对永不响应的本地服务，prompt 在时限内中止
     await assert.rejects(
       () => session.prompt("请读取角色文档"),
       (err: unknown) => {
+        // 只有「最后兜底」才中止；文案必须与到点检查区分。
+        assert.match((err as Error).message, /最后兜底/);
         assert.match((err as Error).message, /超时/);
         return true;
       },
     );
     const elapsed = Date.now() - start;
-    t.diagnostic(`prompt 在 ${elapsed}ms 内被中止（设定时限 800ms）`);
+    t.diagnostic(`prompt 在 ${elapsed}ms 内被中止（检查时限 200ms、最后兜底 1200ms）`);
+    // 若仍按检查时限 abort，会在 ~200ms 就拒绝；跑过 800ms 证明检查时限没有中止整轮。
+    assert.ok(elapsed >= 800, `检查时限不应中止整轮（实际 ${elapsed}ms，应 > 检查时限 200ms 并接近兜底 1200ms）`);
     assert.ok(elapsed < 30000, `应在有限时间内中止，实际 ${elapsed}ms`);
     await session.dispose();
   } finally {

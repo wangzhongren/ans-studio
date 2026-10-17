@@ -151,3 +151,16 @@ export type { SuApprovalTier } from "../../common/编排/shell-gate.ts";
 
 **测试** `test/编排/shell-operator-only.test.ts` 11 例；`test/编排/` 348 计/347 过/1 红（既有 Windows symlink EPERM）。
 
+## 看护信号 `turn-deadline`：轮次到点检查（2026-10-17）
+
+**来源**：PM 评审 `2026-10-17_design_turn-watch-and-recover-review.md`（approved）。整轮不设超时：到点由看护通知 su 检查，未卡死不动作；1 小时为最后兜底。
+
+`src/common/编排/watchdog.ts`（`WatchdogSignalKind` / `renderWatchdogAlert` / `renderWatchdogRecovery` 形状不变）：
+
+- `SIGNAL_LABELS["turn-deadline"] = "轮次到点检查"`（原「轮次逼近超时」）。
+- `SIGNAL_SUGGESTIONS["turn-deadline"] = "到点检查不中止本轮；请用 role_status 核对是否卡死；仍在推进则不动作；只有卡死才 propose_recovery（客户确认后应用执行）；1 小时为最后兜底。"`
+- 信号 kind 仍 `turn-deadline`（契约不变）；恢复行随 label 自动变化；不放宽任何判定。
+- 文案禁止出现「逼近超时 / 已超时 / 硬超时 / 剩余量」；阈值/事实行/每轮一次/解除与适配器 1 小时兜底属桌面窗口与运行时核心。
+
+**测试** `test/编排/watchdog.test.ts` 13 例（含新增的金文本与反向断言）。
+

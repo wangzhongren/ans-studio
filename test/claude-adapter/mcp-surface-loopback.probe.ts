@@ -136,7 +136,7 @@ const runPhase = async (config: PhaseConfig): Promise<{ name: string; spawn: unk
     ? { type: "stdio", command: "/nonexistent/ans-probe-missing-binary" }
     : { type: "stdio", command: process.execPath, args: [fakeServerPath], env: { FAKE_MCP_RECORD_DIR: recordDir, FAKE_MCP_DELAY_MS: String(config.delayMs ?? 0), FAKE_MCP_MODE: config.hang ? "hang" : "ok" }, ...(config.alwaysLoad ? { alwaysLoad: true } : {}) };
   const actualQueries: SDK.Query[] = [];
-  const options = (projectRoot: string): RuntimeSessionOptions => ({ runtime: "claude", projectRoot, skillRoot: projectRoot, gate: () => ({ allowed: false, reason: "probe has no write effects", allowedByRoot: { project: [], skill: [] } }), modelId: "claude-sonnet-4-6", baseUrl: endpoint, constructTimeoutMs: 15000, promptTimeoutMs: config.timeoutMs ?? 25000,
+  const options = (projectRoot: string): RuntimeSessionOptions => ({ runtime: "claude", projectRoot, skillRoot: projectRoot, gate: () => ({ allowed: false, reason: "probe has no write effects", allowedByRoot: { project: [], skill: [] } }), modelId: "claude-sonnet-4-6", baseUrl: endpoint, constructTimeoutMs: 15000, turnLastResortMs: config.timeoutMs ?? 25000,
     providerFactories: { claude: (input) => {
       assert.equal(input.toolDisplayMode, "required-v1");
       return createClaudeRuntimeAdapter({ ...input,

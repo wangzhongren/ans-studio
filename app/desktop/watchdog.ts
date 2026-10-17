@@ -5,7 +5,7 @@
 //
 // —— 看护是什么（与「永不改判定」纪律）——
 // 本模块**只**做三件事：① 以 tick（默认 30s）同步读一遍**同源快照**（SessionManager 的 busy/队列/在途/
-// 待确认——不造第二数据源）；② 命中异常信号（轮次逼近超时 / 投递排队积压 / 命令超时 / 重复失败）时，
+// 待确认——不造第二数据源）；② 命中异常信号（轮次到点检查 / 投递排队积压 / 命令超时 / 重复失败）时，
 // 经**注入的投递端**把一条 `kind:"system"` 的系统消息交给**既有投递机**（忙排队/未开自动开/失败保留重试
 // 全部复用）；③ 在项目完成静默态（全角色空闲＋队列全空＋无在途＋无待确认）经**滞回状态机**投一条收束提示。
 // **绝不**：写项目文件、放行任何命令/写入、停任何轮次、改任何 gate/队列语义、替 su 决策、自动做任何恢复。
@@ -68,8 +68,9 @@ export const WATCHDOG_TICK_ENV = "ANS_DESKTOP_WATCHDOG_TICK_MS";
 export const WATCHDOG_SILENCE_MS = 30_000;
 /** 静默阈值覆盖 env。 */
 export const WATCHDOG_SILENCE_ENV = "ANS_DESKTOP_WATCHDOG_SILENCE_MS";
-/** #1 轮次逼近超时：有效已耗 ≥ 90% × 生效时限（默认 120s → 108s；放宽 900s → 810s）。 */
-export const TURN_DEADLINE_RATIO = 0.9;
+/** #1 轮次**到点检查**：有效已耗 ≥ 100% × 检查时限（默认 120s → 120s；放宽 900s → 900s）。
+ *  客户裁定 2026-10-17：到点**只提示、不中止本轮**；整轮最后兜底固定 1 小时（`turnLastResortMs`）。 */
+export const TURN_DEADLINE_RATIO = 1.0;
 /** #2 投递排队积压：队首 age ≥ 10 min（age 优先）**或**单角色深度 ≥ 5（辅判，见设计 §八 F-2 注）。 */
 export const QUEUE_HEAD_AGE_MS = 10 * 60 * 1000;
 export const QUEUE_DEPTH = 5;
@@ -149,7 +150,7 @@ export type WatchdogObservation =
 
 /** 信号短标签（**仅队列行摘要**用——正文标签在编排单一来源，本表不得用于正文）。 */
 const SIGNAL_SHORT: Record<WatchdogSignalKind, string> = {
-  "turn-deadline": "轮次逼近超时",
+  "turn-deadline": "轮次到点检查",
   "queue-stuck": "投递排队积压",
   "cmd-timeout": "命令超时",
   "repeat-fail": "重复失败",
@@ -219,8 +220,10 @@ export interface WatchdogConfig {
   repeatFailCooldownMs: number;
   stormWindowMs: number;
   stormLimit: number;
-  /** 与会话运行时**同源**的整轮时限显式覆盖（`RuntimeAdapterFactoryOptions.promptTimeoutMs`；未设 ⇒ env/默认）。 */
+  /** 与会话运行时**同源**的到点检查时限显式覆盖（`RuntimeAdapterFactoryOptions.promptTimeoutMs`；未设 ⇒ env/默认）。 */
   promptTimeoutOverrideMs?: number;
+  /** 整轮最后兜底时限显式覆盖（生产固定 1 小时、无 env；测试注入小值用）。 */
+  turnLastResortOverrideMs?: number;
   /** 时限求值用的 env（缺省 `process.env`——桌面启动时 `.env` 已载入，与会话同一份）。 */
   env?: Record<string, string | undefined>;
 }
@@ -335,10 +338,20 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
   /** 系统投递去重键（看护自持命名空间——与 handback/dispatch 键集合隔离）。 */
   const nextSystemKey = (projectRoot: string, label: string): string => `watchdog\u0000${projectRoot}\u0000${label}\u0000${++seq}`;
 
-  // —————— #1 的整轮时限：求值与运行时核心**单一来源同源**（resolveRuntimeTimeouts——本层不另写时长解析；
+  // —————— #1 的时限：求值与运行时核心**单一来源同源**（resolveRuntimeTimeouts——本层不另写时长解析；
   // 只读导入先例：operator-channel.ts 的 SHELL_REVIEW_TIMEOUT_ENV）。会话运行时亦经同一函数取时限。——————
-  const turnTimeoutMs = (runtime: RuntimeKind): number =>
-    resolveRuntimeTimeouts(runtime, { promptTimeoutMs: config.promptTimeoutOverrideMs }, config.env ?? process.env).promptTimeoutMs;
+  const turnTimeouts = (runtime: RuntimeKind) =>
+    resolveRuntimeTimeouts(runtime, {
+      promptTimeoutMs: config.promptTimeoutOverrideMs,
+      turnLastResortMs: config.turnLastResortOverrideMs,
+    }, config.env ?? process.env);
+  /** 到点检查时限（历史字段名 `promptTimeoutMs`；**不中止本轮**）。 */
+  const turnTimeoutMs = (runtime: RuntimeKind): number => turnTimeouts(runtime).promptTimeoutMs;
+  /** 整轮最后兜底（固定 1 小时、无 env）：整小时用「N 小时」，否则按既有毫秒格式化。 */
+  const lastResortText = (runtime: RuntimeKind): string => {
+    const ms = turnTimeouts(runtime).turnLastResortMs;
+    return ms >= 3_600_000 && ms % 3_600_000 === 0 ? `${ms / 3_600_000} 小时` : formatDurationMs(ms);
+  };
 
   /** 投递一条系统消息（统一入口；失败（本层回调抛错）如实记诊断并视为未投出——绝不向上抛）。 */
   const outbound = (projectRoot: string, message: WatchdogOutboundMessage, label: string): boolean => {
@@ -436,8 +449,12 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
 
   const resolveEpisode = (projectRoot: string, signal: WatchdogSignalKind, roleId: string, key: string, st: SignalState): void => {
     if (st.alerted) {
-      // 恢复行只在**告警确实投出过**时投（su 看过告警才需要「已解除」的对账）；仍受风暴护栏约束。
-      if (tryStormDelivery(projectRoot, {
+      if (signal === "turn-deadline") {
+        // 到点检查**不是故障**：解除（轮次结束）时**不投「看护恢复」行**——否则 su 会误以为发生过
+        // 一次超时/中止。只留诊断（观察面），不向会话投任何消息。
+        loggerFor(projectRoot).record("watchdog.recovery", { state: key, count: st.hits });
+      } else if (tryStormDelivery(projectRoot, {
+        // 恢复行只在**告警确实投出过**时投（su 看过告警才需要「已解除」的对账）；仍受风暴护栏约束。
         text: renderWatchdogRecovery({ signal, roleId, hits: st.hits, suppressed: st.suppressed }),
         summary: `系统·看护 · 看护恢复 · ${SIGNAL_SHORT[signal]} · 角色 ${roleId}`,
       }, `recovery-${key}`)) {
@@ -475,7 +492,8 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
     const pendingFor = (roleId: string): number => snapshot.pendingConfirmationsByRole.get(roleId) ?? 0;
     const evaluated = new Set<string>();
 
-    // —— 信号 #1：轮次逼近超时（90% 生效时限；挂起确认卡排除；su 忙排除）——
+    // —— 信号 #1：轮次**到点检查**（100% 检查时限；挂起确认卡排除；su 忙排除）——
+    // 客户裁定 2026-10-17：到点**只提示、不中止本轮**；整轮最后兜底固定 1 小时（`turnLastResortMs`）。
     for (const role of snapshot.roles) {
       const key = `turn-deadline:${role.roleId}`;
       evaluated.add(key);
@@ -499,10 +517,9 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
             signal: "turn-deadline",
             roleId: role.roleId,
             facts: [
-              `本轮有效已耗约 ${formatDurationMs(at - startedAt)}（整轮硬超时 ${turnTimeoutMs(role.runtime)}ms 的 90% 预警线）`,
-              // 实机反馈（2026-10-17）：su 转述时曾把 90% 预警说成「已超时」——事实行必须显式写明
-              // **尚未超时、系统未中止**，并给出到硬超时的剩余量。summary 仍为「轮次逼近超时」。
-              `尚未超时、系统未中止；剩余约 ${formatDurationMs(Math.max(0, turnTimeoutMs(role.runtime) - (at - startedAt)))}（距整轮硬超时）`,
+              `本轮有效已耗约 ${formatDurationMs(at - startedAt)}（看护检查时限 ${turnTimeoutMs(role.runtime)}ms；到点仅检查、不中止本轮）`,
+              `请用 role_status / session_tail 核对该角色是否卡死；仍在推进则不动作；确认卡死才 propose_recovery（客户确认后应用执行）`,
+              `整轮最后兜底 ${lastResortText(role.runtime)}（到点才自动中止本轮）`,
               `本轮自 ${formatClock(startedAt)} 开始、至今仍在进行`,
               `该角色有挂起确认卡时不触发本信号（正确等待不报）`,
             ],

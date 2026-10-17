@@ -42,7 +42,8 @@ test("prompt timeout is locked before SDK aborted settle, with no duplicate term
   let listener: (e: { type: string; aborted?: boolean }) => void = () => {};
   const session = { prompt: () => new Promise<void>(() => {}), abort: async () => listener({ type: "agent_settled", aborted: true }), dispose() {}, subscribe(fn: typeof listener) { listener = fn; return () => {}; } };
   wireSettledOnce(session, e => events.push(e), lifecycle);
-  const prompt = makeRolePrompt({ session, promptMs: 20, gate: createInteractionGate(), emit: e => events.push(e), log, lifecycle });
+  // 检查时限（promptMs）不再 abort；整轮上限改用注入的小 last-resort 值。
+  const prompt = makeRolePrompt({ session, promptMs: 5, turnLastResortMs: 20, gate: createInteractionGate(), emit: e => events.push(e), log, lifecycle });
   await assert.rejects(prompt("private input"), /超时/);
   assert.equal(events.filter(e => e.kind === "settled").length, 1);
   assert.equal((events.at(-1)!.detail as Record<string, unknown>).outcome, "timed_out");
@@ -50,7 +51,7 @@ test("prompt timeout is locked before SDK aborted settle, with no duplicate term
 
 test("abort cleanup is bounded and quarantines an unresponsive session", async () => {
   const events: SessionEvent[] = [];
-  const prompt = makeRolePrompt({ session: { prompt: () => new Promise<void>(() => {}), abort: () => new Promise<void>(() => {}), dispose() {} }, promptMs: 10, abortTimeoutMs: 10, gate: createInteractionGate(), emit: e => events.push(e), log });
+  const prompt = makeRolePrompt({ session: { prompt: () => new Promise<void>(() => {}), abort: () => new Promise<void>(() => {}), dispose() {} }, promptMs: 5, turnLastResortMs: 10, abortTimeoutMs: 10, gate: createInteractionGate(), emit: e => events.push(e), log });
   const began = Date.now();
   await assert.rejects(prompt("wait"), /超时/);
   assert.ok(Date.now() - began < 1000);

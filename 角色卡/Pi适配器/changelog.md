@@ -1,5 +1,26 @@
 # Pi适配器 变更记录
 
+## 2026-10-17 — 整轮时限改为「到点检查 + 1 小时最后兜底」（客户裁定；PM 批准）
+
+**来源**：客户 2026-10-17 裁定「整轮不应该有超时，应该是到了时间，su 要去看下是否卡死了……如果没卡死，就不管他。」并追加「保留 1 小时兜底」；PM 批准评审 `角色卡/项目管理/docs/design/2026-10-17_design_turn-watch-and-recover-review.md`。运行时核心已提供 `DEFAULT_TURN_LAST_RESORT_MS=3600000`、`resolveRuntimeTimeouts().turnLastResortMs`、`RuntimeProviderOptions.turnLastResortMs`，服务层整轮包装已改用 last-resort。
+
+**改动（Pi 边界）**
+- `src/common/pi-adapter/timeout.ts`：镜像新增 `DEFAULT_TURN_LAST_RESORT_MS = 3600000`；`DEFAULT_PROMPT_TIMEOUT_MS` 改为 **300000（5 分钟，2026-10-17 统一口径）** 并注释为「到点检查时限，不用于 abort」；InteractionGate 注释同步为「暂停 1 小时兜底」。
+- `src/common/pi-adapter/real-adapter.ts`：
+  - `makeRolePrompt` 新增 `turnLastResortMs?`（缺省 3600000）；**主 prompt 与 G-5 降级重发**改用 `withPausableTimeout(..., turnLastResortMs, "本轮最后兜底", gate)`——`promptMs` **不再**中止整轮。
+  - **F-3-a 截断收尾补发段保持不变**：`followup.timeoutMs ?? promptMs`（检查时限）有界，不继承 1 小时兜底（PM 评审口径：主轮已完成，不能让补发把它拖住；外层兜底仍是总上限）。
+  - 错误面区分：仅 label「本轮最后兜底」记为 `TURN_LAST_RESORT`（诊断 `prompt.turn_last_resort`，日志/事件「本轮超过最后兜底，已中止」）；普通超时仍 `PROMPT_TIMEOUT`；`outcome` 契约枚举仍为 `timed_out`。
+  - `RoleSessionDeps` 新增 `turnLastResortMs?` 透传；`bindRole` 取 `opts.turnLastResortMs ?? DEFAULT_TURN_LAST_RESORT_MS`（固定值、不读 env），trace 行同时记录检查/兜底两个值。
+- `src/provider/pi/session.ts`：legacy `PiRuntimeAdapterOptions` 新增 `turnLastResortMs?`，并把 `promptTimeoutMs` 注释改为「到点检查时限（不用于 abort）」。模型/桌面注入面走 `RuntimeProviderOptions.turnLastResortMs`，原样透传。
+- **不改**：shell 命令 600000、确认卡/审核 120000、构造 120000。
+
+**测试**
+- 新增 `test/pi-adapter/turn-last-resort.test.ts` 3 例：①`promptMs=20`、实际耗时 120ms → 主轮正常完成（检查时限不中止）；②`promptMs=10`、`turnLastResortMs=90` → 到兜底才中止，诊断 `prompt.turn_last_resort`/`TURN_LAST_RESORT`，与 `prompt.timeout` 不混；③首轮截断后补发段永不返回 → 按 `promptMs=60` 有界失败（不继承 5000ms 兜底）。
+- 更新：`real-adapter.timeout.test.ts`（检查 200ms / 兜底 1200ms，实测 1208ms 中止，证明检查时限不 abort）；`runtime-outcome.test.ts` 两例改用注入兜底；`injected-runtime.test.ts` 两例改用 `turnLastResortMs`（并断言 Service→Pi 透传）。
+- 结果：`node --test "test/pi-adapter/**/*.test.ts"` → **289 项：286 pass / 2 fail / 1 skip**；两 fail 仍为 `injected-runtime.test.ts` 的 Windows `EPERM: symlink`（既有环境限制，与本改动无关）。`npm run typecheck` → 本角色文件 0 错；全仓红仍仅为 claude-adapter 环境缺件。
+
+**风险**：①兜底按有效运行时间计（确认卡挂起期间暂停），检查按墙钟（看护属主，非本角色）；②su 自身轮次无到点检查，仅有 1 小时兜底；③超过 1 小时的合法长任务会被中止（客户已选 1h，不暴露 env）；④`promptTimeoutMs` 旧用户预期「2 分钟中止」现变为「2 分钟检查 + 1 小时兜底」。未 git 提交。
+
 ## 2026-10-17 — contextWindow 系统默认值 32768 → 500000（客户裁定）
 
 **来源：客户 2026-10-17 裁定，逐字**：「我的意思说系统默认就是500k。」

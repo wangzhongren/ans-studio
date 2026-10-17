@@ -177,7 +177,7 @@ test("Service persists replay and adapter-confirmed deferred context result afte
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 
-test("customer wait pauses prompt deadline, abort invalidates late consent, next turn works", async () => {
+test("customer wait pauses the turn last-resort deadline, abort invalidates late consent, next turn works", async () => {
   const root = await temp();
   try {
     let reply!: (value: { outcome: "answered"; value: { confirmed: true } }) => void;
@@ -191,7 +191,7 @@ test("customer wait pauses prompt deadline, abort invalidates late consent, next
       }
       emit({ kind: "settled", summary: "done", detail: { outcome: "completed" } });
     });
-    const session = await createRuntimeAdapter({ runtime: "codex", gate: allow, projectRoot: root, skillRoot: root, promptTimeoutMs: 20, customerInput: () => new Promise((resolve) => { reply = resolve; }), providerFactories: { codex: factory } }).bindRole(role());
+    const session = await createRuntimeAdapter({ runtime: "codex", gate: allow, projectRoot: root, skillRoot: root, turnLastResortMs: 20, customerInput: () => new Promise((resolve) => { reply = resolve; }), providerFactories: { codex: factory } }).bindRole(role());
     const { events, done } = await collect(session);
     const run = session.prompt("ask"); await until(() => reply !== undefined);
     await new Promise((resolve) => setTimeout(resolve, 50)); assert.equal(events.filter((event) => event.kind === "settled").length, 0);
@@ -203,16 +203,85 @@ test("customer wait pauses prompt deadline, abort invalidates late consent, next
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 
-test("throw, native failed outcome and timeout each have one explicit terminal", async () => {
+test("throw, native failed outcome and last-resort timeout each have one explicit terminal", async () => {
   const root = await temp();
   try {
     for (const [expected, action] of [["failed", async () => { throw new Error("SDK error"); }], ["failed", async (_options: RuntimeProviderOptions, emit: (event: SessionEvent) => void) => { emit({ kind: "settled", summary: "fail", detail: { outcome: "failed" } }); }], ["timed_out", async () => { await new Promise(() => {}); }]] as const) {
-      const session = await createRuntimeAdapter({ runtime: "claude", gate: allow, projectRoot: root, skillRoot: root, promptTimeoutMs: 15, providerFactories: { claude: provider(action) } }).bindRole(role());
+      const session = await createRuntimeAdapter({ runtime: "claude", gate: allow, projectRoot: root, skillRoot: root, turnLastResortMs: 15, providerFactories: { claude: provider(action) } }).bindRole(role());
       const { events, done } = await collect(session);
       await session.prompt("run").catch(() => {}); await session.dispose(); await done;
       assert.equal(events.filter((event) => event.kind === "settled").length, 1);
       assert.equal((events.at(-1)?.detail as { outcome: string }).outcome, expected);
     }
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("inspection deadline never aborts a progressing turn; the turn completes normally", async () => {
+  const root = await temp();
+  try {
+    let finished = false;
+    const session = await createRuntimeAdapter({
+      runtime: "claude", gate: allow, projectRoot: root, skillRoot: root,
+      promptTimeoutMs: 10, // inspection deadline only
+      turnLastResortMs: 60000,
+      providerFactories: { claude: provider(async (_options, emit) => {
+        await new Promise((resolve) => setTimeout(resolve, 60)); // well past the inspection deadline
+        finished = true;
+        emit({ kind: "settled", summary: "done", detail: { outcome: "completed" } });
+      }) },
+    }).bindRole(role());
+    const { events, done } = await collect(session);
+    await session.prompt("healthy long turn");
+    assert.equal(finished, true);
+    await session.dispose(); await done;
+    const terminals = events.filter((event) => event.kind === "settled");
+    assert.equal(terminals.length, 1);
+    assert.equal((terminals[0].detail as { outcome: string }).outcome, "completed");
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("last resort aborts at the injected deadline with distinct last-resort wording", async () => {
+  const root = await temp();
+  try {
+    let entered = false;
+    const session = await createRuntimeAdapter({
+      runtime: "pi", gate: allow, projectRoot: root, skillRoot: root,
+      promptTimeoutMs: 600000, // a far larger inspection deadline must not be what aborts
+      turnLastResortMs: 20,
+      providerFactories: { pi: provider(async () => { entered = true; await new Promise(() => {}); }) },
+    }).bindRole(role());
+    const { events, done } = await collect(session);
+    await assert.rejects(session.prompt("hang"), (error: Error) => {
+      assert.match(error.message, /本轮最后兜底/);
+      assert.match(error.message, /最后兜底/);
+      assert.doesNotMatch(error.message, /本轮运行超时/);
+      return true;
+    });
+    assert.equal(entered, true);
+    await session.dispose(); await done;
+    const terminals = events.filter((event) => event.kind === "settled");
+    assert.equal(terminals.length, 1);
+    assert.equal((terminals[0].detail as { outcome: string }).outcome, "timed_out");
+    assert.match(terminals[0].summary, /最后兜底/);
+    assert.notEqual(terminals[0].summary, "本轮运行超时");
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("adapter-internal timed_out keeps the generic summary and is not mislabeled as last resort", async () => {
+  const root = await temp();
+  try {
+    const session = await createRuntimeAdapter({
+      runtime: "claude", gate: allow, projectRoot: root, skillRoot: root,
+      providerFactories: { claude: provider(async (_options, emit) => {
+        emit({ kind: "settled", summary: "inner timeout", detail: { outcome: "timed_out" } });
+      }) },
+    }).bindRole(role());
+    const { events, done } = await collect(session);
+    await session.prompt("inner timeout"); await session.dispose(); await done;
+    const terminals = events.filter((event) => event.kind === "settled");
+    assert.equal(terminals.length, 1);
+    assert.equal((terminals[0].detail as { outcome: string }).outcome, "timed_out");
+    assert.equal(terminals[0].summary, "本轮运行超时");
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 
@@ -323,9 +392,9 @@ test("outer timeout remains timed_out when abort cleanup emits inner aborted ter
       async dispose() { queue.close(); },
     };
   } });
-  const session = await createRuntimeAdapter({ runtime: "pi", gate: allow, projectRoot: process.cwd(), skillRoot: process.cwd(), promptTimeoutMs: 15, providerFactories: { pi: factory } }).bindRole(role());
+  const session = await createRuntimeAdapter({ runtime: "pi", gate: allow, projectRoot: process.cwd(), skillRoot: process.cwd(), turnLastResortMs: 15, providerFactories: { pi: factory } }).bindRole(role());
   const { events, done } = await collect(session);
-  await assert.rejects(session.prompt("race"), /超时/); await session.dispose(); await done;
+  await assert.rejects(session.prompt("race"), /最后兜底/); await session.dispose(); await done;
   assert.equal(abortCalls, 1);
   const terminal = events.filter((event) => event.kind === "settled");
   assert.equal(terminal.length, 1); assert.equal((terminal[0].detail as { outcome: string }).outcome, "timed_out");

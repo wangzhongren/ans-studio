@@ -56,11 +56,12 @@ export const RUNTIME_SETTINGS: Readonly<Record<Exclude<RuntimeKind, "demo">, Run
         help: "拖动选择预设档位，最大 1M tokens；留空＝系统默认（500k）；下一次开启会话时应用。",
       },
       {
-        key: "ANS_PI_PROMPT_TIMEOUT_MS", label: "整轮超时（ms）", required: false, secret: false,
+        // 看护到点检查专用：适配器不再用该值中止整轮（最后兜底固定 1 小时，见 runtime-core/timeout.ts）。
+        key: "ANS_PI_PROMPT_TIMEOUT_MS", label: "看护检查时限", required: false, secret: false,
         choices: ["", "60000", "120000", "300000", "600000", "900000", "1800000"],
-        choiceLabels: ["系统默认（120s）", "1 分钟", "2 分钟", "5 分钟", "10 分钟", "15 分钟", "30 分钟"],
+        choiceLabels: ["系统默认（5 分钟）", "1 分钟", "2 分钟", "5 分钟", "10 分钟", "15 分钟", "30 分钟"],
         control: "range", integer: { min: 1000 },
-        help: "拖动选择整轮超时；留空＝系统默认（120s）；单位 ms；下一次开启会话时应用。",
+        help: "到点只通知治理角色检查是否卡死，不中止本轮；仍在推进则不动作；1 小时为最后兜底；留空＝系统默认（5 分钟）；单位 ms；下一次开启会话时应用。",
       },
       { key: "ANS_PI_REASONING_EFFORT", label: "推理强度", required: false, secret: false, choices: ["off", "low", "medium", "high", "xhigh"], help: REASONING_EFFORT_HELP },
     ],

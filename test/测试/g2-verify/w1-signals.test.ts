@@ -1,7 +1,7 @@
 // test/测试/g2-verify/w1-signals.test.ts —— G-2 独立复验「W1 四信号」对抗域（纯逻辑＋注入时钟/快照/投递端）。
 //
 // 覆盖（独立构造；阈值边界前后行为、排除项、去重冷却、风暴护栏、看护恢复行）：
-//   #1 轮次逼近超时：恰 90% 边界；挂起确认卡排除；su 自身忙排除；每轮一次＋身份更替恢复行。
+//   #1 轮次到点检查：恰 100% 边界（到点仅检查、不中止）；挂起确认卡排除；su 自身忙排除；每轮一次＋身份更替解除行。
 //   #2 投递排队积压：age 恰 10min / depth 恰 5 边界；活跃期单报＋累计；恢复行计数如实；冷却恰边界。
 //   #3 命令超时：单次即报；冷却恰边界；su 忙抑制；无恢复行。
 //   #4 重复失败：15min 窗口恰 3 次边界；completed/aborted 不计；恰 15min 剪枝边界；冷却 30min。
@@ -97,23 +97,31 @@ function queueSnap(agesMs: number[], now: number): WatchdogProjectSnapshot {
   });
 }
 
-const TURN_LIMIT = 120_000; // 默认生效时限（env={}）
-const RATIO = 0.9;
+const TURN_LIMIT = 300_000; // 默认看护检查时限（env={}；客户 2026-10-17：默认 5 分钟）
+const RATIO = 1.0; // 到点即检查（不再有 90% 预警）
 const alertTexts = (rig: Rig): string[] => rig.deliveries.map((d) => d.text);
 
-// ————————————————————— #1 轮次逼近超时 —————————————————————
+// ————————————————————— #1 轮次到点检查（不中止本轮） —————————————————————
 
-test("W1#1：恰 90% 边界——差 1ms 不报、恰 108000ms 报一条；每轮一次", () => {
+test("W1#1：恰 100% 边界——差 1ms 不报、恰 300000ms 报一条；每轮一次；到点不中止", () => {
   const rig = makeRig();
   const t0 = rig.T.v;
   rig.setSnapshot(baseSnapshot({ roles: [busyRole("X", t0, "turn-1"), roleView(SU)] }));
   rig.advance(TURN_LIMIT * RATIO - 1);
   rig.svc.tick();
-  assert.equal(rig.deliveries.length, 0, "90% 差 1ms：不报");
+  assert.equal(rig.deliveries.length, 0, "到点差 1ms：不报");
   rig.advance(1);
   rig.svc.tick();
-  assert.equal(rig.deliveries.length, 1, "恰 90%：报一条（≥ 语义）");
+  assert.equal(rig.deliveries.length, 1, "恰 100%：报一条（≥ 语义）");
   assert.ok(alertTexts(rig)[0].startsWith(WATCHDOG_ALERT_PREFIX), "文首＝看护前缀");
+  const firstText = alertTexts(rig)[0];
+  assert.ok(firstText.includes("轮次到点检查"), "标签＝轮次到点检查");
+  for (const bad of ["逼近超时", "已超时", "硬超时", "剩余量"]) {
+    assert.equal(firstText.includes(bad), false, `不得出现旧措辞：${bad}`);
+  }
+  assert.ok(firstText.includes("到点仅检查、不中止本轮"), "明示不中止本轮");
+  assert.ok(firstText.includes("propose_recovery"), "卡死才提议恢复");
+  assert.ok(firstText.includes("最后兜底"), "1 小时兜底说明");
   rig.svc.tick();
   rig.svc.tick();
   assert.equal(rig.deliveries.length, 1, "同一轮次内不重复打扰（活跃期单报＋累计）");
@@ -148,7 +156,7 @@ test("W1#1 排除：su 自身忙 ⇒ 关于 su 的告警不触发；项目角色
   assert.ok(alertTexts(rig)[0].includes("「X」"), "告警对象是 X");
 });
 
-test("W1#1 身份更替：旧轮次解除投恢复行（计数如实），新一轮独立起算", () => {
+test("W1#1 身份更替：旧轮次解除不投恢复行（到点检查不是故障），新一轮独立起算", () => {
   const rig = makeRig();
   const t0 = rig.T.v;
   rig.setSnapshot(baseSnapshot({ roles: [busyRole("X", t0, "turn-1"), roleView(SU)] }));
@@ -157,14 +165,12 @@ test("W1#1 身份更替：旧轮次解除投恢复行（计数如实），新一
   assert.equal(rig.deliveries.length, 1, "第一轮告警");
   rig.setSnapshot(baseSnapshot({ roles: [busyRole("X", rig.T.v, "turn-2"), roleView(SU)] }));
   rig.svc.tick();
-  assert.equal(rig.deliveries.length, 2, "旧轮次解除 ⇒ 恰一条恢复行");
-  assert.ok(alertTexts(rig)[1].includes("看护恢复"), "第二条＝看护恢复行");
-  assert.ok(alertTexts(rig)[1].includes("轮次逼近超时"), "恢复行指名信号");
-  assert.ok(alertTexts(rig)[1].includes("期间共命中 1 次"), "命中计数如实（N=1）");
+  assert.equal(rig.deliveries.length, 1, "旧轮次解除不得投看护恢复行（检查不是故障）");
+  assert.equal(alertTexts(rig).some((t) => t.includes("看护恢复")), false);
   rig.advance(TURN_LIMIT * RATIO);
   rig.svc.tick();
-  assert.equal(rig.deliveries.length, 3, "新一轮到 90% 独立触发");
-  assert.ok(!alertTexts(rig)[2].includes("看护恢复"), "第三条是新告警（不是恢复行）");
+  assert.equal(rig.deliveries.length, 2, "新一轮到 100% 独立触发");
+  assert.ok(!alertTexts(rig)[1].includes("看护恢复"), "第二条是新告警（不是恢复行）");
 });
 
 // ————————————————————— #2 投递排队积压 —————————————————————

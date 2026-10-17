@@ -1,14 +1,37 @@
 // 硬超时工具（契约 §4 修复：prompt / 构造不得无限期挂起）。
 //
-// 归属：Pi适配器角色私有辅助（src/common/pi-adapter/）。
+// 归属：Pi适配器角色私有辅助（src/common/pi-adapter/）。与 runtime-core/timeout.ts 保持镜像。
 // 不 import 任何 Pi 包，可在纯单测中加载。
+//
+// 两层整轮时限（客户裁定 2026-10-17，PM 批准）：
+// · **到点检查**（`promptTimeoutMs`／`ANS_PI_PROMPT_TIMEOUT_MS`，历史字段名）——只供看护到点
+//   检查，**不中止整轮**；本文件的 `DEFAULT_PROMPT_TIMEOUT_MS` 保留历史值，但适配器不得再用它
+//   包装主 prompt。
+// · **最后兜底**（`DEFAULT_TURN_LAST_RESORT_MS`＝1 小时，固定、无 env）——唯一的自动整轮上限；
+//   测试可经 `turnLastResortMs` 注入小值。
+// 其余时限（shell 命令 10 分钟、审核 120 秒、构造 120 秒）保持不变。
 //
 // 设计：用工厂函数产出带标记的 Error（避免自定义 class 的字段擦除歧义），
 // 并提供 withTimeout 与从环境变量读取时限的工具。
 
-/** 默认 prompt 时限：120000ms。 */
-export const DEFAULT_PROMPT_TIMEOUT_MS = 120000;
-/** 默认构造期单步时限：与 prompt 同量级，避免构造阶段无声挂起。 */
+/**
+ * 默认**到点检查**时限：300000ms（5 分钟；历史字段名 prompt；客户裁定 2026-10-17 后语义变更）。
+ *
+ * 与 PM 评审/设置面板/客户 `.env` 统一为 5 分钟。到点**不中止整轮**：只供看护向 su 发一条
+ * 「轮次到点检查」，由 su 核对是否卡死。适配器**不得**再用本值作为主 prompt 的 abort 时限；
+ * 整轮上限见 `DEFAULT_TURN_LAST_RESORT_MS`。
+ * （截断收尾补发段仍按既有语义使用本值，见 real-adapter 的 `LengthFollowupOptions`。）
+ */
+export const DEFAULT_PROMPT_TIMEOUT_MS = 300000;
+/**
+ * **整轮最后兜底**：3600000ms（1 小时）——唯一的自动整轮上限（客户裁定 2026-10-17）。
+ *
+ * **固定值，不暴露 env**；测试可经 `turnLastResortMs` 注入小值。按**有效运行时间**计
+ * （确认卡挂起期间暂停，语义沿 `InteractionGate` / `withPausableTimeout`）；到点才中止整轮。
+ * 错误 label 固定为「本轮最后兜底」，与「到点检查」明确区分。
+ */
+export const DEFAULT_TURN_LAST_RESORT_MS = 3600000;
+/** 默认构造期单步时限：120000ms，避免构造阶段无声挂起。 */
 export const DEFAULT_CONSTRUCT_TIMEOUT_MS = 120000;
 /**
  * 默认 shell 审核时限：120000ms。审核（含 §7.3 的 b 问 pm、a 问操作者）用**超时包装**，
@@ -148,9 +171,9 @@ export async function raceAbort<T>(work: Promise<T>, signal: AbortSignal | undef
  * （**引用计数**，可重入——同一轮多个交互工具 / 嵌套等待都正确）；外部（如**每轮硬超时**）据此
  * 暂停/恢复自己的计时（见 `withPausableTimeout`）。
  *
- * **为什么需要它**：G-1 裁定等待客户**不设时限**，但每轮 prompt 仍有硬超时（缺省 120s）——
- * 若不做挂起联动，「等你点头」的轮次会被整轮超时杀掉。有了本闸，**客户输入挂起期间该轮时限暂停**，
- * 作答后按**剩余时间**恢复。
+ * **为什么需要它**：G-1 裁定等待客户**不设时限**；整轮另有**最后兜底**（缺省 1 小时，客户裁定
+ * 2026-10-17）——若不做挂起联动，「等你点头」的轮次会被兜底杀掉。有了本闸，**客户输入挂起期间
+ * 该轮兜底暂停**，作答后按**剩余时间**恢复；等待 2 小时也不会触发 1 小时兜底。
  */
 export type { InteractionGate } from "../../model/runtime.ts";
 import type { InteractionGate } from "../../model/runtime.ts";

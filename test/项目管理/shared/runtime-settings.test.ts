@@ -125,30 +125,30 @@ test("Pi 上下文窗口：离散档位滑块、可选、非机密、正整数�
   );
 });
 
-// ———————— 客户 2026-10-17「继续完善」：Pi 整轮超时暴露到设置面板 ————————
+// ———————— 2026-10-17 批准「到点检查 + 1 小时兜底」：整轮时限改为看护检查时限 ————————
 
-test("Pi 整轮超时：离散档位滑块、可选、非机密、正整数元数据；help 逐字", () => {
+test("Pi 看护检查时限：离散档位滑块、可选、非机密、正整数元数据；help 逐字", () => {
   const field = RUNTIME_SETTINGS.pi.fields.find((item) => item.key === "ANS_PI_PROMPT_TIMEOUT_MS");
   assert.ok(field, "Pi 必须有 ANS_PI_PROMPT_TIMEOUT_MS 字段");
-  assert.equal(field.label, "整轮超时（ms）");
-  assert.equal(field.required, false, "整轮超时可选（留空即用系统默认）");
-  assert.equal(field.secret, false, "整轮超时非机密");
+  assert.equal(field.label, "看护检查时限");
+  assert.equal(field.required, false, "看护检查时限可选（留空即用系统默认）");
+  assert.equal(field.secret, false, "看护检查时限非机密");
   assert.deepEqual(
     field.choices,
     ["", "60000", "120000", "300000", "600000", "900000", "1800000"],
-    "整轮超时档位逐字（含空串默认/清除档）",
+    "看护检查时限档位逐字（含空串默认/清除档）",
   );
   assert.deepEqual(
     field.choiceLabels,
-    ["系统默认（120s）", "1 分钟", "2 分钟", "5 分钟", "10 分钟", "15 分钟", "30 分钟"],
-    "整轮超时友好标签逐档对齐",
+    ["系统默认（5 分钟）", "1 分钟", "2 分钟", "5 分钟", "10 分钟", "15 分钟", "30 分钟"],
+    "看护检查时限友好标签逐档对齐",
   );
-  assert.equal(field.control, "range", "整轮超时用滑块控件");
-  assert.deepEqual(field.integer, { min: 1000 }, "整轮超时须保留正整数声明（min=1000ms）");
+  assert.equal(field.control, "range", "看护检查时限用滑块控件");
+  assert.deepEqual(field.integer, { min: 1000 }, "看护检查时限须保留正整数声明（min=1000ms）");
   assert.equal(
     field.help,
-    "拖动选择整轮超时；留空＝系统默认（120s）；单位 ms；下一次开启会话时应用。",
-    "help 须逐字说明滑块、默认、单位与生效时机",
+    "到点只通知治理角色检查是否卡死，不中止本轮；仍在推进则不动作；1 小时为最后兜底；留空＝系统默认（5 分钟）；单位 ms；下一次开启会话时应用。",
+    "help 须逐字说明不中止、未推进不动作、1 小时兜底、默认、单位与生效时机",
   );
 });
 

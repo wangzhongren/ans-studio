@@ -711,7 +711,18 @@ export interface RuntimeProviderOptions {
   baseUrl?: string;
   providerId?: string;
   apiKeyEnvVar?: string;
+  /**
+   * **到点检查时限**（历史字段名，客户裁定 2026-10-17 起**不用于 abort**）：看护据此判断该轮
+   * 是否「到点」需要检查；到点只通知 su 核对是否卡死，**不中止整轮**。缺省
+   * `DEFAULT_PROMPT_TIMEOUT_MS`（Pi 可经 `ANS_PI_PROMPT_TIMEOUT_MS` 调整）。
+   */
   promptTimeoutMs?: number;
+  /**
+   * **整轮最后兜底**（毫秒）：唯一自动整轮上限，到点才中止。缺省 **1 小时**
+   * （`DEFAULT_TURN_LAST_RESORT_MS`＝3600000），固定、不暴露 env；本字段供测试/宿主注入小值。
+   * 按有效运行时间计（确认卡挂起期间暂停）。
+   */
+  turnLastResortMs?: number;
   constructTimeoutMs?: number;
   /**
    * G-4 V2：该角色会话构造时装配的外来 MCP 声明（Service 在 providerFor 读取 `docs/mcp/**` 后注入；

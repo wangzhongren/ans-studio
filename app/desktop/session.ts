@@ -2691,18 +2691,23 @@ export class SessionManager {
         const depth = queue?.items.length ?? 0;
         const busy = live?.busy === true;
         lines.push(`角色 ${rid}：busy=${busy} ｜ 会话 ${liveText} ｜ 队列 ${depth} ｜ 进行中 ${runningKind ?? "—"}`);
-        // 呈现消歧（实机反馈 2026-10-17）：busy=true 时「上一轮终局」**不是当前轮**——必须分开写，
-        // 否则 su 会把历史 timed_out 转述成「该角色超时、已中止」。当前轮事实（已耗/硬超时/turnId）
-        // 只在 busy 且有起始时刻时给出；时限求值与看护/会话运行时**同一来源** `resolveRuntimeTimeouts`
-        // （不另写时长/env 解析），格式化复用看护的事实行工具 `formatDurationMs`。
+        // 呈现消歧（实机反馈 2026-10-17；时限语义随客户 2026-10-17 裁定更新）：busy=true 时「上一轮终局」
+        // **不是当前轮**——必须分开写，否则 su 会把历史 timed_out 转述成「该角色超时、已中止」。当前轮事实
+        // （已耗/看护检查时限/turnId）只在 busy 且有起始时刻时给出；`promptTimeoutMs` 自 2026-10-17 起是
+        // **到点检查时限（不中止本轮）**，整轮最后兜底固定 1 小时（`turnLastResortMs`）。时限求值与看护/
+        // 会话运行时**同一来源** `resolveRuntimeTimeouts`（不另写时长/env 解析），格式化复用 `formatDurationMs`。
         if (busy && live !== undefined && typeof live.turnStartedAt === "number") {
-          const limit = resolveRuntimeTimeouts(
+          const timeouts = resolveRuntimeTimeouts(
             live.runtime,
             { promptTimeoutMs: this.deps.runtimeOptions?.promptTimeoutMs },
             process.env,
-          ).promptTimeoutMs;
+          );
+          const lastResortText =
+            timeouts.turnLastResortMs >= 3_600_000 && timeouts.turnLastResortMs % 3_600_000 === 0
+              ? `${timeouts.turnLastResortMs / 3_600_000} 小时`
+              : formatDurationMs(timeouts.turnLastResortMs);
           lines.push(
-            `  当前轮：进行中（已耗 ${formatDurationMs(Math.max(0, at - live.turnStartedAt))} / 硬超时 ${formatDurationMs(limit)}；turnId=${live.turnId ?? "—"}）`,
+            `  当前轮：进行中（已耗 ${formatDurationMs(Math.max(0, at - live.turnStartedAt))} / 看护检查时限 ${formatDurationMs(timeouts.promptTimeoutMs)}；turnId=${live.turnId ?? "—"}；${lastResortText}最后兜底）`,
           );
         }
         let last: { outcome: RuntimeTurnOutcome; at: string } | undefined;

@@ -99,7 +99,7 @@ try {
     phase = phaseName;
     sideMode = phaseName === "side-query-fail" ? "fail" : "ok";
     mainTurns = 0;
-    const adapter = createRuntimeAdapter({ runtime: "claude", projectRoot: root, skillRoot: root, gate: () => ({ allowed: false, reason: "probe has no write effects", allowedByRoot: { project: [], skill: [] } }), modelId: "claude-sonnet-4-6", baseUrl: endpoint, constructTimeoutMs: 10000, promptTimeoutMs: 15000,
+    const adapter = createRuntimeAdapter({ runtime: "claude", projectRoot: root, skillRoot: root, gate: () => ({ allowed: false, reason: "probe has no write effects", allowedByRoot: { project: [], skill: [] } }), modelId: "claude-sonnet-4-6", baseUrl: endpoint, constructTimeoutMs: 10000, turnLastResortMs: 15000,
       providerFactories: { claude: (config) => {
         assert.equal(config.toolDisplayMode, "required-v1");
         return createClaudeRuntimeAdapter({ ...config,

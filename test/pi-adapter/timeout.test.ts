@@ -51,3 +51,8 @@ test("readTimeoutMs：缺省回退、非法回退、合法解析", () => {
   assert.equal(readTimeoutMs({ [PROMPT_TIMEOUT_ENV]: "-1" }, PROMPT_TIMEOUT_ENV, 5), 5);
   assert.equal(readTimeoutMs({ [PROMPT_TIMEOUT_ENV]: "250" }, PROMPT_TIMEOUT_ENV, 5), 250);
 });
+
+test("看护检查时限默认钉死为 5 分钟（300000ms；2026-10-17 统一口径）", () => {
+  // 主轮不再用它 abort；它只供看护到点检查与截断收尾补发段有界。
+  assert.equal(DEFAULT_PROMPT_TIMEOUT_MS, 300000);
+});

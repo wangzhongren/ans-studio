@@ -171,7 +171,7 @@ test("G-5 推理强度设置：三键往返（合法值规范形写盘＋读侧 
   } finally { temp.cleanup(); }
 });
 
-test("档位字段（choices＋choiceLabels）：Pi 上下文窗口/整轮超时非法值按友好标签提示、不落盘、不回显；合法写规范形；空串清除；无标签字段仍用 raw choices", async () => {
+test("档位字段（choices＋choiceLabels）：Pi 上下文窗口/看护检查时限非法值按友好标签提示、不落盘、不回显；合法写规范形；空串清除；无标签字段仍用 raw choices", async () => {
   const temp = fixture();
   try {
     const cases = [
@@ -186,12 +186,12 @@ test("档位字段（choices＋choiceLabels）：Pi 上下文窗口/整轮超时
       },
       {
         key: "ANS_PI_PROMPT_TIMEOUT_MS",
-        label: "整轮超时（ms）",
+        label: "看护检查时限",
         valid: "300000",
         canonical: "300000",
         labels: ["1 分钟", "2 分钟", "5 分钟", "10 分钟", "15 分钟", "30 分钟"],
         rawChoices: ["60000", "120000", "300000", "600000", "900000", "1800000"],
-        defaultLabel: "系统默认（120s）",
+        defaultLabel: "系统默认（5 分钟）",
       },
     ] as const;
     for (const c of cases) {
