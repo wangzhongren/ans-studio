@@ -26,3 +26,5 @@
 2026-10-15 V2正式落地严格UIUX范围通过：renderer5324b786/stylesdf554f87/index7beda，SV1–SV13及真实batch/资料阅读差距均关闭。依据本角色源码/看图与root真实native截图/AX，未冒签亲操作；accepted原件不变，详见[最终评审](docs/design/2026-10-15_design_visual-v2-implementation-review.md)。无新增设计项或明确待修阻点。
 
 2026-10-16 视觉收敛 v3（审计+提案，未实施/未测试）：客户「聊天太松散/思考没动画/运行图标丑」。产出[审计与收敛提案](docs/design/2026-10-16_design_visual-convergence-v3.md)（快速赢 W1–W11 + 结构级 S1–S4 + 不动作清单 + 12 条数值验收断言）与[证据清单](docs/design/2026-10-16-visual-convergence-v3-evidence/manifest.json)（38 件：before/after 示意截图、逐值度量、renderer 哈希）。等 PM 评审与客户逐项勾选后由桌面UI 实施。
+
+2026-10-17 企业级稳定感提案（未实施/未测试/未部署）：客户「太轻飘飘/不稳定/没有企业稳定感」。输出[设计说明](docs/design/2026-10-17_design_enterprise-stability.md)（问题诊断、A/B 两档、token、布局稳定性、组件状态、可访问性、实施映射、9 条验收口径、D1–D8）与[单文件原型](docs/design/2026-10-17_design_enterprise-stability-prototype.html)（现状/A/B × 1362×862/1280×800/1440×900/960×620，演示数据）。推荐 **A 轻量加固**（A1 框与同列 → A2 重量 → A3 密度），B 企业化重构作为后续独立提案。原型 Playwright 本地自检通过同列 0.0px、固定区 0 位移、宽表内滚、输入增高宽不变、对比度达标；真实 Electron/屏读/640–959 未测。等 PM 评审与客户 D1–D8。
