@@ -572,6 +572,155 @@ test('D1：governanceReacceptSuccessText 逐字', () => {
   );
 });
 
+// ————— P5：「替我审」自动判断（2026-10-17 评审 §6.5/§6.6/§9.3/§10；文案单一来源 = ui-labels）—————
+// 纯映射契约：开关三态（桥缺失不得假开启）、IPC 结果失败不改状态、警告逐字、
+// 结果行 allow/deny/deny 档标记、manual 不产生结果行、手动回落卡 judgeNotice 两类文案。
+
+test('P5：开关视图——未开启默认「替我审」、开启琥珀标记文案、桥缺失禁用且不假开启', () => {
+  const off = labels.shellJudgeToggleView(true, false, false);
+  assert.equal(off.label, '替我审');
+  assert.equal(off.title, '手动逐条确认 shell 命令（默认）');
+  assert.equal(off.checked, false);
+  assert.equal(off.disabled, false);
+  assert.equal(off.warningVisible, false, '未开启不显示常驻警告');
+
+  const on = labels.shellJudgeToggleView(true, true, false);
+  assert.equal(on.label, '替我审批中 · 判断 agent');
+  assert.equal(on.title, '判断 agent 先评估 shell 命令必要性；可随时关闭');
+  assert.equal(on.checked, true);
+  assert.equal(on.enabled, true);
+  assert.equal(on.warningVisible, true, '开启后才显示常驻警告');
+
+  const busy = labels.shellJudgeToggleView(true, true, true);
+  assert.equal(busy.disabled, true, 'IPC 在途只禁用，不改真实状态/文案');
+  assert.equal(busy.checked, true);
+  assert.equal(busy.label, on.label);
+
+  // 桥缺失/未接线：禁用 + 固定文案；即使传入 enabled=true 也**绝不**显示开启态。
+  const missing = labels.shellJudgeToggleView(false, true, false);
+  assert.equal(missing.available, false);
+  assert.equal(missing.enabled, false, '桥缺失不得假开启');
+  assert.equal(missing.checked, false);
+  assert.equal(missing.disabled, true);
+  assert.equal(missing.label, '当前版本不支持自动判断，保持手动');
+  assert.equal(missing.title, '当前版本不支持自动判断，保持手动');
+  assert.equal(missing.warningVisible, false);
+});
+
+test('P5：开关 IPC 结果——成功采用主进程实际值；失败/坏件保持原状态并给错误', () => {
+  assert.deepEqual(labels.shellJudgeToggleResult(false, { ok: true, enabled: true }), { enabled: true, error: '' });
+  assert.deepEqual(labels.shellJudgeToggleResult(true, { ok: true, enabled: false }), { enabled: false, error: '' }, '主进程是权威（即便与点击意图相反）');
+  const failed = labels.shellJudgeToggleResult(true, { ok: false, error: 'IPC 拒绝' });
+  assert.equal(failed.enabled, true, '失败不改状态');
+  assert.equal(failed.error, 'IPC 拒绝');
+  const malformed = labels.shellJudgeToggleResult(false, { ok: true });
+  assert.equal(malformed.enabled, false, '缺 enabled 视为未确认（保持原状态）');
+  assert.ok(malformed.error.length > 0, '坏件给出可见错误');
+  const thrown = labels.shellJudgeToggleResult(true, null);
+  assert.equal(thrown.enabled, true);
+  assert.ok(thrown.error.includes('通道异常'));
+});
+
+test('P5：开启警告三段逐字（§10.2）', () => {
+  const lines = labels.shellJudgeWarningLines();
+  assert.equal(lines.length, 3);
+  assert.equal(lines[0], '替我审批中：shell 命令先由判断 agent 评估必要性；只有判断没发生（不可用/超时/解析失败/引擎不支持）才会弹卡。');
+  assert.equal(lines[1], '判断 agent 只读项目内代码/文档/角色卡（不含 .env、密钥/凭据与项目外），不写文件、不执行命令；不必要会给替代方案，没有替代方案会由请求角色说明并给出路；每次判断会产生一次模型调用（token/延迟）；可能误判，可随时关闭。');
+  assert.equal(lines[2], '判断 agent 跟随会话引擎（Claude / Pi / Codex）；当前引擎不可用、超时或未配置时回落到手动确认。文件写入、选择卡与恢复确认仍需手动。');
+  // 返回副本：调用方不得改到单一来源。
+  lines[0] = 'x';
+  assert.notEqual(labels.shellJudgeWarningLines()[0], 'x');
+});
+
+test('P5：结果行 allow——标题/摘要/档位/引擎/operator；摘要缺失不编命令意图', () => {
+  const allow = labels.shellJudgeResultView({
+    verdict: 'allow', engine: 'claude', operator: 'judge:claude', command: 'node -v', summary: '查看 Node 版本',
+    tier: 'risky', reason: '只读版本信息', at: '2026-10-17T10:00:00Z', toolCallId: 'call-1',
+  });
+  assert.equal(allow.title, '已替你放行（判断 agent）');
+  assert.equal(allow.denyOverride, false);
+  assert.equal(allow.label, '');
+  assert.equal(allow.summary, '查看 Node 版本');
+  assert.equal(allow.engineText, '判断引擎：Claude');
+  assert.equal(allow.operatorText, 'operator:judge:claude');
+  assert.equal(allow.tierText, '档位：risky');
+  assert.deepEqual(allow.lines, []);
+  assert.equal(allow.retryHint, '');
+  assert.equal(allow.toolCallId, 'call-1');
+
+  const noSummary = labels.shellJudgeResultView({ verdict: 'allow', engine: 'pi', operator: 'judge:pi', summary: null });
+  assert.equal(noSummary.summary, '无法概括命令；展开查看原文', '不编命令意图');
+  assert.equal(noSummary.tierText, '');
+});
+
+test('P5：结果行 allow + deny 档放行——标题与徽标必须一眼可分（客户 D1）', () => {
+  const denyTier = labels.shellJudgeResultView({
+    verdict: 'allow', engine: 'codex', operator: 'judge:codex', command: 'rm -rf build', summary: '删除构建目录',
+    tier: 'deny', hardDenyOverride: true, label: 'deny 档 · judge 放行', reason: '构建产物可重建',
+  });
+  assert.equal(denyTier.denyOverride, true);
+  assert.equal(denyTier.title, '已替你放行（判断 agent · deny 档）');
+  assert.equal(denyTier.label, 'deny 档 · judge 放行');
+  assert.equal(denyTier.tierText, '档位：deny');
+  assert.deepEqual(denyTier.lines, ['该命令属于硬拒类，判断 agent 判定必要后放行；请复核']);
+  // 仅 tier=deny（未带 hardDenyOverride）同样按 deny 档标记（契约说二者同现，渲染侧仍保守识别）。
+  const tierOnly = labels.shellJudgeResultView({ verdict: 'allow', tier: 'deny', engine: 'claude' });
+  assert.equal(tierOnly.denyOverride, true);
+  assert.equal(tierOnly.label, 'deny 档 · judge 放行');
+});
+
+test('P5：结果行 deny——理由/替代方案/客户说明/关闭开关后重试的出路', () => {
+  const deny = labels.shellJudgeResultView({
+    verdict: 'deny', engine: 'claude', operator: 'judge:claude', command: 'rm -rf src', summary: '删除源码目录',
+    tier: 'risky', reason: '会删除未提交源码', customerMessage: '该命令会删除项目源码，风险过高。',
+    alternative: { kind: 'command', value: 'rm -rf dist', rationale: '只清理构建产物' }, toolCallId: 'call-2',
+  });
+  assert.equal(deny.title, '未放行（判断 agent）');
+  assert.equal(deny.denyOverride, false);
+  assert.deepEqual(deny.lines, [
+    '判断理由：会删除未提交源码',
+    '替代方案：rm -rf dist（只清理构建产物）',
+    '该命令会删除项目源码，风险过高。',
+  ]);
+  assert.ok(deny.retryHint.includes('关闭「替我审」后重试'), 'deny 必须给出关闭开关后重试的出路');
+  assert.ok(deny.retryHint.includes('替代方案'));
+
+  const noAlt = labels.shellJudgeResultView({
+    verdict: 'deny', engine: 'pi', reason: '不必要', customerMessage: '没有可替代方案，已说明原因。',
+  });
+  assert.deepEqual(noAlt.lines, ['判断理由：不必要', '没有可替代方案，已说明原因。']);
+  assert.ok(noAlt.retryHint.length > 0, '无替代方案仍给出路');
+});
+
+test('P5：manual 不产生结果行；未知/坏件返回 null（不编裁决）', () => {
+  assert.equal(labels.shellJudgeResultView({ verdict: 'manual', reasonCode: 'timeout' }), null);
+  assert.equal(labels.shellJudgeResultView({ verdict: 'unknown' }), null);
+  assert.equal(labels.shellJudgeResultView(null), null);
+  assert.equal(labels.shellJudgeResultView('allow' as unknown as object), null);
+});
+
+test('P5：手动回落卡 judgeNotice——一般 manual 与 row-failed 分开且逐字（§10.4）', () => {
+  assert.equal(
+    labels.shellJudgeNoticeText('row-failed'),
+    '判断 agent 已完成判断，但结果无法在聊天中显示；已转你手动确认。',
+    'row-failed 不得说成「判断没发生」'
+  );
+  assert.equal(
+    labels.shellJudgeNoticeText('timeout'),
+    '判断 agent 未能完成判断：判断超时。已转你手动确认。'
+  );
+  assert.equal(
+    labels.shellJudgeNoticeText('unsupported-engine'),
+    '判断 agent 未能完成判断：当前引擎不支持自动判断。已转你手动确认。'
+  );
+  assert.equal(
+    labels.shellJudgeNoticeText('row-failed').includes('未能完成判断'),
+    false,
+    '判断已完成 ⇒ 不使用「未能完成判断」措辞'
+  );
+  assert.ok(labels.shellJudgeNoticeText(undefined).includes('判断未完成'), '未知 reasonCode 如实说明判断未完成');
+});
+
 test('D1：governanceReacceptFailureView——phase≠write 可声明零写入；phase=write 只逐字 message', () => {
   // precheck / 预览失效：message 逐字 + 追加零副作用 + status 提示。
   const stale = labels.governanceReacceptFailureView('precheck', 'preview-stale', '预览后边界文件又有变化。');

@@ -123,10 +123,21 @@
             >
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
             </button>
+            <!-- P5（评审 §10.1）：自动判断开关——位置在附件按钮之后、#composer-scope 之前。
+                 结构逐字按评审；真实状态只由主进程 `shell:judge-state`/`shell:judge-set` 决定。
+                 桥缺失 ⇒ 渲染侧禁用并把标签改成「当前版本不支持自动判断，保持手动」（不显示假开启态）。 -->
+            <label class="composer-auto-approve">
+              <input type="checkbox" id="auto-approve-toggle" />
+              <span id="auto-approve-label">替我审</span>
+            </label>
+            <span id="auto-approve-status" class="composer-judge-status" role="status" aria-live="polite" hidden></span>
               <span id="composer-scope" class="composer-scope">未选择角色 / Claude</span><span class="composer-keyboard">Enter 发送，Shift + Enter 换行</span>
               <div class="composer-actions"><button id="btn-halt" class="cap-halt" type="button" hidden title="停止当前轮次" aria-label="停止当前轮次">停止本轮</button><button id="btn-send" class="cap-send" type="button" disabled title="发送（Enter）" aria-label="发送">发送 ↑</button></div>
             </div>
           </div>
+          <!-- P5（评审 §10.2）：开启后的**常驻**警告（不是 toast；默认隐藏，关闭即消失）。
+               全文由 ui-labels.js::shellJudgeWarningLines 单一来源生成；琥珀色，不是错误红。 -->
+          <div id="shell-judge-warning" class="judge-warning" role="status" hidden></div>
           <div class="compose-note"><span>普通聊天不会自动产生任务报告</span><span id="runtime-note" class="runtime-note"></span></div>
         </div>
       </main>
@@ -221,6 +232,8 @@
         </div>
         <pre id="sc-command" class="sc-command"></pre>
         <p id="sc-summary" class="sc-summary" hidden></p>
+        <!-- P5（评审 §10.4）：手动回落提示（`judgeNotice`）——无值时隐藏；文案由主进程逐字给出/经 ui-labels 映射。 -->
+        <p id="sc-judge-notice" class="sc-judge-notice" hidden></p>
         <p id="sc-reason" class="sc-reason"></p>
         <details id="sc-details" class="sc-details">
           <summary>详情（argv / cwd）</summary>

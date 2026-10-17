@@ -17,7 +17,7 @@ import { fileURLToPath } from "node:url";
 
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
 
-import { createDesktopInterface, type DesktopInterface } from "./desktop/interface.ts";
+import { createDesktopInterface, createShellJudgeSwitch, isShellJudgeIpcSender, type DesktopInterface } from "./desktop/interface.ts";
 // 运行时配置：开发使用仓库 `.env`，安装包使用 userData/.env，启动载入 `process.env`（补 Electron 缺失的 `--env-file`）；
 // 面板经 IPC 读写同一 `.env`。**`.env` 的读写全仓唯一**在共享模块 `src/common/shared/env-file.ts`
 // （pm 属主）——此处**只读导入，不复制**；路径由 `./desktop/pi-config.ts` 解析（可注入，测试/e2e 用临时路径）。
@@ -34,6 +34,7 @@ import {
   createShellConfirmPresenter,
   DESKTOP_SHELL_GATE_ARMED,
   type OperatorPresenter,
+  type ShellJudgeResultPayload,
 } from "./desktop/operator-channel.ts";
 // 客户交互通道（A-5，2026-10-12）：su 的 request_confirmation / request_choice 经它摆到聊天流里的交互卡
 // 并取回客户裁决（per-window pending Map + **按请求快照校验回包**——渲染进程输入不可信）。
@@ -127,15 +128,23 @@ function createWindow(): BrowserWindow {
 // **su 不接 (b)/(a)**（审读者不给自己开闸：不自审、不弹框）——su 的 shell 是**只读档**（同一份 (c) 实件，
 // 客户裁定 2026-10-12「su 也要有 shell，但是只读」，见 session.ts）。fail-closed 三条（关窗/取消/超时 →
 // 不放行）在 operator-channel.ts。
-/** 桌面操作者通道 (a)（**I-1 已 arm**；presenter 由 `registerIpc` 的 `shellConfirm.presenter` 提供——见彼处）。 */
-function buildDesktopOperatorChannel(presenter: OperatorPresenter) {
+/** 桌面操作者通道 (a)（**I-1 已 arm**；presenter 由 `registerIpc` 的 `shellConfirm.presenter` 提供——见彼处）。
+ *  「替我审」（2026-10-17）：开关读取与结果行推送由**同一窗口作用域**注入——通道自身仍不做命令判定。 */
+function buildDesktopOperatorChannel(
+  presenter: OperatorPresenter,
+  judge?: { isEnabled: () => boolean; emitJudgeResult: (payload: ShellJudgeResultPayload) => void },
+) {
   let operatorId = "unknown";
   try {
     operatorId = os.userInfo().username || "unknown";
   } catch {
     operatorId = "unknown";
   }
-  return createDesktopOperatorChannel({ presenter, operatorId });
+  return createDesktopOperatorChannel({
+    presenter,
+    operatorId,
+    ...(judge !== undefined ? { judge: { isEnabled: judge.isEnabled }, emitJudgeResult: judge.emitJudgeResult } : {}),
+  });
 }
 
 // —————————————————————— 客户交互通道（A-5）：确认制交互卡 ——————————————————————
@@ -175,10 +184,22 @@ function registerIpc(win: BrowserWindow): void {
     void win.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(RECOVERY_PAGE)).catch((error) => mainDiagnostic.error("window.recovery-page.failed", error));
   };
   showMainFailure = showFailure;
+  // —————— 「替我审」开关（2026-10-17 PM 评审 §6.6/§10.3）：主进程权威、默认 false、启动/重载复位 ——————
+  // 同一实例交给通道（调用当刻读 `isEnabled()`）与 Interface（`shell:judge-get/set`），两处永不漂移。
+  // 不写 localStorage/.env/项目文件；关窗/退出即随进程消失。
+  const shellJudgeSwitch = createShellJudgeSwitch();
+  const shellJudgeLog = createDiagnosticLogger({ component: "desktop.shell-judge" });
+  const pushShellJudgeState = (): void => {
+    if (!win.isDestroyed()) win.webContents.send("shell:judge-state", shellJudgeSwitch.get());
+  };
   const loadInterface = async (): Promise<void> => {
     showingFailure = false;
+    // §10.3：渲染重载/初次加载前复位为手动（不持久化）；已挂起卡不受影响。
+    shellJudgeSwitch.reset();
     try {
       await win.loadFile(path.join(HERE, "renderer", "index.html"));
+      // 初次加载后推送真实状态，渲染侧据此同步复选框（不显示假开启态）。
+      pushShellJudgeState();
     } catch (error) {
       mainDiagnostic.error("window.interface.failed", error);
       showFailure();
@@ -291,6 +312,28 @@ function registerIpc(win: BrowserWindow): void {
     return { ok: true };
   });
   registerHandler("shell:confirm-response", (_e, input) => shellConfirm.respond(input));
+  // —————— 「替我审」IPC（2026-10-17；PM 评审 §6.6，通道名钉死） ——————
+  // 两个 handler 内**各自**校验 `event.sender === win.webContents`（不依赖通用 registrar）。
+  // `shell:judge-state/result` 为**主→渲染**推送，无入站 handler。
+  registerHandler("shell:judge-get", (event) => {
+    if (!isShellJudgeIpcSender(event.sender, win.webContents)) return { version: 1, ok: false, error: "请求来源无效。" };
+    return desktop.getShellJudgeState();
+  });
+  registerHandler("shell:judge-set", (event, input) => {
+    if (!isShellJudgeIpcSender(event.sender, win.webContents)) {
+      shellJudgeLog.record("shell-judge.set.rejected", { reason: "sender-mismatch" });
+      return { version: 1, ok: false, error: "请求来源无效。" };
+    }
+    const result = desktop.setShellJudgeEnabled(input);
+    if (result.ok === true) {
+      shellJudgeLog.record("shell-judge.toggled", { enabled: result.enabled, source: "renderer", at: new Date().toISOString() });
+      // 成功后仅影响**之后新到**的 `(a)` 请求；推送让渲染侧以主进程状态为准（不显示假开启态）。
+      pushShellJudgeState();
+    } else {
+      shellJudgeLog.record("shell-judge.set.rejected", { reason: result.error ?? "invalid-request" });
+    }
+    return result;
+  });
   // G-2/W5：恢复确认卡回包——通道内**恰 allow:true 才为真**；未知/已失效 id → expired（绝不当执行）。
   registerHandler("recovery:confirm-response", (_e, input) => recoveryConfirm.respond(input));
 
@@ -310,7 +353,16 @@ function registerIpc(win: BrowserWindow): void {
     console.warn("shell 闸未 arm：(c) 规则集加载失败——fail-closed（run_shell 不注册）。");
   }
   const shellOperatorChannel =
-    shellArming !== undefined ? buildDesktopOperatorChannel(shellConfirm.presenter) : undefined;
+    shellArming !== undefined
+      ? buildDesktopOperatorChannel(shellConfirm.presenter, {
+          isEnabled: () => shellJudgeSwitch.isEnabled(),
+          // 推达失败**必须抛错**：allow 的结果行是放行条件（通道据此降级 manual/row-failed）。
+          emitJudgeResult: (payload) => {
+            if (win.isDestroyed()) throw new Error("窗口已关闭，无法呈现判断结果");
+            win.webContents.send("shell:judge-result", payload);
+          },
+        })
+      : undefined;
 
   if (!desktopEnvPath) throw new Error("运行时配置路径尚未初始化。");
   const desktop = createDesktopInterface({
@@ -358,6 +410,8 @@ function registerIpc(win: BrowserWindow): void {
     openExternalFn: (url) => shell.openExternal(url),
     // I-1：arm 的 (a) 层（仅项目角色会话消费——su 不接 (b)/(a)；见 session.ts）。未 arm 时为 undefined（等同不注入）。
     shellOperatorChannel,
+    // 「替我审」（2026-10-17）：**同一实例**的开关状态机——通道读它、Interface 的 get/set 改它。
+    shellJudgeSwitch,
     // I-1 补丁（2026-10-12 客户重发授权）：(c) 规则集实件（与 (a) 同处接线、同判据——两件同备才 arm）。
     // 同一份对象也供 su 只读档（session.ts 对内置治理角色经 `shellReadonly` 复用——单一来源，两档不漂移）。
     shellArming,

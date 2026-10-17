@@ -240,3 +240,33 @@ work、card、pi、document复用424模态抽屉。仅导航/会话业务面iner
 - 样式最小增量：`.governance-preview .gp-file`（明细行等宽）、`.gp-blocker`（限制原因，`--danger`）、`.empty-hint`；既有 900 列与等宽字体未动。
 
 **测试证据**：`tool-rows.test.ts` 新增 5 例（谓词真值表、文案逐字、预览视图、成功/失败分支含 phase=write 与 precheck 差异）；`renderer.test.ts` 新增 5 例（落库/单一谓词/状态行/空态/预览宿主与零 IPC/成功失败路径）。本机 4 红为既有 CRLF 基线（N-1、data-state、P1-3、G-5），与本批无关。真机渲染：`uiux-v2.mjs` 新增 `ANS_GOVERNANCE_REACCEPT_UI_ONLY=1`（受控 IPC 替身＋真实 Electron；7 项 DOM 断言，`GOVERNANCE_REACCEPT_UI_PASS 7`；截图 `%TEMP%/ans-governance-reaccept-ui/governance-reaccept-{mismatch,preview,success}-1360.png`）。实跑修正：成功后清空 `#composer-hint` 的旧「已取消」提示。
+
+## 2026-10-17 P5「替我审」自动判断：消费契约 / DOM / 文案单点
+
+任务书：项目管理评审 `2026-10-17_design_shell-auto-approve-review.md` §6.5、§6.6、§9.3、§10（客户 D1/D2 已拍板）。
+
+**消费契约**（只读，通道属桌面窗口；按名消费冻结桥，不另起别名）：
+- `desktop.getShellJudgeState()` → `{version:1, ok, enabled?, error?}`；启动默认 `false`。
+- `desktop.setShellJudgeEnabled(enabled)` → `{version:1, ok, enabled?, error?}`；失败**不改状态**。
+- `desktop.onShellJudgeState(cb)` ← `shell:judge-state`：`{version:1, enabled}`（开关变化/重载复位/初次加载后推送）。
+- `desktop.onShellJudgeResult(cb)` ← `shell:judge-result`：`ShellJudgeResultPayload`（`verdict/engine/reasonCode/operator/command/summary/policy/tier/hardDenyOverride/label/reason/customerMessage/alternative/evidence`）。
+- `ShellConfirmRequest` 新增可选 `judgeNotice`（手动回落提示；渲染侧原样逐字呈现，不进 `reasonRaw`）。
+- **桥缺失/主进程未接线**：复选框禁用，标签「当前版本不支持自动判断，保持手动」；**不显示假开启态**。
+
+**渲染侧导出（`ui-labels.js`，全部纯映射）**：
+- `shellJudgeToggleView(available, enabled, busy)` → `{available, enabled, checked, disabled, label, title, warningVisible}`：off「替我审」/悬停「手动逐条确认 shell 命令（默认）」；on「替我审批中 · 判断 agent」/悬停「判断 agent 先评估 shell 命令必要性；可随时关闭」；桥缺失固定文案；桥缺失时即使传入 enabled 也 **checked=false / warningVisible=false**。
+- `shellJudgeToggleResult(previousEnabled, res)` → `{enabled, error}`：`ok:true` 且有布尔 `enabled` 才采用主进程值；失败/坏件保持 `previousEnabled` 并给错误文案。
+- `shellJudgeWarningLines()` → §10.2 三段逐字（返回副本）。
+- `shellJudgeNoticeText(reasonCode)` → 一般 manual「判断 agent 未能完成判断：<人话原因>。已转你手动确认。」；`row-failed`「判断 agent 已完成判断，但结果无法在聊天中显示；已转你手动确认。」。
+- `shellJudgeReasonText(reasonCode)` → manual reasonCode 人话映射（与桌面通道 `judgeManualHumanReason` 同解；未知 ⇒「判断未完成」）。
+- `shellJudgeResultView(payload)` → `{verdict, denyOverride, title, label, summary, engineText, operatorText, tierText, at, lines, retryHint, toolCallId, details}`；`manual`/未知裁决 ⇒ `null`（**manual 不产生结果行**）。allow 标题「已替你放行（判断 agent）」；deny 档放行标题「已替你放行（判断 agent · deny 档）」＋徽标「deny 档 · judge 放行」＋「该命令属于硬拒类，判断 agent 判定必要后放行；请复核」；deny 标题「未放行（判断 agent）」＋理由/替代方案/客户说明＋「可关闭「替我审」后重试（改为手动确认），或按替代方案调整命令。」；summary 空 ⇒「无法概括命令；展开查看原文」。
+- `shellJudgeEngineLabel(engine)` → Claude/Pi/Codex（未知如实原文，缺省「未报告」）。
+
+**DOM/行为**：
+- `index.html` `.composer-bottom`：附件按钮之后、`#composer-scope` 之前新增 §10.1 逐字复选框 `label.composer-auto-approve > input#auto-approve-toggle + span#auto-approve-label`；错误状态位 `#auto-approve-status`（aria-live）。输入区下方常驻警告 `#shell-judge-warning.judge-warning`（默认 `hidden`，琥珀色，非错误红）。shell 卡新增 `#sc-judge-notice.sc-judge-notice`（摘要之后、原因之前，默认 `hidden`）。
+- `renderer.js`：`initShellJudge()` 判桥四方法齐备 → 订阅 state/result → `getShellJudgeState()`；复选框 change 只调 `setShellJudgeEnabled`，由 `shellJudgeToggleResult` 落主进程实际值（失败保持原值并显示 `#auto-approve-status`）；`shell:judge-state` 只接受 `version:1 + 布尔 enabled`。**不写 localStorage/.env/项目文件，不自动开会话/切角色，不触碰已挂起卡。**
+- 结果行：`onShellJudgeResult` 按 `roleId` 落该角色 pane，按 `toolCallId` 扫描行表（工具组 `.items[].callId`、生命周期 `activityStages`、operator `toolCallId`、`data.toolCallId`）并插到其后；定位不到 ⇒ 追加流尾（不丢行优先）；`payload.id` 幂等去重；仅在原 pane 处于底部附近时贴底。行类 `.sys.shell-judge-row`，钩子 `.sj-head/.sj-title/.sj-badge/.sj-cmd/.sj-meta/.sj-line/.sj-exit/.sj-details`。**不自动切换当前角色/视图。**
+- 样式：`.composer-auto-approve(.is-on/.is-unsupported)`、`.composer-judge-status`、`.judge-warning`、`.shell-judge-row` 族、`.sc-judge-notice`；开启态与警告一律 `--amber`（不是 `--danger`）；警告随 `--content-max`（900）且继承整页等宽字体。
+- 探针（只增）：`window.__ansRenderer.shellJudge = { state(), onState, onResult }`（只读快照 + 直接注入推送/结果；桥缺失时 `state.available=false`）。
+
+**测试证据**：`tool-rows.test.ts` 新增 8 例（开关三态/结果自洽/警告逐字/allow/deny 档/deny/manual/notice）；`renderer.test.ts` 新增 5 例（DOM 与样式钩子、开关三态与失败回退、结果行锚定与 deny 徽标、judgeNotice、边界「不自动开会话/不写持久化」）；`uiux-v2.mjs` 新增独立模式 `ANS_JUDGE_UI_ONLY=1`（受控 IPC 替身＋真实 Electron；**JUDGE_UI_PASS 14**，含启动关闭态、开启/取消、失败回退、state 推送、deny 档 allow 锚点、deny 行、manual 不落行、judgeNotice、已挂起卡不受切换影响、后台角色 pane 隔离）；既有 `ANS_TERMINAL_UI_ONLY=1` 增加启动态断言（**TERMINAL_PASS 15**）。全仓 2454 计 /2431 过 /20 红（与改动前基线红集一致）/3 skip；`npx tsc --noEmit` 0 错。

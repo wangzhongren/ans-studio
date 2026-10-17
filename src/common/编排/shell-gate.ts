@@ -69,6 +69,7 @@ import type {
   OperatorPrompt,
   OperatorOutcome,
   OperatorChannelFn,
+  ShellJudgeAudit,
 } from "../../model/runtime.ts";
 import type { BoundarySection1 } from "../../model/boundary.ts";
 import type { ShellClass, ShellRules } from "../../model/decision.ts";
@@ -345,6 +346,11 @@ interface ReviewOutcome {
   result: ShellReviewResult;
   conclusion: ShellAuditRecord["conclusion"];
   branch: string;
+  /**
+   * 判断 agent（「替我审」）自己做出的 allow/deny 归因；只在 `(a)` 通道返回
+   * `OperatorOutcome.allow/deny.judge` 时出现（`manual` 后客户手批**不带**本字段）。
+   */
+  judge?: ShellJudgeAudit;
 }
 
 /** 内部：(b) 的输出——终结（放行/拒绝）或升级到 (a)。 */
@@ -671,6 +677,7 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
         result: { allow: true, by: `${b.bAttr} → ${operatorBy(out)}` },
         conclusion: "allow",
         branch: escalateBranch(b.bBranch, BRANCH_A_ALLOW),
+        ...(out.judge !== undefined ? { judge: out.judge } : {}),
       };
     }
     if (out.outcome === "deny") {
@@ -678,6 +685,7 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
         escalateBranch(b.bBranch, BRANCH_A_DENY),
         `${b.bAttr} → ${operatorBy(out)}`,
         out.reason ?? "操作者拒绝",
+        out.judge,
       );
     }
     // 非法 outcome → 保守拒绝（fail-closed）。
@@ -727,6 +735,8 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
       by: outcome.result.by,
       conditions: [SHELL_GATE_CONDITION], // 声明 shell-gate（门禁按此放行 docs/audit/）
       execution: "未执行", // 审核发生在执行之前；exit code 由 Pi 适配器执行后另记
+      // 判断 agent（「替我审」）自己做出的 allow/deny 才写；manual 后客户手批不带本字段。
+      ...(outcome.judge !== undefined ? { judge: outcome.judge } : {}),
     };
     try {
       const res = await opts.audit.append(record);
@@ -861,8 +871,13 @@ function reasonOf(err: unknown): string {
 }
 
 /** 构造一个「拒绝」结论（(a) 各失败路径共用；by 记录谁（未）审的、branch 记录升级链）。 */
-function denyOutcome(branch: string, by: string, reason: string): ReviewOutcome {
-  return { result: { allow: false, reason, by }, conclusion: "deny", branch };
+function denyOutcome(branch: string, by: string, reason: string, judge?: ShellJudgeAudit): ReviewOutcome {
+  return {
+    result: { allow: false, reason, by },
+    conclusion: "deny",
+    branch,
+    ...(judge !== undefined ? { judge } : {}),
+  };
 }
 
 /** pm 身份（审计 `by`）：`pm:<会话>(<模型>)`，缺项则退化。 */

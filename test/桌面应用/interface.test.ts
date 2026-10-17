@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { createDesktopInterface } from "../../app/desktop/interface.ts";
+import { createDesktopInterface, createShellJudgeSwitch, isShellJudgeIpcSender } from "../../app/desktop/interface.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
 import type { ProjectConfig } from "../../src/model/role.ts";
@@ -1250,4 +1250,109 @@ test("C2 write-failed：同样清列举缓存并通知（让界面如实反映�
     iface.disposeProjectDocuments();
     await fs.rm(base, { recursive: true, force: true });
   }
+});
+
+// ————————————————— 2026-10-17「替我审」开关与判断接线（PM 评审 §6.6/§10.3/§十一） —————————————————
+
+test("替我审开关：主进程权威、默认 false；成功切换；非法输入失败且**不改状态**；reset 复位", async () => {
+  const iface = createDesktopInterface({ pickDirectory: async () => null, emitEvent: () => {} });
+  assert.deepEqual(iface.getShellJudgeState(), { version: 1, ok: true, enabled: false }, "启动默认 false");
+  assert.deepEqual(iface.setShellJudgeEnabled({ enabled: true }), { version: 1, ok: true, enabled: true });
+  assert.deepEqual(iface.getShellJudgeState(), { version: 1, ok: true, enabled: true });
+  const before = iface.getShellJudgeState();
+  for (const bad of [null, undefined, {}, { enabled: "yes" }, { enabled: 1 }, { enabled: true, extra: 1 }, []]) {
+    const result = iface.setShellJudgeEnabled(bad);
+    assert.equal(result.ok, false, `非法输入应拒绝：${JSON.stringify(bad)}`);
+    assert.equal(typeof result.error, "string", "失败带 error");
+    assert.equal(result.enabled, undefined, "失败不回 enabled");
+    assert.deepEqual(iface.getShellJudgeState(), before, "失败不改状态");
+  }
+  iface.resetShellJudgeState();
+  assert.equal(iface.getShellJudgeState().enabled, false, "reset ⇒ 手动（重载复位）");
+  assert.equal((await iface.listLiveSessions()).length, 0, "开关不自动打开会话");
+});
+
+test("替我审开关状态机：同实例共享（main 通道与 Interface 不漂移）；reset 不改已挂起语义由通道调用当刻决定", () => {
+  const shared = createShellJudgeSwitch();
+  assert.equal(shared.isEnabled(), false);
+  shared.set({ enabled: true });
+  assert.equal(shared.isEnabled(), true);
+  shared.reset();
+  assert.equal(shared.isEnabled(), false);
+});
+
+test("替我审开关不持久化：切换不写 .env / 不落任何文件 / 不自动开会话", async () => {
+  const fs = await import("node:fs/promises");
+  const os = await import("node:os");
+  const base = await fs.mkdtemp(path.join(os.tmpdir(), "ans-judge-switch-"));
+  const envPath = path.join(base, ".env");
+  await fs.writeFile(envPath, "ANTHROPIC_AUTH_TOKEN=fixture\n", "utf8");
+  try {
+    const iface = createDesktopInterface({
+      pickDirectory: async () => null,
+      emitEvent: () => {},
+      envFilePath: envPath,
+      piConfigEnv: {},
+    });
+    assert.equal(iface.setShellJudgeEnabled({ enabled: true }).ok, true);
+    assert.equal(iface.setShellJudgeEnabled({ enabled: false }).ok, true);
+    assert.equal(await fs.readFile(envPath, "utf8"), "ANTHROPIC_AUTH_TOKEN=fixture\n", ".env 未被改写");
+    assert.deepEqual((await fs.readdir(base)).sort(), [".env"], "未新增任何持久化文件");
+    assert.equal((await iface.listLiveSessions()).length, 0, "开关不自动打开会话");
+  } finally {
+    await fs.rm(base, { recursive: true, force: true });
+  }
+});
+
+test("shell:judge IPC sender 校验：仅同一 webContents 通过（主进程 handler 只调它）", () => {
+  const webContents = { id: 1 };
+  assert.equal(isShellJudgeIpcSender(webContents, webContents), true);
+  assert.equal(isShellJudgeIpcSender({ id: 2 }, webContents), false, "其他 sender 拒绝");
+  assert.equal(isShellJudgeIpcSender(null, webContents), false);
+  assert.equal(isShellJudgeIpcSender(undefined, webContents), false);
+});
+
+test("替我审接线：Interface 构造会话时用注入的 createShellJudge，并在 metadata 提供 judge（缺省可注入桩件）", async () => {
+  const judge = async () => ({ verdict: "allow" as const, reason: "桩件", reasonCode: "necessary" });
+  const factoryArgs: Record<string, unknown>[] = [];
+  const metadataSeen: ({ judge?: unknown } | undefined)[] = [];
+  let capturedChannel: ((prompt: unknown) => Promise<unknown>) | undefined;
+  const iface = createDesktopInterface({
+    pickDirectory: async () => "/proj",
+    emitEvent: () => {},
+    listProjectFn: async () => FAKE_LISTING,
+    openRoleSessionFn: async (input) => {
+      capturedChannel = input.shellOperatorChannel as ((prompt: unknown) => Promise<unknown>) | undefined;
+      return makeFakeHandle().handle;
+    },
+    shellOperatorChannel: async (_prompt, metadata) => {
+      metadataSeen.push(metadata);
+      return { outcome: "deny", operatorId: "stub", reason: "替身拒绝" };
+    },
+    shellArming: { classifyShell: () => "allow", rules: {} } as never,
+    loadEffectiveConfig: async (opts) => ({
+      project: opts.fallback,
+      source: {
+        kind: "builtin-fallback" as const,
+        path: "",
+        acceptance: opts.fallback.governanceBoundary!.acceptance,
+        pinPaths: [],
+      },
+    }),
+    createShellJudgeFn: (opts) => {
+      factoryArgs.push(opts as unknown as Record<string, unknown>);
+      return judge;
+    },
+  });
+  await iface.listProject({ projectRoot: "/proj" });
+  const opened = await iface.openSession({ projectRoot: "/proj", roleId: "A", runtime: "pi" });
+  assert.equal(opened.ok, true);
+  assert.equal(factoryArgs.length, 1, "Interface 把 createShellJudge 交给会话构造");
+  assert.equal(factoryArgs[0].runtime, "pi");
+  assert.equal(typeof factoryArgs[0].createAdapter, "function", "用会话同一 createAdapter 工厂");
+  assert.ok(capturedChannel, "会话拿到绑定 (a) 通道");
+  await capturedChannel!({ command: "ls", argv: ["ls"], cwd: "/proj", toolCallId: "i1" });
+  assert.equal(metadataSeen[0]?.judge, judge, "metadata.judge 即每会话闭包");
+  await iface.stopSession({ roleId: null });
+  iface.disposeProjectDocuments();
 });

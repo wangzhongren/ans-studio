@@ -95,6 +95,12 @@
     // shell 命令确认卡（M-1，2026-10-12）：当前挂起的一张 `{id, busy}`；无则 null。**无计时器**（G-1 纪律）——
     // 卡片不按时间自我定格；失效只来自主进程回包（`expired`）或正常裁决。
     shellConfirm: null,
+    // P5（2026-10-17 评审 §10）：自动判断开关——**主进程是权威**。`available` = preload 四个桥方法齐备；
+    // `enabled` 只由 `shell:judge-state` / `shell:judge-set` 的实际回包写入（失败保持原值）；`busy` 仅禁点。
+    // 不写 localStorage/.env/项目文件；渲染重载后由主进程重新推送真实状态。
+    shellJudge: { available: false, enabled: false, busy: false, error: "" },
+    // P5 结果行幂等键（同一结果事件重复到达时不重复落行；仅界面会话内）。
+    shellJudgeResultIds: Object.create(null),
     // 恢复确认卡（G-2/U1，2026-10-16 客户批准；设计 §6.2）：当前挂起的一张 `{id, busy}`；无则 null。
     // 与 shell 卡同纪律：**等待不设限**（裁定 4；无计时器）；恰 `{allow:true}`（点「执行」）才作为
     // 执行请求回传；失效/通道异常如实标记（`markRecoveryConfirmExpired`——**绝不**呈现为已执行）。
@@ -1138,6 +1144,7 @@
     replayState = Object.create(null); // 回放去重状态随项目作废（新项目的转录从零核对）
     liveReplayCounts = Object.create(null); manualMessages = Object.create(null);
     reportCards = Object.create(null); deliveryCards = Object.create(null); persistenceCache = Object.create(null);
+    state.shellJudgeResultIds = Object.create(null); // P5：换项目后旧结果行不再沿用（仅界面会话内幂等键）
     $("chat").innerHTML = emptyStateHtml();
     bindEmptyState($("chat"));
   }
@@ -2316,6 +2323,10 @@
     sumEl.hidden = summaryText === ""; // 无从安全概括 ⇒ 只显示命令本体（绝不编意图）
     // 高风险原因：su 卡把 `reasonRaw`（如「命中硬拒程序规则：reshell」）作为**可见**单独一行；
     // 项目卡保持原文：reasonPlain 可见、reasonRaw 仍只在折叠详情里。
+    // P5（评审 §10.4）：手动回落提示 `judgeNotice` **原样逐字**呈现（不改写/不合并进 reason）；无值隐藏。
+    var judgeNotice = typeof payload.judgeNotice === "string" ? payload.judgeNotice : "";
+    $("sc-judge-notice").textContent = judgeNotice;
+    $("sc-judge-notice").hidden = judgeNotice === "";
     var reasonText = typeof payload.reasonPlain === "string" ? payload.reasonPlain : "";
     if (suApproval && typeof payload.reasonRaw === "string" && payload.reasonRaw !== "") {
       reasonText += (reasonText ? "\n" : "") + "命中原因：" + payload.reasonRaw;
@@ -2391,6 +2402,209 @@
       done(null);
     });
   }
+
+  // @shell-judge-start
+  // —————— P5「替我审」自动判断（2026-10-17 评审 §6.5/§6.6/§9.3/§10）——————
+  // 渲染侧只消费冻结契约：`getShellJudgeState` / `setShellJudgeEnabled` / `onShellJudgeState` /
+  // `onShellJudgeResult`（通道与主进程属「桌面窗口」）。**主进程是开关权威**——本段不乐观改状态、
+  // 不写 localStorage/.env/项目文件、不自动开会话/切换角色，也不动已挂起的确认卡。
+  // 全部业务文案经 `ui-labels.js`（单一来源）；结果行按 `roleId` 落 pane、按 `toolCallId` 锚定，
+  // 定位不到时追加流尾（不丢行优先）。
+
+  /** 四个桥方法齐备才算可用；缺任一 ⇒ 禁用并显示「当前版本不支持自动判断，保持手动」。 */
+  function shellJudgeBridgeAvailable() {
+    return !!(d &&
+      typeof d.getShellJudgeState === "function" &&
+      typeof d.setShellJudgeEnabled === "function" &&
+      typeof d.onShellJudgeState === "function" &&
+      typeof d.onShellJudgeResult === "function");
+  }
+
+  /** 把 ui-labels 的纯映射落到 DOM；`checked/disabled/label` 永远取自真实状态（不显示假开启态）。 */
+  function renderShellJudgeToggle() {
+    var s = state.shellJudge;
+    var toggle = $("auto-approve-toggle");
+    if (!toggle) return;
+    var view = UiLabels.shellJudgeToggleView(s.available, s.enabled, s.busy);
+    toggle.checked = view.checked;
+    toggle.disabled = view.disabled;
+    toggle.title = view.title;
+    var wrap = toggle.closest ? toggle.closest(".composer-auto-approve") : null;
+    if (wrap) {
+      wrap.title = view.title;
+      wrap.classList.toggle("is-on", view.enabled);
+      wrap.classList.toggle("is-unsupported", !view.available);
+    }
+    var label = $("auto-approve-label");
+    if (label) label.textContent = view.label;
+    var status = $("auto-approve-status");
+    if (status) {
+      status.textContent = s.error || "";
+      status.hidden = !s.error;
+    }
+    var warning = $("shell-judge-warning");
+    if (warning) {
+      warning.hidden = !view.warningVisible;
+      warning.textContent = "";
+      if (view.warningVisible) {
+        UiLabels.shellJudgeWarningLines().forEach(function (line, index) {
+          var p = document.createElement("p");
+          if (index !== 1) p.className = "jw-strong"; // 首尾两段为强调句；中段为细节说明
+          p.textContent = line;
+          warning.appendChild(p);
+        });
+      }
+    }
+  }
+
+  /** `shell:judge-state`：只接受契约形状（version 1 + 布尔 enabled）；主进程推送即真实状态。 */
+  function applyShellJudgeState(payload) {
+    var s = state.shellJudge;
+    if (!s.available) return false;
+    if (!payload || payload.version !== 1 || typeof payload.enabled !== "boolean") return false;
+    s.enabled = payload.enabled;
+    s.error = "";
+    renderShellJudgeToggle();
+    return true;
+  }
+
+  /** 客户勾选/取消：只调主进程；失败/异常**保持原状态**并显示错误（绝不假开启）。 */
+  function onShellJudgeToggleChange() {
+    var s = state.shellJudge;
+    var toggle = $("auto-approve-toggle");
+    if (!toggle) return;
+    if (!s.available || s.busy) { renderShellJudgeToggle(); return; }
+    var desired = toggle.checked === true;
+    s.busy = true;
+    s.error = "";
+    renderShellJudgeToggle();
+    function settle(res) {
+      var next = UiLabels.shellJudgeToggleResult(s.enabled, res);
+      s.enabled = next.enabled;
+      s.error = next.error;
+      s.busy = false;
+      renderShellJudgeToggle();
+    }
+    try {
+      Promise.resolve(d.setShellJudgeEnabled(desired)).then(settle, function () { settle(null); });
+    } catch (_) {
+      settle(null); // 同步抛错同样按「失败」处理：保持原状态 + 可见错误
+    }
+  }
+
+  /** 结果行锚点：扫描行表，找该 `toolCallId` 所属行，插到其后；找不到 ⇒ null（registerRow 追加流尾）。 */
+  function shellJudgeAnchorIndex(rl, toolCallId) {
+    if (!toolCallId || !rl) return null;
+    for (var i = rl.rows.length - 1; i >= 0; i -= 1) {
+      var rec = rl.rows[i];
+      if (rec.requestId && opRequests[rec.requestId] && opRequests[rec.requestId].toolCallId === toolCallId) return i + 1;
+      if (rec.kind === "activities" && rec.data && Array.isArray(rec.data.items)) {
+        for (var j = 0; j < rec.data.items.length; j += 1) {
+          if (rec.data.items[j] && rec.data.items[j].callId === toolCallId) return i + 1;
+        }
+      }
+      if (rec.activityStages) {
+        var phases = Object.keys(rec.activityStages);
+        for (var k = 0; k < phases.length; k += 1) {
+          if (rec.activityStages[phases[k]] && rec.activityStages[phases[k]].callId === toolCallId) return i + 1;
+        }
+      }
+      if (rec.toolActivity && rec.toolActivity.callId === toolCallId) return i + 1;
+      if (rec.data && rec.data.toolCallId === toolCallId) return i + 1;
+    }
+    return null;
+  }
+
+  /** 结果行构造（系统风格；所有动态文本经 `esc`；`deny 档 · judge 放行` 用琥珀徽标显著标出）。 */
+  function buildShellJudgeResultRow(rec) {
+    var v = rec.data.view;
+    var d = v.details;
+    var div = document.createElement("div");
+    div.className = "sys shell-judge-row " + (v.verdict === "deny" ? "is-deny" : "is-allow") + (v.denyOverride ? " is-deny-override" : "");
+    if (v.toolCallId) div.dataset.toolCallId = v.toolCallId;
+    var html = '<span class="sys-ico">' + (v.verdict === "allow" ? ICONS.ok : ICONS.deny) + "</span>";
+    html += '<div class="sys-text sj-body">';
+    html += '<div class="sj-head"><span class="sj-title">' + esc(v.title) + "</span>";
+    if (v.denyOverride) html += '<span class="sj-badge">' + esc(v.label) + "</span>";
+    html += "</div>";
+    html += '<div class="sj-cmd">' + esc(v.summary) + "</div>";
+    var meta = [];
+    if (v.tierText) meta.push(v.tierText);
+    meta.push(v.engineText);
+    meta.push(v.operatorText);
+    var time = Rt.shortTime(v.at);
+    if (time) meta.push(time);
+    html += '<div class="sj-meta">' + meta.map(function (x) { return esc(x); }).join(" · ") + "</div>";
+    if (v.lines.length) {
+      html += v.lines.map(function (line) { return '<div class="sj-line">' + esc(line) + "</div>"; }).join("");
+    }
+    if (v.retryHint) html += '<div class="sj-exit">' + esc(v.retryHint) + "</div>";
+    html += '<details class="sj-details"><summary>详情（命令原文 / 理由 / 证据）</summary><div class="sj-details-body">';
+    if (d.command) html += '<p class="sj-d-label">命令原文</p><pre class="sj-pre">' + esc(d.command) + "</pre>";
+    if (d.cwd) html += '<p class="sj-kv">cwd：' + esc(d.cwd) + "</p>";
+    if (d.reason) html += '<p class="sj-kv">判断理由：' + esc(d.reason) + "</p>";
+    if (d.alternative) html += '<p class="sj-kv">' + esc(d.alternative) + "</p>";
+    if (d.customerMessage) html += '<p class="sj-kv">客户说明：' + esc(d.customerMessage) + "</p>";
+    if (d.customerMessageSynthesized) html += '<p class="sj-note">客户说明由系统整理。</p>';
+    if (d.evidence.length) {
+      html += '<p class="sj-d-label">证据</p><ul class="sj-evidence">' +
+        d.evidence.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>";
+    }
+    if (d.hardDenyOverride) html += '<p class="sj-note">hardDenyOverride：true（deny 档被判断 agent 放行）。</p>';
+    if (d.toolCallId) html += '<p class="sj-note">toolCallId：' + esc(d.toolCallId) + "</p>";
+    html += "</div></details>";
+    html += "</div>";
+    div.innerHTML = html;
+    return div;
+  }
+
+  /** `shell:judge-result`：按 `roleId` 落 pane、按 `toolCallId` 锚定；`manual` 不产生结果行（原卡替代）。 */
+  function onShellJudgeResult(payload) {
+    if (!payload || typeof payload !== "object") return;
+    if (payload.projectRoot != null && payload.projectRoot !== state.projectRoot) return;
+    if (payload.runtime != null && payload.runtime !== state.runtime) return;
+    var view = UiLabels.shellJudgeResultView(payload);
+    if (!view) return; // manual（或未知裁决）不产生结果行
+    var roleId = typeof payload.roleId === "string" ? payload.roleId : "";
+    if (roleId === "") {
+      diagnose("renderer.event-error", { errorMessage: "判断结果缺少 roleId，未呈现" });
+      return;
+    }
+    var key = typeof payload.id === "string" && payload.id !== "" ? payload.id : "";
+    if (key && state.shellJudgeResultIds[key]) return; // 重复到达幂等
+    if (key) state.shellJudgeResultIds[key] = true;
+    var pane = paneFor(roleId);
+    var pin = streamShouldPin(pane); // 先量后挂：不打断正在阅读的人
+    var atIndex = shellJudgeAnchorIndex(rowListFor(pane), view.toolCallId);
+    registerRow(pane, buildShellJudgeResultRow, 84, { kind: "judge-result", data: { view: view }, atIndex: atIndex });
+    scrollBottom(pane, pin);
+  }
+
+  /** 启动：判桥可用性 → 订阅 → 取主进程真实状态；桥缺失时只禁用并显示说明。 */
+  function initShellJudge() {
+    var s = state.shellJudge;
+    s.available = shellJudgeBridgeAvailable();
+    s.enabled = false;
+    s.error = "";
+    renderShellJudgeToggle();
+    if (!s.available) return;
+    var pushed = false; // 推送先于 get 回包 ⇒ get 的旧快照不得覆盖更新的真实状态
+    function applyRead(res) {
+      if (pushed) return;
+      var next = UiLabels.shellJudgeToggleResult(false, res);
+      s.enabled = next.enabled;
+      s.error = next.error;
+      renderShellJudgeToggle();
+    }
+    d.onShellJudgeState(function (payload) { if (applyShellJudgeState(payload)) pushed = true; });
+    d.onShellJudgeResult(function (payload) { deliverRuntimePayload(payload, onShellJudgeResult); });
+    try {
+      Promise.resolve(d.getShellJudgeState()).then(applyRead, function () { applyRead(null); });
+    } catch (_) {
+      applyRead(null); // 同步抛错同样按读取失败处理（保持手动 + 可见错误）
+    }
+  }
+  // @shell-judge-end
 
   // —————— 恢复确认卡（G-2/U1，2026-10-16 客户批准；设计 §6.2「提议 → 一键确认 → 应用执行 → 回执」）——————
   // su 只能**提议**恢复动作（{abort-turn / rebuild-session / redeliver}）；本卡是客户的一键确认处——
@@ -2857,11 +3071,13 @@
     if (isChoice && typeof req.question === "string" && req.question !== "") {
       html += '<div class="op-question">' + esc(req.question) + "</div>";
     }
-    // 预览（两种 kind 都可带）：**折叠**（details）+ 限高可滚 + pre-wrap——长角色卡正文也能读。
+    // 预览（两种 kind 都可带）：**折叠**（details）+ 限高可滚 + **受控 Markdown**——与角色卡/聊天正文
+    // 同一管线（`Md.renderMarkdown`：html:false 先转义原文 HTML、链接白名单、表格启用）——
+    // 客户反馈「纯文本看着累」；安全红线不变，不在渲染侧另写解析。
     if (typeof req.preview === "string" && req.preview !== "") {
       html +=
         '<details class="op-preview"><summary>' + ICONS.chev + "<span>预览内容（点击展开）</span></summary>" +
-        '<pre class="op-preview-body">' + esc(req.preview) + "</pre></details>";
+        '<div class="op-preview-body card-md">' + Md.renderMarkdown(req.preview) + "</div></details>";
     }
     if (!isChoice && typeof req.detail === "string" && req.detail !== "") {
       html += '<div class="op-detail">' + esc(req.detail) + "</div>";
@@ -5436,6 +5652,8 @@
   // Q-2：滚动 → rAF 合帧 → 一次虚拟窗口更新（窗口化长转录时按需挂载/回收）。
   $("chat").addEventListener("scroll", onChatScroll);
   // shell 命令确认卡（M-1）：拒绝为默认焦点；关闭（×）/ Esc / 「拒绝」= **不放行**（fail-closed 的 UI 侧同向）。
+  // P5：自动判断开关——change 只发一次 IPC（实际状态以主进程回包/推送为准；失败回退并显示错误）。
+  $("auto-approve-toggle").addEventListener("change", onShellJudgeToggleChange);
   $("sc-deny").addEventListener("click", function () { respondShellConfirm(false); });
   $("sc-allow").addEventListener("click", function () { respondShellConfirm(true); });
   $("sc-close").addEventListener("click", function () { respondShellConfirm(false); });
@@ -5500,6 +5718,7 @@
 
   initSidebar(); // 读 localStorage（默认展开/坏值回退）并绑定收起/展开按钮
   ensureGovernanceUi(); // I4：提前建立状态行/预览容器（hidden）——`.session-notice` 的显隐判据因此稳定
+  initShellJudge(); // P5：判桥可用性、订阅 shell:judge-state/result、取主进程真实开关状态
   measureComposer();
   if (typeof ResizeObserver === "function") new ResizeObserver(measureComposer).observe(document.querySelector(".composer"));
   window.addEventListener("resize", measureComposer);
@@ -5571,6 +5790,19 @@
     onOperatorExpired: function (payload) { deliverRuntimePayload(payload, onOperatorExpired); },
     // M-1：供探针直接注入 shell 确认数据面（按 IPC 契约 `{id, command, summary, reasonPlain, …}`）。
     onShellConfirm: onShellConfirm,
+    // P5：自动判断探针（只读状态 + 直接注入推送/结果；不另立判定）。桥缺失时 state.available=false。
+    shellJudge: {
+      state: function () {
+        return {
+          available: state.shellJudge.available,
+          enabled: state.shellJudge.enabled,
+          busy: state.shellJudge.busy,
+          error: state.shellJudge.error,
+        };
+      },
+      onState: applyShellJudgeState,
+      onResult: function (payload) { deliverRuntimePayload(payload, onShellJudgeResult); },
+    },
     // G-2/U1：供探针直接注入恢复确认数据面（按 IPC 契约 `{id, roleId, action, evidence, …}`；
     // 回包仍走 `d.recoveryConfirmRespond`——通道缺席时如实终态「未能回传……不执行」）。
     onRecoveryConfirm: onRecoveryConfirm,

@@ -23,6 +23,16 @@ export function abortError(): Error {
   return error;
 }
 
+/**
+ * The bundled SDK rejects control requests with a plain Error carrying exactly this message once the
+ * query is already closed (its `request()` / pending-response cleanup path). For `interrupt()` that
+ * means the query is already gone — i.e. the stop already happened — not an interrupt failure.
+ * Deliberately exact: any other rejection still propagates.
+ */
+export function isQueryClosedError(error: unknown): boolean {
+  return error instanceof Error && error.message === "Query closed before response received";
+}
+
 /** Framework deadline; pauses on the injected gate and listens to this turn's signal. */
 export async function waitForTurn<T>(work: Promise<T>, signal: AbortSignal, timeoutMs: number, gate: InteractionGate): Promise<T> {
   let remaining = timeoutMs;

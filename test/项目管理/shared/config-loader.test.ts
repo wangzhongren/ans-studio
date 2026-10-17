@@ -18,6 +18,7 @@ import { test, after } from "node:test";
 
 import {
   loadEffectiveConfig,
+  readGovernanceModel,
   enforcePinBackedAcceptance,
   ansProjectPath,
   ANS_DIR_NAME,
@@ -75,6 +76,22 @@ function projectWithAns(acceptance: Acceptance, root = newRoot()): string {
     roles: { R: { card: "角色卡/R/role-card.md", boundary: BOUNDARY_REL } },
     governanceBoundary: { path: BOUNDARY_REL, acceptance },
   };
+  writeAt(root, ".ans/project.json", JSON.stringify(doc, null, 2));
+  return root;
+}
+
+/** 写一份带 `governanceModel` 的 `.ans/project.json`；`model === undefined` 时省略该字段。 */
+function projectWithAnsModel(
+  model: unknown,
+  acceptance: Acceptance = { accepted: false, source: "" },
+  root = newRoot(),
+): string {
+  writeAt(root, BOUNDARY_REL, BOUNDARY_YAML);
+  const doc: Record<string, unknown> = {
+    roles: { R: { card: "角色卡/R/role-card.md", boundary: BOUNDARY_REL } },
+    governanceBoundary: { path: BOUNDARY_REL, acceptance },
+  };
+  if (model !== undefined) doc.governanceModel = model;
   writeAt(root, ".ans/project.json", JSON.stringify(doc, null, 2));
   return root;
 }
@@ -265,4 +282,128 @@ test("ansDirName 覆盖：从自定义目录载入（不影响默认 .ans）", a
   });
   assert.equal(source.kind, "ans");
   assert.equal(source.acceptance.accepted, true);
+});
+
+// ---- 6) governanceModel：readGovernanceModel 三态（评审 5.5） ----
+test("readGovernanceModel：无 .ans → absent（不建文件、不猜测）", async () => {
+  const root = newRoot();
+  const r = await readGovernanceModel(root);
+  assert.deepEqual(r, { state: "absent" });
+});
+
+test("readGovernanceModel：显式 single / trio → explicit", async () => {
+  assert.deepEqual(await readGovernanceModel(projectWithAnsModel("single")), {
+    state: "explicit",
+    model: "single",
+  });
+  assert.deepEqual(await readGovernanceModel(projectWithAnsModel("trio")), {
+    state: "explicit",
+    model: "trio",
+  });
+});
+
+test("readGovernanceModel：字段缺失/非法值 → absent（不猜测）", async () => {
+  assert.deepEqual(await readGovernanceModel(projectWithAnsModel(undefined)), { state: "absent" });
+  for (const bad of ["TRIO", "other", "", null, 1, true, {}, []]) {
+    assert.deepEqual(
+      await readGovernanceModel(projectWithAnsModel(bad)),
+      { state: "absent" },
+      `非法值 ${JSON.stringify(bad)} 应为 absent`,
+    );
+  }
+});
+
+test("readGovernanceModel：JSON 不可解析 → unreadable（不崩）", async () => {
+  const root = newRoot();
+  writeAt(root, ".ans/project.json", "{ 这不是合法 JSON");
+  const r = await readGovernanceModel(root);
+  assert.equal(r.state, "unreadable");
+  if (r.state === "unreadable") assert.ok(r.reason.length > 0);
+});
+
+test("readGovernanceModel：顶层非对象 → unreadable", async () => {
+  const root = newRoot();
+  writeAt(root, ".ans/project.json", "[1,2,3]");
+  assert.equal((await readGovernanceModel(root)).state, "unreadable");
+});
+
+test("readGovernanceModel：文件不可读（目录占位）→ unreadable", async () => {
+  const root = newRoot();
+  mkdirSync(join(root, ".ans", "project.json"), { recursive: true });
+  assert.equal((await readGovernanceModel(root)).state, "unreadable");
+});
+
+test("readGovernanceModel：ansDirName 覆盖读取自定义目录", async () => {
+  const root = newRoot();
+  writeAt(root, ".custom-ans/project.json", JSON.stringify({ governanceModel: "trio" }));
+  assert.deepEqual(await readGovernanceModel(root, ".custom-ans"), { state: "explicit", model: "trio" });
+  assert.deepEqual(await readGovernanceModel(root), { state: "absent" });
+});
+
+// ---- 7) loadEffectiveConfig：governanceModel 作为纯值注入，不改变 acceptance/pin ----
+test("loadEffectiveConfig：显式 trio 注入 project.governanceModel，acceptance/pin 语义不变", async () => {
+  const root = newRoot();
+  writeAt(root, BOUNDARY_REL, BOUNDARY_YAML);
+  const sha = sha256OfFile(join(root, BOUNDARY_REL));
+  const root2 = projectWithAnsModel(
+    "trio",
+    { accepted: true, source: "客户 pin", pin: [{ path: BOUNDARY_REL, sha256: sha }] },
+    root,
+  );
+  const { project, source } = await load(root2);
+  assert.equal(project.governanceModel, "trio");
+  assert.equal(source.kind, "ans");
+  assert.equal(project.governanceBoundary?.acceptance.accepted, true);
+  assert.equal(source.downgradeReason, undefined);
+});
+
+test("loadEffectiveConfig：governanceModel 不改变『accepted:true 无 pin』降级", async () => {
+  const root = projectWithAnsModel("trio", { accepted: true, source: "自填" });
+  const { project, source } = await load(root);
+  assert.equal(project.governanceModel, "trio", "模型是纯值，不因 acceptance 降级而丢失");
+  assert.equal(project.governanceBoundary?.acceptance.accepted, false);
+  assert.ok(source.downgradeReason && source.downgradeReason.length > 0);
+});
+
+test("loadEffectiveConfig：缺失/非法 governanceModel 不填（旧项目默认 single）", async () => {
+  const missing = await load(projectWithAnsModel(undefined));
+  assert.equal(missing.project.governanceModel, undefined);
+  assert.equal(missing.source.kind, "ans");
+
+  const invalid = await load(projectWithAnsModel("TRIO"));
+  assert.equal(invalid.project.governanceModel, undefined);
+  assert.equal(invalid.source.kind, "ans");
+});
+
+test("loadEffectiveConfig：.ans 不可解析 → ans-invalid，模型不填（不崩）", async () => {
+  const root = newRoot();
+  writeAt(root, ".ans/project.json", "{ 这不是合法 JSON");
+  const { project, source } = await load(root);
+  assert.equal(source.kind, "ans-invalid");
+  assert.equal(project.governanceModel, undefined);
+  assert.equal(project.governanceBoundary?.acceptance.accepted, false);
+});
+
+test("loadEffectiveConfig：未知迁移标记字段被忽略，不改变模型/acceptance", async () => {
+  const root = newRoot();
+  writeAt(root, BOUNDARY_REL, BOUNDARY_YAML);
+  const sha = sha256OfFile(join(root, BOUNDARY_REL));
+  const doc = {
+    governanceModel: "trio",
+    governanceMigratedAt: "2026-10-17T00:00:00Z",
+    legacyGovernanceModel: "single",
+    roles: { R: { card: "角色卡/R/role-card.md", boundary: BOUNDARY_REL } },
+    governanceBoundary: {
+      path: BOUNDARY_REL,
+      acceptance: { accepted: true, source: "客户 pin", pin: [{ path: BOUNDARY_REL, sha256: sha }] },
+    },
+  };
+  writeAt(root, ".ans/project.json", JSON.stringify(doc));
+  const { project, source } = await load(root);
+  assert.equal(project.governanceModel, "trio");
+  assert.equal(source.kind, "ans");
+  assert.equal(project.governanceBoundary?.acceptance.accepted, true);
+  // 评审 5.5 未要求迁移标记；loader 不读不写未知字段（迁移写入由编排保留未知字段）。
+  assert.equal(Object.prototype.hasOwnProperty.call(project, "governanceMigratedAt"), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(project, "legacyGovernanceModel"), false);
 });

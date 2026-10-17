@@ -35,3 +35,16 @@ required-v1 缺注入 projector/register 时在任何外部初始化前拒绝；
 ## 2026-10-17 整轮最后兜底（到点检查/兜底两层时限）
 
 `promptTimeoutMs` 语义改为**看护到点检查**（历史字段名；不中止整轮）；Codex 适配器自身的整轮上限只认 `options.turnLastResortMs ?? DEFAULT_TURN_LAST_RESORT_MS`（运行时核心常量，固定 1 小时、不暴露 env；测试/宿主可注入小值）。`pausedDeadline` 仍挂 `interactionGate`：确认卡等待期间暂停，按有效运行时间计——等待客户超过 1 小时不会触发兜底。到点仍走既有 `stop(turn,"timed_out")`（`outcome` 枚举不变），但 `turn.failure` 文案为「Codex 本轮运行超过最后兜底（Nms），已中止以免无限挂起。」并随 settled `detail.error` 外推，与到点检查/普通失败可区分；不再出现「prompt 超时」旧文案。shell 命令 10 分钟、确认卡 120 秒、构造 120 秒不变。测试：注入小 `turnLastResortMs` 到点才中止；单独设很小的 `promptTimeoutMs` 不中止、不产生 `turn/interrupt`。详见[变更记录](changelog.md)。
+
+## 2026-10-17 P3c：判断会话（「替我审」）judgeMode
+
+`RuntimeProviderOptions.judgeMode === true`（运行时核心中性标志；Service 在注入 `shellJudge` 时置位）时，适配器进入只读判断会话（PM 评审 §6.1/§7.1/§十一 P3c）：
+
+- **工具面恰三只**：`options.tools` 必须恰为运行时核心 `buildShellJudgeTools` 的 `judge_read_file`/`judge_list_dir`/`report_shell_judgement`（名单取自 `src/common/runtime-core/shell-judge/tools.ts` 单一来源，本适配器不另造）。缺项/多项/夹带 `write_file`/`edit_file`/`run_shell`/`request_confirmation`/`request_choice`/`submit_report`/`dispatch_task` 任一 ⇒ 工厂与 `bindRole` 均装配前抛错、零引擎/零副作用。原生面只注册 `ans_<judge tool>` dynamicTools，内存 MCP 代理目录同集。
+- **原生能力关闭**：强制 `web_search="disabled"`（忽略 `options.webSearch` 与 `ANS_CODEX_WEB_SEARCH`）；`installedMcpServers` 视为空、原生 `CODEX_HOME` 走临时目录、线程 `ephemeral:true`、沙箱 `read-only`、`networkAccess:false`、审批 `never`；原生审批/选择/自由输入请求照旧 decline/cancel/空答案。judge 轮内若仍收到 `mcpToolCall`/`webSearch`/`commandExecution`/`fileChange` ⇒ 隔离该轮 `failed`（fail closed）。
+- **不持久化**：即使上游误传 `storage` 也不调用 validate/prepare/read/save/append/readReplay；`contextSource:"in-memory"`；不写 `.ans`、不产生聊天/角色状态。
+- **回调原样**：`report_shell_judgement` 把模型原始参数原样交给注入的 `report`（取值域/长度/歧义规范化与脱敏在编排）。
+- **提示面**：judge 系统提示明确「只读判断会话，只有 judge 读取与结论工具」；不宣称写/命令/交互/派发能力，也不拼接项目技能注入节（证据按需用 `judge_read_file` 读）。
+- **普通角色会话逐字不变**：`judgeMode` 未设时工具集不限名单、webSearch 仍按 options/env、storage/installedMcpServers 照旧。
+
+验证：`test/codex-adapter/judge-mode.test.ts` 7 例（离线假引擎＋内存 MCP；无真实模型/凭据/网络）。

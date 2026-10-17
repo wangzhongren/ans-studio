@@ -37,6 +37,7 @@ import type {
 } from "../../model/runtime.ts";
 import { selectNativeSessionManager, sessionFileHasForeignToolChangeBlocks } from "./native-session.ts";
 export { sessionFileHasForeignToolChangeBlocks } from "./native-session.ts";
+import { SHELL_JUDGE_TOOL_NAMES } from "../runtime-core/shell-judge/tools.ts";
 import { describeTool } from "./tool-compat.ts";
 export { describeTool } from "./tool-compat.ts";
 export type { ToolPiDescription } from "./tool-compat.ts";
@@ -1290,7 +1291,18 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
         ...(tool.promptGuidelines ? { promptGuidelines: [...tool.promptGuidelines] } : {}),
       }));
       if (opts.runtime !== "pi") throw new Error("Pi 适配器只能建立 Pi 会话");
-      if (opts.storage && opts.storage.roleId !== role.id) throw new Error("Pi 存储与当前角色不匹配");
+      // 判断 agent（「替我审」，PM 评审 2026-10-17 §4.1/§7.1）：只消费注入的 judge 只读工具集——
+      // 结构性拒绝任何其余工具；force off 原生能力面（server tools / 外来 MCP）并关闭持久化。
+      // 未置 `judgeMode` ⇒ 逐字旧行为（以下各判据均为 false 分支）。
+      const judgeMode = opts.judgeMode === true;
+      if (judgeMode) {
+        const allowedJudgeTools = new Set<string>(SHELL_JUDGE_TOOL_NAMES);
+        const foreign = governedTools.filter((tool) => !allowedJudgeTools.has(tool.name)).map((tool) => tool.name);
+        if (foreign.length > 0) {
+          throw new Error(`判断会话只允许 judge 只读工具，拒绝注入：${foreign.join(", ")}`);
+        }
+      }
+      if (!judgeMode && opts.storage && opts.storage.roleId !== role.id) throw new Error("Pi 存储与当前角色不匹配");
       const log = opts.logger ?? createStageLogger(process.env);
       const diagnostics = createDiagnosticLogger({ component: "pi-adapter", projectRoot: opts.projectRoot, roleId: role.id });
       diagnostics.record("session.construct.start");
@@ -1306,7 +1318,9 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
         const cfg = opts.config ?? resolvePiProviderConfig(opts, profileEnv);
         // 服务端工具配置（客户已批准 2026-10-16；**默认关**）。未知 id / 非法 max_uses ⇒ 构造期抛错
         // （一句话明确、不静默半开；与「缺 baseUrl 即抛」同口径）——在任何网络请求发生之前失败。
-        const serverToolConfig = parseServerToolConfig(profileEnv);
+        // 判断会话**强制关闭**：服务端工具（web_search/web_fetch）是网络/提供方能力，judge 只读
+        // 工具集之外一律不得出现，也不因宿主 env 被打开（PM 评审 §7.1「不得注册任何网络/抓取工具」）。
+        const serverToolConfig = judgeMode ? { enabled: [] } : parseServerToolConfig(profileEnv);
         opts.registerToolDisplayProfile?.({ apiKeyEnvVar: cfg.apiKeyEnvVar, credentials: [...new Set([cfg.apiKeyEnvVar, ...(opts.toolDisplayCredentialEnvNames ?? [])])].map(name => ({ name, value: profileEnv[name] })) });
         log.trace(`构造单步时限=${constructMs}ms，检查时限=${promptMs}ms，最后兜底=${turnLastResortMs}ms`);
 
@@ -1372,7 +1386,9 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
 
         // —— G-4 V2：按角色安装的外来 MCP（stdio 限定；纯消费注入面——不读任何盘上来源）——
         // 缺省（无声明）⇒ 零装配：MCP 扩展不加载、bindExtensions 不调用、放行面＝原快照集 ⇒ 既有行为逐字不变。
-        const installedMcp = Array.isArray(opts.installedMcpServers) ? [...opts.installedMcpServers] : [];
+        // 判断会话**强制置空**（即便调用方误传）：外来 MCP 是任意的第三方工具/网络面，
+        // judge 会话只允许运行时核心的三只只读工具（PM 评审 §4.1/§7.1）。
+        const installedMcp = !judgeMode && Array.isArray(opts.installedMcpServers) ? [...opts.installedMcpServers] : [];
         const mcpActive = installedMcp.length > 0;
         // env:NAME 展开（只自 process.env；缺失即抛——先于任何子进程/网络）。值只进内存与子进程环境。
         const resolvedMcpServers = mcpActive ? resolveInstalledMcpServers(installedMcp, process.env) : [];
@@ -1453,10 +1469,12 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
         // 分段进度：createAgentSession。关内置工具，注册我们自己的受治理工具（含读）；显式注入 model、modelRuntime 与 settingsManager。
         // 生产由 storage 指定本角色 Pi native 目录；旧 sessionDir 仅直接 API 兼容。
         // 缺省为 in-memory，不读取或写入 ~/.pi。
+        // 判断会话**强制 in-memory**：忽略 storage/sessionDir（不持久化、不写项目文件、不产生角色状态；
+        // PM 评审 §6.3「persistSession:false；不写 .ans、不写聊天、不写角色状态」）。
         const sessionSelection = await selectSessionManager(SessionManager, {
           cwd: opts.projectRoot,
-          sessionDir: opts.sessionDir,
-          storage: opts.storage,
+          sessionDir: judgeMode ? undefined : opts.sessionDir,
+          storage: judgeMode ? undefined : opts.storage,
         });
         diagnostics.record("session.restore", { sessionId: sessionSelection.manager.getSessionId(), state: sessionSelection.mode, count: sessionSelection.skippedContaminated ?? 0 });
         if (sessionSelection.note !== undefined) {

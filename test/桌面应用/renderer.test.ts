@@ -20,8 +20,22 @@ const STYLES = fs.readFileSync(path.join(APP_DIR, "styles.css"), "utf8");
 const PRELOAD = fs.readFileSync(path.resolve(HERE, "..", "..", "app", "preload.cjs"), "utf8");
 const MAIN = fs.readFileSync(path.resolve(HERE, "..", "..", "app", "main.ts"), "utf8");
 
+// 预览渲染的行为面：装载与 index.html 同序的 Markdown 管线（vendor → markdown.js），
+// 只做纯函数断言（DOM 折叠行为仍由 e2e 覆盖）。Markdown 的 XSS/配置钉子见 markdown.test.ts。
+await import(new URL("../../app/renderer/vendor/markdown-it.umd.min.js", import.meta.url).href);
+await import(new URL("../../app/renderer/markdown.js", import.meta.url).href);
+const Md = (globalThis as Record<string, unknown>).ANSMarkdown as { renderMarkdown: (s: unknown) => string };
+assert.ok(Md && typeof Md.renderMarkdown === "function", "markdown.js 应挂 globalThis.ANSMarkdown（renderMarkdown）");
+
 // 去掉 // 行注释与 /* */ 块注释后的代码（用于「不得硬编码」这类断言，避免注释里的示例字面量误伤）。
 const RENDERER_CODE = RENDERER.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+// P5 自动判断段的源码切片（`// @shell-judge-start` … `// @shell-judge-end`）——用于钉住
+// 「不自动开会话 / 不写持久化 / 不动已挂起卡」等边界（只看该段，不误伤文件其它历史功能）。
+const SHELL_JUDGE_CODE = (() => {
+  const start = RENDERER.indexOf("// @shell-judge-start");
+  const end = RENDERER.indexOf("// @shell-judge-end");
+  return start >= 0 && end > start ? RENDERER.slice(start, end) : "";
+})();
 
 test("写入语义（桌面一律 pi）：明示写入真实落到导入项目，但受角色边界约束（越界写被拒）", () => {
   assert.ok(RENDERER.includes("实际写入导入项目"), "pi 文案须明示写入被导入项目");
@@ -304,7 +318,11 @@ test("A-5：交互卡（确认/单选/多选/预览）取代收口确认卡；�
   for (const cls of ["op-kind-confirm", "op-kind-select", "op-kind-multi", "op-kind-preview"]) {
     assert.ok(RENDERER.includes(cls), "卡片变体应有 " + cls);
   }
-  assert.ok(RENDERER.includes("op-preview-body"), "预览应为折叠块（details）+ 限高滚动体");
+  assert.ok(
+    RENDERER.includes('<div class="op-preview-body card-md">') && RENDERER.includes("Md.renderMarkdown(req.preview)"),
+    "预览应为折叠块（details）+ 受控 Markdown 体（card-md，同一 Md 管线）",
+  );
+  assert.ok(!RENDERER.includes('<pre class="op-preview-body">'), "预览不得回退为纯文本 pre");
   assert.ok(RENDERER.includes('"checkbox"') && RENDERER.includes('"radio"'), "选择卡应有 radio（单选）/ checkbox（多选）");
   assert.ok(RENDERER.includes("op-submit") && RENDERER.includes("op-cancel"), "选择卡应有 提交/取消");
   assert.ok(RENDERER.includes("op-deny"), "确认卡应有「不同意」");
@@ -324,6 +342,28 @@ test("A-5：交互卡（确认/单选/多选/预览）取代收口确认卡；�
   for (const cls of [".op-request", ".op-preview", ".op-options", ".op-option", ".op-actions", ".op-note"]) {
     assert.ok(STYLES.includes(cls), "styles.css 应有 " + cls);
   }
+});
+
+test("A-5：确认卡预览按受控 Markdown 呈现（标题/列表/表格/加粗；纯文本多行可读；原文 HTML 仍转义）", () => {
+  // 客户 2026-10-17：「预览感觉需要 markdown 显示啊，不然的话看的很累」——折叠/限高滚动/无障碍 summary 不变。
+  assert.ok(RENDERER.includes('<details class="op-preview">'), "预览仍为可折叠 details");
+  assert.ok(RENDERER.includes("<span>预览内容（点击展开）</span></summary>"), "summary 文案与无障碍名不变");
+  // 预览体经**同一** Md 管线（不在渲染侧另写解析）；正文 HTML 由库转义后拼入，未走 esc 的裸拼。
+  const sample =
+    "## 需要确认\n\n- 第一条\n- 第二条\n\n| 字段 | 值 |\n| --- | --- |\n| 范围 | 预览 |\n\n**重点**\n\n第一行\n第二行\n\n" +
+    "<script>window.BAD_PREVIEW=1</script>";
+  const out = Md.renderMarkdown(sample);
+  assert.ok(out.includes("<h2>需要确认</h2>"), "标题应渲染为 h2");
+  assert.ok(out.includes("<ul>") && out.includes("<li>第一条</li>"), "列表应渲染为 ul/li");
+  assert.ok(out.includes("<table>") && out.includes("<th>字段</th>"), "表格应渲染为 table（窄栏内横向滚动由 .card-md 规则兜住）");
+  assert.ok(out.includes("<strong>重点</strong>"), "加粗应渲染为 strong");
+  assert.ok(out.includes("第一行<br>"), "纯文本多行按 breaks:true 保留换行（仍可读）");
+  assert.ok(out.includes("&lt;script&gt;") && !out.includes("<script>"), "原文 HTML 仍被转义（XSS 钉子）");
+  // 样式：限高滚动保留；Markdown 产物不得沿用纯文本 pre-wrap（会出异常空白）；字号/行高沿用角色卡正文口径。
+  const body = STYLES.match(/\.op-request \.op-preview-body \{([\s\S]*?)\}/)?.[1] || "";
+  assert.ok(body.includes("max-height: 40vh") && body.includes("overflow: auto"), "保留限高滚动");
+  assert.ok(!body.includes("white-space: pre-wrap"), "Markdown 产物不得 pre-wrap");
+  assert.ok(body.includes("font-size: 12px") && body.includes("line-height: 1.8"), "字号/行高与 .card-md 上下文一致");
 });
 
 test("A-5：收口面已删（断言「它不在」）——交互卡与确认制取代之，防回潮", () => {
@@ -2265,4 +2305,125 @@ test("左树选中项可见（2026-10-17 实机）：最小位移、可见不动
   const fn = RENDERER.slice(fnStart, RENDERER.indexOf("\n  }", fnStart));
   assert.ok(fnStart > 0 && fn.includes("tree.scrollTop += delta") && !/scrollTop\s*=\s*0/.test(fn), "只做最小位移，不强制回顶");
   assert.ok(!fn.includes("scrollIntoView"), "不用 scrollIntoView（避免连带滚动其它容器）");
+});
+
+// ————————————————— P5：自动判断（2026-10-17 评审 §6.5/§6.6/§9.3/§10）—————————————————
+// 桌面UI 侧只消费冻结桥（get/set/onState/onResult）：主进程是开关权威；桥缺失禁用并说明；
+// 结果按 roleId 落 pane、按 toolCallId 锚定；manual 不产生结果行；已挂起卡不受切换影响。
+// DOM 行为由 e2e 覆盖；此处钉住源码接线、文案单点与边界（不自动开会话/不写持久化）。
+
+test("P5：输入区复选框 + 常驻警告 + 手动回落提示的 DOM 结构（§10.1/§10.2/§10.4）", () => {
+  // 复选框：§10.1 逐字结构；位置在附件按钮之后、#composer-scope 之前。
+  assert.ok(
+    /<label class="composer-auto-approve">\s*<input type="checkbox" id="auto-approve-toggle" \/>\s*<span id="auto-approve-label">替我审<\/span>\s*<\/label>/.test(INDEX),
+    "复选框结构按 §10.1 逐字（label/input/span 三件套）"
+  );
+  const attach = INDEX.indexOf('id="btn-attach-image"');
+  const toggle = INDEX.indexOf('class="composer-auto-approve"');
+  const scope = INDEX.indexOf('id="composer-scope"');
+  assert.ok(attach >= 0 && toggle > attach && scope > toggle, "位置：附件按钮之后、#composer-scope 之前");
+  assert.ok(INDEX.includes('id="auto-approve-status"'), "失败错误位（可见、aria-live）");
+  // 常驻警告容器：默认隐藏（不是 toast）；手动回落提示位默认隐藏。
+  assert.ok(/<div id="shell-judge-warning" class="judge-warning" role="status" hidden><\/div>/.test(INDEX), "开启警告容器默认隐藏");
+  assert.ok(/<p id="sc-judge-notice" class="sc-judge-notice" hidden><\/p>/.test(INDEX), "卡片 judgeNotice 位默认隐藏");
+  const summary = INDEX.indexOf('id="sc-summary"');
+  const notice = INDEX.indexOf('id="sc-judge-notice"');
+  const reason = INDEX.indexOf('id="sc-reason"');
+  assert.ok(summary < notice && notice < reason, "#sc-judge-notice 位于摘要之后、原因之前");
+  // 样式钩子。
+  for (const cls of [".composer-auto-approve", ".judge-warning", ".shell-judge-row", ".sj-badge", ".sc-judge-notice"]) {
+    assert.ok(STYLES.includes(cls), "styles.css 应有 " + cls);
+  }
+  // 警告用琥珀色（不是错误红）；900 内容列与等宽字体不变。
+  const warningBlock = STYLES.match(/\.judge-warning \{([\s\S]*?)\}/)?.[1] || "";
+  assert.ok(warningBlock.includes("var(--amber)"), "开启警告用琥珀色");
+  assert.ok(!warningBlock.includes("var(--danger)") && !warningBlock.includes("var(--danger-line)"), "开启警告不得用错误红");
+  assert.ok(/\.judge-warning \{[\s\S]{0,200}max-width: var\(--content-max\)/.test(STYLES), "警告随 900 内容列");
+  const onBlock = STYLES.match(/\.composer-auto-approve\.is-on \{([\s\S]*?)\}/)?.[1] || "";
+  assert.ok(onBlock.includes("var(--amber)"), "开启标记（判断 agent）用琥珀色");
+  assert.ok(!onBlock.includes("var(--danger)"), "开启标记不得用错误红");
+});
+
+test("P5：开关三态——启动取真实状态、推送同步、点击只信主进程回包；桥缺失禁用且无假开启态", async () => {
+  const UL = (await loadUiLabelsForGovernance()) as unknown as Record<string, any>;
+  // 三态纯映射（与 UI 共用单一来源）。
+  const off = UL.shellJudgeToggleView(true, false, false);
+  assert.equal(off.label, "替我审");
+  assert.equal(off.checked, false);
+  assert.equal(off.warningVisible, false);
+  const on = UL.shellJudgeToggleView(true, true, false);
+  assert.equal(on.label, "替我审批中 · 判断 agent");
+  assert.equal(on.checked, true);
+  assert.equal(on.warningVisible, true);
+  const missing = UL.shellJudgeToggleView(false, true, false);
+  assert.equal(missing.disabled, true);
+  assert.equal(missing.checked, false, "桥缺失不显示假开启态");
+  assert.equal(missing.label, "当前版本不支持自动判断，保持手动");
+  assert.equal(missing.warningVisible, false);
+  // 失败不改状态（主进程是权威）。
+  assert.equal(UL.shellJudgeToggleResult(true, { ok: false, error: "x" }).enabled, true);
+  assert.equal(UL.shellJudgeToggleResult(false, { ok: true, enabled: true }).enabled, true);
+  assert.equal(UL.shellJudgeToggleResult(true, { ok: true, enabled: false }).enabled, false);
+
+  // 启动：四个桥方法齐备判定 + 订阅 state/result + 读取一次真实状态。
+  assert.ok(SHELL_JUDGE_CODE.length > 0, "自动判断段应存在（标记齐全）");
+  assert.ok(SHELL_JUDGE_CODE.includes("typeof d.getShellJudgeState === \"function\"") &&
+    SHELL_JUDGE_CODE.includes("typeof d.setShellJudgeEnabled === \"function\"") &&
+    SHELL_JUDGE_CODE.includes("typeof d.onShellJudgeState === \"function\"") &&
+    SHELL_JUDGE_CODE.includes("typeof d.onShellJudgeResult === \"function\""), "桥可用性按四个冻结方法判定");
+  assert.ok(RENDERER.includes("initShellJudge();"), "启动时初始化自动判断");
+  assert.ok(SHELL_JUDGE_CODE.includes("d.onShellJudgeState(function (payload) { if (applyShellJudgeState(payload)) pushed = true; })"), "订阅 shell:judge-state");
+  assert.ok(SHELL_JUDGE_CODE.includes("Promise.resolve(d.getShellJudgeState())"), "启动读取真实开关状态");
+  // 点击切换：不乐观改状态；成功采用主进程 enabled，失败保持原值并显示错误。
+  assert.ok(RENDERER.includes('$("auto-approve-toggle").addEventListener("change", onShellJudgeToggleChange)'), "复选框 change 绑定");
+  assert.ok(SHELL_JUDGE_CODE.includes("d.setShellJudgeEnabled(desired)"), "切换调用冻结桥方法");
+  assert.ok(SHELL_JUDGE_CODE.includes("UiLabels.shellJudgeToggleResult(s.enabled, res)"), "结果经纯函数自洽（失败保持原状态）");
+  assert.ok(SHELL_JUDGE_CODE.includes("s.enabled = next.enabled"), "只落主进程实际值");
+  assert.ok(!SHELL_JUDGE_CODE.includes("s.enabled = desired"), "点击意图不得直接成为状态（无假开启态）");
+  assert.ok(!/\.enabled\s*=\s*true/.test(SHELL_JUDGE_CODE), "渲染侧不得自行把开关置 true");
+  assert.ok(SHELL_JUDGE_CODE.includes("toggle.checked = view.checked") && SHELL_JUDGE_CODE.includes("toggle.disabled = view.disabled"), "复选框只呈现真实视图");
+  // 警告只在真实开启时出现；关闭即隐藏。
+  assert.ok(SHELL_JUDGE_CODE.includes("warning.hidden = !view.warningVisible"), "警告显隐随真实状态");
+  assert.ok(SHELL_JUDGE_CODE.includes("UiLabels.shellJudgeWarningLines()"), "警告文案经 ui-labels 单一来源");
+});
+
+test("P5：结果行接线——按 roleId 落 pane、按 toolCallId 锚定、deny 档徽标可见、manual 不落行", () => {
+  assert.ok(RENDERER.includes("d.onShellJudgeResult(function (payload) { deliverRuntimePayload(payload, onShellJudgeResult); })"), "订阅 shell:judge-result 并按引擎视图投递");
+  assert.ok(SHELL_JUDGE_CODE.includes("UiLabels.shellJudgeResultView(payload)"), "结果文案/字段经纯映射单一来源");
+  assert.ok(SHELL_JUDGE_CODE.includes('var roleId = typeof payload.roleId === "string" ? payload.roleId : ""'), "严格按 roleId 路由");
+  assert.ok(SHELL_JUDGE_CODE.includes("var pane = paneFor(roleId);"), "落该角色自己的 pane");
+  assert.ok(SHELL_JUDGE_CODE.includes("shellJudgeAnchorIndex(rowListFor(pane), view.toolCallId)"), "按 toolCallId 查锚点");
+  assert.ok(SHELL_JUDGE_CODE.includes("if (rec.data.items[j] && rec.data.items[j].callId === toolCallId) return i + 1;"), "工具调用行后落位");
+  assert.ok(SHELL_JUDGE_CODE.includes("return null;") && SHELL_JUDGE_CODE.includes("atIndex: atIndex"), "定位不到 ⇒ 追加流尾（不丢行）");
+  assert.ok(SHELL_JUDGE_CODE.includes('kind: "judge-result"'), "结果行走行表（参与窗口化/锚点）");
+  assert.ok(SHELL_JUDGE_CODE.includes('state.shellJudgeResultIds[key]'), "重复事件幂等（不重复落行）");
+  // deny 档放行必须一眼可分：标题 + label 徽标（琥珀描边），并用硬拒/请复核说明。
+  assert.ok(SHELL_JUDGE_CODE.includes('<span class="sj-badge">'), "deny 档放行徽标显著呈现");
+  assert.ok(SHELL_JUDGE_CODE.includes("v.tierText") && SHELL_JUDGE_CODE.includes("v.engineText") && SHELL_JUDGE_CODE.includes("v.operatorText"), "行内含档位/judge 引擎/operator");
+  assert.ok(SHELL_JUDGE_CODE.includes("v.lines.map") && SHELL_JUDGE_CODE.includes("v.retryHint"), "行内含理由/替代方案/客户说明与出路");
+  // manual：视图返回 null 时直接返回，不产生结果行。
+  assert.ok(SHELL_JUDGE_CODE.includes("if (!view) return; // manual（或未知裁决）不产生结果行"), "manual 不产生结果行");
+});
+
+test("P5：手动回落卡 judgeNotice 原样渲染（不改写、无值隐藏）；已挂起卡不受开关切换影响", () => {
+  assert.ok(RENDERER.includes('var judgeNotice = typeof payload.judgeNotice === "string" ? payload.judgeNotice : "";'), "读取 payload.judgeNotice");
+  assert.ok(RENDERER.includes('$("sc-judge-notice").textContent = judgeNotice'), "原样 textContent（无 HTML 注入口、不改写）");
+  assert.ok(RENDERER.includes('$("sc-judge-notice").hidden = judgeNotice === ""'), "无值隐藏");
+  // 开关切换/状态推送路径不触碰挂起卡（不关、不重渲染、不重置）。
+  for (const forbidden of ["closeShellConfirm", "renderShellConfirm", "state.shellConfirm", "markShellConfirmExpired"]) {
+    assert.ok(!SHELL_JUDGE_CODE.includes(forbidden), "自动判断段不得触碰已挂起卡：" + forbidden);
+  }
+});
+
+test("P5 边界：不自动开会话/切角色、不写 localStorage/.env/项目文件、不接触 Node/fs", () => {
+  // 只看代码：段内注释会提到「不写 localStorage/.env」等字样，不属于实现。
+  const code = SHELL_JUDGE_CODE.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+  for (const forbidden of ["selectRole(", "selectRuntime(", "openSession(", "state.selectedRoleId =", "state.sessionOpenRoleId ="]) {
+    assert.ok(!code.includes(forbidden), "自动判断段不得自动开会话/切角色：" + forbidden);
+  }
+  for (const forbidden of ["localStorage", "sessionStorage", ".env", "writeFile", "fs.", "require("]) {
+    assert.ok(!code.includes(forbidden), "自动判断段不得写持久化/接触 Node：" + forbidden);
+  }
+  // 结果行/开关文案不含英文判断逻辑分叉（语义在 ui-labels / 主进程）——源码只按 verdict 分 allow/deny 呈现。
+  assert.ok(!code.includes('reasonCode === "necessary"'), "渲染侧不重写判断语义");
 });

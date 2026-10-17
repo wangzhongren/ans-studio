@@ -401,13 +401,18 @@ test("outer timeout remains timed_out when abort cleanup emits inner aborted ter
   assert.equal((terminal[0].detail as { turnId: string }).turnId, terminal[0].turnId);
 });
 
-test("outer aborted result stays aborted while failing cleanup remains honestly reported", async () => {
+test("outer aborted result stays aborted and a settled underlying lifts quarantine despite failing cleanup", async () => {
   let entered = false;
+  let calls = 0;
   let completePrompt!: () => void;
   const factory: RuntimeProviderFactory = (options) => (registerControlledDisplayProfile(options), { async composeContext() { return { systemPrompt: "fixture" }; }, async bindRole() {
     const queue = createEventQueue<SessionEvent>();
     return {
-      async prompt() { entered = true; await new Promise<void>((resolve) => { completePrompt = resolve; }); },
+      async prompt() {
+        calls++;
+        if (calls === 1) { entered = true; await new Promise<void>((resolve) => { completePrompt = resolve; }); return; }
+        queue.push({ kind: "settled", summary: "next turn done", detail: { outcome: "completed" } });
+      },
       events: () => queue.stream,
       async abort() {
         queue.push({ kind: "settled", summary: "inner cleanup failure", detail: { outcome: "failed" } });
@@ -420,9 +425,13 @@ test("outer aborted result stays aborted while failing cleanup remains honestly 
   const { events, done } = await collect(session);
   const run = session.prompt("abort"); const rejected = assert.rejects(run, /中止/); await until(() => entered);
   await assert.rejects(Promise.resolve(session.abort!()), /cleanup fixture failed/); await rejected;
-  await assert.rejects(session.prompt("next"), /清理中/); await session.dispose(); await done;
+  // 清理失败但底层轮次已结束：隔离解除，下一轮可进入（不再永久卡死）。
+  await session.prompt("next"); assert.equal(calls, 2);
+  await session.dispose(); await done;
   const terminal = events.filter((event) => event.kind === "settled");
-  assert.equal(terminal.length, 1); assert.equal((terminal[0].detail as { outcome: string }).outcome, "aborted");
+  assert.equal(terminal.length, 2);
+  assert.equal((terminal[0].detail as { outcome: string }).outcome, "aborted");
+  assert.equal((terminal[1].detail as { outcome: string }).outcome, "completed");
   assert.ok(events.some((event) => event.kind === "denied" && event.summary.includes("cleanup fixture failed")));
 });
 

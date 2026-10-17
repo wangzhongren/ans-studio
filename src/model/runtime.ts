@@ -93,8 +93,8 @@ export interface OperatorPrompt {
 }
 
 export type OperatorOutcome =
-  | { outcome: "allow"; operatorId?: string }
-  | { outcome: "deny"; operatorId?: string; reason?: string }
+  | { outcome: "allow"; operatorId?: string; judge?: ShellJudgeAudit }
+  | { outcome: "deny"; operatorId?: string; reason?: string; judge?: ShellJudgeAudit }
   | { outcome: "unavailable"; reason?: string };
 
 export type OperatorChannelFn = (
@@ -121,6 +121,103 @@ export interface FinalizeResult {
   manifestRel: string;
 }
 
+// —————————————— 治理三权协作（Rapporteur / Nominator / Convener）中立形状 ——————————————
+//
+// 依据：PM 评审《治理三权分立——项目管理评审与 V1 拆发》（2026-10-17，
+// `角色卡/项目管理/docs/design/2026-10-17_design_governance-trio-review.md`）§5.8/§6.3。
+// 本模块**只定义中立形状**：流程标识、卡片种类、步骤状态与载荷。提案接受门、任命写入门、
+// 派发范围门、账本读取与判定都在编排（`common/编排/governance-gate.ts`、`governance-ledger.ts`）；
+// 本层不实现任何判定、不读写账本、不改变任何写权。
+//
+// **缺席＝旧形状**：下列字段全部可选；旧调用不带 flow 元数据时零行为变化，且缺席的
+// flowId/stepId/cardKind **不能**解锁任何治理门禁（门禁只认账本中应用签发的客户决定）。
+
+/** 治理流程/步骤标识的 slug 形状（评审 §5.8）：`^[a-z0-9][a-z0-9-]{1,63}$`。工具层按此校验，不猜测、不截断。 */
+export const GOVERNANCE_SLUG_PATTERN = "^[a-z0-9][a-z0-9-]{1,63}$";
+
+/** 治理流程 id（slug；只作标识，不表达权限）。 */
+export type GovernanceFlowId = string;
+
+/** 治理流程内步骤 id（slug；与 flowId 一起构成派发去重键，评审 §6.3-5）。 */
+export type GovernanceStepId = string;
+
+/** 流程标识对（stepId 语义上从属于 flow；两者均缺席＝旧调用形状）。 */
+export interface GovernanceFlowMetadata {
+  flowId?: GovernanceFlowId;
+  stepId?: GovernanceStepId;
+}
+
+/** `request_choice` 允许的治理卡片种类（评审 §5.8）。 */
+export type GovernanceChoiceCardKind = "proposal" | "appointment" | "acceptance";
+
+/** `request_confirmation` 允许的治理卡片种类（评审 §5.8）。 */
+export type GovernanceConfirmCardKind = "write" | "appointment-write" | "schedule-write";
+
+/** 治理决定卡种类（两交互工具的并集；非法/缺席不能解锁任何治理门禁）。 */
+export type GovernanceCardKind = GovernanceChoiceCardKind | GovernanceConfirmCardKind;
+
+/** 客户交互卡的治理元数据：并入 `CustomerInputRequest`（供桌面卡片显示）与 `CustomerInputMetadata`（供账本分类）。 */
+export interface GovernanceCardMetadata extends GovernanceFlowMetadata {
+  cardKind?: GovernanceCardKind;
+}
+
+/** 提案卡固定选项 id（评审 §5.8；非标准 id → 账本 `unclassified`，门禁拒绝并提示重发）。 */
+export type GovernanceProposalOptionId = "accept" | "accept-quick" | "revise" | "reject";
+
+/** 验收卡固定选项 id（评审 §5.8）。 */
+export type GovernanceAcceptanceOptionId = "accept" | "reject";
+
+/** 提案版本（评审 §6.3-3：一个提案最多 v2）。 */
+export type GovernanceProposalVersion = 1 | 2;
+
+/** 流程步骤种类（评审 §6.1 闭环：提案 → 流程/提名 → 派发 → 验收）。 */
+export type GovernanceStepKind = "proposal" | "nomination" | "dispatch" | "acceptance";
+
+/**
+ * 流程步骤状态（评审 §6.3 机械规则的中立形状；判定在编排，不在本层）：
+ * - `in-progress` 必须有主人（无主人的步骤不得 in-progress）；
+ * - 同一版本同一步骤第二次 `returned` → `escalated-to-customer`，三人停止转交；
+ * - 24h 无状态变化且无客户动作 → 只报 `paused`/`blocked`，不自动催办、不自动换人。
+ */
+export type GovernanceStepStatus =
+  | "pending"
+  | "in-progress"
+  | "returned"
+  | "escalated-to-customer"
+  | "paused"
+  | "blocked"
+  | "done";
+
+/** 流程单中的一个步骤（`docs/flows/<flowId>.md` 的中立形状；解析/判定归编排）。 */
+export interface GovernanceFlowStep {
+  stepId: GovernanceStepId;
+  kind: GovernanceStepKind;
+  /** 步骤主人（项目角色 id）；`in-progress` 时必须有主人（规则在编排）。 */
+  ownerRoleId?: string;
+  status: GovernanceStepStatus;
+}
+
+/** 提案步骤载荷（`docs/proposals/<flowId>-v<version>.md`；只定形状，不实现门禁）。 */
+export interface GovernanceProposalStepPayload {
+  flowId: GovernanceFlowId;
+  stepId?: GovernanceStepId;
+  cardKind: "proposal";
+  /** 提案文件的项目相对路径。 */
+  proposalPath: string;
+  version: GovernanceProposalVersion;
+}
+
+/** 任命步骤载荷（`docs/nominations/<flowId>-v<n>.md`；快捷路径 `accept-quick` 可没有提名文件）。 */
+export interface GovernanceAppointmentStepPayload {
+  flowId: GovernanceFlowId;
+  stepId?: GovernanceStepId;
+  cardKind: "appointment";
+  nominationPath?: string;
+  /** 客户任命的项目角色 id（任命决定的 `targetRoleIds`）。 */
+  targetRoleIds: readonly string[];
+  version: number;
+}
+
 export interface CustomerInputOption {
 
   id: string;
@@ -130,7 +227,7 @@ export interface CustomerInputOption {
   description?: string;
 }
 
-export type CustomerInputRequest =
+export type CustomerInputRequest = (
   | {
       kind: "confirm";
 
@@ -148,7 +245,9 @@ export type CustomerInputRequest =
 
       multiple?: boolean;
       preview?: string;
-    };
+    }
+) &
+  GovernanceCardMetadata;
 
 export type CustomerInputOutcome =
   | { outcome: "answered"; value: { confirmed?: boolean; selected?: string[] }; operatorId?: string }
@@ -163,6 +262,10 @@ export interface CustomerInputMetadata {
   runtime?: RuntimeKind;
   /** Original handler call identity for presentation only; missing legacy IDs stay missing. */
   toolCallId?: string;
+  /** 治理流程元数据（评审 §5.8）：仅当工具入参显式给出时透传；缺席＝旧形状，且不能解锁任何治理门禁。 */
+  flowId?: GovernanceFlowId;
+  stepId?: GovernanceStepId;
+  cardKind?: GovernanceCardKind;
 }
 
 export type CustomerInputFn = (
@@ -208,6 +311,14 @@ export interface DispatchTaskPayload {
   task: string;
 
   reason?: string;
+
+  /**
+   * 治理流程元数据（评审 §5.8/§6.3-5）：治理角色（Convener）派发须带 flowId+stepId
+   * （去重键在 `roleId\0task\0reason` 之外增 `flowId\0stepId`）；旧 su 调用可缺席＝旧行为。
+   * 字段本身不构成授权，派发范围门只认账本中的客户决定（判定在编排）。
+   */
+  flowId?: GovernanceFlowId;
+  stepId?: GovernanceStepId;
 }
 
 export interface DispatchReceipt {
@@ -570,6 +681,118 @@ export interface ShellVerdictPayload {
 
 export type ShellVerdictFn = (verdict: ShellVerdictPayload) => void | Promise<void>;
 
+// —————————————— 判断 agent（「替我审」）中立契约（2026-10-17，PM 评审 revision 2 §6.1） ——————————————
+//
+// 分层（PM 钉死）：中立类型＝本模块；只读工具/读取策略＝`src/common/runtime-core/shell-judge/`；
+// 一次性判断会话驱动＝编排（`createShellJudge`）。**`RuntimeAdapter` 不增加 `judgeShell`**——适配器
+// 只按注入工具集开会话。能力注入（非工具注入）：`GovernedToolsOptions.shellJudge` 注入后 Service 必须
+// 走 `buildShellJudgeTools`、不得走 `buildGovernedTools`；`RuntimeProviderOptions.judgeMode` 为中性标志
+// （Claude 适配器据此强制关闭 WebSearch/外来 MCP）。
+//
+// 客户拍板 D1：judge `allow` **可以放行 su `deny` 档**，但审计/聊天行必须标「deny 档 · judge 放行」
+// （`ShellJudgeAudit.tier === "deny"` + `hardDenyOverride === true`），不伪装成普通放行。
+
+/** 判断来源：su 审批档 / 项目角色升级。 */
+export type ShellJudgePolicy = "su-approval" | "project";
+
+/** 审批档位；`null`＝无档位（如普通项目升级）。 */
+export type ShellJudgeTier = "risky" | "review" | "deny" | null;
+
+/** 一次判断请求（由会话闭包按请求会话的 engine/projectRoot 组装；不信任渲染侧）。 */
+export interface ShellJudgeRequest {
+  command: string;
+  argv: string[];
+  cwd: string;
+  toolCallId: string;
+  roleId: string;
+  projectRoot: string;
+  runtime: RuntimeKind;
+  policy: ShellJudgePolicy;
+  tier: ShellJudgeTier;
+  /** (b) 升级原因 / su 审批档原因。 */
+  reason?: string;
+  /** 当前轮投递给该角色的文本（≤4KB）；不读原始转录/历史回放。 */
+  turnText?: string;
+}
+
+/** `deny` 的替代方案（文本；应用**不自动执行**）。 */
+export interface ShellJudgeAlternative {
+  kind: "command" | "tool" | "instruction";
+  value: string;
+  rationale?: string;
+}
+
+/** 模型可给出的裁决（经 `report_shell_judgement` 原样回调，规范化在编排侧）。 */
+export interface ShellJudgeVerdict {
+  verdict: "allow" | "deny" | "manual";
+  reason?: string;
+  customerMessage?: string;
+  evidence?: string[];
+  alternative?: ShellJudgeAlternative;
+}
+
+/** 运行时/编排补全后的结果（模型只能给 `ShellJudgeVerdict`）。 */
+export interface ShellJudgeOutcome extends ShellJudgeVerdict {
+  /** §6.4 状态码（`necessary` / `safer-alternative` / `no-alternative` / `manual` 等组）。 */
+  reasonCode: string;
+  customerMessageSynthesized?: boolean;
+  /** 实际使用的模型标识（可得则记；不参与 operatorId）。 */
+  model?: string;
+  /** 模型原始裁决（规范化时如实保留；客户 D1 的 deny 档放行**不转换**为 deny）。 */
+  modelVerdict?: "allow" | "deny" | "manual";
+  /** 请求的审批档位（客户 D1：`deny` 档放行须可见标注）。 */
+  tier?: ShellJudgeTier;
+  /** 客户 D1：judge `allow` 放行 su `deny` 档——审计/聊天行标「deny 档 · judge 放行」。 */
+  hardDenyOverride?: true;
+}
+
+export type ShellJudgeFn = (input: ShellJudgeRequest, signal?: AbortSignal) => Promise<ShellJudgeOutcome>;
+
+/**
+ * 判断 agent 自己做出 allow/deny 时的审计归因（`OperatorOutcome.allow/deny.judge`）。
+ * `manual` 后的客户手批是人工归因，**不写**本字段。
+ */
+export interface ShellJudgeAudit {
+  engine: RuntimeKind;
+  /** 实际使用的模型标识（可得则记；不参与 operatorId）。 */
+  model?: string;
+  /** 模型原始裁决（规范化时如实保留；客户 D1 的 deny 档放行**不转换**为 deny）。 */
+  modelVerdict?: "allow" | "deny" | "manual";
+  verdict: "allow" | "deny";
+  reasonCode: string;
+  reason?: string;
+  customerMessage?: string;
+  alternative?: ShellJudgeAlternative;
+  customerMessageSynthesized?: boolean;
+  /** 请求的审批档位（客户 D1：`deny` 档放行须可见标注）。 */
+  tier?: ShellJudgeTier;
+  /** 客户 D1：judge `allow` 放行了 su `deny` 档——审计/聊天行标「deny 档 · judge 放行」。 */
+  hardDenyOverride?: true;
+}
+
+/** 判断会话的读取统计（由只读工具累加；编排据此做「`allow` 必须无损」检查）。 */
+export interface ShellJudgeReadStats {
+  readCalls: number;
+  readBytes: number;
+  /** 策略拒绝次数（敏感/越界/非法/二进制）；预算耗尽只记 `budgetExceeded`，**不并入**本项。 */
+  deniedReads: number;
+  truncatedReads: number;
+  /** 预算耗尽（调用次数/总读取上限）——独立于 `deniedReads`；编排优先据此判 `budget`。 */
+  budgetExceeded: boolean;
+}
+
+/** 判断会话的只读工具选项（`GovernedToolsOptions.shellJudge`；能力注入，非工具注入）。 */
+export interface ShellJudgeToolOptions {
+  /** 请求会话的 projectRoot——读取根与越界判定基准。 */
+  projectRoot: string;
+  /** `report_shell_judgement` 回调：只收模型原始参数，**不在运行时核心做裁决规范化**。 */
+  report: (raw: unknown) => void;
+  /** 工具累加；驱动创建（`allow` 必须无损）。 */
+  stats: ShellJudgeReadStats;
+  /** 缺省：maxCalls 8、maxBytes 192KB、maxFileBytes 64KB。 */
+  budget?: { maxCalls?: number; maxBytes?: number; maxFileBytes?: number };
+}
+
 export interface RuntimeAdapter {
   composeContext(role: ResolvedRole): Promise<{ systemPrompt: string }>;
   bindRole(role: ResolvedRole): Promise<RoleSession>;
@@ -649,6 +872,13 @@ export interface GovernedToolsOptions {
   installMcp?: InstallMcpFn;
   /** G-4 V2：`uninstall_mcp` 能力（校验＋激活＋回执，不写盘）。只给 su 注入；未注入 ⇒ 工具不注册。 */
   uninstallMcp?: UninstallMcpFn;
+  /**
+   * 判断 agent（「替我审」）只读能力注入。**这是能力注入，不是工具注入**：注入后 Service 必须走
+   * `buildShellJudgeTools`（`src/common/runtime-core/shell-judge/`），**不得**走 `buildGovernedTools`——
+   * 判断会话结构性不构造写/编辑/shell/客户交互/回交/派发/MCP 工具。未注入 ⇒ 判断模式不成立。
+   * `RuntimeSessionOptions` 经 `Omit<GovernedToolsOptions, …>` 继承本字段，无需另行声明。
+   */
+  shellJudge?: ShellJudgeToolOptions;
 }
 
 export interface RuntimeSessionRecord {
@@ -746,6 +976,13 @@ export interface RuntimeProviderOptions {
    *   语义保留）。
    */
   reasoningEffort?: ReasoningEffortV1;
+  /**
+   * 判断 agent 会话的中性标志（2026-10-17 PM 评审 §6.1）：Service 在 `shellJudge` 注入时置 `true`，
+   * 同时把 `installedMcpServers` 置 `[]`。Claude 适配器据此**强制**关闭 WebSearch（忽略
+   * `ANS_CLAUDE_WEB_SEARCH`）与外来 MCP，只保留注入的 judge 工具；Pi/Codex 可忽略本字段。
+   * 未设＝字段缺席＝逐字现状。
+   */
+  judgeMode?: true;
 }
 export type RuntimeProviderFactory = (options: RuntimeProviderOptions) => RuntimeAdapter | Promise<RuntimeAdapter>;
 

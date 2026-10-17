@@ -11,12 +11,14 @@
 //    仅在 createPiRuntimeAdapter 返回对象的 bindRole 被调用时经动态 import 懒加载。
 
 import type { ResolvedRole } from "../../model/role.ts";
+import type { WriteDecision } from "../../model/decision.ts";
 import { randomUUID } from "node:crypto";
-import { buildGovernedTools } from "./tools.ts";
+import { buildGovernedTools, buildShellJudgeTools } from "./tools.ts";
 import { createInteractionGate } from "../../common/pi-adapter/timeout.ts";
 import { createEventQueue } from "../../common/pi-adapter/event-queue.ts";
 import { resolvePiProviderConfig, type PiProviderConfigInput } from "../../common/pi-adapter/provider-config.ts";
 import { renderInstalledSkillsSection } from "../../common/编排/installed-skills.ts";
+import type { PiAdapterDependencies, RealPiAdapterOptions } from "../../common/pi-adapter/real-adapter.ts";
 
 // The neutral Model is the sole contract owner. Explicit old-path compatibility exports.
 export type {
@@ -30,7 +32,15 @@ export type {
 import type {
   ToolCall, SessionEvent, PromptOptions, RoleSession, WriteGate, ShellGate, CustomerInputFn,
   ReportHandbackFn, DispatchTaskFn, ShellVerdictFn, RuntimeAdapter, RuntimeProviderOptions,
+  ShellJudgeToolOptions,
 } from "../../model/runtime.ts";
+
+/** 判断会话的写门禁：即便调用方误接写工具，也一律拒绝（工具本身不会注册）。 */
+const DENY_ALL_WRITE_GATE: WriteGate = (targetPath: string): WriteDecision => ({
+  allowed: false,
+  reason: `判断会话不提供写能力（未授予写权：${targetPath}）`,
+  allowedByRoot: { skill: [], project: [] },
+});
 
 // —————————————————————— 公共辅助 ——————————————————————
 
@@ -114,6 +124,13 @@ export function createFakeRuntimeAdapter(opts: {
    * （**只给审读会话**——由调用方以是否注入表达；同 `shellGate` 先例）。
    */
   shellVerdict?: ShellVerdictFn;
+  /**
+   * 判断 agent（「替我审」）只读工具选项（PM 评审 2026-10-17 §6.1）。**注入即判断模式**：
+   * 只走运行时核心的 `buildShellJudgeTools`（恰 `judge_read_file`/`judge_list_dir`/
+   * `report_shell_judgement` 三只只读工具）；**不得**构造 write/edit/run_shell/客户交互/回交/派发
+   * 工具，也不注入 ShellGate、客户通道、回交/派发能力。未注入 ⇒ 普通假适配器路径逐字不变。
+   */
+  shellJudge?: ShellJudgeToolOptions;
 }): RuntimeAdapter {
   const script = opts.script ?? DEFAULT_FAKE_SCRIPT;
 
@@ -124,18 +141,22 @@ export function createFakeRuntimeAdapter(opts: {
 
     async bindRole(role: ResolvedRole): Promise<RoleSession> {
       void role;
-      const tools = buildGovernedTools(opts.gate, {
-        readRoot: opts.readRoot,
-        writeRoot: opts.writeRoot,
-        shellGate: opts.shellGate,
-        shellCwd: opts.shellCwd,
-        shellReviewTimeoutMs: opts.shellReviewTimeoutMs,
-        customerInput: opts.customerInput,
-        customerInputTimeoutMs: opts.customerInputTimeoutMs,
-        reportHandback: opts.reportHandback,
-        dispatchTask: opts.dispatchTask,
-        shellVerdict: opts.shellVerdict,
-      });
+      // 判断模式：能力注入（非工具注入）。只构造运行时核心的只读工具集——结构性不出现
+      // write/edit/run_shell/客户交互/回交/派发/MCP/网络工具（PM 评审 §6.2/§7.1）。
+      const tools = opts.shellJudge !== undefined
+        ? buildShellJudgeTools(opts.shellJudge)
+        : buildGovernedTools(opts.gate, {
+            readRoot: opts.readRoot,
+            writeRoot: opts.writeRoot,
+            shellGate: opts.shellGate,
+            shellCwd: opts.shellCwd,
+            shellReviewTimeoutMs: opts.shellReviewTimeoutMs,
+            customerInput: opts.customerInput,
+            customerInputTimeoutMs: opts.customerInputTimeoutMs,
+            reportHandback: opts.reportHandback,
+            dispatchTask: opts.dispatchTask,
+            shellVerdict: opts.shellVerdict,
+          });
       const byName = new Map(tools.map((t) => [t.name, t]));
       const queue = createEventQueue<SessionEvent>();
 
@@ -256,6 +277,20 @@ export interface PiRuntimeAdapterOptions extends PiProviderConfigInput {
   constructTimeoutMs?: number;
   /** shell 审核硬超时（毫秒）；缺省读 ANS_PI_SHELL_REVIEW_TIMEOUT_MS，再缺省 120000。超时 = 拒绝。 */
   shellReviewTimeoutMs?: number;
+  /**
+   * 判断 agent（「替我审」）只读工具选项（PM 评审 2026-10-17 §6.1）。**注入即判断模式**：
+   * 本 legacy 分支只经运行时核心 `buildShellJudgeTools` 构造恰三只只读工具，
+   * **不**走 `buildGovernedTools`、**不**注入 ShellGate/客户通道/回交/派发能力，
+   * 且不持久化（忽略 `sessionDir`/`storage`）。未注入 ⇒ 普通路径逐字不变。
+   */
+  shellJudge?: ShellJudgeToolOptions;
+  /**
+   * 判断会话的中性标志（`RuntimeProviderOptions.judgeMode` 的兼容形态）。Service 生产入口直接传
+   * `RuntimeProviderOptions`；legacy 直接调用者可只注入 `shellJudge`，二者任一成立即判断模式。
+   */
+  judgeMode?: true;
+  /** 测试注入：仅单测使用（真实生产不传），原样透传给私有 real-adapter。 */
+  dependencies?: PiAdapterDependencies;
 }
 
 export function createPiRuntimeAdapter(opts: RuntimeProviderOptions): RuntimeAdapter;
@@ -264,44 +299,81 @@ export function createPiRuntimeAdapter(opts: RuntimeProviderOptions | PiRuntimeA
   const input = { ...opts };
   if ("runtime" in input && input.runtime !== "pi") throw new Error(`Pi 适配器不支持 runtime: ${input.runtime}`);
   const config = resolvePiProviderConfig(input, process.env);
+  // 判断模式：`shellJudge` 注入（legacy 直接调用）或 Service 置 `judgeMode`（生产装配）。
+  const judgeShell = (input as { shellJudge?: ShellJudgeToolOptions }).shellJudge;
+  const judgeMode = judgeShell !== undefined || (input as { judgeMode?: true }).judgeMode === true;
+  // 测试注入面只给单测，不透进适配器选项（避免被当作未知字段消费）。
+  const { dependencies, ...adapterInput } = input as (RuntimeProviderOptions | PiRuntimeAdapterOptions) & {
+    dependencies?: PiAdapterDependencies;
+  };
   const load = () => import("../../common/pi-adapter/real-adapter.ts");
   return {
     async composeContext(role) {
       // No SDK initialization is needed to render this text.
-      return { systemPrompt: renderSystemPrompt(role, input.projectRoot) };
+      return { systemPrompt: renderSystemPrompt(role, adapterInput.projectRoot) };
     },
     async bindRole(role) {
       const mod = await load();
-      if ("tools" in input) {
-        return mod.createRealPiRuntimeAdapter({ ...input, config }).bindRole(role);
+      if ("tools" in adapterInput) {
+        // Service 生产入口：工具集已在装配层定形（判断模式恰三只 judge 工具）；本层纯消费。
+        return mod.createRealPiRuntimeAdapter({
+          ...adapterInput, config,
+          ...(judgeMode ? { judgeMode: true as const } : {}),
+        }, dependencies).bindRole(role);
       }
       // Approved v1 compatibility edge: public Pi facade -> public core tool operations.
       // Production Service inputs never take this branch or recreate tools.
       const interactionGate = createInteractionGate();
-      let turnId: string | undefined;
-      const currentTurnId = () => turnId;
-      const tools = buildGovernedTools(input.gate, {
-        ...input, readRoot: input.projectRoot, writeRoot: input.projectRoot,
-        shellCwd: input.projectRoot, interactionGate, currentTurnId, runtime: "pi", roleId: role.id,
+      const turn: { id?: string } = {};
+      const currentTurnId = () => turn.id;
+
+      if (judgeMode) {
+        // 判断模式（legacy 直接调用）：**只**构造运行时核心的只读工具集，且不注入
+        // ShellGate/客户交互/回交/派发/审读能力；写门禁为 deny-all（纵深防御），
+        // 持久化被结构性关闭（sessionDir/storage 置空；real-adapter 侧另有 judgeMode 守卫）。
+        if (judgeShell === undefined) throw new Error("判断模式需要注入 shellJudge 只读工具选项");
+        const judgeTools = buildShellJudgeTools(judgeShell);
+        // `gate` 不是 real-adapter 的选项字段（其工具已定形），用交叉类型承载 deny-all 纵深防御。
+        const realOptions = {
+          ...adapterInput, config, runtime: "pi", tools: judgeTools, interactionGate, currentTurnId,
+          judgeMode: true,
+          gate: DENY_ALL_WRITE_GATE,
+          shellGate: undefined, shellCwd: undefined, shellReviewTimeoutMs: undefined,
+          customerInput: undefined, customerInputTimeoutMs: undefined,
+          reportHandback: undefined, dispatchTask: undefined, shellVerdict: undefined,
+          sessionDir: undefined, storage: undefined, installedMcpServers: [],
+        } as RealPiAdapterOptions & { gate: WriteGate };
+        const inner = await mod.createRealPiRuntimeAdapter(realOptions, dependencies).bindRole(role);
+        return wrapSession(role, inner, turn);
+      }
+
+      const tools = buildGovernedTools(adapterInput.gate, {
+        ...adapterInput, readRoot: adapterInput.projectRoot, writeRoot: adapterInput.projectRoot,
+        shellCwd: adapterInput.projectRoot, interactionGate, currentTurnId, runtime: "pi", roleId: role.id,
         extraCredentialEnvVars: config.apiKeyEnvVar ? [config.apiKeyEnvVar] : [],
       });
       const inner = await mod.createRealPiRuntimeAdapter({
-        ...input, config, runtime: "pi", tools, interactionGate, currentTurnId,
-      }).bindRole(role);
-      return {
-        runtime: "pi", roleId: role.id,
-        get contextSource() { return inner.contextSource; },
-        get nativeSessionId() { return inner.nativeSessionId; },
-        get contextWarning() { return inner.contextWarning; },
-        async prompt(text, options) {
-          if (turnId) throw new Error("Agent is already processing a prompt.");
-          turnId = randomUUID();
-          try { await inner.prompt(text, options); } finally { turnId = undefined; }
-        },
-        events: () => inner.events(),
-        abort: () => inner.abort?.(),
-        dispose: () => inner.dispose(),
-      };
+        ...adapterInput, config, runtime: "pi", tools, interactionGate, currentTurnId,
+      }, dependencies).bindRole(role);
+      return wrapSession(role, inner, turn);
     },
+  };
+}
+
+/** 会话外壳：生产/legacy 两条路径共用（turn 去重与只读属性透传语义逐字一致）。 */
+function wrapSession(role: ResolvedRole, inner: RoleSession, turn: { id?: string }): RoleSession {
+  return {
+    runtime: "pi", roleId: role.id,
+    get contextSource() { return inner.contextSource; },
+    get nativeSessionId() { return inner.nativeSessionId; },
+    get contextWarning() { return inner.contextWarning; },
+    async prompt(text, options) {
+      if (turn.id) throw new Error("Agent is already processing a prompt.");
+      turn.id = randomUUID();
+      try { await inner.prompt(text, options); } finally { turn.id = undefined; }
+    },
+    events: () => inner.events(),
+    abort: () => inner.abort?.(),
+    dispose: () => inner.dispose(),
   };
 }

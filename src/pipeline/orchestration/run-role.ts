@@ -73,6 +73,7 @@ import type {
   RuntimeLiveReportDraftV1,
   RuntimeLegacyHistoryEntryV1,
   RuntimeLegacyHistoryProjectionV1,
+  ShellJudgeToolOptions,
 } from "../../model/runtime.ts";
 import { createRuntimeAdapter, projectRuntimeLiveHandback, projectRuntimeLegacyHistory, type RuntimeSessionOptions } from "../../service/runtime/session.ts";
 import { RUNTIME_KINDS } from "../../common/shared/runtime-shared.ts";
@@ -153,6 +154,15 @@ export interface AdapterCapabilities {
   uninstallSkill?: UninstallSkillFn;
   installMcp?: InstallMcpFn;
   uninstallMcp?: UninstallMcpFn;
+  /**
+   * 判断 agent（「替我审」）只读能力（2026-10-17 PM 评审 §6.1/§6.3）。**能力注入，不是工具注入**：
+   * 给出时运行时核心走 `buildShellJudgeTools`（恰 `judge_read_file`/`judge_list_dir`/
+   * `report_shell_judgement`），**不得**走 `buildGovernedTools`；`judgeMode:true` 与
+   * `installedMcpServers:[]` 由 Service 自动置位。形状单一来源＝`model/runtime.ts`。
+   * 只由编排的 `createShellJudge` 经 `createAdapter(gate, {persistSession:false, shellJudge})` 注入；
+   * 普通角色会话不传（未注入 ⇒ 工具不注册）。
+   */
+  shellJudge?: ShellJudgeToolOptions;
 }
 
 export interface RunRoleInput {
@@ -1115,6 +1125,10 @@ export function createRuntimeAdapterFactory(
     // `undefined` ⇒ 对应工具不注册（能力缺席 = 最强 fail-closed，同 install_skill 先例）。
     installMcp: capabilities?.installMcp,
     uninstallMcp: capabilities?.uninstallMcp,
+    // 「替我审」判断会话：只读能力注入（运行时核心 `GovernedToolsOptions.shellJudge` 同名能力位）。
+    // 注入 ⇒ Service 走 `buildShellJudgeTools` + `judgeMode:true` + 外来 MCP 置空；
+    // `undefined` ⇒ 普通会话（逐字现状）。
+    shellJudge: capabilities?.shellJudge ?? options.shellJudge,
     shellGate: capabilities?.shellGate ?? options.shellGate,
     shellVerdict: capabilities?.shellVerdict,
   });

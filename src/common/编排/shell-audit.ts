@@ -16,7 +16,7 @@
 
 import { appendFile, mkdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-import type { WriteGate } from "../../model/runtime.ts";
+import type { ShellJudgeAudit, WriteGate } from "../../model/runtime.ts";
 import type { BoundarySection1 } from "../../model/boundary.ts";
 import type { TaskScope } from "../../model/decision.ts";
 import { resolveWrite } from "../../service/gate/resolve-write.ts";
@@ -57,7 +57,15 @@ export function buildShellAuditGate(
  *   不可用/未接入则记 `...:unavailable` / `...:超时` / `...:通道未接入` 等。**各层身份都可辨识**（§7.6）。
  * - `conditions`：本次写入声明的条件（**须含 `shell-gate`**）；
  * - `execution`：执行结果——exit code（数字）或「未执行」。
+ * - `judge`：**可选**，只在判断 agent（「替我审」）自己做出 `allow`/`deny` 时出现；`manual` 后的客户手批
+ *   是人工归因，**不写**本字段。deny 档被 judge 放行时带 `tier:"deny"` + `hardDenyOverride:true`
+ *   （+ `label:"deny 档 · judge 放行"`），让审计能看出这是模型推翻了硬拒类（客户 D1）。
  */
+export interface ShellJudgeAuditRecord extends ShellJudgeAudit {
+  /** 客户 D1：deny 档放行的人工可读标记；仅 `hardDenyOverride` 时出现。 */
+  label?: "deny 档 · judge 放行";
+}
+
 export interface ShellAuditRecord {
   timestamp: string;
   toolCallId: string;
@@ -69,6 +77,7 @@ export interface ShellAuditRecord {
   by: string;
   conditions: string[];
   execution: number | "未执行";
+  judge?: ShellJudgeAuditRecord;
 }
 
 /** 审计落盘结果；false 时 reason 说明为何未落盘（如条件缺失被门禁拒绝）。 */

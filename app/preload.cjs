@@ -169,6 +169,26 @@ contextBridge.exposeInMainWorld("desktop", {
     }),
 
   /**
+   * 「替我审」开关（2026-10-17 PM 评审 §6.6，方法名钉死）：主进程是权威状态（默认 false、重载复位）。
+   * `getShellJudgeState()` 返回 `{version:1, ok, enabled?, error?}`；`setShellJudgeEnabled(enabled)` 仅提交意图，
+   * **以主进程返回为准**（失败不改状态，渲染侧不得显示假开启态）。**不暴露任何 Node/fs/process 能力。**
+   */
+  getShellJudgeState: () => ipcRenderer.invoke("shell:judge-get"),
+  setShellJudgeEnabled: (enabled) => ipcRenderer.invoke("shell:judge-set", { enabled: enabled === true }),
+  /** 订阅开关状态（开关变化 / 重载复位 / 初次加载后推送）；载荷 `{version:1, enabled}`。返回取消订阅函数。 */
+  onShellJudgeState: (cb) => {
+    const listener = (_event, payload) => cb(payload);
+    ipcRenderer.on("shell:judge-state", listener);
+    return () => ipcRenderer.removeListener("shell:judge-state", listener);
+  },
+  /** 订阅判断结果行（`ShellJudgeResultPayload`；按 `roleId` 落 pane、按 `toolCallId` 锚定）。返回取消订阅函数。 */
+  onShellJudgeResult: (cb) => {
+    const listener = (_event, payload) => cb(payload);
+    ipcRenderer.on("shell:judge-result", listener);
+    return () => ipcRenderer.removeListener("shell:judge-result", listener);
+  },
+
+  /**
    * 订阅「恢复确认请求」（G-2/W5，2026-10-16 客户批准）：su 经 `propose_recovery` 提议恢复动作
    * （停止本轮 / 重建会话 / 重投任务，带逐字证据）时，主进程把卡推来——渲染侧渲染为确认卡
    * （**取消为默认焦点**）。载荷 `{id, projectRoot?, runtime?, roleId, action, evidence, reason?,

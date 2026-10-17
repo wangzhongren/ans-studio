@@ -833,3 +833,28 @@
 ## 2026-10-14 O1 多运行时契约迁移
 
 客户已批准 ANS-RUNTIME-V2 revision 1 必要迁移，未扩写集。CLI/四件 Pipeline/私有 common 改走中立Model与Service、四引擎选择、隔离持久化和实际上下文；确认issuer以原signal拒绝迟到yes。本角色159/159 Pipeline、238/238回归、严格scoped tsc0；最新当前工作区全仓编译exit0（Claude/MCP/zod已可见）；B0正常依赖清单、默认Pi迁移/P1和整合尚待验。原始候选与路径见 [变更证据](docs/change/2026-10-14_change_multi-runtime-orchestration.md)。
+
+## 2026-10-17 — 「替我审」判断 agent（P2 编排驱动与审计透传）
+
+**来源**：PM 评审 `2026-10-17_design_shell-auto-approve-review.md`（approved，revision 2；客户 D1/D2 已拍板）§十四 P2；任务书要求「驱动落 `src/common/编排/shell-judge.ts`、经既有 `govern-session.ts` 薄再导出，不新增 pipeline 单文件」。本批只改编排边界（`src/common/编排/`、`src/pipeline/orchestration/{run-role,govern-session}.ts`、`test/编排/`），**未碰适配器、运行时核心（含 `src/service/runtime/session.ts`）、桌面、UI**。
+
+**改了什么**
+- 新增 `src/common/编排/shell-judge.ts`：`createShellJudge(opts): ShellJudgeFn` + `SHELL_JUDGE_SUPPORTED_RUNTIMES = {claude,pi,codex}` + `SHELL_JUDGE_DENY_TIER_LABEL = "deny 档 · judge 放行"` + `shellJudgeAuditOf`。
+  - 合成判断角色 `shell-judge`（空边界、系统提示来自 prompt 模块）；判断专用适配器 `persistSession:false` + `shellJudge` 只读能力注入 + deny-all 写门禁；缺省工厂动态取 Pipeline `createRuntimeAdapterFactory(project, runtime, runtimeOptions)`（测试注入假 `createAdapter`）。
+  - 15s 硬超时（`AbortController` + `AbortSignal.any`）、中止即 `abort()`+`dispose()`、迟到 `bindRole` 补 `dispose()`；超时前已捕获合法结论保留（超时只中止等待）。
+  - 防循环 Map：同命令 `deny` +1、`allow` 删除、`manual` 不递增；上限缺省 2 → `manual/retry-capped`（不调用模型）。busy 并发 → `manual/unavailable`。
+  - 支持矩阵/上下文检查在驱动层：`demo` → `unsupported-engine`；命令 >16KB / argv >256 → `context-too-large`；命令缺失 → `context-missing`；会话开不了 → `unavailable`；输出非法 → `parse-failed`；模型自报 → `model-manual`。
+  - **`allow` 必须无损**：`deniedReads>0`/`budgetExceeded`/`truncatedReads>0` → 分别降 `read-denied`/`budget`/`read-truncated`；**`deny` 始终有效**。
+  - **客户 D1**：`request.tier === "deny"` 且模型 allow → 照常 `allow`，置 `hardDenyOverride:true` + `label`；不转换、不拦截、不弹卡。
+- 新增 `src/common/编排/shell-judge-verdict.ts`：`normalizeShellJudgeVerdict`（严格三值、allow 必须有 reason、文本 2KB/证据 10×512B 有界）、`synthesizeCustomerMessage`（含标准出路「如需执行，请关闭『替我审』后重试。」、已含不重复、内部行话不转述）、`redactJudgeText`/`redactJudgeVerdict`（环境凭据 ≥8 字符、Bearer/sk-/api-key 形态脱敏 + 有界截断）、`boundedJudgeText`、`hasInternalJargon`。
+- 新增 `src/common/编排/shell-judge-prompt.ts`：稳定系统提示（五维 rubric、deny 档特殊规则、不可信数据警告、只读工具与 `report_shell_judgement` 输出契约）与本次请求提示（只放命令/argv/cwd/来源/档位/原因/当前轮文本；turnText ≤4KB 截断；不复述历史）。
+- 改 `src/common/编排/shell-gate.ts`：`ReviewOutcome` 增可选 `judge`；`runA` 的 allow/deny 透传 `OperatorOutcome.judge`，`denyOutcome` 增可选参数；审计记录写可选 `judge`。`(c)/(b)` 顺序、fail-closed、超时/拒绝语义逐字不变。
+- 改 `src/common/编排/shell-audit.ts`：`ShellAuditRecord.judge?: ShellJudgeAuditRecord`（含可选 `label`），向后兼容。
+- 改 `src/pipeline/orchestration/run-role.ts`：`AdapterCapabilities.shellJudge?: ShellJudgeToolOptions`；`createRuntimeAdapterFactory` 逐名并入 Service 会话构造（运行时核心 `GovernedToolsOptions.shellJudge` 同名能力位）。**未给 `RuntimeAdapter` 加 judgeShell 方法**。
+- 改 `src/pipeline/orchestration/govern-session.ts`：薄再导出 `createShellJudge`/`SHELL_JUDGE_SUPPORTED_RUNTIMES`/`CreateShellJudgeOptions`/`ShellJudgeFn`/`ShellJudgeOutcome`（桌面不跨角色导入私有 common）。
+
+**测试**：新增 `test/编排/shell-judge.test.ts` 27 例（离线、假适配器；绝不调真实模型/凭据/网络）：三态与 reasonCode 全表、deny 有/无替代、读取损伤 allow→manual 且 deny 不变、D1 deny 档放行、超时保留结论/中止/预中止、迟到 bindRole dispose、防循环（上限/allow 清零/manual 不递增）、busy、支持矩阵、不可用、上下文缺失/超限、工具集恰三项与写门禁 deny-all、审计透传 judge（allow/deny/人工不带）、规范化/合成/脱敏/prompt 单元。本文件 27/27；`test/编排/**` 396 计 395 过 1 红（既有 Windows symlink EPERM）。全量三层 glob（`--test-force-exit` 收口本环境泄漏句柄）**2421 计 2398 过 20 红 / 3 skipped**——20 红均为既有环境（Windows symlink EPERM / CRLF 行尾精确钉）或他角色在途（桌面 UI/窗口、运行时核心），**本批零新增红**；不带 `--test-force-exit` 时本机会被 `test/runtime-core/prompt-start-acknowledgement.test.ts` 的子进程泄漏句柄拖住（该文件单独跑 5/5 通过，非本批文件）。
+
+**边界与残余**：只读工具/策略/预算在运行时核心（P1），三适配器 judgeMode 在 P3a–c，桌面开关/三态映射/结果行在 P4/P5；本批不接真实模型，端到端由测试角色独立验证。
+
+**验收缺陷修正（测试角色独立验收）**：第 9 次读取（调用预算耗尽）在运行时核心同时计入 `deniedReads` 并置 `budgetExceeded`；`damageCode` 判定顺序改为 **budget → read-truncated → read-denied**（以 `stats.budgetExceeded` 为准，不依赖单次读取错误码），避免把「判断预算耗尽」误报成「文件不可读」；预算的人话改为「判断预算耗尽（读取次数/总读取字节达上限）」。测试补两个预算优先用例（第 9 次读取 / 与截断同时）并断言预算文案不含「文件不可读」；敏感/越界仍 `read-denied`、截断仍 `read-truncated`、allow 遇任一损伤仍降 manual。

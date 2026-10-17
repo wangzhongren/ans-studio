@@ -6,7 +6,7 @@ import path from "node:path";
 import os from "node:os";
 import { randomUUID } from "node:crypto";
 import type { ResolvedRole } from "../../model/role.ts";
-import type { RuntimeAdapter, RuntimeProviderOptions, RoleSession, SessionEvent, ToolResult, RuntimeTurnOutcome, RuntimeToolEventFactsV1, RuntimeToolErrorFactsV1, InstalledMcpServerV1 } from "../../model/runtime.ts";
+import type { RuntimeAdapter, RuntimeProviderOptions, RoleSession, SessionEvent, ToolDefinition, ToolResult, RuntimeTurnOutcome, RuntimeToolEventFactsV1, RuntimeToolErrorFactsV1, InstalledMcpServerV1 } from "../../model/runtime.ts";
 import { object, deferred, eventQueue, pausedDeadline, bounded, webSearchRow, mcpToolName, mcpToolCallNative, isReasoningParamRejection } from "../../common/codex-adapter/protocol.ts";
 import type { CodexRpcConnection, CodexEngineInput, CodexEngineFactory } from "../../common/codex-adapter/protocol.ts";
 import { settings, safetyConfig, safetyOverrides, effectiveConfig, verifyThread, reasoningEffortOverride } from "../../common/codex-adapter/config.ts";
@@ -22,6 +22,9 @@ import { createDiagnosticLogger } from "../../common/shared/diagnostics.ts";
 import { retryOnTransient } from "../../common/shared/atomic-write.ts";
 // G-4「已安装技能」注入节：渲染单一来源在编排（installed-skills.ts）——本适配器只做「非空则整段拼接」。
 import { renderInstalledSkillsSection } from "../../common/编排/installed-skills.ts";
+// 判断 agent（「替我审」）结构性隔离（2026-10-17 PM 评审 §6.1/§7.1/§十一 P3c）：judge 会话只消费
+// 运行时核心注入的三只只读工具，工具名冻结集合由运行时核心单一来源提供（本适配器不另造名单）。
+import { SHELL_JUDGE_TOOL_NAMES } from "../../common/runtime-core/shell-judge/tools.ts";
 
 export type { CodexRpcConnection, CodexEngineInput, CodexEngineFactory } from "../../common/codex-adapter/protocol.ts";
 
@@ -107,6 +110,19 @@ async function loadMcp(): Promise<CodexMcpModules> {
     const [server, client, memory, types] = await Promise.all(names.map(name => import(name)));
     return { Server: server.Server, Client: client.Client, InMemoryTransport: memory.InMemoryTransport, ListToolsRequestSchema: types.ListToolsRequestSchema, CallToolRequestSchema: types.CallToolRequestSchema };
   } catch { throw new Error("Codex requires @modelcontextprotocol/sdk@1.32.1"); }
+}
+
+const JUDGE_TOOL_NAME_SET: ReadonlySet<string> = new Set(SHELL_JUDGE_TOOL_NAMES);
+/**
+ * 判断模式（「替我审」）工具集校验（PM 评审 §7.1/A12/A35）：judge 会话**恰**接受运行时核心注入的
+ * `judge_read_file`/`judge_list_dir`/`report_shell_judgement`。写入/编辑/shell/客户交互/回交/派发
+ * 工具即便被误注入也**不进入**原生工具面与 MCP 目录——装配前抛错、零副作用（fail closed）。
+ * 普通角色会话不经过本函数（逐字不变）。
+ */
+function assertJudgeToolSet(tools: readonly ToolDefinition[]): void {
+  if (tools.length !== JUDGE_TOOL_NAME_SET.size || tools.some(tool => !JUDGE_TOOL_NAME_SET.has(tool.name))) {
+    throw new Error(`Codex judge session accepts only the shell judge tools (${SHELL_JUDGE_TOOL_NAMES.join(", ")})`);
+  }
 }
 
 /** JSON-RPC transport owns the native process; importing this module starts nothing. */
@@ -293,15 +309,23 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
   if (options.toolDisplayMode === "required-v1" && (typeof options.projectToolEvent !== "function" || typeof options.registerToolDisplayProfile !== "function")) {
     throw new Error("Codex required-v1 tool display requires projector/register capabilities");
   }
+  const judgeMode = options.judgeMode === true;
+  // 判断模式：装配前做结构性工具集校验（零副作用）；普通角色会话不受影响。
+  if (judgeMode) assertJudgeToolSet(options.tools);
   // G-4 installed-skills section: the render is the single orchestration source (hash/matching/bad-file
   // handling all live there). Non-empty splices the whole section verbatim as one prompt segment; empty
   // string renders nothing (zero-skill status quo stays byte-identical).
   const composeContext = async (role: ResolvedRole) => {
-    const installedSkills = renderInstalledSkillsSection(options.projectRoot, role.id);
+    // 判断会话不拼接项目技能注入节：判断只按稳定 rubric + 按需 judge_read_file 读证据，
+    // 不让角色/技能文本进入系统提示（普通角色会话逐字不变）。
+    const installedSkills = judgeMode ? "" : renderInstalledSkillsSection(options.projectRoot, role.id);
     return { systemPrompt: [
       role.cardText,
       `固定角色：${role.id}。实际项目目录：${options.projectRoot}。`,
-      "只通过 ans_ 前缀工具执行项目读取、修改、命令、交互和回交；原生运行环境只读。派发不转移授权。",
+      // 判断会话只有只读工具：明确告知可用面，避免模型在不存在的能力上反复尝试（普通会话逐字不变）。
+      judgeMode
+        ? "本会话是只读判断会话：只通过 ans_ 前缀的 judge_read_file/judge_list_dir 读取项目，并用 report_shell_judgement 交回结论；没有写入、命令、客户交互或派发工具。"
+        : "只通过 ans_ 前缀工具执行项目读取、修改、命令、交互和回交；原生运行环境只读。派发不转移授权。",
       `角色写入边界：${JSON.stringify(role.boundary)}`,
       ...options.tools.flatMap(tool => tool.promptGuidelines ?? []),
       ...(installedSkills === "" ? [] : [installedSkills]),
@@ -311,22 +335,28 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
   return {
     composeContext,
     async bindRole(role) {
+      // 判断模式再校验一次（options 在工厂与 bind 之间可能被误改；仍为零副作用）。
+      if (judgeMode) assertJudgeToolSet(options.tools);
       // Resolve authentication, profile registration and child environment from one snapshot.
       const environmentSnapshot = { ...(options.env ?? process.env) };
-      const config = settings(options, environmentSnapshot);
+      // 判断模式强制关闭 server-side web search（忽略 options.webSearch 与 ANS_CODEX_WEB_SEARCH，
+      // PM 评审 §6.1/A35：引擎原生工具/网络一律不得进入判断会话）。
+      const config = settings(judgeMode ? { ...options, webSearch: false } : options, environmentSnapshot);
       options.registerToolDisplayProfile?.({
         apiKeyEnvVar: config.keyName,
         credentials: [...new Set([config.keyName, ...(options.toolDisplayCredentialEnvNames ?? [])])]
           .map(name => ({ name, value: environmentSnapshot[name] })),
       });
-      const storage = options.storage;
+      // 判断模式不持久化：即便上游误传 storage 也不读/不写会话记录（PM 评审 §6.3 `persistSession:false`）。
+      const storage = judgeMode ? undefined : options.storage;
       if (storage && (storage.runtime !== "codex" || storage.roleId !== role.id)) throw new Error("Codex storage role/runtime mismatch");
       const toolMap = new Map(options.tools.map(tool => [tool.name, tool]));
       if (toolMap.size !== options.tools.length || options.tools.some(tool => !/^[A-Za-z0-9_-]{1,60}$/.test(tool.name))) {
         throw new Error("Codex tools require unique valid ANS names");
       }
       // G-4 V2：已安装 MCP 的校验/展开（装配前、零副作用）与白名单名集（进程/线程/目录三处恰等、降级面共用）。
-      const installedServers = prepareInstalledMcpServers(options.installedMcpServers ?? [], environmentSnapshot);
+      // 判断模式：外来 MCP 一律不装配（即使上游误传声明也置空——PM 评审 §6.1/A35）。
+      const installedServers = prepareInstalledMcpServers(judgeMode ? [] : options.installedMcpServers ?? [], environmentSnapshot);
       const allowedServers = new Set(installedServers.map(server => server.name));
       // G-5：推理强度接线面（注入判定＝会话级；off＝无该档不注入另有如实行）+ 降级闸（会话级恰一次）+ 降级诊断。
       const reasoningInjected = reasoningEffortOverride(config.reasoningEffort) !== undefined;
@@ -360,6 +390,12 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
       };
       const emit = (turn: TurnState | undefined, kind: SessionEvent["kind"], summary: string, detail?: unknown) => {
         queue.push({ runtime: "codex", roleId: role.id, ...(turn ? { turnId: turn.ansId } : {}), kind, summary: config.redact(summary), ...(detail === undefined ? {} : { detail: scrub(detail) }) });
+      };
+      // 原生越权信号单点处置（既有「command/file 工具」先例；判断模式另把 MCP/网络搜索计入同一处置）。
+      const quarantineForbidden = (turn: TurnState, failure: string): void => {
+        turn.failure = failure;
+        quarantined = true; turn.reason = "failed"; turn.controller.abort(); turn.done.resolve("failed");
+        void engine!.close().catch(error => { turn.failure = config.redact(error); });
       };
       // Projected display text is already protected; never recursively scrub its opaque IDs.
       const emitTool = (turn: TurnState, facts: RuntimeToolEventFactsV1, legacyKind: SessionEvent["kind"], legacySummary: string, legacyDetail: unknown) => {
@@ -570,6 +606,8 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
                 if (item.type === "webSearch") {
                   turn.outputSeen = true;
                   turn.searchCalls += 1;
+                  // 判断会话禁止网络/原生搜索（PM 评审 §6.1/A35）：网关仍报搜索＝原生能力泄漏，隔离该轮。
+                  if (judgeMode) { quarantineForbidden(turn, "Codex reported a native web search in a read-only judge session; session quarantined"); return; }
                   const row = webSearchRow(item);
                   emit(turn, "message", row.summary, row.detail);
                 }
@@ -577,6 +615,8 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
                 // （native-result 事实），白名单调用＝已授予能力的执行事实——**不进隔离**（非越权信号）。
                 if (item.type === "mcpToolCall") {
                   turn.outputSeen = true;
+                  // 判断会话只消费注入的 judge 工具（`item/tool/call`）；外部 MCP 调用＝白名单/隔离被绕过，隔离该轮。
+                  if (judgeMode) { quarantineForbidden(turn, "Codex reported a native MCP tool in a read-only judge session; session quarantined"); return; }
                   const name = mcpToolName(typeof item.server === "string" ? item.server : "", typeof item.tool === "string" ? item.tool : "");
                   const native = mcpToolCallNative(item);
                   const args = item.arguments !== null && typeof item.arguments === "object" && !Array.isArray(item.arguments) ? item.arguments as Record<string, unknown> : {};
@@ -610,9 +650,7 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
                   emit(turn, "message", REASONING_EVENT_SUMMARY, { version: 1, source: "reasoning", reasoning: { text, status: text === "" ? "omitted" : "complete", ...(durationMs !== undefined ? { durationMs } : {}) } });
                 }
                 if (item.type === "commandExecution" || item.type === "fileChange") {
-                  turn.failure = "Codex reported a forbidden native command/file tool; session quarantined";
-                  quarantined = true; turn.reason = "failed"; turn.controller.abort(); turn.done.resolve("failed");
-                  void engine!.close().catch(error => { turn.failure = config.redact(error); });
+                  quarantineForbidden(turn, "Codex reported a forbidden native command/file tool; session quarantined");
                 }
               } else if (method === "item/started") {
                 // G-5：reasoning item 的真实起点（durationMs 信号面）；其余 item/started 不映射（沿既有先例）。

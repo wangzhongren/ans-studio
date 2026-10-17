@@ -84,12 +84,12 @@ test("active and disposed prompt rejections have no turn acknowledgement", async
 
 test("quarantined prompt rejection has no acknowledgement after one stopped actual turn", async () => {
   let entered = false;
-  let complete!: () => void;
   const factory: RuntimeProviderFactory = (options) => (registerControlledDisplayProfile(options), { async composeContext() { return { systemPrompt: "fixture" }; }, async bindRole() {
     const queue = createEventQueue<SessionEvent>();
     return {
-      async prompt() { entered = true; await new Promise<void>((resolve) => { complete = resolve; }); }, events: () => queue.stream,
-      async abort() { complete(); throw new Error("native cleanup rejected"); }, async dispose() { queue.close(); },
+      // 底层轮次永不 settle ⇒ 清理失败后隔离保持；这里专门钉住「隔离拒绝零 acknowledgement」。
+      async prompt() { entered = true; await new Promise<void>(() => {}); }, events: () => queue.stream,
+      async abort() { throw new Error("native cleanup rejected"); }, async dispose() { queue.close(); },
     };
   } });
   const session = await createRuntimeAdapter({ runtime: "claude", gate: allow, projectRoot: process.cwd(), skillRoot: process.cwd(), providerFactories: { claude: factory } }).bindRole(role());

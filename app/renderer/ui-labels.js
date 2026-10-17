@@ -238,6 +238,162 @@
     return String(list[i] == null ? "" : list[i]);
   }
 
+  // —————— P5「替我审」自动判断（2026-10-17 评审 §6.5/§6.6/§9.3/§10；文案单一来源）——————
+  // 本段只做「开关/结果/回落提示 → 文案」的纯映射；不判定命令、不读项目、不决定是否放行。
+  // 渲染侧只取用（`renderer.js`）；桥缺失时**不得**呈现任何「已开启」态。
+
+  var SHELL_JUDGE_ON_LABEL = "替我审批中 · 判断 agent";
+  var SHELL_JUDGE_OFF_LABEL = "替我审";
+  var SHELL_JUDGE_BRIDGE_MISSING = "当前版本不支持自动判断，保持手动";
+  var SHELL_JUDGE_OFF_TITLE = "手动逐条确认 shell 命令（默认）";
+  var SHELL_JUDGE_ON_TITLE = "判断 agent 先评估 shell 命令必要性；可随时关闭";
+
+  /** §10.2 开启警告（逐字三行；常驻，不是 toast）。**不含** Markdown 强调标记（粗体由渲染侧 class 表达）。 */
+  var SHELL_JUDGE_WARNING_LINES = [
+    "替我审批中：shell 命令先由判断 agent 评估必要性；只有判断没发生（不可用/超时/解析失败/引擎不支持）才会弹卡。",
+    "判断 agent 只读项目内代码/文档/角色卡（不含 .env、密钥/凭据与项目外），不写文件、不执行命令；不必要会给替代方案，没有替代方案会由请求角色说明并给出路；每次判断会产生一次模型调用（token/延迟）；可能误判，可随时关闭。",
+    "判断 agent 跟随会话引擎（Claude / Pi / Codex）；当前引擎不可用、超时或未配置时回落到手动确认。文件写入、选择卡与恢复确认仍需手动。",
+  ];
+
+  function shellJudgeWarningLines() {
+    return SHELL_JUDGE_WARNING_LINES.slice();
+  }
+
+  /**
+   * 开关视图（纯映射）：`available` 来自 preload 四个方法是否齐备（渲染侧判），`enabled` 只信主进程。
+   *  · 桥缺失 ⇒ 禁用 + 桥缺失文案，**绝不** checked / 警告可见（不显示假开启态）；
+   *  · 可用 ⇒ 文案/悬停按真实 enabled 切换；警告只在 enabled 时显示；
+   *  · `busy`（IPC 在途）只禁用，不改文案与真实状态。
+   */
+  function shellJudgeToggleView(available, enabled, busy) {
+    var ok = available === true;
+    var on = ok && enabled === true;
+    return {
+      available: ok,
+      enabled: on,
+      checked: on,
+      disabled: !ok || busy === true,
+      label: ok ? (on ? SHELL_JUDGE_ON_LABEL : SHELL_JUDGE_OFF_LABEL) : SHELL_JUDGE_BRIDGE_MISSING,
+      title: ok ? (on ? SHELL_JUDGE_ON_TITLE : SHELL_JUDGE_OFF_TITLE) : SHELL_JUDGE_BRIDGE_MISSING,
+      warningVisible: on,
+    };
+  }
+
+  /**
+   * 开关 IPC 结果的自洽化（纯函数；主进程是开关权威）：
+   *  · `ok:true` 且带布尔 `enabled` ⇒ 采用主进程实际值（不采用本地点击意图）；
+   *  · 其余（失败/坏件/异常）⇒ **保持 previousEnabled**（失败不改状态），并给出可见错误。
+   */
+  function shellJudgeToggleResult(previousEnabled, res) {
+    var prev = previousEnabled === true;
+    if (res && res.ok === true && typeof res.enabled === "boolean") {
+      return { enabled: res.enabled, error: "" };
+    }
+    var error = res && typeof res.error === "string" && res.error !== ""
+      ? res.error
+      : "未能确认自动判断开关（通道异常）；保持原状态。";
+    return { enabled: prev, error: error };
+  }
+
+  /** 判断引擎展示名（缺省如实「未报告」，不编引擎）。 */
+  function shellJudgeEngineLabel(engine) {
+    if (engine === "claude") return "Claude";
+    if (engine === "pi") return "Pi";
+    if (engine === "codex") return "Codex";
+    return typeof engine === "string" && engine !== "" ? engine : "未报告";
+  }
+
+  /** `manual` reasonCode 的人话原因（与桌面通道 `judgeManualHumanReason` 同解；未知 ⇒「判断未完成」）。 */
+  function shellJudgeReasonText(reasonCode) {
+    var map = {
+      "unsupported-engine": "当前引擎不支持自动判断",
+      "unavailable": "判断服务不可用",
+      "timeout": "判断超时",
+      "aborted": "本轮已中止",
+      "parse-failed": "判断结果无法解析",
+      "read-denied": "所需项目文件无法读取",
+      "budget": "读取预算已用尽",
+      "read-truncated": "读取内容被截断",
+      "retry-capped": "同类命令连续被拒，已达重试上限",
+      "context-missing": "缺少当前轮任务上下文",
+      "context-too-large": "命令或上下文过大",
+      "model-manual": "判断 agent 自报无法判断",
+      "row-failed": "结果无法在聊天中显示",
+    };
+    return typeof reasonCode === "string" && map[reasonCode] ? map[reasonCode] : "判断未完成";
+  }
+
+  /**
+   * 手动回落卡 `judgeNotice`（§10.4 逐字）：
+   *  · `row-failed` ⇒「判断已完成但结果无法显示」——**不**说成「判断没发生」；
+   *  · 其余 manual ⇒「判断 agent 未能完成判断：<人话原因>。已转你手动确认。」
+   */
+  function shellJudgeNoticeText(reasonCode) {
+    if (reasonCode === "row-failed") {
+      return "判断 agent 已完成判断，但结果无法在聊天中显示；已转你手动确认。";
+    }
+    return "判断 agent 未能完成判断：" + shellJudgeReasonText(reasonCode) + "。已转你手动确认。";
+  }
+
+  /**
+   * 判断结果行视图（§9.3；纯映射）。`manual`/未知裁决 ⇒ **null**（手动卡替代，不产生结果行）。
+   * 返回字段均为已定稿文案/数据；渲染侧只 `esc` 后落 DOM，不再拼业务措辞。
+   *  · allow ⇒「已替你放行（判断 agent）」；deny 档放行（客户 D1）标题/徽标必须一眼可分；
+   *  · deny ⇒ 理由 +（有则）替代方案 + 客户说明 + 「关闭开关重试」的出路；
+   *  · `summary` 为空 ⇒「无法概括命令；展开查看原文」（不编命令意图）。
+   */
+  function shellJudgeResultView(payload) {
+    if (!payload || typeof payload !== "object") return null;
+    var verdict = payload.verdict;
+    if (verdict !== "allow" && verdict !== "deny") return null; // manual 不产生结果行
+    function str(v) { return typeof v === "string" && v !== "" ? v : ""; }
+    var engine = str(payload.engine);
+    var hardDeny = payload.hardDenyOverride === true || (verdict === "allow" && payload.tier === "deny");
+    var summary = str(payload.summary) || "无法概括命令；展开查看原文";
+    var reason = str(payload.reason);
+    var customerMessage = str(payload.customerMessage);
+    var alt = payload.alternative && typeof payload.alternative === "object" ? payload.alternative : null;
+    var altValue = alt ? str(alt.value) : "";
+    var altText = altValue ? "替代方案：" + altValue + (alt && str(alt.rationale) ? "（" + str(alt.rationale) + "）" : "") : "";
+    var operator = str(payload.operator) || (engine ? "judge:" + engine : "judge");
+    var tierText = payload.tier === "risky" || payload.tier === "review" || payload.tier === "deny" ? "档位：" + payload.tier : "";
+    var lines = [];
+    if (verdict === "allow") {
+      if (hardDeny) lines.push("该命令属于硬拒类，判断 agent 判定必要后放行；请复核");
+    } else {
+      if (reason) lines.push("判断理由：" + reason);
+      if (altText) lines.push(altText);
+      if (customerMessage) lines.push(customerMessage);
+    }
+    return {
+      verdict: verdict,
+      denyOverride: hardDeny,
+      title: verdict === "allow"
+        ? (hardDeny ? "已替你放行（判断 agent · deny 档）" : "已替你放行（判断 agent）")
+        : "未放行（判断 agent）",
+      label: hardDeny ? (str(payload.label) || "deny 档 · judge 放行") : "",
+      summary: summary,
+      engineText: "判断引擎：" + shellJudgeEngineLabel(engine),
+      operatorText: "operator:" + operator,
+      tierText: tierText,
+      at: str(payload.at),
+      lines: lines,
+      retryHint: verdict === "deny" ? "可关闭「替我审」后重试（改为手动确认），或按替代方案调整命令。" : "",
+      toolCallId: str(payload.toolCallId),
+      details: {
+        command: str(payload.command),
+        cwd: str(payload.cwd),
+        reason: reason,
+        alternative: altText,
+        customerMessage: customerMessage,
+        customerMessageSynthesized: payload.customerMessageSynthesized === true,
+        evidence: Array.isArray(payload.evidence) ? payload.evidence.filter(function (x) { return typeof x === "string" && x !== ""; }) : [],
+        hardDenyOverride: hardDeny,
+        toolCallId: str(payload.toolCallId),
+      },
+    };
+  }
+
   /** 状态行/空态的 S1 说明（文案单一来源；N 为项目角色数，如实取枚举结果）。 */
   function governanceMissingText(roleCount) {
     var n = typeof roleCount === "number" && isFinite(roleCount) && roleCount >= 0 ? Math.floor(roleCount) : 0;
@@ -462,6 +618,18 @@
     recoveryActionView: recoveryActionView,
     shellConfirmTitle: shellConfirmTitle,
     suApprovalTierLabel: suApprovalTierLabel,
+    shellJudgeToggleView: shellJudgeToggleView,
+    shellJudgeToggleResult: shellJudgeToggleResult,
+    shellJudgeWarningLines: shellJudgeWarningLines,
+    shellJudgeNoticeText: shellJudgeNoticeText,
+    shellJudgeReasonText: shellJudgeReasonText,
+    shellJudgeResultView: shellJudgeResultView,
+    shellJudgeEngineLabel: shellJudgeEngineLabel,
+    SHELL_JUDGE_ON_LABEL: SHELL_JUDGE_ON_LABEL,
+    SHELL_JUDGE_OFF_LABEL: SHELL_JUDGE_OFF_LABEL,
+    SHELL_JUDGE_BRIDGE_MISSING: SHELL_JUDGE_BRIDGE_MISSING,
+    SHELL_JUDGE_OFF_TITLE: SHELL_JUDGE_OFF_TITLE,
+    SHELL_JUDGE_ON_TITLE: SHELL_JUDGE_ON_TITLE,
     sidebarCollapsedFromStorage: sidebarCollapsedFromStorage,
     clampSidebarWidth: clampSidebarWidth,
     stepSidebarWidth: stepSidebarWidth,

@@ -35,7 +35,9 @@ import type {
   InteractionGate,
   PromptInputEventDetail, RuntimeAdapter, RuntimeProviderOptions, SessionEvent, ToolCall,
   ToolDefinition, ToolResult, GovernedToolsOptions,
+  GovernanceCardKind, GovernanceCardMetadata, GovernanceChoiceCardKind, GovernanceConfirmCardKind, GovernanceFlowMetadata,
 } from "../../model/runtime.ts";
+import { GOVERNANCE_SLUG_PATTERN } from "../../model/runtime.ts";
 import type { WriteDecision } from "../../model/decision.ts";
 import type { DiagnosticLog } from "../../model/runtime.ts";
 import { describeTool } from "./schema.ts";
@@ -151,6 +153,55 @@ function handbackMetadata(turnId: string, scope?: Pick<GovernedToolsOptions, "ro
 
 function customerMetadata(signal: AbortSignal | undefined, turnId: string | undefined, scope?: Pick<GovernedToolsOptions, "roleId" | "runtime">, toolCallId?: string): CustomerInputMetadata {
   return { ...(signal ? { signal } : {}), ...(turnId !== undefined ? { turnId } : {}), ...(scope?.roleId ? { roleId: scope.roleId } : {}), ...(scope?.runtime ? { runtime: scope.runtime } : {}), ...(toolCallId !== undefined ? { toolCallId } : {}) };
+}
+
+// —————————————— 治理流程元数据（2026-10-17 PM 评审 §5.8；只做形状校验，不做治理判定） ——————————————
+//
+// flowId/stepId/cardKind 全部可选：缺席＝旧调用形状、零行为变化。给出时按 slug/枚举**严格**校验——
+// 非法格式返回 ok:false 并说明（不猜测、不截断、不静默丢弃）；**不调用客户通道/派发能力**。
+// 本层只把合法字段原样并入卡片请求与 metadata / 派发载荷；是否构成治理决定由编排按账本判定。
+
+const GOVERNANCE_SLUG = new RegExp(GOVERNANCE_SLUG_PATTERN);
+const CHOICE_CARD_KINDS: readonly GovernanceChoiceCardKind[] = ["proposal", "appointment", "acceptance"];
+const CONFIRM_CARD_KINDS: readonly GovernanceConfirmCardKind[] = ["write", "appointment-write", "schedule-write"];
+
+type GovernanceArgs<T> = { ok: true; value: T } | { ok: false; result: ToolResult };
+
+/** 读取可选 slug 字段：缺席＝合法；非字符串/不匹配 pattern ⇒ ok:false（不猜测、不截断）。 */
+function readGovernanceSlugArg(args: Record<string, unknown>, key: string, toolName: string): GovernanceArgs<string | undefined> {
+  const value = args[key];
+  if (value === undefined) return { ok: true, value: undefined };
+  if (typeof value !== "string" || !GOVERNANCE_SLUG.test(value)) {
+    return { ok: false, result: { ok: false, message: `${toolName}: 参数 ${key} 非法（须为匹配 ${GOVERNANCE_SLUG_PATTERN} 的字符串）——未执行；请更正后重试` } };
+  }
+  return { ok: true, value };
+}
+
+function readGovernanceFlowArgs(args: Record<string, unknown>, toolName: string): GovernanceArgs<GovernanceFlowMetadata> {
+  const flowId = readGovernanceSlugArg(args, "flowId", toolName);
+  if (!flowId.ok) return flowId;
+  const stepId = readGovernanceSlugArg(args, "stepId", toolName);
+  if (!stepId.ok) return stepId;
+  return {
+    ok: true,
+    value: {
+      ...(flowId.value !== undefined ? { flowId: flowId.value } : {}),
+      ...(stepId.value !== undefined ? { stepId: stepId.value } : {}),
+    },
+  };
+}
+
+function readGovernanceCardArgs(args: Record<string, unknown>, toolName: string, allowed: readonly GovernanceCardKind[]): GovernanceArgs<GovernanceCardMetadata> {
+  const flow = readGovernanceFlowArgs(args, toolName);
+  if (!flow.ok) return flow;
+  const cardKind = args["cardKind"];
+  if (cardKind !== undefined && (typeof cardKind !== "string" || !(allowed as readonly string[]).includes(cardKind))) {
+    return { ok: false, result: { ok: false, message: `${toolName}: 参数 cardKind 非法（本工具允许：${allowed.join(" / ")}）——未向客户发卡；请更正后重试` } };
+  }
+  return {
+    ok: true,
+    value: { ...flow.value, ...(cardKind !== undefined ? { cardKind: cardKind as GovernanceCardKind } : {}) },
+  };
 }
 
 /**
@@ -815,6 +866,8 @@ function makeRequestConfirmationTool(
       if (title === undefined || title.trim() === "") {
         return { ok: false, message: `${name}: 缺少 title 参数，无法向客户发起确认` };
       }
+      const governance = readGovernanceCardArgs(call.args, name, CONFIRM_CARD_KINDS);
+      if (!governance.ok) return governance.result;
       const preview = readStringArg(call.args, ["preview"]);
       const detail = readStringArg(call.args, ["detail"]);
       const req: CustomerInputRequest = {
@@ -822,9 +875,10 @@ function makeRequestConfirmationTool(
         title,
         ...(preview !== undefined ? { preview } : {}),
         ...(detail !== undefined ? { detail } : {}),
+        ...governance.value,
       };
 
-      const out = await askCustomer(name, req, fn, timeoutMs, call.signal, gate, metadata);
+      const out = await askCustomer(name, req, fn, timeoutMs, call.signal, gate, { ...metadata, ...governance.value });
       if ("ok" in out) return out; // 通道故障 / 超时 / 中止 → 未获同意
       if (out.outcome === "declined") {
         return notConsented(name, `客户拒绝${out.reason !== undefined ? `（${out.reason}）` : ""}`);
@@ -895,6 +949,8 @@ function makeRequestChoiceTool(
           message: `${name}: options 参数非法（应为非空数组，每项含非空且唯一的 id 与非空 label）`,
         };
       }
+      const governance = readGovernanceCardArgs(call.args, name, CHOICE_CARD_KINDS);
+      if (!governance.ok) return governance.result;
       const question = readStringArg(call.args, ["question"]);
       const preview = readStringArg(call.args, ["preview"]);
       const multipleRaw = call.args["multiple"];
@@ -906,9 +962,10 @@ function makeRequestChoiceTool(
         ...(question !== undefined ? { question } : {}),
         ...(multiple !== undefined ? { multiple } : {}),
         ...(preview !== undefined ? { preview } : {}),
+        ...governance.value,
       };
 
-      const out = await askCustomer(name, req, fn, timeoutMs, call.signal, gate, metadata);
+      const out = await askCustomer(name, req, fn, timeoutMs, call.signal, gate, { ...metadata, ...governance.value });
       if ("ok" in out) return out; // 通道故障 / 超时 / 中止 → 未获同意
       if (out.outcome === "declined") {
         return notConsented(name, `客户拒绝${out.reason !== undefined ? `（${out.reason}）` : ""}`);
@@ -1050,11 +1107,14 @@ function makeDispatchTaskTool(fn: DispatchTaskFn, currentTurnId?: () => string |
       if (task === undefined || task.trim() === "") {
         return { ok: false, message: `${name}: 缺少 task 参数（自足的任务文本），无法派发` };
       }
+      const governance = readGovernanceFlowArgs(call.args, name);
+      if (!governance.ok) return governance.result;
       const reason = readStringArg(call.args, ["reason"]);
       const payload: DispatchTaskPayload = {
         roleId,
         task,
         ...(reason !== undefined ? { reason } : {}),
+        ...governance.value,
       };
 
       const label = `${name} 派发`;

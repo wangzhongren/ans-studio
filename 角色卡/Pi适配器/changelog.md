@@ -1,5 +1,33 @@
 # Pi适配器 变更记录
 
+## 2026-10-17 — P3b 判断 agent（「替我审」）Pi judge 模式：只消费运行时核心只读工具集
+
+**来源**：项目管理评审 `角色卡/项目管理/docs/design/2026-10-17_design_shell-auto-approve-review.md` revision 2（客户 D1/D2 已拍板）§5.1/§6.1/§7/§十一 P3b。前置已落地：运行时核心 `buildShellJudgeTools({projectRoot, report, stats, budget})` 恰返回 `judge_read_file`/`judge_list_dir`/`report_shell_judgement`；`RuntimeProviderOptions.judgeMode?: true`；`RuntimeSessionOptions`/`GovernedToolsOptions.shellJudge?`。本角色只做 Pi 侧接入，不改运行时核心/编排/桌面/其他适配器。
+
+**改动（全部本角色 Section 1 内）**
+- `src/provider/pi/tools.ts`：窄兼容 facade 增转出运行时核心的 `buildShellJudgeTools` / `SHELL_JUDGE_TOOL_NAMES` / 三工具名常量与 `ShellJudgeToolOptions` 型；不复制任何工具实现或读取策略。
+- `src/provider/pi/session.ts`：
+  - `createFakeRuntimeAdapter` 增可选 `shellJudge?: ShellJudgeToolOptions`。**注入即判断模式**：只 `buildShellJudgeTools`，不构造 `write_file`/`edit_file`/`run_shell`/`request_confirmation`/`request_choice`/`submit_report`/`dispatch_task`/`report_shell_verdict`；不注入 ShellGate/客户通道/回交/派发。未注入 ⇒ 普通假适配器路径逐字不变。
+  - `createPiRuntimeAdapter`：判据 = `shellJudge` 注入 ∨ `judgeMode:true`。legacy 直接分支在判断模式下**只**用 `buildShellJudgeTools`，写门禁换 deny-all（纵深防御，工具本身不存在），`shellGate/customerInput/reportHandback/dispatchTask/shellVerdict/sessionDir/storage` 全部置空、`installedMcpServers: []`；Service 生产分支（注入 `tools`）纯消费并透传 `judgeMode`。普通分支行为不变（提取共用 `wrapSession`，turn 去重语义逐字保留）。
+  - `PiRuntimeAdapterOptions` 增 `shellJudge?`/`judgeMode?` 与仅测试用的 `dependencies?` 注入面（不透进适配器选项）。
+- `src/common/pi-adapter/real-adapter.ts`：`judgeMode:true` 时——① 注入工具名必须恰在 `SHELL_JUDGE_TOOL_NAMES` 内，否则构造期拒绝；② 强制关闭服务端工具（不解析 `ANS_PI_SERVER_TOOLS`，不注册 web_search/web_fetch）；③ 忽略 `installedMcpServers`（零 MCP 装配、不加载 pi-mcp）；④ 强制 in-memory 会话（忽略 `storage`/`sessionDir`，不写 `.ans`、不产生角色状态）。未置 `judgeMode` ⇒ 以上分支全不生效，逐字旧行为。
+
+**测试**（新增 `test/pi-adapter/shell-judge.test.ts` 7 例，全部离线、无真实模型/网络/凭据）
+- 假适配器：judge 模式恰三只只读工具可执行；write/edit/read/run_shell/交互/回交/派发/审读一律「未知工具」；`report_shell_judgement` 参数原样回调；文件未改、无新增条目。
+- 假适配器普通模式：受治理工具仍在（write_file 走门禁、非未知工具），judge 工具不存在。
+- 真实适配器（pi-ai faux，进程内）：`judgeMode` 下 active 工具恰三项、`noTools:"builtin"`、服务端工具 env 被强制忽略、外来 MCP 零装配、`sessionDir` 被忽略（`contextSource:"in-memory"`、无 `.ans`）；注入 `write_file` 构造期被拒；未置 `judgeMode` 时普通工具照常注册。
+- legacy `createPiRuntimeAdapter` 两分支（经 `dependencies` 测试注入）：判断模式工具集恰三项、无 write/run_shell、无持久化；普通模式仍构造 write/edit/read。
+
+**验证**
+- `node --test "test/pi-adapter/**/*.test.ts"` → **297 项：294 pass / 2 fail / 1 skip**。两 fail 均为既有 `injected-runtime.test.ts` 的 Windows `EPERM: symlink` 环境限制（本机无符号链接权限，与本改动无关）。
+- `npm run typecheck` → 本角色文件（`src/provider/pi`、`src/common/pi-adapter`、`test/pi-adapter`）**0 错**；全仓余下错误均在 claude/codex 适配器角色在飞测试文件，未触碰。
+- 全量 `node --test "test/**/*.test.ts"`（三层 glob）结果见本轮回报（长耗时，后台运行）。
+
+**风险 / 未验边界**
+- Pi 真实模型往返未跑（客户本人凭据验收）；本层只保证工具面结构性隔离与 judge 模式配置面。
+- judge 会话仍会输出上下文窗口默认提示等事件（进会话流），但不落盘、不进聊天/角色状态。
+- 未 git 提交；未读 `.env`；未发网络/真实模型请求。
+
 ## 2026-10-17 — 整轮时限改为「到点检查 + 1 小时最后兜底」（客户裁定；PM 批准）
 
 **来源**：客户 2026-10-17 裁定「整轮不应该有超时，应该是到了时间，su 要去看下是否卡死了……如果没卡死，就不管他。」并追加「保留 1 小时兜底」；PM 批准评审 `角色卡/项目管理/docs/design/2026-10-17_design_turn-watch-and-recover-review.md`。运行时核心已提供 `DEFAULT_TURN_LAST_RESORT_MS=3600000`、`resolveRuntimeTimeouts().turnLastResortMs`、`RuntimeProviderOptions.turnLastResortMs`，服务层整轮包装已改用 last-resort。

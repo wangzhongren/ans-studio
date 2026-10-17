@@ -37,8 +37,10 @@ const SELECTOR_ONLY=process.env.ANS_SELECTOR_UI_ONLY==='1';
 const G2_ONLY=process.env.ANS_G2_RECOVERY_UI_ONLY==='1';
 const TOOLFOLD_ONLY=process.env.ANS_TOOLFOLD_UI_ONLY==='1';
 const GOVREACCEPT_ONLY=process.env.ANS_GOVERNANCE_REACCEPT_UI_ONLY==='1';
+const JUDGE_ONLY=process.env.ANS_JUDGE_UI_ONLY==='1';
 const configReads=[];
-let recoveryEnabled=!(CONFIG_ONLY||SELECTOR_ONLY||FLOW_ONLY||GOVREACCEPT_ONLY), listFailure=false, pickResult=ROOT, configFailure=false, configMalformed=false, configDeferred=false, saveDeferred=false;
+let recoveryEnabled=!(CONFIG_ONLY||SELECTOR_ONLY||FLOW_ONLY||GOVREACCEPT_ONLY||JUDGE_ONLY), listFailure=false, pickResult=ROOT, configFailure=false, configMalformed=false, configDeferred=false, saveDeferred=false;
+let judgeEnabled=false, judgeSetFailure=false; // P5：「替我审」离线开关（主进程权威的替身）
 let configMissing={}, configPending=[], savePending=[];
 let mergeReplayAfterList=false, sendQueued=false; const mergeHistories=new Map();
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
@@ -72,6 +74,8 @@ const handlers={
  'session:operator-response':(_e,input)=>{responses.push(input);return operatorMode==='expired'?({ok:false,expired:true,error:'离线受控请求已失效'}):({ok:true});},
  'runtime-config:get':(_e,input)=>{configReads.push(input.runtime);return configDeferred?new Promise((resolve,reject)=>configPending.push({runtime:input.runtime,resolve,reject})):configFailure?Promise.reject(new Error('fixture config failed')):configMalformed?{...runtimeConfig(input.runtime),missingKeys:undefined}:runtimeConfig(input.runtime);},
  'shell:confirm-response':(_e,input)=>{shellResponses.push(input);return {ok:true};},
+ 'shell:judge-get':()=>({version:1,ok:true,enabled:judgeEnabled}),
+ 'shell:judge-set':(_e,input)=>{if(judgeSetFailure)return {version:1,ok:false,error:'离线受控拒绝：开关未改变'};judgeEnabled=!!input&&input.enabled===true;return {version:1,ok:true,enabled:judgeEnabled};},
  'runtime-config:save':(_e,input)=>{if(saveDeferred)return new Promise(resolve=>savePending.push(resolve));if(saveMode!=='fail')configApplications[input.runtime]=saveApplication;configSaves.push({runtime:input.runtime,keys:Object.keys(input.updates)});return saveMode==='fail'?{ok:false,error:'离线原子写失败'}:{ok:true,runtime:input.runtime,appliedKeys:Object.keys(input.updates),revision:1,application:saveApplication};},
  'pi-config:get':()=>({path:ROOT+'/'+('a-very-long-path/'.repeat(12))+'.env',fields:['ANTHROPIC_AUTH_TOKEN','ANS_PI_BASE_URL','ANS_PI_MODEL','ANS_PI_CONTEXT_WINDOW'].map(key=>({key,secret:key==='ANTHROPIC_AUTH_TOKEN',value:key==='ANTHROPIC_AUTH_TOKEN'?'':'fixture',isSet:true}))}),
  'pi-config:save':()=>({ok:true,appliedKeys:[]}),
@@ -139,8 +143,59 @@ async function roleDocumentFocusChecks(){
  await check('nested role reading is reset for a genuinely different project',`['card','docs','changes'].every(id=>document.querySelector('details[data-section="'+id+'"] .card-text').scrollTop===0)`);
  flowLongRoleDocs=false;
 }
+async function judgeChecks(){
+ await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRuntime('pi');await window.__ansRenderer.selectRole('A')`);
+ const scoped={projectRoot:ROOT,roleId:'A',runtime:'pi'};
+ const toggleState=`(()=>{const t=document.getElementById('auto-approve-toggle'),l=document.getElementById('auto-approve-label'),w=document.getElementById('shell-judge-warning'),s=document.getElementById('auto-approve-status'),wrap=t.closest('.composer-auto-approve');return {checked:t.checked,disabled:t.disabled,label:l.textContent,warningHidden:w.hidden,errorShown:!s.hidden,error:s.textContent,onClass:wrap.classList.contains('is-on')};})()`;
+ // 启动：主进程权威默认 false（桥已接线 ⇒ 可点、标签「替我审」、无警告）。
+ await check('P5 judge starts authoritative off',`(()=>{const v=${toggleState};return v.checked===false&&v.disabled===false&&v.label==='替我审'&&v.warningHidden===true&&v.onClass===false;})()`);
+ // 勾选：ok ⇒ 开启态 + 琥珀标记 + 常驻警告（三段逐字）。
+ await js(`document.getElementById('auto-approve-toggle').click()`);await pause(80);
+ await check('P5 enable shows amber marker and persistent warning',`(()=>{const v=${toggleState},w=document.getElementById('shell-judge-warning');return v.checked&&!v.disabled&&v.label==='替我审批中 · 判断 agent'&&!v.warningHidden&&v.onClass&&w.textContent.includes('只有判断没发生（不可用/超时/解析失败/引擎不支持）才会弹卡')&&w.textContent.includes('文件写入、选择卡与恢复确认仍需手动');})()`);
+ // 取消：回到手动，警告消失。
+ await js(`document.getElementById('auto-approve-toggle').click()`);await pause(80);
+ await check('P5 disable hides warning and returns to manual label',`(()=>{const v=${toggleState};return !v.checked&&v.label==='替我审'&&v.warningHidden&&!v.onClass;})()`);
+ // 失败：主进程拒绝 ⇒ 保持实际状态（关闭）并显示错误；无假开启态。
+ judgeSetFailure=true;await js(`document.getElementById('auto-approve-toggle').click()`);await pause(80);
+ await check('P5 failed toggle keeps actual state and shows error',`(()=>{const v=${toggleState};return !v.checked&&v.label==='替我审'&&v.warningHidden&&v.errorShown&&v.error.includes('离线受控拒绝');})()`);
+ judgeSetFailure=false;
+ // 主进程推送 shell:judge-state ⇒ 同步复选框（不靠本地点击意图）。
+ await push('shell:judge-state',{version:1,enabled:true});
+ await check('P5 pushed judge state turns toggle on',`(()=>{const v=${toggleState};return v.checked&&!v.warningHidden&&v.onClass;})()`);
+ await push('shell:judge-state',{version:1,enabled:false});
+ await check('P5 pushed judge state turns toggle off',`(()=>{const v=${toggleState};return !v.checked&&v.warningHidden&&!v.onClass;})()`);
+ // 结果行：先有工具调用行，再推 allow + deny 档放行；行按 toolCallId 锚在该调用之后。
+ await push('session:events',[{...scoped,event:{kind:'tool_call',turnId:'judge-turn',summary:'模型请求调用 run_shell',detail:{toolName:'run_shell',toolCallId:'judge-call',phase:'start'}}}]);
+ const judgeBase={version:1,id:'sj-judge-call',toolCallId:'judge-call',roleId:'A',projectRoot:ROOT,runtime:'pi',at:'2026-10-17T10:00:00Z',command:'npm run build',summary:'构建项目',policy:'su-approval',tier:'deny',reason:'构建产物需要刷新',engine:'claude',operator:'judge:claude',reasonCode:'necessary',hardDenyOverride:true,label:'deny 档 · judge 放行'};
+ await push('shell:judge-result',{...judgeBase,id:'sj-judge-allow',verdict:'allow'});
+ await check('P5 deny-tier allow row is prominent and anchored after its tool call',`(()=>{const rows=[...document.querySelectorAll('#chat .shell-judge-row')];const row=rows.find(x=>x.dataset.toolCallId==='judge-call');if(!row)return false;const pane=row.closest('.chat-pane'),kids=[...pane.children];const toolIdx=kids.findIndex(x=>x.classList.contains('tool-records')||x.classList.contains('tool-call-record')||x.textContent.includes('run_shell'));return rows.length===1&&row.classList.contains('is-deny-override')&&row.textContent.includes('已替你放行（判断 agent · deny 档）')&&row.textContent.includes('deny 档 · judge 放行')&&row.textContent.includes('该命令属于硬拒类，判断 agent 判定必要后放行；请复核')&&row.textContent.includes('判断引擎：Claude')&&row.textContent.includes('档位：deny')&&toolIdx>=0&&kids.indexOf(row)>toolIdx;})()`);
+ // 普通 deny：理由/替代方案/客户说明/关闭开关重试的出路。
+ await push('shell:judge-result',{...judgeBase,id:'sj-judge-deny',verdict:'deny',tier:'risky',hardDenyOverride:undefined,label:undefined,reasonCode:'safer-alternative',summary:'删除源码目录',command:'rm -rf src',reason:'会删除未提交源码',customerMessage:'该命令会删除项目源码，风险过高。',alternative:{kind:'command',value:'rm -rf dist',rationale:'只清理构建产物'}});
+ await check('P5 deny row shows reason/alternative/customer message and retry exit',`(()=>{const row=[...document.querySelectorAll('#chat .shell-judge-row')].find(x=>x.textContent.includes('未放行（判断 agent）'));return !!row&&row.textContent.includes('判断理由：会删除未提交源码')&&row.textContent.includes('替代方案：rm -rf dist（只清理构建产物）')&&row.textContent.includes('该命令会删除项目源码，风险过高。')&&row.textContent.includes('关闭「替我审」后重试')&&!row.classList.contains('is-deny-override');})()`);
+ // manual：不产生结果行（原卡替代）。
+ const before=await js(`document.querySelectorAll('#chat .shell-judge-row').length`);
+ await push('shell:judge-result',{...judgeBase,id:'sj-judge-manual',verdict:'manual',reasonCode:'timeout'});
+ await check('P5 manual result produces no result row',`document.querySelectorAll('#chat .shell-judge-row').length===${before}`);
+ // 手动回落卡 judgeNotice：原样呈现（row-failed 文案）。
+ await push('shell:confirm-request',{...scoped,id:'judge-manual-card',policy:'project',command:'rm -rf src',summary:'删除源码目录',reasonPlain:'命令危险',cwd:ROOT,argvLines:[],judgeNotice:'判断 agent 已完成判断，但结果无法在聊天中显示；已转你手动确认。'});
+ await check('P5 manual fallback card shows judgeNotice verbatim',`(()=>{const n=document.getElementById('sc-judge-notice');return !n.hidden&&n.textContent==='判断 agent 已完成判断，但结果无法在聊天中显示；已转你手动确认。'&&document.getElementById('sc-reason').textContent==='命令危险';})()`);
+ // 已挂起卡不受开关切换影响（§10.3）：切到开启/关闭都不动卡与按钮，judgeNotice 原样。
+ await js(`document.getElementById('auto-approve-toggle').click()`);await pause(80);
+ await check('P5 pending card survives judge toggle',`(()=>{const c=document.getElementById('shell-confirm'),n=document.getElementById('sc-judge-notice');return !c.hidden&&n.textContent==='判断 agent 已完成判断，但结果无法在聊天中显示；已转你手动确认。'&&!document.getElementById('sc-deny').disabled&&document.getElementById('auto-approve-toggle').checked&&!document.getElementById('shell-judge-warning').hidden;})()`);
+ await js(`document.getElementById('auto-approve-toggle').click()`);await pause(80);
+ await check('P5 pending card still present after turning judge off',`!document.getElementById('shell-confirm').hidden&&!document.getElementById('sc-deny').disabled`);
+ await js(`document.getElementById('sc-deny').click()`);await pause(40);
+ // 结果落角色自己的 pane：B 的结果不切走当前角色 A；切到 B 可见。
+ await push('shell:judge-result',{...judgeBase,id:'sj-judge-b',toolCallId:'judge-b',roleId:'B',verdict:'allow',summary:'B 的命令'});
+ await check('P5 result for another role does not switch the current view',`window.__ansRenderer.state.selectedRoleId==='A'&&document.querySelectorAll('#chat .chat-pane').length===1&&document.querySelector('#chat .chat-pane').dataset.roleId==='A'`);
+ await js(`await window.__ansRenderer.selectRole('B')`);await pause(80);
+ await check('P5 background role result is visible when that role is selected',`[...document.querySelectorAll('#chat .shell-judge-row')].some(x=>x.dataset.toolCallId==='judge-b')`);
+}
 async function terminalChecks(){
  await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRuntime('pi');await window.__ansRenderer.selectRole('A')`);
+ // P5（评审 §10.3）：自动判断开关启动只呈现权威关闭态——桥缺失 ⇒ 禁用+固定文案；桥已接线 ⇒ 默认「替我审」；
+ // 两种情况都不得出现「替我审批中」假开启态或常驻警告（真实开启/结果行需受控桥替身，见 changelog 未验边界）。
+ await check('P5 judge toggle starts authoritative off without fake enable',`(()=>{const t=document.getElementById('auto-approve-toggle'),l=document.getElementById('auto-approve-label'),w=document.getElementById('shell-judge-warning');if(!t||!l||!w)return false;const bridge=typeof window.desktop.getShellJudgeState==='function'&&typeof window.desktop.setShellJudgeEnabled==='function'&&typeof window.desktop.onShellJudgeState==='function'&&typeof window.desktop.onShellJudgeResult==='function';return !t.checked&&w.hidden&&!l.textContent.includes('替我审批中')&&(bridge?l.textContent==='替我审':(t.disabled&&l.textContent==='当前版本不支持自动判断，保持手动'));})()`);
  const scoped={projectRoot:ROOT,roleId:'A',runtime:'pi'};
  sendQueued=true;await js(`document.getElementById('inp-message').value='排队首条';document.getElementById('btn-send').click()`);await pause(40);
  await check('P7 actual queued response sets current hint',`document.getElementById('composer-hint').textContent.includes('已入队')`);
@@ -1048,6 +1103,7 @@ app.whenReady().then(async()=>{
   if(GOVREACCEPT_ONLY){await governanceReacceptChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports,previewCalls,reacceptCalls},null,2));console.log('GOVERNANCE_REACCEPT_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(GHOST_ONLY){await deliveryNoteChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({reports,errors},null,2));console.log('DELIVERY_NOTE_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(VISUAL_ONLY){await visualChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({reports,errors},null,2));console.log('VISUAL_V2_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
+  if(JUDGE_ONLY){await judgeChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports,judgeEnabled,judgeSetFailure},null,2));console.log('JUDGE_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(FRESH_CONTEXT_ONLY||ROLE_FOCUS_ONLY||TERMINAL_ONLY||SEND_FACTS_ONLY||TERMINAL_MERGE_ONLY){if(FRESH_CONTEXT_ONLY)await freshContextChecks();else if(ROLE_FOCUS_ONLY)await roleDocumentFocusChecks();else if(TERMINAL_ONLY)await terminalChecks();else if(SEND_FACTS_ONLY)await sendFactsChecks();else await terminalMergeChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({reports,errors},null,2));console.log((FRESH_CONTEXT_ONLY?'FRESH_CONTEXT':ROLE_FOCUS_ONLY?'ROLE_FOCUS':TERMINAL_ONLY?'TERMINAL':SEND_FACTS_ONLY?'SEND_FACTS':'TERMINAL_MERGE')+'_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(FLOW_ONLY){await completeFlowChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports},null,2));console.log('COMPLETE_FLOW_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(PROJECT_RESET_ONLY){await projectResetChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports},null,2));console.log('PROJECT_RESET_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
@@ -1201,7 +1257,7 @@ app.whenReady().then(async()=>{
   await push('session:history',{roleId:'B',projectRoot:ROOT,rows:[{kind:'assistant',text:'前插说明',at:''},...requestRows]});
   await check('denied conclusion anchor and decided card retained',`(()=>{let a=window.__ansRenderer.replayAnchorDebug('B')[0],m=window.__ansRenderer.rowModelDebug('B');return a.requestIndex!==null&&a.conclusionIndex!==null&&m.operators.length===1&&m.operators[0].index===a.requestIndex+1&&document.querySelector('#chat .op-confirm').hidden;})()`);
   await js(`await window.__ansRenderer.selectRole('A')`);
-  await push('session:operator-request',{id:'pending-fixture',roleId:'A',request:{kind:'confirm',title:'真实接口形状的离线未决',preview:'需确认'}});
+  await push('session:operator-request',{id:'pending-fixture',roleId:'A',request:{kind:'confirm',title:'真实接口形状的离线未决',preview:'## 需确认\n\n- 第一条\n- 第二条\n\n| 字段 | 值 |\n| --- | --- |\n| 范围 | 预览 |\n\n**重点**\n\n<script>window.BAD_PREVIEW=1</script>'}});
   await js(`await window.__ansRenderer.selectRole('B');await window.__ansRenderer.selectRole('A')`);await pause(80);
   await check('pending locator visible after role click',`(()=>{let x=document.querySelector('#chat .op-request'),c=document.getElementById('chat').getBoundingClientRect(),r=x?.getBoundingClientRect();return !!r&&r.top>=c.top&&r.bottom<=c.bottom;})()`);
   await push('session:role-state',snapshot(true));
@@ -1216,7 +1272,11 @@ app.whenReady().then(async()=>{
     reports.push({name:'pending geometry '+mode,value:await js(`(()=>{let c=document.getElementById('chat').getBoundingClientRect(),e=document.querySelector('#chat .op-request');return {chat:c.toJSON(),card:e.getBoundingClientRect().toJSON(),buttons:[...e.querySelectorAll('.op-actions button')].map(b=>({hidden:b.hidden,inert:e.inert,rect:b.getBoundingClientRect().toJSON()})),active:document.activeElement.className,drawer:document.getElementById('right-drawer').className};})()`)});
     await check(`keyboard locate closes ${mode} and exposes all actions`,`(()=>{let c=document.getElementById('chat').getBoundingClientRect(),e=document.querySelector('#chat .op-request'),r=e.getBoundingClientRect(),buttons=[...e.querySelectorAll('.op-actions button')];return !e.inert&&!document.getElementById('right-drawer').classList.contains('open')&&r.left>=c.left&&r.right<=c.right&&r.top>=c.top&&r.bottom<=c.bottom&&buttons.every(b=>{let x=b.getBoundingClientRect();return x.left>=c.left&&x.right<=c.right&&x.top>=c.top&&x.bottom<=c.bottom;})&&document.activeElement===e;})()`);
   }
-  await key('Tab');await check('keyboard reaches original preview',`document.activeElement.matches('.op-preview > summary')`);await key('Enter');await check('keyboard expands original preview',`document.querySelector('#chat .op-request .op-preview').open`);await key('Tab');await check('keyboard enters original confirm action',`document.activeElement.classList.contains('op-confirm')`);
+  await key('Tab');await check('keyboard reaches original preview',`document.activeElement.matches('.op-preview > summary')`);await key('Enter');await check('keyboard expands original preview',`document.querySelector('#chat .op-request .op-preview').open`);
+  // 客户 2026-10-17：预览应渲染 Markdown（标题/列表/表格/加粗），不是纯文本 pre；原文 HTML 仍转义。
+  await check('expanded preview renders controlled markdown',`(()=>{const b=document.querySelector('#chat .op-request .op-preview-body');return !!b&&b.classList.contains('card-md')&&!!b.querySelector('h2')&&b.querySelectorAll('li').length===2&&!!b.querySelector('table')&&!!b.querySelector('strong')&&!b.querySelector('script')&&b.textContent.includes('<script>')&&window.BAD_PREVIEW===undefined;})()`);
+  await check('expanded preview stays inside card width',`(()=>{const b=document.querySelector('#chat .op-request .op-preview-body'),c=document.querySelector('#chat .op-request');return b.scrollWidth<=b.clientWidth+1&&b.getBoundingClientRect().right<=c.getBoundingClientRect().right+0.5;})()`);
+  await key('Tab');await check('keyboard enters original confirm action',`document.activeElement.classList.contains('op-confirm')`);
   await key('Tab');await check('keyboard reaches deny action',`document.activeElement.classList.contains('op-deny')`);
   await key('Enter');await pause(80);
   await check('answered pending returns to true busy',`document.getElementById('op-chip').hidden&&document.querySelector('#chat .tool-current').textContent==='正在工作'`);
@@ -1241,7 +1301,7 @@ app.whenReady().then(async()=>{
     await new Promise(resolve=>{win.webContents.once('did-finish-load',resolve);win.webContents.reload();});await pause(200);
     win.setTitle('ANS UI/UX 离线验收');win.setContentSize(Number(process.env.ANS_UIUX_WIDTH)||1360,Number(process.env.ANS_UIUX_WIDTH)===960?620:860);
     await push('session:role-state',snapshot());await push('session:events',activityEvents());
-    await push('session:operator-request',{id:'preview-pending',roleId:'A',request:{kind:'confirm',title:'离线验收：需要客户确认的请求',preview:'此为受控夹具，无真实任务。'}});
+    await push('session:operator-request',{id:'preview-pending',roleId:'A',request:{kind:'confirm',title:'离线验收：需要客户确认的请求',preview:'## 预览夹具\n\n此为受控夹具，无真实任务。\n\n- 标题、列表与表格同角色卡管线\n- 原文 HTML 仍转义\n\n| 项 | 来源 |\n| --- | --- |\n| 预览 | markdown-it |'}});
     await js(`document.getElementById('tab-card').click()`);console.log('INTERACTIVE_FIXTURE_READY');
   }else app.quit();
  }catch(error){fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({reports,errors,error:String(error),stack:error.stack},null,2));console.error(error);clearTimeout(watchdog);app.exit(1);}

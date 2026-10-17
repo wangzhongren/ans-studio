@@ -14,6 +14,7 @@ import type {
 } from "../../model/runtime.ts";
 import { RUNTIME_KINDS } from "../../common/shared/runtime-shared.ts";
 import { buildGovernedTools, createDemoRuntimeAdapter } from "../../provider/runtime/tools.ts";
+import { buildShellJudgeTools } from "../../common/runtime-core/shell-judge/tools.ts";
 import { createRuntimeSessionStore, readRuntimeSessionHistory as readStoredRuntimeSessionHistory } from "../../provider/runtime/session-store.ts";
 import { createToolDisplayContext, jsonBytes } from "../../common/runtime-core/tool-display.ts";
 import { listInstalledMcpServers } from "../../common/runtime-core/mcp-declarations.ts";
@@ -112,20 +113,26 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
       const interactionGate = createInteractionGate();
       const display = createToolDisplayContext({credentialEnvNames:[...(options.extraCredentialEnvVars ?? []),...(options.apiKeyEnvVar ? [options.apiKeyEnvVar] : [])],requireProfile:true});
       const storage = options.persistSession ? createRuntimeSessionStore({ projectRoot: options.projectRoot, roleId: role.id, runtime: options.runtime }) : undefined;
-      const tools = buildGovernedTools(options.gate, {
-        ...options,
-        readRoot: options.readRoot ?? options.projectRoot,
-        writeRoot: options.writeRoot,
-        shellCwd: options.shellCwd ?? options.projectRoot,
-        extraCredentialEnvVars: [...(options.extraCredentialEnvVars ?? []), ...(options.apiKeyEnvVar ? [options.apiKeyEnvVar] : [])],
-        roleId: role.id,
-        currentTurnId: () => turnId,
-        interactionGate,
-      }).map((tool) => ({ ...tool, async handler(call: Parameters<typeof tool.handler>[0]) {
-        const signal = controller?.signal;
-        if (turnId === undefined || signal?.aborted) return { ok: false, message: `${tool.name}：本轮未运行或已中止，未执行` };
-        return tool.handler({ ...call, signal: signal && call.signal ? AbortSignal.any([signal, call.signal]) : signal ?? call.signal });
-      } }));
+      const judgeTools = options.shellJudge;
+      // 判断 agent（「替我审」）：**能力注入，不是工具注入**——注入 `shellJudge` 时只走
+      // `buildShellJudgeTools`（恰三只只读工具），**不得**走 `buildGovernedTools`（结构性隔离：
+      // 判断会话不存在 write_file/edit_file/read_file/run_shell/客户交互/回交/派发/MCP 工具）。
+      const tools = judgeTools !== undefined
+        ? buildShellJudgeTools(judgeTools)
+        : buildGovernedTools(options.gate, {
+            ...options,
+            readRoot: options.readRoot ?? options.projectRoot,
+            writeRoot: options.writeRoot,
+            shellCwd: options.shellCwd ?? options.projectRoot,
+            extraCredentialEnvVars: [...(options.extraCredentialEnvVars ?? []), ...(options.apiKeyEnvVar ? [options.apiKeyEnvVar] : [])],
+            roleId: role.id,
+            currentTurnId: () => turnId,
+            interactionGate,
+          }).map((tool) => ({ ...tool, async handler(call: Parameters<typeof tool.handler>[0]) {
+            const signal = controller?.signal;
+            if (turnId === undefined || signal?.aborted) return { ok: false, message: `${tool.name}：本轮未运行或已中止，未执行` };
+            return tool.handler({ ...call, signal: signal && call.signal ? AbortSignal.any([signal, call.signal]) : signal ?? call.signal });
+          } }));
       // G-5：推理强度（wave 1 接线）——按运行时读 env（`ANS_CLAUDE/CODEX/PI_REASONING_EFFORT`）并
       // 归一（**纯读**，providerFor 每次重建即重读＝「改设置 ⇒ 下次开会话生效」沿既有语义）。非法值＝
       // **按未设处理**（零参数、零行为变化）＋诊断如实；**绝不因偏好值坏件拒开会话/毁轮次**（偏好不是
@@ -142,7 +149,11 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
         // G-4 V2（wave A）：按角色读取 `docs/mcp/**` 声明并随会话注入（**纯读**——绝不建目录；坏件由
         // 读取器跳过＋诊断，绝不影响开会话）。适配器对 `installedMcpServers` 纯消费（装配/放行/呈现
         // 属各平台批次 P1–P3）；providerFor 每次重建即重读——「安装/卸载 ⇒ 下次开会话生效」。
-        installedMcpServers: listInstalledMcpServers(options.projectRoot, role.id),
+        // 判断 agent 会话：`judgeMode:true` ＋ `installedMcpServers:[]`——外来 MCP 一律不装配
+        // （PM 评审 §6.1；Claude 适配器据此强制关闭 WebSearch/外来 MCP）。
+        ...(judgeTools !== undefined
+          ? { judgeMode: true as const, installedMcpServers: [] as const }
+          : { installedMcpServers: listInstalledMcpServers(options.projectRoot, role.id) }),
         // G-5：仅 `set` 态注入字段；`unset`/`invalid` 保持**字段缺席**（逐字现状的机读形态）。
         ...(reasoningEffort.state === "set" ? { reasoningEffort: reasoningEffort.effort } : {}),
         ...resolveRuntimeTimeouts(options.runtime, options),
@@ -182,8 +193,8 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
       const requestAbort = (turn: Turn): Promise<void> => {
         if (!turn.abortPromise) {
           turn.abortPromise = withTimeout(Promise.resolve().then(() => inner.abort?.()), 1000, "中止清理").catch((error) => {
+            // 清理失败只用于诊断/事件：它不证明底层轮次还在运行，**不得**单独决定隔离。
             turn.cleanupFailed = true;
-            quarantined = true;
             throw error;
           });
         }
@@ -288,7 +299,11 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
             }
             const nativeOptions=plan?(promptOptions?.images ? {images:promptOptions.images} : undefined):promptOptions;
             underlying = Promise.resolve().then(() => inner.prompt(text, nativeOptions));
-            underlying.then(() => { underlyingFinished = true; if (!turn.cleanupFailed) quarantined = false; }, () => { underlyingFinished = true; if (!turn.cleanupFailed) quarantined = false; });
+            // 隔离的唯一语义＝「底层 provider 轮次可能仍在运行」。只要底层已 settle（成功或失败），
+            // 隔离即解除——与清理是否失败无关；清理失败仅保留为诊断/事件事实。底层永不 settle 时，
+            // 隔离保持（fail-closed 不放宽）。
+            const settleUnderlying = () => { underlyingFinished = true; quarantined = false; };
+            underlying.then(settleUnderlying, settleUnderlying);
             const work = underlying.then(async () => { if (!streamEnded) await terminalPromise; });
             // 整轮上限＝最后兜底（客户裁定 2026-10-17）：promptTimeoutMs 仅属看护到点检查，**不再**用于 abort。
             // InteractionGate 暂停语义不变——确认卡等待期间按有效运行时间暂停计时。
@@ -305,7 +320,7 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
               try { await requestAbort(turn); }
               catch (abortError) { emit({ kind: "denied", summary: `中止清理失败：${abortError instanceof Error ? abortError.message : String(abortError)}`, runtime: options.runtime, roleId: role.id, turnId: turn.id }); }
             }
-            quarantined = turn.cleanupFailed === true || (underlying !== undefined && !underlyingFinished);
+            quarantined = underlying !== undefined && !underlyingFinished;
           } finally {
             if(plan)deliveryPreflight=true;
             active = undefined;

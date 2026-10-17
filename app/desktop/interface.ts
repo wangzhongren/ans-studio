@@ -32,6 +32,7 @@ import {
   establishGovernanceRecord as realEstablishGovernanceRecord,
   previewGovernanceReacceptance as realPreviewGovernanceReacceptance,
   reacceptGovernancePins as realReacceptGovernancePins,
+  createShellJudge as realCreateShellJudge,
   type GovernancePreviewResult,
   type EstablishGovernanceResult,
   type GovernanceRecordInput,
@@ -166,6 +167,58 @@ export interface AttachImageResult {
   image?: ImageAttachmentInfo;
 }
 
+// ————————————————— 2026-10-17：「替我审」开关（主进程权威，PM 评审 §6.6/§10.3） —————————————————
+//
+// 状态**只在主进程内存**：默认 false；启动/渲染重载复位；变化经 `shell:judge-state` 推送；**不写 localStorage/
+// `.env`/项目文件**。渲染侧只发意图（`shell:judge-set`），状态以主进程接受为准。开关**只影响之后新到的
+// `(a)` 请求**（通道在调用当刻读取 `isEnabled()`）；已挂起卡不受切换影响。
+
+/** 开关应答（§6.6 钉死 `{version:1,...}`）。 */
+export interface ShellJudgeStateReply {
+  version: 1;
+  ok: boolean;
+  enabled?: boolean;
+  error?: string;
+}
+
+/** 主进程权威的开关状态机（纯内存；由 main.ts 创建并与通道/Interface 共享**同一实例**）。 */
+export interface ShellJudgeSwitch {
+  isEnabled(): boolean;
+  get(): ShellJudgeStateReply & { ok: true; enabled: boolean };
+  /** 校验 `{enabled:boolean}`；**失败不改状态**。 */
+  set(input: unknown): ShellJudgeStateReply;
+  /** 启动/渲染重载复位（默认 false）。 */
+  reset(): void;
+}
+
+/** 构造开关。主进程（`main.ts`）与 Interface 共持同一实例——两处永不漂移。 */
+export function createShellJudgeSwitch(): ShellJudgeSwitch {
+  let enabled = false;
+  return {
+    isEnabled: () => enabled,
+    get: () => ({ version: 1, ok: true, enabled }),
+    set(input: unknown): ShellJudgeStateReply {
+      const record = input !== null && typeof input === "object" && !Array.isArray(input) ? (input as Record<string, unknown>) : undefined;
+      if (record === undefined) return { version: 1, ok: false, error: "开关请求无效（需 {enabled:boolean}）。" };
+      if (typeof record.enabled !== "boolean") return { version: 1, ok: false, error: "enabled 必须为布尔值。" };
+      if (Object.keys(record).some((key) => key !== "enabled")) return { version: 1, ok: false, error: "开关请求含未知字段。" };
+      enabled = record.enabled;
+      return { version: 1, ok: true, enabled };
+    },
+    reset() {
+      enabled = false;
+    },
+  };
+}
+
+/**
+ * `shell:judge-*` 两个 handler 内的来源校验（§6.6：不依赖通用 registrar）。
+ * 纯同一性比较（`event.sender === win.webContents`）——单元测试可直接钉住；主进程 handler 只调它。
+ */
+export function isShellJudgeIpcSender(sender: unknown, expected: unknown): boolean {
+  return sender !== undefined && sender !== null && sender === expected;
+}
+
 export interface DesktopDeps {
   /** 系统文件夹选择器（由主进程用 electron dialog 注入；测试可注入假实现）。 */
   pickDirectory: () => Promise<string | null>;
@@ -213,6 +266,16 @@ export interface DesktopDeps {
   ) => Promise<RoleSessionHandle>;
   createRuntimeAdapterFactoryFn?: RuntimeAdapterFactoryBuilder;
   runtimeOptions?: RuntimeAdapterFactoryOptions;
+  /**
+   * **「替我审」判断闭包工厂（2026-10-17 PM 评审 §十一）**：缺省经编排 Pipeline 公共出口
+   * `govern-session.ts::createShellJudge`（桌面不直接导入私有 `common/编排/`）。测试可注入桩件。
+   */
+  createShellJudgeFn?: typeof realCreateShellJudge;
+  /**
+   * **「替我审」开关状态机（主进程权威）**：main.ts 创建**同一实例**并传给通道与 Interface；
+   * 缺省自建（默认 false）以便单测直用。开关**只影响之后新到的请求**，不自动打开会话、不持久化。
+   */
+  shellJudgeSwitch?: ShellJudgeSwitch;
   createPiAdapterFactoryFn?: (project: ProjectConfig, shellGate?: ShellGate) => (gate: WriteGate) => RuntimeAdapter;
   createDemoAdapterFn?: (opts: { gate: WriteGate; boundary: BoundarySection1 }) => RuntimeAdapter;
   buildProjectConfigFn?: typeof realBuildProjectConfig;
@@ -379,6 +442,18 @@ export interface DesktopInterface {
     confirm: true;
     previewDigest: string;
   }): Promise<ReacceptGovernancePinsResult>;
+  /**
+   * **「替我审」开关读取**（PM 评审 §6.6）：主进程权威、默认 false。返回 `{version:1, ok:true, enabled}`。
+   * 只读，不改变任何会话或请求状态。
+   */
+  getShellJudgeState(): ShellJudgeStateReply & { ok: true; enabled: boolean };
+  /**
+   * **「替我审」开关设置**：仅接受 `{enabled:boolean}`；失败返回 `{ok:false, error}` 且**不改状态**。
+   * 成功后**只影响之后新到的 `(a)` 请求**（已挂起卡不受影响）；不打开会话、不写盘。
+   */
+  setShellJudgeEnabled(input: unknown): ShellJudgeStateReply;
+  /** 启动/渲染重载复位（默认 false；PM 评审 §10.3，由 main.ts 在 `loadInterface()` 前调用）。 */
+  resetShellJudgeState(): void;
   /** 点角色即开：直接建立/续接与该角色的会话（无确认框；B-2 起切换不再结束旧会话）。 */
   openSession(input: SessionOpenRequest): Promise<OpenResult>;
   /**
@@ -491,6 +566,9 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   const reacceptGovernancePinsFn = deps.reacceptGovernancePinsFn ?? realReacceptGovernancePins;
   // C1：pin 证据检查（缺省＝Service 公开出口；门禁引擎唯一实现）。
   const inspectPinnedBoundariesFn = deps.inspectPinnedBoundariesFn ?? inspectPinnedBoundaries;
+  // 「替我审」（2026-10-17）：开关状态机（主进程权威）与判断闭包工厂（缺省＝编排 Pipeline 公共出口）。
+  const shellJudgeSwitch = deps.shellJudgeSwitch ?? createShellJudgeSwitch();
+  const createShellJudgeFn = deps.createShellJudgeFn ?? realCreateShellJudge;
   // Pi 配置面板：函数与目标路径均可注入（**测试/e2e 必须注入临时 `.env`**，绝不碰真实仓库根 `.env`）。
   const getPiConfigFn = deps.getPiConfigFn ?? realGetPiConfig;
   const savePiConfigFn = deps.savePiConfigFn ?? realSavePiConfig;
@@ -551,6 +629,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     createPiAdapterFactory: createPiAdapterFactoryFn,
     createRuntimeAdapterFactory: runtimeFactory,
     runtimeOptions: deps.runtimeOptions,
+    // 「替我审」：每会话判断闭包工厂（会话用同一份 runtimeOptions/createAdapter 构造；缺省真实实现）。
+    createShellJudge: createShellJudgeFn,
     prepareRuntimeProfile: async (runtime) => {
       if (!pendingProfiles.has(runtime)) return;
       if (runtime === "pi" && manager.hasBusyRuntime("pi")) throw new Error("Pi 的旧轮次仍在执行，新配置将在其结束后应用。消息可继续排队。");
@@ -796,6 +876,17 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         deps.emitProjectChanged?.();
       }
       return result;
+    },
+
+    getShellJudgeState(): ShellJudgeStateReply & { ok: true; enabled: boolean } {
+      return shellJudgeSwitch.get();
+    },
+    setShellJudgeEnabled(input: unknown): ShellJudgeStateReply {
+      // 校验在状态机内完成；失败**不改状态**（§6.6）。主进程 handler 负责 `event.sender` 校验与推送。
+      return shellJudgeSwitch.set(input);
+    },
+    resetShellJudgeState(): void {
+      shellJudgeSwitch.reset();
     },
 
     async openSession(input): Promise<OpenResult> {

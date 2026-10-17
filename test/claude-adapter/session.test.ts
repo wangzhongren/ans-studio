@@ -16,8 +16,9 @@ import { buildGovernedTools } from "../../src/provider/runtime/tools.ts";
 import { createRuntimeSessionStore } from "../../src/provider/runtime/session-store.ts";
 import { createRuntimeAdapter, projectRuntimeLiveHandback } from "../../src/service/runtime/session.ts";
 import { toClaudeSchema } from "../../src/common/claude-adapter/schema.ts";
+import { buildShellJudgeTools, SHELL_JUDGE_TOOL_NAMES } from "../../src/common/runtime-core/shell-judge/tools.ts";
 import type { ResolvedRole } from "../../src/model/role.ts";
-import type { RuntimeProviderOptions, InteractionGate, ToolDefinition, SessionEvent, WriteGate } from "../../src/model/runtime.ts";
+import type { RuntimeProviderOptions, InteractionGate, ToolDefinition, SessionEvent, WriteGate, ShellJudgeReadStats } from "../../src/model/runtime.ts";
 
 const role: ResolvedRole = { id: "claude-fixture", kind: "project", cardText: "# Claude fixture", boundary: { entries: [], boundarySource: "fixture", acceptance: { accepted: true, source: "fixture" } }, boundarySource: "fixture", location: { card: "fixture", boundary: "fixture" } };
 const allow: WriteGate = (path) => ({ allowed: true, matchedEntry: { kind: "file", root: "project", path, purpose: "fixture" } });
@@ -32,7 +33,8 @@ const environment = { PATH: process.env.PATH, HOME: process.env.HOME, ANTHROPIC_
 type Script = (client: Client, options: Options, user: SDKUserMessage, queryIndex: number, rawCall: Client["callTool"]) => Promise<{ fail?: boolean; id?: string; resultText?: string; frames?: SDKMessage[] } | void>;
 
 /** A real MCP Client/Server pair drives production registration, parsing and handlers; only query is fake. */
-function fake(script: Script, statuses: unknown[] | (() => Promise<unknown[]>) = []) {
+type FakeEngineBehavior = { interrupt?: () => Promise<void>; closeError?: Error };
+function fake(script: Script, statuses: unknown[] | (() => Promise<unknown[]>) = [], behavior: FakeEngineBehavior = {}) {
   const configurations: Options[] = [];
   const users: SDKUserMessage[] = [];
   let loadCount = 0;
@@ -78,8 +80,8 @@ function fake(script: Script, statuses: unknown[] | (() => Promise<unknown[]>) =
       }
     })();
     return Object.assign(generator, {
-      async interrupt() { interrupts++; },
-      close() { closed = true; closes++; void connected.then(() => client.close()).catch(() => {}); },
+      async interrupt() { interrupts++; if (behavior.interrupt) await behavior.interrupt(); },
+      close() { closed = true; closes++; void connected.then(() => client.close()).catch(() => {}); if (behavior.closeError) throw behavior.closeError; },
       async mcpServerStatus() { statusCalls++; return typeof statuses === "function" ? await statuses() : statuses; },
     }) as unknown as Query;
   };
@@ -110,6 +112,9 @@ const toolResultFrame = (toolUseId: string, content: unknown, isError: boolean):
   parent_tool_use_id: null, session_id: "fixture", uuid: randomUUID(),
 }) as unknown as SDKMessage;
 const probeTool = (): ToolDefinition => ({ name: "probe", description: "fixture", inputSchema: { type: "object", properties: {} }, handler: async () => ({ ok: true, message: "probe" }) });
+const judgeStats = (): ShellJudgeReadStats => ({ readCalls: 0, readBytes: 0, deniedReads: 0, truncatedReads: 0, budgetExceeded: false });
+const judgeTools = (root: string, report: (raw: unknown) => void = () => {}, stats: ShellJudgeReadStats = judgeStats()): ToolDefinition[] =>
+  buildShellJudgeTools({ projectRoot: root, report, stats });
 
 test("SDK stays lazy through composition/bind; actual MCP schema/options isolate all native abilities and credentials", async () => fixture(async (root) => {
   const engine = fake(async (client, config, user) => {
@@ -524,6 +529,66 @@ test("stop pending confirmation cancels queued write and late answer cannot repo
   assert.equal((rows[0]!.detail as { outcome: string }).outcome, "aborted");
   assert.equal((rows[1]!.detail as { outcome: string }).outcome, "completed");
   await session.dispose();
+}));
+
+test("abort treats an already-closed query interrupt rejection as stopped, closes the engine and settles the turn", async () => fixture(async (root) => {
+  let release!: () => void;
+  const work = new Promise<void>((resolve) => { release = resolve; });
+  const engine = fake(async () => { await work; }, [], { interrupt: async () => { throw new Error("Query closed before response received"); } });
+  const session = await createClaudeRuntimeAdapter(options(root, []), engine.dependencies).bindRole(role);
+  try {
+    const rejected = assert.rejects(session.prompt("stop me"), { name: "AbortError" });
+    await untilIO(() => engine.users.length === 1);
+    await session.abort!();
+    await rejected;
+    assert.equal(engine.interrupts, 1);
+    assert.equal(engine.closes, 1);
+    assert.equal(engine.configurations[0]!.abortController!.signal.aborted, true);
+  } finally { release(); await session.dispose(); }
+}));
+
+test("abort still surfaces an interrupt rejection that is not the closed-query signal", async () => fixture(async (root) => {
+  let release!: () => void;
+  const work = new Promise<void>((resolve) => { release = resolve; });
+  const engine = fake(async () => { await work; }, [], { interrupt: async () => { throw new Error("interrupt transport broken"); } });
+  const session = await createClaudeRuntimeAdapter(options(root, []), engine.dependencies).bindRole(role);
+  try {
+    const rejected = assert.rejects(session.prompt("stop me"), { name: "AbortError" });
+    await untilIO(() => engine.users.length === 1);
+    await assert.rejects(async () => { await session.abort!(); }, /interrupt transport broken/);
+    await rejected;
+    assert.equal(engine.interrupts, 1);
+    assert.equal(engine.closes, 1);
+  } finally { release(); await session.dispose(); }
+}));
+
+test("abort still surfaces a closeEngine teardown failure even when the query was already closed", async () => fixture(async (root) => {
+  let release!: () => void;
+  const work = new Promise<void>((resolve) => { release = resolve; });
+  const engine = fake(async () => { await work; }, [], { interrupt: async () => { throw new Error("Query closed before response received"); }, closeError: new Error("close boom") });
+  const session = await createClaudeRuntimeAdapter(options(root, []), engine.dependencies).bindRole(role);
+  try {
+    const rejected = assert.rejects(session.prompt("stop me"), { name: "AbortError" });
+    await untilIO(() => engine.users.length === 1);
+    await assert.rejects(async () => { await session.abort!(); }, /close boom/);
+    await rejected;
+    assert.equal(engine.closes, 1);
+  } finally { release(); await assert.rejects(session.dispose(), /close boom/); }
+}));
+
+test("abort keeps normal interrupt behavior: interrupt runs once and the turn settles aborted", async () => fixture(async (root) => {
+  let release!: () => void;
+  const work = new Promise<void>((resolve) => { release = resolve; });
+  const engine = fake(async () => { await work; });
+  const session = await createClaudeRuntimeAdapter(options(root, []), engine.dependencies).bindRole(role);
+  try {
+    const rejected = assert.rejects(session.prompt("stop me"), { name: "AbortError" });
+    await untilIO(() => engine.users.length === 1);
+    await session.abort!();
+    await rejected;
+    assert.equal(engine.interrupts, 1);
+    assert.equal(engine.closes, 1);
+  } finally { release(); await session.dispose(); }
 }));
 
 test("last-resort deadline emits timed_out once and disposal closes event stream", async () => fixture(async (root) => {
@@ -1251,4 +1316,127 @@ test("unrecognized failures never trigger the reasoning retry (5xx, and 4xx with
     assert.equal((rows.filter((row) => row.kind === "settled").at(-1)!.detail as { outcome: string }).outcome, "failed");
     await session.dispose();
   }
+}));
+
+test("judge mode registers exactly the three injected read-only tools, force-disables WebSearch/installed MCP, and denies every other call", async () => fixture(async (root) => {
+  await writeFile(join(root, "README.md"), "# Judge fixture\n");
+  await writeFile(join(root, ".env"), "TOP_SECRET=1\n");
+  const reports: unknown[] = [];
+  const stats = judgeStats();
+  const tools = judgeTools(root, (raw) => { reports.push(raw); }, stats);
+  assert.deepEqual(tools.map((tool) => tool.name), [...SHELL_JUDGE_TOOL_NAMES]);
+  const storage = createRuntimeSessionStore({ projectRoot: root, roleId: role.id, runtime: "claude" });
+  const engine = fake(async (client, config, user) => {
+    // 结构面：内置工具面为空，allowedTools 只有三只 judge 工具，原生/网络工具显式禁用，
+    // MCP 只有注入的 ans server；即便上游误传 installedMcpServers 也不装配。
+    assert.deepEqual(config.tools, []);
+    assert.deepEqual(config.allowedTools, SHELL_JUDGE_TOOL_NAMES.map((name) => `mcp__ans__${name}`));
+    for (const native of ["Bash", "Write", "Edit", "Read", "WebSearch", "WebFetch", "Task"]) assert.equal(config.disallowedTools!.includes(native), true, native);
+    assert.deepEqual(Object.keys(config.mcpServers!), ["ans"]);
+    assert.equal(config.strictMcpConfig, true);
+    assert.equal(config.persistSession, false);
+    assert.match(config.systemPrompt as string, /只读判断会话/);
+    assert.equal((config.systemPrompt as string).includes("已安装技能"), false);
+    assert.deepEqual((await client.listTools()).tools.map((tool) => tool.name), [...SHELL_JUDGE_TOOL_NAMES]);
+    // 三只 judge 工具实际可用：读文件、列目录、结论原样回调（不做规范化）。
+    const read = await client.callTool({ name: "judge_read_file", arguments: { path: "README.md" } });
+    assert.equal(read.isError, false);
+    assert.match(JSON.stringify(read.content), /# Judge fixture/);
+    const list = await client.callTool({ name: "judge_list_dir", arguments: {} });
+    assert.equal(list.isError, false);
+    assert.match(JSON.stringify(list.content), /README\.md/);
+    assert.equal(JSON.stringify(list.content).includes(".env"), false, "sensitive entries are never named");
+    const verdict = { verdict: "deny", reason: "fixture raw", evidence: ["README.md"], alternative: { kind: "instruction", value: "fixture" }, extraneous: "kept-raw" };
+    const report = await client.callTool({ name: "report_shell_judgement", arguments: verdict });
+    assert.equal(report.isError, false);
+    assert.deepEqual(reports, [verdict]);
+    // 非 judge 工具不存在于 MCP 目录：调用被 hook/MCP 拒绝，结构性不可用。
+    for (const name of ["write_file", "edit_file", "run_shell", "request_confirmation", "request_choice", "submit_report", "dispatch_task"]) {
+      const result = await client.callTool({ name, arguments: {} });
+      assert.equal(result.isError, true, name);
+    }
+    // PreToolUse 兜底：任何非三项名字（含外来 MCP、内置原生工具）一律 deny。
+    const hook = config.hooks!.PreToolUse![0]!.hooks[0]!;
+    const decision = async (toolName: string, mcpServer?: { name: string; source: "sdk" | "dynamic" }) => (await hook(
+      { hook_event_name: "PreToolUse", prompt_id: user.uuid, tool_name: toolName, tool_input: {}, tool_use_id: "toolu_judge", session_id: "fixture", transcript_path: "fixture", cwd: root, ...(mcpServer ? { mcp_server: mcpServer } : {}) },
+      "toolu_judge", { signal: new AbortController().signal }) as { hookSpecificOutput: { permissionDecision: string } }).hookSpecificOutput.permissionDecision;
+    for (const name of ["mcp__ans__write_file", "mcp__ans__run_shell", "mcp__ans__request_confirmation", "mcp__ext__echo", "Bash", "Write", "WebSearch", "WebFetch"]) assert.equal(await decision(name), "deny", name);
+    assert.equal(await decision("mcp__ext__echo", { name: "ext", source: "dynamic" }), "deny");
+    // 已注册 judge 工具仍走原 allow 分支（绑定活动轮 + 单次 call context）。
+    const allowed = await hook({ hook_event_name: "PreToolUse", prompt_id: user.uuid, tool_name: "mcp__ans__judge_read_file", tool_input: { path: "README.md" }, tool_use_id: "toolu_judge", session_id: "fixture", transcript_path: "fixture", cwd: root, mcp_server: { name: "ans", source: "sdk" } }, "toolu_judge", { signal: new AbortController().signal }) as { hookSpecificOutput: { permissionDecision: string; updatedInput?: Record<string, unknown> } };
+    assert.equal(allowed.hookSpecificOutput.permissionDecision, "allow");
+    assert.equal(typeof allowed.hookSpecificOutput.updatedInput!.__ans_call_context, "string");
+    // 敏感文件仍由运行时核心只读策略拒绝（判断模式不改变读取沙箱）。
+    const denied = await client.callTool({ name: "judge_read_file", arguments: { path: ".env" } });
+    assert.equal(denied.isError, true);
+    assert.equal(JSON.stringify(denied.content).includes("TOP_SECRET"), false);
+  });
+  const session = await createClaudeRuntimeAdapter({
+    ...options(root, tools), judgeMode: true,
+    installedMcpServers: [{ name: "ext", command: "/bin/echo", args: [] }],
+    storage,
+  }, { ...engine.dependencies, env: { ...environment, ANS_CLAUDE_WEB_SEARCH: "1" } }).bindRole(role);
+  const reading = collect(session, 1);
+  await session.prompt("judge fixture");
+  await reading;
+  assert.equal(stats.readCalls, 3);
+  assert.equal(stats.deniedReads, 1);
+  assert.equal(stats.budgetExceeded, false);
+  // 判断会话不持久化：不使用注入 storage 的原生目录、不创建项目 .ans；临时配置根在 dispose 后清理。
+  const configDirectory = engine.configurations[0]!.env!.CLAUDE_CONFIG_DIR!;
+  assert.notEqual(configDirectory, storage.nativeDirectory);
+  assert.equal(engine.configurations[0]!.persistSession, false);
+  await session.dispose();
+  await assert.rejects(access(join(root, ".ans")));
+  await assert.rejects(access(configDirectory));
+}));
+
+test("judge mode rejects non-judge tool sets before SDK load and re-checks at bind", async () => fixture(async (root) => {
+  const engine = fake(async () => undefined);
+  for (const tools of [buildGovernedTools(deny), judgeTools(root).slice(0, 2), [probeTool()]]) {
+    assert.throws(() => createClaudeRuntimeAdapter({ ...options(root, tools), judgeMode: true }, engine.dependencies), /判断会话只接受/);
+  }
+  assert.equal(engine.loadCount, 0);
+  // options 在工厂与 bind 之间被误改：bind 再校验，仍零副作用。
+  const config: RuntimeProviderOptions = { ...options(root, judgeTools(root)), judgeMode: true };
+  const adapter = createClaudeRuntimeAdapter(config, engine.dependencies);
+  (config as { tools: readonly ToolDefinition[] }).tools = buildGovernedTools(deny);
+  await assert.rejects(adapter.bindRole(role), /判断会话只接受/);
+  assert.equal(engine.loadCount, 0);
+  // bind 之后、引擎构造之前被误改：prompt 在加载 SDK 前拒绝，仍零副作用。
+  const lateConfig: RuntimeProviderOptions = { ...options(root, judgeTools(root)), judgeMode: true };
+  const lateSession = await createClaudeRuntimeAdapter(lateConfig, engine.dependencies).bindRole(role);
+  (lateConfig as { tools: readonly ToolDefinition[] }).tools = buildGovernedTools(deny);
+  await assert.rejects(lateSession.prompt("late mutation"), /判断会话只接受/);
+  assert.equal(engine.loadCount, 0);
+  await lateSession.dispose();
+}));
+
+test("judge mode abort settles the turn through the unchanged lifecycle path", async () => fixture(async (root) => {
+  let release!: () => void;
+  const work = new Promise<void>((resolve) => { release = resolve; });
+  const engine = fake(async () => { await work; });
+  const session = await createClaudeRuntimeAdapter({ ...options(root, judgeTools(root)), judgeMode: true }, engine.dependencies).bindRole(role);
+  try {
+    const rejected = assert.rejects(session.prompt("judge stop"), { name: "AbortError" });
+    await untilIO(() => engine.users.length === 1);
+    await session.abort!();
+    await rejected;
+    assert.equal(engine.interrupts, 1);
+    assert.equal(engine.closes, 1);
+  } finally { release(); await session.dispose(); }
+}));
+
+test("normal role sessions keep the pre-judge surface: no disallowedTools and the web search bit still honored", async () => fixture(async (root) => {
+  const engine = fake(async (_client, config) => {
+    assert.deepEqual(config.tools, ["WebSearch"]);
+    assert.deepEqual(config.allowedTools, ["mcp__ans__probe", "WebSearch"]);
+    assert.equal("disallowedTools" in config, false);
+    assert.equal(config.persistSession, false);
+  });
+  const session = await createClaudeRuntimeAdapter(options(root, [probeTool()]), { ...engine.dependencies, env: { ...environment, ANS_CLAUDE_WEB_SEARCH: "1" } }).bindRole(role);
+  const reading = collect(session, 1);
+  await session.prompt("normal surface");
+  await reading;
+  await session.dispose();
 }));

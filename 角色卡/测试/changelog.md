@@ -1,5 +1,23 @@
 # 测试 变更记录
 
+## 2026-10-17（复审）— 预算误报修复后 reverified：本批 40/40；全量 2496/2473/20红/3skip；typecheck 0
+
+**修复复审**：运行时核心 `budgetDenied` 不再计入 `deniedReads`（预算耗尽返回独立码 `budget`）；编排 `damageCode` 顺序改为 `budgetExceeded → budget`、`truncatedReads → read-truncated`、`deniedReads → read-denied`；驱动 manual 理由改为「判断预算耗尽（读取次数/总读取字节达上限）…」。
+
+**复审结果**：首轮唯一失败用例（第 9 次真实读取应得 `manual/budget`）**转绿**；`shell-judge-verify` 36/36 ＋ `abort-cleanup-verify` 4/4 ＝ **40/40**。全量 `node --test "test/**/*.test.ts"` → **2496 / 2473 pass / 20 fail / 3 skip**（本批新增红 **0**；20 红全为既有：Windows symlink EPERM 8、runtime-core shell 子进程竞态 1、其他角色在途源码/文案钉 11）；`npm run typecheck` **0 错**。未发现其他缺陷。报告追加 reverified 事件并更新第五条。未 commit/push。
+
+## 2026-10-17 — 「替我审」判断 agent + 卡死修复独立验证：39/40 通过；1 项实现缺陷（预算误报 read-denied）；全量 2495/2471/21/3
+
+**范围**：PM 评审 `2026-10-17_design_shell-auto-approve-review.md` §6–§12（运行时核心只读工具/读取策略、编排 `createShellJudge`、三引擎判断模式、桌面开关/IPC/通道/UI、审计/诊断、deny 档放行、结果行失败分叉）及 2026-10-17 卡死修复（abort 清理失败后的隔离解除、Claude 已关闭查询）。
+
+**方法**：自建 `test/测试/shell-judge-verify/`（`fixture.ts` + 7 文件 **36 例**）＋ `test/测试/abort-cleanup-verify.test.ts`（**4 例**）；全部离线。判断链＝真实 `createShellGate → createDesktopOperatorChannel → createShellJudge（经 govern-session 公共出口）→ buildShellJudgeTools`，假适配器扮演模型；假 IPC＝真实开关状态机 + sender 守卫；假渲染＝真 `ui-labels.js`；三引擎＝Claude 假 SDK 捕获 `Options`、Pi 真实适配器 + pi-ai faux provider、Codex 真实适配器 + 假引擎/内存 MCP 桩、Service 装配逐引擎捕获。不读 `.env`、不跑真实模型/凭据/网络。
+
+**关键结论**：① 默认关→原卡、判断 0 次、审计人工无 `judge`；开启 allow→0 卡/1 行/审计 `operator:judge:<引擎>`+`judge`/诊断；项目与 su 审批两条 policy 均正确。② deny（有/无替代方案）→0 卡、§8.4 文本、合成 `customerMessage`+标准出路、结果行；deny 行投达失败仍 deny。③ manual（不可用/超时/解析失败/读取被拒/截断/防循环/引擎不支持/模型自报/上下文过大）→原卡+`judgeNotice`、审计人工；allow 行投达失败→`row-failed` 卡。④ deny 档 judge allow→放行 0 卡，审计/诊断/结果行三处标「deny 档 · judge 放行」；普通 risky/review 不带标记。⑤ 已挂起卡切换开关不受影响；判断中关闭以调用时点为准；关后恢复手动。⑥ 敏感/越界/junction/二进制/预算读取被拒且不泄内容；三引擎均恰三只 judge 工具、无写/shell/网络。⑦ abort 抛错但底层稍后 settle→隔离解除可再进入；底层永不 settle→仍拒绝；Claude `Query closed before response received` 视为已中止，其他 interrupt 错误仍上抛。
+
+**发现缺陷（未改实现）**：真实 judge 工具第 9 次读取（调用预算耗尽）会同时置 `budgetExceeded` 和 `deniedReads`，驱动 `damageCode` 先判 `deniedReads` ⇒ 返回 `manual/read-denied`（卡片「所需项目文件无法读取」），设计要求 `manual/budget`（「读取预算已用尽」）。属主：运行时核心（`policy.ts::budgetDenied` / `shell-judge.ts::damageCode` 优先级）；编排属主测试直接置 stats 未覆盖真实工具路径。失败断言保留，未放宽/跳过。
+
+**复跑**：本批 **40 例 / 39 通过 / 1 失败（即上述缺陷）**；全量 `node --test "test/**/*.test.ts"` → **2495 / 2471 pass / 21 fail / 3 skip**（**本批新增 1 红**；既有 20 红：Windows symlink EPERM 8、runtime-core shell 子进程竞态 1、其他角色在途源码/文案钉 11）；`npm run typecheck` → **0 错**（本批 0）。详见[报告](docs/fix/2026-10-17_verify_shell-judge-and-abort.md)。未 commit/push。
+
 ## 2026-10-17 — 治理记录 pin 不符「重新接受」独立端到端验证：AC1–AC12 通过，未发现缺陷；修正 3 条旧断言，新增 11 例
 
 **范围**：PM 评审 `2026-10-17_design_governance-pin-recovery-review.md` §5.5/§六/§八/§九——门禁引擎 `inspectPinnedBoundaries`、编排 `previewGovernanceReacceptance`/`reacceptGovernancePins`、桌面 `listProject.governanceRecord`（`pin-mismatch` + `pinFiles`/`pinCount`）与两个 IPC/preload 方法、桌面UI `governanceActionFor`。实现不改，只做独立验证。

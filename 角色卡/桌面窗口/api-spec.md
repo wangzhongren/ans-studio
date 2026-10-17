@@ -61,6 +61,30 @@ queue/running 延续 kind/sourceRoleId/summary/at/id/full 并增加 runtime。�
 
 Customer callback 第二参保留 O1 的原 CustomerInputMetadata.signal；session lifetime 信号为本地补充。Shell 公共 OperatorChannelFn 没有原 signal，Window 只向自己的 presenter 传本地精确句柄轮次 metadata；abort、dispose、settled、send 拒绝、presenter 时限都清理旧 pending。内部 signal 不进入 IPC。旧句柄流不能使新卡失效。发行和 shell 执行前原 signal 检查仍由编排/核心实施。
 
+## 「替我审」自动判断（P4，2026-10-17；PM 评审 §5.2/§6.5/§6.6）
+
+**开关（主进程权威）**：`createShellJudgeSwitch()`（`app/desktop/interface.ts`，纯内存）——默认 `false`；`main.ts` 在 `loadInterface()` **开始前** `reset()`（启动/渲染重载复位）；不写 localStorage/`.env`/项目文件。`main.ts` 与 Interface 共持**同一实例**：通道在**调用当刻**读 `isEnabled()`，所以切换**只影响之后新到的 `(a)` 请求**，已挂起卡不受影响。
+
+| preload 方法 | IPC / 参数 | 返回 |
+| --- | --- | --- |
+| getShellJudgeState() | shell:judge-get（无参） | `{version:1, ok:true, enabled}` |
+| setShellJudgeEnabled(enabled) | shell:judge-set `{enabled:boolean}`（桥内强制布尔） | `{version:1, ok:true, enabled}` \| `{ok:false, error}`（**失败不改状态**） |
+| onShellJudgeState(cb) | 订阅 shell:judge-state（主→渲） | `{version:1, enabled}`——开关变化/重载复位/初次加载后推送 |
+| onShellJudgeResult(cb) | 订阅 shell:judge-result（主→渲） | `ShellJudgeResultPayload` |
+
+两个入站 handler 在 `main.ts` 内**各自**校验 `event.sender === win.webContents`（`isShellJudgeIpcSender` 纯同一性谓词）；不依赖通用 registrar。诊断：`shell-judge.toggled`（enabled/source/at）、`shell-judge.set.rejected`（reason）、`shell-judge.row.failed`（requestId/toolCallId/verdict）。
+
+**通道三态（`app/desktop/operator-channel.ts`）**：`CreateOperatorChannelOptions` 增 `judge?: {isEnabled, timeoutMs?}`（缺省 15000ms，独立于确认卡超时）与 `emitJudgeResult?`。开关关 / 无 `metadata.judge` / `metadata.signal.aborted` ⇒ **原 `present` 路径逐字不变**。开启后：
+
+- `allow`：**先发结果行**（`ShellJudgeResultPayload`；投达失败或缺 `emitJudgeResult` ⇒ `manual/row-failed` → 原卡）→ `{outcome:"allow", operatorId:"judge:<engine>", judge}`。
+- `deny`：格式化 §8.4 文本（说明/原因/替代方案/出路）→ 发结果行（失败**只记诊断**）→ `{outcome:"deny", operatorId:"judge:<engine>", reason, judge}`；**不调 presenter、0 卡**。
+- `manual`：写 `display.judgeNotice`（按 reasonCode 人话；`row-failed` 专用文案）→ 原 `present`；审计归人工（**不写 `judge`**）。
+- **deny 档（客户 D1）**：judge `allow` **照常放行**，只按 `request.tier === "deny"` 置 `hardDenyOverride:true` 与 `label:"deny 档 · judge 放行"`；**无 hard-floor 转换/拦截/弹卡**。
+
+判断请求由会话闭包给出：`roleId/projectRoot/runtime/turnText/judge`；`policy/tier` 由 `OperatorPrompt.reason` 行首 `su-审批档[tier]` 解析（否则 `project`/`null`）。`ShellCommandDisplay`/`ShellConfirmRequest` 增可选 `judgeNotice`（`buildShellConfirmRequest` **原样拷贝**，不进入 `reasonRaw`）。
+
+**会话装配（`app/desktop/session.ts`）**：每会话用**同一份** `runtimeOptions` 与已构造的 `createAdapter` 工厂经编排 `createShellJudge` 生成闭包（`SessionManagerDeps.createShellJudge`；Interface 缺省注入真实实现，经 `govern-session.ts` 薄再导出，**不直接导入私有 `common/编排/`**）；构造失败 ⇒ 不注入（回原 present）。`LiveSession.lastUserText` 在**真实投递**（直发/出队/派发/回交）时写入，UTF-8 ≤4096 字节（超出截断、不据此 manual）；`metadata` 在调用当刻从活会话读取 `turnText`/`judge`；会话 `dispose` 即清两项。三人（su/项目角色）共用；不改既有 shell 审批档/三层链。
+
 ## 其他能力与装配
 
 项目 pickProject/listProject；listProject roles 原样转可选 readonly group/groupDuty，窗口不解析组别。外开、选图/附件、诊断/显式恢复、窗口控制保留已有白名单方法。`app:recovery-state` 增 runtime。所有订阅均返回取消订阅函数；preload 不暴露 Node 能力。未改动通道的完整历史表见[冻结归档](../桌面应用/api-spec.md)。

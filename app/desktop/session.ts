@@ -103,7 +103,7 @@ import {
 // 形状为**桌面侧暂定契约**（设计 §6.1 的 propose_recovery 载荷 / §6.2 的确认流）——编排 O1 透传与
 // 运行时核心 R2 handler 落树后按需重定向（interface 点见 api-spec；本层不复制第二份判定）。
 import { isRecoveryAction, type RecoveryConfirmPresenter } from "./recovery-channel.ts";
-import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputRequest, CustomerInputMetadata, PromptTurnStartedMetadata } from "../../src/model/runtime.ts";
+import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputRequest, CustomerInputMetadata, PromptTurnStartedMetadata, ShellJudgeFn } from "../../src/model/runtime.ts";
 // H-1（2026-10-12）：派发能力的冻结契约（§4 冻结家；只读导入、不复制形状）。
 import type { DispatchTaskPayload, DispatchReceipt, DispatchTaskFn, PromptOptions } from "../../src/model/runtime.ts";
 // G-4/I3（2026-10-16 客户批准）：技能安装/卸载能力的冻结契约（设计 §3.2 冻结家 `src/model/runtime.ts`；
@@ -300,6 +300,17 @@ export interface SessionManagerDeps {
   ) => Promise<RoleSessionHandle>;
   createRuntimeAdapterFactory?: RuntimeAdapterFactoryBuilder;
   runtimeOptions?: RuntimeAdapterFactoryOptions;
+  /**
+   * **「替我审」每会话判断闭包工厂**（2026-10-17 PM 评审 §5.1/§十一）：缺省 ⇒ 不注入判断能力。
+   * 主进程/Interface 注入真实 `createShellJudge`（经编排 Pipeline 公共出口），测试可注入桩件。
+   * 会话用**与请求会话同一份** `runtimeOptions` 与 `createAdapter` 工厂构造；会话 dispose 即清。
+   */
+  createShellJudge?: (opts: {
+    project: ProjectConfig;
+    runtime: RuntimeKind;
+    runtimeOptions?: RuntimeAdapterFactoryOptions;
+    createAdapter: RuntimeAdapterFactory;
+  }) => ShellJudgeFn;
   prepareRuntimeProfile?: (runtime: RuntimeKind) => Promise<void>;
   createPiAdapterFactory: (
     project: ProjectConfig,
@@ -485,6 +496,14 @@ interface LiveSession {
    * **零技能＝空数组**（既有指纹语义逐字不变）。
    */
   skillPaths: string[];
+  /**
+   * **当前轮投递给该角色的文本**（PM 评审 §8.1：≤4KB，内存内；判断 agent 的 `turnText` 输入）。
+   * 每次真实投递（直发/出队/派发/回交）写入；**不展示、不入审计**；会话销毁即清。
+   */
+  lastUserText?: string;
+  /** **每会话判断闭包**（编排 `createShellJudge`；同一份 `runtimeOptions`/`createAdapter` 工厂）。
+   *  会话 dispose 即清（PM 评审 §十一）。 */
+  shellJudge?: ShellJudgeFn;
 }
 
 /** 一次**系统投递**（E-1 回交投 su / H-1 派发投目标角色 / L-1 客户消息）——投递机的队列条目（**一套机，多调用方**）。 */
@@ -530,6 +549,20 @@ interface DeliveryItem {
 function shortenText(s: string, n: number): string {
   const flat = String(s == null ? "" : s).replace(/\s+/g, " ").trim();
   return flat.length > n ? `${flat.slice(0, n)}…` : flat;
+}
+
+/** 「替我审」`turnText` 上界（PM 评审 §8.1：≤4KB；超出截断，不据此 manual）。 */
+const TURN_TEXT_MAX_BYTES = 4096;
+
+/** 把投递文本收敛到 ≤4KB（UTF-8）；不切断多字节字符。 */
+function boundTurnText(text: string): string {
+  const raw = typeof text === "string" ? text : "";
+  const buf = Buffer.from(raw, "utf8");
+  if (buf.length <= TURN_TEXT_MAX_BYTES) return raw;
+  let end = TURN_TEXT_MAX_BYTES;
+  // 退到 UTF-8 字符边界（continuation byte 为 10xxxxxx）。
+  while (end > 0 && (buf[end] & 0xc0) === 0x80) end -= 1;
+  return buf.subarray(0, end).toString("utf8");
 }
 
 /** O-1：单个文件的**内容指纹**（sha256）。
@@ -717,6 +750,9 @@ export class SessionManager {
   }
 
   private async sendDelivery(entry: LiveSession, origin: DeliveryOrigin, text: string, opts?: PromptOptions, requiresHandback = false): Promise<void> {
+    // **「替我审」上下文**（PM 评审 §8.1）：当前轮投递给该角色的文本 ≤4KB，内存内（会话 dispose 即清）；
+    // 超限截断但**不据此 manual**；不读转录/历史回放。写入点即真实投递（直发/出队/派发/回交同一路径）。
+    entry.lastUserText = boundTurnText(text);
     // Every invocation declares its own source; chat also overrides any legacy session taskId.
     let promptOptions: RoleSessionSendOptions = { ...opts, handback: { required: requiresHandback } };
     if (entry.handle.runtime !== undefined || origin.clientMessageId !== undefined || opts?.onTurnStarted !== undefined) {
@@ -798,6 +834,9 @@ export class SessionManager {
     this.noteWatchdogActivity(entry.projectRoot, "session-close"); // G-2/W3：会话关 = 真实活动
     entry.origins.byTurn.clear();
     delete entry.origins.running;
+    // **「替我审」会话级上下文销毁即清**（PM 评审 §8.1/§十一）：turnText 与判断闭包都不跨会话残留。
+    entry.lastUserText = undefined;
+    entry.shellJudge = undefined;
     entry.interactionState.lifetime.abort();
     entry.interactionState.turn.abort();
     try {
@@ -1216,7 +1255,19 @@ export class SessionManager {
     let shellOperatorChannel: OperatorChannelFn | undefined;
     if (this.deps.shellOperatorChannel) {
       const channel = this.deps.shellOperatorChannel;
-      shellOperatorChannel = (prompt) => channel(prompt, { roleId: req.roleId, projectRoot: req.projectRoot, runtime: req.runtime, signal: interactionState.turn.signal });
+      // **「替我审」metadata（PM 评审 §5.2/§6.5）**：`turnText` 与 `judge` 在**调用当刻**从活会话条目读取
+      // （开关开/关由通道的 `isEnabled` 决定；这里只提供事实）。会话已销毁 ⇒ 两者皆缺省，通道回原 present。
+      shellOperatorChannel = (prompt) => {
+        const live = this.sessions.get(key);
+        return channel(prompt, {
+          roleId: req.roleId,
+          projectRoot: req.projectRoot,
+          runtime: req.runtime,
+          signal: interactionState.turn.signal,
+          ...(live?.lastUserText !== undefined ? { turnText: live.lastUserText } : {}),
+          ...(live?.shellJudge !== undefined ? { judge: live.shellJudge } : {}),
+        });
+      };
     }
 
     // I-1 补丁（2026-10-12，客户重发授权）：**(c) 规则集实件**（`classifyShell` + `rules`）——仅**项目角色**
@@ -1257,6 +1308,23 @@ export class SessionManager {
       }
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+    // **「替我审」每会话判断闭包（PM 评审 §5.1/§6.3）**：用**同一份** `runtimeOptions` 与上面已构造的
+    // `createAdapter` 工厂交给编排 `createShellJudge`（判断跟随请求会话引擎，不跨引擎）。构造失败 ⇒ 不注入
+    // （能力缺席，通道回原 present——fail-closed，绝不擅自放行）。闭包随会话条目销毁一并清除。
+    let shellJudge: ShellJudgeFn | undefined;
+    if (this.deps.createShellJudge !== undefined) {
+      try {
+        shellJudge = this.deps.createShellJudge({
+          project,
+          runtime: req.runtime,
+          runtimeOptions: this.deps.runtimeOptions,
+          createAdapter,
+        });
+      } catch (error) {
+        createDiagnosticLogger({ component: "desktop.session", projectRoot: req.projectRoot, roleId: req.roleId }).error("shell-judge.driver.failed", error);
+        shellJudge = undefined;
+      }
     }
     let handle: RoleSessionHandle;
     try {
@@ -1352,6 +1420,7 @@ export class SessionManager {
       boundaryPaths,
       boundaryPrints,
       skillPaths,
+      ...(shellJudge !== undefined ? { shellJudge } : {}),
     };
     this.sessions.set(key, entry);
     if (role.builtIn === true) this.lastSuRuntime.set(req.projectRoot, req.runtime); // G-2/W1：看护向 su 投递时择路用

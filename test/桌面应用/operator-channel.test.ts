@@ -37,9 +37,12 @@ import {
   parseSuApprovalTier,
   plainReasonFor,
   shellIntentSummary,
+  type DesktopOperatorMetadata,
   type OperatorPresenter,
   type ShellConfirmRequest,
+  type ShellJudgeResultPayload,
 } from "../../app/desktop/operator-channel.ts";
+import type { ShellJudgeFn, ShellJudgeOutcome, ShellJudgeRequest } from "../../src/model/runtime.ts";
 // G-2/W5（2026-10-16 客户批准）：恢复确认卡呈现端（与 shell 卡共享 `confirm-card.ts` 通用件——本组钉住
 // **恰 allow:true 才为真、等待不设限（裁定 4）、关窗/中止=未获执行** 的卡侧语义；执行桥在 dispatch-delivery 组）。
 import { createRecoveryConfirmPresenter } from "../../app/desktop/recovery-channel.ts";
@@ -187,7 +190,7 @@ test("arm 决策（I-1 + 补丁）：DESKTOP_SHELL_GATE_ARMED === true——(c) 
     "main.ts 应按 arm 开关构造 (c) 实件（未 arm ⇒ undefined，等同不注入）"
   );
   assert.ok(
-    /shellArming !== undefined \? buildDesktopOperatorChannel\(shellConfirm\.presenter\) : undefined/.test(mainSrc),
+    /shellArming !== undefined\s*\? buildDesktopOperatorChannel\(shellConfirm\.presenter(?:,\s*\{[\s\S]*?\})?\)\s*:\s*undefined/.test(mainSrc),
     "main.ts：(c) 实件缺失 ⇒ (a) 通道也不构造（两件同备才 arm——绝不半装；M-1 起 presenter 为应用内卡）"
   );
   assert.ok(mainSrc.includes("shellArming,") && mainSrc.includes("shellOperatorChannel,"), "main.ts 应把两件都注入 Interface");
@@ -580,7 +583,7 @@ test("M-1：shell 确认**不再用原生对话框**——(a) 层为应用内卡
   );
   assert.ok(mainSrc.includes('registerHandler("shell:confirm-response"'), "main 经窗口作用域注册器受理决定回包");
   assert.ok(mainSrc.includes("rejectAllPending") && mainSrc.includes('win.on("closed"'), "关窗 ⇒ 全部挂起不放行（fail-closed）");
-  assert.ok(mainSrc.includes("buildDesktopOperatorChannel(shellConfirm.presenter)"), "arm 接线改用应用内卡 presenter");
+  assert.ok(mainSrc.includes("buildDesktopOperatorChannel(shellConfirm.presenter,"), "arm 接线改用应用内卡 presenter");
   const preloadSrc = fs.readFileSync(path.join(APP_DIR, "preload.cjs"), "utf8");
   assert.ok(preloadSrc.includes('"shell:confirm-request"') && preloadSrc.includes("onShellConfirm"), "preload 应订阅确认请求");
   assert.ok(
@@ -1076,4 +1079,355 @@ test("G-2/W5 shell 卡按角色 pending 视图（W1 依赖项）：metadata.role
   assert.equal(p.pendingCount(), 3);
   p.rejectAllPending("清场");
   assert.equal(p.pendingRoles().size, 0, "清场后视图清空");
+});
+
+// ————————————————— 2026-10-17「替我审」三态映射（PM 评审 §5.2/§6.5/§8.3/§8.4/§10.4） —————————————————
+//
+// 纪律：通道**不做命令分类**——这里用**桩 judge**（绝不调真实模型）验证「开关 → 调用 → 三态映射」。
+// 结果行是 allow 的放行条件（row-failed ⇒ manual）；deny 档放行只打标记，不转换。
+
+function judgeMetadata(overrides: Partial<DesktopOperatorMetadata> = {}): DesktopOperatorMetadata {
+  return {
+    roleId: "A",
+    projectRoot: "/proj",
+    runtime: "claude",
+    signal: new AbortController().signal,
+    ...overrides,
+  };
+}
+
+function judgeStub(outcome: ShellJudgeOutcome, seen?: ShellJudgeRequest[]): ShellJudgeFn {
+  return async (input) => {
+    seen?.push(input);
+    return outcome;
+  };
+}
+
+test("替我审·开关关：不调 judge，presenter 原路径逐字不变（默认手动）", async () => {
+  let judgeCalls = 0;
+  let presented = 0;
+  const ch = createDesktopOperatorChannel({
+    presenter: { async present() { presented += 1; return { allow: true }; } },
+    operatorId: "alice",
+    judge: { isEnabled: () => false },
+    emitJudgeResult: () => { throw new Error("开关关时不该发结果行"); },
+  });
+  const res = await ch(req("ls", ["ls"]), judgeMetadata({ judge: async () => { judgeCalls += 1; return { verdict: "allow", reason: "x", reasonCode: "necessary" }; } }));
+  assert.deepEqual(res, { outcome: "allow", operatorId: "alice" }, "开关关 ⇒ 原人工放行");
+  assert.equal(judgeCalls, 0, "开关关绝不调用判断");
+  assert.equal(presented, 1, "走原确认卡");
+});
+
+test("替我审·无 metadata.judge：不调判断，原 present 路径", async () => {
+  let presented = 0;
+  const ch = createDesktopOperatorChannel({
+    presenter: { async present() { presented += 1; return { allow: false, note: "人工拒绝" }; } },
+    operatorId: "bob",
+    judge: { isEnabled: () => true },
+  });
+  const res = await ch(req("ls", ["ls"]), judgeMetadata());
+  assert.equal(res.outcome, "deny");
+  assert.equal((res as { reason?: string }).reason, "人工拒绝");
+  assert.equal(presented, 1);
+});
+
+test("替我审·signal 已中止：不调判断，原 present 路径（交回既有中止路径）", async () => {
+  let judgeCalls = 0;
+  let presented = 0;
+  const ac = new AbortController();
+  ac.abort();
+  const ch = createDesktopOperatorChannel({
+    presenter: { async present() { presented += 1; return { allow: true }; } },
+    operatorId: "carol",
+    judge: { isEnabled: () => true },
+  });
+  const res = await ch(req("ls", ["ls"]), judgeMetadata({ signal: ac.signal, judge: async () => { judgeCalls += 1; return { verdict: "allow", reason: "x", reasonCode: "necessary" }; } }));
+  assert.equal(res.outcome, "allow");
+  assert.equal(judgeCalls, 0, "已中止 ⇒ 不发起判断");
+  assert.equal(presented, 1);
+});
+
+test("替我审·allow：请求字段完整、先发结果行，返回 allow + operatorId=judge:<engine> + 审计 judge", async () => {
+  const seen: ShellJudgeRequest[] = [];
+  const emitted: ShellJudgeResultPayload[] = [];
+  let presented = 0;
+  const ch = createDesktopOperatorChannel({
+    presenter: { async present() { presented += 1; return { allow: false }; } },
+    operatorId: "alice",
+    judge: { isEnabled: () => true },
+    emitJudgeResult: (payload) => emitted.push(payload),
+  });
+  const res = await ch(
+    req("ls -la", ["ls", "-la"], "/proj", "pm 拿不准"),
+    judgeMetadata({
+      runtime: "pi",
+      turnText: "当前轮任务：检查目录",
+      judge: judgeStub(
+        { verdict: "allow", reason: "只读列目录", reasonCode: "necessary", model: "test-model" },
+        seen,
+      ),
+    }),
+  );
+  assert.equal(seen.length, 1, "判断被调用一次");
+  assert.deepEqual(seen[0], {
+    command: "ls -la",
+    argv: ["ls", "-la"],
+    cwd: "/proj",
+    toolCallId: "call-1",
+    roleId: "A",
+    projectRoot: "/proj",
+    runtime: "pi",
+    policy: "project",
+    tier: null,
+    reason: "pm 拿不准",
+    turnText: "当前轮任务：检查目录",
+  }, "判断入参来自会话闭包（roleId/projectRoot/runtime + 本轮 turnText）");
+  assert.equal(emitted.length, 1, "先发结果行");
+  assert.equal(emitted[0].verdict, "allow");
+  assert.equal(emitted[0].operator, "judge:pi");
+  assert.equal(emitted[0].engine, "pi");
+  assert.equal(emitted[0].model, "test-model");
+  assert.equal(emitted[0].reasonCode, "necessary");
+  assert.equal(emitted[0].toolCallId, "call-1");
+  assert.equal(emitted[0].summary, shellIntentSummary("ls -la"));
+  assert.equal(emitted[0].policy, "project");
+  assert.equal(emitted[0].tier, null);
+  assert.equal(res.outcome, "allow", "判断放行");
+  assert.equal((res as { operatorId?: string }).operatorId, "judge:pi");
+  const audit = (res as { judge?: { engine: string; verdict: string; reasonCode: string; model?: string } }).judge;
+  assert.equal(audit?.engine, "pi");
+  assert.equal(audit?.verdict, "allow");
+  assert.equal(audit?.reasonCode, "necessary");
+  assert.equal(audit?.model, "test-model");
+  assert.equal(presented, 0, "allow 不弹卡");
+});
+
+test("替我审·allow 但结果行投达失败 ⇒ manual/row-failed（结果行是放行条件），回落原卡且带 judgeNotice", async () => {
+  let presented = 0;
+  let notice = "";
+  const ch = createDesktopOperatorChannel({
+    presenter: {
+      async present(_p, display) {
+        presented += 1;
+        notice = display.judgeNotice ?? "";
+        return { allow: true };
+      },
+    },
+    operatorId: "alice",
+    judge: { isEnabled: () => true },
+    emitJudgeResult: () => { throw new Error("窗口已关闭"); },
+  });
+  const res = await ch(req("ls", ["ls"]), judgeMetadata({ judge: judgeStub({ verdict: "allow", reason: "必要", reasonCode: "necessary" }) }));
+  assert.equal(presented, 1, "回落人工确认");
+  assert.ok(notice.includes("结果无法在聊天中显示"), "row-failed 文案：判断已完成但结果无法显示");
+  assert.ok(notice.includes("已转你手动确认"));
+  assert.equal(res.outcome, "allow", "人工确认后可放行（归因人工）");
+  assert.equal((res as { operatorId?: string }).operatorId, "alice", "审计归人工，not judge");
+  assert.equal((res as { judge?: unknown }).judge, undefined, "人工手批不写 judge 字段");
+});
+
+test("替我审·deny：不调用 presenter；结果行投达 + 格式化原因（说明/原因/替代方案/出路）", async () => {
+  const emitted: ShellJudgeResultPayload[] = [];
+  let presented = 0;
+  const ch = createDesktopOperatorChannel({
+    presenter: { async present() { presented += 1; return { allow: true }; } },
+    operatorId: "alice",
+    judge: { isEnabled: () => true },
+    emitJudgeResult: (payload) => emitted.push(payload),
+  });
+  const outcome: ShellJudgeOutcome = {
+    verdict: "deny",
+    reasonCode: "safer-alternative",
+    reason: "该命令会改写工作区",
+    customerMessage: "这条命令会改文件，先看只读结果。",
+    alternative: { kind: "command", value: "git status" },
+  };
+  const res = await ch(req("git checkout .", ["git", "checkout", "."]), judgeMetadata({ runtime: "codex", judge: judgeStub(outcome) }));
+  assert.equal(presented, 0, "deny 绝不弹卡");
+  assert.equal(emitted.length, 1, "deny 也发结果行");
+  assert.equal(emitted[0].verdict, "deny");
+  assert.equal(emitted[0].operator, "judge:codex");
+  assert.equal(emitted[0].customerMessage, "这条命令会改文件，先看只读结果。");
+  assert.equal(res.outcome, "deny");
+  assert.equal((res as { operatorId?: string }).operatorId, "judge:codex");
+  const reason = (res as { reason?: string }).reason ?? "";
+  assert.match(reason, /判断 agent 未放行该命令/);
+  assert.match(reason, /请向客户说明：这条命令会改文件/);
+  assert.match(reason, /原因：该命令会改写工作区/);
+  assert.match(reason, /替代方案（command）：git status/);
+  assert.match(reason, /关闭「替我审」后重试/);
+  const audit = (res as { judge?: { verdict: string; reasonCode: string; customerMessage?: string } }).judge;
+  assert.equal(audit?.verdict, "deny");
+  assert.equal(audit?.reasonCode, "safer-alternative");
+  assert.equal(audit?.customerMessage, "这条命令会改文件，先看只读结果。");
+});
+
+test("替我审·deny 结果行投达失败 ⇒ 仍 deny（拒绝是安全方向），只记诊断、不弹卡", async () => {
+  let presented = 0;
+  const ch = createDesktopOperatorChannel({
+    presenter: { async present() { presented += 1; return { allow: true }; } },
+    operatorId: "alice",
+    judge: { isEnabled: () => true },
+    emitJudgeResult: () => { throw new Error("窗口已关闭"); },
+  });
+  const res = await ch(req("rm -rf x", ["rm", "-rf", "x"]), judgeMetadata({ judge: judgeStub({ verdict: "deny", reason: "危险", reasonCode: "no-alternative" }) }));
+  assert.equal(res.outcome, "deny", "结果行投达失败不翻转 deny");
+  assert.equal((res as { operatorId?: string }).operatorId, "judge:claude");
+  assert.equal(presented, 0, "仍不弹卡");
+});
+
+test("替我审·manual 回落：设置 display.judgeNotice 后走原 present；审计归人工（不写 judge）", async () => {
+  let notice = "";
+  let presented = 0;
+  const ch = createDesktopOperatorChannel({
+    presenter: {
+      async present(_p, display) {
+        presented += 1;
+        notice = display.judgeNotice ?? "";
+        return { allow: false, note: "人工先拒" };
+      },
+    },
+    operatorId: "dora",
+    judge: { isEnabled: () => true },
+    emitJudgeResult: () => { throw new Error("manual 不该发结果行"); },
+  });
+  const res = await ch(req("ls", ["ls"]), judgeMetadata({ judge: judgeStub({ verdict: "manual", reasonCode: "unavailable", reason: "会话不可用" }) }));
+  assert.equal(presented, 1);
+  assert.match(notice, /判断 agent 未能完成判断/);
+  assert.match(notice, /判断服务不可用/);
+  assert.match(notice, /已转你手动确认/);
+  assert.equal(res.outcome, "deny");
+  assert.equal((res as { operatorId?: string }).operatorId, "dora");
+  assert.equal((res as { judge?: unknown }).judge, undefined, "manual 后人工手批不写 judge");
+});
+
+test("替我审·独立超时：judge 不返回 ⇒ manual/timeout 回落原卡（不占用确认超时）", async () => {
+  let notice = "";
+  const ch = createDesktopOperatorChannel({
+    presenter: { async present(_p, display) { notice = display.judgeNotice ?? ""; return { allow: false }; } },
+    operatorId: "eve",
+    judge: { isEnabled: () => true, timeoutMs: 25 },
+  });
+  const hangingJudge: ShellJudgeFn = (_input, signal) => new Promise((_resolve, reject) => {
+    signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+  });
+  const startedAt = Date.now();
+  const res = await ch(req("ls", ["ls"]), judgeMetadata({ judge: hangingJudge }));
+  assert.ok(Date.now() - startedAt < 2000, "判断超时应独立生效（不等确认超时）");
+  assert.equal(res.outcome, "deny", "回落人工后按人工决定");
+  assert.match(notice, /判断超时/);
+});
+
+test("替我审·deny 档：judge 放行**不转换**——outcome 仍 allow，只按 tier 置 hardDenyOverride/label（客户 D1）", async () => {
+  const seen: ShellJudgeRequest[] = [];
+  const emitted: ShellJudgeResultPayload[] = [];
+  const ch = createDesktopOperatorChannel({
+    presenter: { async present() { throw new Error("deny 档放行不该弹卡"); } },
+    operatorId: "alice",
+    judge: { isEnabled: () => true },
+    emitJudgeResult: (payload) => emitted.push(payload),
+  });
+  // 桩 judge **故意不**自己设置 hardDenyOverride——通道必须按请求 tier 置（不依赖驱动侧实现）。
+  const res = await ch(
+    req("git reset --hard", ["git", "reset", "--hard"], "/proj", "su-审批档[deny] 硬拒类"),
+    judgeMetadata({ runtime: "claude", judge: judgeStub({ verdict: "allow", reason: "客户明确要求回滚", reasonCode: "necessary" }, seen) }),
+  );
+  assert.equal(seen[0].tier, "deny", "tier 来自请求（su 审批档原因前缀）");
+  assert.equal(seen[0].policy, "su-approval");
+  assert.equal(res.outcome, "allow", "照常放行——没有 hard-floor 转换/拦截");
+  assert.equal((res as { operatorId?: string }).operatorId, "judge:claude");
+  const audit = (res as { judge?: { tier?: string; hardDenyOverride?: true; label?: string } }).judge;
+  assert.equal(audit?.tier, "deny");
+  assert.equal(audit?.hardDenyOverride, true);
+  assert.equal(audit?.label, "deny 档 · judge 放行");
+  assert.equal(emitted[0].tier, "deny");
+  assert.equal(emitted[0].hardDenyOverride, true);
+  assert.equal(emitted[0].label, "deny 档 · judge 放行");
+});
+
+test("judgeNotice：buildShellConfirmRequest 原样拷贝、不进入 reasonRaw（§10.4）", () => {
+  const display = describeShellCommand(req("ls", ["ls"], "/proj", "普通原因"));
+  display.judgeNotice = "判断 agent 未能完成判断：判断超时。已转你手动确认。";
+  const built = buildShellConfirmRequest("sc-1", display);
+  assert.equal(built.judgeNotice, display.judgeNotice, "judgeNotice 原样拷贝");
+  assert.equal(built.reasonRaw, "普通原因", "judgeNotice 不进入 reasonRaw");
+  assert.equal(built.reasonPlain, plainReasonFor("普通原因"), "plainReasonFor 映射不受影响");
+  assert.equal(buildShellConfirmRequest("sc-2", describeShellCommand(req("ls", ["ls"]))).judgeNotice, undefined, "无值 ⇒ 字段缺省（渲染侧隐藏）");
+});
+
+// ————————————————— 2026-10-17「替我审」会话装配（PM 评审 §5.2/§十一） —————————————————
+
+test("替我审·session：每会话构造 judge 闭包（同一份 runtimeOptions/createAdapter）；metadata 注入 turnText（≤4KB）与 judge；dispose 即清", async () => {
+  const listing: ProjectListing = {
+    projectRoot: "/proj",
+    roles: [
+      {
+        roleId: "A",
+        cardPath: "角色卡/A/role-card.md",
+        boundaryPath: "角色卡/A/boundary.yaml",
+        cardText: "A",
+        boundary: {
+          entries: [{ root: "project", path: "src/a.ts", kind: "file", purpose: "p" }],
+          boundarySource: "角色卡/A/boundary.yaml",
+          acceptance: { accepted: false, source: "" },
+        },
+      },
+    ],
+    warnings: [],
+    hasRoles: true,
+    primaryRoleId: "A",
+  };
+  const judge: ShellJudgeFn = async () => ({ verdict: "allow", reason: "桩件", reasonCode: "necessary" });
+  const factoryArgs: Record<string, unknown>[] = [];
+  const metadataSeen: (DesktopOperatorMetadata | undefined)[] = [];
+  const runtimeOptions = {};
+  let capturedChannel: OperatorChannelFn | undefined;
+  const mgr = new SessionManager({
+    openRoleSession: async (input) => {
+      capturedChannel = input.shellOperatorChannel;
+      return fakeHandle();
+    },
+    createPiAdapterFactory: () => () => ({}) as unknown as RuntimeAdapter,
+    createDemoAdapter: () => {
+      throw new Error("本用例不应构造 demo 适配器");
+    },
+    buildProjectConfig,
+    getListing: (root) => (root === "/proj" ? listing : undefined),
+    emitEvent: () => {},
+    shellOperatorChannel: async (_prompt, metadata) => {
+      metadataSeen.push(metadata);
+      return { outcome: "deny", operatorId: "stub", reason: "替身拒绝" };
+    },
+    shellArming: buildDesktopShellArming(),
+    loadEffectiveConfig: STUB_LOADER,
+    runtimeOptions,
+    createShellJudge: (opts) => {
+      factoryArgs.push(opts as unknown as Record<string, unknown>);
+      return judge;
+    },
+  });
+  await mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "pi" });
+  assert.equal(factoryArgs.length, 1, "每会话构造一次 judge 闭包");
+  assert.equal(factoryArgs[0].runtimeOptions, runtimeOptions, "判断用**同一份** runtimeOptions（不另读模型/env）");
+  assert.equal(factoryArgs[0].runtime, "pi", "判断跟随请求会话引擎（不跨引擎）");
+  assert.equal(typeof factoryArgs[0].createAdapter, "function", "判断用会话同一 createAdapter 工厂");
+  assert.equal((factoryArgs[0].project as { projectRoot?: string }).projectRoot, "/proj");
+
+  const prompt = { command: "ls", argv: ["ls"], cwd: "/proj", toolCallId: "t1" };
+  await capturedChannel!(prompt);
+  assert.equal(metadataSeen[0]?.judge, judge, "metadata 注入每会话 judge 闭包");
+  assert.equal(metadataSeen[0]?.turnText, undefined, "尚未投递 ⇒ 无 turnText");
+
+  // 投递一轮超长文本：只留 ≤4KB（内存内），不据此 manual。
+  await mgr.send("好".repeat(3000)); // >4096 UTF-8 bytes
+  await capturedChannel!(prompt);
+  const turnText = metadataSeen[1]?.turnText ?? "";
+  assert.ok(Buffer.byteLength(turnText, "utf8") <= 4096, "turnText ≤4KB（超出截断）");
+  assert.ok(turnText.length > 0, "turnText 来自本轮投递文本");
+
+  // 会话销毁 ⇒ judge/turnText 即清（通道回到原 present 事实面）。
+  await mgr.stop(null);
+  await capturedChannel!(prompt);
+  assert.equal(metadataSeen.at(-1)?.judge, undefined, "dispose 后不再提供 judge 闭包");
+  assert.equal(metadataSeen.at(-1)?.turnText, undefined, "dispose 后不残留 turnText");
 });

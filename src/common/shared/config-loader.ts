@@ -55,10 +55,24 @@ export interface ConfigSource {
   downgradeReason?: string;
 }
 
+/**
+ * 载入后的项目配置：`.ans` 显式治理模型作为**纯值**带出（评审 5.5）。
+ * 缺失/非法 → 不填，消费方按 `single`（旧项目逐字兼容）；不改变 acceptance/pin 语义。
+ * 字段与门禁引擎 `src/model/role.ts::GovernanceModel` 同形；W0 期间用内联字面量，
+ * 门禁引擎落地后本模块改为只读导入，不持有第二份业务规则。
+ */
+export type GovernanceModelProjectConfig = ProjectConfig & { governanceModel?: "single" | "trio" };
+
 export interface LoadedConfig {
-  project: ProjectConfig;
+  project: GovernanceModelProjectConfig;
   source: ConfigSource;
 }
+
+/** `readGovernanceModel` 的三态结果（评审 5.5 契约，名称与形状冻结）。 */
+export type GovernanceModelRead =
+  | { state: "explicit"; model: "single" | "trio" }
+  | { state: "absent" }
+  | { state: "unreadable"; reason: string };
 
 export interface LoadConfigOptions {
   /** 项目根（`.ans/project.json` 相对它解析）。 */
@@ -74,6 +88,56 @@ export interface LoadConfigOptions {
 /** `.ans/project.json` 的绝对路径（fallback / doctor 展示共用同一来源，避免两处各拼一遍）。 */
 export function ansProjectPath(projectRoot: string, ansDirName: string = ANS_DIR_NAME): string {
   return path.join(projectRoot, ansDirName, ANS_PROJECT_FILE_NAME);
+}
+
+/** `.ans` 治理模型值域（评审 5.5：只允许 single/trio；其它值不猜测）。 */
+function isGovernanceModel(value: unknown): value is "single" | "trio" {
+  return value === "single" || value === "trio";
+}
+
+/**
+ * 只读 `.ans/project.json` 的 `governanceModel`（评审 5.5，PM 属主共享组件）。
+ *
+ * 三态：
+ *  - 显式 `"single"` / `"trio"` → `{state:"explicit", model}`；
+ *  - 文件不存在 / 字段缺失 / 值非法（`null`、大小写不符、数字、对象…）→ `{state:"absent"}`；
+ *  - 文件存在但不可读/不可解析/顶层非对象 → `{state:"unreadable", reason}`。
+ *
+ * **不复用** `loadEffectiveConfig` 的 fallback 语义（避免把运行期同意带进模型判定）；
+ * **不写盘、不补写**；评审 5.5 未要求 `governanceMigratedAt`/`legacyGovernanceModel`
+ * 等迁移标记，本函数不读不写未知字段（迁移写入由编排负责保留未知字段）。
+ */
+export async function readGovernanceModel(
+  projectRoot: string,
+  ansDirName: string = ANS_DIR_NAME,
+): Promise<GovernanceModelRead> {
+  const file = ansProjectPath(projectRoot, ansDirName);
+
+  let text: string;
+  try {
+    text = await readFile(file, "utf8");
+  } catch (err) {
+    const code = (err as { code?: unknown }).code;
+    // 无 `.ans`（或路径中段不是目录）= 没有显式模型；新空项目的 trio 判定由调用方结合角色数决定。
+    if (code === "ENOENT" || code === "ENOTDIR") return { state: "absent" };
+    return { state: "unreadable", reason: `无法读取 .ans/project.json：${(err as Error).message}` };
+  }
+
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch (err) {
+    return { state: "unreadable", reason: `无法解析 .ans/project.json：${(err as Error).message}` };
+  }
+  if (!isRecord(raw)) {
+    return { state: "unreadable", reason: ".ans/project.json 顶层不是对象" };
+  }
+
+  const value = raw.governanceModel;
+  if (value === undefined) return { state: "absent" };
+  if (isGovernanceModel(value)) return { state: "explicit", model: value };
+  // 非法值不猜测；调用方按 single 处理（保留既有 governanceRecord.invalid 语义）。
+  return { state: "absent" };
 }
 
 /**
@@ -220,7 +284,10 @@ function buildFromAns(raw: Record<string, unknown>, file: string, opts: LoadConf
   const skillRoot = typeof raw.skillRoot === "string" && raw.skillRoot !== "" ? raw.skillRoot : opts.skillRoot;
   const roles = parseRoles(raw.roles);
 
-  const project: ProjectConfig = { projectRoot, skillRoot, roles };
+  const project: GovernanceModelProjectConfig = { projectRoot, skillRoot, roles };
+  // 评审 5.5：显式模型作为纯值带出；缺失/非法不填（消费方默认 single），
+  // 不改变下面的 acceptance/pin 终态规则与降级语义。
+  if (isGovernanceModel(raw.governanceModel)) project.governanceModel = raw.governanceModel;
 
   const govRaw = raw.governanceBoundary;
   let acceptance: Acceptance = { accepted: false, source: "" };

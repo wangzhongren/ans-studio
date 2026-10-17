@@ -12,7 +12,9 @@ import { RUNTIME_CREDENTIAL_ENV_VARS } from "../../common/shared/runtime-shared.
 import { createDiagnosticLogger } from "../../common/shared/diagnostics.ts";
 import { REASONING_EVENT_SUMMARY } from "../../common/runtime-core/reasoning.ts";
 import { toClaudeSchema } from "../../common/claude-adapter/schema.ts";
-import { abortError, createQueue, waitForTurn } from "../../common/claude-adapter/lifecycle.ts";
+import { CLAUDE_JUDGE_DISALLOWED_TOOLS, assertClaudeJudgeToolSet, claudeJudgeSystemPromptLine } from "../../common/claude-adapter/judge.ts";
+import { abortError, createQueue, isQueryClosedError, waitForTurn } from "../../common/claude-adapter/lifecycle.ts";
+import { SHELL_JUDGE_TOOL_NAMES } from "../../common/runtime-core/shell-judge/tools.ts";
 import { DEFAULT_TURN_LAST_RESORT_MS } from "../../common/runtime-core/timeout.ts";
 import { renderInstalledSkillsSection } from "../../common/编排/installed-skills.ts";
 
@@ -80,6 +82,13 @@ const isReasoningRejection = (text: string | undefined): boolean =>
 
 export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, dependencies: ClaudeAdapterDependencies = {}): RuntimeAdapter {
   if (options.runtime !== "claude") throw new Error("Claude 适配器只接受 runtime=claude");
+  // 「替我审」判断模式（PM 评审 §6.1/A12/A35）：`judgeMode` 由 Service 在注入 `shellJudge`
+  // 只读能力时置位，此时 `options.tools` 必须恰为运行时核心注入的三只 judge 工具。
+  // 工具集不匹配 ⇒ SDK 加载前抛错，零副作用（写/编辑/shell/交互/回交/派发工具即便被误注入
+  // 也不会进入判断会话）。普通角色会话 `judgeMode` 缺席，以下分支全部不成立（逐字不变）。
+  const judgeMode = options.judgeMode === true;
+  if (judgeMode) assertClaudeJudgeToolSet(options.tools);
+  const judgeToolNames: ReadonlySet<string> = new Set(SHELL_JUDGE_TOOL_NAMES);
   if (options.toolDisplayMode === "required-v1" && (typeof options.projectToolEvent !== "function" || typeof options.registerToolDisplayProfile !== "function")) {
     throw new Error("Claude required-v1 工具展示缺少 projector/register 能力");
   }
@@ -100,10 +109,14 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
   // handling all live there). Non-empty splices the whole section verbatim as one prompt segment; empty
   // string renders nothing (zero-skill status quo stays byte-identical).
   const systemPrompt = (role: ResolvedRole) => {
-    const installedSkills = renderInstalledSkillsSection(options.projectRoot, role.id);
+    // 判断会话不拼接项目技能注入节：判断只按稳定 rubric + 按需 judge_read_file 读证据，
+    // 不让角色/技能文本进入系统提示（普通角色会话逐字不变）。
+    const installedSkills = judgeMode ? "" : renderInstalledSkillsSection(options.projectRoot, role.id);
     return [
       role.cardText,
-      `你始终绑定角色 ${role.id}。只能通过 mcp__ans__ 工具操作环境；所有写入、shell 和交互由 ANS 的注入能力判断。`,
+      judgeMode
+        ? claudeJudgeSystemPromptLine(role.id)
+        : `你始终绑定角色 ${role.id}。只能通过 mcp__ans__ 工具操作环境；所有写入、shell 和交互由 ANS 的注入能力判断。`,
       `当前角色边界：${JSON.stringify(role.boundary)}`,
       ...options.tools.flatMap((tool) => tool.promptGuidelines ?? []),
       ...(installedSkills === "" ? [] : [installedSkills]),
@@ -125,7 +138,9 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
     }
     return resolved;
   };
-  const installedServers = options.installedMcpServers ?? [];
+  // 判断会话强制不装配任何外来 MCP（PM 评审 §6.1/A35）：即便上游误传声明也置空。
+  // 普通角色会话保持既有纯消费语义（逐字不变）。
+  const installedServers = judgeMode ? [] : options.installedMcpServers ?? [];
   const installedNames = new Set(installedServers.map((declared) => declared.name));
   const installedToolPrefixes = installedServers.map((declared) => `mcp__${declared.name}__`);
   const installedAllowedTools = installedServers.map((declared) => `mcp__${declared.name}`);
@@ -141,12 +156,16 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
   return {
     async composeContext(role) { return { systemPrompt: systemPrompt(role) }; },
     async bindRole(role: ResolvedRole): Promise<RoleSession> {
+      // 判断模式再校验一次（options 在工厂与 bind 之间可能被误改；仍零副作用）。
+      if (judgeMode) assertClaudeJudgeToolSet(options.tools);
       options.registerToolDisplayProfile?.({
         apiKeyEnvVar: credentialName,
         credentials: [...new Set([credentialName, ...(options.toolDisplayCredentialEnvNames ?? [])])]
           .map((name) => ({ name, value: env[name] })),
       });
-      const storage = options.storage;
+      // 判断会话不持久化（PM 评审 §6.3）：即便上游误传 storage 也不读/不写会话记录，
+      // 原生配置根改用临时目录并在 dispose 清理。普通角色会话逐字不变。
+      const storage = judgeMode ? undefined : options.storage;
       if (storage && (storage.runtime !== "claude" || storage.roleId !== role.id)) throw new Error("Claude 存储 runtime/role 不匹配");
       await storage?.validateNativeDirectory?.();
       const previous = await storage?.readLatest();
@@ -228,6 +247,9 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
         current.controller.abort();
         current.input.close();
         if (engine === current) engine = undefined;
+        // A closed engine can never deliver the in-flight turn's result; settle its done promise here
+        // too so prompt() cannot hang when no other path rejected it (e.g. abort/dispose racing).
+        active?.reject(abortError());
         try { current.query.close(); }
         catch (error) { teardownError = safeFailure(error); active?.reject(teardownError); }
       };
@@ -252,6 +274,9 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
         if (engine && !engine.closed) return engine;
         teardownError = undefined;
         if (!storage && nativeId) { nativeId = undefined; warning = "Claude 活会话已中断；下一条输入将新建上下文。"; }
+        // 判断模式：新建引擎前再校验一次（防止工厂→bind→引擎构造之间 options 被误改）；
+        // 必须在加载 SDK 之前，保证零副作用。
+        if (judgeMode) assertClaudeJudgeToolSet(options.tools);
         const sdk = await (dependencies.loadSdk?.() ?? import("@anthropic-ai/claude-agent-sdk"));
         const z = await (dependencies.loadZod?.() ?? import("zod"));
         if (turn.controller.signal.aborted || disposed) {
@@ -300,7 +325,10 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
           server.instance.registerTool(tool.name, {
             description: tool.description,
             inputSchema: toClaudeSchema({ ...tool.inputSchema, properties: { ...properties, [CALL_CONTEXT_ARG]: { type: "string", description: "Internal ANS context assigned by the host; omit this field." } } }, z),
-            annotations: { readOnlyHint: tool.name === "read_file", destructiveHint: tool.name !== "read_file", openWorldHint: tool.name === "run_shell" },
+            annotations: judgeMode
+              // 判断会话三只工具全部只读、不破坏、不触网。
+              ? { readOnlyHint: true, destructiveHint: false, openWorldHint: false }
+              : { readOnlyHint: tool.name === "read_file", destructiveHint: tool.name !== "read_file", openWorldHint: tool.name === "run_shell" },
             _meta: { "anthropic/alwaysLoad": true },
           }, async (args, extra) => {
             // PreToolUse recorded the ORIGINAL turn. RequestHandlerExtra has no turn/tool-use ID;
@@ -335,19 +363,30 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
           });
         }
         // Web search capability bit (construction-time env snapshot). Default off is fail-closed:
-        // unset/0/off/unknown keeps tools/allowedTools/hooks exactly as before.
-        const webSearchEnabled = ["1", "on"].includes((env.ANS_CLAUDE_WEB_SEARCH ?? "").trim().toLowerCase());
+        // unset/0/off/unknown keeps tools/allowedTools/hooks exactly as before. 判断模式强制关闭：
+        // 忽略 ANS_CLAUDE_WEB_SEARCH，网络工具不得进入只读判断会话（PM 评审 §6.1/A35）。
+        const webSearchEnabled = !judgeMode && ["1", "on"].includes((env.ANS_CLAUDE_WEB_SEARCH ?? "").trim().toLowerCase());
         const queryOptions: SDK.Options = {
           cwd: options.projectRoot, systemPrompt: systemPrompt(role),
           tools: webSearchEnabled ? ["WebSearch"] : [],
+          // SDK 事实（真机诊断 CLAUDE_SDK_CAN_USE_TOOL_SHADOWED）：裸 allowedTools 条目会在
+          // canUseTool 之前自动放行整个工具。本适配器的逐次拦截一直由 PreToolUse hook 承担
+          // （hook deny 先于 allowedTools）；判断模式下 allowedTools 只含三只 judge 工具，
+          // 不存在任何写/编辑/shell/交互/回交/派发/网络条目的自动放行面。
           allowedTools: [...names, ...installedAllowedTools, ...(webSearchEnabled ? ["WebSearch"] : [])],
+          // 判断模式第三层结构性禁用：内置原生工具显式钉死（tools:[] 已清空内置面；strictMcpConfig
+          // 保证只有注入的 ans server；PreToolUse 仍对任何非三项调用兜底 deny）。
+          // 普通角色会话不出现该字段（逐字不变）。
+          ...(judgeMode ? { disallowedTools: [...CLAUDE_JUDGE_DISALLOWED_TOOLS] } : {}),
           settingSources: [], strictMcpConfig: true,
           skills: [], plugins: [], settings: { disableAllHooks: true }, extraArgs: { "disable-slash-commands": null },
           mcpServers: { ans: server, ...installedMcpConfigs }, env: childEnv, abortController: controller,
           persistSession: !!storage, ...(nativeId ? { resume: nativeId } : {}),
           ...(options.modelId?.trim() || env.ANS_CLAUDE_MODEL?.trim() ? { model: options.modelId?.trim() || env.ANS_CLAUDE_MODEL?.trim() } : {}),
           ...reasoningOptions(),
-          canUseTool: async () => ({ behavior: "deny", message: "仅允许已注册且预批准的 ANS MCP 工具" }),
+          canUseTool: async () => ({ behavior: "deny", message: judgeMode
+            ? "判断会话仅允许已注册的只读 judge 工具"
+            : "仅允许已注册且预批准的 ANS MCP 工具" }),
           hooks: {
             UserPromptSubmit: [{ hooks: [async (hook, _toolUseID, hookOptions) => {
               if (hook.hook_event_name !== "UserPromptSubmit") return {};
@@ -366,7 +405,9 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
             if (hook.hook_event_name !== "PreToolUse") return {};
             const original = hook.prompt_id ? current.nativeTurns.get(hook.prompt_id) : undefined;
             const originalTurn = original?.turn;
-            if (names.has(hook.tool_name) && hook.mcp_server?.name === "ans" && hook.mcp_server.source === "sdk" && originalTurn && originalTurn === active && !originalTurn.controller.signal.aborted && !original!.signal.aborted && !controller.signal.aborted && !hookOptions.signal.aborted && hook.tool_input && typeof hook.tool_input === "object" && !Array.isArray(hook.tool_input)) {
+            // 判断模式：只放行冻结的三只 judge 工具；任何其他名字即便误入 names 也不得放行
+            // （结构性最后一道闸，兜底文案在下方 deny 分支）。
+            if (names.has(hook.tool_name) && (!judgeMode || judgeToolNames.has(hook.tool_name.slice("mcp__ans__".length))) && hook.mcp_server?.name === "ans" && hook.mcp_server.source === "sdk" && originalTurn && originalTurn === active && !originalTurn.controller.signal.aborted && !original!.signal.aborted && !controller.signal.aborted && !hookOptions.signal.aborted && hook.tool_input && typeof hook.tool_input === "object" && !Array.isArray(hook.tool_input)) {
               const token = randomUUID();
               current.contexts.set(token, { turn: originalTurn, toolName: hook.tool_name.slice("mcp__ans__".length), toolUseId: hook.tool_use_id, signal: AbortSignal.any([original!.signal, hookOptions.signal]) });
               return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow", updatedInput: { ...hook.tool_input as Record<string, unknown>, [CALL_CONTEXT_ARG]: token } } };
@@ -392,11 +433,14 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
             }
             if (originalTurn) {
               const tool = options.tools.find((candidate) => `mcp__ans__${candidate.name}` === hook.tool_name);
+              const blocked = judgeMode ? "拒绝非判断工具或已中止轮次的调用" : "拒绝非 ANS 工具或已中止轮次的调用";
               emitTool(originalTurn, { origin: "governance-hook", phase: "blocked", toolName: tool?.name ?? hook.tool_name,
                 toolCallId: `${originalTurn.id}:${hook.tool_use_id}`,
-                result: { ok: false, message: "拒绝非 ANS 工具或已中止轮次的调用" } }, "denied", "拒绝非 ANS 工具或已中止轮次的调用");
+                result: { ok: false, message: blocked } }, "denied", blocked);
             } else emitUnattributed();
-            return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: "仅允许当前轮注册的 ANS MCP 工具" } };
+            return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: judgeMode
+              ? "判断会话仅允许 judge_read_file/judge_list_dir/report_shell_judgement"
+              : "仅允许当前轮注册的 ANS MCP 工具" } };
           }] }],
           },
         };
@@ -560,10 +604,18 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
           const current = engine;
           if (!current) return;
           let timer: ReturnType<typeof setTimeout> | undefined;
+          let interruptFailure: { error: unknown } | undefined;
           try {
             await Promise.race([current.query.interrupt(), new Promise<void>((resolve) => { timer = setTimeout(resolve, 1000); timer.unref(); })]);
+          } catch (error) {
+            // "Query closed before response received" means the query is already gone, so the stop
+            // already took effect; that is not an interrupt/cleanup failure. Every other rejection
+            // still surfaces after teardown below.
+            interruptFailure = { error };
           } finally { if (timer) clearTimeout(timer); closeEngine(current); }
+          // A real teardown failure must never be swallowed — it wins over the interrupt rejection.
           if (teardownError) throw teardownError;
+          if (interruptFailure && !isQueryClosedError(interruptFailure.error)) throw interruptFailure.error;
         },
         async dispose() {
           if (disposed) return;

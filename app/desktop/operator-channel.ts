@@ -30,6 +30,11 @@
 // 「命令是否危险」由 (c) 判、「语义是否放行」由 (b) 判。本模块**只**：把命令**原文**如实呈现给人、取回人的
 // 放行/拒绝、并在**通道不可用/超时**时给出**非放行**结论（fail-closed）。**不含任何命令分类/白名单/规则**逻辑。
 //
+// **「替我审」（2026-10-17 PM 评审 §5.2/§6.5）**：开关开启时，本模块在 present **之前**调用**注入的**
+// `ShellJudgeFn`（判断语义全部在编排 `createShellJudge`/只读工具），只做三态映射与结果行推送；它**不解析
+// 命令风险、不做 (c) 判定**。`row-failed` 只是 UI 可靠性映射；deny 档放行只按 `tier` 打标记（客户 D1），
+// **没有 hard-floor 转换**。开关关/无 judge/已中止时，原 present 路径**逐字不变**。
+//
 // —— fail-closed 三条（§7.5） ——
 //   · 人点拒绝              → `{outcome:"deny", operatorId, reason}`（编排据此**拒**）；
 //   · 确认超时              → `{outcome:"unavailable", reason:"…超时…"}`（编排据此**拒**）；
@@ -48,8 +53,16 @@ import type {
   OperatorPrompt,
   OperatorOutcome,
   OperatorChannelFn,
+  RuntimeKind,
+  ShellJudgeAlternative,
+  ShellJudgeAudit,
+  ShellJudgeFn,
+  ShellJudgeOutcome,
+  ShellJudgeRequest,
 } from "../../src/model/runtime.ts";
 export type { OperatorPrompt, OperatorOutcome, OperatorChannelFn };
+// 桌面自有类型（§6.5）：判断结果行载荷与桌面侧的审计扩展。只在判断 agent 自己做出 allow/deny 时使用。
+import { createDiagnosticLogger } from "../../src/common/shared/diagnostics.ts";
 
 // (c) 规则集实件（**I-1 补丁**，2026-10-12 客户重发授权）：**只读导入**门禁引擎经 Service 公开出口的
 // 再导出（`src/service/gate/shell-rules.ts`——**同一函数引用**，绝不复制实现、绝不另立第二份规则集）。
@@ -75,6 +88,9 @@ import { SHELL_REVIEW_TIMEOUT_ENV } from "../../src/common/编排/shell-deadline
 export const DEFAULT_OPERATOR_CONFIRM_TIMEOUT_MS = 120000;
 /** 覆盖确认超时的环境变量名（显式专用覆盖，优先于 shell 审核预算）。 */
 export const OPERATOR_CONFIRM_TIMEOUT_ENV = "ANS_DESKTOP_OPERATOR_CONFIRM_TIMEOUT_MS";
+/** 「替我审」在桌面通道层面的**独立**硬超时（PM 评审 §5.2/§6.5：15s；与确认卡超时互不占用）。
+ *  超时 ⇒ `manual/timeout` → 原确认卡（判断只影响是否弹卡，不改变 fail-closed 语义）。 */
+export const DEFAULT_SHELL_JUDGE_CHANNEL_TIMEOUT_MS = 15000;
 
 /**
  * 桌面**是否 arm** shell 闸（即：会话构造路径是否把本通道作为 (a) 层交给编排装配、从而 `run_shell` 被注册）。
@@ -154,8 +170,43 @@ export interface ShellCommandDisplay {
   cwd: string;
   /** 为何升级到人（(b) 拿不准 / 不可用）；无则不展示。 */
   reason?: string;
+  /** **手动回落提示**（「替我审」判断未完成 / 结果行无法投达）——渲染侧新元素 `#sc-judge-notice`；
+   *  无值时隐藏。**不进入 `reasonRaw`**、不改变 `plainReasonFor` 的映射（PM 评审 §10.4）。 */
+  judgeNotice?: string;
   /** 人类可读的完整提示文本（presenter 可直接展示）。 */
   text: string;
+}
+
+/**
+ * 「替我审」判断结果行载荷（桌面自有类型；PM 评审 §6.5，字段名钉死）。
+ * 由 `createDesktopOperatorChannel` 在判断 agent 自己做出 allow/deny 后经 `emitJudgeResult` 推送；
+ * `manual` 不产生结果行（原确认卡 + `judgeNotice` 替代）。`operator` 恒为 `judge:<引擎>`。
+ */
+export interface ShellJudgeResultPayload {
+  version: 1;
+  id: string;
+  toolCallId: string;
+  roleId: string;
+  projectRoot: string;
+  runtime: RuntimeKind;
+  at: string;
+  verdict: "allow" | "deny";
+  engine: RuntimeKind;
+  model?: string;
+  reasonCode: string;
+  operator: `judge:${string}`;
+  command: string;
+  summary: string | null;
+  policy: "su-approval" | "project";
+  tier: "risky" | "review" | "deny" | null;
+  /** 客户 D1：deny 档被 judge 放行；聊天行据此标「deny 档 · judge 放行」。 */
+  hardDenyOverride?: true;
+  label?: "deny 档 · judge 放行";
+  reason?: string;
+  customerMessage?: string;
+  alternative?: ShellJudgeAlternative;
+  evidence?: string[];
+  customerMessageSynthesized?: boolean;
 }
 
 /** 人对一次 shell 确认的选择。 */
@@ -167,7 +218,16 @@ export interface OperatorDecision {
 }
 
 /** 操作者确认的**表现层**（主进程用 electron dialog 实现；测试可注入替身）。 */
-export interface DesktopOperatorMetadata { roleId: string; projectRoot: string; runtime: import("../../src/model/runtime.ts").RuntimeKind; signal: AbortSignal }
+export interface DesktopOperatorMetadata {
+  roleId: string;
+  projectRoot: string;
+  runtime: RuntimeKind;
+  signal: AbortSignal;
+  /** 当前轮投递给该角色的文本（≤4KB，内存内）；仅用于判断，不展示、不入审计。 */
+  turnText?: string;
+  /** 每会话闭包注入的判断能力（编排 `createShellJudge`）；缺省 ⇒ 不启用判断。 */
+  judge?: ShellJudgeFn;
+}
 export type DesktopOperatorChannelFn = (prompt: OperatorPrompt, metadata?: DesktopOperatorMetadata) => ReturnType<OperatorChannelFn>;
 
 export interface OperatorPresenter {
@@ -237,12 +297,28 @@ export interface CreateOperatorChannelOptions {
   timeoutMs?: number;
   /** 可注入环境（读取超时 env）；缺省 `process.env`。 */
   env?: Record<string, string | undefined>;
+  /**
+   * **「替我审」开关与判断超时**（PM 评审 §6.5）。`isEnabled()` 在主进程是权威状态（默认 false、重载复位）；
+   * 关 / 缺省 ⇒ 原 `present` 路径**逐字不变**。`timeoutMs` 缺省 15000（独立于确认卡超时）。
+   */
+  judge?: { isEnabled: () => boolean; timeoutMs?: number };
+  /**
+   * **判断结果行推送**（PM 评审 §6.5）：判断 agent 自己做出 allow/deny 时先推一行到请求角色的聊天流。
+   * **推达失败（抛错）⇒ allow 降级 `manual/row-failed`（结果行是放行条件）；deny 仍 deny，只记诊断**。
+   * 缺省 ⇒ 视为无法投达（allow ⇒ manual/row-failed）。
+   */
+  emitJudgeResult?: (payload: ShellJudgeResultPayload) => void;
 }
 
 /**
  * 装配桌面操作者通道。产出的通道**无任何命令判定**，只：呈现原文 → 取人选择 → 归 `OperatorOutcome`。
  * 一切不确定情形（未配置 / 抛错 / 超时）都落到**非放行**结论（fail-closed）——编排据此拒绝。
  * **只有操作者明确放行（恰为 `allow:true`）才返回 `{outcome:"allow"}`。**
+ *
+ * **「替我审」（2026-10-17 PM 评审 §5.2/§6.5）**：开关开且有 `metadata.judge` 时，在 `present` **之前**
+ * 调判断闭包（独立超时），三态映射：allow ⇒ 先发结果行再放行；deny ⇒ 格式化原因、发结果行、**不调用
+ * presenter**；manual ⇒ 写 `display.judgeNotice` 后走**原** `present` 路径。**本函数依旧不做命令分类**；
+ * `row-failed` 只是 UI 可靠性映射；deny 档放行**不转换**，只按 `tier` 打 `hardDenyOverride` 标记。
  *
  * 返回类型**经推断**为 `(prompt: OperatorPrompt) => Promise<OperatorOutcome>`——**恒返回确定的 `OperatorOutcome`**
  * （所有分支皆返回，绝不返回 `null`/`undefined`），是 §4 冻结契约家 `OperatorChannelFn` 的**结构子类型**。
@@ -253,43 +329,234 @@ export function createDesktopOperatorChannel(opts: CreateOperatorChannelOptions)
     typeof opts.operatorId === "string" && opts.operatorId.trim() !== "" ? opts.operatorId : "unknown";
   const env = opts.env ?? process.env;
   const timeoutMs = opts.timeoutMs ?? readConfirmTimeoutMs(env);
+  const judgeTimeoutMs =
+    typeof opts.judge?.timeoutMs === "number" && Number.isFinite(opts.judge.timeoutMs) && opts.judge.timeoutMs > 0
+      ? Math.floor(opts.judge.timeoutMs)
+      : DEFAULT_SHELL_JUDGE_CHANNEL_TIMEOUT_MS;
+  const judgeLog = createDiagnosticLogger({ component: "desktop.shell-judge" });
+  // 结果行幂等键：本通道（每窗口）自增，避免跨角色/跨项目 toolCallId 碰撞时渲染侧误去重。
+  let judgeResultSeq = 0;
 
   return async (prompt: OperatorPrompt, metadata?: DesktopOperatorMetadata): Promise<OperatorOutcome> => {
     const timeoutController = new AbortController();
     let displayMetadata = metadata;
     if (metadata) displayMetadata = { ...metadata, signal: AbortSignal.any([metadata.signal, timeoutController.signal]) };
-    // 退路：通道未配置 → 不可用（能力缺席即 fail-closed；绝不当「没人问、那就放行」）。
-    if (opts.presenter === undefined) {
-      return { outcome: "unavailable", reason: "操作者确认通道未配置（无 presenter），拒绝执行（fail-closed）" };
-    }
 
-    const display = describeShellCommand(prompt);
-    let decision: OperatorDecision;
+    /** 原 `present` 路径（逐字保留）——开关关/无 judge/已中止/判断回落时走它。 */
+    const presentConfirmed = async (display: ShellCommandDisplay): Promise<OperatorOutcome> => {
+      // 退路：通道未配置 → 不可用（能力缺席即 fail-closed；绝不当「没人问、那就放行」）。
+      if (opts.presenter === undefined) {
+        return { outcome: "unavailable", reason: "操作者确认通道未配置（无 presenter），拒绝执行（fail-closed）" };
+      }
+      let decision: OperatorDecision;
+      try {
+        // 超时包装整个确认；超时 = 拒绝（§7.5 退路 3）。
+        decision = await withConfirmTimeout(opts.presenter.present(prompt, display, displayMetadata), timeoutMs);
+      } catch (err) {
+        const timedOut = err instanceof Error && err.name === OPERATOR_CONFIRM_TIMEOUT_NAME;
+        // F-4-M2（2026-10-16 客户批准）：超时以**带标记的原因**中止组合信号——呈现侧（cancel）据
+        // `AbortSignal.any` 传播的 `signal.reason` 分流失效原因：超时 ⇒ 如实「操作者确认超时（>Nms）…」
+        // （此前被误报成「本轮已结束、停止或会话已重建」）；轮次中止/重建 ⇒ 原中止（reason 为默认 AbortError）。
+        // 判定不变：两者都落 unavailable（fail-closed），绝不默认放行。
+        if (timedOut) timeoutController.abort(confirmTimeoutError(timeoutMs));
+        else timeoutController.abort();
+        return {
+          outcome: "unavailable",
+          reason: timedOut
+            ? `操作者确认超时（>${timeoutMs}ms），拒绝执行（fail-closed）`
+            : `操作者确认通道不可用，拒绝执行（fail-closed）：${reasonOf(err)}`,
+        };
+      }
+
+      // 人明确放行（恰为 true）才放行；拒绝/缺字段/非布尔 → 一律拒绝。
+      if (decision.allow !== true) {
+        return { outcome: "deny", operatorId, reason: decision.note ?? "操作者拒绝执行" };
+      }
+      return { outcome: "allow", operatorId };
+    };
+
+    // —— 前置条件（PM 评审 §5.2）：开关关 / 无 judge / 已中止 ⇒ 原 present（逐字不变）。 ——
+    let judgeEnabled = false;
     try {
-      // 超时包装整个确认；超时 = 拒绝（§7.5 退路 3）。
-      decision = await withConfirmTimeout(opts.presenter.present(prompt, display, displayMetadata), timeoutMs);
-    } catch (err) {
-      const timedOut = err instanceof Error && err.name === OPERATOR_CONFIRM_TIMEOUT_NAME;
-      // F-4-M2（2026-10-16 客户批准）：超时以**带标记的原因**中止组合信号——呈现侧（cancel）据
-      // `AbortSignal.any` 传播的 `signal.reason` 分流失效原因：超时 ⇒ 如实「操作者确认超时（>Nms）…」
-      // （此前被误报成「本轮已结束、停止或会话已重建」）；轮次中止/重建 ⇒ 原中止（reason 为默认 AbortError）。
-      // 判定不变：两者都落 unavailable（fail-closed），绝不默认放行。
-      if (timedOut) timeoutController.abort(confirmTimeoutError(timeoutMs));
-      else timeoutController.abort();
-      return {
-        outcome: "unavailable",
-        reason: timedOut
-          ? `操作者确认超时（>${timeoutMs}ms），拒绝执行（fail-closed）`
-          : `操作者确认通道不可用，拒绝执行（fail-closed）：${reasonOf(err)}`,
-      };
+      judgeEnabled = opts.judge?.isEnabled() === true;
+    } catch {
+      judgeEnabled = false; // 开关读取异常 ⇒ 视作关闭（绝不擅自开启判断）。
+    }
+    const judgeFn = metadata?.judge;
+    if (!judgeEnabled || judgeFn === undefined || metadata === undefined || metadata.signal.aborted === true) {
+      return presentConfirmed(describeShellCommand(prompt));
     }
 
-    // 人明确放行（恰为 true）才放行；拒绝/缺字段/非布尔 → 一律拒绝。
-    if (decision.allow !== true) {
-      return { outcome: "deny", operatorId, reason: decision.note ?? "操作者拒绝执行" };
+    // —— 判断请求：来源/策略/档位来自**会话闭包**（metadata），不信任渲染侧。 ——
+    const tier = parseSuApprovalTier(prompt.reason);
+    const policy: "su-approval" | "project" = tier !== null ? "su-approval" : "project";
+    const judgeRequest: ShellJudgeRequest = {
+      command: typeof prompt.command === "string" ? prompt.command : "",
+      argv: normalizeArgv(prompt.argv),
+      cwd: typeof prompt.cwd === "string" ? prompt.cwd : "",
+      toolCallId: typeof prompt.toolCallId === "string" ? prompt.toolCallId : "",
+      roleId: metadata.roleId,
+      projectRoot: metadata.projectRoot,
+      runtime: metadata.runtime,
+      policy,
+      tier,
+      ...(typeof prompt.reason === "string" && prompt.reason !== "" ? { reason: prompt.reason } : {}),
+      ...(metadata.turnText !== undefined ? { turnText: metadata.turnText } : {}),
+    };
+
+    // 独立超时（15s 缺省）：以组合信号中止判断；超时只影响「是否弹卡」，不改变 fail-closed。
+    const judgeController = new AbortController();
+    const judgeSignal = AbortSignal.any([metadata.signal, judgeController.signal]);
+    let timedOut = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let outcome: ShellJudgeOutcome;
+    try {
+      const timeout = new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => {
+          timedOut = true;
+          judgeController.abort();
+          reject(judgeTimeoutError(judgeTimeoutMs));
+        }, judgeTimeoutMs);
+      });
+      outcome = await Promise.race([judgeFn(judgeRequest, judgeSignal), timeout]);
+    } catch (err) {
+      // 编排 `createShellJudge` 契约上不抛错；这里是**防御**映射（仍不默认放行）。
+      const aborted: boolean = metadata.signal.aborted;
+      outcome = {
+        verdict: "manual",
+        reasonCode: timedOut ? "timeout" : aborted ? "aborted" : "unavailable",
+        reason: timedOut
+          ? `判断超时（>${judgeTimeoutMs}ms），已转手动确认。`
+          : aborted
+            ? "本轮已中止，判断结果不生效（交回既有中止路径）。"
+            : `判断异常：${reasonOf(err)}。已转手动确认。`,
+      };
+    } finally {
+      if (timer !== undefined) clearTimeout(timer);
     }
-    return { outcome: "allow", operatorId };
+
+    if (outcome.verdict === "manual") {
+      // 手动回落：设 `judgeNotice` → **原 present 路径**；审计归人工（不写 `judge` 字段）。
+      const display = describeShellCommand(prompt);
+      display.judgeNotice = manualJudgeNotice(outcome.reasonCode, outcome.reason);
+      return presentConfirmed(display);
+    }
+
+    const engine = metadata.runtime;
+    const operator = `judge:${engine}` as `judge:${string}`;
+    // 客户 D1：deny 档放行**只按 tier 置标记**，不转换、不拦截、不弹卡。
+    const hardDenyOverride = outcome.verdict === "allow" && (tier === "deny" || outcome.hardDenyOverride === true);
+    const label = hardDenyOverride ? ("deny 档 · judge 放行" as const) : undefined;
+    const audit: ShellJudgeAudit & { label?: typeof label } = {
+      engine,
+      verdict: outcome.verdict,
+      reasonCode: outcome.reasonCode,
+      tier,
+      ...(outcome.model !== undefined ? { model: outcome.model } : {}),
+      ...(hardDenyOverride ? { hardDenyOverride: true as const } : {}),
+      ...(label !== undefined ? { label } : {}),
+      ...(outcome.reason !== undefined ? { reason: outcome.reason } : {}),
+      ...(outcome.customerMessage !== undefined ? { customerMessage: outcome.customerMessage } : {}),
+      ...(outcome.alternative !== undefined ? { alternative: outcome.alternative } : {}),
+      ...(outcome.customerMessageSynthesized !== undefined
+        ? { customerMessageSynthesized: outcome.customerMessageSynthesized }
+        : {}),
+    };
+    const payload: ShellJudgeResultPayload = {
+      version: 1,
+      id: `sj-${++judgeResultSeq}`,
+      toolCallId: judgeRequest.toolCallId,
+      roleId: metadata.roleId,
+      projectRoot: metadata.projectRoot,
+      runtime: metadata.runtime,
+      at: new Date().toISOString(),
+      verdict: outcome.verdict,
+      engine,
+      ...(outcome.model !== undefined ? { model: outcome.model } : {}),
+      reasonCode: outcome.reasonCode,
+      operator,
+      command: judgeRequest.command,
+      summary: shellIntentSummary(judgeRequest.command),
+      policy,
+      tier,
+      ...(hardDenyOverride ? { hardDenyOverride: true as const } : {}),
+      ...(label !== undefined ? { label } : {}),
+      ...(outcome.reason !== undefined ? { reason: outcome.reason } : {}),
+      ...(outcome.customerMessage !== undefined ? { customerMessage: outcome.customerMessage } : {}),
+      ...(outcome.alternative !== undefined ? { alternative: outcome.alternative } : {}),
+      ...(outcome.evidence !== undefined ? { evidence: outcome.evidence } : {}),
+      ...(outcome.customerMessageSynthesized !== undefined
+        ? { customerMessageSynthesized: outcome.customerMessageSynthesized }
+        : {}),
+    };
+
+    if (outcome.verdict === "allow") {
+      // **结果行是放行条件**：投达失败 ⇒ `manual/row-failed` → 原确认卡（人重新决定）。
+      try {
+        if (opts.emitJudgeResult === undefined) throw new Error("判断结果行通道未配置");
+        opts.emitJudgeResult(payload);
+      } catch (err) {
+        judgeLog.record("shell-judge.row.failed", { requestId: payload.id, toolCallId: payload.toolCallId, verdict: payload.verdict });
+        const display = describeShellCommand(prompt);
+        display.judgeNotice = manualJudgeNotice("row-failed", reasonOf(err));
+        return presentConfirmed(display);
+      }
+      return { outcome: "allow", operatorId: operator, judge: audit };
+    }
+
+    // deny：发结果行（失败**只记诊断**，仍 deny——拒绝是安全方向）；**不调用 presenter**。
+    try {
+      if (opts.emitJudgeResult === undefined) throw new Error("判断结果行通道未配置");
+      opts.emitJudgeResult(payload);
+    } catch (err) {
+      judgeLog.record("shell-judge.row.failed", { requestId: payload.id, toolCallId: payload.toolCallId, verdict: payload.verdict, reason: reasonOf(err) });
+    }
+    return { outcome: "deny", operatorId: operator, reason: formatJudgeDenyReason(outcome), judge: audit };
   };
+}
+
+/** `manual` 的**卡片提示**（PM 评审 §10.4）——按 reasonCode 分两类，不把「判断发生但降级」说成「没发生」。 */
+export function manualJudgeNotice(reasonCode: string, reason?: string): string {
+  if (reasonCode === "row-failed") {
+    return "判断 agent 已完成判断，但结果无法在聊天中显示；已转你手动确认。";
+  }
+  return `判断 agent 未能完成判断：${judgeManualHumanReason(reasonCode, reason)}。已转你手动确认。`;
+}
+
+/** reasonCode → 人话（未知码回落到判断给出的有界理由；绝不复述内部行话以外的细节）。 */
+function judgeManualHumanReason(reasonCode: string, reason?: string): string {
+  switch (reasonCode) {
+    case "unsupported-engine": return "当前引擎不支持自动判断";
+    case "unavailable": return "判断服务不可用";
+    case "timeout": return "判断超时";
+    case "aborted": return "本轮已中止";
+    case "parse-failed": return "判断结果无法解析";
+    case "read-denied": return "所需项目文件无法读取";
+    case "budget": return "读取预算已用尽";
+    case "read-truncated": return "读取内容被截断";
+    case "retry-capped": return "同类命令连续被拒，已达重试上限";
+    case "context-missing": return "缺少当前轮任务上下文";
+    case "context-too-large": return "命令或上下文过大";
+    case "model-manual": return "判断 agent 自报无法判断";
+    default: {
+      const text = typeof reason === "string" ? reason.trim() : "";
+      return text !== "" ? text.slice(0, 200) : "判断未完成";
+    }
+  }
+}
+
+/** `deny` 返回请求角色的文本（PM 评审 §8.4 逐行口径）；应用不自动重试、不自动执行替代方案。 */
+export function formatJudgeDenyReason(outcome: Pick<ShellJudgeOutcome, "reason" | "customerMessage" | "alternative">): string {
+  const lines = ["判断 agent 未放行该命令。"];
+  const customerMessage = typeof outcome.customerMessage === "string" ? outcome.customerMessage.trim() : "";
+  if (customerMessage !== "") lines.push(`请向客户说明：${customerMessage}`);
+  const reason = typeof outcome.reason === "string" ? outcome.reason.trim() : "";
+  if (reason !== "") lines.push(`原因：${reason}`);
+  if (outcome.alternative !== undefined) {
+    lines.push(`替代方案（${outcome.alternative.kind}）：${outcome.alternative.value}`);
+  }
+  lines.push("出路：如需执行，请关闭「替我审」后重试。");
+  return lines.join("\n");
 }
 
 // —————————————————————— M-1（2026-10-12 客户裁定「这个太丑了」）：应用内确认卡 ——————————————————————
@@ -375,6 +642,8 @@ export interface ShellConfirmRequest {
   tier: SuApprovalTier | null;
   /** **审批策略**：`su-approval`（内置治理角色审批档）或 `project`（项目角色三层链）。桌面自有类型。 */
   policy: "su-approval" | "project";
+  /** 「替我审」手动回落提示（原样来自 `display.judgeNotice`；无值 ⇒ 隐藏，PM 评审 §10.4）。 */
+  judgeNotice?: string;
 }
 
 /** 由既有呈现（`describeShellCommand` 的产物）构建确认卡数据面（纯函数；命令原文逐字转抄）。 */
@@ -391,6 +660,8 @@ export function buildShellConfirmRequest(id: string, display: ShellCommandDispla
     cwd: display.cwd,
     tier,
     policy: tier !== null ? "su-approval" : "project",
+    // PM 评审 §10.4：`buildShellConfirmRequest` **原样拷贝**；presenter 不得改写或丢弃。
+    ...(display.judgeNotice !== undefined ? { judgeNotice: display.judgeNotice } : {}),
   };
 }
 
@@ -496,6 +767,15 @@ export function createShellConfirmPresenter(opts: CreateShellConfirmPresenterOpt
 // —————————————————————— 内部辅助 ——————————————————————
 
 const OPERATOR_CONFIRM_TIMEOUT_NAME = "OperatorConfirmTimeoutError";
+const SHELL_JUDGE_CHANNEL_TIMEOUT_NAME = "ShellJudgeChannelTimeoutError";
+
+/** 判断通道独立超时（与确认卡超时互不占用；超时 ⇒ manual/timeout）。 */
+function judgeTimeoutError(timeoutMs: number): Error {
+  const err = new Error(`判断超时（${timeoutMs}ms）：未在时限内得到判断结论。`) as Error & { timeoutMs?: number };
+  err.name = SHELL_JUDGE_CHANNEL_TIMEOUT_NAME;
+  err.timeoutMs = timeoutMs;
+  return err;
+}
 
 /** 构造带标记的超时错误（与 pi-adapter/timeout.ts 同风格，但**本角色自持**——不跨角色导入他人私有 common/）。
  *  **F-4-M2**：`timeoutMs` 随错误对象携带——中止组合信号后，呈现侧凭 `signal.reason` 写出含实际时限的如实文案。 */

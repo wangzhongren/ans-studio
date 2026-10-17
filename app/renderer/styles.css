@@ -325,7 +325,9 @@ body { display: flex; flex-direction: column; }
 .op-request .op-title { font-weight: 600; color: var(--text); }
 .op-request .op-question { color: var(--text); }
 .op-request .op-detail { color: var(--text-2); white-space: pre-wrap; word-break: break-word; }
-/* 预览（角色卡正文 + 边界摘要等长文）：**折叠** + 限高可滚 + pre-wrap（设计 A-5：max-height:40vh; overflow:auto）。 */
+/* 预览（角色卡正文 + 边界摘要等长文）：**折叠** + 限高可滚（设计 A-5：max-height:40vh; overflow:auto）
+   + **受控 Markdown 产物**（与 `.card-md` 同一套排版；解锁 pre-wrap——块结构自带间距）。
+   `.card-md` 不设字号/行高，此处按角色卡正文口径（12px / 1.8）落定，不新增第二套 Markdown 规则。 */
 .op-request details.op-preview { border: 1px solid var(--border); border-radius: 6px; background: var(--bg); }
 .op-request details.op-preview summary {
   display: flex;
@@ -345,10 +347,8 @@ body { display: flex; flex-direction: column; }
   padding: 0 10px 10px;
   max-height: 40vh;
   overflow: auto;
-  font-family: var(--mono);
-  font-size: 11.5px;
-  line-height: 1.6;
-  white-space: pre-wrap;
+  font-size: 12px;
+  line-height: 1.8;
   word-break: break-word;
   color: var(--text);
 }
@@ -1852,3 +1852,115 @@ button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus
 .app.is-sidebar-resizing { cursor: col-resize; user-select: none; }
 .app.is-sidebar-resizing, .app.is-sidebar-resizing .col-left, .app.is-sidebar-resizing .sidebar-toggle { transition: none; }
 @media (prefers-reduced-motion: reduce) { .app, .col-left, .sidebar-toggle { transition: none; } }
+
+/* ———————— P5「替我审」自动判断（2026-10-17 评审 §10；最小增量）———————
+   开关/开启标记/常驻警告/结果行/手动回落提示。颜色纪律：开启态与警告一律 `--amber`（不是错误红）；
+   内容列仍随 `--content-max`（900），字体继承整页等宽（`--sans`/`--mono` 同一栈）。 */
+.composer-auto-approve {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  min-width: 0;
+  color: var(--text-2);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.composer-auto-approve input {
+  flex: 0 0 auto;
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  accent-color: var(--amber);
+  cursor: pointer;
+}
+.composer-auto-approve:hover { color: var(--text); }
+/* 开启态：琥珀色小圆点 + 琥珀文字（「判断 agent」标记；绝不是错误红）。 */
+.composer-auto-approve.is-on { color: var(--amber); }
+.composer-auto-approve.is-on::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--amber);
+}
+.composer-auto-approve.is-unsupported { color: var(--text-3); cursor: not-allowed; }
+.composer-auto-approve.is-unsupported input { cursor: not-allowed; }
+.composer-judge-status {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--danger);
+}
+.composer-judge-status[hidden] { display: none; }
+
+/* 开启后的**常驻**警告（不是 toast）；默认隐藏；琥珀底/左竖条，非错误红。 */
+.judge-warning {
+  max-width: var(--content-max);
+  margin: 8px auto 0;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--amber);
+  border-radius: 6px;
+  background: var(--bg-soft);
+  color: var(--amber);
+  font-size: 11.5px;
+  line-height: 1.7;
+}
+.judge-warning[hidden] { display: none; }
+.judge-warning p { margin: 0; }
+.judge-warning p + p { margin-top: 4px; }
+.judge-warning .jw-strong { color: var(--amber); }
+
+/* 判断结果行（系统风格；按 `roleId` 落 pane、按 `toolCallId` 锚定）。 */
+.shell-judge-row { max-width: min(760px, 100%); }
+.shell-judge-row .sj-body { font-family: var(--mono); font-size: 11.5px; line-height: 1.65; }
+.shell-judge-row.is-deny-override { border-left: 2px solid var(--amber); padding-left: 8px; }
+.sj-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.sj-title { font-weight: 600; color: var(--text); }
+.shell-judge-row.is-allow .sj-title { color: var(--success); }
+.shell-judge-row.is-deny .sj-title { color: var(--danger); }
+/* deny 档放行徽标：琥珀色描边（显著，但不是错误红）。 */
+.sj-badge {
+  flex: 0 0 auto;
+  padding: 0 5px;
+  border: 1px solid var(--amber);
+  border-radius: 4px;
+  color: var(--amber);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+.sj-cmd { color: var(--text); word-break: break-word; }
+.sj-meta { color: var(--text-3); font-size: 11px; word-break: break-word; }
+.sj-line { color: var(--text-2); white-space: pre-wrap; word-break: break-word; }
+.sj-exit { color: var(--amber); white-space: pre-wrap; word-break: break-word; }
+.sj-details { margin-top: 2px; color: var(--text-2); }
+.sj-details > summary { cursor: pointer; font-size: 11px; color: var(--text-3); }
+.sj-details-body { padding: 4px 0 0 2px; }
+.sj-details-body p { margin: 3px 0; }
+.sj-d-label { font-weight: 600; color: var(--text-2); }
+.sj-pre {
+  margin: 0 0 4px;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-soft);
+  font-family: var(--mono);
+  font-size: 11px;
+  white-space: pre;
+  overflow-x: auto;
+}
+.sj-kv { white-space: pre-wrap; word-break: break-word; }
+.sj-note { color: var(--text-3); }
+.sj-evidence { margin: 2px 0 4px; padding-left: 18px; }
+.sj-evidence li { word-break: break-word; }
+
+/* 手动回落卡提示（`#sc-judge-notice`；无值隐藏；琥珀色，与原因行分开）。 */
+.sc-judge-notice { margin: 0; color: var(--amber); font-size: 12px; line-height: 1.6; }
+.sc-judge-notice[hidden] { display: none; }

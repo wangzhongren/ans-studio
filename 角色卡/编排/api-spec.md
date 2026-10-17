@@ -236,3 +236,67 @@ export function reacceptGovernancePins(input): Promise<ReacceptGovernancePinsRes
 
 **测试** `test/编排/governance-reaccept.test.ts` 20 例：预览形状/blockers、正常写入、`.ans` 只改 pin、manifest 追加/保留/新建、G1–G8 每个守卫（G3 为正向过门；固定三目录下 G3 的拒绝无法由公共 API 构造）、写入失败注入、并发 busy、`preview-stale`、坏 YAML/空 Section 1、缺失/不可读、invalid-request。
 
+
+## 「替我审」判断 agent 驱动（`createShellJudge`，2026-10-17）
+
+**公开入口**（桌面只从此取，不跨角色导入私有 common）：
+
+```ts
+// src/pipeline/orchestration/govern-session.ts（薄再导出）
+export { createShellJudge, SHELL_JUDGE_SUPPORTED_RUNTIMES } from "../../common/编排/shell-judge.ts";
+export type { CreateShellJudgeOptions, ShellJudgeFn, ShellJudgeOutcome } from "../../common/编排/shell-judge.ts";
+```
+
+**驱动面**（`src/common/编排/shell-judge.ts`）：
+
+```ts
+export const SHELL_JUDGE_SUPPORTED_RUNTIMES: ReadonlySet<RuntimeKind>; // {claude, pi, codex}
+export const SHELL_JUDGE_DENY_TIER_LABEL = "deny 档 · judge 放行";
+export const SHELL_JUDGE_ROLE_ID = "shell-judge";
+export const DEFAULT_SHELL_JUDGE_TIMEOUT_MS = 15_000;
+export const DEFAULT_SHELL_JUDGE_MAX_DENY_PER_COMMAND = 2;
+
+export interface CreateShellJudgeOptions {
+  project: ProjectConfig;
+  runtime: RuntimeKind;                       // 请求会话引擎；不跨引擎
+  runtimeOptions?: RuntimeAdapterFactoryOptions; // 与请求会话同一份（D4）
+  createAdapter?: RuntimeAdapterFactory;      // 测试注入；缺省 createRuntimeAdapterFactory(...)
+  now?: () => number;
+  timeoutMs?: number;                         // 缺省 15000
+  maxDenyPerCommand?: number;                 // 缺省 2
+  logger?: DiagnosticLog;
+}
+
+export interface ShellJudgeOutcome extends CoreShellJudgeOutcome {
+  hardDenyOverride?: true;                    // 客户 D1：deny 档被 judge 放行
+  label?: "deny 档 · judge 放行";
+}
+export type ShellJudgeFn = (input: ShellJudgeRequest, signal?: AbortSignal) => Promise<ShellJudgeOutcome>;
+
+export function createShellJudge(opts: CreateShellJudgeOptions): ShellJudgeFn;
+export function shellJudgeAuditOf(request: ShellJudgeRequest, outcome: ShellJudgeOutcome): ShellJudgeAuditWithLabel | undefined;
+```
+
+**行为口径**
+
+| 情形 | 返回 |
+| --- | --- |
+| 模型 `allow` + 无损 | `{verdict:"allow", reasonCode:"necessary"}`；`request.tier==="deny"` 时另带 `hardDenyOverride:true` + `label` |
+| 模型 `deny` 有替代 | `{verdict:"deny", reasonCode:"safer-alternative", alternative}` |
+| 模型 `deny` 无替代 | `{verdict:"deny", reasonCode:"no-alternative", customerMessage(+标准出路), customerMessageSynthesized?}` |
+| 模型 `manual` | `{verdict:"manual", reasonCode:"model-manual"}` |
+| 读取损伤（denied/budget/truncated）后的 `allow` | `manual`（`read-denied`/`budget`/`read-truncated`）；`deny` 不受影响 |
+| 不支持引擎 / 上下文缺失 / 超限 / 不可用 / 超时 / 中止 / 解析失败 / 防循环 / busy | `manual`（`unsupported-engine`/`context-missing`/`context-too-large`/`unavailable`/`timeout`/`aborted`/`parse-failed`/`retry-capped`） |
+
+- 读取损伤判定顺序（钉死）：`budgetExceeded` → `budget`，其次 `truncatedReads` → `read-truncated`，最后 `deniedReads` → `read-denied`。预算耗尽时运行时核心会同时把该次读取计入 `deniedReads`，故**以 `budgetExceeded` 为准**，不得误报「文件不可读」。
+- `persistSession:false`；判断会话只注册 `judge_read_file`/`judge_list_dir`/`report_shell_judgement`（由运行时核心 `buildShellJudgeTools` 按注入的 `shellJudge` 能力装配），写门禁 deny-all。
+- 超时/中止会 `abort()` + `dispose()`；**超时前已捕获的合法结论仍然生效**；迟到 `bindRole` 返回的会话立即 `dispose()`。
+- 防循环键＝命令 trim + 连续空白折叠；`deny` 递增、`allow` 清零、`manual` 不递增；达到上限不再调用模型。
+- 本函数**不抛错**——所有失败归 `manual`（调用方交给桌面通道原卡呈现）。
+
+**裁决辅助面**（`src/common/编排/shell-judge-verdict.ts`）：`normalizeShellJudgeVerdict`、`synthesizeCustomerMessage`、`redactJudgeText`、`redactJudgeVerdict`、`boundedJudgeText`、`hasInternalJargon`、`SHELL_JUDGE_EXIT_LINE`。
+**提示词面**（`src/common/编排/shell-judge-prompt.ts`）：`buildShellJudgeSystemPrompt`、`buildShellJudgePrompt`、三档上限常量。
+
+**审计透传**：`shell-gate.ts` 的 `runA` 把 `OperatorOutcome.allow/deny.judge` 写进审计记录可选 `judge`（`ShellAuditRecord.judge`，含 `tier`/`hardDenyOverride`/`model`/`reasonCode`/`reason`/`customerMessage`/`alternative`/`customerMessageSynthesized`）。人工手批（`manual` 后）**不写** `judge`。`by` 由桌面传入的 `operatorId = "judge:<引擎>"` 经既有 `operatorBy` 形成为 `operator:judge:<引擎>`。
+
+**测试**：`test/编排/shell-judge.test.ts` 27 例（离线桩，不调真实模型/不读 `.env`/不跑凭据）。

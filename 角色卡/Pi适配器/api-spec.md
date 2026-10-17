@@ -29,3 +29,21 @@ Pi唯一tool_call事件源为SDK tool_execution_start，detail带真实turnId/to
 ## PI-A-1 统一工具显示接线（2026-10-15）
 
 生产消费Model实际RuntimeToolEventSource/projector、ToolDefinition.displayInputRule与RuntimeProviderOptions的toolDisplayMode/projectToolEvent/registerToolDisplayProfile/toolDisplayCredentialEnvNames。required-v1缺函数SDK前拒绝，cfg实际选中键/值以同次env快照纯内存登记；legacy直接入口兼容。真实start/hook blocked/native result统一投影；execution只经私有callFacts桥到projector，SDK content和原安全details不新增execution或C对象。未知旧hook不借当前turn，原text/images与metadata双层剥离保持。见[实现及候选证据](docs/change/2026-10-15_change_tool-display-projection.md)。
+
+## 2026-10-17 P3b 判断 agent（「替我审」）judge 模式
+
+依据 PM 评审 `2026-10-17_design_shell-auto-approve-review.md` revision 2 §5.1/§6.1/§7/§十一 P3b。判断会话由编排以一次性非持久化会话创建，适配器只按注入的工具集开会话；只读工具与读取策略的唯一实现归运行时核心 `src/common/runtime-core/shell-judge/`。
+
+**输入面（两面等价）**
+- Service 生产入口：`RuntimeProviderOptions{ tools, judgeMode?: true, installedMcpServers: [] }`——工具已由装配层用 `buildShellJudgeTools` 定形，本层纯消费。
+- legacy 直接入口：`PiRuntimeAdapterOptions.shellJudge?: ShellJudgeToolOptions`（或 `judgeMode?: true`）；本层自己只调 `buildShellJudgeTools`，绝不调 `buildGovernedTools`。
+
+**判断模式的结构性保证（`src/provider/pi/session.ts` + `src/common/pi-adapter/real-adapter.ts`）**
+- 工具面恰为 `judge_read_file` / `judge_list_dir` / `report_shell_judgement`；`judgeMode` 下 real-adapter 校验注入工具名必须全在该集合内，否则构造期抛「判断会话只允许 judge 只读工具」。
+- 不构造/不注册 `write_file`、`edit_file`、`read_file`、`run_shell`、`request_confirmation`、`request_choice`、`submit_report`、`dispatch_task`、`report_shell_verdict`、MCP/网络/服务端工具；legacy 判断分支的写门禁置为 deny-all（纵深防御）。
+- 不注入 ShellGate、客户交互、回交、派发能力（legacy 分支显式置空；生产分支由 Service 不注入表达）。
+- 强制关闭原生能力：忽略 `ANS_PI_SERVER_TOOLS`（不注册 web_search/web_fetch）、忽略 `installedMcpServers`（零 MCP 装配、不加载 pi-mcp）、`noTools:"builtin"`。
+- 不持久化：忽略 `storage`/`sessionDir`，会话管理器恒为 in-memory；不写 `.ans`、不写项目文件、不产生聊天/角色状态。`report_shell_judgement` 只把模型原始参数交给注入回调（规范化/合成归编排）。
+- 未注入 `shellJudge`/未置 `judgeMode` ⇒ 普通角色会话路径逐字不变（受治理工具、ShellGate、交互/回交/派发、持久化与既有行为一致）。
+
+**测试**：`test/pi-adapter/shell-judge.test.ts`（7 例，离线；假适配器 + pi-ai faux 进程内模型 + legacy 注入面）。专项 297 项 294 pass / 2 既有 Windows symlink EPERM / 1 skip；本角色 typecheck 0 错。
