@@ -1271,7 +1271,7 @@ test("右栏抽屉：默认不占屏（col-right 退役）；图标簇两枚（�
   assert.ok(!INDEX.includes("col-right"), "右栏常驻列应退役（.col-right 不在 index.html）");
   assert.ok(INDEX.includes('id="right-drawer"'), "应有右侧抽屉 #right-drawer");
   assert.ok(STYLES.includes("#right-drawer.open") && STYLES.includes("position: absolute"), "抽屉应为覆盖层（absolute + .open 滑出）");
-  assert.ok(STYLES.includes("grid-template-columns:208px minmax(0,1fr)") && STYLES.includes("grid-template-columns:176px minmax(0,1fr)") && STYLES.includes("max-width:800px"), "栅格应为两列（右栏不占列）");
+  assert.ok(STYLES.includes("grid-template-columns:208px minmax(0,1fr)") && STYLES.includes("grid-template-columns:176px minmax(0,1fr)") && STYLES.includes("--content-max: 900px"), "栅格应为两列（右栏不占列）+ A1 内容列 900");
   assert.ok(!/setTimeout|setInterval/.test(RENDERER.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "")), "无计时器纪律不破（抽屉过渡用 CSS）");
   // ② 图标簇：**两枚**（角色资料/Pi 设置）在标题栏控制区、窗口按钮之前；不算 .win-btn（三窗口按钮守卫不破）。
   //    第二轮裁定（2026-10-13）：待办/队列归角色——tab-todo/tab-queue 退役（HTML 与渲染侧接线都不留）。
@@ -1513,15 +1513,19 @@ test("v3/W10+S3：尾行——「正在工作」带同款转轮；chip 可见时
 
 test("v3/W1–W6/W6b/S2：样式数值按批准默认档落位（实测口径见 e2e v3 段）", () => {
   // W1 行距 16 / W2 段距 10、h3 16/6 / W3 气泡 9/14+24 / W4 输入区 14/32/12、胶囊 10/14、空框 28、脚注 6 / W5 活动行 5、首行 6、摘要 22 / W6 注入盒 1.6。
-  assert.ok(STYLES.includes(".chat-pane { max-width:800px; gap:16px; }"), "W1：行距 16px（V2 值 24 的基线修订）");
+  assert.ok(STYLES.includes(".chat-pane { max-width: var(--content-max); gap: 16px; }"), "A1/W1：内容列 900 + 行距 16px");
   assert.ok(STYLES.includes(".msg p { margin: 0 0 10px; }"), "W2：p 段距 10px");
   assert.ok(STYLES.includes(".msg h1, .msg h2, .msg h3 { margin: 16px 0 6px;"), "W2：h1–h3 边距 16/6");
-  assert.ok(STYLES.includes(".msg-user { background:#f0f3ed; border-radius:10px; padding:9px 14px; line-height:24px; }"), "W3：气泡 pad 9/14、行高 24（单行 42px 口径）");
-  assert.ok(STYLES.includes(".composer { padding:14px 32px 12px; min-height:0; border-top:0; }"), "W4：输入区 pad 14/32/12");
+  assert.ok(STYLES.includes(".msg-user { border-radius: 8px 8px 3px 8px; }"), "A2：用户气泡圆角 8（右下 3px 保持）");
+  assert.ok(STYLES.includes("padding:9px 14px; line-height:24px;"), "W3：气泡 pad 9/14、行高 24（单行 42px 口径）");
+  assert.ok(STYLES.includes(".composer { padding:14px 32px 12px; min-height:0; border-top:0; }"), "W4：输入区 pad 14/32/12（旧层保留）");
+  assert.ok(/\.composer \{[^}]*border-top: 1px solid var\(--border\);[^}]*background: #FAFBF8;/s.test(STYLES), "A1：输入区上边线 + 浅底（D5）");
   assert.ok(STYLES.includes(".capsule { display:flex; flex-direction:column; align-items:stretch; padding:10px 14px;"), "W4：胶囊 pad 10/14");
-  assert.ok(STYLES.includes("background:#fff; border-color:#ccd6cb; gap:6px; }"), "W4：胶囊 gap 6");
+  assert.ok(STYLES.includes(".capsule { border-color: var(--border-control); }"), "A2：胶囊控件边框 --border-control（D4）");
+  assert.ok(STYLES.includes("background:#fff; border-color:#ccd6cb; gap:6px; }"), "W4：胶囊 gap 6（旧层保留）");
   assert.ok(STYLES.includes(".capsule textarea { display:block; width:100%; min-height:28px;"), "W4：空输入框 min-height 28");
-  assert.ok(STYLES.includes(".compose-note { max-width:800px; margin:6px auto 0;"), "W4：脚注上距 6");
+  assert.ok(STYLES.includes(".capsule, .attach-row, .compose-note { max-width: var(--content-max); }"), "A1：胶囊/附件/脚注同列 900");
+  assert.ok(STYLES.includes("margin:6px auto 0;"), "W4：脚注上距 6");
   assert.ok(STYLES.includes("line-height: 22px; list-style: none;"), "W5：组摘要行高 22");
   assert.ok(STYLES.includes(".tool-activity { display: grid;") && STYLES.includes("gap: 10px; align-items: start; padding: 5px 0;"), "W5：活动行 pad 5");
   assert.ok(STYLES.includes(".tool-activity:first-of-type { margin-top: 6px; }"), "W5：首行上距 6");
@@ -1529,7 +1533,7 @@ test("v3/W1–W6/W6b/S2：样式数值按批准默认档落位（实测口径见
   // W7（批准②：不动）与 W8（不在批准清单）：正文行高/空态文案保持 v2。
   assert.ok(STYLES.includes(".msg { font-size:15px; line-height:1.8; }"), "W7 未做：正文 15px/1.8 不动（批准②）");
   // S2：chip 左缘对齐阅读列（自适应；验收=左缘差 ≤8px）。
-  assert.ok(STYLES.includes("#chat > .op-chip { margin-left: calc((100% - min(800px, 100%)) / 2); }"), "S2：chip 随阅读列左缘（仅定位规则）");
+  assert.ok(STYLES.includes("#chat > .op-chip { margin-left: calc((100% - min(var(--content-max), 100%)) / 2); }"), "S2：chip 随阅读列左缘（A1 改 --content-max）");
   assert.ok(STYLES.includes(".op-chip { align-self: flex-start; min-height: 30px;"), "S2 未动 chip 卡样式（仅加定位规则）");
 });
 
@@ -1841,4 +1845,78 @@ test("I4：成功——只认 ok＋phase=write＋completed；逐字 message＋�
   assert.ok(RENDERER.includes(': { state: "present" };'), "缺失字段按 present 兜底（旧主进程不显示动作、不崩）");
   assert.ok(RENDERER.includes("reason: typeof gr.reason === \"string\" ? gr.reason : \"\""), "invalid 的 reason 如实转写");
   assert.ok(/renderGovernanceUi\(\);[\s\S]{0,160}refreshEmptyStates\(\);/.test(RENDERER), "列举落地后同步状态行与空态");
+});
+
+// ————— A1+A2 企业级稳定感（2026-10-17 客户批准「按推荐来，A1+A2 实施」；PM 评审 §3.1/§3.2）—————
+// 生产代码只改 `styles.css`；下面按 A1（结构）/A2（重量）两块分别钉住 token 与有效规则。
+
+/** WCAG 相对亮度对比度（测试用纯函数；白底口径与设计稿 §七一致）。 */
+function contrastOnWhite(hex: string): number {
+  const channel = (v: number) => {
+    const c = v / 255;
+    return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  };
+  const n = parseInt(hex.replace("#", ""), 16);
+  const lum = 0.2126 * channel((n >> 16) & 255) + 0.7152 * channel((n >> 8) & 255) + 0.0722 * channel(n & 255);
+  return (1.05) / (lum + 0.05);
+}
+
+test("A1：结构——框线、900 内容列、同列 padding、贴底输入区（HTML/JS 零改动）", () => {
+  const a1Start = STYLES.indexOf("A1 结构");
+  const a2Start = STYLES.indexOf("A2 重量");
+  assert.ok(a1Start > 0 && a2Start > a1Start, "样式末尾应有独立的 A1/A2 覆盖块（便于分步回滚）");
+  const a1 = STYLES.slice(a1Start, a2Start);
+  assert.ok(STYLES.includes("--content-max: 900px"), "D1：内容列 token = 900px");
+  assert.ok(/\.col-left \{[^}]*border-right: 1px solid var\(--border\);/.test(STYLES), "左/中 1px 分隔");
+  assert.ok(/\.titlebar \{[^}]*border-bottom: 1px solid var\(--border-strong\);/.test(a1), "标题栏下边线（A2 颜色）");
+  assert.ok(/\.chat-head \{[^}]*height: auto;[^}]*min-height: 72px;/.test(a1), "会话头 height→min-height（200% 文字不裁切）");
+  assert.ok(/\.chat-head \{[^}]*border-bottom: 1px solid var\(--border\);/.test(a1), "会话头下边线");
+  assert.ok(a1.includes("padding-left: max(32px, calc((100% - var(--content-max)) / 2));"), "会话头/状态行内容列 padding 左（900 推导）");
+  assert.ok(a1.includes("padding-right: max(32px, calc((100% - var(--content-max)) / 2));"), "会话头/状态行内容列 padding 右");
+  assert.ok(/@media \(max-width: 1100px\) \{\s*\.chat-head, \.session-notice \{ padding-left: 24px; padding-right: 24px; \}/s.test(a1), "窄档 base 24px（960 档随容器流式收缩）");
+  assert.ok(a1.includes(".chat-pane { max-width: var(--content-max); gap: 16px; }"), "正文列 900 + 行距 16（v3 保持）");
+  assert.ok(a1.includes(".capsule, .attach-row, .compose-note { max-width: var(--content-max); }"), "胶囊/附件/脚注同列 900");
+  assert.ok(a1.includes("#chat > .op-chip { margin-left: calc((100% - min(var(--content-max), 100%)) / 2); }"), "chip 定位随 900 列");
+  assert.ok(/\.composer \{[^}]*border-top: 1px solid var\(--border\);[^}]*background: #FAFBF8;[^}]*box-shadow: 0 -6px 18px rgba\(21,31,26,\.035\);/.test(a1), "输入区上边线 + D5 浅底 + 贴底上阴影");
+  assert.ok(!/\.chat-head \{[^}]*position:\s*(?:sticky|fixed)/.test(a1) && !/\.composer \{[^}]*position:\s*(?:sticky|fixed)/.test(a1), "不引入 sticky/fixed（保持 flex 固定、仅 .chat 滚动）");
+});
+
+test("A2：重量——token/对比度、控件边框、圆角收敛、表格、浮层阴影、选中竖条", () => {
+  const a2 = STYLES.slice(STYLES.indexOf("A2 重量"));
+  const tokens: Array<[string, string]> = [
+    ["--chrome", "#EDF0EA"], ["--bg-side", "var(--chrome)"], ["--border", "#D7DDD4"], ["--border-strong", "#C4CEC2"],
+    ["--border-control", "#8A968B"], ["--text", "#232C29"], ["--text-2", "#55625B"], ["--text-3", "#6A756E"],
+    ["--success", "#2D634E"], ["--success-hover", "#244F3E"], ["--success-bg", "#E5EEE7"],
+    ["--danger", "#A1433C"], ["--danger-bg", "#FBEFED"], ["--amber", "#8A5B23"], ["--focus-ring", "#2D634E"],
+    ["--radius", "8px"], ["--radius-sm", "6px"],
+  ];
+  for (const [token, value] of tokens) assert.ok(a2.includes(token + ": " + value), `A2 token ${token} = ${value}`);
+  assert.ok(a2.includes("--shadow-card: 0 1px 2px rgba(21,31,26,.05), 0 1px 3px rgba(21,31,26,.04);"), "浮层阴影 token");
+  assert.ok(a2.includes("--shadow-dock: 0 -6px 18px rgba(21,31,26,.035);"), "输入区贴底阴影 token");
+  // 对比度（白底）：正文 ≥7、次级 ≥5、三级 ≥4.5、控件边框/focus ≥3。
+  assert.ok(contrastOnWhite("#232C29") >= 7, "正文对比度 ≥7:1");
+  assert.ok(contrastOnWhite("#55625B") >= 5, "次级文字 ≥5:1");
+  assert.ok(contrastOnWhite("#6A756E") >= 4.5, "三级文字 ≥4.5:1");
+  assert.ok(contrastOnWhite("#8A968B") >= 3, "控件边框 ≥3:1（D4）");
+  assert.ok(contrastOnWhite("#2D634E") >= 3, "焦点环 ≥3:1（实际 7:1）");
+  // 控件边框与焦点语义。
+  assert.ok(a2.includes(".capsule { border-color: var(--border-control); }") && a2.includes("#runtime-select { border-color: var(--border-control); }"), "输入胶囊/引擎选择器走 --border-control");
+  assert.ok(a2.includes(".btn-primary:hover:not(:disabled), .report-source-button:hover:not(:disabled) { background: var(--success-hover); border-color: var(--success-hover); }"), "主按钮 hover 走 --success-hover");
+  // 圆角收敛：容器 8、控件 6、用户气泡右下 3。
+  assert.ok(a2.includes(".capsule, .msg-handback, .msg-delivery, .task-request, .delivery-report, .attach-chip, .sc-card { border-radius: 8px; }"), "容器圆角 8（胶囊/报告/交付/任务请求/附件/确认卡）");
+  assert.ok(a2.includes(".msg-user { border-radius: 8px 8px 3px 8px; }"), "用户气泡 8（右下 3 保持）");
+  assert.ok(a2.includes(".btn, .btn-mini, .drawer-close, .tab-btn, .cap-icon, #runtime-select, .engine-option, .composer-actions .cap-send, .composer-actions .cap-halt { border-radius: 6px; }"), "控件圆角 6");
+  // 表格：外框/表头实底/强表头底线/13-20/6×10；不改 display:block/overflow-x:auto。
+  assert.ok(a2.includes(".msg table { font-size: 13px; line-height: 20px; outline: 1px solid var(--border-strong); outline-offset: -1px; }"), "正文表格 13/20 + 完整外框（outline，不改布局）");
+  assert.ok(a2.includes(".msg table th, .msg table td { border: 1px solid var(--border); padding: 6px 10px; }"), "单元格 1px + 6×10");
+  assert.ok(a2.includes(".msg table th, .card-md table th { background: var(--bg-soft); border-bottom: 1px solid var(--border-strong); }"), "表头实底 + 强底线");
+  assert.ok(STYLES.includes(".msg table,\n.card-md table {\n  display: block;") || /\.msg table,[\s\S]{0,40}\.card-md table \{[^}]*display: block;[^}]*overflow-x: auto;/.test(STYLES), "宽表仍 display:block + overflow-x:auto");
+  // 阴影只给浮层；普通消息/报告卡不加阴影。
+  assert.ok(a2.includes(".sc-card { box-shadow: var(--shadow-card); }") && a2.includes(".composer { box-shadow: var(--shadow-dock); }"), "浮层/输入区阴影");
+  assert.ok(!/(?:^|\n)\.msg[ ,{][^\n]*\{[^}]*box-shadow/s.test(a2) && !/\.msg-handback[^{]*\{[^}]*box-shadow/.test(a2) && !/\.msg-delivery[^{]*\{[^}]*box-shadow/.test(a2) && !/\.task-request[^{]*\{[^}]*box-shadow/.test(a2), "普通消息/报告卡/任务请求不加阴影");
+  // D6：左树选中项 2px 内侧竖条（类名 .tree-item.active；不改布局）。
+  assert.ok(a2.includes(".tree-item.active { box-shadow: inset 2px 0 0 var(--success); }"), "选中竖条 2px inner（D6）");
+  // D7：正文 15/27 不动（A2 不得改写 .msg 字号/行高）。
+  assert.ok(!a2.includes(".msg { font-size") && !a2.includes(".msg {font-size"), "A2 不改正文 15/27（D7）");
+  assert.ok(STYLES.includes(".msg { font-size:15px; line-height:1.8; }") && 15 * 1.8 === 27, "正文 15px × 1.8 = 27px");
 });

@@ -1,4 +1,4 @@
-/* ANS 正式桌面视觉V2：208/176导航，最大800阅读列，424模态资料抽屉。
+/* ANS 正式桌面视觉V2：208/176导航，最大900阅读列（A1，2026-10-17 企业级稳定感基线修订），424模态资料抽屉。
  * 层级以字阶/留白组织；绿色用于当前操作/已知正向，错误与未知保留文字。
  * 10/12px内容容器与7px交互圆角按已接受规范；无演示条/缩放画布。
  * 早期规则保留供旧组件维护，文末V2令牌/布局为当前正式覆盖。
@@ -1701,3 +1701,87 @@ button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus
 .governance-preview .gp-note { color:var(--text-3); }
 .governance-preview .gp-actions { display:flex; gap:8px; margin-top:10px; }
 @media (max-width:1100px) { .governance-preview { margin:8px 24px 0; } }
+
+/* ════════════════════ A1 结构（2026-10-17 客户批准「按推荐来，A1+A2 实施」；PM 评审 §3.1）════════════════════
+   目标：左/中分隔、标题栏/会话头/输入区边线、内容列 900 同列、输入区贴底。
+   只覆盖目标属性；HTML/JS 零改动（同列用 max()/max-width，不引入原型里的包装层）。 */
+:root { --content-max: 900px; }
+
+/* 框：左/中 1px 分隔、标题栏下边线、会话头下边线、输入区上边线。 */
+.col-left { border-right: 1px solid var(--border); }
+.titlebar { border-bottom: 1px solid var(--border-strong); }
+.chat-head {
+  height: auto;
+  min-height: 72px;
+  flex: 0 0 auto;
+  border-bottom: 1px solid var(--border);
+  padding-left: max(32px, calc((100% - var(--content-max)) / 2));
+  padding-right: max(32px, calc((100% - var(--content-max)) / 2));
+}
+.session-notice {
+  flex: 0 0 auto;
+  padding-left: max(32px, calc((100% - var(--content-max)) / 2));
+  padding-right: max(32px, calc((100% - var(--content-max)) / 2));
+}
+@media (max-width: 1100px) {
+  .chat-head, .session-notice { padding-left: 24px; padding-right: 24px; }
+}
+
+/* 贴底输入区：通栏实底（D5=#FAFBF8）+ 1px 上边线 + 极轻上阴影。 */
+.composer {
+  border-top: 1px solid var(--border);
+  background: #FAFBF8;
+  box-shadow: 0 -6px 18px rgba(21,31,26,.035);
+}
+
+/* 网格：标题 / 正文 / 输入胶囊 / 附件 / 脚注统一到 900 内容列（窄档随容器流式收缩）。 */
+.chat-pane { max-width: var(--content-max); gap: 16px; }
+.capsule, .attach-row, .compose-note { max-width: var(--content-max); }
+#chat > .op-chip { margin-left: calc((100% - min(var(--content-max), 100%)) / 2); }
+
+/* ════════════════════ A2 重量（同日批准；PM 评审 §3.2）════════════════════
+   只动 token / 边框 / 圆角 / 表格 / 浮层阴影 / 选中竖条；字号体系、间距刻度、正文 15/27 不动。 */
+:root {
+  --chrome: #EDF0EA;
+  --bg-side: var(--chrome);
+  --border: #D7DDD4;
+  --border-strong: #C4CEC2;
+  --border-control: #8A968B;
+  --text: #232C29;
+  --text-2: #55625B;
+  --text-3: #6A756E;
+  --success: #2D634E;
+  --success-hover: #244F3E;
+  --success-bg: #E5EEE7;
+  --danger: #A1433C;
+  --danger-bg: #FBEFED;
+  --amber: #8A5B23;
+  --focus-ring: #2D634E;
+  --radius: 8px;
+  --radius-sm: 6px;
+  --shadow-card: 0 1px 2px rgba(21,31,26,.05), 0 1px 3px rgba(21,31,26,.04);
+  --shadow-dock: 0 -6px 18px rgba(21,31,26,.035);
+}
+
+/* 控件边框：输入胶囊/引擎选择器升到 3.08:1（D4=#8A968B）；主按钮 hover 走 token。 */
+.capsule { border-color: var(--border-control); }
+#runtime-select { border-color: var(--border-control); }
+.btn-primary:hover:not(:disabled), .report-source-button:hover:not(:disabled) { background: var(--success-hover); border-color: var(--success-hover); }
+
+/* 圆角收敛：容器 10/12→8；控件 7→6；用户气泡右下 3px 保持。 */
+.capsule, .msg-handback, .msg-delivery, .task-request, .delivery-report, .attach-chip, .sc-card { border-radius: 8px; }
+.msg-user { border-radius: 8px 8px 3px 8px; }
+.btn, .btn-mini, .drawer-close, .tab-btn, .cap-icon, #runtime-select, .engine-option, .composer-actions .cap-send, .composer-actions .cap-halt { border-radius: 6px; }
+
+/* 表格：完整外框 + 实底表头 + 强表头底线；正文表格字号 13/20、内边距 6×10。
+   不改 display:block/overflow-x:auto（宽表仍在容器内横向滚动）。`.card-md` 只随 token 变化。 */
+.msg table { font-size: 13px; line-height: 20px; outline: 1px solid var(--border-strong); outline-offset: -1px; }
+.msg table th, .msg table td { border: 1px solid var(--border); padding: 6px 10px; }
+.msg table th, .card-md table th { background: var(--bg-soft); border-bottom: 1px solid var(--border-strong); }
+
+/* 阴影只给浮层（输入区/确认卡；菜单沿用既有阴影）；普通消息与报告卡不加阴影。 */
+.sc-card { box-shadow: var(--shadow-card); }
+.composer { box-shadow: var(--shadow-dock); }
+
+/* D6（客户默认）：左树选中项 2px 内侧强调竖条——类名 `.tree-item.active`，不改 padding/布局。 */
+.tree-item.active { box-shadow: inset 2px 0 0 var(--success); }

@@ -131,3 +131,23 @@ work、card、pi、document复用424模态抽屉。仅导航/会话业务面iner
 ## 2026-10-17 助手消息渲染语义（修订）
 
 三种适配器（Pi `message_end` / Codex `item/completed` / Claude assistant text block）只发**完整消息**，渲染层无增量文本更新——`appendAssistant` 新建行**恒 `mdReady: true`**，经唯一构造点 `buildAssistantRow(rec)` 立即 `Md.renderMarkdown`；**不再读 `roleBusy`/`settledTurns`**，也不等待 settled。`upgradeStreamingMarkdown` 与 `.msg-assistant.is-streaming` 仅保留为**旧行/异常行安全网**（正常路径不可达；CSS 注释注明唯一用途），不得据此理解为存在第二套正常渲染路径。`uiux-v2.mjs` 的活动轮断言改为「助手消息即时渲染、不挂 `is-streaming`」。跨边界提示：`test/桌面应用/hot-path.test.ts` 仍以旧语义字面量断言（安全网使其保持绿），归属角色可按新语义更新。
+
+## 2026-10-17 A1+A2 企业级稳定感：CSS token / 几何契约
+
+**生产改动仅 `app/renderer/styles.css`**（文件末尾 A1、A2 两个覆盖块，可分别回滚）；HTML/JS/桌面窗口零改动。
+
+**A1 结构**
+- `:root { --content-max: 900px; }`。
+- 三条结构线：`.col-left { border-right: 1px solid var(--border); }`；`.titlebar { border-bottom: 1px solid var(--border-strong); }`；`.chat-head { border-bottom: 1px solid var(--border); height:auto; min-height:72px; }`；`.composer { border-top: 1px solid var(--border); background:#FAFBF8; box-shadow:0 -6px 18px rgba(21,31,26,.035); }`。
+- 同列：`.chat-pane`、`.capsule, .attach-row, .compose-note` 均 `max-width: var(--content-max)`；`.chat-head, .session-notice` 用 `padding-inline: max(32px, calc((100% - var(--content-max)) / 2))`，≤1100 档 24px（不给 head/composer 加滚动条宽度；`.chat` 的 22/14px + scrollbar-gutter 承担）。
+- `#chat > .op-chip` 定位公式改 `min(var(--content-max), 100%)`。
+- 实测（Electron 1360/960）：pane＝capsule＝900/736；head/capsule/note 左缘差 <2px；`document.documentElement.scrollWidth === innerWidth`。
+
+**A2 重量**
+- token：`--chrome #EDF0EA`（`--bg-side` 别名）、`--border #D7DDD4`、`--border-strong #C4CEC2`、`--border-control #8A968B`、`--text #232C29`、`--text-2 #55625B`、`--text-3 #6A756E`、`--success #2D634E`、`--success-hover #244F3E`、`--success-bg #E5EEE7`、`--danger #A1433C`、`--danger-bg #FBEFED`、`--amber #8A5B23`、`--focus-ring #2D634E`、`--radius 8px`、`--radius-sm 6px`、`--shadow-card`、`--shadow-dock`。
+- 控件边框：`.capsule`、`#runtime-select` 用 `--border-control`（3.08:1）。
+- 圆角：容器 8（胶囊/报告/交付/任务请求/附件/`sc-card`）、控件 6（按钮/引擎选择器/菜单项/发送停止）、用户气泡 `8px 8px 3px 8px`。
+- 表格：`.msg table` 13/20 + `outline:1px solid var(--border-strong); outline-offset:-1px` + th/td `6px 10px` + 表头 `--bg-soft`/强底线；**不改** `display:block`/`overflow-x:auto`。`.card-md` 仅随 token。
+- 阴影：仅 `.composer`（dock）与 `.sc-card`（card）；普通消息/报告卡/任务请求零新增阴影。
+- D6：`.tree-item.active { box-shadow: inset 2px 0 0 var(--success); }`（类名以实现为准）。
+- D7：正文保持 `15px/1.8 = 27px`；A3 间距/字号/左树高度未动。

@@ -14,7 +14,7 @@
 | Markdown 渲染 | vendor markdown-it 封装（esc 单一来源、html:false、链接白名单外开、表格启用、图片原文呈现）；聊天流/角色卡/卡片同一管线 | 已实现 | 归档：[Markdown 与多会话](../桌面应用/docs/change/2026-10-12_change_markdown-and-multisession.md)、[vendor 化](../桌面应用/docs/change/2026-10-12_change_markdown-vendored-library.md)、[去常规提示与表格](../桌面应用/docs/change/2026-10-13_change_chat-stream-declutter-and-md-tables.md) |
 | 空态 · 提示 · 防呆条 | 未 bootstrap 空态（只说一遍、中栏正中）；写入语义常驻横栏；异常/未授权内联如实呈现；切换项目防呆确认条（不落聊天历史） | 已实现 | 归档：[空态收敛](../桌面应用/changelog.md)（2026-10-11 条目）、[切换项目防呆](../桌面应用/docs/change/2026-10-13_change_p1-queue-withdraw-lru-switch-guard.md) |
 | 治理记录状态与建立入口（I4） | 已有角色但无 `.ans/project.json` 时：状态行与 su 空态给出「尚无治理记录」引导；非模态预览列出将写路径/将 pin 对象与角色数/采纳既有文档/授权来源/旧格式提示/「不扩大、不修改」声明；确认建立后刷新列举并隐藏动作；invalid 如实显示原因且不自动覆盖 | 已实现（UI 侧；`governanceRecord` 与两条 preload 通道由桌面窗口并行接线，落树前动作不可达） | 任务书：[项目管理评审 §二 I4](../项目管理/docs/design/2026-10-17_design_existing-project-compat-review.md)；契约/探针见 [api-spec](api-spec.md) |
-| 按 UI/UX 设计实现（当前批次） | 按 v2 设计规范与原型逐项对齐骨架/色板/组件（66px 聊天头、760 会话列、焦点环等）；两档离线实测复核 | 已实现（当前候选，独立复核待 PM） | 归档：[按设计对齐](../桌面应用/docs/fix/2026-10-13_fix_uiux-design-alignment.md)、[v2 实施设计](../桌面应用/docs/design/2026-10-13_design_uiux-v2-implementation.md)、[体验返工](../桌面应用/docs/fix/2026-10-13_fix_uiux-reacceptance.md) |
+| 按 UI/UX 设计实现（当前批次） | 企业级稳定感 A1+A2（2026-10-17 客户批准）：左/中与标题栏/会话头/输入区结构线；内容列 900 同列；输入区浅底贴底；token/对比度/圆角 8·6/表格外框/浮层阴影/左树选中竖条；正文保持 15/27 | 已实现（A1/A2；A3/B 未做） | 设计：[企业级稳定感](../UIUX设计师/docs/design/2026-10-17_design_enterprise-stability.md)、[PM 评审](../项目管理/docs/design/2026-10-17_design_enterprise-stability-review.md)；本角色：[changelog](changelog.md)（2026-10-17）、旧归档：[按设计对齐](../桌面应用/docs/fix/2026-10-13_fix_uiux-design-alignment.md)、[v2 实施设计](../桌面应用/docs/design/2026-10-13_design_uiux-v2-implementation.md) |
 
 ## 说明
 
