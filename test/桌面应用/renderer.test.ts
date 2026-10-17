@@ -163,7 +163,7 @@ test("T20：来源角色保留报告，主入口不提前镜像，真实投递�
 
 // ————————————————— T28：Pi 配置面板（设计 §11） —————————————————
 
-test("T28：Pi 配置面板存在——3 项必填 + 1 项「高级」（可折叠、可留空）；provider 不在面板；token 掩码", () => {
+test("T28：Pi 配置面板存在——3 项必填 + 2 项「高级」（可折叠、可留空）；provider 不在面板；token 掩码", () => {
   // 面板容器。
   assert.ok(INDEX.includes('id="pi-panel"'), "index.html 应有 Pi 配置面板 #pi-panel");
   // **3 项必填**字段（端点 / 模型 / token）。
@@ -183,8 +183,9 @@ test("T28：Pi 配置面板存在——3 项必填 + 1 项「高级」（可折�
   // 反向守卫：`ANS_PI_PROVIDER` **不再占一个输入框**（它已从面板移除；中间不再是用户该做的决定）。
   assert.ok(!INDEX.includes('id="pi-inp-ANS_PI_PROVIDER"'), "provider 不该有输入框");
   assert.ok(!INDEX.includes(">ANS_PI_PROVIDER<"), "provider 键名不该作为面板字段标签出现");
-  // 渲染侧 PI_KEYS 与主进程一致：4 项（3 必填 + 1 可选），且**不含** provider。
+  // 渲染侧 PI_KEYS 与主进程一致：5 项（3 必填 + 2 高级），且**不含** provider。
   assert.ok(RENDERER.includes('"ANS_PI_CONTEXT_WINDOW"'), "渲染侧面板键应含 CONTEXT_WINDOW");
+  assert.ok(RENDERER.includes('"ANS_PI_PROMPT_TIMEOUT_MS"'), "渲染侧面板键应含 PROMPT_TIMEOUT_MS");
   assert.ok(!/"ANS_PI_PROVIDER"/.test(RENDERER), "渲染侧面板键集合不该含 PROVIDER");
   assert.ok(RENDERER.includes("PI_REQUIRED_KEYS"), "渲染侧应区分必填键（缺才告警）");
   assert.ok(INDEX.includes('id="tab-pi"'), "Pi 设置入口应为右上角图标簇的 tab-pi（2026-10-13 客户裁定）");
@@ -212,6 +213,72 @@ test("T28：Pi 配置面板存在——3 项必填 + 1 项「高级」（可折�
   // 样式钩子。
   assert.ok(STYLES.includes(".pi-panel") && STYLES.includes(".pi-input") && STYLES.includes(".pi-status"), "styles.css 应有面板样式");
   assert.ok(STYLES.includes(".pi-advanced"), "styles.css 应有「高级」可折叠样式");
+});
+
+test("T28 扩展：高级设置组——CONTEXT_WINDOW + PROMPT_TIMEOUT 按序渲染、主区排除、单项兼容", () => {
+  const piKeysStart = RENDERER.indexOf("var PI_KEYS = [");
+  const piKeysEnd = RENDERER.indexOf("];", piKeysStart);
+  const piKeys = RENDERER.slice(piKeysStart, piKeysEnd);
+  assert.ok(piKeys.includes('"ANS_PI_CONTEXT_WINDOW"') && piKeys.includes('"ANS_PI_PROMPT_TIMEOUT_MS"'), "PI_KEYS 含两个高级键（与主进程元数据一致）");
+  // 单一来源：高级键表按序定义；主字段区排除整组。
+  const advStart = RENDERER.indexOf("var ADVANCED_SETTING_KEYS = [");
+  const advEnd = RENDERER.indexOf("];", advStart);
+  const advKeys = RENDERER.slice(advStart, advEnd);
+  assert.ok(advStart > 0 && advKeys.indexOf('"ANS_PI_CONTEXT_WINDOW"') < advKeys.indexOf('"ANS_PI_PROMPT_TIMEOUT_MS"'), "高级区顺序＝上下文窗口 → 整轮超时");
+  // 静态兜底（配置载入前）：index.html 的高级区同样按序含两字段与分隔说明。
+  const staticAdvStart = INDEX.indexOf('class="pi-advanced"');
+  const staticAdvEnd = INDEX.indexOf("</details>", staticAdvStart);
+  const staticAdv = INDEX.slice(staticAdvStart, staticAdvEnd);
+  assert.ok(staticAdv.includes('id="pi-inp-ANS_PI_CONTEXT_WINDOW"') && staticAdv.includes('id="pi-inp-ANS_PI_PROMPT_TIMEOUT_MS"'), "静态高级区含两字段（载入前兜底）");
+  assert.ok(staticAdv.indexOf("ANS_PI_CONTEXT_WINDOW") < staticAdv.indexOf("ANS_PI_PROMPT_TIMEOUT_MS"), "静态高级区顺序一致");
+  assert.ok(staticAdv.includes("以下高级项均可留空；留空 = 使用默认值。"), "静态分隔说明与动态一致");
+  assert.ok(RENDERER.includes("return ADVANCED_SETTING_KEYS.indexOf(f.key) < 0;"), "主字段区经同一键表排除（不另写判据）");
+  // 高级区：按白名单顺序取存在字段（缺件跳过 ⇒ 旧窗口视图只给一项时照常渲染），至少一项才显示。
+  assert.ok(/ADVANCED_SETTING_KEYS\.map\(function \(key\) \{[\s\S]{0,220}\.filter\(Boolean\)/.test(RENDERER), "高级字段按序映射并过滤缺件（单项兼容）");
+  assert.ok(RENDERER.includes("advanced.hidden = advancedFields.length === 0;"), "至少一个高级字段才显示「高级」");
+  assert.ok(RENDERER.includes("advancedFields.map(fieldHtml).join("), "两个 fieldHtml 按序渲染（join 单项即自身）");
+  assert.ok(RENDERER.includes('<p class="pi-advanced-hint">以下高级项均可留空；留空 = 使用默认值。</p>'), "两项之间有分隔说明（沿用既有 .pi-advanced-hint）");
+  assert.ok(!RENDERER.includes("advancedField)") && !RENDERER.includes("const advancedField"), "旧「单个 CONTEXT_WINDOW」分支已退役");
+  // label/help 来自元数据：新字段自动带出，渲染侧不硬编码文案与控件类型。
+  assert.ok(RENDERER.includes("f.label || f.key") && RENDERER.includes("f.help ?"), "label/help 取元数据（新字段自动呈现）");
+  assert.ok(!RENDERER.includes("整轮超时（ms）"), "新字段 label 不在渲染侧硬编码（单一来源=元数据）");
+  assert.ok(RENDERER.includes('type="\' + (f.secret ? "password" : "text")'), "非 range 字段仍走文本/选择控件（range 分支独立）");
+  // 保存/预填沿用既有字段循环——新键自动纳入，不需要第二份键表。
+  assert.ok(/fields\.forEach\(function \(f\) \{\s*var inp = piInput\(f\.key\)/.test(RENDERER), "预填按 fields 循环（新键自动接线）");
+  assert.ok(/\(piView\.fields \|\| \[\]\)\.forEach\(function \(f\) \{[\s\S]{0,260}piInput\(f\.key\)/.test(RENDERER), "保存按 fields 循环（无需新键表）");
+});
+
+test("T28 扩展 2：预设档位滑块——值↔下标↔标签纯映射与 range 控件接线", async () => {
+  const UL = await loadUiLabelsForGovernance();
+  // 7 档夹具（第 0 项为空串=默认/清除；标签由元数据提供，缺省回退 raw value）。
+  const choices = ["", "100000", "200000", "300000", "500000", "1000000", "2000000"];
+  const labels = ["系统默认（500k）", "100k", "200k", "300k", "500k", "1M", "2M"];
+  assert.equal(choices.length, 7, "夹具为 7 档（range max=6）");
+  assert.equal(UL.rangeChoiceIndex(choices, ""), 0, "默认/清除档 ⇒ index 0");
+  assert.equal(UL.rangeChoiceIndex(choices, "500000"), 4, "500000 ⇒ index 4");
+  assert.equal(UL.rangeChoiceIndex(choices, "300000"), 3, "300000 ⇒ index 3");
+  assert.equal(UL.rangeChoiceIndex(choices, 500000), 4, "数值型值按规范字符串匹配");
+  assert.equal(UL.rangeChoiceIndex(choices, "123456"), -1, "不在预设档位 ⇒ -1（回退文本输入，不硬塞滑块）");
+  assert.equal(UL.rangeChoiceValue(choices, 0), "", "默认档的规范值为空串（保存即清除）");
+  assert.equal(UL.rangeChoiceValue(choices, 4), "500000", "index 4 ⇒ hidden 规范值 500000");
+  assert.equal(UL.rangeChoiceValue(choices, 99), "", "越界 ⇒ 空串（不发明值）");
+  assert.equal(UL.rangeChoiceLabel(choices, labels, 0), "系统默认（500k）", "默认档标签逐字");
+  assert.equal(UL.rangeChoiceLabel(choices, labels, 4), "500k", "档位标签逐字");
+  assert.equal(UL.rangeChoiceLabel(choices, [], 4), "500000", "缺 choiceLabels 回退 raw value");
+  // 源码接线：range 分支 / 档数 / output / aria / hidden 规范值 / 自定义值回退 / 预填同步。
+  assert.ok(RENDERER.includes('if (f.control === "range" && choices)'), "fieldHtml 有 range 分支");
+  assert.ok(/type="range" min="0" max="' \+ \(choices\.length - 1\) \+ '" step="1"/.test(RENDERER), "range 档数=choices.length-1、step 1");
+  assert.ok(RENDERER.includes('id="pi-range-out-'), "有 output 标签");
+  assert.ok(RENDERER.includes('aria-valuetext="'), "range 的 aria-valuetext 同步标签");
+  assert.ok(/id="pi-range-' \+ esc\(f\.key\)[\s\S]{0,800}id="pi-inp-' \+ esc\(f\.key\) \+ '" type="hidden" value="' \+ esc\(UiLabels\.rangeChoiceValue/.test(RENDERER), "hidden #pi-inp-* 持规范值（保存链无需改）");
+  assert.ok(RENDERER.includes("当前值不在预设档位；改为预设档位后保存"), "自定义值提示逐字");
+  assert.ok(/rangeIndex < 0[\s\S]{0,300}type="text"/.test(RENDERER), "自定义值回退文本输入（不静默覆盖）");
+  assert.ok(RENDERER.includes("function syncRange(key)") && RENDERER.includes("UiLabels.rangeChoiceIndex(choices, hidden.value)"), "预填按 hidden 值求 index");
+  assert.ok(/function bindRangeControl\(key\)[\s\S]{0,900}addEventListener\("input"/.test(RENDERER), "range input 事件接线（拖动/键盘统一走 input）");
+  assert.ok(/hidden\.value = UiLabels\.rangeChoiceValue\(choices, idx\)[\s\S]{0,160}out\.textContent = text[\s\S]{0,160}setAttribute\("aria-valuetext", text\)/.test(RENDERER), "input 后 hidden/output/aria 三者同步");
+  assert.ok(/fields\.forEach\(function \(f\) \{[\s\S]{0,140}syncRange\(f\.key\)[\s\S]{0,140}bindRangeControl\(f\.key\)/.test(RENDERER), "预填后 syncRange + 绑定");
+  assert.ok(STYLES.includes(".pi-range-wrap") && STYLES.includes(".pi-range-out") && STYLES.includes(".pi-range-note"), "滑块样式钩子齐备");
+  assert.ok(STYLES.includes("accent-color: var(--success)") && STYLES.includes("background: var(--border)"), "滑块只用既有 token（success/border）");
 });
 
 // ————————————————— A-5（2026-10-12）：客户交互卡 + 通道泛化 + 收口面删除 —————————————————
@@ -1714,6 +1781,9 @@ type GovernanceUiLabels = {
   governanceInvalidText: (reason: unknown) => string;
   governanceEmptyState: (roleCount: unknown, primaryRoleId: unknown) => { kind: string; title: string; sub: string };
   governanceFailureView: (phase: unknown, code: unknown, message: unknown) => { lines: string[]; noRetry: boolean };
+  rangeChoiceIndex: (choices: unknown, value: unknown) => number;
+  rangeChoiceValue: (choices: unknown, index: unknown) => string;
+  rangeChoiceLabel: (choices: unknown, labels: unknown, index: unknown) => string;
 };
 
 async function loadUiLabelsForGovernance(): Promise<GovernanceUiLabels> {

@@ -173,8 +173,8 @@
               <input id="pi-inp-ANS_PI_MODEL" class="pi-input" type="text" autocomplete="off" spellcheck="false" />
             </label>
           </div>
-          <!-- 「高级」（可折叠）：收起，别啰嗦。`ANS_PI_CONTEXT_WINDOW` **可留空**——留空即不下发该键，
-               Pi适配器用**保守默认**（压缩会提前触发，不会炸会话）；知道确切值就填。 -->
+          <!-- 「高级」（可折叠）：收起，别啰嗦。高级项**均可留空**——留空即不下发该键，
+               用适配器默认值；知道确切值就填。字段集合/顺序与 renderer.js::ADVANCED_SETTING_KEYS 一致。 -->
           <details class="pi-advanced">
             <summary class="pi-advanced-sum">
               <svg class="pi-advanced-chev" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
@@ -185,6 +185,11 @@
               <label class="pi-field" for="pi-inp-ANS_PI_CONTEXT_WINDOW">
                 <span class="pi-field-label">ANS_PI_CONTEXT_WINDOW</span>
                 <input id="pi-inp-ANS_PI_CONTEXT_WINDOW" class="pi-input" type="text" autocomplete="off" spellcheck="false" />
+              </label>
+              <p class="pi-advanced-hint">以下高级项均可留空；留空 = 使用默认值。</p>
+              <label class="pi-field" for="pi-inp-ANS_PI_PROMPT_TIMEOUT_MS">
+                <span class="pi-field-label">ANS_PI_PROMPT_TIMEOUT_MS</span>
+                <input id="pi-inp-ANS_PI_PROMPT_TIMEOUT_MS" class="pi-input" type="text" autocomplete="off" spellcheck="false" />
               </label>
             </div>
           </details>

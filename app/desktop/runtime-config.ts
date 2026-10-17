@@ -118,10 +118,40 @@ export async function saveRuntimeConfig(input: { runtime: RuntimeKind; updates: 
     // 非法值 ⇒ 如实拒绝、不落盘（错误**不回显提交值原文**，沿凭据不回显纪律）；空串/纯空白＝清除该键
     // （合法：留空维持平台默认）。合法值按 trim 后的**规范形**写盘（写侧只收规范值；读侧的大小写宽松
     // 归一属读取态，不借道写盘）。
+    // 2026-10-17：错误里的可接受值改用 `choiceLabels`（与 `choices` **等长**时；如 Pi 档位的
+    // 「32k / 64k / …」「1 分钟 / 2 分钟 / …」）——只换展示标签，校验仍以 raw `choices` 值为准；
+    // 无标签或长度不匹配时回退 raw `choices`（行为不变）。
     const canonical = value.trim();
     if (field.choices !== undefined && field.choices.length > 0) {
       if (canonical !== "" && !field.choices.includes(canonical)) {
-        return { ...base, ok: false, error: `${field.label}取值无效：仅接受 ${field.choices.join(" / ")}（或留空维持平台默认）。` };
+        const accepted =
+          field.choiceLabels !== undefined && field.choiceLabels.length === field.choices.length
+            ? field.choiceLabels
+            : field.choices;
+        return { ...base, ok: false, error: `${field.label}取值无效：仅接受 ${accepted.join(" / ")}（或留空维持平台默认）。` };
+      }
+      filtered[key] = canonical;
+      continue;
+    }
+    // 整数约束（共享元数据 `RuntimeSettingField.integer`）：用于**无 choices** 的整数自由输入字段
+    // （带 choices 的字段由上方的封闭值域分支处理，值域已内含整数语义）。空串/纯空白＝清除该键
+    // （合法：留空维持平台默认）；否则必须是 `/^\d+$/` 的**安全整数**且落在 [min,max] 内。
+    // 非法值如实拒绝、不落盘（错误**不回显提交值原文**，沿凭据不回显纪律）；合法值按 trim 规范形写盘。
+    if (field.integer !== undefined) {
+      if (canonical === "") {
+        filtered[key] = "";
+        continue;
+      }
+      const parsed = /^\d+$/.test(canonical) ? Number(canonical) : Number.NaN;
+      const min = field.integer.min;
+      const max = field.integer.max;
+      const inRange =
+        Number.isSafeInteger(parsed) &&
+        (min === undefined || parsed >= min) &&
+        (max === undefined || parsed <= max);
+      if (!inRange) {
+        const bound = min !== undefined ? ` ≥ ${min} 的` : "";
+        return { ...base, ok: false, error: `${field.label}必须是${bound}正整数。` };
       }
       filtered[key] = canonical;
       continue;

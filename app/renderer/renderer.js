@@ -2940,17 +2940,25 @@
   }
 
   // —————— Pi 配置面板（设计 §11/T28）：设置 pi 运行时配置 → 保存到仓库根 .env ——————
-  // 与主进程 pi-config.ts 的 PI_PANEL_KEYS 一致：**3 项必填**（端点 / 模型 / token）+ **1 项可选**（上下文窗口，
-  // 收进「高级」、可留空）。token 为机密：**值永不回显**（主进程只给 isSet 布尔、恒返回空 value），此处字段
-  // 恒为 password 型、只示「已设置/未设置」。界面**不作任何判定**（掩码/读写全在主进程侧经共享 env-file 模块，
-  // 单一来源）。**`ANS_PI_PROVIDER` 不在面板里**（代码里有默认值 ans-gateway、是内部标签，客户 2026-10-11 裁定移除）。
+  // 与主进程 pi-config.ts 的 PI_PANEL_KEYS 一致：**3 项必填**（端点 / 模型 / token）+ **2 项高级**（上下文窗口、
+  // 整轮超时；均可留空、收进「高级」）。token 为机密：**值永不回显**（主进程只给 isSet 布尔、恒返回空 value），
+  // 此处字段恒为 password 型、只示「已设置/未设置」。界面**不作任何判定**（掩码/读写全在主进程侧经共享
+  // env-file 模块，单一来源）。**`ANS_PI_PROVIDER` 不在面板里**（代码里有默认值 ans-gateway、是内部标签，
+  // 客户 2026-10-11 裁定移除）。
   var PI_KEYS = [
     "ANTHROPIC_AUTH_TOKEN",
     "ANS_PI_BASE_URL",
     "ANS_PI_MODEL",
     "ANS_PI_CONTEXT_WINDOW",
+    "ANS_PI_PROMPT_TIMEOUT_MS",
   ];
-  // 必填键（3 项）——缺任一才「配置不全、会被拒」；`ANS_PI_CONTEXT_WINDOW` 可选，缺失不算缺（留空 = 保守默认）。
+  // **高级区字段（单一来源，按此顺序渲染）**：折叠、可留空（留空 = 不下发该键，用适配器默认值）。
+  // 主字段区排除本组；未知/缺件字段自动跳过（兼容旧窗口视图只给其中一项）。
+  var ADVANCED_SETTING_KEYS = [
+    "ANS_PI_CONTEXT_WINDOW",
+    "ANS_PI_PROMPT_TIMEOUT_MS",
+  ];
+  // 必填键（3 项）——缺任一才「配置不全、会被拒」；高级键均可选，缺失不算缺（留空 = 默认）。
   var PI_REQUIRED_KEYS = [
     "ANTHROPIC_AUTH_TOKEN",
     "ANS_PI_BASE_URL",
@@ -2970,6 +2978,43 @@
   function piFieldByKey(key) {
     if (!piView || !piView.fields) return null;
     return piView.fields.filter(function (f) { return f.key === key; })[0] || null;
+  }
+
+  /** 预设档位滑块：hidden 规范值 → slider 下标 → output/aria 标签（映射单点在 `ui-labels`）。
+   *  仅当该键存在 range 控件时生效；自定义值（回退文本输入）无滑块 ⇒ no-op。 */
+  function syncRange(key) {
+    var slider = $("pi-range-" + key), out = $("pi-range-out-" + key), hidden = piInput(key);
+    if (!slider || !out || !hidden) return;
+    var f = piFieldByKey(key) || {};
+    var choices = Array.isArray(f.choices) ? f.choices : [];
+    var labels = Array.isArray(f.choiceLabels) ? f.choiceLabels : [];
+    if (!choices.length) return;
+    var idx = UiLabels.rangeChoiceIndex(choices, hidden.value);
+    if (idx < 0) idx = 0;
+    var text = UiLabels.rangeChoiceLabel(choices, labels, idx);
+    slider.value = String(idx);
+    slider.setAttribute("aria-valuetext", text);
+    out.textContent = text;
+    hidden.value = UiLabels.rangeChoiceValue(choices, idx); // 规范值（默认档为 ""）
+  }
+
+  /** 拖动/键盘调整 range：同步 hidden 规范值 + output 标签 + aria-valuetext（保存链不变）。 */
+  function bindRangeControl(key) {
+    var slider = $("pi-range-" + key), out = $("pi-range-out-" + key), hidden = piInput(key);
+    if (!slider || !out || !hidden) return;
+    var f = piFieldByKey(key) || {};
+    var choices = Array.isArray(f.choices) ? f.choices : [];
+    var labels = Array.isArray(f.choiceLabels) ? f.choiceLabels : [];
+    if (!choices.length) return;
+    slider.addEventListener("input", function () {
+      var idx = parseInt(slider.value, 10);
+      if (!isFinite(idx)) idx = 0;
+      idx = Math.max(0, Math.min(choices.length - 1, idx));
+      var text = UiLabels.rangeChoiceLabel(choices, labels, idx);
+      hidden.value = UiLabels.rangeChoiceValue(choices, idx);
+      out.textContent = text;
+      slider.setAttribute("aria-valuetext", text);
+    });
   }
 
   /**
@@ -2994,8 +3039,27 @@
       // ⇒ 附一条原值选项**如实显示**（不静默改写/不假装未设；保存时由主进程按 choices 校验如实拒绝）。
       // 自由文本字段（choices 缺席/空）逐字现状；机密字段不走此支（choices 字段均非机密）。
       var choices = Array.isArray(f.choices) && f.choices.length > 0 ? f.choices : null;
-      var control;
-      if (choices) {
+      var choiceLabels = Array.isArray(f.choiceLabels) ? f.choiceLabels : [];
+      var control, forId = "pi-inp-" + f.key;
+      if (f.control === "range" && choices) {
+        // G-5 wave 2 扩展（2026-10-17）：预设档位滑块。可见 range + output 显示 choiceLabels；
+        // **hidden #pi-inp-<key> 持有规范值**（既有保存循环原样读 #pi-inp-<key>，保存链零改动）。
+        // 键盘方向键由原生 range 提供；aria-valuetext 与 output 同步为同一标签。
+        var rangeIndex = UiLabels.rangeChoiceIndex(choices, f.value);
+        if (rangeIndex < 0) {
+          // 当前保存值不在预设档位：**不静默覆盖**——回退文本输入 + 明示提示，让用户显式改档后保存。
+          control = '<input id="pi-inp-' + esc(f.key) + '" class="pi-input" type="text" autocomplete="off" spellcheck="false" />' +
+            '<span class="pi-range-note">当前值不在预设档位；改为预设档位后保存</span>';
+        } else {
+          var rangeText = UiLabels.rangeChoiceLabel(choices, choiceLabels, rangeIndex);
+          forId = "pi-range-" + f.key;
+          control = '<span class="pi-range-wrap">' +
+            '<input id="pi-range-' + esc(f.key) + '" class="pi-range" type="range" min="0" max="' + (choices.length - 1) + '" step="1" value="' + rangeIndex + '" aria-valuetext="' + esc(rangeText) + '" />' +
+            '<output id="pi-range-out-' + esc(f.key) + '" class="pi-range-out" for="pi-range-' + esc(f.key) + '">' + esc(rangeText) + "</output>" +
+            "</span>" +
+            '<input id="pi-inp-' + esc(f.key) + '" type="hidden" value="' + esc(UiLabels.rangeChoiceValue(choices, rangeIndex)) + '" />';
+        }
+      } else if (choices) {
         var opts = ['<option value="">留空（平台默认）</option>'].concat(choices.map(function (c) { return '<option value="' + esc(String(c)) + '">' + esc(String(c)) + "</option>"; }));
         if (typeof f.value === "string" && f.value !== "" && choices.indexOf(f.value) < 0) opts.push('<option value="' + esc(f.value) + '">' + esc(f.value) + "</option>");
         control = '<select id="pi-inp-' + esc(f.key) + '" class="pi-input pi-select">' + opts.join("") + "</select>";
@@ -3003,17 +3067,23 @@
         control = '<input id="pi-inp-' + esc(f.key) + '" class="pi-input" type="' + (f.secret ? "password" : "text") +
           '" autocomplete="off" spellcheck="false" />' + (f.secret ? '<button id="pi-toggle-secret" class="btn btn-ghost btn-mini" type="button">显示</button>' : "");
       }
-      return '<label class="pi-field" for="pi-inp-' + esc(f.key) + '"><span class="pi-field-label">' +
+      return '<label class="pi-field" for="' + esc(forId) + '"><span class="pi-field-label">' +
         esc(f.label || f.key) + ' · ' + (required ? "必填" : "可选") + (f.secret ? ' <span class="pi-secret-tag">机密</span>' : "") +
         '</span><span class="pi-input-wrap">' + control +
         '</span><span class="runtime-field-help">' + esc(f.key + " · " + Rt.sourceLabel(f) + (f.help ? "。" + f.help : "")) + '</span></label>';
     }
-    var mainFields = fields.filter(function (f) { return f.key !== "ANS_PI_CONTEXT_WINDOW"; });
+    var mainFields = fields.filter(function (f) { return ADVANCED_SETTING_KEYS.indexOf(f.key) < 0; });
     $("pi-panel").querySelector(".pi-fields").innerHTML = mainFields.map(fieldHtml).join("");
     var advanced = $("pi-panel").querySelector(".pi-advanced");
-    var advancedField = fields.find(function (f) { return f.key === "ANS_PI_CONTEXT_WINDOW"; });
-    advanced.hidden = !advancedField;
-    advanced.querySelector(".pi-advanced-body").innerHTML = advancedField ? fieldHtml(advancedField) : "";
+    // 按 ADVANCED_SETTING_KEYS 的顺序取存在的字段（缺件跳过——旧窗口视图只给 CONTEXT_WINDOW 时照常工作）。
+    var advancedFields = ADVANCED_SETTING_KEYS.map(function (key) {
+      return fields.filter(function (f) { return f.key === key; })[0] || null;
+    }).filter(Boolean);
+    advanced.hidden = advancedFields.length === 0;
+    // 两项之间给一行沿用 `.pi-advanced-hint` 的分隔说明（不新增控件/视觉体系）；单项时自然无分隔。
+    advanced.querySelector(".pi-advanced-body").innerHTML = advancedFields.map(fieldHtml).join(
+      '<p class="pi-advanced-hint">以下高级项均可留空；留空 = 使用默认值。</p>'
+    );
     fields.forEach(function (f) {
       var inp = piInput(f.key);
       if (!inp) return;
@@ -3022,6 +3092,12 @@
         inp.placeholder = f.isSet ? "已设置，留空则不修改" : "未设置";
         inp.type = "password";
       } else inp.value = typeof f.value === "string" ? f.value : "";
+    });
+    // 滑块预填/同步：hidden 值已由上段写入 ⇒ 设 slider 下标与 output 标签（默认档 index 0）。
+    fields.forEach(function (f) {
+      if (f.control !== "range") return;
+      syncRange(f.key);
+      bindRangeControl(f.key);
     });
     var tg = $("pi-toggle-secret");
     if (tg) tg.addEventListener("click", toggleSecretVisibility);

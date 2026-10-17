@@ -17,6 +17,8 @@
 
 `RuntimeConfigSaveResult={ok,runtime,appliedKeys,revision,application,error?}`。updates 仅采纳所选引擎白名单字符串；非字符串拒绝；URL 须为不含 userinfo 的 http/https。共享 `saveEnvFile` 逐行保留其他键并原子覆盖；错误不含提交值。成功且写键非空才 revision+1。application 为 current/next-session/after-active-turn；保存本身不证明引擎/账号可连接。
 
+**封闭值域与整数约束（共享元数据，2026-10-17）**：`saveRuntimeConfig` 的 `choices` 分支——校验仍以 raw `choices` 值为准；非法值的可接受值改用 `choiceLabels`（**仅当与 `choices` 等长**；Pi 档位显示「32k / 64k / 128k / 256k / 500k / 1M」「1 分钟 / 2 分钟 / 5 分钟 / …」），无标签或长度不匹配时回退 raw `choices`（行为不变）；文案仍 `` `${field.label}取值无效：仅接受 ${labels.join(" / ")}（或留空维持平台默认）。` ``，**不回显提交值**、不落盘。`integer` 分支保留给**无 choices** 的整数自由输入字段：trim 后空＝清除；否则 `/^\d+$/`＋`Number.isSafeInteger`＋`[min,max]`；非法 ⇒ `ok:false`、错误 `` `${label}必须是${min !== undefined ? ` ≥ ${min} 的` : ""}正整数。` ``、不落盘。现行 Pi：`ANS_PI_CONTEXT_WINDOW` 与 `ANS_PI_PROMPT_TIMEOUT_MS` 均已带 `choices`＋`choiceLabels`＋`control:"range"`＋`integer`（走 choices 分支；空串＝系统默认档）。URL/其他字段行为不变；`getRuntimeConfig` 原样透传 `choices/choiceLabels/control/integer` 元数据（控件属桌面UI）。旧面板白名单 `PI_PANEL_KEYS`（`app/desktop/pi-config.ts`，兼容路径）与 `RUNTIME_SETTINGS.pi` **逐键对齐**：2026-10-17 起为 6 键（新增 `ANS_PI_PROMPT_TIMEOUT_MS`），漂移守卫在 `test/桌面应用/pi-config.test.ts` 强制显式评审。
+
 Pi 保存不重载忙轮次凭据；下一输入或重开在所有旧 Pi 轮次空闲后应用所选字段并重建。各项目等待此安全点的 Pi 队列会被最后一个旧轮次结束唤醒。旧单独 `pi-config.ts` 函数仍兼容既有调用；生产 IPC 使用上述新逻辑。
 
 ## 会话、历史与状态

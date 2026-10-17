@@ -144,6 +144,39 @@
     return n;
   }
 
+  /**
+   * **预设档位纯映射**（2026-10-17 滑块控件；G-5 wave 2 的 choices 控件族扩展）：
+   * `choices` 为元数据值域（第 0 项固定为默认/清除档，通常是 `""`）。三函数只做
+   * 「值 ↔ 下标 ↔ 展示标签」的纯转写，不判定、不改写、不猜值域：
+   *  · `rangeChoiceIndex`：当前保存值 → 下标；不在值域 ⇒ **-1**（调用方回退文本输入，不硬塞滑块）；
+   *  · `rangeChoiceValue`：下标 → 规范值（越界 ⇒ `""`；写入 hidden `#pi-inp-*` 的唯一来源）；
+   *  · `rangeChoiceLabel`：下标 → `choiceLabels[index]`，缺省回退 raw value（不美化）。
+   */
+  function rangeChoiceIndex(choices, value) {
+    var list = Array.isArray(choices) ? choices : [];
+    var v = value == null ? "" : String(value);
+    for (var i = 0; i < list.length; i += 1) {
+      if (String(list[i] == null ? "" : list[i]) === v) return i;
+    }
+    return -1;
+  }
+
+  function rangeChoiceValue(choices, index) {
+    var list = Array.isArray(choices) ? choices : [];
+    var i = typeof index === "number" && isFinite(index) ? Math.floor(index) : -1;
+    if (i < 0 || i >= list.length) return "";
+    return String(list[i] == null ? "" : list[i]);
+  }
+
+  function rangeChoiceLabel(choices, choiceLabels, index) {
+    var list = Array.isArray(choices) ? choices : [];
+    var i = typeof index === "number" && isFinite(index) ? Math.floor(index) : -1;
+    if (i < 0 || i >= list.length) return "";
+    var labels = Array.isArray(choiceLabels) ? choiceLabels : [];
+    if (typeof labels[i] === "string" && labels[i] !== "") return labels[i];
+    return String(list[i] == null ? "" : list[i]);
+  }
+
   /** 状态行/空态的 S1 说明（文案单一来源；N 为项目角色数，如实取枚举结果）。 */
   function governanceMissingText(roleCount) {
     var n = typeof roleCount === "number" && isFinite(roleCount) && roleCount >= 0 ? Math.floor(roleCount) : 0;
@@ -242,6 +275,9 @@
     recoveryActionView: recoveryActionView,
     canEstablishGovernance: canEstablishGovernance,
     projectRoleCount: projectRoleCount,
+    rangeChoiceIndex: rangeChoiceIndex,
+    rangeChoiceValue: rangeChoiceValue,
+    rangeChoiceLabel: rangeChoiceLabel,
     governanceMissingText: governanceMissingText,
     governanceInvalidText: governanceInvalidText,
     governanceEmptyState: governanceEmptyState,

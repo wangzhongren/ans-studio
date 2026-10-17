@@ -1322,17 +1322,34 @@ async function run() {
   await wc().executeJavaScript("window.__ansRenderer.openPiPanel()");
   await sleep(400);
   const panel = await wc().executeJavaScript(
-    "(() => { const p=document.getElementById('pi-panel'); const keys=window.__ansRenderer.piKeys; const adv=document.querySelector('#pi-panel .pi-advanced'); const cw=document.getElementById('pi-inp-ANS_PI_CONTEXT_WINDOW'); return { open: !!(p && !p.hidden), fieldCount: keys.filter(k=>!!document.getElementById('pi-inp-'+k)).length, keyCount: keys.length, hasProvider: !!document.getElementById('pi-inp-ANS_PI_PROVIDER'), tokenType: (document.getElementById('pi-inp-ANTHROPIC_AUTH_TOKEN')||{}).type, hasSaveBtn: !!document.getElementById('pi-save'), adv: !!adv, advOpen: !!(adv && adv.open), cwInAdv: !!(adv && cw && adv.contains(cw)), hint: ((document.querySelector('#pi-panel .pi-advanced-body .runtime-field-help')||{}).textContent||'') + '｜' + ((document.querySelector('#pi-panel .pi-advanced-hint')||{}).textContent||'') }; })()",
+    "(() => { const p=document.getElementById('pi-panel'); const keys=window.__ansRenderer.piKeys; const adv=document.querySelector('#pi-panel .pi-advanced'); const cw=document.getElementById('pi-inp-ANS_PI_CONTEXT_WINDOW'); const tw=document.getElementById('pi-inp-ANS_PI_PROMPT_TIMEOUT_MS'); const labels={}; keys.forEach(k=>{ const el=document.querySelector('label[for=\"pi-inp-'+k+'\"] .pi-field-label')||document.querySelector('label[for=\"pi-range-'+k+'\"] .pi-field-label'); labels[k]=el?el.textContent:''; }); return { open: !!(p && !p.hidden), keys: keys.slice(), fieldCount: keys.filter(k=>!!document.getElementById('pi-inp-'+k)).length, keyCount: keys.length, labels: labels, hasProvider: !!document.getElementById('pi-inp-ANS_PI_PROVIDER'), tokenType: (document.getElementById('pi-inp-ANTHROPIC_AUTH_TOKEN')||{}).type, hasSaveBtn: !!document.getElementById('pi-save'), adv: !!adv, advOpen: !!(adv && adv.open), cwInAdv: !!(adv && cw && adv.contains(cw)), timeoutInAdv: !!(adv && tw && adv.contains(tw)), hint: ((document.querySelector('#pi-panel .pi-advanced-body .runtime-field-help')||{}).textContent||'') + '｜' + ((document.querySelector('#pi-panel .pi-advanced-hint')||{}).textContent||'') }; })()",
   );
   log("PI_PANEL_OPEN=" + panel.open);
   log("PI_PANEL_IN_DRAWER=" + (await wc().executeJavaScript("(() => { const p=document.getElementById('pi-panel'), d=document.getElementById('right-drawer'); return !!p && !!d && d.contains(p) && d.classList.contains('open'); })()")));
   log("PI_FIELD_COUNT=" + panel.fieldCount);
-  // 客户 2026-10-11：面板 3 项必填 + 1 项可选（共 4 键），provider 不再占输入框。
-  log("PI_KEYS_ARE_FOUR=" + (panel.keyCount === 4));
+  // 2026-10-17：Pi 面板键集＝共享注册表：3 项必填 + 2 项高级（共 5 键）。**逐键＋逐 label 精确对齐**，
+  // 不放宽成计数下限——键/标签漂移即红。label 载体形如「<注册表 label> · 必填/可选」。
+  const PI_PANEL_EXPECTED = [
+    ["ANTHROPIC_AUTH_TOKEN", "访问令牌"],
+    ["ANS_PI_BASE_URL", "API 地址"],
+    ["ANS_PI_MODEL", "模型"],
+    ["ANS_PI_CONTEXT_WINDOW", "上下文窗口"],
+    ["ANS_PI_PROMPT_TIMEOUT_MS", "整轮超时（ms）"],
+  ];
+  const piKeysMatch =
+    panel.keyCount === PI_PANEL_EXPECTED.length &&
+    panel.keys.length === PI_PANEL_EXPECTED.length &&
+    PI_PANEL_EXPECTED.every(([key], i) => panel.keys[i] === key);
+  const piLabelsMatch = PI_PANEL_EXPECTED.every(
+    ([key, label]) => (panel.labels[key] || "").split(" · ")[0] === label,
+  );
+  log("PI_KEYS_ARE_FIVE=" + piKeysMatch);
+  log("PI_FIELDS_MATCH_REGISTRY=" + (panel.fieldCount === PI_PANEL_EXPECTED.length && piKeysMatch && piLabelsMatch));
   log("PI_NO_PROVIDER_FIELD=" + (!panel.hasProvider));
   log("PI_ADVANCED_PRESENT=" + panel.adv);
   log("PI_ADVANCED_COLLAPSED_BY_DEFAULT=" + (panel.adv === true && panel.advOpen === false));
   log("PI_CONTEXT_WINDOW_IN_ADVANCED=" + panel.cwInAdv);
+  log("PI_PROMPT_TIMEOUT_IN_ADVANCED=" + panel.timeoutInAdv);
   // 2026-10-16 重锚：高级块「留空=默认」指引的现行载体 = 该字段的 `.runtime-field-help`
   // （单一来源 src/common/shared/runtime-settings.ts 的 help「留空使用保守默认值。」；applyPiView
   // 重写 .pi-advanced-body 后静态 .pi-advanced-hint 段落不再留存——原判据按旧静态载体必假）。

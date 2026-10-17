@@ -106,3 +106,24 @@
 - **A2 重量**：token 按 §4.1（`--chrome #EDF0EA`、`--bg-side` 别名、`--border #D7DDD4`、`--border-strong #C4CEC2`、`--border-control #8A968B`、`--text #232C29`、`--text-2 #55625B`、`--text-3 #6A756E`、`--success #2D634E`、`--success-hover #244F3E`、`--success-bg #E5EEE7`、`--danger #A1433C`、`--danger-bg #FBEFED`、`--amber #8A5B23`、`--focus-ring #2D634E`、`--radius 8px`、`--radius-sm 6px`、`--shadow-card`、`--shadow-dock`）；胶囊/引擎选择器边框 `--border-control`；圆角容器 8、控件 6、用户气泡 `8px 8px 3px 8px`；`.msg table` 13/20 + `outline` 完整外框 + 单元格 6×10 + 表头实底/强底线（不改 `display:block/overflow-x:auto`）；阴影只给输入区与确认卡（普通消息/报告卡/任务请求零新增阴影）；`.tree-item.active` `inset 2px 0 0 var(--success)`。正文 15/27、间距刻度与 A3 项目零触碰。
 - **测试**：`test/桌面应用/renderer.test.ts` → **66 计 / 62 过 / 4 红**（4 红为既有基线 N-1、data-state、P1-3、G-5，未改其断言）；新增 A1/A2 两例（含 WCAG 白底对比度纯函数：正文 ≥7、次级 ≥5、三级 ≥4.5、控件边框/focus ≥3）。`ANS_VISUAL_V2_UI_ONLY=1` 真实 Electron **VISUAL_V2_PASS 36**（含 1360/960 几何、边框、浅底、同列、抽屉 424、无溢出）。默认 e2e 仍只在既有基线 `virtual visible nonempty`（uiux-v2.mjs:1044）失败；该红在本轮前已由 HEAD renderer 复现，非 A1/A2 引入，未改其断言。
 - 指纹：`styles.css 4d374ced`、`renderer.test.ts 15e6bc12`、`uiux-v2.mjs 107c06f5`。
+
+## 2026-10-17：Pi 设置「高级」组扩展——上下文窗口 + 整轮超时
+
+共享元数据新增 Pi `ANS_PI_PROMPT_TIMEOUT_MS`（label「整轮超时（ms）」，integer min 1000；`ANS_PI_CONTEXT_WINDOW` 亦 integer）。渲染侧（`app/renderer/renderer.js`）：
+- `PI_KEYS` 增加 `ANS_PI_PROMPT_TIMEOUT_MS`；新增**单一来源** `ADVANCED_SETTING_KEYS = ["ANS_PI_CONTEXT_WINDOW","ANS_PI_PROMPT_TIMEOUT_MS"]`（按此顺序渲染）。
+- 主字段区以 `ADVANCED_SETTING_KEYS.indexOf(f.key) < 0` 排除整组；`.pi-advanced` 仅在至少一个高级字段存在时显示；`.pi-advanced-body` 按白名单顺序映射存在字段（`.filter(Boolean)`，缺件跳过——旧窗口视图只给 CONTEXT_WINDOW 时照常工作），两项之间用既有 `.pi-advanced-hint` 一行「以下高级项均可留空；留空 = 使用默认值。」分隔（不新增控件/视觉体系）。
+- label/help 仍逐字取元数据（渲染侧不硬编码「整轮超时（ms）」）；正整数保持文本输入；预填/保存沿用既有 `fields` 循环（新键自动接线，保存校验仍由桌面窗口执行）。
+- `index.html` 的静态高级区同步为两字段 + 分隔说明（配置载入前兜底；载入后仍由 `applyPiView` 按元数据重写，顺序一致）。
+- 测试：`renderer.test.ts` 新增 T28 扩展例（两键在高级区/主区排除/顺序/单项兼容/分隔说明/文本控件/元数据文案）；renderer **67 计 / 63 过 / 4 红**（既有基线 N-1、data-state、P1-3、G-5），`runtime-ui.test.ts` **12/12**。
+- 指纹：`renderer.js 4af03ec0`、`index.html abfd9891`、`renderer.test.ts 800d2f20`。
+
+## 2026-10-17：Pi 高级档位滑块（range 控件）
+
+共享元数据为 `ANS_PI_CONTEXT_WINDOW` / `ANS_PI_PROMPT_TIMEOUT_MS` 增加 `choices`、`choiceLabels`、`control: "range"`（`""` 为默认/清除档；标签「系统默认（500k）」「系统默认（120s）」）。渲染侧（`app/renderer/`）：
+- `fieldHtml` 新增 `f.control === "range" && choices` 分支：可见 `<input type="range" id="pi-range-<key>">`（`min=0`、`max=choices.length-1`、`step=1`）＋ `<output id="pi-range-out-<key>">` 展示 `choiceLabels[index]`（缺省回退 raw value）＋ **hidden `<input id="pi-inp-<key>">` 持规范值**（`choices[index]`，默认档 `""`）——既有保存循环原样读 `#pi-inp-<key>`，保存链零改动；`aria-valuetext` 与 output 同步，键盘方向键原生可调。
+- 当前值不在 `choices`：不静默覆盖——回退文本输入＋提示「当前值不在预设档位；改为预设档位后保存」。
+- 纯映射单点：`ui-labels.js::rangeChoiceIndex/rangeChoiceValue/rangeChoiceLabel`；预填后 `syncRange(key)`（hidden 值→index→slider/output），`input` 事件同步 hidden 规范值/output/aria。
+- CSS：`.pi-range-wrap` / `.pi-range-out` / `.pi-range-note`，仅用既有 token（`--success`/`--border`/`--text-2`），无新字体/颜色体系。
+- 测试：renderer **68 计 / 64 过 / 4 红**（既有基线 N-1、data-state、P1-3、G-5），新增 T28 扩展 2（7 档映射、500000/300000→index、默认档空值、自定义值 -1、DOM/同步接线）；`runtime-ui.test.ts` **12/12**。
+- **跨边界影响**：`test/桌面应用/e2e/main.mjs`（桌面窗口）的 `PI_FIELDS_MATCH_REGISTRY` 用 `label[for="pi-inp-<key>"]` 取字段标签；range 字段的 label 正确指向滑块 `pi-range-<key>`，故两项标签查找为空、该断言预计红。请桌面窗口改为同时接受 `pi-range-*`/读取 `.pi-field-label`；本侧未改其文件。`PI_KEYS_ARE_FIVE`、`*_IN_ADVANCED` 与 hint 判据不受影响。
+- 指纹：`renderer.js 36b5ebba`、`ui-labels.js b399f763`、`styles.css c4369839`、`renderer.test.ts 13a9ffb4`（`index.html abfd9891` 未再变）。

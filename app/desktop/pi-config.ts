@@ -62,6 +62,7 @@ export const PI_PANEL_KEYS: readonly string[] = [
   "ANS_PI_BASE_URL",
   "ANS_PI_MODEL",
   "ANS_PI_CONTEXT_WINDOW",
+  "ANS_PI_PROMPT_TIMEOUT_MS",
   "ANS_PI_REASONING_EFFORT",
 ];
 

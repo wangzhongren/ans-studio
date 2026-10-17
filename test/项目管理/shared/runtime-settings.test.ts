@@ -59,25 +59,109 @@ test("推理强度 help 三平台统一口径（逐字：留空＝维持平台�
   }
 });
 
-test("choices 元数据纪律：非空值域、选项为逐字非空字符串、机密字段不出选项", () => {
+test("choices 元数据纪律：非空值域、选项为字符串、空串仅作默认/清除档、机密字段不出选项", () => {
   for (const definition of Object.values(RUNTIME_SETTINGS)) {
     for (const field of definition.fields) {
       if (field.choices === undefined) continue;
       assert.ok(field.choices.length > 0, `${definition.runtime}:${field.key}: 空值域应按未设置（自由文本）处理`);
+      assert.ok(
+        field.choices.filter((choice) => choice === "").length <= 1,
+        `${definition.runtime}:${field.key}: 空串「默认/清除」档至多一个`,
+      );
       for (const choice of field.choices) {
-        assert.ok(choice.trim() !== "", `${definition.runtime}:${field.key}: 选项须为非空字符串`);
+        assert.equal(typeof choice, "string", `${definition.runtime}:${field.key}: 选项须为字符串`);
+        if (choice !== "") assert.ok(choice.trim() !== "", `${definition.runtime}:${field.key}: 非空选项不得为纯空白`);
       }
       assert.equal(field.secret, false, `${definition.runtime}:${field.key}: 机密字段不得挂 choices`);
     }
   }
 });
 
+test("choiceLabels/control 元数据纪律：标签与 choices 等长且非空；range 必须有 choices", () => {
+  for (const definition of Object.values(RUNTIME_SETTINGS)) {
+    for (const field of definition.fields) {
+      if (field.choiceLabels !== undefined) {
+        assert.ok(field.choices !== undefined, `${definition.runtime}:${field.key}: choiceLabels 须有 choices`);
+        assert.equal(
+          field.choiceLabels.length,
+          field.choices!.length,
+          `${definition.runtime}:${field.key}: choiceLabels 须与 choices 等长（逐档对齐）`,
+        );
+        for (const label of field.choiceLabels) {
+          assert.ok(label.trim() !== "", `${definition.runtime}:${field.key}: 友好标签不得为空`);
+        }
+      }
+      if (field.control !== undefined) {
+        assert.equal(field.control, "range", `${definition.runtime}:${field.key}: 当前仅支持 range`);
+        assert.ok(field.choices !== undefined, `${definition.runtime}:${field.key}: range 须有离散档位`);
+      }
+    }
+  }
+});
+
 // ———————— 客户 2026-10-17 裁定：系统默认上下文窗口 500000 ————————
 
-test("Pi 上下文窗口：可选、非机密，help 逐字说明系统默认 500000 tokens", () => {
+test("Pi 上下文窗口：离散档位滑块、可选、非机密、正整数元数据；help 逐字", () => {
   const field = RUNTIME_SETTINGS.pi.fields.find((item) => item.key === "ANS_PI_CONTEXT_WINDOW");
   assert.ok(field, "Pi 必须有 ANS_PI_CONTEXT_WINDOW 字段");
   assert.equal(field.required, false, "上下文窗口可选（留空即用系统默认）");
   assert.equal(field.secret, false, "上下文窗口非机密");
-  assert.equal(field.help, "留空使用系统默认值（500000 tokens）。", "help 须与客户裁定的 500000 默认逐字一致");
+  assert.deepEqual(
+    field.choices,
+    ["", "32768", "65536", "131072", "262144", "500000", "1048576"],
+    "上下文窗口档位逐字（含空串默认/清除档，最大 1M）",
+  );
+  assert.deepEqual(
+    field.choiceLabels,
+    ["系统默认（500k）", "32k", "64k", "128k", "256k", "500k", "1M"],
+    "上下文窗口友好标签逐档对齐",
+  );
+  assert.equal(field.control, "range", "上下文窗口用滑块控件");
+  assert.deepEqual(field.integer, { min: 1 }, "上下文窗口须保留正整数声明（min=1）");
+  assert.equal(
+    field.help,
+    "拖动选择预设档位，最大 1M tokens；留空＝系统默认（500k）；下一次开启会话时应用。",
+    "help 须逐字说明滑块、上限、默认与生效时机",
+  );
+});
+
+// ———————— 客户 2026-10-17「继续完善」：Pi 整轮超时暴露到设置面板 ————————
+
+test("Pi 整轮超时：离散档位滑块、可选、非机密、正整数元数据；help 逐字", () => {
+  const field = RUNTIME_SETTINGS.pi.fields.find((item) => item.key === "ANS_PI_PROMPT_TIMEOUT_MS");
+  assert.ok(field, "Pi 必须有 ANS_PI_PROMPT_TIMEOUT_MS 字段");
+  assert.equal(field.label, "整轮超时（ms）");
+  assert.equal(field.required, false, "整轮超时可选（留空即用系统默认）");
+  assert.equal(field.secret, false, "整轮超时非机密");
+  assert.deepEqual(
+    field.choices,
+    ["", "60000", "120000", "300000", "600000", "900000", "1800000"],
+    "整轮超时档位逐字（含空串默认/清除档）",
+  );
+  assert.deepEqual(
+    field.choiceLabels,
+    ["系统默认（120s）", "1 分钟", "2 分钟", "5 分钟", "10 分钟", "15 分钟", "30 分钟"],
+    "整轮超时友好标签逐档对齐",
+  );
+  assert.equal(field.control, "range", "整轮超时用滑块控件");
+  assert.deepEqual(field.integer, { min: 1000 }, "整轮超时须保留正整数声明（min=1000ms）");
+  assert.equal(
+    field.help,
+    "拖动选择整轮超时；留空＝系统默认（120s）；单位 ms；下一次开启会话时应用。",
+    "help 须逐字说明滑块、默认、单位与生效时机",
+  );
+});
+
+test("integer 元数据纪律：边界为整数且 min ≤ max", () => {
+  for (const definition of Object.values(RUNTIME_SETTINGS)) {
+    for (const field of definition.fields) {
+      if (field.integer === undefined) continue;
+      const { min, max } = field.integer;
+      if (min !== undefined) assert.ok(Number.isInteger(min), `${definition.runtime}:${field.key}: min 须为整数`);
+      if (max !== undefined) assert.ok(Number.isInteger(max), `${definition.runtime}:${field.key}: max 须为整数`);
+      if (min !== undefined && max !== undefined) {
+        assert.ok(min <= max, `${definition.runtime}:${field.key}: min 不得大于 max`);
+      }
+    }
+  }
 });

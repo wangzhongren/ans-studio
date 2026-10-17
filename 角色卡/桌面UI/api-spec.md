@@ -151,3 +151,21 @@ work、card、pi、document复用424模态抽屉。仅导航/会话业务面iner
 - 阴影：仅 `.composer`（dock）与 `.sc-card`（card）；普通消息/报告卡/任务请求零新增阴影。
 - D6：`.tree-item.active { box-shadow: inset 2px 0 0 var(--success); }`（类名以实现为准）。
 - D7：正文保持 `15px/1.8 = 27px`；A3 间距/字号/左树高度未动。
+
+## 2026-10-17 Pi「高级」设置组：键表与渲染契约
+
+- **高级区唯一来源**：`ADVANCED_SETTING_KEYS = ["ANS_PI_CONTEXT_WINDOW", "ANS_PI_PROMPT_TIMEOUT_MS"]`（顺序即渲染顺序）；主字段区以同一表 `indexOf(f.key) < 0` 排除。新键加入只改此表与 `PI_KEYS`，不得另立判据。
+- 字段形状由共享元数据提供：`label`（如「整轮超时（ms）」）、`help`、integer 约束；渲染侧只呈现，不硬编码文案/value 校验。正整数仍为 `type="text"` 输入（不引入新控件）。
+- 渲染：`.pi-advanced` 在至少一个高级字段存在时显示；`.pi-advanced-body` 按白名单顺序 `map → filter(Boolean)` 渲染 `fieldHtml`（缺件跳过 ⇒ 旧窗口视图只给 `CONTEXT_WINDOW` 时兼容）；两项之间插入既有 `.pi-advanced-hint` 分隔说明「以下高级项均可留空；留空 = 使用默认值。」（不新增样式体系）。
+- 预填/保存沿用 `piView.fields` 循环（新键自动纳入）；保存校验由桌面窗口执行，渲染侧不复制。
+- 测试：`test/桌面应用/renderer.test.ts` 的 T28 扩展用例（两键归属/顺序/单项兼容/分隔/文本控件/元数据文案）。
+
+## 2026-10-17 Pi 高级预设档位滑块（range）DOM 契约
+
+- `fieldHtml` 分支条件：`f.control === "range" && Array.isArray(f.choices) && f.choices.length > 0`。
+- 可见控件：`<input id="pi-range-<key>" class="pi-range" type="range" min="0" max="choices.length-1" step="1" value="<index>" aria-valuetext="<label>">` + `<output id="pi-range-out-<key>" class="pi-range-out" for="pi-range-<key>"><label></output>`。
+- **保存值来源不变**：`<input id="pi-inp-<key>" type="hidden" value="<choices[index]>">`（默认档 `""`）；既有保存循环读 `#pi-inp-<key>`，保存链零改动。label 的 `for` 指向滑块（range）或文本输入（非 range）。
+- 纯映射（`ui-labels.js`）：`rangeChoiceIndex(choices,value)`（不在档位 ⇒ -1）、`rangeChoiceValue(choices,index)`（越界 ⇒ ""）、`rangeChoiceLabel(choices,choiceLabels,index)`（缺标签回退 raw value）。
+- 预填/同步：`syncRange(key)` 读 hidden → index → slider/output/aria（并把 hidden 规范化为规范值）；`bindRangeControl(key)` 在 `input` 事件写回 hidden 规范值 + output + aria。自定义值（index=-1）回退 `type="text"` 并显示 `.pi-range-note`「当前值不在预设档位；改为预设档位后保存」。
+- CSS：`.pi-range-wrap`（flex、gap 10）、`.pi-range-out`（12px、`--text-2`）、`.pi-range-note`（11px、`--amber`）；range 轨道 `--border`、滑块 `--success`、focus 环 `--focus-ring`。
+- 跨边界：`test/桌面应用/e2e/main.mjs` 若按 `label[for="pi-inp-<key>"]` 取标签，会因 range label 指向 `pi-range-<key>` 而取空——归桌面窗口调整。

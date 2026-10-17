@@ -44,15 +44,17 @@ function makeTempEnv(initial?: string): { dir: string; envPath: string; cleanup:
   return { dir, envPath, cleanup: () => fs.rmSync(dir, { recursive: true, force: true }) };
 }
 
-test("面板键恰为 3+2（必填 token/端点/模型 + 可选 CONTEXT_WINDOW/REASONING_EFFORT）；provider 不在面板里；默认路径为仓库根 .env", () => {
+test("面板键恰为 3+3（必填 token/端点/模型 + 可选 CONTEXT_WINDOW/PROMPT_TIMEOUT/REASONING_EFFORT）；provider 不在面板里；默认路径为仓库根 .env", () => {
   // 客户 2026-10-11：其实不是 5 个，真正必须你填的是 3 个 —— 端点 / 模型 / token（必填）+ 上下文窗口（可选）。
   // G-5 wave 2：纳入 ANS_PI_REASONING_EFFORT（注册表带 choices 值域；生产面已由注册表路径承载，
   // 本列表纳入是为旧路径不静默失去写入面）。
+  // 2026-10-17：纳入 ANS_PI_PROMPT_TIMEOUT_MS（注册表新增整轮超时档位；漂移守卫在此逼出显式评审）。
   assert.deepEqual(PI_PANEL_KEYS, [
     "ANTHROPIC_AUTH_TOKEN",
     "ANS_PI_BASE_URL",
     "ANS_PI_MODEL",
     "ANS_PI_CONTEXT_WINDOW",
+    "ANS_PI_PROMPT_TIMEOUT_MS",
     "ANS_PI_REASONING_EFFORT",
   ]);
   // G-5 漂移守卫：面板键集与注册表 `RUNTIME_SETTINGS.pi` 字段集**逐键对齐**（不等即须显式评审——
@@ -61,10 +63,11 @@ test("面板键恰为 3+2（必填 token/端点/模型 + 可选 CONTEXT_WINDOW/R
   // 反向守卫：`ANS_PI_PROVIDER` **不在**面板键集合里（它在代码里有默认值 ans-gateway、是内部标签，
   // 不是用户该做的决定；底层仍支持该环境变量，只是不再占一个输入框）。
   assert.ok(!PI_PANEL_KEYS.includes("ANS_PI_PROVIDER"), "provider 绝不进面板键集合");
-  // 必填键恰为 3 项，且都是面板键；CONTEXT_WINDOW / REASONING_EFFORT 是可选（不在必填列）。
+  // 必填键恰为 3 项，且都是面板键；CONTEXT_WINDOW / PROMPT_TIMEOUT / REASONING_EFFORT 是可选（不在必填列）。
   assert.deepEqual(PI_REQUIRED_KEYS, ["ANTHROPIC_AUTH_TOKEN", "ANS_PI_BASE_URL", "ANS_PI_MODEL"]);
   assert.ok(PI_REQUIRED_KEYS.every((k) => PI_PANEL_KEYS.includes(k)), "必填键应含于面板键集合");
   assert.ok(!PI_REQUIRED_KEYS.includes("ANS_PI_CONTEXT_WINDOW"), "上下文窗口是可选，不在必填列");
+  assert.ok(!PI_REQUIRED_KEYS.includes("ANS_PI_PROMPT_TIMEOUT_MS"), "整轮超时是可选，不在必填列");
   assert.ok(!PI_REQUIRED_KEYS.includes("ANS_PI_REASONING_EFFORT"), "推理强度是可选，不在必填列");
   // 默认路径指向仓库根（app/desktop 上两级）下的 .env——与 CLI `--env-file=.env` 同一文件。
   assert.equal(path.basename(resolveRepoEnvPath()), ".env");
@@ -301,9 +304,9 @@ test("interface：getPiConfig/savePiConfig 经注入的临时路径读写（不�
     assert.equal(view0.path, t.envPath);
     assert.ok(view0.fields.every((f) => !f.isSet));
 
-    // 保存 3 个面板键（含 token）。
+    // 保存 3 个面板键（含 token）。上下文窗口取注册表 `choices` 内的合法档位（262144）。
     const saved = await iface.savePiConfig({
-      updates: { ANS_PI_MODEL: "model-x", ANS_PI_CONTEXT_WINDOW: "200000", ANTHROPIC_AUTH_TOKEN: SENTINEL_TOKEN },
+      updates: { ANS_PI_MODEL: "model-x", ANS_PI_CONTEXT_WINDOW: "262144", ANTHROPIC_AUTH_TOKEN: SENTINEL_TOKEN },
     });
     assert.equal(saved.ok, true);
     assert.deepEqual([...saved.appliedKeys].sort(), ["ANTHROPIC_AUTH_TOKEN", "ANS_PI_CONTEXT_WINDOW", "ANS_PI_MODEL"].sort());
@@ -315,7 +318,7 @@ test("interface：getPiConfig/savePiConfig 经注入的临时路径读写（不�
     assert.equal(byKey.ANTHROPIC_AUTH_TOKEN.value, "");
     assert.equal(byKey.ANTHROPIC_AUTH_TOKEN.isSet, true);
     assert.equal(byKey.ANS_PI_MODEL.value, "model-x");
-    assert.equal(byKey.ANS_PI_CONTEXT_WINDOW.value, "200000");
+    assert.equal(byKey.ANS_PI_CONTEXT_WINDOW.value, "262144");
     assert.ok(!JSON.stringify(view1).includes(SENTINEL_TOKEN), "token 绝不外发到渲染进程（视图）");
 
     // 未知键被过滤。

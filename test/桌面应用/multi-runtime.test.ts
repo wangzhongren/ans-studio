@@ -171,6 +171,70 @@ test("G-5 推理强度设置：三键往返（合法值规范形写盘＋读侧 
   } finally { temp.cleanup(); }
 });
 
+test("档位字段（choices＋choiceLabels）：Pi 上下文窗口/整轮超时非法值按友好标签提示、不落盘、不回显；合法写规范形；空串清除；无标签字段仍用 raw choices", async () => {
+  const temp = fixture();
+  try {
+    const cases = [
+      {
+        key: "ANS_PI_CONTEXT_WINDOW",
+        label: "上下文窗口",
+        valid: " 32768 ",
+        canonical: "32768",
+        labels: ["32k", "64k", "128k", "256k", "500k", "1M"],
+        rawChoices: ["32768", "65536", "131072", "262144", "500000", "1048576"],
+        defaultLabel: "系统默认（500k）",
+      },
+      {
+        key: "ANS_PI_PROMPT_TIMEOUT_MS",
+        label: "整轮超时（ms）",
+        valid: "300000",
+        canonical: "300000",
+        labels: ["1 分钟", "2 分钟", "5 分钟", "10 分钟", "15 分钟", "30 分钟"],
+        rawChoices: ["60000", "120000", "300000", "600000", "900000", "1800000"],
+        defaultLabel: "系统默认（120s）",
+      },
+    ] as const;
+    for (const c of cases) {
+      const before = fs.existsSync(temp.envPath) ? fs.readFileSync(temp.envPath, "utf8") : "";
+      for (const badValue of ["abc", "1.5", "-1", "12345"]) {
+        const bad = await saveRuntimeConfig({ runtime: "pi", updates: { [c.key]: badValue } }, { envPath: temp.envPath, revision: 3 });
+        assert.equal(bad.ok, false, `${c.key}=${badValue} 应拒绝`);
+        assert.deepEqual(bad.appliedKeys, [], "拒绝不产生 appliedKeys");
+        assert.equal(bad.revision, 3, "拒绝保留 revision");
+        assert.ok((bad.error ?? "").startsWith(`${c.label}取值无效：仅接受 ${c.defaultLabel} / `), "错误文案＝值域标签形态");
+        for (const label of c.labels) assert.ok((bad.error ?? "").includes(label), `错误应含友好标签「${label}」`);
+        for (const raw of c.rawChoices) assert.equal((bad.error ?? "").includes(raw), false, `错误不得暴露 raw 值 ${raw}`);
+        assert.equal((bad.error ?? "").includes(badValue), false, "错误不回显提交值原文");
+        assert.equal(fs.existsSync(temp.envPath) ? fs.readFileSync(temp.envPath, "utf8") : "", before, "拒绝零副作用（文件未动）");
+      }
+      // 合法：按 canonical（trim 后）写盘。
+      const ok = await saveRuntimeConfig({ runtime: "pi", updates: { [c.key]: c.valid } }, { envPath: temp.envPath });
+      assert.equal(ok.ok, true, `${c.key} 合法档位应接受`);
+      assert.deepEqual(ok.appliedKeys, [c.key]);
+      assert.ok(fs.readFileSync(temp.envPath, "utf8").includes(`${c.key}=${c.canonical}`), "合法档位按规范形写盘");
+    }
+    // 读侧透传 choices/choiceLabels/control/integer 元数据（呈现控件属桌面UI）。
+    const view = await getRuntimeConfig("pi", { envPath: temp.envPath, env: {} });
+    const cwMeta = view.fields.find((f) => f.key === "ANS_PI_CONTEXT_WINDOW")!;
+    assert.equal(cwMeta.control, "range");
+    assert.deepEqual(cwMeta.choiceLabels, ["系统默认（500k）", "32k", "64k", "128k", "256k", "500k", "1M"]);
+    assert.deepEqual(cwMeta.integer, { min: 1 });
+    // 空串/纯空白＝清除（合法，维持默认）。
+    const cleared = await saveRuntimeConfig({ runtime: "pi", updates: { ANS_PI_CONTEXT_WINDOW: "   " } }, { envPath: temp.envPath });
+    assert.equal(cleared.ok, true);
+    assert.equal((await getRuntimeConfig("pi", { envPath: temp.envPath, env: {} })).fields.find((f) => f.key === "ANS_PI_CONTEXT_WINDOW")!.isSet, false, "清除后未设");
+    // 无 choiceLabels 的字段：错误仍用 raw choices（行为不变）。
+    const reasoning = await saveRuntimeConfig({ runtime: "pi", updates: { ANS_PI_REASONING_EFFORT: "max" } }, { envPath: temp.envPath });
+    assert.equal(reasoning.ok, false);
+    assert.ok((reasoning.error ?? "").includes("推理强度取值无效：仅接受 off / low / medium / high / xhigh"), "无标签字段回退 raw choices");
+    // 同批混入非法档位 ⇒ 整批拒绝、零写入。
+    const beforeMixed = fs.readFileSync(temp.envPath, "utf8");
+    const rejected = await saveRuntimeConfig({ runtime: "pi", updates: { ANS_PI_MODEL: "should-not-write", ANS_PI_CONTEXT_WINDOW: "abc" } }, { envPath: temp.envPath });
+    assert.equal(rejected.ok, false);
+    assert.equal(fs.readFileSync(temp.envPath, "utf8"), beforeMixed, "同批非法 ⇒ 整批零写入");
+  } finally { temp.cleanup(); }
+});
+
 test("D1 same role and project across engines and same role across projects keep distinct handles and exact input targets", async () => {
   const current = harness();
   try {
