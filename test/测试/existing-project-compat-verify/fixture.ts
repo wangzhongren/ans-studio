@@ -175,6 +175,41 @@ export function writeUsableAns(root: string, ids: string[]): void {
   fs.writeFileSync(path.join(root, ANS_REL), JSON.stringify(record, null, 2) + "\n", "utf8");
 }
 
+/**
+ * 写一份 **真实 pin** 的 `.ans/project.json`（2026-10-17 pin 逐文件校验接入后的新契约）：
+ * pin 目标与 finalize 同口径——治理边界文档 + 全部角色边界；哈希取**当刻盘上实际字节**。
+ * 用于「全部一致 → present」；`writeUsableAns` 仍保留给「坏 pin / 结构可用」类场景。
+ */
+export function writeRealPinnedAns(root: string, ids: string[]): void {
+  const govAbs = path.join(root, GOV_REL);
+  fs.mkdirSync(path.dirname(govAbs), { recursive: true });
+  if (!fs.existsSync(govAbs)) fs.writeFileSync(govAbs, governanceDocYaml(), "utf8");
+  const roles: AnsRecord["roles"] = {};
+  const pinPaths: string[] = [GOV_REL];
+  for (const id of ids) {
+    const boundaryName = fs.existsSync(path.join(root, "角色卡", id, "boundary.yaml"))
+      ? "boundary.yaml"
+      : "boundary.md";
+    roles[id] = { card: `角色卡/${id}/role-card.md`, boundary: `角色卡/${id}/${boundaryName}` };
+    pinPaths.push(`角色卡/${id}/${boundaryName}`);
+  }
+  const record: AnsRecord = {
+    projectRoot: root.split(path.sep).join("/"),
+    skillRoot: root.split(path.sep).join("/"),
+    roles,
+    governanceBoundary: {
+      path: GOV_REL,
+      acceptance: {
+        accepted: true,
+        source: "test:独立验证夹具（真实 pin）",
+        pin: pinPaths.map((rel) => ({ path: rel, sha256: sha256OfFile(path.join(root, rel)) })),
+      },
+    },
+  };
+  fs.mkdirSync(path.join(root, ".ans"), { recursive: true });
+  fs.writeFileSync(path.join(root, ANS_REL), JSON.stringify(record, null, 2) + "\n", "utf8");
+}
+
 export function readAns(root: string): AnsRecord {
   return JSON.parse(fs.readFileSync(path.join(root, ANS_REL), "utf8")) as AnsRecord;
 }

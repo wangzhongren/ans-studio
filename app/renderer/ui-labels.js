@@ -123,10 +123,21 @@
   }
 
   // —————— I4 治理记录（2026-10-17 客户批准 B+C；项目管理评审 §二 I4/§四.1/§4.5）——————
-  // **动作可见谓词唯一入口**：`hasProject && hasRoles === true && governanceRecord.state === "missing"`。
-  // 渲染侧不得另立判据（S1 的定义亦为此，见评审 §4.1）。
+  // **动作可见谓词唯一入口**（D1，2026-10-17 pin 恢复评审 §5.4）：
+  //  · `pin-mismatch` ⇒ `reaccept`（恢复入口，与 S1 互斥）；
+  //  · `hasRoles === true && missing` ⇒ `establish`（既有 S1）；
+  //  · 其余 ⇒ null（present/invalid/未知状态一律不显示动作，fail-closed）。
+  // 渲染侧不得另立判据（尤其不得直接比较 `record.state === "pin-mismatch"`）。
+  function governanceActionFor(hasProject, hasRoles, recordState) {
+    if (hasProject !== true) return null;
+    if (recordState === "pin-mismatch") return "reaccept";
+    if (hasRoles === true && recordState === "missing") return "establish";
+    return null;
+  }
+
+  /** 既有导出保留（既有测试与调用方兼容），实现委托单一入口。 */
   function canEstablishGovernance(hasProject, hasRoles, recordState) {
-    return hasProject === true && hasRoles === true && recordState === "missing";
+    return governanceActionFor(hasProject, hasRoles, recordState) === "establish";
   }
 
   /**
@@ -272,6 +283,132 @@
     return { lines: lines, noRetry: code === "already-established" || code === "invalid-record" };
   }
 
+  // —————— pin 不符的重新接受（D1，2026-10-17 评审 §5.4；文案单一来源，渲染侧不拼）——————
+  // 纯映射：状态行/空态/预览/成功/失败的**全部业务文案**只在这里生成；渲染侧只取用与 esc。
+
+  /** 归一 pin 计数（非数/负数 ⇒ 0）。 */
+  function pinCountOf(pinCount) {
+    return typeof pinCount === "number" && isFinite(pinCount) && pinCount > 0 ? Math.floor(pinCount) : 0;
+  }
+
+  /** 归一不一致条目（非数组 ⇒ []）。 */
+  function changedListOf(changed) {
+    return Array.isArray(changed) ? changed : [];
+  }
+
+  /** 逐状态计数（只认三态；未知状态不计，也不编类别）。 */
+  function changedCounts(changed) {
+    var counts = { modified: 0, missing: 0, unreadable: 0 };
+    var list = changedListOf(changed);
+    for (var i = 0; i < list.length; i += 1) {
+      var st = list[i] && typeof list[i] === "object" ? list[i].status : "";
+      if (st === "modified") counts.modified += 1;
+      else if (st === "missing") counts.missing += 1;
+      else if (st === "unreadable") counts.unreadable += 1;
+    }
+    return counts;
+  }
+
+  /** pin / 实际哈希的前 8 位（UI 展示用；manifest 用完整 64 位，不在本函数范围）。 */
+  function shortHash(value) {
+    return typeof value === "string" ? value.slice(0, 8) : "";
+  }
+
+  /**
+   * 状态行文案（评审 §5.4 逐字）：只列**非零**类别；三类均零时用「存在不一致」。
+   */
+  function governancePinMismatchText(pinCount, changed) {
+    var n = pinCountOf(pinCount);
+    var list = changedListOf(changed);
+    var c = changedCounts(list);
+    var parts = [];
+    if (c.modified > 0) parts.push(c.modified + " 个内容已变更");
+    if (c.missing > 0) parts.push(c.missing + " 个缺失");
+    if (c.unreadable > 0) parts.push(c.unreadable + " 个不可读");
+    var detail = parts.length ? parts.join("、") : "存在不一致";
+    return "治理记录与盘上边界不一致：共 " + n + " 条 pin，其中 " + list.length +
+      " 个与记录不一致（" + detail + "）。未确认前，会话不能开启、写入会被拒绝。";
+  }
+
+  /** su 空态（pin-mismatch）：标题/说明/次行——说明 = 状态行文案 + 影响面声明。 */
+  function governancePinMismatchEmptyState(pinCount, changed) {
+    return {
+      kind: "governance",
+      title: "治理记录与盘上边界不一致",
+      sub: governancePinMismatchText(pinCount, changed) + "确认接受后只会刷新 SHA-256 与留痕，不会修改任何边界文件内容。",
+      hint: "也可在终端核对 git 历史后再处理。",
+    };
+  }
+
+  /**
+   * 预览面板的视图（纯映射；评审 §5.4 逐字）：
+   *  · 逐文件行只认 modified / missing / unreadable（未知状态不编语义、不展示）；
+   *  · `canConfirm === false` ⇒ `blockerLines` 列出机制给的原因（渲染侧据此禁用确认）。
+   */
+  function governanceReacceptPreviewView(preview) {
+    var p = preview && typeof preview === "object" ? preview : {};
+    var list = changedListOf(p.changed);
+    var fileLines = [];
+    for (var i = 0; i < list.length; i += 1) {
+      var f = list[i] && typeof list[i] === "object" ? list[i] : {};
+      var path = typeof f.path === "string" ? f.path : "";
+      var text = "";
+      if (f.status === "modified") {
+        text = path + " — 内容已变更（pin " + shortHash(f.pinned) + "… → 现 " + shortHash(f.actual) + "…）";
+      } else if (f.status === "missing") {
+        text = path + " — 文件缺失（无法重新 pin）";
+      } else if (f.status === "unreadable") {
+        text = path + " — 文件不可读（无法重新 pin）";
+      }
+      if (text !== "") fileLines.push({ status: f.status, path: path, text: text });
+    }
+    var blockers = Array.isArray(p.blockers) ? p.blockers : [];
+    var blockerLines = [];
+    for (var j = 0; j < blockers.length; j += 1) {
+      var b = blockers[j] && typeof blockers[j] === "object" ? blockers[j] : {};
+      if (typeof b.message === "string" && b.message !== "") blockerLines.push(b.message);
+    }
+    return {
+      title: "重新接受治理边界（预览）",
+      fileLines: fileLines,
+      writeLine: "将写入：.ans/project.json、docs/bootstrap-manifest.md",
+      pinLine: "将重算这 " + pinCountOf(p.pinCount) + " 条 pin；不新增、不删除 pin 条目，不修改任何边界文件内容。",
+      warning: "如果不认识这些改动，请先通过 git 历史或备份核对，不要直接接受。",
+      canConfirm: p.canConfirm === true,
+      blockerLines: blockerLines,
+    };
+  }
+
+  /** 成功文案（评审 §5.4 逐字）。 */
+  function governanceReacceptSuccessText(pinCount, changedCount) {
+    var n = pinCountOf(pinCount);
+    var c = typeof changedCount === "number" && isFinite(changedCount) && changedCount > 0 ? Math.floor(changedCount) : 0;
+    return "已重新接受：更新 " + c + " 条 pin（共 " + n + " 条），写入 .ans/project.json 与 docs/bootstrap-manifest.md。项目已恢复可用。";
+  }
+
+  /**
+   * 重新接受失败视图（评审 §5.4 逐字；`phase` 仍是「是否零副作用」的**唯一依据**）：
+   *  · `phase !== "write"` ⇒ message 逐字；message 未含「未写入任何文件」时追加 `本次未写入任何文件。`；
+   *    再按 status 追加对应提示。
+   *  · `phase === "write"` ⇒ **只逐字显示 message**；绝不追加「未写入任何文件」、绝不出现「已恢复/已成功」。
+   */
+  function governanceReacceptFailureView(phase, status, message) {
+    var lines = [];
+    var msg = typeof message === "string" ? message : "";
+    if (msg !== "") lines.push(msg);
+    if (phase !== "write") {
+      if (msg.indexOf("未写入任何文件") < 0) lines.push("本次未写入任何文件。");
+      if (status === "no-record") lines.push("没有治理记录；请先建立治理记录。");
+      else if (status === "invalid-record") lines.push("治理记录不可用；本版不提供修复。");
+      else if (status === "not-needed") lines.push("边界与记录一致，无需重新接受。");
+      else if (status === "preview-stale") lines.push("预览后边界文件又有变化，已取消本次写入；请重新检查。");
+      else if (status === "missing-file" || status === "unreadable-file" || status === "unparseable-boundary") {
+        lines.push("请先处理上述文件后重试。");
+      } else if (status === "busy") lines.push("上一次操作仍在进行中；本次未写入任何文件。");
+    }
+    return { lines: lines, noRetry: phase === "write" };
+  }
+
   // —————— D-1 回放去重（2026-10-13 真机「同一段消息渲染两遍」修复）——————
   // 真机链路：su 一轮结束 → `project:changed` → 渲染侧 refreshProject → 主进程对每角色**重推**会话历史
   // → 旧实现对同一 pane **无守卫地整份再回放** ⇒ 转录重复（轮次越多重复越多）。本函数给出**纯策略**：
@@ -333,6 +470,7 @@
     SIDEBAR_WIDTH_MIN: SIDEBAR_WIDTH_MIN,
     SIDEBAR_WIDTH_MAX: SIDEBAR_WIDTH_MAX,
     canEstablishGovernance: canEstablishGovernance,
+    governanceActionFor: governanceActionFor,
     projectRoleCount: projectRoleCount,
     rangeChoiceIndex: rangeChoiceIndex,
     rangeChoiceValue: rangeChoiceValue,
@@ -341,6 +479,11 @@
     governanceInvalidText: governanceInvalidText,
     governanceEmptyState: governanceEmptyState,
     governanceFailureView: governanceFailureView,
+    governancePinMismatchText: governancePinMismatchText,
+    governancePinMismatchEmptyState: governancePinMismatchEmptyState,
+    governanceReacceptPreviewView: governanceReacceptPreviewView,
+    governanceReacceptSuccessText: governanceReacceptSuccessText,
+    governanceReacceptFailureView: governanceReacceptFailureView,
     stickToBottom: stickToBottom,
     replayPlan: replayPlan,
     AUTO_SCROLL_THRESHOLD_PX: AUTO_SCROLL_THRESHOLD_PX,

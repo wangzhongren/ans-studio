@@ -30,16 +30,25 @@ import {
 import {
   previewGovernanceRecord as realPreviewGovernanceRecord,
   establishGovernanceRecord as realEstablishGovernanceRecord,
+  previewGovernanceReacceptance as realPreviewGovernanceReacceptance,
+  reacceptGovernancePins as realReacceptGovernancePins,
   type GovernancePreviewResult,
   type EstablishGovernanceResult,
   type GovernanceRecordInput,
+  type GovernanceReacceptInput,
+  type GovernanceReacceptWriteInput,
+  type GovernanceReacceptPreviewResult,
+  type ReacceptGovernancePinsResult,
 } from "../../src/pipeline/orchestration/govern-session.ts";
+// 只读 pin 证据检查：**唯一实现**在门禁引擎私有模块，只经 Service 公开出口消费（跨角色边界纪律）。
+import { inspectPinnedBoundaries } from "../../src/service/boundary/resolve-boundary.ts";
 import { createChatDemoAdapter } from "./chat-adapter.ts";
 
 import {
   buildProjectConfig as realBuildProjectConfig,
   buildEffectiveProjectConfig,
   deriveGovernanceRecord,
+  deriveGovernanceRecordWithPins,
   readRoleDocsIndex,
   projectDocumentCandidates,
   type DocsIndexEntry,
@@ -223,6 +232,20 @@ export interface DesktopDeps {
   previewGovernanceRecordFn?: (input: GovernanceRecordInput) => Promise<GovernancePreviewResult>;
   establishGovernanceRecordFn?: (input: GovernanceRecordInput) => Promise<EstablishGovernanceResult>;
   /**
+   * **C1（治理记录 pin 不符的重新接受恢复，PM 评审 §5.3）**：只读 pin 证据检查——
+   * 缺省经 Service 公开出口 `src/service/boundary/resolve-boundary.ts`（门禁引擎唯一实现）。
+   * 注入以便单测隔离「pin 保持一致 / 不符 / 检查抛错」三种事实；`listProject` 的 `governanceRecord`
+   * 由它合入后可能为 `pin-mismatch`。
+   */
+  inspectPinnedBoundariesFn?: typeof inspectPinnedBoundaries;
+  /**
+   * **C2（同一评审 §5.3）**：重新接受的预览与写入机制——缺省经编排 Pipeline 公共出口
+   * `src/pipeline/orchestration/govern-session.ts`（薄再导出）调用。
+   * 注入以便单测断言透传、guard 拒绝时**不调用机制**、机制结果原样返回与成功后的刷新/清缓存/通知。
+   */
+  previewGovernanceReacceptanceFn?: (input: GovernanceReacceptInput) => Promise<GovernanceReacceptPreviewResult>;
+  reacceptGovernancePinsFn?: (input: GovernanceReacceptWriteInput) => Promise<ReacceptGovernancePinsResult>;
+  /**
    * 「项目内容可能已变」信号（§10.3）——**主入口角色（su）的一轮结束**时由本层触发，主进程据此向
    * 渲染侧推 `project:changed`，渲染侧重取枚举让左树随 su 建角色而**长出**。缺省无操作（测试可注入收集器）。
    *
@@ -337,6 +360,25 @@ export interface DesktopInterface {
    * 并复用既有主→渲染信号 `emitProjectChanged` 让渲染侧重新 `listProject`。
    */
   establishGovernanceRecord(input: { projectRoot: string; confirm: true }): Promise<EstablishGovernanceResult>;
+  /**
+   * **C2（治理记录 pin 不符的重新接受恢复，PM 评审 §5.3）**：预览重新接受——**只读**（不写文件）。
+   * 守卫：`projectRoot` 非空且严格等于当前导入项目；否则 `invalid-request`（本层合成，不调用机制）。
+   * 其余状态（busy/no-record/invalid-record/not-needed/blocked）由机制原样透传。
+   */
+  previewGovernanceReacceptance(input: { projectRoot: string }): Promise<GovernanceReacceptPreviewResult>;
+  /**
+   * **C2**：显式重新接受现有 pin（仅操作者在预览面板确认后触发）。守卫（本层只做 1–3）：
+   * `projectRoot` 是当前导入项目、`confirm === true`、`previewDigest` 为非空 64 位十六进制；
+   * 机制层负责其余守卫（仅 pin-mismatch、只写两路径、写前重新求值、互斥与原子写）。
+   * `status === "completed"` 或 `"write-failed"`（已进入写入阶段）后：先调用既有
+   * `refreshStaleBoundaries`（失败吞掉）→ 清该项目的列举缓存 → 复用 `emitProjectChanged` 让渲染侧
+   * 重新 `listProject`。**不自动打开会话**。
+   */
+  reacceptGovernancePins(input: {
+    projectRoot: string;
+    confirm: true;
+    previewDigest: string;
+  }): Promise<ReacceptGovernancePinsResult>;
   /** 点角色即开：直接建立/续接与该角色的会话（无确认框；B-2 起切换不再结束旧会话）。 */
   openSession(input: SessionOpenRequest): Promise<OpenResult>;
   /**
@@ -422,6 +464,14 @@ function governanceGuardResult(message: string): EstablishGovernanceResult {
   };
 }
 
+/** reaccept 的本层守卫拒绝（阶段固定 `guard`；零调用机制、零写入）。 */
+function reacceptGuardResult(message: string): ReacceptGovernancePinsResult {
+  return { ok: false, status: "invalid-request", phase: "guard", message, wrote: [] };
+}
+
+/** 预览摘要形状：非空 64 位十六进制（`GovernanceReacceptPreview.previewDigest`）。 */
+const PREVIEW_DIGEST_HEX_64 = /^[0-9a-fA-F]{64}$/;
+
 /**
  * 构造桌面 Interface。持有枚举缓存供会话构造 ProjectConfig，并托管 SessionManager。
  */
@@ -436,6 +486,11 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   // I2/C1：预览/建立机制（缺省＝编排 Pipeline 公共出口；不直接导入 `src/common/编排/`）。
   const previewGovernanceRecordFn = deps.previewGovernanceRecordFn ?? realPreviewGovernanceRecord;
   const establishGovernanceRecordFn = deps.establishGovernanceRecordFn ?? realEstablishGovernanceRecord;
+  // C2：重新接受的预览/写入机制（缺省＝编排 Pipeline 公共出口；不直接导入 `src/common/编排/`）。
+  const previewGovernanceReacceptanceFn = deps.previewGovernanceReacceptanceFn ?? realPreviewGovernanceReacceptance;
+  const reacceptGovernancePinsFn = deps.reacceptGovernancePinsFn ?? realReacceptGovernancePins;
+  // C1：pin 证据检查（缺省＝Service 公开出口；门禁引擎唯一实现）。
+  const inspectPinnedBoundariesFn = deps.inspectPinnedBoundariesFn ?? inspectPinnedBoundaries;
   // Pi 配置面板：函数与目标路径均可注入（**测试/e2e 必须注入临时 `.env`**，绝不碰真实仓库根 `.env`）。
   const getPiConfigFn = deps.getPiConfigFn ?? realGetPiConfig;
   const savePiConfigFn = deps.savePiConfigFn ?? realSavePiConfig;
@@ -581,10 +636,26 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         buildProjectConfig: buildProjectConfigFn,
         loadEffectiveConfig: loadEffectiveConfigFn,
       });
-      const governanceRecord = deriveGovernanceRecord({
+      const governanceRecordBase = deriveGovernanceRecord({
         source: effective.source,
         governanceBoundaryPath: effective.project.governanceBoundary?.path,
       });
+      // C1：仅在 `present` 上做逐文件 pin 证据（missing/invalid 不哈希、形状逐字不变）。
+      // pin 检查**永不抛错**（`deriveGovernanceRecordWithPins` 内部兜底）；此处再兜一层，pin 证据
+      // 检查的任何意外都不得让 `listProject` 崩——如实降级为 invalid。
+      let governanceRecord: GovernanceRecordStatus;
+      try {
+        governanceRecord = await deriveGovernanceRecordWithPins({
+          projectRoot: listing.projectRoot,
+          record: governanceRecordBase,
+          pins: effective.source.acceptance?.pin,
+          governanceBoundaryPath: effective.project.governanceBoundary?.path,
+          inspectPinnedBoundariesFn,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        governanceRecord = { state: "invalid", reason: `pin 证据检查失败：${message}` };
+      }
 
       const roles: RoleView[] = [];
       for (const r of listing.roles) {
@@ -668,6 +739,58 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           await manager.refreshStaleBoundaries();
         } catch {
           // 刷新失败不影响建立结果（建立已落盘；下次发言/投递的既有检查点会再查陈旧）。
+        }
+        listingCache.delete(rawRoot);
+        deps.emitProjectChanged?.();
+      }
+      return result;
+    },
+
+    // —————— C2（治理记录 pin 不符的重新接受恢复，2026-10-17 PM 评审 §5.3）——————
+    // 机制（重新求值、只写两路径、写前 digest 比对、按项目互斥、原子写）全部在编排侧；
+    // 本层只做守卫 1（当前导入项目）/ 2（confirm）/ 3（previewDigest 形状）与写入后的收尾。
+    async previewGovernanceReacceptance(input: { projectRoot: string }): Promise<GovernanceReacceptPreviewResult> {
+      const rawRoot = input !== null && typeof input === "object" ? input.projectRoot : undefined;
+      // 守卫 1：projectRoot 非空且严格等于桌面当前导入项目（渲染侧不能传任意路径）。
+      if (typeof rawRoot !== "string" || rawRoot.trim() === "" || rawRoot !== importedProjectRoot) {
+        return { ok: false, status: "invalid-request", message: "项目不是当前导入项目；本次未写入任何文件。" };
+      }
+      // 只把 projectRoot 透传：边界/来源/pin 列表/写路径由机制内部构造，调用方不得提供。
+      return previewGovernanceReacceptanceFn({ projectRoot: rawRoot });
+    },
+
+    async reacceptGovernancePins(input: {
+      projectRoot: string;
+      confirm: true;
+      previewDigest: string;
+    }): Promise<ReacceptGovernancePinsResult> {
+      const record = input !== null && typeof input === "object" ? (input as Record<string, unknown>) : {};
+      const rawRoot = record.projectRoot;
+      // 守卫 1：当前导入项目。
+      if (typeof rawRoot !== "string" || rawRoot.trim() === "" || rawRoot !== importedProjectRoot) {
+        return reacceptGuardResult("项目不是当前导入项目；本次未写入任何文件。");
+      }
+      // 守卫 2：操作者已看过预览并确认（意图标记，不是密码学证据）。
+      if (record.confirm !== true) {
+        return reacceptGuardResult("缺少操作者确认（confirm:true）；本次未写入任何文件。");
+      }
+      // 守卫 3：预览摘要必须是非空 64 位十六进制（机制写入前据此比对 G4；形状不对不进入机制）。
+      const previewDigest = record.previewDigest;
+      if (typeof previewDigest !== "string" || !PREVIEW_DIGEST_HEX_64.test(previewDigest)) {
+        return reacceptGuardResult("缺少有效的预览摘要（previewDigest 必须为 64 位十六进制）；本次未写入任何文件。");
+      }
+      // 其余守卫（仅 pin-mismatch、缺失/不可读阻断、写前重新求值、互斥、原子写）由机制负责；
+      // 本层不透传边界/来源/pin 列表/写路径。
+      const result = await reacceptGovernancePinsFn({ projectRoot: rawRoot, confirm: true, previewDigest });
+
+      // `completed` = 写入成功；`write-failed` = 已进入写入阶段，可能部分落盘——两者都让界面
+      // 如实反映盘面（刷新陈旧边界 → 清列举缓存 → 通知渲染侧重新 listProject）。**不自动打开会话**。
+      if (result.status === "completed" || result.status === "write-failed") {
+        // 先刷新再清缓存：重建路径要经 `getListing` 取得角色表，缓存先删会让重建以「尚未枚举」失败。
+        try {
+          await manager.refreshStaleBoundaries();
+        } catch {
+          // 刷新失败不影响回执（写入结果已如实返回；下次发言/投递的既有检查点会再查陈旧）。
         }
         listingCache.delete(rawRoot);
         deps.emitProjectChanged?.();

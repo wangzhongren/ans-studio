@@ -49,6 +49,36 @@ export interface Acceptance {
   pin?: PinEntry[];
 }
 
+// 只读 pin 证据检查（治理记录 pin 不符的重新接受恢复）的共享结果类型。
+// 冻结契约：角色卡/项目管理/docs/design/2026-10-17_design_governance-pin-recovery-review.md §5.1。
+// 本检查**只读**：不写盘、不建目录、不缓存，也不改变 pin 顺序；唯一实现恒在门禁引擎私有
+// `src/common/门禁引擎/pin-evidence.ts`，跨角色只可经 `src/service/boundary/resolve-boundary.ts` 消费。
+export type PinEvidenceFileStatus = "modified" | "missing" | "unreadable";
+
+export interface PinEvidenceFile {
+  /** pin 里的项目相对路径（posix，原样保留）。 */
+  path: string;
+  /** `.ans` 记录的 SHA-256（小写 64 位十六进制）。 */
+  pinned: string;
+  /** 当前盘上 SHA-256；missing / unreadable 为 null。 */
+  actual: string | null;
+  status: PinEvidenceFileStatus;
+}
+
+export type PinEvidenceState = "ok" | "mismatch" | "invalid";
+
+export interface PinEvidenceResult {
+  state: PinEvidenceState;
+  /** pin 总条数（含一致项）。invalid 时 0。 */
+  checked: number;
+  /** **仅** status !== ok 的条目，按 pin 顺序；ok 时为空数组。 */
+  files: PinEvidenceFile[];
+  /** 对全部 pin 的规范化行求 SHA-256（64 hex）；invalid 时为空串。 */
+  digest: string;
+  /** invalid 的原因（形状非法、路径逃逸、治理边界未被覆盖等）。 */
+  reason?: string;
+}
+
 export interface BoundarySection1 {
   entries: BoundaryEntry[];
   boundarySource: string; // 实际使用的边界文件路径

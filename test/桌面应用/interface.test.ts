@@ -18,7 +18,11 @@ import type {
   EstablishGovernanceResult,
   GovernancePreview,
   GovernancePreviewResult,
+  GovernanceReacceptPreview,
+  GovernanceReacceptPreviewResult,
+  ReacceptGovernancePinsResult,
 } from "../../src/pipeline/orchestration/govern-session.ts";
+import type { PinEvidenceResult } from "../../src/model/boundary.ts";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -384,11 +388,19 @@ test("T17 listProject：hasRoles 与 primaryRoleId 原样转自门禁引擎（�
 test("I1 listProject：governanceRecord 由共享载入器事实派生（missing / present / invalid），与 hasRoles 独立", async () => {
   const fs = await import("node:fs/promises");
   const os = await import("node:os");
+  const { createHash } = await import("node:crypto");
   const base = await fs.mkdtemp(path.join(os.tmpdir(), "ans-governance-record-"));
-  const mkProject = async (name: string, ansJson?: string): Promise<string> => {
+  const GOVERNANCE_REL = "角色卡/governance-boundary.yaml";
+  const GOVERNANCE_TEXT = "role: governance\nentries:\n  - kind: file\n    path: docs/bootstrap-manifest.md\n    purpose: 治理\n";
+  const sha256OfText = (text: string): string => createHash("sha256").update(Buffer.from(text, "utf8")).digest("hex");
+  const mkProject = async (name: string, ansJson?: string, writeGovernanceDoc = false): Promise<string> => {
     const root = path.join(base, name);
     await fs.mkdir(path.join(root, "角色卡/A"), { recursive: true });
     await fs.writeFile(path.join(root, "角色卡/A/role-card.md"), "# A");
+    if (writeGovernanceDoc) {
+      await fs.mkdir(path.join(root, "角色卡"), { recursive: true });
+      await fs.writeFile(path.join(root, GOVERNANCE_REL), GOVERNANCE_TEXT);
+    }
     if (ansJson !== undefined) {
       await fs.mkdir(path.join(root, ".ans"), { recursive: true });
       await fs.writeFile(path.join(root, ".ans/project.json"), ansJson);
@@ -407,20 +419,22 @@ test("I1 listProject：governanceRecord 由共享载入器事实派生（missing
     await walk(root, "");
     return out.sort();
   };
-  const pinnedBoundary = {
-    path: "角色卡/governance-boundary.yaml",
+  // 真实 pin 夹具：pin 指向真实存在的治理边界文件，sha 与盘上内容一致/不一致。
+  const pinnedBoundary = (sha: string) => ({
+    path: GOVERNANCE_REL,
     acceptance: {
       accepted: true,
       source: "operator:test",
-      pin: [{ path: "角色卡/governance-boundary.yaml", sha256: "a".repeat(64) }],
+      pin: [{ path: GOVERNANCE_REL, sha256: sha }],
     },
-  };
+  });
   const roots = {
     missing: await mkProject("missing"),
-    present: await mkProject("present", JSON.stringify({ governanceBoundary: pinnedBoundary })),
+    present: await mkProject("present", JSON.stringify({ governanceBoundary: pinnedBoundary(sha256OfText(GOVERNANCE_TEXT)) }), true),
+    pinMismatch: await mkProject("pin-mismatch", JSON.stringify({ governanceBoundary: pinnedBoundary(sha256OfText("另一份已授权内容")) }), true),
     invalidJson: await mkProject("invalid-json", "{ 不是 JSON"),
     noPin: await mkProject("no-pin", JSON.stringify({
-      governanceBoundary: { path: "角色卡/governance-boundary.yaml", acceptance: { accepted: true, source: "operator:test" } },
+      governanceBoundary: { path: GOVERNANCE_REL, acceptance: { accepted: true, source: "operator:test" } },
     })),
   };
   const makeIface = (root: string, hasRoles = true) => createDesktopInterface({
@@ -442,6 +456,16 @@ test("I1 listProject：governanceRecord 由共享载入器事实派生（missing
     assert.deepEqual(present.governanceRecord, { state: "present" });
     assert.equal(present.hasRoles, false, "governanceRecord 与 hasRoles 相互独立（不得互相覆盖）");
 
+    // C1：pin 与盘上文件不符 → pin-mismatch + 逐文件明细（唯一modified）。
+    const mismatch = await makeIface(roots.pinMismatch).listProject({ projectRoot: roots.pinMismatch });
+    assert.equal(mismatch.governanceRecord.state, "pin-mismatch");
+    assert.equal(mismatch.governanceRecord.pinCount, 1);
+    assert.equal(mismatch.governanceRecord.pinFiles?.length, 1);
+    assert.equal(mismatch.governanceRecord.pinFiles?.[0].path, GOVERNANCE_REL);
+    assert.equal(mismatch.governanceRecord.pinFiles?.[0].status, "modified");
+    assert.equal(mismatch.governanceRecord.pinFiles?.[0].pinned, sha256OfText("另一份已授权内容"));
+    assert.equal(mismatch.governanceRecord.pinFiles?.[0].actual, sha256OfText(GOVERNANCE_TEXT));
+
     const invalidJson = await makeIface(roots.invalidJson).listProject({ projectRoot: roots.invalidJson });
     assert.equal(invalidJson.governanceRecord.state, "invalid");
     assert.match(invalidJson.governanceRecord.reason ?? "", /无法解析/, "invalid 的 reason 应取载入器降级原文");
@@ -461,7 +485,12 @@ test("I1 listProject：governanceRecord 由共享载入器事实派生（missing
 
 test("I1 DesktopDeps.loadEffectiveConfig：可注入（单一授权链），派生不再另读 .ans", async () => {
   let calls = 0;
-  const acceptance = { accepted: true, source: "injected:operator" };
+  // C1 起 present 还须带可验证 pin；本用例只验证载入器注入，pin 证据用注入替身（真实哈希由 I1 主用例覆盖）。
+  const acceptance = {
+    accepted: true,
+    source: "injected:operator",
+    pin: [{ path: "角色卡/governance-boundary.yaml", sha256: "a".repeat(64) }],
+  };
   const iface = createDesktopInterface({
     pickDirectory: async () => null,
     emitEvent: () => {},
@@ -473,6 +502,7 @@ test("I1 DesktopDeps.loadEffectiveConfig：可注入（单一授权链），派�
         source: { kind: "ans", path: "/proj/.ans/project.json", acceptance, pinPaths: [] },
       };
     },
+    inspectPinnedBoundariesFn: async () => ({ state: "ok", checked: 1, files: [], digest: "c".repeat(64) }),
   });
   const res = await iface.listProject({ projectRoot: "/proj" });
   assert.equal(calls, 1, "派生应调用注入的共享载入器（不另写 .ans 读取逻辑）");
@@ -942,6 +972,281 @@ test("I2 establish 成功：清列举缓存、调用既有陈旧边界刷新入�
     assert.match(after.error ?? "", /尚未枚举该项目/);
   } finally {
     await iface.stopSession();
+    iface.disposeProjectDocuments();
+    await fs.rm(base, { recursive: true, force: true });
+  }
+});
+
+// ———————————————— C1/C2（治理记录 pin 不符的重新接受恢复，PM 评审 §5.3）：Interface 接线 ————————————————
+
+const PREVIEW_DIGEST = "d".repeat(64);
+
+const REACCEPT_PREVIEW: GovernanceReacceptPreview = {
+  projectRoot: "/proj",
+  writePaths: [".ans/project.json", "docs/bootstrap-manifest.md"],
+  pinPaths: ["角色卡/governance-boundary.yaml"],
+  pinCount: 1,
+  changed: [{
+    path: "角色卡/governance-boundary.yaml",
+    pinned: "a".repeat(64),
+    actual: "b".repeat(64),
+    status: "modified",
+  }],
+  canConfirm: true,
+  blockers: [],
+  previewDigest: PREVIEW_DIGEST,
+};
+
+function reacceptResult(
+  status: ReacceptGovernancePinsResult["status"],
+  phase: ReacceptGovernancePinsResult["phase"],
+  extra: Partial<ReacceptGovernancePinsResult> = {},
+): ReacceptGovernancePinsResult {
+  return { ok: status === "completed", status, phase, message: `${status}（测试）`, wrote: [], ...extra };
+}
+
+test("C1 listProject：pin 检查抛错不崩（降级 invalid），检查器收到 projectRoot/pins/治理边界路径", async () => {
+  const acceptance = {
+    accepted: true,
+    source: "injected:operator",
+    pin: [{ path: "角色卡/governance-boundary.yaml", sha256: "a".repeat(64) }],
+  };
+  const makeIface = (inspectPinnedBoundariesFn: (input: {
+    projectRoot: string;
+    pins: { path: string; sha256: string }[];
+    requiredPath?: string;
+  }) => Promise<PinEvidenceResult>) => createDesktopInterface({
+    pickDirectory: async () => null,
+    emitEvent: () => {},
+    listProjectFn: async () => FAKE_LISTING,
+    loadEffectiveConfig: async (opts) => ({
+      project: { ...opts.fallback, governanceBoundary: { path: "角色卡/governance-boundary.yaml", acceptance } },
+      source: { kind: "ans", path: "/proj/.ans/project.json", acceptance, pinPaths: [] },
+    }),
+    inspectPinnedBoundariesFn,
+  });
+
+  const inputs: unknown[] = [];
+  const ok = await makeIface(async (input) => {
+    inputs.push(input);
+    return { state: "ok", checked: 1, files: [], digest: "c".repeat(64) };
+  }).listProject({ projectRoot: "/proj" });
+  assert.deepEqual(ok.governanceRecord, { state: "present" }, "pin 全一致 → 保持既有 present 形状");
+  assert.deepEqual(inputs, [{
+    projectRoot: "/proj",
+    pins: acceptance.pin,
+    requiredPath: "角色卡/governance-boundary.yaml",
+  }], "检查器须收到 projectRoot、.ans 的 pin 列表与治理边界路径（覆盖规则）");
+
+  // 检查失败不得让 listProject 崩：如实降级为 invalid，其余列举字段照常返回。
+  const failed = await makeIface(async () => { throw new Error("哈希读取失败"); }).listProject({ projectRoot: "/proj" });
+  assert.equal(failed.projectRoot, "/proj");
+  assert.equal(failed.roles.length, 1, "pin 检查失败不影响角色列举");
+  assert.equal(failed.governanceRecord.state, "invalid");
+  assert.equal(failed.governanceRecord.reason, "pin 证据检查失败：哈希读取失败");
+});
+
+test("C2 守卫：projectRoot 必须是当前导入项目、confirm:true、previewDigest 为 64 hex；拒绝时不调用机制", async () => {
+  let previewCalls = 0;
+  let reacceptCalls = 0;
+  const iface = createDesktopInterface({
+    pickDirectory: async () => null,
+    emitEvent: () => {},
+    listProjectFn: async () => FAKE_LISTING,
+    previewGovernanceReacceptanceFn: async () => { previewCalls += 1; return { ok: true, preview: REACCEPT_PREVIEW }; },
+    reacceptGovernancePinsFn: async () => { reacceptCalls += 1; return reacceptResult("completed", "write"); },
+  });
+
+  // 尚未导入任何项目 ⇒ 非当前导入项目。
+  const previewNotImported = await iface.previewGovernanceReacceptance({ projectRoot: "/proj" });
+  assert.equal(previewNotImported.ok, false);
+  if (!previewNotImported.ok) {
+    assert.equal(previewNotImported.status, "invalid-request");
+    assert.match(previewNotImported.message, /本次未写入任何文件/);
+  }
+  const reacceptNotImported = await iface.reacceptGovernancePins({ projectRoot: "/proj", confirm: true, previewDigest: PREVIEW_DIGEST });
+  assert.equal(reacceptNotImported.ok, false);
+  assert.equal(reacceptNotImported.status, "invalid-request");
+  assert.equal(reacceptNotImported.phase, "guard");
+  assert.deepEqual(reacceptNotImported.wrote, []);
+  assert.match(reacceptNotImported.message, /本次未写入任何文件/);
+
+  await iface.listProject({ projectRoot: "/proj" });
+
+  for (const root of ["", "   ", "/other"]) {
+    const preview = await iface.previewGovernanceReacceptance({ projectRoot: root });
+    assert.equal(preview.ok, false);
+    if (!preview.ok) assert.equal(preview.status, "invalid-request");
+    const reaccept = await iface.reacceptGovernancePins({ projectRoot: root, confirm: true, previewDigest: PREVIEW_DIGEST });
+    assert.equal(reaccept.status, "invalid-request");
+    assert.match(reaccept.message, /本次未写入任何文件/);
+  }
+
+  // 缺 confirm / confirm 非 true。
+  for (const input of [
+    { projectRoot: "/proj", previewDigest: PREVIEW_DIGEST },
+    { projectRoot: "/proj", confirm: false, previewDigest: PREVIEW_DIGEST },
+  ]) {
+    const r = await iface.reacceptGovernancePins(input as never);
+    assert.equal(r.status, "invalid-request");
+    assert.equal(r.phase, "guard");
+    assert.match(r.message, /confirm/);
+    assert.match(r.message, /本次未写入任何文件/);
+  }
+
+  // previewDigest 形状：非空 64 位十六进制。
+  for (const previewDigest of [undefined, "", "abc", "a".repeat(63), "a".repeat(65), "g".repeat(64), ` ${PREVIEW_DIGEST}`]) {
+    const r = await iface.reacceptGovernancePins({
+      projectRoot: "/proj",
+      confirm: true,
+      previewDigest: previewDigest as unknown as string,
+    });
+    assert.equal(r.status, "invalid-request", `digest ${JSON.stringify(previewDigest)} 应被拒`);
+    assert.equal(r.phase, "guard");
+    assert.match(r.message, /previewDigest/);
+    assert.match(r.message, /本次未写入任何文件/);
+  }
+
+  assert.equal(previewCalls, 0, "guard 拒绝时绝不预览");
+  assert.equal(reacceptCalls, 0, "guard 拒绝时绝不重新接受（零写入、不调用机制）");
+});
+
+test("C2 透传：预览只交 projectRoot；重新接受只交 projectRoot/confirm/previewDigest；非写入状态不改缓存不通知", async () => {
+  let previewResult: GovernanceReacceptPreviewResult = { ok: true, preview: REACCEPT_PREVIEW };
+  const previewInputs: unknown[] = [];
+  const reacceptInputs: unknown[] = [];
+  let projectChanged = 0;
+  const iface = createDesktopInterface({
+    pickDirectory: async () => "/proj",
+    emitEvent: () => {},
+    listProjectFn: async () => FAKE_LISTING,
+    openRoleSessionFn: async () => makeFakeHandle().handle,
+    createDemoAdapterFn: () => ({}) as unknown as RuntimeAdapter,
+    buildProjectConfigFn: buildProjectConfig,
+    emitProjectChanged: () => { projectChanged += 1; },
+    previewGovernanceReacceptanceFn: async (input) => { previewInputs.push(input); return previewResult; },
+    reacceptGovernancePinsFn: async (input) => { reacceptInputs.push(input); return reacceptResult("busy", "guard", { message: "上一次操作仍在进行中；本次未写入任何文件。" }); },
+  });
+  await iface.listProject({ projectRoot: "/proj" });
+
+  assert.equal(await iface.previewGovernanceReacceptance({ projectRoot: "/proj" }), previewResult, "同一对象原样透传");
+  assert.deepEqual(previewInputs, [{ projectRoot: "/proj" }], "只透传 projectRoot（不传边界/来源/pin/写路径）");
+
+  const busy = await iface.reacceptGovernancePins({ projectRoot: "/proj", confirm: true, previewDigest: PREVIEW_DIGEST });
+  assert.equal(busy.status, "busy");
+  assert.deepEqual(reacceptInputs, [{ projectRoot: "/proj", confirm: true, previewDigest: PREVIEW_DIGEST }], "只透传三个钉死字段");
+  assert.equal(projectChanged, 0, "未进入写入的状态不得通知渲染侧");
+  // 缓存仍在：busy 后无需重新列举即可继续使用既有缓存开会话（cache hit 路径仍可达）。
+  const opened = await iface.openSession({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  assert.equal(opened.ok, true, "非写入状态不得清列举缓存");
+
+  previewResult = { ok: false, status: "not-needed", message: "边界与记录一致，无需重新接受。" };
+  assert.equal(await iface.previewGovernanceReacceptance({ projectRoot: "/proj" }), previewResult);
+});
+
+test("C2 completed：先刷新陈旧边界 → 清列举缓存 → project:changed；不自动打开会话", async () => {
+  const fs = await import("node:fs/promises");
+  const os = await import("node:os");
+  const base = await fs.mkdtemp(path.join(os.tmpdir(), "ans-governance-reaccept-"));
+  const root = path.join(base, "proj");
+  await fs.mkdir(path.join(root, "角色卡/A"), { recursive: true });
+  await fs.writeFile(path.join(root, "角色卡/A/role-card.md"), "# A\n");
+  const boundaryFile = path.join(root, "角色卡/A/boundary.yaml");
+  await fs.writeFile(boundaryFile, "role: A\nentries:\n  - kind: file\n    path: src/a.ts\n    purpose: p\n");
+  const listing: ProjectListing = { ...FAKE_LISTING, projectRoot: root };
+
+  const openInputs: unknown[] = [];
+  let projectChanged = 0;
+  let captured: unknown;
+  const events: import("../../app/desktop/session.ts").DesktopOrchestrationEvent[] = [];
+  const iface = createDesktopInterface({
+    pickDirectory: async () => root,
+    emitEvent: (envelope) => { events.push(envelope.event); },
+    listProjectFn: async () => listing,
+    openRoleSessionFn: async (input) => { openInputs.push({ projectRoot: input.project, roleId: input.roleId }); return makeFakeHandle().handle; },
+    createDemoAdapterFn: () => ({}) as unknown as RuntimeAdapter,
+    buildProjectConfigFn: buildProjectConfig,
+    emitProjectChanged: () => { projectChanged += 1; },
+    reacceptGovernancePinsFn: async (input) => {
+      captured = input;
+      return reacceptResult("completed", "write", {
+        ok: true,
+        message: "已重新接受。",
+        wrote: [".ans/project.json", "docs/bootstrap-manifest.md"],
+      });
+    },
+  });
+  try {
+    await iface.listProject({ projectRoot: root });
+    const opened = await iface.openSession({ projectRoot: root, roleId: "A", runtime: "demo" });
+    assert.equal(opened.ok, true, "先有活会话，才能观察陈旧边界刷新入口是否被调用");
+    assert.equal(openInputs.length, 1);
+
+    // 让活会话的边界快照过期（O-1 判据＝读盘指纹变化；等长重写在 Windows 上可能被合并，故加长）。
+    await fs.writeFile(boundaryFile, "role: A\nentries:\n  - kind: file\n    path: src/b.ts\n    purpose: 变更后的边界（更长）\n");
+
+    const result = await iface.reacceptGovernancePins({ projectRoot: root, confirm: true, previewDigest: PREVIEW_DIGEST });
+    assert.equal(result.status, "completed");
+    assert.deepEqual(captured, { projectRoot: root, confirm: true, previewDigest: PREVIEW_DIGEST }, "机制只收到三个钉死字段");
+
+    for (let i = 0; i < 100 && openInputs.length < 2; i += 1) await new Promise((r) => setTimeout(r, 10));
+    assert.equal(openInputs.length, 2, "成功后应调用既有陈旧边界刷新入口（空闲会话按新边界重建）");
+    assert.ok(
+      events.some((e) => e.kind === "message" && /边界已更新/.test(e.summary)),
+      "重建应经既有如实记行",
+    );
+    // 不自动打开会话：唯一一次新开会话来自既有陈旧边界重建，且仍是原来的角色 A。
+    assert.ok(openInputs.every((o) => (o as { roleId: string }).roleId === "A"), "不得自动打开任何会话");
+    assert.equal(projectChanged, 1, "复用既有主→渲染 project:changed 信号");
+
+    // 列举缓存已清：重新 listProject 之前，开会话走 cache miss 的如实拒绝。
+    const after = await iface.openSession({ projectRoot: root, roleId: "B", runtime: "demo" });
+    assert.equal(after.ok, false);
+    assert.match(after.error ?? "", /尚未枚举该项目/);
+  } finally {
+    await iface.stopSession();
+    iface.disposeProjectDocuments();
+    await fs.rm(base, { recursive: true, force: true });
+  }
+});
+
+test("C2 write-failed：同样清列举缓存并通知（让界面如实反映可能已部分落盘的盘面）", async () => {
+  const fs = await import("node:fs/promises");
+  const os = await import("node:os");
+  const base = await fs.mkdtemp(path.join(os.tmpdir(), "ans-governance-reaccept-wf-"));
+  const root = path.join(base, "proj");
+  await fs.mkdir(path.join(root, "角色卡/A"), { recursive: true });
+  await fs.writeFile(path.join(root, "角色卡/A/role-card.md"), "# A\n");
+  const listing: ProjectListing = { ...FAKE_LISTING, projectRoot: root };
+
+  let projectChanged = 0;
+  let openCalls = 0;
+  const iface = createDesktopInterface({
+    pickDirectory: async () => root,
+    emitEvent: () => {},
+    listProjectFn: async () => listing,
+    openRoleSessionFn: async () => { openCalls += 1; return makeFakeHandle().handle; },
+    createDemoAdapterFn: () => ({}) as unknown as RuntimeAdapter,
+    buildProjectConfigFn: buildProjectConfig,
+    emitProjectChanged: () => { projectChanged += 1; },
+    reacceptGovernancePinsFn: async () => reacceptResult("write-failed", "write", {
+      message: "写入中断：测试注入；可能已写入部分文件，请核对现场。",
+      wrote: [".ans/project.json"],
+    }),
+  });
+  try {
+    await iface.listProject({ projectRoot: root });
+    const result = await iface.reacceptGovernancePins({ projectRoot: root, confirm: true, previewDigest: PREVIEW_DIGEST });
+    assert.equal(result.ok, false);
+    assert.equal(result.status, "write-failed");
+    assert.equal(result.phase, "write");
+    assert.equal(projectChanged, 1, "write-failed 也要让渲染侧重新列举");
+    assert.equal(openCalls, 0, "不自动打开会话");
+
+    const after = await iface.openSession({ projectRoot: root, roleId: "A", runtime: "demo" });
+    assert.equal(after.ok, false);
+    assert.match(after.error ?? "", /尚未枚举该项目/, "列举缓存已清");
+  } finally {
     iface.disposeProjectDocuments();
     await fs.rm(base, { recursive: true, force: true });
   }

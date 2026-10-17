@@ -1815,11 +1815,25 @@ test("G-5/wave2：推理折叠行接线——默认折叠含运行中、状态�
 
 type GovernanceUiLabels = {
   canEstablishGovernance: (hasProject: unknown, hasRoles: unknown, recordState: unknown) => boolean;
+  governanceActionFor: (hasProject: unknown, hasRoles: unknown, recordState: unknown) => string | null;
   projectRoleCount: (roles: unknown) => number;
   governanceMissingText: (roleCount: unknown) => string;
   governanceInvalidText: (reason: unknown) => string;
   governanceEmptyState: (roleCount: unknown, primaryRoleId: unknown) => { kind: string; title: string; sub: string };
   governanceFailureView: (phase: unknown, code: unknown, message: unknown) => { lines: string[]; noRetry: boolean };
+  governancePinMismatchText: (pinCount: unknown, changed: unknown) => string;
+  governancePinMismatchEmptyState: (pinCount: unknown, changed: unknown) => { kind: string; title: string; sub: string; hint: string };
+  governanceReacceptPreviewView: (preview: unknown) => {
+    title: string;
+    fileLines: { status: string; path: string; text: string }[];
+    writeLine: string;
+    pinLine: string;
+    warning: string;
+    canConfirm: boolean;
+    blockerLines: string[];
+  };
+  governanceReacceptSuccessText: (pinCount: unknown, changedCount: unknown) => string;
+  governanceReacceptFailureView: (phase: unknown, status: unknown, message: unknown) => { lines: string[]; noRetry: boolean };
   rangeChoiceIndex: (choices: unknown, value: unknown) => number;
   rangeChoiceValue: (choices: unknown, index: unknown) => string;
   rangeChoiceLabel: (choices: unknown, labels: unknown, index: unknown) => string;
@@ -1850,8 +1864,10 @@ test("I4：动作可见谓词单一来源——S1 显示；present/invalid/S0 �
   assert.equal(UL.canEstablishGovernance(false, true, "missing"), false, "无项目 ⇒ 隐藏");
   assert.equal(UL.canEstablishGovernance("x", true, "missing"), false, "非布尔真值不当「有项目」");
   // 渲染侧只经该单点取判据；不得另立 `governanceRecord.state === "missing"` 比较。
-  assert.ok(RENDERER.includes("UiLabels.canEstablishGovernance("), "渲染侧应经纯函数取谓词（单一来源）");
+  assert.ok(RENDERER.includes("UiLabels.governanceActionFor("), "渲染侧应经单一谓词取动作（单一来源）");
+  assert.ok(!RENDERER.includes("UiLabels.canEstablishGovernance("), "渲染侧不得绕过单一谓词直接调旧导出（旧导出仅保留兼容）");
   assert.ok(!RENDERER_CODE.includes('governanceRecord.state === "missing"'), "不得在渲染侧另立第二份 missing 判据");
+  assert.ok(!RENDERER_CODE.includes('state === "pin-mismatch"'), "不得在渲染侧直接比较 pin-mismatch（只经 governanceActionFor）");
 });
 
 test("I4 修订：S1 角色数只计项目角色——内置 su（builtIn:true）不计入", async () => {
@@ -1963,6 +1979,86 @@ test("I4：成功——只认 ok＋phase=write＋completed；逐字 message＋�
   assert.ok(RENDERER.includes(': { state: "present" };'), "缺失字段按 present 兜底（旧主进程不显示动作、不崩）");
   assert.ok(RENDERER.includes("reason: typeof gr.reason === \"string\" ? gr.reason : \"\""), "invalid 的 reason 如实转写");
   assert.ok(/renderGovernanceUi\(\);[\s\S]{0,160}refreshEmptyStates\(\);/.test(RENDERER), "列举落地后同步状态行与空态");
+});
+
+// ————— D1/D2：治理记录 pin 不符的重新接受（2026-10-17 评审 §5.4；桌面UI 状态行/空态/预览）—————
+
+test("D2：applyListing 接受 pin-mismatch 并保留 pinFiles/pinCount；未知状态 fail-closed", () => {
+  assert.ok(RENDERER.includes('var knownGovernanceStates = ["present", "missing", "invalid", "pin-mismatch"];'), "状态白名单显式含 pin-mismatch（无直接比较）");
+  assert.ok(RENDERER.includes("pinFiles: Array.isArray(gr.pinFiles) ? gr.pinFiles : []"), "保留逐文件证据");
+  assert.ok(RENDERER.includes('pinCount: typeof gr.pinCount === "number" && isFinite(gr.pinCount) ? gr.pinCount : 0'), "保留 pin 总数");
+  assert.ok(RENDERER.includes(": { state: \"present\" };"), "未知/缺失状态按 present 兜底（不显示动作）");
+  assert.ok(!RENDERER_CODE.includes('=== "pin-mismatch"'), "不得直接比较 pin-mismatch（只经单一谓词）");
+  assert.ok(RENDERER.includes("governanceActionVisible()"), "动作仍经单一包装取谓词");
+});
+
+test("D2：状态行——reaccept 文案＋[检查并重新接受]；establish/invalid 行为不变", async () => {
+  const UL = await loadUiLabelsForGovernance();
+  assert.equal(typeof UL.governanceActionFor, "function", "ui-labels 导出单一谓词");
+  const fn = RENDERER.slice(RENDERER.indexOf("function governanceStatusHtml()"), RENDERER.indexOf("function normalizeGovernancePreview("));
+  assert.ok(fn.includes('if (action === "reaccept")'), "状态行按 reaccept 分支");
+  assert.ok(fn.includes("UiLabels.governancePinMismatchText(mismatch.pinCount, mismatch.pinFiles)"), "不一致文案经纯映射（pin 数与明细）");
+  assert.ok(fn.includes('data-governance-reaccept>检查并重新接受</button>'), "reaccept 动作按钮逐字");
+  assert.ok(fn.includes('if (action === "establish")') && fn.includes("UiLabels.governanceMissingText(projectRoleCount())"), "establish 分支保持既有文案");
+  assert.ok(fn.includes("UiLabels.governanceInvalidText(record.reason)"), "invalid 分支保持原因原文");
+  assert.ok(/governanceInvalidText\(record\.reason\)[\s\S]{0,120}return "";/.test(fn), "invalid 之后无动作");
+});
+
+test("D2：su 空态——reaccept 标题/说明/主按钮/次行；establish 行为不变；按钮已绑定", () => {
+  const fn = RENDERER.slice(RENDERER.indexOf("function emptyStateHtml()"), RENDERER.indexOf("// —————— I4 治理记录"));
+  assert.ok(fn.includes('action === "reaccept"'), "空态按 reaccept 分支");
+  assert.ok(fn.includes("UiLabels.governancePinMismatchEmptyState(record.pinCount, record.pinFiles)"), "空态文案经纯映射");
+  assert.ok(fn.includes('class="empty-hint"'), "次行 hint 独立呈现");
+  assert.ok(fn.includes('data-governance-reaccept>检查并重新接受</button>'), "空态主按钮逐字");
+  assert.ok(fn.includes("UiLabels.governanceEmptyState(projectRoleCount(), primary)"), "establish 空态保持既有文案");
+  assert.ok(RENDERER.includes('container.querySelector(".chat-empty [data-governance-reaccept]")'), "空态主按钮已绑定打开预览");
+});
+
+test("D2：预览——共用 #governance-preview 宿主、mode 分支、按契约调 IPC、取消/关闭不调 IPC、无新增模态", () => {
+  // 宿主复用：仍是既有 #governance-preview（非模态），不新增第四个入口。
+  assert.ok(RENDERER.includes('preview.id = "governance-preview"'), "复用既有预览宿主");
+  assert.ok(!INDEX.includes("governance-modal") && !INDEX.includes("governance-reaccept-modal"), "index.html 无新增模态");
+  assert.ok(!STYLES.includes(".governance-modal"), "styles.css 无新增模态样式");
+  // 模式与 IPC 名（按契约名消费，不另起别名）。
+  assert.ok(RENDERER.includes('mode: "establish"'), "governanceFlow.mode 缺省 establish");
+  assert.ok(RENDERER.includes('governanceFlow.mode = reaccept ? "reaccept" : "establish";'), "打开预览按单一谓词定模式");
+  assert.ok(RENDERER.includes("d.previewGovernanceReacceptance(projectRoot)"), "预览调 previewGovernanceReacceptance(projectRoot)");
+  assert.ok(RENDERER.includes("d.reacceptGovernancePins(projectRoot, digest)"), "确认调 reacceptGovernancePins(projectRoot, digest)");
+  assert.ok(RENDERER.includes("preview.previewDigest") && RENDERER.includes("/^[0-9a-fA-F]{64}$/"), "确认前校验 previewDigest 形状（fail-closed）");
+  // 取消/关闭函数：零 IPC（建立与重新接受均不得调用）。
+  const cancel = RENDERER.slice(RENDERER.indexOf("function cancelGovernancePreview()"), RENDERER.indexOf("function closeGovernancePreview()"));
+  const close = RENDERER.slice(RENDERER.indexOf("function closeGovernancePreview()"), RENDERER.indexOf("async function refreshListingQuietly("));
+  for (const [name, body] of [["取消", cancel], ["关闭", close]] as const) {
+    assert.ok(body.length > 0, name + "函数存在");
+    assert.ok(!body.includes("d.reacceptGovernancePins"), name + "不得调用 reaccept");
+    assert.ok(!body.includes("d.previewGovernanceReacceptance"), name + "不得调用预览");
+    assert.ok(!body.includes("d.establishGovernanceRecord"), name + "不得调用 establish");
+  }
+  assert.ok(cancel.includes('setHint("已取消，未写入任何文件。")'), "取消如实提示零写入");
+  // 预览分支：确认按钮 disabled（busy 或 canConfirm=false）＋blockers 呈现。
+  const viewFn = RENDERER.slice(RENDERER.indexOf("function governanceReacceptPreviewHtml("), RENDERER.indexOf("/** 重画状态行与预览面板"));
+  assert.ok(viewFn.includes("var confirmDisabled = f.busy || !view.canConfirm;"), "busy/canConfirm=false 时禁用确认");
+  assert.ok(viewFn.includes("data-governance-reaccept' + (confirmDisabled ? \" disabled\" : \"\")"), "确认按钮 disabled 接线");
+  assert.ok(viewFn.includes("view.blockerLines.forEach"), "blockers 原因逐条呈现");
+  assert.ok(viewFn.includes("UiLabels.governanceReacceptPreviewView(f.preview)"), "预览文案经纯映射");
+});
+
+test("D2：重新接受成功/失败路径——成功文案单点、主进程驱动刷新；失败按 phase 区分", () => {
+  // 成功：文案经纯映射；不自行伪造状态/刷新（由 project:changed → refreshProject 驱动）。
+  assert.ok(RENDERER.includes("UiLabels.governanceReacceptSuccessText(preview.pinCount, changedCount)"), "成功文案经纯映射");
+  assert.ok(RENDERER.includes("d.onProjectChanged(refreshProject)"), "刷新由主进程 project:changed 驱动");
+  const reacceptFn = RENDERER.slice(
+    RENDERER.indexOf("async function confirmGovernanceReaccept()"),
+    RENDERER.indexOf("\n  }", RENDERER.indexOf("async function confirmGovernanceReaccept()"))
+  );
+  assert.ok(reacceptFn.includes('status === "completed"'), "成功判据 = status completed");
+  assert.ok(!reacceptFn.includes("refreshListingQuietly"), "成功/失败不自行伪造刷新（等主进程事件）");
+  assert.ok(!reacceptFn.includes("state.governanceRecord ="), "不自行改治理状态");
+  // 失败：phase 是零副作用的唯一依据；write 阶段不提供重试。
+  assert.ok(reacceptFn.includes("UiLabels.governanceReacceptFailureView(phase, status, message)"), "失败视图经纯映射");
+  assert.ok(reacceptFn.includes("可能已写入部分文件，请核对现场。"), "写入阶段失败如实提示核对现场");
+  assert.ok(!reacceptFn.includes("未写入任何文件。"), "渲染侧不得自行拼接零副作用文案");
+  assert.ok(reacceptFn.includes('res.phase === "write" || res.phase === "precheck" || res.phase === "guard"'), "phase 白名单归一");
 });
 
 // ————— A1+A2 企业级稳定感（2026-10-17 客户批准「按推荐来，A1+A2 实施」；PM 评审 §3.1/§3.2）—————

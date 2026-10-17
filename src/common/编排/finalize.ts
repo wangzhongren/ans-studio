@@ -67,12 +67,16 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, readdir, rename, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import type { BoundarySection1, PinEntry } from "../../model/boundary.ts";
+import type { BoundarySection1, PinEntry, PinEvidenceFile, PinEvidenceResult } from "../../model/boundary.ts";
 import type { WriteDecision } from "../../model/decision.ts";
 import type { ProjectConfig } from "../../model/role.ts";
 import type { FinalizeStatus, FinalizeResult } from "../../model/runtime.ts";
 import { resolveWrite } from "../../service/gate/resolve-write.ts";
-import { buildGovernanceSeedBoundary, resolveBoundary } from "../../service/boundary/resolve-boundary.ts";
+import {
+  buildGovernanceSeedBoundary,
+  inspectPinnedBoundaries,
+  resolveBoundary,
+} from "../../service/boundary/resolve-boundary.ts";
 import { listProject } from "../../service/role/resolve-role.ts";
 import { toPosix } from "../shared/path-primitives.ts";
 import { ANS_DIR_NAME, ANS_PROJECT_FILE_NAME, ansProjectPath, loadEffectiveConfig } from "../shared/config-loader.ts";
@@ -800,6 +804,695 @@ export async function establishGovernanceRecord(
   } finally {
     governanceEstablishInFlight.delete(projectRoot);
   }
+}
+
+// —————————————— 治理记录 pin 不符：预览 / 显式重新接受（B1，2026-10-17） ——————————————
+//
+// 契约逐字按 PM 评审 `2026-10-17_design_governance-pin-recovery-review.md` §5.2（approved）。
+// **恢复只做两件事**：把现有 pin 列表整表重算后写回 `.ans/project.json`，并向
+// `docs/bootstrap-manifest.md` 追加一条「重新接受记录」。**不修改任何边界文件内容、不增删 pin 条目、
+// 不改 `.ans roles` 映射、不改 `acceptance.source`、不自动开会话、不自动接受**。
+//
+// 与 `establishGovernanceRecord` 的关系：
+//   · **共用**同一进程内互斥集合 `governanceEstablishInFlight`（key = `path.resolve(projectRoot)`；
+//     不另建第二份）与同一落盘原语 `gatedAtomicWrite`、同一一次性种子边界工厂
+//     `buildGovernanceSeedBoundary`、同一共享载入器/公共出口；
+//   · **不复用** `finalizeBootstrap` 本体——它会按 `scanRoles` 重建 pin 目标集与 `.ans roles`，
+//     违反「只刷新现有 pin」。`.ans` 与 manifest 的构建走本节的重新接受专用路径。
+//
+// 预览与写入共用 `evaluateGovernanceReaccept`（读 `.ans` 原文、pin 列表、pin 证据、blockers）；
+// 写入**不复用预览快照**（除 `previewDigest` 比对外）——所有守卫在写入时重新求值。
+
+/**
+ * 一次性治理种子边界的 `acceptance.source`（**操作者动作**，逐字展示）。
+ * **仅用作本次重新接受写入的一次性种子边界的授权来源，不写入 `.ans`**——`.ans` 的
+ * `acceptance.source` 保持最初授权来源不变（PM 评审开放问题 7）。
+ */
+export const GOVERNANCE_REACCEPT_ACCEPTANCE_SOURCE =
+  "desktop-app:操作者为治理记录 pin 不符显式重新接受（操作者点击确认）";
+
+export interface GovernanceReacceptInput {
+  projectRoot: string;
+  skillRoot?: string;
+}
+
+export interface GovernanceReacceptWriteInput extends GovernanceReacceptInput {
+  confirm: true;
+  previewDigest: string; // 预览返回的 64 hex
+}
+
+export type GovernanceReacceptStatus =
+  | "completed" // 写入成功
+  | "write-failed" // 已进入写入阶段但中断，可能部分落盘
+  | "blocked" // 门禁前置拒绝
+  | "not-needed" // 全部 pin 一致，无需操作
+  | "no-record" // .ans/project.json 不存在
+  | "invalid-record" // .ans 不可解析/未接受/pin 形状非法/治理边界未被覆盖
+  | "missing-file" // 有 pin 目标缺失（G5）
+  | "unreadable-file" // 有 pin 目标不可读（G5）
+  | "unparseable-boundary" // 有 pin 目标坏 YAML / Section 1 为空（G6）
+  | "preview-stale" // 预览后盘面变化（G4）
+  | "busy" // 同项目有进行中的治理记录动作（G7）
+  | "invalid-request"; // projectRoot / confirm / previewDigest 形状非法
+
+export interface GovernanceReacceptBlocker {
+  code: "missing-file" | "unreadable-file" | "unparseable-boundary";
+  paths: string[];
+  message: string;
+}
+
+export interface GovernanceReacceptPreview {
+  projectRoot: string;
+  /** 固定 [".ans/project.json", "docs/bootstrap-manifest.md"]（写入顺序）。 */
+  writePaths: string[];
+  /** 现有 pin 列表，原顺序、原路径。 */
+  pinPaths: string[];
+  pinCount: number;
+  /** 仅 modified / missing / unreadable 条目（来自 PinEvidenceResult.files）。 */
+  changed: PinEvidenceFile[];
+  /** false = 有 blockers，确认按钮必须禁用。 */
+  canConfirm: boolean;
+  blockers: GovernanceReacceptBlocker[];
+  /** PinEvidenceResult.digest；确认写入时原样回传。 */
+  previewDigest: string;
+}
+
+export type GovernanceReacceptPreviewFailure =
+  | "invalid-request"
+  | "busy"
+  | "no-record"
+  | "invalid-record"
+  | "not-needed"
+  | "blocked";
+
+export type GovernanceReacceptPreviewResult =
+  | { ok: true; preview: GovernanceReacceptPreview }
+  | { ok: false; status: GovernanceReacceptPreviewFailure; message: string };
+
+export interface ReacceptGovernancePinsResult {
+  /** status === "completed" 时为 true。 */
+  ok: boolean;
+  status: GovernanceReacceptStatus;
+  /** 「是否零副作用」的唯一依据：guard/precheck 为零写入；write 可能已部分落盘。 */
+  phase: "guard" | "precheck" | "write";
+  message: string;
+  /** 已尝试写入的项目相对路径（completed=两项；write-failed=可能的部分路径；其余=[]）。 */
+  wrote: string[];
+  /** completed 时写回 .ans 的新 pin 列表；路径与顺序必须与旧列表完全一致。 */
+  pins?: PinEntry[];
+  /** 观察到的不一致条目（预览/写入共用）。 */
+  changed?: PinEvidenceFile[];
+}
+
+/** G2：只写两个路径——内部硬编码，不接受调用方传入。 */
+const REACCEPT_WRITE_PATHS: readonly string[] = [`.ans/${ANS_PROJECT_FILE_NAME}`, BOOTSTRAP_MANIFEST_REL];
+/** 探测用 roleId：roles 映射为空，确保 `resolveBoundarySection` 直走治理文档分支。 */
+const REACCEPT_PROBE_ROLE_ID = "__ans-governance-reaccept-probe__";
+const SHA256_HEX_64 = /^[0-9a-fA-F]{64}$/;
+const REACCEPT_MANIFEST_HEADING = "## 重新接受记录（治理记录 pin 刷新）";
+
+type NormalizedReacceptInput = { projectRoot: string; skillRoot: string };
+
+function normalizeReacceptInput(input: unknown): NormalizedReacceptInput | undefined {
+  if (input === null || typeof input !== "object") return undefined;
+  const record = input as Record<string, unknown>;
+  const rawRoot = record.projectRoot;
+  if (typeof rawRoot !== "string" || rawRoot.trim() === "") return undefined;
+  const projectRoot = path.resolve(rawRoot);
+  const rawSkillRoot = record.skillRoot;
+  const skillRoot =
+    typeof rawSkillRoot === "string" && rawSkillRoot.trim() !== ""
+      ? path.resolve(rawSkillRoot)
+      : resolveSkillRoot();
+  return { projectRoot, skillRoot };
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function reacceptErrText(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+function reacceptFailure(
+  status: GovernanceReacceptStatus,
+  phase: "guard" | "precheck" | "write",
+  message: string,
+  extra?: Partial<Pick<ReacceptGovernancePinsResult, "wrote" | "pins" | "changed">>,
+): ReacceptGovernancePinsResult {
+  return {
+    ok: false,
+    status,
+    phase,
+    message,
+    wrote: extra?.wrote ?? [],
+    pins: extra?.pins,
+    changed: extra?.changed,
+  };
+}
+
+/** 读取 `.ans` 的 pin 列表（形状非法 → invalid-record 原因；64 hex / 路径安全由门禁证据出口再判）。 */
+function readReacceptPins(raw: unknown): { ok: true; pins: PinEntry[] } | { ok: false; reason: string } {
+  if (!Array.isArray(raw)) return { ok: false, reason: "governanceBoundary.acceptance.pin 必须是数组" };
+  if (raw.length === 0) {
+    return { ok: false, reason: "governanceBoundary.acceptance.pin 为空（至少需要一条 pin）" };
+  }
+  const pins: PinEntry[] = [];
+  for (let i = 0; i < raw.length; i++) {
+    const item = raw[i];
+    if (!isPlainObject(item)) return { ok: false, reason: `pin[${i}] 不是对象` };
+    if (typeof item.path !== "string" || item.path.trim() === "") {
+      return { ok: false, reason: `pin[${i}] 的 path 必须是非空字符串` };
+    }
+    if (typeof item.sha256 !== "string") {
+      return { ok: false, reason: `pin[${i}] 的 sha256 必须是字符串` };
+    }
+    pins.push({ path: item.path, sha256: item.sha256 });
+  }
+  return { ok: true, pins };
+}
+
+type ReacceptEvaluationFailure = {
+  ok: false;
+  status: "no-record" | "invalid-record" | "not-needed";
+  phase: "guard";
+  message: string;
+};
+
+type ReacceptEvaluation = {
+  ok: true;
+  projectRoot: string;
+  skillRoot: string;
+  doc: Record<string, unknown>;
+  pins: PinEntry[];
+  governanceBoundaryPath: string;
+  evidence: PinEvidenceResult;
+  blockers: GovernanceReacceptBlocker[];
+  /** 一次性种子边界（**只在本次调用栈内使用**，不持久化/不缓存）。 */
+  seedBoundary: BoundarySection1;
+  gate: (rel: string) => WriteDecision;
+  /** G3 门禁前置拒绝原因（有 blockers 时由调用方按守卫顺序决定优先级）。 */
+  gateFailure?: string;
+  /** manifest 既存全文；null = 不存在。 */
+  manifestText: string | null;
+  /** manifest 存在但不可读（blocked / precheck）。 */
+  manifestFailure?: string;
+} | ReacceptEvaluationFailure;
+
+/** 读取 manifest：不存在（ENOENT/ENOTDIR）→ null；存在但不是普通文件或读失败 → 不可读原因。 */
+async function readReacceptManifest(
+  projectRoot: string,
+): Promise<{ ok: true; text: string | null } | { ok: false; reason: string }> {
+  const abs = path.resolve(projectRoot, BOOTSTRAP_MANIFEST_REL);
+  let st;
+  try {
+    st = await stat(abs);
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException)?.code;
+    if (code === "ENOENT" || code === "ENOTDIR") return { ok: true, text: null };
+    return { ok: false, reason: reacceptErrText(err) };
+  }
+  if (!st.isFile()) return { ok: false, reason: "不是普通文件" };
+  try {
+    return { ok: true, text: await readFile(abs, "utf8") };
+  } catch (err) {
+    return { ok: false, reason: reacceptErrText(err) };
+  }
+}
+
+/**
+ * 预览与写入**共用**的重新接受求值（只读）：`.ans` 原文/解析、pin 列表、pin 证据、blockers、
+ * G6 内容可解析预检、G3 一次性种子边界门禁前置、manifest 可读性。
+ * 守卫 1（projectRoot）与 2（互斥）由调用方在**首次 await 之前**处理。
+ */
+async function evaluateGovernanceReaccept(input: NormalizedReacceptInput): Promise<ReacceptEvaluation> {
+  const { projectRoot, skillRoot } = input;
+  const ansAbs = ansProjectPath(projectRoot);
+
+  // 3) `.ans/project.json` 存在。
+  if (!(await isFile(ansAbs))) {
+    return {
+      ok: false,
+      status: "no-record",
+      phase: "guard",
+      message: "没有治理记录（.ans/project.json 不存在）；本次未写入任何文件。",
+    };
+  }
+
+  // 4) 原始 `.ans` 可解析、accepted、治理边界路径非空、pin 形状合法且非空。
+  let rawText: string;
+  try {
+    rawText = await readFile(ansAbs, "utf8");
+  } catch (err) {
+    return {
+      ok: false,
+      status: "invalid-record",
+      phase: "guard",
+      message: `治理记录不可读：${reacceptErrText(err)}；本次未写入任何文件。`,
+    };
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(rawText);
+  } catch (err) {
+    return {
+      ok: false,
+      status: "invalid-record",
+      phase: "guard",
+      message: `治理记录不可解析：${reacceptErrText(err)}；本次未写入任何文件。`,
+    };
+  }
+  if (!isPlainObject(parsed)) {
+    return {
+      ok: false,
+      status: "invalid-record",
+      phase: "guard",
+      message: "治理记录顶层不是对象；本次未写入任何文件。",
+    };
+  }
+  const doc = parsed;
+  const govRaw = doc.governanceBoundary;
+  if (!isPlainObject(govRaw)) {
+    return {
+      ok: false,
+      status: "invalid-record",
+      phase: "guard",
+      message: "治理记录缺少 governanceBoundary；本次未写入任何文件。",
+    };
+  }
+  const govPath = govRaw.path;
+  if (typeof govPath !== "string" || govPath.trim() === "") {
+    return {
+      ok: false,
+      status: "invalid-record",
+      phase: "guard",
+      message: "治理记录的 governanceBoundary.path 为空；本次未写入任何文件。",
+    };
+  }
+  const acceptanceRaw = govRaw.acceptance;
+  if (!isPlainObject(acceptanceRaw)) {
+    return {
+      ok: false,
+      status: "invalid-record",
+      phase: "guard",
+      message: "治理记录缺少 governanceBoundary.acceptance；本次未写入任何文件。",
+    };
+  }
+  if (acceptanceRaw.accepted !== true) {
+    return {
+      ok: false,
+      status: "invalid-record",
+      phase: "guard",
+      message: "治理记录未被接受（accepted !== true）；本次未写入任何文件。",
+    };
+  }
+  const pinRead = readReacceptPins(acceptanceRaw.pin);
+  if (!pinRead.ok) {
+    return {
+      ok: false,
+      status: "invalid-record",
+      phase: "guard",
+      message: `治理记录的 pin 形状非法：${pinRead.reason}；本次未写入任何文件。`,
+    };
+  }
+  const pins = pinRead.pins;
+
+  // 5) 门禁公共证据出口：形状/路径安全/治理边界覆盖 + 逐文件哈希（唯一哈希来源）。
+  let evidence: PinEvidenceResult;
+  try {
+    evidence = await inspectPinnedBoundaries({ projectRoot, pins, requiredPath: govPath });
+  } catch (err) {
+    return {
+      ok: false,
+      status: "invalid-record",
+      phase: "guard",
+      message: `pin 证据检查失败：${reacceptErrText(err)}；本次未写入任何文件。`,
+    };
+  }
+  if (evidence.state === "invalid") {
+    return {
+      ok: false,
+      status: "invalid-record",
+      phase: "guard",
+      message: `治理记录的 pin 不可用：${evidence.reason ?? "pin 证据检查失败"}；本次未写入任何文件。`,
+    };
+  }
+  if (evidence.state === "ok") {
+    return {
+      ok: false,
+      status: "not-needed",
+      phase: "guard",
+      message: "边界与治理记录一致，无需重新接受；本次未写入任何文件。",
+    };
+  }
+
+  // 6) G5 缺失/不可读（写侧按 missing 优先；预览侧合并展示）。
+  const missingPaths = evidence.files.filter((f) => f.status === "missing").map((f) => f.path);
+  const unreadablePaths = evidence.files.filter((f) => f.status === "unreadable").map((f) => f.path);
+  const blockers: GovernanceReacceptBlocker[] = [];
+  if (missingPaths.length > 0) {
+    blockers.push({
+      code: "missing-file",
+      paths: missingPaths,
+      message: `有 pin 目标缺失，无法重新 pin：${missingPaths.join("、")}；本次未写入任何文件。`,
+    });
+  }
+  if (unreadablePaths.length > 0) {
+    blockers.push({
+      code: "unreadable-file",
+      paths: unreadablePaths,
+      message: `有 pin 目标不可读，无法重新 pin：${unreadablePaths.join("、")}；本次未写入任何文件。`,
+    });
+  }
+
+  // 8) G6 内容可解析预检：每个 pin 目标用门禁公共解析入口（探测配置只读：同路径、accepted:true、无 pin）。
+  //    缺失/不可读目标已由 G5 阻断，不再重复标记为「不可解析」。
+  const skipParse = new Set([...missingPaths, ...unreadablePaths]);
+  const unparseablePaths: string[] = [];
+  for (const pin of pins) {
+    if (skipParse.has(pin.path)) continue;
+    const probeProject: ProjectConfig = {
+      projectRoot,
+      skillRoot,
+      roles: {},
+      governanceBoundary: {
+        path: pin.path,
+        acceptance: { accepted: true, source: GOVERNANCE_REACCEPT_ACCEPTANCE_SOURCE },
+      },
+    };
+    try {
+      const section = await resolveBoundary(REACCEPT_PROBE_ROLE_ID, probeProject);
+      const parseError = section.parseError;
+      if ((typeof parseError === "string" && parseError !== "") || section.entries.length === 0) {
+        unparseablePaths.push(pin.path);
+      }
+    } catch {
+      unparseablePaths.push(pin.path);
+    }
+  }
+  if (unparseablePaths.length > 0) {
+    blockers.push({
+      code: "unparseable-boundary",
+      paths: unparseablePaths,
+      message: `边界文件无法解析或 Section 1 为空：${unparseablePaths.join("、")}；本次未写入任何文件。`,
+    });
+  }
+
+  // 9) G3 门禁前置：一次性种子边界（三个普通目录）+ 两个待写路径逐条 resolveWrite。
+  const seedBoundary = buildGovernanceSeedBoundary(GOVERNANCE_REACCEPT_ACCEPTANCE_SOURCE);
+  const gate = (rel: string): WriteDecision =>
+    resolveWrite(rel, seedBoundary, undefined, { skillRoot, projectRoot });
+  let gateFailure: string | undefined;
+  for (const rel of REACCEPT_WRITE_PATHS) {
+    const decision = gate(rel);
+    if (!decision.allowed) {
+      gateFailure = `重新接受写入被门禁拒绝（未绕门）：${rel} —— ${decision.reason ?? ""}；本次未写入任何文件。`;
+      break;
+    }
+  }
+
+  // manifest：存在则逐字节保留；读失败 → blocked / precheck，零写入。
+  const manifest = await readReacceptManifest(projectRoot);
+  const manifestFailure = manifest.ok
+    ? undefined
+    : `无法读取 ${BOOTSTRAP_MANIFEST_REL}：${manifest.reason}；本次未写入任何文件。`;
+
+  return {
+    ok: true,
+    projectRoot,
+    skillRoot,
+    doc,
+    pins,
+    governanceBoundaryPath: govPath,
+    evidence,
+    blockers,
+    seedBoundary,
+    gate,
+    gateFailure,
+    manifestText: manifest.ok ? manifest.text : null,
+    manifestFailure,
+  };
+}
+
+/**
+ * 预览「重新接受治理记录 pin」（只读）。
+ * 只要 `.ans` 可解析、accepted、pin 形状合法且非空、治理边界被覆盖、且至少一项不一致 → `ok:true`；
+ * 缺失/不可读/坏内容**不吞掉预览**，放进 `changed` + `blockers`，`canConfirm:false`。
+ * 零写入；写入时不复用本快照（除 `previewDigest` 比对外）。
+ */
+export async function previewGovernanceReacceptance(
+  input: GovernanceReacceptInput,
+): Promise<GovernanceReacceptPreviewResult> {
+  const normalized = normalizeReacceptInput(input);
+  if (normalized === undefined) {
+    return { ok: false, status: "invalid-request", message: "projectRoot 缺失或不可访问；本次未写入任何文件。" };
+  }
+  if (governanceEstablishInFlight.has(normalized.projectRoot)) {
+    return { ok: false, status: "busy", message: "上一次治理记录操作仍在进行中；本次未写入任何文件。" };
+  }
+
+  let evaluation: ReacceptEvaluation;
+  try {
+    evaluation = await evaluateGovernanceReaccept(normalized);
+  } catch (err) {
+    return {
+      ok: false,
+      status: "invalid-record",
+      message: `治理记录求值失败：${reacceptErrText(err)}；本次未写入任何文件。`,
+    };
+  }
+  if (!evaluation.ok) {
+    return { ok: false, status: evaluation.status, message: evaluation.message };
+  }
+
+  if (evaluation.manifestFailure !== undefined) {
+    return { ok: false, status: "blocked", message: evaluation.manifestFailure };
+  }
+  if (evaluation.blockers.length > 0) {
+    // 有明细可展示：确认被禁用，但不是「没有可展示的预览」。
+    return {
+      ok: true,
+      preview: {
+        projectRoot: evaluation.projectRoot,
+        writePaths: [...REACCEPT_WRITE_PATHS],
+        pinPaths: evaluation.pins.map((p) => p.path),
+        pinCount: evaluation.pins.length,
+        changed: evaluation.evidence.files,
+        canConfirm: false,
+        blockers: evaluation.blockers,
+        previewDigest: evaluation.evidence.digest,
+      },
+    };
+  }
+  if (evaluation.gateFailure !== undefined) {
+    return { ok: false, status: "blocked", message: evaluation.gateFailure };
+  }
+  return {
+    ok: true,
+    preview: {
+      projectRoot: evaluation.projectRoot,
+      writePaths: [...REACCEPT_WRITE_PATHS],
+      pinPaths: evaluation.pins.map((p) => p.path),
+      pinCount: evaluation.pins.length,
+      changed: evaluation.evidence.files,
+      canConfirm: true,
+      blockers: [],
+      previewDigest: evaluation.evidence.digest,
+    },
+  };
+}
+
+/** 重新接受记录条目（完整 64 位哈希；UI 可截断，manifest 不截断）。 */
+function renderReacceptManifestEntry(
+  at: string,
+  changed: PinEvidenceFile[],
+  pinCount: number,
+): string {
+  const lines = [
+    `- ${at}：操作者在桌面应用确认重新接受；变更 ${changed.length} 个边界文件（本次刷新 ${pinCount} 条 pin）`,
+  ];
+  for (const f of changed) {
+    lines.push(`  - ${f.path}（旧 pin ${f.pinned} → 新 pin ${f.actual ?? f.pinned}）`);
+  }
+  return lines.join("\n");
+}
+
+/** 追加「重新接受记录」：既有全文逐字节保留；节存在则在节末追加，否则文末新增该节。 */
+function appendReacceptManifestRecord(existing: string | null, entry: string): string {
+  const section = `${REACCEPT_MANIFEST_HEADING}\n\n${entry}\n`;
+  if (existing === null) {
+    return [
+      "# Bootstrap 留痕（创世 finalize）",
+      "",
+      "此前的 manifest 不存在；以下为重新接受记录。",
+      "",
+      section,
+    ].join("\n");
+  }
+  const heading = /^## 重新接受记录（治理记录 pin 刷新）[ \t]*$/m.exec(existing);
+  if (heading === null) {
+    const lead = existing.endsWith("\n") ? "\n" : "\n\n";
+    return existing + lead + section;
+  }
+  const headingEnd = heading.index + heading[0].length;
+  const rest = existing.slice(headingEnd);
+  const next = /\n## [^\n]*/.exec(rest);
+  const insertAt = next === null ? existing.length : headingEnd + next.index;
+  const before = existing.slice(0, insertAt);
+  const after = existing.slice(insertAt);
+  const lead = before.endsWith("\n") ? "" : "\n";
+  return before + lead + entry + "\n" + after;
+}
+
+/**
+ * 显式「重新接受治理记录 pin」（写入）。守卫顺序严格按 PM 评审 §5.2 表 1–11：
+ * projectRoot → 互斥（与 establish 共用集合）→ `.ans` 存在 → 原始记录/形状 → pin 证据
+ * （ok→not-needed；invalid→invalid-record；mismatch→继续）→ G5 → G4 digest → G6 解析预检 →
+ * G3 门禁前置 → G8 写入（`.ans` 先、manifest 后）→ finally 释放互斥。
+ * guard/precheck 拒绝**零写入**；写入阶段抛错如实返回 `phase:"write"`（可能已部分落盘），
+ * **不自动重试、不清理已写产物**。
+ */
+export async function reacceptGovernancePins(
+  input: GovernanceReacceptWriteInput,
+): Promise<ReacceptGovernancePinsResult> {
+  const normalized = normalizeReacceptInput(input);
+  if (normalized === undefined) {
+    return reacceptFailure("invalid-request", "guard", "projectRoot 缺失或不可访问；本次未写入任何文件。");
+  }
+  if ((input as { confirm?: unknown }).confirm !== true) {
+    return reacceptFailure("invalid-request", "guard", "confirm 必须为 true；本次未写入任何文件。");
+  }
+  const { projectRoot } = normalized;
+
+  // 2) 进程内同项目互斥：**在首次 await 之前**占位（与 establishGovernanceRecord 共用同一集合）。
+  if (governanceEstablishInFlight.has(projectRoot)) {
+    return reacceptFailure("busy", "guard", "上一次治理记录操作仍在进行中；本次未写入任何文件。");
+  }
+  governanceEstablishInFlight.add(projectRoot);
+  try {
+    let evaluation: ReacceptEvaluation;
+    try {
+      evaluation = await evaluateGovernanceReaccept(normalized);
+    } catch (err) {
+      return reacceptFailure(
+        "invalid-record",
+        "guard",
+        `治理记录求值失败：${reacceptErrText(err)}；本次未写入任何文件。`,
+      );
+    }
+    if (!evaluation.ok) {
+      return reacceptFailure(evaluation.status, evaluation.phase, evaluation.message);
+    }
+
+    // 6) G5：缺失优先，其次不可读；均零写入。
+    const missing = evaluation.blockers.find((b) => b.code === "missing-file");
+    if (missing !== undefined) {
+      return reacceptFailure("missing-file", "precheck", missing.message, {
+        changed: evaluation.evidence.files,
+      });
+    }
+    const unreadable = evaluation.blockers.find((b) => b.code === "unreadable-file");
+    if (unreadable !== undefined) {
+      return reacceptFailure("unreadable-file", "precheck", unreadable.message, {
+        changed: evaluation.evidence.files,
+      });
+    }
+
+    // 7) G4 摘要比对：形状非法 → invalid-request / guard；与重算 digest 不等 → preview-stale / precheck。
+    const previewDigest = (input as { previewDigest?: unknown }).previewDigest;
+    if (typeof previewDigest !== "string" || !SHA256_HEX_64.test(previewDigest.trim())) {
+      return reacceptFailure(
+        "invalid-request",
+        "guard",
+        "previewDigest 不是 64 位十六进制；本次未写入任何文件。",
+        { changed: evaluation.evidence.files },
+      );
+    }
+    if (previewDigest.trim().toLowerCase() !== evaluation.evidence.digest) {
+      return reacceptFailure(
+        "preview-stale",
+        "precheck",
+        "预览后边界文件又有变化，已取消本次写入；请重新检查。本次未写入任何文件。",
+        { changed: evaluation.evidence.files },
+      );
+    }
+
+    // 8) G6 内容可解析预检（evaluator 已算出；按守卫顺序在此拦截）。
+    const unparseable = evaluation.blockers.find((b) => b.code === "unparseable-boundary");
+    if (unparseable !== undefined) {
+      return reacceptFailure("unparseable-boundary", "precheck", unparseable.message, {
+        changed: evaluation.evidence.files,
+      });
+    }
+
+    // 9) G3 门禁前置 / manifest 可读性。
+    if (evaluation.gateFailure !== undefined) {
+      return reacceptFailure("blocked", "precheck", evaluation.gateFailure, {
+        changed: evaluation.evidence.files,
+      });
+    }
+    if (evaluation.manifestFailure !== undefined) {
+      return reacceptFailure("blocked", "precheck", evaluation.manifestFailure, {
+        changed: evaluation.evidence.files,
+      });
+    }
+
+    // `.ans` 重写：保留全部既有字段（roles/source/未知字段），**只替换** pin；条目数/路径/顺序不变。
+    // 证据只返回非一致项的 actual；一致项的旧 pin 与当刻 actual 相等（证据 `ok` 判据），故沿用旧值。
+    const changedByPath = new Map<string, PinEvidenceFile>();
+    for (const f of evaluation.evidence.files) {
+      if (f.status === "modified") changedByPath.set(f.path, f);
+    }
+    const newPins: PinEntry[] = evaluation.pins.map((oldPin) => {
+      const changed = changedByPath.get(oldPin.path);
+      return { path: oldPin.path, sha256: changed?.actual ?? oldPin.sha256 };
+    });
+    inPlaceReplaceReacceptPins(evaluation.doc, newPins);
+    const ansContent = JSON.stringify(evaluation.doc, null, 2) + "\n";
+
+    const modified = evaluation.evidence.files.filter((f) => f.status === "modified");
+    const manifestContent = appendReacceptManifestRecord(
+      evaluation.manifestText,
+      renderReacceptManifestEntry(new Date().toISOString(), modified, evaluation.pins.length),
+    );
+
+    // 10) G8：`.ans` 先写、manifest 后写；均经既有 gatedAtomicWrite（写前再求一次门禁）。
+    const wrote: string[] = [];
+    try {
+      wrote.push(REACCEPT_WRITE_PATHS[0]);
+      await gatedAtomicWrite(evaluation.gate, REACCEPT_WRITE_PATHS[0], ansContent, projectRoot);
+      wrote.push(REACCEPT_WRITE_PATHS[1]);
+      await gatedAtomicWrite(evaluation.gate, REACCEPT_WRITE_PATHS[1], manifestContent, projectRoot);
+    } catch (err) {
+      return reacceptFailure(
+        "write-failed",
+        "write",
+        `写入中断：${reacceptErrText(err)}；可能已写入部分文件（.ans/project.json 与 docs/bootstrap-manifest.md 不保证齐全），请核对现场。`,
+        { wrote, changed: evaluation.evidence.files },
+      );
+    }
+
+    return {
+      ok: true,
+      status: "completed",
+      phase: "write",
+      message: `已重新接受：更新 ${modified.length} 条 pin（共 ${evaluation.pins.length} 条），写入 ${REACCEPT_WRITE_PATHS.join(" 与 ")}。`,
+      wrote,
+      pins: newPins,
+      changed: evaluation.evidence.files,
+    };
+  } finally {
+    // 11) 释放互斥。
+    governanceEstablishInFlight.delete(projectRoot);
+  }
+}
+
+/** 只替换 `governanceBoundary.acceptance.pin`，不触碰其余字段（含未知字段/roles/source/accepted）。 */
+function inPlaceReplaceReacceptPins(doc: Record<string, unknown>, pins: PinEntry[]): void {
+  const gov = doc.governanceBoundary as Record<string, unknown>;
+  const acceptance = gov.acceptance as Record<string, unknown>;
+  acceptance.pin = pins;
 }
 
 // —————————————————————— 内部辅助 ——————————————————————

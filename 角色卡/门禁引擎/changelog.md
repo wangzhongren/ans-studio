@@ -1,5 +1,47 @@
 # 门禁引擎 变更记录
 
+## 2026-10-17（四）— 治理记录 pin 不符的重新接受恢复 A1–A3：只读 pin 证据检查公共出口
+
+客户 2026-10-17 裁定「这个恢复入口按角色链做一下」；PM 评审
+`角色卡/项目管理/docs/design/2026-10-17_design_governance-pin-recovery-review.md` §5.1/§5.5/§六/§七
+批准并派发本角色 A1–A3。本角色只交付**只读检测**（唯一哈希来源）；编排预览/写入（B）、桌面窗口/UI（C/D）、
+测试角色端到端（E）均属各自属主，**不在本任务**。**`verifyPins` 既有行为一行未改**，新检查是独立只读入口。
+
+- **边界**：`src/model/boundary.ts`（A1，新增 4 个只读结果类型）、`src/common/门禁引擎/pin-evidence.ts`
+  （A2，新增实现）、`src/service/boundary/resolve-boundary.ts`（A3，同一函数引用再导出 + 类型再导出）、
+  `test/门禁引擎/pin-evidence.test.ts`（新，12 例）、本文件、`api-spec.md`、`feature-map.md`、`memo.md`。
+  **未碰** `src/common/编排/`、`app/`、`test/编排/`、`test/桌面应用/`、`test/测试/`、真实项目；不 commit。
+- **A1（Model）**：`PinEvidenceFileStatus`、`PinEvidenceFile`、`PinEvidenceState`、`PinEvidenceResult`
+  按 §5.1 逐字新增（字段与注释一致）；`checked` 含一致项、`files` 仅非一致项、`digest` invalid 时为空串。
+- **A2（实现，`inspectPinnedBoundaries`）**：判定严格按 §5.1 的 1–8 条——① 形状：非空数组、`path` 非空、
+  `sha256` 64 位十六进制（大小写不敏感），非法 `invalid` 且 reason 指明第几项；② 路径安全：绝对路径直接拒、
+  `joinRoot` 规范化后 `absRel` 为空即逃逸；③ `requiredPath` 覆盖：`compareKey(normalizeLexical(joinRoot(...)))`
+  比较，未覆盖 reason 逐字 `治理边界文件未被任何 pin 覆盖：<path>`；④ 逐文件：`ENOENT → missing`、
+  其它 stat 错误/非普通文件/读失败 `→ unreadable`（`actual:null`）、哈希小写不等 `→ modified`、相等不进入
+  `files`；⑤ 无非一致项 `ok`、否则 `mismatch`；⑥ digest 按 §5.1 第 6 条对全部 pin（原顺序、含一致项）拼接
+  规范化行求 SHA-256；⑦ 只读、不缓存、每目标至多一次 `stat` + 一次 `sha256File`；⑧ 哈希复用
+  `io.ts::sha256File`，未写第二份。路径原语复用 `paths.ts`（共享单一来源转出）的
+  `isAbsoluteAny`/`absRel`/`compareKey`/`normalizeLexical`。
+- **未复用 `verifyPins`**：`verifyPins` 首错即返回、不区分 missing/unreadable、不产出 digest、不做 pin 形状
+  的 64 位十六进制校验；把它改成新实现会改变既有 F6 拒绝文案与测试期望。按任务「风险不可控就不动」，
+  `boundary-core.ts` 未改，既有 `pin-acceptance.test.ts` 等逐字通过。
+- **A3（Service 公共出口）**：`resolve-boundary.ts` 增
+  `export { inspectPinnedBoundaries } from "../../common/门禁引擎/pin-evidence.ts";` 与 4 个类型再导出
+  ——**同一函数引用**（测试断言 `===`），不复制实现。
+- **测试**：新增 `test/门禁引擎/pin-evidence.test.ts` 12 例（11 通过 / 1 skip，Windows 专属权限用例）——
+  全一致（含大写哈希）、单文件 modified（`pinned !== actual`、其余一致项不进入 files）、missing、unreadable
+  （目录；权限用例 win32/root 跳过）、形状非法（非数组/非对象/path 空/sha256 非 64 hex）、空 pin、路径逃逸
+  （`..` 与绝对路径）、requiredPath 未覆盖（reason 逐字）与规范化覆盖、digest 公式复算+稳定+任一内容变化即变、
+  只读（前后目录树/大小/mtime 完全一致）、公共出口同一函数引用。全部临时目录，不碰真实项目。
+- **测试（实跑）**：新增文件 **12 计 / 11 过 / 0 红 / 1 skip**；`node --test "test/门禁引擎/**/*.test.ts"`
+  → **218 计 / 217 过 / 0 红 / 1 skip**（上批 206 + 12）；全量 `node --test "test/**/*.test.ts"`
+  → **2262 计 / 2164 过 / 95 红 / 3 skip**——95 红**全部在本角色边界外**（本机未装 npm 依赖致
+  claude/codex/MCP 相关用例 `Cannot find module`、Windows 无符号链接权限 EPERM、以及他角色并行未提交改动），
+  **`test/门禁引擎/` 零红**、本批改动无新增红。`npm run typecheck` → **本角色改动文件 0 错**
+  （全仓 85 处既有错均在缺失依赖的他角色文件）。环境：win32 / Node v24.11.1 / 工作区含他角色未提交改动。
+- **未做/待验证（如实分列）**：编排 B（预览/写入）、桌面 C/D、测试 E 均未开始；真机端到端（pin 不符 →
+  预览 → 重新接受 → 恢复 present）与独立复验**未进行**；本条目**不声称已验**。
+
 ## 2026-10-17（三）— su 卡看护段：整轮「到点检查」不中止 + 卡死才提议恢复 + 1 小时最后兜底
 
 客户 2026-10-17 裁定「整轮不应该有超时，应该是到了时间，su 要去看下是否卡死了，如果卡死了，要想办法

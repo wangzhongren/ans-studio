@@ -67,15 +67,16 @@ Customer callback 第二参保留 O1 的原 CustomerInputMetadata.signal；sessi
 
 ## I1 治理记录状态（existing-project-compat V1，2026-10-17）
 
-`ListProjectResult` 新增 `governanceRecord: GovernanceRecordStatus`（`{state: "present" | "missing" | "invalid"; reason?: string}`；`GovernanceRecordState`/`GovernanceRecordStatus` 定义于 `app/desktop/project.ts`，`interface.ts` 原样再导出）。`listProject` 在枚举后经**既有单一授权链** `buildEffectiveProjectConfig` 读取 `.ans`（无则回退运行期同意；不可用则 fail-closed），由纯函数 `deriveGovernanceRecord` 用载入器事实 `source.kind`/`source.acceptance.accepted`/`source.downgradeReason` 与 `project.governanceBoundary.path` 派生：
+`ListProjectResult` 新增 `governanceRecord: GovernanceRecordStatus`（`{state: "present" | "missing" | "invalid" | "pin-mismatch"; reason?: string; pinFiles?: PinEvidenceFile[]; pinCount?: number}`；`GovernanceRecordState`/`GovernanceRecordStatus` 定义于 `app/desktop/project.ts`，`interface.ts` 原样再导出）。`listProject` 在枚举后经**既有单一授权链** `buildEffectiveProjectConfig` 读取 `.ans`（无则回退运行期同意；不可用则 fail-closed），由纯函数 `deriveGovernanceRecord` 用载入器事实 `source.kind`/`source.acceptance.accepted`/`source.downgradeReason` 与 `project.governanceBoundary.path` 派生，再由 `deriveGovernanceRecordWithPins` 在 `present` 上合入门禁引擎的只读 pin 证据（2026-10-17 C1）：
 
 | state | 判据 | 含义 |
 | --- | --- | --- |
-| `present` | `kind === "ans"` 且 `accepted === true` 且治理边界路径 trim 非空 | 记录存在且结构可用；**不声明 pin 逐文件匹配**（V1 无 `unverified`） |
+| `present` | `kind === "ans"` 且 `accepted === true` 且治理边界路径 trim 非空，且全部 pin 目标哈希一致 | 记录存在且与盘上边界一致；**不新增字段** |
 | `missing` | `kind === "builtin-fallback"` | 无 `.ans/project.json`；即便 fallback 是运行期同意（accepted:true）也是 missing |
-| `invalid` | `ans-invalid`，或 `ans` 但未接受，或治理边界路径为空 | 记录不可用；`reason` 只取载入器降级原文（缺失时给等价原因） |
+| `invalid` | `ans-invalid`，或 `ans` 但未接受，或治理边界路径为空；或 pin 缺失/空/形状非法/检查异常 | 记录不可用；`reason` 只取载入器降级原文（缺失时给等价原因）或证据检查原因 |
+| `pin-mismatch` | 记录结构可用，但至少一条 pin 目标缺失、不可读或 SHA-256 不符 | 带 `pinFiles`（仅不一致项，`path/pinned/actual/status`，按 pin 原顺序）与 `pinCount`（含一致项）；未确认前会话不可开、写入被拒 |
 
-`governanceRecord` 与 `hasRoles` **相互独立**；动作可见谓词固定为 `hasRoles === true && governanceRecord.state === "missing"`。本层**只读**：不写文件、不建目录、不触发 finalize。`DesktopDeps.loadEffectiveConfig` 可注入（缺省＝共享载入器 `src/common/shared/config-loader.ts::loadEffectiveConfig`，只读导入、不复制），并透传给 `SessionManager`，保证界面派生与会话授权链同源。
+`governanceRecord` 与 `hasRoles` **相互独立**；`missing` 的动作可见谓词固定为 `hasRoles === true && governanceRecord.state === "missing"`，`pin-mismatch` 的动作由桌面UI 的单一谓词 `governanceActionFor` 给出。本层**只读**：不写文件、不建目录、不触发 finalize。`DesktopDeps.loadEffectiveConfig` 可注入（缺省＝共享载入器 `src/common/shared/config-loader.ts::loadEffectiveConfig`，只读导入、不复制），并透传给 `SessionManager`，保证界面派生与会话授权链同源。`DesktopDeps.inspectPinnedBoundariesFn` 可注入（缺省＝Service 公开出口 `src/service/boundary/resolve-boundary.ts::inspectPinnedBoundaries`，门禁引擎唯一哈希实现）；检查异常一律降级 `invalid`（`pin 证据检查失败：<message>`），**绝不让 `listProject` 崩**。
 
 测试注入面新增 `createRuntimeAdapterFactoryFn`、`runtimeOptions`；默认全部引擎走 Pipeline 工厂。旧显式 createPiAdapterFactoryFn/createDemoAdapterFn 保留原测试接缝及真实 boundary，未选择它们时不绕行到 demo。envFilePath/piConfigEnv 可注入；开发测试只用临时假 env。
 
@@ -97,6 +98,36 @@ Customer callback 第二参保留 O1 的原 CustomerInputMetadata.signal；sessi
 成功判据＝`ok && phase === "write" && finalize.status === "completed"`。成功后的收尾（顺序固定）：① 调用**既有** `SessionManager.refreshStaleBoundaries()`（O-1 陈旧边界刷新入口；在跑轮次跳过、逐会话失败隔离）——**先于清缓存**，因为重建路径经 `getListing` 取角色表；② `listingCache.delete(projectRoot)`；③ 复用**既有** `DesktopDeps.emitProjectChanged`（main.ts 推 `project:changed`），渲染侧按既有消费面重新 `listProject`（状态随 `.ans` 变 `present`、动作隐藏）。
 
 机制错误（`busy` / `already-established` / `invalid-record` / `no-roles` / `nothing-to-pin` / `unparseable-governance-doc` / `blocked`）原样透传，不重写 `code`/`message`。`DesktopDeps.previewGovernanceRecordFn` / `establishGovernanceRecordFn` 可注入（缺省＝真实机制）。
+
+## C1–C3 治理记录 pin 不符的重新接受恢复（2026-10-17，PM 评审 §5.3）
+
+`app/desktop/project.ts` 新增（纯映射 + 只读派生，`app/desktop/interface.ts` 消费）：
+
+```ts
+export function applyPinEvidence(record, evidence): GovernanceRecordStatus;
+export async function deriveGovernanceRecordWithPins(input: {
+  projectRoot: string;
+  record: GovernanceRecordStatus;
+  pins: PinEntry[] | undefined;
+  governanceBoundaryPath?: string;
+  inspectPinnedBoundariesFn?: typeof inspectPinnedBoundaries;
+}): Promise<GovernanceRecordStatus>;
+```
+
+映射（逐字按评审 §5.3）：`record.state !== "present"` → 原样返回、**不做任何哈希**；`pins` 缺失/空 → `invalid` +「治理记录未提供可验证 pin」；evidence `invalid` → `invalid` + reason；`ok` → 原 `present`（**不新增字段**）；`mismatch` → `pin-mismatch` + `pinFiles` + `pinCount`；任何异常 → `invalid` +「pin 证据检查失败：<message>」，**永不抛错**。治理边界路径非空时作为 `requiredPath` 传给证据检查（治理边界必须被至少一条 pin 覆盖）。
+
+| 层 | 名称 | 请求 | 返回 |
+| --- | --- | --- | --- |
+| IPC | `project:governance-reaccept-preview` | `{projectRoot}` | `GovernanceReacceptPreviewResult` |
+| IPC | `project:governance-reaccept` | `{projectRoot, confirm: true, previewDigest}` | `ReacceptGovernancePinsResult` |
+| preload | `previewGovernanceReacceptance(projectRoot)` | 同上 | 同上 |
+| preload | `reacceptGovernancePins(projectRoot, previewDigest)` | 桥内固定 `{projectRoot, confirm: true, previewDigest}` | 同上 |
+
+`DesktopInterface.previewGovernanceReacceptance` / `reacceptGovernancePins` 经编排 Pipeline 公共出口 `src/pipeline/orchestration/govern-session.ts`（B2 薄再导出）调用机制——**不**直接导入 `src/common/编排/finalize.ts`。机制输入只有三个钉死字段（项目根、确认、预览摘要）；边界、授权来源、pin 列表与写路径均由机制内部构造/重算。
+
+本层守卫只做评审 §5.3 的 1–3：① `projectRoot` 非空且**严格等于** `importedProjectRoot`，否则合成 `invalid-request`（preview 回 `{ok:false,status:"invalid-request",message}`；reaccept 回 `{ok:false,status:"invalid-request",phase:"guard",wrote:[],message}`）；② `confirm === true`；③ `previewDigest` 为非空 64 位十六进制（严格 `/^[0-9a-fA-F]{64}$/`）。guard 拒绝**不调用机制**、零写入，`message` 均含「本次未写入任何文件。」。机制结果（preview 的 busy/no-record/invalid-record/not-needed/blocked；reaccept 的 completed/write-failed/blocked/not-needed/no-record/invalid-record/missing-file/unreadable-file/unparseable-boundary/preview-stale/busy）原样透传。
+
+收尾：`status === "completed"` **或** `"write-failed"`（已进入写入阶段、可能部分落盘）后，顺序固定——① `await manager.refreshStaleBoundaries()`（失败吞掉，不影响回执）；② `listingCache.delete(projectRoot)`；③ `deps.emitProjectChanged?.()` 让渲染侧重新 `listProject`。**不自动打开会话**（不调用 `openSession`）。`DesktopDeps.previewGovernanceReacceptanceFn` / `reacceptGovernancePinsFn` / `inspectPinnedBoundariesFn` 可注入（缺省＝真实实现）。
 
 ## D1R 当前证据
 

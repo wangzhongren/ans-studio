@@ -66,6 +66,25 @@ export type {
   GovernanceRecordInput,
 } from "../../common/编排/finalize.ts";
 
+// ── B2（2026-10-17）：治理记录 pin 不符「重新接受」的 Pipeline 公共出口 ─────────────────────
+// 契约见 PM 评审 `2026-10-17_design_governance-pin-recovery-review.md` §5.2。桌面只依赖 Pipeline
+// 公共出口，不直接导入 `src/common/编排/` 私有模块；薄再导出不改变 `openGovernanceSession` 行为。
+export {
+  previewGovernanceReacceptance,
+  reacceptGovernancePins,
+  GOVERNANCE_REACCEPT_ACCEPTANCE_SOURCE,
+} from "../../common/编排/finalize.ts";
+export type {
+  GovernanceReacceptInput,
+  GovernanceReacceptWriteInput,
+  GovernanceReacceptPreview,
+  GovernanceReacceptPreviewResult,
+  GovernanceReacceptPreviewFailure,
+  GovernanceReacceptBlocker,
+  GovernanceReacceptStatus,
+  ReacceptGovernancePinsResult,
+} from "../../common/编排/finalize.ts";
+
 /** 角色目录名（与 `listProject` 口径一致：项目角色的目录 `角色卡/<id>/`）。 */
 const ROLE_CARD_DIR = "角色卡";
 

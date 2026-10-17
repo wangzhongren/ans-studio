@@ -215,3 +215,28 @@ work、card、pi、document复用424模态抽屉。仅导航/会话业务面iner
 - 纯函数：`UiLabels.roleTreeScrollDelta(treeTop, treeBottom, itemTop, itemBottom)`——条目完整可见（±1px）⇒ `0`；在上方 ⇒ 负位移（对齐顶）；在下方 ⇒ 正位移（对齐底）；非数/缺参 ⇒ `0`。
 - 渲染：`ensureRoleTreeVisible(roleId)` 按 rect 求位移后 `tree.scrollTop += delta`（只做最小位移，**不**写 `scrollTop=0`、**不**用 `scrollIntoView`）。调用点：`applyListing` 末尾（`selectedRoleId || primaryRoleId`，导入/刷新）与 `selectRole` 渲染树后。
 - 语义：已可见时**绝不打扰**（保留用户手动滚动）；导入/切换项目默认选中主入口 ⇒ 主入口自动进入 `.tree` 视口；选中其他角色 ⇒ 该角色进入视口。
+
+## 2026-10-17 治理记录 pin 不符的重新接受（D1–D3）
+
+任务书：[pin 恢复评审 §5.4](../../项目管理/docs/design/2026-10-17_design_governance-pin-recovery-review.md)；产品提案 §三。
+
+**消费契约**（只读，通道属桌面窗口；按名消费，不另起别名）：
+- `listProject.governanceRecord` 新增第四态 `pin-mismatch`，并带 `pinFiles: [{ path, pinned, actual, status: "modified" | "missing" | "unreadable" }]` 与 `pinCount: number`；`present` 形状不变。
+- `desktop.previewGovernanceReacceptance(projectRoot)` → `{ok:true, preview:{writePaths, pinPaths, pinCount, changed, canConfirm, blockers, previewDigest}}` 或 `{ok:false, status, message}`。`ok:true + canConfirm:false` 仍展示明细，但确认禁用。
+- `desktop.reacceptGovernancePins(projectRoot, previewDigest)` → `{ok, status, phase:"guard"|"precheck"|"write", message, wrote, pins?, changed?}`。
+
+**渲染侧导出（`ui-labels.js`，全部纯映射）**：
+- `governanceActionFor(hasProject, hasRoles, recordState)` → `null | "establish" | "reaccept"`——动作可见谓词**唯一入口**；`pin-mismatch ⇒ reaccept`、`hasRoles === true && missing ⇒ establish`、其余 null。`canEstablishGovernance` 保留但委托单点（`=== "establish"`）。
+- `governancePinMismatchText(pinCount, changed)` / `governancePinMismatchEmptyState(pinCount, changed)`——状态行与空态文案（只列非零类别；三类均零用「存在不一致」；空态含 hint）。
+- `governanceReacceptPreviewView(preview)` → `{title, fileLines, writeLine, pinLine, warning, canConfirm, blockerLines}`；modified 行显示 `pin {旧前8位}… → 现 {新前8位}…`，missing/unreadable 行分别标注；未知状态不展示、不编语义。
+- `governanceReacceptSuccessText(pinCount, changedCount)` / `governanceReacceptFailureView(phase, status, message)`——后者 `phase !== "write"` 时追加零写入声明与 status 提示；`phase === "write"` **只逐字 message**，绝不追加「未写入任何文件」、绝不出现「已恢复/已成功」。
+
+**DOM/行为**：
+- `state.governanceRecord` 保留 `pinFiles`/`pinCount`；未知状态按 `{state:"present"}` 兜底（fail-closed，不显示动作）。渲染侧**不得**出现 `state === "pin-mismatch"` 直接比较。
+- `#governance-status`：`reaccept` ⇒ mismatch 文案＋`button[data-governance-reaccept]`（「检查并重新接受」）；`establish`/`invalid` 行为不变。
+- su 空态（`.chat-empty`）：`reaccept` ⇒ mismatch 标题/说明/`.empty-hint` 次行＋主按钮「检查并重新接受」；`establish` 不变。
+- `#governance-preview` 共用宿主：`governanceFlow.mode: "establish" | "reaccept"`；`reaccept` 打开调 `previewGovernanceReacceptance`，确认调 `reacceptGovernancePins(projectRoot, preview.previewDigest)`；取消/关闭**零 IPC**；`busy` 或 `canConfirm === false` 时确认按钮 disabled；失败可「重新检查」，`phase === "write"` 不提供重试。
+- 成功后不自行伪造刷新：由主进程 `project:changed` → `refreshProject` → `listProject`，状态回 `present`、动作消失；不自动打开会话。
+- 样式最小增量：`.governance-preview .gp-file`（明细行等宽）、`.gp-blocker`（限制原因，`--danger`）、`.empty-hint`；既有 900 列与等宽字体未动。
+
+**测试证据**：`tool-rows.test.ts` 新增 5 例（谓词真值表、文案逐字、预览视图、成功/失败分支含 phase=write 与 precheck 差异）；`renderer.test.ts` 新增 5 例（落库/单一谓词/状态行/空态/预览宿主与零 IPC/成功失败路径）。本机 4 红为既有 CRLF 基线（N-1、data-state、P1-3、G-5），与本批无关。真机渲染：`uiux-v2.mjs` 新增 `ANS_GOVERNANCE_REACCEPT_UI_ONLY=1`（受控 IPC 替身＋真实 Electron；7 项 DOM 断言，`GOVERNANCE_REACCEPT_UI_PASS 7`；截图 `%TEMP%/ans-governance-reaccept-ui/governance-reaccept-{mismatch,preview,success}-1360.png`）。实跑修正：成功后清空 `#composer-hint` 的旧「已取消」提示。

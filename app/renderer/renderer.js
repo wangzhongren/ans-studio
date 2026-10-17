@@ -70,8 +70,9 @@
     // 项目是否已 bootstrap（枚举到项目角色）：原样转自门禁引擎 listProject 的 hasRoles（§10.3）。
     hasRoles: true,
     // I4（2026-10-17）：治理记录状态——原样转自 listProject 的 `governanceRecord`
-    // （`{state:"present"|"missing"|"invalid", reason?}`；桌面窗口派生）。**旧主进程无此字段 ⇒
-    // 按 `{state:"present"}` 兜底**（不显示动作、不崩）。判据只用 `state`，不猜 pin 是否匹配。
+    // （`{state:"present"|"missing"|"invalid"|"pin-mismatch", reason?, pinFiles?, pinCount?}`；桌面窗口派生）。
+    // **旧主进程无此字段 ⇒ 按 `{state:"present"}` 兜底**（不显示动作、不崩）。判据只经
+    // `UiLabels.governanceActionFor` 单一谓词，不在此直接比较状态字符串。
     governanceRecord: { state: "present" },
     selectedRoleId: null,
     // 当前**显示中**的角色（其 pane 挂在 #chat 下）；与 sessionOpenRoleId 的关系见下。
@@ -379,16 +380,24 @@
    */
   function emptyStateHtml() {
     var primary = state.primaryRoleId;
-    var title, sub, cta;
+    var action = governanceActionVisible();
+    var title, sub, cta, hint = "";
     if (state.projectRoot && state.hasRoles === false) {
       // S0（客户裁定原文，逐字不变）：未-bootstrap 这件事只说一遍，只在中栏正中。
       title = "项目尚未 bootstrap";
       sub = "与 " + esc(primary) + " 对话，让它把角色建出来；左树会随之长出。";
-    } else if (governanceActionVisible()) {
-      // S1（I4，2026-10-17）：su 空态改为治理记录引导（沿用 primaryRoleId，不硬编码角色名）。
-      var gv = UiLabels.governanceEmptyState(projectRoleCount(), primary);
+    } else if (action === "reaccept") {
+      // pin-mismatch（评审 §5.4）：沿用 su 空态宿主，文案全部来自 ui-labels。
+      var record = governanceRecordOf();
+      var gv = UiLabels.governancePinMismatchEmptyState(record.pinCount, record.pinFiles);
       title = esc(gv.title);
       sub = esc(gv.sub);
+      hint = esc(gv.hint);
+    } else if (action === "establish") {
+      // S1（I4，2026-10-17）：su 空态改为治理记录引导（沿用 primaryRoleId，不硬编码角色名）。
+      var gv1 = UiLabels.governanceEmptyState(projectRoleCount(), primary);
+      title = esc(gv1.title);
+      sub = esc(gv1.sub);
     } else {
       title = "选择左侧角色开始聊天";
       sub = "消息直接发送，无需确认；写入由治理引擎在后台把关。";
@@ -397,7 +406,9 @@
       cta = state.projectRoot && primary
         ? '<button id="btn-start-primary" class="btn btn-primary btn-start">开始与 ' + esc(primary) + " 对话</button>"
         : "";
-    } else if (governanceActionVisible()) {
+    } else if (action === "reaccept") {
+      cta = '<button class="btn btn-primary btn-start" type="button" data-governance-reaccept>检查并重新接受</button>';
+    } else if (action === "establish") {
       cta = '<button class="btn btn-primary btn-start" type="button" data-governance-establish>建立治理记录</button>';
     } else {
       cta = state.projectRoot && primary
@@ -407,6 +418,7 @@
     return '<div class="chat-empty">' +
       '<p class="empty-title">' + title + "</p>" +
       '<p class="empty-sub">' + sub + "</p>" +
+      (hint !== "" ? '<p class="empty-hint">' + hint + "</p>" : "") +
       cta +
       "</div>";
   }
@@ -419,14 +431,17 @@
     }
     var g = container.querySelector(".chat-empty [data-governance-establish]");
     if (g) g.addEventListener("click", openGovernancePreview);
+    var r = container.querySelector(".chat-empty [data-governance-reaccept]");
+    if (r) r.addEventListener("click", openGovernancePreview);
   }
 
   // —————— I4 治理记录（2026-10-17 客户批准 B+C；设计评审 §二 I4 / §4.2 / §4.5）——————
   // 状态值原样转自 `listProject.governanceRecord`（桌面窗口派生）；**动作可见谓词唯一入口** =
-  // `UiLabels.canEstablishGovernance`——本文件不另立判据（S1 的定义即 `hasRoles === true &&
-  // governanceRecord.state === "missing"`，见 §4.1）。预览/建立通道按契约名消费，不另起别名。
+  // `UiLabels.governanceActionFor`——本文件不另立判据（S1 = `hasRoles === true && missing`；
+  // pin-mismatch = `reaccept`；未知状态一律 null）。预览/建立/重新接受通道按契约名消费，不另起别名。
   var governanceFlow = {
     open: false, loading: false, busy: false,
+    mode: "establish", // "establish" | "reaccept"——共用 #governance-preview 宿主与取消/关闭
     preview: null, error: null, result: null,
   };
 
@@ -436,7 +451,7 @@
   }
 
   function governanceActionVisible() {
-    return UiLabels.canEstablishGovernance(
+    return UiLabels.governanceActionFor(
       typeof state.projectRoot === "string" && state.projectRoot !== "",
       state.hasRoles,
       governanceRecordOf().state
@@ -461,7 +476,9 @@
       status.className = "governance-status";
       status.hidden = true;
       status.addEventListener("click", function (e) {
-        var btn = e.target && e.target.closest ? e.target.closest("[data-governance-establish]") : null;
+        var btn = e.target && e.target.closest
+          ? e.target.closest("[data-governance-establish], [data-governance-reaccept]")
+          : null;
         if (btn) openGovernancePreview();
       });
       notice.appendChild(status);
@@ -476,6 +493,8 @@
         var t = e.target;
         if (!t || !t.closest) return;
         if (t.closest("[data-governance-establish]")) confirmGovernanceEstablish();
+        else if (t.closest("[data-governance-reaccept]")) confirmGovernanceReaccept();
+        else if (t.closest("[data-governance-recheck]")) openGovernancePreview();
         else if (t.closest("[data-governance-cancel]")) cancelGovernancePreview();
         else if (t.closest("[data-governance-dismiss]")) closeGovernancePreview();
       });
@@ -484,10 +503,16 @@
     return { status: status, preview: preview };
   }
 
-  /** 状态行文案：S1＝说明＋「建立治理记录」；invalid＝原因原文＋「本版不自动覆盖」（无建立钮）；
-   *  present / S0＝不显示（S0 的未-bootstrap 文案仍只在中栏空态说）。 */
+  /** 状态行文案：reaccept＝不一致说明＋「检查并重新接受」；S1＝说明＋「建立治理记录」；
+   *  invalid＝原因原文＋「本版不自动覆盖」（无动作）；present / S0＝不显示。 */
   function governanceStatusHtml() {
-    if (governanceActionVisible()) {
+    var action = governanceActionVisible();
+    if (action === "reaccept") {
+      var mismatch = governanceRecordOf();
+      return '<span class="gs-text">' + esc(UiLabels.governancePinMismatchText(mismatch.pinCount, mismatch.pinFiles)) + "</span>" +
+        '<button class="btn btn-primary btn-mini" type="button" data-governance-reaccept>检查并重新接受</button>';
+    }
+    if (action === "establish") {
       return '<span class="gs-text">' + esc(UiLabels.governanceMissingText(projectRoleCount())) + "</span>" +
         '<button class="btn btn-primary btn-mini" type="button" data-governance-establish>建立治理记录</button>';
     }
@@ -515,6 +540,41 @@
     };
   }
 
+  /** pin 恢复预览的形状归一（`GovernanceReacceptPreview`；缺字段 fail-closed：canConfirm=false）。 */
+  function normalizeGovernanceReacceptPreview(p) {
+    var src = p && typeof p === "object" ? p : {};
+    var list = function (v) {
+      return Array.isArray(v) ? v.map(function (x) { return String(x == null ? "" : x); }) : [];
+    };
+    var changed = Array.isArray(src.changed) ? src.changed.map(function (f) {
+      var x = f && typeof f === "object" ? f : {};
+      return {
+        path: typeof x.path === "string" ? x.path : "",
+        pinned: typeof x.pinned === "string" ? x.pinned : "",
+        actual: typeof x.actual === "string" ? x.actual : null,
+        status: typeof x.status === "string" ? x.status : "",
+      };
+    }) : [];
+    var blockers = Array.isArray(src.blockers) ? src.blockers.map(function (b) {
+      var x = b && typeof b === "object" ? b : {};
+      return {
+        code: typeof x.code === "string" ? x.code : "",
+        paths: list(x.paths),
+        message: typeof x.message === "string" ? x.message : "",
+      };
+    }) : [];
+    return {
+      projectRoot: typeof src.projectRoot === "string" ? src.projectRoot : "",
+      writePaths: list(src.writePaths),
+      pinPaths: list(src.pinPaths),
+      pinCount: typeof src.pinCount === "number" && isFinite(src.pinCount) ? Math.floor(src.pinCount) : 0,
+      changed: changed,
+      canConfirm: src.canConfirm === true,
+      blockers: blockers,
+      previewDigest: typeof src.previewDigest === "string" ? src.previewDigest : "",
+    };
+  }
+
   function governancePathList(paths) {
     if (!paths.length) return '<span class="gp-list">（无）</span>';
     return '<span class="gp-list">' + paths.map(function (p) { return esc(p); }).join("<br>") + "</span>";
@@ -524,6 +584,7 @@
    *  授权来源逐字 / 旧格式提示 / 「不扩大、不修改」声明 / [建立治理记录] [取消]。 */
   function governancePreviewHtml() {
     var f = governanceFlow;
+    if (f.mode === "reaccept") return governanceReacceptPreviewHtml(f);
     var html = '<p class="gp-title">建立治理记录（预览）</p>';
     if (f.loading) {
       return html + '<p class="gp-note">正在读取预览…</p>' +
@@ -566,6 +627,53 @@
     return html;
   }
 
+  /**
+   * pin 恢复预览（与建立共用 #governance-preview 宿主；非模态）。全部业务文案来自
+   * `UiLabels.governanceReacceptPreviewView`；`canConfirm === false` ⇒ 确认按钮 disabled 并列出 blockers。
+   */
+  function governanceReacceptPreviewHtml(f) {
+    var view = UiLabels.governanceReacceptPreviewView(f.preview);
+    var html = '<p class="gp-title">' + esc(view.title) + "</p>";
+    if (f.loading) {
+      return html + '<p class="gp-note">正在读取预览…</p>' +
+        '<div class="gp-actions"><button class="btn btn-ghost btn-mini" type="button" data-governance-cancel>取消</button></div>';
+    }
+    if (f.result) {
+      var cls = f.result.kind === "success" ? "gp-success" : "gp-error";
+      html += f.result.lines.map(function (line) { return '<p class="' + cls + '">' + esc(line) + "</p>"; }).join("");
+      if (f.result.kind === "success" || f.result.noRetry) {
+        html += '<div class="gp-actions"><button class="btn btn-ghost btn-mini" type="button" data-governance-dismiss>关闭</button></div>';
+      } else {
+        html += '<div class="gp-actions">' +
+          '<button class="btn btn-primary btn-mini" type="button" data-governance-recheck>重新检查</button>' +
+          '<button class="btn btn-ghost btn-mini" type="button" data-governance-cancel>取消</button></div>';
+      }
+      return html;
+    }
+    if (f.error) {
+      html += '<p class="gp-error">' + esc(f.error.message) + "</p>";
+      if (f.error.detail) html += '<p class="gp-note">' + esc(f.error.detail) + "</p>";
+      return html + '<div class="gp-actions"><button class="btn btn-ghost btn-mini" type="button" data-governance-cancel>取消</button></div>';
+    }
+    view.fileLines.forEach(function (line) {
+      html += '<p class="gp-line gp-file">' + esc(line.text) + "</p>";
+    });
+    html += '<p class="gp-line">' + esc(view.writeLine) + "</p>";
+    html += '<p class="gp-line">' + esc(view.pinLine) + "</p>";
+    html += '<p class="gp-declare">' + esc(view.warning) + "</p>";
+    if (!view.canConfirm) {
+      view.blockerLines.forEach(function (line) {
+        html += '<p class="gp-line gp-blocker">' + esc(line) + "</p>";
+      });
+    }
+    var confirmDisabled = f.busy || !view.canConfirm;
+    html += '<div class="gp-actions">' +
+      '<button class="btn btn-primary btn-mini" type="button" data-governance-reaccept' + (confirmDisabled ? " disabled" : "") + ">" +
+      (f.busy ? "正在重新接受…" : "确认接受") + "</button>" +
+      '<button class="btn btn-ghost btn-mini" type="button" data-governance-cancel' + (f.busy ? " disabled" : "") + ">取消</button></div>";
+    return html;
+  }
+
   /** 重画状态行与预览面板（状态行变化会引起 `.session-notice` 高度变化——沿用 U1 的「量—写—补」）。 */
   function renderGovernanceUi() {
     var ui = ensureGovernanceUi();
@@ -602,11 +710,14 @@
     });
   }
 
-  /** 点「建立治理记录」/空态主按钮 → 先取预览（非模态展开），**不直接建立**。 */
+  /** 点「建立治理记录」/「检查并重新接受」/空态主按钮 → 先取预览（非模态展开），**不直接写入**。 */
   async function openGovernancePreview() {
-    if (!governanceActionVisible()) return;
+    var action = governanceActionVisible();
+    if (!action) return;
+    var reaccept = action === "reaccept";
     var projectRoot = state.projectRoot;
     governanceFlow.open = true;
+    governanceFlow.mode = reaccept ? "reaccept" : "establish";
     governanceFlow.loading = true;
     governanceFlow.busy = false;
     governanceFlow.preview = null;
@@ -615,17 +726,37 @@
     renderGovernanceUi();
     var res;
     try {
-      if (!d || typeof d.previewGovernanceRecord !== "function") {
+      if (reaccept) {
+        if (!d || typeof d.previewGovernanceReacceptance !== "function") {
+          res = { ok: false, status: "invalid-request", message: "预览通道不可用（桌面窗口尚未接线）。" };
+        } else {
+          res = await d.previewGovernanceReacceptance(projectRoot);
+        }
+      } else if (!d || typeof d.previewGovernanceRecord !== "function") {
         res = { ok: false, code: "unavailable", message: "预览通道不可用（桌面窗口尚未接线）。" };
       } else {
         res = await d.previewGovernanceRecord(projectRoot);
       }
     } catch (err) {
-      res = { ok: false, code: "error", message: err && err.message ? String(err.message) : String(err) };
+      res = reaccept
+        ? { ok: false, status: "invalid-request", message: err && err.message ? String(err.message) : String(err) }
+        : { ok: false, code: "error", message: err && err.message ? String(err.message) : String(err) };
     }
     if (projectRoot !== state.projectRoot) return; // 换项目后丢弃旧响应
     governanceFlow.loading = false;
     if (!res || res.ok !== true) {
+      if (reaccept) {
+        var status = res && typeof res.status === "string" ? res.status : "";
+        var message = res && typeof res.message === "string" && res.message !== "" ? res.message : "预览失败。";
+        var view = UiLabels.governanceReacceptFailureView("guard", status, message);
+        governanceFlow.error = {
+          message: view.lines.length ? view.lines[0] : message,
+          detail: view.lines.slice(1).join(" "),
+        };
+        renderGovernanceUi();
+        if (status === "no-record" || status === "invalid-record") void refreshListingQuietly(projectRoot);
+        return;
+      }
       var code = res && typeof res.code === "string" ? res.code : "";
       var detail = code ? "错误码：" + code : "";
       if (code === "already-established") detail += "（治理记录已存在；本次未写入任何文件。）";
@@ -639,15 +770,18 @@
       if (code === "already-established" || code === "invalid-record") void refreshListingQuietly(projectRoot);
       return;
     }
-    governanceFlow.preview = normalizeGovernancePreview(res.preview);
+    governanceFlow.preview = reaccept
+      ? normalizeGovernanceReacceptPreview(res.preview)
+      : normalizeGovernancePreview(res.preview);
     renderGovernanceUi();
   }
 
-  /** 取消：关闭面板，**不调用任何 IPC**（尤其不调 establish），如实提示零副作用。 */
+  /** 取消：关闭面板，**不调用任何 IPC**（建立/重新接受均不调），如实提示零副作用。 */
   function cancelGovernancePreview() {
     if (governanceFlow.busy) return;
     governanceFlow.open = false;
     governanceFlow.loading = false;
+    governanceFlow.mode = "establish";
     governanceFlow.preview = null;
     governanceFlow.error = null;
     governanceFlow.result = null;
@@ -659,6 +793,7 @@
     governanceFlow.open = false;
     governanceFlow.loading = false;
     governanceFlow.busy = false;
+    governanceFlow.mode = "establish";
     governanceFlow.preview = null;
     governanceFlow.error = null;
     governanceFlow.result = null;
@@ -676,7 +811,7 @@
   /** 确认建立：按钮 disabled＋「正在建立治理记录…」；成功只认 `phase === "write" && status === "completed"`。 */
   async function confirmGovernanceEstablish() {
     if (!governanceFlow.open || governanceFlow.busy) return;
-    if (!governanceFlow.preview || !governanceActionVisible()) return;
+    if (!governanceFlow.preview || governanceFlow.mode !== "establish" || governanceActionVisible() !== "establish") return;
     var projectRoot = state.projectRoot;
     governanceFlow.busy = true;
     governanceFlow.result = null;
@@ -720,6 +855,60 @@
   function governanceFailureResult(phase, code, message) {
     var view = UiLabels.governanceFailureView(phase, code, message);
     return { kind: "failure", lines: view.lines, noRetry: view.noRetry };
+  }
+
+  /**
+   * 确认重新接受（评审 §5.4）：只从**本次预览**取 `previewDigest` 回传；成功/失败后**不伪造刷新**——
+   * 由主进程 `project:changed` 驱动重新 `listProject`（状态回 present、动作消失）。
+   * `phase` 是「是否零副作用」的唯一依据；`phase === "write"` 不提供重试（可能已部分落盘）。
+   */
+  async function confirmGovernanceReaccept() {
+    if (!governanceFlow.open || governanceFlow.busy) return;
+    if (!governanceFlow.preview || governanceFlow.mode !== "reaccept" || governanceActionVisible() !== "reaccept") return;
+    var preview = governanceFlow.preview;
+    var digest = typeof preview.previewDigest === "string" ? preview.previewDigest : "";
+    if (!/^[0-9a-fA-F]{64}$/.test(digest) || preview.canConfirm !== true) return;
+    var projectRoot = state.projectRoot;
+    governanceFlow.busy = true;
+    governanceFlow.result = null;
+    renderGovernanceUi();
+    var res;
+    try {
+      if (!d || typeof d.reacceptGovernancePins !== "function") {
+        res = { ok: false, status: "invalid-request", phase: "guard", message: "重新接受通道不可用（桌面窗口尚未接线）。", wrote: [] };
+      } else {
+        res = await d.reacceptGovernancePins(projectRoot, digest);
+      }
+    } catch (err) {
+      res = {
+        ok: false, status: "blocked", phase: "guard",
+        message: err && err.message ? String(err.message) : String(err), wrote: [],
+      };
+    }
+    if (projectRoot !== state.projectRoot) return;
+    governanceFlow.busy = false;
+    var phase = res && (res.phase === "write" || res.phase === "precheck" || res.phase === "guard") ? res.phase : "guard";
+    var status = res && typeof res.status === "string" ? res.status : "";
+    var message = res && typeof res.message === "string" ? res.message : "";
+    if (res && res.ok === true && status === "completed") {
+      var changedCount = Array.isArray(preview.changed) ? preview.changed.length : 0;
+      setHint(""); // 清掉先前的「已取消」提示，避免成功文案旁残留矛盾的零写入提示
+      governanceFlow.result = {
+        kind: "success",
+        lines: [UiLabels.governanceReacceptSuccessText(preview.pinCount, changedCount)],
+      };
+      renderGovernanceUi();
+      // 不在此自行改状态/伪造刷新：主进程写后 emitProjectChanged → 重新 listProject。
+      return;
+    }
+    if (message === "" && phase === "write") {
+      message = "写入阶段中断（主进程未返回 message）；可能已写入部分文件，请核对现场。";
+    } else if (message === "") {
+      message = "重新接受失败（主进程未返回 message）。";
+    }
+    var view = UiLabels.governanceReacceptFailureView(phase, status, message);
+    governanceFlow.result = { kind: "failure", lines: view.lines, noRetry: view.noRetry };
+    renderGovernanceUi();
   }
 
   // —————— 每角色聊天容器（B-2：切走保留历史） ——————
@@ -3531,10 +3720,17 @@
     state.roles = res.roles || [];
     state.primaryRoleId = res.primaryRoleId || null;
     state.hasRoles = res.hasRoles !== false;
-    // I4：治理记录状态原样落状态；**旧主进程无此字段 ⇒ 按 present 兜底**（不显示动作，不崩）。
+    // I4：治理记录状态原样落状态；`pin-mismatch` 一并接受并保留逐文件证据（pinFiles/pinCount）。
+    // **未知状态 ⇒ 按 present 兜底**（不显示动作，fail-closed）；判据只经 `UiLabels.governanceActionFor`。
     var gr = res.governanceRecord;
-    state.governanceRecord = gr && typeof gr === "object" && (gr.state === "present" || gr.state === "missing" || gr.state === "invalid")
-      ? { state: gr.state, reason: typeof gr.reason === "string" ? gr.reason : "" }
+    var knownGovernanceStates = ["present", "missing", "invalid", "pin-mismatch"];
+    state.governanceRecord = gr && typeof gr === "object" && knownGovernanceStates.indexOf(gr.state) >= 0
+      ? {
+          state: gr.state,
+          reason: typeof gr.reason === "string" ? gr.reason : "",
+          pinFiles: Array.isArray(gr.pinFiles) ? gr.pinFiles : [],
+          pinCount: typeof gr.pinCount === "number" && isFinite(gr.pinCount) ? gr.pinCount : 0,
+        }
       : { state: "present" };
     if (projectChanged || fresh) closeGovernancePreview(); // 换项目：旧项目的预览不跨项目保留
     var pp = $("project-path");
@@ -5355,8 +5551,10 @@
       state: function () {
         return {
           record: governanceRecordOf(),
+          action: governanceActionVisible(),
           visible: governanceActionVisible(),
           open: governanceFlow.open,
+          mode: governanceFlow.mode,
           busy: governanceFlow.busy,
           preview: governanceFlow.preview,
           error: governanceFlow.error,
@@ -5366,6 +5564,7 @@
       openPreview: openGovernancePreview,
       cancelPreview: cancelGovernancePreview,
       confirm: confirmGovernanceEstablish,
+      confirmReaccept: confirmGovernanceReaccept,
     },
     // L-1/状态准确性：供探针直接注入真实快照（按 IPC 契约 `{roleId, busy, summaries}`）。
     onRoleState: function (payload) { deliverRuntimePayload(payload, onRoleState); },

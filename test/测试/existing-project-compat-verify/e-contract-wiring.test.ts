@@ -33,7 +33,12 @@ test("E2 渲染侧契约：只经 window.desktop 方法消费；不使用 ipcRen
   assert.match(renderer, /d\.establishGovernanceRecord\(projectRoot\)/, "建立经 preload 方法");
   assert.equal(renderer.includes("ipcRenderer"), false, "渲染侧不得直连 ipcRenderer");
   assert.match(renderer, /state\.governanceRecord = gr/, "列举结果原样落 state.governanceRecord");
-  assert.match(renderer, /gr\.state === "present" \|\| gr\.state === "missing" \|\| gr\.state === "invalid"/, "只认三种状态");
+  // 2026-10-17 语义变更（pin 恢复）：状态集合由三态扩为四态（新增 pin-mismatch）。
+  assert.match(
+    renderer,
+    /knownGovernanceStates\s*=\s*\["present", "missing", "invalid", "pin-mismatch"\]/,
+    "只认四种状态（含 pin-mismatch；未知状态 fail-closed 兜底 present）",
+  );
 });
 
 test("E3 Interface 契约：ListProjectResult 带 governanceRecord；两方法在 DesktopInterface 上", () => {

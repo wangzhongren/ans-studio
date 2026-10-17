@@ -476,3 +476,130 @@ test('G-5/wave2：reasoningFoldable——仅 complete 且正文非空可展开�
   assert.equal(tools.reasoningFoldable(null), false);
   assert.equal(tools.reasoningFoldable({ status: 'complete' } as unknown as object), false, '缺 text 坏件防御');
 });
+
+// ————— D1：治理记录 pin 不符的重新接受（2026-10-17 评审 §5.4；文案单一来源 = ui-labels）—————
+// 纯映射契约：动作谓词唯一入口 + 全部文案逐字 + 失败分支（phase=write 与 precheck 的差异）。
+
+test('D1：governanceActionFor 真值表——pin-mismatch ⇒ reaccept；missing ⇒ establish；其余 null', () => {
+  assert.equal(labels.governanceActionFor(true, true, 'pin-mismatch'), 'reaccept');
+  assert.equal(labels.governanceActionFor(true, false, 'pin-mismatch'), 'reaccept', 'pin-mismatch 不依赖 hasRoles（恢复入口优先）');
+  assert.equal(labels.governanceActionFor(true, true, 'missing'), 'establish');
+  assert.equal(labels.governanceActionFor(true, false, 'missing'), null, 'S0（无角色）不显示 establish');
+  assert.equal(labels.governanceActionFor(false, true, 'pin-mismatch'), null, '无项目一律 null');
+  assert.equal(labels.governanceActionFor(false, true, 'missing'), null, '无项目一律 null');
+  assert.equal(labels.governanceActionFor('x', true, 'pin-mismatch'), null, '非布尔真值不当「有项目」');
+  assert.equal(labels.governanceActionFor(true, true, 'present'), null);
+  assert.equal(labels.governanceActionFor(true, true, 'invalid'), null);
+  assert.equal(labels.governanceActionFor(true, true, 'unknown-state'), null, '未知状态 fail-closed');
+  // 既有导出保留并委托单点：恰 establish 时为 true。
+  assert.equal(labels.canEstablishGovernance(true, true, 'missing'), true);
+  assert.equal(labels.canEstablishGovernance(true, true, 'pin-mismatch'), false, 'reaccept 不冒充 establish');
+});
+
+test('D1：governancePinMismatchText/EmptyState——只列非零类别、全零用「存在不一致」、逐字', () => {
+  assert.equal(
+    labels.governancePinMismatchText(9, [{ status: 'modified' }]),
+    '治理记录与盘上边界不一致：共 9 条 pin，其中 1 个与记录不一致（1 个内容已变更）。未确认前，会话不能开启、写入会被拒绝。'
+  );
+  assert.equal(
+    labels.governancePinMismatchText(9, [{ status: 'modified' }, { status: 'missing' }, { status: 'unreadable' }]),
+    '治理记录与盘上边界不一致：共 9 条 pin，其中 3 个与记录不一致（1 个内容已变更、1 个缺失、1 个不可读）。未确认前，会话不能开启、写入会被拒绝。'
+  );
+  assert.equal(
+    labels.governancePinMismatchText(9, [{ status: 'modified' }, { status: 'modified' }]),
+    '治理记录与盘上边界不一致：共 9 条 pin，其中 2 个与记录不一致（2 个内容已变更）。未确认前，会话不能开启、写入会被拒绝。',
+    '同类合并计数、只列非零类别'
+  );
+  assert.equal(
+    labels.governancePinMismatchText(9, [{ status: 'weird' }]),
+    '治理记录与盘上边界不一致：共 9 条 pin，其中 1 个与记录不一致（存在不一致）。未确认前，会话不能开启、写入会被拒绝。',
+    '三类均零 ⇒「存在不一致」（不编类别）'
+  );
+  // 防御：缺参不崩、按 0 条展示。
+  assert.ok(labels.governancePinMismatchText(undefined, undefined).startsWith('治理记录与盘上边界不一致：共 0 条 pin，其中 0 个与记录不一致（存在不一致）。'));
+
+  const empty = labels.governancePinMismatchEmptyState(9, [{ status: 'modified' }]);
+  assert.equal(empty.kind, 'governance');
+  assert.equal(empty.title, '治理记录与盘上边界不一致');
+  assert.equal(
+    empty.sub,
+    '治理记录与盘上边界不一致：共 9 条 pin，其中 1 个与记录不一致（1 个内容已变更）。未确认前，会话不能开启、写入会被拒绝。' +
+      '确认接受后只会刷新 SHA-256 与留痕，不会修改任何边界文件内容。'
+  );
+  assert.equal(empty.hint, '也可在终端核对 git 历史后再处理。');
+});
+
+test('D1：governanceReacceptPreviewView——逐文件行/写入行/pin 行/警示/blockers 逐字', () => {
+  const preview = {
+    pinCount: 9,
+    changed: [
+      { path: '角色卡/assembly/boundary.yaml', pinned: 'a1b2c3d4e5f60718', actual: '9f8e7d6c5b4a0000', status: 'modified' },
+      { path: '角色卡/x/boundary.yaml', pinned: 'ffffffffffffffff', actual: null, status: 'missing' },
+      { path: '角色卡/y/boundary.yaml', pinned: 'eeeeeeeeeeeeeeee', actual: null, status: 'unreadable' },
+    ],
+    canConfirm: false,
+    blockers: [
+      { code: 'missing-file', paths: ['角色卡/x/boundary.yaml'], message: '有 pin 目标缺失：角色卡/x/boundary.yaml' },
+    ],
+  };
+  const view = labels.governanceReacceptPreviewView(preview);
+  assert.equal(view.title, '重新接受治理边界（预览）');
+  assert.deepEqual(view.fileLines.map((x: { text: string }) => x.text), [
+    '角色卡/assembly/boundary.yaml — 内容已变更（pin a1b2c3d4… → 现 9f8e7d6c…）',
+    '角色卡/x/boundary.yaml — 文件缺失（无法重新 pin）',
+    '角色卡/y/boundary.yaml — 文件不可读（无法重新 pin）',
+  ]);
+  assert.equal(view.writeLine, '将写入：.ans/project.json、docs/bootstrap-manifest.md');
+  assert.equal(view.pinLine, '将重算这 9 条 pin；不新增、不删除 pin 条目，不修改任何边界文件内容。');
+  assert.equal(view.warning, '如果不认识这些改动，请先通过 git 历史或备份核对，不要直接接受。');
+  assert.equal(view.canConfirm, false, 'canConfirm 只认 true（fail-closed）');
+  assert.deepEqual(view.blockerLines, ['有 pin 目标缺失：角色卡/x/boundary.yaml']);
+  // 未知状态不编语义、不展示。
+  const unknown = labels.governanceReacceptPreviewView({ pinCount: 1, changed: [{ path: 'a.yaml', status: 'weird' }], canConfirm: true });
+  assert.deepEqual(unknown.fileLines, []);
+  assert.equal(unknown.canConfirm, true);
+});
+
+test('D1：governanceReacceptSuccessText 逐字', () => {
+  assert.equal(
+    labels.governanceReacceptSuccessText(9, 1),
+    '已重新接受：更新 1 条 pin（共 9 条），写入 .ans/project.json 与 docs/bootstrap-manifest.md。项目已恢复可用。'
+  );
+  assert.equal(
+    labels.governanceReacceptSuccessText(9, 0),
+    '已重新接受：更新 0 条 pin（共 9 条），写入 .ans/project.json 与 docs/bootstrap-manifest.md。项目已恢复可用。',
+    '计数如实（不伪造变更数）'
+  );
+});
+
+test('D1：governanceReacceptFailureView——phase≠write 可声明零写入；phase=write 只逐字 message', () => {
+  // precheck / 预览失效：message 逐字 + 追加零副作用 + status 提示。
+  const stale = labels.governanceReacceptFailureView('precheck', 'preview-stale', '预览后边界文件又有变化。');
+  assert.deepEqual(stale.lines, [
+    '预览后边界文件又有变化。',
+    '本次未写入任何文件。',
+    '预览后边界文件又有变化，已取消本次写入；请重新检查。',
+  ]);
+  assert.equal(stale.noRetry, false, 'precheck 失败可重试');
+  // message 已含「未写入任何文件」⇒ 不重复追加。
+  const already = labels.governanceReacceptFailureView('guard', 'no-record', '没有治理记录；本次未写入任何文件。');
+  assert.equal(already.lines.filter((x: string) => x === '本次未写入任何文件。').length, 0, '不重复追加零副作用');
+  assert.ok(already.lines.includes('没有治理记录；请先建立治理记录。'));
+  // 各 status 的追加提示（目录候选）。
+  assert.ok(labels.governanceReacceptFailureView('guard', 'invalid-record', '坏记录').lines.includes('治理记录不可用；本版不提供修复。'));
+  assert.ok(labels.governanceReacceptFailureView('guard', 'not-needed', '一致').lines.includes('边界与记录一致，无需重新接受。'));
+  for (const status of ['missing-file', 'unreadable-file', 'unparseable-boundary']) {
+    assert.ok(labels.governanceReacceptFailureView('precheck', status, '受阻').lines.includes('请先处理上述文件后重试。'), status);
+  }
+  assert.ok(
+    labels.governanceReacceptFailureView('guard', 'busy', '忙').lines.includes('上一次操作仍在进行中；本次未写入任何文件。'),
+    'busy 文案逐字'
+  );
+  // phase=write：**只**逐字 message（绝不追加零写入、绝不出现已恢复/已成功）。
+  const writeFail = labels.governanceReacceptFailureView('write', 'write-failed', '写入中断：磁盘错误；可能已写入部分文件，请核对现场。');
+  assert.deepEqual(writeFail.lines, ['写入中断：磁盘错误；可能已写入部分文件，请核对现场。']);
+  assert.equal(writeFail.noRetry, true, '写入阶段失败不提供重试（可能已部分落盘）');
+  const joined = writeFail.lines.join('\n');
+  assert.ok(!joined.includes('未写入任何文件'), 'phase=write 绝不追加零副作用');
+  assert.ok(!joined.includes('已恢复') && !joined.includes('已成功'), 'phase=write 绝不宣称已恢复/已成功');
+});

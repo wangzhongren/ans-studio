@@ -395,6 +395,11 @@ function registerIpc(win: BrowserWindow): void {
   // 守卫（当前导入项目 / `confirm:true` / 机制内按项目互斥）**全在 Interface**——主进程只透传，不做额外授权判断。
   registerHandler("project:governance-preview", (_e, input) => desktop.previewGovernanceRecord(input));
   registerHandler("project:governance-establish", (_e, input) => desktop.establishGovernanceRecord(input));
+  // C2/C3（治理记录 pin 不符的重新接受恢复，2026-10-17 PM 评审 §5.3）：预览与显式重新接受。
+  // 守卫（当前导入项目 / `confirm:true` / 64 hex previewDigest / 机制内互斥与写前重算）**全在 Interface**——
+  // 主进程只透传，不做额外授权判断。
+  registerHandler("project:governance-reaccept-preview", (_e, input) => desktop.previewGovernanceReacceptance(input));
+  registerHandler("project:governance-reaccept", (_e, input) => desktop.reacceptGovernancePins(input));
   registerHandler("report:retry-save", (_e, input) => desktop.retryReportSave(input));
   registerHandler("report:get-save-state", (_e, input) => desktop.getReportSaveState(input));
   registerHandler("delivery:retry-history-save", (_e, input) => desktop.retryDeliveryHistorySave(input));

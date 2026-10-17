@@ -1,5 +1,23 @@
 # 编排 变更记录
 
+## 2026-10-17 — 治理记录 pin 不符「重新接受」：`previewGovernanceReacceptance` / `reacceptGovernancePins`（B1）＋ Pipeline 薄再导出（B2）
+
+**来源**：PM 评审/任务书 `角色卡/项目管理/docs/design/2026-10-17_design_governance-pin-recovery-review.md`（status: approved）§5.2、§5.5、§六、§七。恢复只做两件事：整表重算现有 pin 写回 `.ans`，并向 manifest 追加一条「重新接受记录」；不改边界文件内容、不增删 pin、不改 roles/source、不自动开会话。
+
+**改了什么（全部在本角色 Section 1 内）**：
+- `src/common/编排/finalize.ts`：新增 `GOVERNANCE_REACCEPT_ACCEPTANCE_SOURCE`、八型（`GovernanceReacceptInput` / `GovernanceReacceptWriteInput` / `GovernanceReacceptStatus` / `GovernanceReacceptBlocker` / `GovernanceReacceptPreview` / `GovernanceReacceptPreviewFailure` / `GovernanceReacceptPreviewResult` / `ReacceptGovernancePinsResult`）、`previewGovernanceReacceptance`、`reacceptGovernancePins` 与内部共用 `evaluateGovernanceReaccept`。
+  - 守卫严格按 §5.2 表 1–11：projectRoot → **与 `establishGovernanceRecord` 共用** `governanceEstablishInFlight`（`path.resolve(projectRoot)` key，不另建集合，写入在首次 await 前占位、`finally` 释放）→ `.ans` 存在（`no-record`）→ 原始记录/acceptance/pin 形状与路径安全（`invalid-record`）→ `inspectPinnedBoundaries({requiredPath})`（`ok`→`not-needed`、`invalid`→`invalid-record`、`mismatch` 继续）→ G5 `missing-file` 优先、否则 `unreadable-file`（precheck，零写入）→ G4 digest 非 64 hex=`invalid-request`/guard、不等=`preview-stale`/precheck → G6 每个 pin 目标用 `resolveBoundary` + 探测 `ProjectConfig`（同路径、accepted:true、无 pin），`parseError` 或 `entries.length===0`→`unparseable-boundary`/precheck（列全部文件）→ G3 `buildGovernanceSeedBoundary(GOVERNANCE_REACCEPT_ACCEPTANCE_SOURCE)` 对两写路径逐条 `resolveWrite`（任一拒=`blocked`/precheck）→ G8 `.ans` 先、manifest 后均经 `gatedAtomicWrite`（异常=`write-failed`/`write`，message「可能已写入部分文件…请核对现场」，绝无「已恢复/已成功」）。
+  - 预览：可解析、accepted、pin 形状合法且非空、治理边界被覆盖且至少一项不一致 → `ok:true`；缺失/不可读/坏内容放进 `changed`+`blockers`、`canConfirm:false`；`ok:false` 仅 `invalid-request`/`busy`/`no-record`/`invalid-record`/`not-needed`/`blocked`（manifest 不可读或 G3 前置拒绝且无 blockers）。
+  - `.ans`：保留全部既有字段（含未知字段/roles/source/accepted），**只替换** `governanceBoundary.acceptance.pin`；条目数/路径/顺序完全不变；`JSON.stringify(doc,null,2)+"\n"`。证据只返回非一致项的 `actual`；一致项判定为 `ok` 即与当刻字节相等，故沿用旧 pin 值。
+  - manifest：既有全文逐字节保留；定位 `## 重新接受记录（治理记录 pin 刷新）`，存在则节末（下一 `## ` 前）追加、否则文末新增；不存在则新建最小头部；条目含 ISO 时间、变更文件数、pin 总数、逐文件旧/新完整 64 位哈希。存在但不可读 → `blocked`/precheck、零写入。
+  - **不复用** `finalizeBootstrap`（其 `scanRoles` 会重建 pin 集与 roles）；复用其 `gatedAtomicWrite`、`finalizeRelPaths`、`isFile` 与一次性种子边界工厂。门禁证据只经 `src/service/boundary/resolve-boundary.ts` 公共出口；未直接导入 `src/common/门禁引擎/`。
+- `src/pipeline/orchestration/govern-session.ts`：追加 §5.2 的薄再导出（两函数、常量、八型）；`openGovernanceSession`/`runGovernSession` 既有行为逐字未改。
+- `test/编排/governance-reaccept.test.ts`（新增 20 例）：预览形状与 blockers、正常写入、`.ans` 只改 pin（roles/source/未知字段/路径/顺序不变）、manifest 追加/保留/新建最小头部、G1–G8 每个守卫（G3 为正向过门；固定三目录下 G3 的拒绝无法由公共 API 构造）、写入失败注入（`docs` 为文件 → `write-failed`/`write` 且 `.ans` 已落盘）、并发 busy、`preview-stale`、坏 YAML / `entries: []`、缺失/不可读、invalid-request、Pipeline 再导出同一函数引用。
+
+**证据**：`node --test "test/编排/governance-reaccept.test.ts"` → **20/20**；`node --test "test/编排/**/*.test.ts"` → **369 计 / 368 过 / 1 红**——唯一红仍是 `shell-authorized-routine.test.ts:103` 的 Windows symlink **EPERM**（既有环境红，与本批零交集）；`node --test "test/**/*.test.ts"`（三层 glob）→ **2282 计 / 2184 过 / 95 红 / 3 skipped**，95 红全部在 `test/codex-adapter/`、`test/claude-adapter/`、`test/装配/`、`test/runtime-core/`、`test/测试/`、`test/桌面应用/` 与上述既有 symlink EPERM（缺 SDK/其他角色在途/既有环境），**本批新增 20 例全绿、无新增红**；`npm run typecheck` → 本批文件**零错**（全仓既有环境错仍在 claude-adapter/provider 与 `test/测试`）。
+
+**未做/边界**：未 git 提交；未碰 `app/**`、`src/model/boundary.ts`、`src/common/门禁引擎/**`、其他角色文件、客户项目；未读 `.env`、未跑凭据/网络命令、未调用真实模型。**跨角色待 pm 转达**：桌面窗口按 §5.3 接两个 IPC/`listProject` 与 `previewDigest` 原样回传；桌面UI按 §5.4 呈现文案（`phase!=="write"` 可补「本次未写入任何文件」，`phase==="write"` 只逐字显示 message）。
+
 ## 2026-10-17 — 看护信号 `turn-deadline` 改为「轮次到点检查」（整轮不设超时；1 小时为最后兜底）
 
 **来源**：PM 评审/任务书 `角色卡/项目管理/docs/design/2026-10-17_design_turn-watch-and-recover-review.md`（status: approved；客户裁定「整轮不应该有超时，应该是到了时间，su 要去看下是否卡死了……如果没卡死，就不管他」＋保留 1 小时兜底）§3.2、§4、§5.1。本轮只改编排的看护信号标签/建议；检测阈值、适配器时限、桌面/门禁卡文本归各属主。

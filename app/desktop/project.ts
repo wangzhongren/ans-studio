@@ -10,9 +10,12 @@
 import path from "node:path";
 import { readdir, readFile, stat } from "node:fs/promises";
 
-import type { Acceptance } from "../../src/model/boundary.ts";
+import type { Acceptance, PinEntry, PinEvidenceFile, PinEvidenceResult } from "../../src/model/boundary.ts";
 import type { ProjectConfig, RoleLocation } from "../../src/model/role.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
+// 只读 pin 证据检查：**唯一实现**在门禁引擎私有 `src/common/门禁引擎/pin-evidence.ts`，跨角色只可经
+// Service 公开出口 `src/service/boundary/resolve-boundary.ts` 消费（PM 评审 §5.1/§7）。
+import { inspectPinnedBoundaries } from "../../src/service/boundary/resolve-boundary.ts";
 // 共享载入器**只读导入的类型**（值不在此导入——载入器的**唯一实现**在 `src/common/shared/config-loader.ts`）。
 import type { LoadConfigOptions, LoadedConfig } from "../../src/common/shared/config-loader.ts";
 // 跨角色共享运行时原语（**单一来源**，pm 属主 `src/common/shared/`）：仅取 `resolveSkillRoot`。
@@ -186,22 +189,27 @@ export async function buildEffectiveProjectConfig(
 // **事实来源**：共享载入器 `loadEffectiveConfig` 经 `buildEffectiveProjectConfig` 返回的
 // `source.kind` / `source.acceptance.accepted` / `source.downgradeReason`，以及采纳后的
 // `project.governanceBoundary.path`。本函数**只做纯派生**——不读文件、不校验 pin 逐文件哈希、
-// 不写任何东西（`listProject` 的只读约束由调用方承担）。
+// 不写任何东西（`listProject` 的只读约束由调用方承担）。pin 逐文件证据由同文件的
+// `deriveGovernanceRecordWithPins` 在本函数结果之上合入（状态新增 `pin-mismatch`）。
 //
-// V1 契约（PM 评审 §四.1 表）：
+// V1 契约（PM 评审 §四.1 表；pin 证据见 `2026-10-17_design_governance-pin-recovery-review` §5.3）：
 //  - present：`kind === "ans"` 且 `accepted === true` 且治理边界路径 trim 后非空。
-//    **不声明 pin 逐文件匹配**（V1 无 `unverified`；S4 pin 不符仍显示 present，见评审 §七-6）。
+//    本函数**不声明 pin 逐文件匹配**——逐文件证据合入后，不符会改判 `pin-mismatch`。
 //  - missing：`kind === "builtin-fallback"`（无 `.ans/project.json`）。即便 fallback 的
 //    acceptance 是运行期同意（accepted:true），也仍是 missing——治理记录是否存在与写入授权是两件事。
 //  - invalid：`ans-invalid`，或 `ans` 但 accepted 不为 true，或治理边界路径为空。
 //    `reason` 只取载入器 `downgradeReason`，缺失时给等价原因（不猜测、不补写）。
 
-export type GovernanceRecordState = "present" | "missing" | "invalid";
+export type GovernanceRecordState = "present" | "missing" | "invalid" | "pin-mismatch";
 
 export interface GovernanceRecordStatus {
   state: GovernanceRecordState;
   /** 仅 state === "invalid" 时给出：载入器降级/不可解析原因原文（不含凭据）。 */
   reason?: string;
+  /** 仅 pin-mismatch：不一致条目（来自 PinEvidenceResult.files，按 pin 原顺序）。 */
+  pinFiles?: PinEvidenceFile[];
+  /** 仅 pin-mismatch：pin 总条数（含一致项）。 */
+  pinCount?: number;
 }
 
 /** `ans-invalid` 且载入器未给降级原因时的等价原因（载入器实际恒给，纯函数仍显式兜底）。 */
@@ -242,6 +250,66 @@ export function deriveGovernanceRecord(input: {
     return { state: "invalid", reason: GOVERNANCE_PATH_EMPTY_REASON };
   }
   return { state: "present" };
+}
+
+// —————————————————————— pin 证据合入（C1，PM 评审 §5.3）——————————————————————
+//
+// 纯映射：把门禁引擎只读 pin 证据合入 `deriveGovernanceRecord` 的派生结果。
+//  · 仅 `present` 会被改判——`missing`/`invalid` 的既有形状与文案逐字不变；
+//  · `ok` → 原样返回 `present`（**不新增字段**，保持既有测试与消费方形状）；
+//  · `mismatch` → `pin-mismatch` + 逐文件明细 + pin 总条数；
+//  · `invalid` → `invalid` + 原因（证据检查本身失败同样归 invalid，fail-closed）。
+// 本函数不读盘、不写盘，便于单测。
+export function applyPinEvidence(
+  record: GovernanceRecordStatus,
+  evidence: PinEvidenceResult,
+): GovernanceRecordStatus {
+  if (record.state !== "present") return record;
+  if (evidence.state === "invalid") {
+    return { state: "invalid", reason: evidence.reason ?? "pin 证据检查失败" };
+  }
+  if (evidence.state === "mismatch") {
+    return { state: "pin-mismatch", pinFiles: evidence.files, pinCount: evidence.checked };
+  }
+  return record;
+}
+
+/**
+ * 只读派生：在 `deriveGovernanceRecord` 之后，对 `present` 记录逐条检查 pin 与盘上文件哈希。
+ *
+ *  · `record.state !== "present"` → **原样返回，不做任何哈希**（missing/invalid 行为逐字不变）；
+ *  · `pins` 缺失/空 → `invalid` +「治理记录未提供可验证 pin」（fail-closed；载入器正常已降级）；
+ *  · 其它情况交给门禁引擎 `inspectPinnedBoundaries`（**唯一哈希来源**），由 `applyPinEvidence` 映射；
+ *  · **永不抛错**：任何意外异常都归为 `invalid` +「pin 证据检查失败：<message>」——调用方
+ *    （`listProject`）不得因 pin 检查失败而崩。
+ *
+ * `governanceBoundaryPath` 非空时作为 `requiredPath` 传给证据检查：治理边界文件必须被至少一条 pin
+ * 覆盖，否则即便其余 pin 全一致，su 仍不可用（§5.1 覆盖规则）。
+ */
+export async function deriveGovernanceRecordWithPins(input: {
+  projectRoot: string;
+  record: GovernanceRecordStatus;
+  pins: PinEntry[] | undefined;
+  governanceBoundaryPath?: string;
+  inspectPinnedBoundariesFn?: typeof inspectPinnedBoundaries;
+}): Promise<GovernanceRecordStatus> {
+  if (input.record.state !== "present") return input.record;
+  try {
+    if (!Array.isArray(input.pins) || input.pins.length === 0) {
+      return { state: "invalid", reason: "治理记录未提供可验证 pin" };
+    }
+    const inspect = input.inspectPinnedBoundariesFn ?? inspectPinnedBoundaries;
+    const governanceBoundaryPath = input.governanceBoundaryPath ?? "";
+    const evidence = await inspect({
+      projectRoot: input.projectRoot,
+      pins: input.pins,
+      ...(governanceBoundaryPath.trim() !== "" ? { requiredPath: governanceBoundaryPath } : {}),
+    });
+    return applyPinEvidence(input.record, evidence);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { state: "invalid", reason: `pin 证据检查失败：${message}` };
+  }
 }
 
 // —————————————————————— 文档/变更记录索引（展示用）————————————————————

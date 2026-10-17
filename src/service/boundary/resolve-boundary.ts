@@ -18,3 +18,17 @@ export function resolveBoundary(roleId: string, project: ProjectConfig): Promise
 // 该边界**一次性**：调用方只在单次 finalize 调用内构造/使用，**不得**写入 ProjectConfig、`.ans`
 // 或任何缓存（否则退化为常设治理写权，客户已否决）。
 export { buildGovernanceSeedBoundaryForGate as buildGovernanceSeedBoundary } from "../../common/门禁引擎/governance-seed.ts";
+
+// Service 公共出口：只读 pin 证据检查（治理记录 pin 不符的重新接受恢复；设计
+// `2026-10-17_design_governance-pin-recovery-review` §5.1）。
+//
+// 单一来源：实现恒在门禁引擎私有 `src/common/门禁引擎/pin-evidence.ts`——本文件**同一函数引用**
+// 再导出（不复制实现）；跨角色（编排/桌面窗口）只可经此处消费。该检查**只读**：不写盘、不建目录、
+// 不缓存；返回的 `files` 仅含非一致项、`digest` 覆盖全部 pin（写入前重算比对，G4）。
+export { inspectPinnedBoundaries } from "../../common/门禁引擎/pin-evidence.ts";
+export type {
+  PinEvidenceFile,
+  PinEvidenceFileStatus,
+  PinEvidenceResult,
+  PinEvidenceState,
+} from "../../model/boundary.ts";

@@ -176,3 +176,16 @@
 - **不变项**：248px 默认/208–360 拖拽、折叠/展开、900 内容列、贴底、等宽字体与 A1+A2 体系均未改。
 - **测试**：renderer **73 计 / 69 过 / 4 红**（既有基线 N-1、data-state、P1-3、G-5），新增左树可见性用例（可见不动/上下最小位移/±1 容差/非法不动/两处调用/不强制回顶）；真实 Electron `ANS_VISUAL_V2_UI_ONLY=1` **VISUAL_V2_PASS 50**（新增 9 角色：导入后 su 可见、选中中段可见、刷新保留手动滚动、点 su 立即可见；截图 `visual-tree-su-visible-1362.png`）；`ANS_TERMINAL_UI_ONLY=1` **TERMINAL_PASS 14**；默认套件仍只在既有 `virtual visible nonempty` 失败（行号 :1101，同一基线红）。
 - 指纹：`renderer.js db1d4583`、`ui-labels.js 3645aaad`、`renderer.test.ts 6ef0698f`、`uiux-v2.mjs 6d75e481`。
+
+## 2026-10-17：治理记录 pin 不符的重新接受（D1–D3 UI）
+
+任务书：项目管理评审 `2026-10-17_design_governance-pin-recovery-review.md` §5.4；产品提案 `2026-10-17_design_governance-pin-recovery.md` §三。
+- **单一谓词**：`ui-labels.js::governanceActionFor(hasProject, hasRoles, recordState)` → `null | "establish" | "reaccept"`（`pin-mismatch ⇒ reaccept`；`hasRoles === true && missing ⇒ establish`；其余 null）。既有 `canEstablishGovernance` 保留并委托单点。renderer 的 `governanceActionVisible()` 改为返回该谓词结果，**全文件不再直接比较 `pin-mismatch`**。
+- **文案单点（全部在 ui-labels）**：`governancePinMismatchText/EmptyState`（只列非零类别、三类全零用「存在不一致」、空态 hint）、`governanceReacceptPreviewView`（标题/逐文件行/写入行/pin 行/警示/blockers）、`governanceReacceptSuccessText`、`governanceReacceptFailureView`（`phase !== "write"` 才追加「本次未写入任何文件。」与 status 提示；`phase === "write"` 只逐字 message，绝不宣称已恢复/已成功）。
+- **状态落库**：`applyListing` 用白名单数组接受第四态 `pin-mismatch` 并保留 `pinFiles`/`pinCount`；未知状态仍兜底 `{state:"present"}`（fail-closed、不显示动作）。
+- **入口（复用三处，不新增模态/第四入口）**：`#governance-status` 在 `reaccept` 时显示 mismatch 文案＋「检查并重新接受」；su 空态显示 mismatch 标题/说明/`.empty-hint` 次行＋主按钮；`#governance-preview` 以 `governanceFlow.mode` 复用宿主——`reaccept` 打开调 `previewGovernanceReacceptance(projectRoot)`，确认调 `reacceptGovernancePins(projectRoot, previewDigest)`；取消/关闭零 IPC；`busy`/`canConfirm:false` 时确认 disabled，失败可「重新检查」。
+- **刷新**：成功后**不自行伪造刷新**——由主进程 `project:changed` → `refreshProject` → `listProject`，状态回 `present`、动作消失；不自动开会话。
+- **样式**：最小增量 `.governance-preview .gp-file`、`.gp-blocker`、`.empty-hint`；900 列与整页等宽字体未动。
+- **测试**：`tool-rows.test.ts` 新增 **5 例**（谓词真值表、文案逐字、预览视图、成功文案、失败分支含 phase=write/precheck 差异）→ 31/31；`renderer.test.ts` 新增 **5 例**（落库与单一谓词、状态行、空态、预览宿主/零 IPC/无新增模态、成功失败路径）→ **78 计 / 74 过 / 4 红**（4 红为**先于本批**的 CRLF 基线 N-1、data-state、P1-3、G-5，已用 HEAD 干净 worktree 复现，与本批无关）。
+- **真机渲染检查（2026-10-17 协调者补验）**：`uiux-v2.mjs` 新增独立模式 `ANS_GOVERNANCE_REACCEPT_UI_ONLY=1`（复用既有受控 IPC 替身与真实 Electron 窗口；不改既有模式行为/断言）。夹具 `governanceRecord=pin-mismatch`（9 条 pin、1 条 modified）；预览/确认 IPC 记录调用参数。7 项 DOM 断言全过：状态行与 su 空态、预览复用 `#governance-preview`（无新增模态）、文件/写入/pin/警示行、取消不调 `project:governance-reaccept`、确认只传 `{projectRoot, confirm:true, previewDigest}`、成功文案。实跑 `GOVERNANCE_REACCEPT_UI_PASS 7`；截图：`%TEMP%/ans-governance-reaccept-ui/governance-reaccept-{mismatch,preview,success}-1360.png`。实跑发现并修复一处真实渲染问题：取消后再成功时 `#composer-hint` 残留「已取消，未写入任何文件。」——成功后清空（e2e 新增断言）。
+- **未接线事实**：`governanceRecord.pin-mismatch`、`previewGovernanceReacceptance`、`reacceptGovernancePins` 由桌面窗口实现；落树前动作不可达（兜底 present）。

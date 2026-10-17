@@ -1,5 +1,17 @@
 # 测试 变更记录
 
+## 2026-10-17 — 治理记录 pin 不符「重新接受」独立端到端验证：AC1–AC12 通过，未发现缺陷；修正 3 条旧断言，新增 11 例
+
+**范围**：PM 评审 `2026-10-17_design_governance-pin-recovery-review.md` §5.5/§六/§八/§九——门禁引擎 `inspectPinnedBoundaries`、编排 `previewGovernanceReacceptance`/`reacceptGovernancePins`、桌面 `listProject.governanceRecord`（`pin-mismatch` + `pinFiles`/`pinCount`）与两个 IPC/preload 方法、桌面UI `governanceActionFor`。实现不改，只做独立验证。
+
+**方法**：自建 `test/测试/governance-pin-recovery-verify/`（`fixture.ts` + **11 例**）。临时项目＝`角色卡/governance-boundary.yaml` + 3 角色 `boundary.yaml`/`role-card.md` + `.ans/project.json`（**真实哈希 pin** 4 条 + 未知字段）+ `docs/bootstrap-manifest.md`；真实链 `listProject → buildEffectiveProjectConfig → preview → reaccept → listProject → resolveRole`；会话入口用确定性桩适配器（立即 settled，不触真实模型）。「零写入」＝完整目录树快照（路径/类型/大小/mtime/文件 sha256）前后 `deepEqual`。
+
+**关键结论**：① 全一致 → evidence `ok`、`present`、无动作、预览 `not-needed`；② 改 1 文件 → `pin-mismatch` 恰 1 条 `modified`，预览 `ok:true`/`canConfirm:true`/changed 正确/`previewDigest` 64 hex，**预览前后零变化**；③ 确认写入 → `completed`，按内容哈希仅 `.ans` 与 manifest 变化，pin 路径/顺序/条数、`roles`、`acceptance.source`、未知字段全不变，被改项写回实际哈希、其余保持旧 pin，manifest 逐字节保留并追加含时间/变更数/路径/完整旧新哈希的一条；④ 写入后 → `present`、su `accepted:true`/`parseError` 空、桩会话可开启；⑤ 删 1 文件 → 预览 `canConfirm:false` + `missing` blocker，写入 `missing-file`/`precheck` 零写入；2 改 + 1 删 → changed 3 条（2 modified + 1 missing）同阻断；⑥ 预览后再改 → `preview-stale`/`precheck` 零写入；⑦ 取消 → 零写入、状态仍 `pin-mismatch`；⑧ `.ans` 缺失 → `missing` + 预览 `no-record` + 只出现 establish；不可解析 → `invalid` + `invalid-record`；⑨ 坏 YAML / `entries: []` → `unparseable-boundary`/`canConfirm:false`/零写入；⑩ Pipeline 公共出口直调同样只改两个文件。
+
+**旧断言修正（语义变更）**：A2 改用新增 `writeRealPinnedAns`（真实哈希）→ `present`；A13 坏 pin 由 `present` 改判 `pin-mismatch`（保留 su 仍未接受/写入被拒覆盖）；E2 渲染侧状态集合由三态正则改为四态 `knownGovernanceStates`（含 `pin-mismatch`）。未放宽或删除覆盖。
+
+**复跑**：本角色两目录 **53/53**；全量 `node --test "test/**/*.test.ts"` → **2314 / 2216 pass / 95 fail / 3 skip**（上一有效基线 2313/2215/95/3；本批 +1 用例通过、红数不变；**95 红全为既有且不在本批目录**：依赖缺件 74、Windows EPERM 7、其他无关漂移 14）；`npm run typecheck` → **85 错**（全为既有依赖缺件，本批改动文件 0 错）。**未发现实现缺陷**；AC11（写入阶段故障注入）与 AC17（manifest 不可读）未由本 E2E 覆盖，AC11 由编排套件覆盖、AC17 留白。详见[报告](docs/fix/2026-10-17_verify_governance-pin-recovery.md)。未 commit/push。
+
 ## 2026-10-17（复审）— 到点检查偏差修复后 reverified：三项修复全落地，全量 2246/2150/94红/2skip，桌面 5 条旧红消失
 
 **修复复审**：① 运行时核心 `resolveRuntimeTimeouts` 改为**全运行时**读 `ANS_PI_PROMPT_TIMEOUT_MS`（env=60000 → pi/claude/codex 均 60000）；② 设置 help 补齐「仍在推进则不动作」「留空＝系统默认（5 分钟）」；③ 桌面 `turn-deadline` 解除**不再投「看护恢复」行**（仅诊断），5 条属主测试已用显式注入同步。

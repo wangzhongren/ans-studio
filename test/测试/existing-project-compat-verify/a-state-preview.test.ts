@@ -22,6 +22,7 @@ import {
   makeEmptyProject,
   makeDesktop,
   writeUsableAns,
+  writeRealPinnedAns,
   snapshotTree,
   governanceDocYaml,
   effectiveOf,
@@ -68,14 +69,19 @@ test("A1 S1：N 个角色（role-card.md + 仅 boundary.md）、无 .ans → mis
   }
 });
 
-test("A2 .ans 有效 → present（结构可用；不声明 pin 逐文件匹配）", async () => {
+test("A2 .ans 有效（真实 pin 全部一致）→ present；pin 逐文件校验通过且列举零写入", async () => {
   const fx = makeS1Project();
   try {
-    writeUsableAns(fx.root, fx.ids);
+    // 2026-10-17 语义变更：pin 逐文件校验接入后，只有**真实哈希全部一致**才是 present。
+    writeRealPinnedAns(fx.root, fx.ids);
+    const before = snapshotTree(fx.root);
     const { iface } = makeDesktop(fx.root);
     const listing = await iface.listProject({ projectRoot: fx.root });
+    const after = snapshotTree(fx.root);
     assert.equal(listing.governanceRecord.state, "present");
     assert.equal(listing.governanceRecord.reason, undefined);
+    assert.equal(listing.governanceRecord.pinFiles, undefined, "present 不携带 pinFiles 明细");
+    assert.deepEqual(after, before, "pin 证据检查只读：列举前后目录树与 mtime 不变");
   } finally {
     fx.cleanup();
   }
@@ -305,18 +311,26 @@ test("A12 空项目（S0）：governanceRecord=missing 与 hasRoles=false 相互
   }
 });
 
-test("A13 文档化限制：present ≠ su 可写（载入器只查 pin 形状；坏 pin 的 .ans 仍显示 present 但 F6/解析拒写）", async () => {
+test("A13 pin 不符 → pin-mismatch（不再是 present）；su 边界仍退回未接受、写入被拒", async () => {
   const fx = makeS1Project();
   try {
-    writeUsableAns(fx.root, fx.ids); // pin 哈希为占位 "a"*64、治理文档不存在——结构上可用。
+    writeUsableAns(fx.root, fx.ids); // pin 哈希为占位 "a"*64、治理文档不存在——结构上可用但**哈希不符**。
     const { iface } = makeDesktop(fx.root);
     const listing = await iface.listProject({ projectRoot: fx.root });
-    assert.equal(listing.governanceRecord.state, "present", "V1：present 只表示记录存在、结构上可用");
+    assert.equal(
+      listing.governanceRecord.state,
+      "pin-mismatch",
+      "2026-10-17 语义变更：pin 逐文件校验接入后，坏 pin 由 present 改判 pin-mismatch",
+    );
+    assert.equal(listing.governanceRecord.pinCount, 1, "pin 总条数如实返回（含一致项）");
+    assert.equal(listing.governanceRecord.pinFiles?.length, 1);
+    assert.equal(listing.governanceRecord.pinFiles?.[0].path, GOV_REL);
+    assert.equal(listing.governanceRecord.pinFiles?.[0].actual, null, "治理文档不存在 ⇒ actual 为 null");
 
-    // 真实边界解析：治理文档读不到 / pin 不符 ⇒ 未接受（present 不代表 su 一定能写）。
+    // 重新接受之前：坏 pin ⇒ 边界未接受（pin-mismatch 如实暴露了此前的盲点）。
     const { project } = await effectiveOf(fx.root);
     const suBoundary = await resolveBoundarySection("su", project);
-    assert.equal(suBoundary.acceptance.accepted, false, "present 不声明 pin 逐文件匹配（PM 评审 §七-6）");
+    assert.equal(suBoundary.acceptance.accepted, false, "pin 不符 ⇒ su 边界未接受");
     assert.ok((suBoundary.parseError ?? "").length > 0);
     const d = resolveWrite("docs/su/memo.md", suBoundary, undefined, {
       skillRoot: project.skillRoot,

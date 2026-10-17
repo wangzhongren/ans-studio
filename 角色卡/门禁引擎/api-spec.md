@@ -50,3 +50,71 @@ listProject(projectRoot: string): Promise<ProjectListing>
 唯一私有实现为 [`role-card-metadata.ts`](../../src/common/门禁引擎/role-card-metadata.ts)。两处公开结果均调用它，不修改边界或 gate 源码。当前源码/测试候选 `d9bd2a97bcfd47f658974cc626564557260112e1f26495febdaec12fc61803e8` 已验证：新用例 8/8；门禁引擎 168 通过、0 失败、1 个 Windows 专属跳过；完整 `npm run typecheck` exit 0。
 
 当前用法见[角色协作组摘要](docs/feature/role-group-metadata.md)，详细候选、环境与命令见[变更记录](docs/change/2026-10-14_change_role-group-metadata.md)。本角色测试没有证明桌面透传或实际渲染，后续由对应属主接入并验证。
+
+## 只读 pin 证据检查（`inspectPinnedBoundaries`，2026-10-17 A1–A3）
+
+治理记录 pin 不符的重新接受恢复所需的**只读检测**出口。契约全文见 PM 评审
+`角色卡/项目管理/docs/design/2026-10-17_design_governance-pin-recovery-review.md` §5.1；本角色只提供检测，
+预览/写入、桌面 IPC 与 UI 属各自属主。
+
+### 共享类型（[`src/model/boundary.ts`](../../src/model/boundary.ts)）
+
+```ts
+export type PinEvidenceFileStatus = "modified" | "missing" | "unreadable";
+
+export interface PinEvidenceFile {
+  path: string;            // pin 里的项目相对路径（posix，原样保留）
+  pinned: string;          // .ans 记录的 SHA-256（小写 64 位十六进制）
+  actual: string | null;   // 当前盘上 SHA-256；missing / unreadable 为 null
+  status: PinEvidenceFileStatus;
+}
+
+export type PinEvidenceState = "ok" | "mismatch" | "invalid";
+
+export interface PinEvidenceResult {
+  state: PinEvidenceState;
+  checked: number;         // pin 总条数（含一致项）；invalid 时 0
+  files: PinEvidenceFile[]; // 仅 status !== ok 的条目，按 pin 顺序
+  digest: string;          // 全部 pin 的规范化行 SHA-256；invalid 时为空串
+  reason?: string;         // invalid 的原因
+}
+```
+
+### 公共出口（[`src/service/boundary/resolve-boundary.ts`](../../src/service/boundary/resolve-boundary.ts)）
+
+```ts
+export { inspectPinnedBoundaries } from "../../common/门禁引擎/pin-evidence.ts";
+export type { PinEvidenceFile, PinEvidenceFileStatus, PinEvidenceResult, PinEvidenceState } from "../../model/boundary.ts";
+
+inspectPinnedBoundaries(input: {
+  projectRoot: string;
+  pins: PinEntry[];
+  requiredPath?: string; // 治理边界项目相对路径；给出时必须被至少一条 pin 覆盖
+}): Promise<PinEvidenceResult>
+```
+
+实现恒在门禁引擎私有 `src/common/门禁引擎/pin-evidence.ts`，Service 只做**同一函数引用**再导出
+（沿 `buildGovernanceSeedBoundary` 先例，不复制实现）；跨角色只可经此公共出口消费。
+
+### 返回值语义（§5.1 逐条）
+
+- **形状**：`pins` 必须为非空数组；每项 `path` 非空字符串、`sha256` 为 64 位十六进制（大小写不敏感）。
+  否则 `state:"invalid"`，`reason` 说明第几项（如 `pin[1] 的 sha256 不是 64 位十六进制`）。
+- **路径安全**：绝对路径、`..` 逃逸（规范化后 `absRel` 判空）→ `invalid`。
+- **覆盖**：给出 `requiredPath` 时须有一条 pin 规范化后指向同一路径；否则
+  `reason:"治理边界文件未被任何 pin 覆盖：<path>"`。
+- **逐文件**：`ENOENT` → `missing`；stat 其它错误 / 非普通文件 / 读失败 → `unreadable`（`actual:null`）；
+  一致项不进入 `files`，非一致项按 **pin 顺序** 保留。
+- **整体**：无非一致项 → `ok`；否则 `mismatch`。
+- **digest**：对全部 pin（含一致项、按原顺序）拼接
+  `path + "\t" + pinned + "\t" + (status ?? "ok") + "\t" + (actual ?? "") + "\n"` 求 SHA-256 小写十六进制。
+  预览由编排作为 `previewDigest` 返回、写入前重算比对（G4）。
+- **只读**：不写盘、不建目录、不缓存、不改变 pin 顺序；每个目标至多一次 `stat`、至多一次
+  `sha256File`（复用 [`io.ts`](../../src/common/门禁引擎/io.ts)，不另写文件哈希）。
+
+### 验证
+
+`test/门禁引擎/pin-evidence.test.ts` 12 例（11 通过、1 例 Windows 专属权限用例跳过）；覆盖全一致、
+单文件 `modified`、`missing`、`unreadable`（目录/权限）、形状非法、空 pin、路径逃逸、`requiredPath`
+未覆盖/规范化覆盖、digest 公式/稳定性/变化、只读（前后目录树与 mtime 不变）及公共出口同一函数引用。
+门禁引擎套件 218 计 / 217 过 / 0 红 / 1 skip。`verifyPins` 既有行为未改，本检查是独立只读入口。

@@ -206,13 +206,19 @@ test("I2 治理记录接线：main.ts 注册两条通道，preload 白名单两�
   assert.ok(api, "preload 应经 contextBridge 暴露白名单对象");
   assert.equal(typeof api!.previewGovernanceRecord, "function");
   assert.equal(typeof api!.establishGovernanceRecord, "function");
+  // C3（2026-10-17 PM 评审 §5.3）：pin 不符的重新接受——两方法逐字暴露。
+  assert.equal(typeof api!.previewGovernanceReacceptance, "function");
+  assert.equal(typeof api!.reacceptGovernancePins, "function");
   assert.equal(api!.fs, undefined, "preload 不暴露 Node 能力");
   assert.equal(api!.require, undefined, "preload 不暴露 Node 能力");
 
   await (api!.previewGovernanceRecord as (root: string) => Promise<unknown>)("/proj");
   await (api!.establishGovernanceRecord as (root: string) => Promise<unknown>)("/proj");
+  const digest = "a".repeat(64);
+  await (api!.previewGovernanceReacceptance as (root: string) => Promise<unknown>)("/proj");
+  await (api!.reacceptGovernancePins as (root: string, d: string) => Promise<unknown>)("/proj", digest);
   // 注意：载荷对象由 vm 内的 preload 脚本构造，跨 realm 的 deepStrictEqual 会因原型不同而假红——逐字段断言。
-  assert.equal(invokes.length, 2);
+  assert.equal(invokes.length, 4);
   assert.equal(invokes[0][0], "project:governance-preview");
   assert.deepEqual(
     Object.fromEntries(Object.entries(invokes[0][1] as Record<string, unknown>)),
@@ -224,11 +230,24 @@ test("I2 治理记录接线：main.ts 注册两条通道，preload 白名单两�
     Object.fromEntries(Object.entries(invokes[1][1] as Record<string, unknown>)),
     { projectRoot: "/proj", confirm: true },
   );
+  assert.equal(invokes[2][0], "project:governance-reaccept-preview");
+  assert.deepEqual(
+    Object.fromEntries(Object.entries(invokes[2][1] as Record<string, unknown>)),
+    { projectRoot: "/proj" },
+  );
+  assert.equal(invokes[3][0], "project:governance-reaccept");
+  // `confirm:true` 同样固定在桥内；digest 原样透传。
+  assert.deepEqual(
+    Object.fromEntries(Object.entries(invokes[3][1] as Record<string, unknown>)),
+    { projectRoot: "/proj", confirm: true, previewDigest: digest },
+  );
 
   const mainSrc = readFileSync(new URL("../../app/main.ts", import.meta.url), "utf8");
   for (const [channel, method] of [
     ["project:governance-preview", "previewGovernanceRecord"],
     ["project:governance-establish", "establishGovernanceRecord"],
+    ["project:governance-reaccept-preview", "previewGovernanceReacceptance"],
+    ["project:governance-reaccept", "reacceptGovernancePins"],
   ] as const) {
     assert.ok(mainSrc.includes(`registerHandler("${channel}"`), `main.ts 应注册 ${channel}`);
     assert.ok(mainSrc.includes(`desktop.${method}(input)`), `main.ts 的 ${channel} 应委托 desktop.${method}`);

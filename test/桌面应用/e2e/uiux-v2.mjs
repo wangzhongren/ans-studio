@@ -17,6 +17,10 @@ const PNG='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCA
 let win, pickResolve, sendResolve, withdrawResolve;
 let pickDeferred=false, sendDeferred=false, withdrawMode='fail', interactiveReady=false, operatorMode='normal';
 const windowCalls=[]; const reports=[]; const errors=[]; const sends=[]; const opens=[]; const histories=[]; const stops=[]; const aborts=[]; const responses=[]; const configSaves=[]; const shellResponses=[]; const configApplications={};
+const previewCalls=[], reacceptCalls=[];
+const GOV_PINNED='a1b2c3d4'+'0'.repeat(56), GOV_ACTUAL='9f8e7d6c'+'1'.repeat(56), GOV_DIGEST='b'.repeat(64);
+const governanceRecordFixture={state:'pin-mismatch',pinCount:9,pinFiles:[{path:'角色卡/assembly/boundary.yaml',pinned:GOV_PINNED,actual:GOV_ACTUAL,status:'modified'}]};
+const governancePreviewFixture={projectRoot:ROOT,writePaths:['.ans/project.json','docs/bootstrap-manifest.md'],pinPaths:['角色卡/governance-boundary.yaml','角色卡/assembly/boundary.yaml'],pinCount:9,changed:[{path:'角色卡/assembly/boundary.yaml',pinned:GOV_PINNED,actual:GOV_ACTUAL,status:'modified'}],canConfirm:true,blockers:[],previewDigest:GOV_DIGEST};
 let saveMode="success", saveApplication="next-session";
 const CONFIG_ONLY=process.env.ANS_CONFIG_UI_ONLY==='1';
 const FRESH_CONTEXT_ONLY=process.env.ANS_FRESH_CONTEXT_UI_ONLY==='1';
@@ -32,8 +36,9 @@ const DUP_ONLY=process.env.ANS_DUP_UI_ONLY==='1';
 const SELECTOR_ONLY=process.env.ANS_SELECTOR_UI_ONLY==='1';
 const G2_ONLY=process.env.ANS_G2_RECOVERY_UI_ONLY==='1';
 const TOOLFOLD_ONLY=process.env.ANS_TOOLFOLD_UI_ONLY==='1';
+const GOVREACCEPT_ONLY=process.env.ANS_GOVERNANCE_REACCEPT_UI_ONLY==='1';
 const configReads=[];
-let recoveryEnabled=!(CONFIG_ONLY||SELECTOR_ONLY||FLOW_ONLY), listFailure=false, pickResult=ROOT, configFailure=false, configMalformed=false, configDeferred=false, saveDeferred=false;
+let recoveryEnabled=!(CONFIG_ONLY||SELECTOR_ONLY||FLOW_ONLY||GOVREACCEPT_ONLY), listFailure=false, pickResult=ROOT, configFailure=false, configMalformed=false, configDeferred=false, saveDeferred=false;
 let configMissing={}, configPending=[], savePending=[];
 let mergeReplayAfterList=false, sendQueued=false; const mergeHistories=new Map();
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
@@ -59,7 +64,7 @@ const handlers={
  'report:retry-save':(_e,input)=>{persistenceCalls.push({operation:'report-save',input});if(saveModeDeferred)return new Promise(resolve=>flowSavePending.push({resolve,input}));if(flowSaveFailure)return outer(input,{ok:false,state:flowSaveFailure==='SNAPSHOT_EXPIRED'?'expired':'failed',reportId:input.reportId,code:flowSaveFailure,retryAvailable:false,message:'固定安全失败'});const value={ok:true,state:'saved',report:flowReports[input.reportId].report,retryAvailable:false};flowReports[input.reportId]={...value,reportId:input.reportId};return outer(input,value);},
  'delivery:retry-history-save':(_e,input)=>{persistenceCalls.push({operation:'history-save',input});const receipt={...flowReceipts[input.attemptId],history:'saved',retryHistoryAvailable:false};flowReceipts[input.attemptId]=receipt;return outer(input,{ok:true,state:'saved',receipt});},
  'window:minimize':()=>{windowCalls.push('minimize');return {ok:true};},'window:toggle-maximize':()=>{windowCalls.push('maximize');return {ok:true};},'window:close':()=>{windowCalls.push('close');return {ok:true};},
- 'window:is-maximized':()=>false,'app:list-project':(_e,projectRoot)=>{if(listFailure)throw new Error('fixture listing failed');if(mergeReplayAfterList)for(const h of mergeHistories.values())win.webContents.send('session:history',h);return {...listing,projectRoot:projectRoot?.projectRoot||ROOT,...(FLOW_ONLY?{documentScope:{version:1,projectViewId:'epoch-one',projectRoot:projectRoot?.projectRoot||ROOT},roles:listing.roles.map(role=>({...role,documents:role.roleId==='A'?documentRefs:role.roleId==='B'?documentRefs.map(ref=>({...ref,roleId:'B',documentId:ref.documentId+'-b',relativePath:ref.relativePath.replace('/A/','/B/')})):[],...(flowLongRoleDocs?{changelog:{path:'changelog.md',text:'# 真实长变更\n\n'+('保留变更阅读位置。\n\n'.repeat(100))}}:{}),docs:flowLongRoleDocs?Array.from({length:100},(_,n)=>({kind:'file',path:'docs/record-'+n+'.md'})):[{kind:'directory',path:'docs/change'},{kind:'file',path:'docs/one.md'}]}))}:{})};},'app:pick-project':()=>pickResult,
+ 'window:is-maximized':()=>false,'app:list-project':(_e,projectRoot)=>{if(listFailure)throw new Error('fixture listing failed');if(mergeReplayAfterList)for(const h of mergeHistories.values())win.webContents.send('session:history',h);return {...listing,projectRoot:projectRoot?.projectRoot||ROOT,...(GOVREACCEPT_ONLY?{governanceRecord:governanceRecordFixture}:{}),...(FLOW_ONLY?{documentScope:{version:1,projectViewId:'epoch-one',projectRoot:projectRoot?.projectRoot||ROOT},roles:listing.roles.map(role=>({...role,documents:role.roleId==='A'?documentRefs:role.roleId==='B'?documentRefs.map(ref=>({...ref,roleId:'B',documentId:ref.documentId+'-b',relativePath:ref.relativePath.replace('/A/','/B/')})):[],...(flowLongRoleDocs?{changelog:{path:'changelog.md',text:'# 真实长变更\n\n'+('保留变更阅读位置。\n\n'.repeat(100))}}:{}),docs:flowLongRoleDocs?Array.from({length:100},(_,n)=>({kind:'file',path:'docs/record-'+n+'.md'})):[{kind:'directory',path:'docs/change'},{kind:'file',path:'docs/one.md'}]}))}:{})};},'app:pick-project':()=>pickResult,
  'session:open':(_e,input)=>{opens.push(input);return {ok:true,resumed:true,contextSource:'resumed',runtime:input.runtime,projectRoot:input.projectRoot,profileRevision:0,...(flowOpenResult||{})};},'session:live':()=>['A','B'],'session:stop':(_e,input)=>{stops.push(input);return {ok:true};},
  'session:history-get':(_e,input)=>{histories.push(input);return mergeHistories.get(input.runtime+'|'+input.roleId)||{...input,rows:[],error:null,skipped:0};},
  'session:live-views':()=>[{projectRoot:ROOT,roleId:'A',runtime:'pi'},{projectRoot:ROOT,roleId:'B',runtime:'pi'},...opens.map(x=>({projectRoot:x.projectRoot,roleId:x.roleId,runtime:x.runtime}))],
@@ -80,6 +85,10 @@ function runtimeConfig(runtime) {
   return {runtime,label:definition.label,path:runtime==='pi'?ROOT+'/'+('a-very-long-path/'.repeat(12))+'.env':ROOT+'/.env',revision:0,application:configApplications[runtime]||'next-session',missingKeys:configMissing[runtime]||[],fields:definition.fields.map(f=>({...f,value:f.secret?'':f.required?'fixture':'',isSet:f.required&&!(configMissing[runtime]||[]).includes(f.key),source:f.secret&&runtime==='codex'?'fallback':f.required?'environment':'default',fallbackKey:f.secret&&runtime==='codex'?'OPENAI_API_KEY':undefined}))};
 }
 Object.entries(handlers).forEach(([name,fn])=>ipcMain.handle(name,fn));
+if(GOVREACCEPT_ONLY){
+  ipcMain.handle('project:governance-reaccept-preview',(_e,input)=>{previewCalls.push(input);return {ok:true,preview:governancePreviewFixture};});
+  ipcMain.handle('project:governance-reaccept',(_e,input)=>{reacceptCalls.push(input);return {ok:true,status:'completed',phase:'write',message:'已重新接受：更新 1 条 pin（共 9 条），写入 .ans/project.json 与 docs/bootstrap-manifest.md。项目已恢复可用。',wrote:['.ans/project.json','docs/bootstrap-manifest.md'],pins:[],changed:governancePreviewFixture.changed};});
+}
 const key=async (name,modifiers=[])=>{const keyCode=({Enter:'Return',ArrowDown:'Down',ArrowUp:'Up'})[name]||name;win.webContents.sendInputEvent({type:'keyDown',keyCode,modifiers});if(name==='Enter')win.webContents.sendInputEvent({type:'char',keyCode:'\r',modifiers});win.webContents.sendInputEvent({type:'keyUp',keyCode,modifiers});await pause(50);};
 function safeReport(hb) { const text=s=>({text:s||'',redacted:false,truncated:false});return {source:{roleId:hb.roleId,runtime:'pi',turnId:hb.turnId},taskId:hb.taskId||null,origin:hb.status==='unreported'?'terminal-fallback':'submitted-report',status:hb.status,summary:text(hb.summary),evidence:(hb.evidence||[]).map(text),evidenceOmitted:0,at:hb.at||''}; }
 const event=(kind,summary,detail)=>({roleId:'A',event:{kind,summary,detail}});
@@ -998,12 +1007,40 @@ async function toolFoldChecks(){
   fs.writeFileSync(path.join(OUT,'toolfold-5-offscreen-settled-1360.png'),(await win.webContents.capturePage()).toPNG());
 }
 
+async function governanceReacceptChecks(){
+  await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)})`);await pause(200);
+  await check('GOV pin-mismatch status row',`(()=>{const s=document.getElementById('governance-status');const b=s&&s.querySelector('[data-governance-reaccept]');return !!s&&!s.hidden&&s.textContent.includes('治理记录与盘上边界不一致')&&s.textContent.includes('共 9 条 pin')&&!!b&&b.textContent==='检查并重新接受';})()`);
+  await check('GOV pin-mismatch empty state reuses su empty host',`(()=>{const e=document.querySelector('.chat-empty');return !!e&&e.textContent.includes('治理记录与盘上边界不一致')&&e.textContent.includes('检查并重新接受')&&e.textContent.includes('也可在终端核对 git 历史后再处理。');})()`);
+  fs.writeFileSync(path.join(OUT,'governance-reaccept-mismatch-1360.png'),(await win.webContents.capturePage()).toPNG());
+  await js(`document.querySelector('#governance-status [data-governance-reaccept]').click()`);await pause(150);
+  await check('GOV preview reuses non-modal #governance-preview',`(()=>{const p=document.getElementById('governance-preview');return !!p&&!p.hidden&&document.querySelectorAll('#governance-preview').length===1&&p.className==='governance-preview'&&p.textContent.includes('重新接受治理边界（预览）');})()`);
+  await check('GOV preview file/write/pin/warning lines',`(()=>{const p=document.getElementById('governance-preview');const t=p.textContent;return t.includes('角色卡/assembly/boundary.yaml — 内容已变更（pin a1b2c3d4… → 现 9f8e7d6c…）')&&t.includes('将写入：.ans/project.json、docs/bootstrap-manifest.md')&&t.includes('将重算这 9 条 pin；不新增、不删除 pin 条目，不修改任何边界文件内容。')&&t.includes('如果不认识这些改动，请先通过 git 历史或备份核对，不要直接接受。')&&!!p.querySelector('[data-governance-reaccept]:not([disabled])');})()`);
+  await check('GOV preview adds no modal or fourth entry',`!document.querySelector('[role="dialog"][id*="governance"]')&&document.querySelectorAll('#governance-preview').length===1&&document.getElementById('governance-preview').className==='governance-preview'`);
+  fs.writeFileSync(path.join(OUT,'governance-reaccept-preview-1360.png'),(await win.webContents.capturePage()).toPNG());
+  assert.equal(previewCalls.length,1,'preview IPC called once');
+  assert.deepEqual(previewCalls[0],{projectRoot:ROOT},'preview IPC only carries projectRoot');
+  // 取消：不调用 reaccept IPC，状态仍为 mismatch。
+  await js(`document.querySelector('#governance-preview [data-governance-cancel]').click()`);await pause(100);
+  assert.equal(reacceptCalls.length,0,'cancel must not call project:governance-reaccept');
+  await check('GOV cancel keeps mismatch state and hides preview',`!document.getElementById('governance-status').hidden&&!!document.querySelector('#governance-status [data-governance-reaccept]')&&document.getElementById('governance-preview').hidden`);
+  // 重新打开并确认接受。
+  await js(`document.querySelector('#governance-status [data-governance-reaccept]').click()`);await pause(150);
+  assert.equal(previewCalls.length,2,'each open performs a fresh preview');
+  await js(`document.querySelector('#governance-preview [data-governance-reaccept]').click()`);await pause(150);
+  assert.equal(reacceptCalls.length,1,'confirm calls reaccept exactly once');
+  assert.deepEqual(reacceptCalls[0],{projectRoot:ROOT,confirm:true,previewDigest:GOV_DIGEST},'confirm only sends root/confirm/digest');
+  await check('GOV success text after completed',`document.getElementById('governance-preview').textContent.includes('已重新接受：更新 1 条 pin（共 9 条），写入 .ans/project.json 与 docs/bootstrap-manifest.md。项目已恢复可用。')&&document.getElementById('composer-hint').textContent===''`);
+  await js(`await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))`);await pause(250);
+  fs.writeFileSync(path.join(OUT,'governance-reaccept-success-1360.png'),(await win.webContents.capturePage()).toPNG());
+}
+
 app.whenReady().then(async()=>{
  const watchdog=setTimeout(()=>{fs.writeFileSync(path.join(OUT,'watchdog.txt'),'timeout');app.exit(1);},60000);
  try {
   win=new BrowserWindow({width:1360,height:860,useContentSize:true,frame:false,show:INTERACTIVE,webPreferences:{preload:path.join(APP,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:false}});
   win.webContents.on('console-message',event=>{if(event.level==='error')errors.push(event.message);});
   await win.loadFile(path.join(APP,'renderer/index.html'));win.setTitle('ANS UI/UX 离线验收');await pause(150);
+  if(GOVREACCEPT_ONLY){await governanceReacceptChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports,previewCalls,reacceptCalls},null,2));console.log('GOVERNANCE_REACCEPT_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(GHOST_ONLY){await deliveryNoteChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({reports,errors},null,2));console.log('DELIVERY_NOTE_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(VISUAL_ONLY){await visualChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({reports,errors},null,2));console.log('VISUAL_V2_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(FRESH_CONTEXT_ONLY||ROLE_FOCUS_ONLY||TERMINAL_ONLY||SEND_FACTS_ONLY||TERMINAL_MERGE_ONLY){if(FRESH_CONTEXT_ONLY)await freshContextChecks();else if(ROLE_FOCUS_ONLY)await roleDocumentFocusChecks();else if(TERMINAL_ONLY)await terminalChecks();else if(SEND_FACTS_ONLY)await sendFactsChecks();else await terminalMergeChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({reports,errors},null,2));console.log((FRESH_CONTEXT_ONLY?'FRESH_CONTEXT':ROLE_FOCUS_ONLY?'ROLE_FOCUS':TERMINAL_ONLY?'TERMINAL':SEND_FACTS_ONLY?'SEND_FACTS':'TERMINAL_MERGE')+'_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}

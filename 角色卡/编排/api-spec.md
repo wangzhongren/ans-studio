@@ -164,3 +164,75 @@ export type { SuApprovalTier } from "../../common/编排/shell-gate.ts";
 
 **测试** `test/编排/watchdog.test.ts` 13 例（含新增的金文本与反向断言）。
 
+## B1+B2（2026-10-17）：治理记录 pin 不符——重新接受（预览 / 写入）
+
+**来源**：PM 评审 `2026-10-17_design_governance-pin-recovery-review.md`（approved）§5.2 / §5.5 / §六 / §七。
+
+**Pipeline 公共出口**（桌面只依赖此处；薄再导出，`openGovernanceSession` 行为不变）：
+
+```ts
+// src/pipeline/orchestration/govern-session.ts
+export {
+  previewGovernanceReacceptance,
+  reacceptGovernancePins,
+  GOVERNANCE_REACCEPT_ACCEPTANCE_SOURCE,
+} from "../../common/编排/finalize.ts";
+export type {
+  GovernanceReacceptInput, GovernanceReacceptWriteInput, GovernanceReacceptPreview,
+  GovernanceReacceptPreviewResult, GovernanceReacceptPreviewFailure, GovernanceReacceptBlocker,
+  GovernanceReacceptStatus, ReacceptGovernancePinsResult,
+} from "../../common/编排/finalize.ts";
+```
+
+**机制公开面**（`src/common/编排/finalize.ts`）：
+
+```ts
+export const GOVERNANCE_REACCEPT_ACCEPTANCE_SOURCE =
+  "desktop-app:操作者为治理记录 pin 不符显式重新接受（操作者点击确认）";
+// 仅作一次性种子边界的授权来源，不写入 .ans（acceptance.source 保持最初授权来源）。
+
+export interface GovernanceReacceptInput { projectRoot: string; skillRoot?: string }
+export interface GovernanceReacceptWriteInput extends GovernanceReacceptInput {
+  confirm: true;
+  previewDigest: string; // 预览返回的 64 hex
+}
+export type GovernanceReacceptStatus =
+  | "completed" | "write-failed" | "blocked" | "not-needed" | "no-record" | "invalid-record"
+  | "missing-file" | "unreadable-file" | "unparseable-boundary" | "preview-stale" | "busy"
+  | "invalid-request";
+export interface GovernanceReacceptBlocker {
+  code: "missing-file" | "unreadable-file" | "unparseable-boundary";
+  paths: string[]; message: string;
+}
+export interface GovernanceReacceptPreview {
+  projectRoot: string;
+  writePaths: string[];   // 固定 [".ans/project.json", "docs/bootstrap-manifest.md"]
+  pinPaths: string[]; pinCount: number;
+  changed: PinEvidenceFile[];       // 仅 modified/missing/unreadable
+  canConfirm: boolean; blockers: GovernanceReacceptBlocker[];
+  previewDigest: string;            // PinEvidenceResult.digest
+}
+export type GovernanceReacceptPreviewFailure =
+  | "invalid-request" | "busy" | "no-record" | "invalid-record" | "not-needed" | "blocked";
+export type GovernanceReacceptPreviewResult =
+  | { ok: true; preview: GovernanceReacceptPreview }
+  | { ok: false; status: GovernanceReacceptPreviewFailure; message: string };
+export interface ReacceptGovernancePinsResult {
+  ok: boolean; status: GovernanceReacceptStatus;
+  phase: "guard" | "precheck" | "write";   // 零副作用的唯一依据
+  message: string; wrote: string[];
+  pins?: PinEntry[]; changed?: PinEvidenceFile[];
+}
+
+export function previewGovernanceReacceptance(input): Promise<GovernanceReacceptPreviewResult>;
+export function reacceptGovernancePins(input): Promise<ReacceptGovernancePinsResult>;
+```
+
+- **共用求值**：内部 `evaluateGovernanceReaccept` 读 `.ans` 原文、pin 列表、`inspectPinnedBoundaries({requiredPath: gov.path})` 证据与 blockers；预览/写入共用，写入不复用预览快照（除 digest 比对）。
+- **守卫顺序（§5.2 表 1–11）**：projectRoot → 与 `establishGovernanceRecord` **共用** `governanceEstablishInFlight`（key=`path.resolve(projectRoot)`）→ `.ans` 存在 → 原始记录/acceptance/pin 形状/路径安全 → 证据（`ok`=`not-needed`、`invalid`=`invalid-record`、`mismatch` 继续）→ G5 缺失优先/不可读（precheck）→ G4 digest 形状/不等（`invalid-request`/`preview-stale`）→ G6 每个 pin 目标 `resolveBoundary` 探测（parseError 或 `entries.length===0` → `unparseable-boundary`）→ G3 一次性种子边界逐条 `resolveWrite`（`blocked`）→ G8 `.ans` 先、manifest 后经 `gatedAtomicWrite`（异常=`write-failed`/`write`，message 明示可能部分落盘）→ `finally` 释放互斥。
+- **`.ans` 重写**：保留全部既有字段（roles、source、accepted、未知字段），只替换 `governanceBoundary.acceptance.pin`；条目数/路径/顺序不变；`JSON.stringify(doc,null,2)+"\n"`。证据只暴露非一致项的 `actual`，一致项判定为 `ok` 即与当刻字节相等，故沿用旧 pin 值。
+- **manifest**：既有全文逐字节保留；存在 `## 重新接受记录（治理记录 pin 刷新）` 则节末追加、否则文末新增；不存在则新建最小头部；条目含 ISO 时间、变更文件数、pin 总数与逐文件旧/新完整 64 位哈希。存在但不可读 → `blocked`/`precheck`，零写入。
+- **不做**：不改边界文件内容、不增删 pin、不改 `roles`/`acceptance.source`、不接受调用方传入写路径、不自动重试、不清理已写产物；跨进程无全局锁（如实登记）。
+
+**测试** `test/编排/governance-reaccept.test.ts` 20 例：预览形状/blockers、正常写入、`.ans` 只改 pin、manifest 追加/保留/新建、G1–G8 每个守卫（G3 为正向过门；固定三目录下 G3 的拒绝无法由公共 API 构造）、写入失败注入、并发 busy、`preview-stale`、坏 YAML/空 Section 1、缺失/不可读、invalid-request。
+

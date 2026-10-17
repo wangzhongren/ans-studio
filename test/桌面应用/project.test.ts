@@ -6,8 +6,9 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { buildProjectConfig, deriveGovernanceRecord, readRoleDocsIndex, resolveSkillRoot, posixDirname } from "../../app/desktop/project.ts";
+import { applyPinEvidence, buildProjectConfig, deriveGovernanceRecord, deriveGovernanceRecordWithPins, readRoleDocsIndex, resolveSkillRoot, posixDirname } from "../../app/desktop/project.ts";
 import { listProject, resolveRole } from "../../src/service/role/resolve-role.ts";
+import type { PinEvidenceFile, PinEvidenceResult } from "../../src/model/boundary.ts";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "..", "..");
@@ -154,4 +155,159 @@ test("deriveGovernanceRecord：invalid——治理边界路径为空或纯空白
     assert.equal(r.state, "invalid", `路径 ${JSON.stringify(governanceBoundaryPath)} 应判 invalid`);
     assert.match(r.reason ?? "", /治理边界路径/);
   }
+});
+
+// —————— C1：pin 证据合入（治理记录 pin 不符的重新接受恢复，PM 评审 §5.3）——————
+
+const PINNED_ACCEPTANCE_TWO_PINS = {
+  accepted: true as const,
+  source: "operator:建立治理记录",
+  pin: [
+    { path: "角色卡/governance-boundary.yaml", sha256: "a".repeat(64) },
+    { path: "角色卡/R/boundary.yaml", sha256: "b".repeat(64) },
+  ],
+};
+
+const OK_EVIDENCE: PinEvidenceResult = { state: "ok", checked: 2, files: [], digest: "c".repeat(64) };
+
+function evidenceOf(checked: number, files: PinEvidenceFile[]): PinEvidenceResult {
+  return { state: "mismatch", checked, files, digest: "d".repeat(64) };
+}
+
+test("applyPinEvidence：ok 保持原 present（不新增字段）；mismatch → pin-mismatch + 明细；invalid → invalid + 原因", () => {
+  const present = { state: "present" as const };
+  assert.deepEqual(applyPinEvidence(present, OK_EVIDENCE), { state: "present" }, "ok 不得新增字段");
+
+  const modified: PinEvidenceFile = {
+    path: "角色卡/R/boundary.yaml",
+    pinned: "b".repeat(64),
+    actual: "e".repeat(64),
+    status: "modified",
+  };
+  const missing: PinEvidenceFile = {
+    path: "角色卡/S/boundary.yaml",
+    pinned: "f".repeat(64),
+    actual: null,
+    status: "missing",
+  };
+  assert.deepEqual(
+    applyPinEvidence(present, evidenceOf(3, [modified, missing])),
+    { state: "pin-mismatch", pinFiles: [modified, missing], pinCount: 3 },
+    "mismatch 必须带逐文件明细与 pin 总条数",
+  );
+
+  assert.deepEqual(
+    applyPinEvidence(present, { state: "invalid", checked: 0, files: [], digest: "", reason: "pin[0] 的 sha256 不是 64 位十六进制" }),
+    { state: "invalid", reason: "pin[0] 的 sha256 不是 64 位十六进制" },
+  );
+  assert.deepEqual(
+    applyPinEvidence(present, { state: "invalid", checked: 0, files: [], digest: "" }),
+    { state: "invalid", reason: "pin 证据检查失败" },
+    "invalid 无原因时给固定等价原因",
+  );
+});
+
+test("applyPinEvidence：missing / invalid 原样返回（不因 pin 证据改写既有形状）", () => {
+  const missing = { state: "missing" as const };
+  const invalid = { state: "invalid" as const, reason: "不可解析" };
+  assert.equal(applyPinEvidence(missing, evidenceOf(1, [])), missing);
+  assert.equal(applyPinEvidence(invalid, OK_EVIDENCE), invalid);
+});
+
+test("deriveGovernanceRecordWithPins：present 以外不做哈希、原样返回（检查器零调用）", async () => {
+  let calls = 0;
+  const inspectPinnedBoundariesFn = async (): Promise<PinEvidenceResult> => {
+    calls += 1;
+    return OK_EVIDENCE;
+  };
+  for (const record of [
+    { state: "missing" as const },
+    { state: "invalid" as const, reason: "不可解析" },
+    { state: "pin-mismatch" as const, pinFiles: [], pinCount: 2 },
+  ]) {
+    const out = await deriveGovernanceRecordWithPins({
+      projectRoot: "/proj",
+      record,
+      pins: [{ path: "角色卡/R/boundary.yaml", sha256: "a".repeat(64) }],
+      governanceBoundaryPath: "角色卡/governance-boundary.yaml",
+      inspectPinnedBoundariesFn,
+    });
+    assert.equal(out, record, `${record.state} 必须原样返回（同一引用）`);
+  }
+  assert.equal(calls, 0, "非 present 不得调用 pin 检查（不做任何哈希）");
+});
+
+test("deriveGovernanceRecordWithPins：pins 缺失或为空 → invalid（fail-closed，检查器零调用）", async () => {
+  let calls = 0;
+  const inspectPinnedBoundariesFn = async (): Promise<PinEvidenceResult> => {
+    calls += 1;
+    return OK_EVIDENCE;
+  };
+  for (const pins of [undefined, []]) {
+    const out = await deriveGovernanceRecordWithPins({
+      projectRoot: "/proj",
+      record: { state: "present" },
+      pins,
+      inspectPinnedBoundariesFn,
+    });
+    assert.deepEqual(out, { state: "invalid", reason: "治理记录未提供可验证 pin" });
+  }
+  assert.equal(calls, 0);
+});
+
+test("deriveGovernanceRecordWithPins：present 时透传 projectRoot/pins/治理边界路径，并映射证据", async () => {
+  const inputs: unknown[] = [];
+  const inspectPinnedBoundariesFn = async (input: unknown): Promise<PinEvidenceResult> => {
+    inputs.push(input);
+    return OK_EVIDENCE;
+  };
+  const out = await deriveGovernanceRecordWithPins({
+    projectRoot: "/proj",
+    record: { state: "present" },
+    pins: PINNED_ACCEPTANCE_TWO_PINS.pin,
+    governanceBoundaryPath: "角色卡/governance-boundary.yaml",
+    inspectPinnedBoundariesFn,
+  });
+  assert.deepEqual(out, { state: "present" }, "ok 保持既有 present 形状");
+  assert.deepEqual(inputs, [{
+    projectRoot: "/proj",
+    pins: PINNED_ACCEPTANCE_TWO_PINS.pin,
+    requiredPath: "角色卡/governance-boundary.yaml",
+  }], "治理边界路径作为 requiredPath（覆盖规则）");
+
+  // 治理边界路径为空时不传 requiredPath。
+  await deriveGovernanceRecordWithPins({
+    projectRoot: "/proj",
+    record: { state: "present" },
+    pins: PINNED_ACCEPTANCE_TWO_PINS.pin,
+    governanceBoundaryPath: "",
+    inspectPinnedBoundariesFn,
+  });
+  assert.deepEqual(inputs[1], { projectRoot: "/proj", pins: PINNED_ACCEPTANCE_TWO_PINS.pin });
+});
+
+test("deriveGovernanceRecordWithPins：mismatch 明细映射为 pin-mismatch；检查器抛错 → invalid 且永不 reject", async () => {
+  const modified: PinEvidenceFile = {
+    path: "角色卡/R/boundary.yaml",
+    pinned: "b".repeat(64),
+    actual: "e".repeat(64),
+    status: "modified",
+  };
+  const mismatch = await deriveGovernanceRecordWithPins({
+    projectRoot: "/proj",
+    record: { state: "present" },
+    pins: PINNED_ACCEPTANCE_TWO_PINS.pin,
+    governanceBoundaryPath: "角色卡/governance-boundary.yaml",
+    inspectPinnedBoundariesFn: async () => evidenceOf(2, [modified]),
+  });
+  assert.deepEqual(mismatch, { state: "pin-mismatch", pinFiles: [modified], pinCount: 2 });
+
+  const failed = await deriveGovernanceRecordWithPins({
+    projectRoot: "/proj",
+    record: { state: "present" },
+    pins: PINNED_ACCEPTANCE_TWO_PINS.pin,
+    governanceBoundaryPath: "角色卡/governance-boundary.yaml",
+    inspectPinnedBoundariesFn: async () => { throw new Error("磁盘读取爆炸"); },
+  });
+  assert.deepEqual(failed, { state: "invalid", reason: "pin 证据检查失败：磁盘读取爆炸" }, "异常必须归为 invalid，绝不外抛");
 });

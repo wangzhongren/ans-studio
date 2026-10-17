@@ -33,6 +33,20 @@ contextBridge.exposeInMainWorld("desktop", {
   establishGovernanceRecord: (projectRoot) =>
     ipcRenderer.invoke("project:governance-establish", { projectRoot, confirm: true }),
 
+  /**
+   * C2（治理记录 pin 不符的重新接受恢复，PM 评审 §5.3）：预览重新接受——**只读**，不写文件。
+   * 主进程守卫：projectRoot 必须是当前导入项目；其余状态由机制原样回执。
+   */
+  previewGovernanceReacceptance: (projectRoot) =>
+    ipcRenderer.invoke("project:governance-reaccept-preview", { projectRoot }),
+
+  /**
+   * C2：显式重新接受现有 pin——**仅**由渲染侧预览面板的确认按钮调用。
+   * `confirm: true` 固定在本桥内；主进程 Interface 再校验它、当前导入项目与 64 hex previewDigest。
+   */
+  reacceptGovernancePins: (projectRoot, previewDigest) =>
+    ipcRenderer.invoke("project:governance-reaccept", { projectRoot, confirm: true, previewDigest }),
+
   /** B/2: only opaque current-project refs; no renderer filesystem paths. */
   readProjectDocument: (input) => ipcRenderer.invoke("project:document-read", input),
   retryReportSave: input => ipcRenderer.invoke('report:retry-save', input),
