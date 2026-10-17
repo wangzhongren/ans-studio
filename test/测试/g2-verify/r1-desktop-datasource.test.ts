@@ -12,7 +12,8 @@ import { makeG2Harness, flush, settledEvent, toolResultOf } from "./fixture.ts";
 function freezeSnapshot(s: import("../../../app/desktop/watchdog.ts").WatchdogProjectSnapshot): unknown {
   return {
     projectRoot: s.projectRoot,
-    suRoleId: s.suRoleId,
+    // 2026-10-17（三权 V1）：快照字段 `suRoleId` → `governanceRoleId`（值=回交主人）。
+    governanceRoleId: s.governanceRoleId,
     roles: [...s.roles].sort((a, b) => a.roleId.localeCompare(b.roleId)),
     queues: [...s.queues].map((q) => ({ targetRoleId: q.targetRoleId, runtime: q.runtime, items: [...q.items].map((i) => ({ ...i })) })),
     activeDeliveries: s.activeDeliveries,

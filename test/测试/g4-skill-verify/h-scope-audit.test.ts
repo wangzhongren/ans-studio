@@ -24,13 +24,16 @@ const read = (rel: string): string => fs.readFileSync(path.join(REPO, rel), "utf
 
 // —————————————————————— ① 预授权范围 ——————————————————————
 
-test("范围①：SU_PREAUTHORIZED_WRITE_DIRS 字面量恰为四棵（docs/su＋docs/contracts＋docs/skills＋docs/mcp）", () => {
-  const src = read("src/pipeline/orchestration/run-role.ts");
-  const m = src.match(/const SU_PREAUTHORIZED_WRITE_DIRS[^=]*=\s*\[([^\]]*)\]/);
-  assert.ok(m, "须能定位预授权常量");
+test("范围①：su 预授权目录字面量恰为四棵（docs/su＋docs/contracts＋docs/skills＋docs/mcp）", () => {
+  // 2026-10-17（三权 V1）：单一来源迁到门禁引擎注册表 `LEGACY_SU_PREAUTHORIZED_DIRS`。
+  const src = read("src/common/门禁引擎/governance-roles.ts");
+  const m = src.match(/LEGACY_SU_PREAUTHORIZED_DIRS[^=]*=\s*\[([^\]]*)\]/);
+  assert.ok(m, "须能定位预授权常量（注册表单一来源）");
   const dirs = [...m![1].matchAll(/"([^"]+)"/g)].map((x) => x[1]);
   assert.deepEqual(dirs, ["docs/su", "docs/contracts", "docs/skills", "docs/mcp"], "预授权恰四棵、顺序与集合固定");
   assert.equal(dirs.includes("docs/workflow.md"), false, "workflow.md 仍不在预授权内（走规划确认）");
+  const runRole = read("src/pipeline/orchestration/run-role.ts");
+  assert.equal(/const(?: readonly)? SU_PREAUTHORIZED_WRITE_DIRS/.test(runRole), false, "编排不得另写第二份字面量");
 });
 
 // —————————————————————— ② MCP V2 零产品实施 ——————————————————————
@@ -46,8 +49,8 @@ test("范围②：MCP V2 已实施——install_mcp/uninstall_mcp 在 src（工�
     assert.ok(typeof d.description === "string" && d.description.length > 0, `${name} schema 可描述（V2 已注册，非未知工具）`);
   }
   // docs/mcp 预授权（与范围① 互证）＋声明读取器单一来源。
-  const src = read("src/pipeline/orchestration/run-role.ts");
-  const m = src.match(/const SU_PREAUTHORIZED_WRITE_DIRS[^=]*=\s*\[([^\]]*)\]/)!;
+  const registry = read("src/common/门禁引擎/governance-roles.ts");
+  const m = registry.match(/LEGACY_SU_PREAUTHORIZED_DIRS[^=]*=\s*\[([^\]]*)\]/)!;
   const dirs = [...m[1].matchAll(/"([^"]+)"/g)].map((x) => x[1]);
   assert.ok(dirs.includes("docs/mcp"), "docs/mcp 并入预授权（第四棵）");
   assert.ok(read("src/common/runtime-core/mcp-declarations.ts").includes('const MCP_REL = "docs/mcp";'), "声明读取器树根＝docs/mcp（单一解析来源）");
@@ -56,12 +59,18 @@ test("范围②：MCP V2 已实施——install_mcp/uninstall_mcp 在 src（工�
     assert.ok(read(f).includes("installedMcpServers"), `适配器装配 installedMcpServers：${f}`);
   }
   assert.ok(read("src/service/runtime/session.ts").includes("listInstalledMcpServers(options.projectRoot"), "服务层按角色读取并注入 installedMcpServers");
-  // 能力位仅 su：编排透传判据＝suppressHandback；桌面注入判据＝role.builtIn === true。
-  assert.ok(/const installMcp = suppressHandback \? input\.installMcp : undefined;/.test(src), "installMcp 透传判据＝suppressHandback（唯一）");
-  assert.ok(/const uninstallMcp = suppressHandback \? input\.uninstallMcp : undefined;/.test(src), "uninstallMcp 同判据");
+  // 能力位：2026-10-17（三权 V1，评审 §5.6）编排改读能力矩阵（`cap.installMcp`，trio=Nominator、
+  // single=su）；桌面注入判据 `canNominate = governanceFunction === "nomination" || legacyBuiltIn`。
+  const src = read("src/pipeline/orchestration/run-role.ts");
+  assert.ok(/const installMcp = cap\?\.installMcp === true \? input\.installMcp : undefined;/.test(src), "installMcp 透传判据＝能力矩阵（唯一）");
+  assert.ok(/const uninstallMcp = cap\?\.installMcp === true \? input\.uninstallMcp : undefined;/.test(src), "uninstallMcp 同判据");
   const sess = read("app/desktop/session.ts");
+  assert.ok(/const canNominate = governanceFunction === "nomination" \|\| legacyBuiltIn;/.test(sess), "canNominate 判据");
   for (const [fn, ty] of [["installMcp", "InstallMcpFn"], ["uninstallMcp", "UninstallMcpFn"]] as const) {
-    assert.ok(new RegExp(`const ${fn}: ${ty} \\| undefined =\\s*\\n\\s*role\\.builtIn === true`).test(sess), `${fn} 桌面注入判据＝role.builtIn === true（仅 su）`);
+    assert.ok(
+      new RegExp(`const ${fn}: ${ty} \\| undefined =\\s*\\n\\s*canNominate`).test(sess),
+      `${fn} 桌面注入判据＝canNominate（single=su / trio=Nominator）`,
+    );
   }
 });
 
@@ -155,19 +164,19 @@ test("范围③（行为）：真实装配 su 会话——install_skill 全链�
   }
 });
 
-test("范围③补＋⑤：编排判据——installSkill 仅 suppressHandback（内置治理角色）透传；项目角色即便误给也零注册", () => {
+test("范围③补＋⑤：编排判据——installSkill 由能力矩阵透传（single=su / trio=Nominator）；项目角色即便误给也零注册", () => {
   const src = read("src/pipeline/orchestration/run-role.ts");
   assert.ok(
-    /const installSkill = suppressHandback \? input\.installSkill : undefined;/.test(src),
-    "installSkill 透传判据＝suppressHandback（唯一）",
+    /const installSkill = cap\?\.installSkill === true \? input\.installSkill : undefined;/.test(src),
+    "installSkill 透传判据＝能力矩阵（唯一）",
   );
   assert.ok(
-    /const uninstallSkill = suppressHandback \? input\.uninstallSkill : undefined;/.test(src),
+    /const uninstallSkill = cap\?\.installSkill === true \? input\.uninstallSkill : undefined;/.test(src),
     "uninstallSkill 同判据",
   );
   const sess = read("app/desktop/session.ts");
-  const inject = sess.match(/const installSkill: InstallSkillFn \| undefined =\s*\n?\s*role\.builtIn === true/);
-  assert.ok(inject, "桌面注入判据＝role.builtIn === true（仅 su）");
+  const inject = sess.match(/const installSkill: InstallSkillFn \| undefined =\s*\n?\s*canNominate/);
+  assert.ok(inject, "桌面注入判据＝canNominate（single=su / trio=Nominator）");
 });
 
 // —————————————————————— ④ 无删除原语 ——————————————————————

@@ -209,38 +209,39 @@ test("I2 治理记录接线：main.ts 注册两条通道，preload 白名单两�
   // C3（2026-10-17 PM 评审 §5.3）：pin 不符的重新接受——两方法逐字暴露。
   assert.equal(typeof api!.previewGovernanceReacceptance, "function");
   assert.equal(typeof api!.reacceptGovernancePins, "function");
+  // V1b（评审 §5.5）：迁移预览/写入——两方法逐字暴露（UI W4 按名消费）。
+  assert.equal(typeof api!.previewGovernanceMigration, "function");
+  assert.equal(typeof api!.migrateGovernanceModel, "function");
   assert.equal(api!.fs, undefined, "preload 不暴露 Node 能力");
   assert.equal(api!.require, undefined, "preload 不暴露 Node 能力");
 
-  await (api!.previewGovernanceRecord as (root: string) => Promise<unknown>)("/proj");
-  await (api!.establishGovernanceRecord as (root: string) => Promise<unknown>)("/proj");
+  await (api!.previewGovernanceRecord as (root: string, options?: unknown) => Promise<unknown>)("/proj", { governanceModel: "trio" });
+  await (api!.establishGovernanceRecord as (root: string, options?: unknown) => Promise<unknown>)("/proj", { governanceModel: "trio" });
   const digest = "a".repeat(64);
   await (api!.previewGovernanceReacceptance as (root: string) => Promise<unknown>)("/proj");
   await (api!.reacceptGovernancePins as (root: string, d: string) => Promise<unknown>)("/proj", digest);
+  await (api!.previewGovernanceMigration as (root: string) => Promise<unknown>)("/proj");
+  await (api!.migrateGovernanceModel as (root: string, d: string) => Promise<unknown>)("/proj", digest);
+  // 非法值也原样上送（由 Interface 判 invalid-request）——桥不得静默丢弃/改写。
+  await (api!.previewGovernanceRecord as (root: string, options?: unknown) => Promise<unknown>)("/proj", { governanceModel: "quad" });
   // 注意：载荷对象由 vm 内的 preload 脚本构造，跨 realm 的 deepStrictEqual 会因原型不同而假红——逐字段断言。
-  assert.equal(invokes.length, 4);
+  const payload = (i: number): Record<string, unknown> => Object.fromEntries(Object.entries(invokes[i][1] as Record<string, unknown>));
+  assert.equal(invokes.length, 7);
   assert.equal(invokes[0][0], "project:governance-preview");
-  assert.deepEqual(
-    Object.fromEntries(Object.entries(invokes[0][1] as Record<string, unknown>)),
-    { projectRoot: "/proj" },
-  );
+  assert.deepEqual(payload(0), { projectRoot: "/proj", governanceModel: "trio" }, "W4 模型选择经桥透传（预览）");
   assert.equal(invokes[1][0], "project:governance-establish");
   // `confirm:true` 固定在桥内——渲染侧无法自行构造/省略该意图标记。
-  assert.deepEqual(
-    Object.fromEntries(Object.entries(invokes[1][1] as Record<string, unknown>)),
-    { projectRoot: "/proj", confirm: true },
-  );
+  assert.deepEqual(payload(1), { projectRoot: "/proj", confirm: true, governanceModel: "trio" }, "W4 模型选择经桥透传（建立）");
   assert.equal(invokes[2][0], "project:governance-reaccept-preview");
-  assert.deepEqual(
-    Object.fromEntries(Object.entries(invokes[2][1] as Record<string, unknown>)),
-    { projectRoot: "/proj" },
-  );
+  assert.deepEqual(payload(2), { projectRoot: "/proj" });
   assert.equal(invokes[3][0], "project:governance-reaccept");
   // `confirm:true` 同样固定在桥内；digest 原样透传。
-  assert.deepEqual(
-    Object.fromEntries(Object.entries(invokes[3][1] as Record<string, unknown>)),
-    { projectRoot: "/proj", confirm: true, previewDigest: digest },
-  );
+  assert.deepEqual(payload(3), { projectRoot: "/proj", confirm: true, previewDigest: digest });
+  assert.equal(invokes[4][0], "project:governance-migrate-preview");
+  assert.deepEqual(payload(4), { projectRoot: "/proj" }, "迁移预览只上送 projectRoot");
+  assert.equal(invokes[5][0], "project:governance-migrate");
+  assert.deepEqual(payload(5), { projectRoot: "/proj", confirm: true, previewDigest: digest }, "迁移确认固定 confirm:true、digest 原样");
+  assert.deepEqual(payload(6), { projectRoot: "/proj", governanceModel: "quad" }, "非法模型原样上送（Interface 拒绝，桥不改写）");
 
   const mainSrc = readFileSync(new URL("../../app/main.ts", import.meta.url), "utf8");
   for (const [channel, method] of [
@@ -248,6 +249,8 @@ test("I2 治理记录接线：main.ts 注册两条通道，preload 白名单两�
     ["project:governance-establish", "establishGovernanceRecord"],
     ["project:governance-reaccept-preview", "previewGovernanceReacceptance"],
     ["project:governance-reaccept", "reacceptGovernancePins"],
+    ["project:governance-migrate-preview", "previewGovernanceMigration"],
+    ["project:governance-migrate", "migrateGovernanceModel"],
   ] as const) {
     assert.ok(mainSrc.includes(`registerHandler("${channel}"`), `main.ts 应注册 ${channel}`);
     assert.ok(mainSrc.includes(`desktop.${method}(input)`), `main.ts 的 ${channel} 应委托 desktop.${method}`);

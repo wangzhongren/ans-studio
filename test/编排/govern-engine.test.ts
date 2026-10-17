@@ -69,6 +69,7 @@ async function withProject<T>(
       projectRoot: target,
       skillRoot: target,
       roles: {},
+      governanceModel: "single",
       governanceBoundary: {
         path: GOV_BOUNDARY_REL,
         acceptance: { accepted: true, source: "test:fixture governance boundary" },
@@ -204,6 +205,7 @@ test("openGovernanceSession：不预建骨架（无 bootstrap 选项）→ 空�
       projectRoot: target,
       skillRoot: target,
       roles: {},
+      governanceModel: "single",
       genesisBootstrap: { source: "desktop:导入空项目=发起 bootstrap（操作者指令）" },
     };
     const handle = await openGovernanceSession(

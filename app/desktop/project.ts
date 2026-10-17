@@ -122,6 +122,9 @@ export function buildProjectConfig(
     skillRoot: resolveSkillRoot(env),
     roles,
     builtInRoles,
+    // 治理模型（评审 §5.4）：门禁引擎枚举给出（single/trio）；缺省按 single（旧行为逐字不变）。
+    // 会话/边界解析按它决定内置角色集与能力——**不得**让 `resolveBoundarySection` 掉回默认 single。
+    governanceModel: listing.governanceModel ?? "single",
     governanceBoundary: { path: governanceBoundaryPath, acceptance },
     // 仅在未 bootstrap 时附带（有角色即不带——见上方切换条件注释）。
     ...(genesisBootstrap ? { genesisBootstrap } : {}),
@@ -181,7 +184,14 @@ export async function buildEffectiveProjectConfig(
   });
   const governanceBoundaryPath = loaded.project.governanceBoundary?.path ?? "";
   const project = deps.buildProjectConfig(listing, loaded.source.acceptance, undefined, governanceBoundaryPath);
-  return { project, source: loaded.source };
+  // 治理模型（评审 §5.4）：载入器显式给出（`.ans` 的 governanceModel）时以它为准；缺失才回退枚举推断
+  // （listing.governanceModel——`buildProjectConfig` 已写入）。否则 `resolveBoundarySection` 会按默认
+  // single 解析，三权角色全部不可写。
+  const governanceModel = loaded.project.governanceModel ?? listing.governanceModel;
+  return {
+    project: governanceModel !== undefined ? { ...project, governanceModel } : project,
+    source: loaded.source,
+  };
 }
 
 // —————————————————————— 治理记录状态（I1，PM 评审 §四.1）——————————————————————

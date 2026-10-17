@@ -152,8 +152,8 @@ test("拒绝分支矩阵：role-not-found / not-registered / role-not-listed / r
       assert.equal(h.disposed("X"), 0, `${label}: 零重建`);
     };
 
-    await expectRefusal(install({ roleId: "NOPE", name: "k1" }), "role-not-found", "角色「NOPE」不是本项目项目角色（或为治理角色 su）——未执行。", "角色不存在");
-    await expectRefusal(install({ roleId: "su", name: "k1" }), "role-not-found", "或为治理角色 su", "su 自身");
+    await expectRefusal(install({ roleId: "NOPE", name: "k1" }), "role-not-found", "角色「NOPE」不是本项目项目角色（或为内置治理角色）——未执行。", "角色不存在");
+    await expectRefusal(install({ roleId: "su", name: "k1" }), "role-not-found", "或为内置治理角色", "su 自身");
     await expectRefusal(install({ roleId: "  ", name: "k1" }), "role-not-found", "——未执行。", "空 roleId");
     await expectRefusal(install({ roleId: "X", name: "不存在" }), "not-registered", "技能未登记：docs/skills/不存在/install.md 不存在——先落盘再安装；未执行。", "登记缺失");
     await expectRefusal(install({ roleId: "X", name: "for-y" }), "role-not-listed", "登记中未包含角色「X」——未执行；如确要安装请先更新登记。", "登记未含角色");

@@ -50,7 +50,17 @@ import type { SessionEvent, RuntimeTurnOutcome, RuntimePersistenceChangeV1, Repo
 //    （能力缺席 = fail-closed，绝不放宽）。
 
 import type { Acceptance } from "../../src/model/boundary.ts";
-import type { ProjectConfig } from "../../src/model/role.ts";
+import type { GovernanceModel, ProjectConfig } from "../../src/model/role.ts";
+// 三权（评审 §5.1/§5.6）：内置治理角色 id 判定 / 注册表统一来自门禁引擎的 Service 公开出口
+// （桌面**不复制**第二份 id 列表，也不直接导入 `src/common/门禁引擎/` 私有模块）。
+import { isBuiltInGovernanceRoleId } from "../../src/service/boundary/resolve-boundary.ts";
+// 治理账本与派发门禁（评审 §5.6/§5.7/§6.2）：只经编排的 Pipeline 公共出口（`govern-session.ts`
+// 薄再导出）消费——桌面**不直接导入**编排私有 `common/`（§十一.3）。
+import {
+  appendGovernanceLedger,
+  evaluateGovernanceGate,
+  readGovernanceLedger,
+} from "../../src/pipeline/orchestration/govern-session.ts";
 // O-1（2026-10-12）：边界快照的**可信信号** = 读盘内容哈希（sha256）——本层只读、不复制门禁解析。
 import fs from "node:fs";
 import path from "node:path";
@@ -672,10 +682,11 @@ export class SessionManager {
    */
   private readonly lastTurns = new Map<string, { outcome: RuntimeTurnOutcome; at: string }>();
   /**
-   * su 最近一次开会话所用 runtime（G-2/W1）：看护向 su 投系统消息时 queueKey 需要 runtime——优先活会话，
-   * 其次本记录，最后 `"pi"`（真实产品默认；demo 是开发替身）。仅为投递择路，不改任何判定。
+   * **回交主人**最近一次开会话所用 runtime（评审 §5.6：`lastSuRuntime` → `lastGovernanceRuntime`）：
+   * trio = Convener（`schedule`），single = 主入口 su。看护向回交主人投系统消息时 queueKey 需要 runtime
+   * ——优先活会话，其次本记录，最后 `"pi"`（真实产品默认；demo 是开发替身）。仅为投递择路，不改任何判定。
    */
-  private readonly lastSuRuntime = new Map<string, RuntimeKind>();
+  private readonly lastGovernanceRuntime = new Map<string, RuntimeKind>();
 
   constructor(deps: SessionManagerDeps) {
     this.deps = deps;
@@ -1195,56 +1206,66 @@ export class SessionManager {
       routineShellPolicy = { enabled: true, projectRoot: req.projectRoot, authorizationSource: "customer-delegated-routine-checks" };
     }
 
-    // ——— 客户确认制交互（A-1/A-3/A-5）：**仅内置治理角色（su）**的会话注入客户交互通道 ———
+    // ——— 三权（评审 §5.6）：能力按 `governanceFunction` 路由；single/su 旧行为逐字不变 ———
+    //
+    // 唯一数据来源＝门禁引擎注册表（经 `role.governanceFunction`/`builtIn` 表达，**不硬编码角色 id**）。
+    // · legacyBuiltIn：single 模型下的内置治理角色（su）——保持旧能力集（派发/看护/安装/审批档）；
+    // · schedule：trio 的 Convener——派发/看护/恢复提议 + 只读 shell；
+    // · nomination：trio 的 Nominator——技能/MCP 安装；
+    // · rapporteur：只有客户确认通道（不派发、不看护、不安装、无 shell）。
+    const governanceModel: GovernanceModel = project.governanceModel ?? "single";
+    const governanceFunction = role.governanceFunction;
+    const legacyBuiltIn = role.builtIn === true && governanceFunction === undefined && governanceModel === "single";
+    const canSchedule = governanceFunction === "schedule" || legacyBuiltIn;
+    const canNominate = governanceFunction === "nomination" || legacyBuiltIn;
+
+    // ——— 客户确认制交互（A-1/A-3/A-5）：**仅内置治理角色（su 或 trio 三人）**的会话注入客户交互通道 ———
     //
     // 判据 = 「本角色是内置治理角色」（`role.builtIn`，数据驱动、**不硬编码 "su"**）。注入 ⇒ 编排把本会话
     // 置为**确认制**（`request_confirmation`/`request_choice` 注册；gate 走「客户确认才发行 writeSet」）——
     // 「客户确定了才加、才落盘」。**普通角色的会话一律不注入**（无客户通道：工具不注册、gate 旧语义逐字
     // 不变）。通道未接（deps.customerInput 缺省）⇒ 不注入——**绝不**出现「没人问就放行」。
+    // trio 下客户作出决定后的 `customer.decision` 账本写入在编排的 `customerInput` 包装器内（评审 §5.7，
+    // 桌面只接线、不另写一份）。
     const customerInput = role.builtIn === true ? this.deps.customerInput : undefined;
 
-    // H-1：**仅内置治理角色（su）**会话注入**派发能力**（数据驱动；契约在 §4 冻结家 `model/runtime.ts`）。
-    // 路由复用 E-1 投递机（`routeDispatch`）；工具「未注入即不注册」——项目角色会话**不注入**（su 才有派发权）。
-    // ⚠ 依赖登记：`openRoleSession` 的入参字段名 `dispatchTask` 以钉死契约为准；编排侧接线落地前，
-    //   真实 run-role 会静默忽略本字段（我方透传就位，等待其承接——见 change 文档）。
+    // H-1：**派发能力**（契约在 §4 冻结家 `model/runtime.ts`）——评审 §5.6：仅 `governanceFunction ===
+    // "schedule"`（Convener）；single/su 保留旧行为（`legacyBuiltIn`）。路由复用 E-1 投递机
+    // （`routeDispatch`）；「未注入即不注册」——项目角色与 Rapporteur/Nominator 都拿不到该工具。
     const dispatchTask: DispatchTaskFn | undefined =
-      role.builtIn === true
+      canSchedule
         ? (d: DispatchTaskPayload) => this.routeDispatch(req.projectRoot, req.runtime, req.roleId, d) // Promise<DispatchReceipt>——契约允许（工具侧 await）
         : undefined;
-    // G-2/W5（2026-10-16 客户批准）：**恢复提议能力**（`propose_recovery`——同 H-1 先例，**仅内置治理角色（su）**
-    // 会话注入；「未注入即不注册」= 最强 fail-closed）。工具 handler 只把载荷交进来；校验/呈现/执行/如实
-    // 回执全在本层（`proposeRecovery`）。契约（字段名与形状）＝ `model/runtime.ts::ProposeRecoveryFn`——
-    // 经编排 `common/编排/watchdog.ts` 同名转发（单一来源，本层不另立形状）。
+    // G-2/W5（2026-10-16 客户批准）：**恢复提议能力**（`propose_recovery`）——评审 §5.6：仅 schedule
+    // （single/su 保留旧行为）。工具 handler 只把载荷交进来；校验/呈现/执行/如实回执全在本层。
     const proposeRecovery: ProposeRecoveryFn | undefined =
-      role.builtIn === true ? (d: ProposeRecoveryPayload) => this.proposeRecovery(req.projectRoot, req.runtime, req.roleId, d) : undefined;
-    // G-2/W1（同处注入）：`role_status` / `session_tail` 两只读工具的桌面侧数据源（**仅 su 会话注入**；
-    // 快照/lastTurn 都是本层同源事实，不在工具层另造）。契约＝ `model/runtime.ts::RoleStatusFn/SessionTailFn`。
+      canSchedule ? (d: ProposeRecoveryPayload) => this.proposeRecovery(req.projectRoot, req.runtime, req.roleId, d) : undefined;
+    // G-2/W1（同处注入）：`role_status` / `session_tail` 两只读工具的桌面侧数据源（**仅 schedule**；
+    // single/su 保留旧行为）。快照/lastTurn 都是本层同源事实，不在工具层另造。
     const roleStatus: RoleStatusFn | undefined =
-      role.builtIn === true ? (query: RoleStatusPayload) => this.roleStatusText(req.projectRoot, query) : undefined;
+      canSchedule ? (query: RoleStatusPayload) => this.roleStatusText(req.projectRoot, query) : undefined;
     const sessionTail: SessionTailFn | undefined =
-      role.builtIn === true ? (query: SessionTailPayload) => this.sessionTailText(req.projectRoot, query) : undefined;
-    // G-4/I3（2026-10-16 客户批准；同 H-1/G-2 先例）：**技能安装/卸载能力**——**仅内置治理角色（su）**
-    // 会话注入；「未注入即不注册」= 最强 fail-closed（项目角色零感知）。工具 handler 只把 `{roleId,name}`
-    // 载荷交进来；护栏/校验/激活/回执/系统行全在本层（`applySkillChange`）。契约（字段名与形状）＝
-    // `model/runtime.ts::InstallSkillFn`/`UninstallSkillFn`（单一来源，本层不另立形状）。
-    // 护栏判据在调用**当刻**读活会话状态（`activeDeliveries`/busy——per-turn 权威信号）；工具层传来的
-    // metadata 仅供展示面，不作判定依据（不接收、不消费）。
+      canSchedule ? (query: SessionTailPayload) => this.sessionTailText(req.projectRoot, query) : undefined;
+    // G-4/I3（2026-10-16 客户批准；同 H-1/G-2 先例）：**技能安装/卸载能力**——评审 §5.6：仅
+    // `governanceFunction === "nomination"`（Nominator）；single/su 保留旧行为。「未注入即不注册」=
+    // 最强 fail-closed（项目角色零感知）。工具 handler 只把 `{roleId,name}` 载荷交进来；
+    // 护栏/校验/激活/回执/系统行全在本层（`applySkillChange`）。
     const installSkill: InstallSkillFn | undefined =
-      role.builtIn === true
+      canNominate
         ? (d: InstallSkillPayload, _metadata?: ReportHandbackMetadata) => this.applySkillChange("installed", req.projectRoot, req.runtime, req.roleId, d)
         : undefined;
     const uninstallSkill: UninstallSkillFn | undefined =
-      role.builtIn === true
+      canNominate
         ? (d: InstallSkillPayload, _metadata?: ReportHandbackMetadata) => this.applySkillChange("uninstalled", req.projectRoot, req.runtime, req.roleId, d)
         : undefined;
     // G-4 V2（2026-10-16 客户批准；同处注入）：**外来 MCP 安装/卸载能力**——与技能两工具**逐字同构**
-    // （仅 su 注入；「未注入即不注册」）；护栏/校验（声明）/激活/回执/系统行全在本层（`applyMcpChange`）。
+    // （仅 nomination；「未注入即不注册」）；护栏/校验（声明）/激活/回执/系统行全在本层（`applyMcpChange`）。
     const installMcp: InstallMcpFn | undefined =
-      role.builtIn === true
+      canNominate
         ? (d: InstallMcpPayload, _metadata?: ReportHandbackMetadata) => this.applyMcpChange("installed", req.projectRoot, req.runtime, req.roleId, d)
         : undefined;
     const uninstallMcp: UninstallMcpFn | undefined =
-      role.builtIn === true
+      canNominate
         ? (d: InstallMcpPayload, _metadata?: ReportHandbackMetadata) => this.applyMcpChange("uninstalled", req.projectRoot, req.runtime, req.roleId, d)
         : undefined;
 
@@ -1274,18 +1295,30 @@ export class SessionManager {
     // 走三层链（su 不自审）。缺省 ⇒ 编排对「规则集未注入」一律拒绝（fail-closed，绝不放宽）。
     const shellArming = role.builtIn === true ? undefined : this.deps.shellArming;
 
-    // **su 审批档（客户裁定 2026-10-17）**：内置治理角色（su）会话把 **(c) 实件 + (a) 通道**（均与项目角色
-    // 同一份 deps 引用——单一来源、永不漂移）经 `shellOperatorOnly` 交给编排装配审批档：
+    // **su 审批档（客户裁定 2026-10-17）**：仅 **single 模型下的内置治理角色（su）** 把 **(c) 实件 +
+    // (a) 通道**（均与项目角色同一份 deps 引用——单一来源、永不漂移）经 `shellOperatorOnly` 交给编排装配审批档：
     //   · (c)=allow（只读白名单）⇒ 直接放行、**0 卡**；
     //   · `risky`/`review`/`deny` ⇒ 客户逐条批准（deny 也可被批准）；拒绝/超时/不可用 = 拒绝。
     // **缺件（deps.shellArming 或 deps.shellOperatorChannel 缺省）⇒ 不传 ⇒ 不 arm**（能力缺席 = fail-closed）。
-    // 旧只读档 `shellReadonly` 桌面**不再使用**（类型保留以兼容其他调用方；与审批档同时出现时编排不 arm）。
+    // 评审 §5.6：trio 三人**都不接**该审批档（治理决定与命令放行分离）；`governanceModel === "single"` 是硬条件。
     const shellOperatorOnly =
-      role.builtIn === true && this.deps.shellArming && shellOperatorChannel
+      legacyBuiltIn && this.deps.shellArming && shellOperatorChannel
         ? {
             classifyShell: this.deps.shellArming.classifyShell,
             rules: this.deps.shellArming.rules,
             operatorChannel: shellOperatorChannel,
+          }
+        : undefined;
+
+    // **trio Convener 只读档（评审 §5.6）**：`governanceFunction === "schedule"` 时从**同一份**
+    // `deps.shellArming`（(c) 实件）构造 `{ classifyShell, rules }`——**不带 operator channel**：
+    // `(c)=allow` 直接执行；`risky`/`review`/`deny` 一律拒绝，不出客户审批卡。Rapporteur/Nominator 无 shell。
+    // single/su 不传（su 走上面的审批档——旧行为逐字不变）。
+    const shellReadonly =
+      governanceFunction === "schedule" && this.deps.shellArming
+        ? {
+            classifyShell: this.deps.shellArming.classifyShell,
+            rules: this.deps.shellArming.rules,
           }
         : undefined;
 
@@ -1375,9 +1408,11 @@ export class SessionManager {
           // I-1 补丁（2026-10-12，客户重发授权）：(c) 实件（classifyShell + defaultShellRules）——与 (a)
           // 同处装配（缺它 ⇒ 编排对「规则集未注入」一律拒绝——真机曾据此如实报「环境无 shell」）。
           ...(shellArming ? { shellArming } : {}),
-          // **su 审批档（客户裁定 2026-10-17）**：仅内置治理角色且 (c)+(a) 同备时给出；缺件不传 ⇒ 不 arm。
-          // 旧只读档 `shellReadonly` 不再传（桌面已改审批档）——与 `shellOperatorOnly` 的互斥由编排守卫兜底。
+          // **su 审批档（客户裁定 2026-10-17）**：仅 single/su 且 (c)+(a) 同备时给出；缺件不传 ⇒ 不 arm。
           ...(shellOperatorOnly ? { shellOperatorOnly } : {}),
+          // **trio Convener 只读档（评审 §5.6）**：同一份 (c) 实件、不含 operator channel；
+          // `(c)=allow` 直接执行，risky/review/deny 一律拒绝（不出客户审批卡）。
+          ...(shellReadonly ? { shellReadonly } : {}),
         },
         { createAdapter },
       );
@@ -1423,7 +1458,8 @@ export class SessionManager {
       ...(shellJudge !== undefined ? { shellJudge } : {}),
     };
     this.sessions.set(key, entry);
-    if (role.builtIn === true) this.lastSuRuntime.set(req.projectRoot, req.runtime); // G-2/W1：看护向 su 投递时择路用
+    // 评审 §5.6：只记录**回交主人**（trio=Convener；single=su）的 runtime——看护向主人投递时择路用。
+    if (canSchedule) this.lastGovernanceRuntime.set(req.projectRoot, req.runtime);
     entry.unsubscribePersistence = entry.handle.onPersistenceChange?.(change => {
       if (this.sessions.get(key) !== entry || change.scope.roleId !== entry.roleId || change.scope.runtime !== entry.runtime) return;
       if (change.kind === 'report-save') this.mergeReportState(entry, undefined, change.state, change.reportId);
@@ -1735,11 +1771,30 @@ export class SessionManager {
 
   // —————— 投递机（E-1 回交投 su + H-1 派发投目标角色；**同一套**，不造第二套） ——————
 
-  /** 主入口角色（su）id：**数据驱动**（门禁引擎枚举给的 `primaryRoleId`，不硬编码）；枚举不到 → null。 */
-  private suRoleIdOf(projectRoot: string): string | null {
+  /**
+   * **回交主人**角色 id（评审 §5.6，数据驱动、不硬编码）：
+   *  · trio → `governanceFunction === "schedule"` 的角色（Convener）；
+   *  · single → 门禁枚举给的 `primaryRoleId`（旧 su）。
+   * 回交、看护系统消息、恢复回执、投递失败系统行全部用它；`primaryRoleId` 只用于主入口/客户镜像。
+   * 枚举不到 → null（投递机按既有「目标未枚举」路径保留待重试，绝不静默丢）。
+   */
+  private handbackOwnerRoleId(projectRoot: string): string | null {
     const listing = this.deps.getListing(projectRoot);
-    const id = listing && typeof listing.primaryRoleId === "string" ? listing.primaryRoleId : "";
+    if (!listing) return null;
+    if ((listing.governanceModel ?? "single") === "trio") {
+      const convener = listing.roles.find((r) => r.governanceFunction === "schedule");
+      return convener !== undefined ? convener.roleId : null;
+    }
+    const id = typeof listing.primaryRoleId === "string" ? listing.primaryRoleId : "";
     return id !== "" ? id : null;
+  }
+
+  /**
+   * **派发主人**角色 id（routeDispatch 的来源防御性校验）：trio → Convener；single → 主入口（su）。
+   * 正常路径由 `open()` 的能力注入保证；此处只做防御性再校验（绝不静默换人）。
+   */
+  private dispatcherRoleIdOf(projectRoot: string): string | null {
+    return this.handbackOwnerRoleId(projectRoot);
   }
 
   /** 投递进展的**系统行**（首选进目标/请求者的 pane；首选未知时退回兜底角色）——如实、不静默。 */
@@ -1929,7 +1984,7 @@ export class SessionManager {
     try {
       if (!hb || typeof hb !== "object" || typeof (hb as { roleId?: unknown }).roleId !== "string") {
         this.emitDeliveryNote(projectRoot, runtime,
-          this.suRoleIdOf(projectRoot),
+          this.handbackOwnerRoleId(projectRoot),
           "(未知角色)",
           "收到一条**形状不符**的回交事件（缺 handback 载荷 / 缺 roleId）——**未投递**（如实忽略；不崩、不静默）。"
         );
@@ -1938,8 +1993,8 @@ export class SessionManager {
       hb = structuredClone(hb);
       if (report) report = structuredClone(report);
       if (liveReport) liveReport = structuredClone(liveReport);
-      const suRoleId = this.suRoleIdOf(projectRoot);
-      if (suRoleId !== null && hb.roleId === suRoleId) return; // su 不自我回交（编排也不发；防御）
+      const ownerRoleId = this.handbackOwnerRoleId(projectRoot);
+      if (isBuiltInGovernanceRoleId(hb.roleId) || (ownerRoleId !== null && hb.roleId === ownerRoleId)) return; // 内置治理角色不自我回交（编排也不发；防御）
       const key = `${projectRoot}\u0000${runtime}\u0000${handbackKey(hb)}`;
       if (this.enqueuedHandbackKeys.has(key)) {
         diagnostic.record("report.duplicate");
@@ -1953,16 +2008,16 @@ export class SessionManager {
         text = renderHandbackPrompt(hb);
       } catch (err) {
         this.emitDeliveryNote(projectRoot, runtime,
-          suRoleId,
+          ownerRoleId,
           hb.roleId,
           `回交载荷无法渲染（${err instanceof Error ? err.message : String(err)}）——**未投递**（如实忽略；不崩）。`
         );
         return;
       }
-      this.enqueueDelivery(projectRoot, suRoleId ?? "", {
+      this.enqueueDelivery(projectRoot, ownerRoleId ?? "", {
         kind: "handback",
         runtime,
-        targetRoleId: suRoleId ?? "",
+        targetRoleId: ownerRoleId ?? "",
         sourceRoleId: hb.roleId,
         text,
         summary: `回交投递 · 来自 ${hb.roleId}`,
@@ -1972,12 +2027,12 @@ export class SessionManager {
         ...(liveReport ? { liveReport, liveDurability } : {}),
       });
       diagnostic.record("report.enqueued");
-      await this.drainQueue(projectRoot, suRoleId, runtime);
+      await this.drainQueue(projectRoot, ownerRoleId, runtime);
     } catch (err) {
       diagnostic.error("report.failed", err);
       // 兜底（belt & braces）：任何意外都如实拦截为系统行——**不产生未捕获拒绝**。
       this.emitDeliveryNote(projectRoot, runtime,
-        this.suRoleIdOf(projectRoot),
+        this.handbackOwnerRoleId(projectRoot),
         "(未知角色)",
         `回交处理异常已拦截（不产生未捕获拒绝）：${err instanceof Error ? err.message : String(err)}`
       );
@@ -2019,9 +2074,27 @@ export class SessionManager {
     if (targetRoleId === "" || task.trim() === "") {
       return fail("派发未受理：roleId 与 task 都必须非空。", "派发未受理：roleId 与 task 都必须非空。");
     }
+    // —— 来源防御性校验（评审 §5.6）：trio 必须是 Convener；single 必须是主入口（su）——
+    // 正常路径由 `open()` 的能力注入保证（只有 schedule/legacy 注入 dispatchTask）；这里再拒一次，
+    // **绝不**把「谁调用」当授权（授权=账本中的客户决定，见下方门禁）。
+    const listing = this.deps.getListing(projectRoot);
+    const model: GovernanceModel = listing?.governanceModel ?? "single";
+    const dispatcherRoleId = this.dispatcherRoleIdOf(projectRoot);
+    if (dispatcherRoleId === null) {
+      return fail(
+        "派发未受理：未枚举到本项目治理模型下的派发主人（trio=Convener / single=主入口）——**未投递**。",
+        "派发未受理：未枚举到派发主人——**未投递**（不静默）。",
+      );
+    }
+    if (fromRoleId !== dispatcherRoleId) {
+      return fail(
+        `派发未受理：来源角色 ${fromRoleId} 不是本项目派发主人 ${dispatcherRoleId}（${model === "trio" ? "Convener" : "主入口"}）。`,
+        `派发未受理：来源角色 ${fromRoleId} 不是派发主人 ${dispatcherRoleId}——**未投递**（不静默）。`,
+      );
+    }
     const findTarget = (): { builtIn?: boolean } | undefined => {
-      const listing = this.deps.getListing(projectRoot);
-      return listing ? listing.roles.find((r) => r.roleId === targetRoleId) : undefined;
+      const current = this.deps.getListing(projectRoot);
+      return current ? current.roles.find((r) => r.roleId === targetRoleId) : undefined;
     };
     let target = findTarget();
     if (!target && this.deps.refreshListing) {
@@ -2039,13 +2112,43 @@ export class SessionManager {
         `派发未受理：角色 ${targetRoleId} 不在本项目——**未投递**（不静默）。`
       );
     }
-    if (target.builtIn === true) {
+    if (target.builtIn === true || isBuiltInGovernanceRoleId(targetRoleId)) {
       return fail(
-        `派发未受理：${targetRoleId} 是内置治理角色（su 自身或同类）——派发对象应是项目角色。`,
+        `派发未受理：${targetRoleId} 是内置治理角色（trio 三人与 su 均不可被派发）——派发对象应是项目角色。`,
         `派发未受理：${targetRoleId} 是内置治理角色——**未投递**（不静默）。`
       );
     }
     const reason = d && typeof d.reason === "string" ? d.reason : undefined;
+    const flowId = d && typeof d.flowId === "string" ? d.flowId : undefined;
+    const stepId = d && typeof d.stepId === "string" ? d.stepId : undefined;
+    // —— 派发范围门（评审 §6.2 五条；门禁只读账本快照，不读 Markdown status）——
+    // trio：读 `.ans/governance/ledger.jsonl` 判「已接受提案 + 任命/快捷路径 + 流程步骤 + 未派发过」；
+    // single：`evaluateGovernanceGate` 不分流三权门禁（旧行为逐字不变，**不读账本**）。
+    const ledgerSnapshot =
+      model === "trio"
+        ? await (async () => {
+            const ledger = await readGovernanceLedger(projectRoot);
+            return { entries: ledger.entries, errors: ledger.errors };
+          })()
+        : { entries: [], errors: [] };
+    const gate = evaluateGovernanceGate(
+      {
+        projectRoot,
+        model,
+        roleId: fromRoleId,
+        action: "dispatch",
+        ...(flowId !== undefined ? { flowId } : {}),
+        ...(stepId !== undefined ? { stepId } : {}),
+        targetRoleId,
+      },
+      ledgerSnapshot,
+    );
+    if (!gate.allowed) {
+      return fail(
+        `派发被治理门禁拒绝：${gate.message}`,
+        `派发未受理（治理门禁 ${gate.code}）：${gate.message}——**未投递**（不静默）。`,
+      );
+    }
     // —— G-1／A2：必读引用接线（提取/判据/渲染 = 编排三件套单一来源；本层只探测 + 按判据分流）——
     // 探测：逐引用算文件**当刻字节**的内容 sha256（复用 `filePrint`；缺失/读失败返回 `<missing>`——
     // `planDispatchDelivery` 判据内天然按缺失处理，无需本层再映射）。
@@ -2056,12 +2159,14 @@ export class SessionManager {
     // 判据必须**紧挨去重登记之前**（见方法注释：拒投不登记——防「键在送达才释放」被拒投项拖成残留误去重）。
     const plan = planDispatchDelivery({ roleId: targetRoleId, task, reason }, probes);
     if (plan.action === "reject") {
-      // fail-closed 拒投：不入队、不登记去重键、不开目标会话；如实回执（工具）+ 系统行（su 聊天流）。
+      // fail-closed 拒投：不入队、不登记去重键、不开目标会话；如实回执（工具）+ 系统行（主人聊天流）。
       return fail(plan.message, plan.systemRow);
     }
-    const dedupKey = `${projectRoot}\u0000${runtime}\u0000${targetRoleId}\u0000${task}\u0000${reason ?? ""}`;
+    // 去重键（评审 §5.6/§6.3-5）：既有 `roleId\0task\0reason` 之外增 `flowId\0stepId`（缺失为空串——
+    // single 旧行为不变）。
+    const dedupKey = `${projectRoot}\u0000${runtime}\u0000${targetRoleId}\u0000${task}\u0000${reason ?? ""}\u0000${flowId ?? ""}\u0000${stepId ?? ""}`;
     if (this.activeDispatchKeys.has(dedupKey)) {
-      return { ok: true, message: `该派发（目标 ${targetRoleId}，同任务文本）已在投递队列中——已去重，不重复投递。` };
+      return { ok: true, message: `该派发（目标 ${targetRoleId}，同任务文本/流程步骤）已在投递队列中——已去重，不重复投递。` };
     }
     this.activeDispatchKeys.add(dedupKey);
     this.enqueueDelivery(projectRoot, targetRoleId, {
@@ -2075,13 +2180,35 @@ export class SessionManager {
       summary: `派发 · 来自 ${fromRoleId}：${shortenText(task, 40)}`,
       dedupKey,
     });
+    // 账本 `dispatch.accepted`（评审 §5.6/§5.7）：**成功入队后**写；门禁/投递失败不写。
+    // 仅 trio（single 旧项目不产生 `.ans/governance` 记录——行为逐字不变）。账本失败**不翻转**派发
+    // （只记诊断；客户决定与队列照旧）；`messageSummary` 截断 ≤200 字。
+    if (model === "trio") {
+      const appended = await appendGovernanceLedger(projectRoot, {
+        at: new Date(this.now()).toISOString(),
+        kind: "dispatch.accepted",
+        ...(flowId !== undefined ? { flowId } : {}),
+        ...(stepId !== undefined ? { stepId } : {}),
+        actorRoleId: fromRoleId,
+        power: "schedule",
+        targetRoleId,
+        messageSummary: shortenText(task, 200),
+        runtime,
+      });
+      if (!appended.ok) {
+        createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId: fromRoleId }).error(
+          "governance.ledger.dispatch.failed",
+          new Error(appended.message),
+        );
+      }
+    }
     void this.drainQueue(projectRoot, targetRoleId, runtime);
     return {
       ok: true,
       message:
         `已受理：任务将投递给角色 ${targetRoleId} 的会话` +
         (this.sessions.get(this.sessionKey(projectRoot, targetRoleId, runtime)) ? "" : "（其会话未开——将自动开启）") +
-        `；投递结果/失败会在其聊天流与 su 的聊天流如实显示（受理≠已完成）。`,
+        `；投递结果/失败会在其聊天流与 ${model === "trio" ? `Convener（${fromRoleId}）` : "su"} 的聊天流如实显示（受理≠已完成）。`,
     };
   }
 
@@ -2133,7 +2260,8 @@ export class SessionManager {
     const pending = this.deps.watchdogPendingConfirmations?.() ?? { total: 0, byRole: new Map<string, number>() };
     return {
       projectRoot,
-      suRoleId: this.suRoleIdOf(projectRoot),
+      // 评审 §5.6：`suRoleId` → `governanceRoleId`（值=回交主人：trio=Convener / single=主入口）。
+      governanceRoleId: this.handbackOwnerRoleId(projectRoot),
       roles,
       queues,
       activeDeliveries,
@@ -2158,20 +2286,21 @@ export class SessionManager {
   }
 
   /**
-   * **系统消息投递**（W2）：看护的告警/收束/恢复回执经**同一套投递机**真投递给 su——忙时排队、未开自动开、
-   * 失败保留重试全部复用（`kind:"system"`；来源标注恒空——呈现层按文首 `[系统·<子类>] ` 定格标记归类）。
-   * 目标 su 未枚举到 ⇒ 入 `""` 目标队列（投递机既有的一次性提示 + 保留待重试；**绝不静默丢**）。
+   * **系统消息投递**（W2）：看护的告警/收束/恢复回执经**同一套投递机**真投递给**回交主人**（评审 §5.6：
+   * trio=Convener；single=su）——忙时排队、未开自动开、失败保留重试全部复用（`kind:"system"`；来源标注
+   * 恒空——呈现层按文首 `[系统·<子类>] ` 定格标记归类）。主人未枚举到 ⇒ 入 `""` 目标队列（投递机既有的
+   * 一次性提示 + 保留待重试；**绝不静默丢**）。
    */
   watchdogDeliver(projectRoot: string, message: { text: string; summary: string; dedupKey: string }): void {
-    const suRoleId = this.suRoleIdOf(projectRoot);
+    const governanceRoleId = this.handbackOwnerRoleId(projectRoot);
     let runtime: RuntimeKind | undefined;
-    if (suRoleId !== null) {
+    if (governanceRoleId !== null) {
       for (const entry of this.sessions.values()) {
-        if (entry.projectRoot === projectRoot && entry.roleId === suRoleId) { runtime = entry.runtime; break; }
+        if (entry.projectRoot === projectRoot && entry.roleId === governanceRoleId) { runtime = entry.runtime; break; }
       }
     }
-    if (runtime === undefined) runtime = this.lastSuRuntime.get(projectRoot) ?? "pi";
-    const target = suRoleId ?? "";
+    if (runtime === undefined) runtime = this.lastGovernanceRuntime.get(projectRoot) ?? "pi";
+    const target = governanceRoleId ?? "";
     this.enqueueDelivery(projectRoot, target, {
       kind: "system",
       runtime,
@@ -2181,7 +2310,7 @@ export class SessionManager {
       summary: message.summary,
       dedupKey: message.dedupKey,
     });
-    void this.drainQueue(projectRoot, suRoleId, runtime);
+    void this.drainQueue(projectRoot, governanceRoleId, runtime);
   }
 
   /**
@@ -2319,7 +2448,11 @@ export class SessionManager {
       target = findTarget();
     }
     if (!target) return refuse(`角色 ${targetRoleId} 不在本项目（未枚举到）——未推送任何确认卡。`, "target-missing");
-    if (target.builtIn === true) return refuse(`${targetRoleId} 是内置治理角色——恢复动作只针对项目角色（未推送任何确认卡）。`, "target-builtin");
+    // 目标须是**本项目角色**且**不是任一内置治理角色**（评审 §5.6：三人与 su 都不可作为恢复目标；
+    // 沿 routeDispatch 的校验先例；缓存 miss ⇒ 实时重枚举一次）。
+    if (target.builtIn === true || isBuiltInGovernanceRoleId(targetRoleId)) {
+      return refuse(`${targetRoleId} 是内置治理角色——恢复动作只针对项目角色（未推送任何确认卡）。`, "target-builtin");
+    }
 
     const presenter = this.deps.recoveryConfirm;
     if (presenter === undefined) {
@@ -2443,27 +2576,27 @@ export class SessionManager {
     action: "installed" | "uninstalled",
     projectRoot: string,
     runtime: RuntimeKind,
-    suRoleId: string,
+    callerRoleId: string,
     d: InstallSkillPayload,
   ): Promise<InstallSkillReceipt> {
     const acting = action === "installed";
     const verb = acting ? "安装" : "卸载";
     const toolName = acting ? "install_skill" : "uninstall_skill";
-    const diagnostic = createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId: suRoleId });
+    const diagnostic = createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId: callerRoleId });
     const refuse = (reason: string, message: string): InstallSkillReceipt => {
       diagnostic.record("skill.refused", { toolName, targetRoleId: typeof d?.roleId === "string" ? d.roleId : "", reasonCode: reason });
       return { ok: false, reason, message };
     };
 
     // ① 裁定④ 轮次护栏（**先判**；拒绝零副作用——不触目标、不读登记、不投系统行）。
-    if (!this.isCustomerInitiatedTurn(projectRoot, runtime, suRoleId)) {
+    if (!this.isCustomerInitiatedTurn(projectRoot, runtime, callerRoleId)) {
       return refuse("not-customer-turn", "本动作仅可在客户消息发起的轮次执行——未执行。");
     }
 
     // ② 载荷防御（模型输入不可信——本层全量重校验，不依赖工具层的参数校验）。
     const roleId = typeof d?.roleId === "string" ? d.roleId.trim() : "";
     const name = typeof d?.name === "string" ? d.name.trim() : "";
-    if (roleId === "") return refuse("role-not-found", `角色「${roleId}」不是本项目项目角色（或为治理角色 su）——未执行。`);
+    if (roleId === "") return refuse("role-not-found", `角色「${roleId}」不是本项目项目角色（或为内置治理角色）——未执行。`);
     if (name === "") return refuse("not-registered", `技能未登记：docs/skills/${name}/install.md 不存在——先落盘再${verb}；未执行。`);
 
     // ③ 目标角色须是**本项目项目角色**（非内置治理角色 su 自身/同类）；缓存 miss ⇒ 实时重枚举一次
@@ -2481,8 +2614,8 @@ export class SessionManager {
       }
       target = findTarget();
     }
-    if (!target || target.builtIn === true || roleId === suRoleId) {
-      return refuse("role-not-found", `角色「${roleId}」不是本项目项目角色（或为治理角色 su）——未执行。`);
+    if (!target || target.builtIn === true || isBuiltInGovernanceRoleId(roleId)) {
+      return refuse("role-not-found", `角色「${roleId}」不是本项目项目角色（或为内置治理角色）——未执行。`);
     }
 
     // ④ 登记校验（**唯一来源**＝编排 `readSkillRegistration`——与渲染器坏件集逐字同口径，绝不复制解析）。
@@ -2591,27 +2724,27 @@ export class SessionManager {
     action: "installed" | "uninstalled",
     projectRoot: string,
     runtime: RuntimeKind,
-    suRoleId: string,
+    callerRoleId: string,
     d: InstallMcpPayload,
   ): Promise<InstallMcpReceipt> {
     const acting = action === "installed";
     const verb = acting ? "安装" : "卸载";
     const toolName = acting ? "install_mcp" : "uninstall_mcp";
-    const diagnostic = createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId: suRoleId });
+    const diagnostic = createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId: callerRoleId });
     const refuse = (reason: string, message: string): InstallMcpReceipt => {
       diagnostic.record("mcp.refused", { toolName, targetRoleId: typeof d?.roleId === "string" ? d.roleId : "", reasonCode: reason });
       return { ok: false, reason, message };
     };
 
     // ① 裁定④ 轮次护栏（**先判**；与技能两工具同判据同文案）。
-    if (!this.isCustomerInitiatedTurn(projectRoot, runtime, suRoleId)) {
+    if (!this.isCustomerInitiatedTurn(projectRoot, runtime, callerRoleId)) {
       return refuse("not-customer-turn", "本动作仅可在客户消息发起的轮次执行——未执行。");
     }
 
     // ② 载荷防御（模型输入不可信——本层全量重校验）。
     const roleId = typeof d?.roleId === "string" ? d.roleId.trim() : "";
     const name = typeof d?.name === "string" ? d.name.trim() : "";
-    if (roleId === "") return refuse("role-not-found", `角色「${roleId}」不是本项目项目角色（或为治理角色 su）——未执行。`);
+    if (roleId === "") return refuse("role-not-found", `角色「${roleId}」不是本项目项目角色（或为内置治理角色）——未执行。`);
     if (name === "") return refuse("not-registered", `MCP 未登记：docs/mcp/${name}.md 不存在——先落盘再${verb}；未执行。`);
 
     // ③ 目标角色须是**本项目项目角色**（非内置治理角色 su 自身/同类）；缓存 miss ⇒ 实时重枚举一次
@@ -2629,8 +2762,8 @@ export class SessionManager {
       }
       target = findTarget();
     }
-    if (!target || target.builtIn === true || roleId === suRoleId) {
-      return refuse("role-not-found", `角色「${roleId}」不是本项目项目角色（或为治理角色 su）——未执行。`);
+    if (!target || target.builtIn === true || isBuiltInGovernanceRoleId(roleId)) {
+      return refuse("role-not-found", `角色「${roleId}」不是本项目项目角色（或为内置治理角色）——未执行。`);
     }
 
     // ④ 声明校验（**唯一来源**＝运行时核心 `readMcpDeclaration`——与装配列表函数逐字同口径，绝不复制解析）。
@@ -2729,14 +2862,15 @@ export class SessionManager {
         lines.push("（尚无运行态：项目未导入，或还没有任何会话/队列——先导入项目并点开角色。）");
         return { ok: true, text: lines.join("\n") };
       }
-      const suRoleId = snapshot.suRoleId;
+      // 评审 §5.6：状态行的主人行数据驱动（trio=Convener；single=su）——**不让 Rapporteur 会话自称 su**。
+      const governanceRoleId = snapshot.governanceRoleId;
       const pendingFor = (rid: string): number => snapshot.pendingConfirmationsByRole.get(rid) ?? 0;
-      const suBusy = suRoleId !== null && snapshot.roles.some((r) => r.roleId === suRoleId && r.busy);
+      const governanceBusy = governanceRoleId !== null && snapshot.roles.some((r) => r.roleId === governanceRoleId && r.busy);
       const stats = this.deps.watchdogStats?.(projectRoot);
       const watchdogLine = stats
         ? `看护：活跃告警 ${stats.activeAlerts}，最近触发 ${stats.lastAlertAt !== null ? new Date(stats.lastAlertAt).toISOString() : "null"}，已抑制 ${stats.suppressedTotal}`
         : "看护：未接线";
-      lines.push(`su：busy=${suBusy} ｜ 待确认卡 ${suRoleId !== null ? pendingFor(suRoleId) : 0} ｜ ${watchdogLine}`);
+      lines.push(`${governanceRoleId ?? "（未枚举）"}：busy=${governanceBusy} ｜ 待确认卡 ${governanceRoleId !== null ? pendingFor(governanceRoleId) : 0} ｜ ${watchdogLine}`);
       const listing = this.deps.getListing(projectRoot);
       const knownRoles = listing ? listing.roles.map((r) => r.roleId) : [...new Set([...snapshot.roles.map((r) => r.roleId), ...snapshot.queues.map((q) => q.targetRoleId)])].filter((r) => r !== "");
       const wantedRoleId = typeof query?.roleId === "string" ? query.roleId.trim() : "";
@@ -2928,7 +3062,7 @@ export class SessionManager {
       .then(() => this.drainQueueUnsafe(projectRoot, targetRoleId, runtime))
       .catch((err) => {
         this.emitDeliveryNote(projectRoot, runtime,
-          this.suRoleIdOf(projectRoot),
+          this.handbackOwnerRoleId(projectRoot),
           "(投递机)",
           `投递机异常已拦截（不产生未捕获拒绝）：${err instanceof Error ? err.message : String(err)}`
         );
@@ -2964,7 +3098,7 @@ export class SessionManager {
    */
   private async drainQueueUnsafe(projectRoot: string, targetRoleId: string | null, runtime: RuntimeKind): Promise<void> {
     const resolvedTarget =
-      targetRoleId !== null && targetRoleId !== "" ? targetRoleId : (this.suRoleIdOf(projectRoot) ?? "");
+      targetRoleId !== null && targetRoleId !== "" ? targetRoleId : (this.handbackOwnerRoleId(projectRoot) ?? "");
     const key = this.queueKey(projectRoot, resolvedTarget, runtime);
     const q = this.deliveryQueues.get(key);
     if (!q || q.length === 0) return;
@@ -2994,7 +3128,7 @@ export class SessionManager {
           item.kind === "handback" ? resolvedTarget : item.sourceRoleId,
           item.sourceRoleId,
           item.kind === "handback"
-            ? `有回交（来自 ${item.sourceRoleId}）待投递，但**开启 su 会话失败**：${opened.error ?? "未知原因"}——未投递（已保留；下次时机自动重试：你打开 su、或下一次回交/一轮结束）。`
+            ? `有回交（来自 ${item.sourceRoleId}）待投递，但**开启 ${resolvedTarget} 会话失败**：${opened.error ?? "未知原因"}——未投递（已保留；下次时机自动重试：你打开 ${resolvedTarget}、或下一次回交/一轮结束）。`
             : `有派发任务（来自 ${item.sourceRoleId}）待投递给角色 ${resolvedTarget}，但**开启其会话失败**：${opened.error ?? "未知原因"}——未投递（已保留；下次时机自动重试：你打开该角色、或下一次派发/一轮结束）。`
         );
         return;
@@ -3018,9 +3152,9 @@ export class SessionManager {
 
     // —— F-2-opt3：认领段开始（自此到 claim.end 之间的同步改动都在串行链内；随后链即释放）——
     diagnostic.record("delivery.claim.start", { state: item.kind, queueDepth: q.length });
-    // 仅 su 队首连续回交合批；客户消息/派发是屏障，正文仍由编排唯一生成。
+    // 仅回交主人队首连续回交合批；客户消息/派发是屏障，正文仍由编排唯一生成。
     let batchCount = 1;
-    if (resolvedTarget === this.suRoleIdOf(projectRoot) && item.kind === "handback" && item.handback && !item.deliveryId) {
+    if (resolvedTarget === this.handbackOwnerRoleId(projectRoot) && item.kind === "handback" && item.handback && !item.deliveryId) {
       while (batchCount < q.length && q[batchCount].kind === "handback" && q[batchCount].handback) batchCount += 1;
     }
     let text = item.text;
@@ -3080,9 +3214,9 @@ export class SessionManager {
       this.notifyRoleState(projectRoot, resolvedTarget, runtime); // 立即外推（running 行即时可见）
       if (sent.kind === "dispatch") this.activeDispatchKeys.delete(sent.dedupKey); // 送达即释放窗口去重（返工可再派）
       if (sent.kind === "handback") {
-        this.emitDeliveryNote(projectRoot, runtime, resolvedTarget, sent.sourceRoleId, `已自动投递 ${sentItems.map((queued) => queued.sourceRoleId).join("、")} 的回交给 su（等待验收与汇总）。`);
+        this.emitDeliveryNote(projectRoot, runtime, resolvedTarget, sent.sourceRoleId, `已自动投递 ${sentItems.map((queued) => queued.sourceRoleId).join("、")} 的回交给 ${resolvedTarget}（等待验收与汇总）。`);
       } else if (sent.kind === "dispatch") {
-        // 派发成功：目标 pane 看得见"任务到货"，su 的 pane 有一条受理回执行（受理≠已完成，如实）。
+        // 派发成功：目标 pane 看得见"任务到货"，派发主人的 pane 有一条受理回执行（受理≠已完成，如实）。
         this.emitDeliveryNote(projectRoot, runtime, resolvedTarget, sent.sourceRoleId, `已接收来自 ${sent.sourceRoleId} 的派发任务——请按任务文本执行，完成后交回报告。`);
         this.emitDeliveryNote(projectRoot, runtime, sent.sourceRoleId, sent.sourceRoleId, `已派发任务给 ${resolvedTarget}（已投递到其会话；其结果/回交会回到本会话）。`);
       }
@@ -3129,7 +3263,7 @@ export class SessionManager {
       // 与 drainQueue 安全壳同款：续段已脱离链，其抛错必须**就地**拦截——绝不产生未捕获拒绝
       // （旧实现里该抛错由 drainQueue 的 catch 收口；F-2-M1 后续段在链外，等价物移到这里）。
       this.emitDeliveryNote(projectRoot, runtime,
-        this.suRoleIdOf(projectRoot),
+        this.handbackOwnerRoleId(projectRoot),
         "(投递机)",
         `投递机异常已拦截（不产生未捕获拒绝）：${err instanceof Error ? err.message : String(err)}`
       );

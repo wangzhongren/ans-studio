@@ -13,7 +13,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { after } from "node:test";
@@ -42,22 +42,48 @@ function emptyProject(): string {
   return mkdtempSync(join(TMP, "empty-"));
 }
 
+/**
+ * 造一个**显式 single 模型**的未 bootstrap 项目（`.ans/project.json` 只写 `governanceModel:"single"`）。
+ * 三权 V1 起「无 `.ans` + 无角色」的新空项目默认 **trio**（评审 §5.4）；旧 su 创世路径只在
+ * single 模型下保留——本文件的 su 用例因此显式钉模型，验证「迁移前 su 行为不变」。
+ */
+function legacySingleProject(): string {
+  const root = emptyProject();
+  mkdirSync(join(root, ".ans"), { recursive: true });
+  writeFileSync(join(root, ".ans", "project.json"), JSON.stringify({ governanceModel: "single" }), "utf8");
+  return root;
+}
+
 const ACCEPTED = { accepted: true, source: "unit-test:desktop-app" } as const;
 
 // ————————————————— ① buildProjectConfig：未 bootstrap 时带 genesisBootstrap，有角色时不带 —————————————————
 
-test("未 bootstrap（hasRoles:false）→ ProjectConfig 带 genesisBootstrap，source 如实记录操作者授权来源", async () => {
+test("未 bootstrap（hasRoles:false）：新空项目默认 trio，ProjectConfig 带 genesisBootstrap，source 含主入口", async () => {
   const root = emptyProject();
   const listing = await listProject(root);
   assert.equal(listing.hasRoles, false, "空项目应枚举为未 bootstrap");
-  assert.equal(listing.primaryRoleId, "su", "主入口为门禁引擎枚举给出的内置治理角色");
+  assert.equal(listing.governanceModel, "trio", "新空项目默认 trio（评审 §5.4）");
+  assert.equal(listing.primaryRoleId, "rapporteur", "trio 主入口为 rapporteur");
 
   const cfg = buildProjectConfig(listing, { ...ACCEPTED }, { ANS_SKILL_ROOT: "/x/skill" });
-  assert.ok(cfg.genesisBootstrap, "未 bootstrap 必须带 genesisBootstrap（否则 su 一个字也写不了）");
+  assert.equal(cfg.governanceModel, "trio", "ProjectConfig 必须带上枚举出的治理模型（否则边界按 single 解析）");
+  assert.ok(cfg.genesisBootstrap, "未 bootstrap 必须带 genesisBootstrap（否则治理角色一个字也写不了）");
   const src = cfg.genesisBootstrap!.source;
   assert.ok(src.includes("desktop-app"), "source 须如实标注 desktop-app（操作者授权来源）");
   assert.ok(src.includes(listing.primaryRoleId), "source 须含 primaryRoleId（不硬编码 su）");
   assert.ok(/bootstrap/.test(src), "source 须点明这是 bootstrap 授权");
+});
+
+test("未 bootstrap + 显式 single（旧项目）：仍 su 主入口、带 genesisBootstrap（迁移前 su 行为不变）", async () => {
+  const root = legacySingleProject();
+  const listing = await listProject(root);
+  assert.equal(listing.hasRoles, false);
+  assert.equal(listing.governanceModel, "single", "显式 single 保持旧模型");
+  assert.equal(listing.primaryRoleId, "su", "single 主入口仍为 su");
+
+  const cfg = buildProjectConfig(listing, { ...ACCEPTED }, { ANS_SKILL_ROOT: "/x/skill" });
+  assert.equal(cfg.governanceModel, "single");
+  assert.ok(cfg.genesisBootstrap, "single 未 bootstrap 仍带创世授权");
 });
 
 test("已 bootstrap（hasRoles:true，真实仓库根）→ ProjectConfig **不带** genesisBootstrap（切换条件）", async () => {
@@ -74,6 +100,7 @@ test("已 bootstrap（hasRoles:true，真实仓库根）→ ProjectConfig **不�
 async function captureSuGate(root: string): Promise<WriteGate> {
   const listing = await listProject(root);
   assert.equal(listing.hasRoles, false);
+  assert.equal(listing.governanceModel, "single", "su 创世用例显式钉 single 模型");
   const project: ProjectConfig = buildProjectConfig(listing, { ...ACCEPTED }, { ANS_SKILL_ROOT: "/x/skill" });
   let captured: WriteGate | undefined;
   await openRoleSession(
@@ -89,8 +116,8 @@ async function captureSuGate(root: string): Promise<WriteGate> {
   return captured!;
 }
 
-test("未 bootstrap：su 的 gate 放行治理产物 角色卡/<新角色>/{role-card.md,boundary.yaml}（scope:undefined 下命中即放行）", async () => {
-  const root = emptyProject();
+test("未 bootstrap（single）：su 的 gate 放行治理产物 角色卡/<新角色>/{role-card.md,boundary.yaml}（scope:undefined 下命中即放行）", async () => {
+  const root = legacySingleProject();
   const gate = await captureSuGate(root);
 
   const card = gate("角色卡/新角色/role-card.md");
@@ -99,15 +126,15 @@ test("未 bootstrap：su 的 gate 放行治理产物 角色卡/<新角色>/{role
   assert.equal(boundary.allowed, true, "su 应能写出新角色的 boundary.yaml");
 });
 
-test("未 bootstrap：su 的 gate 放行 docs/ 与 .ans/ 治理产物", async () => {
-  const root = emptyProject();
+test("未 bootstrap（single）：su 的 gate 放行 docs/ 与 .ans/ 治理产物", async () => {
+  const root = legacySingleProject();
   const gate = await captureSuGate(root);
   assert.equal(gate("docs/design/x.md").allowed, true, "docs/ 属治理产物，应放行");
   assert.equal(gate(".ans/project.json").allowed, true, ".ans/ 属治理产物，应放行");
 });
 
-test("未 bootstrap：su 的 gate **拒绝** src/**（非治理产物）与项目根之外的绝对路径", async () => {
-  const root = emptyProject();
+test("未 bootstrap（single）：su 的 gate **拒绝** src/**（非治理产物）与项目根之外的绝对路径", async () => {
+  const root = legacySingleProject();
   const gate = await captureSuGate(root);
 
   const src = gate("src/evil.ts");

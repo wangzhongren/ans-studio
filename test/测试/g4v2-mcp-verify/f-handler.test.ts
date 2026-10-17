@@ -103,8 +103,8 @@ test("F2 拒绝全分支 → reason 映射逐字＋零副作用（盘快照/零�
       assert.equal(h.disposed("X") + h.disposed("Y"), 0, `${label}: 零重建`);
     };
 
-    await expectRefusal(install({ roleId: "NOPE", name: "ok" }), "role-not-found", "角色「NOPE」不是本项目项目角色（或为治理角色 su）——未执行。", "角色不存在");
-    await expectRefusal(install({ roleId: "su", name: "ok" }), "role-not-found", "或为治理角色 su", "su 自身");
+    await expectRefusal(install({ roleId: "NOPE", name: "ok" }), "role-not-found", "角色「NOPE」不是本项目项目角色（或为内置治理角色）——未执行。", "角色不存在");
+    await expectRefusal(install({ roleId: "su", name: "ok" }), "role-not-found", "或为内置治理角色", "su 自身");
     await expectRefusal(install({ roleId: "  ", name: "ok" }), "role-not-found", "——未执行。", "空 roleId");
     await expectRefusal(install({ roleId: "X", name: "" }), "not-registered", "MCP 未登记：docs/mcp/.md 不存在——先落盘再安装；未执行。", "空 name");
     await expectRefusal(install({ roleId: "X", name: "不存在" }), "not-registered", "MCP 未登记：docs/mcp/不存在.md 不存在——先落盘再安装；未执行。", "声明缺失");

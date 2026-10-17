@@ -59,7 +59,9 @@ test("U1 恢复卡源码钉：恰 allow:true 才作为执行请求回传；取�
   assert.ok(/\$\("rc-deny"\)\.addEventListener\("click", function \(\) \{ respondRecoveryConfirm\(false\); \}\)/.test(r), "「取消」⇒ false");
   assert.ok(/\$\("rc-close"\)\.addEventListener\("click", function \(\) \{ respondRecoveryConfirm\(false\); \}\)/.test(r), "关闭（×）⇒ false");
   assert.ok(r.includes('if (e.key === "Escape" && state.recoveryConfirm)'), "Esc ⇒ 先答恢复卡");
-  assert.ok(/if \(e\.key === "Escape" && state\.recoveryConfirm\) \{\n\s*e\.preventDefault\(\);\n\s*respondRecoveryConfirm\(false\);/.test(r), "Esc ⇒ false（否决 = fail-closed 同向）");
+  // 行尾兼容：Windows 工作树（core.autocrlf=true）下源文件为 CRLF——同一结构断言用 `\r?\n`，
+  // 不放宽语义（仍要求「preventDefault → respondRecoveryConfirm(false)」紧邻）。
+  assert.ok(/if \(e\.key === "Escape" && state\.recoveryConfirm\) \{\r?\n\s*e\.preventDefault\(\);\r?\n\s*respondRecoveryConfirm\(false\);/.test(r), "Esc ⇒ false（否决 = fail-closed 同向）");
   assert.ok(r.includes('$("rc-deny").focus(); // 取消为默认焦点'), "取消为默认焦点");
   assert.ok(r.includes('$("rc-evidence").textContent ='), "证据逐字进 textContent（无 HTML 注入口）");
   // 失效/通道异常的如实终态——绝不呈已执行

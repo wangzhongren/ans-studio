@@ -107,10 +107,11 @@ test("K4 诚实面三处在位（卡/schema/系统行）＋能力位仅 su（桌
   assert.ok(schema.includes("能力级授予") && schema.includes("门禁之外") && schema.includes("不是逐调用受审"), "schema 诚实面在位");
   const desktop = read("app/desktop/session.ts");
   assert.ok(desktop.includes("外来 MCP 工具在 ANS 门禁之外执行（能力级授予，非逐调用受审）"), "系统行诚实面逐字在位");
-  // 能力位仅 su：桌面注入判据 + 编排透传判据字面
-  assert.ok(desktop.includes("const installMcp: InstallMcpFn | undefined =\n      role.builtIn === true"), "桌面注入判据 role.builtIn === true（逐字）");
+  // 能力位（2026-10-17 三权 V1，评审 §5.6）：桌面注入判据＝canNominate（single=su / trio=Nominator）；
+  // 编排透传判据＝能力矩阵 `cap.installMcp`（不再是 suppressHandback 字面）。
+  assert.ok(desktop.includes("const installMcp: InstallMcpFn | undefined =\n      canNominate"), "桌面注入判据 canNominate（逐字）");
   const runRole = read("src/pipeline/orchestration/run-role.ts");
-  assert.ok(runRole.includes("const installMcp = suppressHandback ? input.installMcp : undefined;"), "编排透传判据逐字（仅 su）");
+  assert.ok(runRole.includes("const installMcp = cap?.installMcp === true ? input.installMcp : undefined;"), "编排透传判据逐字（能力矩阵）");
 });
 
 test("K5 tools-only 无资源工具放行面：三名不在 Pi 前缀白名单命中面；Codex 桥名恒 mcp__<server>__（无资源工具特例）", () => {

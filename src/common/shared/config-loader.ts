@@ -32,7 +32,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 import type { Acceptance, PinEntry } from "../../model/boundary.ts";
-import type { ProjectConfig, RoleLocation } from "../../model/role.ts";
+import type { GovernanceModel, ProjectConfig, RoleLocation } from "../../model/role.ts";
 
 /** `.ans/` 目录名（配置，与 package.json/tsconfig.json 同类；归属装配）。 */
 export const ANS_DIR_NAME = ".ans";
@@ -58,19 +58,16 @@ export interface ConfigSource {
 /**
  * 载入后的项目配置：`.ans` 显式治理模型作为**纯值**带出（评审 5.5）。
  * 缺失/非法 → 不填，消费方按 `single`（旧项目逐字兼容）；不改变 acceptance/pin 语义。
- * 字段与门禁引擎 `src/model/role.ts::GovernanceModel` 同形；W0 期间用内联字面量，
- * 门禁引擎落地后本模块改为只读导入，不持有第二份业务规则。
+ * 模型类型单一来源＝门禁引擎 `src/model/role.ts::GovernanceModel`（只读导入）。
  */
-export type GovernanceModelProjectConfig = ProjectConfig & { governanceModel?: "single" | "trio" };
-
 export interface LoadedConfig {
-  project: GovernanceModelProjectConfig;
+  project: ProjectConfig;
   source: ConfigSource;
 }
 
 /** `readGovernanceModel` 的三态结果（评审 5.5 契约，名称与形状冻结）。 */
 export type GovernanceModelRead =
-  | { state: "explicit"; model: "single" | "trio" }
+  | { state: "explicit"; model: GovernanceModel }
   | { state: "absent" }
   | { state: "unreadable"; reason: string };
 
@@ -91,7 +88,7 @@ export function ansProjectPath(projectRoot: string, ansDirName: string = ANS_DIR
 }
 
 /** `.ans` 治理模型值域（评审 5.5：只允许 single/trio；其它值不猜测）。 */
-function isGovernanceModel(value: unknown): value is "single" | "trio" {
+function isGovernanceModel(value: unknown): value is GovernanceModel {
   return value === "single" || value === "trio";
 }
 
@@ -284,7 +281,7 @@ function buildFromAns(raw: Record<string, unknown>, file: string, opts: LoadConf
   const skillRoot = typeof raw.skillRoot === "string" && raw.skillRoot !== "" ? raw.skillRoot : opts.skillRoot;
   const roles = parseRoles(raw.roles);
 
-  const project: GovernanceModelProjectConfig = { projectRoot, skillRoot, roles };
+  const project: ProjectConfig = { projectRoot, skillRoot, roles };
   // 评审 5.5：显式模型作为纯值带出；缺失/非法不填（消费方默认 single），
   // 不改变下面的 acceptance/pin 终态规则与降级语义。
   if (isGovernanceModel(raw.governanceModel)) project.governanceModel = raw.governanceModel;

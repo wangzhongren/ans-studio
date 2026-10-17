@@ -1964,3 +1964,39 @@ button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus
 /* 手动回落卡提示（`#sc-judge-notice`；无值隐藏；琥珀色，与原因行分开）。 */
 .sc-judge-notice { margin: 0; color: var(--amber); font-size: 12px; line-height: 1.6; }
 .sc-judge-notice[hidden] { display: none; }
+
+/* —————— W4 治理三权（2026-10-17 评审 §8）：左树组/副标题、状态行、模型选择、决定卡 ——————
+   只加呈现钩子；900 内容列与整页等宽字体未动（新文字均继承 --sans/--mono）。 */
+.ti-power { font-size: 10.5px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ti-builtin { font-size: 10px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.governance-status .gs-model { color: var(--text-2); }
+.governance-status .gs-banner {
+  flex-basis: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  color: var(--amber);
+  font-size: 12px;
+}
+.governance-status .gs-banner-text { min-width: 0; }
+.governance-status .gs-banner .btn { flex: 0 0 auto; }
+.governance-preview .gp-model { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 0 0 8px; }
+.governance-preview .gp-model .gp-line { margin: 0; }
+.governance-preview .gp-model-opt { display: inline-flex; align-items: center; gap: 6px; color: var(--text); }
+.governance-preview .gp-model-opt input { accent-color: var(--success); }
+.governance-preview .gp-model-note { flex-basis: 100%; margin: 0; color: var(--amber); }
+.op-request .op-gov-badge {
+  flex: 0 0 auto;
+  margin-left: 8px;
+  padding: 0 5px;
+  border: 1px solid var(--amber);
+  border-radius: 4px;
+  color: var(--amber);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+.op-request .op-meta { font-size: 11.5px; color: var(--text-2); overflow-wrap: anywhere; }
+.op-request .op-queued { color: var(--amber); font-size: 12px; line-height: 1.6; }
+.op-request .op-queued[hidden] { display: none; }

@@ -22,16 +22,24 @@ contextBridge.exposeInMainWorld("desktop", {
 
   /**
    * I2（existing-project-compat V1，PM 评审 §四.2）：预览「建立治理记录」——**只读**，不写文件。
-   * 主进程守卫：projectRoot 必须是当前导入项目；其余状态由机制原样回执。
+   * 主进程守卫：projectRoot 必须是当前导入项目；`governanceModel`（可选，single|trio）由 Interface
+   * 校验并透传给机制（缺省＝single，旧行为逐字不变）。其余状态由机制原样回执。
    */
-  previewGovernanceRecord: (projectRoot) => ipcRenderer.invoke("project:governance-preview", { projectRoot }),
+  previewGovernanceRecord: (projectRoot, options) => ipcRenderer.invoke("project:governance-preview", {
+    projectRoot,
+    ...(options && Object.prototype.hasOwnProperty.call(options, "governanceModel") ? { governanceModel: options.governanceModel } : {}),
+  }),
 
   /**
    * I2：显式建立治理记录——**仅**由渲染侧预览面板的确认按钮调用（导入/枚举/定时器等一律不得调用）。
-   * `confirm: true` 固定在本桥内；主进程 Interface 再校验它与当前导入项目。
+   * `confirm: true` 固定在本桥内；`governanceModel`（可选）原样上送、由 Interface 校验（非法即 invalid-request）。
    */
-  establishGovernanceRecord: (projectRoot) =>
-    ipcRenderer.invoke("project:governance-establish", { projectRoot, confirm: true }),
+  establishGovernanceRecord: (projectRoot, options) =>
+    ipcRenderer.invoke("project:governance-establish", {
+      projectRoot,
+      confirm: true,
+      ...(options && Object.prototype.hasOwnProperty.call(options, "governanceModel") ? { governanceModel: options.governanceModel } : {}),
+    }),
 
   /**
    * C2（治理记录 pin 不符的重新接受恢复，PM 评审 §5.3）：预览重新接受——**只读**，不写文件。
@@ -46,6 +54,15 @@ contextBridge.exposeInMainWorld("desktop", {
    */
   reacceptGovernancePins: (projectRoot, previewDigest) =>
     ipcRenderer.invoke("project:governance-reaccept", { projectRoot, confirm: true, previewDigest }),
+
+  /**
+   * V1b 预留（评审 §5.5/§11.2）：治理模型迁移预览/写入。本版 Interface 恒回 `not-available`
+   * （零写入、不改 `.ans`/manifest）——渲染侧据此显示「升级入口待本版后续」，**不得**当作已可用。
+   */
+  previewGovernanceMigration: (projectRoot) =>
+    ipcRenderer.invoke("project:governance-migrate-preview", { projectRoot }),
+  migrateGovernanceModel: (projectRoot, previewDigest) =>
+    ipcRenderer.invoke("project:governance-migrate", { projectRoot, confirm: true, previewDigest }),
 
   /** B/2: only opaque current-project refs; no renderer filesystem paths. */
   readProjectDocument: (input) => ipcRenderer.invoke("project:document-read", input),
@@ -145,6 +162,18 @@ contextBridge.exposeInMainWorld("desktop", {
    * 校验**（选项 id 必须 ⊆ 已发、单选恰一个）后解挂为冻结三态；回报 `{ok, error?}`（非法回包不受理）。
    */
   operatorRespond: (input) => ipcRenderer.invoke("session:operator-response", input),
+
+  /**
+   * 订阅「治理决定卡排队」状态（三权 §6.1 硬约束 / §九-10，2026-10-17）：同一项目已有待客户决定卡时，
+   * 后续提案/任命/写盘/验收请求**入队、不呈现**；载荷 `{...OperatorRequestPayload, waitingFor}`——
+   * 渲染侧据此显示「等待前一个决定」（**不自动合并、不自动批准**）。前一张 resolve/取消/失效后，
+   * 下一张仍经 `onOperatorRequest` 正常呈现。返回取消订阅函数。
+   */
+  onOperatorQueued: (cb) => {
+    const listener = (_event, payload) => cb(payload);
+    ipcRenderer.on("session:operator-queued", listener);
+    return () => ipcRenderer.removeListener("session:operator-queued", listener);
+  },
 
   /**
    * 订阅「shell 命令确认请求」（M-1，2026-10-12）：三层闸 (a) 层为**应用内确认卡**（不再用原生对话框）。

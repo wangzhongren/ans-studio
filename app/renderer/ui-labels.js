@@ -565,6 +565,233 @@
     return { lines: lines, noRetry: phase === "write" };
   }
 
+  // —————— W4 治理三权（2026-10-17 评审 §8；全部文案单一来源）——————
+  // 只做「接口事实 → 文案」的纯转写：角色显示名/权力副标题按 `governanceFunction`，决定卡按
+  // `cardKind`，状态行按 `governanceModel` 与接口给的流程事实。**不按角色 id 分叉**（渲染侧亦不出现
+  // 三权 id 字面量）；未知值一律返回空/兜底，不猜、不编。
+
+  var GOVERNANCE_ROLE_TEXT = {
+    proposal: { cn: "报告员", en: "Rapporteur", power: "提案权 · 不拥有最终批准权" },
+    nomination: { cn: "提名官", en: "Nominator", power: "提名权 · 不拥有最终批准权" },
+    schedule: { cn: "召集人", en: "Convener", power: "编排权 · 不拥有最终批准权" },
+  };
+  var GOVERNANCE_ROLE_BUILTIN_NOTE = "内置角色：随应用发布，无角色目录";
+  var GOVERNANCE_GROUP_LABEL = "治理职能（内置）";
+  // 结论性空态说明（只有 nomination/schedule 需要；proposal 沿用既有治理记录/主入口空态）。
+  var GOVERNANCE_ROLE_EMPTY_HINT = {
+    nomination: "通常由流程单提名步骤打开；仅在客户明确要求时直接使用",
+    schedule: "通常由已接受提案开启流程；只负责排步骤与派发，不批准方案",
+  };
+  var GOVERNANCE_MODEL_TEXT = { single: "旧模型（su）", trio: "三权" };
+  // 状态行只认这四个接口状态值；未知值不显示（不猜「进行中」）。
+  var GOVERNANCE_FLOW_STATUS_TEXT = {
+    "awaiting-customer": "等待客户决定",
+    "in-progress": "进行中",
+    "blocked": "阻塞",
+    "escalated-to-customer": "已升级客户",
+  };
+  var GOVERNANCE_MIGRATION_TEXT = "本项目使用旧治理模型（su）。可升级为三权模型。";
+  var GOVERNANCE_MIGRATION_LABEL = "查看差异 / 升级";
+  var GOVERNANCE_MIGRATION_LABEL_PENDING = "升级入口待本版后续";
+  var GOVERNANCE_DECISION_BADGE = "治理决定 · 客户最终批准";
+  var GOVERNANCE_QUEUE_NOTE = "等待前一个决定";
+  var GOVERNANCE_MODEL_OPTION_TEXT = { single: "单模型（single）", trio: "三权（trio）" };
+  var GOVERNANCE_MODEL_SUGGEST = "检测到三权产物（docs/proposals / docs/nominations / docs/flows），建议选择 trio；请由你点选。";
+  var GOVERNANCE_MODEL_UNWIRED = "当前桌面窗口未接线治理模型选择；本版不能按所选模型建立，按钮已禁用。";
+  var GOVERNANCE_CARD_POWER = {
+    proposal: "提案",
+    appointment: "提名",
+    "appointment-write": "提名",
+    "schedule-write": "编排",
+    acceptance: "验收",
+  };
+
+  /** 治理角色显示视图（按 function；未知/缺失 ⇒ null——不当成治理角色，也不编名字）。 */
+  function governanceRoleView(governanceFunction) {
+    if (typeof governanceFunction !== "string") return null;
+    var t = GOVERNANCE_ROLE_TEXT[governanceFunction];
+    if (!t) return null;
+    return {
+      function: governanceFunction,
+      cn: t.cn,
+      en: t.en,
+      name: t.cn + " " + t.en,
+      power: t.power,
+      builtinNote: GOVERNANCE_ROLE_BUILTIN_NOTE,
+      emptyHint: GOVERNANCE_ROLE_EMPTY_HINT[governanceFunction] || "",
+    };
+  }
+
+  /** 治理角色空态（只有带专属说明的职能返回；proposal ⇒ null = 沿用既有 S0/S1 空态）。 */
+  function governanceRoleEmptyState(governanceFunction) {
+    var view = governanceRoleView(governanceFunction);
+    if (!view || view.emptyHint === "") return null;
+    return { kind: "governance-role", title: view.name, sub: view.emptyHint };
+  }
+
+  /** 治理模型展示名（未知 ⇒ 空串，不显示、不猜）。 */
+  function governanceModelText(model) {
+    return typeof model === "string" && GOVERNANCE_MODEL_TEXT[model] ? GOVERNANCE_MODEL_TEXT[model] : "";
+  }
+
+  /** 流程状态展示名（只认接口四态；未知/缺失 ⇒ 空串）。 */
+  function governanceFlowStatusText(status) {
+    return typeof status === "string" && GOVERNANCE_FLOW_STATUS_TEXT[status] ? GOVERNANCE_FLOW_STATUS_TEXT[status] : "";
+  }
+
+  /**
+   * 状态行文案（纯拼接）：治理模型（三权/旧模型）· 当前流程（若接口给）· 流程状态（若接口给且认识）。
+   * 接口未给 model 时返回空串（渲染侧据此不显示——**不猜模型**）。
+   */
+  function governanceStatusText(model, flowId, flowStatus) {
+    var parts = [];
+    var modelText = governanceModelText(model);
+    if (modelText !== "") parts.push("治理模型：" + modelText);
+    if (typeof flowId === "string" && flowId !== "") parts.push("当前流程：" + flowId);
+    var statusText = governanceFlowStatusText(flowStatus);
+    if (statusText !== "") parts.push(statusText);
+    return parts.join(" · ");
+  }
+
+  /** 旧模型提示条按钮（V1b：桥齐备 ⇒「查看差异 / 升级」可用；否则「升级入口待本版后续」禁用）。 */
+  function governanceMigrationButtonView(wired) {
+    var ok = wired === true;
+    return {
+      label: ok ? GOVERNANCE_MIGRATION_LABEL : GOVERNANCE_MIGRATION_LABEL_PENDING,
+      disabled: !ok,
+      title: ok ? "打开迁移预览（零写入）；确认后只改 .ans 的 governanceModel 并追加 manifest 记录。" : "迁移预览与写入尚未接线；本版不可用。",
+    };
+  }
+
+  /** 迁移预览列表项的展示文本（字符串原样；pin 变更对象显示 path + 新旧前 8 位；其余取 path/message）。 */
+  function migrationItemText(item) {
+    if (typeof item === "string") return item;
+    if (item && typeof item === "object") {
+      var p = typeof item.path === "string" ? item.path : "";
+      var oldHash = typeof item.oldSha256 === "string" ? item.oldSha256 : "";
+      var newHash = typeof item.newSha256 === "string" ? item.newSha256 : "";
+      if (p !== "" && (oldHash !== "" || newHash !== "")) {
+        return p + "（" + shortHash(oldHash) + "… → " + shortHash(newHash) + "…）";
+      }
+      if (p !== "") return p;
+      if (typeof item.message === "string" && item.message !== "") return item.message;
+      try { return JSON.stringify(item); } catch (_) { return ""; }
+    }
+    return item == null ? "" : String(item);
+  }
+
+  /**
+   * 迁移预览视图（纯映射；评审 §5.5 结果形状）：
+   *  · `model → targetModel`、`writePaths`、`modelField`、`manifestLine`、`pinChanges`（应为空）、
+   *    `retainedFiles`、`snapshotDigest` 前 8 位；
+   *  · `canConfirm` 只在 `snapshotDigest` 非空时 true（fail-closed：无摘要不发行）；
+   *  · 未知/缺失项如实「未报告」，不编造路径或哈希。
+   */
+  function governanceMigrationPreviewView(preview) {
+    var p = preview && typeof preview === "object" ? preview : {};
+    var listOf = function (v) { return Array.isArray(v) ? v.map(migrationItemText).filter(function (x) { return x !== ""; }) : []; };
+    var model = governanceModelText(p.model) || (typeof p.model === "string" && p.model !== "" ? p.model : "旧模型");
+    var target = governanceModelText(p.targetModel) || (typeof p.targetModel === "string" && p.targetModel !== "" ? p.targetModel : "三权");
+    var writePaths = listOf(p.writePaths);
+    var pinChanges = listOf(p.pinChanges);
+    var retainedFiles = listOf(p.retainedFiles);
+    var digest = typeof p.snapshotDigest === "string" ? p.snapshotDigest : "";
+    var modelFieldText = p.modelField === null
+      ? "（字段缺失，将新增 governanceModel: \"trio\"）"
+      : (p.modelField === "single" || p.modelField === "trio" ? p.modelField : "（未报告）");
+    return {
+      title: "升级为三权治理模型（预览）",
+      modelLine: "模型：" + model + " → " + target,
+      writeLines: writePaths.length
+        ? writePaths.map(function (x) { return "将写入：" + x; })
+        : ["将写入：（未报告）"],
+      modelFieldLine: "将写入 .ans 字段：" + modelFieldText,
+      manifestLine: "将追加 manifest 记录：" + (typeof p.manifestLine === "string" && p.manifestLine !== "" ? p.manifestLine : "（未报告）"),
+      pinLines: pinChanges.length
+        ? pinChanges.map(function (x) { return "pin 变更：" + x; })
+        : ["pin 变更：无（不重算 pin）"],
+      retainedLines: ["保留文件：" + (retainedFiles.length ? retainedFiles.join("、") : "无")],
+      digestLine: "预览摘要（前 8 位）：" + (digest !== "" ? shortHash(digest) : "（未报告）"),
+      warning: "预览零写入。确认后只改 .ans 的 governanceModel 并追加 manifest 记录；不重写角色卡/边界/pin/历史会话。",
+      canConfirm: digest !== "",
+      digest: digest,
+    };
+  }
+
+  /** 迁移成功文案（逐字；不宣称角色卡/边界/pin/历史被重写）。 */
+  function governanceMigrationSuccessText() {
+    return "已升级为三权治理模型（.ans governanceModel = \"trio\"）。旧角色卡/边界/pin/历史会话保留。";
+  }
+
+  /**
+   * 迁移失败视图（评审 §5.5 status；`phase === "write"` 是「可能已部分落盘」的唯一依据）：
+   *  · phase !== write ⇒ 按 status 给出可声明的零副作用说明；
+   *  · phase === write ⇒ 只逐字 message + 核对现场提示，**绝不**出现「已升级」或「未写入任何文件」。
+   *  `noRetry`：写入阶段失败、already-trio、no-record 不再提供确认重试（防假成功/无意义重试）。
+   */
+  function governanceMigrationFailureView(phase, status, message) {
+    var lines = [];
+    var msg = typeof message === "string" ? message : "";
+    if (msg !== "") lines.push(msg);
+    var st = typeof status === "string" ? status : "";
+    if (phase !== "write") {
+      if (st === "already-trio") lines.push("已是三权治理模型，无需升级；本次未写入任何文件。");
+      else if (st === "no-record") lines.push("没有治理记录（.ans/project.json）；本次未写入任何文件。");
+      else if (st === "blocked") lines.push("升级被阻止；本次未写入任何文件。");
+      else if (st === "preview-stale") lines.push("预览后 .ans 又有变化，已取消本次写入；请重新检查。");
+      else if (st === "busy") lines.push("上一次升级仍在进行中；本次未写入任何文件。");
+      else if (st === "invalid-request") lines.push("升级请求无效；本次未写入任何文件。");
+      else {
+        if (st !== "") lines.push("状态：" + st);
+        lines.push("本次未写入任何文件。");
+      }
+    } else if (st === "write-failed") {
+      lines.push("写入阶段失败，可能已写入部分文件，请核对现场。");
+    } else if (st !== "") {
+      lines.push("状态：" + st);
+    }
+    return { lines: lines, noRetry: phase === "write" || st === "already-trio" || st === "no-record" };
+  }
+
+  /** 建立治理记录预览的模型选项文案（未知 ⇒ 空串）。 */
+  function governanceModelOptionText(model) {
+    return typeof model === "string" && GOVERNANCE_MODEL_OPTION_TEXT[model] ? GOVERNANCE_MODEL_OPTION_TEXT[model] : "";
+  }
+
+  /**
+   * 治理决定卡元信息（纯映射；`CustomerInputRequest` 的可选治理字段）：
+   *  · `cardKind` ⇒ 权力类型（提案/提名/编排/验收）+「治理决定 · 客户最终批准」徽标；
+   *    普通 `write` 与缺席 ⇒ 不是治理决定（无徽标、无权力行——旧卡零变化）；
+   *  · `flowId`/`stepId` 原样显示；
+   *  · `paths`（可选，写盘确认逐路径）、`summary`（可选）、`artifactSha256`（可选）——接口未给就不显示，
+   *    渲染侧不从预览/正文里抽取或自算。
+   */
+  function governanceCardMetaView(request) {
+    var req = request && typeof request === "object" ? request : {};
+    var cardKind = typeof req.cardKind === "string" ? req.cardKind : "";
+    var power = GOVERNANCE_CARD_POWER[cardKind] || "";
+    var flowId = typeof req.flowId === "string" ? req.flowId : "";
+    var stepId = typeof req.stepId === "string" ? req.stepId : "";
+    var lines = [];
+    if (flowId !== "") lines.push("流程：" + flowId);
+    if (stepId !== "") lines.push("步骤：" + stepId);
+    if (power !== "") lines.push("权力类型：" + power);
+    var paths = Array.isArray(req.paths)
+      ? req.paths.filter(function (p) { return typeof p === "string" && p !== ""; })
+      : [];
+    for (var i = 0; i < paths.length; i += 1) lines.push("将写路径：" + paths[i]);
+    if (typeof req.summary === "string" && req.summary !== "") lines.push("摘要：" + req.summary);
+    if (typeof req.artifactSha256 === "string" && req.artifactSha256 !== "") lines.push("哈希：" + req.artifactSha256);
+    return {
+      governance: power !== "",
+      badge: power !== "" ? GOVERNANCE_DECISION_BADGE : "",
+      power: power,
+      flowId: flowId,
+      stepId: stepId,
+      lines: lines,
+    };
+  }
+
   // —————— D-1 回放去重（2026-10-13 真机「同一段消息渲染两遍」修复）——————
   // 真机链路：su 一轮结束 → `project:changed` → 渲染侧 refreshProject → 主进程对每角色**重推**会话历史
   // → 旧实现对同一 pane **无守卫地整份再回放** ⇒ 转录重复（轮次越多重复越多）。本函数给出**纯策略**：
@@ -652,6 +879,24 @@
     governanceReacceptPreviewView: governanceReacceptPreviewView,
     governanceReacceptSuccessText: governanceReacceptSuccessText,
     governanceReacceptFailureView: governanceReacceptFailureView,
+    governanceRoleView: governanceRoleView,
+    governanceRoleEmptyState: governanceRoleEmptyState,
+    governanceModelText: governanceModelText,
+    governanceFlowStatusText: governanceFlowStatusText,
+    governanceStatusText: governanceStatusText,
+    governanceMigrationButtonView: governanceMigrationButtonView,
+    governanceMigrationPreviewView: governanceMigrationPreviewView,
+    governanceMigrationSuccessText: governanceMigrationSuccessText,
+    governanceMigrationFailureView: governanceMigrationFailureView,
+    governanceModelOptionText: governanceModelOptionText,
+    governanceCardMetaView: governanceCardMetaView,
+    GOVERNANCE_GROUP_LABEL: GOVERNANCE_GROUP_LABEL,
+    GOVERNANCE_ROLE_BUILTIN_NOTE: GOVERNANCE_ROLE_BUILTIN_NOTE,
+    GOVERNANCE_MIGRATION_TEXT: GOVERNANCE_MIGRATION_TEXT,
+    GOVERNANCE_DECISION_BADGE: GOVERNANCE_DECISION_BADGE,
+    GOVERNANCE_QUEUE_NOTE: GOVERNANCE_QUEUE_NOTE,
+    GOVERNANCE_MODEL_SUGGEST: GOVERNANCE_MODEL_SUGGEST,
+    GOVERNANCE_MODEL_UNWIRED: GOVERNANCE_MODEL_UNWIRED,
     stickToBottom: stickToBottom,
     replayPlan: replayPlan,
     AUTO_SCROLL_THRESHOLD_PX: AUTO_SCROLL_THRESHOLD_PX,

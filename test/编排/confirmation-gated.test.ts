@@ -79,12 +79,14 @@ async function withTarget<T>(fn: (ctx: { root: string; target: string }) => Prom
   }
 }
 
-/** 创世态 project（= 装配 M1+O1 注入形态）：roles 空、gov.path 空串、genesisBootstrap 在。 */
+/** 创世态 project（= 装配 M1+O1 注入形态）：roles 空、gov.path 空串、genesisBootstrap 在。
+ *  W2 起显式钉 `governanceModel: "single"`：本文件验证的是旧 su 创世路径（trio 的空项目缺省不在此列）。 */
 function genesisProject(target: string): ProjectConfig {
   return {
     projectRoot: target,
     skillRoot: target,
     roles: {},
+    governanceModel: "single",
     governanceBoundary: { path: "", acceptance: { accepted: true, source: "test:DEMO" } },
     genesisBootstrap: { source: GENESIS_SOURCE },
   };

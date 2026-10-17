@@ -22,10 +22,15 @@
 //  6) 目标目录的**注入合同**：空目录 → 不注入 ans-cli 自身的演示数据 + 带 CLI 创世授权；
 //     显式给 ans-cli 根 → 与缺省一致（演示配置原样，自身行为逐字不变）；
 //  7) 目录存在 → 目录校验放行；治理链路走通（经 `governCommand` + 假适配器：EXIT_OK、
-//     边界解析不再失败、客户确认制下 su 的骨架写入真落盘——脚本先 `request_confirmation`
-//     把将写出的路径摆给放行桩 `GovernDeps.customerInput`，并断言确认通道被请求恰好一次）；
+//     边界解析不再失败；新空项目按 trio 默认开 rapporteur，客户确认制下提案写入真落盘——脚本先
+//     `request_confirmation` 把将写出的路径摆给放行桩 `GovernDeps.customerInput`，并断言确认通道
+//     被请求恰好一次）；
 //  8) `main` 入口（环境已清空 Pi 配置）：目录校验放行、不再报治理边界解析失败，
 //     如实以非 0 报缺 provider 配置。
+//
+// 治理模型注入（评审 2026-10-17 §5.4「CLI 同步」，2026-10-17 修复）：`loadInjection` 对外来目标目录
+// 调共享 `readGovernanceModel` 并按「无 `.ans` + 无项目角色 → trio / 其余 single」判定；详见
+// `test/装配/governance-model-injection.test.ts`。
 //
 // 说明：main 的 govern 分支对**真实**适配器需要 provider 配置（会话开启时才解析），故「注入的
 // projectRoot / 注入合同」经导出的 `loadInjection` 直接断言；链路与入口行为经 `governCommand`
@@ -215,17 +220,20 @@ test("ans govern <非目录（文件）> → 明确报错、非 0", async () => 
 
 // ---- 7) 目录存在 → 目录校验放行；治理链路走通（2026-10-12 修复后：不再报边界解析失败） ----
 
-test("ans govern <空目录>（经 governCommand + 假适配器）→ EXIT_OK，边界解析不再失败，创世授权下 su 骨架写入真落盘", async () => {
+test("ans govern <空目录>（经 governCommand + 假适配器）→ EXIT_OK，不再报 single 不可用；新空项目按 trio 开启 rapporteur 并可写提案", async () => {
   const dir = newDir("ok-");
   const inj = await loadInjection(dir);
+  // 新空项目默认治理模型 trio（评审 §5.4「CLI 同步」）：默认治理角色是 rapporteur（提案权），
+  // 可写预授权目录 `docs/proposals/`；`角色卡/**` 属 Nominator 的任命门禁范围（Rapporteur 写会被拒）。
+  assert.equal(inj.project.governanceModel, "trio", "空目录注入的治理模型应为 trio");
   // 客户确认制（2026-10-12 A-1/A-3，取代原「收口提议 + operatorChannel」）：写盘前必须先用
   // `request_confirmation` 把**将写出的具体路径**摆给客户；客户确认后**编排**才把这些路径发行进
   // 本次会话的 writeSet（未确认路径被 F4 拒）。故脚本先确认、再写，且预览里列出目标路径。
-  const preview = "将写出以下文件（均已预览）：\n角色卡/X/role-card.md\n角色卡/X/boundary.yaml";
+  const proposalPath = "docs/proposals/demo-v1.md";
+  const preview = `将写出以下文件（均已预览）：\n${proposalPath}`;
   const script: ToolCall[] = [
-    { name: "request_confirmation", args: { title: "确认写出角色 X 的骨架文件", preview } },
-    { name: "write_file", args: { path: "角色卡/X/role-card.md", content: "# 角色：X\n" } },
-    { name: "write_file", args: { path: "角色卡/X/boundary.yaml", content: "role: X\nentries: []\n" } },
+    { name: "request_confirmation", args: { title: "确认写出提案", preview } },
+    { name: "write_file", args: { path: proposalPath, content: "# 提案\n" } },
   ];
   // 放行桩：确定性同意；同时计次——断言确认通道被请求**恰好一次**（加强，非放宽）。
   const confirmRequests: CustomerInputRequest[] = [];
@@ -234,7 +242,7 @@ test("ans govern <空目录>（经 governCommand + 假适配器）→ EXIT_OK，
     return { outcome: "answered", value: { confirmed: true }, operatorId: "test:装配放行桩" };
   };
   const cap = capture();
-  const code = await governCommand(["govern", dir], {
+  const code = await governCommand(["govern", dir, "--function", "proposal"], {
     ...inj,
     // 编排经 `createAdapter(gate, capabilities)` 把（已包发行器的）客户通道注入适配器：
     // 原样转发，`request_confirmation` 工具才会注册（「注入才注册」）。
@@ -246,16 +254,16 @@ test("ans govern <空目录>（经 governCommand + 假适配器）→ EXIT_OK，
   const err = cap.err.join("");
   assert.equal(code, 0, `应正常走完治理会话（含确认制写盘）；stderr=${err}`);
   assert.ok(
-    !/治理边界解析失败|目标目录不存在|不是目录/.test(err),
-    `不得再报边界/目录错，实际 stderr=${JSON.stringify(err)}`,
+    !/治理边界解析失败|三权角色在 single 治理模型下不可用|目标目录不存在|不是目录/.test(err),
+    `不得再报边界/模型/目录错，实际 stderr=${JSON.stringify(err)}`,
   );
-  assert.ok(existsSync(join(dir, "角色卡", "X", "role-card.md")), "确认后骨架文件应落盘");
-  assert.ok(existsSync(join(dir, "角色卡", "X", "boundary.yaml")), "boundary.yaml 应落盘");
-  assert.equal(readFileSync(join(dir, "角色卡", "X", "role-card.md"), "utf8"), "# 角色：X\n");
+  assert.ok(existsSync(join(dir, proposalPath)), "确认后提案文件应落盘");
+  assert.equal(readFileSync(join(dir, proposalPath), "utf8"), "# 提案\n");
   assert.equal(confirmRequests.length, 1, "客户确认通道应被请求恰好一次（放行桩同意）");
   assert.equal(confirmRequests[0]?.kind, "confirm", "确认请求的形状应为 confirm（可带预览）");
-  // 确认并写入后由编排**自动收尾**（无人工确认步骤）：`.ans`（pin）应被写出。
-  assert.ok(existsSync(join(dir, ".ans", "project.json")), "确认并写入后应自动收尾（写 .ans/project.json）");
+  // 注：本会话没有写出角色 boundary.yaml，也无既存治理边界文档 ⇒ 自动收尾按既有守卫
+  // `nothing-to-pin` 零副作用（不凭空写 `.ans`）。这是 finalize 的既有语义，不属于本次模型注入。
+  assert.equal(existsSync(join(dir, ".ans", "project.json")), false, "无可 pin 之物时不得凭空收口");
 });
 
 test("ans govern <存在的目录>（main 入口；环境已清空 Pi 配置）→ 目录校验放行、不再报边界解析失败；如实非 0 报缺 provider 配置", async () => {

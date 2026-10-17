@@ -46,7 +46,7 @@ test("schema 文案（G-4/I1）：install_skill 钉住仅客户明示时安装/�
   // 失败文案枚举（设计 §3.3 逐字）。
   assert.match(text, /技能未登记：docs\/skills\/<name>\/install\.md 不存在——先落盘再安装；未执行。/);
   assert.match(text, /登记中未包含角色「<roleId>」——未执行；如确要安装请先更新登记。/);
-  assert.match(text, /角色「<roleId>」不是本项目项目角色（或为治理角色 su）——未执行。/);
+  assert.match(text, /角色「<roleId>」不是本项目项目角色（或为内置治理角色）——未执行。/);
   assert.match(text, /next-session/, "在跑不打断＝如实延迟态须写明");
   assert.equal(/已获授权|已放行写盘|授予写权|授权写盘|代为授权成功/.test(text), false, `不得暗示任何授权：${text}`);
 });
@@ -95,7 +95,7 @@ test("G-4/I2：失败如实——§3.3 文案枚举与护栏 not-customer-turn �
   for (const [reason, message] of [
     ["not-registered", "技能未登记：docs/skills/lint-fix/install.md 不存在——先落盘再安装；未执行。"],
     ["role-not-listed", "登记中未包含角色「impl」——未执行；如确要安装请先更新登记。"],
-    ["role-not-found", "角色「impl」不是本项目项目角色（或为治理角色 su）——未执行。"],
+    ["role-not-found", "角色「impl」不是本项目项目角色（或为内置治理角色）——未执行。"],
     ["not-customer-turn", "本动作仅可在客户消息发起的轮次执行——未执行。"],
   ] as const) {
     const result = await tools({ installSkill: async () => failure(reason, message) }).get("install_skill")!.handler({ name: "install_skill", args: { roleId: "impl", name: "lint-fix" } });

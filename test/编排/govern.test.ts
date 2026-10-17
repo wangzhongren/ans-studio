@@ -83,6 +83,7 @@ function fixtureProject(target: string): ProjectConfig {
     projectRoot: target,
     skillRoot: target,
     roles: {},
+    governanceModel: "single",
     governanceBoundary: {
       path: GOV_BOUNDARY_REL,
       acceptance: { accepted: true, source: "test:fixture governance boundary" },
@@ -254,6 +255,7 @@ test("负例：改治理边界文件致 pin 失配 → 拒写（命令非 0，�
       projectRoot: target,
       skillRoot: target,
       roles: {},
+      governanceModel: "single",
       governanceBoundary: {
         path: GOV_BOUNDARY_REL,
         acceptance: { accepted: true, source: "pin:test", pin: [{ path: GOV_BOUNDARY_REL, sha256: sha }] },

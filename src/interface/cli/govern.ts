@@ -23,6 +23,7 @@
 import type { CustomerInputFn, RuntimeKind } from "../../model/runtime.ts";
 import { runGovernSession } from "../../pipeline/orchestration/govern-session.ts";
 import { selectAdapterFactory, type RuntimeAdapterFactory, type RuntimeAdapterFactoryBuilder, type RuntimeAdapterFactoryOptions } from "../../pipeline/orchestration/run-role.ts";
+import { isBuiltInGovernanceRoleId } from "../../service/boundary/resolve-boundary.ts";
 import { RUNTIME_KINDS } from "../../common/shared/runtime-shared.ts";
 import { parseGovernArgs } from "../../common/编排/args.ts";
 import { EXIT_FAILURE, EXIT_USAGE } from "../../common/编排/exit-codes.ts";
@@ -58,7 +59,8 @@ export function resolveGovernTargetDir(argv: string[], deps?: Pick<GovernDeps, "
   return parseGovernArgs(argv).dir ?? deps?.targetDir;
 }
 
-const USAGE = "用法：ans govern [<目录>] [--task <任务>] [--role <角色id>]… [--runtime demo|pi|codex|claude]";
+const USAGE =
+  "用法：ans govern [<目录>] [--task <任务>] [--function proposal|nomination|schedule] [--role <角色id>]… [--runtime demo|pi|codex|claude]";
 
 export async function governCommand(argv: string[], deps?: GovernDeps): Promise<number> {
   // 1) 参数解析（用法错误 → EXIT_USAGE）。目标目录为**可选位置参数**（`ans govern <目录>`，设计 §12.3）；
@@ -115,7 +117,25 @@ export async function governCommand(argv: string[], deps?: GovernDeps): Promise<
   //     `.ans`(pin) + `角色卡/governance-boundary.yaml` + `docs/bootstrap-manifest.md`；
   //     无可 pin 之物 → 零副作用（不会凭空转正）。
   // 注：此处**不再**有 `genesisBootstrap` 判据/`finalizeBootstrap` arm（那套提议-确认语义已删）。
-  const targetRoleIds = parsed.roleIds.length > 0 ? parsed.roleIds : deps.targetRoleIds ?? [];
+  // `--role`（评审 §5.6）：
+  //   · 给出**一个内置治理角色 id**（su/rapporteur/nominator/convener）⇒ 选择本次治理会话角色
+  //     （`governanceRoleId`；trio 必须三人之一、single 必须 su，由引擎的 `resolveGovernanceRole` 明确校验）；
+  //   · 其余值 ⇒ 沿用旧语义「本次要创建/重构的项目角色 id」（targetRoleIds，scope 可写集来源）。
+  //   两者混用（多个值且含内置 id）→ 用法错误，不静默择一。
+  const builtInSelections = parsed.roleIds.filter((id) => isBuiltInGovernanceRoleId(id));
+  if (builtInSelections.length > 0 && parsed.roleIds.length > 1) {
+    process.stderr.write(
+      `ans govern 用法错误：--role 不能同时选择内置治理角色与目标角色（收到：${parsed.roleIds.join("、")}）。\n${USAGE}\n`,
+    );
+    return EXIT_USAGE;
+  }
+  const governanceRoleId = builtInSelections.length === 1 ? builtInSelections[0] : undefined;
+  const targetRoleIds =
+    governanceRoleId !== undefined
+      ? deps.targetRoleIds ?? []
+      : parsed.roleIds.length > 0
+        ? parsed.roleIds
+        : deps.targetRoleIds ?? [];
   const result = await runGovernSession(
     {
       taskId: parsed.taskId,
@@ -123,6 +143,8 @@ export async function governCommand(argv: string[], deps?: GovernDeps): Promise<
       persistSession: deps.runtimeOptions?.persistSession,
       project: deps.project,
       targetRoleIds,
+      ...(parsed.function !== undefined ? { governanceFunction: parsed.function } : {}),
+      ...(governanceRoleId !== undefined ? { governanceRoleId } : {}),
       targetDir,
       // 客户通道：注入优先；缺省不传（runGovernSession 自动补 CLI 终端通道，缺省机制不变）。
       ...(deps.customerInput !== undefined ? { customerInput: deps.customerInput } : {}),

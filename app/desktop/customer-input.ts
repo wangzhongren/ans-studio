@@ -75,6 +75,12 @@ export interface OperatorExpiredPayload { id: string; roleId: string; projectRoo
 
 export interface CreateCustomerInputChannelOptions {
   onExpired?: (payload: OperatorExpiredPayload) => void;
+  /**
+   * **排队通知（三权 §6.1 硬约束 / §九-10，2026-10-17）**：同一项目已有待客户决定卡时，后续治理请求
+   * **入队、不调用 presenter**；本回调让界面如实显示「等待前一个决定」（不自动合并、不自动批准）。
+   * `waitingFor` = 当前占位请求的 id。缺省 ⇒ 无排队状态外推（排队照旧生效）。
+   */
+  onQueued?: (payload: OperatorRequestPayload, waitingFor: string) => void;
   /** 表现层（主进程 webContents.send）；**未配置 → 一律 unavailable**（能力缺席即 fail-closed）。 */
   presenter?: OperatorRequestPresenter;
   /** 操作者标识（随 `CustomerInputOutcome.operatorId` 交给编排，先例同 shell 闸 (a)）。空/缺失归 unknown。 */
@@ -100,8 +106,10 @@ export interface CustomerInputChannel {
   respond(input: { id?: unknown; decision?: unknown }): { ok: boolean; error?: string; expired?: boolean };
   /** 关闭通道：所有挂起请求归 `declined`（窗口已关——未获同意，fail-closed）。幂等。 */
   rejectAllPending(reason: string): void;
-  /** 当前挂起数（测试/如实呈现用）。 */
+  /** 当前挂起数（测试/如实呈现用）：**已呈现的那张＋排队中的请求**（排队者另见 `queuedCount`）。 */
   pendingCount(): number;
+  /** **排队中的治理请求数**（同项目已有待决定卡时入队；未呈现、未自动批准）。 */
+  queuedCount(): number;
   /**
    * **按角色挂起数**（G-2/W1 依赖项，2026-10-16 客户批准）：看护信号 #1「轮次逼近超时」对**带挂起确认卡的
    * 角色**不计入（正确等待不报）——主进程把本视图与 shell 卡/恢复卡的按角色视图合并后交看护。纯读。
@@ -129,8 +137,103 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
   const operatorId =
     typeof opts.operatorId === "string" && opts.operatorId.trim() !== "" ? opts.operatorId : "unknown";
   let seq = 0;
-  const pending = new Map<string, { resolve: (o: CustomerInputOutcome) => void; request: CustomerInputRequest; payload: OperatorRequestPayload; cleanup: () => void }>();
+  /**
+   * 治理决定卡**一项目一卡**（评审 §6.1 硬约束 / §九-10）：同一 `projectRoot` 同一时刻只**呈现**一张；
+   * 后续请求进 `waiting`，**不调用 presenter、不自动批准**；第一张 resolve/取消/超时/会话失效后按序呈现。
+   * `pending` 只放**已呈现**的那张（`pendingCount`/`pendingRoles`/`replayPending` 语义不变）。
+   */
+  interface ChannelEntry {
+    payload: OperatorRequestPayload;
+    request: CustomerInputRequest;
+    /** 同项目的排队键（`ctx.projectRoot`；缺失按空串——单窗口下即"当前项目"）。 */
+    projectKey: string;
+    signals: AbortSignal[];
+    cleanup: () => void;
+    resolve: (outcome: CustomerInputOutcome) => void;
+    state: "active" | "queued" | "done";
+  }
+  const pending = new Map<string, ChannelEntry>();
+  /** projectKey → 排队中的请求（按到达序）。 */
+  const waiting = new Map<string, ChannelEntry[]>();
+  /** projectKey → 当前占位请求 id（未呈现时不存在）。 */
+  const activeByProject = new Map<string, string>();
   const diagnostic = createDiagnosticLogger({ component: "desktop.customer-input" });
+
+  const projectKeyOf = (ctx: { projectRoot?: string } | undefined): string =>
+    typeof ctx?.projectRoot === "string" && ctx.projectRoot !== "" ? ctx.projectRoot : "";
+
+  const notifyExpired = (entry: ChannelEntry, reason: string): void => {
+    try {
+      opts.onExpired?.({ id: entry.payload.id, roleId: entry.payload.roleId, runtime: entry.payload.runtime, projectRoot: entry.payload.projectRoot, reason });
+    } catch (error) {
+      diagnostic.error("interaction.expired.failed", error, { requestId: entry.payload.id });
+    }
+  };
+
+  const removeQueued = (entry: ChannelEntry): void => {
+    const queue = waiting.get(entry.projectKey);
+    if (queue === undefined) return;
+    const idx = queue.indexOf(entry);
+    if (idx >= 0) queue.splice(idx, 1);
+    if (queue.length === 0) waiting.delete(entry.projectKey);
+  };
+
+  /** 结算**已呈现**的那张：清 pending/占位 → 清监听 → resolve → 按序呈现同项目下一张。 */
+  const settleActive = (entry: ChannelEntry, outcome: CustomerInputOutcome): void => {
+    if (entry.state !== "active") return;
+    entry.state = "done";
+    pending.delete(entry.payload.id);
+    if (activeByProject.get(entry.projectKey) === entry.payload.id) activeByProject.delete(entry.projectKey);
+    entry.cleanup();
+    entry.resolve(outcome);
+    drainProject(entry.projectKey);
+  };
+
+  /** 呈现队首（只在项目无占位时调用；presenter 抛错 ⇒ 该张 declined 并继续下一张）。 */
+  const presentEntry = (entry: ChannelEntry): void => {
+    activeByProject.set(entry.projectKey, entry.payload.id);
+    pending.set(entry.payload.id, entry);
+    entry.state = "active";
+    try {
+      opts.presenter!(entry.payload);
+      diagnostic.record("interaction.presented", { requestId: entry.payload.id, pendingCount: pending.size, queuedCount: queuedCount() });
+    } catch (err) {
+      diagnostic.error("interaction.present.failed", err, { requestId: entry.payload.id });
+      // 推不达（窗口已关等）→ 未获同意（fail-closed），不留悬案；继续呈现同项目下一张。
+      settleActive(entry, { outcome: "declined", operatorId, reason: `客户交互请求未能送达界面：${reasonOf(err)}` });
+    }
+  };
+
+  /** 同项目下一张：无占位且队列非空 ⇒ 按到达序呈现（绝不并发/合并/批准）。 */
+  function drainProject(projectKey: string): void {
+    if (activeByProject.has(projectKey)) return;
+    const queue = waiting.get(projectKey);
+    if (queue === undefined || queue.length === 0) {
+      waiting.delete(projectKey);
+      return;
+    }
+    const next = queue.shift()!;
+    if (queue.length === 0) waiting.delete(projectKey);
+    if (next.state !== "queued") {
+      drainProject(projectKey);
+      return;
+    }
+    if (next.signals.some((signal) => signal.aborted)) {
+      next.state = "done";
+      next.cleanup();
+      next.resolve({ outcome: "unavailable", reason: "本轮已停止或会话已重建，旧确认失效。" });
+      notifyExpired(next, "本轮已停止或会话已重建，旧确认失效。");
+      drainProject(projectKey);
+      return;
+    }
+    presentEntry(next);
+  }
+
+  function queuedCount(): number {
+    let count = 0;
+    for (const queue of waiting.values()) count += queue.length;
+    return count;
+  }
 
   const customerInput: DesktopCustomerInputFn = (req, ctx, metadata) =>
     new Promise<CustomerInputOutcome>((resolve) => {
@@ -146,26 +249,56 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
       if (typeof metadata?.turnId === "string" && metadata.turnId !== "") payload.turnId = metadata.turnId;
       if (typeof metadata?.toolCallId === "string" && metadata.toolCallId !== "") payload.toolCallId = metadata.toolCallId;
       const signals = [metadata?.signal, ctx.sessionSignal].filter((signal): signal is AbortSignal => signal !== undefined);
-      const cleanup = () => { for (const signal of signals) signal.removeEventListener("abort", cancel); };
-      const finish = (outcome: CustomerInputOutcome) => { cleanup(); resolve(outcome); };
-      const cancel = () => {
-        if (!pending.delete(id)) return;
-        finish({ outcome: "unavailable", reason: "本轮已停止或会话已重建，旧确认失效。" });
-        try { opts.onExpired?.({ id, roleId: payload.roleId, runtime: payload.runtime, projectRoot: payload.projectRoot, reason: "本轮已停止或会话已重建，旧确认失效。" }); }
-        catch (error) { diagnostic.error("interaction.expired.failed", error, { requestId: id }); }
+      const projectKey = projectKeyOf(ctx);
+      const entry: ChannelEntry = {
+        payload,
+        request: req,
+        projectKey,
+        signals,
+        cleanup: () => { for (const signal of signals) signal.removeEventListener("abort", cancel); },
+        resolve,
+        state: "queued",
       };
-      pending.set(id, { resolve: finish, request: req, payload, cleanup });
-      for (const signal of signals) signal.addEventListener("abort", cancel, { once: true });
-      if (signals.some((signal) => signal.aborted)) { cancel(); return; }
-      try {
-        opts.presenter(payload);
-        diagnostic.record("interaction.presented", { requestId: id, pendingCount: pending.size });
-      } catch (err) {
-        diagnostic.error("interaction.present.failed", err, { requestId: id });
-        // 推不达（窗口已关等）→ 未获同意（fail-closed），不留悬案。
-        pending.delete(id);
-        finish({ outcome: "declined", operatorId, reason: `客户交互请求未能送达界面：${reasonOf(err)}` });
+      /** 取消（轮次停止 / 会话重建）：active ⇒ 结算并放行下一张；queued ⇒ 出队结算（从不呈现）。 */
+      const cancel = () => {
+        if (entry.state === "done") return;
+        const wasActive = entry.state === "active";
+        if (wasActive) {
+          pending.delete(id);
+          if (activeByProject.get(projectKey) === id) activeByProject.delete(projectKey);
+        } else {
+          removeQueued(entry);
+        }
+        entry.state = "done";
+        entry.cleanup();
+        entry.resolve({ outcome: "unavailable", reason: "本轮已停止或会话已重建，旧确认失效。" });
+        notifyExpired(entry, "本轮已停止或会话已重建，旧确认失效。");
+        if (wasActive) drainProject(projectKey);
+      };
+      if (activeByProject.has(projectKey)) {
+        // 一项目一卡：后续请求入队、不呈现；状态经 onQueued 让界面显示「等待前一个决定」。
+        const queue = waiting.get(projectKey) ?? [];
+        queue.push(entry);
+        waiting.set(projectKey, queue);
+        for (const signal of signals) signal.addEventListener("abort", cancel, { once: true });
+        if (signals.some((signal) => signal.aborted)) {
+          cancel();
+          return;
+        }
+        try {
+          opts.onQueued?.(payload, activeByProject.get(projectKey)!);
+        } catch (error) {
+          diagnostic.error("interaction.queued.failed", error, { requestId: id });
+        }
+        diagnostic.record("interaction.queued", { requestId: id, queuedCount: queuedCount() });
+        return;
       }
+      for (const signal of signals) signal.addEventListener("abort", cancel, { once: true });
+      if (signals.some((signal) => signal.aborted)) {
+        cancel();
+        return;
+      }
+      presentEntry(entry);
     });
 
   function respondUnsafe(input: { id?: unknown; decision?: unknown }): { ok: boolean; error?: string; expired?: boolean } {
@@ -189,12 +322,9 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
       if (d.confirmed !== true && d.confirmed !== false) {
         return { ok: false, error: "确认决定必须是布尔值" };
       }
-      pending.delete(id);
-      if (d.confirmed === true) {
-        entry.resolve({ outcome: "answered", value: { confirmed: true }, operatorId });
-      } else {
-        entry.resolve({ outcome: "declined", operatorId, reason: "客户不同意" });
-      }
+      settleActive(entry, d.confirmed === true
+        ? { outcome: "answered", value: { confirmed: true }, operatorId }
+        : { outcome: "declined", operatorId, reason: "客户不同意" });
       return { ok: true };
     }
     // —— choice：取消 ⇒ declined；作答 ⇒ selected 必须 ⊆ 已给选项、去重、单选恰一个。——
@@ -203,8 +333,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
         return { ok: false, error: "决定与请求类型不符（请求是 confirm）" };
       }
       if (d.cancelled === true) {
-        pending.delete(id);
-        entry.resolve({ outcome: "declined", operatorId, reason: "客户取消" });
+        settleActive(entry, { outcome: "declined", operatorId, reason: "客户取消" });
         return { ok: true };
       }
       const rawSel = d.selected;
@@ -222,21 +351,26 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
       if (entry.request.multiple !== true && selected.length !== 1) {
         return { ok: false, error: "单选题只能选一个" };
       }
-      pending.delete(id);
-      entry.resolve({ outcome: "answered", value: { selected }, operatorId });
+      settleActive(entry, { outcome: "answered", value: { selected }, operatorId });
       return { ok: true };
     }
     return { ok: false, error: "未知的决定类型" };
   }
 
   function rejectAllPending(reason: string): void {
-    diagnostic.record("interaction.closed", { pendingCount: pending.size });
-    for (const [id, entry] of pending) {
-      try { opts.onExpired?.({ id, roleId: entry.payload.roleId, runtime: entry.payload.runtime, projectRoot: entry.payload.projectRoot, reason }); }
-      catch (error) { diagnostic.error("interaction.expired.failed", error, { requestId: id }); }
+    diagnostic.record("interaction.closed", { pendingCount: pending.size, queuedCount: queuedCount() });
+    // 已呈现的卡与排队中的请求都归 declined（窗关/项目关闭 = 未获同意，fail-closed）；
+    // 排队者从未呈现，仍经 onExpired 让界面清掉「等待前一个决定」行。
+    for (const entry of [...pending.values(), ...[...waiting.values()].flat()]) {
+      if (entry.state === "done") continue;
+      entry.state = "done";
+      notifyExpired(entry, reason);
+      entry.cleanup();
       entry.resolve({ outcome: "declined", operatorId, reason });
     }
     pending.clear();
+    waiting.clear();
+    activeByProject.clear();
   }
 
   function respond(input: { id?: unknown; decision?: unknown }): { ok: boolean; error?: string; expired?: boolean } {
@@ -255,20 +389,35 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
         diagnostic.error("interaction.replay.failed", error, { requestId: entry.payload.id });
       }
     }
-    diagnostic.record("interaction.replayed", { count });
+    // 一项目一卡：排队项**不呈现卡**，但重推「等待前一个决定」状态行（渲染重载后仍可见）。
+    for (const [projectKey, queue] of waiting) {
+      const waitingFor = activeByProject.get(projectKey) ?? "";
+      for (const entry of queue) {
+        try {
+          opts.onQueued?.(entry.payload, waitingFor);
+          count += 1;
+        } catch (error) {
+          diagnostic.error("interaction.queued.replay.failed", error, { requestId: entry.payload.id });
+        }
+      }
+    }
+    diagnostic.record("interaction.replayed", { count, queuedCount: queuedCount() });
     return count;
   }
 
-  /** 按角色挂起数（G-2/W1；纯读——请求本体不带 roleId，取每会话闭包绑定的 `payload.roleId`）。 */
+  /** 按角色挂起数（G-2/W1；纯读——请求本体不带 roleId，取每会话闭包绑定的 `payload.roleId`）。
+   *  已呈现与排队等待都计入：排队中的角色同样在「正确等待客户」，看护 #1 不应误报。 */
   function pendingRoles(): Map<string, number> {
     const counts = new Map<string, number>();
-    for (const entry of pending.values()) {
+    const add = (entry: ChannelEntry): void => {
       const roleId = entry.payload.roleId;
       if (typeof roleId === "string" && roleId !== "") counts.set(roleId, (counts.get(roleId) ?? 0) + 1);
-    }
+    };
+    for (const entry of pending.values()) add(entry);
+    for (const queue of waiting.values()) for (const entry of queue) add(entry);
     return counts;
   }
-  return { customerInput, respond, rejectAllPending, pendingCount: () => pending.size, pendingRoles, replayPending };
+  return { customerInput, respond, rejectAllPending, pendingCount: () => pending.size + queuedCount(), queuedCount, pendingRoles, replayPending };
 }
 
 function reasonOf(err: unknown): string {

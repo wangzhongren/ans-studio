@@ -208,17 +208,21 @@ test("arm 决策（I-1 + 补丁）：DESKTOP_SHELL_GATE_ARMED === true——(c) 
   );
   // ——— su 审批档（客户裁定 2026-10-17：「只读的免审批，其他的要客户审批」＋「deny 也走客户审批」）———
   assert.ok(
-    /const shellOperatorOnly =\s*role\.builtIn === true && this\.deps\.shellArming && shellOperatorChannel/.test(sessSrc),
-    "session.ts：su 审批档 = 内置角色 && (c) 实件 && (a) 通道（缺件不 arm，fail-closed）"
+    /const shellOperatorOnly =\s*legacyBuiltIn && this\.deps\.shellArming && shellOperatorChannel/.test(sessSrc),
+    "session.ts：su 审批档 = single 内置角色（legacyBuiltIn）&& (c) 实件 && (a) 通道（缺件不 arm，fail-closed）"
   );
   assert.ok(
     /\.\.\.\(shellOperatorOnly \? \{ shellOperatorOnly \} : \{\}\)/.test(sessSrc),
     "session.ts：`shellOperatorOnly` 经 openRoleSession 透传"
   );
-  assert.equal(
+  // 三权（评审 §5.6）：trio Convener 只读档——同一份 (c) 实件、不带 operator channel；single/su 不传。
+  assert.ok(
+    /const shellReadonly =\s*governanceFunction === "schedule" && this\.deps\.shellArming/.test(sessSrc),
+    "session.ts：只有 governanceFunction===\"schedule\"（Convener）构造只读档"
+  );
+  assert.ok(
     /\.\.\.\(shellReadonly \? \{ shellReadonly \} : \{\}\)/.test(sessSrc),
-    false,
-    "session.ts：桌面**不再**透传旧只读档 `shellReadonly`（su 改走审批档）"
+    "session.ts：trio Convener 的只读档经 openRoleSession 透传"
   );
   assert.ok(
     /import type \{ AssembleOperatorShellGateOptions, AssembleReadonlyShellGateOptions, RoutineShellPolicy \} from "\.\.\/\.\.\/src\/pipeline\/orchestration\/shell-arming\.ts"/.test(sessSrc),

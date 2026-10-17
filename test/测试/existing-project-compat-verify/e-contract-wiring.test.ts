@@ -16,9 +16,18 @@ test("E1 IPC 契约：main 注册两个通道；preload 暴露同名方法且 es
   assert.match(main, /registerHandler\("project:governance-preview",\s*\(_e, input\) => desktop\.previewGovernanceRecord\(input\)\)/);
   assert.match(main, /registerHandler\("project:governance-establish",\s*\(_e, input\) => desktop\.establishGovernanceRecord\(input\)\)/);
 
+  // 2026-10-17 契约变更（三权 S1 模型选择，评审 §5.5）：两方法增可选 `options.governanceModel`——
+  // 交付形态是**同一方法 + 可选透传**，不是新通道；`confirm: true` 仍固定在本桥内。
   const preload = read("app/preload.cjs");
-  assert.match(preload, /previewGovernanceRecord:\s*\(projectRoot\) =>\s*ipcRenderer\.invoke\("project:governance-preview",\s*\{ projectRoot \}\)/);
-  assert.match(preload, /establishGovernanceRecord:\s*\(projectRoot\) =>\s*ipcRenderer\.invoke\("project:governance-establish",\s*\{ projectRoot, confirm: true \}\)/);
+  assert.match(
+    preload,
+    /previewGovernanceRecord:\s*\(projectRoot, options\) =>\s*ipcRenderer\.invoke\("project:governance-preview",\s*\{\s*\n\s*projectRoot,/,
+  );
+  assert.match(
+    preload,
+    /establishGovernanceRecord:\s*\(projectRoot, options\) =>\s*\n?\s*ipcRenderer\.invoke\("project:governance-establish",\s*\{\s*\n\s*projectRoot,\s*\n\s*confirm: true,/,
+  );
+  assert.match(preload, /governanceModel: options\.governanceModel/, "可选 governanceModel 原样上送（缺省不注入）");
 
   // 不得出现别名通道（契约名唯一）。
   for (const alias of ["governancePreview", "governanceEstablish", "project:governance-bootstrap"]) {
@@ -29,8 +38,8 @@ test("E1 IPC 契约：main 注册两个通道；preload 暴露同名方法且 es
 
 test("E2 渲染侧契约：只经 window.desktop 方法消费；不使用 ipcRenderer；状态字段原样落 state", () => {
   const renderer = read("app/renderer/renderer.js");
-  assert.match(renderer, /d\.previewGovernanceRecord\(projectRoot\)/, "预览经 preload 方法");
-  assert.match(renderer, /d\.establishGovernanceRecord\(projectRoot\)/, "建立经 preload 方法");
+  assert.match(renderer, /d\.previewGovernanceRecord\(projectRoot(?:,|\))/, "预览经 preload 方法");
+  assert.match(renderer, /d\.establishGovernanceRecord\(projectRoot(?:,|\))/, "建立经 preload 方法");
   assert.equal(renderer.includes("ipcRenderer"), false, "渲染侧不得直连 ipcRenderer");
   assert.match(renderer, /state\.governanceRecord = gr/, "列举结果原样落 state.governanceRecord");
   // 2026-10-17 语义变更（pin 恢复）：状态集合由三态扩为四态（新增 pin-mismatch）。
@@ -44,10 +53,14 @@ test("E2 渲染侧契约：只经 window.desktop 方法消费；不使用 ipcRen
 test("E3 Interface 契约：ListProjectResult 带 governanceRecord；两方法在 DesktopInterface 上", () => {
   const iface = read("app/desktop/interface.ts");
   assert.match(iface, /governanceRecord: GovernanceRecordStatus;/);
-  assert.match(iface, /previewGovernanceRecord\(input: \{ projectRoot: string \}\): Promise<GovernancePreviewResult>;/);
+  // 2026-10-17（三权 S1）：两方法增可选 governanceModel（缺省 single，旧行为逐字不变）。
   assert.match(
     iface,
-    /establishGovernanceRecord\(input: \{ projectRoot: string; confirm: true \}\): Promise<EstablishGovernanceResult>;/,
+    /previewGovernanceRecord\(input: \{ projectRoot: string; governanceModel\?: GovernanceModel \}\): Promise<GovernancePreviewResult>;/,
+  );
+  assert.match(
+    iface,
+    /establishGovernanceRecord\(input: \{ projectRoot: string; confirm: true; governanceModel\?: GovernanceModel \}\): Promise<EstablishGovernanceResult>;/,
   );
   // 桌面只依赖 Pipeline 公共出口（不得直接导入 common/编排/finalize.ts）。
   assert.equal(

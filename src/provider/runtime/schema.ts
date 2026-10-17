@@ -213,7 +213,7 @@ export function describeTool(name: string): ToolDescription {
       parameters: {
         type: "object",
         properties: {
-          roleId: { type: "string", description: "Target project role id (must be a project role, not su itself)" },
+          roleId: { type: "string", description: "Target project role id (must be a project role, not a built-in governance role)" },
           task: {
             type: "string",
             description:
@@ -307,7 +307,7 @@ export function describeTool(name: string): ToolDescription {
         additionalProperties: true,
       },
       description:
-        "**只读**状态查询（看护工具，只注入给治理角色 su）：读取本项目**权威状态快照**——各角色忙/闲、" +
+        "**只读**状态查询（看护工具，只注入给内置治理角色）：读取本项目**权威状态快照**——各角色忙/闲、" +
         "投递队列积压、会话开合、最近一轮结果、待确认数与看护告警状态；includeDiagnostics=true 时附该角色近日志尾部（≤20 条元数据）。" +
         "**纯读：不写盘、不入队、不改任何状态、不改变任何权限**；本工具本身不做任何恢复。输出为结构化文本，" +
         "超 **8 KiB** 会截断并如实标注 `truncated`；数据不可用（如诊断写盘故障）时如实给出「不可用＋原因」，**绝不编造状态**。",
@@ -332,7 +332,7 @@ export function describeTool(name: string): ToolDescription {
         additionalProperties: true,
       },
       description:
-        "**只读**会话尾线（看护工具，只注入给治理角色 su）：返回该角色 ANS 会话文件的**尾部规范化行**" +
+        "**只读**会话尾线（看护工具，只注入给内置治理角色）：返回该角色 ANS 会话文件的**尾部规范化行**" +
         "（每行形如 `<时间> [user|assistant|tool] 一行文本`，超长行截断标注；头部如实给来源文件/总行数/跳过坏行数）。" +
         "内容已经**受保护投影与脱敏管线**（凭据清洗、显示保护）——但仍可能含该角色此前会话原文要点，按排查最小必要读取。" +
         "**纯读：不写盘、不改任何状态、不扩大任何写权**；无会话历史、文件读坏等如实报告，**不抛、不猜、不编造**。" +
@@ -351,7 +351,7 @@ export function describeTool(name: string): ToolDescription {
       parameters: {
         type: "object",
         properties: {
-          roleId: { type: "string", description: "Target project role id (must be a project role, not su itself)" },
+          roleId: { type: "string", description: "Target project role id (must be a project role, not a built-in governance role)" },
           action: {
             type: "string",
             enum: ["abort-turn", "rebuild-session", "redeliver"],
@@ -368,7 +368,7 @@ export function describeTool(name: string): ToolDescription {
         additionalProperties: true,
       },
       description:
-        "**提议**一次恢复动作（看护工具，只注入给治理角色 su）：把 {roleId, action, evidence} 交给应用路由" +
+        "**提议**一次恢复动作（看护工具，只注入给内置治理角色）：把 {roleId, action, evidence} 交给应用路由" +
         "→ 生成**客户一键确认卡** → 客户确认后**由应用执行** → 结果**回执如实**（executed / declined / unsupported / error——后三值一律**未执行**）。" +
         "`action` 恰为三值：`abort-turn`（停止目标角色当前轮次，＝UI「停止本轮」）/ `rebuild-session`（作废并重开其会话；" +
         "在跑轮次不打断、会被拒绝）/ `redeliver`（触发其投递队列立即重试；可用 itemId 指单条）。" +
@@ -390,21 +390,21 @@ export function describeTool(name: string): ToolDescription {
       parameters: {
         type: "object",
         properties: {
-          roleId: { type: "string", description: "Target project role id (must be a project role, not su itself)" },
+          roleId: { type: "string", description: "Target project role id (must be a project role, not a built-in governance role)" },
           name: { type: "string", description: "Skill name (stable short slug matching docs/skills/<name>/)" },
         },
         required: ["roleId", "name"],
         additionalProperties: true,
       },
       description:
-        "向目标角色**安装技能**（只注入给治理角色 su；激活＝重建目标会话，使其新会话系统提示带「已安装技能」指针）。" +
+        "向目标角色**安装技能**（只注入给内置治理角色；激活＝重建目标会话，使其新会话系统提示带「已安装技能」指针）。" +
         "**仅客户明示时安装**——客户在会话中指令你安装才执行；**不得自主发起**；非客户消息发起的轮次调用会被**拒绝**（not-customer-turn：`本动作仅可在客户消息发起的轮次执行——未执行。`）。" +
         "**先落盘再激活**：技能内容与登记先由你经 write_file 落盘到 `docs/skills/<name>/SKILL.md` 与 `docs/skills/<name>/install.md`（登记须含适用角色），**再**调本工具；" +
         "本工具**不写盘、不做治理判定**——只**校验**（登记存在、含目标角色）、**激活**并**如实回执**。" +
         "**安装不改变任何角色的写边界**——技能是必读资料，不是权限；目标角色的写权完全不变。" +
         "回执三态如实：`effective:\"rebuilt\"`＝目标会话已重建、即刻生效；`effective:\"next-session\"`＝目标正在跑轮次、不打断——新会话起生效（如实延迟态，不是错误）；" +
         "失败（`ok:false`）一律**未执行、零副作用**，如实报因（枚举）：技能未登记＝`技能未登记：docs/skills/<name>/install.md 不存在——先落盘再安装；未执行。`；" +
-        "登记未含目标角色＝`登记中未包含角色「<roleId>」——未执行；如确要安装请先更新登记。`；角色不存在或为 su 自身＝`角色「<roleId>」不是本项目项目角色（或为治理角色 su）——未执行。`。" +
+        "登记未含目标角色＝`登记中未包含角色「<roleId>」——未执行；如确要安装请先更新登记。`；角色不存在或为内置治理角色＝`角色「<roleId>」不是本项目项目角色（或为内置治理角色）——未执行。`。" +
         "**不得**把失败或延迟说成已生效。",
       promptGuidelines: [
         "安装技能**仅限客户明示**（客户在会话中说「给<角色>装技能<name>」）：不得自主发起、不得把派发/看护等其它轮次的意图当许可；非客户消息发起的轮次会被拒绝（not-customer-turn）。",
@@ -421,14 +421,14 @@ export function describeTool(name: string): ToolDescription {
       parameters: {
         type: "object",
         properties: {
-          roleId: { type: "string", description: "Target project role id (must be a project role, not su itself)" },
+          roleId: { type: "string", description: "Target project role id (must be a project role, not a built-in governance role)" },
           name: { type: "string", description: "Skill name (stable short slug matching docs/skills/<name>/)" },
         },
         required: ["roleId", "name"],
         additionalProperties: true,
       },
       description:
-        "向目标角色**卸载技能**（只注入给治理角色 su；激活＝重建目标会话，使其新会话系统提示不再带该技能指针）。" +
+        "向目标角色**卸载技能**（只注入给内置治理角色；激活＝重建目标会话，使其新会话系统提示不再带该技能指针）。" +
         "**仅客户明示时卸载**——客户在会话中指令你卸载才执行；**不得自主发起**；非客户消息发起的轮次调用会被**拒绝**（not-customer-turn：`本动作仅可在客户消息发起的轮次执行——未执行。`）。" +
         "**先改登记再卸载**：先由你用 edit_file 把该角色条目从 `docs/skills/<name>/install.md` 移除（或整份置 `status: uninstalled`），**再**调本工具；" +
         "本工具**不写盘**——只**校验登记确已撤销**（未撤销即拒绝：`登记仍含角色「<roleId>」——先改登记再卸载；未执行。`——防「工具说撤了、登记没变」）、**激活**并**如实回执**。" +
@@ -451,21 +451,21 @@ export function describeTool(name: string): ToolDescription {
       parameters: {
         type: "object",
         properties: {
-          roleId: { type: "string", description: "Target project role id (must be a project role, not su itself)" },
+          roleId: { type: "string", description: "Target project role id (must be a project role, not a built-in governance role)" },
           name: { type: "string", description: "MCP server name (stable short slug matching docs/mcp/<name>.md)" },
         },
         required: ["roleId", "name"],
         additionalProperties: true,
       },
       description:
-        "向目标角色**安装外来 MCP server**（只注入给治理角色 su；激活＝重建目标会话，使其新会话装配该 MCP 声明）。" +
+        "向目标角色**安装外来 MCP server**（只注入给内置治理角色；激活＝重建目标会话，使其新会话装配该 MCP 声明）。" +
         "**仅客户明示时安装**——客户在会话中指令你安装才执行；**不得自主发起**；非客户消息发起的轮次调用会被**拒绝**（not-customer-turn：`本动作仅可在客户消息发起的轮次执行——未执行。`）。" +
         "**先落盘再激活**：声明先由你经 write_file 落盘到 `docs/mcp/<name>.md`（用途/启动 command/参数/环境［只收字面量或 `env:NAME` 引用——凭据值不入声明文件］/适用角色/状态），**再**调本工具；" +
         "本工具**不写盘、不做治理判定**——只**校验**（声明存在、含目标角色）、**激活**并**如实回执**。" +
         "**外来 MCP 工具在 ANS 门禁之外执行**（在 server 进程内运行、不属于任何受治理写面）——安装一个 MCP＝给该角色开一片**门禁之外的新动作面**（动作面边界＝server 自己提供什么）＝**能力级授予**，**不是逐调用受审**；安装**不改变任何角色的写边界**。" +
         "回执三态如实：`effective:\"rebuilt\"`＝目标会话已重建、即刻生效；`effective:\"next-session\"`＝目标正在跑轮次、不打断——新会话起生效（如实延迟态，不是错误）；" +
         "失败（`ok:false`）一律**未执行、零副作用**，如实报因（枚举）：MCP 未登记＝`MCP 未登记：docs/mcp/<name>.md 不存在——先落盘再安装；未执行。`；" +
-        "登记未含目标角色＝`登记中未包含角色「<roleId>」——未执行；如确要安装请先更新登记。`；角色不存在或为 su 自身＝`角色「<roleId>」不是本项目项目角色（或为治理角色 su）——未执行。`。" +
+        "登记未含目标角色＝`登记中未包含角色「<roleId>」——未执行；如确要安装请先更新登记。`；角色不存在或为内置治理角色＝`角色「<roleId>」不是本项目项目角色（或为内置治理角色）——未执行。`。" +
         "**不得**把失败或延迟说成已生效。",
       promptGuidelines: [
         "安装外来 MCP **仅限客户明示**（客户在会话中说「给<角色>装 MCP <name>」）：不得自主发起、不得把派发/看护等其它轮次的意图当许可；非客户消息发起的轮次会被拒绝（not-customer-turn）。",
@@ -483,14 +483,14 @@ export function describeTool(name: string): ToolDescription {
       parameters: {
         type: "object",
         properties: {
-          roleId: { type: "string", description: "Target project role id (must be a project role, not su itself)" },
+          roleId: { type: "string", description: "Target project role id (must be a project role, not a built-in governance role)" },
           name: { type: "string", description: "MCP server name (stable short slug matching docs/mcp/<name>.md)" },
         },
         required: ["roleId", "name"],
         additionalProperties: true,
       },
       description:
-        "向目标角色**卸载外来 MCP**（只注入给治理角色 su；激活＝重建目标会话，使其新会话不再装配该 MCP 声明）。" +
+        "向目标角色**卸载外来 MCP**（只注入给内置治理角色；激活＝重建目标会话，使其新会话不再装配该 MCP 声明）。" +
         "**仅客户明示时卸载**——客户在会话中指令你卸载才执行；**不得自主发起**；非客户消息发起的轮次调用会被**拒绝**（not-customer-turn：`本动作仅可在客户消息发起的轮次执行——未执行。`）。" +
         "**先改登记再卸载**：先由你用 edit_file 把该角色条目从 `docs/mcp/<name>.md` 移除（或整份置 `status: uninstalled`），**再**调本工具；" +
         "本工具**不写盘**——只**校验登记确已撤销**（未撤销即拒绝：`登记仍含角色「<roleId>」——先改登记再卸载；未执行。`——防「工具说撤了、声明没变」）、**激活**并**如实回执**。" +

@@ -32,3 +32,32 @@ export type {
   PinEvidenceResult,
   PinEvidenceState,
 } from "../../model/boundary.ts";
+
+// Service 公共出口：内置治理角色注册表（治理三权分立 V1；评审
+// `2026-10-17_design_governance-trio-review.md` §5.2/§5.6）。
+//
+// 单一来源恒在门禁引擎私有 `src/common/门禁引擎/governance-roles.ts`——本文件**同一绑定**再导出
+// （不复制实现/数据）；跨角色（编排/桌面窗口）只可经此公共出口消费，不得导入本角色私有 `common/`。
+// 注册表是**纯数据 + 纯查询**：trio 三人的 Section 1、预授权目录、禁写路径、能力矩阵与
+// 应用专用治理边界（`appGovernanceBoundary`）。应用边界只给应用写库用，**不注入任何角色会话**。
+export {
+  APP_GOVERNANCE_SOURCE,
+  BUILT_IN_GOVERNANCE_ROLES,
+  LEGACY_GOVERNANCE_ROLE_ID,
+  LEGACY_SU_CAPABILITIES,
+  LEGACY_SU_CARD_TEXT,
+  LEGACY_SU_PREAUTHORIZED_DIRS,
+  appGovernanceBoundary,
+  appGovernanceEntries,
+  governanceCapabilitiesOf,
+  governanceFunctionOf,
+  governanceRoleOf,
+  isBuiltInGovernanceRoleId,
+  isTrioGovernanceRoleId,
+  trioGovernanceSource,
+} from "../../common/门禁引擎/governance-roles.ts";
+export type {
+  BuiltInGovernanceRoleSpec,
+  GovernanceCapabilities,
+  TrioGovernanceRoleId,
+} from "../../common/门禁引擎/governance-roles.ts";

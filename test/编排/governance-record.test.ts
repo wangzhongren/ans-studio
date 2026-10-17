@@ -40,6 +40,7 @@ interface AnsPin {
 interface AnsRecord {
   projectRoot: string;
   skillRoot: string;
+  governanceModel?: string;
   roles: Record<string, { card: string; boundary: string }>;
   governanceBoundary: {
     path: string;
@@ -150,6 +151,7 @@ test("preview：S1 正常——三写路径、pin 列表、legacy 提示；零�
     assert.deepEqual(p.roleIds, ["alpha", "beta"]);
     assert.equal(p.adoptExistingGovernanceDoc, false);
     assert.equal(p.acceptanceSource, GOVERNANCE_RECORD_ACCEPTANCE_SOURCE);
+    assert.equal(p.governanceModel, "single", "缺省模型：single（不新增 .ans 字段）");
     assert.deepEqual(p.legacyBoundaryRoleIds, ["beta"]);
 
     assertNoWrites(target);
@@ -311,6 +313,11 @@ test("establish：成功写出三产物；.ans pin-backed、pin/manifest 与实�
     assert.equal(ans.governanceBoundary.path, GOV_REL);
     assert.equal(ans.governanceBoundary.acceptance.accepted, true);
     assert.equal(ans.governanceBoundary.acceptance.source, GOVERNANCE_RECORD_ACCEPTANCE_SOURCE);
+    assert.equal(
+      Object.prototype.hasOwnProperty.call(ans, "governanceModel"),
+      false,
+      "未传 governanceModel：旧 `.ans` 形状不得新增字段",
+    );
     assert.deepEqual(Object.keys(ans.roles).sort(), ["alpha", "beta"]);
 
     const expectedPins = [
@@ -344,6 +351,30 @@ test("establish：成功写出三产物；.ans pin-backed、pin/manifest 与实�
     const again = await previewGovernanceRecord({ projectRoot: target, skillRoot: target });
     assert.equal(again.ok, false);
     if (!again.ok) assert.equal(again.code, "already-established");
+  });
+});
+
+test("establish：governanceModel='trio' → 预览显示 trio、`.ans` 写出该字段", async () => {
+  await withRoot(async ({ root }) => {
+    const target = newProject(root);
+    writeRole(target, "alpha");
+
+    const preview = await previewGovernanceRecord({
+      projectRoot: target,
+      skillRoot: target,
+      governanceModel: "trio",
+    });
+    assert.equal(preview.ok, true, JSON.stringify(preview));
+    if (preview.ok) assert.equal(preview.preview.governanceModel, "trio");
+
+    const result = await establishGovernanceRecord({
+      projectRoot: target,
+      skillRoot: target,
+      governanceModel: "trio",
+    });
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.equal(readAns(target).governanceModel, "trio");
+    assert.equal(readAns(target).governanceBoundary.acceptance.accepted, true);
   });
 });
 

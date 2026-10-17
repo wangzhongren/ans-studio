@@ -5,6 +5,7 @@
 
 /** 运行时选择取值（与装配对齐）：demo = 装配演示假 runtime；pi = 真实 Pi 适配器。 */
 import { RUNTIME_KINDS } from "../shared/runtime-shared.ts";
+import type { GovernanceFunction } from "../../model/role.ts";
 export { RUNTIME_KINDS };
 export type { RuntimeKind } from "../shared/runtime-shared.ts";
 
@@ -75,6 +76,16 @@ function checkRuntime(value: string, errors: string[], assign: (v: string) => vo
   else errors.push(`非法的 --runtime：${value}（应为 ${RUNTIME_KINDS.join("|")}）`);
 }
 
+// 校验 --function 取值（trio 三权职能；single 下是否允许由引擎按治理模型明确拒绝）。
+function checkGovernanceFunction(
+  value: string,
+  errors: string[],
+  assign: (v: GovernanceFunction) => void,
+): void {
+  if ((GOVERNANCE_FUNCTIONS as readonly string[]).includes(value)) assign(value as GovernanceFunction);
+  else errors.push(`非法的 --function：${value}（应为 ${GOVERNANCE_FUNCTIONS.join("|")}）`);
+}
+
 // 解析 `--task <id>`，缺省用 fallback（govern 命令用）。
 export function parseTaskId(argv: string[], fallback: string): string {
   for (let i = 0; i < argv.length; i++) {
@@ -90,12 +101,16 @@ export interface ParsedGovernArgs {
   runtime: string;
   /** 本次治理会话要创建/重构的角色 id（可多次 `--role`；作为 scope 可写集的来源）。 */
   roleIds: string[];
+  /** 治理职能（评审 §5.6）：trio 下选择会话角色；single 下传 → 引擎明确拒绝。 */
+  function?: GovernanceFunction;
   /** **目标项目目录**（可选位置参数 `ans govern <目录>`，设计 §12.3）：治理会话在此目录上建立 projectRoot。
    *  缺省（未给出）= undefined，由**装配**回退到 ans-cli 自身（`resolveProjectRoot()`）。 */
   dir?: string;
   /** 用法错误清单；非空即应非 0 结束。 */
   errors: string[];
 }
+
+const GOVERNANCE_FUNCTIONS: readonly GovernanceFunction[] = ["proposal", "nomination", "schedule"];
 
 // 解析 `ans govern [<目录>] [--task <id>] [--role <角色id>]…`
 //（argv 为 "govern" 之后的剩余参数；容忍前导 "govern" 词）。
@@ -109,6 +124,7 @@ export function parseGovernArgs(argv: string[]): ParsedGovernArgs {
   let taskId = "";
   let dir: string | undefined;
   let runtime = "";
+  let governanceFunction: GovernanceFunction | undefined;
 
   for (let i = 0; i < tokens.length; i++) {
     const t = tokens[i];
@@ -138,6 +154,19 @@ export function parseGovernArgs(argv: string[]): ParsedGovernArgs {
       else checkRuntime(value, errors, (v) => (runtime = v));
       continue;
     }
+    if (t === "--function") {
+      const value = tokens[i + 1];
+      if (value === undefined || value === "" || value.startsWith("-")) errors.push(`选项 ${t} 缺少值`);
+      else checkGovernanceFunction(value, errors, (v) => (governanceFunction = v));
+      i += 1;
+      continue;
+    }
+    if (t.startsWith("--function=")) {
+      const value = t.slice("--function=".length);
+      if (value === "") errors.push("选项 --function 缺少值");
+      else checkGovernanceFunction(value, errors, (v) => (governanceFunction = v));
+      continue;
+    }
     if (t === "--role" || t === "-r") {
       const value = tokens[i + 1];
       if (value === undefined || value === "" || value.startsWith("-")) errors.push(`选项 ${t} 缺少值`);
@@ -161,5 +190,12 @@ export function parseGovernArgs(argv: string[]): ParsedGovernArgs {
   }
 
   if (taskId === "") taskId = "T-GOV-1";
-  return { taskId, roleIds, dir, runtime, errors };
+  return {
+    taskId,
+    roleIds,
+    ...(governanceFunction !== undefined ? { function: governanceFunction } : {}),
+    dir,
+    runtime,
+    errors,
+  };
 }

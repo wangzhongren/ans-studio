@@ -37,7 +37,8 @@ interface Rig {
 function baseSnapshot(over: Partial<WatchdogProjectSnapshot> = {}): WatchdogProjectSnapshot {
   return {
     projectRoot: P,
-    suRoleId: SU,
+    // 2026-10-17（三权 V1，评审 §5.6）：`suRoleId` → `governanceRoleId`（值=回交主人）。
+    governanceRoleId: SU,
     roles: [{ roleId: SU, runtime: "pi", busy: false } as WatchdogRoleView],
     queues: [],
     activeDeliveries: 0,

@@ -25,6 +25,9 @@ import { configureDiagnostics, flushDiagnostics, disposeDiagnostics } from "../.
 // G-2/W5（2026-10-16 客户批准）：恢复确认卡（卡侧真件——present 收集 + respond 驱动「恰 allow:true 才执行」）
 // 与恢复提议能力（经 openRoleSession 捕获——仅 su 注入）。
 import { createRecoveryConfirmPresenter, type RecoveryConfirmRequest, type RecoveryConfirmRequestInput } from "../../app/desktop/recovery-channel.ts";
+// 三权（评审 §5.6）：能力矩阵用例注入客户通道与 shell 两件（判据只看注入字段，不触真实 UI）。
+import type { DesktopCustomerInputFn } from "../../app/desktop/customer-input.ts";
+import type { DesktopOperatorChannelFn, DesktopShellArming } from "../../app/desktop/operator-channel.ts";
 import type { ProposeRecoveryFn, RoleStatusFn, SessionTailFn } from "../../src/model/runtime.ts";
 // G-4/I3（2026-10-16 客户批准）：技能安装/卸载能力（经 openRoleSession 捕获——仅 su 注入）。
 import type { InstallSkillFn, UninstallSkillFn, InstallSkillReceipt } from "../../src/model/runtime.ts";
@@ -68,8 +71,33 @@ function listing(projectRoot = "/proj"): ProjectListing {
     warnings: [],
     hasRoles: true,
     primaryRoleId: "su",
+    governanceModel: "single",
   };
 }
+
+/** 三权（评审 §5.4/§5.6）：trio 列表——内置三人带 `governanceFunction`，主入口 rapporteur。 */
+function trioListing(projectRoot = "/proj"): ProjectListing {
+  const mkBuiltIn = (roleId: string, fn: "proposal" | "nomination" | "schedule"): ProjectListing["roles"][number] => ({
+    roleId,
+    cardPath: "",
+    boundaryPath: "",
+    cardText: roleId,
+    boundary: { entries: [], boundarySource: `<built-in:trio/${roleId}>`, acceptance: { accepted: false, source: "" } },
+    builtIn: true,
+    governanceFunction: fn,
+  });
+  return {
+    projectRoot,
+    roles: [mkBuiltIn("rapporteur", "proposal"), mkBuiltIn("nominator", "nomination"), mkBuiltIn("convener", "schedule"), ...listing(projectRoot).roles.filter((r) => r.builtIn !== true)],
+    warnings: [],
+    hasRoles: true,
+    primaryRoleId: "rapporteur",
+    governanceModel: "trio",
+  };
+}
+
+/** 打开会话时收到的完整能力面（三权能力矩阵断言用）。 */
+type OpenCapabilities = { dispatchTask?: DispatchTaskFn; proposeRecovery?: ProposeRecoveryFn; roleStatus?: RoleStatusFn; sessionTail?: SessionTailFn; installSkill?: InstallSkillFn; uninstallSkill?: UninstallSkillFn; installMcp?: InstallMcpFn; uninstallMcp?: UninstallMcpFn; customerInput?: DesktopCustomerInputFn; shellArming?: DesktopShellArming; shellOperatorChannel?: DesktopOperatorChannelFn; shellOperatorOnly?: unknown; shellReadonly?: unknown };
 
 interface Harness {
   mgr: SessionManager;
@@ -99,18 +127,21 @@ interface Harness {
   uninstallMcpOf: (roleId: string) => UninstallMcpFn | undefined;
   /** G-2/W4：各角色 abort 被调次数（恢复桥「恰一次执行」判据）。 */
   aborts: Record<string, number>;
+  /** 三权（评审 §5.6）：打开会话时收到的完整能力面（矩阵断言用）。 */
+  capabilitiesOf: (roleId: string) => OpenCapabilities | undefined;
 }
 
-function makeHarness(opts: { failSends?: Record<string, number>; openDelayMs?: number; projectRoot?: string; recoveryConfirm?: ReturnType<typeof createRecoveryConfirmPresenter>; unsupportedAbort?: string[]; failOpensAfter?: Record<string, number> } = {}): Harness {
+function makeHarness(opts: { failSends?: Record<string, number>; openDelayMs?: number; projectRoot?: string; recoveryConfirm?: ReturnType<typeof createRecoveryConfirmPresenter>; unsupportedAbort?: string[]; failOpensAfter?: Record<string, number>; customListing?: ProjectListing; customerInput?: DesktopCustomerInputFn; shellArming?: DesktopShellArming; shellOperatorChannel?: DesktopOperatorChannelFn } = {}): Harness {
   const root = opts.projectRoot ?? "/proj";
-  const l = listing(root);
+  const l = opts.customListing ?? listing(root);
   const streams: Record<string, OrchestrationEvent[]> = { su: [], A: [], B: [] };
   const sent: Record<string, string[]> = { su: [], A: [], B: [] };
   const sendOptions: Record<string, RoleSessionSendOptions[]> = {};
   const envelopes: import("../../app/desktop/session.ts").SessionEventEnvelope[] = [];
   const roleStates: { roleId: string; summaries: string[] }[] = [];
   const openCalls: string[] = [];
-  const openInputs: Record<string, { dispatchTask?: DispatchTaskFn; proposeRecovery?: ProposeRecoveryFn; roleStatus?: RoleStatusFn; sessionTail?: SessionTailFn; installSkill?: InstallSkillFn; uninstallSkill?: UninstallSkillFn; installMcp?: InstallMcpFn; uninstallMcp?: UninstallMcpFn }> = {};
+  type OpenCapabilities = { dispatchTask?: DispatchTaskFn; proposeRecovery?: ProposeRecoveryFn; roleStatus?: RoleStatusFn; sessionTail?: SessionTailFn; installSkill?: InstallSkillFn; uninstallSkill?: UninstallSkillFn; installMcp?: InstallMcpFn; uninstallMcp?: InstallMcpFn; customerInput?: DesktopCustomerInputFn; shellArming?: DesktopShellArming; shellOperatorChannel?: DesktopOperatorChannelFn; shellOperatorOnly?: unknown; shellReadonly?: unknown };
+  const openInputs: Record<string, OpenCapabilities> = {};
   const openCounts: Record<string, number> = {};
   const aborts: Record<string, number> = {};
   // 注：`stopped` 逐句柄闭包（不是按 roleId 共享）——G-2/W4 的 rebuildSession 会 dispose 旧句柄、重开新句柄：
@@ -181,7 +212,7 @@ function makeHarness(opts: { failSends?: Record<string, number>; openDelayMs?: n
   const mgr = new SessionManager({
     openRoleSession: async (input) => {
       openCalls.push(input.roleId);
-      const inputWithCapabilities = input as { dispatchTask?: DispatchTaskFn; proposeRecovery?: ProposeRecoveryFn; roleStatus?: RoleStatusFn; sessionTail?: SessionTailFn; installSkill?: InstallSkillFn; uninstallSkill?: UninstallSkillFn; installMcp?: InstallMcpFn; uninstallMcp?: UninstallMcpFn };
+      const inputWithCapabilities = input as OpenCapabilities;
       openInputs[input.roleId] = {
         dispatchTask: inputWithCapabilities.dispatchTask,
         proposeRecovery: inputWithCapabilities.proposeRecovery,
@@ -191,6 +222,11 @@ function makeHarness(opts: { failSends?: Record<string, number>; openDelayMs?: n
         uninstallSkill: inputWithCapabilities.uninstallSkill,
         installMcp: inputWithCapabilities.installMcp,
         uninstallMcp: inputWithCapabilities.uninstallMcp,
+        customerInput: inputWithCapabilities.customerInput,
+        shellArming: inputWithCapabilities.shellArming,
+        shellOperatorChannel: inputWithCapabilities.shellOperatorChannel,
+        shellOperatorOnly: inputWithCapabilities.shellOperatorOnly,
+        shellReadonly: inputWithCapabilities.shellReadonly,
       };
       // G-4 夹具：可控的「第 N 次之后开会话失败」（重建失败分支——rebuildSession 重开失败）。
       const opens = (openCounts[input.roleId] = (openCounts[input.roleId] ?? 0) + 1);
@@ -212,6 +248,10 @@ function makeHarness(opts: { failSends?: Record<string, number>; openDelayMs?: n
     emitRoleState: (info) => roleStates.push(info),
     // G-2/W5：恢复确认卡通道（缺省 ⇒ 恢复桥「未接线、未获执行」fail-closed——本组两条路径都钉）。
     recoveryConfirm: opts.recoveryConfirm,
+    // 三权（评审 §5.6）：能力矩阵用例注入客户通道与 shell 两件（缺省 ⇒ 不注入，保持旧用例逐字不变）。
+    ...(opts.customerInput !== undefined ? { customerInput: opts.customerInput } : {}),
+    ...(opts.shellArming !== undefined ? { shellArming: opts.shellArming } : {}),
+    ...(opts.shellOperatorChannel !== undefined ? { shellOperatorChannel: opts.shellOperatorChannel } : {}),
   });
   return {
     mgr, streams, sent, sendOptions, envelopes, openCalls,
@@ -224,6 +264,7 @@ function makeHarness(opts: { failSends?: Record<string, number>; openDelayMs?: n
     installMcpOf: (roleId) => openInputs[roleId]?.installMcp,
     uninstallMcpOf: (roleId) => openInputs[roleId]?.uninstallMcp,
     hangNext, maxConcurrent, roleStates, aborts,
+    capabilitiesOf: (roleId) => openInputs[roleId],
   };
 }
 
@@ -1092,8 +1133,8 @@ test("G-4/I3 校验分支（全部拒绝⇒零副作用）：role-not-found（su
       assert.ok(r.message.includes(frag), `${reason} 文案如实：「${frag}」∈「${r.message}」`);
     }
   };
-  expectFail(await install({ roleId: "su", name: "lint" }), "role-not-found", "角色「su」不是本项目项目角色（或为治理角色 su）——未执行。");
-  expectFail(await install({ roleId: "ghost", name: "lint" }), "role-not-found", "角色「ghost」不是本项目项目角色（或为治理角色 su）——未执行。");
+  expectFail(await install({ roleId: "su", name: "lint" }), "role-not-found", "角色「su」不是本项目项目角色（或为内置治理角色）——未执行。");
+  expectFail(await install({ roleId: "ghost", name: "lint" }), "role-not-found", "角色「ghost」不是本项目项目角色（或为内置治理角色）——未执行。");
   expectFail(await install({ roleId: "A", name: "nope" }), "not-registered", "技能未登记：docs/skills/nope/install.md 不存在——先落盘再安装；未执行。");
   expectFail(await install({ roleId: "A", name: "forB" }), "role-not-listed", "登记中未包含角色「A」——未执行；如确要安装请先更新登记。");
   expectFail(await install({ roleId: "A", name: "off" }), "not-registered", "状态为「uninstalled」——先改登记再安装；未执行。");
@@ -1331,8 +1372,8 @@ test("G-4 V2 校验分支（全部拒绝⇒零副作用）：role-not-found（su
       assert.ok(r.message.includes(frag), `${reason} 文案如实：「${frag}」∈「${r.message}」`);
     }
   };
-  expectFail(await install({ roleId: "su", name: "fetch" }), "role-not-found", "角色「su」不是本项目项目角色（或为治理角色 su）——未执行。");
-  expectFail(await install({ roleId: "ghost", name: "fetch" }), "role-not-found", "角色「ghost」不是本项目项目角色（或为治理角色 su）——未执行。");
+  expectFail(await install({ roleId: "su", name: "fetch" }), "role-not-found", "角色「su」不是本项目项目角色（或为内置治理角色）——未执行。");
+  expectFail(await install({ roleId: "ghost", name: "fetch" }), "role-not-found", "角色「ghost」不是本项目项目角色（或为内置治理角色）——未执行。");
   expectFail(await install({ roleId: "A", name: "nope" }), "not-registered", "MCP 未登记：docs/mcp/nope.md 不存在——先落盘再安装；未执行。");
   expectFail(await install({ roleId: "A", name: "ans" }), "not-registered", "MCP 未登记：docs/mcp/ans.md 不存在——先落盘再安装；未执行。");
   expectFail(await install({ roleId: "A", name: "bad.name" }), "not-registered", "MCP 未登记：docs/mcp/bad.name.md 不存在——先落盘再安装；未执行。");
@@ -1463,3 +1504,232 @@ test("G-4 V2 卸载成功（先改声明再卸载 ⇒ rebuilt）：系统行如�
   await h.mgr.stop(null);
 });
 
+
+// —————————————— 三权 W3（评审 §5.6）：能力矩阵 / 派发门禁 / 回交与看护路由 / 账本 ——————————————
+//
+// 覆盖：三内置按 `governanceFunction` 注入（rapporteur 仅客户通道；nominator 加安装；convener 加
+// 派发/看护 + 只读 shell）；`routeDispatch` 的派发范围门正反例与 `dispatch.accepted` 账本；
+// 项目角色回交/看护系统消息改投 Convener（Rapporteur 只镜像、不接投递）；旧 single 不写账本。
+
+const trioEntry = (over: Record<string, unknown>) => ({
+  at: new Date().toISOString(),
+  kind: "customer.decision",
+  flowId: "flow-a",
+  actorRoleId: "rapporteur",
+  power: "proposal",
+  customerDecision: "accepted",
+  ...over,
+});
+
+/** 造一个可过派发门禁的 trio 项目根：流程单含步骤 `impl`；账本按用例写入。 */
+async function makeTrioRoot(ledgerEntries: Record<string, unknown>[] = []): Promise<string> {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "ans-trio-dispatch-"));
+  await fs.mkdir(path.join(dir, "docs", "flows"), { recursive: true });
+  await fs.writeFile(
+    path.join(dir, "docs", "flows", "flow-a.md"),
+    ["# 流程 flow-a", "", "| 步骤 | 主人 | 状态 |", "| --- | --- | --- |", "| impl | A | pending |", ""].join("\n"),
+    "utf8",
+  );
+  await fs.mkdir(path.join(dir, ".ans", "governance"), { recursive: true });
+  if (ledgerEntries.length > 0) {
+    await fs.writeFile(
+      path.join(dir, ".ans", "governance", "ledger.jsonl"),
+      ledgerEntries.map((entry) => JSON.stringify(entry)).join("\n") + "\n",
+      "utf8",
+    );
+  }
+  return dir;
+}
+
+test("三权能力矩阵：rapporteur 仅客户通道；nominator 加安装；convener 加派发/看护与只读 shell；项目角色三层链不变", async () => {
+  const dir = await makeTrioRoot();
+  const customerInput: DesktopCustomerInputFn = async () => ({ outcome: "declined", reason: "测试替身" });
+  const arming = {
+    classifyShell: (_command: string) => "allow",
+    rules: { allow: [], review: [], deny: [] },
+  } as unknown as DesktopShellArming;
+  const operatorChannel: DesktopOperatorChannelFn = async () => ({ outcome: "deny", reason: "测试替身" });
+  const h = makeHarness({ projectRoot: dir, customListing: trioListing(dir), customerInput, shellArming: arming, shellOperatorChannel: operatorChannel });
+
+  for (const roleId of ["rapporteur", "nominator", "convener", "A"]) {
+    await h.mgr.open({ projectRoot: dir, roleId, runtime: "demo" });
+    await tick(30);
+  }
+
+  const rapporteur = h.capabilitiesOf("rapporteur")!;
+  assert.equal(typeof rapporteur.customerInput, "function", "rapporteur：客户确认通道（三人都有）");
+  assert.equal(rapporteur.dispatchTask, undefined, "rapporteur 不派发");
+  assert.equal(rapporteur.proposeRecovery, undefined, "rapporteur 无恢复提议");
+  assert.equal(rapporteur.roleStatus, undefined, "rapporteur 无 role_status");
+  assert.equal(rapporteur.sessionTail, undefined, "rapporteur 无 session_tail");
+  assert.equal(rapporteur.installSkill, undefined, "rapporteur 不安装技能");
+  assert.equal(rapporteur.installMcp, undefined, "rapporteur 不安装 MCP");
+  assert.equal(rapporteur.shellOperatorOnly, undefined, "trio 不接 su 审批档");
+  assert.equal(rapporteur.shellReadonly, undefined, "rapporteur 无 shell");
+  assert.equal(rapporteur.shellArming, undefined, "内置角色不走项目三层链");
+
+  const nominator = h.capabilitiesOf("nominator")!;
+  assert.equal(typeof nominator.customerInput, "function", "nominator：客户确认通道");
+  assert.equal(typeof nominator.installSkill, "function", "nominator：技能安装");
+  assert.equal(typeof nominator.uninstallSkill, "function", "nominator：技能卸载");
+  assert.equal(typeof nominator.installMcp, "function", "nominator：MCP 安装");
+  assert.equal(typeof nominator.uninstallMcp, "function", "nominator：MCP 卸载");
+  assert.equal(nominator.dispatchTask, undefined, "nominator 不派发");
+  assert.equal(nominator.proposeRecovery, undefined, "nominator 无恢复提议");
+  assert.equal(nominator.shellReadonly, undefined, "nominator 无 shell");
+
+  const convener = h.capabilitiesOf("convener")!;
+  assert.equal(typeof convener.customerInput, "function", "convener：客户确认通道");
+  assert.equal(typeof convener.dispatchTask, "function", "convener：派发（唯一）");
+  assert.equal(typeof convener.proposeRecovery, "function", "convener：恢复提议");
+  assert.equal(typeof convener.roleStatus, "function", "convener：role_status");
+  assert.equal(typeof convener.sessionTail, "function", "convener：session_tail");
+  assert.equal(convener.installSkill, undefined, "convener 不安装技能");
+  assert.equal(convener.installMcp, undefined, "convener 不安装 MCP");
+  assert.equal(convener.shellOperatorOnly, undefined, "trio 不接 su 审批档");
+  assert.deepEqual(
+    convener.shellReadonly,
+    { classifyShell: arming.classifyShell, rules: arming.rules },
+    "convener 只读档：同一份 (c) 实件、不带 operator channel",
+  );
+  assert.equal((convener.shellReadonly as { operatorChannel?: unknown }).operatorChannel, undefined, "只读档不带 (a) 通道");
+
+  const projectRole = h.capabilitiesOf("A")!;
+  assert.equal(projectRole.customerInput, undefined, "项目角色无客户确认通道");
+  assert.equal(projectRole.dispatchTask, undefined, "项目角色不派发");
+  assert.equal(projectRole.shellReadonly, undefined, "项目角色不带只读档");
+  assert.equal(projectRole.shellArming, arming, "项目角色三层链：(c) 实件逐字不变");
+  assert.equal(typeof projectRole.shellOperatorChannel, "function", "项目角色三层链：(a) 通道逐字不变");
+  await h.mgr.stop(null);
+});
+
+test("routeDispatch 正例（trio）：提案接受 + 任命 + 流程步骤 → 入队 + 写 dispatch.accepted 账本", async () => {
+  const dir = await makeTrioRoot([
+    trioEntry({ decisionKind: "proposal-accept" }),
+    trioEntry({ decisionKind: "appointment", power: "nomination", actorRoleId: "nominator", targetRoleIds: ["A"] }),
+  ]);
+  const h = makeHarness({ projectRoot: dir, customListing: trioListing(dir) });
+  await h.mgr.open({ projectRoot: dir, roleId: "convener", runtime: "demo" });
+  await tick(30);
+  const dispatch = h.capabilitiesOf("convener")!.dispatchTask!;
+  const receipt = (await dispatch({ roleId: "A", task: "实现步骤 impl", flowId: "flow-a", stepId: "impl" }))!;
+  assert.equal(receipt.ok, true, "门禁全过 ⇒ 受理");
+  assert.match(receipt.message ?? "", /已受理/, "回执如实（受理≠已完成）");
+  await tick(200);
+  assert.equal(h.sent.A.length, 1, "目标收到派发");
+  assert.ok(h.sent.A[0].includes("实现步骤 impl"), "任务文本送达");
+
+  const { readGovernanceLedger } = await import("../../src/pipeline/orchestration/govern-session.ts");
+  const ledger = await readGovernanceLedger(dir);
+  assert.deepEqual(ledger.errors, [], "账本可读");
+  const written = ledger.entries.filter((entry) => entry.kind === "dispatch.accepted");
+  assert.equal(written.length, 1, "成功入队后写恰一条 dispatch.accepted");
+  const [entry] = written;
+  assert.equal(entry.actorRoleId, "convener");
+  assert.equal(entry.power, "schedule");
+  assert.equal(entry.flowId, "flow-a");
+  assert.equal(entry.stepId, "impl");
+  assert.equal(entry.targetRoleId, "A");
+  assert.ok((entry.messageSummary ?? "").includes("实现步骤 impl"), "messageSummary 记录任务摘要");
+  await h.mgr.stop(null);
+});
+
+test("routeDispatch 反例（trio）：无客户接受/无任命/目标内置/重复步骤 → 拒投且不写账本", async () => {
+  const { readGovernanceLedger } = await import("../../src/pipeline/orchestration/govern-session.ts");
+  // ① 无账本（无客户决定）：门禁拒。
+  const emptyRoot = await makeTrioRoot();
+  const h1 = makeHarness({ projectRoot: emptyRoot, customListing: trioListing(emptyRoot) });
+  await h1.mgr.open({ projectRoot: emptyRoot, roleId: "convener", runtime: "demo" });
+  await tick(30);
+  const r1 = (await h1.capabilitiesOf("convener")!.dispatchTask!({ roleId: "A", task: "无提案", flowId: "flow-a", stepId: "impl" }))!;
+  assert.equal(r1.ok, false, "无客户接受的提案 ⇒ 拒投");
+  assert.match(r1.message ?? "", /治理门禁/, "回执点明治理门禁");
+  await tick(120);
+  assert.equal(h1.sent.A.length, 0, "拒投不投递");
+  const none = await readGovernanceLedger(emptyRoot);
+  assert.equal(none.entries.filter((entry) => entry.kind === "dispatch.accepted").length, 0, "失败不写 dispatch.accepted");
+  await h1.mgr.stop(null);
+
+  // ② 提案已接受但目标不在任命名单：拒。
+  const noAppointmentRoot = await makeTrioRoot([trioEntry({ decisionKind: "proposal-accept" })]);
+  const h2 = makeHarness({ projectRoot: noAppointmentRoot, customListing: trioListing(noAppointmentRoot) });
+  await h2.mgr.open({ projectRoot: noAppointmentRoot, roleId: "convener", runtime: "demo" });
+  await tick(30);
+  const r2 = (await h2.capabilitiesOf("convener")!.dispatchTask!({ roleId: "A", task: "未任命", flowId: "flow-a", stepId: "impl" }))!;
+  assert.equal(r2.ok, false, "未任命 ⇒ 拒投");
+  assert.match(r2.message ?? "", /任命|治理门禁/, "文案指路任命");
+  await h2.mgr.stop(null);
+
+  // ③ 目标为内置治理角色：拒（即使账本齐全）。
+  const builtinRoot = await makeTrioRoot([
+    trioEntry({ decisionKind: "proposal-accept" }),
+    trioEntry({ decisionKind: "appointment", power: "nomination", actorRoleId: "nominator", targetRoleIds: ["A"] }),
+  ]);
+  const h3 = makeHarness({ projectRoot: builtinRoot, customListing: trioListing(builtinRoot) });
+  await h3.mgr.open({ projectRoot: builtinRoot, roleId: "convener", runtime: "demo" });
+  await tick(30);
+  const r3 = (await h3.capabilitiesOf("convener")!.dispatchTask!({ roleId: "rapporteur", task: "派给内置", flowId: "flow-a", stepId: "impl" }))!;
+  assert.equal(r3.ok, false, "内置目标一律拒");
+  assert.match(r3.message ?? "", /内置治理角色/, "如实原因");
+  await h3.mgr.stop(null);
+
+  // ④ 重复派发同一 flowId+stepId：第二次被账本去重拒。
+  const dupRoot = await makeTrioRoot([
+    trioEntry({ decisionKind: "proposal-accept" }),
+    trioEntry({ decisionKind: "appointment", power: "nomination", actorRoleId: "nominator", targetRoleIds: ["A"] }),
+  ]);
+  const h4 = makeHarness({ projectRoot: dupRoot, customListing: trioListing(dupRoot) });
+  await h4.mgr.open({ projectRoot: dupRoot, roleId: "convener", runtime: "demo" });
+  await tick(30);
+  const dispatch4 = h4.capabilitiesOf("convener")!.dispatchTask!;
+  assert.equal((await dispatch4({ roleId: "A", task: "第一次", flowId: "flow-a", stepId: "impl" }))!.ok, true);
+  const again = (await dispatch4({ roleId: "A", task: "第二次不同文本", flowId: "flow-a", stepId: "impl" }))!;
+  assert.equal(again.ok, false, "同一步骤重复派发被去重");
+  assert.match(again.message ?? "", /已派发过|去重/, "文案如实说明重复");
+  const ledger4 = await readGovernanceLedger(dupRoot);
+  assert.equal(ledger4.entries.filter((entry) => entry.kind === "dispatch.accepted").length, 1, "被拒的重复派发不新增账本");
+  await h4.mgr.stop(null);
+});
+
+test("回交/看护路由（trio）：项目角色回交与系统消息改投 Convener；Rapporteur 不接收", async () => {
+  const dir = await makeTrioRoot();
+  const h = makeHarness({ projectRoot: dir, customListing: trioListing(dir) });
+  await h.mgr.open({ projectRoot: dir, roleId: "rapporteur", runtime: "demo" });
+  await tick(30);
+  await h.mgr.open({ projectRoot: dir, roleId: "convener", runtime: "demo" });
+  await tick(30);
+  await h.mgr.open({ projectRoot: dir, roleId: "A", runtime: "demo" });
+  await tick(30);
+  // 项目角色 A 回交 → 投递主人是 Convener（不是主入口 Rapporteur）。
+  (h.streams.A ??= []).push({ kind: "handback", roleId: "A", summary: "A 完成", handback: HANDBACK_A } as OrchestrationEvent);
+  await tick(250);
+  assert.ok(h.sent.convener.includes(renderHandbackPrompt(HANDBACK_A)), "回交原文投给 Convener");
+  assert.equal((h.sent.rapporteur ?? []).length, 0, "Rapporteur 不接收回交投递（只镜像由渲染侧负责）");
+  assert.equal(h.mgr.watchdogSnapshot(dir)!.governanceRoleId, "convener", "看护快照的治理主人=Convener");
+  // 三人不自我回交（防御）：内置角色的回交事件不被再次投递。
+  const beforeSelf = h.sent.convener.length;
+  (h.streams.convener ??= []).push({ kind: "handback", roleId: "convener", summary: "内置回交", handback: { ...HANDBACK_A, roleId: "convener" } } as OrchestrationEvent);
+  await tick(120);
+  assert.equal(h.sent.convener.length, beforeSelf, "内置治理角色不自我回交（防御性忽略）");
+  // 回交那一轮结束（convener 空闲）后再投系统消息——看护系统消息同样投 Convener。
+  (h.streams.convener ??= []).push({ kind: "settled", summary: "convener 一轮结束" } as OrchestrationEvent);
+  await tick(120);
+  h.mgr.watchdogDeliver(dir, { text: "[系统·看护] 测试", summary: "系统·看护 · 测试", dedupKey: "k-trio" });
+  await tick(200);
+  assert.ok(h.sent.convener.includes("[系统·看护] 测试"), "系统消息投给 Convener");
+  assert.equal((h.sent.rapporteur ?? []).length, 0, "Rapporteur 不接收系统消息");
+  await h.mgr.stop(null);
+});
+
+test("旧 single 不回归：派发仍投主入口 su，且不产生 .ans/governance 账本（旧项目行为逐字不变）", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "ans-single-dispatch-"));
+  const h = makeHarness({ projectRoot: dir, customListing: listing(dir) });
+  await h.mgr.open({ projectRoot: dir, roleId: "su", runtime: "demo" });
+  await tick(30);
+  const receipt = (await h.capabilitiesOf("su")!.dispatchTask!({ roleId: "A", task: "旧项目派发" }))!;
+  assert.equal(receipt.ok, true, "single 旧行为：无需 flowId/stepId，直接受理");
+  await tick(150);
+  assert.equal(h.sent.A.length, 1, "旧行为照常投递");
+  await assert.rejects(fs.stat(path.join(dir, ".ans", "governance", "ledger.jsonl")), "single 不创建治理账本文件");
+  await h.mgr.stop(null);
+});

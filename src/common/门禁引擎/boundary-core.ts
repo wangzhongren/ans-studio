@@ -15,6 +15,10 @@ import { absRel, compareKey, normalizeLexical } from "./paths.ts";
 // 此前 `boundary-core` 从编排私有 `../编排/bootstrap.ts` 导入它——**§6 违规**（跨角色导入私有
 // `common/` ＋ Service 反向依赖 Pipeline）。T31 搬迁即修复：改从本角色内导入（搬迁非 fork）。
 import { buildGovernanceSeedBoundaryForGate } from "./governance-seed.ts";
+// 治理三权分立（评审 2026-10-17 §5.2/§5.3）：trio 三人的 Card/Section 1 来自内置注册表，
+// 不再是 su 的单一治理边界文档。注册表是**纯数据 + 纯查询**，不反向读取本文件的顶层绑定
+// （仅以 live binding 再导出 `LEGACY_*`），故不构成初始化顺序风险。
+import { governanceRoleOf, trioGovernanceSource } from "./governance-roles.ts";
 
 export const BUILT_IN_SOURCE = "<built-in:ans-governed-construction SKILL boundary>";
 
@@ -534,7 +538,7 @@ export function reloadBoundaryEntriesSync(
 }
 
 /**
- * 双来源边界解析（+ 冷启动创世例外）：
+ * 双来源边界解析（+ 冷启动创世例外；V1 起按 `governanceModel` 分支）：
  * 1) 项目覆盖（若已接受优先）：项目配置了该角色边界文件，且项目级接受证据已接受；
  * 2) 治理边界覆盖：项目提供了治理边界文档（针对内置治理角色）；
  * 3) **冷启动「有界创世例外」**（设计 §10.1 / §12.2）：空项目（尚无治理边界文档）上，若调用方
@@ -550,6 +554,18 @@ export function reloadBoundaryEntriesSync(
  * ⚠️ 第 3 步置于第 2 步**之后** = **自终止**：项目治理边界文档一经写出并经 pin 接受，
  *    `governanceBoundary.path` 非空 ⇒ 第 2 步先命中、第 3 步永不求值——创世授权随之失效
  *    （即便 `genesisBootstrap` 残留亦然；自终止是结构性的，不依赖调用方清除该字段）。
+ *
+ * ── 治理模型分支（评审 2026-10-17 §5.3，客户已拍板；缺省 `single` 逐字不变）──────────────
+ * · `single`：`su` 走上面 1–4 步（逐字不变）；trio 三人 id → 未接受 + parseError
+ *   「三权角色在 single 治理模型下不可用」（结构性拒绝，不开放）；其余角色走 1–4 步。
+ * · `trio`：`su` → 未接受 + parseError「su 已归档（当前为三权治理模型），不可写入/开启」；
+ *   trio 三人 → 条目取**内置注册表**（`governance-roles.ts`），**绝不**读取
+ *   `governanceBoundary.path` 的条目作为写权来源；接受证据仍按项目：`path` 非空且
+ *   `acceptance.accepted === true` ⇒ 沿用该 acceptance；`path` 为空且本次显式 `genesisBootstrap`
+ *   ⇒ `{accepted:true, source: genesis.source}`；否则 fail-closed（F6 拒一切写入）。
+ *   **不**把桌面运行期同意（`path` 为空时的 fallback acceptance）当成 trio 的项目接受证据
+ *   （评审 §5.3：trio 的接受必须有 `.ans` 治理记录或本次显式 genesis）。
+ *   项目角色仍走 1–4 步（既有逻辑不变）。
  */
 export async function resolveBoundarySection(
   roleId: string,
@@ -559,6 +575,53 @@ export async function resolveBoundarySection(
   const skillRootAbs = project.skillRoot;
   const gov = project.governanceBoundary;
   const loc = project.roles ? project.roles[roleId] : undefined;
+  const model = project.governanceModel ?? "single";
+
+  if (model === "trio") {
+    // su 迁移后归档：隐藏、不可开启、历史只读（评审 §十三 客户拍板）。即便项目 roles 里
+    // 残留 su 映射也不采用（内置 id 优先；`listProject` 亦不枚举它）。
+    if (roleId === BUILT_IN_GOVERNANCE_ROLE_ID) {
+      return unaccepted(
+        trioGovernanceSource(roleId),
+        "su 已归档（当前为三权治理模型），不可写入/开启",
+      );
+    }
+    const spec = governanceRoleOf(roleId);
+    if (spec !== undefined) {
+      const boundarySource = trioGovernanceSource(spec.id);
+      // 注册表条目是本角色的 Section 1；项目只提供「接受证据」，不提供条目。
+      const entries = spec.entries.map((e) => ({ ...e }));
+      if (
+        gov &&
+        typeof gov.path === "string" &&
+        gov.path !== "" &&
+        gov.acceptance &&
+        gov.acceptance.accepted === true
+      ) {
+        return { entries, boundarySource, acceptance: gov.acceptance };
+      }
+      // 本次显式 genesis（仅 path 为空时；path 非空但未接受的记录不降级为 genesis）。
+      if (
+        (!gov || !gov.path) &&
+        project.genesisBootstrap &&
+        typeof project.genesisBootstrap.source === "string"
+      ) {
+        return {
+          entries,
+          boundarySource,
+          acceptance: { accepted: true, source: project.genesisBootstrap.source },
+        };
+      }
+      return { entries, boundarySource, acceptance: { accepted: false, source: "" } };
+    }
+    // trio 下的项目角色/未知角色：走下方既有 1–4 步（逐字不变）。
+  } else if (governanceRoleOf(roleId) !== undefined) {
+    // single 模型下三权角色不可用（结构性拒绝，不开放）。
+    return unaccepted(
+      trioGovernanceSource(roleId),
+      "三权角色在 single 治理模型下不可用",
+    );
+  }
 
   // 1) 项目覆盖（若已接受）
   if (gov && gov.acceptance && gov.acceptance.accepted === true && loc && loc.boundary) {

@@ -267,6 +267,11 @@ function registerIpc(win: BrowserWindow): void {
     },
     operatorId: desktopOperatorId(),
     onExpired: (payload) => { if (!win.isDestroyed()) win.webContents.send("session:operator-expired", payload); },
+    // 三权（评审 §6.1 硬约束 / §九-10）：同项目已有待决定卡 ⇒ 后续请求排队、不呈现；
+    // 推一条状态事件让渲染侧显示「等待前一个决定」（不自动合并、不自动批准）。
+    onQueued: (payload, waitingFor) => {
+      if (!win.isDestroyed()) win.webContents.send("session:operator-queued", { ...payload, waitingFor });
+    },
   });
   // 窗口关掉：所有挂起请求归「未获同意」（fail-closed）——不留悬案、更不放行。
   win.on("closed", () => customerChannel.rejectAllPending("窗口已关闭，未获同意（fail-closed）"));
@@ -454,6 +459,10 @@ function registerIpc(win: BrowserWindow): void {
   // 主进程只透传，不做额外授权判断。
   registerHandler("project:governance-reaccept-preview", (_e, input) => desktop.previewGovernanceReacceptance(input));
   registerHandler("project:governance-reaccept", (_e, input) => desktop.reacceptGovernancePins(input));
+  // V1b 预留（评审 §5.5/§11.2）：治理模型迁移预览/写入入口先占位——Interface 恒回 `not-available`
+  // （零写入、不改 `.ans`/manifest）。渲染侧据此显示「升级入口待本版后续」，不假装可用。
+  registerHandler("project:governance-migrate-preview", (_e, input) => desktop.previewGovernanceMigration(input));
+  registerHandler("project:governance-migrate", (_e, input) => desktop.migrateGovernanceModel(input));
   registerHandler("report:retry-save", (_e, input) => desktop.retryReportSave(input));
   registerHandler("report:get-save-state", (_e, input) => desktop.getReportSaveState(input));
   registerHandler("delivery:retry-history-save", (_e, input) => desktop.retryDeliveryHistorySave(input));

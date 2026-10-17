@@ -642,7 +642,7 @@ test("G-2/W1 集成：同源快照（busy/busySince/队列/在途）＋观察转
   await tick(20);
   const snap = h.mgr.watchdogSnapshot("/proj");
   assert.ok(snap, "快照可读（同源：会话/队列直读，不造第二数据源）");
-  assert.equal(snap!.suRoleId, "su", "su 判据来自门禁枚举（primaryRoleId）");
+  assert.equal(snap!.governanceRoleId, "su", "su 判据来自门禁枚举（primaryRoleId）");
   const roleA = snap!.roles.find((r) => r.roleId === "A");
   assert.equal(roleA?.busy, true, "busy 事实");
   assert.equal(typeof roleA?.turnStartedAt, "number", "本轮起点（看护 #1 的 elapsed 基准）");

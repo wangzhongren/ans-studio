@@ -331,10 +331,10 @@ export type DispatchTaskFn = (
   metadata?: ReportHandbackMetadata,
 ) => DispatchReceipt | null | undefined | void | Promise<DispatchReceipt | null | undefined | void>;
 
-// —————————————— 看护只读工具与恢复提议（G-2；只给 su 注入，注入才注册） ——————————————
+// —————————————— 看护只读工具与恢复提议（G-2；只给内置治理角色 注入，注入才注册） ——————————————
 //
 // 依据：客户 2026-10-16 批准 G-2（设计 `角色卡/产品/docs/design/2026-10-16_design_role-watchdog-and-closure.md`
-// §四/§六）。三个工具均**只给治理角色 su**——由调用方（编排注入端，判据沿 dispatch_task 的
+// §四/§六）。三个工具均**只给内置治理角色**——由调用方（编排注入端，判据沿 dispatch_task 的
 // suppressHandback 先例）决定「注入才注册」；未注入 ⇒ 工具不存在（最强 fail-closed）。
 // 本层纪律：role_status / session_tail **纯读**（无任何副作用）；propose_recovery **只提交载荷、如实
 // 转达回执**——提议 ≠ 执行、执行以客户确认为准、不得承诺。
@@ -440,10 +440,10 @@ export type ProposeRecoveryFn = (
   metadata?: ReportHandbackMetadata,
 ) => RecoveryReceipt | null | undefined | void | Promise<RecoveryReceipt | null | undefined | void>;
 
-// —————————————— 角色能力安装：技能安装/卸载（G-4 V1；只给 su 注入，注入才注册） ——————————————
+// —————————————— 角色能力安装：技能安装/卸载（G-4 V1；只给内置治理角色 注入，注入才注册） ——————————————
 //
 // 依据：客户 2026-10-16 批准 G-4 V1（设计 `角色卡/产品/docs/design/2026-10-16_design_role-capability-install.md`
-// §3.2/§3.3；PM 派发「运行时核心＝I1/I2」）。两工具均**只给治理角色 su**——由调用方注入能力表达
+// §3.2/§3.3；PM 派发「运行时核心＝I1/I2」）。两工具均**只给内置治理角色**——由调用方注入能力表达
 // 「注入才注册」（未注入 ⇒ 工具不存在，沿 dispatch_task 先例）。本层纪律：**工具不写盘**——落盘
 // 永远由 su 的 `write_file` 完成（「先落盘再激活」＝G-1「先落盘再派发」的镜像）；工具只
 // **校验＋激活＋回执**（校验/激活在注入能力侧＝桌面 handler；激活复用既有重建，在跑不打断）。
@@ -452,7 +452,7 @@ export type ProposeRecoveryFn = (
 
 /** `install_skill` / `uninstall_skill` 载荷（G-4 §3.2）：目标角色与技能名（稳定短 slug，与目录名一致）。 */
 export interface InstallSkillPayload {
-  /** 目标项目角色 id（不能是 su 自身；校验在能力实现侧）。 */
+  /** 目标项目角色 id（不能是内置治理角色；校验在能力实现侧）。 */
   roleId: string;
   /** 技能名（稳定短 slug；落盘位置 `docs/skills/<name>/`）。 */
   name: string;
@@ -466,7 +466,7 @@ export interface InstallSkillPayload {
  *   `digest`＝运行期算的 sha256（展示可截前 12 位）；`note` 为可选如实补充。
  * - `ok:false`＋`reason`＋`message`＝**未执行、零副作用**。`reason` 机读标识（建议枚举：
  *   `not-registered` 落盘/登记不存在、`role-not-listed` 登记未含目标角色、`role-not-found`
- *   角色不存在或为 su 自身、`not-customer-turn` 非客户消息发起的轮次（护栏）、
+ *   角色不存在或为内置治理角色、`not-customer-turn` 非客户消息发起的轮次（护栏）、
  *   `registration-unchanged` 卸载时登记未撤销、`rebuild-failed` 激活失败）；`message` 一句人话，
  *   文案枚举沿产品设计 §3.3。
  */
@@ -484,7 +484,7 @@ export type InstallSkillReceipt =
   | { ok: false; reason: string; message: string };
 
 /**
- * `install_skill` 的注入能力（**只给 su**；未注入 ⇒ 工具不注册）。
+ * `install_skill` 的注入能力（**只给内置治理角色**；未注入 ⇒ 工具不注册）。
  * 纪律（沿 `dispatch_task` 先例）：**工具不写盘**——本能力只**校验（角色/登记/含角色；护栏①：仅
  * 客户消息发起的轮次可执行，非客户轮次以 `not-customer-turn` 如实拒绝）→ 激活（复用既有重建；
  * 在跑不打断 ⇒ `effective:"next-session"`）→ 回执**；失败一律 fail-closed＝**未执行、零副作用**。
@@ -496,7 +496,7 @@ export type InstallSkillFn = (
 ) => Promise<InstallSkillReceipt>;
 
 /**
- * `uninstall_skill` 的注入能力（**只给 su**；未注入 ⇒ 工具不注册）。
+ * `uninstall_skill` 的注入能力（**只给内置治理角色**；未注入 ⇒ 工具不注册）。
  * 纪律同 `InstallSkillFn`；卸载专有两钉：**先改登记再卸载**——能力须校验登记确已撤销，未撤销以
  * `registration-unchanged` 拒绝（防「工具说撤了、登记没变」）；**文件保留**——只撤登记语义、不删
  * `docs/skills/<name>/` 文件本体（「效果已撤」与「字节已清」如实二分陈述）。**卸载不改变任何角色的
@@ -507,13 +507,13 @@ export type UninstallSkillFn = (
   metadata?: ReportHandbackMetadata,
 ) => Promise<InstallSkillReceipt>;
 
-// —————————————— 角色能力安装：MCP 安装/卸载（G-4 V2 wave A；只给 su 注入，注入才注册） ——————————————
+// —————————————— 角色能力安装：MCP 安装/卸载（G-4 V2 wave A；只给内置治理角色 注入，注入才注册） ——————————————
 //
 // 依据：客户 2026-10-16「按推荐批准，开始实施」＝V2（外来 MCP 按角色安装）分批实施（设计
 // `角色卡/产品/docs/design/2026-10-16_design_role-capability-install.md` §五/§九，实施 P1 Claude→P2 Codex→P3 Pi；
 // 本波 wave A＝契约层）。符号冻结（单一来源＝本模块）：读取器在 `src/common/runtime-core/mcp-declarations.ts`、
 // Service 在 providerFor 按角色读取并注入 `RuntimeProviderOptions.installedMcpServers`（适配器纯消费，
-// 三平台装配属各自批次）。两工具均**只给治理角色 su**——未注入 ⇒ 工具不存在（沿技能版「注入才注册」）。
+// 三平台装配属各自批次）。两工具均**只给内置治理角色**——未注入 ⇒ 工具不存在（沿技能版「注入才注册」）。
 // 本层纪律同技能版：**工具不写盘**（落盘＝su 的 `write_file`，「先落盘再激活」的镜像）；工具只
 // **校验＋激活＋回执**（校验/激活在注入能力侧＝桌面 handler；激活复用既有重建，在跑不打断）。
 //
@@ -540,7 +540,7 @@ export interface InstalledMcpServerV1 {
 
 /** `install_mcp` / `uninstall_mcp` 载荷（G-4 V2 §5.1）：目标角色与 MCP 名（稳定短 slug，与 `docs/mcp/<name>.md` 一致）。 */
 export interface InstallMcpPayload {
-  /** 目标项目角色 id（不能是 su 自身；校验在能力实现侧）。 */
+  /** 目标项目角色 id（不能是内置治理角色；校验在能力实现侧）。 */
   roleId: string;
   /** MCP 名（稳定短 slug；声明文件位置 `docs/mcp/<name>.md`）。 */
   name: string;
@@ -555,7 +555,7 @@ export interface InstallMcpPayload {
  *   `note` 为可选如实补充。
  * - `ok:false`＋`reason`＋`message`＝**未执行、零副作用**。`reason` 机读标识（枚举沿技能版：
  *   `not-registered` 声明文件不存在、`role-not-listed` 声明未含目标角色、`role-not-found`
- *   角色不存在或为 su 自身、`not-customer-turn` 非客户消息发起的轮次（护栏）、
+ *   角色不存在或为内置治理角色、`not-customer-turn` 非客户消息发起的轮次（护栏）、
  *   `registration-unchanged` 卸载时声明未撤销、`rebuild-failed` 激活失败）；`message` 一句人话，
  *   文案枚举沿技能版逐字体格（`MCP 未登记：docs/mcp/<name>.md 不存在——先落盘再安装；未执行。` 等）。
  */
@@ -573,7 +573,7 @@ export type InstallMcpReceipt =
   | { ok: false; reason: string; message: string };
 
 /**
- * `install_mcp` 的注入能力（**只给 su**；未注入 ⇒ 工具不注册）。纪律同 `InstallSkillFn`：
+ * `install_mcp` 的注入能力（**只给内置治理角色**；未注入 ⇒ 工具不注册）。纪律同 `InstallSkillFn`：
  * **工具不写盘**——本能力只**校验（角色/声明/含角色；护栏：仅客户消息发起的轮次可执行，非客户
  * 轮次以 `not-customer-turn` 如实拒绝）→ 激活（复用既有重建；在跑不打断 ⇒ `effective:"next-session"`）
  * → 回执**；失败一律 fail-closed＝**未执行、零副作用**。**安装不改变任何角色的写边界**；但安装
@@ -586,7 +586,7 @@ export type InstallMcpFn = (
 ) => Promise<InstallMcpReceipt>;
 
 /**
- * `uninstall_mcp` 的注入能力（**只给 su**；未注入 ⇒ 工具不注册）。
+ * `uninstall_mcp` 的注入能力（**只给内置治理角色**；未注入 ⇒ 工具不注册）。
  * 纪律同 `InstallMcpFn`；卸载专有两钉：**先改声明再卸载**——能力须校验声明确已撤销，未撤销以
  * `registration-unchanged` 拒绝（防「工具说撤了、声明没变」）；**声明文件保留**——只撤装配语义、
  * 不删 `docs/mcp/<name>.md`（「效果已撤」与「文件仍在」如实二分）。**卸载＝下次会话摘除**；已发生的
@@ -850,27 +850,27 @@ export interface GovernedToolsOptions {
   dispatchTask?: DispatchTaskFn;
   shellVerdict?: ShellVerdictFn;
   /**
-   * G-2/R1：`role_status` 数据源（看护只读快照）。**只给 su 会话注入**（编排注入端判据沿
+   * G-2/R1：`role_status` 数据源（看护只读快照）。**只给内置治理角色 会话注入**（编排注入端判据沿
    * dispatch_task 的 suppressHandback 先例）；未注入 ⇒ 工具不注册（结构性 fail-closed）。
    */
   roleStatus?: RoleStatusFn;
-  /** G-2/R1：`session_tail` 数据源（受保护投影后的会话尾线）。只给 su 注入；未注入 ⇒ 工具不注册。 */
+  /** G-2/R1：`session_tail` 数据源（受保护投影后的会话尾线）。只给内置治理角色 注入；未注入 ⇒ 工具不注册。 */
   sessionTail?: SessionTailFn;
-  /** G-2/R2：恢复提议能力（只提交载荷、三态回执）。只给 su 注入；未注入 ⇒ 工具不注册。 */
+  /** G-2/R2：恢复提议能力（只提交载荷、三态回执）。只给内置治理角色 注入；未注入 ⇒ 工具不注册。 */
   proposeRecovery?: ProposeRecoveryFn;
   /**
-   * G-4/I2：`install_skill` 能力（校验＋激活＋回执，**不写盘**）。只给 su 注入（判据沿
+   * G-4/I2：`install_skill` 能力（校验＋激活＋回执，**不写盘**）。只给内置治理角色 注入（判据沿
    * dispatch_task 的 suppressHandback 先例）；未注入 ⇒ 工具不注册（结构性 fail-closed）。
    */
   installSkill?: InstallSkillFn;
-  /** G-4/I2：`uninstall_skill` 能力（校验＋激活＋回执，不写盘）。只给 su 注入；未注入 ⇒ 工具不注册。 */
+  /** G-4/I2：`uninstall_skill` 能力（校验＋激活＋回执，不写盘）。只给内置治理角色 注入；未注入 ⇒ 工具不注册。 */
   uninstallSkill?: UninstallSkillFn;
   /**
-   * G-4 V2：`install_mcp` 能力（校验＋激活＋回执，**不写盘**）。只给 su 注入（判据沿
+   * G-4 V2：`install_mcp` 能力（校验＋激活＋回执，**不写盘**）。只给内置治理角色 注入（判据沿
    * dispatch_task 的 suppressHandback 先例）；未注入 ⇒ 工具不注册（结构性 fail-closed）。
    */
   installMcp?: InstallMcpFn;
-  /** G-4 V2：`uninstall_mcp` 能力（校验＋激活＋回执，不写盘）。只给 su 注入；未注入 ⇒ 工具不注册。 */
+  /** G-4 V2：`uninstall_mcp` 能力（校验＋激活＋回执，不写盘）。只给内置治理角色 注入；未注入 ⇒ 工具不注册。 */
   uninstallMcp?: UninstallMcpFn;
   /**
    * 判断 agent（「替我审」）只读能力注入。**这是能力注入，不是工具注入**：注入后 Service 必须走

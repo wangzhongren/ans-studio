@@ -4,6 +4,7 @@
 
 | 交付物 | 一句话用途 | 状态 | 文档 |
 | --- | --- | --- | --- |
+| 治理三权分立（Rapporteur / Nominator / Convener，V1+V1b） | 新空项目 trio 默认、三人会话/能力矩阵/写权矩阵、三道门禁与派发五条/快捷路径、账本字段与还原、一卡队列、su→trio 迁移全分支、旧 single 逐字兼容、UI 三权左树/副标题/迁移 | verified（2026-10-17，独立套件 32/32；复审后全量 2669/2650/16 红均既有、新增红 0；typecheck 0；两处缺陷已修复） | [用例](../../test/测试/governance-trio-verify/)、[报告](docs/fix/2026-10-17_verify_governance-trio.md) |
 | 「替我审」判断 agent + 卡死修复 | 开关默认关/开启 allow/deny/deny 档放行/manual 回落/结果行失败/挂起卡/防循环/只读沙箱/三引擎工具面；abort 清理失败隔离解除、底层永不 settle 仍拒绝、Claude 已关闭查询 | verified（2026-10-17，修复后套件 40/40；首轮预算误报已修并复审；全量 2496/2473/20/3；typecheck 0） | [判断链用例](../../test/测试/shell-judge-verify/)、[中止隔离用例](../../test/测试/abort-cleanup-verify.test.ts)、[报告](docs/fix/2026-10-17_verify_shell-judge-and-abort.md) |
 | 到点检查 + 1 小时兜底（整轮不设超时） | 检查时限到点只提示不中止；每轮一次；1h 兜底可区分；非整轮时限不变；设置/su 卡/role_status；恢复需客户确认 | verified（2026-10-17，套件 15/15；全量 2246/2150/94/2；三项偏差修复后复审通过） | [用例](../../test/测试/turn-watch-verify/)、[报告](docs/change/2026-10-17_change_turn-watch-recover-verify.md)、[证据](docs/change/2026-10-17-turn-watch-recover-verify-evidence/) |
 | su 命令审批策略（run_shell） | 只读免审批、risky/review/deny 逐条客户批准；分支/审计、su-only 与构造守卫、桌面注入、SU 卡、零执行哨兵 | verified（2026-10-17，套件 36/36＋卡片探针 9/9；全量 2215/2120/93/2） | [用例](../../test/测试/su-shell-approval-verify/)、[报告](docs/change/2026-10-17_change_su-shell-approval-verify.md)、[证据](docs/change/2026-10-17-su-shell-approval-verify-evidence/) |

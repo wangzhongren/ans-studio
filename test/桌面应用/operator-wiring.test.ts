@@ -233,3 +233,101 @@ test("A-5 未接通道：deps.customerInput 缺省 ⇒ 连 su 也不注入（无
   assert.equal(captured[0].customerInput, undefined, "通道未接 ⇒ 不注入 ⇒ 无确认制（工具不注册）");
   await mgr.stop(null);
 });
+
+// ————— ③ 三权 §6.1 硬约束 / §九-10：同一项目一项目一卡（排队、不自动合并/批准） —————
+//
+// 适用范围＝本通道的全部请求（仅内置治理角色 su/三人的 `customerInput` 会走这里；项目角色从不注入）。
+// 按 `projectRoot` 串行：第一张正常呈现；后续入队、**不调用 presenter**；第一张 resolve/取消/失效后按序呈现。
+
+test("一项目一卡：第二张入队不呈现（onQueued 报 waitingFor）；第一张结束后按序呈现；排队中不能作答", async () => {
+  const pushed: OperatorRequestPayload[] = [];
+  const queued: { payload: OperatorRequestPayload; waitingFor: string }[] = [];
+  let n = 0;
+  const channel = createCustomerInputChannel({
+    presenter: (p) => pushed.push(p),
+    operatorId: "tester",
+    nextId: () => `op-${++n}`,
+    onQueued: (payload, waitingFor) => queued.push({ payload, waitingFor }),
+  });
+  const ctx = { roleId: "rapporteur", projectRoot: "/p", runtime: "claude" as const };
+  const p1 = channel.customerInput(
+    { kind: "choice", title: "提案", options: [{ id: "accept", label: "接受" }] },
+    ctx,
+    { cardKind: "proposal", flowId: "flow-a" },
+  );
+  const p2 = channel.customerInput({ kind: "confirm", title: "写盘" }, ctx, { cardKind: "appointment-write", flowId: "flow-a" });
+  assert.equal(pushed.length, 1, "第一张正常呈现");
+  assert.equal(pushed[0].id, "op-1");
+  assert.deepEqual(queued.map((q) => [q.payload.id, q.waitingFor]), [["op-2", "op-1"]], "第二张经 onQueued 报「等待前一个决定」");
+  assert.equal(channel.pendingCount(), 2, "挂起数＝已呈现＋排队（两者都在等待客户）");
+  assert.equal(channel.queuedCount(), 1, "第二张在队列中");
+
+  const early = channel.respond({ id: "op-2", decision: { kind: "confirm", confirmed: true } });
+  assert.equal(early.ok, false, "排队中的卡不能作答（不自动批准）");
+  assert.equal(early.expired, true, "未呈现的 id 不是待答请求");
+  let secondSettled = false;
+  void Promise.resolve(p2).then(() => { secondSettled = true; });
+  await Promise.resolve();
+  assert.equal(secondSettled, false, "排队请求保持未决（绝不自动 answered/declined）");
+
+  assert.equal(channel.respond({ id: "op-1", decision: { kind: "choice", selected: ["accept"] } }).ok, true);
+  assert.equal((await p1)!.outcome, "answered");
+  assert.equal(pushed.length, 2, "第一张结束后第二张呈现");
+  assert.equal(pushed[1].id, "op-2");
+  assert.equal(channel.queuedCount(), 0);
+  assert.equal(channel.respond({ id: "op-2", decision: { kind: "confirm", confirmed: true } }).ok, true);
+  assert.equal((await p2)!.outcome, "answered");
+});
+
+test("一项目一卡：第一张取消/失效 → 第二张呈现；排队项随会话失效出队；rejectAllPending 清空并按 fail-closed 结算", async () => {
+  const pushed: OperatorRequestPayload[] = [];
+  const expired: string[] = [];
+  let n = 0;
+  const channel = createCustomerInputChannel({
+    presenter: (p) => pushed.push(p),
+    operatorId: "tester",
+    nextId: () => `op-${++n}`,
+    onExpired: (payload) => expired.push(payload.id),
+  });
+  const ctx = { roleId: "convener", projectRoot: "/p", runtime: "pi" as const };
+  const first = new AbortController();
+  const p1 = channel.customerInput({ kind: "confirm", title: "第一张" }, ctx, { signal: first.signal });
+  const second = new AbortController();
+  const p2 = channel.customerInput({ kind: "confirm", title: "第二张" }, ctx, { signal: second.signal });
+  assert.equal(pushed.length, 1, "第二张未呈现");
+
+  // 排队项随本轮/会话中止（dispose）出队：不呈现、如实 unavailable。
+  second.abort();
+  assert.equal((await p2)!.outcome, "unavailable", "排队项失效 = 未获同意（fail-closed）");
+  assert.equal(channel.queuedCount(), 0, "失效项已出队");
+  assert.equal(pushed.length, 1, "失效的排队项从未呈现");
+
+  // 第一张被取消 → 无下一张可呈现。
+  first.abort();
+  assert.equal((await p1)!.outcome, "unavailable");
+  assert.equal(channel.pendingCount(), 0);
+
+  // 新的两张：第一张呈现、第二张排队；窗关 rejectAllPending ⇒ 两张都 declined、队列清空。
+  const p3 = channel.customerInput({ kind: "confirm", title: "甲" }, ctx);
+  const p4 = channel.customerInput({ kind: "confirm", title: "乙" }, ctx);
+  assert.equal(pushed.length, 2, "前一组清空后新第一张正常呈现");
+  assert.equal(channel.pendingCount(), 2, "挂起数＝已呈现＋排队");
+  assert.equal(channel.queuedCount(), 1);
+  channel.rejectAllPending("窗口已关闭，未获同意（fail-closed）");
+  assert.equal((await p3)!.outcome, "declined");
+  assert.equal((await p4)!.outcome, "declined");
+  assert.equal(channel.pendingCount(), 0);
+  assert.equal(channel.queuedCount(), 0);
+  assert.ok(expired.includes("op-3") && expired.includes("op-4"), "两张都收到失效通知（排队项也清掉等待行）");
+});
+
+test("一项目一卡按项目隔离：不同 projectRoot 各自可同时呈现（单窗口内不互相阻塞）", async () => {
+  const pushed: OperatorRequestPayload[] = [];
+  const channel = createCustomerInputChannel({ presenter: (p) => pushed.push(p), operatorId: "tester" });
+  void channel.customerInput({ kind: "confirm", title: "a" }, { roleId: "convener", projectRoot: "/a" });
+  void channel.customerInput({ kind: "confirm", title: "b" }, { roleId: "convener", projectRoot: "/b" });
+  assert.equal(pushed.length, 2, "不同项目各一张，互不排队");
+  assert.equal(channel.pendingCount(), 2);
+  assert.equal(channel.queuedCount(), 0);
+  channel.rejectAllPending("cleanup");
+});

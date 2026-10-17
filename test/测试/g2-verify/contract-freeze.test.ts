@@ -119,9 +119,11 @@ test("G-2 契约②：字段名 roleStatus/sessionTail/proposeRecovery 五面同
   assert.ok(/roleStatus\?: RoleStatusFn;/.test(runRole), "run-role.ts AdapterCapabilities.roleStatus");
   assert.ok(/sessionTail\?: SessionTailFn;/.test(runRole), "run-role.ts AdapterCapabilities.sessionTail");
   assert.ok(/proposeRecovery\?: ProposeRecoveryFn;/.test(runRole), "run-role.ts AdapterCapabilities.proposeRecovery");
-  assert.ok(/const roleStatus = suppressHandback \? input\.roleStatus : undefined;/.test(runRole), "O1 只 su 注入判据（roleStatus）");
-  assert.ok(/const sessionTail = suppressHandback \? input\.sessionTail : undefined;/.test(runRole), "O1 只 su 注入判据（sessionTail）");
-  assert.ok(/const proposeRecovery = suppressHandback \? input\.proposeRecovery : undefined;/.test(runRole), "O1 只 su 注入判据（proposeRecovery）");
+  // 2026-10-17（三权 V1，评审 §5.6）：判据由 `suppressHandback` 改为能力矩阵
+  // `capabilities.roleStatus/sessionTail/proposeRecovery`（trio=Convener；su 旧能力由注册表给出）。
+  assert.ok(/const roleStatus = cap\?\.roleStatus === true \? input\.roleStatus : undefined;/.test(runRole), "能力矩阵判据（roleStatus）");
+  assert.ok(/const sessionTail = cap\?\.sessionTail === true \? input\.sessionTail : undefined;/.test(runRole), "能力矩阵判据（sessionTail）");
+  assert.ok(/const proposeRecovery = cap\?\.proposeRecovery === true \? input\.proposeRecovery : undefined;/.test(runRole), "能力矩阵判据（proposeRecovery）");
   assert.ok(/roleStatus: capabilities\?\.roleStatus,/.test(runRole), "createRuntimeAdapter 选项并入 roleStatus");
   assert.ok(/sessionTail: capabilities\?\.sessionTail,/.test(runRole), "createRuntimeAdapter 选项并入 sessionTail");
   assert.ok(/proposeRecovery: capabilities\?\.proposeRecovery,/.test(runRole), "createRuntimeAdapter 选项并入 proposeRecovery");
@@ -138,7 +140,8 @@ test("G-2 契约②：字段名 roleStatus/sessionTail/proposeRecovery 五面同
   // 承载契约物理单一来源：编排 watchdog.ts 只 re-export model/runtime.ts 同名符号（无第二份形状）；
   // run-role.ts 的 Fn 类型同样从契约家导入。
   const o1 = read("src/common/编排/watchdog.ts");
-  assert.ok(/export type \{\n([\s\S]*?)\} from "\.\.\/\.\.\/model\/runtime\.ts";/.test(o1), "编排 watchdog.ts re-export 契约家符号");
+  // 行尾兼容：Windows 工作树（core.autocrlf）下源文件为 CRLF——结构断言允许 `\r?\n`。
+  assert.ok(/export type \{\r?\n([\s\S]*?)\} from "\.\.\/\.\.\/model\/runtime\.ts";/.test(o1), "编排 watchdog.ts re-export 契约家符号");
   for (const sym of ["ProposeRecoveryFn", "RecoveryReceipt", "RoleStatusFn", "SessionTailFn", "WatchdogToolResult"]) {
     assert.ok(new RegExp(`export type \\{[\\s\\S]*?\\b${sym}\\b[\\s\\S]*?\\} from`).test(o1), `转发符号 ${sym}`);
     assert.ok(!new RegExp(`(interface|type) ${sym}\\b`).test(o1), `不得在编排另立第二份 ${sym}`);
@@ -152,12 +155,20 @@ test("G-2 契约②：字段名 roleStatus/sessionTail/proposeRecovery 五面同
   }
 
   const session = read("app/desktop/session.ts");
-  assert.ok(/\.\.\.\(proposeRecovery \? \{ proposeRecovery \} : \{\}\),/.test(session), "桌面注入 proposeRecovery（仅 su 会话构造处）");
+  assert.ok(/\.\.\.\(proposeRecovery \? \{ proposeRecovery \} : \{\}\),/.test(session), "桌面注入 proposeRecovery（构造处）");
   assert.ok(/\.\.\.\(roleStatus \? \{ roleStatus \} : \{\}\),/.test(session), "桌面注入 roleStatus");
   assert.ok(/\.\.\.\(sessionTail \? \{ sessionTail \} : \{\}\),/.test(session), "桌面注入 sessionTail");
-  assert.ok(/role\.builtIn === true \? \(d: ProposeRecoveryPayload\) => this\.proposeRecovery\(/.test(session), "桌面 proposeRecovery 只给 builtIn");
-  assert.ok(/role\.builtIn === true \? \(query: RoleStatusPayload\) => this\.roleStatusText\(/.test(session), "桌面 roleStatus 只给 builtIn");
-  assert.ok(/role\.builtIn === true \? \(query: SessionTailPayload\) => this\.sessionTailText\(/.test(session), "桌面 sessionTail 只给 builtIn");
+  // 2026-10-17（三权 V1，评审 §5.6）：判据由 `role.builtIn === true` 改为能力矩阵
+  // `canSchedule = governanceFunction === "schedule" || legacyBuiltIn`；legacyBuiltIn 仅在
+  // single 模型的内置角色（su）上成立——旧能力集逐字保留，trio 三人按职能分配。
+  assert.ok(
+    /const legacyBuiltIn = role\.builtIn === true && governanceFunction === undefined && governanceModel === "single";/.test(session),
+    "legacyBuiltIn 判据（single/su 旧能力集）",
+  );
+  assert.ok(/const canSchedule = governanceFunction === "schedule" \|\| legacyBuiltIn;/.test(session), "canSchedule 判据");
+  assert.ok(/canSchedule \? \(d: ProposeRecoveryPayload\) => this\.proposeRecovery\(/.test(session), "桌面 proposeRecovery 随 canSchedule");
+  assert.ok(/canSchedule \? \(query: RoleStatusPayload\) => this\.roleStatusText\(/.test(session), "桌面 roleStatus 随 canSchedule");
+  assert.ok(/canSchedule \? \(query: SessionTailPayload\) => this\.sessionTailText\(/.test(session), "桌面 sessionTail 随 canSchedule");
 });
 
 // ————————————————————— ③ 编排承载：真实 openRoleSession 桩适配器捕获 —————————————————————

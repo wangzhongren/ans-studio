@@ -69,7 +69,7 @@ import path from "node:path";
 
 import type { BoundarySection1, PinEntry, PinEvidenceFile, PinEvidenceResult } from "../../model/boundary.ts";
 import type { WriteDecision } from "../../model/decision.ts";
-import type { ProjectConfig } from "../../model/role.ts";
+import type { GovernanceModel, ProjectConfig } from "../../model/role.ts";
 import type { FinalizeStatus, FinalizeResult } from "../../model/runtime.ts";
 import { resolveWrite } from "../../service/gate/resolve-write.ts";
 import {
@@ -79,8 +79,20 @@ import {
 } from "../../service/boundary/resolve-boundary.ts";
 import { listProject } from "../../service/role/resolve-role.ts";
 import { toPosix } from "../shared/path-primitives.ts";
-import { ANS_DIR_NAME, ANS_PROJECT_FILE_NAME, ansProjectPath, loadEffectiveConfig } from "../shared/config-loader.ts";
+import {
+  ANS_DIR_NAME,
+  ANS_PROJECT_FILE_NAME,
+  ansProjectPath,
+  loadEffectiveConfig,
+  readGovernanceModel,
+} from "../shared/config-loader.ts";
 import { resolveSkillRoot } from "../shared/runtime-shared.ts";
+import { appendGovernanceLedger } from "./governance-ledger.ts";
+import {
+  isGovernanceRecordBusy,
+  releaseGovernanceRecordLock,
+  tryAcquireGovernanceRecordLock,
+} from "./governance-record-lock.ts";
 
 /** 项目角色目录名（与 `listProject` 口径一致）。 */
 const ROLE_DIR_NAME = "角色卡";
@@ -132,6 +144,12 @@ export interface FinalizeInput {
   governanceBoundaryPath?: string;
   /** 覆盖写入 `.ans` 的 `acceptance.source`；缺省取 `boundary.acceptance.source`。 */
   acceptanceSource?: string;
+  /**
+   * 治理模型（评审 §5.5）。**仅当给出**才在 `.ans` 写入 `governanceModel`：
+   * trio 新项目/创世由调用方传 `"trio"`；single/su 不传——旧 `.ans` 形状逐字不变。
+   * 显式传 `"single"` 会如实写出该字段（调用方负责只在确有必要时传）。
+   */
+  governanceModel?: GovernanceModel;
   /** 可注入时钟（测试用）；缺省 `new Date()`。 */
   now?: () => Date;
   /**
@@ -309,6 +327,8 @@ export async function finalizeBootstrap(input: FinalizeInput): Promise<FinalizeR
   const ansProject = {
     projectRoot: toPosix(projectRoot),
     skillRoot: toPosix(input.skillRoot),
+    // 评审 §5.5：仅当调用方给出模型才写该字段；single/旧项目不传 ⇒ `.ans` 形状不变。
+    ...(input.governanceModel !== undefined ? { governanceModel: input.governanceModel } : {}),
     roles: rolesMap,
     governanceBoundary: {
       path: governanceBoundaryRel,
@@ -359,9 +379,20 @@ export async function repinIfBootstrapped(
   input: Omit<FinalizeInput, "writeGovernanceBoundaryDoc">,
 ): Promise<FinalizeResult | undefined> {
   if (await isGenesisState(input.projectRoot)) {
+    // 创世态：模型由**调用方**按当前模型传入（trio 传 "trio"；single 不传，旧 `.ans` 形状不变）。
     return finalizeBootstrap({ ...input, writeGovernanceBoundaryDoc: true }); // 首次收尾（守卫：无可 pin → 零副作用）
   }
-  return finalizeBootstrap({ ...input, writeGovernanceBoundaryDoc: false });
+  // 非创世态：本函数会**重建** `.ans`（roles/pin/acceptance 重算）。若不带上既有模型，
+  // trio 项目会在任一轮 settle 后被写成「无 governanceModel」⇒ 共享载入器按 single 读取（模型降级）。
+  // 故调用方未显式给出时，从当刻 `.ans` 读取并原样保留；字段缺失/非法/不可读 ⇒ 不写（旧形状不变）。
+  const governanceModel = input.governanceModel ?? (await existingGovernanceModel(input.projectRoot));
+  return finalizeBootstrap({ ...input, governanceModel, writeGovernanceBoundaryDoc: false });
+}
+
+/** 读取既有 `.ans` 的显式模型（只读；缺失/非法/不可读 → `undefined`，不猜测）。 */
+async function existingGovernanceModel(projectRoot: string): Promise<GovernanceModel | undefined> {
+  const read = await readGovernanceModel(projectRoot);
+  return read.state === "explicit" ? read.model : undefined;
 }
 
 // —————————————— 已有角色但无治理记录：预览 / 显式建立（I3，2026-10-17） ——————————————
@@ -393,6 +424,11 @@ export interface GovernancePreview {
   adoptExistingGovernanceDoc: boolean;
   /** 将写入 `.ans` 的操作者动作来源（逐字展示）。 */
   acceptanceSource: string;
+  /**
+   * 本次将写入 `.ans` 的治理模型（评审 §5.5「预览必须显示将写入的治理模型」）。
+   * `single` 时**不新增** `governanceModel` 字段（旧 `.ans` 形状不变）；`trio` 时写出该字段。
+   */
+  governanceModel: GovernanceModel;
   /** pin 目标中仍是 legacy `boundary.md` 的角色（只提示，不迁移）。 */
   legacyBoundaryRoleIds: string[];
 }
@@ -427,10 +463,22 @@ export interface EstablishGovernanceResult {
 export interface GovernanceRecordInput {
   projectRoot: string;
   skillRoot?: string;
+  /**
+   * 治理模型（评审 §8.3 S1 预览的模型选择；V1b 迁移批次落 `.ans`）。**缺省 `single`**：
+   * 旧项目建立治理记录的行为逐字不变（不新增 `.ans/governance/ledger.jsonl`）；
+   * 只有显式 `trio` 才写 `governance.established`（评审 §5.7 的治理账本属三权模型）。
+   */
+  governanceModel?: GovernanceModel;
+  /**
+   * 可选预览摘要（评审 §5.7：`governance.established` 的 `decisionEvidence.previewDigest`）。
+   * 本模块不校验它（治理记录的建立预览当前不带 digest）；给出即原样写入账本供审计。
+   */
+  previewDigest?: string;
 }
 
-/** 进程内**同项目**建立互斥（I3，PM 评审 §4.6-3）。跨进程无全局锁——如实登记（见文件头）。 */
-const governanceEstablishInFlight = new Set<string>();
+// —————————————— 进程内同项目互斥（I3，PM 评审 §4.6-3；V1b 迁移共用） ——————————————
+// 集合已提为 `governance-record-lock.ts`——establish / reaccept / migrate 三者同一份锁，不造第二份。
+// 跨进程无全局锁——如实登记（见文件头）。
 
 type NormalizedGovernanceInput = { projectRoot: string; skillRoot: string };
 
@@ -616,7 +664,7 @@ export async function previewGovernanceRecord(input: GovernanceRecordInput): Pro
   if (normalized === undefined) {
     return { ok: false, code: "invalid-request", message: "projectRoot 缺失或不可访问；本次未写入任何文件。" };
   }
-  if (governanceEstablishInFlight.has(normalized.projectRoot)) {
+  if (isGovernanceRecordBusy(normalized.projectRoot)) {
     return { ok: false, code: "busy", message: "上一次建立仍在进行中；本次未写入任何文件。" };
   }
 
@@ -684,6 +732,7 @@ export async function previewGovernanceRecord(input: GovernanceRecordInput): Pro
       roleIds: target.roleIds,
       adoptExistingGovernanceDoc: target.adoptExistingGovernanceDoc,
       acceptanceSource: GOVERNANCE_RECORD_ACCEPTANCE_SOURCE,
+      governanceModel: input.governanceModel ?? "single",
       legacyBoundaryRoleIds: target.legacyBoundaryRoleIds,
     },
   };
@@ -704,11 +753,10 @@ export async function establishGovernanceRecord(
   }
   const { projectRoot, skillRoot } = normalized;
 
-  // 3) 进程内同项目互斥：**在首次 await 之前**占位（并发调用可确定性得到 busy）。
-  if (governanceEstablishInFlight.has(projectRoot)) {
+  // 3) 进程内同项目互斥：**在首次 await 之前**占位（并发调用可确定性得到 busy；与 migrate 共用锁）。
+  if (!tryAcquireGovernanceRecordLock(projectRoot)) {
     return guardResult(projectRoot, "busy", "blocked", "上一次建立仍在进行中；本次未写入任何文件。");
   }
-  governanceEstablishInFlight.add(projectRoot);
   try {
     // 4) `.ans/project.json` 必须不存在；存在即拒（无论有效/损坏，均不覆盖——修复属 V2）。
     const record = await inspectGovernanceRecord(normalized);
@@ -783,6 +831,8 @@ export async function establishGovernanceRecord(
         skillRoot,
         boundary: target.boundary,
         writeGovernanceBoundaryDoc: !doc.exists,
+        // 评审 §5.5：trio 由调用方显式给出；single/旧项目不给（保持旧 `.ans` 形状）。
+        ...(input.governanceModel !== undefined ? { governanceModel: input.governanceModel } : {}),
       });
     } catch (err) {
       // 写入阶段抛错：可能已落盘部分文件（治理文档/.ans/manifest 之一）——**如实**返回，不重试、不清理。
@@ -798,11 +848,23 @@ export async function establishGovernanceRecord(
     }
 
     // finalizeBootstrap 的失败只来自 precheck（零写入）；成功即已进入写入阶段并完成。
-    return finalize.ok
-      ? { ok: true, phase: "write", finalize }
-      : { ok: false, phase: "precheck", finalize };
+    if (finalize.ok) {
+      // §5.7：trio 项目 establish 成功后写 `governance.established`（应用动作；失败只诊断，不翻转结果）。
+      // single 旧项目保持零新增副作用（不建治理账本目录；任务书「旧 single 行为逐字不变」）。
+      if ((input.governanceModel ?? "single") === "trio") {
+        await appendGovernanceRecordLedgerEvent(projectRoot, {
+          kind: "governance.established",
+          action: "establish",
+          ...(typeof input.previewDigest === "string" && input.previewDigest.trim() !== ""
+            ? { previewDigest: input.previewDigest }
+            : {}),
+        });
+      }
+      return { ok: true, phase: "write", finalize };
+    }
+    return { ok: false, phase: "precheck", finalize };
   } finally {
-    governanceEstablishInFlight.delete(projectRoot);
+    releaseGovernanceRecordLock(projectRoot);
   }
 }
 
@@ -814,9 +876,9 @@ export async function establishGovernanceRecord(
 // 不改 `.ans roles` 映射、不改 `acceptance.source`、不自动开会话、不自动接受**。
 //
 // 与 `establishGovernanceRecord` 的关系：
-//   · **共用**同一进程内互斥集合 `governanceEstablishInFlight`（key = `path.resolve(projectRoot)`；
-//     不另建第二份）与同一落盘原语 `gatedAtomicWrite`、同一一次性种子边界工厂
-//     `buildGovernanceSeedBoundary`、同一共享载入器/公共出口；
+//   · **共用**同一进程内互斥集合（`governance-record-lock.ts`；establish/reaccept/migrate 三者
+//     key 统一 `path.resolve(projectRoot)`，不另建第二份）与同一落盘原语 `gatedAtomicWrite`、
+//     同一一次性种子边界工厂 `buildGovernanceSeedBoundary`、同一共享载入器/公共出口；
 //   · **不复用** `finalizeBootstrap` 本体——它会按 `scanRoles` 重建 pin 目标集与 `.ans roles`，
 //     违反「只刷新现有 pin」。`.ans` 与 manifest 的构建走本节的重新接受专用路径。
 //
@@ -834,6 +896,11 @@ export const GOVERNANCE_REACCEPT_ACCEPTANCE_SOURCE =
 export interface GovernanceReacceptInput {
   projectRoot: string;
   skillRoot?: string;
+  /**
+   * 治理模型（显式覆盖；缺省读 `.ans/project.json` 的 `governanceModel`，无则 `single`）。
+   * 仅 `trio` 写 `governance.reaccepted` 账本事件——single 旧项目保持零新增副作用。
+   */
+  governanceModel?: GovernanceModel;
 }
 
 export interface GovernanceReacceptWriteInput extends GovernanceReacceptInput {
@@ -1248,7 +1315,7 @@ export async function previewGovernanceReacceptance(
   if (normalized === undefined) {
     return { ok: false, status: "invalid-request", message: "projectRoot 缺失或不可访问；本次未写入任何文件。" };
   }
-  if (governanceEstablishInFlight.has(normalized.projectRoot)) {
+  if (isGovernanceRecordBusy(normalized.projectRoot)) {
     return { ok: false, status: "busy", message: "上一次治理记录操作仍在进行中；本次未写入任何文件。" };
   }
 
@@ -1365,11 +1432,10 @@ export async function reacceptGovernancePins(
   }
   const { projectRoot } = normalized;
 
-  // 2) 进程内同项目互斥：**在首次 await 之前**占位（与 establishGovernanceRecord 共用同一集合）。
-  if (governanceEstablishInFlight.has(projectRoot)) {
+  // 2) 进程内同项目互斥：**在首次 await 之前**占位（与 establish/migrate 共用同一份锁）。
+  if (!tryAcquireGovernanceRecordLock(projectRoot)) {
     return reacceptFailure("busy", "guard", "上一次治理记录操作仍在进行中；本次未写入任何文件。");
   }
-  governanceEstablishInFlight.add(projectRoot);
   try {
     let evaluation: ReacceptEvaluation;
     try {
@@ -1473,6 +1539,18 @@ export async function reacceptGovernancePins(
       );
     }
 
+    // §5.7：trio 项目 reaccept 成功后写 `governance.reaccepted`（带 action + previewDigest；
+    // 失败只诊断，不翻转结果）。single 旧项目保持零新增副作用。
+    const reacceptModel: GovernanceModel =
+      input.governanceModel ?? (evaluation.doc.governanceModel === "trio" ? "trio" : "single");
+    if (reacceptModel === "trio") {
+      await appendGovernanceRecordLedgerEvent(projectRoot, {
+        kind: "governance.reaccepted",
+        action: "reaccept",
+        previewDigest: previewDigest.trim().toLowerCase(),
+      });
+    }
+
     return {
       ok: true,
       status: "completed",
@@ -1484,7 +1562,7 @@ export async function reacceptGovernancePins(
     };
   } finally {
     // 11) 释放互斥。
-    governanceEstablishInFlight.delete(projectRoot);
+    releaseGovernanceRecordLock(projectRoot);
   }
 }
 
@@ -1642,5 +1720,37 @@ async function firstExistingFile(dirAbs: string, names: string[]): Promise<strin
 async function sha256File(absPath: string): Promise<string> {
   const bytes = await readFile(absPath);
   return createHash("sha256").update(bytes).digest("hex");
+}
+
+/**
+ * 治理记录事件落账本（评审 §5.7）：`governance.established` / `governance.reaccepted`。
+ * **best-effort**：`appendGovernanceLedger` 自身只诊断不抛；这里再兜一层，任何失败都不改变
+ * establish/reaccept 的结果（账本失败不翻转，§九-16）。
+ * `governance.migrated` 由 V1b 迁移模块 `governance-migration.ts` 写入（本函数只负责
+ * establish/reaccept 两类事件）。
+ */
+async function appendGovernanceRecordLedgerEvent(
+  projectRoot: string,
+  event: {
+    kind: "governance.established" | "governance.reaccepted";
+    action: "establish" | "reaccept";
+    previewDigest?: string;
+  },
+): Promise<void> {
+  try {
+    await appendGovernanceLedger(projectRoot, {
+      at: new Date().toISOString(),
+      kind: event.kind,
+      actorRoleId: "app",
+      power: "app",
+      decisionEvidence: {
+        kind: "desktop-governance-record",
+        action: event.action,
+        ...(event.previewDigest !== undefined ? { previewDigest: event.previewDigest } : {}),
+      },
+    });
+  } catch {
+    /* 见上：账本失败不翻转治理记录动作 */
+  }
 }
 

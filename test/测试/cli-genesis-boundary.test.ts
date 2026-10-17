@@ -63,7 +63,11 @@ function countingConfirm(): { channel: CustomerInputFn; calls: () => number } {
 
 test("创世判定面：空目录注入的 su 边界恰 3 条；src/**、词法/真实路径逃逸、根外绝对路径全拒", async () => {
   const dir = newDir("judge-");
-  const { project, configSource } = await loadInjection(dir);
+  const injected = await loadInjection(dir);
+  // 2026-10-17 三权 V1：新空目录在门禁引擎推断为 trio；su 创世属于**旧 single 模型**。
+  // 本文件钉的是旧 su 创世链，故显式按 single 求值（旧项目 `.ans` 显式 single 即此形态）。
+  const project = { ...injected.project, governanceModel: "single" as const };
+  const { configSource } = injected;
   assert.equal(configSource.kind, "builtin-fallback", "空目录无 .ans → 内置回退（CLI 创世的触发条件）");
 
   const resolved = await resolveRole("su", project);
@@ -101,6 +105,8 @@ test("创世判定面：空目录注入的 su 边界恰 3 条；src/**、词法/
 test("创世链路面（确认制）：governCommand + 假适配器 + 确认桩——越界写入不落盘、确认后的治理产物真落盘并经自动收尾转正、命令以 0 结束", async () => {
   const dir = newDir("chain-");
   const inj = await loadInjection(dir);
+  // 旧 single 创世链（新空目录默认 trio；CLI 的 trio 注入见独立套件与已知缺陷报告）。
+  const singleInj = { ...inj, project: { ...inj.project, governanceModel: "single" as const } };
   const preview = ["将创建角色 X，写出：", "角色卡/X/role-card.md", "角色卡/X/boundary.yaml"].join("\n");
   const script: ToolCall[] = [
     // 未确认先试写：越界（src/）——应在写入之前被拒。
@@ -112,7 +118,7 @@ test("创世链路面（确认制）：governCommand + 假适配器 + 确认桩�
   ];
   const { channel, calls } = countingConfirm();
   const code = await governCommand(["govern", dir], {
-    ...inj,
+    ...singleInj,
     createAdapter: (gate, caps) =>
       createFakeRuntimeAdapter({ gate, script, writeRoot: dir, customerInput: caps?.customerInput }),
     customerInput: channel,
@@ -140,7 +146,10 @@ test("角落（O1，客户 2026-10-12 裁定维持现状）：有 角色卡/ 但
   const listing = await listProject(dir);
   assert.equal(listing.hasRoles, true, "桌面判据（能枚举到项目角色）在此角落为 true");
 
-  const { project, configSource } = await loadInjection(dir);
+  const injectedCorner = await loadInjection(dir);
+  const { configSource } = injectedCorner;
+  // 旧 single 角落（本用例的全部断言都是 su 创世面；显式 single 与旧项目记录一致）。
+  const project = { ...injectedCorner.project, governanceModel: "single" as const };
   assert.equal(configSource.kind, "builtin-fallback", "无 .ans → 内置回退（CLI 判据的由来：无 .ans ≠ 无角色）");
   assert.ok(
     project.genesisBootstrap !== undefined,

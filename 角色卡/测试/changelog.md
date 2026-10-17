@@ -1,5 +1,27 @@
 # 测试 变更记录
 
+## 2026-10-17（复审）— 三权验证两处缺陷修复后 reverified：三权套件 32/32；全量 2669/2650/16红/3skip（新增红 0）；typecheck 0
+
+**修复复审**：① 装配 `src/index.ts::loadInjection` 按评审 §5.4 注入治理模型（外来目录：显式值优先、不可读 single、无 `.ans` 且无角色目录 trio、其余 single；ans-cli 自身仍用载入配置）——`real-entry`（1）与 `t1-real-cli` govern×3 转绿，装配 `govern-target` 2 + `multi-runtime` 5 同源红亦转绿；② 运行时核心安装/看护类 schema 文案统一为「内置治理角色」（不再写死 su）。
+
+**本角色同步**：`g4-skill-verify/a-tools-surface`、`g4v2-mcp-verify/c-tools` 两条**文案期望**改为新文案（仅期望值，不放宽/不删断言）。
+
+**复审结果**：三权套件 **32/32**；全量 `node --test "test/**/*.test.ts"` → **2669 / 2650 pass / 16 fail / 3 skip**（基线 2628/2568/57/3；共固定 41＝本角色断言修正 30＋实现修复 11；**新增红 0**；剩余 16 红全为既有：本角色 1＝Windows symlink EPERM，其他角色 15＝Windows symlink/存储权限 6、runtime-core 工具 2、编排 shell 竞态 1、桌面UI 在途 5、markdown vendor pin 1）；`npm run typecheck` → **0 错**。未发现其他缺陷。报告追加 reverified 事件并更新第五/六/八节。未 commit/push。
+
+## 2026-10-17 — 治理三权分立独立端到端验证：新增 32 例全通过；修正 30 条旧断言；全量 2660/2630/27红/3skip（新增红 0）；typecheck 0；发现 1 项 CLI 注入缺陷 + 1 项文案偏差
+
+**范围**：PM 评审 `2026-10-17_design_governance-trio-review.md` §5–§9/§十一/§十二（客户 2026-10-17 拍板 V1 + V1b）已落地的门禁引擎/运行时核心/编排/桌面窗口/桌面UI 实现。
+
+**方法**：自建 `test/测试/governance-trio-verify/`（`fixture.ts` + 5 用例文件 **32 例**），全部离线。关键链路：真实 `listProject`/`resolveRole`/`resolveBoundarySection`/`resolveWrite`/`evaluateGovernanceGate`/账本/迁移；会话＝真实 `openGovernanceSession`/`openRoleSession` + 确定性桩适配器（脚本化工具调用、立即 settled）；假桌面＝真实 `SessionManager` + 真实 `openRoleSession`（仅假适配器/listing/emit）；假 IPC＝真实 `createDesktopInterface`（仅注入 listing/预览/迁移实现）；UI＝真 `ui-labels.js` 纯函数 + renderer 结构钉。不读 `.env`、不跑真实模型/凭据/网络。
+
+**逐项结论**：① 新空项目恰 3 内置（顺序 rapporteur/nominator/convener）、`primaryRoleId=rapporteur`、trio；② 三人会话按 function 可开，su/非法组合明确拒；③ 能力矩阵逐项（dispatch/status/sessionTail/recovery 仅 Convener；install 仅 Nominator；三人不自我回交；Rapporteur/Nominator 无 shell、Convener 只读档 risky 拒）；④ 写权矩阵逐项（三人预授权范围放行；角色卡/.ans/治理边界/manifest 全拒；文案指路）；⑤ 三道门禁（无接受写 flow/提名拒、无任命写角色卡拒、派发五条 + 快捷路径、账本坏 fail-closed、append 失败不翻转）；⑥ 账本 `customer.decision`/`artifact.observed`/`dispatch.accepted`/`governance.migrated` 字段与顺序，完整 flow 可还原「谁提案/谁提名/谁排程/客户批了什么」；⑦ 一项目一待决定串行队列（第二张不呈现、取消/失效清队、绝不自动批准）；⑧ 迁移六分支（预览零写入、只增/改 governanceModel、未知字段/roles/pin 保留、manifest 留痕、账本 migrated、迁移后 su 隐藏不可开启历史保留、already-trio/no-record/preview-stale/write-failed）；⑨ 旧 single 逐字兼容（su 枚举/边界、shell 审批档、回交/看护主人=su、S1 旧形状与显式 trio 选择）；⑩ UI 三权左树/副标题/空态/状态行/旧模型提示/迁移按钮与预览确认。
+
+**旧断言修正（30 条，均未放宽）**：t9-block1 旧 su 空项目改显式 single（首例改钉 trio 默认）；cli-genesis-boundary 显式 single；existing-project-compat E1/E2/E3 适配可选 `governanceModel`、C5 显式 single；g1/g4-skill/g4v2 预授权来源迁到注册表 `LEGACY_SU_PREAUTHORIZED_DIRS` 并反向钉无第二份；g2/g4 能力判据改为 `cap.*`/`legacyBuiltIn`/`canSchedule`/`canNominate`；看护快照 `suRoleId`→`governanceRoleId`（g2 w1/r1/w3、turn-watch fixture，typecheck 4 错归零）；安装拒绝文案改「或为内置治理角色」；U1 Esc 正则兼容 CRLF。
+
+**缺陷（未改实现）**：① 阻塞性——`src/index.ts::loadInjection` 未按评审 §5.4 注入 `governanceModel`：`ans govern <空目录>`（推断 trio）选到 rapporteur 后，`resolveRole` 仍按 single 解析 ⇒「三权角色在 single 治理模型下不可用」，命令报「治理边界解析失败」；应打开 Rapporteur 再因缺 provider 配置失败。证据：`real-entry.test.ts`（1 红）＋`t1-real-cli.test.ts`（govern×3 红）保留。属主装配/编排。② 轻度——安装类工具 schema 仍写「或为治理角色 su」，与桌面 handler「或为内置治理角色」不一致（trio 下会误导模型，不影响判定）。属主运行时核心/桌面窗口。
+
+**复跑**：本批 **32/32**；全量 `node --test "test/**/*.test.ts"` → **2660 / 2630 pass / 27 fail / 3 skip**（基线 2628/2568/57/3；**新增 32 例全过、新增红 0、固定 30 条**；27 红全为既有：本角色 5＝上述 CLI 缺陷 4＋Windows symlink EPERM 1，其他角色 22）；`npm run typecheck` → **0 错**（基线 4 错已随本批修正）。未 commit/push。详见[报告](docs/fix/2026-10-17_verify_governance-trio.md)。
+
 ## 2026-10-17（复审）— 预算误报修复后 reverified：本批 40/40；全量 2496/2473/20红/3skip；typecheck 0
 
 **修复复审**：运行时核心 `budgetDenied` 不再计入 `deniedReads`（预算耗尽返回独立码 `budget`）；编排 `damageCode` 顺序改为 `budgetExceeded → budget`、`truncatedReads → read-truncated`、`deniedReads → read-denied`；驱动 manual 理由改为「判断预算耗尽（读取次数/总读取字节达上限）…」。

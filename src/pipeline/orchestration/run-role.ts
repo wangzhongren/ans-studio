@@ -18,7 +18,7 @@
 //   · 通道**不可用/拒绝/未确认** → 不发行 → 该路径写入被拒（fail-closed）。
 //   · **例外（客户裁定 2026-10-16）**：内置治理角色（su）的**初始** writeSet 恒含 `docs/su/**`、
 //     `docs/contracts/**`、`docs/skills/**` 与 `docs/mcp/**`（预授权写目录，不经发行器、随会话初始化
-//     计算；见 SU_PREAUTHORIZED_WRITE_DIRS）——对其余一切路径以上四条逐字适用。
+//     计算；见 scopeWithBuiltInPreauthorization）——对其余一切路径以上四条逐字适用。
 // 【已登记的残余漏洞：内容漂移】本机制只保证「**路径**已预览且已确认」；「预览内容 ≠ 写出内容」
 // 关不住（O-A1 内容比对经客户 2026-10-12 裁定不采纳——如实登记，不实现）。
 // 未给 `customerInput` 的会话（无客户通道）保持旧语义：scope 原样传递（可为 undefined = 不收窄）。
@@ -35,10 +35,19 @@
 // （确认制会话例外：其 writeSet 由发行器动态持有，见上。）
 
 import type { ProjectConfig, ResolvedRole } from "../../model/role.ts";
-import type { TaskScope } from "../../model/decision.ts";
+import type { TaskScope, WriteDecision } from "../../model/decision.ts";
+import { createHash } from "node:crypto";
+import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { resolveRole } from "../../service/role/resolve-role.ts";
 import { resolveBoundary } from "../../service/boundary/resolve-boundary.ts";
+import {
+  LEGACY_SU_PREAUTHORIZED_DIRS,
+  appGovernanceBoundary,
+  governanceCapabilitiesOf,
+  governanceRoleOf,
+  type BuiltInGovernanceRoleSpec,
+} from "../../service/boundary/resolve-boundary.ts";
 import { resolveWrite } from "../../service/gate/resolve-write.ts";
 import type {
   RuntimeReplayEntry,
@@ -51,7 +60,12 @@ import type {
   WriteGate,
   ShellGate,
   CustomerInputFn,
+  CustomerInputMetadata,
+  CustomerInputOutcome,
+  CustomerInputRequest,
+  GovernanceCardKind,
   DispatchTaskFn,
+  DispatchTaskPayload,
   RoleStatusFn,
   SessionTailFn,
   ProposeRecoveryFn,
@@ -92,6 +106,15 @@ import { EXIT_OK, EXIT_USAGE, EXIT_FAILURE } from "../../common/编排/exit-code
 import type { ShellVerdictFn } from "../../common/编排/shell-gate.ts";
 import { repinIfBootstrapped, DEFAULT_GOVERNANCE_BOUNDARY_REL } from "../../common/编排/finalize.ts";
 import { conditionSlugsOf, createConfirmedWriteIssuer } from "../../common/编排/confirmed-writes.ts";
+import {
+  appendGovernanceLedger,
+  readGovernanceLedger,
+  type GovernanceDecisionKind,
+  type GovernanceLedgerEntry,
+  type GovernanceLedgerSnapshot,
+  type GovernancePower,
+} from "../../common/编排/governance-ledger.ts";
+import { evaluateGovernanceGate, type GovernanceGateAction } from "../../common/编排/governance-gate.ts";
 import { CLI_POSITIONING } from "../../common/编排/cli-positioning.ts";
 import { createDiagnosticLogger } from "../../common/shared/diagnostics.ts";
 // 跨角色共享路径原语（**单一来源** = pm 属主 `src/common/shared/path-primitives.ts`；工程法案 §一.5
@@ -502,34 +525,121 @@ export async function openRoleSession(
 
   // 底层只建**一个**会话：多轮 send 复用同一 RoleSession，绝不每轮重建。
   //
-  // gate（A-3）：有 `customerInput` ⇒ 确认制动态 writeSet（发行器追加；**内置治理角色 su** 的初始
-  // 集额外含预授权写目录——客户裁定 2026-10-16，见 SU_PREAUTHORIZED_WRITE_DIRS）；
-  // 无 ⇒ 原样传 input.scope（可为 undefined = 不收窄，旧语义逐字不变；su 的静态 scope 同口径并入预授权）。
+  // 能力来源（评审 §5.6「单点」）：内置治理角色一律读门禁引擎注册表
+  // `governanceCapabilitiesOf`；`su` 得到 `LEGACY_SU_CAPABILITIES`（single 旧行为逐字不变）；
+  // 项目角色没有治理能力（`undefined`），保持既有「只给内置治理角色」的注入纪律。
+  const builtInGovernance = setup.role.kind === "built-in-governance";
+  const trioSpec: BuiltInGovernanceRoleSpec | undefined = governanceRoleOf(setup.role.id);
+  const isTrio = trioSpec !== undefined;
+  const governanceModel = input.project.governanceModel ?? "single";
+  // 评审 §5.3：trio 下自动收尾/重 pin 的写权来自**应用专用边界**——三人的 Section 1 不含
+  // `.ans/**`/`docs/bootstrap-manifest.md`，若沿用角色边界，收尾会 fail-closed、`.ans` 永不落盘。
+  // single/su 逐字沿用会话边界（旧行为不变）。
+  const repinBoundary =
+    isTrio || governanceModel === "trio"
+      ? appGovernanceBoundary(setup.role.boundary.acceptance)
+      : setup.role.boundary;
+  const cap = builtInGovernance ? governanceCapabilitiesOf(setup.role.id) : undefined;
+  // 预授权目录（评审 §5.6）：trio 按注册表；su 用既有四棵；项目角色没有预授权。
+  const preauthorizedDirs: readonly string[] = builtInGovernance
+    ? trioSpec?.preauthorizedDirs ??
+      (setup.role.id === "su" ? LEGACY_SU_PREAUTHORIZED_DIRS : [])
+    : [];
+
+  // gate（A-3）：有 `customerInput` ⇒ 确认制动态 writeSet（发行器追加；内置治理角色的初始集额外含
+  // 预授权写目录）；无 ⇒ 原样传 input.scope（可为 undefined = 不收窄，旧语义逐字不变）。
   const confirmationMode = input.customerInput !== undefined;
   const issued = new Set<string>();
   const conditions = conditionSlugsOf(setup.role.boundary);
   const gateCtx = { skillRoot: input.project.skillRoot, projectRoot: input.project.projectRoot };
   const staticScope = input.scope;
-  // su 预授权（客户裁定 2026-10-16）：判据 = **既有治理角色标记**（与 suppressHandback/dispatchTask
-  // 同一判据；本产品内置治理角色即 su，不另硬编码 id）。
-  const suPreauthorized = setup.role.kind === "built-in-governance";
-  const gate: WriteGate = confirmationMode
+
+  // 账本快照（评审 §5.7）：open 时读一次；每次 send 前刷新；客户决定后**同步更新内存快照**并异步落盘。
+  // `local` 保存本会话已作出但可能尚未落盘的决定，刷新时按签名去重合并——避免「刷新读到旧盘面」把
+  // 刚作出的决定丢掉。
+  const ledgerState: { snapshot: GovernanceLedgerSnapshot; local: GovernanceLedgerEntry[] } = {
+    snapshot: { entries: [], errors: [] },
+    local: [],
+  };
+  let currentFlowId: string | undefined;
+  let boundSessionForEvidence: RoleSession | undefined;
+  const refreshLedger = async (): Promise<void> => {
+    const disk = await readGovernanceLedger(input.project.projectRoot);
+    const missingLocal = ledgerState.local.filter(
+      (local) => !disk.entries.some((entry) => sameLedgerEntry(entry, local)),
+    );
+    ledgerState.snapshot = { entries: [...disk.entries, ...missingLocal], errors: disk.errors };
+  };
+  if (isTrio) await refreshLedger();
+
+  const baseGate: WriteGate = confirmationMode
     ? (p) =>
         resolveWrite(
           p,
           setup.role.boundary,
-          suPreauthorized
-            ? scopeWithSuPreauthorization({ writeSet: [...issued], conditions }, p, input.project.projectRoot)
+          preauthorizedDirs.length > 0
+            ? scopeWithBuiltInPreauthorization(
+                { writeSet: [...issued], conditions },
+                p,
+                input.project.projectRoot,
+                preauthorizedDirs,
+              )
             : { writeSet: [...issued], conditions },
           gateCtx,
         )
-    : suPreauthorized && staticScope !== undefined
+    : preauthorizedDirs.length > 0 && staticScope !== undefined
       ? (p) =>
-          resolveWrite(p, setup.role.boundary, scopeWithSuPreauthorization(staticScope, p, input.project.projectRoot), gateCtx)
+          resolveWrite(
+            p,
+            setup.role.boundary,
+            scopeWithBuiltInPreauthorization(staticScope, p, input.project.projectRoot, preauthorizedDirs),
+            gateCtx,
+          )
       : buildGate(setup.role, input.project, input.scope);
 
+  // trio gate 包装（评审 §5.2/§5.6）：先判 `forbiddenWritePaths`（应用治理记录/其他治理角色资料，
+  // 任何角色不可写），再按路径分派三道门禁（write-flow / write-nomination / write-role-card），
+  // 最后才走既有 resolveWrite。门禁只读账本快照，不读 Markdown status。
+  const gate: WriteGate = isTrio
+    ? (p) => {
+        const rel = projectRelativeLexical(p, input.project.projectRoot);
+        const forbidden = forbiddenWriteDecision(trioSpec!, rel);
+        if (forbidden !== undefined) {
+          log.record("governance.write.forbidden", { path: rel ?? p });
+          return forbidden;
+        }
+        const routed = governanceActionForPath(rel);
+        if (routed !== undefined) {
+          const decision = evaluateGovernanceGate(
+            {
+              projectRoot: input.project.projectRoot,
+              model: governanceModel,
+              roleId: setup.role.id,
+              action: routed.action,
+              flowId: routed.flowId ?? currentFlowId,
+              targetRoleId: routed.targetRoleId,
+              path: rel ?? undefined,
+            },
+            ledgerState.snapshot,
+          );
+          if (!decision.allowed) {
+            log.record("governance.gate.rejected", {
+              action: routed.action,
+              path: rel ?? p,
+              code: decision.code,
+            });
+            return { allowed: false, reason: decision.message, allowedByRoot: { skill: [], project: [] } };
+          }
+        }
+        return baseGate(p);
+      }
+    : baseGate;
+
   // 客户通道包装（A-3）：客户确认后，把「已预览且校验在边界内的具体路径」发行进 writeSet。
-  // 只做「确认 → 发行」；裁决结果原样返回（不改答案、不写盘、不成败判定都在别处）。
+  // trio 追加（评审 §5.7/§5.8）：
+  //   · 按角色校验 cardKind 白名单——越权**不弹卡**，直接返回 declined（fail-closed）；
+  //   · 客户作出决定后，按 cardKind + 选项 id 写 `customer.decision`（同步更新内存快照并异步落盘）；
+  //   · 账本只记 `CustomerInputOutcome` 与工具调用证据，不采信角色自述；unavailable 不写（无决定）。
   const governedInput: CustomerInputFn | undefined = confirmationMode
     ? (() => {
         const issue = createConfirmedWriteIssuer({
@@ -541,16 +651,50 @@ export async function openRoleSession(
         const raw = input.customerInput!;
         return async (req, metadata) => {
           const originalMetadata = metadata === undefined ? undefined : { ...metadata };
+          const cardKind = req.cardKind ?? originalMetadata?.cardKind;
+          if (isTrio) {
+            const allowed = TRIO_CARD_KINDS[trioSpec!.id];
+            if (cardKind !== undefined && !allowed.includes(cardKind)) {
+              log.record("governance.cardKind.rejected", {
+                roleId: setup.role.id,
+                cardKind,
+                allowed: [...allowed],
+              });
+              return {
+                outcome: "declined",
+                reason:
+                  `治理角色 ${setup.role.id} 不允许 cardKind=${cardKind}；` +
+                  `允许：${allowed.join(" / ")}。本次未向客户发卡。`,
+              };
+            }
+            const flowId = req.flowId ?? originalMetadata?.flowId;
+            if (isGovernanceFlowId(flowId)) currentFlowId = flowId;
+          }
           const out = await raw(req, metadata);
-          issue(req, out ?? null, originalMetadata);
+          const issuedPaths = issue(req, out ?? null, originalMetadata);
+          if (isTrio) {
+            recordCustomerDecision({
+              state: ledgerState,
+              projectRoot: input.project.projectRoot,
+              roleId: setup.role.id,
+              function: trioSpec!.function,
+              req,
+              metadata: originalMetadata,
+              out,
+              issuedPaths,
+              sessionId: boundSessionForEvidence?.nativeSessionId,
+              runtime: input.runtime ?? boundSessionForEvidence?.runtime,
+              log,
+            });
+          }
           return out;
         };
       })()
     : undefined;
 
-  // 回交（设计 §10.8）：角色会话 settle → 编排发 `handback` 事件，交回 su。**内置治理角色（su）自身
-  // 不回交**（回交的主体是**其他角色**，目的地才是 su）——故对 built-in-governance 角色**不挂**回交。
-  const suppressHandback = setup.role.kind === "built-in-governance";
+  // 回交（设计 §10.8）：角色会话 settle → 编排发 `handback` 事件，交回治理角色。
+  // **内置治理角色自身不回交**（回交的主体是**其他角色**）——`suppressHandback` 仅用于本语义。
+  const suppressHandback = builtInGovernance;
 
   // 交报告（C-1）：**只给回交主体（非 su）**注入 `reportHandback`——模型经 `submit_report` 交的报告
   // （`summary`/`evidence`/`status`）正常终局优先取报告值；su 不注入。无合法报告明确未报告。
@@ -582,47 +726,71 @@ export async function openRoleSession(
   const sessionDir =
     input.persistSession === false ? undefined : sessionDirFor(input.project.projectRoot, setup.role.id, input.runtime);
 
-  // H-1 派发任务：**只给治理角色（su）**转交前端路由能力——项目角色会话不注入（`dispatch_task` 只给 su）。
-  const dispatchTask = suppressHandback ? input.dispatchTask : undefined;
+  // H-1 派发任务（评审 §5.6）：能力矩阵驱动——仅 `capabilities.dispatchTask`（trio=Convener；su 旧行为）。
+  // trio 下再包一层**派发范围门**（评审 §6.2 五条）：门禁拒绝即 `{ok:false}` 如实回执，不进入前端路由。
+  const dispatchTask: DispatchTaskFn | undefined =
+    cap?.dispatchTask === true && input.dispatchTask !== undefined
+      ? isTrio
+        ? async (dispatch, metadata) => {
+            const decision = evaluateGovernanceGate(
+              {
+                projectRoot: input.project.projectRoot,
+                model: governanceModel,
+                roleId: setup.role.id,
+                action: "dispatch",
+                flowId: dispatch.flowId,
+                stepId: dispatch.stepId,
+                targetRoleId: dispatch.roleId,
+              },
+              ledgerState.snapshot,
+            );
+            if (!decision.allowed) {
+              log.record("governance.dispatch.rejected", {
+                flowId: dispatch.flowId,
+                stepId: dispatch.stepId,
+                targetRoleId: dispatch.roleId,
+                code: decision.code,
+              });
+              return { ok: false, message: `派发被治理门禁拒绝：${decision.message}` };
+            }
+            return input.dispatchTask!(dispatch as DispatchTaskPayload, metadata);
+          }
+        : input.dispatchTask
+      : undefined;
 
-  // G-2 看护三能力（R1/R2，2026-10-16 客户批准）：**只给治理角色（su）**转交——判据复用上文
-  // `suppressHandback`（内置治理角色）；项目角色会话即便调用方误给也不注入（工具不注册）。未给 ⇒
-  // 不注入（能力缺席 = 最强 fail-closed，同 run_shell/customerInput/dispatch_task 先例）。
+  // G-2 看护三能力（R1/R2）：能力矩阵驱动——仅 `capabilities.roleStatus/sessionTail/proposeRecovery`
+  // （trio=Convener；su 旧行为）。未注入 ⇒ 不注入（能力缺席 = 最强 fail-closed）。
   // 承载契约（字段名/形状）单一来源：`common/编排/watchdog.ts`。
-  const roleStatus = suppressHandback ? input.roleStatus : undefined;
-  const sessionTail = suppressHandback ? input.sessionTail : undefined;
-  const proposeRecovery = suppressHandback ? input.proposeRecovery : undefined;
+  const roleStatus = cap?.roleStatus === true ? input.roleStatus : undefined;
+  const sessionTail = cap?.sessionTail === true ? input.sessionTail : undefined;
+  const proposeRecovery = cap?.proposeRecovery === true ? input.proposeRecovery : undefined;
 
-  // G-4 技能安装/卸载两能力（I1/I2 工具，2026-10-16 客户批准 V1）：**只给治理角色（su）**转交——
-  // 判据复用 `suppressHandback`，同 dispatchTask/看护三能力；项目角色会话即便调用方误给也不注入
-  // （`install_skill`/`uninstall_skill` 不注册）。字段名**逐字**＝契约家能力名（错一名 ⇒ 工具静默
-  // 零注册，G-2 教训）；承载契约（字段名/形状）单一来源：`model/runtime.ts`。
-  const installSkill = suppressHandback ? input.installSkill : undefined;
-  const uninstallSkill = suppressHandback ? input.uninstallSkill : undefined;
+  // G-4 技能安装/卸载两能力（I1/I2）：能力矩阵驱动——仅 `capabilities.installSkill`
+  // （trio=Nominator；su 旧行为）。字段名**逐字**＝契约家能力名（错一名 ⇒ 工具静默零注册）。
+  const installSkill = cap?.installSkill === true ? input.installSkill : undefined;
+  const uninstallSkill = cap?.installSkill === true ? input.uninstallSkill : undefined;
 
-  // G-4 V2 MCP 安装/卸载两能力（运行时核心 V2 契约落盘后收口，客户 2026-10-16 批准 V2 分批）：
-  // **只给治理角色（su）**转交——判据复用 `suppressHandback`，同技能两能力；项目角色会话即便调用方
-  // 误给也不注入（`install_mcp`/`uninstall_mcp` 不注册）。字段名**逐字**＝契约家能力名（错一名 ⇒
-  // 工具静默零注册，G-2 教训）；承载契约（字段名/形状）单一来源：`model/runtime.ts`。
-  const installMcp = suppressHandback ? input.installMcp : undefined;
-  const uninstallMcp = suppressHandback ? input.uninstallMcp : undefined;
+  // G-4 V2 MCP 安装/卸载两能力：能力矩阵驱动——仅 `capabilities.installMcp`
+  // （trio=Nominator；su 旧行为）。**安装不改变任何角色的写边界**。
+  const installMcp = cap?.installMcp === true ? input.installMcp : undefined;
+  const uninstallMcp = cap?.installMcp === true ? input.uninstallMcp : undefined;
 
-  // I-1 开放 shell（项目角色三层链）+ **su 审批档**（2026-10-17）+ **su 只读档**（2026-10-12）——
-  // 共用同一个 `shellGate` 能力位（「注入才注册」：注入了 ⇒ Pi 适配器注册 `run_shell`；未注入/装配失败 ⇒
-  // **不 arm**，能力缺席 = fail-closed，绝不放宽）。
-  // 优先级（确定行为，写明）：
-  //   1) `shellOperatorOnly`（su 审批档）——**su-only**：仅 `suppressHandback === true` 生效；项目角色误传
-  //      不 arm（诊断记录）。与 `shellReadonly` 同时给出 ⇒ **不 arm**（互斥诊断，不择一静默生效）。
-  //   2) `shellReadonly`（旧只读档；保留给其他调用方/测试）。
-  //   3) 项目角色三层链（`shellOperatorChannel`/`shellArming`，既有 `!suppressHandback` 条件，逐字不变）。
+  // I-1 开放 shell（项目角色三层链）+ 审批档/只读档——共用同一个 `shellGate` 能力位
+  // （「注入才注册」：注入了 ⇒ 适配器注册 `run_shell`；未注入/装配失败 ⇒ **不 arm**，fail-closed）。
+  // 能力矩阵（评审 §5.6）：
+  //   · `shell: "none"`（trio Rapporteur/Nominator）→ 不 arm（即使调用方误传选项也拒绝并记诊断）；
+  //   · `shell: "readonly"`（trio Convener）→ 仅只读档；
+  //   · `shell: "operator-approve"`（su single）→ 审批档；保留旧 `shellReadonly` 注入作为 su 的
+  //     兼容路径（桌面自 2026-10-17 起用审批档，但旧调用方/测试仍可使用；两档同时给出 ⇒ 不 arm）；
+  //   · 项目角色（cap undefined）→ 既有三层链/只读路径**逐字不变**。
   let shellGate: ShellGate | undefined;
   if (input.shellOperatorOnly !== undefined) {
     if (input.shellReadonly !== undefined) {
       // 互斥：不择一静默生效（PM 评审 §3.4）。
       log.record("shell.operatorOnly.rejected", { mode: "shellOperatorOnly", outcome: "not-armed", reasonCode: "conflicts-with-shellReadonly" });
-    } else if (!suppressHandback) {
-      // su-only：项目角色误传不得把三层链绕成「客户全权审批」。
-      log.record("shell.operatorOnly.rejected", { mode: "shellOperatorOnly", outcome: "not-armed", reasonCode: "not-built-in-governance" });
+    } else if (cap?.shell !== "operator-approve") {
+      // 审批档只属于 single/su（能力矩阵）；项目角色/trio 误传不得把三层链绕成「客户全权审批」。
+      log.record("shell.operatorOnly.rejected", { mode: "shellOperatorOnly", outcome: "not-armed", reasonCode: "capability-denied" });
     } else {
       try {
         shellGate = await assembleOperatorShellGate({ project: input.project, ...input.shellOperatorOnly });
@@ -632,13 +800,18 @@ export async function openRoleSession(
       }
     }
   } else if (input.shellReadonly !== undefined) {
-    try {
-      shellGate = await assembleReadonlyShellGate({ project: input.project, ...input.shellReadonly });
-    } catch (err) {
-      log.error("shell.arming.failed", err);
-      shellGate = undefined; // 装配失败 ⇒ 不 arm（能力缺席 = fail-closed，run_shell 不注册）
+    if (cap !== undefined && cap.shell === "none") {
+      // trio Rapporteur/Nominator：没有 shell 面（评审 §5.6）。
+      log.record("shell.readonly.rejected", { outcome: "not-armed", reasonCode: "capability-denied" });
+    } else {
+      try {
+        shellGate = await assembleReadonlyShellGate({ project: input.project, ...input.shellReadonly });
+      } catch (err) {
+        log.error("shell.arming.failed", err);
+        shellGate = undefined; // 装配失败 ⇒ 不 arm（能力缺席 = fail-closed，run_shell 不注册）
+      }
     }
-  } else if (!suppressHandback && input.shellOperatorChannel !== undefined) {
+  } else if (!builtInGovernance && input.shellOperatorChannel !== undefined) {
     try {
       shellGate = await assembleProjectShellGate({
         project: input.project,
@@ -683,7 +856,23 @@ export async function openRoleSession(
     log.error("session.open.failed", err);
     throw err;
   }
+  boundSessionForEvidence = session;
   log.record("session.open.ready");
+
+  // §5.7 `artifact.observed`：trio 内置角色在会话 open 时扫一次预授权目录作为基线（只记哈希、不写账本），
+  // 每轮 settle 后只对「新增/变更」的 `.md` 追加 `artifact.observed`。su（single）不参与治理账本——旧项目
+  // 行为逐字不变（不因开会话/每轮 settle 凭空写 `.ans`）。
+  const artifactHashes = new Map<string, string>();
+  const artifactScanEnabled = isTrio && preauthorizedDirs.length > 0;
+  if (artifactScanEnabled) {
+    try {
+      for (const artifact of await scanPreauthorizedArtifacts(input.project.projectRoot, preauthorizedDirs)) {
+        artifactHashes.set(artifact.relPath, artifact.sha256);
+      }
+    } catch (err) {
+      log.error("governance.artifact.baseline.failed", err);
+    }
+  }
 
   // 自动收尾的授权边界 = **本会话解析出的边界**（创世态下即治理种子边界；普通角色下即其项目
   // 边界）——与 su 同一授权。治理边界文档落点：项目未声明（如桌面创世 `path` 为空串）时用默认约定路径。
@@ -804,6 +993,9 @@ export async function openRoleSession(
     get contextWarning() { return session.contextWarning; },
     async send(text: string, opts?: RoleSessionSendOptions): Promise<void> {
       legacyReport = undefined;
+      // 账本快照刷新（评审 §5.7 时序边界）：每次 send 开始时重读盘面——跨会话的新客户决定在此生效；
+      // 未含决定则门禁拒，绝不猜。读取失败 → 快照 errors 非空 → 门禁 fail-closed。
+      if (isTrio) await refreshLedger();
       // F-5-opt1：排入的模型可见注记作为**本轮输入前缀**送出（不单独开轮、不改判定；送达一次即消费）。
       const notice = pendingModelNotice;
       const outbound = notice !== undefined && notice !== "" ? `${notice}\n\n${text}` : text;
@@ -914,12 +1106,38 @@ export async function openRoleSession(
                 await repinIfBootstrapped({
                   projectRoot: input.project.projectRoot,
                   skillRoot: input.project.skillRoot,
-                  boundary: setup.role.boundary,
+                  boundary: repinBoundary,
                   governanceBoundaryPath: govPath,
+                  // 评审 §5.5：创世态由调用方传当前模型；single 不传，旧 `.ans` 形状逐字不变。
+                  ...(governanceModel === "trio" ? { governanceModel: "trio" as const } : {}),
                 });
               } catch (err) {
                 log.error("session.repin.failed", err);
                 /* 自动收尾/重 pin 是 best-effort；失败不打断会话事件流 */
+              }
+            }
+            // §5.7 `artifact.observed`（仅 trio 内置角色、仅预授权目录、仅新增/变更的 `.md`）：
+            // 应用算 sha256；账本失败只记诊断，不打断事件流、不回滚角色产物。
+            if (artifactScanEnabled) {
+              try {
+                const artifacts = await scanPreauthorizedArtifacts(input.project.projectRoot, preauthorizedDirs);
+                for (const artifact of artifacts) {
+                  if (artifactHashes.get(artifact.relPath) === artifact.sha256) continue;
+                  artifactHashes.set(artifact.relPath, artifact.sha256);
+                  const entry: GovernanceLedgerEntry = {
+                    at: new Date().toISOString(),
+                    kind: "artifact.observed",
+                    actorRoleId: setup.role.id,
+                    power: trioSpec!.function as GovernancePower,
+                    artifactPath: artifact.relPath,
+                    artifactSha256: artifact.sha256,
+                    ...artifactFlowMetadata(artifact.relPath),
+                  };
+                  const result = await appendGovernanceLedger(input.project.projectRoot, entry);
+                  if (!result.ok) log.record("governance.artifact.append.failed", { message: result.message });
+                }
+              } catch (err) {
+                log.error("governance.artifact.scan.failed", err);
               }
             }
           }
@@ -995,59 +1213,428 @@ function buildGate(
 }
 
 /**
- * **su 预授权写目录（客户裁定 2026-10-16）**——内置治理角色（su）会话的**初始 writeSet 恒含**的
- * 「项目根相对、含子路径」目录树（四棵）。客户裁定原文：①「这个 su 可以写 docs/su 的目录，不需要
- * 我审批」；② 追加「还有个契约目录也可以给他写。」（`docs/contracts/` = 跨角色契约落盘目录的全项目
- * 约定；该约定本体落地时生效，本预授权先装好）；③ G-4（角色能力安装）V1 十项裁定全采纳
- * （2026-10-16 批准）——§4.6 候选 1＝预授权扩列 `docs/skills`（技能文档树：`docs/skills/<name>/`
- * install.md 登记 + SKILL.md 内容；安装＝「先落盘再激活」，无卡口径要求落盘在 su 初始 writeSet 内）；
- * ④ G-4 V2（MCP 安装）——客户 2026-10-16「按推荐批准，开始实施」（分批：P1 Claude→P2 Codex→P3 Pi），
- * V1 裁定①「`docs/mcp` 未扩——V2 另议」的落点＝预授权扩列 `docs/mcp`（MCP 声明树：
- * `docs/mcp/<name>.md` 声明文件；落盘同「先落盘再激活」口径——产品提案 §九 V2 范围①）。
+ * **内置角色预授权写目录**（评审 §5.2/§5.6）——会话**初始 writeSet 恒含**的「项目根相对、含子路径」
+ * 目录树：
+ *   · trio：注册表 `preauthorizedDirs`（Rapporteur `docs/proposals|contracts|governance/rapporteur`；
+ *     Nominator `docs/nominations|skills|mcp|governance/nominator`；Convener `docs/flows|governance/convener`）；
+ *   · su（single）：既有四棵 `docs/su`、`docs/contracts`、`docs/skills`、`docs/mcp`（客户裁定 2026-10-16；
+ *     单一来源改为门禁引擎 `LEGACY_SU_PREAUTHORIZED_DIRS`，本文件不再另写一份）；
+ *   · 项目角色：无预授权。
  *
  * 语义与边界（钉死）：
- * - **仅**内置治理角色（`kind === "built-in-governance"`——既有判据，同 suppressHandback/
- *   dispatchTask 处）**仅**这四棵目录树；su 卡文本的配套修改由门禁引擎另行实施（不属本模块）。
- * - 它是**初始集合的一部分**——不依赖确认发行器（`request_confirmation` 发行的是「**经确认发行**的
- *   写权」，预授权不属此类）；每次开会话/会话重建都生效（本集合在会话初始化处的 gate 求值中计算，
- *   随句柄生灭；桌面 O-1 重建路径按新开会话同口径获得。F-5-opt1 的重建提示说的是经确认发行的写权，
- *   语义不受本机制影响、保持原样）。
+ * - 它是**初始集合的一部分**——不依赖确认发行器；每次开会话/会话重建都生效。
  * - 实现口径（F4 为**精确匹配**）：求值时把「目标路径本身」的项目根相对词法路径并入本次 writeSet
  *   ——等价于该路径初始就在已发行集中。判定链其余环节（F6 接受门、F7 真实路径逃逸复核、边界条目
  *   匹配、条件激活）**逐字不变**：不在边界内/未接受/逃逸的路径照拒，fail-closed 不放松。
- * - 其余一切路径（`docs/` 其它子路径、`角色卡/`、`.ans/` …）照旧只认已发行集：未确认 = F4 拒。
- * 背景/测试/回滚：`角色卡/编排/docs/fix/2026-10-16_fix_su-notes-preauth.md`（docs/su、docs/contracts）、
- * `角色卡/编排/docs/change/2026-10-16_change_g4-skill-injection-and-preauth.md`（docs/skills 扩列，G-4 I5）
- * 与 `角色卡/编排/docs/change/2026-10-16_change_g4v2-mcp-preauth.md`（docs/mcp 扩列，G-4 V2 wave A）。
+ * - 其余一切路径照旧只认已发行集：未确认 = F4 拒。
+ * 背景：`角色卡/编排/docs/fix/2026-10-16_fix_su-notes-preauth.md` 与 G-4 两批变更记录。
  */
-const SU_PREAUTHORIZED_WRITE_DIRS: readonly string[] = ["docs/su", "docs/contracts", "docs/skills", "docs/mcp"];
 
-/**
- * 目标路径落在预授权目录树内 → 返回其**项目根相对词法路径**；否则 `undefined`。
- * 取值规则与 `resolveWrite` **同源**（绝对路径按项目根取相对、相对路径按项目根解释），且纯词法、
- * 不触盘——真实路径逃逸（符号链接/junction）始终由 resolveWrite 的 F7 独立复核，本函数不放行任何
- * 未经 F6/边界/条件判定的路径。`isUnderOrEqual` 按**段**比较（`docs/su2` 不被 `docs/su` 覆盖、
- * `docs/mcp2` 不被 `docs/mcp` 覆盖），大小写口径沿用共享原语（Windows 不敏感）。空路径 / 取不到
- * 根内相对（含 skill 根目标）→ undefined。
- */
-function suPreauthorizedRelOf(targetPath: string, projectRoot: string): string | undefined {
+/** 目标路径 → **项目根相对词法路径**（取值规则与 resolveWrite 同源）；空/根外 → undefined。 */
+function projectRelativeLexical(targetPath: string, projectRoot: string): string | undefined {
   const raw = typeof targetPath === "string" ? targetPath.trim() : "";
   if (raw === "") return undefined;
   const rel = isAbsoluteAny(raw) ? absRel(normalizeLexical(raw), projectRoot) : normalizeLexical(raw);
   if (rel === null || rel === "") return undefined;
-  return SU_PREAUTHORIZED_WRITE_DIRS.some((dir) => isUnderOrEqual(rel, dir)) ? rel : undefined;
+  return rel;
 }
 
 /**
- * su 会话 gate 求值入口：目标在预授权树内 ⇒ 把其项目根相对路径**并入本次 writeSet**（不经发行器）；
- * 其余 ⇒ **原样返回 base**（逐字现状，零行为变化）。base 由调用方保证非 undefined（确认制动态集，
- * 或静态 scope）；`scope === undefined` 的「不做任务收窄」会话**不经过本函数**——绝不因预授权凭空
- * 造出 F4 收窄 scope（那会收窄而非放宽既有语义）。
+ * 目标路径落在预授权目录树内 → 返回其项目根相对词法路径；否则 `undefined`。
+ * `isUnderOrEqual` 按**段**比较（`docs/mcp2` 不被 `docs/mcp` 覆盖），大小写口径沿用共享原语。
  */
-function scopeWithSuPreauthorization(base: TaskScope, targetPath: string, projectRoot: string): TaskScope {
-  const rel = suPreauthorizedRelOf(targetPath, projectRoot);
+function preauthorizedRelOf(
+  targetPath: string,
+  projectRoot: string,
+  dirs: readonly string[],
+): string | undefined {
+  const rel = projectRelativeLexical(targetPath, projectRoot);
+  if (rel === undefined) return undefined;
+  return dirs.some((dir) => isUnderOrEqual(rel, dir)) ? rel : undefined;
+}
+
+/**
+ * 内置角色会话 gate 求值入口：目标在预授权树内 ⇒ 把其项目根相对路径**并入本次 writeSet**（不经发行器）；
+ * 其余 ⇒ **原样返回 base**（零行为变化）。base 由调用方保证非 undefined（确认制动态集或静态 scope）；
+ * `scope === undefined` 的「不做任务收窄」会话**不经过本函数**。
+ */
+function scopeWithBuiltInPreauthorization(
+  base: TaskScope,
+  targetPath: string,
+  projectRoot: string,
+  dirs: readonly string[],
+): TaskScope {
+  const rel = preauthorizedRelOf(targetPath, projectRoot, dirs);
   if (rel === undefined) return base;
   return { writeSet: [...base.writeSet, rel], conditions: base.conditions };
+}
+
+/**
+ * trio 禁写路径（评审 §5.2/§5.6）：在 `resolveWrite` **之前**判定。命中即拒，文案点明
+ * 「该路径属应用治理记录/其他治理角色，任何角色不可写」。只对注册表角色生效（su/项目角色保持现状）。
+ */
+function forbiddenWriteDecision(
+  spec: BuiltInGovernanceRoleSpec,
+  rel: string | undefined,
+): WriteDecision | undefined {
+  if (rel === undefined) return undefined;
+  const hit = spec.forbiddenWritePaths.some((prefix) => isUnderOrEqual(rel, prefix));
+  if (!hit) return undefined;
+  return {
+    allowed: false,
+    reason: `拒绝写入 ${rel}：该路径属应用治理记录/其他治理角色，任何角色不可写。`,
+    allowedByRoot: { skill: [], project: [] },
+  };
+}
+
+/** 路径 → 三道门禁动作（只认固定形状；写流程/提名的非标准文件名 → 无 flowId，门禁 fail-closed）。 */
+interface RoutedGovernanceAction {
+  action: GovernanceGateAction;
+  flowId?: string;
+  targetRoleId?: string;
+}
+
+function governanceActionForPath(rel: string | undefined): RoutedGovernanceAction | undefined {
+  if (rel === undefined) return undefined;
+  const parts = rel.split("/");
+  if (parts[0] === "docs" && parts[1] === "flows") {
+    if (parts.length === 3 && parts[2].endsWith(".md")) {
+      const flowId = parts[2].slice(0, -".md".length);
+      return { action: "write-flow", ...(isGovernanceFlowId(flowId) ? { flowId } : {}) };
+    }
+    if (parts.length > 3) return { action: "write-flow" }; // 非标准子路径：无 flowId → 拒
+    return undefined;
+  }
+  if (parts[0] === "docs" && parts[1] === "nominations") {
+    if (parts.length === 3 && parts[2].endsWith(".md")) {
+      const match = /^(.+)-v\d+\.md$/.exec(parts[2]);
+      return {
+        action: "write-nomination",
+        ...(match !== null && isGovernanceFlowId(match[1]) ? { flowId: match[1] } : {}),
+      };
+    }
+    if (parts.length > 3) return { action: "write-nomination" };
+    return undefined;
+  }
+  if (parts[0] === "角色卡" && parts.length >= 3) {
+    return { action: "write-role-card", targetRoleId: parts[1] };
+  }
+  return undefined;
+}
+
+/** 治理 flowId 形状（与运行时核心 `GOVERNANCE_SLUG_PATTERN` 同值；本地再判一次，不导入运行时实现）。 */
+const GOVERNANCE_FLOW_ID_RE = /^[a-z0-9][a-z0-9-]{1,63}$/;
+
+function isGovernanceFlowId(value: unknown): value is string {
+  return typeof value === "string" && GOVERNANCE_FLOW_ID_RE.test(value);
+}
+
+/** 每角色允许的 `cardKind` 白名单（评审 §5.8 表；越权不弹卡，由 customerInput 包装器直接拒绝）。 */
+const TRIO_CARD_KINDS: Record<BuiltInGovernanceRoleSpec["id"], readonly GovernanceCardKind[]> = {
+  rapporteur: ["proposal", "acceptance", "write"],
+  nominator: ["appointment", "appointment-write", "write"],
+  convener: ["schedule-write", "write"],
+};
+
+/** 账本条目签名（本会话内存合并去重用；只比较能唯一识别一次决定/事件的字段）。 */
+function ledgerEntrySignature(entry: GovernanceLedgerEntry): string {
+  return [
+    entry.at,
+    entry.kind,
+    entry.actorRoleId,
+    entry.flowId ?? "",
+    entry.decisionKind ?? "",
+    entry.artifactPath ?? "",
+    (entry.targetRoleIds ?? []).join(","),
+    entry.customerDecision ?? "",
+  ].join("\u0000");
+}
+
+function sameLedgerEntry(a: GovernanceLedgerEntry, b: GovernanceLedgerEntry): boolean {
+  return ledgerEntrySignature(a) === ledgerEntrySignature(b);
+}
+
+type CustomerDecisionClassification = {
+  decisionKind?: GovernanceDecisionKind;
+  customerDecision?: GovernanceLedgerEntry["customerDecision"];
+  targetRoleIds?: string[];
+};
+
+/**
+ * 按 `cardKind` + 客户**实际返回**（`CustomerInputOutcome`）分类；**不采信角色自述**：
+ *   · `unavailable`/null → `undefined`（没有客户决定，不写账本）；
+ *   · `declined` → `unclassified`（fail-closed：后续依赖该 flow 决定的门禁拒，直至客户重新决定）；
+ *   · `answered` + 标准选项 id → 评审 §5.8 映射；非标准/多选冲突 → `unclassified`。
+ */
+function classifyCustomerDecision(
+  cardKind: GovernanceCardKind | undefined,
+  out: CustomerInputOutcome | null | undefined,
+): CustomerDecisionClassification | undefined {
+  if (out === null || out === undefined) return undefined;
+  if (out.outcome === "unavailable") return undefined;
+  if (out.outcome === "declined") return { decisionKind: "unclassified", customerDecision: "none" };
+
+  const selected = Array.isArray(out.value.selected) ? out.value.selected : [];
+  switch (cardKind) {
+    case "proposal": {
+      const recognized = selected.filter((id) =>
+        ["accept", "accept-quick", "revise", "reject"].includes(id),
+      );
+      if (recognized.length !== 1) return { decisionKind: "unclassified", customerDecision: "none" };
+      switch (recognized[0]) {
+        case "accept":
+          return { decisionKind: "proposal-accept", customerDecision: "accepted" };
+        case "accept-quick":
+          return { decisionKind: "proposal-accept-quick", customerDecision: "accepted-quick" };
+        case "revise":
+          return { decisionKind: "proposal-revise", customerDecision: "changes-requested" };
+        default:
+          return { decisionKind: "proposal-reject", customerDecision: "rejected" };
+      }
+    }
+    case "appointment":
+      return selected.length > 0
+        ? { decisionKind: "appointment", customerDecision: "appointed", targetRoleIds: [...selected] }
+        : { decisionKind: "unclassified", customerDecision: "none" };
+    case "acceptance": {
+      if (selected.length !== 1 || !["accept", "reject"].includes(selected[0])) {
+        return { decisionKind: "unclassified", customerDecision: "none" };
+      }
+      return {
+        decisionKind: "acceptance",
+        customerDecision: selected[0] === "accept" ? "accepted" : "rejected",
+      };
+    }
+    case "appointment-write":
+    case "schedule-write":
+      return {
+        decisionKind: cardKind,
+        customerDecision: out.value.confirmed === true ? "accepted" : "rejected",
+      };
+    case "write":
+      // 普通写盘确认：不解锁任何治理门禁（无 decisionKind）；仍留痕客户是否同意。
+      return { customerDecision: out.value.confirmed === true ? "accepted" : "rejected" };
+    default:
+      return { decisionKind: "unclassified", customerDecision: "none" };
+  }
+}
+
+/**
+ * `customer.decision` 写入（评审 §5.7/§5.8）：仅 trio 内置角色、仅带合法 `flowId` 的卡。
+ * 同步更新内存快照（本会话后续写入立即受该决定约束），异步补 artifact 哈希并落盘；
+ * 账本失败只记诊断，**不改变客户决定、不放宽门禁、不阻断写盘**（§九-16）。
+ */
+function recordCustomerDecision(args: {
+  state: { snapshot: GovernanceLedgerSnapshot; local: GovernanceLedgerEntry[] };
+  projectRoot: string;
+  roleId: string;
+  function: "proposal" | "nomination" | "schedule";
+  req: CustomerInputRequest;
+  metadata?: CustomerInputMetadata;
+  out: CustomerInputOutcome | null | undefined;
+  issuedPaths: string[];
+  sessionId?: string;
+  runtime?: RuntimeKind;
+  log: ReturnType<typeof createDiagnosticLogger>;
+}): void {
+  const flowId = args.req.flowId ?? args.metadata?.flowId;
+  if (!isGovernanceFlowId(flowId)) return; // 无治理流程上下文的普通交互：不写账本
+  const cardKind = args.req.cardKind ?? args.metadata?.cardKind;
+  const classification = classifyCustomerDecision(cardKind, args.out);
+  if (classification === undefined) return;
+
+  const stepId = args.req.stepId ?? args.metadata?.stepId;
+  const evidence: GovernanceLedgerEntry["decisionEvidence"] = {
+    kind: "customer-input",
+    ...(typeof args.metadata?.toolCallId === "string" && args.metadata.toolCallId !== ""
+      ? { toolCallId: args.metadata.toolCallId }
+      : {}),
+    ...(typeof args.metadata?.turnId === "string" && args.metadata.turnId !== ""
+      ? { turnId: args.metadata.turnId }
+      : {}),
+    ...(typeof args.sessionId === "string" && args.sessionId !== ""
+      ? { sessionId: args.sessionId }
+      : {}),
+  };
+  const entry: GovernanceLedgerEntry = {
+    at: new Date().toISOString(),
+    kind: "customer.decision",
+    flowId,
+    ...(isGovernanceFlowId(stepId) ? { stepId } : {}),
+    actorRoleId: args.roleId,
+    power: cardKind === "acceptance" ? "acceptance" : args.function,
+    ...(classification.decisionKind !== undefined
+      ? { decisionKind: classification.decisionKind }
+      : {}),
+    ...(classification.targetRoleIds !== undefined
+      ? { targetRoleIds: classification.targetRoleIds }
+      : {}),
+    ...(classification.customerDecision !== undefined
+      ? { customerDecision: classification.customerDecision }
+      : {}),
+    ...(args.issuedPaths.length > 0 ? { paths: [...args.issuedPaths] } : {}),
+    decisionEvidence: evidence,
+    messageSummary: truncateText(args.req.title, 200),
+    ...(args.runtime !== undefined ? { runtime: args.runtime } : {}),
+  };
+
+  // 同步快照：客户决定即刻生效（本会话后续写盘不再等磁盘）。
+  args.state.local.push(entry);
+  args.state.snapshot = {
+    entries: [...args.state.snapshot.entries, entry],
+    errors: args.state.snapshot.errors,
+  };
+
+  void (async () => {
+    try {
+      const artifact = await findDecisionArtifact(args.projectRoot, entry, args.issuedPaths);
+      if (artifact !== undefined) Object.assign(entry, artifact);
+      const result = await appendGovernanceLedger(args.projectRoot, entry);
+      if (!result.ok) args.log.record("governance.decision.append.failed", { message: result.message });
+    } catch (err) {
+      args.log.error("governance.decision.append.failed", err);
+    }
+  })();
+}
+
+function truncateText(text: string, max: number): string {
+  return text.length <= max ? text : `${text.slice(0, max)}…`;
+}
+
+/**
+ * 为客户决定补 `artifactPath`/`artifactVersion`/`artifactSha256`（应用算；评审 §5.7）。
+ * 找不到对应候选物（如尚未写出的 flow 文件）→ 不补，不阻断、不猜。
+ */
+async function findDecisionArtifact(
+  projectRoot: string,
+  entry: GovernanceLedgerEntry,
+  issuedPaths: string[],
+): Promise<Pick<GovernanceLedgerEntry, "artifactPath" | "artifactVersion" | "artifactSha256"> | undefined> {
+  let candidate: string | undefined;
+  let version: number | undefined;
+
+  if (entry.decisionKind === "appointment") {
+    const latest = await latestVersionedArtifact(projectRoot, "docs/nominations", entry.flowId);
+    candidate = latest?.relPath;
+    version = latest?.version;
+  } else if (entry.decisionKind === "schedule-write") {
+    candidate = entry.flowId !== undefined ? `docs/flows/${entry.flowId}.md` : undefined;
+  } else if (entry.decisionKind === "appointment-write" || entry.decisionKind === undefined) {
+    candidate = issuedPaths.find((p) => p.endsWith(".md")) ?? issuedPaths[0];
+  } else if (
+    entry.decisionKind === "proposal-accept" ||
+    entry.decisionKind === "proposal-accept-quick" ||
+    entry.decisionKind === "proposal-revise" ||
+    entry.decisionKind === "proposal-reject" ||
+    entry.decisionKind === "acceptance"
+  ) {
+    const latest = await latestVersionedArtifact(projectRoot, "docs/proposals", entry.flowId);
+    candidate = latest?.relPath;
+    version = latest?.version;
+  }
+
+  if (candidate === undefined) return undefined;
+  try {
+    const data = await readFile(path.join(projectRoot, candidate));
+    return {
+      artifactPath: candidate,
+      ...(version !== undefined ? { artifactVersion: version } : {}),
+      artifactSha256: createHash("sha256").update(data).digest("hex"),
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+/** 在 `docs/proposals|nominations` 中找 `<flowId>-v<N>.md` 的最高版本。 */
+async function latestVersionedArtifact(
+  projectRoot: string,
+  dirRel: string,
+  flowId: string | undefined,
+): Promise<{ relPath: string; version: number } | undefined> {
+  if (!isGovernanceFlowId(flowId)) return undefined;
+  let names: string[];
+  try {
+    names = await readdir(path.join(projectRoot, dirRel));
+  } catch {
+    return undefined;
+  }
+  const pattern = new RegExp(`^${flowId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}-v(\\d+)\\.md$`);
+  let best: { name: string; version: number } | undefined;
+  for (const name of names) {
+    const match = pattern.exec(name);
+    if (match === null) continue;
+    const version = Number(match[1]);
+    if (best === undefined || version > best.version) best = { name, version };
+  }
+  return best === undefined ? undefined : { relPath: `${dirRel}/${best.name}`, version: best.version };
+}
+
+/** 预授权目录下 `.md` 的递归扫描结果（项目相对 posix 路径 + 应用算的 sha256）。 */
+interface ObservedArtifact {
+  relPath: string;
+  sha256: string;
+}
+
+/**
+ * 扫描预授权目录内的 `.md`（评审 §5.7：`artifact.observed` 只扫角色预授权目录，不扫 `角色卡/` 全树）。
+ * 跳过符号链接（防经链接逃逸），按路径排序保证顺序稳定。
+ */
+async function scanPreauthorizedArtifacts(
+  projectRoot: string,
+  dirs: readonly string[],
+): Promise<ObservedArtifact[]> {
+  const out: ObservedArtifact[] = [];
+  const seen = new Set<string>();
+  const walk = async (absDir: string, relDir: string): Promise<void> => {
+    let entries;
+    try {
+      entries = await readdir(absDir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const rel = relDir === "" ? entry.name : `${relDir}/${entry.name}`;
+      if (entry.isSymbolicLink()) continue;
+      if (entry.isDirectory()) {
+        await walk(path.join(absDir, entry.name), rel);
+        continue;
+      }
+      if (!entry.isFile() || !entry.name.toLowerCase().endsWith(".md")) continue;
+      if (seen.has(rel)) continue;
+      seen.add(rel);
+      try {
+        const data = await readFile(path.join(projectRoot, ...rel.split("/")));
+        out.push({ relPath: rel, sha256: createHash("sha256").update(data).digest("hex") });
+      } catch {
+        /* 读失败：跳过本次观察（下次 settle 再试） */
+      }
+    }
+  };
+  for (const dir of dirs) {
+    const relDir = dir.replace(/\\/g, "/").replace(/\/+$/, "");
+    if (relDir === "") continue;
+    const abs = path.join(projectRoot, ...relDir.split("/"));
+    try {
+      const info = await stat(abs);
+      if (!info.isDirectory()) continue;
+    } catch {
+      continue;
+    }
+    await walk(abs, relDir);
+  }
+  return out.sort((a, b) => a.relPath.localeCompare(b.relPath));
+}
+
+/** 从候选物路径推导报告用的 flowId / 版本（只用于账本留痕；不做任何门禁判定）。 */
+function artifactFlowMetadata(relPath: string): Pick<GovernanceLedgerEntry, "flowId" | "artifactVersion"> {
+  const proposal = /^docs\/(?:proposals|nominations)\/(.+)-v(\d+)\.md$/.exec(relPath);
+  if (proposal !== null && isGovernanceFlowId(proposal[1])) {
+    return { flowId: proposal[1], artifactVersion: Number(proposal[2]) };
+  }
+  const flow = /^docs\/flows\/(.+)\.md$/.exec(relPath);
+  if (flow !== null && isGovernanceFlowId(flow[1])) return { flowId: flow[1] };
+  return {};
 }
 
 /**

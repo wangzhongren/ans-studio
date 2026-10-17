@@ -270,3 +270,58 @@ work、card、pi、document复用424模态抽屉。仅导航/会话业务面iner
 - 探针（只增）：`window.__ansRenderer.shellJudge = { state(), onState, onResult }`（只读快照 + 直接注入推送/结果；桥缺失时 `state.available=false`）。
 
 **测试证据**：`tool-rows.test.ts` 新增 8 例（开关三态/结果自洽/警告逐字/allow/deny 档/deny/manual/notice）；`renderer.test.ts` 新增 5 例（DOM 与样式钩子、开关三态与失败回退、结果行锚定与 deny 徽标、judgeNotice、边界「不自动开会话/不写持久化」）；`uiux-v2.mjs` 新增独立模式 `ANS_JUDGE_UI_ONLY=1`（受控 IPC 替身＋真实 Electron；**JUDGE_UI_PASS 14**，含启动关闭态、开启/取消、失败回退、state 推送、deny 档 allow 锚点、deny 行、manual 不落行、judgeNotice、已挂起卡不受切换影响、后台角色 pane 隔离）；既有 `ANS_TERMINAL_UI_ONLY=1` 增加启动态断言（**TERMINAL_PASS 15**）。全仓 2454 计 /2431 过 /20 红（与改动前基线红集一致）/3 skip；`npx tsc --noEmit` 0 错。
+
+## 2026-10-17 W4 治理三权：左树/空态/状态行/决定卡（评审 §8）
+
+任务书：项目管理评审 `角色卡/项目管理/docs/design/2026-10-17_design_governance-trio-review.md` §8（全部）、§九 UI 相关、§十一 W4。
+
+**消费契约（只读；桌面窗口 W3 透传）**：
+- `listProject.governanceModel?: "single" | "trio"`。渲染侧只在值恰为 `single`/`trio` 时落 `state.governanceModelKnown=true`；缺失/坏值 ⇒ `known=false`：状态行模型与旧模型提示条一律不显示（**不猜模型**），树仍按角色自身的 `governanceFunction` 分组。
+- `RoleView.governanceFunction?: "proposal" | "nomination" | "schedule"`（trio 内置角色，`builtIn:true`）。渲染侧**不硬编码** `rapporteur`/`nominator`/`convener` 任何 id；显示名、权力副标题、内置标识、专属空态全部经 `UiLabels.governanceRoleView/ governanceRoleEmptyState` 由 function 派生。`single` 旧内置 su（无 governanceFunction）逐字走原路径。
+- `listProject.governanceFlow?: { flowId?: string; status?: string }`（可选）。`status` 只认 `awaiting-customer` / `in-progress` / `blocked` / `escalated-to-customer`；未知值不显示（不拿 Markdown/角色自述猜状态）。
+- `CustomerInputRequest` 的可选治理字段：W0 冻结的 `flowId`/`stepId`/`cardKind`；另有可选展示字段 `paths?: string[]`、`summary?: string`、`artifactSha256?: string`（未给不显示；渲染侧不从 preview/正文抽取或自算）。
+- `session:operator-request` payload 可选 `queued: boolean`（直接或在 `request.queued`）：桌面窗口是决定队列权威。`queued:true` ⇒ 卡显示「等待前一个决定」、全部作答控件禁用；同请求重推 `queued:false` ⇒ 解冻。**UI 不自动合并、不自动批准**（到达路径零 `operatorRespond`）。
+- S1 建立治理记录：`previewGovernanceRecord(projectRoot, { governanceModel })` / `establishGovernanceRecord(projectRoot, { governanceModel })`。`governanceModelKnown !== true` 时模型单选与建立按钮 disabled 并显示「当前桌面窗口未接线治理模型选择；本版不能按所选模型建立，按钮已禁用。」；旧窗口忽略第二实参（防御式兼容）。
+- 预览可选返回 `governanceModel` / `suggestedGovernanceModel: "trio"` / `detectedGovernanceArtifacts: true`：前者与所选不一致时如实显示「（与所选不同）」；后者只显示「建议选择 trio」提示，**不自动切换**（必须客户点选）。
+- 迁移桥 `previewGovernanceMigration(projectRoot)` / `migrateGovernanceModel(projectRoot, previewDigest)`：两者都存在时旧模型提示条按钮启用（「查看差异 / 升级」），否则「升级入口待本版后续」禁用。点击只打开**零写入**非模态预览（复用 `#governance-preview`）；取消/关闭零 IPC 写调用。
+
+**渲染侧导出（`ui-labels.js`，全部纯映射）**：
+- `governanceRoleView(fn) → {cn,en,name,power,builtinNote,emptyHint} | null`：`报告员 Rapporteur`「提案权 · 不拥有最终批准权」/`提名官 Nominator`「提名权 · 不拥有最终批准权」/`召集人 Convener`「编排权 · 不拥有最终批准权」；内置标识「内置角色：随应用发布，无角色目录」；未知/缺失 ⇒ null。
+- `governanceRoleEmptyState(fn)`：提名「通常由流程单提名步骤打开；仅在客户明确要求时直接使用」、编排「通常由已接受提案开启流程；只负责排步骤与派发，不批准方案」；提案 ⇒ null（沿用既有 S0/S1 空态）。
+- `governanceStatusText(model, flowId, status)`：`治理模型：三权|旧模型（su）`、`当前流程：<flowId>`、四态人话，以 ` · ` 连接；未知/缺失项不出现。
+- `governanceMigrationButtonView(wired) → {label, disabled, title}`；`GOVERNANCE_MIGRATION_TEXT` 逐字「本项目使用旧治理模型（su）。可升级为三权模型。」。
+- `governanceModelOptionText(model)`：`单模型（single）` / `三权（trio）`。
+- `governanceCardMetaView(request) → {governance,badge,power,flowId,stepId,lines}`：`cardKind`→权力（`proposal→提案`、`appointment/appointment-write→提名`、`schedule-write→编排`、`acceptance→验收`）；治理决定徽标「治理决定 · 客户最终批准」；`lines` = 流程/步骤/权力类型/将写路径（逐条）/摘要/哈希（接口给了才出现）；普通 `write` 与缺失不是治理决定（无徽标/权力行）；`GOVERNANCE_QUEUE_NOTE`「等待前一个决定」。
+- `GOVERNANCE_GROUP_LABEL`「治理职能（内置）」、`GOVERNANCE_ROLE_BUILTIN_NOTE`、`GOVERNANCE_DECISION_BADGE`、`GOVERNANCE_MODEL_SUGGEST`、`GOVERNANCE_MODEL_UNWIRED`。
+
+**DOM/行为**：
+- 左树 `renderRoleTree`：`主入口`（`primaryRoleId`）→ `治理职能（内置）`（其余带 `governanceFunction` 的内置角色）→ 其余项目角色沿用 `Rt.roleGroups`（`group`/`groupDuty`）。治理行 `.ti-name`＝「中文名 英文名」、`.ti-power`＝权力副标题、`.ti-builtin`＝内置标识；`aria-description`/`title` 同步。single 旧树逐字不变。
+- 空态 `emptyStateHtml(roleId)`：提名/编排 pane 显示专属标题+说明（无 CTA）；Rapporteur 保留「建立治理记录 / 检查并重新接受」；S0/S1 文案逐字保留。
+- `#governance-status`：`.gs-model` 模型/流程行（模型未知不显示）；单模型项目追加 `.gs-banner`（提示条 + `button[data-governance-migrate][disabled]`）。既有 `data-governance-establish/reaccept` 动作不变。
+- 决定卡：`.op-gov-badge`（治理决定徽标）、`.op-meta`（元信息逐行 esc）、`.op-queued`（等待前一个决定）；`queued` 时作答控件 disabled；同一请求重推 `queued` 只更新排队呈现。
+- `#governance-preview` 建立模式：`.gp-model` 单选（`input[data-governance-model]`，默认 single）、`将写入的治理模型` 行、`.gp-model-note`（建议 trio / 未接线说明）；确认按钮在未报告模型时 disabled。
+- 探针（只增）：`window.__ansRenderer.governance.state()` 追加 `governanceModel`/`governanceModelKnown`/`governanceFlow`/`previewModel`。
+
+**测试证据（本批）**：`tool-rows.test.ts` +5（角色文案/专属空态/状态行/迁移按钮/决定卡元信息逐字）；`renderer.test.ts` +5（三组树与无硬编码 id/空态接线/状态行与迁移条/S1 模型选择与透传/决定卡与排队不自动批准）。边界内 `renderer+tool-rows` 134 计/130 过/4 红（4 红＝既有 CRLF 基线：N-1、data-state、P1-3、G-5，与本批无关）。全量 `node --test "test/**/*.test.ts"`：2596 计/2538 过/55 红/3 skip；红集为既有/他域在飞（W0–W3）与上述 4 条 CRLF 基线，另有 1 条 `test/测试/.../e-contract-wiring` E2 因 `establishGovernanceRecord` 新增第二实参（模型选择透传）的旧正则失配，待测试角色 W5 同步。`uiux-v2.mjs` 未加 UI-only 模式（真实 Electron 夹具成本高；DOM 行为由源码守卫覆盖，真机验收留 W5）。
+
+### V1b 迁移界面（2026-10-17 追加）
+
+**消费契约（桌面窗口已接线）**：
+- `desktop.previewGovernanceMigration(projectRoot)` → `{ok:true, preview:{model, targetModel, writePaths, modelField, manifestLine, pinChanges, retainedFiles, snapshotDigest}}` 或 `{ok:false, code, message}`；预览**零写入**。
+- `desktop.migrateGovernanceModel(projectRoot, previewDigest)` → `{ok, phase:"guard"|"write", status:"completed"|"already-trio"|"no-record"|"blocked"|"write-failed"|"preview-stale"|"busy"|"invalid-request", model, message}`。
+- 两个桥方法都存在时提示条按钮启用（`governanceMigrationButtonView(true)`）；否则「升级入口待本版后续」禁用。**不新增模态**：迁移预览复用 `#governance-preview`（`governanceFlow.mode = "migrate"`）。
+
+**渲染侧导出（`ui-labels.js`）**：
+- `governanceMigrationButtonView(wired)`：wired ⇒「查看差异 / 升级」可用；否则待后续禁用。
+- `governanceMigrationPreviewView(preview)` → `{title, modelLine, writeLines, modelFieldLine, manifestLine, pinLines, retainedLines, digestLine, warning, canConfirm, digest}`：模型「旧模型（su） → 三权」、写路径逐条、`modelField`（`null` ⇒「字段缺失，将新增 `governanceModel: "trio"`」）、`manifestLine`、pin 变更（空 ⇒「无（不重算 pin）」；非空显示 path + 新旧前 8 位）、保留文件、`snapshotDigest` 前 8 位；`canConfirm` 只在摘要非空时 true（fail-closed）。
+- `governanceMigrationSuccessText()` 逐字「已升级为三权治理模型（.ans governanceModel = "trio"）。旧角色卡/边界/pin/历史会话保留。」。
+- `governanceMigrationFailureView(phase, status, message)`：`phase !== "write"` 按 status 声明零写入（already-trio/no-record/blocked/preview-stale/busy/invalid-request）；`phase === "write"` 只逐字 message +「可能已写入部分文件，请核对现场」，**绝不**出现「已升级」或「未写入任何文件」。`noRetry` = write 阶段 / already-trio / no-record。
+
+**DOM/行为**：
+- 提示条按钮 `button[data-governance-migrate]`：点击 → `openGovernanceMigrationPreview()`（只调 preview）。
+- 预览：复用 `.gp-title/.gp-line/.gp-note/.gp-declare/.gp-actions`；按钮 `data-governance-migrate-confirm`（「确认升级」/「正在升级…」）、`data-governance-cancel`、失败时的 `data-governance-migrate-recheck`（「重新检查」）、终态 `data-governance-dismiss`。摘要缺失/忙 ⇒ 确认 disabled。
+- 确认：`d.migrateGovernanceModel(projectRoot, preview.snapshotDigest)`；成功只认 `ok === true && status === "completed"`，显示成功文案并**等主进程 `project:changed` 刷新**（不自行改 `state.governanceModel`、不自行刷新）。失败按 status/phase 显示；`phase === "write"` 不提供重试。
+- 取消/关闭：只重置面板状态，**零 IPC 写调用**。
+- S1 模型选择：仍以 `(projectRoot, { governanceModel })` 透传 preview/establish；listing 回报 `governanceModel` 后 `governanceModelKnown=true`，按钮不再因「模型未知」禁用；建议 trio 只提示、必须客户点选。
+
+**测试证据（V1b 追加）**：`tool-rows.test.ts` +2（迁移按钮启用/禁用；预览字段/成功/失败逐字，含 pinChanges 防御与 phase=write 不假成功）；`renderer.test.ts` +4（按钮能力与零写入预览、预览字段与 fail-closed、确认摘要/成功/失败/取消零写、S1 透传与默认 single）。边界内 **140 计 /136 过 /4 基线红**。**跨角色对齐（已核）**：`app/preload.cjs` 的 `previewGovernanceRecord`/`establishGovernanceRecord` 已接受 `(projectRoot, options)` 并把 `governanceModel` 并入 IPC 载荷（Interface 同字段校验）；渲染侧调用形状与之一致（`{ governanceModel }`）。

@@ -111,7 +111,7 @@ test("C4 失败透传与 schema 互核：能力 reason+message 原样进回执�
   const cases: Array<{ reason: string; message: string }> = [
     { reason: "not-registered", message: "MCP 未登记：docs/mcp/srv.md 不存在——先落盘再安装；未执行。" },
     { reason: "role-not-listed", message: "登记中未包含角色「X」——未执行；如确要安装请先更新登记。" },
-    { reason: "role-not-found", message: "角色「X」不是本项目项目角色（或为治理角色 su）——未执行。" },
+    { reason: "role-not-found", message: "角色「X」不是本项目项目角色（或为内置治理角色）——未执行。" },
     { reason: "not-customer-turn", message: "本动作仅可在客户消息发起的轮次执行——未执行。" },
     { reason: "registration-unchanged", message: "登记仍含角色「X」——先改登记再卸载；未执行。" },
   ];

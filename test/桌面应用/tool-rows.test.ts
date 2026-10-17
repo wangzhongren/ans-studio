@@ -752,3 +752,147 @@ test('D1：governanceReacceptFailureView——phase≠write 可声明零写入�
   assert.ok(!joined.includes('未写入任何文件'), 'phase=write 绝不追加零副作用');
   assert.ok(!joined.includes('已恢复') && !joined.includes('已成功'), 'phase=write 绝不宣称已恢复/已成功');
 });
+
+// —————— W4 治理三权（2026-10-17 评审 §8）：左树/空态/状态行/决定卡文案单一来源 ——————
+// 全部按接口事实（governanceFunction / cardKind / governanceModel / flowId）纯转写；未知值不显示、不猜。
+
+test('W4：治理角色文案——中文名+英文名/权力副标题/内置标识（按 governanceFunction 派生，未知不猜）', () => {
+  const p = labels.governanceRoleView('proposal');
+  assert.equal(p.name, '报告员 Rapporteur', '提案职能＝报告员 Rapporteur');
+  assert.equal(p.power, '提案权 · 不拥有最终批准权');
+  const n = labels.governanceRoleView('nomination');
+  assert.equal(n.name, '提名官 Nominator');
+  assert.equal(n.power, '提名权 · 不拥有最终批准权');
+  const s = labels.governanceRoleView('schedule');
+  assert.equal(s.name, '召集人 Convener');
+  assert.equal(s.power, '编排权 · 不拥有最终批准权');
+  for (const v of [p, n, s]) assert.equal(v.builtinNote, '内置角色：随应用发布，无角色目录', '内置标识逐字');
+  assert.equal(labels.GOVERNANCE_ROLE_BUILTIN_NOTE, '内置角色：随应用发布，无角色目录');
+  assert.equal(labels.GOVERNANCE_GROUP_LABEL, '治理职能（内置）');
+  for (const bad of ['su', 'Rapporteur', '', null, undefined, 1]) {
+    assert.equal(labels.governanceRoleView(bad), null, '未知/缺失 function 不当治理角色（不按 id 猜）：' + String(bad));
+  }
+});
+
+test('W4：治理角色空态——提名/编排专属说明逐字；提案沿用既有空态（null）', () => {
+  assert.equal(labels.governanceRoleEmptyState('proposal'), null, '报告员空态沿用既有治理记录/主入口空态');
+  const n = labels.governanceRoleEmptyState('nomination');
+  assert.equal(n.title, '提名官 Nominator');
+  assert.equal(n.sub, '通常由流程单提名步骤打开；仅在客户明确要求时直接使用');
+  const s = labels.governanceRoleEmptyState('schedule');
+  assert.equal(s.title, '召集人 Convener');
+  assert.equal(s.sub, '通常由已接受提案开启流程；只负责排步骤与派发，不批准方案');
+  assert.equal(labels.governanceRoleEmptyState('su'), null, '未知职能不编空态');
+});
+
+test('W4：状态行——治理模型/当前流程/四态逐字；未知模型/状态不显示（不猜）', () => {
+  assert.equal(labels.governanceStatusText('trio', '', ''), '治理模型：三权');
+  assert.equal(labels.governanceStatusText('single', '', ''), '治理模型：旧模型（su）');
+  assert.equal(labels.governanceStatusText('trio', 'flow-1', 'awaiting-customer'), '治理模型：三权 · 当前流程：flow-1 · 等待客户决定');
+  assert.equal(labels.governanceStatusText('trio', '', 'in-progress'), '治理模型：三权 · 进行中');
+  assert.equal(labels.governanceStatusText('trio', '', 'blocked'), '治理模型：三权 · 阻塞');
+  assert.equal(labels.governanceStatusText('trio', '', 'escalated-to-customer'), '治理模型：三权 · 已升级客户');
+  assert.equal(labels.governanceStatusText('trio', '', 'paused'), '治理模型：三权', '未知/不承诺状态不显示（不猜）');
+  assert.equal(labels.governanceStatusText('', 'flow-1', ''), '当前流程：flow-1', '模型未知仍可如实显示接口给的流程 id');
+  assert.equal(labels.governanceStatusText(undefined, '', 'blocked'), '阻塞');
+  assert.equal(labels.governanceFlowStatusText('awaiting-customer'), '等待客户决定');
+  assert.equal(labels.governanceFlowStatusText('nope'), '', '未知状态空串');
+});
+
+test('W4/V1b：旧模型迁移按钮——未接线「升级入口待本版后续」禁用；桥齐备「查看差异 / 升级」启用；提示条文案逐字', () => {
+  assert.equal(labels.GOVERNANCE_MIGRATION_TEXT, '本项目使用旧治理模型（su）。可升级为三权模型。');
+  const pending = labels.governanceMigrationButtonView(false);
+  assert.equal(pending.label, '升级入口待本版后续');
+  assert.equal(pending.disabled, true, '未接线不假装迁移可用');
+  assert.ok(pending.title.includes('尚未接线'));
+  const wired = labels.governanceMigrationButtonView(true);
+  assert.equal(wired.label, '查看差异 / 升级');
+  assert.equal(wired.disabled, false, 'V1b：两个桥方法齐备 ⇒ 按钮可用（只打开零写入预览）');
+  assert.ok(wired.title.includes('零写入'));
+});
+
+test('W4/V1b：迁移预览视图——旧模型→三权、写路径、modelField/manifestLine、pin 空、保留文件、摘要前 8 位', () => {
+  const view = labels.governanceMigrationPreviewView({
+    model: 'single', targetModel: 'trio',
+    writePaths: ['.ans/project.json', 'docs/bootstrap-manifest.md'],
+    modelField: null,
+    manifestLine: '治理模型升级（su → trio）',
+    pinChanges: [],
+    retainedFiles: ['角色卡/实现者/role-card.md', 'docs/su/旧方案.md'],
+    snapshotDigest: 'a'.repeat(64),
+  });
+  assert.equal(view.title, '升级为三权治理模型（预览）');
+  assert.equal(view.modelLine, '模型：旧模型（su） → 三权');
+  assert.deepEqual(view.writeLines, ['将写入：.ans/project.json', '将写入：docs/bootstrap-manifest.md']);
+  assert.equal(view.modelFieldLine, '将写入 .ans 字段：（字段缺失，将新增 governanceModel: "trio"）');
+  assert.equal(view.manifestLine, '将追加 manifest 记录：治理模型升级（su → trio）');
+  assert.deepEqual(view.pinLines, ['pin 变更：无（不重算 pin）']);
+  assert.deepEqual(view.retainedLines, ['保留文件：角色卡/实现者/role-card.md、docs/su/旧方案.md']);
+  assert.equal(view.digestLine, '预览摘要（前 8 位）：aaaaaaaa');
+  assert.equal(view.canConfirm, true);
+  assert.equal(view.digest, 'a'.repeat(64), '摘要原样（确认时回传，不截断）');
+  // 非空 pinChanges 也如实呈现（V1b 应为空；防御式）。
+  const changed = labels.governanceMigrationPreviewView({ modelField: 'single', pinChanges: [{ path: '角色卡/a/boundary.yaml', oldSha256: 'b'.repeat(64), newSha256: 'c'.repeat(64) }] });
+  assert.deepEqual(changed.pinLines, ['pin 变更：角色卡/a/boundary.yaml（bbbbbbbb… → cccccccc…）']);
+  // 摘要缺失 ⇒ fail-closed（canConfirm=false），不编摘要。
+  assert.equal(labels.governanceMigrationPreviewView({}).canConfirm, false);
+  assert.equal(labels.governanceMigrationPreviewView({}).digestLine, '预览摘要（前 8 位）：（未报告）');
+  assert.deepEqual(labels.governanceMigrationPreviewView({}).writeLines, ['将写入：（未报告）']);
+});
+
+test('W4/V1b：迁移成功文案逐字；失败按 status/phase 如实、绝不假成功', () => {
+  assert.equal(labels.governanceMigrationSuccessText(), '已升级为三权治理模型（.ans governanceModel = "trio"）。旧角色卡/边界/pin/历史会话保留。');
+  const stale = labels.governanceMigrationFailureView('guard', 'preview-stale', '预览已失效。');
+  assert.deepEqual(stale.lines, ['预览已失效。', '预览后 .ans 又有变化，已取消本次写入；请重新检查。']);
+  assert.equal(stale.noRetry, false, 'preview-stale 可重新检查');
+  for (const [status, copy] of [
+    ['already-trio', '已是三权治理模型，无需升级；本次未写入任何文件。'],
+    ['no-record', '没有治理记录（.ans/project.json）；本次未写入任何文件。'],
+    ['blocked', '升级被阻止；本次未写入任何文件。'],
+    ['busy', '上一次升级仍在进行中；本次未写入任何文件。'],
+    ['invalid-request', '升级请求无效；本次未写入任何文件。'],
+  ] as const) {
+    const v = labels.governanceMigrationFailureView('guard', status, '');
+    assert.deepEqual(v.lines, [copy], status + ' 文案逐字');
+    assert.equal(v.lines.join('').includes('已升级'), false, status + ' 不得出现假成功');
+  }
+  assert.equal(labels.governanceMigrationFailureView('guard', 'already-trio', '').noRetry, true);
+  assert.equal(labels.governanceMigrationFailureView('guard', 'no-record', '').noRetry, true);
+  const writeFail = labels.governanceMigrationFailureView('write', 'write-failed', '写入中断：磁盘错误。');
+  assert.deepEqual(writeFail.lines, ['写入中断：磁盘错误。', '写入阶段失败，可能已写入部分文件，请核对现场。']);
+  assert.equal(writeFail.lines.join('').includes('未写入任何文件'), false, 'phase=write 绝不宣称零写入');
+  assert.equal(writeFail.lines.join('').includes('已升级'), false, 'phase=write 绝不宣称已升级');
+  assert.equal(writeFail.noRetry, true, '写入阶段失败不提供重试');
+});
+
+test('W4：决定卡元信息——cardKind→权力类型、flowId/stepId/路径/摘要/哈希；普通 write 与缺失不冒充治理决定', () => {
+  const proposal = labels.governanceCardMetaView({ cardKind: 'proposal', flowId: 'flow-1' });
+  assert.equal(proposal.governance, true);
+  assert.equal(proposal.badge, '治理决定 · 客户最终批准');
+  assert.equal(proposal.power, '提案');
+  assert.deepEqual(proposal.lines, ['流程：flow-1', '权力类型：提案']);
+  assert.equal(labels.governanceCardMetaView({ cardKind: 'appointment' }).power, '提名');
+  assert.equal(labels.governanceCardMetaView({ cardKind: 'appointment-write' }).power, '提名');
+  assert.equal(labels.governanceCardMetaView({ cardKind: 'schedule-write' }).power, '编排');
+  assert.equal(labels.governanceCardMetaView({ cardKind: 'acceptance' }).power, '验收');
+  const full = labels.governanceCardMetaView({
+    cardKind: 'appointment-write', flowId: 'f1', stepId: 's1',
+    paths: ['角色卡/实现者/role-card.md', '角色卡/实现者/boundary.yaml'], summary: '任命 1 个角色', artifactSha256: 'a'.repeat(64),
+  });
+  assert.deepEqual(full.lines, [
+    '流程：f1', '步骤：s1', '权力类型：提名',
+    '将写路径：角色卡/实现者/role-card.md', '将写路径：角色卡/实现者/boundary.yaml',
+    '摘要：任命 1 个角色', '哈希：' + 'a'.repeat(64),
+  ]);
+  // 普通 write 不是治理决定（无徽标/权力行）；缺字段不编。
+  const plain = labels.governanceCardMetaView({ cardKind: 'write', flowId: 'f1' });
+  assert.equal(plain.governance, false);
+  assert.equal(plain.badge, '');
+  assert.deepEqual(plain.lines, ['流程：f1']);
+  const empty = labels.governanceCardMetaView({});
+  assert.equal(empty.governance, false);
+  assert.deepEqual(empty.lines, []);
+  assert.deepEqual(labels.governanceCardMetaView(null).lines, [], '坏件不崩、不编');
+  assert.equal(labels.GOVERNANCE_QUEUE_NOTE, '等待前一个决定');
+  assert.equal(labels.GOVERNANCE_DECISION_BADGE, '治理决定 · 客户最终批准');
+});

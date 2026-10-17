@@ -220,3 +220,25 @@
 - **styles.css 最小增量**：`.composer-auto-approve(.is-on/.is-unsupported)`、`.composer-judge-status`、`.judge-warning`、`.shell-judge-row`/`.sj-*`、`.sc-judge-notice`；开启态与警告一律 `--amber`，警告随 900 内容列、继承整页等宽字体。
 - **测试**：`tool-rows.test.ts` 新增 8 例（三态/失败不改状态/警告逐字/allow/deny 档/deny/manual/notice）→ 39/39；`renderer.test.ts` 新增 5 例（DOM 与样式钩子、开关三态与失败回退、结果行锚定与 deny 徽标、judgeNotice、边界）→ **85 计 /81 过 /4 红**（4 红仍为先于本批的 CRLF 基线 N-1、data-state、P1-3、G-5）；全仓 `node --test "test/**/*.test.ts"` **2454 计 /2431 过 /20 红 /3 skip**——20 红与改动前基线红集逐条一致（无新增红）；`npx tsc --noEmit` 0 错。`uiux-v2.mjs` 新增独立模式 `ANS_JUDGE_UI_ONLY=1`（受控 IPC 替身＋真实 Electron，**JUDGE_UI_PASS 14**）：启动权威关闭态、勾选开启（琥珀标记+常驻警告）、取消关闭、失败保持实际状态并显示错误、`shell:judge-state` 推送同步、deny 档 allow 结果行（标题/徽标/硬拒说明）按 toolCallId 锚在工具调用之后、普通 deny（理由/替代方案/客户说明/关闭开关重试）、manual 不产生结果行、`#sc-judge-notice` 原样呈现、已挂起卡在开关切换前后保持可作答、后台角色结果不切当前视图且切回可见。既有 `ANS_TERMINAL_UI_ONLY=1` 同步新增启动态断言 → **TERMINAL_PASS 15**。
 - **未验边界**：结果行未持久化（V1 界面会话内，重启不保证重现——持久来源为审计 JSONL+诊断）；`alternatives/evidence` 的展示为上界文本，未做长文折叠（证据按设计有界）。
+
+## 2026-10-17 W4 治理三权界面（左树/空态/状态行/决定卡；评审 §8）
+
+实施——项目管理评审《治理三权分立》§8/§九/§十一 W4（客户已批准方向；V1 最小 UI 面）：
+- **左树**（`renderRoleTree`/`roleTreeItem`/`roleSubtitle`）：trio 三组＝主入口（`primaryRoleId`）→「治理职能（内置）」（其余带 `governanceFunction` 的内置角色）→ 其余项目角色沿用 `group`/`groupDuty`。治理行显示「报告员 Rapporteur / 提名官 Nominator / 召集人 Convener」、权力副标题（提案权/提名权/编排权 · 不拥有最终批准权）、内置标识「内置角色：随应用发布，无角色目录」。全部由 `governanceFunction`/`builtIn` 派生，渲染源码**零三权 id 字面量**；single 旧树（su + 项目角色）逐字不变。
+- **空态**：Nominator「通常由流程单提名步骤打开；仅在客户明确要求时直接使用」；Convener「通常由已接受提案开启流程；只负责排步骤与派发，不批准方案」；Rapporteur 保留「建立治理记录 / 检查并重新接受」入口（S0/S1 文案逐字）。`emptyStateHtml(roleId)` 按 pane 角色取文案；未 bootstrap/主聊天区仍用通用空态。
+- **状态行**：`#governance-status` 显示「治理模型：三权 / 旧模型（su）」、当前流程 id（接口给 `governanceFlow.flowId` 才显示）与四态（等待客户决定/进行中/阻塞/已升级客户）；只认接口事实，未知不猜。单模型项目追加旧模型提示条「本项目使用旧治理模型（su）。可升级为三权模型。」+ 按钮；V1 未接线 ⇒「升级入口待本版后续」且恒 disabled（不假装可用）。
+- **S1 建立治理记录预览**：新增治理模型单选 `single`/`trio`（默认 `single`；接口明确 trio 时保留），点选即重取预览并显示「将写入的治理模型」；预览/建立以 `{ governanceModel }` 透传 interface。检测到三权产物（接口返回 `suggestedGovernanceModel:"trio"` 或 `detectedGovernanceArtifacts:true`）只显示「建议选择 trio」，**必须客户点选**。接口未报告模型 ⇒ 单选与建立按钮 disabled 并说明。
+- **决定卡**：显示 `flowId`/`stepId`、权力类型（`cardKind`→提案/提名/编排/验收）、将写路径（可选 `paths`）、摘要/哈希（可选 `summary`/`artifactSha256`）、选项；治理决定徽标「治理决定 · 客户最终批准」。`queued:true`（桌面窗口决定队列）⇒「等待前一个决定」+ 作答控件禁用；UI **不自动合并/批准**（到达路径无 `operatorRespond`）。
+- **文案与样式**：全部新文案单点在 `ui-labels.js`；`styles.css` 仅加 `.ti-power/.ti-builtin/.gs-model/.gs-banner/.gp-model*/.op-gov-badge/.op-meta/.op-queued` 最小钩子，900 内容列与整页等宽字体未动。
+- **测试**：`tool-rows.test.ts` +5（角色文案/专属空态/状态行/迁移按钮/决定卡元信息逐字）；`renderer.test.ts` +5（三组树与无硬编码 id/空态接线/状态行与迁移条/S1 模型选择与透传/决定卡与排队不自动批准）。边界内 `renderer+tool-rows` **134 计 /130 过 /4 红**（4 红＝既有 CRLF 基线 N-1、data-state、P1-3、G-5）。全量 `node --test "test/**/*.test.ts"` **2596 计 /2538 过 /55 红 /3 skip**：红集为既有/他域在飞（W0–W3）＋上述 4 条 CRLF 基线，另有 `test/测试/existing-project-compat-verify/e-contract-wiring` E2 因 `establishGovernanceRecord` 新增第二实参（模型透传）的旧正则失配，待测试角色 W5 同步。`uiux-v2.mjs` 本批未加 UI-only 模式（真实 Electron 夹具成本高；DOM 行为由源码守卫覆盖，真机验收留 W5）。
+- **跨角色待接（W3/W5）**：`listProject.governanceModel`、`RoleView.governanceFunction`、可选 `governanceFlow`、`operator-request.queued`、`preview/establishGovernanceRecord` 第二实参 `{governanceModel}`；迁移桥未接线（V1b）。
+
+## 2026-10-17 V1b 旧模型迁移界面（预览→确认；零写入预览）
+
+实施——桌面窗口接通真实 `previewGovernanceMigration`/`migrateGovernanceModel` 后，本侧完成渲染面：
+- **提示条按钮**：两桥方法齐备 ⇒「查看差异 / 升级」启用；缺失 ⇒「升级入口待本版后续」禁用。点击只打开**非模态零写入预览**（复用 `#governance-preview`，`mode:"migrate"`），取消/关闭不调任何写入口。
+- **预览**：模型「旧模型（su） → 三权」、`writePaths` 逐条（`.ans/project.json`、`docs/bootstrap-manifest.md`）、`modelField`（`null` 如实「字段缺失，将新增」）、`manifestLine`、`pinChanges`（空 ⇒「无（不重算 pin）」；非空如实 path + 新旧前 8 位）、`retainedFiles`、`snapshotDigest` 前 8 位；「确认升级」在摘要缺失/忙时 disabled（fail-closed）。
+- **确认**：`d.migrateGovernanceModel(projectRoot, preview.snapshotDigest)`；成功只认 `ok && status==="completed"`，文案「已升级为三权治理模型（.ans governanceModel = "trio"）。旧角色卡/边界/pin/历史会话保留。」，由主进程 `project:changed` 驱动刷新（不自行改模型/刷新）。失败按 status/phase 如实：already-trio/no-record/blocked/preview-stale/busy/invalid-request 声明零写入；`write-failed`（phase=write）只提示可能部分落盘、不提供重试，绝不出现「已升级」假成功。
+- **S1 模型选择**：listing 已回报 `governanceModel` ⇒ 选择器与建立按钮不再因「模型未知」禁用；继续以 `(projectRoot, { governanceModel })` 透传 preview/establish；「建议 trio」只提示，必须客户点选，默认 single。
+- **测试**：`tool-rows.test.ts` +2（迁移按钮启用/禁用；预览字段/成功/失败逐字，含 pinChanges 防御与 phase=write 不假成功）→ 46/46；`renderer.test.ts` +4（按钮能力与零写入预览、预览字段与 fail-closed、确认摘要/成功/失败/取消零写、S1 透传与默认 single）→ 94 计/90 过/4 基线红。边界内合计 **140 计 /136 过 /4 红**（4 红＝既有 CRLF 基线 N-1、data-state、P1-3、G-5）。`uiux-v2.mjs` 未加假 IPC 模式（成本高；源码守卫覆盖，真机验收留 W5）。
+- **跨角色对齐（已核）**：`app/preload.cjs` 的 `previewGovernanceRecord`/`establishGovernanceRecord` 已接受 `(projectRoot, options)` 并把 `{governanceModel}` 并入 IPC 载荷（Interface 同字段校验）；渲染侧调用形状与之一致，S1 选择不再被静默忽略。

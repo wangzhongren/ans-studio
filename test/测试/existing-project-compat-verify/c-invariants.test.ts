@@ -197,9 +197,12 @@ test("C5 N7/N8：S0 创世判据与 ans govern 注入行为逐字不变", async 
   const s1 = makeS1Project(["alpha"]);
   try {
     // N7：空项目 → hasRoles=false 且桌面配置带 genesisBootstrap（既有创世行为）。
+    // 2026-10-17 契约变更（三权 V1）：**新空项目默认 trio**，su 创世只属于旧 single 模型。
+    // 本用例验的是「旧模型逐字兼容」——显式按 single 构造（生产旧项目由 `.ans` 显式 single 得到）。
     const emptyListing = await listProject(empty.root);
     assert.equal(emptyListing.hasRoles, false);
-    const emptyProject = buildProjectConfig(emptyListing, DESKTOP_RUNTIME_CONSENT);
+    const singleEmptyListing = { ...emptyListing, governanceModel: "single" as const };
+    const emptyProject = buildProjectConfig(singleEmptyListing, DESKTOP_RUNTIME_CONSENT);
     assert.ok(emptyProject.genesisBootstrap, "S0：空项目必须有创世授权");
     assert.match(emptyProject.genesisBootstrap!.source, /导入空文件夹/);
     const suS0 = await resolveBoundarySection("su", emptyProject);

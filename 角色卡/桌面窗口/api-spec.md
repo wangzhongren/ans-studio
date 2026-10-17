@@ -53,9 +53,11 @@ queue/running 延续 kind/sourceRoleId/summary/at/id/full 并增加 runtime。�
 
 `onOperatorRequest` / session:operator-request：`{id,roleId,projectRoot?,runtime?,request,anchorKey}`。`operatorRespond({id,decision})` / session:operator-response 延续 confirm/choice 请求快照校验；非法决定可重试，旧 id 返回 expired。
 
+**一项目一卡（三权 §6.1 硬约束 / §九-10，2026-10-17）**：`createCustomerInputChannel` 按 `projectRoot` 串行——同项目同一时刻只呈现一张待客户决定卡；后续请求**入队、不调用 presenter**（`queuedCount()` 可见），状态经 `onQueued(payload, waitingFor)` 外推，主进程推 `session:operator-queued`（载荷 `{...OperatorRequestPayload, waitingFor}`，preload `onOperatorQueued(cb)`）让 UI 显示「等待前一个决定」。第一张 resolve/取消/超时/会话失效后按到达序呈现下一张；排队项随 `signal` 中止出队（`unavailable`）、`rejectAllPending`/窗关时与活动卡一并 `declined` 清空（fail-closed）。**不自动合并、不自动批准**；排队中的 id 不可作答（`expired:true`）。`pendingCount()`/`pendingRoles()` **同时计入已呈现与排队中的请求**（排队中的角色同样在「正确等待客户」，看护 #1 不误报）；`queuedCount()` 单列排队数；`replayPending()` 重推已呈现卡与排队状态行（不呈现排队卡）。适用范围＝本通道全部请求：仅内置治理角色（trio 三人与 su）会注入该通道，项目角色从不经过；single/su 语义不变（仅有并发卡时串行化）。
+
 `onShellConfirm` / shell:confirm-request 保留 `{id,command,summary,reasonPlain,reasonRaw,argvLines,cwd}`，新增可选 roleId/projectRoot/runtime；生产 Window 绑定 exact handle 时提供。**2026-10-17 增** `tier: "risky"|"review"|"deny"|null` 与 `policy: "su-approval"|"project"`（桌面自有类型，不改契约家 `OperatorPrompt`）：从 `display.reason` **行首**匹配 `su-审批档[tier]`（前缀经编排 `shell-arming.ts` 公共再导出；先匹配前缀，避免既有 `/risky/` 泛匹配）。`policy=su-approval` 时 `reasonPlain` 含「逐条客户批准」「拒绝/超时/通道不可用 = 拒绝」「批准后可能绕过 ANS 文件写边界」；deny 用「硬拒类（deny）」、risky/review 各用其档位名。项目角色三层链恒 `tier:null`/`policy:"project"`，原文映射逐字不变。shellConfirmRespond 仍仅恰 allow:true 才接受。
 
-**su 审批档注入（客户裁定 2026-10-17）**：`SessionManager` 对内置治理角色（`role.builtIn`）把 `deps.shellArming`（(c) 实件）＋ `deps.shellOperatorChannel`（(a) 通道，**su 也构造**，绑定 roleId/projectRoot/runtime/signal）经 `openRoleSession({shellOperatorOnly})` 交给编排 `assembleOperatorShellGate`：只读白名单直放（0 卡），`risky`/`review`/`deny` 一律客户逐条批准（deny 也可批准）；**不接 (b)**（su 不自审）；缺件 ⇒ 不传 ⇒ 不 arm。项目角色仍走 `shellArming` + `shellOperatorChannel` 三层链；旧 `shellReadonly` 桌面**不再注入**（类型保留兼容；与审批档同时出现编排不 arm）。`app/main.ts` 零改动（`shellArming` 为 undefined 时通道也不构造——两件同备才 arm）。
+**su 审批档注入（客户裁定 2026-10-17；三权 W3 起收窄为 single）**：`SessionManager` 对 **single 模型下的内置治理角色（su）** 把 `deps.shellArming`（(c) 实件）＋ `deps.shellOperatorChannel`（(a) 通道，**su 也构造**，绑定 roleId/projectRoot/runtime/signal）经 `openRoleSession({shellOperatorOnly})` 交给编排 `assembleOperatorShellGate`：只读白名单直放（0 卡），`risky`/`review`/`deny` 一律客户逐条批准（deny 也可批准）；**不接 (b)**（su 不自审）；缺件 ⇒ 不传 ⇒ 不 arm。**trio 三人一律不接审批档**（评审 §5.6）；Convener 仅经 `shellReadonly` 收同一份 (c) 实件（`(c)=allow` 直接执行，risky/review/deny 一律拒绝、0 卡、不带 operator channel），Rapporteur/Nominator 无 shell。项目角色仍走 `shellArming` + `shellOperatorChannel` 三层链。
 
 新增 `onOperatorExpired(cb)` / session:operator-expired：`{id,roleId,projectRoot?,runtime?,reason}`，同时覆盖 customer confirm/choice 与 shell，id 分别为 op-* / sc-*。UI 按身份定格旧卡。
 
@@ -110,10 +112,10 @@ Customer callback 第二参保留 O1 的原 CustomerInputMetadata.signal；sessi
 
 | 层 | 名称 | 请求 | 返回 |
 | --- | --- | --- | --- |
-| IPC | `project:governance-preview` | `{projectRoot}` | `GovernancePreviewResult` |
-| IPC | `project:governance-establish` | `{projectRoot, confirm: true}` | `EstablishGovernanceResult` |
-| preload | `previewGovernanceRecord(projectRoot)` | 同上 | 同上 |
-| preload | `establishGovernanceRecord(projectRoot)` | 桥内固定 `{projectRoot, confirm: true}` | 同上 |
+| IPC | `project:governance-preview` | `{projectRoot, governanceModel?: "single"\|"trio"}` | `GovernancePreviewResult` |
+| IPC | `project:governance-establish` | `{projectRoot, confirm: true, governanceModel?: "single"\|"trio"}` | `EstablishGovernanceResult` |
+| preload | `previewGovernanceRecord(projectRoot, governanceModel?)` | 同上 | 同上 |
+| preload | `establishGovernanceRecord(projectRoot, governanceModel?)` | 桥内固定 `{projectRoot, confirm: true, governanceModel?}`（仅接受合法值） | 同上 |
 
 `DesktopInterface.previewGovernanceRecord({projectRoot})` / `establishGovernanceRecord({projectRoot, confirm:true})` 经编排 Pipeline 公共出口 `src/pipeline/orchestration/govern-session.ts`（B2 薄再导出）调用机制——**不**直接导入 `src/common/编排/finalize.ts`。机制输入只有 `projectRoot`（边界、授权来源、写路径均由机制内部构造）。
 
@@ -213,6 +215,33 @@ A4 legacy provenance窄修：protected工具t.statusSource/target.source分别�
 
 安装包配置路径修复：main.whenReady后只解析一次resolveDesktopEnvPath({isPackaged,userDataPath})，packaged=userData/.env，dev仍repo.env；启动共享loader和DesktopInterface.envFilePath同值，不复制env实现/不拷贝凭据。受控host CLI --ans-packaged-smoke <absolute.json> --user-data-dir=<temp>验证真实DOM/preload/既有只读IPC和设置开闭，结果含isPackaged，开发不算通过；无新renderer IPC。证据见docs/fix/2026-10-15_fix_packaged-runtime-config.md。
 
+## 三权治理 V1 桌面端（W3，2026-10-17；评审 §5.6/§6.2）
+
+**Interface 透传**：`ListProjectResult` 增 `governanceModel: GovernanceModel`（原样转自门禁引擎 `listProject`，缺省 `"single"`）；`RoleView` 增可选 `governanceFunction?: GovernanceFunction`（仅 trio 的 rapporteur/nominator/convener 携带，原样透传、不硬编码 id）。`app/desktop/project.ts::buildProjectConfig` 把 `listing.governanceModel ?? "single"` 写进 `ProjectConfig.governanceModel`；`buildEffectiveProjectConfig` 优先采纳载入器 `.ans` 的显式模型，缺失才回退枚举结果——否则边界解析会掉回 single，三权角色全部不可写。
+
+**能力路由（`SessionManager.open()`，唯一数据来源＝`role.governanceFunction`/`builtIn`，不硬编码 id）**：
+
+| 能力 | rapporteur | nominator | convener | su（single） |
+| --- | --- | --- | --- | --- |
+| `customerInput`（客户确认制） | 是 | 是 | 是 | 是 |
+| `dispatchTask` / `roleStatus` / `sessionTail` / `proposeRecovery` | 否 | 否 | **是** | 是（旧行为） |
+| `installSkill` / `uninstallSkill` / `installMcp` / `uninstallMcp` | 否 | **是** | 否 | 是（旧行为） |
+| `shellOperatorOnly`（su 审批档） | 否 | 否 | 否 | **是**（`governanceModel==="single"` 硬条件） |
+| `shellReadonly`（只读档） | 否 | 否 | **是**（同一份 (c) 实件、无 operator channel） | 否 |
+| `shellArming` + `shellOperatorChannel`（项目三层链） | 否（内置） | 否（内置） | 否（内置） | 否（内置） |
+
+项目角色（`builtIn !== true`）三项 shell 字段逐字不变；`customerInput` 对全部内置角色注入（su 与三人）。old single 行为逐字不变（`legacyBuiltIn = builtIn && governanceFunction===undefined && model==="single"` 管住全部旧能力）。
+
+**派发（`routeDispatch`）**：① 来源防御性校验——trio 必须是 Convener（`governanceFunction==="schedule"`），single 必须是主入口（su）；不符即如实拒投 + 系统行。② 目标 `builtIn === true` 或保留 id 一律拒。③ 调编排 Pipeline 公共出口 `evaluateGovernanceGate({action:"dispatch", flowId, stepId, targetRoleId})`（trio 读 `.ans/governance/ledger.jsonl` 快照：提案接受/任命名单/快捷路径/流程步骤/`flowId+stepId` 未派发；single 不分流三权门禁）。④ 去重键在 `roleId\0task\0reason` 之外增 `flowId\0stepId`。⑤ **成功入队后**写 `dispatch.accepted`（`actorRoleId=Convener`、`power:"schedule"`、`flowId/stepId/targetRoleId`、`messageSummary` ≤200 字、`runtime`）；失败/被拒**不写**。账本失败只记诊断，不翻转派发、不放宽门禁。single 旧项目**不创建** `.ans/governance`。
+
+**回交 / 看护路由**：`handbackOwnerRoleId(projectRoot)`——trio 找 `governanceFunction==="schedule"`（Convener），single 用 `primaryRoleId`（su）。回交、看护系统消息、恢复回执、投递失败系统行全部改用它；`primaryRoleId` 只用于主入口/客户镜像。`WatchdogProjectSnapshot.suRoleId` 更名 `governanceRoleId`（值=回交主人），`app/desktop/watchdog.ts` 消费方同步（`role_status` 主人行亦数据驱动，single 仍显示 `su：`）。项目角色回交只进 Convener；Rapporteur 不接投递（镜像由渲染侧负责）。内置治理角色（三人+su）不自我回交（防御性拒绝）。`lastSuRuntime` → `lastGovernanceRuntime`（只记回交主人的 runtime）。`applySkillChange`/`applyMcpChange`/`proposeRecovery` 的目标守卫统一为「任一内置治理角色」。
+
+**V1b 迁移接线（编排侧已就绪）**：`project:governance-migrate-preview` / `project:governance-migrate` 与 preload `previewGovernanceMigration(projectRoot)` / `migrateGovernanceModel(projectRoot, previewDigest)`。`DesktopInterface.previewGovernanceMigration` 守卫当前导入项目后**只透传 `{projectRoot}`**；`migrateGovernanceModel` 守卫「当前导入项目、`confirm===true`、`previewDigest` 64 hex」后透传 `{projectRoot, confirm:true, previewDigest}`——路径/模型/写路径均由机制内部构造，**不接受调用方提供**。`completed`/`write-failed`（已进入写入阶段）后：**先** `refreshStaleBoundaries()`（重建路径要经 `getListing` 取角色表，缓存先删会失败——沿用既有教训）→ 清列举缓存 → `emitProjectChanged`；失败（busy/preview-stale/blocked/…）**不清缓存**。**不自动打开会话**。机制结果（preview 的 model/targetModel/writePaths/modelField/manifestLine/pinChanges/retainedFiles/snapshotDigest；migrate 的 phase/status/model/message）原样透传。`DesktopDeps.previewGovernanceMigrationFn` / `migrateGovernanceModelFn` 可注入（缺省＝编排 Pipeline 公共出口）。
+
+**S1 建立治理记录的模型选择（W4）**：`previewGovernanceRecord({projectRoot, governanceModel?})` 与 `establishGovernanceRecord({projectRoot, confirm:true, governanceModel?})`——`governanceModel` 只接受 `"single"|"trio"`；非法值 **invalid-request** 且不调用机制；缺省不传（旧行为逐字不变），显式 `trio` 才由机制写入 `.ans`。
+
+
+
 ## G-2 看护与恢复（W1-W5，2026-10-16 客户批准；G-2 revision 1）
 
 模块：`app/desktop/watchdog.ts`（看护器——纯逻辑＋注入时钟/快照/投递端）、`app/desktop/confirm-card.ts`（确认卡 pending/replay/expire 通用件——shell 卡与恢复卡共享）、`app/desktop/recovery-channel.ts`（恢复确认卡呈现端）。文案与三能力形状的单一来源为编排 `src/common/编排/watchdog.ts` / 契约家 `src/model/runtime.ts`——本角色只读导入。
@@ -222,9 +251,9 @@ A4 legacy provenance窄修：protected工具t.statusSource/target.source分别�
 | onRecoveryConfirm(cb) | 订阅 recovery:confirm-request（主→渲） | `{id, projectRoot?, runtime?, roleId, action, evidence, reason?, requestedBy?, requestedAt?, itemId?}`——evidence 逐字；恰 `{allow:true}` 才作为执行请求 |
 | recoveryConfirmRespond({id,allow}) | recovery:confirm-response | `{ok:true}` \| `{ok:false, expired:true}`（失效/旧回包——未获执行）\| `{ok:false, error}`（非法回包不受理） |
 
-桥与执行（`SessionManager` 公共/注入面）：`proposeRecovery` 能力（仅 su 会话经 `openRoleSession({proposeRecovery})` 注入；`ProposeRecoveryFn` 契约——返回 `RecoveryReceipt{outcome: executed|declined|unsupported|error, message?, operatorId?, at?}`，恰 executed 为已执行）；`rebuildSession(target)`（新公共入口；busy 拒绝；F-5-opt1 注记适用）；`redeliverNudge(target, itemId?)`；`abort` 复用既有。回执三路：工具返回＋UI 系统行＋经投递机投回 su（`kind:"system"`）。
+桥与执行（`SessionManager` 公共/注入面）：`proposeRecovery` 能力（trio 仅 Convener（`governanceFunction==="schedule"`）；single 仅 su——经 `openRoleSession({proposeRecovery})` 注入；`ProposeRecoveryFn` 契约——返回 `RecoveryReceipt{outcome: executed|declined|unsupported|error, message?, operatorId?, at?}`，恰 executed 为已执行）；`rebuildSession(target)`（新公共入口；busy 拒绝；F-5-opt1 注记适用）；`redeliverNudge(target, itemId?)`；`abort` 复用既有。回执三路：工具返回＋UI 系统行＋经投递机投回**回交主人**（trio=Convener / single=su；`kind:"system"`）。
 
-只读数据源（同判据仅 su 注入）：`roleStatus`（`RoleStatusPayload{roleId?,includeDiagnostics?}`→`WatchdogToolResult`——结构化文本；8KiB 截断在工具层）与 `sessionTail`（`SessionTailPayload{roleId,lines?}`→`WatchdogToolResult`——**受保护投影管线**产出，行数工具层归一、本层防御夹取）。两工具**纯读**（调用前后快照逐字段一致，有测试钉）。
+只读数据源（同判据：trio 仅 Convener、single 仅 su 注入）：`roleStatus`（`RoleStatusPayload{roleId?,includeDiagnostics?}`→`WatchdogToolResult`——结构化文本；8KiB 截断在工具层）与 `sessionTail`（`SessionTailPayload{roleId,lines?}`→`WatchdogToolResult`——**受保护投影管线**产出，行数工具层归一、本层防御夹取）。两工具**纯读**（调用前后快照逐字段一致，有测试钉）。
 
 ### role_status 呈现消歧（2026-10-17 实机反馈）
 

@@ -12,7 +12,7 @@ import type { ProjectDocumentRef, ProjectDocumentScope, DocumentReadErrorCode, R
 import type { BoundarySection1 } from "../../src/model/boundary.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
 import type { RoleSessionHandle, RoleSessionAbortResult } from "../../src/pipeline/orchestration/run-role.ts";
-import type { ProjectConfig } from "../../src/model/role.ts";
+import type { GovernanceFunction, GovernanceModel, ProjectConfig } from "../../src/model/role.ts";
 // 会话事件流类型：编排把 `RoleSessionHandle.events()` 放宽为 `OrchestrationEvent`（既有 `SessionEvent`
 // + 编排在 `settled` 时追加的 `handback` 回交事件，设计 §10.8）。外推时套上 `roleId` 信封
 // （`SessionEventEnvelope`，B-2）——**类型从编排/本角色只读导入、不复制形状**。
@@ -32,6 +32,9 @@ import {
   establishGovernanceRecord as realEstablishGovernanceRecord,
   previewGovernanceReacceptance as realPreviewGovernanceReacceptance,
   reacceptGovernancePins as realReacceptGovernancePins,
+  // V1b（评审 §5.5）：迁移预览/写入——编排 Pipeline 公共出口（薄再导出），桌面只接线。
+  previewGovernanceMigration as realPreviewGovernanceMigration,
+  migrateGovernanceModel as realMigrateGovernanceModel,
   createShellJudge as realCreateShellJudge,
   type GovernancePreviewResult,
   type EstablishGovernanceResult,
@@ -40,7 +43,11 @@ import {
   type GovernanceReacceptWriteInput,
   type GovernanceReacceptPreviewResult,
   type ReacceptGovernancePinsResult,
+  type GovernanceMigrationPreviewResult,
+  type GovernanceMigrationResult,
+  type GovernanceMigrationWriteInput,
 } from "../../src/pipeline/orchestration/govern-session.ts";
+export type { GovernanceMigrationPreviewResult, GovernanceMigrationResult } from "../../src/pipeline/orchestration/govern-session.ts";
 // 只读 pin 证据检查：**唯一实现**在门禁引擎私有模块，只经 Service 公开出口消费（跨角色边界纪律）。
 import { inspectPinnedBoundaries } from "../../src/service/boundary/resolve-boundary.ts";
 import { createChatDemoAdapter } from "./chat-adapter.ts";
@@ -118,8 +125,10 @@ export interface RoleView {
   boundaryPath: string;
   cardText: string;
   boundary: BoundarySection1;
-  /** 内置治理角色（su）：无角色目录、无 docs 索引。 */
+  /** 内置治理角色（su / trio 三人）：无角色目录、无 docs 索引。 */
   builtIn: boolean;
+  /** 仅 trio 的三个内置治理角色携带（`proposal`/`nomination`/`schedule`）；原样转自门禁引擎枚举。 */
+  governanceFunction?: GovernanceFunction;
   changelog: { path: string; text: string } | null;
   docs: DocsIndexEntry[];
   documents?: ProjectDocumentRef[];
@@ -137,10 +146,17 @@ export interface ListProjectResult {
    */
   hasRoles: boolean;
   /**
-   * **主入口角色 id**（= 门禁引擎 `listProject` 给出的 `primaryRoleId`，内置治理角色 su）。
+   * **主入口角色 id**（= 门禁引擎 `listProject` 给出的 `primaryRoleId`：single → su；trio → rapporteur）。
    * **原样转自门禁引擎**（单一来源）；渲染侧据此设主位/默认选中，**不得硬编码 "su"**（§10.7）。
+   * 注（评审 §5.6）：三权下它只用于主入口/客户镜像；回交/看护/系统行的主人见 `governanceModel` 对应的
+   * Convener——本结果不另立第二套路由判据。
    */
   primaryRoleId: string;
+  /**
+   * **治理模型**（评审 §5.4/§5.6）：原样转自门禁引擎（single/trio）。渲染侧据它显示三权/旧模型提示、
+   * 分组内置治理角色；**不得**改用 `docs/proposals` 等产物目录猜测模型。
+   */
+  governanceModel: GovernanceModel;
   /**
    * **治理记录状态（I1，PM 评审 §四.1）**：由共享载入器事实（`source.kind`/`accepted`/
    * `downgradeReason`）与 `governanceBoundary.path` 经 `deriveGovernanceRecord` 纯派生。
@@ -152,8 +168,13 @@ export interface ListProjectResult {
   governanceRecord: GovernanceRecordStatus;
 }
 
-/** 选图结果（K-2）：`image.dataBase64` 供渲染侧预览；`cancelled` 表示用户取消（**不是失败**）。 */
-export interface PickImageResult {
+// —————————————— V1b 迁移入口（评审 §5.5/§11.2；编排侧已就绪） ——————————————
+//
+// 「su → trio」显式迁移：预览零写入 → 客户确认 → 写 `.ans` + manifest 留痕。机制与结果形状全部在
+// 编排 Pipeline 公共出口（`govern-session.ts` 薄再导出）；本层只做「当前导入项目 / confirm /
+// previewDigest 64hex」守卫与成功后的收尾，**不重写判定、不接受调用方提供的路径/模型/写路径**。
+
+/** 选图结果（K-2）：`image.dataBase64` 供渲染侧预览；`cancelled` 表示用户取消（**不是失败**）。 */export interface PickImageResult {
   ok: boolean;
   cancelled?: boolean;
   error?: string;
@@ -309,6 +330,13 @@ export interface DesktopDeps {
   previewGovernanceReacceptanceFn?: (input: GovernanceReacceptInput) => Promise<GovernanceReacceptPreviewResult>;
   reacceptGovernancePinsFn?: (input: GovernanceReacceptWriteInput) => Promise<ReacceptGovernancePinsResult>;
   /**
+   * **V1b 迁移（评审 §5.5）**：预览/写入机制——缺省经编排 Pipeline 公共出口
+   * `src/pipeline/orchestration/govern-session.ts`（薄再导出）调用。注入以便单测断言透传、
+   * guard 拒绝时**不调用机制**、成功/失败后的收尾分流。
+   */
+  previewGovernanceMigrationFn?: (input: { projectRoot: string }) => Promise<GovernanceMigrationPreviewResult>;
+  migrateGovernanceModelFn?: (input: GovernanceMigrationWriteInput) => Promise<GovernanceMigrationResult>;
+  /**
    * 「项目内容可能已变」信号（§10.3）——**主入口角色（su）的一轮结束**时由本层触发，主进程据此向
    * 渲染侧推 `project:changed`，渲染侧重取枚举让左树随 su 建角色而**长出**。缺省无操作（测试可注入收集器）。
    *
@@ -415,14 +443,15 @@ export interface DesktopInterface {
    * 其余状态/门禁错误（`busy`/`already-established`/`invalid-record`/`no-roles`/`nothing-to-pin`/
    * `unparseable-governance-doc`/`blocked`）由机制原样透传。
    */
-  previewGovernanceRecord(input: { projectRoot: string }): Promise<GovernancePreviewResult>;
+  previewGovernanceRecord(input: { projectRoot: string; governanceModel?: GovernanceModel }): Promise<GovernancePreviewResult>;
   /**
    * **I2/C1**：显式建立治理记录（仅操作者在预览面板确认后触发）。守卫（PM 评审 §4.6 本层负责 1–3）：
-   * `projectRoot` 必须是当前导入项目、`confirm === true`；按项目的在途互斥由机制内部负责（`busy`），
-   * 本层**不造第二份**。成功后清该项目的列举缓存、调用既有陈旧边界刷新入口（`refreshStaleBoundaries`），
-   * 并复用既有主→渲染信号 `emitProjectChanged` 让渲染侧重新 `listProject`。
+   * `projectRoot` 必须是当前导入项目、`confirm === true`；`governanceModel`（若给）必须是 `single`/`trio`
+   * ——缺省 `single`（旧行为逐字不变），显式 `trio` 才由机制写入 `.ans`。按项目的在途互斥由机制内部负责
+   * （`busy`），本层**不造第二份**。成功后清该项目的列举缓存、调用既有陈旧边界刷新入口
+   * （`refreshStaleBoundaries`），并复用既有主→渲染信号 `emitProjectChanged` 让渲染侧重新 `listProject`。
    */
-  establishGovernanceRecord(input: { projectRoot: string; confirm: true }): Promise<EstablishGovernanceResult>;
+  establishGovernanceRecord(input: { projectRoot: string; confirm: true; governanceModel?: GovernanceModel }): Promise<EstablishGovernanceResult>;
   /**
    * **C2（治理记录 pin 不符的重新接受恢复，PM 评审 §5.3）**：预览重新接受——**只读**（不写文件）。
    * 守卫：`projectRoot` 非空且严格等于当前导入项目；否则 `invalid-request`（本层合成，不调用机制）。
@@ -442,6 +471,18 @@ export interface DesktopInterface {
     confirm: true;
     previewDigest: string;
   }): Promise<ReacceptGovernancePinsResult>;
+  /**
+   * **V1b 迁移预览**（评审 §5.5）：零写入；先守卫当前导入项目，再透传 `{projectRoot}` 给编排机制。
+   * 调用方不得提供路径/模型/写路径。
+   */
+  previewGovernanceMigration(input: { projectRoot: string }): Promise<GovernanceMigrationPreviewResult>;
+  /**
+   * **V1b 显式迁移**（评审 §5.5）：守卫当前导入项目、`confirm:true`、`previewDigest` 64 hex；
+   * 透传 `{projectRoot, confirm:true, previewDigest}`。`completed`/`write-failed` 后（已进入写入阶段）：
+   * 先 `refreshStaleBoundaries()`（沿用既有教训：重建路径要经 `getListing` 取角色表）→ 清列举缓存 →
+   * `emitProjectChanged`。**不自动打开会话**；失败不清缓存。
+   */
+  migrateGovernanceModel(input: { projectRoot: string; confirm: true; previewDigest: string }): Promise<GovernanceMigrationResult>;
   /**
    * **「替我审」开关读取**（PM 评审 §6.6）：主进程权威、默认 false。返回 `{version:1, ok:true, enabled}`。
    * 只读，不改变任何会话或请求状态。
@@ -547,6 +588,11 @@ function reacceptGuardResult(message: string): ReacceptGovernancePinsResult {
 /** 预览摘要形状：非空 64 位十六进制（`GovernanceReacceptPreview.previewDigest`）。 */
 const PREVIEW_DIGEST_HEX_64 = /^[0-9a-fA-F]{64}$/;
 
+/** 治理模型封闭值域（评审 §5.1/§5.5；缺省 `single`）。 */
+function isGovernanceModelValue(value: unknown): value is GovernanceModel {
+  return value === "single" || value === "trio";
+}
+
 /**
  * 构造桌面 Interface。持有枚举缓存供会话构造 ProjectConfig，并托管 SessionManager。
  */
@@ -564,6 +610,9 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   // C2：重新接受的预览/写入机制（缺省＝编排 Pipeline 公共出口；不直接导入 `src/common/编排/`）。
   const previewGovernanceReacceptanceFn = deps.previewGovernanceReacceptanceFn ?? realPreviewGovernanceReacceptance;
   const reacceptGovernancePinsFn = deps.reacceptGovernancePinsFn ?? realReacceptGovernancePins;
+  // V1b：迁移预览/写入（缺省＝编排 Pipeline 公共出口；不直接导入私有 `common/编排/`）。
+  const previewGovernanceMigrationFn = deps.previewGovernanceMigrationFn ?? realPreviewGovernanceMigration;
+  const migrateGovernanceModelFn = deps.migrateGovernanceModelFn ?? realMigrateGovernanceModel;
   // C1：pin 证据检查（缺省＝Service 公开出口；门禁引擎唯一实现）。
   const inspectPinnedBoundariesFn = deps.inspectPinnedBoundariesFn ?? inspectPinnedBoundaries;
   // 「替我审」（2026-10-17）：开关状态机（主进程权威）与判断闭包工厂（缺省＝编排 Pipeline 公共出口）。
@@ -763,6 +812,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         };
         if (r.group !== undefined) roleView = { ...roleView, group: r.group };
         if (r.groupDuty !== undefined) roleView = { ...roleView, groupDuty: r.groupDuty };
+        // 三权（评审 §5.1/§5.6）：`governanceFunction` 原样透传（仅 trio 内置角色携带；su/项目角色不出现）。
+        if (r.governanceFunction !== undefined) roleView = { ...roleView, governanceFunction: r.governanceFunction };
         roles.push(roleView);
       }
       if (generation === importSequence) importedProjectRoot = listing.projectRoot;
@@ -774,37 +825,57 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         projectRoot: listing.projectRoot,
         roles,
         warnings: listing.warnings,
-        // 原样转自门禁引擎（单一来源）：hasRoles 供「尚未 bootstrap」判断、primaryRoleId 供主位/默认选中。
+        // 原样转自门禁引擎（单一来源）：hasRoles 供「尚未 bootstrap」判断、primaryRoleId 供主位/默认选中、
+        // governanceModel 供三权/旧模型提示（评审 §5.4/§5.6）。
         hasRoles: listing.hasRoles,
         primaryRoleId: listing.primaryRoleId,
+        governanceModel: listing.governanceModel ?? "single",
         governanceRecord,
       };
     },
 
     // —————— I2/C1（existing-project-compat V1，2026-10-17 PM 评审 §二 I2 / §四.2 / §4.6）——————
     // 机制（预览/建立、一次性边界、finalize、按项目互斥）全部在编排侧；本层只做守卫 1–3 与成功后的收尾。
-    async previewGovernanceRecord(input: { projectRoot: string }): Promise<GovernancePreviewResult> {
-      const rawRoot = input !== null && typeof input === "object" ? input.projectRoot : undefined;
+    async previewGovernanceRecord(input: { projectRoot: string; governanceModel?: GovernanceModel }): Promise<GovernancePreviewResult> {
+      const record = input !== null && typeof input === "object" ? (input as Record<string, unknown>) : {};
+      const rawRoot = record.projectRoot;
       // 守卫 1：projectRoot 非空且等于桌面当前导入项目（渲染侧不能传任意路径）。
       if (typeof rawRoot !== "string" || rawRoot.trim() === "" || rawRoot !== importedProjectRoot) {
         return { ok: false, code: "invalid-request", message: "项目不是当前导入项目；本次未写入任何文件。" };
       }
-      // 只把 projectRoot 透传：边界/授权来源/写路径由机制内部构造，调用方不得提供。
-      return previewGovernanceRecordFn({ projectRoot: rawRoot });
+      // 守卫 2（W4/S1）：治理模型若给出必须是封闭值域；缺省＝single（旧行为逐字不变）。
+      const governanceModel = record.governanceModel;
+      if (governanceModel !== undefined && !isGovernanceModelValue(governanceModel)) {
+        return { ok: false, code: "invalid-request", message: "governanceModel 必须是 single 或 trio；本次未写入任何文件。" };
+      }
+      // 只把 projectRoot（与可选模型）透传：边界/授权来源/写路径由机制内部构造，调用方不得提供。
+      return previewGovernanceRecordFn({
+        projectRoot: rawRoot,
+        ...(governanceModel !== undefined ? { governanceModel } : {}),
+      });
     },
 
-    async establishGovernanceRecord(input: { projectRoot: string; confirm: true }): Promise<EstablishGovernanceResult> {
-      const rawRoot = input !== null && typeof input === "object" ? input.projectRoot : undefined;
+    async establishGovernanceRecord(input: { projectRoot: string; confirm: true; governanceModel?: GovernanceModel }): Promise<EstablishGovernanceResult> {
+      const record = input !== null && typeof input === "object" ? (input as Record<string, unknown>) : {};
+      const rawRoot = record.projectRoot;
       // 守卫 1：当前导入项目。
       if (typeof rawRoot !== "string" || rawRoot.trim() === "" || rawRoot !== importedProjectRoot) {
         return governanceGuardResult("项目不是当前导入项目；本次未写入任何文件。");
       }
       // 守卫 2：操作者已看过预览并确认（意图标记，不是密码学证据）。
-      if (input === null || typeof input !== "object" || input.confirm !== true) {
+      if (record.confirm !== true) {
         return governanceGuardResult("缺少操作者确认（confirm:true）；本次未写入任何文件。");
       }
-      // 守卫 3：按项目的在途互斥**由机制内部负责**（并发第二次得到 `busy`）——本层不另造第二份。
-      const result = await establishGovernanceRecordFn({ projectRoot: rawRoot });
+      // 守卫 3（W4/S1）：治理模型若给出必须是封闭值域；缺省＝single（旧行为逐字不变）。
+      const governanceModel = record.governanceModel;
+      if (governanceModel !== undefined && !isGovernanceModelValue(governanceModel)) {
+        return governanceGuardResult("governanceModel 必须是 single 或 trio；本次未写入任何文件。");
+      }
+      // 守卫 4：按项目的在途互斥**由机制内部负责**（并发第二次得到 `busy`）——本层不另造第二份。
+      const result = await establishGovernanceRecordFn({
+        projectRoot: rawRoot,
+        ...(governanceModel !== undefined ? { governanceModel } : {}),
+      });
 
       // 成功（`phase === "write"` 且 finalize 完成）后：
       //  ① 调用**既有**陈旧边界刷新入口（O-1，`SessionManager.refreshStaleBoundaries`）：空闲的活会话
@@ -871,6 +942,59 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           await manager.refreshStaleBoundaries();
         } catch {
           // 刷新失败不影响回执（写入结果已如实返回；下次发言/投递的既有检查点会再查陈旧）。
+        }
+        listingCache.delete(rawRoot);
+        deps.emitProjectChanged?.();
+      }
+      return result;
+    },
+
+    // —————— V1b 迁移（评审 §5.5）：预览零写入 / 客户确认后写 `.ans` + manifest 留痕 ——————
+    // 机制（模型读取、快照摘要、原子写、互斥、留痕）全部在编排侧；本层只做守卫与成功后的收尾，
+    // 不接受调用方提供的路径/模型/写路径，也不重写任何判定。
+    async previewGovernanceMigration(input: { projectRoot: string }): Promise<GovernanceMigrationPreviewResult> {
+      const rawRoot = input !== null && typeof input === "object" ? input.projectRoot : undefined;
+      // 守卫：projectRoot 非空且严格等于桌面当前导入项目（渲染侧不能传任意路径）。
+      if (typeof rawRoot !== "string" || rawRoot.trim() === "" || rawRoot !== importedProjectRoot) {
+        return { ok: false, code: "invalid-request", message: "项目不是当前导入项目；本次未写入任何文件。" };
+      }
+      // 只透传 projectRoot：模型/写路径/摘要均由机制内部构造。
+      return previewGovernanceMigrationFn({ projectRoot: rawRoot });
+    },
+
+    async migrateGovernanceModel(input: {
+      projectRoot: string;
+      confirm: true;
+      previewDigest: string;
+    }): Promise<GovernanceMigrationResult> {
+      const record = input !== null && typeof input === "object" ? (input as Record<string, unknown>) : {};
+      const rawRoot = record.projectRoot;
+      const model: GovernanceModel = (typeof rawRoot === "string" ? listingCache.get(rawRoot)?.governanceModel : undefined) ?? "single";
+      // 守卫 1：当前导入项目。
+      if (typeof rawRoot !== "string" || rawRoot.trim() === "" || rawRoot !== importedProjectRoot) {
+        return { ok: false, phase: "guard", status: "invalid-request", model, message: "项目不是当前导入项目；本次未写入任何文件。" };
+      }
+      // 守卫 2：操作者已看过预览并确认（意图标记，不是密码学证据）。
+      if (record.confirm !== true) {
+        return { ok: false, phase: "guard", status: "invalid-request", model, message: "缺少操作者确认（confirm:true）；本次未写入任何文件。" };
+      }
+      // 守卫 3：预览摘要必须是非空 64 位十六进制（机制写入前据此比对快照；形状不对不进入机制）。
+      const previewDigest = record.previewDigest;
+      if (typeof previewDigest !== "string" || !PREVIEW_DIGEST_HEX_64.test(previewDigest)) {
+        return { ok: false, phase: "guard", status: "invalid-request", model, message: "缺少有效的预览摘要（previewDigest 必须为 64 位十六进制）；本次未写入任何文件。" };
+      }
+      // 其余守卫（仅 single→trio、记录可用、写前重新求值、互斥、原子写与 manifest 留痕）由机制负责；
+      // 本层不透传路径/模型/写路径。
+      const result = await migrateGovernanceModelFn({ projectRoot: rawRoot, confirm: true, previewDigest });
+
+      // `completed` = 写入成功；`write-failed` = 已进入写入阶段，可能部分落盘——两者都让界面如实反映盘面。
+      // 顺序沿用既有教训：**先** refreshStaleBoundaries（重建路径要经 `getListing` 取角色表）→ 清缓存 →
+      // project:changed。失败（busy/preview-stale/blocked/...）**不清缓存**、不改动任何状态。不自动开会话。
+      if (result.status === "completed" || result.status === "write-failed") {
+        try {
+          await manager.refreshStaleBoundaries();
+        } catch {
+          // 刷新失败不影响迁移回执（写入结果已如实返回；下次发言/投递的既有检查点会再查陈旧）。
         }
         listingCache.delete(rawRoot);
         deps.emitProjectChanged?.();

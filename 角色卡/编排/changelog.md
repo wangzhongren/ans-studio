@@ -1,5 +1,28 @@
 # 编排 变更记录
 
+## 2026-10-17 — V1b：治理模型 `su → trio` 显式迁移（`previewGovernanceMigration` / `migrateGovernanceModel`）＋首次收尾带模型
+
+**来源**：PM 评审 `角色卡/项目管理/docs/design/2026-10-17_design_governance-trio-review.md` §3.2（V1b）、§5.5、§5.7、§九-12、§十一 W2/V1b。W0/W1/W2 已前置。本批只改编排边界：`src/common/编排/{governance-migration.ts,governance-record-lock.ts,finalize.ts}`、`src/pipeline/orchestration/{govern-session.ts,run-role.ts}`、`test/编排/`、本角色四文档；**未碰**门禁引擎、运行时核心、桌面、UI、其他角色测试。
+
+**改了什么**
+
+- 新增 `src/common/编排/governance-migration.ts`：
+  - `previewGovernanceMigration({projectRoot})` **零写入**：返回 `{model:"single", targetModel:"trio", writePaths:[".ans/project.json","docs/bootstrap-manifest.md"], modelField, manifestLine:"治理模型升级（su → trio）", pinChanges:[], retainedFiles, snapshotDigest}`。`modelField` 为 `.ans` 原始字段快照（`null`=缺失，旧 single 形状）；`retainedFiles` 列出角色卡/边界/治理文档/旧 `docs/su/**`（只列确实存在者）；`snapshotDigest` 覆盖 `.ans` 原始字节 + manifest 内容/缺失。守卫：invalid-request → busy → no-record → already-trio → invalid-record → blocked（manifest 不可读 / 应用边界门禁前置拒）。
+  - `migrateGovernanceModel({projectRoot, confirm:true, previewDigest})`：守卫 invalid-request（projectRoot/confirm/digest 64 hex）→ busy（**首次 await 前**占位）→ no-record → already-trio → blocked（坏 `.ans`/manifest 不可读/门禁前置拒）→ preview-stale → 写入 → write-failed。只改 `.ans` 的 `governanceModel:"trio"`：内存 `{...doc, governanceModel}` **保留全部既有/未知字段**（roles/source/pin/自定义字段）；`.ans` 先、manifest 后原子写；manifest 追加升级节（ISO 时间、旧/新模型、变更文件、`.ans` 新旧 SHA-256、客户确认）；账本 best-effort 写 `governance.migrated`（`action:"migrate"` + `previewDigest`）。**不重写角色卡/边界/pin、不删历史、不建 `角色卡/su/`**。成功 `{ok:true, phase:"write", status:"completed", model:"trio", message}`。
+  - 门禁用 Service 公共出口 `appGovernanceBoundary`（不注入任何角色会话）；`.ans` 内容中的路径经 `safeProjectRel` 防逃逸后才 stat（仅预览展示）。
+- 新增 `src/common/编排/governance-record-lock.ts`：把原 `finalize.ts` 的模块级 `Set` 提为 establish / reaccept / migrate **共用**的进程内同项目互斥（`tryAcquire` 同步占位、`finally` 释放、`isBusy` 只读检查）；跨进程无全局锁如实登记。
+- 改 `src/common/编排/finalize.ts`：
+  - `FinalizeInput.governanceModel?: GovernanceModel`：`finalizeBootstrap` **仅当给出**才在 `.ans` 写该字段（不传保持旧形状）。
+  - `repinIfBootstrapped`：创世态由调用方传当前模型；**非创世态**调用方未传时从当刻 `.ans` 读取并保留既有模型（避免重 pin 把 trio 降级为 single）；`.ans` 缺失/字段非法/不可读 → 不写（旧形状不变）。
+  - `GovernancePreview.governanceModel`：预览显示「将写入的治理模型」（缺省 `single`）；`establishGovernanceRecord` 把 `governanceModel` 交给 `finalizeBootstrap`（仅 trio 写 `governance.established` 的既有逻辑不变）。
+  - establish/reaccept 的互斥改为调用共享锁模块；行为与文案逐字不变。
+- `src/pipeline/orchestration/govern-session.ts`：追加 V1b 薄再导出（两函数、四常量、七型）；`openGovernanceSession`/`runGovernSession` 行为逐字未改。
+- `src/pipeline/orchestration/run-role.ts`（V1b 接线缺口修复）：自动收尾调用点 `repinIfBootstrapped` 现在按当前模型传参——trio 传 `governanceModel:"trio"`、single 不传（旧 `.ans` 形状不变）；并把收尾边界改为 `appGovernanceBoundary(会话边界的 acceptance)`（评审 §5.3）——三人 Section 1 不含 `.ans/**`/`docs/bootstrap-manifest.md`，沿用角色边界会让创世收尾 fail-closed、`.ans` 永不落盘。single/su 仍用会话边界，行为逐字不变。
+
+**测试**：新增 `test/编排/governance-migration.test.ts` **13 例**（预览零写入与形状、`.ans` 只增/改模型且未知字段保留、manifest 留痕/新旧哈希、账本 action+digest、pin/角色卡/旧 docs/su 不变、不建 `角色卡/su/`、already-trio/no-record/invalid-record→blocked/manifest 目录→blocked/preview-stale/busy/write-failed/invalid-request、旧 single 无字段）；扩展 `finalize.test.ts` **+3**（finalize 仅在给出时写模型；repin 创世传/不传、非创世保留 trio；**trio 创世首次 settle 收尾写出 `governanceModel:"trio"`**，single 首次收尾不写字段且顶层形状逐字不变）与 `governance-record.test.ts` **+1**（trio 预览/建立写字段）及既有断言（缺省 single 预览、不传不写字段）；`governance-record-ledger.test.ts` 补 `.ans` 模型断言并更新迁移归属注释。证据：目标 4 文件 **41/41**；`node --test "test/编排/**/*.test.ts"` → **451 计 / 450 过 / 1 红**——唯一红为既有 `shell-authorized-routine.test.ts:103` 的 Windows symlink **EPERM**（与本批零交集）；全量三层 glob `node --test "test/**/*.test.ts"` → **2618 计 / 2557 过 / 58 红 / 3 skipped**：58 红均为**他域既有/在途**（运行时核心 symlink·abort·BOM、桌面 UI/窗口迁移入口仍在 V1 占位、装配、测试角色源码钉）与同一条 Windows symlink EPERM，`test/编排/` 新增 17 例全绿、零新增红（他域待各属主接线/更新，如实登记不代为修复）；`npm run typecheck` → 本批文件零错（他域既有 4 条 + 桌面迁移占位仍回 `not-available` 2 条，待其接线）。
+
+**未做/边界**：未 git 提交；未碰 `app/**`、`src/common/门禁引擎/**`、`src/service/**`、`src/model/**`、其他角色文件、客户项目；未读 `.env`、未跑凭据/网络命令、未调用真实模型。**跨角色待 pm 转达**：桌面窗口须把 `previewGovernanceMigration`/`migrateGovernanceModel` 接到既有 IPC 占位（`project:governance-migrate-preview`/`project:governance-migrate`），成功后清 listing 缓存 → `refreshStaleBoundaries()` → `emitProjectChanged`，不自动开会话（其占位 handler 仍回 `not-available`，待其接线）；桌面UI 按预览字段展示写路径/字段快照/manifest 行/保留文件，确认时原样回传 `snapshotDigest`。`run-role.ts` 的创世收尾缺口已在本批修复（trio 传模型 + 应用边界），无需再转达。
+
 ## 2026-10-17 — 治理记录 pin 不符「重新接受」：`previewGovernanceReacceptance` / `reacceptGovernancePins`（B1）＋ Pipeline 薄再导出（B2）
 
 **来源**：PM 评审/任务书 `角色卡/项目管理/docs/design/2026-10-17_design_governance-pin-recovery-review.md`（status: approved）§5.2、§5.5、§六、§七。恢复只做两件事：整表重算现有 pin 写回 `.ans`，并向 manifest 追加一条「重新接受记录」；不改边界文件内容、不增删 pin、不改 roles/source、不自动开会话。
@@ -858,3 +881,19 @@
 **边界与残余**：只读工具/策略/预算在运行时核心（P1），三适配器 judgeMode 在 P3a–c，桌面开关/三态映射/结果行在 P4/P5；本批不接真实模型，端到端由测试角色独立验证。
 
 **验收缺陷修正（测试角色独立验收）**：第 9 次读取（调用预算耗尽）在运行时核心同时计入 `deniedReads` 并置 `budgetExceeded`；`damageCode` 判定顺序改为 **budget → read-truncated → read-denied**（以 `stats.budgetExceeded` 为准，不依赖单次读取错误码），避免把「判断预算耗尽」误报成「文件不可读」；预算的人话改为「判断预算耗尽（读取次数/总读取字节达上限）」。测试补两个预算优先用例（第 9 次读取 / 与截断同时）并断言预算文案不含「文件不可读」；敏感/越界仍 `read-denied`、截断仍 `read-truncated`、allow 遇任一损伤仍降 manual。
+
+## 2026-10-17 — W2：治理三权编排接线（账本 / 三道门禁 / 能力矩阵）
+
+**来源**：PM 评审 `2026-10-17_design_governance-trio-review.md` §5.6/§5.7/§6.2/§十一 W2（W0 契约 + W1 门禁已落地）。本批只改编排边界：`src/common/编排/{governance-ledger,governance-gate}.ts`（新）、`finalize.ts`、`src/pipeline/orchestration/{run-role,govern-session}.ts`、`src/interface/cli/govern.ts`、`src/common/编排/args.ts`、`test/编排/`、本角色四文档。**未碰**门禁引擎 / 运行时核心 / 适配器 / 桌面 / UI。
+
+**账本**：`appendGovernanceLedger`（append-only `.ans/governance/ledger.jsonl`、按项目串行、fsync、失败只诊断不抛）、`readGovernanceLedger`（坏行/不可读进 `errors`；文件不存在=空账本）、`refreshGovernanceLedgerSnapshot`、`flushGovernanceLedger`。trio 会话 `open`/`send` 刷新快照；客户决定后同步更新内存快照并异步落盘（`customer.decision`）。
+
+**门禁**：`evaluateGovernanceGate(input,snapshot)` 三道门全部 fail-closed——提案接受门、任命写入门、派发五条；`model!=="trio"` 不分流；账本 `errors` 非空拒一切。`run-role` 在 `resolveWrite` 之前先判 `forbiddenWritePaths`，再按路径分派门禁。
+
+**能力矩阵**：`governanceCapabilitiesOf` 单点驱动 dispatch/roleStatus/sessionTail/proposeRecovery/installSkill(Mcp) 注入；预授权改 `scopeWithBuiltInPreauthorization`（trio 注册表 / su 四棵）；shell 按 `cap.shell`（none/readonly/operator-approve，su 旧只读兼容路径保留）。`customerInput` 按角色 cardKind 白名单（越权不弹卡），写 `decisionKind`/`customerDecision`/`targetRoleIds`/`paths`/`decisionEvidence`/`artifactSha256`。
+
+**会话/CLI**：`GovernSessionInput.governanceFunction`、`resolveGovernanceRole` 统一解析（single 传 function 明确拒绝）；`withGovernanceRole` 只并入选中 id；默认提示词按 proposal/nomination/schedule 追加纪律（不写「已批准」），single/su 旧文案逐字保留；`--function` 与 `--role`（内置 id 选会话角色）落地。`finalize` 仅 trio 写 `governance.established`/`governance.reaccepted`；single 旧项目零新增副作用。
+
+**测试**：新增 `governance-ledger.test.ts`（6）、`governance-gate.test.ts`（13）、`governance-session.test.ts`（18）、`governance-record-ledger.test.ts`（1）共 38 例离线全绿；`test/编排/**` 434 计 433 过 1 红（既有 Windows symlink EPERM，与本批零交集）。全量三层 glob `node --test "test/**/*.test.ts"` **2580 计 2526 过 51 红 / 3 skipped**；其中他域红 50 条（W1 基线 46 条 + W2 有意变更的 4 条源码钉/旧能力字面断言，归测试/桌面/装配属主更新），本角色新增用例零红。typecheck 全仓 0 错。
+
+**已知取舍（如实登记）**：① 派发去重按 `flowId+stepId` 硬拒；「流程单已出新版本」的放行需带版本键（V2，本版 fail-closed）；② 账本 `artifact.observed` 仅 trio 内置角色（su/single 不写，保持旧项目零新副作用）；③ 内容漂移仍不在本机制范围（O-A1 未采纳，沿 A-3 登记）。

@@ -24,12 +24,17 @@ test("代码级钉子（独立）：session.ts 无本地副本实现/调用、�
 });
 
 test("代码级钉子（独立）：su 预授权写目录恰为四棵（docs/su + docs/contracts + docs/skills + docs/mcp）——workflow.md 不在其中", async () => {
-  const src = await read("../../../src/pipeline/orchestration/run-role.ts");
-  const m = src.match(/const SU_PREAUTHORIZED_WRITE_DIRS[^=]*=\s*\[([^\]]*)\]/);
-  assert.ok(m, "须能定位 SU_PREAUTHORIZED_WRITE_DIRS 定义");
+  // 2026-10-17（三权 V1）：预授权常量从编排 `run-role.ts` 迁到**门禁引擎注册表**（评审 §5.2「单一来源」）。
+  // 本钉子随之改读注册表，并**反向断言**编排不再另写一份字面量（防第二真相）。
+  const registry = await read("../../../src/common/门禁引擎/governance-roles.ts");
+  const m = registry.match(/LEGACY_SU_PREAUTHORIZED_DIRS[^=]*=\s*\[([^\]]*)\]/);
+  assert.ok(m, "须能定位 LEGACY_SU_PREAUTHORIZED_DIRS 定义（单一来源）");
   const dirs = [...m![1].matchAll(/"([^"]+)"/g)].map((x) => x[1]);
   assert.deepEqual(dirs, ["docs/su", "docs/contracts", "docs/skills", "docs/mcp"], "恰为四棵目录树（客户裁定范围；G-4＋V2 扩列后＝四棵；两分写盘口径的机制实况）");
   assert.equal(dirs.some((d) => d.includes("workflow")), false, "docs/workflow.md 不在预授权内（走规划确认）");
+  const runRole = await read("../../../src/pipeline/orchestration/run-role.ts");
+  assert.equal(/const(?: readonly)? SU_PREAUTHORIZED_WRITE_DIRS/.test(runRole), false, "编排不得再定义第二份预授权字面量");
+  assert.ok(runRole.includes("LEGACY_SU_PREAUTHORIZED_DIRS"), "编排从注册表只读导入预授权数据");
 });
 
 test("卡文本独立反向断言（含非空洞验证）：含 docs/workflow.md 的小句不得声称免确认/直接写/预授权", () => {
@@ -120,6 +125,8 @@ test("四处文案口径一致性抽查（独立）：渲染块 / 卡文本 / �
     references: [{ path: "docs/workflow.md", sha256: "a".repeat(64) }],
   });
   const govern = await read("../../../src/pipeline/orchestration/govern-session.ts");
+  // 去注释后再切片：注释里也会出现「预授权」字样（数据驱动说明），不得被当成文案句。
+  const governCode = govern.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
 
   // ① 块名与阅读纪律：渲染块 / 卡文本 / 工具描述 三处同短语
   assert.ok(block.includes("必读（按序"), "渲染块头含块名前缀");
@@ -145,14 +152,25 @@ test("四处文案口径一致性抽查（独立）：渲染块 / 卡文本 / �
   assert.ok(toolText.includes("写盘许可已预置、直接写即可"), "工具：契约直接写（预置）");
   assert.ok(T.includes("同一次规划确认"), "卡：workflow 走规划确认 preview");
   assert.ok(toolText.includes("列入规划确认的 preview"), "工具：workflow 走规划确认 preview");
-  const preauthClauses = splitClauses(govern).filter((c) => c.includes("预授权"));
+  const preauthClauses = splitClauses(governCode).filter((c) => c.includes("预授权"));
   assert.ok(preauthClauses.length >= 2, `治理会话两处预授权句在场（非空洞），实得 ${preauthClauses.length}`);
+  // 2026-10-17（三权 V1）：治理会话文案改为**数据驱动**（角色显示名/预授权目录/职能一律读注册表，
+  // 评审 §5.6「不得让 Rapporteur 会话自称 su」）。故预授权句不再硬编码 `docs/su/`，而是引用数据源变量；
+  // 字面四棵的单一来源仍在注册表（上方「代码级钉子」已逐字钉住）。
+  const registry = await read("../../../src/common/门禁引擎/governance-roles.ts");
+  assert.match(registry, /LEGACY_SU_PREAUTHORIZED_DIRS[^=]*=\s*\[\s*"docs\/su",\s*"docs\/contracts",\s*"docs\/skills",\s*"docs\/mcp",?\s*\]/, "注册表持有 su 四棵字面量");
   for (const c of preauthClauses) {
-    assert.ok(c.includes("docs/su/"), `预授权句须点名 docs/su/（实得：${c}）`);
-    assert.ok(c.includes("docs/contracts/"), `预授权句须点名 docs/contracts/（实得：${c}）`);
+    assert.ok(
+      /preauthorizedDirs|preauth\b|docs\/su\/|没有预授权目录/.test(c),
+      `预授权句须引用数据源变量（trio/通用文案）、旧 su 字面量（single 分支），或如实声明「没有预授权目录」；实得：${c}`,
+    );
     assert.equal(c.includes("docs/workflow.md"), false, `预授权句不得含 docs/workflow.md（实得：${c}）`);
   }
-  for (const c of splitClauses(govern).filter((c) => c.includes("docs/workflow.md"))) {
+  assert.ok(
+    preauthClauses.some((c) => /preauthorizedDirs|preauth\b/.test(c)),
+    "至少一处预授权句数据驱动（trio 三人的目录不得写死 su）",
+  );
+  for (const c of splitClauses(governCode).filter((c) => c.includes("docs/workflow.md"))) {
     assert.equal(/预授权|直接写|无需确认|免确认/.test(c), false, `治理会话中 workflow.md 指称不得与预授权/免确认同句（实得：${c}）`);
   }
 

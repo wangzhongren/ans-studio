@@ -32,10 +32,9 @@ import { createDesktopInterface } from "../../app/desktop/interface.ts";
 import { openRoleSession as realOpenRoleSession } from "../../src/pipeline/orchestration/run-role.ts";
 import { openGovernanceSession } from "../../src/pipeline/orchestration/govern-session.ts";
 import { createFakeRuntimeAdapter } from "../../src/provider/pi/session.ts";
-import { listProject } from "../../src/service/role/resolve-role.ts";
+import { listProject, resolveRole, type ProjectListing } from "../../src/service/role/resolve-role.ts";
 import { loadEffectiveConfig } from "../../src/common/shared/config-loader.ts";
-import { resolveRole } from "../../src/service/role/resolve-role.ts";
-import { resolveBoundarySection } from "../../src/common/门禁引擎/boundary-core.ts";
+import { resolveBoundarySection, builtInBoundarySection, BUILT_IN_ROLE_CARD_TEXT } from "../../src/common/门禁引擎/boundary-core.ts";
 import { sha256File } from "../../src/common/门禁引擎/io.ts";
 import { resolveWrite } from "../../src/service/gate/resolve-write.ts";
 import { buildGovernedTools } from "../../src/provider/pi/tools.ts";
@@ -62,12 +61,15 @@ after(() => {
 
 const GOV_REL = "角色卡/governance-boundary.yaml";
 
-/** 创世项目（空文件夹 + 操作者发起的 bootstrap）：**不预建任何东西**，也不预置治理边界。 */
+/** 创世项目（空文件夹 + 操作者发起的 bootstrap）：**不预建任何东西**，也不预置治理边界。
+ *  2026-10-17 三权 V1 后，su 创世属于**旧 single 模型**（新空项目默认 trio）——本文件显式 single
+ *  以钉住「旧项目逐字兼容」；trio 新项目的创世/默认见 `test/测试/governance-trio-verify/`。 */
 function genesisProject(target: string): ProjectConfig {
   return {
     projectRoot: target,
     skillRoot: target,
     roles: {},
+    governanceModel: "single",
     genesisBootstrap: { source: "test:T35 操作者导入空文件夹并开启 su 对话=发起 bootstrap（操作者指令）" },
   };
 }
@@ -93,12 +95,35 @@ interface DesktopGateCapture {
   open: OpenResult;
 }
 
+/** 桌面链取 gate：2026-10-17 后 su 只存在于**显式 single** 的旧项目——注入 `listProjectFn`
+ *  返回「旧 single 项目」的枚举形态（内置 su + 既有项目角色；模型显式 single），仍交给真实
+ *  `buildProjectConfig`/`openRoleSession` 装配 gate。新空项目默认 trio 由独立套件覆盖。 */
 async function openSuViaDesktop(dir: string): Promise<DesktopGateCapture> {
   let gate: WriteGate | undefined;
   let project: ProjectConfig | undefined;
+  const singleListing = async (root: string): Promise<ProjectListing> => {
+    const real = await listProject(root);
+    return {
+      ...real,
+      governanceModel: "single",
+      primaryRoleId: "su",
+      roles: [
+        {
+          roleId: "su",
+          cardPath: "",
+          boundaryPath: "",
+          cardText: BUILT_IN_ROLE_CARD_TEXT,
+          boundary: builtInBoundarySection(),
+          builtIn: true,
+        },
+        ...real.roles.filter((r) => r.builtIn !== true),
+      ],
+    };
+  };
   const iface = createDesktopInterface({
     pickDirectory: async () => dir,
     emitEvent: () => {},
+    listProjectFn: singleListing,
     // 捕获「构造出的 ProjectConfig」后，仍交给**真实** openRoleSession 装配 gate（不换底层）。
     openRoleSessionFn: async (input, deps) => {
       project = input.project;
@@ -120,17 +145,29 @@ async function openSuViaDesktop(dir: string): Promise<DesktopGateCapture> {
 
 // —————————————————————— 1) 导入空文件夹：listProject（IPC）不抛错 ——————————————————————
 
-test("用户入口/空文件夹：IPC listProject 不抛错，返回内置 su + hasRoles:false + primaryRoleId", async () => {
+test("用户入口/空文件夹：IPC listProject 不抛错，新空项目默认三权（3 内置 / rapporteur 主入口）", async () => {
   const dir = tempRoot("empty");
   const iface = createDesktopInterface({ pickDirectory: async () => dir, emitEvent: () => {} });
   const listing = await iface.listProject({ projectRoot: dir });
 
   assert.equal(listing.hasRoles, false, "空项目应 hasRoles:false（尚未 bootstrap）");
-  assert.equal(listing.primaryRoleId, "su", "primaryRoleId 应为主入口（内置 su，由门禁引擎给出）");
-  assert.equal(listing.roles.length, 1, "空项目 roles 只应含内置 su");
-  assert.equal(listing.roles[0].roleId, "su");
-  assert.equal(listing.roles[0].builtIn, true);
-  assert.ok(listing.roles[0].cardText.length > 0, "内置 su 应带角色说明（无角色卡文件，由引擎合成）");
+  // 2026-10-17 客户拍板（三权 V1）：**新空项目默认 trio**；旧 su 只属于显式 single 的旧项目。
+  assert.equal(listing.governanceModel, "trio", "新空项目默认 trio（评审 §5.4）");
+  assert.equal(listing.primaryRoleId, "rapporteur", "primaryRoleId 应是主入口 rapporteur（由门禁引擎给出）");
+  assert.deepEqual(
+    listing.roles.map((r) => r.roleId),
+    ["rapporteur", "nominator", "convener"],
+    "空项目 roles 恰含三个内置治理角色（顺序固定）",
+  );
+  for (const r of listing.roles) {
+    assert.equal(r.builtIn, true);
+    assert.ok(r.cardText.length > 0, "内置治理角色应带角色说明（无角色卡文件，由引擎合成）");
+  }
+  assert.deepEqual(
+    listing.roles.map((r) => r.governanceFunction),
+    ["proposal", "nomination", "schedule"],
+    "治理职能原样透传（渲染侧不硬编码 id）",
+  );
   // 空项目是**正常状态**（**客户 2026-10-11 裁定**）：「无角色目录」=「项目尚未 bootstrap」的**初始态**，
   // 客户为「空文件夹 → 与 su 对话 → su 建角色」专门设计了整套流程，故**不该报警**——门禁引擎据此改，
   // `listProject` 在**无角色目录**时不再推 warning（`hasRoles:false` 与界面「项目尚未 bootstrap」提示已说清楚）。
@@ -146,10 +183,12 @@ test("用户入口/空文件夹：IPC listProject 不抛错，返回内置 su + 
     !listing.warnings.some((w) => /无角色目录|尚未 bootstrap/.test(w)),
     `空项目不得再出现「无角色目录 / 尚未 bootstrap」类 warning，实得：${JSON.stringify(listing.warnings)}`,
   );
-  // 创世态：su **不再带** `readOnly` 字段——客户 2026-10-11 裁定移除「只读」徽标（它偏离了
-  // 「门禁静默执行、拒绝内联显示在聊天流里」的原模型；su 本就一直能聊天/写治理产物）。
+  // 创世态：内置角色**不再带** `readOnly` 字段——客户 2026-10-11 裁定移除「只读」徽标（它偏离了
+  // 「门禁静默执行、拒绝内联显示在聊天流里」的原模型；内置角色本就一直能聊天/写治理产物）。
   // 留**反向守卫**（断言该字段**不存在**）而非删行：它不会再长回来。
-  assert.equal("readOnly" in listing.roles[0], false, "su 不应再带 readOnly 字段（只读徽标已移除）");
+  for (const r of listing.roles) {
+    assert.equal("readOnly" in r, false, "内置角色不应再带 readOnly 字段（只读徽标已移除）");
+  }
 });
 
 test("用户入口/空文件夹对照：项目根不存在 / 是文件 → 仍是**真错误**（抛错），不伪装成空项目", async () => {
@@ -530,6 +569,8 @@ test("用户入口/收尾负例：**把授权拿掉**（边界未接受）→ su
     projectRoot: dir,
     skillRoot: dir,
     roles: {},
+    // 旧 single 模型（本用例验 su 收尾不绕门；新空项目默认 trio，走独立套件）。
+    governanceModel: "single",
     governanceBoundary: { path: GOV_REL, acceptance: { accepted: false, source: "" } },
   };
 

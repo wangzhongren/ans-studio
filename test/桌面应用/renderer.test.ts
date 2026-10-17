@@ -1969,7 +1969,11 @@ test("I4：S1 空态文案——含「尚无治理记录」与 ans govern 兜底
   // 状态行接线：S1 说明与 invalid 原因均经纯函数；invalid 分支不得出现建立按钮。
   assert.ok(RENDERER.includes("UiLabels.governanceMissingText(projectRoleCount())"), "S1 状态行经纯映射");
   assert.ok(RENDERER.includes("UiLabels.governanceInvalidText(record.reason)"), "invalid 状态行经纯映射（reason 逐字）");
-  assert.ok(/governanceInvalidText\(record\.reason\)[\s\S]{0,120}return "";/.test(RENDERER), "invalid 之后仅返回空/无建立按钮");
+  const invalidBranch = RENDERER.slice(
+    RENDERER.indexOf('if (state.projectRoot && record.state === "invalid")'),
+    RENDERER.indexOf("return modelHtml + migrationBannerHtml();")
+  );
+  assert.ok(invalidBranch.length > 0 && !invalidBranch.includes("data-governance-establish") && !invalidBranch.includes("data-governance-reaccept"), "invalid 之后无建立/重新接受动作（W4 模型行/迁移条不引入动作）");
 });
 
 test("I4：预览面板——将写路径/pin 对象与角色数/采纳/授权来源/旧格式提示/不扩大声明；取消不调 establish", async () => {
@@ -1986,7 +1990,7 @@ test("I4：预览面板——将写路径/pin 对象与角色数/采纳/授权�
   assert.ok(RENDERER.includes("data-governance-cancel"), "面板含 [取消] 按钮");
   // IPC：按契约名消费，不另起别名。
   assert.ok(RENDERER.includes("d.previewGovernanceRecord(projectRoot)"), "预览调 previewGovernanceRecord(projectRoot)");
-  assert.ok(RENDERER.includes("d.establishGovernanceRecord(projectRoot)"), "建立调 establishGovernanceRecord(projectRoot)");
+  assert.ok(RENDERER.includes("d.establishGovernanceRecord(projectRoot, { governanceModel: governanceFlow.model })"), "建立调 establishGovernanceRecord(projectRoot, {governanceModel})");
   // 取消函数：只关面板＋如实提示；**不调用任何 IPC**（尤其 establish）。
   const start = RENDERER.indexOf("function cancelGovernancePreview()");
   const end = RENDERER.indexOf("\n  }", start);
@@ -2000,7 +2004,7 @@ test("I4：预览面板——将写路径/pin 对象与角色数/采纳/授权�
 test("I4：禁止重复点击——确认后 disabled＋「正在建立治理记录…」；phase=write 失败不得宣称零副作用", async () => {
   const UL = await loadUiLabelsForGovernance();
   assert.ok(RENDERER.includes("正在建立治理记录…"), "建立中按钮文案");
-  assert.ok(/data-governance-establish' \+ \(f\.busy \? " disabled"/.test(RENDERER), "建立中按钮 disabled（防重复点击）");
+  assert.ok(/data-governance-establish' \+ \(confirmDisabled \? " disabled"/.test(RENDERER), "建立中/接口未接线时按钮 disabled（防重复点击/不假装可用）");
   // 失败文案构造是纯函数：phase 是「是否零副作用」的唯一依据。
   const writeFail = UL.governanceFailureView("write", "", "写入中断：磁盘错误；可能已写入部分文件，请重新执行。");
   const writeJoined = writeFail.lines.join("\n");
@@ -2056,11 +2060,15 @@ test("D2：状态行——reaccept 文案＋[检查并重新接受]；establish/
   assert.ok(fn.includes('data-governance-reaccept>检查并重新接受</button>'), "reaccept 动作按钮逐字");
   assert.ok(fn.includes('if (action === "establish")') && fn.includes("UiLabels.governanceMissingText(projectRoleCount())"), "establish 分支保持既有文案");
   assert.ok(fn.includes("UiLabels.governanceInvalidText(record.reason)"), "invalid 分支保持原因原文");
-  assert.ok(/governanceInvalidText\(record\.reason\)[\s\S]{0,120}return "";/.test(fn), "invalid 之后无动作");
+  const invalidBranch = fn.slice(
+    fn.indexOf('record.state === "invalid"'),
+    fn.indexOf("return modelHtml + migrationBannerHtml();")
+  );
+  assert.ok(invalidBranch.length > 0 && !invalidBranch.includes("data-governance-establish") && !invalidBranch.includes("data-governance-reaccept"), "invalid 之后无动作（W4 模型行/迁移条不引入动作）");
 });
 
 test("D2：su 空态——reaccept 标题/说明/主按钮/次行；establish 行为不变；按钮已绑定", () => {
-  const fn = RENDERER.slice(RENDERER.indexOf("function emptyStateHtml()"), RENDERER.indexOf("// —————— I4 治理记录"));
+  const fn = RENDERER.slice(RENDERER.indexOf("function emptyStateHtml("), RENDERER.indexOf("// —————— I4 治理记录"));
   assert.ok(fn.includes('action === "reaccept"'), "空态按 reaccept 分支");
   assert.ok(fn.includes("UiLabels.governancePinMismatchEmptyState(record.pinCount, record.pinFiles)"), "空态文案经纯映射");
   assert.ok(fn.includes('class="empty-hint"'), "次行 hint 独立呈现");
@@ -2426,4 +2434,180 @@ test("P5 边界：不自动开会话/切角色、不写 localStorage/.env/项目
   }
   // 结果行/开关文案不含英文判断逻辑分叉（语义在 ui-labels / 主进程）——源码只按 verdict 分 allow/deny 呈现。
   assert.ok(!code.includes('reasonCode === "necessary"'), "渲染侧不重写判断语义");
+});
+
+// —————— W4 治理三权（2026-10-17 评审 §8）：渲染侧接线与「不猜/不假装」守卫 ——————
+// 纯文案逐字由 tool-rows.test.ts 同批断言；此处钉源码不变式（分组、派生、单点、无硬编码 id、未接线禁用）。
+
+test("W4：左树三组——主入口/治理职能（内置）/项目角色；治理行由 governanceFunction 派生（不硬编码三权 id）", () => {
+  const tree = RENDERER.slice(RENDERER.indexOf("function renderRoleTree("), RENDERER.indexOf("function selectedRole("));
+  assert.ok(tree.length > 0, "renderRoleTree 存在");
+  assert.ok(tree.includes("UiLabels.governanceRoleView(r.governanceFunction)"), "治理组按 governanceFunction 派生（不按 id）");
+  assert.ok(tree.includes("UiLabels.GOVERNANCE_GROUP_LABEL"), "治理组标签经 ui-labels 单一来源");
+  assert.ok(tree.includes('treeGroupLabel("主入口")'), "主入口组保留");
+  assert.ok(tree.includes("Rt.roleGroups(others)"), "其余项目角色沿用 group/groupDuty 分组");
+  // 顺序：主入口 → 治理职能 → 其余项目角色（源码序）。
+  const primaryPos = tree.indexOf('treeGroupLabel("主入口")');
+  const govPos = tree.indexOf("UiLabels.GOVERNANCE_GROUP_LABEL");
+  const othersPos = tree.indexOf("Rt.roleGroups(others)");
+  assert.ok(primaryPos >= 0 && govPos > primaryPos && othersPos > govPos, "三组顺序＝主入口 → 治理职能 → 其他角色");
+
+  const item = RENDERER.slice(RENDERER.indexOf("function roleTreeItem("), RENDERER.indexOf("function ensureRoleTreeVisible("));
+  assert.ok(item.includes("var gov = UiLabels.governanceRoleView(r.governanceFunction);"), "树项按 governanceFunction 取显示视图");
+  assert.ok(item.includes("var displayName = gov ? gov.name : r.roleId;"), "治理行＝中文名+英文名；其余行沿用 roleId（single 旧树逐字不变）");
+  assert.ok(item.includes('class="ti-power"') && item.includes('class="ti-builtin"'), "权力副标题与内置标识钩子齐备");
+  assert.ok(item.includes("esc(roleSubtitle(r))"), "副标题经 roleSubtitle 单点");
+  assert.ok(item.includes('gov ? gov.builtinNote : (r.builtIn ? "内置角色：定义在 SKILL.md，无角色目录" : "")'), "内置标识：trio 新文案、旧 su 逐字保留");
+
+  const sub = RENDERER.slice(RENDERER.indexOf("function roleSubtitle("), RENDERER.indexOf("function roleTreeItem("));
+  assert.ok(sub.includes("UiLabels.governanceRoleView(role && role.governanceFunction)"), "roleSubtitle 读 governanceFunction");
+  assert.ok(sub.includes("return gov.power;"), "治理角色副标题＝权力说明");
+  assert.ok(sub.includes('return "内置治理角色（定义见 SKILL.md）";'), "旧 su 副标题逐字保留");
+
+  // 不硬编码三权 id（去注释源码断言；角色名/权力文案全部来自 ui-labels）。
+  for (const id of ["rapporteur", "nominator", "convener"]) {
+    assert.ok(!RENDERER_CODE.includes(id), "renderer.js 代码中不得硬编码三权 id：" + id);
+  }
+  for (const cls of [".ti-power", ".ti-builtin"]) assert.ok(STYLES.includes(cls), "styles.css 应有 " + cls);
+});
+
+test("W4：空态——报告员保留治理记录入口；提名/编排专属说明按 governanceFunction 呈现；pane 按角色取文案", () => {
+  const fn = RENDERER.slice(RENDERER.indexOf("function emptyStateHtml("), RENDERER.indexOf("// —————— I4 治理记录"));
+  assert.ok(fn.length > 0, "emptyStateHtml 存在（带 roleId 参数）");
+  assert.ok(fn.includes("UiLabels.governanceRoleView(role.governanceFunction)"), "空态按角色治理职能取视图");
+  assert.ok(fn.includes("UiLabels.governanceRoleEmptyState(role.governanceFunction)"), "专属说明经 ui-labels 单点");
+  assert.ok(fn.includes('action === "reaccept"') && fn.includes("data-governance-reaccept"), "报告员/既有 pin-mismatch 入口保留");
+  assert.ok(fn.includes('action === "establish"') && fn.includes("data-governance-establish"), "报告员/既有建立入口保留");
+  // 每个 pane 用**自己的角色**取空态（不再用通用文案）；主聊天区/换项目仍用通用空态。
+  assert.ok(RENDERER.includes("p.innerHTML = emptyStateHtml(key);"), "paneFor 按角色 id 取空态");
+  assert.ok(RENDERER.includes("outerHTML = emptyStateHtml(key);"), "refreshEmptyStates 按角色 id 刷新");
+  assert.ok(RENDERER.includes('$("chat").innerHTML = emptyStateHtml();'), "换项目/主聊天区保持通用空态");
+  // 旧 single 行为：项目角色无 governanceFunction ⇒ 走原分支（无专属空态）。
+  assert.ok(fn.includes("if (govEmpty)"), "专属空态是显式分支；无治理职能时逐字走原分支");
+});
+
+test("W4：状态行——治理模型/当前流程/状态只信 interface；未给不猜；旧模型提示条与 V1 按钮不假装可用", () => {
+  // 落状态：显式白名单，缺失 ⇒ known=false（不显示模型、不猜）。
+  assert.ok(RENDERER.includes('state.governanceModelKnown = model === "single" || model === "trio";'), "模型白名单");
+  assert.ok(RENDERER.includes('state.governanceModel = state.governanceModelKnown ? model : "single";'), "缺失按 single 兜底但不显示");
+  assert.ok(RENDERER.includes("var gf = res.governanceFlow;"), "当前流程原样转自 listing.governanceFlow");
+  assert.ok(RENDERER.includes('flowId: typeof gf.flowId === "string" ? gf.flowId : ""'), "flowId 原样转写");
+  assert.ok(RENDERER.includes('status: typeof gf.status === "string" ? gf.status : ""'), "status 原样转写");
+  // 显示：模型行经纯映射；接口未报告模型 ⇒ 空。
+  assert.ok(RENDERER.includes("UiLabels.governanceStatusText("), "状态行经 ui-labels");
+  assert.ok(RENDERER.includes('if (!state.projectRoot || state.governanceModelKnown !== true) return "";'), "模型未知 ⇒ 不显示（不猜）");
+  // 旧模型提示条：逐字文案 + 能力探测 + 恒禁用按钮。
+  assert.ok(RENDERER.includes("UiLabels.GOVERNANCE_MIGRATION_TEXT"), "提示条文案单一来源");
+  assert.ok(RENDERER.includes('typeof d.previewGovernanceMigration === "function"'), "迁移入口按桥能力探测");
+  assert.ok(RENDERER.includes("UiLabels.governanceMigrationButtonView(wired)"), "按钮文案/禁用经纯映射");
+  assert.ok(RENDERER.includes('data-governance-migrate\' + (view.disabled ? " disabled" : "")'), "迁移按钮显隐按桥能力（未接线禁用/齐备启用）");
+  assert.ok(RENDERER.includes("openGovernanceMigrationPreview()"), "按钮/状态行点击进入迁移预览");
+  for (const cls of [".gs-model", ".gs-banner"]) assert.ok(STYLES.includes(cls), "styles.css 应有 " + cls);
+});
+
+test("W4：建立治理记录预览——single/trio 选择默认 single、客户点选、结果透传 interface；未接线禁用并说明", () => {
+  // 选择器：data 钩子 + 默认 single + change 委托。
+  assert.ok(RENDERER.includes('data-governance-model value="'), "模型单选项（data 钩子）");
+  assert.ok(RENDERER.includes('governanceFlow.model === "trio" ? "trio" : "single"'), "选择值归一（默认 single）");
+  assert.ok(RENDERER.includes('governanceFlow.model = state.governanceModelKnown === true && state.governanceModel === "trio" ? "trio" : "single";'), "默认 single；仅在接口明确 trio 时保留 trio");
+  assert.ok(RENDERER.includes('preview.addEventListener("change"'), "点选经 change 委托");
+  assert.ok(RENDERER.includes("selectGovernanceModel(input.value)"), "选择处理单点");
+  assert.ok(RENDERER.includes("openGovernancePreview(true)"), "点选后重取预览（保留客户选择）");
+  // 透传：预览与建立均带 {governanceModel}；未接线时不传、按钮禁用并说明。
+  assert.ok(RENDERER.includes("d.previewGovernanceRecord(projectRoot, { governanceModel: governanceFlow.model })"), "预览透传模型");
+  assert.ok(RENDERER.includes("d.establishGovernanceRecord(projectRoot, { governanceModel: governanceFlow.model })"), "建立透传模型");
+  assert.ok(RENDERER.includes("state.governanceModelKnown !== true"), "未接线判定");
+  assert.ok(RENDERER.includes("UiLabels.GOVERNANCE_MODEL_UNWIRED"), "未接线说明逐字（ui-labels）");
+  assert.ok(RENDERER.includes("var confirmDisabled = f.busy || state.governanceModelKnown !== true;"), "未接线 ⇒ 建立按钮禁用");
+  assert.equal((RENDERER.match(/d\.establishGovernanceRecord\(/g) || []).length, 1, "建立调用点唯一（选项随同一调用透传）");
+  // 建议 trio：仅接口信号，客户必须点选（不自动切换）。
+  assert.ok(RENDERER.includes('suggestedGovernanceModel === "trio" || governanceFlow.preview.detectedGovernanceArtifacts === true'), "建议 trio 只信接口信号");
+  assert.ok(RENDERER.includes("UiLabels.GOVERNANCE_MODEL_SUGGEST"), "建议文案经 ui-labels");
+  assert.ok(!RENDERER_CODE.includes('governanceFlow.model = "trio";'), "不得自动把选择切成 trio（必须客户点选）");
+  // normalize 保留可选字段（接口未给 ⇒ 空/不提示）。
+  assert.ok(RENDERER.includes('governanceModel: src.governanceModel === "trio"'), "预览落模型字段");
+  assert.ok(RENDERER.includes("detectedGovernanceArtifacts: src.detectedGovernanceArtifacts === true"), "预览落产物检测信号");
+  for (const cls of [".gp-model", ".gp-model-opt", ".gp-model-note"]) assert.ok(STYLES.includes(cls), "styles.css 应有 " + cls);
+});
+
+test("W4：决定卡——flowId/权力/写路径/摘要/哈希/排队提示；排队不可作答；UI 不自动合并/批准", () => {
+  assert.ok(RENDERER.includes("UiLabels.governanceCardMetaView(req)"), "决定卡元信息经纯映射");
+  assert.ok(RENDERER.includes("meta.lines.forEach"), "逐行转义呈现（flowId/权力/路径/摘要/哈希）");
+  assert.ok(RENDERER.includes("meta.governance ? '<span class=\"op-gov-badge\">'"), "治理决定徽标（客户最终批准）");
+  assert.ok(RENDERER.includes("UiLabels.GOVERNANCE_QUEUE_NOTE"), "排队提示文案单一来源");
+  assert.ok(RENDERER.includes("var queued = payload.queued === true || req.queued === true;"), "排队事实只信桌面窗口");
+  assert.ok(RENDERER.includes('var queuedNext = typeof payload.queued === "boolean"'), "同一请求重推的 queued 事实（payload 优先，request.queued 兼容）");
+  assert.ok(RENDERER.includes("if (queued) setButtonsDisabled(true);"), "排队卡不可作答");
+  assert.ok(RENDERER.includes('if (entry.queued === true) { setNote(UiLabels.GOVERNANCE_QUEUE_NOTE, ""); return; }'), "提交守卫（不自动批准）");
+  assert.ok(RENDERER.includes("function updateQueuedOperatorCard(entry)"), "排队推进由桌面窗口重推 queued 驱动（UI 不自行合并）");
+  // 到达路径不得自动作答：operatorRespond 只出现在作答函数里。
+  const arrival = RENDERER.slice(RENDERER.indexOf("function appendOperatorRequest("), RENDERER.indexOf("function onOperatorExpired("));
+  assert.ok(!arrival.includes("operatorRespond"), "请求到达不得自动回传决定");
+  assert.ok(!arrival.includes('state = "decided"'), "请求到达不得伪造成已决定");
+  for (const cls of [".op-gov-badge", ".op-meta", ".op-queued"]) assert.ok(STYLES.includes(cls), "styles.css 应有 " + cls);
+});
+
+// —————— W4/V1b 旧模型迁移界面（评审 §5.5）：按钮能力、零写入预览、确认/失败、S1 透传 ——————
+
+test("V1b：迁移按钮按桥能力启用/禁用；点击只打开零写入预览（不直接写入）", () => {
+  assert.ok(RENDERER.includes('typeof d.previewGovernanceMigration === "function"'), "迁移预览桥能力探测");
+  assert.ok(RENDERER.includes('typeof d.migrateGovernanceModel === "function"'), "迁移写入桥能力探测");
+  assert.ok(RENDERER.includes('(view.disabled ? " disabled" : "")'), "按钮 disabled 只由能力视图决定");
+  assert.ok(RENDERER.includes('esc(view.label)'), "文案经 ui-labels 单一来源");
+  // 状态行点击委托：迁移按钮走 openGovernanceMigrationPreview（其余仍走 openGovernancePreview）。
+  assert.ok(RENDERER.includes('[data-governance-establish], [data-governance-reaccept], [data-governance-migrate]'), "状态行委托含迁移按钮");
+  assert.ok(RENDERER.includes("if (btn.getAttribute(\"data-governance-migrate\") !== null) openGovernanceMigrationPreview();"), "迁移按钮点击进入迁移预览");
+  // 打开预览只调 preview，不调写入。
+  const openFn = RENDERER.slice(RENDERER.indexOf("async function openGovernanceMigrationPreview("), RENDERER.indexOf("async function confirmGovernanceMigration("));
+  assert.ok(openFn.length > 0 && openFn.includes("d.previewGovernanceMigration(projectRoot)"), "预览调用 previewGovernanceMigration");
+  assert.ok(!openFn.includes("d.migrateGovernanceModel("), "打开预览不得调写入口（零写入；仅能力探测）");
+});
+
+test("V1b：迁移预览字段——模型/写路径/modelField/manifestLine/pinChanges/保留文件/摘要前 8 位；确认按钮 fail-closed", () => {
+  const norm = RENDERER.slice(RENDERER.indexOf("function normalizeGovernanceMigrationPreview("), RENDERER.indexOf("function governanceMigrationPreviewHtml("));
+  for (const field of ["targetModel", "writePaths", "modelField", "manifestLine", "pinChanges", "retainedFiles", "snapshotDigest"]) {
+    assert.ok(norm.includes(field), "归一保留预览字段：" + field);
+  }
+  const view = RENDERER.slice(RENDERER.indexOf("function governanceMigrationPreviewHtml("), RENDERER.indexOf("async function openGovernanceMigrationPreview("));
+  assert.ok(view.includes("UiLabels.governanceMigrationPreviewView(f.preview)"), "预览文案经 ui-labels 单点");
+  for (const line of ["view.modelLine", "view.writeLines", "view.modelFieldLine", "view.manifestLine", "view.pinLines", "view.retainedLines", "view.digestLine", "view.warning"]) {
+    assert.ok(view.includes(line), "预览逐字段呈现：" + line);
+  }
+  assert.ok(view.includes('data-governance-migrate-confirm'), "「确认升级」按钮");
+  assert.ok(view.includes('data-governance-cancel'), "「取消」按钮");
+  assert.ok(view.includes("var confirmDisabled = f.busy || !view.canConfirm;"), "摘要缺失/忙 ⇒ 确认禁用（fail-closed）");
+  assert.ok(view.includes('data-governance-migrate-recheck'), "失败可重新检查（preview-stale/busy 等）");
+});
+
+test("V1b：确认升级只回传 snapshotDigest；成功由 project:changed 刷新；失败按 status/phase 如实", () => {
+  const confirmFn = RENDERER.slice(RENDERER.indexOf("async function confirmGovernanceMigration("), RENDERER.indexOf("  /** 重画状态行与预览面板"));
+  assert.ok(confirmFn.length > 0, "confirmGovernanceMigration 存在");
+  assert.ok(confirmFn.includes("d.migrateGovernanceModel(projectRoot, preview.snapshotDigest)"), "确认调用 migrateGovernanceModel(projectRoot, snapshotDigest)");
+  assert.ok(confirmFn.includes("preview.snapshotDigest === \"\""), "摘要为空不发行（fail-closed）");
+  assert.ok(confirmFn.includes('res.ok === true && status === "completed"'), "成功判据 = ok && status completed");
+  assert.ok(confirmFn.includes("UiLabels.governanceMigrationSuccessText()"), "成功文案经 ui-labels（已升级为三权治理模型…）");
+  assert.ok(confirmFn.includes("UiLabels.governanceMigrationFailureView(phase, status, message)"), "失败文案经纯映射（status/phase）");
+  assert.ok(confirmFn.includes("可能已写入部分文件，请核对现场。"), "phase=write 失败如实提示核对现场");
+  const successBranch = confirmFn.slice(0, confirmFn.indexOf('if (message === "" && phase === "write")'));
+  assert.ok(!successBranch.includes("refreshListingQuietly"), "成功后由主进程 project:changed 驱动刷新（不自伪造）");
+  assert.ok(confirmFn.includes('if (status === "already-trio" || status === "no-record") void refreshListingQuietly(projectRoot);'), "already-trio/no-record 只读刷新列举（不写盘）");
+  assert.ok(!confirmFn.includes("state.governanceModel ="), "不自行改模型（等刷新）");
+  // 取消/关闭零写入口（迁移预览共用同一宿主）。
+  const cancel = RENDERER.slice(RENDERER.indexOf("function cancelGovernancePreview()"), RENDERER.indexOf("function closeGovernancePreview()"));
+  const close = RENDERER.slice(RENDERER.indexOf("function closeGovernancePreview()"), RENDERER.indexOf("async function refreshListingQuietly("));
+  for (const [name, body] of [["取消", cancel], ["关闭", close]] as const) {
+    assert.ok(body.length > 0, name + "函数存在");
+    assert.ok(!body.includes("migrateGovernanceModel"), name + "不得调迁移写入");
+    assert.ok(!body.includes("previewGovernanceMigration"), name + "不得调迁移预览");
+  }
+});
+
+test("V1b：S1 模型选择继续透传 preview/establish，且模型由 listing 回报后不再禁用", () => {
+  assert.ok(RENDERER.includes("state.governanceModelKnown = model === \"single\" || model === \"trio\";"), "listing 回报模型 ⇒ known=true");
+  assert.ok(RENDERER.includes("state.governanceModelKnown ? model : \"single\""), "缺失才回退 single（不显示）");
+  assert.ok(RENDERER.includes("d.previewGovernanceRecord(projectRoot, { governanceModel: governanceFlow.model })"), "预览透传所选模型");
+  assert.ok(RENDERER.includes("d.establishGovernanceRecord(projectRoot, { governanceModel: governanceFlow.model })"), "建立透传所选模型");
+  assert.ok(RENDERER.includes("var confirmDisabled = f.busy || state.governanceModelKnown !== true;"), "仅模型未回报时禁用（回报后可用）");
+  assert.ok(RENDERER.includes("UiLabels.GOVERNANCE_MODEL_SUGGEST"), "「建议 trio」提示保留");
+  assert.ok(RENDERER.includes('? "trio" : "single";'), "默认仍 single（仅接口明确 trio 时保留）");
 });

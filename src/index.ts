@@ -11,7 +11,7 @@
 // 演示配置（projectRoot/skillRoot/roles 及 T-1 的 scope）同样经 deps 作为纯值注入。
 
 import path from "node:path";
-import { statSync } from "node:fs";
+import { readdirSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import { parseInvocation } from "./common/装配/cli-parse.ts";
@@ -25,7 +25,9 @@ import {
 // §6 单一来源（T24）：`resolveSkillRoot` / `PI_CREDENTIAL_ENV_VARS` 改从共享模块只读导入，删本地副本。
 import { resolveSkillRoot, PI_CREDENTIAL_ENV_VARS } from "./common/shared/runtime-shared.ts";
 import {
+  ansProjectPath,
   loadEffectiveConfig,
+  readGovernanceModel,
   type ConfigSource,
   type LoadedConfig,
 } from "./common/装配/config-loader.ts";
@@ -203,6 +205,19 @@ async function loadConfig(projectRoot: string = resolveProjectRoot()): Promise<L
  * 导出以便测试直接断言注入结果与经 governCommand 的接线：main 的 govern 分支对**真实**适配器需要
  * provider 配置（在会话开启时才解析），测试经 `governCommand(argv, deps)` 注入假适配器走完链路
  * （见 `test/装配/govern-target.test.ts`）。
+ *
+ * ── 治理模型注入（评审 2026-10-17 §5.4「CLI 同步」）────────────────────────────
+ * `ans govern <目录>` 的配置注入必须把治理模型带进 `ProjectConfig`，否则 `resolveRole` 按缺省
+ * `single` 解析：编排已按 `listProject` 选到 rapporteur，边界解析却报「三权角色在 single 治理模型下
+ * 不可用」。判定与 `listProject` 同口径（**不复制** `.ans` 读取实现——`readGovernanceModel` 由 PM
+ * 属主共享组件提供，只读导入）：
+ *  - explicit → 用显式值；
+ *  - unreadable → `single`（保留既有 invalid / fail-closed 语义）；
+ *  - absent + 无 `.ans/project.json` 且无项目角色目录 → `trio`（新空项目）；
+ *  - absent + 其余（有 `.ans` 记录或有项目角色目录）→ `single`（旧项目，行为逐字不变）。
+ * **只对「外来目标目录」做推断**：`ans govern`（缺省）与 `ans govern <ans-cli 根>` 仍用载入配置
+ * （`.ans` 显式值原样生效；缺失即沿用既有 single 默认），不因目标推断改写 ans-cli 自身。
+ * `ans role run` 不经本函数（`buildRoleRunDeps` 直接 `loadConfig`），语义不受影响。
  */
 export async function loadInjection(targetDir?: string): Promise<ConfigInjection> {
   const projectRoot = targetDir === undefined ? resolveProjectRoot() : path.resolve(targetDir);
@@ -218,7 +233,70 @@ export async function loadInjection(targetDir?: string): Promise<ConfigInjection
       };
     }
   }
+  // 治理模型：外来目标目录按磁盘事实判定（与 listProject 同口径）；ans-cli 自身用载入配置。
+  if (targetDir !== undefined && !isSelfProjectRoot(projectRoot)) {
+    project.governanceModel = await resolveInjectedGovernanceModel(projectRoot);
+  }
   return { project, configSource: source };
+}
+
+/** 项目角色目录名（与 `listProject` 同口径；中文/英文两套都认）。 */
+const PROJECT_ROLE_DIR_NAMES = ["角色卡", "role-cards"] as const;
+
+/**
+ * `ans govern <外来目录>` 的治理模型判定（评审 §5.4「CLI 同步」）。
+ *
+ * 与 `listProject` 的判定顺序逐条对齐，避免 CLI 与桌面在同一目录上得出不同模型：
+ *  1) `.ans` 显式值优先；
+ *  2) `.ans` 不可读/不可解析 → `single`（行为不变，治理记录状态仍由桌面标 invalid）；
+ *  3) 无显式值：**既无 `.ans/project.json` 记录、也无项目角色目录** → `trio`（新空项目）；
+ *     其余（旧项目）→ `single`。
+ *
+ * `readGovernanceModel` 是 `.ans` 模型判定的单一来源（共享载入器 `loadEffectiveConfig` 也用它同一份
+ * 解析规则把显式值带进 `ProjectConfig`，二者结论一致）。角色目录探测只数**子目录**
+ * （与 `listProject` 的 `totalRoleDirs` 同口径：空 `角色卡/` 目录不算有角色）。读取异常一律按
+ * 「有角色」保守处理 → `single`（不把结构异常误判成新空项目而开放 trio）。
+ */
+async function resolveInjectedGovernanceModel(projectRoot: string): Promise<"single" | "trio"> {
+  const read = await readGovernanceModel(projectRoot);
+  if (read.state === "explicit") return read.model;
+  if (read.state === "unreadable") return "single";
+  const hasAnsRecord = isExistingFile(ansProjectPath(projectRoot));
+  return hasAnsRecord || hasProjectRoleDirs(projectRoot) ? "single" : "trio";
+}
+
+/** 是否存在 `.ans/project.json` 记录（仅 stat，不读内容；与 listProject 的判据同源）。 */
+function isExistingFile(absPath: string): boolean {
+  try {
+    return statSync(absPath).isFile();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 是否**有项目角色目录**：`角色卡/` 或 `role-cards/` 下至少一个子目录（与 `listProject` 的
+ * `totalRoleDirs` 同口径；保留 id / 归档目录也算「有角色」，模型判定不因角色是否有效而改变）。
+ * 结构异常（角色目录路径是文件、不可读）→ 按「有角色」保守处理，避免把旧项目误判成新空项目。
+ */
+function hasProjectRoleDirs(projectRoot: string): boolean {
+  for (const name of PROJECT_ROLE_DIR_NAMES) {
+    const dir = path.join(projectRoot, name);
+    let kind: "dir" | "other" | "none";
+    try {
+      kind = statSync(dir).isDirectory() ? "dir" : "other";
+    } catch {
+      kind = "none";
+    }
+    if (kind === "none") continue;
+    if (kind === "other") return true;
+    try {
+      if (readdirSync(dir, { withFileTypes: true }).some((entry) => entry.isDirectory())) return true;
+    } catch {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**

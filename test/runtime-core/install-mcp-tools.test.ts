@@ -52,7 +52,7 @@ test("schema 文案（G-4 V2）：install_mcp 钉住仅客户明示时安装/不
   // 失败文案枚举（沿技能版逐字体格）。
   assert.match(text, /MCP 未登记：docs\/mcp\/<name>\.md 不存在——先落盘再安装；未执行。/);
   assert.match(text, /登记中未包含角色「<roleId>」——未执行；如确要安装请先更新登记。/);
-  assert.match(text, /角色「<roleId>」不是本项目项目角色（或为治理角色 su）——未执行。/);
+  assert.match(text, /角色「<roleId>」不是本项目项目角色（或为内置治理角色）——未执行。/);
   assert.match(text, /next-session/, "在跑不打断＝如实延迟态须写明");
   assert.match(text, /env:NAME/, "声明格式：env 值只收字面量或 env:NAME 引用（凭据值不入文件）");
   assert.equal(/已获授权|已放行写盘|授予写权|授权写盘|代为授权成功/.test(text), false, `不得暗示任何授权：${text}`);
@@ -105,7 +105,7 @@ test("G-4 V2：失败如实——枚举与护栏 not-customer-turn 原样转达�
   for (const [reason, message] of [
     ["not-registered", "MCP 未登记：docs/mcp/fs.md 不存在——先落盘再安装；未执行。"],
     ["role-not-listed", "登记中未包含角色「impl」——未执行；如确要安装请先更新登记。"],
-    ["role-not-found", "角色「impl」不是本项目项目角色（或为治理角色 su）——未执行。"],
+    ["role-not-found", "角色「impl」不是本项目项目角色（或为内置治理角色）——未执行。"],
     ["not-customer-turn", "本动作仅可在客户消息发起的轮次执行——未执行。"],
   ] as const) {
     const result = await tools({ installMcp: async () => failure(reason, message) }).get("install_mcp")!.handler({ name: "install_mcp", args: { roleId: "impl", name: "fs" } });

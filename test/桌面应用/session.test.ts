@@ -515,7 +515,7 @@ function wdRole(roleId: string, extra: Partial<WatchdogRoleView> = {}): Watchdog
 function wdSnapshot(over: Partial<WatchdogProjectSnapshot> = {}): WatchdogProjectSnapshot {
   return {
     projectRoot: "/p",
-    suRoleId: "su",
+    governanceRoleId: "su",
     roles: [],
     queues: [],
     activeDeliveries: 0,

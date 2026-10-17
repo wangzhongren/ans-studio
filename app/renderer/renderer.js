@@ -74,6 +74,13 @@
     // **旧主进程无此字段 ⇒ 按 `{state:"present"}` 兜底**（不显示动作、不崩）。判据只经
     // `UiLabels.governanceActionFor` 单一谓词，不在此直接比较状态字符串。
     governanceRecord: { state: "present" },
+    // W4（2026-10-17 评审 §8）：治理模型——原样转自 listProject 的 `governanceModel`（`single|trio`）。
+    // **接口未给（旧主进程）⇒ `known=false`**：状态行/迁移提示条一律不显示、不猜模型；树仍按
+    // 每个角色的 `governanceFunction` 事实分组（角色数据本身是权威）。
+    governanceModel: "single",
+    governanceModelKnown: false,
+    // 当前流程事实（可选）：接口若提供 `governanceFlow: {flowId?, status?}` 原样转写；缺失 ⇒ 空（不猜）。
+    governanceFlow: { flowId: "", status: "" },
     selectedRoleId: null,
     // 当前**显示中**的角色（其 pane 挂在 #chat 下）；与 sessionOpenRoleId 的关系见下。
     sessionOpenRoleId: null, // 当前活动会话的角色 id（最近一次 openSession 成功者；null=无）
@@ -377,18 +384,47 @@
     });
   }
 
+  /** 枚举里的角色（按 id）；找不到 ⇒ null（不编角色）。 */
+  function roleById(roleId) {
+    var key = String(roleId == null ? "" : roleId);
+    if (key === "") return null;
+    return state.roles.find(function (r) { return r.roleId === key; }) || null;
+  }
+
+  /** 角色显示名：治理职能角色 = 「报告员 Rapporteur」等（由 `governanceFunction` 派生，不硬编码 id）；
+   *  其余角色沿用 roleId（旧树逐字不变）。 */
+  function displayNameOf(role) {
+    if (!role) return "";
+    var gov = UiLabels.governanceRoleView(role.governanceFunction);
+    return gov ? gov.name : role.roleId;
+  }
+
+  /** 主入口显示名（数据来自 primaryRoleId + 角色事实；无治理职能时为原 id）。 */
+  function primaryDisplayName() {
+    return displayNameOf(roleById(state.primaryRoleId)) || state.primaryRoleId;
+  }
+
   /**
    * 空聊天区（每个角色的聊天容器/默认视图都以它开局，作 HTML 字符串返回）：
    * **这是「未 bootstrap」这件事唯一该说的地方**（客户裁定：它曾同时出现在中栏横栏、中栏正中、左栏三处，
    * 收敛为只在此处）——若 `hasRoles === false`，标题/说明引导与 su 对话、把角色建出来，并给一个
    * **「开始与 <主入口> 对话」主按钮**（§10.7，`primaryRoleId` 驱动、不硬编码）。注意：默认主路径是 su，
    * 但**不自动开会话**（避免每次导入都起会话）。
+   * W4：拥有专属说明的治理职能（提名/编排）显示其空态说明（`governanceFunction` 派生）；提案职能
+   * （Rapporteur）沿用既有治理记录/主入口空态，「建立治理记录 / 检查并重新接受」入口逐字保留。
    */
-  function emptyStateHtml() {
-    var primary = state.primaryRoleId;
+  function emptyStateHtml(roleId) {
+    var primary = primaryDisplayName();
     var action = governanceActionVisible();
+    var role = roleById(roleId);
+    var govEmpty = role && UiLabels.governanceRoleView(role.governanceFunction)
+      ? UiLabels.governanceRoleEmptyState(role.governanceFunction)
+      : null;
     var title, sub, cta, hint = "";
-    if (state.projectRoot && state.hasRoles === false) {
+    if (govEmpty) {
+      title = esc(govEmpty.title);
+      sub = esc(govEmpty.sub);
+    } else if (state.projectRoot && state.hasRoles === false) {
       // S0（客户裁定原文，逐字不变）：未-bootstrap 这件事只说一遍，只在中栏正中。
       title = "项目尚未 bootstrap";
       sub = "与 " + esc(primary) + " 对话，让它把角色建出来；左树会随之长出。";
@@ -408,7 +444,9 @@
       title = "选择左侧角色开始聊天";
       sub = "消息直接发送，无需确认；写入由治理引擎在后台把关。";
     }
-    if (state.projectRoot && state.hasRoles === false) {
+    if (govEmpty) {
+      cta = "";
+    } else if (state.projectRoot && state.hasRoles === false) {
       cta = state.projectRoot && primary
         ? '<button id="btn-start-primary" class="btn btn-primary btn-start">开始与 ' + esc(primary) + " 对话</button>"
         : "";
@@ -448,6 +486,7 @@
   var governanceFlow = {
     open: false, loading: false, busy: false,
     mode: "establish", // "establish" | "reaccept"——共用 #governance-preview 宿主与取消/关闭
+    model: "single", // W4：建立时写入的治理模型（single|trio；默认 single，须客户点选）
     preview: null, error: null, result: null,
   };
 
@@ -483,9 +522,11 @@
       status.hidden = true;
       status.addEventListener("click", function (e) {
         var btn = e.target && e.target.closest
-          ? e.target.closest("[data-governance-establish], [data-governance-reaccept]")
+          ? e.target.closest("[data-governance-establish], [data-governance-reaccept], [data-governance-migrate]")
           : null;
-        if (btn) openGovernancePreview();
+        if (!btn) return;
+        if (btn.getAttribute("data-governance-migrate") !== null) openGovernanceMigrationPreview();
+        else openGovernancePreview();
       });
       notice.appendChild(status);
     }
@@ -500,33 +541,109 @@
         if (!t || !t.closest) return;
         if (t.closest("[data-governance-establish]")) confirmGovernanceEstablish();
         else if (t.closest("[data-governance-reaccept]")) confirmGovernanceReaccept();
+        else if (t.closest("[data-governance-migrate-confirm]")) confirmGovernanceMigration();
+        else if (t.closest("[data-governance-migrate-recheck]")) openGovernanceMigrationPreview();
         else if (t.closest("[data-governance-recheck]")) openGovernancePreview();
         else if (t.closest("[data-governance-cancel]")) cancelGovernancePreview();
         else if (t.closest("[data-governance-dismiss]")) closeGovernancePreview();
+      });
+      // W4：治理模型选择（single/trio）——选择即重取预览，让「将写入的治理模型」与预览同步；
+      // 客户未点选前不自动改（默认值在 openGovernancePreview 落定）。
+      preview.addEventListener("change", function (e) {
+        var input = e.target && e.target.closest ? e.target.closest("[data-governance-model]") : null;
+        if (input) selectGovernanceModel(input.value);
       });
       notice.parentNode.insertBefore(preview, notice.nextSibling);
     }
     return { status: status, preview: preview };
   }
 
-  /** 状态行文案：reaccept＝不一致说明＋「检查并重新接受」；S1＝说明＋「建立治理记录」；
-   *  invalid＝原因原文＋「本版不自动覆盖」（无动作）；present / S0＝不显示。 */
+  /** 状态行：治理模型（三权/旧模型）+ 当前流程/状态（接口提供才显示）；其上叠加既有治理记录动作。
+   *  模型未知（旧主进程未给 `governanceModel`）⇒ 模型行与迁移提示条都不显示（不猜模型）。 */
   function governanceStatusHtml() {
     var action = governanceActionVisible();
+    var modelHtml = governanceModelStatusHtml();
     if (action === "reaccept") {
       var mismatch = governanceRecordOf();
-      return '<span class="gs-text">' + esc(UiLabels.governancePinMismatchText(mismatch.pinCount, mismatch.pinFiles)) + "</span>" +
-        '<button class="btn btn-primary btn-mini" type="button" data-governance-reaccept>检查并重新接受</button>';
+      return modelHtml +
+        '<span class="gs-text">' + esc(UiLabels.governancePinMismatchText(mismatch.pinCount, mismatch.pinFiles)) + "</span>" +
+        '<button class="btn btn-primary btn-mini" type="button" data-governance-reaccept>检查并重新接受</button>' +
+        migrationBannerHtml();
     }
     if (action === "establish") {
-      return '<span class="gs-text">' + esc(UiLabels.governanceMissingText(projectRoleCount())) + "</span>" +
-        '<button class="btn btn-primary btn-mini" type="button" data-governance-establish>建立治理记录</button>';
+      return modelHtml +
+        '<span class="gs-text">' + esc(UiLabels.governanceMissingText(projectRoleCount())) + "</span>" +
+        '<button class="btn btn-primary btn-mini" type="button" data-governance-establish>建立治理记录</button>' +
+        migrationBannerHtml();
     }
     var record = governanceRecordOf();
     if (state.projectRoot && record.state === "invalid") {
-      return '<span class="gs-text gs-invalid">' + esc(UiLabels.governanceInvalidText(record.reason)) + "</span>";
+      return modelHtml +
+        '<span class="gs-text gs-invalid">' + esc(UiLabels.governanceInvalidText(record.reason)) + "</span>" +
+        migrationBannerHtml();
     }
-    return "";
+    return modelHtml + migrationBannerHtml();
+  }
+
+  /** 治理模型/流程状态行（纯文案来自 ui-labels；接口未给模型 ⇒ 空）。 */
+  function governanceModelStatusHtml() {
+    if (!state.projectRoot || state.governanceModelKnown !== true) return "";
+    var text = UiLabels.governanceStatusText(
+      state.governanceModel,
+      state.governanceFlow && state.governanceFlow.flowId,
+      state.governanceFlow && state.governanceFlow.status
+    );
+    return text === "" ? "" : '<span class="gs-text gs-model">' + esc(text) + "</span>";
+  }
+
+  /** 旧模型提示条（仅单模型项目、且接口明确报告模型时显示）。桥齐备 ⇒ 按钮可用并打开零写入预览；
+   *  未接线 ⇒「升级入口待本版后续」禁用（不假装可用）。 */
+  function migrationBannerHtml() {
+    if (!state.projectRoot || state.governanceModelKnown !== true || state.governanceModel !== "single") return "";
+    var wired = !!(d && typeof d.previewGovernanceMigration === "function" && typeof d.migrateGovernanceModel === "function");
+    var view = UiLabels.governanceMigrationButtonView(wired);
+    return '<span class="gs-banner">' +
+      '<span class="gs-banner-text">' + esc(UiLabels.GOVERNANCE_MIGRATION_TEXT) + "</span>" +
+      '<button class="btn btn-ghost btn-mini" type="button" data-governance-migrate' + (view.disabled ? " disabled" : "") +
+      ' title="' + esc(view.title) + '">' + esc(view.label) + "</button></span>";
+  }
+
+  /** 建立治理记录的模型选择器（预览头部）：默认 single，trio 须客户显式点选。
+   *  接口未报告 `governanceModel` ⇒ 控件与建立按钮禁用并说明（不假装选择会被采纳）。 */
+  function governanceModelPickerHtml() {
+    var known = state.governanceModelKnown === true;
+    var selected = governanceFlow.model === "trio" ? "trio" : "single";
+    function option(model) {
+      return '<label class="gp-model-opt"><input type="radio" name="governance-model" data-governance-model value="' + model + '"' +
+        (selected === model ? " checked" : "") + (known ? "" : " disabled") + "> <span>" +
+        esc(UiLabels.governanceModelOptionText(model)) + "</span></label>";
+    }
+    var html = '<div class="gp-model">' +
+      '<span class="gp-line">治理模型（建立时写入 .ans）：</span>' + option("single") + option("trio") +
+      '<span class="gp-line">将写入的治理模型：' + esc(UiLabels.governanceModelOptionText(selected)) + "</span>";
+    if (!known) html += '<span class="gp-model-note">' + esc(UiLabels.GOVERNANCE_MODEL_UNWIRED) + "</span>";
+    var suggested = governanceFlow.preview &&
+      (governanceFlow.preview.suggestedGovernanceModel === "trio" || governanceFlow.preview.detectedGovernanceArtifacts === true);
+    if (suggested && selected !== "trio") {
+      html += '<span class="gp-model-note">' + esc(UiLabels.GOVERNANCE_MODEL_SUGGEST) + "</span>";
+    }
+    return html + "</div>";
+  }
+
+  /** 选择治理模型：只记客户点选；立即重取预览（预览是「将写入什么」的权威显示）。 */
+  function selectGovernanceModel(model) {
+    if (governanceFlow.busy || governanceFlow.loading) return;
+    if (model !== "single" && model !== "trio") return;
+    if (governanceFlow.model === model) return;
+    governanceFlow.model = model;
+    if (governanceFlow.open && governanceFlow.mode === "establish") {
+      governanceFlow.preview = null;
+      governanceFlow.error = null;
+      governanceFlow.result = null;
+      void openGovernancePreview(true); // 保留客户已选模型（不回到默认值）
+    } else {
+      renderGovernanceUi();
+    }
   }
 
   function normalizeGovernancePreview(p) {
@@ -543,6 +660,10 @@
       adoptExistingGovernanceDoc: src.adoptExistingGovernanceDoc === true,
       acceptanceSource: typeof src.acceptanceSource === "string" ? src.acceptanceSource : "",
       legacyBoundaryRoleIds: list(src.legacyBoundaryRoleIds),
+      // W4（可选）：预览返回的治理模型与「建议 trio」信号（接口未给就不显示/不提示——不猜）。
+      governanceModel: src.governanceModel === "trio" ? "trio" : (src.governanceModel === "single" ? "single" : ""),
+      suggestedGovernanceModel: src.suggestedGovernanceModel === "trio" ? "trio" : "",
+      detectedGovernanceArtifacts: src.detectedGovernanceArtifacts === true,
     };
   }
 
@@ -586,12 +707,14 @@
     return '<span class="gp-list">' + paths.map(function (p) { return esc(p); }).join("<br>") + "</span>";
   }
 
-  /** 预览面板 HTML（非模态）：将写路径 / 将 pin 的对象与角色数 / 是否采纳既有治理边界文档 /
-   *  授权来源逐字 / 旧格式提示 / 「不扩大、不修改」声明 / [建立治理记录] [取消]。 */
+  /** 预览面板 HTML（非模态）：治理模型选择 / 将写路径 / 将 pin 的对象与角色数 / 是否采纳既有治理边界
+   *  文档 / 授权来源逐字 / 旧格式提示 / 「不扩大、不修改」声明 / [建立治理记录] [取消]。 */
   function governancePreviewHtml() {
     var f = governanceFlow;
     if (f.mode === "reaccept") return governanceReacceptPreviewHtml(f);
+    if (f.mode === "migrate") return governanceMigrationPreviewHtml(f);
     var html = '<p class="gp-title">建立治理记录（预览）</p>';
+    if (!f.result && !f.error) html += governanceModelPickerHtml();
     if (f.loading) {
       return html + '<p class="gp-note">正在读取预览…</p>' +
         '<div class="gp-actions"><button class="btn btn-ghost btn-mini" type="button" data-governance-cancel>取消</button></div>';
@@ -614,6 +737,10 @@
       return html + '<div class="gp-actions"><button class="btn btn-ghost btn-mini" type="button" data-governance-cancel>取消</button></div>';
     }
     var p = f.preview;
+    // 预览返回的模型与客户所选不一致时如实指出（不假装选择已被采纳；正常接线应一致）。
+    if (p.governanceModel && p.governanceModel !== f.model) {
+      html += '<p class="gp-line gp-legacy">预览返回的治理模型：' + esc(UiLabels.governanceModelOptionText(p.governanceModel)) + "（与所选不同）</p>";
+    }
     html += '<p class="gp-line">将写入：' + governancePathList(p.writePaths) + "</p>";
     html += '<p class="gp-line">将 pin 的对象（' + p.pinPaths.length + " 项）及角色（" + p.roleIds.length + " 个）：" +
       governancePathList(p.pinPaths) + "</p>";
@@ -626,8 +753,10 @@
         esc(p.legacyBoundaryRoleIds.join("、")) + "（迁移属后续版本）</p>";
     }
     html += '<p class="gp-declare">不扩大任何角色写边界、不修改任何角色边界文件内容。</p>';
+    // W4：接口未报告 `governanceModel` ⇒ 选择不会被采纳——建立按钮禁用（不假装可用）。
+    var confirmDisabled = f.busy || state.governanceModelKnown !== true;
     html += '<div class="gp-actions">' +
-      '<button class="btn btn-primary btn-mini" type="button" data-governance-establish' + (f.busy ? " disabled" : "") + ">" +
+      '<button class="btn btn-primary btn-mini" type="button" data-governance-establish' + (confirmDisabled ? " disabled" : "") + ">" +
       (f.busy ? "正在建立治理记录…" : "建立治理记录") + "</button>" +
       '<button class="btn btn-ghost btn-mini" type="button" data-governance-cancel' + (f.busy ? " disabled" : "") + ">取消</button></div>";
     return html;
@@ -680,6 +809,145 @@
     return html;
   }
 
+  /** 迁移预览的形状归一（`GovernanceMigrationPreview`；缺字段 fail-closed：canConfirm=false）。 */
+  function normalizeGovernanceMigrationPreview(p) {
+    var src = p && typeof p === "object" ? p : {};
+    var arr = function (v) { return Array.isArray(v) ? v.slice() : []; };
+    return {
+      model: src.model === "trio" ? "trio" : (src.model === "single" ? "single" : ""),
+      targetModel: src.targetModel === "trio" ? "trio" : (src.targetModel === "single" ? "single" : ""),
+      writePaths: arr(src.writePaths),
+      modelField: src.modelField === "trio" ? "trio" : (src.modelField === "single" ? "single" : (src.modelField === null ? null : "")),
+      manifestLine: typeof src.manifestLine === "string" ? src.manifestLine : "",
+      pinChanges: arr(src.pinChanges),
+      retainedFiles: arr(src.retainedFiles),
+      snapshotDigest: typeof src.snapshotDigest === "string" ? src.snapshotDigest : "",
+    };
+  }
+
+  /**
+   * 迁移预览（V1b；与建立/重新接受共用 #governance-preview 宿主，非模态）。全部业务文案来自
+   * `UiLabels.governanceMigrationPreviewView`；`canConfirm === false` ⇒「确认升级」disabled。
+   * 预览**零写入**；取消/关闭不调任何写入口。
+   */
+  function governanceMigrationPreviewHtml(f) {
+    var view = UiLabels.governanceMigrationPreviewView(f.preview);
+    var html = '<p class="gp-title">' + esc(view.title) + "</p>";
+    if (f.loading) {
+      return html + '<p class="gp-note">正在读取迁移预览…</p>' +
+        '<div class="gp-actions"><button class="btn btn-ghost btn-mini" type="button" data-governance-cancel>取消</button></div>';
+    }
+    if (f.result) {
+      var cls = f.result.kind === "success" ? "gp-success" : "gp-error";
+      html += f.result.lines.map(function (line) { return '<p class="' + cls + '">' + esc(line) + "</p>"; }).join("");
+      if (f.result.kind === "success" || f.result.noRetry) {
+        html += '<div class="gp-actions"><button class="btn btn-ghost btn-mini" type="button" data-governance-dismiss>关闭</button></div>';
+      } else {
+        html += '<div class="gp-actions">' +
+          '<button class="btn btn-primary btn-mini" type="button" data-governance-migrate-recheck>重新检查</button>' +
+          '<button class="btn btn-ghost btn-mini" type="button" data-governance-cancel>取消</button></div>';
+      }
+      return html;
+    }
+    if (f.error) {
+      html += '<p class="gp-error">' + esc(f.error.message) + "</p>";
+      if (f.error.detail) html += '<p class="gp-note">' + esc(f.error.detail) + "</p>";
+      return html + '<div class="gp-actions">' +
+        '<button class="btn btn-primary btn-mini" type="button" data-governance-migrate-recheck>重新检查</button>' +
+        '<button class="btn btn-ghost btn-mini" type="button" data-governance-cancel>取消</button></div>';
+    }
+    html += '<p class="gp-line">' + esc(view.modelLine) + "</p>";
+    view.writeLines.forEach(function (line) { html += '<p class="gp-line">' + esc(line) + "</p>"; });
+    html += '<p class="gp-line">' + esc(view.modelFieldLine) + "</p>";
+    html += '<p class="gp-line">' + esc(view.manifestLine) + "</p>";
+    view.pinLines.forEach(function (line) { html += '<p class="gp-line">' + esc(line) + "</p>"; });
+    view.retainedLines.forEach(function (line) { html += '<p class="gp-line">' + esc(line) + "</p>"; });
+    html += '<p class="gp-line gp-legacy">' + esc(view.digestLine) + "</p>";
+    html += '<p class="gp-declare">' + esc(view.warning) + "</p>";
+    var confirmDisabled = f.busy || !view.canConfirm;
+    html += '<div class="gp-actions">' +
+      '<button class="btn btn-primary btn-mini" type="button" data-governance-migrate-confirm' + (confirmDisabled ? " disabled" : "") + ">" +
+      (f.busy ? "正在升级…" : "确认升级") + "</button>" +
+      '<button class="btn btn-ghost btn-mini" type="button" data-governance-cancel' + (f.busy ? " disabled" : "") + ">取消</button></div>";
+    return html;
+  }
+
+  /** 打开迁移预览（零写入）：桥齐备才可进入（按钮由 `governanceMigrationButtonView` 控制）。 */
+  async function openGovernanceMigrationPreview() {
+    if (!d || typeof d.previewGovernanceMigration !== "function" || typeof d.migrateGovernanceModel !== "function") return;
+    var projectRoot = state.projectRoot;
+    if (!projectRoot) return;
+    governanceFlow.open = true;
+    governanceFlow.mode = "migrate";
+    governanceFlow.loading = true;
+    governanceFlow.busy = false;
+    governanceFlow.preview = null;
+    governanceFlow.error = null;
+    governanceFlow.result = null;
+    renderGovernanceUi();
+    var res;
+    try {
+      res = await d.previewGovernanceMigration(projectRoot);
+    } catch (err) {
+      res = { ok: false, code: "error", message: err && err.message ? String(err.message) : String(err) };
+    }
+    if (projectRoot !== state.projectRoot) return;
+    governanceFlow.loading = false;
+    if (!res || res.ok !== true) {
+      governanceFlow.error = {
+        message: res && typeof res.message === "string" && res.message !== "" ? res.message : "迁移预览失败。",
+        detail: res && typeof res.code === "string" && res.code !== "" ? "错误码：" + res.code : "",
+      };
+      renderGovernanceUi();
+      return;
+    }
+    governanceFlow.preview = normalizeGovernanceMigrationPreview(res.preview);
+    renderGovernanceUi();
+  }
+
+  /** 确认升级：只回传本次预览的 `snapshotDigest`；成功/失败按 status 如实，不伪造「已升级」。 */
+  async function confirmGovernanceMigration() {
+    if (!governanceFlow.open || governanceFlow.busy || governanceFlow.mode !== "migrate") return;
+    var preview = governanceFlow.preview;
+    if (!preview || typeof preview.snapshotDigest !== "string" || preview.snapshotDigest === "") return;
+    var projectRoot = state.projectRoot;
+    governanceFlow.busy = true;
+    governanceFlow.result = null;
+    renderGovernanceUi();
+    var res;
+    try {
+      if (!d || typeof d.migrateGovernanceModel !== "function") {
+        res = { ok: false, phase: "guard", status: "invalid-request", message: "升级通道不可用（桌面窗口尚未接线）。", model: "single" };
+      } else {
+        res = await d.migrateGovernanceModel(projectRoot, preview.snapshotDigest);
+      }
+    } catch (err) {
+      res = { ok: false, phase: "guard", status: "invalid-request", message: err && err.message ? String(err.message) : String(err), model: "single" };
+    }
+    if (projectRoot !== state.projectRoot) return;
+    governanceFlow.busy = false;
+    var status = res && typeof res.status === "string" ? res.status : "";
+    var phase = res && (res.phase === "write" || res.phase === "guard") ? res.phase : "guard";
+    var message = res && typeof res.message === "string" ? res.message : "";
+    if (res && res.ok === true && status === "completed") {
+      setHint(""); // 清掉可能残留的「已取消」提示
+      governanceFlow.result = { kind: "success", lines: [UiLabels.governanceMigrationSuccessText()] };
+      renderGovernanceUi();
+      // 不在此自行改模型/伪造刷新：主进程写后 emitProjectChanged → refreshProject → listProject。
+      return;
+    }
+    if (message === "" && phase === "write") {
+      message = "写入阶段中断（主进程未返回 message）；可能已写入部分文件，请核对现场。";
+    } else if (message === "") {
+      message = "升级失败（主进程未返回 message）。";
+    }
+    var view = UiLabels.governanceMigrationFailureView(phase, status, message);
+    governanceFlow.result = { kind: "failure", lines: view.lines, noRetry: view.noRetry };
+    renderGovernanceUi();
+    // 已是 trio / 无记录 ⇒ 状态可能已变：**只读**刷新列举（不写盘）；成功路径仍等 project:changed。
+    if (status === "already-trio" || status === "no-record") void refreshListingQuietly(projectRoot);
+  }
+
   /** 重画状态行与预览面板（状态行变化会引起 `.session-notice` 高度变化——沿用 U1 的「量—写—补」）。 */
   function renderGovernanceUi() {
     var ui = ensureGovernanceUi();
@@ -711,19 +979,24 @@
     Object.keys(chatPanes).forEach(function (key) {
       var pane = chatPanes[key];
       if (!pane || !pane.querySelector(".chat-empty")) return;
-      pane.querySelector(".chat-empty").outerHTML = emptyStateHtml();
+      pane.querySelector(".chat-empty").outerHTML = emptyStateHtml(key);
       bindEmptyState(pane);
     });
   }
 
-  /** 点「建立治理记录」/「检查并重新接受」/空态主按钮 → 先取预览（非模态展开），**不直接写入**。 */
-  async function openGovernancePreview() {
+  /** 点「建立治理记录」/「检查并重新接受」/空态主按钮 → 先取预览（非模态展开），**不直接写入**。
+   *  W4：建立预览带治理模型选择（默认 single；客户点选后以 `keepModel === true` 重取，不回到默认值）。 */
+  async function openGovernancePreview(keepModel) {
     var action = governanceActionVisible();
     if (!action) return;
     var reaccept = action === "reaccept";
     var projectRoot = state.projectRoot;
     governanceFlow.open = true;
     governanceFlow.mode = reaccept ? "reaccept" : "establish";
+    if (!reaccept && keepModel !== true) {
+      // 默认 single（评审 §8.3）；若接口已明确报告 trio（例如既有 trio 记录重建），保留 trio 不降级。
+      governanceFlow.model = state.governanceModelKnown === true && state.governanceModel === "trio" ? "trio" : "single";
+    }
     governanceFlow.loading = true;
     governanceFlow.busy = false;
     governanceFlow.preview = null;
@@ -740,6 +1013,9 @@
         }
       } else if (!d || typeof d.previewGovernanceRecord !== "function") {
         res = { ok: false, code: "unavailable", message: "预览通道不可用（桌面窗口尚未接线）。" };
+      } else if (state.governanceModelKnown === true) {
+        // 模型选择随预览透传（接口未接线时不传、也不假装选择会被采纳）。
+        res = await d.previewGovernanceRecord(projectRoot, { governanceModel: governanceFlow.model });
       } else {
         res = await d.previewGovernanceRecord(projectRoot);
       }
@@ -827,7 +1103,9 @@
       if (!d || typeof d.establishGovernanceRecord !== "function") {
         res = { ok: false, phase: "guard", code: "unavailable", finalize: { status: "blocked", message: "建立通道不可用（桌面窗口尚未接线）。" } };
       } else {
-        res = await d.establishGovernanceRecord(projectRoot);
+        // W4：客户点选的治理模型随建立透传（接口按 `GovernanceRecordInput` 消费；旧窗口忽略多余实参，
+        // 且按钮在 `governanceModelKnown !== true` 时已 disabled——不假装模型选择生效）。
+        res = await d.establishGovernanceRecord(projectRoot, { governanceModel: governanceFlow.model });
       }
     } catch (err) {
       res = { ok: false, phase: "guard", code: "error", finalize: { status: "blocked", message: err && err.message ? String(err.message) : String(err) } };
@@ -1075,7 +1353,7 @@
       p = document.createElement("div");
       p.className = "chat-pane";
       p.setAttribute("data-role-id", key);
-      p.innerHTML = emptyStateHtml();
+      p.innerHTML = emptyStateHtml(key);
       bindEmptyState(p);
       chatPanes[key] = p;
     }
@@ -2813,6 +3091,8 @@
   function freezeOperatorCard(card, text, cls) {
     var bs = card.querySelectorAll(".op-actions button, .op-options input");
     for (var i = 0; i < bs.length; i += 1) { bs[i].disabled = true; if (bs[i].tagName === "BUTTON") bs[i].hidden = true; }
+    var queuedNote = card.querySelector(".op-queued");
+    if (queuedNote) queuedNote.hidden = true; // 终态不再显示「等待前一个决定」
     var noteEl = card.querySelector(".op-note");
     if (noteEl) {
       noteEl.hidden = false;
@@ -2967,13 +3247,23 @@
     var roleId = rawRoleId !== "" ? rawRoleId : "(未标识角色)";
     var entry = opRequests[requestId];
     if (entry) {
+      // W4：桌面窗口是决定队列的权威——同一请求重推时只采纳它的 `queued` 事实（不自行排队/合并/批准）。
+      var queuedNext = typeof payload.queued === "boolean"
+        ? payload.queued
+        : (typeof req.queued === "boolean" ? req.queued : null);
+      if (queuedNext !== null && entry.state === "open") {
+        entry.queued = queuedNext;
+        updateQueuedOperatorCard(entry);
+      }
       materializeOperatorCard(requestId); // 重复到达（重放/重渲染）：幂等补挂，不重复建卡、不重复提示
       return;
     }
     // anchorKey：请求的锚点键（主进程按单一算法从请求本体 kind+title 拼出）——（重）物化时与回放行
     // 精确关联、把卡落回它发生的位置；payload 未带（旧主进程/探针直发）⇒ null ⇒ 走首物化位/兜底落尾。
     var anchorKey = typeof payload.anchorKey === "string" && payload.anchorKey !== "" ? payload.anchorKey : null;
-    opRequests[requestId] = entry = { roleId: roleId, runtime: state.runtime, projectRoot: state.projectRoot, turnId: typeof payload.turnId === "string" ? payload.turnId : "", toolCallId: typeof payload.toolCallId === "string" ? payload.toolCallId : "", request: req, state: "open", finalNote: null, card: null, anchorKey: anchorKey };
+    // W4：排队事实只信接口（payload.queued 或请求自带 queued）；缺省 false = 可作答。
+    var queued = payload.queued === true || req.queued === true;
+    opRequests[requestId] = entry = { roleId: roleId, runtime: state.runtime, projectRoot: state.projectRoot, turnId: typeof payload.turnId === "string" ? payload.turnId : "", toolCallId: typeof payload.toolCallId === "string" ? payload.toolCallId : "", request: req, state: "open", finalNote: null, card: null, anchorKey: anchorKey, queued: queued };
     materializeOperatorCard(requestId);
     refreshAwaitingBadge(roleId);
     updateRightQueue(roleId);
@@ -3062,14 +3352,25 @@
     card.className = "op-request " + variantClass;
     card.dataset.requestId = requestId;
 
+    // W4 决定卡：flowId / 权力类型 / 写路径 / 摘要 / 哈希——全部来自请求的**可选**治理字段（纯映射）；
+    // 缺失即不显示（旧卡零变化），渲染侧不从预览/正文抽取或自算。`queued` 只信桌面窗口给的排队事实。
+    var meta = UiLabels.governanceCardMetaView(req);
+    var queued = entry.queued === true;
     var html = "";
     html +=
       '<div class="op-head">' +
       '<span class="op-ico">' + ICONS.shield + "</span>" +
       '<span class="op-title">' + esc(isChoice ? req.title || "请选择" : req.title || "请确认") + "</span>" +
+      (meta.governance ? '<span class="op-gov-badge">' + esc(meta.badge) + "</span>" : "") +
       "</div>";
     if (isChoice && typeof req.question === "string" && req.question !== "") {
       html += '<div class="op-question">' + esc(req.question) + "</div>";
+    }
+    meta.lines.forEach(function (line) {
+      html += '<div class="op-meta">' + esc(line) + "</div>";
+    });
+    if (queued) {
+      html += '<div class="op-queued">' + esc(UiLabels.GOVERNANCE_QUEUE_NOTE) + "</div>";
     }
     // 预览（两种 kind 都可带）：**折叠**（details）+ 限高可滚 + **受控 Markdown**——与角色卡/聊天正文
     // 同一管线（`Md.renderMarkdown`：html:false 先转义原文 HTML、链接白名单、表格启用）——
@@ -3150,6 +3451,7 @@
     /** 回传决定：先乐观熄灯（B-3 按**全部 open 请求**重算）；成功/失效定格；可重试则解冻。 */
     function submit(decision, pendingText, okText) {
       if (entry.state !== "open" || entry.runtime !== state.runtime || entry.projectRoot !== state.projectRoot) return;
+      if (entry.queued === true) { setNote(UiLabels.GOVERNANCE_QUEUE_NOTE, ""); return; } // 排队中不可作答
       setButtonsDisabled(true);
       setNote(pendingText, "");
       refreshEntryAwaiting(entry);
@@ -3177,7 +3479,7 @@
         .catch(function (err) {
           if (entry.state !== "open") return;
           // 可重试（校验驳回/通道瞬时失败等）：请求仍 open——解冻供修正重试，如实示原因。
-          setButtonsDisabled(false);
+          if (entry.queued !== true) setButtonsDisabled(false);
           refreshEntryAwaiting(entry);
           setNote("回传失败：" + String(err && err.message ? err.message : err) + "——请重试。", "op-note-err");
         });
@@ -3221,6 +3523,29 @@
         if (selected.length === 0) return; // 防御：按钮禁用态已挡
         submit({ kind: "choice", selected: selected }, "已提交，等待主进程受理…", "已提交选择。");
       });
+    }
+    // W4：桌面窗口判定为排队（已有前一个待决定）⇒ 整卡不可作答，只显示「等待前一个决定」；
+    // UI 不自行合并/批准（队列权威在桌面窗口；后续重推 queued:false 时由 updateQueuedOperatorCard 解冻）。
+    if (queued) setButtonsDisabled(true);
+  }
+
+  /** 排队态变化（同一请求被桌面窗口重推 `queued`）：同步提示与可作答态；不动请求本体/不做决定。 */
+  function updateQueuedOperatorCard(entry) {
+    var card = entry.card;
+    if (!card || entry.state !== "open") return;
+    var queued = entry.queued === true;
+    var note = card.querySelector(".op-queued");
+    if (note) note.hidden = !queued;
+    var bs = card.querySelectorAll(".op-actions button, .op-options input");
+    for (var i = 0; i < bs.length; i += 1) bs[i].disabled = queued;
+    if (!queued) {
+      // 选择卡的「提交」仍须至少选一项（恢复排队前的既有判据；不另立第二套规则）。
+      var submit = card.querySelector(".op-submit");
+      if (submit) {
+        var inputs = card.querySelectorAll(".op-options input"), any = false;
+        for (var j = 0; j < inputs.length; j += 1) { if (inputs[j].checked) { any = true; break; } }
+        submit.disabled = !any;
+      }
     }
   }
 
@@ -3948,6 +4273,17 @@
           pinCount: typeof gr.pinCount === "number" && isFinite(gr.pinCount) ? gr.pinCount : 0,
         }
       : { state: "present" };
+    // W4：治理模型与当前流程——**只在接口明确提供时**落状态；缺失 ⇒ 不显示、不猜（旧主进程形状不变）。
+    var model = res.governanceModel;
+    state.governanceModelKnown = model === "single" || model === "trio";
+    state.governanceModel = state.governanceModelKnown ? model : "single";
+    var gf = res.governanceFlow;
+    state.governanceFlow = gf && typeof gf === "object"
+      ? {
+          flowId: typeof gf.flowId === "string" ? gf.flowId : "",
+          status: typeof gf.status === "string" ? gf.status : "",
+        }
+      : { flowId: "", status: "" };
     if (projectChanged || fresh) closeGovernancePreview(); // 换项目：旧项目的预览不跨项目保留
     var pp = $("project-path");
     pp.textContent = res.projectRoot;
@@ -4464,8 +4800,12 @@
   }
 
   /**
-   * 「角色简介」首句（展示用小字；无正文则回退到边界条目数）。 */
+   * 「角色简介」首句（展示用小字；无正文则回退到边界条目数）。
+   * W4：治理职能角色（由 `governanceFunction` 派生）返回权力副标题——「提案权 · 不拥有最终批准权」等；
+   * 旧内置 su（无 governanceFunction）返回原文，逐字不变。 */
   function roleSubtitle(role) {
+    var gov = UiLabels.governanceRoleView(role && role.governanceFunction);
+    if (gov) return gov.power;
     if (role.builtIn) return "内置治理角色（定义见 SKILL.md）";
     var text = String(role.cardText || "").trim();
     var m = text.replace(/^#+\s*/m, "").split(/[\n。；;]/)[0].trim();
@@ -4474,9 +4814,13 @@
     return n + " 条边界条目";
   }
 
-  /** 单条角色树项（图标 + 名称 + 副标题 + 徽标 + **状态徽标**（B-3：色点+短标签，悬停示最近事件））。 */
+  /** 单条角色树项（图标 + 名称 + 副标题 + 徽标 + **状态徽标**（B-3：色点+短标签，悬停示最近事件））。
+   *  W4：治理职能行显示「中文名 英文名」、权力副标题与「内置角色：随应用发布，无角色目录」；
+   *  全部由 `governanceFunction`/`builtIn` 派生（不硬编码三权 id）；旧 su/项目角色逐字不变。 */
   function roleTreeItem(r, isPrimary) {
     var item = document.createElement("div");
+    var gov = UiLabels.governanceRoleView(r.governanceFunction);
+    var displayName = gov ? gov.name : r.roleId;
     // primary：主入口条目在左树里用**带边框的区域**框出（呈现；主入口身份本身来自 primaryRoleId）。
     item.className = "tree-item" + (r.builtIn ? " builtin" : "") +
       (isPrimary ? " primary" : "") +
@@ -4484,13 +4828,19 @@
     item.setAttribute("data-role-id", r.roleId);
     item.setAttribute("role", "button");
     item.setAttribute("tabindex", "0");
-    var identityDescription = [isPrimary ? "主入口：默认入口与主路径" : "", r.builtIn ? "内置角色：定义在 SKILL.md，无角色目录" : ""].filter(Boolean).join("；");
+    var identityDescription = [
+      isPrimary ? "主入口：默认入口与主路径" : "",
+      gov ? gov.builtinNote : (r.builtIn ? "内置角色：定义在 SKILL.md，无角色目录" : ""),
+    ].filter(Boolean).join("；");
     if (identityDescription) { item.setAttribute("aria-description", identityDescription); item.title = r.roleId + "；" + identityDescription; }
     item.innerHTML =
       '<span class="ti-icon"><span class="ti-avatar">' + esc(Array.from(r.roleId).slice(0, 1).join("")) + "</span></span>" +
-      '<span class="ti-main"><span class="ti-name">' + esc(r.roleId) + "</span>" +
+      '<span class="ti-main"><span class="ti-name">' + esc(displayName) + "</span>" +
+      (gov ? '<span class="ti-power">' + esc(roleSubtitle(r)) + "</span>" : "") +
       (r.group && r.groupDuty ? '<span class="ti-group-duty">' + esc(r.groupDuty) + "</span>" : "") +
-      '<span class="ti-sub">' + esc(Rt.runtimeLabel(state.runtime)) + ' · ' + statusBadgeHtml(r.roleId) + "</span></span>" +
+      '<span class="ti-sub">' + esc(Rt.runtimeLabel(state.runtime)) + ' · ' + statusBadgeHtml(r.roleId) + "</span>" +
+      (gov ? '<span class="ti-builtin">' + esc(gov.builtinNote) + "</span>" : "") +
+      "</span>" +
       '<span class="ti-facts">' +
       "</span>";
     function activate() { selectRole(r.roleId); }
@@ -4526,8 +4876,9 @@
   }
 
   /**
-   * 角色树：**主入口角色（`primaryRoleId`）置顶为「主入口」分组**，其余归入「其他角色（查看/调试）」分组
-   * （§10.7）——次级角色**保留、可点、可聊**。主入口 id 取门禁引擎给的字段，**不硬编码 "su"**。
+   * 角色树：**主入口角色（`primaryRoleId`）置顶为「主入口」分组**；治理职能角色（按 `governanceFunction`
+   * 派生）归入「治理职能（内置）」；其余项目角色沿用 `group`/`groupDuty` 分组（§10.7 / 三权评审 §8.1）。
+   * 主入口 id 取门禁引擎给的字段，**不硬编码 "su"**；single 旧树（仅 su + 项目角色）逐字不变。
    */
   function renderRoleTree() {
     if (backgroundDelivery) return;
@@ -4538,10 +4889,20 @@
       return;
     }
     var primary = state.roles.find(function (r) { return r.roleId === state.primaryRoleId; }) || null;
-    var others = state.roles.filter(function (r) { return !primary || r.roleId !== primary.roleId; });
+    var governanceRoles = [];
+    var others = [];
+    state.roles.forEach(function (r) {
+      if (primary && r.roleId === primary.roleId) return;
+      if (UiLabels.governanceRoleView(r.governanceFunction)) governanceRoles.push(r);
+      else others.push(r);
+    });
     if (primary) {
       el.appendChild(treeGroupLabel("主入口"));
       el.appendChild(roleTreeItem(primary, true));
+    }
+    if (governanceRoles.length) {
+      el.appendChild(treeGroupLabel(UiLabels.GOVERNANCE_GROUP_LABEL));
+      governanceRoles.forEach(function (r) { el.appendChild(roleTreeItem(r, false)); });
     }
     if (others.length) {
       el.appendChild(treeGroupLabel("其他角色（查看/调试）"));
@@ -5778,6 +6139,11 @@
           preview: governanceFlow.preview,
           error: governanceFlow.error,
           result: governanceFlow.result,
+          // W4（只增）：治理模型/流程事实与预览中的模型选择（只读快照）。
+          governanceModel: state.governanceModel,
+          governanceModelKnown: state.governanceModelKnown,
+          governanceFlow: state.governanceFlow,
+          previewModel: governanceFlow.model,
         };
       },
       openPreview: openGovernancePreview,

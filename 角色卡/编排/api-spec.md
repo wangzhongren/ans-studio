@@ -300,3 +300,132 @@ export function shellJudgeAuditOf(request: ShellJudgeRequest, outcome: ShellJudg
 **审计透传**：`shell-gate.ts` 的 `runA` 把 `OperatorOutcome.allow/deny.judge` 写进审计记录可选 `judge`（`ShellAuditRecord.judge`，含 `tier`/`hardDenyOverride`/`model`/`reasonCode`/`reason`/`customerMessage`/`alternative`/`customerMessageSynthesized`）。人工手批（`manual` 后）**不写** `judge`。`by` 由桌面传入的 `operatorId = "judge:<引擎>"` 经既有 `operatorBy` 形成为 `operator:judge:<引擎>`。
 
 **测试**：`test/编排/shell-judge.test.ts` 27 例（离线桩，不调真实模型/不读 `.env`/不跑凭据）。
+
+## W2（2026-10-17）：治理三权在编排层的接线（账本 / 门禁 / 能力矩阵）
+
+**依据**：PM 评审 `角色卡/项目管理/docs/design/2026-10-17_design_governance-trio-review.md` §5.6/§5.7/§6.2/§十一 W2。本批只改编排自有路径：`src/common/编排/`、`src/pipeline/orchestration/{run-role,govern-session}.ts`、`src/interface/cli/govern.ts`、`test/编排/`、本角色文档。
+
+### 治理账本（`src/common/编排/governance-ledger.ts`）
+
+```ts
+export const GOVERNANCE_LEDGER_REL = ".ans/governance/ledger.jsonl";
+export type GovernancePower = "proposal" | "nomination" | "schedule" | "acceptance" | "app" | "customer";
+export type GovernanceDecisionKind =
+  | "proposal-accept" | "proposal-accept-quick" | "proposal-revise" | "proposal-reject"
+  | "appointment" | "appointment-write" | "schedule-write" | "acceptance"
+  | "migration" | "unclassified";
+export interface GovernanceLedgerEntry { at; kind; flowId?; stepId?; actorRoleId; power; decisionKind?;
+  artifactPath?; artifactVersion?; artifactSha256?; paths?; targetRoleId?; targetRoleIds?;
+  customerDecision?; decisionEvidence?; messageSummary?; runtime?; sessionId? }
+export interface GovernanceLedgerSnapshot { entries: readonly GovernanceLedgerEntry[]; errors: readonly string[] }
+
+export function appendGovernanceLedger(projectRoot, entry): Promise<{ok:true}|{ok:false;message:string}>;
+export function readGovernanceLedger(projectRoot): Promise<{entries;errors}>;
+export function refreshGovernanceLedgerSnapshot(projectRoot): Promise<GovernanceLedgerSnapshot>;
+export function flushGovernanceLedger(projectRoot): Promise<void>; // 测试/宿主等待在飞追加
+export function governanceLedgerPath(projectRoot): string;
+```
+
+- append-only、UTF-8、一行一条 JSON；进程内按 `projectRoot` 串行（promise 链）；`mkdir -p` → 追加 → `fsync`。
+- 失败**不回滚、不抛给角色**：只记诊断并如实返回 `{ok:false}`（「账本失败不翻转」，评审 §九-16）。
+- 读取：文件不存在 → 空账本无错误；坏行/不可读 → `errors`（坏行跳过），门禁见 `errors` 非空即 fail-closed。
+- **角色不可写**：`.ans/**` 在三人 `forbiddenWritePaths` 内；编排 gate 在 `resolveWrite` 之前拒绝。
+
+### 三道门禁（`src/common/编排/governance-gate.ts`）
+
+```ts
+export interface GovernanceGateInput {
+  projectRoot: string; model: GovernanceModel; roleId: string;
+  action: "write-flow" | "write-nomination" | "write-role-card" | "dispatch";
+  flowId?: string; stepId?: string; targetRoleId?: string; targetRoleIds?: string[]; path?: string;
+}
+export type GovernanceGateDecision = {allowed:true} | {allowed:false; code:string; message:string};
+export function evaluateGovernanceGate(input, snapshot): GovernanceGateDecision;
+export function parseFlowStepIds(text: string): string[];
+```
+
+- **提案接受门**（write-flow/write-nomination）：该 flow 最新提案类决定必须是 `proposal-accept`/`proposal-accept-quick`；`revise`/`reject`/`unclassified` 拒。普通写盘确认（无 `decisionKind`）不覆盖此前接受决定。
+- **任命写入门**（write-role-card）：该 flow 最新任命决定（`decisionKind="appointment"`）的 `targetRoleIds` 必须含目标角色；`flowId` 缺省时在全部 flow 的最新任命中查找（写卡路径无 flow 上下文）。
+- **派发范围门**（dispatch）五条：① 目标不是内置治理角色（三人与 su）；② 提案已接受；③ 目标在任命名单内**或** `accept-quick` 且目标是既有项目角色；④ `flowId`/`stepId` 必填且流程文件 `docs/flows/<flowId>.md` 存在对应步骤（只判存在、不读 status）；⑤ 同一 `flowId+stepId` 未派发过。
+- 防御性来源校验：write-flow/dispatch 必须 Convener；write-nomination/write-role-card 必须 Nominator。
+- `model !== "trio"` → `{allowed:true}`（旧 single 不分流三权门禁）；快照 `errors` 非空 → 拒一切动作（`ledger-corrupt`，文案指 `ledger.jsonl`）。
+
+### 治理会话（`govern-session.ts`）
+
+- `GovernSessionInput` 增 `governanceFunction?: GovernanceFunction`；解析顺序：显式 `governanceRoleId` → `governanceFunction` 对应 id → trio 缺省 rapporteur / single 缺省 su（统一走 Service `resolveGovernanceRole`；非法组合抛明确文案）。`ProjectConfig.governanceModel` 显式时优先于磁盘枚举。
+- `GovernanceSessionHandle.governanceFunction?: GovernanceFunction` 如实带出；`withGovernanceRole` 只并入**选中**的 id。
+- 默认提示词：trio 按 function 追加提案/提名/编排纪律（不写「已批准/已授权」，只说等待客户决定）；single/su 文案逐字保留。
+- 薄再导出（桌面只依赖此公共出口）：账本五函数/四型、`evaluateGovernanceGate`/`parseFlowStepIds` 及三型。
+
+### 能力矩阵与写门禁（`run-role.ts`）
+
+- 能力唯一来源 `governanceCapabilitiesOf(roleId)`（su 返回 `LEGACY_SU_CAPABILITIES`）：dispatchTask / roleStatus / sessionTail / proposeRecovery / installSkill(含 uninstall) / installMcp(含 uninstall) 按 `cap.*` 注入；项目角色无治理能力。
+- 预授权目录 `scopeWithBuiltInPreauthorization`：trio 按注册表 `preauthorizedDirs`；su 用 `LEGACY_SU_PREAUTHORIZED_DIRS` 四棵；项目角色无预授权。
+- trio gate 包装顺序：`forbiddenWritePaths`（拒 `.ans/**`、其他治理角色资料等）→ 路径分派 `write-flow`/`write-nomination`/`write-role-card` → 既有 `resolveWrite`。
+- `customerInput` 包装：按角色 `cardKind` 白名单（Rapporteur: proposal/acceptance/write；Nominator: appointment/appointment-write/write；Convener: schedule-write/write）——越权**不弹卡**、返回 declined；客户决定后写 `customer.decision`（同步更新内存快照、异步落盘），字段含 `power`/`decisionKind`/`customerDecision`/`targetRoleIds`/`paths`/`decisionEvidence{toolCallId,turnId,sessionId}`/`messageSummary`；`unavailable` 不写。
+- 会话 `open`/`send` 开始刷新账本快照；trio 内置角色 settle 后扫预授权目录的 `.md`，新增/变更写 `artifact.observed`（应用算 sha256）。
+- 三人不自我回交；`dispatchTask` 仅 Convener（trio）注入，并包一道派发门禁，拒投返回 `{ok:false}`。
+
+### finalize（`finalize.ts`）
+
+- `GovernanceRecordInput` / `GovernanceReacceptInput` 增可选 `governanceModel`（缺省 single）；仅 **trio** 在 establish/reaccept 成功后写 `governance.established`/`governance.reaccepted`（`actorRoleId="app"`、`power="app"`、`decisionEvidence.action` 与 `previewDigest` 如有）。single 旧项目保持零新增副作用。
+- 迁移 `governance.migrated` 留到 V1b（本版不实现）。
+
+### CLI（`govern.ts` / `args.ts`）
+
+- 新增 `--function proposal|nomination|schedule`（trio 缺省 proposal；single 传 → 引擎明确拒绝）。
+- `--role`：单个内置治理角色 id（su/rapporteur/nominator/convener）⇒ 选择会话角色；其余值沿用旧语义（目标角色）；混用 → 用法错误。trio/single 合法性由 `resolveGovernanceRole` 统一校验。
+
+## V1b（2026-10-17）：治理模型 `su → trio` 显式迁移
+
+**依据**：PM 评审 `2026-10-17_design_governance-trio-review.md` §3.2（V1b）/§5.5/§5.7/§九-12/§十一 V1b。本批只改编排边界：`src/common/编排/`、`src/pipeline/orchestration/govern-session.ts`、`test/编排/`、本角色文档；未碰门禁引擎/运行时核心/桌面/UI。
+
+**Pipeline 公共出口**（桌面只依赖此处，不直接导入 `src/common/编排/` 私有模块）：
+
+```ts
+// src/pipeline/orchestration/govern-session.ts（薄再导出；openGovernanceSession 行为不变）
+export {
+  previewGovernanceMigration, migrateGovernanceModel,
+  GOVERNANCE_MIGRATION_ACCEPTANCE_SOURCE, GOVERNANCE_MIGRATION_MANIFEST_HEADING,
+  GOVERNANCE_MIGRATION_TARGET_MODEL, GOVERNANCE_MIGRATION_WRITE_PATHS,
+};
+export type {
+  GovernanceMigrationPreview, GovernanceMigrationPreviewResult, GovernanceMigrationPreviewFailure,
+  GovernanceMigrationResult, GovernanceMigrationStatus, GovernanceMigrationWriteInput,
+  GovernanceMigrationPinChange,
+};
+```
+
+### `previewGovernanceMigration({projectRoot})`——零写入
+
+```ts
+preview: {
+  model: "single"; targetModel: "trio";
+  writePaths: [".ans/project.json", "docs/bootstrap-manifest.md"];
+  modelField: "single" | "trio" | null; // `.ans` 原始字段快照；null=字段缺失（旧 single 形状）
+  manifestLine: "治理模型升级（su → trio）";
+  pinChanges: [];                        // V1b 不重算 pin
+  retainedFiles: string[];               // 角色卡/边界/治理文档/旧 docs/su（只列确实存在的）
+  snapshotDigest: string;                // `.ans` 原始字节 + manifest 内容/缺失；确认时原样回传
+}
+```
+
+守卫：`invalid-request`（projectRoot）→ `busy`（与 establish/reaccept 共用 `governance-record-lock.ts`）→ `no-record` → `already-trio` → `invalid-record`（`.ans` 不可解析）→ `blocked`（manifest 不可读 / 门禁前置拒）。预览**不建目录、不写任何文件**。
+
+### `migrateGovernanceModel({projectRoot, confirm:true, previewDigest})`
+
+守卫顺序：`invalid-request`（projectRoot / confirm / previewDigest 64 hex）→ `busy`（首次 await 前占位）→ `no-record` → `already-trio` → `blocked`（记录不可解析/manifest 不可读/门禁前置拒）→ `preview-stale`（摘要不等）→ 写入 → `write-failed`。
+
+- 只改 `.ans` 的 `governanceModel:"trio"`：在内存构造 `{...doc, governanceModel:"trio"}`，**保留全部既有/未知字段**（roles/source/pin/projectRoot/skillRoot/自定义字段）；`.ans` 先、manifest 后，均原子写。
+- manifest 追加「治理模型升级（su → trio）」：时间（ISO）、旧模型 `single`、新模型 `trio`、变更文件、`.ans` 旧/新 SHA-256、客户确认证据；既有全文逐字节保留。
+- 账本 best-effort 写 `governance.migrated`（`actorRoleId="app"`、`power="app"`、`decisionEvidence.action="migrate"`、`previewDigest`）；失败只诊断、不翻转迁移结果。
+- **不重写角色卡/边界/pin、不删历史、不建 `角色卡/su/`**；旧 `docs/su/**` 保留只读。
+- 成功返回 `{ok:true, phase:"write", status:"completed", model:"trio", message}`；guard 拒绝零写入；`write-failed` 如实回 `phase:"write"`（不重试、不清理）。
+
+### 首次收尾 / 建立治理记录带模型
+
+- `FinalizeInput.governanceModel?: "single"|"trio"`：`finalizeBootstrap` **仅当给出**才在 `.ans` 写 `governanceModel`；不传保持旧 `.ans` 形状。
+- `repinIfBootstrapped`：创世态由调用方传当前模型（trio 传 `"trio"`；single 不传）；非创世态若调用方未传，则从当刻 `.ans` 读取并**保留**既有模型，避免重 pin 把 trio 降级为 single。
+- `run-role.ts` 自动收尾调用点（V1b 接线）：trio 下传 `governanceModel:"trio"`（single 不传，旧形状不变），并把收尾边界换成 `appGovernanceBoundary(会话边界的 acceptance)`——三人 Section 1 不含 `.ans/**`/`docs/bootstrap-manifest.md`，沿用角色边界会让收尾 fail-closed、`.ans` 永不落盘。single/su 仍用会话边界（旧行为不变）。
+- `GovernanceRecordInput.governanceModel`：`GovernancePreview.governanceModel` 显示「将写入的治理模型」（缺省 `single`），`establishGovernanceRecord` 把它交给 `finalizeBootstrap`；仅 trio 写 `governance.established` 账本（旧 single 零新增副作用）。
+- `GovernanceRecordInput.previewDigest`（W2 已落）：原样写入 `governance.established` 供审计；本模块不校验它。

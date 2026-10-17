@@ -21,7 +21,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { openRoleSession } from "../../src/pipeline/orchestration/run-role.ts";
-import { finalizeBootstrap, isGenesisState } from "../../src/common/编排/finalize.ts";
+import { finalizeBootstrap, isGenesisState, repinIfBootstrapped } from "../../src/common/编排/finalize.ts";
 import { loadEffectiveConfig } from "../../src/common/shared/config-loader.ts";
 import { resolveRole } from "../../src/service/role/resolve-role.ts";
 import type { BoundaryEntry, BoundarySection1 } from "../../src/model/boundary.ts";
@@ -85,6 +85,7 @@ function sha256Of(absPath: string): string {
 
 function readAns(target: string): {
   roles: Record<string, { card: string; boundary: string }>;
+  governanceModel?: string;
   governanceBoundary: {
     path: string;
     acceptance: { accepted: boolean; source: string; pin: { path: string; sha256: string }[] };
@@ -145,6 +146,17 @@ test("自动收尾：创世 su 会话 settle 后**自动**写出治理边界文�
       assert.equal(sha256Of(join(target, p.path)), p.sha256, `pin 与实际 SHA-256 一致：${p.path}`);
     }
     assert.deepEqual(ans.roles, { X: { card: "角色卡/X/role-card.md", boundary: "角色卡/X/boundary.yaml" } });
+    // V1b：single 旧项目首次收尾**不写** governanceModel，`.ans` 顶层形状逐字不变。
+    assert.equal(
+      Object.prototype.hasOwnProperty.call(ans, "governanceModel"),
+      false,
+      "single 旧项目不得新增 governanceModel 字段",
+    );
+    assert.deepEqual(
+      Object.keys(ans).sort(),
+      ["governanceBoundary", "projectRoot", "roles", "skillRoot"],
+      "single 旧项目 `.ans` 顶层形状必须逐字不变",
+    );
 
     // 载入器认它为 pin-backed accepted；角色边界可解析（无 parseError）。
     const loaded = await loadEffectiveConfig({ projectRoot: target, skillRoot: target, fallback: genesisProject(target) });
@@ -153,6 +165,39 @@ test("自动收尾：创世 su 会话 settle 后**自动**写出治理边界文�
     const role = await resolveRole("X", loaded.project);
     assert.equal(role.boundary.acceptance.accepted, true);
     assert.equal(role.boundary.parseError, undefined);
+  });
+});
+
+// ——————————————— ①b trio 创世首次 settle 带模型 ———————————————
+
+test("trio 创世首次 settle：自动收尾写 .ans 且含 governanceModel:'trio'（应用边界 + 调用方传模型）", async () => {
+  await withRoot(async ({ target }) => {
+    mkdirSync(target, { recursive: true });
+    placeRole(target, "X"); // 有物可 pin，收尾才会真正写 `.ans`
+
+    const project: ProjectConfig = {
+      projectRoot: target,
+      skillRoot: target,
+      roles: {},
+      builtInRoles: ["rapporteur", "nominator", "convener"],
+      governanceModel: "trio",
+      genesisBootstrap: { source: "test:trio 创世（操作者指令）" },
+    };
+    const handle = await openRoleSession(
+      { roleId: "rapporteur", project },
+      { createAdapter: settledStubAdapter },
+    );
+    await handle.send("（桩会话）");
+    await driveToSettled(handle);
+    await handle.dispose();
+
+    assert.ok(existsSync(join(target, ANS_REL)), "trio 创世首个有物可 pin 的 settle 应自动收尾");
+    const ans = readAns(target);
+    assert.equal(ans.governanceModel, "trio", "trio 创世收尾必须写出模型，否则下次加载回退 single");
+    assert.equal(ans.governanceBoundary.acceptance.accepted, true);
+    // 三人的 Section 1 不含 `.ans/**`；收尾能落盘证明 run-role 用了**应用专用边界**。
+    assert.ok(existsSync(join(target, GOV_REL)), "应收尾写出治理边界文档");
+    assert.ok(existsSync(join(target, MANIFEST_REL)), "应收尾写出 manifest");
   });
 });
 
@@ -256,6 +301,72 @@ test("finalizeBootstrap（单元）：写出治理边界文档 + .ans；pin 覆�
     assert.ok(existsSync(join(target, GOV_REL)), "应写出治理边界文档");
     assert.deepEqual(res.pins.map((p) => p.path).sort(), [GOV_REL, "角色卡/X/boundary.yaml"].sort());
     for (const p of res.pins) assert.equal(p.sha256, sha256Of(join(target, p.path)), `pin 实算一致：${p.path}`);
+  });
+});
+
+// ——————————————— ④b 治理模型字段（评审 §5.5） ———————————————
+
+test("finalizeBootstrap：仅当给出 governanceModel 才写字段；trio 写出、不传保持旧 `.ans` 形状", async () => {
+  await withRoot(async ({ target }) => {
+    placeRole(target, "X");
+    const boundary = seedLikeBoundary();
+
+    // 不传模型（single/旧项目）：`.ans` 不得出现 governanceModel 字段。
+    const single = await finalizeBootstrap({ projectRoot: target, skillRoot: target, boundary });
+    assert.equal(single.ok, true, single.message ?? "");
+    assert.equal(Object.prototype.hasOwnProperty.call(readAns(target), "governanceModel"), false);
+
+    // 显式 trio：写出该字段。
+    const trio = await finalizeBootstrap({ projectRoot: target, skillRoot: target, boundary, governanceModel: "trio" });
+    assert.equal(trio.ok, true, trio.message ?? "");
+    assert.equal(readAns(target).governanceModel, "trio");
+
+    // 显式 single：如实写出（仅调用方明确要求时）。
+    const explicitSingle = await finalizeBootstrap({
+      projectRoot: target,
+      skillRoot: target,
+      boundary,
+      governanceModel: "single",
+    });
+    assert.equal(explicitSingle.ok, true, explicitSingle.message ?? "");
+    assert.equal(readAns(target).governanceModel, "single");
+  });
+});
+
+test("repinIfBootstrapped：创世态由调用方传模型（trio 写出；不传旧形状）；非创世重 pin 保留既有 trio", async () => {
+  await withRoot(async ({ target }) => {
+    placeRole(target, "X");
+    const boundary = seedLikeBoundary();
+
+    // 创世态 + 不传模型 → 旧形状（无字段）。
+    const single = await repinIfBootstrapped({ projectRoot: target, skillRoot: target, boundary });
+    assert.equal(single?.ok, true, single?.message ?? "");
+    assert.equal(Object.prototype.hasOwnProperty.call(readAns(target), "governanceModel"), false);
+
+    // 非创世态重 pin：不传模型时必须**保留**既有字段缺失状态（不凭空写 single）。
+    const repinNoModel = await repinIfBootstrapped({ projectRoot: target, skillRoot: target, boundary });
+    assert.equal(repinNoModel?.ok, true, repinNoModel?.message ?? "");
+    assert.equal(Object.prototype.hasOwnProperty.call(readAns(target), "governanceModel"), false);
+  });
+
+  await withRoot(async ({ target }) => {
+    placeRole(target, "X");
+    const boundary = seedLikeBoundary();
+
+    // 创世态 + trio → 写出字段。
+    const trio = await repinIfBootstrapped({
+      projectRoot: target,
+      skillRoot: target,
+      boundary,
+      governanceModel: "trio",
+    });
+    assert.equal(trio?.ok, true, trio?.message ?? "");
+    assert.equal(readAns(target).governanceModel, "trio");
+
+    // 非创世态重 pin（调用方不再传模型）：从当刻 `.ans` 读取并保留 trio，绝不降级为 single。
+    const repin = await repinIfBootstrapped({ projectRoot: target, skillRoot: target, boundary });
+    assert.equal(repin?.ok, true, repin?.message ?? "");
+    assert.equal(readAns(target).governanceModel, "trio", "非创世重 pin 不得丢失既有模型");
   });
 });
 

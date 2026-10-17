@@ -1082,14 +1082,14 @@ function makeSubmitReportTool(fn: ReportHandbackFn, currentTurnId?: () => string
 // —————————————— 派发任务工具（设计 H-1；dispatch_task） ——————————————
 
 /**
- * dispatch_task：**派发任务**工具（设计 H-1，**只给 su**）。把「任务与上下文」交给注入的能力
+ * dispatch_task：**派发任务**工具（设计 H-1，**只给内置治理角色**）。把「任务与上下文」交给注入的能力
  * （编排路由成目标角色会话的一条输入，前端负责自动开/排队/去重——不在本层）。
  *
  * 纪律（与交互/交报告工具同）：**本层不写盘、不做治理判定、不进 `GOVERNED_WRITE_TOOLS`**——
  * handler 只把载荷交给注入的能力并**如实**转达回执：
  * - 受理成功（回执 `ok:true`，或**无回执**——`null`/`undefined`/`void` 视为已受理）→ 「任务已派发给 <roleId>」，
  *   并**重申「派发 ≠ 授权」**（防模型把派发当成替对方获准写盘）；
- * - 被拒（回执 `ok:false`，如「roleId 不是本项目角色 / 指向 su 自身」）/ 能力抛错 → `ok:false`，
+ * - 被拒（回执 `ok:false`，如「roleId 不是本项目角色 / 指向内置治理角色」）/ 能力抛错 → `ok:false`，
  *   明确「**未能派发**」+ 原因，**绝不**说成「已派发」。
  * 悬挂防护：`raceAbort`（会话中止即立即返回；本地调用，不设等待超时）。
  */
@@ -1196,7 +1196,7 @@ function makeReportShellVerdictTool(fn: ShellVerdictFn): ExecutableTool {
 // —————————————— 看护只读工具 + 恢复提议（G-2；role_status / session_tail / propose_recovery） ——————————————
 //
 // 依据：客户 2026-10-16 批准 G-2（设计 `角色卡/产品/docs/design/2026-10-16_design_role-watchdog-and-closure.md`
-// §四/§六；PM 派发「运行时核心＝R1/R2」）。三工具均**只给 su**——由调用方（编排注入端，判据沿
+// §四/§六；PM 派发「运行时核心＝R1/R2」）。三工具均**只给内置治理角色**——由调用方（编排注入端，判据沿
 // dispatch_task 的 suppressHandback 先例）决定**注入才注册**（未注入 ⇒ 工具不存在 = 最强 fail-closed）。
 // 本层纪律：role_status / session_tail **纯读**（无任何副作用；数据源由桌面窗口按同源快照/受保护投影提供）；
 // propose_recovery **只提交载荷、如实转达三态回执**——提议 ≠ 执行、执行以客户确认为准、不得承诺。
@@ -1338,7 +1338,7 @@ function makeSessionTailTool(fn: SessionTailFn, currentTurnId?: () => string | u
 const RECOVERY_ACTIONS: readonly RecoveryAction[] = ["abort-turn", "rebuild-session", "redeliver"];
 
 /**
- * propose_recovery：**恢复提议**工具（G-2 §6，**只给 su**）。把 `{roleId, action, evidence, reason?, itemId?}`
+ * propose_recovery：**恢复提议**工具（G-2 §6，**只给内置治理角色**）。把 `{roleId, action, evidence, reason?, itemId?}`
  * 交给注入的能力（桌面路由：校验 → 恢复确认卡 →（恰 allow:true 才）执行 → 三态回执）。
  *
  * 纪律（与 dispatch_task 同）：**本层不执行任何动作、不做治理判定、不改变任何权限/写权**——handler 只把
@@ -1419,7 +1419,7 @@ function makeProposeRecoveryTool(fn: ProposeRecoveryFn, currentTurnId?: () => st
 // —————————————— 角色能力安装（G-4；install_skill / uninstall_skill） ——————————————
 //
 // 依据：客户 2026-10-16 批准 G-4 V1（设计 `角色卡/产品/docs/design/2026-10-16_design_role-capability-install.md`
-// §3.2/§3.3；PM 派发「运行时核心＝I1/I2」）。两工具均**只给 su**——由调用方（注入端判据沿
+// §3.2/§3.3；PM 派发「运行时核心＝I1/I2」）。两工具均**只给内置治理角色**——由调用方（注入端判据沿
 // dispatch_task 的 suppressHandback 先例）决定**注入才注册**（未注入 ⇒ 工具不存在 = 最强 fail-closed）。
 // 本层纪律：**工具不写盘**——落盘永远由 su 的 `write_file` 完成（「先落盘再激活」＝G-1「先落盘再派发」
 // 的镜像）；校验（角色/登记/含角色、卸前登记确已撤销、客户轮次护栏）与激活（复用既有重建；在跑
@@ -1513,12 +1513,12 @@ function makeSkillReceiptTool(kind: "install" | "uninstall", fn: InstallSkillFn 
   };
 }
 
-/** install_skill：**技能安装**工具（G-4，**只给 su**；见 `makeSkillReceiptTool` §纪律）。 */
+/** install_skill：**技能安装**工具（G-4，**只给内置治理角色**；见 `makeSkillReceiptTool` §纪律）。 */
 function makeInstallSkillTool(fn: InstallSkillFn, currentTurnId?: () => string | undefined, scope?: Pick<GovernedToolsOptions, "roleId" | "runtime">): ExecutableTool {
   return makeSkillReceiptTool("install", fn, currentTurnId, scope);
 }
 
-/** uninstall_skill：**技能卸载**工具（G-4，**只给 su**；见 `makeSkillReceiptTool` §纪律）。 */
+/** uninstall_skill：**技能卸载**工具（G-4，**只给内置治理角色**；见 `makeSkillReceiptTool` §纪律）。 */
 function makeUninstallSkillTool(fn: UninstallSkillFn, currentTurnId?: () => string | undefined, scope?: Pick<GovernedToolsOptions, "roleId" | "runtime">): ExecutableTool {
   return makeSkillReceiptTool("uninstall", fn, currentTurnId, scope);
 }
@@ -1527,7 +1527,7 @@ function makeUninstallSkillTool(fn: UninstallSkillFn, currentTurnId?: () => stri
 //
 // 依据：客户 2026-10-16「按推荐批准，开始实施」＝V2（外来 MCP 按角色安装）分批实施（设计
 // `角色卡/产品/docs/design/2026-10-16_design_role-capability-install.md` §五/§九；本波＝wave A
-// 契约层）。纪律与技能版**逐字同构**：两工具**只给 su**（调用方注入才注册，未注入 ⇒ 不存在）、
+// 契约层）。纪律与技能版**逐字同构**：两工具**只给内置治理角色**（调用方注入才注册，未注入 ⇒ 不存在）、
 // **不写盘**（落盘＝su 的 `write_file`，「先落盘再激活」）、只**路由载荷 `{roleId,name}`** 并
 // **如实转达回执**（契约两态：ok:true[rebuilt|next-session] / ok:false[reason+message]；契约外一律
 // fail-closed）。回执形状归一同技能版**共用 `skillReceiptOf`**（InstallMcpReceipt **沿
@@ -1598,12 +1598,12 @@ function makeMcpReceiptTool(kind: "install" | "uninstall", fn: InstallMcpFn | Un
   };
 }
 
-/** install_mcp：**MCP 安装**工具（G-4 V2，**只给 su**；见 `makeMcpReceiptTool` §纪律）。 */
+/** install_mcp：**MCP 安装**工具（G-4 V2，**只给内置治理角色**；见 `makeMcpReceiptTool` §纪律）。 */
 function makeInstallMcpTool(fn: InstallMcpFn, currentTurnId?: () => string | undefined, scope?: Pick<GovernedToolsOptions, "roleId" | "runtime">): ExecutableTool {
   return makeMcpReceiptTool("install", fn, currentTurnId, scope);
 }
 
-/** uninstall_mcp：**MCP 卸载**工具（G-4 V2，**只给 su**；见 `makeMcpReceiptTool` §纪律）。 */
+/** uninstall_mcp：**MCP 卸载**工具（G-4 V2，**只给内置治理角色**；见 `makeMcpReceiptTool` §纪律）。 */
 function makeUninstallMcpTool(fn: UninstallMcpFn, currentTurnId?: () => string | undefined, scope?: Pick<GovernedToolsOptions, "roleId" | "runtime">): ExecutableTool {
   return makeMcpReceiptTool("uninstall", fn, currentTurnId, scope);
 }
@@ -1658,7 +1658,7 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
   }
 
   // 结构性保证（设计 H-1，同 run_shell / customerInput / reportHandback 先例）：
-  // **未注入派发能力时 `dispatch_task` 不存在**。只给 su——编排对项目角色不注入即不注册。
+  // **未注入派发能力时 `dispatch_task` 不存在**。只给内置治理角色——编排对项目角色不注入即不注册。
   const dispatchTask = options?.dispatchTask;
   if (dispatchTask !== undefined) {
     tools.push(makeDispatchTaskTool(dispatchTask, options?.currentTurnId, { roleId: options?.roleId, runtime: options?.runtime }));
@@ -1672,7 +1672,7 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
   }
 
   // 结构性保证（G-2/R1，同 run_shell / dispatchTask 先例）：**未注入数据源时看护只读工具不存在**。
-  // 只给 su——由调用方（编排注入端，判据沿 dispatch_task 的 suppressHandback 先例）决定注入；
+  // 只给内置治理角色——由调用方（编排注入端，判据沿 dispatch_task 的 suppressHandback 先例）决定注入；
   // 未注入 ⇒ 模型无法请求（能力缺席 = 最强 fail-closed）。metadata 同 dispatch_task 先例（turnId 捕获）。
   const roleStatus = options?.roleStatus;
   if (roleStatus !== undefined) tools.push(makeRoleStatusTool(roleStatus, options?.currentTurnId, { roleId: options?.roleId, runtime: options?.runtime }));
@@ -1686,7 +1686,7 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
   }
 
   // 结构性保证（G-4/I2，同 dispatch_task 先例）：**未注入安装/卸载能力时对应工具不存在**。
-  // 只给 su——由调用方（注入端判据沿 dispatch_task 的 suppressHandback 先例）决定注入；
+  // 只给内置治理角色——由调用方（注入端判据沿 dispatch_task 的 suppressHandback 先例）决定注入；
   // 未注入 ⇒ 模型无法请求（能力缺席 = 最强 fail-closed）。两能力各自独立「注入才注册」。
   const installSkill = options?.installSkill;
   if (installSkill !== undefined) {
@@ -1697,7 +1697,7 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
     tools.push(makeUninstallSkillTool(uninstallSkill, options?.currentTurnId, { roleId: options?.roleId, runtime: options?.runtime }));
   }
   // 结构性保证（G-4 V2，同技能对先例）：**未注入 MCP 安装/卸载能力时对应工具不存在**。
-  // 只给 su——由调用方（注入端判据沿 dispatch_task 的 suppressHandback 先例）决定注入；
+  // 只给内置治理角色——由调用方（注入端判据沿 dispatch_task 的 suppressHandback 先例）决定注入；
   // 未注入 ⇒ 模型无法请求（能力缺席 = 最强 fail-closed）。两能力各自独立「注入才注册」。
   const installMcp = options?.installMcp;
   if (installMcp !== undefined) {

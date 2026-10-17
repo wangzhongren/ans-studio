@@ -135,7 +135,7 @@ test("裁定 8：完成态判定**不排除客户活跃**——静默谓词项�
   const m = /const silent =\n([\s\S]*?);\n/.exec(wd);
   assert.ok(m, "找得到静默谓词");
   const expr = m![1];
-  for (const term of ["roles.every((r) => !r.busy)", "queues.every((q) => q.items.length === 0)", "activeDeliveries === 0", "pendingConfirmationsTotal === 0", "!snapshot.chainsActive", "!suBusy"]) {
+  for (const term of ["roles.every((r) => !r.busy)", "queues.every((q) => q.items.length === 0)", "activeDeliveries === 0", "pendingConfirmationsTotal === 0", "!snapshot.chainsActive", "!govBusy"]) {
     assert.ok(expr.includes(term), `谓词含：${term}`);
   }
   assert.ok(!/customer|clientActivity|recentInput/.test(expr), "谓词不含「客户活跃」排除项（裁定：不排除）");
@@ -256,7 +256,7 @@ test("范围落点：W1-W5/R1/R2/O1/G/U1 逐项文件与关键符号在位（存
     ["R1", "src/provider/runtime/schema.ts", 'if (name === "role_status")'],
     ["R1", "src/provider/runtime/schema.ts", 'if (name === "session_tail")'],
     ["R2", "src/provider/runtime/schema.ts", 'if (name === "propose_recovery")'],
-    ["O1", "src/pipeline/orchestration/run-role.ts", "const roleStatus = suppressHandback ? input.roleStatus : undefined;"],
+    ["O1", "src/pipeline/orchestration/run-role.ts", "const roleStatus = cap?.roleStatus === true ? input.roleStatus : undefined;"],
     ["O1", "src/common/编排/watchdog.ts", "export function renderWatchdogAlert"],
     ["O1", "src/common/编排/watchdog.ts", "export function renderClosurePrompt"],
     ["O1", "src/common/编排/watchdog.ts", "export function renderRecoveryReceipt"],

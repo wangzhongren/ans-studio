@@ -21,6 +21,8 @@ import type {
   GovernanceReacceptPreview,
   GovernanceReacceptPreviewResult,
   ReacceptGovernancePinsResult,
+  GovernanceMigrationPreview,
+  GovernanceMigrationResult,
 } from "../../src/pipeline/orchestration/govern-session.ts";
 import type { PinEvidenceResult } from "../../src/model/boundary.ts";
 
@@ -806,6 +808,7 @@ const EMPTY_PREVIEW: GovernancePreview = {
   roleIds: ["A"],
   adoptExistingGovernanceDoc: false,
   acceptanceSource: "desktop-app:测试",
+  governanceModel: "single",
   legacyBoundaryRoleIds: [],
 };
 
@@ -1355,4 +1358,257 @@ test("替我审接线：Interface 构造会话时用注入的 createShellJudge�
   assert.equal(metadataSeen[0]?.judge, judge, "metadata.judge 即每会话闭包");
   await iface.stopSession({ roleId: null });
   iface.disposeProjectDocuments();
+});
+
+// —————————————— 三权 W3（评审 §5.6）：Interface 透传 + V1b 迁移入口 ——————————————
+
+test("三权：listProject 透传 governanceModel 与角色的 governanceFunction（原样转自门禁引擎）", async () => {
+  const trio: ProjectListing = {
+    projectRoot: "/trio",
+    roles: [
+      { roleId: "rapporteur", cardPath: "", boundaryPath: "", cardText: "# Rapporteur", boundary: { entries: [], boundarySource: "<built-in:trio/rapporteur>", acceptance: { accepted: false, source: "" } }, builtIn: true, governanceFunction: "proposal" },
+      { roleId: "nominator", cardPath: "", boundaryPath: "", cardText: "# Nominator", boundary: { entries: [], boundarySource: "<built-in:trio/nominator>", acceptance: { accepted: false, source: "" } }, builtIn: true, governanceFunction: "nomination" },
+      { roleId: "convener", cardPath: "", boundaryPath: "", cardText: "# Convener", boundary: { entries: [], boundarySource: "<built-in:trio/convener>", acceptance: { accepted: false, source: "" } }, builtIn: true, governanceFunction: "schedule" },
+      { roleId: "A", cardPath: "角色卡/A/role-card.md", boundaryPath: "角色卡/A/boundary.yaml", cardText: "# A", boundary: { entries: [], boundarySource: "角色卡/A/boundary.yaml", acceptance: { accepted: false, source: "" } } },
+    ],
+    warnings: [],
+    hasRoles: true,
+    primaryRoleId: "rapporteur",
+    governanceModel: "trio",
+  };
+  const iface = createDesktopInterface({
+    pickDirectory: async () => "/trio",
+    emitEvent: () => {},
+    listProjectFn: async () => trio,
+  });
+  const res = await iface.listProject({ projectRoot: "/trio" });
+  assert.equal(res.governanceModel, "trio", "治理模型原样透传（渲染侧据它显示三权/旧模型）");
+  assert.equal(res.primaryRoleId, "rapporteur", "三权主入口原样透传");
+  assert.deepEqual(res.roles.map((r) => r.governanceFunction), ["proposal", "nomination", "schedule", undefined], "内置三人带职能，项目角色不带");
+});
+
+// —————————————— V1b 迁移接线（评审 §5.5）：守卫 / 透传 / 成功收尾 ——————————————
+
+const MIGRATION_PREVIEW: GovernanceMigrationPreview = {
+  model: "single",
+  targetModel: "trio",
+  writePaths: [".ans/project.json", "docs/bootstrap-manifest.md"],
+  modelField: "single",
+  manifestLine: "治理模型升级（su → trio）",
+  pinChanges: [],
+  retainedFiles: ["角色卡/governance-boundary.yaml"],
+  snapshotDigest: "a".repeat(64),
+};
+
+test("V1b 迁移预览：当前导入项目守卫 + 只透传 projectRoot；机制结果原样返回", async () => {
+  const calls: { projectRoot: string }[] = [];
+  const iface = createDesktopInterface({
+    pickDirectory: async () => "/proj",
+    emitEvent: () => {},
+    listProjectFn: async () => FAKE_LISTING,
+    previewGovernanceMigrationFn: async (input) => {
+      calls.push(input);
+      return { ok: true, preview: MIGRATION_PREVIEW };
+    },
+  });
+  const denied = await iface.previewGovernanceMigration({ projectRoot: "/elsewhere" });
+  assert.equal(denied.ok, false);
+  assert.equal(denied.ok === false ? denied.code : "", "invalid-request", "非当前导入项目 ⇒ invalid-request");
+  assert.equal(calls.length, 0, "guard 拒绝不调用机制");
+
+  await iface.listProject({ projectRoot: "/proj" });
+  const preview = await iface.previewGovernanceMigration({ projectRoot: "/proj" });
+  assert.deepEqual(preview, { ok: true, preview: MIGRATION_PREVIEW }, "机制结果原样返回（含 targetModel/writePaths/snapshotDigest）");
+  assert.deepEqual(calls, [{ projectRoot: "/proj" }], "只透传 projectRoot（不接受调用方提供的路径/模型/写路径）");
+
+  const forged = await iface.previewGovernanceMigration({ projectRoot: "/proj", model: "trio", writePaths: ["x"] } as never);
+  assert.deepEqual(calls[1], { projectRoot: "/proj" }, "多余字段不被透传");
+  assert.equal(forged.ok, true);
+});
+
+test("V1b 迁移写入守卫：非导入项目 / 缺 confirm / 非法 previewDigest → invalid-request 且不调用机制", async () => {
+  let calls = 0;
+  const iface = createDesktopInterface({
+    pickDirectory: async () => "/proj",
+    emitEvent: () => {},
+    listProjectFn: async () => FAKE_LISTING,
+    migrateGovernanceModelFn: async (input): Promise<GovernanceMigrationResult> => {
+      calls += 1;
+      return { ok: true, phase: "write", status: "completed", model: "trio", message: `已迁移 ${input.projectRoot}` };
+    },
+  });
+  const notImported = await iface.migrateGovernanceModel({ projectRoot: "/elsewhere", confirm: true, previewDigest: "a".repeat(64) });
+  assert.equal(notImported.status, "invalid-request");
+  assert.equal(notImported.phase, "guard");
+
+  await iface.listProject({ projectRoot: "/proj" });
+  const noConfirm = await iface.migrateGovernanceModel({ projectRoot: "/proj", previewDigest: "a".repeat(64) } as never);
+  assert.equal(noConfirm.status, "invalid-request");
+  assert.match(noConfirm.message, /confirm/);
+  const badDigest = await iface.migrateGovernanceModel({ projectRoot: "/proj", confirm: true, previewDigest: "not-hex" });
+  assert.equal(badDigest.status, "invalid-request");
+  assert.match(badDigest.message, /previewDigest|预览摘要/);
+  assert.equal(calls, 0, "三个 guard 分支都不得调用机制");
+
+  const ok = await iface.migrateGovernanceModel({ projectRoot: "/proj", confirm: true, previewDigest: "b".repeat(64) });
+  assert.equal(calls, 1, "合法请求进入机制一次");
+  assert.equal(ok.status, "completed");
+});
+
+test("V1b 迁移成功：先刷新陈旧边界 → 清列举缓存 → project:changed；不自动开会话；失败不清缓存", async () => {
+  const fs = await import("node:fs/promises");
+  const os = await import("node:os");
+  const base = await fs.mkdtemp(path.join(os.tmpdir(), "ans-governance-migrate-"));
+  const root = path.join(base, "proj");
+  await fs.mkdir(path.join(root, "角色卡/A"), { recursive: true });
+  await fs.mkdir(path.join(root, ".ans"), { recursive: true });
+  await fs.writeFile(path.join(root, "角色卡/A/role-card.md"), "# A\n");
+  await fs.writeFile(path.join(root, "角色卡/A/boundary.yaml"), "role: A\nentries:\n  - kind: file\n    path: src/a.ts\n    purpose: p\n");
+  const ansFile = path.join(root, ".ans", "project.json");
+  await fs.writeFile(ansFile, JSON.stringify({ governanceModel: "single", projectRoot: root }) + "\n");
+  const listing: ProjectListing = { ...FAKE_LISTING, projectRoot: root, governanceModel: "single" };
+
+  let openCalls = 0;
+  let projectChanged = 0;
+  let captured: unknown;
+  let status: GovernanceMigrationResult["status"] = "completed";
+  const iface = createDesktopInterface({
+    pickDirectory: async () => root,
+    emitEvent: () => {},
+    listProjectFn: async () => listing,
+    openRoleSessionFn: async () => { openCalls += 1; return makeFakeHandle().handle; },
+    createDemoAdapterFn: () => ({}) as unknown as RuntimeAdapter,
+    buildProjectConfigFn: buildProjectConfig,
+    emitProjectChanged: () => { projectChanged += 1; },
+    migrateGovernanceModelFn: async (input) => {
+      captured = input;
+      return status === "completed"
+        ? { ok: true, phase: "write", status, model: "trio", message: "迁移完成。" }
+        : { ok: false, phase: "guard", status, model: "single", message: "未迁移。" };
+    },
+  });
+  try {
+    await iface.listProject({ projectRoot: root });
+    assert.equal((await iface.openSession({ projectRoot: root, roleId: "A", runtime: "demo" })).ok, true);
+    // 让活会话的 `.ans/project.json` 指纹过期（尺寸可判：Windows/mtime 粒度合并时等长重写可能漏检）。
+    await fs.writeFile(ansFile, JSON.stringify({ governanceModel: "single", projectRoot: root, marker: "changed-size" }) + "\n");
+
+    const result = await iface.migrateGovernanceModel({ projectRoot: root, confirm: true, previewDigest: "c".repeat(64) });
+    assert.equal(result.status, "completed");
+    assert.deepEqual(captured, { projectRoot: root, confirm: true, previewDigest: "c".repeat(64) }, "只透传三个钉死字段");
+    for (let i = 0; i < 100 && openCalls < 2; i += 1) await new Promise((r) => setTimeout(r, 10));
+    assert.equal(openCalls, 2, "成功应先经既有 refreshStaleBoundaries 重建陈旧会话");
+    assert.equal(projectChanged, 1, "复用既有 project:changed 信号");
+    const after = await iface.openSession({ projectRoot: root, roleId: "B", runtime: "demo" });
+    assert.equal(after.ok, false, "列举缓存已清：重新 listProject 前开会话如实拒绝");
+    assert.match(after.error ?? "", /尚未枚举该项目/);
+
+    // 失败分支（如 busy/preview-stale/blocked）不清缓存、不发 project:changed。
+    await iface.listProject({ projectRoot: root });
+    const changedBefore = projectChanged;
+    status = "blocked";
+    const blocked = await iface.migrateGovernanceModel({ projectRoot: root, confirm: true, previewDigest: "c".repeat(64) });
+    assert.equal(blocked.status, "blocked");
+    assert.equal(projectChanged, changedBefore, "失败不触发 project:changed");
+    assert.equal((await iface.openSession({ projectRoot: root, roleId: "A", runtime: "demo" })).ok, true, "失败不清列举缓存");
+  } finally {
+    await iface.stopSession();
+    iface.disposeProjectDocuments();
+    await fs.rm(base, { recursive: true, force: true });
+  }
+});
+
+
+test("V1b 默认真实机制走通（不经注入）：预览 → 确认 → `.ans` 写入 trio + manifest 留痕；not-available 已消失", async () => {
+  const fs = await import("node:fs/promises");
+  const os = await import("node:os");
+  const base = await fs.mkdtemp(path.join(os.tmpdir(), "ans-governance-migrate-real-"));
+  const root = path.join(base, "proj");
+  await fs.mkdir(path.join(root, "角色卡/A"), { recursive: true });
+  await fs.mkdir(path.join(root, ".ans"), { recursive: true });
+  await fs.writeFile(path.join(root, "角色卡/A/role-card.md"), "# A\n");
+  await fs.writeFile(path.join(root, "角色卡/A/boundary.yaml"), "role: A\nentries:\n  - kind: file\n    path: src/a.ts\n    purpose: p\n");
+  await fs.writeFile(path.join(root, ".ans", "project.json"), JSON.stringify({ projectRoot: root }) + "\n");
+  const listing: ProjectListing = { ...FAKE_LISTING, projectRoot: root, governanceModel: "single" };
+  let projectChanged = 0;
+  const iface = createDesktopInterface({
+    pickDirectory: async () => root,
+    emitEvent: () => {},
+    listProjectFn: async () => listing,
+    emitProjectChanged: () => { projectChanged += 1; },
+  });
+  try {
+    await iface.listProject({ projectRoot: root });
+    const preview = await iface.previewGovernanceMigration({ projectRoot: root });
+    assert.equal(preview.ok, true, "默认走编排真实预览（不再是 not-available）");
+    if (preview.ok) {
+      assert.equal(preview.preview.model, "single");
+      assert.equal(preview.preview.targetModel, "trio");
+      assert.deepEqual(preview.preview.writePaths, [".ans/project.json", "docs/bootstrap-manifest.md"]);
+      assert.match(preview.preview.snapshotDigest, /^[0-9a-f]{64}$/);
+    }
+    const digest = preview.ok ? preview.preview.snapshotDigest : "";
+    const result = await iface.migrateGovernanceModel({ projectRoot: root, confirm: true, previewDigest: digest });
+    assert.equal(result.ok, true, "确认后真实迁移完成");
+    assert.equal(result.status, "completed");
+    assert.equal(JSON.parse(await fs.readFile(path.join(root, ".ans", "project.json"), "utf8")).governanceModel, "trio");
+    assert.match(await fs.readFile(path.join(root, "docs", "bootstrap-manifest.md"), "utf8"), /治理模型升级/);
+    assert.equal(projectChanged, 1, "成功后复用 project:changed");
+    const after = await iface.openSession({ projectRoot: root, roleId: "A", runtime: "demo" });
+    assert.equal(after.ok, false, "成功后清列举缓存（重新枚举前开会话如实拒绝）");
+  } finally {
+    await iface.stopSession();
+    iface.disposeProjectDocuments();
+    await fs.rm(base, { recursive: true, force: true });
+  }
+});
+
+// —————————————— W4/S1：建立治理记录的模型选择（single/trio）透传 ——————————————
+
+test("S1 模型选择：preview/establish 只接受 single|trio 并透传；不合法 → invalid-request 且不调用机制", async () => {
+  const previewInputs: unknown[] = [];
+  const establishInputs: unknown[] = [];
+  const preview: GovernancePreviewResult = { ok: true, preview: { ...EMPTY_PREVIEW, governanceModel: "trio" } };
+  const established: EstablishGovernanceResult = {
+    ok: true,
+    phase: "write",
+    finalize: {
+      ok: true,
+      status: "completed",
+      message: "治理记录已建立。",
+      reason: "",
+      wrote: [".ans/project.json"],
+      pins: [],
+      roles: ["A"],
+      projectJsonRel: ".ans/project.json",
+      manifestRel: "docs/bootstrap-manifest.md",
+    },
+  };
+  const iface = createDesktopInterface({
+    pickDirectory: async () => "/proj",
+    emitEvent: () => {},
+    listProjectFn: async () => FAKE_LISTING,
+    previewGovernanceRecordFn: async (input) => { previewInputs.push(input); return preview; },
+    establishGovernanceRecordFn: async (input) => { establishInputs.push(input); return established; },
+  });
+  await iface.listProject({ projectRoot: "/proj" });
+
+  assert.deepEqual(await iface.previewGovernanceRecord({ projectRoot: "/proj", governanceModel: "trio" }), preview);
+  assert.deepEqual(previewInputs, [{ projectRoot: "/proj", governanceModel: "trio" }], "预览透传 trio");
+
+  const badPreview = await iface.previewGovernanceRecord({ projectRoot: "/proj", governanceModel: "quad" as never });
+  assert.equal(badPreview.ok, false);
+  assert.equal(badPreview.ok === false ? badPreview.code : "", "invalid-request");
+  assert.equal(previewInputs.length, 1, "非法模型不调用机制");
+
+  assert.deepEqual(await iface.establishGovernanceRecord({ projectRoot: "/proj", confirm: true, governanceModel: "trio" }), established);
+  assert.deepEqual(establishInputs, [{ projectRoot: "/proj", governanceModel: "trio" }], "建立透传 trio");
+
+  const badEstablish = await iface.establishGovernanceRecord({ projectRoot: "/proj", confirm: true, governanceModel: "" as never });
+  assert.equal(badEstablish.ok, false);
+  assert.equal(badEstablish.phase, "guard");
+  assert.equal(establishInputs.length, 1, "非法模型不调用机制");
+
+  await iface.previewGovernanceRecord({ projectRoot: "/proj" });
+  assert.deepEqual(previewInputs[1], { projectRoot: "/proj" }, "缺省不传 governanceModel（旧行为逐字不变）");
 });

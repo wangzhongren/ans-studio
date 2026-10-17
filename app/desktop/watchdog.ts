@@ -111,7 +111,12 @@ export interface WatchdogRoleView {
 /** 一个项目的看护快照（**同源**：全部取自 SessionManager 的内存结构，读时同步、不引锁）。 */
 export interface WatchdogProjectSnapshot {
   projectRoot: string;
-  suRoleId: string | null;
+  /**
+   * 治理/回交主人角色 id（评审 §5.6：`suRoleId` → `governanceRoleId`，值=回交主人）：
+   * trio = Convener（`governanceFunction === "schedule"`）；single = `primaryRoleId`（旧 su）。
+   * 看护的「主人自身忙不报」「系统消息投向谁」都以它为准；未枚举到 → null。
+   */
+  governanceRoleId: string | null;
   /** 活会话（busy 事实的唯一来源）。 */
   roles: WatchdogRoleView[];
   /** 全部非空队列（含目标无活会话者）。 */
@@ -487,8 +492,8 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
     const at = now();
     const snapshot = deps.snapshot(projectRoot);
     if (!snapshot) return;
-    const suBusy = snapshot.suRoleId !== null && snapshot.roles.some((r) => r.roleId === snapshot.suRoleId && r.busy);
-    const suSuppressed = (roleId: string): boolean => roleId !== "" && roleId === snapshot.suRoleId && suBusy; // 「su 自身忙不报」
+    const govBusy = snapshot.governanceRoleId !== null && snapshot.roles.some((r) => r.roleId === snapshot.governanceRoleId && r.busy);
+    const govSuppressed = (roleId: string): boolean => roleId !== "" && roleId === snapshot.governanceRoleId && govBusy; // 「治理主人自身忙不报」
     const pendingFor = (roleId: string): number => snapshot.pendingConfirmationsByRole.get(roleId) ?? 0;
     const evaluated = new Set<string>();
 
@@ -504,7 +509,7 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
         const limit = turnTimeoutMs(role.runtime);
         const elapsed = at - role.turnStartedAt;
         identity = role.turnId ?? `t${role.turnStartedAt}`;
-        if (elapsed >= limit * config.turnDeadlineRatio && pendingFor(role.roleId) === 0 && !suSuppressed(role.roleId)) {
+        if (elapsed >= limit * config.turnDeadlineRatio && pendingFor(role.roleId) === 0 && !govSuppressed(role.roleId)) {
           positive = true;
           startedAt = role.turnStartedAt;
         }
@@ -537,7 +542,7 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
       const head = q.items[0];
       const depth = q.items.length;
       const headAge = head !== undefined ? at - head.enqueuedAtMs : 0;
-      const positive = head !== undefined && !suSuppressed(q.targetRoleId) && (headAge >= config.queueHeadAgeMs || depth >= config.queueDepth);
+      const positive = head !== undefined && !govSuppressed(q.targetRoleId) && (headAge >= config.queueHeadAgeMs || depth >= config.queueDepth);
       evaluateEpisode(projectRoot, {
         key, signal: "queue-stuck", roleId: q.targetRoleId, positive,
         cooldownMs: config.queueStuckCooldownMs,
@@ -568,7 +573,7 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
       const key = `repeat-fail:${roleId}`;
       evaluated.add(key);
       const last = pruned.length > 0 ? pruned[pruned.length - 1] : undefined;
-      const positive = pruned.length >= config.repeatFailCount && !suSuppressed(roleId);
+      const positive = pruned.length >= config.repeatFailCount && !govSuppressed(roleId);
       evaluateEpisode(projectRoot, {
         key, signal: "repeat-fail", roleId, positive,
         cooldownMs: config.repeatFailCooldownMs,
@@ -608,7 +613,7 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
       snapshot.activeDeliveries === 0 &&
       snapshot.pendingConfirmationsTotal === 0 &&
       !snapshot.chainsActive &&
-      !suBusy; // 「su busy=false」显式一列（全角色空闲已蕴含，保留为独立口径）
+      !govBusy; // 「治理主人 busy=false」显式一列（全角色空闲已蕴含，保留为独立口径）
     if (closure.fired) return; // 已投（恰一次）：只等**真实活动**重新武装（observe 的 activity / 非 system 轮的 settled）
     if (!silent) {
       closure.silenceSince = undefined;
@@ -680,8 +685,8 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
         // 命令超时（#3）：单次即报（低频高信号）；冷却期内只累计抑制；**无恢复行**（瞬时事件，无所谓「解除」）。
         if (observation.kind === "command-timed-out") {
           const snapshot = deps.snapshot(projectRoot);
-          const suBusy = snapshot !== undefined && snapshot.suRoleId !== null && snapshot.roles.some((r) => r.roleId === snapshot.suRoleId && r.busy);
-          if (observation.roleId !== "" && snapshot !== undefined && observation.roleId === snapshot.suRoleId && suBusy) return; // su 自身忙不报
+          const govBusy = snapshot !== undefined && snapshot.governanceRoleId !== null && snapshot.roles.some((r) => r.roleId === snapshot.governanceRoleId && r.busy);
+          if (observation.roleId !== "" && snapshot !== undefined && observation.roleId === snapshot.governanceRoleId && govBusy) return; // 治理主人自身忙不报
           const full = `${projectRoot}\u0000${observation.roleId}`;
           let st = instantStates.get(full);
           if (!st) {
