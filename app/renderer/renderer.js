@@ -62,7 +62,7 @@
 
   var state = {
     projectRoot: null,
-    runtime: "pi",
+    runtime: "claude",
     roles: [],
     // 主入口角色 id：**原样转自门禁引擎 listProject 的 primaryRoleId**（§10.7），渲染侧据此设主位/默认选中，
     // **不硬编码 "su"**。null = 尚未导入项目。

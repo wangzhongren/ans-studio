@@ -52,7 +52,7 @@
         <nav id="role-tree" class="tree" aria-label="角色列表"></nav>
         <div class="sidebar-foot">
           <button id="btn-import" class="btn btn-ghost btn-block btn-project">导入项目</button>
-          <button id="tab-pi" class="btn btn-ghost btn-block sidebar-settings" type="button" title="Pi 设置" aria-label="Pi 设置">设置</button>
+          <button id="tab-pi" class="btn btn-ghost btn-block sidebar-settings" type="button" title="Claude 设置" aria-label="Claude 设置">设置</button>
           <div id="sidebar-role-count" class="sidebar-role-count">尚未导入项目</div>
         </div>
         <div id="warnings" class="warnings"></div>
@@ -64,7 +64,7 @@
         <header class="chat-head">
           <div class="session-identity"><span id="chat-role" class="chat-role">未选择角色</span><span id="chat-role-sub" class="chat-role-sub" hidden></span><span id="context-state" class="context-state" role="status" aria-live="polite">尚未开启会话</span></div>
           <div class="session-actions" id="right-tabs">
-            <button id="runtime-select" class="engine-trigger" type="button" role="combobox" aria-label="会话引擎，当前 Pi" aria-haspopup="listbox" aria-controls="runtime-options" aria-expanded="false" aria-disabled="true" disabled><span class="engine-value">Pi</span><svg class="engine-chevron" viewBox="0 0 12 12" aria-hidden="true"><path d="m3 4.5 3 3 3-3" /></svg></button>
+            <button id="runtime-select" class="engine-trigger" type="button" role="combobox" aria-label="会话引擎，当前 Claude" aria-haspopup="listbox" aria-controls="runtime-options" aria-expanded="false" aria-disabled="true" disabled><span class="engine-value">Claude</span><svg class="engine-chevron" viewBox="0 0 12 12" aria-hidden="true"><path d="m3 4.5 3 3 3-3" /></svg></button>
             <button id="tab-work" class="btn btn-ghost" type="button" title="工作概览" aria-label="工作概览">工作概览 <span class="tab-badge" hidden></span></button>
             <button id="tab-card" class="btn btn-ghost" type="button" title="角色资料" aria-label="角色资料">角色资料</button>
           </div>
@@ -123,7 +123,7 @@
             >
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
             </button>
-              <span id="composer-scope" class="composer-scope">未选择角色 / Pi</span><span class="composer-keyboard">Enter 发送，Shift + Enter 换行</span>
+              <span id="composer-scope" class="composer-scope">未选择角色 / Claude</span><span class="composer-keyboard">Enter 发送，Shift + Enter 换行</span>
               <div class="composer-actions"><button id="btn-halt" class="cap-halt" type="button" hidden title="停止当前轮次" aria-label="停止当前轮次">停止本轮</button><button id="btn-send" class="cap-send" type="button" disabled title="发送（Enter）" aria-label="发送">发送 ↑</button></div>
             </div>
           </div>
@@ -291,9 +291,9 @@
          （renderer 经 `window.ANSUiLabels` 取用）。 -->
     <script src="ui-labels.js"></script>
     <div id="runtime-options" class="engine-menu" role="listbox" aria-label="会话引擎" hidden>
-      <div id="runtime-option-pi" class="engine-option" role="option" aria-selected="true" data-runtime="pi" title="Pi"><span class="engine-option-name">Pi</span><svg class="engine-tick" viewBox="0 0 12 12" aria-hidden="true"><path d="m2 6 2.5 2.5 5.5-6" /></svg></div>
+      <div id="runtime-option-pi" class="engine-option" role="option" aria-selected="false" data-runtime="pi" title="Pi"><span class="engine-option-name">Pi</span><svg class="engine-tick" viewBox="0 0 12 12" aria-hidden="true"><path d="m2 6 2.5 2.5 5.5-6" /></svg></div>
       <div id="runtime-option-codex" class="engine-option" role="option" aria-selected="false" data-runtime="codex" title="Codex"><span class="engine-option-name">Codex</span><svg class="engine-tick" viewBox="0 0 12 12" aria-hidden="true"><path d="m2 6 2.5 2.5 5.5-6" /></svg></div>
-      <div id="runtime-option-claude" class="engine-option" role="option" aria-selected="false" data-runtime="claude" title="Claude"><span class="engine-option-name">Claude</span><svg class="engine-tick" viewBox="0 0 12 12" aria-hidden="true"><path d="m2 6 2.5 2.5 5.5-6" /></svg></div>
+      <div id="runtime-option-claude" class="engine-option" role="option" aria-selected="true" data-runtime="claude" title="Claude"><span class="engine-option-name">Claude</span><svg class="engine-tick" viewBox="0 0 12 12" aria-hidden="true"><path d="m2 6 2.5 2.5 5.5-6" /></svg></div>
     </div>
     <script src="runtime-ui.js"></script>
     <script src="engine-selector.js"></script>

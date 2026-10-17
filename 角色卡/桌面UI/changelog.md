@@ -189,3 +189,13 @@
 - **测试**：`tool-rows.test.ts` 新增 **5 例**（谓词真值表、文案逐字、预览视图、成功文案、失败分支含 phase=write/precheck 差异）→ 31/31；`renderer.test.ts` 新增 **5 例**（落库与单一谓词、状态行、空态、预览宿主/零 IPC/无新增模态、成功失败路径）→ **78 计 / 74 过 / 4 红**（4 红为**先于本批**的 CRLF 基线 N-1、data-state、P1-3、G-5，已用 HEAD 干净 worktree 复现，与本批无关）。
 - **真机渲染检查（2026-10-17 协调者补验）**：`uiux-v2.mjs` 新增独立模式 `ANS_GOVERNANCE_REACCEPT_UI_ONLY=1`（复用既有受控 IPC 替身与真实 Electron 窗口；不改既有模式行为/断言）。夹具 `governanceRecord=pin-mismatch`（9 条 pin、1 条 modified）；预览/确认 IPC 记录调用参数。7 项 DOM 断言全过：状态行与 su 空态、预览复用 `#governance-preview`（无新增模态）、文件/写入/pin/警示行、取消不调 `project:governance-reaccept`、确认只传 `{projectRoot, confirm:true, previewDigest}`、成功文案。实跑 `GOVERNANCE_REACCEPT_UI_PASS 7`；截图：`%TEMP%/ans-governance-reaccept-ui/governance-reaccept-{mismatch,preview,success}-1360.png`。实跑发现并修复一处真实渲染问题：取消后再成功时 `#composer-hint` 残留「已取消，未写入任何文件。」——成功后清空（e2e 新增断言）。
 - **未接线事实**：`governanceRecord.pin-mismatch`、`previewGovernanceReacceptance`、`reacceptGovernancePins` 由桌面窗口实现；落树前动作不可达（兜底 present）。
+
+## 2026-10-17：默认会话引擎改为 Claude
+
+客户指令「默认选择调成claude」——只改默认值，不改选择器交互模型、不重排选项、不覆盖已保存/显式传入的 runtime。
+- **JS 初始态**：`app/renderer/renderer.js` 的 `state.runtime` 初值 `"pi"` → `"claude"`。其余判据未动：`selectRuntime` 白名单 `["pi","codex","claude"]`、`deliverRuntimePayload` 的 `payload.runtime || "pi"`（消息信封兜底）、`Rt.matchesView` 旧缺身份只兼容 Pi、`viewKey` 缺省键。
+- **静态初始态（首帧一致、不闪）**：`app/renderer/index.html` 的 `#runtime-select` `aria-label`「会话引擎，当前 Claude」、`.engine-value`「Claude」、输入区 `#composer-scope`「未选择角色 / Claude」、`#runtime-option-pi` `aria-selected="false"`、`#runtime-option-claude` `aria-selected="true"`、`#tab-pi` title/aria-label「Claude 设置」。选项顺序仍为 **Pi / Codex / Claude**。
+- **已保存/显式 runtime 优先**：启动恢复 `getRecoveryState().runtime` 为合法枚举时仍原样覆盖默认值；设置抽屉标题与「打开 X 设置」按钮随当前引擎。
+- **测试（只按新默认改期望，未放宽断言）**：`uiux-v2.mjs` SELECTOR 模式新增 Claude 默认断言，并把交互语义平移到新默认下验证——Home 浏览首项 Pi 不提交、Space 提交 Pi 并触发一次配置读取、Enter 仅关闭、关闭后方向键打开当前选中、End 浏览末项并停底不提交、Tab/ShiftTab/外部指针/窗口 blur 取消、hover 只移临时高亮不改选中、点击才提交、长标签省略且保留可访问全名。CONFIG 模式改为 Claude 默认并保留 Pi/Claude 切换检查；FLOW_ONLY 各段与恢复台在 `loadProject` 后显式 `selectRuntime('pi')`（恢复夹具显式 `runtime:'pi'`），保持原 pi 夹具语义且顺带验证「显式 runtime 覆盖默认」。`renderer.test.ts` 新增默认值/静态一致性/选项顺序守卫。
+- **实测**：SELECTOR **27**、CONFIG **21**、COMPLETE_FLOW **41**、SEND_FACTS **8**、ROLE_FOCUS **11** 全过；截图 `%TEMP%/ans-uiux-claude-selector-final2/initial-engine-claude.png`（触发器与输入区均显示 Claude）。`renderer.test.ts` **79 计 / 75 过 / 4 红**——4 红仍为既有 CRLF 基线 N-1、data-state、P1-3、G-5（新增默认值用例通过）。`runtime-ui.test.ts` **12 计 /11 过 /1 红**——红为既有 localStorage 守卫（左栏持久化早于本批）。默认套件的既有 `virtual visible nonempty` 红仍在；已用「默认 pi」同点复现（隐藏窗口 rAF 不执行，滚动 55% 后虚拟窗口不更新），先于本批、未改断言。
+- 指纹：`renderer.js 2b12ecc6`、`index.html ea5a5da2`、`renderer.test.ts 3deba253`、`uiux-v2.mjs 21fbb8ce`。

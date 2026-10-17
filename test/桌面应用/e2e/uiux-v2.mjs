@@ -56,7 +56,7 @@ const flowReports={},flowReceipts={};
 const outer=(input,value)=>({ok:true,version:1,scope:{projectRoot:input.projectRoot,roleId:input.roleId,runtime:input.runtime},value});
 const documentRefs=['one','two'].map((id,index)=>({version:1,projectViewId:'epoch-one',documentId:'doc-'+id,roleId:'A',relativePath:'角色卡/A/docs/'+id+'.md',label:'报告 '+(index+1),format:'markdown'}));
 const handlers={
- 'app:renderer-diagnostic':()=>({ok:true}), 'app:recovery-state':()=>recoveryEnabled?({projectRoot:ROOT,roleId:'A'}):({}),'app:recovery-ready':()=>({ok:true}),
+ 'app:renderer-diagnostic':()=>({ok:true}), 'app:recovery-state':()=>recoveryEnabled?({projectRoot:ROOT,roleId:'A',runtime:'pi'}):({}),'app:recovery-ready':()=>({ok:true}),
  'project:document-read':(_e,input)=>{docCalls.push(input);if(docMode==='deferred')return new Promise(resolve=>docPending.push(resolve));if(docMode!=='success')return {ok:false,version:1,projectViewId:input.projectViewId,documentId:input.documentId,code:docMode,message:'fixed safe error'};return {ok:true,version:1,projectViewId:input.projectViewId,documentId:input.documentId,roleId:input.documentId.endsWith('-b')?'B':'A',relativePath:'角色卡/'+(input.documentId.endsWith('-b')?'B':'A')+'/docs/one.md',format:'markdown',byteLength:100,text:'# 已列文档\n\n<script>window.BAD_DOC=1</script>\n\n![image](https://invalid.example/never.png)\n\n[javascript](javascript:alert(1))\n\n文档正文'};},
  'session:get-persistence':(_e,input)=>{persistenceCalls.push({operation:'capabilities',input});return outer(input,{mode:'enabled',reportSaveSupported:true,deliveryHistorySaveSupported:true,querySupported:true});},
  'report:get-save-state':(_e,input)=>{persistenceCalls.push({operation:'report-query',input});return outer(input,flowReports[input.reportId]||{state:'saved',reportId:input.reportId,retryAvailable:false});},
@@ -99,7 +99,7 @@ const viewportGeometry=`(() => { const root=document.documentElement,b=document.
 async function reading(){return js(`(() => {let c=document.getElementById('chat'),t=c.getBoundingClientRect().top;let nodes=[...c.querySelectorAll('.msg,.tool-records,.sys-denied')];let n=nodes.find(x=>x.getBoundingClientRect().bottom>t&&x.getBoundingClientRect().top<c.getBoundingClientRect().bottom);return n?{text:n.textContent.slice(0,60),offset:n.getBoundingClientRect().top-t}:null;})()`);}
 async function freshContextChecks(){
   const project=ROOT+'-new-context';flowOpenResult={resumed:false,contextSource:'fresh'};
-  await js(`await window.__ansRenderer.loadProject(${JSON.stringify(project)});await window.__ansRenderer.selectRole('A')`);
+  await js(`await window.__ansRenderer.loadProject(${JSON.stringify(project)});await window.__ansRenderer.selectRuntime('pi');await window.__ansRenderer.selectRole('A')`);
   await check('P5 truly fresh open says new context without old history',`document.getElementById('context-state').textContent==='新会话'`);
   await js(`document.getElementById('inp-message').value='首条普通选择';document.getElementById('btn-send').click()`);await pause(30);
   const sent=sends.at(-1),turn='fresh-first-turn';
@@ -116,7 +116,7 @@ async function freshContextChecks(){
 }
 async function roleDocumentFocusChecks(){
  flowLongRoleDocs=true;
- await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRole('A');if(window.__ansRenderer.state.rightTab!=='card')document.getElementById('tab-card').click();['card','docs','changes'].forEach(id=>document.querySelector('details[data-section="'+id+'"]').open=true);document.getElementById('right-body').scrollTop=document.getElementById('right-body').scrollHeight`);await pause(30);
+ await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRuntime('pi');await window.__ansRenderer.selectRole('A');if(window.__ansRenderer.state.rightTab!=='card')document.getElementById('tab-card').click();['card','docs','changes'].forEach(id=>document.querySelector('details[data-section="'+id+'"]').open=true);document.getElementById('right-body').scrollTop=document.getElementById('right-body').scrollHeight`);await pause(30);
  await js(`['card','docs','changes'].forEach(id=>{let el=document.querySelector('details[data-section="'+id+'"] .card-text');el.scrollTop=el.scrollHeight});document.getElementById('right-body').scrollTop=document.getElementById('right-body').scrollHeight`);await pause(30);
  const nested=await js(`Object.fromEntries(['card','docs','changes'].map(id=>[id,document.querySelector('details[data-section="'+id+'"] .card-text').scrollTop]))`);assert.ok(Object.values(nested).every(x=>x>100));
  await check('nested reading fixture has visible real opener and positive inner and outer scroll',`(()=>{let b=document.querySelector('.role-document-entry').getBoundingClientRect(),d=document.getElementById('right-body').getBoundingClientRect();return b.top>=d.top&&b.bottom<=d.bottom&&document.getElementById('right-body').scrollTop>100})()`);
@@ -140,7 +140,7 @@ async function roleDocumentFocusChecks(){
  flowLongRoleDocs=false;
 }
 async function terminalChecks(){
- await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRole('A')`);
+ await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRuntime('pi');await window.__ansRenderer.selectRole('A')`);
  const scoped={projectRoot:ROOT,roleId:'A',runtime:'pi'};
  sendQueued=true;await js(`document.getElementById('inp-message').value='排队首条';document.getElementById('btn-send').click()`);await pause(40);
  await check('P7 actual queued response sets current hint',`document.getElementById('composer-hint').textContent.includes('已入队')`);
@@ -181,7 +181,7 @@ async function terminalChecks(){
  assert.equal(shellResponses.length,denyCount+1,'su/project deny responds once');assert.equal(shellResponses.at(-1).allow,false,'deny never authorizes');
 }
 async function sendFactsChecks(){
- await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRole('A')`);
+ await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRuntime('pi');await window.__ansRenderer.selectRole('A')`);
  const scope={projectRoot:ROOT,roleId:'A',runtime:'pi'};
  async function begin(text){sendDeferred=true;await js(`document.getElementById('inp-message').value=${JSON.stringify(text)};document.getElementById('btn-send').click()`);await pause(20);return sends.at(-1).metadata.clientMessageId;}
  async function event(client,turn,kind,outcome){await push('session:events',[{...scope,clientMessageId:client,event:{kind,turnId:turn,summary:kind==='settled'?'实际收尾 '+outcome:'用户输入',detail:kind==='settled'?{outcome}:{source:'prompt-input',text:'实际普通消息'}}}]);}
@@ -205,7 +205,7 @@ async function sendFactsChecks(){
  sendDeferred=false;
 }
 async function terminalMergeChecks(){
- await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRole('A')`);
+ await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRuntime('pi');await window.__ansRenderer.selectRole('A')`);
  const scope={projectRoot:ROOT,roleId:'A',runtime:'pi'};
  const event=(kind,turnId,outcome,summary,detail={})=>({...scope,event:{kind,turnId,summary,detail:{outcome,...detail}}});
  await push('session:events',[event('denied','merged-stop','aborted','本轮已中止'),event('settled','merged-stop','aborted','本轮已中止')]);
@@ -239,7 +239,7 @@ async function terminalMergeChecks(){
 
 }
 async function visualChecks(){
- await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRole('A')`);
+ await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRuntime('pi');await window.__ansRenderer.selectRole('A')`);
  const scope={projectRoot:ROOT,roleId:'A',runtime:'pi'},request='明确任务请求原文。'+('内容原样保留。'.repeat(80));
  await js(`document.getElementById('inp-message').value=${JSON.stringify(request)};document.getElementById('btn-send').click()`);await pause(30);const sent=sends.at(-1);
  await push('session:events',[{...scope,clientMessageId:sent.metadata.clientMessageId,event:{kind:'message',turnId:'visual-task',summary:'用户输入',detail:{source:'prompt-input',text:request}}},{...scope,event:{kind:'message',turnId:'ordinary-chat',summary:'用户输入',detail:{source:'prompt-input',text:'普通聊天不折叠也不制造报告'}}}]);
@@ -380,7 +380,7 @@ async function visualChecks(){
 async function deliveryNoteChecks(){
  listing.roles[0].builtIn=true;
  const project=ROOT+'/very-long-project-folder-name-'.repeat(18);
- await js(`await window.__ansRenderer.loadProject(${JSON.stringify(project)});await window.__ansRenderer.selectRole('B')`);
+ await js(`await window.__ansRenderer.loadProject(${JSON.stringify(project)});await window.__ansRenderer.selectRuntime('pi');await window.__ansRenderer.selectRole('B')`);
  const scope={projectRoot:project,roleId:'B',runtime:'pi'};
  const oldNote='已接收来自 su 的派发任务——请按任务文本执行，完成后交回报告。';
  await push('session:events',[{...scope,event:{kind:'tool_call',summary:oldNote}}]);
@@ -406,7 +406,7 @@ async function deliveryNoteChecks(){
  assert.equal(sends.length,0,'history and progress rendering must not prompt');
 }
 async function completeFlowChecks(){
-  await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRole('A')`);
+  await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRuntime('pi');await window.__ansRenderer.selectRole('A')`);
   const payload=(event,roleId='A',runtime='pi')=>({projectRoot:ROOT,roleId,runtime,event:{...event,roleId,runtime}});
   const text=(value,flags={})=>({text:value,redacted:false,truncated:false,...flags});
   await check('fresh empty context never mistakes loader for history',`document.getElementById('context-state').textContent==='会话继续使用现有上下文'&&!document.getElementById('context-state').textContent.includes('历史')`);
@@ -632,34 +632,37 @@ async function selectorChecks() {
   await check('disabled combobox before import',`${trigger}.disabled&&${trigger}.getAttribute('aria-disabled')==='true'&&${trigger}.getAttribute('role')==='combobox'`);
   await js(`${trigger}.click();${trigger}.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))`);
   await check('disabled cannot open',`${menu}.hidden&&${trigger}.getAttribute('aria-expanded')==='false'`);
-  listing.roles=[];listing.hasRoles=false;listing.primaryRoleId=null;configMissing.claude=['ANTHROPIC_API_KEY'];
+  listing.roles=[];listing.hasRoles=false;listing.primaryRoleId=null;configMissing.claude=['ANTHROPIC_API_KEY'];configMissing.pi=['ANTHROPIC_AUTH_TOKEN','ANS_PI_MODEL'];
   await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)})`);await pause(60);
-  await check('empty folder enables custom selector',`!${trigger}.disabled&&${trigger}.getAttribute('aria-disabled')==='false'`);
-  await js(`${trigger}.focus()`);await key('Enter');await key('End');
-  await check('End browses Claude without commit',`window.__ansRenderer.state.runtime==='pi'&&${trigger}.getAttribute('aria-activedescendant')==='runtime-option-claude'&&document.getElementById('runtime-option-pi').getAttribute('aria-selected')==='true'&&document.getElementById('runtime-option-claude').getAttribute('aria-selected')==='false'`);
+  await check('empty folder enables custom selector with Claude default',`!${trigger}.disabled&&${trigger}.getAttribute('aria-disabled')==='false'&&window.__ansRenderer.state.runtime==='claude'&&${trigger}.value==='claude'&&${trigger}.querySelector('.engine-value').textContent==='Claude'&&${trigger}.getAttribute('aria-label')==='会话引擎，当前 Claude'&&document.getElementById('runtime-option-pi').getAttribute('aria-selected')==='false'&&document.getElementById('runtime-option-claude').getAttribute('aria-selected')==='true'`);
+  fs.writeFileSync(path.join(OUT,'initial-engine-claude.png'),(await win.webContents.capturePage()).toPNG());
+  await js(`${trigger}.focus()`);await key('Enter');await key('Home');
+  await check('Home browses first Pi without commit',`window.__ansRenderer.state.runtime==='claude'&&${trigger}.getAttribute('aria-activedescendant')==='runtime-option-pi'&&document.getElementById('runtime-option-pi').getAttribute('aria-selected')==='false'&&document.getElementById('runtime-option-claude').getAttribute('aria-selected')==='true'&&${trigger}.value==='claude'`);
   const before=configReads.length;await key('Space');await pause(70);
-  await check('Space commits Claude once with live missing entry',`window.__ansRenderer.state.runtime==='claude'&&${trigger}.value==='claude'&&${menu}.hidden&&${trigger}.getAttribute('aria-label')==='会话引擎，当前 Claude'&&document.getElementById('runtime-config-settings').textContent==='打开 Claude 设置'`);assert.equal(configReads.length,before+1);
+  await check('Space commits Pi once with live missing entry',`window.__ansRenderer.state.runtime==='pi'&&${trigger}.value==='pi'&&${menu}.hidden&&${trigger}.getAttribute('aria-label')==='会话引擎，当前 Pi'&&document.getElementById('runtime-config-settings').textContent==='打开 Pi 设置'&&document.getElementById('runtime-option-pi').getAttribute('aria-selected')==='true'`);assert.equal(configReads.length,before+1);
   const same=configReads.length;await key('Enter');await key('Enter');await pause(40);
-  await check('current Enter only closes',`${menu}.hidden&&window.__ansRenderer.state.runtime==='claude'`);assert.equal(configReads.length,same);
+  await check('current Enter only closes',`${menu}.hidden&&window.__ansRenderer.state.runtime==='pi'`);assert.equal(configReads.length,same);
   await key('Home');await key('ArrowUp');
   await check('Home opens first and stops at top',`${trigger}.getAttribute('aria-activedescendant')==='runtime-option-pi'`);
   await key('Escape');
-  await check('Escape cancels and retains trigger focus',`${menu}.hidden&&window.__ansRenderer.state.runtime==='claude'&&document.activeElement===${trigger}`);
-  await key('ArrowDown');await key('ArrowDown');
-  await check('closed arrow opens selected and stops at last',`${trigger}.getAttribute('aria-activedescendant')==='runtime-option-claude'`);
+  await check('Escape cancels and retains trigger focus',`${menu}.hidden&&window.__ansRenderer.state.runtime==='pi'&&document.activeElement===${trigger}`);
+  await key('ArrowDown');
+  await check('closed arrow opens current selected',`${trigger}.getAttribute('aria-activedescendant')==='runtime-option-pi'&&window.__ansRenderer.state.runtime==='pi'`);
+  await key('End');
+  await check('End browses last Claude and stops at bottom without commit',`${trigger}.getAttribute('aria-activedescendant')==='runtime-option-claude'&&window.__ansRenderer.state.runtime==='pi'&&document.getElementById('runtime-option-pi').getAttribute('aria-selected')==='true'`);
   await key('Home');await key('Tab');
-  await check('Tab cancels naturally to accepted work overview without committing',`${menu}.hidden&&window.__ansRenderer.state.runtime==='claude'&&document.activeElement.id==='tab-work'`);
+  await check('Tab cancels naturally to accepted work overview without committing',`${menu}.hidden&&window.__ansRenderer.state.runtime==='pi'&&document.activeElement.id==='tab-work'`);
   await key('Tab');await key('Tab');await check('missing settings remains naturally keyboard reachable after work and role actions',`document.activeElement.id==='runtime-config-settings'`);
   await js(`${trigger}.focus()`);await key('Enter');await key('Home');
   await key('Tab',['shift']);
-  await check('ShiftTab cancellation leaves natural previous target',`${menu}.hidden&&window.__ansRenderer.state.runtime==='claude'&&document.activeElement.id==='tab-pi'`);
+  await check('ShiftTab cancellation leaves natural previous target',`${menu}.hidden&&window.__ansRenderer.state.runtime==='pi'&&document.activeElement.id==='tab-pi'`);
   await js(`${trigger}.focus();${trigger}.click()`);await key('Home');
   await js(`document.getElementById('runtime-config-settings').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));document.getElementById('runtime-config-settings').focus()`);
-  await check('outside pointer cancels without focus stealing',`${menu}.hidden&&window.__ansRenderer.state.runtime==='claude'&&document.activeElement.id==='runtime-config-settings'`);
+  await check('outside pointer cancels without focus stealing',`${menu}.hidden&&window.__ansRenderer.state.runtime==='pi'&&document.activeElement.id==='runtime-config-settings'`);
   await js(`${trigger}.focus();${trigger}.click();window.dispatchEvent(new Event('blur'))`);
-  await check('window blur closes without commit',`${menu}.hidden&&window.__ansRenderer.state.runtime==='claude'`);
+  await check('window blur closes without commit',`${menu}.hidden&&window.__ansRenderer.state.runtime==='pi'`);
   await js(`${trigger}.click();document.getElementById('runtime-option-codex').dispatchEvent(new PointerEvent('pointermove',{bubbles:true}))`);
-  await check('hover moves temporary only and keeps selected check',`${trigger}.getAttribute('aria-activedescendant')==='runtime-option-codex'&&document.getElementById('runtime-option-claude').getAttribute('aria-selected')==='true'`);
+  await check('hover moves temporary only and keeps selected check',`${trigger}.getAttribute('aria-activedescendant')==='runtime-option-codex'&&document.getElementById('runtime-option-pi').getAttribute('aria-selected')==='true'`);
   const mouseBefore=configReads.length;await js(`document.getElementById('runtime-option-codex').click()`);await pause(60);
   await check('option click commits Codex once',`window.__ansRenderer.state.runtime==='codex'&&${trigger}.value==='codex'&&${menu}.hidden`);assert.equal(configReads.length,mouseBefore+1);
   const currentClick=configReads.length;await js(`${trigger}.click();document.getElementById('runtime-option-codex').click()`);await pause(30);assert.equal(configReads.length,currentClick);
@@ -684,16 +687,18 @@ async function configChecks() {
   const notice=`document.getElementById('runtime-config-notice')`, msg=`document.getElementById('runtime-config-message')`, button=`document.getElementById('runtime-config-settings')`;
   await check('before import disabled and no notice',`document.getElementById('runtime-select').disabled&&${notice}.hidden`);
   await js(`await window.__ansRenderer.selectRuntime('claude')`);
-  await check('programmatic no-project guard',`window.__ansRenderer.state.runtime==='pi'`);
+  await check('programmatic no-project guard',`window.__ansRenderer.state.runtime==='claude'`);
   pickResult=null;await js(`document.getElementById('btn-import').click()`);await pause(60);
   await check('cancel initial import remains disabled',`document.getElementById('runtime-select').disabled`);
   pickResult=ROOT;listFailure=true;await js(`document.getElementById('btn-import').click()`);await pause(60);
   await check('failed initial import remains disabled',`document.getElementById('runtime-select').disabled`);
   listFailure=false;listing.roles=[];listing.hasRoles=false;listing.primaryRoleId=null;
-  configMissing.pi=['ANTHROPIC_AUTH_TOKEN','ANS_PI_MODEL'];
+  configMissing.pi=['ANTHROPIC_AUTH_TOKEN','ANS_PI_MODEL'];configMissing.claude=['ANTHROPIC_API_KEY'];
   await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)})`);await pause(60);
-  await check('empty imported folder enables and checks Pi without role',`!document.getElementById('runtime-select').disabled&&!${notice}.hidden&&${msg}.textContent.includes('ANS_PI_MODEL')&&window.__ansRenderer.state.selectedRoleId===null`);
-  configMissing.claude=['ANTHROPIC_API_KEY'];configMissing.codex=['CODEX_API_KEY','ANS_CODEX_MODEL'];
+  await check('empty imported folder enables and checks Claude without role',`!document.getElementById('runtime-select').disabled&&!${notice}.hidden&&${msg}.textContent.includes('ANTHROPIC_API_KEY')&&window.__ansRenderer.state.selectedRoleId===null`);
+  configMissing.codex=['CODEX_API_KEY','ANS_CODEX_MODEL'];
+  await js(`await window.__ansRenderer.selectRuntime('pi')`);await pause(40);
+  await check('empty imported folder switch checks Pi live',`${msg}.textContent.includes('ANS_PI_MODEL')&&${button}.textContent==='打开 Pi 设置'`);
   await js(`await window.__ansRenderer.selectRuntime('claude')`);await pause(60);
   await check('closed drawer Claude missing key actionable outside chat',`!${notice}.hidden&&${msg}.textContent.includes('ANTHROPIC_API_KEY')&&${button}.textContent==='打开 Claude 设置'&&window.__ansRenderer.state.rightTab===null&&!document.getElementById('chat').textContent.includes('ANTHROPIC_API_KEY')`);
   await js(`${button}.focus()`);await key('Enter');await pause(60);

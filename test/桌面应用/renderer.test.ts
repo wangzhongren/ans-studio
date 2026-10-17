@@ -45,10 +45,25 @@ test("V2r1：真实 Pi/Codex/Claude 可选，保留单一写入语义和退役 D
   assert.ok(RENDERER.includes('$("runtime-note")'), "renderer.js 应写入横栏写入语义 #runtime-note");
   assert.ok(STYLES.includes(".runtime-note"), "styles.css 应有 .runtime-note 样式");
   assert.ok(STYLES.includes(".chat-head-notes"), "styles.css 应有横栏提示区 .chat-head-notes");
-  // 会话一律以 pi 发起（renderer 不再读选择器值）。
+  // 会话以当前选中的真实引擎发起（renderer 不再读选择器静态值）。
   assert.ok(INDEX.includes('id="runtime-select"'), "新真实引擎选择入口存在");
   for (const runtime of ["pi", "codex", "claude"]) assert.ok(INDEX.includes('data-runtime="' + runtime + '"'), "真实引擎选项：" + runtime);
   assert.ok(RENDERER.includes("runtime: runtime"), "openSession 传本次捕获的所选引擎");
+});
+
+test("默认引擎为 Claude：JS 初始 state 与 index.html 静态初始态一致，选项顺序不变", () => {
+  // 2026-10-17 客户指令：默认选择 Claude（唯一改动是默认值；显式/已保存 runtime 仍按原值）。
+  assert.ok(/var state = \{[\s\S]{0,200}?runtime: "claude"/.test(RENDERER), "renderer.js 初始 state.runtime 应为 claude");
+  assert.ok(!/var state = \{[\s\S]{0,200}?runtime: "pi"/.test(RENDERER), "renderer.js 初始 state.runtime 不得再为 pi");
+  // 静态初始态与 JS 初始态一致（首帧不闪）。
+  assert.ok(/id="runtime-select"[^>]*aria-label="会话引擎，当前 Claude"/.test(INDEX), "combobox 可访问名应为当前 Claude");
+  assert.ok(INDEX.includes('<span class="engine-value">Claude</span>'), "触发器显示 Claude");
+  assert.ok(/id="runtime-option-pi"[^>]*aria-selected="false"/.test(INDEX), "Pi 选项静态非选中");
+  assert.ok(/id="runtime-option-claude"[^>]*aria-selected="true"/.test(INDEX), "Claude 选项静态选中");
+  assert.ok(INDEX.includes("未选择角色 / Claude"), "输入区范围静态文案跟随默认引擎");
+  // 只改默认值：选项顺序仍为 Pi / Codex / Claude，不重排。
+  const pi = INDEX.indexOf('data-runtime="pi"'), codex = INDEX.indexOf('data-runtime="codex"'), claude = INDEX.indexOf('data-runtime="claude"');
+  assert.ok(pi >= 0 && codex >= 0 && claude >= 0 && pi < codex && codex < claude, "引擎选项顺序必须保持 Pi / Codex / Claude");
 });
 
 test("不再有一概而论的「V1 桌面：只判不写」（该说法仅 demo 路径成立）", () => {
