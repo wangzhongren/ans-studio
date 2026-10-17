@@ -1,5 +1,42 @@
 # 门禁引擎 变更记录
 
+## 2026-10-17 — 已有角色但无治理记录（S1）兼容 V1：A1 种子边界 Service 公共出口 + F1（I5）F6 回执恢复指引
+
+客户 2026-10-17 裁定「推进吧，按 B+C 来」（不自动创世、不设内置常设治理写权）；PM 评审
+`角色卡/项目管理/docs/design/2026-10-17_design_existing-project-compat-review.md` 批准 V1 并派发
+（§一/§三/§五 A1、F1、§七、§八）。本角色只做自己边界内的 **A1**（I3 机制所需的种子边界公开出口）与
+**F1**（I5，已并入 V1）。**判定逻辑零变化**（F6/F4/pin/重 pin 未动）。
+
+- **边界**：`src/service/boundary/resolve-boundary.ts`（新增公开再导出）、`src/service/gate/resolve-write.ts`
+  （F6 文案）、`test/门禁引擎/governance-seed-public-entry.test.ts`（新，5 例）、
+  `test/门禁引擎/f6-denial-guidance.test.ts`（新，5 例）、本文件、`memo.md`、`feature-map.md`。
+  **未碰** `app/**`、`src/common/编排/`、两份 `format-denial.ts`、他角色 files/tests/docs、客户项目；不 commit。
+- **A1（PM 评审 §五 A1）**：`resolve-boundary.ts` 增
+  `export { buildGovernanceSeedBoundaryForGate as buildGovernanceSeedBoundary } from "../../common/门禁引擎/governance-seed.ts";`
+  ——**同一函数引用**，不复制实现、不 fork 第二份种子（§6：跨角色只经 Service 公开出口消费私有
+  `common/`）；既有 `resolveBoundary` 导出与行为逐字不变。公开出口**不持久化**：调用方（编排 B1）只在
+  单次 `establishGovernanceRecord` 调用栈内构造/使用，不得写入 `ProjectConfig`、`.ans` 或缓存
+  （头注已写明，防退化为候选 G）。测试 `governance-seed-public-entry.test.ts`：引用同一性；
+  三**普通** directory（`角色卡/`、`docs/`、`.ans/`，root 恒 project、**无 condition**）；`accepted:true`；
+  source 逐字透传（含空 source 原样返回，由 F6 判定）；每次调用返回全新对象/数组；`resolveBoundary` 仍在。
+- **F1（PM 评审 §三；I5 的真实组装点只有 `resolve-write.ts` F6 分支）**：新增常量 `F6_DENIAL_GUIDANCE`
+  （紧随既有 `F4_DENIAL_GUIDANCE`），F6 分支 reason＝**首句逐字**
+  `边界未被接受或缺少证据来源（F6）：拒绝一切写入。` ＋ **不判断 `.ans` 状态**的规范式指引
+  （「可能的恢复路径：若项目已有角色但缺少 .ans/project.json → 桌面「建立治理记录」或
+  `ans govern <项目目录>`（需已配置模型与凭据）；若已存在 → 检查可解析、accepted:true、pin 齐全、
+  被 pin 文件未改动——程序不会自动覆盖或重新接受」）。指引**不重复首句**（保
+  `test/编排/shell-gate.test.ts:370` 整句计数）；**判定条件/顺序零变化**。两份 `format-denial.ts`
+  **未改**（渲染器只是 `写入被拒绝：${reason}` 包装，指引自动随 reason 带出）。文案纪律已按 §三：
+  不猜状态、不说「项目角色不受影响」、不承诺自动修复、不暗示无需凭据（测试含反向断言）。
+- **测试（实跑）**：`node --test "test/门禁引擎/**/*.test.ts"` → **198 计 / 198 过 / 0 红 / 0 skipped**
+  （上条 188 + 本批 10）；两个新文件单独跑 **10/10**；`node --test "test/编排/shell-gate.test.ts"` →
+  **20/20**（F6 整句计数断言 `:370` 未被破坏）；`npm run typecheck` → **本批改动文件 0 错**
+  （全仓其余报错均属他角色既有文件，与本批无关）。环境：win32 / 工作区含他角色未提交改动。
+- **未做/待验证（如实分列）**：I3（编排 B1/B2）、I1/I2/I4（桌面）不在本任务；真机端到端（S1 项目点
+  「建立治理记录」→ su 解卡）与独立复验**未进行**；本条目**不声称已验**。
+- **供下游（编排 B1）**：种子边界来自 `src/service/boundary/resolve-boundary.ts` 的
+  `buildGovernanceSeedBoundary(source)`；一次性语义与来源常量由其调用栈负责，本角色只提供同一实现引用。
+
 ## 2026-10-16（六）— su 卡配套修订：G-4 V2「安装纪律」MCP 部分 + 预授权扩列第四棵（`docs/mcp`）
 
 客户 2026-10-16「按推荐批准，开始实施」＝**V2（MCP 安装）分批实施**（四项裁定全采纳：Pi 资源工具

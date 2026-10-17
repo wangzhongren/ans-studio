@@ -20,6 +20,19 @@ contextBridge.exposeInMainWorld("desktop", {
   /** 枚举项目下的角色（含角色卡正文、边界条目、文档与变更记录索引）。 */
   listProject: (projectRoot) => ipcRenderer.invoke("app:list-project", { projectRoot }),
 
+  /**
+   * I2（existing-project-compat V1，PM 评审 §四.2）：预览「建立治理记录」——**只读**，不写文件。
+   * 主进程守卫：projectRoot 必须是当前导入项目；其余状态由机制原样回执。
+   */
+  previewGovernanceRecord: (projectRoot) => ipcRenderer.invoke("project:governance-preview", { projectRoot }),
+
+  /**
+   * I2：显式建立治理记录——**仅**由渲染侧预览面板的确认按钮调用（导入/枚举/定时器等一律不得调用）。
+   * `confirm: true` 固定在本桥内；主进程 Interface 再校验它与当前导入项目。
+   */
+  establishGovernanceRecord: (projectRoot) =>
+    ipcRenderer.invoke("project:governance-establish", { projectRoot, confirm: true }),
+
   /** B/2: only opaque current-project refs; no renderer filesystem paths. */
   readProjectDocument: (input) => ipcRenderer.invoke("project:document-read", input),
   retryReportSave: input => ipcRenderer.invoke('report:retry-save', input),

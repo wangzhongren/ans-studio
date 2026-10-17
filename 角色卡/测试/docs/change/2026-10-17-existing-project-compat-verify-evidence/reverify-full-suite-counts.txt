@@ -1,0 +1,13 @@
+reverify full-suite (node --test "test/**/*.test.ts")
+timestamp: 2026-10-17
+tests 2150
+pass 2055
+fail 93
+skipped 2
+exit 1
+failure-classification:
+  missing-dependency 75
+  windows-symlink-EPERM 8
+  CRLF-source-anchor 9   (renderer.test 4, markdown 1, g2-verify 3, g4v2/k-scope-audit 1)
+  flaky-timing 1         (runtime-core/tools.test.ts abort-shell; passes standalone)
+same-as-pre-fix: yes

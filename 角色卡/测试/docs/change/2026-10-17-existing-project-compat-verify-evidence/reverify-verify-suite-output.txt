@@ -1,0 +1,51 @@
+✔ A1 S1：N 个角色（role-card.md + 仅 boundary.md）、无 .ans → missing + hasRoles=true；列举零写入 (19.3256ms)
+✔ A2 .ans 有效 → present（结构可用；不声明 pin 逐文件匹配） (13.2419ms)
+✔ A3 N1：.ans 非法 JSON → invalid + reason（载入器降级原文，不含凭据） (9.0409ms)
+✔ A4 N2：.ans 合法但 accepted:true 无 pin → invalid + reason（终态规则降级） (10.8447ms)
+✔ A5 preview（S1）：三写路径 / pin 列表 / roleIds / adopt=false / legacy 提示；零写入 (15.0768ms)
+✔ A6 preview（S1b）：既有治理边界文档 → adopt=true，不覆盖；写路径不含治理文档 (11.8174ms)
+✔ A7 N4：坏治理边界文档（entries: []）→ unparseable-governance-doc 且零写入 (8.2047ms)
+✔ A7b N4：治理边界文档 YAML 语法错误 → unparseable-governance-doc 且零写入 (7.331ms)
+✔ A8 无角色 → no-roles（零写入） (0.966ms)
+✔ A9 V7：.ans 已存在 → preview 拒绝 already-established（有效）/ invalid-record（无效）且零写入 (13.65ms)
+✔ A10 桌面守卫：projectRoot 非当前导入项目 → invalid-request（不进入机制、零写入） (8.4627ms)
+✔ A11 F6 首句在拒绝回执中逐字保留且只出现一次（本套件锚点；完整 I5 断言见 c-invariants） (0.1107ms)
+✔ A12 空项目（S0）：governanceRecord=missing 与 hasRoles=false 相互独立；动作谓词仍为 false (1.5261ms)
+✔ A13 文档化限制：present ≠ su 可写（载入器只查 pin 形状；坏 pin 的 .ans 仍显示 present 但 F6/解析拒写） (14.6165ms)
+✔ B1 V2：成功建立——三产物、.ans 结构与 pin 逐条独立复算、manifest 一致、completed (43.8033ms)
+✔ B2 V3（确定性）：真实 resolveBoundarySection + resolveWrite——su 写 docs/su/memo.md allowed，src/** 仍拒 (35.3162ms)
+✔ B3 V4：建立前后项目角色写各自边界内 allowed、边界外仍拒（角色不受影响） (35.7355ms)
+✔ B4 V5：预览零写入；取消不调 IPC（渲染源码级守卫）；present 时动作不可见 (10.3696ms)
+✔ B5 V6b：写入阶段失败（docs 为文件）→ phase=write、ok=false、message 明确可能部分写入；文案不宣称零副作用 (14.1868ms)
+✔ B6 V6：guard 拒绝零写入（已建立 / 无效记录 / 无角色 / 桌面守卫） (20.8558ms)
+✔ B6b V6（precheck 层）：finalizeBootstrap 无可 pin / 门禁拒 → 零写入（机制内部无条件构造，故经 direct 验证） (3.9228ms)
+✔ B7 V7：.ans 有效后 preview/establish 拒绝且零写入；动作隐藏 (22.1853ms)
+✔ B8 并发：同项目两次 establish → 恰一次 ok、一次 busy；不双写 (18.2989ms)
+✔ B9 一次性边界不持久化：删 .ans 后重新建立复用重新求值（采纳既有治理文档 + 新 pin 反映当刻字节） (27.3198ms)
+✔ B11 建立重新求值：不信任预览快照——预览后改动角色边界，pin 反映建立当刻字节；预览 pin 列表＝建立 pin 列表 (20.9813ms)
+✔ B12 V6b 复审：写入阶段失败后新文案不再承诺「重新执行」；.ans 已落盘时重试确为 already-established（如实登记，不判缺陷） (16.3908ms)
+✔ B10 A1 公共出口：Service 导出的种子边界与门禁引擎私有实现**同一函数引用**（三目录、有界） (0.3479ms)
+✔ C1 F6：未接受边界拒绝一切写入；首句逐字保留且只出现一次；恢复指引在位 (15.979ms)
+✔ C2 V8：未接受边界上 request_confirmation → confirmed:true 不发行 writeSet；重试仍 F6；不产生 .ans (6.4674ms)
+✔ C3 pin 校验：改被 pin 文件字节 / 伪造 pin 哈希 → su 边界仍退回未接受 (32.2612ms)
+✔ C4 N5：缺 role-card.md / 缺边界文件的角色目录不被 preview 列出、也不被 pin (22.5893ms)
+✔ C5 N7/N8：S0 创世判据与 ans govern 注入行为逐字不变 (19.0647ms)
+✔ C6 失败/取消零副作用不依赖 wrote.length：phase 语义与写路径集合一致 (20.6896ms)
+✔ C7 无角色但存在 .ans（S3 变体）：preview 先报 invalid-record（不覆盖），且不因 hasRoles 顺序而误报 (6.4711ms)
+✔ C8 一次性边界无模块级缓存：同一进程连续两次 preview 返回等价、但建立对象内部新建（行为等价性） (14.9998ms)
+✔ D1 权限边界：本轮每个改动文件都落在其属主 boundary.yaml 的 Section 1 内 (1.6575ms)
+✔ D2 权限边界：本轮改动未落在测试角色自己的写入面之外（test/测试/ 目录条目） (0.7713ms)
+✔ D3 文档产物：测试角色报告/证据路径在 test/测试/ 与 角色卡/测试/docs/ 白名单内 (0.178ms)
+✔ E1 IPC 契约：main 注册两个通道；preload 暴露同名方法且 establish 固定 confirm:true (1.1773ms)
+✔ E2 渲染侧契约：只经 window.desktop 方法消费；不使用 ipcRenderer；状态字段原样落 state (1.1543ms)
+✔ E3 Interface 契约：ListProjectResult 带 governanceRecord；两方法在 DesktopInterface 上 (0.5811ms)
+✔ E4 动作只由确认按钮触发：establish 调用点唯一（preview/建立均无自动/定时调用） (1.8717ms)
+ℹ tests 42
+ℹ suites 0
+ℹ pass 42
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 476.8421
+EXIT:0

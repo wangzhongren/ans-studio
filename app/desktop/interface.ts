@@ -16,7 +16,7 @@ import type { ProjectConfig } from "../../src/model/role.ts";
 // 会话事件流类型：编排把 `RoleSessionHandle.events()` 放宽为 `OrchestrationEvent`（既有 `SessionEvent`
 // + 编排在 `settled` 时追加的 `handback` 回交事件，设计 §10.8）。外推时套上 `roleId` 信封
 // （`SessionEventEnvelope`，B-2）——**类型从编排/本角色只读导入、不复制形状**。
-import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, DispatchTaskFn, PromptImage, PromptOptions } from "../../src/model/runtime.ts";
+import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, DispatchTaskFn, PromptImage, PromptOptions, FinalizeResult } from "../../src/model/runtime.ts";
 
 import { listProject as realListProject } from "../../src/service/role/resolve-role.ts";
 import {
@@ -25,14 +25,32 @@ import {
   createRuntimeAdapterFactory as realCreateRuntimeAdapterFactory,
   type RuntimeAdapterFactoryBuilder, type RuntimeAdapterFactoryOptions,
 } from "../../src/pipeline/orchestration/run-role.ts";
+// I2/C1（2026-10-17 PM 评审 §四.2/§4.6）：建立治理记录的预览/建立机制。**只**经编排的 Pipeline 公共出口
+// （`govern-session.ts` 薄再导出）使用——**不得**直接导入 `src/common/编排/finalize.ts`（跨角色私有 common）。
+import {
+  previewGovernanceRecord as realPreviewGovernanceRecord,
+  establishGovernanceRecord as realEstablishGovernanceRecord,
+  type GovernancePreviewResult,
+  type EstablishGovernanceResult,
+  type GovernanceRecordInput,
+} from "../../src/pipeline/orchestration/govern-session.ts";
 import { createChatDemoAdapter } from "./chat-adapter.ts";
 
 import {
   buildProjectConfig as realBuildProjectConfig,
+  buildEffectiveProjectConfig,
+  deriveGovernanceRecord,
   readRoleDocsIndex,
   projectDocumentCandidates,
   type DocsIndexEntry,
+  type GovernanceRecordStatus,
 } from "./project.ts";
+// 治理记录状态类型（PM 评审 §四.1 契约）：定义在 `project.ts`（派生函数同址，避免两处漂移），
+// 此处原样再导出供 Interface 消费方（preload/渲染侧类型）引用。
+export type { GovernanceRecordState, GovernanceRecordStatus } from "./project.ts";
+// 载入器类型（只读导入共享组件类型；**实现**的唯一来源在 `src/common/shared/config-loader.ts`）。
+import type { LoadConfigOptions, LoadedConfig } from "../../src/common/shared/config-loader.ts";
+import { loadEffectiveConfig as realLoadEffectiveConfig } from "../../src/common/shared/config-loader.ts";
 import {
   SessionManager,
   type SessionOpenRequest,
@@ -112,6 +130,15 @@ export interface ListProjectResult {
    * **原样转自门禁引擎**（单一来源）；渲染侧据此设主位/默认选中，**不得硬编码 "su"**（§10.7）。
    */
   primaryRoleId: string;
+  /**
+   * **治理记录状态（I1，PM 评审 §四.1）**：由共享载入器事实（`source.kind`/`accepted`/
+   * `downgradeReason`）与 `governanceBoundary.path` 经 `deriveGovernanceRecord` 纯派生。
+   * - `missing`：无 `.ans/project.json`（与 `hasRoles` **相互独立**——「有角色但无治理记录」= S1）。
+   * - `invalid`：记录存在但不可解析、未接受或治理边界路径为空；`reason` 为载入器降级原文。
+   * - `present`：记录存在且结构上可用；**不声明 pin 逐文件匹配**（V1 无 `unverified` 态）。
+   * 本层只读派生：`listProject` 不写文件、不建目录、不触发 finalize。
+   */
+  governanceRecord: GovernanceRecordStatus;
 }
 
 /** 选图结果（K-2）：`image.dataBase64` 供渲染侧预览；`cancelled` 表示用户取消（**不是失败**）。 */
@@ -176,6 +203,21 @@ export interface DesktopDeps {
   createPiAdapterFactoryFn?: (project: ProjectConfig, shellGate?: ShellGate) => (gate: WriteGate) => RuntimeAdapter;
   createDemoAdapterFn?: (opts: { gate: WriteGate; boundary: BoundarySection1 }) => RuntimeAdapter;
   buildProjectConfigFn?: typeof realBuildProjectConfig;
+  /**
+   * 载入有效配置（`.ans` 优先）——**共享载入器**（`src/common/shared/config-loader.ts`，pm 属主；
+   * 只读导入、不复制实现）。缺省真实实现；注入以便单测隔离 `governanceRecord` 的三种来源事实。
+   * 同时透传给 `SessionManager`，保证界面派生与会话授权链在同一注入下一致。
+   */
+  loadEffectiveConfig?: (opts: LoadConfigOptions) => Promise<LoadedConfig>;
+  /**
+   * **I2/C1（existing-project-compat V1，PM 评审 §4.3/§4.4）**：建立治理记录的预览与建立机制——
+   * 缺省经编排 Pipeline 公共出口 `src/pipeline/orchestration/govern-session.ts`（薄再导出）调用。
+   * 注入以便单测断言透传、guard 拒绝时**不调用机制**、机制错误（busy/already-established…）原样透传。
+   * 本层只做 §4.6 的 1–3 号守卫（当前导入项目 / confirm / 不另造互斥）；边界构造、`.ans` 判定与写入
+   * 全部在机制内部。
+   */
+  previewGovernanceRecordFn?: (input: GovernanceRecordInput) => Promise<GovernancePreviewResult>;
+  establishGovernanceRecordFn?: (input: GovernanceRecordInput) => Promise<EstablishGovernanceResult>;
   /**
    * 「项目内容可能已变」信号（§10.3）——**主入口角色（su）的一轮结束**时由本层触发，主进程据此向
    * 渲染侧推 `project:changed`，渲染侧重取枚举让左树随 su 建角色而**长出**。缺省无操作（测试可注入收集器）。
@@ -277,6 +319,20 @@ export interface DesktopInterface {
   readProjectDocument(input: unknown): Promise<ReadProjectDocumentResult>;
   disposeProjectDocuments(): void;
   listProject(input: { projectRoot: string }): Promise<ListProjectResult>;
+  /**
+   * **I2/C1（existing-project-compat V1）**：预览「建立治理记录」——**只读**（不写文件、不建目录）。
+   * 守卫：`projectRoot` 非空且等于当前导入项目；否则 `invalid-request`（本层合成，不调用机制）。
+   * 其余状态/门禁错误（`busy`/`already-established`/`invalid-record`/`no-roles`/`nothing-to-pin`/
+   * `unparseable-governance-doc`/`blocked`）由机制原样透传。
+   */
+  previewGovernanceRecord(input: { projectRoot: string }): Promise<GovernancePreviewResult>;
+  /**
+   * **I2/C1**：显式建立治理记录（仅操作者在预览面板确认后触发）。守卫（PM 评审 §4.6 本层负责 1–3）：
+   * `projectRoot` 必须是当前导入项目、`confirm === true`；按项目的在途互斥由机制内部负责（`busy`），
+   * 本层**不造第二份**。成功后清该项目的列举缓存、调用既有陈旧边界刷新入口（`refreshStaleBoundaries`），
+   * 并复用既有主→渲染信号 `emitProjectChanged` 让渲染侧重新 `listProject`。
+   */
+  establishGovernanceRecord(input: { projectRoot: string; confirm: true }): Promise<EstablishGovernanceResult>;
   /** 点角色即开：直接建立/续接与该角色的会话（无确认框；B-2 起切换不再结束旧会话）。 */
   openSession(input: SessionOpenRequest): Promise<OpenResult>;
   /**
@@ -336,6 +392,33 @@ export interface DesktopInterface {
 }
 
 /**
+ * guard 回执里的固定相对路径：与编排 `finalizeRelPaths` 的固定输出**同值**。本层 guard 分支**不写文件**，
+ * 这两个字段只是 `EstablishGovernanceResult.finalize` 的形状字段（PM 评审 §4.4）。
+ */
+const GOVERNANCE_GUARD_PROJECT_JSON_REL = ".ans/project.json";
+const GOVERNANCE_GUARD_MANIFEST_REL = "docs/bootstrap-manifest.md";
+
+/** establish 的本层守卫拒绝（阶段固定 `guard`；零调用机制、零写入）。 */
+function governanceGuardResult(message: string): EstablishGovernanceResult {
+  return {
+    ok: false,
+    phase: "guard",
+    code: "invalid-request",
+    finalize: {
+      ok: false,
+      status: "blocked",
+      message,
+      reason: message,
+      wrote: [],
+      pins: [],
+      roles: [],
+      projectJsonRel: GOVERNANCE_GUARD_PROJECT_JSON_REL,
+      manifestRel: GOVERNANCE_GUARD_MANIFEST_REL,
+    },
+  };
+}
+
+/**
  * 构造桌面 Interface。持有枚举缓存供会话构造 ProjectConfig，并托管 SessionManager。
  */
 export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
@@ -344,6 +427,11 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   const createPiAdapterFactoryFn = deps.createPiAdapterFactoryFn ?? realCreatePiAdapterFactory;
   const createDemoAdapterFn = deps.createDemoAdapterFn ?? createChatDemoAdapter;
   const buildProjectConfigFn = deps.buildProjectConfigFn ?? realBuildProjectConfig;
+  // 治理记录状态与会话授权链共用的**同一份**共享载入器（只读导入，不复制实现）。
+  const loadEffectiveConfigFn = deps.loadEffectiveConfig ?? realLoadEffectiveConfig;
+  // I2/C1：预览/建立机制（缺省＝编排 Pipeline 公共出口；不直接导入 `src/common/编排/`）。
+  const previewGovernanceRecordFn = deps.previewGovernanceRecordFn ?? realPreviewGovernanceRecord;
+  const establishGovernanceRecordFn = deps.establishGovernanceRecordFn ?? realEstablishGovernanceRecord;
   // Pi 配置面板：函数与目标路径均可注入（**测试/e2e 必须注入临时 `.env`**，绝不碰真实仓库根 `.env`）。
   const getPiConfigFn = deps.getPiConfigFn ?? realGetPiConfig;
   const savePiConfigFn = deps.savePiConfigFn ?? realSavePiConfig;
@@ -412,6 +500,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     },
     createDemoAdapter: createDemoAdapterFn,
     buildProjectConfig: buildProjectConfigFn,
+    // I1：界面 `governanceRecord` 与会话授权链共用同一载入器注入（缺省＝共享载入器真实实现）。
+    loadEffectiveConfig: loadEffectiveConfigFn,
     getListing: (root) => listingCache.get(root),
     emitEvent: emitSessionEvent,
     emitPersistenceChange: update => { if (update.scope.projectRoot === importedProjectRoot) deps.emitPersistenceChange?.(update); },
@@ -479,6 +569,19 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       const listing = await listProjectFn(projectRoot);
       listingCache.set(listing.projectRoot, listing);
 
+      // ——— I1 治理记录状态（PM 评审 §四.1）———
+      // **只读**：走**既有单一授权链** `buildEffectiveProjectConfig`（`.ans` 优先、无则运行期同意回退、
+      // 不可用则 fail-closed），不另写第二份 `.ans` 读取逻辑；派生只用载入器事实与采纳的治理边界路径。
+      // 本段不写文件、不建目录、不触发 finalize（显式建立动作属下一组 C1）。
+      const effective = await buildEffectiveProjectConfig(listing, {
+        buildProjectConfig: buildProjectConfigFn,
+        loadEffectiveConfig: loadEffectiveConfigFn,
+      });
+      const governanceRecord = deriveGovernanceRecord({
+        source: effective.source,
+        governanceBoundaryPath: effective.project.governanceBoundary?.path,
+      });
+
       const roles: RoleView[] = [];
       for (const r of listing.roles) {
         let changelog: { path: string; text: string } | null = null;
@@ -519,7 +622,53 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         // 原样转自门禁引擎（单一来源）：hasRoles 供「尚未 bootstrap」判断、primaryRoleId 供主位/默认选中。
         hasRoles: listing.hasRoles,
         primaryRoleId: listing.primaryRoleId,
+        governanceRecord,
       };
+    },
+
+    // —————— I2/C1（existing-project-compat V1，2026-10-17 PM 评审 §二 I2 / §四.2 / §4.6）——————
+    // 机制（预览/建立、一次性边界、finalize、按项目互斥）全部在编排侧；本层只做守卫 1–3 与成功后的收尾。
+    async previewGovernanceRecord(input: { projectRoot: string }): Promise<GovernancePreviewResult> {
+      const rawRoot = input !== null && typeof input === "object" ? input.projectRoot : undefined;
+      // 守卫 1：projectRoot 非空且等于桌面当前导入项目（渲染侧不能传任意路径）。
+      if (typeof rawRoot !== "string" || rawRoot.trim() === "" || rawRoot !== importedProjectRoot) {
+        return { ok: false, code: "invalid-request", message: "项目不是当前导入项目；本次未写入任何文件。" };
+      }
+      // 只把 projectRoot 透传：边界/授权来源/写路径由机制内部构造，调用方不得提供。
+      return previewGovernanceRecordFn({ projectRoot: rawRoot });
+    },
+
+    async establishGovernanceRecord(input: { projectRoot: string; confirm: true }): Promise<EstablishGovernanceResult> {
+      const rawRoot = input !== null && typeof input === "object" ? input.projectRoot : undefined;
+      // 守卫 1：当前导入项目。
+      if (typeof rawRoot !== "string" || rawRoot.trim() === "" || rawRoot !== importedProjectRoot) {
+        return governanceGuardResult("项目不是当前导入项目；本次未写入任何文件。");
+      }
+      // 守卫 2：操作者已看过预览并确认（意图标记，不是密码学证据）。
+      if (input === null || typeof input !== "object" || input.confirm !== true) {
+        return governanceGuardResult("缺少操作者确认（confirm:true）；本次未写入任何文件。");
+      }
+      // 守卫 3：按项目的在途互斥**由机制内部负责**（并发第二次得到 `busy`）——本层不另造第二份。
+      const result = await establishGovernanceRecordFn({ projectRoot: rawRoot });
+
+      // 成功（`phase === "write"` 且 finalize 完成）后：
+      //  ① 调用**既有**陈旧边界刷新入口（O-1，`SessionManager.refreshStaleBoundaries`）：空闲的活会话
+      //     按新边界作废重建（在跑的轮次跳过，等下一时机；不新造机制）。**先于清缓存**——重建路径要经
+      //     `getListing` 取得角色表，缓存先删会让重建以「尚未枚举」失败。逐会话失败已在方法内隔离，
+      //     这里再兜一层，绝不让刷新异常改写已成功的建立回执。
+      //  ② 清该项目的列举缓存——界面不得继续读建立前的旧 listing；
+      //  ③ 复用**既有**主→渲染信号 `emitProjectChanged`（main.ts 推 `project:changed`）：渲染侧据既有
+      //     消费面重新 `listProject`，状态随 `.ans` 变为 present、动作隐藏。
+      if (result.ok === true && result.phase === "write" && result.finalize.status === "completed") {
+        try {
+          await manager.refreshStaleBoundaries();
+        } catch {
+          // 刷新失败不影响建立结果（建立已落盘；下次发言/投递的既有检查点会再查陈旧）。
+        }
+        listingCache.delete(rawRoot);
+        deps.emitProjectChanged?.();
+      }
+      return result;
     },
 
     async openSession(input): Promise<OpenResult> {

@@ -14,6 +14,11 @@ import type { ProjectConfig } from "../../src/model/role.ts";
 import type { RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
 import type { OrchestrationEvent, TaskHandback } from "../../src/common/编排/handback.ts";
 import type { RuntimeAdapter, SessionEvent, WriteGate, CustomerInputFn } from "../../src/provider/pi/session.ts";
+import type {
+  EstablishGovernanceResult,
+  GovernancePreview,
+  GovernancePreviewResult,
+} from "../../src/pipeline/orchestration/govern-session.ts";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -372,6 +377,108 @@ test("T17 listProject：hasRoles 与 primaryRoleId 原样转自门禁引擎（�
   assert.equal(res.primaryRoleId, "su", "primaryRoleId 应原样转达（供主位/默认选中）");
 });
 
+// —————— I1：治理记录状态（PM 评审 §四.1）——————
+// 三种状态走**真实共享载入器**（不注入 loadEffectiveConfig），仅枚举来源用假 listing；
+// 同时核对 governanceRecord 与 hasRoles 相互独立、列举前后项目树不变（只读）。
+
+test("I1 listProject：governanceRecord 由共享载入器事实派生（missing / present / invalid），与 hasRoles 独立", async () => {
+  const fs = await import("node:fs/promises");
+  const os = await import("node:os");
+  const base = await fs.mkdtemp(path.join(os.tmpdir(), "ans-governance-record-"));
+  const mkProject = async (name: string, ansJson?: string): Promise<string> => {
+    const root = path.join(base, name);
+    await fs.mkdir(path.join(root, "角色卡/A"), { recursive: true });
+    await fs.writeFile(path.join(root, "角色卡/A/role-card.md"), "# A");
+    if (ansJson !== undefined) {
+      await fs.mkdir(path.join(root, ".ans"), { recursive: true });
+      await fs.writeFile(path.join(root, ".ans/project.json"), ansJson);
+    }
+    return root;
+  };
+  const tree = async (root: string): Promise<string[]> => {
+    const out: string[] = [];
+    const walk = async (dir: string, rel: string): Promise<void> => {
+      for (const d of await fs.readdir(dir, { withFileTypes: true })) {
+        const next = rel ? `${rel}/${d.name}` : d.name;
+        out.push(next);
+        if (d.isDirectory()) await walk(path.join(dir, d.name), next);
+      }
+    };
+    await walk(root, "");
+    return out.sort();
+  };
+  const pinnedBoundary = {
+    path: "角色卡/governance-boundary.yaml",
+    acceptance: {
+      accepted: true,
+      source: "operator:test",
+      pin: [{ path: "角色卡/governance-boundary.yaml", sha256: "a".repeat(64) }],
+    },
+  };
+  const roots = {
+    missing: await mkProject("missing"),
+    present: await mkProject("present", JSON.stringify({ governanceBoundary: pinnedBoundary })),
+    invalidJson: await mkProject("invalid-json", "{ 不是 JSON"),
+    noPin: await mkProject("no-pin", JSON.stringify({
+      governanceBoundary: { path: "角色卡/governance-boundary.yaml", acceptance: { accepted: true, source: "operator:test" } },
+    })),
+  };
+  const makeIface = (root: string, hasRoles = true) => createDesktopInterface({
+    pickDirectory: async () => root,
+    emitEvent: () => {},
+    listProjectFn: async () => ({ ...FAKE_LISTING, projectRoot: root, hasRoles }),
+    envFilePath: path.join(root, "absent-fake-env"),
+  });
+  try {
+    const before = new Map<string, string[]>();
+    for (const [key, root] of Object.entries(roots)) before.set(key, await tree(root));
+
+    const missing = await makeIface(roots.missing).listProject({ projectRoot: roots.missing });
+    assert.deepEqual(missing.governanceRecord, { state: "missing" });
+    assert.equal(missing.hasRoles, true, "hasRoles 原样转自枚举（S1 判定＝hasRoles && missing）");
+
+    // present 与 hasRoles 独立：枚举声称无角色，状态仍应是 present。
+    const present = await makeIface(roots.present, false).listProject({ projectRoot: roots.present });
+    assert.deepEqual(present.governanceRecord, { state: "present" });
+    assert.equal(present.hasRoles, false, "governanceRecord 与 hasRoles 相互独立（不得互相覆盖）");
+
+    const invalidJson = await makeIface(roots.invalidJson).listProject({ projectRoot: roots.invalidJson });
+    assert.equal(invalidJson.governanceRecord.state, "invalid");
+    assert.match(invalidJson.governanceRecord.reason ?? "", /无法解析/, "invalid 的 reason 应取载入器降级原文");
+
+    const noPin = await makeIface(roots.noPin).listProject({ projectRoot: roots.noPin });
+    assert.equal(noPin.governanceRecord.state, "invalid", "accepted:true 无 pin 由载入器降级 ⇒ invalid");
+    assert.match(noPin.governanceRecord.reason ?? "", /pin/, "reason 应说明 pin 缺失");
+
+    // 只读：列举前后目录树逐项一致（不建 .ans、不写文件）。
+    for (const [key, root] of Object.entries(roots)) {
+      assert.deepEqual(await tree(root), before.get(key), `listProject 前后目录树应不变（${key}）`);
+    }
+  } finally {
+    await fs.rm(base, { recursive: true, force: true });
+  }
+});
+
+test("I1 DesktopDeps.loadEffectiveConfig：可注入（单一授权链），派生不再另读 .ans", async () => {
+  let calls = 0;
+  const acceptance = { accepted: true, source: "injected:operator" };
+  const iface = createDesktopInterface({
+    pickDirectory: async () => null,
+    emitEvent: () => {},
+    listProjectFn: async () => FAKE_LISTING,
+    loadEffectiveConfig: async (opts) => {
+      calls += 1;
+      return {
+        project: { ...opts.fallback, governanceBoundary: { path: "角色卡/governance-boundary.yaml", acceptance } },
+        source: { kind: "ans", path: "/proj/.ans/project.json", acceptance, pinPaths: [] },
+      };
+    },
+  });
+  const res = await iface.listProject({ projectRoot: "/proj" });
+  assert.equal(calls, 1, "派生应调用注入的共享载入器（不另写 .ans 读取逻辑）");
+  assert.deepEqual(res.governanceRecord, { state: "present" });
+});
+
 test("T17 主入口角色一轮结束（settled）→ 触发 emitProjectChanged；非主入口角色不触发", async () => {
   const listing: ProjectListing = {
     projectRoot: "/proj",
@@ -658,3 +765,184 @@ async function assertWindowsInterfaceClosed(iface:ReturnType<typeof createDeskto
  const refreshed=await iface.listProject({projectRoot:root});assert.equal(refreshed.documentReadUnavailable,'UNSUPPORTED_ENVIRONMENT');assert.equal(refreshed.documentScope,undefined);assert.ok(refreshed.roles.every(role=>(role.documents??[]).length===0));
  assert.deepEqual(await fs.readFile(file),before);assert.equal((await fs.stat(file)).mtimeMs,stat.mtimeMs);
 }
+
+// ———————————————— I2（existing-project-compat V1）：治理记录预览/建立的 Interface 接线 ————————————————
+
+const EMPTY_PREVIEW: GovernancePreview = {
+  projectRoot: "/proj",
+  governanceBoundaryRel: "角色卡/governance-boundary.yaml",
+  writePaths: [".ans/project.json"],
+  pinPaths: [],
+  roleIds: ["A"],
+  adoptExistingGovernanceDoc: false,
+  acceptanceSource: "desktop-app:测试",
+  legacyBoundaryRoleIds: [],
+};
+
+function blockedEstablish(code: "invalid-request" | "busy", message: string): EstablishGovernanceResult {
+  return {
+    ok: false,
+    phase: "guard",
+    code,
+    finalize: {
+      ok: false,
+      status: "blocked",
+      message,
+      reason: message,
+      wrote: [],
+      pins: [],
+      roles: [],
+      projectJsonRel: ".ans/project.json",
+      manifestRel: "docs/bootstrap-manifest.md",
+    },
+  };
+}
+
+test("I2 守卫：projectRoot 必须非空且是当前导入项目，establish 必须 confirm:true；拒绝时不调用机制", async () => {
+  let previewCalls = 0;
+  let establishCalls = 0;
+  const iface = createDesktopInterface({
+    pickDirectory: async () => null,
+    emitEvent: () => {},
+    listProjectFn: async () => FAKE_LISTING,
+    previewGovernanceRecordFn: async () => { previewCalls += 1; return { ok: true, preview: EMPTY_PREVIEW }; },
+    establishGovernanceRecordFn: async () => {
+      establishCalls += 1;
+      return { ok: false, phase: "guard", code: "busy", finalize: blockedEstablish("busy", "未预期调用").finalize };
+    },
+  });
+
+  // 尚未导入任何项目 ⇒ 非当前导入项目。
+  const notImported = await iface.previewGovernanceRecord({ projectRoot: "/proj" });
+  assert.equal(notImported.ok, false);
+  if (!notImported.ok) assert.equal(notImported.code, "invalid-request");
+  const establishNotImported = await iface.establishGovernanceRecord({ projectRoot: "/proj", confirm: true });
+  assert.equal(establishNotImported.ok, false);
+  assert.equal(establishNotImported.phase, "guard");
+  assert.equal(establishNotImported.code, "invalid-request");
+  assert.deepEqual(establishNotImported.finalize.wrote, []);
+  assert.deepEqual(establishNotImported.finalize.pins, []);
+
+  await iface.listProject({ projectRoot: "/proj" });
+
+  // 空 projectRoot / 不是当前项目 / 缺 confirm——全为 invalid-request。
+  for (const root of ["", "   ", "/other"]) {
+    const preview = await iface.previewGovernanceRecord({ projectRoot: root });
+    assert.equal(preview.ok, false);
+    if (!preview.ok) assert.equal(preview.code, "invalid-request");
+    const establish = await iface.establishGovernanceRecord({ projectRoot: root, confirm: true });
+    assert.equal(establish.code, "invalid-request");
+  }
+  const missingConfirm = await iface.establishGovernanceRecord({ projectRoot: "/proj" } as never);
+  assert.equal(missingConfirm.ok, false);
+  assert.equal(missingConfirm.phase, "guard");
+  assert.equal(missingConfirm.code, "invalid-request");
+  assert.match(missingConfirm.finalize.message ?? "", /confirm/, "缺 confirm 应如实说明");
+
+  assert.equal(previewCalls, 0, "guard 拒绝时绝不预览");
+  assert.equal(establishCalls, 0, "guard 拒绝时绝不建立（零写入、不调用机制）");
+});
+
+test("I2 透传：预览/建立只把 projectRoot 交给机制；busy/already-established 等错误原样返回", async () => {
+  let previewResult: GovernancePreviewResult = { ok: true, preview: EMPTY_PREVIEW };
+  let establishResult: EstablishGovernanceResult = blockedEstablish("busy", "上一次建立仍在进行中；本次未写入任何文件。");
+  const previewInputs: unknown[] = [];
+  const establishInputs: unknown[] = [];
+  const iface = createDesktopInterface({
+    pickDirectory: async () => null,
+    emitEvent: () => {},
+    listProjectFn: async () => FAKE_LISTING,
+    previewGovernanceRecordFn: async (input) => { previewInputs.push(input); return previewResult; },
+    establishGovernanceRecordFn: async (input) => { establishInputs.push(input); return establishResult; },
+  });
+  await iface.listProject({ projectRoot: "/proj" });
+
+  assert.equal(await iface.previewGovernanceRecord({ projectRoot: "/proj" }), previewResult, "同一对象原样透传");
+  assert.deepEqual(previewInputs, [{ projectRoot: "/proj" }], "只透传 projectRoot（不传边界/来源/写路径）");
+
+  assert.equal(await iface.establishGovernanceRecord({ projectRoot: "/proj", confirm: true }), establishResult);
+  assert.deepEqual(establishInputs, [{ projectRoot: "/proj" }], "confirm 是 Interface 的守卫入参，不进入机制输入");
+
+  // 机制的其他错误同样原样返回（不重写 message/code）。
+  const already: GovernancePreviewResult = { ok: false, code: "already-established", message: "治理记录已存在；本次未写入任何文件。" };
+  previewResult = already;
+  assert.equal(await iface.previewGovernanceRecord({ projectRoot: "/proj" }), already);
+  const noRoles = blockedEstablish("invalid-request", "项目没有可用角色（hasRoles=false）；本次未写入任何文件。");
+  establishResult = noRoles;
+  assert.equal(await iface.establishGovernanceRecord({ projectRoot: "/proj", confirm: true }), noRoles);
+});
+
+test("I2 establish 成功：清列举缓存、调用既有陈旧边界刷新入口、复用 project:changed 让渲染侧重取", async () => {
+  const fs = await import("node:fs/promises");
+  const os = await import("node:os");
+  const base = await fs.mkdtemp(path.join(os.tmpdir(), "ans-governance-establish-"));
+  const root = path.join(base, "proj");
+  await fs.mkdir(path.join(root, "角色卡/A"), { recursive: true });
+  await fs.writeFile(path.join(root, "角色卡/A/role-card.md"), "# A\n");
+  const boundaryFile = path.join(root, "角色卡/A/boundary.yaml");
+  await fs.writeFile(boundaryFile, "role: A\nentries:\n  - kind: file\n    path: src/a.ts\n    purpose: p\n");
+  const listing: ProjectListing = { ...FAKE_LISTING, projectRoot: root };
+
+  let openCalls = 0;
+  let projectChanged = 0;
+  let captured: unknown;
+  const events: import("../../app/desktop/session.ts").DesktopOrchestrationEvent[] = [];
+  const iface = createDesktopInterface({
+    pickDirectory: async () => root,
+    emitEvent: (envelope) => { events.push(envelope.event); },
+    listProjectFn: async () => listing,
+    openRoleSessionFn: async () => { openCalls += 1; return makeFakeHandle().handle; },
+    createDemoAdapterFn: () => ({}) as unknown as RuntimeAdapter,
+    buildProjectConfigFn: buildProjectConfig,
+    emitProjectChanged: () => { projectChanged += 1; },
+    establishGovernanceRecordFn: async (input) => {
+      captured = input;
+      return {
+        ok: true,
+        phase: "write",
+        finalize: {
+          ok: true,
+          status: "completed",
+          message: "治理记录已建立。",
+          reason: "",
+          wrote: [".ans/project.json", "角色卡/governance-boundary.yaml", "docs/bootstrap-manifest.md"],
+          pins: [],
+          roles: ["A"],
+          projectJsonRel: ".ans/project.json",
+          manifestRel: "docs/bootstrap-manifest.md",
+        },
+      };
+    },
+  });
+  try {
+    await iface.listProject({ projectRoot: root });
+    const opened = await iface.openSession({ projectRoot: root, roleId: "A", runtime: "demo" });
+    assert.equal(opened.ok, true, "先有活会话，才能观察陈旧边界刷新入口是否被调用");
+
+    // 让活会话的边界快照过期（O-1 判据＝读盘指纹变化）。**尺寸必须可判**：等长重写在
+    // Windows/mtime 粒度合并时可能被 `filePrint` 的 (mtimeMs,size) 命中旧缓存（既有教训）。
+    await fs.writeFile(boundaryFile, "role: A\nentries:\n  - kind: file\n    path: src/b.ts\n    purpose: 变更后的边界（更长）\n");
+
+    const result = await iface.establishGovernanceRecord({ projectRoot: root, confirm: true });
+    assert.equal(result.ok, true);
+    assert.deepEqual(captured, { projectRoot: root }, "机制只收到 projectRoot");
+
+    // 既有 refreshStaleBoundaries 是 fire-and-forget：有界等待重建发生。
+    for (let i = 0; i < 100 && openCalls < 2; i += 1) await new Promise((r) => setTimeout(r, 10));
+    assert.equal(openCalls, 2, "成功后应调用既有陈旧边界刷新入口（空闲会话按新边界重建）");
+    assert.ok(
+      events.some((e) => e.kind === "message" && /边界已更新/.test(e.summary)),
+      "重建应经既有如实记行（不新造通知机制）",
+    );
+    assert.equal(projectChanged, 1, "复用既有主→渲染 project:changed 信号（渲染侧据此重新 listProject）");
+
+    // 列举缓存已清：重新 listProject 之前，开会话走 cache miss 的如实拒绝。
+    const after = await iface.openSession({ projectRoot: root, roleId: "B", runtime: "demo" });
+    assert.equal(after.ok, false);
+    assert.match(after.error ?? "", /尚未枚举该项目/);
+  } finally {
+    await iface.stopSession();
+    iface.disposeProjectDocuments();
+    await fs.rm(base, { recursive: true, force: true });
+  }
+});

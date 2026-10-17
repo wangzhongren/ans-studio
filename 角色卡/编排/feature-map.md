@@ -13,6 +13,7 @@
 | ans govern（治理会话） | su 的治理对话（建/改角色、创世）：CLI 与桌面收敛为同一引擎 `openGovernanceSession` | 已实现 | 功能文档待补（[确认制/删收口](docs/change/2026-10-12_change_governed-interaction-a3-a4.md)） |
 | 客户确认制（写前预览确认） | 写盘前经 `request_confirmation` 预览（含具体路径）并获客户 `confirmed:true`，写集按确认发行 | 已实现 | 功能文档待补（同左；残余「内容漂移」已如实登记） |
 | 自动收尾 / 重 pin | su 会话 settle 后自动重扫并更新 `.ans` pin + manifest（创世首轮 = 首次收尾） | 已实现 | 功能文档待补（同左 + [finalize 相关记录](docs/change/2026-10-12_change_governed-interaction-a3-a4.md)） |
+| **建立治理记录（已有角色、无 `.ans`）** | `previewGovernanceRecord` 只读预览 / `establishGovernanceRecord` 由操作者显式触发，复用 `finalizeBootstrap` 写出治理边界文档 + `.ans` + manifest；守卫/互斥/`phase` 三态见记录 | 已实现（B1+B2） | [I3 记录](changelog.md#2026-10-17--i3已有角色但无治理记录兼容previewgovernancerecord--establishgovernancerecordb1--pipeline-薄再导出b2)；公开面见 [api-spec](api-spec.md) |
 | shell 闸（三层链：项目角色） | c-b-a审核与留痕；宿主已委托本项目精确常规检查且b明确允许时免重复a | 编排已实现并验证 | [shell审核](docs/feature/shell-review.md) |
 | **su 只读 shell（只读档）** | **su 的 `run_shell` 只执行 (c) 只读白名单命令；risky/review/deny 一律拒——不接 (b)/(a)、不弹框** | **已实现** | [su 只读 shell](docs/change/2026-10-12_change_su-readonly-shell.md)（稳定功能说明待补） |
 | 回交（任务报告） | 按真实ACK/turnId隔离来源、报告与证据，普通聊天不自动回交；正式任务未报告/失败如实回交，最终报告按真实bound档保存，失败仅保存恢复；主入口核对已收到报告后向客户汇总 | 编排已实现并验证 | [任务报告回交](docs/feature/task-handback.md) |

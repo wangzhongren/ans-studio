@@ -181,6 +181,69 @@ export async function buildEffectiveProjectConfig(
   return { project, source: loaded.source };
 }
 
+// —————————————————————— 治理记录状态（I1，PM 评审 §四.1）——————————————————————
+//
+// **事实来源**：共享载入器 `loadEffectiveConfig` 经 `buildEffectiveProjectConfig` 返回的
+// `source.kind` / `source.acceptance.accepted` / `source.downgradeReason`，以及采纳后的
+// `project.governanceBoundary.path`。本函数**只做纯派生**——不读文件、不校验 pin 逐文件哈希、
+// 不写任何东西（`listProject` 的只读约束由调用方承担）。
+//
+// V1 契约（PM 评审 §四.1 表）：
+//  - present：`kind === "ans"` 且 `accepted === true` 且治理边界路径 trim 后非空。
+//    **不声明 pin 逐文件匹配**（V1 无 `unverified`；S4 pin 不符仍显示 present，见评审 §七-6）。
+//  - missing：`kind === "builtin-fallback"`（无 `.ans/project.json`）。即便 fallback 的
+//    acceptance 是运行期同意（accepted:true），也仍是 missing——治理记录是否存在与写入授权是两件事。
+//  - invalid：`ans-invalid`，或 `ans` 但 accepted 不为 true，或治理边界路径为空。
+//    `reason` 只取载入器 `downgradeReason`，缺失时给等价原因（不猜测、不补写）。
+
+export type GovernanceRecordState = "present" | "missing" | "invalid";
+
+export interface GovernanceRecordStatus {
+  state: GovernanceRecordState;
+  /** 仅 state === "invalid" 时给出：载入器降级/不可解析原因原文（不含凭据）。 */
+  reason?: string;
+}
+
+/** `ans-invalid` 且载入器未给降级原因时的等价原因（载入器实际恒给，纯函数仍显式兜底）。 */
+const GOVERNANCE_INVALID_REASON = "治理记录不可用（.ans/project.json 不可解析或结构无效）";
+/** `ans` 且 accepted 不为 true、载入器未给降级原因时的等价原因。 */
+const GOVERNANCE_UNACCEPTED_REASON = "治理记录未接受（accepted 不为 true）";
+/** `ans` 且 accepted 但治理边界路径为空时的等价原因。 */
+const GOVERNANCE_PATH_EMPTY_REASON = "治理记录缺少治理边界路径（governanceBoundary.path 为空）";
+
+/**
+ * 由载入器结果事实派生 `governanceRecord` 状态（纯函数，便于单测）。
+ *
+ * @param input.source 载入器 `source`（只取 kind/acceptance/downgradeReason 三项事实）
+ * @param input.governanceBoundaryPath `project.governanceBoundary?.path`（缺省按空串处理）
+ */
+export function deriveGovernanceRecord(input: {
+  source: Pick<LoadedConfig["source"], "kind" | "acceptance" | "downgradeReason">;
+  governanceBoundaryPath?: string;
+}): GovernanceRecordStatus {
+  const { source } = input;
+  const governanceBoundaryPath = input.governanceBoundaryPath ?? "";
+
+  // 无 `.ans/project.json`：missing（不看 fallback acceptance——运行期同意不是治理记录）。
+  if (source.kind === "builtin-fallback") {
+    return { state: "missing" };
+  }
+
+  // `.ans` 存在但不可解析/不可用：invalid，原因如实取载入器降级文本。
+  if (source.kind === "ans-invalid") {
+    return { state: "invalid", reason: source.downgradeReason ?? GOVERNANCE_INVALID_REASON };
+  }
+
+  // kind === "ans"：记录在盘上，但结构可用性还要看 accepted 与治理边界路径。
+  if (source.acceptance.accepted !== true) {
+    return { state: "invalid", reason: source.downgradeReason ?? GOVERNANCE_UNACCEPTED_REASON };
+  }
+  if (governanceBoundaryPath.trim() === "") {
+    return { state: "invalid", reason: GOVERNANCE_PATH_EMPTY_REASON };
+  }
+  return { state: "present" };
+}
+
 // —————————————————————— 文档/变更记录索引（展示用）————————————————————
 export interface DocsIndexEntry {
   path: string; // 相对角色目录，如 docs/design/x.md

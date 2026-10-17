@@ -391,6 +391,10 @@ function registerIpc(win: BrowserWindow): void {
 
   registerHandler("app:pick-project", () => desktop.pickProject());
   registerHandler("project:document-read", (_e, input) => desktop.readProjectDocument(input));
+  // I2/C1（existing-project-compat V1，2026-10-17 PM 评审 §四.2/§4.6）：建立治理记录的预览与显式建立。
+  // 守卫（当前导入项目 / `confirm:true` / 机制内按项目互斥）**全在 Interface**——主进程只透传，不做额外授权判断。
+  registerHandler("project:governance-preview", (_e, input) => desktop.previewGovernanceRecord(input));
+  registerHandler("project:governance-establish", (_e, input) => desktop.establishGovernanceRecord(input));
   registerHandler("report:retry-save", (_e, input) => desktop.retryReportSave(input));
   registerHandler("report:get-save-state", (_e, input) => desktop.getReportSaveState(input));
   registerHandler("delivery:retry-history-save", (_e, input) => desktop.retryDeliveryHistorySave(input));

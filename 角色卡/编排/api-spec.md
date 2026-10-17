@@ -51,3 +51,60 @@ A4新display写入证据只接受accepted/result/oktrue/已知写工具/完整�
 
 消费方（桌面窗口 A2 接线）：`extractDispatchReadPaths` → `filePrint` 逐个探测（`<missing>` 原样传入）→ `planDispatchDelivery`；**判据先于去重登记**（拒投不登记、不入队）；拒投 `fail(plan.message, plan.systemRow)`；删除 `renderDispatchPromptLocal`。测试 `test/编排/dispatch-reads.test.ts` 14 例；`test/编排/` 288/288、typecheck 全仓 0 错。见[实施记录](docs/change/2026-10-16_change_contract-workflow-dispatch-a1.md)。
 
+## I3（2026-10-17）：已有角色但无治理记录——预览 / 显式建立
+
+**Pipeline 公共出口**（桌面只依赖此处，不直接导入 `src/common/编排/` 私有模块）：
+
+```ts
+// src/pipeline/orchestration/govern-session.ts（薄再导出；openGovernanceSession 行为不变）
+export {
+  previewGovernanceRecord,
+  establishGovernanceRecord,
+  GOVERNANCE_RECORD_ACCEPTANCE_SOURCE,
+} from "../../common/编排/finalize.ts";
+export type {
+  GovernancePreview, GovernancePreviewResult, GovernancePreviewErrorCode,
+  EstablishGovernanceResult, GovernanceRecordInput,
+} from "../../common/编排/finalize.ts";
+```
+
+**机制公开面**（`src/common/编排/finalize.ts`）：
+
+```ts
+export const GOVERNANCE_RECORD_ACCEPTANCE_SOURCE =
+  "desktop-app:操作者为已有角色的项目显式建立治理记录（操作者点击确认）";
+
+export interface GovernanceRecordInput { projectRoot: string; skillRoot?: string }
+
+export interface GovernancePreview {
+  projectRoot: string;
+  governanceBoundaryRel: string;   // "角色卡/governance-boundary.yaml"
+  writePaths: string[];            // 写入顺序：治理文档（若写）→ .ans/project.json → docs/bootstrap-manifest.md
+  pinPaths: string[];              // 治理文档 + 可 pin 的角色边界（与 finalize 的 scanRoles 同口径）
+  roleIds: string[];               // 将纳入 .ans roles 映射（缺件角色不在此列）
+  adoptExistingGovernanceDoc: boolean;
+  acceptanceSource: string;        // 逐字＝GOVERNANCE_RECORD_ACCEPTANCE_SOURCE
+  legacyBoundaryRoleIds: string[]; // pin 目标中仍是 boundary.md 的角色（只提示、不迁移）
+}
+export type GovernancePreviewResult =
+  | { ok: true; preview: GovernancePreview }
+  | { ok: false; code: GovernancePreviewErrorCode; message: string };
+export type GovernancePreviewErrorCode =
+  | "invalid-request" | "already-established" | "invalid-record" | "no-roles"
+  | "nothing-to-pin" | "unparseable-governance-doc" | "blocked" | "busy";
+
+export interface EstablishGovernanceResult {
+  ok: boolean;                          // 与 finalize.ok 同值
+  phase: "guard" | "precheck" | "write";// UI 判断「是否零副作用」的唯一依据
+  code?: GovernancePreviewErrorCode;    // guard 分支原因
+  finalize: FinalizeResult;             // 逐字嵌套（message/status/wrote/pins/roles 不改写）
+}
+
+export function previewGovernanceRecord(input: GovernanceRecordInput): Promise<GovernancePreviewResult>;
+export function establishGovernanceRecord(input: GovernanceRecordInput): Promise<EstablishGovernanceResult>;
+```
+
+**守卫与副作用语义**：`invalid-request`（projectRoot 缺失/不可访问；importedProjectRoot 与 `confirm === true` 归桌面 IPC）→ `busy`（进程内同项目互斥；跨进程无全局锁）→ `.ans` 不存在（可用→`already-established`／损坏→`invalid-record`，guard/not-genesis，不覆盖）→ `no-roles`（`listProject().hasRoles === false`）→ 既有治理文档用 `resolveBoundary` + 探测 `ProjectConfig`（同路径、accepted:true、无 pin）校验，parseError 或条目为空→`unparseable-governance-doc`（零写入），通过→`writeGovernanceBoundaryDoc:false` 采纳/不覆盖 → `precheck`（`nothing-to-pin`/`blocked`，零写入）→ finalize。写入阶段抛错→`phase:"write"`、`ok:false`、message「写入中断：<错误>；可能已写入部分文件（治理边界文档/.ans/manifest 不保证齐全），请核对现场；本版不会自动覆盖已存在的 .ans，修复路径待后续版本。」；**不自动重试、不清理已写产物、不承诺可重试**。一次性种子边界每次调用新建、不缓存、不入配置（其上传记来源字符串会写入 `.ans` 的 `acceptance.source`）；`.ans` 无「创世种子」标记。
+
+**测试** `test/编排/governance-record.test.ts` 17 例（预览七态＋并发＋建立成功/采纳重跑/五类零写入/写入阶段注入错误）。
+

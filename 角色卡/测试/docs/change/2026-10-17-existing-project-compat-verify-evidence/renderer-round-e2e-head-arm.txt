@@ -1,0 +1,18 @@
+
+Error occurred in handler for 'session:withdraw': Error: 离线受控网络不可用
+    at withdrawResolve (file:///D:/work/ans-cli/test/%E6%B5%8B%E8%AF%95/.tmp-e2e-head-arm/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:76:176)
+    at file:///D:/work/ans-cli/test/%E6%B5%8B%E8%AF%95/.tmp-e2e-head-arm/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:1025:129
+AssertionError [ERR_ASSERTION]: virtual visible nonempty
+
+false !== true
+
+    at check (file:///D:/work/ans-cli/test/%E6%B5%8B%E8%AF%95/.tmp-e2e-head-arm/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:41:474)
+    at async file:///D:/work/ans-cli/test/%E6%B5%8B%E8%AF%95/.tmp-e2e-head-arm/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/uiux-v2.mjs:1044:3 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+EXIT:1

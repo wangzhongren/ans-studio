@@ -1,0 +1,30 @@
+{
+  "reports": [
+    {
+      "name": "source: appendAssistant mdReady:true",
+      "value": true
+    },
+    {
+      "name": "source: legacy safety net present",
+      "value": true
+    },
+    {
+      "name": "assistant markdown rendered before settled",
+      "value": true
+    },
+    {
+      "name": "assistant content kept verbatim after render",
+      "value": true
+    },
+    {
+      "name": "settled keeps single assistant row",
+      "value": true
+    },
+    {
+      "name": "settled does not regress markdown",
+      "value": true
+    }
+  ],
+  "errors": [],
+  "electron": "44.7.0"
+}

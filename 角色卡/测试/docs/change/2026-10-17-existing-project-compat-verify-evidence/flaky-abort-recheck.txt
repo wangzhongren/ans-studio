@@ -1,0 +1,36 @@
+✔ Model/schema: required write/edit fields, optionals, unknown names and injected capabilities (1.7669ms)
+✔ schema 文案（客户 2026-10-16 su 预置裁定配套）：request_confirmation 写明 su 专属例外，写盘确认必备语义保留 (0.2113ms)
+✔ schema 文案（G-1/A4）：dispatch_task 钉住「先落盘再派发」与「必读（按序）」按地址引用；必备语义逐字保留 (0.146ms)
+✔ gate deny/throw and gate-triggered abort produce zero filesystem effects (4.3547ms)
+✖ real write/edit preserves UTF-8 BOM/CRLF and rejects missing match or symlink escape (17.3974ms)
+✔ pre-aborted edit and capability handlers never run or mutate (7.0024ms)
+✔ shell gate deny/throw/timeout have no effects; explicit allow runs argv without shell (66.7855ms)
+✔ abort running shell kills child before delayed write and returns failure (740.9365ms)
+✔ customer decline/abort and failed handbacks are honest; report/dispatch carry captured turn (14.8364ms)
+✔ shell exposes actual structured execution and observed collection truncation without parsing model text (101.3732ms)
+✔ accepted-memory report receipt states final persistence and delivery are still pending (0.2574ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 10
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1060.7324
+
+✖ failing tests:
+
+test at test\runtime-core\tools.test.ts:111:1
+✖ real write/edit preserves UTF-8 BOM/CRLF and rejects missing match or symlink escape (17.3974ms)
+  Error: EPERM: operation not permitted, symlink 'C:\Users\MLoong\AppData\Local\Temp\ans-runtime-core-S2e5mx' -> 'C:\Users\MLoong\AppData\Local\Temp\ans-runtime-core-XlYmHr\link'
+      at async symlink (node:internal/fs/promises:1009:10)
+      at async TestContext.<anonymous> (file:///D:/work/ans-cli/test/runtime-core/tools.test.ts:120:5)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'symlink',
+    path: 'C:\\Users\\MLoong\\AppData\\Local\\Temp\\ans-runtime-core-S2e5mx',
+    dest: 'C:\\Users\\MLoong\\AppData\\Local\\Temp\\ans-runtime-core-XlYmHr\\link'
+  }
+EXIT:1

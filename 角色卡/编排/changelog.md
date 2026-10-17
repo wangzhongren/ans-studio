@@ -1,5 +1,28 @@
 # 编排 变更记录
 
+## 2026-10-17 — I3「已有角色但无治理记录」兼容：`previewGovernanceRecord` / `establishGovernanceRecord`（B1）＋ Pipeline 薄再导出（B2）
+
+**来源**：PM 评审/任务书 `角色卡/项目管理/docs/design/2026-10-17_design_existing-project-compat-review.md`（status: approved，客户裁定「推进吧，按 B+C 来」）§一、§二 I3、§四.3/§4.4/§4.6、§五 B1/B2、§七。方案级无返工项；本轮按批准口径实施，未改道 A、未给内置边界加 accepted、未加常驻治理写权。
+
+**改了什么（全部在本角色 Section 1 内）**：
+- `src/common/编排/finalize.ts`：新增 `GOVERNANCE_RECORD_ACCEPTANCE_SOURCE`（操作者动作常量，逐字：`desktop-app:操作者为已有角色的项目显式建立治理记录（操作者点击确认）`）、四型 `GovernancePreview` / `GovernancePreviewResult` / `GovernancePreviewErrorCode` / `EstablishGovernanceResult`、输入型 `GovernanceRecordInput`，以及两个函数：
+  - `previewGovernanceRecord(input)`：只读。守卫顺序 invalid-request → busy → `.ans` 状态（可用→`already-established`；损坏/未接受/边界路径空→`invalid-record`）→ `hasRoles` → 既有治理文档校验 → `precheck`（`nothing-to-pin`/`blocked` 原样 message）。成功返回 `governanceBoundaryRel`、按写入顺序的 `writePaths`、`pinPaths`、`roleIds`、`adoptExistingGovernanceDoc`、`acceptanceSource`、`legacyBoundaryRoleIds`。
+  - `establishGovernanceRecord(input)`：守卫（§4.6 的 3–7；importedProjectRoot/confirm 归桌面 IPC）：进程内同项目互斥 → `.ans` 必须不存在（有效/损坏均不覆盖）→ `hasRoles === true` → 既有治理文档可解析且条目非空（通过则 `writeGovernanceBoundaryDoc:false` 采纳、不覆盖）→ `finalizeBootstrap`。`phase` 三态 `guard`/`precheck`/`write`；`FinalizeResult` 逐字嵌套；写入阶段抛错捕获为 `phase:"write"` +「写入中断：…；可能已写入部分文件（治理边界文档/.ans/manifest 不保证齐全），请核对现场；本版不会自动覆盖已存在的 .ans，修复路径待后续版本。」，不自动重试、不清理已写产物；`finally` 释放互斥。
+  - 复用（不复制）：`precheck`/`finalizeRelPaths`/`scanRoles`/`isGenesisState`；`precheck` 现回传 `writePaths`（按实际写入顺序：治理文档→`.ans`→manifest）与 `legacyBoundaryRoleIds`（`boundaryRel` 以 `.md` 结尾的角色），供预览与 finalize 共用同一份目标构建。
+  - 一次性边界：每次调用内 `buildGovernanceSeedBoundary(<常量>)` 新建；模块级只留互斥 `Set`（无边界缓存、无配置字段）。`.ans` 持久化的是 finalize 写出的治理边界文档的 pin-backed acceptance（source 取该常量），不是种子边界。
+  - 跨层导入（与既有先例一致，如实登记）：`buildGovernanceSeedBoundary`/`resolveBoundary` 从 Service 公共出口 `src/service/boundary/resolve-boundary.ts` 只读导入；`listProject` 从 `src/service/role/resolve-role.ts`；`loadEffectiveConfig`/`resolveSkillRoot` 从共享模块。**未复制任何实现**。
+- `src/pipeline/orchestration/govern-session.ts`：**薄再导出** B1 的两个函数、常量与五型（含输入型），供桌面经 Pipeline 公共出口消费；`openGovernanceSession`/`runGovernSession` 既有行为逐字未改。
+
+**为什么 `hasRoles` 用 `listProject`、pin 目标用 `scanRoles`**：`hasRoles` 是产品层既有判据（桌面 S1 与 `ProjectListing` 同源）；finalize 的 pin 目标必须与其扫描口径一致（`角色卡/` 下同时有 `role-card.md` 与可 pin 边界）。两者并非重复实现——前者判定「项目是否有角色」，后者决定「本次能 pin 什么」；`role-cards/`（英文目录）等形态会如实落到 `nothing-to-pin`（N6），不会被误报为 `no-roles`（N5/N6 的如实反映）。
+
+**测试**：新增 `test/编排/governance-record.test.ts` **17 例**：preview 七态（S1 三写路径 + pin 列表 + legacy 提示、`already-established`、`invalid-record`、`no-roles`、`nothing-to-pin`、文档不可解析、条目为空）＋并发 busy（preview 与第二次 establish 均 busy，首个正常完成）＋invalid-request；establish 成功（三产物、`.ans` 可解析/pin-backed、pin/manifest 独立重算一致、`governanceBoundary.path` 非空、accepted、pin 覆盖治理文档与全部可 pin 角色边界、无「创世种子」标记）＋删 `.ans` 后重跑（采纳既有治理文档、pin 反映当刻字节、不复用上次结果）＋no-roles/`.ans` 已存在/损坏/坏治理文档/precheck 五类零写入＋写入阶段注入错误（`docs` 为文件 → `phase:"write"`、message 如实、`.ans`/治理文档可能已落盘）。未改既有 `finalizeBootstrap`/`repinIfBootstrapped` 用例；既有用例零调整。
+
+**证据**：`node --test "test/编排/governance-record.test.ts"` → **17/17**；`node --test "test/编排/**/*.test.ts"` → **337 计 / 336 过 / 1 红**——唯一红 `test/编排/shell-authorized-routine.test.ts:103` 的 `symlinkSync` **EPERM**（Windows 无符号链接权限，既有环境红，与本批零交集；本批未碰该文件）；`node --test "test/编排/govern-engine.test.ts"` 包含于上述套件、全绿。`npm run typecheck` → **本批文件零错**；全仓 **85 错**，全部在 `src/provider/claude/**` 与 `test/claude-adapter/**`／`test/测试/**`，根因缺 `@anthropic-ai/claude-agent-sdk`／`zod`／MCP SDK 类型声明（既有环境，未改无关文件）。
+
+**未做/边界**：未 git 提交；未碰 `app/**`、`src/service/**`、其他角色文件、客户项目；未读 `.env`、未跑凭据/网络命令。**跨角色待 pm 转达**：桌面 C1 在 IPC 层做 `importedProjectRoot` 与 `confirm === true` 校验，然后调用 `establishGovernanceRecord({ projectRoot })`（`skillRoot` 可省略，缺省 `resolveSkillRoot()` 与装配同源）；预览/建立的错误文案与 `phase` 语义按 §4.5 呈现。
+
+**独立验证修正（同日，测试角色反馈后）**：① 来源常量改为 `desktop-app:操作者为已有角色的项目显式建立治理记录（操作者点击确认）`——旧文案「仅本次，不持久化」与事实矛盾：该字符串会经 `finalizeBootstrap` 写入 `.ans` 的 `acceptance.source`；**一次性的是种子边界对象**，已在常量注释中如实区分。② 写入阶段失败消息改为「写入中断：<错误>；可能已写入部分文件（治理边界文档/.ans/manifest 不保证齐全），请核对现场；本版不会自动覆盖已存在的 .ans，修复路径待后续版本。」——不再承诺「重新执行会安全采纳」（`.ans` 已落盘时重跑会得到 `already-established`，V1 不覆盖）。`phase:"write"`、`ok:false`、不自动重试、不清理已写产物均不变；测试断言同步（新增「不得承诺可重试」反向断言）。
+
 ## 2026-10-16 — G-4 V2 wave A（客户批准 V2 分批实施「按推荐批准，开始实施」）：su 预授权扩列**第四棵** `docs/mcp`（常量＋话术＋测试面同步）
 
 **来源**：客户 2026-10-16「按推荐批准，开始实施」＝G-4 V2（MCP 安装）分批实施（PM 评审 `2026-10-15_change_kanban-fixes-pm-review.md` §「客户批准（2026-10-16）」；产品提案 revision 2 `2026-10-16_design_role-capability-install.md` §九 V2 范围①——V1 裁定①「`docs/mcp` 未扩——V2 再议」落点；PM 派发原文「编排（**预授权第四棵树 `docs/mcp`**＋话术同步）」）。本批＝**wave A 编排件**；能力位透传（`installMcp`/`uninstallMcp` 接线点亮）＝wave B、待运行时核心契约定形——**本批不做**。实施记录：`docs/change/2026-10-16_change_g4v2-mcp-preauth.md`。

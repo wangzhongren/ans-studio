@@ -1,5 +1,25 @@
 # 产品 变更记录
 
+## 2026-10-17 — 已有角色但无治理记录的项目兼容：客户裁定回填（按 B+C 实施）
+
+**来源**：客户 2026-10-17 讨论后裁定——先问「su 写这些文件的权限是不是可以内置、不用从文件读取」，评估后自判「这个感觉天生就可以治理，也有点问题，这个我觉得他最好能兼容这种情况」，最终「推进吧，按 B+C 来」。据此把[设计提案](docs/design/2026-10-17_design_existing-project-compat.md)由 draft revision 1 回填为 **approved revision 2**（events 追加 `kind: accepted`）。
+
+**裁定内容**：①**主路径＝B+C**：项目状态/su 空态显式一步动作「建立治理记录」，操作者点击发起，应用侧复用 `finalizeBootstrap` 写治理边界文档 + `.ans`（含 pin）+ manifest；一次性、显式、可预览、自终止。②**A 不采用**：客户此前已明确否掉自动落盘；A 仅保留为文档化备选/降级，不得写成主路径或默认。③**否决「把治理写权做成 su 的内置常设权限」**（改内置边界为 accepted + 加项目根治理条目），新增 §3.8 与 §3.7 对比表 G 行，理由如实四条：混淆「su 有治理职责」（产品定义）与「该项目治理边界已被接受」（项目级证据）；让 S3 不再 fail-closed、掩盖 `.ans` 损坏；接受证据失去意义（项目可永远没有治理记录）；例外不终止，与「接受必须是显式证据」的设计相悖。④S3/S4 仍 fail-closed，修复模式留后续（不在 V1）。
+
+**同步改动**：§八 分期收敛为 V1＝I1+I2+I3+I4+I8；I5（F6 回执指引）标注「由项目管理在评审中定是否并入 V1」；I6/I7 与 V2 保持独立。§九 第 1 项改为「B+C（已批准，按此实施）」，新增 1b「是否内置常设写权＝否（已否决）」；§四 增补「禁止把一次性边界做成常设」纪律；全文清理「A 可作主路径/默认」表述；§十 与结语同步为「已批准、实施尚未开始」。
+
+**边界与状态**：本轮只改本角色四件（提案、feature-map、memo、本文件）；**未实施代码**，实施待项目管理评审并拆发属主角色；未改 `app/`、`src/`、`test/`、仓库 `docs/`、其他角色文件与客户项目 `D:\work\vibe-code\codeagent`；未运行凭据/真实网络命令；未 git 提交。
+
+## 2026-10-17 — 已有角色但无治理记录的项目兼容（设计提案）
+
+**来源**：客户现场（v1.3.0 打开 `D:\work\vibe-code\codeagent`）——7 个项目角色、每个只有 `boundary.md`、`.ans/` 只有 `sessions/`、无 `.ans/project.json`；su 写 `docs/su/memo.md` 被 F6 全拒，客户原话「这种情况，应该多一个路径啊，应该让产品想想怎么兼容这种情况。」新增[设计提案](docs/design/2026-10-17_design_existing-project-compat.md)。
+
+**做了什么**：只读复核判定链与真实现场——①`resolveBoundarySection` 四步（项目角色覆盖→治理边界路径→创世例外→内置未接受），`genesisBootstrap` 仅在 `hasRoles === false` 设置；②`finalizeBootstrap` 的 `.ans` 写入被同一 F6 拒、`blocked` 返回值被 `run-role.ts` 忽略（无诊断、无自愈）；③`request_confirmation` 只发行 writeSet（F4），F6 在其之前，确认卡无法产生边界接受；④纠正「7 个角色全只读」误判：项目角色经 `DESKTOP_RUNTIME_CONSENT` accepted=true，代码/测试路径可写，诊断日志 4 次失败写全来自 su、角色零写尝试；⑤旧 `boundary.md` 条件目录缺 slug 被静默丢弃，且即使有 slug，`scope:undefined` 下条件目录也不激活——与主问题独立。
+
+**核心设计结论**：①状态矩阵 S0 空项目 / S1 有角色无 `.ans` / S1b 已有治理文档无 `.ans` / S2 `.ans` 有效 / S3 `.ans` 无效或未 pin-backed / S4 pin 不符——逐格给出 su 与项目角色可写面与卡点；S1 只卡 su，S3/S4 两者都只读（fail-closed）。②**推荐 B+C**：项目状态/su 空态显式一步动作「为已有角色的项目建立治理记录」，应用侧复用 `finalizeBootstrap` 写 `角色卡/governance-boundary.yaml` + `.ans`（含 pin）+ manifest；操作者点击即来源、一次性种子边界不持久化、不自动、不由模型触发、不把确认卡当接受。③**备选/兜底**：A 把创世判据改为「无 `.ans/project.json`」（与 CLI `ans govern` 对齐，零 UI 但隐式落盘）；D 文档化 CLI `ans govern <目录>`（已存在）；E（确认卡当接受）/F（su 采用角色边界）明确拒绝并逐条说明破坏的不变量。④F6 回执应在原首行后追加「原因 + 恢复路径」，未知状态不猜；旧格式迁移单独处置（推荐迁移为 `boundary.yaml` 且 docs 用普通目录，辅以加载告警；反对整份报错导致角色全只读）。
+
+**边界与状态**：提案完成、**未实施/未测试**；8 个待客户决策项与实施归属见提案 §八/§九。写集仅本角色设计文档、feature-map、memo、本文件；未改 `app/`、`src/`、`test/`、仓库 `docs/`、其他角色文件与客户项目 `D:\work\vibe-code\codeagent`；未运行凭据/真实网络命令；未 git 提交。
+
 ## 2026-10-16 — G-5（推理与推理强度）细化提案
 
 按 PM 评审批次的派发行（来源：项目管理 `docs/change/2026-10-15_change_kanban-fixes-pm-review.md` §「候选 G-5『推理与推理强度』」，客户原话「你这个需要支持推理，需要支持推理强度。」）新增[设计提案](docs/design/2026-10-16_design_reasoning-and-effort.md)。

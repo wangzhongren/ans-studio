@@ -177,3 +177,60 @@ test("无 .ans → 回退运行期同意（登记的非-pin 例外，行为不�
   assert.ok(events.map((e) => e.kind).includes("accepted"), "回退路径下边界内写入仍被接受（行为不变）");
   await mgr.stop();
 });
+
+// ————————————— I2（existing-project-compat V1）：治理记录预览/建立的主进程/preload 两端交叉守卫 —————————————
+//
+// main.ts 依赖 electron、不能在 node 下直接导入——故按本仓既有写法做**两端交叉守卫**：
+//  ① 在 vm 中执行真实 `app/preload.cjs`，捕获它实际暴露的方法与发出的通道/载荷；
+//  ② 读取真实 `app/main.ts` 源码，断言同一通道名已注册并委托给 Interface 的同名方法。
+// 两侧必须逐字对上（通道名/方法名漂移即红）。
+
+test("I2 治理记录接线：main.ts 注册两条通道，preload 白名单两方法且 establish 固定 confirm:true", async () => {
+  const vm = await import("node:vm");
+  let api: Record<string, unknown> | undefined;
+  const invokes: unknown[][] = [];
+  const preloadSrc = readFileSync(new URL("../../app/preload.cjs", import.meta.url), "utf8");
+  vm.runInNewContext(preloadSrc, {
+    require: (name: string) => {
+      assert.equal(name, "electron");
+      return {
+        contextBridge: {
+          exposeInMainWorld: (_key: string, value: Record<string, unknown>) => { api = value; },
+        },
+        ipcRenderer: {
+          invoke: (...args: unknown[]) => { invokes.push(args); return Promise.resolve({ ok: false }); },
+        },
+      };
+    },
+  });
+  assert.ok(api, "preload 应经 contextBridge 暴露白名单对象");
+  assert.equal(typeof api!.previewGovernanceRecord, "function");
+  assert.equal(typeof api!.establishGovernanceRecord, "function");
+  assert.equal(api!.fs, undefined, "preload 不暴露 Node 能力");
+  assert.equal(api!.require, undefined, "preload 不暴露 Node 能力");
+
+  await (api!.previewGovernanceRecord as (root: string) => Promise<unknown>)("/proj");
+  await (api!.establishGovernanceRecord as (root: string) => Promise<unknown>)("/proj");
+  // 注意：载荷对象由 vm 内的 preload 脚本构造，跨 realm 的 deepStrictEqual 会因原型不同而假红——逐字段断言。
+  assert.equal(invokes.length, 2);
+  assert.equal(invokes[0][0], "project:governance-preview");
+  assert.deepEqual(
+    Object.fromEntries(Object.entries(invokes[0][1] as Record<string, unknown>)),
+    { projectRoot: "/proj" },
+  );
+  assert.equal(invokes[1][0], "project:governance-establish");
+  // `confirm:true` 固定在桥内——渲染侧无法自行构造/省略该意图标记。
+  assert.deepEqual(
+    Object.fromEntries(Object.entries(invokes[1][1] as Record<string, unknown>)),
+    { projectRoot: "/proj", confirm: true },
+  );
+
+  const mainSrc = readFileSync(new URL("../../app/main.ts", import.meta.url), "utf8");
+  for (const [channel, method] of [
+    ["project:governance-preview", "previewGovernanceRecord"],
+    ["project:governance-establish", "establishGovernanceRecord"],
+  ] as const) {
+    assert.ok(mainSrc.includes(`registerHandler("${channel}"`), `main.ts 应注册 ${channel}`);
+    assert.ok(mainSrc.includes(`desktop.${method}(input)`), `main.ts 的 ${channel} 应委托 desktop.${method}`);
+  }
+});

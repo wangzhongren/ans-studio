@@ -50,6 +50,22 @@ import type { OrchestrationEvent } from "../../common/编排/handback.ts";
 import { EXIT_FAILURE, EXIT_OK } from "../../common/编排/exit-codes.ts";
 import { createCliCustomerInput } from "../../common/编排/operator-channel.ts";
 
+// ── B2（2026-10-17）：I3「建立治理记录」的 Pipeline 公共出口 ─────────────────────────────
+// 桌面只依赖 Pipeline 公共出口，**不直接导入** `src/common/编排/` 私有模块（PM 评审 §五.1 边界纪律）。
+// 薄再导出：不改变 `openGovernanceSession` 任何既有行为。
+export {
+  previewGovernanceRecord,
+  establishGovernanceRecord,
+  GOVERNANCE_RECORD_ACCEPTANCE_SOURCE,
+} from "../../common/编排/finalize.ts";
+export type {
+  GovernancePreview,
+  GovernancePreviewResult,
+  GovernancePreviewErrorCode,
+  EstablishGovernanceResult,
+  GovernanceRecordInput,
+} from "../../common/编排/finalize.ts";
+
 /** 角色目录名（与 `listProject` 口径一致：项目角色的目录 `角色卡/<id>/`）。 */
 const ROLE_CARD_DIR = "角色卡";
 

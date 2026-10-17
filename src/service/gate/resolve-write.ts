@@ -95,6 +95,22 @@ const F4_DENIAL_GUIDANCE =
   "再重试写入即可；任务型会话请把该路径加入任务 writeSet（或改在 writeSet 内选路径）。" +
   "注意：许可按会话生效——会话重建/重开后不会自动保留，需重新确认。";
 
+/**
+ * F6 拒绝信息的恢复指引（I5，并入 V1；PM 评审 §三）。
+ *
+ * `resolveWrite` 只能看到 `boundary.acceptance`，**拿不到 `.ans` 状态**（S1/S3/S4 不可区分）——故这里
+ * 用**不判断状态的规范式文案**（「若…；若…」），不猜具体状态、不说「项目角色不受影响」（S3/S4 下不成立）、
+ * 不承诺自动修复、不暗示 `ans govern` 不需要凭据。
+ *
+ * 原首句 `边界未被接受或缺少证据来源（F6）：拒绝一切写入。` **逐字保留**（`test/编排/shell-gate.test.ts`
+ * 按该整句计数），本指引**不重复首句**，只在其后追加。**判定逻辑、条件与顺序零变化**：未接受/缺 source
+ * 仍拒绝一切写入（fail-closed 不放松）。
+ */
+const F6_DENIAL_GUIDANCE =
+  "\n可能的恢复路径：若项目已有角色但缺少 .ans/project.json，请由操作者在桌面点击「建立治理记录」，" +
+  "或在终端运行 ans govern <项目目录>（需已配置模型与凭据）；若 .ans/project.json 已存在，请检查它" +
+  "可解析、accepted:true 且 pin 齐全、被 pin 的边界文件未被改动——程序不会自动覆盖或重新接受。";
+
 function deny(reason: string, boundary: BoundarySection1, scope: TaskScope | undefined): WriteDecision {
   return { allowed: false, reason, allowedByRoot: allowedByRootOf(boundary, scope) };
 }
@@ -118,9 +134,14 @@ export function resolveWrite(
   }
 
   // F6：边界未被接受或缺少证据来源 → 拒绝一切写入
+  // 首句逐字保留（跨角色按整句计数）；其后追加不判断状态的恢复指引（I5，仅文案、判定零变化）。
   const acc = boundary.acceptance;
   if (!acc || acc.accepted !== true || typeof acc.source !== "string" || acc.source.trim() === "") {
-    return deny("边界未被接受或缺少证据来源（F6）：拒绝一切写入。", boundary, scope);
+    return deny(
+      "边界未被接受或缺少证据来源（F6）：拒绝一切写入。" + F6_DENIAL_GUIDANCE,
+      boundary,
+      scope,
+    );
   }
 
   const raw = typeof targetPath === "string" ? targetPath.trim() : "";
