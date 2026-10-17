@@ -500,6 +500,9 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
             roleId: role.roleId,
             facts: [
               `本轮有效已耗约 ${formatDurationMs(at - startedAt)}（整轮硬超时 ${turnTimeoutMs(role.runtime)}ms 的 90% 预警线）`,
+              // 实机反馈（2026-10-17）：su 转述时曾把 90% 预警说成「已超时」——事实行必须显式写明
+              // **尚未超时、系统未中止**，并给出到硬超时的剩余量。summary 仍为「轮次逼近超时」。
+              `尚未超时、系统未中止；剩余约 ${formatDurationMs(Math.max(0, turnTimeoutMs(role.runtime) - (at - startedAt)))}（距整轮硬超时）`,
               `本轮自 ${formatClock(startedAt)} 开始、至今仍在进行`,
               `该角色有挂起确认卡时不触发本信号（正确等待不报）`,
             ],

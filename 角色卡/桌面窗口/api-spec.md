@@ -61,9 +61,38 @@ Customer callback 第二参保留 O1 的原 CustomerInputMetadata.signal；sessi
 
 项目 pickProject/listProject；listProject roles 原样转可选 readonly group/groupDuty，窗口不解析组别。外开、选图/附件、诊断/显式恢复、窗口控制保留已有白名单方法。`app:recovery-state` 增 runtime。所有订阅均返回取消订阅函数；preload 不暴露 Node 能力。未改动通道的完整历史表见[冻结归档](../桌面应用/api-spec.md)。
 
+## I1 治理记录状态（existing-project-compat V1，2026-10-17）
+
+`ListProjectResult` 新增 `governanceRecord: GovernanceRecordStatus`（`{state: "present" | "missing" | "invalid"; reason?: string}`；`GovernanceRecordState`/`GovernanceRecordStatus` 定义于 `app/desktop/project.ts`，`interface.ts` 原样再导出）。`listProject` 在枚举后经**既有单一授权链** `buildEffectiveProjectConfig` 读取 `.ans`（无则回退运行期同意；不可用则 fail-closed），由纯函数 `deriveGovernanceRecord` 用载入器事实 `source.kind`/`source.acceptance.accepted`/`source.downgradeReason` 与 `project.governanceBoundary.path` 派生：
+
+| state | 判据 | 含义 |
+| --- | --- | --- |
+| `present` | `kind === "ans"` 且 `accepted === true` 且治理边界路径 trim 非空 | 记录存在且结构可用；**不声明 pin 逐文件匹配**（V1 无 `unverified`） |
+| `missing` | `kind === "builtin-fallback"` | 无 `.ans/project.json`；即便 fallback 是运行期同意（accepted:true）也是 missing |
+| `invalid` | `ans-invalid`，或 `ans` 但未接受，或治理边界路径为空 | 记录不可用；`reason` 只取载入器降级原文（缺失时给等价原因） |
+
+`governanceRecord` 与 `hasRoles` **相互独立**；动作可见谓词固定为 `hasRoles === true && governanceRecord.state === "missing"`。本层**只读**：不写文件、不建目录、不触发 finalize。`DesktopDeps.loadEffectiveConfig` 可注入（缺省＝共享载入器 `src/common/shared/config-loader.ts::loadEffectiveConfig`，只读导入、不复制），并透传给 `SessionManager`，保证界面派生与会话授权链同源。
+
 测试注入面新增 `createRuntimeAdapterFactoryFn`、`runtimeOptions`；默认全部引擎走 Pipeline 工厂。旧显式 createPiAdapterFactoryFn/createDemoAdapterFn 保留原测试接缝及真实 boundary，未选择它们时不绕行到 demo。envFilePath/piConfigEnv 可注入；开发测试只用临时假 env。
 
 已知原有直接 public 门禁枚举/规则导入与 legacy demo/request-anchor 的 Provider 常量/工具导入延续本次前已批准结构；新引擎工厂和历史均通过 Pipeline，不增加 Provider/SDK 跨层调用。真实窗口交互由 U1/T1 提供独立证据。
+
+## I2 治理记录预览/建立接线（existing-project-compat V1，2026-10-17）
+
+| 层 | 名称 | 请求 | 返回 |
+| --- | --- | --- | --- |
+| IPC | `project:governance-preview` | `{projectRoot}` | `GovernancePreviewResult` |
+| IPC | `project:governance-establish` | `{projectRoot, confirm: true}` | `EstablishGovernanceResult` |
+| preload | `previewGovernanceRecord(projectRoot)` | 同上 | 同上 |
+| preload | `establishGovernanceRecord(projectRoot)` | 桥内固定 `{projectRoot, confirm: true}` | 同上 |
+
+`DesktopInterface.previewGovernanceRecord({projectRoot})` / `establishGovernanceRecord({projectRoot, confirm:true})` 经编排 Pipeline 公共出口 `src/pipeline/orchestration/govern-session.ts`（B2 薄再导出）调用机制——**不**直接导入 `src/common/编排/finalize.ts`。机制输入只有 `projectRoot`（边界、授权来源、写路径均由机制内部构造）。
+
+守卫（PM 评审 §4.6，本层负责 1–3）：① `projectRoot` 非空且等于当前导入项目 `importedProjectRoot`，否则合成 `invalid-request`；② establish 必须 `confirm === true`，否则 `invalid-request`；③ 同项目在途互斥由**机制内部**负责（并发第二次得到 `busy`），本层不造第二份（渲染侧重复点击由 UI 禁用）。guard 拒绝时**不调用机制**、零写入；establish 的 guard 回执固定 `phase:"guard"`、`status:"blocked"`，`projectJsonRel`/`manifestRel` 为固定相对路径（`.ans/project.json` / `docs/bootstrap-manifest.md`，与 `finalizeRelPaths` 输出同值）。
+
+成功判据＝`ok && phase === "write" && finalize.status === "completed"`。成功后的收尾（顺序固定）：① 调用**既有** `SessionManager.refreshStaleBoundaries()`（O-1 陈旧边界刷新入口；在跑轮次跳过、逐会话失败隔离）——**先于清缓存**，因为重建路径经 `getListing` 取角色表；② `listingCache.delete(projectRoot)`；③ 复用**既有** `DesktopDeps.emitProjectChanged`（main.ts 推 `project:changed`），渲染侧按既有消费面重新 `listProject`（状态随 `.ans` 变 `present`、动作隐藏）。
+
+机制错误（`busy` / `already-established` / `invalid-record` / `no-roles` / `nothing-to-pin` / `unparseable-governance-doc` / `blocked`）原样透传，不重写 `code`/`message`。`DesktopDeps.previewGovernanceRecordFn` / `establishGovernanceRecordFn` 可注入（缺省＝真实机制）。
 
 ## D1R 当前证据
 
@@ -137,6 +166,17 @@ A4 legacy provenance窄修：protected工具t.statusSource/target.source分别�
 桥与执行（`SessionManager` 公共/注入面）：`proposeRecovery` 能力（仅 su 会话经 `openRoleSession({proposeRecovery})` 注入；`ProposeRecoveryFn` 契约——返回 `RecoveryReceipt{outcome: executed|declined|unsupported|error, message?, operatorId?, at?}`，恰 executed 为已执行）；`rebuildSession(target)`（新公共入口；busy 拒绝；F-5-opt1 注记适用）；`redeliverNudge(target, itemId?)`；`abort` 复用既有。回执三路：工具返回＋UI 系统行＋经投递机投回 su（`kind:"system"`）。
 
 只读数据源（同判据仅 su 注入）：`roleStatus`（`RoleStatusPayload{roleId?,includeDiagnostics?}`→`WatchdogToolResult`——结构化文本；8KiB 截断在工具层）与 `sessionTail`（`SessionTailPayload{roleId,lines?}`→`WatchdogToolResult`——**受保护投影管线**产出，行数工具层归一、本层防御夹取）。两工具**纯读**（调用前后快照逐字段一致，有测试钉）。
+
+### role_status 呈现消歧（2026-10-17 实机反馈）
+
+`busy=true` 时「当前轮」与「上一轮终局」**分行呈现、语义互斥**：
+
+- `  当前轮：进行中（已耗 X / 硬超时 Y；turnId=…）`——仅在快照有 `turnStartedAt` 时给出；X/Y 经 `formatDurationMs`，时限求值与看护/会话运行时同一来源 `resolveRuntimeTimeouts`（不另写时长/env 解析）；turnId 缺失时显示 `—`。
+- `  上一轮终局：<outcome> @ <at>（不表示当前轮；该角色近 15 分钟 failed/timed_out 计 N）`——历史终局显式标注，不得读成当前轮。
+- `busy=false` 时保持原样 `  最近一轮：<outcome> @ <at>（该角色近 15 分钟 failed/timed_out 计 N）`。
+- 历史统计（近 15 分钟 failed/timed_out 计数）保留，语义仍是历史统计。
+
+看护 #1 `turn-deadline` 事实行新增：`尚未超时、系统未中止；剩余约 X（距整轮硬超时）`；summary 与文首仍为「轮次逼近超时」——**不得**改成「已超时」（系统未中止该轮）。
 
 `system` 第四类投递：`DeliveryItem.kind` 增 `"system"`（看护告警/收束/恢复回执）；来源标注恒空、正文文首定格 `[系统·<子类>] `（U1 tool-rows.js 归类判据）；**不可撤回**；去重键看护自持命名空间（`watchdog\0…`）；失败保留待重试＋如实系统行。队列快照 `queue` 条目类型补 `id/full`（如实对齐运行时输出）。
 

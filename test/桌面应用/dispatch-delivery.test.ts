@@ -925,6 +925,46 @@ test("G-2/W1 数据源：role_status 结构化文本（busy/队列/最近一轮/
   await h.mgr.stop(null);
 });
 
+test("G-2/W1 role_status 呈现消歧（实机反馈 2026-10-17）：busy 时「当前轮：进行中」与「上一轮终局」分行、语义分开", async () => {
+  const h = makeHarness();
+  await h.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
+  await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  await tick(30);
+  const roleStatus = h.roleStatusOf("su")!;
+
+  // 第一轮：正常结束但终局为 timed_out（成为「上一轮」历史），随后再开一轮使 busy=true。
+  const first = h.mgr.send("第一轮");
+  await tick(20);
+  h.streams.A.push({ kind: "settled", summary: "结束", detail: { outcome: "timed_out" } });
+  await first;
+  await tick(150);
+  const second = h.mgr.send("第二轮");
+  await tick(20);
+
+  const view = (await roleStatus({ roleId: "A" }))!;
+  assert.equal(view.ok, true);
+  const text = view.text ?? "";
+  assert.match(text, /当前轮：进行中（已耗 .+ \/ 硬超时 .+；turnId=/, "busy 且有起始时刻 ⇒ 当前轮事实行");
+  assert.match(
+    text,
+    /上一轮终局：timed_out @ .+（不表示当前轮；该角色近 15 分钟 failed\/timed_out 计 \d+）/,
+    "busy ⇒ 历史终局明确标「上一轮终局」「不表示当前轮」，历史统计保留",
+  );
+  assert.equal(/最近一轮：timed_out/.test(text), false, "busy 时不得把历史终局写成「最近一轮」（语义误导）");
+  const lines = text.split("\n");
+  const currentLine = lines.find((line) => line.includes("当前轮：进行中")) ?? "";
+  const lastLine = lines.find((line) => line.includes("上一轮终局")) ?? "";
+  assert.ok(currentLine !== "" && lastLine !== "" && currentLine !== lastLine, "两个事实必须分行呈现");
+  assert.equal(currentLine.includes("timed_out"), false, "当前轮行不混入历史终局");
+  assert.equal(lastLine.includes("进行中"), false, "上一轮终局行不混入当前轮状态");
+
+  // 收尾：第二轮结束，避免残留忙态影响后续。
+  h.streams.A.push({ kind: "settled", summary: "结束", detail: { outcome: "completed" } });
+  await second;
+  await tick(150);
+  await h.mgr.stop(null);
+});
+
 test("G-2/W2：system 投递失败 ⇒ 如实系统行＋放回队首保留（未丢弃）；下次时机自动重试成功", async () => {
   const h = makeHarness({ failSends: { su: 1 } });
   await h.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });

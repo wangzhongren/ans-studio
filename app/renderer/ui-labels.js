@@ -122,6 +122,73 @@
     return null;
   }
 
+  // —————— I4 治理记录（2026-10-17 客户批准 B+C；项目管理评审 §二 I4/§四.1/§4.5）——————
+  // **动作可见谓词唯一入口**：`hasProject && hasRoles === true && governanceRecord.state === "missing"`。
+  // 渲染侧不得另立判据（S1 的定义亦为此，见评审 §4.1）。
+  function canEstablishGovernance(hasProject, hasRoles, recordState) {
+    return hasProject === true && hasRoles === true && recordState === "missing";
+  }
+
+  /**
+   * **项目**角色计数（I4 实机缺陷修正，2026-10-17）：`state.roles` 含内置角色（`builtIn === true`，
+   * 如治理主入口）——S1 文案只应报**项目角色**数，不含内置。判据只看 `builtIn` 布尔事实，
+   * **不硬编码任何角色名/id**；缺字段（旧枚举）按项目角色计。
+   */
+  function projectRoleCount(roles) {
+    var list = Array.isArray(roles) ? roles : [];
+    var n = 0;
+    for (var i = 0; i < list.length; i += 1) {
+      var r = list[i];
+      if (r && typeof r === "object" && r.builtIn !== true) n += 1;
+    }
+    return n;
+  }
+
+  /** 状态行/空态的 S1 说明（文案单一来源；N 为项目角色数，如实取枚举结果）。 */
+  function governanceMissingText(roleCount) {
+    var n = typeof roleCount === "number" && isFinite(roleCount) && roleCount >= 0 ? Math.floor(roleCount) : 0;
+    return "本项目有 " + n + " 个项目角色，但尚无治理记录（.ans/project.json）。项目角色可按各自边界工作；治理角色暂时无法写入。";
+  }
+
+  /** `.ans` 存在但不可用（S3）——显示原因为原文，**不自动覆盖**（修复属后续版本）。 */
+  function governanceInvalidText(reason) {
+    var r = typeof reason === "string" && reason !== "" ? reason : "原因未提供";
+    return "治理记录不可用：" + r + "；本版不自动覆盖";
+  }
+
+  /** S1 空态（su 空态）标题/说明——主入口角色经 `primaryRoleId` 传入，**不硬编码任何角色名**。 */
+  function governanceEmptyState(roleCount, primaryRoleId) {
+    var primary = typeof primaryRoleId === "string" && primaryRoleId !== "" ? primaryRoleId : "主入口角色";
+    return {
+      kind: "governance",
+      title: "尚无治理记录",
+      sub: governanceMissingText(roleCount) + "与 " + primary + " 对话前，请先建立治理记录；也可在终端运行 ans govern <项目目录>。",
+    };
+  }
+
+  /**
+   * establish 失败文案行（评审 §4.5；`phase` 是「是否零副作用」的**唯一依据**）：
+   *  · `phase !== "write"` ⇒ 可声明未写入任何文件；
+   *  · `phase === "write"` ⇒ **绝不**出现「未写入任何文件」（写入阶段可能已落盘部分文件）。
+   * `finalize.message` 由调用方逐字传入（本函数不重写）。
+   */
+  function governanceFailureView(phase, code, message) {
+    var lines = [];
+    if (typeof message === "string" && message !== "") lines.push(message);
+    if (phase !== "write") {
+      if (code === "already-established") lines.push("治理记录已存在；本次未写入任何文件。");
+      else if (code === "busy") lines.push("上一次建立仍在进行中；本次未写入任何文件。");
+      else if (code === "invalid-record") lines.push("治理记录不可用；本版不自动覆盖，修复路径待后续版本。");
+      else {
+        if (typeof code === "string" && code !== "") lines.push("错误码：" + code);
+        lines.push("未写入任何文件。");
+      }
+    } else if (typeof code === "string" && code !== "") {
+      lines.push("错误码：" + code);
+    }
+    return { lines: lines, noRetry: code === "already-established" || code === "invalid-record" };
+  }
+
   // —————— D-1 回放去重（2026-10-13 真机「同一段消息渲染两遍」修复）——————
   // 真机链路：su 一轮结束 → `project:changed` → 渲染侧 refreshProject → 主进程对每角色**重推**会话历史
   // → 旧实现对同一 pane **无守卫地整份再回放** ⇒ 转录重复（轮次越多重复越多）。本函数给出**纯策略**：
@@ -173,6 +240,12 @@
     arrivalScrolls: arrivalScrolls,
     pendingChipLabel: pendingChipLabel,
     recoveryActionView: recoveryActionView,
+    canEstablishGovernance: canEstablishGovernance,
+    projectRoleCount: projectRoleCount,
+    governanceMissingText: governanceMissingText,
+    governanceInvalidText: governanceInvalidText,
+    governanceEmptyState: governanceEmptyState,
+    governanceFailureView: governanceFailureView,
     stickToBottom: stickToBottom,
     replayPlan: replayPlan,
     AUTO_SCROLL_THRESHOLD_PX: AUTO_SCROLL_THRESHOLD_PX,

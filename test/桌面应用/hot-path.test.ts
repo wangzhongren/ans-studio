@@ -258,9 +258,15 @@ test("Q-2 Markdown 成本护栏：典型 200 行 < 1200ms（惰性化后每轮�
   for (let i = 0; i < 200; i += 1) Md.renderMarkdown(sample + " #" + i);
   const elapsed = performance.now() - t0;
   assert.ok(elapsed < 1200, "解析成本护栏（宽松）：200 次典型行 < 1200ms（本机实测远低于此）");
-  // 源钉：惰性化的三个支点（流式纯文本 / settled 一次性升级 / 离屏 build 才解析）。
-  assert.ok(RENDERER.includes("upgradeStreamingMarkdown"), "settled 一次性升级");
-  assert.ok(RENDERER.includes("is-streaming"), "流式纯文本形态");
-  assert.ok(/if \(rec\.mdReady\)[\s\S]{0,80}Md\.renderMarkdown\(rec\.data\)/.test(RENDERER), "离屏行挂载（build）时才解析");
-  assert.ok(RENDERER.includes("state.roleBusy[roleId] === true"), "流式判定用**真实信号**（会话忙态快照）");
+  // 源钉（2026-10-17 修订）：三种适配器只发**完整消息** ⇒ 助手行**即时 Markdown**——
+  // `appendAssistant` 新建行恒 `mdReady: true`，不依赖 `roleBusy`/`settledTurns` 退化；
+  // `upgradeStreamingMarkdown` 仅作旧行/异常行安全网（正常新行不经过它），纯文本形态只服务该安全网。
+  const appendAssistantSrc = /function appendAssistant\([\s\S]*?\n  \}/.exec(RENDERER)?.[0] ?? "";
+  assert.ok(appendAssistantSrc.includes("buildAssistantRow"), "appendAssistant 经唯一行构造点建行");
+  assert.ok(appendAssistantSrc.includes("mdReady: true"), "appendAssistant 新建行恒 mdReady:true（即时 Markdown）");
+  assert.equal(appendAssistantSrc.includes("state.roleBusy"), false, "appendAssistant 不依赖 roleBusy（不再退化为纯文本）");
+  assert.equal(appendAssistantSrc.includes("state.settledTurns"), false, "appendAssistant 不依赖 settledTurns");
+  assert.ok(/if \(rec\.mdReady\)[\s\S]{0,80}Md\.renderMarkdown\(rec\.data\)/.test(RENDERER), "buildAssistantRow 的 mdReady 分支即时渲染 Markdown");
+  assert.ok(/rec\.kind !== "assistant" \|\| rec\.mdReady\) continue/.test(RENDERER), "upgradeStreamingMarkdown 仅升级 mdReady:false 的旧行（安全网）");
+  assert.ok(RENDERER.includes("is-streaming"), "纯文本形态保留（仅旧行/安全网分支）");
 });

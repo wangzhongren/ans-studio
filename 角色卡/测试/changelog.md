@@ -1,10 +1,46 @@
 # 测试 变更记录
 
+## 2026-10-17 — 渲染轮复审（助手消息即时 Markdown）：全量 2153/2058/93红/2skip，e2e 原失败点通过、剩余红经 HEAD A/B 证明既有
+
+**范围**：桌面UI 渲染改动（`appendAssistant` 恒 `mdReady:true`；旧行升级仅作安全网）＋ `uiux-v2.mjs` 两处 `.trim()` 修订。
+
+**结果**：① 全量 `node --test "test/**/*.test.ts"` → **2153 / 2058 pass / 93 fail / 2 skip**（较上轮 +1 测试＝并发属主；红数 93 与组成不变：依赖缺件 75、EPERM 8、CRLF 源钉 9、计时竞态 1）。② e2e 当前 renderer → exit 1，**仅** `virtual visible nonempty`（`uiux-v2.mjs:1044`）；其前全部通过，**含原失败点 `routine collapsed; failure direct; assistant untouched`（:964）**。③ **独立 HEAD A/B**：在 `test/测试/.tmp-e2e-head-arm/` 建隔离副本（复制 app/src/e2e，renderer 用 `git show HEAD:`，sha256 前 8＝`7d18858b`），同点同观测失败 → 该红**先于本轮**，桌面UI 自报属实；运行后删除副本。④ 新语义独立 Electron 探针 `test/测试/render-md-ready-probe.mjs` → **6/6**：源码字面 `mdReady:true`；含 `##`/表格的助手消息未 settled 即 `<h2>/<table>`、内容保留、无 `is-streaming`；settled 不重复插行/不回退；旧行安全网（仅升级 `mdReady:false`，settled 仍调用）在位（新进程内运行期不可达，源码面验证）。
+
+**结论**：未新增红、原失败点已修；剩余 `virtual visible nonempty` 非本轮引入，不判返工，建议后续独立定位。证据：`renderer-round-summary.md`、`renderer-round-e2e-current.txt`、`renderer-round-e2e-head-arm.txt`、`renderer-round-md-probe.txt`(+report json)。只改 `test/测试/` 与本角色文档；未 commit。
+
+## 2026-10-17 — 客户裁定「系统默认就是 500k」：t29 默认值钉从 32768 同步为 500000
+
+**来源**：客户 2026-10-17 裁定「我的意思说系统默认就是500k」；Pi适配器已把 `DEFAULT_PI_CONTEXT_WINDOW` 改为 **500000** 并更新 notice 文案。本角色同步自己属下的钉值：
+
+- `test/测试/t29-pi-config-roundtrip.test.ts:161`：`assert.equal(DEFAULT_PI_CONTEXT_WINDOW, 32768, "保守默认值应钉死为 32768（勿被悄悄改动）")` → **500000**，文案「系统默认值应钉死为 500000（客户 2026-10-17 裁定）」；同段「保守默认值/保守默认」注释与用例名按新语义改为「系统默认值」（:137/:140/:143 与 :160 回落断言消息）。
+- `test/测试/t9-block1-bootstrap.test.ts:78` 手工步骤说明「留空 = 用保守默认」→「留空 = 用系统默认 500000」（非断言，措辞同步）。
+- 其余 `32768` 出现均为**显式夹具值**（`g4-skill-verify/g-splicing.test.ts` ×2、`g4v2-mcp-verify/j-pi.test.ts` ×1 的 `contextWindow: 32768`），按指示**未改**。
+
+**复跑**：`node --test "test/测试/t29-pi-config-roundtrip.test.ts"` → **11/11 pass**；全量 `node --test "test/**/*.test.ts"` → **2152 tests / 2057 pass / 93 fail / 2 skip**（较上一轮 2150/2055/93/2：新增 2 例由并发属主落地、**红数 93 不变、归因不变**——依赖缺件 75、Windows EPERM 8、CRLF 源钉 9、计时竞态 1）。只改 `test/测试/` 与本角色文档；未碰产品代码、未 commit。
+
+## 2026-10-17（复审）— 编排按备注②/⑤修正两处文案后 reverified：独立套件 42/42，全量计数与 93 红归因不变
+
+**修正对象（编排，语义/契约不变）**：① `GOVERNANCE_RECORD_ACCEPTANCE_SOURCE` → `desktop-app:操作者为已有角色的项目显式建立治理记录（操作者点击确认）`（一次性的是种子边界对象，不是该来源字符串）；② 写入阶段失败消息 → `写入中断：<错误>；可能已写入部分文件（治理边界文档/.ans/manifest 不保证齐全），请核对现场；本版不会自动覆盖已存在的 .ans，修复路径待后续版本。`（不再承诺「重新执行」；phase/不重试/不清理不变）。
+
+**复审**：独立套件 `node --test "test/测试/existing-project-compat-verify/*.test.ts"` → **42/42 pass**（B5 按新文案加正向断言 + 「不得出现『重新执行』」反向断言；B12 改为复审语义；其余断言引用常量，自然通过）；全量 `node --test "test/**/*.test.ts"` → **2150 tests / 2055 pass / 93 fail / 2 skip**（与修正前逐位相同；93 红组成不变：依赖缺件 75、Windows EPERM 8、CRLF 源钉 9、计时竞态 1）；`npm run typecheck` → **85 错**（不变，本批/本轮实现 0 错）；`reverify-sha256-freeze.txt` **24/24** 逐字节一致。报告 status 保持 `verified`、`revision: 2`、事件追加 `reverified`；备注②/⑤改记为「已由编排修正」。未改产品代码，未 commit/push。
+
+## 2026-10-17 — 已有角色但无治理记录的项目兼容（B+C V1）独立验证：整体通过（0 不通过 / 7 备注）
+
+**范围**：门禁引擎（A1 种子边界 Service 公共出口、I5 F6 恢复指引）、编排（I3 preview/establish、一次性种子边界、进程内互斥、B2 薄再导出）、桌面窗口（I1 `deriveGovernanceRecord`、I2/C1 IPC 与守卫）、桌面UI（I4 状态行/su 空态/预览面板/文案）。批准口径＝客户 2026-10-17「按 B+C 来」；验收口径＝PM 评审 §六（V1–V8/V6b、N1–N8）。
+
+**方法**：对抗性独立构造、不复用实施方断言——自建 `test/测试/existing-project-compat-verify/`（5 用例文件 **42 例** + `fixture.ts`）。夹具与客户现场同形状（N 角色 `role-card.md` + **仅** `boundary.md`、无 `.ans`；另 S1b/N5/S2/S3/S4 变体）；真实链 `listProject → buildEffectiveProjectConfig → resolveBoundarySection → resolveWrite`，机制经 Pipeline 公共出口调用。证据：`sha256-freeze.txt`（24 文件指纹）、`git-status-short.txt`、`verify-suite-output.txt`（42/42）、`flaky-abort-recheck.txt`、`full-suite-summary.md`、`typecheck-summary.md`。
+
+**关键结论**：① V2 三产物 + `.ans` 结构 + pin 逐条独立实算一致 + manifest 一致 + completed；② V3 确定性：su 写 `docs/su/memo.md` allowed、`src/**` 拒；V4 角色边界前后不变；③ V5/V6 零写入（树 + mtime）；V6b phase=write 且 message「可能已写入部分文件」、文案绝不称零副作用；V7 幂等；并发恰一 ok 一 busy；一次性边界无 genesis 标记、重建重算 pin（不信任预览）；④ F6 首句逐字且恰一次 + 指引（两份 `format-denial` 同构）；V8 确认卡不发行 writeSet、不产生 `.ans`；篡改/伪造 pin 仍未接受；⑤ N1/N2 invalid+reason；N4 采纳与坏文档；N5 缺件跳过；N7/N8 既有创世与 CLI 注入不变；⑥ 40 个改动/新增文件 40/40 在属主 boundary 内，零越界。
+
+**复跑**：本批 **42/42**；全量 `node --test "test/**/*.test.ts"` → **2150 tests / 2055 pass / 93 fail / 2 skip**（基线 2108/2014/92/2；93 红全部归因既有环境：依赖缺件 75、Windows EPERM 8、CRLF 源钉 9〔含任务书已列 renderer.test 4 + markdown 1〕、计时竞态 1——均与本轮实现无交集）；`npm run typecheck` → **85 错，全部既有依赖缺件**，本批与本轮实现文件 0 错。
+
+**备注（不判缺陷）**：N6 `nothing-to-pin`/precheck `blocked` 经 preview/establish 入口结构性不可达（hasRoles 先判 + 内部种子恒覆盖写路径），底层经 `finalizeBootstrap` 直调验证；V6b message「重新执行」在 `.ans` 已落盘子场景会得 already-established（设计原文，含「或核对现场」）；跨进程无全局锁（设计已登记）；`present ≠ su 可写`（V1 文档化限制，A13 实证）；`acceptance.source` 落盘后含「不持久化」字样（指一次性边界而非该字符串）易误读，建议 V2 改述；真实 su 会话/Electron e2e 属客户与桌面UI 轮。详见[报告](docs/change/2026-10-17_change_existing-project-compat-verify.md)与[证据](docs/change/2026-10-17-existing-project-compat-verify-evidence/)。未 commit/push。
+
 ## 2026-10-16 — v1.3.0 CI Windows 红修复：验证套件平台适配（6 红全为测试侧；产品修复需求零）
 
 **来源**：CI run `38924209553` Windows job（regression tests 8 红，其中 test/测试 面 6 红＝本角色验证套件；另 2 红属 Pi适配器/Codex适配器角色）。逐条判别：**双向核**（控制字符 `0x01` 夹具目录不可建盘＝Windows 文件系统真值；读取器名判据先于盘面、直调名覆盖保留）、**① 三触发**（通知点名＝平台原生分隔符真值——桌面窗口属主自有测试已用 `path.join` 冻结同口径且 Windows CI 通过）、**H2**（自扫描面 `path.relative` 反斜杠未归一——**非第四处直读**）、**G1a/G1d/J3**（Windows 对自定义环境块强制补齐的十键 OS/libuv 真值——同一 CI 三处互异 spawn 实现实得相同十键集；SIGTERM＝TerminateProcess 无信号面）。**产品修复需求零**；平台分支只替换平台真值值面、断言本体零放宽。改动 4 文件：`test/测试/g4-skill-verify/b-render-double-check.test.ts`、`test/测试/g4-skill-verify/f-fingerprint.test.ts`、`test/测试/g4v2-mcp-verify/j-pi.test.ts`、`test/测试/g5-reasoning-verify/h-scope-audit.test.ts`（另 `g-claude-launcher.test.ts` 由 Claude适配器角色并发修复，已复核）。复跑：`test/测试/**` **502/502**、全量 **2110/2109/0红/1skip**、typecheck 0；win32 分支经进程内仿真（b-render 7/7）与 `path.win32` 变换证明。详见[修复记录](docs/fix/2026-10-16_fix_windows-ci-platform-branches.md)。未 commit/push。
 
-## 2026-10-16 — G-5（推理与推理强度）独立验证：整体通过（0 不通过 / 6 备注）
+## 2026-10-16 — G-5（推理与推理强度）独立验证：整体通过（0 不通过 / 7 备注）
 
 **范围**：契约与归一（五值冻结/三态归一/三 env 键/非法⇒按未设＋诊断不毁会话）、事实通道与投影单点（脱敏/16384 B 预算/omitted 恒空/durationMs 防伪/summary 定格/幂等/坏件诊断/emit 与历史兩路同单点）、Claude 接线（映射未设零参数·off disabled·四档直通·max 不收编/捕获不预脱敏/降级 4xx＋词元恰一次同输入重推）、Codex 接线（五值校验装配前抛/单条 `-c`/off 如实文案/reasoning 事件双信号时长/降级闸恰一次＋负例四格）、Pi 接线（off 前置修复假关闭消除/未设零调用/R1 自证网关三窗修复/捕获/降级终态前消费不二次/429 排除/中断守卫）、设置链（三字段 choices 单源/保存值域拒 trim 规范形空串清除批量原子/pi-config 漂移对齐＋旧路径如实现状）、桌面渲染（四态文案真实执行/select 控件/默认折叠 esc 纯文本/回放载体真驱动）、范围审计（探针纯本地/键读取面单点/零网络面）。
 
@@ -33,7 +69,7 @@
 - `node --test "test/**/*.test.ts"`（全量）→ **2047 tests：2046 pass / 0 fail / 1 skip**（唯一 skip＝`test/门禁引擎/resolve-write.test.ts:173` 既有 Windows-only；单独复跑 21 pass/1 skip 确认）。
 - `npm run typecheck` → **0 错**。
 
-## 2026-10-16 — G-4 V2（su 安装外来 MCP 全链）独立验证：整体通过（0 不通过 / 6 备注）
+## 2026-10-16 — G-4 V2（su 安装外来 MCP 全链）独立验证：整体通过（0 不通过 / 7 备注）
 
 **范围**：契约与读取器（`InstalledMcpServerV1`＋`mcp-declarations.ts`）、Service 接线（`providerFor` 按角色注入）、工具面（`install_mcp`/`uninstall_mcp`）、编排（第四棵树 `docs/mcp`＋能力位透传仅 su）、门禁卡文本（MCP 安装纪律段＋J-1 守卫全检）、桌面 handler（`applyMcpChange` 护栏/三态/系统行/诊断）、Claude P1（hook 五条件＋env 收窄启动器）、Codex P2（单条 root map＋三处名字集恰等＋`mcpToolCall` 映射）、Pi P3（前缀判据×2 同源＋tools-only＋自持 transport＋dispose 收口）、桌面UI 复用、范围审计（stdio 限定/名拒/零二次卡/诚实面/探针纯本地）。
 

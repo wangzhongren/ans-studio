@@ -557,7 +557,9 @@ body { display: flex; flex-direction: column; }
   border-radius: 14px 14px 3px 14px;
 }
 .msg-assistant { align-self: stretch; }
-/* Q-1（2026-10-12）：流式段的**纯文本**形态（一轮结束后一次性 Markdown 化——`.is-streaming` 随之移除）。 */
+/* Q-1（2026-10-12；2026-10-17 修订）：助手消息由适配器**完整消息**驱动——新建行即时 Markdown，
+   不再有正常生产者挂 `.is-streaming`。此规则**仅作旧行/异常行安全网**（`buildAssistantRow` 的
+   `mdReady === false` 分支；`upgradeStreamingMarkdown` 在 settle 时清除）。 */
 .msg-assistant.is-streaming { white-space: pre-wrap; word-break: break-word; }
 /* Q-2：窗口化 spacer（窗口外行高之和——撑住总高；本身不可见）。 */
 .virt-spacer { flex: 0 0 auto; width: 100%; }
@@ -1589,7 +1591,7 @@ button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus
 .session-actions .tab-badge { position:static; display:inline; border:0; background:transparent; color:inherit; padding:0; margin-left:4px; }
 .session-actions .tab-badge[hidden] { display:none; }
 .session-notice { display:flex; gap:12px; padding:0 32px; color:var(--amber); font-size:12px; }
-.session-notice:has(.composer-hint:empty):has(#history-projection-note:empty) { display:none; }
+.session-notice:has(.composer-hint:empty):has(#history-projection-note:empty):has(#governance-status[hidden]) { display:none; }
 /* W4（2026-10-16 客户批准）：输入区让出垂直空间——pad 20/32/14→14/32/12、胶囊 pad 12/16→10/14、
    gap 8→6、空输入框 min-height 40→28（= 单行 22.4 + 5.6；autoGrow 按新 min-height 自然生效，无 JS 改动）、
    脚注上距 8→6。输入区总高 165.6→实测 137.6px（验收 ≤140）。 */
@@ -1678,3 +1680,24 @@ button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus
 
 /* 长项目路径保持单行，完整路径由现有title提供。 */
 .project-path { white-space:nowrap; text-overflow:ellipsis; overflow:hidden; max-height:none; }
+
+/* ———————— I4 治理记录（2026-10-17 客户批准 B+C）：状态行 + 非模态预览面板 ————————
+   沿用现有令牌/圆角/间距；不引入新字体或颜色体系。状态行嵌在既有 `.session-notice` 位置，
+   预览面板紧随其后（空态/状态区展开，不遮挡、不弹模态）。 */
+.governance-status { display:flex; align-items:center; gap:10px; flex-wrap:wrap; min-width:0; }
+.governance-status[hidden] { display:none; }
+.governance-status .gs-text { color:var(--amber); }
+.governance-status .gs-invalid { color:var(--danger); }
+.governance-preview { margin:8px 32px 0; padding:12px 14px; border:1px solid var(--border); border-radius:var(--radius); background:var(--bg-soft); font-size:12px; line-height:1.7; }
+.governance-preview[hidden] { display:none; }
+.governance-preview p { margin:0 0 6px; }
+.governance-preview .gp-title { margin:0 0 8px; font-weight:600; color:var(--text); }
+.governance-preview .gp-line { color:var(--text-2); }
+.governance-preview .gp-list { display:block; margin-top:2px; font-family:var(--mono); font-size:11px; color:var(--text); overflow-wrap:anywhere; }
+.governance-preview .gp-legacy { color:var(--amber); }
+.governance-preview .gp-declare { margin-top:8px; color:var(--text); }
+.governance-preview .gp-error { color:var(--danger); }
+.governance-preview .gp-success { color:var(--success); }
+.governance-preview .gp-note { color:var(--text-3); }
+.governance-preview .gp-actions { display:flex; gap:8px; margin-top:10px; }
+@media (max-width:1100px) { .governance-preview { margin:8px 24px 0; } }

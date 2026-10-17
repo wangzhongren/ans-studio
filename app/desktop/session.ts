@@ -73,6 +73,8 @@ import { renderHandbackPrompt, renderHandbackBatchPrompt, handbackKey, extractDi
 // **单一来源**——本层**只做接线**（投递时用 `filePrint` 探测各引用、按判据拒投或入队），不得各写一份。
 // 本批已删除本地副本 `renderDispatchPromptLocal`（既有登记依赖收口——落地后必须切换、不得两处并存）。
 import { createDiagnosticLogger, getDiagnosticsStatus } from "../../src/common/shared/diagnostics.ts";
+// 整轮硬超时求值的**单一来源**（与看护 signal #1、会话运行时同一函数；本层不另写时长/env 解析）。
+import { resolveRuntimeTimeouts } from "../../src/common/runtime-core/timeout.ts";
 // G-2/W1：role_status 的会话尾部数据面**复用受保护投影管线**（`getSessionHistory` 同路径——凭据清洗、
 // display 保护已在链上；su 不直接读裸 JSONL）。
 import { getSessionHistory } from "./runtime-history.ts";
@@ -84,7 +86,7 @@ import { classifyProcessOutcome, pickLatestSessionFile, sessionsDirFor } from ".
 // 事件转发（settled/命令超时/真实活动 → 看护器）；W5 恢复回执与看护三能力的**形状单一来源**：
 // 契约家 `model/runtime.ts`（编排 `common/编排/watchdog.ts` 同名转发）＋ 回执文案也收敛在编排单一来源
 // （`renderRecoveryReceipt`——本层只读导入，不复制第二份）。
-import { recoveryActionLabel, recoveryReceiptSummary, type WatchdogObservation, type WatchdogProjectSnapshot } from "./watchdog.ts";
+import { recoveryActionLabel, recoveryReceiptSummary, formatDurationMs, type WatchdogObservation, type WatchdogProjectSnapshot } from "./watchdog.ts";
 import {
   renderRecoveryReceipt,
   type ProposeRecoveryFn,
@@ -2681,10 +2683,32 @@ export class SessionManager {
         let runningKind: string | undefined;
         for (const [key, item] of this.activeDeliveries) if (key.startsWith(`${projectRoot}\u0000${rid}\u0000`)) { runningKind = item.kind; break; }
         const depth = queue?.items.length ?? 0;
-        lines.push(`角色 ${rid}：busy=${live?.busy === true} ｜ 会话 ${liveText} ｜ 队列 ${depth} ｜ 进行中 ${runningKind ?? "—"}`);
+        const busy = live?.busy === true;
+        lines.push(`角色 ${rid}：busy=${busy} ｜ 会话 ${liveText} ｜ 队列 ${depth} ｜ 进行中 ${runningKind ?? "—"}`);
+        // 呈现消歧（实机反馈 2026-10-17）：busy=true 时「上一轮终局」**不是当前轮**——必须分开写，
+        // 否则 su 会把历史 timed_out 转述成「该角色超时、已中止」。当前轮事实（已耗/硬超时/turnId）
+        // 只在 busy 且有起始时刻时给出；时限求值与看护/会话运行时**同一来源** `resolveRuntimeTimeouts`
+        // （不另写时长/env 解析），格式化复用看护的事实行工具 `formatDurationMs`。
+        if (busy && live !== undefined && typeof live.turnStartedAt === "number") {
+          const limit = resolveRuntimeTimeouts(
+            live.runtime,
+            { promptTimeoutMs: this.deps.runtimeOptions?.promptTimeoutMs },
+            process.env,
+          ).promptTimeoutMs;
+          lines.push(
+            `  当前轮：进行中（已耗 ${formatDurationMs(Math.max(0, at - live.turnStartedAt))} / 硬超时 ${formatDurationMs(limit)}；turnId=${live.turnId ?? "—"}）`,
+          );
+        }
         let last: { outcome: RuntimeTurnOutcome; at: string } | undefined;
         for (const [key, value] of this.lastTurns) if (key.startsWith(`${projectRoot}\u0000${rid}\u0000`)) { last = value; break; }
-        if (last) lines.push(`  最近一轮：${last.outcome} @ ${last.at}（该角色近 15 分钟 failed/timed_out 计 ${stats?.failuresByRole.get(rid) ?? 0}）`);
+        if (last) {
+          const history = `该角色近 15 分钟 failed/timed_out 计 ${stats?.failuresByRole.get(rid) ?? 0}`;
+          lines.push(
+            busy
+              ? `  上一轮终局：${last.outcome} @ ${last.at}（不表示当前轮；${history}）`
+              : `  最近一轮：${last.outcome} @ ${last.at}（${history}）`,
+          );
+        }
         for (const item of queue?.items ?? []) {
           lines.push(`  队列明细：- [${item.kind}] 来自 ${item.sourceRoleId === "" ? "（系统）" : item.sourceRoleId}：${shortenText(item.summary, 80)}（入队 ${new Date(item.enqueuedAtMs).toISOString()}，id=${item.dedupKey}）`);
         }

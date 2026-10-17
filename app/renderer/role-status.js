@@ -16,8 +16,11 @@
 //   idle-restored（空闲（已恢复））—— D-1：该角色有**恢复出来的界面记录**（句柄未开/未保活时）——如实标注，
 //                                  **不假装"工作中/未开启"**
 //
-// 派生优先级：错误 > 等待你确认 > 工作中 >（保活⇒空闲 / 有过会话⇒已停止 / 有恢复记录⇒空闲（已恢复）/
-// 否则⇒未开启）。
+// 派生优先级（2026-10-17 修订）：**等待你确认 > 工作中 > 错误 >**（保活⇒空闲 / 有过会话⇒已停止 /
+// 有恢复记录⇒空闲（已恢复）/ 否则⇒未开启）。
+// **`error` 是上一轮终局事实，不代表当前轮**——`facts.error` 只在 settled 时更新，新轮开始时不会清零；
+// 因此只要真实信号表明当前在跑（busy）或队列有待办，就显示「工作中」，上一轮的超时/错误等空闲时再显示。
+// `awaitingConfirm` 仍排在 working 之上（等待客户作答比「工作中」更具体、更需要行动）。
 //
 // **准确性纪律（2026-10-12 客户裁定，重点）**：`working` 只由**真实信号**派生——
 //   · `facts.busy`       = 主进程外推的会话 busy 标志（开跑 / settled / dispose 时推；后台跑的轮次同样计入）；
@@ -36,11 +39,12 @@
   /** 由既有事实派生状态 id（facts 均可缺省——缺省即该项为假/零）。 */
   function deriveRoleStatus(facts) {
     var f = facts || {};
-    if (f.error) return "error";
     if (f.awaitingConfirm) return "awaiting-confirm";
     // 真实信号：会话 busy（轮次在跑）或队列有待办——两者任一为真都**不得**显示「空闲」。
+    // working 优先于 error：error 是上一轮终局，不代表当前轮（新轮 busy 时不得误报「错误」）。
     if (f.busy === true) return "working";
     if (typeof f.queueDepth === "number" && f.queueDepth > 0) return "working";
+    if (f.error) return "error";
     if (f.live) return "idle";
     if (f.hadSession) return "stopped";
     if (f.restored) return "idle-restored";

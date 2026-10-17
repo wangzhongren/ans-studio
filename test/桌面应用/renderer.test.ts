@@ -397,10 +397,19 @@ test("B-3 + 状态准确性（2026-10-12 客户裁定）：状态→徽标纯函
   assert.equal(St.deriveRoleStatus({ restored: true }), "idle-restored");
   assert.equal(St.deriveRoleStatus({ restored: true, live: true }), "idle", "已保活时它就是普通「空闲」");
   assert.equal(St.deriveRoleStatus({ restored: true, hadSession: true }), "stopped", "开过又停 → 「已停止」优先于恢复标注");
-  // 优先级：错误 > 等待你确认 > 工作中（真实信号）。
-  assert.equal(St.deriveRoleStatus({ live: true, busy: true, awaitingConfirm: true, error: true }), "error");
+  // 优先级（2026-10-17 修订）：等待你确认 > 工作中 > 错误 > 其余。
+  // `error` 是**上一轮终局**，不代表当前轮：上一轮超时/失败后新一轮 busy ⇒ 显示「工作中」，空闲时才显示「错误」。
+  assert.equal(St.deriveRoleStatus({ live: true, busy: true, awaitingConfirm: true, error: true }), "awaiting-confirm", "等待确认 > 工作中 > 错误");
   assert.equal(St.deriveRoleStatus({ live: true, busy: true, awaitingConfirm: true }), "awaiting-confirm");
   assert.equal(St.deriveRoleStatus({ live: true, queueDepth: 1, awaitingConfirm: true }), "awaiting-confirm");
+  assert.equal(St.deriveRoleStatus({ busy: true, error: true }), "working", "新一轮 busy ⇒ 工作中（不残留上一轮超时/错误）");
+  assert.equal(St.deriveRoleStatus({ live: true, busy: true, error: true }), "working");
+  assert.equal(St.deriveRoleStatus({ queueDepth: 2, error: true }), "working", "有待办 ⇒ 工作中（error 等空闲再显示）");
+  assert.equal(St.deriveRoleStatus({ live: true, error: true }), "error", "空闲时仍如实显示上一轮错误");
+  assert.equal(St.deriveRoleStatus({ error: true, awaitingConfirm: true }), "awaiting-confirm", "等待确认仍高于错误");
+  // 徽标文案守卫（实机反馈原句）：busy+error ⇒「工作中」；空闲 error ⇒「错误」。
+  assert.equal(St.statusBadge(St.deriveRoleStatus({ busy: true, error: true })).label, "工作中");
+  assert.equal(St.statusBadge(St.deriveRoleStatus({ error: true })).label, "错误");
   // **反向断言（准确性判据）**：旧的可由界面自设的 working 事实已退役——喂它不再影响派生（不得界面推测「工作中」）。
   assert.equal(St.deriveRoleStatus({ live: true, working: true }), "idle", "界面自设的 working 不是判据（已退役）");
 
@@ -1091,7 +1100,37 @@ test("Q-2：窗口化行模型（阈值 150 / 缓冲 30 / spacer / rAF 合帧）
   const code = RENDERER.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
   assert.ok(!code.includes("setTimeout") && !code.includes("setInterval"), "renderer 代码仍无 setTimeout/setInterval（rAF 合帧合规）");
   // 样式钩子。
-  assert.ok(STYLES.includes(".virt-spacer") && STYLES.includes(".msg-assistant.is-streaming"), "spacer/流式纯文本样式钩子");
+  assert.ok(STYLES.includes(".virt-spacer") && STYLES.includes(".msg-assistant.is-streaming"), "spacer 样式 + 旧行安全网样式（`.is-streaming` 无正常生产者）");
+});
+
+test("助手消息即时 Markdown（2026-10-17 实机修复）：roleBusy/未 settled 也不再退化为纯文本", async () => {
+  const href = new URL("../../app/renderer/markdown.js", import.meta.url).href;
+  await import(href);
+  const Md = (globalThis as Record<string, unknown>).ANSMarkdown as { renderMarkdown: (t: string) => string };
+  // 完整消息样例（## 标题 + 表格）：必须立即产出结构化标签，而不是原文管道符。
+  const out = Md.renderMarkdown("## 结论\n\n| 项 | 值 |\n| --- | --- |\n| a | 1 |");
+  assert.ok(out.includes("<h2>结论</h2>"), "## 立即成 <h2>");
+  assert.ok(out.includes("<table>") && out.includes("<td>a</td>"), "表格立即成 <table>/<td>");
+  assert.ok(!/\|\s*项\s*\|/.test(out), "不得保留原文管道符表格");
+  // appendAssistant：新行恒 mdReady=true（即时 Markdown）；判定不再读 roleBusy/settledTurns。
+  const start = RENDERER.indexOf("function appendAssistant(");
+  const end = RENDERER.indexOf("\n  }", start);
+  const body = RENDERER.slice(start, end);
+  const bodyCode = body.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+  assert.ok(start > 0 && end > start, "appendAssistant 存在");
+  assert.ok(body.includes("buildAssistantRow"), "构造走助手行单点");
+  assert.ok(body.includes("mdReady: true"), "新行 mdReady=true（不再等 settled 升级）");
+  assert.ok(!bodyCode.includes("roleBusy") && !bodyCode.includes("settledTurns"), "不再按 roleBusy/settledTurns 退化纯文本");
+  assert.ok(!bodyCode.includes("streaming"), "appendAssistant 无 streaming 分支");
+  // 构造点：mdReady=true 立即 Markdown；mdReady=false 仅为旧行安全网（注释注明、无正常生产者）。
+  const buildStart = RENDERER.indexOf("function buildAssistantRow(");
+  const buildEnd = RENDERER.indexOf("\n  }", buildStart);
+  const buildBody = RENDERER.slice(buildStart, buildEnd);
+  assert.ok(buildBody.includes("if (rec.mdReady)") && buildBody.includes("Md.renderMarkdown(rec.data)"), "mdReady=true 立即 Markdown");
+  assert.ok(buildBody.includes("安全网"), "mdReady=false 分支注明安全网唯一用途（不构成第二套正常路径）");
+  // settle 升级保留为安全网，正常新行不依赖。
+  assert.ok(RENDERER.includes("function upgradeStreamingMarkdown("), "settle 安全网仍在");
+  assert.ok(RENDERER.includes("仅升级历史上仍为 `mdReady: false` 的助手行"), "安全网注释说明唯一用途");
 });
 
 // ————————————————— S-1（2026-10-12 客户「输出不会让滚动条滚动到最底下了」）：流式贴底回归 —————————————————
@@ -1657,4 +1696,149 @@ test("G-5/wave2：推理折叠行接线——默认折叠含运行中、状态�
   assert.ok(STYLES.includes(".reasoning-record > summary { display: flex;") && STYLES.includes(".reasoning-record summary .chev"), "折叠行样式钩子齐备（同工具行折叠语法）");
   assert.ok(!/\.reasoning-record[^{]*\{[^}]*animation:/.test(STYLES), "推理行不得引入新动效（chev 旋转＝既有 transition 语法）");
   assert.ok(STYLES.includes(".reasoning-record .reasoning-body { white-space: pre-wrap;"), "展开正文 pre-wrap（原文换行如实）");
+});
+
+// ————— I4：已有角色但无治理记录的项目兼容（2026-10-17 客户批准 B+C；项目管理评审 §二 I4 / §四.1 / §4.5）—————
+// 契约：`listProject.governanceRecord = {state:"present"|"missing"|"invalid", reason?}`；
+// preload `previewGovernanceRecord(projectRoot)` / `establishGovernanceRecord(projectRoot)`（按名消费，不另起别名）。
+// 动作可见谓词**只有一个**：`state.projectRoot && hasRoles === true && governanceRecord.state === "missing"`。
+
+type GovernanceUiLabels = {
+  canEstablishGovernance: (hasProject: unknown, hasRoles: unknown, recordState: unknown) => boolean;
+  projectRoleCount: (roles: unknown) => number;
+  governanceMissingText: (roleCount: unknown) => string;
+  governanceInvalidText: (reason: unknown) => string;
+  governanceEmptyState: (roleCount: unknown, primaryRoleId: unknown) => { kind: string; title: string; sub: string };
+  governanceFailureView: (phase: unknown, code: unknown, message: unknown) => { lines: string[]; noRetry: boolean };
+};
+
+async function loadUiLabelsForGovernance(): Promise<GovernanceUiLabels> {
+  const href = new URL("../../app/renderer/ui-labels.js", import.meta.url).href;
+  await import(href);
+  return (globalThis as Record<string, unknown>).ANSUiLabels as GovernanceUiLabels;
+}
+
+test("I4：动作可见谓词单一来源——S1 显示；present/invalid/S0 不显示", async () => {
+  const UL = await loadUiLabelsForGovernance();
+  assert.ok(UL && typeof UL.canEstablishGovernance === "function", "ui-labels 应导出可见谓词（纯函数）");
+  assert.equal(UL.canEstablishGovernance(true, true, "missing"), true, "S1（有项目＋有角色＋missing）⇒ 显示");
+  assert.equal(UL.canEstablishGovernance(true, true, "present"), false, "present ⇒ 隐藏");
+  assert.equal(UL.canEstablishGovernance(true, true, "invalid"), false, "invalid ⇒ 隐藏（本版不自动覆盖）");
+  assert.equal(UL.canEstablishGovernance(true, false, "missing"), false, "S0（无角色）⇒ 隐藏，保持既有 bootstrap 空态");
+  assert.equal(UL.canEstablishGovernance(false, true, "missing"), false, "无项目 ⇒ 隐藏");
+  assert.equal(UL.canEstablishGovernance("x", true, "missing"), false, "非布尔真值不当「有项目」");
+  // 渲染侧只经该单点取判据；不得另立 `governanceRecord.state === "missing"` 比较。
+  assert.ok(RENDERER.includes("UiLabels.canEstablishGovernance("), "渲染侧应经纯函数取谓词（单一来源）");
+  assert.ok(!RENDERER_CODE.includes('governanceRecord.state === "missing"'), "不得在渲染侧另立第二份 missing 判据");
+});
+
+test("I4 修订：S1 角色数只计项目角色——内置 su（builtIn:true）不计入", async () => {
+  const UL = await loadUiLabelsForGovernance();
+  const roles = [{ roleId: "su", builtIn: true }, ...Array.from({ length: 7 }, (_, i) => ({ roleId: "r" + i }))];
+  assert.equal(UL.projectRoleCount(roles), 7, "内置角色（builtIn:true）不计入项目角色数");
+  assert.equal(UL.projectRoleCount([{ roleId: "a" }]), 1, "缺 builtIn 字段按项目角色计（旧枚举兼容）");
+  assert.equal(UL.projectRoleCount(undefined), 0, "非数组 ⇒ 0（不崩）");
+  assert.equal(UL.projectRoleCount([null, { roleId: "a" }, { roleId: "su", builtIn: true }]), 1, "非对象/内置均跳过");
+  const text = UL.governanceMissingText(UL.projectRoleCount(roles));
+  assert.ok(text.includes("7 个项目角色"), "状态行应显示 7 个项目角色");
+  assert.ok(!text.includes("8 个项目角色"), "状态行不得显示含内置 su 的 8");
+  const gv = UL.governanceEmptyState(UL.projectRoleCount(roles), "su");
+  assert.ok(gv.sub.includes("7 个项目角色"), "S1 空态应显示 7 个项目角色");
+  assert.ok(!gv.sub.includes("8 个项目角色"), "S1 空态不得显示含内置 su 的 8");
+  // 计数单点：过滤在 ui-labels，renderer 只经一个包装取用；两处 S1 文案不得再传含内置的总数。
+  assert.ok(RENDERER.includes("UiLabels.projectRoleCount(state.roles)"), "计数经 ui-labels 单点");
+  assert.ok(/function projectRoleCount\(\) \{\s*return UiLabels\.projectRoleCount\(state\.roles\);/.test(RENDERER), "renderer 单一包装");
+  assert.ok(RENDERER.includes("UiLabels.governanceEmptyState(projectRoleCount(), primary)"), "空态用项目角色数");
+  assert.ok(RENDERER.includes("UiLabels.governanceMissingText(projectRoleCount())"), "状态行用项目角色数");
+  assert.ok(!RENDERER.includes("UiLabels.governanceEmptyState(state.roles.length"), "空态不得再用含内置的总数");
+  assert.ok(!RENDERER.includes("UiLabels.governanceMissingText(state.roles.length"), "状态行不得再用含内置的总数");
+});
+
+test("I4：S1 空态文案——含「尚无治理记录」与 ans govern 兜底、不含「项目尚未 bootstrap」；S0 逐字不变", async () => {
+  const UL = await loadUiLabelsForGovernance();
+  const gv = UL.governanceEmptyState(3, "治理者");
+  assert.equal(gv.kind, "governance");
+  assert.ok(gv.title.includes("尚无治理记录"), "S1 标题应含「尚无治理记录」");
+  assert.ok(gv.sub.includes("尚无治理记录"), "S1 说明应说明无治理记录");
+  assert.ok(!gv.title.includes("项目尚未 bootstrap") && !gv.sub.includes("项目尚未 bootstrap"), "S1 不得复用 S0 文案");
+  assert.ok(gv.sub.includes("ans govern <项目目录>"), "应给 CLI 兜底提示（逐字）");
+  assert.ok(gv.sub.includes("治理者") && gv.sub.includes("3 个项目角色"), "主入口取自 primaryRoleId、角色数如实");
+  assert.ok(gv.sub.includes("项目角色可按各自边界工作") && gv.sub.includes("暂时无法写入"), "如实说明影响面（不夸大）");
+  // 渲染接线：S1 空态走纯函数、主按钮打开预览（非模态），S0 分支逐字保留。
+  assert.ok(RENDERER.includes("UiLabels.governanceEmptyState(projectRoleCount(), primary)"), "S1 空态文案经纯映射");
+  assert.ok(RENDERER.includes('data-governance-establish>建立治理记录</button>'), "S1 空态主按钮=「建立治理记录」");
+  assert.ok(RENDERER.includes('title = "项目尚未 bootstrap";'), "S0 标题逐字保留");
+  assert.ok(RENDERER.includes('sub = "与 " + esc(primary) + " 对话，让它把角色建出来；左树会随之长出。";'), "S0 说明逐字保留");
+  // 状态行文案：invalid 如实显示原因且说明不自动覆盖；S1 状态行同源。
+  assert.equal(UL.governanceInvalidText("记录不可解析"), "治理记录不可用：记录不可解析；本版不自动覆盖");
+  assert.equal(UL.governanceInvalidText(""), "治理记录不可用：原因未提供；本版不自动覆盖", "缺原因不编造");
+  assert.ok(UL.governanceMissingText(0).includes("0 个项目角色"));
+  // 状态行接线：S1 说明与 invalid 原因均经纯函数；invalid 分支不得出现建立按钮。
+  assert.ok(RENDERER.includes("UiLabels.governanceMissingText(projectRoleCount())"), "S1 状态行经纯映射");
+  assert.ok(RENDERER.includes("UiLabels.governanceInvalidText(record.reason)"), "invalid 状态行经纯映射（reason 逐字）");
+  assert.ok(/governanceInvalidText\(record\.reason\)[\s\S]{0,120}return "";/.test(RENDERER), "invalid 之后仅返回空/无建立按钮");
+});
+
+test("I4：预览面板——将写路径/pin 对象与角色数/采纳/授权来源/旧格式提示/不扩大声明；取消不调 establish", async () => {
+  // 面板字段逐项接线（全部 esc；数据来自 preview 契约）。
+  for (const field of ["writePaths", "pinPaths", "roleIds.length", "adoptExistingGovernanceDoc", "acceptanceSource", "legacyBoundaryRoleIds"]) {
+    assert.ok(RENDERER.includes(field), `预览面板应消费 ${field}`);
+  }
+  assert.ok(RENDERER.includes("将写入："), "列出将写路径");
+  assert.ok(RENDERER.includes("将 pin 的对象（"), "列出将 pin 的对象与数量");
+  assert.ok(RENDERER.includes("授权来源（逐字）："), "授权来源逐字展示");
+  assert.ok(RENDERER.includes("以下角色的边界仍是旧版 Markdown，将被原样 pin："), "旧格式单独一行提示");
+  assert.ok(RENDERER.includes("（迁移属后续版本）"), "明确迁移属后续版本（别让用户以为 V1 会迁）");
+  assert.ok(RENDERER.includes("不扩大任何角色写边界、不修改任何角色边界文件内容。"), "声明不扩大/不修改任何角色边界");
+  assert.ok(RENDERER.includes("data-governance-cancel"), "面板含 [取消] 按钮");
+  // IPC：按契约名消费，不另起别名。
+  assert.ok(RENDERER.includes("d.previewGovernanceRecord(projectRoot)"), "预览调 previewGovernanceRecord(projectRoot)");
+  assert.ok(RENDERER.includes("d.establishGovernanceRecord(projectRoot)"), "建立调 establishGovernanceRecord(projectRoot)");
+  // 取消函数：只关面板＋如实提示；**不调用任何 IPC**（尤其 establish）。
+  const start = RENDERER.indexOf("function cancelGovernancePreview()");
+  const end = RENDERER.indexOf("\n  }", start);
+  const fn = RENDERER.slice(start, end);
+  assert.ok(start > 0 && end > start, "应存在 cancelGovernancePreview");
+  assert.ok(!fn.includes("d.establishGovernanceRecord"), "取消不得调用 establish");
+  assert.ok(!fn.includes("d.previewGovernanceRecord"), "取消不得调用 preview");
+  assert.ok(fn.includes('setHint("已取消，未写入任何文件。")'), "取消文案逐字");
+});
+
+test("I4：禁止重复点击——确认后 disabled＋「正在建立治理记录…」；phase=write 失败不得宣称零副作用", async () => {
+  const UL = await loadUiLabelsForGovernance();
+  assert.ok(RENDERER.includes("正在建立治理记录…"), "建立中按钮文案");
+  assert.ok(/data-governance-establish' \+ \(f\.busy \? " disabled"/.test(RENDERER), "建立中按钮 disabled（防重复点击）");
+  // 失败文案构造是纯函数：phase 是「是否零副作用」的唯一依据。
+  const writeFail = UL.governanceFailureView("write", "", "写入中断：磁盘错误；可能已写入部分文件，请重新执行。");
+  const writeJoined = writeFail.lines.join("\n");
+  assert.ok(writeJoined.includes("可能已写入部分文件"), "写入阶段失败逐字保留可能部分写入");
+  assert.ok(!writeJoined.includes("未写入任何文件"), "phase=write 时**不得**出现「未写入任何文件」");
+  const writeFailCode = UL.governanceFailureView("write", "io-error", "写入中断。");
+  assert.ok(!writeFailCode.lines.join("\n").includes("未写入任何文件"), "写入阶段失败带 code 也不得宣称零副作用");
+  assert.ok(UL.governanceFailureView("precheck", "", "门禁拒绝。").lines.join("\n").includes("未写入任何文件"), "precheck 失败可声明零副作用");
+  assert.ok(UL.governanceFailureView("guard", "busy", "忙").lines.includes("上一次建立仍在进行中；本次未写入任何文件。"), "busy 文案按 §4.5");
+  const exists = UL.governanceFailureView("guard", "already-established", "已存在");
+  assert.ok(exists.lines.includes("治理记录已存在；本次未写入任何文件。"), "already-established 文案按 §4.5");
+  assert.equal(exists.noRetry, true, "already-established 不再提供建立按钮");
+  const invalid = UL.governanceFailureView("guard", "invalid-record", "不可用");
+  assert.ok(invalid.lines.some((line) => line.includes("治理记录不可用")), "invalid-record 文案按 §4.5");
+  assert.equal(invalid.noRetry, true, "invalid-record 不再提供建立按钮");
+  // 渲染侧失败路径取纯函数、不自行拼接零副作用。
+  assert.ok(RENDERER.includes("UiLabels.governanceFailureView(phase, code, message)"), "失败行经纯函数单点");
+  assert.ok(!RENDERER_CODE.includes('lines.push("未写入任何文件。")'), "渲染侧不得自行拼接零副作用文案");
+});
+
+test("I4：成功——只认 ok＋phase=write＋completed；逐字 message＋重建提示；刷新 listProject 后动作隐藏", async () => {
+  assert.ok(
+    RENDERER.includes('res.ok === true && phase === "write" && finalize.status === "completed"'),
+    "成功判据 = ok && phase===\"write\" && status===\"completed\""
+  );
+  assert.ok(RENDERER.includes("治理角色将在下一轮发送前按新边界重建（若正在运行，下一轮结束后生效）。"), "成功追加重建提示（逐字）");
+  assert.ok(RENDERER.includes("void refreshListingQuietly(projectRoot);"), "成功后重新取 listProject");
+  assert.ok(/refreshListingQuietly\(projectRoot\) \{[\s\S]{0,220}applyListing\(list, false\)/.test(RENDERER), "刷新走既有 applyListing（状态变 present ⇒ 动作隐藏）");
+  // 状态落库与旧主进程兜底。
+  assert.ok(RENDERER.includes("state.governanceRecord = gr && typeof gr"), "applyListing 应落 governanceRecord");
+  assert.ok(RENDERER.includes(': { state: "present" };'), "缺失字段按 present 兜底（旧主进程不显示动作、不崩）");
+  assert.ok(RENDERER.includes("reason: typeof gr.reason === \"string\" ? gr.reason : \"\""), "invalid 的 reason 如实转写");
+  assert.ok(/renderGovernanceUi\(\);[\s\S]{0,160}refreshEmptyStates\(\);/.test(RENDERER), "列举落地后同步状态行与空态");
 });

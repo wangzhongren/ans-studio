@@ -7,9 +7,9 @@
 | 模块 | 全局名 | 关键导出 |
 | --- | --- | --- |
 | `app/renderer/markdown.js` | `globalThis.ANSMarkdown` | `esc`（转义单一来源）、`renderMarkdown`、`options`、`createRenderer`（测试钉子面） |
-| `app/renderer/role-status.js` | `globalThis.ANSRoleStatus` | 角色状态七态派生（图标/文案/样式的唯一映射） |
+| `app/renderer/role-status.js` | `globalThis.ANSRoleStatus` | 角色状态七态派生（图标/文案/样式的唯一映射）；`deriveRoleStatus` 优先级 **`awaitingConfirm > working（busy/队列待办）> error > 其余`**——`error` 是上一轮终局，不代表当前轮（新轮 busy 时显示「工作中」） |
 | `app/renderer/tool-rows.js` | `globalThis.ANSToolRows` | `activityOf`、`slimToolRow` 等活动分类与工具行纯函数 |
-| `app/renderer/ui-labels.js` | `globalThis.ANSUiLabels` | `replayPlan`（回放策略）、队列视图与文案纯映射 |
+| `app/renderer/ui-labels.js` | `globalThis.ANSUiLabels` | `replayPlan`（回放策略）、队列视图与文案纯映射；I4 治理记录：`canEstablishGovernance`（动作可见谓词唯一入口）、`projectRoleCount`（**项目**角色计数，过滤 `builtIn !== true`——S1 文案只用它）、`governanceMissingText`、`governanceInvalidText`、`governanceEmptyState`、`governanceFailureView`（失败行唯一构造点，`phase` 是零副作用唯一依据） |
 | `app/renderer/runtime-ui.js` | `globalThis.ANSRuntimeUI` | `runtimeLabel`、`viewKey`、`matchesView`、`roleGroups`、`sourceLabel`、`applicationLabel`（纯展示，不读文件或判断授权） |
 
 `renderer.js` 为经典脚本（IIFE，依赖 `window.desktop`），不导出模块；其对外契约 = DOM id/类名与 `data-state` 等既有钩子（e2e 与渲染测试按此断言）。另暴露 `window.__ansRenderer` 调试探针面（`selectRole`/`rowModelDebug`/`replayAnchorDebug` 等，e2e 时序断言用）：字段**只增不改**——`rowModelDebug` 新增 `rowGap`（2026-10-14 口径缓存不变量断言用）。
@@ -110,3 +110,24 @@ work、card、pi、document复用424模态抽屉。仅导航/会话业务面iner
 
 **契约边界**：以上均为渲染侧内部呈现面；IPC 通道、事件形状与主进程契约**零变化**（跨边界需求仍走桌面窗口）。
 验收与证据：`docs/fix/2026-10-16_fix_visual-convergence-v3-implementation.md`（§4 逐条断言 + 截图对照）。
+
+## 2026-10-17 I4 治理记录：消费契约与 DOM/探针
+
+**消费（只读，通道属桌面窗口；按名消费，不另起别名）**：
+- `listProject` 结果新增 `governanceRecord: { state: "present" | "missing" | "invalid"; reason?: string }`。渲染侧原样落 `state.governanceRecord`；字段缺失按 `{state:"present"}` 兜底（旧主进程 ⇒ 动作不可达、不崩）。`reason` 仅 `invalid` 使用。
+- `desktop.previewGovernanceRecord(projectRoot)` → `{ok:true, preview:{projectRoot, governanceBoundaryRel, writePaths, pinPaths, roleIds, adoptExistingGovernanceDoc, acceptanceSource, legacyBoundaryRoleIds}}` 或 `{ok:false, code, message}`。
+- `desktop.establishGovernanceRecord(projectRoot)` → `{ok, phase:"guard"|"precheck"|"write", code?, finalize:{status,message,wrote,pins,roles,...}}`；`finalize` 逐字展示，`phase` 是「是否零副作用」的唯一依据（`phase === "write"` 失败不得出现「未写入任何文件」）。
+
+**可见谓词（唯一）**：`UiLabels.canEstablishGovernance(hasProject, hasRoles, recordState)` = `hasProject && hasRoles === true && recordState === "missing"`。`state.projectRoot` 为空串/非字符串均视为无项目。
+
+**DOM（非模态；均在既有中栏，不新增模态层）**：
+- `#governance-status.governance-status`：动态创建并 append 到既有 `.session-notice`（`hidden` 属性驱动）。S1＝`.gs-text` ＋ `button[data-governance-establish]`（「建立治理记录」）；invalid＝`.gs-text.gs-invalid`（「治理记录不可用：<reason>；本版不自动覆盖」，无按钮）；present/S0 隐藏。`.session-notice` 空态隐藏规则已纳入 `:has(#governance-status[hidden])`。
+- `#governance-preview.governance-preview`：动态创建、紧随 `.session-notice`。内容钩子：`.gp-title`、`.gp-line`、`.gp-list`、`.gp-legacy`、`.gp-declare`、`.gp-note`、`.gp-error`、`.gp-success`、`.gp-actions`；按钮由 `data-governance-establish` / `data-governance-cancel` / `data-governance-dismiss` 委托。预览含 `writePaths`、`pinPaths` 与 `roleIds.length`、`adoptExistingGovernanceDoc`、`acceptanceSource`（逐字）、`legacyBoundaryRoleIds` 单行提示、「不扩大任何角色写边界、不修改任何角色边界文件内容。」。
+- S1 空态（`.chat-empty`）：标题「尚无治理记录」、说明含角色数/主入口/`ans govern <项目目录>`、主按钮 `data-governance-establish`；S0 空态文案逐字不变。**角色数只计项目角色**：`UiLabels.projectRoleCount(state.roles)` 过滤 `builtIn === true`（内置治理主入口不计入；不硬编码角色名/id）。
+- 文案：取消「已取消，未写入任何文件。」；建立中「正在建立治理记录…」＋disabled；成功 `finalize.message`＋「治理角色将在下一轮发送前按新边界重建（若正在运行，下一轮结束后生效）。」；失败按 `governanceFailureView`（§4.5 的 `already-established`/`busy`/`invalid-record` 文案）。
+
+**调试探针（只增不改）**：`window.__ansRenderer.governance = { state(), openPreview, cancelPreview, confirm }`。`state()` 返回 `{record, visible, open, busy, preview, error, result}`（只读快照）；`visible` 仍由 `governanceActionVisible()` 单点计算。
+
+## 2026-10-17 助手消息渲染语义（修订）
+
+三种适配器（Pi `message_end` / Codex `item/completed` / Claude assistant text block）只发**完整消息**，渲染层无增量文本更新——`appendAssistant` 新建行**恒 `mdReady: true`**，经唯一构造点 `buildAssistantRow(rec)` 立即 `Md.renderMarkdown`；**不再读 `roleBusy`/`settledTurns`**，也不等待 settled。`upgradeStreamingMarkdown` 与 `.msg-assistant.is-streaming` 仅保留为**旧行/异常行安全网**（正常路径不可达；CSS 注释注明唯一用途），不得据此理解为存在第二套正常渲染路径。`uiux-v2.mjs` 的活动轮断言改为「助手消息即时渲染、不挂 `is-streaming`」。跨边界提示：`test/桌面应用/hot-path.test.ts` 仍以旧语义字面量断言（安全网使其保持绿），归属角色可按新语义更新。

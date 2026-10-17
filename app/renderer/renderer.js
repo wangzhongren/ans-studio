@@ -69,6 +69,10 @@
     primaryRoleId: null,
     // 项目是否已 bootstrap（枚举到项目角色）：原样转自门禁引擎 listProject 的 hasRoles（§10.3）。
     hasRoles: true,
+    // I4（2026-10-17）：治理记录状态——原样转自 listProject 的 `governanceRecord`
+    // （`{state:"present"|"missing"|"invalid", reason?}`；桌面窗口派生）。**旧主进程无此字段 ⇒
+    // 按 `{state:"present"}` 兜底**（不显示动作、不崩）。判据只用 `state`，不猜 pin 是否匹配。
+    governanceRecord: { state: "present" },
     selectedRoleId: null,
     // 当前**显示中**的角色（其 pane 挂在 #chat 下）；与 sessionOpenRoleId 的关系见下。
     sessionOpenRoleId: null, // 当前活动会话的角色 id（最近一次 openSession 成功者；null=无）
@@ -255,17 +259,31 @@
    */
   function emptyStateHtml() {
     var primary = state.primaryRoleId;
-    var title, sub;
+    var title, sub, cta;
     if (state.projectRoot && state.hasRoles === false) {
+      // S0（客户裁定原文，逐字不变）：未-bootstrap 这件事只说一遍，只在中栏正中。
       title = "项目尚未 bootstrap";
       sub = "与 " + esc(primary) + " 对话，让它把角色建出来；左树会随之长出。";
+    } else if (governanceActionVisible()) {
+      // S1（I4，2026-10-17）：su 空态改为治理记录引导（沿用 primaryRoleId，不硬编码角色名）。
+      var gv = UiLabels.governanceEmptyState(projectRoleCount(), primary);
+      title = esc(gv.title);
+      sub = esc(gv.sub);
     } else {
       title = "选择左侧角色开始聊天";
       sub = "消息直接发送，无需确认；写入由治理引擎在后台把关。";
     }
-    var cta = state.projectRoot && primary
-      ? '<button id="btn-start-primary" class="btn btn-primary btn-start">开始与 ' + esc(primary) + " 对话</button>"
-      : "";
+    if (state.projectRoot && state.hasRoles === false) {
+      cta = state.projectRoot && primary
+        ? '<button id="btn-start-primary" class="btn btn-primary btn-start">开始与 ' + esc(primary) + " 对话</button>"
+        : "";
+    } else if (governanceActionVisible()) {
+      cta = '<button class="btn btn-primary btn-start" type="button" data-governance-establish>建立治理记录</button>';
+    } else {
+      cta = state.projectRoot && primary
+        ? '<button id="btn-start-primary" class="btn btn-primary btn-start">开始与 ' + esc(primary) + " 对话</button>"
+        : "";
+    }
     return '<div class="chat-empty">' +
       '<p class="empty-title">' + title + "</p>" +
       '<p class="empty-sub">' + sub + "</p>" +
@@ -279,6 +297,309 @@
     if (b) {
       b.addEventListener("click", function () { selectRole(state.primaryRoleId); });
     }
+    var g = container.querySelector(".chat-empty [data-governance-establish]");
+    if (g) g.addEventListener("click", openGovernancePreview);
+  }
+
+  // —————— I4 治理记录（2026-10-17 客户批准 B+C；设计评审 §二 I4 / §4.2 / §4.5）——————
+  // 状态值原样转自 `listProject.governanceRecord`（桌面窗口派生）；**动作可见谓词唯一入口** =
+  // `UiLabels.canEstablishGovernance`——本文件不另立判据（S1 的定义即 `hasRoles === true &&
+  // governanceRecord.state === "missing"`，见 §4.1）。预览/建立通道按契约名消费，不另起别名。
+  var governanceFlow = {
+    open: false, loading: false, busy: false,
+    preview: null, error: null, result: null,
+  };
+
+  function governanceRecordOf() {
+    var r = state.governanceRecord;
+    return r && typeof r === "object" ? r : { state: "present" };
+  }
+
+  function governanceActionVisible() {
+    return UiLabels.canEstablishGovernance(
+      typeof state.projectRoot === "string" && state.projectRoot !== "",
+      state.hasRoles,
+      governanceRecordOf().state
+    );
+  }
+
+  /** S1 文案用的**项目角色**数（I4 实机缺陷修正：`state.roles` 含内置 su——只数 `builtIn !== true`；
+   *  过滤单点在 `UiLabels.projectRoleCount`，此处只喂当前枚举）。 */
+  function projectRoleCount() {
+    return UiLabels.projectRoleCount(state.roles);
+  }
+
+  /** 状态行/预览面板的宿主：均**非模态**。状态行挂在既有提示条 `.session-notice` 里（同一位置，
+   *  不新增模态/弹窗）；预览面板紧随提示条之后（空态/状态区展开）。 */
+  function ensureGovernanceUi() {
+    var notice = document.querySelector(".session-notice");
+    if (!notice) return null;
+    var status = $("governance-status");
+    if (!status) {
+      status = document.createElement("div");
+      status.id = "governance-status";
+      status.className = "governance-status";
+      status.hidden = true;
+      status.addEventListener("click", function (e) {
+        var btn = e.target && e.target.closest ? e.target.closest("[data-governance-establish]") : null;
+        if (btn) openGovernancePreview();
+      });
+      notice.appendChild(status);
+    }
+    var preview = $("governance-preview");
+    if (!preview) {
+      preview = document.createElement("div");
+      preview.id = "governance-preview";
+      preview.className = "governance-preview";
+      preview.hidden = true;
+      preview.addEventListener("click", function (e) {
+        var t = e.target;
+        if (!t || !t.closest) return;
+        if (t.closest("[data-governance-establish]")) confirmGovernanceEstablish();
+        else if (t.closest("[data-governance-cancel]")) cancelGovernancePreview();
+        else if (t.closest("[data-governance-dismiss]")) closeGovernancePreview();
+      });
+      notice.parentNode.insertBefore(preview, notice.nextSibling);
+    }
+    return { status: status, preview: preview };
+  }
+
+  /** 状态行文案：S1＝说明＋「建立治理记录」；invalid＝原因原文＋「本版不自动覆盖」（无建立钮）；
+   *  present / S0＝不显示（S0 的未-bootstrap 文案仍只在中栏空态说）。 */
+  function governanceStatusHtml() {
+    if (governanceActionVisible()) {
+      return '<span class="gs-text">' + esc(UiLabels.governanceMissingText(projectRoleCount())) + "</span>" +
+        '<button class="btn btn-primary btn-mini" type="button" data-governance-establish>建立治理记录</button>';
+    }
+    var record = governanceRecordOf();
+    if (state.projectRoot && record.state === "invalid") {
+      return '<span class="gs-text gs-invalid">' + esc(UiLabels.governanceInvalidText(record.reason)) + "</span>";
+    }
+    return "";
+  }
+
+  function normalizeGovernancePreview(p) {
+    var src = p && typeof p === "object" ? p : {};
+    var list = function (v) {
+      return Array.isArray(v) ? v.map(function (x) { return String(x == null ? "" : x); }) : [];
+    };
+    return {
+      projectRoot: typeof src.projectRoot === "string" ? src.projectRoot : "",
+      governanceBoundaryRel: typeof src.governanceBoundaryRel === "string" ? src.governanceBoundaryRel : "",
+      writePaths: list(src.writePaths),
+      pinPaths: list(src.pinPaths),
+      roleIds: list(src.roleIds),
+      adoptExistingGovernanceDoc: src.adoptExistingGovernanceDoc === true,
+      acceptanceSource: typeof src.acceptanceSource === "string" ? src.acceptanceSource : "",
+      legacyBoundaryRoleIds: list(src.legacyBoundaryRoleIds),
+    };
+  }
+
+  function governancePathList(paths) {
+    if (!paths.length) return '<span class="gp-list">（无）</span>';
+    return '<span class="gp-list">' + paths.map(function (p) { return esc(p); }).join("<br>") + "</span>";
+  }
+
+  /** 预览面板 HTML（非模态）：将写路径 / 将 pin 的对象与角色数 / 是否采纳既有治理边界文档 /
+   *  授权来源逐字 / 旧格式提示 / 「不扩大、不修改」声明 / [建立治理记录] [取消]。 */
+  function governancePreviewHtml() {
+    var f = governanceFlow;
+    var html = '<p class="gp-title">建立治理记录（预览）</p>';
+    if (f.loading) {
+      return html + '<p class="gp-note">正在读取预览…</p>' +
+        '<div class="gp-actions"><button class="btn btn-ghost btn-mini" type="button" data-governance-cancel>取消</button></div>';
+    }
+    if (f.result) {
+      var cls = f.result.kind === "success" ? "gp-success" : "gp-error";
+      html += f.result.lines.map(function (line) { return '<p class="' + cls + '">' + esc(line) + "</p>"; }).join("");
+      if (f.result.kind === "success" || f.result.noRetry) {
+        html += '<div class="gp-actions"><button class="btn btn-ghost btn-mini" type="button" data-governance-dismiss>关闭</button></div>';
+      } else {
+        html += '<div class="gp-actions">' +
+          '<button class="btn btn-primary btn-mini" type="button" data-governance-establish>建立治理记录</button>' +
+          '<button class="btn btn-ghost btn-mini" type="button" data-governance-cancel>取消</button></div>';
+      }
+      return html;
+    }
+    if (f.error) {
+      html += '<p class="gp-error">' + esc(f.error.message) + "</p>";
+      if (f.error.detail) html += '<p class="gp-note">' + esc(f.error.detail) + "</p>";
+      return html + '<div class="gp-actions"><button class="btn btn-ghost btn-mini" type="button" data-governance-cancel>取消</button></div>';
+    }
+    var p = f.preview;
+    html += '<p class="gp-line">将写入：' + governancePathList(p.writePaths) + "</p>";
+    html += '<p class="gp-line">将 pin 的对象（' + p.pinPaths.length + " 项）及角色（" + p.roleIds.length + " 个）：" +
+      governancePathList(p.pinPaths) + "</p>";
+    html += '<p class="gp-line">' + (p.adoptExistingGovernanceDoc
+      ? "将采纳既有治理边界文档（不覆盖其内容）。"
+      : "将写入治理边界文档：" + esc(p.governanceBoundaryRel) + "。") + "</p>";
+    html += '<p class="gp-line">授权来源（逐字）：' + esc(p.acceptanceSource) + "</p>";
+    if (p.legacyBoundaryRoleIds.length) {
+      html += '<p class="gp-line gp-legacy">以下角色的边界仍是旧版 Markdown，将被原样 pin：' +
+        esc(p.legacyBoundaryRoleIds.join("、")) + "（迁移属后续版本）</p>";
+    }
+    html += '<p class="gp-declare">不扩大任何角色写边界、不修改任何角色边界文件内容。</p>';
+    html += '<div class="gp-actions">' +
+      '<button class="btn btn-primary btn-mini" type="button" data-governance-establish' + (f.busy ? " disabled" : "") + ">" +
+      (f.busy ? "正在建立治理记录…" : "建立治理记录") + "</button>" +
+      '<button class="btn btn-ghost btn-mini" type="button" data-governance-cancel' + (f.busy ? " disabled" : "") + ">取消</button></div>";
+    return html;
+  }
+
+  /** 重画状态行与预览面板（状态行变化会引起 `.session-notice` 高度变化——沿用 U1 的「量—写—补」）。 */
+  function renderGovernanceUi() {
+    var ui = ensureGovernanceUi();
+    if (!ui) return;
+    var pin = noticeLayoutPin();
+    var html = governanceStatusHtml();
+    ui.status.hidden = html === "";
+    ui.status.innerHTML = html;
+    if (!governanceFlow.open) {
+      ui.preview.hidden = true;
+      ui.preview.innerHTML = "";
+    } else {
+      ui.preview.hidden = false;
+      ui.preview.innerHTML = governancePreviewHtml();
+    }
+    restickAfterNoticeChange(pin);
+  }
+
+  /** 空态文案刷新（治理记录状态变化后，已存在的空态要跟着换；有内容的 pane 不动）。 */
+  function refreshEmptyStates() {
+    var chat = $("chat");
+    if (chat) {
+      var direct = chat.firstElementChild;
+      if (direct && direct.classList.contains("chat-empty")) {
+        chat.innerHTML = emptyStateHtml();
+        bindEmptyState(chat);
+      }
+    }
+    Object.keys(chatPanes).forEach(function (key) {
+      var pane = chatPanes[key];
+      if (!pane || !pane.querySelector(".chat-empty")) return;
+      pane.querySelector(".chat-empty").outerHTML = emptyStateHtml();
+      bindEmptyState(pane);
+    });
+  }
+
+  /** 点「建立治理记录」/空态主按钮 → 先取预览（非模态展开），**不直接建立**。 */
+  async function openGovernancePreview() {
+    if (!governanceActionVisible()) return;
+    var projectRoot = state.projectRoot;
+    governanceFlow.open = true;
+    governanceFlow.loading = true;
+    governanceFlow.busy = false;
+    governanceFlow.preview = null;
+    governanceFlow.error = null;
+    governanceFlow.result = null;
+    renderGovernanceUi();
+    var res;
+    try {
+      if (!d || typeof d.previewGovernanceRecord !== "function") {
+        res = { ok: false, code: "unavailable", message: "预览通道不可用（桌面窗口尚未接线）。" };
+      } else {
+        res = await d.previewGovernanceRecord(projectRoot);
+      }
+    } catch (err) {
+      res = { ok: false, code: "error", message: err && err.message ? String(err.message) : String(err) };
+    }
+    if (projectRoot !== state.projectRoot) return; // 换项目后丢弃旧响应
+    governanceFlow.loading = false;
+    if (!res || res.ok !== true) {
+      var code = res && typeof res.code === "string" ? res.code : "";
+      var detail = code ? "错误码：" + code : "";
+      if (code === "already-established") detail += "（治理记录已存在；本次未写入任何文件。）";
+      else if (code === "invalid-record") detail += "（治理记录不可用；本版不自动覆盖。）";
+      else if (code === "busy") detail += "（上一次建立仍在进行中；本次未写入任何文件。）";
+      governanceFlow.error = {
+        message: res && typeof res.message === "string" && res.message !== "" ? res.message : "预览失败。",
+        detail: detail,
+      };
+      renderGovernanceUi();
+      if (code === "already-established" || code === "invalid-record") void refreshListingQuietly(projectRoot);
+      return;
+    }
+    governanceFlow.preview = normalizeGovernancePreview(res.preview);
+    renderGovernanceUi();
+  }
+
+  /** 取消：关闭面板，**不调用任何 IPC**（尤其不调 establish），如实提示零副作用。 */
+  function cancelGovernancePreview() {
+    if (governanceFlow.busy) return;
+    governanceFlow.open = false;
+    governanceFlow.loading = false;
+    governanceFlow.preview = null;
+    governanceFlow.error = null;
+    governanceFlow.result = null;
+    renderGovernanceUi();
+    setHint("已取消，未写入任何文件。");
+  }
+
+  function closeGovernancePreview() {
+    governanceFlow.open = false;
+    governanceFlow.loading = false;
+    governanceFlow.busy = false;
+    governanceFlow.preview = null;
+    governanceFlow.error = null;
+    governanceFlow.result = null;
+    renderGovernanceUi();
+  }
+
+  async function refreshListingQuietly(projectRoot) {
+    try {
+      var list = await d.listProject(projectRoot);
+      if (projectRoot !== state.projectRoot) return;
+      if (list && typeof list === "object") applyListing(list, false);
+    } catch (_) { /* 刷新失败不覆盖已如实显示的失败文案 */ }
+  }
+
+  /** 确认建立：按钮 disabled＋「正在建立治理记录…」；成功只认 `phase === "write" && status === "completed"`。 */
+  async function confirmGovernanceEstablish() {
+    if (!governanceFlow.open || governanceFlow.busy) return;
+    if (!governanceFlow.preview || !governanceActionVisible()) return;
+    var projectRoot = state.projectRoot;
+    governanceFlow.busy = true;
+    governanceFlow.result = null;
+    renderGovernanceUi();
+    var res;
+    try {
+      if (!d || typeof d.establishGovernanceRecord !== "function") {
+        res = { ok: false, phase: "guard", code: "unavailable", finalize: { status: "blocked", message: "建立通道不可用（桌面窗口尚未接线）。" } };
+      } else {
+        res = await d.establishGovernanceRecord(projectRoot);
+      }
+    } catch (err) {
+      res = { ok: false, phase: "guard", code: "error", finalize: { status: "blocked", message: err && err.message ? String(err.message) : String(err) } };
+    }
+    if (projectRoot !== state.projectRoot) return;
+    governanceFlow.busy = false;
+    var finalize = res && res.finalize && typeof res.finalize === "object" ? res.finalize : {};
+    var phase = res && (res.phase === "write" || res.phase === "precheck" || res.phase === "guard") ? res.phase : "guard";
+    var code = res && typeof res.code === "string" ? res.code : "";
+    var message = typeof finalize.message === "string" ? finalize.message : "";
+    if (res && res.ok === true && phase === "write" && finalize.status === "completed") {
+      governanceFlow.result = {
+        kind: "success",
+        lines: [message, "治理角色将在下一轮发送前按新边界重建（若正在运行，下一轮结束后生效）。"].filter(function (line) { return line !== ""; }),
+      };
+      renderGovernanceUi();
+      void refreshListingQuietly(projectRoot); // 刷新后状态变 present，动作隐藏
+      return;
+    }
+    // 失败：逐字显示 finalize.message；`phase` 是「是否零副作用」的唯一依据（写入阶段失败不得宣称零副作用）。
+    if (message === "" && phase === "write") {
+      message = "写入阶段中断（主进程未返回 finalize.message）；可能已写入部分文件，请重新执行或核对现场。";
+    } else if (message === "") {
+      message = "建立失败（主进程未返回 finalize.message）。";
+    }
+    governanceFlow.result = governanceFailureResult(phase, code, message);
+    renderGovernanceUi();
+    if (governanceFlow.result.noRetry) void refreshListingQuietly(projectRoot);
+  }
+
+  function governanceFailureResult(phase, code, message) {
+    var view = UiLabels.governanceFailureView(phase, code, message);
+    return { kind: "failure", lines: view.lines, noRetry: view.noRetry };
   }
 
   // —————— 每角色聊天容器（B-2：切走保留历史） ——————
@@ -858,29 +1179,32 @@
     return rec;
   }
 
+  /** 助手行元素构造（唯一构造点）。**2026-10-17 修订**：三种适配器只发**完整消息**
+   *  （Pi `message_end` / Codex `item/completed` / Claude assistant text block），渲染层没有增量文本
+   *  更新——`appendAssistant` 新建行恒 `mdReady: true`，此处**即时 Markdown**。
+   *  下面的 `mdReady === false` 分支仅作**旧行/异常行安全网**（唯一用途；正常路径不可达），
+   *  不构成第二套正常渲染路径；`upgradeStreamingMarkdown` 会在 settle 时把旧行升为 Markdown。 */
+  function buildAssistantRow(rec) {
+    var div = document.createElement("div");
+    div.className = "msg msg-assistant";
+    if (rec.mdReady) {
+      div.innerHTML = Md.renderMarkdown(rec.data); // B-1：受控 Markdown（先转义后解析）
+    } else {
+      div.classList.add("is-streaming"); // 安全网专用（旧 `.is-streaming` 样式仅服务此分支）
+      div.textContent = String(rec.data == null ? "" : rec.data);
+    }
+    return div;
+  }
+
   function appendAssistant(pane, text, turnId) {
-    // Q-1/Q-2（2026-10-12）：**流式惰性 Markdown**——该角色正在跑（真信号 `roleBusy`）时助手消息先以
-    // **纯文本**挂上（textContent——天然转义），一轮结束（settled）再**一次性** Markdown 化该段；
-    // 离屏行（窗口化）**不跑解析器**——挂载时才渲染。非流式（回放/静止态消息）逐字照旧即时渲染。
-    var roleId = pane.dataset.roleId || "";
-    var replyRows = rowListFor(pane);
-    var streaming = state.roleBusy[roleId] === true && !(turnId && replyRows.settledTurns && replyRows.settledTurns[turnId]);
+    // Q-1/Q-2（2026-10-17 修订）：**完整消息 ⇒ 即时 Markdown**——不再按 `roleBusy` 退化为纯文本，
+    // 也不等 settled 升级；离屏行仍由行表惰性 build（窗口化语义不变）。
     var pin = streamShouldPin(pane); // S-1：**先量后挂**（在底部附近才贴底；上翻不打断）
     registerRow(
       pane,
-      function (rec) {
-        var div = document.createElement("div");
-        div.className = "msg msg-assistant";
-        if (rec.mdReady) {
-          div.innerHTML = Md.renderMarkdown(rec.data); // B-1：同上
-        } else {
-          div.classList.add("is-streaming");
-          div.textContent = String(rec.data == null ? "" : rec.data); // 纯文本（无 HTML 注入口）
-        }
-        return div;
-      },
+      buildAssistantRow,
       60,
-      { kind: "assistant", data: text, mdReady: !streaming, turnId: turnId, assistantText: true }
+      { kind: "assistant", data: text, mdReady: true, turnId: turnId, assistantText: true }
     );
     scrollBottom(pane, pin);
   }
@@ -1036,8 +1360,8 @@
     var opens = activityOpen[roleId];
     return opens && Object.prototype.hasOwnProperty.call(opens, id) ? opens[id] === true : null;
   }
-  /** 默认开合：仅「实时到达（live）且该轮未 settled 且本角色 busy」的组默认展开——与流式 Markdown
-   *  （`appendAssistant` 的 roleBusy + settledTurns）同族判据；回放/无轮次身份/已 settle ⇒ 默认折叠。 */
+  /** 默认开合：仅「实时到达（live）且该轮未 settled 且本角色 busy」的组默认展开——工具组自身判据；
+   *  回放/无轮次身份/已 settle ⇒ 默认折叠。（2026-10-17：助手消息已即时 Markdown，不再共享流式判据。） */
   function groupDefaultOpen(pane, activity, rl) {
     var turnId = activity.turnId || "";
     if (activity.origin !== "live" || turnId === "") return false;
@@ -2427,9 +2751,9 @@
     }
   }
 
-  /** 一轮结束（settled）时的**流式 Markdown 一次性升级**（Q-1/Q-2）：
-   *  把该角色仍为纯文本的助手行统一升级——**已挂载**元素就地转 Markdown；**未挂载**行只改状态标志，
-   *  待其挂载时由 `build` 直接出 Markdown（**离屏不跑解析器**）。高度变化一次性重测（写读分离）。 */
+  /** **安全网**（2026-10-17 修订）：仅升级历史上仍为 `mdReady: false` 的助手行（新行恒即时 Markdown，
+   *  不依赖本函数）。已挂载元素就地转 Markdown；未挂载行只改状态标志，待其挂载时由
+   *  `buildAssistantRow` 直接出 Markdown（**离屏不跑解析器**）。高度变化一次性重测（写读分离）。 */
   function upgradeStreamingMarkdown(roleId) {
     var rl = paneRowLists[roleId];
     if (!rl || rl.pane !== paneFor(roleId)) return;
@@ -2560,7 +2884,8 @@
       // 此处只清「上一次的错误态」（本轮正常收口）并记行；**不再**由事件流自设忙闲（准确性裁定）。
       var outcome = ev.detail && ev.detail.outcome;
       metaFor(roleId).error = outcome === "failed" || outcome === "timed_out";
-      // Q-1/Q-2：流式段的**一次性 Markdown 化**（本轮期间到达的助手消息先是纯文本——见 appendAssistant）。
+      // Q-1/Q-2（2026-10-17 修订）：助手消息已即时 Markdown（完整消息语义，见 appendAssistant）；
+      // 此处保留 upgradeStreamingMarkdown **仅作旧行/异常行安全网**，正常新行不依赖。
       upgradeStreamingMarkdown(roleId);
       if (typeof ev.turnId === "string" && ev.turnId) { var settledList = rowListFor(pane); (settledList.settledTurns || (settledList.settledTurns = Object.create(null)))[ev.turnId] = true; if ((settledList.reportedTurns && settledList.reportedTurns[ev.turnId] || settledList.deliveryTurns && settledList.deliveryTurns[ev.turnId])) applyReportedTask(pane, ev.turnId); foldTurnGroups(pane, ev.turnId); } // 工具行折叠口径：轮结束 ⇒ 该轮工具组折叠成一行（手动开合/焦点在内者除外）
       if (!appendTurnTerminal(pane, ev)) sysRow(pane, "sys-settled", ICONS.call, ev.summary);
@@ -2996,6 +3321,12 @@
     state.roles = res.roles || [];
     state.primaryRoleId = res.primaryRoleId || null;
     state.hasRoles = res.hasRoles !== false;
+    // I4：治理记录状态原样落状态；**旧主进程无此字段 ⇒ 按 present 兜底**（不显示动作，不崩）。
+    var gr = res.governanceRecord;
+    state.governanceRecord = gr && typeof gr === "object" && (gr.state === "present" || gr.state === "missing" || gr.state === "invalid")
+      ? { state: gr.state, reason: typeof gr.reason === "string" ? gr.reason : "" }
+      : { state: "present" };
+    if (projectChanged || fresh) closeGovernancePreview(); // 换项目：旧项目的预览不跨项目保留
     var pp = $("project-path");
     pp.textContent = res.projectRoot;
     pp.classList.remove("is-empty");
@@ -3036,6 +3367,8 @@
     renderTabs();
     setChatHeader(selectedRole());
     updateControls();
+    renderGovernanceUi(); // I4：状态行随列举结果刷新（S1/invalid/隐藏）
+    refreshEmptyStates(); // I4：空态文案同步（S1 引导 / 建立成功后回到常态）
   }
 
   /** 取主进程的保活会话列表（B-2）→ 「有活动会话」与状态派生的数据源。失败如实清空（不假装有）。 */
@@ -4737,6 +5070,7 @@
   // L-1 + 状态准确性：每角色**真实状态快照**（busy × 队列摘要，变化时）→ 徽标「工作中 · N 待办」+ 队列行。
   if (d.onRoleState) d.onRoleState(function (payload) { deliverRuntimePayload(payload, onRoleState); });
 
+  ensureGovernanceUi(); // I4：提前建立状态行/预览容器（hidden）——`.session-notice` 的显隐判据因此稳定
   measureComposer();
   if (typeof ResizeObserver === "function") new ResizeObserver(measureComposer).observe(document.querySelector(".composer"));
   window.addEventListener("resize", measureComposer);
@@ -4769,6 +5103,24 @@
     savePiConfigFromForm: savePiConfigFromForm,
     appendOperatorRequest: appendOperatorRequest,
     piKeys: PI_KEYS.slice(),
+    // I4（2026-10-17）：治理记录探针（只读状态 + 三个入口）——供 e2e 驱动非模态预览/取消/建立；
+    // 判据仍只有 `governanceActionVisible()` 一个入口（探针不另算）。
+    governance: {
+      state: function () {
+        return {
+          record: governanceRecordOf(),
+          visible: governanceActionVisible(),
+          open: governanceFlow.open,
+          busy: governanceFlow.busy,
+          preview: governanceFlow.preview,
+          error: governanceFlow.error,
+          result: governanceFlow.result,
+        };
+      },
+      openPreview: openGovernancePreview,
+      cancelPreview: cancelGovernancePreview,
+      confirm: confirmGovernanceEstablish,
+    },
     // L-1/状态准确性：供探针直接注入真实快照（按 IPC 契约 `{roleId, busy, summaries}`）。
     onRoleState: function (payload) { deliverRuntimePayload(payload, onRoleState); },
     onOperatorExpired: function (payload) { deliverRuntimePayload(payload, onOperatorExpired); },

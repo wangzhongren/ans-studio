@@ -573,6 +573,11 @@ test("G-2/W1 #1：轮次 90% 生效时限才报（demo=120s → 108s 边界）�
   h.service.tick();
   assert.equal(h.delivered.length, 1, "到 90% 线即报（含边界）");
   assert.ok(h.delivered[0].text.startsWith("[系统·看护]") && h.delivered[0].text.includes("轮次逼近超时") && h.delivered[0].text.includes("A"), "文案＝编排单一来源（文首/信号/角色）");
+  // 实机反馈（2026-10-17）：事实行必须写明「尚未超时、系统未中止」与到硬超时的剩余量——
+  // summary/文首仍为「轮次逼近超时」，不得让 su 转述成「已超时」。
+  assert.match(h.delivered[0].text, /尚未超时、系统未中止；剩余约 12 秒（距整轮硬超时）/, "90% 预警：尚未超时＋剩余量（demo 120s，108s 时剩 12s）");
+  assert.equal(h.delivered[0].text.includes("已超时"), false, "不得出现「已超时」（系统未中止该轮）");
+  assert.ok(h.delivered[0].summary.includes("轮次逼近超时"), "summary 仍保留「轮次逼近超时」");
   h.advance(30_000);
   h.service.tick();
   assert.equal(h.delivered.length, 1, "同一活跃期内重复命中只累计（不重复打扰）");
