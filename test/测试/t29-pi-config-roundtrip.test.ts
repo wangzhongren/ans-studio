@@ -134,13 +134,13 @@ test("T29 往返：载入后 resolvePiProviderConfig 成功构造（baseUrl/mode
   }
 });
 
-// —————————————————————— 2b) 上下文窗口可选（新语义）：缺失 → 不硬失败，回落保守默认值 ——————————————
+// —————————————————————— 2b) 上下文窗口可选（新语义）：缺失 → 不硬失败，回落系统默认值 ——————————————
 //
 // 客户 2026-10-11 裁定：`ANS_PI_CONTEXT_WINDOW` 从「必填」改为**可选**（面板里收进「高级」、**可留空**）。
-// 留空 = **不下发该键**，Pi适配器回落**保守默认值**（不抛错，只在日志/事件流给可见提示）。
+// 留空 = **不下发该键**，Pi适配器回落**系统默认值**（不抛错，只在日志/事件流给可见提示）。
 // 用**反向守卫**：断言「缺失**不抛错**」且取到默认值——防「必填」旧语义长回来。
 
-test("T29 往返：ANS_PI_CONTEXT_WINDOW 缺失 → 不硬失败，采用保守默认值（新语义）", async () => {
+test("T29 往返：ANS_PI_CONTEXT_WINDOW 缺失 → 不硬失败，采用系统默认值（新语义）", async () => {
   // 刻意**不写** context window：模拟「高级项留空」。
   const t = makeTempEnv(
     [
@@ -157,8 +157,8 @@ test("T29 往返：ANS_PI_CONTEXT_WINDOW 缺失 → 不硬失败，采用保守�
 
     // 缺失**不应抛错**（旧语义会硬失败）。
     const cfg = resolvePiProviderConfig({}, env);
-    assert.equal(cfg.contextWindow, DEFAULT_PI_CONTEXT_WINDOW, "缺失应回落到保守默认值");
-    assert.equal(DEFAULT_PI_CONTEXT_WINDOW, 32768, "保守默认值应钉死为 32768（勿被悄悄改动）");
+    assert.equal(cfg.contextWindow, DEFAULT_PI_CONTEXT_WINDOW, "缺失应回落到系统默认值");
+    assert.equal(DEFAULT_PI_CONTEXT_WINDOW, 500000, "系统默认值应钉死为 500000（客户 2026-10-17 裁定）");
     assert.equal(cfg.contextWindowSource, "default", "来源应如实标注为 default（供适配器给可见提示）");
     assert.ok(!JSON.stringify(cfg).includes(SENTINEL_TOKEN), "构造结果不得含 token 值");
   } finally {

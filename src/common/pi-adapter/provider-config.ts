@@ -27,19 +27,19 @@ export interface PiProviderConfigInput {
   apiKeyEnvVar?: string;
   /**
    * 真实模型的上下文窗口（tokens）；缺省环境变量 ANS_PI_CONTEXT_WINDOW。
-   * **可选**（优先级：显式值 > 环境变量 > 保守默认 DEFAULT_PI_CONTEXT_WINDOW）：
-   * 缺失时**不再硬失败**——回落到一个**保守**默认值并给出可见提示，免得用户为了用起来还得
+   * **可选**（优先级：显式值 > 环境变量 > 系统默认值 DEFAULT_PI_CONTEXT_WINDOW）：
+   * 缺失时**不再硬失败**——回落到**系统默认值**并给出可见提示，免得用户为了用起来还得
    * 跑去服务商那儿手查自己模型的窗口大小。给了但**非法**（0 / 负数 / 非数）**仍明确失败**。
    *
    * 背景：模型克隆自 anthropic 模板，模板值是 claude 的 1,000,000，与网关上的真实模型无关。
    * 沿用模板值会让 pi 的自动压缩阈值（contextWindow − reserveTokens）永远够不着，长会话先吃到
-   * 服务端超长报错——故缺失时**绝不能**回落到模板值，只能回落到一个保守的小值
-   * （见 DEFAULT_PI_CONTEXT_WINDOW 的论证）。
+   * 服务端超长报错——故缺失时**绝不能**原样沿用模板值，只能回落到**系统默认值**
+   * （见 DEFAULT_PI_CONTEXT_WINDOW 的论证与客户裁定）。
    */
   contextWindow?: number;
 }
 
-/** `contextWindow` 的来源：显式 `opts.contextWindow` / 环境变量 / 保守默认。 */
+/** `contextWindow` 的来源：显式 `opts.contextWindow` / 环境变量 / 系统默认。 */
 export type ContextWindowSource = "explicit" | "env" | "default";
 
 export interface PiProviderConfig {
@@ -47,9 +47,9 @@ export interface PiProviderConfig {
   baseUrl: string;
   modelId: string;
   apiKeyEnvVar: string;
-  /** 上下文窗口（tokens）：显式/环境变量/保守默认三者解析后的**具体值**（恒为正数）。 */
+  /** 上下文窗口（tokens）：显式/环境变量/系统默认三者解析后的**具体值**（恒为正数）。 */
   contextWindow: number;
-  /** `contextWindow` 的来源；`"default"` 表示用了保守默认值（适配器据此给出可见提示）。 */
+  /** `contextWindow` 的来源；`"default"` 表示用了系统默认值（适配器据此给出可见提示）。 */
   contextWindowSource: ContextWindowSource;
 }
 
@@ -57,28 +57,34 @@ const DEFAULT_PROVIDER_ID = "ans-gateway";
 const DEFAULT_API_KEY_ENV = "ANTHROPIC_AUTH_TOKEN";
 
 /**
- * 未显式给出上下文窗口时的**保守默认值**（tokens）。
+ * 未显式给出上下文窗口时的**系统默认值**（tokens）。
  *
- * ── 为什么默认必须「保守」（宁可小、不可大）──
- * 两个方向的代价**不对称**：
- *   · 默认偏**小** → Pi 的自动压缩阈值（contextWindow − reserveTokens）**提前**到达 → 最多多压缩几次，
- *     属**良性**；
- *   · 默认偏**大** → 阈值够不着、压缩**永不触发** → 长会话先吃**服务端超长报错**、会话**炸掉**——正是
- *     anthropic 模板那个 1,000,000 造成的问题。
- * 故缺失时应倒向「小」。
+ * ── 2026-10-17 客户裁定：系统默认值就是 500000 ──
+ * 客户逐字原话：「我的意思说系统默认就是500k。」
+ * 真机证据（客户项目 `D:\work\vibe-code\codeagent`）：su 会话在 `ANS_PI_CONTEXT_WINDOW` 留空、
+ * 适配器采用旧默认 32768 时，固定提示 + 历史已达 **38–44k tokens**；SDK 把 `max_tokens` 钳到
+ * **1**（`min(model.maxTokens, max(1, contextWindow − estimateContextTokens − 4096))`），
+ * 连续多轮 `stopReason=length`（`rawStopReason=max_tokens`）、正文 0，`submit_report` 无法发出。
+ * 客户据此要求把系统默认值改为 500000。
  *
- * ── 为什么取 32768，而不再小/再大 ──
- *   · **不能 ≤ 16384**：Pi 压缩的 reserveTokens 被钉为 16384（`settings.ts` 的 ANS_SETTINGS_OVERRIDES，
- *     等同 Pi 内置缺省）。若 contextWindow ≤ 16384，则阈值 contextWindow − reserveTokens ≤ 0，
- *     `shouldCompact`（compaction.js:173，判 `contextTokens > contextWindow − reserveTokens`）会**几乎每轮
- *     都触发**——退化、抖动，**不是**「良性」。故必须严格 > reserveTokens。
- *   · **取 32768（32k）**：阈值 = 32768 − 16384 = 16384，**切实为正**且留有真实工作余量；同时 32k 是当下
- *     网关所服务指令模型的**事实下限**（32k/64k/128k… 很普遍），故对绝大多数模型都**不会**超过其真实窗口
- *     ——正落在「宁可小」的安全方向。它比模板值 1,000,000 小约 30 倍，压缩终于会真正发生。
- *   · 若某模型真实窗口确实 < 32768（罕见），用户以 ANS_PI_CONTEXT_WINDOW / opts.contextWindow 覆盖即可；
- *     宁可偶尔「多压几次」，也不要「窗口设大 → 会话炸掉」。
+ * ── 代价（如实保留，勿删）──
+ * 默认偏大并非没有代价：若模型/网关的**真实窗口小于 500000**，Pi 的自动压缩阈值
+ * （contextWindow − reserveTokens）就够不着、压缩**不触发**，长会话先吃**服务端超长报错**、
+ * 会话炸掉——这正是 anthropic 模板的 1,000,000 造成过的问题。旧默认 32768 曾按「宁可小、不可大」
+ * 规避此项；客户 2026-10-17 裁定后，权衡改为：**宁可让真实窗口较小的模型冒超长报错的风险，
+ * 也不要让 38–44k 的会话被钳到 max_tokens=1、整轮无正文**（后者对客户是直接不可用，且多轮连续发生）。
+ *
+ * ── 不能取太小：仍须严格 > reserveTokens ──
+ * Pi 压缩的 reserveTokens 被钉为 16384（`settings.ts` 的 ANS_SETTINGS_OVERRIDES，等同 Pi 内置缺省）。
+ * 若 contextWindow ≤ 16384，则阈值 contextWindow − reserveTokens ≤ 0，`shouldCompact`
+ * （compaction.js:173）会**几乎每轮都触发**——退化、抖动。500000 的阈值 = 500000 − 16384 = 483616，
+ * 压缩仍留有真实工作余量（只是真实窗口更小的模型需要覆盖）。
+ *
+ * ── 覆盖路径（不变）──
+ * `ANS_PI_CONTEXT_WINDOW` / `opts.contextWindow` 仍可**逐机 / 逐模型**覆盖，优先级仍是
+ * 显式值 > 环境变量 > 系统默认值。若该模型/网关的实际窗口更小，请用上述任一方式覆盖为真实值。
  */
-export const DEFAULT_PI_CONTEXT_WINDOW = 32768;
+export const DEFAULT_PI_CONTEXT_WINDOW = 500000;
 
 function pick(explicit: string | undefined, envValue: string | undefined): string {
   const value = explicit ?? envValue ?? "";
@@ -95,7 +101,7 @@ function assertContextWindow(raw: number, shown: unknown): number {
 
 /**
  * 解析上下文窗口的**来源与取值**。显式值优先，其次环境变量；都没给 →
- * `{ value: undefined, source: "default" }`（由 resolvePiProviderConfig 回落到**保守默认值**，不再硬失败）。
+ * `{ value: undefined, source: "default" }`（由 resolvePiProviderConfig 回落到**系统默认值**，不再硬失败）。
  * 给了但非法**明确失败**——配置错误不该被静默吞掉。
  */
 function parseContextWindow(
@@ -114,7 +120,7 @@ function parseContextWindow(
 /**
  * 解析并校验显式 provider 配置。baseUrl / modelId / 凭据任一缺失即抛错（fail-closed），
  * 从而在任何网络请求发生之前阻止回落到默认端点。
- * **例外**：`contextWindow` 为**可选**——缺失回落到保守默认值（不抛错），仅非法值才抛错。
+ * **例外**：`contextWindow` 为**可选**——缺失回落到系统默认值（不抛错），仅非法值才抛错。
  */
 export function resolvePiProviderConfig(
   input: PiProviderConfigInput,
@@ -125,7 +131,7 @@ export function resolvePiProviderConfig(
   const modelId = pick(input.modelId, env["ANS_PI_MODEL"]);
   const apiKeyEnvVar = input.apiKeyEnvVar ?? DEFAULT_API_KEY_ENV;
   const parsed = parseContextWindow(input.contextWindow, env["ANS_PI_CONTEXT_WINDOW"]);
-  // 缺失（显式与环境变量都没给）**不再硬失败**：回落到**保守默认值**（宁可小不可大，论证见上方常量）。
+  // 缺失（显式与环境变量都没给）**不再硬失败**：回落到**系统默认值**（客户 2026-10-17 裁定，论证见上方常量）。
   const contextWindow = parsed.value ?? DEFAULT_PI_CONTEXT_WINDOW;
   const contextWindowSource: ContextWindowSource = parsed.value === undefined ? "default" : parsed.source;
 
@@ -149,15 +155,14 @@ export function resolvePiProviderConfig(
 }
 
 /**
- * 用了保守默认值时的**可见提示**文案（供适配器同时打进日志与事件流）；非默认来源返回 `undefined`。
+ * 用了系统默认值时的**可见提示**文案（供适配器同时打进日志与事件流）；非默认来源返回 `undefined`。
  * 让用户知道「用的是默认值」以及「怎么覆盖」，而**不是**硬失败（这正是本次改动的目的：
  * 不把「查自己模型窗口大小」的负担转嫁给用户）。
  */
 export function renderContextWindowNotice(source: ContextWindowSource, value: number): string | undefined {
   if (source !== "default") return undefined;
   return (
-    `未配置上下文窗口（opts.contextWindow 与 ANS_PI_CONTEXT_WINDOW 均未给出）：已采用保守默认值 ` +
-    `${value} tokens。默认偏小 → 压缩可能提前触发（良性）；如需精确值，请设置 ANS_PI_CONTEXT_WINDOW ` +
-    `或传入 opts.contextWindow。`
+    `未配置上下文窗口（opts.contextWindow 与 ANS_PI_CONTEXT_WINDOW 均未给出）：已采用系统默认值 ` +
+    `${value} tokens。若该模型/网关的实际窗口更小，请设置 ANS_PI_CONTEXT_WINDOW 覆盖。`
   );
 }

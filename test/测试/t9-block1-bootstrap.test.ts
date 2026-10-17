@@ -75,7 +75,7 @@ function genesisProject(target: string): ProjectConfig {
 /** 「客户跑」的手工验步骤（本机不可自动验收，如实写明）。 */
 export const CLIENT_MANUAL_STEPS = [
   "① 桌面导入一个**空文件夹**（无 角色卡/、无 .ans/）→ 左树应显示 su、并提示「项目尚未 bootstrap」。",
-  "② 在 .env 配置真实 provider：ANS_PI_BASE_URL / ANS_PI_MODEL（必填）+ ANTHROPIC_AUTH_TOKEN；ANS_PI_CONTEXT_WINDOW 可选（留空 = 用保守默认，缺失不报错）。",
+  "② 在 .env 配置真实 provider：ANS_PI_BASE_URL / ANS_PI_MODEL（必填）+ ANTHROPIC_AUTH_TOKEN；ANS_PI_CONTEXT_WINDOW 可选（留空 = 用系统默认 500000，缺失不报错）。",
   "③ 选 pi 运行时，点 su 开始对话，**用自然语言**说明要建哪些角色（例：「建一个『项目管理』和『编排』角色」）。",
   "④ 断言：su 真的发起 write_file 写出 角色卡/<角色>/{role-card.md,boundary.yaml,memo.md}；越界写（如 src/**）在写前被拒。",
   "⑤ 断言：写完后左树（su 轮次 settle 触发 project:changed）随 su 建角色而**长出**对应角色。",

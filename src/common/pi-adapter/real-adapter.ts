@@ -132,8 +132,8 @@ export async function buildExplicitRuntime(
   //
   // contextWindow **必须**落到我们解析出的具体值：模板是 claude 的 1,000,000，与网关上的真实模型无关。
   // 沿用模板值则 pi 的自动压缩阈值（contextWindow - reserveTokens）永远够不着，会话会先吃到服务端的
-  // 超长报错，而不是优雅压缩。cfg.contextWindow 恒为**具体数**——显式值 / 环境变量 / 保守默认
-  // DEFAULT_PI_CONTEXT_WINDOW 三者之一（provider-config.ts 解析；缺失回落到保守默认，不再硬失败），
+  // 超长报错，而不是优雅压缩。cfg.contextWindow 恒为**具体数**——显式值 / 环境变量 / 系统默认
+  // DEFAULT_PI_CONTEXT_WINDOW 三者之一（provider-config.ts 解析；缺失回落到系统默认，不再硬失败），
   // 故此处**无条件**覆盖，没有 "template" 回落。
   const model = {
     ...templateModel,
@@ -202,7 +202,7 @@ export async function buildExplicitRuntime(
     throw new Error("安全护栏：baseUrl 指向 api.anthropic.com，已中止以避免把凭据发往默认端点。");
   }
 
-  // —— 安全护栏：解析出的 contextWindow（含保守默认）必须确实落到运行时模型，不得回落到模板的 1,000,000 ——
+  // —— 安全护栏：解析出的 contextWindow（含系统默认）必须确实落到运行时模型，不得回落到模板的 1,000,000 ——
   if (selected.contextWindow !== cfg.contextWindow) {
     throw new Error(
       `安全护栏：解析出的 contextWindow（${cfg.contextWindow}）未落到运行时模型（${String(selected.contextWindow)}），已中止。`,
@@ -1294,7 +1294,7 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
         // prompt 时限只约束「非等待」的计算与生成时间。
         const interactionGate = opts.interactionGate;
 
-        // 上下文窗口缺失时**不再硬失败**：采用保守默认值，并给出**可见**提示（日志 + 事件流，见下）。
+        // 上下文窗口缺失时**不再硬失败**：采用系统默认值，并给出**可见**提示（日志 + 事件流，见下）。
         const contextWindowNotice = renderContextWindowNotice(cfg.contextWindowSource, cfg.contextWindow);
         if (contextWindowNotice !== undefined) log.stage(contextWindowNotice);
 

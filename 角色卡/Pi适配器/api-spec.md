@@ -16,7 +16,7 @@
 
 production prompt/abort：Service turn ID 注入到 Pi lifecycle，事件顶层及 detail 使用同一 ID。SDK settled 只暂存，prompt promise 结果确定后才发一次终态；首次明确中止/超时/失败不被清理错误改名。同一轮共享一次 native abort，空闲 stop 为 no-op，原生清理最多900ms，失败隔离会话；legacy direct helper 无 strictLifecycle 仍保留原 fixture 透传行为。等待客户或审核用原注入 InteractionGate 暂停 prompt deadline。
 
-Pi 时限显式值优先，缺省读旧 ANS_PI_PROMPT_TIMEOUT_MS/ANS_PI_CONSTRUCT_TIMEOUT_MS，再缺省120000；Core C1T 现将同值一次注入 inner/outer。Pi配置的 contextWindow 仍接受旧显式字段或 ANS_PI_CONTEXT_WINDOW，缺省32768并提示。
+Pi 时限显式值优先，缺省读旧 ANS_PI_PROMPT_TIMEOUT_MS/ANS_PI_CONSTRUCT_TIMEOUT_MS，再缺省120000；Core C1T 现将同值一次注入 inner/outer。Pi配置的 contextWindow 仍接受旧显式字段或 ANS_PI_CONTEXT_WINDOW，缺省 500000（系统默认值；2026-10-17 客户裁定）并提示。
 
 当前：迁移已实现，Pi 全部199/199（原185+新增14）与全仓strict tsc exit0，最终候选指纹见原记录。跨角色合并验收由各原属主完成。SDK固定 `@earendil-works/pi-coding-agent@1.1.0`，没有真实模型调用、真实 .env/持久凭据写入或提交。原始证据最终见 [P1 记录](docs/change/2026-10-14_change_pi-injected-runtime.md)，当前流程见 [Pi 功能](docs/feature/pi-runtime.md)。
 

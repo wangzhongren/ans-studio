@@ -77,9 +77,9 @@ test("createPiRuntimeAdapter 构造时缺失配置即抛错（不等网络）", 
   );
 });
 
-// —— 上下文窗口（ANS_PI_CONTEXT_WINDOW）：**可选**；缺失 → 保守默认（不抛错）；非法 → 仍明确失败 ——
+// —— 上下文窗口（ANS_PI_CONTEXT_WINDOW）：**可选**；缺失 → 系统默认（不抛错）；非法 → 仍明确失败 ——
 
-test("contextWindow：未配置 → 采用保守默认值，**不抛错**（不再把查窗口的负担转嫁用户）", () => {
+test("contextWindow：未配置 → 采用系统默认值，**不抛错**（不再把查窗口的负担转嫁用户）", () => {
   const cfg = resolvePiProviderConfig(
     { baseUrl: PROXY, modelId: MODEL },
     { ANTHROPIC_AUTH_TOKEN: "t" },
@@ -88,18 +88,20 @@ test("contextWindow：未配置 → 采用保守默认值，**不抛错**（不�
   assert.equal(cfg.contextWindowSource, "default");
 });
 
-test("contextWindow：默认值被钉死为 32768（防被人悄悄改动）", () => {
-  // 论证见 provider-config.ts 的 DEFAULT_PI_CONTEXT_WINDOW：32768 是「保守」选择
-  // （严格 > reserveTokens=16384，且落在常见网关模型窗口的「事实下限」方向）。
-  assert.equal(DEFAULT_PI_CONTEXT_WINDOW, 32768);
+test("contextWindow：系统默认值被钉死为 500000（客户 2026-10-17 裁定，防被人悄悄改动）", () => {
+  // 客户逐字裁定：「我的意思说系统默认就是500k。」论证与真机证据见 provider-config.ts 的
+  // DEFAULT_PI_CONTEXT_WINDOW：旧默认 32768 下，38–44k 会话被 SDK 钳到 max_tokens=1，
+  // 连续 stopReason=length、正文 0，submit_report 无法发出。
+  assert.equal(DEFAULT_PI_CONTEXT_WINDOW, 500000);
 });
 
 test("contextWindow：缺失时的可见提示——提到默认值、并说明如何覆盖", () => {
   const notice = renderContextWindowNotice("default", DEFAULT_PI_CONTEXT_WINDOW);
   assert.ok(notice !== undefined, "默认来源必须给出可见提示");
-  assert.match(notice!, /32768/); // 告知用的是哪个默认值
+  assert.match(notice!, /500000/); // 告知用的是哪个默认值
   assert.match(notice!, /ANS_PI_CONTEXT_WINDOW/); // 告知如何覆盖（环境变量）
   assert.match(notice!, /opts\.contextWindow/); // 告知如何覆盖（显式选项）
+  assert.match(notice!, /系统默认值/); // 2026-10-17 裁定后的措辞（不再是「保守默认」）
   // 非默认来源不产生提示（不打扰用户）。
   assert.equal(renderContextWindowNotice("explicit", 131072), undefined);
   assert.equal(renderContextWindowNotice("env", 65536), undefined);

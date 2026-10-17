@@ -71,3 +71,13 @@ test("choices 元数据纪律：非空值域、选项为逐字非空字符串、
     }
   }
 });
+
+// ———————— 客户 2026-10-17 裁定：系统默认上下文窗口 500000 ————————
+
+test("Pi 上下文窗口：可选、非机密，help 逐字说明系统默认 500000 tokens", () => {
+  const field = RUNTIME_SETTINGS.pi.fields.find((item) => item.key === "ANS_PI_CONTEXT_WINDOW");
+  assert.ok(field, "Pi 必须有 ANS_PI_CONTEXT_WINDOW 字段");
+  assert.equal(field.required, false, "上下文窗口可选（留空即用系统默认）");
+  assert.equal(field.secret, false, "上下文窗口非机密");
+  assert.equal(field.help, "留空使用系统默认值（500000 tokens）。", "help 须与客户裁定的 500000 默认逐字一致");
+});

@@ -34,7 +34,7 @@ export const RUNTIME_SETTINGS: Readonly<Record<Exclude<RuntimeKind, "demo">, Run
       { key: "ANTHROPIC_AUTH_TOKEN", label: "访问令牌", required: true, secret: true },
       { key: "ANS_PI_BASE_URL", label: "API 地址", required: true, secret: false },
       { key: "ANS_PI_MODEL", label: "模型", required: true, secret: false },
-      { key: "ANS_PI_CONTEXT_WINDOW", label: "上下文窗口", required: false, secret: false, help: "留空使用保守默认值。" },
+      { key: "ANS_PI_CONTEXT_WINDOW", label: "上下文窗口", required: false, secret: false, help: "留空使用系统默认值（500000 tokens）。" },
       { key: "ANS_PI_REASONING_EFFORT", label: "推理强度", required: false, secret: false, choices: ["off", "low", "medium", "high", "xhigh"], help: REASONING_EFFORT_HELP },
     ],
   },

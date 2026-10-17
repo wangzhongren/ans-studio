@@ -1,5 +1,21 @@
 # Pi适配器 变更记录
 
+## 2026-10-17 — contextWindow 系统默认值 32768 → 500000（客户裁定）
+
+**来源：客户 2026-10-17 裁定，逐字**：「我的意思说系统默认就是500k。」
+
+**真机证据（客户项目 `D:\work\vibe-code\codeagent`）**：su 会话在 `ANS_PI_CONTEXT_WINDOW` 留空、适配器采用旧默认 32768 时，固定提示 + 历史已达 **38–44k tokens**；SDK 把 `max_tokens` 钳到 **1**（`min(model.maxTokens, max(1, contextWindow − estimateContextTokens − 4096))`），连续多轮 `stopReason=length`（`rawStopReason=max_tokens`）、正文 0，`submit_report` 无法发出。客户据此要求系统默认值改为 500000。
+
+**改动**
+- `src/common/pi-adapter/provider-config.ts`：`DEFAULT_PI_CONTEXT_WINDOW = 32768` → **`500000`**；重写常量论证——**保留**「默认偏大可能超过模型真实窗口 → 压缩不触发 → 服务端超长报错」的代价说明，同时如实记录客户裁定与上述真机证据；明确 `ANS_PI_CONTEXT_WINDOW` / `opts.contextWindow` 仍可逐机/逐模型覆盖（优先级不变：显式 > 环境变量 > 系统默认）；「保守默认值」措辞统一改为「系统默认值」。
+- `renderContextWindowNotice` 文案改为：「未配置上下文窗口（opts.contextWindow 与 ANS_PI_CONTEXT_WINDOW 均未给出）：已采用系统默认值 500000 tokens。若该模型/网关的实际窗口更小，请设置 ANS_PI_CONTEXT_WINDOW 覆盖。」日志 + 事件流的可见行为不变（仍仅 `source==="default"` 时输出）。
+- `src/common/pi-adapter/real-adapter.ts`：仅注释措辞「保守默认」→「系统默认」，零行为改动。
+- `test/pi-adapter/provider-config.test.ts`：钉死值 32768 → 500000；notice 正则 `/32768/` → `/500000/`，并新增 `/系统默认值/` 断言；测试名/注释同步。测试与探测夹具中**显式**传 `contextWindow: 32768` 的用例均为显式值，未改。
+
+**验证**：`node --test "test/pi-adapter/provider-config.test.ts"` → **13/13 pass**；`node --test "test/pi-adapter/**/*.test.ts"` → **283 pass / 2 fail / 1 skip**，两失败均为 `injected-runtime.test.ts` 的 Windows `EPERM: symlink`（本机无符号链接权限的既有环境限制，与本改动无关，代码路径未触及）；`npm run typecheck` → 本角色文件 **0 错**；全仓报错均在 `src/common/claude-adapter/`、`src/provider/claude/session.ts` 与 `test/claude-adapter/**`、`test/测试/g3-g5-*`，为环境缺件（`@anthropic-ai/claude-agent-sdk` / `zod` / `@modelcontextprotocol/sdk`），未改无关文件。
+
+**风险 / 边界外不一致（已上报，不在本角色边界内改）**：① `test/测试/t29-pi-config-roundtrip.test.ts:161` 仍断言 `DEFAULT_PI_CONTEXT_WINDOW === 32768`，随本改动会红——归「测试」角色同步；② 其注释与 `test/测试/t9-block1-bootstrap.test.ts:78`、`test/桌面应用/e2e/main.mjs:1337` 仍写「保守默认」；③ `src/common/shared/runtime-settings.ts:37` 的 help 文案「留空使用保守默认值。」归「项目管理」角色同步。真实模型窗口 < 500000 的网关现在需要用户显式覆盖，否则可能先吃服务端超长报错——这是客户裁定接受的权衡。未 git 提交。
+
 ## 2026-10-16 — v1.3.0 CI（Windows run 38924209553）环境收窄断言红修复：Windows 平台真值豁免（逐键判别）
 
 **来源**：协调函转 CI 红（Windows job）——`test/pi-adapter/installed-mcp-servers.test.ts`「env 收窄」例断言红。**逐键判别（CI 实得键集为准）**：实得＝自持 3 键（PATH/PROBE_ENV_DUMP/PROBE_MARKER）＋ `["HOMEDRIVE","HOMEPATH","LOGONSERVER","SYSTEMDRIVE","SYSTEMROOT","TEMP","USERDOMAIN","USERNAME","USERPROFILE","WINDIR"]`。判定：**十键全为 Windows 平台级注入（真值豁免，沿 macOS `__CF_USER_TEXT_ENCODING` 先例）**——整组为登录会话级真值（身份/系统目录/临时目录，进程创建语义补入）；**同一次 CI 中另两处独立实现**（Claude 端 G1a、Codex 端 J3 的收窄断言）实得**同一键集**（三处 spawn 实现互异）⇒ 平台级、非栈级。**哨兵键零泄漏**（实得键集不含 `P3_MCP_GATEWAY_SENTINEL`）；**名单外业务键为零**——无产品缺口。**修复**：仅测试的平台真值分支——`platformInjected` 按 `process.platform` 选集（win32＝上述十键／darwin＝`__CF_USER_TEXT_ENCODING`／其余＝空），**断言本体零放宽**（「自持键在场」「哨兵不泄漏」字面保留）。与 CI 实得键集程序化比对：**exact match**。产品代码（自持 transport/收窄语义）零改动。
