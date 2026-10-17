@@ -108,3 +108,46 @@ export function establishGovernanceRecord(input: GovernanceRecordInput): Promise
 
 **测试** `test/编排/governance-record.test.ts` 17 例（预览七态＋并发＋建立成功/采纳重跑/五类零写入/写入阶段注入错误）。
 
+## su shell 审批档（2026-10-17）
+
+**来源**：PM 评审 `2026-10-17_design_su-shell-approval-review.md`（approved）。客户裁定：只读白名单免审批，其余（含原硬拒 deny）逐条客户批准。
+
+**`src/common/编排/shell-gate.ts` 公开面**：
+
+```ts
+export const BRANCH_C_RISKY = "c-risky";
+export const BRANCH_C_REVIEW = "c-review";
+export const SU_APPROVAL_REASON_PREFIX = "su-审批档";
+export type SuApprovalTier = "risky" | "review" | "deny";
+export function renderSuApprovalReason(tier: SuApprovalTier, detail?: string): string;
+// CreateShellGateOptions / ShellGateBuildDeps 新增：
+//   operatorOnly?: boolean;   // 缺省 false；不接 (b)，allow 直放，risky/review/deny 交 (a)
+//   approveDeny?: boolean;    // 缺省 false；仅 operatorOnly=true 有效；true ⇒ deny 也交 (a)
+```
+
+- **构造守卫（抛错 ⇒ 不 arm）**：`readonlyOnly && operatorOnly` 互斥；`approveDeny && !operatorOnly`；`operatorOnly` 缺 `operatorChannel`；`operatorOnly` 带 `pmAsk`/`routineShellPolicy`。
+- **判定映射**：`allow`→`c-allow`（0 卡）；`risky`→`c-risky→a-*`；`review`→`c-review→a-*`；`deny`+`approveDeny`→`c-deny→a-*`；`deny` 无 `approveDeny`→既有硬拒 `c-deny`。`by` 后缀 `（su 审批档）`；批准后 `... → operator:<标识>`。卡片 reason 由 `renderSuApprovalReason` 生成（含档位/命中原因/写边界警告）。
+- 审计/落盘、fail-closed 退路、`readonlyOnly` 与项目三层链行为**逐字不变**。
+
+**Pipeline 公共出口 `src/pipeline/orchestration/shell-arming.ts`**：
+
+```ts
+export interface AssembleOperatorShellGateOptions {
+  project: ProjectConfig;
+  operatorChannel: OperatorChannelFn; // 必填
+  classifyShell?: ClassifyShellFn;
+  rules?: ShellRules | (() => ShellRules | Promise<ShellRules>);
+  timeoutMs?: number; operatorTimeoutMs?: number;
+  now?: () => Date; env?: Record<string, string | undefined>;
+  auditSink?: ShellAuditSink;
+  // 无 pmAsk / pmRoleId / openSession / sessionDeps / routineShellPolicy（type 层面保证）
+}
+export async function assembleOperatorShellGate(opts: AssembleOperatorShellGateOptions): Promise<ShellGate>;
+export { SU_APPROVAL_REASON_PREFIX, renderSuApprovalReason } from "../../common/编排/shell-gate.ts";
+export type { SuApprovalTier } from "../../common/编排/shell-gate.ts";
+```
+
+**`openRoleSession` 输入**：`shellOperatorOnly?: Omit<AssembleOperatorShellGateOptions,"project">`。优先级 `shellOperatorOnly`（su-only：仅 `suppressHandback===true`）→ `shellReadonly` → 项目角色三层链；项目角色误传或与 `shellReadonly` 同时给出 ⇒ **不 arm**（诊断）。装配失败 ⇒ 不 arm（`run_shell` 不注册）。
+
+**测试** `test/编排/shell-operator-only.test.ts` 11 例；`test/编排/` 348 计/347 过/1 红（既有 Windows symlink EPERM）。
+

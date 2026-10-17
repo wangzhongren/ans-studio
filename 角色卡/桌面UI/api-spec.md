@@ -169,3 +169,14 @@ work、card、pi、document复用424模态抽屉。仅导航/会话业务面iner
 - 预填/同步：`syncRange(key)` 读 hidden → index → slider/output/aria（并把 hidden 规范化为规范值）；`bindRangeControl(key)` 在 `input` 事件写回 hidden 规范值 + output + aria。自定义值（index=-1）回退 `type="text"` 并显示 `.pi-range-note`「当前值不在预设档位；改为预设档位后保存」。
 - CSS：`.pi-range-wrap`（flex、gap 10）、`.pi-range-out`（12px、`--text-2`）、`.pi-range-note`（11px、`--amber`）；range 轨道 `--border`、滑块 `--success`、focus 环 `--focus-ring`。
 - 跨边界：`test/桌面应用/e2e/main.mjs` 若按 `label[for="pi-inp-<key>"]` 取标签，会因 range label 指向 `pi-range-<key>` 而取空——归桌面窗口调整。
+
+## 2026-10-17 su 命令审批卡：消费字段与呈现契约
+
+- 请求数据面（桌面窗口 `ShellConfirmRequest`）：新增 `policy: "su-approval" | "project"`、`tier: "risky" | "review" | "deny" | null`；其余 `command`/`summary`/`reasonPlain`/`reasonRaw`/`argvLines`/`cwd` 不变。渲染侧**只呈现**，不重写判定；字段缺失按 `project` 原行为。
+- 标题（`#sc-title`）：`UiLabels.shellConfirmTitle(policy)`——su ⇒「SU 命令审批」，否则「shell 命令请求」。
+- 档位可见行（`#sc-summary`）：`UiLabels.suApprovalTierLabel(tier)`——`风险命令（risky）` / `未自动判定（review）` / `硬拒类（deny）`；未知 tier ⇒ 空（不编档位）。su 且有 summary 时显示「档位 · 摘要」；project 摘要逐字不变。
+- 原因（`#sc-reason`）：`reasonPlain` 原文；su 卡额外追加可见单行「命中原因：<reasonRaw>」（CSS `white-space: pre-wrap`）；project 的 `reasonRaw` 仍只在折叠详情 `#sc-reason-raw`。
+- 警告（`#sc-hint`）：su 卡前置「批准后命令以当前 OS 用户权限执行，可能绕过 ANS 文件写边界；请逐字核对命令原文。」＋既有 fail-closed 提示；project hint 逐字不变。
+- 焦点/按钮：`#sc-deny` 默认焦点；拒绝/关闭/Esc ⇒ `allow:false`；恰 `allow:true` 才回传放行；无「记住/不再询问」。
+- 样式：`#shell-confirm.is-su-approval` 由渲染侧切换（`.sc-summary` 600、`.sc-hint` 用 `--amber`）；零 HTML 改动。
+- 测试：`renderer.test.ts` 的 SU 审批卡用例；`uiux-v2.mjs` 的 `ANS_TERMINAL_UI_ONLY=1` 段（TERMINAL_PASS 14）。

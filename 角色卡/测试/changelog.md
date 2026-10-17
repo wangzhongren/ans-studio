@@ -1,5 +1,15 @@
 # 测试 变更记录
 
+## 2026-10-17 — su 的 run_shell 审批策略独立验证：整体通过（0 不通过 / 6 备注）
+
+**范围**：客户 2026-10-17「只读的免审批，其他的要客户审批」＋「deny 也走客户审批」；PM 评审 `2026-10-17_design_su-shell-approval-review.md`。编排（operatorOnly/approveDeny/分支/守卫、assembleOperatorShellGate、run-role su-only 与互斥、CLI 模式文案）、门禁引擎（内置卡命令纪律）、桌面窗口（su 注入 + tier/policy/plain reason）、桌面UI（SU 卡）。
+
+**方法**：对抗性独立构造、不复用实施方断言——自建 `test/测试/su-shell-approval-verify/`（5 用例文件 **36 例** + 夹具 + 离线 Electron 卡片探针 9 项）。全部假件/临时目录；零执行哨兵只用 `process.execPath -e` 写临时文件（无 `sh -c`/rm）；不跑真机、不用凭据。
+
+**关键结论**：① allow → 0 卡、`c-allow`、by「（su 审批档）」；risky/review/deny（approveDeny）各恰 1 卡，批准→`c-*→a-allow`、拒绝/超时/不可用→对应 `a-deny/a-timeout/a-unavailable`；deny 无 approveDeny → `c-deny` 0 卡；四组构造守卫全抛错。② 审计 command 原文/argv/cwd/branch/by/conditions 齐备、三态可辨。③ `assembleOperatorShellGate` 缺件 fail-closed；run-role su-only/互斥/装配失败均不 arm；type 面无 pmAsk/routineShellPolicy。④ 桌面 su 收 `shellOperatorOnly`、不收 `shellReadonly`；项目角色三层链不变；缺件不 arm。⑤ 卡片 tier/policy/三档 plain reason/SU 标题/警告/默认拒绝焦点；Esc 回传 allow:false；项目卡旧呈现不变。⑥ 真实 gate+run_shell：批准 deny/risky 真实执行；拒绝/超时/不可用哨兵不存在；review 批准 spawn 失败如实。
+
+**复跑**：本批 **36/36**、卡片探针 **9/9**；全量 `node --test "test/**/*.test.ts"` → **2215 / 2120 pass / 93 fail / 2 skip**（上一轮 2153/2058/93/2；+62 测试＝本批 36＋并发属主 26；**红数 93 与组成不变**：依赖缺件 75、Windows EPERM 8、CRLF 源钉 9、计时竞态 1）；typecheck **85 错**（全为既有依赖缺件，本批/同步文件 0 错）。**并发值钉同步**：Pi 滑块批次新增 `ANS_PI_PROMPT_TIMEOUT_MS` → t29 面板键 5→6；桌面角色状态消歧 → g2 R1 接受「上一轮终局（不表示当前轮）」——同步后红数回到 93，非产品缺陷。未发现需返工缺陷。详见[报告](docs/change/2026-10-17_change_su-shell-approval-verify.md)与[证据](docs/change/2026-10-17-su-shell-approval-verify-evidence/)。未 commit/push。
+
 ## 2026-10-17 — 渲染轮复审（助手消息即时 Markdown）：全量 2153/2058/93红/2skip，e2e 原失败点通过、剩余红经 HEAD A/B 证明既有
 
 **范围**：桌面UI 渲染改动（`appendAssistant` 恒 `mdReady:true`；旧行升级仅作安全网）＋ `uiux-v2.mjs` 两处 `.trim()` 修订。

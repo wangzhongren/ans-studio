@@ -1,5 +1,44 @@
 # 门禁引擎 变更记录
 
+## 2026-10-17（二）— su 卡新增「命令纪律（su 审批档）」：只读免审批、risky/review/deny 均客户逐条批准
+
+客户 2026-10-17 裁定「这个su 的命令也改一下，不是只读，是只读的免审批，其他的要客户审批」，并追加
+「deny 也走客户审批」；PM 评审 `角色卡/项目管理/docs/design/2026-10-17_design_su-shell-approval-review.md`
+批准实施（§一/§3.7/§八 步 2）。本角色只做**命令纪律卡文本**（机制：编排 `operatorOnly`/`approveDeny`、
+桌面 tier/policy/卡片、审计分支，均属各自属主）。**判定逻辑一行未改**。
+
+- **边界**：`src/common/门禁引擎/boundary-core.ts`（`BUILT_IN_ROLE_CARD_TEXT` 新增段 + 头注）、
+  `test/门禁引擎/su-shell-approval-convention.test.ts`（新，4 例）、本文件、`memo.md`、`feature-map.md`。
+  **未碰** `app/**`、`src/common/编排/`、`src/pipeline/`、运行时核心/Pi适配器、他角色 files/tests/docs、
+  客户项目；不 commit。
+- **卡文本新增段（位置＝「派发失败/被拒」之后、「安装纪律（技能安装/卸载）」之前；PM 建议位置）**：
+  ① **只读白名单**命令（读取/查询类，(c) 判为 allow）**免审批、直接执行**；② 其余一切命令——risky/review
+  **以及原本硬拒的 deny 类**（如 `sh -c`/`eval`、提权、系统破坏等）——**都会向客户弹出确认卡，
+  客户批准后才执行**；拒绝、超时、通道不可用 = **不执行**；③ **不走 pm 审读**（su 不自审）；
+  ④ 确认卡会显示 `su-审批档[risky|review|deny]`、原始命令与原因；⑤ **不得**把「已提交审批」说成已获准、
+  把客户口头同意当批准、自行执行未获批准的命令、声称审批会自动通过；⑥ 如实披露 **shell 命令不受 ANS
+  文件写入边界约束**——批准的是这一次命令、**不是新的写权**；`sh -c`/deny 类批准后以**当前 OS 用户权限**
+  执行、**可能写到项目外**（含当前 OS 用户可写的任何位置），客户审批是唯一闸；⑦ 每次判定仍落
+  `docs/audit/shell-gate.jsonl`（治理边界 + `shell-gate` 条件），审计不改上述任何判定。
+  **与「确认制要点」分开**：`request_confirmation` 管 `write_file`，审批卡管 `run_shell`，不得混同。
+- **口径与事实对齐（如实）**：`rm`/`rmdir`/`dd` 属 **risky** 而非 deny（规则事实），故卡文本举例用
+  「如 `sh -c`/`eval`、提权、系统破坏等」而**不**写「rm -rf 属 deny」；deny 面（reshell、内联求值、提权、
+  系统破坏、LOLBin）按客户裁定**全部可批准**，本角色不擅设不可批准子集（评审 §七-2 的待确认项留客户）。
+- **守卫与测试**：新段**零**未否定「授权/获准/放行」小句（唯一含「获准」小句带「不得」）；
+  `test/门禁引擎/su-shell-approval-convention.test.ts` 4 例——位置断言；审批档关键词、deny 也须经客户批准
+  （反例：不得写「deny 直接拒绝」/「无需客户审批」）；卡片披露与 shell 绕过写边界如实陈述；J-1 守卫
+  小句级 + **变异非空洞验证**（合成「客户已获准执行该命令」必须被捕获）。
+- **测试（实跑）**：`node --test "test/门禁引擎/su-shell-approval-convention.test.ts"` → **4/4**；
+  `node --test "test/门禁引擎/**/*.test.ts"` → **202 计 / 202 过 / 0 红 / 0 skipped**（上批 198 + 4）；
+  `dispatch-after-landing-convention.test.ts` + `su-doc-surface-convention.test.ts` → **22/22**；
+  `npm run typecheck` → **本角色改动文件 0 错**（全仓其余报错均属他角色既有文件）。
+  环境：win32 / 工作区含他角色未提交改动。
+- **跨边界（回报、未改）**：机制侧（编排 `SU_APPROVAL_REASON_PREFIX`/`renderSuApprovalReason`、审计分支
+  `c-risky→a-*`/`c-review→a-*`/`c-deny→a-*`、桌面 tier/policy 与卡片标题/警告）**尚未见落树**；本卡文本
+  按评审钉死口径先行披露。日后若 `su-审批档[...]` 前缀、档位名或审计路径改名，须**同批**回改本段与本测试。
+- **未做/待验证（如实分列）**：真机端到端（客户看卡、批准/拒绝、核对写边界披露）与独立复验**未进行**；
+  本条目**不声称已验**。
+
 ## 2026-10-17 — 已有角色但无治理记录（S1）兼容 V1：A1 种子边界 Service 公共出口 + F1（I5）F6 回执恢复指引
 
 客户 2026-10-17 裁定「推进吧，按 B+C 来」（不自动创世、不设内置常设治理写权）；PM 评审

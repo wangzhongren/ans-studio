@@ -850,6 +850,41 @@ test("M-1：shell 确认卡——命令在 <pre>、摘要/人话原因、折叠�
   assert.ok(/\.sc-command\s*\{[^}]*white-space: pre;/.test(STYLES) && /\.sc-command\s*\{[^}]*overflow-x: auto;/.test(STYLES), "命令块：不折行、可横向滚动");
 });
 
+test("SU 命令审批卡：标题/档位/可见原因/绕过写边界警告/拒绝默认焦点；project 卡逐字回归", async () => {
+  const UL = await loadUiLabelsForGovernance();
+  // 纯映射：标题按 policy；档位标签按 tier（未知不编）。
+  assert.equal(UL.shellConfirmTitle("su-approval"), "SU 命令审批");
+  assert.equal(UL.shellConfirmTitle("project"), "shell 命令请求");
+  assert.equal(UL.shellConfirmTitle(undefined), "shell 命令请求", "旧请求/缺 policy 保持原文");
+  assert.equal(UL.suApprovalTierLabel("risky"), "风险命令（risky）");
+  assert.equal(UL.suApprovalTierLabel("review"), "未自动判定（review）");
+  assert.equal(UL.suApprovalTierLabel("deny"), "硬拒类（deny）");
+  assert.equal(UL.suApprovalTierLabel(null), "", "未知档位不编标签（只呈原因/警告）");
+  // 渲染接线（复用既有 sc-title/sc-summary/sc-reason/sc-hint，零 HTML 改动）。
+  assert.ok(RENDERER.includes('var suApproval = payload.policy === "su-approval";'), "su 分支显式（缺省=project 原行为）");
+  assert.ok(RENDERER.includes('$("sc-title").textContent = UiLabels.shellConfirmTitle(payload.policy)'), "标题按 policy 动态设置");
+  assert.ok(RENDERER.includes("UiLabels.suApprovalTierLabel(payload.tier)"), "档位标签按 tier 呈现");
+  assert.ok(RENDERER.includes("批准后命令以当前 OS 用户权限执行，可能绕过 ANS 文件写边界；请逐字核对命令原文。"), "必备绕过写边界警告逐字");
+  assert.ok(/suApproval && typeof payload\.reasonRaw === "string"[\s\S]{0,180}"命中原因：" \+ payload\.reasonRaw/.test(RENDERER), "su 卡可见命中原因（reasonRaw 单独一行）");
+  assert.ok(RENDERER.includes('$("sc-reason").textContent = reasonText'), "原因经 textContent（无 HTML 注入口）");
+  assert.ok(RENDERER.includes('$("sc-deny").focus()'), "拒绝为默认焦点（su 卡同样不得默认批准）");
+  assert.ok(!/\$\("sc-allow"\)\.focus\(\)/.test(RENDERER), "不得默认聚焦批准键");
+  assert.ok(!INDEX.includes("记住") && !INDEX.includes("不再询问") && !RENDERER.includes("记住选择"), "无「记住/不再询问」");
+  assert.ok(!INDEX.includes("is-su-approval"), "零 HTML 改动：su 类由渲染侧切换");
+  // project 卡逐字回归：只有 su 分支拼档位/可见命中原因/警告；project 保持原值。
+  assert.ok(/summaryText = suApproval && tierLabel \? \(summary \? tierLabel \+ " · " \+ summary : tierLabel\) : summary;/.test(RENDERER), "project 摘要原样（仅 su 拼档位）");
+  assert.ok(/reasonText = typeof payload\.reasonPlain === "string" \? payload\.reasonPlain : "";/.test(RENDERER), "project 原因=reasonPlain");
+  assert.ok(/\(suApproval \? SU_APPROVAL_WARNING \+ " " : ""\) \+ SHELL_CONFIRM_DEFAULT_HINT/.test(RENDERER), "project hint 原样；su 追加警告");
+  // 拒绝/取消不调用放行路径：三入口均 false；恰 allow:true 才回传放行。
+  assert.ok(RENDERER.includes('$("sc-deny").addEventListener("click", function () { respondShellConfirm(false); })'), "拒绝 ⇒ allow:false");
+  assert.ok(RENDERER.includes('$("sc-close").addEventListener("click", function () { respondShellConfirm(false); })'), "关闭 ⇒ allow:false");
+  assert.ok(/e\.key === "Escape"[\s\S]{0,140}respondShellConfirm\(false\)/.test(RENDERER), "Esc ⇒ allow:false");
+  assert.ok(/allow: allow === true/.test(RENDERER), "恰 allow:true 才可能放行");
+  // 样式：原因保留换行；su 档位行加粗、警告用未决色（既有 token）。
+  assert.ok(STYLES.includes(".sc-reason { white-space: pre-wrap; }"), "原因保留换行");
+  assert.ok(STYLES.includes("#shell-confirm.is-su-approval .sc-summary { font-weight: 600; }") && STYLES.includes("#shell-confirm.is-su-approval .sc-hint { color: var(--amber); }"), "su 卡档位/警告样式钩子");
+});
+
 // ————————————————— G-2/U1（2026-10-16 客户批准；设计 2026-10-16_design_role-watchdog-and-closure）—————————————————
 // 恢复确认卡（§6.2：提议 → 一键确认 → 恰 allow:true 执行 → 回执）与 `[系统]` 消息行样式（§3.3/§7.3）。
 
@@ -1784,6 +1819,8 @@ type GovernanceUiLabels = {
   rangeChoiceIndex: (choices: unknown, value: unknown) => number;
   rangeChoiceValue: (choices: unknown, index: unknown) => string;
   rangeChoiceLabel: (choices: unknown, labels: unknown, index: unknown) => string;
+  shellConfirmTitle: (policy: unknown) => string;
+  suApprovalTierLabel: (tier: unknown) => string;
 };
 
 async function loadUiLabelsForGovernance(): Promise<GovernanceUiLabels> {

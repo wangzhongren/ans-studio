@@ -10,6 +10,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import type { SessionEvent } from "../../src/provider/pi/session.ts";
+import type { RuntimeAdapter, OperatorChannelFn } from "../../src/provider/pi/session.ts";
 import type { OrchestrationEvent, TaskHandback } from "../../src/common/编排/handback.ts";
 import type { ProjectConfig } from "../../src/model/role.ts";
 import { openRoleSession, createPiAdapterFactory, type RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
@@ -801,4 +802,94 @@ test("G-2/W3 投递端异常：收束投不出去 ⇒ 不标已投——下个 t
   assert.equal(h.delivered[0].text, renderClosurePrompt(32_000), "重试复用同一静默毫秒数（32_000）");
   h.service.tick();
   assert.equal(h.delivered.filter((d) => d.text.includes("收束")).length, 1, "此后不重发");
+});
+
+// ———————————————— su 审批档（客户裁定 2026-10-17）：会话管理器注入判据 ————————————————
+
+test("su 审批档注入：内置角色收到 shellOperatorOnly（(c) 实件 + (a) 通道），项目角色仍走三层链，su 不再用只读档", async () => {
+  const listing: ProjectListing = {
+    projectRoot: "/proj",
+    roles: [
+      {
+        roleId: "su",
+        cardPath: "",
+        boundaryPath: "",
+        cardText: "su",
+        boundary: { entries: [], boundarySource: "<built-in>", acceptance: { accepted: false, source: "" } },
+        builtIn: true,
+      },
+      {
+        roleId: "A",
+        cardPath: "角色卡/A/role-card.md",
+        boundaryPath: "角色卡/A/boundary.yaml",
+        cardText: "A",
+        boundary: { entries: [], boundarySource: "角色卡/A/boundary.yaml", acceptance: { accepted: false, source: "" } },
+      },
+    ],
+    warnings: [],
+    hasRoles: true,
+    primaryRoleId: "su",
+  };
+  const arming = { classifyShell: () => "allow" as const, rules: { version: "stub" } };
+  const channel: OperatorChannelFn = async () => ({ outcome: "deny", operatorId: "test" });
+  const seen: Record<string, unknown>[] = [];
+  const makeHandle = (): RoleSessionHandle => ({
+    async send() {},
+    events() {
+      return {
+        [Symbol.asyncIterator]() {
+          return { async next() { return { value: undefined as unknown as SessionEvent, done: true }; } };
+        },
+      };
+    },
+    async dispose() {},
+  });
+  const mgr = new SessionManager({
+    openRoleSession: async (input) => {
+      seen.push(input as unknown as Record<string, unknown>);
+      return makeHandle();
+    },
+    createPiAdapterFactory: () => () => ({}) as unknown as RuntimeAdapter,
+    createDemoAdapter: () => {
+      throw new Error("本用例不应构造 demo 适配器");
+    },
+    buildProjectConfig,
+    getListing: (root) => (root === "/proj" ? listing : undefined),
+    emitEvent: () => {},
+    shellOperatorChannel: channel,
+    shellArming: arming as never,
+    loadEffectiveConfig: async (opts) => ({
+      project: opts.fallback,
+      source: {
+        kind: "builtin-fallback" as const,
+        path: "",
+        acceptance: opts.fallback.governanceBoundary?.acceptance ?? { accepted: false, source: "" },
+        pinPaths: [],
+      },
+    }),
+  });
+  await mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "pi" });
+  await mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "pi" });
+  const a = seen.find((input) => input.roleId === "A")!;
+  const su = seen.find((input) => input.roleId === "su")!;
+  // 项目角色：三层链逐字不变（(a)+(c)，无审批档）。
+  assert.equal(typeof a.shellOperatorChannel, "function", "项目角色仍收 (a) 通道");
+  assert.equal(a.shellArming, arming, "项目角色仍收 (c) 实件（原引用）");
+  assert.ok(!("shellOperatorOnly" in a), "项目角色不走 su 审批档");
+  assert.ok(!("shellReadonly" in a), "项目角色不带只读档");
+  // su：审批档（(c)+(a) 同备）——不再直接收 shellOperatorChannel/shellArming/shellReadonly。
+  assert.ok(!("shellOperatorChannel" in su), "su 不再直接收 shellOperatorChannel（(a) 在审批档内）");
+  assert.ok(!("shellArming" in su), "su 不接三层链 (c) 字段");
+  assert.ok(!("shellReadonly" in su), "su **不再**使用旧只读档");
+  const only = su.shellOperatorOnly as { classifyShell?: unknown; rules?: unknown; operatorChannel?: unknown };
+  assert.ok(only, "su 应收到 shellOperatorOnly");
+  assert.equal(only.classifyShell, arming.classifyShell, "审批档 (c)：classifyShell 同一函数引用");
+  assert.equal(only.rules, arming.rules, "审批档 (c)：rules 同一引用");
+  assert.equal(typeof only.operatorChannel, "function", "审批档 (a)：operatorChannel 为绑定本会话的通道函数");
+  assert.deepEqual(
+    await (only.operatorChannel as OperatorChannelFn)({ command: "fixture", argv: ["fixture"], cwd: "/proj", toolCallId: "t1" }),
+    { outcome: "deny", operatorId: "test" },
+    "审批档 (a) 原样转交底层通道裁决",
+  );
+  await mgr.stop(null);
 });

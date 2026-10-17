@@ -53,7 +53,9 @@ queue/running 延续 kind/sourceRoleId/summary/at/id/full 并增加 runtime。�
 
 `onOperatorRequest` / session:operator-request：`{id,roleId,projectRoot?,runtime?,request,anchorKey}`。`operatorRespond({id,decision})` / session:operator-response 延续 confirm/choice 请求快照校验；非法决定可重试，旧 id 返回 expired。
 
-`onShellConfirm` / shell:confirm-request 保留 `{id,command,summary,reasonPlain,reasonRaw,argvLines,cwd}`，新增可选 roleId/projectRoot/runtime；生产 Window 绑定 exact handle 时提供。shellConfirmRespond 仍仅恰 allow:true 才接受。
+`onShellConfirm` / shell:confirm-request 保留 `{id,command,summary,reasonPlain,reasonRaw,argvLines,cwd}`，新增可选 roleId/projectRoot/runtime；生产 Window 绑定 exact handle 时提供。**2026-10-17 增** `tier: "risky"|"review"|"deny"|null` 与 `policy: "su-approval"|"project"`（桌面自有类型，不改契约家 `OperatorPrompt`）：从 `display.reason` **行首**匹配 `su-审批档[tier]`（前缀经编排 `shell-arming.ts` 公共再导出；先匹配前缀，避免既有 `/risky/` 泛匹配）。`policy=su-approval` 时 `reasonPlain` 含「逐条客户批准」「拒绝/超时/通道不可用 = 拒绝」「批准后可能绕过 ANS 文件写边界」；deny 用「硬拒类（deny）」、risky/review 各用其档位名。项目角色三层链恒 `tier:null`/`policy:"project"`，原文映射逐字不变。shellConfirmRespond 仍仅恰 allow:true 才接受。
+
+**su 审批档注入（客户裁定 2026-10-17）**：`SessionManager` 对内置治理角色（`role.builtIn`）把 `deps.shellArming`（(c) 实件）＋ `deps.shellOperatorChannel`（(a) 通道，**su 也构造**，绑定 roleId/projectRoot/runtime/signal）经 `openRoleSession({shellOperatorOnly})` 交给编排 `assembleOperatorShellGate`：只读白名单直放（0 卡），`risky`/`review`/`deny` 一律客户逐条批准（deny 也可批准）；**不接 (b)**（su 不自审）；缺件 ⇒ 不传 ⇒ 不 arm。项目角色仍走 `shellArming` + `shellOperatorChannel` 三层链；旧 `shellReadonly` 桌面**不再注入**（类型保留兼容；与审批档同时出现编排不 arm）。`app/main.ts` 零改动（`shellArming` 为 undefined 时通道也不构造——两件同备才 arm）。
 
 新增 `onOperatorExpired(cb)` / session:operator-expired：`{id,roleId,projectRoot?,runtime?,reason}`，同时覆盖 customer confirm/choice 与 shell，id 分别为 op-* / sc-*。UI 按身份定格旧卡。
 

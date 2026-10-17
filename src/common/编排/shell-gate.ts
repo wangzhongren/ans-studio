@@ -192,6 +192,34 @@ export const BRANCH_RISKY_NO_BA = "risky-default-deny"; // (c)=risky 且 (b)/(a)
  * reason 里写明命中的是哪一档（risky / review）——让模型看懂「这是 su 只读档的策略拒绝，不是环境故障」。
  */
 export const BRANCH_READONLY_DENY = "readonly-deny";
+/**
+ * **su 审批档**（客户裁定 2026-10-17：「只读的免审批，其他的要客户审批」＋「deny 也走客户审批」）：
+ * `operatorOnly` 模式下 (c) 的非白名单档直接交 (a)，分支前缀标出命中的 (c) 档位（`c-risky→a-*` /
+ * `c-review→a-*` / `c-deny→a-*`）。既有 `c-deny`（硬拒终结）仍是 `approveDeny=false` 的回归路径。
+ */
+export const BRANCH_C_RISKY = "c-risky";
+export const BRANCH_C_REVIEW = "c-review";
+/**
+ * **su 审批档原因前缀**（单一来源；桌面窗口按 `/^su-审批档\[(risky|review|deny)\]/` 稳定解析）。
+ * 与 `renderSuApprovalReason` 配套；项目角色三层链**永不**使用此前缀（其文案逐字不变）。
+ */
+export const SU_APPROVAL_REASON_PREFIX = "su-审批档";
+export type SuApprovalTier = "risky" | "review" | "deny";
+
+/**
+ * 渲染 su 审批档的 `OperatorPrompt.reason`：**固定前缀 + 档位 token**，并如实披露「批准后命令以
+ * 当前 OS 用户权限执行，可能绕过 ANS 文件写边界」。桌面窗口只读导入/按钉死正则解析，不得另写文案。
+ */
+export function renderSuApprovalReason(tier: SuApprovalTier, detail?: string): string {
+  const why =
+    typeof detail === "string" && detail.trim() !== ""
+      ? detail.trim()
+      : `(c) 判为 ${tier}，需客户逐条批准`;
+  return (
+    `${SU_APPROVAL_REASON_PREFIX}[${tier}]：${why}；` +
+    "批准后命令以当前 OS 用户权限执行，可能绕过 ANS 文件写边界。"
+  );
+}
 export const BRANCH_RULESET_LOAD_FAILED = "ruleset-load-failed"; // 规则集加载/解析失败
 export const BRANCH_NO_CLASSIFIER = "no-classifier"; // 未注入分类函数
 export const BRANCH_CLASSIFY_ERROR = "classify-error"; // 分类函数抛错
@@ -295,6 +323,21 @@ export interface CreateShellGateOptions {
    * **缺省 `false` = 既有三层链行为逐字不变。**
    */
   readonlyOnly?: boolean;
+  /**
+   * **su 审批档（operator-only，客户裁定 2026-10-17）**：`true` ⇒ **不接 (b)**——
+   * `(c)=allow` 直接放行（`c-allow`，**0 卡**）；`risky`/`review` 一律交 (a)（`c-risky→a-*` /
+   * `c-review→a-*`）；`deny` 仅在 `approveDeny === true` 时交 (a)（`c-deny→a-*`），否则沿用既有硬拒。
+   * **构造期守卫（fail-closed，抛错 ⇒ 调用方不 arm）**：与 `readonlyOnly` 互斥；必须有
+   * `operatorChannel`；**不得**带 `pmAsk`/`routineShellPolicy`（su 不自审，客户审批不得被绕过）。
+   * 缺省 `false` = 既有三层链行为逐字不变。
+   */
+  operatorOnly?: boolean;
+  /**
+   * **允许客户批准 (c)=deny**（客户裁定「deny 也走客户审批」）。**仅在 `operatorOnly === true` 时有效**；
+   * 单独给出（`operatorOnly !== true`）→ 构造期抛错，防止项目角色三层链的硬地板被误关。
+   * 缺省 `false` = `deny` 沿用既有硬拒终结。
+   */
+  approveDeny?: boolean;
 }
 
 /** 内部：一次审核的结论 + 审计所需的分支/结论分类。 */
@@ -315,6 +358,24 @@ type BOutcome =
  * 并把「拒绝」作为一切不确定情形的落点（fail-closed）。
  */
 export function createShellGate(opts: CreateShellGateOptions): ShellGate {
+  // —— 构造期守卫（su 审批档，2026-10-17；全部 fail-closed，抛错 ⇒ 调用方不 arm）——
+  // 1) 模式互斥：只读档只放行 (c)=allow；审批档要把 risky/review/deny 交 (a) —— 两者语义冲突。
+  if (opts.readonlyOnly === true && opts.operatorOnly === true) {
+    throw new Error("shell 闸配置错误：readonlyOnly 与 operatorOnly 互斥，拒绝装配");
+  }
+  // 2) approveDeny 必须伴随 operatorOnly —— 防止项目角色三层链的硬地板被单独误关。
+  if (opts.approveDeny === true && opts.operatorOnly !== true) {
+    throw new Error("shell 闸配置错误：approveDeny 仅在 operatorOnly === true 时有效，拒绝装配");
+  }
+  // 3) 审批档必须有客户通道 —— 不得退化成「全拒但已注册」。
+  if (opts.operatorOnly === true && typeof opts.operatorChannel !== "function") {
+    throw new Error("shell 闸配置错误：operatorOnly 必须提供 operatorChannel，拒绝装配");
+  }
+  // 4) su 不自审；客户审批不得被 pm 审读 / 委托常规检查绕过。
+  if (opts.operatorOnly === true && (typeof opts.pmAsk === "function" || opts.routineShellPolicy !== undefined)) {
+    throw new Error("shell 闸配置错误：operatorOnly 不得带 pmAsk/routineShellPolicy，拒绝装配");
+  }
+
   const log = createDiagnosticLogger({ component: "orchestration.shell-gate", projectRoot: opts.projectRoot ?? opts.routineShellPolicy?.projectRoot });
   const env = opts.env ?? process.env;
   const timeoutMs = opts.timeoutMs ?? readTimeoutMs(env, SHELL_REVIEW_TIMEOUT_ENV, DEFAULT_SHELL_REVIEW_TIMEOUT_MS);
@@ -381,9 +442,15 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
     }
 
     const by = `ruleset:${detail.ruleId ?? rulesId}`;
-    // su 只读档（readonlyOnly）：三出口（allow / deny / readonly-deny）的 `by` **统一带档位后缀**——
-    // 审计记录（§7.6）无独立 role 字段，档位经 `by`+`branch` 如实落痕，「如实记录请求来自 su 只读档」即可辨识。
-    const byTagged = opts.readonlyOnly === true ? `${by}（su 只读档）` : by;
+    // 档位后缀（审计 `by` 可辨识；两者互斥，构造期已守）：
+    //   · 只读档 ⇒ `（su 只读档）`（既有，逐字不变）；
+    //   · 审批档 ⇒ `（su 审批档）`（2026-10-17；**不得**复用只读档后缀）。
+    const byTagged =
+      opts.readonlyOnly === true
+        ? `${by}（su 只读档）`
+        : opts.operatorOnly === true
+          ? `${by}（su 审批档）`
+          : by;
 
     // 映射（§7.5）。
     if (detail.decision === "allow") {
@@ -393,6 +460,24 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
         conclusion: "allow",
         branch: BRANCH_C_ALLOW,
       };
+    }
+    // —— su 审批档（operatorOnly，客户裁定 2026-10-17）：allow 已在上方直放（**0 次 operator 调用**）——
+    // 其余档一律交 (a) 客户逐条批准；`deny` 仅在 `approveDeny === true` 时如此，否则落到下方既有硬拒。
+    // 不接 (b)（构造期已禁止 pmAsk/routineShellPolicy）——su 不自审。
+    if (opts.operatorOnly === true) {
+      const tier = detail.decision; // 此时已排除 "allow"
+      if (tier !== "deny" || opts.approveDeny === true) {
+        const branch =
+          tier === "deny" ? BRANCH_C_DENY : tier === "risky" ? BRANCH_C_RISKY : BRANCH_C_REVIEW;
+        const detailText =
+          detail.reason ??
+          (tier === "deny" ? `命中 c 硬拒规则（${by}）` : `(c) 判为 ${tier}（${by}）`);
+        return await runA(req, {
+          bBranch: branch,
+          bAttr: byTagged,
+          why: renderSuApprovalReason(tier, detailText),
+        });
+      }
     }
     if (detail.decision === "deny") {
       // 命中 c 硬拒 → 直接拒绝，终结（(b)/(a) 不可翻案）。
@@ -715,6 +800,10 @@ export interface ShellGateBuildDeps {
    * 缺省 `false` = 既有三层链行为逐字不变。
    */
   readonlyOnly?: boolean;
+  /** **su 审批档**（见 `CreateShellGateOptions.operatorOnly`；构造期守卫同上）。 */
+  operatorOnly?: boolean;
+  /** **允许客户批准 (c)=deny**（仅 `operatorOnly === true` 有效；见 `CreateShellGateOptions.approveDeny`）。 */
+  approveDeny?: boolean;
 }
 
 export function buildShellGate(deps: ShellGateBuildDeps): ShellGate {
@@ -751,6 +840,8 @@ export function buildShellGate(deps: ShellGateBuildDeps): ShellGate {
     now: deps.now,
     env: deps.env,
     readonlyOnly: deps.readonlyOnly,
+    operatorOnly: deps.operatorOnly,
+    approveDeny: deps.approveDeny,
   });
 }
 

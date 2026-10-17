@@ -66,9 +66,10 @@ import {
 // I-1 补丁（2026-10-12 客户重发授权）：(c) 规则集实件的形状与构造（**只读转出**——形状 `Omit` 自编排
 // `AssembleShellGateOptions`，见 operator-channel.ts；本层不另立第二份）。
 import type { DesktopOperatorChannelFn, DesktopShellArming } from "./operator-channel.ts";
-// su 只读档（客户裁定 2026-10-12：「su 也要有 shell，但是只读」）：只读档装配选项形状的**单一来源**在编排
-// （`shell-arming.ts::AssembleReadonlyShellGateOptions`）——只读导入其类型（运行期擦除），本层不另立第二形状。
-import type { AssembleReadonlyShellGateOptions } from "../../src/pipeline/orchestration/shell-arming.ts";
+// su 审批档（客户裁定 2026-10-17）：审批档装配选项形状的**单一来源**同样在编排
+// （`shell-arming.ts::AssembleOperatorShellGateOptions`）——只读导入其类型，本层不另立第二形状。
+// 旧 su 只读档（2026-10-12）类型保留兼容；桌面自 2026-10-17 起不再注入 `shellReadonly`。
+import type { AssembleOperatorShellGateOptions, AssembleReadonlyShellGateOptions } from "../../src/pipeline/orchestration/shell-arming.ts";
 // 客户确认制交互（A-5）：桌面侧的客户通道形状（带角色上下文）——本层只透传，实现在 `customer-input.ts`。
 import type { DesktopCustomerInputFn } from "./customer-input.ts";
 // G-2（2026-10-16 客户批准）：恢复确认卡通道（W5——presenter/回包/关窗清帐在 main 接线，本层只透传）与
@@ -188,12 +189,15 @@ export interface DesktopDeps {
       /** G-4 V2：外来 MCP 安装/卸载能力（仅 su 注入；形状＝契约家）。同款透传与登记。 */
       installMcp?: import("../../src/model/runtime.ts").InstallMcpFn;
       uninstallMcp?: import("../../src/model/runtime.ts").UninstallMcpFn;
-      /** (a) 操作者确认通道（I-1 arm）：经本层透传（**仅项目角色**消费——见 session.ts）。 */
+      /** (a) 操作者确认通道（I-1 arm；2026-10-17 起 su 也构造）：项目角色走三层链；su 经 `shellOperatorOnly`
+       *  装配审批档（通道对象作为其 `operatorChannel` 字段）。 */
       shellOperatorChannel?: DesktopOperatorChannelFn;
-      /** (c) 规则集实件（I-1 补丁，2026-10-12）：经本层透传（**仅项目角色**消费——与 (a) 同判据走三层链）。 */
+      /** (c) 规则集实件：仅项目角色走三层链（与 (a) 同判据）。 */
       shellArming?: DesktopShellArming;
-      /** **su 只读档（客户裁定 2026-10-12）**：经本层透传（**仅内置治理角色（su）**消费——session.ts
-       *  复用同一份 (c) 实件给出；编排装配只读档 ShellGate，su 的 `run_shell` 只执行 (c) 只读白名单）。 */
+      /** **su 审批档（客户裁定 2026-10-17）**：仅内置治理角色（su）；形状＝编排 `AssembleOperatorShellGateOptions`
+       *  的 `Omit<…, "project">`（只读导入、不另立第二形状）。缺件 ⇒ 不传 ⇒ 不 arm。 */
+      shellOperatorOnly?: Omit<AssembleOperatorShellGateOptions, "project">;
+      /** **su 只读档（旧路径，类型保留兼容）**：桌面自 2026-10-17 起不再注入（su 改走审批档）。 */
       shellReadonly?: Omit<AssembleReadonlyShellGateOptions, "project">;
     },
     deps: { createAdapter: (gate: WriteGate) => RuntimeAdapter },
@@ -235,9 +239,9 @@ export interface DesktopDeps {
    */
   shellGate?: ShellGate;
   /**
-   * **(a) 操作者确认通道**（I-1，2026-10-12 arm）——交付编排装配 (c)/(b)/(a) `ShellGate`
-   * （`buildShellGate` 的 `operatorChannel`）。**只对项目角色生效**（su **不接 (b)/(a)**——审读者不给自己
-   * 开闸：不自审、不弹框；su 的 shell 走只读档 `shellReadonly`，见 session.ts 的 `role.builtIn` 判据）。
+   * **(a) 操作者确认通道**（I-1，2026-10-12 arm；**2026-10-17 起 su 也使用**）——交付编排装配：
+   * **项目角色** ⇒ (c)/(b)/(a) 三层 `ShellGate`；**内置治理角色（su）** ⇒ **审批档**（`shellOperatorOnly`，
+   * 客户裁定 2026-10-17：只读白名单免审批，其余含 deny 逐条客户批准；**不接 (b)**——su 不自审）。
    * 主进程用 `createDesktopOperatorChannel`（应用内确认卡：命令原文 + 放行/拒绝，拒绝为默认与取消项）
    * 构造后注入；**测试/e2e 可注入替身**。
    */
@@ -247,8 +251,8 @@ export interface DesktopDeps {
    * 主进程 arm 时经 `operator-channel.ts::buildDesktopShellArming()` 构造（**只读导入**门禁引擎经 Service
    * 公开出口的 `classifyShell`/`defaultShellRules`——不复制实现）；构造/加载失败 ⇒ `undefined` ⇒
    * **不 arm**（主进程同时撤下 (a) 通道——`run_shell` 不注册，fail-closed）。**项目角色**走向上三层链；
-   * **内置治理角色（su）**由 session.ts 用**同一份实件**经 `shellReadonly` 装配**只读档**
-   * （客户裁定 2026-10-12——单一来源，两边永不漂移）。**测试/e2e 可注入替身（桩件）**。
+   * **内置治理角色（su）**由 session.ts 用**同一份实件**经 `shellOperatorOnly` 装配**审批档**
+   * （客户裁定 2026-10-17——单一来源，两边永不漂移）。**测试/e2e 可注入替身（桩件）**。
    */
   shellArming?: DesktopShellArming;
   /**

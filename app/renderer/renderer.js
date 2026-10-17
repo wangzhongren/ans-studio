@@ -1980,6 +1980,8 @@
   // 才可能放行。渲染侧**只呈现**：不做任何命令判定；回传失败/失效时如实标记（**绝不**呈现为「已放行」）。
   // **无计时器**（G-1 纪律）：本卡不按时间自我定格——超时判定在主进程通道侧（超时 = 不放行）。
   var SHELL_CONFIRM_DEFAULT_HINT = "点「拒绝」、按 Esc 或关闭本框 = 不放行（不会执行）。";
+  // su 审批卡（2026-10-17 PM 评审 §3.6）：必备风险披露——shell 不受文件写边界约束，客户审批是唯一闸。
+  var SU_APPROVAL_WARNING = "批准后命令以当前 OS 用户权限执行，可能绕过 ANS 文件写边界；请逐字核对命令原文。";
 
   function onShellConfirm(payload) {
     if (!payload || typeof payload !== "object" || typeof payload.id !== "string" || payload.id === "") return;
@@ -1992,13 +1994,24 @@
 
   function renderShellConfirm(cur) {
     var payload = cur.payload;
+    // su 审批卡与项目角色三层链卡：同组件、不同标题/档位/披露；project/旧请求逐字保持既有行为。
+    var suApproval = payload.policy === "su-approval";
+    $("sc-title").textContent = UiLabels.shellConfirmTitle(payload.policy);
     // 命令**逐字原文**：textContent 落入（无 HTML 注入口——不美化、不改写、不截断）。
     $("sc-command").textContent = typeof payload.command === "string" ? payload.command : "";
     var summary = typeof payload.summary === "string" && payload.summary !== "" ? payload.summary : "";
+    var tierLabel = suApproval ? UiLabels.suApprovalTierLabel(payload.tier) : "";
+    var summaryText = suApproval && tierLabel ? (summary ? tierLabel + " · " + summary : tierLabel) : summary;
     var sumEl = $("sc-summary");
-    sumEl.textContent = summary;
-    sumEl.hidden = summary === ""; // 无从安全概括 ⇒ 只显示命令本体（绝不编意图）
-    $("sc-reason").textContent = typeof payload.reasonPlain === "string" ? payload.reasonPlain : "";
+    sumEl.textContent = summaryText;
+    sumEl.hidden = summaryText === ""; // 无从安全概括 ⇒ 只显示命令本体（绝不编意图）
+    // 高风险原因：su 卡把 `reasonRaw`（如「命中硬拒程序规则：reshell」）作为**可见**单独一行；
+    // 项目卡保持原文：reasonPlain 可见、reasonRaw 仍只在折叠详情里。
+    var reasonText = typeof payload.reasonPlain === "string" ? payload.reasonPlain : "";
+    if (suApproval && typeof payload.reasonRaw === "string" && payload.reasonRaw !== "") {
+      reasonText += (reasonText ? "\n" : "") + "命中原因：" + payload.reasonRaw;
+    }
+    $("sc-reason").textContent = reasonText;
     $("sc-cwd").textContent = typeof payload.cwd === "string" ? payload.cwd : "";
     $("sc-argv").textContent = Array.isArray(payload.argvLines) ? payload.argvLines.join("\n") : "";
     var raw = typeof payload.reasonRaw === "string" && payload.reasonRaw !== "" ? "审核原文（内部用语，仅供核查）：" + payload.reasonRaw : "";
@@ -2009,14 +2022,15 @@
 
     var overlay = $("shell-confirm");
     overlay.hidden = false;
+    overlay.classList.toggle("is-su-approval", suApproval);
     syncDrawerModal();
     overlay.classList.remove("is-expired");
-    $("sc-hint").textContent = SHELL_CONFIRM_DEFAULT_HINT;
+    $("sc-hint").textContent = (suApproval ? SU_APPROVAL_WARNING + " " : "") + SHELL_CONFIRM_DEFAULT_HINT;
     $("sc-deny").disabled = cur.busy;
     $("sc-allow").disabled = cur.busy;
     $("sc-close").disabled = cur.busy;
     if (cur.expiredReason) markShellConfirmExpired(cur.expiredReason);
-    $("sc-deny").focus(); // 拒绝为默认焦点（fail-closed 的 UI 侧同向）
+    $("sc-deny").focus(); // 拒绝为默认焦点（fail-closed 的 UI 侧同向）——su 卡同样不得默认批准
   }
 
   function closeShellConfirm() {

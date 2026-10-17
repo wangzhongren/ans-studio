@@ -56,7 +56,8 @@ export type { OperatorPrompt, OperatorOutcome, OperatorChannelFn };
 import { classifyShell, defaultShellRules } from "../../src/service/gate/shell-rules.ts";
 // 装配选项形状的**单一来源**在编排（`shell-arming.ts`）：只读导入其类型（运行期擦除），据它取
 // 「前端该注入哪几件」——`Omit` 掉 project/operatorChannel/sessionDeps（那三件由编排按本次会话装配）。
-import type { AssembleShellGateOptions } from "../../src/pipeline/orchestration/shell-arming.ts";
+import { SU_APPROVAL_REASON_PREFIX } from "../../src/pipeline/orchestration/shell-arming.ts";
+import type { AssembleShellGateOptions, SuApprovalTier } from "../../src/pipeline/orchestration/shell-arming.ts";
 
 // argv 规范化原语的**单一来源**（pm，T23，`src/common/shared/argv-primitives.ts`）：**只读导入**——
 // 与编排侧（写审计）同源，故「操作者所见」与「审计所记」不可能漂移。此前本模块的**本地副本（逐字镜像）
@@ -310,10 +311,38 @@ export function shellIntentSummary(command: string): string | null {
   return `它会在项目里执行：${word}`;
 }
 
+/** **su 审批档原因解析（2026-10-17）**：只认**行首固定前缀** `su-审批档[tier]`（前缀单一来源＝编排
+ *  `shell-arming.ts` 公共再导出）。**先匹配前缀**，避免与既有 `/risky/i` 等泛匹配串线；项目角色三层链
+ *  的原因**永不带此前缀** ⇒ 恒 `null`（`policy: "project"`）。 */
+const SU_APPROVAL_REASON_RE = new RegExp(
+  `^${SU_APPROVAL_REASON_PREFIX.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\[(risky|review|deny)\\]`,
+);
+
+export function parseSuApprovalTier(reason: unknown): SuApprovalTier | null {
+  if (typeof reason !== "string") return null;
+  const match = SU_APPROVAL_REASON_RE.exec(reason.trim());
+  return match === null ? null : (match[1] as SuApprovalTier);
+}
+
+/** su 审批档的人话（单一来源在本模块；含三条必备披露：逐条客户批准 / 拒绝超时通道不可用＝拒绝 /
+ *  批准后可能绕过 ANS 文件写边界）。档位名：deny＝硬拒类、risky/review 各用其档位名。 */
+function suApprovalPlainReason(tier: SuApprovalTier): string {
+  const tierText =
+    tier === "deny" ? "硬拒类（deny）" : tier === "risky" ? "风险命令（risky）" : "未自动判定（review）";
+  return (
+    `SU 审批档：${tierText}——须逐条客户批准才执行；` +
+    "批准后可能绕过 ANS 文件写边界（命令以当前 OS 用户权限运行）。" +
+    "拒绝/超时/通道不可用 = 拒绝；默认拒绝、无「记住」，不自动通过。"
+  );
+}
+
 /** 升级原因 → **人话**（(b) 判读的内部用语**不得**原样示人；未识别一律给 fail-closed 通用句——
- *  既不泄行话、也**不替审核编造结论**；原始措辞只进渲染侧折叠详情供核查）。 */
+ *  既不泄行话、也**不替审核编造结论**；原始措辞只进渲染侧折叠详情供核查）。
+ *  **su 审批档前缀优先**（2026-10-17）——先按行首前缀解析，再走既有项目角色映射（逐字不变）。 */
 export function plainReasonFor(reason: unknown): string {
   const raw = typeof reason === "string" ? reason : "";
+  const suTier = parseSuApprovalTier(raw);
+  if (suTier !== null) return suApprovalPlainReason(suTier);
   if (/risky/i.test(raw)) return "自动审核判定这条命令有风险——按治理规则，有风险的命令必须由你亲自确认才能执行。";
   if (/超时|timeout/i.test(raw)) return "自动审核超时，未给出结论——按 fail-closed 交你确认。";
   if (/json|解析|parse/i.test(raw)) return "自动审核给出的结论无法解析，未能形成明确意见——按 fail-closed 交你确认。";
@@ -341,11 +370,17 @@ export interface ShellConfirmRequest {
   argvLines: string[];
   /** 执行工作目录（钉在项目根）。 */
   cwd: string;
+  /** **su 审批档位**（2026-10-17；桌面自有类型，不改契约家 `OperatorPrompt`）：仅在 reason 行首命中
+   *  `su-审批档[tier]` 时给出；项目角色三层链恒 `null`。 */
+  tier: SuApprovalTier | null;
+  /** **审批策略**：`su-approval`（内置治理角色审批档）或 `project`（项目角色三层链）。桌面自有类型。 */
+  policy: "su-approval" | "project";
 }
 
 /** 由既有呈现（`describeShellCommand` 的产物）构建确认卡数据面（纯函数；命令原文逐字转抄）。 */
 export function buildShellConfirmRequest(id: string, display: ShellCommandDisplay): ShellConfirmRequest {
   const reasonRaw = typeof display.reason === "string" && display.reason !== "" ? display.reason : null;
+  const tier = parseSuApprovalTier(reasonRaw);
   return {
     id,
     command: display.command,
@@ -354,6 +389,8 @@ export function buildShellConfirmRequest(id: string, display: ShellCommandDispla
     reasonRaw,
     argvLines: display.argvLines,
     cwd: display.cwd,
+    tier,
+    policy: tier !== null ? "su-approval" : "project",
   };
 }
 

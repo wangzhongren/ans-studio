@@ -1,0 +1,48 @@
+{
+  "reports": [
+    {
+      "name": "su card visible + title",
+      "value": true
+    },
+    {
+      "name": "su card tier + command verbatim",
+      "value": true
+    },
+    {
+      "name": "su card plain reason + visible raw hit reason",
+      "value": true
+    },
+    {
+      "name": "su card mandatory warning in hint",
+      "value": true
+    },
+    {
+      "name": "su card default deny focus",
+      "value": true
+    },
+    {
+      "name": "Esc responds allow:false",
+      "value": true
+    },
+    {
+      "name": "card closed after Esc",
+      "value": true
+    },
+    {
+      "name": "project card keeps legacy title/no warning/no tier",
+      "value": true
+    },
+    {
+      "name": "project card default deny focus",
+      "value": true
+    }
+  ],
+  "errors": [],
+  "responses": [
+    {
+      "id": "su-denytier-1",
+      "allow": false
+    }
+  ],
+  "electron": "44.7.0"
+}

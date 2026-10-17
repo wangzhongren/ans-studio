@@ -33,6 +33,7 @@ import type {
   OperatorOutcome,
   OperatorPrompt,
 } from "../../model/runtime.ts";
+import { SU_APPROVAL_REASON_PREFIX } from "./shell-gate.ts";
 
 /** 认作「放行」的输入（小写比较）。 */
 const DEFAULT_ALLOW_INPUTS = ["y", "yes", "是", "放行", "allow"];
@@ -102,8 +103,15 @@ export function createCliOperatorChannel(
 /** 操作者提示文案（命令**逐字原文**——§7.3 要求人看到原文）。 */
 export function formatOperatorPrompt(prompt: OperatorPrompt): string {
   const reason = prompt.reason !== undefined && prompt.reason !== "" ? `\n升级原因：${prompt.reason}` : "";
+  // 按模式如实标注（2026-10-17）：su 审批档不接 (b) 审读，**不得**再写「(b) 未定」；
+  // 项目角色三层链的既有文案逐字不变。判据 = 单一来源前缀（与桌面窗口同一 token）。
+  const suApproval =
+    typeof prompt.reason === "string" && prompt.reason.startsWith(`${SU_APPROVAL_REASON_PREFIX}[`);
+  const modeLine = suApproval
+    ? "(su 审批档：客户逐条批准，不走 (b) 审读)"
+    : "(b) 未定，(a) 请操作者确认";
   return (
-    `\n—— shell 命令审核（(b) 未定，(a) 请操作者确认）——\n` +
+    `\n—— shell 命令审核（${modeLine}）——\n` +
     `命令原文：\n${prompt.command}\n` +
     `（argv：${JSON.stringify(prompt.argv)}；cwd：${prompt.cwd}）${reason}\n` +
     `放行该命令？[y/放行 = 放行；其它 = 拒绝]\n`

@@ -1,5 +1,29 @@
 # 编排 变更记录
 
+## 2026-10-17 — su 的 `run_shell` 改为「只读免审批、其余含 deny 逐条客户批准」（`operatorOnly` + `approveDeny`，编排侧）
+
+**来源**：PM 评审/任务书 `角色卡/项目管理/docs/design/2026-10-17_design_su-shell-approval-review.md`（status: approved；客户裁定「这个su 的命令也改一下，不是只读，是只读的免审批，其他的要客户审批」＋「deny 也走客户审批」）§3.1–§3.4、§4、§5.1。本轮只做编排侧；桌面/门禁卡文本/运行时核心未碰。
+
+**改了什么（全部在本角色 Section 1 内）**：
+- `src/common/编排/shell-gate.ts`：
+  - `CreateShellGateOptions` / `ShellGateBuildDeps` 新增 `operatorOnly?: boolean`、`approveDeny?: boolean`（缺省 false）。
+  - **构造期守卫**（抛错 ⇒ 调用方不 arm）：`readonlyOnly && operatorOnly` 互斥；`approveDeny && !operatorOnly` 抛错；`operatorOnly` 必须有 `operatorChannel`；`operatorOnly` 不得带 `pmAsk`/`routineShellPolicy`。
+  - **判定映射**（operatorOnly=true）：`allow` → 直放（`c-allow`，**0 次 operator 调用**）；`risky`/`review` → `runA`（`c-risky→a-*` / `c-review→a-*`）；`deny` + `approveDeny=true` → `runA`（`c-deny→a-*`）；`deny` + `approveDeny=false` → 既有硬拒（`c-deny`，回归）。
+  - 新增 `BRANCH_C_RISKY`/`BRANCH_C_REVIEW`；`by` 后缀审批档为 `（su 审批档）`（**不复用**只读档后缀），批准后为 `... → operator:<标识>`。
+  - 导出单一来源 `SU_APPROVAL_REASON_PREFIX = "su-审批档"`、`SuApprovalTier` 与 `renderSuApprovalReason(tier, detail?)`：`su-审批档[<tier>]：<命中原因>；批准后命令以当前 OS 用户权限执行，可能绕过 ANS 文件写边界。`
+  - 审计字段/落盘不变（command 原文、argv、cwd、conclusion、branch、by、`conditions:["shell-gate"]`、`execution:"未执行"`）；审计失败不翻转判定。
+- `src/pipeline/orchestration/shell-arming.ts`：新增 `AssembleOperatorShellGateOptions`（含 project/operatorChannel 必填、classifyShell/rules/timeoutMs/operatorTimeoutMs/now/env/auditSink；**无** pmAsk/pmRoleId/openSession/sessionDeps/routineShellPolicy）与 `assembleOperatorShellGate`（`buildShellGate({ operatorOnly:true, approveDeny:true, operatorChannel, ... })`；审计边界/刷新复用 `resolveGovernanceBoundary`，同只读档）；并再导出 `SU_APPROVAL_REASON_PREFIX`/`renderSuApprovalReason`/`SuApprovalTier` 供桌面经 Pipeline 公共出口消费。
+- `src/pipeline/orchestration/run-role.ts`：新增 `shellOperatorOnly?: Omit<AssembleOperatorShellGateOptions,"project">`。优先级：`shellOperatorOnly`（su-only 校验）→ `shellReadonly` → 项目角色三层链。**su-only**：`suppressHandback === true` 才生效；项目角色误传 ⇒ 不 arm + 诊断（`reasonCode:"not-built-in-governance"`）。与 `shellReadonly` 同时给出 ⇒ **不 arm** + 诊断（`conflicts-with-shellReadonly`）。装配失败 ⇒ 不 arm。
+- `src/common/编排/operator-channel.ts`：`formatOperatorPrompt` 按 `SU_APPROVAL_REASON_PREFIX` 识别模式——su 审批档显示「su 审批档：客户逐条批准，不走 (b) 审读」，不再写死「(b) 未定」；其他通道文案逐字不变。
+
+**语义/回归**：`readonlyOnly`（su 只读档）与项目角色三层链逐字保留、缺省行为不变；旧只读档代码/测试未删（评审 §七-5）。
+
+**测试**：新增 `test/编排/shell-operator-only.test.ts` **11 例**——allow 0 卡/审计字段；risky/review/deny × 批准/拒绝/超时/不可用（branch/by/reason）；deny+approveDeny=false 回归；五条构造守卫；`renderSuApprovalReason` 金文本；CLI 提示模式；`assembleOperatorShellGate` 装配与缺件 fail-closed；`openRoleSession` 的 su-only/互斥/缺通道不 arm。既有 `shell-gate`/`shell-readonly`/`shell-review-chain`/`shell-arming`/`run-role` 用例零改动。
+
+**证据**：`node --test "test/编排/shell-operator-only.test.ts"` → **11/11**；`node --test "test/编排/**/*.test.ts"` → **348 计 / 347 过 / 1 红**——唯一红仍是 `shell-authorized-routine.test.ts:103` 的 Windows 符号链接 EPERM（既有环境红，与本批无关）；`npm run typecheck` → **本批文件零错**；全仓仍 85 错（claude-adapter/provider 与 `test/claude-adapter`/`test/测试` 的既有缺件）。
+
+**未做/边界**：未 git 提交；未碰 `app/**`、`src/common/门禁引擎/**`、`src/provider/**`、`src/service/**`、其他角色文件、客户项目；未读 `.env`、未跑凭据/网络命令、未真跑 shell 命令。**跨角色待 pm 转达**：桌面窗口按 §3.5 给 su 注入 `shellOperatorOnly`（`operatorChannel` 对 su 也构造、不再传 `shellReadonly`），卡片按 §3.6 解析 `su-审批档[...]` 并显示档位/警告；门禁引擎按 §3.7 写内置角色卡命令纪律段。
+
 ## 2026-10-17 — I3「已有角色但无治理记录」兼容：`previewGovernanceRecord` / `establishGovernanceRecord`（B1）＋ Pipeline 薄再导出（B2）
 
 **来源**：PM 评审/任务书 `角色卡/项目管理/docs/design/2026-10-17_design_existing-project-compat-review.md`（status: approved，客户裁定「推进吧，按 B+C 来」）§一、§二 I3、§四.3/§4.4/§4.6、§五 B1/B2、§七。方案级无返工项；本轮按批准口径实施，未改道 A、未给内置边界加 accepted、未加常驻治理写权。

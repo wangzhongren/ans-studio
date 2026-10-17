@@ -15,7 +15,7 @@
 | 自动收尾 / 重 pin | su 会话 settle 后自动重扫并更新 `.ans` pin + manifest（创世首轮 = 首次收尾） | 已实现 | 功能文档待补（同左 + [finalize 相关记录](docs/change/2026-10-12_change_governed-interaction-a3-a4.md)） |
 | **建立治理记录（已有角色、无 `.ans`）** | `previewGovernanceRecord` 只读预览 / `establishGovernanceRecord` 由操作者显式触发，复用 `finalizeBootstrap` 写出治理边界文档 + `.ans` + manifest；守卫/互斥/`phase` 三态见记录 | 已实现（B1+B2） | [I3 记录](changelog.md#2026-10-17--i3已有角色但无治理记录兼容previewgovernancerecord--establishgovernancerecordb1--pipeline-薄再导出b2)；公开面见 [api-spec](api-spec.md) |
 | shell 闸（三层链：项目角色） | c-b-a审核与留痕；宿主已委托本项目精确常规检查且b明确允许时免重复a | 编排已实现并验证 | [shell审核](docs/feature/shell-review.md) |
-| **su 只读 shell（只读档）** | **su 的 `run_shell` 只执行 (c) 只读白名单命令；risky/review/deny 一律拒——不接 (b)/(a)、不弹框** | **已实现** | [su 只读 shell](docs/change/2026-10-12_change_su-readonly-shell.md)（稳定功能说明待补） |
+| **su shell（审批档；只读档保留）** | **su 的 `run_shell`：只读白名单免审批直放（0 卡）；risky/review/deny 逐条客户批准（不接 (b) 审读）；旧只读档代码保留** | **已实现** | [su 审批档记录](changelog.md#2026-10-17--su-的-run_shell-改为只读免审批其余含-deny-逐条客户批准operatoronly--approvedeny编排侧)；[su 只读 shell](docs/change/2026-10-12_change_su-readonly-shell.md)（稳定功能说明待补） |
 | 回交（任务报告） | 按真实ACK/turnId隔离来源、报告与证据，普通聊天不自动回交；正式任务未报告/失败如实回交，最终报告按真实bound档保存，失败仅保存恢复；主入口核对已收到报告后向客户汇总 | 编排已实现并验证 | [任务报告回交](docs/feature/task-handback.md) |
 | su 派发任务 | su 把任务派发给项目角色（前端路由：未开自动开/忙排队/去重）；派发 ≠ 授权 | 已实现（编排侧） | 功能文档待补（[派发接线](docs/change/2026-10-12_change_su-dispatch-wiring.md)、[派发回执](docs/change/2026-10-12_change_dispatch-receipt-queue.md)） |
 | 会话开局注入（已安装技能节，G-4 I4） | `renderInstalledSkillsSection(projectRoot, roleId)`：读 `docs/skills/<name>/install.md` 登记＋当刻字节 digest，渲染「本角色已安装技能（先读）」指针节；坏件跳过不拒会、零技能空串；三适配器系统提示各拼接一段（接线待其属主） | 编排侧已实现（渲染单一来源；三适配器接线待其属主） | [G-4 I4/I5 记录](docs/change/2026-10-16_change_g4-skill-injection-and-preauth.md) |

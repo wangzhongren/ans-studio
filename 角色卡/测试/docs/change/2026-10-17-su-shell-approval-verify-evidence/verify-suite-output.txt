@@ -1,0 +1,45 @@
+✔ A1 allow：直接放行、operator 0 次、branch c-allow、by 含（su 审批档）；审计字段齐备 (2.437ms)
+✔ A2 risky × 批准：恰 1 次请求；branch c-risky→a-allow；allow=true (0.4183ms)
+✔ A2 risky × 拒绝：恰 1 次请求；branch c-risky→a-deny；allow=false (0.1389ms)
+✔ A2 risky × 不可用：恰 1 次请求；branch c-risky→a-unavailable；allow=false (0.1155ms)
+✔ A3 risky × 超时：恰 1 次请求；branch c-risky→a-timeout；deny (36.4404ms)
+✔ A2 review × 批准：恰 1 次请求；branch c-review→a-allow；allow=true (0.3642ms)
+✔ A2 review × 拒绝：恰 1 次请求；branch c-review→a-deny；allow=false (0.2172ms)
+✔ A2 review × 不可用：恰 1 次请求；branch c-review→a-unavailable；allow=false (0.1449ms)
+✔ A3 review × 超时：恰 1 次请求；branch c-review→a-timeout；deny (30.521ms)
+✔ A2 deny × 批准：恰 1 次请求；branch c-deny→a-allow；allow=true (0.2489ms)
+✔ A2 deny × 拒绝：恰 1 次请求；branch c-deny→a-deny；allow=false (0.129ms)
+✔ A2 deny × 不可用：恰 1 次请求；branch c-deny→a-unavailable；allow=false (0.0928ms)
+✔ A3 deny × 超时：恰 1 次请求；branch c-deny→a-timeout；deny (31.0413ms)
+✔ A4 deny + approveDeny=false：既有硬拒 c-deny，0 次请求（回归） (0.354ms)
+✔ A5 构造守卫四组：互斥 / approveDeny 无 operatorOnly / 无通道 / 带 pmAsk 或 routineShellPolicy (0.3995ms)
+✔ A6 规则集加载失败 / 分类器抛错：fail-closed 且有稳定 branch（非审批放行） (0.1899ms)
+✔ A8 旧只读档回归：allow 直放；risky/review → readonly-deny、deny → 既有硬拒 c-deny；0 次 operator (0.1432ms)
+✔ A7 renderSuApprovalReason：前缀/档位 token/写边界风险披露为固定文本；detail 逐字进入 (0.0665ms)
+✔ B1 assembleOperatorShellGate：allow 0 卡；risky 出卡；审计落 sink；缺件 fail-closed (25.09ms)
+✔ B2 assembleOperatorShellGate：无通道 ⇒ 装配抛错（不 arm） (4.5721ms)
+✔ B3 openRoleSession：su arm；项目角色误传 / 与 shellReadonly 互斥 / 装配失败 ⇒ 不 arm (9.8419ms)
+✔ B4 选项面 type 守卫：AssembleOperatorShellGateOptions 不含 pmAsk/pmRoleId/openSession/sessionDeps/routineShellPolicy (0.48ms)
+✔ C1 桌面注入：su 收 shellOperatorOnly（含 (c)+(a)）、不收 shellReadonly/顶层通道；项目角色三层链不变 (14.3662ms)
+✔ C2 缺件不 arm：缺 shellArming 或缺 shellOperatorChannel ⇒ su 不传 shellOperatorOnly (7.065ms)
+✔ D1 档位解析：行首前缀优先；deny 不被后缀 /risky/ 抢占；项目角色恒 null (0.503ms)
+✔ D2 卡片数据：tier/policy、命令原文/cwd/reasonRaw；三档 plain reason 含必备披露 (0.3942ms)
+✔ D3 UI 纯映射：SU 标题/项目标题；三档标签；未知档位不编造 (0.8459ms)
+✔ D4 渲染源码：SU 警告/默认拒绝焦点/标题档位原因接线；不得把审批呈现成已获准 (1.5142ms)
+✔ D5 前缀单一来源：Pipeline 公共出口与编排私有实现逐字相同 (0.5279ms)
+✔ D6 内置角色卡命令纪律：免审批/逐条批准/不走 pm/不得说已获准/写边界披露齐备 (0.4461ms)
+✔ E1 deny（真实规则 node -e）：批准 → 真实执行并产生哨兵；审计结论 allow (60.0877ms)
+✔ E2 deny × 拒绝：零执行（哨兵不存在）；审计 branch=c-deny→a-deny (3.7752ms)
+✔ E2 deny × 不可用：零执行（哨兵不存在）；审计 branch=c-deny→a-unavailable (2.2839ms)
+✔ E2b deny × 超时：零执行（哨兵不存在）；审计 branch=c-deny→a-timeout (43.4241ms)
+✔ E3 risky（测试分类器）：批准 → 执行；拒绝 → 零执行；branch 对应 (52.9419ms)
+✔ E4 review（不存在的程序）：批准 → 判定已放行但 spawn 失败如实（不假成功） (3.8965ms)
+ℹ tests 36
+ℹ suites 0
+ℹ pass 36
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 375.2255
+EXIT:0

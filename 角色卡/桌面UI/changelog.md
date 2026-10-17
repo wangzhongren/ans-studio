@@ -127,3 +127,15 @@
 - 测试：renderer **68 计 / 64 过 / 4 红**（既有基线 N-1、data-state、P1-3、G-5），新增 T28 扩展 2（7 档映射、500000/300000→index、默认档空值、自定义值 -1、DOM/同步接线）；`runtime-ui.test.ts` **12/12**。
 - **跨边界影响**：`test/桌面应用/e2e/main.mjs`（桌面窗口）的 `PI_FIELDS_MATCH_REGISTRY` 用 `label[for="pi-inp-<key>"]` 取字段标签；range 字段的 label 正确指向滑块 `pi-range-<key>`，故两项标签查找为空、该断言预计红。请桌面窗口改为同时接受 `pi-range-*`/读取 `.pi-field-label`；本侧未改其文件。`PI_KEYS_ARE_FIVE`、`*_IN_ADVANCED` 与 hint 判据不受影响。
 - 指纹：`renderer.js 36b5ebba`、`ui-labels.js b399f763`、`styles.css c4369839`、`renderer.test.ts 13a9ffb4`（`index.html abfd9891` 未再变）。
+
+## 2026-10-17：su 命令审批卡（标题 / 档位 / 风险披露 / 拒绝默认焦点）
+
+依据 PM 评审 `2026-10-17_design_su-shell-approval-review.md` §3.6（编排/门禁侧已就绪，窗口传 `policy`/`tier`）。**零 HTML 改动**，复用既有 shell 确认卡：
+- **标题**：`policy === "su-approval"` ⇒「SU 命令审批」；`project`/缺省 ⇒「shell 命令请求」（`ui-labels.js::shellConfirmTitle`）。
+- **档位可见行**（`#sc-summary`）：`risky`⇒「风险命令（risky）」、`review`⇒「未自动判定（review）」、`deny`⇒「硬拒类（deny）」；未知 tier 不编标签（`suApprovalTierLabel`）。
+- **可见原因**：`reasonPlain` 原文；su 卡额外把 `reasonRaw` 作为单独一行「命中原因：<raw>」放进可见 `#sc-reason`（`white-space: pre-wrap`）；project 卡 `reasonRaw` 仍只在折叠详情。
+- **必备警告**（`#sc-hint`）：su 卡追加「批准后命令以当前 OS 用户权限执行，可能绕过 ANS 文件写边界；请逐字核对命令原文。」＋既有 fail-closed 提示；project 卡 hint 逐字不变。
+- **默认拒绝**：沿用 `#sc-deny.focus()`；拒绝/关闭/Esc ⇒ `allow:false`；恰 `allow:true` 才回传放行；无「记住/不再询问」；不显示只读徽标。`#shell-confirm.is-su-approval` 由渲染侧切换（档位行加粗、警告用 `--amber`）。
+- 测试：renderer **69 计 / 65 过 / 4 红**（既有基线 N-1、data-state、P1-3、G-5），新增 SU 审批卡用例（三档标签、标题、警告、可见命中原因、拒绝焦点、project 逐字回归、拒绝不调用放行）；`ANS_TERMINAL_UI_ONLY=1` 真实 Electron **TERMINAL_PASS 14**（新增 5 项 su/project 卡检查）；默认 e2e 仍只在既有 `virtual visible nonempty`（1044）失败。
+- 依赖：`payload.policy`/`payload.tier` 字段由桌面窗口按契约提供；缺失时按 project 原行为（不猜档位）。
+- 指纹：`renderer.js 9fcbf68d`、`ui-labels.js 270a1dcb`、`styles.css a5848df1`、`renderer.test.ts b8f91729`、`uiux-v2.mjs f12db959`。

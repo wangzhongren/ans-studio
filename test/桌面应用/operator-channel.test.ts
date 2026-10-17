@@ -34,6 +34,7 @@ import {
   DEFAULT_OPERATOR_CONFIRM_TIMEOUT_MS,
   describeShellCommand,
   DESKTOP_SHELL_GATE_ARMED,
+  parseSuApprovalTier,
   plainReasonFor,
   shellIntentSummary,
   type OperatorPresenter,
@@ -195,29 +196,38 @@ test("arm 决策（I-1 + 补丁）：DESKTOP_SHELL_GATE_ARMED === true——(c) 
   assert.ok(ifaceSrc.includes("shellArming: deps.shellArming"), "Interface 应把 (c) 实件透传给会话管理器");
   const sessSrc = fs.readFileSync(path.join(APP_DIR, "desktop", "session.ts"), "utf8");
   assert.ok(
-    sessSrc.includes("role.builtIn !== true && this.deps.shellOperatorChannel"),
-    "session.ts：**仅项目角色**注入 (a)（su 不接 (b)/(a)——审读者不给自己开闸）"
+    /if \(this\.deps\.shellOperatorChannel\) \{/.test(sessSrc),
+    "session.ts：**(a) 通道对 su 也构造**（2026-10-17 审批档；不再有 role.builtIn 条件）"
   );
   assert.ok(
     /role\.builtIn === true \? undefined : this\.deps\.shellArming/.test(sessSrc),
-    "session.ts：(c) 实件与 (a) 同判据（仅项目角色走三层链）"
+    "session.ts：(c) 实件仍只给项目角色三层链（su 不自审）"
   );
-  // ——— su 只读档（客户裁定 2026-10-12：「su 也要有 shell，但是只读」）的源码钉子 ———
+  // ——— su 审批档（客户裁定 2026-10-17：「只读的免审批，其他的要客户审批」＋「deny 也走客户审批」）———
   assert.ok(
-    /role\.builtIn === true \? this\.deps\.shellArming : undefined/.test(sessSrc),
-    "session.ts：内置治理角色（su）经 shellReadonly **复用同一份 (c) 实件**（deps.shellArming 原引用——单一来源，与项目角色永不漂移）"
+    /const shellOperatorOnly =\s*role\.builtIn === true && this\.deps\.shellArming && shellOperatorChannel/.test(sessSrc),
+    "session.ts：su 审批档 = 内置角色 && (c) 实件 && (a) 通道（缺件不 arm，fail-closed）"
   );
   assert.ok(
+    /\.\.\.\(shellOperatorOnly \? \{ shellOperatorOnly \} : \{\}\)/.test(sessSrc),
+    "session.ts：`shellOperatorOnly` 经 openRoleSession 透传"
+  );
+  assert.equal(
     /\.\.\.\(shellReadonly \? \{ shellReadonly \} : \{\}\)/.test(sessSrc),
-    "session.ts：shellReadonly 经 openRoleSession 透传（缺省不传 ⇒ su 不 arm——能力缺席即 fail-closed）"
+    false,
+    "session.ts：桌面**不再**透传旧只读档 `shellReadonly`（su 改走审批档）"
   );
   assert.ok(
-    /import type \{ AssembleReadonlyShellGateOptions, RoutineShellPolicy \} from "\.\.\/\.\.\/src\/pipeline\/orchestration\/shell-arming\.ts"/.test(sessSrc),
-    "session.ts：只读档装配选项形状**只读导入自编排**（单一来源；不另立第二形状）"
+    /import type \{ AssembleOperatorShellGateOptions, AssembleReadonlyShellGateOptions, RoutineShellPolicy \} from "\.\.\/\.\.\/src\/pipeline\/orchestration\/shell-arming\.ts"/.test(sessSrc),
+    "session.ts：审批档/只读档装配选项形状**只读导入自编排**（单一来源；不另立第二形状）"
+  );
+  assert.ok(
+    ifaceSrc.includes('shellOperatorOnly?: Omit<AssembleOperatorShellGateOptions, "project">'),
+    "Interface：审批档透传面镜像**同一形状**（`Omit<AssembleOperatorShellGateOptions, \"project\">`）"
   );
   assert.ok(
     ifaceSrc.includes('shellReadonly?: Omit<AssembleReadonlyShellGateOptions, "project">'),
-    "Interface：透传面镜像**同一形状**（`Omit<AssembleReadonlyShellGateOptions, \"project\">`——不另造第二形状）"
+    "Interface：旧只读档类型保留兼容（桌面不再注入）"
   );
   // 编排消费点只读核查：给出即 arm（**不带 `!suppressHandback` 前缀**——su 会话恒 suppressHandback=true，
   // 带上该前缀 su 永远 arm 不上；只读档分支由 `shellReadonly !== undefined` 单独判）。
@@ -299,12 +309,12 @@ test("I-1 补丁（**真正接通**核查）：真实 openRoleSession + 真实�
   );
 });
 
-test("su 只读档（**真正接通**核查）：真实 openRoleSession + 真实装配——su 会话能力面产出**只读档** ShellGate（ls 放行 / rm 拒、不弹框）", async () => {
-  // 客户裁定 2026-10-12「su 也要有 shell，但是只读」的**桌面侧端到端核查**：SessionManager（内置治理角色
-  // 判据）→ 真实 `openRoleSession`（只读档 arm）→ 真实 `assembleReadonlyShellGate` + 真实 (c) 实件
-  // （`buildDesktopShellArming`：门禁引擎同一函数引用 + 默认规则集）⇒ 能力面 `capabilities.shellGate` 产出，
-  // 且判定就是**只读档**（ls 放行；rm 拒、理由写明只读档）。**全程不触网、不真跑命令**（只做闸判定）；
-  // 项目落在系统临时目录（审计若落盘也只在临时目录，**绝不碰仓库**）。
+test("su 审批档（**真正接通**核查）：真实 openRoleSession + 真实装配——su 会话能力面产出审批档 ShellGate（ls 免审批直放 / rm 出卡经客户批准或拒绝）", async () => {
+  // 客户裁定 2026-10-17「只读的免审批，其他的要客户审批」＋「deny 也走客户审批」的**桌面侧端到端核查**：
+  // SessionManager（内置治理角色判据）→ 真实 `openRoleSession`（`shellOperatorOnly` arm）→ 真实
+  // `assembleOperatorShellGate` + 真实 (c) 实件（`buildDesktopShellArming`）⇒ 能力面 `capabilities.shellGate`
+  // 产出：ls 命中白名单 ⇒ 0 卡直放；rm（risky）⇒ 出 1 卡，客户批准 ⇒ 执行、客户拒绝 ⇒ 拒绝。
+  // **全程不触网、不真跑命令**（只做闸判定）；项目落在系统临时目录（审计若落盘也只在临时目录，**绝不碰仓库**）。
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "ans-desktop-su-readonly-"));
   try {
     // 临时项目 fixture：治理边界文档（= X 的边界文件，含 docs/audit/ 条件目录——只读档的审计边界经它解析）
@@ -365,8 +375,17 @@ test("su 只读档（**真正接通**核查）：真实 openRoleSession + 真实
       };
     };
     const captured: (Record<string, unknown> | undefined)[] = [];
+    // (a) 通道桩件：记录每次审批请求；outcome 可由用例切换（批准 → 执行、拒绝 → 不执行）。
+    const prompts: OperatorPrompt[] = [];
+    let outcome: "allow" | "deny" = "allow";
+    const operatorChannel: OperatorChannelFn = async (prompt) => {
+      prompts.push(prompt);
+      return outcome === "allow"
+        ? { outcome: "allow", operatorId: "test" }
+        : { outcome: "deny", operatorId: "test", reason: "客户拒绝" };
+    };
     const mgr = new SessionManager({
-      openRoleSession, // **真实**编排入口：只读档装配真跑（不发模型请求、不执行任何命令）
+      openRoleSession, // **真实**编排入口：审批档装配真跑（不发模型请求、不执行任何命令）
       createPiAdapterFactory: () => (gate: WriteGate, capabilities?: unknown) => {
         captured.push(capabilities as Record<string, unknown> | undefined);
         return {
@@ -394,8 +413,10 @@ test("su 只读档（**真正接通**核查）：真实 openRoleSession + 真实
       buildProjectConfig,
       getListing: (root2) => (root2 === root ? listing : undefined),
       emitEvent: () => {},
-      // 与 main.ts 生产形态同款：(c) 实件（真件——同一函数引用 + 默认规则集）——**同一份**也供 su 只读档。
+      // 与 main.ts 生产形态同款：(c) 实件（真件——同一函数引用 + 默认规则集）＋ (a) 通道桩件
+      // ——su 经 `shellOperatorOnly` 装配审批档（同一份实件，不另造规则集）。
       shellArming: buildDesktopShellArming(),
+      shellOperatorChannel: operatorChannel,
       loadEffectiveConfig: loader,
     });
 
@@ -403,18 +424,26 @@ test("su 只读档（**真正接通**核查）：真实 openRoleSession + 真实
     assert.equal(r.ok, true, "su 会话应能开启（真实装配；本路径不触网）");
     const caps = captured[0];
     const gate = caps?.shellGate as ShellGate | undefined;
-    assert.ok(gate !== undefined, "**接通证据**：su 给只读档 ⇒ 能力面产出 ShellGate（Pi 适配器 run_shell 注册条件成立）");
+    assert.ok(gate !== undefined, "**接通证据**：su 给审批档 ⇒ 能力面产出 ShellGate（Pi 适配器 run_shell 注册条件成立）");
 
-    // 判定即**只读档**（只接 (c)；不接 (b)/(a)——没有审读会话被打开、没有任何对话框被弹）。
+    // (c)=allow ⇒ 免审批直接放行（**0 次审批卡**）。
     const ls = await gate!({ command: "ls -la", argv: ["ls", "-la"], cwd: root, toolCallId: "call-ls" });
-    assert.equal(ls.allow, true, "只读白名单命令（ls）放行——su 只读 shell 的正当用途");
+    assert.equal(ls.allow, true, "只读白名单命令（ls）放行——su 审批档的免审批路径");
+    assert.equal(prompts.length, 0, "只读白名单 ⇒ 不弹审批卡（0 次通道调用）");
+    // (c)=risky ⇒ 出 1 卡；客户批准 ⇒ 执行。
     const rm = await gate!({ command: "rm -rf x", argv: ["rm", "-rf", "x"], cwd: root, toolCallId: "call-rm" });
-    assert.equal(rm.allow, false, "risky（rm）→ 只读档一律拒（不交 (b) 审读、不打扰客户）");
-    if (!rm.allow) {
-      assert.match(rm.reason, /su 只读档/, "拒绝理由写明只读档策略（模型能看懂是策略拒、不是环境故障）");
-    }
+    assert.equal(prompts.length, 1, "risky（rm）⇒ 出 1 张客户审批卡");
+    assert.equal(rm.allow, true, "客户批准 ⇒ 执行");
+    assert.match(prompts[0].reason ?? "", /^su-审批档\[(risky|review|deny)\]/, "卡片原因＝审批档固定前缀 + 档位");
+    // 客户拒绝 ⇒ 拒绝（fail-closed）。
+    outcome = "deny";
+    const rmDenied = await gate!({ command: "rm -rf y", argv: ["rm", "-rf", "y"], cwd: root, toolCallId: "call-rm2" });
+    assert.equal(rmDenied.allow, false, "客户拒绝 ⇒ 拒绝（fail-closed）");
+    assert.equal(prompts.length, 2);
+    // (c)=review 同样交客户审批（不是只读档式的直接拒）。
     const nodeTest = await gate!({ command: "node --test", argv: ["node", "--test"], cwd: root, toolCallId: "call-nt" });
-    assert.equal(nodeTest.allow, false, "review（node --test——不在只读白名单，现状）→ 只读档拒");
+    assert.equal(prompts.length, 3, "review ⇒ 同样出卡交客户审批");
+    assert.equal(nodeTest.allow, false, "当前桩件答案为拒绝 ⇒ 不执行");
     await mgr.stop();
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
@@ -446,6 +475,23 @@ test("M-1 数据面：白话摘要只取命令首词（不编意图）；升级�
   assert.ok(!unknown.includes("XYZ") && unknown.includes("fail-closed"), "未识别：给通用 fail-closed 句（不把原话丢给客户、不替审核编结论）");
   assert.equal(plainReasonFor(undefined), plainReasonFor(""), "缺省同解（通用句）");
 
+  // ——— su 审批档（客户裁定 2026-10-17）：**行首前缀优先**，三档各用其档位名；三条必备披露 ———
+  const tierNames = { risky: "风险命令（risky）", review: "未自动判定（review）", deny: "硬拒类（deny）" } as const;
+  for (const tier of ["risky", "review", "deny"] as const) {
+    const rawReason = `su-审批档[${tier}]：命中规则（ruleset:x）；批准后命令以当前 OS 用户权限执行，可能绕过 ANS 文件写边界。`;
+    const plain = plainReasonFor(rawReason);
+    assert.ok(plain.includes(tierNames[tier]), `${tier} → 使用其档位名`);
+    assert.ok(plain.includes("逐条客户批准"), "su 文案含「逐条客户批准」");
+    assert.ok(plain.includes("拒绝/超时/通道不可用 = 拒绝"), "su 文案含「拒绝/超时/通道不可用 = 拒绝」");
+    assert.ok(plain.includes("批准后可能绕过 ANS 文件写边界"), "su 文案含绕过写边界警告");
+    assert.equal(plain.includes("自动审核判定这条命令有风险"), false, `前缀优先：${tier} 不得串到项目角色的 /risky/ 泛匹配文案`);
+    assert.equal(plain.includes("su-审批档"), false, "不把内部前缀原样丢给客户");
+  }
+  // 前缀只在**行首**生效；项目角色原因里偶然出现同文字不得改变 policy。
+  assert.equal(parseSuApprovalTier("说明里提到 su-审批档[risky] 但不位于行首"), null);
+  assert.equal(parseSuApprovalTier("su-审批档[risky]：x"), "risky");
+  assert.equal(parseSuApprovalTier(null), null);
+
   // 数据面构建：命令**逐字**（含元字符，不改写/不截断）；原文原因只进折叠详情供核查。
   const display = describeShellCommand(
     req("rm -rf build && echo hi", ["rm", "-rf", "build", "&&", "echo", "hi"], "D:/proj", "pm 拿不准，交操作者")
@@ -457,6 +503,17 @@ test("M-1 数据面：白话摘要只取命令首词（不编意图）；升级�
   assert.ok(payload.reasonPlain.includes("拿不准") && !payload.reasonPlain.includes("pm"));
   assert.deepEqual(payload.argvLines, display.argvLines, "argv 逐项行原样转抄");
   assert.equal(payload.cwd, "D:/proj");
+  assert.equal(payload.tier, null, "项目角色三层链：tier 恒 null");
+  assert.equal(payload.policy, "project", "项目角色三层链：policy=project");
+  // su 审批档：三档数据面（tier/policy/plain reason）。
+  for (const tier of ["risky", "review", "deny"] as const) {
+    const suReason = `su-审批档[${tier}]：命中规则（ruleset:x）；批准后命令以当前 OS 用户权限执行，可能绕过 ANS 文件写边界。`;
+    const suPayload = buildShellConfirmRequest(`sc-su-${tier}`, describeShellCommand(req("rm -rf build", ["rm", "-rf", "build"], "/proj", suReason)));
+    assert.equal(suPayload.tier, tier, `su ${tier}：tier 如实解析`);
+    assert.equal(suPayload.policy, "su-approval", `su ${tier}：policy=su-approval`);
+    assert.equal(suPayload.reasonRaw, suReason, "原文只进折叠详情（逐字）");
+    assert.ok(suPayload.reasonPlain.includes(tier === "deny" ? "硬拒类（deny）" : tier === "risky" ? "风险命令（risky）" : "未自动判定（review）"));
+  }
 });
 
 test("M-1 presenter：恰 allow:true 才放行；拒绝/缺字段 → 不放行；未知 id → expired；关窗 ⇒ 全部不放行", async () => {
@@ -660,13 +717,20 @@ test("I-1 注入判据：**项目角色**会话收到 (a) 通道 + (c) 实件（
     classifyShell: () => "allow" as const,
     rules: { version: "桩件" },
   };
-  const captured: { roleId: string; shellOperatorChannel?: OperatorChannelFn; shellArming?: unknown; shellReadonly?: unknown }[] = [];
+  const captured: {
+    roleId: string;
+    shellOperatorChannel?: OperatorChannelFn;
+    shellArming?: unknown;
+    shellOperatorOnly?: { classifyShell?: unknown; rules?: unknown; operatorChannel?: OperatorChannelFn };
+    shellReadonly?: unknown;
+  }[] = [];
   const mgr = new SessionManager({
     openRoleSession: async (input) => {
       captured.push({
         roleId: input.roleId,
         shellOperatorChannel: input.shellOperatorChannel,
         shellArming: (input as { shellArming?: unknown }).shellArming,
+        shellOperatorOnly: (input as { shellOperatorOnly?: { classifyShell?: unknown; rules?: unknown; operatorChannel?: OperatorChannelFn } }).shellOperatorOnly,
         shellReadonly: (input as { shellReadonly?: unknown }).shellReadonly,
       });
       return fakeHandle();
@@ -686,23 +750,28 @@ test("I-1 注入判据：**项目角色**会话收到 (a) 通道 + (c) 实件（
   await mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "pi" });
   const a = captured.find((c) => c.roleId === "A");
   const su = captured.find((c) => c.roleId === "su");
+  // ——— 项目角色：三层链逐字不变 ———
   assert.equal(typeof a!.shellOperatorChannel, "function", "项目角色应收到绑定本会话生命周期的 (a) 通道");
   assert.deepEqual(await a!.shellOperatorChannel!({ command: "fixture", argv: ["fixture"], cwd: "/proj", toolCallId: "D1" }), await channel({ command: "fixture", argv: ["fixture"], cwd: "/proj", toolCallId: "D1" }), "绑定包装仍原样转交通道裁决");
-  assert.equal(su!.shellOperatorChannel, undefined, "su 不接 (b)/(a)（审读者不给自己开闸：不自审、不弹框）");
   assert.equal(a!.shellArming, armingStub, "(c) 实件应**原引用**下发给项目角色（装配面不加工——引用同一性）");
-  assert.equal(su!.shellArming, undefined, "su 不接三层链（其 shell 走只读档）");
-  // ——— su 只读档（客户裁定 2026-10-12：「su 也要有 shell，但是只读」）———
-  assert.equal(
-    su!.shellReadonly,
-    armingStub,
-    "su 应收到 shellReadonly 且**恰为同一份 (c) 实件**（deps.shellArming 原引用——单一来源，与项目角色永不漂移）"
-  );
-  {
-    const ro = su!.shellReadonly as { classifyShell?: unknown; rules?: unknown };
-    assert.equal(typeof ro.classifyShell, "function", "shellReadonly 含 (c) 的 classifyShell（门禁引擎同一函数引用）");
-    assert.ok(ro.rules !== undefined, "shellReadonly 含 (c) 的 rules（规则集本体）");
-  }
+  assert.equal(a!.shellOperatorOnly, undefined, "项目角色不走 su 审批档（仍三层链）");
   assert.equal(a!.shellReadonly, undefined, "项目角色不带 shellReadonly（照旧走 (c)/(b)/(a) 三层链，逐字不变）");
+  // ——— su 审批档（客户裁定 2026-10-17）：operator-only 注入、**不传** readonly ———
+  assert.equal(su!.shellOperatorChannel, undefined, "su 不再直接收 shellOperatorChannel（(a) 通道在 shellOperatorOnly 内）");
+  assert.equal(su!.shellArming, undefined, "su 不接三层链（不自审）");
+  assert.equal(su!.shellReadonly, undefined, "su **不再**收到旧只读档 shellReadonly（改走审批档）");
+  assert.ok(su!.shellOperatorOnly, "su 应收到 shellOperatorOnly（审批档）");
+  {
+    const only = su!.shellOperatorOnly!;
+    assert.equal(only.classifyShell, armingStub.classifyShell, "shellOperatorOnly.classifyShell 恰为 (c) 实件同一函数引用");
+    assert.equal(only.rules, armingStub.rules, "shellOperatorOnly.rules 恰为 (c) 实件同一引用");
+    assert.equal(typeof only.operatorChannel, "function", "shellOperatorOnly.operatorChannel 应为绑定的 (a) 通道");
+    assert.deepEqual(
+      await only.operatorChannel!({ command: "fixture", argv: ["fixture"], cwd: "/proj", toolCallId: "D2" }),
+      await channel({ command: "fixture", argv: ["fixture"], cwd: "/proj", toolCallId: "D2" }),
+      "su 的 (a) 通道同样原样转交裁决",
+    );
+  }
   await mgr.stop(null);
 });
 
@@ -726,13 +795,14 @@ test("I-1 补丁：未 arm（未配置两件）时**什么都不传**——输�
   assert.ok(seen, "应开启过一次会话");
   assert.ok(!("shellOperatorChannel" in (seen as object)), "未配置 ⇒ (a) 字段不出现（不注入）");
   assert.ok(!("shellArming" in (seen as object)), "未配置 ⇒ (c) 字段不出现（不注入）");
+  assert.ok(!("shellOperatorOnly" in (seen as object)), "未配置 ⇒ 审批档字段不出现（不 arm）");
   assert.ok(!("shellReadonly" in (seen as object)), "未配置 ⇒ shellReadonly 字段不出现（项目角色不带——照旧）");
   await mgr.stop(null);
 });
 
-test("su 只读档 fail-closed：deps.shellArming 缺省 ⇒ su 连 shellReadonly 都不注入（能力缺席 = 不 arm，绝不放宽）", async () => {
+test("su 审批档 fail-closed：deps.shellArming 缺省 ⇒ su 连 shellOperatorOnly/shellOperatorChannel/shellReadonly 都不注入（能力缺席 = 不 arm，绝不放宽）", async () => {
   // 「缺省/构造失败 ⇒ 不传」（任务口径：fail-closed）。与上例同款，但开的是**内置治理角色（su）**——
-  // 正是只读档的目标会话；缺件时它同样**什么都拿不到**（不降级、不放宽）。
+  // 正是审批档的目标会话；缺件时它同样**什么都拿不到**（不降级、不放宽）。
   const listing: ProjectListing = {
     projectRoot: "/proj",
     roles: [
@@ -762,14 +832,16 @@ test("su 只读档 fail-closed：deps.shellArming 缺省 ⇒ su 连 shellReadonl
     buildProjectConfig,
     getListing: (root) => (root === "/proj" ? listing : undefined),
     emitEvent: () => {},
-    // 刻意不提供 shellArming（(c) 实件构造失败/未接线的主进程形态）。
+    // 刻意不提供 shellArming（(c) 实件构造失败/未接线的主进程形态）——即便通道在场也不得半装。
+    shellOperatorChannel: async () => ({ outcome: "deny", operatorId: "test", reason: "替身拒绝" }),
     loadEffectiveConfig: STUB_LOADER,
   });
   await mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "pi" });
   assert.ok(seen, "应开启过一次 su 会话");
-  assert.ok(!("shellReadonly" in (seen as object)), "deps.shellArming 缺省 ⇒ su 不注入 shellReadonly（不 arm——绝不半装/放宽）");
-  assert.ok(!("shellArming" in (seen as object)), "su 也不收三层链的 (c) 字段（不接 (b)/(a)）");
-  assert.ok(!("shellOperatorChannel" in (seen as object)), "su 不收 (a) 字段（不弹框）");
+  assert.ok(!("shellOperatorOnly" in (seen as object)), "deps.shellArming 缺省 ⇒ su 不注入 shellOperatorOnly（不 arm——绝不半装/放宽）");
+  assert.ok(!("shellReadonly" in (seen as object)), "su 不再注入旧只读档 shellReadonly");
+  assert.ok(!("shellArming" in (seen as object)), "su 也不收三层链的 (c) 字段（不接 (b)）");
+  assert.ok(!("shellOperatorChannel" in (seen as object)), "su 不经 shellOperatorChannel 字段（(a) 通道在 shellOperatorOnly 内）");
   await mgr.stop(null);
 });
 

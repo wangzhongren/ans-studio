@@ -91,10 +91,18 @@ test("T29 往返：临时 .env 载入后，进程 env 拿到正确值（含 toke
       ].sort(),
     );
     // 面板键集合（单一来源 = `pi-config.ts` 的 `PI_PANEL_KEYS`；G-5 wave 2 起与注册表 `RUNTIME_SETTINGS.pi`
-    // 字段集对齐）：**3 必填 + 2 可选 = 5**（增 `ANS_PI_REASONING_EFFORT`）。
+    // 字段集对齐）：**3 必填 + 3 可选 = 6**（增 `ANS_PI_REASONING_EFFORT`；2026-10-17 Pi 滑块批次再增
+    // `ANS_PI_PROMPT_TIMEOUT_MS`——整轮超时滑块）。
     assert.deepEqual(
       [...PI_PANEL_KEYS].sort(),
-      ["ANTHROPIC_AUTH_TOKEN", "ANS_PI_BASE_URL", "ANS_PI_CONTEXT_WINDOW", "ANS_PI_MODEL", "ANS_PI_REASONING_EFFORT"].sort(),
+      [
+        "ANTHROPIC_AUTH_TOKEN",
+        "ANS_PI_BASE_URL",
+        "ANS_PI_CONTEXT_WINDOW",
+        "ANS_PI_MODEL",
+        "ANS_PI_PROMPT_TIMEOUT_MS",
+        "ANS_PI_REASONING_EFFORT",
+      ].sort(),
     );
     // 反向守卫：`ANS_PI_PROVIDER` **不在**面板键里（代码里有默认值 `ans-gateway`，是内部标签、非用户该填）。
     // 用反向守卫（断言它**不在**）而非删行——防它悄悄长回面板。

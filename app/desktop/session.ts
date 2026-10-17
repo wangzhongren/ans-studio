@@ -40,13 +40,14 @@ import type { SessionEvent, RuntimeTurnOutcome, RuntimePersistenceChangeV1, Repo
 //    （发行在编排 `common/编排/confirmed-writes.ts`，本层不复制）；**「客户确定了才加、才落盘」取代了旧收口**
 //    ——收口提议/确认/手动 finalize 已删，产物收尾由编排在 settle 后**自动**完成（本层不再有 finalize 面）。
 //    普通角色会话**不注入**（无客户通道：两工具不注册、gate 旧语义逐字不变）。
-//  - **su 只读 shell（客户裁定 2026-10-12：「su 也要有 shell，但是只读」）**：内置治理角色（su）会话把
-//    **(c) 规则集实件**（与项目角色**同一份** `deps.shellArming`——单一来源、永不漂移）经 `shellReadonly`
-//    交给编排 `assembleReadonlyShellGate` 装配**只读档** ShellGate ⇒ su 的 `run_shell` **注册**，但**只执行
-//    (c) 只读白名单命令**（`risky`/`review`/`deny` 一律拒）。**su 不接 (b)/(a)**（「审读者不给自己开闸」：
-//    自己就是审读者、不自审；只读外的命令直接拒、**不弹任何对话框、不打扰客户**）。**给出即 arm**（编排
-//    只读档分支不带 `suppressHandback` 前缀——su 会话恒 `suppressHandback === true`，见 `run-role.ts`）；
-//    缺省/构造失败（`deps.shellArming` 为 undefined）⇒ **不传** ⇒ su 不 arm（能力缺席 = fail-closed，绝不放宽）。
+//  - **su 审批档（客户裁定 2026-10-17：「只读的免审批，其他的要客户审批」＋「deny 也走客户审批」）**：
+//    内置治理角色（su）会话把 **(c) 规则集实件**（与项目角色**同一份** `deps.shellArming`——单一来源、永不漂移）
+//    与 **(a) 操作者确认通道**（与项目角色同一份 `deps.shellOperatorChannel`）经 `shellOperatorOnly` 交给编排
+//    `assembleOperatorShellGate` 装配**审批档** ShellGate ⇒ su 的 `run_shell` **注册**：(c) 只读白名单直接放行
+//    **0 卡**；`risky`/`review`/`deny` 一律交客户**逐条批准**（deny 也可被批准）。**su 不接 (b)**（不自审）；
+//    拒绝/超时/通道不可用 = 拒绝（fail-closed）。旧只读档（`shellReadonly`）桌面**不再使用**（类型保留兼容）。
+//    缺省/构造失败（`deps.shellArming` 或 `deps.shellOperatorChannel` 为 undefined）⇒ **不传** ⇒ su 不 arm
+//    （能力缺席 = fail-closed，绝不放宽）。
 
 import type { Acceptance } from "../../src/model/boundary.ts";
 import type { ProjectConfig } from "../../src/model/role.ts";
@@ -123,7 +124,7 @@ import type { DesktopOperatorChannelFn, DesktopShellArming } from "./operator-ch
 // su 只读档（客户裁定 2026-10-12：「su 也要有 shell，但是只读」）：只读档装配选项形状的**单一来源**在编排
 // （`shell-arming.ts::AssembleReadonlyShellGateOptions`）——只读导入其类型（运行期擦除），据它取「只读档
 // 该注入哪几件」。**不另立第二形状**（与 `DesktopShellArming` 同法，见 operator-channel.ts 注释）。
-import type { AssembleReadonlyShellGateOptions, RoutineShellPolicy } from "../../src/pipeline/orchestration/shell-arming.ts";
+import type { AssembleOperatorShellGateOptions, AssembleReadonlyShellGateOptions, RoutineShellPolicy } from "../../src/pipeline/orchestration/shell-arming.ts";
 // 桌面客户交互通道（A-5）：请求/裁决的冻结形状在 §4 冻结契约家（model/runtime.ts），
 // 本模块只读导入转出；`DesktopCustomerInputFn` 是本层对「带角色上下文」的窄扩展（请求本体不带 roleId）。
 import type { DesktopCustomerInputFn } from "./customer-input.ts";
@@ -281,17 +282,18 @@ export interface SessionManagerDeps {
       installMcp?: InstallMcpFn;
       /** **外来 MCP 卸载能力**（G-4 V2，仅 su 注入；形状＝契约家 `UninstallMcpFn`）。 */
       uninstallMcp?: UninstallMcpFn;
-      /** **(a) 操作者确认通道（I-1 arm）**：仅**项目角色**会话注入（su **不接 (b)/(a)**——审读者不给自己开闸；
-       *  编排据此装配 (c)/(b)/(a) ShellGate 并注册 `run_shell`；装配落地前被静默忽略——登记）。 */
+      /** **(a) 操作者确认通道（I-1 arm；2026-10-17 起 su 也构造）**：**项目角色** ⇒ 编排装配 (c)/(b)/(a)
+       *  三层链；**内置治理角色（su）** ⇒ 经下方 `shellOperatorOnly` 装配审批档。角色判据见 `open()`。 */
       shellOperatorChannel?: OperatorChannelFn;
-      /** **(c) 规则集实件（I-1 补丁，2026-10-12）**：仅**项目角色**会话注入（与 (a) 同判据）。 */
+      /** **(c) 规则集实件（I-1 补丁，2026-10-12）**：仅**项目角色**会话注入（与 (a) 同判据走三层链）。 */
       shellArming?: DesktopShellArming;
-      /** **su 只读档（客户裁定 2026-10-12：「su 也要有 shell，但是只读」）**：仅**内置治理角色（su）**会话
-       *  注入（判据 `role.builtIn`，见 SessionManager.open）——**复用同一份 (c) 实件 `DesktopShellArming`**
-       *  （单一来源、与项目角色永不漂移）。编排据此装配**只读档** ShellGate（只接 (c)：命中只读白名单放行；
-       *  `risky`/`review`/`deny` 一律拒；**不接 (b)/(a)**——不打扰客户、不弹框）⇒ `run_shell` 注册。
-       *  **给出即 arm**（su 会话恒 `suppressHandback === true`，编排只读档分支不带该前缀——别被旧注释误导）；
-       *  缺省/构造失败 ⇒ 不传 ⇒ 不 arm（能力缺席 = fail-closed，绝不放宽）。 */
+      /** **su 审批档（客户裁定 2026-10-17）**：仅**内置治理角色（su）**会话注入——(c) 只读白名单免审批，
+       *  `risky`/`review`/`deny` 一律交客户逐条批准（deny 也可批准）；**不接 (b)**（su 不自审）。
+       *  形状＝编排 `AssembleOperatorShellGateOptions`（`Omit<…, "project">`，只读导入、不另立第二形状）。
+       *  缺省/缺件 ⇒ 不传 ⇒ su 不 arm（能力缺席 = fail-closed，绝不放宽）。 */
+      shellOperatorOnly?: Omit<AssembleOperatorShellGateOptions, "project">;
+      /** **su 只读档（旧路径，客户裁定 2026-10-12）**：类型保留以兼容其他调用方/测试；**桌面自 2026-10-17
+       *  起不再使用**（su 改走审批档）。与 `shellOperatorOnly` 同时出现 ⇒ 编排不 arm（互斥守卫）。 */
       shellReadonly?: Omit<AssembleReadonlyShellGateOptions, "project">;
     },
     deps: { createAdapter: RuntimeAdapterFactory },
@@ -1207,30 +1209,34 @@ export class SessionManager {
         ? (d: InstallMcpPayload, _metadata?: ReportHandbackMetadata) => this.applyMcpChange("uninstalled", req.projectRoot, req.runtime, req.roleId, d)
         : undefined;
 
-    // I-1（2026-10-12，客户裁定 arm）：**只对项目角色**把 (a) 操作者确认通道交给编排装配 (c)/(b)/(a)
-    // `ShellGate`（判据 `role.builtIn`，数据驱动）。「审读者不给自己开闸」仍成立：su **不接 (b)/(a)**
-    // （自己就是审读者、不自审；只读外的命令直接拒、不弹框、不打扰客户）——su 的 shell 走下方**只读档**。
+    // (a) 操作者确认通道（I-1 arm；**2026-10-17 起 su 也构造**）：项目角色 → 编排装配 (c)/(b)/(a) 三层链；
+    // 内置治理角色（su）→ 经下方 `shellOperatorOnly` 装配**审批档**。通道**每会话闭包绑定** roleId/
+    // projectRoot/runtime 与本轮 signal（裁决与卡片都按该会话归档）。
     const interactionState = { lifetime: new AbortController(), turn: new AbortController() };
     let shellOperatorChannel: OperatorChannelFn | undefined;
-    if (role.builtIn !== true && this.deps.shellOperatorChannel) {
+    if (this.deps.shellOperatorChannel) {
       const channel = this.deps.shellOperatorChannel;
       shellOperatorChannel = (prompt) => channel(prompt, { roleId: req.roleId, projectRoot: req.projectRoot, runtime: req.runtime, signal: interactionState.turn.signal });
     }
 
-    // I-1 补丁（2026-10-12，客户重发授权）：**(c) 规则集实件**（`classifyShell` + `rules`）——与 (a) 通道
-    // **同判据**（只对项目角色走三层链；su 不接 (b)/(a)）。两件均由主进程构造（`buildDesktopShellArming`）；
-    // 缺省 ⇒ 编排对「规则集未注入」一律拒绝（fail-closed，绝不放宽）。
+    // I-1 补丁（2026-10-12，客户重发授权）：**(c) 规则集实件**（`classifyShell` + `rules`）——仅**项目角色**
+    // 走三层链（su 不自审）。缺省 ⇒ 编排对「规则集未注入」一律拒绝（fail-closed，绝不放宽）。
     const shellArming = role.builtIn === true ? undefined : this.deps.shellArming;
 
-    // **su 只读 shell（客户裁定 2026-10-12：「su 也要有 shell，但是只读」）**：内置治理角色（su）会话把
-    // **(c) 规则集实件**——**复用同一份 `this.deps.shellArming`**（`buildDesktopShellArming` 产出的
-    // `{classifyShell, rules}`；单一来源、与项目角色永不漂移）——经 `shellReadonly` 交给编排
-    // `assembleReadonlyShellGate` 装配**只读档** ShellGate ⇒ su 的 `run_shell` 注册、但只执行 (c) 只读
-    // 白名单命令（risky/review/deny 一律拒；**不接 (b)/(a)**——不弹框）。
-    // **给出即 arm**：su 的会话恒 `suppressHandback === true`（`run-role.ts` 的 suppressHandback 判据），
-    // 而只读档分支**不带**该前缀——判据就是「给出即 arm」，别被旧注释的 `!suppressHandback` 联想误导。
-    // 缺省/构造失败（`deps.shellArming` 为 undefined）⇒ 不传 ⇒ su 不 arm（能力缺席 = fail-closed，绝不放宽）。
-    const shellReadonly = role.builtIn === true ? this.deps.shellArming : undefined;
+    // **su 审批档（客户裁定 2026-10-17）**：内置治理角色（su）会话把 **(c) 实件 + (a) 通道**（均与项目角色
+    // 同一份 deps 引用——单一来源、永不漂移）经 `shellOperatorOnly` 交给编排装配审批档：
+    //   · (c)=allow（只读白名单）⇒ 直接放行、**0 卡**；
+    //   · `risky`/`review`/`deny` ⇒ 客户逐条批准（deny 也可被批准）；拒绝/超时/不可用 = 拒绝。
+    // **缺件（deps.shellArming 或 deps.shellOperatorChannel 缺省）⇒ 不传 ⇒ 不 arm**（能力缺席 = fail-closed）。
+    // 旧只读档 `shellReadonly` 桌面**不再使用**（类型保留以兼容其他调用方；与审批档同时出现时编排不 arm）。
+    const shellOperatorOnly =
+      role.builtIn === true && this.deps.shellArming && shellOperatorChannel
+        ? {
+            classifyShell: this.deps.shellArming.classifyShell,
+            rules: this.deps.shellArming.rules,
+            operatorChannel: shellOperatorChannel,
+          }
+        : undefined;
 
     // pi 路径把 arm 接缝（shellGate，缺省 undefined = 不 arm）透传给编排的真实适配器工厂
     // （`createPiAdapterFactory(project, shellGate?)` 是编排已冻结的签名，此处不发明新形状）。
@@ -1295,15 +1301,15 @@ export class SessionManager {
           // G-4 V2：外来 MCP 安装/卸载能力（同款注入与登记）。
           ...(installMcp ? { installMcp } : {}),
           ...(uninstallMcp ? { uninstallMcp } : {}),
-          // I-1：(a) 操作者确认通道（仅项目角色；编排据它装配 (c)/(b)/(a) ShellGate 并注册 run_shell——
-          // 装配接线落地前本字段被静默忽略，登记在案）。
-          ...(shellOperatorChannel ? { shellOperatorChannel } : {}),
+          // I-1：(a) 操作者确认通道——**项目角色**走 (c)/(b)/(a) 三层链（与下方 `shellArming` 同备）。
+          // su 不走此字段（其 (a) 通道在 `shellOperatorOnly` 内，见下）。
+          ...(role.builtIn !== true && shellOperatorChannel ? { shellOperatorChannel } : {}),
           // I-1 补丁（2026-10-12，客户重发授权）：(c) 实件（classifyShell + defaultShellRules）——与 (a)
           // 同处装配（缺它 ⇒ 编排对「规则集未注入」一律拒绝——真机曾据此如实报「环境无 shell」）。
           ...(shellArming ? { shellArming } : {}),
-          // su 只读档（客户裁定 2026-10-12）：「su 也要有 shell，但是只读」——**仅内置治理角色**会话给出
-          // （同一份 (c) 实件，供编排 `assembleReadonlyShellGate` 装配只读档）；**给出即 arm**。
-          ...(shellReadonly ? { shellReadonly } : {}),
+          // **su 审批档（客户裁定 2026-10-17）**：仅内置治理角色且 (c)+(a) 同备时给出；缺件不传 ⇒ 不 arm。
+          // 旧只读档 `shellReadonly` 不再传（桌面已改审批档）——与 `shellOperatorOnly` 的互斥由编排守卫兜底。
+          ...(shellOperatorOnly ? { shellOperatorOnly } : {}),
         },
         { createAdapter },
       );

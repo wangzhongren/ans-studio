@@ -158,6 +158,18 @@ async function terminalChecks(){
  await check('A non-tool terminal stays actual system fact without invented tool target',`[...document.querySelectorAll('.sys-call')].some(x=>x.textContent==='本轮已中止')&&![...document.querySelectorAll('.tool-row,.activity-row,details')].some(x=>x.textContent.includes('本轮已中止')&&x.textContent.includes('目标未记录'))`);
  await push('session:history',{...scoped,rows:[{kind:'denied',eventKind:'denied',turnId:'ordinary-abort',text:'本轮已中止'},{kind:'denied',eventKind:'denied',turnId:'other-abort',text:'本轮已中止'}]});
  await check('A replay non-tool terminal preserves two actual turns without fabricated tool details',`[...document.querySelectorAll('.sys-call')].filter(x=>x.textContent==='本轮已中止').length===2&&![...document.querySelectorAll('details')].some(x=>x.textContent.includes('本轮已中止')&&x.textContent.includes('目标未记录'))`);
+ // su 命令审批卡（2026-10-17 PM 评审 §3.6）：标题/档位/可见原因/绕过写边界警告/拒绝默认焦点。
+ const suCard=(tier,id)=>({...scoped,id,policy:'su-approval',tier,command:'sh -c "echo approved"',summary:'执行 shell 命令',reasonPlain:'逐条客户批准；拒绝/超时/通道不可用 = 拒绝。',reasonRaw:'命中硬拒程序规则：reshell',cwd:ROOT,argvLines:['sh','-c','echo approved']});
+ await push('shell:confirm-request',suCard('deny','su-deny'));await pause(40);
+ await check('SU approval deny card shows title tier reason warning and deny focus',`(()=>{const t=document.getElementById('sc-title').textContent,s=document.getElementById('sc-summary').textContent,r=document.getElementById('sc-reason').textContent,h=document.getElementById('sc-hint').textContent;return t==='SU 命令审批'&&s.includes('硬拒类（deny）')&&r.includes('逐条客户批准')&&r.includes('命中原因：命中硬拒程序规则：reshell')&&h.includes('批准后命令以当前 OS 用户权限执行，可能绕过 ANS 文件写边界')&&document.activeElement===document.getElementById('sc-deny')&&!document.getElementById('sc-allow').disabled&&!document.body.textContent.includes('不再询问')})()`);
+ await push('shell:confirm-request',suCard('risky','su-risky'));await pause(30);
+ await check('SU approval risky tier label',`document.getElementById('sc-summary').textContent.includes('风险命令（risky）')&&document.getElementById('sc-title').textContent==='SU 命令审批'`);
+ await push('shell:confirm-request',suCard('review','su-review'));await pause(30);
+ await check('SU approval review tier label',`document.getElementById('sc-summary').textContent.includes('未自动判定（review）')`);
+ await push('shell:confirm-request',{...scoped,id:'project-shell',policy:'project',command:'echo literal',summary:'项目卡摘要',reasonPlain:'项目角色原因原文',reasonRaw:'项目审核原文',cwd:ROOT,argvLines:[]});await pause(30);
+ await check('project shell card stays verbatim without su warning',`(()=>{const t=document.getElementById('sc-title').textContent,s=document.getElementById('sc-summary').textContent,r=document.getElementById('sc-reason').textContent,h=document.getElementById('sc-hint').textContent;return t==='shell 命令请求'&&s==='项目卡摘要'&&r==='项目角色原因原文'&&!h.includes('可能绕过 ANS 文件写边界')&&document.activeElement===document.getElementById('sc-deny')})()`);
+ const denyCount=shellResponses.length;await js(`document.getElementById('sc-deny').click()`);await pause(40);
+ assert.equal(shellResponses.length,denyCount+1,'su/project deny responds once');assert.equal(shellResponses.at(-1).allow,false,'deny never authorizes');
 }
 async function sendFactsChecks(){
  await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRole('A')`);

@@ -49,6 +49,12 @@ import type { AdapterCapabilities } from "./run-role.ts";
 import type { RoutineShellPolicy } from "../../common/编排/routine-shell-policy.ts";
 export type { RoutineShellPolicy } from "../../common/编排/routine-shell-policy.ts";
 
+// ── su 审批档的卡片原因文案（2026-10-17，PM 评审 §3.2）──────────────────────────────
+// **Pipeline 公共出口**：桌面窗口只读导入本模块，不直接导入编排私有 `common/`（§6 边界纪律）。
+// 单一来源仍在 `common/编排/shell-gate.ts`；此处**同一符号再导出**（不复制实现）。
+export { SU_APPROVAL_REASON_PREFIX, renderSuApprovalReason } from "../../common/编排/shell-gate.ts";
+export type { SuApprovalTier } from "../../common/编排/shell-gate.ts";
+
 /** 无治理边界时的审计边界（未接受 ⇒ 审计写被门禁拒，如实 stderr；**不翻转**判定）。 */
 const NO_AUDIT_BOUNDARY: BoundarySection1 = {
   entries: [],
@@ -217,6 +223,88 @@ export async function assembleReadonlyShellGate(opts: AssembleReadonlyShellGateO
       }),
     // **不接 (b)/(a)**：不传 pmAsk、不传 operatorChannel；只读档由 shell-gate 层结构保证两闸永不调用。
     readonlyOnly: true,
+    ...(opts.timeoutMs !== undefined ? { timeoutMs: opts.timeoutMs } : {}),
+    projectRoot: opts.project.projectRoot,
+    skillRoot: opts.project.skillRoot,
+    pmBoundary: govBoundary,
+    auditBoundaryRefresh: refreshAuditBoundary,
+    ...(opts.now !== undefined ? { now: opts.now } : {}),
+    ...(opts.env !== undefined ? { env: opts.env } : {}),
+    ...(opts.auditSink !== undefined ? { auditSink: opts.auditSink } : {}),
+  });
+}
+
+// —————————————————————— su 审批档（客户裁定 2026-10-17） ——————————————————————
+
+/**
+ * `assembleOperatorShellGate` 的选项（**契约钉死**：编排/桌面/测试按此接，不许改名）。
+ * **选项面没有** `pmAsk`/`pmRoleId`/`openSession`/`sessionDeps`/`routineShellPolicy`——su 不自审，
+ * 客户审批不得被 pm 审读或委托常规检查绕过；type 层面即接不上。
+ * `operatorChannel` **必填**（无通道即不 arm；`shell-gate.ts` 构造期亦有守卫）。
+ */
+export interface AssembleOperatorShellGateOptions {
+  /** 目标项目（配置单一来源在装配/前端）。 */
+  project: ProjectConfig;
+  /** (a) 客户确认通道（**必填**；桌面确认卡 / 测试桩）。批准才执行；拒绝/超时/不可用 = 拒绝。 */
+  operatorChannel: OperatorChannelFn;
+  /** (c) 门禁引擎纯函数（既有件；**注入**）。未注入 ⇒ 闸一律拒绝（fail-closed）。 */
+  classifyShell?: ClassifyShellFn;
+  /** (c) 规则集本体或加载器（门禁引擎的数据）；未注入 ⇒ 同上（fail-closed）。 */
+  rules?: ShellRules | (() => ShellRules | Promise<ShellRules>);
+  /** 整体审核超时（毫秒）。 */
+  timeoutMs?: number;
+  /** (a) 确认超时（毫秒）；缺省 = `timeoutMs`。**超时 = 拒绝**。 */
+  operatorTimeoutMs?: number;
+  /** 可注入时钟（测试）。 */
+  now?: () => Date;
+  /** 可注入环境（测试）。 */
+  env?: Record<string, string | undefined>;
+  /** 覆盖审计 sink（测试）；缺省落 `docs/audit/shell-gate.jsonl`（经治理边界 + `shell-gate` 条件）。 */
+  auditSink?: ShellAuditSink;
+}
+
+/**
+ * 装配 **su 审批档** `ShellGate`（客户裁定 2026-10-17：「只读的免审批，其他的要客户审批」＋
+ * 「deny 也走客户审批」）。语义（判定全部在 `shell-gate.ts`，本函数只装配）：
+ * - `(c)=allow` → 直接放行（`c-allow`），**不弹卡**（0 次 operator 调用）；
+ * - `(c)=risky` / `review` → 交 (a)（`c-risky→a-*` / `c-review→a-*`）；
+ * - `(c)=deny` → 也交 (a)（`c-deny→a-*`；`approveDeny: true`）——原硬拒可被客户逐条批准；
+ * - **不接 (b)**（su 不自审）；拒绝/超时/通道不可用 = 拒绝（fail-closed）。
+ *
+ * 审计边界 = 治理角色边界（与三层链/只读档**同一解析**，共用 `resolveGovernanceBoundary`）；
+ * 审计仍落 `docs/audit/shell-gate.jsonl`，`conditions`/`execution` 既有语义不变。
+ * 装配失败 / 缺件 ⇒ 构造抛错或闸一律拒绝；调用方（`openRoleSession`）捕获 ⇒ **不 arm**。
+ */
+export async function assembleOperatorShellGate(
+  opts: AssembleOperatorShellGateOptions,
+): Promise<ShellGate> {
+  // 审计边界 = 内置治理角色边界（与三层链/只读档共用同一 helper，不造第二份解析）。
+  const { boundary: govBoundary } = await resolveGovernanceBoundary(opts.project);
+
+  // F-6-1 审计边界刷新闭包（同只读档接线）：重读盘上最新 `.ans` 验收 → 同一解析重试一次。
+  const refreshAuditBoundary = async (): Promise<BoundarySection1> => {
+    const loaded = await loadEffectiveConfig({
+      projectRoot: opts.project.projectRoot,
+      skillRoot: opts.project.skillRoot,
+      fallback: opts.project,
+    });
+    const { boundary } = await resolveGovernanceBoundary(loaded.project);
+    return boundary;
+  };
+
+  return buildShellGate({
+    ...(opts.classifyShell !== undefined ? { classifyShell: opts.classifyShell } : {}),
+    // (c) 规则集未注入 → 加载器抛错 → createShellGate 判 `ruleset-load-failed` → 一律拒绝（fail-closed）。
+    rules:
+      opts.rules ??
+      (() => {
+        throw new Error("(c) shell 规则集未注入——本闸一律拒绝（fail-closed）");
+      }),
+    operatorChannel: opts.operatorChannel,
+    // su 审批档：不接 (b)；risky/review/deny 一律交 (a) 客户逐条批准。
+    operatorOnly: true,
+    approveDeny: true,
+    ...(opts.operatorTimeoutMs !== undefined ? { operatorTimeoutMs: opts.operatorTimeoutMs } : {}),
     ...(opts.timeoutMs !== undefined ? { timeoutMs: opts.timeoutMs } : {}),
     projectRoot: opts.project.projectRoot,
     skillRoot: opts.project.skillRoot,

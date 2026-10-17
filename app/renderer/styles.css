@@ -1796,3 +1796,10 @@ button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus
 .pi-range-wrap input[type="range"]:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 3px; }
 .pi-range-out { flex: 0 0 auto; min-width: 96px; font-size: 12px; line-height: 18px; color: var(--text-2); text-align: right; font-variant-numeric: tabular-nums; }
 .pi-range-note { display: block; margin-top: 4px; font-size: 11px; line-height: 1.5; color: var(--amber); }
+
+/* ———————— su 命令审批卡（2026-10-17 PM 评审 §3.6）——————
+   复用既有 shell 确认卡结构：档位行加粗、原因保留换行（reasonPlain + 可见命中原因）、
+   绕过写边界的警告沿用未决色（不改结构/按钮/焦点语义）。 */
+.sc-reason { white-space: pre-wrap; }
+#shell-confirm.is-su-approval .sc-summary { font-weight: 600; }
+#shell-confirm.is-su-approval .sc-hint { color: var(--amber); }

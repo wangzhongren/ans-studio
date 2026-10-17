@@ -4,6 +4,7 @@
 
 | 交付物 | 一句话用途 | 状态 | 文档 |
 | --- | --- | --- | --- |
+| su 命令审批策略（run_shell） | 只读免审批、risky/review/deny 逐条客户批准；分支/审计、su-only 与构造守卫、桌面注入、SU 卡、零执行哨兵 | verified（2026-10-17，套件 36/36＋卡片探针 9/9；全量 2215/2120/93/2） | [用例](../../test/测试/su-shell-approval-verify/)、[报告](docs/change/2026-10-17_change_su-shell-approval-verify.md)、[证据](docs/change/2026-10-17-su-shell-approval-verify-evidence/) |
 | 已有角色但无治理记录兼容（B+C V1） | S1 状态/预览/建立、su 解卡（确定性 gate）、角色不受影响、零副作用/V6b、幂等、并发、F6 恢复指引、确认卡不被误用、权限审计 | verified（2026-10-17，独立套件 42/42；0 不通过/7 备注；文案修正后复审仍 42/42） | [用例](../../test/测试/existing-project-compat-verify/)、[报告](docs/change/2026-10-17_change_existing-project-compat-verify.md)、[证据](docs/change/2026-10-17-existing-project-compat-verify-evidence/) |
 | 助手消息即时 Markdown（渲染轮复审） | `appendAssistant` 恒 `mdReady:true`；未 settled 即 `<h2>/<table>`；旧行安全网在位；e2e 剩余红经 HEAD A/B 证明既有 | verified（2026-10-17，Electron 探针 6/6；全量 2153/2058/93/2） | [探针](../../test/测试/render-md-ready-probe.mjs)、[摘要](docs/change/2026-10-17-existing-project-compat-verify-evidence/renderer-round-summary.md)、[报告 §⑧](docs/change/2026-10-17_change_existing-project-compat-verify.md) |
 | 三运行时独立入口验证（T1） | 真CLI/Pipeline/实际Electron主入口的选择、门禁、取消、隔离与回归证据 | verified：独立11、实际main23、旧UI119、锚点14通过；全仓1225通过/0失败/1旧Windows skip | [方案](docs/design/2026-10-14_design_multi-runtime-independent-verification.md)、[报告](docs/change/2026-10-14_change_multi-runtime-independent-verification.md)、[重复问题](docs/fix/2026-10-14_fix_actual-main-live-history-duplication.md) |

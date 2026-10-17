@@ -98,11 +98,15 @@ test("R1 role_status 文本结构：项目/时间、su 行（busy/待确认/看�
       h2.cleanup();
     }
 
-    // 最近一轮行：X settle(timed_out) 后出现
+    // 最近一轮行：X settle(timed_out) 后出现。2026-10-17 呈现消歧：busy=true 时写作「上一轮终局」
+    // （明示不表示当前轮），非 busy 时仍为「最近一轮」——两者都如实，接受任一。
     h.ctl("X").streams.push(settledEvent("timed_out"));
     await flush(60);
     const r3 = toolResultOf(await suInput.roleStatus!({ roleId: "X" }));
-    assert.ok(r3.text!.includes("最近一轮：timed_out @"), `最近一轮如实：${r3.text}`);
+    assert.ok(/(最近一轮|上一轮终局)：timed_out @/.test(r3.text!), `最近一轮如实：${r3.text}`);
+    if (r3.text!.includes("上一轮终局：")) {
+      assert.ok(r3.text!.includes("不表示当前轮"), "「上一轮终局」须明示不表示当前轮");
+    }
     assert.ok(r3.text!.includes("近 15 分钟 failed/timed_out 计"), "窗口计数行");
   } finally {
     await h.mgr.stop(null).catch(() => undefined);

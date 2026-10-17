@@ -79,8 +79,10 @@ import { RUNTIME_KINDS } from "../../common/shared/runtime-shared.ts";
 import {
   assembleProjectShellGate,
   assembleReadonlyShellGate,
+  assembleOperatorShellGate,
   type AssembleShellGateOptions,
   type AssembleReadonlyShellGateOptions,
+  type AssembleOperatorShellGateOptions,
   type RoutineShellPolicy,
 } from "./shell-arming.ts";
 import { formatEvent } from "../../common/编排/output.ts";
@@ -113,10 +115,11 @@ import { absRel, isAbsoluteAny, isUnderOrEqual, normalizeLexical } from "../../c
  * · `dispatchTask`（H-1 su 派发任务；未注入 ⇒ `dispatch_task` 不注册）——**只给治理角色 su**注入
  *   （项目角色不给）。形状 = 契约家 `DispatchTaskFn`（前端路由：开/排队/去重/失败保留归前端；
  *   **派发 ≠ 授权**——能力实现方不得据此授予任何写权）。
- * · `shellGate`（I-1 开放 shell + su 只读档；未注入 ⇒ `run_shell` 不注册）——**项目角色**经三层链注入
+ * · `shellGate`（I-1 开放 shell + su 审批档/只读档；未注入 ⇒ `run_shell` 不注册）——**项目角色**经三层链注入
  *   （`openRoleSession` 收到 `shellOperatorChannel` 时经 `assembleProjectShellGate` 装配）；**su** 经
- *   **只读档**注入（收到 `shellReadonly` 时经 `assembleReadonlyShellGate` 装配——客户裁定 2026-10-12：
- *   「su 也要有 shell，但是只读」）。比工厂第二参优先（`capabilities?.shellGate ?? shellGate`）。
+ *   **审批档**（`shellOperatorOnly`，客户裁定 2026-10-17：只读白名单免审批、其余含 deny 逐条客户批准；
+ *   经 `assembleOperatorShellGate` 装配）或**只读档**（`shellReadonly`，旧路径）注入。
+ *   比工厂第二参优先（`capabilities?.shellGate ?? shellGate`）。
  * · `shellVerdict`（R-1 shell 审读结论工具；未注入 ⇒ `report_shell_verdict` 不注册）——**审读会话专用**
  *   （由 `pm-reviewer` 注入；形状单一来源 `common/编排/shell-gate.ts`）。
  * · `roleStatus` / `sessionTail` / `proposeRecovery`（G-2 看护三工具；未注入 ⇒ 对应工具不注册）——
@@ -455,6 +458,16 @@ export async function openRoleSession(
      */
     shellReadonly?: Omit<AssembleReadonlyShellGateOptions, "project">;
     /**
+     * **su 审批档（客户裁定 2026-10-17：「只读的免审批，其他的要客户审批」＋「deny 也走客户审批」）**：
+     * 给出 ⇒ 内置治理角色 su 装配 `assembleOperatorShellGate`（只接 (c)+(a)：allow 直放 0 卡；
+     * risky/review/deny 一律交客户逐条批准；**不接 (b)**——su 不自审）。选项面没有 pmAsk/
+     * routineShellPolicy（type 层面保证）。
+     * **su-only 守卫**：仅 `suppressHandback === true`（内置治理角色）时生效；项目角色误传 ⇒ **不 arm**
+     * 并记录诊断（防止三层链被绕过）。**与 `shellReadonly` 同时给出 ⇒ 不 arm**（诊断记录，不择一静默生效）。
+     * 装配失败/缺件 ⇒ 不 arm（`run_shell` 不注册，fail-closed）。优先级：operatorOnly → readonly → 三层链。
+     */
+    shellOperatorOnly?: Omit<AssembleOperatorShellGateOptions, "project">;
+    /**
      * **R-1：审读结论工具的能力**（`report_shell_verdict`「注入才注册」）——审读会话专用，由
      * `pm-reviewer` 注入；一般调用方不传。
      */
@@ -584,15 +597,31 @@ export async function openRoleSession(
   const installMcp = suppressHandback ? input.installMcp : undefined;
   const uninstallMcp = suppressHandback ? input.uninstallMcp : undefined;
 
-  // I-1 开放 shell（项目角色三层链）+ **su 只读档**（客户裁定 2026-10-12）——两档共用同一个
-  // `shellGate` 能力位（「注入才注册」：注入了 ⇒ Pi 适配器注册 `run_shell`；未注入/装配失败 ⇒
+  // I-1 开放 shell（项目角色三层链）+ **su 审批档**（2026-10-17）+ **su 只读档**（2026-10-12）——
+  // 共用同一个 `shellGate` 能力位（「注入才注册」：注入了 ⇒ Pi 适配器注册 `run_shell`；未注入/装配失败 ⇒
   // **不 arm**，能力缺席 = fail-closed，绝不放宽）。
-  // 优先级（确定行为，写明）：**`shellReadonly` 优先**——给出即按只读档装配。对 **su** 这是设计指向的
-  // 用途（「su 也要有 shell，但是只读」；三层链恒不对 su arm，故只读档不能再加 `!suppressHandback`
-  // 前缀，否则 su 永远 arm 不上）；对**项目角色**给出时按更严的一档处理（只读档执行集严格 ⊆ 三层链）。
-  // 仅当未给 `shellReadonly` 时，才走既有 `shellOperatorChannel`/`shellArming` 三层链（项目角色，逐字不变）。
+  // 优先级（确定行为，写明）：
+  //   1) `shellOperatorOnly`（su 审批档）——**su-only**：仅 `suppressHandback === true` 生效；项目角色误传
+  //      不 arm（诊断记录）。与 `shellReadonly` 同时给出 ⇒ **不 arm**（互斥诊断，不择一静默生效）。
+  //   2) `shellReadonly`（旧只读档；保留给其他调用方/测试）。
+  //   3) 项目角色三层链（`shellOperatorChannel`/`shellArming`，既有 `!suppressHandback` 条件，逐字不变）。
   let shellGate: ShellGate | undefined;
-  if (input.shellReadonly !== undefined) {
+  if (input.shellOperatorOnly !== undefined) {
+    if (input.shellReadonly !== undefined) {
+      // 互斥：不择一静默生效（PM 评审 §3.4）。
+      log.record("shell.operatorOnly.rejected", { mode: "shellOperatorOnly", outcome: "not-armed", reasonCode: "conflicts-with-shellReadonly" });
+    } else if (!suppressHandback) {
+      // su-only：项目角色误传不得把三层链绕成「客户全权审批」。
+      log.record("shell.operatorOnly.rejected", { mode: "shellOperatorOnly", outcome: "not-armed", reasonCode: "not-built-in-governance" });
+    } else {
+      try {
+        shellGate = await assembleOperatorShellGate({ project: input.project, ...input.shellOperatorOnly });
+      } catch (err) {
+        log.error("shell.arming.failed", err);
+        shellGate = undefined; // 装配失败 ⇒ 不 arm（能力缺席 = fail-closed，run_shell 不注册）
+      }
+    }
+  } else if (input.shellReadonly !== undefined) {
     try {
       shellGate = await assembleReadonlyShellGate({ project: input.project, ...input.shellReadonly });
     } catch (err) {

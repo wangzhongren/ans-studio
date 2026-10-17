@@ -144,6 +144,19 @@
     return n;
   }
 
+  /** shell 确认卡标题：su 审批卡与项目角色三层链卡区分（缺省/旧请求 ⇒ 保持原文）。 */
+  function shellConfirmTitle(policy) {
+    return policy === "su-approval" ? "SU 命令审批" : "shell 命令请求";
+  }
+
+  /** su 审批档位可见标签（PM 评审 §3.6；未知/缺省 ⇒ 空串，只显示原因与警告，不编档位）。 */
+  function suApprovalTierLabel(tier) {
+    if (tier === "risky") return "风险命令（risky）";
+    if (tier === "review") return "未自动判定（review）";
+    if (tier === "deny") return "硬拒类（deny）";
+    return "";
+  }
+
   /**
    * **预设档位纯映射**（2026-10-17 滑块控件；G-5 wave 2 的 choices 控件族扩展）：
    * `choices` 为元数据值域（第 0 项固定为默认/清除档，通常是 `""`）。三函数只做
@@ -273,6 +286,8 @@
     arrivalScrolls: arrivalScrolls,
     pendingChipLabel: pendingChipLabel,
     recoveryActionView: recoveryActionView,
+    shellConfirmTitle: shellConfirmTitle,
+    suApprovalTierLabel: suApprovalTierLabel,
     canEstablishGovernance: canEstablishGovernance,
     projectRoleCount: projectRoleCount,
     rangeChoiceIndex: rangeChoiceIndex,
