@@ -180,3 +180,38 @@ work、card、pi、document复用424模态抽屉。仅导航/会话业务面iner
 - 焦点/按钮：`#sc-deny` 默认焦点；拒绝/关闭/Esc ⇒ `allow:false`；恰 `allow:true` 才回传放行；无「记住/不再询问」。
 - 样式：`#shell-confirm.is-su-approval` 由渲染侧切换（`.sc-summary` 600、`.sc-hint` 用 `--amber`）；零 HTML 改动。
 - 测试：`renderer.test.ts` 的 SU 审批卡用例；`uiux-v2.mjs` 的 `ANS_TERMINAL_UI_ONLY=1` 段（TERMINAL_PASS 14）。
+
+## 2026-10-17 字体契约：整页等宽（客户裁定）
+
+- `styles.css :root`：
+  - `--mono: ui-monospace, "Cascadia Mono", "Cascadia Code", "SF Mono", Consolas, "Liberation Mono", "Microsoft YaHei", monospace;`
+  - `--sans: var(--mono);` —— 单一来源；UI 标签/按钮/标题/消息/表格全部经 `var(--sans)` 或 `var(--mono)` 取同一栈。
+- 中文由 `"Microsoft YaHei"` 兜底；**不引入**外部字体文件、`@font-face` 或专有 Anthropic 字体。`index.html` CSP 保持 `default-src 'none'`（本地系统字体无需 `font-src`；未改 HTML）。
+- 字号基线不变：body `13px/1.55`、消息 `15px/1.8`（27px）；A1+A2 的 900 内容列、结构线、贴底输入区不变。
+- 约束：新增样式不得再写 `system-ui` / `"Segoe UI"` 作为主字体，也不得绕过 `--sans`/`--mono` 自写第二套字体栈（测试守卫）。
+
+## 2026-10-17 可收起左栏：DOM / 状态契约
+
+- 状态单点：`.app.is-sidebar-collapsed`（DOM 唯一判据；渲染侧 `sidebarCollapsedNow()`）。收起时 `.app { grid-template-columns: 0 minmax(0,1fr) }`，`.col-left { opacity:0; visibility:hidden; overflow:hidden; padding-inline:0; border-right-width:0 }`——完全隐藏、不占位。
+- DOM：`#sidebar-collapse`（`.col-left` 品牌区右上，`‹`，aria-label「收起左侧栏」，展开态可见）；`#sidebar-expand`（`.col-mid` 左上绝对定位，`›`，aria-label「展开左侧栏」，收起态可见；不在标题栏拖拽区）。原生 `<button>`，Enter/Space 触发；无新增快捷键。
+- 持久化：`localStorage["ans.sidebar.collapsed"]`（`"1"` 收起 / `"0"` 展开；默认展开）。读：`try { UiLabels.sidebarCollapsedFromStorage(getItem) } catch { false }`；写：`try { setItem(key, collapsed ? "1" : "0") } catch {}`；坏值/异常回退展开。
+- 切换：先记 `#chat.scrollTop`，应用类后回写（正文列宽不变时保持；内容变矮时按浏览器上限夹取）。宽档（≥1101）栅格轨道 160ms 过渡 + 左栏 opacity/padding 160ms；≤1100 不参与栅格过渡（避免窗口跨断点重排），仍保留 opacity；`prefers-reduced-motion: reduce` 全部禁用。
+- 几何：收起前后 `.chat-head`/`.composer` 的 y 不变；内容列保持 `--content-max:900px`（960 收起后可容纳 900、展开时 736）；`document.documentElement.scrollWidth === innerWidth`。
+- 探针（只增）：`window.__ansRenderer.sidebar = { collapsed(), toggle(), set(collapsed) }`。
+
+## 2026-10-17 左栏宽度调节：token / DOM / 持久化契约
+
+- 宽度单点：`--sidebar-width`（`:root` 默认 `248px`）；`.app { grid-template-columns: var(--sidebar-width) minmax(0,1fr) }`（窄档同）。折叠态 `.app.is-sidebar-collapsed` 把首列置 0，但**不改变** `--sidebar-width`（展开恢复）。
+- 范围/默认：`UiLabels.SIDEBAR_WIDTH_DEFAULT=248`、`MIN=208`、`MAX=360`；`clampSidebarWidth(value)`（非数/缺失⇒248、越界⇒边界、四舍五入）、`stepSidebarWidth(current,delta)`（键盘步进先归一再加）。
+- DOM：`#sidebar-resizer`（`.sidebar-resizer`，`role="separator"`、`aria-orientation="vertical"`、`aria-valuenow/min/max`、`tabindex="0"`、`cursor:col-resize`）位于 `.col-left` 右缘；视觉线 `::after` 用 `--border-strong`，hover/拖动 `--success`；不与 `#sidebar-collapse` 重叠、不入标题栏拖拽区。
+- 交互：pointerdown/move/up（按 `clientX` 位移改变量；拖动期 `.app.is-sidebar-resizing` 禁用过渡、`cursor:col-resize`/`user-select:none`）；`dblclick` 复位 248；`ArrowLeft/ArrowRight` ±8、Shift ±24。
+- 持久化：`localStorage["ans.sidebar.width"]`；读 `try/catch` → clamp（坏值回退 248）；写前 clamp、写异常静默；拖动松手/双击/键盘步进时持久化。
+- 几何：内容列仍 `--content-max:900px`；1362/1280 展开默认 248 时 pane=900；960 展开默认 248 时 pane=664（无横向溢出）；收起后 960 pane=900。拖动/折叠前后 `.chat-head`/`.composer` 的 y 不变。
+- 探针（只增）：`window.__ansRenderer.sidebar = { collapsed(), toggle(), set(), width(), setWidth() }`。
+
+## 2026-10-17 左树选中项滚动定位契约
+
+- 树项 DOM：`.tree-item[data-role-id="<roleId>"]`（渲染侧设置；测试/e2e 用此定位）。
+- 纯函数：`UiLabels.roleTreeScrollDelta(treeTop, treeBottom, itemTop, itemBottom)`——条目完整可见（±1px）⇒ `0`；在上方 ⇒ 负位移（对齐顶）；在下方 ⇒ 正位移（对齐底）；非数/缺参 ⇒ `0`。
+- 渲染：`ensureRoleTreeVisible(roleId)` 按 rect 求位移后 `tree.scrollTop += delta`（只做最小位移，**不**写 `scrollTop=0`、**不**用 `scrollIntoView`）。调用点：`applyListing` 末尾（`selectedRoleId || primaryRoleId`，导入/刷新）与 `selectRole` 渲染树后。
+- 语义：已可见时**绝不打扰**（保留用户手动滚动）；导入/切换项目默认选中主入口 ⇒ 主入口自动进入 `.tree` 视口；选中其他角色 ⇒ 该角色进入视口。

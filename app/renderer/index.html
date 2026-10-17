@@ -38,6 +38,12 @@
       <aside class="col col-left">
         <!-- V2：品牌、紧凑项目、真实角色导航与稳定底部入口。 -->
         <div class="workspace-brand">ans<span>AGENT WORKSPACE</span></div>
+        <!-- 可收起左栏（2026-10-17 客户反馈「最好左边能收起来」）：收起按钮贴品牌区右上；
+             收起后内容区左上保留展开按钮（见 .col-mid 内 #sidebar-expand）。原生 button ⇒ Enter/Space 可用。 -->
+        <button id="sidebar-collapse" class="sidebar-toggle" type="button" aria-label="收起左侧栏" title="收起左侧栏" aria-expanded="true">‹</button>
+        <!-- 左栏宽度分隔线（2026-10-17 客户选择「248px + 可拖拽」）：拖动/双击复位/方向键 ±8（Shift ±24）；
+             不进入标题栏拖拽区，也不与收起按钮重叠。 -->
+        <div id="sidebar-resizer" class="sidebar-resizer" role="separator" aria-orientation="vertical" aria-label="调整左侧栏宽度" aria-valuenow="248" aria-valuemin="208" aria-valuemax="360" tabindex="0" title="拖动调整左栏宽度；双击复位 248px"></div>
         <div class="project-summary">
           <div class="project-icon" aria-hidden="true">⌑</div>
           <div class="project-identity"><div id="project-name" class="project-name" hidden></div><div id="project-path" class="project-path is-empty">尚未导入项目</div></div>
@@ -54,6 +60,7 @@
 
       <!-- 中栏：与角色的聊天（点角色即开，多轮直发） -->
       <main class="col col-mid">
+        <button id="sidebar-expand" class="sidebar-toggle sidebar-expand" type="button" aria-label="展开左侧栏" title="展开左侧栏" aria-expanded="false" hidden>›</button>
         <header class="chat-head">
           <div class="session-identity"><span id="chat-role" class="chat-role">未选择角色</span><span id="chat-role-sub" class="chat-role-sub" hidden></span><span id="context-state" class="context-state" role="status" aria-live="polite">尚未开启会话</span></div>
           <div class="session-actions" id="right-tabs">

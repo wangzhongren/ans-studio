@@ -178,6 +178,126 @@
     if (source && source.kind === "queue" && source.projectRoot === state.projectRoot && source.runtime === state.runtime && source.roleId === roleId && (!clientMessageId || source.clientMessageId === clientMessageId)) setHint("");
   }
 
+  // —————— 可收起左栏（2026-10-17 客户反馈「左边和内容区域不太协调…最好左边能收起来」）——————
+  // 状态单点＝`.app.is-sidebar-collapsed` 类（DOM 是唯一判据）；持久化只读写 localStorage 的
+  // `ans.sidebar.collapsed`（"1" 收起 / "0" 展开）。坏值/异常（隐私模式等）一律回退**展开**。
+  // 切换时先记 `#chat.scrollTop`、改后回写（内容列宽仍是 900，正文换行不变，滚动不跳顶）。
+  var SIDEBAR_STORAGE_KEY = "ans.sidebar.collapsed";
+  // 左栏宽度（2026-10-17 客户选择「248px + 可拖拽」）：单一来源 = CSS 变量 `--sidebar-width`；
+  // 持久化键独立；折叠只把栅格首列置 0，宽度变量原样保留，展开即恢复。
+  var SIDEBAR_WIDTH_STORAGE_KEY = "ans.sidebar.width";
+
+  function currentSidebarWidth() {
+    var raw = getComputedStyle(document.documentElement).getPropertyValue("--sidebar-width");
+    var n = parseFloat(raw);
+    return isFinite(n) ? UiLabels.clampSidebarWidth(n) : UiLabels.SIDEBAR_WIDTH_DEFAULT;
+  }
+
+  /** 应用宽度（不做持久化）：只改变量 + 分隔线 aria，不重建 DOM。 */
+  function applySidebarWidth(width) {
+    var w = UiLabels.clampSidebarWidth(width);
+    document.documentElement.style.setProperty("--sidebar-width", w + "px");
+    var resizer = $("sidebar-resizer");
+    if (resizer) resizer.setAttribute("aria-valuenow", String(w));
+    return w;
+  }
+
+  function readSidebarWidth() {
+    try { return UiLabels.clampSidebarWidth(window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY)); }
+    catch (_) { return UiLabels.SIDEBAR_WIDTH_DEFAULT; }
+  }
+
+  function writeSidebarWidth(width) {
+    try { window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(UiLabels.clampSidebarWidth(width))); }
+    catch (_) { /* 存储不可用：本次会话仍可拖动，只是不持久化 */ }
+  }
+
+  /** 分隔线：pointer 拖动（改 CSS 变量 + aria）、双击复位 248、←/→ ±8（Shift ±24）。
+   *  拖动期间 `.is-sidebar-resizing` 禁用宽度过渡（避免滞后）；松手恢复并持久化。 */
+  function initSidebarResizer() {
+    var resizer = $("sidebar-resizer");
+    if (!resizer) return;
+    var app = document.querySelector(".app");
+    var startX = 0, startWidth = 0, dragging = false;
+    resizer.addEventListener("pointerdown", function (event) {
+      if (event.button != null && event.button !== 0) return;
+      dragging = true;
+      startX = event.clientX;
+      startWidth = currentSidebarWidth();
+      if (app) app.classList.add("is-sidebar-resizing");
+      try { resizer.setPointerCapture(event.pointerId); } catch (_) {}
+      event.preventDefault();
+    });
+    resizer.addEventListener("pointermove", function (event) {
+      if (!dragging) return;
+      applySidebarWidth(startWidth + (event.clientX - startX));
+      event.preventDefault();
+    });
+    function endDrag(event) {
+      if (!dragging) return;
+      dragging = false;
+      if (app) app.classList.remove("is-sidebar-resizing");
+      try { resizer.releasePointerCapture(event.pointerId); } catch (_) {}
+      writeSidebarWidth(currentSidebarWidth());
+    }
+    resizer.addEventListener("pointerup", endDrag);
+    resizer.addEventListener("pointercancel", endDrag);
+    resizer.addEventListener("dblclick", function () {
+      applySidebarWidth(UiLabels.SIDEBAR_WIDTH_DEFAULT);
+      writeSidebarWidth(UiLabels.SIDEBAR_WIDTH_DEFAULT);
+    });
+    resizer.addEventListener("keydown", function (event) {
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      event.preventDefault();
+      var step = event.shiftKey ? 24 : 8;
+      var next = UiLabels.stepSidebarWidth(currentSidebarWidth(), event.key === "ArrowRight" ? step : -step);
+      applySidebarWidth(next);
+      writeSidebarWidth(next);
+    });
+  }
+
+  function sidebarCollapsedNow() {
+    var app = document.querySelector(".app");
+    return !!app && app.classList.contains("is-sidebar-collapsed");
+  }
+
+  function readSidebarCollapsed() {
+    try { return UiLabels.sidebarCollapsedFromStorage(window.localStorage.getItem(SIDEBAR_STORAGE_KEY)); }
+    catch (_) { return false; }
+  }
+
+  function writeSidebarCollapsed(collapsed) {
+    try { window.localStorage.setItem(SIDEBAR_STORAGE_KEY, collapsed === true ? "1" : "0"); }
+    catch (_) { /* 存储不可用：本次会话仍可切换，只是不持久化 */ }
+  }
+
+  /** 应用收起态（不负责持久化）：类 + 两枚按钮的显隐/aria（展开按钮始终在内容区左上可达）。 */
+  function applySidebarCollapsed(collapsed) {
+    var value = collapsed === true;
+    var app = document.querySelector(".app");
+    if (app) app.classList.toggle("is-sidebar-collapsed", value);
+    var expand = $("sidebar-expand"), collapse = $("sidebar-collapse");
+    if (expand) { expand.hidden = !value; expand.setAttribute("aria-expanded", String(!value)); }
+    if (collapse) { collapse.hidden = value; collapse.setAttribute("aria-expanded", String(!value)); }
+  }
+
+  function toggleSidebar() {
+    var chat = $("chat"), top = chat ? chat.scrollTop : 0;
+    var next = !sidebarCollapsedNow();
+    applySidebarCollapsed(next);
+    writeSidebarCollapsed(next);
+    if (chat) chat.scrollTop = top; // 先量后改：正文列宽不变，滚动位置保持
+  }
+
+  function initSidebar() {
+    applySidebarWidth(readSidebarWidth()); // 默认 248；坏值/越界 clamp
+    initSidebarResizer();
+    applySidebarCollapsed(readSidebarCollapsed()); // 默认展开；坏值回退展开
+    var collapse = $("sidebar-collapse"), expand = $("sidebar-expand");
+    if (collapse) collapse.addEventListener("click", toggleSidebar);
+    if (expand) expand.addEventListener("click", toggleSidebar);
+  }
+
   /** 会话状态（客户裁定 2026-10-13：界面**不再显示**「聊天中/空闲」pill）——kind **程序化保留**：
    *  写到 `#chat` 的 `data-state` 属性（run/idle/err），e2e 与外部驱动仍可断言；label 参数保留以兼容调用点。 */
   function setState(kind, label) {
@@ -3453,6 +3573,7 @@
     $("sidebar-role-count").textContent = state.roles.length + " 个角色 · 本地会话";
     $("project-path").title = state.projectRoot || "尚未导入项目";
     renderRoleTree();
+    ensureRoleTreeVisible(state.selectedRoleId || state.primaryRoleId); // 导入/刷新：主入口/选中项可见（用户滚动不被重置到顶）
     renderRight();
     renderTabs();
     setChatHeader(selectedRole());
@@ -3948,6 +4069,7 @@
     item.className = "tree-item" + (r.builtIn ? " builtin" : "") +
       (isPrimary ? " primary" : "") +
       (r.roleId === state.selectedRoleId ? " active" : "");
+    item.setAttribute("data-role-id", r.roleId);
     item.setAttribute("role", "button");
     item.setAttribute("tabindex", "0");
     var identityDescription = [isPrimary ? "主入口：默认入口与主路径" : "", r.builtIn ? "内置角色：定义在 SKILL.md，无角色目录" : ""].filter(Boolean).join("；");
@@ -3963,6 +4085,25 @@
     item.addEventListener("click", activate);
     item.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); activate(); } });
     return item;
+  }
+
+  /**
+   * 让指定角色项落在 `.tree` 视口内（2026-10-17 实机：248px 左栏 + 9 角色时，导入/选中后
+   * 主入口 `su` 可能被滚出可视区，看起来像「主入口消失」）。
+   * 口径：**已可见就不动**（保留用户手动滚动）；需要时只做**最小位移**（近端对齐），
+   * 不强制 `scrollTop=0`。切项目/导入/选中后调用。
+   */
+  function ensureRoleTreeVisible(roleId) {
+    var tree = $("role-tree");
+    if (!tree || typeof roleId !== "string" || roleId === "") return;
+    var items = tree.querySelectorAll(".tree-item[data-role-id]"), target = null;
+    for (var i = 0; i < items.length; i += 1) {
+      if (items[i].getAttribute("data-role-id") === roleId) { target = items[i]; break; }
+    }
+    if (!target) return;
+    var treeRect = tree.getBoundingClientRect(), itemRect = target.getBoundingClientRect();
+    var delta = UiLabels.roleTreeScrollDelta(treeRect.top, treeRect.bottom, itemRect.top, itemRect.bottom);
+    if (delta !== 0) tree.scrollTop += delta; // 最小位移到近端；浏览器自行夹取上下限
   }
 
   function treeGroupLabel(text) {
@@ -4037,6 +4178,7 @@
     state.selectedRoleId = roleId;
     if (!isSameRole) restoreComposerDraft(roleId);
     renderRoleTree();
+    ensureRoleTreeVisible(roleId); // 499：选中角色必须在左树视口内（不强制回顶）
     renderRight();
     renderTabs();
     setChatHeader(selectedRole());
@@ -5160,6 +5302,7 @@
   // L-1 + 状态准确性：每角色**真实状态快照**（busy × 队列摘要，变化时）→ 徽标「工作中 · N 待办」+ 队列行。
   if (d.onRoleState) d.onRoleState(function (payload) { deliverRuntimePayload(payload, onRoleState); });
 
+  initSidebar(); // 读 localStorage（默认展开/坏值回退）并绑定收起/展开按钮
   ensureGovernanceUi(); // I4：提前建立状态行/预览容器（hidden）——`.session-notice` 的显隐判据因此稳定
   measureComposer();
   if (typeof ResizeObserver === "function") new ResizeObserver(measureComposer).observe(document.querySelector(".composer"));
@@ -5193,6 +5336,19 @@
     savePiConfigFromForm: savePiConfigFromForm,
     appendOperatorRequest: appendOperatorRequest,
     piKeys: PI_KEYS.slice(),
+    // 可收起左栏探针（只读状态 + 切换）：判据仍是 `.app.is-sidebar-collapsed` 单点。
+    sidebar: {
+      collapsed: sidebarCollapsedNow,
+      toggle: toggleSidebar,
+      set: function (collapsed) {
+        var chat = $("chat"), top = chat ? chat.scrollTop : 0;
+        applySidebarCollapsed(collapsed === true);
+        writeSidebarCollapsed(sidebarCollapsedNow());
+        if (chat) chat.scrollTop = top;
+      },
+      width: currentSidebarWidth,
+      setWidth: function (width) { var w = applySidebarWidth(width); writeSidebarWidth(w); return w; },
+    },
     // I4（2026-10-17）：治理记录探针（只读状态 + 三个入口）——供 e2e 驱动非模态预览/取消/建立；
     // 判据仍只有 `governanceActionVisible()` 一个入口（探针不另算）。
     governance: {

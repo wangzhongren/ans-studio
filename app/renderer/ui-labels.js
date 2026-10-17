@@ -144,6 +144,43 @@
     return n;
   }
 
+  /**
+   * 左树「让选中项可见」的**最小滚动位移**（2026-10-17 实机修复：248px + 多角色时主入口被滚出视口）：
+   * 已完整可见（±1px 容差）⇒ 0（保留用户手动滚动，绝不重置到顶）；在上方 ⇒ 负位移（对齐顶）；
+   * 在下方 ⇒ 正位移（对齐底）。非数/缺参 ⇒ 0（保守不动）。
+   */
+  function roleTreeScrollDelta(treeTop, treeBottom, itemTop, itemBottom) {
+    var t = Number(treeTop), b = Number(treeBottom), i = Number(itemTop), j = Number(itemBottom);
+    if (![t, b, i, j].every(function (n) { return isFinite(n); })) return 0;
+    if (i >= t - 1 && j <= b + 1) return 0;
+    if (i < t) return i - t;
+    return j - b;
+  }
+
+  /** 左栏宽度（2026-10-17 客户选择「248px + 可拖拽」）：默认 248、范围 208–360（单一来源）。 */
+  var SIDEBAR_WIDTH_DEFAULT = 248;
+  var SIDEBAR_WIDTH_MIN = 208;
+  var SIDEBAR_WIDTH_MAX = 360;
+
+  /** 宽度解析/clamp：数值越界 → 边界；非数/坏值/缺失 → 默认 248；四舍五入到整数。 */
+  function clampSidebarWidth(value) {
+    var n = typeof value === "number" ? value : parseFloat(value == null ? "" : String(value));
+    if (!isFinite(n)) return SIDEBAR_WIDTH_DEFAULT;
+    n = Math.round(n);
+    return Math.max(SIDEBAR_WIDTH_MIN, Math.min(SIDEBAR_WIDTH_MAX, n));
+  }
+
+  /** 键盘步进（±8 / Shift ±24）：先归一当前值再加步长，最终仍 clamp。 */
+  function stepSidebarWidth(current, delta) {
+    var step = typeof delta === "number" && isFinite(delta) ? delta : 0;
+    return clampSidebarWidth(clampSidebarWidth(current) + step);
+  }
+
+  /** 左栏收起状态的**存储值解析**（单点）：仅 `"1"` 表示收起；`"0"`/缺失/坏值 ⇒ 展开。 */
+  function sidebarCollapsedFromStorage(value) {
+    return value === "1";
+  }
+
   /** shell 确认卡标题：su 审批卡与项目角色三层链卡区分（缺省/旧请求 ⇒ 保持原文）。 */
   function shellConfirmTitle(policy) {
     return policy === "su-approval" ? "SU 命令审批" : "shell 命令请求";
@@ -288,6 +325,13 @@
     recoveryActionView: recoveryActionView,
     shellConfirmTitle: shellConfirmTitle,
     suApprovalTierLabel: suApprovalTierLabel,
+    sidebarCollapsedFromStorage: sidebarCollapsedFromStorage,
+    clampSidebarWidth: clampSidebarWidth,
+    stepSidebarWidth: stepSidebarWidth,
+    roleTreeScrollDelta: roleTreeScrollDelta,
+    SIDEBAR_WIDTH_DEFAULT: SIDEBAR_WIDTH_DEFAULT,
+    SIDEBAR_WIDTH_MIN: SIDEBAR_WIDTH_MIN,
+    SIDEBAR_WIDTH_MAX: SIDEBAR_WIDTH_MAX,
     canEstablishGovernance: canEstablishGovernance,
     projectRoleCount: projectRoleCount,
     rangeChoiceIndex: rangeChoiceIndex,

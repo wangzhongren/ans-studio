@@ -139,3 +139,40 @@
 - 测试：renderer **69 计 / 65 过 / 4 红**（既有基线 N-1、data-state、P1-3、G-5），新增 SU 审批卡用例（三档标签、标题、警告、可见命中原因、拒绝焦点、project 逐字回归、拒绝不调用放行）；`ANS_TERMINAL_UI_ONLY=1` 真实 Electron **TERMINAL_PASS 14**（新增 5 项 su/project 卡检查）；默认 e2e 仍只在既有 `virtual visible nonempty`（1044）失败。
 - 依赖：`payload.policy`/`payload.tier` 字段由桌面窗口按契约提供；缺失时按 project 原行为（不猜档位）。
 - 指纹：`renderer.js 9fcbf68d`、`ui-labels.js 270a1dcb`、`styles.css a5848df1`、`renderer.test.ts b8f91729`、`uiux-v2.mjs f12db959`。
+
+## 2026-10-17：整页等宽字体（客户裁定「和 claude code 一样」→ 整页等宽终端感）
+
+客户逐字「字体设置成和claude code 一样的字体」，并选择「**整页等宽（终端感）**」。`app/renderer/styles.css` `:root`：
+- `--mono: ui-monospace, "Cascadia Mono", "Cascadia Code", "SF Mono", Consolas, "Liberation Mono", "Microsoft YaHei", monospace;`
+- `--sans: var(--mono);`（单一来源，避免 sans/mono 漂移）——UI 标签/按钮/标题/消息/表格全部走该栈；中文由 `"Microsoft YaHei"` 兜底；不引入外部字体文件或专有 Anthropic 字体。
+- `index.html` CSP 保持 `default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:`——本地系统字体不触发网络/资源加载，**无需新增 font-src**；未改 HTML。
+- A1+A2 基线保持：900 内容列、三条结构线、贴底输入区、body 13px/1.55、消息 15px/27px 均未改；未因换字体调整字号。
+- 测试：`renderer.test.ts` 新增字体栈用例（等宽栈逐字、`--sans` 复用 `--mono`、无 system-ui/Segoe UI 主字体、中文回退、无外部/专有字体、CSP 与字号基线）；renderer **70 计 / 66 过 / 4 红**（既有基线 N-1、data-state、P1-3、G-5）。真实 Electron：`ANS_VISUAL_V2_UI_ONLY=1` **VISUAL_V2_PASS 36**、`ANS_TERMINAL_UI_ONLY=1` **TERMINAL_PASS 14**；默认套件仍只在既有 `virtual visible nonempty` 失败（行号随本轮新增 e2e 用例后移至 :1056，同一基线红）。
+- 指纹：`styles.css 773200fa`、`renderer.test.ts 8c61cd01`。
+
+## 2026-10-17：可收起左栏（客户反馈「左边和内容区域不太协调…最好左边能收起来」）
+
+- **交互**：展开态 `.col-left` 品牌区右上角 `#sidebar-collapse`（`‹`，aria-label「收起左侧栏」）；收起态 `.col-left` 完全隐藏（栅格首列 0、不占位），内容区左上 `#sidebar-expand`（`›`，aria-label「展开左侧栏」）始终可达；原生 `<button>` ⇒ Enter/Space 可触发，无新快捷键、不与窗口按钮/拖拽区冲突。状态单点＝`.app.is-sidebar-collapsed` 类。
+- **持久化**：`localStorage["ans.sidebar.collapsed"]`（`"1"` 收起 / `"0"` 展开；默认展开）；读写各自 try/catch，坏值/异常经 `ui-labels.js::sidebarCollapsedFromStorage` 回退展开。切换前记 `#chat.scrollTop`、改后回写（正文列宽不变时滚动位置保持；960 档收起使内容列变宽、内容变矮时按浏览器上限夹取，不退到顶部）。
+- **协调/稳定**：收起后内容列仍为 `var(--content-max)=900px` 居中；`.chat-head`/`.composer` 的 y 不变；无页面横向溢出（1362/1280/960 实测）。过渡：宽档（≥1101）`grid-template-columns` 160ms + 左栏 opacity/padding；窄档不参与栅格过渡（避免窗口跨 1100 断点时内容列短暂错位），仍保留 opacity 过渡；`prefers-reduced-motion: reduce` 全部禁用。A1+A2 的框线/900 列/贴底/重量体系未改；未新增字体/颜色。
+- **测试**：`renderer.test.ts` 新增收起左栏用例（默认展开、存储解析坏值回退、单点类判据、按钮显隐/可达、滚动先量后改、160ms/reduced-motion、900 列保持）；renderer **71 计 / 67 过 / 4 红**（既有基线 N-1、data-state、P1-3、G-5）。真实 Electron `ANS_VISUAL_V2_UI_ONLY=1` **VISUAL_V2_PASS 42**（新增 1362/1280/960 收起/展开 6 项几何与截图）；`ANS_TERMINAL_UI_ONLY=1` **TERMINAL_PASS 14**；默认套件仍只在既有 `virtual visible nonempty` 失败（行号随新增用例移至 :1068，同一基线红）。
+- 指纹：`renderer.js 2a74a347`、`index.html 6a1641b9`、`styles.css 7d8abbc2`、`ui-labels.js 4799508d`、`renderer.test.ts a65533c2`、`uiux-v2.mjs 65de9503`。
+
+## 2026-10-17：左栏宽度可调（248px + 可拖拽）
+
+客户选择「**248px + 可拖拽（推荐）**」：
+- **默认/范围**：默认 248px，范围 208–360px。`.app` 栅格首列改为 `var(--sidebar-width)`（窄档同样使用该变量）；`:root { --sidebar-width: 248px }`。拖动/键盘只改该变量与分隔线 aria，不重建 DOM。
+- **分隔线**：`#sidebar-resizer`（`role="separator"`、`aria-orientation="vertical"`、`aria-valuemin/max/now`、`tabindex="0"`、`cursor: col-resize`）贴左栏右缘；**不与收起按钮重叠**、不进入标题栏拖拽区。Pointer 拖动（`is-sidebar-resizing` 期间禁用宽度过渡，松手恢复并持久化）；双击复位 248；←/→ ±8px、Shift ±24px。
+- **持久化**：`localStorage["ans.sidebar.width"]`；纯函数 `ui-labels.js::clampSidebarWidth/stepSidebarWidth`（默认 248、越界 clamp、坏值/非数回退 248、四舍五入）。读取 try/catch，写入 clamp 后持久化。
+- **折叠保留**：折叠只切 `.app.is-sidebar-collapsed`（栅格首列 0），宽度变量与 aria 原样保留；展开恢复上次宽度。
+- **窄窗口（≤1100）**：不额外响应式 clamp——960 档默认 248 时内容列 664px、无横向溢出（展开后 `.chat-pane` 随容器流式收缩）；拖动到 360 时仍无横向溢出，仅阅读列更窄。A1+A2 的 900 列、框线、贴底与等宽字体保持。
+- **测试**：renderer **72 计 / 68 过 / 4 红**（既有基线 N-1、data-state、P1-3、G-5），新增宽度用例（默认/clamp/坏值/持久化/拖动/双击/键盘/折叠保留）；真实 Electron `ANS_VISUAL_V2_UI_ONLY=1` **VISUAL_V2_PASS 46**（新增默认 248、拖动 328、双击复位、Shift+24、折叠保留 5 项几何与截图：`visual-resized-1362.png` / `visual-width-reset-1362.png`）；`ANS_TERMINAL_UI_ONLY=1` **TERMINAL_PASS 14**；默认套件仍只在既有 `virtual visible nonempty` 失败（行号移至 :1083，同一基线红）。
+- 指纹：`renderer.js 13edf327`、`index.html a894a25e`、`styles.css 3ba8adf7`、`ui-labels.js b935c072`、`renderer.test.ts 0f83061c`、`uiux-v2.mjs 30f68cc4`。
+
+## 2026-10-17：左树选中项滚动定位（248px + 9 角色时主入口被滚出视口）
+
+实机反馈：`.tree` `scrollTop=91`（clientHeight 500 / scrollHeight 591），主入口 `su` rect y=153、高 58、视口从 y=216 开始——选中项被滚出可视区，看起来像「主入口消失」。
+- **实现**：角色树项加 `data-role-id`；新增 `ensureRoleTreeVisible(roleId)`：找到目标项后按 `.tree`/条目 rect 计算**最小位移**（上方对齐顶、下方对齐底），已完整可见（±1px）则**不动**——不强制 `scrollTop=0`，保留用户手动滚动。纯位移单点 `ui-labels.js::roleTreeScrollDelta`（非法输入 ⇒ 0）。在 `applyListing`（导入/刷新，取 `selectedRoleId || primaryRoleId`）与 `selectRole` 渲染树后调用。未用 `scrollIntoView`（避免连带滚动其它容器）。
+- **不变项**：248px 默认/208–360 拖拽、折叠/展开、900 内容列、贴底、等宽字体与 A1+A2 体系均未改。
+- **测试**：renderer **73 计 / 69 过 / 4 红**（既有基线 N-1、data-state、P1-3、G-5），新增左树可见性用例（可见不动/上下最小位移/±1 容差/非法不动/两处调用/不强制回顶）；真实 Electron `ANS_VISUAL_V2_UI_ONLY=1` **VISUAL_V2_PASS 50**（新增 9 角色：导入后 su 可见、选中中段可见、刷新保留手动滚动、点 su 立即可见；截图 `visual-tree-su-visible-1362.png`）；`ANS_TERMINAL_UI_ONLY=1` **TERMINAL_PASS 14**；默认套件仍只在既有 `virtual visible nonempty` 失败（行号 :1101，同一基线红）。
+- 指纹：`renderer.js db1d4583`、`ui-labels.js 3645aaad`、`renderer.test.ts 6ef0698f`、`uiux-v2.mjs 6d75e481`。

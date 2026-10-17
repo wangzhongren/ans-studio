@@ -364,8 +364,12 @@ test("自绘标题栏：三个窗口按钮经 IPC 接主进程（最小化 / 最
   assert.ok(STYLES.includes("-webkit-app-region: drag"), "标题栏应为拖动区（-webkit-app-region: drag）");
   assert.ok(STYLES.includes("-webkit-app-region: no-drag"), "窗口按钮应为 no-drag（否则点不动）");
   assert.ok(STYLES.includes(".win-btn-close"), "应有关闭按钮样式（克制的中性/语义提示）");
-  // 双击最大化：**不**挂 dblclick（由 Windows 原生在拖动区/ HTCAPTION 上处理，叠加会变成双击无反应）。
-  assert.ok(!RENDERER.includes('addEventListener("dblclick"'), "渲染侧不得挂 dblclick（会与原生双击最大化叠加）");
+  // 双击最大化：**标题栏不**挂 dblclick（由 Windows 原生在拖动区/ HTCAPTION 上处理，叠加会变成双击无反应）；
+  // 唯一允许的 dblclick = 左栏宽度分隔线「双击复位 248」（不在标题栏、无叠加）。
+  const dblclickSites = RENDERER.match(/addEventListener\("dblclick"/g) || [];
+  assert.equal(dblclickSites.length, 1, "dblclick 仅允许分隔线一处");
+  assert.ok(RENDERER.includes('resizer.addEventListener("dblclick"'), "唯一 dblclick = 分隔线复位");
+  assert.ok(!/titlebar[\s\S]{0,240}addEventListener\("dblclick"/.test(RENDERER), "标题栏不得挂 dblclick");
   // 应用标识只在标题栏一份：左栏不再重复堆砌品牌。
   assert.ok(!INDEX.includes("brand-mark") && !INDEX.includes("brand-sub"), "左栏不应再重复堆砌品牌标识（已上移到标题栏）");
   assert.ok(STYLES.includes(".titlebar") && STYLES.includes(".win-btn"), "styles.css 应有标题栏与窗口按钮样式");
@@ -1373,7 +1377,7 @@ test("右栏抽屉：默认不占屏（col-right 退役）；图标簇两枚（�
   assert.ok(!INDEX.includes("col-right"), "右栏常驻列应退役（.col-right 不在 index.html）");
   assert.ok(INDEX.includes('id="right-drawer"'), "应有右侧抽屉 #right-drawer");
   assert.ok(STYLES.includes("#right-drawer.open") && STYLES.includes("position: absolute"), "抽屉应为覆盖层（absolute + .open 滑出）");
-  assert.ok(STYLES.includes("grid-template-columns:208px minmax(0,1fr)") && STYLES.includes("grid-template-columns:176px minmax(0,1fr)") && STYLES.includes("--content-max: 900px"), "栅格应为两列（右栏不占列）+ A1 内容列 900");
+  assert.ok(STYLES.includes("grid-template-columns:var(--sidebar-width) minmax(0,1fr)") && STYLES.includes("--sidebar-width: 248px") && STYLES.includes("--content-max: 900px"), "栅格两列（左栏宽度可调）+ A1 内容列 900");
   assert.ok(!/setTimeout|setInterval/.test(RENDERER.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "")), "无计时器纪律不破（抽屉过渡用 CSS）");
   // ② 图标簇：**两枚**（角色资料/Pi 设置）在标题栏控制区、窗口按钮之前；不算 .win-btn（三窗口按钮守卫不破）。
   //    第二轮裁定（2026-10-13）：待办/队列归角色——tab-todo/tab-queue 退役（HTML 与渲染侧接线都不留）。
@@ -1821,6 +1825,13 @@ type GovernanceUiLabels = {
   rangeChoiceLabel: (choices: unknown, labels: unknown, index: unknown) => string;
   shellConfirmTitle: (policy: unknown) => string;
   suApprovalTierLabel: (tier: unknown) => string;
+  sidebarCollapsedFromStorage: (value: unknown) => boolean;
+  clampSidebarWidth: (value: unknown) => number;
+  stepSidebarWidth: (current: unknown, delta: unknown) => number;
+  roleTreeScrollDelta: (treeTop: unknown, treeBottom: unknown, itemTop: unknown, itemBottom: unknown) => number;
+  SIDEBAR_WIDTH_DEFAULT: number;
+  SIDEBAR_WIDTH_MIN: number;
+  SIDEBAR_WIDTH_MAX: number;
 };
 
 async function loadUiLabelsForGovernance(): Promise<GovernanceUiLabels> {
@@ -2026,4 +2037,121 @@ test("A2：重量——token/对比度、控件边框、圆角收敛、表格、
   // D7：正文 15/27 不动（A2 不得改写 .msg 字号/行高）。
   assert.ok(!a2.includes(".msg { font-size") && !a2.includes(".msg {font-size"), "A2 不改正文 15/27（D7）");
   assert.ok(STYLES.includes(".msg { font-size:15px; line-height:1.8; }") && 15 * 1.8 === 27, "正文 15px × 1.8 = 27px");
+});
+
+test("字体：整页等宽（2026-10-17 客户裁定）——--sans 与 --mono 同一等宽栈，无 system-ui/Segoe 主字体", () => {
+  const mono = 'ui-monospace, "Cascadia Mono", "Cascadia Code", "SF Mono", Consolas, "Liberation Mono", "Microsoft YaHei", monospace';
+  assert.ok(STYLES.includes("--mono: " + mono + ";"), "等宽栈逐字（含中文回退）");
+  assert.ok(STYLES.includes("--sans: var(--mono);"), "--sans 复用 --mono（单一来源，避免漂移）");
+  assert.ok(!/--sans:\s*system-ui/.test(STYLES) && !/--sans:[^;]*"Segoe UI"/.test(STYLES), "不得再以 system-ui/Segoe UI 为主字体");
+  assert.ok(!/--sans:[^;]*sans-serif/.test(STYLES), "--sans 不再是 sans-serif 栈（整页等宽终端感）");
+  // 中文回退；不引入外部/专有字体资源（CSP 无需 font-src）。
+  assert.ok(mono.includes('"Microsoft YaHei"'), "中文由 Microsoft YaHei 兜底");
+  assert.ok(!/@font-face/.test(STYLES) && !/fonts\.googleapis|\.woff2?|\.ttf/i.test(STYLES), "不引入外部字体文件");
+  const cssCode = STYLES.replace(/\/\*[\s\S]*?\*\//g, "");
+  assert.ok(!/Anthropic/i.test(cssCode) && !/AnthropicSans/i.test(INDEX), "不引入专有 Anthropic 字体");
+  assert.ok(INDEX.includes("default-src 'none'") && INDEX.includes("style-src 'self'"), "CSP 保持（本地系统字体无需新增资源）");
+  // 字号基线保持：body 13px、消息 15px/1.8（27px）；本批不改字号。
+  assert.ok(STYLES.includes("font: 13px/1.55 var(--sans);"), "body 仍 13px/1.55（换字体栈，不改字号）");
+  assert.ok(STYLES.includes(".msg { font-size:15px; line-height:1.8; }"), "正文仍 15px/27px 基线");
+});
+
+test("可收起左栏：默认展开/toggle 类/localStorage 坏值回退/展开按钮可达/900 列保持", async () => {
+  const UL = await loadUiLabelsForGovernance();
+  // 存储值解析单点：仅 "1" 收起；"0"/缺失/坏值一律展开。
+  assert.equal(UL.sidebarCollapsedFromStorage("1"), true, "存 \"1\" ⇒ 收起");
+  assert.equal(UL.sidebarCollapsedFromStorage("0"), false, "存 \"0\" ⇒ 展开");
+  assert.equal(UL.sidebarCollapsedFromStorage("yes"), false, "坏值回退展开");
+  assert.equal(UL.sidebarCollapsedFromStorage(null), false, "缺失回退展开");
+  // DOM：展开态收起按钮在左栏品牌区；收起态展开按钮在内容区（会话头一侧），不在拖拽标题栏。
+  assert.ok(INDEX.includes('id="sidebar-collapse"') && INDEX.includes('aria-label="收起左侧栏"'), "展开态：收起按钮 + 无障碍名");
+  assert.ok(INDEX.includes('id="sidebar-expand"') && INDEX.includes('aria-label="展开左侧栏"'), "收起态：展开按钮 + 无障碍名");
+  assert.ok(INDEX.indexOf('id="sidebar-expand"') > INDEX.indexOf('class="col col-mid"'), "展开按钮在内容区（不在标题栏拖拽区）");
+  assert.ok(!INDEX.includes("accesskey"), "不引入新快捷键");
+  // 持久化：唯一键、读写各自 try/catch、坏值经纯函数回退。
+  assert.ok(RENDERER.includes('var SIDEBAR_STORAGE_KEY = "ans.sidebar.collapsed";'), "唯一存储键");
+  assert.ok(/function readSidebarCollapsed\(\) \{\s*try \{[\s\S]{0,200}localStorage\.getItem\(SIDEBAR_STORAGE_KEY\)[\s\S]{0,120}catch \(_\) \{ return false; \}/.test(RENDERER), "读取异常/坏值回退展开");
+  assert.ok(/function writeSidebarCollapsed\(collapsed\) \{\s*try \{[\s\S]{0,200}localStorage\.setItem\(SIDEBAR_STORAGE_KEY, collapsed === true \? "1" : "0"\)[\s\S]{0,80}catch/.test(RENDERER), "写入异常不抛出（仅不持久化）");
+  // 状态单点 = `.app.is-sidebar-collapsed` 类；按钮显隐互补；切换保持滚动位置。
+  assert.ok(RENDERER.includes("function sidebarCollapsedNow()") && RENDERER.includes('app.classList.contains("is-sidebar-collapsed")'), "状态单点＝类");
+  assert.ok(RENDERER.includes('app.classList.toggle("is-sidebar-collapsed", value)'), "toggle 同一类");
+  assert.equal((RENDERER.match(/classList\.contains\("is-sidebar-collapsed"\)/g) || []).length, 1, "无第二判据");
+  assert.ok(RENDERER.includes("expand.hidden = !value") && RENDERER.includes("collapse.hidden = value"), "两按钮显隐互补（展开按钮收起后可达）");
+  assert.ok(/var chat = \$\("chat"\), top = chat \? chat\.scrollTop : 0;[\s\S]{0,260}chat\.scrollTop = top;/.test(RENDERER), "先量后改：切换后滚动位置保持");
+  assert.ok(RENDERER.includes("initSidebar();"), "启动时读持久化并绑定按钮");
+  // CSS：收起不占位、左栏完全隐藏、160ms 过渡、reduced-motion 禁用、900 列/贴底体系不变。
+  assert.ok(STYLES.includes(".app.is-sidebar-collapsed { grid-template-columns: 0 minmax(0, 1fr); }"), "首列 0（不保留占位）");
+  assert.ok(/\.app\.is-sidebar-collapsed \.col-left \{[^}]*visibility: hidden;[^}]*overflow: hidden;/.test(STYLES), "左栏完全隐藏");
+  assert.ok(STYLES.includes("transition: grid-template-columns 160ms ease;") && STYLES.includes("transition: opacity 160ms ease"), "宽度/透明度 160ms 过渡");
+  assert.ok(/@media \(prefers-reduced-motion: reduce\) \{ \.app, \.col-left, \.sidebar-toggle \{ transition: none; \}/.test(STYLES), "减少动效偏好下禁用动画");
+  assert.ok(STYLES.includes("--content-max: 900px") && STYLES.includes(".chat-pane { max-width: var(--content-max); gap: 16px; }"), "A1 900 列保持");
+  assert.ok(STYLES.includes("#sidebar-collapse { top: 16px; right: 10px; }") && STYLES.includes(".sidebar-expand { top: 18px; left: 6px; z-index: 9; }"), "收起在左栏品牌区、展开在内容区左上（不压窗口按钮）");
+  assert.ok(STYLES.includes(".sidebar-toggle:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }"), "按钮键盘焦点环");
+});
+
+test("左栏宽度：默认 248 / 208–360 clamp / 坏值回退 / 持久化 / 拖动·键盘·双击 / 折叠保留", async () => {
+  const UL = await loadUiLabelsForGovernance();
+  // 纯函数单点：默认/范围/clamp/步进。
+  assert.equal(UL.SIDEBAR_WIDTH_DEFAULT, 248);
+  assert.equal(UL.SIDEBAR_WIDTH_MIN, 208);
+  assert.equal(UL.SIDEBAR_WIDTH_MAX, 360);
+  assert.equal(UL.clampSidebarWidth(undefined), 248, "缺省 ⇒ 248");
+  assert.equal(UL.clampSidebarWidth(null), 248, "缺失 ⇒ 248");
+  assert.equal(UL.clampSidebarWidth("abc"), 248, "坏值 ⇒ 248");
+  assert.equal(UL.clampSidebarWidth("100"), 208, "低于下限 ⇒ clamp 208");
+  assert.equal(UL.clampSidebarWidth("999"), 360, "高于上限 ⇒ clamp 360");
+  assert.equal(UL.clampSidebarWidth("248"), 248, "合法存储值逐字");
+  assert.equal(UL.clampSidebarWidth(248.6), 249, "四舍五入到整数");
+  assert.equal(UL.stepSidebarWidth(248, 8), 256, "→ +8");
+  assert.equal(UL.stepSidebarWidth(248, -8), 240, "← -8");
+  assert.equal(UL.stepSidebarWidth(350, 24), 360, "Shift +24 后 clamp");
+  assert.equal(UL.stepSidebarWidth(210, -24), 208, "Shift -24 后 clamp");
+  assert.equal(UL.stepSidebarWidth("bad", 8), 256, "坏当前值先回退 248 再步进");
+  // DOM/ARIA：分隔线（role/orientation/值域/可聚焦），不与收起按钮重叠（热区贴右缘）。
+  assert.ok(INDEX.includes('id="sidebar-resizer"') && INDEX.includes('role="separator"') && INDEX.includes('aria-orientation="vertical"'), "分隔线角色");
+  assert.ok(INDEX.includes('aria-valuemin="208"') && INDEX.includes('aria-valuemax="360"') && INDEX.includes('aria-valuenow="248"'), "ARIA 值域/当前值");
+  assert.ok(INDEX.includes('tabindex="0"'), "分隔线可键盘聚焦");
+  assert.ok(!/sidebar-resizer[^>]*accesskey/.test(INDEX), "不引入新快捷键");
+  // 栅格与 token：首列走 `--sidebar-width`，默认 248；拖动只改变量。
+  assert.ok(STYLES.includes("--sidebar-width: 248px"), "默认宽度 token");
+  assert.ok(STYLES.includes("grid-template-columns:var(--sidebar-width) minmax(0,1fr)"), "栅格首列使用变量");
+  assert.ok(RENDERER.includes('var SIDEBAR_WIDTH_STORAGE_KEY = "ans.sidebar.width"'), "宽度持久化键");
+  assert.ok(/function readSidebarWidth\(\) \{\s*try \{[\s\S]{0,200}getItem\(SIDEBAR_WIDTH_STORAGE_KEY\)[\s\S]{0,140}catch \(_\) \{ return UiLabels\.SIDEBAR_WIDTH_DEFAULT; \}/.test(RENDERER), "读取异常/坏值回退 248");
+  assert.ok(/function writeSidebarWidth\(width\) \{\s*try \{[\s\S]{0,200}setItem\(SIDEBAR_WIDTH_STORAGE_KEY, String\(UiLabels\.clampSidebarWidth\(width\)\)\)[\s\S]{0,80}catch/.test(RENDERER), "写入前 clamp、异常不抛");
+  assert.ok(RENDERER.includes('document.documentElement.style.setProperty("--sidebar-width", w + "px")'), "拖动只改变量（不重建 DOM）");
+  assert.ok(RENDERER.includes('resizer.setAttribute("aria-valuenow", String(w))'), "同步 aria-valuenow");
+  // 拖动/双击/键盘。
+  assert.ok(/pointerdown[\s\S]{0,320}is-sidebar-resizing/.test(RENDERER), "拖动开始禁用宽度过渡");
+  assert.ok(RENDERER.includes("startWidth + (event.clientX - startX)"), "水平拖动按位移改宽度");
+  assert.ok(/function endDrag\(event\) \{[\s\S]{0,340}writeSidebarWidth\(currentSidebarWidth\(\)\)/.test(RENDERER), "松手持久化");
+  assert.ok(RENDERER.includes('resizer.addEventListener("pointerup", endDrag)') && RENDERER.includes('"pointercancel"'), "pointerup/pointercancel 收尾");
+  assert.ok(/dblclick[\s\S]{0,160}UiLabels\.SIDEBAR_WIDTH_DEFAULT/.test(RENDERER), "双击复位 248");
+  assert.ok(/event\.shiftKey \? 24 : 8/.test(RENDERER) && RENDERER.includes("ArrowLeft") && RENDERER.includes("ArrowRight"), "←/→ ±8、Shift ±24");
+  // 折叠保留宽度：折叠函数只切类，不碰宽度变量。
+  assert.ok(/function applySidebarCollapsed\(collapsed\) \{[\s\S]{0,420}classList\.toggle\("is-sidebar-collapsed"/.test(RENDERER), "折叠只切类");
+  assert.ok(!/function applySidebarCollapsed\(collapsed\) \{[\s\S]{0,420}--sidebar-width/.test(RENDERER), "折叠不改变宽度变量（展开后恢复）");
+  // CSS：热区/拖动禁用过渡/焦点环。
+  assert.ok(STYLES.includes(".sidebar-resizer {") && STYLES.includes("cursor: col-resize"), "分隔线热区 cursor");
+  assert.ok(STYLES.includes(".app.is-sidebar-resizing, .app.is-sidebar-resizing .col-left, .app.is-sidebar-resizing .sidebar-toggle { transition: none; }"), "拖动期间禁用过渡");
+  assert.ok(STYLES.includes(".sidebar-resizer:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }"), "分隔线焦点环");
+});
+
+test("左树选中项可见（2026-10-17 实机）：最小位移、可见不动、不重置到顶", async () => {
+  const UL = await loadUiLabelsForGovernance();
+  // 纯位移单点：已可见（±1px）⇒ 0；上方/下方 ⇒ 最小位移。
+  assert.equal(UL.roleTreeScrollDelta(200, 700, 300, 360), 0, "完整可见 ⇒ 不动（保留用户滚动）");
+  assert.equal(UL.roleTreeScrollDelta(200, 700, 199, 260), 0, "上边界 1px 容差");
+  assert.equal(UL.roleTreeScrollDelta(200, 700, 640, 701), 0, "下边界 1px 容差");
+  assert.equal(UL.roleTreeScrollDelta(216, 716, 153, 211), -63, "在上方 ⇒ 对齐顶（实机 su 场景）");
+  assert.equal(UL.roleTreeScrollDelta(216, 716, 700, 760), 44, "在下方 ⇒ 对齐底");
+  assert.equal(UL.roleTreeScrollDelta(NaN, 1, 2, 3), 0, "非法输入 ⇒ 不动");
+  // 渲染接线：树项带定位键；applyListing/selectRole 后确保可见；只做加位移、绝不回顶。
+  assert.ok(RENDERER.includes('item.setAttribute("data-role-id", r.roleId)'), "树项带 data-role-id 定位键");
+  assert.ok(RENDERER.includes("ensureRoleTreeVisible(state.selectedRoleId || state.primaryRoleId)"), "applyListing（导入/刷新）后确保主入口/选中项可见");
+  assert.ok(/renderRoleTree\(\);\s*ensureRoleTreeVisible\(roleId\);/.test(RENDERER), "selectRole 后确保选中项可见");
+  assert.ok(RENDERER.includes("UiLabels.roleTreeScrollDelta(treeRect.top, treeRect.bottom, itemRect.top, itemRect.bottom)"), "位移经纯函数单点");
+  const fnStart = RENDERER.indexOf("function ensureRoleTreeVisible(roleId)");
+  const fn = RENDERER.slice(fnStart, RENDERER.indexOf("\n  }", fnStart));
+  assert.ok(fnStart > 0 && fn.includes("tree.scrollTop += delta") && !/scrollTop\s*=\s*0/.test(fn), "只做最小位移，不强制回顶");
+  assert.ok(!fn.includes("scrollIntoView"), "不用 scrollIntoView（避免连带滚动其它容器）");
 });

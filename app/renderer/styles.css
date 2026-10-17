@@ -31,12 +31,16 @@
   --amber: #87602B;       /* 未决/未知（v2 amber） */
 
   --radius: 8px;          /* 交互元素圆角 */
+  --sidebar-width: 248px; /* 左栏默认宽度（可拖拽 208–360；折叠时栅格首列 0） */
   --radius-sm: 6px;
 
   --focus-ring: #42745E;  /* 键盘焦点环（v2 原型 focus-visible） */
 
-  --sans: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-  --mono: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace;
+  /* 2026-10-17 客户裁定「字体设置成和 claude code 一样的字体」＋选择「整页等宽（终端感）」：
+     UI/标题/按钮/消息/表格统一走等宽栈；`--sans` 复用 `--mono`（单一来源，避免漂移）。
+     中文由 "Microsoft YaHei" 兜底；不引入外部字体文件或专有 Anthropic 字体。 */
+  --mono: ui-monospace, "Cascadia Mono", "Cascadia Code", "SF Mono", Consolas, "Liberation Mono", "Microsoft YaHei", monospace;
+  --sans: var(--mono);
 }
 
 * { box-sizing: border-box; }
@@ -1482,7 +1486,7 @@ textarea:focus-visible,
   --bg-hover:#f1f4ee; --bg-selected:#dfe8df; --border:#dde2dc; --border-strong:#cdd7ce;
   --text:#232c29; --text-2:#5d6862; --text-3:#747e78; --success:#2d634e; --success-bg:#e5eee7;
   --danger:#a1433c; --danger-bg:#fbefed; --amber:#8a5b23; --focus-ring:#2d634e; --radius:10px; --radius-sm:7px; }
-.app { grid-template-columns:208px minmax(0,1fr); }
+.app { grid-template-columns:var(--sidebar-width) minmax(0,1fr); }
 .col-left .side-head { padding-left:16px; padding-right:16px; }
 .side-actions { padding-left:16px; padding-right:16px; }
 .tree { padding:0 8px 16px; }
@@ -1547,7 +1551,7 @@ textarea:focus-visible,
 .document-read-text { font-size:15px; line-height:1.8; }
 button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus-visible { outline:2px solid var(--focus-ring); outline-offset:3px; }
 @media (max-width:1100px) {
- .app { grid-template-columns:176px minmax(0,1fr); }
+ .app { grid-template-columns:var(--sidebar-width) minmax(0,1fr); }
  .col-left .side-head, .side-actions { padding-left:12px; padding-right:12px; }
  .chat-head { min-height:68px; padding:8px 24px; }
  .chat { padding:24px; }
@@ -1803,3 +1807,45 @@ button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus
 .sc-reason { white-space: pre-wrap; }
 #shell-confirm.is-su-approval .sc-summary { font-weight: 600; }
 #shell-confirm.is-su-approval .sc-hint { color: var(--amber); }
+
+/* ———————— 可收起左栏（2026-10-17 客户反馈「最好左边能收起来」）——————
+   收起＝`.app.is-sidebar-collapsed`（DOM 单点）：栅格首列 0、左栏完全隐藏（不占位）；
+   内容区左上保留展开按钮（始终可达）；顶栏/会话头/输入区贴底与 900 内容列不变。
+   过渡 160ms；减少动效偏好下禁用动画。 */
+/* 只在宽档做栅格轨道过渡：窄档（≤1100）栅格列本身会随断点从 208→176 变化，
+   若也参与过渡，窗口缩放会让内容列在 160ms 内短暂错位；窄档收起时仍由 opacity 过渡。 */
+@media (min-width: 1101px) { .app { transition: grid-template-columns 160ms ease; } }
+.col-left { position: relative; transition: opacity 160ms ease, padding 160ms ease, border-color 160ms ease; }
+.col-mid { position: relative; }
+.app.is-sidebar-collapsed { grid-template-columns: 0 minmax(0, 1fr); }
+.app.is-sidebar-collapsed .col-left { opacity: 0; visibility: hidden; overflow: hidden; padding-left: 0; padding-right: 0; border-right-width: 0; }
+.sidebar-toggle {
+  position: absolute; z-index: 8;
+  width: 24px; height: 24px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border); border-radius: 6px;
+  background: var(--bg); color: var(--text-2);
+  font: 16px/1 var(--sans); cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, opacity 160ms ease;
+}
+.sidebar-toggle:hover { background: var(--bg-hover); color: var(--text); }
+.sidebar-toggle:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.sidebar-toggle[hidden] { display: none; }
+#sidebar-collapse { top: 16px; right: 10px; }
+.sidebar-expand { top: 18px; left: 6px; z-index: 9; }
+@media (max-width: 1100px) { #sidebar-collapse { top: 14px; right: 8px; } }
+/* 宽度分隔线（2026-10-17 客户选择「248px + 可拖拽」）：贴左栏右缘的窄热区；视觉线沿用既有
+   `--border-strong`，hover/拖动时用 `--success`；不进入标题栏拖拽区，也不与收起按钮重叠。 */
+.sidebar-resizer {
+  position: absolute; top: 0; right: -4px; width: 9px; height: 100%;
+  z-index: 7; cursor: col-resize; background: transparent;
+}
+.sidebar-resizer::after {
+  content: ""; position: absolute; top: 0; bottom: 0; left: 4px; width: 1px;
+  background: var(--border-strong);
+}
+.sidebar-resizer:hover::after, .app.is-sidebar-resizing .sidebar-resizer::after { background: var(--success); }
+.sidebar-resizer:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.app.is-sidebar-resizing { cursor: col-resize; user-select: none; }
+.app.is-sidebar-resizing, .app.is-sidebar-resizing .col-left, .app.is-sidebar-resizing .sidebar-toggle { transition: none; }
+@media (prefers-reduced-motion: reduce) { .app, .col-left, .sidebar-toggle { transition: none; } }
