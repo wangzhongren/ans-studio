@@ -35,6 +35,8 @@ import {
   type RoleSessionHandle,
 } from "../../src/pipeline/orchestration/run-role.ts";
 import { assembleReadonlyShellGate } from "../../src/pipeline/orchestration/shell-arming.ts";
+import { resolveRole } from "../../src/service/role/resolve-role.ts";
+import { resolveWrite } from "../../src/service/gate/resolve-write.ts";
 import { classifyShell, classifyShellDetailed, defaultShellRules } from "../../src/common/门禁引擎/classify-shell.ts";
 import { createFakeRuntimeAdapter } from "../../src/provider/pi/session.ts";
 import {
@@ -88,6 +90,20 @@ function makeTempProject(): ProjectConfig {
     roles: { X: { card: "角色卡/X/role-card.md", boundary: "角色卡/X/boundary.yaml" } },
     builtInRoles: ["su"],
     governanceBoundary: { path: "角色卡/X/boundary.yaml", acceptance: { accepted: true, source: "test:fixture" } },
+  };
+}
+/** trio 项目（四内置治理角色；W6-A 审计边界应映射为应用专用边界（含 docs/audit/））。 */
+function makeTrioProject(): ProjectConfig {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ans-trio-readonly-"));
+  fs.mkdirSync(path.join(root, ".ans"), { recursive: true });
+  fs.writeFileSync(path.join(root, ".ans", "project.json"), JSON.stringify({ governanceModel: "trio" }));
+  return {
+    projectRoot: root,
+    skillRoot: root,
+    roles: {},
+    governanceModel: "trio",
+    builtInRoles: [],
+    governanceBoundary: { path: "角色卡/governance-boundary.yaml", acceptance: { accepted: true, source: "test:trio-readonly" } },
   };
 }
 const cleanup = (p: ProjectConfig): void => fs.rmSync(p.projectRoot, { recursive: true, force: true });
@@ -286,6 +302,44 @@ test("只读档审计：真落 docs/audit/shell-gate.jsonl（逐字命令 / bran
       assert.ok(rec.conditions.includes(SHELL_GATE_CONDITION), "声明 shell-gate 条件");
       assert.equal(rec.cwd, project.projectRoot);
     }
+  } finally {
+    cleanup(project);
+  }
+});
+
+// —————————————————————— ⑧b W6-A trio 审计边界 ——————————————————————
+
+test("W6-A trio 审计边界：只读档真落 docs/audit/shell-gate.jsonl（应用专用边界）；Liaison 角色边界仍不含 docs/audit", async () => {
+  const project = makeTrioProject();
+  try {
+    // 不给 auditSink ⇒ 走默认文件落盘。trio 下首个内置角色是 Liaison（Section 1 只有 docs/intents/），
+    // 若沿用其边界审计会被拒；W6-A 起审计边界映射为应用专用边界（含 docs/audit/）。
+    const gate = await assemble({ project, classify: classifyShellDetailed, rules: RULES, timeoutMs: 2000 });
+    const result = await gate({
+      command: "ls -la",
+      argv: ["ls", "-la"],
+      cwd: project.projectRoot,
+      toolCallId: "trio-tc-1",
+    });
+    assert.equal(result.allow, true, "只读白名单命令照常放行（判定不变）");
+
+    const auditPath = path.join(project.projectRoot, SHELL_AUDIT_REL_PATH);
+    assert.ok(fs.existsSync(auditPath), "trio 审计应真落盘（docs/audit/shell-gate.jsonl）");
+    const lines = fs.readFileSync(auditPath, "utf8").trim().split("\n");
+    assert.equal(lines.length, 1);
+    const record = JSON.parse(lines[0]) as ShellAuditRecord;
+    assert.equal(record.command, "ls -la");
+    assert.equal(record.branch, BRANCH_C_ALLOW);
+    assert.equal(record.execution, "未执行");
+    assert.ok(record.conditions.includes(SHELL_GATE_CONDITION), "shell-gate 条件语义保留");
+
+    // 角色仍不可写 docs/audit/：应用专用边界不注入任何角色会话（Liaison 的 Section 1 只有 docs/intents/）。
+    const liaison = await resolveRole("liaison", project);
+    const decision = resolveWrite(SHELL_AUDIT_REL_PATH, liaison.boundary, undefined, {
+      skillRoot: project.skillRoot,
+      projectRoot: project.projectRoot,
+    });
+    assert.equal(decision.allowed, false, "Liaison 角色边界不得覆盖 docs/audit/（审计只由应用写）");
   } finally {
     cleanup(project);
   }

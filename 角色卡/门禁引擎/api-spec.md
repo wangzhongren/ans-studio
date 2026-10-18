@@ -198,8 +198,12 @@ APP_GOVERNANCE_SOURCE                // "<built-in:app-governance>"
 - **条目/预授权/禁写**按评审 §5.2/§4.2 表逐项落表；禁写路径展开为**具体前缀**（`.ans/`、
   `docs/bootstrap-manifest.md`、`角色卡/governance-boundary.yaml`、`角色卡/<五 id>/` 等），
   按段比较、不实现 glob。
-- **应用专用边界**固定三条：`角色卡/governance-boundary.yaml`（file）、`.ans/`（directory）、
-  `docs/bootstrap-manifest.md`（file）。只给编排在 finalize/repin/迁移中使用，**不注入任何角色会话**。
+- **应用专用边界**固定四项：`角色卡/governance-boundary.yaml`（file）、`.ans/`（directory）、
+  `docs/bootstrap-manifest.md`（file）、`docs/audit/`（directory，shell 命令审计由应用写）。
+  只给编排在 finalize/repin/迁移与 shell 审计中使用，**不注入任何角色会话**；四角色与 su 的
+  Section 1/预授权均不含 `docs/audit/`（角色仍不可写）。
+  **注意**：编排 `assembleProjectShellGate` 的 `pmBoundary` 当前取首个内置角色边界，需由编排侧
+  改用 `appGovernanceBoundary` 才能让该目录在真机 shell 审计中生效。
 - 四人（Liaison 例外：不发卡、无 cardKind）的 `cardText` 均写明：职能与权力、
   **不拥有最终批准权**、可写目录与禁写路径、应用独占写路径、不得创建第五个治理角色、
   不得修改其他治理角色资料；Liaison 另写明 `hand_off_intent` 交接约定。三张旧卡的文本同批修订：
@@ -259,8 +263,10 @@ confirmed-writes，不在门禁层实现）。shell：convener 只读档，liais
 
 `test/门禁引擎/governance-trio.test.ts`（四人注册表/写权/边界/解析更新）+ 新增
 `test/门禁引擎/liaison-role.test.ts`（旧 trio 零迁移、single 不变、Liaison 写权/能力/AC3 拒绝
-归属文案/保留 id）；`list-project.test.ts` 四人顺序/主入口/保留 id 更新。门禁引擎套件 **254 计 /
-253 过 / 0 红 / 1 skip**。`npm run typecheck` 在本角色边界内零错；复跑时的 3 条全仓错误均在
+归属文案/保留 id）；`list-project.test.ts` 四人顺序/主入口/保留 id 更新；应用边界补
+`docs/audit/` 用例（应用可写、四角色与 su 拒写）。门禁引擎套件 **255 计 / 254 过 / 0 红 /
+1 skip**；相关编排 shell 套件 143 计 / 142 过 / 1 红（Windows `symlinkSync` EPERM，无关）。
+`npm run typecheck` 在本角色边界内零错；复跑时的 3 条全仓错误均在
 他域新写的 liaison 测试（`test/编排/liaison-handoff.test.ts`、`test/测试/governance-liaison-verify/
 b-intent-handoff.test.ts` 仍用被评审取代的 `"communication"` 名称），与门禁引擎交付无关，如实登记、
 未越界修改。

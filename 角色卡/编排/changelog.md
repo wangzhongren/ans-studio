@@ -1,5 +1,16 @@
 # 编排 变更记录
 
+## 2026-10-18 — W6-A 补丁：trio 的 shell 审计边界改用应用专用边界
+
+**来源**：门禁引擎已把 `docs/audit/` 加入应用专用边界（`appGovernanceEntries`）；协调口径指出编排的 `shell-arming.ts` 审计 `pmBoundary` 仍取「首个内置角色边界」，四角色下该边界（Liaison 仅 `docs/intents/`）不含 `docs/audit/`，真机审计仍会被拒。
+
+**改**：`src/pipeline/orchestration/shell-arming.ts` 新增 `auditBoundaryOf(project, govBoundary, roleId?)`：
+- **trio**（`project.governanceModel === "trio"`，或模型缺省且首个内置角色为 trio 角色）⇒ 审计边界改用 `appGovernanceBoundary(govBoundary.acceptance)`（门禁引擎 Service 公共出口，勿复制实现；含 `docs/audit/`，应用写审计）。三层链、只读档、审批档及各自的 F-6-1 刷新闭包统一经此映射。
+- **single/su** ⇒ 原样返回既有治理角色边界（`docs/audit/` 条件目录 + `shell-gate` 条件），逐字不变。
+- `buildShellAuditGate` 仍固定声明 `shell-gate` 条件（额外条件对非条件条目无影响，语义保留）；应用专用边界**不注入任何角色会话**，角色仍不可写 `docs/audit/`；任何命令判定不变。
+
+**测试**：`test/编排/shell-readonly.test.ts` +1 例——trio 只读档审计真落 `docs/audit/shell-gate.jsonl`（branch/execution/conditions 正确），且 `resolveRole("liaison")` 的边界仍拒写 `docs/audit/`；既有 single/su 审计真落盘用例不回归。证据：`test/编排/**/*.test.ts` **473 计/472 过/1 红**（唯一红＝既有 Windows symlink EPERM）；全量三层 glob **2774 计 / 2755 过 / 16 红 / 3 skipped**（16 红均他域既有/在途：9 条 Windows symlink EPERM、5 条桌面 UI 在飞源码扫描、vendor markdown-it pin、g4 读取器防御），本角色零新增红；`npm run typecheck` **0 错**（全仓）。**边界**：未 git 提交；未碰门禁引擎/运行时核心/适配器/桌面/UI。
+
 ## 2026-10-18 — W6-A：治理四角色编排接线（意图交接 / 澄清 / 账本）
 
 **来源**：PM 评审 `角色卡/项目管理/docs/design/2026-10-18_design_governance-liaison-review.md`（status approved）§5.1–§5.4、§7、§十二 W6-A；门禁引擎与运行时核心 W6-0 已前置（注册表四角色、`handOffIntent`/`requestClarification` 能力位与两工具）。本批只改编排边界：`src/common/编排/governance-handoff.ts`（新增）、`governance-ledger.ts`、`src/pipeline/orchestration/{run-role.ts,govern-session.ts}`、`src/common/编排/args.ts`、`src/interface/cli/govern.ts`、`test/编排/`、本角色文档；**未碰**门禁引擎、运行时核心、适配器、桌面、UI。
@@ -19,7 +30,7 @@
 - `src/pipeline/orchestration/govern-session.ts`：W6-A 薄再导出（校验/去重/轮次/常量/类型）；职能纪律提示词改为**注册表数据驱动**（`spec.displayName`，不写死 su/rapporteur/convener），新增 Liaison「沟通权纪律」（`docs/intents/`、`hand_off_intent`、**交接 ≠ 客户批准**）；`runGovernSession` 的确认制说明行按 `capabilities.customerInput` 判定（Liaison 不再误报确认制）；治理职能文案表 `GOVERNANCE_FUNCTION_LABEL`（沟通权/提案权/提名权/编排权）。
 - `src/common/编排/args.ts` / `src/interface/cli/govern.ts`：**CLI 收窄（四角色评审 §4.6/AC21）**——`--function liaison` 在参数解析处显式拒绝（「联络官（liaison）仅桌面主入口提供；CLI 请用 --function proposal|nomination|schedule」），`--role liaison` 在命令层显式拒绝；`proposal|nomination|schedule` 行为与 USAGE 逐字保持，**缺省仍是 `proposal`→rapporteur**。`openGovernanceSession` 的 `governanceFunction` 类型仍含 `liaison`（桌面/测试前端按评审 §4.5 可路由）。
 
-**测试**：新增 `test/编排/liaison-handoff.test.ts` **9 例**（合法 initial、slug/四要素/summary、文件权威三向不一致、frontmatter 缺失/未闭合/坏行、去重/initial 一次性/clarification 引用、clarification 无既有交接、每轮一次+缺 turnId 降级、账本坏 fail-closed、模型/角色防御、澄清轮次计数）与 `test/编排/liaison-session.test.ts` **12 例**（四人+su 能力矩阵；交接成功→回调+账本字段；投递失败/校验失败零账本；每轮一次+去重+**同轮并发串行化**；Liaison `artifact.observed`=liaison；澄清两轮上限+账本/失败零账本；CLI 拒绝 liaison（`--function`/`--role`）而引擎可路由、缺省 proposal、single 拒绝；提示词数据驱动；项目角色旧行为不回归）。更新 `test/编排/governance-session.test.ts` 的三权 `--function`、提示词与禁写归属文案断言。**证据**：`test/编排/**/*.test.ts` **472 计/471 过/1 红**——唯一红为既有 Windows symlink EPERM（`shell-authorized-routine.test.ts:103`）；全量三层 glob `node --test "test/**/*.test.ts"` **2772 计 / 2751 过 / 18 红 / 3 skipped**：18 红均为他域既有/在途——9 条 Windows symlink EPERM、5 条桌面 UI 在飞源码扫描、vendor markdown-it pin、`test/测试/g4-skill-verify` 读取器防御；另 2 条为协调口径/跨角色的**测试角色待更新**：① `governance-trio-verify/a-listing-sessions-writes.test.ts` 仍断言旧通用禁写文案（「应用治理记录|其他治理角色」），现按 AC3 归属文案返回「提名官 Nominator」；② `governance-liaison-verify/b-intent-handoff.test.ts` AC5 期望 `dispatch.accepted{trigger:"intent-handoff"}`，按评审 §7.2 该条由**桌面投递端 W6-B**写，测试夹具的 stub 投递未模拟该写入。**本角色文件零新增红**。`npm run typecheck`：本角色文件 **0 错**；全仓 2 条错均在 `test/测试/governance-liaison-verify/b-intent-handoff.test.ts`（仍比对 `"communication"`，待测试角色按 `"liaison"` 更新）。
+**测试**：新增 `test/编排/liaison-handoff.test.ts` **9 例**（合法 initial、slug/四要素/summary、文件权威三向不一致、frontmatter 缺失/未闭合/坏行、去重/initial 一次性/clarification 引用、clarification 无既有交接、每轮一次+缺 turnId 降级、账本坏 fail-closed、模型/角色防御、澄清轮次计数）与 `test/编排/liaison-session.test.ts` **12 例**（四人+su 能力矩阵；交接成功→回调+账本字段；投递失败/校验失败零账本；每轮一次+去重+**同轮并发串行化**；Liaison `artifact.observed`=liaison；澄清两轮上限+账本/失败零账本；CLI 拒绝 liaison（`--function`/`--role`）而引擎可路由、缺省 proposal、single 拒绝；提示词数据驱动；项目角色旧行为不回归）。更新 `test/编排/governance-session.test.ts` 的三权 `--function`、提示词与禁写归属文案断言。**证据**：`test/编排/**/*.test.ts` **473 计/472 过/1 红**（含本补丁 +1 例）——唯一红为既有 Windows symlink EPERM（`shell-authorized-routine.test.ts:103`）；全量三层 glob `node --test "test/**/*.test.ts"` **2774 计 / 2755 过 / 16 红 / 3 skipped**：16 红均为他域既有/在途——9 条 Windows symlink EPERM、5 条桌面 UI 在飞源码扫描、vendor markdown-it pin、`test/测试/g4-skill-verify` 读取器防御；**本角色文件零新增红**。`npm run typecheck` **0 错**（全仓）。
 
 **与评审的差异（如实登记）**：`GovernancePower`/CLI 收窄已按评审 §7.1/§4.6/AC21 落为 `"liaison"` 与 CLI 拒绝，不再是差异。唯一保留的实现取舍：评审 §5.4 的澄清是「账本 + 主入口系统行、客户在 Liaison 回答后由 Liaison 再交接」，本批任务书写「经 customerInput 发问并返回答案」——冻结回执仅有 `{ok,message?}`，实现为送达回调把答案随 `message` 回传（能回则回，不假装）；送达端是否经客户通道发问由桌面 W6-B 决定。其余（Liaison 写权/能力、四角色枚举、交接去重/每轮一次、`intent.handed-off`、两轮上限、single/su 不变）逐项按评审。
 

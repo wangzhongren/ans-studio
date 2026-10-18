@@ -51,11 +51,19 @@
   应用写。只改文案，放行/拒绝与 `allowedByRoot` 零变化；其他角色文案逐字不变。
   新增 1 例文案断言（共 7 例）。**编排侧前置 `forbiddenWriteDecision` 的通用文案属编排属主**，
   本角色未越界修改。
+- **应用边界补 shell 审计目录（真机四角色回归修复）**：`appGovernanceEntries()` 增
+  `docs/audit/`（directory，purpose「shell 命令审计（应用写）」）——四角色默认入口改为 Liaison 后，
+  真机出现「shell 闸审计未落盘：目标路径未匹配任何边界条目：docs/audit/shell-gate.jsonl」。
+  该目录**只给应用**，不加入任何角色的 Section 1/预授权（四角色与 su 写该路径仍被拒）。
+  测试：应用边界可写 `docs/audit/shell-gate.jsonl`；四角色 + su 拒写；注册表不含该目录。
+  **生效前提**：shell 审计门禁由编排 `assembleProjectShellGate` 装配，其 `pmBoundary` 当前取
+  「首个内置角色的边界」；编排侧需改用 `appGovernanceBoundary`（本角色未越界修改）。
 - **测试**：`governance-trio.test.ts` 更新为四人（顺序/职能/显示名/Section 1/预授权/能力/卡文本/
   禁写/写权/`resolveGovernanceRole` 文案）；`list-project.test.ts` 空项目与显式 trio 期望四人、
   `primaryRoleId=liaison`、保留 id 增 `liaison`；新增 `liaison-role.test.ts` 7 例（旧 trio 自动
   获 Liaison 且 `.ans` 逐字节不变、single 不变、`docs/intents/**` 放行/越界拒、AC3 归属文案、
-  能力矩阵、保留 id）。**门禁引擎套件 254 计 / 253 过 / 0 红 / 1 skip**（Windows 专属 skip）。
+  能力矩阵、保留 id）。**门禁引擎套件 255 计 / 254 过 / 0 红 / 1 skip**（Windows 专属 skip）；
+  相关编排 shell 套件 143 计 / 142 过 / 1 红（Windows `symlinkSync` EPERM，与本批无关）。
 - **全量与类型（如实）**：`node --test "test/**/*.test.ts"`（三层 glob）2697 计 / 2673 过 /
   **21 红** / 3 skip。其中 **5 条是本批契约性预期红，全在本角色边界外**：
   `test/测试/t9-block1-bootstrap.test.ts`（主入口仍断言 rapporteur）、

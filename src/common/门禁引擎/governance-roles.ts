@@ -432,15 +432,18 @@ export function trioGovernanceSource(roleId: string): string {
 export const APP_GOVERNANCE_SOURCE = "<built-in:app-governance>";
 
 /**
- * 应用专用治理边界条目（评审 §5.3）：固定三项——
- * `角色卡/governance-boundary.yaml`（file）、`.ans/`（directory）、`docs/bootstrap-manifest.md`（file）。
- * 只在编排的 `finalizeBootstrap` / `repinIfBootstrapped` / 迁移流程中使用；**不注入任何角色会话**。
+ * 应用专用治理边界条目（评审 §5.3；2026-10-18 增 shell 审计目录）：固定四项——
+ * `角色卡/governance-boundary.yaml`（file）、`.ans/`（directory）、`docs/bootstrap-manifest.md`（file）、
+ * `docs/audit/`（directory，shell 命令审计由应用写）。
+ * 只在编排的 `finalizeBootstrap` / `repinIfBootstrapped` / 迁移 / shell 审计边界中使用；
+ * **不注入任何角色会话**。四人与 su 的 Section 1 均不含 `docs/audit/`（角色仍不可写）。
  */
 export function appGovernanceEntries(): BoundaryEntry[] {
   return [
     projectEntry("角色卡/governance-boundary.yaml", "file", "应用写出的项目治理边界文档（pin 锚点）"),
     projectEntry(".ans/", "directory", "应用独占治理记录区（.ans/project.json、.ans/governance/ledger.jsonl）"),
     projectEntry("docs/bootstrap-manifest.md", "file", "应用写出的 bootstrap/迁移留痕清单"),
+    projectEntry("docs/audit/", "directory", "shell 命令审计（应用写）"),
   ];
 }
 

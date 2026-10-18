@@ -56,6 +56,7 @@ flowchart LR
 | su arm 位（只读档/三层链两档分流） | `src/pipeline/orchestration/run-role.ts` — `openRoleSession` 输入 `shellReadonly`（优先）/ `shellOperatorChannel` + `shellArming` |
 | (b) 审读会话 | `src/pipeline/orchestration/pm-reviewer.ts` — `createPmReviewer()`（经 `openRoleSession(内置治理角色)`；结论走 `report_shell_verdict` 工具） |
 | shell 审计留痕 | `src/common/编排/shell-audit.ts` — 落 `docs/audit/shell-gate.jsonl`（`execution` 恒「未执行」；写前经门禁 + 声明 `shell-gate` 条件） |
+| shell 审计边界（W6-A 补丁） | `src/pipeline/orchestration/shell-arming.ts` — `auditBoundaryOf()`：trio 用应用专用边界 `appGovernanceBoundary`（含 `docs/audit/`）；single/su 沿用既有治理角色边界（`docs/audit/` 条件目录），逐字不变 |
 | 回交 / 派发文案单一来源 | `src/common/编排/handback.ts` — `withHandback` / `renderHandbackPrompt` / `renderDispatchPrompt` / `handbackKey` 等 |
 | 自动收尾 / 重 pin | `src/common/编排/finalize.ts` — `repinIfBootstrapped()` / `finalizeBootstrap()` |
 | 意图交接 / 澄清守卫（W6-A） | `src/common/编排/governance-handoff.ts` — `validateIntentHandoff()`（文件权威/四要素/slug/去重/`initial` 一次性/每轮一次/账本可读）、`intentHandoffDedupeKey()`、`countClarificationRounds()`（同一 flow 最多 2 轮） |

@@ -32,6 +32,10 @@ import type { RuntimeKind, RuntimeAdapter, ShellGate, WriteGate, OperatorChannel
 import type { BoundarySection1 } from "../../model/boundary.ts";
 import { listProject, resolveRole } from "../../service/role/resolve-role.ts";
 import {
+  appGovernanceBoundary,
+  governanceRoleOf,
+} from "../../service/boundary/resolve-boundary.ts";
+import {
   buildShellGate,
   type ClassifyShellFn,
   type ShellRules,
@@ -109,6 +113,8 @@ export async function assembleProjectShellGate(opts: AssembleShellGateOptions): 
     opts.project,
     opts.pmRoleId,
   );
+  // W6-A：trio 下审计边界改用应用专用边界（含 docs/audit/）；single/su 逐字不变。
+  const auditBoundary = auditBoundaryOf(opts.project, govBoundary, reviewerRoleId);
 
   const pmAsk =
     reviewerRoleId !== undefined
@@ -132,8 +138,8 @@ export async function assembleProjectShellGate(opts: AssembleShellGateOptions): 
       skillRoot: opts.project.skillRoot,
       fallback: opts.project,
     });
-    const { boundary } = await resolveGovernanceBoundary(loaded.project, opts.pmRoleId);
-    return boundary;
+    const refreshed = await resolveGovernanceBoundary(loaded.project, opts.pmRoleId);
+    return auditBoundaryOf(loaded.project, refreshed.boundary, refreshed.roleId);
   };
 
   return buildShellGate({
@@ -152,7 +158,7 @@ export async function assembleProjectShellGate(opts: AssembleShellGateOptions): 
     ...(opts.timeoutMs !== undefined ? { timeoutMs: opts.timeoutMs } : {}),
     projectRoot: opts.project.projectRoot,
     skillRoot: opts.project.skillRoot,
-    pmBoundary: govBoundary,
+    pmBoundary: auditBoundary,
     auditBoundaryRefresh: refreshAuditBoundary,
     ...(opts.now !== undefined ? { now: opts.now } : {}),
     ...(opts.env !== undefined ? { env: opts.env } : {}),
@@ -192,12 +198,16 @@ export interface AssembleReadonlyShellGateOptions {
  * - fail-closed 退路（`ruleset-load-failed` / `no-classifier` / `classify-error`）与三层链逐字一致——
  *   **装配失败 / 缺件 ⇒ 一律拒绝**，绝不放宽；调用方（`openRoleSession`）装配抛错 ⇒ **不 arm**（`run_shell` 不注册）。
  *
- * 审计边界 = 治理角色边界（与三层链**同一解析**，共用 `resolveGovernanceBoundary`；取不到 ⇒ 审计写被门禁拒、
- * stderr 如实，**不翻转判定**）。审计仍落 `docs/audit/shell-gate.jsonl`，`execution` 恒「未执行」（既有约定）。
+ * 审计边界 = 治理角色边界（与三层链**同一解析**，共用 `resolveGovernanceBoundary`；trio 下再经
+ * `auditBoundaryOf` 映射为应用专用边界 `appGovernanceBoundary`（含 `docs/audit/`），single/su 不变；
+ * 取不到 ⇒ 审计写被门禁拒、stderr 如实，**不翻转判定**）。审计仍落 `docs/audit/shell-gate.jsonl`，
+ * `execution` 恒「未执行」（既有约定）。
  */
 export async function assembleReadonlyShellGate(opts: AssembleReadonlyShellGateOptions): Promise<ShellGate> {
   // 审计边界 = 内置治理角色边界（枚举 builtIn → resolveRole；与三层链共用同一 helper，不造第二份解析）。
-  const { boundary: govBoundary } = await resolveGovernanceBoundary(opts.project);
+  // W6-A：trio 下改用应用专用边界（含 docs/audit/）；single/su 逐字不变。
+  const { roleId: auditRoleId, boundary: govBoundary } = await resolveGovernanceBoundary(opts.project);
+  const auditBoundary = auditBoundaryOf(opts.project, govBoundary, auditRoleId);
 
   // **F-6-1 审计边界刷新闭包**（只读档同接线）：语义与三层链装配完全一致（重读盘上最新 `.ans` 验收 →
   // `loaded.project` 经同一 `resolveGovernanceBoundary` 重解析；无 `.ans` → 回退快照）。只读档无
@@ -209,8 +219,8 @@ export async function assembleReadonlyShellGate(opts: AssembleReadonlyShellGateO
       skillRoot: opts.project.skillRoot,
       fallback: opts.project,
     });
-    const { boundary } = await resolveGovernanceBoundary(loaded.project);
-    return boundary;
+    const refreshed = await resolveGovernanceBoundary(loaded.project);
+    return auditBoundaryOf(loaded.project, refreshed.boundary, refreshed.roleId);
   };
 
   return buildShellGate({
@@ -226,7 +236,7 @@ export async function assembleReadonlyShellGate(opts: AssembleReadonlyShellGateO
     ...(opts.timeoutMs !== undefined ? { timeoutMs: opts.timeoutMs } : {}),
     projectRoot: opts.project.projectRoot,
     skillRoot: opts.project.skillRoot,
-    pmBoundary: govBoundary,
+    pmBoundary: auditBoundary,
     auditBoundaryRefresh: refreshAuditBoundary,
     ...(opts.now !== undefined ? { now: opts.now } : {}),
     ...(opts.env !== undefined ? { env: opts.env } : {}),
@@ -271,7 +281,8 @@ export interface AssembleOperatorShellGateOptions {
  * - `(c)=deny` → 也交 (a)（`c-deny→a-*`；`approveDeny: true`）——原硬拒可被客户逐条批准；
  * - **不接 (b)**（su 不自审）；拒绝/超时/通道不可用 = 拒绝（fail-closed）。
  *
- * 审计边界 = 治理角色边界（与三层链/只读档**同一解析**，共用 `resolveGovernanceBoundary`）；
+ * 审计边界 = 治理角色边界（与三层链/只读档**同一解析**，共用 `resolveGovernanceBoundary`；
+ * 本档只服务 single/su，`auditBoundaryOf` 原样返回，逐字不变）；
  * 审计仍落 `docs/audit/shell-gate.jsonl`，`conditions`/`execution` 既有语义不变。
  * 装配失败 / 缺件 ⇒ 构造抛错或闸一律拒绝；调用方（`openRoleSession`）捕获 ⇒ **不 arm**。
  */
@@ -279,7 +290,9 @@ export async function assembleOperatorShellGate(
   opts: AssembleOperatorShellGateOptions,
 ): Promise<ShellGate> {
   // 审计边界 = 内置治理角色边界（与三层链/只读档共用同一 helper，不造第二份解析）。
-  const { boundary: govBoundary } = await resolveGovernanceBoundary(opts.project);
+  // W6-A：本档只服务 single/su；沿用既有治理角色边界（`auditBoundaryOf` 原样返回）。
+  const { roleId: auditRoleId, boundary: govBoundary } = await resolveGovernanceBoundary(opts.project);
+  const auditBoundary = auditBoundaryOf(opts.project, govBoundary, auditRoleId);
 
   // F-6-1 审计边界刷新闭包（同只读档接线）：重读盘上最新 `.ans` 验收 → 同一解析重试一次。
   const refreshAuditBoundary = async (): Promise<BoundarySection1> => {
@@ -288,8 +301,8 @@ export async function assembleOperatorShellGate(
       skillRoot: opts.project.skillRoot,
       fallback: opts.project,
     });
-    const { boundary } = await resolveGovernanceBoundary(loaded.project);
-    return boundary;
+    const refreshed = await resolveGovernanceBoundary(loaded.project);
+    return auditBoundaryOf(loaded.project, refreshed.boundary, refreshed.roleId);
   };
 
   return buildShellGate({
@@ -308,7 +321,7 @@ export async function assembleOperatorShellGate(
     ...(opts.timeoutMs !== undefined ? { timeoutMs: opts.timeoutMs } : {}),
     projectRoot: opts.project.projectRoot,
     skillRoot: opts.project.skillRoot,
-    pmBoundary: govBoundary,
+    pmBoundary: auditBoundary,
     auditBoundaryRefresh: refreshAuditBoundary,
     ...(opts.now !== undefined ? { now: opts.now } : {}),
     ...(opts.env !== undefined ? { env: opts.env } : {}),
@@ -317,6 +330,28 @@ export async function assembleOperatorShellGate(
 }
 
 // —————————————————————— 共享：内置治理角色发现 + 其边界（审计边界）解析 ——————————————————————
+
+/**
+ * 审计写门禁的边界（W6-A 四角色，2026-10-18）：
+ * - **trio**：改用**应用专用边界** `appGovernanceBoundary`——门禁引擎已把 `docs/audit/` 收入
+ *   `appGovernanceEntries()`（shell 审计由应用写）；首个内置角色（Liaison）的 Section 1 只有
+ *   `docs/intents/`，沿用会让 shell 审计写被拒。审计仍由 `buildShellAuditGate` 声明 `shell-gate`
+ *   条件（额外条件对非条件条目无影响；既有语义保留）。
+ * - **single/su**：**逐字保持**既有治理角色边界（`docs/audit/` 条件目录 + `shell-gate` 条件）。
+ * 只影响审计写门禁；不注入任何角色会话、不改变任何命令判定。
+ */
+function auditBoundaryOf(
+  project: ProjectConfig,
+  govBoundary: BoundarySection1,
+  roleId?: string,
+): BoundarySection1 {
+  const model = project.governanceModel;
+  const isTrio =
+    model === "trio" ||
+    (model === undefined && roleId !== undefined && governanceRoleOf(roleId) !== undefined);
+  if (!isTrio) return govBoundary;
+  return appGovernanceBoundary(govBoundary.acceptance);
+}
 
 /**
  * **内置治理角色发现 + 其边界解析**（三层链与只读档**共用**的「审计边界」路径；§6：只经 Service 公开出口）。

@@ -595,16 +595,29 @@ test("写权：convener 可写 flows/workflow/自身记录；角色卡、提案�
 
 // —————————————————————— 5) 应用专用治理边界 ——————————————————————
 
-test("appGovernanceBoundary：固定三条应用写路径、来源标签、acceptance 透传", () => {
+test("appGovernanceBoundary：固定四项应用写路径（含 shell 审计目录）、来源标签、acceptance 透传", () => {
   const acceptance = { accepted: true, source: "app:finalize" };
   const b = appGovernanceBoundary(acceptance);
   assert.equal(b.boundarySource, APP_GOVERNANCE_SOURCE);
   assert.equal(b.acceptance, acceptance);
   assert.deepEqual(
     b.entries.map((e) => `${e.path}:${e.kind}`).sort(),
-    [".ans/:directory", "docs/bootstrap-manifest.md:file", "角色卡/governance-boundary.yaml:file"].sort(),
+    [
+      ".ans/:directory",
+      "docs/audit/:directory",
+      "docs/bootstrap-manifest.md:file",
+      "角色卡/governance-boundary.yaml:file",
+    ].sort(),
   );
-  for (const p of [".ans/project.json", ".ans/governance/ledger.jsonl", "docs/bootstrap-manifest.md", "角色卡/governance-boundary.yaml"]) {
+  for (const p of [
+    ".ans/project.json",
+    ".ans/governance/ledger.jsonl",
+    "docs/bootstrap-manifest.md",
+    "角色卡/governance-boundary.yaml",
+    // 真机回归（2026-10-18）：四角色默认入口改为 Liaison 后，shell 审计落盘曾因应用边界缺
+    // docs/audit/ 被拒；应用边界必须覆盖该目录（只给应用，不给任何角色）。
+    "docs/audit/shell-gate.jsonl",
+  ]) {
     assert.equal(allows(b, p), true, `应用边界应放行 ${p}`);
   }
   for (const p of ["角色卡/A/role-card.md", "docs/proposals/f.md", "src/x.ts"]) {
@@ -612,6 +625,30 @@ test("appGovernanceBoundary：固定三条应用写路径、来源标签、accep
   }
   // 未接受 ⇒ F6 拒一切（应用边界也 fail-closed）。
   assert.equal(allows(appGovernanceBoundary({ accepted: false, source: "" }), ".ans/project.json"), false);
+});
+
+test("appGovernanceBoundary：docs/audit/ 只给应用——四角色与 su 写 shell 审计仍被拒", async () => {
+  // 注册表不把 docs/audit/ 给任何角色（Section 1 / 预授权均无）。
+  for (const spec of BUILT_IN_GOVERNANCE_ROLES) {
+    assert.equal(spec.entries.some((e) => e.path === "docs/audit/"), false, `${spec.id} 不得获得 docs/audit/`);
+    assert.equal(
+      spec.preauthorizedDirs.includes("docs/audit/"),
+      false,
+      `${spec.id} 不得预授权 docs/audit/`,
+    );
+  }
+  for (const spec of BUILT_IN_GOVERNANCE_ROLES) {
+    const b = await resolveBoundarySection(spec.id, trioProject());
+    assert.equal(allows(b, "docs/audit/shell-gate.jsonl"), false, `${spec.id} 不得写 shell 审计`);
+  }
+  // su：trio 下已归档（结构性拒写）；single 的内置边界同样不含 docs/audit/。
+  const suTrio = await resolveBoundarySection(BUILT_IN_GOVERNANCE_ROLE_ID, trioProject());
+  assert.equal(allows(suTrio, "docs/audit/shell-gate.jsonl"), false, "su（trio 归档）不得写 shell 审计");
+  const suSingle = await resolveBoundarySection(BUILT_IN_GOVERNANCE_ROLE_ID, singleProject());
+  assert.equal(allows(suSingle, "docs/audit/shell-gate.jsonl"), false, "su（single 内置）不得写 shell 审计");
+  // 应用边界（唯一合法写入者）可写。
+  const app = appGovernanceBoundary({ accepted: true, source: "app:audit" });
+  assert.equal(allows(app, "docs/audit/shell-gate.jsonl"), true);
 });
 
 // —————————————————————— 6) resolveGovernanceRole 公共出口 ——————————————————————

@@ -460,3 +460,11 @@ preview: {
 - **CLI 收窄（AC21）**：`parseGovernArgs` 的 `--function` 仍只接受 `proposal|nomination|schedule`；`--function liaison` 显式拒绝（「联络官（liaison）仅桌面主入口提供；CLI 请用 --function proposal|nomination|schedule」）；`--role liaison` 在 `governCommand` 显式拒绝（EXIT_USAGE）。**缺省仍是 `proposal`→rapporteur**（主入口由 `listProject` 的 `primaryRoleId=liaison` 表达）。
 - 引擎层 `openGovernanceSession` 的 `governanceFunction` 类型仍含 `liaison`（桌面/测试前端按评审 §4.5 可路由）；single 下由 `resolveGovernanceRole` 明确拒绝。
 - `govern-session.ts` 的职能纪律提示词改为**注册表驱动**（`spec.displayName`），Liaison 段写 `docs/intents/`、`hand_off_intent`、**交接 ≠ 客户批准**；`runGovernSession` 的确认制说明行同样按 `capabilities.customerInput` 判定（Liaison 不再误报确认制）。
+
+### W6-A 补丁：trio 的 shell 审计边界（2026-10-18）
+
+门禁引擎已把 `docs/audit/` 加入 `appGovernanceEntries()`（shell 审计由应用写）。编排 `shell-arming.ts` 新增私有 `auditBoundaryOf(project, govBoundary, roleId?)`：
+
+- **trio**（`project.governanceModel === "trio"`，或模型缺省且首个内置角色为 trio 角色）：`assembleProjectShellGate` / `assembleReadonlyShellGate` / `assembleOperatorShellGate` 及其 F-6-1 `auditBoundaryRefresh` 的审计边界改用 `appGovernanceBoundary(govBoundary.acceptance)`（经 `src/service/boundary/resolve-boundary.ts` 公共出口，不复制实现）。审计真落 `docs/audit/shell-gate.jsonl`。
+- **single/su**：原样返回既有治理角色边界（`docs/audit/` 条件目录 + `shell-gate` 条件），逐字不变。
+- `buildShellAuditGate` 仍固定声明 `conditions:["shell-gate"]`（额外条件对非条件条目无影响，语义保留）；应用专用边界不注入任何角色会话，角色仍不可写 `docs/audit/`；任何命令判定不变。
