@@ -187,22 +187,30 @@ function registerIpc(win: BrowserWindow): void {
     void win.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(RECOVERY_PAGE)).catch((error) => mainDiagnostic.error("window.recovery-page.failed", error));
   };
   showMainFailure = showFailure;
-  // —————— 「替我审」开关（2026-10-17 PM 评审 §6.6/§10.3）：主进程权威、默认 false、启动/重载复位 ——————
-  // 同一实例交给通道（调用当刻读 `isEnabled()`）与 Interface（`shell:judge-get/set`），两处永不漂移。
-  // 不写 localStorage/.env/项目文件；关窗/退出即随进程消失。
+  // —————— 「替我审批」（approval）与「替我决策」（decision）开关（2026-10-17 / 2026-10-18 评审 §3.3） ——————
+  // 两个**独立**状态机：默认 false、启动/重载复位、不持久化、互不影响；只在主进程内存。
+  // 同一实例交给通道（调用当刻读 `isEnabled()`）与 Interface（`shell:judge-*` / `decision:judge-*`），
+  // 两处永不漂移。代码符号沿用 `shellJudgeSwitch`（approval 组现为「shell + 写盘族」），通道名不改。
   const shellJudgeSwitch = createShellJudgeSwitch();
+  const decisionJudgeSwitch = createShellJudgeSwitch();
   const shellJudgeLog = createDiagnosticLogger({ component: "desktop.shell-judge" });
+  const decisionJudgeLog = createDiagnosticLogger({ component: "desktop.decision-judge" });
   const pushShellJudgeState = (): void => {
-    if (!win.isDestroyed()) win.webContents.send("shell:judge-state", shellJudgeSwitch.get());
+    if (!win.isDestroyed()) win.webContents.send("shell:judge-state", { ...shellJudgeSwitch.get(), available: true });
+  };
+  const pushDecisionJudgeState = (): void => {
+    if (!win.isDestroyed()) win.webContents.send("decision:judge-state", { ...decisionJudgeSwitch.get(), available: true });
   };
   const loadInterface = async (): Promise<void> => {
     showingFailure = false;
-    // §10.3：渲染重载/初次加载前复位为手动（不持久化）；已挂起卡不受影响。
+    // §10.3：渲染重载/初次加载前**两个开关各自**复位为手动（不持久化）；已挂起卡不受影响。
     shellJudgeSwitch.reset();
+    decisionJudgeSwitch.reset();
     try {
       await win.loadFile(path.join(HERE, "renderer", "index.html"));
-      // 初次加载后推送真实状态，渲染侧据此同步复选框（不显示假开启态）。
+      // 初次加载后推送真实状态，渲染侧据此同步两个复选框（不显示假开启态）。
       pushShellJudgeState();
+      pushDecisionJudgeState();
     } catch (error) {
       mainDiagnostic.error("window.interface.failed", error);
       showFailure();
@@ -290,6 +298,22 @@ function registerIpc(win: BrowserWindow): void {
       win.webContents.send("governance:next-step", payload);
       advanceGovernanceFlow?.(payload, context);
     },
+    // 判断 agent（2026-10-18 双开关评审 §8.1/§8.3）：按卡种所属组读**各自**开关（主进程权威）；
+    // 两开关互不影响；判断闭包由每会话上下文（`ctx.governanceJudge`）提供。
+    judge: {
+      isGroupEnabled: (group) => (group === "approval" ? shellJudgeSwitch.isEnabled() : decisionJudgeSwitch.isEnabled()),
+    },
+    // 代批结果行：推达失败**必须抛错**（结果行是 approve 的条件，通道据此回落 manual/row-failed）。
+    emitJudgeResult: (payload) => {
+      if (win.isDestroyed()) throw new Error("窗口已关闭，无法呈现判断结果");
+      win.webContents.send("session:operator-judge", payload);
+      // §8.3：结果行同时落主入口 Liaison 进度行（best-effort，失败只诊断，绝不影响已完成的决定）。
+      try {
+        desktop.emitJudgeProgress(payload);
+      } catch (error) {
+        mainDiagnostic.error("governance-judge.progress.failed", error, { requestId: payload.requestId, cardKind: payload.cardKind });
+      }
+    },
   });
   // 窗口关掉：所有挂起请求归「未获同意」（fail-closed）——不留悬案、更不放行。
   win.on("closed", () => customerChannel.rejectAllPending("窗口已关闭，未获同意（fail-closed）"));
@@ -354,6 +378,28 @@ function registerIpc(win: BrowserWindow): void {
       pushShellJudgeState();
     } else {
       shellJudgeLog.record("shell-judge.set.rejected", { reason: result.error ?? "invalid-request" });
+    }
+    return result;
+  });
+  // —————— 「替我决策」IPC（2026-10-18 双开关评审 §3.3，通道名钉死） ——————
+  // 与 approval 同形、**各自独立**的开关；同样在 handler 内校验 sender。
+  // `decision:judge-state` 为主→渲染推送；结果行走 `session:operator-judge`（见 createCustomerInputChannel 接线）。
+  registerHandler("decision:judge-get", (event) => {
+    if (!isShellJudgeIpcSender(event.sender, win.webContents)) return { version: 1, ok: false, error: "请求来源无效。" };
+    return desktop.getDecisionJudgeState();
+  });
+  registerHandler("decision:judge-set", (event, input) => {
+    if (!isShellJudgeIpcSender(event.sender, win.webContents)) {
+      decisionJudgeLog.record("decision-judge.set.rejected", { reason: "sender-mismatch" });
+      return { version: 1, ok: false, error: "请求来源无效。" };
+    }
+    const result = desktop.setDecisionJudgeEnabled(input);
+    if (result.ok === true) {
+      decisionJudgeLog.record("decision-judge.toggled", { enabled: result.enabled, source: "renderer", at: new Date().toISOString() });
+      // 只影响之后新到的治理决定卡；已挂起/判断中的卡不追溯（通道在结果结算前会再查一次开关）。
+      pushDecisionJudgeState();
+    } else {
+      decisionJudgeLog.record("decision-judge.set.rejected", { reason: result.error ?? "invalid-request" });
     }
     return result;
   });
@@ -435,6 +481,8 @@ function registerIpc(win: BrowserWindow): void {
     shellOperatorChannel,
     // 「替我审」（2026-10-17）：**同一实例**的开关状态机——通道读它、Interface 的 get/set 改它。
     shellJudgeSwitch,
+    // 「替我决策」（2026-10-18）：**同一实例**的第二套开关——与 approval 互不影响。
+    decisionJudgeSwitch,
     // I-1 补丁（2026-10-12 客户重发授权）：(c) 规则集实件（与 (a) 同处接线、同判据——两件同备才 arm）。
     // 同一份对象也供 su 只读档（session.ts 对内置治理角色经 `shellReadonly` 复用——单一来源，两档不漂移）。
     shellArming,

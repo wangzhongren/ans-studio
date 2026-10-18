@@ -18,7 +18,7 @@
 
 import { mkdir, open, readFile } from "node:fs/promises";
 import path from "node:path";
-import type { HandOffIntentKind, RuntimeKind } from "../../model/runtime.ts";
+import type { GovernanceJudgeAudit, HandOffIntentKind, RuntimeKind } from "../../model/runtime.ts";
 import { createDiagnosticLogger } from "../shared/diagnostics.ts";
 
 /** 账本的项目相对路径（评审 §5.7 固定值）。 */
@@ -99,12 +99,19 @@ export interface GovernanceLedgerEntry {
   turnId?: string;
   customerDecision?: "accepted" | "accepted-quick" | "appointed" | "rejected" | "changes-requested" | "none";
   decisionEvidence?: {
-    kind: "customer-input" | "desktop-governance-record" | "customer-message";
+    /**
+     * 2026-10-18 双开关评审 §7.4/§10.1：`"judge"` 表示该决定由客户委托的判断 agent 代批；
+     * `judge` 子对象是**有界审计证据**。`actorRoleId`/`power` 照旧（仍是发起治理角色/职能），
+     * 绝不写 `actorRoleId:"judge"`；`kind` 不参与任何门禁（门禁只读 `decisionKind`/`customerDecision`）。
+     */
+    kind: "customer-input" | "judge" | "desktop-governance-record" | "customer-message";
     toolCallId?: string;
     turnId?: string;
     sessionId?: string;
     action?: "establish" | "reaccept" | "migrate";
     previewDigest?: string;
+    /** 仅 `kind:"judge"`：有界判断审计（reason ≤1KB、evidence ≤10 条、pathDecisions ≤50 条）。 */
+    judge?: GovernanceJudgeAudit;
   };
   messageSummary?: string;
   runtime?: RuntimeKind;

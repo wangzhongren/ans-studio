@@ -1,5 +1,35 @@
 # Pi适配器 变更记录
 
+## 2026-10-18 — P3b 治理卡判断 agent（「替我审批」/「替我决策」）Pi 接入：judge allowlist 改并集、治理 judge 恰三工具
+
+**来源**：项目管理评审 `角色卡/项目管理/docs/design/2026-10-18_design_judge-governance-cards-review.md` §六/§十二 P3b。前置（P1 已冻结）：运行时核心 `buildGovernanceJudgeTools` 恰三只治理工具（`judge_read_file`/`judge_list_dir`/`report_governance_judgement`）、`GOVERNANCE_JUDGE_TOOL_NAMES`、`ALL_JUDGE_TOOL_NAMES`（四名并集）、`GovernedToolsOptions.governanceJudge`；Service 已在注入 `governanceJudge` 时走 `buildGovernanceJudgeTools`、置 `judgeMode:true` 与 `installedMcpServers:[]`。本角色只做 Pi 侧接入，不改运行时核心/编排/桌面/其他适配器。
+
+**改动（全部本角色 Section 1 内）**
+- `src/provider/pi/tools.ts`：薄转出运行时核心的 `buildGovernanceJudgeTools` / `GOVERNANCE_JUDGE_TOOL_NAMES` / `GOVERNANCE_JUDGE_REPORT_TOOL` / `ALL_JUDGE_TOOL_NAMES` 与 `GovernanceJudgeToolOptions` 型；不复制实现。
+- `src/provider/pi/session.ts`：
+  - 新增私有 `judgeToolset()`：`shellJudge` 与 `governanceJudge` **恰一**；同时给出 ⇒ 抛「互斥」（不静默择一）；注入 `governanceJudge` ⇒ 只 `buildGovernanceJudgeTools`（恰三只治理只读工具），绝不走 `buildGovernedTools`；都未注入 ⇒ `undefined`（普通路径逐字不变）。
+  - `createFakeRuntimeAdapter` 增 `governanceJudge?: GovernanceJudgeToolOptions`；注入即治理判断模式（工具面恰三只，其余一律「未知工具」）。
+  - `PiRuntimeAdapterOptions` 增 `governanceJudge?`；`createPiRuntimeAdapter` 判据＝`shellJudge` ∨ `governanceJudge` ∨ `judgeMode:true`；legacy 判断分支用 `judgeToolset()` 选工具集，原有隔离（deny-all 写门禁、ShellGate/客户交互/回交/派发/审读置空、`sessionDir/storage` 忽略、`installedMcpServers:[]`）逐字保留；两种能力同时注入在**构造期**抛互斥错误。
+- `src/common/pi-adapter/real-adapter.ts`：`judgeMode` 的 allowlist 由 `SHELL_JUDGE_TOOL_NAMES` 改为运行时核心并集 `ALL_JUDGE_TOOL_NAMES`（并集**只用于放行面、不用于装配**）；原四件强制事（服务端工具强制关闭、外来 MCP 零装配、忽略持久化、非 judge 工具构造期拒绝）全部原样保留。shell judge 会话实际工具面仍恰三只。
+
+**测试**（新增 `test/pi-adapter/governance-judge.test.ts` 8 例，全部离线、无真实模型/网络/凭据）
+- 工具集常量：治理恰三只、shell 仍恰三只、并集恰四只且等于去重并集（并集只用于 allowlist）。
+- 假适配器治理 judge 模式：list/read/report 三只可执行；`report_shell_judgement`、write/edit/read/run_shell、交互、回交、派发、审读共十种一律「未知工具」；`report_governance_judgement` 参数原样回调；文件未改、无新增条目。
+- 假适配器：两种判断能力同时注入 ⇒ `bindRole` 抛互斥；未注入时普通路径不变（write_file 走门禁、两类 judge 工具均不存在）。
+- 真实适配器（pi-ai faux，进程内）：`judgeMode` + 治理工具 ⇒ active 工具恰三只治理工具、`noTools:"builtin"`、服务端工具 env 被强制忽略、外来 MCP 零装配、`sessionDir` 被忽略（in-memory、无 `.ans`）、report 原样；注入 `write_file` 构造期被拒。
+- legacy `createPiRuntimeAdapter` 注入 `governanceJudge`：active 工具恰三只治理工具、无 write/run_shell、无 shell judge report、无持久化、report 原样；两种能力同时注入构造期抛互斥。
+- 既有 `shell-judge.test.ts` 7 例未改、全绿：shell judge 工具面与行为不回归。
+
+**验证**
+- `node --test "test/pi-adapter/**/*.test.ts"` → **305 项：302 pass / 2 fail / 1 skip**。两 fail 均为既有 `injected-runtime.test.ts` 的 Windows `EPERM: symlink` 环境限制（本机无符号链接权限，与本改动无关）；skip 为既有条件跳过。
+- `npm run typecheck` → 本角色文件 **0 错**；全仓唯一错误在 `src/provider/codex/session.ts`（Codex 适配器 P3c 并行在飞，`judgeReportTool` 未定义），非本角色引入、未触碰。
+- 全量 `node --test "test/**/*.test.ts"`（三层 glob）→ **2806 项：2784 pass / 19 fail / 3 skip**。19 红均在本角色边界之外（如实归类）：① 8 处 Windows `EPERM: symlink` 环境限制（`test/claude-adapter/session.test.ts`、`test/codex-adapter/session.test.ts`、`test/pi-adapter/injected-runtime.test.ts` ×2、`test/runtime-core/session-store.test.ts` ×2、`test/runtime-core/tools.test.ts`、`test/编排/shell-authorized-routine.test.ts`）；② `test/runtime-core/tools.test.ts` shell 中止时序 1 处（P1 运行时核心在飞）；③ 桌面应用 8 处（`dispatch-delivery.test.ts` ×2、`renderer.test.ts` ×4、`runtime-ui.test.ts`、`markdown.test.ts`）；④ `test/测试/` 验收脚本 2 处（`shell-judge-verify/f-readonly-sandbox.test.ts` 的敏感目录文案随 P1 `.ans` 收紧、`g4-skill-verify/b-render-double-check.test.ts`）。本角色新增/修改的测试 0 红（新增 8 例全绿；既有 shell-judge 7 例全绿；Pi 专项 305 项 302 pass，2 红为上述既有 symlink EPERM）。
+
+**风险 / 未验边界**
+- Pi 真实模型往返未跑（客户本人凭据验收）；本层只保证工具面结构性隔离、allowlist 并集与判断模式配置面。
+- 治理 judge 的规范化/required-read/逐路径机械复核/回落不在本层（编排侧）；本层只保证 `report_governance_judgement` 原样交回。
+- 未 git 提交；未读 `.env`；未发网络/真实模型请求。
+
 ## 2026-10-17 — P3b 判断 agent（「替我审」）Pi judge 模式：只消费运行时核心只读工具集
 
 **来源**：项目管理评审 `角色卡/项目管理/docs/design/2026-10-17_design_shell-auto-approve-review.md` revision 2（客户 D1/D2 已拍板）§5.1/§6.1/§7/§十一 P3b。前置已落地：运行时核心 `buildShellJudgeTools({projectRoot, report, stats, budget})` 恰返回 `judge_read_file`/`judge_list_dir`/`report_shell_judgement`；`RuntimeProviderOptions.judgeMode?: true`；`RuntimeSessionOptions`/`GovernedToolsOptions.shellJudge?`。本角色只做 Pi 侧接入，不改运行时核心/编排/桌面/其他适配器。

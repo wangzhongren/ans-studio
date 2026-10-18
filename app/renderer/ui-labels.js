@@ -238,53 +238,73 @@
     return String(list[i] == null ? "" : list[i]);
   }
 
-  // —————— P5「替我审」自动判断（2026-10-17 评审 §6.5/§6.6/§9.3/§10；文案单一来源）——————
-  // 本段只做「开关/结果/回落提示 → 文案」的纯映射；不判定命令、不读项目、不决定是否放行。
+  // —————— P5「替我审批」/「替我决策」双开关（2026-10-18 评审 §三/§八/§九；文案单一来源）——————
+  // 本段只做「开关/警告/结果/回落提示 → 文案」的纯映射；不判定命令/卡片、不读项目、不决定是否放行。
   // 渲染侧只取用（`renderer.js`）；桥缺失时**不得**呈现任何「已开启」态。
+  // 分组单一来源在主进程（`GOVERNANCE_CARD_GROUP`）；渲染侧只按载荷里的 group 显示，不再写第二张映射表。
+
+  var JUDGE_GROUP_APPROVAL = "approval";
+  var JUDGE_GROUP_DECISION = "decision";
+  var JUDGE_GROUP_LABELS = { approval: "代审批", decision: "代决策" };
 
   var SHELL_JUDGE_ON_LABEL = "替我审批中 · 判断 agent";
-  var SHELL_JUDGE_OFF_LABEL = "替我审";
+  var SHELL_JUDGE_OFF_LABEL = "替我审批";
+  var DECISION_JUDGE_ON_LABEL = "替我决策中 · 判断 agent";
+  var DECISION_JUDGE_OFF_LABEL = "替我决策";
   var SHELL_JUDGE_BRIDGE_MISSING = "当前版本不支持自动判断，保持手动";
-  var SHELL_JUDGE_OFF_TITLE = "手动逐条确认 shell 命令（默认）";
-  var SHELL_JUDGE_ON_TITLE = "判断 agent 先评估 shell 命令必要性；可随时关闭";
+  var DECISION_JUDGE_SINGLE_NOTE = "旧治理模型（single）不支持代决策";
+  var SHELL_JUDGE_OFF_TITLE = "手动逐条确认 shell 命令与 trio 写盘/写卡确认（默认）";
+  var SHELL_JUDGE_ON_TITLE = "判断 agent 先评估 shell 命令与 trio 写盘/写卡确认；可随时关闭";
+  var DECISION_JUDGE_OFF_TITLE = "手动逐张确认提案接受、任命与验收（默认）";
+  var DECISION_JUDGE_ON_TITLE = "判断 agent 先评估提案接受、任命与验收；可随时关闭";
 
   /** 开启警告的关闭按钮文案（客户 2026-10-18：提示只出现一次，可手动收起）。 */
   var SHELL_JUDGE_WARNING_CLOSE_LABEL = "知道了";
   /** 开启警告的自动收起时长（客户要求约 8–10 秒；无计时器纪律只豁免此一次性提示，不用于业务等待）。 */
   var SHELL_JUDGE_WARNING_AUTO_DISMISS_MS = 9000;
 
-  /** §10.2 开启警告（逐字三行；客户 2026-10-18 改为**每次开启只显示一次**）。**不含** Markdown 强调标记（粗体由渲染侧 class 表达）。 */
-  var SHELL_JUDGE_WARNING_LINES = [
-    "替我审批中：shell 命令先由判断 agent 评估必要性；只有判断没发生（不可用/超时/解析失败/引擎不支持）才会弹卡。",
-    "判断 agent 只读项目内代码/文档/角色卡（不含 .env、密钥/凭据与项目外），不写文件、不执行命令；不必要会给替代方案，没有替代方案会由请求角色说明并给出路；每次判断会产生一次模型调用（token/延迟）；可能误判，可随时关闭。",
-    "判断 agent 跟随会话引擎（Claude / Pi / Codex）；当前引擎不可用、超时或未配置时回落到手动确认。文件写入、选择卡与恢复确认仍需手动。",
-  ];
-
-  function shellJudgeWarningLines() {
-    return SHELL_JUDGE_WARNING_LINES.slice();
+  /** 分组的人话标记（§9.3/§10.2）：结果行、审计可见文案统一用「代审批/代决策」。 */
+  function judgeGroupLabel(group) {
+    return JUDGE_GROUP_LABELS[group] || "";
   }
 
   /**
-   * 开关视图（纯映射）：`available` 来自 preload 四个方法是否齐备（渲染侧判），`enabled` 只信主进程。
-   *  · 桥缺失 ⇒ 禁用 + 桥缺失文案，**绝不** checked（不显示假开启态）；
+   * 一个开关的视图（纯映射）：`available` 来自 preload 四个方法是否齐备 + 主进程 `available`；
+   * `enabled` 只信主进程。
+   *  · 桥缺失/驱动缺失 ⇒ 禁用 + 桥缺失文案，**绝不** checked（不显示假开启态）；
+   *  · decision 在 single 项目 ⇒ 禁用 +「旧治理模型（single）不支持代决策」（`note`），不显示开启态；
    *  · 可用 ⇒ 文案/悬停按真实 enabled 切换；开启期间输入区保留紧凑琥珀标记（label + `.is-on` 圆点）；
    *  · `busy`（IPC 在途）只禁用，不改文案与真实状态。
-   * 长文警告的显隐**不在这里**（不是 enabled 的纯函数）：见 `shellJudgeWarningStep`。
+   * 长文警告的显隐**不在这里**（不是 enabled 的纯函数）：见 `judgeWarningStep`。
    */
-  function shellJudgeToggleView(available, enabled, busy) {
+  function judgeToggleView(group, available, enabled, busy, options) {
+    var decision = group === JUDGE_GROUP_DECISION;
     var ok = available === true;
-    var on = ok && enabled === true;
+    var singleDisabled = decision && !!(options && options.singleDisabled === true);
+    var on = ok && !singleDisabled && enabled === true;
+    var onLabel = decision ? DECISION_JUDGE_ON_LABEL : SHELL_JUDGE_ON_LABEL;
+    var offLabel = decision ? DECISION_JUDGE_OFF_LABEL : SHELL_JUDGE_OFF_LABEL;
+    var offTitle = decision ? DECISION_JUDGE_OFF_TITLE : SHELL_JUDGE_OFF_TITLE;
+    var onTitle = decision ? DECISION_JUDGE_ON_TITLE : SHELL_JUDGE_ON_TITLE;
     return {
+      group: group,
       available: ok,
       enabled: on,
       checked: on,
-      disabled: !ok || busy === true,
-      label: ok ? (on ? SHELL_JUDGE_ON_LABEL : SHELL_JUDGE_OFF_LABEL) : SHELL_JUDGE_BRIDGE_MISSING,
-      title: ok ? (on ? SHELL_JUDGE_ON_TITLE : SHELL_JUDGE_OFF_TITLE) : SHELL_JUDGE_BRIDGE_MISSING,
+      singleDisabled: singleDisabled,
+      disabled: !ok || singleDisabled || busy === true,
+      label: ok ? (on ? onLabel : offLabel) : SHELL_JUDGE_BRIDGE_MISSING,
+      title: !ok ? SHELL_JUDGE_BRIDGE_MISSING : (singleDisabled ? DECISION_JUDGE_SINGLE_NOTE : (on ? onTitle : offTitle)),
+      note: ok && singleDisabled ? DECISION_JUDGE_SINGLE_NOTE : "",
       // 兼容字段（旧调用方仍读取）：仅表示「开启态下一次性警告的候选」——实际显隐由
-      // `shellJudgeWarningStep` 决定（每次开启只显示一次）；渲染侧**不得**用它控制警告显隐。
+      // `judgeWarningStep` 决定（每次开启只显示一次）；渲染侧**不得**用它控制警告显隐。
       warningVisible: on,
     };
+  }
+
+  /** 兼容旧调用方：approval 组开关视图。 */
+  function shellJudgeToggleView(available, enabled, busy) {
+    return judgeToggleView(JUDGE_GROUP_APPROVAL, available, enabled, busy, null);
   }
 
   /**
@@ -292,13 +312,42 @@
    *  · `enabled !== true` ⇒ 复位 `shown=false`、不显示（关闭开关后清掉「已提示」）；
    *  · 开启且该次开启尚未提示 ⇒ `shown=true, show=true`（只显示这一次）；
    *  · 开启且已提示（重绘/收消息/切角色/重复推送）⇒ 不显示（**绝不重复弹出**）。
+   * 每个组**各自**一份 `shown`：另一组首次开启时会再显示一次（仍是同一块警告）。
    * 渲染侧只在 `show` 时展示；展示后无论手动「知道了」还是到时自动消失都不再出现，
-   * 直到客户关闭开关再重新开启。**不持久化**：应用重启后再次开启会再提示一次。
+   * 直到客户关闭该组开关再重新开启。**不持久化**：应用重启后再次开启会再提示一次。
    */
-  function shellJudgeWarningStep(enabled, shown) {
+  function judgeWarningStep(enabled, shown) {
     if (enabled !== true) return { shown: false, show: false };
     if (shown === true) return { shown: true, show: false };
     return { shown: true, show: true };
+  }
+
+  /** 兼容旧调用方：approval 组一次性状态迁移。 */
+  function shellJudgeWarningStep(enabled, shown) {
+    return judgeWarningStep(enabled, shown);
+  }
+
+  /**
+   * §9.2 开启警告：**同一块**按当前开启的组列行（两个都开 ⇒ 两段）。
+   * 返回 `[{text, strong}]`——strong 由渲染侧 class 表达（不含 Markdown 标记）。
+   * 客户 2026-10-18 口径：整块每次开启只显示一次（每个组各自一次，见 `judgeWarningStep`）。
+   */
+  function judgeWarningLines(groups) {
+    var list = Array.isArray(groups) ? groups : [];
+    var approval = list.indexOf(JUDGE_GROUP_APPROVAL) >= 0;
+    var decision = list.indexOf(JUDGE_GROUP_DECISION) >= 0;
+    var lines = [];
+    if (approval) lines.push({ text: "替我审批中：shell 命令与写盘/写卡确认（write / appointment-write / schedule-write）将由判断 agent 代批。", strong: true });
+    if (decision) lines.push({ text: "替我决策中：提案接受、任命、验收将由判断 agent 代批。", strong: true });
+    lines.push({ text: "判断 agent 只读项目内代码/文档/角色卡（不含 .env、密钥/凭据、.ans 账本/会话、审计日志与项目外），不写文件、不执行命令；只代你「接受/任命/确认/验收」，不会代你拒绝、要求修改或勾选证据不足的候选；不确定、缺证据、读取失败、引擎不可用、超时或解析失败会按所属开关回落逐张卡，由你决定。", strong: false });
+    lines.push({ text: "提案快捷路径（accept-quick）默认不代批；旧治理模型（single/su）的治理方向卡仍逐张确认；single 下写盘确认仍逐张手动。", strong: false });
+    lines.push({ text: "每次代批会产生一次模型调用（token/延迟）；结果行与审计会标明「judge 代批 · 代审批/代决策」；可能误判，可随时关闭。", strong: false });
+    return lines;
+  }
+
+  /** 兼容旧调用方：approval 组的警告文本（仅文字）。 */
+  function shellJudgeWarningLines() {
+    return judgeWarningLines([JUDGE_GROUP_APPROVAL]).map(function (line) { return line.text; });
   }
 
   /**
@@ -325,7 +374,7 @@
     return typeof engine === "string" && engine !== "" ? engine : "未报告";
   }
 
-  /** `manual` reasonCode 的人话原因（与桌面通道 `judgeManualHumanReason` 同解；未知 ⇒「判断未完成」）。 */
+  /** `manual` reasonCode 的人话原因（shell judge；与桌面通道 `judgeManualHumanReason` 同解）。 */
   function shellJudgeReasonText(reasonCode) {
     var map = {
       "unsupported-engine": "当前引擎不支持自动判断",
@@ -345,8 +394,47 @@
     return typeof reasonCode === "string" && map[reasonCode] ? map[reasonCode] : "判断未完成";
   }
 
+  /** 治理卡 `manual` reasonCode 的人话原因（driver 规范化后的安全名单；未知 ⇒「判断未完成」）。 */
+  function governanceJudgeReasonText(reasonCode) {
+    var map = {
+      "sufficient": "判断通过",
+      "not-recommended": "判断 agent 未推荐该选择",
+      "path-unverified": "写入路径未经逐路径核对",
+      "path-outside-boundary": "写入路径越出角色边界",
+      "artifact-missing": "缺少规范物证文件",
+      "artifact-not-read": "判断 agent 未读取必需文件",
+      "insufficient-evidence": "证据不足",
+      "group-mismatch": "判断分组与卡片不一致",
+      "switch-off": "判断期间开关已关闭",
+      "budget": "读取预算已用尽",
+      "read-denied": "所需项目文件无法读取",
+      "read-truncated": "读取内容被截断",
+      "unsupported-engine": "当前引擎不支持自动判断",
+      "unavailable": "判断服务不可用",
+      "timeout": "判断超时",
+      "aborted": "本轮已中止",
+      "parse-failed": "判断结果无法解析",
+      "model-manual": "判断 agent 自报无法判断",
+      "row-failed": "结果无法在聊天中显示",
+    };
+    return typeof reasonCode === "string" && map[reasonCode] ? map[reasonCode] : "判断未完成";
+  }
+
   /**
-   * 手动回落卡 `judgeNotice`（§10.4 逐字）：
+   * 手动回落卡 `judgeNotice`（§9.3 逐字；主进程也会给 `judgeNotice`，渲染侧优先原样呈现主进程文本）：
+   *  · `row-failed` ⇒「判断已完成，但结果无法在聊天中显示」——**不**说成「判断没发生」；
+   *  · 其余 manual ⇒「判断 agent 未代批（代审批/代决策）：<人话原因>；已转你手动确认。」
+   */
+  function governanceJudgeNoticeText(group, reasonCode) {
+    var label = judgeGroupLabel(group) || "代审批/代决策";
+    if (reasonCode === "row-failed") {
+      return "判断 agent 已完成判断，但结果无法在聊天中显示（" + label + "）；已转你手动确认。";
+    }
+    return "判断 agent 未代批（" + label + "）：" + governanceJudgeReasonText(reasonCode) + "；已转你手动确认。";
+  }
+
+  /**
+   * 手动回落卡 `judgeNotice`（旧 shell judge 口径；§10.4 逐字）：
    *  · `row-failed` ⇒「判断已完成但结果无法显示」——**不**说成「判断没发生」；
    *  · 其余 manual ⇒「判断 agent 未能完成判断：<人话原因>。已转你手动确认。」
    */
@@ -355,6 +443,90 @@
       return "判断 agent 已完成判断，但结果无法在聊天中显示；已转你手动确认。";
     }
     return "判断 agent 未能完成判断：" + shellJudgeReasonText(reasonCode) + "。已转你手动确认。";
+  }
+
+  /**
+   * 判断结果行视图（§9.3；纯映射）。`manual` 不产生结果行（原卡替代，本函数只接收 approve 载荷）。
+   * 返回字段均为已定稿文案/数据；渲染侧只 `esc` 后落 DOM，不再拼业务措辞。
+   *  · 标题固定「judge 代批 · 代审批/代决策」，徽标重复分组标记；
+   *  · 结论按 cardKind：提案接受 / 任命 <roleIds> / 验收通过 / 确认写入 N 个路径（前 3 个）；
+   *  · 引擎/operator/流程/理由/选中项/路径在正文与折叠详情。
+   */
+  function governanceJudgeResultView(payload) {
+    if (!payload || typeof payload !== "object") return null;
+    var group = typeof payload.group === "string" ? payload.group : "";
+    if (group !== JUDGE_GROUP_APPROVAL && group !== JUDGE_GROUP_DECISION) return null;
+    function str(v) { return typeof v === "string" && v !== "" ? v : ""; }
+    function arr(v) {
+      return Array.isArray(v) ? v.filter(function (x) { return typeof x === "string" && x !== ""; }) : [];
+    }
+    var cardKind = str(payload.cardKind);
+    var engine = str(payload.engine);
+    var flowId = str(payload.flowId);
+    var selected = arr(payload.selected);
+    var paths = arr(payload.paths);
+    var evidence = arr(payload.evidence);
+    var pathDecisions = Array.isArray(payload.pathDecisions)
+      ? payload.pathDecisions.filter(function (p) { return p && typeof p === "object" && typeof p.path === "string" && p.path !== ""; })
+        .map(function (p) { return { path: p.path, ok: p.ok === true, reason: str(p.reason) }; })
+      : [];
+    var groupLabel = judgeGroupLabel(group);
+    var headline = "";
+    if (cardKind === "proposal") {
+      headline = "接受提案（" + (selected.length ? selected.join("、") : "accept") + "）";
+    } else if (cardKind === "acceptance") {
+      headline = "验收通过（" + (selected.length ? selected.join("、") : "accept") + "）";
+    } else if (cardKind === "appointment") {
+      headline = selected.length ? "任命 " + selected.join("、") : "任命（未报告选中项）";
+    } else if (cardKind === "write" || cardKind === "appointment-write" || cardKind === "schedule-write") {
+      var pathCount = paths.length;
+      headline = pathCount
+        ? "确认写入 " + pathCount + " 个路径（" + paths.slice(0, 3).join("、") + (pathCount > 3 ? " 等 " + pathCount + " 个" : "") + "）"
+        : "确认写入（未报告路径）";
+    } else {
+      headline = "已代批" + (cardKind ? "（" + cardKind + "）" : "");
+    }
+    if (flowId) headline += " · 流程 " + flowId;
+    var lines = [];
+    var reason = str(payload.reason);
+    if (reason) lines.push("判断理由：" + reason);
+    if (selected.length && cardKind !== "appointment" && cardKind !== "proposal" && cardKind !== "acceptance") {
+      lines.push("选中项：" + selected.join("、"));
+    }
+    if (paths.length && cardKind !== "write" && cardKind !== "appointment-write" && cardKind !== "schedule-write") {
+      lines.push("路径：" + paths.join("、"));
+    }
+    var durationMs = typeof payload.durationMs === "number" && isFinite(payload.durationMs) ? payload.durationMs : null;
+    var readCalls = typeof payload.readCalls === "number" && isFinite(payload.readCalls) ? payload.readCalls : null;
+    var readBytes = typeof payload.readBytes === "number" && isFinite(payload.readBytes) ? payload.readBytes : null;
+    return {
+      group: group,
+      groupLabel: groupLabel,
+      cardKind: cardKind,
+      title: "judge 代批 · " + groupLabel,
+      badge: groupLabel,
+      headline: headline,
+      engineText: "判断引擎：" + shellJudgeEngineLabel(engine),
+      operatorText: "operator:" + (engine ? "judge:" + engine : "judge"),
+      flowText: flowId ? "流程：" + flowId : "",
+      at: str(payload.at),
+      lines: lines,
+      toolCallId: str(payload.toolCallId),
+      requestId: str(payload.requestId),
+      details: {
+        reason: reason,
+        selected: selected,
+        paths: paths,
+        pathDecisions: pathDecisions,
+        evidence: evidence,
+        durationMs: durationMs,
+        readCalls: readCalls,
+        readBytes: readBytes,
+        toolCallId: str(payload.toolCallId),
+        requestId: str(payload.requestId),
+        flowId: flowId,
+      },
+    };
   }
 
   /**
@@ -391,8 +563,8 @@
       verdict: verdict,
       denyOverride: hardDeny,
       title: verdict === "allow"
-        ? (hardDeny ? "已替你放行（判断 agent · deny 档）" : "已替你放行（判断 agent）")
-        : "未放行（判断 agent）",
+        ? (hardDeny ? "已替你放行（判断 agent · 代审批 · deny 档）" : "已替你放行（判断 agent · 代审批）")
+        : "未放行（判断 agent · 代审批）",
       label: hardDeny ? (str(payload.label) || "deny 档 · judge 放行") : "",
       summary: summary,
       engineText: "判断引擎：" + shellJudgeEngineLabel(engine),
@@ -400,7 +572,7 @@
       tierText: tierText,
       at: str(payload.at),
       lines: lines,
-      retryHint: verdict === "deny" ? "可关闭「替我审」后重试（改为手动确认），或按替代方案调整命令。" : "",
+      retryHint: verdict === "deny" ? "可关闭「替我审批」后重试（改为手动确认），或按替代方案调整命令。" : "",
       toolCallId: str(payload.toolCallId),
       details: {
         command: str(payload.command),
@@ -896,11 +1068,25 @@
     shellJudgeReasonText: shellJudgeReasonText,
     shellJudgeResultView: shellJudgeResultView,
     shellJudgeEngineLabel: shellJudgeEngineLabel,
+    judgeToggleView: judgeToggleView,
+    judgeWarningStep: judgeWarningStep,
+    judgeWarningLines: judgeWarningLines,
+    judgeGroupLabel: judgeGroupLabel,
+    governanceJudgeReasonText: governanceJudgeReasonText,
+    governanceJudgeNoticeText: governanceJudgeNoticeText,
+    governanceJudgeResultView: governanceJudgeResultView,
+    JUDGE_GROUP_APPROVAL: JUDGE_GROUP_APPROVAL,
+    JUDGE_GROUP_DECISION: JUDGE_GROUP_DECISION,
     SHELL_JUDGE_ON_LABEL: SHELL_JUDGE_ON_LABEL,
     SHELL_JUDGE_OFF_LABEL: SHELL_JUDGE_OFF_LABEL,
+    DECISION_JUDGE_ON_LABEL: DECISION_JUDGE_ON_LABEL,
+    DECISION_JUDGE_OFF_LABEL: DECISION_JUDGE_OFF_LABEL,
     SHELL_JUDGE_BRIDGE_MISSING: SHELL_JUDGE_BRIDGE_MISSING,
+    DECISION_JUDGE_SINGLE_NOTE: DECISION_JUDGE_SINGLE_NOTE,
     SHELL_JUDGE_OFF_TITLE: SHELL_JUDGE_OFF_TITLE,
     SHELL_JUDGE_ON_TITLE: SHELL_JUDGE_ON_TITLE,
+    DECISION_JUDGE_OFF_TITLE: DECISION_JUDGE_OFF_TITLE,
+    DECISION_JUDGE_ON_TITLE: DECISION_JUDGE_ON_TITLE,
     SHELL_JUDGE_WARNING_CLOSE_LABEL: SHELL_JUDGE_WARNING_CLOSE_LABEL,
     SHELL_JUDGE_WARNING_AUTO_DISMISS_MS: SHELL_JUDGE_WARNING_AUTO_DISMISS_MS,
     sidebarCollapsedFromStorage: sidebarCollapsedFromStorage,

@@ -47,3 +47,21 @@ Pi唯一tool_call事件源为SDK tool_execution_start，detail带真实turnId/to
 - 未注入 `shellJudge`/未置 `judgeMode` ⇒ 普通角色会话路径逐字不变（受治理工具、ShellGate、交互/回交/派发、持久化与既有行为一致）。
 
 **测试**：`test/pi-adapter/shell-judge.test.ts`（7 例，离线；假适配器 + pi-ai faux 进程内模型 + legacy 注入面）。专项 297 项 294 pass / 2 既有 Windows symlink EPERM / 1 skip；本角色 typecheck 0 错。
+
+## 2026-10-18 P3b 治理卡判断 agent（「替我审批」/「替我决策」）Pi 接入
+
+依据 PM 评审 `2026-10-18_design_judge-governance-cards-review.md` §六/§十二 P3b（P1 已冻结运行时核心的 `buildGovernanceJudgeTools`、`GOVERNANCE_JUDGE_TOOL_NAMES`、`ALL_JUDGE_TOOL_NAMES`、`GovernedToolsOptions.governanceJudge`）。本角色只做 Pi 侧接入；工具实现、读取策略、规范化与裁决全在运行时核心/编排。
+
+**输入面（两面等价）**
+- Service 生产入口：`RuntimeProviderOptions{ tools, judgeMode: true, installedMcpServers: [] }`——Service 注入 `governanceJudge` 时已用 `buildGovernanceJudgeTools` 把工具定形为恰三只治理只读工具，本层纯消费。
+- legacy 直接入口：`PiRuntimeAdapterOptions.governanceJudge?: GovernanceJudgeToolOptions`（或沿用 `judgeMode?: true`）；本层只调 `buildGovernanceJudgeTools`，绝不调 `buildGovernedTools`。与 `shellJudge` **恰一**：同时给出在构造期抛「shellJudge 与 governanceJudge 互斥」（假适配器在 `bindRole` 抛同款错误），不静默择一。
+
+**结构性保证（`src/provider/pi/session.ts` + `src/common/pi-adapter/real-adapter.ts`）**
+- 治理 judge 工具面恰为 `judge_read_file` / `judge_list_dir` / `report_governance_judgement`；`judgeMode` 下 real-adapter 的 allowlist 改为运行时核心并集 `ALL_JUDGE_TOOL_NAMES`（恰四名：两个 report 工具）；并集**只用于 allowlist，不用于装配**——每次会话实际注入的仍恰是某一方三只工具。非并集工具（`write_file` 等）在构造期抛「判断会话只允许 judge 只读工具」。
+- shell judge 会话装配不变：仍只走 `buildShellJudgeTools`，恰三只 `SHELL_JUDGE_TOOL_NAMES`；其行为与 allowlist 语义（三只均被放行）不回归。
+- 不构造/不注册写、编辑、shell、客户交互、回交、派发、MCP/网络/服务端工具；legacy 判断分支写门禁 deny-all（纵深防御）。
+- 强制关闭原生能力：忽略 `ANS_PI_SERVER_TOOLS`、忽略 `installedMcpServers`（零 MCP 装配）、`noTools:"builtin"`；不持久化（忽略 `storage`/`sessionDir`，会话恒 in-memory）。
+- `report_governance_judgement` 只把模型原始参数交给注入回调（不规范化/不裁剪）；规范化、required-read、逐路径机械复核在编排侧。
+- 未注入任何判断能力 ⇒ 普通角色会话路径逐字不变（受治理工具、ShellGate、交互/回交/派发、持久化与既有行为一致）。
+
+**测试**：`test/pi-adapter/governance-judge.test.ts`（8 例，离线）：工具集常量（治理恰三、shell 恰三、并集恰四）；假适配器治理模式工具面/未知工具/report 原样/文件未变；两能力互斥；普通路径不回归；真实 faux 适配器 judgeMode 工具面 + 服务端/MCP/持久化关闭；非 judge 工具构造期拒绝；legacy `governanceJudge` 直连分支与构造期互斥。专项 305 项 302 pass / 2 既有 Windows symlink EPERM / 1 skip。

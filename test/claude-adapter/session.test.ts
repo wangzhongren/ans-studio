@@ -17,6 +17,7 @@ import { createRuntimeSessionStore } from "../../src/provider/runtime/session-st
 import { createRuntimeAdapter, projectRuntimeLiveHandback } from "../../src/service/runtime/session.ts";
 import { toClaudeSchema } from "../../src/common/claude-adapter/schema.ts";
 import { buildShellJudgeTools, SHELL_JUDGE_TOOL_NAMES } from "../../src/common/runtime-core/shell-judge/tools.ts";
+import { ALL_JUDGE_TOOL_NAMES, GOVERNANCE_JUDGE_TOOL_NAMES, buildGovernanceJudgeTools } from "../../src/common/runtime-core/governance-judge/tools.ts";
 import type { ResolvedRole } from "../../src/model/role.ts";
 import type { RuntimeProviderOptions, InteractionGate, ToolDefinition, SessionEvent, WriteGate, ShellJudgeReadStats } from "../../src/model/runtime.ts";
 
@@ -115,6 +116,8 @@ const probeTool = (): ToolDefinition => ({ name: "probe", description: "fixture"
 const judgeStats = (): ShellJudgeReadStats => ({ readCalls: 0, readBytes: 0, deniedReads: 0, truncatedReads: 0, budgetExceeded: false });
 const judgeTools = (root: string, report: (raw: unknown) => void = () => {}, stats: ShellJudgeReadStats = judgeStats()): ToolDefinition[] =>
   buildShellJudgeTools({ projectRoot: root, report, stats });
+const governanceJudgeTools = (root: string, report: (raw: unknown) => void = () => {}, stats: ShellJudgeReadStats = judgeStats()): ToolDefinition[] =>
+  buildGovernanceJudgeTools({ projectRoot: root, report, stats });
 
 test("SDK stays lazy through composition/bind; actual MCP schema/options isolate all native abilities and credentials", async () => fixture(async (root) => {
   const engine = fake(async (client, config, user) => {
@@ -1389,6 +1392,102 @@ test("judge mode registers exactly the three injected read-only tools, force-dis
   await session.dispose();
   await assert.rejects(access(join(root, ".ans")));
   await assert.rejects(access(configDirectory));
+}));
+
+test("governance judge mode registers exactly the three governance tools, force-disables WebSearch/installed MCP, and denies non-allowlisted calls", async () => fixture(async (root) => {
+  await writeFile(join(root, "README.md"), "# Governance judge fixture\n");
+  await writeFile(join(root, ".env"), "TOP_SECRET=1\n");
+  const reports: unknown[] = [];
+  const stats = judgeStats();
+  const tools = governanceJudgeTools(root, (raw) => { reports.push(raw); }, stats);
+  assert.deepEqual(tools.map((tool) => tool.name), [...GOVERNANCE_JUDGE_TOOL_NAMES]);
+  // 并集只用于 allowlist：恰为 shell 三只 + report_governance_judgement（去重四只）。
+  assert.deepEqual([...ALL_JUDGE_TOOL_NAMES].sort(), [...new Set([...SHELL_JUDGE_TOOL_NAMES, ...GOVERNANCE_JUDGE_TOOL_NAMES])].sort());
+  const storage = createRuntimeSessionStore({ projectRoot: root, roleId: role.id, runtime: "claude" });
+  const engine = fake(async (client, config, user) => {
+    // 结构面与 shell judge 同款：内置工具面为空，allowedTools 只有治理三只，原生/网络工具显式禁用，
+    // MCP 只有注入的 ans server；即便上游误传 installedMcpServers 也不装配。
+    assert.deepEqual(config.tools, []);
+    assert.deepEqual(config.allowedTools, GOVERNANCE_JUDGE_TOOL_NAMES.map((name) => `mcp__ans__${name}`));
+    for (const native of ["Bash", "Write", "Edit", "Read", "WebSearch", "WebFetch", "Task"]) assert.equal(config.disallowedTools!.includes(native), true, native);
+    assert.deepEqual(Object.keys(config.mcpServers!), ["ans"]);
+    assert.equal(config.strictMcpConfig, true);
+    assert.equal(config.persistSession, false);
+    assert.match(config.systemPrompt as string, /只读判断会话/);
+    assert.match(config.systemPrompt as string, /report_governance_judgement/);
+    assert.equal((config.systemPrompt as string).includes("report_shell_judgement"), false);
+    assert.equal((config.systemPrompt as string).includes("已安装技能"), false);
+    assert.deepEqual((await client.listTools()).tools.map((tool) => tool.name), [...GOVERNANCE_JUDGE_TOOL_NAMES]);
+    // 三只治理 judge 工具实际可用：读/列复用 shell judge 沙箱，结论原样回调（不做规范化）。
+    const read = await client.callTool({ name: "judge_read_file", arguments: { path: "README.md" } });
+    assert.equal(read.isError, false);
+    assert.match(JSON.stringify(read.content), /# Governance judge fixture/);
+    const list = await client.callTool({ name: "judge_list_dir", arguments: {} });
+    assert.equal(list.isError, false);
+    assert.match(JSON.stringify(list.content), /README\.md/);
+    assert.equal(JSON.stringify(list.content).includes(".env"), false, "sensitive entries are never named");
+    const verdict = { verdict: "approve", group: "approval", cardKind: "write", selected: ["accept"], pathDecisions: [{ path: "docs/a.md", ok: true }], extraneous: "kept-raw" };
+    const report = await client.callTool({ name: "report_governance_judgement", arguments: verdict });
+    assert.equal(report.isError, false);
+    assert.deepEqual(reports, [verdict]);
+    // shell 的 report 工具不属于治理三件套：结构与 hook 双重拒绝。
+    const shellReport = await client.callTool({ name: "report_shell_judgement", arguments: { verdict: "allow" } });
+    assert.equal(shellReport.isError, true);
+    for (const name of ["write_file", "edit_file", "run_shell", "request_confirmation", "request_choice", "submit_report", "dispatch_task"]) {
+      const result = await client.callTool({ name, arguments: {} });
+      assert.equal(result.isError, true, name);
+    }
+    // PreToolUse 兜底：非治理三项名字（含 shell report、写/shell、外来 MCP、内置原生/网络）一律 deny。
+    const hook = config.hooks!.PreToolUse![0]!.hooks[0]!;
+    const decision = async (toolName: string, mcpServer?: { name: string; source: "sdk" | "dynamic" }) => (await hook(
+      { hook_event_name: "PreToolUse", prompt_id: user.uuid, tool_name: toolName, tool_input: {}, tool_use_id: "toolu_governance", session_id: "fixture", transcript_path: "fixture", cwd: root, ...(mcpServer ? { mcp_server: mcpServer } : {}) },
+      "toolu_governance", { signal: new AbortController().signal }) as { hookSpecificOutput: { permissionDecision: string } }).hookSpecificOutput.permissionDecision;
+    for (const name of ["mcp__ans__write_file", "mcp__ans__run_shell", "mcp__ans__request_confirmation", "mcp__ans__report_shell_judgement", "mcp__ext__echo", "Bash", "Write", "WebSearch", "WebFetch"]) assert.equal(await decision(name), "deny", name);
+    assert.equal(await decision("mcp__ext__echo", { name: "ext", source: "dynamic" }), "deny");
+    // 已注册治理工具仍走原 allow 分支（绑定活动轮 + 单次 call context）。
+    const allowed = await hook({ hook_event_name: "PreToolUse", prompt_id: user.uuid, tool_name: "mcp__ans__report_governance_judgement", tool_input: { verdict: "manual" }, tool_use_id: "toolu_governance", session_id: "fixture", transcript_path: "fixture", cwd: root, mcp_server: { name: "ans", source: "sdk" } }, "toolu_governance", { signal: new AbortController().signal }) as { hookSpecificOutput: { permissionDecision: string; updatedInput?: Record<string, unknown> } };
+    assert.equal(allowed.hookSpecificOutput.permissionDecision, "allow");
+    assert.equal(typeof allowed.hookSpecificOutput.updatedInput!.__ans_call_context, "string");
+    // 敏感文件仍由运行时核心只读策略拒绝（判断模式不改变读取沙箱）。
+    const denied = await client.callTool({ name: "judge_read_file", arguments: { path: ".env" } });
+    assert.equal(denied.isError, true);
+    assert.equal(JSON.stringify(denied.content).includes("TOP_SECRET"), false);
+  });
+  const session = await createClaudeRuntimeAdapter({
+    ...options(root, tools), judgeMode: true,
+    installedMcpServers: [{ name: "ext", command: "/bin/echo", args: [] }],
+    storage,
+  }, { ...engine.dependencies, env: { ...environment, ANS_CLAUDE_WEB_SEARCH: "1" } }).bindRole(role);
+  const reading = collect(session, 1);
+  await session.prompt("governance judge fixture");
+  await reading;
+  assert.equal(stats.readCalls, 3);
+  assert.equal(stats.deniedReads, 1);
+  assert.equal(stats.budgetExceeded, false);
+  const configDirectory = engine.configurations[0]!.env!.CLAUDE_CONFIG_DIR!;
+  assert.notEqual(configDirectory, storage.nativeDirectory);
+  assert.equal(engine.configurations[0]!.persistSession, false);
+  await session.dispose();
+  await assert.rejects(access(join(root, ".ans")));
+  await assert.rejects(access(configDirectory));
+}));
+
+test("judge mode accepts either frozen triple but rejects mixed, partial, or extended judge tool sets", async () => fixture(async (root) => {
+  const engine = fake(async () => undefined);
+  const shell = judgeTools(root);
+  const governance = governanceJudgeTools(root);
+  // 两个冻结三件套都能通过工厂与 bind（不加载 SDK、不开 query）。
+  for (const tools of [shell, governance]) {
+    const session = await createClaudeRuntimeAdapter({ ...options(root, tools), judgeMode: true }, engine.dependencies).bindRole(role);
+    await session.dispose();
+  }
+  const mixed = [governance[0]!, shell[2]!, governance[2]!];
+  const duplicated = [governance[0]!, governance[0]!, governance[1]!];
+  const union = [...shell, governance[2]!];
+  for (const tools of [mixed, duplicated, governance.slice(0, 2), [...governance, probeTool()], union]) {
+    assert.throws(() => createClaudeRuntimeAdapter({ ...options(root, tools), judgeMode: true }, engine.dependencies), /判断会话只接受/);
+  }
+  assert.equal(engine.loadCount, 0);
 }));
 
 test("judge mode rejects non-judge tool sets before SDK load and re-checks at bind", async () => fixture(async (root) => {

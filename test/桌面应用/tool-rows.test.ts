@@ -572,21 +572,21 @@ test('D1：governanceReacceptSuccessText 逐字', () => {
   );
 });
 
-// ————— P5：「替我审」自动判断（2026-10-17 评审 §6.5/§6.6/§9.3/§10；文案单一来源 = ui-labels）—————
-// 纯映射契约：开关三态（桥缺失不得假开启）、IPC 结果失败不改状态、警告逐字、
-// 结果行 allow/deny/deny 档标记、manual 不产生结果行、手动回落卡 judgeNotice 两类文案。
+// ————— P5：「替我审批」/「替我决策」双开关（2026-10-18 评审 §三/§八/§九；文案单一来源 = ui-labels）—————
+// 纯映射契约：两开关各自三态（桥缺失/驱动缺失不得假开启）、失败不改状态、警告按开启组列行、
+// 治理结果行（代审批/代决策）、manual 不产生结果行、手动回落 judgeNotice 两类文案。
 
-test('P5：开关视图——未开启默认「替我审」、开启琥珀标记文案、桥缺失禁用且不假开启', () => {
+test('P5：approval 开关视图——未开启默认「替我审批」、开启琥珀标记、桥缺失禁用且不假开启', () => {
   const off = labels.shellJudgeToggleView(true, false, false);
-  assert.equal(off.label, '替我审');
-  assert.equal(off.title, '手动逐条确认 shell 命令（默认）');
+  assert.equal(off.label, '替我审批');
+  assert.equal(off.title, '手动逐条确认 shell 命令与 trio 写盘/写卡确认（默认）');
   assert.equal(off.checked, false);
   assert.equal(off.disabled, false);
   assert.equal(off.enabled, false, '未开启无琥珀紧凑标记');
 
   const on = labels.shellJudgeToggleView(true, true, false);
   assert.equal(on.label, '替我审批中 · 判断 agent');
-  assert.equal(on.title, '判断 agent 先评估 shell 命令必要性；可随时关闭');
+  assert.equal(on.title, '判断 agent 先评估 shell 命令与 trio 写盘/写卡确认；可随时关闭');
   assert.equal(on.checked, true);
   assert.equal(on.enabled, true, '开启期间保留琥珀紧凑标记（长文警告只出现一次）');
 
@@ -605,17 +605,54 @@ test('P5：开关视图——未开启默认「替我审」、开启琥珀标记
   assert.equal(missing.title, '当前版本不支持自动判断，保持手动');
 });
 
-test('P5：一次性开启警告——首次开启显示一次、关闭/重绘不重现、关开关再开启才再显示', () => {
+test('P5：decision 开关视图——默认「替我决策」、开启标记、single 禁用并说明、桥缺失不假开启', () => {
+  const off = labels.judgeToggleView('decision', true, false, false, null);
+  assert.equal(off.label, '替我决策');
+  assert.equal(off.title, '手动逐张确认提案接受、任命与验收（默认）');
+  assert.equal(off.checked, false);
+  assert.equal(off.disabled, false);
+
+  const on = labels.judgeToggleView('decision', true, true, false, null);
+  assert.equal(on.label, '替我决策中 · 判断 agent');
+  assert.equal(on.checked, true);
+  assert.equal(on.enabled, true, '两个开启态各自保留紧凑标记');
+
+  // single 项目：禁用 + 人话说明；即使主进程残留 enabled=true 也不勾选。
+  const single = labels.judgeToggleView('decision', true, true, false, { singleDisabled: true });
+  assert.equal(single.disabled, true);
+  assert.equal(single.checked, false, 'single 下不得显示假开启态');
+  assert.equal(single.note, '旧治理模型（single）不支持代决策');
+  assert.equal(single.label, '替我决策', 'single 说明走状态位，不顶掉开关标签');
+  assert.equal(single.enabled, false);
+
+  // 桥缺失（含主进程 available:false）：与 approval 同一句禁用文案。
+  const missing = labels.judgeToggleView('decision', false, true, false, null);
+  assert.equal(missing.disabled, true);
+  assert.equal(missing.checked, false);
+  assert.equal(missing.label, '当前版本不支持自动判断，保持手动');
+
+  // 两开关互不影响：approval 的开关视图不因 decision 状态变化。
+  assert.equal(labels.shellJudgeToggleView(true, false, false).label, '替我审批');
+  assert.equal(labels.judgeToggleView('approval', true, false, false, { singleDisabled: true }).label, '替我审批',
+    'singleDisabled 只作用于 decision 组');
+  assert.equal(labels.judgeToggleView('unknown', true, false, false, null).label, '替我审批');
+});
+
+test('P5：一次性开启警告——每组各自一次、关闭/重绘不重现、关开关再开启才再显示', () => {
   // 关闭态：不显示，并清掉「已提示」（客户关闭开关后再次开启要再提示一次）。
-  assert.deepEqual(labels.shellJudgeWarningStep(false, false), { shown: false, show: false });
-  assert.deepEqual(labels.shellJudgeWarningStep(false, true), { shown: false, show: false }, '关闭开关即复位「已提示」');
+  assert.deepEqual(labels.judgeWarningStep(false, false), { shown: false, show: false });
+  assert.deepEqual(labels.judgeWarningStep(false, true), { shown: false, show: false }, '关闭开关即复位「已提示」');
   // 首次开启：显示一次并记住。
-  assert.deepEqual(labels.shellJudgeWarningStep(true, false), { shown: true, show: true }, '首次开启显示一次');
+  assert.deepEqual(labels.judgeWarningStep(true, false), { shown: true, show: true }, '首次开启显示一次');
   // 已提示后：重绘/收消息/切角色/重复推送都不再显示。
-  assert.deepEqual(labels.shellJudgeWarningStep(true, true), { shown: true, show: false }, '已关闭/已自动消失后不重复显示');
+  assert.deepEqual(labels.judgeWarningStep(true, true), { shown: true, show: false }, '已关闭/已自动消失后不重复显示');
   // 关闭再开启：重新显示一次。
-  const afterOff = labels.shellJudgeWarningStep(false, true);
-  assert.deepEqual(labels.shellJudgeWarningStep(true, afterOff.shown), { shown: true, show: true }, '关闭再开启会再次显示');
+  const afterOff = labels.judgeWarningStep(false, true);
+  assert.deepEqual(labels.judgeWarningStep(true, afterOff.shown), { shown: true, show: true }, '关闭再开启会再次显示');
+  // 兼容别名仍是同一状态机（approval 组）。
+  assert.deepEqual(labels.shellJudgeWarningStep(true, false), { shown: true, show: true });
+  // 每组各自一份 shown：decision 首次开启（approval 已提示过）仍会再显示一次同一块警告。
+  assert.deepEqual(labels.judgeWarningStep(true, false), { shown: true, show: true }, '另一组首次开启再显示一次');
   // 文案与时长单点。
   assert.equal(labels.SHELL_JUDGE_WARNING_CLOSE_LABEL, '知道了', '关闭按钮文案单一来源');
   assert.ok(
@@ -638,15 +675,38 @@ test('P5：开关 IPC 结果——成功采用主进程实际值；失败/坏件
   assert.ok(thrown.error.includes('通道异常'));
 });
 
-test('P5：开启警告三段逐字（§10.2）', () => {
-  const lines = labels.shellJudgeWarningLines();
-  assert.equal(lines.length, 3);
-  assert.equal(lines[0], '替我审批中：shell 命令先由判断 agent 评估必要性；只有判断没发生（不可用/超时/解析失败/引擎不支持）才会弹卡。');
-  assert.equal(lines[1], '判断 agent 只读项目内代码/文档/角色卡（不含 .env、密钥/凭据与项目外），不写文件、不执行命令；不必要会给替代方案，没有替代方案会由请求角色说明并给出路；每次判断会产生一次模型调用（token/延迟）；可能误判，可随时关闭。');
-  assert.equal(lines[2], '判断 agent 跟随会话引擎（Claude / Pi / Codex）；当前引擎不可用、超时或未配置时回落到手动确认。文件写入、选择卡与恢复确认仍需手动。');
-  // 返回副本：调用方不得改到单一来源。
-  lines[0] = 'x';
-  assert.notEqual(labels.shellJudgeWarningLines()[0], 'x');
+test('P5：开启警告——同一块按开启组列行（approval / decision / 两组同开）', () => {
+  const approval = labels.judgeWarningLines(['approval']);
+  assert.equal(approval.length, 4, '一段组说明 + 三段共享说明');
+  assert.deepEqual(approval[0], {
+    text: '替我审批中：shell 命令与写盘/写卡确认（write / appointment-write / schedule-write）将由判断 agent 代批。',
+    strong: true,
+  });
+  assert.ok(approval[1].text.includes('只读项目内代码/文档/角色卡'), '共享只读范围说明');
+  assert.ok(approval[1].text.includes('按所属开关回落逐张卡'), '共享回落说明');
+  assert.equal(approval[1].strong, false);
+  assert.ok(approval[2].text.includes('提案快捷路径（accept-quick）默认不代批'));
+  assert.ok(approval[3].text.includes('judge 代批 · 代审批/代决策'));
+
+  const decision = labels.judgeWarningLines(['decision']);
+  assert.equal(decision.length, 4);
+  assert.deepEqual(decision[0], {
+    text: '替我决策中：提案接受、任命、验收将由判断 agent 代批。',
+    strong: true,
+  });
+
+  const both = labels.judgeWarningLines(['approval', 'decision']);
+  assert.equal(both.length, 5, '两个都开：两段组说明 + 三段共享说明（仍同一块）');
+  assert.equal(both[0].strong, true);
+  assert.equal(both[1].strong, true);
+
+  const none = labels.judgeWarningLines([]);
+  assert.equal(none.length, 3, '无开启组也返回共享说明（渲染侧不会展示）');
+  // 返回新数组/对象：调用方不得改到单一来源。
+  both[0].text = 'x';
+  assert.notEqual(labels.judgeWarningLines(['approval'])[0].text, 'x');
+  // 兼容旧调用方：approval 组文本（仅文字）与首行逐字。
+  assert.equal(labels.shellJudgeWarningLines()[0], approval[0].text);
 });
 
 test('P5：结果行 allow——标题/摘要/档位/引擎/operator；摘要缺失不编命令意图', () => {
@@ -654,7 +714,7 @@ test('P5：结果行 allow——标题/摘要/档位/引擎/operator；摘要缺
     verdict: 'allow', engine: 'claude', operator: 'judge:claude', command: 'node -v', summary: '查看 Node 版本',
     tier: 'risky', reason: '只读版本信息', at: '2026-10-17T10:00:00Z', toolCallId: 'call-1',
   });
-  assert.equal(allow.title, '已替你放行（判断 agent）');
+  assert.equal(allow.title, '已替你放行（判断 agent · 代审批）');
   assert.equal(allow.denyOverride, false);
   assert.equal(allow.label, '');
   assert.equal(allow.summary, '查看 Node 版本');
@@ -676,7 +736,7 @@ test('P5：结果行 allow + deny 档放行——标题与徽标必须一眼可�
     tier: 'deny', hardDenyOverride: true, label: 'deny 档 · judge 放行', reason: '构建产物可重建',
   });
   assert.equal(denyTier.denyOverride, true);
-  assert.equal(denyTier.title, '已替你放行（判断 agent · deny 档）');
+  assert.equal(denyTier.title, '已替你放行（判断 agent · 代审批 · deny 档）');
   assert.equal(denyTier.label, 'deny 档 · judge 放行');
   assert.equal(denyTier.tierText, '档位：deny');
   assert.deepEqual(denyTier.lines, ['该命令属于硬拒类，判断 agent 判定必要后放行；请复核']);
@@ -692,14 +752,14 @@ test('P5：结果行 deny——理由/替代方案/客户说明/关闭开关后�
     tier: 'risky', reason: '会删除未提交源码', customerMessage: '该命令会删除项目源码，风险过高。',
     alternative: { kind: 'command', value: 'rm -rf dist', rationale: '只清理构建产物' }, toolCallId: 'call-2',
   });
-  assert.equal(deny.title, '未放行（判断 agent）');
+  assert.equal(deny.title, '未放行（判断 agent · 代审批）');
   assert.equal(deny.denyOverride, false);
   assert.deepEqual(deny.lines, [
     '判断理由：会删除未提交源码',
     '替代方案：rm -rf dist（只清理构建产物）',
     '该命令会删除项目源码，风险过高。',
   ]);
-  assert.ok(deny.retryHint.includes('关闭「替我审」后重试'), 'deny 必须给出关闭开关后重试的出路');
+  assert.ok(deny.retryHint.includes('关闭「替我审批」后重试'), 'deny 必须给出关闭开关后重试的出路');
   assert.ok(deny.retryHint.includes('替代方案'));
 
   const noAlt = labels.shellJudgeResultView({
@@ -736,6 +796,80 @@ test('P5：手动回落卡 judgeNotice——一般 manual 与 row-failed 分开�
     '判断已完成 ⇒ 不使用「未能完成判断」措辞'
   );
   assert.ok(labels.shellJudgeNoticeText(undefined).includes('判断未完成'), '未知 reasonCode 如实说明判断未完成');
+});
+
+test('P5：治理代批结果行——「judge 代批 · 代审批/代决策」+ 结论/理由/引擎/选中项或路径', () => {
+  const proposal = labels.governanceJudgeResultView({
+    version: 1, id: 'r1', group: 'decision', cardKind: 'proposal', flowId: 'flow-a',
+    engine: 'claude', operator: 'judge:claude', at: '2026-10-18T10:00:00Z', reasonCode: 'sufficient',
+    reason: '提案范围清晰', selected: ['accept'], paths: [], evidence: ['docs/proposals/flow-a-v1.md'],
+    toolCallId: 'call-1', requestId: 'req-1',
+  });
+  assert.equal(proposal.title, 'judge 代批 · 代决策');
+  assert.equal(proposal.badge, '代决策');
+  assert.equal(proposal.headline, '接受提案（accept） · 流程 flow-a');
+  assert.equal(proposal.engineText, '判断引擎：Claude');
+  assert.equal(proposal.operatorText, 'operator:judge:claude');
+  assert.equal(proposal.flowText, '流程：flow-a');
+  assert.deepEqual(proposal.lines, ['判断理由：提案范围清晰']);
+  assert.deepEqual(proposal.details.selected, ['accept']);
+  assert.deepEqual(proposal.details.evidence, ['docs/proposals/flow-a-v1.md']);
+  assert.equal(proposal.toolCallId, 'call-1');
+
+  const appointment = labels.governanceJudgeResultView({
+    group: 'decision', cardKind: 'appointment', flowId: 'flow-b', engine: 'pi',
+    selected: ['designer', 'tester'], reason: '与推荐集一致',
+  });
+  assert.equal(appointment.headline, '任命 designer、tester · 流程 flow-b');
+  assert.deepEqual(appointment.lines, ['判断理由：与推荐集一致'], '任命选中项在结论行，不重复');
+
+  const acceptance = labels.governanceJudgeResultView({
+    group: 'decision', cardKind: 'acceptance', flowId: 'flow-c', engine: 'codex', selected: ['accept'],
+  });
+  assert.equal(acceptance.headline, '验收通过（accept） · 流程 flow-c');
+
+  // write 族（approval）：确认写入 N 个路径；超过 3 个显示前 3 个 +「等 N 个」。
+  const write = labels.governanceJudgeResultView({
+    group: 'approval', cardKind: 'write', flowId: 'flow-d', engine: 'claude',
+    paths: ['a.md', 'b.md', 'c.md', 'd.md'], confirmed: true,
+    pathDecisions: [{ path: 'a.md', ok: true }, { path: 'b.md', ok: false, reason: '越界' }],
+    reason: '路径均在边界内', durationMs: 1200, readCalls: 2, readBytes: 4096,
+  });
+  assert.equal(write.title, 'judge 代批 · 代审批');
+  assert.equal(write.headline, '确认写入 4 个路径（a.md、b.md、c.md 等 4 个） · 流程 flow-d');
+  assert.equal(write.details.pathDecisions.length, 2);
+  assert.equal(write.details.pathDecisions[1].ok, false);
+  assert.equal(write.details.pathDecisions[1].reason, '越界');
+  assert.equal(write.details.durationMs, 1200);
+  assert.equal(write.details.readCalls, 2);
+  assert.equal(write.details.readBytes, 4096);
+
+  // 坏件/未知分组：不产生结果行（不编结论）。
+  assert.equal(labels.governanceJudgeResultView({ group: 'other', cardKind: 'proposal' }), null);
+  assert.equal(labels.governanceJudgeResultView({ cardKind: 'proposal' }), null);
+  assert.equal(labels.governanceJudgeResultView(null), null);
+  assert.equal(labels.governanceJudgeResultView('decision' as unknown as object), null);
+});
+
+test('P5：治理手动回落 notice——一般 manual 与 row-failed 分开（代审批/代决策）', () => {
+  assert.equal(
+    labels.governanceJudgeNoticeText('decision', 'path-unverified'),
+    '判断 agent 未代批（代决策）：写入路径未经逐路径核对；已转你手动确认。'
+  );
+  assert.equal(
+    labels.governanceJudgeNoticeText('approval', 'artifact-not-read'),
+    '判断 agent 未代批（代审批）：判断 agent 未读取必需文件；已转你手动确认。'
+  );
+  assert.equal(
+    labels.governanceJudgeNoticeText('decision', 'row-failed'),
+    '判断 agent 已完成判断，但结果无法在聊天中显示（代决策）；已转你手动确认。'
+  );
+  assert.equal(
+    labels.governanceJudgeNoticeText('approval', 'row-failed').includes('未能完成判断'),
+    false,
+    '判断已完成 ⇒ 不使用「未能完成判断」措辞'
+  );
+  assert.ok(labels.governanceJudgeNoticeText('decision', undefined).includes('判断未完成'), '未知 reasonCode 如实说明');
 });
 
 test('D1：governanceReacceptFailureView——phase≠write 可声明零写入；phase=write 只逐字 message', () => {

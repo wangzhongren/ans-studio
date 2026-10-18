@@ -230,6 +230,32 @@ contextBridge.exposeInMainWorld("desktop", {
   },
 
   /**
+   * 「替我决策」开关（2026-10-18 双开关评审 §3.3，方法名钉死）：与「替我审批」**独立**的第二套开关
+   * （默认 false、重载复位、不持久化；两开关互不影响）。`getDecisionJudgeState()` 返回
+   * `{version:1, ok, enabled?, available?, error?}`；`setDecisionJudgeEnabled(enabled)` 仅提交意图，
+   * **以主进程返回为准**（失败不改状态）。**不暴露任何 Node/fs/process 能力。**
+   */
+  getDecisionJudgeState: () => ipcRenderer.invoke("decision:judge-get"),
+  setDecisionJudgeEnabled: (enabled) => ipcRenderer.invoke("decision:judge-set", { enabled: enabled === true }),
+  /** 订阅「替我决策」开关状态（开关变化 / 重载复位 / 初次加载后推送）。返回取消订阅函数。 */
+  onDecisionJudgeState: (cb) => {
+    const listener = (_event, payload) => cb(payload);
+    ipcRenderer.on("decision:judge-state", listener);
+    return () => ipcRenderer.removeListener("decision:judge-state", listener);
+  },
+  /**
+   * 订阅治理卡判断代批结果行（`OperatorJudgeResultPayload`，2026-10-18 评审 §8.1/§9.3）：
+   * 载荷含 `group/cardKind/engine/reasonCode/reason/selected/confirmed/paths/pathDecisions/...`；
+   * 只在 `approve` 成功时出现（manual 走卡片 `judgeNotice`）。按 `roleId` 落 pane、`toolCallId`/`anchorKey` 锚定。
+   * 返回取消订阅函数。
+   */
+  onOperatorJudgeResult: (cb) => {
+    const listener = (_event, payload) => cb(payload);
+    ipcRenderer.on("session:operator-judge", listener);
+    return () => ipcRenderer.removeListener("session:operator-judge", listener);
+  },
+
+  /**
    * 订阅「恢复确认请求」（G-2/W5，2026-10-16 客户批准）：su 经 `propose_recovery` 提议恢复动作
    * （停止本轮 / 重建会话 / 重投任务，带逐字证据）时，主进程把卡推来——渲染侧渲染为确认卡
    * （**取消为默认焦点**）。载荷 `{id, projectRoot?, runtime?, roleId, action, evidence, reason?,

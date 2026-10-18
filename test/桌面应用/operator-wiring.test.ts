@@ -10,10 +10,24 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { SessionManager } from "../../app/desktop/session.ts";
-import { createCustomerInputChannel, type OperatorRequestPayload, type GovernanceNextStepContext, type GovernanceNextStepPayload } from "../../app/desktop/customer-input.ts";
+import {
+  createCustomerInputChannel,
+  judgeResultSummary,
+  type OperatorRequestPayload,
+  type OperatorJudgeResultPayload,
+  type GovernanceNextStepContext,
+  type GovernanceNextStepPayload,
+} from "../../app/desktop/customer-input.ts";
 import { interactionAnchorKey } from "../../app/desktop/request-anchor.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
 import type { CustomerInputFn, CustomerInputRequest, SessionEvent } from "../../src/provider/pi/session.ts";
+import type {
+  GovernanceJudgeContext,
+  GovernanceJudgeFn,
+  GovernanceJudgeGroup,
+  GovernanceJudgeOutcome,
+  GovernanceJudgeRequest,
+} from "../../src/model/runtime.ts";
 import type { RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
 
@@ -504,11 +518,18 @@ test("治理下一步：onNextStep 抛错不影响客户决定结算与后续排
   assert.equal((await p2)!.outcome, "answered");
 });
 
-test("preload：暴露 onGovernanceNextStep 订阅且不暴露 Node 能力", async () => {
+test("preload：暴露 onGovernanceNextStep/决策开关/结果行订阅且不暴露 Node 能力", async () => {
   const fs = await import("node:fs");
   const source = fs.readFileSync(new URL("../../app/preload.cjs", import.meta.url), "utf8");
   assert.ok(source.includes("onGovernanceNextStep"), "preload 应暴露 onGovernanceNextStep");
   assert.ok(source.includes('"governance:next-step"'), "订阅通道名应为 governance:next-step");
+  // 2026-10-18 双开关评审 §3.3：decision 的四个白名单方法（get/set/state/result）逐字存在。
+  for (const method of ["getDecisionJudgeState", "setDecisionJudgeEnabled", "onDecisionJudgeState", "onOperatorJudgeResult"]) {
+    assert.ok(source.includes(method), `preload 应暴露 ${method}`);
+  }
+  for (const channel of ['"decision:judge-get"', '"decision:judge-set"', '"decision:judge-state"', '"session:operator-judge"']) {
+    assert.ok(source.includes(channel), `订阅/调用通道名应为 ${channel}`);
+  }
   assert.ok(!/require\(["'](?:node:)?fs["']\)/.test(source), "preload 不暴露 fs");
   assert.ok(!source.includes("process."), "preload 不暴露 process");
 });
@@ -751,4 +772,578 @@ test("W6-B 报告员 write 卡镜像：mirrorRoleId=liaison、同一请求只答
   assert.equal(second.expired, true, "两侧冻结：第二次按终态拒绝");
   assert.equal((await pending)!.outcome, "answered");
   assert.equal(channel.pendingCount(), 0);
+});
+
+// ————— ⑤ 2026-10-18 双开关：judging 状态机 / 正向代批 / 按组回落 / 审计 —————
+//
+// 依据：PM 评审《「替我审批」/「替我决策」双开关——项目管理评审与 V1 拆发》§3.2/§4/§8。
+// 本通道只在 **presentEntry 调用 presenter 之前**判断；代批成功 0 卡、1 行、`onNextStep` 恰一次；
+// manual/负向/证据不足/读取失败/超时/引擎不可用/开关关闭 ⇒ 原卡 + `judgeNotice`；另一组不受影响。
+
+const flushJudge = () => new Promise((resolve) => setTimeout(resolve, 5));
+
+function factsOf(flowId: string) {
+  return {
+    governanceModel: "trio" as const,
+    flowId,
+    ledgerErrors: 0,
+    unresolvedClarificationCount: 0,
+    latestDecisionKinds: [],
+  };
+}
+
+function judgeContextOf(flowId: string, extra: Partial<GovernanceJudgeContext> = {}): GovernanceJudgeContext {
+  return { flowId, facts: factsOf(flowId), ...extra };
+}
+
+const JUDGE_CTX = { roleId: "rapporteur", projectRoot: "/p", runtime: "claude" as const, governanceModel: "trio" as const };
+
+function makeJudgeChannel(opts: {
+  enabled: (group: GovernanceJudgeGroup) => boolean;
+  judge?: GovernanceJudgeFn;
+  emit?: (payload: OperatorJudgeResultPayload) => void;
+  timeoutMs?: number;
+  queued?: (payload: OperatorRequestPayload, waitingFor: string) => void;
+}) {
+  const pushed: OperatorRequestPayload[] = [];
+  const results: OperatorJudgeResultPayload[] = [];
+  const next: { payload: GovernanceNextStepPayload; context: GovernanceNextStepContext }[] = [];
+  let n = 0;
+  const channel = createCustomerInputChannel({
+    presenter: (payload) => pushed.push(payload),
+    operatorId: "tester",
+    nextId: () => `op-${++n}`,
+    judge: {
+      isGroupEnabled: opts.enabled,
+      ...(opts.judge !== undefined ? { fn: opts.judge } : {}),
+      ...(opts.timeoutMs !== undefined ? { timeoutMs: opts.timeoutMs } : {}),
+    },
+    emitJudgeResult: opts.emit ?? ((payload) => results.push(payload)),
+    onNextStep: (payload, context) => next.push({ payload, context }),
+    ...(opts.queued !== undefined ? { onQueued: opts.queued } : {}),
+  });
+  return { channel, pushed, results, next };
+}
+
+function writeRequest(title = "写盘"): CustomerInputRequest {
+  return { kind: "confirm", title, cardKind: "write", preview: "docs/proposals/flow-a-v1.md" };
+}
+
+function approveJudge(requests: GovernanceJudgeRequest[]): GovernanceJudgeFn {
+  return async (request) => {
+    requests.push(request);
+    const value = request.card.kind === "confirm" ? { confirmed: true as const } : { selected: ["accept"] };
+    return {
+      verdict: "approve",
+      group: request.group,
+      cardKind: request.cardKind,
+      reasonCode: "sufficient",
+      engine: request.runtime,
+      model: "judge-model",
+      value,
+      paths: request.paths,
+      evidence: ["docs/proposals/flow-a-v1.md"],
+      durationMs: 12,
+      readCalls: 2,
+      readBytes: 128,
+    };
+  };
+}
+
+test("双开关矩阵：仅所属组开启才判断；两开关互不影响；无 cardKind 旧卡永不判断", async () => {
+  const enabled = { approval: false, decision: false };
+  const requests: GovernanceJudgeRequest[] = [];
+  const { channel, pushed, results, next } = makeJudgeChannel({
+    enabled: (group) => enabled[group],
+    judge: approveJudge(requests),
+  });
+  const proposalMeta = { cardKind: "proposal" as const, flowId: "flow-a", judgeContext: judgeContextOf("flow-a") };
+
+  // 两开关都关：与改动前逐字一致（卡呈现、无 judge 调用、无结果行）
+  const p1 = channel.customerInput(proposalRequest("flow-a"), JUDGE_CTX, proposalMeta);
+  assert.equal(requests.length, 0);
+  assert.equal(channel.judgingCount(), 0);
+  assert.equal(pushed.length, 1);
+  assert.equal(channel.respond({ id: "op-1", decision: { kind: "choice", selected: ["accept"] } }).ok, true);
+  await p1;
+
+  // 只开 approval：proposal（decision 组）不判断，原卡照常
+  enabled.approval = true;
+  const p2 = channel.customerInput(proposalRequest("flow-a"), JUDGE_CTX, proposalMeta);
+  assert.equal(requests.length, 0, "approval 开关不影响 decision 卡");
+  assert.equal(pushed.length, 2);
+  assert.equal(channel.respond({ id: "op-2", decision: { kind: "choice", selected: ["accept"] } }).ok, true);
+  await p2;
+
+  // 只开 decision：proposal 代批成功——0 卡、1 行、answered+judge 审计、下一步恰一次
+  enabled.approval = false;
+  enabled.decision = true;
+  const nextBefore = next.length;
+  const o3 = (await channel.customerInput(proposalRequest("flow-a"), JUDGE_CTX, proposalMeta))!;
+  assert.equal(requests.length, 1, "decision 组只判断一次");
+  assert.equal(requests[0].group, "decision");
+  assert.equal(pushed.length, 2, "代批成功不呈现卡");
+  assert.equal(results.length, 1, "代批成功产生一条结果行");
+  assert.equal(results[0].group, "decision");
+  assert.equal(results[0].cardKind, "proposal");
+  assert.deepEqual(results[0].selected, ["accept"]);
+  assert.equal(results[0].engine, "claude");
+  assert.equal(next.length, nextBefore + 1, "onNextStep 恰一次（派发 Nominator）");
+  assert.equal(next[nextBefore].payload.cardKind, "proposal");
+  assert.equal(o3.outcome, "answered");
+  assert.deepEqual(o3.value, { selected: ["accept"] });
+  assert.equal(o3.operatorId, "judge:claude");
+  assert.equal(o3.judge?.group, "decision");
+  assert.equal(o3.judge?.cardKind, "proposal");
+  assert.equal(o3.judge?.engine, "claude");
+  assert.equal(o3.judge?.model, "judge-model");
+  assert.deepEqual(o3.judge?.selected, ["accept"]);
+
+  // 只开 decision：write（approval 组）不判断
+  const w1 = channel.customerInput(writeRequest(), JUDGE_CTX, { cardKind: "write", flowId: "flow-a", judgeContext: judgeContextOf("flow-a") });
+  assert.equal(requests.length, 1, "decision 开关不影响 write 卡");
+  assert.equal(pushed.length, 3);
+  assert.equal(channel.respond({ id: "op-4", decision: { kind: "confirm", confirmed: true } }).ok, true);
+  await w1;
+
+  // 只开 approval：write 代批成功（confirmed:true）
+  enabled.decision = false;
+  enabled.approval = true;
+  const o5 = (await channel.customerInput(writeRequest(), JUDGE_CTX, { cardKind: "write", flowId: "flow-a", judgeContext: judgeContextOf("flow-a") }))!;
+  assert.equal(requests.length, 2);
+  assert.equal(requests[1].group, "approval");
+  assert.equal(o5.outcome, "answered");
+  assert.deepEqual(o5.value, { confirmed: true });
+  assert.equal(o5.judge?.group, "approval");
+  assert.equal(results.length, 2);
+  assert.equal(results[1].group, "approval");
+
+  // 无 cardKind 旧卡：即使两开关都开也不判断（零行为变化）
+  enabled.decision = true;
+  const legacy = channel.customerInput({ kind: "confirm", title: "旧卡" }, JUDGE_CTX);
+  assert.equal(requests.length, 2);
+  assert.equal(pushed.length, 4);
+  assert.equal(channel.respond({ id: "op-6", decision: { kind: "confirm", confirmed: true } }).ok, true);
+  await legacy;
+});
+
+test("judging 状态机：不呈现/不计 pending、占住一项目一卡；respond 返回 expired；manual 后原卡+notice", async () => {
+  let release: ((outcome: GovernanceJudgeOutcome) => void) | undefined;
+  const judge: GovernanceJudgeFn = (request) =>
+    new Promise((resolve) => {
+      release = (outcome) => resolve(outcome);
+    });
+  const queued: { payload: OperatorRequestPayload; waitingFor: string }[] = [];
+  const { channel, pushed, results, next } = makeJudgeChannel({
+    enabled: () => true,
+    judge,
+    queued: (payload, waitingFor) => queued.push({ payload, waitingFor }),
+  });
+  const p1 = channel.customerInput(proposalRequest("flow-a"), JUDGE_CTX, {
+    cardKind: "proposal",
+    flowId: "flow-a",
+    judgeContext: judgeContextOf("flow-a"),
+  });
+  assert.equal(pushed.length, 0, "judging 不调用 presenter");
+  assert.equal(channel.pendingCount(), 0, "judging 不计入 pending");
+  assert.equal(channel.queuedCount(), 0);
+  assert.equal(channel.judgingCount(), 1, "新增的 judgingCount 仅诊断用");
+  assert.equal(channel.pendingRoles().size, 0, "看护不把 judging 当作「等待客户」");
+  assert.equal(channel.respond({ id: "op-1", decision: { kind: "choice", selected: ["accept"] } }).expired, true, "判断中的卡不可作答");
+
+  // 一项目一卡：第二张（无 cardKind 的旧卡，不会被判断）入队等待
+  const p2 = channel.customerInput({ kind: "confirm", title: "第二张" }, JUDGE_CTX);
+  assert.equal(queued.length, 1);
+  assert.equal(queued[0].waitingFor, "op-1", "judging 占住队列");
+  assert.equal(channel.queuedCount(), 1);
+  assert.equal(channel.judgingCount(), 1);
+
+  release!({
+    verdict: "manual",
+    group: "decision",
+    cardKind: "proposal",
+    reasonCode: "insufficient-evidence",
+    reason: "提案证据不足",
+    engine: "claude",
+  });
+  await flushJudge();
+  assert.equal(pushed.length, 1, "manual 呈现原卡（且仅一次）");
+  assert.equal(pushed[0].id, "op-1");
+  assert.match(String(pushed[0].judgeNotice), /未代批（代决策）/, "提示标明分组，不把降级说成未发生");
+  assert.match(String(pushed[0].judgeNotice), /已转你手动确认/);
+  assert.equal(results.length, 0, "manual 不发结果行");
+  assert.equal(channel.judgingCount(), 0);
+  assert.equal(channel.pendingCount(), 2, "manual 后：active 1 + 排队 1（pendingCount 含排队）");
+
+  assert.equal(channel.respond({ id: "op-1", decision: { kind: "choice", selected: ["accept"] } }).ok, true);
+  const o1 = (await p1)!;
+  assert.equal(o1.outcome, "answered");
+  assert.equal(o1.judge, undefined, "客户手答不写 judge 审计（decisionEvidence 仍是 customer-input）");
+  assert.equal(next.length, 1, "客户手答后下一步恰一次");
+  assert.equal(pushed.length, 2, "第一张结算后第二张才呈现");
+  assert.equal(pushed[1].id, "op-2");
+  assert.equal(channel.respond({ id: "op-2", decision: { kind: "confirm", confirmed: true } }).ok, true);
+  await p2;
+});
+
+test("allow 代批合成结果：proposal/appointment/acceptance 选项、write confirmed；审计字段有界", async () => {
+  const requests: GovernanceJudgeRequest[] = [];
+  const judge: GovernanceJudgeFn = async (request) => {
+    requests.push(request);
+    if (request.cardKind === "appointment") {
+      return {
+        verdict: "approve",
+        group: "decision",
+        cardKind: "appointment",
+        reasonCode: "sufficient",
+        engine: "pi",
+        value: { selected: ["role-a", "role-b"] },
+        evidence: ["docs/nominations/flow-a-v1.md"],
+        durationMs: 9,
+      };
+    }
+    return {
+      verdict: "approve",
+      group: request.group,
+      cardKind: request.cardKind,
+      reasonCode: "sufficient",
+      engine: "pi",
+      value: { selected: ["accept"] },
+      evidence: ["docs/flows/flow-a.md"],
+    };
+  };
+  const { channel, results, next } = makeJudgeChannel({ enabled: () => true, judge });
+
+  const proposal = await channel.customerInput(proposalRequest("flow-a"), JUDGE_CTX, {
+    cardKind: "proposal",
+    flowId: "flow-a",
+    judgeContext: judgeContextOf("flow-a"),
+  });
+  assert.deepEqual((proposal as { value: unknown }).value, { selected: ["accept"] });
+  assert.equal((proposal as { judge?: { engine?: string } }).judge?.engine, "pi");
+
+  const appointment: CustomerInputRequest = {
+    kind: "choice",
+    title: "任命",
+    cardKind: "appointment",
+    flowId: "flow-a",
+    multiple: true,
+    options: [
+      { id: "role-a", label: "A" },
+      { id: "role-b", label: "B" },
+      { id: "role-c", label: "C" },
+    ],
+  };
+  const o2 = (await channel.customerInput(appointment, { ...JUDGE_CTX, roleId: "nominator" }, {
+    cardKind: "appointment",
+    flowId: "flow-a",
+    judgeContext: judgeContextOf("flow-a", { recommendedRoleIds: ["role-a", "role-b"] }),
+  }))!;
+  assert.equal(o2.outcome, "answered");
+  assert.deepEqual(o2.value, { selected: ["role-a", "role-b"] });
+  assert.deepEqual(next.find((entry) => entry.payload.cardKind === "appointment")?.context.targetRoleIds, ["role-a", "role-b"]);
+
+  const acceptance: CustomerInputRequest = {
+    kind: "choice",
+    title: "验收",
+    cardKind: "acceptance",
+    flowId: "flow-a",
+    options: [{ id: "accept", label: "通过" }, { id: "reject", label: "退回" }],
+  };
+  const o3 = (await channel.customerInput(acceptance, { ...JUDGE_CTX, roleId: "convener" }, {
+    cardKind: "acceptance",
+    flowId: "flow-a",
+    judgeContext: judgeContextOf("flow-a"),
+  }))!;
+  assert.equal(o3.outcome, "answered");
+  assert.deepEqual(o3.value, { selected: ["accept"] });
+
+  // 代批结果行与审计：group/cardKind/reason/engine/selected/paths/readCalls/readBytes
+  assert.equal(results.length, 3);
+  for (const result of results) {
+    assert.equal(result.version, 1);
+    assert.equal(typeof result.id, "string");
+    assert.equal(typeof result.requestId, "string");
+    assert.equal(result.reasonCode, "sufficient");
+  }
+  assert.deepEqual(results[1].selected, ["role-a", "role-b"]);
+  assert.equal(o3.judge?.group, "decision");
+  assert.equal(o3.judge?.cardKind, "acceptance");
+  assert.deepEqual(o3.judge?.evidence, ["docs/flows/flow-a.md"]);
+});
+
+test("manual/负向结果回落：原卡 + judgeNotice，不写 judge 审计、不发结果行；下一张不受影响", async () => {
+  let release: ((outcome: GovernanceJudgeOutcome) => void) | undefined;
+  const { channel, pushed, results } = makeJudgeChannel({
+    enabled: () => true,
+    judge: () => new Promise((resolve) => { release = resolve; }),
+  });
+  const p = channel.customerInput(proposalRequest("flow-a"), JUDGE_CTX, {
+    cardKind: "proposal",
+    flowId: "flow-a",
+    judgeContext: judgeContextOf("flow-a"),
+  });
+  // 负向输出（judge 归一化为 manual）：仍回落手动
+  release!({ verdict: "manual", group: "decision", cardKind: "proposal", reasonCode: "not-recommended", reason: "应拒绝", engine: "claude" });
+  await flushJudge();
+  assert.equal(pushed.length, 1);
+  assert.match(String(pushed[0].judgeNotice), /未代批（代决策）/);
+  assert.match(String(pushed[0].judgeNotice), /已转你手动确认/);
+  assert.equal(results.length, 0);
+  assert.equal(channel.respond({ id: "op-1", decision: { kind: "choice", cancelled: true } }).ok, true);
+  const outcome = (await p)!;
+  assert.equal(outcome.outcome, "declined", "客户取消仍是 declined（不代拒绝也不代批准）");
+});
+
+test("结果行投达失败 ⇒ manual/row-failed 原卡；不自动结算", async () => {
+  const { channel, pushed, results } = makeJudgeChannel({
+    enabled: () => true,
+    judge: approveJudge([]),
+    emit: () => { throw new Error("窗口已关闭"); },
+  });
+  const p = channel.customerInput(writeRequest(), JUDGE_CTX, {
+    cardKind: "write",
+    flowId: "flow-a",
+    judgeContext: judgeContextOf("flow-a"),
+  });
+  await flushJudge();
+  assert.equal(pushed.length, 1, "结果行失败必须回落原卡");
+  assert.match(String(pushed[0].judgeNotice), /判断已完成，但结果无法在聊天中显示/);
+  assert.equal(results.length, 0);
+  assert.equal(channel.respond({ id: "op-1", decision: { kind: "confirm", confirmed: true } }).ok, true);
+  const outcome = (await p)!;
+  assert.equal(outcome.outcome, "answered");
+  assert.equal((outcome as { judge?: unknown }).judge, undefined, "客户手批不是 judge 代批");
+});
+
+test("判断中关闭开关 ⇒ 再查一次：原卡 + switch-off 提示，不发结果行", async () => {
+  let enabled = true;
+  let release: ((outcome: GovernanceJudgeOutcome) => void) | undefined;
+  const { channel, pushed, results } = makeJudgeChannel({
+    enabled: (group) => group === "decision" && enabled,
+    judge: () => new Promise((resolve) => { release = resolve; }),
+  });
+  const p = channel.customerInput(proposalRequest("flow-a"), JUDGE_CTX, {
+    cardKind: "proposal",
+    flowId: "flow-a",
+    judgeContext: judgeContextOf("flow-a"),
+  });
+  assert.equal(channel.judgingCount(), 1);
+  enabled = false; // 判断期间关闭
+  release!({ verdict: "approve", group: "decision", cardKind: "proposal", reasonCode: "sufficient", engine: "claude", value: { selected: ["accept"] } });
+  await flushJudge();
+  assert.equal(pushed.length, 1, "开关关闭 ⇒ 原卡");
+  assert.match(String(pushed[0].judgeNotice), /你已关闭对应开关/);
+  assert.equal(results.length, 0);
+  assert.equal(channel.respond({ id: "op-1", decision: { kind: "choice", selected: ["accept"] } }).ok, true);
+  await p;
+});
+
+test("按组回落互不影响：approval 组 manual 时 decision 组仍可代批", async () => {
+  const requests: GovernanceJudgeRequest[] = [];
+  const judge: GovernanceJudgeFn = async (request) => {
+    requests.push(request);
+    if (request.group === "approval") {
+      return { verdict: "manual", group: "approval", cardKind: request.cardKind, reasonCode: "artifact-not-read", reason: "未读物证", engine: "claude" };
+    }
+    return { verdict: "approve", group: "decision", cardKind: request.cardKind, reasonCode: "sufficient", engine: "claude", value: { selected: ["accept"] } };
+  };
+  const { channel, pushed, results } = makeJudgeChannel({ enabled: () => true, judge });
+  // 不同 projectRoot：互不排队（同一项目一卡只影响同项目）。
+  const pWrite = channel.customerInput(writeRequest(), { ...JUDGE_CTX, projectRoot: "/p-write" }, {
+    cardKind: "write",
+    flowId: "flow-a",
+    judgeContext: judgeContextOf("flow-a"),
+  });
+  const pProposal = channel.customerInput(proposalRequest("flow-a"), JUDGE_CTX, {
+    cardKind: "proposal",
+    flowId: "flow-a",
+    judgeContext: judgeContextOf("flow-a"),
+  });
+  await flushJudge();
+  assert.equal(pushed.length, 1, "只有 approval 组回落呈现原卡");
+  assert.equal(pushed[0].request.cardKind, "write");
+  assert.equal(results.length, 1, "decision 组仍代批");
+  assert.equal(results[0].group, "decision");
+  assert.equal((await pProposal)!.outcome, "answered");
+  assert.equal(channel.respond({ id: "op-1", decision: { kind: "confirm", confirmed: true } }).ok, true);
+  await pWrite;
+});
+
+test("replayPending 不重新判断；rejectAllPending 结算 judging 为 declined，迟到结果丢弃", async () => {
+  let release: ((outcome: GovernanceJudgeOutcome) => void) | undefined;
+  const requests: GovernanceJudgeRequest[] = [];
+  const { channel, pushed, results } = makeJudgeChannel({
+    enabled: () => true,
+    judge: (request) => {
+      requests.push(request);
+      return new Promise((resolve) => { release = resolve; });
+    },
+  });
+  const p = channel.customerInput(proposalRequest("flow-a"), JUDGE_CTX, {
+    cardKind: "proposal",
+    flowId: "flow-a",
+    judgeContext: judgeContextOf("flow-a"),
+  });
+  assert.equal(channel.replayPending(), 0, "judging 不在 pending，重放不呈现");
+  assert.equal(requests.length, 1, "replay 不重新判断");
+  assert.equal(channel.judgingCount(), 1);
+  channel.rejectAllPending("窗口已关闭，未获同意（fail-closed）");
+  const outcome = (await p)!;
+  assert.equal(outcome.outcome, "declined");
+  // 迟到结果：state 已 done ⇒ 丢弃（不呈现、不发结果行、不改结算）
+  release!({ verdict: "approve", group: "decision", cardKind: "proposal", reasonCode: "sufficient", engine: "claude", value: { selected: ["accept"] } });
+  await flushJudge();
+  assert.equal(pushed.length, 0);
+  assert.equal(results.length, 0);
+  assert.equal(channel.judgingCount(), 0);
+});
+
+test("通道层防御超时：判断超时 ⇒ 原卡 + 超时提示（fail-closed）", async () => {
+  const { channel, pushed } = makeJudgeChannel({
+    enabled: () => true,
+    judge: () => new Promise(() => {}),
+    timeoutMs: 20,
+  });
+  const p = channel.customerInput(proposalRequest("flow-a"), JUDGE_CTX, {
+    cardKind: "proposal",
+    flowId: "flow-a",
+    judgeContext: judgeContextOf("flow-a"),
+  });
+  await new Promise((resolve) => setTimeout(resolve, 60));
+  assert.equal(pushed.length, 1);
+  assert.match(String(pushed[0].judgeNotice), /判断超时/);
+  assert.equal(channel.respond({ id: "op-1", decision: { kind: "choice", cancelled: true } }).ok, true);
+  await p;
+});
+
+test("single/su、缺 judgeContext、事实不可用：都不调用 judge（旧路径零变化/fail-closed）", async () => {
+  let calls = 0;
+  const judge: GovernanceJudgeFn = async (request) => {
+    calls += 1;
+    return { verdict: "approve", group: "decision", cardKind: "proposal", reasonCode: "sufficient", engine: "claude", value: { selected: ["accept"] } };
+  };
+  const { channel, pushed } = makeJudgeChannel({ enabled: () => true, judge });
+
+  // single：即使开关开也不判断
+  const single = channel.customerInput(proposalRequest("flow-a"), { ...JUDGE_CTX, governanceModel: "single" }, {
+    cardKind: "proposal",
+    flowId: "flow-a",
+    judgeContext: judgeContextOf("flow-a"),
+  });
+  assert.equal(calls, 0, "single/su 不代批");
+  assert.equal(pushed.length, 1);
+  assert.equal(channel.respond({ id: "op-1", decision: { kind: "choice", selected: ["accept"] } }).ok, true);
+  await single;
+
+  // 缺 judgeContext（应用事实未接线）：不判断、无 notice
+  const missing = channel.customerInput(proposalRequest("flow-a"), JUDGE_CTX, { cardKind: "proposal", flowId: "flow-a" });
+  assert.equal(calls, 0);
+  assert.equal(pushed.length, 2);
+  assert.equal(pushed[1].judgeNotice, undefined);
+  assert.equal(channel.respond({ id: "op-2", decision: { kind: "choice", selected: ["accept"] } }).ok, true);
+  await missing;
+
+  // 事实不可用（run-role 计算失败）：不调用模型，原卡 + 提示
+  const unavailable = channel.customerInput(proposalRequest("flow-a"), JUDGE_CTX, {
+    cardKind: "proposal",
+    flowId: "flow-a",
+    judgeContext: { ...judgeContextOf("flow-a"), unavailableReason: "ledger unreadable" },
+  });
+  assert.equal(calls, 0, "事实不可用时不浪费模型调用");
+  assert.equal(pushed.length, 3);
+  assert.match(String(pushed[2].judgeNotice), /治理事实不可读/);
+  assert.equal(channel.respond({ id: "op-3", decision: { kind: "choice", selected: ["accept"] } }).ok, true);
+  await unavailable;
+});
+
+test("结果行人话摘要：四类卡的代批行含「judge 代批 · 代审批/代决策」", () => {
+  const base = { version: 1 as const, id: "gj", requestId: "op", anchorKey: "k", toolCallId: "t", roleId: "r", at: "x", engine: "claude" as const, reasonCode: "sufficient" };
+  assert.match(judgeResultSummary({ ...base, group: "decision", cardKind: "proposal", flowId: "flow-a" }), /judge 代批 · 代决策：接受提案（accept）/);
+  assert.match(judgeResultSummary({ ...base, group: "decision", cardKind: "appointment", selected: ["a", "b"], flowId: "flow-a" }), /任命 a、b/);
+  assert.match(judgeResultSummary({ ...base, group: "decision", cardKind: "acceptance", flowId: "flow-a" }), /验收通过/);
+  assert.match(judgeResultSummary({ ...base, group: "approval", cardKind: "write", paths: ["p1", "p2", "p3", "p4"] }), /代审批：确认写入 4 个路径/);
+});
+
+test("SessionManager：trio 会话注入 governanceJudge 上下文；single/su 不构造", async () => {
+  const listing = trioMirrorListing();
+  const judge: GovernanceJudgeFn = async (request) => ({
+    verdict: "manual",
+    group: request.group,
+    cardKind: request.cardKind,
+    reasonCode: "insufficient-evidence",
+    engine: "claude",
+  });
+  let factoryCalls = 0;
+  let captured: { customerInput?: CustomerInputFn } | undefined;
+  const ctxSeen: { governanceModel?: string; governanceJudge?: unknown; turnText?: string }[] = [];
+  const metadataSeen: unknown[] = [];
+  const mgr = new SessionManager({
+    openRoleSession: async (input) => {
+      if (input.roleId === "rapporteur") captured = input as unknown as { customerInput?: CustomerInputFn };
+      return quietHandle();
+    },
+    createPiAdapterFactory: () => { throw new Error("本用例不应构造 pi 适配器"); },
+    createDemoAdapter: () => { throw new Error("本用例不应构造 demo 适配器"); },
+    buildProjectConfig,
+    getListing: (root) => (root === listing.projectRoot ? listing : undefined),
+    emitEvent: () => {},
+    customerInput: (_req, ctx, metadata) => {
+      ctxSeen.push(ctx as { governanceModel?: string; governanceJudge?: unknown; turnText?: string });
+      metadataSeen.push(metadata);
+      return { outcome: "declined", reason: "替身：拒绝" };
+    },
+    createGovernanceJudge: () => {
+      factoryCalls += 1;
+      return judge;
+    },
+  });
+  assert.equal((await mgr.open({ projectRoot: listing.projectRoot, roleId: "rapporteur", runtime: "demo" })).ok, true);
+  assert.equal(factoryCalls, 1, "trio + 通道已接 ⇒ 构造每会话闭包");
+  const judgeContext = judgeContextOf("flow-a");
+  await captured!.customerInput!(
+    proposalRequest("flow-a"),
+    { cardKind: "proposal", flowId: "flow-a", judgeContext },
+  );
+  assert.equal(ctxSeen[0].governanceModel, "trio");
+  assert.equal(ctxSeen[0].governanceJudge, judge);
+  assert.deepEqual((metadataSeen[0] as { judgeContext?: unknown }).judgeContext, judgeContext, "judgeContext 原样透传到通道");
+  await mgr.stop(null);
+
+  // single/su：不构造、ctx 无 judge
+  const single: ProjectListing = {
+    projectRoot: "/single-judge-session",
+    roles: [{ roleId: "su", cardPath: "", boundaryPath: "", cardText: "# su", boundary: { entries: [], boundarySource: "<built-in>", acceptance: { accepted: true, source: "test" } }, builtIn: true }],
+    warnings: [],
+    hasRoles: false,
+    primaryRoleId: "su",
+    governanceModel: "single",
+  };
+  let singleFactoryCalls = 0;
+  let suInput: { customerInput?: CustomerInputFn } | undefined;
+  const singleCtx: { governanceJudge?: unknown }[] = [];
+  const singleMgr = new SessionManager({
+    openRoleSession: async (input) => {
+      if (input.roleId === "su") suInput = input as unknown as { customerInput?: CustomerInputFn };
+      return quietHandle();
+    },
+    createPiAdapterFactory: () => { throw new Error("本用例不应构造 pi 适配器"); },
+    createDemoAdapter: () => { throw new Error("本用例不应构造 demo 适配器"); },
+    buildProjectConfig,
+    getListing: (root) => (root === single.projectRoot ? single : undefined),
+    emitEvent: () => {},
+    customerInput: (_req, ctx) => {
+      singleCtx.push(ctx as { governanceJudge?: unknown });
+      return { outcome: "declined", reason: "替身：拒绝" };
+    },
+    createGovernanceJudge: () => {
+      singleFactoryCalls += 1;
+      return judge;
+    },
+  });
+  assert.equal((await singleMgr.open({ projectRoot: single.projectRoot, roleId: "su", runtime: "demo" })).ok, true);
+  assert.equal(singleFactoryCalls, 0, "single/su 不构造治理判断闭包");
+  await suInput!.customerInput!({ kind: "confirm", title: "旧卡" });
+  assert.equal(singleCtx[0].governanceJudge, undefined);
+  await singleMgr.stop(null);
 });

@@ -90,7 +90,10 @@ import type {
   RuntimeLegacyHistoryEntryV1,
   RuntimeLegacyHistoryProjectionV1,
   ShellJudgeToolOptions,
+  GovernanceJudgeContext,
+  GovernanceJudgeToolOptions,
 } from "../../model/runtime.ts";
+import { governanceCardGroup } from "../../model/runtime.ts";
 import { createRuntimeAdapter, projectRuntimeLiveHandback, projectRuntimeLegacyHistory, type RuntimeSessionOptions } from "../../service/runtime/session.ts";
 import { RUNTIME_KINDS } from "../../common/shared/runtime-shared.ts";
 import {
@@ -107,7 +110,7 @@ import { withHandback, type OrchestrationEvent, type TaskReport, type HandbackIn
 import { EXIT_OK, EXIT_USAGE, EXIT_FAILURE } from "../../common/编排/exit-codes.ts";
 import type { ShellVerdictFn } from "../../common/编排/shell-gate.ts";
 import { repinIfBootstrapped, DEFAULT_GOVERNANCE_BOUNDARY_REL } from "../../common/编排/finalize.ts";
-import { conditionSlugsOf, createConfirmedWriteIssuer } from "../../common/编排/confirmed-writes.ts";
+import { conditionSlugsOf, createConfirmedWriteIssuer, extractPathCandidates } from "../../common/编排/confirmed-writes.ts";
 import {
   appendGovernanceLedger,
   readGovernanceLedger,
@@ -116,6 +119,12 @@ import {
   type GovernanceLedgerSnapshot,
 } from "../../common/编排/governance-ledger.ts";
 import { evaluateGovernanceGate, type GovernanceGateAction } from "../../common/编排/governance-gate.ts";
+import {
+  buildGovernanceJudgeFacts,
+  parseRecommendedRoleIds,
+  unavailableGovernanceJudgeFacts,
+} from "../../common/编排/governance-judge-facts.ts";
+import { boundedGovernanceJudgeAudit } from "../../common/编排/governance-judge-verdict.ts";
 import {
   CLARIFICATION_MAX_ROUNDS,
   countClarificationRounds,
@@ -209,6 +218,13 @@ export interface AdapterCapabilities {
    * 普通角色会话不传（未注入 ⇒ 工具不注册）。
    */
   shellJudge?: ShellJudgeToolOptions;
+  /**
+   * 治理卡判断 agent（「替我审批」/「替我决策」）只读能力（2026-10-18 双开关评审 §7.1/§6.2）。
+   * 与 `shellJudge` 同形的**能力注入**：只由编排 `createGovernanceJudge` 经
+   * `createAdapter(gate, {persistSession:false, governanceJudge})` 注入；普通角色会话不传
+   * （未注入 ⇒ 对应工具不注册，逐字现状）。运行时核心据此走 `buildGovernanceJudgeTools`。
+   */
+  governanceJudge?: GovernanceJudgeToolOptions;
 }
 
 export interface RunRoleInput {
@@ -712,7 +728,40 @@ export async function openRoleSession(
             const flowId = req.flowId ?? originalMetadata?.flowId;
             if (isGovernanceFlowId(flowId)) currentFlowId = flowId;
           }
-          const out = await raw(req, metadata);
+          // 2026-10-18 双开关评审 §5.2：judgeContext 的**唯一计算点**。只在 trio 角色、允许的
+          // cardKind、且 flowId 合法时计算；并入传给客户通道的 metadata（桌面只消费）。
+          // 账本先刷新，确保事实不是陈旧快照；recordCustomerDecision 仍用 originalMetadata 的
+          // toolCallId/turnId。事实计算失败 ⇒ `unavailableReason` + `ledgerErrors>0`（禁止 approve）。
+          let judgeMetadata = metadata;
+          if (isTrio && cardKind !== undefined && TRIO_CARD_KINDS[trioSpec!.id].includes(cardKind)) {
+            const flowId = req.flowId ?? originalMetadata?.flowId;
+            if (isGovernanceFlowId(flowId)) {
+              let judgeContext: GovernanceJudgeContext;
+              try {
+                await refreshLedger();
+                judgeContext = await computeJudgeContext({
+                  projectRoot: input.project.projectRoot,
+                  skillRoot: input.project.skillRoot,
+                  boundary: setup.role.boundary,
+                  trioSpec: trioSpec!,
+                  flowId,
+                  req,
+                  metadata: originalMetadata,
+                  snapshot: ledgerState.snapshot,
+                  conditions,
+                });
+              } catch (err) {
+                log.error("governance-judge.context.failed", err);
+                judgeContext = {
+                  flowId,
+                  facts: unavailableGovernanceJudgeFacts(flowId),
+                  unavailableReason: truncateText(errText(err), 512),
+                };
+              }
+              judgeMetadata = { ...(metadata ?? {}), judgeContext };
+            }
+          }
+          const out = await raw(req, judgeMetadata);
           const issuedPaths = issue(req, out ?? null, originalMetadata);
           if (isTrio) {
             recordCustomerDecision({
@@ -1684,18 +1733,43 @@ function recordCustomerDecision(args: {
   if (classification === undefined) return;
 
   const stepId = args.req.stepId ?? args.metadata?.stepId;
-  const evidence: GovernanceLedgerEntry["decisionEvidence"] = {
-    kind: "customer-input",
-    ...(typeof args.metadata?.toolCallId === "string" && args.metadata.toolCallId !== ""
-      ? { toolCallId: args.metadata.toolCallId }
-      : {}),
-    ...(typeof args.metadata?.turnId === "string" && args.metadata.turnId !== ""
-      ? { turnId: args.metadata.turnId }
-      : {}),
-    ...(typeof args.sessionId === "string" && args.sessionId !== ""
-      ? { sessionId: args.sessionId }
-      : {}),
-  };
+  // 2026-10-18 双开关评审 §7.4：judge 只是**审计证据**；`actorRoleId`/`power` 照旧，绝不伪装成客户。
+  const judge = args.out?.outcome === "answered" ? args.out.judge : undefined;
+  const derivedGroup = cardKind !== undefined ? governanceCardGroup(cardKind) : undefined;
+  if (judge !== undefined && derivedGroup !== undefined && judge.group !== derivedGroup) {
+    // 交叉校验：不翻转已发生的决定、不改成 customer-input（那会错误归因给客户），只记诊断。
+    args.log.record("governance-judge.group.mismatch", {
+      cardKind,
+      group: judge.group,
+      expectedGroup: derivedGroup,
+    });
+  }
+  const evidence: GovernanceLedgerEntry["decisionEvidence"] = judge !== undefined
+    ? {
+        kind: "judge",
+        ...(typeof args.metadata?.toolCallId === "string" && args.metadata.toolCallId !== ""
+          ? { toolCallId: args.metadata.toolCallId }
+          : {}),
+        ...(typeof args.metadata?.turnId === "string" && args.metadata.turnId !== ""
+          ? { turnId: args.metadata.turnId }
+          : {}),
+        ...(typeof args.sessionId === "string" && args.sessionId !== ""
+          ? { sessionId: args.sessionId }
+          : {}),
+        judge: boundedGovernanceJudgeAudit(judge),
+      }
+    : {
+        kind: "customer-input",
+        ...(typeof args.metadata?.toolCallId === "string" && args.metadata.toolCallId !== ""
+          ? { toolCallId: args.metadata.toolCallId }
+          : {}),
+        ...(typeof args.metadata?.turnId === "string" && args.metadata.turnId !== ""
+          ? { turnId: args.metadata.turnId }
+          : {}),
+        ...(typeof args.sessionId === "string" && args.sessionId !== ""
+          ? { sessionId: args.sessionId }
+          : {}),
+      };
   const entry: GovernanceLedgerEntry = {
     at: new Date().toISOString(),
     kind: "customer.decision",
@@ -1730,7 +1804,16 @@ function recordCustomerDecision(args: {
       const artifact = await findDecisionArtifact(args.projectRoot, entry, args.issuedPaths);
       if (artifact !== undefined) Object.assign(entry, artifact);
       const result = await appendGovernanceLedger(args.projectRoot, entry);
-      if (!result.ok) args.log.record("governance.decision.append.failed", { message: result.message });
+      if (!result.ok) {
+        args.log.record("governance.decision.append.failed", { message: result.message });
+        if (entry.decisionEvidence?.kind === "judge") {
+          // 账本失败不翻转决定（结果行/诊断兜底；评审 §7.4）。
+          args.log.record("governance-judge.audit.failed", {
+            toolCallId: args.metadata?.toolCallId,
+            reason: truncateText(result.message, 512),
+          });
+        }
+      }
     } catch (err) {
       args.log.error("governance.decision.append.failed", err);
     }
@@ -1808,6 +1891,156 @@ async function latestVersionedArtifact(
     if (best === undefined || version > best.version) best = { name, version };
   }
   return best === undefined ? undefined : { relPath: `${dirRel}/${best.name}`, version: best.version };
+}
+
+/** 项目根相对路径是否为常规文件（judge 物证存在性判定；不跟随目录）。 */
+async function isRegularFileForJudge(projectRoot: string, rel: string): Promise<boolean> {
+  try {
+    const info = await stat(path.join(projectRoot, ...rel.split("/")));
+    return info.isFile();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 按 cardKind（+ 来源角色）计算规范物证路径（2026-10-18 双开关评审 §5.4）。
+ * 只给判断上下文/桌面提示用；**不做门禁判定**，缺失由 driver 回落 `manual/artifact-missing`。
+ */
+async function judgeArtifactsForCard(args: {
+  projectRoot: string;
+  flowId: string;
+  cardKind: GovernanceCardKind;
+  governanceFunction: GovernanceFunction;
+}): Promise<NonNullable<GovernanceJudgeContext["artifacts"]>> {
+  const proposal = await latestVersionedArtifact(args.projectRoot, "docs/proposals", args.flowId);
+  const nomination = await latestVersionedArtifact(args.projectRoot, "docs/nominations", args.flowId);
+  const flowRel = `docs/flows/${args.flowId}.md`;
+  const flowExists = await isRegularFileForJudge(args.projectRoot, flowRel);
+
+  const proposalPath = proposal?.relPath;
+  const nominationPath = nomination?.relPath;
+  const flowPath = flowExists ? flowRel : undefined;
+
+  const only = (pathValue: string | undefined): NonNullable<GovernanceJudgeContext["artifacts"]> =>
+    pathValue !== undefined ? { proposalPath: pathValue } : {};
+  const onlyNomination = (pathValue: string | undefined): NonNullable<GovernanceJudgeContext["artifacts"]> =>
+    pathValue !== undefined ? { nominationPath: pathValue } : {};
+  const onlyFlow = (pathValue: string | undefined): NonNullable<GovernanceJudgeContext["artifacts"]> =>
+    pathValue !== undefined ? { flowPath: pathValue } : {};
+
+  switch (args.cardKind) {
+    case "proposal":
+      return only(proposalPath);
+    case "appointment":
+      return onlyNomination(nominationPath);
+    case "acceptance":
+      return { ...only(proposalPath), ...onlyFlow(flowPath) };
+    case "appointment-write":
+      return { ...onlyNomination(nominationPath), ...onlyFlow(flowPath) };
+    case "schedule-write":
+      return onlyFlow(flowPath);
+    case "write":
+      // 来源角色相关的最新物证（评审 §5.4 表最后一行）。
+      switch (args.governanceFunction) {
+        case "proposal":
+          return only(proposalPath);
+        case "nomination":
+          return onlyNomination(nominationPath);
+        case "schedule":
+          return onlyFlow(flowPath);
+        default:
+          return {};
+      }
+    default:
+      return {
+        ...only(proposalPath),
+        ...onlyNomination(nominationPath),
+        ...onlyFlow(flowPath),
+      };
+  }
+}
+
+/**
+ * `judgeContext` 的唯一计算点（2026-10-18 双开关评审 §5.2/§5.4）：
+ * paths/pathProbes（与 issuer 同一份 `extractPathCandidates` + `resolveWrite`）、
+ * 写根/禁写、规范物证、推荐集、账本事实。桌面只消费，不重算、不读 `.ans`。
+ */
+async function computeJudgeContext(args: {
+  projectRoot: string;
+  skillRoot: string;
+  boundary: ResolvedRole["boundary"];
+  trioSpec: BuiltInGovernanceRoleSpec;
+  flowId: string;
+  req: CustomerInputRequest;
+  metadata?: CustomerInputMetadata;
+  snapshot: GovernanceLedgerSnapshot;
+  conditions: string[];
+}): Promise<GovernanceJudgeContext> {
+  const cardKind = args.req.cardKind ?? args.metadata?.cardKind;
+  const context: GovernanceJudgeContext = {
+    flowId: args.flowId,
+    facts: buildGovernanceJudgeFacts({ snapshot: args.snapshot, flowId: args.flowId }),
+  };
+  if (cardKind === undefined) return context;
+
+  const stepId = args.req.stepId ?? args.metadata?.stepId;
+  if (typeof stepId === "string" && stepId !== "") context.stepId = stepId;
+  if (typeof args.metadata?.toolCallId === "string" && args.metadata.toolCallId !== "") {
+    context.toolCallId = args.metadata.toolCallId;
+  }
+  if (typeof args.metadata?.turnId === "string" && args.metadata.turnId !== "") {
+    context.turnId = args.metadata.turnId;
+  }
+
+  const artifacts = await judgeArtifactsForCard({
+    projectRoot: args.projectRoot,
+    flowId: args.flowId,
+    cardKind,
+    governanceFunction: args.trioSpec.function,
+  });
+  if (Object.keys(artifacts).length > 0) context.artifacts = artifacts;
+
+  if (cardKind === "appointment" && artifacts.nominationPath !== undefined) {
+    try {
+      const text = await readFile(path.join(args.projectRoot, ...artifacts.nominationPath.split("/")), "utf8");
+      const recommended = parseRecommendedRoleIds(text);
+      if (recommended !== undefined) context.recommendedRoleIds = recommended;
+    } catch {
+      // 提名文件不可读 ⇒ 不提供推荐集（driver 回落 manual/insufficient-evidence）。
+    }
+  }
+
+  // 写根/禁写：只读事实；不做第二份判定（判定仍由 driver 的机械复核与门禁完成）。
+  context.allowedPathRoots = args.boundary.entries
+    .filter((entry) => entry.root === "project")
+    .map((entry) => normalizeLexical(entry.path))
+    .filter((entry) => entry !== "" && entry !== ".");
+  context.forbiddenPaths = [...args.trioSpec.forbiddenWritePaths];
+
+  if (args.req.kind === "confirm") {
+    const candidates = extractPathCandidates([args.req.title, args.req.preview ?? "", args.req.detail ?? ""].join("\n"));
+    context.paths = candidates;
+    context.pathProbes = candidates.map((candidate) => {
+      let allowed = false;
+      let reason: string | undefined;
+      try {
+        const decision = resolveWrite(
+          candidate,
+          args.boundary,
+          { writeSet: [candidate], conditions: args.conditions },
+          { skillRoot: args.skillRoot, projectRoot: args.projectRoot },
+        );
+        allowed = decision.allowed === true;
+        if (decision.allowed !== true) reason = truncateText(decision.reason, 512);
+      } catch (err) {
+        reason = truncateText(errText(err), 512);
+      }
+      return { path: candidate, allowed, ...(reason !== undefined ? { reason } : {}) };
+    });
+  }
+
+  return context;
 }
 
 /** 预授权目录下 `.md` 的递归扫描结果（项目相对 posix 路径 + 应用算的 sha256）。 */
@@ -1961,6 +2194,10 @@ export function createRuntimeAdapterFactory(
     // 注入 ⇒ Service 走 `buildShellJudgeTools` + `judgeMode:true` + 外来 MCP 置空；
     // `undefined` ⇒ 普通会话（逐字现状）。
     shellJudge: capabilities?.shellJudge ?? options.shellJudge,
+    // 治理卡判断会话（「替我审批」/「替我决策」）：与 `shellJudge` 同形的只读能力注入。
+    // **只由编排 `createGovernanceJudge` 使用**（judge 会话），普通角色会话不传；
+    // Service 侧二者互斥（同时给出 ⇒ 抛配置错误）。
+    governanceJudge: capabilities?.governanceJudge ?? options.governanceJudge,
     shellGate: capabilities?.shellGate ?? options.shellGate,
     shellVerdict: capabilities?.shellVerdict,
   });

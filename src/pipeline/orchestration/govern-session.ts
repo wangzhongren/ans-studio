@@ -168,6 +168,15 @@ export type {
   ShellJudgeOutcome,
 } from "../../common/编排/shell-judge.ts";
 
+// ── 2026-10-18：「替我审批」/「替我决策」治理卡判断 agent 驱动的 Pipeline 公共出口 ─────────────
+// 桌面只依赖 Pipeline 公共出口，**不直接导入** `src/common/编排/` 私有模块（PM 评审 §7.6）。
+// 薄再导出：不新增 pipeline 单文件、不改变 `openGovernanceSession` 任何既有行为。
+export {
+  createGovernanceJudge,
+  GOVERNANCE_JUDGE_SUPPORTED_RUNTIMES,
+} from "../../common/编排/governance-judge.ts";
+export type { CreateGovernanceJudgeOptions } from "../../common/编排/governance-judge.ts";
+
 /** 角色目录名（与 `listProject` 口径一致：项目角色的目录 `角色卡/<id>/`）。 */
 const ROLE_CARD_DIR = "角色卡";
 

@@ -8,7 +8,7 @@
 // 三条硬口径：
 //   1. 未知 verdict / 缺失 / 空串 → `undefined`（调用方落 `manual/parse-failed`，绝不从散文里猜结论）；
 //   2. `allow` 必须有非空 `reason`（不完整判断不得放行）；
-//   3. `deny` 的 `customerMessage` 必须是人话、可直接转述、含「关闭『替我审』后重试」出路；缺失或含内部
+//   3. `deny` 的 `customerMessage` 必须是人话、可直接转述、含「关闭『替我审批』后重试」出路；缺失或含内部
 //      行话时由本模块合成（`customerMessageSynthesized` 由调用方置位）。
 
 import type { ShellJudgeAlternative, ShellJudgeVerdict } from "../../model/runtime.ts";
@@ -33,8 +33,8 @@ export const SHELL_JUDGE_INTERNAL_JARGON = [
   "(c)",
 ] as const;
 
-/** `deny` 的标准出路句（PM 评审 §8.4 逐字）。 */
-export const SHELL_JUDGE_EXIT_LINE = "如需执行，请关闭「替我审」后重试。";
+/** `deny` 的标准出路句（2026-10-18 双开关后统一为「替我审批」；PM 评审 §8.4）。 */
+export const SHELL_JUDGE_EXIT_LINE = "如需执行，请关闭「替我审批」后重试。";
 
 const REDACTED = "[已脱敏]";
 
@@ -119,7 +119,7 @@ export function normalizeShellJudgeVerdict(input: unknown): ShellJudgeVerdict | 
 }
 
 function containsExitLine(text: string): boolean {
-  return text.includes("关闭") && text.includes("替我审") && text.includes("重试");
+  return text.includes("关闭") && text.includes("替我审批") && text.includes("重试");
 }
 
 /** 把标准出路并入已有说明：已含则不重复（PM 评审 §6.2「已含则不重复」）。 */
@@ -133,7 +133,7 @@ export function withSynthesizedExitLine(message: string): string {
 
 /**
  * 合成可直接转述给客户的说明（`deny` 缺 `customerMessage` 或含内部行话时由驱动调用）。
- * 输出**保证**非空且含「关闭『替我审』后重试」出路；不夹带内部行话/档位 token/凭据。
+ * 输出**保证**非空且含「关闭『替我审批』后重试」出路；不夹带内部行话/档位 token/凭据。
  */
 export function synthesizeCustomerMessage(verdict: ShellJudgeVerdict): string {
   const existing = verdict.customerMessage?.trim();

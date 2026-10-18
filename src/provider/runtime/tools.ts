@@ -822,6 +822,23 @@ function operatorTag(operatorId: string | undefined): string {
 }
 
 /**
+ * 判断 agent 代批回执（2026-10-18 双开关评审 §7.5）：**不得**说成客户本人点击/批准。
+ * `judge.group` 决定「代审批/代决策」文案；`operator:judge:<engine>` 与桌面结算的 operatorId 同源。
+ */
+function judgeReceipt(
+  name: string,
+  judge: { group: "approval" | "decision"; engine: string },
+  conclusion: string,
+): string {
+  const mode = judge.group === "approval" ? "替我审批" : "替我决策";
+  const groupLabel = judge.group === "approval" ? "代审批" : "代决策";
+  return (
+    `${name}：客户委托的判断 agent（${mode}）已代批（${groupLabel}；operator:judge:${judge.engine}）：${conclusion}。` +
+    `这不是客户本人点击，请在向客户汇报时说明是判断 agent 代批。`
+  );
+}
+
+/**
  * 交互工具族的公共等待路径（设计 A-6）：调注入的 `CustomerInputFn` → 套 `raceAbort`（**会话中止 =
  * 立即 fail-closed 返回，防悬挂**）→ 外套 `withTimeout`（**超时 = 未获同意**）。
  * 任何异常（含 fn 同步抛错）都**不抛给上层**，一律转成「未获同意」结果（fail-closed；同 run_shell 的
@@ -901,6 +918,13 @@ function makeRequestConfirmationTool(
         return notConsented(name, out.reason ?? "客户通道不可用");
       }
       if (out.value.confirmed === true) {
+        // 判断 agent 代批：口径必须是「代批」，不得说成客户本人点击（评审 §7.5）。
+        if (out.judge !== undefined) {
+          return {
+            ok: true,
+            message: judgeReceipt(name, out.judge, `已确认「${title}」（confirmed:true）`),
+          };
+        }
         return {
           ok: true,
           message:
@@ -1000,11 +1024,19 @@ function makeRequestChoiceTool(
         const opt = options.find((o) => o.id === id);
         return opt !== undefined ? `${opt.id}（${opt.label}）` : id;
       });
+      const selection = labels.length > 0 ? labels.join("、") : "（未选择任何项）";
+      if (out.judge !== undefined) {
+        // 判断 agent 代批：不得说成客户本人选择（评审 §7.5）。
+        return {
+          ok: true,
+          message: judgeReceipt(name, out.judge, `已选择：${selection}`),
+        };
+      }
       return {
         ok: true,
         message:
           `${name}：客户已选择（${operatorTag(out.operatorId)}）：` +
-          `${labels.length > 0 ? labels.join("、") : "（未选择任何项）"}。` +
+          `${selection}。` +
           `请按客户的选择继续；**未选中的项不得擅自代选**。`,
       };
     },

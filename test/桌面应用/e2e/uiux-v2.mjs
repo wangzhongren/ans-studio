@@ -41,7 +41,9 @@ const JUDGE_ONLY=process.env.ANS_JUDGE_UI_ONLY==='1';
 const MIRROR_ONLY=process.env.ANS_MIRROR_UI_ONLY==='1';
 const configReads=[];
 let recoveryEnabled=!(CONFIG_ONLY||SELECTOR_ONLY||FLOW_ONLY||GOVREACCEPT_ONLY||JUDGE_ONLY), listFailure=false, pickResult=ROOT, configFailure=false, configMalformed=false, configDeferred=false, saveDeferred=false;
-let judgeEnabled=false, judgeSetFailure=false; // P5：「替我审」离线开关（主进程权威的替身）
+let judgeEnabled=false, judgeSetFailure=false; // P5：「替我审批」离线开关（主进程权威的替身）
+let decisionJudgeEnabled=false, decisionSetFailure=false; // P5：第二个开关「替我决策」的离线替身
+let judgeGovernanceModel='trio'; // JUDGE_ONLY：listing 的治理模型（trio 启用 decision；single 演示禁用）
 let configMissing={}, configPending=[], savePending=[];
 let mergeReplayAfterList=false, sendQueued=false; const mergeHistories=new Map();
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
@@ -67,7 +69,7 @@ const handlers={
  'report:retry-save':(_e,input)=>{persistenceCalls.push({operation:'report-save',input});if(saveModeDeferred)return new Promise(resolve=>flowSavePending.push({resolve,input}));if(flowSaveFailure)return outer(input,{ok:false,state:flowSaveFailure==='SNAPSHOT_EXPIRED'?'expired':'failed',reportId:input.reportId,code:flowSaveFailure,retryAvailable:false,message:'固定安全失败'});const value={ok:true,state:'saved',report:flowReports[input.reportId].report,retryAvailable:false};flowReports[input.reportId]={...value,reportId:input.reportId};return outer(input,value);},
  'delivery:retry-history-save':(_e,input)=>{persistenceCalls.push({operation:'history-save',input});const receipt={...flowReceipts[input.attemptId],history:'saved',retryHistoryAvailable:false};flowReceipts[input.attemptId]=receipt;return outer(input,{ok:true,state:'saved',receipt});},
  'window:minimize':()=>{windowCalls.push('minimize');return {ok:true};},'window:toggle-maximize':()=>{windowCalls.push('maximize');return {ok:true};},'window:close':()=>{windowCalls.push('close');return {ok:true};},
- 'window:is-maximized':()=>false,'app:list-project':(_e,projectRoot)=>{if(listFailure)throw new Error('fixture listing failed');if(mergeReplayAfterList)for(const h of mergeHistories.values())win.webContents.send('session:history',h);return {...listing,projectRoot:projectRoot?.projectRoot||ROOT,...(GOVREACCEPT_ONLY?{governanceRecord:governanceRecordFixture}:{}),...(FLOW_ONLY?{documentScope:{version:1,projectViewId:'epoch-one',projectRoot:projectRoot?.projectRoot||ROOT},roles:listing.roles.map(role=>({...role,documents:role.roleId==='A'?documentRefs:role.roleId==='B'?documentRefs.map(ref=>({...ref,roleId:'B',documentId:ref.documentId+'-b',relativePath:ref.relativePath.replace('/A/','/B/')})):[],...(flowLongRoleDocs?{changelog:{path:'changelog.md',text:'# 真实长变更\n\n'+('保留变更阅读位置。\n\n'.repeat(100))}}:{}),docs:flowLongRoleDocs?Array.from({length:100},(_,n)=>({kind:'file',path:'docs/record-'+n+'.md'})):[{kind:'directory',path:'docs/change'},{kind:'file',path:'docs/one.md'}]}))}:{})};},'app:pick-project':()=>pickResult,
+ 'window:is-maximized':()=>false,'app:list-project':(_e,projectRoot)=>{if(listFailure)throw new Error('fixture listing failed');if(mergeReplayAfterList)for(const h of mergeHistories.values())win.webContents.send('session:history',h);return {...listing,projectRoot:projectRoot?.projectRoot||ROOT,...(GOVREACCEPT_ONLY?{governanceRecord:governanceRecordFixture}:{}),...(JUDGE_ONLY?{governanceModel:judgeGovernanceModel}:{}),...(FLOW_ONLY?{documentScope:{version:1,projectViewId:'epoch-one',projectRoot:projectRoot?.projectRoot||ROOT},roles:listing.roles.map(role=>({...role,documents:role.roleId==='A'?documentRefs:role.roleId==='B'?documentRefs.map(ref=>({...ref,roleId:'B',documentId:ref.documentId+'-b',relativePath:ref.relativePath.replace('/A/','/B/')})):[],...(flowLongRoleDocs?{changelog:{path:'changelog.md',text:'# 真实长变更\n\n'+('保留变更阅读位置。\n\n'.repeat(100))}}:{}),docs:flowLongRoleDocs?Array.from({length:100},(_,n)=>({kind:'file',path:'docs/record-'+n+'.md'})):[{kind:'directory',path:'docs/change'},{kind:'file',path:'docs/one.md'}]}))}:{})};},'app:pick-project':()=>pickResult,
  'session:open':(_e,input)=>{opens.push(input);return {ok:true,resumed:true,contextSource:'resumed',runtime:input.runtime,projectRoot:input.projectRoot,profileRevision:0,...(flowOpenResult||{})};},'session:live':()=>['A','B'],'session:stop':(_e,input)=>{stops.push(input);return {ok:true};},
  'session:history-get':(_e,input)=>{histories.push(input);return mergeHistories.get(input.runtime+'|'+input.roleId)||{...input,rows:[],error:null,skipped:0};},
  'session:live-views':()=>[{projectRoot:ROOT,roleId:'A',runtime:'pi'},{projectRoot:ROOT,roleId:'B',runtime:'pi'},...opens.map(x=>({projectRoot:x.projectRoot,roleId:x.roleId,runtime:x.runtime}))],
@@ -77,6 +79,8 @@ const handlers={
  'shell:confirm-response':(_e,input)=>{shellResponses.push(input);return {ok:true};},
  'shell:judge-get':()=>({version:1,ok:true,enabled:judgeEnabled}),
  'shell:judge-set':(_e,input)=>{if(judgeSetFailure)return {version:1,ok:false,error:'离线受控拒绝：开关未改变'};judgeEnabled=!!input&&input.enabled===true;return {version:1,ok:true,enabled:judgeEnabled};},
+ 'decision:judge-get':()=>({version:1,ok:true,enabled:decisionJudgeEnabled}),
+ 'decision:judge-set':(_e,input)=>{if(decisionSetFailure)return {version:1,ok:false,error:'离线受控拒绝：决策开关未改变'};decisionJudgeEnabled=!!input&&input.enabled===true;return {version:1,ok:true,enabled:decisionJudgeEnabled};},
  'runtime-config:save':(_e,input)=>{if(saveDeferred)return new Promise(resolve=>savePending.push(resolve));if(saveMode!=='fail')configApplications[input.runtime]=saveApplication;configSaves.push({runtime:input.runtime,keys:Object.keys(input.updates)});return saveMode==='fail'?{ok:false,error:'离线原子写失败'}:{ok:true,runtime:input.runtime,appliedKeys:Object.keys(input.updates),revision:1,application:saveApplication};},
  'pi-config:get':()=>({path:ROOT+'/'+('a-very-long-path/'.repeat(12))+'.env',fields:['ANTHROPIC_AUTH_TOKEN','ANS_PI_BASE_URL','ANS_PI_MODEL','ANS_PI_CONTEXT_WINDOW'].map(key=>({key,secret:key==='ANTHROPIC_AUTH_TOKEN',value:key==='ANTHROPIC_AUTH_TOKEN'?'':'fixture',isSet:true}))}),
  'pi-config:save':()=>({ok:true,appliedKeys:[]}),
@@ -148,11 +152,11 @@ async function judgeChecks(){
  await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRuntime('pi');await window.__ansRenderer.selectRole('A')`);
  const scoped={projectRoot:ROOT,roleId:'A',runtime:'pi'};
  const toggleState=`(()=>{const t=document.getElementById('auto-approve-toggle'),l=document.getElementById('auto-approve-label'),w=document.getElementById('shell-judge-warning'),s=document.getElementById('auto-approve-status'),wrap=t.closest('.composer-auto-approve'),c=document.getElementById('shell-judge-warning-close'),x=document.getElementById('shell-judge-warning-text');return {checked:t.checked,disabled:t.disabled,label:l.textContent,warningHidden:w.hidden,errorShown:!s.hidden,error:s.textContent,onClass:wrap.classList.contains('is-on'),closeLabel:c?c.textContent:'',warningText:x?x.textContent:''};})()`;
- // 启动：主进程权威默认 false（桥已接线 ⇒ 可点、标签「替我审」、无警告）。
- await check('P5 judge starts authoritative off',`(()=>{const v=${toggleState};return v.checked===false&&v.disabled===false&&v.label==='替我审'&&v.warningHidden===true&&v.onClass===false;})()`);
+ // 启动：主进程权威默认 false（桥已接线 ⇒ 可点、标签「替我审批」、无警告）。
+ await check('P5 judge starts authoritative off',`(()=>{const v=${toggleState};return v.checked===false&&v.disabled===false&&v.label==='替我审批'&&v.warningHidden===true&&v.onClass===false;})()`);
  // 首次勾选：琥珀标记 + 完整警告**只显示一次**（客户 2026-10-18；带「知道了」）。
  await js(`document.getElementById('auto-approve-toggle').click()`);await pause(80);
- await check('P5 first enable shows amber marker and one-time warning',`(()=>{const v=${toggleState};return v.checked&&!v.disabled&&v.label==='替我审批中 · 判断 agent'&&!v.warningHidden&&v.onClass&&v.closeLabel==='知道了'&&v.warningText.includes('只有判断没发生（不可用/超时/解析失败/引擎不支持）才会弹卡')&&v.warningText.includes('文件写入、选择卡与恢复确认仍需手动');})()`);
+ await check('P5 first enable shows amber marker and one-time warning',`(()=>{const v=${toggleState};return v.checked&&!v.disabled&&v.label==='替我审批中 · 判断 agent'&&!v.warningHidden&&v.onClass&&v.closeLabel==='知道了'&&v.warningText.includes('替我审批中：shell 命令与写盘/写卡确认')&&v.warningText.includes('按所属开关回落逐张卡')&&v.warningText.includes('judge 代批 · 代审批/代决策');})()`);
  // 「知道了」收起：开关仍开启、紧凑琥珀标记仍在；重复推送 / 重绘 / 切角色都不再重现。
  await js(`document.getElementById('shell-judge-warning-close').click()`);await pause(40);
  await check('P5 acknowledged warning hides but compact amber marker stays',`(()=>{const v=${toggleState};return v.checked&&v.onClass&&v.label==='替我审批中 · 判断 agent'&&v.warningHidden;})()`);
@@ -162,7 +166,7 @@ async function judgeChecks(){
  await check('P5 role switch/redraw does not re-show acknowledged warning',`(()=>{const v=${toggleState};return v.checked&&v.onClass&&v.warningHidden;})()`);
  // 取消：回到手动，警告消失（并复位「已提示」）。
  await js(`document.getElementById('auto-approve-toggle').click()`);await pause(80);
- await check('P5 disable hides warning and returns to manual label',`(()=>{const v=${toggleState};return !v.checked&&v.label==='替我审'&&v.warningHidden&&!v.onClass;})()`);
+ await check('P5 disable hides warning and returns to manual label',`(()=>{const v=${toggleState};return !v.checked&&v.label==='替我审批'&&v.warningHidden&&!v.onClass;})()`);
  // 再次开启：重新显示一次。
  await js(`document.getElementById('auto-approve-toggle').click()`);await pause(80);
  await check('P5 re-enable after toggle off shows the warning once again',`(()=>{const v=${toggleState};return v.checked&&v.onClass&&!v.warningHidden&&v.closeLabel==='知道了';})()`);
@@ -175,7 +179,7 @@ async function judgeChecks(){
  await check('P5 disable after auto-dismiss clears prompt state',`(()=>{const v=${toggleState};return !v.checked&&v.warningHidden&&!v.onClass;})()`);
  // 失败：主进程拒绝 ⇒ 保持实际状态（关闭）并显示错误；无假开启态。
  judgeSetFailure=true;await js(`document.getElementById('auto-approve-toggle').click()`);await pause(80);
- await check('P5 failed toggle keeps actual state and shows error',`(()=>{const v=${toggleState};return !v.checked&&v.label==='替我审'&&v.warningHidden&&v.errorShown&&v.error.includes('离线受控拒绝');})()`);
+ await check('P5 failed toggle keeps actual state and shows error',`(()=>{const v=${toggleState};return !v.checked&&v.label==='替我审批'&&v.warningHidden&&v.errorShown&&v.error.includes('离线受控拒绝');})()`);
  judgeSetFailure=false;
  // 主进程推送 shell:judge-state ⇒ 同步复选框（不靠本地点击意图）；每次都按一次性规则处理。
  await push('shell:judge-state',{version:1,enabled:true});
@@ -189,10 +193,10 @@ async function judgeChecks(){
  await push('session:events',[{...scoped,event:{kind:'tool_call',turnId:'judge-turn',summary:'模型请求调用 run_shell',detail:{toolName:'run_shell',toolCallId:'judge-call',phase:'start'}}}]);
  const judgeBase={version:1,id:'sj-judge-call',toolCallId:'judge-call',roleId:'A',projectRoot:ROOT,runtime:'pi',at:'2026-10-17T10:00:00Z',command:'npm run build',summary:'构建项目',policy:'su-approval',tier:'deny',reason:'构建产物需要刷新',engine:'claude',operator:'judge:claude',reasonCode:'necessary',hardDenyOverride:true,label:'deny 档 · judge 放行'};
  await push('shell:judge-result',{...judgeBase,id:'sj-judge-allow',verdict:'allow'});
- await check('P5 deny-tier allow row is prominent and anchored after its tool call',`(()=>{const rows=[...document.querySelectorAll('#chat .shell-judge-row')];const row=rows.find(x=>x.dataset.toolCallId==='judge-call');if(!row)return false;const pane=row.closest('.chat-pane'),kids=[...pane.children];const toolIdx=kids.findIndex(x=>x.classList.contains('tool-records')||x.classList.contains('tool-call-record')||x.textContent.includes('run_shell'));return rows.length===1&&row.classList.contains('is-deny-override')&&row.textContent.includes('已替你放行（判断 agent · deny 档）')&&row.textContent.includes('deny 档 · judge 放行')&&row.textContent.includes('该命令属于硬拒类，判断 agent 判定必要后放行；请复核')&&row.textContent.includes('判断引擎：Claude')&&row.textContent.includes('档位：deny')&&toolIdx>=0&&kids.indexOf(row)>toolIdx;})()`);
+ await check('P5 deny-tier allow row is prominent and anchored after its tool call',`(()=>{const rows=[...document.querySelectorAll('#chat .shell-judge-row')];const row=rows.find(x=>x.dataset.toolCallId==='judge-call');if(!row)return false;const pane=row.closest('.chat-pane'),kids=[...pane.children];const toolIdx=kids.findIndex(x=>x.classList.contains('tool-records')||x.classList.contains('tool-call-record')||x.textContent.includes('run_shell'));return rows.length===1&&row.classList.contains('is-deny-override')&&row.textContent.includes('已替你放行（判断 agent · 代审批 · deny 档）')&&row.textContent.includes('deny 档 · judge 放行')&&row.textContent.includes('该命令属于硬拒类，判断 agent 判定必要后放行；请复核')&&row.textContent.includes('判断引擎：Claude')&&row.textContent.includes('档位：deny')&&toolIdx>=0&&kids.indexOf(row)>toolIdx;})()`);
  // 普通 deny：理由/替代方案/客户说明/关闭开关重试的出路。
  await push('shell:judge-result',{...judgeBase,id:'sj-judge-deny',verdict:'deny',tier:'risky',hardDenyOverride:undefined,label:undefined,reasonCode:'safer-alternative',summary:'删除源码目录',command:'rm -rf src',reason:'会删除未提交源码',customerMessage:'该命令会删除项目源码，风险过高。',alternative:{kind:'command',value:'rm -rf dist',rationale:'只清理构建产物'}});
- await check('P5 deny row shows reason/alternative/customer message and retry exit',`(()=>{const row=[...document.querySelectorAll('#chat .shell-judge-row')].find(x=>x.textContent.includes('未放行（判断 agent）'));return !!row&&row.textContent.includes('判断理由：会删除未提交源码')&&row.textContent.includes('替代方案：rm -rf dist（只清理构建产物）')&&row.textContent.includes('该命令会删除项目源码，风险过高。')&&row.textContent.includes('关闭「替我审」后重试')&&!row.classList.contains('is-deny-override');})()`);
+ await check('P5 deny row shows reason/alternative/customer message and retry exit',`(()=>{const row=[...document.querySelectorAll('#chat .shell-judge-row')].find(x=>x.textContent.includes('未放行（判断 agent · 代审批）'));return !!row&&row.textContent.includes('判断理由：会删除未提交源码')&&row.textContent.includes('替代方案：rm -rf dist（只清理构建产物）')&&row.textContent.includes('该命令会删除项目源码，风险过高。')&&row.textContent.includes('关闭「替我审批」后重试')&&!row.classList.contains('is-deny-override');})()`);
  // manual：不产生结果行（原卡替代）。
  const before=await js(`document.querySelectorAll('#chat .shell-judge-row').length`);
  await push('shell:judge-result',{...judgeBase,id:'sj-judge-manual',verdict:'manual',reasonCode:'timeout'});
@@ -211,12 +215,50 @@ async function judgeChecks(){
  await check('P5 result for another role does not switch the current view',`window.__ansRenderer.state.selectedRoleId==='A'&&document.querySelectorAll('#chat .chat-pane').length===1&&document.querySelector('#chat .chat-pane').dataset.roleId==='A'`);
  await js(`await window.__ansRenderer.selectRole('B')`);await pause(80);
  await check('P5 background role result is visible when that role is selected',`[...document.querySelectorAll('#chat .shell-judge-row')].some(x=>x.dataset.toolCallId==='judge-b')`);
+ // ———— P5 第二个开关「替我决策」（P4 IPC 接线后驱动；桥缺失只验证禁用+说明，不假开启） ————
+ const decisionWired=await js(`typeof window.desktop.getDecisionJudgeState==='function'&&typeof window.desktop.setDecisionJudgeEnabled==='function'&&typeof window.desktop.onDecisionJudgeState==='function'&&typeof window.desktop.onOperatorJudgeResult==='function'`);
+ if(!decisionWired){
+  await check('P5 decision switch bridge missing → disabled with explicit note',`(()=>{const t=document.getElementById('judge-decision-toggle'),l=document.getElementById('judge-decision-label'),s=document.getElementById('judge-decision-status');return !!t&&!!l&&!t.checked&&t.disabled&&l.textContent==='当前版本不支持自动判断，保持手动'&&!s.hidden&&s.textContent.includes('当前版本不支持自动判断');})()`);
+ }else{
+  const dState=`(()=>{const t=document.getElementById('judge-decision-toggle'),l=document.getElementById('judge-decision-label'),w=document.getElementById('shell-judge-warning'),s=document.getElementById('judge-decision-status'),wrap=t.closest('.composer-auto-approve'),x=document.getElementById('shell-judge-warning-text');return {checked:t.checked,disabled:t.disabled,label:l.textContent,warningHidden:w.hidden,noteShown:!s.hidden,note:s.textContent,onClass:wrap.classList.contains('is-on'),warningText:x?x.textContent:''};})()`;
+  await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRole('A')`);await pause(60);
+  await check('P5 decision starts authoritative off in trio',`(()=>{const v=${dState};return v.checked===false&&v.disabled===false&&v.label==='替我决策'&&v.warningHidden===true&&v.onClass===false;})()`);
+  await js(`document.getElementById('judge-decision-toggle').click()`);await pause(80);
+  await check('P5 decision first enable shows amber marker and the same one warning block',`(()=>{const v=${dState};return v.checked&&!v.disabled&&v.label==='替我决策中 · 判断 agent'&&!v.warningHidden&&v.onClass&&v.warningText.includes('替我决策中：提案接受、任命、验收将由判断 agent 代批。')&&!v.warningText.includes('替我审批中：');})()`);
+  await js(`document.getElementById('shell-judge-warning-close').click()`);await pause(40);
+  await js(`document.getElementById('judge-decision-toggle').click()`);await pause(80);
+  await check('P5 decision disable hides warning and returns to manual label',`(()=>{const v=${dState};return !v.checked&&v.label==='替我决策'&&v.warningHidden&&!v.onClass;})()`);
+  decisionSetFailure=true;await js(`document.getElementById('judge-decision-toggle').click()`);await pause(80);
+  await check('P5 failed decision toggle keeps actual state and shows error',`(()=>{const v=${dState};return !v.checked&&v.label==='替我决策'&&v.warningHidden&&v.noteShown&&v.note.includes('离线受控拒绝');})()`);
+  decisionSetFailure=false;
+  await push('decision:judge-state',{version:1,enabled:true});
+  await check('P5 pushed decision state turns switch on with one-time warning',`(()=>{const v=${dState};return v.checked&&!v.warningHidden&&v.onClass;})()`);
+  await js(`document.getElementById('shell-judge-warning-close').click()`);await pause(40);
+  await push('decision:judge-state',{version:1,enabled:true});
+  await check('P5 repeated decision state does not re-show warning',`(()=>{const v=${dState};return v.checked&&v.warningHidden&&v.onClass;})()`);
+  // 治理代批结果行：按 toolCallId 锚定、标题含「judge 代批 · 代决策」、结论/理由/引擎可见。
+  await push('session:events',[{projectRoot:ROOT,roleId:'A',runtime:'pi',event:{kind:'tool_call',turnId:'gov-turn',summary:'模型请求确认',detail:{toolName:'request_confirmation',toolCallId:'gov-call',phase:'start'}}}]);
+  await push('session:operator-judge',{version:1,id:'gov-result-1',requestId:'gov-req-1',anchorKey:'gov-anchor',toolCallId:'gov-call',roleId:'A',projectRoot:ROOT,runtime:'pi',at:'2026-10-18T10:00:00Z',group:'decision',cardKind:'proposal',flowId:'flow-a',engine:'claude',model:'fixture',reasonCode:'sufficient',reason:'提案范围清晰',selected:['accept'],paths:[],evidence:['docs/proposals/flow-a-v1.md'],durationMs:1200,readCalls:2,readBytes:4096});
+  await check('P5 decision result row says judge 代批 · 代决策 and anchors after its tool call',`(()=>{const row=[...document.querySelectorAll('#chat .governance-judge-row')].find(x=>x.dataset.toolCallId==='gov-call');if(!row)return false;const pane=row.closest('.chat-pane'),kids=[...pane.children];const toolIdx=kids.findIndex(x=>x.textContent.includes('request_confirmation')||x.textContent.includes('模型请求确认'));return row.textContent.includes('judge 代批 · 代决策')&&row.textContent.includes('接受提案（accept） · 流程 flow-a')&&row.textContent.includes('判断引擎：Claude')&&row.textContent.includes('operator:judge:claude')&&row.textContent.includes('判断理由：提案范围清晰')&&row.textContent.includes('docs/proposals/flow-a-v1.md')&&toolIdx>=0&&kids.indexOf(row)>toolIdx;})()`);
+  await push('session:operator-judge',{version:1,id:'gov-result-2',requestId:'gov-req-2',toolCallId:'gov-write-call',roleId:'A',projectRoot:ROOT,runtime:'pi',at:'2026-10-18T10:01:00Z',group:'approval',cardKind:'write',flowId:'flow-b',engine:'pi',reasonCode:'sufficient',reason:'路径均在边界内',selected:[],confirmed:true,paths:['docs/proposals/a.md','docs/proposals/b.md'],pathDecisions:[{path:'docs/proposals/a.md',ok:true},{path:'docs/proposals/b.md',ok:true}]});
+  await check('P5 approval write result row says judge 代批 · 代审批 with path count',`(()=>{const row=[...document.querySelectorAll('#chat .governance-judge-row')].find(x=>x.dataset.toolCallId==='gov-write-call');return !!row&&row.textContent.includes('judge 代批 · 代审批')&&row.textContent.includes('确认写入 2 个路径')&&row.textContent.includes('docs/proposals/a.md');})()`);
+  // 手动回落卡：原卡 + `judgeNotice`（主进程原文逐字；卡仍可作答，UI 不自动批准）。
+  await push('session:operator-request',{projectRoot:ROOT,roleId:'A',runtime:'pi',id:'gov-fallback-card',judgeNotice:'判断 agent 未代批（代决策）：证据不足；已转你手动确认。',request:{kind:'choice',title:'接受提案',cardKind:'proposal',flowId:'flow-a',options:[{id:'accept',label:'接受'},{id:'revise',label:'要求修改'}]}});
+  await check('P5 manual fallback card shows judgeNotice verbatim and stays actionable',`(()=>{const card=document.querySelector('[data-request-id="gov-fallback-card"]'),n=card?card.querySelector('.op-judge-notice'):null;return !!n&&n.textContent==='判断 agent 未代批（代决策）：证据不足；已转你手动确认。'&&card.querySelectorAll('.op-options input').length===2&&[...card.querySelectorAll('.op-options input')].every(x=>!x.disabled);})()`);
+  // single 项目：decision 禁用并说明；切回 trio 恢复可用（UI 禁用不是安全边界）。
+  judgeGovernanceModel='single';await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRole('A')`);await pause(60);
+  await check('P5 single project disables decision with explicit note',`(()=>{const v=${dState};return v.disabled&&!v.checked&&v.label==='替我决策'&&v.noteShown&&v.note==='旧治理模型（single）不支持代决策';})()`);
+  judgeGovernanceModel='trio';await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRole('A')`);await pause(60);
+  await check('P5 trio project restores decision availability',`(()=>{const v=${dState};return !v.disabled&&v.label==='替我决策'||v.label==='替我决策中 · 判断 agent';})()`);
+  await push('decision:judge-state',{version:1,enabled:false});
+  await check('P5 decision off after checks',`(()=>{const v=${dState};return !v.checked&&v.label==='替我决策'&&!v.onClass;})()`);
+ }
 }
 async function terminalChecks(){
  await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRuntime('pi');await window.__ansRenderer.selectRole('A')`);
  // P5（评审 §10.3）：自动判断开关启动只呈现权威关闭态——桥缺失 ⇒ 禁用+固定文案；桥已接线 ⇒ 默认「替我审」；
  // 两种情况都不得出现「替我审批中」假开启态或开启警告（真实开启/结果行需受控桥替身，见 changelog 未验边界）。
- await check('P5 judge toggle starts authoritative off without fake enable',`(()=>{const t=document.getElementById('auto-approve-toggle'),l=document.getElementById('auto-approve-label'),w=document.getElementById('shell-judge-warning');if(!t||!l||!w)return false;const bridge=typeof window.desktop.getShellJudgeState==='function'&&typeof window.desktop.setShellJudgeEnabled==='function'&&typeof window.desktop.onShellJudgeState==='function'&&typeof window.desktop.onShellJudgeResult==='function';return !t.checked&&w.hidden&&!l.textContent.includes('替我审批中')&&(bridge?l.textContent==='替我审':(t.disabled&&l.textContent==='当前版本不支持自动判断，保持手动'));})()`);
+ await check('P5 judge toggle starts authoritative off without fake enable',`(()=>{const t=document.getElementById('auto-approve-toggle'),l=document.getElementById('auto-approve-label'),w=document.getElementById('shell-judge-warning');if(!t||!l||!w)return false;const bridge=typeof window.desktop.getShellJudgeState==='function'&&typeof window.desktop.setShellJudgeEnabled==='function'&&typeof window.desktop.onShellJudgeState==='function'&&typeof window.desktop.onShellJudgeResult==='function';const dt=document.getElementById('judge-decision-toggle'),dl=document.getElementById('judge-decision-label');if(!dt||!dl)return false;const decisionBridge=typeof window.desktop.getDecisionJudgeState==='function'&&typeof window.desktop.setDecisionJudgeEnabled==='function'&&typeof window.desktop.onDecisionJudgeState==='function'&&typeof window.desktop.onOperatorJudgeResult==='function';return !t.checked&&w.hidden&&!l.textContent.includes('替我审批中')&&(bridge?l.textContent==='替我审批':(t.disabled&&l.textContent==='当前版本不支持自动判断，保持手动'))&&!dt.checked&&!dl.textContent.includes('替我决策中')&&(decisionBridge?dl.textContent==='替我决策':(dt.disabled&&dl.textContent==='当前版本不支持自动判断，保持手动'));})()`);
  const scoped={projectRoot:ROOT,roleId:'A',runtime:'pi'};
  sendQueued=true;await js(`document.getElementById('inp-message').value='排队首条';document.getElementById('btn-send').click()`);await pause(40);
  await check('P7 actual queued response sets current hint',`document.getElementById('composer-hint').textContent.includes('已入队')`);

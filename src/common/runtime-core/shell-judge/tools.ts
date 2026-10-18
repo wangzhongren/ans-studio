@@ -34,14 +34,20 @@ const REASON_TEXT: Record<JudgeReadCode, string> = {
   binary: "目标疑似二进制文件（已拒绝）",
   budget: "读取预算已耗尽（调用次数/总读取上限）",
   "read-failed": "读取失败",
+  "app-private": "该路径属于应用私有数据（账本/会话）（已拒绝）",
 };
 
-function failure(name: string, code: JudgeReadCode, pathClass: string): ToolResult {
+/**
+ * 判断工具统一的拒绝回执（**不回显绝对路径**；最多给类别）。
+ * 导出供 `governance-judge/tools.ts` 复用同一文案来源（不复制第二份）。
+ */
+export function judgeToolFailure(name: string, code: JudgeReadCode, pathClass: string): ToolResult {
   // 不回显绝对路径；最多给类别（PM 评审 §7.2 硬要求）。
   return { ok: false, message: `${name}：${REASON_TEXT[code]}（类别：${pathClass}）。不要据此假设文件内容。` };
 }
 
-function aborted(name: string): ToolResult {
+/** 判断工具统一的中止回执（导出供治理 judge 复用）。 */
+export function judgeToolAborted(name: string): ToolResult {
   return { ok: false, message: `${name}：本轮已中止，未执行` };
 }
 
@@ -68,10 +74,10 @@ function definition(name: string, handler: ToolDefinition["handler"]): ToolDefin
  */
 export function buildShellJudgeTools(options: ShellJudgeToolOptions): ToolDefinition[] {
   const read: ToolDefinition = definition(SHELL_JUDGE_READ_TOOL, async (call) => {
-    if (call.signal?.aborted) return aborted(SHELL_JUDGE_READ_TOOL);
+    if (call.signal?.aborted) return judgeToolAborted(SHELL_JUDGE_READ_TOOL);
     const input = stringArg(call.args?.path);
     const result = await resolveJudgeRead({ projectRoot: options.projectRoot, path: input ?? "", stats: options.stats, budget: options.budget });
-    if (!result.ok) return failure(SHELL_JUDGE_READ_TOOL, result.code, result.pathClass);
+    if (!result.ok) return judgeToolFailure(SHELL_JUDGE_READ_TOOL, result.code, result.pathClass);
     return {
       ok: true,
       message: `${SHELL_JUDGE_READ_TOOL}: ${result.rel}\n\n${result.text}${result.truncated ? "\n\n[已截断：文件超过单文件/总读取预算]" : ""}`,
@@ -79,10 +85,10 @@ export function buildShellJudgeTools(options: ShellJudgeToolOptions): ToolDefini
   });
 
   const list: ToolDefinition = definition(SHELL_JUDGE_LIST_TOOL, async (call) => {
-    if (call.signal?.aborted) return aborted(SHELL_JUDGE_LIST_TOOL);
+    if (call.signal?.aborted) return judgeToolAborted(SHELL_JUDGE_LIST_TOOL);
     const input = stringArg(call.args?.path);
     const result = await resolveJudgeList({ projectRoot: options.projectRoot, ...(input !== undefined ? { path: input } : {}), stats: options.stats, budget: options.budget });
-    if (!result.ok) return failure(SHELL_JUDGE_LIST_TOOL, result.code, result.pathClass);
+    if (!result.ok) return judgeToolFailure(SHELL_JUDGE_LIST_TOOL, result.code, result.pathClass);
     const body = result.entries.length > 0 ? result.entries.join("\n") : "（空目录或无可列条目）";
     return {
       ok: true,
@@ -91,7 +97,7 @@ export function buildShellJudgeTools(options: ShellJudgeToolOptions): ToolDefini
   });
 
   const report: ToolDefinition = definition(SHELL_JUDGE_REPORT_TOOL, async (call) => {
-    if (call.signal?.aborted) return aborted(SHELL_JUDGE_REPORT_TOOL);
+    if (call.signal?.aborted) return judgeToolAborted(SHELL_JUDGE_REPORT_TOOL);
     // **原样回调**：不做取值域/长度/歧义规范化（那属于编排侧唯一裁决语义）。
     try {
       options.report(call.args);

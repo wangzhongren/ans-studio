@@ -12,5 +12,14 @@ export {
   buildShellJudgeTools, SHELL_JUDGE_TOOL_NAMES,
   SHELL_JUDGE_READ_TOOL, SHELL_JUDGE_LIST_TOOL, SHELL_JUDGE_REPORT_TOOL,
 } from "../../common/runtime-core/shell-judge/tools.ts";
+// 治理卡判断 agent（「替我审批」/「替我决策」）工具集的窄转出（2026-10-18 双开关评审 §6.2）：
+// `buildGovernanceJudgeTools` 恰三只治理工具；`ALL_JUDGE_TOOL_NAMES` 是三个适配器 judge allowlist
+// 的并集（只用于放行面，不用于装配）。实现归运行时核心，本 facade 不复制。
+export {
+  buildGovernanceJudgeTools, GOVERNANCE_JUDGE_TOOL_NAMES, GOVERNANCE_JUDGE_REPORT_TOOL,
+  ALL_JUDGE_TOOL_NAMES,
+} from "../../common/runtime-core/governance-judge/tools.ts";
 export type { ShellKillSwitchDecision } from "../runtime/tools.ts";
-export type { ToolDefinition, ToolResult, GovernedToolsOptions, ShellJudgeToolOptions } from "../../model/runtime.ts";
+export type {
+  ToolDefinition, ToolResult, GovernedToolsOptions, ShellJudgeToolOptions, GovernanceJudgeToolOptions,
+} from "../../model/runtime.ts";

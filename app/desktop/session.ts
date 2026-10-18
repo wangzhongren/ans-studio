@@ -113,7 +113,7 @@ import {
 // 形状为**桌面侧暂定契约**（设计 §6.1 的 propose_recovery 载荷 / §6.2 的确认流）——编排 O1 透传与
 // 运行时核心 R2 handler 落树后按需重定向（interface 点见 api-spec；本层不复制第二份判定）。
 import { isRecoveryAction, type RecoveryConfirmPresenter } from "./recovery-channel.ts";
-import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputRequest, CustomerInputMetadata, PromptTurnStartedMetadata, ShellJudgeFn } from "../../src/model/runtime.ts";
+import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputRequest, CustomerInputMetadata, PromptTurnStartedMetadata, ShellJudgeFn, GovernanceJudgeFn } from "../../src/model/runtime.ts";
 // W6-B（四角色评审 §5.3/§5.4）：意图交接与澄清的冻结形状（§4 契约家）——只读导入、不复制。
 // 编排（run-role）已完成校验/去重/每轮一次/两轮上限并在成功回执后写账本；本层只是**投递端**。
 import type {
@@ -350,6 +350,18 @@ export interface SessionManagerDeps {
     runtimeOptions?: RuntimeAdapterFactoryOptions;
     createAdapter: RuntimeAdapterFactory;
   }) => ShellJudgeFn;
+  /**
+   * **「替我决策」每会话判断闭包工厂**（2026-10-18 双开关评审 §8.2）：缺省 ⇒ 不注入判断能力。
+   * 主进程/Interface 注入真实 `createGovernanceJudge`（经编排 Pipeline 公共出口），测试可注入桩件。
+   * 只在 trio 且客户交互通道已注入的会话构造；用**与请求会话同一份** `runtimeOptions`/`createAdapter`，
+   * 会话 dispose 即清（与 `shellJudge` 一并）。
+   */
+  createGovernanceJudge?: (opts: {
+    project: ProjectConfig;
+    runtime: RuntimeKind;
+    runtimeOptions?: RuntimeAdapterFactoryOptions;
+    createAdapter: RuntimeAdapterFactory;
+  }) => GovernanceJudgeFn;
   prepareRuntimeProfile?: (runtime: RuntimeKind) => Promise<void>;
   createPiAdapterFactory: (
     project: ProjectConfig,
@@ -548,6 +560,12 @@ interface LiveSession {
   /** **每会话判断闭包**（编排 `createShellJudge`；同一份 `runtimeOptions`/`createAdapter` 工厂）。
    *  会话 dispose 即清（PM 评审 §十一）。 */
   shellJudge?: ShellJudgeFn;
+  /**
+   * **「替我审批/决策」每会话判断闭包**（编排 `createGovernanceJudge`，2026-10-18 双开关评审 §8.2）：
+   * 只在 trio + 客户交互通道已接的会话构造；与 `shellJudge` 同一份 `runtimeOptions`/`createAdapter`。
+   * 会话 dispose 即清；缺失 ⇒ 通道按「判断能力缺席」回落原卡（fail-closed，绝不代批）。
+   */
+  governanceJudge?: GovernanceJudgeFn;
 }
 
 /** 一次**系统投递**（E-1 回交投 su / H-1 派发投目标角色 / L-1 客户消息）——投递机的队列条目（**一套机，多调用方**）。 */
@@ -886,6 +904,7 @@ export class SessionManager {
     // **「替我审」会话级上下文销毁即清**（PM 评审 §8.1/§十一）：turnText 与判断闭包都不跨会话残留。
     entry.lastUserText = undefined;
     entry.shellJudge = undefined;
+    entry.governanceJudge = undefined;
     entry.interactionState.lifetime.abort();
     entry.interactionState.turn.abort();
     try {
@@ -1655,6 +1674,24 @@ export class SessionManager {
         shellJudge = undefined;
       }
     }
+    // **「替我审批/决策」每会话判断闭包（2026-10-18 双开关评审 §8.2）**：只在 trio 且本会话确实接入
+    // 客户交互通道时构造（single/su 与 Liaison 不注入——不判断、不产生模型调用）。用**同一份**
+    // `runtimeOptions` 与 `createAdapter`（判断跟随请求会话引擎，不跨引擎）。构造失败 ⇒ 不注入
+    // （能力缺席，通道回落原卡——fail-closed）。闭包随会话条目销毁一并清除。
+    let governanceJudge: GovernanceJudgeFn | undefined;
+    if (governanceModel === "trio" && customerInput !== undefined && this.deps.createGovernanceJudge !== undefined) {
+      try {
+        governanceJudge = this.deps.createGovernanceJudge({
+          project,
+          runtime: req.runtime,
+          runtimeOptions: this.deps.runtimeOptions,
+          createAdapter,
+        });
+      } catch (error) {
+        createDiagnosticLogger({ component: "desktop.session", projectRoot: req.projectRoot, roleId: req.roleId }).error("governance-judge.driver.failed", error);
+        governanceJudge = undefined;
+      }
+    }
     let handle: RoleSessionHandle;
     try {
       // scope 传 undefined：聊天无预先任务，授权上界 = 角色边界本身（门禁引擎据此不做 F4 收窄）。
@@ -1685,6 +1722,12 @@ export class SessionManager {
           ...(customerInput
             ? { customerInput: (r: CustomerInputRequest, metadata?: CustomerInputMetadata) => {
                 const mirrorRoleId = mirrorRoleIdFor(r);
+                // **判断上下文（2026-10-18 双开关评审 §8.2）**：judge 闭包与 turnText 在调用当刻从活会话
+                // 条目读取（会话已销毁 ⇒ 缺省，通道不判断）；`metadata` 原样透传（含 run-role 加的
+                // `judgeContext`，桌面只消费、不重算）。governanceModel 由 open() 定格。
+                const live = this.sessions.get(key);
+                const judge = live?.governanceJudge ?? governanceJudge;
+                const turnText = live?.lastUserText;
                 return customerInput(
                   r,
                   {
@@ -1692,7 +1735,10 @@ export class SessionManager {
                     runtime: req.runtime,
                     projectRoot: req.projectRoot,
                     sessionSignal: interactionState.lifetime.signal,
+                    governanceModel,
                     ...(mirrorRoleId !== undefined ? { mirrorRoleId } : {}),
+                    ...(judge !== undefined ? { governanceJudge: judge } : {}),
+                    ...(typeof turnText === "string" && turnText !== "" ? { turnText } : {}),
                   },
                   metadata,
                 );
@@ -1771,6 +1817,7 @@ export class SessionManager {
       boundaryPrints,
       skillPaths,
       ...(shellJudge !== undefined ? { shellJudge } : {}),
+      ...(governanceJudge !== undefined ? { governanceJudge } : {}),
     };
     this.sessions.set(key, entry);
     // 评审 §5.6：只记录**回交主人**（trio=Convener；single=su）的 runtime——看护向主人投递时择路用。

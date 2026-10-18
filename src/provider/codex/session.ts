@@ -22,9 +22,12 @@ import { createDiagnosticLogger } from "../../common/shared/diagnostics.ts";
 import { retryOnTransient } from "../../common/shared/atomic-write.ts";
 // G-4「已安装技能」注入节：渲染单一来源在编排（installed-skills.ts）——本适配器只做「非空则整段拼接」。
 import { renderInstalledSkillsSection } from "../../common/编排/installed-skills.ts";
-// 判断 agent（「替我审」）结构性隔离（2026-10-17 PM 评审 §6.1/§7.1/§十一 P3c）：judge 会话只消费
-// 运行时核心注入的三只只读工具，工具名冻结集合由运行时核心单一来源提供（本适配器不另造名单）。
-import { SHELL_JUDGE_TOOL_NAMES } from "../../common/runtime-core/shell-judge/tools.ts";
+// 判断 agent（「替我审批」/「替我决策」）结构性隔离（2026-10-18 双开关评审 §6.2/§十一 P3c）：judge 会话
+// 只消费运行时核心注入的三只只读工具。allowlist 单一来源＝运行时核心导出的并集 `ALL_JUDGE_TOOL_NAMES`
+// （shell 与治理判断共享读/列两名、各有一个 report 工具）；并集**只用于 allowlist，不用于装配**，
+// 本适配器不另造名单。
+import { ALL_JUDGE_TOOL_NAMES, GOVERNANCE_JUDGE_REPORT_TOOL } from "../../common/runtime-core/governance-judge/tools.ts";
+import { SHELL_JUDGE_REPORT_TOOL, SHELL_JUDGE_TOOL_NAMES } from "../../common/runtime-core/shell-judge/tools.ts";
 
 export type { CodexRpcConnection, CodexEngineInput, CodexEngineFactory } from "../../common/codex-adapter/protocol.ts";
 
@@ -112,17 +115,29 @@ async function loadMcp(): Promise<CodexMcpModules> {
   } catch { throw new Error("Codex requires @modelcontextprotocol/sdk@1.32.1"); }
 }
 
-const JUDGE_TOOL_NAME_SET: ReadonlySet<string> = new Set(SHELL_JUDGE_TOOL_NAMES);
+const JUDGE_TOOL_NAME_SET: ReadonlySet<string> = new Set(ALL_JUDGE_TOOL_NAMES);
+const JUDGE_REPORT_TOOL_NAMES: ReadonlySet<string> = new Set([SHELL_JUDGE_REPORT_TOOL, GOVERNANCE_JUDGE_REPORT_TOOL]);
+/** 判断会话的两类冻结工具集：shell judge（`report_shell_judgement`）与治理 judge（`report_governance_judgement`）。 */
+type JudgeToolFlavor = "shell" | "governance";
+
 /**
- * 判断模式（「替我审」）工具集校验（PM 评审 §7.1/A12/A35）：judge 会话**恰**接受运行时核心注入的
- * `judge_read_file`/`judge_list_dir`/`report_shell_judgement`。写入/编辑/shell/客户交互/回交/派发
- * 工具即便被误注入也**不进入**原生工具面与 MCP 目录——装配前抛错、零副作用（fail closed）。
+ * 判断模式工具集校验（2026-10-18 双开关评审 §6.2/§十一 P3c/AC19/AC24）：judge 会话**恰**接受运行时核心
+ * 两种冻结工具集之一（各三只）：
+ * · shell judge：`judge_read_file`/`judge_list_dir`/`report_shell_judgement`；
+ * · 治理 judge：`judge_read_file`/`judge_list_dir`/`report_governance_judgement`。
+ * allowlist 来自运行时核心并集 `ALL_JUDGE_TOOL_NAMES`（本适配器不另造名单）。写入/编辑/shell/客户交互/
+ * 回交/派发工具即便被误注入也**不进入**原生工具面与 MCP 目录——装配前抛错、零副作用（fail closed）。
+ * 返回值指出注入的是哪一类，用于系统提示中指明正确的 report 工具名。
  * 普通角色会话不经过本函数（逐字不变）。
  */
-function assertJudgeToolSet(tools: readonly ToolDefinition[]): void {
-  if (tools.length !== JUDGE_TOOL_NAME_SET.size || tools.some(tool => !JUDGE_TOOL_NAME_SET.has(tool.name))) {
-    throw new Error(`Codex judge session accepts only the shell judge tools (${SHELL_JUDGE_TOOL_NAMES.join(", ")})`);
+function assertJudgeToolSet(tools: readonly ToolDefinition[]): JudgeToolFlavor {
+  const names = new Set(tools.map(tool => tool.name));
+  const reports = tools.filter(tool => JUDGE_REPORT_TOOL_NAMES.has(tool.name));
+  // 两种冻结集都恰三只；名字不重复；恰一只 report；每只都在运行时核心并集内。
+  if (tools.length !== SHELL_JUDGE_TOOL_NAMES.length || names.size !== tools.length || reports.length !== 1 || tools.some(tool => !JUDGE_TOOL_NAME_SET.has(tool.name))) {
+    throw new Error(`Codex judge session accepts only a frozen judge tool set (${ALL_JUDGE_TOOL_NAMES.join(", ")})`);
   }
+  return names.has(GOVERNANCE_JUDGE_REPORT_TOOL) ? "governance" : "shell";
 }
 
 /** JSON-RPC transport owns the native process; importing this module starts nothing. */
@@ -312,6 +327,8 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
   const judgeMode = options.judgeMode === true;
   // 判断模式：装配前做结构性工具集校验（零副作用）；普通角色会话不受影响。
   if (judgeMode) assertJudgeToolSet(options.tools);
+  /** 判断会话的 report 工具名（每次从注入集重取：工厂与 bind 之间 options 可能被误改）。 */
+  const judgeReportTool = () => assertJudgeToolSet(options.tools) === "governance" ? GOVERNANCE_JUDGE_REPORT_TOOL : SHELL_JUDGE_REPORT_TOOL;
   // G-4 installed-skills section: the render is the single orchestration source (hash/matching/bad-file
   // handling all live there). Non-empty splices the whole section verbatim as one prompt segment; empty
   // string renders nothing (zero-skill status quo stays byte-identical).
@@ -323,8 +340,9 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
       role.cardText,
       `固定角色：${role.id}。实际项目目录：${options.projectRoot}。`,
       // 判断会话只有只读工具：明确告知可用面，避免模型在不存在的能力上反复尝试（普通会话逐字不变）。
+      // 治理 judge 与 shell judge 的 report 工具名不同（并集 allowlist → 按注入集判定）；读取面相同。
       judgeMode
-        ? "本会话是只读判断会话：只通过 ans_ 前缀的 judge_read_file/judge_list_dir 读取项目，并用 report_shell_judgement 交回结论；没有写入、命令、客户交互或派发工具。"
+        ? `本会话是只读判断会话：只通过 ans_ 前缀的 judge_read_file/judge_list_dir 读取项目，并用 ${judgeReportTool()} 交回结论；没有写入、命令、客户交互或派发工具。`
         : "只通过 ans_ 前缀工具执行项目读取、修改、命令、交互和回交；原生运行环境只读。派发不转移授权。",
       `角色写入边界：${JSON.stringify(role.boundary)}`,
       ...options.tools.flatMap(tool => tool.promptGuidelines ?? []),

@@ -2,7 +2,7 @@
 // 测试角色：判断 agent 只读沙箱独立验证（2026-10-17）。
 //
 // 覆盖（PM 评审 §7.2/§7.3/§7.4 与 §12.2-9/10 与 §12.1 A11/A18/A20）：
-//   · `.env*`/私钥/凭据/令牌/`.git/`/`docs/audit/`/`.ans/sessions/` 读取被拒且**不泄露内容**；
+//   · `.env*`/私钥/凭据/令牌/`.git/`/`docs/audit/`/`.ans/**`（整棵应用私有数据）读取被拒且**不泄露内容**；
 //   · 项目外绝对路径、`..`、符号链接/junction 逃逸被拒，拒绝文案不回显绝对路径；
 //   · 二进制拒绝；超预算拒绝；单文件超限截断并标记；
 //   · `judge_list_dir` 只列一层、敏感项不列名；
@@ -69,23 +69,35 @@ test("敏感文件/目录读取全部被拒且不泄露内容；列表不列敏�
 
     const { byName, stats: readStats } = fixture(root);
     const read = byName.get(SHELL_JUDGE_READ_TOOL)!;
-    for (const target of [
-      ".env",
-      ".env.local",
-      "keys/server.pem",
-      "credentials.json",
-      "my-token.txt",
-      ".git/config",
-      "docs/audit/a.md",
-      ".ans/sessions/x.jsonl",
-    ]) {
+    const deniedTargets: Array<{ target: string; expected: RegExp }> = [
+      { target: ".env", expected: /敏感/ },
+      { target: ".env.local", expected: /敏感/ },
+      { target: "keys/server.pem", expected: /敏感/ },
+      { target: "credentials.json", expected: /敏感/ },
+      { target: "my-token.txt", expected: /敏感/ },
+      { target: ".git/config", expected: /敏感/ },
+      { target: "docs/audit/a.md", expected: /敏感/ },
+      // 2026-10-18 双开关评审 §6.3：`.ans/**` 整体硬排除（app-private），不再只排 sessions。
+      { target: ".ans/sessions/x.jsonl", expected: /应用私有数据/ },
+    ];
+    for (const { target, expected } of deniedTargets) {
       const result = await read.handler(call(SHELL_JUDGE_READ_TOOL, { path: target }));
       assert.equal(result.ok, false, `${target} 必须被拒绝`);
-      assert.match(result.message, /敏感/);
+      assert.match(result.message, expected, `${target} 拒绝原因须如实标注类别`);
       assert.equal(result.message.includes(ENV_SENTINEL), false, `${target} 拒绝文案不得泄露内容`);
       assert.equal(result.message.includes(SECRET_SENTINEL), false, `${target} 拒绝文案不得泄露内容`);
       assert.equal(result.message.includes(root), false, `${target} 拒绝文案不得回显绝对路径`);
     }
+
+    // `.ans/governance/ledger.jsonl` 同样整体拒绝（独立会话，避免被上一个会话的预算耗尽掩盖）。
+    const ledgerFixture = fixture(root);
+    const ledgerRead = await ledgerFixture.byName.get(SHELL_JUDGE_READ_TOOL)!.handler(
+      call(SHELL_JUDGE_READ_TOOL, { path: ".ans/governance/ledger.jsonl" }),
+    );
+    assert.equal(ledgerRead.ok, false, "账本文件必须被拒绝");
+    assert.match(ledgerRead.message, /应用私有数据/);
+    assert.equal(ledgerRead.message.includes(SECRET_SENTINEL), false, "账本拒绝文案不得泄露内容");
+    assert.equal(ledgerRead.message.includes(root), false, "账本拒绝文案不得回显绝对路径");
 
     // 8 次被拒读取也占调用预算；列表用独立会话统计（同一预算语义）。
     const listingFixture = fixture(root);
@@ -101,8 +113,9 @@ test("敏感文件/目录读取全部被拒且不泄露内容；列表不列敏�
     assert.equal(docs.message.includes("audit"), false, "docs/audit 不得列名");
     assert.match(docs.message, /plan\.md/);
     const ans = await listingFixture.byName.get(SHELL_JUDGE_LIST_TOOL)!.handler(call(SHELL_JUDGE_LIST_TOOL, { path: ".ans" }));
-    assert.equal(ans.ok, true);
-    assert.equal(ans.message.includes("sessions"), false, ".ans/sessions 不得列名");
+    assert.equal(ans.ok, false, ".ans 整体拒绝（应用私有数据，不是只隐藏 sessions）");
+    assert.match(ans.message, /应用私有数据/);
+    assert.equal(ans.message.includes("sessions"), false, ".ans 拒绝文案不得列出内部目录名");
     const sensitiveDir = await listingFixture.byName.get(SHELL_JUDGE_LIST_TOOL)!.handler(call(SHELL_JUDGE_LIST_TOOL, { path: ".git" }));
     assert.equal(sensitiveDir.ok, false, "敏感目录本身不可列");
     assert.equal(readStats.deniedReads >= 8, true);

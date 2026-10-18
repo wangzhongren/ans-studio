@@ -42,6 +42,7 @@ test/桌面应用/（渲染侧，路径沿用拆分前）
 - **esc 单一来源**：非 Markdown 路径的转义一律走 `Markdown.esc`；模型输出禁直插。
 - **无计时器纪律**：交互卡不按时间过期；抽屉过渡纯 CSS。除既有诊断/去抖机制外不新增 setTimeout/setInterval。
 - **治理决定卡镜像（W6-C）**：`opRequests[requestId]` 以 `surfaces`/`cards` 承载同一请求的多面呈现；源面沿用锚点/生命周期，镜像面（主入口 Liaison）追加末尾且不自动滚动。作答唯一入口 `submitOperatorDecision`（单点 `operatorRespond`），成功后/失效冻结全部面；排队请求不物化卡，仅主入口聚合行。渲染侧不自行判定是否镜像（只认载荷 `mirrorRoleId`），也不写账本/模型上下文。
+- **双自动判断开关（2026-10-18）**：`shellJudge`=「替我审批」（shell + 写盘族）、`decisionJudge`=「替我决策」（提案/任命/验收）；主进程是两组开关的权威，`renderJudgeToggles()` 是唯一重绘点，一次性警告同一块、每组各自 `promptShown`。治理代批结果行（`session:operator-judge`）与 shell 结果行都按 `roleId` 落 pane、按 `toolCallId` 锚定；manual 用卡片 `judgeNotice`（shell `#sc-judge-notice` / 治理 `.op-judge-notice`）。渲染侧不写第二张 `cardKind→group` 映射表。
 - 历史沿革（UI/UX v2、设计对齐、IME、抽屉、图片、P1 等）见冻结归档 `角色卡/桌面应用/docs/` 与[功能导航](feature-map.md)链接。
 
 ## 已知偏离 / 边界登记

@@ -12,9 +12,8 @@ import { RUNTIME_CREDENTIAL_ENV_VARS } from "../../common/shared/runtime-shared.
 import { createDiagnosticLogger } from "../../common/shared/diagnostics.ts";
 import { REASONING_EVENT_SUMMARY } from "../../common/runtime-core/reasoning.ts";
 import { toClaudeSchema } from "../../common/claude-adapter/schema.ts";
-import { CLAUDE_JUDGE_DISALLOWED_TOOLS, assertClaudeJudgeToolSet, claudeJudgeSystemPromptLine } from "../../common/claude-adapter/judge.ts";
+import { CLAUDE_JUDGE_DISALLOWED_TOOLS, CLAUDE_JUDGE_TOOL_NAMES, assertClaudeJudgeToolSet, claudeJudgeReportToolName, claudeJudgeSystemPromptLine } from "../../common/claude-adapter/judge.ts";
 import { abortError, createQueue, isQueryClosedError, waitForTurn } from "../../common/claude-adapter/lifecycle.ts";
-import { SHELL_JUDGE_TOOL_NAMES } from "../../common/runtime-core/shell-judge/tools.ts";
 import { DEFAULT_TURN_LAST_RESORT_MS } from "../../common/runtime-core/timeout.ts";
 import { renderInstalledSkillsSection } from "../../common/编排/installed-skills.ts";
 
@@ -82,13 +81,15 @@ const isReasoningRejection = (text: string | undefined): boolean =>
 
 export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, dependencies: ClaudeAdapterDependencies = {}): RuntimeAdapter {
   if (options.runtime !== "claude") throw new Error("Claude 适配器只接受 runtime=claude");
-  // 「替我审」判断模式（PM 评审 §6.1/A12/A35）：`judgeMode` 由 Service 在注入 `shellJudge`
-  // 只读能力时置位，此时 `options.tools` 必须恰为运行时核心注入的三只 judge 工具。
+  // 判断模式（「替我审」/「替我审批」「替我决策」）：`judgeMode` 由 Service 在注入 `shellJudge`
+  // **或** `governanceJudge` 只读能力时置位，此时 `options.tools` 必须恰为运行时核心注入的对应
+  // 三件套（shell 的 report_shell_judgement 或治理的 report_governance_judgement，二者不可混用）。
   // 工具集不匹配 ⇒ SDK 加载前抛错，零副作用（写/编辑/shell/交互/回交/派发工具即便被误注入
   // 也不会进入判断会话）。普通角色会话 `judgeMode` 缺席，以下分支全部不成立（逐字不变）。
   const judgeMode = options.judgeMode === true;
   if (judgeMode) assertClaudeJudgeToolSet(options.tools);
-  const judgeToolNames: ReadonlySet<string> = new Set(SHELL_JUDGE_TOOL_NAMES);
+  // allowlist 用运行时核心并集（PM 双开关评审 §6.2）；装配仍只认上面校验过的三件套之一。
+  const judgeToolNames: ReadonlySet<string> = CLAUDE_JUDGE_TOOL_NAMES;
   if (options.toolDisplayMode === "required-v1" && (typeof options.projectToolEvent !== "function" || typeof options.registerToolDisplayProfile !== "function")) {
     throw new Error("Claude required-v1 工具展示缺少 projector/register 能力");
   }
@@ -115,7 +116,7 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
     return [
       role.cardText,
       judgeMode
-        ? claudeJudgeSystemPromptLine(role.id)
+        ? claudeJudgeSystemPromptLine(role.id, claudeJudgeReportToolName(options.tools))
         : `你始终绑定角色 ${role.id}。只能通过 mcp__ans__ 工具操作环境；所有写入、shell 和交互由 ANS 的注入能力判断。`,
       `当前角色边界：${JSON.stringify(role.boundary)}`,
       ...options.tools.flatMap((tool) => tool.promptGuidelines ?? []),
@@ -326,7 +327,7 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
             description: tool.description,
             inputSchema: toClaudeSchema({ ...tool.inputSchema, properties: { ...properties, [CALL_CONTEXT_ARG]: { type: "string", description: "Internal ANS context assigned by the host; omit this field." } } }, z),
             annotations: judgeMode
-              // 判断会话三只工具全部只读、不破坏、不触网。
+              // 判断会话三件套（shell 或治理 report）全部只读、不破坏、不触网。
               ? { readOnlyHint: true, destructiveHint: false, openWorldHint: false }
               : { readOnlyHint: tool.name === "read_file", destructiveHint: tool.name !== "read_file", openWorldHint: tool.name === "run_shell" },
             _meta: { "anthropic/alwaysLoad": true },
@@ -405,8 +406,8 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
             if (hook.hook_event_name !== "PreToolUse") return {};
             const original = hook.prompt_id ? current.nativeTurns.get(hook.prompt_id) : undefined;
             const originalTurn = original?.turn;
-            // 判断模式：只放行冻结的三只 judge 工具；任何其他名字即便误入 names 也不得放行
-            // （结构性最后一道闸，兜底文案在下方 deny 分支）。
+            // 判断模式：只放行冻结的 judge 三件套之一（shell 或治理；名字还必须确实已注册，
+            // 因此混合/缺失集合在入口已被拒绝）。这是结构性最后一道闸，兜底文案在下方 deny 分支。
             if (names.has(hook.tool_name) && (!judgeMode || judgeToolNames.has(hook.tool_name.slice("mcp__ans__".length))) && hook.mcp_server?.name === "ans" && hook.mcp_server.source === "sdk" && originalTurn && originalTurn === active && !originalTurn.controller.signal.aborted && !original!.signal.aborted && !controller.signal.aborted && !hookOptions.signal.aborted && hook.tool_input && typeof hook.tool_input === "object" && !Array.isArray(hook.tool_input)) {
               const token = randomUUID();
               current.contexts.set(token, { turn: originalTurn, toolName: hook.tool_name.slice("mcp__ans__".length), toolUseId: hook.tool_use_id, signal: AbortSignal.any([original!.signal, hookOptions.signal]) });
@@ -439,7 +440,7 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
                 result: { ok: false, message: blocked } }, "denied", blocked);
             } else emitUnattributed();
             return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: judgeMode
-              ? "判断会话仅允许 judge_read_file/judge_list_dir/report_shell_judgement"
+              ? `判断会话仅允许 ${options.tools.map((tool) => tool.name).join("/")}`
               : "仅允许当前轮注册的 ANS MCP 工具" } };
           }] }],
           },

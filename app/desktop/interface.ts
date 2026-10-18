@@ -37,6 +37,8 @@ import {
   previewGovernanceMigration as realPreviewGovernanceMigration,
   migrateGovernanceModel as realMigrateGovernanceModel,
   createShellJudge as realCreateShellJudge,
+  // 2026-10-18 双开关评审 §7.6/§8.2：「替我审批/决策」判断闭包——同样只经编排 Pipeline 公共出口。
+  createGovernanceJudge as realCreateGovernanceJudge,
   // W6-B（四角色评审 §7.2）：应用后台推进成功后写 `dispatch.accepted(app, trigger=customer-decision)`——
   // 账本只经 Pipeline 公共出口（薄再导出）使用，不直接导入编排私有 `common/`。
   appendGovernanceLedger,
@@ -92,7 +94,8 @@ import type { DesktopOperatorChannelFn, DesktopShellArming } from "./operator-ch
 // 旧 su 只读档（2026-10-12）类型保留兼容；桌面自 2026-10-17 起不再注入 `shellReadonly`。
 import type { AssembleOperatorShellGateOptions, AssembleReadonlyShellGateOptions } from "../../src/pipeline/orchestration/shell-arming.ts";
 // 客户确认制交互（A-5）：桌面侧的客户通道形状（带角色上下文）——本层只透传，实现在 `customer-input.ts`。
-import type { DesktopCustomerInputFn } from "./customer-input.ts";
+// 判断代批结果行的结构化载荷与人话摘要（2026-10-18 双开关评审 §8.1/§9.3）同源，不在这里另写一份。
+import { judgeResultSummary, type DesktopCustomerInputFn, type OperatorJudgeResultPayload } from "./customer-input.ts";
 // 治理下一步（2026-10-18 客户修正）：客户决定成功后的**后台派发**。推导/文案纯逻辑在 governance-advance.ts；
 // 本层负责打开目标治理角色会话、投递**唯一一条**任务，并把成功/失败经既有 delivery-note 系统行如实落流。
 import {
@@ -207,12 +210,17 @@ export interface AttachImageResult {
 // `.env`/项目文件**。渲染侧只发意图（`shell:judge-set`），状态以主进程接受为准。开关**只影响之后新到的
 // `(a)` 请求**（通道在调用当刻读取 `isEnabled()`）；已挂起卡不受切换影响。
 
-/** 开关应答（§6.6 钉死 `{version:1,...}`）。 */
+/** 开关应答（§6.6 钉死 `{version:1,...}`；2026-10-18 评审 §3.3 增可选 `available`）。 */
 export interface ShellJudgeStateReply {
   version: 1;
   ok: boolean;
   enabled?: boolean;
   error?: string;
+  /**
+   * 判断能力是否可用（主进程未接 judge 驱动时 false）。本版本恒接真实驱动 ⇒ 恒 true；
+   * 渲染侧只在**明确 false** 时禁用并显示「当前版本不支持自动判断」，**不得显示假开启态**。
+   */
+  available?: boolean;
 }
 
 /** 主进程权威的开关状态机（纯内存；由 main.ts 创建并与通道/Interface 共享**同一实例**）。 */
@@ -314,6 +322,16 @@ export interface DesktopDeps {
    * 缺省自建（默认 false）以便单测直用。开关**只影响之后新到的请求**，不自动打开会话、不持久化。
    */
   shellJudgeSwitch?: ShellJudgeSwitch;
+  /**
+   * **「替我决策」判断闭包工厂（2026-10-18 双开关评审 §8.2）**：缺省经编排 Pipeline 公共出口
+   * `govern-session.ts::createGovernanceJudge`（桌面不直接导入私有 `common/编排/`）。测试可注入桩件。
+   */
+  createGovernanceJudgeFn?: typeof realCreateGovernanceJudge;
+  /**
+   * **「替我决策」开关状态机（主进程权威）**：与 approval 同形、**互不影响**；main.ts 创建**同一实例**
+   * 并传给客户交互通道与 Interface。缺省自建（默认 false）；只在主进程内存、重载复位、不持久化。
+   */
+  decisionJudgeSwitch?: ShellJudgeSwitch;
   createPiAdapterFactoryFn?: (project: ProjectConfig, shellGate?: ShellGate) => (gate: WriteGate) => RuntimeAdapter;
   createDemoAdapterFn?: (opts: { gate: WriteGate; boundary: BoundarySection1 }) => RuntimeAdapter;
   buildProjectConfigFn?: typeof realBuildProjectConfig;
@@ -512,6 +530,21 @@ export interface DesktopInterface {
   setShellJudgeEnabled(input: unknown): ShellJudgeStateReply;
   /** 启动/渲染重载复位（默认 false；PM 评审 §10.3，由 main.ts 在 `loadInterface()` 前调用）。 */
   resetShellJudgeState(): void;
+  /**
+   * **「替我决策」开关读取**（2026-10-18 双开关评审 §3.3）：与 approval 同形、**互不影响**；
+   * 主进程权威、默认 false、重载复位、不持久化。返回 `{version:1, ok:true, enabled, available}`。
+   */
+  getDecisionJudgeState(): ShellJudgeStateReply & { ok: true; enabled: boolean };
+  /** **「替我决策」开关设置**：仅接受 `{enabled:boolean}`；失败不改状态；只影响之后新到的卡。 */
+  setDecisionJudgeEnabled(input: unknown): ShellJudgeStateReply;
+  /** 启动/渲染重载复位（默认 false；与 approval 各自复位、互不影响）。 */
+  resetDecisionJudgeState(): void;
+  /**
+   * **判断代批结果行落主入口进度行**（§8.3，best-effort）：`approve` 结算后由主进程调用；
+   * 经既有 `emitSessionEvent` 的 `message`（`detail.source:"judge-decision"`）落在主入口 Liaison 的角色流。
+   * 不造第二张可作答卡、失败只诊断；主入口与来源角色相同（或项目未列举）时不重复发。
+   */
+  emitJudgeProgress(payload: OperatorJudgeResultPayload): void;
   /** 点角色即开：直接建立/续接与该角色的会话（无确认框；B-2 起切换不再结束旧会话）。 */
   openSession(input: SessionOpenRequest): Promise<OpenResult>;
   /**
@@ -650,6 +683,9 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   // 「替我审」（2026-10-17）：开关状态机（主进程权威）与判断闭包工厂（缺省＝编排 Pipeline 公共出口）。
   const shellJudgeSwitch = deps.shellJudgeSwitch ?? createShellJudgeSwitch();
   const createShellJudgeFn = deps.createShellJudgeFn ?? realCreateShellJudge;
+  // 「替我决策」（2026-10-18 双开关评审 §3.3/§8.2）：同形第二套开关（互不影响）与治理判断闭包工厂。
+  const decisionJudgeSwitch = deps.decisionJudgeSwitch ?? createShellJudgeSwitch();
+  const createGovernanceJudgeFn = deps.createGovernanceJudgeFn ?? realCreateGovernanceJudge;
   // Pi 配置面板：函数与目标路径均可注入（**测试/e2e 必须注入临时 `.env`**，绝不碰真实仓库根 `.env`）。
   const getPiConfigFn = deps.getPiConfigFn ?? realGetPiConfig;
   const savePiConfigFn = deps.savePiConfigFn ?? realSavePiConfig;
@@ -764,6 +800,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     runtimeOptions: deps.runtimeOptions,
     // 「替我审」：每会话判断闭包工厂（会话用同一份 runtimeOptions/createAdapter 构造；缺省真实实现）。
     createShellJudge: createShellJudgeFn,
+    // 「替我决策」（2026-10-18 双开关评审 §8.2）：每会话治理判断闭包工厂（仅 trio + 通道已接时构造）。
+    createGovernanceJudge: createGovernanceJudgeFn,
     prepareRuntimeProfile: async (runtime) => {
       if (!pendingProfiles.has(runtime)) return;
       if (runtime === "pi" && manager.hasBusyRuntime("pi")) throw new Error("Pi 的旧轮次仍在执行，新配置将在其结束后应用。消息可继续排队。");
@@ -1087,14 +1125,53 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     },
 
     getShellJudgeState(): ShellJudgeStateReply & { ok: true; enabled: boolean } {
-      return shellJudgeSwitch.get();
+      // `available`：本版本恒接真实判断驱动；渲染侧只在明确 false 时禁用（§3.3）。
+      return { ...shellJudgeSwitch.get(), available: true };
     },
     setShellJudgeEnabled(input: unknown): ShellJudgeStateReply {
       // 校验在状态机内完成；失败**不改状态**（§6.6）。主进程 handler 负责 `event.sender` 校验与推送。
-      return shellJudgeSwitch.set(input);
+      return { ...shellJudgeSwitch.set(input), available: true };
     },
     resetShellJudgeState(): void {
       shellJudgeSwitch.reset();
+    },
+
+    // 「替我决策」（2026-10-18 双开关评审 §3.3）：同形第二套；与 approval **互不影响**。
+    getDecisionJudgeState(): ShellJudgeStateReply & { ok: true; enabled: boolean } {
+      return { ...decisionJudgeSwitch.get(), available: true };
+    },
+    setDecisionJudgeEnabled(input: unknown): ShellJudgeStateReply {
+      return { ...decisionJudgeSwitch.set(input), available: true };
+    },
+    resetDecisionJudgeState(): void {
+      decisionJudgeSwitch.reset();
+    },
+
+    /**
+     * 代批结果行落主入口进度行（§8.3，best-effort）：只经既有事件流落系统 `message` 行
+     * （`detail.source:"judge-decision"`），**不造第二张可作答卡**；失败只记诊断，不影响已完成的决定。
+     */
+    emitJudgeProgress(payload: OperatorJudgeResultPayload): void {
+      const projectRoot =
+        typeof payload.projectRoot === "string" && payload.projectRoot !== "" ? payload.projectRoot : importedProjectRoot;
+      if (projectRoot === undefined || projectRoot === "") return;
+      const primaryRoleId = listingCache.get(projectRoot)?.primaryRoleId;
+      if (typeof primaryRoleId !== "string" || primaryRoleId === "") return;
+      if (primaryRoleId === payload.roleId) return; // 来源即主入口：结果行已在该角色流中，不重复
+      try {
+        emitSessionEvent({
+          roleId: primaryRoleId,
+          projectRoot,
+          runtime: payload.runtime ?? payload.engine,
+          event: { kind: "message", summary: judgeResultSummary(payload), detail: { source: "judge-decision" } },
+        });
+      } catch (error) {
+        createDiagnosticLogger({ component: "desktop.interface", projectRoot }).error("governance-judge.progress.failed", error, {
+          requestId: payload.requestId,
+          group: payload.group,
+          cardKind: payload.cardKind,
+        });
+      }
     },
 
     async openSession(input): Promise<OpenResult> {

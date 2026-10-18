@@ -10,3 +10,5 @@
 - [推理强度与推理事件（G-5 wave 2）](docs/change/2026-10-16_change_g5-reasoning-effort.md)：请求面四档 `-c model_reasoning_effort`（off/未设零注入＋如实行）；推理完成态 item 恰一行事实（增量零行、不隔离、durationMs 真实信号）；网关拒绝 ⇒ 保守识别＋恰一次去参数重发（重建进程）。探针记录见 [probe_reasoning-surface](docs/change/2026-10-16-probe_reasoning-surface.md)。真实网关接受面属验收轮。
 
 - 整轮最后兜底（2026-10-17）：Codex 不再无整轮上限——`promptTimeoutMs` 仅作看护到点检查（不中止），整轮上限＝`turnLastResortMs`（缺省 1 小时，运行时核心常量；确认卡等待期间暂停）。到点中止的 failure/settled 文案写「最后兜底」，与到点检查区分；outcome 仍 `timed_out`。见 [changelog](changelog.md)。
+
+- [治理 judge 会话（「替我审批」/「替我决策」，P3c）](docs/change/2026-10-18_change_codex-governance-judge.md)：`judgeMode` 复用——allowlist 改为运行时核心并集 `ALL_JUDGE_TOOL_NAMES`，只接受 shell 或治理任一冻结三工具集；治理会话恰注册 `judge_read_file`/`judge_list_dir`/`report_governance_judgement`，系统提示点名治理 report；web search/MCP/持久化/写与交互面结构性关闭，原生泄漏隔离；shell 工具面与普通会话逐字不变。离线测试覆盖并集 allowlist/拒绝矩阵、report 原样回调、隔离与普通模式不回归。

@@ -555,7 +555,7 @@ export function formatJudgeDenyReason(outcome: Pick<ShellJudgeOutcome, "reason" 
   if (outcome.alternative !== undefined) {
     lines.push(`替代方案（${outcome.alternative.kind}）：${outcome.alternative.value}`);
   }
-  lines.push("出路：如需执行，请关闭「替我审」后重试。");
+  lines.push("出路：如需执行，请关闭「替我审批」后重试。");
   return lines.join("\n");
 }
 

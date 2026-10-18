@@ -1898,6 +1898,8 @@ button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus
   color: var(--danger);
 }
 .composer-judge-status[hidden] { display: none; }
+/* 中性/禁用说明（如 single 下「替我决策」不可用）：琥珀提示，不是错误红。 */
+.composer-judge-status.is-note { color: var(--amber); }
 
 /* 一次性开启提示（客户 2026-10-18「这个提示应该弹出只出现一次就行了」）：
    浮在输入区上方——**不占聊天布局、不推动消息区**（绝对定位于 .composer 的定位上下文）；
@@ -1990,9 +1992,14 @@ button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus
 .sj-evidence { margin: 2px 0 4px; padding-left: 18px; }
 .sj-evidence li { word-break: break-word; }
 
+/* 治理代批结果行（`session:operator-judge`）：与客户手批卡区分——标题用琥珀，不冒充客户操作。 */
+.governance-judge-row .sj-title { color: var(--amber); }
+
 /* 手动回落卡提示（`#sc-judge-notice`；无值隐藏；琥珀色，与原因行分开）。 */
 .sc-judge-notice { margin: 0; color: var(--amber); font-size: 12px; line-height: 1.6; }
 .sc-judge-notice[hidden] { display: none; }
+/* 交互卡（治理方向卡）的手动回落提示：主进程给的人话原因，原样转义呈现。 */
+.op-judge-notice { margin: 6px 0 0; color: var(--amber); font-size: 12px; line-height: 1.6; }
 
 /* —————— W4 治理三权（2026-10-17 评审 §8）：左树组/副标题、状态行、模型选择、决定卡 ——————
    只加呈现钩子；900 内容列与整页等宽字体未动（新文字均继承 --sans/--mono）。 */

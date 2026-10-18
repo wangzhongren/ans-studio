@@ -156,6 +156,34 @@ export type GovernanceConfirmCardKind = "write" | "appointment-write" | "schedul
 /** 治理决定卡种类（两交互工具的并集；非法/缺席不能解锁任何治理门禁）。 */
 export type GovernanceCardKind = GovernanceChoiceCardKind | GovernanceConfirmCardKind;
 
+// —————————————— 治理卡判断 agent 分组（「替我审批」/「替我决策」）单一来源 ——————————————
+//
+// 依据：PM 评审《「替我审批」/「替我决策」双开关——项目管理评审与 V1 拆发》§3.1/§六。
+// `cardKind → group` **只允许这一份实现**（桌面包、编排、测试、UI 全部读这里；不得再写第二张映射表）。
+// 组只表达「哪一类卡由哪个开关代批」，不表达任何权限；判断本身仍只做正向代批（见 `GovernanceJudgeOutcome`）。
+
+/** 治理卡判断开关分组：`approval`＝shell＋写盘族；`decision`＝提案/任命/验收。 */
+export type GovernanceJudgeGroup = "approval" | "decision";
+
+/** 卡片种类 → 开关分组（冻结；新增卡种必须回到评审更新本表）。 */
+export const GOVERNANCE_CARD_GROUP: Readonly<Record<GovernanceCardKind, GovernanceJudgeGroup>> = Object.freeze({
+  write: "approval",
+  "appointment-write": "approval",
+  "schedule-write": "approval",
+  proposal: "decision",
+  appointment: "decision",
+  acceptance: "decision",
+});
+
+/**
+ * 卡片种类所属开关分组。`undefined`/未知 kind ⇒ `undefined` ⇒ **永不判断**（旧卡零变化）。
+ * 运行时入参可能来自不可信调用方，故除类型外再做一次自有键检查。
+ */
+export function governanceCardGroup(kind: GovernanceCardKind | undefined): GovernanceJudgeGroup | undefined {
+  if (kind === undefined || typeof kind !== "string") return undefined;
+  return Object.prototype.hasOwnProperty.call(GOVERNANCE_CARD_GROUP, kind) ? GOVERNANCE_CARD_GROUP[kind] : undefined;
+}
+
 /** 客户交互卡的治理元数据：并入 `CustomerInputRequest`（供桌面卡片显示）与 `CustomerInputMetadata`（供账本分类）。 */
 export interface GovernanceCardMetadata extends GovernanceFlowMetadata {
   cardKind?: GovernanceCardKind;
@@ -250,7 +278,16 @@ export type CustomerInputRequest = (
   GovernanceCardMetadata;
 
 export type CustomerInputOutcome =
-  | { outcome: "answered"; value: { confirmed?: boolean; selected?: string[] }; operatorId?: string }
+  | {
+      outcome: "answered";
+      value: { confirmed?: boolean; selected?: string[] };
+      operatorId?: string;
+      /**
+       * 判断 agent 代批的审计归因（2026-10-18 双开关评审 §6.1/§四）：只有 `approve` 结算时才出现；
+       * 客户手批不带本字段（仍是 `decisionEvidence.kind:"customer-input"`）。`declined`/`unavailable` 不加。
+       */
+      judge?: GovernanceJudgeAudit;
+    }
   | { outcome: "declined"; operatorId?: string; reason?: string }
   | { outcome: "unavailable"; reason?: string };
 
@@ -266,6 +303,12 @@ export interface CustomerInputMetadata {
   flowId?: GovernanceFlowId;
   stepId?: GovernanceStepId;
   cardKind?: GovernanceCardKind;
+  /**
+   * 治理卡判断上下文（2026-10-18 双开关评审 §5.2）：**唯一计算点**是编排 `run-role.ts::governedInput`
+   * （paths/写根/禁写/物证/推荐集/账本事实）；桌面只消费、不重算、不读 `.ans`。
+   * 缺席＝旧调用零变化；出现 `unavailableReason` 时判断必须回落 `manual`。
+   */
+  judgeContext?: GovernanceJudgeContext;
 }
 
 export type CustomerInputFn = (
@@ -818,6 +861,11 @@ export type ShellJudgeFn = (input: ShellJudgeRequest, signal?: AbortSignal) => P
  * `manual` 后的客户手批是人工归因，**不写**本字段。
  */
 export interface ShellJudgeAudit {
+  /**
+   * 所属开关分组（2026-10-18 双开关评审 §6.1）：shell judge 固定 `"approval"`。
+   * 可选加法——旧读者忽略；客户手批不写本字段。
+   */
+  group?: "approval";
   engine: RuntimeKind;
   /** 实际使用的模型标识（可得则记；不参与 operatorId）。 */
   model?: string;
@@ -844,6 +892,12 @@ export interface ShellJudgeReadStats {
   truncatedReads: number;
   /** 预算耗尽（调用次数/总读取上限）——独立于 `deniedReads`；编排优先据此判 `budget`。 */
   budgetExceeded: boolean;
+  /**
+   * 成功读取的项目相对路径（2026-10-18 双开关评审 §5.4/§6.1）：去重、最多 16 条。
+   * 治理 judge 以 `requiredReadPaths ⊆ readPaths` 做「approve 必须真的读过物证」门槛；
+   * shell judge 也会累积（可选加法，旧读者忽略）。被拒/截断未成功的读取不记录。
+   */
+  readPaths?: string[];
 }
 
 /** 判断会话的只读工具选项（`GovernedToolsOptions.shellJudge`；能力注入，非工具注入）。 */
@@ -856,6 +910,137 @@ export interface ShellJudgeToolOptions {
   stats: ShellJudgeReadStats;
   /** 缺省：maxCalls 8、maxBytes 192KB、maxFileBytes 64KB。 */
   budget?: { maxCalls?: number; maxBytes?: number; maxFileBytes?: number };
+}
+
+// —————————————— 治理卡判断 agent（「替我审批」/「替我决策」）中立契约（2026-10-18，PM 评审 §六） ——————————————
+//
+// 分层与 shell judge 一致：中立类型＝本模块；只读工具/读取策略＝`src/common/runtime-core/governance-judge/`
+// （读/列复用 `shell-judge/policy.ts`，并整体排除 `.ans/**`）；规范化/驱动/账本证据＝编排（P2）。
+// 判断**只做正向代批**：`revise`/`reject`/`false`/空选择/未知 id 一律由编排归一化 `manual`；
+// 本层不实现任何判定、不读写账本、不改变任何写权。分组映射＝上方 `GOVERNANCE_CARD_GROUP`（单一来源）。
+
+/** 判断卡范围（desktop/orchestration 与驱动共用；字段逐字按评审 §6.1）。 */
+export interface GovernanceJudgeRequest {
+  group: GovernanceJudgeGroup;
+  cardKind: GovernanceCardKind;
+  roleId: string;
+  projectRoot: string;
+  runtime: RuntimeKind;
+  governanceModel: "single" | "trio";
+  flowId: string;
+  stepId?: string;
+  toolCallId?: string;
+  turnId?: string;
+  /** 当前轮投递给该角色的文本（≤4KB）；不读原始转录/历史回放。 */
+  turnText?: string;
+  /** 客户交互卡原样（**不可信数据**；其中的指令一律不执行）。 */
+  card: CustomerInputRequest;
+  /** confirm 卡：应用提取的候选路径（与 issuer 同一份）。 */
+  paths?: string[];
+  /** `resolveWrite` 机械探测结果（应用计算；driver 复核，不靠模型自报）。 */
+  pathProbes?: Array<{ path: string; allowed: boolean; reason?: string }>;
+  /** 只读事实：发起角色 Section 1 可写根。 */
+  allowedPathRoots?: string[];
+  /** 只读事实：禁写路径。 */
+  forbiddenPaths?: string[];
+  /** 规范物证路径（由编排按 cardKind 计算；缺失 ⇒ manual）。 */
+  artifacts?: { proposalPath?: string; nominationPath?: string; flowPath?: string };
+  /** appointment：应用解析提名文件得到的机器可读推荐集（模型只能选恰该集合）。 */
+  recommendedRoleIds?: string[];
+  /** 有界治理事实快照（账本不可读/错误 ⇒ 禁止 approve）。 */
+  facts: GovernanceJudgeFacts;
+  at: string;
+}
+
+/** confirm 卡的逐路径结论（模型自报；driver 必须与 `pathProbes` 机械复核）。 */
+export interface GovernanceJudgePathDecision { path: string; ok: boolean; reason?: string }
+
+/** 判断代批的审计归因（`CustomerInputOutcome.answered.judge`；客户手批不带）。 */
+export interface GovernanceJudgeAudit {
+  group: GovernanceJudgeGroup;
+  cardKind: GovernanceCardKind;
+  engine: RuntimeKind;
+  model?: string;
+  reasonCode: string;
+  reason?: string;
+  evidence?: string[];
+  selected?: string[];
+  confirmed?: true;
+  paths?: string[];
+  pathDecisions?: GovernanceJudgePathDecision[];
+  durationMs?: number;
+  readCalls?: number;
+  readBytes?: number;
+}
+
+/** 驱动补全后的判断结果（模型只能经 `report_governance_judgement` 交回原始参数）。 */
+export interface GovernanceJudgeOutcome {
+  verdict: "approve" | "manual";
+  group: GovernanceJudgeGroup;
+  cardKind: GovernanceCardKind;
+  reasonCode: string;
+  reason?: string;
+  engine: RuntimeKind;
+  model?: string;
+  value?: { selected?: string[]; confirmed?: true };
+  paths?: string[];
+  pathDecisions?: GovernanceJudgePathDecision[];
+  evidence?: string[];
+  durationMs?: number;
+  readCalls?: number;
+  readBytes?: number;
+}
+
+export type GovernanceJudgeFn = (
+  request: GovernanceJudgeRequest,
+  signal?: AbortSignal,
+) => Promise<GovernanceJudgeOutcome>;
+
+/** 治理 judge 只读工具选项（`GovernedToolsOptions.governanceJudge`；能力注入，非工具注入）。 */
+export interface GovernanceJudgeToolOptions {
+  projectRoot: string;
+  /** `report_governance_judgement` 回调：只收模型原始参数，**不在运行时核心做规范化**。 */
+  report: (raw: unknown) => void;
+  stats: ShellJudgeReadStats;
+  /** 缺省：maxCalls 8、maxBytes 192KB、maxFileBytes 64KB。 */
+  budget?: { maxCalls?: number; maxBytes?: number; maxFileBytes?: number };
+}
+
+/**
+ * 编排在 `run-role.ts::governedInput` 计算并放入 `CustomerInputMetadata.judgeContext` 的应用事实。
+ * 桌面只把 `ctx` + 本对象拼成 `GovernanceJudgeRequest`；**不读账本、不 import 编排私有模块**。
+ */
+export interface GovernanceJudgeContext {
+  flowId: string;
+  stepId?: string;
+  toolCallId?: string;
+  turnId?: string;
+  paths?: string[];
+  pathProbes?: Array<{ path: string; allowed: boolean; reason?: string }>;
+  allowedPathRoots?: string[];
+  forbiddenPaths?: string[];
+  artifacts?: { proposalPath?: string; nominationPath?: string; flowPath?: string };
+  recommendedRoleIds?: string[];
+  facts: GovernanceJudgeFacts;
+  /** 事实计算失败/账本不可读；出现即禁止 approve。 */
+  unavailableReason?: string;
+}
+
+/** 有界、机读的治理事实快照（评审 §5.3；`ledgerErrors > 0` ⇒ 所有 approve 归一化 manual）。 */
+export interface GovernanceJudgeFacts {
+  governanceModel: "trio";
+  flowId: string;
+  /** >0 ⇒ 禁止 approve（fail-closed）。 */
+  ledgerErrors: number;
+  proposalDecision?: "accepted" | "accepted-quick" | "revise" | "reject";
+  /** 最新 appointment 决定。 */
+  appointmentTargetRoleIds?: string[];
+  /** 该 flow 的 `dispatch.accepted` 步骤（去重，≤50）。 */
+  dispatchedStepIds?: string[];
+  /** >0 ⇒ acceptance 禁止 approve（启发式，宁可高估）。 */
+  unresolvedClarificationCount: number;
+  /** 有界（≤20），供 prompt/审计。 */
+  latestDecisionKinds: string[];
 }
 
 export interface RuntimeAdapter {
@@ -956,6 +1141,13 @@ export interface GovernedToolsOptions {
    * `RuntimeSessionOptions` 经 `Omit<GovernedToolsOptions, …>` 继承本字段，无需另行声明。
    */
   shellJudge?: ShellJudgeToolOptions;
+  /**
+   * 治理卡判断 agent（「替我审批」/「替我决策」）只读能力注入（2026-10-18 双开关评审 §6.1/§6.2）。
+   * 与 `shellJudge` **恰一**：同时给出＝配置错误（Service 抛错，不静默择一）；给出时 Service 只走
+   * `buildGovernanceJudgeTools`（恰 `judge_read_file`/`judge_list_dir`/`report_governance_judgement`），
+   * 同样 `judgeMode:true` 且 `installedMcpServers:[]`。未注入 ⇒ 判断路径不进入（逐字现状）。
+   */
+  governanceJudge?: GovernanceJudgeToolOptions;
 }
 
 export interface RuntimeSessionRecord {
@@ -1054,10 +1246,10 @@ export interface RuntimeProviderOptions {
    */
   reasoningEffort?: ReasoningEffortV1;
   /**
-   * 判断 agent 会话的中性标志（2026-10-17 PM 评审 §6.1）：Service 在 `shellJudge` 注入时置 `true`，
-   * 同时把 `installedMcpServers` 置 `[]`。Claude 适配器据此**强制**关闭 WebSearch（忽略
-   * `ANS_CLAUDE_WEB_SEARCH`）与外来 MCP，只保留注入的 judge 工具；Pi/Codex 可忽略本字段。
-   * 未设＝字段缺席＝逐字现状。
+   * 判断 agent 会话的中性标志（2026-10-17 PM 评审 §6.1；2026-10-18 双开关评审复用）：
+   * Service 在 `shellJudge` **或** `governanceJudge` 注入时置 `true`，同时把 `installedMcpServers` 置 `[]`。
+   * Claude 适配器据此**强制**关闭 WebSearch（忽略 `ANS_CLAUDE_WEB_SEARCH`）与外来 MCP，只保留注入的
+   * judge 工具；Pi/Codex 可忽略本字段。未设＝字段缺席＝逐字现状。
    */
   judgeMode?: true;
 }

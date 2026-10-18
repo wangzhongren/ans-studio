@@ -62,7 +62,7 @@ test("项目根内可读（相对/绝对）；根外、`..`、符号链接逃逸
     await writeFile(path.join(outside, "secret.txt"), "OUTSIDE_SECRET", "utf8");
     await symlink(outside, path.join(root, "escape"), "junction");
 
-    const { byName } = fixture(root);
+    const { byName, stats } = fixture(root);
     const inside = await byName.get(SHELL_JUDGE_READ_TOOL)!.handler(call(SHELL_JUDGE_READ_TOOL, { path: "src/app.ts" }));
     assert.equal(inside.ok, true);
     assert.match(inside.message, /judge_read_file: src\/app\.ts/);
@@ -83,6 +83,9 @@ test("项目根内可读（相对/绝对）；根外、`..`、符号链接逃逸
     const escape = await byName.get(SHELL_JUDGE_READ_TOOL)!.handler(call(SHELL_JUDGE_READ_TOOL, { path: "escape/secret.txt" }));
     assert.equal(escape.ok, false);
     assert.equal(escape.message.includes("OUTSIDE_SECRET"), false);
+
+    // 2026-10-18 双开关评审 §5.4：成功读取的项目相对路径去重累积；被拒/越界读取不记录。
+    assert.deepEqual(stats.readPaths, ["src/app.ts"]);
   } finally {
     await rm(root, { recursive: true, force: true });
     await rm(outside, { recursive: true, force: true });
@@ -112,7 +115,7 @@ test("敏感文件/目录拒绝：.env、私钥、凭据/令牌、.git、审计�
     for (const payload of [".env", ".env.local", "keys/server.pem", "credentials.json", "my-token.txt", "docs/audit/a.md", ".ans/sessions/x.jsonl", ".git/config"]) {
       const result = await byName.get(SHELL_JUDGE_READ_TOOL)!.handler(call(SHELL_JUDGE_READ_TOOL, { path: payload }));
       assert.equal(result.ok, false, `${payload} 必须被拒绝`);
-      assert.match(result.message, /敏感/);
+      assert.match(result.message, /敏感|应用私有数据/);
     }
 
     // 8 次被拒读取也占调用预算；列表用独立会话统计（同一预算语义）。
@@ -120,15 +123,16 @@ test("敏感文件/目录拒绝：.env、私钥、凭据/令牌、.git、审计�
     assert.equal(listing.ok, true);
     assert.match(listing.message, /README\.md/);
     assert.match(listing.message, /src\//, "目录名以 / 结尾");
-    for (const hidden of [".env", ".env.local", "credentials.json", "my-token.txt", ".git"]) {
+    for (const hidden of [".env", ".env.local", "credentials.json", "my-token.txt", ".git", ".ans"]) {
       assert.equal(listing.message.includes(hidden), false, `列表不得列出敏感项 ${hidden}`);
     }
     const docsList = await fixture(root).byName.get(SHELL_JUDGE_LIST_TOOL)!.handler(call(SHELL_JUDGE_LIST_TOOL, { path: "docs" }));
     assert.equal(docsList.ok, true);
     assert.equal(docsList.message.includes("audit"), false, "docs/audit 不得列名");
+    // 2026-10-18 双开关评审 §6.3 收紧：整棵 `.ans/**` 硬排除——`.ans` 本身也不可列（含账本/会话）。
     const ansList = await fixture(root).byName.get(SHELL_JUDGE_LIST_TOOL)!.handler(call(SHELL_JUDGE_LIST_TOOL, { path: ".ans" }));
-    assert.equal(ansList.ok, true);
-    assert.equal(ansList.message.includes("sessions"), false, ".ans/sessions 不得列名");
+    assert.equal(ansList.ok, false, ".ans 整体拒绝，不再是「可列但隐藏 sessions」");
+    assert.match(ansList.message, /应用私有数据/);
 
     // 敏感目录本身也不可列。
     const sensitiveDir = await fixture(root).byName.get(SHELL_JUDGE_LIST_TOOL)!.handler(call(SHELL_JUDGE_LIST_TOOL, { path: ".git" }));
@@ -147,7 +151,10 @@ test("敏感文件/目录拒绝：.env、私钥、凭据/令牌、.git、审计�
     assert.equal(sensitiveClass([".env"]), "env");
     assert.equal(sensitiveClass(["keys", "server.pem"]), "key-material");
     assert.equal(sensitiveClass(["docs", "audit", "x.md"]), "audit");
-    assert.equal(sensitiveClass([".ans", "sessions", "x.jsonl"]), "session");
+    // 2026-10-18 收紧：任何 `.ans` 段 ⇒ app-private（含账本/会话/应用文件）。
+    assert.equal(sensitiveClass([".ans"]), "app-private");
+    assert.equal(sensitiveClass([".ans", "sessions", "x.jsonl"]), "app-private");
+    assert.equal(sensitiveClass([".ans", "governance", "ledger.jsonl"]), "app-private");
   } finally {
     await rm(root, { recursive: true, force: true });
   }

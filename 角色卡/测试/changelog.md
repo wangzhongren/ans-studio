@@ -1,5 +1,17 @@
 # 测试 变更记录
 
+## 2026-10-18 — 双开关「替我审批/替我决策」+ 治理判断 agent 独立验证：本批 42/42；全量 2896/2877/16红/3skip（新增红 0）；typecheck 0
+
+**验证对象**：PM 评审 `2026-10-18_design_judge-governance-cards-review.md` §三–§九/§十二（AC1–AC26）已落地实现。
+
+**新增套件**：`test/测试/governance-judge-cards-verify/`（`fixture.ts` + 6 文件 **41 例**）——双开关矩阵（都关/仅 approval/仅 decision/都开/独立性）；六卡种与 accept-quick（proposal/appointment 推荐集/写盘三卡逐路径/acceptance 最高门槛）；required-read 与机械复核；回落矩阵（证据不足/读失败/超时/引擎不可用/解析失败/无 cardKind/single/su/按组隔离/结果行失败/判断中关开关/中止关窗/driver busy）；账本审计（`decisionEvidence.kind:"judge"` + group/cardKind/engine/model/reason/evidence/selected/paths；客户手答仍 `customer-input`）；一项目一卡/同一 id 只答一次/judging 占卡/`onNextStep` 恰一次/replay 不重判；UI（两复选框、一次性警告、结果行、notice、桥缺失/single 禁用、preload 四方法、主进程按组接线）。
+
+**旧断言修正（未放宽）**：`shell-judge-verify` 4 文件 7 条——标签「替我审」→「替我审批」、警告三行→按组四行、结果行/deny 档/retryHint 增「代审批」、`.ans` 整体 app-private（含账本）且列表整体拒绝。
+
+**结果**：本批 **41/41**；`shell-judge-verify` **36/36**；全量 **2893 / 2874 pass / 16 fail / 3 skip**（**新增红 0**；既有红 16＝Windows symlink EPERM 9、子进程中止时序 1、markdown vendor pin 1、桌面 renderer/runtime-ui 源码钉 5）；`npm run typecheck` → **0 错**。
+
+**复审（同日）**：属主修复两项观察——① 编排 acceptance 补机械门槛（流程各步 done、每步有 `dispatch.accepted`、无阻塞/未结算决定/未闭环澄清，否则 manual）；② shell 出路统一「关闭『替我审批』后重试」。本角色新增 acceptance 机械门槛 5 例（pending/缺 dispatch/blocked/无步骤表/unclassified），并把 `b-deny-flow` 的 `EXIT_LINE`/reason 断言同步为新口径；复跑本批 **42/42**、`shell-judge-verify` **36/36**、全量 **2896 / 2877 pass / 16 fail / 3 skip**（新增红 0）、typecheck **0 错**。残余仅 single/无 cardKind 按契约无 notice 与已登记风险。详见[报告](docs/fix/2026-10-18_verify_governance-judge-cards.md)。未 commit/push。
+
 ## 2026-10-18（复审 2）— 桌面契约更新（write 卡镜像等）后 reverified：本批 35/35；全量 2780/2761/16红/3skip（新增红 0）；typecheck 0
 
 **契约更新**：桌面侧治理角色 settle 后刷新 listing；`routeDispatch`/`role_status` miss 时强制刷新一次；任命后等 Nominator 写完再派 Convener；**镜像白名单新增普通 `write` 卡**（报告员写入确认也镜像到联络官）。

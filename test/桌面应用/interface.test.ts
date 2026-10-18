@@ -1265,9 +1265,9 @@ test("C2 write-failed：同样清列举缓存并通知（让界面如实反映�
 
 test("替我审开关：主进程权威、默认 false；成功切换；非法输入失败且**不改状态**；reset 复位", async () => {
   const iface = createDesktopInterface({ pickDirectory: async () => null, emitEvent: () => {} });
-  assert.deepEqual(iface.getShellJudgeState(), { version: 1, ok: true, enabled: false }, "启动默认 false");
-  assert.deepEqual(iface.setShellJudgeEnabled({ enabled: true }), { version: 1, ok: true, enabled: true });
-  assert.deepEqual(iface.getShellJudgeState(), { version: 1, ok: true, enabled: true });
+  assert.deepEqual(iface.getShellJudgeState(), { version: 1, ok: true, enabled: false, available: true }, "启动默认 false");
+  assert.deepEqual(iface.setShellJudgeEnabled({ enabled: true }), { version: 1, ok: true, enabled: true, available: true });
+  assert.deepEqual(iface.getShellJudgeState(), { version: 1, ok: true, enabled: true, available: true });
   const before = iface.getShellJudgeState();
   for (const bad of [null, undefined, {}, { enabled: "yes" }, { enabled: 1 }, { enabled: true, extra: 1 }, []]) {
     const result = iface.setShellJudgeEnabled(bad);
@@ -1363,6 +1363,186 @@ test("替我审接线：Interface 构造会话时用注入的 createShellJudge�
   await capturedChannel!({ command: "ls", argv: ["ls"], cwd: "/proj", toolCallId: "i1" });
   assert.equal(metadataSeen[0]?.judge, judge, "metadata.judge 即每会话闭包");
   await iface.stopSession({ roleId: null });
+  iface.disposeProjectDocuments();
+});
+
+// —————————————— 2026-10-18 双开关：「替我决策」开关/IPC 接线与判断闭包 ——————————————
+
+test("替我决策开关：默认 false、与 approval **互不影响**；非法输入不改状态；reset 只复位自己", async () => {
+  const iface = createDesktopInterface({ pickDirectory: async () => null, emitEvent: () => {} });
+  assert.deepEqual(
+    iface.getDecisionJudgeState(),
+    { version: 1, ok: true, enabled: false, available: true },
+    "decision 启动默认 false（available 由主进程驱动接线决定）",
+  );
+  assert.equal(iface.setShellJudgeEnabled({ enabled: true }).ok, true);
+  assert.equal(iface.getDecisionJudgeState().enabled, false, "approval 开启不影响 decision");
+  assert.equal(iface.setDecisionJudgeEnabled({ enabled: true }).ok, true);
+  assert.equal(iface.getShellJudgeState().enabled, true, "decision 开启不影响 approval");
+  const before = iface.getDecisionJudgeState();
+  for (const bad of [null, undefined, {}, { enabled: "yes" }, { enabled: 1 }, { enabled: true, extra: 1 }, []]) {
+    const result = iface.setDecisionJudgeEnabled(bad);
+    assert.equal(result.ok, false, `非法输入应拒绝：${JSON.stringify(bad)}`);
+    assert.equal(typeof result.error, "string");
+    assert.deepEqual(iface.getDecisionJudgeState(), before, "失败不改状态");
+  }
+  iface.resetDecisionJudgeState();
+  assert.equal(iface.getDecisionJudgeState().enabled, false, "reset ⇒ 手动（重载复位）");
+  assert.equal(iface.getShellJudgeState().enabled, true, "复位 decision 不动 approval");
+  iface.resetShellJudgeState();
+  assert.equal(iface.getShellJudgeState().enabled, false);
+});
+
+/** trio 枚举（主入口 liaison + 提案角色 rapporteur）。 */
+const JUDGE_TRIO_LISTING: ProjectListing = {
+  projectRoot: "/trio-judge",
+  roles: [
+    { roleId: "liaison", cardPath: "", boundaryPath: "", cardText: "# liaison", boundary: { entries: [], boundarySource: "<built-in:trio/liaison>", acceptance: { accepted: true, source: "test" } }, builtIn: true, governanceFunction: "liaison" },
+    { roleId: "rapporteur", cardPath: "", boundaryPath: "", cardText: "# rapporteur", boundary: { entries: [], boundarySource: "<built-in:trio/rapporteur>", acceptance: { accepted: true, source: "test" } }, builtIn: true, governanceFunction: "proposal" },
+  ],
+  warnings: [],
+  hasRoles: true,
+  primaryRoleId: "liaison",
+  governanceModel: "trio",
+};
+
+test("替我决策接线：trio 会话构造 governanceJudge 闭包并放入 customerInput ctx；judgeContext 原样透传", async () => {
+  const judge = async () => ({
+    verdict: "manual" as const,
+    group: "decision" as const,
+    cardKind: "proposal" as const,
+    reasonCode: "insufficient-evidence",
+    engine: "pi" as const,
+  });
+  let factoryCalls = 0;
+  let captured: { customerInput?: CustomerInputFn } | undefined;
+  const ctxSeen: { governanceModel?: string; governanceJudge?: unknown }[] = [];
+  const metaSeen: unknown[] = [];
+  const iface = createDesktopInterface({
+    pickDirectory: async () => "/trio-judge",
+    emitEvent: () => {},
+    listProjectFn: async () => JUDGE_TRIO_LISTING,
+    openRoleSessionFn: async (input) => {
+      captured = input as unknown as { customerInput?: CustomerInputFn };
+      return makeFakeHandle().handle;
+    },
+    customerInput: (_req, ctx, metadata) => {
+      ctxSeen.push(ctx as { governanceModel?: string; governanceJudge?: unknown });
+      metaSeen.push(metadata);
+      return { outcome: "declined", reason: "替身：拒绝" };
+    },
+    createGovernanceJudgeFn: (opts) => {
+      factoryCalls += 1;
+      assert.equal(opts.runtime, "pi");
+      assert.equal(typeof opts.createAdapter, "function", "用会话同一 createAdapter 工厂");
+      return judge;
+    },
+    loadEffectiveConfig: async (opts) => ({
+      project: opts.fallback,
+      source: {
+        kind: "builtin-fallback" as const,
+        path: "",
+        acceptance: opts.fallback.governanceBoundary!.acceptance,
+        pinPaths: [],
+      },
+    }),
+  });
+  await iface.listProject({ projectRoot: "/trio-judge" });
+  const opened = await iface.openSession({ projectRoot: "/trio-judge", roleId: "rapporteur", runtime: "pi" });
+  assert.equal(opened.ok, true);
+  assert.equal(factoryCalls, 1, "trio + 客户通道会话构造治理判断闭包");
+  assert.ok(captured?.customerInput, "Rapporteur 注入客户通道");
+  const judgeContext = {
+    flowId: "flow-a",
+    facts: { governanceModel: "trio" as const, flowId: "flow-a", ledgerErrors: 0, unresolvedClarificationCount: 0, latestDecisionKinds: [] },
+  };
+  await captured!.customerInput!(
+    { kind: "choice", title: "提案", cardKind: "proposal", flowId: "flow-a", options: [{ id: "accept", label: "接受" }] },
+    { cardKind: "proposal", flowId: "flow-a", judgeContext },
+  );
+  assert.equal(ctxSeen[0].governanceModel, "trio", "ctx 带治理模型（通道的判断门只认 trio）");
+  assert.equal(ctxSeen[0].governanceJudge, judge, "ctx 带每会话判断闭包");
+  assert.deepEqual((metaSeen[0] as { judgeContext?: unknown }).judgeContext, judgeContext, "run-role 的 judgeContext 原样透传");
+  await iface.stopSession({ roleId: null });
+  iface.disposeProjectDocuments();
+});
+
+test("替我决策接线：single/su 不构造治理判断闭包（ctx 无 governanceJudge）", async () => {
+  const single: ProjectListing = {
+    projectRoot: "/single-judge",
+    roles: [
+      { roleId: "su", cardPath: "", boundaryPath: "", cardText: "# su", boundary: { entries: [], boundarySource: "<built-in>", acceptance: { accepted: true, source: "test" } }, builtIn: true },
+    ],
+    warnings: [],
+    hasRoles: true,
+    primaryRoleId: "su",
+    governanceModel: "single",
+  };
+  let factoryCalls = 0;
+  let captured: { customerInput?: CustomerInputFn } | undefined;
+  const ctxSeen: { governanceModel?: string; governanceJudge?: unknown }[] = [];
+  const iface = createDesktopInterface({
+    pickDirectory: async () => "/single-judge",
+    emitEvent: () => {},
+    listProjectFn: async () => single,
+    openRoleSessionFn: async (input) => {
+      captured = input as unknown as { customerInput?: CustomerInputFn };
+      return makeFakeHandle().handle;
+    },
+    customerInput: (_req, ctx) => {
+      ctxSeen.push(ctx as { governanceModel?: string; governanceJudge?: unknown });
+      return { outcome: "declined", reason: "替身：拒绝" };
+    },
+    createGovernanceJudgeFn: () => {
+      factoryCalls += 1;
+      return async () => ({ verdict: "manual", group: "decision", cardKind: "proposal", reasonCode: "x", engine: "pi" });
+    },
+    loadEffectiveConfig: async (opts) => ({
+      project: opts.fallback,
+      source: { kind: "builtin-fallback" as const, path: "", acceptance: opts.fallback.governanceBoundary!.acceptance, pinPaths: [] },
+    }),
+  });
+  await iface.listProject({ projectRoot: "/single-judge" });
+  assert.equal((await iface.openSession({ projectRoot: "/single-judge", roleId: "su", runtime: "pi" })).ok, true);
+  assert.equal(factoryCalls, 0, "single 不构造判断闭包");
+  await captured!.customerInput!({ kind: "choice", title: "提案", cardKind: "proposal", flowId: "flow-a", options: [{ id: "accept", label: "接受" }] });
+  assert.equal(ctxSeen[0].governanceModel, "single");
+  assert.equal(ctxSeen[0].governanceJudge, undefined, "single/su 不注入判断能力");
+  await iface.stopSession({ roleId: null });
+  iface.disposeProjectDocuments();
+});
+
+test("代批进度行：落主入口 Liaison（detail.source=judge-decision）；来源即主入口不重复", async () => {
+  const events: SessionEventEnvelope[] = [];
+  const iface = createDesktopInterface({
+    pickDirectory: async () => "/trio-judge",
+    emitEvent: (envelope) => { events.push(envelope); },
+    listProjectFn: async () => JUDGE_TRIO_LISTING,
+  });
+  await iface.listProject({ projectRoot: "/trio-judge" });
+  const payload = {
+    version: 1 as const,
+    id: "gj-1",
+    requestId: "op-1",
+    anchorKey: "k",
+    toolCallId: "t1",
+    roleId: "rapporteur",
+    at: "2026-10-18T00:00:00.000Z",
+    group: "decision" as const,
+    cardKind: "proposal" as const,
+    flowId: "flow-a",
+    engine: "pi" as const,
+    reasonCode: "sufficient",
+  };
+  iface.emitJudgeProgress(payload);
+  const messages = events.filter((envelope) => envelope.event.kind === "message");
+  assert.equal(messages.length, 1);
+  assert.equal(messages[0].roleId, "liaison", "进度行落主入口");
+  const messageEvent = messages[0].event as { summary?: string; detail?: { source?: string } };
+  assert.equal(messageEvent.detail?.source, "judge-decision");
+  assert.match(String(messageEvent.summary), /judge 代批 · 代决策/);
+  iface.emitJudgeProgress({ ...payload, roleId: "liaison" });
+  assert.equal(events.filter((envelope) => envelope.event.kind === "message").length, 1, "来源即主入口时不重复");
   iface.disposeProjectDocuments();
 });
 

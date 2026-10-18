@@ -44,7 +44,7 @@ test("judge mode accepts exactly the three read-only tools and refuses any write
     [],
   ];
   for (const tools of foreign) {
-    assert.throws(() => createCodexRuntimeAdapter(options("/fixture", engines, { judgeMode: true, tools })), /shell judge tools/);
+    assert.throws(() => createCodexRuntimeAdapter(options("/fixture", engines, { judgeMode: true, tools })), /frozen judge tool set/);
   }
   assert.equal(engines.engines.length, 0, "拒绝发生在装配前：零引擎/零副作用");
 });

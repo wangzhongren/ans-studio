@@ -84,7 +84,7 @@ test("deny 档 + judge allow：放行、0 卡、审计/诊断/结果行三处可
     const view = UL.shellJudgeResultView(row);
     assert.ok(view !== null);
     assert.equal(view.denyOverride, true);
-    assert.equal(view.title, "已替你放行（判断 agent · deny 档）");
+    assert.equal(view.title, "已替你放行（判断 agent · 代审批 · deny 档）");
     assert.equal(view.label, LABEL);
     assert.ok(view.lines.some((line) => line.includes("硬拒类")), "正文必须说明这是硬拒类被推翻");
     assert.ok(view.lines.some((line) => line.includes("请复核")), "正文必须提示请复核");
@@ -157,7 +157,7 @@ test("普通 risky/review 放行不带 deny 档标记（防止标记泛化）", 
       const view = UL.shellJudgeResultView(row);
       assert.ok(view !== null);
       assert.equal(view.denyOverride, false);
-      assert.equal(view.title, "已替你放行（判断 agent）");
+      assert.equal(view.title, "已替你放行（判断 agent · 代审批）");
       assert.equal(view.label, "");
     }
   } finally {

@@ -13,7 +13,7 @@
 import type { ResolvedRole } from "../../model/role.ts";
 import type { WriteDecision } from "../../model/decision.ts";
 import { randomUUID } from "node:crypto";
-import { buildGovernedTools, buildShellJudgeTools } from "./tools.ts";
+import { buildGovernedTools, buildGovernanceJudgeTools, buildShellJudgeTools } from "./tools.ts";
 import { createInteractionGate } from "../../common/pi-adapter/timeout.ts";
 import { createEventQueue } from "../../common/pi-adapter/event-queue.ts";
 import { resolvePiProviderConfig, type PiProviderConfigInput } from "../../common/pi-adapter/provider-config.ts";
@@ -32,8 +32,30 @@ export type {
 import type {
   ToolCall, SessionEvent, PromptOptions, RoleSession, WriteGate, ShellGate, CustomerInputFn,
   ReportHandbackFn, DispatchTaskFn, ShellVerdictFn, RuntimeAdapter, RuntimeProviderOptions,
-  ShellJudgeToolOptions,
+  ShellJudgeToolOptions, GovernanceJudgeToolOptions, ToolDefinition,
 } from "../../model/runtime.ts";
+
+/**
+ * 判断会话的工具集选择（「替我审」shell judge 与治理 judge 恰一，2026-10-18 双开关评审 §6.2）。
+ *
+ * - 注入 `shellJudge` ⇒ 只 `buildShellJudgeTools`（恰三只 shell 只读工具）。
+ * - 注入 `governanceJudge` ⇒ 只 `buildGovernanceJudgeTools`（恰三只治理只读工具）。
+ * - 两者同时给出 ⇒ **配置错误，抛错**（与 Service `createRuntimeAdapter` 同口径，不静默择一）。
+ * - 都未注入 ⇒ `undefined`（普通受治理工具路径，逐字不变）。
+ *
+ * 判断会话的工具面只来自这里；`ALL_JUDGE_TOOL_NAMES` 并集只用于适配器 allowlist，不用于装配。
+ */
+function judgeToolset(opts: {
+  shellJudge?: ShellJudgeToolOptions;
+  governanceJudge?: GovernanceJudgeToolOptions;
+}): ToolDefinition[] | undefined {
+  if (opts.shellJudge !== undefined && opts.governanceJudge !== undefined) {
+    throw new Error("shellJudge 与 governanceJudge 互斥：判断会话只能注入其中一种判断能力");
+  }
+  if (opts.shellJudge !== undefined) return buildShellJudgeTools(opts.shellJudge);
+  if (opts.governanceJudge !== undefined) return buildGovernanceJudgeTools(opts.governanceJudge);
+  return undefined;
+}
 
 /** 判断会话的写门禁：即便调用方误接写工具，也一律拒绝（工具本身不会注册）。 */
 const DENY_ALL_WRITE_GATE: WriteGate = (targetPath: string): WriteDecision => ({
@@ -131,6 +153,13 @@ export function createFakeRuntimeAdapter(opts: {
    * 工具，也不注入 ShellGate、客户通道、回交/派发能力。未注入 ⇒ 普通假适配器路径逐字不变。
    */
   shellJudge?: ShellJudgeToolOptions;
+  /**
+   * 治理卡判断 agent（「替我审批」/「替我决策」）只读工具选项（2026-10-18 双开关评审 §6.1/§6.2）。
+   * **注入即判断模式**：只走运行时核心的 `buildGovernanceJudgeTools`（恰 `judge_read_file`/
+   * `judge_list_dir`/`report_governance_judgement` 三只只读工具），结构性不构造写/shell/交互/回交/
+   * 派发/MCP/网络工具。与 `shellJudge` **恰一**（同时给出 ⇒ 抛错）。未注入 ⇒ 普通路径逐字不变。
+   */
+  governanceJudge?: GovernanceJudgeToolOptions;
 }): RuntimeAdapter {
   const script = opts.script ?? DEFAULT_FAKE_SCRIPT;
 
@@ -142,21 +171,21 @@ export function createFakeRuntimeAdapter(opts: {
     async bindRole(role: ResolvedRole): Promise<RoleSession> {
       void role;
       // 判断模式：能力注入（非工具注入）。只构造运行时核心的只读工具集——结构性不出现
-      // write/edit/run_shell/客户交互/回交/派发/MCP/网络工具（PM 评审 §6.2/§7.1）。
-      const tools = opts.shellJudge !== undefined
-        ? buildShellJudgeTools(opts.shellJudge)
-        : buildGovernedTools(opts.gate, {
-            readRoot: opts.readRoot,
-            writeRoot: opts.writeRoot,
-            shellGate: opts.shellGate,
-            shellCwd: opts.shellCwd,
-            shellReviewTimeoutMs: opts.shellReviewTimeoutMs,
-            customerInput: opts.customerInput,
-            customerInputTimeoutMs: opts.customerInputTimeoutMs,
-            reportHandback: opts.reportHandback,
-            dispatchTask: opts.dispatchTask,
-            shellVerdict: opts.shellVerdict,
-          });
+      // write/edit/run_shell/客户交互/回交/派发/MCP/网络工具（PM 评审 §6.2/§7.1；
+      // 2026-10-18 双开关评审 §6.2：shell judge 与治理 judge 的工具集都只经运行时核心构造）。
+      const judgeTools = judgeToolset(opts);
+      const tools = judgeTools ?? buildGovernedTools(opts.gate, {
+        readRoot: opts.readRoot,
+        writeRoot: opts.writeRoot,
+        shellGate: opts.shellGate,
+        shellCwd: opts.shellCwd,
+        shellReviewTimeoutMs: opts.shellReviewTimeoutMs,
+        customerInput: opts.customerInput,
+        customerInputTimeoutMs: opts.customerInputTimeoutMs,
+        reportHandback: opts.reportHandback,
+        dispatchTask: opts.dispatchTask,
+        shellVerdict: opts.shellVerdict,
+      });
       const byName = new Map(tools.map((t) => [t.name, t]));
       const queue = createEventQueue<SessionEvent>();
 
@@ -285,8 +314,15 @@ export interface PiRuntimeAdapterOptions extends PiProviderConfigInput {
    */
   shellJudge?: ShellJudgeToolOptions;
   /**
+   * 治理卡判断 agent（「替我审批」/「替我决策」）只读工具选项（2026-10-18 双开关评审 §6.1/§6.2）。
+   * 本 legacy 分支只经运行时核心 `buildGovernanceJudgeTools` 构造恰三只治理只读工具；隔离口径与
+   * `shellJudge` 相同（不注入任何写/shell/交互/回交/派发能力、不持久化）。与 `shellJudge` **恰一**
+   * （同时给出 ⇒ 构造期抛错，不静默择一）。未注入 ⇒ 普通路径逐字不变。
+   */
+  governanceJudge?: GovernanceJudgeToolOptions;
+  /**
    * 判断会话的中性标志（`RuntimeProviderOptions.judgeMode` 的兼容形态）。Service 生产入口直接传
-   * `RuntimeProviderOptions`；legacy 直接调用者可只注入 `shellJudge`，二者任一成立即判断模式。
+   * `RuntimeProviderOptions`；legacy 直接调用者可只注入 `shellJudge`/`governanceJudge`，任一成立即判断模式。
    */
   judgeMode?: true;
   /** 测试注入：仅单测使用（真实生产不传），原样透传给私有 real-adapter。 */
@@ -299,9 +335,16 @@ export function createPiRuntimeAdapter(opts: RuntimeProviderOptions | PiRuntimeA
   const input = { ...opts };
   if ("runtime" in input && input.runtime !== "pi") throw new Error(`Pi 适配器不支持 runtime: ${input.runtime}`);
   const config = resolvePiProviderConfig(input, process.env);
-  // 判断模式：`shellJudge` 注入（legacy 直接调用）或 Service 置 `judgeMode`（生产装配）。
+  // 判断模式：`shellJudge`/`governanceJudge` 注入（legacy 直接调用）或 Service 置 `judgeMode`
+  // （生产装配）。两种判断能力**恰一**——同时给出是配置错误，不静默择一
+  // （2026-10-18 双开关评审 §6.2，与 Service `createRuntimeAdapter` 同口径）。
   const judgeShell = (input as { shellJudge?: ShellJudgeToolOptions }).shellJudge;
-  const judgeMode = judgeShell !== undefined || (input as { judgeMode?: true }).judgeMode === true;
+  const judgeGovernance = (input as { governanceJudge?: GovernanceJudgeToolOptions }).governanceJudge;
+  if (judgeShell !== undefined && judgeGovernance !== undefined) {
+    throw new Error("shellJudge 与 governanceJudge 互斥：判断会话只能注入其中一种判断能力");
+  }
+  const judgeMode = judgeShell !== undefined || judgeGovernance !== undefined
+    || (input as { judgeMode?: true }).judgeMode === true;
   // 测试注入面只给单测，不透进适配器选项（避免被当作未知字段消费）。
   const { dependencies, ...adapterInput } = input as (RuntimeProviderOptions | PiRuntimeAdapterOptions) & {
     dependencies?: PiAdapterDependencies;
@@ -328,11 +371,11 @@ export function createPiRuntimeAdapter(opts: RuntimeProviderOptions | PiRuntimeA
       const currentTurnId = () => turn.id;
 
       if (judgeMode) {
-        // 判断模式（legacy 直接调用）：**只**构造运行时核心的只读工具集，且不注入
-        // ShellGate/客户交互/回交/派发/审读能力；写门禁为 deny-all（纵深防御），
+        // 判断模式（legacy 直接调用）：**只**构造运行时核心的只读工具集（shell judge 或治理 judge，
+        // 恰一），且不注入 ShellGate/客户交互/回交/派发/审读能力；写门禁为 deny-all（纵深防御），
         // 持久化被结构性关闭（sessionDir/storage 置空；real-adapter 侧另有 judgeMode 守卫）。
-        if (judgeShell === undefined) throw new Error("判断模式需要注入 shellJudge 只读工具选项");
-        const judgeTools = buildShellJudgeTools(judgeShell);
+        const judgeTools = judgeToolset({ shellJudge: judgeShell, governanceJudge: judgeGovernance });
+        if (judgeTools === undefined) throw new Error("判断模式需要注入 shellJudge 或 governanceJudge 只读工具选项");
         // `gate` 不是 real-adapter 的选项字段（其工具已定形），用交叉类型承载 deny-all 纵深防御。
         const realOptions = {
           ...adapterInput, config, runtime: "pi", tools: judgeTools, interactionGate, currentTurnId,

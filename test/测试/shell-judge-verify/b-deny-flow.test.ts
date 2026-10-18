@@ -22,7 +22,7 @@ import {
   setJudgeEnabled,
 } from "./fixture.ts";
 
-const EXIT_LINE = /关闭[「『]替我审[」』]后重试/;
+const EXIT_LINE = /关闭[「『]替我审批[」』]后重试/;
 
 test("judge deny + 替代方案：0 卡、结果行、请求角色收到原因+替代方案、审计 deny + judge", async () => {
   const project = await makeTempProject();
@@ -58,7 +58,7 @@ test("judge deny + 替代方案：0 卡、结果行、请求角色收到原因+�
     assert.match(result.reason, /请向客户说明：这一步没有必要/);
     assert.match(result.reason, /原因：全量测试会修改共享数据/);
     assert.match(result.reason, /替代方案（command）：npm run test:unit/);
-    assert.match(result.reason, /出路：如需执行，请关闭「替我审」后重试。/);
+    assert.match(result.reason, /出路：如需执行，请关闭「替我审批」后重试。/);
 
     assert.equal(chain.rows.length, 1);
     const row = chain.rows[0]!;
@@ -89,11 +89,11 @@ test("judge deny + 替代方案：0 卡、结果行、请求角色收到原因+�
     const UL = await loadUiLabels();
     const view = UL.shellJudgeResultView(row);
     assert.ok(view !== null);
-    assert.equal(view.title, "未放行（判断 agent）");
+    assert.equal(view.title, "未放行（判断 agent · 代审批）");
     assert.equal(view.operatorText, "operator:judge:pi");
     assert.ok(view.lines.some((line) => line.includes("替代方案：npm run test:unit")));
     assert.ok(view.lines.some((line) => line.includes("建议先跑单元测试")));
-    assert.match(view.retryHint, /关闭「替我审」后重试/);
+    assert.match(view.retryHint, /关闭「替我审批」后重试/);
   } finally {
     await project.cleanup();
   }
@@ -143,7 +143,7 @@ test("judge deny 无替代方案：0 卡、合成 customerMessage + 标准出路
     const UL = await loadUiLabels();
     const view = UL.shellJudgeResultView(row);
     assert.ok(view !== null);
-    assert.equal(view.title, "未放行（判断 agent）");
+    assert.equal(view.title, "未放行（判断 agent · 代审批）");
     assert.ok(view.lines.some((line) => EXIT_LINE.test(line)), "结果行必须显示同一说明与出路");
   } finally {
     await project.cleanup();

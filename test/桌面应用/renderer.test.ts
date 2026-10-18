@@ -2320,34 +2320,41 @@ test("左树选中项可见（2026-10-17 实机）：最小位移、可见不动
   assert.ok(!fn.includes("scrollIntoView"), "不用 scrollIntoView（避免连带滚动其它容器）");
 });
 
-// ————————————————— P5：自动判断（2026-10-17 评审 §6.5/§6.6/§9.3/§10）—————————————————
-// 桌面UI 侧只消费冻结桥（get/set/onState/onResult）：主进程是开关权威；桥缺失禁用并说明；
-// 结果按 roleId 落 pane、按 toolCallId 锚定；manual 不产生结果行；已挂起卡不受切换影响。
+// ————————————————— P5：双自动判断开关（2026-10-18 评审 §三/§八/§九）—————————————————
+// 桌面UI 侧只消费冻结桥：主进程是开关权威；桥/驱动缺失禁用并说明；两组默认关、互不影响；
+// 结果行按 roleId 落 pane、按 toolCallId 锚定；manual 不产生结果行（原卡 + judgeNotice）。
 // DOM 行为由 e2e 覆盖；此处钉住源码接线、文案单点与边界（不自动开会话/不写持久化）。
 
-test("P5：输入区复选框 + 一次性警告 + 手动回落提示的 DOM 结构（§10.1/§10.2/§10.4）", () => {
-  // 复选框：§10.1 逐字结构；位置在附件按钮之后、#composer-scope 之前。
+test("P5：输入区两个复选框 + 一次性警告 + 手动回落提示的 DOM 结构（§9.1/§9.2/§9.3）", () => {
+  // 复选框：§9.1 逐字结构；位置在附件按钮之后、#composer-scope 之前；两个开关并排。
   assert.ok(
-    /<label class="composer-auto-approve">\s*<input type="checkbox" id="auto-approve-toggle" \/>\s*<span id="auto-approve-label">替我审<\/span>\s*<\/label>/.test(INDEX),
-    "复选框结构按 §10.1 逐字（label/input/span 三件套）"
+    /<label class="composer-auto-approve">\s*<input type="checkbox" id="auto-approve-toggle" \/>\s*<span id="auto-approve-label">替我审批<\/span>\s*<\/label>/.test(INDEX),
+    "approval 复选框结构（label/input/span 三件套，标签「替我审批」）"
+  );
+  assert.ok(
+    /<label class="composer-auto-approve">\s*<input type="checkbox" id="judge-decision-toggle" \/>\s*<span id="judge-decision-label">替我决策<\/span>\s*<\/label>/.test(INDEX),
+    "decision 复选框结构（label/input/span 三件套，标签「替我决策」）"
   );
   const attach = INDEX.indexOf('id="btn-attach-image"');
-  const toggle = INDEX.indexOf('class="composer-auto-approve"');
+  const approval = INDEX.indexOf('id="auto-approve-toggle"');
+  const decision = INDEX.indexOf('id="judge-decision-toggle"');
   const scope = INDEX.indexOf('id="composer-scope"');
-  assert.ok(attach >= 0 && toggle > attach && scope > toggle, "位置：附件按钮之后、#composer-scope 之前");
-  assert.ok(INDEX.includes('id="auto-approve-status"'), "失败错误位（可见、aria-live）");
-  // 一次性警告容器：默认隐藏；文本容器 +「知道了」关闭按钮（客户 2026-10-18）。
+  assert.ok(attach >= 0 && approval > attach && decision > approval && scope > decision, "位置：附件按钮之后、#composer-scope 之前，两个复选框并排");
+  assert.ok(INDEX.includes('id="auto-approve-status"'), "approval 失败/状态位（可见、aria-live）");
+  assert.ok(INDEX.includes('id="judge-decision-status"'), "decision 失败/状态位（single 说明也走这里）");
+  // 一次性警告容器：两个开关共用**同一块**（默认隐藏；文本容器 +「知道了」关闭按钮）。
+  assert.equal((INDEX.match(/id="shell-judge-warning"/g) || []).length, 1, "警告只有一块（两个开关共用）");
   assert.ok(
     /<div id="shell-judge-warning" class="judge-warning" role="status" aria-live="polite" hidden>\s*<div id="shell-judge-warning-text" class="judge-warning-text"><\/div>\s*<button id="shell-judge-warning-close" class="judge-warning-close" type="button" title="关闭提示" aria-label="知道了">知道了<\/button>\s*<\/div>/.test(INDEX),
     "开启警告容器默认隐藏，内含文本容器与「知道了」关闭按钮"
   );
-  assert.ok(/<p id="sc-judge-notice" class="sc-judge-notice" hidden><\/p>/.test(INDEX), "卡片 judgeNotice 位默认隐藏");
+  assert.ok(/<p id="sc-judge-notice" class="sc-judge-notice" hidden><\/p>/.test(INDEX), "shell 卡 judgeNotice 位默认隐藏");
   const summary = INDEX.indexOf('id="sc-summary"');
   const notice = INDEX.indexOf('id="sc-judge-notice"');
   const reason = INDEX.indexOf('id="sc-reason"');
   assert.ok(summary < notice && notice < reason, "#sc-judge-notice 位于摘要之后、原因之前");
   // 样式钩子。
-  for (const cls of [".composer-auto-approve", ".judge-warning", ".judge-warning-close", ".shell-judge-row", ".sj-badge", ".sc-judge-notice"]) {
+  for (const cls of [".composer-auto-approve", ".judge-warning", ".judge-warning-close", ".shell-judge-row", ".sj-badge", ".sc-judge-notice", ".composer-judge-status.is-note", ".governance-judge-row", ".op-judge-notice"]) {
     assert.ok(STYLES.includes(cls), "styles.css 应有 " + cls);
   }
   // 警告用琥珀色（不是错误红）；一次性浮层不占聊天布局。
@@ -2361,13 +2368,15 @@ test("P5：输入区复选框 + 一次性警告 + 手动回落提示的 DOM 结�
   const onBlock = STYLES.match(/\.composer-auto-approve\.is-on \{([\s\S]*?)\}/)?.[1] || "";
   assert.ok(onBlock.includes("var(--amber)"), "开启标记（判断 agent）用琥珀色");
   assert.ok(!onBlock.includes("var(--danger)"), "开启标记不得用错误红");
+  const noteBlock = STYLES.match(/\.composer-judge-status\.is-note \{([\s\S]*?)\}/)?.[1] || "";
+  assert.ok(noteBlock.includes("var(--amber)") && !noteBlock.includes("var(--danger)"), "single/禁用说明用琥珀，不是错误红");
 });
 
-test("P5：开关三态——启动取真实状态、推送同步、点击只信主进程回包；桥缺失禁用且无假开启态", async () => {
+test("P5：两个开关各自三态——启动取真实状态、推送同步、点击只信主进程回包；桥缺失禁用且无假开启态", async () => {
   const UL = (await loadUiLabelsForGovernance()) as unknown as Record<string, any>;
-  // 三态纯映射（与 UI 共用单一来源）。
+  // 三态纯映射（与 UI 共用单一来源）；两个开启态各自紧凑标记。
   const off = UL.shellJudgeToggleView(true, false, false);
-  assert.equal(off.label, "替我审");
+  assert.equal(off.label, "替我审批");
   assert.equal(off.checked, false);
   assert.equal(off.enabled, false);
   const on = UL.shellJudgeToggleView(true, true, false);
@@ -2378,55 +2387,78 @@ test("P5：开关三态——启动取真实状态、推送同步、点击只信
   assert.equal(missing.disabled, true);
   assert.equal(missing.checked, false, "桥缺失不显示假开启态");
   assert.equal(missing.label, "当前版本不支持自动判断，保持手动");
+  const decisionOff = UL.judgeToggleView("decision", true, false, false, null);
+  assert.equal(decisionOff.label, "替我决策");
+  assert.equal(decisionOff.checked, false);
+  const decisionOn = UL.judgeToggleView("decision", true, true, false, null);
+  assert.equal(decisionOn.label, "替我决策中 · 判断 agent");
+  assert.equal(decisionOn.checked, true);
+  const single = UL.judgeToggleView("decision", true, true, false, { singleDisabled: true });
+  assert.equal(single.disabled, true);
+  assert.equal(single.checked, false, "single 下不得显示假开启态");
+  assert.equal(single.note, "旧治理模型（single）不支持代决策");
   // 失败不改状态（主进程是权威）。
   assert.equal(UL.shellJudgeToggleResult(true, { ok: false, error: "x" }).enabled, true);
   assert.equal(UL.shellJudgeToggleResult(false, { ok: true, enabled: true }).enabled, true);
   assert.equal(UL.shellJudgeToggleResult(true, { ok: true, enabled: false }).enabled, false);
 
-  // 启动：四个桥方法齐备判定 + 订阅 state/result + 读取一次真实状态。
+  // 启动：两组各自四个桥方法齐备判定 + 订阅 state/result + 读取一次真实状态。
   assert.ok(SHELL_JUDGE_CODE.length > 0, "自动判断段应存在（标记齐全）");
   assert.ok(SHELL_JUDGE_CODE.includes("typeof d.getShellJudgeState === \"function\"") &&
     SHELL_JUDGE_CODE.includes("typeof d.setShellJudgeEnabled === \"function\"") &&
     SHELL_JUDGE_CODE.includes("typeof d.onShellJudgeState === \"function\"") &&
-    SHELL_JUDGE_CODE.includes("typeof d.onShellJudgeResult === \"function\""), "桥可用性按四个冻结方法判定");
-  assert.ok(RENDERER.includes("initShellJudge();"), "启动时初始化自动判断");
+    SHELL_JUDGE_CODE.includes("typeof d.onShellJudgeResult === \"function\""), "approval 桥可用性按四个冻结方法判定");
+  assert.ok(SHELL_JUDGE_CODE.includes("typeof d.getDecisionJudgeState === \"function\"") &&
+    SHELL_JUDGE_CODE.includes("typeof d.setDecisionJudgeEnabled === \"function\"") &&
+    SHELL_JUDGE_CODE.includes("typeof d.onDecisionJudgeState === \"function\"") &&
+    SHELL_JUDGE_CODE.includes("typeof d.onOperatorJudgeResult === \"function\""), "decision 桥可用性按四个冻结方法判定");
+  assert.ok(RENDERER.includes("initJudgeSwitches();"), "启动时初始化两个自动判断开关");
   assert.ok(SHELL_JUDGE_CODE.includes("d.onShellJudgeState(function (payload) { if (applyShellJudgeState(payload)) pushed = true; })"), "订阅 shell:judge-state");
-  assert.ok(SHELL_JUDGE_CODE.includes("Promise.resolve(d.getShellJudgeState())"), "启动读取真实开关状态");
+  assert.ok(SHELL_JUDGE_CODE.includes("d.onDecisionJudgeState(function (payload) { if (applyDecisionJudgeState(payload)) pushed = true; })"), "订阅 decision:judge-state");
+  assert.ok(SHELL_JUDGE_CODE.includes("Promise.resolve(d.getShellJudgeState())"), "启动读取 approval 真实开关状态");
+  assert.ok(SHELL_JUDGE_CODE.includes("Promise.resolve(d.getDecisionJudgeState())"), "启动读取 decision 真实开关状态");
   // 点击切换：不乐观改状态；成功采用主进程 enabled，失败保持原值并显示错误。
-  assert.ok(RENDERER.includes('$("auto-approve-toggle").addEventListener("change", onShellJudgeToggleChange)'), "复选框 change 绑定");
-  assert.ok(SHELL_JUDGE_CODE.includes("d.setShellJudgeEnabled(desired)"), "切换调用冻结桥方法");
+  assert.ok(RENDERER.includes('$("auto-approve-toggle").addEventListener("change", onShellJudgeToggleChange)'), "approval 复选框 change 绑定");
+  assert.ok(RENDERER.includes('$("judge-decision-toggle").addEventListener("change", onDecisionJudgeToggleChange)'), "decision 复选框 change 绑定");
+  assert.ok(SHELL_JUDGE_CODE.includes("d.setShellJudgeEnabled(desired)"), "approval 切换调用冻结桥方法");
+  assert.ok(SHELL_JUDGE_CODE.includes("d.setDecisionJudgeEnabled(desired)"), "decision 切换调用冻结桥方法");
   assert.ok(SHELL_JUDGE_CODE.includes("UiLabels.shellJudgeToggleResult(s.enabled, res)"), "结果经纯函数自洽（失败保持原状态）");
   assert.ok(SHELL_JUDGE_CODE.includes("s.enabled = next.enabled"), "只落主进程实际值");
   assert.ok(!SHELL_JUDGE_CODE.includes("s.enabled = desired"), "点击意图不得直接成为状态（无假开启态）");
   assert.ok(!/\.enabled\s*=\s*true/.test(SHELL_JUDGE_CODE), "渲染侧不得自行把开关置 true");
   assert.ok(SHELL_JUDGE_CODE.includes("toggle.checked = view.checked") && SHELL_JUDGE_CODE.includes("toggle.disabled = view.disabled"), "复选框只呈现真实视图");
-  // 一次性警告的状态机与文案单点（客户 2026-10-18）。
-  assert.ok(SHELL_JUDGE_CODE.includes("UiLabels.shellJudgeWarningStep(s.enabled, s.promptShown)"), "一次性提示经 ui-labels 纯函数迁移");
-  assert.ok(SHELL_JUDGE_CODE.includes("s.promptShown = step.shown"), "记录本次开启已提示（重绘不重现）");
-  assert.ok(SHELL_JUDGE_CODE.includes("if (step.show) showShellJudgeWarning();"), "只在首次开启时展示警告");
-  assert.ok(SHELL_JUDGE_CODE.includes("UiLabels.shellJudgeWarningLines()"), "警告文案经 ui-labels 单一来源");
+  // 一次性警告的状态机与文案单点（客户 2026-10-18；每组各自一次）。
+  assert.ok(SHELL_JUDGE_CODE.includes("UiLabels.judgeWarningStep(state.shellJudge.enabled, state.shellJudge.promptShown)"), "approval 一次性提示经 ui-labels 纯函数迁移");
+  assert.ok(SHELL_JUDGE_CODE.includes("UiLabels.judgeWarningStep(state.decisionJudge.enabled, state.decisionJudge.promptShown)"), "decision 一次性提示经同一纯函数迁移（各自 shown）");
+  assert.ok(SHELL_JUDGE_CODE.includes("state.shellJudge.promptShown = a.shown") && SHELL_JUDGE_CODE.includes("state.decisionJudge.promptShown = b.shown"), "每组记录本次开启已提示（重绘不重现）");
+  assert.ok(SHELL_JUDGE_CODE.includes("if (a.show || b.show) { showShellJudgeWarning(groups); return; }"), "任一组首次开启即展示同一块警告");
+  assert.ok(SHELL_JUDGE_CODE.includes("UiLabels.judgeWarningLines(groups)"), "警告文案经 ui-labels 单一来源（按开启组列行）");
   assert.ok(SHELL_JUDGE_CODE.includes("UiLabels.SHELL_JUDGE_WARNING_CLOSE_LABEL"), "关闭按钮文案经 ui-labels 单一来源");
   assert.ok(SHELL_JUDGE_CODE.includes("UiLabels.SHELL_JUDGE_WARNING_AUTO_DISMISS_MS"), "自动收起时长经 ui-labels 单一来源");
   assert.ok(SHELL_JUDGE_CODE.includes("setTimeout(function () {"), "约 8–10 秒后自动消失");
   assert.ok(SHELL_JUDGE_CODE.includes("hideShellJudgeWarning()"), "关闭/自动到时/关闭开关共用收起");
   assert.ok(RENDERER.includes('$("shell-judge-warning-close").addEventListener("click", hideShellJudgeWarning)'), "「知道了」点击收起");
   // 重绘/收消息/切角色路径不会直接改警告显隐——只有展示/收起两个写点，展示只经一次性状态机。
-  const showCalls = (SHELL_JUDGE_CODE.match(/showShellJudgeWarning\(\)/g) || []).length;
+  const showCalls = (SHELL_JUDGE_CODE.match(/showShellJudgeWarning\(/g) || []).length;
   assert.equal(showCalls, 2, "showShellJudgeWarning 仅定义 + step.show 单点调用");
   const visibilityWrites = (SHELL_JUDGE_CODE.match(/warning\.hidden = (?:true|false)/g) || []).length;
   assert.equal(visibilityWrites, 2, "警告显隐只有展示/收起两处写点");
   assert.ok(SHELL_JUDGE_CODE.includes("warning.hidden = false;") && SHELL_JUDGE_CODE.includes("warning.hidden = true;"), "展示与收起各一处");
+  // single 项目禁用 decision（UI 禁用只是展示，不是安全边界）。
+  assert.ok(SHELL_JUDGE_CODE.includes('state.governanceModel === "single"'), "single 判据只读 listing 事实");
+  assert.ok(SHELL_JUDGE_CODE.includes("{ singleDisabled: decisionJudgeSingleDisabled() }"), "decision 视图透传 single 禁用");
+  assert.ok(RENDERER.includes("renderJudgeToggles();") && RENDERER.includes("state.governanceModel = state.governanceModelKnown ? model : \"single\";"), "listing 落模型后重绘（切到 trio 恢复可用）");
 });
 
-test("P5：结果行接线——按 roleId 落 pane、按 toolCallId 锚定、deny 档徽标可见、manual 不落行", () => {
+test("P5：结果行接线——shell 与治理代批均按 roleId 落 pane、按 toolCallId 锚定、manual 不落行", () => {
   assert.ok(RENDERER.includes("d.onShellJudgeResult(function (payload) { deliverRuntimePayload(payload, onShellJudgeResult); })"), "订阅 shell:judge-result 并按引擎视图投递");
-  assert.ok(SHELL_JUDGE_CODE.includes("UiLabels.shellJudgeResultView(payload)"), "结果文案/字段经纯映射单一来源");
+  assert.ok(SHELL_JUDGE_CODE.includes("UiLabels.shellJudgeResultView(payload)"), "shell 结果文案/字段经纯映射单一来源");
   assert.ok(SHELL_JUDGE_CODE.includes('var roleId = typeof payload.roleId === "string" ? payload.roleId : ""'), "严格按 roleId 路由");
   assert.ok(SHELL_JUDGE_CODE.includes("var pane = paneFor(roleId);"), "落该角色自己的 pane");
   assert.ok(SHELL_JUDGE_CODE.includes("shellJudgeAnchorIndex(rowListFor(pane), view.toolCallId)"), "按 toolCallId 查锚点");
   assert.ok(SHELL_JUDGE_CODE.includes("if (rec.data.items[j] && rec.data.items[j].callId === toolCallId) return i + 1;"), "工具调用行后落位");
   assert.ok(SHELL_JUDGE_CODE.includes("return null;") && SHELL_JUDGE_CODE.includes("atIndex: atIndex"), "定位不到 ⇒ 追加流尾（不丢行）");
-  assert.ok(SHELL_JUDGE_CODE.includes('kind: "judge-result"'), "结果行走行表（参与窗口化/锚点）");
+  assert.ok(SHELL_JUDGE_CODE.includes('kind: "judge-result"'), "shell 结果行走行表（参与窗口化/锚点）");
   assert.ok(SHELL_JUDGE_CODE.includes('state.shellJudgeResultIds[key]'), "重复事件幂等（不重复落行）");
   // deny 档放行必须一眼可分：标题 + label 徽标（琥珀描边），并用硬拒/请复核说明。
   assert.ok(SHELL_JUDGE_CODE.includes('<span class="sj-badge">'), "deny 档放行徽标显著呈现");
@@ -2434,6 +2466,22 @@ test("P5：结果行接线——按 roleId 落 pane、按 toolCallId 锚定、de
   assert.ok(SHELL_JUDGE_CODE.includes("v.lines.map") && SHELL_JUDGE_CODE.includes("v.retryHint"), "行内含理由/替代方案/客户说明与出路");
   // manual：视图返回 null 时直接返回，不产生结果行。
   assert.ok(SHELL_JUDGE_CODE.includes("if (!view) return; // manual（或未知裁决）不产生结果行"), "manual 不产生结果行");
+
+  // 治理代批结果行（`session:operator-judge`）：标题「judge 代批 · 代审批/代决策」，与客户手批区分。
+  assert.ok(RENDERER.includes("d.onOperatorJudgeResult(function (payload) { deliverRuntimePayload(payload, onOperatorJudgeResult); })"), "订阅 session:operator-judge 并按引擎视图投递");
+  assert.ok(SHELL_JUDGE_CODE.includes("UiLabels.governanceJudgeResultView(payload)"), "治理结果文案/字段经纯映射单一来源");
+  assert.ok(SHELL_JUDGE_CODE.includes("var view = UiLabels.governanceJudgeResultView(payload);") && SHELL_JUDGE_CODE.includes("if (!view) return; // 未知分组/坏件不产生结果行"), "未知分组/坏件不产生结果行");
+  assert.ok(SHELL_JUDGE_CODE.includes("state.governanceJudgeResultIds[key]"), "治理结果行幂等（不重复落行）");
+  assert.ok(SHELL_JUDGE_CODE.includes('kind: "governance-judge-result"'), "治理结果行走行表");
+  assert.ok(SHELL_JUDGE_CODE.includes('div.className = "sys shell-judge-row governance-judge-row is-allow"'), "治理结果行独立样式钩子（与客户手批卡区分）");
+  assert.ok(SHELL_JUDGE_CODE.includes("esc(v.title)") && SHELL_JUDGE_CODE.includes("esc(v.headline)") && SHELL_JUDGE_CODE.includes("esc(v.badge)"), "全部动态文本经 esc");
+  assert.ok(SHELL_JUDGE_CODE.includes("d.pathDecisions.map") && SHELL_JUDGE_CODE.includes("d.selected.join") && SHELL_JUDGE_CODE.includes("d.paths.join"), "详情含逐路径结论/选中项/路径");
+  assert.ok(SHELL_JUDGE_CODE.includes("d.durationMs") && SHELL_JUDGE_CODE.includes("d.readCalls") && SHELL_JUDGE_CODE.includes("d.readBytes"), "详情含耗时/读取次数/字节");
+
+  // 手动回落卡（治理方向卡）`judgeNotice`：主进程给的原文逐字、转义呈现；无值不渲染。
+  assert.ok(RENDERER.includes('if (typeof entry.judgeNotice === "string" && entry.judgeNotice !== "") {'), "交互卡读取可选 judgeNotice");
+  assert.ok(RENDERER.includes('\'<div class="op-judge-notice">\' + esc(entry.judgeNotice) + "</div>"'), "交互卡渲染 judgeNotice（esc，无 HTML 注入口）");
+  assert.ok(RENDERER.includes('typeof payload.judgeNotice === "string" && payload.judgeNotice !== ""'), "同一请求重推可补/更新 judgeNotice");
 });
 
 test("P5：手动回落卡 judgeNotice 原样渲染（不改写、无值隐藏）；已挂起卡不受开关切换影响", () => {

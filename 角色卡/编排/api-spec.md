@@ -468,3 +468,46 @@ preview: {
 - **trio**（`project.governanceModel === "trio"`，或模型缺省且首个内置角色为 trio 角色）：`assembleProjectShellGate` / `assembleReadonlyShellGate` / `assembleOperatorShellGate` 及其 F-6-1 `auditBoundaryRefresh` 的审计边界改用 `appGovernanceBoundary(govBoundary.acceptance)`（经 `src/service/boundary/resolve-boundary.ts` 公共出口，不复制实现）。审计真落 `docs/audit/shell-gate.jsonl`。
 - **single/su**：原样返回既有治理角色边界（`docs/audit/` 条件目录 + `shell-gate` 条件），逐字不变。
 - `buildShellAuditGate` 仍固定声明 `conditions:["shell-gate"]`（额外条件对非条件条目无影响，语义保留）；应用专用边界不注入任何角色会话，角色仍不可写 `docs/audit/`；任何命令判定不变。
+
+## 2026-10-18 P2：治理卡判断 agent（「替我审批」/「替我决策」）
+
+依据：PM 评审 `角色卡/项目管理/docs/design/2026-10-18_design_judge-governance-cards-review.md` §五–§七/§十/§十二（status approved；P1 运行时核心契约已冻结）。本批只改编排边界；桌面 P4 状态机/结果行、适配器 P3 归各属主。
+
+### Pipeline 公共出口（`govern-session.ts` 薄再导出）
+
+```ts
+export { createGovernanceJudge, GOVERNANCE_JUDGE_SUPPORTED_RUNTIMES } from "../../common/编排/governance-judge.ts";
+export type { CreateGovernanceJudgeOptions } from "../../common/编排/governance-judge.ts";
+```
+
+- `CreateGovernanceJudgeOptions = { project; runtime; runtimeOptions?; createAdapter?; now?; timeoutMs?; logger? }`。
+- `createGovernanceJudge(opts) => GovernanceJudgeFn`：返回函数**不抛错**；三引擎支持矩阵 `{claude, pi, codex}`，demo/未配置 → `manual/unsupported-engine`。合成角色 `governance-judge`（空边界）、`persistSession:false`、deny-all 写门禁、`governanceJudge` 只读能力注入、15s 硬超时（`AbortSignal.any`）、中止/迟到 bindRole dispose、每闭包 `busy`（第二张 `manual/unavailable`）、无防循环计数。
+- `governanceJudgeAuditOf(outcome)`：approve → 有界 `GovernanceJudgeAudit`（reason ≤1KB、evidence ≤10、pathDecisions ≤50）。
+- **acceptance 机械门槛（P6）**：提示前读 `docs/flows/<flowId>.md` + `.ans/governance/ledger.jsonl`；所有步骤 `done`、每步都有 `dispatch.accepted`、无 `unclassified`/`none` 未结算决定、无未闭环澄清、账本可读；任一不满足 ⇒ `manual`（`insufficient-evidence`/`artifact-missing`/`ledger-unavailable`），不靠模型自报。
+- 双开关后 shell 出路句统一为 `如需执行，请关闭「替我审批」后重试。`（`SHELL_JUDGE_EXIT_LINE`/校验/提示/测试）。
+- 支持内部模块：`governance-judge-prompt.ts`（稳定系统提示 + 本次请求提示）、`governance-judge-verdict.ts`（唯一规范化点）、`governance-judge-facts.ts`（有界账本事实/规范物证/推荐集解析）。桌面不得直接导入私有 `common/编排/`。
+
+### `run-role.ts`
+
+- `AdapterCapabilities` 增 `governanceJudge?: GovernanceJudgeToolOptions`；`createRuntimeAdapterFactory` 逐名透传（仅 judge 会话使用；普通角色会话不注入）。
+- `openRoleSession` 的 `governedInput` 是 `CustomerInputMetadata.judgeContext` 的**唯一计算点**（评审 §5.2）：
+  - 仅 `isTrio` + `TRIO_CARD_KINDS[role]` 允许的 cardKind + 合法 flowId 时计算；先 `refreshLedger()`。
+  - `paths`/`pathProbes`：confirm 卡从 title/preview/detail 用 `extractPathCandidates` 提取候选，再用与 issuer 同一份 `resolveWrite`（`writeSet:[candidate]` + 会话 conditions）探测；`allowedPathRoots` 取角色边界 project 条目；`forbiddenPaths` 取 trio 注册表；`artifacts` 按 cardKind/来源角色（`latestVersionedArtifact` + `docs/flows/<id>.md`）；`recommendedRoleIds` 解析最新提名文件；`facts` 由账本快照提炼。
+  - 计算失败 → `unavailableReason` + `facts.ledgerErrors:1`；`recordCustomerDecision` 仍用 `originalMetadata` 的 toolCallId/turnId。
+- `recordCustomerDecision`：`answered && out.judge` → `decisionEvidence.kind:"judge"` + 有界 `judge`；`actorRoleId`/`power` 不变；`judge.group` 与 `governanceCardGroup(cardKind)` 不符只记 `governance-judge.group.mismatch`、不翻转决定；账本失败另记 `governance-judge.audit.failed`。
+- single/su/项目角色：不计算 `judgeContext`、不注入 `governanceJudge`，能力矩阵逐字不变。
+
+### 账本（`governance-ledger.ts`）
+
+- `decisionEvidence.kind` 增 `"judge"`；`decisionEvidence.judge?: GovernanceJudgeAudit`（有界）。旧读者忽略；门禁只读 `decisionKind/customerDecision`（已核对不读 `decisionEvidence`）。
+
+### 交互工具回执（`provider/runtime/tools.ts`）
+
+- `request_confirmation`/`request_choice` 在 `out.judge` 时：
+  `「<工具>：客户委托的判断 agent（替我审批/替我决策）已代批（代审批/代决策；operator:judge:<engine>）：<结论>。这不是客户本人点击，请在向客户汇报时说明是判断 agent 代批。」`
+- 客户手批文案逐字不变。
+
+### 验收证据
+
+- 新增 `test/编排/governance-judge.test.ts` **28/28**：六卡种正反例、required-read/物证缺失、逐路径复核（probes/写根/禁写/来源/pathDecisions 覆盖）、accept-quick 不代批、任命推荐集、读取损伤、支持矩阵/超时/中止/busy、事实/推荐集解析、trio judgeContext 与 single/su/项目角色对照、账本 judge 字段与 group 交叉校验、两工具回执、审计有界、**acceptance 流程完成度机械门槛**。
+- 相关既有套件 74/74；`npm run typecheck` 0 错；全量三层 glob `node --test "test/**/*.test.ts"` 2895 计/2874 过/18 红/3 skipped，18 红均他域/环境既有（含本次「替我审批」文案统一后 `test/测试/shell-judge-verify` 2 条待其属主同步；明细见 changelog）。

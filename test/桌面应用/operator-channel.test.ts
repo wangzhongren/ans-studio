@@ -1259,7 +1259,7 @@ test("替我审·deny：不调用 presenter；结果行投达 + 格式化原因�
   assert.match(reason, /请向客户说明：这条命令会改文件/);
   assert.match(reason, /原因：该命令会改写工作区/);
   assert.match(reason, /替代方案（command）：git status/);
-  assert.match(reason, /关闭「替我审」后重试/);
+  assert.match(reason, /关闭「替我审批」后重试/);
   const audit = (res as { judge?: { verdict: string; reasonCode: string; customerMessage?: string } }).judge;
   assert.equal(audit?.verdict, "deny");
   assert.equal(audit?.reasonCode, "safer-alternative");

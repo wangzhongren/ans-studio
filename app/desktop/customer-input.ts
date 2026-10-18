@@ -9,9 +9,12 @@
 // 入参 `CustomerInputRequest`（confirm：title/preview?/detail?；choice：title/question?/options/multiple?/preview?）
 // 与出参 `CustomerInputOutcome`（answered / declined / unavailable 三态）**只读导入、原样转出**——
 // 同一契约只许一个形状（同 operator-channel.ts 的既有惯例）。**时限（G-1，2026-10-12 客户裁定）**：
-// **不按时间过期**——客户原话「没必要超时啊，就卡在这等客户同意呗」；本模块**无任何计时器**
+// **不按时间过期**——客户原话「没必要超时啊，就卡在这等客户同意呗」；卡片等待**无任何计时器**
 // （无 setTimeout/setInterval，测试有钉子）。历史遗留的工具层 `withTimeout`（若仍启用）不属本模块——
 // 去时限是 **Pi适配器** 的职责（见 change 文档的跨角色建议）。
+// **判断 agent（2026-10-18 双开关评审 §四/§八）**：卡片即将呈现前的**只读代批判断**在这里发生；
+// 判断本身的 15s 硬超时由注入的 `GovernanceJudgeFn`（编排 driver）负责，本模块只用
+// `AbortSignal.timeout` 做通道层防御超时（**不引入 self 计时器**，卡片等待语义逐字不变）。
 //
 // —— 本模块不做任何判定（硬约束：不得出现第二份判定实现）——
 // 「确认后哪些路径可写」的**发行**在编排（`common/编排/confirmed-writes.ts`）；「写不写」在 gate 与文件工具。
@@ -31,7 +34,17 @@ import type {
   CustomerInputOutcome,
   CustomerInputFn,
   CustomerInputMetadata,
+  GovernanceCardKind,
+  GovernanceJudgeAudit,
+  GovernanceJudgeFn,
+  GovernanceJudgeGroup,
+  GovernanceJudgeOutcome,
+  GovernanceJudgeRequest,
+  RuntimeKind,
 } from "../../src/model/runtime.ts";
+// 分组映射（`cardKind → approval/decision`）的**单一来源**（2026-10-18 双开关评审 §3.1）：
+// 本模块与 UI/编排/测试都读同一张表，绝不在这里写第二份。
+import { governanceCardGroup } from "../../src/model/runtime.ts";
 export type { CustomerInputRequest, CustomerInputOutcome, CustomerInputFn };
 // 锚点键的**唯一算法**（真机缺陷修复 2026-10-12：已决卡切走再切回跑到聊天流最末尾——卡的（重）物化
 // 须按其时序锚点落位）。请求本体（kind/title）与回放侧（session-history.ts 解析的 toolCall 块）两侧
@@ -71,6 +84,12 @@ export interface OperatorRequestPayload {
    * single 模型、普通写盘卡（`write`）与无 `cardKind` 的旧卡**不出现**该字段。
    */
   mirrorRoleId?: string;
+  /**
+   * **判断回落提示**（2026-10-18 双开关评审 §4.3/§9.3）：判断 agent 未能代批（manual/负向/证据不足/
+   * 读取失败/超时/结果行投达失败/开关关闭）时附在人话卡上；`row-failed` 单列。只有回落卡带本字段，
+   * 正常卡片与代批成功（0 卡）都没有。
+   */
+  judgeNotice?: string;
 }
 
 /**
@@ -87,6 +106,59 @@ export type OperatorDecisionPayload =
 export type OperatorRequestPresenter = (payload: OperatorRequestPayload) => void;
 
 export interface OperatorExpiredPayload { id: string; roleId: string; projectRoot?: string; runtime?: CustomerInputMetadata["runtime"]; reason: string }
+
+/**
+ * **判断代批结果行载荷**（2026-10-18 双开关评审 §8.1，字段名钉死）。
+ * 只在 `approve` 结算成功后经 `emitJudgeResult` 推送（IPC `session:operator-judge`，主→渲）；
+ * `manual` 不产生结果行（原卡 + `judgeNotice`）。`id` 是结果行幂等键，`requestId` 是客户交互请求 id。
+ * 本载荷只含结构化、已脱敏/有界的字段；**不写模型上下文**。
+ */
+export interface OperatorJudgeResultPayload {
+  version: 1;
+  id: string;
+  requestId: string;
+  anchorKey: string;
+  toolCallId: string;
+  roleId: string;
+  projectRoot?: string;
+  runtime?: RuntimeKind;
+  at: string;
+  group: GovernanceJudgeGroup;
+  cardKind: GovernanceCardKind;
+  flowId?: string;
+  engine: RuntimeKind;
+  model?: string;
+  reasonCode: string;
+  reason?: string;
+  selected?: string[];
+  confirmed?: true;
+  paths?: string[];
+  pathDecisions?: Array<{ path: string; ok: boolean; reason?: string }>;
+  evidence?: string[];
+  durationMs?: number;
+  readCalls?: number;
+  readBytes?: number;
+}
+
+/**
+ * 结果行的一句人话（评审 §9.3 的文案口径）：渲染侧与主入口进度行共用，只做展示拼接、不做判定。
+ * 路径多时显示前 3 个 + 「等 n 个」。
+ */
+export function judgeResultSummary(
+  payload: Pick<OperatorJudgeResultPayload, "group" | "cardKind" | "selected" | "confirmed" | "paths" | "flowId">,
+): string {
+  const flow = typeof payload.flowId === "string" && payload.flowId !== "" ? ` · 流程 ${payload.flowId}` : "";
+  if (payload.cardKind === "proposal") return `judge 代批 · 代决策：接受提案（accept）${flow}`;
+  if (payload.cardKind === "acceptance") return `judge 代批 · 代决策：验收通过（accept）${flow}`;
+  if (payload.cardKind === "appointment") {
+    const ids = Array.isArray(payload.selected) ? payload.selected : [];
+    return `judge 代批 · 代决策：任命 ${ids.join("、")}${flow}`;
+  }
+  const paths = Array.isArray(payload.paths) ? payload.paths : [];
+  const shown = paths.slice(0, 3).join("、");
+  const tail = paths.length > 3 ? `等 ${paths.length} 个` : "";
+  return `judge 代批 · 代审批：确认写入 ${paths.length} 个路径${paths.length > 0 ? `（${shown}${tail}）` : ""}`;
+}
 
 export interface CreateCustomerInputChannelOptions {
   onExpired?: (payload: OperatorExpiredPayload) => void;
@@ -109,6 +181,25 @@ export interface CreateCustomerInputChannelOptions {
   operatorId: string;
   /** 关联 id 生成器（缺省 `op-<n>`；注入以便测试确定性）。 */
   nextId?: () => string;
+  /**
+   * **治理卡判断 agent（2026-10-18 双开关评审 §8.1）**：缺省 ⇒ 永不判断（行为与改动前逐字一致）。
+   * `fn` 也可由每次 `customerInput` 的 `ctx.governanceJudge` 提供（per-session；ctx 优先）。
+   * `isGroupEnabled` 是主进程权威——通道在 `presentEntry` 当刻与 `approve` 结算前各查一次。
+   * 本模块**不判定**「该不该批」：只把请求与 `metadata.judgeContext` 的应用事实拼给 driver。
+   */
+  judge?: {
+    /** 每会话注入的判断能力；缺省 ⇒ 不判断。 */
+    fn?: GovernanceJudgeFn;
+    /** 主进程权威：所属组是否开启（approval/decision 互不影响）。 */
+    isGroupEnabled: (group: GovernanceJudgeGroup) => boolean;
+    /** 通道层防御超时；缺省 15000ms（driver 内还有一层硬超时）。 */
+    timeoutMs?: number;
+  };
+  /**
+   * **判断结果行推送**（§8.1）：`approve` 时调用；**抛错/缺失 ⇒ 该卡回落 `manual/row-failed`**。
+   * 结果行是代批的可见性条件；主进程推 IPC `session:operator-judge`。
+   */
+  emitJudgeResult?: (payload: OperatorJudgeResultPayload) => void;
 }
 
 export interface CustomerInputChannel {
@@ -138,6 +229,11 @@ export interface CustomerInputChannel {
    */
   pendingRoles(): Map<string, number>;
   replayPending(): number;
+  /**
+   * **判断中的卡数**（2026-10-18 双开关评审 §4.2；诊断/测试用）：`judging` 既不是「等待客户」也不计入
+   * `pendingCount`/`queuedCount`/`pendingRoles`（看护把它视为角色忙碌，不点亮「等待你确认」徽标）。
+   */
+  judgingCount(): number;
 }
 
 /**
@@ -154,6 +250,12 @@ export type DesktopCustomerInputFn = (
     sessionSignal?: AbortSignal;
     /** 决定卡镜像面（trio 主入口 Liaison 的角色 id；由 `SessionManager.open` 按模型/卡片种类/来源角色计算）。 */
     mirrorRoleId?: string;
+    /** 治理模型（`SessionManager.open` 定格）：判断门只认 `"trio"`；single/su 不代批（§3.2）。 */
+    governanceModel?: "single" | "trio";
+    /** 每会话判断闭包（编排 `createGovernanceJudge`；与 shell judge 同一份 runtimeOptions/createAdapter）。 */
+    governanceJudge?: GovernanceJudgeFn;
+    /** 当前轮投递给该角色的文本（≤4KB；判断 agent 的 `turnText` 输入）。缺省不猜。 */
+    turnText?: string;
   },
   metadata?: CustomerInputMetadata,
 ) => Promise<CustomerInputOutcome | null | undefined> | CustomerInputOutcome | null | undefined;
@@ -166,6 +268,8 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
   const operatorId =
     typeof opts.operatorId === "string" && opts.operatorId.trim() !== "" ? opts.operatorId : "unknown";
   let seq = 0;
+  /** 判断结果行的幂等键序号（本通道/窗口内递增；结果行是运行期呈现，不回放）。 */
+  let judgeResultSeq = 0;
   /**
    * 治理决定卡**一项目一卡**（评审 §6.1 硬约束 / §九-10）：同一 `projectRoot` 同一时刻只**呈现**一张；
    * 后续请求进 `waiting`，**不调用 presenter、不自动批准**；第一张 resolve/取消/超时/会话失效后按序呈现。
@@ -179,9 +283,27 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     signals: AbortSignal[];
     cleanup: () => void;
     resolve: (outcome: CustomerInputOutcome) => void;
-    state: "active" | "queued" | "done";
+    /**
+     * `queued` → `judging`（判断 agent 正在看卡；**不是**在等客户）→ `active`（卡片已呈现）/`done`。
+     * 只有 `active` 进 `pending`；`judging` 占住一项目一卡，但**不点亮**「等待你确认」。
+     */
+    state: "active" | "queued" | "judging" | "done";
+    /** 同一请求只判断一次（§4.2）：进入 `judging` 即定格；`replay`/`drain` 永不再次判断。 */
+    judged?: boolean;
+    /** 判断所需的会话上下文（调用当刻快照；不含任何判定）。 */
+    ctx: {
+      runtime?: CustomerInputMetadata["runtime"];
+      projectRoot?: string;
+      governanceModel?: "single" | "trio";
+      governanceJudge?: GovernanceJudgeFn;
+      turnText?: string;
+    };
+    /** `run-role` 计算的应用事实（`judgeContext`）与卡片元数据；原样透传、不重算。 */
+    metadata?: CustomerInputMetadata;
   }
   const pending = new Map<string, ChannelEntry>();
+  /** 判断中的卡（不呈现、不计入 pending/queued/pendingRoles；中止时一并结算）。 */
+  const judging = new Map<string, ChannelEntry>();
   /** projectKey → 排队中的请求（按到达序）。 */
   const waiting = new Map<string, ChannelEntry[]>();
   /** projectKey → 当前占位请求 id（未呈现时不存在）。 */
@@ -243,20 +365,30 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     }
   };
 
-  /** 结算**已呈现**的那张：清 pending/占位 → 清监听 → resolve → 下一步推导 → 按序呈现同项目下一张。 */
-  const settleActive = (entry: ChannelEntry, outcome: CustomerInputOutcome): void => {
-    if (entry.state !== "active") return;
-    entry.state = "done";
-    pending.delete(entry.payload.id);
+  /**
+   * 结算一张卡（已呈现或判断中）：清对应登记/占位 → 清监听 → resolve → 下一步推导 → 按序呈现同项目下一张。
+   * **`notifyNextStep`/`drainProject` 恰一次**（§4.3）：代批成功与客户手批走同一条结算路径，
+   * 下一步的 `advanceGovernanceFlow`/`dispatch.accepted(app)` 语义逐字不变。
+   */
+  const settleEntry = (entry: ChannelEntry, outcome: CustomerInputOutcome, from: "active" | "judging"): void => {
+    if (entry.state !== from) return;
+    if (from === "active") pending.delete(entry.payload.id);
+    else judging.delete(entry.payload.id);
     if (activeByProject.get(entry.projectKey) === entry.payload.id) activeByProject.delete(entry.projectKey);
+    entry.state = "done";
     entry.cleanup();
     entry.resolve(outcome);
     notifyNextStep(entry, outcome);
     drainProject(entry.projectKey);
   };
 
-  /** 呈现队首（只在项目无占位时调用；presenter 抛错 ⇒ 该张 declined 并继续下一张）。 */
-  const presentEntry = (entry: ChannelEntry): void => {
+  /** 结算**已呈现**的那张（既有语义逐字不变）。 */
+  const settleActive = (entry: ChannelEntry, outcome: CustomerInputOutcome): void => {
+    settleEntry(entry, outcome, "active");
+  };
+
+  /** 呈现一张卡（原路径；`judgeNotice` 若有已由回落路径写在 `payload` 上）：登记 pending/占位 → presenter。 */
+  const presentNow = (entry: ChannelEntry): void => {
     activeByProject.set(entry.projectKey, entry.payload.id);
     pending.set(entry.payload.id, entry);
     entry.state = "active";
@@ -268,6 +400,300 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
       // 推不达（窗口已关等）→ 未获同意（fail-closed），不留悬案；继续呈现同项目下一张。
       settleActive(entry, { outcome: "declined", operatorId, reason: `客户交互请求未能送达界面：${reasonOf(err)}` });
     }
+  };
+
+  /** 一次判断的定格计划（`shouldJudge` 全部满足才生成；只读事实，不含判定）。 */
+  interface JudgePlan {
+    fn: GovernanceJudgeFn;
+    request: GovernanceJudgeRequest;
+    group: GovernanceJudgeGroup;
+    cardKind: GovernanceCardKind;
+    timeoutMs: number;
+  }
+
+  const DEFAULT_JUDGE_TIMEOUT_MS = 15_000;
+
+  /**
+   * `shouldJudge`（评审 §4.2，全部满足才调用 judge）：
+   * ① presenter 存在（没有回落面就不判断）；② 注入了 judge fn（ctx 优先）；③ `cardKind` 有组；
+   * ④ 主进程权威 `isGroupEnabled(group)`；⑤ `governanceModel === "trio"`；⑥ flowId 合法/非空；
+   * ⑦ 信号未中止。另：`judgeContext` 必须存在（应用事实缺席 ⇒ 保持手动，旧路径零变化）。
+   */
+  const planJudge = (entry: ChannelEntry): JudgePlan | undefined => {
+    if (opts.presenter === undefined) return undefined;
+    if (entry.judged === true) return undefined; // 同一请求只判断一次
+    const judgeContext = entry.metadata?.judgeContext;
+    if (judgeContext === undefined) return undefined;
+    const cardKind = entry.request.cardKind ?? entry.metadata?.cardKind;
+    if (cardKind === undefined) return undefined;
+    const group = governanceCardGroup(cardKind);
+    if (group === undefined) return undefined; // 无 cardKind/未知 kind 的旧卡永不判断
+    if (opts.judge?.isGroupEnabled(group) !== true) return undefined;
+    const fn = entry.ctx.governanceJudge ?? opts.judge?.fn;
+    if (fn === undefined) return undefined;
+    if (entry.ctx.governanceModel !== "trio") return undefined; // single/su：写盘族与 decision 都不代批
+    const projectRoot = entry.ctx.projectRoot;
+    const runtime = entry.ctx.runtime ?? entry.metadata?.runtime;
+    if (typeof projectRoot !== "string" || projectRoot === "" || runtime === undefined) return undefined;
+    const flowId =
+      typeof judgeContext.flowId === "string" && judgeContext.flowId !== ""
+        ? judgeContext.flowId
+        : entry.metadata?.flowId ?? entry.request.flowId;
+    if (typeof flowId !== "string" || flowId === "") return undefined; // judged card 必须可入账
+    if (entry.signals.some((signal) => signal.aborted)) return undefined;
+    const request: GovernanceJudgeRequest = {
+      group,
+      cardKind,
+      roleId: entry.payload.roleId,
+      projectRoot,
+      runtime,
+      governanceModel: "trio",
+      flowId,
+      card: entry.request,
+      facts: judgeContext.facts,
+      at: new Date().toISOString(),
+    };
+    const stepId = judgeContext.stepId ?? entry.metadata?.stepId ?? entry.request.stepId;
+    if (typeof stepId === "string" && stepId !== "") request.stepId = stepId;
+    const toolCallId = judgeContext.toolCallId ?? entry.metadata?.toolCallId;
+    if (typeof toolCallId === "string" && toolCallId !== "") request.toolCallId = toolCallId;
+    const turnId = judgeContext.turnId ?? entry.metadata?.turnId;
+    if (typeof turnId === "string" && turnId !== "") request.turnId = turnId;
+    if (typeof entry.ctx.turnText === "string" && entry.ctx.turnText !== "") request.turnText = entry.ctx.turnText;
+    if (judgeContext.paths !== undefined) request.paths = judgeContext.paths;
+    if (judgeContext.pathProbes !== undefined) request.pathProbes = judgeContext.pathProbes;
+    if (judgeContext.allowedPathRoots !== undefined) request.allowedPathRoots = judgeContext.allowedPathRoots;
+    if (judgeContext.forbiddenPaths !== undefined) request.forbiddenPaths = judgeContext.forbiddenPaths;
+    if (judgeContext.artifacts !== undefined) request.artifacts = judgeContext.artifacts;
+    if (judgeContext.recommendedRoleIds !== undefined) request.recommendedRoleIds = judgeContext.recommendedRoleIds;
+    const configured = opts.judge?.timeoutMs;
+    const timeoutMs =
+      typeof configured === "number" && Number.isFinite(configured) && configured > 0
+        ? Math.floor(configured)
+        : DEFAULT_JUDGE_TIMEOUT_MS;
+    return { fn, request, group, cardKind, timeoutMs };
+  };
+
+  /** 构造一次 fail-closed 的 manual 结果（渠道/超时/防御映射用；不伪造 approve）。 */
+  const manualOutcome = (plan: JudgePlan, reasonCode: string, reason?: string): GovernanceJudgeOutcome => ({
+    verdict: "manual",
+    group: plan.group,
+    cardKind: plan.cardKind,
+    reasonCode,
+    engine: plan.request.runtime,
+    ...(reason !== undefined ? { reason } : {}),
+  });
+
+  /** 判断结论的 `value` 必须与卡片形状/选项一致（防注入的防御复核；driver 已规范化）。 */
+  const approvedValue = (
+    request: CustomerInputRequest,
+    outcome: GovernanceJudgeOutcome,
+  ): { selected?: string[]; confirmed?: true } | undefined => {
+    if (request.kind === "confirm") {
+      return outcome.value?.confirmed === true ? { confirmed: true } : undefined;
+    }
+    const raw = outcome.value?.selected;
+    if (!Array.isArray(raw) || raw.length === 0 || raw.some((item) => typeof item !== "string")) return undefined;
+    const selected = [...new Set(raw)];
+    if (selected.length !== raw.length) return undefined;
+    const offered = new Set(request.options.map((option) => option.id));
+    if (selected.some((item) => !offered.has(item))) return undefined;
+    if (request.multiple !== true && selected.length !== 1) return undefined;
+    return { selected };
+  };
+
+  /** 判断回落的人话提示（§9.3；`row-failed` 单列；不把「判断发生但降级」说成「没发生」）。 */
+  const judgeManualNotice = (group: GovernanceJudgeGroup, reasonCode: string, reason?: string): string => {
+    const label = group === "approval" ? "代审批" : "代决策";
+    if (reasonCode === "row-failed") return "判断已完成，但结果无法在聊天中显示；已转你手动确认。";
+    return `判断 agent 未代批（${label}）：${judgeHumanReason(reasonCode, reason)}；已转你手动确认。`;
+  };
+
+  /** 结算判断结果：approve 先发结果行再走同一 `settleEntry`；manual 设 `judgeNotice` 后呈现原卡。 */
+  const settleJudgeOutcome = (entry: ChannelEntry, plan: JudgePlan, rawOutcome: GovernanceJudgeOutcome): void => {
+    const { group, cardKind } = plan;
+    let outcome = rawOutcome;
+    if (outcome.verdict === "approve") {
+      // §4.3-1：判断期间开关可能被关/重载复位 ⇒ 再查一次（主进程权威）。
+      if (opts.judge?.isGroupEnabled(group) !== true) {
+        diagnostic.record("governance-judge.switch.off", { requestId: entry.payload.id, group });
+        outcome = manualOutcome(plan, "switch-off", "你已关闭对应开关");
+      } else if (outcome.group !== group || outcome.cardKind !== cardKind) {
+        outcome = manualOutcome(plan, "group-mismatch", "判断结果分组与卡片不符");
+      } else {
+        const value = approvedValue(entry.request, outcome);
+        if (value === undefined) {
+          outcome = manualOutcome(plan, "not-recommended", "判断结论与卡片选项不符");
+        } else {
+          const payload: OperatorJudgeResultPayload = {
+            version: 1,
+            id: `gj-${++judgeResultSeq}`,
+            requestId: entry.payload.id,
+            anchorKey: entry.payload.anchorKey,
+            toolCallId: entry.payload.toolCallId ?? "",
+            roleId: entry.payload.roleId,
+            at: new Date().toISOString(),
+            group,
+            cardKind,
+            ...(plan.request.flowId !== "" ? { flowId: plan.request.flowId } : {}),
+            engine: outcome.engine,
+            ...(entry.payload.projectRoot !== undefined ? { projectRoot: entry.payload.projectRoot } : {}),
+            ...(entry.payload.runtime !== undefined ? { runtime: entry.payload.runtime } : {}),
+            reasonCode: outcome.reasonCode,
+            ...(outcome.model !== undefined ? { model: outcome.model } : {}),
+            ...(outcome.reason !== undefined ? { reason: outcome.reason } : {}),
+            ...(value.selected !== undefined ? { selected: value.selected } : {}),
+            ...(value.confirmed === true ? { confirmed: true as const } : {}),
+            ...(outcome.paths !== undefined ? { paths: outcome.paths } : {}),
+            ...(outcome.pathDecisions !== undefined ? { pathDecisions: outcome.pathDecisions } : {}),
+            ...(outcome.evidence !== undefined ? { evidence: outcome.evidence } : {}),
+            ...(outcome.durationMs !== undefined ? { durationMs: outcome.durationMs } : {}),
+            ...(outcome.readCalls !== undefined ? { readCalls: outcome.readCalls } : {}),
+            ...(outcome.readBytes !== undefined ? { readBytes: outcome.readBytes } : {}),
+          };
+          let rowFailed = false;
+          try {
+            if (opts.emitJudgeResult === undefined) throw new Error("判断结果行通道未配置");
+            opts.emitJudgeResult(payload);
+          } catch (error) {
+            // 结果行是 approve 的条件：投达失败 ⇒ 原卡手动（§4.3-3）。
+            diagnostic.error("governance-judge.row.failed", error, {
+              requestId: entry.payload.id,
+              toolCallId: entry.payload.toolCallId,
+              cardKind,
+            });
+            rowFailed = true;
+          }
+          if (!rowFailed) {
+            const audit: GovernanceJudgeAudit = {
+              group,
+              cardKind,
+              engine: outcome.engine,
+              ...(outcome.model !== undefined ? { model: outcome.model } : {}),
+              reasonCode: outcome.reasonCode,
+              ...(outcome.reason !== undefined ? { reason: outcome.reason } : {}),
+              ...(outcome.evidence !== undefined ? { evidence: outcome.evidence } : {}),
+              ...(value.selected !== undefined ? { selected: value.selected } : {}),
+              ...(value.confirmed === true ? { confirmed: true as const } : {}),
+              ...(outcome.paths !== undefined ? { paths: outcome.paths } : {}),
+              ...(outcome.pathDecisions !== undefined ? { pathDecisions: outcome.pathDecisions } : {}),
+              ...(outcome.durationMs !== undefined ? { durationMs: outcome.durationMs } : {}),
+              ...(outcome.readCalls !== undefined ? { readCalls: outcome.readCalls } : {}),
+              ...(outcome.readBytes !== undefined ? { readBytes: outcome.readBytes } : {}),
+            };
+            diagnostic.record("governance-judge.approve", {
+              requestId: entry.payload.id,
+              group,
+              cardKind,
+              engine: outcome.engine,
+              reasonCode: outcome.reasonCode,
+              selectedCount: value.selected?.length ?? 0,
+              pathCount: outcome.paths?.length ?? 0,
+              durationMs: outcome.durationMs,
+              readCalls: outcome.readCalls,
+              readBytes: outcome.readBytes,
+            });
+            settleEntry(
+              entry,
+              {
+                outcome: "answered",
+                value,
+                operatorId: `judge:${outcome.engine}`,
+                judge: audit,
+              },
+              "judging",
+            );
+            return;
+          }
+          outcome = manualOutcome(plan, "row-failed", "判断结果无法在聊天中显示");
+        }
+      }
+    }
+    // manual（含全部回落）：原卡 + judgeNotice；不写账本决定；客户手答仍是 customer-input 证据。
+    if (entry.state !== "judging") return; // 已中止/已结算：丢弃结果
+    diagnostic.record("governance-judge.manual", {
+      requestId: entry.payload.id,
+      group,
+      cardKind,
+      reasonCode: outcome.reasonCode,
+    });
+    judging.delete(entry.payload.id);
+    entry.payload.judgeNotice = judgeManualNotice(group, outcome.reasonCode, outcome.reason);
+    presentNow(entry);
+  };
+
+  /** 启动一次判断（异步、不阻塞队列）；迟到/中止后的结果看到 `state !== "judging"` 一律丢弃。 */
+  const runJudge = async (entry: ChannelEntry, plan: JudgePlan): Promise<void> => {
+    // 通道层防御超时：`AbortSignal.timeout`（不引入 self 计时器——卡片等待语义不变）。
+    const timeoutSignal = AbortSignal.timeout(plan.timeoutMs);
+    const combined = AbortSignal.any([timeoutSignal, ...entry.signals]);
+    const aborted = Symbol("judge-aborted");
+    const abortPromise = new Promise<typeof aborted>((resolve) => {
+      if (combined.aborted) {
+        resolve(aborted);
+        return;
+      }
+      combined.addEventListener("abort", () => resolve(aborted), { once: true });
+    });
+    let outcome: GovernanceJudgeOutcome | typeof aborted;
+    try {
+      outcome = await Promise.race([plan.fn(plan.request, combined), abortPromise]);
+    } catch (error) {
+      // 编排 driver 契约上不抛错；这里是防御映射（仍 fail-closed，绝不默认放行）。
+      const touched = entry.signals.some((signal) => signal.aborted);
+      outcome = manualOutcome(
+        plan,
+        touched ? "aborted" : "unavailable",
+        touched ? "本轮已中止，判断结果不生效。" : `判断异常：${reasonOf(error)}`,
+      );
+    }
+    if (entry.state !== "judging") return; // 中止/关窗/已结算：不写任何东西
+    if (outcome === aborted) {
+      const timedOut = timeoutSignal.aborted && !entry.signals.some((signal) => signal.aborted);
+      outcome = manualOutcome(
+        plan,
+        timedOut ? "timeout" : "aborted",
+        timedOut ? `判断超时（>${plan.timeoutMs}ms）` : "本轮已中止，判断结果不生效。",
+      );
+    } else if (
+      outcome === null ||
+      typeof outcome !== "object" ||
+      (outcome.verdict !== "approve" && outcome.verdict !== "manual")
+    ) {
+      // 注入的 fn 未按契约交回裁决：防御性 fail-closed，绝不默认放行。
+      outcome = manualOutcome(plan, "parse-failed", "判断结果形状非法");
+    }
+    settleJudgeOutcome(entry, plan, outcome);
+  };
+
+  /** 呈现队首（只在项目无占位时调用）：先过判断门；`judging` 占住一项目一卡并异步判断，否则原路径呈现。 */
+  const presentEntry = (entry: ChannelEntry): void => {
+    const plan = planJudge(entry);
+    if (plan === undefined) {
+      presentNow(entry);
+      return;
+    }
+    // 应用事实不可用（账本不可读/计算失败）：不调用模型、直接原卡 + 提示（fail-closed，禁止 approve）。
+    if (entry.metadata?.judgeContext?.unavailableReason !== undefined) {
+      entry.payload.judgeNotice = judgeManualNotice(plan.group, "ledger-unavailable");
+      presentNow(entry);
+      return;
+    }
+    activeByProject.set(entry.projectKey, entry.payload.id); // 防下一张被 drain（一项目一卡）
+    judging.set(entry.payload.id, entry);
+    entry.state = "judging";
+    entry.judged = true; // 同一请求只判断一次
+    diagnostic.record("governance-judge.started", {
+      requestId: entry.payload.id,
+      toolCallId: entry.payload.toolCallId,
+      roleId: entry.payload.roleId,
+      projectRoot: entry.payload.projectRoot,
+      runtime: entry.payload.runtime,
+      group: plan.group,
+      cardKind: plan.cardKind,
+      flowId: plan.request.flowId,
+    });
+    void runJudge(entry, plan);
   };
 
   /** 同项目下一张：无占位且队列非空 ⇒ 按到达序呈现（绝不并发/合并/批准）。 */
@@ -327,22 +753,29 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
         cleanup: () => { for (const signal of signals) signal.removeEventListener("abort", cancel); },
         resolve,
         state: "queued",
+        // 判断上下文（§4.2/§5.2）：只存调用当刻的会话事实；是否判断在 `presentEntry` 当刻再查开关。
+        ctx: {
+          ...(ctx.runtime !== undefined ? { runtime: ctx.runtime } : {}),
+          ...(ctx.projectRoot !== undefined ? { projectRoot: ctx.projectRoot } : {}),
+          ...(ctx.governanceModel !== undefined ? { governanceModel: ctx.governanceModel } : {}),
+          ...(ctx.governanceJudge !== undefined ? { governanceJudge: ctx.governanceJudge } : {}),
+          ...(typeof ctx.turnText === "string" && ctx.turnText !== "" ? { turnText: ctx.turnText } : {}),
+        },
+        ...(metadata !== undefined ? { metadata } : {}),
       };
-      /** 取消（轮次停止 / 会话重建）：active ⇒ 结算并放行下一张；queued ⇒ 出队结算（从不呈现）。 */
+      /** 取消（轮次停止 / 会话重建）：active/judging ⇒ 结算并放行下一张；queued ⇒ 出队结算（从不呈现）。 */
       const cancel = () => {
         if (entry.state === "done") return;
-        const wasActive = entry.state === "active";
-        if (wasActive) {
-          pending.delete(id);
-          if (activeByProject.get(projectKey) === id) activeByProject.delete(projectKey);
-        } else {
-          removeQueued(entry);
-        }
+        const wasOccupying = entry.state === "active" || entry.state === "judging";
+        if (entry.state === "active") pending.delete(id);
+        else if (entry.state === "judging") judging.delete(id);
+        else removeQueued(entry);
+        if (wasOccupying && activeByProject.get(projectKey) === id) activeByProject.delete(projectKey);
         entry.state = "done";
         entry.cleanup();
         entry.resolve({ outcome: "unavailable", reason: "本轮已停止或会话已重建，旧确认失效。" });
         notifyExpired(entry, "本轮已停止或会话已重建，旧确认失效。");
-        if (wasActive) drainProject(projectKey);
+        if (wasOccupying) drainProject(projectKey);
       };
       if (activeByProject.has(projectKey)) {
         // 一项目一卡：后续请求入队、不呈现；状态经 onQueued 让界面显示「等待前一个决定」。
@@ -428,9 +861,9 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
 
   function rejectAllPending(reason: string): void {
     diagnostic.record("interaction.closed", { pendingCount: pending.size, queuedCount: queuedCount() });
-    // 已呈现的卡与排队中的请求都归 declined（窗关/项目关闭 = 未获同意，fail-closed）；
-    // 排队者从未呈现，仍经 onExpired 让界面清掉「等待前一个决定」行。
-    for (const entry of [...pending.values(), ...[...waiting.values()].flat()]) {
+    // 已呈现的卡、判断中的卡与排队中的请求都归 declined（窗关/项目关闭 = 未获同意，fail-closed）；
+    // 排队者从未呈现，仍经 onExpired 让界面清掉「等待前一个决定」行；判断中的卡迟到结果被丢弃（state=done）。
+    for (const entry of [...pending.values(), ...judging.values(), ...[...waiting.values()].flat()]) {
       if (entry.state === "done") continue;
       entry.state = "done";
       notifyExpired(entry, reason);
@@ -438,6 +871,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
       entry.resolve({ outcome: "declined", operatorId, reason });
     }
     pending.clear();
+    judging.clear();
     waiting.clear();
     activeByProject.clear();
   }
@@ -486,7 +920,41 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     for (const queue of waiting.values()) for (const entry of queue) add(entry);
     return counts;
   }
-  return { customerInput, respond, rejectAllPending, pendingCount: () => pending.size + queuedCount(), queuedCount, pendingRoles, replayPending };
+  return {
+    customerInput,
+    respond,
+    rejectAllPending,
+    pendingCount: () => pending.size + queuedCount(),
+    queuedCount,
+    pendingRoles,
+    replayPending,
+    judgingCount: () => judging.size,
+  };
+}
+
+/** 判断回落的人话映射（未知码回落到有界理由；仅展示，不参与任何判定）。 */
+function judgeHumanReason(reasonCode: string, reason?: string): string {
+  switch (reasonCode) {
+    case "switch-off": return "你已关闭对应开关";
+    case "timeout": return "判断超时";
+    case "aborted": return "本轮已中止";
+    case "unavailable": return "判断服务不可用";
+    case "unsupported-engine": return "当前引擎不支持自动判断";
+    case "parse-failed": return "判断结果无法解析";
+    case "artifact-missing": return "规范物证缺失";
+    case "artifact-not-read": return "判断未读取必需的项目文件";
+    case "path-outside-boundary": return "写盘路径不在允许范围内";
+    case "path-unverified": return "写盘路径无法逐项核对";
+    case "not-recommended": return "候选与推荐/选项不一致";
+    case "insufficient-evidence": return "证据不足";
+    case "ledger-unavailable": return "治理事实不可读";
+    case "group-mismatch": return "判断结果与卡片分组不一致";
+    case "read-denied": return "所需项目文件无法读取";
+    case "budget": return "读取预算已用尽";
+    case "read-truncated": return "读取内容被截断";
+    case "context-missing": return "缺少判断所需的上下文";
+    default: return typeof reason === "string" && reason !== "" ? reason : "判断未给出可代批结论";
+  }
 }
 
 function reasonOf(err: unknown): string {

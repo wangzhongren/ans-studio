@@ -57,7 +57,7 @@ export function buildShellJudgeSystemPrompt(): string {
     "结论必须调用工具 report_shell_judgement 交回；在正文里写结论不算数。参数：",
     '{"verdict":"allow|deny|manual","reason":"简短、可核对的理由","customerMessage":"可直接转述给客户的人话","evidence":["相对路径或任务依据"],"alternative":{"kind":"command|tool|instruction","value":"具体值","rationale":"为什么更安全"}}',
     "- allow：必须给出非空 reason（不能是「看起来没问题」）；理由要能指出依据。",
-    "- deny：有更安全的做法时给 alternative；没有时用 customerMessage 说明原因与下一步（含「如需执行，请关闭『替我审』后重试」）。没有替代方案仍然是 deny，不是 manual。",
+    "- deny：有更安全的做法时给 alternative；没有时用 customerMessage 说明原因与下一步（含「如需执行，请关闭『替我审批』后重试」）。没有替代方案仍然是 deny，不是 manual。",
     "- manual：仅限判断无法发生（读取策略/预算阻止判断等）；不得用 manual 逃避「不必要」或「不确定」判断。",
     "- 不确定但能说明 → deny，不弹卡；不要把「不必要」「无替代方案」当 manual。",
     "",

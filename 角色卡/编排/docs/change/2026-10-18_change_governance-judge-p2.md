@@ -1,0 +1,55 @@
+# 变更记录：P2 编排——治理卡判断 agent（「替我审批」/「替我决策」）
+
+- 日期：2026-10-18
+- 角色：编排
+- 依据：`角色卡/项目管理/docs/design/2026-10-18_design_judge-governance-cards-review.md` §五–§七、§十、§十二（status approved）；P1 运行时核心契约已冻结。
+- 边界：只改 `src/common/编排/`、`src/pipeline/orchestration/{run-role.ts,govern-session.ts}`、`src/provider/runtime/tools.ts`（仅回执）、`test/编排/`、本角色文档。未碰门禁引擎、运行时核心、适配器、桌面、UI。
+
+## 一、交付内容
+
+### 新增（`src/common/编排/`）
+
+| 文件 | 职责 |
+| --- | --- |
+| `governance-judge.ts` | `createGovernanceJudge` / `GOVERNANCE_JUDGE_SUPPORTED_RUNTIMES` / `governanceJudgeAuditOf`。复用 shell judge 生命周期骨架（不抽 `judge-session.ts`、不改 `shell-judge.ts`）：合成角色、`persistSession:false`、deny-all、只读能力注入、15s、中止、busy、无防循环。 |
+| `governance-judge-prompt.ts` | 稳定系统提示（只读代理、正向代批、不可信数据、`.ans/**` 硬排除、六卡种 rubric、输出契约）＋本次请求提示（卡片/路径/探测/事实/必读物证/`turnText` 截断）。 |
+| `governance-judge-verdict.ts` | **唯一规范化点**：严格取值域、accept-quick 不代批、任命恰等推荐集、写根/禁写/来源匹配、`pathProbes`+`pathDecisions` 逐路径复核、required-read、读取损伤/账本错误 fail-closed、模型 `reasonCode` 安全映射、审计有界。 |
+| `governance-judge-facts.ts` | 有界账本事实（字符串 ≤128B、数组 ≤50、整体 ≤8KB）、逐卡种规范物证、提名推荐集解析（frontmatter/固定行、缺失/歧义 ⇒ undefined）。 |
+
+### 修改
+
+- `src/pipeline/orchestration/run-role.ts`
+  - `AdapterCapabilities.governanceJudge` + 工厂透传。
+  - `governedInput` 计算 `judgeContext`（唯一计算点；仅 trio + 允许 cardKind + 合法 flowId；先刷新账本；paths/pathProbes 与 issuer 同一份；错误 ⇒ `unavailableReason` + `ledgerErrors:1`）。
+  - `recordCustomerDecision`：`decisionEvidence.kind:"judge"` + 有界 judge；`actorRoleId`/`power` 不变；group 交叉校验只诊断；审计失败诊断。
+- `src/common/编排/governance-ledger.ts`：`kind` 增 `"judge"`、增 `judge?: GovernanceJudgeAudit`。
+- `src/provider/runtime/tools.ts`：两交互工具的 judge 代批回执（含「不是客户本人点击」）；客户手批文案逐字不变。
+- `src/pipeline/orchestration/govern-session.ts`：按 §7.6 薄再导出。
+
+## 二、关键机械门槛（fail-closed）
+
+1. 账本 `ledgerErrors > 0` 或 `unavailableReason` ⇒ 所有 approve → manual。
+2. 读取被拒/截断/预算耗尽 ⇒ approve → manual（预算优先）。
+3. 规范物证缺失 ⇒ `artifact-missing`；必读物证未实际读取 ⇒ `artifact-not-read`；必读超预算 ⇒ `budget`。
+4. confirm 卡：`paths` 非空、`pathProbes` 全 `allowed`、路径在写根内且不在禁写前缀、来源角色写区匹配、`pathDecisions` 精确覆盖且全 ok；任一不满足整卡 manual，不发行 writeSet。
+5. `appointment-write` 目标必须在最新任命名单且非内置；`schedule-write` 路径必须匹配 flowId。
+6. proposal/acceptance 只接受 `["accept"]`；`accept-quick`/`revise`/`reject`/空选择 → manual。
+7. appointment `selected` 恰等于 `recommendedRoleIds`（无重复、⊆ 选项、非内置、多选一致性）。
+8. 模型自报 `reasonCode` 仅安全名单透传，其余 `model-manual`。
+9. **acceptance 流程完成度（P6 验收观察）**：提示前读流程单 + 账本——所有步骤 `done`、每步都有 `dispatch.accepted`、无 `unclassified`/`none` 未结算决定、无未闭环澄清、账本可读；任一不满足直接 `manual`，不调用模型、不靠模型自报。
+10. 双开关后 shell 出路句统一为 `如需执行，请关闭「替我审批」后重试。`（不再写「替我审」）。
+
+## 三、证据
+
+- 新增 `test/编排/governance-judge.test.ts` **28/28**。
+- 相关既有套件 **74/74**。
+- `npm run typecheck`：**0 错**。
+- 全量三层 glob `node --test "test/**/*.test.ts"`：**2895 计 / 2874 过 / 18 红 / 3 skipped**。18 红逐条归因均为他域/环境既有：9 条 Windows symlink EPERM、5 条桌面 renderer 既有红（`test/桌面应用/`，文件未动）、vendor markdown-it pin 1 条、`test/runtime-core/tools.test.ts` abort shell 1 条（单跑通过，全量负载下时序 flake）、`test/测试/shell-judge-verify/b-deny-flow` 2 条（本次统一「替我审批」文案后的预期红，待测试角色同步）。本批零新增非预期红。
+
+## 四、偏离/未做（如实登记）
+
+1. 桌面侧诊断事件（`governance-judge.switch.off`/`row.failed`）与状态机/结果行归 P4；`read.denied` 无逐调用回调，driver 以 `manual/read-denied` 汇总。
+2. shell 审计 `group:"approval"` 与桌面 operator-channel 归 P4（§7.1 明示 V1 不改 `shell-judge.ts`）。
+3. 回执在 §7.5 金文本基础上增「代审批/代决策」分组标记，以满足 §10.2。
+4. required-read 的「confirm 卡已存在目标文件」由 driver 用 `stat` 机械判定（不新增契约字段）。
+5. 未 git 提交；未读 `.env`、未跑真实模型/凭据/网络。

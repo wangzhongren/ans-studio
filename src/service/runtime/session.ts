@@ -15,6 +15,7 @@ import type {
 import { RUNTIME_KINDS } from "../../common/shared/runtime-shared.ts";
 import { buildGovernedTools, createDemoRuntimeAdapter } from "../../provider/runtime/tools.ts";
 import { buildShellJudgeTools } from "../../common/runtime-core/shell-judge/tools.ts";
+import { buildGovernanceJudgeTools } from "../../common/runtime-core/governance-judge/tools.ts";
 import { createRuntimeSessionStore, readRuntimeSessionHistory as readStoredRuntimeSessionHistory } from "../../provider/runtime/session-store.ts";
 import { createToolDisplayContext, jsonBytes } from "../../common/runtime-core/tool-display.ts";
 import { listInstalledMcpServers } from "../../common/runtime-core/mcp-declarations.ts";
@@ -101,6 +102,11 @@ async function defaultFactory(runtime: RuntimeKind): Promise<RuntimeProviderFact
 
 export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAdapter {
   if (!(RUNTIME_KINDS as readonly string[]).includes(options.runtime)) throw new Error(`未知运行时：${options.runtime}`);
+  // 2026-10-18 双开关评审 §6.2：`shellJudge` 与 `governanceJudge` **恰一**——同时给出是配置错误，
+  // 不静默择一（否则 shell 会话可能悄悄拿到治理工具，或反之）。
+  if (options.shellJudge !== undefined && options.governanceJudge !== undefined) {
+    throw new Error("shellJudge 与 governanceJudge 互斥：判断会话只能注入其中一种判断能力");
+  }
   const providers = new Map<ResolvedRole, Promise<{
     adapter: RuntimeAdapter; options: RuntimeProviderOptions; display: ReturnType<typeof createToolDisplayContext>; setTurn(id?: string, controller?: AbortController): void;
   }>>();
@@ -113,13 +119,19 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
       const interactionGate = createInteractionGate();
       const display = createToolDisplayContext({credentialEnvNames:[...(options.extraCredentialEnvVars ?? []),...(options.apiKeyEnvVar ? [options.apiKeyEnvVar] : [])],requireProfile:true});
       const storage = options.persistSession ? createRuntimeSessionStore({ projectRoot: options.projectRoot, roleId: role.id, runtime: options.runtime }) : undefined;
-      const judgeTools = options.shellJudge;
-      // 判断 agent（「替我审」）：**能力注入，不是工具注入**——注入 `shellJudge` 时只走
-      // `buildShellJudgeTools`（恰三只只读工具），**不得**走 `buildGovernedTools`（结构性隔离：
-      // 判断会话不存在 write_file/edit_file/read_file/run_shell/客户交互/回交/派发/MCP 工具）。
-      const tools = judgeTools !== undefined
-        ? buildShellJudgeTools(judgeTools)
-        : buildGovernedTools(options.gate, {
+      const shellJudge = options.shellJudge;
+      const governanceJudge = options.governanceJudge;
+      const judgeTools = shellJudge ?? governanceJudge;
+      // 判断 agent：**能力注入，不是工具注入**——注入 `shellJudge` 时只走 `buildShellJudgeTools`
+      // （恰三只只读工具）；注入 `governanceJudge` 时只走 `buildGovernanceJudgeTools`
+      // （恰 `judge_read_file`/`judge_list_dir`/`report_governance_judgement`）。两者都**不得**走
+      // `buildGovernedTools`（结构性隔离：判断会话不存在 write_file/edit_file/read_file/run_shell/
+      // 客户交互/回交/派发/MCP 工具）。二者互斥在 createRuntimeAdapter 入口已检查。
+      const tools = shellJudge !== undefined
+        ? buildShellJudgeTools(shellJudge)
+        : governanceJudge !== undefined
+          ? buildGovernanceJudgeTools(governanceJudge)
+          : buildGovernedTools(options.gate, {
             ...options,
             readRoot: options.readRoot ?? options.projectRoot,
             writeRoot: options.writeRoot,
@@ -149,8 +161,9 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
         // G-4 V2（wave A）：按角色读取 `docs/mcp/**` 声明并随会话注入（**纯读**——绝不建目录；坏件由
         // 读取器跳过＋诊断，绝不影响开会话）。适配器对 `installedMcpServers` 纯消费（装配/放行/呈现
         // 属各平台批次 P1–P3）；providerFor 每次重建即重读——「安装/卸载 ⇒ 下次开会话生效」。
-        // 判断 agent 会话：`judgeMode:true` ＋ `installedMcpServers:[]`——外来 MCP 一律不装配
-        // （PM 评审 §6.1；Claude 适配器据此强制关闭 WebSearch/外来 MCP）。
+        // 判断 agent 会话（shell judge 或治理 judge）：`judgeMode:true` ＋ `installedMcpServers:[]`——
+        // 外来 MCP 一律不装配（PM 评审 §6.1；2026-10-18 双开关评审 §6.2 对两者一致；
+        // Claude 适配器据此强制关闭 WebSearch/外来 MCP）。
         ...(judgeTools !== undefined
           ? { judgeMode: true as const, installedMcpServers: [] as const }
           : { installedMcpServers: listInstalledMcpServers(options.projectRoot, role.id) }),

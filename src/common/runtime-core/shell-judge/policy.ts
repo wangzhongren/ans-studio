@@ -28,6 +28,9 @@ export interface ShellJudgeBudget {
 /** 单次列表最多展示条目数（PM 评审 §7.1）。 */
 export const SHELL_JUDGE_MAX_LIST_ENTRIES = 200;
 
+/** `ShellJudgeReadStats.readPaths` 上限（2026-10-18 双开关评审 §5.4：去重、最多 16 条）。 */
+export const SHELL_JUDGE_MAX_READ_PATHS = 16;
+
 /** 二进制探测窗口（PM 评审 §7.2：前 8KB 含 NUL 即拒绝）。 */
 const BINARY_PROBE_BYTES = 8 * 1024;
 
@@ -37,6 +40,8 @@ export type JudgeReadCode =
   | "invalid-path"
   | "outside-root"
   | "sensitive"
+  /** 应用私有数据（整棵 `.ans/**`）：与普通敏感文件区分，便于审计/诊断（评审 §6.3）。 */
+  | "app-private"
   | "not-found"
   | "not-a-file"
   | "not-a-directory"
@@ -52,7 +57,10 @@ export type JudgePathClass =
   | "credential-dir"
   | "vcs"
   | "audit"
+  /** 历史值：`.ans/sessions` 曾为独立类别；现整棵 `.ans/**` 一律 `app-private`（保留联合成员兼容旧读者）。 */
   | "session"
+  /** 应用私有数据（整棵 `.ans/**`：账本/会话/应用文件；2026-10-18 双开关评审 §6.3 硬排除）。 */
+  | "app-private"
   | "outside-root"
   | "binary"
   | "non-regular"
@@ -98,8 +106,12 @@ export function resolveBudget(budget?: Partial<ShellJudgeBudget> | undefined): S
 /**
  * 敏感 basename / 目录段判定（大小写不敏感）。
  * 覆盖：`.env`/`.env.*`/`.envrc`、私钥/证书扩展名、凭据/令牌文件名、凭据目录、`.git/`、
- * `docs/audit/`、`.ans/sessions/`、`.config/gcloud/`、`.kube/config`、`.docker/config.json`。
+ * `docs/audit/`、**整棵 `.ans/`（任何 `.ans` 段 ⇒ `app-private`；含账本/会话/应用文件）**、
+ * `.config/gcloud/`、`.kube/config`、`.docker/config.json`。
  * **宁可误排除，也不漏读凭据**（PM 评审 §7.2 硬要求）。
+ *
+ * 2026-10-18 双开关评审 §6.3 收紧：`.ans` 由「只排除 `.ans/sessions`」改为**整体硬排除**
+ * （判断 agent 不读账本/会话/应用文件；shell judge 同受益，属更严不属回归）。
  */
 export function sensitiveClass(segments: readonly string[]): JudgePathClass | undefined {
   const lower = segments.map((segment) => segment.toLowerCase());
@@ -112,7 +124,8 @@ export function sensitiveClass(segments: readonly string[]): JudgePathClass | un
     if (CREDENTIAL_NAME.test(name)) return "credential";
     const next = lower[index + 1];
     if (name === "docs" && next === "audit") return "audit";
-    if (name === ".ans" && next === "sessions") return "session";
+    // 任何 `.ans` 段即应用私有数据（整棵 `.ans/**`；先于历史 `.ans/sessions` 判断）。
+    if (name === ".ans") return "app-private";
     if (name === ".config" && next === "gcloud") return "credential-dir";
     if (name === ".kube" && next === "config") return "credential";
     if (name === ".docker" && next === "config.json") return "credential";
@@ -165,6 +178,11 @@ function denied(code: JudgeReadCode, pathClass: JudgePathClass, stats: ShellJudg
   return { ok: false, code, pathClass };
 }
 
+/** 敏感类拒绝：`.ans/**`（app-private）用独立原因码，其余仍 `sensitive`（评审 §6.3）。 */
+function deniedSensitive(pathClass: JudgePathClass, stats: ShellJudgeReadStats): { ok: false; code: JudgeReadCode; pathClass: JudgePathClass } {
+  return denied(pathClass === "app-private" ? "app-private" : "sensitive", pathClass, stats);
+}
+
 /** 请求路径的敏感检查只看项目根内的相对段；根外路径交给前缀校验（不把用户名/盘符当敏感名）。 */
 function requestedSegments(projectRoot: string, requested: string): string[] {
   const root = resolve(projectRoot);
@@ -183,6 +201,17 @@ function consumeCall(stats: ShellJudgeReadStats, budget: ShellJudgeBudget): bool
   stats.readCalls += 1;
   if (stats.readCalls > budget.maxCalls || stats.readBytes >= budget.maxBytes) return false;
   return true;
+}
+
+/**
+ * 记录一次成功读取的项目相对路径（去重；上限 `SHELL_JUDGE_MAX_READ_PATHS`）。
+ * 只记录成功读取（被拒/预算/二进制不记录）——治理 judge 的 required-read 门槛依赖这份事实。
+ * 字段可选：调用方没初始化时在此按需创建（不改变旧读者的既有统计语义）。
+ */
+function recordReadPath(stats: ShellJudgeReadStats, rel: string): void {
+  const list = (stats.readPaths ??= []);
+  if (list.includes(rel) || list.length >= SHELL_JUDGE_MAX_READ_PATHS) return;
+  list.push(rel);
 }
 
 function utf8Prefix(data: Buffer): string {
@@ -217,7 +246,7 @@ export async function resolveJudgeRead(input: JudgeReadInput): Promise<JudgeRead
   const requested = isAbsolute(input.path) ? input.path : resolve(input.projectRoot, input.path);
   // 请求路径本身也做敏感检查（防「真实路径别名」在解析前就被当成普通文件）。
   const requestedSensitive = sensitiveClass(requestedSegments(input.projectRoot, requested));
-  if (requestedSensitive !== undefined) return denied("sensitive", requestedSensitive, stats);
+  if (requestedSensitive !== undefined) return deniedSensitive(requestedSensitive, stats);
 
   let rootReal: string;
   let real: string;
@@ -233,7 +262,7 @@ export async function resolveJudgeRead(input: JudgeReadInput): Promise<JudgeRead
   if (rel === "") return denied("not-a-file", "non-regular", stats);
   // 真实路径的每一段再查（防 `.env` 被链接成 `config.txt`）。
   const realSensitive = sensitiveClass(segmentsOf(rel));
-  if (realSensitive !== undefined) return denied("sensitive", realSensitive, stats);
+  if (realSensitive !== undefined) return deniedSensitive(realSensitive, stats);
 
   let info;
   try {
@@ -270,7 +299,9 @@ export async function resolveJudgeRead(input: JudgeReadInput): Promise<JudgeRead
   // 总预算被本次读取吃满（cap 被 remaining 限制）⇒ 后续读取一律预算拒绝（PM 评审 §7.2）。
   if (stats.readBytes >= budget.maxBytes && info.size > data.length) stats.budgetExceeded = true;
 
-  return { ok: true, abs: real, rel: slashPath(rel), truncated, text: utf8Prefix(data), bytes: data.length };
+  const relSlash = slashPath(rel);
+  recordReadPath(stats, relSlash);
+  return { ok: true, abs: real, rel: relSlash, truncated, text: utf8Prefix(data), bytes: data.length };
 }
 
 /**
@@ -287,7 +318,7 @@ export async function resolveJudgeList(input: JudgeListInput): Promise<JudgeList
 
   const requested = isAbsolute(rawPath) ? rawPath : resolve(input.projectRoot, rawPath);
   const requestedSensitive = sensitiveClass(requestedSegments(input.projectRoot, requested));
-  if (requestedSensitive !== undefined) return denied("sensitive", requestedSensitive, stats);
+  if (requestedSensitive !== undefined) return deniedSensitive(requestedSensitive, stats);
 
   let rootReal: string;
   let real: string;
@@ -302,7 +333,7 @@ export async function resolveJudgeList(input: JudgeListInput): Promise<JudgeList
   const rel = relative(rootReal, real);
   const relSegments = segmentsOf(rel);
   const realSensitive = sensitiveClass(relSegments);
-  if (realSensitive !== undefined) return denied("sensitive", realSensitive, stats);
+  if (realSensitive !== undefined) return deniedSensitive(realSensitive, stats);
 
   let info;
   try {

@@ -123,14 +123,21 @@
             >
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
             </button>
-            <!-- P5（评审 §10.1）：自动判断开关——位置在附件按钮之后、#composer-scope 之前。
-                 结构逐字按评审；真实状态只由主进程 `shell:judge-state`/`shell:judge-set` 决定。
-                 桥缺失 ⇒ 渲染侧禁用并把标签改成「当前版本不支持自动判断，保持手动」（不显示假开启态）。 -->
+            <!-- P5（2026-10-18 双开关评审 §9.1）：两个独立开关——位置在附件按钮之后、#composer-scope 之前。
+                 真实状态只由主进程 `shell:judge-state`/`shell:judge-set` 与
+                 `decision:judge-state`/`decision:judge-set` 决定；两者默认关、互不影响、重载复位。
+                 桥/驱动缺失 ⇒ 渲染侧禁用并把标签改成「当前版本不支持自动判断，保持手动」（不显示假开启态）；
+                 single 项目下「替我决策」禁用并提示「旧治理模型（single）不支持代决策」。 -->
             <label class="composer-auto-approve">
               <input type="checkbox" id="auto-approve-toggle" />
-              <span id="auto-approve-label">替我审</span>
+              <span id="auto-approve-label">替我审批</span>
             </label>
             <span id="auto-approve-status" class="composer-judge-status" role="status" aria-live="polite" hidden></span>
+            <label class="composer-auto-approve">
+              <input type="checkbox" id="judge-decision-toggle" />
+              <span id="judge-decision-label">替我决策</span>
+            </label>
+            <span id="judge-decision-status" class="composer-judge-status" role="status" aria-live="polite" hidden></span>
               <span id="composer-scope" class="composer-scope">未选择角色 / Claude</span><span class="composer-keyboard">Enter 发送，Shift + Enter 换行</span>
               <div class="composer-actions"><button id="btn-halt" class="cap-halt" type="button" hidden title="停止当前轮次" aria-label="停止当前轮次">停止本轮</button><button id="btn-send" class="cap-send" type="button" disabled title="发送（Enter）" aria-label="发送">发送 ↑</button></div>
             </div>

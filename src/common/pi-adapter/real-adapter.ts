@@ -37,7 +37,7 @@ import type {
 } from "../../model/runtime.ts";
 import { selectNativeSessionManager, sessionFileHasForeignToolChangeBlocks } from "./native-session.ts";
 export { sessionFileHasForeignToolChangeBlocks } from "./native-session.ts";
-import { SHELL_JUDGE_TOOL_NAMES } from "../runtime-core/shell-judge/tools.ts";
+import { ALL_JUDGE_TOOL_NAMES } from "../runtime-core/governance-judge/tools.ts";
 import { describeTool } from "./tool-compat.ts";
 export { describeTool } from "./tool-compat.ts";
 export type { ToolPiDescription } from "./tool-compat.ts";
@@ -1291,12 +1291,15 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
         ...(tool.promptGuidelines ? { promptGuidelines: [...tool.promptGuidelines] } : {}),
       }));
       if (opts.runtime !== "pi") throw new Error("Pi 适配器只能建立 Pi 会话");
-      // 判断 agent（「替我审」，PM 评审 2026-10-17 §4.1/§7.1）：只消费注入的 judge 只读工具集——
-      // 结构性拒绝任何其余工具；force off 原生能力面（server tools / 外来 MCP）并关闭持久化。
+      // 判断 agent（「替我审」/「替我审批」/「替我决策」，PM 评审 2026-10-17 §4.1/§7.1；
+      // 2026-10-18 双开关评审 §6.2）：只消费注入的 judge 只读工具集——结构性拒绝任何其余工具；
+      // force off 原生能力面（server tools / 外来 MCP）并关闭持久化。
+      // allowlist 用运行时核心的**并集** `ALL_JUDGE_TOOL_NAMES`（shell 与治理 judge 会话都能注册各自的
+      // report 工具）；并集只用于放行面、不用于装配——每次会话实际注入的仍恰是某一方三只工具。
       // 未置 `judgeMode` ⇒ 逐字旧行为（以下各判据均为 false 分支）。
       const judgeMode = opts.judgeMode === true;
       if (judgeMode) {
-        const allowedJudgeTools = new Set<string>(SHELL_JUDGE_TOOL_NAMES);
+        const allowedJudgeTools = new Set<string>(ALL_JUDGE_TOOL_NAMES);
         const foreign = governedTools.filter((tool) => !allowedJudgeTools.has(tool.name)).map((tool) => tool.name);
         if (foreign.length > 0) {
           throw new Error(`判断会话只允许 judge 只读工具，拒绝注入：${foreign.join(", ")}`);

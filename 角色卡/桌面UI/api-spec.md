@@ -354,3 +354,33 @@ work、card、pi、document复用424模态抽屉。仅导航/会话业务面iner
 **探针（只增）**：`window.__ansRenderer.onOperatorQueued(payload)`（按 IPC 契约直接注入）。
 
 **测试证据（本批）**：`tool-rows.test.ts` 48/48（四角色文案、四项空态、状态行四角色、镜像来源/聚合文案逐字）；`renderer.test.ts` 100 计/96 过（4 红为既有 CRLF 基线 N-1、data-state、P1-3、G-5），新增 6 例覆盖四角色树/空态优先级/镜像物化/只答一次/排队聚合/两侧一致。真实 Electron：`ANS_MIRROR_UI_ONLY=1` 新段 `mirrorChecks`，`MIRROR_UI_PASS 8`（离线受控 IPC，无模型/网络/凭据）。全量 `node --test "test/**/*.test.ts"`：2735 计/2709 过/23 红/3 skip；红集为他域预期红：旧三权断言（`test/测试/governance-trio-verify/*`、`test/编排/*`）、Windows symlink EPERM、vendor CRLF pin、既有渲染器基线与 `abort running shell` 环境红（详见当轮报告）。
+
+## 2026-10-18 P5 双开关「替我审批 / 替我决策」：控件 / 状态 / 结果行 / 回落（评审 §三/§八/§九/§十二 P5）
+
+任务书：项目管理评审 `2026-10-18_design_judge-governance-cards-review.md` §3.3、§8、§9、§12 P5（P4 桌面窗口 IPC 在本批联调时已落树；本角色按冻结契约消费）。
+
+**消费契约（只读；通道属桌面窗口）**：
+- approval 组沿用：`desktop.getShellJudgeState()` / `setShellJudgeEnabled(enabled)` / `onShellJudgeState(cb)` / `onShellJudgeResult(cb)`（`shell:judge-get/set/state/result`）。
+- decision 组新增（按名消费）：`desktop.getDecisionJudgeState()` / `setDecisionJudgeEnabled(enabled)` / `onDecisionJudgeState(cb)` / `onOperatorJudgeResult(cb)`（`decision:judge-get/set/state`、结果行 `session:operator-judge`）。
+- 状态回包/推送同形 `{version:1, ok?, enabled?, error?, available?}`；**`available:false` 与桥缺失同样处理**：按组禁用并显示「当前版本不支持自动判断，保持手动」，绝不显示假开启态。
+- `session:operator-request` payload 新增可选 `judgeNotice?: string`：手动回落提示，渲染侧**原样转义呈现**（不合并进 `reason`、无 HTML 注入口）。
+- `OperatorJudgeResultPayload`（`session:operator-judge`，§8.1）：`version:1, id, requestId, anchorKey, toolCallId, roleId, projectRoot?, runtime?, at, group, cardKind, flowId?, engine, model?, reasonCode, reason?, selected?, confirmed?, paths?, pathDecisions?, evidence?, durationMs?, readCalls?, readBytes?`。只覆盖 approve；`manual` 用卡片 `judgeNotice`。
+- 分组文案只按载荷里的 `group`（`approval|decision`）显示，渲染侧**不写第二张 `cardKind→group` 映射表**。
+
+**渲染侧导出（`ui-labels.js`，全部纯映射）**：
+- `judgeToggleView(group, available, enabled, busy, {singleDisabled})` → `{group, available, enabled, checked, disabled, singleDisabled, label, title, note, warningVisible}`：approval off/on「替我审批」/「替我审批中 · 判断 agent」；decision off/on「替我决策」/「替我决策中 · 判断 agent」；桥缺失固定文案；decision + single ⇒ 禁用、`checked=false`、`note=旧治理模型（single）不支持代决策`。`shellJudgeToggleView` 保留为 approval 别名。
+- `judgeWarningStep(enabled, shown)`（`shellJudgeWarningStep` 别名）→ 每组各自的一次性状态迁移（关闭复位、首次显示一次、已提示不重复）。
+- `judgeWarningLines(groups)` → `[{text, strong}]`：同一块按开启组列行（approval 段 / decision 段 + 三段共享说明：只读范围/回落、accept-quick 与 single 说明、成本与审计标记）；`shellJudgeWarningLines()` 保留为 approval 仅文字别名。
+- `governanceJudgeResultView(payload)` → `{group, groupLabel, cardKind, title, badge, headline, engineText, operatorText, flowText, at, lines, toolCallId, requestId, details}`；标题「judge 代批 · 代审批/代决策」；结论按 `cardKind`：proposal「接受提案（accept）」、appointment「任命 <ids>」、acceptance「验收通过（accept）」、write 族「确认写入 N 个路径（前 3 个 + 等 N 个）」；未知 group/坏件 ⇒ `null`（不编结论）。
+- `governanceJudgeNoticeText(group, reasonCode)`：一般 manual「判断 agent 未代批（代审批/代决策）：<人话原因>；已转你手动确认。」；`row-failed`「判断 agent 已完成判断，但结果无法在聊天中显示（…）；已转你手动确认。」。`governanceJudgeReasonText` 为 driver 安全名单的人话映射。
+- shell 结果标题按 §10.2 加分组标记：「已替你放行（判断 agent · 代审批）」「已替你放行（判断 agent · 代审批 · deny 档）」「未放行（判断 agent · 代审批）」；deny 出路改「关闭「替我审批」后重试」。
+
+**DOM/行为**：
+- `index.html` `.composer-bottom`：两个并排复选框 `#auto-approve-toggle` + `#judge-decision-toggle`（标签「替我审批」「替我决策」），各自状态位 `#auto-approve-status` / `#judge-decision-status`（aria-live；single 说明走 `.is-note` 琥珀）。一次性警告仍是**同一块** `#shell-judge-warning`（两个开关共用；按开启组重建文本）。
+- `renderer.js`：`initJudgeSwitches()` 分组判桥（各四方法）→ 各自订阅 state/result → 启动读取；`renderJudgeToggles()` 是唯一重绘点（两开关 + 警告同步）。点击只调对应 set，由 `shellJudgeToggleResult` 落主进程实际值（失败保持原值并显示错误）；`available:false` 通过 state/推送/读取落为不可用。`applyListing` 落 `governanceModel` 后重绘——single 禁用 decision、trio 恢复。
+- 结果行：shell `onShellJudgeResult` 保持原锚定；治理 `onOperatorJudgeResult` 按 `roleId` 落 pane、按 `toolCallId` 锚定（复用 `shellJudgeAnchorIndex`），定位不到追加流尾；`payload.id` 幂等；仅在底部附近贴底；行类 `.sys.shell-judge-row.governance-judge-row`，标题/徽标用琥珀表达「judge 代批」，详情折叠含理由/选中项/路径/逐路径结论/证据/耗时/读取量/toolCallId/requestId。
+- 手动回落：shell 卡沿用 `#sc-judge-notice`；治理交互卡新增 `.op-judge-notice`（主进程 `judgeNotice` 原文 `esc` 落入；同一请求重推可补/更新；卡仍可作答，UI 不自动批准）。
+- 边界：**不自动开会话/切角色、不写 localStorage/.env/项目文件、不触碰已挂起卡**；两开关默认关、互不影响、重载复位（主进程权威）。
+- 探针（只增）：`window.__ansRenderer.decisionJudge = { state(), onState, onResult }`（桥缺失时 `available=false`；`state()` 附 `singleDisabled`）。
+
+**测试证据**：`tool-rows.test.ts` 51/51（双开关矩阵、警告按开启组列行、治理结果行结论/路径截断、回落 notice 两类）；`renderer.test.ts` 100 计/96 过（4 红＝既有 CRLF 基线 N-1/data-state/P1-3/G-5），新增/改写覆盖两复选框 DOM、两组桥与状态机、一次性警告按组、治理结果行接线/幂等/esc、交互卡 `judgeNotice`、single 禁用；真实 Electron 离线 `ANS_JUDGE_UI_ONLY=1` → **JUDGE_UI_PASS 33**（decision 开关读取/设置/推送/失败回退、结果行锚定、写盘代批行、回落卡、single/trio 矩阵），`ANS_TERMINAL_UI_ONLY=1` → TERMINAL_PASS 15。全量三层 glob：2852 计/2826 过/23 红/3 skip；本域无新增红，红集分类见 [changelog](changelog.md) 同日条目。

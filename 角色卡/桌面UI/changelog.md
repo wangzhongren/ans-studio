@@ -266,3 +266,17 @@
 - **状态行**：`governanceStatusText` 的 trio 文案改为「治理模型：三权 · 四角色」；迁移预览等仍用「三权」。
 - **测试**：`tool-rows.test.ts` **48/48**；`renderer.test.ts` **100 计/96 过**（4 红＝既有 CRLF 基线 N-1、data-state、P1-3、G-5）；真实 Electron `ANS_MIRROR_UI_ONLY=1` 新段 **MIRROR_UI_PASS 8**（四角色树/状态行/Liaison 空态/镜像双面/只答一次/排队聚合）。全量三层 glob **2735 计/2709 过/23 红/3 skip**；红集为他域预期红：旧三权断言（`test/测试/governance-trio-verify/*`、`test/编排/*`）、Windows symlink EPERM、vendor CRLF pin、`runtime-ui` localStorage 守卫、`abort running shell` 环境红与上述 4 条基线红。
 - 指纹：本轮工作树未提交，以 `git diff` 为准（`app/renderer/{renderer.js,styles.css,ui-labels.js}`、`test/桌面应用/{renderer.test.ts,tool-rows.test.ts,e2e/uiux-v2.mjs}` 与本文件）。
+
+## 2026-10-18：P5 双开关「替我审批 / 替我决策」UI（评审 §三/§八/§九/§十二 P5）
+
+任务书：项目管理评审 `2026-10-18_design_judge-governance-cards-review.md` §3.3、§8、§9、§12 P5。P4 桌面窗口正在并行实现 decision IPC；本角色按冻结契约消费，桥缺失时按组禁用并说明（不假开启）。
+
+- **index.html**：`.composer-bottom` 附件按钮后并排两个复选框——`#auto-approve-toggle`（静态标签「替我审批」）与新增 `#judge-decision-toggle`（「替我决策」），各自状态位 `#auto-approve-status` / `#judge-decision-status`（aria-live；single 说明走 `.is-note` 琥珀）。一次性警告仍是**同一块** `#shell-judge-warning`（两个开关共用，按开启组重建文本）。
+- **ui-labels.js 文案单点**：新增 `judgeToggleView(group, available, enabled, busy, {singleDisabled})`（两组各自 off/on/桥缺失；decision+single ⇒ 禁用 +「旧治理模型（single）不支持代决策」）、`judgeWarningStep`（每组各自 `promptShown`）、`judgeWarningLines(groups)`（§9.2 同一块按开启项列行：approval/decision 段 + 三段共享说明）、`governanceJudgeResultView`（标题「judge 代批 · 代审批/代决策」；结论按 cardKind：接受提案/任命/验收通过/确认写入 N 个路径；详情含理由/选中项/路径/逐路径结论/证据/耗时/读取量）、`governanceJudgeNoticeText` / `governanceJudgeReasonText`。既有 `shellJudge*` 名字保留为 approval 别名；shell 结果标题按 §10.2 加「代审批」分组标记，deny 出路改「关闭「替我审批」后重试」。
+- **renderer.js**：`initJudgeSwitches()` 分组判桥（各四方法）→ 各自订阅 state/result → 启动读取；`renderJudgeToggles()` 是唯一重绘点（两开关 + 警告同步）。点击只调对应 set，由 `shellJudgeToggleResult` 落主进程实际值（失败保持原值并显示错误）；`available:false` 经读取/推送落为不可用。`applyListing` 落 `governanceModel` 后重绘：single 禁用 decision、trio 恢复。**不自动开会话/切角色、不写 localStorage/.env/项目文件、不触碰已挂起卡。**
+- **结果行**：shell `onShellJudgeResult` 保持原锚定；新增 `onOperatorJudgeResult`（`session:operator-judge`）按 `roleId` 落 pane、按 `toolCallId` 锚定，定位不到追加流尾；`payload.id` 幂等；行类 `.sys.shell-judge-row.governance-judge-row`，琥珀标题/徽标表达「judge 代批」，与客户手批卡区分。`manual` 不产生结果行。
+- **手动回落**：shell 卡沿用 `#sc-judge-notice`；治理交互卡新增 `.op-judge-notice`——主进程 `judgeNotice` 原文 `esc` 呈现、同一请求重推可补/更新，卡仍可作答（UI 不自动批准）。
+- **样式**：仅加 `.composer-judge-status.is-note`、`.governance-judge-row .sj-title`、`.op-judge-notice`；琥珀/中性色，未动 900 列与等宽字体。
+- **探针（只增）**：`window.__ansRenderer.decisionJudge = { state(), onState, onResult }`。
+- **测试**：`tool-rows.test.ts` **51/51**（双开关矩阵/警告按组列行/治理结果行/回落文案）；`renderer.test.ts` **100 计 / 96 过 / 4 红**（4 红＝既有 CRLF 基线 N-1、data-state、P1-3、G-5）；真实 Electron `ANS_JUDGE_UI_ONLY=1` → **JUDGE_UI_PASS 33**（含 decision 开关读取/设置/推送/失败回退、首次警告、治理结果行按 toolCallId 锚定、写盘代批行、`judgeNotice` 卡、single 禁用与 trio 恢复；P4 IPC 在本批联调时已落树），`ANS_TERMINAL_UI_ONLY=1` → **TERMINAL_PASS 15**（启动两组权威关闭态）。全量 `node --test "test/**/*.test.ts"`：**2852 计 / 2826 过 / 23 红 / 3 skip**。
+- **红集分类（如实）**：4 条 `renderer.test.ts` 既有 CRLF 基线（N-1/data-state/P1-3/G-5）；6 条 `test/测试/shell-judge-verify/{a-allow-flow,b-deny-flow,e-deny-tier}` 仍断言旧 UI 文案（「替我审」/旧警告三行/旧结果标题），按评审 §10.2/§12.3 需测试角色更新（本角色不改他域测试）；1 条同目录 `f-readonly-sandbox`（P1 `.ans` 整体排除后的「敏感」旧文案）、1 条 `markdown` vendor pin、1 条 `runtime-ui` localStorage 守卫、1 条 `g4-skill` 读取器防御为既有基线；其余 9 条为环境/他域既有红（Windows symlink EPERM、`abort running shell`、Pi/Codex/Claude 适配器存储与 symlink 用例等）。本批未新增本域红；此前 3 条「唯一计时器必须位于 showShellJudgeWarning」测试角色守卫已通过保留函数名与计时器位置继续全绿。

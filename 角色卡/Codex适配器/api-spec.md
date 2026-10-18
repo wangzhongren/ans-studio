@@ -40,11 +40,23 @@ required-v1 缺注入 projector/register 时在任何外部初始化前拒绝；
 
 `RuntimeProviderOptions.judgeMode === true`（运行时核心中性标志；Service 在注入 `shellJudge` 时置位）时，适配器进入只读判断会话（PM 评审 §6.1/§7.1/§十一 P3c）：
 
-- **工具面恰三只**：`options.tools` 必须恰为运行时核心 `buildShellJudgeTools` 的 `judge_read_file`/`judge_list_dir`/`report_shell_judgement`（名单取自 `src/common/runtime-core/shell-judge/tools.ts` 单一来源，本适配器不另造）。缺项/多项/夹带 `write_file`/`edit_file`/`run_shell`/`request_confirmation`/`request_choice`/`submit_report`/`dispatch_task` 任一 ⇒ 工厂与 `bindRole` 均装配前抛错、零引擎/零副作用。原生面只注册 `ans_<judge tool>` dynamicTools，内存 MCP 代理目录同集。
+- **工具面恰三只**：`options.tools` 必须恰为运行时核心两种冻结工具集之一——shell judge（`judge_read_file`/`judge_list_dir`/`report_shell_judgement`）或治理 judge（`judge_read_file`/`judge_list_dir`/`report_governance_judgement`）；allowlist 取自 `src/common/runtime-core/governance-judge/tools.ts` 的并集 `ALL_JUDGE_TOOL_NAMES`（单一只读工具名来源，本适配器不另造；2026-10-18 起由 shell 名单改为并集）。缺项/多项/混合 report/夹带 `write_file`/`edit_file`/`run_shell`/`request_confirmation`/`request_choice`/`submit_report`/`dispatch_task` 任一 ⇒ 工厂与 `bindRole` 均装配前抛错、零引擎/零副作用。原生面只注册 `ans_<judge tool>` dynamicTools，内存 MCP 代理目录同集。
 - **原生能力关闭**：强制 `web_search="disabled"`（忽略 `options.webSearch` 与 `ANS_CODEX_WEB_SEARCH`）；`installedMcpServers` 视为空、原生 `CODEX_HOME` 走临时目录、线程 `ephemeral:true`、沙箱 `read-only`、`networkAccess:false`、审批 `never`；原生审批/选择/自由输入请求照旧 decline/cancel/空答案。judge 轮内若仍收到 `mcpToolCall`/`webSearch`/`commandExecution`/`fileChange` ⇒ 隔离该轮 `failed`（fail closed）。
 - **不持久化**：即使上游误传 `storage` 也不调用 validate/prepare/read/save/append/readReplay；`contextSource:"in-memory"`；不写 `.ans`、不产生聊天/角色状态。
-- **回调原样**：`report_shell_judgement` 把模型原始参数原样交给注入的 `report`（取值域/长度/歧义规范化与脱敏在编排）。
-- **提示面**：judge 系统提示明确「只读判断会话，只有 judge 读取与结论工具」；不宣称写/命令/交互/派发能力，也不拼接项目技能注入节（证据按需用 `judge_read_file` 读）。
+- **回调原样**：`report_shell_judgement` / `report_governance_judgement` 把模型原始参数原样交给注入的 `report`（取值域/长度/歧义规范化与脱敏在编排）。
+- **提示面**：judge 系统提示明确「只读判断会话，只有 judge 读取与结论工具」并点名当前注入集的 report 工具（shell 会话逐字保持 `report_shell_judgement`，治理会话为 `report_governance_judgement`）；不宣称写/命令/交互/派发能力，也不拼接项目技能注入节（证据按需用 `judge_read_file` 读）。
 - **普通角色会话逐字不变**：`judgeMode` 未设时工具集不限名单、webSearch 仍按 options/env、storage/installedMcpServers 照旧。
 
 验证：`test/codex-adapter/judge-mode.test.ts` 7 例（离线假引擎＋内存 MCP；无真实模型/凭据/网络）。
+
+## 2026-10-18 P3c：治理 judge（「替我审批」/「替我决策」）复用 judgeMode
+
+依据 `角色卡/项目管理/docs/design/2026-10-18_design_judge-governance-cards-review.md` §六/§十二 P3c。Service 在注入 `governanceJudge` 时走 `buildGovernanceJudgeTools`（恰 `judge_read_file`/`judge_list_dir`/`report_governance_judgement`）并同样置 `judgeMode:true`、`installedMcpServers:[]`；适配器不新增能力位，按注入工具集判定会话类别：
+
+- **allowlist**：`ALL_JUDGE_TOOL_NAMES` 并集（运行时核心单一来源）；只接受**恰一种冻结集**（shell 或治理，各三只、恰一只 report、名字无重复）。并集只用于 allowlist，不放宽装配——shell 会话仍恰三只 shell 工具，治理会话仍恰三只治理工具。
+- **提示面**：治理会话点名 `report_governance_judgement`；shell 会话文本逐字不变。
+- **隔离姿态**：沿用 `judgeMode` 的既有结构性隔离（web search 强制关、MCP 不装配、不持久化、只读沙箱、原生泄漏隔离该轮）；治理会话无写/shell/客户交互/回交/派发/MCP/网络工具。
+- **回调**：`report_governance_judgement` 原样回调；规范化/required-read/逐路径复核在编排（P2）。
+- **普通会话**：`judgeMode` 未设时逐字不变（不做 judge 名单限制）。
+
+验证：新 `test/codex-adapter/judge-governance.test.ts` 6 例；`test/codex-adapter/**` 66 过/1 既有 Windows symlink EPERM 环境红/1 skip；typecheck 0 错。全量三层 glob 与残余见[实施记录](docs/change/2026-10-18_change_codex-governance-judge.md)。

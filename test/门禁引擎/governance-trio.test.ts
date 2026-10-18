@@ -237,6 +237,12 @@ test("卡文本：四人均写明职能/不拥有最终批准权/可写与禁写
     assert.match(t, /只能由应用写/, `${spec.id} 须写明应用独占写路径`);
     assert.match(t, /\.ans\/\*\*/, `${spec.id} 须点名 .ans 禁写`);
     assert.match(t, /不得创建第五个治理角色/, `${spec.id} 须禁止治理角色增殖`);
+    // P2b（2026-10-18 judge 治理卡评审 §15.2）：四张卡都须有 judge 代批纪律。
+    assert.match(t, /替我审批/, `${spec.id} 须写明客户可能开启替我审批`);
+    assert.match(t, /替我决策/, `${spec.id} 须写明客户可能开启替我决策`);
+    assert.match(t, /judge 代批/, `${spec.id} 须写明回执标 judge 代批`);
+    assert.match(t, /不得声称是客户本人点击或亲自批准/, `${spec.id} 须禁止声称客户本人点击/批准`);
+    assert.match(t, /不得把代批当作扩权/, `${spec.id} 须禁止把代批当作扩权`);
   }
   // Liaison：沟通权 + 交接约定；没有 customerInput，故不写 cardKind。
   const l = governanceRoleOf("liaison")!.cardText;
@@ -264,6 +270,20 @@ test("卡文本：四人均写明职能/不拥有最终批准权/可写与禁写
     /客户点击入口打开 Nominator/,
     "2026-10-18 客户修正：提名步骤由应用后台派发",
   );
+});
+
+test("卡文本：Nominator 机器可读 `recommended:` 推荐集（judge 代决策唯一可选集合，P2b）", () => {
+  const t = governanceRoleOf("nominator")!.cardText;
+  assert.match(t, /`recommended:`/, "提名文件须给机器可读 recommended: 推荐集");
+  assert.match(t, /`recommended: \[角色id, \.\.\.\]`/, "frontmatter 数组格式按评审 §7.3");
+  assert.match(t, /推荐：角色id1、角色id2/, "固定行格式按评审 §7.3");
+  assert.match(t, /恰等于该集合/, "judge 只能选恰等于推荐集的候选");
+  assert.match(t, /不得含内置治理角色 id/, "推荐集不得含内置治理角色");
+  assert.match(t, /回落客户手动确认/, "缺推荐/解析歧义时回落手动");
+  // 推荐集约定只属提名官；其余三张卡不得定义（避免第二份口径）。
+  for (const id of ["liaison", "rapporteur", "convener"] as const) {
+    assert.doesNotMatch(governanceRoleOf(id)!.cardText, /recommended:/, `${id} 不定义推荐集`);
+  }
 });
 
 test("注册表：forbiddenWritePaths 按段展开（无 glob），覆盖应用独占路径与其他治理角色目录", () => {

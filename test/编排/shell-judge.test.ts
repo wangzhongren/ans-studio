@@ -610,3 +610,10 @@ test("buildShellJudgePrompt：只放本次数据，不复述历史；turnText �
   assert.match(text, /已按 4KB 上限截断/);
   assert.doesNotMatch(text, /历史/);
 });
+
+test("客户出路句：双开关后统一指「替我审批」（不再写「替我审」）", () => {
+  assert.equal(SHELL_JUDGE_EXIT_LINE, "如需执行，请关闭「替我审批」后重试。");
+  const synthesized = synthesizeCustomerMessage({ verdict: "deny", reason: "当前不必要" });
+  assert.ok(synthesized.includes(SHELL_JUDGE_EXIT_LINE));
+  assert.ok(synthesized.includes("替我审批"));
+});

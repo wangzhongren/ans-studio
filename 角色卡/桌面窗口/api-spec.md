@@ -106,6 +106,34 @@ Customer callback 第二参保留 O1 的原 CustomerInputMetadata.signal；sessi
 
 **会话装配（`app/desktop/session.ts`）**：每会话用**同一份** `runtimeOptions` 与已构造的 `createAdapter` 工厂经编排 `createShellJudge` 生成闭包（`SessionManagerDeps.createShellJudge`；Interface 缺省注入真实实现，经 `govern-session.ts` 薄再导出，**不直接导入私有 `common/编排/`**）；构造失败 ⇒ 不注入（回原 present）。`LiveSession.lastUserText` 在**真实投递**（直发/出队/派发/回交）时写入，UTF-8 ≤4096 字节（超出截断、不据此 manual）；`metadata` 在调用当刻从活会话读取 `turnText`/`judge`；会话 `dispose` 即清两项。三人（su/项目角色）共用；不改既有 shell 审批档/三层链。
 
+## 双开关「替我审批」/「替我决策」（P4，2026-10-18；PM 评审 §三/§四/§八/§九/§十二）
+
+**两个开关是两套独立状态**（同一 `createShellJudgeSwitch()` 实现，**不同实例**）：都默认 `false`、只在主进程内存、启动/渲染重载 `loadInterface()` 复位、不持久化、互不影响。组映射唯一来源＝`src/model/runtime.ts::GOVERNANCE_CARD_GROUP`/`governanceCardGroup`（桌面不再写第二张表）：`write`/`appointment-write`/`schedule-write`→`approval`；`proposal`/`appointment`/`acceptance`→`decision`。
+
+| preload 方法 | IPC / 参数 | 返回 |
+| --- | --- | --- |
+| getShellJudgeState() | shell:judge-get（无参） | `{version:1, ok, enabled, available}` |
+| setShellJudgeEnabled(enabled) | shell:judge-set `{enabled:boolean}`（桥内强制布尔） | `{version:1, ok, enabled, available}` \| `{ok:false, error, available}`（**失败不改状态**） |
+| onShellJudgeState(cb) | 订阅 shell:judge-state | `{version:1, enabled, available}` |
+| onShellJudgeResult(cb) | 订阅 shell:judge-result | `ShellJudgeResultPayload`（shell judge，字段不变） |
+| getDecisionJudgeState() | decision:judge-get（无参） | `{version:1, ok, enabled, available}` |
+| setDecisionJudgeEnabled(enabled) | decision:judge-set `{enabled:boolean}`（桥内强制布尔） | 同上；失败不改状态 |
+| onDecisionJudgeState(cb) | 订阅 decision:judge-state | `{version:1, enabled, available}` |
+| onOperatorJudgeResult(cb) | 订阅 `session:operator-judge`（主→渲） | `OperatorJudgeResultPayload` |
+
+`available` 是可选加法（本版本恒 `true`；渲染侧只在明确 `false` 时禁用，不显示假开启态）。四个入站 handler 各自校验 sender；诊断 `decision-judge.toggled` / `decision-judge.set.rejected`。`OperatorJudgeResultPayload`＝`{version:1, id, requestId, anchorKey, toolCallId, roleId, projectRoot?, runtime?, at, group, cardKind, flowId?, engine, model?, reasonCode, reason?, selected?, confirmed?, paths?, pathDecisions?, evidence?, durationMs?, readCalls?, readBytes?}`；只在 `approve` 结算且结果行投达成功后出现。
+
+**判断发生点与状态机（`app/desktop/customer-input.ts`）**：只在 `presentEntry` 调用 `presenter` **之前**判断；`ChannelEntry.state` 增 `judging`。`shouldJudge` 全部满足才调用——presenter 存在、注入了 `ctx.governanceJudge`（或 `opts.judge.fn`）、`cardKind` 有组、所属组开关开（主进程权威）、`ctx.governanceModel === "trio"`、`flowId` 非空、信号未中止、`metadata.judgeContext` 存在。`judging` 占住一项目一卡但**不进 pending**：`pendingCount/queuedCount/pendingRoles` 不计、`judgingCount()` 仅供诊断、`respond` 对判断中 id 回 `expired:true`；`judged=true` 保证同一请求只判断一次，`replayPending` 不重判。
+
+- `approve`：结算前**再查开关**（关 ⇒ `manual/switch-off`）→ 防御复核 group/cardKind/value（选项 ⊆ 卡片、单选恰一、confirm 恰 `confirmed:true`）→ **先** `emitJudgeResult`（缺失/抛错 ⇒ `manual/row-failed`）→ 同一 `settleEntry` 结算为 `{outcome:"answered", value:{selected}|{confirmed:true}, operatorId:"judge:<engine>", judge}` → `notifyNextStep`/`drainProject` 恰一次（**0 卡、1 行**）。
+- `manual`（负向/证据不足/读取失败/超时/引擎不可用/group 不符/`judgeContext.unavailableReason`/开关关闭/中止/结果行失败）：原卡 + `OperatorRequestPayload.judgeNotice`（`row-failed` 单列；带「代审批/代决策」）。不写账本决定；客户手答仍归 `customer-input`。回落**按组、按卡、整卡**，另一组不受影响；判断中关开关不追溯已挂起卡（结算前再查一次）。
+- 通道层防御超时用 `AbortSignal.timeout`（不引入 `setTimeout/setInterval`）；`rejectAllPending`/`cancel` 把 `judging` 一并结算，迟到结果见 `state !== "judging"` 丢弃。
+- 结果行人话摘要 `judgeResultSummary(payload)`：`judge 代批 · 代决策：接受提案（accept）/任命 <ids>/验收通过（accept）· 流程 <flowId>`；写盘族 `judge 代批 · 代审批：确认写入 <n> 个路径（…）`。
+
+**会话装配（`app/desktop/session.ts`）**：`LiveSession.governanceJudge`；仅在 `governanceModel === "trio"` 且客户交互通道已接时，用**同一份** `runtimeOptions`/`createAdapter` 经 `SessionManagerDeps.createGovernanceJudge`（Interface 缺省真实实现，经 `govern-session.ts` 薄再导出）构造；构造失败 ⇒ 不注入。`customerInput` 闭包 ctx 增 `governanceModel/governanceJudge/turnText`（调用当刻读活会话），`metadata`（含编排计算的 `judgeContext`）**原样透传**；dispose 清空。single/su/Liaison 不注入。
+
+**主进程（`app/main.ts`）**：客户通道 `judge.isGroupEnabled = group === "approval" ? shellJudgeSwitch.isEnabled() : decisionJudgeSwitch.isEnabled()`；`emitJudgeResult` 推 `session:operator-judge`（窗口已关时**抛错** ⇒ 通道降级 `row-failed`），并经 `desktop.emitJudgeProgress(payload)` best-effort 落主入口 Liaison 进度行（`emitSessionEvent` 的 `message`，`detail.source:"judge-decision"`；来源即主入口不重复、失败只诊断）。`advanceGovernanceFlow` **零改动**（代批成功仍经 `notifyNextStep` 触发）。
+
 ## 其他能力与装配
 
 项目 pickProject/listProject；listProject roles 原样转可选 readonly group/groupDuty，窗口不解析组别。外开、选图/附件、诊断/显式恢复、窗口控制保留已有白名单方法。`app:recovery-state` 增 runtime。所有订阅均返回取消订阅函数；preload 不暴露 Node 能力。未改动通道的完整历史表见[冻结归档](../桌面应用/api-spec.md)。

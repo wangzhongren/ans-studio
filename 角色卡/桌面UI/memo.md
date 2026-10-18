@@ -185,3 +185,15 @@ U1R2本侧冻结：原卡按真实request/conclusion重插与显式null token保
 - **布局**：`.composer{position:relative}` + `.judge-warning{position:absolute; bottom:calc(100% + 8px)}` 使提示浮在输入区上方，**不占聊天布局、不推动消息区**；`.judge-warning[hidden]{display:none}` 保留。DOM 拆为 `#shell-judge-warning-text`（三段）+ `#shell-judge-warning-close`（「知道了」）；`showShellJudgeWarning` 只重建文本容器，不重建关闭按钮（事件绑定在初始化处，不丢）。
 - **兼容字段**：`shellJudgeToggleView().warningVisible` 保留 = `on`（旧调用方/独立测试仍读），但**实际显隐不再由它决定**；渲染侧不得用它控制警告。
 - **测试现状**：tool-rows 47/47；renderer 94 计/90 过/4 红（既有 CRLF 基线 N-1/data-state/P1-3/G-5）；markdown vendor pin 与 runtime-ui localStorage 为既有基线红。全量 2670 计/2648 过/19 红/3 skip（3 条新红见上「跨边界」，其余 16 条为此前基线/环境）。真实 Electron `ANS_JUDGE_UI_ONLY=1` 已跑：**JUDGE_UI_PASS 21**（受控 IPC 替身，无真实模型/网络；e2e 已断言首次显示/知道了/重复推送与切角色不重现/关闭再开启再显示/约 9 秒自动消失）。
+
+## 2026-10-18 P5 双开关「替我审批 / 替我决策」（事实与续接线索）
+
+- **契约（冻结，按名消费）**：approval 沿用 `getShellJudgeState/setShellJudgeEnabled/onShellJudgeState/onShellJudgeResult`；decision 为 `getDecisionJudgeState/setDecisionJudgeEnabled/onDecisionJudgeState/onOperatorJudgeResult`（`decision:judge-get/set/state`、结果行 `session:operator-judge`）。**每组四方法缺任一 ⇒ 该组禁用 +「当前版本不支持自动判断，保持手动」**；主进程 state 回包/推送的 `available:false` 与桥缺失同解。`session:operator-request` 可选 `judgeNotice`（原样转义呈现）。
+- **主进程是开关权威**：两个开关各自 `busy`/`error`，点击只调对应 set；`shellJudgeToggleResult` 是共用自洽纯函数（成功采用回包 `enabled`，失败/坏件保持原值 + 可见错误）。**不得**乐观写 `enabled`；`renderer.test.ts` 反向守卫。两开关默认关、互不影响、重载复位（不写 localStorage；主进程 memory 状态）。
+- **一次性警告**：仍是**同一块** `#shell-judge-warning`，但每组各自一份 `promptShown`（`ui-labels::judgeWarningStep`）。某组首次开启 ⇒ 显示；另一组首次开启 ⇒ 再显示一次（文本按当前开启组重建：approval/decision 段 + 三段共享说明）；「知道了」/约 9 秒自动收起后不重复，直到该组关闭再开启。计时器移到 `state.judgeWarningTimer`（唯一一处）。
+- **single 项目**：`applyListing` 落 `governanceModel` 后重绘；decision 控件禁用 + 状态位「旧治理模型（single）不支持代决策」；切回 trio 恢复。**UI 禁用不是安全边界**，main 的逐卡门才是。
+- **结果行**：新增 `onOperatorJudgeResult`（治理代批，approval 写盘族 + decision）；`ui-labels::governanceJudgeResultView` 负责标题「judge 代批 · 代审批/代决策」与结论文案；锚定复用 `shellJudgeAnchorIndex`（toolCallId），定位不到追加流尾；`state.governanceJudgeResultIds` 幂等、换项目清空。**manual 不产生结果行**。
+- **回落**：shell 卡 `#sc-judge-notice`；治理方向卡 `.op-judge-notice`（`entry.judgeNotice`，同一请求重推可更新）。`judgeNotice` 文本由主进程给，渲染侧不自行编原因；`row-failed` 与一般 manual 的区分在文案单点。
+- **续接线索（跨角色）**：decision 四方法与 `session:operator-judge` 载荷属「桌面窗口」P4；本批联调时 P4 已落树（`app/preload.cjs`/`app/main.ts`/`interface.ts`），`ANS_JUDGE_UI_ONLY=1` 已实际驱动 decision 开关/警告/结果行/single 矩阵（**JUDGE_UI_PASS 33**）。若旧窗口/回滚版本缺任一桥方法，UI 自动按组禁用，不崩、不假开启。
+- **测试现状**：`tool-rows.test.ts` 51/51；`renderer.test.ts` 100 计/96 过/4 红（既有 CRLF 基线 N-1/data-state/P1-3/G-5）；全量三层 glob **2852 计/2826 过/23 红/3 skip**。红集：4 条渲染基线 + 6 条 shell-judge-verify 旧文案（评审 §10.2 需测试角色更新）+ 1 条 f-readonly（P1 `.ans` 文案）+ markdown vendor pin + runtime-ui localStorage + g4-skill 读取器防御 + 9 条环境/他域既有红；本域无新增红。
+- **他域预期红**：`test/测试/shell-judge-verify/{a-allow-flow,b-deny-flow,e-deny-tier}.test.ts` 断言旧 UI 文案（「替我审」/旧警告三行/旧结果标题）；评审 §10.2/§12.3 要求加「代审批」分组标记与新警告文案，归测试角色更新；本角色不改他域测试。
