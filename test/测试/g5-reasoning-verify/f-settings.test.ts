@@ -66,13 +66,14 @@ test("F3 choices 拒：非法值如实拒绝、零落盘、错误不回显提交
     const rejected = await saveRuntimeConfig({ runtime: "pi", updates: { ANS_PI_REASONING_EFFORT: "banana-等级" } }, { envPath: t.envPath });
     assert.equal(rejected.ok, false);
     assert.ok(rejected.error!.includes("推理强度取值无效"), "类别如实");
-    assert.ok(rejected.error!.includes("off / low / medium / high / xhigh"), "值域如实列出");
+    // 2026-10-18 客户改为滑块：错误文案按既有契约优先列 `choiceLabels`（不弱化安全断言）。
+    assert.ok(rejected.error!.includes("关 / 低 / 中 / 高 / 极高"), "值域如实列出友好标签（滑块档位）");
     assert.equal(rejected.error!.includes("banana"), false, "不回显提交值原文");
     assert.equal(fs.readFileSync(t.envPath, "utf8"), before, "拒绝零副作用（文件逐字未动）");
     // 值域按运行时：codex 拒 off / 收 high；claude 收 off（端点）。
     const codexOff = await saveRuntimeConfig({ runtime: "codex", updates: { ANS_CODEX_REASONING_EFFORT: "off" } }, { envPath: t.envPath });
     assert.equal(codexOff.ok, false, "codex 无 off 档");
-    assert.ok(codexOff.error!.includes("low / medium / high / xhigh"));
+    assert.ok(codexOff.error!.includes("低 / 中 / 高 / 极高"), "codex 值域按友好标签列出（无「关」档）");
     assert.equal(fs.readFileSync(t.envPath, "utf8"), before, "codex 拒绝同样零副作用");
     const codexHigh = await saveRuntimeConfig({ runtime: "codex", updates: { ANS_CODEX_REASONING_EFFORT: "high" } }, { envPath: t.envPath });
     assert.equal(codexHigh.ok, true);

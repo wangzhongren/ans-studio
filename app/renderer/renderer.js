@@ -4265,6 +4265,19 @@
     return piView.fields.filter(function (f) { return f.key === key; })[0] || null;
   }
 
+  /** 短档位判定（2026-10-18 客户要求：思考强度滑块做大并带文字刻度）：
+   *  ≤5 档且每档标签都非空且 ≤4 字 ⇒ 滑块上方显示一行 `choiceLabels` 文字刻度（reasoning 关/低/中/高/极高
+   *  与 codex 四档）；context/timeout 等 7 档长标签 ⇒ 不显示刻度（避免挤爆），滑块同样放大。
+   *  判定只依赖元数据 `choices`/`choiceLabels`，不按字段 key 分叉。 */
+  function shortTierRange(choices, labels) {
+    if (!Array.isArray(choices) || choices.length === 0 || choices.length > 5) return false;
+    if (!Array.isArray(labels) || labels.length !== choices.length) return false;
+    for (var i = 0; i < labels.length; i += 1) {
+      if (typeof labels[i] !== "string" || labels[i] === "" || labels[i].length > 4) return false;
+    }
+    return true;
+  }
+
   /** 预设档位滑块：hidden 规范值 → slider 下标 → output/aria 标签（映射单点在 `ui-labels`）。
    *  仅当该键存在 range 控件时生效；自定义值（回退文本输入）无滑块 ⇒ no-op。 */
   function syncRange(key) {
@@ -4336,9 +4349,19 @@
           control = '<input id="pi-inp-' + esc(f.key) + '" class="pi-input" type="text" autocomplete="off" spellcheck="false" />' +
             '<span class="pi-range-note">当前值不在预设档位；改为预设档位后保存</span>';
         } else {
+          // 短档位（reasoning 等 ≤5 档、标签 ≤4 字）：滑块**上方**一行 `choiceLabels` 文字刻度，
+          // 每档一列（不显示 0..N 数字）；长档位（context/timeout 7 档）不画刻度，避免挤爆。
+          var shortTier = shortTierRange(choices, choiceLabels);
           var rangeText = UiLabels.rangeChoiceLabel(choices, choiceLabels, rangeIndex);
+          var ticks = "";
+          if (shortTier) {
+            ticks = '<span class="pi-range-ticks" aria-hidden="true">' +
+              choiceLabels.map(function (tierLabel) {
+                return '<span class="pi-range-tick">' + esc(tierLabel) + "</span>";
+              }).join("") + "</span>";
+          }
           forId = "pi-range-" + f.key;
-          control = '<span class="pi-range-wrap">' +
+          control = '<span class="pi-range-wrap">' + ticks +
             '<input id="pi-range-' + esc(f.key) + '" class="pi-range" type="range" min="0" max="' + (choices.length - 1) + '" step="1" value="' + rangeIndex + '" aria-valuetext="' + esc(rangeText) + '" />' +
             '<output id="pi-range-out-' + esc(f.key) + '" class="pi-range-out" for="pi-range-' + esc(f.key) + '">' + esc(rangeText) + "</output>" +
             "</span>" +

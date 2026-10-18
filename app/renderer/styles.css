@@ -1813,10 +1813,13 @@ button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus
 /* ———————— Pi 预设档位滑块（2026-10-17）——————
    高级区字段：可见 range + output 标签；hidden `#pi-inp-*` 持规范值（既有保存链原样读取）。
    只使用既有 token（--success / --border / --text-2 / --focus-ring），间距与高级区一致。 */
-.pi-range-wrap { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.pi-range-wrap input[type="range"] { flex: 1 1 auto; min-width: 0; height: 20px; margin: 0; background: transparent; accent-color: var(--success); -webkit-appearance: none; appearance: none; }
-.pi-range-wrap input[type="range"]::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: var(--border); }
-.pi-range-wrap input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; margin-top: -5px; border-radius: 50%; background: var(--success); border: 0; }
+/* 2026-10-18 客户要求：思考强度滑块做大，上方只带一行文字刻度（短档位才画；长档位不画）。 */
+.pi-range-wrap { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; min-width: 0; width: 100%; }
+.pi-range-ticks { flex: 1 1 100%; display: flex; justify-content: space-between; padding: 0 11px; }
+.pi-range-tick { font-size: 10px; line-height: 1.2; color: var(--text-2); white-space: nowrap; }
+.pi-range-wrap input[type="range"] { flex: 1 1 auto; width: 100%; min-width: 0; height: 30px; margin: 0; background: transparent; accent-color: var(--success); -webkit-appearance: none; appearance: none; }
+.pi-range-wrap input[type="range"]::-webkit-slider-runnable-track { height: 8px; border-radius: 4px; background: var(--border); }
+.pi-range-wrap input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; margin-top: -7px; border-radius: 50%; background: var(--success); border: 0; }
 .pi-range-wrap input[type="range"]:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 3px; }
 .pi-range-out { flex: 0 0 auto; min-width: 96px; font-size: 12px; line-height: 18px; color: var(--text-2); text-align: right; font-variant-numeric: tabular-nums; }
 .pi-range-note { display: block; margin-top: 4px; font-size: 11px; line-height: 1.5; color: var(--amber); }

@@ -318,6 +318,50 @@ test("T28 扩展 2：预设档位滑块——值↔下标↔标签纯映射与 r
   assert.ok(STYLES.includes("accent-color: var(--success)") && STYLES.includes("background: var(--border)"), "滑块只用既有 token（success/border）");
 });
 
+test("2026-10-18：短档位大滑块——仅文字刻度、输出纯标签；长档位不画刻度但同样放大", async () => {
+  const UL = await loadUiLabelsForGovernance();
+  // 纯判定函数从源码取出执行（与既有 pure-helper 提取先例一致）。
+  const shortSrc = RENDERER.match(/function shortTierRange\(choices, labels\) \{[\s\S]*?\n  \}/)![0];
+  const shortTierRange = new Function(shortSrc + "\nreturn shortTierRange;")() as (c: unknown, l: unknown) => boolean;
+  const reasoningChoices = ["off", "low", "medium", "high", "xhigh"];
+  const reasoningLabels = ["关", "低", "中", "高", "极高"];
+  assert.equal(shortTierRange(reasoningChoices, reasoningLabels), true, "Claude/Pi reasoning 五档 ⇒ 短档位（画文字刻度）");
+  assert.equal(shortTierRange(["low", "medium", "high", "xhigh"], ["低", "中", "高", "极高"]), true, "Codex 四档 ⇒ 短档位");
+  const contextChoices = ["", "32768", "65536", "131072", "262144", "500000", "1048576"];
+  const contextLabels = ["系统默认（500k）", "32k", "64k", "128k", "256k", "500k", "1M"];
+  assert.equal(shortTierRange(contextChoices, contextLabels), false, "context 7 档长标签 ⇒ 不画刻度");
+  assert.equal(shortTierRange(reasoningChoices, []), false, "缺标签 ⇒ 不画刻度（防挤压）");
+
+  // 刻度文字 = choiceLabels；输出/aria = 纯标签（无数字、无「· 下标」）。
+  for (let index = 0; index < reasoningChoices.length; index += 1) {
+    assert.equal(UL.rangeChoiceLabel(reasoningChoices, reasoningLabels, index), reasoningLabels[index], "输出纯标签");
+  }
+  assert.equal(UL.rangeChoiceLabel(reasoningChoices, reasoningLabels, 3), "高", "当前值输出「高」（不拼 3）");
+  assert.equal(UL.rangeChoiceLabel(reasoningChoices, reasoningLabels, 4), "极高");
+  assert.equal(UL.rangeChoiceLabel(contextChoices, contextLabels, 5), "500k", "长档位输出仍为纯标签");
+  // 保存值仍是规范 choices 值（hidden 链不变）。
+  assert.equal(UL.rangeChoiceValue(reasoningChoices, 3), "high");
+  assert.equal(UL.rangeChoiceValue(reasoningChoices, 4), "xhigh");
+  assert.equal(UL.rangeChoiceValue(contextChoices, 5), "500000");
+
+  // 源码接线：刻度由 shortTierRange 门控；只渲染文字（无 0..N 数字）；sync/bind 输出纯标签。
+  assert.ok(RENDERER.includes('class="pi-range-ticks"'), "有刻度行（短档位才渲染）");
+  assert.ok(/if \(shortTier\) \{[\s\S]{0,300}choiceLabels\.map\(function \(tierLabel\)/.test(RENDERER), "刻度逐档取 choiceLabels 文字");
+  assert.ok(RENDERER.includes("esc(tierLabel)"), "刻度文字经 esc");
+  assert.ok(!RENDERER.includes("pi-range-tick-num"), "刻度不含数字行");
+  assert.ok(!/tierIndex/.test(RENDERER), "刻度不使用数字下标");
+  assert.equal((RENDERER.match(/var text = UiLabels\.rangeChoiceLabel\(choices, labels, idx\);/g) || []).length, 2, "sync/bind 输出均为纯标签");
+  assert.ok(!/text \+ " · " \+ idx/.test(RENDERER), "输出不拼「· 下标」");
+  assert.ok(/hidden\.value = UiLabels\.rangeChoiceValue\(choices, idx\)/.test(RENDERER), "拖动后仍写 hidden 规范 choices 值");
+  assert.ok(/id="pi-inp-' \+ esc\(f\.key\) \+ '" type="hidden" value="' \+ esc\(UiLabels\.rangeChoiceValue\(choices, rangeIndex\)\)/.test(RENDERER), "hidden 初始值仍是规范 choices 值（保存链零改动）");
+
+  // 滑块放大与刻度样式。
+  assert.ok(/\.pi-range-wrap input\[type="range"\] \{[^}]*height: 30px;/.test(STYLES), "input 高度约 30px");
+  assert.ok(/::-webkit-slider-runnable-track \{[^}]*height: 8px;/.test(STYLES), "轨道 8px");
+  assert.ok(/::-webkit-slider-thumb \{[^}]*width: 22px; height: 22px;/.test(STYLES), "拇指 22px");
+  assert.ok(/\.pi-range-ticks \{[^}]*justify-content: space-between;/.test(STYLES), "刻度一行分布（与拇指端点对齐）");
+});
+
 // ————————————————— A-5（2026-10-12）：客户交互卡 + 通道泛化 + 收口面删除 —————————————————
 
 test("A-5：交互卡（确认/单选/多选/预览）取代收口确认卡；作答经 operatorRespond 回传（主进程按请求快照校验）", () => {

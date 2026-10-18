@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { createDesktopInterface } from "../../app/desktop/interface.ts";
 import { SessionManager, type SessionManagerDeps, type SessionEventEnvelope } from "../../app/desktop/session.ts";
 import { getRuntimeConfig, saveRuntimeConfig } from "../../app/desktop/runtime-config.ts";
+import { RUNTIME_SETTINGS, type RuntimeSettingField } from "../../src/common/shared/runtime-settings.ts";
 import { getSessionHistory } from "../../app/desktop/runtime-history.ts";
 import { createCustomerInputChannel, type OperatorExpiredPayload, type OperatorRequestPayload } from "../../app/desktop/customer-input.ts";
 import { createShellConfirmPresenter, createDesktopOperatorChannel } from "../../app/desktop/operator-channel.ts";
@@ -148,7 +149,10 @@ test("G-5 推理强度设置：三键往返（合法值规范形写盘＋读侧 
     const bad = await saveRuntimeConfig({ runtime: "pi", updates: { ANS_PI_REASONING_EFFORT: "max" } }, { envPath: temp.envPath, revision: 5 });
     assert.equal(bad.ok, false);
     assert.equal(bad.revision, 5);
-    assert.ok((bad.error ?? "").includes("推理强度取值无效") && (bad.error ?? "").includes("off / low / medium / high / xhigh"), "如实提示值域");
+    assert.ok(
+      (bad.error ?? "").includes("推理强度取值无效") && (bad.error ?? "").includes("关 / 低 / 中 / 高 / 极高"),
+      "如实提示值域（滑块档位友好标签）",
+    );
     assert.ok(!(bad.error ?? "").includes("max"), "错误不回显提交值原文");
     assert.equal(fs.readFileSync(temp.envPath, "utf8"), before, "拒绝零副作用（文件未动）");
     // 写侧只收规范形：读侧的大小写宽松归一属读取态，不借道写盘。
@@ -158,7 +162,7 @@ test("G-5 推理强度设置：三键往返（合法值规范形写盘＋读侧 
     // 值域按运行时：codex 无 off 档 ⇒ off 拒绝；high 接受。
     const codexOff = await saveRuntimeConfig({ runtime: "codex", updates: { ANS_CODEX_REASONING_EFFORT: "off" } }, { envPath: temp.envPath });
     assert.equal(codexOff.ok, false);
-    assert.ok((codexOff.error ?? "").includes("low / medium / high / xhigh"), "codex 值域不含 off");
+    assert.ok((codexOff.error ?? "").includes("低 / 中 / 高 / 极高"), "codex 值域按友好标签列出（不含「关」档）");
     const codexHigh = await saveRuntimeConfig({ runtime: "codex", updates: { ANS_CODEX_REASONING_EFFORT: "high" } }, { envPath: temp.envPath });
     assert.equal(codexHigh.ok, true);
     assert.ok(fs.readFileSync(temp.envPath, "utf8").includes("ANS_CODEX_REASONING_EFFORT=high"));
@@ -223,10 +227,28 @@ test("档位字段（choices＋choiceLabels）：Pi 上下文窗口/看护检查
     const cleared = await saveRuntimeConfig({ runtime: "pi", updates: { ANS_PI_CONTEXT_WINDOW: "   " } }, { envPath: temp.envPath });
     assert.equal(cleared.ok, true);
     assert.equal((await getRuntimeConfig("pi", { envPath: temp.envPath, env: {} })).fields.find((f) => f.key === "ANS_PI_CONTEXT_WINDOW")!.isSet, false, "清除后未设");
-    // 无 choiceLabels 的字段：错误仍用 raw choices（行为不变）。
-    const reasoning = await saveRuntimeConfig({ runtime: "pi", updates: { ANS_PI_REASONING_EFFORT: "max" } }, { envPath: temp.envPath });
-    assert.equal(reasoning.ok, false);
-    assert.ok((reasoning.error ?? "").includes("推理强度取值无效：仅接受 off / low / medium / high / xhigh"), "无标签字段回退 raw choices");
+    // 无 choiceLabels 的字段：错误仍用 raw choices（分支保留，用临时合成字段验证）。
+    const fields = RUNTIME_SETTINGS.pi.fields as RuntimeSettingField[];
+    fields.push({
+      key: "ANS_PI_TEST_CHOICES_ONLY",
+      label: "测试档位",
+      required: false,
+      secret: false,
+      choices: ["alpha", "beta"],
+    });
+    try {
+      const beforeFallback = fs.readFileSync(temp.envPath, "utf8");
+      const fallback = await saveRuntimeConfig({ runtime: "pi", updates: { ANS_PI_TEST_CHOICES_ONLY: "gamma" } }, { envPath: temp.envPath });
+      assert.equal(fallback.ok, false);
+      assert.ok(
+        (fallback.error ?? "").includes("测试档位取值无效：仅接受 alpha / beta"),
+        "无标签字段回退 raw choices",
+      );
+      assert.equal((fallback.error ?? "").includes("gamma"), false, "回退分支同样不回显提交值原文");
+      assert.equal(fs.readFileSync(temp.envPath, "utf8"), beforeFallback, "回退分支同样零落盘");
+    } finally {
+      fields.pop();
+    }
     // 同批混入非法档位 ⇒ 整批拒绝、零写入。
     const beforeMixed = fs.readFileSync(temp.envPath, "utf8");
     const rejected = await saveRuntimeConfig({ runtime: "pi", updates: { ANS_PI_MODEL: "should-not-write", ANS_PI_CONTEXT_WINDOW: "abc" } }, { envPath: temp.envPath });

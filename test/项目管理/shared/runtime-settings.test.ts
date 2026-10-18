@@ -53,6 +53,31 @@ test("推理强度 choices ＝平台真实档位：Codex 无 off（平台无该�
   assert.deepEqual(reasoningField("claude")?.choices, ["off", "low", "medium", "high", "xhigh"]);
 });
 
+// ———————— 客户 2026-10-18 要求：思考强度改回滑块（control: range + 中文档位标签） ————————
+
+test("推理强度改回滑块：三字段 control 为 range，choiceLabels 与 choices 逐档对齐", () => {
+  assert.equal(reasoningField("pi")?.control, "range", "Pi 推理强度用滑块控件");
+  assert.deepEqual(
+    reasoningField("pi")?.choiceLabels,
+    ["关", "低", "中", "高", "极高"],
+    "Pi 推理强度标签逐档对齐（含 off 档「关」）",
+  );
+
+  assert.equal(reasoningField("codex")?.control, "range", "Codex 推理强度用滑块控件");
+  assert.deepEqual(
+    reasoningField("codex")?.choiceLabels,
+    ["低", "中", "高", "极高"],
+    "Codex 推理强度标签逐档对齐（无 off 档）",
+  );
+
+  assert.equal(reasoningField("claude")?.control, "range", "Claude 推理强度用滑块控件");
+  assert.deepEqual(
+    reasoningField("claude")?.choiceLabels,
+    ["关", "低", "中", "高", "极高"],
+    "Claude 推理强度标签逐档对齐（含 off 档「关」）",
+  );
+});
+
 test("推理强度 help 三平台统一口径（逐字：留空＝维持平台默认；档位梯；思考计入输出 tokens）", () => {
   for (const runtime of REASONING_RUNTIMES) {
     assert.equal(reasoningField(runtime)?.help, REASONING_HELP, runtime);

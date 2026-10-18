@@ -63,7 +63,13 @@ export const RUNTIME_SETTINGS: Readonly<Record<Exclude<RuntimeKind, "demo">, Run
         control: "range", integer: { min: 1000 },
         help: "到点只通知治理角色检查是否卡死，不中止本轮；仍在推进则不动作；1 小时为最后兜底；留空＝系统默认（5 分钟）；单位 ms；下一次开启会话时应用。",
       },
-      { key: "ANS_PI_REASONING_EFFORT", label: "推理强度", required: false, secret: false, choices: ["off", "low", "medium", "high", "xhigh"], help: REASONING_EFFORT_HELP },
+      {
+        key: "ANS_PI_REASONING_EFFORT", label: "推理强度", required: false, secret: false,
+        choices: ["off", "low", "medium", "high", "xhigh"],
+        choiceLabels: ["关", "低", "中", "高", "极高"],
+        control: "range",
+        help: REASONING_EFFORT_HELP,
+      },
     ],
   },
   codex: {
@@ -73,7 +79,13 @@ export const RUNTIME_SETTINGS: Readonly<Record<Exclude<RuntimeKind, "demo">, Run
       { key: "ANS_CODEX_MODEL", label: "模型", required: true, secret: false },
       { key: "ANS_CODEX_BASE_URL", label: "API 地址", required: false, secret: false, help: "留空使用 OpenAI API；自定义地址须兼容 Responses API。" },
       // Codex has no "off" level; the choices list states the platform's real ladder.
-      { key: "ANS_CODEX_REASONING_EFFORT", label: "推理强度", required: false, secret: false, choices: ["low", "medium", "high", "xhigh"], help: REASONING_EFFORT_HELP },
+      {
+        key: "ANS_CODEX_REASONING_EFFORT", label: "推理强度", required: false, secret: false,
+        choices: ["low", "medium", "high", "xhigh"],
+        choiceLabels: ["低", "中", "高", "极高"],
+        control: "range",
+        help: REASONING_EFFORT_HELP,
+      },
     ],
   },
   claude: {
@@ -82,7 +94,13 @@ export const RUNTIME_SETTINGS: Readonly<Record<Exclude<RuntimeKind, "demo">, Run
       { key: "ANTHROPIC_API_KEY", label: "API 密钥", required: true, secret: true },
       { key: "ANS_CLAUDE_MODEL", label: "模型", required: false, secret: false, help: "留空使用 SDK 默认模型。" },
       { key: "ANTHROPIC_BASE_URL", label: "API 地址", required: false, secret: false, help: "留空使用 SDK 默认服务。" },
-      { key: "ANS_CLAUDE_REASONING_EFFORT", label: "推理强度", required: false, secret: false, choices: ["off", "low", "medium", "high", "xhigh"], help: REASONING_EFFORT_HELP },
+      {
+        key: "ANS_CLAUDE_REASONING_EFFORT", label: "推理强度", required: false, secret: false,
+        choices: ["off", "low", "medium", "high", "xhigh"],
+        choiceLabels: ["关", "低", "中", "高", "极高"],
+        control: "range",
+        help: REASONING_EFFORT_HELP,
+      },
     ],
   },
 };
