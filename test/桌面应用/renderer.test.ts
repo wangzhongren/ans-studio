@@ -303,7 +303,7 @@ test("T28 扩展 2：预设档位滑块——值↔下标↔标签纯映射与 r
   assert.equal(UL.rangeChoiceLabel(choices, labels, 4), "500k", "档位标签逐字");
   assert.equal(UL.rangeChoiceLabel(choices, [], 4), "500000", "缺 choiceLabels 回退 raw value");
   // 源码接线：range 分支 / 档数 / output / aria / hidden 规范值 / 自定义值回退 / 预填同步。
-  assert.ok(RENDERER.includes('if (f.control === "range" && choices)'), "fieldHtml 有 range 分支");
+  assert.ok(RENDERER.includes('if (f.control === "range" && choices && !shortTierRange(choices, choiceLabels))'), "fieldHtml 有 range 分支（仅长档位）");
   assert.ok(/type="range" min="0" max="' \+ \(choices\.length - 1\) \+ '" step="1"/.test(RENDERER), "range 档数=choices.length-1、step 1");
   assert.ok(RENDERER.includes('id="pi-range-out-'), "有 output 标签");
   assert.ok(RENDERER.includes('aria-valuetext="'), "range 的 aria-valuetext 同步标签");
@@ -318,48 +318,40 @@ test("T28 扩展 2：预设档位滑块——值↔下标↔标签纯映射与 r
   assert.ok(STYLES.includes("accent-color: var(--success)") && STYLES.includes("background: var(--border)"), "滑块只用既有 token（success/border）");
 });
 
-test("2026-10-18：短档位大滑块——仅文字刻度、输出纯标签；长档位不画刻度但同样放大", async () => {
+test("2026-10-18：推理强度改回下拉（中文标签 / raw 值）；range 仅长档位；无 ticks、滑块恢复紧凑", async () => {
   const UL = await loadUiLabelsForGovernance();
   // 纯判定函数从源码取出执行（与既有 pure-helper 提取先例一致）。
   const shortSrc = RENDERER.match(/function shortTierRange\(choices, labels\) \{[\s\S]*?\n  \}/)![0];
   const shortTierRange = new Function(shortSrc + "\nreturn shortTierRange;")() as (c: unknown, l: unknown) => boolean;
   const reasoningChoices = ["off", "low", "medium", "high", "xhigh"];
   const reasoningLabels = ["关", "低", "中", "高", "极高"];
-  assert.equal(shortTierRange(reasoningChoices, reasoningLabels), true, "Claude/Pi reasoning 五档 ⇒ 短档位（画文字刻度）");
-  assert.equal(shortTierRange(["low", "medium", "high", "xhigh"], ["低", "中", "高", "极高"]), true, "Codex 四档 ⇒ 短档位");
+  assert.equal(shortTierRange(reasoningChoices, reasoningLabels), true, "Claude/Pi reasoning ⇒ 下拉（不占 range）");
+  assert.equal(shortTierRange(["low", "medium", "high", "xhigh"], ["低", "中", "高", "极高"]), true, "Codex 四档 ⇒ 下拉");
   const contextChoices = ["", "32768", "65536", "131072", "262144", "500000", "1048576"];
   const contextLabels = ["系统默认（500k）", "32k", "64k", "128k", "256k", "500k", "1M"];
-  assert.equal(shortTierRange(contextChoices, contextLabels), false, "context 7 档长标签 ⇒ 不画刻度");
-  assert.equal(shortTierRange(reasoningChoices, []), false, "缺标签 ⇒ 不画刻度（防挤压）");
-
-  // 刻度文字 = choiceLabels；输出/aria = 纯标签（无数字、无「· 下标」）。
+  const timeoutChoices = ["", "60000", "120000", "300000", "600000", "900000", "1800000"];
+  const timeoutLabels = ["系统默认（5 分钟）", "1 分钟", "2 分钟", "5 分钟", "10 分钟", "15 分钟", "30 分钟"];
+  assert.equal(shortTierRange(contextChoices, contextLabels), false, "context 7 档长标签 ⇒ 仍用 range");
+  assert.equal(shortTierRange(timeoutChoices, timeoutLabels), false, "timeout 7 档长标签 ⇒ 仍用 range");
+  // 标签/raw 值映射：下拉显示中文标签，提交值仍是 raw choices。
   for (let index = 0; index < reasoningChoices.length; index += 1) {
-    assert.equal(UL.rangeChoiceLabel(reasoningChoices, reasoningLabels, index), reasoningLabels[index], "输出纯标签");
+    assert.equal(UL.rangeChoiceLabel(reasoningChoices, reasoningLabels, index), reasoningLabels[index], "下拉文本 = choiceLabels");
+    assert.equal(UL.rangeChoiceValue(reasoningChoices, index), reasoningChoices[index], "提交值 = raw choices");
   }
-  assert.equal(UL.rangeChoiceLabel(reasoningChoices, reasoningLabels, 3), "高", "当前值输出「高」（不拼 3）");
-  assert.equal(UL.rangeChoiceLabel(reasoningChoices, reasoningLabels, 4), "极高");
-  assert.equal(UL.rangeChoiceLabel(contextChoices, contextLabels, 5), "500k", "长档位输出仍为纯标签");
-  // 保存值仍是规范 choices 值（hidden 链不变）。
-  assert.equal(UL.rangeChoiceValue(reasoningChoices, 3), "high");
-  assert.equal(UL.rangeChoiceValue(reasoningChoices, 4), "xhigh");
-  assert.equal(UL.rangeChoiceValue(contextChoices, 5), "500000");
 
-  // 源码接线：刻度由 shortTierRange 门控；只渲染文字（无 0..N 数字）；sync/bind 输出纯标签。
-  assert.ok(RENDERER.includes('class="pi-range-ticks"'), "有刻度行（短档位才渲染）");
-  assert.ok(/if \(shortTier\) \{[\s\S]{0,300}choiceLabels\.map\(function \(tierLabel\)/.test(RENDERER), "刻度逐档取 choiceLabels 文字");
-  assert.ok(RENDERER.includes("esc(tierLabel)"), "刻度文字经 esc");
-  assert.ok(!RENDERER.includes("pi-range-tick-num"), "刻度不含数字行");
-  assert.ok(!/tierIndex/.test(RENDERER), "刻度不使用数字下标");
-  assert.equal((RENDERER.match(/var text = UiLabels\.rangeChoiceLabel\(choices, labels, idx\);/g) || []).length, 2, "sync/bind 输出均为纯标签");
-  assert.ok(!/text \+ " · " \+ idx/.test(RENDERER), "输出不拼「· 下标」");
-  assert.ok(/hidden\.value = UiLabels\.rangeChoiceValue\(choices, idx\)/.test(RENDERER), "拖动后仍写 hidden 规范 choices 值");
-  assert.ok(/id="pi-inp-' \+ esc\(f\.key\) \+ '" type="hidden" value="' \+ esc\(UiLabels\.rangeChoiceValue\(choices, rangeIndex\)\)/.test(RENDERER), "hidden 初始值仍是规范 choices 值（保存链零改动）");
-
-  // 滑块放大与刻度样式。
-  assert.ok(/\.pi-range-wrap input\[type="range"\] \{[^}]*height: 30px;/.test(STYLES), "input 高度约 30px");
-  assert.ok(/::-webkit-slider-runnable-track \{[^}]*height: 8px;/.test(STYLES), "轨道 8px");
-  assert.ok(/::-webkit-slider-thumb \{[^}]*width: 22px; height: 22px;/.test(STYLES), "拇指 22px");
-  assert.ok(/\.pi-range-ticks \{[^}]*justify-content: space-between;/.test(STYLES), "刻度一行分布（与拇指端点对齐）");
+  // 源码接线：range 分支只接长档位；select 分支 option 文本 1:1 choiceLabels、value 仍 raw。
+  assert.ok(RENDERER.includes('if (f.control === "range" && choices && !shortTierRange(choices, choiceLabels))'), "range 仅长档位（reasoning 走下拉）");
+  assert.ok(/choices\.map\(function \(c, index\)[\s\S]{0,240}choiceLabels\[index\]/.test(RENDERER), "option 文本用 choiceLabels");
+  assert.ok(/<option value="' \+ esc\(String\(c\)\) \+ '">' \+ esc\(optionText\)/.test(RENDERER), "option value 仍是 raw choices");
+  assert.ok(RENDERER.includes("留空（平台默认）"), "留空档保留");
+  // 无刻度渲染与样式；range 恢复原始紧凑尺寸（轨道 4px、拇指 14px、高 20px、output 在右）。
+  assert.ok(!RENDERER.includes("pi-range-ticks") && !RENDERER.includes("pi-range-tick"), "不再渲染 ticks");
+  assert.ok(!STYLES.includes(".pi-range-ticks") && !STYLES.includes(".pi-range-tick"), "ticks 样式已移除");
+  assert.ok(/\.pi-range-wrap \{[^}]*display: flex; align-items: center;/.test(STYLES), "range 横向紧凑布局");
+  assert.ok(/\.pi-range-wrap input\[type="range"\] \{[^}]*height: 20px;/.test(STYLES), "input 高度恢复 20px");
+  assert.ok(/::-webkit-slider-runnable-track \{[^}]*height: 4px;/.test(STYLES), "轨道恢复 4px");
+  assert.ok(/::-webkit-slider-thumb \{[^}]*width: 14px; height: 14px;/.test(STYLES), "拇指恢复 14px");
+  assert.ok(/\.pi-range-out \{[^}]*text-align: right;/.test(STYLES), "output 在右侧");
 });
 
 // ————————————————— A-5（2026-10-12）：客户交互卡 + 通道泛化 + 收口面删除 —————————————————
@@ -1858,8 +1850,12 @@ test("G-4/V2-MCP：MCP 工具行/安装行零特判——渲染平面对 mcp__/i
 test("G-5/wave2：设置面板 choices 字段＝选择控件（值域即选项＋留空未设态）；自由文本字段逐字现状", () => {
   // 判据＝元数据 choices 非空（单一来源；值域按运行时——Codex 无 off 档自动成立），非机密字段不走此支。
   assert.ok(RENDERER_CODE.includes("Array.isArray(f.choices) && f.choices.length > 0"), "判据=choices 非空（元数据单一来源）");
-  // 选项＝choices 逐字（面板显示值＝保存接受值＝适配器认识值——不加别名映射、不美化）。
-  assert.ok(RENDERER_CODE.includes("choices.map(function (c) { return '<option value=\"' + esc(String(c)) + '\">' + esc(String(c)) + \"</option>\"; })"), "选项=choices 逐字（无第二份值域表）");
+  // 选项文本＝choiceLabels（客户 2026-10-18：推理强度下拉显示 关/低/中/高/极高）；value＝raw choices
+  // （面板显示值可读、保存接受值/适配器值域仍是单一来源；缺标签回退 raw）。
+  assert.ok(
+    /choices\.map\(function \(c, index\) \{[\s\S]{0,260}choiceLabels\[index\][\s\S]{0,260}<option value="' \+ esc\(String\(c\)\) \+ '">' \+ esc\(optionText\)/.test(RENDERER_CODE),
+    "选项文本=choiceLabels、value=raw choices（无第二份值域表）"
+  );
   assert.ok(RENDERER_CODE.includes("'<option value=\"\">留空（平台默认）</option>'"), "留空项＝未设态（保存侧空串＝清除该键、维持平台默认）");
   assert.ok(RENDERER_CODE.includes("f.value !== \"\" && choices.indexOf(f.value) < 0"), "现存非选项值（手编坏值）附原值选项如实显示——不静默改写、不假装未设");
   assert.ok(RENDERER_CODE.includes("'<select id=\"pi-inp-' + esc(f.key) + '\" class=\"pi-input pi-select\">'"), "选择控件（<select>）走既有 pi-input 盒形");

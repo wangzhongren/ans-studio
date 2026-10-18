@@ -53,24 +53,24 @@ test("推理强度 choices ＝平台真实档位：Codex 无 off（平台无该�
   assert.deepEqual(reasoningField("claude")?.choices, ["off", "low", "medium", "high", "xhigh"]);
 });
 
-// ———————— 客户 2026-10-18 要求：思考强度改回滑块（control: range + 中文档位标签） ————————
+// ———————— 客户 2026-10-18 改口：思考强度改回下拉（不挂 control，choices 默认渲染为 select） ————————
 
-test("推理强度改回滑块：三字段 control 为 range，choiceLabels 与 choices 逐档对齐", () => {
-  assert.equal(reasoningField("pi")?.control, "range", "Pi 推理强度用滑块控件");
+test("推理强度改回下拉：三字段不挂 control，choiceLabels 与 choices 逐档对齐", () => {
+  assert.equal(reasoningField("pi")?.control, undefined, "Pi 推理强度用默认下拉（非滑块）");
   assert.deepEqual(
     reasoningField("pi")?.choiceLabels,
     ["关", "低", "中", "高", "极高"],
     "Pi 推理强度标签逐档对齐（含 off 档「关」）",
   );
 
-  assert.equal(reasoningField("codex")?.control, "range", "Codex 推理强度用滑块控件");
+  assert.equal(reasoningField("codex")?.control, undefined, "Codex 推理强度用默认下拉（非滑块）");
   assert.deepEqual(
     reasoningField("codex")?.choiceLabels,
     ["低", "中", "高", "极高"],
     "Codex 推理强度标签逐档对齐（无 off 档）",
   );
 
-  assert.equal(reasoningField("claude")?.control, "range", "Claude 推理强度用滑块控件");
+  assert.equal(reasoningField("claude")?.control, undefined, "Claude 推理强度用默认下拉（非滑块）");
   assert.deepEqual(
     reasoningField("claude")?.choiceLabels,
     ["关", "低", "中", "高", "极高"],

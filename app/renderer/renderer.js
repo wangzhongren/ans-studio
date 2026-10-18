@@ -4265,9 +4265,9 @@
     return piView.fields.filter(function (f) { return f.key === key; })[0] || null;
   }
 
-  /** 短档位判定（2026-10-18 客户要求：思考强度滑块做大并带文字刻度）：
-   *  ≤5 档且每档标签都非空且 ≤4 字 ⇒ 滑块上方显示一行 `choiceLabels` 文字刻度（reasoning 关/低/中/高/极高
-   *  与 codex 四档）；context/timeout 等 7 档长标签 ⇒ 不显示刻度（避免挤爆），滑块同样放大。
+  /** 短档位判定（2026-10-18 客户要求：推理强度改回下拉；range 只留给 context/timeout 长档位）：
+   *  ≤5 档且每档标签都非空且 ≤4 字 ⇒ 走 choices/select 分支，option 文本用 `choiceLabels`
+   *  （reasoning 关/低/中/高/极高 与 codex 四档）；7 档长标签（context/timeout）仍走 range。
    *  判定只依赖元数据 `choices`/`choiceLabels`，不按字段 key 分叉。 */
   function shortTierRange(choices, labels) {
     if (!Array.isArray(choices) || choices.length === 0 || choices.length > 5) return false;
@@ -4339,8 +4339,9 @@
       var choices = Array.isArray(f.choices) && f.choices.length > 0 ? f.choices : null;
       var choiceLabels = Array.isArray(f.choiceLabels) ? f.choiceLabels : [];
       var control, forId = "pi-inp-" + f.key;
-      if (f.control === "range" && choices) {
-        // G-5 wave 2 扩展（2026-10-17）：预设档位滑块。可见 range + output 显示 choiceLabels；
+      if (f.control === "range" && choices && !shortTierRange(choices, choiceLabels)) {
+        // G-5 wave 2 扩展（2026-10-17）：预设档位滑块（**仅长档位**：context/timeout 7 档长标签，
+        // 2026-10-18 客户要求短档位 reasoning 改回下拉）。可见 range + output 显示 choiceLabels；
         // **hidden #pi-inp-<key> 持有规范值**（既有保存循环原样读 #pi-inp-<key>，保存链零改动）。
         // 键盘方向键由原生 range 提供；aria-valuetext 与 output 同步为同一标签。
         var rangeIndex = UiLabels.rangeChoiceIndex(choices, f.value);
@@ -4349,26 +4350,21 @@
           control = '<input id="pi-inp-' + esc(f.key) + '" class="pi-input" type="text" autocomplete="off" spellcheck="false" />' +
             '<span class="pi-range-note">当前值不在预设档位；改为预设档位后保存</span>';
         } else {
-          // 短档位（reasoning 等 ≤5 档、标签 ≤4 字）：滑块**上方**一行 `choiceLabels` 文字刻度，
-          // 每档一列（不显示 0..N 数字）；长档位（context/timeout 7 档）不画刻度，避免挤爆。
-          var shortTier = shortTierRange(choices, choiceLabels);
           var rangeText = UiLabels.rangeChoiceLabel(choices, choiceLabels, rangeIndex);
-          var ticks = "";
-          if (shortTier) {
-            ticks = '<span class="pi-range-ticks" aria-hidden="true">' +
-              choiceLabels.map(function (tierLabel) {
-                return '<span class="pi-range-tick">' + esc(tierLabel) + "</span>";
-              }).join("") + "</span>";
-          }
           forId = "pi-range-" + f.key;
-          control = '<span class="pi-range-wrap">' + ticks +
+          control = '<span class="pi-range-wrap">' +
             '<input id="pi-range-' + esc(f.key) + '" class="pi-range" type="range" min="0" max="' + (choices.length - 1) + '" step="1" value="' + rangeIndex + '" aria-valuetext="' + esc(rangeText) + '" />' +
             '<output id="pi-range-out-' + esc(f.key) + '" class="pi-range-out" for="pi-range-' + esc(f.key) + '">' + esc(rangeText) + "</output>" +
             "</span>" +
             '<input id="pi-inp-' + esc(f.key) + '" type="hidden" value="' + esc(UiLabels.rangeChoiceValue(choices, rangeIndex)) + '" />';
         }
       } else if (choices) {
-        var opts = ['<option value="">留空（平台默认）</option>'].concat(choices.map(function (c) { return '<option value="' + esc(String(c)) + '">' + esc(String(c)) + "</option>"; }));
+        // 下拉：option 文本 1:1 用 `choiceLabels`（如 关/低/中/高/极高；缺标签回退 raw），
+        // `value` 仍是 raw choices（off/low/...）——提交/保存链与适配器值域不变。
+        var opts = ['<option value="">留空（平台默认）</option>'].concat(choices.map(function (c, index) {
+          var optionText = typeof choiceLabels[index] === "string" && choiceLabels[index] !== "" ? choiceLabels[index] : String(c);
+          return '<option value="' + esc(String(c)) + '">' + esc(optionText) + "</option>";
+        }));
         if (typeof f.value === "string" && f.value !== "" && choices.indexOf(f.value) < 0) opts.push('<option value="' + esc(f.value) + '">' + esc(f.value) + "</option>");
         control = '<select id="pi-inp-' + esc(f.key) + '" class="pi-input pi-select">' + opts.join("") + "</select>";
       } else {
