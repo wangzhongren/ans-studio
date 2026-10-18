@@ -203,17 +203,30 @@ test('W6b：system 展示正文剥离文首标记（displayBody）——判据/�
   assert.equal(tools.classifyInjectedMessage('[回交] 来自 A 的报告')?.displayBody, undefined);
 });
 
-test('内部治理反馈展示收敛：displayBody 固定短提示（不转述原文），body 保留原文；其他系统子类不变', () => {
+test('内部治理反馈展示收敛：带来源短提示可区分（不转述原文），无来源回退；其他系统子类不变', () => {
   const raw = '[系统·治理反馈] 来自 Draft 的内部报告：完成度 80%。\nRAW_SENTINEL';
   const fb = tools.classifyInjectedMessage(raw);
   assert.equal(fb?.kind, 'system', '归类仍是 system');
   assert.equal(fb?.label, '系统消息 · 治理反馈', '子类仍是治理反馈');
-  assert.equal(fb?.displayBody, '内部反馈已交给主理，稍后由主理汇总告知你。', '展示面固定短提示');
+  assert.equal(fb?.displayBody, '内部反馈已交给主理，稍后由主理汇总告知你。', '来源取不到 ⇒ 回退现有短句');
   assert.ok(String(fb?.displayBody).includes('主理汇总'));
   assert.ok(!String(fb?.displayBody).includes('RAW_SENTINEL'), '展示面不含内部原文');
   assert.ok(!String(fb?.displayBody).includes('完成度'), '不转述内部报告内容');
   assert.equal(fb?.body, raw, '原文保留在 body（会话记录/模型提示不受影响）');
   assert.equal(fb?.sourceRoleId, '', '来源=系统');
+  // 生产正文（app/desktop/session.ts）：`来自 <displayName> 的内部反馈（…）：` ⇒ 展示行带来源、可区分。
+  const draft = tools.classifyInjectedMessage(
+    '[系统·治理反馈] 来自 Draft 的内部反馈（内部材料，请汇总后告知客户，不要逐字转述）：\nRAW_SENTINEL_DRAFT'
+  );
+  assert.equal(draft?.displayBody, '来自 Draft 的内部反馈已交给主理，稍后由主理汇总告知你。');
+  assert.ok(!String(draft?.displayBody).includes('RAW_SENTINEL_DRAFT'), '带来源时仍不显示原文');
+  const steward = tools.classifyInjectedMessage('[系统·治理反馈] 来自 Steward 的内部反馈：\nRAW_SENTINEL_STEWARD');
+  assert.equal(steward?.displayBody, '来自 Steward 的内部反馈已交给主理，稍后由主理汇总告知你。');
+  assert.ok(!String(steward?.displayBody).includes('RAW_SENTINEL_STEWARD'));
+  assert.notEqual(draft?.displayBody, steward?.displayBody, 'Draft / Steward 两条展示行可区分');
+  // displayName 可含「/」（如 "Draft / 提案"）——来源原样取到，仍不泄露正文。
+  const named = tools.classifyInjectedMessage('[系统·治理反馈] 来自 Draft / 提案 的内部反馈：\nRAW');
+  assert.equal(named?.displayBody, '来自 Draft / 提案 的内部反馈已交给主理，稍后由主理汇总告知你。');
   // 回显路径（`用户指令：` 前缀）同解；body 去前缀后仍是投递原文。
   const echo = tools.classifyInjectedMessage('用户指令：' + raw);
   assert.equal(echo?.displayBody, '内部反馈已交给主理，稍后由主理汇总告知你。');

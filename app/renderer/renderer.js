@@ -5367,7 +5367,9 @@
           othersFoldOpen = open;
         });
         Rt.roleGroups(others).forEach(function (group) {
-          othersFold.appendChild(treeGroupLabel(group.name));
+          // 真机截图（2026-10-18）：无分组角色与 details summary 同名——默认分组不再重复内层标题，
+          // 直接把角色项挂进 details；有名项目分组照旧保留各自 label。
+          if (group.name !== "其他角色（查看/调试）") othersFold.appendChild(treeGroupLabel(group.name));
           group.roles.forEach(function (r) { othersFold.appendChild(roleTreeItem(r, false)); });
         });
         el.appendChild(othersFold);

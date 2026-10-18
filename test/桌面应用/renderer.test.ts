@@ -2688,8 +2688,17 @@ test("2026-10-18：左树折叠卡——两个 details 默认 collapsed、主入
   assert.ok(tree.includes("govFold.appendChild(roleTreeItem(r, false))"), "四个内置治理角色挂进 details");
   // 项目角色仍由 listing 的 group/groupDuty 驱动（数据/分组不变），只是收进 details。
   assert.ok(tree.includes("Rt.roleGroups(others)"), "项目角色分组仍由 Rt.roleGroups 驱动");
-  assert.ok(tree.includes("othersFold.appendChild(treeGroupLabel(group.name))"), "分组标题挂在其他角色 details 内");
-  assert.ok(tree.includes("othersFold.appendChild(roleTreeItem(r, false))"), "项目角色项挂在其他角色 details 内");
+  // 真机截图（2026-10-18）：默认无分组与 details summary 同名——折叠分支内不再重复同名 label；
+  // 有名项目分组照旧保留各自 label（多分组时子分组可见）。
+  const foldBranch = tree.slice(tree.indexOf("var othersFold ="), tree.indexOf("el.appendChild(othersFold);"));
+  assert.ok(foldBranch.length > 0, "其他角色折叠分支存在");
+  assert.equal((foldBranch.match(/treeGroupFold\("其他角色（查看\/调试）"/g) ?? []).length, 1, "details summary 只有一处「其他角色（查看/调试）」");
+  assert.equal((foldBranch.match(/treeGroupLabel\("其他角色（查看\/调试）"\)/g) ?? []).length, 0, "折叠分支内不再追加同名 treeGroupLabel");
+  assert.ok(
+    foldBranch.includes('if (group.name !== "其他角色（查看/调试）") othersFold.appendChild(treeGroupLabel(group.name));'),
+    "默认同名分组跳过内层标题；有名项目分组保留 label"
+  );
+  assert.ok(foldBranch.includes("othersFold.appendChild(roleTreeItem(r, false))"), "项目角色项挂在其他角色 details 内（不论有无分组名）");
   // single 旧树（su + 项目角色）不折叠：原平铺分支逐字保留，仅 trio 走折叠。
   assert.ok(tree.includes('state.governanceModelKnown === true && state.governanceModel === "trio"'), "仅 trio 折叠（模型未知/single 走旧树）");
   assert.ok(tree.includes('el.appendChild(treeGroupLabel("其他角色（查看/调试）"));'), "single 旧树平铺分组逐字保留");
