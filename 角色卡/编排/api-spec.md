@@ -509,7 +509,10 @@ export type { CreateGovernanceJudgeOptions } from "../../common/编排/governanc
 
 ### 验收证据
 
-- **超时（P6 真机修复）**：治理 judge 默认 `60_000ms`；`ANS_GOVERNANCE_JUDGE_TIMEOUT_MS`（正整数，非法回默认）可覆盖；计时只从模型判断开始（不含排队/等卡），文案带时长（如「判断超时（>60s）」）；shell judge 保持 15s。测试：judge **33/33**、`test/编排` **507 计/506 过**（symlink 环境红）、typecheck 0。
+- **物证命名（P6 真机修复）**：`<flowId>-vN.md` 与 `<flowId>.proposal-vN.md` / `<flowId>.nomination-vN.md` 均解析，取最大版本；找不到才 `artifact-missing`。
+- **pathProbes（P6 真机修复）**：只取 preview 的「一行一个路径」声明；关键词后可直接跟路径（`将写入 docs/x.md`），关键词与冒号间允许修饰词（`写入路径仅一条：docs/x.md`），列表符/`路径：`标签/反引号容忍；**不扫描散文**；散文里的 `src/**`、`test/**`、`data/ledger.json` 不进入候选；越界声明路径仍生成 `allowed:false` probe 并整卡回落。
+- **boundary.yaml 写前内容校验（P6 真机修复）**：`write_file`/`edit_file` 目标匹配 `角色卡/<id>/boundary.yaml` 时，用门禁引擎 Service 公共出口 `validateBoundaryYamlText` 校验最终内容；非法 ⇒ 拒绝写入、零文件副作用，回执「boundary.yaml 格式非法：<原因>；顶层只允许 role / entries / archived，请按模板重写」；`role-card.md` 与其他路径不校验内容。
+- **超时（P6 真机修复）**：治理 judge 默认 `60_000ms`；`ANS_GOVERNANCE_JUDGE_TIMEOUT_MS`（正整数，非法回默认）可覆盖；计时只从模型判断开始（不含排队/等卡），文案带时长（如「判断超时（>60s）」）；shell judge 保持 15s。测试：judge **38/38**、boundary 校验 **4/4**、`test/编排` **516 计/515 过**（symlink 环境红）、typecheck 0。
 - **write 新文件（P6 真机修复）**：`write` 卡 artifacts/required-read 只收**已存在**的相关物证；新建目标文件不进入 required-read，改由 `preview` 正文核对；`preview` 为空 ⇒ `manual/insufficient-evidence`。`appointment-write`/`schedule-write` 的 nomination/flow 要求不变。
 - 新增 `test/编排/governance-judge.test.ts` **32/32**：六卡种正反例、required-read/物证缺失、逐路径复核（probes/写根/禁写/来源/pathDecisions 覆盖）、accept-quick 不代批、任命推荐集、读取损伤、支持矩阵/超时/中止/busy、事实/推荐集解析、trio judgeContext 与 single/su/项目角色对照、账本 judge 字段与 group 交叉校验、两工具回执、审计有界、**acceptance 流程完成度机械门槛**、**write 新文件 preview/旧版物证**。
 - 相关既有套件 74/74、P6 套件 42/42；`npm run typecheck` 0 错；全量三层 glob `node --test "test/**/*.test.ts"` 2900 计/2881 过/16 红/3 skipped，16 红均他域/环境既有（明细见 changelog）。

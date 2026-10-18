@@ -110,7 +110,7 @@ import { withHandback, type OrchestrationEvent, type TaskReport, type HandbackIn
 import { EXIT_OK, EXIT_USAGE, EXIT_FAILURE } from "../../common/编排/exit-codes.ts";
 import type { ShellVerdictFn } from "../../common/编排/shell-gate.ts";
 import { repinIfBootstrapped, DEFAULT_GOVERNANCE_BOUNDARY_REL } from "../../common/编排/finalize.ts";
-import { conditionSlugsOf, createConfirmedWriteIssuer, extractPathCandidates } from "../../common/编排/confirmed-writes.ts";
+import { conditionSlugsOf, createConfirmedWriteIssuer } from "../../common/编排/confirmed-writes.ts";
 import {
   appendGovernanceLedger,
   readGovernanceLedger,
@@ -121,6 +121,7 @@ import {
 import { evaluateGovernanceGate, type GovernanceGateAction } from "../../common/编排/governance-gate.ts";
 import {
   buildGovernanceJudgeFacts,
+  declaredWritePathsFromPreview,
   parseRecommendedRoleIds,
   unavailableGovernanceJudgeFacts,
 } from "../../common/编排/governance-judge-facts.ts";
@@ -1882,7 +1883,10 @@ async function latestVersionedArtifact(
   } catch {
     return undefined;
   }
-  const pattern = new RegExp(`^${flowId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}-v(\\d+)\\.md$`);
+  // 容忍实际命名（2026-10-18 真机）：`<flowId>-vN.md` 与 `<flowId>.proposal-vN.md` /
+  // `<flowId>.nomination-vN.md` 都按同一 flow 的最新版本解析（取最大 N）。
+  const escaped = flowId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`^${escaped}(?:\\.(?:proposal|nomination))?-v(\\d+)\\.md$`);
   let best: { name: string; version: number } | undefined;
   for (const name of names) {
     const match = pattern.exec(name);
@@ -1963,7 +1967,7 @@ async function judgeArtifactsForCard(args: {
 
 /**
  * `judgeContext` 的唯一计算点（2026-10-18 双开关评审 §5.2/§5.4）：
- * paths/pathProbes（与 issuer 同一份 `extractPathCandidates` + `resolveWrite`）、
+ * paths/pathProbes（只取 preview 的**声明写入路径**；与散文无关，`resolveWrite` 机械探测）、
  * 写根/禁写、规范物证、推荐集、账本事实。桌面只消费，不重算、不读 `.ans`。
  */
 async function computeJudgeContext(args: {
@@ -2019,7 +2023,9 @@ async function computeJudgeContext(args: {
   context.forbiddenPaths = [...args.trioSpec.forbiddenWritePaths];
 
   if (args.req.kind === "confirm") {
-    const candidates = extractPathCandidates([args.req.title, args.req.preview ?? "", args.req.detail ?? ""].join("\n"));
+    // 2026-10-18 真机修复：候选路径只来自 preview 的「一行一个路径」声明，**不从散文扫描**——
+    // 预览里提到的 src/**、test/**、data/ledger.json 等不是本次写入目标，不应变成越界 probe。
+    const candidates = declaredWritePathsFromPreview(args.req.preview ?? "");
     context.paths = candidates;
     context.pathProbes = candidates.map((candidate) => {
       let allowed = false;
@@ -2101,7 +2107,7 @@ async function scanPreauthorizedArtifacts(
 
 /** 从候选物路径推导报告用的 flowId / 版本（只用于账本留痕；不做任何门禁判定）。 */
 function artifactFlowMetadata(relPath: string): Pick<GovernanceLedgerEntry, "flowId" | "artifactVersion"> {
-  const proposal = /^docs\/(?:proposals|nominations)\/(.+)-v(\d+)\.md$/.exec(relPath);
+  const proposal = /^docs\/(?:proposals|nominations)\/(.+?)(?:\.(?:proposal|nomination))?-v(\d+)\.md$/.exec(relPath);
   if (proposal !== null && isGovernanceFlowId(proposal[1])) {
     return { flowId: proposal[1], artifactVersion: Number(proposal[2]) };
   }

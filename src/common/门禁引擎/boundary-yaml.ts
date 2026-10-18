@@ -22,6 +22,36 @@ function fail(msg: string): never {
   throw new Error(msg);
 }
 
+/** 顶层未知键的具体纠正提示（真机 2026-10-18：Nominator 写了 version/roleId/root 顶层键 ⇒ 整个边界解析失败、
+ *  新角色不被枚举）。顶层只允许 role / entries / archived；这里把常见误写的正确写法直接点出来。 */
+function topKeyError(key: string): string {
+  if (key === "roleId") return "未知顶层键：roleId（角色 id 写在 `role:`；顶层只允许 role / entries / archived）";
+  if (key === "version") return "未知顶层键：version（边界 YAML 不写版本号；顶层只允许 role / entries / archived）";
+  if (key === "root") {
+    return "未知顶层键：root（顶层不得写 root；条目内 root 仅 conditional-directory 可选，普通条目不写；顶层只允许 role / entries / archived）";
+  }
+  return `未知顶层键：${key}（顶层只允许 role / entries / archived）`;
+}
+
+/** 边界 YAML 文本校验结果：只读解析，不写盘。 */
+export type BoundaryYamlValidation =
+  | { ok: true; entries: BoundaryEntry[] }
+  | { ok: false; message: string };
+
+/**
+ * 公共校验入口（经 Service `resolve-boundary.ts` 再导出）：在写盘前校验边界 YAML 文本。
+ * 合法返回规范化后的 entries；非法返回 `{ok:false, message}`（含纠正提示），**不写盘、不读盘**。
+ * 与加载器走同一个 `parseBoundaryYamlDoc`（单一来源），避免写前校验与运行时解析口径漂移。
+ */
+export function validateBoundaryYamlText(text: string): BoundaryYamlValidation {
+  const src = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+  try {
+    return { ok: true, entries: parseBoundaryYamlDoc(src).entries };
+  } catch (err) {
+    return { ok: false, message: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 /** 严格解析边界 YAML；任何违规抛错（整个边界视为解析失败） */
 export function parseBoundaryYaml(text: string): BoundaryEntry[] {
   return parseBoundaryYamlDoc(text).entries;
@@ -40,7 +70,7 @@ export function parseBoundaryYamlDoc(text: string): { entries: BoundaryEntry[]; 
 
   const top = doc as Record<string, unknown>;
   for (const k of Object.keys(top)) {
-    if (!TOP_KEYS.has(k)) fail(`未知顶层键：${k}`);
+    if (!TOP_KEYS.has(k)) fail(topKeyError(k));
   }
   if (top.archived !== undefined && typeof top.archived !== "boolean") {
     fail("archived 必须是布尔值（true = 该角色目录为冻结归档）");

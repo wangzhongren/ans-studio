@@ -29,7 +29,7 @@ import type {
   GovernanceMigrationPreview,
   GovernanceMigrationResult,
 } from "../../src/pipeline/orchestration/govern-session.ts";
-import { readGovernanceLedger } from "../../src/pipeline/orchestration/govern-session.ts";
+import { readGovernanceLedger, appendGovernanceLedger } from "../../src/pipeline/orchestration/govern-session.ts";
 import type { PinEvidenceResult } from "../../src/model/boundary.ts";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -2220,6 +2220,162 @@ test("治理自动推进（真机修正）：任命后角色始终未写出 ⇒ 
     await iface.stopSession();
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+/** 可推任意事件（回交/消息）与 `settled` 的句柄（收尾推进用：模拟真实轮次事件顺序）。 */
+function scriptedGovernanceHandle(sends: string[]): {
+  handle: RoleSessionHandle;
+  emit: (event: SessionEvent) => void;
+  settle: () => void;
+} {
+  const queue: SessionEvent[] = [];
+  const handle: RoleSessionHandle = {
+    async send(text: string): Promise<void> { sends.push(text); },
+    events(): AsyncIterable<SessionEvent> {
+      return {
+        [Symbol.asyncIterator]() {
+          return {
+            async next(): Promise<IteratorResult<SessionEvent>> {
+              for (let i = 0; i < 400; i += 1) {
+                const event = queue.shift();
+                if (event !== undefined) return { value: event, done: false };
+                await new Promise((resolve) => setTimeout(resolve, 5));
+              }
+              return { value: undefined as unknown as SessionEvent, done: true };
+            },
+          };
+        },
+      };
+    },
+    async dispose(): Promise<void> {},
+  };
+  return {
+    handle,
+    emit: (event) => { queue.push(event); },
+    settle: () => { queue.push({ kind: "settled", summary: "一轮结束（测试替身）" } as SessionEvent); },
+  };
+}
+
+/**
+ * 收尾推进端到端夹具：写入流程单/账本 → Convener 派发一项任务给 executor → executor 回交 →
+ * Convener 收到回交并 settle。返回各角色发送记录/事件，供断言「是否派 Rapporteur」。
+ */
+async function runHandbackAcceptanceScenario(status: string) {
+  const root = makeTempProjectRoot(`ans-acceptance-${status}-`);
+  const flowId = "flow-a";
+  const listing = listingWithProjectRoles({ ...trioListing(), projectRoot: root }, ["executor"]);
+  mkdirSync(path.join(root, "docs", "flows"), { recursive: true });
+  writeFileSync(
+    path.join(root, "docs", "flows", `${flowId}.md`),
+    `| 步骤 | 状态 |\n| --- | --- |\n| impl | ${status} |\n`,
+  );
+  await appendGovernanceLedger(root, {
+    at: new Date().toISOString(),
+    kind: "customer.decision",
+    flowId,
+    decisionKind: "proposal-accept",
+    customerDecision: "accepted",
+    actorRoleId: "rapporteur",
+    power: "proposal",
+  });
+  await appendGovernanceLedger(root, {
+    at: new Date().toISOString(),
+    kind: "customer.decision",
+    flowId,
+    decisionKind: "appointment",
+    customerDecision: "accepted",
+    actorRoleId: "nominator",
+    power: "nomination",
+    targetRoleIds: ["executor"],
+  });
+  const sendsByRole = new Map<string, string[]>();
+  const events: SessionEventEnvelope[] = [];
+  const controls = new Map<string, { emit: (event: SessionEvent) => void; settle: () => void }>();
+  let dispatchTask: DispatchTaskFn | undefined;
+  const iface = createDesktopInterface({
+    pickDirectory: async () => root,
+    emitEvent: (envelope) => { events.push(envelope); },
+    listProjectFn: async () => listing,
+    openRoleSessionFn: async (input) => {
+      const sends: string[] = [];
+      sendsByRole.set(input.roleId, sends);
+      const made = scriptedGovernanceHandle(sends);
+      controls.set(input.roleId, made);
+      if (input.roleId === "convener") dispatchTask = input.dispatchTask;
+      return made.handle;
+    },
+    buildProjectConfigFn: buildProjectConfig,
+  });
+  await iface.listProject({ projectRoot: root });
+  assert.equal((await iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+  assert.ok(dispatchTask, "Convener 注入 dispatch_task");
+  const dispatched = await dispatchTask!({ roleId: "executor", task: "实现步骤", flowId, stepId: "impl" });
+  assert.ok(dispatched, "dispatch_task 应有回执");
+  assert.equal(dispatched.ok, true, dispatched.message ?? "");
+  await waitForTest(() => (sendsByRole.get("executor")?.length ?? 0) > 0);
+  controls.get("executor")!.emit({
+    kind: "handback",
+    summary: "回交",
+    handback: {
+      roleId: "executor",
+      status: "completed",
+      summary: "实现完成",
+      evidence: ["docs/reports/impl.md"],
+      at: new Date().toISOString(),
+    },
+  } as unknown as SessionEvent);
+  await waitForTest(() => (sendsByRole.get("convener")?.length ?? 0) > 0, 3000);
+  controls.get("executor")!.settle();
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  controls.get("convener")!.settle();
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  return {
+    flowId,
+    sendsByRole,
+    events,
+    repeatConvenerSettle: () => controls.get("convener")!.settle(),
+    close: async () => {
+      await iface.stopSession();
+      rmSync(root, { recursive: true, force: true });
+    },
+  };
+}
+
+test("收尾推进：回交送达 Convener 且流程全部完成 ⇒ 派 Rapporteur 恰一次；重复 settle 不重派", async () => {
+  const scenario = await runHandbackAcceptanceScenario("done");
+  try {
+    const rapporteurSends = scenario.sendsByRole.get("rapporteur") ?? [];
+    assert.equal(rapporteurSends.length, 1, "全部完成 ⇒ 恰一条验收汇总任务");
+    assert.match(rapporteurSends[0] ?? "", /流程 flow-a 步骤已全部完成/);
+    assert.match(rapporteurSends[0] ?? "", /流程单：docs\/flows\/flow-a\.md/);
+    assert.match(rapporteurSends[0] ?? "", /docs\/reports\/impl\.md/, "任务带回交/核对报告路径");
+    assert.match(rapporteurSends[0] ?? "", /请汇总证据并出验收卡/);
+    assert.match(rapporteurSends[0] ?? "", /不要自行验收或代替客户决定/);
+    const notes = scenario.events
+      .filter((envelope) => envelope.roleId === "convener" && envelope.event.kind === "message" && (envelope.event as { detail?: { source?: string } }).detail?.source === "delivery-note")
+      .map((envelope) => String((envelope.event as { summary?: string }).summary));
+    assert.ok(notes.some((note) => /已派发验收汇总任务给 Rapporteur/.test(note)), "系统行如实告知已派发");
+    scenario.repeatConvenerSettle();
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    assert.equal(rapporteurSends.length, 1, "重复 settle 不重复派");
+  } finally {
+    await scenario.close();
+  }
+});
+
+test("收尾推进：步骤未完成/阻塞 ⇒ 不派 Rapporteur（保持现状）", async () => {
+  const pending = await runHandbackAcceptanceScenario("pending");
+  try {
+    assert.equal((pending.sendsByRole.get("rapporteur") ?? []).length, 0, "pending 步骤：不派");
+  } finally {
+    await pending.close();
+  }
+  const blocked = await runHandbackAcceptanceScenario("blocked");
+  try {
+    assert.equal((blocked.sendsByRole.get("rapporteur") ?? []).length, 0, "blocked 步骤：不派");
+  } finally {
+    await blocked.close();
   }
 });
 

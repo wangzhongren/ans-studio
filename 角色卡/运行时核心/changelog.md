@@ -1,5 +1,15 @@
 # 运行时核心变更记录
 
+## 2026-10-18 角色 `boundary.yaml` 写前内容校验（接管编排实现＋验收，已实施待验证）
+
+真机缺陷：Nominator 写出顶层含 `version`/`roleId`/`root` 的非法 `角色卡/<id>/boundary.yaml`，应用照单写入后新角色无法枚举。编排为修复在运行时核心文件 `src/provider/runtime/tools.ts` 中加入写前校验，本角色接管验收：
+
+①分层复核：校验函数只从 **Service 公共出口** `src/service/boundary/resolve-boundary.ts` import（它再导出**门禁引擎私有的同一函数引用**，单一来源、不复制解析器）；Provider **不直接 import** `common/门禁引擎/boundary-yaml.ts`。这是定向例外——改为「注入校验器」会让未注入路径 fail-open，违背「非法边界写不进去」。落点是 `write_file`/`edit_file` 的公共写盘咽喉（覆盖 Service 会话、Pi 直连与演示），未改门禁/适配器。顺手清理了 `edit_file` 中乱码转义注释。
+
+②行为：仅对 `角色卡/<id>/boundary.yaml` 生效（相对/`./`/项目根内绝对/Windows 反斜杠均识别）；非法顶层键或结构 ⇒ `ok:false`，回执含具体原因与「顶层只允许 role / entries / archived」；`write_file` 在任何 `mkdir`/`open` 之前返回（角色目录都不创建），`edit_file` 对编辑后文本校验、拒绝时文件逐字节不变。`role-card.md` 与其他同名路径不校验内容。校验是写时安全网，不授予/改变任何写权。
+
+**测试**：新增 `test/runtime-core/boundary-write-guard.test.ts` 5 例（三类非法顶层拒写＋零副作用；合法模板放行；`./`/绝对路径受校验；`role-card.md`/其他路径不校验；`edit_file` 拒绝且文件不变；Windows 反斜杠平台条件）。`node --test "test/runtime-core/**/*.test.ts"`：**195 计 / 192 过 / 3 红**（3 红均为既有 Windows `symlink EPERM`：session-store ×2、tools ×1）。`npx tsc --noEmit`：**0 错**。全量三层 glob `node --test --test-timeout=60000 --test-force-exit "test/**/*.test.ts"`：**2961 计 / 2937 过 / 20 红 / 3 跳过**，红项均为既有环境/桌面/治理在飞面（明细见本文件同日 list_dir 条目末段），**无本批新增红**。未跑真实模型/凭据/网络；未 git 提交。
+
 ## 2026-10-18 普通角色只读目录工具 `list_dir`（真机噪声修复，已实施待验证）
 
 真机反馈：普通角色没有列目录工具，定位流程单/角色卡时只能反复猜文件名，产生大量 `read_file` 的 `ENOENT`/`EISDIR`。按协调者派发新增只读 `list_dir`：
@@ -10,7 +20,7 @@
 
 ③`src/provider/runtime/schema.ts`：`list_dir` 严格 schema（`path` 可选字符串、`additionalProperties:false`）与描述/guidelines（只读、一层、敏感项不列名、目录用 list_dir）。
 
-**测试**：新增 `test/runtime-core/list-dir-tool.test.ts` 6 例（默认注册与 schema、列目录/一层/目录带 `/`、敏感项不列名与敏感目录拒绝、`..`/根外绝对路径/junction 逃逸/不存在/非目录、200 项截断、中止不执行）；本角色既有精确工具面断言同步为含 `list_dir`（3→4 项；全注入 16→17）。`node --test "test/runtime-core/**/*.test.ts"`：**190 计 / 187 过 / 3 红**（3 红均为既有 Windows `symlink EPERM`：session-store ×2、tools ×1，无新增红）。`npx tsc --noEmit`：**0 错**。全量三层 glob `node --test --test-force-exit "test/**/*.test.ts"`：**2912 计 / 2888 过 / 21 红 / 3 跳过**——21 红归属：9 条 Windows `symlink EPERM` 环境红、6 条桌面 renderer/runtime-ui/vendor 哈希既有钉、1 条 runtime-core shell abort 并发时序（单独复跑通过）、**3 条在飞治理双开关验证**（`test/测试/governance-judge-cards-verify` ×2、`governance-liaison-verify` ×1；下一步/派发断言，属其他角色在飞面）、**2 条 list_dir 预期红**（`test/codex-adapter/session.test.ts` 动态工具数 9→10、`test/测试/g4-skill-verify/h-scope-audit.test.ts` 工具面固定清单未含 `list_dir`；均属适配器/测试角色目录，本角色不越界，需其属主同步）。附加说明：全量必须加 `--test-force-exit`——`test/codex-adapter/session.test.ts` 在当前工作树（P3c 在飞改动）测试完成后仍有未释放句柄，普通 `node --test` 会在该文件处挂起；与本批改动无关。未跑真实模型/凭据/网络；未 git 提交。
+**测试**：新增 `test/runtime-core/list-dir-tool.test.ts` 6 例（默认注册与 schema、列目录/一层/目录带 `/`、敏感项不列名与敏感目录拒绝、`..`/根外绝对路径/junction 逃逸/不存在/非目录、200 项截断、中止不执行）；本角色既有精确工具面断言同步为含 `list_dir`（3→4 项；全注入 16→17）。`node --test "test/runtime-core/**/*.test.ts"`：**195 计 / 192 过 / 3 红**（3 红均为既有 Windows `symlink EPERM`：session-store ×2、tools ×1，无新增红）。`npx tsc --noEmit`：**0 错**。全量三层 glob `node --test --test-timeout=60000 --test-force-exit "test/**/*.test.ts"`：**2961 计 / 2937 过 / 20 红 / 3 跳过**——逐项失败断言 21 个（Node 将 1 个嵌套子测试归并）：9 条 Windows `symlink EPERM` 环境红、1 条 runtime-core shell abort 并发时序（单独复跑通过）、9 条桌面应用在飞面（dispatch/handback 投递、收尾推进、renderer×4、runtime-ui、vendor 哈希）、2 条治理双开关在飞验证（离线 e2e 超时、写盘代批账本断言）。**本批无新增红**：先前两条 list_dir 预期红（codex 动态工具数、g4 固定工具面）已由属主同轮同步转绿。附加说明：当前工作树的全量必须加 `--test-force-exit`（且有文件在高并发下挂起，故加 `--test-timeout=60000`）——`test/codex-adapter/session.test.ts` 等在飞改动存在未释放句柄；与本批改动无关。未跑真实模型/凭据/网络；未 git 提交。
 
 ## 2026-10-18 「替我审批」/「替我决策」治理卡判断 P1：中立契约＋只读工具＋互斥装配（已实施待验证）
 

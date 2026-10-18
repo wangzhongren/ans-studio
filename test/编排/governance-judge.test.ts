@@ -44,6 +44,7 @@ import {
 import { DEFAULT_SHELL_JUDGE_TIMEOUT_MS } from "../../src/common/编排/shell-judge.ts";
 import {
   buildGovernanceJudgeFacts,
+  declaredWritePathsFromPreview,
   parseRecommendedRoleIds,
   requiredArtifactPaths,
 } from "../../src/common/编排/governance-judge-facts.ts";
@@ -759,6 +760,62 @@ test("appointment-write / schedule-write：新文件 + preview 正文仍可代�
   }
 });
 
+test("write：两条声明路径全 allowed → approve（真实 2 文件，不误判散文路径）", async () => {
+  const targetA = "docs/proposals/local-ledger-cli.proposal-v1.md";
+  const targetB = "docs/contracts/local-ledger-cli.md";
+  const { judge } = makeJudge({
+    report: {
+      verdict: "approve",
+      reason: "两条路径均在报告员写区内，preview 含正文。",
+      evidence: [targetA, targetB],
+      confirmed: true,
+      pathDecisions: [{ path: targetA, ok: true }, { path: targetB, ok: true }],
+    },
+  });
+  const out = await judge(confirmRequest({
+    paths: [targetA, targetB],
+    pathProbes: [{ path: targetA, allowed: true }, { path: targetB, allowed: true }],
+    artifacts: undefined,
+    card: {
+      kind: "confirm",
+      title: "新建本地账本 CLI",
+      preview: `将写入以下文件：\n- ${targetA}\n- ${targetB}\n\n正文：add/list/summary。不会修改 src/**、test/**、data/ledger.json。`,
+      cardKind: "write",
+      flowId: "local-ledger-cli",
+    },
+  }));
+  assert.equal(out.verdict, "approve");
+  assert.deepEqual(out.paths, [targetA, targetB]);
+});
+
+test("write：声明路径越界 → path-outside-boundary（即使另外路径 allowed）", async () => {
+  const ok = "docs/proposals/local-ledger-cli.proposal-v1.md";
+  const bad = "src/evil.ts";
+  const { judge } = makeJudge({
+    report: {
+      verdict: "approve",
+      reason: "ok",
+      evidence: [ok],
+      confirmed: true,
+      pathDecisions: [{ path: ok, ok: true }, { path: bad, ok: true }],
+    },
+  });
+  const out = await judge(confirmRequest({
+    paths: [ok, bad],
+    pathProbes: [{ path: ok, allowed: true }, { path: bad, allowed: false }],
+    artifacts: undefined,
+    card: {
+      kind: "confirm",
+      title: "新建本地账本 CLI",
+      preview: `将写入以下文件：\n- ${ok}\n- ${bad}`,
+      cardKind: "write",
+      flowId: "local-ledger-cli",
+    },
+  }));
+  assert.equal(out.verdict, "manual");
+  assert.equal(out.reasonCode, "path-outside-boundary");
+});
+
 test("appointment-write：目标必须在最新任命名单且非内置 → approve；否则 manual", async () => {
   const appointmentWrite = (target: string, factsOver: Partial<GovernanceJudgeFacts>): GovernanceJudgeRequest => request({
     group: "approval",
@@ -982,6 +1039,29 @@ test("requiredArtifactPaths：逐卡种必需物证与缺失判定", () => {
   );
 });
 
+test("declaredWritePathsFromPreview：只认一行一个的声明路径，散文路径不进入", () => {
+  const text = [
+    "本提案新增文件（不会修改 src/**、test/**，也不改 data/ledger.json）：",
+    "将写入以下文件：",
+    "- docs/proposals/local-ledger-cli.proposal-v1.md",
+    "* `docs/contracts/local-ledger-cli.md`",
+    "路径：docs/governance/rapporteur/notes.md",
+    "2. docs/flow.md（新建）",
+    "将写入 docs/proposals/local-ledger-cli-v1.md",
+    "写入路径仅一条：docs/nominations/local-ledger-cli.md",
+    "正文里提到 data/ledger.json 和 bin/ledger.js 只是说明。",
+  ].join("\n");
+  assert.deepEqual(declaredWritePathsFromPreview(text), [
+    "docs/proposals/local-ledger-cli.proposal-v1.md",
+    "docs/contracts/local-ledger-cli.md",
+    "docs/governance/rapporteur/notes.md",
+    "docs/flow.md",
+    "docs/proposals/local-ledger-cli-v1.md",
+    "docs/nominations/local-ledger-cli.md",
+  ]);
+  assert.deepEqual(declaredWritePathsFromPreview("只改 data/ledger.json 和 src/*"), []);
+});
+
 test("parseRecommendedRoleIds：frontmatter/固定行；缺失/歧义/重复 → undefined", () => {
   assert.deepEqual(
     parseRecommendedRoleIds("---\nflowId: flow-a\nrecommended: [alpha, beta]\n---\n"),
@@ -1130,7 +1210,7 @@ test("run-role：trio 判断上下文（paths/pathProbes/写根/禁写/物证/�
       const req: CustomerInputRequest = {
         kind: "confirm",
         title: "写入提案",
-        preview: "将写入 docs/proposals/flow-a-v2.md（正文……）。",
+        preview: "将写入以下文件：\n- docs/proposals/flow-a-v2.md\n\n正文……",
         cardKind: "write",
         flowId: "flow-a",
       };
@@ -1148,6 +1228,178 @@ test("run-role：trio 判断上下文（paths/pathProbes/写根/禁写/物证/�
       assert.equal(context.toolCallId, "call-9");
       assert.equal(context.turnId, "turn-2");
       assert.equal(capturedInput.metadata?.toolCallId, "call-9", "metadata 其余字段原样保留");
+    } finally {
+      await handle.dispose();
+    }
+  });
+});
+
+test("run-role：物证容忍 `<flowId>.proposal-vN` / `.nomination-vN` 并取最新", async () => {
+  // 1) 两种提案命名共存：取版本号最高的（跨命名比较）。
+  await withRoot(async (root) => {
+    writeFile(root, "docs/proposals/local-ledger-cli-v1.md");
+    writeFile(root, "docs/proposals/local-ledger-cli.proposal-v2.md");
+    const capturedInput: CapturedInput = {};
+    const captured: { caps?: AdapterCapabilities; gate?: WriteGate } = {};
+    const handle = await openRoleSession(
+      {
+        roleId: "rapporteur",
+        project: trioProject(root),
+        autoRepin: false,
+        customerInput: ((_req, metadata) => {
+          capturedInput.metadata = metadata;
+          return { outcome: "declined" as const };
+        }) as CustomerInputFn,
+      },
+      { createAdapter: capturingFactory(captured) },
+    );
+    try {
+      await captured.caps!.customerInput!(
+        {
+          kind: "choice",
+          title: "接受提案",
+          options: [{ id: "accept", label: "接受" }],
+          cardKind: "proposal",
+          flowId: "local-ledger-cli",
+        },
+        { toolCallId: "call-name" },
+      );
+      assert.equal(
+        capturedInput.metadata?.judgeContext?.artifacts?.proposalPath,
+        "docs/proposals/local-ledger-cli.proposal-v2.md",
+      );
+    } finally {
+      await handle.dispose();
+    }
+  });
+
+  // 2) 只有传统 `<flowId>-vN.md` 命名也能解析。
+  await withRoot(async (root) => {
+    writeFile(root, "docs/proposals/local-ledger-cli-v1.md");
+    const capturedInput: CapturedInput = {};
+    const captured: { caps?: AdapterCapabilities; gate?: WriteGate } = {};
+    const handle = await openRoleSession(
+      {
+        roleId: "rapporteur",
+        project: trioProject(root),
+        autoRepin: false,
+        customerInput: ((_req, metadata) => {
+          capturedInput.metadata = metadata;
+          return { outcome: "declined" as const };
+        }) as CustomerInputFn,
+      },
+      { createAdapter: capturingFactory(captured) },
+    );
+    try {
+      await captured.caps!.customerInput!(
+        {
+          kind: "choice",
+          title: "接受提案",
+          options: [{ id: "accept", label: "接受" }],
+          cardKind: "proposal",
+          flowId: "local-ledger-cli",
+        },
+        { toolCallId: "call-name-2" },
+      );
+      assert.equal(
+        capturedInput.metadata?.judgeContext?.artifacts?.proposalPath,
+        "docs/proposals/local-ledger-cli-v1.md",
+      );
+    } finally {
+      await handle.dispose();
+    }
+  });
+
+  // 3) 提名 `.nomination-vN` 同样解析，并从中读取推荐集。
+  await withRoot(async (root) => {
+    writeFile(root, "docs/nominations/flow-a-v1.md");
+    writeFile(root, "docs/nominations/flow-a.nomination-v3.md", "---\nflowId: flow-a\nrecommended: [alpha]\n---\n");
+    const capturedInput: CapturedInput = {};
+    const captured: { caps?: AdapterCapabilities; gate?: WriteGate } = {};
+    const handle = await openRoleSession(
+      {
+        roleId: "nominator",
+        project: trioProject(root, "nominator"),
+        autoRepin: false,
+        customerInput: ((_req, metadata) => {
+          capturedInput.metadata = metadata;
+          return { outcome: "declined" as const };
+        }) as CustomerInputFn,
+      },
+      { createAdapter: capturingFactory(captured) },
+    );
+    try {
+      await captured.caps!.customerInput!(
+        {
+          kind: "choice",
+          title: "任命角色",
+          options: [{ id: "alpha", label: "Alpha" }],
+          multiple: true,
+          cardKind: "appointment",
+          flowId: "flow-a",
+        },
+        { toolCallId: "call-name-3" },
+      );
+      assert.equal(
+        capturedInput.metadata?.judgeContext?.artifacts?.nominationPath,
+        "docs/nominations/flow-a.nomination-v3.md",
+      );
+      assert.deepEqual(capturedInput.metadata?.judgeContext?.recommendedRoleIds, ["alpha"]);
+    } finally {
+      await handle.dispose();
+    }
+  });
+});
+
+test("run-role：pathProbes 只取 preview 声明路径，散文路径不进 probe", async () => {
+  await withRoot(async (root) => {
+    const capturedInput: CapturedInput = {};
+    const captured: { caps?: AdapterCapabilities; gate?: WriteGate } = {};
+    const handle = await openRoleSession(
+      {
+        roleId: "rapporteur",
+        project: trioProject(root),
+        autoRepin: false,
+        customerInput: ((_req, metadata) => {
+          capturedInput.metadata = metadata;
+          return { outcome: "declined" as const };
+        }) as CustomerInputFn,
+      },
+      { createAdapter: capturingFactory(captured) },
+    );
+    try {
+      const targetA = "docs/proposals/local-ledger-cli.proposal-v1.md";
+      const targetB = "docs/contracts/local-ledger-cli.md";
+      await captured.caps!.customerInput!(
+        {
+          kind: "confirm",
+          title: "新建本地账本 CLI",
+          preview:
+            `将写入以下文件：\n- ${targetA}\n- ${targetB}\n\n` +
+            "说明：不会修改 src/**、test/**，也不改 data/ledger.json、bin/ledger.js。",
+          cardKind: "write",
+          flowId: "local-ledger-cli",
+        },
+        { toolCallId: "call-paths" },
+      );
+      const context = capturedInput.metadata?.judgeContext;
+      assert.deepEqual(context?.paths, [targetA, targetB], "散文路径不得进入候选");
+      assert.equal(context?.pathProbes?.length, 2);
+      assert.ok(context?.pathProbes?.every((probe) => probe.allowed === true));
+
+      // 声明了越界路径 ⇒ 该 probe 必须 allowed:false（driver 会整卡回落）。
+      await captured.caps!.customerInput!(
+        {
+          kind: "confirm",
+          title: "新建本地账本 CLI",
+          preview: `将写入以下文件：\n- ${targetA}\n- src/evil.ts`,
+          cardKind: "write",
+          flowId: "local-ledger-cli",
+        },
+        { toolCallId: "call-paths-2" },
+      );
+      const probes = capturedInput.metadata?.judgeContext?.pathProbes ?? [];
+      assert.equal(probes.find((probe) => probe.path === "src/evil.ts")?.allowed, false);
     } finally {
       await handle.dispose();
     }

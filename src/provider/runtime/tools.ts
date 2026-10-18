@@ -4,7 +4,7 @@ import { createEventQueue } from "../../common/runtime-core/event-queue.ts";
 import { resolveProjectList } from "../../common/runtime-core/list-dir.ts";
 import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
-import { isAbsolute, resolve } from "node:path";
+import { isAbsolute, relative, resolve } from "node:path";
 import type {
   WriteGate,
   ShellGate,
@@ -48,6 +48,10 @@ import type { WriteDecision } from "../../model/decision.ts";
 import type { DiagnosticLog } from "../../model/runtime.ts";
 import { describeTool } from "./schema.ts";
 import { formatDenialMessage } from "../../common/runtime-core/format-denial.ts";
+// 2026-10-18 真机修复：写前校验角色 boundary.yaml 内容（**只经 Service 公共出口**——Provider 不直接
+// import 门禁引擎私有 `common/门禁引擎/boundary-yaml.ts`；该出口再导出**同一函数引用**，单一来源不变，
+// 与运行时边界解析同一实现，避免「写得进、枚举不了」）。
+import { validateBoundaryYamlText } from "../../service/boundary/resolve-boundary.ts";
 import {
   CUSTOMER_INPUT_TIMEOUT_ENV,
   DEFAULT_SHELL_EXEC_TIMEOUT_MS,
@@ -242,6 +246,46 @@ function govern(gate: WriteGate, name: string, path: string, writeRoot: string |
   return { proceed: true, abs: writeRoot !== undefined ? resolved : undefined };
 }
 
+/** 角色边界文档路径（写前内容校验只针对它；role-card.md 等不校验内容）。 */
+const ROLE_BOUNDARY_WRITE_RE = /^(?:\.\/)?角色卡\/[^/]+\/boundary\.yaml$/i;
+
+function projectRelForWrite(path: string, writeRoot: string | undefined): string | undefined {
+  const raw = path.replace(/\\/g, "/");
+  if (writeRoot === undefined) return raw;
+  try {
+    const abs = resolveWriteAbs(path, writeRoot);
+    const rel = relative(writeRoot, abs).replace(/\\/g, "/");
+    if (rel === "" || rel === ".." || rel.startsWith("../") || isAbsolute(rel)) return raw;
+    return rel;
+  } catch {
+    return raw;
+  }
+}
+
+/**
+ * 写前内容校验（2026-10-18 真机：Nominator 写出顶层含 version/roleId/root 的非法 boundary.yaml，
+ * 应用照单写入后新角色无法枚举）。用门禁引擎 Service 公共出口 `validateBoundaryYamlText`（与运行时
+ * 边界解析同一实现）；非法 ⇒ **拒绝写入、零文件副作用**，回执给出原因与顶层键约束。
+ * 只对 `角色卡/<id>/boundary.yaml` 生效；`role-card.md` 与其他路径不校验内容。
+ */
+function rejectInvalidBoundaryWrite(
+  name: string,
+  path: string,
+  content: string,
+  writeRoot: string | undefined,
+): ToolResult | undefined {
+  const rel = projectRelForWrite(path, writeRoot);
+  if (rel === undefined || !ROLE_BOUNDARY_WRITE_RE.test(rel)) return undefined;
+  const validation = validateBoundaryYamlText(content);
+  if (validation.ok) return undefined;
+  return {
+    ok: false,
+    message:
+      `${name} 拒绝写入 ${path}：boundary.yaml 格式非法：${validation.message}；` +
+      `顶层只允许 role / entries / archived，请按模板重写（未写入，目标文件未被触碰）`,
+  };
+}
+
 /** 落盘前守卫 + mkdir + 二次复核 + 原子写；任一步失败返回可读错误（可能已建目录但未写文件）。 */
 async function writeGuarded(
   name: string,
@@ -295,6 +339,10 @@ function makeWriteFileTool(gate: WriteGate, writeRoot: string | undefined): Exec
       if (path === undefined) return { ok: false, message: `${name}: 缺少 path 参数，无法判定写入目标` };
       const content = readStringArg(call.args, ["content", "text"]);
       if (content === undefined) return { ok: false, message: `${name}: 缺少 content 参数，无法写入` };
+
+      // 写前内容校验（仅角色 boundary.yaml）：非法 ⇒ 拒绝，任何文件系统副作用之前返回。
+      const invalidBoundary = rejectInvalidBoundaryWrite(name, path, content, writeRoot);
+      if (invalidBoundary !== undefined) return invalidBoundary;
 
       const pre = govern(gate, name, path, writeRoot);
       if (!pre.proceed) return pre.result;
@@ -363,6 +411,9 @@ function makeEditFileTool(gate: WriteGate, writeRoot: string | undefined): Execu
         return { ok: false, message: `${name}：未找到 old_string，未写入（文件保持不变）：${path}` };
       }
       const next = decoded.text.slice(0, idx) + newString + decoded.text.slice(idx + oldString.length);
+      // 编辑后的 boundary.yaml 也必须能通过同一校验（拒绝时文件保持不变）。
+      const invalidBoundary = rejectInvalidBoundaryWrite(name, path, next, writeRoot);
+      if (invalidBoundary !== undefined) return invalidBoundary;
       const data = Buffer.from((decoded.bom ? "\uFEFF" : "") + next, "utf8");
 
       return writeGuarded(name, path, pre.abs, writeRoot, data, { createParent: false }, call.signal);

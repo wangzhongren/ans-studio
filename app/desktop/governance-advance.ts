@@ -61,6 +61,127 @@ export function governanceFlowPath(flowId: string): string {
   return `docs/flows/${flowId}.md`;
 }
 
+/** 流程单的步骤状态（触发「收尾推进」用的保守解析；最终验收仍由编排 driver 机械核对）。 */
+export interface FlowStepStatus {
+  id: string;
+  status: string;
+}
+
+function stripFlowCell(value: string): string {
+  return value.trim().replace(/^[`*_]+/, "").replace(/[`*_]+$/, "").trim();
+}
+
+function splitFlowRow(line: string): string[] | undefined {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith("|") || !trimmed.endsWith("|")) return undefined;
+  return trimmed.slice(1, -1).split("|").map((cell) => cell.trim());
+}
+
+/**
+ * 解析流程单的「步骤/状态」表（**触发门**，不是验收判定）：表头须同时含「步骤/step」与「状态/status」；
+ * 解析口径与编排 `parseFlowSteps` 对齐；缺表头/无数据行 ⇒ `wellFormed:false`（调用方 fail-closed 不派）。
+ */
+export function parseFlowStepStatuses(markdown: string): { wellFormed: boolean; steps: FlowStepStatus[] } {
+  if (typeof markdown !== "string" || markdown.trim() === "") return { wellFormed: false, steps: [] };
+  const lines = markdown.replace(/\r\n/g, "\n").split("\n");
+  let headerIndex = -1;
+  let stepColumn = -1;
+  let statusColumn = -1;
+  for (let index = 0; index < lines.length; index += 1) {
+    const cells = splitFlowRow(lines[index]!);
+    if (cells === undefined) continue;
+    const step = cells.findIndex((cell) => /^(步骤|step)$/i.test(stripFlowCell(cell)));
+    const status = cells.findIndex((cell) => /^(状态|status)$/i.test(stripFlowCell(cell)));
+    if (step !== -1 && status !== -1) {
+      headerIndex = index;
+      stepColumn = step;
+      statusColumn = status;
+      break;
+    }
+  }
+  if (headerIndex === -1) return { wellFormed: false, steps: [] };
+  const steps: FlowStepStatus[] = [];
+  for (let index = headerIndex + 1; index < lines.length; index += 1) {
+    const cells = splitFlowRow(lines[index]!);
+    if (cells === undefined) break;
+    if (cells.length > 0 && cells.every((cell) => /^:?-{2,}:?$/.test(cell.trim()))) continue;
+    if (cells.length <= Math.max(stepColumn, statusColumn)) return { wellFormed: false, steps: [] };
+    const id = stripFlowCell(cells[stepColumn]!);
+    const status = stripFlowCell(cells[statusColumn]!);
+    if (id === "") continue;
+    steps.push({ id, status });
+  }
+  return { wellFormed: true, steps };
+}
+
+/** 收尾检查所需的最小账本形状（结构类型；不 import 编排私有账本类型）。 */
+export interface FlowCompletionLedgerEntryLike {
+  kind?: string;
+  flowId?: string;
+  stepId?: string;
+  decisionKind?: string;
+  customerDecision?: string;
+}
+
+/**
+ * 「流程全部完成」的**触发门**（2026-10-18 收尾推进）：所有步骤 `done`、每步都有 `dispatch.accepted`、
+ * 无未结算决定、尚无验收决定、账本可读。返回 `undefined` = 可以派 Rapporteur 出验收；否则返回人话原因
+ * （调用方只记诊断、**不派、不循环**）。本函数**不是**验收判定——验收卡仍由决策开关/判断 agent/客户手批。
+ */
+export function flowCompletionIssue(
+  flowId: string,
+  markdown: string,
+  ledger: { errors: readonly string[]; entries: readonly FlowCompletionLedgerEntryLike[] },
+): string | undefined {
+  if (ledger.errors.length > 0) return "治理账本不可读或存在坏行";
+  const parsed = parseFlowStepStatuses(markdown);
+  if (!parsed.wellFormed || parsed.steps.length === 0) return "流程单缺少可解析的步骤表";
+  const notDone = parsed.steps.filter((step) => step.status.toLowerCase() !== "done");
+  if (notDone.length > 0) {
+    const detail = notDone.slice(0, 10).map((step) => `${step.id}=${step.status || "（空）"}`).join("、");
+    return `流程仍有未完成/阻塞/待派发步骤（${detail}）`;
+  }
+  const dispatched = new Set(
+    ledger.entries
+      .filter((entry) => entry.kind === "dispatch.accepted" && entry.flowId === flowId && typeof entry.stepId === "string")
+      .map((entry) => entry.stepId as string),
+  );
+  const missingDispatch = parsed.steps.filter((step) => !dispatched.has(step.id));
+  if (missingDispatch.length > 0) {
+    return `流程步骤缺少 dispatch.accepted 记录（${missingDispatch.slice(0, 10).map((step) => step.id).join("、")}）`;
+  }
+  const acceptance = ledger.entries.find(
+    (entry) => entry.kind === "customer.decision" && entry.flowId === flowId && entry.decisionKind === "acceptance",
+  );
+  if (acceptance !== undefined) return "该流程已有验收决定";
+  const unresolved = ledger.entries.filter(
+    (entry) =>
+      entry.kind === "customer.decision" &&
+      entry.flowId === flowId &&
+      (entry.decisionKind === "unclassified" || entry.customerDecision === "none" || entry.customerDecision === undefined || entry.customerDecision === ""),
+  );
+  if (unresolved.length > 0) return "该流程仍有未结算的决定";
+  return undefined;
+}
+
+/**
+ * 收尾推进的唯一一条任务（Rapporteur）：只引用流程单与回交/报告路径，要求汇总证据并**出验收卡**；
+ * 不预先决定通过/退回（验收卡仍走决策开关/判断 agent 或客户手批）。
+ */
+export function buildAcceptanceTaskMessage(flowId: string, evidence: readonly string[]): string {
+  const paths = [...new Set(evidence.filter((item): item is string => nonEmptyString(item)))].slice(0, 10);
+  const evidenceText = paths.length > 0 ? paths.join("、") : "见回交报告与流程单";
+  return (
+    `流程 ${flowId} 步骤已全部完成（流程单：${governanceFlowPath(flowId)}；回交/核对报告路径：${evidenceText}）。` +
+    `请汇总证据并出验收卡（不要自行验收或代替客户决定）。`
+  );
+}
+
+/** 收尾推进成功的系统行。 */
+export function governanceAcceptanceAdvanceNote(flowId: string): string {
+  return `流程 ${flowId} 步骤已全部完成，已派发验收汇总任务给 Rapporteur（工作中）`;
+}
+
 /**
  * 推导所需的**桌面上下文**（不进 IPC 载荷——事件契约保持上面那一个形状）。
  * 后台派发（打开目标会话 + 发一条任务）与系统行落位需要它。

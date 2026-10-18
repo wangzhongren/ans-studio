@@ -388,6 +388,18 @@ export interface SessionManagerDeps {
    * `handback` 回交事件，设计 §10.8）——**类型从编排导入，不在此另立一份**。
    */
   emitEvent: (envelope: SessionEventEnvelope) => void;
+  /**
+   * **收尾推进（2026-10-18 真机缺口）**：项目角色回交送达 Convener、且 Convener 本轮 settle 后回调。
+   * 只提供事实（flowId/回交证据）；是否/如何派 Rapporteur 出验收由 Interface 检查流程单/账本后决定。
+   * 失败只记诊断，绝不影响已完成的回交轮；本层不打开会话、不写账本。
+   */
+  onHandbackSettled?: (info: {
+    projectRoot: string;
+    runtime: RuntimeKind;
+    roleId: string;
+    flowId: string;
+    evidence: string[];
+  }) => void;
   emitPersistenceChange?: (update: PersistenceUpdated) => void;
   /**
    * **队列变化外推**（L-1 可见性）：某角色队列的**摘要快照**——主进程据此推渲染侧（该角色的队列行 +
@@ -504,6 +516,12 @@ interface DeliveryOrigin {
   clientMessageId?: string;
   turnId?: string;
   settled: boolean;
+  /** 本轮由哪类投递开跑（settle 后「收尾推进」据此只认回交轮）。 */
+  kind?: DeliveryItem["kind"];
+  /** 本轮关联的治理流程 id（dispatch/handback 条目携带；去重；多流程批次按集合处理）。 */
+  flowIds?: string[];
+  /** 回交轮携带的证据路径（≤10，供验收汇总任务引用）。 */
+  handbackEvidence?: string[];
 }
 
 interface LiveSession {
@@ -587,6 +605,8 @@ interface DeliveryItem {
   kind: "handback" | "dispatch" | "message" | "system";
   /** 目标角色 id（回交→su；派发/客户消息→被派角色）。 */
   targetRoleId: string;
+  /** 治理流程 id（2026-10-18 收尾推进）：dispatch/handback 条目携带；客户消息/系统消息缺席。 */
+  flowId?: string;
   /** 发起者（回交=产出角色；派发=派发者 su；客户消息=本端的当前角色）。 */
   sourceRoleId: string;
   /** 投递输入正文（**入队时定格**；重试用同一份，不重渲染）。 */
@@ -1915,6 +1935,9 @@ export class SessionManager {
           const sourceMatches = ev.kind !== "handback" && (ev.runtime === undefined || ev.runtime === runtime) && (ev.roleId === undefined || ev.roleId === roleId);
           const legacyTerminal = sourceMatches && origin === undefined && entry.origins.running?.turnId === undefined;
           if (ev.kind === "settled" && sourceMatches && (origin === entry.origins.running || (origin?.settled === true && entry.origins.running === undefined) || legacyTerminal)) {
+            // 收尾推进：旧式空 turnId 的 settled 走 legacyTerminal 时 `origin` 为 undefined，
+            // 但本轮投递事实仍在 `origins.running` 上——先定格，再删除。
+            const settledOrigin = origin ?? entry.origins.running;
             if (origin) origin.settled = true;
             delete entry.origins.running;
             this.trimDeliveryOrigins(entry);
@@ -1932,6 +1955,31 @@ export class SessionManager {
               // G-2/W1+W3：先读「进行中」条目再撤销——本轮是否由 `kind:"system"` 投递持有（看护自身的告警/
               // 收束/恢复回执）决定该 settle 是否算**真实活动**（刻意排除 ⇒ 防「总结完→又被立即催」的骚扰
               // 回路；静默阈值默认 30s＝一个 tick 的最小防抖——客户 2026-10-16 run-5 裁定，隔离更须严格）。
+              // 2026-10-18 收尾推进：回交送达 Convener 且本轮 settle ⇒ 把 flowId/回交证据交给 Interface，
+              // 由它检查流程单/账本后决定是否后台派 Rapporteur 出验收（本层不判断、不打开会话、不写账本）。
+              if (
+                settledOrigin?.kind === "handback" &&
+                settledOrigin.flowIds !== undefined &&
+                settledOrigin.flowIds.length > 0 &&
+                this.dispatcherRoleIdOf(en.projectRoot) === roleId
+              ) {
+                for (const flowId of settledOrigin.flowIds) {
+                  try {
+                    this.deps.onHandbackSettled?.({
+                      projectRoot: en.projectRoot,
+                      runtime,
+                      roleId,
+                      flowId,
+                      evidence: settledOrigin.handbackEvidence ?? [],
+                    });
+                  } catch (error) {
+                    createDiagnosticLogger({ component: "desktop.session", projectRoot: en.projectRoot, roleId }).error(
+                      "acceptance.handback-settled.failed",
+                      error,
+                    );
+                  }
+                }
+              }
               const finishedDelivery = this.activeDeliveries.get(this.queueKey(en.projectRoot, roleId, runtime));
               this.activeDeliveries.delete(this.queueKey(en.projectRoot, roleId, runtime)); // 「进行中」随本轮结束撤销
               // 状态准确性：settled = 「本角色离开工作中」的**真实信号**（B-2 下切走的后台轮次结束也走这里）
@@ -2317,7 +2365,7 @@ export class SessionManager {
     if (!id) {
       const state = event?.reportPersistence?.state;
       const liveCompatible = state === 'disabled' || state === 'unknown-live' || state === undefined && entry.handle.persistenceMode !== 'enabled';
-      if (event && liveCompatible) void this.handleHandback(entry.projectRoot, entry.runtime, event.handback, undefined, event.liveReport, state === 'unknown-live' ? 'unknown-live' : state === 'disabled' || entry.handle.persistenceMode === 'disabled' ? 'memory-only' : 'unknown-live');
+      if (event && liveCompatible) void this.handleHandback(entry.projectRoot, entry.runtime, event.handback, undefined, event.liveReport, state === 'unknown-live' ? 'unknown-live' : state === 'disabled' || entry.handle.persistenceMode === 'disabled' ? 'memory-only' : 'unknown-live', this.handbackFlowId(entry, event.handback));
       return;
     }
     const key = this.persistenceKey(this.persistenceScope(entry), id);
@@ -2333,7 +2381,7 @@ export class SessionManager {
     this.reportStates.set(key, record);
     if (record.event && record.state?.state === 'saved' && record.state.report && !record.queued) {
       record.queued = true; // synchronous once gate, before handleHandback's first await
-      void this.handleHandback(entry.projectRoot, entry.runtime, record.event.handback, record.state.report, record.event.liveReport);
+      void this.handleHandback(entry.projectRoot, entry.runtime, record.event.handback, record.state.report, record.event.liveReport, undefined, this.handbackFlowId(entry, record.event.handback));
     }
   }
   private rememberReceipt(entry: LiveSession, receipt: RuntimeDeliveryReceiptV1): void {
@@ -2391,7 +2439,20 @@ export class SessionManager {
    *  **真机崩溃修复（2026-10-12）**：本函数经 `void` fire-and-forget 调用（consume 的事件循环），**任何上抛
    *  都会变成未捕获拒绝**——故：(1) 形状防御（缺 `handback` 载荷 / 缺 `roleId`）先拦；(2) `renderHandbackPrompt`
    *  渲染包 try/catch（坏形状绝不喂给它）；(3) 整体再包一层 catch——一切都落**如实系统行**，绝不上抛。 */
-  private async handleHandback(projectRoot: string, runtime: RuntimeKind, hb: TaskHandback, report?: RuntimeReportSnapshotV1, liveReport?: RuntimeLiveReportViewV1, liveDurability?: 'memory-only' | 'unknown-live'): Promise<void> {
+  /**
+   * 回交所归属的治理流程 id（收尾推进用）：取该回交真实轮次 origin 上的 `flowIds`——该 origin 由
+   * Convener 派发的 `dispatch` 条目带入 flowId。多流程批次/旧调用/无 flowId ⇒ 返回 undefined（不猜、不派）。
+   */
+  private handbackFlowId(entry: LiveSession, hb: TaskHandback | undefined): string | undefined {
+    if (hb === undefined || hb === null || typeof hb !== "object") return undefined; // 坏形状交给 handleHandback 的防御分支
+    const origin = typeof hb.turnId === "string" && hb.turnId !== ""
+      ? entry.origins.byTurn.get(hb.turnId)
+      : entry.origins.running;
+    const flowIds = origin?.flowIds ?? [];
+    return flowIds.length === 1 ? flowIds[0] : undefined;
+  }
+
+  private async handleHandback(projectRoot: string, runtime: RuntimeKind, hb: TaskHandback, report?: RuntimeReportSnapshotV1, liveReport?: RuntimeLiveReportViewV1, liveDurability?: 'memory-only' | 'unknown-live', flowId?: string): Promise<void> {
     const diagnostic = createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId: hb?.roleId });
     diagnostic.record("report.received", { outcome: hb?.status });
     try {
@@ -2436,6 +2497,7 @@ export class SessionManager {
         summary: `回交投递 · 来自 ${hb.roleId}`,
         dedupKey: key,
         handback: hb,
+        ...(flowId !== undefined ? { flowId } : {}),
         ...(report ? { report } : {}),
         ...(liveReport ? { liveReport, liveDurability } : {}),
       });
@@ -2584,6 +2646,7 @@ export class SessionManager {
       runtime,
       targetRoleId,
       sourceRoleId: fromRoleId,
+      ...(flowId !== undefined ? { flowId } : {}),
       // 文本：编排 `planDispatchDelivery` 产出的定格文本（必读块已由**同一单一来源** `renderDispatchPrompt`
       // 注入；无引用 = 旧格式逐字）——本层不另写渲染（本地副本 `renderDispatchPromptLocal` 已删除）。
       text: plan.text,
@@ -3596,6 +3659,16 @@ export class SessionManager {
     }
     // 先置忙再 await（防「open 尾部放行」与本次调用竞态导致并发 send）；失败则复位。
     const origin = this.beginDeliveryOrigin(entry, sent.clientMessageId);
+    // 收尾推进（2026-10-18）：把本轮的投递类别/流程 id/回交证据定格在 origin 上——settle 后据此决定
+    // 是否请 Interface 检查「流程全部完成」。多流程批次保留集合；客户消息/系统消息无 flowId。
+    origin.kind = sent.kind;
+    const originFlows = [...new Set(sentItems.map((queued) => queued.flowId).filter((id): id is string => typeof id === "string" && id !== ""))];
+    if (originFlows.length > 0) origin.flowIds = originFlows;
+    if (sent.kind === "handback") {
+      origin.handbackEvidence = [
+        ...new Set(sentItems.flatMap((queued) => queued.handback?.evidence ?? []).filter((item): item is string => typeof item === "string" && item !== "")),
+      ].slice(0, 10);
+    }
     entry.interactionState.turn = new AbortController();
     entry.busy = true;
     entry.busySince = this.now(); // G-2/W1：本轮起点定格（看护信号 #1 的 elapsed 基准）

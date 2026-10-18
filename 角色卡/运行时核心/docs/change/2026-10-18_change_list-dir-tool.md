@@ -33,7 +33,7 @@ related: [governance-judge-p1-runtime-core]
 ## 验证（本机 Windows / Node v24.14.0）
 
 - 新增 `test/runtime-core/list-dir-tool.test.ts` 6 例：默认注册与 schema、列目录语义/一层/目录带 `/`、敏感项不列名与敏感目录拒绝、`..`/根外绝对路径/junction 逃逸/不存在/非目录、200 项截断、中止不执行。
-- `node --test "test/runtime-core/**/*.test.ts"`：**190 计 / 187 过 / 3 红**（3 红均为既有 Windows `symlink EPERM`：session-store ×2、tools ×1）。
+- `node --test "test/runtime-core/**/*.test.ts"`：**195 计 / 192 过 / 3 红**（3 红均为既有 Windows `symlink EPERM`：session-store ×2、tools ×1）。
 - `npx tsc --noEmit`：0 错。
-- 全量三层 glob `node --test --test-force-exit "test/**/*.test.ts"`：**2912 计 / 2888 过 / 21 红 / 3 跳过**。本批相关红项：codex-adapter 动态工具数 9→10、g4-skill-verify 固定工具面未含 `list_dir`（均为其他角色测试钉，需其属主同步）；其余 19 红为既有环境/桌面/在飞治理验证红（明细见 [changelog](../changelog.md) 同日条目）。`--test-force-exit` 仅用于绕过 codex-adapter 在飞改动留下的未释放句柄（与本批无关）。
+- 全量三层 glob `node --test --test-timeout=60000 --test-force-exit "test/**/*.test.ts"`：**2961 计 / 2937 过 / 20 红 / 3 跳过**；本批无新增红（先前两条 list_dir 预期红——codex 动态工具数、g4 固定工具面——已由属主同轮同步转绿），其余为既有环境/桌面/治理在飞面（明细见 [changelog](../changelog.md) 同日条目）。`--test-force-exit`/`--test-timeout` 仅用于绕开当前工作树在飞改动留下的未释放句柄与个别挂起文件（与本批无关）。
 - 未跑真实模型/凭据/网络；未读 `.env`；未 git 提交。

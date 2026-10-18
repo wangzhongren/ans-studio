@@ -1,5 +1,6 @@
 import type { PersistenceReply, PersistenceValues, PersistenceUpdated, PersistenceScope } from "./session.ts";
 import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { createProjectDocumentReader } from "../../src/pipeline/project-document/read-project-document.ts";
 import type { ProjectDocumentRef, ProjectDocumentScope, DocumentReadErrorCode, ReadProjectDocumentResult } from "../../src/model/project-document.ts";
 // app/desktop/interface.ts
@@ -39,6 +40,8 @@ import {
   createShellJudge as realCreateShellJudge,
   // 2026-10-18 双开关评审 §7.6/§8.2：「替我审批/决策」判断闭包——同样只经编排 Pipeline 公共出口。
   createGovernanceJudge as realCreateGovernanceJudge,
+  // 2026-10-18 收尾推进：只经 Pipeline 公共出口读账本（不直接导入编排私有 `common/编排/`）。
+  readGovernanceLedger,
   // W6-B（四角色评审 §7.2）：应用后台推进成功后写 `dispatch.accepted(app, trigger=customer-decision)`——
   // 账本只经 Pipeline 公共出口（薄再导出）使用，不直接导入编排私有 `common/`。
   appendGovernanceLedger,
@@ -99,8 +102,11 @@ import { judgeResultSummary, type DesktopCustomerInputFn, type OperatorJudgeResu
 // 治理下一步（2026-10-18 客户修正）：客户决定成功后的**后台派发**。推导/文案纯逻辑在 governance-advance.ts；
 // 本层负责打开目标治理角色会话、投递**唯一一条**任务，并把成功/失败经既有 delivery-note 系统行如实落流。
 import {
+  buildAcceptanceTaskMessage,
   buildAppointmentWriteReminderMessage,
   buildGovernanceAdvanceMessage,
+  flowCompletionIssue,
+  governanceAcceptanceAdvanceNote,
   governanceAdvanceSuccessNote,
   governanceAppointmentWriteNote,
   governanceFlowPath,
@@ -799,6 +805,71 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     watchdogService = undefined;
   }
 
+  // —————— 收尾推进（2026-10-18 真机缺口）：回交送达 Convener 且其 settle 后，流程全部完成则派 Rapporteur ——————
+  // 触发事实来自 `SessionManager.onHandbackSettled`（回交轮 origin 的 flowId/证据）；本层只读流程单与账本做
+  // **触发门**检查，全部完成才后台派 Rapporteur 一条汇总任务；不自动验收、不代批（验收卡仍走决策开关/客户手批）。
+  // 每 flow 只派一次（运行期 Set）；不循环重试；失败如实落 Convener 系统行。
+  const acceptanceDispatchedFlows = new Set<string>();
+  const dispatchAcceptanceAfterHandback = async (info: {
+    projectRoot: string;
+    runtime: RuntimeKind;
+    roleId: string;
+    flowId: string;
+    evidence: string[];
+  }): Promise<void> => {
+    const listing = listingCache.get(info.projectRoot);
+    if (listing?.governanceModel !== "trio") return; // single/旧项目不产生验收推进
+    const key = `${info.projectRoot}\u0000${info.flowId}`;
+    if (acceptanceDispatchedFlows.has(key)) return; // 每 flow 只派一次
+    acceptanceDispatchedFlows.add(key); // 先占位：防同一 settle 批次/并发重复派
+    const diagnostic = createDiagnosticLogger({ component: "desktop.governance-acceptance", projectRoot: info.projectRoot, roleId: info.roleId });
+    const note = (summary: string): void => {
+      try {
+        emitSessionEvent({ roleId: info.roleId, projectRoot: info.projectRoot, runtime: info.runtime, event: { kind: "message", summary, detail: { source: "delivery-note" } } });
+      } catch (error) {
+        diagnostic.error("acceptance.note.failed", error);
+      }
+    };
+    try {
+      const flowRel = governanceFlowPath(info.flowId);
+      let markdown: string;
+      try {
+        markdown = await readFile(`${info.projectRoot}/${flowRel}`, "utf8");
+      } catch (error) {
+        diagnostic.record("acceptance.flow.unreadable", { flowId: info.flowId });
+        acceptanceDispatchedFlows.delete(key); // 流程单未落盘：保持现状，后续回交可再检查
+        return;
+      }
+      const ledger = await readGovernanceLedger(info.projectRoot);
+      const issue = flowCompletionIssue(info.flowId, markdown, ledger);
+      if (issue !== undefined) {
+        diagnostic.record("acceptance.flow.incomplete", { flowId: info.flowId, reason: issue });
+        acceptanceDispatchedFlows.delete(key); // 未完成/阻塞：不派；后续回交可再检查（不是循环）
+        return;
+      }
+      const message = buildAcceptanceTaskMessage(info.flowId, info.evidence);
+      const opened = await manager.openBackground({ projectRoot: info.projectRoot, roleId: "rapporteur", runtime: info.runtime });
+      if (!opened.ok) {
+        acceptanceDispatchedFlows.delete(key);
+        diagnostic.error("acceptance.open.failed", new Error(opened.error ?? "unknown"), { flowId: info.flowId });
+        note(`收尾推进失败：无法开启 Rapporteur 会话：${opened.error ?? "未知原因"}；未自动重试。`);
+        return;
+      }
+      const sent = await manager.sendBackground({ projectRoot: info.projectRoot, roleId: "rapporteur", runtime: info.runtime, text: message });
+      if (!sent.ok) {
+        acceptanceDispatchedFlows.delete(key);
+        diagnostic.error("acceptance.send.failed", new Error(sent.error ?? "unknown"), { flowId: info.flowId });
+        note(`收尾推进失败：发送验收任务给 Rapporteur 失败：${sent.error ?? "未知原因"}；未自动重试。`);
+        return;
+      }
+      note(governanceAcceptanceAdvanceNote(info.flowId));
+      diagnostic.record("acceptance.dispatched", { flowId: info.flowId, queued: sent.queued === true });
+    } catch (error) {
+      acceptanceDispatchedFlows.delete(key);
+      diagnostic.error("acceptance.advance.failed", error, { flowId: info.flowId });
+    }
+  };
+
   const manager = new SessionManager({
     openRoleSession: openRoleSessionFn,
     createPiAdapterFactory: createPiAdapterFactoryFn,
@@ -820,6 +891,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     loadEffectiveConfig: loadEffectiveConfigFn,
     getListing: (root) => listingCache.get(root),
     emitEvent: emitSessionEvent,
+    // 收尾推进（2026-10-18）：回交送达 Convener 且其本轮 settle 后，检查流程完成度并（仅全部完成时）派 Rapporteur。
+    onHandbackSettled: (info) => { void dispatchAcceptanceAfterHandback(info); },
     emitPersistenceChange: update => { if (update.scope.projectRoot === importedProjectRoot) deps.emitPersistenceChange?.(update); },
     // L-1 + 状态准确性：真实状态快照外推（变化时；缺省 ⇒ 界面无队列行/忙态——入队本身不受影响）。
     emitRoleState: deps.emitRoleState,

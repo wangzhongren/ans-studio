@@ -14,6 +14,7 @@
 // `governance-judge-verdict.ts`）。
 
 import type { GovernanceJudgeFacts, GovernanceJudgeRequest } from "../../model/runtime.ts";
+import { isAbsoluteAny, normalizeLexical } from "../shared/path-primitives.ts";
 import type { GovernanceLedgerEntry, GovernanceLedgerSnapshot } from "./governance-ledger.ts";
 
 /** facts 序列化上限（评审 §5.3：整个 facts ≤8KB）。 */
@@ -348,6 +349,38 @@ export function evaluateAcceptanceCompletion(input: {
     return { ok: false, reasonCode: "insufficient-evidence", reason: "该流程仍有未结算的决定，不能代批验收，已转手动确认。" };
   }
   return { ok: true };
+}
+
+/**
+ * **声明写入路径**（2026-10-18 真机修复）：只从 preview 的「一行一个路径」声明中提取，
+ * **不扫描散文**（散文里的 `src/**`、`test/**`、`data/ledger.json` 等不是本次写入目标）。
+ * 约定来源：`request_confirmation` 的 promptGuidelines「preview 必须列出将要写出的具体路径
+ * （每个待写文件一行，相对项目根、含目录）」。支持行首列表符/「路径：」标签/反引号。
+ */
+export function declaredWritePathsFromPreview(preview: string | undefined): string[] {
+  if (typeof preview !== "string" || preview.trim() === "") return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const rawLine of preview.replace(/\r\n/g, "\n").split("\n")) {
+    let line = rawLine.trim();
+    line = line.replace(/^(?:[-*+]|\d+[.)])\s+/, "");
+    // 关键词后可直接跟路径（`将写入 docs/x.md`），也可带修饰词+冒号
+    // （`写入路径仅一条：docs/x.md`）；`路径：` / 反引号 / 列表符同样容忍。
+    line = line.replace(/^(?:写入路径|将写入|写入|新建|创建|修改|更新|路径)\s*/, "");
+    line = line.replace(/^(?:[^：:\s]+\s*)?[:：]\s*/, "");
+    line = line.replace(/^[`"'“”‘’*_]+/, "").replace(/[`"'“”‘’*_]+$/, "").trim();
+    line = line.replace(/[（(][^（）()]*[）)]$/, "").replace(/[。；;，,]+$/, "").trim();
+    if (line === "" || /\s/.test(line) || !line.includes("/")) continue;
+    if (/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(line)) continue; // URL
+    if (isAbsoluteAny(line)) continue; // 绝对路径
+    const norm = normalizeLexical(line);
+    if (norm === "" || norm === "." || norm.startsWith("../")) continue;
+    if (norm.split("/").some((segment) => segment === "" || segment === "..")) continue;
+    if (seen.has(norm)) continue;
+    seen.add(norm);
+    out.push(norm);
+  }
+  return out;
 }
 
 /** 角色 id token（推荐集/任命 id 用；不做过度限制——项目角色 id 可为中文）。 */

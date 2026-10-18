@@ -13,11 +13,20 @@ import { SessionManager } from "../../app/desktop/session.ts";
 import {
   createCustomerInputChannel,
   judgeResultSummary,
+  resolveChannelJudgeTimeoutMs,
+  formatJudgeTimeoutMs,
+  DEFAULT_GOVERNANCE_JUDGE_CHANNEL_TIMEOUT_MS,
+  GOVERNANCE_JUDGE_CHANNEL_TIMEOUT_ENV,
   type OperatorRequestPayload,
   type OperatorJudgeResultPayload,
   type GovernanceNextStepContext,
   type GovernanceNextStepPayload,
 } from "../../app/desktop/customer-input.ts";
+import {
+  buildAcceptanceTaskMessage,
+  flowCompletionIssue,
+  parseFlowStepStatuses,
+} from "../../app/desktop/governance-advance.ts";
 import { interactionAnchorKey } from "../../app/desktop/request-anchor.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
 import type { CustomerInputFn, CustomerInputRequest, SessionEvent } from "../../src/provider/pi/session.ts";
@@ -804,6 +813,7 @@ function makeJudgeChannel(opts: {
   judge?: GovernanceJudgeFn;
   emit?: (payload: OperatorJudgeResultPayload) => void;
   timeoutMs?: number;
+  env?: Record<string, string | undefined>;
   queued?: (payload: OperatorRequestPayload, waitingFor: string) => void;
 }) {
   const pushed: OperatorRequestPayload[] = [];
@@ -818,6 +828,7 @@ function makeJudgeChannel(opts: {
       isGroupEnabled: opts.enabled,
       ...(opts.judge !== undefined ? { fn: opts.judge } : {}),
       ...(opts.timeoutMs !== undefined ? { timeoutMs: opts.timeoutMs } : {}),
+      ...(opts.env !== undefined ? { env: opts.env } : {}),
     },
     emitJudgeResult: opts.emit ?? ((payload) => results.push(payload)),
     onNextStep: (payload, context) => next.push({ payload, context }),
@@ -1200,7 +1211,7 @@ test("replayPending 不重新判断；rejectAllPending 结算 judging 为 declin
   assert.equal(channel.judgingCount(), 0);
 });
 
-test("通道层防御超时：判断超时 ⇒ 原卡 + 超时提示（fail-closed）", async () => {
+test("通道层防御超时：判断超时 ⇒ 原卡 + 超时提示（含实际时长，fail-closed）", async () => {
   const { channel, pushed } = makeJudgeChannel({
     enabled: () => true,
     judge: () => new Promise(() => {}),
@@ -1213,9 +1224,29 @@ test("通道层防御超时：判断超时 ⇒ 原卡 + 超时提示（fail-clos
   });
   await new Promise((resolve) => setTimeout(resolve, 60));
   assert.equal(pushed.length, 1);
-  assert.match(String(pushed[0].judgeNotice), /判断超时/);
+  assert.match(String(pushed[0].judgeNotice), /判断超时（>20ms）/);
   assert.equal(channel.respond({ id: "op-1", decision: { kind: "choice", cancelled: true } }).ok, true);
   await p;
+});
+
+test("治理 judge 通道超时：默认 75s（driver 60s+15s）；由 ANS_GOVERNANCE_JUDGE_TIMEOUT_MS 派生；非法回 75s", async () => {
+  // 结构性：driver 60s 时通道 = 75s，绝不让通道先杀 driver。
+  assert.equal(DEFAULT_GOVERNANCE_JUDGE_CHANNEL_TIMEOUT_MS, 75_000);
+  assert.equal(GOVERNANCE_JUDGE_CHANNEL_TIMEOUT_ENV, "ANS_GOVERNANCE_JUDGE_TIMEOUT_MS");
+  assert.equal(resolveChannelJudgeTimeoutMs(undefined, {}), 75_000, "缺省 75s");
+  assert.equal(resolveChannelJudgeTimeoutMs(undefined, { ANS_GOVERNANCE_JUDGE_TIMEOUT_MS: "60000" }), 75_000, "driver 60s ⇒ 通道 75s");
+  assert.equal(resolveChannelJudgeTimeoutMs(undefined, { ANS_GOVERNANCE_JUDGE_TIMEOUT_MS: "120000" }), 135_000, "env 覆盖 +15s");
+  assert.equal(resolveChannelJudgeTimeoutMs(undefined, { ANS_GOVERNANCE_JUDGE_TIMEOUT_MS: "20" }), 15_020, "余量恒为 15s");
+  for (const bad of ["abc", "0", "-1", "1.5", "", " "]) {
+    assert.equal(
+      resolveChannelJudgeTimeoutMs(undefined, { ANS_GOVERNANCE_JUDGE_TIMEOUT_MS: bad }),
+      75_000,
+      `非法 env 回 75s：${JSON.stringify(bad)}`,
+    );
+  }
+  assert.equal(resolveChannelJudgeTimeoutMs(20, {}), 20, "显式 timeoutMs 原样使用（测试/宿主）");
+  assert.equal(formatJudgeTimeoutMs(75_000), "75s");
+  assert.equal(formatJudgeTimeoutMs(35), "35ms");
 });
 
 test("single/su、缺 judgeContext、事实不可用：都不调用 judge（旧路径零变化/fail-closed）", async () => {
@@ -1347,4 +1378,78 @@ test("SessionManager：trio 会话注入 governanceJudge 上下文；single/su �
   await suInput!.customerInput!({ kind: "confirm", title: "旧卡" });
   assert.equal(singleCtx[0].governanceJudge, undefined);
   await singleMgr.stop(null);
+});
+
+// ————— ⑥ 2026-10-18 收尾推进：流程全部完成后派 Rapporteur 出验收（触发门） —————
+
+function flowMarkdown(steps: Array<[string, string]>): string {
+  return [
+    "# flow-a",
+    "",
+    "| 步骤 | 状态 |",
+    "| --- | --- |",
+    ...steps.map(([id, status]) => `| ${id} | ${status} |`),
+  ].join("\n");
+}
+
+const DISPATCHED_IMPL = { kind: "dispatch.accepted", flowId: "flow-a", stepId: "impl" };
+
+test("收尾触发门：所有步骤 done 且账本完备才放行；未完成/阻塞/缺派发/未结算/已验收都不派", () => {
+  const parsed = parseFlowStepStatuses(flowMarkdown([["impl", "done"], ["verify", "done"]]));
+  assert.equal(parsed.wellFormed, true);
+  assert.deepEqual(parsed.steps, [{ id: "impl", status: "done" }, { id: "verify", status: "done" }]);
+  const ledger = {
+    errors: [],
+    entries: [DISPATCHED_IMPL, { kind: "dispatch.accepted", flowId: "flow-a", stepId: "verify" }],
+  };
+  assert.equal(
+    flowCompletionIssue("flow-a", flowMarkdown([["impl", "done"], ["verify", "done"]]), ledger),
+    undefined,
+    "全部完成：允许派 Rapporteur",
+  );
+  assert.match(
+    flowCompletionIssue("flow-a", flowMarkdown([["impl", "done"], ["verify", "pending"]]), ledger) ?? "",
+    /未完成\/阻塞\/待派发步骤（verify=pending）/,
+    "未完成步骤：不派",
+  );
+  assert.match(
+    flowCompletionIssue("flow-a", flowMarkdown([["impl", "done"], ["verify", "blocked"]]), ledger) ?? "",
+    /verify=blocked/,
+    "阻塞步骤：不派",
+  );
+  assert.match(
+    flowCompletionIssue("flow-a", flowMarkdown([["impl", "done"]]), { errors: [], entries: [] }) ?? "",
+    /缺少 dispatch\.accepted 记录（impl）/,
+    "缺派发记录：不派",
+  );
+  assert.match(
+    flowCompletionIssue("flow-a", flowMarkdown([["impl", "done"]]), {
+      errors: [],
+      entries: [DISPATCHED_IMPL, { kind: "customer.decision", flowId: "flow-a", decisionKind: "unclassified", customerDecision: "none" }],
+    }) ?? "",
+    /仍有未结算的决定/,
+    "未结算决定：不派",
+  );
+  assert.match(
+    flowCompletionIssue("flow-a", flowMarkdown([["impl", "done"]]), {
+      errors: [],
+      entries: [DISPATCHED_IMPL, { kind: "customer.decision", flowId: "flow-a", decisionKind: "acceptance", customerDecision: "accepted" }],
+    }) ?? "",
+    /已有验收决定/,
+    "已验收：不重复派",
+  );
+  assert.match(
+    flowCompletionIssue("flow-a", "没有步骤表", { errors: [], entries: [DISPATCHED_IMPL] }) ?? "",
+    /缺少可解析的步骤表/,
+  );
+  assert.match(flowCompletionIssue("flow-a", flowMarkdown([["impl", "done"]]), { errors: ["bad line"], entries: [] }) ?? "", /账本不可读/);
+});
+
+test("收尾任务消息：带流程单与回交/报告路径，要求汇总并出验收卡、不自行验收", () => {
+  const message = buildAcceptanceTaskMessage("flow-a", ["docs/reports/impl.md", "docs/reports/impl.md", ""]);
+  assert.match(message, /流程 flow-a 步骤已全部完成/);
+  assert.match(message, /流程单：docs\/flows\/flow-a\.md/);
+  assert.match(message, /回交\/核对报告路径：docs\/reports\/impl\.md/);
+  assert.match(message, /请汇总证据并出验收卡/);
+  assert.match(message, /不要自行验收或代替客户决定/);
 });

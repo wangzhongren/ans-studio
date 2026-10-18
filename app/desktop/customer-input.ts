@@ -12,9 +12,11 @@
 // **不按时间过期**——客户原话「没必要超时啊，就卡在这等客户同意呗」；卡片等待**无任何计时器**
 // （无 setTimeout/setInterval，测试有钉子）。历史遗留的工具层 `withTimeout`（若仍启用）不属本模块——
 // 去时限是 **Pi适配器** 的职责（见 change 文档的跨角色建议）。
-// **判断 agent（2026-10-18 双开关评审 §四/§八）**：卡片即将呈现前的**只读代批判断**在这里发生；
-// 判断本身的 15s 硬超时由注入的 `GovernanceJudgeFn`（编排 driver）负责，本模块只用
-// `AbortSignal.timeout` 做通道层防御超时（**不引入 self 计时器**，卡片等待语义逐字不变）。
+// **判断 agent（2026-10-18 双开关评审 §四/§八；同日真机修正超时）**：卡片即将呈现前的**只读代批判断**在这里发生；
+// 判断本身的硬超时由注入的 `GovernanceJudgeFn`（编排 driver，默认 60s，可经
+// `ANS_GOVERNANCE_JUDGE_TIMEOUT_MS` 覆盖）负责；本模块的通道层防御超时 = driver 超时 + 15s 余量
+// （缺省 75s），用 `AbortSignal.timeout` 实现（**不引入 self 计时器**，卡片等待语义逐字不变）。
+// **shell judge 的通道超时不变（15s）**，两套互不影响。
 //
 // —— 本模块不做任何判定（硬约束：不得出现第二份判定实现）——
 // 「确认后哪些路径可写」的**发行**在编排（`common/编排/confirmed-writes.ts`）；「写不写」在 gate 与文件工具。
@@ -192,8 +194,13 @@ export interface CreateCustomerInputChannelOptions {
     fn?: GovernanceJudgeFn;
     /** 主进程权威：所属组是否开启（approval/decision 互不影响）。 */
     isGroupEnabled: (group: GovernanceJudgeGroup) => boolean;
-    /** 通道层防御超时；缺省 15000ms（driver 内还有一层硬超时）。 */
+    /**
+     * 通道层防御超时；缺省由 `ANS_GOVERNANCE_JUDGE_TIMEOUT_MS`（driver 超时，默认 60s）+ 15s 余量派生
+     * ⇒ **75s**（driver 内还有一层硬超时，绝不让通道先杀 driver）。shell judge 的通道超时仍为 15s，互不影响。
+     */
     timeoutMs?: number;
+    /** 环境变量来源（缺省 `process.env`；测试注入用——不修改全局环境）。 */
+    env?: Record<string, string | undefined>;
   };
   /**
    * **判断结果行推送**（§8.1）：`approve` 时调用；**抛错/缺失 ⇒ 该卡回落 `manual/row-failed`**。
@@ -259,6 +266,42 @@ export type DesktopCustomerInputFn = (
   },
   metadata?: CustomerInputMetadata,
 ) => Promise<CustomerInputOutcome | null | undefined> | CustomerInputOutcome | null | undefined;
+
+/** 治理 judge driver 超时的环境变量名（与编排 `GOVERNANCE_JUDGE_TIMEOUT_ENV` 同名；不 import 其私有模块）。 */
+export const GOVERNANCE_JUDGE_CHANNEL_TIMEOUT_ENV = "ANS_GOVERNANCE_JUDGE_TIMEOUT_MS";
+/** 通道层比 driver 多留的余量（避免通道先触发、杀掉 driver 的合法判断）。 */
+export const GOVERNANCE_JUDGE_CHANNEL_TIMEOUT_MARGIN_MS = 15_000;
+/** driver 缺省超时（与编排 `DEFAULT_GOVERNANCE_JUDGE_TIMEOUT_MS` 同值；通道据此派生 75s）。 */
+export const DEFAULT_GOVERNANCE_JUDGE_CHANNEL_BASE_MS = 60_000;
+/** 治理 judge 通道层缺省防御超时：driver 60s + 15s 余量 = 75s。**shell judge 仍 15s。** */
+export const DEFAULT_GOVERNANCE_JUDGE_CHANNEL_TIMEOUT_MS =
+  DEFAULT_GOVERNANCE_JUDGE_CHANNEL_BASE_MS + GOVERNANCE_JUDGE_CHANNEL_TIMEOUT_MARGIN_MS;
+
+/**
+ * 解析治理 judge 通道层超时（导出供测试钉住）：
+ * 显式 `timeoutMs`（测试/宿主）优先；否则环境变量 `ANS_GOVERNANCE_JUDGE_TIMEOUT_MS`（正整数）＋15s 余量；
+ * 非法/缺失 ⇒ 75_000。driver 自己的超时由编排单独解析（同名 env）。
+ */
+export function resolveChannelJudgeTimeoutMs(
+  option: unknown,
+  env?: Record<string, string | undefined>,
+): number {
+  if (typeof option === "number" && Number.isFinite(option) && option > 0) return Math.floor(option);
+  const source = env ?? (typeof process !== "undefined" ? process.env : {});
+  const raw = source[GOVERNANCE_JUDGE_CHANNEL_TIMEOUT_ENV];
+  if (typeof raw === "string" && /^[1-9]\d*$/.test(raw.trim())) {
+    const parsed = Number(raw.trim());
+    if (Number.isSafeInteger(parsed) && parsed > 0) {
+      return parsed + GOVERNANCE_JUDGE_CHANNEL_TIMEOUT_MARGIN_MS;
+    }
+  }
+  return DEFAULT_GOVERNANCE_JUDGE_CHANNEL_TIMEOUT_MS;
+}
+
+/** 超时人话的时长格式：整秒用 `Ns`，否则 `Nms`（与编排 driver 文案同口径）。 */
+export function formatJudgeTimeoutMs(timeoutMs: number): string {
+  return timeoutMs >= 1000 && timeoutMs % 1000 === 0 ? `${timeoutMs / 1000}s` : `${timeoutMs}ms`;
+}
 
 /**
  * 装配桌面客户交互通道。产出：`customerInput`（给编排）+ `respond`（回包受理）+ `rejectAllPending`（窗关清帐）。
@@ -411,7 +454,11 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     timeoutMs: number;
   }
 
-  const DEFAULT_JUDGE_TIMEOUT_MS = 15_000;
+  /**
+   * 治理 judge 通道层防御超时：显式 `timeoutMs` 优先；否则由 `ANS_GOVERNANCE_JUDGE_TIMEOUT_MS`
+   * （driver 超时）+ 15s 余量派生；缺省 driver 60s ⇒ 通道 75s。**shell judge 不受影响（仍 15s）**。
+   */
+  const judgeTimeoutMs = resolveChannelJudgeTimeoutMs(opts.judge?.timeoutMs, opts.judge?.env);
 
   /**
    * `shouldJudge`（评审 §4.2，全部满足才调用 judge）：
@@ -466,12 +513,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     if (judgeContext.forbiddenPaths !== undefined) request.forbiddenPaths = judgeContext.forbiddenPaths;
     if (judgeContext.artifacts !== undefined) request.artifacts = judgeContext.artifacts;
     if (judgeContext.recommendedRoleIds !== undefined) request.recommendedRoleIds = judgeContext.recommendedRoleIds;
-    const configured = opts.judge?.timeoutMs;
-    const timeoutMs =
-      typeof configured === "number" && Number.isFinite(configured) && configured > 0
-        ? Math.floor(configured)
-        : DEFAULT_JUDGE_TIMEOUT_MS;
-    return { fn, request, group, cardKind, timeoutMs };
+    return { fn, request, group, cardKind, timeoutMs: judgeTimeoutMs };
   };
 
   /** 构造一次 fail-closed 的 manual 结果（渠道/超时/防御映射用；不伪造 approve）。 */
@@ -653,7 +695,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
       outcome = manualOutcome(
         plan,
         timedOut ? "timeout" : "aborted",
-        timedOut ? `判断超时（>${plan.timeoutMs}ms）` : "本轮已中止，判断结果不生效。",
+        timedOut ? `判断超时（>${formatJudgeTimeoutMs(plan.timeoutMs)}）` : "本轮已中止，判断结果不生效。",
       );
     } else if (
       outcome === null ||
@@ -936,7 +978,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
 function judgeHumanReason(reasonCode: string, reason?: string): string {
   switch (reasonCode) {
     case "switch-off": return "你已关闭对应开关";
-    case "timeout": return "判断超时";
+    case "timeout": return typeof reason === "string" && reason !== "" ? reason : "判断超时";
     case "aborted": return "本轮已中止";
     case "unavailable": return "判断服务不可用";
     case "unsupported-engine": return "当前引擎不支持自动判断";

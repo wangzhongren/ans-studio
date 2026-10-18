@@ -10,6 +10,13 @@ export function resolveBoundary(roleId: string, project: ProjectConfig): Promise
   return resolveBoundarySection(roleId, project);
 }
 
+// Service 公共出口：边界 YAML 文本校验（写前校验，2026-10-18 真机修复）。
+// 编排在提名官写 `角色卡/<角色 id>/boundary.yaml` 前复用；只读解析、不写盘、不读盘。
+// 单一来源恒在门禁引擎私有 `boundary-yaml.ts`——本文件**同一函数引用**再导出（不复制实现）；
+// 与运行时加载器共用同一个解析器，避免写前校验与加载口径漂移。
+export { validateBoundaryYamlText } from "../../common/门禁引擎/boundary-yaml.ts";
+export type { BoundaryYamlValidation } from "../../common/门禁引擎/boundary-yaml.ts";
+
 // Service 公共出口：治理种子边界（已有角色但无治理记录的项目「建立治理记录」，设计
 // `2026-10-17_design_existing-project-compat` / PM 评审 §五 A1）。
 //
