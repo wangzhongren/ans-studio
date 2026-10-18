@@ -38,6 +38,7 @@ const G2_ONLY=process.env.ANS_G2_RECOVERY_UI_ONLY==='1';
 const TOOLFOLD_ONLY=process.env.ANS_TOOLFOLD_UI_ONLY==='1';
 const GOVREACCEPT_ONLY=process.env.ANS_GOVERNANCE_REACCEPT_UI_ONLY==='1';
 const JUDGE_ONLY=process.env.ANS_JUDGE_UI_ONLY==='1';
+const MIRROR_ONLY=process.env.ANS_MIRROR_UI_ONLY==='1';
 const configReads=[];
 let recoveryEnabled=!(CONFIG_ONLY||SELECTOR_ONLY||FLOW_ONLY||GOVREACCEPT_ONLY||JUDGE_ONLY), listFailure=false, pickResult=ROOT, configFailure=false, configMalformed=false, configDeferred=false, saveDeferred=false;
 let judgeEnabled=false, judgeSetFailure=false; // P5：「替我审」离线开关（主进程权威的替身）
@@ -146,22 +147,42 @@ async function roleDocumentFocusChecks(){
 async function judgeChecks(){
  await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRuntime('pi');await window.__ansRenderer.selectRole('A')`);
  const scoped={projectRoot:ROOT,roleId:'A',runtime:'pi'};
- const toggleState=`(()=>{const t=document.getElementById('auto-approve-toggle'),l=document.getElementById('auto-approve-label'),w=document.getElementById('shell-judge-warning'),s=document.getElementById('auto-approve-status'),wrap=t.closest('.composer-auto-approve');return {checked:t.checked,disabled:t.disabled,label:l.textContent,warningHidden:w.hidden,errorShown:!s.hidden,error:s.textContent,onClass:wrap.classList.contains('is-on')};})()`;
+ const toggleState=`(()=>{const t=document.getElementById('auto-approve-toggle'),l=document.getElementById('auto-approve-label'),w=document.getElementById('shell-judge-warning'),s=document.getElementById('auto-approve-status'),wrap=t.closest('.composer-auto-approve'),c=document.getElementById('shell-judge-warning-close'),x=document.getElementById('shell-judge-warning-text');return {checked:t.checked,disabled:t.disabled,label:l.textContent,warningHidden:w.hidden,errorShown:!s.hidden,error:s.textContent,onClass:wrap.classList.contains('is-on'),closeLabel:c?c.textContent:'',warningText:x?x.textContent:''};})()`;
  // 启动：主进程权威默认 false（桥已接线 ⇒ 可点、标签「替我审」、无警告）。
  await check('P5 judge starts authoritative off',`(()=>{const v=${toggleState};return v.checked===false&&v.disabled===false&&v.label==='替我审'&&v.warningHidden===true&&v.onClass===false;})()`);
- // 勾选：ok ⇒ 开启态 + 琥珀标记 + 常驻警告（三段逐字）。
+ // 首次勾选：琥珀标记 + 完整警告**只显示一次**（客户 2026-10-18；带「知道了」）。
  await js(`document.getElementById('auto-approve-toggle').click()`);await pause(80);
- await check('P5 enable shows amber marker and persistent warning',`(()=>{const v=${toggleState},w=document.getElementById('shell-judge-warning');return v.checked&&!v.disabled&&v.label==='替我审批中 · 判断 agent'&&!v.warningHidden&&v.onClass&&w.textContent.includes('只有判断没发生（不可用/超时/解析失败/引擎不支持）才会弹卡')&&w.textContent.includes('文件写入、选择卡与恢复确认仍需手动');})()`);
- // 取消：回到手动，警告消失。
+ await check('P5 first enable shows amber marker and one-time warning',`(()=>{const v=${toggleState};return v.checked&&!v.disabled&&v.label==='替我审批中 · 判断 agent'&&!v.warningHidden&&v.onClass&&v.closeLabel==='知道了'&&v.warningText.includes('只有判断没发生（不可用/超时/解析失败/引擎不支持）才会弹卡')&&v.warningText.includes('文件写入、选择卡与恢复确认仍需手动');})()`);
+ // 「知道了」收起：开关仍开启、紧凑琥珀标记仍在；重复推送 / 重绘 / 切角色都不再重现。
+ await js(`document.getElementById('shell-judge-warning-close').click()`);await pause(40);
+ await check('P5 acknowledged warning hides but compact amber marker stays',`(()=>{const v=${toggleState};return v.checked&&v.onClass&&v.label==='替我审批中 · 判断 agent'&&v.warningHidden;})()`);
+ await push('shell:judge-state',{version:1,enabled:true});
+ await check('P5 repeated enabled push does not re-show acknowledged warning',`(()=>{const v=${toggleState};return v.checked&&v.onClass&&v.warningHidden;})()`);
+ await js(`await window.__ansRenderer.selectRole('A')`);await pause(80);
+ await check('P5 role switch/redraw does not re-show acknowledged warning',`(()=>{const v=${toggleState};return v.checked&&v.onClass&&v.warningHidden;})()`);
+ // 取消：回到手动，警告消失（并复位「已提示」）。
  await js(`document.getElementById('auto-approve-toggle').click()`);await pause(80);
  await check('P5 disable hides warning and returns to manual label',`(()=>{const v=${toggleState};return !v.checked&&v.label==='替我审'&&v.warningHidden&&!v.onClass;})()`);
+ // 再次开启：重新显示一次。
+ await js(`document.getElementById('auto-approve-toggle').click()`);await pause(80);
+ await check('P5 re-enable after toggle off shows the warning once again',`(()=>{const v=${toggleState};return v.checked&&v.onClass&&!v.warningHidden&&v.closeLabel==='知道了';})()`);
+ // 自动消失：约 9 秒后收起（轮询至 12s；与开关/紧凑标记无关——它们保持）。
+ let autoDismissed=false;const autoStart=Date.now();
+ for(let i=0;i<24;i++){await pause(500);if(await js(`document.getElementById('shell-judge-warning').hidden`)){autoDismissed=true;break;}}
+ const autoElapsed=Date.now()-autoStart;
+ await check('P5 warning auto-dismisses after about 9 seconds without touching the switch',`(()=>{const v=${toggleState};return ${autoDismissed&&autoElapsed>=7500}&&v.checked&&v.onClass&&v.warningHidden;})()`);
+ await js(`document.getElementById('auto-approve-toggle').click()`);await pause(80);
+ await check('P5 disable after auto-dismiss clears prompt state',`(()=>{const v=${toggleState};return !v.checked&&v.warningHidden&&!v.onClass;})()`);
  // 失败：主进程拒绝 ⇒ 保持实际状态（关闭）并显示错误；无假开启态。
  judgeSetFailure=true;await js(`document.getElementById('auto-approve-toggle').click()`);await pause(80);
  await check('P5 failed toggle keeps actual state and shows error',`(()=>{const v=${toggleState};return !v.checked&&v.label==='替我审'&&v.warningHidden&&v.errorShown&&v.error.includes('离线受控拒绝');})()`);
  judgeSetFailure=false;
- // 主进程推送 shell:judge-state ⇒ 同步复选框（不靠本地点击意图）。
+ // 主进程推送 shell:judge-state ⇒ 同步复选框（不靠本地点击意图）；每次都按一次性规则处理。
  await push('shell:judge-state',{version:1,enabled:true});
- await check('P5 pushed judge state turns toggle on',`(()=>{const v=${toggleState};return v.checked&&!v.warningHidden&&v.onClass;})()`);
+ await check('P5 pushed judge state turns toggle on with one-time warning',`(()=>{const v=${toggleState};return v.checked&&!v.warningHidden&&v.onClass;})()`);
+ await js(`document.getElementById('shell-judge-warning-close').click()`);await pause(40);
+ await push('shell:judge-state',{version:1,enabled:true});
+ await check('P5 repeated pushed state does not re-show warning',`(()=>{const v=${toggleState};return v.checked&&v.warningHidden&&v.onClass;})()`);
  await push('shell:judge-state',{version:1,enabled:false});
  await check('P5 pushed judge state turns toggle off',`(()=>{const v=${toggleState};return !v.checked&&v.warningHidden&&!v.onClass;})()`);
  // 结果行：先有工具调用行，再推 allow + deny 档放行；行按 toolCallId 锚在该调用之后。
@@ -194,7 +215,7 @@ async function judgeChecks(){
 async function terminalChecks(){
  await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRuntime('pi');await window.__ansRenderer.selectRole('A')`);
  // P5（评审 §10.3）：自动判断开关启动只呈现权威关闭态——桥缺失 ⇒ 禁用+固定文案；桥已接线 ⇒ 默认「替我审」；
- // 两种情况都不得出现「替我审批中」假开启态或常驻警告（真实开启/结果行需受控桥替身，见 changelog 未验边界）。
+ // 两种情况都不得出现「替我审批中」假开启态或开启警告（真实开启/结果行需受控桥替身，见 changelog 未验边界）。
  await check('P5 judge toggle starts authoritative off without fake enable',`(()=>{const t=document.getElementById('auto-approve-toggle'),l=document.getElementById('auto-approve-label'),w=document.getElementById('shell-judge-warning');if(!t||!l||!w)return false;const bridge=typeof window.desktop.getShellJudgeState==='function'&&typeof window.desktop.setShellJudgeEnabled==='function'&&typeof window.desktop.onShellJudgeState==='function'&&typeof window.desktop.onShellJudgeResult==='function';return !t.checked&&w.hidden&&!l.textContent.includes('替我审批中')&&(bridge?l.textContent==='替我审':(t.disabled&&l.textContent==='当前版本不支持自动判断，保持手动'));})()`);
  const scoped={projectRoot:ROOT,roleId:'A',runtime:'pi'};
  sendQueued=true;await js(`document.getElementById('inp-message').value='排队首条';document.getElementById('btn-send').click()`);await pause(40);
@@ -853,6 +874,38 @@ async function runtimeChecks() {
   for(const runtime of ['pi','codex','claude'])assert.ok(histories.some(x=>x.projectRoot===ROOT&&x.roleId===roleId&&x.runtime===runtime),'history exact '+runtime);
   reports.push({name:'runtime bridge targets',opens:opens.slice(-8),histories:histories.slice(-8),aborts:aborts.slice(-1),configSaves});
 }
+async function mirrorChecks() {
+  // W6-C（四角色评审 §6/§9）：四角色左树、Liaison 空态、决定卡镜像（同一请求 id 两侧呈现、只答一次）、
+  // 排队聚合。离线受控夹具；不启用模型/网络/凭据。
+  const saved={roles:listing.roles,primary:listing.primaryRoleId,model:listing.governanceModel,record:listing.governanceRecord,warnings:listing.warnings};
+  const govRole=(roleId,fn)=>({roleId,cardText:'# '+roleId,cardPath:'',boundary:{entries:[]},boundaryPath:'',builtIn:true,governanceFunction:fn,changelog:null,docs:[]});
+  listing.roles=[govRole('liaison','liaison'),govRole('rapporteur','proposal'),govRole('nominator','nomination'),govRole('convener','schedule'),{roleId:'A',cardText:'# A',cardPath:'',boundary:{entries:[]},changelog:null,docs:[]}];
+  listing.primaryRoleId='liaison';listing.governanceModel='trio';listing.governanceRecord={state:'present'};listing.warnings=[];
+  await js(`await window.__ansRenderer.selectRuntime('pi');await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)})`);
+  await check('W6-C four-role tree: Liaison primary; governance group exactly Rapporteur/Nominator/Convener', `(()=>{const t=document.getElementById('role-tree');const groups=[...t.querySelectorAll('.tree-group')].map(x=>x.textContent);const names=[...t.querySelectorAll('.ti-name')].map(x=>x.textContent);const primary=t.querySelector('.tree-item.primary[data-role-id="liaison"]');const gov=[...t.querySelectorAll('.tree-item.builtin:not(.primary)[data-role-id]')].map(x=>x.dataset.roleId);return groups.includes('主入口')&&groups.includes('治理职能（内置）')&&!!primary&&primary.querySelector('.ti-name').textContent==='联络官 Liaison'&&primary.querySelector('.ti-power').textContent==='客户沟通 · 不拥有最终批准权'&&primary.querySelector('.ti-builtin').textContent==='内置角色：随应用发布，无角色目录'&&gov.join(',')==='rapporteur,nominator,convener'&&names.includes('报告员 Rapporteur')&&names.includes('提名官 Nominator')&&names.includes('召集人 Convener')&&!t.textContent.includes('角色卡/liaison/');})()`);
+  await check('W6-C status line shows 三权 · 四角色', `document.getElementById('governance-status').textContent.includes('治理模型：三权 · 四角色')`);
+  await check('W6-C Liaison empty state explains customer entrance without self CTA', `(()=>{const e=document.querySelector('#chat .chat-empty');return !!e&&e.textContent.includes('客户默认入口')&&e.textContent.includes('再交给报告员形成提案')&&e.textContent.includes('我不写提案、不批准')&&!e.querySelector('#btn-start-primary');})()`);
+  await js(`await window.__ansRenderer.selectRole('liaison')`);await pause(80);
+  const request={id:'mirror-1',roleId:'rapporteur',projectRoot:ROOT,runtime:'pi',mirrorRoleId:'liaison',anchorKey:'mirror-anchor',request:{kind:'confirm',title:'镜像提案决定',cardKind:'proposal',flowId:'flow-mirror',summary:'提案 v1'}};
+  const before=responses.length;
+  await push('session:operator-request',request);
+  await check('W6-C mirror card rendered in Liaison with badge/source label and same request id', `(()=>{const c=document.querySelector('#chat .chat-pane[data-role-id="liaison"] [data-request-id="mirror-1"]');return !!c&&c.classList.contains('is-mirror')&&c.dataset.surfaceRoleId==='liaison'&&c.querySelector('.op-mirror-badge').textContent==='镜像 · 主入口'&&c.querySelector('.op-mirror-source').textContent==='来自 报告员 Rapporteur 的治理决定 · 客户最终批准'&&c.querySelector('.op-title').textContent==='镜像提案决定'&&c.querySelectorAll('.op-actions button').length===2;})()`);
+  await js(`document.querySelector('#chat .chat-pane[data-role-id="liaison"] [data-request-id="mirror-1"] .op-confirm').click()`);await pause(110);
+  assert.equal(responses.length,before+1,'mirror answer responds once');
+  await check('W6-C answering mirror freezes the mirror face', `(()=>{const m=document.querySelector('#chat .chat-pane[data-role-id="liaison"] [data-request-id="mirror-1"]');return [...m.querySelectorAll('.op-actions button')].every(b=>b.disabled&&b.hidden)&&m.querySelector('.op-note').textContent==='已确认。';})()`);
+  await js(`await window.__ansRenderer.selectRole('rapporteur')`);await pause(80);
+  await check('W6-C source face kept and also frozen; no mirror label there', `(()=>{const s=document.querySelector('#chat .chat-pane[data-role-id="rapporteur"] [data-request-id="mirror-1"]');return !!s&&!s.classList.contains('is-mirror')&&s.dataset.surfaceRoleId==='rapporteur'&&[...s.querySelectorAll('.op-actions button')].every(b=>b.disabled&&b.hidden)&&s.querySelector('.op-note').textContent==='已确认。'&&!s.querySelector('.op-mirror-source');})()`);
+  const afterFirst=responses.length;await js(`document.querySelector('#chat .chat-pane[data-role-id="rapporteur"] [data-request-id="mirror-1"] .op-confirm').click()`);await pause(50);assert.equal(responses.length,afterFirst,'second face cannot answer again');
+  await js(`await window.__ansRenderer.selectRole('liaison')`);await pause(60);
+  await push('session:operator-queued',{id:'mirror-q1',roleId:'rapporteur',projectRoot:ROOT,runtime:'pi',mirrorRoleId:'liaison',waitingFor:'mirror-1',request:{kind:'confirm',title:'排队提案一',cardKind:'proposal'}});
+  await push('session:operator-queued',{id:'mirror-q2',roleId:'rapporteur',projectRoot:ROOT,runtime:'pi',mirrorRoleId:'liaison',waitingFor:'mirror-1',request:{kind:'confirm',title:'排队提案二',cardKind:'proposal'}});
+  await check('W6-C queued aggregate on primary; no operable queued card on either side', `(()=>{const pane=document.querySelector('#chat .chat-pane[data-role-id="liaison"]');const a=pane.querySelector('.op-queue-aggregate');return !!a&&a.textContent.includes('还有 2 个决定等待前一个决定')&&!document.querySelector('[data-request-id="mirror-q1"]')&&!document.querySelector('[data-request-id="mirror-q2"]');})()`);
+  await push('session:operator-request',{...request,id:'mirror-q1',anchorKey:'mirror-anchor-q1',request:{kind:'confirm',title:'排队提案一',cardKind:'proposal',flowId:'flow-q1'}});
+  await check('W6-C presented queue removes one aggregate and mirrors on both faces', `(()=>{const pane=document.querySelector('#chat .chat-pane[data-role-id="liaison"]');const a=pane.querySelector('.op-queue-aggregate');const m=pane.querySelector('[data-request-id="mirror-q1"]');return (!a||a.textContent.includes('还有 1 个决定等待前一个决定'))&&!!m&&m.classList.contains('is-mirror');})()`);
+  await push('session:operator-expired',{id:'mirror-q2',roleId:'rapporteur',projectRoot:ROOT,runtime:'pi',reason:'离线清理'});
+  listing.roles=saved.roles;listing.primaryRoleId=saved.primary;listing.governanceModel=saved.model;listing.governanceRecord=saved.record;listing.warnings=saved.warnings;
+  await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRuntime('pi')`);
+}
 async function mergeChecks() {
   listing.roles=roles;
   await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRole('A')`);
@@ -1097,13 +1150,14 @@ async function governanceReacceptChecks(){
 app.whenReady().then(async()=>{
  const watchdog=setTimeout(()=>{fs.writeFileSync(path.join(OUT,'watchdog.txt'),'timeout');app.exit(1);},60000);
  try {
-  win=new BrowserWindow({width:1360,height:860,useContentSize:true,frame:false,show:INTERACTIVE,webPreferences:{preload:path.join(APP,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:false}});
+  win=new BrowserWindow({width:1360,height:860,useContentSize:true,frame:false,show:INTERACTIVE,webPreferences:{preload:path.join(APP,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:false,backgroundThrottling:false}});
   win.webContents.on('console-message',event=>{if(event.level==='error')errors.push(event.message);});
   await win.loadFile(path.join(APP,'renderer/index.html'));win.setTitle('ANS UI/UX 离线验收');await pause(150);
   if(GOVREACCEPT_ONLY){await governanceReacceptChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports,previewCalls,reacceptCalls},null,2));console.log('GOVERNANCE_REACCEPT_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(GHOST_ONLY){await deliveryNoteChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({reports,errors},null,2));console.log('DELIVERY_NOTE_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(VISUAL_ONLY){await visualChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({reports,errors},null,2));console.log('VISUAL_V2_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(JUDGE_ONLY){await judgeChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports,judgeEnabled,judgeSetFailure},null,2));console.log('JUDGE_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
+  if(MIRROR_ONLY){await mirrorChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports,responses},null,2));console.log('MIRROR_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(FRESH_CONTEXT_ONLY||ROLE_FOCUS_ONLY||TERMINAL_ONLY||SEND_FACTS_ONLY||TERMINAL_MERGE_ONLY){if(FRESH_CONTEXT_ONLY)await freshContextChecks();else if(ROLE_FOCUS_ONLY)await roleDocumentFocusChecks();else if(TERMINAL_ONLY)await terminalChecks();else if(SEND_FACTS_ONLY)await sendFactsChecks();else await terminalMergeChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({reports,errors},null,2));console.log((FRESH_CONTEXT_ONLY?'FRESH_CONTEXT':ROLE_FOCUS_ONLY?'ROLE_FOCUS':TERMINAL_ONLY?'TERMINAL':SEND_FACTS_ONLY?'SEND_FACTS':'TERMINAL_MERGE')+'_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(FLOW_ONLY){await completeFlowChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports},null,2));console.log('COMPLETE_FLOW_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(PROJECT_RESET_ONLY){await projectResetChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports},null,2));console.log('PROJECT_RESET_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
@@ -1293,6 +1347,7 @@ app.whenReady().then(async()=>{
   await push('session:events',[event('message','普通助手追问：请补充验收标准。')]);
   await check('ordinary question creates no pending',`document.getElementById('op-chip').hidden&&!document.querySelector('#chat .tool-current')`);
   await runtimeChecks();
+  await mirrorChecks();
   if(errors.length) reports.push({name:'renderer console errors',errors});assert.equal(errors.length,0);
   fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports,sends},null,2));
   console.log('UIUX_V2_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);

@@ -5,9 +5,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 
 import { createDesktopInterface, createShellJudgeSwitch, isShellJudgeIpcSender } from "../../app/desktop/interface.ts";
+import type { SessionEventEnvelope } from "../../app/desktop/session.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
 import type { ProjectConfig } from "../../src/model/role.ts";
@@ -24,6 +27,7 @@ import type {
   GovernanceMigrationPreview,
   GovernanceMigrationResult,
 } from "../../src/pipeline/orchestration/govern-session.ts";
+import { readGovernanceLedger } from "../../src/pipeline/orchestration/govern-session.ts";
 import type { PinEvidenceResult } from "../../src/model/boundary.ts";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -1611,4 +1615,440 @@ test("S1 模型选择：preview/establish 只接受 single|trio 并透传；不�
 
   await iface.previewGovernanceRecord({ projectRoot: "/proj" });
   assert.deepEqual(previewInputs[1], { projectRoot: "/proj" }, "缺省不传 governanceModel（旧行为逐字不变）");
+});
+
+// —————————————— 治理自动推进（2026-10-18 客户修正）：后台派发，不抢 pane ——————————————
+//
+// 客户反馈「这个不是应该自动的转发人物给后续流程吗」：提案接受后不能只显示「请切换到 nominator」。
+// 修正后的行为：应用在**后台**打开目标治理角色会话并投递**唯一一条**任务消息；当前会话/输入焦点不变，
+// 不自动批准、不写账本；成功/失败经既有 delivery-note 系统行如实落发起卡片的聊天流。
+
+function trioListing(roleIds: string[] = ["rapporteur", "nominator", "convener"]): ProjectListing {
+  const role = (roleId: string) => ({
+    roleId,
+    cardPath: "",
+    boundaryPath: "",
+    cardText: `# ${roleId}`,
+    boundary: { entries: [], boundarySource: "<built-in>", acceptance: { accepted: false, source: "" } },
+    builtIn: true,
+    ...(roleId === "rapporteur"
+      ? { governanceFunction: "proposal" as const }
+      : roleId === "nominator"
+        ? { governanceFunction: "nomination" as const }
+        : { governanceFunction: "schedule" as const }),
+  });
+  return {
+    projectRoot: "/proj",
+    roles: roleIds.map(role),
+    warnings: [],
+    hasRoles: false,
+    primaryRoleId: "rapporteur",
+    governanceModel: "trio",
+  };
+}
+
+function quietGovernanceHandle(sends: string[]): RoleSessionHandle {
+  return {
+    async send(text: string): Promise<void> { sends.push(text); },
+    events(): AsyncIterable<SessionEvent> {
+      return {
+        [Symbol.asyncIterator]() {
+          return {
+            async next(): Promise<IteratorResult<SessionEvent>> {
+              return { value: undefined as unknown as SessionEvent, done: true };
+            },
+          };
+        },
+      };
+    },
+    async dispose(): Promise<void> {},
+  };
+}
+
+/** 可推 `settled` 的句柄（与 makeFakeHandle 同思路，轮询窗口更短）：验证忙时排队/下一轮直发。 */
+function settleableGovernanceHandle(sends: string[]): { handle: RoleSessionHandle; settle: () => void } {
+  const queue: SessionEvent[] = [];
+  const handle: RoleSessionHandle = {
+    async send(text: string): Promise<void> { sends.push(text); },
+    events(): AsyncIterable<SessionEvent> {
+      return {
+        [Symbol.asyncIterator]() {
+          return {
+            async next(): Promise<IteratorResult<SessionEvent>> {
+              for (let i = 0; i < 100; i += 1) {
+                const event = queue.shift();
+                if (event !== undefined) return { value: event, done: false };
+                await new Promise((resolve) => setTimeout(resolve, 5));
+              }
+              return { value: undefined as unknown as SessionEvent, done: true };
+            },
+          };
+        },
+      };
+    },
+    async dispose(): Promise<void> {},
+  };
+  return { handle, settle: () => { queue.push({ kind: "settled", summary: "一轮结束（测试替身）" } as SessionEvent); } };
+}
+
+test("治理自动推进：接受提案 → 后台派发提名任务给 Nominator，当前 pane 不变、只发一条任务", async () => {
+  const sendsByRole = new Map<string, string[]>();
+  const openRoles: string[] = [];
+  const events: SessionEventEnvelope[] = [];
+  const iface = createDesktopInterface({
+    pickDirectory: async () => "/proj",
+    emitEvent: (envelope) => { events.push(envelope); },
+    listProjectFn: async () => trioListing(),
+    openRoleSessionFn: async (input) => {
+      openRoles.push(input.roleId);
+      const sends: string[] = [];
+      sendsByRole.set(input.roleId, sends);
+      return quietGovernanceHandle(sends);
+    },
+    buildProjectConfigFn: buildProjectConfig,
+  });
+  await iface.listProject({ projectRoot: "/proj" });
+  assert.equal((await iface.openSession({ projectRoot: "/proj", roleId: "rapporteur", runtime: "demo" })).ok, true);
+
+  const expected =
+    "流程 flow-a：客户已接受提案 docs/proposals/flow-a-v1.md。" +
+    "请执行提名：读取提案与流程单，给出候选角色与理由，并通过任命卡请客户确认；不要自行任命或写角色卡。";
+  const result = await iface.advanceGovernanceFlow({
+    payload: { version: 1, flowId: "flow-a", cardKind: "proposal", nextFunction: "nomination", roleId: "nominator", proposalPath: "docs/proposals/flow-a-v1.md" },
+    context: { sourceRoleId: "rapporteur", projectRoot: "/proj", runtime: "demo" },
+  });
+  assert.deepEqual(result, { ok: true, dispatched: true, targetRoleId: "nominator" });
+  assert.deepEqual(openRoles, ["rapporteur", "nominator"], "目标角色会话在后台开启（无渲染侧 open/select）");
+  assert.deepEqual(sendsByRole.get("nominator"), [expected], "只投递一条客户给定文案，无自动批准/第二条");
+
+  // 当前 pane 不变：不带 target 的客户消息仍落 Rapporteur。
+  const rapporteurSends = sendsByRole.get("rapporteur")!;
+  rapporteurSends.length = 0;
+  const clientSend = await iface.sendSession({ text: "客户继续说" });
+  assert.equal(clientSend.ok, true);
+  assert.deepEqual(sendsByRole.get("rapporteur"), ["客户继续说"], "活动角色仍是 Rapporteur");
+  assert.deepEqual(sendsByRole.get("nominator"), [expected], "后台派发不改变目标角色收到的消息");
+
+  // 成功系统行落**当前**聊天流（Rapporteur），措辞按客户要求。
+  const notes = events.filter((e) => e.roleId === "rapporteur" && e.event.kind === "message" && (e.event.detail as { source?: string } | undefined)?.source === "delivery-note");
+  assert.equal(notes.length, 1);
+  assert.equal(notes[0].event.summary, "已派发提名任务给 Nominator（工作中）");
+  await iface.stopSession();
+});
+
+test("治理自动推进：accept-quick 与 appointment 都派发给 Convener；无下一步不派发", async () => {
+  const sendsByRole = new Map<string, string[]>();
+  const openRoles: string[] = [];
+  let settleConvener: (() => void) | undefined;
+  const iface = createDesktopInterface({
+    pickDirectory: async () => "/proj",
+    emitEvent: () => {},
+    listProjectFn: async () => trioListing(),
+    openRoleSessionFn: async (input) => {
+      openRoles.push(input.roleId);
+      const sends: string[] = [];
+      sendsByRole.set(input.roleId, sends);
+      const made = settleableGovernanceHandle(sends);
+      if (input.roleId === "convener") settleConvener = made.settle;
+      return made.handle;
+    },
+    buildProjectConfigFn: buildProjectConfig,
+  });
+  await iface.listProject({ projectRoot: "/proj" });
+
+  assert.equal((await iface.advanceGovernanceFlow({
+    payload: { version: 1, flowId: "flow-q", cardKind: "proposal", nextFunction: "schedule", roleId: "convener" },
+    context: { sourceRoleId: "rapporteur", projectRoot: "/proj", runtime: "demo" },
+  })).ok, true);
+  // 第一轮结束后（settled）下一张客户决定才直发；忙时应入队（既有投递机语义）。
+  settleConvener?.();
+  await new Promise((resolve) => setTimeout(resolve, 60));
+  assert.equal((await iface.advanceGovernanceFlow({
+    payload: { version: 1, flowId: "flow-r", cardKind: "appointment", nextFunction: "schedule", roleId: "convener" },
+    context: { sourceRoleId: "nominator", projectRoot: "/proj", runtime: "demo", targetRoleIds: ["role-a", "role-b"] },
+  })).ok, true);
+
+  assert.deepEqual(openRoles, ["convener"], "Convener 会话后台开启一次、后续续接（不重建）");
+  assert.deepEqual(sendsByRole.get("convener"), [
+    "流程 flow-q：客户已接受提案（快捷路径）。请写流程单并排步骤；涉及新建/改边界仍须任命卡与写盘确认。",
+    "流程 flow-r：客户已完成任命 role-a、role-b。请写流程单并派发已批准步骤。",
+  ]);
+
+  const before = (sendsByRole.get("convener") ?? []).length;
+  const nothing = await iface.advanceGovernanceFlow({
+    payload: { version: 1, flowId: "flow-r", cardKind: "acceptance", nextFunction: null, roleId: null },
+    context: { sourceRoleId: "rapporteur", projectRoot: "/proj", runtime: "demo" },
+  });
+  assert.deepEqual(nothing, { ok: true, dispatched: false }, "验收收口/无下一步：不派发");
+  assert.equal((sendsByRole.get("convener") ?? []).length, before, "无下一步不产生任何模型消息");
+  await iface.stopSession();
+});
+
+test("治理自动推进：后台派发不抢活动角色（activeRoleId 保持为空）", async () => {
+  const sendsByRole = new Map<string, string[]>();
+  const iface = createDesktopInterface({
+    pickDirectory: async () => "/proj",
+    emitEvent: () => {},
+    listProjectFn: async () => trioListing(),
+    openRoleSessionFn: async (input) => {
+      const sends: string[] = [];
+      sendsByRole.set(input.roleId, sends);
+      return quietGovernanceHandle(sends);
+    },
+    buildProjectConfigFn: buildProjectConfig,
+  });
+  await iface.listProject({ projectRoot: "/proj" });
+  const result = await iface.advanceGovernanceFlow({
+    payload: { version: 1, flowId: "flow-a", cardKind: "proposal", nextFunction: "nomination", roleId: "nominator" },
+    context: { sourceRoleId: "rapporteur", projectRoot: "/proj", runtime: "demo" },
+  });
+  assert.equal(result.ok, true);
+  assert.equal(sendsByRole.get("nominator")?.length, 1);
+  // 没有用户打开的会话 → 后台打开不得成为活动角色：不带 target 的 send 如实回「会话尚未开启」。
+  const send = await iface.sendSession({ text: "不应落在 Nominator 的客户消息" });
+  assert.equal(send.ok, false);
+  assert.match(send.error ?? "", /会话尚未开启/);
+  assert.equal(sendsByRole.get("nominator")?.length, 1, "后台会话没有被当成当前 pane");
+  await iface.stopSession();
+});
+
+test("治理自动推进失败：目标角色缺失/发送失败 → 如实错误系统行，当前会话不阻塞", async () => {
+  // ① 目标角色缺失：项目枚举里没有 nominator。
+  const sendsByRole = new Map<string, string[]>();
+  const events: SessionEventEnvelope[] = [];
+  const iface = createDesktopInterface({
+    pickDirectory: async () => "/proj",
+    emitEvent: (envelope) => { events.push(envelope); },
+    listProjectFn: async () => trioListing(["rapporteur", "convener"]),
+    openRoleSessionFn: async (input) => {
+      const sends: string[] = [];
+      sendsByRole.set(input.roleId, sends);
+      return quietGovernanceHandle(sends);
+    },
+    buildProjectConfigFn: buildProjectConfig,
+  });
+  await iface.listProject({ projectRoot: "/proj" });
+  assert.equal((await iface.openSession({ projectRoot: "/proj", roleId: "rapporteur", runtime: "demo" })).ok, true);
+  const missing = await iface.advanceGovernanceFlow({
+    payload: { version: 1, flowId: "flow-a", cardKind: "proposal", nextFunction: "nomination", roleId: "nominator" },
+    context: { sourceRoleId: "rapporteur", projectRoot: "/proj", runtime: "demo" },
+  });
+  assert.equal(missing.ok, false);
+  assert.equal(missing.dispatched, false);
+  assert.match(missing.error ?? "", /Nominator/);
+  const failureNotes = events.filter((e) => e.roleId === "rapporteur" && e.event.kind === "message" && (e.event.detail as { source?: string } | undefined)?.source === "delivery-note");
+  assert.equal(failureNotes.length, 1, "失败如实落一行系统行");
+  assert.match(failureNotes[0].event.summary ?? "", /自动推进失败/);
+  // 当前会话不阻塞：客户消息照常投给 Rapporteur。
+  const rapporteurSends = sendsByRole.get("rapporteur")!;
+  rapporteurSends.length = 0;
+  assert.equal((await iface.sendSession({ text: "继续当前工作" })).ok, true);
+  assert.deepEqual(sendsByRole.get("rapporteur"), ["继续当前工作"]);
+  await iface.stopSession();
+
+  // ② 发送失败：目标会话能开，但句柄 send 抛错。
+  const events2: SessionEventEnvelope[] = [];
+  const iface2 = createDesktopInterface({
+    pickDirectory: async () => "/proj",
+    emitEvent: (envelope) => { events2.push(envelope); },
+    listProjectFn: async () => trioListing(),
+    openRoleSessionFn: async (input) => {
+      if (input.roleId === "nominator") {
+        return {
+          async send(): Promise<void> { throw new Error("目标运行时拒绝投递"); },
+          events(): AsyncIterable<SessionEvent> {
+            return { [Symbol.asyncIterator]() { return { async next() { return { value: undefined as unknown as SessionEvent, done: true }; } }; } };
+          },
+          async dispose(): Promise<void> {},
+        } as RoleSessionHandle;
+      }
+      return quietGovernanceHandle([]);
+    },
+    buildProjectConfigFn: buildProjectConfig,
+  });
+  await iface2.listProject({ projectRoot: "/proj" });
+  assert.equal((await iface2.openSession({ projectRoot: "/proj", roleId: "rapporteur", runtime: "demo" })).ok, true);
+  const sendFailed = await iface2.advanceGovernanceFlow({
+    payload: { version: 1, flowId: "flow-a", cardKind: "proposal", nextFunction: "nomination", roleId: "nominator" },
+    context: { sourceRoleId: "rapporteur", projectRoot: "/proj", runtime: "demo" },
+  });
+  assert.equal(sendFailed.ok, false);
+  assert.match(sendFailed.error ?? "", /发送任务给 Nominator 失败/);
+  const notes2 = events2.filter((e) => e.roleId === "rapporteur" && e.event.kind === "message" && (e.event.detail as { source?: string } | undefined)?.source === "delivery-note");
+  assert.equal(notes2.length, 1);
+  assert.match(notes2[0].event.summary ?? "", /自动推进失败/);
+  await iface2.stopSession();
+});
+
+// ————— W6-B（2026-10-18）：后台推进的审计账本（四角色评审 §7.2 / AC19）—————
+//
+// `advanceGovernanceFlow` 投递成功后写 `dispatch.accepted{actorRoleId:"app", power:"app",
+// trigger:"customer-decision"}`；失败不写；single 不写；账本失败只记诊断、不翻转投递结果。
+
+function makeTempProjectRoot(prefix: string): string {
+  return mkdtempSync(path.join(tmpdir(), prefix));
+}
+
+test("W6-B 自动推进账本：trio 成功投递后恰一条 dispatch.accepted(app, trigger=customer-decision)，不写客户决定", async () => {
+  const root = makeTempProjectRoot("ans-advance-ledger-");
+  try {
+    const listing: ProjectListing = { ...trioListing(), projectRoot: root };
+    const sendsByRole = new Map<string, string[]>();
+    const iface = createDesktopInterface({
+      pickDirectory: async () => root,
+      emitEvent: () => {},
+      listProjectFn: async () => listing,
+      openRoleSessionFn: async (input) => {
+        const sends: string[] = [];
+        sendsByRole.set(input.roleId, sends);
+        return quietGovernanceHandle(sends);
+      },
+      buildProjectConfigFn: buildProjectConfig,
+    });
+    await iface.listProject({ projectRoot: root });
+    assert.equal((await iface.openSession({ projectRoot: root, roleId: "rapporteur", runtime: "demo" })).ok, true);
+    const result = await iface.advanceGovernanceFlow({
+      payload: {
+        version: 1,
+        flowId: "flow-a",
+        cardKind: "proposal",
+        nextFunction: "nomination",
+        roleId: "nominator",
+        proposalPath: "docs/proposals/flow-a-v1.md",
+      },
+      context: { sourceRoleId: "rapporteur", projectRoot: root, runtime: "demo", stepId: "step-1" },
+    });
+    assert.equal(result.ok, true);
+    assert.equal(result.dispatched, true);
+    assert.equal(sendsByRole.get("nominator")?.length, 1, "先投递成功");
+
+    const ledger = await readGovernanceLedger(root);
+    assert.deepEqual(ledger.errors, [], "账本可读、无坏行");
+    const accepted = ledger.entries.filter((entry) => entry.kind === "dispatch.accepted");
+    assert.equal(accepted.length, 1, "成功恰写一条 dispatch.accepted");
+    const entry = accepted[0];
+    assert.equal(entry.actorRoleId, "app", "应用动作（actor=app）");
+    assert.equal(entry.power, "app", "power=app（不是任何角色的决定权）");
+    assert.equal(entry.trigger, "customer-decision", "触发来源=客户决定推进");
+    assert.equal(entry.flowId, "flow-a");
+    assert.equal(entry.stepId, "step-1", "卡片/上下文显式给出的 stepId 原样入账（AC19）");
+    assert.equal(entry.targetRoleId, "nominator");
+    assert.equal(entry.customerDecision, undefined, "不写 customerDecision（不是客户批准）");
+    assert.equal(entry.decisionEvidence, undefined, "不写 decisionEvidence");
+
+    // 拿不到 stepId 时：照常投递，但账本不伪造 stepId（只记诊断）。
+    const second = await iface.advanceGovernanceFlow({
+      payload: { version: 1, flowId: "flow-b", cardKind: "proposal", nextFunction: "schedule", roleId: "convener" },
+      context: { sourceRoleId: "rapporteur", projectRoot: root, runtime: "demo" },
+    });
+    assert.equal(second.ok, true);
+    const ledgerAfter = await readGovernanceLedger(root);
+    const convenerEntry = ledgerAfter.entries
+      .filter((e) => e.kind === "dispatch.accepted")
+      .find((e) => e.targetRoleId === "convener");
+    assert.ok(convenerEntry, "第二次投递照常入账");
+    assert.equal(convenerEntry!.stepId, undefined, "stepId 缺席时不伪造");
+    await iface.stopSession();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("W6-B 自动推进账本：失败不写 dispatch.accepted；账本失败不翻转已完成的投递", async () => {
+  // ① 目标角色缺失 → 推进失败 → 不写账本。
+  const rootA = makeTempProjectRoot("ans-advance-ledger-fail-");
+  try {
+    const listing: ProjectListing = { ...trioListing(["rapporteur", "convener"]), projectRoot: rootA };
+    const iface = createDesktopInterface({
+      pickDirectory: async () => rootA,
+      emitEvent: () => {},
+      listProjectFn: async () => listing,
+      openRoleSessionFn: async (input) => quietGovernanceHandle([]),
+      buildProjectConfigFn: buildProjectConfig,
+    });
+    await iface.listProject({ projectRoot: rootA });
+    assert.equal((await iface.openSession({ projectRoot: rootA, roleId: "rapporteur", runtime: "demo" })).ok, true);
+    const failed = await iface.advanceGovernanceFlow({
+      payload: { version: 1, flowId: "flow-a", cardKind: "proposal", nextFunction: "nomination", roleId: "nominator" },
+      context: { sourceRoleId: "rapporteur", projectRoot: rootA, runtime: "demo" },
+    });
+    assert.equal(failed.ok, false);
+    const ledgerA = await readGovernanceLedger(rootA);
+    assert.equal(ledgerA.entries.filter((entry) => entry.kind === "dispatch.accepted").length, 0, "失败不写账本");
+    await iface.stopSession();
+  } finally {
+    rmSync(rootA, { recursive: true, force: true });
+  }
+
+  // ② 账本不可写（`.ans` 是普通文件 → mkdir 失败）：投递已完成，结果不翻转；只记诊断。
+  const rootB = makeTempProjectRoot("ans-advance-ledger-broken-");
+  try {
+    writeFileSync(path.join(rootB, ".ans"), "not-a-directory");
+    const listing: ProjectListing = { ...trioListing(), projectRoot: rootB };
+    const iface = createDesktopInterface({
+      pickDirectory: async () => rootB,
+      emitEvent: () => {},
+      listProjectFn: async () => listing,
+      openRoleSessionFn: async (input) => quietGovernanceHandle([]),
+      buildProjectConfigFn: buildProjectConfig,
+    });
+    await iface.listProject({ projectRoot: rootB });
+    assert.equal((await iface.openSession({ projectRoot: rootB, roleId: "rapporteur", runtime: "demo" })).ok, true);
+    const result = await iface.advanceGovernanceFlow({
+      payload: { version: 1, flowId: "flow-b", cardKind: "proposal", nextFunction: "schedule", roleId: "convener" },
+      context: { sourceRoleId: "rapporteur", projectRoot: rootB, runtime: "demo" },
+    });
+    assert.equal(result.ok, true, "账本失败不翻转投递结果");
+    assert.equal(result.dispatched, true);
+    const ledgerB = await readGovernanceLedger(rootB);
+    assert.equal(
+      ledgerB.entries.filter((entry) => entry.kind === "dispatch.accepted").length,
+      0,
+      "账本不可写时不产生条目；投递结果已如实返回（不翻转、不重试）",
+    );
+    await iface.stopSession();
+  } finally {
+    rmSync(rootB, { recursive: true, force: true });
+  }
+});
+
+test("W6-B 自动推进账本：single 模型不写 dispatch.accepted（旧项目不产生新账本事件）", async () => {
+  const root = makeTempProjectRoot("ans-advance-ledger-single-");
+  try {
+    const role = (roleId: string) => ({
+      roleId,
+      cardPath: "",
+      boundaryPath: "",
+      cardText: `# ${roleId}`,
+      boundary: { entries: [], boundarySource: "<built-in>", acceptance: { accepted: true, source: "test" } },
+      builtIn: true,
+    });
+    const listing: ProjectListing = {
+      projectRoot: root,
+      roles: [role("su"), role("convener")],
+      warnings: [],
+      hasRoles: false,
+      primaryRoleId: "su",
+      governanceModel: "single",
+    };
+    const iface = createDesktopInterface({
+      pickDirectory: async () => root,
+      emitEvent: () => {},
+      listProjectFn: async () => listing,
+      openRoleSessionFn: async (input) => quietGovernanceHandle([]),
+      buildProjectConfigFn: buildProjectConfig,
+    });
+    await iface.listProject({ projectRoot: root });
+    assert.equal((await iface.openSession({ projectRoot: root, roleId: "su", runtime: "demo" })).ok, true);
+    const result = await iface.advanceGovernanceFlow({
+      payload: { version: 1, flowId: "flow-s", cardKind: "proposal", nextFunction: "schedule", roleId: "convener" },
+      context: { sourceRoleId: "su", projectRoot: root, runtime: "demo" },
+    });
+    assert.equal(result.ok, true);
+    const ledger = await readGovernanceLedger(root);
+    assert.equal(ledger.entries.length, 0, "single 不产生任何账本条目");
+    await iface.stopSession();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

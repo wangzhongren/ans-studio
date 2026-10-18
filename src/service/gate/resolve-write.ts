@@ -27,6 +27,7 @@ import {
   realResolve,
 } from "../../common/门禁引擎/paths.ts";
 import { reloadBoundaryEntriesSync } from "../../common/门禁引擎/boundary-core.ts";
+import { governanceWriteOwnerGuidance } from "../../common/门禁引擎/governance-roles.ts";
 
 /** 条目是否被当前任务的条件声明激活（非条件条目恒真；无 scope 时无声明 → 条件条目不激活） */
 function isActive(e: BoundaryEntry, scope: TaskScope | undefined): boolean {
@@ -239,15 +240,19 @@ export function resolveWrite(
   // 桌面 O-1 会在交互时机自动重建旧快照会话（多能自愈）；本句服务残余情形（轮次在跑 / 未触达重建）。
   // 线索是**提示**、不是放行：判定仍是拒绝（fail-closed 不变，文案已写明「本次判定不变，仍为拒绝」）。
   const base = `目标路径未匹配任何边界条目（根：${root}）：${rel}`;
+  // AC3（四角色评审 §4.4）：Liaison 越界写须指回正确归属（提案→报告员、提名/角色卡→提名官、
+  // 流程→召集人、应用记录→应用），不能只给「未匹配边界」。只追加文案，判定零变化。
+  const ownerGuidance = governanceWriteOwnerGuidance(boundary.boundarySource, rel);
+  const withOwner = ownerGuidance !== undefined ? `${base}。${ownerGuidance}` : base;
   const fresh = reloadBoundaryEntriesSync(boundary.boundarySource, projectRootAbs, skillRootAbs);
   const freshCovers =
     fresh !== null && fresh.some((e) => e.root === root && pathCovers(e, rel) && isActive(e, scope));
   if (freshCovers) {
     return deny(
-      `${base}。本会话可能持有旧边界快照（盘上边界现已含该路径）——请重开会话后重试；本次判定不变，仍为拒绝。`,
+      `${withOwner}。本会话可能持有旧边界快照（盘上边界现已含该路径）——请重开会话后重试；本次判定不变，仍为拒绝。`,
       boundary,
       scope,
     );
   }
-  return deny(base, boundary, scope);
+  return deny(withOwner, boundary, scope);
 }

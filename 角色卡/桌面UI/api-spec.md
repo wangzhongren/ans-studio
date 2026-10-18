@@ -254,22 +254,23 @@ work、card、pi、document复用424模态抽屉。仅导航/会话业务面iner
 - **桥缺失/主进程未接线**：复选框禁用，标签「当前版本不支持自动判断，保持手动」；**不显示假开启态**。
 
 **渲染侧导出（`ui-labels.js`，全部纯映射）**：
-- `shellJudgeToggleView(available, enabled, busy)` → `{available, enabled, checked, disabled, label, title, warningVisible}`：off「替我审」/悬停「手动逐条确认 shell 命令（默认）」；on「替我审批中 · 判断 agent」/悬停「判断 agent 先评估 shell 命令必要性；可随时关闭」；桥缺失固定文案；桥缺失时即使传入 enabled 也 **checked=false / warningVisible=false**。
+- `shellJudgeToggleView(available, enabled, busy)` → `{available, enabled, checked, disabled, label, title, warningVisible}`：off「替我审」/悬停「手动逐条确认 shell 命令（默认）」；on「替我审批中 · 判断 agent」/悬停「判断 agent 先评估 shell 命令必要性；可随时关闭」；桥缺失固定文案；桥缺失时即使传入 enabled 也 **checked=false / warningVisible=false**。**`warningVisible` 是兼容字段（= enabled），实际警告显隐由 `shellJudgeWarningStep` 决定**。
+- `shellJudgeWarningStep(enabled, shown)` → `{shown, show}`：客户 2026-10-18「提示只出现一次」的一次性状态迁移——关闭 ⇒ `{false,false}`（复位「已提示」）；开启且未提示 ⇒ `{true,true}`（显示一次）；开启且已提示（重绘/收消息/切角色/重复推送）⇒ `{true,false}`（不重复）。不持久化：重启后再次开启会再提示一次。
 - `shellJudgeToggleResult(previousEnabled, res)` → `{enabled, error}`：`ok:true` 且有布尔 `enabled` 才采用主进程值；失败/坏件保持 `previousEnabled` 并给错误文案。
-- `shellJudgeWarningLines()` → §10.2 三段逐字（返回副本）。
+- `shellJudgeWarningLines()` → §10.2 三段逐字（返回副本）；`SHELL_JUDGE_WARNING_CLOSE_LABEL` =「知道了」；`SHELL_JUDGE_WARNING_AUTO_DISMISS_MS` = 9000（客户 8–10 秒口径；渲染侧唯一计时器）。
 - `shellJudgeNoticeText(reasonCode)` → 一般 manual「判断 agent 未能完成判断：<人话原因>。已转你手动确认。」；`row-failed`「判断 agent 已完成判断，但结果无法在聊天中显示；已转你手动确认。」。
 - `shellJudgeReasonText(reasonCode)` → manual reasonCode 人话映射（与桌面通道 `judgeManualHumanReason` 同解；未知 ⇒「判断未完成」）。
 - `shellJudgeResultView(payload)` → `{verdict, denyOverride, title, label, summary, engineText, operatorText, tierText, at, lines, retryHint, toolCallId, details}`；`manual`/未知裁决 ⇒ `null`（**manual 不产生结果行**）。allow 标题「已替你放行（判断 agent）」；deny 档放行标题「已替你放行（判断 agent · deny 档）」＋徽标「deny 档 · judge 放行」＋「该命令属于硬拒类，判断 agent 判定必要后放行；请复核」；deny 标题「未放行（判断 agent）」＋理由/替代方案/客户说明＋「可关闭「替我审」后重试（改为手动确认），或按替代方案调整命令。」；summary 空 ⇒「无法概括命令；展开查看原文」。
 - `shellJudgeEngineLabel(engine)` → Claude/Pi/Codex（未知如实原文，缺省「未报告」）。
 
 **DOM/行为**：
-- `index.html` `.composer-bottom`：附件按钮之后、`#composer-scope` 之前新增 §10.1 逐字复选框 `label.composer-auto-approve > input#auto-approve-toggle + span#auto-approve-label`；错误状态位 `#auto-approve-status`（aria-live）。输入区下方常驻警告 `#shell-judge-warning.judge-warning`（默认 `hidden`，琥珀色，非错误红）。shell 卡新增 `#sc-judge-notice.sc-judge-notice`（摘要之后、原因之前，默认 `hidden`）。
-- `renderer.js`：`initShellJudge()` 判桥四方法齐备 → 订阅 state/result → `getShellJudgeState()`；复选框 change 只调 `setShellJudgeEnabled`，由 `shellJudgeToggleResult` 落主进程实际值（失败保持原值并显示 `#auto-approve-status`）；`shell:judge-state` 只接受 `version:1 + 布尔 enabled`。**不写 localStorage/.env/项目文件，不自动开会话/切角色，不触碰已挂起卡。**
+- `index.html` `.composer-bottom`：附件按钮之后、`#composer-scope` 之前新增 §10.1 逐字复选框 `label.composer-auto-approve > input#auto-approve-toggle + span#auto-approve-label`；错误状态位 `#auto-approve-status`（aria-live）。开启警告 `#shell-judge-warning.judge-warning`（默认 `hidden`，琥珀色，非错误红）为**一次性浮层**：内含 `#shell-judge-warning-text`（三段）+ `#shell-judge-warning-close`（「知道了」）；绝对定位于 `.composer` 上方（`bottom:calc(100% + 8px)`），**不占聊天布局、不推动消息区**。shell 卡新增 `#sc-judge-notice.sc-judge-notice`（摘要之后、原因之前，默认 `hidden`）。
+- `renderer.js`：`initShellJudge()` 判桥四方法齐备 → 订阅 state/result → `getShellJudgeState()`；复选框 change 只调 `setShellJudgeEnabled`，由 `shellJudgeToggleResult` 落主进程实际值（失败保持原值并显示 `#auto-approve-status`）；`shell:judge-state` 只接受 `version:1 + 布尔 enabled`。警告显隐只经 `syncShellJudgeWarning()` → `shellJudgeWarningStep`（首次开启显示、`setTimeout` 约 9 秒自动收起、「知道了」手动收起；关闭开关复位），**重绘/收消息/切角色/重复推送不重现**。**不写 localStorage/.env/项目文件，不自动开会话/切角色，不触碰已挂起卡。**
 - 结果行：`onShellJudgeResult` 按 `roleId` 落该角色 pane，按 `toolCallId` 扫描行表（工具组 `.items[].callId`、生命周期 `activityStages`、operator `toolCallId`、`data.toolCallId`）并插到其后；定位不到 ⇒ 追加流尾（不丢行优先）；`payload.id` 幂等去重；仅在原 pane 处于底部附近时贴底。行类 `.sys.shell-judge-row`，钩子 `.sj-head/.sj-title/.sj-badge/.sj-cmd/.sj-meta/.sj-line/.sj-exit/.sj-details`。**不自动切换当前角色/视图。**
-- 样式：`.composer-auto-approve(.is-on/.is-unsupported)`、`.composer-judge-status`、`.judge-warning`、`.shell-judge-row` 族、`.sc-judge-notice`；开启态与警告一律 `--amber`（不是 `--danger`）；警告随 `--content-max`（900）且继承整页等宽字体。
+- 样式：`.composer-auto-approve(.is-on/.is-unsupported)`、`.composer-judge-status`、`.judge-warning`（绝对定位浮层 + `.judge-warning-close`）、`.shell-judge-row` 族、`.sc-judge-notice`；开启态与警告一律 `--amber`（不是 `--danger`）；警告宽度 `min(var(--content-max), calc(100% - 32px))` 且继承整页等宽字体。
 - 探针（只增）：`window.__ansRenderer.shellJudge = { state(), onState, onResult }`（只读快照 + 直接注入推送/结果；桥缺失时 `state.available=false`）。
 
-**测试证据**：`tool-rows.test.ts` 新增 8 例（开关三态/结果自洽/警告逐字/allow/deny 档/deny/manual/notice）；`renderer.test.ts` 新增 5 例（DOM 与样式钩子、开关三态与失败回退、结果行锚定与 deny 徽标、judgeNotice、边界「不自动开会话/不写持久化」）；`uiux-v2.mjs` 新增独立模式 `ANS_JUDGE_UI_ONLY=1`（受控 IPC 替身＋真实 Electron；**JUDGE_UI_PASS 14**，含启动关闭态、开启/取消、失败回退、state 推送、deny 档 allow 锚点、deny 行、manual 不落行、judgeNotice、已挂起卡不受切换影响、后台角色 pane 隔离）；既有 `ANS_TERMINAL_UI_ONLY=1` 增加启动态断言（**TERMINAL_PASS 15**）。全仓 2454 计 /2431 过 /20 红（与改动前基线红集一致）/3 skip；`npx tsc --noEmit` 0 错。
+**测试证据**：`tool-rows.test.ts` 新增 9 例（开关三态/一次性警告状态机/结果自洽/警告逐字/allow/deny 档/deny/manual/notice）→ 47/47；`renderer.test.ts` 新增/改写 5 例（DOM 与样式钩子（一次性浮层/「知道了」）、开关三态与失败回退、一次性接线（step/计时器/关闭按钮/无重绘重显）、结果行锚定与 deny 徽标、judgeNotice、边界「不自动开会话/不写持久化」）；`uiux-v2.mjs` 独立模式 `ANS_JUDGE_UI_ONLY=1`（受控 IPC 替身＋真实 Electron；断言已按一次性行为更新：首次显示/「知道了」后紧凑标记保持/重复推送与切角色不重现/关闭再开启再显示/约 9 秒自动消失；实跑 **JUDGE_UI_PASS 21**，无真实模型/网络）。全量 `node --test "test/**/*.test.ts"` 2670 计 /2648 过 /19 红 /3 skip：其中 3 红是测试角色 `test/测试/` 的「renderer 全文零 setTimeout」守卫，需其属主豁免本批唯一一次性计时器；其余 16 红为此前基线。`npx tsc --noEmit` 本轮未跑（渲染侧为 JS 经典脚本，无类型面改动）。
 
 ## 2026-10-17 W4 治理三权：左树/空态/状态行/决定卡（评审 §8）
 
@@ -277,7 +278,7 @@ work、card、pi、document复用424模态抽屉。仅导航/会话业务面iner
 
 **消费契约（只读；桌面窗口 W3 透传）**：
 - `listProject.governanceModel?: "single" | "trio"`。渲染侧只在值恰为 `single`/`trio` 时落 `state.governanceModelKnown=true`；缺失/坏值 ⇒ `known=false`：状态行模型与旧模型提示条一律不显示（**不猜模型**），树仍按角色自身的 `governanceFunction` 分组。
-- `RoleView.governanceFunction?: "proposal" | "nomination" | "schedule"`（trio 内置角色，`builtIn:true`）。渲染侧**不硬编码** `rapporteur`/`nominator`/`convener` 任何 id；显示名、权力副标题、内置标识、专属空态全部经 `UiLabels.governanceRoleView/ governanceRoleEmptyState` 由 function 派生。`single` 旧内置 su（无 governanceFunction）逐字走原路径。
+- `RoleView.governanceFunction?: "liaison" | "proposal" | "nomination" | "schedule"`（trio 内置角色，`builtIn:true`）。渲染侧**不硬编码** `liaison`/`rapporteur`/`nominator`/`convener` 任何 id；显示名、权力副标题、内置标识、专属空态全部经 `UiLabels.governanceRoleView/ governanceRoleEmptyState` 由 function 派生。`single` 旧内置 su（无 governanceFunction）逐字走原路径。
 - `listProject.governanceFlow?: { flowId?: string; status?: string }`（可选）。`status` 只认 `awaiting-customer` / `in-progress` / `blocked` / `escalated-to-customer`；未知值不显示（不拿 Markdown/角色自述猜状态）。
 - `CustomerInputRequest` 的可选治理字段：W0 冻结的 `flowId`/`stepId`/`cardKind`；另有可选展示字段 `paths?: string[]`、`summary?: string`、`artifactSha256?: string`（未给不显示；渲染侧不从 preview/正文抽取或自算）。
 - `session:operator-request` payload 可选 `queued: boolean`（直接或在 `request.queued`）：桌面窗口是决定队列权威。`queued:true` ⇒ 卡显示「等待前一个决定」、全部作答控件禁用；同请求重推 `queued:false` ⇒ 解冻。**UI 不自动合并、不自动批准**（到达路径零 `operatorRespond`）。
@@ -286,9 +287,9 @@ work、card、pi、document复用424模态抽屉。仅导航/会话业务面iner
 - 迁移桥 `previewGovernanceMigration(projectRoot)` / `migrateGovernanceModel(projectRoot, previewDigest)`：两者都存在时旧模型提示条按钮启用（「查看差异 / 升级」），否则「升级入口待本版后续」禁用。点击只打开**零写入**非模态预览（复用 `#governance-preview`）；取消/关闭零 IPC 写调用。
 
 **渲染侧导出（`ui-labels.js`，全部纯映射）**：
-- `governanceRoleView(fn) → {cn,en,name,power,builtinNote,emptyHint} | null`：`报告员 Rapporteur`「提案权 · 不拥有最终批准权」/`提名官 Nominator`「提名权 · 不拥有最终批准权」/`召集人 Convener`「编排权 · 不拥有最终批准权」；内置标识「内置角色：随应用发布，无角色目录」；未知/缺失 ⇒ null。
-- `governanceRoleEmptyState(fn)`：提名「通常由流程单提名步骤打开；仅在客户明确要求时直接使用」、编排「通常由已接受提案开启流程；只负责排步骤与派发，不批准方案」；提案 ⇒ null（沿用既有 S0/S1 空态）。
-- `governanceStatusText(model, flowId, status)`：`治理模型：三权|旧模型（su）`、`当前流程：<flowId>`、四态人话，以 ` · ` 连接；未知/缺失项不出现。
+- `governanceRoleView(fn) → {cn,en,name,power,primaryEntrance,builtinNote,emptyHint} | null`：`联络官 Liaison`「客户沟通 · 不拥有最终批准权」（`primaryEntrance:true`，仅供渲染侧附加职责提示）/`报告员 Rapporteur`「提案权 · 不拥有最终批准权」/`提名官 Nominator`「提名权 · 不拥有最终批准权」/`召集人 Convener`「编排权 · 不拥有最终批准权」；内置标识「内置角色：随应用发布，无角色目录」；未知/缺失 ⇒ null。
+- `governanceRoleEmptyState(fn)`：联络官「客户默认入口：你说要做什么，我先确认目标、范围与验收，再交给报告员形成提案。我不写提案、不批准。本版起默认入口为联络官；报告员与历史提案不变。」、报告员「通常由联络官交接打开；客户也可以直接找我。我只写提案，不批准。」、提名「通常由流程单提名步骤打开；仅在客户明确要求时直接使用」、编排「通常由已接受提案开启流程；只负责排步骤与派发，不批准方案」。
+- `governanceStatusText(model, flowId, status)`：`治理模型：三权 · 四角色|旧模型（su）`、`当前流程：<flowId>`、四态人话，以 ` · ` 连接；未知/缺失项不出现（迁移预览等仍用 `governanceModelText` 的「三权」）。
 - `governanceMigrationButtonView(wired) → {label, disabled, title}`；`GOVERNANCE_MIGRATION_TEXT` 逐字「本项目使用旧治理模型（su）。可升级为三权模型。」。
 - `governanceModelOptionText(model)`：`单模型（single）` / `三权（trio）`。
 - `governanceCardMetaView(request) → {governance,badge,power,flowId,stepId,lines}`：`cardKind`→权力（`proposal→提案`、`appointment/appointment-write→提名`、`schedule-write→编排`、`acceptance→验收`）；治理决定徽标「治理决定 · 客户最终批准」；`lines` = 流程/步骤/权力类型/将写路径（逐条）/摘要/哈希（接口给了才出现）；普通 `write` 与缺失不是治理决定（无徽标/权力行）；`GOVERNANCE_QUEUE_NOTE`「等待前一个决定」。
@@ -325,3 +326,31 @@ work、card、pi、document复用424模态抽屉。仅导航/会话业务面iner
 - S1 模型选择：仍以 `(projectRoot, { governanceModel })` 透传 preview/establish；listing 回报 `governanceModel` 后 `governanceModelKnown=true`，按钮不再因「模型未知」禁用；建议 trio 只提示、必须客户点选。
 
 **测试证据（V1b 追加）**：`tool-rows.test.ts` +2（迁移按钮启用/禁用；预览字段/成功/失败逐字，含 pinChanges 防御与 phase=write 不假成功）；`renderer.test.ts` +4（按钮能力与零写入预览、预览字段与 fail-closed、确认摘要/成功/失败/取消零写、S1 透传与默认 single）。边界内 **140 计 /136 过 /4 基线红**。**跨角色对齐（已核）**：`app/preload.cjs` 的 `previewGovernanceRecord`/`establishGovernanceRecord` 已接受 `(projectRoot, options)` 并把 `governanceModel` 并入 IPC 载荷（Interface 同字段校验）；渲染侧调用形状与之一致（`{ governanceModel }`）。
+
+## 2026-10-18 W6-C 四角色左树 / 决定卡镜像 / 排队聚合（四角色评审 §6/§9）
+
+任务书：项目管理 `角色卡/项目管理/docs/design/2026-10-18_design_governance-liaison-review.md` §6（镜像契约）、§9（UI 最小面）、§十 AC2/AC8–AC11/AC20。
+
+**消费契约（只读；桌面窗口 W6-B 已透传）**：
+- `listProject.primaryRoleId` trio 下为 `liaison`（主入口），`roles` 顺序 `liaison/rapporteur/nominator/convener`；渲染侧仍只按字段与 `governanceFunction` 派生，不硬编码任何治理角色 id。
+- `session:operator-request` payload 新增可选 `mirrorRoleId?: string`——**同一请求 id 的第二呈现面**（trio 治理决定卡的主入口 Liaison）。渲染侧**不重复判据**（不读模型、不按 `cardKind` 猜）；缺省 ⇒ 单面零变化。single 不下发该字段，因此不镜像。
+- `session:operator-queued` payload `{...request, waitingFor}`（原有通道）：同一项目已有待决定卡时后续请求入队，**不呈现可操作卡**。渲染侧仅在 trio 主入口显示聚合行；single/su 不出现该行。
+- `session:operator-expired` 按请求 `id` 命中后冻结**全部**呈现面（不再要求 `payload.roleId` 等于来源角色）。
+
+**渲染侧导出（`ui-labels.js`，全部纯映射）**：
+- `governanceRoleView` 增 `liaison`（`联络官 Liaison` / `客户沟通 · 不拥有最终批准权` / `primaryEntrance:true`）；四项内置标识仍为「内置角色：随应用发布，无角色目录」。
+- `governanceRoleEmptyState`：Liaison 客户入口说明、Rapporteur 交接说明逐字（见上节）；Nominator/Convener 既有说明不变。
+- `governanceStatusText`：三权模型显示「三权 · 四角色」；`governanceModelText` / 迁移预览仍显示「三权」。
+- `governanceMirrorSourceLabel(sourceName)` ⇒「来自 <发起角色> 的治理决定 · 客户最终批准」；`governanceQueueAggregateText(n)` ⇒「还有 N 个决定等待前一个决定」（n≤0 ⇒ 空串）；`GOVERNANCE_MIRROR_BADGE`「镜像 · 主入口」。
+
+**DOM/行为**：
+- 左树：主入口组＝`primaryRoleId`（trio 下 Liaison）；「治理职能（内置）」组恰为 Rapporteur/Nominator/Convener；每行 `.ti-name` 中文+英文、`.ti-power` 权力副标题、`.ti-builtin` 内置标识。single 旧树输出逐字不变。
+- 空态优先级：`hasRoles===false`（S0）→ `reaccept`/`establish`（治理记录 CTA）→ 治理角色专属空态 → 默认。Liaison 的职责说明在 S0/治理记录分支作**附加提示**（`primaryEntrance` 标记，非硬编码 id）；专属空态分支不重复「开始与 <自己> 对话」CTA。`resetPanes`/`refreshEmptyStates` 的 `#chat` 空态按当前主入口取文案（single 输出不变）。
+- 镜像：`opRequests[requestId] = { id, roleId, mirrorRoleId, surfaces[], cards{roleId→Element}, ... }`；`openRequestIdsFor` 按 `surfaces` 命中。源面沿用既有锚点/生命周期；镜像面追加所辖 pane 末尾、不参与源面锚点表、**不自动滚动**。镜像卡 `.op-request.is-mirror` + `.op-mirror-badge` + `.op-mirror-source`（来源标签），卡内容/选项与源面相同。
+- 作答：唯一入口 `submitOperatorDecision(entry, decision, …)` → `d.operatorRespond({id, decision})`；`entry.submitting` 与终态双闸，成功后 `freezeEntryCards` 冻结 `surfaces` 全部卡（按钮 hidden+disabled、同一 finalNote）；失效同样全冻结。渲染侧只有 **一个** `operatorRespond` 调用点。
+- 排队：`onOperatorQueued` 仅在 trio 记录事实；主入口 pane 的 `.op-queue-aggregate` 显示聚合数量，排队请求不物化卡；同一 id 被呈现/失效后从聚合移除。`refreshEntryAwaiting`/`updateQueuedOperatorCard` 遍历 `surfaces`，两侧徽标/chip/队列/启停一致。
+- 风格：`styles.css` 仅新增 `.op-request.is-mirror`、`.op-mirror-badge`、`.op-mirror-source`、`.op-queue-aggregate`；900 列与等宽字体未动。
+
+**探针（只增）**：`window.__ansRenderer.onOperatorQueued(payload)`（按 IPC 契约直接注入）。
+
+**测试证据（本批）**：`tool-rows.test.ts` 48/48（四角色文案、四项空态、状态行四角色、镜像来源/聚合文案逐字）；`renderer.test.ts` 100 计/96 过（4 红为既有 CRLF 基线 N-1、data-state、P1-3、G-5），新增 6 例覆盖四角色树/空态优先级/镜像物化/只答一次/排队聚合/两侧一致。真实 Electron：`ANS_MIRROR_UI_ONLY=1` 新段 `mirrorChecks`，`MIRROR_UI_PASS 8`（离线受控 IPC，无模型/网络/凭据）。全量 `node --test "test/**/*.test.ts"`：2735 计/2709 过/23 红/3 skip；红集为他域预期红：旧三权断言（`test/测试/governance-trio-verify/*`、`test/编排/*`）、Windows symlink EPERM、vendor CRLF pin、既有渲染器基线与 `abort running shell` 环境红（详见当轮报告）。

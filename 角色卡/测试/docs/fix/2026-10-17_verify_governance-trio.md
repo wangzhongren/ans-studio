@@ -3,7 +3,7 @@ id: governance-trio-independent-verification
 type: fix
 title: 治理三权分立（Rapporteur / Nominator / Convener）独立端到端验证（测试角色）
 created: "2026-10-17"
-updated: "2026-10-17"
+updated: "2026-10-18"
 timezone: Asia/Shanghai
 status: verified
 related: [governance-trio-review, existing-project-compat, governance-pin-recovery]
@@ -14,6 +14,9 @@ events:
   - date: "2026-10-17"
     kind: reverified
     summary: 属主修复两处缺陷后复审——①装配 `loadInjection` 按 §5.4 注入治理模型（显式优先、不可读 single、无 .ans 且无角色目录 trio、其余 single），real-entry 1 红 + t1-real-cli govern×3 红转绿（装配 govern-target/multi-runtime 同源 7 红亦转绿）；②运行时核心安装/看护类 schema 文案统一为「内置治理角色」；同步本角色两条文案期望（a-tools-surface、c-tools，仅期望值不放宽）。复跑：三权套件 32/32；全量 2669/2650 pass/16 fail/3 skip（新增红 0；剩余 16 红均为既有：本角色 1＝Windows symlink EPERM，其他角色 15）；typecheck 0 错
+  - date: "2026-10-18"
+    kind: reverified
+    summary: 桌面UI「替我审」开启警告改一次性（显示约 9 秒自动收起，保留「知道了」手动关闭）后，同步本角色 3 条渲染零计时器守卫（`g2-verify/u1-renderer`、`existing-project-compat-verify/e-contract-wiring`、`g3-search-verify/scope-audit-and-fold`）——由「全文零 setTimeout」改为「恰一个、且锁定位于 showShellJudgeWarning、到期只 hideShellJudgeWarning、时长取自 ui-labels 常量=9000ms；恢复卡切片零计时器；setInterval 仍为零；计时器回调不触碰治理动作」；未放宽其他断言。复跑：三权套件 32/32；受影响 3 文件 22/22；全量 2680/2660 pass/17 fail/3 skip（本角色目录仍 1 红＝Windows symlink EPERM；其他角色 16 红，其中 1 条为并发属主新变更引入的边界刷新源码钉，非本角色文件）；typecheck 0 错
 ---
 
 # 治理三权分立独立端到端验证（测试角色）
@@ -129,6 +132,7 @@ events:
 | 36 | 迁移按钮：桥齐备启用「查看差异 / 升级」、未接线禁用「升级入口待本版后续」；点击只开预览；确认按钮才调 `migrateGovernanceModel(projectRoot, snapshotDigest)` | **通过** | e-5、e-6 |
 | 37 | 迁移预览/成功/失败视图：字段、摘要前 8 位、无摘要不发行；write 阶段失败绝不说「已升级/未写入」；already-trio/no-record 不提供重试 | **通过** | e-6 |
 | 38 | 假 IPC：`listProject` 透传 `governanceModel`/`governanceFunction`/`primaryRoleId`；S1 预览/建立透传模型、非法模型 `invalid-request`；迁移预览/写入守卫与透传正确 | **通过** | e-7、e-8 |
+| 39 | 渲染计时器纪律（2026-10-18 客户批准豁免）：全文恰一个 `setTimeout`，仅用于「替我审」一次性开启警告约 9 秒自动收起；位置/用途/时长来源锁定；`setInterval` 为零；恢复卡零计时器 | **通过** | u1-renderer、e-contract-wiring、g3 scope-audit-and-fold |
 
 ## 四、既有断言修正（因契约变更，30 条；均未放宽）
 
@@ -144,25 +148,27 @@ events:
 8. **安装拒绝文案（g4-skill e-handler、g4v2 f-handler）**：桌面 handler 文案由「或为治理角色 su」改为「或为内置治理角色」（trio 三人均适用）。
 9. **U1 Esc 行尾（g2 u1-renderer）**：Windows 工作树 CRLF 下正则改 `\r?\n`，结构断言（preventDefault → respond(false) 紧邻）不变。
 10. **安装类 schema 文案（g4-skill a-tools-surface、g4v2 c-tools）**：属主把 schema 从「或为治理角色 su」统一为「或为内置治理角色」后，同步两条**文案期望**（仅期望值，不放宽/不删断言）。
+11. **渲染侧零计时器守卫（u1-renderer、e-contract-wiring、g3 scope-audit-and-fold）**：桌面UI 2026-10-18 把「替我审」开启警告改为一次性（约 9 秒自动收起 + 「知道了」手动关闭）——由「全文零 setTimeout」改为**锁定唯一豁免**：恰一个 `setTimeout`、位于 `showShellJudgeWarning`、到期只 `hideShellJudgeWarning`、时长取自 `UiLabels.SHELL_JUDGE_WARNING_AUTO_DISMISS_MS` 且常量=9000ms；`setInterval` 仍为零；恢复卡切片零计时器；计时器回调不触碰治理动作。其他断言未动。
 
 ## 五、全量数字与红项归因
 
-| 指标 | 基线（本轮开始） | 最终（两处缺陷修复后复审） | 说明 |
+| 指标 | 基线（本轮开始） | 最终（缺陷修复 + 10-18 计时器豁免复审后） | 说明 |
 | --- | --- | --- | --- |
-| `node --test "test/**/*.test.ts"` | 2628 tests / 2568 pass / **57 fail** / 3 skip | **2669 / 2650 pass / 16 fail / 3 skip** | 本角色新增 32 例全通过；两处实现修复另使 CLI/装配 11 条既有红转绿；**新增红 0**；共固定 41 条（本角色断言修正 30 + 实现修复 11） |
+| `node --test "test/**/*.test.ts"` | 2628 tests / 2568 pass / **57 fail** / 3 skip | **2680 / 2660 pass / 17 fail / 3 skip** | 本角色新增 32 例全通过；两处实现修复使 CLI/装配 11 条既有红转绿；10-18 计时器守卫更新后受影响 3 文件 22/22；**本角色新增红 0**；剩余 17 红全为既有或并发属主变更（见下） |
 | `npm run typecheck` | **4 错**（本角色 4 处 `suRoleId`） | **0 错** | 本角色 4 处已按新字段修正；最终复审仍 0 |
 
-**最终 16 红（全部为既有，非本轮新增；`comm` 比对基线与上轮均无新增）**：
+**最终 17 红（本角色目录仅 1 红；无本角色新增）**：
 
 - **本角色 1 红**：`test/测试/g4-skill-verify/b-render-double-check.test.ts` —— Windows 创建符号链接 `EPERM`（环境限制；基线即红）。
-- **其他角色 15 红**（未改其文件）：
+- **其他角色 16 红**（未改其文件）：
   - Windows symlink/存储权限环境红 6：runtime-core session-store 2、pi-adapter 2、claude-adapter 1、codex-adapter 1；
   - runtime-core/tools 2（真实写 BOM/CRLF + 中止 shell 子进程竞态）；
   - 编排 shell-authorized-routine 1；
   - 桌面UI renderer 4 + runtime-ui 1（其属主在途源码钉）；
-  - 桌面应用 markdown vendor pin 1。
+  - 桌面应用 markdown vendor pin 1；
+  - 桌面应用 boundary-refresh 1（`O-1 接线钉`；**并发属主 10-18 源码变更引入**，非本角色文件、非本轮守卫修改所致）。
 
-**复审变化**：属主修复后，`real-entry`（1）与 `t1-real-cli` govern×3 转绿；装配 `govern-target` 2 + `multi-runtime` 5 亦因同一模型注入修复转绿。逐条比对：固定 41、新增 0。
+**复审变化**：属主修复后，`real-entry`（1）与 `t1-real-cli` govern×3 转绿；装配 `govern-target` 2 + `multi-runtime` 5 亦因同一模型注入修复转绿。本角色断言修正使 30 条转绿；10-18 三条计时器守卫更新后无新增本角色红。逐条比对基线：固定 41；相对基线新增 0（17 红均可在基线或并发属主变更中归因）。
 
 ## 六、发现的缺陷（两处均已在复审前由属主修复）
 
@@ -186,4 +192,4 @@ events:
 
 - 三权 V1 + V1b 的**新空项目默认、三人会话与能力矩阵、写权矩阵、三道门禁、派发五条、快捷路径、账本契约与可还原性、一卡队列、迁移全分支、旧 single 兼容、UI 最小面**在离线确定性夹具下**逐项通过**（32/32；两处缺陷修复后复审仍 32/32）。
 - 本角色既有断言修正 30 条，均为契约变更导致的签名/判据/文案/字段迁移，**未放宽、未跳过、未隐藏错误**；两处实现修复另使 11 条既有红转绿；typecheck 由 4 错归零。
-- 首轮发现 **1 项阻塞性契约缺口**（CLI 空目录未注入 `governanceModel`）与 **1 项轻度文案偏差**，**均已在复审前由属主修复**并转绿；最终 16 红全部为既有（Windows 环境 7、其他角色在途/竞态 9），**新增红 0**。
+- 首轮发现 **1 项阻塞性契约缺口**（CLI 空目录未注入 `governanceModel`）与 **1 项轻度文案偏差**，**均已在复审前由属主修复**并转绿；10-18 客户批准的「一次性开启警告」计时器豁免已用**唯一位置/数量/用途/时长**锁定，不放开其他零计时器纪律。最终 17 红：本角色目录仅 1（Windows symlink EPERM），其他 16 为既有环境/并发属主变更；**本角色新增红 0**。

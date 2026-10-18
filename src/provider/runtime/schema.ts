@@ -264,6 +264,95 @@ export function describeTool(name: string): ToolDescription {
       ],
     };
   }
+  if (name === "hand_off_intent") {
+    // 治理四角色 W6-A（2026-10-18 PM 评审 §5.1；只给联络官 Liaison 注入，注入才注册）。
+    // 严格 schema：四要素必填、slug/枚举约束、不接受未知参数；工具层在触达注入能力前拒绝非法值。
+    // 纪律：交接 ≠ 客户批准 / 意图文件是权威 / 去重与 initial 仅一次 / 不重复派发。
+    return {
+      parameters: {
+        type: "object",
+        properties: {
+          intentId: {
+            type: "string",
+            pattern: GOVERNANCE_SLUG_PATTERN,
+            description: "Intent record id (slug) matching docs/intents/<intentId>.md",
+          },
+          handoffKind: {
+            type: "string",
+            enum: ["initial", "clarification", "revision"],
+            description:
+              "initial = first handoff of this intentId (allowed once); clarification/revision require an existing successful handoff for the same intentId",
+          },
+          goal: { type: "string", minLength: 1, description: "What the customer wants (must match the intent file)" },
+          scope: { type: "string", minLength: 1, description: "Included/excluded scope (must match the intent file)" },
+          acceptance: { type: "string", minLength: 1, description: "Acceptance criteria (must match the intent file)" },
+          summary: {
+            type: "string",
+            minLength: 1,
+            maxLength: 200,
+            description: "One-line summary of the intent, 1..200 characters; over-long summaries are rejected, never truncated",
+          },
+          flowId: {
+            type: "string",
+            pattern: GOVERNANCE_SLUG_PATTERN,
+            description: "Optional governance flow id (slug); recommended for clarification/revision",
+          },
+        },
+        required: ["intentId", "handoffKind", "goal", "scope", "acceptance", "summary"],
+        additionalProperties: false,
+      },
+      description:
+        "把客户意图**交接**给报告员（只注入给联络官 Liaison；未注入即不存在）。先写 `docs/intents/<intentId>.md`" +
+        "（frontmatter 含 intentId/handoffKind/goal/scope/acceptance 与客户原话），**再**调用本工具。" +
+        "应用会机械校验四要素（goal/scope/acceptance 非空、summary 1..200 字、入参与意图文件逐项一致）、" +
+        "按 `intentId+handoffKind+文件哈希` 去重、`initial` 每个 intentId 仅一次、同一轮至多一次；" +
+        "成功后由应用在**后台**把一条任务交给报告员形成提案（不打开/不切换会话、不移动焦点），失败只如实回执、不重试。" +
+        "**交接 ≠ 客户批准**——它不是客户决定、不能解锁任何治理门禁，也不代表提案已被接受或已获授权。" +
+        "被拒绝时按回执修正（补意图文件 / 改用 clarification 或 revision / 等待下一轮），**不要重复派发**。",
+      promptGuidelines: [
+        "意图文件是权威：goal/scope/acceptance 必须与 `docs/intents/<intentId>.md` 逐项一致；不要把模型自己的话写进文件冒充客户原话。",
+        "每个 intentId 的 `initial` 只能交接一次；需求变化用 `clarification`/`revision`（须已有同 intentId 的成功交接）；同一轮不要重复调用、不要重复派发。",
+        "**交接 ≠ 客户批准**：不得据此宣称提案已被接受、已获授权或客户已同意任何事项。",
+      ],
+    };
+  }
+  if (name === "request_clarification") {
+    // 治理四角色 W6-A（2026-10-18 PM 评审 §5.4；只给报告员 Rapporteur 注入，注入才注册）。
+    // 严格 schema：question 必填、flowId/intentId 至少一个（语义由工具层前置校验）、不接受未知参数。
+    // 纪律：不弹决定卡 / 不占一项目一卡 / 同一 flow 最多 2 轮 / 不改变任何权力或写权。
+    return {
+      parameters: {
+        type: "object",
+        properties: {
+          flowId: {
+            type: "string",
+            pattern: GOVERNANCE_SLUG_PATTERN,
+            description: "Governance flow id (slug); give this or intentId (at least one is required)",
+          },
+          intentId: {
+            type: "string",
+            pattern: GOVERNANCE_SLUG_PATTERN,
+            description: "Intent record id (slug); give this or flowId (at least one is required)",
+          },
+          question: { type: "string", minLength: 1, description: "One customer-facing question sentence (required)" },
+          summary: { type: "string", maxLength: 200, description: "Optional summary, at most 200 characters" },
+        },
+        required: ["question"],
+        additionalProperties: false,
+      },
+      description:
+        "把需要客户澄清的**一句话问题**交给应用（只注入给报告员 Rapporteur；未注入即不存在）：应用会把它记入账本，" +
+        "并在主入口（联络官聊天流）显示系统行。`flowId` 与 `intentId` **至少给一个**（用于同一 flow 的轮次计数）；" +
+        "同一 flow 最多 **2 轮**——达到上限后必须在提案卡上请客户决定（带假设/备选），不要继续追问。" +
+        "本工具**不弹客户决定卡**、不占「一项目一卡」队列、**不改变任何权力或写权**；提交成功不等于客户已回答——" +
+        "回答来了再由联络官更新意图并交接。",
+      promptGuidelines: [
+        "信息不足时用本工具把问题送到主入口；问题要一句话、可直接给客户看，不要反复追问客户。",
+        "同一 flow 最多 2 轮澄清；超过后请在提案卡上请客户决定（带假设/备选），不要继续追问。",
+        "本工具不弹决定卡、不写提案、不改变任何权力或写权；提交成功不代表客户已回答或已批准任何事项。",
+      ],
+    };
+  }
   if (name === "report_shell_verdict") {
     // 审读结论工具（R-1，只给审读会话）：结构化结论（三值枚举）；**不得**暗示它授予任何权限。
     return {

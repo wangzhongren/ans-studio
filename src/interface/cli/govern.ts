@@ -117,11 +117,13 @@ export async function governCommand(argv: string[], deps?: GovernDeps): Promise<
   //     `.ans`(pin) + `角色卡/governance-boundary.yaml` + `docs/bootstrap-manifest.md`；
   //     无可 pin 之物 → 零副作用（不会凭空转正）。
   // 注：此处**不再**有 `genesisBootstrap` 判据/`finalizeBootstrap` arm（那套提议-确认语义已删）。
-  // `--role`（评审 §5.6）：
+  // `--role`（评审 §5.6；四角色评审 §4.6）：
   //   · 给出**一个内置治理角色 id**（su/rapporteur/nominator/convener）⇒ 选择本次治理会话角色
   //     （`governanceRoleId`；trio 必须三人之一、single 必须 su，由引擎的 `resolveGovernanceRole` 明确校验）；
   //   · 其余值 ⇒ 沿用旧语义「本次要创建/重构的项目角色 id」（targetRoleIds，scope 可写集来源）。
   //   两者混用（多个值且含内置 id）→ 用法错误，不静默择一。
+  //   **CLI 收窄（AC21）**：`--function liaison` 在参数解析处显式拒绝；`--role liaison` 也在此显式拒绝——
+  //   联络官的 `hand_off_intent` 需要桌面后台投递，CLI 单进程没有这条路径，半可用的主入口比不提供更危险。
   const builtInSelections = parsed.roleIds.filter((id) => isBuiltInGovernanceRoleId(id));
   if (builtInSelections.length > 0 && parsed.roleIds.length > 1) {
     process.stderr.write(
@@ -130,6 +132,13 @@ export async function governCommand(argv: string[], deps?: GovernDeps): Promise<
     return EXIT_USAGE;
   }
   const governanceRoleId = builtInSelections.length === 1 ? builtInSelections[0] : undefined;
+  if (governanceRoleId === "liaison") {
+    process.stderr.write(
+      "ans govern 用法错误：联络官（liaison）仅桌面主入口提供；CLI 请用 --role rapporteur|nominator|convener（或 --function proposal|nomination|schedule）。\n" +
+        `${USAGE}\n`,
+    );
+    return EXIT_USAGE;
+  }
   const targetRoleIds =
     governanceRoleId !== undefined
       ? deps.targetRoleIds ?? []

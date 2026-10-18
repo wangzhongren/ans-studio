@@ -135,9 +135,13 @@
               <div class="composer-actions"><button id="btn-halt" class="cap-halt" type="button" hidden title="停止当前轮次" aria-label="停止当前轮次">停止本轮</button><button id="btn-send" class="cap-send" type="button" disabled title="发送（Enter）" aria-label="发送">发送 ↑</button></div>
             </div>
           </div>
-          <!-- P5（评审 §10.2）：开启后的**常驻**警告（不是 toast；默认隐藏，关闭即消失）。
-               全文由 ui-labels.js::shellJudgeWarningLines 单一来源生成；琥珀色，不是错误红。 -->
-          <div id="shell-judge-warning" class="judge-warning" role="status" hidden></div>
+          <!-- P5（评审 §10.2；客户 2026-10-18「这个提示应该弹出只出现一次就行了」）：开启后的**一次性**警告——
+               每次开启只显示一次；带「知道了」关闭按钮，约 9 秒后自动收起；关闭后不再出现，直到关闭开关再重新开启。
+               浮在输入区上方，**不占聊天布局、不推动消息区**；全文由 ui-labels.js 单一来源生成；琥珀色，不是错误红。 -->
+          <div id="shell-judge-warning" class="judge-warning" role="status" aria-live="polite" hidden>
+            <div id="shell-judge-warning-text" class="judge-warning-text"></div>
+            <button id="shell-judge-warning-close" class="judge-warning-close" type="button" title="关闭提示" aria-label="知道了">知道了</button>
+          </div>
           <div class="compose-note"><span>普通聊天不会自动产生任务报告</span><span id="runtime-note" class="runtime-note"></span></div>
         </div>
       </main>

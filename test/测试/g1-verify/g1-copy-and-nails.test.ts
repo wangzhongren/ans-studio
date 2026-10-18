@@ -168,7 +168,7 @@ test("四处文案口径一致性抽查（独立）：渲染块 / 卡文本 / �
   }
   assert.ok(
     preauthClauses.some((c) => /preauthorizedDirs|preauth\b/.test(c)),
-    "至少一处预授权句数据驱动（trio 三人的目录不得写死 su）",
+    "至少一处预授权句数据驱动（trio 四角色的目录不得写死 su）",
   );
   for (const c of splitClauses(governCode).filter((c) => c.includes("docs/workflow.md"))) {
     assert.equal(/预授权|直接写|无需确认|免确认/.test(c), false, `治理会话中 workflow.md 指称不得与预授权/免确认同句（实得：${c}）`);

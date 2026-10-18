@@ -242,3 +242,27 @@
 - **S1 模型选择**：listing 已回报 `governanceModel` ⇒ 选择器与建立按钮不再因「模型未知」禁用；继续以 `(projectRoot, { governanceModel })` 透传 preview/establish；「建议 trio」只提示，必须客户点选，默认 single。
 - **测试**：`tool-rows.test.ts` +2（迁移按钮启用/禁用；预览字段/成功/失败逐字，含 pinChanges 防御与 phase=write 不假成功）→ 46/46；`renderer.test.ts` +4（按钮能力与零写入预览、预览字段与 fail-closed、确认摘要/成功/失败/取消零写、S1 透传与默认 single）→ 94 计/90 过/4 基线红。边界内合计 **140 计 /136 过 /4 红**（4 红＝既有 CRLF 基线 N-1、data-state、P1-3、G-5）。`uiux-v2.mjs` 未加假 IPC 模式（成本高；源码守卫覆盖，真机验收留 W5）。
 - **跨角色对齐（已核）**：`app/preload.cjs` 的 `previewGovernanceRecord`/`establishGovernanceRecord` 已接受 `(projectRoot, options)` 并把 `{governanceModel}` 并入 IPC 载荷（Interface 同字段校验）；渲染侧调用形状与之一致，S1 选择不再被静默忽略。
+
+## 2026-10-18：「替我审」开启警告改为一次性弹出（客户反馈）
+
+客户逐字「这个提示应该弹出只出现一次就行了」（截图：输入区下方三段「替我审批中…」一直占着版面）。按评审 `2026-10-17_design_shell-auto-approve-review.md` §10 的警告文案与 `app/renderer` 边界实施；**本次客户口径覆盖原「常驻警告」**。
+
+- **行为**：勾选「替我审」且主进程确认开启后，完整三段警告**只显示一次**；带「知道了」关闭按钮，约 9 秒自动收起（`SHELL_JUDGE_WARNING_AUTO_DISMISS_MS=9000`，客户 8–10 秒口径）；关闭/自动消失后**不再重复显示**，直到客户关闭开关再重新开启。关闭开关即复位「已提示」；**不持久化**（不写 localStorage），应用重启后再次开启会再提示一次。渲染重绘/收消息/切角色/重复 `shell:judge-state` 推送均不重现——状态迁移纯函数 `ui-labels.js::shellJudgeWarningStep(enabled, shown)`（关闭 ⇒ `shown=false`；开启且未提示 ⇒ 显示一次并记住；已提示 ⇒ 不显示）。开启期间输入区仍保留琥珀「替我审批中 · 判断 agent」紧凑标记（`.is-on` 圆点）。
+- **不占布局**：警告改为 `.composer` 内的绝对定位浮层（`.composer{position:relative}` + `.judge-warning{position:absolute; bottom:calc(100% + 8px)}`），不参与 flex 布局、不推动聊天消息区；琥珀色，非错误红。
+- **DOM/文案**：`#shell-judge-warning` 内拆出 `#shell-judge-warning-text`（三段）+ `#shell-judge-warning-close`（「知道了」，文案单点 `SHELL_JUDGE_WARNING_CLOSE_LABEL`）；警告仍由 `shellJudgeWarningLines()` 单一来源生成。`shellJudgeToggleView` 的 `warningVisible` 保留为**兼容字段**（= 开启态；实际显隐不再由它决定，渲染侧不得使用）。
+- **计时器纪律例外**：本功能是客户明确要求的一次性提示自动收起，也是渲染侧唯一的 `setTimeout`；卡片等待/抽屉/滚动/折叠仍零计时器（`renderer.test.ts` 六条守卫改为剔除 `@shell-judge-start…end` 段后检查）。
+- **测试**：`tool-rows.test.ts` +1（一次性状态机真值表/关闭文案/自动收起时长区间）→ **47/47**；`renderer.test.ts` P5 用例按新行为改写（DOM 结构、一次性接线、关闭按钮、无重绘重显）→ **94 计/90 过/4 红**（4 红仍为先于本批的 CRLF 基线 N-1、data-state、P1-3、G-5）；`markdown.test.ts` vendor pin 与 `runtime-ui.test.ts` localStorage 守卫为既有基线红。`uiux-v2.mjs` `ANS_JUDGE_UI_ONLY=1` 段增补：首次显示/「知道了」收起后开关与紧凑标记保持/重复推送与切角色不重现/关闭再开启再显示/约 9 秒自动消失。真实 Electron 离线 e2e（受控 IPC 替身，无真实模型/网络）**JUDGE_UI_PASS 21**。
+- **全量**：`node --test "test/**/*.test.ts"` **2670 计 /2648 过 /19 红 /3 skip**。19 红中 **3 条为测试角色 `test/测试/` 的「renderer 全文零 setTimeout」守卫**（`existing-project-compat-verify/e-contract-wiring.test.ts` E4、`g2-verify/u1-renderer.test.ts`、`g3-search-verify/scope-audit-and-fold.test.ts`）——需其属主按本批批准的一次性计时器豁免本段（本角色不改他域测试）；其余 16 红为此前基线（8 条环境 symlink/abort、`runtime-core` 读取器防御 1 条、`g4-skill-verify` 全量并发偶发 1 条（单跑通过）、4 条 CRLF 基线 + vendor pin + runtime-ui localStorage 守卫）。
+- 指纹：本轮工作树未提交，以 `git diff` 为准（`app/renderer/{index.html,renderer.js,styles.css,ui-labels.js}`、`test/桌面应用/{renderer.test.ts,tool-rows.test.ts,e2e/uiux-v2.mjs}` 与本文件）。
+
+## 2026-10-18：W6-C 四角色左树 / 决定卡镜像 / 排队聚合（三权·四角色）
+
+按项目管理评审 `2026-10-18_design_governance-liaison-review.md` §6/§9 实施桌面UI侧（W6-C）：
+
+- **左树/文案**：`ui-labels.js` 增 `liaison`＝「联络官 Liaison」「客户沟通 · 不拥有最终批准权」（`primaryEntrance` 标记，渲染侧不硬编码 id）；治理职能组自动只剩 Rapporteur/Nominator/Convener。single 旧树（su + 项目角色）输出逐字不变。
+- **空态**：优先级钉死 S0 → 治理记录动作 → 治理角色专属 → 默认。Liaison 空态逐字「客户默认入口：你说要做什么，我先确认目标、范围与验收，再交给报告员形成提案。我不写提案、不批准。本版起默认入口为联络官；报告员与历史提案不变。」；Rapporteur 增「通常由联络官交接打开；客户也可以直接找我。我只写提案，不批准。」；`resetPanes`/`refreshEmptyStates` 的 `#chat` 空态按当前主入口取文案，使导入后立即可见 Liaison 说明（single 输出不变）。
+- **镜像卡**：`opRequests` 扩为 `{surfaces, cards, id, mirrorRoleId}`；镜像面追加到 `mirrorRoleId`（主入口 Liaison）pane 末尾、不参与源面锚点表、不自动滚动；`.op-request.is-mirror` + `.op-mirror-badge`「镜像 · 主入口」+ `.op-mirror-source`「来自 <发起角色> 的治理决定 · 客户最终批准」。源面保留。作答唯一入口 `submitOperatorDecision`（一个 `operatorRespond` 调用点），`submitting` + 终态双闸，成功后/失效率先冻结 `surfaces` 全部卡。
+- **排队**：订阅既有 `session:operator-queued`；trio 主入口 pane 显示 `.op-queue-aggregate`「还有 N 个决定等待前一个决定」，排队请求不物化可操作卡；同一 id 呈现/失效后移除；single/su 不出现该行。`refreshEntryAwaiting`/`updateQueuedOperatorCard` 遍历全部呈现面，徽标/chip/队列/启停两侧一致。
+- **状态行**：`governanceStatusText` 的 trio 文案改为「治理模型：三权 · 四角色」；迁移预览等仍用「三权」。
+- **测试**：`tool-rows.test.ts` **48/48**；`renderer.test.ts` **100 计/96 过**（4 红＝既有 CRLF 基线 N-1、data-state、P1-3、G-5）；真实 Electron `ANS_MIRROR_UI_ONLY=1` 新段 **MIRROR_UI_PASS 8**（四角色树/状态行/Liaison 空态/镜像双面/只答一次/排队聚合）。全量三层 glob **2735 计/2709 过/23 红/3 skip**；红集为他域预期红：旧三权断言（`test/测试/governance-trio-verify/*`、`test/编排/*`）、Windows symlink EPERM、vendor CRLF pin、`runtime-ui` localStorage 守卫、`abort running shell` 环境红与上述 4 条基线红。
+- 指纹：本轮工作树未提交，以 `git diff` 为准（`app/renderer/{renderer.js,styles.css,ui-labels.js}`、`test/桌面应用/{renderer.test.ts,tool-rows.test.ts,e2e/uiux-v2.mjs}` 与本文件）。

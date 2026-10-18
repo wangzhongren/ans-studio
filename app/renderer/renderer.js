@@ -102,10 +102,13 @@
     // shell 命令确认卡（M-1，2026-10-12）：当前挂起的一张 `{id, busy}`；无则 null。**无计时器**（G-1 纪律）——
     // 卡片不按时间自我定格；失效只来自主进程回包（`expired`）或正常裁决。
     shellConfirm: null,
-    // P5（2026-10-17 评审 §10）：自动判断开关——**主进程是权威**。`available` = preload 四个桥方法齐备；
+    // P5（2026-10-17 评审 §10；客户 2026-10-18「这个提示应该弹出只出现一次就行了」）：
+    // 自动判断开关——**主进程是权威**。`available` = preload 四个桥方法齐备；
     // `enabled` 只由 `shell:judge-state` / `shell:judge-set` 的实际回包写入（失败保持原值）；`busy` 仅禁点。
+    // `promptShown` = 本次开启是否已展示过完整警告（一次性；关闭开关即复位；不持久化）；
+    // `warningTimer` = 该警告的自动收起计时器（只此一处计时，不用于业务等待）。
     // 不写 localStorage/.env/项目文件；渲染重载后由主进程重新推送真实状态。
-    shellJudge: { available: false, enabled: false, busy: false, error: "" },
+    shellJudge: { available: false, enabled: false, busy: false, error: "", promptShown: false, warningTimer: null },
     // P5 结果行幂等键（同一结果事件重复到达时不重复落行；仅界面会话内）。
     shellJudgeResultIds: Object.create(null),
     // 恢复确认卡（G-2/U1，2026-10-16 客户批准；设计 §6.2）：当前挂起的一张 `{id, busy}`；无则 null。
@@ -417,17 +420,18 @@
     var primary = primaryDisplayName();
     var action = governanceActionVisible();
     var role = roleById(roleId);
-    var govEmpty = role && UiLabels.governanceRoleView(role.governanceFunction)
-      ? UiLabels.governanceRoleEmptyState(role.governanceFunction)
-      : null;
+    var gov = role ? UiLabels.governanceRoleView(role.governanceFunction) : null;
+    var govEmpty = gov ? UiLabels.governanceRoleEmptyState(role.governanceFunction) : null;
+    // W6-C（四角色评审 §9.2）：主入口（Liaison）的职责说明在 S0 与治理记录动作里作**附加提示**，
+    // 不替换既有标题/按钮；其余治理角色的专属空态仍只在其自身 pane 显示。
+    var entranceHint = gov && gov.primaryEntrance && gov.emptyHint !== "" ? gov.emptyHint : "";
     var title, sub, cta, hint = "";
-    if (govEmpty) {
-      title = esc(govEmpty.title);
-      sub = esc(govEmpty.sub);
-    } else if (state.projectRoot && state.hasRoles === false) {
+    // 优先级（评审 §9.2 钉死）：S0（未 bootstrap）→ 治理记录动作 → 治理角色专属空态 → 默认。
+    if (state.projectRoot && state.hasRoles === false) {
       // S0（客户裁定原文，逐字不变）：未-bootstrap 这件事只说一遍，只在中栏正中。
       title = "项目尚未 bootstrap";
       sub = "与 " + esc(primary) + " 对话，让它把角色建出来；左树会随之长出。";
+      if (entranceHint !== "") hint = esc(entranceHint);
     } else if (action === "reaccept") {
       // pin-mismatch（评审 §5.4）：沿用 su 空态宿主，文案全部来自 ui-labels。
       var record = governanceRecordOf();
@@ -435,21 +439,27 @@
       title = esc(gv.title);
       sub = esc(gv.sub);
       hint = esc(gv.hint);
+      if (entranceHint !== "") hint = hint === "" ? esc(entranceHint) : hint + "<br>" + esc(entranceHint);
     } else if (action === "establish") {
       // S1（I4，2026-10-17）：su 空态改为治理记录引导（沿用 primaryRoleId，不硬编码角色名）。
       var gv1 = UiLabels.governanceEmptyState(projectRoleCount(), primary);
       title = esc(gv1.title);
       sub = esc(gv1.sub);
+      if (entranceHint !== "") hint = esc(entranceHint);
+    } else if (govEmpty) {
+      // 治理角色专属空态（Liaison 的客户入口说明、Rapporteur 的交接说明、Nominator/Convener 既有说明）。
+      title = esc(govEmpty.title);
+      sub = esc(govEmpty.sub);
     } else {
       title = "选择左侧角色开始聊天";
       sub = "消息直接发送，无需确认；写入由治理引擎在后台把关。";
     }
-    if (govEmpty) {
-      cta = "";
-    } else if (state.projectRoot && state.hasRoles === false) {
+    if (state.projectRoot && state.hasRoles === false) {
       cta = state.projectRoot && primary
         ? '<button id="btn-start-primary" class="btn btn-primary btn-start">开始与 ' + esc(primary) + " 对话</button>"
         : "";
+    } else if (govEmpty && action !== "reaccept" && action !== "establish") {
+      cta = ""; // 治理角色专属空态不重复「开始与 <自己> 对话」。
     } else if (action === "reaccept") {
       cta = '<button class="btn btn-primary btn-start" type="button" data-governance-reaccept>检查并重新接受</button>';
     } else if (action === "establish") {
@@ -972,7 +982,7 @@
     if (chat) {
       var direct = chat.firstElementChild;
       if (direct && direct.classList.contains("chat-empty")) {
-        chat.innerHTML = emptyStateHtml();
+        chat.innerHTML = emptyStateHtml(state.selectedRoleId || state.primaryRoleId);
         bindEmptyState(chat);
       }
     }
@@ -1223,7 +1233,7 @@
     return { liveRoles: state.liveRoles, roleMeta: state.roleMeta, roleBusy: state.roleBusy,
       queueByRole: state.queueByRole, queueItemsByRole: state.queueItemsByRole, runningByRole: state.runningByRole,
       sessionOpenRoleId: state.sessionOpenRoleId, shellConfirm: state.shellConfirm, recoveryConfirm: state.recoveryConfirm, chatPanes: chatPanes, paneRowLists: paneRowLists, paneAnchors: paneAnchors,
-      opRequests: opRequests, replayState: replayState, activityOpen: activityOpen, groupSeqByRole: groupSeqByRole,
+      opRequests: opRequests, queuedRequests: queuedRequests, replayState: replayState, activityOpen: activityOpen, groupSeqByRole: groupSeqByRole,
       groupIdentitiesByRole: groupIdentitiesByRole, drawerReading: drawerReading, composerDrafts: composerDrafts,
       withdrawPending: withdrawPending, withdrawFeedback: withdrawFeedback, lastManualSend: lastManualSend,
       liveReplayCounts: liveReplayCounts, manualMessages: manualMessages, reportCards: reportCards, deliveryCards: deliveryCards, persistenceCache: persistenceCache };
@@ -1238,6 +1248,7 @@
     state.recoveryConfirm = v.recoveryConfirm || null;
     chatPanes = v.chatPanes || Object.create(null); paneRowLists = v.paneRowLists || Object.create(null);
     paneAnchors = v.paneAnchors || Object.create(null); opRequests = v.opRequests || Object.create(null);
+    queuedRequests = v.queuedRequests || Object.create(null);
     replayState = v.replayState || Object.create(null); activityOpen = v.activityOpen || Object.create(null);
     groupSeqByRole = v.groupSeqByRole || Object.create(null); groupIdentitiesByRole = v.groupIdentitiesByRole || Object.create(null);
     drawerReading = v.drawerReading || Object.create(null); composerDrafts = v.composerDrafts || Object.create(null);
@@ -1419,11 +1430,12 @@
     paneRowLists = Object.create(null); // Q-2：行表随 pane 作废（老项目的行模型不跨项目）
     paneAnchors = Object.create(null); // 回放锚点表随项目作废（锚点是行序位——只对老项目的行表有意义）
     opRequests = Object.create(null); // 交互请求登记表随之作废（旧项目的请求已随会话/时限自行落定）
+    queuedRequests = Object.create(null); // 排队聚合同理：旧项目的队列不跨项目保留
     replayState = Object.create(null); // 回放去重状态随项目作废（新项目的转录从零核对）
     liveReplayCounts = Object.create(null); manualMessages = Object.create(null);
     reportCards = Object.create(null); deliveryCards = Object.create(null); persistenceCache = Object.create(null);
     state.shellJudgeResultIds = Object.create(null); // P5：换项目后旧结果行不再沿用（仅界面会话内幂等键）
-    $("chat").innerHTML = emptyStateHtml();
+    $("chat").innerHTML = emptyStateHtml(state.selectedRoleId || state.primaryRoleId);
     bindEmptyState($("chat"));
   }
 
@@ -2698,6 +2710,53 @@
       typeof d.onShellJudgeResult === "function");
   }
 
+  /** 收起完整警告（「知道了」/自动到时/关闭开关共用）：只收起本次提示，不改开关、不写任何持久化。 */
+  function hideShellJudgeWarning() {
+    var s = state.shellJudge;
+    if (s.warningTimer) { clearTimeout(s.warningTimer); s.warningTimer = null; }
+    var warning = $("shell-judge-warning");
+    if (warning) warning.hidden = true;
+  }
+
+  /** 展示完整警告（仅该次开启的首次）：文案经 ui-labels 单点；约 9 秒后自动收起（客户 8–10 秒口径）。 */
+  function showShellJudgeWarning() {
+    var warning = $("shell-judge-warning");
+    var text = $("shell-judge-warning-text");
+    if (!warning || !text) return;
+    text.textContent = "";
+    UiLabels.shellJudgeWarningLines().forEach(function (line, index) {
+      var p = document.createElement("p");
+      if (index !== 1) p.className = "jw-strong"; // 首尾两段为强调句；中段为细节说明
+      p.textContent = line;
+      text.appendChild(p);
+    });
+    var close = $("shell-judge-warning-close");
+    if (close) {
+      close.textContent = UiLabels.SHELL_JUDGE_WARNING_CLOSE_LABEL;
+      close.setAttribute("aria-label", UiLabels.SHELL_JUDGE_WARNING_CLOSE_LABEL);
+    }
+    warning.hidden = false;
+    var s = state.shellJudge;
+    if (s.warningTimer) clearTimeout(s.warningTimer);
+    s.warningTimer = setTimeout(function () {
+      s.warningTimer = null;
+      hideShellJudgeWarning();
+    }, UiLabels.SHELL_JUDGE_WARNING_AUTO_DISMISS_MS);
+  }
+
+  /**
+   * 一次性提示同步（状态迁移纯函数在 ui-labels::shellJudgeWarningStep）：
+   * 仅「关闭 → 开启」后的首次渲染展示；重绘/收消息/切角色/重复 state 推送均不重现。
+   * 关闭开关即复位「已提示」——再次开启会再显示一次；不写 localStorage（重启后同样再提示一次）。
+   */
+  function syncShellJudgeWarning() {
+    var s = state.shellJudge;
+    var step = UiLabels.shellJudgeWarningStep(s.enabled, s.promptShown);
+    s.promptShown = step.shown;
+    if (!s.enabled) { hideShellJudgeWarning(); return; }
+    if (step.show) showShellJudgeWarning();
+  }
+
   /** 把 ui-labels 的纯映射落到 DOM；`checked/disabled/label` 永远取自真实状态（不显示假开启态）。 */
   function renderShellJudgeToggle() {
     var s = state.shellJudge;
@@ -2720,19 +2779,7 @@
       status.textContent = s.error || "";
       status.hidden = !s.error;
     }
-    var warning = $("shell-judge-warning");
-    if (warning) {
-      warning.hidden = !view.warningVisible;
-      warning.textContent = "";
-      if (view.warningVisible) {
-        UiLabels.shellJudgeWarningLines().forEach(function (line, index) {
-          var p = document.createElement("p");
-          if (index !== 1) p.className = "jw-strong"; // 首尾两段为强调句；中段为细节说明
-          p.textContent = line;
-          warning.appendChild(p);
-        });
-      }
-    }
+    syncShellJudgeWarning();
   }
 
   /** `shell:judge-state`：只接受契约形状（version 1 + 布尔 enabled）；主进程推送即真实状态。 */
@@ -3025,9 +3072,12 @@
   //  · **失效终态**（respond 回 `expired`，G-1 起**只剩一种真实失效**：应用关闭/重启后未决请求不复存在——
   //    客户已裁定「没必要超时啊，就卡在这等客户同意呗」）——卡片可**无限期**保持待答；本块**无任何计时器**
   //    （无 setTimeout/setInterval，测试有钉子）；时限问题归适配器侧，桌面不自造第二套计时。
-  var opRequests = Object.create(null); // requestId → { roleId, request, state:"open"|"decided"|"expired", finalNote, card,
+  var opRequests = Object.create(null); // requestId → { id, roleId, mirrorRoleId, surfaces, cards, request, state:"open"|"decided"|"expired", finalNote, card,
                                         //   anchorKey（请求锚点键，主进程按单一算法给出）,
                                         //   anchorIndex/anchorListSeq（首次物化的行序位与行表身份——重物化落位用）}
+  // W6-C（四角色评审 §6.3）：一项目一卡队列的**排队聚合**事实（仅 trio；payload 带 `waitingFor`）。
+  // 排队请求不物化可操作卡；主入口只显示「还有 N 个决定等待前一个决定」。呈现是运行期状态。
+  var queuedRequests = Object.create(null); // requestId → OperatorRequestPayload（含 waitingFor）
   var opLocalSeq = 0; // 防御：payload 无 id 时本地生成（正常链路 channel 恒给 id）
 
   // ——— 回放锚点表（真机缺陷修复 2026-10-12：「已决卡切走再切回跑到聊天流最末尾」）———
@@ -3059,11 +3109,18 @@
     a.rowsAtReplay = rowIndex + 1;
   }
 
-  /** 该角色**未作答**请求的 id 列表（登记次序=到达次序）——左树徽标 / 当前 pane 指针 / P-1 chip **共用同一状态源**。 */
+  /** 登记条目的**呈现面**（W6-C：镜像 = 同一请求 id 的第二呈现面；旧条目按来源角色兜底）。 */
+  function requestSurfaces(entry) {
+    return entry && Array.isArray(entry.surfaces) && entry.surfaces.length ? entry.surfaces : [entry.roleId];
+  }
+
+  /** 该角色**未作答**请求的 id 列表（登记次序=到达次序）——按 `surfaces` 命中（源面与镜像面同源）。
+   *  左树徽标 / 当前 pane 指针 / P-1 chip **共用同一状态源**。 */
   function openRequestIdsFor(roleId) {
     var ids = [];
     for (var id in opRequests) {
-      if (opRequests[id].roleId === roleId && opRequests[id].state === "open") ids.push(id);
+      var entry = opRequests[id];
+      if (entry.state === "open" && requestSurfaces(entry).indexOf(roleId) >= 0) ids.push(id);
     }
     return ids;
   }
@@ -3084,7 +3141,10 @@
   }
 
   function refreshEntryAwaiting(entry) {
-    deliverRuntimePayload({ projectRoot: entry.projectRoot, runtime: entry.runtime, roleId: entry.roleId }, function () { refreshAwaitingBadge(entry.roleId); });
+    // W6-C：源面与镜像面同一状态源——任一面的徽标/chip/队列同时刷新（同一请求 id，不建第二份状态）。
+    requestSurfaces(entry).forEach(function (surfaceRoleId) {
+      deliverRuntimePayload({ projectRoot: entry.projectRoot, runtime: entry.runtime, roleId: surfaceRoleId }, function () { refreshAwaitingBadge(surfaceRoleId); });
+    });
   }
 
   /** 卡片的**终态呈现**（按钮永久隐藏 + 如实说明；重物化时同款输出）。 */
@@ -3101,6 +3161,54 @@
     }
   }
 
+  /** 登记条目的全部呈现卡（源面 + 镜像面；W6-C 同一请求 id）。 */
+  function entryCardsOf(entry) {
+    var cards = [];
+    var map = entry && entry.cards && typeof entry.cards === "object" ? entry.cards : null;
+    if (map) {
+      for (var key in map) {
+        if (map[key] && cards.indexOf(map[key]) < 0) cards.push(map[key]);
+      }
+    }
+    if (entry && entry.card && cards.indexOf(entry.card) < 0) cards.push(entry.card);
+    return cards;
+  }
+
+  /** 冻结**所有**呈现面（任一侧作答后两侧同时定格；不产生第二次作答）。 */
+  function freezeEntryCards(entry) {
+    if (!entry || !entry.finalNote) return;
+    entryCardsOf(entry).forEach(function (card) {
+      if (card) freezeOperatorCard(card, entry.finalNote.text, entry.finalNote.cls);
+    });
+  }
+
+  /** 统一启停所有呈现面的按钮/选项（提交中与排队中不可作答）。 */
+  function setEntryButtonsDisabled(entry, disabled) {
+    entryCardsOf(entry).forEach(function (card) {
+      var bs = card.querySelectorAll(".op-actions button, .op-options input");
+      for (var i = 0; i < bs.length; i += 1) bs[i].disabled = disabled;
+      if (!disabled) {
+        // 选择卡的「提交」仍须至少选一项（恢复排队/失败重试前的既有判据，不另立规则）。
+        var submit = card.querySelector(".op-submit");
+        if (submit) {
+          var inputs = card.querySelectorAll(".op-options input"), any = false;
+          for (var j = 0; j < inputs.length; j += 1) { if (inputs[j].checked) { any = true; break; } }
+          submit.disabled = !any;
+        }
+      }
+    });
+  }
+
+  /** 所有呈现面的说明行（同一请求同一文案）。 */
+  function setEntryNote(entry, text, cls) {
+    entryCardsOf(entry).forEach(function (card) {
+      var noteEl = card.querySelector(".op-note");
+      if (!noteEl) return;
+      noteEl.hidden = false;
+      noteEl.className = "op-note" + (cls ? " " + cls : "");
+      noteEl.textContent = text;
+    });
+  }
   /** 该 pane 里某卡的**元素**（按 data-request-id 逐子节点比对——不做选择器拼接；找不到 ⇒ null）。 */
   function cardElInPane(pane, requestId) {
     var kids = pane.children;
@@ -3245,6 +3353,13 @@
     // 严格路由：**绝不**回落 `state.selectedRoleId`——正常链路（channel 每会话闭包恒带 roleId）不会走到空值分支；
     // 若真为空（异常），落到显式命名的兜底并如实说明，**不**冒充"当前查看的角色"。
     var roleId = rawRoleId !== "" ? rawRoleId : "(未标识角色)";
+    // W6-C（四角色评审 §6.1/§6.3）：镜像面 = 主进程在载荷里给出的第二呈现面（trio 治理决定卡）。
+    // 渲染侧**不重复判据**（不读模型/不按 cardKind 猜）：有 `mirrorRoleId` 就多呈现一面；缺省零变化。
+    var mirrorRoleId = typeof payload.mirrorRoleId === "string" && payload.mirrorRoleId !== "" && payload.mirrorRoleId !== roleId
+      ? payload.mirrorRoleId
+      : null;
+    var surfaces = [roleId];
+    if (mirrorRoleId !== null) surfaces.push(mirrorRoleId);
     var entry = opRequests[requestId];
     if (entry) {
       // W4：桌面窗口是决定队列的权威——同一请求重推时只采纳它的 `queued` 事实（不自行排队/合并/批准）。
@@ -3255,7 +3370,12 @@
         entry.queued = queuedNext;
         updateQueuedOperatorCard(entry);
       }
-      materializeOperatorCard(requestId); // 重复到达（重放/重渲染）：幂等补挂，不重复建卡、不重复提示
+      // 同一 id 的镜像面后补（重推/恢复）：补齐 surfaces 后幂等补挂；不建第二个请求。
+      if (mirrorRoleId !== null && requestSurfaces(entry).indexOf(mirrorRoleId) < 0) {
+        entry.surfaces = requestSurfaces(entry).concat([mirrorRoleId]);
+        entry.mirrorRoleId = mirrorRoleId;
+      }
+      requestSurfaces(entry).forEach(function (surfaceRoleId) { materializeOperatorCard(requestId, surfaceRoleId); });
       return;
     }
     // anchorKey：请求的锚点键（主进程按单一算法从请求本体 kind+title 拼出）——（重）物化时与回放行
@@ -3263,33 +3383,129 @@
     var anchorKey = typeof payload.anchorKey === "string" && payload.anchorKey !== "" ? payload.anchorKey : null;
     // W4：排队事实只信接口（payload.queued 或请求自带 queued）；缺省 false = 可作答。
     var queued = payload.queued === true || req.queued === true;
-    opRequests[requestId] = entry = { roleId: roleId, runtime: state.runtime, projectRoot: state.projectRoot, turnId: typeof payload.turnId === "string" ? payload.turnId : "", toolCallId: typeof payload.toolCallId === "string" ? payload.toolCallId : "", request: req, state: "open", finalNote: null, card: null, anchorKey: anchorKey, queued: queued };
-    materializeOperatorCard(requestId);
-    refreshAwaitingBadge(roleId);
-    updateRightQueue(roleId);
+    opRequests[requestId] = entry = { id: requestId, roleId: roleId, mirrorRoleId: mirrorRoleId, surfaces: surfaces, cards: Object.create(null), runtime: state.runtime, projectRoot: state.projectRoot, turnId: typeof payload.turnId === "string" ? payload.turnId : "", toolCallId: typeof payload.toolCallId === "string" ? payload.toolCallId : "", request: req, state: "open", finalNote: null, card: null, anchorKey: anchorKey, queued: queued, submitting: false };
+    // 该请求已被呈现 ⇒ 它不再属于排队聚合（同一 id，不建第二份卡）。
+    if (queuedRequests[requestId]) {
+      delete queuedRequests[requestId];
+      renderQueueAggregate();
+    }
+    requestSurfaces(entry).forEach(function (surfaceRoleId) { materializeOperatorCard(requestId, surfaceRoleId); });
+    refreshEntryAwaiting(entry);
     if (backgroundDelivery) return;
     if (rawRoleId === "") {
       sysRow(activePane(), "sys-call", ICONS.shield, "（异常）收到一条未带角色标识的交互请求——已就地呈现；正常链路不会如此。");
-    } else if (roleId !== state.selectedRoleId) {
-      // 可见性指针：请求**不属于**当前查看的角色时，在当前 pane 放一条只读提示（客户「切走就看不到」的正面解法）。
+    } else if (requestSurfaces(entry).indexOf(state.selectedRoleId) < 0) {
+      // 可见性指针：请求的**所有呈现面**都不是当前查看的角色时，在当前 pane 放一条只读提示。
       sysRow(activePane(), "sys-call", ICONS.shield, "【待确认】角色 " + esc(roleId) + " 有一条交互请求等你作答——点左侧该角色查看。");
     }
   }
 
   function onOperatorExpired(payload) {
     if (state.shellConfirm && state.shellConfirm.id === payload.id) markShellConfirmExpired("此确认已失效，未获放行。" + (payload.reason || "请让角色重新发起。"));
+    if (payload && payload.id != null) {
+      var queuedId = String(payload.id);
+      if (queuedRequests[queuedId]) {
+        delete queuedRequests[queuedId];
+        renderQueueAggregate();
+      }
+    }
     var entry = payload && opRequests[payload.id];
-    if (!entry || entry.state !== "open" || payload.roleId !== entry.roleId) return;
+    if (!entry || entry.state !== "open") return;
+    // W6-C：按**请求 id** 冻结全部呈现面（镜像面同一请求；不要求 payload.roleId 等于来源角色）。
     entry.state = "expired";
     entry.finalNote = { text: "请求已失效，未获同意。" + (payload.reason ? "原因：" + payload.reason : "请让角色重新发起。"), cls: "op-note-err" };
-    if (entry.card) freezeOperatorCard(entry.card, entry.finalNote.text, entry.finalNote.cls);
+    freezeEntryCards(entry);
     refreshEntryAwaiting(entry);
   }
 
-  /** pane 重挂/重建后的**补挂**（正常路径卡随 pane 元素存活；本钩子防 pane 被重建时丢卡）。 */
+  /** W6-C（评审 §6.3/§9.3）：排队状态（trio）。排队请求**不物化可操作卡**；主入口只显示聚合行。
+   *  单模型不出现这行（评审 §9.3「single/su 不出现这些行」）；本函数不做任何请求合并/批准。 */
+  function onOperatorQueued(payload) {
+    if (!payload || typeof payload !== "object" || payload.id == null) return;
+    if (state.governanceModelKnown !== true || state.governanceModel !== "trio") return;
+    queuedRequests[String(payload.id)] = payload;
+    renderQueueAggregate();
+  }
+
+  function queuedCountForProject() {
+    var n = 0;
+    for (var id in queuedRequests) {
+      var q = queuedRequests[id];
+      if (!q || q.projectRoot != null && q.projectRoot !== state.projectRoot) continue;
+      n += 1;
+    }
+    return n;
+  }
+
+  /** 主入口 pane 的排队聚合行（同一项目一行，原位更新；排队清空即移除）。 */
+  function renderQueueAggregate() {
+    if (state.governanceModelKnown !== true || state.governanceModel !== "trio") return;
+    var primary = state.primaryRoleId;
+    if (!primary) return;
+    var pane = paneFor(primary);
+    var el = pane.querySelector(".op-queue-aggregate");
+    var n = queuedCountForProject();
+    if (n === 0) {
+      if (el) el.remove();
+      return;
+    }
+    ensureContent(pane);
+    if (!el) {
+      el = document.createElement("div");
+      el.className = "sys sys-queue op-queue-aggregate";
+      el.innerHTML = '<span class="sys-ico">' + ICONS.clock + '</span><span class="sys-text"></span>';
+    }
+    var text = UiLabels.governanceQueueAggregateText(n);
+    el.querySelector(".sys-text").textContent = text;
+    pane.appendChild(el); // 聚合行始终停在最新处（与队列行同一处理）
+  }
+
+  /** 唯一作答入口（W6-C）：任一侧点击都调用同一个 `respond({id, decision})`；成功后冻结**全部**
+   *  呈现面（源面 + 镜像面）。重复点击/第二侧提交由 `entry.submitting` 与终态双闸挡住。 */
+  function submitOperatorDecision(entry, decision, pendingText, okText) {
+    if (!entry || entry.state !== "open" || entry.submitting === true) return;
+    if (entry.runtime !== state.runtime || entry.projectRoot !== state.projectRoot) return;
+    if (entry.queued === true) { setEntryNote(entry, UiLabels.GOVERNANCE_QUEUE_NOTE, ""); return; }
+    entry.submitting = true;
+    setEntryButtonsDisabled(entry, true);
+    setEntryNote(entry, pendingText, "");
+    refreshEntryAwaiting(entry);
+    Promise.resolve(d.operatorRespond({ id: entry.id, decision: decision }))
+      .then(function (r) {
+        entry.submitting = false;
+        if (entry.state !== "open") return;
+        if (r && r.ok === true) {
+          entry.state = "decided";
+          entry.finalNote = { text: okText, cls: "op-note-ok" };
+          freezeEntryCards(entry);
+          refreshEntryAwaiting(entry);
+          return;
+        }
+        if (r && r.expired === true) {
+          // **失效终态**（G-1）：只在应用关闭/重启后出现；两侧同时定格，不再解冻重试。
+          entry.state = "expired";
+          entry.finalNote = { text: "请求已失效（轮次停止、会话重建或应用关闭），未获同意——请让角色重新发起。", cls: "op-note-err" };
+          freezeEntryCards(entry);
+          refreshEntryAwaiting(entry);
+          return;
+        }
+        throw new Error((r && r.error) || "通道未受理");
+      })
+      .catch(function (err) {
+        entry.submitting = false;
+        if (entry.state !== "open") return;
+        // 可重试（校验驳回/通道瞬时失败等）：请求仍 open——**两侧**解冻供修正重试，如实示原因。
+        if (entry.queued !== true) setEntryButtonsDisabled(entry, false);
+        refreshEntryAwaiting(entry);
+        setEntryNote(entry, "回传失败：" + String(err && err.message ? err.message : err) + "——请重试。", "op-note-err");
+      });
+  }
+
+  /** pane 重挂/重建后的**补挂**（正常路径卡随 pane 元素存活；本钩子防 pane 被重建时丢卡）。
+   *  W6-C：按该角色的**呈现面**补挂——源面与镜像面各自物化同一请求 id。 */
   function materializePendingFor(roleId) {
     for (var id in opRequests) {
-      if (opRequests[id].roleId === roleId) materializeOperatorCard(id);
+      if (requestSurfaces(opRequests[id]).indexOf(roleId) >= 0) materializeOperatorCard(id, roleId);
     }
   }
 
@@ -3327,18 +3543,31 @@
    *     卡就是当下最新事件，行表尾即它发生的位置（防同题新请求被回放锚点插进历史）。
    *  ③ **兜底：追加行表尾**——找不到任何锚点也**绝不丢卡**（不丢卡优先于落位；语义在 operatorAnchorIndex 写明）。
    *  open 与 decided 一视同仁（decided 卡按 finalNote 定格呈现，落位同法）。 */
-  function materializeOperatorCard(requestId) {
+  function materializeOperatorCard(requestId, surfaceRoleId) {
     var entry = opRequests[requestId];
     if (!entry) return;
-    var pane = paneFor(entry.roleId);
-    var rl0 = paneRowLists[String(entry.roleId == null ? "" : entry.roleId)];
+    var surface = typeof surfaceRoleId === "string" && surfaceRoleId !== "" ? surfaceRoleId : entry.roleId;
+    var isMirror = surface !== entry.roleId;
+    var pane = paneFor(surface);
+    var rl0 = paneRowLists[String(surface == null ? "" : surface)];
     if (rl0 && rl0.pane === pane) {
       for (var i0 = 0; i0 < rl0.rows.length; i0 += 1) {
-        if (rl0.rows[i0].kind === "operator" && rl0.rows[i0].requestId === requestId) return; // ① 行仍在（可能离屏）——卡未丢
+        if (rl0.rows[i0].kind === "operator" && rl0.rows[i0].requestId === requestId) {
+          // ① 行仍在（可能离屏）——卡未丢；顺带补登记卡元素（旧状态/恢复路径的防御）。
+          if (!entry.cards) entry.cards = Object.create(null);
+          if (!entry.cards[surface] && rl0.rows[i0].el) entry.cards[surface] = rl0.rows[i0].el;
+          return;
+        }
       }
     }
     ensureContent(pane);
-    if (cardInPane(pane, requestId)) return; // 去重：行表缺失但 DOM 还在（防御）——同样不重建
+    var existing = cardInPane(pane, requestId);
+    if (existing) {
+      // 去重：行表缺失但 DOM 还在（防御）——同样不重建。
+      if (!entry.cards) entry.cards = Object.create(null);
+      if (!entry.cards[surface]) entry.cards[surface] = existing;
+      return;
+    }
     var req = entry.request;
 
     var isChoice = req.kind === "choice";
@@ -3349,8 +3578,9 @@
       : (req.preview ? "op-kind-preview" : "op-kind-confirm");
 
     var card = document.createElement("div");
-    card.className = "op-request " + variantClass;
+    card.className = "op-request " + variantClass + (isMirror ? " is-mirror" : "");
     card.dataset.requestId = requestId;
+    card.dataset.surfaceRoleId = surface; // 读数/测试用：同一请求 id 的呈现面
 
     // W4 决定卡：flowId / 权力类型 / 写路径 / 摘要 / 哈希——全部来自请求的**可选**治理字段（纯映射）；
     // 缺失即不显示（旧卡零变化），渲染侧不从预览/正文抽取或自算。`queued` 只信桌面窗口给的排队事实。
@@ -3362,7 +3592,13 @@
       '<span class="op-ico">' + ICONS.shield + "</span>" +
       '<span class="op-title">' + esc(isChoice ? req.title || "请选择" : req.title || "请确认") + "</span>" +
       (meta.governance ? '<span class="op-gov-badge">' + esc(meta.badge) + "</span>" : "") +
+      (isMirror ? '<span class="op-mirror-badge">' + esc(UiLabels.GOVERNANCE_MIRROR_BADGE) + "</span>" : "") +
       "</div>";
+    if (isMirror) {
+      // 来源标签（评审 §6.1）：明确这是同一请求在客户主入口的第二呈现，不是第二张审批。
+      var sourceName = displayNameOf(roleById(entry.roleId)) || entry.roleId;
+      html += '<div class="op-mirror-source">' + esc(UiLabels.governanceMirrorSourceLabel(sourceName)) + "</div>";
+    }
     if (isChoice && typeof req.question === "string" && req.question !== "") {
       html += '<div class="op-question">' + esc(req.question) + "</div>";
     }
@@ -3391,7 +3627,7 @@
           .map(function (o) {
             return (
               '<label class="op-option">' +
-              '<input type="' + (multiple ? "checkbox" : "radio") + '" name="op-' + esc(requestId) + '" value="' + esc(o.id) + '">' +
+              '<input type="' + (multiple ? "checkbox" : "radio") + '" name="op-' + esc(requestId) + (isMirror ? "-" + esc(surface) : "") + '" value="' + esc(o.id) + '">' +
               "<span>" + esc(o.label || o.id) +
               (o.description ? '<span class="op-desc">' + esc(o.description) + "</span>" : "") +
               "</span></label>"
@@ -3413,76 +3649,33 @@
     card.innerHTML = html;
     // P-1（2026-10-12 真机：卡被后续 288 行活动推走；e2e 又暴露一处时序 bug）：**先量后挂**——
     // 判据是「**到达前**用户是否在底部附近」；卡本体上百 px 会立刻把距离推过阈值，不能拿加卡后的距离当判据。
-    var nearBottomAtArrival = arrivalShouldScrollToCard(entry.roleId);
+    // W6-C：镜像面**不自动滚动**（评审 §9.4「镜像卡到达只更新徽标与状态行」——不移动 pane/焦点）。
+    var nearBottomAtArrival = !isMirror && arrivalShouldScrollToCard(entry.roleId);
     // ② 按锚点落位（走不到 ① 的防线——见函数头注）；③ 找不到锚点 ⇒ atIndex=null ⇒ 追加行表尾（兜底不丢卡）。
     //    **首次到达不加锚**：卡就是当下最新的事件，行表尾＝它发生的位置（此后新行只在其后追加，位置关系
     //    不再变）——回放锚点表只服务于「位置丢失后的重物化」（防同题新请求被插进历史）。
+    //    W6-C：镜像面**不参与源面锚点表**，一律追加到镜像 pane 末尾（评审 §6.3）。
     var rl = rowListFor(pane);
-    var first = entry.anchorIndex === undefined;
-    var atIndex = first ? null : operatorAnchorIndex(rl, entry);
+    var first = !isMirror && entry.anchorIndex === undefined;
+    var atIndex = isMirror ? null : (first ? null : operatorAnchorIndex(rl, entry));
     // Q-2：待确认卡入行表（**keepEl**——离窗只脱挂、实例与监听器保留；`requestId` 供 P-1 定位按行找）。
-    var rec = adoptOperatorLifecycle(pane, entry, card) || registerRow(pane, function () { return card; }, 220, { keepEl: true, kind: "operator", requestId: requestId, atIndex: atIndex });
+    var rec = (!isMirror ? adoptOperatorLifecycle(pane, entry, card) : null) || registerRow(pane, function () { return card; }, 220, { keepEl: true, kind: "operator", requestId: requestId, atIndex: atIndex });
     if (first) {
       entry.anchorIndex = rec.index; // 首次物化的时序位置（其后新行只追加/重编号，此位恒指「它发生时的地方」）
       entry.anchorListSeq = rl.seq;
     }
     if (nearBottomAtArrival) scrollBottomForced(pane); // 到达即达（在往上翻 ⇒ 不打断——chip 持久指示）
-    updateOpChip(entry.roleId);
+    if (!entry.cards) entry.cards = Object.create(null);
+    entry.cards[surface] = card;
+    if (!isMirror) entry.card = card;
+    updateOpChip(surface);
 
     // —— 作答流程（**登记表驱动**）：提交期间禁用按钮；成功/失效 → **终态定格**（登记 finalNote，
     //    重物化时同款输出）；可重试失败（校验驳回等）→ 解冻重试——如实，不假装成功。 ——
-    entry.card = card;
-    fillOperatorLifecycle(entry);
+    if (!isMirror) fillOperatorLifecycle(entry);
     if (entry.state !== "open") {
       freezeOperatorCard(card, entry.finalNote.text, entry.finalNote.cls); // 补挂的终态卡：定格呈现
       return;
-    }
-    function setNote(text, cls) {
-      var noteEl = card.querySelector(".op-note");
-      if (!noteEl) return;
-      noteEl.hidden = false;
-      noteEl.className = "op-note" + (cls ? " " + cls : "");
-      noteEl.textContent = text;
-    }
-    function setButtonsDisabled(disabled) {
-      var bs = card.querySelectorAll(".op-actions button, .op-options input");
-      for (var i = 0; i < bs.length; i += 1) bs[i].disabled = disabled;
-    }
-    /** 回传决定：先乐观熄灯（B-3 按**全部 open 请求**重算）；成功/失效定格；可重试则解冻。 */
-    function submit(decision, pendingText, okText) {
-      if (entry.state !== "open" || entry.runtime !== state.runtime || entry.projectRoot !== state.projectRoot) return;
-      if (entry.queued === true) { setNote(UiLabels.GOVERNANCE_QUEUE_NOTE, ""); return; } // 排队中不可作答
-      setButtonsDisabled(true);
-      setNote(pendingText, "");
-      refreshEntryAwaiting(entry);
-      Promise.resolve(d.operatorRespond({ id: requestId, decision: decision }))
-        .then(function (r) {
-          if (entry.state !== "open") return;
-          if (r && r.ok === true) {
-            entry.state = "decided";
-            entry.finalNote = { text: okText, cls: "op-note-ok" };
-            freezeOperatorCard(card, entry.finalNote.text, entry.finalNote.cls);
-            refreshEntryAwaiting(entry);
-            return;
-          }
-          if (r && r.expired === true) {
-            // **失效终态**（G-1：卡片**不按时间过期**）：此分支只剩一种真实失效——应用关闭/重启后，
-            // 未决请求随窗口一起消失；旧卡作答时如实告知（含出路），定格、不再解冻重试。
-            entry.state = "expired";
-            entry.finalNote = { text: "请求已失效（轮次停止、会话重建或应用关闭），未获同意——请让角色重新发起。", cls: "op-note-err" };
-            freezeOperatorCard(card, entry.finalNote.text, entry.finalNote.cls);
-            refreshEntryAwaiting(entry);
-            return;
-          }
-          throw new Error((r && r.error) || "通道未受理");
-        })
-        .catch(function (err) {
-          if (entry.state !== "open") return;
-          // 可重试（校验驳回/通道瞬时失败等）：请求仍 open——解冻供修正重试，如实示原因。
-          if (entry.queued !== true) setButtonsDisabled(false);
-          refreshEntryAwaiting(entry);
-          setNote("回传失败：" + String(err && err.message ? err.message : err) + "——请重试。", "op-note-err");
-        });
     }
 
     var btnConfirm = card.querySelector(".op-confirm");
@@ -3491,17 +3684,17 @@
     var btnCancel = card.querySelector(".op-cancel");
     if (btnConfirm) {
       btnConfirm.addEventListener("click", function () {
-        submit({ kind: "confirm", confirmed: true }, "已提交，等待主进程受理…", "已确认。");
+        submitOperatorDecision(entry, { kind: "confirm", confirmed: true }, "已提交，等待主进程受理…", "已确认。");
       });
     }
     if (btnDeny) {
       btnDeny.addEventListener("click", function () {
-        submit({ kind: "confirm", confirmed: false }, "已提交，等待主进程受理…", "已回「不同意」（未获同意）。");
+        submitOperatorDecision(entry, { kind: "confirm", confirmed: false }, "已提交，等待主进程受理…", "已回「不同意」（未获同意）。");
       });
     }
     if (btnCancel) {
       btnCancel.addEventListener("click", function () {
-        submit({ kind: "choice", cancelled: true }, "已提交，等待主进程受理…", "已取消（未获同意）。");
+        submitOperatorDecision(entry, { kind: "choice", cancelled: true }, "已提交，等待主进程受理…", "已取消（未获同意）。");
       });
     }
     if (btnSubmit) {
@@ -3521,32 +3714,25 @@
           if (inputs[j].checked) selected.push(inputs[j].value);
         }
         if (selected.length === 0) return; // 防御：按钮禁用态已挡
-        submit({ kind: "choice", selected: selected }, "已提交，等待主进程受理…", "已提交选择。");
+        submitOperatorDecision(entry, { kind: "choice", selected: selected }, "已提交，等待主进程受理…", "已提交选择。");
       });
     }
     // W4：桌面窗口判定为排队（已有前一个待决定）⇒ 整卡不可作答，只显示「等待前一个决定」；
     // UI 不自行合并/批准（队列权威在桌面窗口；后续重推 queued:false 时由 updateQueuedOperatorCard 解冻）。
-    if (queued) setButtonsDisabled(true);
+    // W6-C：同一请求的**所有呈现面**同步启停。
+    if (queued) setEntryButtonsDisabled(entry, true);
   }
 
-  /** 排队态变化（同一请求被桌面窗口重推 `queued`）：同步提示与可作答态；不动请求本体/不做决定。 */
+  /** 排队态变化（同一请求被桌面窗口重推 `queued`）：同步提示与可作答态；不动请求本体/不做决定。
+   *  W6-C：源面与镜像面同步（同一请求 id 的排队状态两侧一致）。 */
   function updateQueuedOperatorCard(entry) {
-    var card = entry.card;
-    if (!card || entry.state !== "open") return;
+    if (!entry || entry.state !== "open") return;
     var queued = entry.queued === true;
-    var note = card.querySelector(".op-queued");
-    if (note) note.hidden = !queued;
-    var bs = card.querySelectorAll(".op-actions button, .op-options input");
-    for (var i = 0; i < bs.length; i += 1) bs[i].disabled = queued;
-    if (!queued) {
-      // 选择卡的「提交」仍须至少选一项（恢复排队前的既有判据；不另立第二套规则）。
-      var submit = card.querySelector(".op-submit");
-      if (submit) {
-        var inputs = card.querySelectorAll(".op-options input"), any = false;
-        for (var j = 0; j < inputs.length; j += 1) { if (inputs[j].checked) { any = true; break; } }
-        submit.disabled = !any;
-      }
-    }
+    entryCardsOf(entry).forEach(function (card) {
+      var note = card.querySelector(".op-queued");
+      if (note) note.hidden = !queued;
+    });
+    setEntryButtonsDisabled(entry, queued || entry.submitting === true);
   }
 
   // 本端**手动发送**的最近一条（H-1 附录：投递回显归类时的**防误伤**判据——手输内容即便字面以投递前缀
@@ -6003,9 +6189,11 @@
   $("right-body").addEventListener("click", onDocumentAction);
   $("right-body").addEventListener("click", function (event) {
     var button = event.target.closest(".pending-locate"); if (!button) return;
-    var id = button.dataset.requestId, entry = opRequests[id]; if (!entry || entry.roleId !== state.selectedRoleId) return;
-    closeRightDrawer(); scrollToOperatorCard(entry.roleId, id);
-    var card = cardElInPane(paneFor(entry.roleId), id); if (card) { card.tabIndex = -1; card.focus({ preventScroll: true }); }
+    var id = button.dataset.requestId, entry = opRequests[id];
+    if (!entry || requestSurfaces(entry).indexOf(state.selectedRoleId) < 0) return;
+    var surfaceRoleId = state.selectedRoleId;
+    closeRightDrawer(); scrollToOperatorCard(surfaceRoleId, id);
+    var card = cardElInPane(paneFor(surfaceRoleId), id); if (card) { card.tabIndex = -1; card.focus({ preventScroll: true }); }
   });
   $("drawer-close").addEventListener("click", closeRightDrawer);
   // Markdown 链接（B-1）：点聊天流里的链接一律**外开**（事件委托挂在 #chat 上——pane 切换不丢）。
@@ -6015,6 +6203,8 @@
   // shell 命令确认卡（M-1）：拒绝为默认焦点；关闭（×）/ Esc / 「拒绝」= **不放行**（fail-closed 的 UI 侧同向）。
   // P5：自动判断开关——change 只发一次 IPC（实际状态以主进程回包/推送为准；失败回退并显示错误）。
   $("auto-approve-toggle").addEventListener("change", onShellJudgeToggleChange);
+  // P5（客户 2026-10-18）：一次性警告的「知道了」——只收起本次提示，不改开关、不写持久化。
+  $("shell-judge-warning-close").addEventListener("click", hideShellJudgeWarning);
   $("sc-deny").addEventListener("click", function () { respondShellConfirm(false); });
   $("sc-allow").addEventListener("click", function () { respondShellConfirm(true); });
   $("sc-close").addEventListener("click", function () { respondShellConfirm(false); });
@@ -6064,6 +6254,8 @@
   window.addEventListener("beforeunload", function () { persistenceUnsubscribers.forEach(function (off) { if (typeof off === "function") off(); }); });
   if (d.onOperatorRequest) d.onOperatorRequest(function (payload) { deliverRuntimePayload(payload, appendOperatorRequest); });
   if (d.onOperatorExpired) d.onOperatorExpired(function (payload) { deliverRuntimePayload(payload, onOperatorExpired); });
+  // W6-C（评审 §6.3）：一项目一卡排队状态——排队请求不物化可操作卡，只在主入口显示聚合行。
+  if (d.onOperatorQueued) d.onOperatorQueued(function (payload) { deliverRuntimePayload(payload, onOperatorQueued); });
   // shell 命令确认卡（M-1）：主进程推来的数据面 → 应用内卡片（拒绝为默认；Esc/关闭 = 不放行）。
   if (d.onShellConfirm) d.onShellConfirm(function (payload) { deliverRuntimePayload(payload, onShellConfirm); });
   // 恢复确认卡（G-2/U1，2026-10-16 客户批准）：su 提议的恢复动作数据面 → 应用内卡片
@@ -6154,6 +6346,7 @@
     // L-1/状态准确性：供探针直接注入真实快照（按 IPC 契约 `{roleId, busy, summaries}`）。
     onRoleState: function (payload) { deliverRuntimePayload(payload, onRoleState); },
     onOperatorExpired: function (payload) { deliverRuntimePayload(payload, onOperatorExpired); },
+    onOperatorQueued: function (payload) { deliverRuntimePayload(payload, onOperatorQueued); },
     // M-1：供探针直接注入 shell 确认数据面（按 IPC 契约 `{id, command, summary, reasonPlain, …}`）。
     onShellConfirm: onShellConfirm,
     // P5：自动判断探针（只读状态 + 直接注入推送/结果；不另立判定）。桥缺失时 state.available=false。

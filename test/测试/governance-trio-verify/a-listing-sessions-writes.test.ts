@@ -1,5 +1,5 @@
 // test/测试/governance-trio-verify/a-listing-sessions-writes.test.ts
-// 独立端到端验收（测试角色，2026-10-17）：新空项目默认、三人会话、能力矩阵、写权矩阵。
+// 独立端到端验收（测试角色，2026-10-17；2026-10-18 四角色同步）：新空项目默认、治理会话、能力矩阵、写权矩阵。
 //
 // 依据：`角色卡/项目管理/docs/design/2026-10-17_design_governance-trio-review.md`
 // §5.2/§5.3/§5.4/§5.6/§6.2/§九-1/2/3/4/7/9；全部离线（临时目录 + 假适配器），不读 `.env`、不跑真实模型。
@@ -25,14 +25,18 @@ import {
 
 // —————————————————————— 1) 新空项目默认 ——————————————————————
 
-test("新空项目：listProject 恰 3 个 builtIn（顺序 rapporteur→nominator→convener）、primaryRoleId=rapporteur、governanceModel=trio", async () => {
+test("新空项目：listProject 恰 4 个 builtIn（顺序 liaison→rapporteur→nominator→convener）、primaryRoleId=liaison、governanceModel=trio", async () => {
   const { root, cleanup } = makeRoot("empty-listing");
   try {
     const listing = await listProject(root);
     const builtIns = listing.roles.filter((r) => r.builtIn === true);
-    assert.deepEqual(builtIns.map((r) => r.roleId), ["rapporteur", "nominator", "convener"], "恰 3 个内置、顺序固定");
-    assert.deepEqual(builtIns.map((r) => r.governanceFunction), ["proposal", "nomination", "schedule"]);
-    assert.equal(listing.primaryRoleId, "rapporteur", "主入口 = Rapporteur");
+    assert.deepEqual(
+      builtIns.map((r) => r.roleId),
+      ["liaison", "rapporteur", "nominator", "convener"],
+      "恰 4 个内置、顺序固定（2026-10-18 客户拍板「三权不变、角色四名」）",
+    );
+    assert.deepEqual(builtIns.map((r) => r.governanceFunction), ["liaison", "proposal", "nomination", "schedule"]);
+    assert.equal(listing.primaryRoleId, "liaison", "主入口 = 联络官 Liaison");
     assert.equal(listing.governanceModel, "trio", "新空项目默认 trio");
     assert.equal(listing.hasRoles, false, "尚无项目角色");
     assert.equal(listing.roles.some((r) => r.roleId === "su"), false, "trio 下不枚举 su");
@@ -48,9 +52,9 @@ test("新空项目：listProject 恰 3 个 builtIn（顺序 rapporteur→nominat
   }
 });
 
-// —————————————————————— 2) 三人会话可开（function 路由） ——————————————————————
+// —————————————————————— 2) 治理会话可开（function 路由；proposal/nomination/schedule） ——————————————————————
 
-test("三人会话可开：openGovernanceSession 按 function 选择角色；显式 roleId 一致；su/非法组合明确拒绝", async () => {
+test("治理会话可开：openGovernanceSession 按 function 选择角色；显式 roleId 一致；su/非法组合明确拒绝", async () => {
   const { root, cleanup } = makeRoot("open-sessions");
   try {
     writeProjectRole(root, "A");
@@ -98,7 +102,7 @@ test("三人会话可开：openGovernanceSession 按 function 选择角色；显
 
 // —————————————————————— 3) 能力矩阵逐项 ——————————————————————
 
-test("能力矩阵：dispatch/status/sessionTail/recovery 仅 Convener；install 仅 Nominator；三人不自我回交；shell 档逐人", async () => {
+test("能力矩阵：dispatch/status/sessionTail/recovery 仅 Convener；install 仅 Nominator；三个三权角色不自我回交；shell 档逐人", async () => {
   const { root, cleanup } = makeRoot("cap-matrix");
   try {
     writeProjectRole(root, "A");
@@ -210,7 +214,7 @@ test("能力矩阵：dispatch/status/sessionTail/recovery 仅 Convener；install
 
 // —————————————————————— 4) 写权矩阵 ——————————————————————
 
-test("写权矩阵：三人各自预授权范围放行；角色卡/.ans/治理边界/manifest 全拒；拒绝文案指路", async () => {
+test("写权矩阵：Rapporteur/Nominator/Convener 各自预授权范围放行；角色卡/.ans/治理边界/manifest 全拒；拒绝文案指路", async () => {
   const { root, cleanup } = makeRoot("write-matrix");
   try {
     writeProjectRole(root, "A");
@@ -305,9 +309,10 @@ test("写权矩阵：三人各自预授权范围放行；角色卡/.ans/治理�
       assert.ok((d as { reason?: string }).reason && (d as { reason: string }).reason.length > 0);
     }
     const convCard = g("convener", "角色卡/A/role-card.md");
-    assert.match(convCard.allowed === false ? (convCard.reason ?? "") : "", /应用治理记录|其他治理角色/);
+    // 2026-10-18 四角色修复后：禁写文案指回正确归属（角色卡→提名官 Nominator）。
+    assert.match(convCard.allowed === false ? (convCard.reason ?? "") : "", /提名官|Nominator/);
 
-    // 治理边界与 manifest 是应用独占：三人一致拒绝。
+    // 治理边界与 manifest 是应用独占：三个三权角色一致拒绝。
     for (const id of ["rapporteur", "nominator", "convener"]) {
       for (const p of [".ans/project.json", ".ans/governance/ledger.jsonl", GOV_REL, "docs/bootstrap-manifest.md"]) {
         assert.equal(g(id, p).allowed, false, `${id} 不得写应用独占路径：${p}`);

@@ -1,5 +1,77 @@
 # 门禁引擎 变更记录
 
+## 2026-10-18 — 治理四角色 W6-A（门禁引擎）：Liaison 注册表/枚举/写权/能力 + 旧 trio 兼容
+
+客户 2026-10-18 拍板「**三权不变、角色四名**」：新增 `liaison`（联络官，客户沟通权，主入口），
+`governanceModel` 仍为 `"trio"`；旧 trio 项目自动获得 Liaison、零迁移；single/su 逐字不变。
+实施口径＝PM 评审 `角色卡/项目管理/docs/design/2026-10-18_design_governance-liaison-review.md`
+§4.1–§4.7 与 §十二 W6-A（本批只做**门禁引擎**；运行时核心/编排/桌面/UI 属各自属主）。
+
+- **边界**：`src/model/role.ts`、`src/common/门禁引擎/governance-roles.ts`、
+  `src/common/门禁引擎/boundary-core.ts`（仅注释）、`src/service/role/resolve-role.ts`、
+  `src/service/boundary/resolve-boundary.ts`（仅注释/再导出说明）、
+  `test/门禁引擎/governance-trio.test.ts`、`test/门禁引擎/list-project.test.ts`、
+  `test/门禁引擎/liaison-role.test.ts`（新）、本文件、`api-spec.md`、`feature-map.md`、`memo.md`。
+  **未碰** `src/model/runtime.ts`、`src/pipeline/`、`src/common/编排/`、`app/`、其他角色
+  files/tests/docs、真实项目；不读 `.env`、不跑真实模型/凭据/网络；未 commit。
+- **Model（`src/model/role.ts`）**：`GovernanceFunction` 增 `"liaison"` →
+  `"liaison" | "proposal" | "nomination" | "schedule"`；`GovernanceModel` 注释明确 `trio` 指权力
+  模型而非角色数量；`ResolvedRole.governanceFunction` 注释改为四角色。
+- **注册表（`governance-roles.ts`）**：
+  - `BuiltInGovernanceRoleSpec.id` 增 `"liaison"`；`BUILT_IN_GOVERNANCE_ROLES` 首位插 Liaison
+    （顺序 `liaison → rapporteur → nominator → convener`，即 `listProject` 枚举顺序）；
+    `displayName="联络官 Liaison"`、`function="liaison"`。
+  - `GovernanceCapabilities`：`customerInput` 由字面量 `true` 改为 `boolean`；新增
+    `handOffIntent`（仅 Liaison=true）与 `requestClarification`（仅 Rapporteur=true）；
+    `LEGACY_SU_CAPABILITIES` 两新位显式 false（su 旧行为不多给工具）。
+  - Liaison：Section 1 / 预授权只有 `docs/intents/`；`forbiddenWritePaths` =
+    应用独占三项 + `角色卡/` + `docs/proposals|contracts|nominations|skills|mcp|flows|governance/`
+    + `docs/workflow.md`；能力只有 `handOffIntent`，`customerInput=false`，无派发/看护/安装/
+    恢复/shell（`none`）；卡文本写明「客户沟通 · 不拥有最终批准权」、`hand_off_intent` 交接约定、
+    唯一写区与「不实现/不跑代码/不写测试」。
+  - `BUILT_IN_ROLE_DIR_PREFIXES` 增 `角色卡/liaison/`（其余角色禁写矩阵随之覆盖）。
+  - 三张旧卡同批修订：Rapporteur 去掉「理解客户意图、沟通」、改读 `docs/intents/**` 并使用
+    `request_clarification`；Nominator/Convener/Rapporteur 的「不得创建第四个」改「第五个」；
+    Convener 提名步骤改为「由应用后台派发（不打开/不切换客户会话）」、「三个内置治理角色」
+    改为「四个」。
+  - `TrioGovernanceRoleId` / `BUILT_IN_GOVERNANCE_ROLES` / `isTrioGovernanceRoleId` /
+    `trioGovernanceSource` 名称保留（`trio` = 权力模型），避免无意义跨角色改名。
+- **Service**：`resolveRole`/`listProject` 自动按注册表识别 Liaison（保留 id 反遮蔽、卡文本、
+  `governanceFunction:"liaison"`）；trio `primaryRoleId` 改为 `"liaison"`；`resolveGovernanceRole`
+  的 trio 合法 id 增 `liaison`、错误文案列四人、`function:"liaison"` 可解析。
+  **缺省 `function` 仍为 `proposal`（→ rapporteur）**：这是共享解析器语义，CLI `ans govern`
+  不提供 Liaison（评审 §4.5/§4.6）；桌面主入口经 `primaryRoleId` 得到 Liaison。
+- **边界解析**：`resolveBoundarySection` 的 trio 分支按 `governanceRoleOf` 取条目，Liaison 自动
+  生效（`<built-in:trio/liaison>`、接受证据＝`.ans` 或本次 genesis、fail-closed 不变）；single 下
+  Liaison 与其余 trio 角色一样结构性拒绝（「三权角色在 single 治理模型下不可用」）。
+  旧 trio 项目零迁移：`listProject` 只读 `.ans`，不重写。
+- **拒绝文案（AC3 补充）**：`resolveWrite` 对 Liaison 边界的最终「未匹配条目」拒绝追加归属指引
+  （`governanceWriteOwnerGuidance`，注册表单点）：提案/契约→报告员 Rapporteur、角色卡/提名/
+  技能/MCP→提名官 Nominator、流程/workflow→召集人 Convener、`.ans/`/manifest/治理边界→只能由
+  应用写。只改文案，放行/拒绝与 `allowedByRoot` 零变化；其他角色文案逐字不变。
+  新增 1 例文案断言（共 7 例）。**编排侧前置 `forbiddenWriteDecision` 的通用文案属编排属主**，
+  本角色未越界修改。
+- **测试**：`governance-trio.test.ts` 更新为四人（顺序/职能/显示名/Section 1/预授权/能力/卡文本/
+  禁写/写权/`resolveGovernanceRole` 文案）；`list-project.test.ts` 空项目与显式 trio 期望四人、
+  `primaryRoleId=liaison`、保留 id 增 `liaison`；新增 `liaison-role.test.ts` 7 例（旧 trio 自动
+  获 Liaison 且 `.ans` 逐字节不变、single 不变、`docs/intents/**` 放行/越界拒、AC3 归属文案、
+  能力矩阵、保留 id）。**门禁引擎套件 254 计 / 253 过 / 0 红 / 1 skip**（Windows 专属 skip）。
+- **全量与类型（如实）**：`node --test "test/**/*.test.ts"`（三层 glob）2697 计 / 2673 过 /
+  **21 红** / 3 skip。其中 **5 条是本批契约性预期红，全在本角色边界外**：
+  `test/测试/t9-block1-bootstrap.test.ts`（主入口仍断言 rapporteur）、
+  `test/测试/governance-trio-verify/a-listing-sessions-writes.test.ts`（3 内置/主入口）、
+  `test/测试/governance-trio-verify/d-single-compat.test.ts`（su 能力 deepEqual 缺两新位）、
+  `c-migration.test.ts`（三内置顺序）、`test/桌面应用/interface.test.ts`
+  （IPC 空项目 3 内置/rapporteur）——均待编排/桌面/测试属主按 W6-A/W6-B/W6-D 更新。
+  其余 16 红与本批无关：9 条 Windows `symlinkSync` EPERM、vendor markdown-it pin 不符、
+  `abort running shell` 时序、5 条 `test/桌面应用/renderer.test.ts` 源码扫描（工作树在飞的
+  `app/renderer/renderer.js` 修改）。
+  `npx tsc --noEmit`：本角色边界内零错。首批复跑时的 3 条编排属主错误
+  （`GovernancePower`/`TRIO_CARD_KINDS` 未纳 `"liaison"`）已由编排侧并行修复；AC3 复跑时剩 3 条
+  全在他域新写的 liaison 测试（`test/编排/liaison-handoff.test.ts`、
+  `test/测试/governance-liaison-verify/b-intent-handoff.test.ts` 仍用被评审取代的
+  `"communication"` 名称），与门禁引擎交付无关，如实登记、未越界修改。
+
 ## 2026-10-17（五）— 治理三权分立 V1 W0+W1：类型/注册表/listProject/resolveRole/resolveBoundarySection/应用治理边界
 
 客户 2026-10-17 拍板（原话要点）：su 拆为 `rapporteur`（提案权）/`nominator`（提名权）/`convener`

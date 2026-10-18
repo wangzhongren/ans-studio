@@ -81,6 +81,27 @@ export type {
   GovernanceGateInput,
 } from "../../common/编排/governance-gate.ts";
 
+// ── W6-A（2026-10-18）：意图交接/澄清的 Pipeline 公共出口 ──────────────────────────────────
+// 四角色评审 §5.2：桌面窗口只依赖 Pipeline 公共出口，**不直接导入**编排私有 `common/`。
+// 薄再导出：`validateIntentHandoff`/`intentHandoffDedupeKey`/澄清轮次计数与上限。
+export {
+  INTENT_DIR_REL,
+  GOVERNANCE_SLUG_PATTERN,
+  INTENT_SUMMARY_MAX_CHARS,
+  CLARIFICATION_MAX_ROUNDS,
+  intentArtifactPath,
+  intentHandoffDedupeKey,
+  validateIntentHandoff,
+  countClarificationRounds,
+} from "../../common/编排/governance-handoff.ts";
+export type {
+  IntentHandoffValidationInput,
+  IntentHandoffValidationContext,
+  IntentHandoffValidation,
+  ClarificationRoundTarget,
+  ClarificationRoundCount,
+} from "../../common/编排/governance-handoff.ts";
+
 // ── B2（2026-10-17）：I3「建立治理记录」的 Pipeline 公共出口 ─────────────────────────────
 // 桌面只依赖 Pipeline 公共出口，**不直接导入** `src/common/编排/` 私有模块（PM 评审 §五.1 边界纪律）。
 // 薄再导出：不改变 `openGovernanceSession` 任何既有行为。
@@ -150,6 +171,14 @@ export type {
 /** 角色目录名（与 `listProject` 口径一致：项目角色的目录 `角色卡/<id>/`）。 */
 const ROLE_CARD_DIR = "角色卡";
 
+/** 治理职能 → 权力文案（唯一文案表；Liaison 是沟通权而非决定权）。 */
+const GOVERNANCE_FUNCTION_LABEL: Record<GovernanceFunction, string> = {
+  liaison: "沟通权",
+  proposal: "提案权",
+  nomination: "提名权",
+  schedule: "编排权",
+};
+
 /**
  * 治理会话创建角色时写入的标准文件（role-card / boundary / memo）。
  * 它们的父目录是 `角色卡/<id>/`——即治理边界 `角色卡/`（condition `role-restructuring`）之内。
@@ -168,9 +197,9 @@ export interface GovernSessionInput {
   /** 覆盖内置治理角色 id；缺省经 `listProject` 枚举 `builtIn` 得到（不硬编码）。 */
   governanceRoleId?: string;
   /**
-   * 治理职能（评审 §5.6）：trio 下选择会话角色——`proposal`→rapporteur（缺省）、
-   * `nomination`→nominator、`schedule`→convener。single 下传本字段**明确拒绝**
-   * （旧治理模型只有 su；`resolveGovernanceRole` 给明确文案）。
+   * 治理职能（评审 §5.6；四角色评审 §4.5）：trio 下选择会话角色——`liaison`→liaison、
+   * `proposal`→rapporteur（缺省）、`nomination`→nominator、`schedule`→convener。single 下传本字段
+   * **明确拒绝**（旧治理模型只有 su；`resolveGovernanceRole` 给明确文案）。
    * 与显式 `governanceRoleId` 同时给出时必须一致，否则抛错。
    */
   governanceFunction?: GovernanceFunction;
@@ -198,7 +227,7 @@ export interface GovernSessionInput {
 export interface GovernanceSessionHandle extends RoleSessionHandle {
   /** 治理角色 id（经 `listProject` 枚举，非硬编码）。 */
   governanceRoleId: string;
-  /** 治理职能（trio 三人之一；single/su 为 undefined）。 */
+  /** 治理职能（trio 四人之一：liaison/proposal/nomination/schedule；single/su 为 undefined）。 */
   governanceFunction?: GovernanceFunction;
   /** 边界来源（项目治理边界，或冷启动创世种子）。 */
   boundarySource: string;
@@ -324,7 +353,7 @@ async function discoverGovernanceRole(
       ? { ...listing, governanceModel: project.governanceModel }
       : listing;
   const resolved = resolveGovernanceRole(effective, opts);
-  // 兜底：resolveGovernanceRole 已保证 trio 三人之一 / single su；此处只防御空 id。
+  // 兜底：resolveGovernanceRole 已保证 trio 四人之一 / single su；此处只防御空 id。
   if (typeof resolved.roleId !== "string" || resolved.roleId === "") {
     throw new Error(`未解析出治理角色（listProject 未枚举到 builtIn 角色）；项目根：${project.projectRoot}`);
   }
@@ -368,13 +397,14 @@ export async function runGovernSession(
   }
 
   // 文案数据驱动（评审 §5.6）：角色显示名/预授权目录/职能一律读注册表，**不再把 su 写死**；
-  // 单人旧模型（su）的显示名回退为「内置治理角色 su」，行为不变。
+  // 单人旧模型（su）的显示名回退为「内置治理角色」，行为不变。
   const roleSpec = governanceRoleOf(handle.governanceRoleId);
   const roleLabel = roleSpec?.displayName ?? "内置治理角色";
   const preauthorizedDirs = roleSpec?.preauthorizedDirs ?? LEGACY_SU_PREAUTHORIZED_DIRS;
+  // 治理职能 → 权力文案（数据驱动；Liaison 是沟通权，不是决定权）。
   const functionLabel =
     roleSpec !== undefined
-      ? `；治理职能 ${roleSpec.function}（${roleSpec.function === "proposal" ? "提案权" : roleSpec.function === "nomination" ? "提名权" : "编排权"}，不拥有最终批准权）`
+      ? `；治理职能 ${roleSpec.function}（${GOVERNANCE_FUNCTION_LABEL[roleSpec.function]}，不拥有最终批准权）`
       : "";
   record({
     kind: "message",
@@ -385,7 +415,11 @@ export async function runGovernSession(
       (handle.targetDir ? `；目标目录 ${handle.targetDir}` : ""),
   });
   const roleIds = input.targetRoleIds ?? [];
-  const confirmationMode = effectiveInput.customerInput !== undefined;
+  // 与 `openRoleSession` 的 gate 同口径（W6-A）：能力矩阵 `customerInput=false` 的角色（Liaison）
+  // 即便前端给了客户通道也不进入确认制——`request_confirmation`/`request_choice` 结构性不注册。
+  const confirmationMode =
+    effectiveInput.customerInput !== undefined &&
+    (roleSpec === undefined || roleSpec.capabilities.customerInput);
   record({
     kind: "message",
     summary: confirmationMode
@@ -520,46 +554,62 @@ function buildGovernPrompt(
     roleIds.length > 0
       ? `\n本次指定目标角色：${roleIds.join("、")}；写这些角色的任何路径仍须先取得客户决定（见下）。`
       : "";
-  return `${head}${confirmRule}${targets}\n${governanceFunctionDiscipline(spec.function)}`;
+  return `${head}${confirmRule}${targets}\n${governanceFunctionDiscipline(spec)}`;
 }
 
 /**
- * 三权各自纪律（评审 §5.6/§6.1）：只描述「怎么产出候选物、需要哪张客户决定卡、不能做什么」，
- * **绝不写成「已批准/已授权」**——客户决定只由应用签发的确认卡 + 账本表达。
+ * 四角色各自纪律（评审 §5.6/§6.1 + 四角色评审 §4.3）：只描述「怎么产出候选物、需要哪张客户决定卡、
+ * 不能做什么」，**绝不写成「已批准/已授权」**——客户决定只由应用签发的确认卡 + 账本表达。
+ * 角色名称/职能来自注册表 spec（**不写死 su/rapporteur**）。
  */
-function governanceFunctionDiscipline(fn: "proposal" | "nomination" | "schedule"): string {
-  if (fn === "proposal") {
-    return (
-      "**提案权纪律（Rapporteur，不拥有最终批准权）**：" +
-      "提案写入 `docs/proposals/<flowId>-v1.md`（frontmatter: flowId/version/author/status: draft），" +
-      "契约写入 `docs/contracts/**`，工作记录写入 `docs/governance/rapporteur/**`。\n" +
-      "向客户请求决定用 `request_choice`，`cardKind=proposal`，`flowId` 必填，选项 id 固定为 " +
-      "`accept` / `accept-quick` / `revise` / `reject`；验收用 `cardKind=acceptance`，选项 id " +
-      "`accept` / `reject`。非标准 id 不会解锁任何门禁。\n" +
-      "你不批准、不任命、不排程、不派发；不得把自己的推荐写成客户决定，不得把 Markdown 的 `status` " +
-      "当作客户决定。"
-    );
+function governanceFunctionDiscipline(spec: BuiltInGovernanceRoleSpec): string {
+  switch (spec.function) {
+    case "proposal":
+      return (
+        `**提案权纪律（${spec.displayName}，不拥有最终批准权）**：` +
+        "提案写入 `docs/proposals/<flowId>-v1.md`（frontmatter: flowId/version/author/status: draft），" +
+        "契约写入 `docs/contracts/**`，工作记录写入 `docs/governance/rapporteur/**`。\n" +
+        "若由联络官交接了客户意图（`docs/intents/<intentId>.md`），以文件为准形成提案；信息不足用 " +
+        "`request_clarification` 把问题送到主入口（同一 flow 最多 2 轮），不反复追问客户。\n" +
+        "向客户请求决定用 `request_choice`，`cardKind=proposal`，`flowId` 必填，选项 id 固定为 " +
+        "`accept` / `accept-quick` / `revise` / `reject`；验收用 `cardKind=acceptance`，选项 id " +
+        "`accept` / `reject`。非标准 id 不会解锁任何门禁。\n" +
+        "你不批准、不任命、不排程、不派发；不得把自己的推荐写成客户决定，不得把 Markdown 的 `status` " +
+        "当作客户决定。"
+      );
+    case "nomination":
+      return (
+        `**提名权纪律（${spec.displayName}，不拥有最终批准权）**：` +
+        "提名写入 `docs/nominations/<flowId>-vN.md`，技能/MCP 声明写入 `docs/skills/**`、`docs/mcp/**`，" +
+        "工作记录写入 `docs/governance/nominator/**`。\n" +
+        "**提名 ≠ 任命**：先 `request_choice`（`cardKind=appointment`，`flowId`，`multiple:true`，选项 id 为" +
+        "候选角色 id）取得客户任命，再 `request_confirmation`（`cardKind=appointment-write`，逐文件列出将写路径）" +
+        "取得写盘确认，之后才能写 `角色卡/<id>/**`；未取得任命/写盘确认的写入会被门禁拒绝。\n" +
+        "你不批准方案、不排程、不派发；不得声称已获客户批准。"
+      );
+    case "schedule":
+      return (
+        `**编排权纪律（${spec.displayName}，不拥有最终批准权）**：` +
+        "流程单写入 `docs/flows/<flowId>.md`（步骤表；首步标「提名」），项目工作流写入 `docs/workflow.md`，" +
+        "工作记录写入 `docs/governance/convener/**`。\n" +
+        "只有账本中已有客户接受的提案（accept / accept-quick）＋已任命名单（或 accept-quick 复用既有项目角色）" +
+        "＋流程单对应步骤时，才能 `dispatch_task`；`flowId`/`stepId` 必填，目标只能是项目角色" +
+        "（四个内置治理角色一律拒绝）。shell 面仅只读档。\n" +
+        "你不批准方案、不任命、不验收；不得把「已派发」写成「已完成」。"
+      );
+    case "liaison":
+      // 沟通权——客户沟通入口，不是决定权。
+      return (
+        `**沟通权纪律（${spec.displayName}，不拥有最终批准权）**：` +
+        "客户意图写入 `docs/intents/<intentId>.md`（frontmatter: intentId/handoffKind/goal/scope/" +
+        "acceptance/customerWords；四要素必须非空，`customerWords` 只摘录客户原话，**不得写入凭据/密钥**）。\n" +
+        "需要报告员形成提案时，用 `hand_off_intent` 把意图交给应用（intentId/handoffKind/goal/scope/" +
+        "acceptance/summary，须与意图文件逐项一致）；应用在后台投递给报告员，不打开/不切换客户会话。" +
+        "**交接 ≠ 客户批准**，也不解锁任何门禁；同一意图不要重复交接。\n" +
+        "信息不足就先向客户问清；客户回答后更新意图文件，再用 `handoffKind=clarification` 交接。\n" +
+        "你不写提案、不任命、不排程、不派发、不安装、不写账本；不得批准或声称已获客户批准。"
+      );
   }
-  if (fn === "nomination") {
-    return (
-      "**提名权纪律（Nominator，不拥有最终批准权）**：" +
-      "提名写入 `docs/nominations/<flowId>-vN.md`，技能/MCP 声明写入 `docs/skills/**`、`docs/mcp/**`，" +
-      "工作记录写入 `docs/governance/nominator/**`。\n" +
-      "**提名 ≠ 任命**：先 `request_choice`（`cardKind=appointment`，`flowId`，`multiple:true`，选项 id 为" +
-      "候选角色 id）取得客户任命，再 `request_confirmation`（`cardKind=appointment-write`，逐文件列出将写路径）" +
-      "取得写盘确认，之后才能写 `角色卡/<id>/**`；未取得任命/写盘确认的写入会被门禁拒绝。\n" +
-      "你不批准方案、不排程、不派发；不得声称已获客户批准。"
-    );
-  }
-  return (
-    "**编排权纪律（Convener，不拥有最终批准权）**：" +
-    "流程单写入 `docs/flows/<flowId>.md`（步骤表；首步标「提名」），项目工作流写入 `docs/workflow.md`，" +
-    "工作记录写入 `docs/governance/convener/**`。\n" +
-    "只有账本中已有客户接受的提案（accept / accept-quick）＋已任命名单（或 accept-quick 复用既有项目角色）" +
-    "＋流程单对应步骤时，才能 `dispatch_task`；`flowId`/`stepId` 必填，目标只能是项目角色" +
-    "（三个内置治理角色一律拒绝）。shell 面仅只读档。\n" +
-    "你不批准方案、不任命、不验收；不得把「已派发」写成「已完成」。"
-  );
 }
 
 function errText(err: unknown): string {

@@ -155,8 +155,18 @@ test("callSummary：denied/failed 拆分（同相位行 denied 优先、timed-ou
 
 const RENDERER = read("app/renderer/renderer.js");
 
-test("渲染侧无计时器（settle 驱动）——全文零 setTimeout/setInterval 调用；折叠挂点在批尾", () => {
-  assert.equal(/\bsetTimeout\s*\(/.test(RENDERER), false, "renderer 不得有 setTimeout 调用");
+test("渲染侧计时器纪律（settle 驱动）——唯一豁免为一次性开启警告自动收起；折叠挂点在批尾", () => {
+  // 2026-10-18 客户批准：仅在「替我审批中」一次性警告上加一个约 9 秒自动收起计时器。
+  // 锁定数量/位置/用途/时长来源；setInterval 仍为零（settle 驱动不变）。
+  const timers = RENDERER.match(/\bsetTimeout\s*\(/g) ?? [];
+  assert.equal(timers.length, 1, "renderer 恰有一个 setTimeout（一次性警告自动收起）");
+  const warnStart = RENDERER.indexOf("function showShellJudgeWarning(");
+  const warnEnd = RENDERER.indexOf("function syncShellJudgeWarning(");
+  const timerAt = RENDERER.indexOf("setTimeout(function ()");
+  assert.ok(timerAt > warnStart && timerAt < warnEnd, "唯一计时器必须位于 showShellJudgeWarning 内");
+  const timerSlice = RENDERER.slice(timerAt, timerAt + 240);
+  assert.ok(timerSlice.includes("hideShellJudgeWarning();"), "计时器到期只收起该警告");
+  assert.ok(timerSlice.includes("UiLabels.SHELL_JUDGE_WARNING_AUTO_DISMISS_MS"), "时长经 ui-labels 单一来源");
   assert.equal(/\bsetInterval\s*\(/.test(RENDERER), false, "renderer 不得有 setInterval 调用");
   assert.ok(RENDERER.includes("flushDeferredFolds(); // 工具行折叠口径"), "批尾挂点必须在 flushBatchSideEffects 内");
   const settledBranch = RENDERER.indexOf("foldTurnGroups(pane, ev.turnId);");

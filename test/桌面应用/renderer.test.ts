@@ -36,6 +36,14 @@ const SHELL_JUDGE_CODE = (() => {
   const end = RENDERER.indexOf("// @shell-judge-end");
   return start >= 0 && end > start ? RENDERER.slice(start, end) : "";
 })();
+// 「无计时器」纪律的唯一例外（客户 2026-10-18 要求一次性开启警告约 8–10 秒自动消失）：
+// 检查其余渲染代码的计时器时剔除自动判断段——卡片等待/抽屉/滚动仍不得自造计时器。
+const RENDERER_CODE_NO_JUDGE = (() => {
+  const start = RENDERER.indexOf("// @shell-judge-start");
+  const end = RENDERER.indexOf("// @shell-judge-end");
+  const without = start >= 0 && end > start ? RENDERER.slice(0, start) + RENDERER.slice(end) : RENDERER;
+  return without.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+})();
 
 test("写入语义（桌面一律 pi）：明示写入真实落到导入项目，但受角色边界约束（越界写被拒）", () => {
   assert.ok(RENDERER.includes("实际写入导入项目"), "pi 文案须明示写入被导入项目");
@@ -601,7 +609,7 @@ test("真机缺陷修复：交互卡严格投递所属 pane（不回落当前查
   assert.ok(RENDERER.includes("cardInPane"), "物化应查重（同 requestId 同 pane 不重复建卡）");
   // ③ 可见性：非当前查看的请求 → 当前 pane 放**只读指针**；徽标按「任一 open 请求」重算。
   assert.ok(RENDERER.includes("【待确认】角色 ") && RENDERER.includes("点左侧该角色查看"), "未查看时应向当前 pane 放只读指针（只提示、不搬卡）");
-  assert.ok(RENDERER.includes("roleId !== state.selectedRoleId"), "指针仅在请求不属于当前查看角色时出现");
+  assert.ok(RENDERER.includes("requestSurfaces(entry).indexOf(state.selectedRoleId) < 0"), "指针仅在请求的全部呈现面都不是当前查看角色时出现");
   assert.ok(RENDERER.includes("openRequestCountFor") && RENDERER.includes("refreshAwaitingBadge"), "「等待你确认」徽标应随挂起集重算（B-3）");
   assert.ok(RENDERER.includes("awaitingConfirm"), "徽标判据仍由既有事实（挂起请求）驱动");
   // ④ 失效终态（G-1：**卡片不按时间过期**——唯一真实失效＝应用关闭/重启后未决请求不复存在）。
@@ -614,7 +622,7 @@ test("真机缺陷修复：交互卡严格投递所属 pane（不回落当前查
   assert.ok(!RENDERER.includes("超时或已被处理"), "时间源性旧文案已删（G-1）");
   // G-1 钉子 ①：交互卡路径**无任何计时器**——卡片可长期保持 open，无按时间过期/自动定格（用去注释源码断言，
   // 免得「说明无计时器」的那句注释自己被当成计时器）。
-  assert.ok(!RENDERER_CODE.includes("setTimeout") && !RENDERER_CODE.includes("setInterval"), "renderer 代码不得有任何计时器（卡片不按时间过期）");
+  assert.ok(!RENDERER_CODE_NO_JUDGE.includes("setTimeout") && !RENDERER_CODE_NO_JUDGE.includes("setInterval"), "renderer 代码不得有任何计时器（卡片不按时间过期；一次性警告除外）");
   // 通道侧：未知 id（重启后旧回包）→ 终态 expired；原因文案指向重启/关闭而非超时；通道同样无计时器。
   const CI = fs.readFileSync(path.resolve(HERE, "..", "..", "app", "desktop", "customer-input.ts"), "utf8");
   const CI_CODE = CI.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
@@ -968,7 +976,7 @@ test("G-2 U1：恢复确认卡——动作/目标角色/证据逐字；恰「执
   // 失效/通道异常如实终态（绝不呈现为已执行）；等待不设限 = 无计时器（同 G-1 钉子口径）。
   assert.ok(RENDERER.includes("未获执行") && RENDERER.includes("请让提议方重新发起"), "失效态如实（未获执行 + 出路）");
   assert.ok(RENDERER.includes("按 fail-closed 不执行"), "通道异常态如实（未接通道 ≠ 已执行）");
-  assert.ok(!RENDERER_CODE.includes("setTimeout") && !RENDERER_CODE.includes("setInterval"), "恢复卡不得有任何计时器（等待不设限——裁定 4）");
+  assert.ok(!RENDERER_CODE_NO_JUDGE.includes("setTimeout") && !RENDERER_CODE_NO_JUDGE.includes("setInterval"), "恢复卡不得有任何计时器（等待不设限——裁定 4）");
   // 动作人话标签=纯映射（未知动作只呈现原始 token——不假装认识）；渲染侧不自写第二份语义。
   assert.ok(RENDERER.includes("UiLabels.recoveryActionView"), "动作标签应经纯映射取");
   // 样式钩子 + 证据块换行/可滚。
@@ -1190,7 +1198,7 @@ test("P-1：待确认卡可达性——到达即达（底部阈值内滚到卡/�
   assert.ok(RENDERER.includes("UiLabels.arrivalScrolls("), "到达判定经纯映射");
   assert.ok(
     /if \(arrivalShouldScrollToCard\(entry\.roleId\)\) scrollBottom\(pane\);/.test(RENDERER) === false &&
-      RENDERER.includes("var nearBottomAtArrival = arrivalShouldScrollToCard(entry.roleId);") &&
+      RENDERER.includes("var nearBottomAtArrival = !isMirror && arrivalShouldScrollToCard(entry.roleId);") &&
       RENDERER.includes("if (nearBottomAtArrival) scrollBottomForced(pane);"),
     "物化时：**先量后挂**（到达前距离为判据），仅在阈值内滚到卡（强制贴底）；否则不打断阅读"
   );
@@ -1202,8 +1210,7 @@ test("P-1：待确认卡可达性——到达即达（底部阈值内滚到卡/�
   // 定位 = 滚动 + 高亮（一次性 CSS 动画；无计时器）。
   assert.ok(RENDERER.includes("function scrollToOperatorCard(") && RENDERER.includes('el.classList.add("is-flash")'), "定位=滚动到卡+高亮");
   assert.ok(RENDERER.includes("el.scrollIntoView({ block: \"center\" })"), "滚动容器=#chat（块居中）");
-  const rendererCode = RENDERER.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
-  assert.ok(!rendererCode.includes("setTimeout") && !rendererCode.includes("setInterval"), "无计时器（G-1 纪律不破；高亮=CSS 动画——注释里的说明不算）");
+  assert.ok(!RENDERER_CODE_NO_JUDGE.includes("setTimeout") && !RENDERER_CODE_NO_JUDGE.includes("setInterval"), "无计时器（G-1 纪律不破；高亮=CSS 动画——一次性警告除外）");
   // 切换：showPane 有未作答卡 ⇒ 滚到卡（P-1 优先）；无卡 ⇒ 到底部（U-1 客户裁定）。
   assert.ok(
     RENDERER.includes("var pendingIds = openRequestIdsFor(key);") && /scrollToOperatorCard\(key, pendingIds\[0\]\)/.test(RENDERER),
@@ -1258,8 +1265,7 @@ test("Q-2：窗口化行模型（阈值 150 / 缓冲 30 / spacer / rAF 合帧）
   // 批量收尾副作用（左树每批一次——原先每事件一次）。
   assert.ok(/function flushBatchSideEffects\(\) \{\s*if \(batchDepth > 0\) return;\s*renderRoleTree\(\);/.test(RENDERER), "左树重渲染每批至多一次");
   // 无计时器纪律不破（rAF 不算计时器）。
-  const code = RENDERER.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
-  assert.ok(!code.includes("setTimeout") && !code.includes("setInterval"), "renderer 代码仍无 setTimeout/setInterval（rAF 合帧合规）");
+  assert.ok(!RENDERER_CODE_NO_JUDGE.includes("setTimeout") && !RENDERER_CODE_NO_JUDGE.includes("setInterval"), "renderer 代码仍无 setTimeout/setInterval（rAF 合帧合规；一次性警告除外）");
   // 样式钩子。
   assert.ok(STYLES.includes(".virt-spacer") && STYLES.includes(".msg-assistant.is-streaming"), "spacer 样式 + 旧行安全网样式（`.is-streaming` 无正常生产者）");
 });
@@ -1394,8 +1400,7 @@ test("U1：会话提示条（.session-notice）出现/增高——「在底部�
   );
   assert.ok(/if \(!pin \|\| !pin\.pinned \|\| backgroundDelivery \|\| !pin\.chat\.isConnected\) return;/.test(RENDERER), "补滚前置闸：原在底部 + 非后台 + 视图仍在");
   // ④ 不新增计时器（本批纪律保持——纯同步量写，不引延迟/抖动）。
-  const code = RENDERER.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
-  assert.ok(!code.includes("setTimeout") && !code.includes("setInterval"), "提示条补滚不得引入计时器");
+  assert.ok(!RENDERER_CODE_NO_JUDGE.includes("setTimeout") && !RENDERER_CODE_NO_JUDGE.includes("setInterval"), "提示条补滚不得引入计时器（一次性警告除外）");
 });
 
 // ————————————————— 真机缺陷修复（2026-10-12）：交互卡锚点物化（已决卡切走切回跑到流尾） —————————————————
@@ -1403,11 +1408,11 @@ test("U1：会话提示条（.session-notice）出现/增高——「在底部�
 test("锚点物化：重物化复用既有行（不重建落尾）；registerRow 支持锚点插入；回放锚点表登记与消费；兜底落尾写明且不丢卡", () => {
   // ① 主修复：materializeOperatorCard 先查行表——卡行仍在（keepEl 行被虚拟窗口脱挂≠丢失）⇒ 复用、直接返回。
   assert.ok(
-    /function materializeOperatorCard\(requestId\) \{[\s\S]{0,600}rl0\.rows\[i0\]\.kind === "operator" && rl0\.rows\[i0\]\.requestId === requestId[\s\S]{0,80}return;/.test(RENDERER),
+    /function materializeOperatorCard\(requestId, surfaceRoleId\) \{[\s\S]{0,1800}rl0\.rows\[i0\]\.kind === "operator" && rl0\.rows\[i0\]\.requestId === requestId[\s\S]{0,450}return;/.test(RENDERER),
     "物化应先按 requestId 查既有卡行（离屏≠丢失——不得重建追加行表尾）"
   );
   // 旧缺陷的病灶（每次重建都无条件 registerRow 追加尾）不得回潮：去重守卫必须仍存在于重建之前。
-  assert.ok(/function materializeOperatorCard\(requestId\) \{[\s\S]{0,900}cardInPane\(pane, requestId\)\) return;/.test(RENDERER), "去重守卫仍在（同卡不重建）");
+  assert.ok(/function materializeOperatorCard\(requestId, surfaceRoleId\) \{[\s\S]{0,1100}cardInPane\(pane, requestId\)/.test(RENDERER), "去重守卫仍在（同卡不重建）");
   // ② registerRow 支持 atIndex（锚点插入 + 右移重编号）。
   assert.ok(/typeof o\.atIndex === "number" && o\.atIndex >= 0 && o\.atIndex <= rl\.rows\.length/.test(RENDERER), "registerRow 应支持 atIndex 锚点插入");
   assert.ok(/rl\.rows\.splice\(at, 0, rec\);[\s\S]{0,120}rl\.rows\[x\]\.index = x;/.test(RENDERER), "插入后其后各行 index 应右移重编号（attachRow/定位/窗口按 index 找行）");
@@ -1416,7 +1421,7 @@ test("锚点物化：重物化复用既有行（不重建落尾）；registerRow
   assert.ok(/function operatorAnchorIndex\(rl, entry\) \{[\s\S]{0,200}entry\.anchorListSeq === rl\.seq/.test(RENDERER), "物化应按锚点表落位（同表校验用 seq）");
   assert.ok(/a\.requestIndex !== null && a\.requestIndex \+ 1 <= rl\.rows\.length\) return a\.requestIndex \+ 1;/.test(RENDERER), "回放锚点应插到调用行之后（两行之间）");
   // ④ 首次到达不加锚（卡=当下最新事件，行表尾即它发生的位置——防同题新请求被插进历史）。
-  assert.ok(/var first = entry\.anchorIndex === undefined;[\s\S]{0,120}var atIndex = first \? null : operatorAnchorIndex\(rl, entry\);/.test(RENDERER), "首次物化应追加（不加锚）；重物化才按锚点落位");
+  assert.ok(/var first = !isMirror && entry\.anchorIndex === undefined;[\s\S]{0,160}var atIndex = isMirror \? null : \(first \? null : operatorAnchorIndex\(rl, entry\)\);/.test(RENDERER), "首次物化/镜像面应追加（不加锚）；源面重物化才按锚点落位");
   // ⑤ 兜底：找不到锚点 ⇒ null ⇒ 追加行表尾——绝不丢卡（代码里写明该兜底）。
   assert.ok(/return null; \/\/ 兜底：行表尾（绝不丢卡——位置让位于不丢）/.test(RENDERER), "兜底落尾须在代码写明（绝不丢卡）");
   // ⑥ 探针面：e2e 断言「卡行序索引落在锚点而非行表尾」的读数口。
@@ -1433,7 +1438,7 @@ test("右栏抽屉：默认不占屏（col-right 退役）；图标簇两枚（�
   assert.ok(INDEX.includes('id="right-drawer"'), "应有右侧抽屉 #right-drawer");
   assert.ok(STYLES.includes("#right-drawer.open") && STYLES.includes("position: absolute"), "抽屉应为覆盖层（absolute + .open 滑出）");
   assert.ok(STYLES.includes("grid-template-columns:var(--sidebar-width) minmax(0,1fr)") && STYLES.includes("--sidebar-width: 248px") && STYLES.includes("--content-max: 900px"), "栅格两列（左栏宽度可调）+ A1 内容列 900");
-  assert.ok(!/setTimeout|setInterval/.test(RENDERER.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "")), "无计时器纪律不破（抽屉过渡用 CSS）");
+  assert.ok(!/setTimeout|setInterval/.test(RENDERER_CODE_NO_JUDGE), "无计时器纪律不破（抽屉过渡用 CSS；一次性警告除外）");
   // ② 图标簇：**两枚**（角色资料/Pi 设置）在标题栏控制区、窗口按钮之前；不算 .win-btn（三窗口按钮守卫不破）。
   //    第二轮裁定（2026-10-13）：待办/队列归角色——tab-todo/tab-queue 退役（HTML 与渲染侧接线都不留）。
   assert.ok(INDEX.includes('id="right-tabs"'), "应有右上角图标簇 #right-tabs");
@@ -2320,7 +2325,7 @@ test("左树选中项可见（2026-10-17 实机）：最小位移、可见不动
 // 结果按 roleId 落 pane、按 toolCallId 锚定；manual 不产生结果行；已挂起卡不受切换影响。
 // DOM 行为由 e2e 覆盖；此处钉住源码接线、文案单点与边界（不自动开会话/不写持久化）。
 
-test("P5：输入区复选框 + 常驻警告 + 手动回落提示的 DOM 结构（§10.1/§10.2/§10.4）", () => {
+test("P5：输入区复选框 + 一次性警告 + 手动回落提示的 DOM 结构（§10.1/§10.2/§10.4）", () => {
   // 复选框：§10.1 逐字结构；位置在附件按钮之后、#composer-scope 之前。
   assert.ok(
     /<label class="composer-auto-approve">\s*<input type="checkbox" id="auto-approve-toggle" \/>\s*<span id="auto-approve-label">替我审<\/span>\s*<\/label>/.test(INDEX),
@@ -2331,22 +2336,28 @@ test("P5：输入区复选框 + 常驻警告 + 手动回落提示的 DOM 结构�
   const scope = INDEX.indexOf('id="composer-scope"');
   assert.ok(attach >= 0 && toggle > attach && scope > toggle, "位置：附件按钮之后、#composer-scope 之前");
   assert.ok(INDEX.includes('id="auto-approve-status"'), "失败错误位（可见、aria-live）");
-  // 常驻警告容器：默认隐藏（不是 toast）；手动回落提示位默认隐藏。
-  assert.ok(/<div id="shell-judge-warning" class="judge-warning" role="status" hidden><\/div>/.test(INDEX), "开启警告容器默认隐藏");
+  // 一次性警告容器：默认隐藏；文本容器 +「知道了」关闭按钮（客户 2026-10-18）。
+  assert.ok(
+    /<div id="shell-judge-warning" class="judge-warning" role="status" aria-live="polite" hidden>\s*<div id="shell-judge-warning-text" class="judge-warning-text"><\/div>\s*<button id="shell-judge-warning-close" class="judge-warning-close" type="button" title="关闭提示" aria-label="知道了">知道了<\/button>\s*<\/div>/.test(INDEX),
+    "开启警告容器默认隐藏，内含文本容器与「知道了」关闭按钮"
+  );
   assert.ok(/<p id="sc-judge-notice" class="sc-judge-notice" hidden><\/p>/.test(INDEX), "卡片 judgeNotice 位默认隐藏");
   const summary = INDEX.indexOf('id="sc-summary"');
   const notice = INDEX.indexOf('id="sc-judge-notice"');
   const reason = INDEX.indexOf('id="sc-reason"');
   assert.ok(summary < notice && notice < reason, "#sc-judge-notice 位于摘要之后、原因之前");
   // 样式钩子。
-  for (const cls of [".composer-auto-approve", ".judge-warning", ".shell-judge-row", ".sj-badge", ".sc-judge-notice"]) {
+  for (const cls of [".composer-auto-approve", ".judge-warning", ".judge-warning-close", ".shell-judge-row", ".sj-badge", ".sc-judge-notice"]) {
     assert.ok(STYLES.includes(cls), "styles.css 应有 " + cls);
   }
-  // 警告用琥珀色（不是错误红）；900 内容列与等宽字体不变。
+  // 警告用琥珀色（不是错误红）；一次性浮层不占聊天布局。
   const warningBlock = STYLES.match(/\.judge-warning \{([\s\S]*?)\}/)?.[1] || "";
   assert.ok(warningBlock.includes("var(--amber)"), "开启警告用琥珀色");
   assert.ok(!warningBlock.includes("var(--danger)") && !warningBlock.includes("var(--danger-line)"), "开启警告不得用错误红");
-  assert.ok(/\.judge-warning \{[\s\S]{0,200}max-width: var\(--content-max\)/.test(STYLES), "警告随 900 内容列");
+  assert.ok(warningBlock.includes("position: absolute"), "一次性警告浮层不参与布局");
+  assert.ok(/\.judge-warning \{[\s\S]{0,300}bottom: calc\(100% \+ 8px\)/.test(STYLES), "浮在输入区上方（不推动消息区）");
+  assert.ok(/\.composer \{ position: relative; \}/.test(STYLES), "输入区为浮层提供定位上下文");
+  assert.ok(/\.judge-warning-close \{[\s\S]{0,300}var\(--amber\)/.test(STYLES), "「知道了」按钮用琥珀色");
   const onBlock = STYLES.match(/\.composer-auto-approve\.is-on \{([\s\S]*?)\}/)?.[1] || "";
   assert.ok(onBlock.includes("var(--amber)"), "开启标记（判断 agent）用琥珀色");
   assert.ok(!onBlock.includes("var(--danger)"), "开启标记不得用错误红");
@@ -2358,16 +2369,15 @@ test("P5：开关三态——启动取真实状态、推送同步、点击只信
   const off = UL.shellJudgeToggleView(true, false, false);
   assert.equal(off.label, "替我审");
   assert.equal(off.checked, false);
-  assert.equal(off.warningVisible, false);
+  assert.equal(off.enabled, false);
   const on = UL.shellJudgeToggleView(true, true, false);
   assert.equal(on.label, "替我审批中 · 判断 agent");
   assert.equal(on.checked, true);
-  assert.equal(on.warningVisible, true);
+  assert.equal(on.enabled, true, "开启期间保留琥珀紧凑标记");
   const missing = UL.shellJudgeToggleView(false, true, false);
   assert.equal(missing.disabled, true);
   assert.equal(missing.checked, false, "桥缺失不显示假开启态");
   assert.equal(missing.label, "当前版本不支持自动判断，保持手动");
-  assert.equal(missing.warningVisible, false);
   // 失败不改状态（主进程是权威）。
   assert.equal(UL.shellJudgeToggleResult(true, { ok: false, error: "x" }).enabled, true);
   assert.equal(UL.shellJudgeToggleResult(false, { ok: true, enabled: true }).enabled, true);
@@ -2390,9 +2400,22 @@ test("P5：开关三态——启动取真实状态、推送同步、点击只信
   assert.ok(!SHELL_JUDGE_CODE.includes("s.enabled = desired"), "点击意图不得直接成为状态（无假开启态）");
   assert.ok(!/\.enabled\s*=\s*true/.test(SHELL_JUDGE_CODE), "渲染侧不得自行把开关置 true");
   assert.ok(SHELL_JUDGE_CODE.includes("toggle.checked = view.checked") && SHELL_JUDGE_CODE.includes("toggle.disabled = view.disabled"), "复选框只呈现真实视图");
-  // 警告只在真实开启时出现；关闭即隐藏。
-  assert.ok(SHELL_JUDGE_CODE.includes("warning.hidden = !view.warningVisible"), "警告显隐随真实状态");
+  // 一次性警告的状态机与文案单点（客户 2026-10-18）。
+  assert.ok(SHELL_JUDGE_CODE.includes("UiLabels.shellJudgeWarningStep(s.enabled, s.promptShown)"), "一次性提示经 ui-labels 纯函数迁移");
+  assert.ok(SHELL_JUDGE_CODE.includes("s.promptShown = step.shown"), "记录本次开启已提示（重绘不重现）");
+  assert.ok(SHELL_JUDGE_CODE.includes("if (step.show) showShellJudgeWarning();"), "只在首次开启时展示警告");
   assert.ok(SHELL_JUDGE_CODE.includes("UiLabels.shellJudgeWarningLines()"), "警告文案经 ui-labels 单一来源");
+  assert.ok(SHELL_JUDGE_CODE.includes("UiLabels.SHELL_JUDGE_WARNING_CLOSE_LABEL"), "关闭按钮文案经 ui-labels 单一来源");
+  assert.ok(SHELL_JUDGE_CODE.includes("UiLabels.SHELL_JUDGE_WARNING_AUTO_DISMISS_MS"), "自动收起时长经 ui-labels 单一来源");
+  assert.ok(SHELL_JUDGE_CODE.includes("setTimeout(function () {"), "约 8–10 秒后自动消失");
+  assert.ok(SHELL_JUDGE_CODE.includes("hideShellJudgeWarning()"), "关闭/自动到时/关闭开关共用收起");
+  assert.ok(RENDERER.includes('$("shell-judge-warning-close").addEventListener("click", hideShellJudgeWarning)'), "「知道了」点击收起");
+  // 重绘/收消息/切角色路径不会直接改警告显隐——只有展示/收起两个写点，展示只经一次性状态机。
+  const showCalls = (SHELL_JUDGE_CODE.match(/showShellJudgeWarning\(\)/g) || []).length;
+  assert.equal(showCalls, 2, "showShellJudgeWarning 仅定义 + step.show 单点调用");
+  const visibilityWrites = (SHELL_JUDGE_CODE.match(/warning\.hidden = (?:true|false)/g) || []).length;
+  assert.equal(visibilityWrites, 2, "警告显隐只有展示/收起两处写点");
+  assert.ok(SHELL_JUDGE_CODE.includes("warning.hidden = false;") && SHELL_JUDGE_CODE.includes("warning.hidden = true;"), "展示与收起各一处");
 });
 
 test("P5：结果行接线——按 roleId 落 pane、按 toolCallId 锚定、deny 档徽标可见、manual 不落行", () => {
@@ -2465,8 +2488,8 @@ test("W4：左树三组——主入口/治理职能（内置）/项目角色；�
   assert.ok(sub.includes('return "内置治理角色（定义见 SKILL.md）";'), "旧 su 副标题逐字保留");
 
   // 不硬编码三权 id（去注释源码断言；角色名/权力文案全部来自 ui-labels）。
-  for (const id of ["rapporteur", "nominator", "convener"]) {
-    assert.ok(!RENDERER_CODE.includes(id), "renderer.js 代码中不得硬编码三权 id：" + id);
+  for (const id of ["liaison", "rapporteur", "nominator", "convener"]) {
+    assert.ok(!RENDERER_CODE.includes(id), "renderer.js 代码中不得硬编码治理角色 id：" + id);
   }
   for (const cls of [".ti-power", ".ti-builtin"]) assert.ok(STYLES.includes(cls), "styles.css 应有 " + cls);
 });
@@ -2481,7 +2504,7 @@ test("W4：空态——报告员保留治理记录入口；提名/编排专属�
   // 每个 pane 用**自己的角色**取空态（不再用通用文案）；主聊天区/换项目仍用通用空态。
   assert.ok(RENDERER.includes("p.innerHTML = emptyStateHtml(key);"), "paneFor 按角色 id 取空态");
   assert.ok(RENDERER.includes("outerHTML = emptyStateHtml(key);"), "refreshEmptyStates 按角色 id 刷新");
-  assert.ok(RENDERER.includes('$("chat").innerHTML = emptyStateHtml();'), "换项目/主聊天区保持通用空态");
+  assert.ok(RENDERER.includes('$("chat").innerHTML = emptyStateHtml(state.selectedRoleId || state.primaryRoleId);'), "换项目/主聊天区按当前主入口取空态（single 输出不变）");
   // 旧 single 行为：项目角色无 governanceFunction ⇒ 走原分支（无专属空态）。
   assert.ok(fn.includes("if (govEmpty)"), "专属空态是显式分支；无治理职能时逐字走原分支");
 });
@@ -2537,14 +2560,113 @@ test("W4：决定卡——flowId/权力/写路径/摘要/哈希/排队提示；�
   assert.ok(RENDERER.includes("UiLabels.GOVERNANCE_QUEUE_NOTE"), "排队提示文案单一来源");
   assert.ok(RENDERER.includes("var queued = payload.queued === true || req.queued === true;"), "排队事实只信桌面窗口");
   assert.ok(RENDERER.includes('var queuedNext = typeof payload.queued === "boolean"'), "同一请求重推的 queued 事实（payload 优先，request.queued 兼容）");
-  assert.ok(RENDERER.includes("if (queued) setButtonsDisabled(true);"), "排队卡不可作答");
-  assert.ok(RENDERER.includes('if (entry.queued === true) { setNote(UiLabels.GOVERNANCE_QUEUE_NOTE, ""); return; }'), "提交守卫（不自动批准）");
+  assert.ok(RENDERER.includes("if (queued) setEntryButtonsDisabled(entry, true);"), "排队卡不可作答（源面与镜像面同步）");
+  assert.ok(RENDERER.includes('if (entry.queued === true) { setEntryNote(entry, UiLabels.GOVERNANCE_QUEUE_NOTE, ""); return; }'), "提交守卫（不自动批准）");
   assert.ok(RENDERER.includes("function updateQueuedOperatorCard(entry)"), "排队推进由桌面窗口重推 queued 驱动（UI 不自行合并）");
   // 到达路径不得自动作答：operatorRespond 只出现在作答函数里。
   const arrival = RENDERER.slice(RENDERER.indexOf("function appendOperatorRequest("), RENDERER.indexOf("function onOperatorExpired("));
   assert.ok(!arrival.includes("operatorRespond"), "请求到达不得自动回传决定");
   assert.ok(!arrival.includes('state = "decided"'), "请求到达不得伪造成已决定");
   for (const cls of [".op-gov-badge", ".op-meta", ".op-queued"]) assert.ok(STYLES.includes(cls), "styles.css 应有 " + cls);
+});
+
+// —————— W6-C（2026-10-18 四角色评审 §6/§9）：Liaison 主入口、镜像卡、排队聚合、空态优先级 ——————
+
+test("W6-C：四角色左树——主入口仍由 primaryRoleId 驱动；治理职能组排除主入口；Liaison 文案经 ui-labels", () => {
+  const tree = RENDERER.slice(RENDERER.indexOf("function renderRoleTree("), RENDERER.indexOf("function selectedRole("));
+  assert.ok(tree.includes("var primary = state.roles.find(function (r) { return r.roleId === state.primaryRoleId; }) || null;"), "主入口仍按 primaryRoleId 取（不硬编码角色）");
+  assert.ok(tree.includes("if (primary && r.roleId === primary.roleId) return;"), "治理职能组排除主入口（Liaison 归主入口组）");
+  const item = RENDERER.slice(RENDERER.indexOf("function roleTreeItem("), RENDERER.indexOf("function ensureRoleTreeVisible("));
+  assert.ok(item.includes("var gov = UiLabels.governanceRoleView(r.governanceFunction);"), "行文案由 governanceFunction 派生");
+  assert.ok(item.includes("var displayName = gov ? gov.name : r.roleId;"), "治理行显示中文名+英文名（含联络官 Liaison）");
+  assert.ok(item.includes("esc(roleSubtitle(r))") && item.includes('class="ti-power"'), "权力副标题钩子仍在");
+  assert.ok(item.includes('class="ti-builtin"'), "内置标识钩子仍在");
+  // 四角色 id 均不得硬编码（含 liaison）；single 旧树无 governanceFunction 时逐字走原路径。
+  assert.ok(RENDERER.includes("UiLabels.governanceRoleView(role.governanceFunction)"), "roleSubtitle/空态按 function 派生");
+  assert.ok(RENDERER.includes('if (role.builtIn) return "内置治理角色（定义见 SKILL.md）";'), "旧 su 副标题逐字保留");
+});
+
+test("W6-C：空态优先级——S0 → 治理记录动作 → 治理角色专属 → 默认；Liaison 提示仅附加不替换，专属空态无重复 CTA", () => {
+  const fn = RENDERER.slice(RENDERER.indexOf("function emptyStateHtml("), RENDERER.indexOf("// —————— I4 治理记录"));
+  const s0 = fn.indexOf('state.projectRoot && state.hasRoles === false');
+  const reaccept = fn.indexOf('action === "reaccept"');
+  const establish = fn.indexOf('action === "establish"');
+  const govEmpty = fn.indexOf("} else if (govEmpty)");
+  assert.ok(s0 >= 0 && reaccept > s0 && establish > reaccept && govEmpty > establish, "优先级顺序：S0 → reaccept → establish → 治理角色专属空态");
+  assert.ok(fn.includes("gov.primaryEntrance"), "Liaison 职责提示按 ui-labels 的 primaryEntrance 标记附加（不硬编码 id）");
+  assert.ok(fn.includes("govEmpty && action !== \"reaccept\" && action !== \"establish\""), "专属空态不重复「开始与 <自己> 对话」CTA");
+  assert.ok(fn.includes("UiLabels.governanceRoleEmptyState(role.governanceFunction)"), "治理角色空态经 ui-labels 单点");
+  assert.ok(fn.includes("UiLabels.governanceEmptyState(projectRoleCount(), primary)"), "S1 建立入口仍在");
+  assert.ok(fn.includes("data-governance-reaccept") && fn.includes("data-governance-establish"), "治理记录两个入口保留（Liaison 亦可到达）");
+});
+
+test("W6-C：镜像卡——同一请求 id 双呈现；镜像面追加末尾/不参与源锚点、不自动滚动；来源标签来自 ui-labels", () => {
+  const arrival = RENDERER.slice(RENDERER.indexOf("function appendOperatorRequest("), RENDERER.indexOf("function onOperatorExpired("));
+  assert.ok(arrival.includes("payload.mirrorRoleId"), "镜像面只信桌面窗口载荷（渲染侧不重复判据）");
+  assert.ok(!arrival.includes("governanceModel"), "到达路径不以模型/卡片种类自行决定镜像（不建第二份判据）");
+  assert.ok(arrival.includes("var surfaces = [roleId];"), "呈现面列表由来源角色起始");
+  assert.ok(arrival.includes("surfaces: surfaces, cards: Object.create(null)"), "登记表扩 surfaces/cards（同一请求 id）");
+  assert.ok((arrival.match(/opRequests\[requestId\] = entry = \{/g) || []).length === 1, "同一请求只登记一次（镜像不是第二个请求）");
+
+  const materialize = RENDERER.slice(RENDERER.indexOf("function materializeOperatorCard("), RENDERER.indexOf("function updateQueuedOperatorCard("));
+  assert.ok(materialize.includes("function materializeOperatorCard(requestId, surfaceRoleId)"), "物化按呈现面参数化");
+  assert.ok(materialize.includes("var isMirror = surface !== entry.roleId;"), "镜像面判定 = 非来源面");
+  assert.ok(materialize.includes('card.className = "op-request " + variantClass + (isMirror ? " is-mirror" : "")'), "镜像卡样式标识");
+  assert.ok(materialize.includes("UiLabels.governanceMirrorSourceLabel(sourceName)"), "来源标签经 ui-labels");
+  assert.ok(materialize.includes("UiLabels.GOVERNANCE_MIRROR_BADGE"), "镜像徽标经 ui-labels");
+  assert.ok(materialize.includes("var nearBottomAtArrival = !isMirror && arrivalShouldScrollToCard(entry.roleId);"), "镜像到达不自动滚动（不移动 pane/焦点）");
+  assert.ok(materialize.includes("var atIndex = isMirror ? null : (first ? null : operatorAnchorIndex(rl, entry));"), "镜像面不参与源面锚点表（追加末尾）");
+  assert.ok(materialize.includes("(!isMirror ? adoptOperatorLifecycle(pane, entry, card) : null)"), "镜像面不接管源角色工具生命周期");
+  assert.ok(materialize.includes("entry.cards[surface] = card;") && materialize.includes("if (!isMirror) entry.card = card;"), "每面各自物化、同一 requestId 登记");
+  assert.ok(materialize.includes("requestId: requestId"), "按钮/卡共用同一请求 id");
+  for (const cls of [".op-request.is-mirror", ".op-mirror-badge", ".op-mirror-source"]) assert.ok(STYLES.includes(cls), "styles.css 应有 " + cls);
+});
+
+test("W6-C：只答一次——任一侧作答调用同一 respond；成功后冻结两侧；第二侧/重复提交被终态与 submitting 双闸挡住", () => {
+  assert.equal((RENDERER.match(/d\.operatorRespond\(/g) || []).length, 1, "renderer 只有一个作答调用点（镜像不建第二通道）");
+  const submit = RENDERER.slice(RENDERER.indexOf("function submitOperatorDecision("), RENDERER.indexOf("function materializePendingFor("));
+  assert.ok(submit.includes("if (!entry || entry.state !== \"open\" || entry.submitting === true) return;"), "非 open/提交中直接拒绝");
+  assert.ok(submit.includes("entry.submitting = true;"), "提交闸置位");
+  assert.ok(submit.includes("d.operatorRespond({ id: entry.id, decision: decision })"), "同一个请求 id 回传");
+  assert.ok(submit.includes('entry.state = "decided";') && submit.includes("freezeEntryCards(entry);"), "成功后冻结**所有**呈现面");
+  assert.ok(submit.includes('entry.state = "expired";') && submit.includes("freezeEntryCards(entry);"), "失效同样冻结所有呈现面");
+  assert.ok(submit.includes("setEntryButtonsDisabled(entry, true);"), "提交时两侧同时禁用");
+  const freeze = RENDERER.slice(RENDERER.indexOf("function freezeEntryCards("), RENDERER.indexOf("function setEntryButtonsDisabled("));
+  assert.ok(freeze.includes("entryCardsOf(entry).forEach"), "冻结遍历全部呈现面");
+  // 失效事件按请求 id 命中全部面（不再要求 payload.roleId 等于来源角色）。
+  const expired = RENDERER.slice(RENDERER.indexOf("function onOperatorExpired("), RENDERER.indexOf("function onOperatorQueued("));
+  assert.ok(expired.includes("var entry = payload && opRequests[payload.id];"), "失效按请求 id 查找");
+  assert.ok(!expired.includes("payload.roleId !== entry.roleId"), "镜像面失效不被来源角色过滤掉");
+  assert.ok(expired.includes("freezeEntryCards(entry);") && expired.includes("refreshEntryAwaiting(entry);"), "失效冻结并刷新两侧");
+  assert.ok(!expired.includes("operatorRespond"), "失效不回传决定");
+});
+
+test("W6-C：排队与一项目一卡——排队事件只出聚合行、不物化可操作卡；single/su 不出现该行；呈现后从聚合移除", () => {
+  assert.ok(RENDERER.includes("if (d.onOperatorQueued) d.onOperatorQueued("), "订阅 session:operator-queued");
+  const queued = RENDERER.slice(RENDERER.indexOf("function onOperatorQueued("), RENDERER.indexOf("function queuedCountForProject("));
+  assert.ok(queued.includes("state.governanceModel !== \"trio\"") && queued.includes("return;"), "仅 trio；single/su 不走聚合");
+  assert.ok(!queued.includes("operatorRespond"), "排队事件不得作答/批准");
+  assert.ok(!queued.includes("materializeOperatorCard"), "排队请求不物化可操作卡");
+  assert.ok(queued.includes("queuedRequests[String(payload.id)] = payload;"), "按请求 id 记排队事实（同一请求不建第二份）");
+  const aggregate = RENDERER.slice(RENDERER.indexOf("function renderQueueAggregate("), RENDERER.indexOf("function submitOperatorDecision("));
+  assert.ok(aggregate.includes("UiLabels.governanceQueueAggregateText(n)"), "聚合行文案经 ui-labels");
+  assert.ok(aggregate.includes('".op-queue-aggregate"'), "主入口聚合行 DOM 钩子");
+  assert.ok(aggregate.includes("paneFor(primary)"), "聚合行落在主入口 pane（primaryRoleId）");
+  assert.ok(RENDERER.includes("if (queuedRequests[requestId]) {"), "同一请求被呈现后从排队聚合移除");
+  assert.ok(RENDERER.includes("delete queuedRequests[queuedId];"), "失效/取消也从聚合移除");
+  assert.ok(STYLES.includes(".op-queue-aggregate"), "styles.css 应有 .op-queue-aggregate");
+});
+
+test("W6-C：冻结/排队状态在两侧一致——refreshEntryAwaiting 按 surfaces 刷新；排队启停遍历全部卡", () => {
+  assert.ok(RENDERER.includes("function requestSurfaces(entry)"), "呈现面单一读取点");
+  const open = RENDERER.slice(RENDERER.indexOf("function openRequestIdsFor("), RENDERER.indexOf("function openRequestCountFor("));
+  assert.ok(open.includes("requestSurfaces(entry).indexOf(roleId) >= 0"), "未作答列表按 surfaces 命中（源面+镜像面）");
+  const refresh = RENDERER.slice(RENDERER.indexOf("function refreshEntryAwaiting("), RENDERER.indexOf("function entryCardsOf("));
+  assert.ok(refresh.includes("requestSurfaces(entry).forEach"), "徽标/chip/队列刷新遍历全部呈现面");
+  const queuedCard = RENDERER.slice(RENDERER.indexOf("function updateQueuedOperatorCard("), RENDERER.indexOf("// 本端**手动发送**的最近一条"));
+  assert.ok(queuedCard.includes("entryCardsOf(entry).forEach"), "排队提示同步到全部呈现面");
+  assert.ok(queuedCard.includes("setEntryButtonsDisabled(entry, queued || entry.submitting === true);"), "两侧同启停（提交中保持禁用）");
+  assert.ok(RENDERER.includes("requestSurfaces(opRequests[id]).indexOf(roleId) >= 0) materializeOperatorCard(id, roleId);"), "pane 重挂按呈现面补挂");
 });
 
 // —————— W4/V1b 旧模型迁移界面（评审 §5.5）：按钮能力、零写入预览、确认/失败、S1 透传 ——————

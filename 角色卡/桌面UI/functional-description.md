@@ -41,6 +41,7 @@ test/桌面应用/（渲染侧，路径沿用拆分前）
 - **事件订阅单源**：页面级多次订阅同一事件会各自回调（e2e 探针须避免叠加订阅造成观测伪影）。
 - **esc 单一来源**：非 Markdown 路径的转义一律走 `Markdown.esc`；模型输出禁直插。
 - **无计时器纪律**：交互卡不按时间过期；抽屉过渡纯 CSS。除既有诊断/去抖机制外不新增 setTimeout/setInterval。
+- **治理决定卡镜像（W6-C）**：`opRequests[requestId]` 以 `surfaces`/`cards` 承载同一请求的多面呈现；源面沿用锚点/生命周期，镜像面（主入口 Liaison）追加末尾且不自动滚动。作答唯一入口 `submitOperatorDecision`（单点 `operatorRespond`），成功后/失效冻结全部面；排队请求不物化卡，仅主入口聚合行。渲染侧不自行判定是否镜像（只认载荷 `mirrorRoleId`），也不写账本/模型上下文。
 - 历史沿革（UI/UX v2、设计对齐、IME、抽屉、图片、P1 等）见冻结归档 `角色卡/桌面应用/docs/` 与[功能导航](feature-map.md)链接。
 
 ## 已知偏离 / 边界登记

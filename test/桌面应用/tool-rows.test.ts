@@ -582,14 +582,13 @@ test('P5：开关视图——未开启默认「替我审」、开启琥珀标记
   assert.equal(off.title, '手动逐条确认 shell 命令（默认）');
   assert.equal(off.checked, false);
   assert.equal(off.disabled, false);
-  assert.equal(off.warningVisible, false, '未开启不显示常驻警告');
+  assert.equal(off.enabled, false, '未开启无琥珀紧凑标记');
 
   const on = labels.shellJudgeToggleView(true, true, false);
   assert.equal(on.label, '替我审批中 · 判断 agent');
   assert.equal(on.title, '判断 agent 先评估 shell 命令必要性；可随时关闭');
   assert.equal(on.checked, true);
-  assert.equal(on.enabled, true);
-  assert.equal(on.warningVisible, true, '开启后才显示常驻警告');
+  assert.equal(on.enabled, true, '开启期间保留琥珀紧凑标记（长文警告只出现一次）');
 
   const busy = labels.shellJudgeToggleView(true, true, true);
   assert.equal(busy.disabled, true, 'IPC 在途只禁用，不改真实状态/文案');
@@ -604,7 +603,25 @@ test('P5：开关视图——未开启默认「替我审」、开启琥珀标记
   assert.equal(missing.disabled, true);
   assert.equal(missing.label, '当前版本不支持自动判断，保持手动');
   assert.equal(missing.title, '当前版本不支持自动判断，保持手动');
-  assert.equal(missing.warningVisible, false);
+});
+
+test('P5：一次性开启警告——首次开启显示一次、关闭/重绘不重现、关开关再开启才再显示', () => {
+  // 关闭态：不显示，并清掉「已提示」（客户关闭开关后再次开启要再提示一次）。
+  assert.deepEqual(labels.shellJudgeWarningStep(false, false), { shown: false, show: false });
+  assert.deepEqual(labels.shellJudgeWarningStep(false, true), { shown: false, show: false }, '关闭开关即复位「已提示」');
+  // 首次开启：显示一次并记住。
+  assert.deepEqual(labels.shellJudgeWarningStep(true, false), { shown: true, show: true }, '首次开启显示一次');
+  // 已提示后：重绘/收消息/切角色/重复推送都不再显示。
+  assert.deepEqual(labels.shellJudgeWarningStep(true, true), { shown: true, show: false }, '已关闭/已自动消失后不重复显示');
+  // 关闭再开启：重新显示一次。
+  const afterOff = labels.shellJudgeWarningStep(false, true);
+  assert.deepEqual(labels.shellJudgeWarningStep(true, afterOff.shown), { shown: true, show: true }, '关闭再开启会再次显示');
+  // 文案与时长单点。
+  assert.equal(labels.SHELL_JUDGE_WARNING_CLOSE_LABEL, '知道了', '关闭按钮文案单一来源');
+  assert.ok(
+    labels.SHELL_JUDGE_WARNING_AUTO_DISMISS_MS >= 8000 && labels.SHELL_JUDGE_WARNING_AUTO_DISMISS_MS <= 10000,
+    '自动收起时长在客户要求的 8–10 秒内'
+  );
 });
 
 test('P5：开关 IPC 结果——成功采用主进程实际值；失败/坏件保持原状态并给错误', () => {
@@ -756,17 +773,22 @@ test('D1：governanceReacceptFailureView——phase≠write 可声明零写入�
 // —————— W4 治理三权（2026-10-17 评审 §8）：左树/空态/状态行/决定卡文案单一来源 ——————
 // 全部按接口事实（governanceFunction / cardKind / governanceModel / flowId）纯转写；未知值不显示、不猜。
 
-test('W4：治理角色文案——中文名+英文名/权力副标题/内置标识（按 governanceFunction 派生，未知不猜）', () => {
+test('W4/W6-C：治理角色文案——四角色中文名+英文名/权力副标题/内置标识（按 governanceFunction 派生，未知不猜）', () => {
+  const l = labels.governanceRoleView('liaison');
+  assert.equal(l.name, '联络官 Liaison', '四角色主入口＝联络官 Liaison');
+  assert.equal(l.power, '客户沟通 · 不拥有最终批准权', 'Liaison 权力副标题逐字');
+  assert.equal(l.primaryEntrance, true, 'Liaison 标记为客户默认入口');
   const p = labels.governanceRoleView('proposal');
   assert.equal(p.name, '报告员 Rapporteur', '提案职能＝报告员 Rapporteur');
   assert.equal(p.power, '提案权 · 不拥有最终批准权');
+  assert.equal(p.primaryEntrance, false);
   const n = labels.governanceRoleView('nomination');
   assert.equal(n.name, '提名官 Nominator');
   assert.equal(n.power, '提名权 · 不拥有最终批准权');
   const s = labels.governanceRoleView('schedule');
   assert.equal(s.name, '召集人 Convener');
   assert.equal(s.power, '编排权 · 不拥有最终批准权');
-  for (const v of [p, n, s]) assert.equal(v.builtinNote, '内置角色：随应用发布，无角色目录', '内置标识逐字');
+  for (const v of [l, p, n, s]) assert.equal(v.builtinNote, '内置角色：随应用发布，无角色目录', '内置标识逐字');
   assert.equal(labels.GOVERNANCE_ROLE_BUILTIN_NOTE, '内置角色：随应用发布，无角色目录');
   assert.equal(labels.GOVERNANCE_GROUP_LABEL, '治理职能（内置）');
   for (const bad of ['su', 'Rapporteur', '', null, undefined, 1]) {
@@ -774,8 +796,13 @@ test('W4：治理角色文案——中文名+英文名/权力副标题/内置标
   }
 });
 
-test('W4：治理角色空态——提名/编排专属说明逐字；提案沿用既有空态（null）', () => {
-  assert.equal(labels.governanceRoleEmptyState('proposal'), null, '报告员空态沿用既有治理记录/主入口空态');
+test('W4/W6-C：治理角色空态——四角色说明逐字（Liaison 客户入口/提案交接；提名编排既有）', () => {
+  const l = labels.governanceRoleEmptyState('liaison');
+  assert.equal(l.title, '联络官 Liaison');
+  assert.equal(l.sub, '客户默认入口：你说要做什么，我先确认目标、范围与验收，再交给报告员形成提案。我不写提案、不批准。本版起默认入口为联络官；报告员与历史提案不变。');
+  const p = labels.governanceRoleEmptyState('proposal');
+  assert.equal(p.title, '报告员 Rapporteur');
+  assert.equal(p.sub, '通常由联络官交接打开；客户也可以直接找我。我只写提案，不批准。');
   const n = labels.governanceRoleEmptyState('nomination');
   assert.equal(n.title, '提名官 Nominator');
   assert.equal(n.sub, '通常由流程单提名步骤打开；仅在客户明确要求时直接使用');
@@ -785,18 +812,29 @@ test('W4：治理角色空态——提名/编排专属说明逐字；提案沿�
   assert.equal(labels.governanceRoleEmptyState('su'), null, '未知职能不编空态');
 });
 
-test('W4：状态行——治理模型/当前流程/四态逐字；未知模型/状态不显示（不猜）', () => {
-  assert.equal(labels.governanceStatusText('trio', '', ''), '治理模型：三权');
+test('W4/W6-C：状态行——三权显示四角色；当前流程/四态逐字；未知不猜', () => {
+  assert.equal(labels.governanceStatusText('trio', '', ''), '治理模型：三权 · 四角色');
   assert.equal(labels.governanceStatusText('single', '', ''), '治理模型：旧模型（su）');
-  assert.equal(labels.governanceStatusText('trio', 'flow-1', 'awaiting-customer'), '治理模型：三权 · 当前流程：flow-1 · 等待客户决定');
-  assert.equal(labels.governanceStatusText('trio', '', 'in-progress'), '治理模型：三权 · 进行中');
-  assert.equal(labels.governanceStatusText('trio', '', 'blocked'), '治理模型：三权 · 阻塞');
-  assert.equal(labels.governanceStatusText('trio', '', 'escalated-to-customer'), '治理模型：三权 · 已升级客户');
-  assert.equal(labels.governanceStatusText('trio', '', 'paused'), '治理模型：三权', '未知/不承诺状态不显示（不猜）');
+  assert.equal(labels.governanceStatusText('trio', 'flow-1', 'awaiting-customer'), '治理模型：三权 · 四角色 · 当前流程：flow-1 · 等待客户决定');
+  assert.equal(labels.governanceStatusText('trio', '', 'in-progress'), '治理模型：三权 · 四角色 · 进行中');
+  assert.equal(labels.governanceStatusText('trio', '', 'blocked'), '治理模型：三权 · 四角色 · 阻塞');
+  assert.equal(labels.governanceStatusText('trio', '', 'escalated-to-customer'), '治理模型：三权 · 四角色 · 已升级客户');
+  assert.equal(labels.governanceStatusText('trio', '', 'paused'), '治理模型：三权 · 四角色', '未知/不承诺状态不显示（不猜）');
   assert.equal(labels.governanceStatusText('', 'flow-1', ''), '当前流程：flow-1', '模型未知仍可如实显示接口给的流程 id');
   assert.equal(labels.governanceStatusText(undefined, '', 'blocked'), '阻塞');
   assert.equal(labels.governanceFlowStatusText('awaiting-customer'), '等待客户决定');
   assert.equal(labels.governanceFlowStatusText('nope'), '', '未知状态空串');
+});
+
+test('W6-C：镜像卡来源标签与主入口排队聚合文案逐字（同一请求的第二呈现，不是第二张审批）', () => {
+  assert.equal(labels.governanceMirrorSourceLabel('报告员 Rapporteur'), '来自 报告员 Rapporteur 的治理决定 · 客户最终批准');
+  assert.equal(labels.governanceMirrorSourceLabel(''), '来自 发起角色 的治理决定 · 客户最终批准', '缺名不编角色，如实用兜底');
+  assert.equal(labels.governanceQueueAggregateText(1), '还有 1 个决定等待前一个决定');
+  assert.equal(labels.governanceQueueAggregateText(3), '还有 3 个决定等待前一个决定');
+  assert.equal(labels.governanceQueueAggregateText(0), '', '无排队不显示');
+  assert.equal(labels.governanceQueueAggregateText(-1), '', '坏值不显示');
+  assert.equal(labels.governanceQueueAggregateText('2'), '', '只认数量，不猜');
+  assert.equal(labels.GOVERNANCE_MIRROR_BADGE, '镜像 · 主入口');
 });
 
 test('W4/V1b：旧模型迁移按钮——未接线「升级入口待本版后续」禁用；桥齐备「查看差异 / 升级」启用；提示条文案逐字', () => {

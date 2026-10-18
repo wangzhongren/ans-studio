@@ -17,6 +17,11 @@ import type {
   ReportHandbackPayload,
   DispatchTaskFn,
   DispatchTaskPayload,
+  HandOffIntentFn,
+  HandOffIntentKind,
+  HandOffIntentPayload,
+  RequestClarificationFn,
+  RequestClarificationPayload,
   RoleStatusFn,
   RoleStatusPayload,
   SessionTailFn,
@@ -76,6 +81,12 @@ export const SUBMIT_REPORT_TOOL_NAME = "submit_report";
 
 /** dispatch_task 工具名（设计 H-1；su 派发任务给项目角色——派发 ≠ 授权）。 */
 export const DISPATCH_TASK_TOOL_NAME = "dispatch_task";
+
+/** hand_off_intent 工具名（W6-A；联络官把客户意图交接给报告员——交接 ≠ 客户批准）。 */
+export const HAND_OFF_INTENT_TOOL_NAME = "hand_off_intent";
+
+/** request_clarification 工具名（W6-A；报告员把澄清问题送到主入口——不弹决定卡）。 */
+export const REQUEST_CLARIFICATION_TOOL_NAME = "request_clarification";
 
 /** report_shell_verdict 工具名（R-1；审读会话交回结构化审读结论；与编排 shell-gate.ts:206 同串）。 */
 export const SHELL_VERDICT_TOOL_NAME = "report_shell_verdict";
@@ -791,6 +802,9 @@ function abortedToolResult(name: string): ToolResult {
   if (name === SUBMIT_REPORT_TOOL_NAME) return { ok: false, message: `${name}：报告**未能交回**（原因：会话已中止）` };
   if (name === SHELL_VERDICT_TOOL_NAME) return { ok: false, message: `${name}：审读结论**未能交回**（原因：会话已中止）` };
   if (name === DISPATCH_TASK_TOOL_NAME) return { ok: false, message: `${name}：任务**未能派发**（原因：会话已中止）` };
+  // W6-A：交接/澄清中止时**不假设已投递/已提交**（零副作用面如实）。
+  if (name === HAND_OFF_INTENT_TOOL_NAME) return { ok: false, message: `${name}：意图**未能交接**（原因：会话已中止）——**不要当它已交接**；如实告知客户。` };
+  if (name === REQUEST_CLARIFICATION_TOOL_NAME) return { ok: false, message: `${name}：澄清请求**未能提交**（原因：会话已中止）——**不要当客户已看到该问题**；如实告知客户。` };
   // G-2/R2：中止时**不假设已执行**——等待被中止的提议其结果以系统回执为准（确认卡可能仍被处理）。
   if (name === PROPOSE_RECOVERY_TOOL_NAME) return { ok: false, message: `${name}：本次提议**未获结果**（原因：会话已中止）——**不要假设已执行**；如实告知客户。` };
   // G-4/I2：中止时**不假设已安装/已卸载**（零副作用面如实）。
@@ -1141,6 +1155,198 @@ function makeDispatchTaskTool(fn: DispatchTaskFn, currentTurnId?: () => string |
         ok: false,
         message: `${name}：任务**未能派发**（回执：${receipt.message ?? "被拒"}）——请如实向客户说明；**不要当它成功、不要宣称已送达**。`,
       };
+    },
+  };
+}
+
+// —————————————— 治理四角色：意图交接与澄清（W6-A；hand_off_intent / request_clarification） ——————————————
+//
+// 依据：`角色卡/项目管理/docs/design/2026-10-18_design_governance-liaison-review.md` §5.1/§5.4
+// （四角色 liaison → rapporteur → nominator → convener；治理模型仍 `trio`）。两工具均**由能力注入面
+// 决定可用性**：`hand_off_intent` 只给联络官、`request_clarification` 只给报告员（判据在编排/桌面
+// 注入端，本层不硬编码角色 id）；未注入 ⇒ 工具不存在（沿 dispatch_task 先例，最强 fail-closed）。
+// 本层纪律：**不读文件、不写账本、不投递、不做治理判定**——handler 只做**严格参数校验**（非法值
+// 在触达注入能力前拒绝，不猜测、不截断、不静默丢弃）并把载荷原样交给能力，随后**如实**转达回执：
+// 交接 ≠ 客户批准；澄清 ≠ 客户已回答；契约外回执一律按未交接/未提交 fail-closed。
+
+const HAND_OFF_INTENT_KINDS: readonly HandOffIntentKind[] = ["initial", "clarification", "revision"];
+const HAND_OFF_INTENT_ARG_KEYS: ReadonlySet<string> = new Set(["intentId", "handoffKind", "goal", "scope", "acceptance", "summary", "flowId"]);
+const REQUEST_CLARIFICATION_ARG_KEYS: ReadonlySet<string> = new Set(["flowId", "intentId", "question", "summary"]);
+/** 摘要长度上限（评审 §5.1/§5.4：200 字；按 Unicode 码点计——超长拒绝，不静默截断）。 */
+const SUMMARY_MAX_CHARS = 200;
+
+/** 严格参数面：不接受未声明参数（schema `additionalProperties:false` 的 handler 同款守卫）。 */
+function unknownGovernanceArg(args: Record<string, unknown>, allowed: ReadonlySet<string>, toolName: string): ToolResult | undefined {
+  for (const key of Object.keys(args)) {
+    if (!allowed.has(key)) {
+      return { ok: false, message: `${toolName}: 未知参数 ${key}（本工具不接受该参数）——未执行；请更正后重试` };
+    }
+  }
+  return undefined;
+}
+
+/** 必填非空字符串（只做空串判定，**不改写**载荷值——文件为权威，比较在编排侧）。 */
+function readRequiredTextArg(args: Record<string, unknown>, key: string, toolName: string): { ok: true; value: string } | { ok: false; result: ToolResult } {
+  const value = args[key];
+  if (typeof value !== "string" || value.trim() === "") {
+    return { ok: false, result: { ok: false, message: `${toolName}: 缺少或非法的 ${key} 参数（须为非空字符串）——未执行；请更正后重试` } };
+  }
+  return { ok: true, value };
+}
+
+/** 可选摘要校验：给出时必须是非空字符串且 ≤200 字；缺席保持缺席（不凭空生成键）。 */
+function readOptionalSummaryArg(args: Record<string, unknown>, toolName: string): { ok: true; value: string | undefined } | { ok: false; result: ToolResult } {
+  const value = args["summary"];
+  if (value === undefined) return { ok: true, value: undefined };
+  if (typeof value !== "string") {
+    return { ok: false, result: { ok: false, message: `${toolName}: summary 参数非法（须为字符串）——未执行；请更正后重试` } };
+  }
+  const length = Array.from(value).length;
+  if (length > SUMMARY_MAX_CHARS) {
+    return { ok: false, result: { ok: false, message: `${toolName}: summary 超过 ${SUMMARY_MAX_CHARS} 字（${length} 字）——未执行；请压缩后重试` } };
+  }
+  return { ok: true, value };
+}
+
+/** 交接/澄清共用的两态回执归一：契约外（缺失/非对象/ok 非布尔）→ undefined，由调用方 fail-closed。 */
+function simpleReceiptOf(value: unknown): { ok: boolean; message?: string } | undefined {
+  if (value === null || typeof value !== "object") return undefined;
+  const record = value as Record<string, unknown>;
+  if (record["ok"] !== true && record["ok"] !== false) return undefined;
+  const message = typeof record["message"] === "string" && record["message"].trim() !== "" ? record["message"] : undefined;
+  return { ok: record["ok"] === true, ...(message !== undefined ? { message } : {}) };
+}
+
+/**
+ * hand_off_intent：**意图交接**工具（W6-A，**只给联络官注入**）。把 `HandOffIntentPayload` 原样交给
+ * 注入的能力（编排/桌面窗口执行文件校验、去重、`initial` 仅一次、每轮一次与后台投递）。
+ *
+ * 行为钉点（评审 §5.1/§5.2）：非法参数（slug/枚举/四要素/summary 超长/未知参数）在**触达能力前**拒绝；
+ * 合法载荷原样透传（含可选 flowId，缺席不造键）；metadata 沿 dispatch_task 先例（turnId/roleId/runtime）；
+ * 成功 → 「已交接」并重申**交接 ≠ 客户批准**；`ok:false` / 抛错 / 契约外回执 → 明确「**未能交接**」，
+ * **绝不**说成已交接。悬挂防护：`raceAbort`（会话中止即立即返回；本地调用，不设等待超时）。
+ */
+function makeHandOffIntentTool(fn: HandOffIntentFn, currentTurnId?: () => string | undefined, scope?: Pick<GovernedToolsOptions, "roleId" | "runtime">): ExecutableTool {
+  const name = HAND_OFF_INTENT_TOOL_NAME;
+  return {
+    name,
+    async handler(call) {
+      const turnId = currentTurnId?.();
+      const unknown = unknownGovernanceArg(call.args, HAND_OFF_INTENT_ARG_KEYS, name);
+      if (unknown !== undefined) return unknown;
+      const intentId = readGovernanceSlugArg(call.args, "intentId", name);
+      if (!intentId.ok) return intentId.result;
+      if (intentId.value === undefined) {
+        return { ok: false, message: `${name}: 缺少 intentId 参数（意图记录 slug，对应 docs/intents/<intentId>.md）——未交接` };
+      }
+      const handoffKind = call.args["handoffKind"];
+      if (typeof handoffKind !== "string" || !HAND_OFF_INTENT_KINDS.includes(handoffKind as HandOffIntentKind)) {
+        return { ok: false, message: `${name}: handoffKind 参数非法（应为 "initial" / "clarification" / "revision" 之一）——未交接` };
+      }
+      const goal = readRequiredTextArg(call.args, "goal", name);
+      if (!goal.ok) return goal.result;
+      const intentScope = readRequiredTextArg(call.args, "scope", name);
+      if (!intentScope.ok) return intentScope.result;
+      const acceptance = readRequiredTextArg(call.args, "acceptance", name);
+      if (!acceptance.ok) return acceptance.result;
+      const summary = readRequiredTextArg(call.args, "summary", name);
+      if (!summary.ok) return summary.result;
+      const summaryLength = Array.from(summary.value).length;
+      if (summaryLength > SUMMARY_MAX_CHARS) {
+        return { ok: false, message: `${name}: summary 超过 ${SUMMARY_MAX_CHARS} 字（${summaryLength} 字）——未交接；请压缩后重试` };
+      }
+      const flowId = readGovernanceSlugArg(call.args, "flowId", name);
+      if (!flowId.ok) return flowId.result;
+      const payload: HandOffIntentPayload = {
+        intentId: intentId.value,
+        handoffKind: handoffKind as HandOffIntentKind,
+        goal: goal.value,
+        scope: intentScope.value,
+        acceptance: acceptance.value,
+        summary: summary.value,
+        ...(flowId.value !== undefined ? { flowId: flowId.value } : {}),
+      };
+
+      let receipt: unknown;
+      try {
+        receipt = await raceAbort(Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return turnId === undefined ? fn(payload) : fn(payload, handbackMetadata(turnId, scope)); }), call.signal, `${name} 交接意图`);
+      } catch (err) {
+        return { ok: false, message: `${name}：意图**未能交接**（原因：${reasonOf(err)}）——请如实向客户说明；**不要当它已交接、不要重复派发**。` };
+      }
+      const normalized = simpleReceiptOf(receipt);
+      if (normalized === undefined) {
+        return { ok: false, message: `${name}：能力未返回明确回执（回执缺失或非法）——按**未交接**处理；**不要当它已交接**，如实告知客户。` };
+      }
+      const detail = normalized.message !== undefined ? ` ${normalized.message}` : "";
+      if (normalized.ok) {
+        return {
+          ok: true,
+          message:
+            `${name}：意图「${payload.intentId}」已交接（handoffKind: ${payload.handoffKind}）——应用已把一条任务交给报告员。${detail}` +
+            `注意：**交接 ≠ 客户批准**——它不是客户决定，不能据此宣称提案已被接受或已获授权；不要重复交接。`,
+        };
+      }
+      return { ok: false, message: `${name}：意图**未能交接**（回执：${normalized.message ?? "能力侧被拒且未提供原因"}）——请如实向客户说明；**不要当它已交接、不要重复派发**。` };
+    },
+  };
+}
+
+/**
+ * request_clarification：**澄清请求**工具（W6-A，**只给报告员注入**）。把 `RequestClarificationPayload`
+ * 原样交给注入的能力（账本 `clarification.requested` 与主入口系统行在能力侧）。
+ *
+ * 行为钉点（评审 §5.4）：`question` 必填非空；`flowId`/`intentId` **至少一个**（皆缺→拒绝，不猜测归属）；
+ * 可选 `summary` ≤200 字；未知参数拒绝；非法值在**触达能力前**拒绝；合法载荷原样透传（缺席键不凭空出现）。
+ * 成功 → 「已提交」并重申「不弹决定卡、不改变任何权力/写权、同一 flow 最多 2 轮」；失败/抛错/契约外
+ * 回执 → 明确「**未能提交**」，**绝不**说成客户已看到。悬挂防护：`raceAbort`（不设等待超时）。
+ */
+function makeRequestClarificationTool(fn: RequestClarificationFn, currentTurnId?: () => string | undefined, scope?: Pick<GovernedToolsOptions, "roleId" | "runtime">): ExecutableTool {
+  const name = REQUEST_CLARIFICATION_TOOL_NAME;
+  return {
+    name,
+    async handler(call) {
+      const turnId = currentTurnId?.();
+      const unknown = unknownGovernanceArg(call.args, REQUEST_CLARIFICATION_ARG_KEYS, name);
+      if (unknown !== undefined) return unknown;
+      const flowId = readGovernanceSlugArg(call.args, "flowId", name);
+      if (!flowId.ok) return flowId.result;
+      const intentId = readGovernanceSlugArg(call.args, "intentId", name);
+      if (!intentId.ok) return intentId.result;
+      if (flowId.value === undefined && intentId.value === undefined) {
+        return { ok: false, message: `${name}: 缺少 flowId/intentId 参数（至少给出一个，用于同一 flow 的澄清轮次计数）——未提交` };
+      }
+      const question = readRequiredTextArg(call.args, "question", name);
+      if (!question.ok) return question.result;
+      const summary = readOptionalSummaryArg(call.args, name);
+      if (!summary.ok) return summary.result;
+      const payload: RequestClarificationPayload = {
+        ...(flowId.value !== undefined ? { flowId: flowId.value } : {}),
+        ...(intentId.value !== undefined ? { intentId: intentId.value } : {}),
+        question: question.value,
+        ...(summary.value !== undefined ? { summary: summary.value } : {}),
+      };
+
+      let receipt: unknown;
+      try {
+        receipt = await raceAbort(Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return turnId === undefined ? fn(payload) : fn(payload, handbackMetadata(turnId, scope)); }), call.signal, `${name} 提交澄清`);
+      } catch (err) {
+        return { ok: false, message: `${name}：澄清请求**未能提交**（原因：${reasonOf(err)}）——请如实向客户说明；**不要当客户已看到该问题**。` };
+      }
+      const normalized = simpleReceiptOf(receipt);
+      if (normalized === undefined) {
+        return { ok: false, message: `${name}：能力未返回明确回执（回执缺失或非法）——按**未提交**处理；**不要当客户已看到该问题**，如实告知客户。` };
+      }
+      const detail = normalized.message !== undefined ? ` ${normalized.message}` : "";
+      const target = [flowId.value !== undefined ? `flowId: ${flowId.value}` : undefined, intentId.value !== undefined ? `intentId: ${intentId.value}` : undefined].filter((part): part is string => part !== undefined).join("、");
+      if (normalized.ok) {
+        return {
+          ok: true,
+          message:
+            `${name}：澄清请求已提交（${target}）——应用已记录并在主入口显示。${detail}` +
+            `注意：本工具**不弹客户决定卡、不改变任何权力或写权**；同一 flow 最多 2 轮，超过后请在提案卡上请客户决定（带假设/备选）。`,
+        };
+      }
+      return { ok: false, message: `${name}：澄清请求**未能提交**（回执：${normalized.message ?? "能力侧被拒且未提供原因"}）——请如实向客户说明；**不要当客户已看到该问题**。` };
     },
   };
 }
@@ -1662,6 +1868,18 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
   const dispatchTask = options?.dispatchTask;
   if (dispatchTask !== undefined) {
     tools.push(makeDispatchTaskTool(dispatchTask, options?.currentTurnId, { roleId: options?.roleId, runtime: options?.runtime }));
+  }
+
+  // 结构性保证（W6-A，同 dispatch_task 先例）：**未注入交接/澄清能力时对应工具不存在**。
+  // 只给联络官/报告员——由能力注入面（编排/桌面窗口）决定「注入才注册」；本层不硬编码角色 id。
+  // 未注入 ⇒ 模型无法请求（能力缺席 = 最强 fail-closed）。两能力各自独立、互不隐含。
+  const handOffIntent = options?.handOffIntent;
+  if (handOffIntent !== undefined) {
+    tools.push(makeHandOffIntentTool(handOffIntent, options?.currentTurnId, { roleId: options?.roleId, runtime: options?.runtime }));
+  }
+  const requestClarification = options?.requestClarification;
+  if (requestClarification !== undefined) {
+    tools.push(makeRequestClarificationTool(requestClarification, options?.currentTurnId, { roleId: options?.roleId, runtime: options?.runtime }));
   }
 
   // 结构性保证（R-1，同 run_shell / customerInput 等先例）：**未注入审读结论能力时

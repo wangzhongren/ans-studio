@@ -177,7 +177,7 @@ async function consume(handle: { events(): AsyncIterable<{ kind: string }> }): P
 
 // —————————————————————— ① function 路由 / 校验 ——————————————————————
 
-test("parseGovernArgs：--function 三种取值与非法值（用法错误）", () => {
+test("parseGovernArgs：--function 三权取值与非法值（CLI 不提供 liaison，AC21）", () => {
   for (const fn of ["proposal", "nomination", "schedule"] as const) {
     const parsed = parseGovernArgs(["govern", "--function", fn]);
     assert.equal(parsed.function, fn);
@@ -185,6 +185,9 @@ test("parseGovernArgs：--function 三种取值与非法值（用法错误）", 
   }
   assert.equal(parseGovernArgs(["govern", "--function=nomination"]).function, "nomination");
   assert.equal(parseGovernArgs(["govern"]).function, undefined);
+  const liaison = parseGovernArgs(["govern", "--function", "liaison"]);
+  assert.equal(liaison.function, undefined);
+  assert.ok(liaison.errors.some((e) => /仅桌面主入口提供/.test(e)), "liaison 显式拒绝并指路");
   assert.ok(parseGovernArgs(["govern", "--function", "bogus"]).errors.some((e) => /非法的 --function/.test(e)));
   assert.ok(parseGovernArgs(["govern", "--function"]).errors.some((e) => /缺少值/.test(e)));
 });
@@ -295,10 +298,11 @@ test("默认提示词：trio 按 function 追加各自纪律（不写「已批�
     };
 
     const trio = trioProject(root);
-    const expectations: Array<["proposal" | "nomination" | "schedule", RegExp[]]> = [
-      ["proposal", [/提案权纪律（Rapporteur/, /docs\/proposals\//, /cardKind=proposal/, /不拥有最终批准权/]],
-      ["nomination", [/提名权纪律（Nominator/, /docs\/nominations\//, /appointment/, /提名 ≠ 任命/]],
-      ["schedule", [/编排权纪律（Convener/, /docs\/flows\//, /dispatch_task/, /flowId.*stepId/]],
+    const expectations: Array<["liaison" | "proposal" | "nomination" | "schedule", RegExp[]]> = [
+      ["liaison", [/沟通权纪律（联络官 Liaison/, /docs\/intents\//, /hand_off_intent/, /交接 ≠ 客户批准/]],
+      ["proposal", [/提案权纪律（报告员 Rapporteur/, /docs\/proposals\//, /cardKind=proposal/, /不拥有最终批准权/]],
+      ["nomination", [/提名权纪律（提名官 Nominator/, /docs\/nominations\//, /appointment/, /提名 ≠ 任命/]],
+      ["schedule", [/编排权纪律（召集人 Convener/, /docs\/flows\//, /dispatch_task/, /flowId.*stepId/]],
     ];
     for (const [fn, patterns] of expectations) {
       const { captured, factory } = promptCapturing();
@@ -473,7 +477,7 @@ test("禁写：三人写 .ans/**、其他治理角色资料 → 拒绝且文案�
     try {
       const forbidden = captured.gate!("角色卡/rapporteur/role-card.md");
       assert.equal(forbidden.allowed, false);
-      assert.match((forbidden as { reason: string }).reason, /任何角色不可写/);
+      assert.match((forbidden as { reason: string }).reason, /提名官 Nominator/);
 
       const noAppointment = captured.gate!("角色卡/A/role-card.md");
       assert.equal(noAppointment.allowed, false);
@@ -490,7 +494,7 @@ test("禁写：三人写 .ans/**、其他治理角色资料 → 拒绝且文案�
     try {
       const ans = convener.gate!(".ans/project.json");
       assert.equal(ans.allowed, false);
-      assert.match((ans as { reason: string }).reason, /任何角色不可写/);
+      assert.match((ans as { reason: string }).reason, /只能由应用写/);
     } finally {
       await ch.dispose();
     }

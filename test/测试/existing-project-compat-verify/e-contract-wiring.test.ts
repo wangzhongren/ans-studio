@@ -75,7 +75,23 @@ test("E4 动作只由确认按钮触发：establish 调用点唯一（preview/�
   const renderer = read("app/renderer/renderer.js");
   const calls = renderer.match(/d\.establishGovernanceRecord\(/g) ?? [];
   assert.equal(calls.length, 1, "renderer.js 中 establish 调用点恰一处（确认面板）");
-  // 无定时器触发（renderer 既有「零计时器」纪律亦覆盖治理面板）。
-  assert.equal(/setTimeout\s*\(/.test(renderer), false, "renderer.js 不得以 setTimeout 自动触发");
+  // 无定时器触发治理面板（renderer 既有「零计时器」纪律）：2026-10-18 客户批准唯一豁免——
+  // 「替我审批中」一次性警告约 9 秒自动收起（showShellJudgeWarning）。锁定数量/位置/用途，
+  // 并反向断言该计时器回调不触碰任何治理动作；setInterval 仍为零。
+  const timers = renderer.match(/\bsetTimeout\s*\(/g) ?? [];
+  assert.equal(timers.length, 1, "renderer.js 恰有一个 setTimeout（豁免仅限一次性警告）");
+  const warnStart = renderer.indexOf("function showShellJudgeWarning(");
+  const warnEnd = renderer.indexOf("function syncShellJudgeWarning(");
+  const timerAt = renderer.indexOf("setTimeout(function ()");
+  assert.ok(timerAt > warnStart && timerAt < warnEnd, "唯一计时器必须位于 showShellJudgeWarning 内");
+  const timerSlice = renderer.slice(timerAt, timerAt + 240);
+  assert.ok(timerSlice.includes("hideShellJudgeWarning();"), "计时器到期只收起该警告");
+  assert.equal(
+    /establishGovernanceRecord|previewGovernanceRecord|previewGovernanceMigration|migrateGovernanceModel|GovernancePreview|GovernanceMigration/.test(
+      timerSlice,
+    ),
+    false,
+    "计时器回调不得自动触发治理动作",
+  );
   assert.equal(/setInterval\s*\(/.test(renderer), false, "renderer.js 不得以 setInterval 自动触发");
 });

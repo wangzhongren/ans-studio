@@ -3,15 +3,18 @@ id: governance-trio-review
 type: design
 title: 治理三权分立（Rapporteur / Nominator / Convener）——项目管理评审与 V1 拆发
 created: "2026-10-17"
-updated: "2026-10-17"
+updated: "2026-10-18"
 timezone: Asia/Shanghai
 status: approved
-revision: 1
+revision: 2
 related: [governance-trio, governance-pin-recovery, existing-project-compat, contract-workflow-dispatch, role-capability-install, shell-auto-approve, role-watchdog-and-closure]
 events:
   - date: "2026-10-17"
     kind: reviewed
-    summary: 批准三权分立方向；V1 最小闭环＝三个内置治理角色/rapporteur 主入口/能力矩阵/按角色边界与预授权/三道协议门禁/应用账本/新项目 trio 与旧项目 single 兼容；迁移单列 V1b，面板与自动推进列 V2；钉死跨角色契约并纠正提案与代码事实的 13 处偏差；列出八项必须客户拍板
+    summary: 批准三权分立方向；V1 最小闭环＝三个内置治理角色/rapporteur 主入口/能力矩阵/按角色边界与预授权/三道协议门禁/应用账本/新项目 trio 与旧项目 single 兼容；迁移单列 V1b，面板列 V2（自动推进后被 2026-10-18 客户修正纳入 V1）；钉死跨角色契约并纠正提案与代码事实的 13 处偏差；列出八项必须客户拍板
+  - date: "2026-10-18"
+    kind: revised
+    summary: 客户修正「不用打开啊，后续的显示工作中就行了，派发一个任务过去就行了」：客户接受提案/完成任命后，应用（桌面窗口）在后台按账本客户决定机械派发下一步给 Nominator/Convener（actor=app），不打开/切换会话、不移动当前 pane/输入焦点，左树只显示「工作中」；派发按步骤限定，不自动批准/写盘/任命；治理角色仍不互相授权，角色间无批准关系；账本记 dispatch.accepted(actorRoleId:"app", power:"app")，不记客户批准；失败如实落系统行、不循环重试；single/su 不受影响。revision 2
 ---
 
 # 治理三权分立（Rapporteur / Nominator / Convener）——项目管理评审与 V1 拆发
@@ -34,7 +37,7 @@ events:
 6. **新项目默认 trio、旧项目默认 single 兼容**：旧项目行为逐字不变；左树显示非模态升级提示。
 7. **最小 UI**：主入口 / 治理职能分组、权力副标题、等待客户决定状态行、迁移提示条；不做三个独立面板。
 
-**V1b（紧随 V1）**：旧项目「su → trio」显式迁移（预览零写入 → 客户确认 → 写 `.ans` + manifest 留痕，不重写角色卡/边界/pin，不删历史）。**V2**：流程面板、自动推进、批量迁移、一键回滚、更细权限策略。若 V1b 未就绪，旧项目**保持 single 全功能**并在界面明示——这是明确降级，不是静默半成品。
+**V1b（紧随 V1）**：旧项目「su → trio」显式迁移（预览零写入 → 客户确认 → 写 `.ans` + manifest 留痕，不重写角色卡/边界/pin，不删历史）。**V2**：流程面板、批量迁移、一键回滚、更细权限策略（应用后台派发下一步已纳入 V1，见 v2 修正）。若 V1b 未就绪，旧项目**保持 single 全功能**并在界面明示——这是明确降级，不是静默半成品。
 
 **没有必须返工的方案级问题**；但有 **13 处代码事实偏差**（§二）和 **必须执行的实施修正**（§五），以及 **8 项必须客户拍板**（§十二）。
 
@@ -50,7 +53,7 @@ events:
 | 6 | 审计账本建议 `docs/audit/governance.jsonl` | `docs/audit/**` 在 PM 边界内且条件是 `shell-gate`（`角色卡/项目管理/boundary.yaml:50-54`）；再写一类文件需要新 condition/Governance 授权，且角色可读。 | V1 账本放 **`.ans/governance/ledger.jsonl`**（应用独占区，角色均禁写，无需改任何角色边界）；`docs/audit/governance.jsonl` 只作 V2 导出/只读视图。 |
 | 7 | 三人均不写 `.ans`/治理边界/manifest | 现状 `.ans` 写入由 `gatedAtomicWrite` 经 `resolveWrite` 放行；`renderGovernanceBoundaryDoc()` 写出 `角色卡/ docs/ .ans/` 三普通目录（`finalize.ts:102-121`）。 | 保留「应用写」，但必须新增应用专用边界并把三人边界里的 `.ans/`、`角色卡/governance-boundary.yaml`、manifest 列为**禁写路径**（含拒绝文案）。 |
 | 8 | `docs/workflow.md` 文件级预授权 | 预授权机制只支持**目录树**：`SU_PREAUTHORIZED_WRITE_DIRS`（`run-role.ts:1023`）+ `isUnderOrEqual`。单文件不在机制内。 | V1 **不新增文件级预授权**；Convener 首次写 `docs/workflow.md` 走一次 `request_confirmation`。降级如实写入角色卡。 |
-| 9 | Convener 把「提名」步骤交给 Nominator | `dispatch_task` 目标校验明确拒绝 `builtIn === true`（`app/desktop/session.ts:1973-1978`）；三人都是内置。 | **治理角色之间不互相 dispatch**。Convener 把流程单标到「提名」步骤，应用在客户聊天流/左树给一个**客户点击的「打开 Nominator（提名步骤）」**入口；不新增角色间命令通道。 |
+| 9 | Convener 把「提名」步骤交给 Nominator | `dispatch_task` 目标校验明确拒绝 `builtIn === true`（`app/desktop/session.ts:1973-1978`）；三人都是内置。 | **治理角色不互相授权，角色间仍无命令通道**；但应用（桌面窗口）可在客户决定后，依据账本机械地把下一步任务**在后台**派发给 Nominator/Convener（actor=app，见 §6.1）。不打开/切换会话，不把下一步写成「已批准」。 |
 | 10 | 确认卡上显示 flowId、权力类型 | `CustomerInputRequest` 只有 `confirm`/`choice` 与自由文本（`src/model/runtime.ts:133-156`）；`CustomerInputMetadata` 无 flowId/stepId（:159-166）；工具 schema 也不收。 | 给 `request_confirmation`/`request_choice` 增加**可选** `flowId`/`stepId`（slug 校验），透传进 metadata 与账本；缺失时仍可用（旧调用零变化）。 |
 | 11 | 三人均可被 `resolveRole` 解析 | `resolveRole` 只对 `roleId === "su"` 填 `BUILT_IN_ROLE_CARD_TEXT`（`src/service/role/resolve-role.ts:56-58`）；其余内置角色 `cardText` 为空。 | 注册表提供三张卡文本；`resolveRole` 对 trio id 返回 `kind:"built-in-governance"` + `governanceFunction` + 卡文本。 |
 | 12 | `listProject` 返回三条内置，`primaryRoleId = rapporteur` | `listProject` 先把 su 塞进 `roles` 再扫目录（`resolve-role.ts:172-180`、:253），且**不读 `.ans`**；`primaryRoleId` 恒为 `SU`（:269）。 | 先扫项目角色算 `hasRoles`，再按 `governanceModel` 决定内置角色集与 `primaryRoleId`；模型来源由共享载入器新增 `readGovernanceModel` 提供（PM 属主），Service 只读调用。 |
@@ -69,9 +72,9 @@ events:
 | --- | --- | --- |
 | 门禁引擎 | 内置治理角色注册表；`GovernanceModel`/`GovernanceFunction` 类型；`listProject` 三内置/主入口/模型；`resolveRole` 三卡文本与 function；`resolveBoundarySection` 按模型与角色合成边界；应用专用治理边界；保留 id 冲突守卫 | 不把三人边界写进项目文件；不新增治理边界文档；不改 pin 算法 |
 | 运行时核心 | `DispatchTaskPayload` 增可选 `flowId`/`stepId`；`request_confirmation`/`request_choice` 增可选 `flowId`/`stepId` 并透传 metadata；能力矩阵类型 | 不改 abort/超时/隔离；不改 judge 语义；不新增第二套工具 |
-| 编排 | `openGovernanceSession` 支持 `governanceFunction`；`withGovernanceRole` 并入选中角色；按 function 的能力注入与预授权；禁写路径守卫；治理账本；三道门禁的纯判定函数；settle 后账本观测 | 不把治理角色做成 dispatch 目标；不自动推进流程；不自动批准 |
-| 桌面窗口 | 三内置注入、按 function 路由；回交/看护改投 Convener、镜像 Rapporteur；`routeDispatch` 加流程门禁与 reserved 目标拒绝；安装/恢复的目标守卫改「任一内置」；迁移入口接线（V1b 单独一波）；客户决定队列（一项目一卡） | 不改 shell 三层链的项目角色语义；不把 judge 的 allow 当治理批准 |
-| 桌面UI | 左树三组（主入口/治理职能/其他角色）；权力副标题；`primaryRoleId` CTA；等待客户决定状态行；旧模型迁移提示条；确认卡显示 flowId/权力类型 | 不做提案/提名/流程三个面板；不读 Markdown `status` 当权威 |
+| 编排 | `openGovernanceSession` 支持 `governanceFunction`；`withGovernanceRole` 并入选中角色；按 function 的能力注入与预授权；禁写路径守卫；治理账本；三道门禁的纯判定函数；settle 后账本观测 | 不把治理角色做成 `dispatch_task` 目标；不自动批准/写盘/任命；应用可在客户决定后机械派发下一步（actor=app，见 §6.1） |
+| 桌面窗口 | 三内置注入、按 function 路由；回交/看护改投 Convener、镜像 Rapporteur；`routeDispatch` 加流程门禁与 reserved 目标拒绝；`advanceGovernanceStep` 客户决定后后台派发下一步（不切换、失败系统行）；安装/恢复的目标守卫改「任一内置」；迁移入口接线（V1b 单独一波）；客户决定队列（一项目一卡） | 不改 shell 三层链的项目角色语义；不把 judge 的 allow 当治理批准；不自动批准/写盘/任命 |
+| 桌面UI | 左树三组（主入口/治理职能/其他角色）；权力副标题；`primaryRoleId` CTA；等待客户决定状态行；后台推进只显示「工作中」不切换选中/pane/焦点；旧模型迁移提示条；确认卡显示 flowId/权力类型 | 不做提案/提名/流程三个面板；不读 Markdown `status` 当权威；不自动打开/切换下一角色 |
 | 测试 | 按角色写权矩阵、三道门禁、路由、迁移、账本还原、UI e2e；全量三层 glob | 不跑真实模型/凭据；不以测试全绿代替客户真机 |
 
 ### 3.2 V1b（紧随 V1，可独立交付）
@@ -84,9 +87,10 @@ events:
 ### 3.3 V2（不在本版承诺）
 
 - 流程侧栏/面板（按 flowId 展示步骤、负责人、状态、待客户决定）；
-- 自动推进（应用按流程单自动推进下一步，但仍不自动批准）；
 - 批量迁移、CLI 迁移、一键回滚；
 - 更细权限策略、跨项目治理、三人各自独立模型。
+
+> **v2 变更**：客户已把「应用后台派发下一步」纳入 V1（不打开/不切换会话）；V2 不再列「自动推进」。
 
 ## 四、三权权限裁定（逐条回答提案 §十二 的 12 个开放问题）
 
@@ -105,11 +109,11 @@ events:
    - 派发文本必须引用已接受的提案/契约/流程单路径，不内嵌全文、不自算哈希（沿用 G-1）。
    - `dispatch_task` 只注入 Convener；Rapporteur/Nominator 不注册该工具。
    - 去重键在既有 `roleId\0task\0reason` 之外增 `flowId\0stepId`；同一 flow 步骤重复派发被拒/提示。
-   - **治理角色之间不 dispatch**（见 §二-9）；Convener 通过流程单 + 客户点击的「打开 Nominator」入口完成提名步骤。
+   - **治理角色不互相授权**（见 §二-9）；Convener 仍不直接向 Nominator 发 `dispatch_task`。应用在客户接受提案/完成任命后，依据账本在后台把下一步任务派发给 Nominator/Convener（actor=app，§6.1）；不打开/切换会话。
 
 5. **旧 su 是否保留？→ 旧项目默认保留 su 全功能兼容模式；显式迁移后 su 归档只读、隐藏、不可开启、不删历史。** 不自动把 su 改成只读；不强制迁移；不建 `角色卡/su/`。是否长期双模型并存由客户定；V1 不提供一键回滚（迁移预览会列出可手工恢复的 `.ans` 字段与 manifest 记录）。
 
-6. **是否三期分批？→ 是：V1 最小闭环、V1b 迁移、V2 面板/自动推进/批量。** 客户若要求「迁移也必须进 V1」，则把 V1b 并入 V1 的最后一波，但不得挤掉三道门禁与账本——门禁与账本是制度原则的载体，缺它们三权只是三个聊天角色。
+6. **是否三期分批？→ 是：V1 最小闭环（含应用后台派发下一步）、V1b 迁移、V2 面板/批量。** 客户若要求「迁移也必须进 V1」，则把 V1b 并入 V1 的最后一波，但不得挤掉三道门禁与账本——门禁与账本是制度原则的载体，缺它们三权只是三个聊天角色。
 
 7. **契约归属**：`docs/contracts/**` 归 **Rapporteur**（提案的冻结表达）；Nominator/Convener 只读。契约版本化，变更出新版本文件；不原地改。
 
@@ -339,13 +343,21 @@ export function readGovernanceModel(projectRoot: string, ansDirName?: string): P
 - `shellOperatorOnly`：仅 `model === "single" && role.builtIn === true`（su 旧审批档）；trio 下**不传**。
 - `shellReadonly`：trio 下 `role.governanceFunction === "schedule"` 时从同一 `deps.shellArming` 构造 `{ classifyShell, rules }`（不带 operator channel）；single 下不传（su 用审批档）。
 - `shellArming`（项目角色三层链）：`role.builtIn !== true`，逐字不变。
-- `routeDispatch`：目标 `builtIn === true` 拒绝（三人均拒绝）；新增流程门禁（§6.2）；来源角色必须是 Convener（注入已保证，再做防御性校验）。
+- `routeDispatch`：目标 `builtIn === true` 拒绝（三人均拒绝）；新增流程门禁（§6.2）；来源角色必须是 Convener（注入已保证，再做防御性校验）。Convener 工具派发成功写 `dispatch.accepted{actorRoleId:"convener", power:"schedule"}`。
 - `applySkillChange`/`applyMcpChange` 的「不能是 su 自身」改为 `isBuiltInGovernanceRoleId(targetRoleId)`。
 - `proposeRecovery` 的目标守卫同样改为「任一内置」。
 - `lastSuRuntime` 改名 `lastGovernanceRuntime`：键仍是 projectRoot，值取 **回交主人**（trio=Convener）会话的 runtime；看护投递用它。
 - `handbackOwnerRoleId(projectRoot)`：trio 从 listing 找 `governanceFunction === "schedule"` 的角色 id；single 用 `primaryRoleId`。回交、看护、恢复回执、投递失败系统行全部改用它；`primaryRoleId` 只用于主入口/镜像。
 - `watchdogSnapshot.suRoleId` → `governanceRoleId`（同义替换，值=回交主人）；`app/desktop/watchdog.ts` 的消费方同步。
 - `routeDispatch` 成功入队后写账本 `dispatch.accepted`（5.7）；失败不写。
+- **`advanceGovernanceStep`（v2 客户修正：应用后台推进，不是角色间 dispatch）**：
+  - 触发：客户 `customer.decision`（proposal-accept/accept-quick、appointment、acceptance）后；以及治理步骤 `settle` / `artifact.observed` 后（例如 Convener 写完 flow，推进到提名步骤）。
+  - 读账本 + flow 步骤，确定下一步 owner（`nominator`/`convener`）；**该步骤所需的客户前置决定必须已在账本中**，否则停止等待，不猜。走 **`advance` 判定**（§6.2），**不套用 `dispatch` 的「目标必须项目角色」**（目标就是内置治理角色）。
+  - 通过桌面既有会话队列/`sendSession` 向目标角色投递**步骤限定的任务文本**（引用提案/flow/步骤/产物路径；不内嵌全文、不自算哈希）；**不是** `dispatch_task` 工具、不是角色间命令通道。投递来源标 **`app`**（应用任务，不是客户消息）；目标 pane 若显示，只显示系统任务行/系统行，**不得写成客户发言**。
+  - **不打开/不切换会话、不改变当前 pane / 输入焦点**；目标角色在后台运行，左树只按 `role-state` 显示「工作中」。
+  - **不自动批准、不自动写盘、不自动任命**；任命卡/写盘确认卡仍由客户决定。派发消息不得写成「已批准/已授权」。
+  - 同一 `flowId+stepId` 去重；失败（会话打不开/发送失败）如实落**系统行**，**不循环重试**；`single`/`su` 不触发本函数。
+  - 审计：成功写 `dispatch.accepted{actorRoleId:"app", power:"app", flowId, stepId, targetRoleId, messageSummary}`；不写 `customerDecision`/`decisionEvidence`，**不记成客户批准**。
 
 ### 5.7 审计账本（编排私有 common + Pipeline 薄再导出）
 
@@ -438,10 +450,11 @@ export interface GovernanceLedgerSnapshot {
 | 事件 | 写入者 | 触发点 |
 | --- | --- | --- |
 | `customer.decision` | 编排 | `run-role.ts` 的 `customerInput` 包装器：`raw(req, metadata)` 返回后，按 `cardKind` + 选项 id 写 `decisionKind`，按 `outcome` 写 `customerDecision`；`power` 由 function 映射（proposal/nomination/schedule/acceptance）；`decisionEvidence` 带 `toolCallId/turnId/sessionId`；`artifactSha256` 由应用对最新版本文件计算；写盘确认另记 `paths` |
-| `dispatch.accepted` | 桌面窗口 | `routeDispatch` 入队成功后；`decisionEvidence` 不需要（派发不是客户决定），`messageSummary` 截断 ≤200 字 |
+| `dispatch.accepted` | 桌面窗口 | **Convener 工具派发**：`routeDispatch` 入队成功后，`actorRoleId:"convener"`, `power:"schedule"`；**应用后台推进**：`advanceGovernanceStep` 投递成功后，`actorRoleId:"app"`, `power:"app"`。两者 `decisionEvidence` 均不需要（派发不是客户决定），`messageSummary` 截断 ≤200 字，**绝不写 `customerDecision`**。 |
 | `artifact.observed` | 编排 | 内置角色每轮 settle 后，扫其 `preauthorizedDirs` 下的 `.md`，与上一轮快照比较，新增/变更才写；`artifactSha256` 应用算 |
 | `governance.established` / `governance.reaccepted` / `governance.migrated` | 编排 | `finalize.ts` 的 establish/reaccept/migrate 成功后；`decisionEvidence.action` 与 `previewDigest` 必填（如有） |
 
+- `dispatch.accepted` **不是客户批准**：`actorRoleId:"app"`/`power:"app"` 表示应用按账本客户决定机械推进；不得改写为 `power:"customer"`，也不得据此放行写盘/任命/验收。`actorRoleId:"convener"`/`power:"schedule"` 是 Convener 的工具派发，同样不是客户批准。
 - `artifact.observed` 的扫描范围**仅**角色的预授权目录（不扫 `角色卡/` 全树；Nominator 写出的角色卡由 `customer.decision` 的任命/写盘确认覆盖，V2 再补 `appointment.written`）。
 - 账本不记 shell 审批；shell 审批继续落 `docs/audit/shell-gate.jsonl`，两者不混用，也不互相替代。
 
@@ -492,14 +505,23 @@ export interface GovernanceLedgerSnapshot {
   ├─ request_choice（cardKind=proposal，flowId，选项：accept / accept-quick / revise / reject）
   └─ 客户决定① → 账本 customer.decision（power=proposal）
         ↓
+  应用（actor=app）在后台派发 Convener：
+    「按已接受提案写/更新 docs/flows/<flowId>.md；只写流程单，不批准/不任命/不写角色卡」
+    （不打开/不切换会话；左树显示「工作中」；当前 pane/输入焦点不变）
+        ↓
   Convener 写 docs/flows/<flowId>.md（步骤表；首步标「提名」）
-  ├─ 界面给「打开 Nominator（提名步骤）」客户点击入口（不是 dispatch）
   └─ 若客户选 accept-quick 且复用现有角色 → 可跳过提名文件，直接建步骤
+        ↓
+  应用（actor=app）在后台派发 Nominator：
+    「按 flow 提名步骤写 docs/nominations/<flowId>-v1.md；只提名，任命/写盘仍由客户卡决定」
         ↓
   Nominator 写 docs/nominations/<flowId>-v1.md
   ├─ request_choice（cardKind=appointment，flowId，multiple:true，候选角色 id）→ 客户决定②：任命
   └─ request_confirmation（cardKind=appointment-write，flowId，逐文件列角色卡/边界路径）→ 客户决定③：写盘
         ↓（Nominator 写角色卡/边界；应用自动 finalize/pin）
+  应用（actor=app）在后台派发 Convener：
+    「按 flow 下一步派发已任命项目角色；只派发，不批准/不改需求」
+        ↓
   Convener dispatch_task（flowId+stepId，目标=已任命项目角色）
         ↓
   项目角色执行 → 回交 Convener（镜像 Rapporteur）
@@ -516,7 +538,9 @@ export interface GovernanceLedgerSnapshot {
 - 没有客户决定①，Convener 不能写 flow（门禁按账本拒绝）；没有决定②，Nominator 不能写任何 `角色卡/**`；没有已接受提案 + 已任命名单/快捷路径 + 流程步骤，`dispatch_task` 拒投。
 - 同一 flow 同一时刻只允许一个待客户决定；第二张卡排队。
 - 角色之间不互相批准；`status: accepted` 写在 Markdown 里不改变任何门禁。
-- 治理角色之间不 `dispatch`；提名步骤由客户点击打开。
+- 治理角色**不互相授权、不互相 `dispatch_task`**；应用可在客户决定后机械派发下一步（actor=app，§5.6 `advanceGovernanceStep`），**不打开/不切换会话、不移动当前 pane/输入焦点**。
+- 应用后台派发只推进步骤：不自动批准、不自动写盘、不自动任命；目标角色仍走自己的门禁与客户卡；派发文本不得写成「已批准/已授权」。
+- 派发失败（会话打不开/发送失败）如实落系统行，**不循环重试**；`single`/`su` 不触发应用推进，行为逐字不变。
 - 客户可以随时直接打开三人；直接对话不改变权力边界。
 
 ### 6.2 三道门禁（应用侧纯判定，编排私有 common `governance-gate.ts`）
@@ -526,7 +550,7 @@ export interface GovernanceGateInput {
   projectRoot: string;
   model: GovernanceModel;
   roleId: string;
-  action: "write-flow" | "write-nomination" | "write-role-card" | "dispatch";
+  action: "write-flow" | "write-nomination" | "write-role-card" | "dispatch" | "advance";
   flowId?: string;
   stepId?: string;
   targetRoleId?: string;
@@ -555,7 +579,8 @@ export function evaluateGovernanceGate(
   5. 同一 `flowId+stepId` 未被派发过（或流程单已出新版本）。
   任一条不满足 → 拒投 + 如实回执 + 系统行；不静默。
 - 门禁读账本失败（文件不可读/格式坏）→ **拒**（fail-closed），文案提示检查 `.ans/governance/ledger.jsonl`；不回退到 Markdown。
-- 门禁只服务内置角色会话与 `routeDispatch`；**项目角色不受此门禁影响**（它们按各自边界工作）。
+- **应用推进门（advance）**：校验 flow/step 存在、目标=该步骤 owner（`nominator`/`convener`）、所需客户决定已在账本、`flowId+stepId` 未派发；**不套用 `dispatch` 的「目标必须项目角色」**（目标是内置治理角色）；actor=app，不写 `customerDecision`。
+- 门禁只服务内置角色会话、`routeDispatch` 与**应用后台推进** `advanceGovernanceStep`（`advance` 判定，actor=app，只读判定）；**项目角色不受此门禁影响**（它们按各自边界工作）。
 
 ### 6.3 防空转/防循环（V1 机械规则）
 
@@ -567,6 +592,7 @@ export function evaluateGovernanceGate(
 6. 禁止自循环：候选物作者不能同时是接受者；三人不能互相批准。
 7. 无进展熔断：24h 无状态变化且无客户动作 → Convener 只报 `paused/blocked`，不自动催办、不自动换人。
 8. 治理角色不增殖：不得创建第四个治理角色，不得把项目角色提升为治理角色。
+9. 应用后台推进（`advanceGovernanceStep`）：同一 `flowId+stepId` 去重；失败只落系统行、**不循环重试**；`single`/`su` 不触发；派发成功只写 `dispatch.accepted{actorRoleId:"app",power:"app"}`，不写客户决定。
 
 ### 6.4 快捷路径（客户明确要求时）
 
@@ -589,7 +615,8 @@ export function evaluateGovernanceGate(
 | pin 重新接受 | 预览 + 确认 | `governance.reaccepted` | 自动重试/自动覆盖 |
 
 - 门禁、派发、账本**只认应用签发的决定**；不解析提案/提名/流程文件的 `status`。
-- 任何角色不得把自己的推荐写成决定；UI 文案「推荐」「等待客户决定」，不用「已授权」「已批准」描述提名/派发/流程推进。
+- **应用后台派发不是客户决定**：`dispatch.accepted{actorRoleId:"app", power:"app"}` 不写 `customerDecision`/`decisionEvidence`；不得用它冒充提案接受、任命或验收。
+- 任何角色不得把自己的推荐写成决定；UI 文案「推荐」「等待客户决定」，不用「已授权」「已批准」描述提名/派发/流程推进（应用后台派发也不例外）。
 
 ### 7.2 judge（「替我审」）与三权的关系
 
@@ -604,7 +631,7 @@ export function evaluateGovernanceGate(
 | --- | --- |
 | 谁提的案 | `artifact.observed`（`actorRoleId="rapporteur"`，`artifactPath="docs/proposals/<flowId>-vN.md"`，版本/哈希） |
 | 谁提的名 | `artifact.observed`（`actorRoleId="nominator"`，`artifactPath="docs/nominations/<flowId>-vN.md"`） |
-| 谁排的程 | `artifact.observed`（`actorRoleId="convener"`，`artifactPath="docs/flows/<flowId>.md"`）+ `dispatch.accepted`（`flowId/stepId/targetRoleId`） |
+| 谁排的程 | `artifact.observed`（`actorRoleId="convener"`，`artifactPath="docs/flows/<flowId>.md"`）+ `dispatch.accepted`（`flowId/stepId/targetRoleId`；应用后台推进 `actorRoleId="app"/power="app"`，Convener 工具派发 `actorRoleId="convener"/power="schedule"`） |
 | 客户批了什么 | `customer.decision`（`decisionKind`、`customerDecision`、`targetRoleIds`、`paths`、`decisionEvidence.toolCallId/turnId/sessionId`） |
 | 治理记录何时建立/迁移 | `governance.established` / `governance.reaccepted` / `governance.migrated`（`decisionEvidence.action` + `previewDigest`） |
 
@@ -630,12 +657,15 @@ export function evaluateGovernanceGate(
 
 实现落点：`app/renderer/renderer.js::renderRoleTree()`（:4318）与 `roleTreeItem()`（:4264）按 `role.builtIn` + `state.primaryRoleId` 分组；`roleSubtitle()`（:4254）读 `role.governanceFunction` 映射文案；**不硬编码 id**，数据来自 `listProject` 的 `governanceFunction`。
 
+**后台推进的 UI 纪律（v2 客户修正）**：应用后台派发只更新目标角色的 `role-state`（busy）→ 左树显示「工作中」；**不切换当前选中角色、不移动聊天 pane、不抢输入焦点**。客户可以继续当前对话；需要看目标角色时自己点开。
+
 ### 8.2 空态与状态行
 
 - Rapporteur 空态保留「建立治理记录 / 检查并重新接受」入口（沿用 `UiLabels.governanceActionFor` 单一谓词）。
-- Nominator 空态：「通常由流程单提名步骤打开；仅在客户明确要求时直接使用」。
-- Convener 空态：「通常由已接受提案开启流程；只负责排步骤与派发，不批准方案」。
-- 状态行显示：治理模型（三权/旧模型）、当前 flowId（若有）、`等待客户决定` / `进行中` / `阻塞` / `已升级客户`；状态由账本/流程单派生，不读角色自述。
+- Nominator 空态：「通常由应用按 flow 提名步骤后台派发；仅在客户明确要求时直接打开」。
+- Convener 空态：「通常由应用在客户接受提案后后台派发；只负责排步骤与派发，不批准方案」。
+- 状态行显示：治理模型（三权/旧模型）、当前 flowId（若有）、`等待客户决定` / `进行中` / `阻塞` / `已升级客户`；目标角色被应用后台派发时按 role-state 显示「工作中」；状态由账本/流程单派生，不读角色自述。
+- **后台推进失败**：会话打不开/发送失败 → 在目标角色 pane 落一条系统行（如「应用无法派发下一步：<原因>；未重试」），**不循环重试**、不切换视图；`single`/`su` 不出现该行。
 - 旧模型提示条：「本项目使用旧治理模型（su）。可升级为三权模型。」+「查看差异 / 升级」；V1 若 V1b 未就绪，按钮显示「升级入口待本版后续」，不假装可用。
 
 ### 8.3 决定卡
@@ -654,12 +684,12 @@ export function evaluateGovernanceGate(
 ## 九、验收映射（可测量）
 
 1. **新项目默认**：`listProject` 恰返回 3 个 `builtIn === true`，顺序 `rapporteur`/`nominator`/`convener`，`primaryRoleId === "rapporteur"`，`governanceModel === "trio"`；左树出现「主入口 / 治理职能」两组；CTA 打开 Rapporteur。
-2. **三人可开**：分别打开三人的会话；默认只选中 Rapporteur；直接打开 Nominator/Convener 不改变其权限约束（工具注册矩阵逐项断言）。
+2. **三人可开**：分别打开三人的会话；默认只选中 Rapporteur；**客户手动**直接打开 Nominator/Convener 不改变其权限约束（工具注册矩阵逐项断言）；应用后台推进**不得**代替客户切换选中角色/焦点。
 3. **写权矩阵**：Rapporteur 写 `角色卡/**` 被拒；Nominator 未确认写 `角色卡/**` 被拒；Convener 写 `角色卡/**`、`.ans/**` 被拒；三人写 `.ans/**`、`角色卡/governance-boundary.yaml`、`docs/bootstrap-manifest.md` 全部被拒；拒绝文案指路。至少三个角色的边界求值测试。
 4. **预授权矩阵**：Rapporteur 写 `docs/nominations/**` 被拒；Nominator 写 `docs/proposals/**` 被拒；Convener 写 `docs/proposals/**`、`docs/skills/**` 被拒；三人预授权目录内的写放行（仍过 F6）。
 5. **提案门禁**：没有账本 `customer.decision`（accepted）的 flow，Convener 写 flow 被拒；提案文件里写 `status: accepted` 不改变判定。
 6. **任命门禁**：没有任命决定，Nominator 写任何 `角色卡/**` 被拒；确认卡未列出的路径写不进去；任命名单外的目标角色不能被派发。
-7. **派发门禁**：没有已接受提案 + 任命/快捷路径 + 流程步骤 → `dispatch_task` 拒投；目标为三人之一 → 拒投；同一 `flowId+stepId` 重复派发被去重；每次成功派发账本有 `dispatch.accepted`。
+7. **派发门禁**：没有已接受提案 + 任命/快捷路径 + 流程步骤 → `dispatch_task` 拒投；目标为三人之一 → 拒投；同一 `flowId+stepId` 重复派发被去重；每次成功派发账本有 `dispatch.accepted`（Convener 工具派发 `actorRoleId:"convener"/power:"schedule"`；应用后台推进 `actorRoleId:"app"/power:"app"`）。
 8. **回交路由**：trio 下项目角色回交进 Convener 并在 Rapporteur 聊天流镜像；single 下仍进 su。
 9. **看护路由**：trio 下看护系统消息投 Convener；Rapporteur 只镜像；Convener 可 `role_status`/`session_tail`/`propose_recovery`，Rapporteur/Nominator 不注册这些工具。
 10. **一次一个待决定**：同一项目同时只允许一个待客户决定；第二张卡排队并在界面可见。
@@ -669,11 +699,15 @@ export function evaluateGovernanceGate(
 14. **`.ans` 不可解析**：`governanceModel` 按 `single` 处理，治理记录状态 `invalid`，不崩、不静默回退运行期同意。
 15. **保留 id 冲突**：`角色卡/rapporteur/`、`角色卡/nominator/`、`角色卡/convener/`、`角色卡/su/` 均被跳过并警告；不会遮蔽内置角色。
 16. **账本失败不翻转**：账本 append 失败只记诊断/如实回执，不改变客户决定、不放宽门禁、不阻断写盘。
-17. **无自动批准**：全仓不存在「角色文件 status → 门禁放行」「judge allow → 治理批准」「dispatch 成功 → 验收通过」的代码路径；测试逐条断言。
+17. **无自动批准**：全仓不存在「角色文件 status → 门禁放行」「judge allow → 治理批准」「应用后台派发 → 客户决定/自动批准/自动写盘/自动任命」「dispatch 成功 → 验收通过」的代码路径；测试逐条断言。
 18. **UI 最小面**：无三个新面板；主入口/治理职能分组、权力副标题、等待客户决定状态行、迁移提示条可见；现有治理记录入口仍可用。
 19. **快捷路径**：`accept-quick` 且无新角色 → 可跳过提名文件派发；有新建/改边界 → 仍出任命卡 + 写盘确认卡。
 20. **全量回归**：`node --test "test/**/*.test.ts"`（三层 glob，不能漏测）；typecheck 零错；不跑真实模型/凭据/`.env`。
-21. **文件交接闭环（确定性端到端）**：不跑真实模型，用测试夹具模拟「Rapporteur 写提案 → 客户接受 → Convener 写 flow → Nominator 写提名 → 客户任命 → 写盘确认 → 角色卡落盘 → Convener 派发 → 项目角色回交 → Convener 更新 flow → Rapporteur 请客户验收」；每一步的账本事件、候选物路径/版本/哈希、派发回执、回交镜像可串成一条链；跳过任一道客户决定都会被门禁拒绝。
+21. **文件交接闭环（确定性端到端）**：不跑真实模型，用测试夹具模拟「Rapporteur 写提案 → 客户接受 → 应用后台派发 Convener → Convener 写 flow → 应用后台派发 Nominator → Nominator 写提名 → 客户任命 → 写盘确认 → 角色卡落盘 → 应用后台派发 Convener → Convener 派发 → 项目角色回交 → Convener 更新 flow → Rapporteur 请客户验收」；每一步的账本事件（含 `dispatch.accepted{actor:"app"}`）、候选物路径/版本/哈希、派发回执、回交镜像可串成一条链；跳过任一道客户决定都会被门禁拒绝。
+22. **后台推进不打扰（v2）**：客户接受提案/完成任命后，应用后台派发 Convener/Nominator；**不打开/不切换会话、不移动当前 pane/输入焦点**；左树只显示「工作中」；当前聊天内容不变。
+23. **应用不越权（v2）**：后台派发消息按步骤限定；**来源标 app（系统任务，不是客户消息）**；不自动批准、不自动写盘、不自动任命；目标角色的任命卡/写盘确认卡、门禁与账本校验照常；派发文本不含「已批准/已授权」。
+24. **应用派发审计（v2）**：每次成功后台派发写 `dispatch.accepted{actorRoleId:"app", power:"app", flowId, stepId, targetRoleId}`；不写 `customerDecision`/`decisionEvidence`，**不记成客户批准**。
+25. **应用派发失败（v2）**：会话打不开/发送失败 → 目标角色 pane 系统行如实说明，不循环重试、不切换视图；`single`/`su` 不触发后台推进，行为逐字不变。
 
 ## 十、风险
 
@@ -685,9 +719,11 @@ export function evaluateGovernanceGate(
 | **迁移丢记录** | 升级时丢 `.ans`/pin/历史 | 预览零写入、只改 `governanceModel`、保留未知字段、manifest 追加、pin 不变不重算；不删旧文件 |
 | **三权空转** | 提案→提名→流程→退回循环 | 一步骤一主人、最多退回一次、提案最多 v2、24h 熔断、流程单强制显示下一步 |
 | **提名越权** | Nominator 自行写角色卡/扩边界 | 任命卡 + 逐路径写盘确认卡；写入门禁只认账本；禁写治理边界/自身/其他治理角色 |
-| **编排越权** | Convener 派发未批准任务/给三人派活/自行改需求 | 派发门禁；内置目标拒绝；`dispatch_task` 只注入 Convener；账本留痕 |
-| **审批旁路** | Markdown 自称 accepted，或把 judge allow 当治理批准 | 门禁只认账本；judge 仅 shell；卡面区分治理决定/shell 放行 |
-| **成本/延迟** | 三个会话、多次落盘，简单任务也要三轮 | 快捷路径；V1 不自动让三人互聊；一次只推进一步；模板化 |
+| **编排越权** | Convener 派发未批准任务/给三人派活/自行改需求；应用后台派发越权或替客户批准 | 派发门禁；内置目标拒绝；`dispatch_task` 只注入 Convener；应用 `advanceGovernanceStep` 只按账本客户决定推进、步骤限定、不自动批准/写盘/任命；账本留痕 |
+| **后台推进打扰** | 客户接受提案/任命后 UI 自动打开/切换到下一角色，打断当前对话 | 应用只后台投递任务；**不切换选中角色、不移动 pane/焦点**；左树只显示「工作中」；AC22 源码/行为断言 |
+| **后台派发失败/循环** | 会话打不开/发送失败反复重试，刷屏或卡死 | 失败只落目标角色系统行，不循环重试；同一 `flowId+stepId` 去重；single/su 不触发；AC25 |
+| **审批旁路** | Markdown 自称 accepted，或把 judge allow 当治理批准，或把 app dispatch 当客户批准 | 门禁只认账本；judge 仅 shell；`dispatch.accepted{actor:"app"}` 不写 `customerDecision`；卡面区分治理决定/shell 放行 |
+| **成本/延迟** | 三个会话、多次落盘，简单任务也要三轮 | 快捷路径；V1 只由应用按客户决定推进一步，不让三人互聊；一次只推进一步；模板化 |
 | **客户认知负担** | 三个角色、三种权力、多张卡 | 默认只面对 Rapporteur；权力副标题；一项目一卡；旧项目提示条 |
 | **内置边界漂移** | 代码里的三人边界变化，pin 不覆盖 | 记录 `governanceModel` 版本；启动/测试校验角色 id 与能力矩阵；文档如实说明 pin 不钉代码 |
 | **保留 id 冲突** | 项目已有同名角色目录，遮蔽治理角色 | 保留 id 守卫；`listProject` 跳过 + 警告；`resolveRole` 忽略项目映射 |
@@ -721,10 +757,10 @@ export function evaluateGovernanceGate(
 | W0 契约 | 门禁引擎 + 运行时核心 + PM | `model/role.ts` 类型；注册表壳；`model/runtime.ts` 的 `flowId`/`stepId`/metadata；`config-loader.ts` 的 `readGovernanceModel` | 无（但 runtime.ts 需 judge 已收口） |
 | W1 门禁 | 门禁引擎 | 注册表全量；`listProject`；`resolveRole`；`resolveBoundarySection`；`appGovernanceBoundary`；保留 id 守卫；单测 | W0 |
 | W2 编排 | 编排 | `openGovernanceSession` function；能力矩阵；预授权/禁写；账本；`governance-gate.ts`；`repinIfBootstrapped` 改用应用边界；单测 | W0 + W1 |
-| W3 桌面窗口 | 桌面窗口 | 三内置注入/路由；回交/看护改投；`routeDispatch` 门禁；一卡队列；单测 | W1 + W2 |
-| W4 桌面UI | 桌面UI | 左树三组/权力副标题/CTA/状态行/迁移提示；不做三面板；渲染测试 | W3 的 Interface 契约 |
+| W3 桌面窗口 | 桌面窗口 | 三内置注入/路由；回交/看护改投；`routeDispatch` 门禁；`advanceGovernanceStep` 后台派发（不切换/失败系统行）；一卡队列；单测 | W1 + W2 |
+| W4 桌面UI | 桌面UI | 左树三组/权力副标题/CTA/状态行/迁移提示；「工作中」只随 role-state、不切换 pane/焦点；不做三面板；渲染测试 | W3 的 Interface 契约 |
 | V1b 迁移 | 桌面窗口 + 编排 + 桌面UI | 迁移预览/写入 IPC、S1 模型选择、manifest 留痕、缓存刷新；不重写角色卡/边界/pin | W3 |
-| W5 独立验收 | 测试 | 三权验证套件、迁移夹具、审计还原、全量三层 glob | W1–W4 + V1b |
+| W5 独立验收 | 测试 | 三权验证套件、迁移夹具、审计还原、后台推进 AC22–AC25、全量三层 glob | W1–W4 + V1b |
 
 - W1 与 W0 的 `model/role.ts` 可同角色一次完成；W0 的 `model/runtime.ts` 由运行时核心独立完成，与 W1 并行（不同文件）。
 - W2 依赖 W1 的 Service 导出；W3 依赖 W2 的 Pipeline 公共导出；W4 依赖 W3 的 `ListProjectResult`/`RoleView`；W5 最后。
@@ -745,17 +781,17 @@ export function evaluateGovernanceGate(
 
 ## 十二、必须客户拍板的点
 
-以下 8 项超出 PM 可自行裁定的范围，实施前需客户明确；PM 给出推荐默认。
+以下 8 项超出 PM 可自行裁定的范围，实施前需客户明确；其中第 5 项已由客户 2026-10-18 修正拍板，其余按推荐默认。
 
 1. **V1 分期**：V1 最小闭环（三角色/门禁/账本/兼容）+ V1b 迁移，是否接受？推荐：接受；迁移不挤掉门禁与账本。
 2. **旧项目默认 single**：未迁移前保持 su 全功能、不出现三权角色，是否接受？推荐：接受；迁移入口常驻、不强制。
 3. **迁移后 su 的处置**：隐藏、不可开启、历史只读、不建 `角色卡/su/`、V1 无一键回滚，是否接受？推荐：接受；回滚列 V2。
 4. **任命写卡两层卡**：先任命卡（多选候选角色 id）、再写盘确认卡（逐路径），是否接受？推荐：接受；这是「提名 ≠ 任命」的结构性保证。
-5. **治理角色之间不 dispatch**：Convener 不直接向 Nominator 派「提名」步骤，改由客户点击「打开 Nominator（提名步骤）」入口，是否接受？推荐：接受；避免新增角色间命令通道与「派发=授权」混淆。
+5. **应用后台派发下一步（客户修正，已拍板）**：客户接受提案/完成任命后，**不由 UI 打开/切换下一角色**；应用在后台按账本客户决定把下一步任务派发给 Nominator/Convener（`actor=app`），目标角色后台运行、左树显示「工作中」、当前 pane/焦点不变；不自动批准/写盘/任命；失败系统行不重试；`single`/`su` 不变。**客户原话：「不用打开啊，后续的显示工作中就行了，派发一个任务过去就行了。」**
 6. **三人 shell 面**：三人都不接 risky/deny 审批档，Convener 只读档，是否接受？推荐：接受；执行类 shell 留给项目角色三层链。
 7. **账本位置**：V1 用 `.ans/governance/ledger.jsonl`（应用独占）而非 `docs/audit/governance.jsonl`，是否接受？推荐：接受；V2 再做只读导出。
 8. **快捷路径**：提案卡提供「接受并直接执行（复用现有角色）」，有新建/改边界仍走任命 + 写盘确认，是否接受？推荐：接受；简单任务少一轮提名。
 
 ## 十三、明确声明
 
-**本文件只是评审与拆发，未实施。** 未改任何源码、测试、`.ans`、UI 或其他角色文件；未启动执行上下文；未读 `.env`、未跑凭据/网络/真实模型；未 git 提交。文中的源码行号为写作时点工作树读数（含在飞修改），实施前须按当轮 HEAD 复核。本评审不构成对 §十二 的客户裁定；未拍板项按推荐默认写入任务书时须逐条标注「待客户确认」。
+**本文件只是评审与拆发，未实施。** 未改任何源码、测试、`.ans`、UI 或其他角色文件；未启动执行上下文；未读 `.env`、未跑凭据/网络/真实模型；本 revision 未自行 git 提交。文中的源码行号为写作时点工作树读数（含在飞修改），实施前须按当轮 HEAD 复核。本评审 §十二 第 5 项已由客户 2026-10-18 拍板；其余未拍板项按推荐默认写入任务书时须逐条标注「待客户确认」。

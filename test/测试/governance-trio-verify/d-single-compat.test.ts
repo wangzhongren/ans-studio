@@ -78,6 +78,9 @@ test("旧 single：su 能力集（派发/看护/安装/审批档）+ 预授权�
     const project = singleProject(root);
     assert.deepEqual(governanceCapabilitiesOf("su"), {
       customerInput: true,
+      // 2026-10-18 四角色：su 旧行为不多给工具——两新增能力显式 false（不是缺省省略）。
+      handOffIntent: false,
+      requestClarification: false,
       dispatchTask: true,
       roleStatus: true,
       sessionTail: true,

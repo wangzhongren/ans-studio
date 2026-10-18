@@ -1,5 +1,13 @@
 # 产品 变更记录
 
+## 2026-10-18 — 治理四角色（新增 Liaison 联络官）：客户沟通与提案分权设计提案
+
+**来源**：客户需求逐字——「感觉报告员可以在拆分一下，把客户沟通，和编写提案，拆分出来。客户沟通的作为主入口。」已拍板：新角色 **Liaison 联络官（liaison）**；提案接受/修改决定卡**镜像到主入口**；**现在就改四权**。新增[设计提案](docs/design/2026-10-18_design_governance-liaison.md)（status: proposed，零代码改动）。
+
+**核心设计结论**：①**三权不变、角色四名**：Liaison 只有**沟通权（非决定权）**，负责客户沟通、理解意图、把任务交给 Rapporteur；不拥有提案/提名/编排权，也没有最终批准权。②Liaison 写权推荐**只写 `docs/intents/`**：意图记录带客户原话/goal/scope/acceptance，提案以 `intentId` 关联；可审计、符合「先落盘再派发」、权限面最小；「完全不写」作为不推荐备选并说明代价。③**主入口**：trio 下 `listProject` 返回四角色 `liaison/rapporteur/nominator/convener`，`primaryRoleId = "liaison"`；客户默认与 Liaison 对话，仍可直接打开其他三人（不是关卡）。④**自动交接**：Liaison 写意图后调 `hand_off_intent`；应用校验（意图文件、四要素非空、同意图去重、每轮一次、initial 仅一次）后经既有投递队列**后台**派发 Rapporteur（actor=app，不打开/不切换/左树「工作中」）；失败只落系统行、不循环重试；交接不是批准、不解锁门禁。⑤**决定卡镜像**：所有治理 `cardKind`（proposal/appointment/appointment-write/schedule-write/acceptance）镜像到主入口；镜像=同一请求 id 的第二呈现，不是第二请求；原生卡仍显示、两侧都可答但**同一请求只答一次**、两侧冻结；只镜像 active 卡，排队用聚合行，「一项目一卡」不变；`write`/shell/恢复卡不镜像。⑥**兼容**：**保持 `governanceModel:"trio"`**（三权四角色），不新增 `.ans` 字段/角色映射、不迁移；现有 trio 项目（含试跑）升级后自动获得 Liaison 主入口，提案/流程/账本/pin 不动；single/su 逐字不变；旧版应用读 trio 仍按三角色工作（降级友好）。⑦**审计**：账本增 `power:"communication"`、`kind:"intent.handed-off"`/`"clarification.requested"`；`dispatch.accepted{actor:"app",trigger:"intent-handoff"}` 不写客户决定；镜像作答仍只一条 `customer.decision`；可还原「谁提的案、谁转的交、客户批了什么」。⑧**异常**：Liaison 判断不了就列缺失、不交接；Rapporteur 澄清用 `request_clarification`（最多 2 轮）经 Liaison 往返；客户直接找 Rapporteur 仍完全可用。⑨**与在飞 auto-dispatch/下一步事件**：`app/desktop/governance-advance.ts` 等正在收口，Liaison 必须**串行在其后**，复用其投递纪律与触发，不复制第二套；不新增 `cardKind`，不改变既有下一步推导。⑩**最小 V1**＝四角色注册/主入口与文案、Liaison 写权与卡文本、`hand_off_intent` 与应用后台投递、决定卡镜像、澄清闭环、兼容与审计、AC1–AC18 与全量三层 glob。**待 PM/客户拍板 10 点**见提案 §十（Liaison 写权、镜像范围、交接守卫、澄清工具、Liaison 不发卡、多意图并行、保持 trio、进度行、旧项目提示、排期）。
+
+**边界与状态**：提案完成、**未实施/未测试**；实施归属建议（门禁引擎/运行时核心/编排/桌面窗口/桌面UI/测试）与最小 V1 见提案 §九。写集仅本角色四件（提案、feature-map、memo、本文件）；未改 `app/`、`src/`、`test/`、仓库 `docs/`、其他角色文件与 `.ans`；未读取 `.env`；未运行真实模型/网络/凭据；未 git 提交。
+
 ## 2026-10-17 — 已有角色但无治理记录的项目兼容：客户裁定回填（按 B+C 实施）
 
 **来源**：客户 2026-10-17 讨论后裁定——先问「su 写这些文件的权限是不是可以内置、不用从文件读取」，评估后自判「这个感觉天生就可以治理，也有点问题，这个我觉得他最好能兼容这种情况」，最终「推进吧，按 B+C 来」。据此把[设计提案](docs/design/2026-10-17_design_existing-project-compat.md)由 draft revision 1 回填为 **approved revision 2**（events 追加 `kind: accepted`）。

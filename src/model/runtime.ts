@@ -331,6 +331,71 @@ export type DispatchTaskFn = (
   metadata?: ReportHandbackMetadata,
 ) => DispatchReceipt | null | undefined | void | Promise<DispatchReceipt | null | undefined | void>;
 
+// —————————————— 治理四角色：意图交接与澄清（W6-A；2026-10-18 PM 评审 §5.1/§5.4） ——————————————
+//
+// 依据：`角色卡/项目管理/docs/design/2026-10-18_design_governance-liaison-review.md`（四角色
+// liaison → rapporteur → nominator → convener；治理模型仍 `trio`）。本模块**只定义中立形状**：
+// 工具层不读文件、不写账本、不投递，只把载荷交给注入的能力（校验/去重/后台投递/账本在编排与
+// 桌面窗口）。**交接 ≠ 客户批准**：本类型不产生任何能解锁门禁的客户决定；谁拥有
+// `hand_off_intent`（仅联络官 Liaison）/`request_clarification`（仅报告员 Rapporteur）由能力
+// 注入面保证，本层不硬编码角色 id、不做治理判定。
+
+/** 意图交接种类（评审 §5.1）：`initial` 每个 intentId 仅一次；`clarification`/`revision` 须引用既有成功交接。 */
+export type HandOffIntentKind = "initial" | "clarification" | "revision";
+
+/**
+ * `hand_off_intent` 载荷（评审 §5.1；形状冻结）。四要素 `goal`/`scope`/`acceptance`/`summary`
+ * 由工具层严格校验（非空、summary 1..200 字，超长拒绝不截断）；意图文件
+ * `docs/intents/<intentId>.md` 是权威，入参与文件不一致由编排侧校验拒绝。
+ */
+export interface HandOffIntentPayload {
+  /** 意图记录 slug（`GOVERNANCE_SLUG_PATTERN`）；对应 `docs/intents/<intentId>.md`。 */
+  intentId: string;
+  handoffKind: HandOffIntentKind;
+  goal: string;
+  scope: string;
+  acceptance: string;
+  /** 一句话摘要（1..200 字）。 */
+  summary: string;
+  /** 可选流程 id（slug）；clarification/revision 建议携带。 */
+  flowId?: GovernanceFlowId;
+}
+
+/** `hand_off_intent` 回执：`ok:false` 的 `message` 必须能指导模型下一步；工具层对缺失/非法回执 fail-closed。 */
+export interface HandOffIntentReceipt {
+  ok: boolean;
+  message?: string;
+}
+
+export type HandOffIntentFn = (
+  payload: HandOffIntentPayload,
+  metadata?: ReportHandbackMetadata,
+) => HandOffIntentReceipt | Promise<HandOffIntentReceipt>;
+
+/**
+ * `request_clarification` 载荷（评审 §5.4）。`flowId` 与 `intentId` **至少给一个**（同一 flow 的
+ * 2 轮上限由注入能力按账本计数判定）；本工具不弹客户决定卡、不占「一项目一卡」队列。
+ */
+export interface RequestClarificationPayload {
+  flowId?: GovernanceFlowId;
+  intentId?: string;
+  /** 给客户看的一句话问题（非空）。 */
+  question: string;
+  /** 可选摘要（≤200 字）。 */
+  summary?: string;
+}
+
+/** `request_clarification` 回执：`ok:false` 的 `message` 必须能指导模型下一步；工具层对缺失/非法回执 fail-closed。 */
+export interface RequestClarificationReceipt {
+  ok: boolean;
+  message?: string;
+}
+
+export type RequestClarificationFn = (
+  payload: RequestClarificationPayload,
+  metadata?: ReportHandbackMetadata,
+) => RequestClarificationReceipt | Promise<RequestClarificationReceipt>;
+
 // —————————————— 看护只读工具与恢复提议（G-2；只给内置治理角色 注入，注入才注册） ——————————————
 //
 // 依据：客户 2026-10-16 批准 G-2（设计 `角色卡/产品/docs/design/2026-10-16_design_role-watchdog-and-closure.md`
@@ -848,6 +913,18 @@ export interface GovernedToolsOptions {
   interactionGate?: InteractionGate;
   reportHandback?: ReportHandbackFn;
   dispatchTask?: DispatchTaskFn;
+  /**
+   * W6-A：`hand_off_intent` 能力（意图交接：校验/去重/后台投递/账本在注入能力侧）。
+   * **只给联络官 Liaison 会话注入**（判据在注入端＝编排/桌面窗口，本层不硬编码角色 id）；
+   * 未注入 ⇒ 工具不注册（结构性 fail-closed）。交接 ≠ 客户批准。
+   */
+  handOffIntent?: HandOffIntentFn;
+  /**
+   * W6-A：`request_clarification` 能力（澄清请求：账本＋主入口系统行在注入能力侧；同一 flow 最多 2 轮）。
+   * **只给报告员 Rapporteur 会话注入**（判据在注入端，本层不硬编码角色 id）；
+   * 未注入 ⇒ 工具不注册（结构性 fail-closed）。
+   */
+  requestClarification?: RequestClarificationFn;
   shellVerdict?: ShellVerdictFn;
   /**
    * G-2/R1：`role_status` 数据源（看护只读快照）。**只给内置治理角色 会话注入**（编排注入端判据沿

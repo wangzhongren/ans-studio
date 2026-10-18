@@ -121,20 +121,20 @@ test("listProject：真实项目级错误仍抛出（不存在 / 不是目录）
   await assert.rejects(() => listProject(proj), /不是目录/);
 });
 
-test("T14/三权：导入空目录（新空项目）→ 不抛错、trio 三内置、rapporteur 主入口、空 warnings", async () => {
+test("T14/四角色：导入空目录（新空项目）→ 不抛错、trio 四内置、liaison 主入口、空 warnings", async () => {
   const empty = join(ROOT, "empty");
   mkdirSync(empty, { recursive: true });
 
   const listing = await listProject(empty); // §10.2：不再抛「未找到角色目录」
   assert.equal(listing.projectRoot, empty);
   assert.equal(listing.hasRoles, false);
-  // 治理三权分立 V1（客户 2026-10-17 拍板；评审 §5.4 §九-1）：新空项目默认 trio。
+  // 治理三权分立 V1（客户 2026-10-17 拍板）+ 四角色（客户 2026-10-18 拍板）：新空项目默认 trio。
   assert.equal(listing.governanceModel, "trio");
-  assert.equal(listing.primaryRoleId, "rapporteur");
+  assert.equal(listing.primaryRoleId, "liaison");
   assert.deepEqual(
     listing.roles.map((r) => r.roleId),
-    ["rapporteur", "nominator", "convener"],
-    "trio 内置角色顺序必须是 rapporteur → nominator → convener",
+    ["liaison", "rapporteur", "nominator", "convener"],
+    "trio 内置角色顺序必须是 liaison → rapporteur → nominator → convener",
   );
   for (const builtIn of listing.roles) {
     assert.equal(builtIn.builtIn, true);
@@ -144,6 +144,7 @@ test("T14/三权：导入空目录（新空项目）→ 不抛错、trio 三内�
     assert.equal(builtIn.boundary.acceptance.accepted, false); // 展示用，fail-closed 由 resolveBoundarySection 把关
     assert.ok(builtIn.boundary.entries.length > 0);
   }
+  assert.equal(listing.roles.find((r) => r.roleId === "liaison")?.governanceFunction, "liaison");
   assert.equal(listing.roles.find((r) => r.roleId === "rapporteur")?.governanceFunction, "proposal");
   assert.equal(listing.roles.find((r) => r.roleId === "nominator")?.governanceFunction, "nomination");
   assert.equal(listing.roles.find((r) => r.roleId === "convener")?.governanceFunction, "schedule");
@@ -187,10 +188,10 @@ test("三权：`.ans/project.json` 缺 governanceModel（旧记录）→ single�
   writeFileSync(join(trio, ".ans", "project.json"), JSON.stringify({ governanceModel: "trio" }));
   const trioListing = await listProject(trio);
   assert.equal(trioListing.governanceModel, "trio");
-  assert.equal(trioListing.primaryRoleId, "rapporteur");
+  assert.equal(trioListing.primaryRoleId, "liaison");
   assert.deepEqual(
     trioListing.roles.map((r) => r.roleId),
-    ["rapporteur", "nominator", "convener", "实现者"],
+    ["liaison", "rapporteur", "nominator", "convener", "实现者"],
   );
   assert.equal(trioListing.hasRoles, true);
 });
@@ -204,9 +205,9 @@ test("三权：`.ans` 不可解析 → single（行为不变，不崩）", async
   assert.deepEqual(listing.roles.map((r) => r.roleId), ["su"], "无角色目录时旧行为仍只列 su");
 });
 
-test("三权：保留 id 冲突——项目里的 su/rapporteur/nominator/convener 目录跳过并警告", async () => {
+test("四角色：保留 id 冲突——项目里的 su/liaison/rapporteur/nominator/convener 目录跳过并警告", async () => {
   const proj = join(ROOT, "reserved");
-  for (const id of ["su", "rapporteur", "nominator", "convener", "正常"]) {
+  for (const id of ["su", "liaison", "rapporteur", "nominator", "convener", "正常"]) {
     const d = join(proj, "角色卡", id);
     mkdirSync(d, { recursive: true });
     writeFileSync(join(d, "role-card.md"), `# ${id}`);
@@ -216,7 +217,7 @@ test("三权：保留 id 冲突——项目里的 su/rapporteur/nominator/conven
   assert.equal(listing.governanceModel, "single"); // 有角色目录 → 旧项目
   assert.deepEqual(listing.roles.map((r) => r.roleId), ["su", "正常"]);
   const w = listing.warnings.join("\n");
-  for (const id of ["su", "rapporteur", "nominator", "convener"]) {
+  for (const id of ["su", "liaison", "rapporteur", "nominator", "convener"]) {
     assert.match(w, new RegExp(`${id}：与内置治理角色 id 冲突，已跳过`), `保留 id ${id} 须跳过并警告`);
   }
 });

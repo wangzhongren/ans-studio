@@ -34,7 +34,7 @@
 // 此时**不做任务级收窄**，只用角色边界；编排把 undefined 原样传给 resolveWrite，绝不伪造全量 writeSet。
 // （确认制会话例外：其 writeSet 由发行器动态持有，见上。）
 
-import type { ProjectConfig, ResolvedRole } from "../../model/role.ts";
+import type { GovernanceFunction, ProjectConfig, ResolvedRole } from "../../model/role.ts";
 import type { TaskScope, WriteDecision } from "../../model/decision.ts";
 import { createHash } from "node:crypto";
 import { readdir, readFile, stat } from "node:fs/promises";
@@ -66,6 +66,8 @@ import type {
   GovernanceCardKind,
   DispatchTaskFn,
   DispatchTaskPayload,
+  HandOffIntentFn,
+  RequestClarificationFn,
   RoleStatusFn,
   SessionTailFn,
   ProposeRecoveryFn,
@@ -112,9 +114,13 @@ import {
   type GovernanceDecisionKind,
   type GovernanceLedgerEntry,
   type GovernanceLedgerSnapshot,
-  type GovernancePower,
 } from "../../common/编排/governance-ledger.ts";
 import { evaluateGovernanceGate, type GovernanceGateAction } from "../../common/编排/governance-gate.ts";
+import {
+  CLARIFICATION_MAX_ROUNDS,
+  countClarificationRounds,
+  validateIntentHandoff,
+} from "../../common/编排/governance-handoff.ts";
 import { CLI_POSITIONING } from "../../common/编排/cli-positioning.ts";
 import { createDiagnosticLogger } from "../../common/shared/diagnostics.ts";
 // 跨角色共享路径原语（**单一来源** = pm 属主 `src/common/shared/path-primitives.ts`；工程法案 §一.5
@@ -139,6 +145,9 @@ import { absRel, isAbsoluteAny, isUnderOrEqual, normalizeLexical } from "../../c
  * · `dispatchTask`（H-1 su 派发任务；未注入 ⇒ `dispatch_task` 不注册）——**只给治理角色 su**注入
  *   （项目角色不给）。形状 = 契约家 `DispatchTaskFn`（前端路由：开/排队/去重/失败保留归前端；
  *   **派发 ≠ 授权**——能力实现方不得据此授予任何写权）。
+ * · `handOffIntent` / `requestClarification`（W6-A 意图交接/澄清；未注入 ⇒ 对应工具不注册）——
+ *   **只给** Liaison / Rapporteur（能力矩阵 `handOffIntent`/`requestClarification`）。编排先做文件/
+ *   去重/每轮一次/两轮澄清上限与账本；能力实现方只负责投递/呈现。**交接 ≠ 客户批准；澄清 ≠ 客户已回答**。
  * · `shellGate`（I-1 开放 shell + su 审批档/只读档；未注入 ⇒ `run_shell` 不注册）——**项目角色**经三层链注入
  *   （`openRoleSession` 收到 `shellOperatorChannel` 时经 `assembleProjectShellGate` 装配）；**su** 经
  *   **审批档**（`shellOperatorOnly`，客户裁定 2026-10-17：只读白名单免审批、其余含 deny 逐条客户批准；
@@ -168,6 +177,20 @@ export interface AdapterCapabilities {
   runtime?: RuntimeKind;
   persistSession?: boolean;
   dispatchTask?: DispatchTaskFn;
+  /**
+   * W6-A：`hand_off_intent` 能力（四角色评审 §5.1/§5.2）。**只给联络官 Liaison**（能力矩阵
+   * `handOffIntent`）；本编排层已在校验/去重/每轮一次/账本成功后才调到这里——本字段是**投递端**
+   * （桌面窗口：后台开 Rapporteur、`sendBackground`、系统行；`dispatch.accepted{trigger:"intent-handoff"}`
+   * 由投递端写）。未注入 ⇒ 工具不注册（结构性 fail-closed）。**交接 ≠ 客户批准**。
+   */
+  handOffIntent?: HandOffIntentFn;
+  /**
+   * W6-A：`request_clarification` 能力（四角色评审 §5.4）。**只给报告员 Rapporteur**（能力矩阵
+   * `requestClarification`）；本编排层已做两轮上限判定并写 `clarification.requested`，本字段负责把
+   * 问题送到主入口（桌面窗口：系统行；若其实现经客户通道发问，答案可随回执 message 返回）。
+   * 未注入 ⇒ 工具不注册（结构性 fail-closed）。**澄清 ≠ 客户已回答，不弹决定卡**。
+   */
+  requestClarification?: RequestClarificationFn;
   shellGate?: ShellGate;
   shellVerdict?: ShellVerdictFn;
   roleStatus?: RoleStatusFn;
@@ -418,6 +441,21 @@ export async function openRoleSession(
      */
     dispatchTask?: DispatchTaskFn;
     /**
+     * **W6-A 意图交接的投递能力（`hand_off_intent`「注入才注册」）**：前端（桌面窗口）提供的实现——
+     * 校验通过后把**一条**任务投给 Rapporteur（后台开/发、不打开/不切换、系统行、写
+     * `dispatch.accepted{trigger:"intent-handoff"}`）。**只对联络官 Liaison 注入**（能力矩阵
+     * `handOffIntent`；其余角色即使误给也不注入）；编排在此之上先做文件/去重/每轮一次校验并写
+     * `intent.handed-off`。未给出 ⇒ 工具不注册。**交接不是客户批准**。
+     */
+    handOffIntent?: HandOffIntentFn;
+    /**
+     * **W6-A 澄清请求的送达能力（`request_clarification`「注入才注册」）**：前端（桌面窗口）提供的
+     * 实现——把报告员的问题送到主入口（系统行；若其实现经客户通道发问，答案可随回执 message 返回）。
+     * **只对报告员 Rapporteur 注入**（能力矩阵 `requestClarification`）；编排先读账本判两轮上限并写
+     * `clarification.requested`。未给出 ⇒ 工具不注册。**澄清不弹决定卡、不改变任何权力/写权**。
+     */
+    requestClarification?: RequestClarificationFn;
+    /**
      * **G-2 看护自查能力（R1；`role_status`「注入才注册」）**：前端提供的实现（主进程读同源快照＋
      * 诊断尾部 → 结构化文本）。**只对治理角色会话（su）转交**（判据同 `dispatchTask`）；形状单一来源
      * ＝契约家 `model/runtime.ts`（R1 属主；文案契约在 `common/编排/watchdog.ts`）。**纯读**：不写盘、
@@ -548,7 +586,11 @@ export async function openRoleSession(
 
   // gate（A-3）：有 `customerInput` ⇒ 确认制动态 writeSet（发行器追加；内置治理角色的初始集额外含
   // 预授权写目录）；无 ⇒ 原样传 input.scope（可为 undefined = 不收窄，旧语义逐字不变）。
-  const confirmationMode = input.customerInput !== undefined;
+  // W6-A（四角色评审 §4.4）：**能力矩阵收窄**——Liaison 的 `customerInput=false`，即便调用方误给
+  // 通道也不进入确认制（`request_confirmation`/`request_choice` 结构性不注册；走静态边界/预授权）。
+  // 项目角色（cap undefined）与 su/其余 trio 角色（cap.customerInput=true）行为逐字不变。
+  const confirmationMode =
+    input.customerInput !== undefined && (cap === undefined || cap.customerInput);
   const issued = new Set<string>();
   const conditions = conditionSlugsOf(setup.role.boundary);
   const gateCtx = { skillRoot: input.project.skillRoot, projectRoot: input.project.projectRoot };
@@ -758,6 +800,142 @@ export async function openRoleSession(
         : input.dispatchTask
       : undefined;
 
+  // W6-A 意图交接（四角色评审 §5.1/§5.2）：能力矩阵驱动——仅 `capabilities.handOffIntent`（trio=Liaison）。
+  // 编排侧先做机械校验（意图文件权威、slug、四要素、去重、initial 一次性、每轮一次、账本可读），
+  // 通过后调用前端投递能力；**先投递成功、后写账本**；投递失败如实回执、不重试、不写成功账本。
+  // 交接不是客户批准：本包装器不产生任何 customer.decision，也不解锁任何门禁。
+  const successfulHandoffTurns = new Set<string>();
+  // 同一会话的交接/澄清串行链：即便模型在同一轮并行发起两次调用，第二个也等第一个落盘后再校验
+  // （「每轮一次」「两轮上限」才是机械成立的，而不是赌工具调用顺序）。
+  const handoffSerial: { chain: Promise<void> } = { chain: Promise.resolve() };
+  const clarificationSerial: { chain: Promise<void> } = { chain: Promise.resolve() };
+  const handOffIntent: HandOffIntentFn | undefined =
+    isTrio && cap?.handOffIntent === true && input.handOffIntent !== undefined
+      ? (payload, metadata) =>
+          serializeGovernanceTask(handoffSerial, async () => {
+          const turnId = metadata?.turnId;
+          if (turnId !== undefined && successfulHandoffTurns.has(turnId)) {
+            return { ok: false, message: "同一轮已交接过一次意图（每轮至多一次）；未交接；请在本轮结束后再交接。" };
+          }
+          const validation = await validateIntentHandoff(
+            { projectRoot: input.project.projectRoot, ...payload },
+            {
+              governanceModel,
+              governanceFunction: trioSpec!.function,
+              roleId: setup.role.id,
+              ...(turnId !== undefined ? { turnId } : {}),
+              ...(boundSessionForEvidence?.nativeSessionId !== undefined
+                ? { sessionId: boundSessionForEvidence.nativeSessionId }
+                : {}),
+            },
+          );
+          if (!validation.ok) {
+            log.record("governance.handoff.rejected", { code: validation.code, intentId: payload.intentId });
+            return { ok: false, message: validation.message };
+          }
+          for (const warning of validation.warnings ?? []) {
+            log.record("governance.handoff.warning", { message: warning });
+          }
+          let receipt;
+          try {
+            receipt = await input.handOffIntent!(payload, metadata);
+          } catch (err) {
+            log.error("governance.handoff.delivery.failed", err, { intentId: payload.intentId });
+            return { ok: false, message: `应用无法把意图交给报告员：${errText(err)}；未重试。` };
+          }
+          if (receipt?.ok !== true) {
+            const reason = receipt?.message ?? "投递端未确认";
+            log.record("governance.handoff.delivery.rejected", { intentId: payload.intentId, reason });
+            return { ok: false, message: `应用无法把意图交给报告员：${reason}；未重试。` };
+          }
+          if (turnId !== undefined) successfulHandoffTurns.add(turnId);
+          // 先投递成功、后写账本；账本失败只记诊断，不翻转投递结果、不重试（评审 §7.2）。
+          const entryRuntime = input.runtime ?? boundSessionForEvidence?.runtime;
+          const entry: GovernanceLedgerEntry = {
+            at: new Date().toISOString(),
+            kind: "intent.handed-off",
+            actorRoleId: setup.role.id,
+            power: "liaison",
+            intentId: payload.intentId,
+            handoffKind: payload.handoffKind,
+            targetRoleId: "rapporteur",
+            ...(validation.flowId !== undefined ? { flowId: validation.flowId } : {}),
+            artifactPath: validation.artifactPath,
+            artifactSha256: validation.artifactSha256,
+            messageSummary: truncateText(payload.summary, 200),
+            ...(turnId !== undefined ? { turnId } : {}),
+            ...(boundSessionForEvidence?.nativeSessionId !== undefined
+              ? { sessionId: boundSessionForEvidence.nativeSessionId }
+              : {}),
+            ...(entryRuntime !== undefined ? { runtime: entryRuntime } : {}),
+          };
+          const appended = await appendGovernanceLedger(input.project.projectRoot, entry);
+          if (!appended.ok) log.record("governance.handoff.append.failed", { message: appended.message });
+          return {
+            ok: true,
+            message: `已把意图「${payload.intentId}」交给报告员（handoffKind=${payload.handoffKind}）——交接 ≠ 客户批准。`,
+          };
+        })
+      : undefined;
+
+  // W6-A 澄清请求（四角色评审 §5.4）：能力矩阵驱动——仅 `capabilities.requestClarification`（trio=Rapporteur）。
+  // 编排侧先读账本判两轮上限（同一 flowId，无则同一 intentId）；通过后把问题交给前端送达主入口，
+  // 再写 `clarification.requested`（actor=rapporteur, power=proposal）。失败如实回执、不重试、不写账本。
+  // 澄清不弹决定卡、不占「一项目一卡」、不改变任何权力或写权。
+  const requestClarification: RequestClarificationFn | undefined =
+    isTrio && cap?.requestClarification === true && input.requestClarification !== undefined
+      ? (payload, metadata) =>
+          serializeGovernanceTask(clarificationSerial, async () => {
+          const rounds = await countClarificationRounds(input.project.projectRoot, payload);
+          if (!rounds.ok) return { ok: false, message: rounds.message };
+          if (rounds.rounds >= CLARIFICATION_MAX_ROUNDS) {
+            return {
+              ok: false,
+              message:
+                `同一${rounds.scope === "flow" ? "流程" : "意图"}已有 ${rounds.rounds} 轮澄清` +
+                `（上限 ${CLARIFICATION_MAX_ROUNDS} 轮）：请在提案卡上请客户决定（带假设/备选），未提交。`,
+            };
+          }
+          let receipt;
+          try {
+            receipt = await input.requestClarification!(payload, metadata);
+          } catch (err) {
+            log.error("governance.clarification.submit.failed", err, {
+              flowId: payload.flowId,
+              intentId: payload.intentId,
+            });
+            return { ok: false, message: `澄清请求未能提交：${errText(err)}；未重试。` };
+          }
+          if (receipt?.ok !== true) {
+            return { ok: false, message: `澄清请求未能提交：${receipt?.message ?? "送达端未确认"}；未重试。` };
+          }
+          const entryRuntime = input.runtime ?? boundSessionForEvidence?.runtime;
+          const entry: GovernanceLedgerEntry = {
+            at: new Date().toISOString(),
+            kind: "clarification.requested",
+            actorRoleId: setup.role.id,
+            power: "proposal",
+            ...(payload.flowId !== undefined ? { flowId: payload.flowId } : {}),
+            ...(payload.intentId !== undefined ? { intentId: payload.intentId } : {}),
+            messageSummary: truncateText(payload.summary ?? payload.question, 200),
+            ...(metadata?.turnId !== undefined ? { turnId: metadata.turnId } : {}),
+            ...(boundSessionForEvidence?.nativeSessionId !== undefined
+              ? { sessionId: boundSessionForEvidence.nativeSessionId }
+              : {}),
+            ...(entryRuntime !== undefined ? { runtime: entryRuntime } : {}),
+          };
+          const appended = await appendGovernanceLedger(input.project.projectRoot, entry);
+          if (!appended.ok) log.record("governance.clarification.append.failed", { message: appended.message });
+          const detail = receipt.message !== undefined ? ` ${receipt.message}` : "";
+          return {
+            ok: true,
+            message:
+              `澄清请求已记录（第 ${rounds.rounds + 1} 轮）——不弹决定卡、不改变任何权力/写权；` +
+              `应用已在主入口显示。${detail}`,
+          };
+        })
+      : undefined;
+
   // G-2 看护三能力（R1/R2）：能力矩阵驱动——仅 `capabilities.roleStatus/sessionTail/proposeRecovery`
   // （trio=Convener；su 旧行为）。未注入 ⇒ 不注入（能力缺席 = 最强 fail-closed）。
   // 承载契约（字段名/形状）单一来源：`common/编排/watchdog.ts`。
@@ -834,6 +1012,8 @@ export async function openRoleSession(
     ...(input.runtime !== undefined ? { runtime: input.runtime } : {}),
     ...(input.persistSession !== undefined ? { persistSession: input.persistSession } : {}),
     ...(dispatchTask !== undefined ? { dispatchTask } : {}),
+    ...(handOffIntent !== undefined ? { handOffIntent } : {}),
+    ...(requestClarification !== undefined ? { requestClarification } : {}),
     ...(roleStatus !== undefined ? { roleStatus } : {}),
     ...(sessionTail !== undefined ? { sessionTail } : {}),
     ...(proposeRecovery !== undefined ? { proposeRecovery } : {}),
@@ -1128,7 +1308,7 @@ export async function openRoleSession(
                     at: new Date().toISOString(),
                     kind: "artifact.observed",
                     actorRoleId: setup.role.id,
-                    power: trioSpec!.function as GovernancePower,
+                    power: trioSpec!.function,
                     artifactPath: artifact.relPath,
                     artifactSha256: artifact.sha256,
                     ...artifactFlowMetadata(artifact.relPath),
@@ -1270,8 +1450,49 @@ function scopeWithBuiltInPreauthorization(
 }
 
 /**
- * trio 禁写路径（评审 §5.2/§5.6）：在 `resolveWrite` **之前**判定。命中即拒，文案点明
- * 「该路径属应用治理记录/其他治理角色，任何角色不可写」。只对注册表角色生效（su/项目角色保持现状）。
+ * 越界写入的**归属指引**（与门禁引擎 AC3 的 Liaison 归属文案同口径；2026-10-18 协调口径）。
+ * 只影响**拒绝文案**，不改变 `forbiddenWritePaths` 的放行/拒绝判定。
+ * 顺序敏感：应用独占路径先于「角色卡/」等宽前缀匹配。
+ */
+function governanceWriteOwnerHint(rel: string): string {
+  const hints: ReadonlyArray<{ prefixes: readonly string[]; guidance: string }> = [
+    {
+      prefixes: [".ans/", "docs/bootstrap-manifest.md", "角色卡/governance-boundary.yaml"],
+      guidance: "该路径只能由应用写（治理记录/账本/边界文档/manifest），任何角色都不可写。",
+    },
+    {
+      prefixes: ["docs/proposals/", "docs/contracts/", "docs/governance/rapporteur/"],
+      guidance: "该路径属报告员 Rapporteur 的写区（提案/契约）；请把客户意图交给报告员，由报告员形成提案。",
+    },
+    {
+      prefixes: [
+        "角色卡/",
+        "docs/nominations/",
+        "docs/skills/",
+        "docs/mcp/",
+        "docs/governance/nominator/",
+      ],
+      guidance: "该路径属提名官 Nominator 的写区（角色/提名/技能/MCP）；请交给提名官。",
+    },
+    {
+      prefixes: ["docs/flows/", "docs/workflow.md", "docs/governance/convener/"],
+      guidance: "该路径属召集人 Convener 的写区（流程/编排）；请交给召集人。",
+    },
+  ];
+  for (const hint of hints) {
+    const hit = hint.prefixes.some((prefix) => {
+      const relLower = rel.toLowerCase();
+      const prefixLower = prefix.toLowerCase();
+      return prefix.endsWith("/") ? relLower.startsWith(prefixLower) : relLower === prefixLower;
+    });
+    if (hit) return hint.guidance;
+  }
+  return "该路径属应用治理记录或其他治理角色，当前角色不可写。";
+}
+
+/**
+ * trio 门禁包装的**第一道**：`forbiddenWritePaths`（应用独占 + 其他治理角色资料）。
+ * 命中即拒（先于三道门禁与 `resolveWrite`）；文案指回归属（AC3 口径）。
  */
 function forbiddenWriteDecision(
   spec: BuiltInGovernanceRoleSpec,
@@ -1282,7 +1503,7 @@ function forbiddenWriteDecision(
   if (!hit) return undefined;
   return {
     allowed: false,
-    reason: `拒绝写入 ${rel}：该路径属应用治理记录/其他治理角色，任何角色不可写。`,
+    reason: `拒绝写入 ${rel}：${governanceWriteOwnerHint(rel)}`,
     allowedByRoot: { skill: [], project: [] },
   };
 }
@@ -1329,8 +1550,27 @@ function isGovernanceFlowId(value: unknown): value is string {
   return typeof value === "string" && GOVERNANCE_FLOW_ID_RE.test(value);
 }
 
+/**
+ * 同一会话内的治理操作串行链（W6-A）：交接「每轮一次/去重」与澄清「两轮上限」的机械判定依赖
+ * 「前一次已落账」；模型可能同轮并行发起多次工具调用，故按会话串行执行（前一条失败不影响后一条）。
+ */
+function serializeGovernanceTask<T>(
+  state: { chain: Promise<void> },
+  task: () => Promise<T>,
+): Promise<T> {
+  const run = state.chain.then(task, task);
+  state.chain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
 /** 每角色允许的 `cardKind` 白名单（评审 §5.8 表；越权不弹卡，由 customerInput 包装器直接拒绝）。 */
 const TRIO_CARD_KINDS: Record<BuiltInGovernanceRoleSpec["id"], readonly GovernanceCardKind[]> = {
+  // W6-A：Liaison 的 `customerInput=false`（只用聊天与 hand_off_intent）——空白名单是结构性兜底：
+  // 即便调用方误给客户通道，任何治理卡也会被包装器拒绝。
+  liaison: [],
   rapporteur: ["proposal", "acceptance", "write"],
   nominator: ["appointment", "appointment-write", "write"],
   convener: ["schedule-write", "write"],
@@ -1428,7 +1668,7 @@ function recordCustomerDecision(args: {
   state: { snapshot: GovernanceLedgerSnapshot; local: GovernanceLedgerEntry[] };
   projectRoot: string;
   roleId: string;
-  function: "proposal" | "nomination" | "schedule";
+  function: GovernanceFunction;
   req: CustomerInputRequest;
   metadata?: CustomerInputMetadata;
   out: CustomerInputOutcome | null | undefined;
@@ -1696,6 +1936,11 @@ export function createRuntimeAdapterFactory(
     customerInput: capabilities?.customerInput,
     reportHandback: capabilities?.reportHandback,
     dispatchTask: capabilities?.dispatchTask,
+    // W6-A：意图交接/澄清两能力并入适配器选项——**契约字段名** `handOffIntent` /
+    // `requestClarification`（运行时核心 `GovernedToolsOptions` 同名能力位，形状同源
+    // `model/runtime.ts`）；`undefined` ⇒ 对应工具不注册（最弱接触面，同 dispatch_task 先例）。
+    handOffIntent: capabilities?.handOffIntent,
+    requestClarification: capabilities?.requestClarification,
     // G-2/R1-R2：看护三能力并入适配器选项——**契约字段名** `roleStatus` / `sessionTail` /
     // `proposeRecovery`（运行时核心 `GovernedToolsOptions` 同名能力位，形状同源 `model/runtime.ts`）；
     // `undefined` ⇒ 对应工具不注册（能力缺席 = 最强 fail-closed，同 dispatch_task 先例）。

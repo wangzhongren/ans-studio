@@ -18,14 +18,26 @@
 
 import { mkdir, open, readFile } from "node:fs/promises";
 import path from "node:path";
-import type { RuntimeKind } from "../../model/runtime.ts";
+import type { HandOffIntentKind, RuntimeKind } from "../../model/runtime.ts";
 import { createDiagnosticLogger } from "../shared/diagnostics.ts";
 
 /** 账本的项目相对路径（评审 §5.7 固定值）。 */
 export const GOVERNANCE_LEDGER_REL = ".ans/governance/ledger.jsonl";
 
-/** 账本事件的权力归属（评审 §5.7）。 */
-export type GovernancePower = "proposal" | "nomination" | "schedule" | "acceptance" | "app" | "customer";
+/**
+ * 账本事件的权力归属（评审 §5.7；2026-10-18 四角色 W6-A 增补）。
+ *
+ * - `"liaison"`：联络官 Liaison 的**沟通权**（不是决定权）——`intent.handed-off` 与 Liaison 的
+ *   `artifact.observed` 使用（四角色评审 §7.1 逐字值；门禁不读 `power`，它只是审计标记）。
+ */
+export type GovernancePower =
+  | "proposal"
+  | "nomination"
+  | "schedule"
+  | "acceptance"
+  | "app"
+  | "customer"
+  | "liaison";
 
 /** 客户决定的细分类型（门禁按它判定，不靠自然语言；评审 §5.7/§5.8）。 */
 export type GovernanceDecisionKind =
@@ -40,6 +52,13 @@ export type GovernanceDecisionKind =
   | "migration"
   | "unclassified"; // 缺 cardKind 或选项 id 非标准：门禁一律拒绝，提示重发
 
+/**
+ * `dispatch.accepted` 的触发来源（四角色评审 §7.1）：区分「客户决定后推进」「意图交接后投递」
+ * 「settle 后推进」；三者都仍是 `actorRoleId:"app"`, `power:"app"`，**都不是客户批准**。
+ * 旧条目缺 `trigger` 仍合法（不追改历史）。
+ */
+export type GovernanceLedgerTrigger = "customer-decision" | "intent-handoff" | "settle";
+
 /** 账本条目（评审 §5.7 逐字形状；只增不改，未知字段读取时原样保留）。 */
 export interface GovernanceLedgerEntry {
   at: string; // ISO
@@ -49,7 +68,10 @@ export interface GovernanceLedgerEntry {
     | "artifact.observed"
     | "governance.established"
     | "governance.reaccepted"
-    | "governance.migrated";
+    | "governance.migrated"
+    // W6-A（四角色评审 §7.1）：意图交接与澄清。两者都**不是**客户批准，任何门禁不读。
+    | "intent.handed-off"
+    | "clarification.requested";
   flowId?: string;
   stepId?: string;
   /** 本事件的动作人（角色 id，或 "app"/"customer"）。 */
@@ -64,6 +86,17 @@ export interface GovernanceLedgerEntry {
   paths?: string[];
   targetRoleId?: string;
   targetRoleIds?: string[];
+  /** W6-A：意图交接/澄清所引用的意图记录（`docs/intents/<intentId>.md` 的 slug）。 */
+  intentId?: string;
+  /** W6-A：仅 intent.handed-off——交接种类（initial 每个 intentId 仅一次）。 */
+  handoffKind?: HandOffIntentKind;
+  /** W6-A：仅 dispatch.accepted——触发来源（见 GovernanceLedgerTrigger）；缺席＝旧条目。 */
+  trigger?: GovernanceLedgerTrigger;
+  /**
+   * W6-A：仅 intent.handed-off——所属轮次（每轮一次守卫；同会话同轮第二次成功交接被拒）。
+   * 不属于客户决定的 `decisionEvidence`；`sessionId` 与它合起来定位一轮。
+   */
+  turnId?: string;
   customerDecision?: "accepted" | "accepted-quick" | "appointed" | "rejected" | "changes-requested" | "none";
   decisionEvidence?: {
     kind: "customer-input" | "desktop-governance-record" | "customer-message";

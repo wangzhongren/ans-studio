@@ -38,6 +38,14 @@ export type { CustomerInputRequest, CustomerInputOutcome, CustomerInputFn };
 // 各自用同一函数拼键，渲染侧据此把卡锚定回「调用工具 request_confirmation」附近。只读导入、不复制。
 import { interactionAnchorKey } from "./request-anchor.ts";
 import { createDiagnosticLogger } from "../../src/common/shared/diagnostics.ts";
+// 治理下一步推导（2026-10-18 客户修正）：纯逻辑在 governance-advance.ts；本模块**只**在客户决定
+// 成功结算后回调，由主进程决定是否后台派发——本模块不打开会话、不发模型消息、不做任何批准。
+import {
+  deriveGovernanceNextStep,
+  type GovernanceNextStepContext,
+  type GovernanceNextStepPayload,
+} from "./governance-advance.ts";
+export type { GovernanceNextStepContext, GovernanceNextStepPayload } from "./governance-advance.ts";
 
 /** 推给渲染侧的交互请求载荷（IPC `session:operator-request` 的形状，主→渲）。 */
 export interface OperatorRequestPayload {
@@ -56,6 +64,13 @@ export interface OperatorRequestPayload {
    * 记进请求登记表，供卡的（重）物化与**回放行**（同样带 anchorKey）精确关联——卡落回它发生的位置。
    */
   anchorKey: string;
+  /**
+   * **决定卡镜像**（四角色评审 §6.1，W6-B）：trio 下治理决定卡（proposal/appointment/appointment-write/
+   * schedule-write/acceptance）的**第二呈现面** = 主入口 Liaison 的角色 id。同一 `id`、同一份 pending、
+   * 同一个 `respond`——镜像只是呈现路由，**不是第二个请求**，不产生第二份账本决定与第二次 `onNextStep`。
+   * single 模型、普通写盘卡（`write`）与无 `cardKind` 的旧卡**不出现**该字段。
+   */
+  mirrorRoleId?: string;
 }
 
 /**
@@ -83,6 +98,13 @@ export interface CreateCustomerInputChannelOptions {
   onQueued?: (payload: OperatorRequestPayload, waitingFor: string) => void;
   /** 表现层（主进程 webContents.send）；**未配置 → 一律 unavailable**（能力缺席即 fail-closed）。 */
   presenter?: OperatorRequestPresenter;
+  /**
+   * **治理下一步（2026-10-18 客户修正）**：客户决定**成功结算**（answered）后推导下一步并回调；
+   * `nextFunction/roleId` 为 null 也会回调（明确「无下一步」，供界面显示状态）。取消/拒绝/expired 不回调。
+   * 主进程据此在**后台**打开目标治理角色会话并派发**一条**任务（不抢当前 pane、不自动批准、不写账本）；
+   * 本模块自身不打开会话、不发模型消息——回调抛错只记诊断，绝不影响已完成的客户决定。
+   */
+  onNextStep?: (payload: GovernanceNextStepPayload, context: GovernanceNextStepContext) => void;
   /** 操作者标识（随 `CustomerInputOutcome.operatorId` 交给编排，先例同 shell 闸 (a)）。空/缺失归 unknown。 */
   operatorId: string;
   /** 关联 id 生成器（缺省 `op-<n>`；注入以便测试确定性）。 */
@@ -125,7 +147,14 @@ export interface CustomerInputChannel {
  */
 export type DesktopCustomerInputFn = (
   req: CustomerInputRequest,
-  ctx: { roleId: string; runtime?: CustomerInputMetadata["runtime"]; projectRoot?: string; sessionSignal?: AbortSignal },
+  ctx: {
+    roleId: string;
+    runtime?: CustomerInputMetadata["runtime"];
+    projectRoot?: string;
+    sessionSignal?: AbortSignal;
+    /** 决定卡镜像面（trio 主入口 Liaison 的角色 id；由 `SessionManager.open` 按模型/卡片种类/来源角色计算）。 */
+    mirrorRoleId?: string;
+  },
   metadata?: CustomerInputMetadata,
 ) => Promise<CustomerInputOutcome | null | undefined> | CustomerInputOutcome | null | undefined;
 
@@ -178,7 +207,43 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     if (queue.length === 0) waiting.delete(entry.projectKey);
   };
 
-  /** 结算**已呈现**的那张：清 pending/占位 → 清监听 → resolve → 按序呈现同项目下一张。 */
+  /**
+   * 客户决定**成功结算**后推导下一步并回调（只有 answered；取消/拒绝/expired 一律不回调）。
+   * 推导/回调均隔离：抛错只记诊断，绝不影响已完成的客户决定与排队流转。
+   */
+  const notifyNextStep = (entry: ChannelEntry, outcome: CustomerInputOutcome): void => {
+    if (outcome.outcome !== "answered" || opts.onNextStep === undefined) return;
+    let payload: GovernanceNextStepPayload | null;
+    try {
+      payload = deriveGovernanceNextStep(entry.request, outcome);
+    } catch (error) {
+      diagnostic.error("interaction.next-step.failed", error, { requestId: entry.payload.id });
+      return;
+    }
+    if (payload === null) return; // 无治理元数据 / 未知卡片种类：旧行为零变化。
+    const selected = outcome.value?.selected;
+    const context: GovernanceNextStepContext = {
+      ...(entry.payload.roleId !== "" ? { sourceRoleId: entry.payload.roleId } : {}),
+      ...(entry.payload.projectRoot !== undefined ? { projectRoot: entry.payload.projectRoot } : {}),
+      ...(entry.payload.runtime !== undefined ? { runtime: entry.payload.runtime } : {}),
+      ...(payload.cardKind === "appointment" && Array.isArray(selected) ? { targetRoleIds: selected } : {}),
+      // W6-B 审计（四角色评审 AC19）：仅当请求显式带 stepId 时透传；缺席不猜、不伪造。
+      ...(typeof entry.request.stepId === "string" && entry.request.stepId !== "" ? { stepId: entry.request.stepId } : {}),
+    };
+    try {
+      opts.onNextStep(payload, context);
+      diagnostic.record("interaction.next-step", {
+        requestId: entry.payload.id,
+        cardKind: payload.cardKind,
+        nextFunction: payload.nextFunction,
+        roleId: payload.roleId,
+      });
+    } catch (error) {
+      diagnostic.error("interaction.next-step.failed", error, { requestId: entry.payload.id });
+    }
+  };
+
+  /** 结算**已呈现**的那张：清 pending/占位 → 清监听 → resolve → 下一步推导 → 按序呈现同项目下一张。 */
   const settleActive = (entry: ChannelEntry, outcome: CustomerInputOutcome): void => {
     if (entry.state !== "active") return;
     entry.state = "done";
@@ -186,6 +251,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     if (activeByProject.get(entry.projectKey) === entry.payload.id) activeByProject.delete(entry.projectKey);
     entry.cleanup();
     entry.resolve(outcome);
+    notifyNextStep(entry, outcome);
     drainProject(entry.projectKey);
   };
 
@@ -244,6 +310,9 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
       }
       const id = opts.nextId ? opts.nextId() : `op-${++seq}`;
       const payload: OperatorRequestPayload = { id, roleId: String((ctx && ctx.roleId) || ""), request: req, anchorKey: interactionAnchorKey(req.kind, req.title) };
+      // 镜像面（四角色评审 §6.1）：由 SessionManager 计算并给出；仅非空字符串进入载荷。
+      // 同一请求仍只登记一条 pending、只结算一次——本字段不改变任何校验/账本/下一步推导。
+      if (typeof ctx?.mirrorRoleId === "string" && ctx.mirrorRoleId !== "") payload.mirrorRoleId = ctx.mirrorRoleId;
       if (ctx.runtime !== undefined) payload.runtime = ctx.runtime;
       if (ctx.projectRoot !== undefined) payload.projectRoot = ctx.projectRoot;
       if (typeof metadata?.turnId === "string" && metadata.turnId !== "") payload.turnId = metadata.turnId;

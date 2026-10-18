@@ -27,7 +27,7 @@ import { makeRoot } from "./fixture.ts";
 await import(new URL("../../../app/renderer/ui-labels.js", import.meta.url).href);
 const Labels = (globalThis as unknown as {
   ANSUiLabels: Record<string, (...args: never[]) => unknown> & {
-    governanceRoleView: (fn: unknown) => { function: string; cn: string; en: string; name: string; power: string; builtinNote: string; emptyHint: string } | null;
+    governanceRoleView: (fn: unknown) => { function: string; cn: string; en: string; name: string; power: string; builtinNote: string; emptyHint: string; primaryEntrance: boolean } | null;
     governanceRoleEmptyState: (fn: unknown) => { kind: string; title: string; sub: string } | null;
     governanceStatusText: (model: unknown, flowId: unknown, status: unknown) => string;
     governanceMigrationButtonView: (wired: unknown) => { label: string; disabled: boolean; title: string };
@@ -59,8 +59,9 @@ const renderer = fs.readFileSync(path.join(REPO, "app/renderer/renderer.js"), "u
 
 // —————————————————————— 1) 权力副标题 / 空态 ——————————————————————
 
-test("UI：三权副标题——报告员提案权 / 提名官提名权 / 召集人编排权，且都写明「不拥有最终批准权」", () => {
+test("UI：四角色副标题——联络官客户沟通 / 报告员提案权 / 提名官提名权 / 召集人编排权，且都写明「不拥有最终批准权」", () => {
   const expected = [
+    ["liaison", "联络官", "Liaison", "客户沟通"],
     ["proposal", "报告员", "Rapporteur", "提案权"],
     ["nomination", "提名官", "Nominator", "提名权"],
     ["schedule", "召集人", "Convener", "编排权"],
@@ -75,36 +76,64 @@ test("UI：三权副标题——报告员提案权 / 提名官提名权 / 召集
     assert.match(v!.power, /不拥有最终批准权/, "副标题必须声明不拥有最终批准权");
     assert.match(v!.builtinNote, /内置角色：随应用发布，无角色目录/);
   }
-  assert.equal(Labels.governanceRoleView("proposal")!.emptyHint, "", "Rapporteur 沿用既有主入口空态");
+  assert.equal(
+    Labels.governanceRoleView("liaison")!.primaryEntrance,
+    true,
+    "Liaison 是客户默认入口（primaryEntrance）",
+  );
+  assert.match(
+    Labels.governanceRoleView("liaison")!.emptyHint,
+    /客户默认入口/,
+    "Liaison 空态说明客户默认入口",
+  );
+  assert.match(
+    Labels.governanceRoleView("proposal")!.emptyHint,
+    /联络官/,
+    "Rapporteur 空态说明通常由联络官交接打开（2026-10-18 起不再是空串）",
+  );
   assert.equal(Labels.governanceRoleView(undefined), null, "未知/缺失 function ⇒ null（不当成治理角色）");
   assert.equal(Labels.governanceRoleView("other"), null);
 });
 
-test("UI：Nominator/Convener 专属空态逐字、Rapporteur 沿用既有空态（null）", () => {
+test("UI：Liaison/Rapporteur/Nominator/Convener 专属空态逐字；未知 function ⇒ null", () => {
+  const l = Labels.governanceRoleEmptyState("liaison");
+  const r = Labels.governanceRoleEmptyState("proposal");
   const n = Labels.governanceRoleEmptyState("nomination");
   const c = Labels.governanceRoleEmptyState("schedule");
-  assert.ok(n && c);
+  assert.ok(l && r && n && c);
+  assert.equal(l!.title, "联络官 Liaison");
+  assert.equal(
+    l!.sub,
+    "客户默认入口：你说要做什么，我先确认目标、范围与验收，再交给报告员形成提案。我不写提案、不批准。本版起默认入口为联络官；报告员与历史提案不变。",
+  );
+  assert.equal(r!.title, "报告员 Rapporteur");
+  assert.equal(r!.sub, "通常由联络官交接打开；客户也可以直接找我。我只写提案，不批准。");
   assert.equal(n!.title, "提名官 Nominator");
   assert.equal(n!.sub, "通常由流程单提名步骤打开；仅在客户明确要求时直接使用");
   assert.equal(c!.title, "召集人 Convener");
   assert.equal(c!.sub, "通常由已接受提案开启流程；只负责排步骤与派发，不批准方案");
-  assert.equal(Labels.governanceRoleEmptyState("proposal"), null);
   assert.equal(Labels.governanceRoleEmptyState(undefined), null);
 });
 
 // —————————————————————— 2) 状态行 / 旧模型提示 ——————————————————————
 
-test("UI：状态行——治理模型（三权/旧模型）· 当前流程 · 四态；接口未给模型不猜", () => {
+test("UI：状态行——治理模型（三权 · 四角色/旧模型）· 当前流程 · 四态；接口未给模型不猜", () => {
   assert.equal(
     Labels.governanceStatusText("trio", "flow-a", "awaiting-customer"),
-    "治理模型：三权 · 当前流程：flow-a · 等待客户决定",
+    "治理模型：三权 · 四角色 · 当前流程：flow-a · 等待客户决定",
   );
   assert.equal(Labels.governanceStatusText("single", "", ""), "治理模型：旧模型（su）");
-  assert.equal(Labels.governanceStatusText("trio", "flow-a", "in-progress"), "治理模型：三权 · 当前流程：flow-a · 进行中");
-  assert.equal(Labels.governanceStatusText("trio", "", "blocked"), "治理模型：三权 · 阻塞");
-  assert.equal(Labels.governanceStatusText("trio", "", "escalated-to-customer"), "治理模型：三权 · 已升级客户");
+  assert.equal(
+    Labels.governanceStatusText("trio", "flow-a", "in-progress"),
+    "治理模型：三权 · 四角色 · 当前流程：flow-a · 进行中",
+  );
+  assert.equal(Labels.governanceStatusText("trio", "", "blocked"), "治理模型：三权 · 四角色 · 阻塞");
+  assert.equal(
+    Labels.governanceStatusText("trio", "", "escalated-to-customer"),
+    "治理模型：三权 · 四角色 · 已升级客户",
+  );
   assert.equal(Labels.governanceStatusText(undefined, "flow-a", "awaiting-customer"), "当前流程：flow-a · 等待客户决定", "未知模型不显示、不猜");
-  assert.equal(Labels.governanceStatusText("trio", "", "made-up"), "治理模型：三权", "未知状态不显示、不猜");
+  assert.equal(Labels.governanceStatusText("trio", "", "made-up"), "治理模型：三权 · 四角色", "未知状态不显示、不猜");
   assert.equal(Labels.GOVERNANCE_MIGRATION_TEXT, "本项目使用旧治理模型（su）。可升级为三权模型。");
   assert.equal(Labels.GOVERNANCE_DECISION_BADGE, "治理决定 · 客户最终批准");
   assert.equal(Labels.GOVERNANCE_QUEUE_NOTE, "等待前一个决定");
@@ -189,7 +218,7 @@ test("UI：左树三组顺序＝主入口 → 治理职能（内置）→ 其他
   assert.ok(tree.includes("state.primaryRoleId"), "主入口来自 primaryRoleId");
   assert.ok(tree.includes("UiLabels.governanceRoleView(r.governanceFunction)"), "治理分组由 governanceFunction 派生");
   const code = renderer.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
-  for (const id of ["rapporteur", "nominator", "convener"]) {
+  for (const id of ["liaison", "rapporteur", "nominator", "convener"]) {
     assert.equal(code.includes(id), false, `renderer 代码不得硬编码治理角色 id：${id}`);
   }
   assert.ok(renderer.includes("function roleSubtitle(role)"));
@@ -217,7 +246,7 @@ test("UI：迁移入口——按桥能力探测、按钮 data 属性、点击只
 const EMPTY_BOUNDARY = { entries: [], boundarySource: "<built-in:trio/>", acceptance: { accepted: false, source: "" } };
 
 function fakeTrioListing(root: string): ProjectListing {
-  const builtIn = (roleId: string, fn: "proposal" | "nomination" | "schedule") => ({
+  const builtIn = (roleId: string, fn: "liaison" | "proposal" | "nomination" | "schedule") => ({
     roleId,
     cardPath: "",
     boundaryPath: "",
@@ -229,6 +258,7 @@ function fakeTrioListing(root: string): ProjectListing {
   return {
     projectRoot: root,
     roles: [
+      builtIn("liaison", "liaison"),
       builtIn("rapporteur", "proposal"),
       builtIn("nominator", "nomination"),
       builtIn("convener", "schedule"),
@@ -242,7 +272,7 @@ function fakeTrioListing(root: string): ProjectListing {
     ],
     warnings: [],
     hasRoles: true,
-    primaryRoleId: "rapporteur",
+    primaryRoleId: "liaison",
     governanceModel: "trio",
   };
 }
@@ -273,10 +303,10 @@ test("假 IPC：listProject 透传 governanceModel / role.governanceFunction / p
     });
     const res = await iface.listProject({ projectRoot: root });
     assert.equal(res.governanceModel, "trio");
-    assert.equal(res.primaryRoleId, "rapporteur");
+    assert.equal(res.primaryRoleId, "liaison");
     assert.deepEqual(
       res.roles.filter((r) => r.builtIn).map((r) => `${r.roleId}:${r.governanceFunction}`),
-      ["rapporteur:proposal", "nominator:nomination", "convener:schedule"],
+      ["liaison:liaison", "rapporteur:proposal", "nominator:nomination", "convener:schedule"],
     );
     assert.equal(res.governanceRecord.state, "missing", "无 `.ans` ⇒ missing（不是 present）");
   } finally {

@@ -1854,7 +1854,7 @@ button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus
 @media (prefers-reduced-motion: reduce) { .app, .col-left, .sidebar-toggle { transition: none; } }
 
 /* ———————— P5「替我审」自动判断（2026-10-17 评审 §10；最小增量）———————
-   开关/开启标记/常驻警告/结果行/手动回落提示。颜色纪律：开启态与警告一律 `--amber`（不是错误红）；
+   开关/开启标记/一次性警告/结果行/手动回落提示。颜色纪律：开启态与警告一律 `--amber`（不是错误红）；
    内容列仍随 `--content-max`（900），字体继承整页等宽（`--sans`/`--mono` 同一栈）。 */
 .composer-auto-approve {
   display: inline-flex;
@@ -1899,11 +1899,24 @@ button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus
 }
 .composer-judge-status[hidden] { display: none; }
 
-/* 开启后的**常驻**警告（不是 toast）；默认隐藏；琥珀底/左竖条，非错误红。 */
+/* 一次性开启提示（客户 2026-10-18「这个提示应该弹出只出现一次就行了」）：
+   浮在输入区上方——**不占聊天布局、不推动消息区**（绝对定位于 .composer 的定位上下文）；
+   默认隐藏；琥珀底/左竖条，非错误红；「知道了」手动收起，约 9 秒自动收起。 */
+.composer { position: relative; }
 .judge-warning {
-  max-width: var(--content-max);
-  margin: 8px auto 0;
-  padding: 9px 12px;
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: min(var(--content-max), calc(100% - 32px));
+  max-height: 40vh;
+  overflow: auto;
+  margin: 0;
+  padding: 10px 12px;
   border: 1px solid var(--border);
   border-left: 2px solid var(--amber);
   border-radius: 6px;
@@ -1911,11 +1924,27 @@ button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus
   color: var(--amber);
   font-size: 11.5px;
   line-height: 1.7;
+  box-shadow: var(--shadow-card);
 }
 .judge-warning[hidden] { display: none; }
+.judge-warning-text { flex: 1 1 auto; min-width: 0; }
 .judge-warning p { margin: 0; }
 .judge-warning p + p { margin-top: 4px; }
 .judge-warning .jw-strong { color: var(--amber); }
+/* 「知道了」：琥珀描边小按钮（可手动收起；不是错误操作）。 */
+.judge-warning-close {
+  flex: 0 0 auto;
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--amber);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--amber);
+  font: 600 11.5px/1.5 var(--sans);
+  cursor: pointer;
+}
+.judge-warning-close:hover { background: var(--amber); color: var(--bg); }
+.judge-warning-close:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 
 /* 判断结果行（系统风格；按 `roleId` 落 pane、按 `toolCallId` 锚定）。 */
 .shell-judge-row { max-width: min(760px, 100%); }
@@ -2000,3 +2029,20 @@ button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus
 .op-request .op-meta { font-size: 11.5px; color: var(--text-2); overflow-wrap: anywhere; }
 .op-request .op-queued { color: var(--amber); font-size: 12px; line-height: 1.6; }
 .op-request .op-queued[hidden] { display: none; }
+/* W6-C（四角色评审 §6.1/§6.3）：决定卡镜像面——同一请求 id 的第二呈现。左侧竖条换语义色作区分，
+   来源标签说明「来自 <发起角色> 的治理决定」；不改变卡内容/选项/按钮语义。最小增量。 */
+.op-request.is-mirror { border-left-color: var(--focus-ring); background: #F7FAF4; }
+.op-request .op-mirror-badge {
+  flex: 0 0 auto;
+  margin-left: 8px;
+  padding: 0 5px;
+  border: 1px solid var(--focus-ring);
+  border-radius: 4px;
+  color: var(--focus-ring);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+.op-request .op-mirror-source { color: var(--text-2); font-size: 11.5px; line-height: 1.6; }
+/* 主入口排队聚合行（只读、非模型消息）：排队请求不物化可操作卡。 */
+.op-queue-aggregate { color: var(--amber); }

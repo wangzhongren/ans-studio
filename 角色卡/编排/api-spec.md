@@ -429,3 +429,34 @@ preview: {
 - `run-role.ts` 自动收尾调用点（V1b 接线）：trio 下传 `governanceModel:"trio"`（single 不传，旧形状不变），并把收尾边界换成 `appGovernanceBoundary(会话边界的 acceptance)`——三人 Section 1 不含 `.ans/**`/`docs/bootstrap-manifest.md`，沿用角色边界会让收尾 fail-closed、`.ans` 永不落盘。single/su 仍用会话边界（旧行为不变）。
 - `GovernanceRecordInput.governanceModel`：`GovernancePreview.governanceModel` 显示「将写入的治理模型」（缺省 `single`），`establishGovernanceRecord` 把它交给 `finalizeBootstrap`；仅 trio 写 `governance.established` 账本（旧 single 零新增副作用）。
 - `GovernanceRecordInput.previewDigest`（W2 已落）：原样写入 `governance.established` 供审计；本模块不校验它。
+
+## W6-A（2026-10-18）治理四角色编排接线：意图交接 / 澄清 / 账本
+
+依据：PM 评审 `角色卡/项目管理/docs/design/2026-10-18_design_governance-liaison-review.md` §5.1/§5.2/§5.4/§7（status approved；治理模型仍 `trio`，四角色 `liaison → rapporteur → nominator → convener`）。本批只改编排边界；桌面 W6-B、UI W6-C 待各属主。
+
+### 公开输入（`openRoleSession` / `AdapterCapabilities`）
+
+- `handOffIntent?: HandOffIntentFn`：**只给 Liaison**（注册表 `capabilities.handOffIntent`）。编排先机械校验意图文件/去重/`initial` 一次性/每轮一次/账本可读，**投递成功后才**写 `intent.handed-off`；投递回调（桌面 W6-B：后台开/发 Rapporteur、系统行、`dispatch.accepted{trigger:"intent-handoff"}`）失败如实回执、不重试、不写成功账本。
+- `requestClarification?: RequestClarificationFn`：**只给 Rapporteur**（`capabilities.requestClarification`）。编排按账本判同一 `flowId`（无则同一 `intentId`）已有 2 轮 `clarification.requested` → 拒绝并提示在提案卡上请客户决定（带假设/备选）；送达成功后写账本；不弹决定卡、不占「一项目一卡」、不改变任何权力/写权。
+- 两能力均「注入才注册」：`undefined` ⇒ 对应工具在会话里不存在（结构性 fail-closed）。`RuntimeSessionOptions` 经 `GovernedToolsOptions` 同名位透传，Service/Provider 无需改。
+- `confirmationMode` 收窄（W6-A）：`input.customerInput !== undefined && (cap === undefined || cap.customerInput)`——Liaison 的 `customerInput=false`，**不注册** `request_confirmation`/`request_choice`，走静态边界 + 预授权（`docs/intents/`）；其余角色与项目角色行为逐字不变。
+
+### 意图交接机械校验（`src/common/编排/governance-handoff.ts`）
+
+- `validateIntentHandoff(input, context?) => Promise<IntentHandoffValidation>`：模型/角色防御性校验（trio + liaison）→ slug（`^[a-z0-9][a-z0-9-]{1,63}$`）→ 四要素非空、`summary` 1..200 字（超长拒绝不截断）→ `docs/intents/<intentId>.md` 存在可读、frontmatter 以 `---` 开头并闭合、顶层 `key: value` 可解析、文件 `intentId` 与入参一致、`goal/scope/acceptance` **入参与文件逐项相等**（文件是权威）、文件 `handoffKind`/`flowId` 若给出须一致 → 账本可读（坏行/不可读 fail-closed）→ 去重（`intentId+handoffKind+sha256(原始字节)`）→ `initial` 每个 `intentId` 仅一次 → `clarification`/`revision` 必须已有同 `intentId` 成功交接 → 每轮一次（账本同 `turnId`；缺 `turnId` 降级并返回 `warnings`）。
+- `intentHandoffDedupeKey({intentId,handoffKind,sha256})`：去重键单一来源。
+- `countClarificationRounds(projectRoot, {flowId?, intentId?})`：账本坏 → `ok:false`；`CLARIFICATION_MAX_ROUNDS = 2`。
+- 以上三件 + 常量/类型经 `govern-session.ts` 薄再导出（桌面不直接导入私有 `common/`）。
+
+### 账本（`governance-ledger.ts`）
+
+- `GovernancePower` 增 `"liaison"`（Liaison 沟通权；四角色评审 §7.1/AC 口径）；`GovernanceLedgerEntry.kind` 增 `"intent.handed-off"` / `"clarification.requested"`；条目增 `intentId?` / `handoffKind?` / `trigger?("customer-decision"|"intent-handoff"|"settle")` / `turnId?`。
+- 写入点（编排）：`intent.handed-off{actorRoleId:"liaison", power:"liaison", targetRoleId:"rapporteur", intentId, handoffKind, flowId?, artifactPath, artifactSha256, messageSummary, turnId?, sessionId?, runtime?}`；`clarification.requested{actorRoleId:"rapporteur", power:"proposal", flowId?, intentId?, messageSummary, turnId?, sessionId?, runtime?}`。
+- 两者都**不是客户批准**：不写 `customerDecision`/`decisionEvidence`，任何门禁不读；账本失败只诊断、不翻转投递结果。
+- `artifact.observed` 对 Liaison 写 `power:"liaison"`（`GovernanceFunction` 直接可赋值给 `GovernancePower`）。
+
+### CLI / 函数路由
+
+- **CLI 收窄（AC21）**：`parseGovernArgs` 的 `--function` 仍只接受 `proposal|nomination|schedule`；`--function liaison` 显式拒绝（「联络官（liaison）仅桌面主入口提供；CLI 请用 --function proposal|nomination|schedule」）；`--role liaison` 在 `governCommand` 显式拒绝（EXIT_USAGE）。**缺省仍是 `proposal`→rapporteur**（主入口由 `listProject` 的 `primaryRoleId=liaison` 表达）。
+- 引擎层 `openGovernanceSession` 的 `governanceFunction` 类型仍含 `liaison`（桌面/测试前端按评审 §4.5 可路由）；single 下由 `resolveGovernanceRole` 明确拒绝。
+- `govern-session.ts` 的职能纪律提示词改为**注册表驱动**（`spec.displayName`），Liaison 段写 `docs/intents/`、`hand_off_intent`、**交接 ≠ 客户批准**；`runGovernSession` 的确认制说明行同样按 `capabilities.customerInput` 判定（Liaison 不再误报确认制）。

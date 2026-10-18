@@ -176,6 +176,18 @@ contextBridge.exposeInMainWorld("desktop", {
   },
 
   /**
+   * 订阅「治理流程下一步」（2026-10-18 客户修正）：客户决定**成功结算**后主进程推 `governance:next-step`，
+   * 载荷 `{version:1, flowId?, cardKind, nextFunction, roleId, proposalPath?}`。
+   * **仅供界面显示状态行/提示**——UI 不得据此打开/切换会话：下一步任务由主进程在后台派发，
+   * 当前会话与输入焦点不变。取消/拒绝/失效不发。返回取消订阅函数。
+   */
+  onGovernanceNextStep: (cb) => {
+    const listener = (_event, payload) => cb(payload);
+    ipcRenderer.on("governance:next-step", listener);
+    return () => ipcRenderer.removeListener("governance:next-step", listener);
+  },
+
+  /**
    * 订阅「shell 命令确认请求」（M-1，2026-10-12）：三层闸 (a) 层为**应用内确认卡**（不再用原生对话框）。
    * 主进程推 `{id, command, summary, reasonPlain, reasonRaw, argvLines, cwd}`——`command` 为**逐字原文**；
    * `summary`/`reasonPlain` 已由主进程翻成**人话**（内部行话不外露）；`reasonRaw`/`argvLines`/`cwd` 供

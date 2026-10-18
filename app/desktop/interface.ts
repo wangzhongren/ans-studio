@@ -1,4 +1,5 @@
 import type { PersistenceReply, PersistenceValues, PersistenceUpdated, PersistenceScope } from "./session.ts";
+import { existsSync } from "node:fs";
 import { createProjectDocumentReader } from "../../src/pipeline/project-document/read-project-document.ts";
 import type { ProjectDocumentRef, ProjectDocumentScope, DocumentReadErrorCode, ReadProjectDocumentResult } from "../../src/model/project-document.ts";
 // app/desktop/interface.ts
@@ -36,6 +37,9 @@ import {
   previewGovernanceMigration as realPreviewGovernanceMigration,
   migrateGovernanceModel as realMigrateGovernanceModel,
   createShellJudge as realCreateShellJudge,
+  // W6-B（四角色评审 §7.2）：应用后台推进成功后写 `dispatch.accepted(app, trigger=customer-decision)`——
+  // 账本只经 Pipeline 公共出口（薄再导出）使用，不直接导入编排私有 `common/`。
+  appendGovernanceLedger,
   type GovernancePreviewResult,
   type EstablishGovernanceResult,
   type GovernanceRecordInput,
@@ -89,6 +93,15 @@ import type { DesktopOperatorChannelFn, DesktopShellArming } from "./operator-ch
 import type { AssembleOperatorShellGateOptions, AssembleReadonlyShellGateOptions } from "../../src/pipeline/orchestration/shell-arming.ts";
 // 客户确认制交互（A-5）：桌面侧的客户通道形状（带角色上下文）——本层只透传，实现在 `customer-input.ts`。
 import type { DesktopCustomerInputFn } from "./customer-input.ts";
+// 治理下一步（2026-10-18 客户修正）：客户决定成功后的**后台派发**。推导/文案纯逻辑在 governance-advance.ts；
+// 本层负责打开目标治理角色会话、投递**唯一一条**任务，并把成功/失败经既有 delivery-note 系统行如实落流。
+import {
+  buildGovernanceAdvanceMessage,
+  governanceAdvanceSuccessNote,
+  type GovernanceAdvanceResult,
+  type GovernanceNextStepContext,
+  type GovernanceNextStepPayload,
+} from "./governance-advance.ts";
 // G-2（2026-10-16 客户批准）：恢复确认卡通道（W5——presenter/回包/关窗清帐在 main 接线，本层只透传）与
 // 看护服务（W1+W3——同源快照/系统投递/观察转发都在 SessionManager，本层装配并起停 tick）。
 import type { RecoveryConfirmPresenter } from "./recovery-channel.ts";
@@ -260,6 +273,10 @@ export interface DesktopDeps {
       customerInput?: CustomerInputFn;
       /** 派发任务能力（H-1）：仅内置治理角色（su）会话注入（见 session.ts::routeDispatch）。 */
       dispatchTask?: DispatchTaskFn;
+      /** W6-B：意图交接投递端（仅 Liaison 注入；编排已校验/写账本，桌面只后台投递）。 */
+      handOffIntent?: import("../../src/model/runtime.ts").HandOffIntentFn;
+      /** W6-B：澄清送达端（仅 Rapporteur 注入；编排已判两轮上限/写账本，桌面只落主入口系统行）。 */
+      requestClarification?: import("../../src/model/runtime.ts").RequestClarificationFn;
       /** G-2/W5（2026-10-16 客户批准）：恢复提议能力（仅 su 注入；形状＝契约家，编排 O1 透传）。 */
       proposeRecovery?: import("../../src/common/编排/watchdog.ts").ProposeRecoveryFn;
       /** G-2/W1：role_status / session_tail 数据源（仅 su 注入；形状＝契约家）。 */
@@ -504,6 +521,15 @@ export interface DesktopInterface {
    * `PromptOptions` 下发；任一张不合格 ⇒ **整条拒发**（fail-closed：绝不「丢图发文字」让客户以为图已送达）。
    */
   sendSession(input: { text: string; images?: unknown; target?: SessionTarget; metadata?: SessionMessageMetadata }): Promise<SendResult>;
+  /**
+   * **应用代客户推进治理流程（2026-10-18 客户修正）**：客户决定成功后（`governance:next-step` 回调），
+   * 在**后台**打开目标治理角色（Nominator/Convener）会话并投递**唯一一条**任务消息——
+   * `accept` → Nominator 提名；`accept-quick` / `appointment` → Convener 写流程单/派发。
+   * **不抢 `activeRoleId`、不切当前 pane、不自动批准/写盘、不写账本**；成功/失败都经既有
+   * `delivery-note` 系统行落在发起卡片的角色聊天流（失败如实、不重试循环）。
+   * 仅由主进程 `governance:next-step` 回调调用——**不挂 IPC、不暴露给渲染侧**。
+   */
+  advanceGovernanceFlow(input: { payload: GovernanceNextStepPayload; context?: GovernanceNextStepContext }): Promise<GovernanceAdvanceResult>;
   /** 关闭会话（B-2 **定向**：给定 `roleId` 只关它、历史留在界面上；缺省/`null` 关全部，供换项目/退出）。 */
   stopSession(input?: { roleId?: string | null; projectRoot?: string; runtime?: RuntimeKind }): Promise<StopResult>;
   /**
@@ -591,6 +617,12 @@ const PREVIEW_DIGEST_HEX_64 = /^[0-9a-fA-F]{64}$/;
 /** 治理模型封闭值域（评审 §5.1/§5.5；缺省 `single`）。 */
 function isGovernanceModelValue(value: unknown): value is GovernanceModel {
   return value === "single" || value === "trio";
+}
+
+/** 账本 `messageSummary` 截断（≤200 Unicode 码点；与编排 `truncateText` 同口径，不静默改语义）。 */
+function ledgerSummary(text: string): string {
+  const chars = Array.from(text);
+  return chars.length <= 200 ? text : chars.slice(0, 200).join("");
 }
 
 /**
@@ -1050,6 +1082,98 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       // 组**契约形状** `PromptOptions`（单一来源 `src/model/runtime.ts`）——之后整包同一引用透传。
       const opts: PromptOptions = { images: cleaned };
       return manager.send(text, opts, input?.target, input?.metadata);
+    },
+
+    // 应用代客户推进治理流程（2026-10-18 客户修正）：后台打开目标治理角色 + 投递唯一一条任务。
+    // 纪律：不抢活动角色/当前 pane；成功/失败经既有 delivery-note 系统行如实落发起卡片的聊天流；
+    // 不自动批准、不写 `.ans`/账本（只记诊断）；失败不重试循环，也绝不影响当前会话。
+    async advanceGovernanceFlow(input): Promise<GovernanceAdvanceResult> {
+      const payload = input?.payload;
+      if (!payload || payload.nextFunction === null || payload.roleId === null) {
+        return { ok: true, dispatched: false }; // 明确无下一步（验收收口/写盘/修订/拒绝）：不发任务。
+      }
+      const context = input.context ?? {};
+      const targetRoleId = payload.roleId; // 已排除 null（上面的早退）——闭包内保持非空类型。
+      const projectRoot =
+        typeof context.projectRoot === "string" && context.projectRoot !== ""
+          ? context.projectRoot
+          : importedProjectRoot;
+      const sourceRoleId =
+        typeof context.sourceRoleId === "string" && context.sourceRoleId !== ""
+          ? context.sourceRoleId
+          : payload.roleId;
+      let runtime: RuntimeKind | undefined = isRuntimeKind(context.runtime) ? context.runtime : undefined;
+      if (runtime === undefined && projectRoot !== undefined) {
+        // 旧调用可能不带 runtime：以发起卡片的**真实活会话**为准（只读视图，不猜默认引擎）。
+        runtime = manager.liveSessionViews().find((view) => view.projectRoot === projectRoot && view.roleId === sourceRoleId)?.runtime;
+      }
+      const diagnostic = createDiagnosticLogger({ component: "desktop.governance-advance", projectRoot, roleId: payload.roleId });
+      const targetLabel = targetRoleId === "nominator" ? "Nominator" : "Convener";
+      const note = (summary: string): void => {
+        if (projectRoot === undefined || runtime === undefined || sourceRoleId === "") return;
+        try {
+          emitSessionEvent({ roleId: sourceRoleId, projectRoot, runtime, event: { kind: "message", summary, detail: { source: "delivery-note" } } });
+        } catch (error) {
+          diagnostic.error("advance.note.failed", error);
+        }
+      };
+      const fail = (error: string): GovernanceAdvanceResult => {
+        diagnostic.error("advance.failed", new Error(error), { flowId: payload.flowId, cardKind: payload.cardKind, targetRoleId });
+        note(`自动推进失败：${error}`);
+        return { ok: false, dispatched: false, targetRoleId, error };
+      };
+      if (projectRoot === undefined) return fail("缺少项目根，无法后台派发");
+      if (runtime === undefined) return fail("缺少运行时，无法后台派发");
+      const message = buildGovernanceAdvanceMessage(payload, context.targetRoleIds);
+      if (message === null) return fail("缺少流程信息（flowId/任命名单），未自动派发");
+      const opened = await manager.openBackground({ projectRoot, roleId: targetRoleId, runtime });
+      if (!opened.ok) return fail(`无法开启 ${targetLabel} 会话：${opened.error ?? "未知原因"}`);
+      const sent = await manager.sendBackground({ projectRoot, roleId: targetRoleId, runtime, text: message });
+      if (!sent.ok) return fail(`发送任务给 ${targetLabel} 失败：${sent.error ?? "未知原因"}`);
+      note(governanceAdvanceSuccessNote(payload));
+      // 审计步骤 id（AC19）：只认卡片/上下文**显式给出**的 stepId；拿不到就如实记诊断，不伪造。
+      const stepId = typeof context.stepId === "string" && context.stepId !== "" ? context.stepId : undefined;
+      if (stepId === undefined) {
+        diagnostic.record("advance.ledger.step-missing", { flowId: payload.flowId, targetRoleId });
+      }
+      diagnostic.record("advance.dispatched", {
+        flowId: payload.flowId,
+        cardKind: payload.cardKind,
+        targetRoleId,
+        stepId: stepId ?? null,
+        queued: sent.queued === true,
+      });
+      // W6-B（四角色评审 §7.2 / AC19）：**投递成功后**写账本 `dispatch.accepted{actorRoleId:"app",
+      // power:"app", trigger:"customer-decision"}`——应用推进 ≠ 客户批准，**不写 customerDecision/
+      // decisionEvidence**。仅 trio（single 旧项目不产生 `.ans/governance` 记录）；账本失败只记诊断，
+      // 不翻转已完成的投递结果、不重试。`stepId` 不在 `governance:next-step` 契约里（payload 未携带），
+      // 故不臆造。根不存在（测试/异常调用）时不创建目录：按账本失败处理（记诊断、结果不变）。
+      const ledgerModel = listingCache.get(projectRoot)?.governanceModel ?? "single";
+      if (ledgerModel === "trio") {
+        if (!existsSync(projectRoot)) {
+          diagnostic.record("advance.ledger.skipped", { reason: "project-root-missing", targetRoleId });
+        } else {
+          const appended = await appendGovernanceLedger(projectRoot, {
+            at: new Date().toISOString(),
+            kind: "dispatch.accepted",
+            ...(payload.flowId !== undefined ? { flowId: payload.flowId } : {}),
+            actorRoleId: "app",
+            power: "app",
+            trigger: "customer-decision",
+            targetRoleId,
+            ...(stepId !== undefined ? { stepId } : {}),
+            messageSummary: ledgerSummary(message),
+            runtime,
+          });
+          if (!appended.ok) {
+            diagnostic.error("advance.ledger.failed", new Error(appended.message), {
+              flowId: payload.flowId,
+              targetRoleId,
+            });
+          }
+        }
+      }
+      return { ok: true, dispatched: true, targetRoleId, ...(sent.queued === true ? { queued: true } : {}) };
     },
 
     async stopSession(input?: { roleId?: string | null; projectRoot?: string; runtime?: RuntimeKind }): Promise<StopResult> {

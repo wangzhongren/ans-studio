@@ -160,7 +160,7 @@ test("G-2 契约②：字段名 roleStatus/sessionTail/proposeRecovery 五面同
   assert.ok(/\.\.\.\(sessionTail \? \{ sessionTail \} : \{\}\),/.test(session), "桌面注入 sessionTail");
   // 2026-10-17（三权 V1，评审 §5.6）：判据由 `role.builtIn === true` 改为能力矩阵
   // `canSchedule = governanceFunction === "schedule" || legacyBuiltIn`；legacyBuiltIn 仅在
-  // single 模型的内置角色（su）上成立——旧能力集逐字保留，trio 三人按职能分配。
+  // single 模型的内置角色（su）上成立——旧能力集逐字保留，trio 四角色按职能分配。
   assert.ok(
     /const legacyBuiltIn = role\.builtIn === true && governanceFunction === undefined && governanceModel === "single";/.test(session),
     "legacyBuiltIn 判据（single/su 旧能力集）",

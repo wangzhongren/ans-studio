@@ -39,6 +39,9 @@ import {
 // 客户交互通道（A-5，2026-10-12）：su 的 request_confirmation / request_choice 经它摆到聊天流里的交互卡
 // 并取回客户裁决（per-window pending Map + **按请求快照校验回包**——渲染进程输入不可信）。
 import { createCustomerInputChannel } from "./desktop/customer-input.ts";
+// 治理下一步（2026-10-18 客户修正）：客户决定成功后由应用**后台**把下一步任务派给目标治理角色
+// （不打开/切换当前会话）。推导与文案在 governance-advance.ts；派发动作在 Interface（advanceGovernanceFlow）。
+import type { GovernanceNextStepContext, GovernanceNextStepPayload } from "./desktop/governance-advance.ts";
 // G-2/W5（2026-10-16 客户批准）：恢复确认卡呈现端——su 经 `propose_recovery` 提议恢复动作时，把卡经
 // `recovery:confirm-request` 推给渲染侧（桌面UI 已落树消费面）、回包经 `recovery:confirm-response` 受理；
 // **恰 allow:true 才是执行请求**；关窗 `rejectAllPending` = 未获执行（fail-closed）。**等待不设限**（裁定 4）。
@@ -260,6 +263,12 @@ function registerIpc(win: BrowserWindow): void {
 
   // 客户交互通道（A-5）：请求经 `session:operator-request` 推给渲染侧渲染成交互卡；客户决定经
   // `session:operator-response` 回传、在通道内**按请求快照校验**后解挂。**挂在窗口作用域**（每窗口一套）。
+  //
+  // 治理下一步（2026-10-18 客户修正）：通道先于 `desktop` 装配（desktop 需要 customerInput），故用可变句柄
+  // 在 desktop 建立后接上——在此之前不可能有客户回包，句柄必已就位。
+  let advanceGovernanceFlow:
+    | ((payload: GovernanceNextStepPayload, context: GovernanceNextStepContext) => void)
+    | undefined;
   const customerChannel = createCustomerInputChannel({
     presenter: (payload) => {
       if (win.isDestroyed()) throw new Error("窗口已关闭，无法呈现交互请求");
@@ -271,6 +280,15 @@ function registerIpc(win: BrowserWindow): void {
     // 推一条状态事件让渲染侧显示「等待前一个决定」（不自动合并、不自动批准）。
     onQueued: (payload, waitingFor) => {
       if (!win.isDestroyed()) win.webContents.send("session:operator-queued", { ...payload, waitingFor });
+    },
+    // 客户决定**成功结算**后：先发契约事件 `governance:next-step`（供 UI 显示状态行，UI **不再**据此
+    // 打开/切换会话），再由应用在后台派发唯一一条任务（不抢当前 pane、不自动批准、不写账本）。
+    // 取消/拒绝/expired 不会走到这里（customer-input 只对 answered 回调）。
+    onNextStep: (payload, context) => {
+      // 窗口已关：不发事件、也不再后台派发（关窗不清账本、不造活动；客户决定本身已由编排入账）。
+      if (win.isDestroyed()) return;
+      win.webContents.send("governance:next-step", payload);
+      advanceGovernanceFlow?.(payload, context);
     },
   });
   // 窗口关掉：所有挂起请求归「未获同意」（fail-closed）——不留悬案、更不放行。
@@ -435,6 +453,13 @@ function registerIpc(win: BrowserWindow): void {
     },
   });
   iface = desktop;
+  // 治理下一步的后台派发（2026-10-18 客户修正）：打开目标治理角色会话并投递一条任务；不调用任何渲染侧
+  // open/select，当前会话与输入焦点不变。Interface 内部已隔离失败（诊断 + 系统行），此处只兜底意外抛错。
+  advanceGovernanceFlow = (payload, context) => {
+    void desktop.advanceGovernanceFlow({ payload, context }).catch((error) => {
+      mainDiagnostic.error("governance.advance.failed", error, { cardKind: payload.cardKind, flowId: payload.flowId });
+    });
+  };
   desktop.startWatchdog(); // G-2/W1：看护周期 tick（默认 30s，仅 env 可调）——窗口注册后启动
   win.on("closed", () => {
     desktop.stopWatchdog(); // G-2/W1：窗关停 tick（看护绝不跨窗口残留）

@@ -58,6 +58,9 @@ flowchart LR
 | shell 审计留痕 | `src/common/编排/shell-audit.ts` — 落 `docs/audit/shell-gate.jsonl`（`execution` 恒「未执行」；写前经门禁 + 声明 `shell-gate` 条件） |
 | 回交 / 派发文案单一来源 | `src/common/编排/handback.ts` — `withHandback` / `renderHandbackPrompt` / `renderDispatchPrompt` / `handbackKey` 等 |
 | 自动收尾 / 重 pin | `src/common/编排/finalize.ts` — `repinIfBootstrapped()` / `finalizeBootstrap()` |
+| 意图交接 / 澄清守卫（W6-A） | `src/common/编排/governance-handoff.ts` — `validateIntentHandoff()`（文件权威/四要素/slug/去重/`initial` 一次性/每轮一次/账本可读）、`intentHandoffDedupeKey()`、`countClarificationRounds()`（同一 flow 最多 2 轮） |
+| 治理四角色能力注入（W6-A） | `src/pipeline/orchestration/run-role.ts` — `openRoleSession` 输入 `handOffIntent` / `requestClarification`，按注册表能力矩阵 `governanceCapabilitiesOf` 只注入 Liaison / Rapporteur；成功投递后写 `intent.handed-off` / `clarification.requested` |
+| 治理账本（W2/W6-A） | `src/common/编排/governance-ledger.ts` — append-only `.ans/governance/ledger.jsonl`；`GovernancePower` 含 `liaison`（Liaison 沟通权），`kind` 含 `intent.handed-off` / `clarification.requested` |
 | 确认制发行器（写集按客户确认发行） | `src/common/编排/confirmed-writes.ts` — `createConfirmedWriteIssuer()` |
 | CLI 交互通道（客户确认 / 操作者确认） | `src/common/编排/operator-channel.ts` — `createCliCustomerInput()` / `createCliOperatorChannel()` |
 | 角色/边界解析（Service 出口，本角色只消费） | `src/service/role/resolve-role.ts`、`src/service/boundary/resolve-boundary.ts`、`src/service/gate/resolve-write.ts` |
@@ -68,7 +71,7 @@ flowchart LR
 
 ### 模块如何拼起来
 
-- **一次会话的装配顺序**（`openRoleSession`）：角色/边界解析（`setupRole`，会话式入口允许内置治理角色）→ 写门禁（确认制则动态 writeSet，见 `confirmed-writes.ts`）→ 能力面组装（`customerInput` / `reportHandback` / `sessionDir` / `dispatchTask` / `shellGate` / `shellVerdict`，均「注入才注册」）→ `deps.createAdapter(gate, capabilities)` → 绑定角色 → 事件流包装（回交 + 每轮 settle 后自动收尾/重 pin）。
+- **一次会话的装配顺序**（`openRoleSession`）：角色/边界解析（`setupRole`，会话式入口允许内置治理角色）→ 写门禁（确认制则动态 writeSet，见 `confirmed-writes.ts`；W6-A 起按注册表能力矩阵收窄：`customerInput=false` 的 Liaison 即使误给通道也不进确认制）→ 能力面组装（`customerInput` / `reportHandback` / `sessionDir` / `dispatchTask` / `handOffIntent` / `requestClarification` / `shellGate` / `shellVerdict`，均「注入才注册」且按 `governanceCapabilitiesOf` 过滤）→ `deps.createAdapter(gate, capabilities)` → 绑定角色 → 事件流包装（回交 + 每轮 settle 后自动收尾/重 pin）。
 - **shell 闸两档**：**项目角色**走三层链 (c)→(b)→(a)（`assembleProjectShellGate`，需前端给 (a) 通道）；**su** 走**只读档**（`assembleReadonlyShellGate`，只接 (c) 白名单，risky/review/deny 一律拒，不接 (b)/(a)）。两档共用同一个 `shellGate` 能力位与同一审计边界解析；`run_shell` 仅在能力位被注入时注册（未 arm / 装配失败 ⇒ 不注册，fail-closed 结构性保证）。
 - **判定源与执行点分离**：`shell-gate.ts` 不含任何规则集——`classifyShell` 与规则集由调用方注入（实件属门禁引擎，生产经 `src/service/gate/` 公开再导出，**该出口尚不存在**——既有跨角色待办，缺注入 ⇒ 闸一律拒）；执行（spawn）只在 Pi 适配器 `run_shell` 一处，审核与 spawn 同址。
 - **审计口径**：一切 shell 判定都落 `docs/audit/shell-gate.jsonl`（命令逐字原文、argv、cwd、conclusion、branch、by、conditions、`execution` 恒「未执行」）；落盘本身经门禁（治理边界 + 声明 `shell-gate` 条件），审计失败不翻转判定、如实 stderr。

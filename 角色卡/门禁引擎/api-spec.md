@@ -119,19 +119,23 @@ inspectPinnedBoundaries(input: {
 未覆盖/规范化覆盖、digest 公式/稳定性/变化、只读（前后目录树与 mtime 不变）及公共出口同一函数引用。
 门禁引擎套件 218 计 / 217 过 / 0 红 / 1 skip。`verifyPins` 既有行为未改，本检查是独立只读入口。
 
-## 治理三权分立 V1（W0+W1，2026-10-17）
+## 治理三权分立 V1（W0+W1，2026-10-17；四角色 2026-10-18）
 
-客户拍板：su 拆为 `rapporteur`（提案权）/`nominator`（提名权）/`convener`（编排权），
+客户 2026-10-17 拍板：su 拆为 `rapporteur`（提案权）/`nominator`（提名权）/`convener`（编排权），
 **无任何角色自动拥有最终批准权**；新项目 trio、旧项目默认 single 兼容；迁移后 su 隐藏/不可开启/
 历史只读；三人基本只读 shell；账本在 `.ans/governance/ledger.jsonl`。契约全文见 PM 评审
 `角色卡/项目管理/docs/design/2026-10-17_design_governance-trio-review.md` §5.1–§5.6。
-本角色交付 W0+W1；编排/桌面/迁移/验收属各自属主。
+
+客户 2026-10-18 拍板**「三权不变、角色四名」**：新增 `liaison`（联络官，沟通权）作为 trio 默认
+主入口；`governanceModel` 值仍为 `"trio"`；旧 trio 项目自动获得 Liaison、零迁移；single/su 逐字
+不变。契约全文见 `2026-10-18_design_governance-liaison-review.md` §4.1–§4.7。本角色交付门禁引擎
+W6-A 部分；交接工具/镜像卡/账本/UI 属各自属主。
 
 ### 共享类型（[`src/model/role.ts`](../../src/model/role.ts)）
 
 ```ts
 export type GovernanceModel = "single" | "trio";            // 缺省 "single"（旧行为逐字不变）
-export type GovernanceFunction = "proposal" | "nomination" | "schedule";
+export type GovernanceFunction = "liaison" | "proposal" | "nomination" | "schedule";
 
 export interface ResolvedRole { /* ... */ governanceFunction?: GovernanceFunction; }
 export interface ProjectConfig { /* ... */ governanceModel?: GovernanceModel; }
@@ -141,7 +145,8 @@ Service 侧（[`src/service/role/resolve-role.ts`](../../src/service/role/resolv
 `ProjectRoleSummary.governanceFunction?: GovernanceFunction`、
 `ProjectListing.governanceModel?: GovernanceModel`。
 **运行时契约**：`listProject` **恒返回** `governanceModel`；类型上标可选只为兼容其他角色在 W3 前
-构造的测试夹具（读取方 `?? "single"` 即旧行为）。这是本批唯一的类型级放宽，已在 changelog 登记。
+构造的测试夹具（读取方 `?? "single"` 即旧行为）。这是 2026-10-17 批唯一的类型级放宽，已在
+changelog 登记。
 
 ### 内置注册表（[`src/common/门禁引擎/governance-roles.ts`](../../src/common/门禁引擎/governance-roles.ts)）
 
@@ -150,7 +155,9 @@ Service 公共出口（[`src/service/boundary/resolve-boundary.ts`](../../src/se
 
 ```ts
 export interface GovernanceCapabilities {
-  customerInput: true;            // 三人与 su
+  customerInput: boolean;         // Liaison=false；rapporteur/nominator/convener/su=true
+  handOffIntent: boolean;         // 仅 liaison
+  requestClarification: boolean;  // 仅 rapporteur
   dispatchTask: boolean;          // 仅 convener（trio）/ su（single）
   roleStatus: boolean;            // 仅 convener / su
   sessionTail: boolean;           // 仅 convener / su
@@ -161,7 +168,7 @@ export interface GovernanceCapabilities {
 }
 
 export interface BuiltInGovernanceRoleSpec {
-  id: "rapporteur" | "nominator" | "convener";
+  id: "liaison" | "rapporteur" | "nominator" | "convener";
   displayName: string;
   function: GovernanceFunction;
   cardText: string;
@@ -171,68 +178,89 @@ export interface BuiltInGovernanceRoleSpec {
   capabilities: GovernanceCapabilities;
 }
 
-BUILT_IN_GOVERNANCE_ROLES            // 顺序：rapporteur → nominator → convener
+BUILT_IN_GOVERNANCE_ROLES            // 顺序：liaison → rapporteur → nominator → convener
 LEGACY_GOVERNANCE_ROLE_ID            // "su"
 LEGACY_SU_PREAUTHORIZED_DIRS         // docs/su, docs/contracts, docs/skills, docs/mcp
-LEGACY_SU_CAPABILITIES
+LEGACY_SU_CAPABILITIES               // 旧行为；handOffIntent/requestClarification=false
 LEGACY_SU_CARD_TEXT
 governanceRoleOf(id) / governanceFunctionOf(id) / governanceCapabilitiesOf(id)
-isBuiltInGovernanceRoleId(id)        // 三人 + su
-isTrioGovernanceRoleId(id)           // 三人（不含 su）
+isBuiltInGovernanceRoleId(id)        // 四人 + su
+isTrioGovernanceRoleId(id)           // 四人（不含 su）
 trioGovernanceSource(roleId)         // "<built-in:trio/<id>>"
 appGovernanceEntries() / appGovernanceBoundary(acceptance)
 APP_GOVERNANCE_SOURCE                // "<built-in:app-governance>"
 ```
 
-- **条目/预授权/禁写**按评审 §5.2 表逐项落表；禁写路径展开为**具体前缀**（`.ans/`、
-  `docs/bootstrap-manifest.md`、`角色卡/governance-boundary.yaml`、`角色卡/<四 id>/` 等），
+- **Liaison 逐项**：Section 1 与预授权只有 `docs/intents/`；禁写 `.ans/**`、manifest、
+  `角色卡/**`、`docs/proposals|contracts|nominations|skills|mcp|flows|governance/**`、
+  `docs/workflow.md`；能力只有 `handOffIntent`（沟通/交接），**无** `customerInput`/派发/看护/
+  安装/恢复/shell。卡文本写明「客户沟通 · 不拥有最终批准权」「不实现、不跑代码、不写测试」。
+- **条目/预授权/禁写**按评审 §5.2/§4.2 表逐项落表；禁写路径展开为**具体前缀**（`.ans/`、
+  `docs/bootstrap-manifest.md`、`角色卡/governance-boundary.yaml`、`角色卡/<五 id>/` 等），
   按段比较、不实现 glob。
 - **应用专用边界**固定三条：`角色卡/governance-boundary.yaml`（file）、`.ans/`（directory）、
   `docs/bootstrap-manifest.md`（file）。只给编排在 finalize/repin/迁移中使用，**不注入任何角色会话**。
-- 三人的 `cardText` 均写明：职能与权力、**不拥有最终批准权**、可写目录与禁写路径、`cardKind`/
-  选项 id 约定、应用独占写路径、不得创建第四个治理角色、不得修改其他治理角色资料。
+- 四人（Liaison 例外：不发卡、无 cardKind）的 `cardText` 均写明：职能与权力、
+  **不拥有最终批准权**、可写目录与禁写路径、应用独占写路径、不得创建第五个治理角色、
+  不得修改其他治理角色资料；Liaison 另写明 `hand_off_intent` 交接约定。三张旧卡的文本同批修订：
+  Rapporteur 去掉「客户沟通主入口」、改读 `docs/intents/**` + `request_clarification`；
+  Convener 的提名步骤改为「由应用后台派发」。
+- **AC3 拒绝归属指引**：`resolveWrite` 对 `<built-in:trio/liaison>` 边界的「未匹配条目」拒绝
+  追加 `governanceWriteOwnerGuidance` 文案（注册表单点）：`docs/proposals|contracts` → 报告员
+  Rapporteur、`角色卡/|docs/nominations|skills|mcp` → 提名官 Nominator、
+  `docs/flows|workflow.md` → 召集人 Convener、`.ans/|manifest|治理边界` → 只能由应用写。
+  只改文案，判定/`allowedByRoot` 零变化；其他角色文案逐字不变。编排侧前置
+  `forbiddenWriteDecision` 的通用文案属编排属主。
 
 ### `listProject` / `resolveRole` / `resolveGovernanceRole`
 
 - `listProject(projectRoot)`：先扫项目角色、再读 `readGovernanceModel`（PM 属主，只读消费）。
   显式值优先；`.ans` 不可读 → single；无显式值且无 `.ans/project.json` 且无任何角色目录 →
   新空项目 trio；其余 single（不按产物目录猜模型）。内置前置：single→`su`；
-  trio→三人（此顺序）；`primaryRoleId` single→`su`、trio→`rapporteur`。
-- 保留 id：`su`/`rapporteur`/`nominator`/`convener` 的项目目录一律跳过并警告
+  trio→四人（liaison → rapporteur → nominator → convener）；`primaryRoleId`
+  single→`su`、trio→`liaison`。**旧 trio 项目零迁移**：`.ans`、pin、manifest 均不重写。
+- 保留 id：`su`/`liaison`/`rapporteur`/`nominator`/`convener` 的项目目录一律跳过并警告
   「与内置治理角色 id 冲突，已跳过」；`resolveRole` 对保留 id 忽略 `project.roles` 映射。
 - `resolveRole`：trio 下 `su` 抛「角色 su 已归档（当前为三权治理模型），不可开启」；
   trio id 返回 `kind:"built-in-governance"` + 注册表卡文本 + `governanceFunction`；
   single 下 su 的解析结果逐字不变。
 - `resolveGovernanceRole(listing,{function?,roleId?})`：single 只认 `su`（传 function/其他 id 抛错）；
-  trio 按显式 `roleId` 或 `function`（缺省 `proposal`→rapporteur），非法组合明确报错。
+  trio 按显式 `roleId` 或 `function` 解析，非法组合明确报错、文案列四人。
+  **缺省 `function` 仍是 `proposal`（→ rapporteur）**：共享解析器语义不变，CLI `ans govern`
+  不提供 Liaison（无跨会话后台交接，评审 §4.5/§4.6）；桌面主入口经 `primaryRoleId` 得到 Liaison。
   `openGovernanceSession`/CLI/测试应共用本出口，不得各自枚举 `builtIn`。
 
 ### `resolveBoundarySection` 的模型分支
 
 - `model = project.governanceModel ?? "single"`。
-- **single**：`su` 与项目角色走既有四分支（**逐字未改**）；trio id → 未接受 + parseError
+- **single**：`su` 与项目角色走既有四分支（**逐字未改**）；trio 四角色 id → 未接受 + parseError
   「三权角色在 single 治理模型下不可用」。`resolveWrite` 据此拒一切写。
 - **trio**：`su` → 未接受 + parseError「su 已归档（当前为三权治理模型），不可写入/开启」；
-  trio 三人 → `entries` 取注册表、`boundarySource="<built-in:trio/<id>>"`，接受证据＝
+  trio 四人 → `entries` 取注册表、`boundarySource="<built-in:trio/<id>>"`，接受证据＝
   项目 `governanceBoundary.path` 非空且 `accepted===true`（沿用其 acceptance），或 `path` 为空 +
   本次显式 `genesisBootstrap`（`source` 透传）；否则 fail-closed。**绝不**读取治理边界文档的
-  条目作为三人写权；`path` 为空时的桌面运行期同意**不**能当 trio 接受证据。
+  条目作为四人写权；`path` 为空时的桌面运行期同意**不**能当 trio 接受证据。
 - 项目角色在 trio 下仍走既有四分支（既有逻辑不变）。
 
 ### 写权矩阵（本角色边界求值可证部分）
 
 | 角色 | 可写（Section 1） | 明确拒写（越界示例） |
 | --- | --- | --- |
+| liaison | `docs/intents/` | `角色卡/**`、`docs/proposals/**`、`docs/contracts/**`、`docs/nominations/**`、`docs/flows/**`、`docs/skills/**`、`docs/mcp/**`、`docs/governance/**`、`docs/workflow.md`、`.ans/**`、manifest |
 | rapporteur | `docs/proposals/`、`docs/contracts/`、`docs/governance/rapporteur/` | `角色卡/**`、`docs/nominations/**`、`docs/flows/**`、`docs/skills/**`、`docs/mcp/**`、`.ans/**`、manifest |
 | nominator | `角色卡/`、`docs/nominations/`、`docs/skills/`、`docs/mcp/`、`docs/governance/nominator/` | `docs/proposals/**`、`docs/flows/**`、`.ans/**`、manifest |
 | convener | `docs/flows/`、`docs/workflow.md`、`docs/governance/convener/` | `角色卡/**`、`docs/proposals/**`、`docs/nominations/**`、`docs/skills/**`、`docs/mcp/**`、`.ans/**`、manifest |
 
 `角色卡/` 内的 `角色卡/governance-boundary.yaml` 与 `角色卡/<内置治理 id>/` 属**禁写路径**，
 由编排 gate 包装在 `resolveWrite` **之前**判定（本角色只提供数据；提名写卡的客户确认同样在编排
-confirmed-writes，不在门禁层实现）。三人 shell：convener 只读档，rapporteur/nominator 不接 shell。
+confirmed-writes，不在门禁层实现）。shell：convener 只读档，liaison/rapporteur/nominator 不接 shell。
 
-### 验证
+### 验证（2026-10-18 四角色批）
 
-`test/门禁引擎/governance-trio.test.ts` 28 例 + `list-project.test.ts` 更新/新增；门禁引擎套件
-**246 计 / 245 过 / 0 红 / 1 skip**；`npm run typecheck` exit 0。全量 2542 计 / 2473 过 / 66 红 / 3 skip，
-新增红全部在边界外（编排/桌面/测试角色尚未按 W2/W3 接线 `governanceModel`），详见 changelog。
+`test/门禁引擎/governance-trio.test.ts`（四人注册表/写权/边界/解析更新）+ 新增
+`test/门禁引擎/liaison-role.test.ts`（旧 trio 零迁移、single 不变、Liaison 写权/能力/AC3 拒绝
+归属文案/保留 id）；`list-project.test.ts` 四人顺序/主入口/保留 id 更新。门禁引擎套件 **254 计 /
+253 过 / 0 红 / 1 skip**。`npm run typecheck` 在本角色边界内零错；复跑时的 3 条全仓错误均在
+他域新写的 liaison 测试（`test/编排/liaison-handoff.test.ts`、`test/测试/governance-liaison-verify/
+b-intent-handoff.test.ts` 仍用被评审取代的 `"communication"` 名称），与门禁引擎交付无关，如实登记、
+未越界修改。

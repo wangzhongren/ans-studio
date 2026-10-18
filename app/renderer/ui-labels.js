@@ -248,7 +248,12 @@
   var SHELL_JUDGE_OFF_TITLE = "手动逐条确认 shell 命令（默认）";
   var SHELL_JUDGE_ON_TITLE = "判断 agent 先评估 shell 命令必要性；可随时关闭";
 
-  /** §10.2 开启警告（逐字三行；常驻，不是 toast）。**不含** Markdown 强调标记（粗体由渲染侧 class 表达）。 */
+  /** 开启警告的关闭按钮文案（客户 2026-10-18：提示只出现一次，可手动收起）。 */
+  var SHELL_JUDGE_WARNING_CLOSE_LABEL = "知道了";
+  /** 开启警告的自动收起时长（客户要求约 8–10 秒；无计时器纪律只豁免此一次性提示，不用于业务等待）。 */
+  var SHELL_JUDGE_WARNING_AUTO_DISMISS_MS = 9000;
+
+  /** §10.2 开启警告（逐字三行；客户 2026-10-18 改为**每次开启只显示一次**）。**不含** Markdown 强调标记（粗体由渲染侧 class 表达）。 */
   var SHELL_JUDGE_WARNING_LINES = [
     "替我审批中：shell 命令先由判断 agent 评估必要性；只有判断没发生（不可用/超时/解析失败/引擎不支持）才会弹卡。",
     "判断 agent 只读项目内代码/文档/角色卡（不含 .env、密钥/凭据与项目外），不写文件、不执行命令；不必要会给替代方案，没有替代方案会由请求角色说明并给出路；每次判断会产生一次模型调用（token/延迟）；可能误判，可随时关闭。",
@@ -261,9 +266,10 @@
 
   /**
    * 开关视图（纯映射）：`available` 来自 preload 四个方法是否齐备（渲染侧判），`enabled` 只信主进程。
-   *  · 桥缺失 ⇒ 禁用 + 桥缺失文案，**绝不** checked / 警告可见（不显示假开启态）；
-   *  · 可用 ⇒ 文案/悬停按真实 enabled 切换；警告只在 enabled 时显示；
+   *  · 桥缺失 ⇒ 禁用 + 桥缺失文案，**绝不** checked（不显示假开启态）；
+   *  · 可用 ⇒ 文案/悬停按真实 enabled 切换；开启期间输入区保留紧凑琥珀标记（label + `.is-on` 圆点）；
    *  · `busy`（IPC 在途）只禁用，不改文案与真实状态。
+   * 长文警告的显隐**不在这里**（不是 enabled 的纯函数）：见 `shellJudgeWarningStep`。
    */
   function shellJudgeToggleView(available, enabled, busy) {
     var ok = available === true;
@@ -275,8 +281,24 @@
       disabled: !ok || busy === true,
       label: ok ? (on ? SHELL_JUDGE_ON_LABEL : SHELL_JUDGE_OFF_LABEL) : SHELL_JUDGE_BRIDGE_MISSING,
       title: ok ? (on ? SHELL_JUDGE_ON_TITLE : SHELL_JUDGE_OFF_TITLE) : SHELL_JUDGE_BRIDGE_MISSING,
+      // 兼容字段（旧调用方仍读取）：仅表示「开启态下一次性警告的候选」——实际显隐由
+      // `shellJudgeWarningStep` 决定（每次开启只显示一次）；渲染侧**不得**用它控制警告显隐。
       warningVisible: on,
     };
+  }
+
+  /**
+   * 一次性开启警告的**状态迁移**（纯函数；客户 2026-10-18「这个提示应该弹出只出现一次就行了」）：
+   *  · `enabled !== true` ⇒ 复位 `shown=false`、不显示（关闭开关后清掉「已提示」）；
+   *  · 开启且该次开启尚未提示 ⇒ `shown=true, show=true`（只显示这一次）；
+   *  · 开启且已提示（重绘/收消息/切角色/重复推送）⇒ 不显示（**绝不重复弹出**）。
+   * 渲染侧只在 `show` 时展示；展示后无论手动「知道了」还是到时自动消失都不再出现，
+   * 直到客户关闭开关再重新开启。**不持久化**：应用重启后再次开启会再提示一次。
+   */
+  function shellJudgeWarningStep(enabled, shown) {
+    if (enabled !== true) return { shown: false, show: false };
+    if (shown === true) return { shown: true, show: false };
+    return { shown: true, show: true };
   }
 
   /**
@@ -570,19 +592,26 @@
   // `cardKind`，状态行按 `governanceModel` 与接口给的流程事实。**不按角色 id 分叉**（渲染侧亦不出现
   // 三权 id 字面量）；未知值一律返回空/兜底，不猜、不编。
 
+  // 四角色（2026-10-18 客户拍板「三权不变、角色四名」）：顺序/名称以注册表为准，此处只做展示转写。
+  // `primaryEntrance` 只标记客户默认入口（Liaison）；渲染侧据此附加职责提示，不按角色 id 分叉。
   var GOVERNANCE_ROLE_TEXT = {
+    liaison: { cn: "联络官", en: "Liaison", power: "客户沟通 · 不拥有最终批准权", primaryEntrance: true },
     proposal: { cn: "报告员", en: "Rapporteur", power: "提案权 · 不拥有最终批准权" },
     nomination: { cn: "提名官", en: "Nominator", power: "提名权 · 不拥有最终批准权" },
     schedule: { cn: "召集人", en: "Convener", power: "编排权 · 不拥有最终批准权" },
   };
   var GOVERNANCE_ROLE_BUILTIN_NOTE = "内置角色：随应用发布，无角色目录";
   var GOVERNANCE_GROUP_LABEL = "治理职能（内置）";
-  // 结论性空态说明（只有 nomination/schedule 需要；proposal 沿用既有治理记录/主入口空态）。
+  // 结论性空态说明（四角色各自一句；评审 §9.2 逐字）。Liaison 的说明在其它空态分支里作附加提示。
   var GOVERNANCE_ROLE_EMPTY_HINT = {
+    liaison: "客户默认入口：你说要做什么，我先确认目标、范围与验收，再交给报告员形成提案。我不写提案、不批准。本版起默认入口为联络官；报告员与历史提案不变。",
+    proposal: "通常由联络官交接打开；客户也可以直接找我。我只写提案，不批准。",
     nomination: "通常由流程单提名步骤打开；仅在客户明确要求时直接使用",
     schedule: "通常由已接受提案开启流程；只负责排步骤与派发，不批准方案",
   };
   var GOVERNANCE_MODEL_TEXT = { single: "旧模型（su）", trio: "三权" };
+  // 状态行专用（任务 W6-C：治理模型显示「三权 · 四角色」）；迁移预览等仍用 `GOVERNANCE_MODEL_TEXT`。
+  var GOVERNANCE_MODEL_STATUS_TEXT = { single: "旧模型（su）", trio: "三权 · 四角色" };
   // 状态行只认这四个接口状态值；未知值不显示（不猜「进行中」）。
   var GOVERNANCE_FLOW_STATUS_TEXT = {
     "awaiting-customer": "等待客户决定",
@@ -595,6 +624,7 @@
   var GOVERNANCE_MIGRATION_LABEL_PENDING = "升级入口待本版后续";
   var GOVERNANCE_DECISION_BADGE = "治理决定 · 客户最终批准";
   var GOVERNANCE_QUEUE_NOTE = "等待前一个决定";
+  var GOVERNANCE_MIRROR_BADGE = "镜像 · 主入口";
   var GOVERNANCE_MODEL_OPTION_TEXT = { single: "单模型（single）", trio: "三权（trio）" };
   var GOVERNANCE_MODEL_SUGGEST = "检测到三权产物（docs/proposals / docs/nominations / docs/flows），建议选择 trio；请由你点选。";
   var GOVERNANCE_MODEL_UNWIRED = "当前桌面窗口未接线治理模型选择；本版不能按所选模型建立，按钮已禁用。";
@@ -617,12 +647,25 @@
       en: t.en,
       name: t.cn + " " + t.en,
       power: t.power,
+      primaryEntrance: t.primaryEntrance === true,
       builtinNote: GOVERNANCE_ROLE_BUILTIN_NOTE,
       emptyHint: GOVERNANCE_ROLE_EMPTY_HINT[governanceFunction] || "",
     };
   }
 
-  /** 治理角色空态（只有带专属说明的职能返回；proposal ⇒ null = 沿用既有 S0/S1 空态）。 */
+  /** 治理决定卡的**镜像来源标签**（评审 §6.1：镜像面标明来源，不是第二张审批）。 */
+  function governanceMirrorSourceLabel(sourceName) {
+    var name = typeof sourceName === "string" && sourceName !== "" ? sourceName : "发起角色";
+    return "来自 " + name + " 的治理决定 · 客户最终批准";
+  }
+
+  /** 主入口排队聚合行文案（评审 §6.1/§9.3）：只有数量，不编请求内容。 */
+  function governanceQueueAggregateText(count) {
+    var n = typeof count === "number" && isFinite(count) && count > 0 ? Math.floor(count) : 0;
+    return n > 0 ? "还有 " + n + " 个决定等待前一个决定" : "";
+  }
+
+  /** 治理角色空态（带专属说明的职能返回；其余 ⇒ null = 沿用既有 S0/S1/默认空态）。 */
   function governanceRoleEmptyState(governanceFunction) {
     var view = governanceRoleView(governanceFunction);
     if (!view || view.emptyHint === "") return null;
@@ -645,7 +688,7 @@
    */
   function governanceStatusText(model, flowId, flowStatus) {
     var parts = [];
-    var modelText = governanceModelText(model);
+    var modelText = typeof model === "string" && GOVERNANCE_MODEL_STATUS_TEXT[model] ? GOVERNANCE_MODEL_STATUS_TEXT[model] : "";
     if (modelText !== "") parts.push("治理模型：" + modelText);
     if (typeof flowId === "string" && flowId !== "") parts.push("当前流程：" + flowId);
     var statusText = governanceFlowStatusText(flowStatus);
@@ -847,6 +890,7 @@
     suApprovalTierLabel: suApprovalTierLabel,
     shellJudgeToggleView: shellJudgeToggleView,
     shellJudgeToggleResult: shellJudgeToggleResult,
+    shellJudgeWarningStep: shellJudgeWarningStep,
     shellJudgeWarningLines: shellJudgeWarningLines,
     shellJudgeNoticeText: shellJudgeNoticeText,
     shellJudgeReasonText: shellJudgeReasonText,
@@ -857,6 +901,8 @@
     SHELL_JUDGE_BRIDGE_MISSING: SHELL_JUDGE_BRIDGE_MISSING,
     SHELL_JUDGE_OFF_TITLE: SHELL_JUDGE_OFF_TITLE,
     SHELL_JUDGE_ON_TITLE: SHELL_JUDGE_ON_TITLE,
+    SHELL_JUDGE_WARNING_CLOSE_LABEL: SHELL_JUDGE_WARNING_CLOSE_LABEL,
+    SHELL_JUDGE_WARNING_AUTO_DISMISS_MS: SHELL_JUDGE_WARNING_AUTO_DISMISS_MS,
     sidebarCollapsedFromStorage: sidebarCollapsedFromStorage,
     clampSidebarWidth: clampSidebarWidth,
     stepSidebarWidth: stepSidebarWidth,
@@ -881,6 +927,8 @@
     governanceReacceptFailureView: governanceReacceptFailureView,
     governanceRoleView: governanceRoleView,
     governanceRoleEmptyState: governanceRoleEmptyState,
+    governanceMirrorSourceLabel: governanceMirrorSourceLabel,
+    governanceQueueAggregateText: governanceQueueAggregateText,
     governanceModelText: governanceModelText,
     governanceFlowStatusText: governanceFlowStatusText,
     governanceStatusText: governanceStatusText,
@@ -895,6 +943,7 @@
     GOVERNANCE_MIGRATION_TEXT: GOVERNANCE_MIGRATION_TEXT,
     GOVERNANCE_DECISION_BADGE: GOVERNANCE_DECISION_BADGE,
     GOVERNANCE_QUEUE_NOTE: GOVERNANCE_QUEUE_NOTE,
+    GOVERNANCE_MIRROR_BADGE: GOVERNANCE_MIRROR_BADGE,
     GOVERNANCE_MODEL_SUGGEST: GOVERNANCE_MODEL_SUGGEST,
     GOVERNANCE_MODEL_UNWIRED: GOVERNANCE_MODEL_UNWIRED,
     stickToBottom: stickToBottom,

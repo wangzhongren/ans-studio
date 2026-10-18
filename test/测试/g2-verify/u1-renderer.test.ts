@@ -6,7 +6,7 @@
 //   · 队列行撤回判据：canWithdraw 只认 message（system 行无撤回钮）；来源标签接线；
 //   · 恢复卡（renderer.js/index.html/styles.css 源码钉）：恰 allow:true 才作为执行请求回传；
 //     取消/Esc/关闭（×）一律 false；失效/通道异常如实终态「未获执行/fail-closed 不执行」绝不呈已执行；
-//     **零计时器**（全文无 setTimeout/setInterval 调用）；取消为默认焦点；证据逐字 textContent；
+//     **恢复卡零计时器**（唯一豁免＝2026-10-18 一次性开启警告的 9 秒自动收起，位置/数量/用途锁定）；取消为默认焦点；证据逐字 textContent；
 //     Esc 优先答恢复卡（DOM 声明在 shell 卡之后）；
 //   · system 消息行：is-system 类＋shield 图标＋标签（分类器单一来源）＋样式钩子存在。
 
@@ -52,7 +52,7 @@ test("U1：recoveryActionView——恰三枚冻结枚举映射；未知动作 �
   }
 });
 
-test("U1 恢复卡源码钉：恰 allow:true 才作为执行请求回传；取消/Esc/关闭均 false；默认焦点＝取消；零计时器", () => {
+test("U1 恢复卡源码钉：恰 allow:true 才作为执行请求回传；取消/Esc/关闭均 false；默认焦点＝取消；恢复卡零计时器（唯一豁免＝一次性开启警告自动收起）", () => {
   const r = read("app/renderer/renderer.js");
   assert.ok(r.includes("d.recoveryConfirmRespond({ id: cur.id, allow: allow === true })"), "回传判据＝恰 allow === true");
   assert.ok(/\$\("rc-allow"\)\.addEventListener\("click", function \(\) \{ respondRecoveryConfirm\(true\); \}\)/.test(r), "「执行」按钮 ⇒ true");
@@ -68,9 +68,28 @@ test("U1 恢复卡源码钉：恰 allow:true 才作为执行请求回传；取�
   assert.ok(r.includes("此确认已失效（应用重启或请求已结束），未获执行——请让提议方重新发起。"), "失效终态含「未获执行」");
   assert.ok(r.includes("未能回传你的决定（通道未接或异常）——按 fail-closed 不执行；请让提议方重新发起。"), "通道异常如实 fail-closed");
   assert.ok(!/rc-(allow|hint)[^\n]*已执行/.test(r), "恢复卡文案不得出现「已执行」正向断言");
-  // 零计时器（裁定 4）：全文无 setTimeout/setInterval 调用（含注释命中 0 次调用）
-  assert.ok(!/setTimeout\s*\(/.test(r), "renderer.js 无 setTimeout 调用");
-  assert.ok(!/setInterval\s*\(/.test(r), "renderer.js 无 setInterval 调用");
+  // 零计时器（裁定 4）：恢复卡本身无计时器；2026-10-18 客户批准**唯一豁免**——「替我审批中」
+  // 一次性警告约 9 秒自动收起（客户 8–10 秒口径）。锁定「出现位置/数量/用途/时长来源」，不放开其他面：
+  // 全文恰一个 setTimeout、位于 showShellJudgeWarning、回调仅 hideShellJudgeWarning、
+  // 时长取自 ui-labels 单一来源且恰 9000ms；setInterval 仍为零；恢复卡切片零计时器。
+  const timerCalls = r.match(/\bsetTimeout\s*\(/g) ?? [];
+  assert.equal(timerCalls.length, 1, "renderer.js 恰有一个 setTimeout（仅一次性开启警告自动收起）");
+  const warnStart = r.indexOf("function showShellJudgeWarning(");
+  const warnEnd = r.indexOf("function syncShellJudgeWarning(");
+  const timerAt = r.indexOf("setTimeout(function ()");
+  assert.ok(warnStart >= 0 && warnEnd > warnStart, "找得到 showShellJudgeWarning 切片");
+  assert.ok(timerAt > warnStart && timerAt < warnEnd, "唯一计时器必须位于 showShellJudgeWarning 内");
+  const timerSlice = r.slice(timerAt, timerAt + 240);
+  assert.ok(timerSlice.includes("hideShellJudgeWarning();"), "计时器到期只收起该警告");
+  assert.ok(timerSlice.includes("UiLabels.SHELL_JUDGE_WARNING_AUTO_DISMISS_MS"), "时长经 ui-labels 单一来源（9 秒）");
+  const labels = read("app/renderer/ui-labels.js");
+  assert.ok(/SHELL_JUDGE_WARNING_AUTO_DISMISS_MS = 9000;/.test(labels), "自动收起时长钉死 9000ms（客户 8–10 秒口径）");
+  assert.ok(r.includes("if (s.warningTimer) { clearTimeout(s.warningTimer); s.warningTimer = null; }"), "「知道了」/关闭时清除计时器");
+  assert.ok(!/\bsetInterval\s*\(/.test(r), "renderer.js 无 setInterval 调用");
+  assert.ok(
+    !/setTimeout/.test(r.slice(r.indexOf("function renderRecoveryConfirm"), r.indexOf("function respondRecoveryConfirm"))),
+    "恢复卡无计时器（等待不设限）",
+  );
   assert.ok(r.includes("等待不设限"), "「等待不设限」纪律在注释/实现处");
 });
 

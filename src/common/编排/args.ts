@@ -77,11 +77,17 @@ function checkRuntime(value: string, errors: string[], assign: (v: string) => vo
 }
 
 // 校验 --function 取值（trio 三权职能；single 下是否允许由引擎按治理模型明确拒绝）。
+// 四角色评审 §4.6/AC21：**CLI 不提供 liaison**（跨会话后台投递只有桌面有）——显式拒绝并指路，
+// `proposal|nomination|schedule` 行为逐字不变。
 function checkGovernanceFunction(
   value: string,
   errors: string[],
   assign: (v: GovernanceFunction) => void,
 ): void {
+  if (value === "liaison") {
+    errors.push("联络官（liaison）仅桌面主入口提供；CLI 请用 --function proposal|nomination|schedule");
+    return;
+  }
   if ((GOVERNANCE_FUNCTIONS as readonly string[]).includes(value)) assign(value as GovernanceFunction);
   else errors.push(`非法的 --function：${value}（应为 ${GOVERNANCE_FUNCTIONS.join("|")}）`);
 }
