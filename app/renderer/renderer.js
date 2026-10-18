@@ -328,13 +328,14 @@
   }
 
   function setChatHeader(role) {
-    $("chat-role").textContent = role ? role.roleId : "未选择角色";
+    var name = role ? displayNameOf(role) : "";
+    $("chat-role").textContent = role ? name : "未选择角色";
     $("chat-role-sub").textContent = role
       ? ""
       : "从左侧选择一个角色开始聊天";
     $("chat-role-sub").hidden = !!role;
-    $("composer-scope").textContent = (role ? role.roleId : "未选择角色") + " / " + Rt.runtimeLabel(state.runtime);
-    $("inp-message").placeholder = role ? "给" + role.roleId + "发送消息…" : "选择角色后发送消息…";
+    $("composer-scope").textContent = (role ? name : "未选择角色") + " / " + Rt.runtimeLabel(state.runtime);
+    $("inp-message").placeholder = role ? "给" + name + "发送消息…" : "选择角色后发送消息…";
     renderContextState(role ? role.roleId : null);
     updateHaltButton();
     syncChatState(role ? role.roleId : null);
@@ -2394,7 +2395,9 @@
     var evidence = report.evidence || [], flags = Rt.textFlags(report.summary);
     var evidenceFlags = evidence.some(function (item) { return item.truncated; }) ? "部分证据显示已截断" : "";
     if (evidence.some(function (item) { return item.redacted; })) evidenceFlags += (evidenceFlags ? "；" : "") + "部分证据已净化";
-    return '<div class="report-top"><div class="report-eyebrow">来源 ' + esc(report.source && report.source.roleId || "未知") + ' · ' + esc(report.origin === "submitted-report" ? "正式回交" : report.origin === "terminal-fallback" ? "终态记录" : "来源未确认") + '</div><h2 class="report-title">任务报告</h2><div class="hb-head"><strong>' + esc(reportDeclaration(report)) + '</strong></div><p class="hb-meta">' + esc(report.source && report.source.runtime ? Rt.runtimeLabel(report.source.runtime) : "引擎未知") + ' · ' + esc(report.taskId ? "任务 " + report.taskId : "任务关联未知") + '</p></div><div class="report-body"><div class="excerpt-label">报告原文摘录</div><div class="hb-summary card-md">' + Md.renderMarkdown(preview) + '</div><p class="projection-flags">' + esc([flags, folded ? "摘要已折叠，完整可用显示副本见下方" : "", evidenceFlags, report.evidenceOmitted ? "另有 " + report.evidenceOmitted + " 条证据因预算省略" : ""].filter(Boolean).join("；")) + '</p><dl class="report-facts">' + (includeSave ? '<div><dt>报告存储</dt><dd><div class="persistence-state" role="status" aria-live="polite"></div></dd></div>' : '') + '<div><dt>独立验收</dt><dd>尚未确认</dd></div></dl><p class="report-disclaimer">以上为报告或终态记录，不等于独立验收通过。</p><div class="report-actions"><details class="report-complete"><summary>查看完整报告摘要与证据</summary><div class="report-complete-body"><div class="hb-complete-summary card-md">' + Md.renderMarkdown(full) + '</div><p class="projection-flags">' + esc(flags) + '</p><ul class="hb-evidence">' + (evidence.length ? evidence.map(function (item) { return '<li>' + esc(reportText(item)) + '<small class="projection-flags">' + esc(Rt.textFlags(item)) + '</small></li>'; }).join("") : '<li>（未提供证据）</li>') + '</ul></div></details></div></div>';
+    var sourceRoleId = report.source && report.source.roleId ? report.source.roleId : "";
+    var sourceName = sourceRoleId !== "" ? (displayNameOf(roleById(sourceRoleId)) || sourceRoleId) : "未知";
+    return '<div class="report-top"><div class="report-eyebrow">来源 ' + esc(sourceName) + ' · ' + esc(report.origin === "submitted-report" ? "正式回交" : report.origin === "terminal-fallback" ? "终态记录" : "来源未确认") + '</div><h2 class="report-title">任务报告</h2><div class="hb-head"><strong>' + esc(reportDeclaration(report)) + '</strong></div><p class="hb-meta">' + esc(report.source && report.source.runtime ? Rt.runtimeLabel(report.source.runtime) : "引擎未知") + ' · ' + esc(report.taskId ? "任务 " + report.taskId : "任务关联未知") + '</p></div><div class="report-body"><div class="excerpt-label">报告原文摘录</div><div class="hb-summary card-md">' + Md.renderMarkdown(preview) + '</div><p class="projection-flags">' + esc([flags, folded ? "摘要已折叠，完整可用显示副本见下方" : "", evidenceFlags, report.evidenceOmitted ? "另有 " + report.evidenceOmitted + " 条证据因预算省略" : ""].filter(Boolean).join("；")) + '</p><dl class="report-facts">' + (includeSave ? '<div><dt>报告存储</dt><dd><div class="persistence-state" role="status" aria-live="polite"></div></dd></div>' : '') + '<div><dt>独立验收</dt><dd>尚未确认</dd></div></dl><p class="report-disclaimer">以上为报告或终态记录，不等于独立验收通过。</p><div class="report-actions"><details class="report-complete"><summary>查看完整报告摘要与证据</summary><div class="report-complete-body"><div class="hb-complete-summary card-md">' + Md.renderMarkdown(full) + '</div><p class="projection-flags">' + esc(flags) + '</p><ul class="hb-evidence">' + (evidence.length ? evidence.map(function (item) { return '<li>' + esc(reportText(item)) + '<small class="projection-flags">' + esc(Rt.textFlags(item)) + '</small></li>'; }).join("") : '<li>（未提供证据）</li>') + '</ul></div></details></div></div>';
   }
   function bindReportReading(card, pane) {
     card.querySelectorAll("details").forEach(function (details) { details.addEventListener("toggle", function () {
@@ -3172,7 +3175,8 @@
     $("rc-action").textContent = view ? "动作：" + view.label + "（" + action + "）" : "动作：" + action;
     $("rc-note").textContent = view ? view.note : "";
     $("rc-note").hidden = !view;
-    $("rc-role").textContent = "目标角色：" + (typeof payload.roleId === "string" && payload.roleId !== "" ? payload.roleId : "(未标识)");
+    var targetRoleId = typeof payload.roleId === "string" && payload.roleId !== "" ? payload.roleId : "";
+    $("rc-role").textContent = "目标角色：" + (targetRoleId !== "" ? (displayNameOf(roleById(targetRoleId)) || targetRoleId) : "(未标识)");
     // 证据**逐字**：textContent 落入（无 HTML 注入口——不美化、不改写、不截断）。
     $("rc-evidence").textContent = typeof payload.evidence === "string" ? payload.evidence : "";
     var reason = typeof payload.reason === "string" && payload.reason !== "" ? "原因（提议方提供）：" + payload.reason : "";
@@ -3611,7 +3615,7 @@
       sysRow(activePane(), "sys-call", ICONS.shield, "（异常）收到一条未带角色标识的交互请求——已就地呈现；正常链路不会如此。");
     } else if (requestSurfaces(entry).indexOf(state.selectedRoleId) < 0) {
       // 可见性指针：请求的**所有呈现面**都不是当前查看的角色时，在当前 pane 放一条只读提示。
-      sysRow(activePane(), "sys-call", ICONS.shield, "【待确认】角色 " + esc(roleId) + " 有一条交互请求等你作答——点左侧该角色查看。");
+      sysRow(activePane(), "sys-call", ICONS.shield, "【待确认】角色 " + (displayNameOf(roleById(roleId)) || roleId) + " 有一条交互请求等你作答——点左侧该角色查看。");
     }
   }
 
@@ -3974,7 +3978,8 @@
   function buildInjectedElement(inj, isReplay) {
     var el = document.createElement("div");
     el.className = "msg msg-injected is-" + inj.kind + (isReplay ? " is-replay" : "");
-    var label = inj.kind === "handback" ? "原始交接内容 · 来源未确认" : inj.label + (inj.sourceRoleId ? " · 来自 " + inj.sourceRoleId : "");
+    var sourceName = inj.sourceRoleId ? (displayNameOf(roleById(inj.sourceRoleId)) || inj.sourceRoleId) : "";
+    var label = inj.kind === "handback" ? "原始交接内容 · 来源未确认" : inj.label + (sourceName ? " · 来自 " + sourceName : "");
     var bodyText = typeof inj.displayBody === "string" ? inj.displayBody : inj.body;
     var body = '<div class="mi-body">' + Md.renderMarkdown(bodyText) + "</div>";
     if (inj.kind === "handback") body = '<details class="mi-report-detail"><summary>交接内容（结构化来源未保存）</summary>' + body + "</details>";
@@ -4454,7 +4459,7 @@
   function renderDocumentView() {
     var view = documentView, body = $("right-body");
     if (!view) { body.textContent = "文档上下文已失效。"; return; }
-    $("drawer-title").textContent = view.roleId + " · 来源文档";
+    $("drawer-title").textContent = (displayNameOf(roleById(view.roleId)) || view.roleId) + " · 来源文档";
     if (view.mode === "list") {
       body.innerHTML = (view.origin === "card" ? '<button class="btn btn-ghost btn-mini" data-doc-action="back-role">返回角色资料</button>' : '') +
         '<p class="document-source-note">以下是当前项目中该角色已列出的可读文档，请选择要阅读的文件。</p>' +
@@ -5250,7 +5255,7 @@
       isPrimary ? "主入口：默认入口与主路径" : "",
       gov ? gov.builtinNote : (r.builtIn ? "内置角色：定义在 SKILL.md，无角色目录" : ""),
     ].filter(Boolean).join("；");
-    if (identityDescription) { item.setAttribute("aria-description", identityDescription); item.title = r.roleId + "；" + identityDescription; }
+    if (identityDescription) { item.setAttribute("aria-description", identityDescription); item.title = displayName + "；" + identityDescription; }
     item.innerHTML =
       '<span class="ti-icon"><span class="ti-avatar">' + esc(Array.from(r.roleId).slice(0, 1).join("")) + "</span></span>" +
       '<span class="ti-main"><span class="ti-name">' + esc(displayName) + "</span>" +
@@ -5428,7 +5433,7 @@
       ? null
       // W11（2026-10-16 客户批准）：开会话 loading 行改用**同一枚** SVG 弧线转轮（图源 = role-status.js
       // 的 SPINNER_SVG 单点；边框转轮 .spinner/`spin 0.8s` 已退役——全应用只有一种转轮）。
-      : sysRow(pane, "sys-loading", St.SPINNER_SVG, "正在开启与角色 " + roleId + " 的会话…");
+      : sysRow(pane, "sys-loading", St.SPINNER_SVG, "正在开启与角色 " + (displayNameOf(roleById(roleId)) || roleId) + " 的会话…");
     setHint("");
 
     try {
@@ -5922,7 +5927,7 @@
       return;
     }
     if (tab === "work") {
-      if (titleEl) titleEl.textContent = role.roleId + " · 工作概览";
+      if (titleEl) titleEl.textContent = displayNameOf(role) + " · 工作概览";
       body.innerHTML = '<div id="right-queue-body" class="role-work">' + workListHtml(role.roleId) + '</div><section class="recent-reports"><h3>最近回交</h3></section>';
       renderedDrawerRole = role.roleId; updateWorkReports(role.roleId); restoreDrawerReading(role.roleId); return;
     }
@@ -5932,7 +5937,7 @@
     var entries = role.boundary && role.boundary.entries ? role.boundary.entries : [];
     var qViews = queueViewsFor(role.roleId);
     var qDepth = (state.queueByRole[role.roleId] || []).length;
-    if (titleEl) titleEl.textContent = role.roleId + " · 角色资料";
+    if (titleEl) titleEl.textContent = displayNameOf(role) + " · 角色资料";
     var saved = drawerReading[role.roleId] || { sections: {}, full: {} };
     drawerReading[role.roleId] = saved;
     var html = "";

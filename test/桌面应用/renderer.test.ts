@@ -2712,6 +2712,44 @@ test("2026-10-18：左树折叠卡——两个 details 默认 collapsed、主入
   assert.ok(STYLES.includes(".tree-group-fold .tree-group"), "折叠内分组标题样式对齐");
 });
 
+// —————— 2026-10-18 客户：用户可见角色标识一律显示名（五角色显示名由 ui-labels 派生；项目角色仍 roleId）——————
+// 内部路由/日志/metadata 仍以 roleId 为键（paneFor/metaFor/selectRole/data-role-id），只改呈现面。
+
+test("2026-10-18：chat header/composer/右侧标题/系统行/来源显示 displayNameOf；项目角色仍 roleId", () => {
+  const header = RENDERER.slice(RENDERER.indexOf("function setChatHeader("), RENDERER.indexOf("/** `#chat[data-state]`"));
+  assert.ok(header.length > 0, "setChatHeader 存在");
+  assert.ok(header.includes('var name = role ? displayNameOf(role) : "";'), "显示名统一取 displayNameOf");
+  assert.ok(header.includes('$("chat-role").textContent = role ? name : "未选择角色";'), "#chat-role 显示名");
+  assert.ok(header.includes('$("composer-scope").textContent = (role ? name : "未选择角色")'), "#composer-scope 角色段显示名");
+  assert.ok(header.includes('"给" + name + "发送消息…"'), "输入框 placeholder 显示名");
+  assert.ok(!/textContent = role \? role\.roleId|"给" \+ role\.roleId/.test(header), "聊天头部/输入框不再出现裸 roleId");
+  assert.ok(header.includes("renderContextState(role ? role.roleId : null)"), "内部路由仍以 roleId 为键（只改呈现面）");
+
+  // 右侧标题（工作概览 / 角色资料 / 来源文档）与角色资料抽屉。
+  assert.ok(RENDERER.includes('displayNameOf(role) + " · 工作概览"'), "右侧工作概览标题显示名");
+  assert.ok(RENDERER.includes('displayNameOf(role) + " · 角色资料"'), "右侧角色资料标题显示名");
+  assert.ok(RENDERER.includes('(displayNameOf(roleById(view.roleId)) || view.roleId) + " · 来源文档"'), "来源文档抽屉标题显示名（取不到保留 id）");
+
+  // 恢复确认「目标角色：<id>」：listing 能取到角色 ⇒ 显示名；取不到保留 id。
+  assert.ok(RENDERER.includes('(displayNameOf(roleById(targetRoleId)) || targetRoleId)'), "恢复确认目标角色显示名/回退 id");
+
+  // 聊天流系统行与来源标注。
+  assert.ok(RENDERER.includes('(displayNameOf(roleById(roleId)) || roleId) + " 有一条交互请求'), "待确认系统行显示名");
+  assert.ok(RENDERER.includes('(displayNameOf(roleById(roleId)) || roleId) + " 的会话…"'), "开启会话系统行显示名");
+  assert.ok(RENDERER.includes('var sourceName = inj.sourceRoleId ? (displayNameOf(roleById(inj.sourceRoleId)) || inj.sourceRoleId) : "";'), "投递来源 chip 显示名");
+  assert.ok(RENDERER.includes('displayNameOf(roleById(sourceRoleId)) || sourceRoleId'), "任务报告来源显示名");
+  assert.ok(RENDERER.includes('item.title = displayName + "；" + identityDescription;'), "左树悬停标题显示名");
+
+  // 派生单点：治理职能 ⇒ 中文名+英文名（主理 Lead / 提案 Draft / 组队 Crew / 统筹 Steward / 验收 Proof，来自 ui-labels）；
+  // 无治理职能的项目角色/旧 su ⇒ roleId（逐字不变）。
+  const display = RENDERER.slice(RENDERER.indexOf("function displayNameOf("), RENDERER.indexOf("function primaryDisplayName("));
+  assert.ok(display.includes("UiLabels.governanceRoleView(role.governanceFunction)"), "显示名按 governanceFunction 派生（不硬编码 id）");
+  assert.ok(display.includes("return gov ? gov.name : role.roleId;"), "项目角色仍用 roleId");
+  // 内部键未被替换：路由/定位仍以 roleId 为键。
+  assert.ok(RENDERER.includes("function paneFor(roleId)"), "pane 内部键仍是 roleId");
+  assert.ok(RENDERER.includes('item.setAttribute("data-role-id", r.roleId);'), "定位键 data-role-id 仍是 roleId");
+});
+
 test("W6-C：空态优先级——S0 → 治理记录动作 → 治理角色专属 → 默认；Liaison 提示仅附加不替换，专属空态无重复 CTA", () => {
   const fn = RENDERER.slice(RENDERER.indexOf("function emptyStateHtml("), RENDERER.indexOf("// —————— I4 治理记录"));
   const s0 = fn.indexOf('state.projectRoot && state.hasRoles === false');
