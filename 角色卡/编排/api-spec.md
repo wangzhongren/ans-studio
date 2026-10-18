@@ -509,5 +509,7 @@ export type { CreateGovernanceJudgeOptions } from "../../common/编排/governanc
 
 ### 验收证据
 
-- 新增 `test/编排/governance-judge.test.ts` **28/28**：六卡种正反例、required-read/物证缺失、逐路径复核（probes/写根/禁写/来源/pathDecisions 覆盖）、accept-quick 不代批、任命推荐集、读取损伤、支持矩阵/超时/中止/busy、事实/推荐集解析、trio judgeContext 与 single/su/项目角色对照、账本 judge 字段与 group 交叉校验、两工具回执、审计有界、**acceptance 流程完成度机械门槛**。
-- 相关既有套件 74/74；`npm run typecheck` 0 错；全量三层 glob `node --test "test/**/*.test.ts"` 2895 计/2874 过/18 红/3 skipped，18 红均他域/环境既有（含本次「替我审批」文案统一后 `test/测试/shell-judge-verify` 2 条待其属主同步；明细见 changelog）。
+- **超时（P6 真机修复）**：治理 judge 默认 `60_000ms`；`ANS_GOVERNANCE_JUDGE_TIMEOUT_MS`（正整数，非法回默认）可覆盖；计时只从模型判断开始（不含排队/等卡），文案带时长（如「判断超时（>60s）」）；shell judge 保持 15s。测试：judge **33/33**、`test/编排` **507 计/506 过**（symlink 环境红）、typecheck 0。
+- **write 新文件（P6 真机修复）**：`write` 卡 artifacts/required-read 只收**已存在**的相关物证；新建目标文件不进入 required-read，改由 `preview` 正文核对；`preview` 为空 ⇒ `manual/insufficient-evidence`。`appointment-write`/`schedule-write` 的 nomination/flow 要求不变。
+- 新增 `test/编排/governance-judge.test.ts` **32/32**：六卡种正反例、required-read/物证缺失、逐路径复核（probes/写根/禁写/来源/pathDecisions 覆盖）、accept-quick 不代批、任命推荐集、读取损伤、支持矩阵/超时/中止/busy、事实/推荐集解析、trio judgeContext 与 single/su/项目角色对照、账本 judge 字段与 group 交叉校验、两工具回执、审计有界、**acceptance 流程完成度机械门槛**、**write 新文件 preview/旧版物证**。
+- 相关既有套件 74/74、P6 套件 42/42；`npm run typecheck` 0 错；全量三层 glob `node --test "test/**/*.test.ts"` 2900 计/2881 过/16 红/3 skipped，16 红均他域/环境既有（明细见 changelog）。

@@ -22,6 +22,7 @@ related: [judge-governance-cards-review]
   - 既有 judge 姿态对两类会话一致（沿用 `judgeMode`，未新增分支）：`web_search="disabled"`、`installedMcpServers` 视为空、storage 忽略（线程 ephemeral/CODEX_HOME 临时目录）、只读沙箱 `networkAccess:false`、原生审批/选择/输入 decline/cancel/空答案、原生 `mcpToolCall`/`webSearch`/`commandExecution`/`fileChange` 泄漏隔离该轮。治理 judge 结构上无写/shell/交互/回交/派发/MCP/网络工具。
   - 普通角色会话路径逐字不变（`judgeMode` 未设时不做名单校验、webSearch/storage/MCP 照旧）。
 - **`test/codex-adapter/judge-mode.test.ts`**（1 行）：断言错误文案改为 `/frozen judge tool set/`（行为不变：仍拒绝夹带/缺项/多项）。
+- **`test/codex-adapter/session.test.ts`**（1 例，随运行时核心新增只读 `list_dir` 同步）：普通角色动态工具数 9→10，并断言 `ans_list_dir` 已注册、在临时读取根下可执行（列出 `hello.txt`/`sub/`）；judge 工具面不受影响。
 - **`test/codex-adapter/judge-governance.test.ts`**（新；6 例，离线假引擎＋内存 MCP）：
   1. 并集 allowlist 接受 shell/治理两类冻结集；夹带 `write_file`/`run_shell`、空集、缺 report、双 report、混合 report、重复名均在装配前拒绝且零引擎。
   2. 治理会话原生工具面恰 `ans_judge_list_dir`/`ans_judge_read_file`/`ans_report_governance_judgement`；写/编辑/shell/客户交互/回交/派发与 `report_shell_judgement` 均不可调用；审批/选择/输入请求照旧 decline/空答案；只读沙箱。
@@ -35,7 +36,7 @@ related: [judge-governance-cards-review]
 
 - `node --test "test/codex-adapter/judge-mode.test.ts" "test/codex-adapter/judge-governance.test.ts"` ⇒ **13/13 绿**（0 skip）。
 - `node --test "test/codex-adapter/**/*.test.ts"` ⇒ **68 计 / 66 过 / 1 红 / 1 skip**；唯一红＝`session.test.ts:351` Windows symlink `EPERM`（既有环境红，非本批）；skip＝POSIX-only 进程组清理用例（平台既有）。
-- `npx tsc --noEmit` ⇒ 全仓 **0 错**。
+- `npx tsc --noEmit` ⇒ 本角色文件 **0 错**；复跑时全仓 4 错均在 `test/测试/governance-e2e-auto/`（他域在飞，非本批文件）。
 - 全量 `node --test "test/**/*.test.ts"` ⇒ **2806 计 / 2784 过 / 19 红 / 3 skip**；19 红**均不在本批文件**：Windows symlink EPERM 环境红（codex/claude/pi 存储与 runtime-core tools、编排 shell-authorized-routine、测试 g4 渲染）、桌面应用 renderer/runtime-ui/markdown/dispatch-delivery 与 runtime-core shell-judge 文案等**他域在飞/预期红**；`test/codex-adapter/` 内仅上述既有 EPERM 一红。
 
 ## 未验边界与残余（如实登记）

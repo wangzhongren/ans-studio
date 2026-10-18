@@ -745,6 +745,29 @@ export function describeTool(name: string): ToolDescription {
       ],
     };
   }
+  if (name === "list_dir") {
+    // 普通角色只读目录列举（真机噪声修复）：只列一层、目录带 `/`、最多 200 项、敏感项不列名。
+    // 与 judge 的 `judge_list_dir` 口径同源但**工具名独立**；只读、不写盘、不执行。
+    return {
+      parameters: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Directory to list (project-relative, or an absolute path inside the project root; default = project root)" },
+        },
+        required: [],
+        additionalProperties: false,
+      },
+      description:
+        "**只读**列出项目内的目录（普通角色工具）：默认项目根，路径必须是**项目根之内**（相对或绝对），只列**一层**，" +
+        "目录名以 `/` 结尾，最多 200 项。`..`、项目根之外、指向根外的符号链接/junction 一律拒绝；" +
+        "`.env`/密钥/凭据类文件、`.git/`、审计/会话等敏感项**不会列出名字**。" +
+        "目标不存在会明确报错；目标不是目录时提示改用 read_file。**本工具不写盘、不执行命令、不改变任何权限**。",
+      promptGuidelines: [
+        "定位文件时先用 list_dir 看一层目录，再按需 read_file；**不要**对目录调用 read_file（会得到明确的改用提示）。",
+        "`.env`、密钥/凭据类文件与 `.git/` 等敏感项不会出现；不要尝试猜测或绕行这些名字。",
+      ],
+    };
+  }
   if (!["write_file", "edit_file", "read_file"].includes(name)) throw new Error(`未知 ANS 工具：${name}`);
   const parameters = {
     type: "object",

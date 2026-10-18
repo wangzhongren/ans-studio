@@ -28,7 +28,7 @@ test("G-2/R1+R2 能力位：三工具各自「注入才注册」（未注入⇒�
   assert.equal(describeTool("session_tail").executionMode, undefined);
 
   // 结构性保证（沿 run_shell / dispatch_task「注入才注册」先例）：缺省均不注册；各自注入才注册自己。
-  assert.deepEqual([...tools().keys()], ["write_file", "edit_file", "read_file"]);
+  assert.deepEqual([...tools().keys()], ["write_file", "edit_file", "read_file", "list_dir"]);
   const onlyStatus = tools({ roleStatus: () => ({ ok: true, text: "stub" }) });
   assert.equal(onlyStatus.has("role_status"), true);
   assert.equal(onlyStatus.has("session_tail"), false);

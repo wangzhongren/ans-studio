@@ -23,7 +23,7 @@ test("G-4 V2 能力位：两工具各自「注入才注册」（未注入⇒不�
   assert.equal(describeTool("uninstall_mcp").executionMode, undefined);
 
   // 结构性保证（沿 run_shell / dispatch_task「注入才注册」先例）：缺省均不注册；各自注入才注册自己。
-  assert.deepEqual([...tools().keys()], ["write_file", "edit_file", "read_file"]);
+  assert.deepEqual([...tools().keys()], ["write_file", "edit_file", "read_file", "list_dir"]);
   const onlyInstall = tools({ installMcp: async () => receipt() });
   assert.equal(onlyInstall.has("install_mcp"), true);
   assert.equal(onlyInstall.has("uninstall_mcp"), false);
@@ -32,9 +32,9 @@ test("G-4 V2 能力位：两工具各自「注入才注册」（未注入⇒不�
   assert.equal(onlyUninstall.has("uninstall_mcp"), true);
   assert.equal(onlyUninstall.has("install_mcp"), false);
   const both = tools({ installMcp: async () => receipt(), uninstallMcp: async () => receipt({ action: "uninstalled" }) });
-  assert.deepEqual([...both.keys()], ["write_file", "edit_file", "read_file", "install_mcp", "uninstall_mcp"]);
+  assert.deepEqual([...both.keys()], ["write_file", "edit_file", "read_file", "list_dir", "install_mcp", "uninstall_mcp"]);
   const allFour = tools({ installSkill: async () => ({ ok: false, reason: "r", message: "m" }), uninstallSkill: async () => ({ ok: false, reason: "r", message: "m" }), installMcp: async () => receipt(), uninstallMcp: async () => receipt({ action: "uninstalled" }) });
-  assert.deepEqual([...allFour.keys()], ["write_file", "edit_file", "read_file", "install_skill", "uninstall_skill", "install_mcp", "uninstall_mcp"]);
+  assert.deepEqual([...allFour.keys()], ["write_file", "edit_file", "read_file", "list_dir", "install_skill", "uninstall_skill", "install_mcp", "uninstall_mcp"]);
 });
 
 test("schema 文案（G-4 V2）：install_mcp 钉住仅客户明示时安装/不得自主发起/先落盘再激活/不写盘/门禁之外执行＝能力级授予（非逐调用受审）/不改变写边界/失败文案枚举（含 not-customer-turn）", () => {

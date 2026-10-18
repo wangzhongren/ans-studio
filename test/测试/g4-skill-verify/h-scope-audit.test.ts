@@ -187,7 +187,7 @@ test("范围④：工具面无删除原语；卸载链源码不含 unlink/rm/删
     uninstallSkill: async () => ({ ok: false, reason: "r", message: "m" }),
     customerInput: async () => ({ outcome: "declined" }),
   }).map((t) => t.name);
-  assert.deepEqual(names.sort(), ["edit_file", "install_skill", "read_file", "request_choice", "request_confirmation", "uninstall_skill", "write_file"].sort(), "工具面集合固定（无删除/无导出第三套）");
+  assert.deepEqual(names.sort(), ["edit_file", "install_skill", "list_dir", "read_file", "request_choice", "request_confirmation", "uninstall_skill", "write_file"].sort(), "工具面集合固定（运行核新增只读 list_dir；无删除/无导出第三套）");
   assert.equal(names.some((n) => /delete|remove|unlink|rm_/.test(n)), false, "不得注册任何删除类工具");
   const sess = read("app/desktop/session.ts");
   const start = sess.indexOf("private async applySkillChange");

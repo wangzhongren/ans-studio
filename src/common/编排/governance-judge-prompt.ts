@@ -88,6 +88,8 @@ export function buildGovernanceJudgeSystemPrompt(): string {
     "- schedule-write：docs/flows/<flowId>.md（允许 docs/workflow.md），flowId 与卡片一致。",
     "preview/detail 必须足以核对**内容**：新文件能看到正文或明确结构；改文件能看到改什么；",
     "只有「按提案写」「写入上述文件」⇒ manual。pathDecisions 必须恰好覆盖全部 paths 且全 ok:true。",
+    "**新文件（paths 中尚不存在的目标）不要求读取**（读取必然失败）；必须用 preview 核对正文/结构，",
+    "preview 为空或不足以核对内容 ⇒ manual。只有**已存在**的相关物证才在 requiredReadPaths 中。",
     "",
     "【输出契约】",
     "结论必须调用工具 report_governance_judgement 交回；在正文里写结论不算数。参数：",
@@ -189,11 +191,11 @@ export function buildGovernanceJudgePrompt(
 
   if (requiredReadPaths.length > 0) {
     lines.push("");
-    lines.push("approve 前必须实际读取以下路径（judge_read_file；缺一即 manual）：");
+    lines.push("approve 前必须实际读取以下路径（judge_read_file；缺一即 manual；只含已存在物证）：");
     for (const path of requiredReadPaths) lines.push(`- ${path}`);
   } else {
     lines.push("");
-    lines.push("（本次请求没有额外的必读物证路径。）");
+    lines.push("（本次请求没有额外的必读物证路径；新建目标文件不要求读取，须用 preview 核对正文。）");
   }
 
   if (request.turnText !== undefined && request.turnText.trim() !== "") {

@@ -1,5 +1,17 @@
 # 测试 变更记录
 
+## 2026-10-18 — 四角色治理全自动链路独立端到端验收：新增 26/26；全量 2938/2919/16/3（新增红 0）；typecheck 0
+
+**任务**：客户要求「不要让客户手测，把四角色全自动链路跑到绿」——用桩适配器/假模型跑真实桌面接口与真实项目目录，复现并验证 8 个真机失败场景。
+
+**新增套件**：`test/测试/governance-e2e-auto/`（`fixture.ts` + 9 个测试文件 **26 例**），全部离线。夹具要点：真实 trio 项目（`.ans/project.json` pin-backed acceptance + 治理边界文档）；跨多轮脚本化适配器（逐能力位透传 `buildGovernedTools`）；假判断会话解析真实 driver 提示词、先真实 `judge_read_file` 再交回结论；桌面台走真实 `createDesktopInterface`（真实 `listProject`/`openRoleSession`/客户通道/判断 driver/listing 刷新）。
+
+**逐场景**：① 首次新建提案 write 卡：双开关开 + 判断 allow ⇒ 0 卡、账本 `decisionEvidence.kind:"judge"`；空 preview ⇒ driver 回落手动。② 接受提案：先 Convener 写流程单，落盘后才派 Nominator；缺失则停住不循环。③ 任命后 executor 未写卡：先派 Nominator `appointment-write`，listing 刷新后才派 Convener；始终未写出则如实失败。④ `role_status`/`dispatch_task`：未任命/未写卡拒绝，写卡后受理；账本 app 与 convener 两类 `dispatch.accepted`。⑤ 双开关矩阵、accept-quick 不代批、single/su 不启用。⑥ 验收门槛四类 negative + positive。⑦ 判断超时默认 60s/env 覆盖/两组原卡回落。⑧ `list_dir` 可用、敏感项不列、越界拒绝、`read_file` 遇目录指路。另加**四角色全自动闭环**（Liaison→Rapporteur→Convener→Nominator→写卡→Convener→executor），0 手动卡、当前 pane 不切换、listing 刷新、账本可还原。
+
+**旧断言同步（未放宽）**：`g4-skill-verify/h-scope-audit` 固定工具面清单加入 `list_dir`（8 项）；`governance-judge-cards-verify` d/e 与 `governance-liaison-verify/d` 的 accept 下一步同步为现行两段式 Convener + `followUp:"nomination-after-flow"`（3 条旧契约红转绿）。
+
+**结果**：新增套件 **26/26**；judge-cards + liaison **77/77**；g4-skill **50/51**（1 条既有 Windows symlink EPERM）；全量 **2938 / 2919 pass / 16 fail / 3 skip**（基线 2896/2877/16/3：+42 tests、+42 pass、失败数不变；16 红全为既有环境/他角色在途）；`npm run typecheck` → **0 错**。**未发现实现缺陷**。详见[报告](docs/fix/2026-10-18_verify_governance-e2e-auto.md)。未 commit/push。
+
 ## 2026-10-18 — 双开关「替我审批/替我决策」+ 治理判断 agent 独立验证：本批 42/42；全量 2896/2877/16红/3skip（新增红 0）；typecheck 0
 
 **验证对象**：PM 评审 `2026-10-18_design_judge-governance-cards-review.md` §三–§九/§十二（AC1–AC26）已落地实现。

@@ -235,14 +235,14 @@ test("request_clarification：能力拒绝/抛错/契约外回执 fail-closed；
 
 test("未注入时不注册；注入各自独立；既有工具面不回归", () => {
   const base = tools();
-  assert.deepEqual([...base.keys()], ["write_file", "edit_file", "read_file"]);
+  assert.deepEqual([...base.keys()], ["write_file", "edit_file", "read_file", "list_dir"]);
   assert.equal(base.has(HAND_OFF_INTENT_TOOL_NAME), false);
   assert.equal(base.has(REQUEST_CLARIFICATION_TOOL_NAME), false);
 
   const handoffOnly = tools({ handOffIntent: () => ({ ok: true }) });
   assert.equal(handoffOnly.has(HAND_OFF_INTENT_TOOL_NAME), true);
   assert.equal(handoffOnly.has(REQUEST_CLARIFICATION_TOOL_NAME), false, "两能力各自独立、互不隐含");
-  assert.equal(handoffOnly.size, 4);
+  assert.equal(handoffOnly.size, 5);
 
   const clarifyOnly = tools({ requestClarification: () => ({ ok: true }) });
   assert.equal(clarifyOnly.has(REQUEST_CLARIFICATION_TOOL_NAME), true);
@@ -262,7 +262,7 @@ test("未注入时不注册；注入各自独立；既有工具面不回归", ()
     installMcp: async () => ({ ok: false, reason: "stub", message: "stub" }),
     uninstallMcp: async () => ({ ok: false, reason: "stub", message: "stub" }),
   });
-  assert.equal(all.size, 16, "既有全注入工具面必须保持 16 项（不回归）");
+  assert.equal(all.size, 17, "既有全注入工具面必须保持 17 项（含 list_dir；不回归）");
   assert.equal(all.has(HAND_OFF_INTENT_TOOL_NAME), false, "未注入交接能力时不得注册");
   assert.equal(all.has(REQUEST_CLARIFICATION_TOOL_NAME), false, "未注入澄清能力时不得注册");
 });

@@ -99,8 +99,12 @@ import { judgeResultSummary, type DesktopCustomerInputFn, type OperatorJudgeResu
 // 治理下一步（2026-10-18 客户修正）：客户决定成功后的**后台派发**。推导/文案纯逻辑在 governance-advance.ts；
 // 本层负责打开目标治理角色会话、投递**唯一一条**任务，并把成功/失败经既有 delivery-note 系统行如实落流。
 import {
+  buildAppointmentWriteReminderMessage,
   buildGovernanceAdvanceMessage,
   governanceAdvanceSuccessNote,
+  governanceAppointmentWriteNote,
+  governanceFlowPath,
+  governanceNominationFollowUpNote,
   type GovernanceAdvanceResult,
   type GovernanceNextStepContext,
   type GovernanceNextStepPayload,
@@ -555,10 +559,12 @@ export interface DesktopInterface {
    */
   sendSession(input: { text: string; images?: unknown; target?: SessionTarget; metadata?: SessionMessageMetadata }): Promise<SendResult>;
   /**
-   * **应用代客户推进治理流程（2026-10-18 客户修正）**：客户决定成功后（`governance:next-step` 回调），
-   * 在**后台**打开目标治理角色（Nominator/Convener）会话并投递**唯一一条**任务消息——
-   * `accept` → Nominator 提名；`accept-quick` / `appointment` → Convener 写流程单/派发。
-   * **不抢 `activeRoleId`、不切当前 pane、不自动批准/写盘、不写账本**；成功/失败都经既有
+   * **应用代客户推进治理流程（2026-10-18 客户修正；同日真机修正为四角色闭环）**：客户决定成功后
+   * （`governance:next-step` 回调），在**后台**打开目标治理角色（Nominator/Convener）会话并投递**唯一一条**任务——
+   * `proposal accept` → **先** Convener 写 `docs/flows/<flowId>.md`（步骤表，首步提名）；等 Convener 本轮真正
+   * 空闲后检查流程单：落盘 ⇒ 再派 Nominator（消息带流程路径），缺失/超时 ⇒ 系统行如实报错、**不循环**；
+   * `accept-quick`/`appointment` → Convener 写流程单/排程（既有逻辑）。
+   * **不抢 `activeRoleId`、不切当前 pane、不自动批准/写盘、不写客户决定**；成功/失败都经既有
    * `delivery-note` 系统行落在发起卡片的角色聊天流（失败如实、不重试循环）。
    * 仅由主进程 `governance:next-step` 回调调用——**不挂 IPC、不暴露给渲染侧**。
    */
@@ -1251,8 +1257,50 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         note(`自动推进失败：${error}`);
         return { ok: false, dispatched: false, targetRoleId, error };
       };
+      /** 两段式第一段已投递、但第二段无法继续（流程单缺失/角色未写出等）：如实报错、**不重试**。 */
+      const chainFail = (error: string, dispatchedTarget: "nominator" | "convener" = targetRoleId): GovernanceAdvanceResult => {
+        diagnostic.error("advance.chain.failed", new Error(error), { flowId: payload.flowId, cardKind: payload.cardKind, targetRoleId: dispatchedTarget });
+        note(`自动推进停住：${error}`);
+        return { ok: false, dispatched: true, targetRoleId: dispatchedTarget, error };
+      };
       if (projectRoot === undefined) return fail("缺少项目根，无法后台派发");
       if (runtime === undefined) return fail("缺少运行时，无法后台派发");
+      /** 后台开目标会话并投递一条任务；成功/失败都如实（不重试）。 */
+      const dispatchTo = async (
+        target: "nominator" | "convener",
+        text: string,
+      ): Promise<{ ok: true; queued?: boolean } | { ok: false; error: string }> => {
+        const label = target === "nominator" ? "Nominator" : "Convener";
+        const opened = await manager.openBackground({ projectRoot, roleId: target, runtime });
+        if (!opened.ok) return { ok: false, error: `无法开启 ${label} 会话：${opened.error ?? "未知原因"}` };
+        const sent = await manager.sendBackground({ projectRoot, roleId: target, runtime, text });
+        if (!sent.ok) return { ok: false, error: `发送任务给 ${label} 失败：${sent.error ?? "未知原因"}` };
+        return { ok: true, ...(sent.queued === true ? { queued: true } : {}) };
+      };
+      /** 投递成功后的应用动作审计（trio；失败只诊断、不翻转）。 */
+      const appendDispatchAccepted = async (ledgerTarget: "nominator" | "convener", text: string, ledgerStepId?: string): Promise<void> => {
+        const ledgerModel = listingCache.get(projectRoot)?.governanceModel ?? "single";
+        if (ledgerModel !== "trio") return;
+        if (!existsSync(projectRoot)) {
+          diagnostic.record("advance.ledger.skipped", { reason: "project-root-missing", targetRoleId: ledgerTarget });
+          return;
+        }
+        const appended = await appendGovernanceLedger(projectRoot, {
+          at: new Date().toISOString(),
+          kind: "dispatch.accepted",
+          ...(payload.flowId !== undefined ? { flowId: payload.flowId } : {}),
+          actorRoleId: "app",
+          power: "app",
+          trigger: "customer-decision",
+          targetRoleId: ledgerTarget,
+          ...(ledgerStepId !== undefined ? { stepId: ledgerStepId } : {}),
+          messageSummary: ledgerSummary(text),
+          runtime,
+        });
+        if (!appended.ok) {
+          diagnostic.error("advance.ledger.failed", new Error(appended.message), { flowId: payload.flowId, targetRoleId: ledgerTarget });
+        }
+      };
       // W6-B 真机阻塞修复（任命后的派发时序）：客户决定卡是在来源角色本轮**中途**作答的——Nominator
       // 可能还在写角色卡。先等来源本轮 settle（`waitForRoleSettle`：只等一次、有上限；无会话/不忙立即
       // 返回；超时或会话释放只记诊断后继续），再强制刷新 listing，然后才派发。**绝不循环重试**。
@@ -1264,6 +1312,58 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       if (!listingFresh) diagnostic.record("advance.listing-refresh.failed", { projectRoot });
       const message = buildGovernanceAdvanceMessage(payload, context.targetRoleIds);
       if (message === null) return fail("缺少流程信息（flowId/任命名单），未自动派发");
+      // —— 2026-10-18 真机修正：任命后先确认目标角色**真的写出来了** ——
+      // 账本已有 appointment 决定、但目标角色不在刷新后的 listing（角色卡/边界未写）时，直接派 Convener
+      // 只会让它反复报「未枚举」。此时先派 Nominator 用 appointment-write 逐路径写卡；它本轮结束后重查，
+      // 角色出现才派 Convener，仍未出现 ⇒ 系统行如实报错、**不循环**。
+      const appointmentTargets =
+        payload.cardKind === "appointment" && Array.isArray(context.targetRoleIds)
+          ? context.targetRoleIds.filter((id): id is string => typeof id === "string" && id.trim() !== "")
+          : [];
+      const roleExists = (roleId: string): boolean =>
+        listingCache.get(projectRoot)?.roles.some((role) => role.roleId === roleId) === true;
+      const missingAppointmentRoles =
+        payload.cardKind === "appointment" ? appointmentTargets.filter((roleId) => !roleExists(roleId)) : [];
+      if (payload.cardKind === "appointment" && payload.flowId !== undefined && missingAppointmentRoles.length > 0) {
+        const reminder = buildAppointmentWriteReminderMessage(payload.flowId, appointmentTargets);
+        const writeDispatch = await dispatchTo("nominator", reminder);
+        if (!writeDispatch.ok) return fail(writeDispatch.error);
+        note(governanceAppointmentWriteNote());
+        await appendDispatchAccepted("nominator", reminder);
+        diagnostic.record("advance.appointment.awaiting-roles", {
+          flowId: payload.flowId,
+          missing: missingAppointmentRoles,
+          queued: writeDispatch.queued === true,
+        });
+        const nominatorIdle = await manager.waitForRoleIdle(projectRoot, "nominator", runtime);
+        if (!nominatorIdle) {
+          return chainFail(
+            `Nominator 本轮未在时限内结束，角色（${missingAppointmentRoles.join("、")}）未确认；未派 Convener`,
+            "nominator",
+          );
+        }
+        await manager.refreshListingNow(projectRoot);
+        const stillMissing = appointmentTargets.filter((roleId) => !roleExists(roleId));
+        if (stillMissing.length > 0) {
+          return chainFail(`角色卡/边界仍未写出（${stillMissing.join("、")} 未枚举到）；未派 Convener`, "nominator");
+        }
+        const convenerDispatch = await dispatchTo("convener", message);
+        if (!convenerDispatch.ok) return chainFail(convenerDispatch.error, "nominator");
+        note(governanceAdvanceSuccessNote(payload));
+        await appendDispatchAccepted(
+          "convener",
+          message,
+          typeof context.stepId === "string" && context.stepId !== "" ? context.stepId : undefined,
+        );
+        diagnostic.record("advance.appointment.dispatched", { flowId: payload.flowId, targetRoleId: "convener" });
+        return {
+          ok: true,
+          dispatched: true,
+          targetRoleId: "nominator",
+          followUpRoleId: "convener",
+          ...(convenerDispatch.queued === true ? { queued: true } : {}),
+        };
+      }
       const opened = await manager.openBackground({ projectRoot, roleId: targetRoleId, runtime });
       if (!opened.ok) return fail(`无法开启 ${targetLabel} 会话：${opened.error ?? "未知原因"}`);
       const sent = await manager.sendBackground({ projectRoot, roleId: targetRoleId, runtime, text: message });
@@ -1286,30 +1386,67 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       // decisionEvidence**。仅 trio（single 旧项目不产生 `.ans/governance` 记录）；账本失败只记诊断，
       // 不翻转已完成的投递结果、不重试。`stepId` 不在 `governance:next-step` 契约里（payload 未携带），
       // 故不臆造。根不存在（测试/异常调用）时不创建目录：按账本失败处理（记诊断、结果不变）。
-      const ledgerModel = listingCache.get(projectRoot)?.governanceModel ?? "single";
-      if (ledgerModel === "trio") {
-        if (!existsSync(projectRoot)) {
-          diagnostic.record("advance.ledger.skipped", { reason: "project-root-missing", targetRoleId });
-        } else {
-          const appended = await appendGovernanceLedger(projectRoot, {
+      await appendDispatchAccepted(targetRoleId, message, stepId);
+      // —— 2026-10-18 真机修正：proposal accept 两段式闭环 ——
+      // 客户接受提案时 `docs/flows/<flowId>.md` 可能尚不存在（应由 Convener 先写）；直接派 Nominator
+      // 只会让它反复猜路径、大量读失败。第一段已派 Convener 写流程单；等它本轮真正空闲后检查流程单：
+      // 存在 ⇒ 再派 Nominator（任务消息带流程路径）；缺失/超时 ⇒ 系统行如实报错，**不循环重试**。
+      if (payload.followUp === "nomination-after-flow") {
+        const flowId = payload.flowId;
+        if (flowId === undefined) return chainFail("缺少流程信息（flowId），未派发提名任务");
+        const flowPath = governanceFlowPath(flowId);
+        const idle = await manager.waitForRoleIdle(projectRoot, targetRoleId, runtime);
+        diagnostic.record("advance.chain.convener-idle", { flowId, idle });
+        if (!idle) {
+          return chainFail(`Convener 本轮未在时限内结束，流程单 ${flowPath} 未确认；未派发提名任务`);
+        }
+        if (!existsSync(`${projectRoot}/${flowPath}`)) {
+          return chainFail(`Convener 未写出流程单 ${flowPath}；未派发提名任务`);
+        }
+        const nominationPayload: GovernanceNextStepPayload = {
+          version: 1,
+          flowId,
+          cardKind: "proposal",
+          nextFunction: "nomination",
+          roleId: "nominator",
+          ...(payload.proposalPath !== undefined ? { proposalPath: payload.proposalPath } : {}),
+        };
+        const nominationMessage = buildGovernanceAdvanceMessage(nominationPayload);
+        if (nominationMessage === null) return chainFail("缺少流程信息，未派发提名任务");
+        const openedNomination = await manager.openBackground({ projectRoot, roleId: "nominator", runtime });
+        if (!openedNomination.ok) {
+          return chainFail(`无法开启 Nominator 会话：${openedNomination.error ?? "未知原因"}`);
+        }
+        const sentNomination = await manager.sendBackground({ projectRoot, roleId: "nominator", runtime, text: nominationMessage });
+        if (!sentNomination.ok) {
+          return chainFail(`发送提名任务给 Nominator 失败：${sentNomination.error ?? "未知原因"}`);
+        }
+        note(governanceNominationFollowUpNote());
+        diagnostic.record("advance.chain.nomination-dispatched", { flowId, queued: sentNomination.queued === true });
+        // 第二段派发同样记 app 动作（无 stepId 可伪造；验收只读带 stepId 的 dispatch 步骤）。
+        if ((listingCache.get(projectRoot)?.governanceModel ?? "single") === "trio" && existsSync(projectRoot)) {
+          const appendedNomination = await appendGovernanceLedger(projectRoot, {
             at: new Date().toISOString(),
             kind: "dispatch.accepted",
-            ...(payload.flowId !== undefined ? { flowId: payload.flowId } : {}),
+            flowId,
             actorRoleId: "app",
             power: "app",
             trigger: "customer-decision",
-            targetRoleId,
-            ...(stepId !== undefined ? { stepId } : {}),
-            messageSummary: ledgerSummary(message),
+            targetRoleId: "nominator",
+            messageSummary: ledgerSummary(nominationMessage),
             runtime,
           });
-          if (!appended.ok) {
-            diagnostic.error("advance.ledger.failed", new Error(appended.message), {
-              flowId: payload.flowId,
-              targetRoleId,
-            });
+          if (!appendedNomination.ok) {
+            diagnostic.error("advance.ledger.failed", new Error(appendedNomination.message), { flowId, targetRoleId: "nominator" });
           }
         }
+        return {
+          ok: true,
+          dispatched: true,
+          targetRoleId,
+          followUpRoleId: "nominator",
+          ...(sentNomination.queued === true ? { queued: true } : {}),
+        };
       }
       return { ok: true, dispatched: true, targetRoleId, ...(sent.queued === true ? { queued: true } : {}) };
     },

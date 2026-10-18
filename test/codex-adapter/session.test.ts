@@ -375,9 +375,13 @@ test("native directory symlink rejected before engine, absent persistence create
 });
 
 test("all injected ANS capability callbacks keep receipts/turn metadata; denied customer and failed report stay failed", async () => {
+  const root = await temporary();
+  await mkdir(path.join(root, "sub"));
+  await writeFile(path.join(root, "hello.txt"), "fixture");
   const received: Array<Record<string, unknown>> = [];
   const engines = harness();
   const tools = buildGovernedTools(deny, {
+    readRoot: root,
     runtime: "codex", roleId: role.id, currentTurnId: () => "service-turn-fixed",
     customerInput: () => ({ outcome: "declined" }),
     reportHandback: (payload, metadata) => { received.push({ payload, metadata }); return { ok: false, message: "report rejected" }; },
@@ -387,16 +391,26 @@ test("all injected ANS capability callbacks keep receipts/turn metadata; denied 
   });
   const session = await createCodexRuntimeAdapter(options("/fixture", engines, { tools, currentTurnId: () => "service-turn-fixed" })).bindRole(role);
   const turn = await start(session, engines.engine);
-  assert.equal((await engines.engine.call("request_confirmation", { title: "decline fixture" })).success, false);
-  assert.equal((await engines.engine.call("request_choice", { title: "choose", options: [{ id: "one", label: "one" }] })).success, false);
-  assert.equal((await engines.engine.call("submit_report", { status: "completed", summary: "fixture report" })).success, false);
-  assert.equal((await engines.engine.call("dispatch_task", { roleId: "other", task: "fixture task" })).success, true);
-  assert.equal((await engines.engine.call("report_shell_verdict", { verdict: "allow" })).success, false);
-  for (const item of received) assert.deepEqual(item.metadata, { turnId: "service-turn-fixed", roleId: role.id, runtime: "codex" });
-  const specs = engines.engine.requests.find(request => request.method === "thread/start")!.params.dynamicTools as Array<{ name: string }>;
-  assert.equal(specs.length, 9);
-  assert.ok(specs.every(spec => spec.name.startsWith("ans_")));
-  engines.engine.finish(); await turn.completion; await session.dispose();
+  try {
+    assert.equal((await engines.engine.call("request_confirmation", { title: "decline fixture" })).success, false);
+    assert.equal((await engines.engine.call("request_choice", { title: "choose", options: [{ id: "one", label: "one" }] })).success, false);
+    assert.equal((await engines.engine.call("submit_report", { status: "completed", summary: "fixture report" })).success, false);
+    assert.equal((await engines.engine.call("dispatch_task", { roleId: "other", task: "fixture task" })).success, true);
+    assert.equal((await engines.engine.call("report_shell_verdict", { verdict: "allow" })).success, false);
+    for (const item of received) assert.deepEqual(item.metadata, { turnId: "service-turn-fixed", roleId: role.id, runtime: "codex" });
+    const specs = engines.engine.requests.find(request => request.method === "thread/start")!.params.dynamicTools as Array<{ name: string }>;
+    assert.equal(specs.length, 10);
+    assert.ok(specs.every(spec => spec.name.startsWith("ans_")));
+    assert.ok(specs.some(spec => spec.name === "ans_list_dir"), "普通角色工具面含只读 list_dir（运行时核心新增）");
+    // 注册即可执行：临时读取根下如实列出一层（目录带 `/`），不是「未注册工具」拒绝。
+    const listed = await engines.engine.call("list_dir", { path: "." });
+    assert.equal(listed.success, true);
+    assert.match(JSON.stringify(listed), /hello\.txt/);
+    assert.match(JSON.stringify(listed), /sub\//);
+  } finally {
+    engines.engine.finish(); await turn.completion.catch(() => {}); await session.dispose();
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test("call IDs differ across restarts; all shared credential values are scrubbed from model/tool outputs", async () => {

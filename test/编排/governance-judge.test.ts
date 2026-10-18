@@ -33,10 +33,15 @@ import type { AdapterCapabilities, RuntimeAdapterFactory } from "../../src/pipel
 import { openRoleSession } from "../../src/pipeline/orchestration/run-role.ts";
 import {
   createGovernanceJudge,
+  DEFAULT_GOVERNANCE_JUDGE_TIMEOUT_MS,
+  formatGovernanceJudgeTimeout,
   governanceJudgeAuditOf,
   GOVERNANCE_JUDGE_ROLE_ID,
   GOVERNANCE_JUDGE_SUPPORTED_RUNTIMES,
+  GOVERNANCE_JUDGE_TIMEOUT_ENV,
+  resolveGovernanceJudgeTimeoutMs,
 } from "../../src/common/编排/governance-judge.ts";
+import { DEFAULT_SHELL_JUDGE_TIMEOUT_MS } from "../../src/common/编排/shell-judge.ts";
 import {
   buildGovernanceJudgeFacts,
   parseRecommendedRoleIds,
@@ -584,6 +589,176 @@ test("write：pathProbes 越界 / 禁写 / pathDecisions 缺项 / 未确认 → 
   }
 });
 
+test("write：新建目标文件（无旧版物证）+ preview 正文 → approve，不要求读取新文件", async () => {
+  await withRoot(async (root) => {
+    const target = "docs/proposals/realtime-whiteboard.md";
+    const req = confirmRequest({
+      projectRoot: root,
+      paths: [target],
+      pathProbes: [{ path: target, allowed: true }],
+      artifacts: undefined,
+      card: {
+        kind: "confirm",
+        title: "新建提案",
+        preview: `写入 ${target}，正文：\n# 实时白板提案\n\ngoal: ...\nscope: ...\nacceptance: ...`,
+        cardKind: "write",
+        flowId: "flow-a",
+      },
+    });
+    const report = {
+      verdict: "approve",
+      reason: "新文件 preview 含完整正文，路径在报告员写区内。",
+      evidence: ["docs/proposals/realtime-whiteboard.md"],
+      confirmed: true,
+      pathDecisions: [{ path: target, ok: true }],
+    };
+    const { judge, seen } = makeJudge({ report });
+    const out = await judge(req);
+    assert.equal(out.verdict, "approve");
+    assert.deepEqual(out.value, { confirmed: true });
+    assert.ok(!(seen.prompts[0] ?? "").includes("approve 前必须实际读取"), "新文件不进入 required-read");
+  });
+});
+
+test("write：新建目标文件 preview 为空 → manual/insufficient-evidence", async () => {
+  await withRoot(async (root) => {
+    const target = "docs/proposals/realtime-whiteboard.md";
+    const req = confirmRequest({
+      projectRoot: root,
+      paths: [target],
+      pathProbes: [{ path: target, allowed: true }],
+      artifacts: undefined,
+      card: {
+        kind: "confirm",
+        title: "新建提案",
+        preview: "",
+        cardKind: "write",
+        flowId: "flow-a",
+      },
+    });
+    const { judge, seen } = makeJudge({
+      report: {
+        verdict: "approve",
+        reason: "ok",
+        evidence: ["preview"],
+        confirmed: true,
+        pathDecisions: [{ path: target, ok: true }],
+      },
+    });
+    const out = await judge(req);
+    assert.equal(out.verdict, "manual");
+    assert.equal(out.reasonCode, "insufficient-evidence");
+    assert.equal(seen.binds, 0, "空 preview 不调用模型");
+  });
+});
+
+test("write：已有旧版提案 → 必须读旧版；新目标文件本身不要求读", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, "docs/proposals/flow-a-v1.md");
+    const target = "docs/proposals/flow-a-v2.md";
+    const req = confirmRequest({
+      projectRoot: root,
+      paths: [target],
+      pathProbes: [{ path: target, allowed: true }],
+      artifacts: { proposalPath: "docs/proposals/flow-a-v1.md" },
+      card: {
+        kind: "confirm",
+        title: "写入提案 v2",
+        preview: `写入 ${target}，正文：修改验收条目。`,
+        cardKind: "write",
+        flowId: "flow-a",
+      },
+    });
+    const report = {
+      verdict: "approve",
+      reason: "v2 与 v1 一致，仅改验收条目。",
+      evidence: ["docs/proposals/flow-a-v1.md", target],
+      confirmed: true,
+      pathDecisions: [{ path: target, ok: true }],
+    };
+    {
+      const { judge } = makeJudge({ report });
+      const out = await judge(req);
+      assert.equal(out.verdict, "manual");
+      assert.equal(out.reasonCode, "artifact-not-read", "旧版物证必须实际读取");
+    }
+    {
+      const { judge } = makeJudge({ report: readThenReport(["docs/proposals/flow-a-v1.md"], report) });
+      const out = await judge(req);
+      assert.equal(out.verdict, "approve");
+    }
+  });
+});
+
+test("appointment-write / schedule-write：新文件 + preview 正文仍可代批（不回归）", async () => {
+  {
+    const { judge } = makeJudge({
+      report: readThenReport(["docs/nominations/flow-a-v1.md"], {
+        verdict: "approve",
+        reason: "候选与提案一致。",
+        evidence: ["docs/nominations/flow-a-v1.md"],
+        confirmed: true,
+        pathDecisions: [
+          { path: "角色卡/alpha/role-card.md", ok: true },
+          { path: "角色卡/alpha/boundary.yaml", ok: true },
+        ],
+      }),
+    });
+    const out = await judge(request({
+      group: "approval",
+      cardKind: "appointment-write",
+      roleId: "nominator",
+      card: {
+        kind: "confirm",
+        title: "写入角色卡",
+        preview: "创建 角色卡/alpha/role-card.md 与 boundary.yaml，正文……",
+        cardKind: "appointment-write",
+        flowId: "flow-a",
+      },
+      paths: ["角色卡/alpha/role-card.md", "角色卡/alpha/boundary.yaml"],
+      pathProbes: [
+        { path: "角色卡/alpha/role-card.md", allowed: true },
+        { path: "角色卡/alpha/boundary.yaml", allowed: true },
+      ],
+      allowedPathRoots: ["角色卡/"],
+      forbiddenPaths: [".ans/", "角色卡/governance-boundary.yaml", "角色卡/rapporteur/", "角色卡/su/"],
+      artifacts: { nominationPath: "docs/nominations/flow-a-v1.md" },
+      facts: facts({ appointmentTargetRoleIds: ["alpha"] }),
+    }));
+    assert.equal(out.verdict, "approve");
+  }
+  {
+    const flowPath = "docs/flows/flow-a.md";
+    const { judge } = makeJudge({
+      report: readThenReport(["docs/flows/flow-a.md"], {
+        verdict: "approve",
+        reason: "流程步骤与提案一致。",
+        evidence: ["docs/flows/flow-a.md"],
+        confirmed: true,
+        pathDecisions: [{ path: flowPath, ok: true }],
+      }),
+    });
+    const out = await judge(request({
+      group: "approval",
+      cardKind: "schedule-write",
+      roleId: "convener",
+      card: {
+        kind: "confirm",
+        title: "写入新流程单",
+        preview: `新建 ${flowPath}，包含步骤 s1/s2。`,
+        cardKind: "schedule-write",
+        flowId: "flow-a",
+      },
+      paths: [flowPath],
+      pathProbes: [{ path: flowPath, allowed: true }],
+      allowedPathRoots: ["docs/flows/", "docs/workflow.md", "docs/governance/convener/"],
+      forbiddenPaths: [".ans/", "角色卡/", "docs/proposals/", "docs/nominations/"],
+      artifacts: { flowPath: "docs/flows/flow-a.md" },
+    }));
+    assert.equal(out.verdict, "approve");
+  }
+});
+
 test("appointment-write：目标必须在最新任命名单且非内置 → approve；否则 manual", async () => {
   const appointmentWrite = (target: string, factsOver: Partial<GovernanceJudgeFacts>): GovernanceJudgeRequest => request({
     group: "approval",
@@ -698,6 +873,7 @@ test("超时/中止/busy：全部 manual，不外抛", async () => {
     const out = await judge(request({ artifacts: { proposalPath: "docs/proposals/flow-a-v1.md" } }));
     assert.equal(out.verdict, "manual");
     assert.equal(out.reasonCode, "timeout");
+    assert.match(out.reason ?? "", /判断超时（>30ms）/);
   }
   {
     const controller = new AbortController();
@@ -718,6 +894,36 @@ test("超时/中止/busy：全部 manual，不外抛", async () => {
     assert.equal(second.reasonCode, "unavailable");
     seen.release?.();
     await first;
+  }
+});
+
+test("超时配置：治理默认 60s、环境变量覆盖、非法回退；shell 仍 15s", async () => {
+  assert.equal(DEFAULT_GOVERNANCE_JUDGE_TIMEOUT_MS, 60_000);
+  assert.equal(resolveGovernanceJudgeTimeoutMs(undefined, {}), 60_000);
+  assert.equal(resolveGovernanceJudgeTimeoutMs(undefined, { [GOVERNANCE_JUDGE_TIMEOUT_ENV]: "1234" }), 1234);
+  for (const bad of ["", "0", "-1", "1.5", "abc", "9007199254740993"]) {
+    assert.equal(
+      resolveGovernanceJudgeTimeoutMs(undefined, { [GOVERNANCE_JUDGE_TIMEOUT_ENV]: bad }),
+      60_000,
+      `非法环境值 ${JSON.stringify(bad)} 应回默认`,
+    );
+  }
+  assert.equal(resolveGovernanceJudgeTimeoutMs(25, { [GOVERNANCE_JUDGE_TIMEOUT_ENV]: "1234" }), 25, "显式选项优先");
+  assert.equal(formatGovernanceJudgeTimeout(60_000), "60s");
+  assert.equal(formatGovernanceJudgeTimeout(30), "30ms");
+  assert.equal(DEFAULT_SHELL_JUDGE_TIMEOUT_MS, 15_000, "shell judge 默认不变");
+
+  const previous = process.env[GOVERNANCE_JUDGE_TIMEOUT_ENV];
+  process.env[GOVERNANCE_JUDGE_TIMEOUT_ENV] = "40";
+  try {
+    const { factory } = fakeFactory({ settle: false });
+    const judge = createGovernanceJudge({ project: PROJECT, runtime: "claude", createAdapter: factory });
+    const out = await judge(request({ artifacts: { proposalPath: "docs/proposals/flow-a-v1.md" } }));
+    assert.equal(out.reasonCode, "timeout");
+    assert.match(out.reason ?? "", /判断超时（>40ms）/);
+  } finally {
+    if (previous === undefined) delete process.env[GOVERNANCE_JUDGE_TIMEOUT_ENV];
+    else process.env[GOVERNANCE_JUDGE_TIMEOUT_ENV] = previous;
   }
 });
 

@@ -1,5 +1,17 @@
 # 运行时核心变更记录
 
+## 2026-10-18 普通角色只读目录工具 `list_dir`（真机噪声修复，已实施待验证）
+
+真机反馈：普通角色没有列目录工具，定位流程单/角色卡时只能反复猜文件名，产生大量 `read_file` 的 `ENOENT`/`EISDIR`。按协调者派发新增只读 `list_dir`：
+
+①新建 `src/common/runtime-core/list-dir.ts::resolveProjectList({projectRoot,path?})`：项目相对路径或项目根内绝对路径；缺省/空串＝项目根；只列**一层**；目录名以 `/` 结尾；最多 200 项（超出截断并标记）。路径必须解析到项目根内（realpath＋前缀比较，win32 大小写不敏感）；拒绝 NUL、`..` 段、win32 盘符相对/ADS、根外绝对路径、符号链接/junction 逃逸；不存在 ⇒ `not-found`；目标是文件 ⇒ `not-a-directory`（提示改用 `read_file`）；目标本身是敏感/应用私有目录（`.git`、`.ans`、`docs/audit` 等）⇒ 拒绝。目录项复用 judge 的 `sensitiveClass`：`.env*`、密钥/证书、凭据/令牌、`.git/`、`docs/audit/`、`.ans/**` 等敏感名**不列出**；**不占** judge 读取预算。
+
+②`src/provider/runtime/tools.ts`：新增 `LIST_DIR_TOOL_NAME = "list_dir"` 与 `makeListDirTool(readRoot)`；`buildGovernedTools` **默认注册**（普通角色会话无需注入能力即获得；judge 会话走各自工具集、不装配该工具）；工具只读、不过写门禁、不写盘、不执行，中止信号 ⇒ 未执行。`read_file` 命中 `EISDIR` 时明确提示「改用 list_dir」（其余错误文案/行为不变）。
+
+③`src/provider/runtime/schema.ts`：`list_dir` 严格 schema（`path` 可选字符串、`additionalProperties:false`）与描述/guidelines（只读、一层、敏感项不列名、目录用 list_dir）。
+
+**测试**：新增 `test/runtime-core/list-dir-tool.test.ts` 6 例（默认注册与 schema、列目录/一层/目录带 `/`、敏感项不列名与敏感目录拒绝、`..`/根外绝对路径/junction 逃逸/不存在/非目录、200 项截断、中止不执行）；本角色既有精确工具面断言同步为含 `list_dir`（3→4 项；全注入 16→17）。`node --test "test/runtime-core/**/*.test.ts"`：**190 计 / 187 过 / 3 红**（3 红均为既有 Windows `symlink EPERM`：session-store ×2、tools ×1，无新增红）。`npx tsc --noEmit`：**0 错**。全量三层 glob `node --test --test-force-exit "test/**/*.test.ts"`：**2912 计 / 2888 过 / 21 红 / 3 跳过**——21 红归属：9 条 Windows `symlink EPERM` 环境红、6 条桌面 renderer/runtime-ui/vendor 哈希既有钉、1 条 runtime-core shell abort 并发时序（单独复跑通过）、**3 条在飞治理双开关验证**（`test/测试/governance-judge-cards-verify` ×2、`governance-liaison-verify` ×1；下一步/派发断言，属其他角色在飞面）、**2 条 list_dir 预期红**（`test/codex-adapter/session.test.ts` 动态工具数 9→10、`test/测试/g4-skill-verify/h-scope-audit.test.ts` 工具面固定清单未含 `list_dir`；均属适配器/测试角色目录，本角色不越界，需其属主同步）。附加说明：全量必须加 `--test-force-exit`——`test/codex-adapter/session.test.ts` 在当前工作树（P3c 在飞改动）测试完成后仍有未释放句柄，普通 `node --test` 会在该文件处挂起；与本批改动无关。未跑真实模型/凭据/网络；未 git 提交。
+
 ## 2026-10-18 「替我审批」/「替我决策」治理卡判断 P1：中立契约＋只读工具＋互斥装配（已实施待验证）
 
 按 PM 评审《[「替我审批」/「替我决策」双开关——项目管理评审与 V1 拆发](../项目管理/docs/design/2026-10-18_design_judge-governance-cards-review.md)》§三/§五/§六实施运行时核心 P1：

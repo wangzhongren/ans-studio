@@ -1,6 +1,7 @@
 // Shared ANS tool execution. Owner: 运行时核心. SDK adapters receive handlers by injection.
 import { coreToolTarget } from "../../common/runtime-core/tool-display.ts";
 import { createEventQueue } from "../../common/runtime-core/event-queue.ts";
+import { resolveProjectList } from "../../common/runtime-core/list-dir.ts";
 import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { isAbsolute, resolve } from "node:path";
@@ -383,9 +384,50 @@ function makeReadTool(readRoot: string): ExecutableTool {
         const content = await readFile(absolute, "utf8");
         return { ok: true, message: `read_file: ${path}\n\n${content}` };
       } catch (err) {
+        const code = (err as NodeJS.ErrnoException | undefined)?.code;
+        // 真机噪声修复：目录不能用 read_file 读——明确指路 list_dir，避免继续猜文件名。
+        if (code === "EISDIR") {
+          return { ok: false, message: `read_file 失败：${path} 是目录——请改用 list_dir 列出目录后再读文件` };
+        }
         const reason = err instanceof Error ? err.message : String(err);
         return { ok: false, message: `read_file 失败：${path}（${reason}）` };
       }
+    },
+  };
+}
+
+/** 普通角色只读目录工具名（与 judge 的 `judge_list_dir` 名字独立）。 */
+export const LIST_DIR_TOOL_NAME = "list_dir";
+
+const LIST_DIR_ERROR_TEXT: Record<string, string> = {
+  "invalid-path": "路径非法（已拒绝）",
+  "outside-root": "路径在项目根之外（已拒绝）",
+  sensitive: "该路径属于敏感文件/目录（已拒绝）",
+  "not-found": "路径不存在或不可访问",
+  "not-a-directory": "目标不是目录（读取文件请用 read_file）",
+  "read-failed": "目录读取失败",
+};
+
+/**
+ * 构造只读目录列举工具（list_dir）：项目根内、只列一层、目录名以 `/` 结尾、最多 200 项，
+ * `.env`/密钥/凭据类文件与 `.git/` 等敏感项**不列名**；不写盘、不执行、不过写门禁。
+ */
+function makeListDirTool(projectRoot: string): ExecutableTool {
+  return {
+    name: LIST_DIR_TOOL_NAME,
+    async handler(call) {
+      if (call.signal?.aborted) return { ok: false, message: "list_dir：本轮已中止，未执行" };
+      const raw = call.args?.path;
+      if (raw !== undefined && typeof raw !== "string") {
+        return { ok: false, message: "list_dir: path 必须是字符串" };
+      }
+      const result = await resolveProjectList({ projectRoot, ...(raw !== undefined ? { path: raw } : {}) });
+      if (!result.ok) {
+        const text = LIST_DIR_ERROR_TEXT[result.code] ?? "目录列举失败";
+        return { ok: false, message: `list_dir：${text}。不要据此假设目录内容。` };
+      }
+      const body = result.entries.length > 0 ? result.entries.join("\n") : "（空目录或无可列条目）";
+      return { ok: true, message: `list_dir: ${result.rel}\n\n${body}${result.truncated ? "\n\n[已截断：条目超过上限]" : ""}` };
     },
   };
 }
@@ -1849,7 +1891,7 @@ function makeUninstallMcpTool(fn: UninstallMcpFn, currentTurnId?: () => string |
 /**
  * 构造受治理工具集：
  * - 写入类 write_file / edit_file（先 gate，获准且配置了 writeRoot 时落盘）；
- * - 读取类 read_file（不过 gate）；
+ * - 读取类 read_file + 只读目录列举 list_dir（均不过 gate）；
  * - 命令级 run_shell——**仅当注入了 `shellGate` 时才注册**（§7.5.1 的结构性 fail-closed）。
  * gate / shellGate 均由调用方（Pipeline/编排）注入并绑定各自的判定源。
  */
@@ -1860,6 +1902,7 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
     makeWriteFileTool(gate, writeRoot),
     makeEditFileTool(gate, writeRoot),
     makeReadTool(readRoot),
+    makeListDirTool(readRoot),
   ];
 
   // 结构性保证（设计 §7.5.1）：**未注入 ShellGate 时 run_shell 根本不存在**。

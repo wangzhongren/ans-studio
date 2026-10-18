@@ -23,7 +23,7 @@ test("G-4/I1+I2 能力位：两工具各自「注入才注册」（未注入⇒�
   assert.equal(describeTool("uninstall_skill").executionMode, undefined);
 
   // 结构性保证（沿 run_shell / dispatch_task「注入才注册」先例）：缺省均不注册；各自注入才注册自己。
-  assert.deepEqual([...tools().keys()], ["write_file", "edit_file", "read_file"]);
+  assert.deepEqual([...tools().keys()], ["write_file", "edit_file", "read_file", "list_dir"]);
   const onlyInstall = tools({ installSkill: async () => receipt() });
   assert.equal(onlyInstall.has("install_skill"), true);
   assert.equal(onlyInstall.has("uninstall_skill"), false);
@@ -31,7 +31,7 @@ test("G-4/I1+I2 能力位：两工具各自「注入才注册」（未注入⇒�
   assert.equal(onlyUninstall.has("uninstall_skill"), true);
   assert.equal(onlyUninstall.has("install_skill"), false);
   const both = tools({ installSkill: async () => receipt(), uninstallSkill: async () => receipt({ action: "uninstalled" }) });
-  assert.deepEqual([...both.keys()], ["write_file", "edit_file", "read_file", "install_skill", "uninstall_skill"]);
+  assert.deepEqual([...both.keys()], ["write_file", "edit_file", "read_file", "list_dir", "install_skill", "uninstall_skill"]);
 });
 
 test("schema 文案（G-4/I1）：install_skill 钉住仅客户明示时安装/不得自主发起/先落盘再激活/不写盘/不改变写边界/失败文案枚举（含 not-customer-turn）", () => {

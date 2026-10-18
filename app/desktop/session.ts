@@ -1221,6 +1221,49 @@ export class SessionManager {
   }
 
   /**
+   * **等待角色真正空闲**（链式治理推进用，2026-10-18 真机修正）：`busy !== true` **且**该角色的投递队列为空。
+   *
+   * 与 `waitForRoleSettle` 的差别：后者只等「下一轮 settle」——若目标在收到任务前正忙、任务经既有投递机
+   * 排队，第一次 settle 只结束**上一轮**，本次任务尚未跑完。链式检查「Convener 是否写出了流程单」必须等
+   * 本次任务真正结束。**只等待、不重投、不重试**；超时或会话释放 ⇒ false（调用方如实报错、不循环）。
+   */
+  waitForRoleIdle(
+    projectRoot: string,
+    roleId: string,
+    runtime: RuntimeKind,
+    timeoutMs = 60_000,
+  ): Promise<boolean> {
+    const key = this.sessionKey(projectRoot, roleId, runtime);
+    const queueKey = this.queueKey(projectRoot, roleId, runtime);
+    const deadline = Date.now() + Math.max(1, timeoutMs);
+    return new Promise<boolean>((resolve) => {
+      let done = false;
+      const finish = (idle: boolean): void => {
+        if (done) return;
+        done = true;
+        clearInterval(timer);
+        resolve(idle);
+      };
+      const check = (): void => {
+        const entry = this.sessions.get(key);
+        if (!entry) {
+          finish(false); // 会话被释放：没有可等待的轮次，如实失败。
+          return;
+        }
+        const queue = this.deliveryQueues.get(queueKey);
+        const idle = entry.busy !== true && (queue === undefined || queue.length === 0);
+        if (idle) {
+          finish(true);
+          return;
+        }
+        if (Date.now() >= deadline) finish(false);
+      };
+      const timer = setInterval(check, 50);
+      check();
+    });
+  }
+
+  /**
    * **意图交接的投递端**（W6-B，四角色评审 §5.3；`hand_off_intent` 注入 Liaison 时绑定到本方法）。
    *
    * 编排（`run-role.ts`）已完成：意图文件权威校验、slug/四要素、去重、`initial` 一次性、每轮一次、

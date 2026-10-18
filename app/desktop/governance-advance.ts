@@ -9,6 +9,12 @@
 //   1. `deriveGovernanceNextStep`：按 `cardKind` + 客户实际选择推导下一步（nomination / schedule / 无）；
 //   2. `buildGovernanceAdvanceMessage`：按推导结果生成**唯一一条**任务消息（客户给定文案）。
 //
+// 2026-10-18 真机修正（四角色闭环）：`proposal` 被**接受**时不再直接派 Nominator——此时
+// `docs/flows/<flowId>.md` 还不存在（应由 Convener 先写），直接派只会让它反复猜路径、大量读失败。
+// 现改为两段式：先派 Convener 写流程单（步骤表，首步提名；`followUp:"nomination-after-flow"`），
+// 应用在 Convener 本轮真正空闲后检查流程单是否落盘；落盘 ⇒ 再派 Nominator（消息带流程路径），
+// 缺失/超时 ⇒ 系统行如实报错、**不循环重试**。`accept-quick`/`appointment` 仍单段派 Convener。
+//
 // 纪律（沿 customer-input.ts 的同一套）：
 //  - 只认 `CustomerInputOutcome` 里**客户实际作出**的决定，不采信角色自述；取消/拒绝/expired 不推导；
 //  - `nextFunction=null` = 明确「没有下一步」（验收收口 / 普通写盘 / 修订 / 拒绝）——由调用方如实呈现，
@@ -42,6 +48,17 @@ export interface GovernanceNextStepPayload {
   nextFunction: GovernanceNextFunction | null;
   roleId: GovernanceNextRoleId | null;
   proposalPath?: string;
+  /**
+   * **两段式闭环标记（2026-10-18 真机修正）**：`proposal` 被**接受**时先由 Convener 写
+   * `docs/flows/<flowId>.md`（步骤表，首步提名）；流程单落盘后应用再派 Nominator。
+   * `accept-quick`/`appointment` 没有本字段（直接由 Convener 排程）。
+   */
+  followUp?: "nomination-after-flow";
+}
+
+/** 治理流程单的项目相对路径（唯一写法；Convener 写、应用检查、Nominator 任务引用均用它）。 */
+export function governanceFlowPath(flowId: string): string {
+  return `docs/flows/${flowId}.md`;
 }
 
 /**
@@ -68,6 +85,8 @@ export interface GovernanceAdvanceResult {
   /** 是否真的投递了任务（`nextFunction=null` 时为 false——无需派发）。 */
   dispatched: boolean;
   targetRoleId?: GovernanceNextRoleId;
+  /** `proposal accept` 两段式：第二段真正派发到的目标（流程单落盘后才会有）。 */
+  followUpRoleId?: GovernanceNextRoleId;
   /** 目标角色忙时经既有投递机入队（`send` 的同一语义）。 */
   queued?: boolean;
   error?: string;
@@ -144,11 +163,13 @@ export function buildIntentHandoffMessage(payload: HandOffIntentPayload): string
 }
 
 /**
- * 按「卡片种类 + 客户实际选择」推导下一步（客户已定契约的推导表）：
- * - `proposal` + `accept`       → nomination / nominator；
- * - `proposal` + `accept-quick` → schedule / convener；
+ * 按「卡片种类 + 客户实际选择」推导下一步（客户已定契约的推导表；2026-10-18 真机修正后）：
+ * - `proposal` + `accept`       → schedule / convener，`followUp:"nomination-after-flow"`：
+ *                                 **先**由 Convener 写 `docs/flows/<flowId>.md`（步骤表，首步提名），
+ *                                 流程单落盘后应用再派 Nominator（**不再直接派 Nominator**）；
+ * - `proposal` + `accept-quick` → schedule / convener（写流程单并排步骤，无提名）；
  * - `proposal` + `revise|reject`→ null（无下一步，等客户改稿或放弃）；
- * - `appointment`（任命成功）    → schedule / convener；
+ * - `appointment`（任命成功）    → schedule / convener（排程，既有逻辑不变）；
  * - `acceptance`（验收成功）     → null（流程收口）；
  * - `write`/`appointment-write`/`schedule-write` → null（写盘确认不解锁任何下一步）；
  * - 未答（declined/unavailable/取消/expired）或卡上无 `cardKind` → 不产生事件（返回 null）。
@@ -165,11 +186,14 @@ export function deriveGovernanceNextStep(
   const selected = answeredSelected(outcome);
   let nextFunction: GovernanceNextFunction | null = null;
   let roleId: GovernanceNextRoleId | null = null;
+  let followUp: GovernanceNextStepPayload["followUp"];
   switch (cardKind) {
     case "proposal": {
       if (selected.includes("accept")) {
-        nextFunction = "nomination";
-        roleId = "nominator";
+        // 真机闭环：流程单不存在时不能直接派 Nominator（否则只能反复猜路径、大量读失败）。
+        nextFunction = "schedule";
+        roleId = "convener";
+        followUp = "nomination-after-flow";
       } else if (selected.includes("accept-quick")) {
         nextFunction = "schedule";
         roleId = "convener";
@@ -191,6 +215,7 @@ export function deriveGovernanceNextStep(
       return null; // 未知种类：不猜、不发假事件。
   }
   const payload: GovernanceNextStepPayload = { version: 1, cardKind, nextFunction, roleId };
+  if (followUp !== undefined) payload.followUp = followUp;
   if (nonEmptyString(request.flowId)) payload.flowId = request.flowId;
   const proposalPath = readProposalPath(request, selected);
   if (proposalPath !== undefined) payload.proposalPath = proposalPath;
@@ -207,17 +232,32 @@ export function buildGovernanceAdvanceMessage(
 ): string | null {
   if (!nonEmptyString(payload.flowId)) return null;
   const flowId = payload.flowId;
+  const flowPath = governanceFlowPath(flowId);
   if (payload.cardKind === "proposal" && payload.nextFunction === "nomination" && payload.roleId === "nominator") {
     const proposalPath = payload.proposalPath ?? `docs/proposals/${flowId}-v1.md`;
     return (
+      `流程 ${flowId}：客户已接受提案 ${proposalPath}；流程单已落盘于 ${flowPath}。` +
+      `请执行提名：按流程单的首个提名步骤，读取提案与流程单，给出候选角色与理由，并通过任命卡请客户确认；不要自行任命或写角色卡。`
+    );
+  }
+  if (
+    payload.cardKind === "proposal" &&
+    payload.nextFunction === "schedule" &&
+    payload.roleId === "convener" &&
+    payload.followUp === "nomination-after-flow"
+  ) {
+    // accept 两段式第一段：先写流程单；Nominator 由应用在流程单落盘后派发。
+    const proposalPath = payload.proposalPath ?? `docs/proposals/${flowId}-v1.md`;
+    return (
       `流程 ${flowId}：客户已接受提案 ${proposalPath}。` +
-      `请执行提名：读取提案与流程单，给出候选角色与理由，并通过任命卡请客户确认；不要自行任命或写角色卡。`
+      `请先写流程单 ${flowPath}（步骤表；首个步骤为提名：由 Nominator 读取提案并给出候选角色）。` +
+      `写完后本轮即可结束；提名任务会在流程单落盘后由应用派给 Nominator。不要把步骤说成已派发。`
     );
   }
   if (payload.cardKind === "proposal" && payload.nextFunction === "schedule" && payload.roleId === "convener") {
     return (
       `流程 ${flowId}：客户已接受提案（快捷路径）。` +
-      `请写流程单并排步骤；涉及新建/改边界仍须任命卡与写盘确认。`
+      `请写流程单 ${flowPath} 并排步骤（无提名）；涉及新建/改边界仍须任命卡与写盘确认。`
     );
   }
   if (payload.cardKind === "appointment" && payload.nextFunction === "schedule" && payload.roleId === "convener") {
@@ -233,4 +273,27 @@ export function governanceAdvanceSuccessNote(payload: GovernanceNextStepPayload)
   return payload.nextFunction === "nomination"
     ? "已派发提名任务给 Nominator（工作中）"
     : "已派发流程任务给 Convener（工作中）";
+}
+
+/** accept 两段式第二段的系统行：流程单已落盘、Nominator 已派。 */
+export function governanceNominationFollowUpNote(): string {
+  return "流程单已落盘，已派发提名任务给 Nominator（工作中）";
+}
+
+/**
+ * **任命后角色尚未写出**时的补救任务（2026-10-18 真机修正）：账本已有 `appointment` 决定，但目标角色
+ * 不在刷新后的 listing（角色卡/边界未写）。此时**不能**派 Convener（它只会反复报「未枚举」）；改派
+ * Nominator 用 appointment-write 逐路径写卡，写完后本轮结束；应用随后再检查角色是否出现。
+ */
+export function buildAppointmentWriteReminderMessage(flowId: string, targetRoleIds: readonly string[]): string {
+  const ids = targetRoleIds.filter((id): id is string => nonEmptyString(id));
+  return (
+    `流程 ${flowId}：客户已完成任命 ${ids.join("、")}，但角色卡/边界尚未写出（项目中尚未枚举到这些角色）。` +
+    `请用 appointment-write 确认卡逐路径完成写卡与边界写入；写完后本轮结束，不要自行任命、不要派发。`
+  );
+}
+
+/** 任命后先派写卡任务的系统行。 */
+export function governanceAppointmentWriteNote(): string {
+  return "已派发写卡任务给 Nominator（工作中）";
 }

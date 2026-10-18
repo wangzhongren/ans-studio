@@ -122,8 +122,9 @@ test("proposal 代批：0 卡、1 行、账本 kind=judge（group/cardKind/engin
 
     assert.equal(h.presented.length, 0, "代批成功必须 0 卡");
     assert.equal(h.rows.length, 1, "代批成功必须恰 1 行结果");
-    assert.equal(h.nextSteps.length, 1, "onNextStep 恰一次（派发 Nominator）");
-    assert.equal((h.nextSteps[0]!.payload as { roleId?: string }).roleId, "nominator");
+    assert.equal(h.nextSteps.length, 1, "onNextStep 恰一次（先派 Convener 写流程单）");
+    assert.equal((h.nextSteps[0]!.payload as { roleId?: string }).roleId, "convener");
+    assert.equal((h.nextSteps[0]!.payload as { followUp?: string }).followUp, "nomination-after-flow");
 
     // 工具回执口径（AC25）：不得说成客户本人点击。
     const receipt = capture.results.find((result) => result.name === "request_choice");

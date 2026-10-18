@@ -37,14 +37,16 @@
 7. appointment `selected` 恰等于 `recommendedRoleIds`（无重复、⊆ 选项、非内置、多选一致性）。
 8. 模型自报 `reasonCode` 仅安全名单透传，其余 `model-manual`。
 9. **acceptance 流程完成度（P6 验收观察）**：提示前读流程单 + 账本——所有步骤 `done`、每步都有 `dispatch.accepted`、无 `unclassified`/`none` 未结算决定、无未闭环澄清、账本可读；任一不满足直接 `manual`，不调用模型、不靠模型自报。
-10. 双开关后 shell 出路句统一为 `如需执行，请关闭「替我审批」后重试。`（不再写「替我审」）。
+10. **write 新文件（P6 真机缺陷）**：`write` 卡 artifacts/required-read 只收**已存在**的相关物证；新建目标不进入 required-read（读必失败），改由 `preview` 正文核对；`preview` 为空 ⇒ `manual/insufficient-evidence`。`appointment-write`/`schedule-write` 的 nomination/flow 要求不变。
+11. 双开关后 shell 出路句统一为 `如需执行，请关闭「替我审批」后重试。`（不再写「替我审」）。
+12. **治理 judge 超时（P6 真机修复）**：默认 `60_000ms`；`ANS_GOVERNANCE_JUDGE_TIMEOUT_MS`（正整数，非法回默认）覆盖；计时只从模型判断开始（不含排队/等卡），文案带时长（如「判断超时（>60s）」）；shell judge 保持 15s。测试：judge **33/33**、`test/编排` **507 计/506 过**（symlink 环境红）、typecheck 0；全量在并行他域改动期间挂起未取得完成快照（此前完成快照 2900/16 红均他域/环境）。
 
 ## 三、证据
 
-- 新增 `test/编排/governance-judge.test.ts` **28/28**。
-- 相关既有套件 **74/74**。
+- 新增 `test/编排/governance-judge.test.ts` **32/32**。
+- 相关既有套件 **74/74**；P6 验收套件 **42/42**。
 - `npm run typecheck`：**0 错**。
-- 全量三层 glob `node --test "test/**/*.test.ts"`：**2895 计 / 2874 过 / 18 红 / 3 skipped**。18 红逐条归因均为他域/环境既有：9 条 Windows symlink EPERM、5 条桌面 renderer 既有红（`test/桌面应用/`，文件未动）、vendor markdown-it pin 1 条、`test/runtime-core/tools.test.ts` abort shell 1 条（单跑通过，全量负载下时序 flake）、`test/测试/shell-judge-verify/b-deny-flow` 2 条（本次统一「替我审批」文案后的预期红，待测试角色同步）。本批零新增非预期红。
+- 全量三层 glob `node --test "test/**/*.test.ts"`：**2900 计 / 2881 过 / 16 红 / 3 skipped**。16 红逐条归因均为他域/环境既有：9 条 Windows symlink EPERM、5 条桌面 renderer 既有红（`test/桌面应用/`，文件未动）、vendor markdown-it pin 1 条、`test/runtime-core/tools.test.ts` abort shell 1 条（单跑通过，全量负载下时序 flake）。本批零新增红。
 
 ## 四、偏离/未做（如实登记）
 

@@ -54,8 +54,31 @@ import { redactJudgeText } from "./shell-judge-verdict.ts";
 
 /** 判断 agent 的合成角色 id（不落项目、不出现在角色列表、不写聊天）。 */
 export const GOVERNANCE_JUDGE_ROLE_ID = "governance-judge";
-/** 默认判断硬超时（评审 §7.1：15s）。 */
-export const DEFAULT_GOVERNANCE_JUDGE_TIMEOUT_MS = 15_000;
+/**
+ * 判断硬超时（2026-10-18 真机修复）：治理判断要读提案/契约/账本/流程，15s 过短；
+ * 默认 **60s**（shell judge 仍为 15s，互不影响）。可用环境变量覆盖（正整数，非法回默认）。
+ */
+export const DEFAULT_GOVERNANCE_JUDGE_TIMEOUT_MS = 60_000;
+export const GOVERNANCE_JUDGE_TIMEOUT_ENV = "ANS_GOVERNANCE_JUDGE_TIMEOUT_MS";
+
+/** 解析治理 judge 超时：显式选项 > 环境变量 > 默认 60s；非法（0/负/小数/非数字）回默认。 */
+export function resolveGovernanceJudgeTimeoutMs(
+  option: unknown,
+  env: Record<string, string | undefined> = process.env,
+): number {
+  if (typeof option === "number" && Number.isFinite(option) && option > 0) return Math.floor(option);
+  const raw = env[GOVERNANCE_JUDGE_TIMEOUT_ENV];
+  if (typeof raw === "string" && /^[1-9]\d*$/.test(raw.trim())) {
+    const parsed = Number(raw.trim());
+    if (Number.isSafeInteger(parsed) && parsed > 0) return parsed;
+  }
+  return DEFAULT_GOVERNANCE_JUDGE_TIMEOUT_MS;
+}
+
+/** 超时文案的时长格式：整秒用 `Ns`，否则 `Nms`（如 `>60s` / `>30ms`）。 */
+export function formatGovernanceJudgeTimeout(timeoutMs: number): string {
+  return timeoutMs >= 1000 && timeoutMs % 1000 === 0 ? `${timeoutMs / 1000}s` : `${timeoutMs}ms`;
+}
 /** 默认读取预算的调用次数上限（与运行时核心 `SHELL_JUDGE_DEFAULT_BUDGET.maxCalls` 同值）。 */
 const GOVERNANCE_JUDGE_MAX_REQUIRED_READS = 8;
 
@@ -254,6 +277,38 @@ async function verifyAcceptanceMechanics(
   });
 }
 
+/**
+ * 新建目标文件的 preview 门槛（评审 §5.4）：confirm 卡中**尚不存在**的目标文件不进入
+ * required-read（读它必然失败），改由 preview 正文核对内容；preview 为空 ⇒ manual。
+ * 「内容是否足够」由 rubric 判断，本层只机械拦截空 preview。
+ */
+async function verifyConfirmPreview(
+  request: GovernanceJudgeRequest,
+  projectRoot: string,
+): Promise<{ ok: true } | { ok: false; reasonCode: string; reason: string }> {
+  if (request.card.kind !== "confirm") return { ok: true };
+  const paths = Array.isArray(request.paths) ? request.paths : [];
+  let createsNewFile = false;
+  for (const candidate of paths) {
+    const rel = safeRelativePath(candidate);
+    if (rel === undefined) continue; // 非法路径由逐路径复核处理
+    if (!(await isRegularFile(projectRoot, rel))) {
+      createsNewFile = true;
+      break;
+    }
+  }
+  if (!createsNewFile) return { ok: true };
+  const preview = typeof request.card.preview === "string" ? request.card.preview.trim() : "";
+  if (preview === "") {
+    return {
+      ok: false,
+      reasonCode: "insufficient-evidence",
+      reason: "新建文件的写盘确认缺少 preview 正文，无法核对将写入的内容，已转手动确认。",
+    };
+  }
+  return { ok: true };
+}
+
 /** 解析降级路径：最后一条 message 必须是**纯 JSON 对象**（可去代码围栏）；夹带解释/多个 JSON → undefined。 */
 function parseMessageVerdict(summary: string): NormalizedGovernanceJudgeVerdict | undefined {
   let text = summary.trim();
@@ -276,9 +331,7 @@ function parseMessageVerdict(summary: string): NormalizedGovernanceJudgeVerdict 
 export function createGovernanceJudge(opts: CreateGovernanceJudgeOptions): GovernanceJudgeFn {
   const log = opts.logger ?? createDiagnosticLogger({ component: "orchestration.governance-judge", projectRoot: opts.project.projectRoot });
   const now = opts.now ?? (() => Date.now());
-  const timeoutMs = typeof opts.timeoutMs === "number" && Number.isFinite(opts.timeoutMs) && opts.timeoutMs > 0
-    ? Math.floor(opts.timeoutMs)
-    : DEFAULT_GOVERNANCE_JUDGE_TIMEOUT_MS;
+  const timeoutMs = resolveGovernanceJudgeTimeoutMs(opts.timeoutMs);
   const model = modelFromOptions(opts.runtimeOptions);
   let busy = false;
 
@@ -358,6 +411,26 @@ export function createGovernanceJudge(opts: CreateGovernanceJudgeOptions): Gover
       };
     }
 
+    // 写盘卡：新建目标文件必须带 preview 正文（读不存在的目标没有意义，评审 §5.4）。
+    if (request.card.kind === "confirm") {
+      const preview = await verifyConfirmPreview(request, projectRoot);
+      if (!preview.ok) {
+        log.record("governance-judge.manual", {
+          toolCallId: request.toolCallId,
+          reasonCode: preview.reasonCode,
+          reason: preview.reason,
+          group: request.group,
+          cardKind: request.cardKind,
+        });
+        return {
+          ...manualOutcome(preview.reasonCode, preview.reason),
+          group: request.group,
+          cardKind: request.cardKind,
+          engine: request.runtime,
+        };
+      }
+    }
+
     // 验收卡：先机械核对流程完成度（不靠模型自报），未完成/阻塞/待派发/未结算 ⇒ 直接 manual。
     if (request.cardKind === "acceptance") {
       const acceptance = await verifyAcceptanceMechanics(request, projectRoot);
@@ -378,7 +451,8 @@ export function createGovernanceJudge(opts: CreateGovernanceJudgeOptions): Gover
       }
     }
 
-    // 超时/中止：AbortController + AbortSignal.any。
+    // 超时/中止：AbortController + AbortSignal.any。**计时只从模型判断开始**——此前的
+    // 上下文校验/物证预检/排队与等卡均不计入（busy 在此前已直接回落）。
     const timed = new AbortController();
     const signals = signal !== undefined ? [timed.signal, signal] : [timed.signal];
     const combined = AbortSignal.any(signals);
@@ -446,7 +520,7 @@ export function createGovernanceJudge(opts: CreateGovernanceJudgeOptions): Gover
       if (aborted && verdict === undefined) {
         log.record("governance-judge.manual", { toolCallId: request.toolCallId, reasonCode: "timeout", group: request.group, cardKind: request.cardKind });
         return {
-          ...manualOutcome("timeout", `判断超时（>${timeoutMs}ms），已转手动确认。`),
+          ...manualOutcome("timeout", `判断超时（>${formatGovernanceJudgeTimeout(timeoutMs)}），已转手动确认。`),
           group: request.group,
           cardKind: request.cardKind,
           engine: request.runtime,

@@ -286,6 +286,26 @@ test("卡文本：Nominator 机器可读 `recommended:` 推荐集（judge 代决
   }
 });
 
+test("卡文本：角色卡写入归属——Nominator 任命后必须 appointment-write；Convener 不写卡/不建角色/无卡不派发", () => {
+  const n = governanceRoleOf("nominator")!.cardText;
+  assert.match(n, /任命后写卡/, "Nominator 须写明任命后写卡");
+  assert.match(n, /必须继续发起 `appointment-write` 确认卡/, "任命后必须继续发起写盘确认卡");
+  assert.match(n, /未完成写卡前不得结束流程/, "未完成写卡不得结束流程");
+  assert.match(n, /不得只写提名文件/, "提名文件不能替代角色卡/边界写入");
+
+  const c = governanceRoleOf("convener")!.cardText;
+  assert.match(c, /你不写角色卡、不创建角色/, "Convener 不写角色卡、不创建角色");
+  assert.match(c, /角色由 Nominator 在任命决定后经 `appointment-write`/, "写卡归属 Nominator");
+  assert.match(c, /角色不存在时不得派发/, "角色不存在时不得派发");
+  assert.match(c, /不得代写角色卡/, "Convener 不得代写角色卡");
+
+  // 四角色口径：不得残留「su 负责 appointment-write / 写角色卡」的 single 旧模型表述。
+  for (const spec of BUILT_IN_GOVERNANCE_ROLES) {
+    assert.doesNotMatch(spec.cardText, /su[^。\n]*appointment-write/, `${spec.id} 不得把写卡归给 su`);
+    assert.doesNotMatch(spec.cardText, /su[^。\n]*写角色卡/, `${spec.id} 不得让 su 写角色卡`);
+  }
+});
+
 test("注册表：forbiddenWritePaths 按段展开（无 glob），覆盖应用独占路径与其他治理角色目录", () => {
   for (const spec of BUILT_IN_GOVERNANCE_ROLES) {
     assert.equal(

@@ -17,10 +17,11 @@ test("Model/schema: required write/edit fields, optionals, unknown names and inj
   assert.deepEqual(describeTool("edit_file").parameters.required, ["path", "old_string", "new_string"]);
   assert.deepEqual(describeTool("submit_report").parameters.required, ["status", "summary"]);
   assert.deepEqual(describeTool("read_file").parameters.required, ["path"]);
+  assert.deepEqual(describeTool("list_dir").parameters.required, []);
   assert.throws(() => describeTool("native_shell"), /未知/);
-  assert.deepEqual([...tools(allow).keys()], ["write_file", "edit_file", "read_file"]);
+  assert.deepEqual([...tools(allow).keys()], ["write_file", "edit_file", "read_file", "list_dir"]);
   const all = tools(allow, { shellGate: async () => ({ allow: false, reason: "deny", by: "fixture" }), customerInput: () => ({ outcome: "declined" }), reportHandback: () => {}, dispatchTask: () => {}, shellVerdict: () => {}, roleStatus: () => ({ ok: true, text: "stub" }), sessionTail: () => ({ ok: true, text: "stub" }), proposeRecovery: () => ({ outcome: "declined" }), installSkill: async () => ({ ok: false, reason: "stub", message: "stub" }), uninstallSkill: async () => ({ ok: false, reason: "stub", message: "stub" }), installMcp: async () => ({ ok: false, reason: "stub", message: "stub" }), uninstallMcp: async () => ({ ok: false, reason: "stub", message: "stub" }) });
-  assert.equal(all.size, 16);
+  assert.equal(all.size, 17);
   for (const tool of all.values()) {
     assert.equal(tool.inputSchema.type, "object");
     assert.ok(tool.description.length);

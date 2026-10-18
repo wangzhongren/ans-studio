@@ -230,8 +230,10 @@ export function requiredArtifactPaths(request: GovernanceJudgeRequest): { paths:
     case "schedule-write":
       return { paths: flow !== undefined ? [flow] : [], missing: flow === undefined };
     case "write": {
+      // 写盘卡：只把 run-role 按来源角色收窄的**已存在**物证放进 required-read；
+      // 即将新建的目标文件不在此列（评审 §5.4「新文件除外」，由 preview 正文核对）。
       const paths = [proposal, nomination, flow].filter((p): p is string => p !== undefined);
-      return { paths, missing: paths.length === 0 };
+      return { paths, missing: false };
     }
     default:
       return { paths: [], missing: true };

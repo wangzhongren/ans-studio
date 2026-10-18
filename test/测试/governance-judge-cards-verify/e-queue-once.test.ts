@@ -179,10 +179,11 @@ test("代批后 onNextStep 恰一次；结算后 respond/再次 replay 不产生
     const out = await h.ask(card("提案一"));
     assert.equal(out.outcome, "answered");
     assert.equal(h.nextSteps.length, 1);
-    const payload = h.nextSteps[0]!.payload as { cardKind?: string; nextFunction?: string | null; roleId?: string | null };
+    const payload = h.nextSteps[0]!.payload as { cardKind?: string; nextFunction?: string | null; roleId?: string | null; followUp?: string };
     assert.equal(payload.cardKind, "proposal");
-    assert.equal(payload.nextFunction, "nomination");
-    assert.equal(payload.roleId, "nominator");
+    assert.equal(payload.nextFunction, "schedule", "接受提案先派 Convener 写流程单");
+    assert.equal(payload.roleId, "convener");
+    assert.equal(payload.followUp, "nomination-after-flow", "流程单落盘后才派 Nominator");
     h.channel.replayPending();
     assert.equal(h.nextSteps.length, 1, "replay 不得触发第二次 next-step");
     assert.equal(h.channel.respond({ id: "op-1", decision: { kind: "choice", selected: ["accept"] } }).expired, true);

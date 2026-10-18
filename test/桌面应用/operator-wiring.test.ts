@@ -382,7 +382,7 @@ function proposalRequest(flowId: string, extra: Record<string, unknown> = {}): C
 
 const GOVERNANCE_CTX = { roleId: "rapporteur", projectRoot: "/p", runtime: "claude" as const };
 
-test("治理下一步：proposal accept/accept-quick 推导提名/排程；flowId 与 proposalPath 透传", async () => {
+test("治理下一步：proposal accept 先派 Convener 写流程单（followUp 标记），accept-quick 直接排程", async () => {
   const { channel, next } = makeNextStepChannel();
 
   const p1 = channel.customerInput(proposalRequest("flow-a", { proposalPath: "docs/proposals/flow-a-v2.md" }), GOVERNANCE_CTX);
@@ -392,10 +392,11 @@ test("治理下一步：proposal accept/accept-quick 推导提名/排程；flowI
     version: 1,
     flowId: "flow-a",
     cardKind: "proposal",
-    nextFunction: "nomination",
-    roleId: "nominator",
+    nextFunction: "schedule",
+    roleId: "convener",
     proposalPath: "docs/proposals/flow-a-v2.md",
-  }, "accept → Nominator；请求显式给出的 proposalPath 原样透传");
+    followUp: "nomination-after-flow",
+  }, "accept → 先 Convener 写流程单；流程单落盘后应用再派 Nominator（真机修正）");
   assert.deepEqual(next[0].context, {
     sourceRoleId: "rapporteur",
     projectRoot: "/p",
@@ -411,7 +412,7 @@ test("治理下一步：proposal accept/accept-quick 推导提名/排程；flowI
     cardKind: "proposal",
     nextFunction: "schedule",
     roleId: "convener",
-  }, "accept-quick → Convener（快捷路径，无 proposalPath 时不编造）");
+  }, "accept-quick → Convener 写流程并排步骤（无 followUp、无提名）");
 });
 
 test("治理下一步：proposal revise/reject、acceptance、write 推导为 null（明确无下一步，仍回调）", async () => {

@@ -5,7 +5,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 
@@ -1873,6 +1873,15 @@ function settleableGovernanceHandle(sends: string[]): { handle: RoleSessionHandl
   return { handle, settle: () => { queue.push({ kind: "settled", summary: "一轮结束（测试替身）" } as SessionEvent); } };
 }
 
+/** 有界等待测试条件（真实定时器；超时抛错，绝不无限挂起）。 */
+async function waitForTest(check: () => boolean, timeoutMs = 2000): Promise<void> {
+  const started = Date.now();
+  while (!check()) {
+    if (Date.now() - started > timeoutMs) throw new Error("等待测试条件超时");
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+
 test("治理自动推进：接受提案 → 后台派发提名任务给 Nominator，当前 pane 不变、只发一条任务", async () => {
   const sendsByRole = new Map<string, string[]>();
   const openRoles: string[] = [];
@@ -1893,8 +1902,8 @@ test("治理自动推进：接受提案 → 后台派发提名任务给 Nominato
   assert.equal((await iface.openSession({ projectRoot: "/proj", roleId: "rapporteur", runtime: "demo" })).ok, true);
 
   const expected =
-    "流程 flow-a：客户已接受提案 docs/proposals/flow-a-v1.md。" +
-    "请执行提名：读取提案与流程单，给出候选角色与理由，并通过任命卡请客户确认；不要自行任命或写角色卡。";
+    "流程 flow-a：客户已接受提案 docs/proposals/flow-a-v1.md；流程单已落盘于 docs/flows/flow-a.md。" +
+    "请执行提名：按流程单的首个提名步骤，读取提案与流程单，给出候选角色与理由，并通过任命卡请客户确认；不要自行任命或写角色卡。";
   const result = await iface.advanceGovernanceFlow({
     payload: { version: 1, flowId: "flow-a", cardKind: "proposal", nextFunction: "nomination", roleId: "nominator", proposalPath: "docs/proposals/flow-a-v1.md" },
     context: { sourceRoleId: "rapporteur", projectRoot: "/proj", runtime: "demo" },
@@ -1918,6 +1927,138 @@ test("治理自动推进：接受提案 → 后台派发提名任务给 Nominato
   await iface.stopSession();
 });
 
+test("治理自动推进（真机修正）：accept 先派 Convener 写流程单，落盘后才派 Nominator", async () => {
+  const root = makeTempProjectRoot("ans-advance-chain-");
+  try {
+    const listing: ProjectListing = { ...trioListing(), projectRoot: root };
+    const sendsByRole = new Map<string, string[]>();
+    const openRoles: string[] = [];
+    const events: SessionEventEnvelope[] = [];
+    let settleConvener: (() => void) | undefined;
+    const iface = createDesktopInterface({
+      pickDirectory: async () => root,
+      emitEvent: (envelope) => { events.push(envelope); },
+      listProjectFn: async () => listing,
+      openRoleSessionFn: async (input) => {
+        openRoles.push(input.roleId);
+        const sends: string[] = [];
+        sendsByRole.set(input.roleId, sends);
+        const made = settleableGovernanceHandle(sends);
+        if (input.roleId === "convener") {
+          settleConvener = made.settle;
+          // 模拟 Convener 本轮真正写出流程单（应用只读检查，不代写）。
+          const handle = made.handle;
+          const originalSend = handle.send.bind(handle);
+          handle.send = async (text: string) => {
+            await originalSend(text);
+            mkdirSync(path.join(root, "docs", "flows"), { recursive: true });
+            writeFileSync(path.join(root, "docs", "flows", "flow-a.md"), "# flow-a\n");
+          };
+        }
+        return made.handle;
+      },
+      buildProjectConfigFn: buildProjectConfig,
+    });
+    await iface.listProject({ projectRoot: root });
+    const advancing = iface.advanceGovernanceFlow({
+      payload: {
+        version: 1,
+        flowId: "flow-a",
+        cardKind: "proposal",
+        nextFunction: "schedule",
+        roleId: "convener",
+        proposalPath: "docs/proposals/flow-a-v1.md",
+        followUp: "nomination-after-flow",
+      },
+      context: { sourceRoleId: "rapporteur", projectRoot: root, runtime: "demo" },
+    });
+    await waitForTest(() => (sendsByRole.get("convener")?.length ?? 0) > 0);
+    assert.equal(sendsByRole.get("nominator")?.length ?? 0, 0, "流程单落盘前绝不派 Nominator");
+    assert.deepEqual(sendsByRole.get("convener"), [
+      "流程 flow-a：客户已接受提案 docs/proposals/flow-a-v1.md。" +
+        "请先写流程单 docs/flows/flow-a.md（步骤表；首个步骤为提名：由 Nominator 读取提案并给出候选角色）。" +
+        "写完后本轮即可结束；提名任务会在流程单落盘后由应用派给 Nominator。不要把步骤说成已派发。",
+    ], "第一段任务明确要求先写流程单、首步提名");
+
+    settleConvener!();
+    const result = await advancing;
+    assert.deepEqual(result, { ok: true, dispatched: true, targetRoleId: "convener", followUpRoleId: "nominator" });
+    assert.deepEqual(openRoles, ["convener", "nominator"], "Convener settle 且流程单落盘后才开 Nominator");
+    assert.deepEqual(sendsByRole.get("nominator"), [
+      "流程 flow-a：客户已接受提案 docs/proposals/flow-a-v1.md；流程单已落盘于 docs/flows/flow-a.md。" +
+        "请执行提名：按流程单的首个提名步骤，读取提案与流程单，给出候选角色与理由，并通过任命卡请客户确认；不要自行任命或写角色卡。",
+    ], "第二段任务带流程路径，不再让 Nominator 猜");
+    const notes = events
+      .filter((e) => e.roleId === "rapporteur" && e.event.kind === "message" && (e.event.detail as { source?: string } | undefined)?.source === "delivery-note")
+      .map((e) => e.event.summary);
+    assert.deepEqual(notes, [
+      "已派发流程任务给 Convener（工作中）",
+      "流程单已落盘，已派发提名任务给 Nominator（工作中）",
+    ]);
+    await iface.stopSession();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("治理自动推进（真机修正）：Convener 未写流程单 ⇒ 不派 Nominator、如实报错、不循环", async () => {
+  const root = makeTempProjectRoot("ans-advance-chain-missing-");
+  try {
+    const listing: ProjectListing = { ...trioListing(), projectRoot: root };
+    const sendsByRole = new Map<string, string[]>();
+    const openRoles: string[] = [];
+    const events: SessionEventEnvelope[] = [];
+    let settleConvener: (() => void) | undefined;
+    const iface = createDesktopInterface({
+      pickDirectory: async () => root,
+      emitEvent: (envelope) => { events.push(envelope); },
+      listProjectFn: async () => listing,
+      openRoleSessionFn: async (input) => {
+        openRoles.push(input.roleId);
+        const sends: string[] = [];
+        sendsByRole.set(input.roleId, sends);
+        const made = settleableGovernanceHandle(sends);
+        if (input.roleId === "convener") settleConvener = made.settle;
+        return made.handle;
+      },
+      buildProjectConfigFn: buildProjectConfig,
+    });
+    await iface.listProject({ projectRoot: root });
+    const advancing = iface.advanceGovernanceFlow({
+      payload: {
+        version: 1,
+        flowId: "flow-a",
+        cardKind: "proposal",
+        nextFunction: "schedule",
+        roleId: "convener",
+        proposalPath: "docs/proposals/flow-a-v1.md",
+        followUp: "nomination-after-flow",
+      },
+      context: { sourceRoleId: "rapporteur", projectRoot: root, runtime: "demo" },
+    });
+    await waitForTest(() => (sendsByRole.get("convener")?.length ?? 0) > 0);
+    settleConvener!();
+    const result = await advancing;
+    assert.equal(result.ok, false, "流程单缺失 ⇒ 整体如实失败");
+    assert.equal(result.dispatched, true, "第一段（Convener）已完成");
+    assert.match(result.error ?? "", /未写出流程单 docs\/flows\/flow-a\.md/);
+    assert.ok(!openRoles.includes("nominator"), "流程单缺失时绝不派 Nominator");
+    assert.equal(sendsByRole.get("nominator")?.length ?? 0, 0);
+    const notes = events
+      .filter((e) => e.roleId === "rapporteur" && e.event.kind === "message" && (e.event.detail as { source?: string } | undefined)?.source === "delivery-note")
+      .map((e) => e.event.summary);
+    assert.equal(notes.length, 2);
+    assert.match(notes[1] ?? "", /自动推进停住：Convener 未写出流程单/);
+    // 不循环：再等一拍，Convener 不再收到第二条任务。
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    assert.equal(sendsByRole.get("convener")?.length, 1, "不重试、不循环派发");
+    await iface.stopSession();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+
 test("治理自动推进：accept-quick 与 appointment 都派发给 Convener；无下一步不派发", async () => {
   const sendsByRole = new Map<string, string[]>();
   const openRoles: string[] = [];
@@ -1925,7 +2066,7 @@ test("治理自动推进：accept-quick 与 appointment 都派发给 Convener；
   const iface = createDesktopInterface({
     pickDirectory: async () => "/proj",
     emitEvent: () => {},
-    listProjectFn: async () => trioListing(),
+    listProjectFn: async () => listingWithProjectRoles(trioListing(), ["role-a", "role-b"]),
     openRoleSessionFn: async (input) => {
       openRoles.push(input.roleId);
       const sends: string[] = [];
@@ -1952,7 +2093,7 @@ test("治理自动推进：accept-quick 与 appointment 都派发给 Convener；
 
   assert.deepEqual(openRoles, ["convener"], "Convener 会话后台开启一次、后续续接（不重建）");
   assert.deepEqual(sendsByRole.get("convener"), [
-    "流程 flow-q：客户已接受提案（快捷路径）。请写流程单并排步骤；涉及新建/改边界仍须任命卡与写盘确认。",
+    "流程 flow-q：客户已接受提案（快捷路径）。请写流程单 docs/flows/flow-q.md 并排步骤（无提名）；涉及新建/改边界仍须任命卡与写盘确认。",
     "流程 flow-r：客户已完成任命 role-a、role-b。请写流程单并派发已批准步骤。",
   ]);
 
@@ -1964,6 +2105,122 @@ test("治理自动推进：accept-quick 与 appointment 都派发给 Convener；
   assert.deepEqual(nothing, { ok: true, dispatched: false }, "验收收口/无下一步：不派发");
   assert.equal((sendsByRole.get("convener") ?? []).length, before, "无下一步不产生任何模型消息");
   await iface.stopSession();
+});
+
+test("治理自动推进（真机修正）：任命后角色未写出 ⇒ 先派 Nominator 写卡，角色出现后才派 Convener", async () => {
+  const root = makeTempProjectRoot("ans-advance-appointment-");
+  try {
+    let rolesPresent = false;
+    const listingNow = (): ProjectListing => {
+      const base: ProjectListing = { ...trioListing(), projectRoot: root };
+      return rolesPresent ? listingWithProjectRoles(base, ["executor"]) : base;
+    };
+    const sendsByRole = new Map<string, string[]>();
+    const openRoles: string[] = [];
+    const events: SessionEventEnvelope[] = [];
+    let settleNominator: (() => void) | undefined;
+    const iface = createDesktopInterface({
+      pickDirectory: async () => root,
+      emitEvent: (envelope) => { events.push(envelope); },
+      listProjectFn: async () => listingNow(),
+      openRoleSessionFn: async (input) => {
+        openRoles.push(input.roleId);
+        const sends: string[] = [];
+        sendsByRole.set(input.roleId, sends);
+        const made = settleableGovernanceHandle(sends);
+        if (input.roleId === "nominator") {
+          settleNominator = made.settle;
+          // 模拟 Nominator 用 appointment-write 写出角色卡（应用只读检查 listing）。
+          const handle = made.handle;
+          const originalSend = handle.send.bind(handle);
+          handle.send = async (text: string) => {
+            await originalSend(text);
+            rolesPresent = true;
+          };
+        }
+        return made.handle;
+      },
+      buildProjectConfigFn: buildProjectConfig,
+    });
+    await iface.listProject({ projectRoot: root });
+    const advancing = iface.advanceGovernanceFlow({
+      payload: { version: 1, flowId: "flow-e", cardKind: "appointment", nextFunction: "schedule", roleId: "convener" },
+      context: { sourceRoleId: "nominator", projectRoot: root, runtime: "demo", targetRoleIds: ["executor"], stepId: "step-appoint" },
+    });
+    await waitForTest(() => (sendsByRole.get("nominator")?.length ?? 0) > 0);
+    assert.ok(!openRoles.includes("convener"), "角色未写出前绝不派 Convener");
+    assert.deepEqual(sendsByRole.get("nominator"), [
+      "流程 flow-e：客户已完成任命 executor，但角色卡/边界尚未写出（项目中尚未枚举到这些角色）。" +
+        "请用 appointment-write 确认卡逐路径完成写卡与边界写入；写完后本轮结束，不要自行任命、不要派发。",
+    ], "先派 Nominator 写卡，不派 Convener");
+    settleNominator!();
+    const result = await advancing;
+    assert.deepEqual(result, { ok: true, dispatched: true, targetRoleId: "nominator", followUpRoleId: "convener" });
+    assert.deepEqual(openRoles, ["nominator", "convener"], "Nominator settle、角色出现后才开 Convener");
+    assert.deepEqual(sendsByRole.get("convener"), [
+      "流程 flow-e：客户已完成任命 executor。请写流程单并派发已批准步骤。",
+    ]);
+    const notes = events
+      .filter((e) => e.roleId === "nominator" && e.event.kind === "message" && (e.event.detail as { source?: string } | undefined)?.source === "delivery-note")
+      .map((e) => e.event.summary);
+    assert.deepEqual(notes, [
+      "已派发写卡任务给 Nominator（工作中）",
+      "已派发流程任务给 Convener（工作中）",
+    ]);
+    await iface.stopSession();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("治理自动推进（真机修正）：任命后角色始终未写出 ⇒ 不派 Convener、如实报错、不循环", async () => {
+  const root = makeTempProjectRoot("ans-advance-appointment-missing-");
+  try {
+    const listing: ProjectListing = { ...trioListing(), projectRoot: root };
+    const sendsByRole = new Map<string, string[]>();
+    const openRoles: string[] = [];
+    const events: SessionEventEnvelope[] = [];
+    let settleNominator: (() => void) | undefined;
+    const iface = createDesktopInterface({
+      pickDirectory: async () => root,
+      emitEvent: (envelope) => { events.push(envelope); },
+      listProjectFn: async () => listing,
+      openRoleSessionFn: async (input) => {
+        openRoles.push(input.roleId);
+        const sends: string[] = [];
+        sendsByRole.set(input.roleId, sends);
+        const made = settleableGovernanceHandle(sends);
+        if (input.roleId === "nominator") settleNominator = made.settle;
+        return made.handle;
+      },
+      buildProjectConfigFn: buildProjectConfig,
+    });
+    await iface.listProject({ projectRoot: root });
+    const advancing = iface.advanceGovernanceFlow({
+      payload: { version: 1, flowId: "flow-e", cardKind: "appointment", nextFunction: "schedule", roleId: "convener" },
+      context: { sourceRoleId: "nominator", projectRoot: root, runtime: "demo", targetRoleIds: ["executor"] },
+    });
+    await waitForTest(() => (sendsByRole.get("nominator")?.length ?? 0) > 0);
+    settleNominator!();
+    const result = await advancing;
+    assert.equal(result.ok, false);
+    assert.equal(result.dispatched, true, "第一段写卡任务已投递");
+    assert.equal(result.targetRoleId, "nominator");
+    assert.match(result.error ?? "", /角色卡\/边界仍未写出（executor 未枚举到）/);
+    assert.ok(!openRoles.includes("convener"), "角色仍未写出时绝不派 Convener");
+    assert.equal(sendsByRole.get("convener")?.length ?? 0, 0);
+    const notes = events
+      .filter((e) => e.roleId === "nominator" && e.event.kind === "message" && (e.event.detail as { source?: string } | undefined)?.source === "delivery-note")
+      .map((e) => e.event.summary);
+    assert.equal(notes.length, 2);
+    assert.match(notes[1] ?? "", /自动推进停住：角色卡\/边界仍未写出/);
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    assert.equal(sendsByRole.get("nominator")?.length, 1, "不重试、不循环");
+    assert.equal(sendsByRole.get("convener")?.length ?? 0, 0);
+    await iface.stopSession();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("治理自动推进：后台派发不抢活动角色（activeRoleId 保持为空）", async () => {
@@ -2342,7 +2599,7 @@ test("W6-B 真机修复：role_status / dispatch_task 目标 miss 时强制刷�
 });
 
 test("W6-B 真机修复：任命决定后等 Nominator 本轮 settle 再派 Convener（写入前不派）", async () => {
-  const listing = trioListing();
+  const listing = listingWithProjectRoles(trioListing(), ["role-a"]);
   const settles = new Map<string, () => void>();
   const openRoles: string[] = [];
   const sendsByRole = new Map<string, string[]>();
@@ -2393,7 +2650,7 @@ test("W6-B 真机修复：任命决定后等 Nominator 本轮 settle 再派 Conv
 });
 
 test("W6-B 真机修复：listing 刷新失败不崩、不打断会话/派发（只记诊断）", async () => {
-  const base = trioListing();
+  const base = listingWithProjectRoles(trioListing(), ["role-a"]);
   let listCalls = 0;
   let projectChanged = 0;
   const settles = new Map<string, () => void>();

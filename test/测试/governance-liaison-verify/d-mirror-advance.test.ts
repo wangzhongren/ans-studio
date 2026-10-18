@@ -377,7 +377,7 @@ test("ui-labels：镜像徽标/来源标签/排队聚合文案逐字；单模型
 
 // —————————————————————— 4) 自动推进推导与账本 ——————————————————————
 
-test("下一步推导：accept→Nominator、accept-quick→Convener、任命→Convener、其余无下一步；镜像范围判据", () => {
+test("下一步推导：accept→Convener（两段式）、accept-quick→Convener、任命→Convener、其余无下一步；镜像范围判据", () => {
   const accept = deriveGovernanceNextStep(choiceRequest("proposal"), {
     outcome: "answered",
     value: { selected: ["accept"] },
@@ -386,10 +386,11 @@ test("下一步推导：accept→Nominator、accept-quick→Convener、任命→
   assert.deepEqual(accept, {
     version: 1,
     cardKind: "proposal",
-    nextFunction: "nomination",
-    roleId: "nominator",
+    nextFunction: "schedule",
+    roleId: "convener",
+    followUp: "nomination-after-flow",
     flowId: "flow-a",
-  });
+  }, "接受提案先派 Convener 写流程单；流程落盘后由应用再派 Nominator");
   const quick = deriveGovernanceNextStep(choiceRequest("proposal"), {
     outcome: "answered",
     value: { selected: ["accept-quick"] },
