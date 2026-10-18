@@ -278,5 +278,15 @@
 - **手动回落**：shell 卡沿用 `#sc-judge-notice`；治理交互卡新增 `.op-judge-notice`——主进程 `judgeNotice` 原文 `esc` 呈现、同一请求重推可补/更新，卡仍可作答（UI 不自动批准）。
 - **样式**：仅加 `.composer-judge-status.is-note`、`.governance-judge-row .sj-title`、`.op-judge-notice`；琥珀/中性色，未动 900 列与等宽字体。
 - **探针（只增）**：`window.__ansRenderer.decisionJudge = { state(), onState, onResult }`。
-- **测试**：`tool-rows.test.ts` **51/51**（双开关矩阵/警告按组列行/治理结果行/回落文案）；`renderer.test.ts` **100 计 / 96 过 / 4 红**（4 红＝既有 CRLF 基线 N-1、data-state、P1-3、G-5）；真实 Electron `ANS_JUDGE_UI_ONLY=1` → **JUDGE_UI_PASS 33**（含 decision 开关读取/设置/推送/失败回退、首次警告、治理结果行按 toolCallId 锚定、写盘代批行、`judgeNotice` 卡、single 禁用与 trio 恢复；P4 IPC 在本批联调时已落树），`ANS_TERMINAL_UI_ONLY=1` → **TERMINAL_PASS 15**（启动两组权威关闭态）。全量 `node --test "test/**/*.test.ts"`：**2852 计 / 2826 过 / 23 红 / 3 skip**。
-- **红集分类（如实）**：4 条 `renderer.test.ts` 既有 CRLF 基线（N-1/data-state/P1-3/G-5）；6 条 `test/测试/shell-judge-verify/{a-allow-flow,b-deny-flow,e-deny-tier}` 仍断言旧 UI 文案（「替我审」/旧警告三行/旧结果标题），按评审 §10.2/§12.3 需测试角色更新（本角色不改他域测试）；1 条同目录 `f-readonly-sandbox`（P1 `.ans` 整体排除后的「敏感」旧文案）、1 条 `markdown` vendor pin、1 条 `runtime-ui` localStorage 守卫、1 条 `g4-skill` 读取器防御为既有基线；其余 9 条为环境/他域既有红（Windows symlink EPERM、`abort running shell`、Pi/Codex/Claude 适配器存储与 symlink 用例等）。本批未新增本域红；此前 3 条「唯一计时器必须位于 showShellJudgeWarning」测试角色守卫已通过保留函数名与计时器位置继续全绿。
+- **测试**：`tool-rows.test.ts` **51/51**（双开关矩阵/警告按组列行/治理结果行/回落文案）；`renderer.test.ts` **152 计 / 148 过 / 4 红**（4 红＝既有 CRLF 基线 N-1、data-state、P1-3、G-5）；真实 Electron `ANS_JUDGE_UI_ONLY=1` → **JUDGE_UI_PASS 33**（含 decision 开关读取/设置/推送/失败回退、首次警告、治理结果行按 toolCallId 锚定、写盘代批行、`judgeNotice` 卡、single 禁用与 trio 恢复；P4 IPC 在本批联调时已落树），`ANS_TERMINAL_UI_ONLY=1` → **TERMINAL_PASS 22**（含启动两组权威关闭态与真机卡收起 7 项）。全量三层 glob（最新收尾）：**2972 计 / 2953 过 / 16 红 / 3 skip**。
+- **红集分类（如实）**：本域仅 4 条 `renderer.test.ts` 既有 CRLF 基线（N-1/data-state/P1-3/G-5）；其余 12 条为既有/他域：9 条 Windows symlink EPERM、`abort running shell`、Pi/Codex/Claude 适配器存储与 symlink 用例，1 条 `markdown` vendor pin、1 条 `runtime-ui` localStorage 守卫、1 条 `g4-skill` 读取器防御。此前 `test/测试/shell-judge-verify/*` 的旧 UI 文案断言已由测试角色同步更新转绿；本批未新增本域红；3 条「唯一计时器必须位于 showShellJudgeWarning」测试角色守卫通过保留函数名与计时器位置继续全绿。
+
+## 2026-10-18：真机修复——轮次结束/失效回执后收起 shell 确认卡
+
+真机 UX：轮次中止/重建后，挂起的 shell 确认卡没有被收起，留下按钮全禁用、写着「此确认已失效」的卡，看起来像页面卡住。
+
+- **settled 收起**：`appendOneEvent` 在本轮 `settled`（完成/失败/中止/超时）时调用 `closeStaleShellConfirm(env)`——只命中同 `roleId` + 同 `runtime` + 同 `projectRoot` 的当前卡；其它角色或仍在等待（未 settled）的卡保持可操作。
+- **失效回执收起**：`session:operator-expired` 按 `id` 命中当前 shell 卡时直接 `closeShellConfirm()` 并 `setHint(payload.reason)`；旧 id/迟到回执不误收、不重建。
+- **回包三路径收起**：`respondShellConfirm` 的受理、`expired:true`、通道失败都收起卡片；过期/失败用 `setHint` 如实说明「未获放行」。删除 `markShellConfirmExpired` 与 shell 卡的 `is-expired` 终态（恢复卡保留自己的失效态）。
+- **文案同步（2026-10-18 收尾）**：`ui-labels.shellJudgeNoticeText` 与桌面通道 `manualJudgeNotice` 对齐——一般 manual 增「规则判定仅作参考；判断 agent 未完成时才由你手批。」，`row-failed` 改为「…；规则判定仅作参考，本卡已转你手动确认。」；`tool-rows.test.ts` 相关逐字断言同步。`test/测试/shell-judge-verify/c-manual-flow.test.ts` 的 retry-capped 旧期望仍待测试角色更新（本角色不改他域测试）。
+- **测试**：`renderer.test.ts` +1 源码守卫（settled 清理、role/runtime/project 校验、失效回执收起、三路径收起、迟到回包不重建）；`ANS_TERMINAL_UI_ONLY=1` 新增 7 项 DOM 断言（等待中的卡保持、其它角色 settled 不影响、settled 收起、新卡恢复可操作、旧 id 失效不误收、失效回执收起并提示原因、重复失效不重建）→ **TERMINAL_PASS 22**；`ANS_JUDGE_UI_ONLY=1` **JUDGE_UI_PASS 33** 不回归。全量三层 glob **2972 计 / 2953 过 / 16 红 / 3 skip**（本域仅 4 条既有 CRLF 基线，无新增红）。`test/桌面应用/e2e/main.mjs`（桌面窗口自检台）仍断言 Esc 后保留 `is-expired` 可见卡，需其属主按新 UX 更新（本角色不改其文件）。

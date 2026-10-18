@@ -190,6 +190,57 @@ function matchRisky(args: string[], program: string, rules: ShellRiskyRule[]): s
   return null;
 }
 
+// —————————————————————— 窄只读 re-shell 白名单（客户 2026-10-18 裁定）——————————————————————
+// `cmd /c dir`、`powershell -Command "Test-Path '<字面路径>'"` 一类**只读探针**不应硬拒；
+// 但 re-shell 把真命令藏在参数 string 里、可能带元字符/变量展开，故只开两个极窄形态，且**先于**
+// hardDenyPrograms 的 reshell 规则判定。其余 cmd/powershell/sh -c/pwsh/绝对路径可执行文件仍 deny。
+//
+// 防绕过要点：
+//  - argv[0] 必须是**裸程序名**（不含 / 或 \）——绝对路径可执行文件仍走 deny；
+//  - 整个 argv 不得含元字符/变量展开：& | < > ^ % ! $ ` ; ( ) 与换行/回车（cmd 与 PowerShell 都会在
+//    子进程内解释这些字符，argv-noshell 的前提在 re-shell 上不成立）；
+//  - cmd：[/d] /c 后**恰为** dir 或 where（大小写不敏感），其后只读参数可带；
+//  - powershell：恰为 -NoProfile -Command，命令**恰为** Test-Path '<路径>'（单/双引号，路径内不含
+//    引号/元字符）；不接 `Get-Process`、脚本块、管道等其它形态。
+const RESHELL_ALLOW_METACHARS = ["&", "|", "<", ">", "^", "%", "!", "$", "`", ";", "(", ")", "\n", "\r"];
+
+function hasReshellAllowMetachar(s: string): boolean {
+  return RESHELL_ALLOW_METACHARS.some((t) => s.includes(t));
+}
+
+/** argv[0] 是否为裸程序名（无路径分隔符；引号先去一层）。 */
+function isBareProgramName(raw: string): boolean {
+  const q = stripQuotes(raw.trim());
+  return !q.includes("/") && !q.includes("\\");
+}
+
+/** 只读 re-shell 白名单：命中返回规则 id（readonly-reshell），否则 null。 */
+function matchReadonlyReshell(argv: string[], program: string): string | null {
+  if (!isBareProgramName(argv[0])) return null;
+  if (argv.some(hasReshellAllowMetachar)) return null;
+  const args = argv.slice(1);
+  if (program === "cmd") {
+    let i = 0;
+    if (args[i]?.toLowerCase() === "/d") i += 1;
+    if (args[i]?.toLowerCase() !== "/c") return null;
+    i += 1;
+    const sub = args[i]?.toLowerCase();
+    if (sub !== "dir" && sub !== "where") return null;
+    return "readonly-reshell";
+  }
+  if (program === "powershell") {
+    if (args.length !== 3) return null;
+    if (args[0]?.toLowerCase() !== "-noprofile") return null;
+    if (args[1]?.toLowerCase() !== "-command") return null;
+    const command = args[2];
+    if (typeof command !== "string") return null;
+    // splitCommand 会剥掉外层引号、保留内层引号：`-Command "Test-Path 'C:\x'"` → `Test-Path 'C:\x'`。
+    if (!/^test-path\s+(['"])([^'"]+)\1$/i.test(command.trim())) return null;
+    return "readonly-reshell";
+  }
+  return null;
+}
+
 /** 白名单匹配：program 命中且子命令/禁用 flag 条件满足时返回规则 id，否则 null */
 function matchReadOnly(args: string[], program: string, rules: ShellReadOnlyRule[]): string | null {
   for (const r of rules) {
@@ -254,6 +305,18 @@ export function classifyShellDetailed(argv: unknown, rules: unknown): ShellVerdi
     };
   }
   const program = programName(prog0);
+
+  // 4.5) 窄只读 re-shell 白名单（客户 2026-10-18 裁定）——**先于** reshell 硬拒：
+  //   只放 `cmd [/d] /c dir|where` 与 `powershell -NoProfile -Command "Test-Path '<字面路径>'"`；
+  //   其余 re-shell 形态（sh -c/pwsh/cmd /c del/绝对路径可执行文件…）仍在第 5 步 deny。
+  const roReshell = matchReadonlyReshell(args, program);
+  if (roReshell !== null) {
+    return {
+      decision: "allow",
+      reason: `命中窄只读 re-shell 白名单：${roReshell}`,
+      ruleId: `allow:readonly:${roReshell}`,
+    };
+  }
 
   // 5) 硬拒程序（外壳/破坏性/执行包装器/间接执行器）——先于白名单，握绝对否决
   const denyProg = matchHardDeny(args, program, R.hardDenyPrograms);

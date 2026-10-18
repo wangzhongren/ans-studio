@@ -131,6 +131,8 @@ test("openRoleSession真正把宿主政策传到shell装配，su仍只读", asyn
       shellOperatorChannel: () => { opCalls++; return { outcome: "deny" }; },
       shellArming: {
         classifyShell, rules: defaultShellRules(), auditSink: createMemoryAuditSink(),
+        // 本用例验证旧三层链的委托常规检查；2026-10-18 起项目角色默认 advisory，显式关闭走回归路径。
+        advisoryRuleset: false,
         openSession: async () => ({ async send() {}, async *events() { yield { kind: "message", summary: '{"verdict":"allow"}' }; yield { kind: "settled", summary: "ended" }; }, async dispose() {} }),
       },
     }, deps);

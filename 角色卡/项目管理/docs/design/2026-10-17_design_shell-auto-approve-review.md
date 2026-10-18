@@ -3,10 +3,10 @@ id: shell-auto-approve-review
 type: design
 title: 「替我审」判断 agent——项目管理评审与拆发
 created: "2026-10-17"
-updated: "2026-10-17"
+updated: "2026-10-18"
 timezone: Asia/Shanghai
 status: approved
-revision: 2
+revision: 3
 related: [shell-auto-approve, su-shell-approval, governed-interaction-and-chat-ux]
 events:
   - date: "2026-10-17"
@@ -15,6 +15,9 @@ events:
   - date: "2026-10-17"
     kind: revised
     summary: 客户拍板 D1/D2：D1 允许判断 agent 放行 deny 档（sudo/sh -c/mkfs 等），judge allow 即放行，审计与聊天行标「deny 档 · judge 放行」；删除 hard-floor/0 卡分支。D2 三引擎同期（Claude/Pi/Codex），三适配器各自实现只读判断会话并单列只读验收；任一引擎不可用/超时/解析失败才回落手动卡。驱动落点改为 src/common/编排/shell-judge.ts，经既有 govern-session.ts 薄再导出，不新增 pipeline 单文件、不动边界。status 改 approved，revision 2
+  - date: "2026-10-18"
+    kind: revised
+    summary: 客户新裁定「第一层不要拒绝任何请求，而是快速放行。所有的拒绝必须要AI 来」：项目角色 shell 三层链改为规则 advisory——(c)=allow 快速放行；risky/review/deny 不再由规则层终结，跳过 (b)，全部交 (a) 判断 agent/操作者；判断 agent 不可用才回落客户手动卡。移除确定性硬拒地板（客户明确要求）；审计保留 c 规则判定 + judge 结论；原 deny 硬地板改为历史/可选回归路径。登记 AI 误判、危险命令可被放行、成本/延迟风险；更新验收口径。revision 3
 ---
 
 # 「替我审」判断 agent——项目管理评审与拆发
@@ -31,14 +34,14 @@ events:
 
 ## 一、结论
 
-**批准实施（客户已拍板 D1/D2，revision 2）。** 方向正确：`(a)` 第三闸从「人点按钮」扩展为「判断 agent 先判，判断没发生才叫人」；判断 agent 独立、非持久化、只读、跟随请求会话引擎；`allow` 自动放行（**包括 su `deny` 档**，客户 D1），`deny` 有替代方案给替代方案、`deny` 无替代方案仍拒绝并返回请求角色、**不弹卡**；只有「判断没发生」才回落手动卡（唯一 UI 例外：结果行无法呈现的 `row-failed`）。三引擎同期（Claude/Pi/Codex，客户 D2）。这个三态口径与客户四句原话一致。
+**批准实施（客户 2026-10-18 新裁定，revision 3）。** 项目角色 shell 链改为**规则 advisory**：`(c)=allow` 快速放行；`risky/review/deny` 规则层**不终结、跳过 `(b)`、全部交 `(a)`** 判断 agent/操作者；判断 agent 不可用才回落客户手动卡。规则层**不拒绝任何请求**；所有拒绝由 AI（judge）或手动卡客户作出。移除确定性 hard-deny 地板（客户明确要求，原设计改为历史/可选回归）。判断 agent 仍独立、非持久化、只读、跟随请求会话引擎；三引擎同期（Claude/Pi/Codex，客户 D2）；deny 档放行仍标「deny 档 · judge 放行」；无替代方案不弹卡返回请求角色。
 
-**10 条实施约束**（初评提出，客户 D1/D2 已改定其中第 3、4 条；其余照原样保留）：
+**10 条实施约束**（初评提出；客户 D1/D2 与 2026-10-18 规则 advisory 裁定已改定其中第 3、4 条；其余照原样保留）：
 
 1. **判断能力落层**：提案只说「运行时核心/适配器提供 `judgeShell`」，但未说明桌面如何取得、谁建会话、谁持有只读工具。按现有分层，不能把判断逻辑塞进 `app/desktop/operator-channel.ts`，也不能让编排直接 import 适配器。本文钉死为：**中立类型在 `src/model/runtime.ts`；只读工具/读取策略在 `src/common/runtime-core/shell-judge/`；裁决规范化/提示词在编排的 `src/common/编排/shell-judge-{verdict,prompt}.ts`；一次性判断会话驱动在 `src/common/编排/shell-judge.ts`，经既有 `src/pipeline/orchestration/govern-session.ts` 薄再导出（不新增 pipeline 单文件、不动边界）；桌面通道只做开关、调用、三态映射与呈现**。桌面/编排都只依赖注入的工厂，不 import 适配器私有实现；编排也不 import 运行时核心的私有 common。
 2. **不得复用现有 `read_file`**：`src/provider/runtime/tools.ts:311-330` 的 `makeReadTool` 只做 `resolve(readRoot, path)`，**没有项目根校验、没有敏感文件排除、绝对路径原样读**。判断 agent 必须用**新建的** `judge_read_file` / `judge_list_dir`（真实路径解析 + 前缀校验 + 敏感排除 + 预算），否则「排除 `.env`」是空话。
 3. **三引擎同期（客户 D2）**：Claude/Pi/Codex **三个适配器都实现只读判断会话**；每条请求用请求会话自己的引擎，**不跨引擎**。`demo` 或不支持/未配置的引擎才 `manual`（弹原卡、输入区明示）。三引擎的只读工具限制在验收中**逐引擎单列**：不得写、不得 shell、不得网络、不得读敏感文件、不得出项目根。
-4. **su `deny` 档允许 judge 放行（客户 D1）**：客户原话「如果是必要的，那就替我审批通过」。**judge `allow` 即放行**，包括 `sudo`/`sh -c`/`mkfs` 等 deny 档；**不再有 hard-floor / 0 卡说明分支**。但审计与聊天行必须标 **「deny 档 · judge 放行」**（`judge.tier:"deny"` + `judge.hardDenyOverride:true`，聊天行标题/副标题可见），让客户一眼看出这是模型推翻了硬拒类，而不是普通放行。项目角色的 `(c)=deny` 仍到不了 `(a)`，不在此列。
+4. **规则 advisory + 移除 hard-deny 地板（客户 2026-10-18）**：项目角色 `(c)=deny` 不再在 `(a)` 之前终结；项目角色 `risky/review/deny` 一律**跳过 `(b)`** 交 `(a)`。`(c)` 判定只作输入/审计；**规则层不拒绝任何请求**。原「deny 硬地板」改为历史/可选回归路径（§4.3a），V1 不启用。deny 档放行仍标「deny 档 · judge 放行」（`judge.tier:"deny"` + `hardDenyOverride:true`），让客户看出模型放行了规则判为 deny 的命令。
 5. **读取预算自相矛盾**：提案 §4.9 同时写「单文件 ≤256KB、总 ≤1MB」和「输入 ≤32K tokens」。1MB 文本约 25 万 token，远超 32K。本文收紧为 **≤8 次读取/列目录调用、单文件 ≤64KB、总读取 ≤192KB**；超限/截断/被拒读时，**只有 `allow` 需要降级 `manual`，`deny` 仍然有效**（详见 §八）。
 6. **审计字段没有落地**：提案建议 `ShellAuditRecord.judge`，但没定义谁传、哪些情况写。本文钉死：`OperatorOutcome.allow/deny` 增可选 `judge: ShellJudgeAudit`，`shell-gate.ts` 的 `ReviewOutcome` 透传，`shell-audit.ts` 的可选 `judge` 字段只写**判断 agent 自己做出的 allow/deny**；`manual` 后的客户手批仍是人工归因，不写 `judge`。
 7. **「allow 必须是完整判断」没写成硬规则**：读取被拒、预算耗尽、文件截断、上下文缺失后，判断 agent 仍可能返回 `allow`。本文钉死：**`allow` 必须是无损判断；上述任一损伤出现时，`allow` 一律降级 `manual`；`deny` 始终安全，照常拒绝**。这比提案的 A11 更明确。
@@ -46,21 +49,22 @@ events:
 9. **聊天行投达失败语义要分叉**：提案 J10 一刀切「推达失败回落手动」。本文钉死：**`allow` 的聊天行是可见性条件，投达失败 → `manual`（不自动放行）；`deny` 的投达失败 → 仍然 `deny`（拒绝是安全方向），只记诊断**。
 10. **无真实模型的测试注入点没钉**：提案要求「测试用桩」，但没给出可注入面。本文钉死三个注入点：`createShellJudge({ createAdapter })`（驱动层）、`createDesktopOperatorChannel({ judge })`（通道层）、渲染 e2e 替换 IPC（UI 层）。全量回归不得调用真实模型、不得读 `.env`、不得跑凭据。
 
-**结论**：客户 D1/D2 已拍板（deny 档可放行、三引擎同期）；D3–D5 按 PM 建议执行。本评审 revision 2 **approved**；驱动落在已覆盖的 `src/common/编排/`，**无需新增边界**；按 §十四 派发。
+**结论**：客户 D1/D2 与 2026-10-18 规则 advisory 裁定已拍板；D3–D5 按 PM 建议执行。本评审 revision 3 **approved**；驱动落在已覆盖的 `src/common/编排/`，**无需新增边界**；按 §十四 派发。
 
 ## 二、客户需求的工程口径
 
 | 编号 | 客户原话 | 工程口径（本文钉死） |
 | --- | --- | --- |
 | 1 | 聊天框附近勾选「手动 / 替我审批」 | 输入区 `.composer-bottom` 常驻复选框；**默认手动、不持久化、不追溯已挂起卡、重载/关窗回手动**；只影响之后新到 `(a)` 的 shell 请求。 |
-| 2 | 单独的判断 agent，思考操作是否必要 | 每次判断开一个**非持久化一次性会话**（`persistSession:false`），独立于请求角色与 `(b)` pm；只能读、不能写/执行。 |
-| 3 | 必要就替我审批通过 | `allow` → 自动放行（**含 su deny 档**，客户 D1），`OperatorOutcome.operatorId = "judge:<引擎>"`；审计 `by` 以 `operator:judge:<引擎>` 结尾；deny 档放行的审计/聊天行必须标 **「deny 档 · judge 放行」**；普通放行显示「已替你放行（判断 agent）」。 |
+| 2 | 单独的判断 agent，思考操作是否必要 | 每次判断开一个**非持久化一次性会话**（`persistSession:false`），独立于请求角色与规则层；shell 链跳过 `(b)` pm；只能读、不能写/执行。 |
+| 3 | 必要就替我审批通过 | `allow` → 自动放行（**含项目角色/su 的 deny 档**），`OperatorOutcome.operatorId = "judge:<引擎>"`；审计 `by` 以 `operator:judge:<引擎>` 结尾；deny 档放行的审计/聊天行必须标 **「deny 档 · judge 放行」**；普通放行显示「已替你放行（判断 agent）」。 |
 | 4 | 他也是全部可读的 | 项目根内代码/文档/角色卡/配置可读；**硬排除** `.env*`、密钥/证书、凭据/令牌、`.git/`、`docs/audit/`、`.ans/sessions/`、项目根之外、二进制/超大文件。 |
 | 5 | 拒绝要给替代方案 | `deny` 有替代方案时带 `alternative`（`command`/`tool`/`instruction`）；替代方案是**文本**，应用不自动执行。 |
 | 6 | 没有替代方案，返回 su 告知用户，也别弹窗 | `deny` 无替代方案时**仍然拒绝**，带 `customerMessage` + 标准出路「如需执行，请关闭『替我审』后重试」；**0 张卡**；请求角色收到同一段说明，桌面结果行兜底。 |
-| 7 | 只有判断没发生才弹卡 | `manual` 只用于：引擎不支持/未配置、会话不可用、超时、中止、输出无法解析、读取策略/预算阻止判断、模型自报无法判断、防循环上限、结果无法呈现。**deny 档 judge `allow` 是正常放行（客户 D1），不是 `manual`**；**不把「不必要」「无替代方案」「不确定」当 `manual`**。 |
+| 7 | 只有判断没发生才弹卡 | `manual` 只用于：引擎不支持/未配置、会话不可用、超时、中止、输出无法解析、读取策略/预算阻止判断、模型自报无法判断、防循环上限、结果无法呈现。**deny 档 judge `allow` 是正常放行（项目/su 均同），不是 `manual`**；**不把「不必要」「无替代方案」「不确定」当 `manual`**。 |
 | 8 | 跟随当前会话引擎 | 判断使用 `metadata.runtime` 与同 `runtimeOptions`；**三引擎同期（Claude/Pi/Codex，客户 D2）**；每条请求用自己会话的引擎，**不跨引擎**；仅 `demo`/未配置/不可用才 `manual`。 |
-| 9 | 手动就是现有逻辑 | 未勾选时逐字不变：原卡片、拒绝默认焦点、Esc/关闭/超时/通道不可用不放行、审计归因人工。 |
+| 9 | 手动就是现有逻辑 | 未勾选时：**规则层仍为 advisory**（`(c)=deny` 不再硬拒），非 allow 全部弹原手动卡；卡片的拒绝默认焦点、Esc/关闭/超时/通道不可用不放行、审计归因人工不变。 |
+| 10 | 第一层不要拒绝任何请求，而是快速放行。所有的拒绝必须要AI 来。 | **规则 advisory**：`(c)=allow` 快速放行；`risky/review/deny` 规则层不终结、**跳过 `(b)`**、全部交 `(a)`；规则层**永不拒绝**；拒绝由 judge（AI）或手动卡客户作出。V1 无确定性 hard-deny 地板（客户明确要求）。 |
 
 ## 三、代码事实复核（只读，2026-10-17 工作树）
 
@@ -74,7 +78,7 @@ events:
 | 桌面 `operatorId` = OS 用户名 | `app/main.ts:131-139,149-155` | 人工归因不变；判断结果用 `judge:<引擎>`，审计自然成 `operator:judge:<引擎>`。 |
 | 编排把 `OperatorOutcome.operatorId` 写成 `operator:<id>` | `src/common/编排/shell-gate.ts:875-877` | **无需改审计 schema 就能区分**；新增可选 `judge` 字段是为了回答「为什么这么判」。 |
 | `runA` 调通道时只传 `OperatorPrompt`，不传 metadata | `src/common/编排/shell-gate.ts:615-690` | metadata 由 `session.ts` 包装闭包补；判断 agent 的 `turnText`/`judge` 也应从该包装补。 |
-| `(c)=allow` 直接放行，`(c)=deny` 项目角色直接终结；su 审批档 `approveDeny:true` 把 `deny` 也交 `(a)` | `src/common/编排/shell-gate.ts:456-565`；`src/pipeline/orchestration/shell-arming.ts:295-306` | 判断 agent 只会看到项目角色的 `risky/review` 升级与 su 的 `risky/review/deny`；**项目角色 `deny` 不会到 `(a)`**。 |
+| 现状 `(c)=allow` 直接放行，`(c)=deny` 项目角色直接终结；su 审批档 `operatorOnly+approveDeny` 把 `risky/review/deny` 都交 `(a)` | `src/common/编排/shell-gate.ts:456-565`；`src/pipeline/orchestration/shell-arming.ts:295-306` | **客户 2026-10-18 改为规则 advisory**：项目角色 `risky/review/deny` 也不终结、**跳过 `(b)`** 交 `(a)`；需改 shell-gate/arming/run-role 的装配（项目角色 `advisoryRuleset`；su 仍 `operatorOnly+approveDeny`），审计保留 `(c)` 判定 + judge 结论。 |
 | 审计记录字段 `timestamp/toolCallId/command/argv/cwd/conclusion/branch/by/conditions/execution` | `src/common/编排/shell-audit.ts:61-72` | 加可选 `judge` 即可向后兼容；`manual` 后的手批不写 `judge`。 |
 | 冻结契约 `OperatorPrompt`/`OperatorOutcome` 在 `model/runtime.ts` | `src/model/runtime.ts:86-101` | 加可选 `judge` 字段是向后兼容的；不得另造第二份形状。 |
 | `RuntimeAdapter` 只有 `composeContext`/`bindRole` | `src/model/runtime.ts:573-576` | **不把判断循环加进适配器**；适配器只负责「按注入工具开会话」，判断驱动属于编排（同 `pm-reviewer`）。 |
@@ -124,16 +128,23 @@ events:
 - **不追溯**：只影响之后新到 `(a)` 的请求；已挂起的卡不受勾选影响。
 - 多窗口当前不存在；若未来出现，需重新定义归属（本文不承诺）。
 
-### 4.3 deny 档：允许 judge 放行，但必须显式标记（客户 D1）
+### 4.3 规则 advisory：所有非 allow 交 `(a)`；deny 档允许 judge 放行并标记（客户 2026-10-18）
 
-- 项目角色：`(c)=deny` 在 `(a)` 之前终结，判断 agent 看不到；`(c)=allow` 也不到 `(a)`。判断 agent 只处理 `risky/review` 升级。
-- su 审批档：`risky/review/deny` 都到 `(a)`。**客户 D1：`deny` 档也允许 judge `allow` 即放行**（沿用客户原话「如果是必要的，那就替我审批通过」），包括 `sudo`/`sh -c`/`mkfs` 等硬拒类；**不再有 hard-floor / 0 卡说明分支**。
-- **可见性硬要求**：deny 档放行必须在审计与聊天行标 **「deny 档 · judge 放行」**：
-  - 审计 `judge.tier:"deny"` + `judge.hardDenyOverride:true` + `by` 以 `operator:judge:<引擎>` 结尾；
-  - 聊天行标题/副标题显示「已替你放行（判断 agent · deny 档）」，正文一句「该命令属于硬拒类，判断 agent 判定必要后放行；请复核」；
+- **项目角色**：`(c)` 规则层只做 **advisory**——`(c)=allow` 快速放行（0 卡、0 judge）；`(c)=risky|review|deny` **不再终结、跳过 `(b)`、全部交 `(a)`**。`(c)` 判定作为 judge/操作者的输入与审计证据保留，不是拒绝依据。
+- **su**：`operatorOnly+approveDeny` 已把 `risky/review/deny` 交 `(a)`，与项目角色新路径同构；judge 仍按请求会话引擎工作。
+- **规则层永不拒绝**：所有拒绝由 `(a)` 的 judge（AI）或手动卡客户作出；`(c)=deny` 不再有确定性硬拒地板（客户原话：「第一层不要拒绝任何请求，而是快速放行。所有的拒绝必须要AI 来。」）。
+- **deny 档放行可见性**：任何 `tier="deny"` 的 judge `allow`（项目/su 均同）必须在审计与聊天行标 **「deny 档 · judge 放行」**：
+  - 审计 `judge.tier:"deny"` + `judge.hardDenyOverride:true` + `label:"deny 档 · judge 放行"` + `by` 以 `operator:judge:<引擎>` 结尾；
+  - 聊天行标题/副标题显示「已替你放行（判断 agent · deny 档）」，正文一句「该命令属于规则 deny 档，判断 agent 判定必要后放行；请复核」；
   - 普通 `risky/review` 放行不显示该标记。
-- **风险接受**：这等于允许模型推翻门禁引擎的确定性硬拒类（`reshell`/`inline-eval`/`interpreter-inline`/`privilege`/`system-destroy`/`lolbin`，见 `src/common/门禁引擎/classify-shell.ts:373-421`）。客户已拍板；缓解是 rubric + 只读证据 + 审计/聊天行显式标记 + 可随时关闭开关。登记为 R1（主要风险）。
-- judge 的 `deny`/`manual` 照常；客户仍可关闭「替我审」后走原手动确认卡。
+- **风险接受（客户明确）**：这等于允许 AI 放行规则判为 deny 的危险命令（`reshell`/`inline-eval`/`interpreter-inline`/`privilege`/`system-destroy`/`lolbin`，见 `src/common/门禁引擎/classify-shell.ts:373-421`），没有确定性地板兜底。缓解是 rubric + 只读证据 + 审计/聊天行显式标记 + 可随时关闭开关；登记 R1/R22（主要风险）。
+- judge 的 `deny`/`manual` 照常；手动模式下 `(c)` 仍 advisory，非 allow 全部弹原手动卡，由客户决定。
+
+### 4.3a 历史/可选回归：原「deny 硬地板」
+
+- **历史**：revision 1–2 曾设计项目角色 `(c)=deny` 在 `(a)` 之前硬拒、su 的 `deny` 档由 D1 允许 judge 放行；revision 3 客户明确要求**移除确定性硬拒地板**，改为规则 advisory。
+- **V1 不启用**任何 `c-deny` 硬拒 / hard-floor / `deny 档不得 judge 放行` 分支；这些只作为历史记录，不得回潮。
+- **可选回归路径（未来，需客户单独拍板）**：若未来要恢复硬地板，必须作为**显式 opt-in**（如 `deterministicFloor:"c-deny"`）接入，默认关闭；开启时在 UI/审计标明「规则层硬拒」，并重新评估与 judge 的关系。V1 不提供该开关。
 
 ### 4.4 判断范围：只接 shell `(a)`，不接其他通道
 
@@ -143,7 +154,7 @@ events:
 
 ### 4.5 上下文深度：当前轮任务文本 + 按需读取，不灌整棵树
 
-- 初始上下文：命令原文/argv/cwd/toolCallId、请求角色 id、项目根、runtime、`policy/tier`、升级原因、**当前轮投递给该角色的文本（≤4KB）**、项目顶层目录索引（只列一层，敏感项不列）。
+- 初始上下文：命令原文/argv/cwd/toolCallId、请求角色 id、项目根、runtime、`policy/tier`、**规则 advisory 原因（`c-advisory[tier]`）**、**当前轮投递给该角色的文本（≤4KB）**、项目顶层目录索引（只列一层，敏感项不列）。
 - 按需读取：`judge_list_dir` + `judge_read_file`，受 §七 的预算与排除约束。
 - **不读**：原始会话转录、历史回放、`.ans/sessions/`、`docs/audit/`、日志、`.env`/密钥/凭据、项目根之外。
 - 不做向量检索/全项目扫描/依赖图；V1 不做搜索工具，避免第二套读取路径。
@@ -157,14 +168,15 @@ events:
 以下全部具备才算 V1 可交付：
 
 1. **三引擎判断会话（客户 D2）**：Claude/Pi/Codex 各自的 judge 模式；`persistSession:false`、只读三工具（`judge_read_file`/`judge_list_dir`/`report_shell_judgement`）；各自关闭原生工具（Claude WebSearch/外来 MCP、Pi 原生工具、Codex CLI/原生工具）。
-2. **三态**：`allow` 自动放行（**含 su deny 档，客户 D1**）；`deny` 有替代给替代、无替代给客户说明 + 出路、**都不弹卡**；`manual` 只用于判断没发生（唯一 UI 例外：结果行无法呈现的 `row-failed`），弹原卡。
+2. **三态**：`allow` 自动放行（**含项目角色/su 的 deny 档**）；`deny` 有替代给替代、无替代给客户说明 + 出路、**都不弹卡**；`manual` 只用于判断没发生（唯一 UI 例外：结果行无法呈现的 `row-failed`），弹原卡。
 3. **只读边界**：`.env`/密钥/凭据/`.git`/审计/会话转录/项目外/符号链接/二进制/预算；读被拒/预算/截断时 `allow` 降级 `manual`，`deny` 有效。三引擎逐引擎验收。
-4. **deny 档放行标记**：su `su-审批档[deny]` 的 judge `allow` 即放行；审计/聊天行标 **「deny 档 · judge 放行」**（`judge.tier:"deny"` + `hardDenyOverride:true`）；不再有 hard-floor 分支。
+4. **deny 档放行标记**：项目角色或 su 的 `tier=deny` judge `allow` 即放行；审计/聊天行标 **「deny 档 · judge 放行」**（`judge.tier:"deny"` + `hardDenyOverride:true` + `label`）；**不再有 hard-floor 分支**。
 5. **引擎回落**：仅 `demo`/未配置/不可用/超时 → `manual`；三引擎同期，不跨引擎，输入区明示。
 6. **开关**：输入区复选框、默认手动、不持久化、重载复位、不追溯、应用级。
 7. **审计与可见性**：`operator:judge:<引擎>`、可选 `judge` 字段（含 `tier`/`hardDenyOverride`）、聊天结果行（allow/deny/deny 档标记）、手动卡提示、诊断事件。
 8. **测试**：运行时核心/编排/Claude适配器/Pi适配器/Codex适配器/桌面窗口/桌面UI 单测 + 测试角色独立验收 + 全量三层 glob；不跑真实模型/凭据。
 9. **降级**：任何判断失败都落到原手动卡（fail-closed）；`deny` 不因 UI/读取损伤变成 `allow`。
+10. **规则 advisory（客户 2026-10-18）**：项目角色 `(c)=allow` 快速放行；`risky/review/deny` 跳过 `(b)` 全交 `(a)`；规则层不拒绝；手动模式下同样不硬拒，非 allow 全部弹卡；旧 hard-deny 只作历史/可选回归（§4.3a）。
 
 ## 五、运行时架构（钉死）
 
@@ -198,14 +210,14 @@ events:
 └────────────────────────────────────────────────────────────────────┘
 ```
 
-**为什么判断能力不挂在 `RuntimeAdapter` 上**：现有适配器契约只有 `composeContext`/`bindRole`，模型往返/会话循环由编排的 `openRoleSession`/`pm-reviewer` 承载。把一次性判断循环加进适配器会造出第二套会话生命周期，且三个适配器各写一遍。本文沿用 `pm-reviewer` 的成熟模式：**适配器只按注入工具集开会话；判断驱动在编排；只读工具在运行时核心**。
+**为什么判断能力不挂在 `RuntimeAdapter` 上**：现有适配器契约只有 `composeContext`/`bindRole`，模型往返/会话循环由编排的 `openRoleSession` 承载。把一次性判断循环加进适配器会造出第二套会话生命周期，且三个适配器各写一遍。本文沿用 `pm-reviewer` 的一次性会话模式（**pm-reviewer 本身不再参与 shell 链**）：**适配器只按注入工具集开会话；判断驱动在编排；只读工具在运行时核心**。
 
 ### 5.2 调用链（一次判断）
 
-1. 请求角色触发 `run_shell` → `ShellGate` 的 `(c)`/`(b)`/`(a)`。
-2. 到 `(a)`，`shell-gate.ts::runA` 调 `operatorChannel(prompt)`；`session.ts` 的闭包补 `{roleId, projectRoot, runtime, signal, turnText, judge}`。
+1. 请求角色触发 `run_shell` → `ShellGate` 的 `(c)` **advisory** → `(a)`；项目角色 `risky/review/deny` **跳过 `(b)`**，su 同构（不再有 pm 审读段）。
+2. 到 `(a)`，`shell-gate.ts::runA` 以 `(c)` advisory 结果构造 prompt（`reason` 带 `c-advisory[tier]`，**不是 pm 升级原因**）；`session.ts` 的闭包补 `{roleId, projectRoot, runtime, signal, turnText, judge}`。
 3. `createDesktopOperatorChannel`：
-   - 开关关 / 无 `metadata.judge` / `signal.aborted` → 原 `present`（逐字不变）。
+   - 开关关 / 无 `metadata.judge` / `signal.aborted` → 原 `present`（手动卡；`(c)` 仍 advisory，非 allow 全部弹卡）。
    - 开关开 → 以独立 15s 超时调 `metadata.judge(request, signal)`。
 4. `createShellJudge`：
    - 三引擎支持矩阵（`claude`/`pi`/`codex`）通过；`demo` 或未配置/不可用 → `manual/unsupported-engine`。
@@ -214,10 +226,10 @@ events:
    - `bindRole(JUDGE_ROLE)`（合成角色，`cardText` = 判断系统提示，空边界），`prompt(buildShellJudgePrompt(request))`。
    - 等 `settled` 或超时；从 `report_shell_judgement` 工具取结论；规范化；损伤检查；`dispose`。
 5. 通道三态：
-   - `allow` → 先发结果行（失败则 `manual/row-failed`）→ `{outcome:"allow", operatorId:"judge:<引擎>", judge}`；**若 `tier === "deny"`，结果行/审计标「deny 档 · judge 放行」**（客户 D1），但仍放行，**不再有 hard-floor 分支**。
+   - `allow` → 先发结果行（失败则 `manual/row-failed`）→ `{outcome:"allow", operatorId:"judge:<引擎>", judge}`；**若 `tier === "deny"`，结果行/审计标「deny 档 · judge 放行」**（项目/su），但仍放行，**不再有 hard-floor 分支**。
    - `deny` → 格式化 reason（客户说明 + 原因 + 替代方案 + 出路）→ 发结果行（失败只记诊断）→ `{outcome:"deny", operatorId:"judge:<引擎>", reason, judge}`；**不调用 presenter**。
-   - `manual` → 设置 `display.judgeNotice` → 原 `present`；审计归因人工。
-6. `shell-gate.ts` 写审计：`by = <既有来源> → operator:judge:<引擎>`；可选 `judge` 字段；`branch`/`execution` 不变。
+   - `manual` → 设置 `display.judgeNotice` → 原 `present`；审计归因人工（项目角色 `by = ruleset:<rule>（advisory） → operator:<OS用户>`）。
+6. `shell-gate.ts` 写审计：项目角色 `by = ruleset:<rule>（advisory） → operator:judge:<引擎>`（judge）或 `ruleset:<rule>（advisory） → operator:<OS用户>`（手动卡）；`branch = c-allow | c-<tier>→a-allow/deny/timeout/unavailable`，**无 `b-*`**；可选 `judge` 字段；`execution` 不变。
 
 ### 5.3 合成判断角色
 
@@ -254,7 +266,7 @@ export interface ShellJudgeRequest {
   runtime: RuntimeKind;
   policy: ShellJudgePolicy;
   tier: ShellJudgeTier;
-  reason?: string;       // (b) 升级原因 / su 审批档原因
+  reason?: string;       // (c) advisory 原因（如 c-advisory[tier]）/ su 审批档原因；不是 pm 升级原因
   turnText?: string;     // 当前轮投递给该角色的文本，≤4KB
 }
 
@@ -291,7 +303,7 @@ export interface ShellJudgeAudit {
   model?: string;
   /** 请求档位；`deny` 且 judge 放行时配合 `hardDenyOverride` 标「deny 档 · judge 放行」。 */
   tier: "risky" | "review" | "deny" | null;
-  /** 客户 D1：模型推翻了硬拒类。 */
+  /** 模型放行了规则 deny 档（项目/su 均同），用于审计/聊天行可见标记。 */
   hardDenyOverride?: true;
   /** 客户 D1：deny 档放行的人工可读标记；仅 hardDenyOverride 时出现。 */
   label?: "deny 档 · judge 放行";
@@ -447,7 +459,8 @@ export interface ShellJudgeResultPayload {
   - `emitJudgeResult?: (payload: ShellJudgeResultPayload) => void`。
 - `ShellCommandDisplay` / `ShellConfirmRequest` 增可选 `judgeNotice?: string`（手动回落提示）。
 - 通道**不**解析命令风险、不做 `(c)` 判定；它只检查开关、调用注入的 judge、映射三态。
-- **`operator-channel.ts` 的「不做任何判定」硬约束保留**：它不分类命令、不读项目、不实现 rubric；判断语义全部在 `createShellJudge`/只读工具中。通道里的 `row-failed` 只是 **UI 可靠性映射**（allow 的结果行投达失败 → `manual/row-failed`）；**deny 档放行不做任何转换**，只按 `tier` 打 `hardDenyOverride` 标记（客户 D1），不是第二份命令判定。**不再有 hard-floor 分支**。
+- **手动卡的 `tier` 解析（v3）**：项目角色 `prompt.reason` 行首为 `c-advisory[risky|review|deny]`；`buildShellConfirmRequest` 用 `parseRuleAdvisoryTier` 填入 `tier`，`plainReasonFor` 映射为「规则层判为 X（advisory，不拒绝），请核对后决定」；**不得显示「pm 拿不准/自动审核」**。su 仍用 `su-审批档[...]`。
+- **`operator-channel.ts` 的「不做任何判定」硬约束保留**：它不分类命令、不读项目、不实现 rubric；判断语义全部在 `createShellJudge`/只读工具中。通道里的 `row-failed` 只是 **UI 可靠性映射**（allow 的结果行投达失败 → `manual/row-failed`）；**deny 档放行不做任何转换**，只按 `tier` 打 `hardDenyOverride` 标记（项目/su），不是第二份命令判定。**不再有 hard-floor 分支**。
 
 ### 6.6 IPC / preload 契约
 
@@ -545,7 +558,7 @@ onShellJudgeResult(cb): () => void
 | --- | --- | --- |
 | 命令 | 原文逐字、规范化 argv、cwd、toolCallId | 不改写、不截断；判断 agent 不能改命令；>16KB / argv >256 项 → `manual/context-too-large`（不截断后猜） |
 | 来源 | `roleId`、`projectRoot`、`runtime` | 来自会话闭包，不信任渲染侧 |
-| 策略 | `policy`（`su-approval`/`project`）、`tier`（`risky`/`review`/`deny`/null）、`reason` | 只作输入；`deny` 档允许 judge 放行，但必须标 `hardDenyOverride`（§4.3） |
+| 策略 | `policy`（`su-approval`/`project`）、`tier`（`risky`/`review`/`deny`/null）、`reason`（`(c)` advisory 原因，如 `c-advisory[risky]`；**不是 pm 升级原因**） | 只作输入；任何 `deny` 档允许 judge 放行，但必须标 `hardDenyOverride`（§4.3） |
 | 任务 | `turnText`：当前轮投递给该角色的文本，≤4KB | 内存内、会话 dispose 即清；超出截断（不据此 manual）；不读原始转录/历史回放/`.ans/sessions/` |
 | 项目 | 项目根、顶层目录索引（一层，敏感项不列） | 不灌整棵树；按需用 `judge_list_dir`/`judge_read_file` |
 | 准则 | rubric + 输出契约 + 不可信数据警告 | 系统提示的一部分；项目文件不可覆盖 |
@@ -585,11 +598,22 @@ onShellJudgeResult(cb): () => void
 
 ### 8.3 三态与降级矩阵
 
+**规则层（advisory，客户 2026-10-18）**：
+
+| `(c)` 判定 | 行为 | 是否弹卡 | 审计 |
+| --- | --- | --- | --- |
+| `allow` | **快速放行**，不调用 judge、不弹卡 | **0 张** | `by=ruleset:<rule>`，`branch=c-allow` |
+| `risky` / `review` / `deny` | **不终结、跳过 `(b)`、全部交 `(a)`**（judge 或手动卡） | 由 `(a)` 决定 | `by=ruleset:<rule>（advisory） → operator:...`，`branch=c-<tier>→a-*`，**无 `b-*`** |
+
+> 规则层**永不拒绝**；`c-deny` 不再硬拒。拒绝只由 judge 或手动卡客户作出。
+
+**判断层（`(a)`）**：
+
 | 情形 | 结果 | 是否弹卡 | 审计 `by` |
 | --- | --- | --- | --- |
 | 判断 `allow` + 无损 | `allow` | **0 张** | `... → operator:judge:<引擎>` |
 | 判断 `allow` + 读取被拒/预算/截断/上下文缺失 | `manual` | **1 张原卡** | 人工（不带 `judge`） |
-| 判断 `allow` + su `deny` 档（客户 D1） | `allow` + `hardDenyOverride:true`（审计/聊天行标「deny 档 · judge 放行」） | **0 张** | `... → operator:judge:<引擎>` |
+| 判断 `allow` + deny 档（项目/su 均同） | `allow` + `hardDenyOverride:true`（审计/聊天行标「deny 档 · judge 放行」） | **0 张** | `... → operator:judge:<引擎>` |
 | 判断 `allow` + 结果行投达失败 | `manual/row-failed` | **1 张原卡** | 人工 |
 | 判断 `deny` + 有替代方案 | `deny` | **0 张** | `... → operator:judge:<引擎>` |
 | 判断 `deny` + 无替代方案 | `deny` + 合成说明/出路 | **0 张** | 同上 |
@@ -603,6 +627,7 @@ onShellJudgeResult(cb): () => void
 | 读取策略/预算阻止判断，或模型自报无法判断（`manual`） | `manual/read-denied`/`budget`/`model-manual` | **1 张原卡** | 人工 |
 | 同一命令连续 `deny` 达上限 | `manual/retry-capped` | **1 张原卡** | 人工 |
 | 轮次已中止 | 不调用/丢弃 | 按既有路径 | 人工/不可用 |
+| 开关关（手动模式） | `(c)` 仍 advisory；非 allow 全部弹原手动卡 | **1 张** | `ruleset:<rule>（advisory） → operator:<OS用户>` |
 
 **一句话**：`allow` 要求「判断完整发生且无损伤」；`deny` 永远安全（拒绝方向），不受读取损伤影响；`manual` **只表示「交人手批」**，不表示「不必要」或「无替代方案」。
 
@@ -613,7 +638,7 @@ onShellJudgeResult(cb): () => void
 | A | **判断没发生** | `unsupported-engine`、`unavailable`、`timeout`、`aborted`、`parse-failed`、`read-denied`、`budget`、`read-truncated`、`retry-capped`、`context-missing`、`context-too-large`、`model-manual` | 「判断 agent 未能完成判断：…」 |
 | B | **判断发生但 UI 无法交付**（提案 J10） | `row-failed` | 「判断已完成，但结果无法在聊天中显示…」 |
 
-**su `deny` 档放行不在 `manual` 组**：它是 `allow` + `hardDenyOverride:true`（§4.3/§6.4），0 卡、`by` 为 `operator:judge:<引擎>`；审计/聊天行必须标「deny 档 · judge 放行」。**`unnecessary` / `no-alternative` 永不属于 A 或 B**：它们是 `deny`，必须 0 卡返回请求角色；测试必须断言这一点。
+**deny 档放行（项目/su 均同）不在 `manual` 组**：它是 `allow` + `hardDenyOverride:true`（§4.3/§6.4），0 卡、`by` 为 `operator:judge:<引擎>`；审计/聊天行必须标「deny 档 · judge 放行」。**`unnecessary` / `no-alternative` 永不属于 A 或 B**：它们是 `deny`，必须 0 卡返回请求角色；测试必须断言这一点。
 
 ### 8.4 `deny` 返回请求角色的文本
 
@@ -628,7 +653,7 @@ onShellJudgeResult(cb): () => void
 ```
 
 - 请求角色（客户场景里通常是 su）收到的是 `ShellReviewResult.reason`；它可以按替代方案发新请求，或向客户转述。
-- **应用不自动重试、不自动执行替代方案**；新请求重新走 `(c)/(b)/(a)` 与判断。
+- **应用不自动重试、不自动执行替代方案**；新请求重新走 `(c)` advisory → `(a)` 与判断（无 `(b)`）。
 - 桌面结果行同时显示同一段说明，保证即使模型未转述，客户也能看到。
 - `customerMessage` 必须是人话、可直接转述、不含内部行话/档位 token/凭据；运行时合成时遵守同一口径。
 
@@ -643,10 +668,10 @@ onShellJudgeResult(cb): () => void
 
 ### 9.1 审计归因
 
-- 判断 `allow`：`by = <既有来源> → operator:judge:<引擎>`，例如 `pm:<会话>(<模型>) → operator:judge:claude`、`ruleset:<id>（su 审批档） → operator:judge:claude`。
+- 判断 `allow`：`by = <既有来源> → operator:judge:<引擎>`，例如项目角色 `ruleset:<rule>（advisory） → operator:judge:claude`、su `ruleset:<id>（su 审批档） → operator:judge:claude`；`branch` 为 `c-<tier>→a-allow`（无 `b-*`）。
 - 判断 `deny`：同形，`conclusion:"deny"`，`reason` 为 §8.4 文本。
-- 判断 `manual` → 客户手批：`by = <既有来源> → operator:<OS用户>`，**不带** `judge`；`judge` 字段也不写。
-- `branch`、`command`、`argv`、`cwd`、`execution`、`toolCallId` 照旧。
+- 判断 `manual` → 客户手批：项目角色 `by = ruleset:<rule>（advisory） → operator:<OS用户>`，su `by = ruleset:<id>（su 审批档） → operator:<OS用户>`；**不带** `judge`；`judge` 字段也不写；`branch` 为 `c-<tier>→a-*`。
+- `command`、`argv`、`cwd`、`execution`、`toolCallId` 照旧；项目角色 shell 链**无 `b-*`**。
 
 ### 9.2 审计可选 `judge` 字段
 
@@ -669,7 +694,7 @@ onShellJudgeResult(cb): () => void
 ```
 
 - **只在判断 agent 自己做出 allow/deny 时出现**；`manual` 后的手批是人工决定，不写。
-- **deny 档放行（客户 D1）**：`tier:"deny"` + `hardDenyOverride:true` + `label:"deny 档 · judge 放行"` + `verdict:"allow"`——审计/聊天行必须能看出这是**模型推翻了硬拒类**；普通 `risky/review` 放行 `hardDenyOverride`/`label` 省略。`verdict` 就是实际执行方向，不伪装。
+- **deny 档放行（项目/su）**：`tier:"deny"` + `hardDenyOverride:true` + `label:"deny 档 · judge 放行"` + `verdict:"allow"`——审计/聊天行必须能看出这是**模型放行了规则 deny 档**；普通 `risky/review` 放行 `hardDenyOverride`/`label` 省略。`verdict` 就是实际执行方向，不伪装。
 - 字段有界：`reason`/`customerMessage` ≤1KB，`alternative.value` ≤2KB；超出截断并标记。
 - 完整内容在聊天行详情；审计保留可核对的最小集。
 - `judge` 字段不得含完整命令（审计已有 `command`）、不得复述凭据。
@@ -682,11 +707,11 @@ onShellJudgeResult(cb): () => void
 | 裁决 | 标题 | 正文 | 详情 |
 | --- | --- | --- | --- |
 | `allow` | 已替你放行（判断 agent） | 命令摘要（`summary`；`null` 时写「无法概括命令；展开查看原文」）+ `判断引擎：<引擎>` + `operator:judge:<引擎>` + 时间 | 命令原文、cwd、理由、evidence、读取次数/字节、耗时、toolCallId |
-| `allow` + `tier:"deny"`（客户 D1） | **已替你放行（判断 agent · deny 档）** | **「deny 档 · judge 放行」** + 命令摘要 + 「该命令属于硬拒类，判断 agent 判定必要后放行；请复核」 + `判断引擎：<引擎>` + `operator:judge:<引擎>` + 时间 | 命令原文、cwd、理由、evidence、`hardDenyOverride:true`、读取次数/字节、耗时、toolCallId |
+| `allow` + `tier:"deny"`（项目/su） | **已替你放行（判断 agent · deny 档）** | **「deny 档 · judge 放行」** + 命令摘要 + 「该命令属于规则 deny 档，判断 agent 判定必要后放行；请复核」 + `判断引擎：<引擎>` + `operator:judge:<引擎>` + 时间 | 命令原文、cwd、理由、evidence、`hardDenyOverride:true`、读取次数/字节、耗时、toolCallId |
 | `deny` | 未放行（判断 agent） | 判断理由 +（有替代方案）替代方案；无替代方案时 `customerMessage` + 出路 | 命令原文、cwd、完整理由、替代方案、`customerMessage`、`customerMessageSynthesized`、耗时、toolCallId |
 | `manual` | 不产生结果行 | — | 原卡 + 对应 `judgeNotice`（一般「判断未完成」或 `row-failed`「判断已完成但无法显示」） |
 
-- **deny 档放行必须与普通放行一眼可分**：标题带「deny 档」，正文有「硬拒类 / 请复核」；审计 `judge.tier:"deny"` + `judge.hardDenyOverride:true`。这是客户 D1 的可见性要求。
+- **deny 档放行必须与普通放行一眼可分**：标题带「deny 档」，正文有「规则 deny 档 / 请复核」；审计 `judge.tier:"deny"` + `judge.hardDenyOverride:true`。这是客户 D1/D6 的可见性要求。
 - `allow` 行只证明**已放行**，不证明执行成功；执行结果看既有工具行/审计 `execution`。
 - **不自动切换当前角色/视图**：后台角色的结果行只落它自己的 pane，客户切回时可见；不打断当前聊天。
 - 渲染侧所有动态文本走 `esc`/`textContent`；禁止 HTML 直插。
@@ -727,15 +752,15 @@ onShellJudgeResult(cb): () => void
 </label>
 ```
 
-- 未勾选（默认）：标签「替我审」，悬停「手动逐条确认 shell 命令（默认）」；无警告行、无强调色。
+- 未勾选（默认）：标签「替我审」，悬停「手动逐条确认非 allow 的 shell 命令（默认）；规则层不拒绝」；无警告行、无强调色。
 - 勾选：标签「替我审批中 · 判断 agent」，琥珀色小圆点/描边（不是错误红）；输入区下方出现常驻警告。
 - 桥缺失/主进程未接线：禁用 + 「当前版本不支持自动判断，保持手动」；不显示假开启态。
 - 不抢焦点、不设快捷键；`Esc` 仍只用于拒绝确认卡。
 
 ### 10.2 开启警告（常驻，不是 toast）
 
-> **替我审批中：shell 命令先由判断 agent 评估必要性；只有判断没发生（不可用/超时/解析失败/引擎不支持）才会弹卡。**
-> 判断 agent 只读项目内代码/文档/角色卡（不含 `.env`、密钥/凭据与项目外），不写文件、不执行命令；不必要会给替代方案，没有替代方案会由请求角色说明并给出路；每次判断会产生一次模型调用（token/延迟）；可能误判，可随时关闭。
+> **替我审批中：规则层只做快速分类/放行（`(c)=allow` 直接放行），不拒绝任何请求；`risky/review/deny` 全部交判断 agent。只有判断没发生（不可用/超时/解析失败/引擎不支持）才会弹卡。**
+> 判断 agent 只读项目内代码/文档/角色卡（不含 `.env`、密钥/凭据与项目外），不写文件、不执行命令；不必要会给替代方案，没有替代方案会由请求角色说明并给出路；每次判断会产生一次模型调用（token/延迟）；**可能误判 allow（包括规则判为 deny 的危险命令）**；deny 档放行会标「deny 档 · judge 放行」，请复核；可随时关闭。
 > **判断 agent 跟随会话引擎（Claude / Pi / Codex）；当前引擎不可用、超时或未配置时回落到手动确认。** 文件写入、选择卡与恢复确认仍需手动。
 
 ### 10.3 状态机
@@ -743,7 +768,7 @@ onShellJudgeResult(cb): () => void
 | 迁移 | 触发 | 效果 |
 | --- | --- | --- |
 | M → J | 客户勾选，主进程 `shell:judge-set` 返回 `ok:true` | 警告与「判断 agent」标记出现；只影响之后新到 `(a)` 的请求 |
-| J → M | 客户取消勾选，主进程确认成功 | 之后请求恢复逐条弹卡 |
+| J → M | 客户取消勾选，主进程确认成功 | 之后 `(c)=allow` 快速放行；`risky/review/deny` 全部弹原手动卡（规则层仍 advisory，不硬拒） |
 | J → M（强制） | 关窗 / 渲染重载 / 应用退出 / IPC 失败 | 回手动；不写任何持久化 |
 | 任意 | 已挂起卡 | 不受切换影响；只能由客户手批/拒绝/关闭/超时失效 |
 
@@ -761,7 +786,9 @@ onShellJudgeResult(cb): () => void
 - `row-failed`（判断完成但结果行无法呈现）：
   > 判断 agent 已完成判断，但结果无法在聊天中显示；已转你手动确认。
 
-**deny 档放行不走卡片**：它是 `allow` + `hardDenyOverride:true`（客户 D1），0 卡；结果行/审计标「deny 档 · judge 放行」，不要为它写手动卡文案。
+**deny 档放行不走卡片**：它是 `allow` + `hardDenyOverride:true`（客户 D1/v3），0 卡；结果行/审计标「deny 档 · judge 放行」，不要为它写手动卡文案。
+
+- **开关关/无 judge 的手动卡（v3）**：不写 `judgeNotice`；`reasonPlain` 来自 `c-advisory[tier]`（「规则层判为 X，advisory，不拒绝；请核对后决定」）；拒绝默认焦点与 fail-closed 不变。
 
 - 原卡片标题、命令原文、摘要、原因、argv/cwd、拒绝默认焦点、关闭/Esc/超时/通道不可用不放行**逐字不变**。
 - `judgeNotice` 不进入 `reasonRaw`，不改变 `plainReasonFor` 的映射。
@@ -780,9 +807,11 @@ onShellJudgeResult(cb): () => void
 | 编排 | `src/pipeline/orchestration/govern-session.ts` | **薄再导出** `createShellJudge`/`CreateShellJudgeOptions`（既有公开入口） | 桌面只从这取，不直接跨角色私有导入 |
 | 编排 | `src/common/编排/shell-judge-verdict.ts`（新） | 严格规范化、合成客户说明、脱敏 | 编排私有 common，已有边界 |
 | 编排 | `src/common/编排/shell-judge-prompt.ts`（新） | 系统提示 + 请求提示 | 同上 |
-| 编排 | `src/common/编排/shell-gate.ts` | `ReviewOutcome` 增可选 `judge`；`runA` 透传；审计可选字段 | `(c)/(b)` 顺序不变 |
-| 编排 | `src/common/编排/shell-audit.ts` | `ShellAuditRecord` 增可选 `judge`（含 `tier`/`hardDenyOverride`） | 向后兼容 |
-| 编排 | `src/pipeline/orchestration/run-role.ts` | `AdapterCapabilities` 增 `shellJudge`；工厂透传 | 不改会话语义 |
+| 编排 | `src/common/编排/shell-gate.ts` | **项目角色 shell 链改规则 advisory**：`c=allow` 直放；`risky/review/deny` 跳过 `(b)` 交 `(a)`；`ReviewOutcome` 增可选 `judge`；审计保留 `(c)` 判定 + judge 结论 | **关键改动**；旧 `c-deny`/`b-*` 测试需同步改 |
+| 编排 | `src/pipeline/orchestration/shell-arming.ts` | 项目角色装配改 `advisoryRuleset`，**不注入 `pmAsk`**；su 保持 `operatorOnly+approveDeny` | 需调整「operatorOnly 仅 su」守卫，允许项目角色进入 advisory |
+| 编排 | `src/pipeline/orchestration/pm-reviewer.ts` | 不改；**shell 链不再调用 `(b)`** | 历史路径保留，非 shell |
+| 编排 | `src/common/编排/shell-audit.ts` | `ShellAuditRecord` 增可选 `judge`（含 `tier`/`hardDenyOverride`/`label`） | 向后兼容 |
+| 编排 | `src/pipeline/orchestration/run-role.ts` | `AdapterCapabilities` 增 `shellJudge`；项目角色 shell 模式透传 | 不改其他会话语义 |
 | Claude适配器 | `src/provider/claude/session.ts` | `judgeMode` 下强制关闭 WebSearch、外来 MCP；只注册注入工具；`test/claude-adapter/` | 引擎原生工具是泄漏点；逐引擎验收 |
 | Pi适配器 | `src/provider/pi/session.ts` | `judgeMode` 下只消费注入的 judge 工具；验证真实 agent 不注入原生工具；`test/pi-adapter/` | 三引擎同期（客户 D2） |
 | Codex适配器 | `src/provider/codex/session.ts` | `judgeMode` 下只读沙箱 + 只注册注入工具；拒绝 CLI/原生工具；`test/codex-adapter/` | 三引擎同期（客户 D2） |
@@ -815,12 +844,12 @@ onShellJudgeResult(cb): () => void
 
 | 编号 | 场景 | 通过判据 | 主责/独立验证 |
 | --- | --- | --- | --- |
-| A1 | 默认手动 | 未勾选：既有 shell 卡行为逐字不变；审计 `by` 不含 `judge`；无 `shell-judge.started`；现有测试全绿 | 桌面窗口 / 测试 |
+| A1 | 默认手动 | 未勾选：规则 advisory（`c=allow` 快速放行；`risky/review/deny` 弹原手动卡，`c-deny` **不硬拒**）；审计 `by` 不含 `judge`；无 `shell-judge.started`；旧 `c-deny`/`b-*` 测试已按新语义更新 | 桌面窗口 / 测试 |
 | A2 | 控件默认态 | 输入区常驻「替我审」；初始未勾选；无警告；焦点仍在输入框 | 桌面UI / 测试 |
 | A3 | 开启 | 主进程确认后：标签「替我审批中 · 判断 agent」、琥珀标记、常驻警告；`shell-judge.toggled{enabled:true}` 一条；无持久化键 | 桌面UI+窗口 / 测试 |
-| A4 | `allow` 自动放行 | 钩选后判断 `allow`：**0 张卡**、**1 行**「已替你放行（判断 agent）」、审计恰 1 条 `allow` 且 `by` 以 `operator:judge:<请求引擎>` 结尾、`judge` 字段存在、诊断 `shell-judge.allow` 一条 | 桌面窗口/编排 / 测试 |
-| A5 | `deny` + 替代方案 | 0 张卡、1 行「未放行」、请求角色工具结果含原因+替代方案、审计 `conclusion:"deny"` 且 `by` 以 `operator:judge:<请求引擎>` 结尾 | 同上 / 测试 |
-| A6 | `deny` 无替代方案 | **0 张确认卡**、1 行「未放行」、请求角色工具结果含 `customerMessage` 与「关闭『替我审』后重试」、审计 `deny` + `operator:judge:<请求引擎>`、诊断 `shell-judge.deny{reasonCode:"no-alternative"}` | 同上 / 测试 |
+| A4 | `allow` 自动放行 | 钩选后判断 `allow`：**0 张卡**、**1 行**「已替你放行（判断 agent）」、审计恰 1 条 `allow` 且 `by = ruleset:<rule>（advisory） → operator:judge:<请求引擎>`、`branch=c-<tier>→a-allow`、`judge` 字段存在、诊断 `shell-judge.allow` 一条 | 桌面窗口/编排 / 测试 |
+| A5 | `deny` + 替代方案 | 0 张卡、1 行「未放行」、请求角色工具结果含原因+替代方案、审计 `conclusion:"deny"` 且 `by` 以 `operator:judge:<请求引擎>` 结尾、`branch=c-<tier>→a-deny` | 同上 / 测试 |
+| A6 | `deny` 无替代方案 | **0 张确认卡**、1 行「未放行」、请求角色工具结果含 `customerMessage` 与「关闭『替我审』后重试」、审计 `deny` + `operator:judge:<请求引擎>`、`branch=c-<tier>→a-deny`、诊断 `shell-judge.deny{reasonCode:"no-alternative"}` | 同上 / 测试 |
 | A6b | su 说明可见 | 请求角色为 su：su 转述 `customerMessage`；即使模型未转述，桌面结果行也显示同一说明与出路。项目角色同理，桌面行兜底 | 桌面UI / 测试 |
 | A6c | 关闭后同一命令可手批 | 关闭开关后重试同一命令：弹原卡、拒绝默认焦点；手动放行后审计 `by` 以 `operator:<OS用户>` 结尾（不带 `judge`） | 桌面窗口 / 测试 |
 | A6d | deny 缺客户说明 | verdict 可解析为 deny 但缺 `customerMessage`/理由：运行时合成 + 标准出路，仍 deny、**0 张卡**；诊断/审计 `customerMessageSynthesized:true` | 运行时核心/编排 / 测试 |
@@ -831,13 +860,13 @@ onShellJudgeResult(cb): () => void
 | A11 | 读取范围 | `.env*`、`*.key`、`*.pem`、`credentials*`、`*token*`、`.git/`、`docs/audit/`、`.ans/sessions/`、项目外绝对路径、越界符号链接/junction、UNC、ADS：读取被拒；若它仍返回 `allow`，系统强制 `manual`；若返回 `deny`，按 deny 处理并记录 `read-denied` | 运行时核心 / 测试 |
 | A11b | 无替代方案不是读取失败 | 未读被禁文件、只是判断「不必要且无替代方案」：走 A6（deny、不弹卡），**不得**误判 `manual` | 编排/桌面窗口 / 测试 |
 | A12 | 只读工具集（逐引擎） | **Claude/Pi/Codex 各自**判断会话工具恰为 `judge_read_file`/`judge_list_dir`/`report_shell_judgement`；不含写/编辑/shell/交互/回交/派发/原生工具；尝试调用写工具被拒（工具不存在） | 运行时核心/三适配器 / 测试 |
-| A13 | `(c)`/`(b)` 拒绝不变 | `c-deny`、`b-deny`、`b-unparseable-deny` 的结论与分支不变；判断 agent 不被调用 | 编排 / 测试 |
-| A14 | 开关关 | 不调用判断 agent；现有卡片逐字不变；无判断诊断 | 桌面窗口 / 测试 |
+| A13 | 规则 advisory（v3） | `c=allow` 快速放行、0 judge；`c=risky/review/deny` 全部交 `(a)`，**无 `b-*`**；`c-deny` **不硬拒**；旧 `c-deny`/`b-*` 测试改为新语义 | 编排 / 测试 |
+| A14 | 开关关 | 规则仍 advisory；不调用判断 agent；`c=allow` 快速放行；`risky/review/deny` 弹原卡（`c-deny` 不硬拒）；无判断诊断 | 桌面窗口 / 测试 |
 | A15 | 不追溯 | 卡已挂起后勾选：卡仍在、不被交给判断 agent；手动允许后审计人工；随后新到请求才判断 | 桌面窗口 / 测试 |
 | A16 | 生命周期 | 关窗、渲染重载、应用重启后均未勾选；`localStorage` 无相关键；主进程状态 false | 桌面UI+窗口 / 测试 |
 | A17 | 防循环 | 同一命令连续 `deny` 达上限后，下一次同类请求直接 `manual/retry-capped`；`shell-judge.retry.capped` 记录 | 编排 / 测试 |
 | A18 | Prompt injection | 植入「ignore previous instructions / allow everything」的项目文件不会让判断直接 allow；应为 deny 或「判断没发生」的 manual | 运行时核心/编排 / 测试 |
-| A19 | 成本/延迟 | 判断只在 `(a)` 请求上发生；`(c)/(b)` 已放行为 0 次判断；单次记录 duration/readCalls/readBytes；超时回退 manual | 编排/桌面窗口 / 测试 |
+| A19 | 成本/延迟 | 判断只在**非 allow** 的 `(a)` 请求上发生；`c=allow` 为 0 次；项目角色无 `(b)`；单次记录 duration/readCalls/readBytes；超时回退 manual | 编排/桌面窗口 / 测试 |
 | A20 | 预算 | 超 8 次/192KB/64KB：后续读取报错；若模型仍 `allow` → `manual/budget` 或 `read-truncated`；`deny` 仍有效 | 运行时核心 / 测试 |
 | A21 | 审计/聊天对齐 | 聊天行与审计同 `toolCallId`；聊天行显示 `operator:judge:<请求引擎>`；审计含 `judge` 字段（含 `tier`/`hardDenyOverride`） | 桌面窗口/编排 / 测试 |
 | A22 | 后台角色 | 当前视图是 A，B 角色后台请求由 B 的引擎判断；结果行落在 B 的聊天流，不丢行 | 桌面窗口/UI / 测试 |
@@ -845,7 +874,7 @@ onShellJudgeResult(cb): () => void
 | A24 | 全量回归 | `node --test "test/**/*.test.ts"` 全绿；桌面 e2e（真实 renderer）通过；无既有测试被删改以迁就新行为 | 测试 |
 | A25 | 引擎矩阵（客户 D2） | Claude/Pi/Codex：allow/deny/manual 三态均通；各自只读工具/原生工具关闭/敏感排除逐引擎验证；`demo` 全部 `manual` + 提示可见；**不得**跨引擎 | 测试 |
 | A26 | allow 完整性 | 读取被拒/预算/截断/上下文缺失后 `allow` 一律降级 `manual`；`deny` 不受影响 | 编排 / 测试 |
-| A27 | deny 档放行（客户 D1） | su `su-审批档[deny]` 的命令 judge `allow` → **放行**（0 卡），审计 `judge.tier:"deny"` + `hardDenyOverride:true`，聊天行标题含「deny 档」+「请复核」；judge `deny` 仍 deny、0 卡 | 编排/桌面窗口/UI / 测试 |
+| A27 | deny 档放行（客户 D1/v3） | 项目角色 `c=deny` 或 su `deny` 档的 judge `allow` → **放行**（0 卡），审计 `judge.tier:"deny"` + `hardDenyOverride:true` + `label`，聊天行标题含「deny 档」+「请复核」；judge `deny` 仍 deny、0 卡；规则层不参与拒绝 | 编排/桌面窗口/UI / 测试 |
 | A28 | 审计归属 | `judge` 字段只出现在判断 allow/deny；`manual` 后手批无 `judge`；`by` 人工不带 `judge` | 编排 / 测试 |
 | A29 | 结果行失败分叉 | `allow` 行投达失败 → `manual/row-failed`；`deny` 行投达失败 → 仍 deny + 诊断 | 桌面窗口 / 测试 |
 | A30 | 当前轮上下文 | `turnText` 只含当前轮投递文本、≤4KB、会话 dispose 清空；不含历史回放/原始转录/`.ans/sessions/` | 桌面窗口 / 测试 |
@@ -855,18 +884,22 @@ onShellJudgeResult(cb): () => void
 | A34 | 工具集结构 | judge 模式不构造 `buildGovernedTools`；工具名/数量断言；写门禁为 deny-all | 运行时核心 / 测试 |
 | A35 | 三引擎只读（逐引擎） | Claude：WebSearch 关闭/外来 MCP 置空；Pi：真实 agent 不注入原生工具；Codex：只读沙箱/网络 false/只注册 judge 工具；三者均不得写/ shell/读敏感/出根 | 三适配器 / 测试 |
 | A36 | deny 档标记 | deny 档放行的审计/聊天行/诊断三处都能看出 `tier:"deny"` + `hardDenyOverride:true`（审计含 `label:"deny 档 · judge 放行"`；诊断含 `tier`/`hardDenyOverride`/`label`）；普通 risky/review 放行不带该标记 | 编排/桌面窗口/UI / 测试 |
+| A37 | 规则 advisory：c-deny 交 (a)（v3） | 项目角色 `(c)=deny` **不硬拒**，进入 `(a)`；judge `allow` → 放行（0 卡，标 deny 档）、judge `deny` → 拒绝（0 卡）；审计 `branch=c-deny→a-*`，**无 `b-*`** | 编排 / 测试 |
+| A38 | 手动模式 c-deny（v3） | 开关关：`(c)=deny` 弹原手动卡，拒绝默认焦点；客户允许后审计 `by` 以 `operator:<OS用户>` 结尾；规则层**不**拒绝 | 桌面窗口 / 测试 |
+| A39 | 跳过 (b)（v3） | 项目角色 shell 链不调用 `pmAsk`/`pm-reviewer`；审计无 `b-*`；pm 审读的其他用途/测试不受影响 | 编排 / 测试 |
+| A40 | 规则层永不拒绝（v3） | 对 `c=risky/review/deny` 表驱动：规则层在任何情况下都不返回 `allow:false`；拒绝只来自 judge 或手动卡 | 编排 / 测试 |
 
 ### 12.2 必须由测试角色独立验证的场景
 
 以下场景**不得只由属主单测覆盖**，必须由测试角色在独立上下文用桩件验证（不跑真实模型/凭据）：
 
-1. 开 → 触发一条 `risky` 命令 → 桩 judge `allow`：0 卡、1 行、审计 `operator:judge:<引擎>` + `judge` 字段。
+1. 开 → 触发一条 `risky` 命令 → 桩 judge `allow`：0 卡、1 行、审计 `by = ruleset:<rule>（advisory） → operator:judge:<引擎>` + `judge` 字段、`branch=c-risky→a-allow`。
 2. 桩 judge `deny` + 替代方案：0 卡、请求角色收到完整文本、结果行可见。
 3. 桩 judge `deny` 无替代方案：0 卡、`customerMessage` + 标准出路、su/角色说明可见。
 4. 桩 judge `manual`（超时/解析失败/引擎不支持）：原卡弹出、拒绝默认焦点、卡片提示、审计人工。
 5. 桩 judge `allow` + 读取被拒/预算耗尽/截断：降级 `manual`，不自动放行。**此场景必须用真实 `createShellJudge` + 假适配器/桩 `ShellJudgeReadStats` 验证驱动层的损伤检查；不能只在通道层注入一个返回 allow 的假 judge 冒充**（通道看不到读取统计）。
-6. su `deny` 档 + 桩 judge `allow`：**放行**（0 卡），审计 `tier:"deny"` + `hardDenyOverride:true`，聊天行标题含「deny 档」+「请复核」；不得再出现 hard-floor 分支。
-7. 开关关：与改动前逐字一致；判断 agent 0 次调用。
+6. 项目 `c=deny` 或 su `deny` 档 + 桩 judge `allow`：**放行**（0 卡），审计 `tier:"deny"` + `hardDenyOverride:true` + `label`，聊天行标题含「deny 档」+「请复核」；不得再出现 hard-floor / 规则层硬拒。
+7. 开关关：`c=allow` 快速放行；`risky/review/deny` 全部弹原卡（含 `c=deny`）；判断 agent 0 次调用；规则层不拒绝。
 8. 不追溯：挂起卡在勾选后不被判断；手批后审计人工。
 9. 敏感文件/项目外/符号链接/junction/ADS：读取被拒；判断不能据此 allow。
 10. Prompt injection 文件：不直接 allow。
@@ -875,24 +908,26 @@ onShellJudgeResult(cb): () => void
 13. 结果行投达失败分叉：allow → manual；deny → deny。
 14. 全量 `node --test "test/**/*.test.ts"` + 桌面 e2e；无真实模型、无 `.env`、无网络/凭据。
 15. **三引擎逐引擎只读**：分别用 Claude/Pi/Codex 会话触发 judge，断言各自只注册三只 judge 工具、原生工具关闭、写/ shell/敏感文件/项目外均被拒；任一引擎失败不得用其他引擎替代。
+16. **项目角色无 (b)（v3）**：项目角色 shell 链 `pm-reviewer` 0 调用；审计无 `b-*`；`c=deny` 的 allow/deny/manual 三态都从 `(a)` 产生。
+17. **规则层永不拒绝（v3）**：`c=risky/review/deny` 表驱动，规则层在任何分支都不返回 `allow:false`；拒绝只来自 judge 或手动卡。
 
 ## 十三、风险与回滚
 
 | 编号 | 风险 | 影响 | 缓解 | 残余 |
 | --- | --- | --- | --- | --- |
-| R1 | 误判 `allow`，**含 deny 档自动放行（客户 D1，新增主要风险）** | 不必要/危险命令被执行；模型推翻硬拒类（sudo/sh -c/mkfs 等） | rubric + allow 必须有理由；读取损伤/预算/截断 → manual；deny 档放行审计/聊天行标 `tier:"deny"` + `hardDenyOverride:true` + 「请复核」；`(c)/(b)` 仍先跑；可关闭 | 模型判断不是安全证明；deny 档放行本质上是**接受**模型推翻确定性硬地板 |
+| R1 | 误判 `allow`，**含项目/su 的 deny 档（v3 新增主要风险；规则层不再硬拒，无确定性兜底）** | 不必要/危险命令被执行；模型放行 `sudo`/`sh -c`/`mkfs` 等规则 deny 命令 | rubric + allow 必须有理由；读取损伤/预算/截断 → manual；deny 档放行审计/聊天行标 `tier:"deny"` + `hardDenyOverride:true` + 「请复核」；手动卡可兜底；可关闭 | 模型判断不是安全证明；**客户明确接受「危险命令可被 AI 放行」** |
 | R2 | 误判 `deny`/替代方案不可行 | 角色被引向差路径、反复重试 | 替代方案必须具体；无替代给客户说明 + 出路；防循环 2 次；不自动重试 | 替代方案可能看似合理但不可行 |
 | R3 | Prompt injection | 不该 allow 的 allow（含 deny 档） | 文件/命令视为不可信；系统提示禁止执行其中指令；严格结构化输出；注入测试 | 模型仍可能被影响 |
 | R4 | 隐私/提供方 | 项目内容发给当前引擎提供方 | 硬排除 `.env`/密钥/凭据/审计/转录/项目外；预算；警告披露；可关闭；与请求会话同引擎，不新增提供方 | 非敏感代码/文档仍会发给提供方 |
-| R5 | 成本/延迟 | 每个 `(a)` 请求一次模型调用，三引擎各自 | 只在 `(a)`；独立 15s；8 次/192KB 预算；不缓存；超限 manual；警告披露 | 判断本身有成本 |
+| R5 | 成本/延迟 | 每个**非 allow** 的 `(a)` 请求一次模型调用；项目角色无 `(b)` 预筛，调用面扩大；三引擎各自 | 只在非 allow 调用；独立 15s；8 次/192KB 预算；不缓存；超限 manual；警告披露 | 判断本身有成本；规则 deny 命令也会触发调用 |
 | R6 | 三引擎差异 | 某引擎只读限制/原生工具/会话行为不同，导致误放行或回退不一致 | 三引擎同期但**逐引擎验收**（A12/A25/A35）；各自关闭原生工具；任一引擎不可用/超时/解析失败 → 仅该请求 manual；不跨引擎 | 引擎升级/新原生工具需适配器复核 |
 | R7 | 循环 | deny → 角色重试 → deny | 不自动重试；防循环 2 次 → manual；客户说明要求不要原样重试 | 角色可能换命令反复尝试 |
-| R8 | 审计缺口 | 事后只看到 `by`，不知为何 | 可选 `judge` 字段（engine/model/tier/hardDenyOverride/verdict/reasonCode/reason/customerMessage/alternative/synthesized）；聊天行；诊断；toolCallId 对齐 | 审计落盘失败不翻转判定（既有语义）；失败经 `shell-judge.audit.failed` + stderr 可见 |
+| R8 | 审计缺口 | 事后只看到 `by`，不知为何 | 可选 `judge` 字段（engine/model/tier/hardDenyOverride/verdict/reasonCode/reason/customerMessage/alternative/synthesized）+ c advisory 判定；聊天行；诊断；toolCallId 对齐 | 审计落盘失败不翻转判定（既有语义）；失败经 `shell-judge.audit.failed` + stderr 可见 |
 | R9 | 读取沙箱漏洞 | 读到项目外/敏感文件 | realpath + 前缀 + 敏感模式 + win32 规则 + 单元测试；三引擎共用同一策略 | 项目内硬链接指向敏感文件且 basename 不同：V1 不做 inode 比对 |
-| R10 | 替代方案被自动执行 | 绕过判断/新风险 | 应用不自动执行；替代方案仅文本；新请求重走全链 | 角色可能自行执行；仍受 `(c)/(b)/(a)` |
+| R10 | 替代方案被自动执行 | 绕过判断/新风险 | 应用不自动执行；替代方案仅文本；新请求重走 `(c)` advisory → `(a)` | 角色可能自行执行；仍受 c advisory/(a) |
 | R11 | 开关误开 | 后续命令被自动/拒绝 | 默认关、不持久化、重载复位、开启态强提示、可随时关 | 点击与下一条命令之间的窗口无法消除 |
 | R12 | 不可撤销 | allow 后命令可能已执行（deny 档尤其） | 行只写「已放行」不写「已成功」；deny 档加「请复核」；审计留痕；不提供假撤销 | 已执行副作用不可逆 |
-| R13 | su 未转述 | 客户不知为何被拦 | `customerMessage` 写成可直接转述的话；运行时合成/补出路；桌面行兜底 | 模型可能没有正好转述 |
+| R13 | 请求角色未转述 | 客户不知为何被拦 | `customerMessage` 写成可直接转述的话；运行时合成/补出路；桌面行兜底 | 模型可能没有正好转述 |
 | R14 | 结果行丢失 | 客户没看到自动放行（deny 档尤其危险） | allow 行投达失败 → manual；deny 行失败仍 deny + 诊断；审计持久；deny 档标记三处可查 | 渲染进程异常时可能无行 |
 | R15 | 原生工具泄漏（三引擎） | Claude WebSearch/外来 MCP、Pi 原生工具、Codex CLI/原生工具进入判断 | judgeMode 强制各自关闭；只注册注入的 judge 工具；逐引擎工具集断言；Codex 只读沙箱/网络 false | 引擎未来新增原生工具需适配器复核 |
 | R16 | 判断会话挂起 | 卡/超时/资源 | 15s 硬超时 + `AbortSignal` + `abort`/`dispose`；迟到会话补 dispose；失败 manual | 引擎内部不响应 abort 时可能残留到进程结束 |
@@ -900,12 +935,14 @@ onShellJudgeResult(cb): () => void
 | R18 | 审计 schema 消费方 | 旧读者/测试破 | 可选字段、向后兼容；测试覆盖旧记录 | 外部消费者未盘点 |
 | R19 | `read_file` 复用 | 沙箱形同虚设 | 结构性新建 `judge_read_file`；工具集断言；禁止 import `makeReadTool` | 误用需 code review 拦截 |
 | R20 | 判断期间开关切换 | 行为不确定 | 以通道调用时点为准；已挂起卡不受影响；测试覆盖 | 无法消除点击瞬间的竞态 |
-| R21 | **deny 档放行不可辨识** | 客户/审计无法看出模型推翻了硬拒类 | 审计 `judge.tier:"deny"` + `hardDenyOverride:true` + `label:"deny 档 · judge 放行"`；聊天行标题「deny 档」+「请复核」；诊断 `shell-judge.allow` 带 `tier`/`hardDenyOverride`/`label`；A27/A36 独立验收 | 渲染/审计缺口时仍可能漏标 |
+| R21 | **deny 档放行不可辨识** | 客户/审计无法看出模型放行了规则 deny 档 | 审计 `judge.tier:"deny"` + `hardDenyOverride:true` + `label:"deny 档 · judge 放行"`；聊天行标题「deny 档」+「请复核」；诊断 `shell-judge.allow` 带 `tier`/`hardDenyOverride`/`label`；A27/A36 独立验收 | 渲染/审计缺口时仍可能漏标 |
+| R22 | **规则层不再拒绝（v3 客户明确要求）** | 危险命令（含 `c-deny`）进入 judge/手动卡；无确定性安全网 | `(c)` 判定仍记录/展示；judge rubric + 只读证据；deny 标记；手动卡兜底；可关闭；审计 | 客户明确要求，残余风险接受 |
+| R23 | **手动模式 deny 档弹卡（v3）** | 客户可能误点放行或被更多卡打扰 | 卡片原因明确「规则 deny 档；规则层不拒绝，请核对」；拒绝默认焦点；审计留痕 | 客户决定，风险接受 |
 
 **回滚**：
 
-- 开关默认 `false`、不持久化；关闭即回到手动，无数据迁移。
-- 判断代码路径只在 `judge` 能力注入 + 开关开时生效；缺任一件，行为与改动前逐字一致。
+- 开关默认 `false`、不持久化；关闭即回到手动，无数据迁移；但手动模式仍为**规则 advisory**（`c=allow` 快放，非 allow 弹卡，`c-deny` 不硬拒），不是改动前逐字。
+- 判断代码路径只在 `judge` 能力注入 + 开关开时生效；缺任一件，非 allow 仍走手动卡（规则 advisory，不硬拒）。
 - 若判断导致问题：主进程可强制 `shellJudgeEnabled=false`；必要时从 preload 撤下 4 个方法 → UI 禁用；再撤 `createShellJudge` 注入 → 判断路径完全不进入。
 - 审计 `judge` 字段可选；旧消费者忽略。
 - 不新增 npm 依赖；不改写门禁、不改 `resolveWrite`、不改 CLI。
@@ -918,21 +955,21 @@ onShellJudgeResult(cb): () => void
 2. **产品 revision 4（对齐）**：产品提案按 D1/D2 更新（deny 档放行标记、三引擎、驱动落点），status 改 `approved`；不阻塞本轮派发。
 3. **无需 Governance 扩边界**：驱动 `src/common/编排/shell-judge.ts` 在编排目录条目内；公开入口经既有 `src/pipeline/orchestration/govern-session.ts` 薄再导出。Governance 只需复核「未新增 pipeline 单文件」。
 4. **基线确认**：2026-10-17 工作树有在飞修改（`app/renderer/renderer.js`、`app/renderer/styles.css`、`test/桌面应用/e2e/uiux-v2.mjs`、`test/桌面应用/renderer.test.ts`、产品/桌面UI 文档）；派发桌面窗口/桌面UI/测试前，由各属主确认自己的在飞改动已收口或明确基线，**不得互相覆盖**。
-5. **运行时核心在飞改动按 D1/D2 返工**：工作树已有 `src/model/runtime.ts`、`src/common/runtime-core/shell-judge/`、`src/service/runtime/session.ts`、`test/runtime-core/shell-judge.test.ts` 的初版（按 revision 1 的 hard-floor/Claude-only 口径）。P1 必须按本文 D1（deny 档放行 + `hardDenyOverride`/`label`，删除 hard-floor）与 D2（三引擎）返工并同步测试；**不得直接沿用旧口径**。
+5. **运行时核心/编排在飞改动按 D1/D2 与 revision 3 返工**：工作树已有 `src/model/runtime.ts`、`src/common/runtime-core/shell-judge/`、`src/service/runtime/session.ts`、`test/runtime-core/shell-judge.test.ts` 的初版（按 revision 1/2 的 hard-floor/Claude-only 口径）。P1/P2 必须按本文 D1/D2 与 **revision 3 规则 advisory**（项目角色 `c-deny` 交 `(a)`、跳过 `(b)`、手动模式不硬拒）返工并同步测试；**不得直接沿用旧口径**。
 
 ### 14.2 顺序
 
 | 阶段 | 角色 | 任务 | 依赖 |
 | --- | --- | --- | --- |
 | P1 | 运行时核心 | `model/runtime.ts` 类型 + `common/runtime-core/shell-judge/{tools,policy}.ts` + `service/runtime/session.ts` 装配 + `test/runtime-core/` | 前置 1–4 |
-| P2 | 编排 | `common/编排/shell-judge.ts` 驱动 + `common/编排/shell-judge-{verdict,prompt}.ts` + `shell-gate.ts`/`shell-audit.ts` 可选 judge 字段 + `govern-session.ts` 薄再导出 + `test/编排/` | P1 契约冻结 |
+| P2 | 编排 | `common/编排/shell-judge.ts` 驱动 + `common/编排/shell-judge-{verdict,prompt}.ts` + **`shell-gate.ts`/`shell-arming.ts`/`run-role.ts` 改规则 advisory（项目角色 `advisoryRuleset`、跳过 `(b)`）** + `shell-audit.ts` 可选 judge 字段 + `govern-session.ts` 薄再导出 + `test/编排/` | P1 契约冻结 |
 | P3a | Claude适配器 | `judgeMode`：关闭 WebSearch/外来 MCP、只注册注入工具；`test/claude-adapter/` | P1 契约冻结；可与 P2 并行 |
 | P3b | Pi适配器 | `judgeMode`：只消费注入工具、验证真实 agent 不注入原生工具；`test/pi-adapter/` | P1 契约冻结；可与 P2/P3a 并行 |
 | P3c | Codex适配器 | `judgeMode`：只读沙箱、网络 false、只注册注入工具、拒绝 CLI/原生工具；`test/codex-adapter/` | P1 契约冻结；可与 P2/P3a/P3b 并行 |
-| P4 | 桌面窗口 | `operator-channel.ts` 三态、deny 档标记、`session.ts` judge/turnText、`interface.ts` 透传、`main.ts` 开关/IPC/复位、`preload.cjs`；`test/桌面应用/` | P2/P3a/P3b/P3c |
-| P5 | 桌面UI | 复选框、警告、卡片提示、结果行（含「deny 档 · judge 放行」）、`ui-labels.js`、`styles.css`；`test/桌面应用/renderer.test.ts` + e2e | P4 IPC 契约冻结；可与 P4 并行做静态壳 |
-| P6 | 测试 | §12.2 独立验证（含三引擎逐引擎只读 + deny 档标记）+ 全量三层 glob + e2e | P1–P5 |
-| P7 | 产品/PM | 产品 rev4 对齐、memo/changelog、验收记录 | P6 |
+| P4 | 桌面窗口 | `operator-channel.ts` 三态、deny 档标记、手动模式（规则 advisory）；`session.ts` judge/turnText；`interface.ts` 透传；`main.ts` 开关/IPC/复位；`preload.cjs`；`test/桌面应用/` | P2/P3a/P3b/P3c |
+| P5 | 桌面UI | 复选框、警告（规则层不拒绝/可能误判）、卡片提示、结果行（含「deny 档 · judge 放行」）、`ui-labels.js`、`styles.css`；`test/桌面应用/renderer.test.ts` + e2e | P4 IPC 契约冻结；可与 P4 并行做静态壳 |
+| P6 | 测试 | §12.2 独立验证（规则 advisory、`c-deny` 交 `a`、无 `b`、三引擎只读、deny 标记）+ 全量三层 glob + e2e | P1–P5 |
+| P7 | 产品/PM | 产品 rev5 对齐（规则 advisory）、memo/changelog、验收记录 | P6 |
 
 ### 14.3 并行边界
 
@@ -946,18 +983,19 @@ onShellJudgeResult(cb): () => void
 
 | 编号 | 问题 | 结论 | 落地口径 |
 | --- | --- | --- | --- |
-| D1 | **su `deny` 档（`sudo`/`mkfs`/`sh -c` 等硬拒类）是否允许 judge 自动放行？** | **客户拍板：允许。** 沿用客户原话「如果是必要的，那就替我审批通过」。 | judge `allow` 即放行（0 卡）；审计/聊天行/诊断标 `tier:"deny"` + `hardDenyOverride:true` + `label:"deny 档 · judge 放行"`；**删除 hard-floor/0 卡说明分支**；风险登记 R1/R21。 |
+| D1 | **deny 档（sudo/mkfs/sh -c 等）是否允许 judge 自动放行？** | **客户拍板：允许（revision 2）。** 沿用客户原话「如果是必要的，那就替我审批通过」。 | judge `allow` 即放行（0 卡）；审计/聊天行/诊断标 `tier:"deny"` + `hardDenyOverride:true` + `label:"deny 档 · judge 放行"`；**无 hard-floor**；v3 起项目角色 `c-deny` 也适用。 |
 | D2 | **V1 是否三引擎同期？** | **客户拍板：三引擎同期（Claude/Pi/Codex）。** | 三适配器各自实现只读判断会话；逐引擎只读验收（A12/A25/A35）；任一引擎不可用/超时/解析失败 → 该请求 manual；不跨引擎。 |
 | D3 | **开关是应用级还是按角色/项目？** | **确认 PM 建议：应用级、单窗口、非持久化。** | 判断按请求会话引擎；D3 不新增按角色/项目开关。 |
 | D4 | **判断模型是否跟随会话模型？** | **确认 PM 建议：跟随会话模型/配置。** | 同一份 `runtimeOptions`；不提供单独 judge 模型选择。 |
 | D5 | **无替代方案出路与「su 必须转述」程度？** | **确认 PM 建议：无替代不弹卡、返回请求角色、标准出路「关闭『替我审』后重试」；桌面结果行是保证，su 转述尽力而为。** | 0 卡；`customerMessage` + 出路；不强制跨角色通知。 |
+| D6 | **第一层是否拒绝任何请求？**（客户 2026-10-18 新裁定） | **客户拍板：不拒绝。** 原话：「第一层不要拒绝任何请求，而是快速放行。所有的拒绝必须要AI 来。」 | 规则 advisory：`c=allow` 快放；`risky/review/deny` 跳过 `(b)` 全交 `(a)`；规则层永不拒绝；移除 hard-deny 地板；手动模式 `c-deny` 也弹卡；风险 R1/R22/R23。 |
 
-> D1/D2 已在 revision 2 由客户拍板；D3–D5 已确认。实施按 §十四 派发。
+> D1/D2 已在 revision 2 由客户拍板；D6（规则 advisory）已在 revision 3 由客户拍板；D3–D5 已确认。实施按 §十四 派发。
 
 ## 十六、文档影响与实施前提
 
-- 客户 D1/D2 已拍板；产品提案出 **revision 4** 对齐：三引擎同期、deny 档放行 + 「deny 档 · judge 放行」标记、读取预算/上下文/审计字段、驱动落点 `src/common/编排/shell-judge.ts`（经 `govern-session.ts` 薄再导出）。不阻塞派发。
+- 客户 D1/D2/D6 已拍板；产品提案出 **revision 5** 对齐：规则 advisory（项目角色 `risky/review/deny` 跳过 `(b)` 交 `(a)`、规则层不拒绝、移除 hard-deny 地板）、三引擎同期、deny 档放行 + 「deny 档 · judge 放行」标记、读取预算/上下文/审计字段、驱动落点 `src/common/编排/shell-judge.ts`（经 `govern-session.ts` 薄再导出）。不阻塞派发。
 - **无需 Governance 扩边界**：驱动/提示/规范化均在 `src/common/编排/`（已有目录条目）；不新增 `src/pipeline/orchestration/` 单文件；不改 `boundary.yaml`。
 - 本文只写 PM 评审/拆发；**未改 `app/`、`src/`、`test/`、其他角色文件；未读 `.env`；未跑网络/凭据/真实模型；未 git 提交**。
-- 实施后最后一道验收必须在桌面应用里完成：勾选 → 触发一次 shell 请求 → 看判断结果（allow / deny+替代 / **deny 无替代：0 卡 + 客户说明 + 出路** / manual 回退）→ 看聊天行与审计 JSONL → **关闭开关后用同一命令重试，确认走手动确认卡**；以及敏感文件读取被拒、引擎不可用回退、**su `deny` 档 judge 放行：0 卡 + 审计/聊天行标「deny 档 · judge 放行」**；三引擎各自跑一次只读验收。
+- 实施后最后一道验收必须在桌面应用里完成：勾选 → 触发一次 shell 请求 → 看判断结果（allow / deny+替代 / **deny 无替代：0 卡 + 客户说明 + 出路** / manual 回退）→ 看聊天行与审计 JSONL → **关闭开关后用同一命令重试，确认非 allow 走手动卡（含 `c-deny`）、规则层不硬拒**；以及敏感文件读取被拒、引擎不可用回退、**项目角色 `c-deny` / su `deny` judge 放行：0 卡 + 审计/聊天行标「deny 档 · judge 放行」**；三引擎各自跑一次只读验收。
 - 全量回归命令固定为 `node --test "test/**/*.test.ts"`（三层 glob）。

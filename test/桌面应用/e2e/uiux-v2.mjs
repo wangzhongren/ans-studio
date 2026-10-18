@@ -297,6 +297,22 @@ async function terminalChecks(){
  await check('project shell card stays verbatim without su warning',`(()=>{const t=document.getElementById('sc-title').textContent,s=document.getElementById('sc-summary').textContent,r=document.getElementById('sc-reason').textContent,h=document.getElementById('sc-hint').textContent;return t==='shell 命令请求'&&s==='项目卡摘要'&&r==='项目角色原因原文'&&!h.includes('可能绕过 ANS 文件写边界')&&document.activeElement===document.getElementById('sc-deny')})()`);
  const denyCount=shellResponses.length;await js(`document.getElementById('sc-deny').click()`);await pause(40);
  assert.equal(shellResponses.length,denyCount+1,'su/project deny responds once');assert.equal(shellResponses.at(-1).allow,false,'deny never authorizes');
+ // 2026-10-18 真机（桌面UI）：settled / 失效回执后不保留按钮全禁用的 shell 确认卡；仍在等待的卡不受影响。
+ const staleShell={...scoped,id:'stale-shell',policy:'project',command:'echo stale',summary:'旧卡',reasonPlain:'旧卡原因',cwd:ROOT,argvLines:[]};
+ await push('shell:confirm-request',staleShell);await pause(30);
+ await check('shell card stays actionable while its turn is waiting',`!document.getElementById('shell-confirm').hidden&&!document.getElementById('sc-deny').disabled&&window.__ansRenderer.state.shellConfirm.id==='stale-shell'`);
+ await push('session:events',[{...scoped,roleId:'B',event:{kind:'settled',turnId:'other-turn',summary:'B 轮次结束',detail:{outcome:'completed'}}}]);
+ await check('other role settled leaves the waiting shell card untouched',`!document.getElementById('shell-confirm').hidden&&!document.getElementById('sc-deny').disabled&&window.__ansRenderer.state.shellConfirm.id==='stale-shell'`);
+ await push('session:events',[{...scoped,event:{kind:'settled',turnId:'stale-turn',summary:'本轮结束',detail:{outcome:'completed'}}}]);
+ await check('settled removes its stale shell card instead of leaving a disabled card',`document.getElementById('shell-confirm').hidden&&window.__ansRenderer.state.shellConfirm===null`);
+ await push('shell:confirm-request',{...staleShell,id:'fresh-shell'});await pause(30);
+ await check('a new shell card after settled is actionable again',`!document.getElementById('shell-confirm').hidden&&!document.getElementById('sc-allow').disabled&&window.__ansRenderer.state.shellConfirm.id==='fresh-shell'`);
+ await push('session:operator-expired',{...scoped,id:'stale-shell',reason:'旧请求已失效'});
+ await check('late expiry for a removed id cannot touch the current card',`!document.getElementById('shell-confirm').hidden&&window.__ansRenderer.state.shellConfirm.id==='fresh-shell'`);
+ await push('session:operator-expired',{...scoped,id:'fresh-shell',reason:'本轮已结束、停止或会话已重建，旧 shell 确认失效。'});
+ await check('expiry receipt closes the shell card and reports the reason',`document.getElementById('shell-confirm').hidden&&window.__ansRenderer.state.shellConfirm===null&&document.getElementById('composer-hint').textContent.includes('旧 shell 确认失效')`);
+ await push('session:operator-expired',{...scoped,id:'fresh-shell',reason:'重复失效'});
+ await check('repeated expiry cannot rebuild a closed shell card',`document.getElementById('shell-confirm').hidden&&window.__ansRenderer.state.shellConfirm===null`);
 }
 async function sendFactsChecks(){
  await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRuntime('pi');await window.__ansRenderer.selectRole('A')`);

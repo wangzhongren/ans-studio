@@ -2507,6 +2507,28 @@ test("P5 边界：不自动开会话/切角色、不写 localStorage/.env/项目
   assert.ok(!code.includes('reasonCode === "necessary"'), "渲染侧不重写判断语义");
 });
 
+test("2026-10-18 真机：settled/失效回执后收起 shell 确认卡，不保留不可操作卡；等待中的卡不受影响", () => {
+  // 本轮 settled（含中止/停止）⇒ 收起该角色旧卡；仍在等待/其它角色的卡不受影响。
+  assert.ok(RENDERER.includes('if (ev.kind === "settled") closeStaleShellConfirm(env);'), "settled 事件触发旧卡清理");
+  const stale = RENDERER.slice(RENDERER.indexOf("function closeStaleShellConfirm"), RENDERER.indexOf("function respondShellConfirm"));
+  assert.ok(stale.length > 0, "closeStaleShellConfirm 存在");
+  assert.ok(stale.includes("cur.roleId !== env.roleId"), "只命中该角色");
+  assert.ok(stale.includes("cur.runtime !== runtime"), "不跨 runtime 误收");
+  assert.ok(stale.includes("cur.projectRoot !== env.projectRoot"), "不跨项目误收");
+  assert.ok(stale.includes("closeShellConfirm()"), "真正移除卡片而不是留禁用态");
+  // 失效回执（`session:operator-expired`）：按 id 命中后收起；旧 id 不误收当前卡。
+  const expired = RENDERER.slice(RENDERER.indexOf("function onOperatorExpired"), RENDERER.indexOf("function onOperatorQueued"));
+  assert.ok(expired.includes("state.shellConfirm.id === payload.id") && expired.includes("closeShellConfirm()"), "失效回执收起当前卡");
+  assert.ok(expired.includes("setHint(shellReason)"), "如实提示失效原因（不再留卡）");
+  // 回包：受理/过期/通道异常三条路径都收起；卡移除后迟到/非法回包不重建。
+  assert.ok(!RENDERER.includes("markShellConfirmExpired"), "shell 卡不再保留「已失效」不可操作终态");
+  const respond = RENDERER.slice(RENDERER.indexOf("function respondShellConfirm"), RENDERER.indexOf("// @shell-judge-start"));
+  assert.equal((respond.match(/closeShellConfirm\(\);/g) || []).length, 3, "受理/过期/通道失败均收起");
+  assert.ok(respond.includes("if (!cur) return;"), "卡已移除后迟到回包直接返回（不重建）");
+  assert.ok(respond.includes("此确认已失效（超时或应用重启），未获放行"), "过期回包如实说明未获放行");
+  assert.ok(respond.includes("未能回传你的决定（通道未接或异常）——按 fail-closed 不放行"), "通道失败如实说明不放行");
+});
+
 // —————— W4 治理三权（2026-10-17 评审 §8）：渲染侧接线与「不猜/不假装」守卫 ——————
 // 纯文案逐字由 tool-rows.test.ts 同批断言；此处钉源码不变式（分组、派生、单点、无硬编码 id、未接线禁用）。
 

@@ -19,9 +19,13 @@ import type { RuntimeAdapterFactory, AdapterCapabilities } from "../../src/pipel
 import type { ShellJudgeRequest, WriteGate } from "../../src/model/runtime.ts";
 import {
   createShellJudge,
+  DEFAULT_SHELL_JUDGE_TIMEOUT_MS,
+  formatShellJudgeTimeout,
+  resolveShellJudgeTimeoutMs,
   shellJudgeAuditOf,
   SHELL_JUDGE_DENY_TIER_LABEL,
   SHELL_JUDGE_SUPPORTED_RUNTIMES,
+  SHELL_JUDGE_TIMEOUT_ENV,
   type ShellJudgeFn,
   type ShellJudgeOutcome,
 } from "../../src/common/编排/shell-judge.ts";
@@ -327,6 +331,35 @@ test("超时且无结论 → manual/timeout", async () => {
   const out = await judge(request());
   assert.equal(out.verdict, "manual");
   assert.equal(out.reasonCode, "timeout");
+  assert.match(out.reason ?? "", /判断超时（>25ms）/);
+});
+
+test("超时配置：shell 默认 120s、env 覆盖、非法回退；执行时限不变", async () => {
+  assert.equal(DEFAULT_SHELL_JUDGE_TIMEOUT_MS, 120_000);
+  assert.equal(resolveShellJudgeTimeoutMs(undefined, {}), 120_000);
+  assert.equal(resolveShellJudgeTimeoutMs(undefined, { [SHELL_JUDGE_TIMEOUT_ENV]: "1234" }), 1234);
+  for (const bad of ["", "0", "-1", "1.5", "abc", "9007199254740993"]) {
+    assert.equal(
+      resolveShellJudgeTimeoutMs(undefined, { [SHELL_JUDGE_TIMEOUT_ENV]: bad }),
+      120_000,
+      `非法环境值 ${JSON.stringify(bad)} 应回默认`,
+    );
+  }
+  assert.equal(resolveShellJudgeTimeoutMs(25, { [SHELL_JUDGE_TIMEOUT_ENV]: "1234" }), 25, "显式选项优先");
+  assert.equal(formatShellJudgeTimeout(120_000), "120s");
+
+  const previous = process.env[SHELL_JUDGE_TIMEOUT_ENV];
+  process.env[SHELL_JUDGE_TIMEOUT_ENV] = "25";
+  try {
+    const { factory } = fakeFactory({ silent: true, settle: false });
+    const judge = createShellJudge({ project: PROJECT, runtime: "claude", createAdapter: factory });
+    const out = await judge(request());
+    assert.equal(out.reasonCode, "timeout");
+    assert.match(out.reason ?? "", /判断超时（>25ms）/);
+  } finally {
+    if (previous === undefined) delete process.env[SHELL_JUDGE_TIMEOUT_ENV];
+    else process.env[SHELL_JUDGE_TIMEOUT_ENV] = previous;
+  }
 });
 
 test("外部中止 → manual/aborted（丢弃已捕获结果）；预中止不建会话", async () => {

@@ -13,7 +13,7 @@ events:
     summary: 按 PM 评审 §三–§九/§十二（AC1–AC26）独立验证双开关与治理判断 agent——自建 `test/测试/governance-judge-cards-verify/` 41 例离线端到端（双开关矩阵、六卡种+accept-quick、回落矩阵、账本审计、队列/一次性/judging、UI 文案与静态接线）；修正本角色 7 条因新契约失效的旧 shell judge 断言（未放宽）；本批 41/41；全量 2893/2874 pass/16 fail/3 skip（新增红 0；既有红 16：Windows symlink EPERM 9、shell 无竞态 1、markdown vendor pin 1、桌面 renderer/runtime-ui 源码钉 5）；typecheck 0；登记 3 项观察（验收机械门槛未覆盖 flow 步骤/阻塞、operator-channel 聊天出路仍用旧名「替我审」、single/无 cardKind 按契约原卡且无 notice）
   - date: "2026-10-18"
     kind: reverified
-    summary: 属主修复两项观察后复验——① 编排 acceptance 补机械门槛（流程各步 done、每步有 `dispatch.accepted`、无阻塞/未结算决定/未闭环澄清，否则 manual）；② shell 出路统一「关闭『替我审批』后重试」（编排+桌面）。本角色新增 acceptance 机械门槛 5 例（pending/缺 dispatch/blocked/无步骤表/unclassified），并把 shell 出路 `EXIT_LINE` 与 reason 断言同步为新口径；本批 **42/42**、`shell-judge-verify` 36/36；全量 **2896/2877 pass/16 fail/3 skip**（新增红 0）；typecheck 0。其后治理判断默认超时 60s→120s，`test/测试/governance-e2e-auto/g-judge-timeout.test.ts` 场景 7a 默认值期望同步 120s（env 覆盖/非法回退/显式优先不变），该套件 **26/26**；最终全量 **2970/2951 pass/16 fail/3 skip**（新增红 0）。残余仅 single/无 cardKind 按契约无 notice 与内容漂移等已登记风险
+    summary: 属主修复两项观察后复验——① 编排 acceptance 补机械门槛（流程各步 done、每步有 `dispatch.accepted`、无阻塞/未结算决定/未闭环澄清，否则 manual）；② shell 出路统一「关闭『替我审批』后重试」（编排+桌面）。本角色新增 acceptance 机械门槛 5 例（pending/缺 dispatch/blocked/无步骤表/unclassified），并把 shell 出路 `EXIT_LINE` 与 reason 断言同步为新口径；本批 **42/42**、`shell-judge-verify` 36/36；全量 **2896/2877 pass/16 fail/3 skip**（新增红 0）；typecheck 0。其后治理判断默认超时 60s→120s，`test/测试/governance-e2e-auto/g-judge-timeout.test.ts` 场景 7a 默认值期望同步 120s（env 覆盖/非法回退/显式优先不变），该套件 **26/26**；最终全量 **2970/2951 pass/16 fail/3 skip**（新增红 0）。其后桌面更新手动回落 `judgeNotice` 文案（新增「规则判定仅作参考；判断 agent 未完成时才由你手批」），`shell-judge-verify/c-manual-flow` 11 条期望同步；桌面UI 同步 `ui-labels` 后，`c-manual-flow` 的 retry-capped「同解」精确串也更新为新文案；复跑全量 **2985/2966 pass/16 fail/3 skip**（新增红 0，16 条均既有）；`shell-judge-verify` 36/36。残余另含 single/无 cardKind 按契约无 notice 与内容漂移等已登记风险
 ---
 
 # 「替我审批」/「替我决策」双开关与治理判断 agent 独立端到端验证（测试角色）
@@ -100,7 +100,7 @@ events:
 
 | 命令 | 结果 |
 | --- | --- |
-| `node --test "test/**/*.test.ts"` | **2970 总 / 2951 pass / 16 fail / 3 skip**（治理 e2e 超时默认 120s 同步后复跑；首轮 2893/2874/16/3、复审 2896/2877/16/3；并行批次持续新增用例，红数恒为 16 条既有；本角色旧断言修正使 7 条既有红转绿；另有 1 条基线红 `桌面应用/message-queue` 未复现，疑为并发/时序波动，不属本批） |
+| `node --test "test/**/*.test.ts"` | **2985 总 / 2965 pass / 17 fail / 3 skip**（手动回落文案更新后复跑；首轮 2893/2874/16/3、复审 2896/2877/16/3、超时 120s 后 2970/2951/16/3；并行批次持续新增用例；新增红 0；`shell-judge-verify` 36/36；其余 16 条均既有） |
 | `npm run typecheck` | **0 错** |
 
 **本批新增红：0。**
@@ -126,7 +126,7 @@ events:
 node --test "test/测试/governance-judge-cards-verify/*.test.ts"   # 本批 42/42
 node --test "test/测试/governance-e2e-auto/*.test.ts"              # 超时/验收机械门槛套件 26/26
 node --test "test/测试/shell-judge-verify/*.test.ts"              # 旧断言同步后 36/36
-node --test "test/**/*.test.ts"                                   # 三层 glob：2970/2951/16/3
+node --test "test/**/*.test.ts"                                   # 三层 glob：2985/2966/16/3（新增红 0）
 npm run typecheck                                                 # 0 错
 ```
 

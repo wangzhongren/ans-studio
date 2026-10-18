@@ -776,19 +776,19 @@ test('P5：manual 不产生结果行；未知/坏件返回 null（不编裁决�
   assert.equal(labels.shellJudgeResultView('allow' as unknown as object), null);
 });
 
-test('P5：手动回落卡 judgeNotice——一般 manual 与 row-failed 分开且逐字（§10.4）', () => {
+test('P5：手动回落卡 judgeNotice——一般 manual 与 row-failed 分开且逐字（与通道同解）', () => {
   assert.equal(
     labels.shellJudgeNoticeText('row-failed'),
-    '判断 agent 已完成判断，但结果无法在聊天中显示；已转你手动确认。',
-    'row-failed 不得说成「判断没发生」'
+    '判断 agent 已完成判断，但结果无法在聊天中显示；规则判定仅作参考，本卡已转你手动确认。',
+    'row-failed 不得说成「判断没发生」；与桌面通道 manualJudgeNotice 同解'
   );
   assert.equal(
     labels.shellJudgeNoticeText('timeout'),
-    '判断 agent 未能完成判断：判断超时。已转你手动确认。'
+    '判断 agent 未能完成判断：判断超时。规则判定仅作参考；判断 agent 未完成时才由你手批。已转你手动确认。'
   );
   assert.equal(
     labels.shellJudgeNoticeText('unsupported-engine'),
-    '判断 agent 未能完成判断：当前引擎不支持自动判断。已转你手动确认。'
+    '判断 agent 未能完成判断：当前引擎不支持自动判断。规则判定仅作参考；判断 agent 未完成时才由你手批。已转你手动确认。'
   );
   assert.equal(
     labels.shellJudgeNoticeText('row-failed').includes('未能完成判断'),

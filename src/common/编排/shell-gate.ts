@@ -339,6 +339,16 @@ export interface CreateShellGateOptions {
    * 缺省 `false` = `deny` 沿用既有硬拒终结。
    */
   approveDeny?: boolean;
+  /**
+   * **advisory 规则集（客户 2026-10-18 新裁定）**：第一层 (c) 规则**不拒绝任何请求**，只快速放行；
+   * 所有拒绝必须由 AI（判断 agent）/操作者经 (a) 做出。
+   * - `(c)=allow` → 直接放行（`c-allow`，0 卡）；
+   * - `(c)=risky/review/deny` → **跳过 (b)**，直接交 (a)（`c-risky→a-*` / `c-review→a-*` / `c-deny→a-*`）；
+   *   规则判定与命中原因写入 `OperatorPrompt.reason`，供判断 agent 参考；
+   * - 不再有 `c-deny` 终结分支（仅 `advisoryRuleset=false` 的旧路径保留硬拒用于回归）。
+   * **构造期守卫**：与 `readonlyOnly`/`operatorOnly` 互斥；必须有 `operatorChannel`。
+   */
+  advisoryRuleset?: boolean;
 }
 
 /** 内部：一次审核的结论 + 审计所需的分支/结论分类。 */
@@ -380,6 +390,13 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
   // 4) su 不自审；客户审批不得被 pm 审读 / 委托常规检查绕过。
   if (opts.operatorOnly === true && (typeof opts.pmAsk === "function" || opts.routineShellPolicy !== undefined)) {
     throw new Error("shell 闸配置错误：operatorOnly 不得带 pmAsk/routineShellPolicy，拒绝装配");
+  }
+  // 5) advisory 规则集（项目角色）：与只读/审批档互斥；必须有 (a) 通道（所有拒绝由 AI/操作者做出）。
+  if (opts.advisoryRuleset === true && (opts.readonlyOnly === true || opts.operatorOnly === true)) {
+    throw new Error("shell 闸配置错误：advisoryRuleset 与 readonlyOnly/operatorOnly 互斥，拒绝装配");
+  }
+  if (opts.advisoryRuleset === true && typeof opts.operatorChannel !== "function") {
+    throw new Error("shell 闸配置错误：advisoryRuleset 必须提供 operatorChannel，拒绝装配");
   }
 
   const log = createDiagnosticLogger({ component: "orchestration.shell-gate", projectRoot: opts.projectRoot ?? opts.routineShellPolicy?.projectRoot });
@@ -456,7 +473,9 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
         ? `${by}（su 只读档）`
         : opts.operatorOnly === true
           ? `${by}（su 审批档）`
-          : by;
+          : opts.advisoryRuleset === true
+            ? `${by}（advisory 规则）`
+            : by;
 
     // 映射（§7.5）。
     if (detail.decision === "allow") {
@@ -466,6 +485,21 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
         conclusion: "allow",
         branch: BRANCH_C_ALLOW,
       };
+    }
+    // —— advisory 规则集（客户 2026-10-18）：(c) 只快速放行，**不拒绝任何请求** ——
+    // risky/review/deny 一律跳过 (b)、直接交 (a)；规则判定与命中原因作为 reason 交判断 agent 参考。
+    // （构造期已守卫与 readonlyOnly/operatorOnly 互斥、必须有 operatorChannel。）
+    if (opts.advisoryRuleset === true) {
+      const tier = detail.decision; // 已排除 "allow"
+      const branch = tier === "deny" ? BRANCH_C_DENY : tier === "risky" ? BRANCH_C_RISKY : BRANCH_C_REVIEW;
+      const detailText =
+        detail.reason ??
+        (tier === "deny" ? `命中 c 规则判为 deny（${by}）` : `(c) 判为 ${tier}（${by}）`);
+      return await runA(req, {
+        bBranch: branch,
+        bAttr: byTagged,
+        why: `(c) 规则判为 ${tier}（${by}）：${detailText}。规则只作参考；请判断是否放行。`,
+      });
     }
     // —— su 审批档（operatorOnly，客户裁定 2026-10-17）：allow 已在上方直放（**0 次 operator 调用**）——
     // 其余档一律交 (a) 客户逐条批准；`deny` 仅在 `approveDeny === true` 时如此，否则落到下方既有硬拒。
@@ -814,6 +848,8 @@ export interface ShellGateBuildDeps {
   operatorOnly?: boolean;
   /** **允许客户批准 (c)=deny**（仅 `operatorOnly === true` 有效；见 `CreateShellGateOptions.approveDeny`）。 */
   approveDeny?: boolean;
+  /** **advisory 规则集**（见 `CreateShellGateOptions.advisoryRuleset`）。 */
+  advisoryRuleset?: boolean;
 }
 
 export function buildShellGate(deps: ShellGateBuildDeps): ShellGate {
@@ -852,6 +888,7 @@ export function buildShellGate(deps: ShellGateBuildDeps): ShellGate {
     readonlyOnly: deps.readonlyOnly,
     operatorOnly: deps.operatorOnly,
     approveDeny: deps.approveDeny,
+    advisoryRuleset: deps.advisoryRuleset,
   });
 }
 

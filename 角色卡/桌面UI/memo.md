@@ -195,5 +195,13 @@ U1R2本侧冻结：原卡按真实request/conclusion重插与显式null token保
 - **结果行**：新增 `onOperatorJudgeResult`（治理代批，approval 写盘族 + decision）；`ui-labels::governanceJudgeResultView` 负责标题「judge 代批 · 代审批/代决策」与结论文案；锚定复用 `shellJudgeAnchorIndex`（toolCallId），定位不到追加流尾；`state.governanceJudgeResultIds` 幂等、换项目清空。**manual 不产生结果行**。
 - **回落**：shell 卡 `#sc-judge-notice`；治理方向卡 `.op-judge-notice`（`entry.judgeNotice`，同一请求重推可更新）。`judgeNotice` 文本由主进程给，渲染侧不自行编原因；`row-failed` 与一般 manual 的区分在文案单点。
 - **续接线索（跨角色）**：decision 四方法与 `session:operator-judge` 载荷属「桌面窗口」P4；本批联调时 P4 已落树（`app/preload.cjs`/`app/main.ts`/`interface.ts`），`ANS_JUDGE_UI_ONLY=1` 已实际驱动 decision 开关/警告/结果行/single 矩阵（**JUDGE_UI_PASS 33**）。若旧窗口/回滚版本缺任一桥方法，UI 自动按组禁用，不崩、不假开启。
-- **测试现状**：`tool-rows.test.ts` 51/51；`renderer.test.ts` 100 计/96 过/4 红（既有 CRLF 基线 N-1/data-state/P1-3/G-5）；全量三层 glob **2852 计/2826 过/23 红/3 skip**。红集：4 条渲染基线 + 6 条 shell-judge-verify 旧文案（评审 §10.2 需测试角色更新）+ 1 条 f-readonly（P1 `.ans` 文案）+ markdown vendor pin + runtime-ui localStorage + g4-skill 读取器防御 + 9 条环境/他域既有红；本域无新增红。
-- **他域预期红**：`test/测试/shell-judge-verify/{a-allow-flow,b-deny-flow,e-deny-tier}.test.ts` 断言旧 UI 文案（「替我审」/旧警告三行/旧结果标题）；评审 §10.2/§12.3 要求加「代审批」分组标记与新警告文案，归测试角色更新；本角色不改他域测试。
+- **测试现状**：`tool-rows.test.ts` 51/51；`renderer.test.ts` **152 计/148 过/4 红**（既有 CRLF 基线 N-1/data-state/P1-3/G-5）；全量三层 glob（最新收尾）**2972 计/2953 过/16 红/3 skip**。红集：4 条渲染基线 + 9 条环境（Windows symlink/abort 等）+ markdown vendor pin + runtime-ui localStorage + g4-skill 读取器防御；本域无新增红。此前 shell-judge-verify 旧文案断言已由测试角色同步更新转绿。
+- **他域预期红（已收口）**：`test/测试/shell-judge-verify/{a-allow-flow,b-deny-flow,e-deny-tier}.test.ts` 曾断言旧 UI 文案（「替我审」/旧警告三行/旧结果标题）；测试角色已按评审 §10.2/§12.3 更新，最新全量中转绿。
+
+## 2026-10-18 真机修复：轮次结束/失效回执后收起 shell 确认卡
+
+- **问题**：轮次中止/重建后，主进程已让旧 shell 卡失效（`session:operator-expired` 或回包 `expired:true`），渲染侧却只把按钮全禁用并保留「此确认已失效」卡——看起来像页面卡住。
+- **行为**：① 本轮 `settled`（完成/失败/中止/超时）⇒ `closeStaleShellConfirm(env)` 收起同 `roleId`+`runtime`+`projectRoot` 的当前卡；② `session:operator-expired` 按 `id` 命中 ⇒ 收起并 `setHint(reason)`；③ `respondShellConfirm` 的受理/过期/通道失败三条路径都收起（过期/失败如实提示未获放行）；卡移除后迟到/非法回包在 `if (!cur) return;` 处直接返回，不重建。其它角色或本轮仍在等待的卡保持可操作。
+- **删除**：`markShellConfirmExpired` 与 shell 卡 `is-expired` 终态（恢复确认卡继续用自己的 `.rc-card.is-expired`）。
+- **测试**：renderer +1 源码守卫；`ANS_TERMINAL_UI_ONLY=1` +7 DOM 断言 → **TERMINAL_PASS 22**；`ANS_JUDGE_UI_ONLY=1` **JUDGE_UI_PASS 33** 不回归；全量（最新）**2972 计/2953 过/16 红/3 skip**（本域仅 4 条既有基线）。`test/桌面应用/e2e/main.mjs`（桌面窗口）仍断言 Esc 后保留失效卡可见，需其属主按新 UX 更新。
+- **文案同步**：`shellJudgeNoticeText` 已与桌面通道 `manualJudgeNotice` 对齐（一般 manual 增「规则判定仅作参考；判断 agent 未完成时才由你手批。」；`row-failed` 增「规则判定仅作参考，本卡已转你手动确认。」）。`test/测试/shell-judge-verify/c-manual-flow` 的 retry-capped 旧期望待测试角色更新（他域，不改）。

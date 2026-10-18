@@ -120,6 +120,61 @@ test("硬拒：外壳 sh -c / bash -c / cmd /c / pwsh（argv 藏命令）→ den
   assert.equal(classifyShell(["wsl", "rm", "-rf", "/"], rules), "deny");
 });
 
+// ---- 4a.0) 窄只读 re-shell 白名单（客户 2026-10-18 裁定）----
+// `cmd /c dir`/`where` 与 `powershell -NoProfile -Command "Test-Path '<字面路径>'"` 是只读探针。
+// 仅在 deny reshell 规则之前开这两个形态；其余 re-shell 仍硬拒。
+test("只读 re-shell：cmd [/d] /c dir|where 与 powershell Test-Path '<路径>' → allow（ruleId 钉死）", () => {
+  for (const argv of [
+    ["cmd", "/c", "dir"],
+    ["cmd", "/C", "DIR"],
+    ["cmd.exe", "/d", "/c", "dir"],
+    ["cmd", "/c", "where", "node"],
+    ["cmd", "/c", "dir", "C:\\work"],
+    ["powershell", "-NoProfile", "-Command", "Test-Path 'C:\\work\\ans-cli'"],
+    ["powershell.exe", "-NoProfile", "-Command", "Test-Path \"D:\\work\\x\""],
+    ["powershell", "-noprofile", "-command", "Test-Path 'C:\\a b'"],
+  ]) {
+    assert.equal(classifyShell(argv, rules), "allow", `只读探针应放行：${argv.join(" ")}`);
+  }
+  assert.equal(classifyShellDetailed(["cmd", "/c", "dir"], rules).ruleId, "allow:readonly:readonly-reshell");
+  assert.equal(
+    classifyShellDetailed(["powershell", "-NoProfile", "-Command", "Test-Path 'C:\\x'"], rules).ruleId,
+    "allow:readonly:readonly-reshell",
+  );
+});
+
+test("只读 re-shell 仍守住：del/Get-Process/元字符/变量/绝对路径/pwsh → deny", () => {
+  for (const argv of [
+    ["cmd", "/c", "del", "x"],
+    ["cmd", "/c", "dir", "&", "del", "x"],
+    ["cmd", "/c", "dir", "sub|more"],
+    ["cmd", "/c", "dir", "C:\\%TEMP%"],
+    ["cmd", "/c", "dir", "!x!"],
+    ["cmd", "/c", "dir", "^"],
+    ["cmd", "/d", "dir"],
+    ["cmd", "/c", "dirextra"],
+    ["cmd", "/c", "wherex"],
+    ["C:\\Windows\\System32\\cmd.exe", "/c", "dir"],
+    ["powershell", "-Command", "Get-Process"],
+    ["powershell", "-NoProfile", "-Command", "Get-Process"],
+    ["powershell", "-NoProfile", "-Command", "Test-Path '$env:TEMP'"],
+    ["powershell", "-NoProfile", "-Command", "Test-Path 'C:\\x'; del y"],
+    ["powershell", "-NoProfile", "-Command", "Test-Path 'C:\\x' | Out-File y"],
+    ["powershell", "-NoProfile", "-Command", "Test-Path (Resolve-Path x)"],
+    ["powershell", "-NoProfile", "-Command", "Test-Path 'C:\\x`y'"],
+    [
+      "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+      "-NoProfile",
+      "-Command",
+      "Test-Path 'C:\\x'",
+    ],
+    ["pwsh", "-NoProfile", "-Command", "Test-Path 'C:\\x'"],
+    ["node", "-e", "1"],
+  ]) {
+    assert.equal(classifyShell(argv, rules), "deny", `必须仍 deny：${argv.join(" ")}`);
+  }
+});
+
 // ★★ 反向守卫（§14.4 核心）—— `sh -c` 是最容易被后人「顺手放宽」的一处 ★★
 // 它**必须**仍是 deny，**不得**因为「rm 改判 risky 了」而跟着被放宽成 risky（那是整体绕过写边界）。
 test("反向守卫：sh -c 仍硬拒——**不是** risky、**不是** allow（防止后人顺手放宽，§14.4）", () => {
@@ -127,7 +182,8 @@ test("反向守卫：sh -c 仍硬拒——**不是** risky、**不是** allow（
     ["sh", "-c", "rm -rf /"],
     ["sh", "-c", "echo hi"],
     ["bash", "-c", "ls"],
-    ["cmd", "/c", "dir"],
+    // 注：`cmd /c dir` 自客户 2026-10-18 裁定起走窄只读白名单（见下方 4a.0）；此处用非只读子命令守反向断言。
+    ["cmd", "/c", "del", "x"],
   ]) {
     const d = classifyShell(argv, rules);
     assert.equal(d, "deny", `sh -c 一类必须仍 deny：${argv.join(" ")}`);

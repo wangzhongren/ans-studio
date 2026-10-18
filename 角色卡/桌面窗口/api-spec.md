@@ -98,14 +98,16 @@ Customer callback 第二参保留 O1 的原 CustomerInputMetadata.signal；sessi
 
 两个入站 handler 在 `main.ts` 内**各自**校验 `event.sender === win.webContents`（`isShellJudgeIpcSender` 纯同一性谓词）；不依赖通用 registrar。诊断：`shell-judge.toggled`（enabled/source/at）、`shell-judge.set.rejected`（reason）、`shell-judge.row.failed`（requestId/toolCallId/verdict）。
 
-**通道三态（`app/desktop/operator-channel.ts`）**：`CreateOperatorChannelOptions` 增 `judge?: {isEnabled, timeoutMs?}`（缺省 15000ms，独立于确认卡超时）与 `emitJudgeResult?`。开关关 / 无 `metadata.judge` / `metadata.signal.aborted` ⇒ **原 `present` 路径逐字不变**。开启后：
+**通道三态（`app/desktop/operator-channel.ts`）**：`CreateOperatorChannelOptions` 增 `judge?: {isEnabled, timeoutMs?}`（缺省 **135000ms**：driver 120s + 15s，由 `ANS_SHELL_JUDGE_TIMEOUT_MS` 派生；独立于确认卡超时）与 `emitJudgeResult?`。开关关 / 无 `metadata.judge` / `metadata.signal.aborted` ⇒ **原 `present` 路径逐字不变**。开启后：
 
 - `allow`：**先发结果行**（`ShellJudgeResultPayload`；投达失败或缺 `emitJudgeResult` ⇒ `manual/row-failed` → 原卡）→ `{outcome:"allow", operatorId:"judge:<engine>", judge}`。
 - `deny`：格式化 §8.4 文本（说明/原因/替代方案/出路）→ 发结果行（失败**只记诊断**）→ `{outcome:"deny", operatorId:"judge:<engine>", reason, judge}`；**不调 presenter、0 卡**。
-- `manual`：写 `display.judgeNotice`（按 reasonCode 人话；`row-failed` 专用文案）→ 原 `present`；审计归人工（**不写 `judge`**）。
+- `manual`：写 `display.judgeNotice`（按 reasonCode 人话，附「规则判定仅作参考；判断 agent 未完成时才由你手批」；`row-failed` 专用文案）→ 原 `present`；审计归人工（**不写 `judge`**）。
 - **deny 档（客户 D1）**：judge `allow` **照常放行**，只按 `request.tier === "deny"` 置 `hardDenyOverride:true` 与 `label:"deny 档 · judge 放行"`；**无 hard-floor 转换/拦截/弹卡**。
 
 判断请求由会话闭包给出：`roleId/projectRoot/runtime/turnText/judge`；`policy/tier` 由 `OperatorPrompt.reason` 行首 `su-审批档[tier]` 解析（否则 `project`/`null`）。`ShellCommandDisplay`/`ShellConfirmRequest` 增可选 `judgeNotice`（`buildShellConfirmRequest` **原样拷贝**，不进入 `reasonRaw`）。
+
+**2026-10-18 客户裁定（第一层规则不拒绝任何请求）**：c 规则只快速放行/作参考，**所有拒绝由判断 agent 做出**；risky/review/deny 均交给 (a)。桌面 (a) 通道对 deny 档**同样调用 judge**（无 tier 短路）；结果行/审计保留 c 规则判定（`policy/tier`）与 judge 结论（`verdict/reasonCode`）；诊断 `shell-judge.decision` 以 `decision:"<policy>:<tier 或 null>:<verdict>"` + `outcome` + `reasonCode` 同时保留两者。single/su 旧路径（开关关/无 judge）逐字不变。
 
 **会话装配（`app/desktop/session.ts`）**：每会话用**同一份** `runtimeOptions` 与已构造的 `createAdapter` 工厂经编排 `createShellJudge` 生成闭包（`SessionManagerDeps.createShellJudge`；Interface 缺省注入真实实现，经 `govern-session.ts` 薄再导出，**不直接导入私有 `common/编排/`**）；构造失败 ⇒ 不注入（回原 present）。`LiveSession.lastUserText` 在**真实投递**（直发/出队/派发/回交）时写入，UTF-8 ≤4096 字节（超出截断、不据此 manual）；`metadata` 在调用当刻从活会话读取 `turnText`/`judge`；会话 `dispose` 即清两项。三人（su/项目角色）共用；不改既有 shell 审批档/三层链。
 
@@ -130,7 +132,7 @@ Customer callback 第二参保留 O1 的原 CustomerInputMetadata.signal；sessi
 
 - `approve`：结算前**再查开关**（关 ⇒ `manual/switch-off`）→ 防御复核 group/cardKind/value（选项 ⊆ 卡片、单选恰一、confirm 恰 `confirmed:true`）→ **先** `emitJudgeResult`（缺失/抛错 ⇒ `manual/row-failed`）→ 同一 `settleEntry` 结算为 `{outcome:"answered", value:{selected}|{confirmed:true}, operatorId:"judge:<engine>", judge}` → `notifyNextStep`/`drainProject` 恰一次（**0 卡、1 行**）。
 - `manual`（负向/证据不足/读取失败/超时/引擎不可用/group 不符/`judgeContext.unavailableReason`/开关关闭/中止/结果行失败）：原卡 + `OperatorRequestPayload.judgeNotice`（`row-failed` 单列；带「代审批/代决策」）。不写账本决定；客户手答仍归 `customer-input`。回落**按组、按卡、整卡**，另一组不受影响；判断中关开关不追溯已挂起卡（结算前再查一次）。
-- **治理 judge 通道层防御超时**（2026-10-18 真机修正；同日 driver 默认上调后再次同步）：driver 超时（`ANS_GOVERNANCE_JUDGE_TIMEOUT_MS`，默认 **120s**，编排解析）**+15s 余量**，缺省 **135s**；非法/缺失回 135s；显式 `judge.timeoutMs` 原样使用（测试/宿主）。用 `AbortSignal.timeout`（不引入 `setTimeout/setInterval`）；超时提示带**实际时长**（`判断超时（>135s）`/`（>20ms）`）。**shell judge 的通道超时保持 15s**，两套互不影响。`rejectAllPending`/`cancel` 把 `judging` 一并结算，迟到结果见 `state !== "judging"` 丢弃。
+- **治理 judge 通道层防御超时**（2026-10-18 真机修正；同日 driver 默认上调后再次同步）：driver 超时（`ANS_GOVERNANCE_JUDGE_TIMEOUT_MS`，默认 **120s**，编排解析）**+15s 余量**，缺省 **135s**；非法/缺失回 135s；显式 `judge.timeoutMs` 原样使用（测试/宿主）。用 `AbortSignal.timeout`（不引入 `setTimeout/setInterval`）；超时提示带**实际时长**（`判断超时（>135s）`/`（>20ms）`）。**shell judge 的通道超时独立派生**（`ANS_SHELL_JUDGE_TIMEOUT_MS`，driver 默认 120s + 15s 余量 ⇒ 135s，见 §「替我审」），两套互不影响。`rejectAllPending`/`cancel` 把 `judging` 一并结算，迟到结果见 `state !== "judging"` 丢弃。
 - 结果行人话摘要 `judgeResultSummary(payload)`：`judge 代批 · 代决策：接受提案（accept）/任命 <ids>/验收通过（accept）· 流程 <flowId>`；写盘族 `judge 代批 · 代审批：确认写入 <n> 个路径（…）`。
 
 **会话装配（`app/desktop/session.ts`）**：`LiveSession.governanceJudge`；仅在 `governanceModel === "trio"` 且客户交互通道已接时，用**同一份** `runtimeOptions`/`createAdapter` 经 `SessionManagerDeps.createGovernanceJudge`（Interface 缺省真实实现，经 `govern-session.ts` 薄再导出）构造；构造失败 ⇒ 不注入。`customerInput` 闭包 ctx 增 `governanceModel/governanceJudge/turnText`（调用当刻读活会话），`metadata`（含编排计算的 `judgeContext`）**原样透传**；dispose 清空。single/su/Liaison 不注入。

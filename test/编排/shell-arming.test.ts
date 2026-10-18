@@ -95,6 +95,9 @@ async function assemble(opts: {
     operatorChannel: opts.operator ?? (() => ({ outcome: "deny", operatorId: "test-客户", reason: "测试拒绝" })),
     classifyShell,
     rules: RULES,
+    // 2026-10-18 客户新裁定后项目角色默认 advisory；本文件的 I-1 用例保留**旧三层链**行为做回归，
+    // 显式关闭 advisory。新默认行为由 `shell-advisory-ruleset.test.ts` 覆盖。
+    advisoryRuleset: false,
     sessionDeps: {
       createAdapter: (gate: WriteGate) =>
         createFakeRuntimeAdapter({ gate, script: [] }),
@@ -372,6 +375,7 @@ test("R-1 端到端：夹具模型经 shellVerdict 交回结构化结论 → 只
       },
       classifyShell,
       rules: RULES,
+      advisoryRuleset: false,
       sessionDeps: { createAdapter: spyFactory },
       auditSink: { async append() { return { ok: true }; } },
     });
@@ -432,6 +436,7 @@ test("F-6-T6 事故回归 E2E：创世过渡窗口内的未接受快照，在收
       operatorChannel: () => ({ outcome: "deny", operatorId: "test" }),
       classifyShell,
       rules: RULES,
+      advisoryRuleset: false,
       sessionDeps: { createAdapter: (g: WriteGate) => createFakeRuntimeAdapter({ gate: g, script: [] }) },
     });
     const r1 = await gate(req("ls -la", ["ls", "-la"]));

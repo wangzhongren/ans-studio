@@ -2638,12 +2638,10 @@
     overlay.hidden = false;
     overlay.classList.toggle("is-su-approval", suApproval);
     syncDrawerModal();
-    overlay.classList.remove("is-expired");
     $("sc-hint").textContent = (suApproval ? SU_APPROVAL_WARNING + " " : "") + SHELL_CONFIRM_DEFAULT_HINT;
     $("sc-deny").disabled = cur.busy;
     $("sc-allow").disabled = cur.busy;
     $("sc-close").disabled = cur.busy;
-    if (cur.expiredReason) markShellConfirmExpired(cur.expiredReason);
     $("sc-deny").focus(); // 拒绝为默认焦点（fail-closed 的 UI 侧同向）——su 卡同样不得默认批准
   }
 
@@ -2654,25 +2652,26 @@
     if (!backgroundDelivery && state.rightTab !== null) $("drawer-close").focus({ preventScroll: true });
   }
 
-  /** 卡片终态（失效/回传失败）：禁用全部动作键 + 如实一行——**绝不**呈现为「已放行」。 */
-  function markShellConfirmExpired(text) {
-    if (!state.shellConfirm) return;
-    state.shellConfirm.busy = true;
-    state.shellConfirm.expiredReason = text;
-    if (backgroundDelivery) return;
-    $("shell-confirm").classList.add("is-expired");
-    $("sc-deny").disabled = true;
-    $("sc-allow").disabled = true;
-    $("sc-close").disabled = false; // 失效后只可关闭展示，不回传放行。
-    $("sc-hint").textContent = text;
+  /**
+   * 2026-10-18 真机（桌面UI）：本轮已 settled（完成/失败/中止/超时）后，该角色的 shell 确认卡不可能再被作答——
+   * 收起它，**不保留按钮全禁用、写着「已失效」的卡**（看起来像页面卡住）。只命中该角色、同 runtime/project 的
+   * 当前卡；本轮仍在等待的卡（未 settled）和其它角色的卡不受影响。
+   */
+  function closeStaleShellConfirm(env) {
+    var cur = state.shellConfirm;
+    if (!cur || cur.roleId !== env.roleId) return;
+    var runtime = env.runtime || (env.event && env.event.runtime) || state.runtime;
+    if (cur.runtime !== runtime) return;
+    if (env.projectRoot != null && cur.projectRoot !== env.projectRoot) return;
+    closeShellConfirm();
   }
 
   /** 回传决定（**恰 allow:true 才作为放行**；拒绝/Esc/关闭均为 false）。受理 ⇒ 收起卡片；
-   *  失效/通道失败 ⇒ 如实终态（不假装已裁决、更不假装已放行）。 */
+   *  失效/通道失败 ⇒ **收起卡片**并如实提示（不假装已裁决、更不假装已放行；不留不可操作卡）。 */
   function respondShellConfirm(allow) {
     var cur = state.shellConfirm;
     if (!cur) return;
-    if (cur.busy) { if (cur.expiredReason && allow !== true) closeShellConfirm(); return; }
+    if (cur.busy) return;
     cur.busy = true;
     var done = function (res) {
       deliverRuntimePayload(cur, function () {
@@ -2682,10 +2681,12 @@
         return;
       }
       if (res && res.expired === true) {
-        markShellConfirmExpired("此确认已失效（超时或应用重启），未获放行——请让角色重新发起。");
+        closeShellConfirm();
+        if (!backgroundDelivery) setHint("此确认已失效（超时或应用重启），未获放行——请让角色重新发起。");
         return;
       }
-      markShellConfirmExpired("未能回传你的决定（通道未接或异常）——按 fail-closed 不放行；请让角色重新发起。");
+      closeShellConfirm();
+      if (!backgroundDelivery) setHint("未能回传你的决定（通道未接或异常）——按 fail-closed 不放行；请让角色重新发起。");
       });
     };
     if (!d.shellConfirmRespond) {
@@ -3615,7 +3616,15 @@
   }
 
   function onOperatorExpired(payload) {
-    if (state.shellConfirm && state.shellConfirm.id === payload.id) markShellConfirmExpired("此确认已失效，未获放行。" + (payload.reason || "请让角色重新发起。"));
+    // 2026-10-18 真机：失效回执**直接收起**该 shell 确认卡（不再留按钮全禁用的「已失效」卡）；
+    // 如实提示原因，且只按 id 命中当前卡——旧 id/迟到回包不会重建或误收其它卡。
+    if (state.shellConfirm && state.shellConfirm.id === payload.id) {
+      var shellReason = typeof payload.reason === "string" && payload.reason !== ""
+        ? payload.reason
+        : "此确认已失效，未获放行——请让角色重新发起。";
+      closeShellConfirm();
+      if (!backgroundDelivery) setHint(shellReason);
+    }
     if (payload && payload.id != null) {
       var queuedId = String(payload.id);
       if (queuedRequests[queuedId]) {
@@ -4055,6 +4064,9 @@
     var ev = env.event;
     if (ev.runtime != null && ev.runtime !== state.runtime || ev.roleId != null && ev.roleId !== env.roleId) return;
     bindManualTurn(env);
+    // 2026-10-18 真机（桌面UI）：本轮 settled（完成/失败/中止/超时）后，该角色已不可能再作答旧 shell 确认卡——
+    // 立即收起，避免留下按钮全禁用、写着「已失效」的卡。仍在等待的卡（未 settled、其它角色）不受影响。
+    if (ev.kind === "settled") closeStaleShellConfirm(env);
     var key = Rt.replayKey({ turnId: ev.turnId, kind: ev.kind, eventKind: ev.kind, text: ev.summary, detail: ev.detail });
     var counts = liveReplayCounts[env.roleId] || (liveReplayCounts[env.roleId] = Object.create(null));
     var canonical = Rt.canonicalKey({ turnId: ev.turnId, kind: ev.kind, eventKind: ev.kind, detail: ev.detail });

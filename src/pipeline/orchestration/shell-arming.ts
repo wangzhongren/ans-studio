@@ -97,6 +97,12 @@ export interface AssembleShellGateOptions {
   sessionDeps: {
     createAdapter: (gate: WriteGate, capabilities?: AdapterCapabilities) => RuntimeAdapter;
   };
+  /**
+   * **advisory 规则集（客户 2026-10-18 新裁定）**：第一层 (c) 只快速放行，不拒绝任何请求；
+   * `risky/review/deny` 跳过 (b) 直接交 (a)（判断 agent/操作者）。**缺省 `true`**（项目角色三层链）；
+   * 显式 `false` 保留旧硬拒路径用于回归。
+   */
+  advisoryRuleset?: boolean;
 }
 
 /**
@@ -163,6 +169,8 @@ export async function assembleProjectShellGate(opts: AssembleShellGateOptions): 
     ...(opts.now !== undefined ? { now: opts.now } : {}),
     ...(opts.env !== undefined ? { env: opts.env } : {}),
     ...(opts.auditSink !== undefined ? { auditSink: opts.auditSink } : {}),
+    // 项目角色三层链默认 advisory（客户 2026-10-18）：规则只放行，不拒绝；拒绝交 (a)。
+    advisoryRuleset: opts.advisoryRuleset ?? true,
   });
 }
 

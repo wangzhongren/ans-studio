@@ -32,6 +32,9 @@ import {
   createDesktopOperatorChannel,
   createShellConfirmPresenter,
   DEFAULT_OPERATOR_CONFIRM_TIMEOUT_MS,
+  DEFAULT_SHELL_JUDGE_CHANNEL_TIMEOUT_MS,
+  SHELL_JUDGE_TIMEOUT_ENV,
+  resolveShellJudgeChannelTimeoutMs,
   describeShellCommand,
   DESKTOP_SHELL_GATE_ARMED,
   parseSuApprovalTier,
@@ -1299,6 +1302,7 @@ test("替我审·manual 回落：设置 display.judgeNotice 后走原 present；
   assert.equal(presented, 1);
   assert.match(notice, /判断 agent 未能完成判断/);
   assert.match(notice, /判断服务不可用/);
+  assert.match(notice, /规则判定仅作参考；判断 agent 未完成时才由你手批/);
   assert.match(notice, /已转你手动确认/);
   assert.equal(res.outcome, "deny");
   assert.equal((res as { operatorId?: string }).operatorId, "dora");
@@ -1320,6 +1324,27 @@ test("替我审·独立超时：judge 不返回 ⇒ manual/timeout 回落原卡�
   assert.ok(Date.now() - startedAt < 2000, "判断超时应独立生效（不等确认超时）");
   assert.equal(res.outcome, "deny", "回落人工后按人工决定");
   assert.match(notice, /判断超时/);
+});
+
+test("替我审·通道超时同步：默认 135s（driver 120s+15s），env 派生/非法回 135s；确认超时仍 120s", () => {
+  assert.equal(DEFAULT_SHELL_JUDGE_CHANNEL_TIMEOUT_MS, 135_000);
+  assert.equal(SHELL_JUDGE_TIMEOUT_ENV, "ANS_SHELL_JUDGE_TIMEOUT_MS");
+  assert.equal(resolveShellJudgeChannelTimeoutMs(undefined, {}), 135_000, "缺省 135s");
+  assert.equal(
+    resolveShellJudgeChannelTimeoutMs(undefined, { ANS_SHELL_JUDGE_TIMEOUT_MS: "120000" }),
+    135_000,
+    "driver 120s ⇒ 通道 135s（不会先杀 driver）",
+  );
+  assert.equal(resolveShellJudgeChannelTimeoutMs(undefined, { ANS_SHELL_JUDGE_TIMEOUT_MS: "60000" }), 75_000, "env 覆盖 +15s");
+  for (const bad of ["abc", "0", "-1", "1.5", "", " "]) {
+    assert.equal(
+      resolveShellJudgeChannelTimeoutMs(undefined, { ANS_SHELL_JUDGE_TIMEOUT_MS: bad }),
+      135_000,
+      `非法 env 回 135s：${JSON.stringify(bad)}`,
+    );
+  }
+  assert.equal(resolveShellJudgeChannelTimeoutMs(25, {}), 25, "显式 timeoutMs 原样使用（测试/宿主）");
+  assert.equal(DEFAULT_OPERATOR_CONFIRM_TIMEOUT_MS, 120_000, "确认卡等待超时不变");
 });
 
 test("替我审·deny 档：judge 放行**不转换**——outcome 仍 allow，只按 tier 置 hardDenyOverride/label（客户 D1）", async () => {
@@ -1349,9 +1374,84 @@ test("替我审·deny 档：judge 放行**不转换**——outcome 仍 allow，�
   assert.equal(emitted[0].label, "deny 档 · judge 放行");
 });
 
+test("替我审·deny 档也进入 judge（第一层规则不拒绝）：judge deny ⇒ 0 卡、审计保留 tier 与 judge 结论", async () => {
+  const seen: ShellJudgeRequest[] = [];
+  let presented = 0;
+  const ch = createDesktopOperatorChannel({
+    presenter: { async present() { presented += 1; return { allow: false }; } },
+    operatorId: "alice",
+    judge: { isEnabled: () => true },
+    emitJudgeResult: () => {},
+  });
+  const res = await ch(
+    req("git reset --hard", ["git", "reset", "--hard"], "/proj", "su-审批档[deny] 硬拒类"),
+    judgeMetadata({ runtime: "claude", judge: judgeStub({ verdict: "deny", reason: "会改写工作区", reasonCode: "dangerous" }, seen) }),
+  );
+  assert.equal(seen.length, 1, "deny 档不得被规则短路——必须进入判断 agent");
+  assert.equal(seen[0].tier, "deny", "c 规则判定随请求进入 judge");
+  assert.equal(seen[0].policy, "su-approval");
+  assert.equal(res.outcome, "deny", "judge 拒绝 ⇒ 不执行");
+  assert.equal(presented, 0, "judge 已给出结论 ⇒ 0 卡");
+  const audit = (res as { judge?: { verdict?: string; tier?: string; reasonCode?: string } }).judge;
+  assert.equal(audit?.verdict, "deny", "审计保留 judge 结论");
+  assert.equal(audit?.tier, "deny", "审计保留 c 规则判定");
+  assert.equal(audit?.reasonCode, "dangerous");
+});
+
+test("替我审·项目角色 deny 类命令也进入 judge（规则不拒绝）：policy=project、judge 结论 0 卡", async () => {
+  const seen: ShellJudgeRequest[] = [];
+  let presented = 0;
+  const ch = createDesktopOperatorChannel({
+    presenter: { async present() { presented += 1; return { allow: false }; } },
+    operatorId: "alice",
+    judge: { isEnabled: () => true },
+    emitJudgeResult: () => {},
+  });
+  const res = await ch(
+    req("git reset --hard", ["git", "reset", "--hard"], "/proj", "deny 类：会改写工作区"),
+    judgeMetadata({ runtime: "claude", judge: judgeStub({ verdict: "deny", reason: "会改写工作区", reasonCode: "dangerous" }, seen) }),
+  );
+  assert.equal(seen.length, 1, "项目角色 deny 类不得被规则短路——必须进入判断 agent");
+  assert.equal(seen[0].policy, "project");
+  assert.equal(res.outcome, "deny");
+  assert.equal(presented, 0, "judge 已拒绝 ⇒ 0 卡");
+});
+
+test("承接 2026-10-18 裁定：shell-judge.decision 诊断保留 c 规则判定（policy/tier）与 judge 结论", async () => {
+  const dir = await fsp.mkdtemp(path.join(os.tmpdir(), "ans-shell-judge-diag-"));
+  configureDiagnostics({ directory: dir });
+  try {
+    const ch = createDesktopOperatorChannel({
+      presenter: { async present() { throw new Error("judge 已拒绝，不该弹卡"); } },
+      operatorId: "alice",
+      judge: { isEnabled: () => true },
+      emitJudgeResult: () => {},
+    });
+    await ch(
+      req("git reset --hard", ["git", "reset", "--hard"], "/proj", "su-审批档[deny] 硬拒类"),
+      judgeMetadata({ runtime: "claude", judge: judgeStub({ verdict: "deny", reason: "会改写工作区", reasonCode: "dangerous" }) }),
+    );
+    await flushDiagnostics();
+    const files = await fsp.readdir(dir);
+    const records = (await Promise.all(files.map((f) => fsp.readFile(path.join(dir, f), "utf8"))))
+      .join("")
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line) as Record<string, unknown>);
+    const decision = records.find((record) => record.event === "shell-judge.decision");
+    assert.ok(decision, "判断结论写 shell-judge.decision 诊断");
+    assert.equal(decision?.decision, "su-approval:deny:deny", "诊断保留 c 规则判定（policy/tier）与 judge 结论");
+    assert.equal(decision?.outcome, "deny", "诊断保留 judge 结论");
+    assert.equal(decision?.reasonCode, "dangerous");
+  } finally {
+    await disposeDiagnostics();
+    await fsp.rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("judgeNotice：buildShellConfirmRequest 原样拷贝、不进入 reasonRaw（§10.4）", () => {
   const display = describeShellCommand(req("ls", ["ls"], "/proj", "普通原因"));
-  display.judgeNotice = "判断 agent 未能完成判断：判断超时。已转你手动确认。";
+  display.judgeNotice = "判断 agent 未能完成判断：判断超时。规则判定仅作参考；判断 agent 未完成时才由你手批。已转你手动确认。";
   const built = buildShellConfirmRequest("sc-1", display);
   assert.equal(built.judgeNotice, display.judgeNotice, "judgeNotice 原样拷贝");
   assert.equal(built.reasonRaw, "普通原因", "judgeNotice 不进入 reasonRaw");

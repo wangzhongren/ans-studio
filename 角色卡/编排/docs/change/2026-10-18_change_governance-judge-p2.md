@@ -44,7 +44,9 @@
 14. **pathProbes 声明路径（P6 真机修复）**：`computeJudgeContext` 优先用 `request_confirmation` 的显式 `req.paths`（非空时；空数组视为未给），否则回退 preview 的「一行一个路径」声明；`createConfirmedWriteIssuer` 同样优先显式 `paths` 发行写集；不扫描散文；越界声明路径仍 `allowed:false` 并整卡回落。
 15. **boundary.yaml 写前内容校验（P6 真机修复）**：`write_file`/`edit_file` 目标匹配 `角色卡/<id>/boundary.yaml` 时，用门禁引擎 Service 公共出口 `validateBoundaryYamlText` 校验最终内容；非法 ⇒ 拒绝写入、零文件副作用，回执「boundary.yaml 格式非法：<原因>；顶层只允许 role / entries / archived，请按模板重写」；`role-card.md` 与其他路径不校验内容。
 16. **schedule-write 新文件（P6 真机修复）**：目标 `docs/flows/<flow>.md` 不存在时不要求旧物证，改由 preview 正文核对（空 preview ⇒ manual）；文件已存在仍要求读取旧版；`appointment-write` 的 nomination 要求不变。
-17. 测试：judge **41/41**、boundary 校验 **4/4**、e2e 1a **2/2**、`test/编排` **519 计/518 过**（symlink 环境红）、typecheck 0；全量仍受并行他域改动影响未能取得完成快照（此前完成快照 2900/16 红均他域/环境）。
+17. **shell judge 超时（P6 真机修复）**：默认 `120_000ms`；`ANS_SHELL_JUDGE_TIMEOUT_MS`（正整数，非法回默认）覆盖；文案带时长（如「判断超时（>120s）」）；shell 执行时限不变。跨角色：桌面 (a) 通道默认仍 15s，须由桌面角色同步 ≥120s。
+18. **advisory 规则集（客户 2026-10-18 新裁定）**：`createShellGate`/`buildShellGate`/`assembleProjectShellGate` 支持 `advisoryRuleset`（项目角色默认 true；`run-role` 经 `shellArming` 透传）。`(c)=allow` 放行 0 卡；`risky/review/deny` 跳过 (b) 直接交 (a)（`c-risky→a-*`/`c-review→a-*`/`c-deny→a-*`），规则原因进 `OperatorPrompt.reason`；与 `readonlyOnly`/`operatorOnly` 互斥、必须有 `operatorChannel`；`false` 保留旧硬拒回归。
+19. 测试：judge **41/41**、shell **29/29**、advisory **7/7**、boundary 校验 **4/4**、e2e 1a **2/2**、`test/编排` **527 计/526 过**（symlink 环境红）、typecheck 0；全量仍受并行他域改动影响未能取得完成快照（此前完成快照 2900/16 红均他域/环境）。
 
 ## 三、证据
 

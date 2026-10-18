@@ -51,7 +51,7 @@ test("判断会话不可用：原卡 + judgeNotice「判断服务不可用」", 
 
     const result = await chain.gate(REQUEST("manual-unavailable"));
     assert.equal(result.allow, false, "通道不可用时卡片默认拒绝");
-    assertManualCard(chain, /判断 agent 未能完成判断：判断服务不可用。已转你手动确认。/);
+    assertManualCard(chain, /判断 agent 未能完成判断：判断服务不可用。规则判定仅作参考；判断 agent 未完成时才由你手批。已转你手动确认。/);
     assert.equal(fake.seen.binds, 1);
   } finally {
     await project.cleanup();
@@ -72,7 +72,7 @@ test("判断超时：原卡 + judgeNotice「判断超时」，底层会话被 ab
 
     const result = await chain.gate(REQUEST("manual-timeout"));
     assert.equal(result.allow, false);
-    assertManualCard(chain, /判断 agent 未能完成判断：判断超时。已转你手动确认。/);
+    assertManualCard(chain, /判断 agent 未能完成判断：判断超时。规则判定仅作参考；判断 agent 未完成时才由你手批。已转你手动确认。/);
     assert.equal(fake.seen.aborted, 1, "超时必须中止底层判断会话");
     assert.equal(fake.seen.disposed, 1, "超时必须 dispose 底层判断会话");
   } finally {
@@ -93,7 +93,7 @@ test("输出无法解析：模型散文不猜结论 ⇒ 原卡 +「判断结果�
 
     const result = await chain.gate(REQUEST("manual-parse"));
     assert.equal(result.allow, false);
-    assertManualCard(chain, /判断 agent 未能完成判断：判断结果无法解析。已转你手动确认。/);
+    assertManualCard(chain, /判断 agent 未能完成判断：判断结果无法解析。规则判定仅作参考；判断 agent 未完成时才由你手批。已转你手动确认。/);
   } finally {
     await project.cleanup();
   }
@@ -121,7 +121,7 @@ test("allow + 读取被拒：真实驱动按「allow 必须无损」降级 manua
 
     const result = await chain.gate(REQUEST("manual-read-denied"));
     assert.equal(result.allow, false, "读取损伤后的 allow 不得自动放行");
-    assertManualCard(chain, /判断 agent 未能完成判断：所需项目文件无法读取。已转你手动确认。/);
+    assertManualCard(chain, /判断 agent 未能完成判断：所需项目文件无法读取。规则判定仅作参考；判断 agent 未完成时才由你手批。已转你手动确认。/);
     assert.equal(fake.seen.binds, 1);
   } finally {
     await project.cleanup();
@@ -152,7 +152,7 @@ test("allow + 读取预算耗尽：真实驱动降级 manual/budget", async () =
 
     const result = await chain.gate(REQUEST("manual-budget"));
     assert.equal(result.allow, false);
-    assertManualCard(chain, /判断 agent 未能完成判断：读取预算已用尽。已转你手动确认。/);
+    assertManualCard(chain, /判断 agent 未能完成判断：读取预算已用尽。规则判定仅作参考；判断 agent 未完成时才由你手批。已转你手动确认。/);
   } finally {
     await project.cleanup();
   }
@@ -180,7 +180,7 @@ test("allow + 读取截断：真实驱动降级 manual/read-truncated", async ()
 
     const result = await chain.gate(REQUEST("manual-truncated"));
     assert.equal(result.allow, false);
-    assertManualCard(chain, /判断 agent 未能完成判断：读取内容被截断。已转你手动确认。/);
+    assertManualCard(chain, /判断 agent 未能完成判断：读取内容被截断。规则判定仅作参考；判断 agent 未完成时才由你手批。已转你手动确认。/);
   } finally {
     await project.cleanup();
   }
@@ -208,11 +208,11 @@ test("防循环：同一命令连续 deny 达上限后不再调用模型，原�
     const third = await chain.gate(REQUEST("cap-3"));
     assert.equal(third.allow, false);
     assert.equal(fake.seen.binds, 2, "达到上限后不得再调用模型");
-    assertManualCard(chain, /判断 agent 未能完成判断：同类命令连续被拒，已达重试上限。已转你手动确认。/, 2);
+    assertManualCard(chain, /判断 agent 未能完成判断：同类命令连续被拒，已达重试上限。规则判定仅作参考；判断 agent 未完成时才由你手批。已转你手动确认。/, 2);
     const UL = await loadUiLabels();
     assert.equal(
       UL.shellJudgeNoticeText("retry-capped"),
-      "判断 agent 未能完成判断：同类命令连续被拒，已达重试上限。已转你手动确认。",
+      "判断 agent 未能完成判断：同类命令连续被拒，已达重试上限。规则判定仅作参考；判断 agent 未完成时才由你手批。已转你手动确认。",
     );
   } finally {
     await project.cleanup();
@@ -228,7 +228,7 @@ test("引擎不支持（demo）：manual/unsupported-engine，不调用任何适
 
     const result = await chain.gate(REQUEST("manual-unsupported"));
     assert.equal(result.allow, false);
-    assertManualCard(chain, /判断 agent 未能完成判断：当前引擎不支持自动判断。已转你手动确认。/);
+    assertManualCard(chain, /判断 agent 未能完成判断：当前引擎不支持自动判断。规则判定仅作参考；判断 agent 未完成时才由你手批。已转你手动确认。/);
     assert.equal(fake.seen.binds, 0, "不支持引擎不得调用任何适配器");
   } finally {
     await project.cleanup();
@@ -260,7 +260,7 @@ test("allow 结果行投达失败：回落原卡 +「判断已完成但结果无
     assert.equal(chain.rows.length, 0, "结果行投达失败");
     assert.equal(chain.displays.length, 1, "必须回落原确认卡");
     const notice = chain.displays[0]!.judgeNotice ?? "";
-    assert.equal(notice, "判断 agent 已完成判断，但结果无法在聊天中显示；已转你手动确认。");
+    assert.equal(notice, "判断 agent 已完成判断，但结果无法在聊天中显示；规则判定仅作参考，本卡已转你手动确认。");
     const record = lastAudit(chain);
     assert.ok(record.by.endsWith("→ operator:客户"), "人工重新批准归人工");
     assert.equal("judge" in record, false, "row-failed 后的人工批准不写 judge 字段");
@@ -282,7 +282,7 @@ test("判断请求超上限：命令 >16KB 直接 manual/context-too-large（不
     const huge = `echo ${"x".repeat(17 * 1024)}`;
     const result = await chain.gate({ command: huge, argv: ["echo", "x".repeat(17 * 1024)], cwd: "/proj", toolCallId: "too-large" });
     assert.equal(result.allow, false);
-    assertManualCard(chain, /判断 agent 未能完成判断：命令或上下文过大。已转你手动确认。/);
+    assertManualCard(chain, /判断 agent 未能完成判断：命令或上下文过大。规则判定仅作参考；判断 agent 未完成时才由你手批。已转你手动确认。/);
     assert.equal(fake.seen.binds, 0);
   } finally {
     await project.cleanup();
@@ -301,7 +301,7 @@ test("模型自报 manual：原卡 +「判断 agent 自报无法判断」", asyn
     setJudgeEnabled(chain, true);
     const result = await chain.gate(REQUEST("model-manual"));
     assert.equal(result.allow, false);
-    assertManualCard(chain, /判断 agent 未能完成判断：判断 agent 自报无法判断。已转你手动确认。/);
+    assertManualCard(chain, /判断 agent 未能完成判断：判断 agent 自报无法判断。规则判定仅作参考；判断 agent 未完成时才由你手批。已转你手动确认。/);
   } finally {
     await project.cleanup();
   }

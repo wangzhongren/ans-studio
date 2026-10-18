@@ -9,7 +9,7 @@
 //   · 用与请求会话同一份 runtimeOptions 建**判断专用**适配器：`persistSession:false`、注入只读
 //     `shellJudge` 能力（运行时核心据此走 `buildShellJudgeTools`）、deny-all 写门禁；
 //   · 合成判断角色（空边界、系统提示来自 `shell-judge-prompt.ts`）、提示一次、等 settled；
-//   · 独立 15s 硬超时（`AbortSignal.any`）、中止、迟到 bindRole 的 dispose；
+//   · 独立 120s 硬超时（`AbortSignal.any`；2026-10-18 客户要求与治理判断一致）、中止、迟到 bindRole 的 dispose；
 //   · 防循环（同命令连续 deny 上限，allow 清零、manual 不递增）；
 //   · 裁决规范化（`shell-judge-verdict.ts`）、`allow` 必须无损、`deny` 始终有效、客户说明合成；
 //   · **客户 D1**：`tier:"deny"` 且模型 allow → 照常 `allow`，置 `hardDenyOverride:true` 与
@@ -49,8 +49,31 @@ import {
 export const SHELL_JUDGE_ROLE_ID = "shell-judge";
 /** 客户 D1：deny 档被 judge 放行时的审计/聊天行标记（逐字）。 */
 export const SHELL_JUDGE_DENY_TIER_LABEL = "deny 档 · judge 放行" as const;
-/** 默认判断硬超时（PM 评审 §6.3：15s）。 */
-export const DEFAULT_SHELL_JUDGE_TIMEOUT_MS = 15_000;
+/**
+ * 默认判断硬超时（2026-10-18 客户要求：与治理判断一致 ⇒ **120s**）。
+ * 环境变量 `ANS_SHELL_JUDGE_TIMEOUT_MS`（正整数，非法回默认）可覆盖；shell 执行时限不变。
+ */
+export const DEFAULT_SHELL_JUDGE_TIMEOUT_MS = 120_000;
+export const SHELL_JUDGE_TIMEOUT_ENV = "ANS_SHELL_JUDGE_TIMEOUT_MS";
+
+/** 解析 shell judge 超时：显式选项 > 环境变量 > 默认 120s；非法回默认。 */
+export function resolveShellJudgeTimeoutMs(
+  option: unknown,
+  env: Record<string, string | undefined> = process.env,
+): number {
+  if (typeof option === "number" && Number.isFinite(option) && option > 0) return Math.floor(option);
+  const raw = env[SHELL_JUDGE_TIMEOUT_ENV];
+  if (typeof raw === "string" && /^[1-9]\d*$/.test(raw.trim())) {
+    const parsed = Number(raw.trim());
+    if (Number.isSafeInteger(parsed) && parsed > 0) return parsed;
+  }
+  return DEFAULT_SHELL_JUDGE_TIMEOUT_MS;
+}
+
+/** 超时文案的时长格式：整秒用 `Ns`，否则 `Nms`（如 `>120s` / `>25ms`）。 */
+export function formatShellJudgeTimeout(timeoutMs: number): string {
+  return timeoutMs >= 1000 && timeoutMs % 1000 === 0 ? `${timeoutMs / 1000}s` : `${timeoutMs}ms`;
+}
 /** 默认同一命令连续 deny 上限（PM 评审 §8.5）。 */
 export const DEFAULT_SHELL_JUDGE_MAX_DENY_PER_COMMAND = 2;
 
@@ -83,7 +106,7 @@ export interface CreateShellJudgeOptions {
   createAdapter?: RuntimeAdapterFactory;
   /** 测试/宿主注入时钟（毫秒）。 */
   now?: () => number;
-  /** 判断硬超时；缺省 15000ms。 */
+  /** 判断硬超时；缺省 120000ms（env `ANS_SHELL_JUDGE_TIMEOUT_MS` 可覆盖）。 */
   timeoutMs?: number;
   /** 同一命令连续 deny 上限；缺省 2。 */
   maxDenyPerCommand?: number;
@@ -177,9 +200,7 @@ function modelFromOptions(options?: RuntimeAdapterFactoryOptions): string | unde
 export function createShellJudge(opts: CreateShellJudgeOptions): ShellJudgeFn {
   const log = opts.logger ?? createDiagnosticLogger({ component: "orchestration.shell-judge", projectRoot: opts.project.projectRoot });
   const now = opts.now ?? (() => Date.now());
-  const timeoutMs = typeof opts.timeoutMs === "number" && Number.isFinite(opts.timeoutMs) && opts.timeoutMs > 0
-    ? Math.floor(opts.timeoutMs)
-    : DEFAULT_SHELL_JUDGE_TIMEOUT_MS;
+  const timeoutMs = resolveShellJudgeTimeoutMs(opts.timeoutMs);
   const maxDenyPerCommand = typeof opts.maxDenyPerCommand === "number" && Number.isFinite(opts.maxDenyPerCommand) && opts.maxDenyPerCommand >= 1
     ? Math.floor(opts.maxDenyPerCommand)
     : DEFAULT_SHELL_JUDGE_MAX_DENY_PER_COMMAND;
@@ -404,7 +425,7 @@ export function createShellJudge(opts: CreateShellJudgeOptions): ShellJudgeFn {
       const captured = pickVerdict();
       if (captured !== undefined) return complete(captured);
       log.record("shell-judge.timeout", { toolCallId: request.toolCallId, durationMs: now() - startedAt });
-      return manualOutcome("timeout", `判断超时（>${timeoutMs}ms），已转手动确认。`);
+      return manualOutcome("timeout", `判断超时（>${formatShellJudgeTimeout(timeoutMs)}），已转手动确认。`);
     }
     if (result.kind === "error") {
       const reason = `判断会话不可用：${errText(result.error)}。已转手动确认。`;

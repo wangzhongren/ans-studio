@@ -88,9 +88,36 @@ import { SHELL_REVIEW_TIMEOUT_ENV } from "../../src/common/编排/shell-deadline
 export const DEFAULT_OPERATOR_CONFIRM_TIMEOUT_MS = 120000;
 /** 覆盖确认超时的环境变量名（显式专用覆盖，优先于 shell 审核预算）。 */
 export const OPERATOR_CONFIRM_TIMEOUT_ENV = "ANS_DESKTOP_OPERATOR_CONFIRM_TIMEOUT_MS";
-/** 「替我审」在桌面通道层面的**独立**硬超时（PM 评审 §5.2/§6.5：15s；与确认卡超时互不占用）。
- *  超时 ⇒ `manual/timeout` → 原确认卡（判断只影响是否弹卡，不改变 fail-closed 语义）。 */
-export const DEFAULT_SHELL_JUDGE_CHANNEL_TIMEOUT_MS = 15000;
+/**
+ * shell judge 通道层**独立**超时（2026-10-18 真机修正：driver 默认 120s 后同步）：
+ * driver 超时由编排 `ANS_SHELL_JUDGE_TIMEOUT_MS` 解析（默认 120s），本通道 = 同名 env + 15s 余量
+ * ⇒ 缺省 **135s**；非法/缺失回 135s；显式 `judge.timeoutMs` 原样。**确认卡等待超时与 shell 执行时限不变**。
+ */
+export const SHELL_JUDGE_TIMEOUT_ENV = "ANS_SHELL_JUDGE_TIMEOUT_MS";
+export const SHELL_JUDGE_CHANNEL_TIMEOUT_MARGIN_MS = 15_000;
+export const DEFAULT_SHELL_JUDGE_DRIVER_TIMEOUT_MS = 120_000;
+export const DEFAULT_SHELL_JUDGE_CHANNEL_TIMEOUT_MS =
+  DEFAULT_SHELL_JUDGE_DRIVER_TIMEOUT_MS + SHELL_JUDGE_CHANNEL_TIMEOUT_MARGIN_MS;
+
+/**
+ * 解析 shell judge 通道超时（导出供测试钉住）：显式 `timeoutMs` 优先；否则
+ * `ANS_SHELL_JUDGE_TIMEOUT_MS`（正整数）+ 15s 余量；非法/缺失 ⇒ 135_000。driver 自己解析同名 env。
+ */
+export function resolveShellJudgeChannelTimeoutMs(
+  option: unknown,
+  env?: Record<string, string | undefined>,
+): number {
+  if (typeof option === "number" && Number.isFinite(option) && option > 0) return Math.floor(option);
+  const source = env ?? (typeof process !== "undefined" ? process.env : {});
+  const raw = source[SHELL_JUDGE_TIMEOUT_ENV];
+  if (typeof raw === "string" && /^[1-9]\d*$/.test(raw.trim())) {
+    const parsed = Number(raw.trim());
+    if (Number.isSafeInteger(parsed) && parsed > 0) {
+      return parsed + SHELL_JUDGE_CHANNEL_TIMEOUT_MARGIN_MS;
+    }
+  }
+  return DEFAULT_SHELL_JUDGE_CHANNEL_TIMEOUT_MS;
+}
 
 /**
  * 桌面**是否 arm** shell 闸（即：会话构造路径是否把本通道作为 (a) 层交给编排装配、从而 `run_shell` 被注册）。
@@ -299,7 +326,8 @@ export interface CreateOperatorChannelOptions {
   env?: Record<string, string | undefined>;
   /**
    * **「替我审」开关与判断超时**（PM 评审 §6.5）。`isEnabled()` 在主进程是权威状态（默认 false、重载复位）；
-   * 关 / 缺省 ⇒ 原 `present` 路径**逐字不变**。`timeoutMs` 缺省 15000（独立于确认卡超时）。
+   * 关 / 缺省 ⇒ 原 `present` 路径**逐字不变**。`timeoutMs` 缺省 135000（driver 120s + 15s 余量；
+   * 独立于确认卡超时）。
    */
   judge?: { isEnabled: () => boolean; timeoutMs?: number };
   /**
@@ -329,10 +357,7 @@ export function createDesktopOperatorChannel(opts: CreateOperatorChannelOptions)
     typeof opts.operatorId === "string" && opts.operatorId.trim() !== "" ? opts.operatorId : "unknown";
   const env = opts.env ?? process.env;
   const timeoutMs = opts.timeoutMs ?? readConfirmTimeoutMs(env);
-  const judgeTimeoutMs =
-    typeof opts.judge?.timeoutMs === "number" && Number.isFinite(opts.judge.timeoutMs) && opts.judge.timeoutMs > 0
-      ? Math.floor(opts.judge.timeoutMs)
-      : DEFAULT_SHELL_JUDGE_CHANNEL_TIMEOUT_MS;
+  const judgeTimeoutMs = resolveShellJudgeChannelTimeoutMs(opts.judge?.timeoutMs, env);
   const judgeLog = createDiagnosticLogger({ component: "desktop.shell-judge" });
   // 结果行幂等键：本通道（每窗口）自增，避免跨角色/跨项目 toolCallId 碰撞时渲染侧误去重。
   let judgeResultSeq = 0;
@@ -489,6 +514,18 @@ export function createDesktopOperatorChannel(opts: CreateOperatorChannelOptions)
         ? { customerMessageSynthesized: outcome.customerMessageSynthesized }
         : {}),
     };
+    // 审计/诊断同时保留 **c 规则判定**（policy/tier）与 **judge 结论**（verdict/reasonCode）。
+    // 2026-10-18 客户裁定：第一层规则只快速放行/作参考，**不拒绝任何请求**——deny 档同样进入本判断。
+    // 诊断字段走共享白名单：`decision` 承载「policy:tier:verdict」三元（tier/policy/verdict 无独立白名单名）。
+    judgeLog.record("shell-judge.decision", {
+      requestId: payload.id,
+      toolCallId: payload.toolCallId,
+      roleId: metadata.roleId,
+      runtime: metadata.runtime,
+      decision: `${policy}:${tier ?? "null"}:${outcome.verdict}`,
+      outcome: outcome.verdict,
+      reasonCode: outcome.reasonCode,
+    });
 
     if (outcome.verdict === "allow") {
       // **结果行是放行条件**：投达失败 ⇒ `manual/row-failed` → 原确认卡（人重新决定）。
@@ -518,9 +555,9 @@ export function createDesktopOperatorChannel(opts: CreateOperatorChannelOptions)
 /** `manual` 的**卡片提示**（PM 评审 §10.4）——按 reasonCode 分两类，不把「判断发生但降级」说成「没发生」。 */
 export function manualJudgeNotice(reasonCode: string, reason?: string): string {
   if (reasonCode === "row-failed") {
-    return "判断 agent 已完成判断，但结果无法在聊天中显示；已转你手动确认。";
+    return "判断 agent 已完成判断，但结果无法在聊天中显示；规则判定仅作参考，本卡已转你手动确认。";
   }
-  return `判断 agent 未能完成判断：${judgeManualHumanReason(reasonCode, reason)}。已转你手动确认。`;
+  return `判断 agent 未能完成判断：${judgeManualHumanReason(reasonCode, reason)}。规则判定仅作参考；判断 agent 未完成时才由你手批。已转你手动确认。`;
 }
 
 /** reasonCode → 人话（未知码回落到判断给出的有界理由；绝不复述内部行话以外的细节）。 */

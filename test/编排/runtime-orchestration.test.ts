@@ -288,7 +288,7 @@ test("O1 shell arming creates its reviewer on source runtime with a verdict tool
   });
   try {
     const auditSink = createMemoryAuditSink();
-    const shellGate = await assembleProjectShellGate({ project, runtime: "claude", pmRoleId: "su", rules: defaultShellRules(), classifyShell: () => "review", operatorChannel: () => ({ outcome: "deny", operatorId: "O1" }), auditSink, sessionDeps: { createAdapter: createRuntimeAdapterFactory(project, "claude", optionsFor("claude", provider.factory)) } });
+    const shellGate = await assembleProjectShellGate({ project, runtime: "claude", pmRoleId: "su", rules: defaultShellRules(), classifyShell: () => "review", advisoryRuleset: false, operatorChannel: () => ({ outcome: "deny", operatorId: "O1" }), auditSink, sessionDeps: { createAdapter: createRuntimeAdapterFactory(project, "claude", optionsFor("claude", provider.factory)) } });
     const result = await shellGate({ command: "inspect", argv: ["inspect"], cwd: project.projectRoot, toolCallId: "shell-O1" });
     assert.equal(result.allow, false);
     assert.equal(auditSink.records.length, 1);

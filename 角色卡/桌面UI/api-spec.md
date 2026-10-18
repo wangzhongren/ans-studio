@@ -383,4 +383,11 @@ work、card、pi、document复用424模态抽屉。仅导航/会话业务面iner
 - 边界：**不自动开会话/切角色、不写 localStorage/.env/项目文件、不触碰已挂起卡**；两开关默认关、互不影响、重载复位（主进程权威）。
 - 探针（只增）：`window.__ansRenderer.decisionJudge = { state(), onState, onResult }`（桥缺失时 `available=false`；`state()` 附 `singleDisabled`）。
 
-**测试证据**：`tool-rows.test.ts` 51/51（双开关矩阵、警告按开启组列行、治理结果行结论/路径截断、回落 notice 两类）；`renderer.test.ts` 100 计/96 过（4 红＝既有 CRLF 基线 N-1/data-state/P1-3/G-5），新增/改写覆盖两复选框 DOM、两组桥与状态机、一次性警告按组、治理结果行接线/幂等/esc、交互卡 `judgeNotice`、single 禁用；真实 Electron 离线 `ANS_JUDGE_UI_ONLY=1` → **JUDGE_UI_PASS 33**（decision 开关读取/设置/推送/失败回退、结果行锚定、写盘代批行、回落卡、single/trio 矩阵），`ANS_TERMINAL_UI_ONLY=1` → TERMINAL_PASS 15。全量三层 glob：2852 计/2826 过/23 红/3 skip；本域无新增红，红集分类见 [changelog](changelog.md) 同日条目。
+**测试证据**：`tool-rows.test.ts` 51/51（双开关矩阵、警告按开启组列行、治理结果行结论/路径截断、回落 notice 两类）；`renderer.test.ts` **152 计/148 过**（4 红＝既有 CRLF 基线 N-1/data-state/P1-3/G-5），新增/改写覆盖两复选框 DOM、两组桥与状态机、一次性警告按组、治理结果行接线/幂等/esc、交互卡 `judgeNotice`、single 禁用；真实 Electron 离线 `ANS_JUDGE_UI_ONLY=1` → **JUDGE_UI_PASS 33**（decision 开关读取/设置/推送/失败回退、结果行锚定、写盘代批行、回落卡、single/trio 矩阵），`ANS_TERMINAL_UI_ONLY=1` → **TERMINAL_PASS 22**（含真机卡收起 7 项）。全量三层 glob（最新）：**2972 计/2953 过/16 红/3 skip**；本域仅 4 条既有基线，红集分类见 [changelog](changelog.md) 同日条目。
+
+### 2026-10-18 真机追加：settled/失效回执收起 shell 确认卡
+
+- `appendOneEvent` 在本轮 `settled` 时调用 `closeStaleShellConfirm(env)`：只收起同 `roleId` + `runtime` + `projectRoot` 的当前 `state.shellConfirm`；其它角色/本轮仍在等待的卡不动。
+- `session:operator-expired` 按 `id` 命中当前 shell 卡 ⇒ `closeShellConfirm()` + `setHint(payload.reason)`（旧 id 不误收、不回建）。
+- `respondShellConfirm` 的 `ok:true`、`expired:true`、通道失败三条路径都收起；过期/失败以 `setHint` 如实说明「未获放行」。删除 shell 卡 `markShellConfirmExpired`/`is-expired` 终态；卡移除后迟到/非法回包在 `if (!cur) return;` 直接返回。
+- 测试：`renderer.test.ts` +1 源码守卫；`ANS_TERMINAL_UI_ONLY=1` +7 DOM 断言 → **TERMINAL_PASS 22**；JUDGE 33 不回归。`test/桌面应用/e2e/main.mjs`（桌面窗口属主）仍断言 Esc 后保留 `is-expired` 可见卡，需按新 UX 更新。

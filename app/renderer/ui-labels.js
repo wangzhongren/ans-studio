@@ -434,15 +434,15 @@
   }
 
   /**
-   * 手动回落卡 `judgeNotice`（旧 shell judge 口径；§10.4 逐字）：
-   *  · `row-failed` ⇒「判断已完成但结果无法显示」——**不**说成「判断没发生」；
-   *  · 其余 manual ⇒「判断 agent 未能完成判断：<人话原因>。已转你手动确认。」
+   * 手动回落卡 `judgeNotice`（与桌面通道 `manualJudgeNotice` 同解；通道已更新为「规则判定仅作参考」口径）：
+   *  · `row-failed` ⇒「判断已完成，但结果无法在聊天中显示」——**不**说成「判断没发生」；
+   *  · 其余 manual ⇒「判断 agent 未能完成判断：<人话原因>。规则判定仅作参考；判断 agent 未完成时才由你手批。已转你手动确认。」
    */
   function shellJudgeNoticeText(reasonCode) {
     if (reasonCode === "row-failed") {
-      return "判断 agent 已完成判断，但结果无法在聊天中显示；已转你手动确认。";
+      return "判断 agent 已完成判断，但结果无法在聊天中显示；规则判定仅作参考，本卡已转你手动确认。";
     }
-    return "判断 agent 未能完成判断：" + shellJudgeReasonText(reasonCode) + "。已转你手动确认。";
+    return "判断 agent 未能完成判断：" + shellJudgeReasonText(reasonCode) + "。规则判定仅作参考；判断 agent 未完成时才由你手批。已转你手动确认。";
   }
 
   /**

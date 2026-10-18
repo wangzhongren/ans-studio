@@ -1015,7 +1015,7 @@ test("超时/中止/busy：全部 manual，不外抛", async () => {
   }
 });
 
-test("超时配置：治理默认 120s、环境变量覆盖、非法回退；shell 仍 15s", async () => {
+test("超时配置：治理默认 120s、环境变量覆盖、非法回退；shell 120s", async () => {
   assert.equal(DEFAULT_GOVERNANCE_JUDGE_TIMEOUT_MS, 120_000);
   assert.equal(resolveGovernanceJudgeTimeoutMs(undefined, {}), 120_000);
   assert.equal(resolveGovernanceJudgeTimeoutMs(undefined, { [GOVERNANCE_JUDGE_TIMEOUT_ENV]: "1234" }), 1234);
@@ -1029,7 +1029,7 @@ test("超时配置：治理默认 120s、环境变量覆盖、非法回退；she
   assert.equal(resolveGovernanceJudgeTimeoutMs(25, { [GOVERNANCE_JUDGE_TIMEOUT_ENV]: "1234" }), 25, "显式选项优先");
   assert.equal(formatGovernanceJudgeTimeout(120_000), "120s");
   assert.equal(formatGovernanceJudgeTimeout(30), "30ms");
-  assert.equal(DEFAULT_SHELL_JUDGE_TIMEOUT_MS, 15_000, "shell judge 默认不变");
+  assert.equal(DEFAULT_SHELL_JUDGE_TIMEOUT_MS, 120_000, "shell judge 默认 120s");
 
   const previous = process.env[GOVERNANCE_JUDGE_TIMEOUT_ENV];
   process.env[GOVERNANCE_JUDGE_TIMEOUT_ENV] = "40";
