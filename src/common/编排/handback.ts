@@ -312,6 +312,7 @@ export function extractDispatchReadPaths(task: string): string[] {
 export function planDispatchDelivery(
   req: DispatchTaskPayload,
   probes: ReadonlyMap<string, string | undefined>,
+  opts?: DispatchPromptOptions,
 ): DispatchDeliveryPlan {
   const references: DispatchReadRef[] = [];
   let workflowMissing = false;
@@ -332,11 +333,16 @@ export function planDispatchDelivery(
       systemRow: `派发未受理：引用的契约 ${missingContract} 不存在——**未投递**（不静默；su 修正后重派）。`,
     };
   }
-  return { action: "deliver", text: renderDispatchPrompt(req, { references, workflowMissing }) };
+  return { action: "deliver", text: renderDispatchPrompt(req, { ...opts, references, workflowMissing }) };
 }
 
 /** `renderDispatchPrompt` 的 G-1 选项（可选——缺省 = 旧格式逐字不变）。 */
 export interface DispatchPromptOptions {
+  /**
+   * 派发主人角色 id（2026-10-18 客户反馈：三权下派实际主人是 Convener，界面却写死「来自 su」）。
+   * 缺省 `su`——single/su 路径逐字保持旧文案。
+   */
+  sourceRoleId?: string;
   /** 已由代码算好哈希的必读引用（调用方保证已过 `planDispatchDelivery` 判据）；**按给定序**编号渲染。 */
   references?: readonly DispatchReadRef[];
   /**
@@ -363,14 +369,15 @@ export interface DispatchPromptOptions {
  */
 export function renderDispatchPrompt(req: DispatchTaskPayload, opts?: DispatchPromptOptions): string {
   const reason = req.reason !== undefined && req.reason !== "" ? `（原因：${req.reason}）` : "";
+  const sourceRoleId = opts?.sourceRoleId ?? "su";
   const references = opts?.references ?? [];
   // 引用为准：同路径既在 references 又有缺失标注（矛盾输入）→ 以探测后的事实渲染，抑制标注。
   const workflowMissing = opts?.workflowMissing === true && !references.some((r) => r.path === WORKFLOW_REL);
   if (references.length === 0 && !workflowMissing) {
     // 无必读引用：旧格式**逐字不变**（设计 §四.1 的引用块是「加」出来的，不是重排版式的理由）。
-    return [`[派发] 来自 su 的任务${reason}`, req.task, "完成后请交回报告（改了什么/结论/证据）。"].join("\n");
+    return [`[派发] 来自 ${sourceRoleId} 的任务${reason}`, req.task, "完成后请交回报告（改了什么/结论/证据）。"].join("\n");
   }
-  const lines = [`[派发] 来自 su 的任务${reason}`];
+  const lines = [`[派发] 来自 ${sourceRoleId} 的任务${reason}`];
   lines.push("必读（按序，先读完再动手；哈希由系统在投递时计算，与文件当刻字节绑定）：");
   if (workflowMissing) lines.push("  （本项目未提供 workflow.md）"); // 如实标注（§四.3 第 2 条，措辞照设计原文）
   references.forEach((ref, i) => lines.push(`  ${i + 1}. ${ref.path}（sha256:${ref.sha256}）`));

@@ -16,6 +16,7 @@ import {
   CLARIFICATION_MAX_ROUNDS,
   countClarificationRounds,
   intentHandoffDedupeKey,
+  parseIntentFrontmatter,
   validateIntentHandoff,
   type IntentHandoffValidationInput,
 } from "../../src/common/编排/governance-handoff.ts";
@@ -202,6 +203,104 @@ test("frontmatter：缺失/未闭合/坏行 → 拒绝", async () => {
     const badLine = await validateIntentHandoff(baseInput(root));
     assert.equal(badLine.ok, false);
     if (!badLine.ok) assert.equal(badLine.code, "invalid-frontmatter");
+  });
+});
+
+test("frontmatter 块标量：| 保留换行、> 折叠、chomping/缩进指示符、块后按键继续、# 属正文", () => {
+  const text = [
+    "---",
+    "intentId: intent-a",
+    "customerQuote: |",
+    "  第一行原话",
+    "    缩进更深的内容",
+    "  # 这是正文不是注释",
+    "goal: >",
+    "  让客户能接受",
+    "  一份提案",
+    "scope: |-",
+    "  只读分析",
+    "  不改代码",
+    "acceptance: >-",
+    "  客户接受提案",
+    "  且流程可验收",
+    "summary: |2-",
+    "    两格缩进",
+    "      再深两格",
+    "---",
+    "",
+  ].join("\n");
+  const parsed = parseIntentFrontmatter(text);
+  assert.equal(parsed.ok, true);
+  if (!parsed.ok) return;
+  assert.equal(parsed.fields.intentId, "intent-a", "块结束后的顶层键照常解析");
+  assert.equal(
+    parsed.fields.customerQuote,
+    "第一行原话\n  缩进更深的内容\n# 这是正文不是注释\n",
+    "| 保留换行、块内 # 不是注释",
+  );
+  assert.equal(parsed.fields.goal, "让客户能接受 一份提案\n", "> 折叠为空格");
+  assert.equal(parsed.fields.scope, "只读分析\n不改代码", "|- 去尾换行");
+  assert.equal(parsed.fields.acceptance, "客户接受提案 且流程可验收", ">- 折叠且去尾换行");
+  assert.equal(parsed.fields.summary, "  两格缩进\n    再深两格", "缩进指示符 2 生效");
+});
+
+test("frontmatter 块标量：|+ 保留尾部空行，缺省单个换行；空块为空串", () => {
+  const kept = parseIntentFrontmatter("---\nkey: |+\n  a\n\n\nnext: b\n---\n");
+  assert.equal(kept.ok, true);
+  if (kept.ok) {
+    assert.equal(kept.fields.key, "a\n\n\n", "+ 保留尾部空行");
+    assert.equal(kept.fields.next, "b");
+  }
+  const clipped = parseIntentFrontmatter("---\nkey: >\n  a\n\n\nnext: b\n---\n");
+  assert.equal(clipped.ok, true);
+  if (clipped.ok) assert.equal(clipped.fields.key, "a\n", "缺省 clip 恰一个换行");
+  const empty = parseIntentFrontmatter("---\nquote: |\nnext: b\n---\n");
+  assert.equal(empty.ok, true);
+  if (empty.ok) {
+    assert.equal(empty.fields.quote, "", "空块 ⇒ 空串");
+    assert.equal(empty.fields.next, "b", "空块不吞下一个顶层键");
+  }
+  // 解析失败文案保持原样（不支持嵌套/列表的口径不变）。
+  const bad = parseIntentFrontmatter("---\nbad line\n---\n");
+  assert.equal(bad.ok, false);
+  if (!bad.ok) {
+    assert.equal(bad.code, "invalid-frontmatter");
+    assert.equal(bad.message, "意图文件 frontmatter 第 2 行无法解析（只支持顶层 key: value）。");
+  }
+});
+
+test("validateIntentHandoff：块标量意图文件（customerQuote: |）成功交接", async () => {
+  await withRoot(async (root) => {
+    const fm = [
+      "intentId: intent-a",
+      "handoffKind: initial",
+      "customerQuote: |",
+      "  客户原话：做一个受治理的提案流程。",
+      "  第二行也逐字保留。",
+      "goal: >",
+      "  让客户能接受",
+      "  一份提案",
+      "scope: |-",
+      "  只读分析，",
+      "  不改代码",
+      "acceptance: >-",
+      "  客户接受提案",
+      "  且流程可验收",
+      "flowId: flow-a",
+    ].join("\n");
+    mkdirSync(join(root, "docs", "intents"), { recursive: true });
+    writeFileSync(
+      join(root, "docs", "intents", `${INTENT_ID}.md`),
+      `---\n${fm}\n---\n客户原话：做一个受治理的提案流程。\n`,
+    );
+    const validation = await validateIntentHandoff(baseInput(root, {
+      goal: "让客户能接受 一份提案",
+      scope: "只读分析，\n不改代码",
+      acceptance: "客户接受提案 且流程可验收",
+    }));
+    assert.equal(validation.ok, true);
+    if (!validation.ok) return;
+    assert.equal(validation.artifactPath, `docs/intents/${INTENT_ID}.md`);
   });
 });
 

@@ -79,6 +79,8 @@ import { normalizeArgv } from "../../src/common/shared/argv-primitives.ts";
 // G-2/W5（2026-10-16 客户批准）：确认卡的 pending/replay/expire 机制抽入**共享通用件**
 // （`confirm-card.ts`，与恢复确认卡同件——设计 §6.2「实现建议」）；本文件的行为逐字保留（见下方注释）。
 import { createConfirmCardCore } from "./confirm-card.ts";
+// 判断回落 reason 的人话映射（2026-10-18 客户反馈：read-denied 丢具体路径/原因）：与治理通道**同解**的小件。
+import { readDeniedHumanReason, stripTrailingSentencePunct } from "./judge-reason.ts";
 // F-4-M1（2026-10-16 客户批准）：shell 审核预算的 env 名**单一来源**在编排（shell-deadline.ts——
 // shell-gate.ts 的同一引用）；本层**只读导入**，绝不在此另写 "ANS_PI_SHELL_REVIEW_TIMEOUT_MS" 字面量。
 import { SHELL_REVIEW_TIMEOUT_ENV } from "../../src/common/编排/shell-deadline.ts";
@@ -557,7 +559,7 @@ export function manualJudgeNotice(reasonCode: string, reason?: string): string {
   if (reasonCode === "row-failed") {
     return "判断 agent 已完成判断，但结果无法在聊天中显示；规则判定仅作参考，本卡已转你手动确认。";
   }
-  return `判断 agent 未能完成判断：${judgeManualHumanReason(reasonCode, reason)}。规则判定仅作参考；判断 agent 未完成时才由你手批。已转你手动确认。`;
+  return `判断 agent 未能完成判断：${stripTrailingSentencePunct(judgeManualHumanReason(reasonCode, reason))}。规则判定仅作参考；判断 agent 未完成时才由你手批。已转你手动确认。`;
 }
 
 /** reasonCode → 人话（未知码回落到判断给出的有界理由；绝不复述内部行话以外的细节）。 */
@@ -568,7 +570,7 @@ function judgeManualHumanReason(reasonCode: string, reason?: string): string {
     case "timeout": return "判断超时";
     case "aborted": return "本轮已中止";
     case "parse-failed": return "判断结果无法解析";
-    case "read-denied": return "所需项目文件无法读取";
+    case "read-denied": return readDeniedHumanReason(reason);
     case "budget": return "读取预算已用尽";
     case "read-truncated": return "读取内容被截断";
     case "retry-capped": return "同类命令连续被拒，已达重试上限";

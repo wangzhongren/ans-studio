@@ -1309,6 +1309,70 @@ test("替我审·manual 回落：设置 display.judgeNotice 后走原 present；
   assert.equal((res as { judge?: unknown }).judge, undefined, "manual 后人工手批不写 judge");
 });
 
+test("替我审·read-denied 回落带出具体路径；无记录如实说明；超长仍限 200（客户反馈 2026-10-18）", async () => {
+  const run = async (reason?: string): Promise<string> => {
+    let notice = "";
+    const ch = createDesktopOperatorChannel({
+      presenter: { async present(_p, display) { notice = display.judgeNotice ?? ""; return { allow: false }; } },
+      operatorId: "frank",
+      judge: { isEnabled: () => true },
+      emitJudgeResult: () => { throw new Error("manual 不该发结果行"); },
+    });
+    const outcome: ShellJudgeOutcome = reason === undefined
+      ? { verdict: "manual", reasonCode: "read-denied" }
+      : { verdict: "manual", reasonCode: "read-denied", reason };
+    const res = await ch(req("ls", ["ls"]), judgeMetadata({ judge: judgeStub(outcome) }));
+    assert.equal(res.outcome, "deny", "回落人工后按人工决定");
+    return notice;
+  };
+
+  // ①带具体路径：原样带出冒号后的内容（去尾），不再丢成笼统一句。
+  const concrete = "判断读取被拒：.ans/sessions/x.json（应用私有数据，判断侧不开放）、src/foo.txt（敏感文件），无法保证无损判断，已转手动确认。";
+  assert.equal(
+    await run(concrete),
+    "判断 agent 未能完成判断：读取被拒：.ans/sessions/x.json（应用私有数据，判断侧不开放）、src/foo.txt（敏感文件），无法保证无损判断。规则判定仅作参考；判断 agent 未完成时才由你手批。已转你手动确认。",
+  );
+
+  // ②无 reason / 不符合约定前缀：如实说明「未记录具体路径」。
+  const fallback = "判断 agent 未能完成判断：所需项目文件无法读取（未记录具体路径）。规则判定仅作参考；判断 agent 未完成时才由你手批。已转你手动确认。";
+  assert.equal(await run(undefined), fallback, "无 reason 不再只说笼统一句");
+  assert.equal(
+    await run("判断读取被拒（敏感文件/越界/二进制），无法保证无损判断，已转手动确认。"),
+    fallback,
+    "无约定前缀（旧式 reason）回落兜底",
+  );
+
+  // ③超长：映射输出仍限 200 码点，前缀保留、尾部截断。
+  const notice = await run(`判断读取被拒：${"长".repeat(300)}，无法保证无损判断，已转手动确认。`);
+  const head = "判断 agent 未能完成判断：";
+  const mapped = notice.slice(head.length, notice.indexOf("。规则判定仅作参考"));
+  assert.equal(Array.from(mapped).length, 200, "映射输出限 200 码点");
+  assert.equal(mapped, `读取被拒：${"长".repeat(195)}`, "超长截断且保留前缀");
+});
+
+test("替我审·manual 回落：人话 reason 尾部标点归一（不出现「。；」/「。。」）", async () => {
+  for (const suffix of ["。", "；", "."]) {
+    let notice = "";
+    const ch = createDesktopOperatorChannel({
+      presenter: { async present(_p, display) { notice = display.judgeNotice ?? ""; return { allow: false }; } },
+      operatorId: "gina",
+      judge: { isEnabled: () => true },
+      emitJudgeResult: () => { throw new Error("manual 不该发结果行"); },
+    });
+    const res = await ch(
+      req("ls", ["ls"]),
+      judgeMetadata({ judge: judgeStub({ verdict: "manual", reasonCode: "driver-manual", reason: `按 fail-closed 回落客户${suffix}` }) }),
+    );
+    assert.equal(res.outcome, "deny");
+    assert.equal(
+      notice,
+      "判断 agent 未能完成判断：按 fail-closed 回落客户。规则判定仅作参考；判断 agent 未完成时才由你手批。已转你手动确认。",
+      `尾部 ${suffix} 归一（只去一个标点）`,
+    );
+    assert.ok(!notice.includes("。；") && !notice.includes("。。"), "不出现重复标点");
+  }
+});
+
 test("替我审·独立超时：judge 不返回 ⇒ manual/timeout 回落原卡（不占用确认超时）", async () => {
   let notice = "";
   const ch = createDesktopOperatorChannel({

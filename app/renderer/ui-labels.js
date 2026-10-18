@@ -420,15 +420,58 @@
     return typeof reasonCode === "string" && map[reasonCode] ? map[reasonCode] : "判断未完成";
   }
 
+  // —————— 读取被拒的具体原因（2026-10-18 客户反馈：回落卡只说「所需项目文件无法读取」看不懂）——————
+  // 编排约定：`read-denied` 的 `reason` 形如
+  // 「判断读取被拒：.ans/sessions/x.json（应用私有数据，判断侧不开放）、src/foo.txt（敏感文件），
+  //   无法保证无损判断，已转手动确认。」
+  // 本段只做「reason → 具体内容」的纯转写（渲染侧不猜原因）；无 reason/格式不符 ⇒ 如实「未记录具体路径」。
+  var READ_DENIED_PREFIX = "判断读取被拒：";
+  var READ_DENIED_NO_DETAIL = "所需项目文件无法读取（未记录具体路径）";
+  var JUDGE_NOTICE_MAX = 200;
+
+  /** 取「判断读取被拒：」之后的具体内容，去掉编排追加的通用尾注；格式不符 ⇒ 空串。 */
+  function judgeReadDeniedDetail(reason) {
+    if (typeof reason !== "string") return "";
+    var at = reason.indexOf(READ_DENIED_PREFIX);
+    if (at < 0) return "";
+    var detail = reason.slice(at + READ_DENIED_PREFIX.length).trim();
+    // 尾注变体：`，无法保证无损判断，已转手动确认。` / `，已转手动确认。` / `。`
+    detail = detail.replace(/，已转手动确认。$/, "");
+    detail = detail.replace(/。$/, "");
+    detail = detail.replace(/，无法保证无损判断$/, "");
+    detail = detail.replace(/。$/, "").trim();
+    return detail;
+  }
+
+  /** 拼接回落提示并保证 ≤200 字：具体内容超限时截断加「…」（固定文案不动，与主进程同解）。 */
+  function judgeNoticeWithDetail(prefix, detail, suffix) {
+    var room = JUDGE_NOTICE_MAX - prefix.length - suffix.length;
+    var text = detail.length <= room ? detail : (room > 1 ? detail.slice(0, room - 1) + "…" : "");
+    return prefix + text + suffix;
+  }
+
   /**
    * 手动回落卡 `judgeNotice`（§9.3 逐字；主进程也会给 `judgeNotice`，渲染侧优先原样呈现主进程文本）：
    *  · `row-failed` ⇒「判断已完成，但结果无法在聊天中显示」——**不**说成「判断没发生」；
+   *  · `read-denied` 且 `reason` 含「判断读取被拒：<具体内容>」⇒「读取被拒：<具体内容>」，与主进程同解；
+   *    无 `reason`/格式不符 ⇒「所需项目文件无法读取（未记录具体路径）」；
    *  · 其余 manual ⇒「判断 agent 未代批（代审批/代决策）：<人话原因>；已转你手动确认。」
    */
-  function governanceJudgeNoticeText(group, reasonCode) {
+  function governanceJudgeNoticeText(group, reasonCode, reason) {
     var label = judgeGroupLabel(group) || "代审批/代决策";
     if (reasonCode === "row-failed") {
       return "判断 agent 已完成判断，但结果无法在聊天中显示（" + label + "）；已转你手动确认。";
+    }
+    if (reasonCode === "read-denied") {
+      var detail = judgeReadDeniedDetail(reason);
+      if (detail !== "") {
+        return judgeNoticeWithDetail(
+          "判断 agent 未代批（" + label + "）：读取被拒：",
+          detail,
+          "，无法保证无损判断；已转你手动确认。"
+        );
+      }
+      return "判断 agent 未代批（" + label + "）：" + READ_DENIED_NO_DETAIL + "；已转你手动确认。";
     }
     return "判断 agent 未代批（" + label + "）：" + governanceJudgeReasonText(reasonCode) + "；已转你手动确认。";
   }
@@ -436,13 +479,27 @@
   /**
    * 手动回落卡 `judgeNotice`（与桌面通道 `manualJudgeNotice` 同解；通道已更新为「规则判定仅作参考」口径）：
    *  · `row-failed` ⇒「判断已完成，但结果无法在聊天中显示」——**不**说成「判断没发生」；
+   *  · `read-denied` 且 `reason` 含「判断读取被拒：<具体内容>」⇒「读取被拒：<具体内容>」，与主进程同解；
+   *    无 `reason`/格式不符 ⇒「所需项目文件无法读取（未记录具体路径）」；
    *  · 其余 manual ⇒「判断 agent 未能完成判断：<人话原因>。规则判定仅作参考；判断 agent 未完成时才由你手批。已转你手动确认。」
    */
-  function shellJudgeNoticeText(reasonCode) {
+  function shellJudgeNoticeText(reasonCode, reason) {
     if (reasonCode === "row-failed") {
       return "判断 agent 已完成判断，但结果无法在聊天中显示；规则判定仅作参考，本卡已转你手动确认。";
     }
-    return "判断 agent 未能完成判断：" + shellJudgeReasonText(reasonCode) + "。规则判定仅作参考；判断 agent 未完成时才由你手批。已转你手动确认。";
+    var reasonText = shellJudgeReasonText(reasonCode);
+    if (reasonCode === "read-denied") {
+      var detail = judgeReadDeniedDetail(reason);
+      if (detail !== "") {
+        return judgeNoticeWithDetail(
+          "判断 agent 未能完成判断：读取被拒：",
+          detail,
+          "，无法保证无损判断。规则判定仅作参考；判断 agent 未完成时才由你手批。已转你手动确认。"
+        );
+      }
+      reasonText = READ_DENIED_NO_DETAIL;
+    }
+    return "判断 agent 未能完成判断：" + reasonText + "。规则判定仅作参考；判断 agent 未完成时才由你手批。已转你手动确认。";
   }
 
   /**

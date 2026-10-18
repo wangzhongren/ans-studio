@@ -205,6 +205,71 @@ test("三权：`.ans` 不可解析 → single（行为不变，不崩）", async
   assert.deepEqual(listing.roles.map((r) => r.roleId), ["su"], "无角色目录时旧行为仍只列 su");
 });
 
+// 真机缺陷 2026-10-18（live-ci）：新 trio 项目由 Liaison 建档后，Nominator 写出**首个项目角色**
+// `builder`，而 `.ans/project.json` 尚未写出（`repinIfBootstrapped` 此时无可 pin 之物、零副作用）。
+// 旧判定「无显式模型 + 有角色目录 ⇒ single」令模型翻转，Convener 的 dispatch_task 被
+// `dispatcherRoleIdOf` 判成「来源角色不是派发主人 su」而拒绝。`trio` 账本是确定事实（single 不建
+// 治理账本目录），据此封住该窗口；以下四个夹具钉死边界。
+
+test("三权：首角色已落盘但 `.ans` 未写出、账本存在 → trio、liaison 主入口、四内置角色", async () => {
+  const proj = join(ROOT, "first-role-trio");
+  const d = join(proj, "角色卡", "builder");
+  mkdirSync(d, { recursive: true });
+  writeFileSync(join(d, "role-card.md"), "# builder");
+  writeFileSync(join(d, "boundary.yaml"), "entries:\n  - kind: directory\n    path: src/\n    purpose: t\n");
+  // 账本只 stat、不读内容：空文件也满足（真实账本一行一条 JSON）。
+  mkdirSync(join(proj, ".ans", "governance"), { recursive: true });
+  writeFileSync(join(proj, ".ans", "governance", "ledger.jsonl"), "");
+
+  const listing = await listProject(proj);
+  assert.equal(listing.governanceModel, "trio");
+  assert.equal(listing.primaryRoleId, "liaison");
+  assert.deepEqual(
+    listing.roles.map((r) => r.roleId),
+    ["liaison", "rapporteur", "nominator", "convener", "builder"],
+    "四个内置角色在前（liaison → rapporteur → nominator → convener），首项目角色照常枚举",
+  );
+  assert.equal(listing.hasRoles, true);
+  assert.deepEqual(listing.warnings, []);
+});
+
+test("三权：同上但无账本 → single、su 主入口（旧项目行为逐字不变）", async () => {
+  const proj = join(ROOT, "first-role-no-ledger");
+  const d = join(proj, "角色卡", "builder");
+  mkdirSync(d, { recursive: true });
+  writeFileSync(join(d, "role-card.md"), "# builder");
+  writeFileSync(join(d, "boundary.yaml"), "entries:\n  - kind: directory\n    path: src/\n    purpose: t\n");
+
+  const listing = await listProject(proj);
+  assert.equal(listing.governanceModel, "single");
+  assert.equal(listing.primaryRoleId, "su");
+  assert.deepEqual(listing.roles.map((r) => r.roleId), ["su", "builder"]);
+});
+
+test("三权：显式 `.ans/project.json` single 优先于账本 → 仍 single", async () => {
+  const proj = join(ROOT, "explicit-single-ledger");
+  mkdirSync(join(proj, ".ans", "governance"), { recursive: true });
+  writeFileSync(join(proj, ".ans", "project.json"), JSON.stringify({ governanceModel: "single" }));
+  writeFileSync(join(proj, ".ans", "governance", "ledger.jsonl"), "");
+
+  const listing = await listProject(proj);
+  assert.equal(listing.governanceModel, "single", "显式值优先，账本不得覆盖");
+  assert.equal(listing.primaryRoleId, "su");
+  assert.deepEqual(listing.roles.map((r) => r.roleId), ["su"]);
+});
+
+test("三权：`.ans/project.json` 不可解析 + 账本存在 → 仍 single（unreadable fail-closed 不变）", async () => {
+  const proj = join(ROOT, "unreadable-ledger");
+  mkdirSync(join(proj, ".ans", "governance"), { recursive: true });
+  writeFileSync(join(proj, ".ans", "project.json"), "{not-json");
+  writeFileSync(join(proj, ".ans", "governance", "ledger.jsonl"), "");
+
+  const listing = await listProject(proj);
+  assert.equal(listing.governanceModel, "single");
+  assert.equal(listing.primaryRoleId, "su");
+  assert.deepEqual(listing.roles.map((r) => r.roleId), ["su"]);
+});
+
 test("四角色：保留 id 冲突——项目里的 su/liaison/rapporteur/nominator/convener 目录跳过并警告", async () => {
   const proj = join(ROOT, "reserved");
   for (const id of ["su", "liaison", "rapporteur", "nominator", "convener", "正常"]) {

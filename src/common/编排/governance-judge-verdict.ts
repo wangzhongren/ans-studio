@@ -24,6 +24,7 @@ import type {
 } from "../../model/runtime.ts";
 import { governanceCardGroup } from "../../model/runtime.ts";
 import { boundedJudgeText, redactJudgeText } from "./shell-judge-verdict.ts";
+import { readDeniedReason } from "./shell-judge.ts";
 import { requiredArtifactPaths } from "./governance-judge-facts.ts";
 
 /** 判断理由/证据/路径结论的文本上限（评审 §7.2：reason ≤2KB；审计再收紧到 1KB）。 */
@@ -246,12 +247,22 @@ export interface EvaluateGovernanceJudgeVerdictArgs {
   durationMs?: number;
 }
 
+/**
+ * `artifact-missing` 的 reason 文案（2026-10-18 客户反馈：只写「规范物证缺失」看不出缺哪个文件）：
+ * 有约定路径 ⇒ 逐条列出；无路径 ⇒ 保留原泛化文案（向后兼容）。
+ */
+export function artifactMissingReason(missingPaths?: readonly string[]): string {
+  const paths = [...new Set((missingPaths ?? []).map((path) => path.trim()).filter((path) => path !== ""))];
+  return paths.length === 0
+    ? "规范物证缺失，无法核对判断，已转手动确认。"
+    : `规范物证缺失：${paths.join("、")}（判断无法核对），已转手动确认。`;
+}
+
 function manualOutcome(
   args: EvaluateGovernanceJudgeVerdictArgs,
   reasonCode: string,
   reason: string,
-): GovernanceJudgeOutcome {
-  const stats = args.stats;
+): GovernanceJudgeOutcome {  const stats = args.stats;
   return {
     verdict: "manual",
     group: args.request.group,
@@ -308,7 +319,7 @@ export function evaluateGovernanceJudgeVerdict(args: EvaluateGovernanceJudgeVerd
       ? "判断预算耗尽（读取次数/总读取字节达上限），无法保证无损判断，已转手动确认。"
       : damage === "read-truncated"
         ? "判断所需文件被截断，无法保证无损判断，已转手动确认。"
-        : "判断读取被拒（敏感文件/越界/二进制），无法保证无损判断，已转手动确认。";
+        : readDeniedReason(stats);
     return manualOutcome(args, damage, reason);
   }
 
@@ -460,7 +471,7 @@ export function evaluateGovernanceJudgeVerdict(args: EvaluateGovernanceJudgeVerd
   // 5) 规范物证必须存在且真的被读过（required-read 门槛）。
   const requiredArtifacts = requiredArtifactPaths(request);
   if (requiredArtifacts.missing) {
-    return manualOutcome(args, "artifact-missing", "规范物证缺失，无法核对判断，已转手动确认。");
+    return manualOutcome(args, "artifact-missing", artifactMissingReason(requiredArtifacts.missingPaths));
   }
   const readPaths = new Set((stats?.readPaths ?? []).map(normalizeRel));
   const requiredReadPaths = uniquePaths([

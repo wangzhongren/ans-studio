@@ -26,6 +26,7 @@ import {
   SHELL_JUDGE_DENY_TIER_LABEL,
   SHELL_JUDGE_SUPPORTED_RUNTIMES,
   SHELL_JUDGE_TIMEOUT_ENV,
+  summarizeDeniedReads,
   type ShellJudgeFn,
   type ShellJudgeOutcome,
 } from "../../src/common/编排/shell-judge.ts";
@@ -289,6 +290,117 @@ test("读取损伤：allow 一律降 manual（budget 优先 / read-truncated / r
   const out = await judge(request());
   assert.equal(out.verdict, "deny");
   assert.equal(out.reasonCode, "safer-alternative");
+});
+
+test("read-denied 摘要：列项目相对路径与类别（app-private 条目可随其他拒绝一起展示）", async () => {
+  const { judge } = makeJudge({
+    report: (seen: Seen) => {
+      const stats = seen.capabilities!.shellJudge!.stats;
+      stats.deniedReads = 2;
+      stats.deniedPaths = [
+        { path: ".ans/sessions/a.json", code: "app-private", pathClass: "app-private" },
+        { path: "src/foo.txt", code: "sensitive", pathClass: "credential" },
+      ];
+      return { verdict: "allow", reason: "仍想放行" };
+    },
+  });
+  const out = await judge(request());
+  assert.equal(out.verdict, "manual");
+  assert.equal(out.reasonCode, "read-denied");
+  const reason = out.reason ?? "";
+  assert.match(reason, /判断读取被拒：/);
+  assert.match(reason, /\.ans\/sessions\/a\.json（应用私有数据）/);
+  assert.match(reason, /src\/foo\.txt（凭据文件）/);
+  assert.match(reason, /无法保证无损判断，已转手动确认。/);
+  assert.doesNotMatch(reason, /[A-Za-z]:[\\/]|\/(?:home|Users|tmp)\//, "摘要不含绝对路径");
+});
+
+test("read-denied 摘要：根外条目（path 为空）只显示类别", async () => {
+  const { judge } = makeJudge({
+    report: (seen: Seen) => {
+      const stats = seen.capabilities!.shellJudge!.stats;
+      stats.deniedReads = 1;
+      stats.deniedPaths = [{ path: "", code: "outside-root", pathClass: "outside-root" }];
+      return { verdict: "allow", reason: "仍想放行" };
+    },
+  });
+  const out = await judge(request());
+  assert.equal(out.reasonCode, "read-denied");
+  assert.match(out.reason ?? "", /判断读取被拒：项目外路径，/);
+  assert.doesNotMatch(out.reason ?? "", /（/, "根外条目不得渲染空路径");
+});
+
+test("read-denied 摘要：deniedPaths 为空 ⇒ 保留原泛化文案", async () => {
+  const { judge } = makeJudge({
+    report: (seen: Seen) => {
+      const stats = seen.capabilities!.shellJudge!.stats;
+      stats.deniedReads = 1;
+      stats.deniedPaths = [];
+      return { verdict: "allow", reason: "仍想放行" };
+    },
+  });
+  const out = await judge(request());
+  assert.equal(out.verdict, "manual");
+  assert.equal(out.reasonCode, "read-denied");
+  assert.match(out.reason ?? "", /判断读取被拒（敏感文件\/越界\/二进制），无法保证无损判断，已转手动确认。/);
+});
+
+test("read-denied 摘要：最多 3 条、更多追加「等 N 个路径」且 ≤200 字符", async () => {
+  const entries = [
+    { path: "a.env", code: "sensitive" as const, pathClass: "env" as const },
+    { path: "keys/id.pem", code: "sensitive" as const, pathClass: "key-material" as const },
+    { path: "config/secret.txt", code: "sensitive" as const, pathClass: "credential" as const },
+    { path: "bin/tool.exe", code: "binary" as const, pathClass: "binary" as const },
+  ];
+  const { judge } = makeJudge({
+    report: (seen: Seen) => {
+      const stats = seen.capabilities!.shellJudge!.stats;
+      stats.deniedReads = 4;
+      stats.deniedPaths = entries;
+      return { verdict: "allow", reason: "仍想放行" };
+    },
+  });
+  const out = await judge(request());
+  const reason = out.reason ?? "";
+  assert.equal(out.reasonCode, "read-denied");
+  assert.match(reason, /a\.env（环境变量文件）/);
+  assert.match(reason, /keys\/id\.pem（私钥\/证书）/);
+  assert.match(reason, /config\/secret\.txt（凭据文件）/);
+  assert.doesNotMatch(reason, /bin\/tool\.exe/, "第 4 条不展开");
+  assert.match(reason, / 等 4 个路径/);
+  const summary = reason.replace(/^判断读取被拒：/, "").replace(/，无法保证无损判断，已转手动确认。$/, "");
+  assert.ok([...summary].length <= 200, `摘要 ≤200 字符，实际 ${[...summary].length}`);
+});
+
+test("read-denied 摘要：按原因码细化（not-found ⇒ 路径不存在，不再显示「受限路径」）", () => {
+  const summarize = (entry: { path: string; code: "not-found" | "not-a-file" | "read-failed" | "invalid-path" | "empty"; pathClass: "unknown" | "non-regular" }) =>
+    summarizeDeniedReads({
+      readCalls: 1,
+      readBytes: 0,
+      deniedReads: 1,
+      truncatedReads: 0,
+      budgetExceeded: false,
+      deniedPaths: [entry],
+    });
+  assert.equal(summarize({ path: "docs/flows", code: "not-found", pathClass: "unknown" }), "docs/flows（路径不存在）");
+  assert.equal(summarize({ path: "docs/a.md", code: "not-a-file", pathClass: "non-regular" }), "docs/a.md（路径类型不符）");
+  assert.equal(summarize({ path: "docs/b", code: "read-failed", pathClass: "unknown" }), "docs/b（读取失败）");
+  assert.equal(summarize({ path: "../x", code: "invalid-path", pathClass: "unknown" }), "../x（非法路径）");
+  assert.equal(summarize({ path: "", code: "empty", pathClass: "unknown" }), "空路径", "path 为空只显示原因");
+});
+
+test("app-private 拒绝不计入 deniedReads：单独出现不触发 read-denied", async () => {
+  const { judge } = makeJudge({
+    report: (seen: Seen) => {
+      const stats = seen.capabilities!.shellJudge!.stats;
+      stats.appPrivateDeniedReads = 1;
+      stats.deniedPaths = [{ path: ".ans/sessions/a.json", code: "app-private", pathClass: "app-private" }];
+      return { verdict: "allow", reason: "账本已在事实里" };
+    },
+  });
+  const out = await judge(request());
+  assert.equal(out.verdict, "allow", "app-private 不构成读取损伤");
+  assert.equal(out.reasonCode, "necessary");
 });
 
 // —————————————————————— 3. 客户 D1：deny 档放行 ——————————————————————

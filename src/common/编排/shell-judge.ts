@@ -22,10 +22,13 @@
 
 import type {
   DiagnosticLog,
+  JudgePathClass,
+  JudgeReadCode,
   RoleSession,
   RuntimeAdapter,
   RuntimeKind,
   ShellJudgeAudit,
+  ShellJudgeDeniedPath,
   ShellJudgeOutcome as CoreShellJudgeOutcome,
   ShellJudgeReadStats,
   ShellJudgeRequest,
@@ -151,7 +154,7 @@ function byteLength(text: string): number {
 }
 
 function emptyStats(): ShellJudgeReadStats {
-  return { readCalls: 0, readBytes: 0, deniedReads: 0, truncatedReads: 0, budgetExceeded: false };
+  return { readCalls: 0, readBytes: 0, deniedReads: 0, truncatedReads: 0, budgetExceeded: false, deniedPaths: [] };
 }
 
 /**
@@ -167,6 +170,79 @@ function damageCode(stats: ShellJudgeReadStats): string | undefined {
   if (stats.truncatedReads > 0) return "read-truncated";
   if (stats.deniedReads > 0) return "read-denied";
   return undefined;
+}
+
+/** 判断读取被拒文案前缀（桌面按此解析并显示「读取被拒：<摘要>」）。 */
+export const JUDGE_READ_DENIED_PREFIX = "判断读取被拒：" as const;
+/** 被拒摘要最多展示的路径条数（超出追加「等 N 个路径」）。 */
+export const DENIED_READ_SUMMARY_MAX_ITEMS = 3;
+/** 被拒摘要字符上限（客户反馈：卡片文案要短、要看得懂）。 */
+export const DENIED_READ_SUMMARY_MAX_CHARS = 200;
+
+/** 路径类别 → 客户可读文案（未知类别回退「受限路径」，不泄露原路径）。 */
+const DENIED_PATH_CLASS_LABELS: Readonly<Record<JudgePathClass, string>> = {
+  env: "环境变量文件",
+  "key-material": "私钥/证书",
+  credential: "凭据文件",
+  "credential-dir": "凭据目录",
+  vcs: "版本库元数据",
+  audit: "审计目录",
+  session: "会话数据",
+  "app-private": "应用私有数据",
+  "outside-root": "项目外路径",
+  binary: "二进制文件",
+  "non-regular": "非普通文件",
+  budget: "读取预算",
+  unknown: "受限路径",
+};
+
+/** 读取原因码 → 客户可读文案（优先于 pathClass：`not-found` 不等于「受限路径」）。 */
+const DENIED_READ_CODE_LABELS: Readonly<Partial<Record<JudgeReadCode, string>>> = {
+  "not-found": "路径不存在",
+  "not-a-file": "路径类型不符",
+  "not-a-directory": "路径类型不符",
+  "read-failed": "读取失败",
+  "invalid-path": "非法路径",
+  empty: "空路径",
+};
+
+function deniedPathLabel(entry: ShellJudgeDeniedPath): string {
+  const label = DENIED_READ_CODE_LABELS[entry.code]
+    ?? DENIED_PATH_CLASS_LABELS[entry.pathClass]
+    ?? DENIED_PATH_CLASS_LABELS.unknown;
+  // 根外/无法安全表示时 `path` 为 ""：只显示类别，绝不回显绝对路径。
+  return entry.path === "" ? label : `${entry.path}（${label}）`;
+}
+
+/**
+ * 被拒读取的客户可读摘要（纯函数；编排内复用，**不跨层导出到运行时核心**）：
+ * 项目相对路径 + 类别，按现有顺序最多 3 条；更多追加「等 N 个路径」；整体 ≤200 字符。
+ * `deniedPaths` 为空 ⇒ `undefined`（调用方保留泛化文案，向后兼容）。
+ */
+export function summarizeDeniedReads(stats: ShellJudgeReadStats | undefined): string | undefined {
+  const entries = stats?.deniedPaths;
+  if (entries === undefined || entries.length === 0) return undefined;
+  const shown = entries.slice(0, DENIED_READ_SUMMARY_MAX_ITEMS).map(deniedPathLabel);
+  let summary = shown.join("、");
+  if (entries.length > DENIED_READ_SUMMARY_MAX_ITEMS) {
+    summary += ` 等 ${entries.length} 个路径`;
+  }
+  const chars = [...summary];
+  if (chars.length > DENIED_READ_SUMMARY_MAX_CHARS) {
+    summary = `${chars.slice(0, DENIED_READ_SUMMARY_MAX_CHARS - 1).join("")}…`;
+  }
+  return summary;
+}
+
+/**
+ * `read-denied` 的 reason 文案：有逐路径摘要 ⇒ 列出「路径（类别）」；无摘要 ⇒ 原泛化文案。
+ * shell judge 与治理 judge 共用同一口径（2026-10-18 客户反馈：手动卡要说明读不了什么）。
+ */
+export function readDeniedReason(stats: ShellJudgeReadStats | undefined): string {
+  const summary = summarizeDeniedReads(stats);
+  return summary === undefined
+    ? "判断读取被拒（敏感文件/越界/二进制），无法保证无损判断，已转手动确认。"
+    : `${JUDGE_READ_DENIED_PREFIX}${summary}，无法保证无损判断，已转手动确认。`;
 }
 
 function manualOutcome(reasonCode: string, reason: string): ShellJudgeOutcome {
@@ -344,7 +420,7 @@ export function createShellJudge(opts: CreateShellJudgeOptions): ShellJudgeFn {
               ? "判断预算耗尽（读取次数/总读取字节达上限），无法保证无损判断，已转手动确认。"
               : damage === "read-truncated"
                 ? "判断所需文件被截断，无法保证无损判断，已转手动确认。"
-                : "判断读取被拒（敏感文件/越界/二进制），无法保证无损判断，已转手动确认。";
+                : readDeniedReason(stats);
           log.record("shell-judge.manual", {
             toolCallId: request.toolCallId,
             reasonCode: damage,

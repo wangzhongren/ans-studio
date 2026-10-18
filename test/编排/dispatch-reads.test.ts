@@ -73,6 +73,56 @@ test("renderDispatchPrompt（G-1）：无引用 → 旧格式逐字不变（引�
   assert.equal(renderDispatchPrompt(r), legacy);
   assert.equal(renderDispatchPrompt(r, {}), legacy, "空 opts 同旧格式");
   assert.equal(renderDispatchPrompt(r, { references: [] }), legacy, "空引用同旧格式");
+  assert.equal(renderDispatchPrompt(r, { sourceRoleId: "su" }), legacy, "显式 su 同旧格式");
+});
+
+test("renderDispatchPrompt：sourceRoleId → 首行「来自 <角色> 的任务」；[派发] 前缀与 task 原文不变", () => {
+  const r = req("把 src/x.ts 的校验补上\n第二行也逐字保留", { reason: "首派" });
+  const text = renderDispatchPrompt(r, { sourceRoleId: "convener" });
+  assert.equal(text.split("\n")[0], "[派发] 来自 convener 的任务（原因：首派）");
+  assert.ok(text.includes("\n把 src/x.ts 的校验补上\n第二行也逐字保留\n"), "task 原文逐字保留");
+  assert.ok(text.startsWith("[派发] "), "行首前缀不得变（渲染侧归类依赖）");
+  // 不传 sourceRoleId ⇒ 仍「来自 su」（single/su 兼容）。
+  assert.equal(renderDispatchPrompt(r).split("\n")[0], "[派发] 来自 su 的任务（原因：首派）");
+});
+
+test("renderDispatchPrompt：sourceRoleId + 必读块 → 仅首行变化，块格式逐字不变", () => {
+  const r = req("按 docs/contracts/kanban-api-v1.md 实现 kanban 接口");
+  const text = renderDispatchPrompt(r, {
+    sourceRoleId: "convener",
+    references: [
+      { path: "docs/workflow.md", sha256: WF },
+      { path: "docs/contracts/kanban-api-v1.md", sha256: CT },
+    ],
+  });
+  assert.equal(text, [
+    "[派发] 来自 convener 的任务",
+    "必读（按序，先读完再动手；哈希由系统在投递时计算，与文件当刻字节绑定）：",
+    `  1. docs/workflow.md（sha256:${WF}）`,
+    `  2. docs/contracts/kanban-api-v1.md（sha256:${CT}）`,
+    "任务：按 docs/contracts/kanban-api-v1.md 实现 kanban 接口",
+    "完成后请交回报告（改了什么 / 结论 / 证据；完成口令见 workflow.md 第 2 节）。",
+  ].join("\n"), "必读块格式不随派发主人变化");
+});
+
+test("planDispatchDelivery：第三参透传 sourceRoleId（有/无必读引用两个 deliver 分支）", () => {
+  const plain = req("直接实现");
+  const plainPlan = planDispatchDelivery(plain, new Map(), { sourceRoleId: "convener" });
+  assert.equal(plainPlan.action, "deliver");
+  assert.equal(plainPlan.text.split("\n")[0], "[派发] 来自 convener 的任务");
+  const withRefs = req("按 docs/contracts/kanban-api-v1.md 实现");
+  const plan = planDispatchDelivery(
+    withRefs,
+    new Map([["docs/contracts/kanban-api-v1.md", CT]]),
+    { sourceRoleId: "convener" },
+  );
+  assert.equal(plan.action, "deliver");
+  assert.equal(plan.text.split("\n")[0], "[派发] 来自 convener 的任务");
+  assert.ok(plan.text.includes(`  1. docs/contracts/kanban-api-v1.md（sha256:${CT}）`));
+  // 不传 ⇒ 旧行为逐字（既有调用方不受影响）。
+  const legacyPlan = planDispatchDelivery(plain, new Map());
+  assert.equal(legacyPlan.action, "deliver");
+  assert.equal(legacyPlan.text.split("\n")[0], "[派发] 来自 su 的任务");
 });
 
 test("renderDispatchPrompt（G-1）：workflow+契约 → 逐行必读块（编号/缩进/哈希逐字/完成口令指向）；无授权语义", () => {

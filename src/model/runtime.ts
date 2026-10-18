@@ -895,12 +895,65 @@ export interface ShellJudgeAudit {
   hardDenyOverride?: true;
 }
 
+/**
+ * 判断读取拒绝原因码（中立契约；实现/策略在 `runtime-core/shell-judge/policy.ts`，该模块 re-export 同一符号）。
+ * 2026-10-18 从 policy 上移到本模块：`ShellJudgeReadStats.deniedPaths` 的诊断形状需要引用它。
+ */
+export type JudgeReadCode =
+  | "empty"
+  | "invalid-path"
+  | "outside-root"
+  | "sensitive"
+  /** 应用私有数据（`.ans/**` 中除只读开放白名单外的内容）：与普通敏感文件区分，便于审计/诊断。 */
+  | "app-private"
+  | "not-found"
+  | "not-a-file"
+  | "not-a-directory"
+  | "binary"
+  | "budget"
+  | "read-failed";
+
+/** 判断读取路径类别（诊断/文案用；**不携带原路径**）。 */
+export type JudgePathClass =
+  | "env"
+  | "key-material"
+  | "credential"
+  | "credential-dir"
+  | "vcs"
+  | "audit"
+  /** 历史值：`.ans/sessions` 曾为独立类别；现默认 `app-private`（白名单路径除外）。 */
+  | "session"
+  /** 应用私有数据（`.ans/**` 中除只读开放白名单外的内容）。 */
+  | "app-private"
+  | "outside-root"
+  | "binary"
+  | "non-regular"
+  | "budget"
+  | "unknown";
+
+/** 一次被拒读取的诊断（`ShellJudgeReadStats.deniedPaths`；仅项目相对路径，根外只记类别）。 */
+export interface ShellJudgeDeniedPath {
+  /** 请求的项目相对路径（posix）；根外/无法安全表示时为 `""`（只看 `code`/`pathClass`）。 */
+  path: string;
+  code: JudgeReadCode;
+  pathClass: JudgePathClass;
+}
+
 /** 判断会话的读取统计（由只读工具累加；编排据此做「`allow` 必须无损」检查）。 */
 export interface ShellJudgeReadStats {
   readCalls: number;
   readBytes: number;
-  /** 策略拒绝次数（敏感/越界/非法/二进制）；预算耗尽只记 `budgetExceeded`，**不并入**本项。 */
+  /**
+   * 策略拒绝次数（敏感/越界/非法/二进制/读取失败）；预算耗尽只记 `budgetExceeded`，**不并入**本项。
+   * **信息性读取结果**（`not-found`/`not-a-file`/`not-a-directory`）不计入本项（正常探测，不构成读取受损）。
+   */
   deniedReads: number;
+  /**
+   * `.ans/**`（应用私有数据，白名单除外）拒绝次数（2026-10-18 真机修复）：**不计入 `deniedReads`**，
+   * 也**不参与**驱动的 damageCode/allow 降级——账本/会话已在应用事实里，读不到 `.ans` 不构成「读取受损」。
+   * 仅作诊断/审计（可选加法，旧读者忽略）。
+   */
+  appPrivateDeniedReads?: number;
   truncatedReads: number;
   /** 预算耗尽（调用次数/总读取上限）——独立于 `deniedReads`；编排优先据此判 `budget`。 */
   budgetExceeded: boolean;
@@ -910,6 +963,12 @@ export interface ShellJudgeReadStats {
    * shell judge 也会累积（可选加法，旧读者忽略）。被拒/截断未成功的读取不记录。
    */
   readPaths?: string[];
+  /**
+   * 被拒读取的逐路径诊断（2026-10-18 客户反馈：手动回落卡只写「无法读取」看不懂）。
+   * 只记**项目相对路径**与原因码/类别；根外路径不记绝对路径（`path` 为 `""`，只留类别）。
+   * 按 `(path, code, pathClass)` 去重、最多 16 条；仅诊断，不参与 damageCode/降级判定。
+   */
+  deniedPaths?: ShellJudgeDeniedPath[];
 }
 
 /** 判断会话的只读工具选项（`GovernedToolsOptions.shellJudge`；能力注入，非工具注入）。 */

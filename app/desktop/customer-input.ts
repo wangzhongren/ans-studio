@@ -52,6 +52,8 @@ export type { CustomerInputRequest, CustomerInputOutcome, CustomerInputFn };
 // 须按其时序锚点落位）。请求本体（kind/title）与回放侧（session-history.ts 解析的 toolCall 块）两侧
 // 各自用同一函数拼键，渲染侧据此把卡锚定回「调用工具 request_confirmation」附近。只读导入、不复制。
 import { interactionAnchorKey } from "./request-anchor.ts";
+// 判断回落 reason 的人话映射（2026-10-18 客户反馈：read-denied 丢具体路径/原因）：与 shell 通道**同解**的小件。
+import { readDeniedHumanReason, stripTrailingSentencePunct } from "./judge-reason.ts";
 import { createDiagnosticLogger } from "../../src/common/shared/diagnostics.ts";
 // 治理下一步推导（2026-10-18 客户修正）：纯逻辑在 governance-advance.ts；本模块**只**在客户决定
 // 成功结算后回调，由主进程决定是否后台派发——本模块不打开会话、不发模型消息、不做任何批准。
@@ -548,7 +550,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
   const judgeManualNotice = (group: GovernanceJudgeGroup, reasonCode: string, reason?: string): string => {
     const label = group === "approval" ? "代审批" : "代决策";
     if (reasonCode === "row-failed") return "判断已完成，但结果无法在聊天中显示；已转你手动确认。";
-    return `判断 agent 未代批（${label}）：${judgeHumanReason(reasonCode, reason)}；已转你手动确认。`;
+    return `判断 agent 未代批（${label}）：${stripTrailingSentencePunct(judgeHumanReason(reasonCode, reason))}；已转你手动确认。`;
   };
 
   /** 结算判断结果：approve 先发结果行再走同一 `settleEntry`；manual 设 `judgeNotice` 后呈现原卡。 */
@@ -991,7 +993,7 @@ function judgeHumanReason(reasonCode: string, reason?: string): string {
     case "insufficient-evidence": return "证据不足";
     case "ledger-unavailable": return "治理事实不可读";
     case "group-mismatch": return "判断结果与卡片分组不一致";
-    case "read-denied": return "所需项目文件无法读取";
+    case "read-denied": return readDeniedHumanReason(reason);
     case "budget": return "读取预算已用尽";
     case "read-truncated": return "读取内容被截断";
     case "context-missing": return "缺少判断所需的上下文";

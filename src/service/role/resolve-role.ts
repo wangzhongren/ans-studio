@@ -210,6 +210,8 @@ export function resolveGovernanceRole(
 const ROLE_DIR_NAMES = ["角色卡", "role-cards"]; // 中文 / 英文项目角色目录名
 const CARD_NAMES = ["role-card.md"];
 const BOUNDARY_NAMES = ["boundary.yaml", "boundary.yml", "boundary.md"];
+/** 与编排 `GOVERNANCE_LEDGER_REL` 同一约定路径（门禁引擎不反向依赖编排，故本地声明）。 */
+const GOVERNANCE_LEDGER_REL = ".ans/governance/ledger.jsonl";
 
 async function statKind(p: string): Promise<"dir" | "file" | "other" | "none"> {
   try {
@@ -247,7 +249,11 @@ async function firstExistingFile(dirAbs: string, names: string[]): Promise<strin
  * - listProject 无接受证据入参，故所列 boundary 的 acceptance 一律为未接受（仅用于展示）。
  * - **治理模型**（评审 §5.4/§5.5）：显式 `readGovernanceModel` 优先；`.ans` 不可读/不可解析 →
  *   single（行为不变）；无显式值且既无 `.ans/project.json` 也无任何角色目录 → 新空项目 trio；
- *   其余（旧项目）→ single。不按 `docs/proposals|nominations|flows` 产物猜模型。
+ *   其余（旧项目）→ single，**但 `.ans/governance/ledger.jsonl` 存在 ⇒ trio**。trio 账本是确定事实
+ *   （账本只在 trio 流程中产生，single 明确不建治理账本目录），用于封住「首个项目角色已落盘但
+ *   `.ans` 尚未写出」的模型翻转窗口（真机缺陷 2026-10-18：Nominator 写出 builder 后 Convener 的
+ *   `dispatch_task` 被误判为 single→su 而拒绝，左树/主入口短暂回退）。账本只 stat 文件、不读内容；
+ *   不存在/不可读 ⇒ 按旧规则。不按 `docs/proposals|nominations|flows` 等产物猜模型。
  * - 结果含 `primaryRoleId` 与 `governanceModel`：桌面据此设主入口/模型提示，**渲染侧不硬编码 id**。
  */
 export async function listProject(projectRoot: string): Promise<ProjectListing> {
@@ -374,7 +380,16 @@ export async function listProject(projectRoot: string): Promise<ProjectListing> 
     governanceModel = "single";
   } else {
     const ansRecordExists = (await statKind(ansProjectPath(projAbs))) === "file";
-    governanceModel = !ansRecordExists && totalRoleDirs === 0 ? "trio" : "single";
+    if (!ansRecordExists && totalRoleDirs === 0) {
+      governanceModel = "trio";
+    } else {
+      // 确定事实：trio 账本只在 trio 流程中产生（single 明确不建治理账本目录）。用于封住
+      // 「首个项目角色已落盘但 `.ans` 尚未写出」的模型翻转窗口（真机缺陷 2026-10-18：builder
+      // 落盘后本行曾翻成 single，Convener 派发被误判为「来源角色不是派发主人 su」而拒绝）。
+      // 只 stat 文件、不读内容；不存在/不可读（含路径不是文件）⇒ 按旧规则 single。
+      const ledgerExists = (await statKind(joinRoot(projAbs, GOVERNANCE_LEDGER_REL))) === "file";
+      governanceModel = ledgerExists ? "trio" : "single";
+    }
   }
 
   // 内置角色前置（顺序即枚举顺序；评审 §5.4）：

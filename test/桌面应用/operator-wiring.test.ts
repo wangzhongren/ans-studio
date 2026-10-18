@@ -1107,6 +1107,81 @@ test("manual/负向结果回落：原卡 + judgeNotice，不写 judge 审计、�
   assert.equal(outcome.outcome, "declined", "客户取消仍是 declined（不代拒绝也不代批准）");
 });
 
+test("治理·read-denied 回落带出具体路径；无记录如实说明；超长仍限 200（客户反馈 2026-10-18）", async () => {
+  const run = async (reason?: string): Promise<string> => {
+    const { channel, pushed, results } = makeJudgeChannel({
+      enabled: () => true,
+      judge: async (request) => ({
+        verdict: "manual",
+        group: request.group,
+        cardKind: request.cardKind,
+        reasonCode: "read-denied",
+        engine: request.runtime,
+        ...(reason !== undefined ? { reason } : {}),
+      }),
+    });
+    const p = channel.customerInput(proposalRequest("flow-a"), JUDGE_CTX, {
+      cardKind: "proposal",
+      flowId: "flow-a",
+      judgeContext: judgeContextOf("flow-a"),
+    });
+    await flushJudge();
+    assert.equal(pushed.length, 1, "回落必须呈现原卡");
+    assert.equal(results.length, 0, "manual 不得发结果行");
+    const notice = String(pushed[0].judgeNotice);
+    assert.equal(channel.respond({ id: "op-1", decision: { kind: "choice", selected: ["accept"] } }).ok, true);
+    await p;
+    return notice;
+  };
+
+  // ①带具体路径：与 shell 通道同解，原样带出冒号后的内容（去尾）。
+  const concrete = "判断读取被拒：.ans/sessions/x.json（应用私有数据，判断侧不开放）、src/foo.txt（敏感文件），无法保证无损判断，已转手动确认。";
+  assert.equal(
+    await run(concrete),
+    "判断 agent 未代批（代决策）：读取被拒：.ans/sessions/x.json（应用私有数据，判断侧不开放）、src/foo.txt（敏感文件），无法保证无损判断；已转你手动确认。",
+  );
+
+  // ②无 reason / 不符合约定前缀：如实说明「未记录具体路径」。
+  const fallback = "判断 agent 未代批（代决策）：所需项目文件无法读取（未记录具体路径）；已转你手动确认。";
+  assert.equal(await run(undefined), fallback, "无 reason 不再只说笼统一句");
+  assert.equal(
+    await run("判断读取被拒（敏感文件/越界/二进制），无法保证无损判断，已转手动确认。"),
+    fallback,
+    "无约定前缀（旧式 reason）回落兜底",
+  );
+
+  // ③超长：映射输出仍限 200 码点，前缀保留、尾部截断。
+  const notice = await run(`判断读取被拒：${"长".repeat(300)}，无法保证无损判断，已转手动确认。`);
+  const head = "判断 agent 未代批（代决策）：";
+  const mapped = notice.slice(head.length, notice.indexOf("；已转你手动确认"));
+  assert.equal(Array.from(mapped).length, 200, "映射输出限 200 码点");
+  assert.equal(mapped, `读取被拒：${"长".repeat(195)}`, "超长截断且保留前缀");
+});
+
+test("判断回落文案：人话 reason 以句末标点结尾时不出现「。；」", async () => {
+  const { channel, pushed } = makeJudgeChannel({
+    enabled: () => true,
+    judge: async (request) => ({
+      verdict: "manual",
+      group: request.group,
+      cardKind: request.cardKind,
+      reasonCode: "driver-manual",
+      reason: "按 fail-closed 回落客户。",
+      engine: request.runtime,
+    }),
+  });
+  const p = channel.customerInput(proposalRequest("flow-a"), JUDGE_CTX, {
+    cardKind: "proposal",
+    flowId: "flow-a",
+    judgeContext: judgeContextOf("flow-a"),
+  });
+  await flushJudge();
+  assert.equal(String(pushed[0].judgeNotice), "判断 agent 未代批（代决策）：按 fail-closed 回落客户；已转你手动确认。", "尾部句号去掉一个再接分号");
+  assert.ok(!String(pushed[0].judgeNotice).includes("。；"), "不出现「。；」");
+  assert.equal(channel.respond({ id: "op-1", decision: { kind: "choice", selected: ["accept"] } }).ok, true);
+  await p;
+});
+
 test("结果行投达失败 ⇒ manual/row-failed 原卡；不自动结算", async () => {
   const { channel, pushed, results } = makeJudgeChannel({
     enabled: () => true,
@@ -1395,49 +1470,64 @@ function flowMarkdown(steps: Array<[string, string]>): string {
 
 const DISPATCHED_IMPL = { kind: "dispatch.accepted", flowId: "flow-a", stepId: "impl" };
 
-test("收尾触发门：所有步骤 done 且账本完备才放行；未完成/阻塞/缺派发/未结算/已验收都不派", () => {
-  const parsed = parseFlowStepStatuses(flowMarkdown([["impl", "done"], ["verify", "done"]]));
+test("收尾触发门：执行步骤全 done 才放行；验收步骤单列（pending 可派、done/缺失/已验收不派）", () => {
+  const parsed = parseFlowStepStatuses(flowMarkdown([["impl", "done"], ["verify", "done"], ["acceptance", "pending"]]));
   assert.equal(parsed.wellFormed, true);
-  assert.deepEqual(parsed.steps, [{ id: "impl", status: "done" }, { id: "verify", status: "done" }]);
+  assert.deepEqual(parsed.steps, [
+    { id: "impl", status: "done" },
+    { id: "verify", status: "done" },
+    { id: "acceptance", status: "pending" },
+  ]);
   const ledger = {
     errors: [],
     entries: [DISPATCHED_IMPL, { kind: "dispatch.accepted", flowId: "flow-a", stepId: "verify" }],
   };
   assert.equal(
-    flowCompletionIssue("flow-a", flowMarkdown([["impl", "done"], ["verify", "done"]]), ledger),
+    flowCompletionIssue("flow-a", flowMarkdown([["impl", "done"], ["verify", "done"], ["acceptance", "pending"]]), ledger),
     undefined,
-    "全部完成：允许派 Rapporteur",
+    "执行步骤全 done + 验收 pending ⇒ 允许派 Rapporteur（验收鸡生蛋修复）",
   );
   assert.match(
-    flowCompletionIssue("flow-a", flowMarkdown([["impl", "done"], ["verify", "pending"]]), ledger) ?? "",
+    flowCompletionIssue("flow-a", flowMarkdown([["impl", "done"], ["verify", "pending"], ["acceptance", "pending"]]), ledger) ?? "",
     /未完成\/阻塞\/待派发步骤（verify=pending）/,
-    "未完成步骤：不派",
+    "执行步骤未完成：不派",
   );
   assert.match(
-    flowCompletionIssue("flow-a", flowMarkdown([["impl", "done"], ["verify", "blocked"]]), ledger) ?? "",
+    flowCompletionIssue("flow-a", flowMarkdown([["impl", "done"], ["verify", "blocked"], ["acceptance", "pending"]]), ledger) ?? "",
     /verify=blocked/,
-    "阻塞步骤：不派",
+    "执行步骤阻塞：不派",
   );
   assert.match(
-    flowCompletionIssue("flow-a", flowMarkdown([["impl", "done"]]), { errors: [], entries: [] }) ?? "",
+    flowCompletionIssue("flow-a", flowMarkdown([["impl", "done"], ["acceptance", "pending"]]), { errors: [], entries: [] }) ?? "",
     /缺少 dispatch\.accepted 记录（impl）/,
-    "缺派发记录：不派",
+    "执行步骤缺派发记录：不派",
+  );
+  // 验收步骤自身：缺失 / 已 done / 已有验收决定各自阻止；pending 放行（见上）。
+  assert.match(
+    flowCompletionIssue("flow-a", flowMarkdown([["impl", "done"]]), { errors: [], entries: [DISPATCHED_IMPL] }) ?? "",
+    /流程单缺少验收步骤/,
+    "缺验收步骤：fail-closed 不派",
   );
   assert.match(
-    flowCompletionIssue("flow-a", flowMarkdown([["impl", "done"]]), {
-      errors: [],
-      entries: [DISPATCHED_IMPL, { kind: "customer.decision", flowId: "flow-a", decisionKind: "unclassified", customerDecision: "none" }],
-    }) ?? "",
-    /仍有未结算的决定/,
-    "未结算决定：不派",
+    flowCompletionIssue("flow-a", flowMarkdown([["impl", "done"], ["acceptance", "done"]]), { errors: [], entries: [DISPATCHED_IMPL] }) ?? "",
+    /验收步骤已完成/,
+    "验收步骤已 done：不重复派",
   );
   assert.match(
-    flowCompletionIssue("flow-a", flowMarkdown([["impl", "done"]]), {
+    flowCompletionIssue("flow-a", flowMarkdown([["impl", "done"], ["acceptance", "pending"]]), {
       errors: [],
       entries: [DISPATCHED_IMPL, { kind: "customer.decision", flowId: "flow-a", decisionKind: "acceptance", customerDecision: "accepted" }],
     }) ?? "",
     /已有验收决定/,
     "已验收：不重复派",
+  );
+  assert.match(
+    flowCompletionIssue("flow-a", flowMarkdown([["impl", "done"], ["acceptance", "pending"]]), {
+      errors: [],
+      entries: [DISPATCHED_IMPL, { kind: "customer.decision", flowId: "flow-a", decisionKind: "unclassified", customerDecision: "none" }],
+    }) ?? "",
+    /仍有未结算的决定/,
+    "未结算决定：不派",
   );
   assert.match(
     flowCompletionIssue("flow-a", "没有步骤表", { errors: [], entries: [DISPATCHED_IMPL] }) ?? "",

@@ -10,7 +10,11 @@
 
 import { lstat, open, readdir, realpath } from "node:fs/promises";
 import { isAbsolute, relative, resolve, sep } from "node:path";
-import type { ShellJudgeReadStats } from "../../../model/runtime.ts";
+import type { JudgePathClass, JudgeReadCode, ShellJudgeReadStats } from "../../../model/runtime.ts";
+
+// 中立契约家（`model/runtime.ts`）是 `JudgeReadCode`/`JudgePathClass` 的定义来源（`ShellJudgeReadStats.deniedPaths`
+// 需要引用）；本模块保持原来的导出面，旧 import 路径不变。
+export type { JudgePathClass, JudgeReadCode };
 
 /** 缺省预算（PM 评审 §五/§七钉死）：8 次调用、单文件 64KB、总读取 192KB。 */
 export const SHELL_JUDGE_DEFAULT_BUDGET = Object.freeze({
@@ -31,41 +35,33 @@ export const SHELL_JUDGE_MAX_LIST_ENTRIES = 200;
 /** `ShellJudgeReadStats.readPaths` 上限（2026-10-18 双开关评审 §5.4：去重、最多 16 条）。 */
 export const SHELL_JUDGE_MAX_READ_PATHS = 16;
 
+/** `ShellJudgeReadStats.deniedPaths` 上限（2026-10-18 客户反馈：诊断去重、最多 16 条）。 */
+export const SHELL_JUDGE_MAX_DENIED_PATHS = 16;
+
+/**
+ * 判断 agent 在 `.ans/**` 中**只读开放**的精确文件（2026-10-18 客户裁定）：
+ * `.ans/project.json` 与 `.ans/governance/ledger.jsonl`（账本/哈希证据，无凭据）。
+ * 其余 `.ans` 内容（含 `.ans/sessions/**` 会话转录）继续 `app-private` 拒绝。
+ */
+const JUDGE_ANS_READ_ALLOW = new Set([".ans/project.json", ".ans/governance/ledger.jsonl"]);
+
+/** `.ans/governance/` 目录可列，但只显示 `ledger.jsonl`（其余内容不列名）。 */
+const JUDGE_ANS_GOVERNANCE_DIR = ".ans/governance";
+
+function segmentsKey(segments: readonly string[]): string {
+  return segments.map((segment) => segment.toLowerCase()).join("/");
+}
+
+function isAnsReadAllowed(segments: readonly string[]): boolean {
+  return JUDGE_ANS_READ_ALLOW.has(segmentsKey(segments));
+}
+
+function isAnsGovernanceDir(segments: readonly string[]): boolean {
+  return segmentsKey(segments) === JUDGE_ANS_GOVERNANCE_DIR;
+}
+
 /** 二进制探测窗口（PM 评审 §7.2：前 8KB 含 NUL 即拒绝）。 */
 const BINARY_PROBE_BYTES = 8 * 1024;
-
-/** 拒绝原因码（工具层据此给模型人话；**不回显绝对路径**）。 */
-export type JudgeReadCode =
-  | "empty"
-  | "invalid-path"
-  | "outside-root"
-  | "sensitive"
-  /** 应用私有数据（整棵 `.ans/**`）：与普通敏感文件区分，便于审计/诊断（评审 §6.3）。 */
-  | "app-private"
-  | "not-found"
-  | "not-a-file"
-  | "not-a-directory"
-  | "binary"
-  | "budget"
-  | "read-failed";
-
-/** 路径类别（诊断/文案用；**不携带原路径**）。 */
-export type JudgePathClass =
-  | "env"
-  | "key-material"
-  | "credential"
-  | "credential-dir"
-  | "vcs"
-  | "audit"
-  /** 历史值：`.ans/sessions` 曾为独立类别；现整棵 `.ans/**` 一律 `app-private`（保留联合成员兼容旧读者）。 */
-  | "session"
-  /** 应用私有数据（整棵 `.ans/**`：账本/会话/应用文件；2026-10-18 双开关评审 §6.3 硬排除）。 */
-  | "app-private"
-  | "outside-root"
-  | "binary"
-  | "non-regular"
-  | "budget"
-  | "unknown";
 
 export type JudgeReadResolution =
   | { ok: true; abs: string; rel: string; truncated: boolean; text: string; bytes: number }
@@ -173,22 +169,66 @@ function compareRoot(real: string, rootReal: string): boolean {
   return !(rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel));
 }
 
-function denied(code: JudgeReadCode, pathClass: JudgePathClass, stats: ShellJudgeReadStats): { ok: false; code: JudgeReadCode; pathClass: JudgePathClass } {
-  stats.deniedReads += 1;
+/** 记录一次被拒读取的诊断（项目相对路径；去重、≤16；根外由调用方传 `""`，只留类别）。 */
+function recordDeniedPath(stats: ShellJudgeReadStats, path: string, code: JudgeReadCode, pathClass: JudgePathClass): void {
+  const normalized = path.replace(/\\/g, "/");
+  const list = (stats.deniedPaths ??= []);
+  if (list.some((entry) => entry.path === normalized && entry.code === code && entry.pathClass === pathClass)) return;
+  if (list.length >= SHELL_JUDGE_MAX_DENIED_PATHS) return;
+  list.push({ path: normalized, code, pathClass });
+}
+
+/**
+ * 信息性读取结果（2026-10-18 真机：judge 探测尚不存在的物证路径，`not-found` 被计入 `deniedReads`
+ * ⇒ 驱动误判 read-denied、把 allow 降级）。路径不存在/类型不符是正常探测，不是策略拒绝：
+ * 仍写入 `deniedPaths`（诊断），但**不增加** `deniedReads`，也不影响 damageCode。
+ */
+const INFORMATIONAL_DENIAL_CODES: ReadonlySet<JudgeReadCode> = new Set(["not-found", "not-a-file", "not-a-directory"]);
+
+function denied(
+  code: JudgeReadCode,
+  pathClass: JudgePathClass,
+  stats: ShellJudgeReadStats,
+  requestedPath = "",
+): { ok: false; code: JudgeReadCode; pathClass: JudgePathClass } {
+  if (!INFORMATIONAL_DENIAL_CODES.has(code)) stats.deniedReads += 1;
+  recordDeniedPath(stats, requestedPath, code, pathClass);
   return { ok: false, code, pathClass };
 }
 
-/** 敏感类拒绝：`.ans/**`（app-private）用独立原因码，其余仍 `sensitive`（评审 §6.3）。 */
-function deniedSensitive(pathClass: JudgePathClass, stats: ShellJudgeReadStats): { ok: false; code: JudgeReadCode; pathClass: JudgePathClass } {
-  return denied(pathClass === "app-private" ? "app-private" : "sensitive", pathClass, stats);
+/**
+ * 敏感类拒绝：`.ans/**` 白名单外内容（app-private）用独立原因码与独立计数——**不计入 `deniedReads`**
+ * （2026-10-18 真机：账本已在 facts 里，读不到 `.ans` 不应让驱动的 allow 降级为 read-denied）；
+ * 其余仍 `sensitive` 并计入 `deniedReads`。两者都把请求的项目相对路径记入 `deniedPaths`（诊断用）。
+ */
+function deniedSensitive(
+  pathClass: JudgePathClass,
+  stats: ShellJudgeReadStats,
+  requestedPath = "",
+): { ok: false; code: JudgeReadCode; pathClass: JudgePathClass } {
+  if (pathClass === "app-private") {
+    stats.appPrivateDeniedReads = (stats.appPrivateDeniedReads ?? 0) + 1;
+    recordDeniedPath(stats, requestedPath, "app-private", pathClass);
+    return { ok: false, code: "app-private", pathClass };
+  }
+  return denied("sensitive", pathClass, stats, requestedPath);
 }
 
 /** 请求路径的敏感检查只看项目根内的相对段；根外路径交给前缀校验（不把用户名/盘符当敏感名）。 */
 function requestedSegments(projectRoot: string, requested: string): string[] {
-  const root = resolve(projectRoot);
-  const rel = relative(root, requested);
-  if (rel === "" || rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) return [];
-  return segmentsOf(rel);
+  return segmentsOf(requestedProjectRel(projectRoot, requested));
+}
+
+/** 请求路径的项目相对形式（posix）；根外/无法安全表示 ⇒ `""`（诊断只留类别，不记绝对路径）。 */
+function requestedProjectRel(projectRoot: string, requested: string): string {
+  try {
+    const root = resolve(projectRoot);
+    const rel = relative(root, requested);
+    if (rel === "" || rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) return "";
+    return slashPath(rel);
+  } catch {
+    return "";
+  }
 }
 
 /** 预算耗尽＝**独立原因码 `budget`**（不并入 `deniedReads`＝read-denied 统计）；编排以 `budgetExceeded` 优先判 `budget`。 */
@@ -244,9 +284,14 @@ export async function resolveJudgeRead(input: JudgeReadInput): Promise<JudgeRead
   if (!consumeCall(stats, budget)) return budgetDenied(stats);
 
   const requested = isAbsolute(input.path) ? input.path : resolve(input.projectRoot, input.path);
-  // 请求路径本身也做敏感检查（防「真实路径别名」在解析前就被当成普通文件）。
-  const requestedSensitive = sensitiveClass(requestedSegments(input.projectRoot, requested));
-  if (requestedSensitive !== undefined) return deniedSensitive(requestedSensitive, stats);
+  const requestedRel = requestedProjectRel(input.projectRoot, requested);
+  // 请求路径本身也做敏感检查（防「真实路径别名」在解析前就被当成普通文件）；
+  // `.ans/project.json` 与 `.ans/governance/ledger.jsonl` 是客户裁定的只读白名单。
+  const requestedSegmentList = requestedSegments(input.projectRoot, requested);
+  const requestedSensitive = sensitiveClass(requestedSegmentList);
+  if (requestedSensitive !== undefined && !isAnsReadAllowed(requestedSegmentList)) {
+    return deniedSensitive(requestedSensitive, stats, requestedRel);
+  }
 
   let rootReal: string;
   let real: string;
@@ -254,23 +299,26 @@ export async function resolveJudgeRead(input: JudgeReadInput): Promise<JudgeRead
     rootReal = await realpath(input.projectRoot);
     real = await realpath(requested);
   } catch {
-    return denied("not-found", "unknown", stats);
+    return denied("not-found", "unknown", stats, requestedRel);
   }
   if (!compareRoot(real, rootReal)) return denied("outside-root", "outside-root", stats);
 
   const rel = relative(rootReal, real);
-  if (rel === "") return denied("not-a-file", "non-regular", stats);
-  // 真实路径的每一段再查（防 `.env` 被链接成 `config.txt`）。
-  const realSensitive = sensitiveClass(segmentsOf(rel));
-  if (realSensitive !== undefined) return deniedSensitive(realSensitive, stats);
+  if (rel === "") return denied("not-a-file", "non-regular", stats, requestedRel);
+  // 真实路径的每一段再查（防 `.env` 被链接成 `config.txt`；白名单文件按真实路径放行）。
+  const realSegments = segmentsOf(rel);
+  const realSensitive = sensitiveClass(realSegments);
+  if (realSensitive !== undefined && !isAnsReadAllowed(realSegments)) {
+    return deniedSensitive(realSensitive, stats, requestedRel);
+  }
 
   let info;
   try {
     info = await lstat(real);
   } catch {
-    return denied("not-found", "unknown", stats);
+    return denied("not-found", "unknown", stats, requestedRel);
   }
-  if (!info.isFile()) return denied("not-a-file", "non-regular", stats);
+  if (!info.isFile()) return denied("not-a-file", "non-regular", stats, requestedRel);
 
   const remaining = budget.maxBytes - stats.readBytes;
   const cap = Math.min(budget.maxFileBytes, remaining);
@@ -287,10 +335,10 @@ export async function resolveJudgeRead(input: JudgeReadInput): Promise<JudgeRead
       await handle.close();
     }
   } catch {
-    return denied("read-failed", "unknown", stats);
+    return denied("read-failed", "unknown", stats, requestedRel);
   }
   if (data.subarray(0, Math.min(BINARY_PROBE_BYTES, data.length)).includes(0)) {
-    return denied("binary", "binary", stats);
+    return denied("binary", "binary", stats, requestedRel);
   }
 
   const truncated = info.size > data.length || (data.length === cap && info.size > cap);
@@ -317,8 +365,13 @@ export async function resolveJudgeList(input: JudgeListInput): Promise<JudgeList
   if (!consumeCall(stats, budget)) return budgetDenied(stats);
 
   const requested = isAbsolute(rawPath) ? rawPath : resolve(input.projectRoot, rawPath);
-  const requestedSensitive = sensitiveClass(requestedSegments(input.projectRoot, requested));
-  if (requestedSensitive !== undefined) return deniedSensitive(requestedSensitive, stats);
+  const requestedRel = requestedProjectRel(input.projectRoot, requested);
+  const requestedSegmentList = requestedSegments(input.projectRoot, requested);
+  const requestedSensitive = sensitiveClass(requestedSegmentList);
+  // `.ans/governance/` 是客户裁定的只读开放目录（仅列 ledger.jsonl）；其余 `.ans/**` 仍拒绝。
+  if (requestedSensitive !== undefined && !isAnsGovernanceDir(requestedSegmentList)) {
+    return deniedSensitive(requestedSensitive, stats, requestedRel);
+  }
 
   let rootReal: string;
   let real: string;
@@ -326,28 +379,35 @@ export async function resolveJudgeList(input: JudgeListInput): Promise<JudgeList
     rootReal = await realpath(input.projectRoot);
     real = await realpath(requested);
   } catch {
-    return denied("not-found", "unknown", stats);
+    return denied("not-found", "unknown", stats, requestedRel);
   }
   if (!compareRoot(real, rootReal)) return denied("outside-root", "outside-root", stats);
 
   const rel = relative(rootReal, real);
   const relSegments = segmentsOf(rel);
   const realSensitive = sensitiveClass(relSegments);
-  if (realSensitive !== undefined) return deniedSensitive(realSensitive, stats);
+  const ansGovernance = isAnsGovernanceDir(relSegments);
+  if (realSensitive !== undefined && !ansGovernance) {
+    return deniedSensitive(realSensitive, stats, requestedRel);
+  }
 
   let info;
   try {
     info = await lstat(real);
   } catch {
-    return denied("not-found", "unknown", stats);
+    return denied("not-found", "unknown", stats, requestedRel);
   }
-  if (!info.isDirectory()) return denied("not-a-directory", "non-regular", stats);
+  if (!info.isDirectory()) return denied("not-a-directory", "non-regular", stats, requestedRel);
 
   let names: string[];
   try {
-    names = (await readdir(real)).filter((name) => !sensitiveEntry(relSegments, name)).sort((a, b) => a.localeCompare(b));
+    const all = await readdir(real);
+    names = (ansGovernance
+      ? all.filter((name) => name.toLowerCase() === "ledger.jsonl")
+      : all.filter((name) => !sensitiveEntry(relSegments, name))
+    ).sort((a, b) => a.localeCompare(b));
   } catch {
-    return denied("read-failed", "unknown", stats);
+    return denied("read-failed", "unknown", stats, requestedRel);
   }
 
   const truncated = names.length > SHELL_JUDGE_MAX_LIST_ENTRIES;

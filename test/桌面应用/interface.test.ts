@@ -2268,7 +2268,7 @@ async function runHandbackAcceptanceScenario(status: string) {
   mkdirSync(path.join(root, "docs", "flows"), { recursive: true });
   writeFileSync(
     path.join(root, "docs", "flows", `${flowId}.md`),
-    `| 步骤 | 状态 |\n| --- | --- |\n| impl | ${status} |\n`,
+    `| 步骤 | 状态 |\n| --- | --- |\n| impl | ${status} |\n| acceptance | pending |\n`,
   );
   await appendGovernanceLedger(root, {
     at: new Date().toISOString(),

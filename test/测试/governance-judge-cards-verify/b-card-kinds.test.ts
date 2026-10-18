@@ -423,22 +423,58 @@ test("required-read：未读必读物证 ⇒ artifact-not-read；读敏感文件
   const { root, cleanup } = makeRoot("required-read");
   try {
     seedProject(root);
-    write(root, ".ans/governance/ledger.jsonl", "{\"sentinel\":\"DO_NOT_LEAK\"}\n");
+    const ENV_SENTINEL = "DO_NOT_LEAK";
+    const SESSION_SENTINEL = "DO_NOT_LEAK_SESSION";
+    write(root, ".ans/governance/ledger.jsonl", "{\"kind\":\"fixture\",\"note\":\"ledger-readable\"}\n");
+    write(root, ".ans/sessions/private.jsonl", `{\"secret\":\"${SESSION_SENTINEL}\"}\n`);
     const notRead = await run(root, requestFor("proposal"), {
       report: report({ group: "decision", cardKind: "proposal", selected: ["accept"] }),
     });
     assert.equal(notRead.outcome.verdict, "manual");
     assert.equal(notRead.outcome.reasonCode, "artifact-not-read");
 
+    // 2026-10-18 客户裁定：账本只读开放 ⇒ 读账本不再制造 read-denied。
+    let ledgerReadable = false;
+    const ledgerRead = await run(root, requestFor("proposal"), {
+      beforeReport: async (tools) => {
+        const result = await tools.get("judge_read_file")!.handler({ name: "judge_read_file", args: { path: ".ans/governance/ledger.jsonl" } });
+        ledgerReadable = result.ok === true && result.message.includes("ledger-readable");
+      },
+      reads: [PROPOSAL_REL],
+      report: report({ group: "decision", cardKind: "proposal", selected: ["accept"] }),
+    });
+    assert.equal(ledgerReadable, true, "账本只读开放，判断可读");
+    assert.equal(ledgerRead.outcome.verdict, "approve", "读账本不得让 approve 降级");
+
+    // 契约：`.ans` 的 app-private 拒绝不计入 deniedReads（不触发 allow 降级）。
+    let sessionDenied = false;
+    const appPrivate = await run(root, requestFor("proposal"), {
+      beforeReport: async (tools) => {
+        const result = await tools.get("judge_read_file")!.handler({ name: "judge_read_file", args: { path: ".ans/sessions/private.jsonl" } });
+        sessionDenied = result.ok === false
+          && /应用私有数据/.test(result.message)
+          && !result.message.includes(SESSION_SENTINEL);
+      },
+      reads: [PROPOSAL_REL],
+      report: report({ group: "decision", cardKind: "proposal", selected: ["accept"] }),
+    });
+    assert.equal(sessionDenied, true, "会话数据仍 app-private 拒绝且不泄露内容");
+    assert.equal(appPrivate.outcome.verdict, "approve", "app-private 拒绝不构成读取损伤");
+
+    // 真实敏感文件 `.env` 制造 read-denied；回落文案给出路径/类别且不泄露 sentinel。
     const denied = await run(root, requestFor("proposal"), {
       beforeReport: async (tools) => {
-        await tools.get("judge_read_file")!.handler({ name: "judge_read_file", args: { path: ".ans/governance/ledger.jsonl" } });
+        const result = await tools.get("judge_read_file")!.handler({ name: "judge_read_file", args: { path: ".env" } });
+        assert.equal(result.ok, false, ".env 必须被拒绝");
+        assert.equal(result.message.includes(ENV_SENTINEL), false, "拒绝回执不得泄露 .env 内容");
       },
       reads: [PROPOSAL_REL],
       report: report({ group: "decision", cardKind: "proposal", selected: ["accept"] }),
     });
     assert.equal(denied.outcome.verdict, "manual");
     assert.equal(denied.outcome.reasonCode, "read-denied", "读取被拒必须让 approve 降级");
+    assert.match(denied.outcome.reason ?? "", /判断读取被拒：\.env（环境变量文件）/);
+    assert.equal((denied.outcome.reason ?? "").includes(ENV_SENTINEL), false, "回落文案不得泄露 .env 内容");
 
     const missingArtifact = await run(root, requestFor("proposal", { artifacts: {} }), {
       report: report({ group: "decision", cardKind: "proposal", selected: ["accept"] }),

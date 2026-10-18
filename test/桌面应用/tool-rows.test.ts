@@ -796,6 +796,37 @@ test('P5：手动回落卡 judgeNotice——一般 manual 与 row-failed 分开�
     '判断已完成 ⇒ 不使用「未能完成判断」措辞'
   );
   assert.ok(labels.shellJudgeNoticeText(undefined).includes('判断未完成'), '未知 reasonCode 如实说明判断未完成');
+
+  // ———— read-denied：具体路径与原因（2026-10-18 客户反馈：只说「文件无法读取」看不懂）————
+  const noDetail = '判断 agent 未能完成判断：所需项目文件无法读取（未记录具体路径）。规则判定仅作参考；判断 agent 未完成时才由你手批。已转你手动确认。';
+  assert.equal(labels.shellJudgeNoticeText('read-denied'), noDetail, '无 reason ⇒ 如实「未记录具体路径」');
+  assert.equal(labels.shellJudgeNoticeText('read-denied', '格式不符'), noDetail, '格式不符 ⇒ 同一兜底（不编路径）');
+  const deniedReason = '判断读取被拒：.ans/sessions/x.json（应用私有数据，判断侧不开放）、src/foo.txt（敏感文件），无法保证无损判断，已转手动确认。';
+  assert.equal(
+    labels.shellJudgeNoticeText('read-denied', deniedReason),
+    '判断 agent 未能完成判断：读取被拒：.ans/sessions/x.json（应用私有数据，判断侧不开放）、src/foo.txt（敏感文件），无法保证无损判断。规则判定仅作参考；判断 agent 未完成时才由你手批。已转你手动确认。',
+    '取「判断读取被拒：」后的具体内容；与主进程同解'
+  );
+  for (const variant of [
+    '判断读取被拒：src/secret.ts（敏感文件），已转手动确认。',
+    '判断读取被拒：src/secret.ts（敏感文件）。',
+  ]) {
+    assert.equal(
+      labels.shellJudgeNoticeText('read-denied', variant),
+      '判断 agent 未能完成判断：读取被拒：src/secret.ts（敏感文件），无法保证无损判断。规则判定仅作参考；判断 agent 未完成时才由你手批。已转你手动确认。',
+      '尾注变体（，已转手动确认。/。）剥离干净：' + variant
+    );
+  }
+  const longPath = '目录/'.repeat(80) + 'file.md';
+  const limited = labels.shellJudgeNoticeText('read-denied', '判断读取被拒：' + longPath + '，无法保证无损判断，已转手动确认。');
+  assert.ok(limited.length <= 200, '回落文本 ≤200 字（实测 ' + limited.length + '）');
+  assert.ok(limited.includes('读取被拒：目录/'), '保留具体内容开头');
+  assert.ok(limited.includes('…'), '超长具体内容截断加省略号');
+  assert.ok(!limited.includes(longPath), '完整超长路径不进入文本');
+  assert.ok(
+    limited.endsWith('，无法保证无损判断。规则判定仅作参考；判断 agent 未完成时才由你手批。已转你手动确认。'),
+    '截断只动具体内容，固定文案逐字保留'
+  );
 });
 
 test('P5：治理代批结果行——「judge 代批 · 代审批/代决策」+ 结论/理由/引擎/选中项或路径', () => {
@@ -870,6 +901,34 @@ test('P5：治理手动回落 notice——一般 manual 与 row-failed 分开（
     '判断已完成 ⇒ 不使用「未能完成判断」措辞'
   );
   assert.ok(labels.governanceJudgeNoticeText('decision', undefined).includes('判断未完成'), '未知 reasonCode 如实说明');
+
+  // ———— read-denied：具体路径与原因（与 shell 同解；group 只影响标签）————
+  const noDetail = '判断 agent 未代批（代决策）：所需项目文件无法读取（未记录具体路径）；已转你手动确认。';
+  assert.equal(labels.governanceJudgeNoticeText('decision', 'read-denied'), noDetail, '无 reason ⇒ 如实「未记录具体路径」');
+  assert.equal(labels.governanceJudgeNoticeText('decision', 'read-denied', '格式不符'), noDetail, '格式不符 ⇒ 同一兜底（不编路径）');
+  const deniedReason = '判断读取被拒：.ans/sessions/x.json（应用私有数据，判断侧不开放）、src/foo.txt（敏感文件），无法保证无损判断，已转手动确认。';
+  assert.equal(
+    labels.governanceJudgeNoticeText('decision', 'read-denied', deniedReason),
+    '判断 agent 未代批（代决策）：读取被拒：.ans/sessions/x.json（应用私有数据，判断侧不开放）、src/foo.txt（敏感文件），无法保证无损判断；已转你手动确认。',
+    '取「判断读取被拒：」后的具体内容；与主进程同解'
+  );
+  for (const variant of [
+    '判断读取被拒：src/secret.ts（敏感文件），已转手动确认。',
+    '判断读取被拒：src/secret.ts（敏感文件）。',
+  ]) {
+    assert.equal(
+      labels.governanceJudgeNoticeText('approval', 'read-denied', variant),
+      '判断 agent 未代批（代审批）：读取被拒：src/secret.ts（敏感文件），无法保证无损判断；已转你手动确认。',
+      '尾注变体（，已转手动确认。/。）剥离干净：' + variant
+    );
+  }
+  const longPath = '目录/'.repeat(80) + 'file.md';
+  const limited = labels.governanceJudgeNoticeText('decision', 'read-denied', '判断读取被拒：' + longPath + '，无法保证无损判断，已转手动确认。');
+  assert.ok(limited.length <= 200, '回落文本 ≤200 字（实测 ' + limited.length + '）');
+  assert.ok(limited.includes('读取被拒：目录/'), '保留具体内容开头');
+  assert.ok(limited.includes('…'), '超长具体内容截断加省略号');
+  assert.ok(!limited.includes(longPath), '完整超长路径不进入文本');
+  assert.ok(limited.endsWith('，无法保证无损判断；已转你手动确认。'), '截断只动具体内容，固定文案逐字保留');
 });
 
 test('D1：governanceReacceptFailureView——phase≠write 可声明零写入；phase=write 只逐字 message', () => {

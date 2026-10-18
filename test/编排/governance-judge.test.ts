@@ -276,6 +276,72 @@ test("proposal：物证缺失 → manual/artifact-missing（即使模型 approve
   assert.equal(seen.binds, 0, "物证缺失时不调用模型");
 });
 
+test("artifact-missing reason：proposal/appointment/acceptance 列出约定物证路径", async () => {
+  // proposal：缺 docs/proposals/<flowId>-v1.md
+  const proposal = await makeJudge({ report: APPROVE_PROPOSAL }).judge(request());
+  assert.equal(proposal.reasonCode, "artifact-missing");
+  assert.match(proposal.reason ?? "", /规范物证缺失：docs\/proposals\/flow-a-v1\.md（判断无法核对），已转手动确认。/);
+
+  // appointment：无提名文件 ⇒ 明确点名 docs/nominations/<flowId>-v1.md
+  const appointmentReq = request({
+    cardKind: "appointment",
+    card: {
+      kind: "choice",
+      title: "任命角色",
+      options: [{ id: "alpha", label: "Alpha" }],
+      cardKind: "appointment",
+      flowId: "flow-a",
+    },
+    recommendedRoleIds: ["alpha"],
+    artifacts: {},
+  });
+  const appointment = await makeJudge({}).judge(appointmentReq);
+  assert.equal(appointment.verdict, "manual");
+  assert.equal(appointment.reasonCode, "artifact-missing");
+  assert.match(appointment.reason ?? "", /规范物证缺失：docs\/nominations\/flow-a-v1\.md（判断无法核对），已转手动确认。/);
+
+  // acceptance：proposal 与 flow 两个物证都缺 ⇒ 两条路径都列出
+  const acceptanceReq = request({
+    cardKind: "acceptance",
+    card: {
+      kind: "choice",
+      title: "验收",
+      options: [{ id: "accept", label: "接受" }],
+      cardKind: "acceptance",
+      flowId: "flow-a",
+    },
+    artifacts: {},
+  });
+  const acceptance = await makeJudge({}).judge(acceptanceReq);
+  assert.equal(acceptance.reasonCode, "artifact-missing");
+  assert.match(acceptance.reason ?? "", /docs\/proposals\/flow-a-v1\.md/);
+  assert.match(acceptance.reason ?? "", /docs\/flows\/flow-a\.md/);
+});
+
+test("requiredArtifactPaths：flowId 缺失时 missingPaths 用文字，不编造路径", () => {
+  assert.deepEqual(requiredArtifactPaths(request({ flowId: "" })).missingPaths, ["提案"]);
+  assert.deepEqual(
+    requiredArtifactPaths(request({
+      flowId: "",
+      cardKind: "appointment",
+      card: {
+        kind: "choice",
+        title: "任命角色",
+        options: [{ id: "alpha", label: "Alpha" }],
+        cardKind: "appointment",
+        flowId: "",
+      },
+      recommendedRoleIds: ["alpha"],
+      artifacts: {},
+    })).missingPaths,
+    ["提名"],
+  );
+  assert.deepEqual(
+    requiredArtifactPaths(request({ flowId: "", cardKind: "acceptance", card: { kind: "choice", title: "验收", options: [], cardKind: "acceptance" }, artifacts: {} })).missingPaths,
+    ["提案", "流程单文件"],
+  );
+});
+
 test("proposal：读取被拒/预算/截断 → approve 降 manual", async () => {
   const cases: Array<[Partial<GovernanceJudgeFacts> & object, string]> = [];
   void cases;
@@ -296,6 +362,46 @@ test("proposal：读取被拒/预算/截断 → approve 降 manual", async () =>
     assert.equal(out.verdict, "manual");
     assert.equal(out.reasonCode, code);
   }
+});
+
+test("proposal：read-denied 摘要列出相对路径与类别（治理与 shell judge 同口径）", async () => {
+  const { judge } = makeJudge({
+    report: (seen: Seen) => {
+      const stats = seen.capabilities!.governanceJudge!.stats;
+      stats.readPaths = ["docs/proposals/flow-a-v1.md"];
+      stats.deniedReads = 2;
+      stats.deniedPaths = [
+        { path: ".ans/sessions/a.json", code: "app-private", pathClass: "app-private" },
+        { path: "src/foo.txt", code: "sensitive", pathClass: "credential" },
+      ];
+      return APPROVE_PROPOSAL;
+    },
+  });
+  const out = await judge(request({ artifacts: { proposalPath: "docs/proposals/flow-a-v1.md" } }));
+  assert.equal(out.verdict, "manual");
+  assert.equal(out.reasonCode, "read-denied");
+  const reason = out.reason ?? "";
+  assert.match(reason, /判断读取被拒：/);
+  assert.match(reason, /\.ans\/sessions\/a\.json（应用私有数据）/);
+  assert.match(reason, /src\/foo\.txt（凭据文件）/);
+  assert.match(reason, /无法保证无损判断，已转手动确认。/);
+  assert.doesNotMatch(reason, /[A-Za-z]:[\\/]|\/(?:home|Users|tmp)\//, "摘要不含绝对路径");
+});
+
+test("proposal：read-denied 且 deniedPaths 为空 ⇒ 保留原泛化文案", async () => {
+  const { judge } = makeJudge({
+    report: (seen: Seen) => {
+      const stats = seen.capabilities!.governanceJudge!.stats;
+      stats.readPaths = ["docs/proposals/flow-a-v1.md"];
+      stats.deniedReads = 1;
+      stats.deniedPaths = [];
+      return APPROVE_PROPOSAL;
+    },
+  });
+  const out = await judge(request({ artifacts: { proposalPath: "docs/proposals/flow-a-v1.md" } }));
+  assert.equal(out.verdict, "manual");
+  assert.equal(out.reasonCode, "read-denied");
+  assert.match(out.reason ?? "", /判断读取被拒（敏感文件\/越界\/二进制），无法保证无损判断，已转手动确认。/);
 });
 
 // —————————————————————— ② appointment ——————————————————————

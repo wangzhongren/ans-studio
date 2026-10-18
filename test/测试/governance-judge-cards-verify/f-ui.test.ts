@@ -139,6 +139,31 @@ test("回落提示：代审批/代决策人话原因；row-failed 单列「判�
   assert.match(rowFailed, /判断 agent 已完成判断，但结果无法在聊天中显示/);
   assert.doesNotMatch(rowFailed, /未代批/);
   assert.match(UL.governanceJudgeNoticeText("decision", "unknown-code"), /判断未完成/);
+
+  // read-denied（2026-10-18 客户反馈）：无 reason ⇒ 如实「未记录具体路径」；带编排给的具体内容 ⇒ 同解呈现。
+  const govNotice = UL.governanceJudgeNoticeText as (group: string, reasonCode: string, reason?: string) => string;
+  assert.equal(
+    govNotice("decision", "read-denied"),
+    "判断 agent 未代批（代决策）：所需项目文件无法读取（未记录具体路径）；已转你手动确认。",
+  );
+  assert.equal(
+    govNotice("decision", "read-denied", "格式不符"),
+    "判断 agent 未代批（代决策）：所需项目文件无法读取（未记录具体路径）；已转你手动确认。",
+  );
+  assert.equal(
+    govNotice(
+      "decision",
+      "read-denied",
+      "判断读取被拒：.ans/sessions/x.json（应用私有数据，判断侧不开放）、src/foo.txt（敏感文件），无法保证无损判断，已转手动确认。",
+    ),
+    "判断 agent 未代批（代决策）：读取被拒：.ans/sessions/x.json（应用私有数据，判断侧不开放）、src/foo.txt（敏感文件），无法保证无损判断；已转你手动确认。",
+  );
+  const longPath = "目录/".repeat(80) + "file.md";
+  const limited = govNotice("approval", "read-denied", "判断读取被拒：" + longPath + "，无法保证无损判断，已转手动确认。");
+  assert.ok(limited.length <= 200, "回落文本 ≤200 字");
+  assert.match(limited, /读取被拒：目录\//);
+  assert.match(limited, /…/);
+  assert.ok(limited.endsWith("，无法保证无损判断；已转你手动确认。"), "固定文案逐字保留");
 });
 
 test("preload 暴露 decision 四方法与结果行订阅；不暴露 Node 原语", () => {

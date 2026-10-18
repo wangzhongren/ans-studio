@@ -676,6 +676,38 @@ async function filePrint(absPath: string): Promise<string> {
  */
 export const CAPABILITY_INSTALL_SYSTEM_PREFIX = "[系统·安装]";
 
+/** 非 assistant 正文的 `detail.source`（系统行/投递状态/推理/工具展示/长度提示——不记入反馈镜像）。 */
+const NON_ASSISTANT_DETAIL_SOURCES: ReadonlySet<string> = new Set([
+  "delivery-note",
+  "prompt-input",
+  "delivery-receipt",
+  "delivery-boundary",
+  "reasoning",
+  "reasoning-diagnostic",
+  "tool-display-diagnostic",
+  "server-tools",
+  "length-followup",
+  "length-degrade",
+  "system",
+]);
+
+/**
+ * assistant 正文判定（2026-10-18 live 修正）：`message` 且 summary 非空；`detail` 缺省或**不是**
+ * 系统行/工具事件（带 `display` 的普通 assistant 文本照记）。工具事件按 `toolCallId`/`toolName`/`call`
+ * 键排除；detail 结构无法确认（非对象）时不记（fail-closed，避免把系统行当正文）。
+ */
+function isAssistantTextEvent(ev: OrchestrationEvent): ev is Exclude<OrchestrationEvent, HandbackEvent> {
+  if (ev.kind !== "message") return false;
+  if (typeof ev.summary !== "string" || ev.summary.trim() === "") return false;
+  const detail = ev.detail;
+  if (detail === undefined) return true;
+  if (typeof detail !== "object" || detail === null) return false;
+  const record = detail as Record<string, unknown>;
+  if (typeof record.source === "string" && NON_ASSISTANT_DETAIL_SOURCES.has(record.source)) return false;
+  if ("toolCallId" in record || "toolName" in record || "call" in record) return false;
+  return true;
+}
+
 /**
  * 会话管理器（B-2：**每角色一个保活句柄** + 上限 LRU）：点角色即开、多轮直发；
  * **切走不 dispose、切回直接续**；超出 `MAX_LIVE_SESSIONS` 时淘汰最久未用者。
@@ -753,6 +785,14 @@ export class SessionManager {
    * 其他只读消费方取用；不参与任何判定。
    */
   private readonly lastTurns = new Map<string, { outcome: RuntimeTurnOutcome; at: string }>();
+  /**
+   * **各角色本轮 assistant 正文累积**（2026-10-18 客户反馈「内部治理角色，应该都向联络官反馈」）：
+   * 只记 `kind:"message"` 且**无结构化 detail** 的普通助手消息（delivery-note/prompt-input/receipt/
+   * reasoning 等系统行一律不记）。Claude 一条回复可能拆成多个 text block（各发一条 message）——
+   * 同一键 + 同一 `turnId` 用 `\n` 追加；`turnId` 变化即重置；总长上限 4000 码点（超出保留最新，
+   * 前置 `…`）。settle 时由 `mirrorGovernanceFeedback` 取出即删。不参与任何判定。
+   */
+  private readonly lastAssistantText = new Map<string, { turnId?: string; text: string }>();
   /**
    * **回交主人**最近一次开会话所用 runtime（评审 §5.6：`lastSuRuntime` → `lastGovernanceRuntime`）：
    * trio = Convener（`schedule`），single = 主入口 su。看护向回交主人投系统消息时 queueKey 需要 runtime
@@ -2001,6 +2041,11 @@ export class SessionManager {
               this.notifyRoleState(en.projectRoot, roleId, runtime);
               // G-2/W1：转发放行前的结构化事实（lastTurn 落表 + 看护观察；outcome 只认四值终局——缺事实不猜）。
               if (wasBusy) {
+                // 2026-10-18 客户反馈：trio 内置治理角色本轮收尾正文镜像到主入口（Liaison），
+                // UI-only 系统行；不 prompt、不触发新轮。取出即删 ⇒ 重复 settle 不重复镜像。
+                // 用**事件循环的 projectRoot**（与 lastAssistantText 的 queueKey 同源）——不要用 en.projectRoot
+                // （会话 entry 的 root 可能是斜杠变体，getListing 精确匹配会静默 miss）。
+                this.mirrorGovernanceFeedback(projectRoot, runtime, roleId);
                 const settledOutcomeRaw = origin?.outcome ?? (ev.detail as { outcome?: unknown } | undefined)?.outcome;
                 const settledOutcome =
                   settledOutcomeRaw === "completed" || settledOutcomeRaw === "failed" || settledOutcomeRaw === "aborted" || settledOutcomeRaw === "timed_out"
@@ -2027,6 +2072,19 @@ export class SessionManager {
           // E-1：回交到达 ⇒ 自动投递交 su 验收（去重 + 排队 + 失败如实/保留；见 handleHandback）。
           if (ev.kind === "handback") {
             this.mergeReportState(entry, ev);
+          }
+          // 2026-10-18 客户反馈「内部治理角色，应该都向联络官反馈」：只记**普通 assistant 正文**
+          // （系统行/投递状态/推理/工具事件不记；live 的正文可能带 `display`，照记）。
+          // 同一回复可能拆多个 text block ⇒ 同 turnId 用 "\n" 累积（turnId 变化重置；总长 ≤4000 码点）。
+          if (isAssistantTextEvent(ev)) {
+            const textKey = this.queueKey(projectRoot, roleId, runtime);
+            const prev = this.lastAssistantText.get(textKey);
+            const accumulated = prev !== undefined && prev.turnId === ev.turnId ? `${prev.text}\n${ev.summary}` : ev.summary;
+            const chars = Array.from(accumulated);
+            this.lastAssistantText.set(textKey, {
+              turnId: ev.turnId,
+              text: chars.length > 4000 ? `…${chars.slice(chars.length - 3999).join("")}` : accumulated,
+            });
           }
           if (ev.kind === 'message') {
             const detail = ev.detail as { source?: string; text?: string; inputProvenance?: RuntimeInputProvenanceV1; inputPresentation?: RuntimeLiveHandbackPresentationV1; receipt?: RuntimeDeliveryReceiptV1 } | undefined;
@@ -2276,6 +2334,61 @@ export class SessionManager {
   private emitDeliveryNote(projectRoot: string, runtime: RuntimeKind, preferredRoleId: string | null, fallbackRoleId: string, summary: string): void {
     const roleId = preferredRoleId !== null && preferredRoleId !== "" ? preferredRoleId : fallbackRoleId;
     this.deps.emitEvent({ roleId, projectRoot, runtime, event: { kind: "message", summary, detail: { source: "delivery-note" } } });
+  }
+
+  /**
+   * **收尾反馈镜像**（2026-10-18 客户反馈「内部治理角色，应该都向联络官反馈」）：
+   * trio 的内置治理角色（Rapporteur/Nominator/Convener）一轮结束后，把本轮 assistant 正文作为
+   * **UI-only 系统行**投到主入口（`primaryRoleId`，Liaison）的 pane——不 prompt 主入口、不触发新轮。
+   *  · 仅 trio；`roleId === primaryRoleId` ⇒ 不镜像（Liaison 自己）；
+   *  · 仅内置治理角色（`builtIn === true` 且有 `governanceFunction`）——项目角色不镜像（其回交仍走 Convener）；
+   *  · 文本**取出即删**（防重复 settle 重复镜像）；trim 后非空、≤2000 码点（超出加 `…`）。
+   *  · `getListing` 在精确 miss 时做**斜杠归一兜底**（真机：事件循环 root 与枚举缓存 key 可能正/反斜杠
+   *    不一致）；仅查找变体，**不改变**调用方 key。
+   *  · 每个 early-return 记一条 `governance.feedback.skip`（不记正文）；成功记 `governance.feedback.mirrored`。
+   *    **诊断/镜像任何失败都吞掉**——绝不打断 settle。
+   */
+  private mirrorGovernanceFeedback(projectRoot: string, runtime: RuntimeKind, roleId: string): void {
+    const diagnostic = createDiagnosticLogger({ component: "desktop.governance-feedback", projectRoot, roleId });
+    const skip = (reason: "no-listing" | "non-trio" | "primary" | "not-builtin" | "no-text"): void => {
+      // 共享白名单只落允许字段名 ⇒ 同时带 `reasonCode`（机器可读）；绝不带正文。
+      diagnostic.record("governance.feedback.skip", { reason, reasonCode: reason });
+    };
+    try {
+      const listing = this.findListingForFeedback(projectRoot);
+      if (listing === undefined) return skip("no-listing");
+      if ((listing.governanceModel ?? "single") !== "trio") return skip("non-trio");
+      const primaryRoleId = typeof listing.primaryRoleId === "string" ? listing.primaryRoleId : "";
+      if (primaryRoleId === "" || roleId === primaryRoleId) return skip("primary");
+      const role = listing.roles.find((r) => r.roleId === roleId);
+      if (role === undefined || role.builtIn !== true || role.governanceFunction === undefined) return skip("not-builtin");
+      const key = this.queueKey(projectRoot, roleId, runtime);
+      const last = this.lastAssistantText.get(key);
+      if (last === undefined) return skip("no-text");
+      this.lastAssistantText.delete(key); // 取出即删：重复 settle 不重复镜像
+      const text = last.text.trim();
+      if (text === "") return skip("no-text");
+      const chars = Array.from(text);
+      const bounded = chars.length > 2000 ? `${chars.slice(0, 2000).join("")}…` : text;
+      const mirroredChars = Array.from(bounded).length;
+      this.emitDeliveryNote(projectRoot, runtime, primaryRoleId, roleId, `治理反馈 · ${roleId}：${bounded}`);
+      // `targetRoleId`/`count` 是共享白名单里的同义允许名（roleId/chars 本身不在白名单）。
+      diagnostic.record("governance.feedback.mirrored", { roleId, targetRoleId: roleId, chars: mirroredChars, count: mirroredChars });
+    } catch {
+      // 镜像/诊断失败绝不打断 settle（静默降级为「没有这条系统行」）。
+    }
+  }
+
+  /** `mirrorGovernanceFeedback` 的 listing 查找：精确命中优先；miss 时按斜杠变体再查（仅查找，不改 key）。 */
+  private findListingForFeedback(projectRoot: string): ProjectListing | undefined {
+    const direct = this.deps.getListing(projectRoot);
+    if (direct !== undefined) return direct;
+    for (const variant of [projectRoot.replace(/\\/g, "/"), projectRoot.replace(/\//g, "\\")]) {
+      if (variant === projectRoot) continue;
+      const found = this.deps.getListing(variant);
+      if (found !== undefined) return found;
+    }
+    return undefined;
   }
 
   /** 队列键：项目 × 目标角色（一套机对多个目标；空目标=主入口暂未枚举到——每次尝试时重解析）。 */
@@ -2643,7 +2756,7 @@ export class SessionManager {
       probes.set(readPath, await filePrint(path.join(projectRoot, readPath)));
     }
     // 判据必须**紧挨去重登记之前**（见方法注释：拒投不登记——防「键在送达才释放」被拒投项拖成残留误去重）。
-    const plan = planDispatchDelivery({ roleId: targetRoleId, task, reason }, probes);
+    const plan = planDispatchDelivery({ roleId: targetRoleId, task, reason }, probes, { sourceRoleId: fromRoleId });
     if (plan.action === "reject") {
       // fail-closed 拒投：不入队、不登记去重键、不开目标会话；如实回执（工具）+ 系统行（主人聊天流）。
       return fail(plan.message, plan.systemRow);

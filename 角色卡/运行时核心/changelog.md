@@ -1,5 +1,32 @@
 # 运行时核心变更记录
 
+## 2026-10-18 信息性读取结果（not-found / not-a-file / not-a-directory）不计入 `deniedReads`（真机修复，已实施待验证）
+
+真机误判（live-fix-check，schedule-write 首建 `docs/flows/<flow>.md`）：判断 agent 尝试读/列**尚不存在**的 `docs/flows`，`resolveJudgeRead` 记 `not-found` 并 `deniedReads += 1` ⇒ 驱动 `damageCode` 判 `read-denied` ⇒ 自动代批被降级为手动卡。路径不存在是正常探测，不是策略拒绝。
+
+修复：`src/common/runtime-core/shell-judge/policy.ts` 把 `not-found`/`not-a-file`/`not-a-directory` 归为**信息性读取结果**——仍写入 `stats.deniedPaths`（path/code/pathClass，供回落卡诊断），但**不增加 `deniedReads`**、不增加 `appPrivateDeniedReads`、不影响 damageCode。其余拒绝保持原计数语义：`sensitive`/`app-private`/`outside-root`/`binary`/`invalid-path`/`empty`/`read-failed` 仍计入（app-private 只计 `appPrivateDeniedReads`）；`budget` 仍独立走 `budgetExceeded`。`JudgeReadCode`/`deniedPaths` 形状不变；`ShellJudgeReadStats.deniedReads` 注释同步。
+
+**测试**：`test/runtime-core/governance-judge.test.ts` 新增 1 例——读/列不存在路径、目录当文件、文件当目录后 `deniedReads===0`、`truncatedReads===0`、`budgetExceeded===false`（damageCode 输入干净 ⇒ allow 不降级），且 `deniedPaths` 含对应 `{code:"not-found"/"not-a-file"/"not-a-directory", pathClass:"unknown"/"non-regular"}`；随后读 `.env` 与越界仍分别累加 `deniedReads`。`node --test "test/runtime-core/**/*.test.ts"`：**203 计 / 200 过 / 3 红**（3 红均为既有 Windows `symlink EPERM`：session-store ×2、tools ×1）。`npx tsc --noEmit`：本角色文件 **0 错**；全仓仅 1 条他域在飞快照错（`test/测试/governance-liaison-verify/b-intent-handoff.test.ts:551`：`summary` 可能为 `undefined`，与本次改动无关）。未跑真实模型/凭据/网络；未 git 提交。
+
+## 2026-10-18 `.ans` 只读开放两文件＋判断读取拒绝诊断 `deniedPaths`（真机修复，已实施待验证）
+
+客户裁定：`.ans/` 里**只读开放**两个非敏感文件给判断 agent——`.ans/project.json` 与 `.ans/governance/ledger.jsonl`（账本/哈希证据，无凭据）；`.ans/sessions/**`（会话转录）与其余 `.ans` 内容继续 `app-private` 拒绝。客户反馈：手动回落卡只写「所需项目文件无法读取」看不懂，需记录具体路径与类别。
+
+①`src/common/runtime-core/shell-judge/policy.ts`：新增 `.ans` 白名单（精确匹配 `.ans/project.json`、`.ans/governance/ledger.jsonl`；`.ans/governance/` 可列但**只显示 `ledger.jsonl`**）。`resolveJudgeRead`/`resolveJudgeList` 的请求路径与真实路径检查都放行白名单（防别名混淆），其余 `.ans` 段仍 `app-private`。②`src/model/runtime.ts`：`JudgeReadCode`/`JudgePathClass` 上移为中立契约（policy re-export，旧 import 不变）；`ShellJudgeReadStats` 增可选 `deniedPaths?: ShellJudgeDeniedPath[]`（`{path,code,pathClass}`）。③`denied()`/`deniedSensitive()` 记录**请求的项目相对路径**：按 `(path,code,pathClass)` 去重、≤16；敏感/app-private 记相对路径；**根外只记类别（`path:""`），绝不记绝对路径**；预算耗尽不入 `deniedPaths`。诊断不参与 damageCode/降级。
+
+**测试**：`test/runtime-core/governance-judge.test.ts` 更新/新增 3 例——两个白名单文件可读、`.ans/governance` 只列 `ledger.jsonl`、sessions/其他 `.ans`/`.ans` 根仍拒绝；app-private 不计 `deniedReads`（仍计 `appPrivateDeniedReads`）；`deniedPaths` 记录相对路径、根外不泄露绝对路径、去重与上限 16。`node --test "test/runtime-core/**/*.test.ts"`：**202 计 / 199 过 / 3 红**（3 红均为既有 Windows `symlink EPERM`：session-store ×2、tools ×1）。`npx tsc --noEmit`：**0 错**。全量三层 glob `node --test --test-timeout=60000 --test-force-exit "test/**/*.test.ts"`：**3000 计 / 2978 过 / 19 红 / 3 跳过**——9 条 Windows `symlink EPERM`、1 条 runtime-core shell abort 并发时序（单独复跑通过）、6 条桌面应用在飞面、**3 条测试角色验证按新裁定需改口径**（`governance-judge-cards-verify/b-card-kinds` 仍拿 `.ans/governance/ledger.jsonl` 当敏感文件触发 read-denied，现应按客户裁定可读；`shell-judge-verify/c-manual-flow` 仍钉旧版通用文案，实际驱动已按 `deniedPaths` 输出具体路径/类别；`shell-judge-verify/f-readonly-sandbox` 仍钉 `.ans` 整体拒绝）。本批无实现缺陷红。未跑真实模型/凭据/网络；未 git 提交。
+
+## 2026-10-18 `.ans/**`（app-private）拒绝不再计入 `deniedReads`（真机修复，已实施待验证）
+
+真机：治理 judge 试图读 `.ans/**`（账本已在 facts 里）被 `app-private` 策略拒绝，但 `deniedSensitive` 把这次拒绝计入了 `deniedReads`；驱动的 `damageCode` 只看 `budgetExceeded`/`truncatedReads`/`deniedReads`，于是把 `approve` 降级为 `manual/read-denied`，提名写入卡无法代批。
+
+修复：
+
+①`src/model/runtime.ts::ShellJudgeReadStats` 增可选 `appPrivateDeniedReads?: number`（仅诊断/审计，**不参与** damageCode）。
+②`src/common/runtime-core/shell-judge/policy.ts::deniedSensitive`：`app-private` 拒绝只递增 `appPrivateDeniedReads`，**不再**进入 `denied(...)`、**不计入 `deniedReads`**；普通 `sensitive`（`.env`/密钥/凭据/`.git/` 等）与 `outside-root`/非法/二进制仍计入 `deniedReads`（仍触发降级）。预算/截断口径不变；`.ans` 内容仍不可读、原因码仍 `app-private`。
+
+**测试**：`test/runtime-core/governance-judge.test.ts` 新增 1 例——读 `.ans/governance/ledger.jsonl` 拒绝后 `deniedReads===0`、`appPrivateDeniedReads===1`、`truncatedReads===0`、`budgetExceeded===false`（damageCode 输入干净 ⇒ allow 不降级），账本内容不泄露；`.env` 与越界仍分别累加 `deniedReads`；`.ans` 列表拒绝同样只计 `appPrivateDeniedReads`。既有读取策略用例同步为「`.env` 计 1、`.ans` 计 3（读×2+列×1）」。`node --test "test/runtime-core/**/*.test.ts"`：**201 计 / 198 过 / 3 红**（3 红均为既有 Windows `symlink EPERM`：session-store ×2、tools ×1）。`npx tsc --noEmit`：**0 错**。全量三层 glob 结果见本文件下一条最新快照。未跑真实模型/凭据/网络；未 git 提交。
+
 ## 2026-10-18 确认卡显式写入路径 `paths`（复杂项目真机修复，已实施待验证）
 
 真机复杂项目中，`request_confirmation` 的预览既引用大量路径又声明 2 个写入目标，文本提取无法区分，判断回落。修复：

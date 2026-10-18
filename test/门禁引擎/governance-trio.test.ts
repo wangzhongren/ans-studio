@@ -324,6 +324,18 @@ test("卡文本：角色卡写入归属——Nominator 任命后必须 appointme
   assert.match(n, /必须继续发起 `appointment-write` 确认卡/, "任命后必须继续发起写盘确认卡");
   assert.match(n, /未完成写卡前不得结束流程/, "未完成写卡不得结束流程");
   assert.match(n, /不得只写提名文件/, "提名文件不能替代角色卡/边界写入");
+  // 真机 2026-10-18（live-fix-check）：判断 agent 以提名文件为 appointment 的规范物证——
+  // Nominator 先弹任命卡时提名文件尚不存在 ⇒ artifact-missing，任命卡回落手动（替我决策失效）。
+  // 卡文本必须写死「先写提名文件、再弹任命卡」的顺序，且位置在不拥有批准权段之后、任命后写卡之前。
+  assert.match(
+    n,
+    /\*\*顺序（必须）\*\*：先写提名文件 `docs\/nominations\/<flowId>-v1\.md`（候选、理由、`recommended:` 推荐集），\s*\*\*再\*\*调用 `request_choice` 任命卡。/,
+    "Nominator 须写死先写提名文件再弹任命卡",
+  );
+  assert.match(n, /判断 agent 以提名文件为物证；先弹卡会因规范物证缺失回落手动。/);
+  const orderAt = n.indexOf("**顺序（必须）**");
+  assert.ok(orderAt > n.indexOf("不拥有最终批准权"), "顺序段须在不拥有批准权段之后");
+  assert.ok(orderAt < n.indexOf("任命后写卡"), "顺序段须在任命后写卡段之前");
 
   const c = governanceRoleOf("convener")!.cardText;
   assert.match(c, /你不写角色卡、不创建角色/, "Convener 不写角色卡、不创建角色");

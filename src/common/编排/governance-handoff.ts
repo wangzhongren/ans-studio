@@ -117,10 +117,67 @@ type FrontmatterParse =
   | { ok: false; code: string; message: string };
 
 /**
- * 解析意图文件 frontmatter（**顶层简单 `key: value`**；不支持嵌套/多行块标量）。
+ * 解析意图文件 frontmatter（**顶层简单 `key: value`**；支持 `|`/`>` 块标量，不支持嵌套/列表）。
  * 文件必须以 `---` 行开头并有闭合 `---` 行；空行与 `#` 注释跳过；同名键后者覆盖前者。
+ *
+ * 块标量（2026-10-18 真机：客户原话 `customerQuote: |` 曾被误判「第 N 行无法解析」）：
+ * · 标记 `|`（保留换行）或 `>`（折叠为空格），可带 chomping `-`/`+` 与可选缩进指示符（如 `|2-`）；
+ * · 收集后续**缩进**行直到下一个顶层键/闭合 `---`/文件尾；块内 `#` 是正文，不是注释；
+ * · 块内行去掉公共缩进（有缩进指示符时按其值）；chomping：`-` 去尾换行、`+` 保留、缺省单个换行。
  */
-function parseIntentFrontmatter(text: string): FrontmatterParse {
+function blockScalarLines(lines: readonly string[]): { indent: number } {
+  const indents = lines
+    .filter((line) => line.trim() !== "")
+    .map((line) => /^[ \t]*/.exec(line)![0].length);
+  return { indent: indents.length > 0 ? Math.min(...indents) : 0 };
+}
+
+/** `>` 折叠：相邻非空行以空格相连；空行按数量保留为换行（不额外多算一个）。 */
+function foldBlockLines(lines: readonly string[]): string {
+  let out = "";
+  let pendingBlank = 0;
+  let started = false;
+  for (const line of lines) {
+    if (line.trim() === "") {
+      pendingBlank += 1;
+      continue;
+    }
+    if (!started) {
+      out += "\n".repeat(pendingBlank) + line;
+      started = true;
+    } else {
+      out += (pendingBlank > 0 ? "\n".repeat(pendingBlank) : " ") + line;
+    }
+    pendingBlank = 0;
+  }
+  return out;
+}
+
+/** 把块标量内容行按样式/缩进/chomping 渲染为字段值。 */
+function renderBlockScalar(
+  style: "|" | ">",
+  chomp: "-" | "+" | "",
+  lines: readonly string[],
+  indentIndicator: number | undefined,
+): string {
+  const common = blockScalarLines(lines);
+  const indent = indentIndicator ?? common.indent;
+  const stripped = lines.map((line) =>
+    line.trim() === "" ? "" : line.slice(Math.min(indent, /^[ \t]*/.exec(line)![0].length)),
+  );
+  let trailingBlanks = 0;
+  while (trailingBlanks < stripped.length && stripped[stripped.length - 1 - trailingBlanks]!.trim() === "") {
+    trailingBlanks += 1;
+  }
+  const coreLines = stripped.slice(0, stripped.length - trailingBlanks);
+  const core = style === ">" ? foldBlockLines(coreLines) : coreLines.join("\n");
+  if (core === "") return chomp === "+" ? "\n".repeat(trailingBlanks) : "";
+  if (chomp === "-") return core;
+  if (chomp === "+") return core + "\n".repeat(1 + trailingBlanks);
+  return core + "\n";
+}
+
+export function parseIntentFrontmatter(text: string): FrontmatterParse {
   const normalized = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
   const lines = normalized.split(/\r?\n/);
   if (lines.length === 0 || lines[0].trim() !== "---") {
@@ -148,7 +205,26 @@ function parseIntentFrontmatter(text: string): FrontmatterParse {
         message: `意图文件 frontmatter 第 ${i + 1} 行无法解析（只支持顶层 key: value）。`,
       };
     }
-    fields[match[1]] = unquote(match[2].trim());
+    const rawValue = match[2].trim();
+    const block = /^([|>])([+-]?)([1-9]?)([+-]?)\s*(?:#.*)?$/.exec(rawValue);
+    if (block !== null) {
+      const style = block[1] as "|" | ">";
+      const chompGroup = block[2] !== "" ? block[2] : block[4];
+      const chomp = chompGroup === "+" ? "+" : chompGroup === "-" ? "-" : "";
+      const indentIndicator = block[3] !== "" ? Number(block[3]) : undefined;
+      const content: string[] = [];
+      let j = i + 1;
+      for (; j < lines.length; j++) {
+        const next = lines[j]!;
+        // 空行属于块内容；非空且无缩进 ⇒ 块结束（下一个顶层键或闭合 `---`）。
+        if (next.trim() !== "" && !/^[ \t]/.test(next)) break;
+        content.push(next);
+      }
+      fields[match[1]] = renderBlockScalar(style, chomp, content, indentIndicator);
+      i = j - 1; // 外层循环 i++ 后正好落在结束行
+      continue;
+    }
+    fields[match[1]] = unquote(rawValue);
   }
   if (!closed) {
     return { ok: false, code: "missing-frontmatter", message: "意图文件 frontmatter 没有闭合的 `---`。" };

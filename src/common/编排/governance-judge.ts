@@ -44,6 +44,7 @@ import { buildGovernanceJudgePrompt, buildGovernanceJudgeSystemPrompt } from "./
 import { evaluateAcceptanceCompletion, requiredArtifactPaths, isGovernanceJudgeFlowId } from "./governance-judge-facts.ts";
 import { readGovernanceLedger } from "./governance-ledger.ts";
 import {
+  artifactMissingReason,
   boundedGovernanceJudgeAudit,
   evaluateGovernanceJudgeVerdict,
   governanceJudgeAuditFromOutcome,
@@ -134,7 +135,7 @@ function errText(err: unknown): string {
 }
 
 function emptyStats(): ShellJudgeReadStats {
-  return { readCalls: 0, readBytes: 0, deniedReads: 0, truncatedReads: 0, budgetExceeded: false, readPaths: [] };
+  return { readCalls: 0, readBytes: 0, deniedReads: 0, truncatedReads: 0, budgetExceeded: false, readPaths: [], deniedPaths: [] };
 }
 
 function modelFromOptions(options?: RuntimeAdapterFactoryOptions): string | undefined {
@@ -212,7 +213,7 @@ async function requiredReadPathsFor(request: GovernanceJudgeRequest): Promise<
 > {
   const required = requiredArtifactPaths(request);
   if (required.missing) {
-    return { ok: false, reasonCode: "artifact-missing", reason: "规范物证缺失，无法核对判断，已转手动确认。" };
+    return { ok: false, reasonCode: "artifact-missing", reason: artifactMissingReason(required.missingPaths) };
   }
   const paths: string[] = [];
   const seen = new Set<string>();

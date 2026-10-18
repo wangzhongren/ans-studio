@@ -545,8 +545,20 @@ test("桌面交接闭环：后台开 Rapporteur + 恰一条任务；不切换 pa
         envelope.event.kind === "message" &&
         (envelope.event.detail as { source?: string } | undefined)?.source === "delivery-note",
     );
-    assert.equal(notes.length, 1, "成功系统行恰一条，落 Liaison 聊天流");
-    assert.equal(notes[0].event.summary, "已交给报告员（工作中）");
+    // 2026-10-18 客户反馈：trio 内置治理角色轮末会把正文镜像到主入口（Liaison）——也是 delivery-note。
+    // 本用例只钉「交接成功系统行」恰一条；镜像行不属于交接（且夹具的「用户指令」回显无结构化 detail，
+    // 真实适配器会标 prompt-input，故不在此断言其条数）。
+    const handoffNotes = notes.filter(
+      (envelope) =>
+        typeof envelope.event.summary === "string" &&
+        /已交给报告员|报告员工作中，已排队/.test(envelope.event.summary),
+    );
+    assert.equal(
+      handoffNotes.length,
+      1,
+      `成功系统行恰一条，落 Liaison 聊天流（实得：${notes.map((envelope) => envelope.event.summary ?? "").join(" | ")}）`,
+    );
+    assert.equal(handoffNotes[0]?.event.summary, "已交给报告员（工作中）");
     // 当前 pane 仍可对 Liaison 发言（投递可能异步入队，轮询到真实 prompt 发生）。
     prompted.get("liaison")!.length = 0;
     await manager.send("客户继续说话");

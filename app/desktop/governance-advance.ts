@@ -124,9 +124,16 @@ export interface FlowCompletionLedgerEntryLike {
 }
 
 /**
- * 「流程全部完成」的**触发门**（2026-10-18 收尾推进）：所有步骤 `done`、每步都有 `dispatch.accepted`、
- * 无未结算决定、尚无验收决定、账本可读。返回 `undefined` = 可以派 Rapporteur 出验收；否则返回人话原因
- * （调用方只记诊断、**不派、不循环**）。本函数**不是**验收判定——验收卡仍由决策开关/判断 agent/客户手批。
+ * 「流程全部完成」的**触发门**（2026-10-18 收尾推进）：**执行步骤**全部 `done`、每步都有
+ * `dispatch.accepted`、无未结算决定、尚无验收决定。返回 `undefined` = 可以派 Rapporteur 出验收；
+ * 否则返回人话原因（调用方只记诊断、**不派、不循环**）。本函数**不是**验收判定——验收卡仍由
+ * 决策开关/判断 agent/客户手批。
+ *
+ * **验收步骤单列（2026-10-18 真机修正——验收鸡生蛋）**：`acceptance` 是验收步骤本身，不能算进
+ * 「执行步骤必须 done + 必须有 dispatch.accepted」：它本就 pending，且应用用 `sendBackground` 派
+ * Rapporteur 不写 `dispatch.accepted`——若把它算进去，验收任务永远派不出去。现只对**执行步骤**
+ * （`id !== "acceptance"`）做完成判定；验收步骤自身：缺失 ⇒ fail-closed 不派；已 `done` ⇒ 不重复派；
+ * 已有 `customer.decision acceptance` ⇒ 不重复派；其余（pending/in-progress）⇒ 允许派。
  */
 export function flowCompletionIssue(
   flowId: string,
@@ -136,7 +143,10 @@ export function flowCompletionIssue(
   if (ledger.errors.length > 0) return "治理账本不可读或存在坏行";
   const parsed = parseFlowStepStatuses(markdown);
   if (!parsed.wellFormed || parsed.steps.length === 0) return "流程单缺少可解析的步骤表";
-  const notDone = parsed.steps.filter((step) => step.status.toLowerCase() !== "done");
+  // 验收步骤是派发目标本身，不参与「执行完成」判定（见函数注释）。
+  const executionSteps = parsed.steps.filter((step) => step.id !== "acceptance");
+  const acceptanceStep = parsed.steps.find((step) => step.id === "acceptance");
+  const notDone = executionSteps.filter((step) => step.status.toLowerCase() !== "done");
   if (notDone.length > 0) {
     const detail = notDone.slice(0, 10).map((step) => `${step.id}=${step.status || "（空）"}`).join("、");
     return `流程仍有未完成/阻塞/待派发步骤（${detail}）`;
@@ -146,10 +156,12 @@ export function flowCompletionIssue(
       .filter((entry) => entry.kind === "dispatch.accepted" && entry.flowId === flowId && typeof entry.stepId === "string")
       .map((entry) => entry.stepId as string),
   );
-  const missingDispatch = parsed.steps.filter((step) => !dispatched.has(step.id));
+  const missingDispatch = executionSteps.filter((step) => !dispatched.has(step.id));
   if (missingDispatch.length > 0) {
     return `流程步骤缺少 dispatch.accepted 记录（${missingDispatch.slice(0, 10).map((step) => step.id).join("、")}）`;
   }
+  if (acceptanceStep === undefined) return "流程单缺少验收步骤";
+  if (acceptanceStep.status.toLowerCase() === "done") return "验收步骤已完成";
   const acceptance = ledger.entries.find(
     (entry) => entry.kind === "customer.decision" && entry.flowId === flowId && entry.decisionKind === "acceptance",
   );
@@ -292,7 +304,8 @@ export function buildIntentHandoffMessage(payload: HandOffIntentPayload): string
  * - `proposal` + `revise|reject`→ null（无下一步，等客户改稿或放弃）；
  * - `appointment`（任命成功）    → schedule / convener（排程，既有逻辑不变）；
  * - `acceptance`（验收成功）     → null（流程收口）；
- * - `write`/`appointment-write`/`schedule-write` → null（写盘确认不解锁任何下一步）；
+ * - `write`/`appointment-write`/`schedule-write` → null（写盘确认不解锁任何下一步；appointment-write
+ *                                 的后续由既有 appointment 链路负责：写卡 → settle → 刷新 → 角色出现后派 Convener）；
  * - 未答（declined/unavailable/取消/expired）或卡上无 `cardKind` → 不产生事件（返回 null）。
  *
  * 非标准选项 id（例如账本会记 `unclassified` 的提案选项）一律按「无下一步」处理——不猜。
@@ -331,7 +344,7 @@ export function deriveGovernanceNextStep(
     case "write":
     case "appointment-write":
     case "schedule-write":
-      break; // 流程收口 / 普通写盘：无下一步。
+      break; // 流程收口 / 普通写盘 / 写卡确认（后续由既有 appointment 链路负责）：无下一步。
     default:
       return null; // 未知种类：不猜、不发假事件。
   }

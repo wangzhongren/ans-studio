@@ -2,7 +2,9 @@
 // 测试角色：判断 agent 只读沙箱独立验证（2026-10-17）。
 //
 // 覆盖（PM 评审 §7.2/§7.3/§7.4 与 §12.2-9/10 与 §12.1 A11/A18/A20）：
-//   · `.env*`/私钥/凭据/令牌/`.git/`/`docs/audit/`/`.ans/**`（整棵应用私有数据）读取被拒且**不泄露内容**；
+//   · `.env*`/私钥/凭据/令牌/`.git/`/`docs/audit/` 读取被拒且**不泄露内容**；`.ans/**` 除
+//     `.ans/project.json` 与 `.ans/governance/ledger.jsonl`（2026-10-18 客户裁定只读开放）外仍
+//     app-private 拒绝，且 app-private 拒绝不计入 `deniedReads`；
 //   · 项目外绝对路径、`..`、符号链接/junction 逃逸被拒，拒绝文案不回显绝对路径；
 //   · 二进制拒绝；超预算拒绝；单文件超限截断并标记；
 //   · `judge_list_dir` 只列一层、敏感项不列名；
@@ -55,6 +57,7 @@ test("敏感文件/目录读取全部被拒且不泄露内容；列表不列敏�
     await mkdir(path.join(root, "keys"), { recursive: true });
     await mkdir(path.join(root, "docs", "audit"), { recursive: true });
     await mkdir(path.join(root, ".ans", "sessions"), { recursive: true });
+    await mkdir(path.join(root, ".ans", "governance"), { recursive: true });
     await mkdir(path.join(root, ".git"), { recursive: true });
     await writeFile(path.join(root, ".env"), `KEY=${ENV_SENTINEL}\n`, "utf8");
     await writeFile(path.join(root, ".env.local"), `LOCAL=${SECRET_SENTINEL}\n`, "utf8");
@@ -64,6 +67,10 @@ test("敏感文件/目录读取全部被拒且不泄露内容；列表不列敏�
     await writeFile(path.join(root, ".git", "config"), `remote=${SECRET_SENTINEL}`, "utf8");
     await writeFile(path.join(root, "docs", "audit", "a.md"), SECRET_SENTINEL, "utf8");
     await writeFile(path.join(root, ".ans", "sessions", "x.jsonl"), SECRET_SENTINEL, "utf8");
+    await writeFile(path.join(root, ".ans", "notes.txt"), SECRET_SENTINEL, "utf8");
+    await writeFile(path.join(root, ".ans", "project.json"), `{"projectRoot":".","fixture":true}`, "utf8");
+    await writeFile(path.join(root, ".ans", "governance", "ledger.jsonl"), `{"kind":"fixture","note":"ledger-readable"}\n`, "utf8");
+    await writeFile(path.join(root, ".ans", "governance", "other.jsonl"), SECRET_SENTINEL, "utf8");
     await writeFile(path.join(root, "README.md"), "# fixture\n", "utf8");
     await writeFile(path.join(root, "docs", "plan.md"), "plan\n", "utf8");
 
@@ -77,8 +84,6 @@ test("敏感文件/目录读取全部被拒且不泄露内容；列表不列敏�
       { target: "my-token.txt", expected: /敏感/ },
       { target: ".git/config", expected: /敏感/ },
       { target: "docs/audit/a.md", expected: /敏感/ },
-      // 2026-10-18 双开关评审 §6.3：`.ans/**` 整体硬排除（app-private），不再只排 sessions。
-      { target: ".ans/sessions/x.jsonl", expected: /应用私有数据/ },
     ];
     for (const { target, expected } of deniedTargets) {
       const result = await read.handler(call(SHELL_JUDGE_READ_TOOL, { path: target }));
@@ -89,17 +94,31 @@ test("敏感文件/目录读取全部被拒且不泄露内容；列表不列敏�
       assert.equal(result.message.includes(root), false, `${target} 拒绝文案不得回显绝对路径`);
     }
 
-    // `.ans/governance/ledger.jsonl` 同样整体拒绝（独立会话，避免被上一个会话的预算耗尽掩盖）。
-    const ledgerFixture = fixture(root);
-    const ledgerRead = await ledgerFixture.byName.get(SHELL_JUDGE_READ_TOOL)!.handler(
-      call(SHELL_JUDGE_READ_TOOL, { path: ".ans/governance/ledger.jsonl" }),
-    );
-    assert.equal(ledgerRead.ok, false, "账本文件必须被拒绝");
-    assert.match(ledgerRead.message, /应用私有数据/);
-    assert.equal(ledgerRead.message.includes(SECRET_SENTINEL), false, "账本拒绝文案不得泄露内容");
-    assert.equal(ledgerRead.message.includes(root), false, "账本拒绝文案不得回显绝对路径");
+    // 2026-10-18 客户裁定：`.ans` 只读开放 `.ans/project.json` 与 `.ans/governance/ledger.jsonl`；
+    // 其余 `.ans` 内容（sessions/其他文件）仍 app-private 拒绝且不泄露内容。独立会话，避免预算串扰。
+    const ansFixture = fixture(root);
+    const ansRead = ansFixture.byName.get(SHELL_JUDGE_READ_TOOL)!;
+    for (const target of [".ans/sessions/x.jsonl", ".ans/notes.txt", ".ans/governance/other.jsonl"]) {
+      const deniedRead = await ansRead.handler(call(SHELL_JUDGE_READ_TOOL, { path: target }));
+      assert.equal(deniedRead.ok, false, `${target} 必须被拒绝`);
+      assert.match(deniedRead.message, /应用私有数据/, `${target} 拒绝原因须标注 app-private`);
+      assert.equal(deniedRead.message.includes(SECRET_SENTINEL), false, `${target} 拒绝文案不得泄露内容`);
+      assert.equal(deniedRead.message.includes(root), false, `${target} 拒绝文案不得回显绝对路径`);
+    }
+    // 契约：app-private 拒绝不计入 `deniedReads`（不触发 allow 降级），只单独计数。
+    assert.equal(ansFixture.stats.deniedReads, 0, "app-private 拒绝不得计入 deniedReads");
+    assert.equal(ansFixture.stats.appPrivateDeniedReads, 3);
 
-    // 8 次被拒读取也占调用预算；列表用独立会话统计（同一预算语义）。
+    const ledgerRead = await ansRead.handler(call(SHELL_JUDGE_READ_TOOL, { path: ".ans/governance/ledger.jsonl" }));
+    assert.equal(ledgerRead.ok, true, "账本只读开放（2026-10-18 客户裁定）");
+    assert.match(ledgerRead.message, /ledger-readable/, "账本内容可读");
+    assert.equal(ledgerRead.message.includes(SECRET_SENTINEL), false, "读账本不得带出其他 .ans 内容");
+
+    const projectRead = await ansRead.handler(call(SHELL_JUDGE_READ_TOOL, { path: ".ans/project.json" }));
+    assert.equal(projectRead.ok, true, ".ans/project.json 只读开放");
+    assert.match(projectRead.message, /"fixture":true/);
+
+    // 7 次敏感拒绝也占调用预算；列表用独立会话统计（同一预算语义）。
     const listingFixture = fixture(root);
     const listing = await listingFixture.byName.get(SHELL_JUDGE_LIST_TOOL)!.handler(call(SHELL_JUDGE_LIST_TOOL, {}));
     assert.equal(listing.ok, true);
@@ -116,9 +135,15 @@ test("敏感文件/目录读取全部被拒且不泄露内容；列表不列敏�
     assert.equal(ans.ok, false, ".ans 整体拒绝（应用私有数据，不是只隐藏 sessions）");
     assert.match(ans.message, /应用私有数据/);
     assert.equal(ans.message.includes("sessions"), false, ".ans 拒绝文案不得列出内部目录名");
+    // `.ans/governance/` 目录可列，但只显示 ledger.jsonl（客户裁定；其余内容不列名）。
+    const gov = await listingFixture.byName.get(SHELL_JUDGE_LIST_TOOL)!.handler(call(SHELL_JUDGE_LIST_TOOL, { path: ".ans/governance" }));
+    assert.equal(gov.ok, true, ".ans/governance 目录可列（只读开放）");
+    assert.match(gov.message, /ledger\.jsonl/, "账本可见");
+    assert.equal(gov.message.includes("other.jsonl"), false, "目录内其他文件不得列名");
+    assert.equal(gov.message.includes(SECRET_SENTINEL), false);
     const sensitiveDir = await listingFixture.byName.get(SHELL_JUDGE_LIST_TOOL)!.handler(call(SHELL_JUDGE_LIST_TOOL, { path: ".git" }));
     assert.equal(sensitiveDir.ok, false, "敏感目录本身不可列");
-    assert.equal(readStats.deniedReads >= 8, true);
+    assert.equal(readStats.deniedReads, 7, "敏感拒绝 7 次计入 deniedReads（app-private 不计入）");
   } finally {
     await rm(root, { recursive: true, force: true });
   }

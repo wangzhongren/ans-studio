@@ -198,10 +198,16 @@ export function buildGovernanceJudgeFacts(input: {
 /**
  * 规范物证要求（评审 §5.4）：
  * - 返回**必须可读**的物证路径与「是否有必需物证缺失」；
+ * - `missingPaths` 是缺失物证的**约定路径**（客户可读；flowId 缺失时退化为「提案/提名/流程单文件」
+ *   文字，不编造路径）——2026-10-18 客户反馈：只写「规范物证缺失」看不出缺哪个文件；
  * - `write` 卡的物证由 `run-role` 按来源角色收窄后放入 `artifacts`，此处取全部已给项；
  * - `appointment-write` 的 flow 物证可选（存在才要求读，缺失不单独阻断）。
  */
-export function requiredArtifactPaths(request: GovernanceJudgeRequest): { paths: string[]; missing: boolean } {
+export function requiredArtifactPaths(request: GovernanceJudgeRequest): {
+  paths: string[];
+  missing: boolean;
+  missingPaths?: string[];
+} {
   const artifacts = request.artifacts ?? {};
   const proposal = typeof artifacts.proposalPath === "string" && artifacts.proposalPath.trim() !== ""
     ? artifacts.proposalPath.trim()
@@ -212,21 +218,37 @@ export function requiredArtifactPaths(request: GovernanceJudgeRequest): { paths:
   const flow = typeof artifacts.flowPath === "string" && artifacts.flowPath.trim() !== ""
     ? artifacts.flowPath.trim()
     : undefined;
+  const flowId = typeof request.flowId === "string" && request.flowId.trim() !== "" ? request.flowId.trim() : undefined;
+  // 约定路径（flowId 缺失 ⇒ 文字，不编造路径）。
+  const expectedProposal = flowId !== undefined ? `docs/proposals/${flowId}-v1.md` : "提案";
+  const expectedNomination = flowId !== undefined ? `docs/nominations/${flowId}-v1.md` : "提名";
+  const expectedFlow = flowId !== undefined ? `docs/flows/${flowId}.md` : "流程单文件";
 
   switch (request.cardKind) {
     case "proposal":
-      return { paths: proposal !== undefined ? [proposal] : [], missing: proposal === undefined };
+      return proposal !== undefined
+        ? { paths: [proposal], missing: false }
+        : { paths: [], missing: true, missingPaths: [expectedProposal] };
     case "appointment":
-      return { paths: nomination !== undefined ? [nomination] : [], missing: nomination === undefined };
-    case "acceptance":
+      return nomination !== undefined
+        ? { paths: [nomination], missing: false }
+        : { paths: [], missing: true, missingPaths: [expectedNomination] };
+    case "acceptance": {
+      const missingPaths = [
+        ...(proposal === undefined ? [expectedProposal] : []),
+        ...(flow === undefined ? [expectedFlow] : []),
+      ];
       return {
         paths: [proposal, flow].filter((p): p is string => p !== undefined),
-        missing: proposal === undefined || flow === undefined,
+        missing: missingPaths.length > 0,
+        ...(missingPaths.length > 0 ? { missingPaths } : {}),
       };
+    }
     case "appointment-write":
       return {
         paths: [nomination, flow].filter((p): p is string => p !== undefined),
         missing: nomination === undefined,
+        ...(nomination === undefined ? { missingPaths: [expectedNomination] } : {}),
       };
     case "schedule-write":
       // 流程单可能是在本卡中首次创建（目标尚不存在）⇒ 不强制物证；改由 preview 正文核对。

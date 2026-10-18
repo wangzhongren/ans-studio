@@ -186,28 +186,49 @@ test("工具集恰为 judge_read_file / judge_list_dir / report_governance_judge
   for (const tool of tools) assert.equal(tool.inputSchema.type, "object");
 });
 
-test("读取策略：整棵 .ans/** 硬排除（账本/会话）；项目内物证可读并累积 readPaths", async () => {
+test("读取策略：.ans 只读开放 project.json 与 governance/ledger.jsonl；sessions 与其他 .ans 仍拒绝", async () => {
   const root = await temp();
   try {
     await mkdir(path.join(root, ".ans", "governance"), { recursive: true });
     await mkdir(path.join(root, ".ans", "sessions", "r"), { recursive: true });
     await mkdir(path.join(root, "docs", "proposals"), { recursive: true });
-    await writeFile(path.join(root, ".ans", "governance", "ledger.jsonl"), `LEDGER_SECRET`, "utf8");
+    await writeFile(path.join(root, ".ans", "project.json"), `{"project":"demo"}`, "utf8");
+    await writeFile(path.join(root, ".ans", "governance", "ledger.jsonl"), `LEDGER_LINE`, "utf8");
+    await writeFile(path.join(root, ".ans", "governance", "extra.json"), `EXTRA_PRIVATE`, "utf8");
     await writeFile(path.join(root, ".ans", "sessions", "r", "x.jsonl"), `SESSION_SECRET`, "utf8");
+    await writeFile(path.join(root, ".ans", "state.json"), `STATE_PRIVATE`, "utf8");
     await writeFile(path.join(root, ".env"), `ENV_SECRET`, "utf8");
     await writeFile(path.join(root, "docs", "proposals", "flow-a-v1.md"), "# 提案\n\n范围与验收。\n", "utf8");
 
-    const { byName, stats } = fixture(root);
-    for (const target of [".ans/governance/ledger.jsonl", ".ans/sessions/r/x.jsonl", ".ans"]) {
-      const result = target === ".ans"
-        ? await byName.get("judge_list_dir")!.handler(call("judge_list_dir", { path: target }))
-        : await byName.get("judge_read_file")!.handler(call("judge_read_file", { path: target }));
+    const stats = freshStats();
+    const byName = new Map(buildGovernanceJudgeTools({ projectRoot: root, report: () => {}, stats, budget: { maxCalls: 20 } }).map((tool) => [tool.name, tool]));
+    const projectJson = await byName.get("judge_read_file")!.handler(call("judge_read_file", { path: ".ans/project.json" }));
+    assert.equal(projectJson.ok, true);
+    assert.match(projectJson.message, /"project":"demo"/);
+    const ledger = await byName.get("judge_read_file")!.handler(call("judge_read_file", { path: ".ans/governance/ledger.jsonl" }));
+    assert.equal(ledger.ok, true);
+    assert.match(ledger.message, /LEDGER_LINE/);
+
+    // `.ans/governance/` 可列，但只显示 ledger.jsonl（其他内容不列名）。
+    const governanceList = await byName.get("judge_list_dir")!.handler(call("judge_list_dir", { path: ".ans/governance" }));
+    assert.equal(governanceList.ok, true);
+    assert.match(governanceList.message, /ledger\.jsonl/);
+    assert.equal(governanceList.message.includes("extra.json"), false, "只读开放目录只显示 ledger.jsonl");
+    assert.equal(governanceList.message.includes("EXTRA_PRIVATE"), false);
+
+    // sessions 与其他 .ans 内容仍 app-private 拒绝；`.ans` 本身仍不可列。
+    for (const target of [".ans/sessions/r/x.jsonl", ".ans/state.json", ".ans/governance/extra.json"]) {
+      const result = await byName.get("judge_read_file")!.handler(call("judge_read_file", { path: target }));
       assert.equal(result.ok, false, `${target} 必须被拒绝`);
       assert.match(result.message, /应用私有数据/);
-      for (const sentinel of ["LEDGER_SECRET", "SESSION_SECRET", root]) {
+      for (const sentinel of ["SESSION_SECRET", "STATE_PRIVATE", "EXTRA_PRIVATE", root]) {
         assert.equal(result.message.includes(sentinel), false, `拒绝文案不得泄露 ${sentinel}`);
       }
     }
+    const ansList = await byName.get("judge_list_dir")!.handler(call("judge_list_dir", { path: ".ans" }));
+    assert.equal(ansList.ok, false, ".ans 根目录仍不可列");
+    const sessionsList = await byName.get("judge_list_dir")!.handler(call("judge_list_dir", { path: ".ans/sessions" }));
+    assert.equal(sessionsList.ok, false, ".ans/sessions 不可列");
 
     const rootList = await byName.get("judge_list_dir")!.handler(call("judge_list_dir", {}));
     assert.equal(rootList.ok, true);
@@ -220,10 +241,148 @@ test("读取策略：整棵 .ans/** 硬排除（账本/会话）；项目内物�
     const proposal = await byName.get("judge_read_file")!.handler(call("judge_read_file", { path: "docs/proposals/flow-a-v1.md" }));
     assert.equal(proposal.ok, true);
     assert.match(proposal.message, /范围与验收/);
-    assert.deepEqual(stats.readPaths, ["docs/proposals/flow-a-v1.md"], "只需记录成功读取的项目相对路径");
-    assert.equal(stats.deniedReads >= 4, true, "被拒读取仍计 deniedReads");
+    assert.deepEqual(stats.readPaths, [".ans/project.json", ".ans/governance/ledger.jsonl", "docs/proposals/flow-a-v1.md"], "成功读取按序累积");
+    assert.equal(stats.deniedReads, 1, "只有 .env 这类敏感拒绝计入 deniedReads");
+    assert.equal(stats.appPrivateDeniedReads, 5, "sessions/其他 .ans 读×3 + `.ans` 列×1 + `.ans/sessions` 列×1");
   } finally {
     await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("app-private 拒绝不计入 deniedReads（allow 不因读会话/私有文件被降级）；敏感/越界仍计入", async () => {
+  const root = await temp();
+  const outside = await temp();
+  try {
+    await mkdir(path.join(root, ".ans", "sessions", "r"), { recursive: true });
+    await writeFile(path.join(root, ".ans", "sessions", "r", "x.jsonl"), "SESSION_CONTENT", "utf8");
+    await writeFile(path.join(root, ".env"), "ENV_CONTENT", "utf8");
+    await writeFile(path.join(outside, "secret.txt"), "OUTSIDE_CONTENT", "utf8");
+
+    const { byName, stats } = fixture(root);
+    const session = await byName.get("judge_read_file")!.handler(call("judge_read_file", { path: ".ans/sessions/r/x.jsonl" }));
+    assert.equal(session.ok, false, ".ans/sessions 内容仍不可读");
+    assert.match(session.message, /应用私有数据/);
+    // 驱动的 damageCode 只看 deniedReads/truncatedReads/budgetExceeded：三者均未被 app-private 污染 ⇒ allow 不降级。
+    assert.equal(stats.deniedReads, 0, "app-private 不计入 deniedReads（damageCode 输入保持干净）");
+    assert.equal(stats.appPrivateDeniedReads, 1);
+    assert.equal(stats.truncatedReads, 0);
+    assert.equal(stats.budgetExceeded, false);
+    assert.deepEqual(stats.deniedPaths, [{ path: ".ans/sessions/r/x.jsonl", code: "app-private", pathClass: "app-private" }]);
+
+    const env = await byName.get("judge_read_file")!.handler(call("judge_read_file", { path: ".env" }));
+    assert.equal(env.ok, false);
+    assert.match(env.message, /敏感/);
+    assert.equal(stats.deniedReads, 1, "普通敏感拒绝仍计入 deniedReads（allow 仍会降级）");
+
+    const escape = await byName.get("judge_read_file")!.handler(call("judge_read_file", { path: "../secret.txt" }));
+    assert.equal(escape.ok, false);
+    assert.equal(stats.deniedReads, 2, "越界拒绝仍计入 deniedReads");
+
+    // 用同一 stats 的 list 拒绝也不计入 deniedReads。
+    const list = await byName.get("judge_list_dir")!.handler(call("judge_list_dir", { path: ".ans/sessions" }));
+    assert.equal(list.ok, false);
+    assert.equal(stats.deniedReads, 2, "app-private 列表拒绝同样不计入 deniedReads");
+    assert.equal(stats.appPrivateDeniedReads, 2);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+    await rm(outside, { recursive: true, force: true });
+  }
+});
+
+test("deniedPaths：记录项目相对路径与类别（去重≤16）；敏感/根外不泄露绝对路径；app-private 记录相对路径", async () => {
+  const root = await temp();
+  const outside = await temp();
+  try {
+    await mkdir(path.join(root, ".ans", "sessions"), { recursive: true });
+    await writeFile(path.join(root, ".ans", "sessions", "x.jsonl"), "SESSION", "utf8");
+    await writeFile(path.join(root, ".env"), "ENV", "utf8");
+    await writeFile(path.join(outside, "secret.txt"), "OUTSIDE", "utf8");
+
+    const { byName, stats } = fixture(root);
+    await byName.get("judge_read_file")!.handler(call("judge_read_file", { path: ".env" }));
+    await byName.get("judge_read_file")!.handler(call("judge_read_file", { path: ".env" })); // 重复拒绝去重
+    await byName.get("judge_read_file")!.handler(call("judge_read_file", { path: ".ans/sessions/x.jsonl" }));
+    await byName.get("judge_read_file")!.handler(call("judge_read_file", { path: "../secret.txt" }));
+    await byName.get("judge_read_file")!.handler(call("judge_read_file", { path: path.join(outside, "secret.txt") }));
+
+    const sensitiveEntries = stats.deniedPaths?.filter((entry) => entry.code === "sensitive") ?? [];
+    assert.deepEqual(sensitiveEntries, [{ path: ".env", code: "sensitive", pathClass: "env" }], "敏感路径去重且记相对路径");
+    const privateEntries = stats.deniedPaths?.filter((entry) => entry.code === "app-private") ?? [];
+    assert.deepEqual(privateEntries, [{ path: ".ans/sessions/x.jsonl", code: "app-private", pathClass: "app-private" }], "app-private 记录相对路径");
+    const outsideEntries = stats.deniedPaths?.filter((entry) => entry.code === "outside-root") ?? [];
+    assert.equal(outsideEntries.length >= 1, true);
+    for (const entry of outsideEntries) {
+      assert.equal(entry.path, "", "根外只记类别，不记绝对/相对外部路径");
+      assert.equal(entry.pathClass, "outside-root");
+    }
+    assert.equal(JSON.stringify(stats.deniedPaths).includes(outside), false, "诊断不得包含项目外绝对路径");
+    assert.equal(JSON.stringify(stats.deniedPaths).includes("OUTSIDE"), false);
+
+    // 上限 16：17 个不同的敏感文件只留前 16 条（用独立预算会话）。
+    for (let index = 0; index < 17; index++) {
+      await writeFile(path.join(root, `secret-${index}.txt`), "x", "utf8");
+    }
+    const capped = freshStats();
+    const cappedTools = buildGovernanceJudgeTools({ projectRoot: root, report: () => {}, stats: capped, budget: { maxCalls: 40 } });
+    const cappedByName = new Map(cappedTools.map((tool) => [tool.name, tool]));
+    for (let index = 0; index < 17; index++) {
+      const result = await cappedByName.get("judge_read_file")!.handler(call("judge_read_file", { path: `secret-${index}.txt` }));
+      assert.equal(result.ok, false);
+    }
+    assert.equal(capped.deniedPaths?.length, 16, "deniedPaths 上限 16 条");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+    await rm(outside, { recursive: true, force: true });
+  }
+});
+
+test("信息性读取结果（not-found/not-a-file/not-a-directory）不增加 deniedReads，仍记 deniedPaths；真实敏感/越界仍计数", async () => {
+  const root = await temp();
+  const outside = await temp();
+  try {
+    await mkdir(path.join(root, "dir"), { recursive: true });
+    await writeFile(path.join(root, "file.txt"), "x", "utf8");
+    await writeFile(path.join(root, ".env"), "ENV", "utf8");
+    await writeFile(path.join(outside, "secret.txt"), "OUTSIDE", "utf8");
+
+    const stats = freshStats();
+    const byName = new Map(buildGovernanceJudgeTools({ projectRoot: root, report: () => {}, stats, budget: { maxCalls: 20 } }).map((tool) => [tool.name, tool]));
+    const read = (target: string) => byName.get("judge_read_file")!.handler(call("judge_read_file", { path: target }));
+    const list = (target: string) => byName.get("judge_list_dir")!.handler(call("judge_list_dir", { path: target }));
+
+    const missing = await read("missing.md");
+    assert.equal(missing.ok, false);
+    assert.match(missing.message, /不存在/);
+    const missingDir = await list("missing-dir");
+    assert.equal(missingDir.ok, false);
+    const dirAsFile = await read("dir");
+    assert.equal(dirAsFile.ok, false);
+    assert.match(dirAsFile.message, /不是常规文件/);
+    const fileAsDir = await list("file.txt");
+    assert.equal(fileAsDir.ok, false);
+    assert.match(fileAsDir.message, /不是目录/);
+
+    // 信息性结果不进入 damageCode 输入（deniedReads/truncatedReads/budgetExceeded 全部保持干净）⇒ allow 不被降级。
+    assert.equal(stats.deniedReads, 0, "not-found/not-a-file/not-a-directory 不计入 deniedReads");
+    assert.equal(stats.truncatedReads, 0);
+    assert.equal(stats.budgetExceeded, false);
+    assert.equal(stats.appPrivateDeniedReads, undefined);
+    const informational = stats.deniedPaths?.filter((entry) => ["not-found", "not-a-file", "not-a-directory"].includes(entry.code)) ?? [];
+    assert.equal(informational.some((entry) => entry.path === "missing.md" && entry.code === "not-found" && entry.pathClass === "unknown"), true);
+    assert.equal(informational.some((entry) => entry.path === "missing-dir" && entry.code === "not-found"), true);
+    assert.equal(informational.some((entry) => entry.path === "dir" && entry.code === "not-a-file"), true);
+    assert.equal(informational.some((entry) => entry.path === "file.txt" && entry.code === "not-a-directory"), true);
+
+    // 真实敏感/越界仍保持原计数语义（仍触发 allow 降级）。
+    const env = await read(".env");
+    assert.equal(env.ok, false);
+    assert.equal(stats.deniedReads, 1);
+    const escape = await read("../secret.txt");
+    assert.equal(escape.ok, false);
+    assert.equal(stats.deniedReads, 2);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+    await rm(outside, { recursive: true, force: true });
   }
 });
 

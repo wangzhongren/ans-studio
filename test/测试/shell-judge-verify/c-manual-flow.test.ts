@@ -121,7 +121,11 @@ test("allow + 读取被拒：真实驱动按「allow 必须无损」降级 manua
 
     const result = await chain.gate(REQUEST("manual-read-denied"));
     assert.equal(result.allow, false, "读取损伤后的 allow 不得自动放行");
-    assertManualCard(chain, /判断 agent 未能完成判断：所需项目文件无法读取。规则判定仅作参考；判断 agent 未完成时才由你手批。已转你手动确认。/);
+    // 2026-10-18 客户裁定：read-denied 卡片须给出具体路径与类别（不再是泛化的「所需项目文件无法读取」）。
+    assertManualCard(
+      chain,
+      /^判断 agent 未能完成判断：读取被拒：\.env（环境变量文件），无法保证无损判断。规则判定仅作参考；判断 agent 未完成时才由你手批。已转你手动确认。$/,
+    );
     assert.equal(fake.seen.binds, 1);
   } finally {
     await project.cleanup();
