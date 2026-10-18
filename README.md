@@ -2,19 +2,19 @@
 
 **让 AI 按角色分工，在明确的文件边界内完成代码任务。**
 
-ANS Studio 面向希望在真实项目中使用多个 AI 角色协作的开发者：从需求与授权开始，经过派发、修改和测试，再把执行证据交回检查。提供桌面应用与 CLI，支持 Pi、Codex 和 Claude。
+ANS Studio 面向希望在真实项目中使用多个 AI 角色协作的开发者：从需求与授权开始，经过派发、修改和测试，再把执行证据交回检查。提供桌面应用与 CLI；桌面默认使用 Claude，也可切换 Pi 或 Codex，CLI 支持 demo（不调用模型）、Pi、Codex 与 Claude。
 
 ## 五个治理角色
 
-新建或空项目默认使用 **三权 · 五角色** 治理模型，界面状态行显示「三权 · 五角色」。三权指提案、提名、编排三类决定权，沟通与验收不是决定权。五个内置治理角色随应用发布，没有角色目录，只读写治理文件与证据，不承担实现与测试；内部 roleId 保持稳定，界面显示下列名称。
+新建或空项目默认使用 **三权 · 五角色** 治理模型，界面状态行显示「三权 · 五角色」。三权指提案、组队、统筹三类决定权，沟通与验收不是决定权。五个内置治理角色随应用发布，没有角色目录，只读写治理文件与证据，不承担实现与测试；内部 roleId 保持稳定，界面显示下列名称。
 
-| 界面名称 | roleId | 职责 | 批准权 |
+| 界面名称 | roleId | 职责 | 权力 |
 | --- | --- | --- | --- |
-| Lead / 主理 | `liaison` | 客户沟通与默认主入口；把客户意图写入 `docs/intents/` | 不拥有 |
-| Draft / 提案 | `rapporteur` | 形成提案与跨角色契约 | 不拥有 |
-| Crew / 组队 | `nominator` | 提名项目角色、写角色卡与边界 | 不拥有 |
-| Steward / 统筹 | `convener` | 编排流程、派发任务 | 不拥有 |
-| Proof / 验收 | `verifier` | 独立只读核对证据、出验收卡 | 不拥有 |
+| Lead / 主理 | `liaison` | 客户沟通与默认主入口；把客户意图写入 `docs/intents/` | 客户沟通 · 不拥有最终批准权 |
+| Draft / 提案 | `rapporteur` | 形成提案与跨角色契约 | 提案权 · 不拥有最终批准权 |
+| Crew / 组队 | `nominator` | 提名项目角色、写角色卡与边界 | 组队权 · 不拥有最终批准权 |
+| Steward / 统筹 | `convener` | 编排流程、派发任务 | 统筹权 · 不拥有最终批准权 |
+| Proof / 验收 | `verifier` | 独立只读核对证据、出验收卡 | 验收权 · 不拥有最终批准权 |
 
 `su` 只用于旧模型（single）与兼容路径，不是新项目的默认入口。
 
@@ -30,7 +30,7 @@ ANS Studio 面向希望在真实项目中使用多个 AI 角色协作的开发�
 
 学术来源：Wang, Zhongren. 2026. *Role-First Software Governance: Asymmetric Authority Boundaries for AI-Native Agent Systems*. [DOI: 10.5281/zenodo.22824700](https://zenodo.org/records/22824700)。
 
-![ANS Studio 真实桌面：角色导航、任务回交与执行证据](角色卡/测试/docs/change/2026-10-15-visual-v2-implementation-evidence/native-final-target-report-1360.png)
+![ANS Studio 真实桌面：五角色导航与需求确认卡](角色卡/桌面UI/docs/change/2026-10-18_readme-five-roles/desktop-intent-confirm.png)
 
 ## 下载与运行
 
@@ -46,7 +46,7 @@ ANS Studio 面向希望在真实项目中使用多个 AI 角色协作的开发�
 
 ## 第一次使用
 
-1. **导入项目并选择引擎。** 点击左下角「导入项目」。导入前引擎选择不可用；也可以选择一个空文件夹，按默认的五角色开始。在会话顶部选择 Pi、Codex 或 Claude。缺少配置时，点击提示中的「打开设置」按钮；日后也可从左下角「设置」进入。保存成功只表示配置已保存，连接是否可用仍需实际请求验证。
+1. **导入项目并选择引擎。** 点击左下角「导入项目」。导入前引擎选择不可用；也可以选择一个空文件夹，按默认的五角色开始。在会话顶部选择引擎：默认 Claude，也可切换 Pi、Codex。缺少配置时，点击提示中的「打开设置」按钮；日后也可从左下角「设置」进入。保存成功只表示配置已保存，连接是否可用仍需实际请求验证。
 2. **与 Lead 说明需求。** Lead 是默认主入口，负责确认目标、范围与验收标准，并把客户意图写入 `docs/intents/`。写完意图后，Lead 会弹出**需求确认卡**（`confirm` / `revise`）；只有你确认后，意图才会交给 Draft。
 3. **确认提案与任命。** Draft 依据意图形成提案，提案卡提供 `accept` / `accept-quick` / `revise` / `reject`。接受后，Steward 写流程单，Crew 提名项目角色并弹出任命卡；任命后 Crew 再经写盘确认卡逐路径写角色卡与边界。
 4. **实施、回交与验收。** 项目角色按各自边界实施、测试并回交；Steward 处理流程与派发。Proof 独立只读核对交付与回交证据，出验收卡（`accept` / `reject`），由你决定是否验收。
@@ -60,7 +60,7 @@ ANS Studio 面向希望在真实项目中使用多个 AI 角色协作的开发�
 
 | 引擎 | 必填配置 | 可选配置 |
 | --- | --- | --- |
-| Pi | `ANTHROPIC_AUTH_TOKEN`、`ANS_PI_BASE_URL`、`ANS_PI_MODEL` | `ANS_PI_CONTEXT_WINDOW`，默认 32768 |
+| Pi | `ANTHROPIC_AUTH_TOKEN`、`ANS_PI_BASE_URL`、`ANS_PI_MODEL` | `ANS_PI_CONTEXT_WINDOW`，留空默认 500000；模型/网关实际窗口更小时请覆盖 |
 | Codex | `CODEX_API_KEY`（或 `OPENAI_API_KEY`）、`ANS_CODEX_MODEL` | `ANS_CODEX_BASE_URL`，默认 `https://api.openai.com/v1`；自定义端点须兼容 Responses API |
 | Claude | `ANTHROPIC_API_KEY` | `ANS_CLAUDE_MODEL`、`ANTHROPIC_BASE_URL`，留空使用 SDK 默认 |
 
@@ -111,7 +111,7 @@ node --env-file=.env bin/ans.js govern /path/to/project --runtime pi
 node --env-file=.env bin/ans.js role run "角色ID" --task "任务内容" --runtime pi
 ```
 
-`--runtime` 支持 `demo|pi|codex|claude`，优先于 `ANS_RUNTIME` 环境变量。未指定时，`role run` 默认 demo，`govern` 默认 Pi。`govern` 的目标目录必须已存在；不提供目录时使用当前工具项目。`ans init` 已移除。
+`--runtime` 支持 `demo|pi|codex|claude`，优先于 `ANS_RUNTIME` 环境变量。未指定时，`role run` 默认 demo，`govern` 默认 Pi。桌面的默认引擎是 Claude，CLI 保持上述默认。`govern` 的目标目录必须已存在；不提供目录时使用当前工具项目。`ans init` 已移除。
 
 ### 检查与打包
 
@@ -130,7 +130,7 @@ npm run typecheck
 - **Windows 暂不支持内置来源文档阅读。** 可查看完整摘要和执行记录，来源文件请通过系统编辑器打开。
 - **CLI 与桌面能力有差异。** CLI 使用终端确认，暂不提供桌面式任务派发与回交投递、队列界面。多任务依赖的自动调度尚未实现。
 - **ZIP 分发暂无安装器和自动更新。** 更新时需自行下载新版本。
-- **验证范围有限。** 三平台运行包已通过原生构建、回归和解压启动检查，这些包测试未调用在线模型；真实在线代码任务的既有验证为 Pi。Codex、Claude 的受控测试不等于在线模型全链路验收。
+- **验证范围有限。** 三平台运行包由原生 CI 构建、回归并做解压启动检查，包内测试不调用在线模型；既有真实验证记录中，在线桌面与代码任务以 Pi 为主，Codex、Claude 的受控/离线整链测试不等于在线模型全链路验收。桌面默认 Claude 只表示默认选择，不表示已获在线验收。
 
 ## 深入了解
 
