@@ -229,7 +229,9 @@ export function requiredArtifactPaths(request: GovernanceJudgeRequest): { paths:
         missing: nomination === undefined,
       };
     case "schedule-write":
-      return { paths: flow !== undefined ? [flow] : [], missing: flow === undefined };
+      // 流程单可能是在本卡中首次创建（目标尚不存在）⇒ 不强制物证；改由 preview 正文核对。
+      // 文件已存在时，driver 会把实际存在的目标文件并入 required-read（仍须读取旧版）。
+      return { paths: flow !== undefined ? [flow] : [], missing: false };
     case "write": {
       // 写盘卡：只把 run-role 按来源角色收窄的**已存在**物证放进 required-read；
       // 即将新建的目标文件不在此列（评审 §5.4「新文件除外」，由 preview 正文核对）。

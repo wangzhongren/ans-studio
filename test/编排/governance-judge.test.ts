@@ -57,6 +57,8 @@ import {
   normalizeGovernanceJudgeVerdict,
 } from "../../src/common/编排/governance-judge-verdict.ts";
 import { flushGovernanceLedger, readGovernanceLedger } from "../../src/common/编排/governance-ledger.ts";
+import { createConfirmedWriteIssuer, explicitConfirmPaths } from "../../src/common/编排/confirmed-writes.ts";
+import type { BoundarySection1 } from "../../src/model/boundary.ts";
 import { buildGovernedTools } from "../../src/provider/runtime/tools.ts";
 import { allow } from "../runtime-core/fixtures.ts";
 
@@ -899,6 +901,65 @@ test("schedule-write：路径必须匹配 flowId → approve；不匹配 manual"
   }
 });
 
+test("schedule-write：首次新建 flow 不要求旧物证；已存在须读旧版；空 preview manual", async () => {
+  const target = "docs/flows/flow-a.md";
+  const scheduleWrite = (root: string, preview = `将写入以下文件：\n- ${target}\n\n正文：步骤 s1/s2。`): GovernanceJudgeRequest => request({
+    projectRoot: root,
+    group: "approval",
+    cardKind: "schedule-write",
+    roleId: "convener",
+    card: {
+      kind: "confirm",
+      title: "写入流程单",
+      preview,
+      cardKind: "schedule-write",
+      flowId: "flow-a",
+    },
+    paths: [target],
+    pathProbes: [{ path: target, allowed: true }],
+    allowedPathRoots: ["docs/flows/", "docs/workflow.md", "docs/governance/convener/"],
+    forbiddenPaths: [".ans/", "角色卡/", "docs/proposals/", "docs/nominations/"],
+    artifacts: undefined,
+  });
+  const report = {
+    verdict: "approve",
+    reason: "流程步骤与已接受提案一致。",
+    evidence: [target],
+    confirmed: true,
+    pathDecisions: [{ path: target, ok: true }],
+  };
+
+  await withRoot(async (root) => {
+    // 1) 首次新建：目标不存在、无旧物证 ⇒ preview 正文足够即可代批。
+    const { judge } = makeJudge({ report });
+    const out = await judge(scheduleWrite(root));
+    assert.equal(out.verdict, "approve", "新建流程单不得因旧物证缺失回落");
+  });
+
+  await withRoot(async (root) => {
+    // 2) 已存在：必须读取旧版；不读 ⇒ artifact-not-read，读后 approve。
+    writeFile(root, target, "# 旧流程单\n\n| 步骤 | 角色 | 状态 |\n| --- | --- | --- |\n| s1 | 实现者 | done |\n");
+    const { judge } = makeJudge({ report });
+    const blocked = await judge(scheduleWrite(root));
+    assert.equal(blocked.verdict, "manual");
+    assert.equal(blocked.reasonCode, "artifact-not-read");
+    const { judge: judge2 } = makeJudge({ report: readThenReport([target], report) });
+    const out = await judge2(scheduleWrite(root));
+    assert.equal(out.verdict, "approve");
+  });
+
+  await withRoot(async (root) => {
+    // 3) 新建目标 + 空 preview ⇒ manual，且不调用模型。
+    const { judge, seen } = makeJudge({ report });
+    const out = await judge(scheduleWrite(root, ""));
+    assert.equal(out.verdict, "manual");
+    assert.equal(out.reasonCode, "insufficient-evidence");
+    assert.equal(seen.binds, 0);
+  });
+});
+
+
+
 // —————————————————————— ⑤ 驱动边界 ——————————————————————
 
 test("支持矩阵：demo → manual/unsupported-engine；不支持的 request.runtime 跟随 opts", async () => {
@@ -954,19 +1015,19 @@ test("超时/中止/busy：全部 manual，不外抛", async () => {
   }
 });
 
-test("超时配置：治理默认 60s、环境变量覆盖、非法回退；shell 仍 15s", async () => {
-  assert.equal(DEFAULT_GOVERNANCE_JUDGE_TIMEOUT_MS, 60_000);
-  assert.equal(resolveGovernanceJudgeTimeoutMs(undefined, {}), 60_000);
+test("超时配置：治理默认 120s、环境变量覆盖、非法回退；shell 仍 15s", async () => {
+  assert.equal(DEFAULT_GOVERNANCE_JUDGE_TIMEOUT_MS, 120_000);
+  assert.equal(resolveGovernanceJudgeTimeoutMs(undefined, {}), 120_000);
   assert.equal(resolveGovernanceJudgeTimeoutMs(undefined, { [GOVERNANCE_JUDGE_TIMEOUT_ENV]: "1234" }), 1234);
   for (const bad of ["", "0", "-1", "1.5", "abc", "9007199254740993"]) {
     assert.equal(
       resolveGovernanceJudgeTimeoutMs(undefined, { [GOVERNANCE_JUDGE_TIMEOUT_ENV]: bad }),
-      60_000,
+      120_000,
       `非法环境值 ${JSON.stringify(bad)} 应回默认`,
     );
   }
   assert.equal(resolveGovernanceJudgeTimeoutMs(25, { [GOVERNANCE_JUDGE_TIMEOUT_ENV]: "1234" }), 25, "显式选项优先");
-  assert.equal(formatGovernanceJudgeTimeout(60_000), "60s");
+  assert.equal(formatGovernanceJudgeTimeout(120_000), "120s");
   assert.equal(formatGovernanceJudgeTimeout(30), "30ms");
   assert.equal(DEFAULT_SHELL_JUDGE_TIMEOUT_MS, 15_000, "shell judge 默认不变");
 
@@ -1037,6 +1098,69 @@ test("requiredArtifactPaths：逐卡种必需物证与缺失判定", () => {
     requiredArtifactPaths(request({ cardKind: "appointment-write", artifacts: { nominationPath: "n.md", flowPath: "f.md" } })),
     { paths: ["n.md", "f.md"], missing: false },
   );
+});
+
+test("explicitConfirmPaths：显式优先、空数组视为未给、非法项过滤", () => {
+  const req = (paths: unknown): CustomerInputRequest => ({
+    kind: "confirm",
+    title: "写入",
+    preview: "",
+    paths,
+  }) as unknown as CustomerInputRequest;
+  assert.deepEqual(explicitConfirmPaths(req(["docs/proposals/a.md", "docs/contracts/b.md", "docs/proposals/a.md"])), [
+    "docs/proposals/a.md",
+    "docs/contracts/b.md",
+  ]);
+  assert.equal(explicitConfirmPaths(req([])), undefined, "空数组视为未给");
+  assert.deepEqual(explicitConfirmPaths(req(["", "../x", "/abs", 42])), [], "非空但全非法 ⇒ 不透传、不回退猜");
+  assert.equal(
+    explicitConfirmPaths({ kind: "choice", title: "选", options: [{ id: "a", label: "A" }], paths: ["docs/a.md"] } as unknown as CustomerInputRequest),
+    undefined,
+    "choice 卡不消费 paths",
+  );
+});
+
+test("confirmed-write issuer：显式 paths 优先于 preview 散文；无 paths/空数组回退旧行为", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, "docs/proposals/.keep");
+    writeFile(root, "docs/contracts/.keep");
+    const boundary: BoundarySection1 = {
+      entries: [
+        { root: "project", path: "docs/proposals/", kind: "directory", purpose: "提案" },
+        { root: "project", path: "docs/contracts/", kind: "directory", purpose: "契约" },
+      ],
+      boundarySource: "test",
+      acceptance: { accepted: true, source: "test" },
+    };
+    const makeIssuer = (): ((req: CustomerInputRequest, out: { outcome: "answered"; value: { confirmed: true } }) => string[]) => {
+      const issued = new Set<string>();
+      const issue = createConfirmedWriteIssuer({
+        boundary,
+        conditions: [],
+        ctx: { skillRoot: root, projectRoot: root },
+        issued,
+      });
+      return (req, out) => issue(req, out);
+    };
+    const confirm = { outcome: "answered" as const, value: { confirmed: true as const } };
+    const explicitReq = {
+      kind: "confirm",
+      title: "写入",
+      preview: "说明：不会修改 docs/proposals/other-1.md、docs/proposals/other-2.md、docs/contracts/other.md 等 10 个文件。",
+      paths: ["docs/proposals/a.md", "docs/contracts/b.md"],
+    } as unknown as CustomerInputRequest;
+    assert.deepEqual(makeIssuer()(explicitReq, confirm), ["docs/proposals/a.md", "docs/contracts/b.md"]);
+
+    const fallbackReq = {
+      kind: "confirm",
+      title: "写入",
+      preview: "将写入以下文件：\n- docs/proposals/c.md",
+    } as unknown as CustomerInputRequest;
+    assert.deepEqual(makeIssuer()(fallbackReq, confirm), ["docs/proposals/c.md"], "无 paths 回退 preview");
+
+    const emptyReq = { ...fallbackReq, paths: [] } as unknown as CustomerInputRequest;
+    assert.deepEqual(makeIssuer()(emptyReq, confirm), ["docs/proposals/c.md"], "空数组回退 preview");
+  });
 });
 
 test("declaredWritePathsFromPreview：只认一行一个的声明路径，散文路径不进入", () => {
@@ -1386,6 +1510,37 @@ test("run-role：pathProbes 只取 preview 声明路径，散文路径不进 pro
       assert.deepEqual(context?.paths, [targetA, targetB], "散文路径不得进入候选");
       assert.equal(context?.pathProbes?.length, 2);
       assert.ok(context?.pathProbes?.every((probe) => probe.allowed === true));
+
+      // 显式 paths 优先：预览散文提到 10 个其他文件也不影响。
+      await captured.caps!.customerInput!(
+        {
+          kind: "confirm",
+          title: "新建本地账本 CLI",
+          preview:
+            "说明：不会修改 docs/proposals/other-1.md、docs/proposals/other-2.md、docs/contracts/other-3.md、" +
+            "src/**、test/**、data/ledger.json 等 10 个文件。",
+          cardKind: "write",
+          flowId: "local-ledger-cli",
+          paths: [targetA, targetB],
+        } as unknown as CustomerInputRequest,
+        { toolCallId: "call-paths-explicit" },
+      );
+      assert.deepEqual(capturedInput.metadata?.judgeContext?.paths, [targetA, targetB], "显式 paths 优先");
+      assert.equal(capturedInput.metadata?.judgeContext?.pathProbes?.length, 2);
+
+      // 空数组视为未给 ⇒ 回退 preview 声明（旧行为）。
+      await captured.caps!.customerInput!(
+        {
+          kind: "confirm",
+          title: "新建本地账本 CLI",
+          preview: `将写入以下文件：\n- ${targetA}\n- ${targetB}`,
+          cardKind: "write",
+          flowId: "local-ledger-cli",
+          paths: [],
+        } as unknown as CustomerInputRequest,
+        { toolCallId: "call-paths-empty" },
+      );
+      assert.deepEqual(capturedInput.metadata?.judgeContext?.paths, [targetA, targetB], "空数组回退 preview");
 
       // 声明了越界路径 ⇒ 该 probe 必须 allowed:false（driver 会整卡回落）。
       await captured.caps!.customerInput!(

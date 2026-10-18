@@ -56,12 +56,13 @@ import { redactJudgeText } from "./shell-judge-verdict.ts";
 export const GOVERNANCE_JUDGE_ROLE_ID = "governance-judge";
 /**
  * 判断硬超时（2026-10-18 真机修复）：治理判断要读提案/契约/账本/流程，15s 过短；
- * 默认 **60s**（shell judge 仍为 15s，互不影响）。可用环境变量覆盖（正整数，非法回默认）。
+ * 复杂项目 60s 仍不足 ⇒ 默认 **120s**（shell judge 仍为 15s，互不影响）。
+ * 可用环境变量覆盖（正整数，非法回默认）。
  */
-export const DEFAULT_GOVERNANCE_JUDGE_TIMEOUT_MS = 60_000;
+export const DEFAULT_GOVERNANCE_JUDGE_TIMEOUT_MS = 120_000;
 export const GOVERNANCE_JUDGE_TIMEOUT_ENV = "ANS_GOVERNANCE_JUDGE_TIMEOUT_MS";
 
-/** 解析治理 judge 超时：显式选项 > 环境变量 > 默认 60s；非法（0/负/小数/非数字）回默认。 */
+/** 解析治理 judge 超时：显式选项 > 环境变量 > 默认 120s；非法（0/负/小数/非数字）回默认。 */
 export function resolveGovernanceJudgeTimeoutMs(
   option: unknown,
   env: Record<string, string | undefined> = process.env,
@@ -75,7 +76,7 @@ export function resolveGovernanceJudgeTimeoutMs(
   return DEFAULT_GOVERNANCE_JUDGE_TIMEOUT_MS;
 }
 
-/** 超时文案的时长格式：整秒用 `Ns`，否则 `Nms`（如 `>60s` / `>30ms`）。 */
+/** 超时文案的时长格式：整秒用 `Ns`，否则 `Nms`（如 `>120s` / `>30ms`）。 */
 export function formatGovernanceJudgeTimeout(timeoutMs: number): string {
   return timeoutMs >= 1000 && timeoutMs % 1000 === 0 ? `${timeoutMs / 1000}s` : `${timeoutMs}ms`;
 }

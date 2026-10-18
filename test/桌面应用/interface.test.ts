@@ -2697,12 +2697,14 @@ test("W6-B 真机修复：治理角色 settle 后异步刷新 listing 缓存并 
   });
   await iface.listProject({ projectRoot: "/proj" });
   assert.equal((await iface.openSession({ projectRoot: "/proj", roleId: "nominator", runtime: "demo" })).ok, true);
+  // 2026-10-18 真机竞态修复：旧缓存缺角色时 `open()` 会强制刷新一次 listing 再查——新角色立即可开
+  // （此前这里复现的是「尚未枚举到」；刷新后的 listing 缓存由同一 `listProjectFn` 更新）。
   const before = await iface.openSession({ projectRoot: "/proj", roleId: "role-a", runtime: "demo" });
-  assert.equal(before.ok, false, "刷新前旧缓存看不到新角色（复现真机）");
+  assert.equal(before.ok, true, "旧缓存缺角色 ⇒ open 强制刷新一次后找到（不再误报未找到角色）");
 
   settles.get("nominator")!();
   await new Promise((resolve) => setTimeout(resolve, 100));
-  assert.ok(listCalls >= 2, "治理角色 settled 后重新 listProject");
+  assert.ok(listCalls >= 3, "治理角色 settled 后重新 listProject（open 刷新 + settle 刷新）");
   assert.ok(projectChanged >= 1, "刷新后 emitProjectChanged（渲染侧重取左树）");
   const after = await iface.openSession({ projectRoot: "/proj", roleId: "role-a", runtime: "demo" });
   assert.equal(after.ok, true, "刷新后新角色可开会话");

@@ -1229,22 +1229,23 @@ test("通道层防御超时：判断超时 ⇒ 原卡 + 超时提示（含实际
   await p;
 });
 
-test("治理 judge 通道超时：默认 75s（driver 60s+15s）；由 ANS_GOVERNANCE_JUDGE_TIMEOUT_MS 派生；非法回 75s", async () => {
-  // 结构性：driver 60s 时通道 = 75s，绝不让通道先杀 driver。
-  assert.equal(DEFAULT_GOVERNANCE_JUDGE_CHANNEL_TIMEOUT_MS, 75_000);
+test("治理 judge 通道超时：默认 135s（driver 120s+15s）；由 ANS_GOVERNANCE_JUDGE_TIMEOUT_MS 派生；非法回 135s", async () => {
+  // 结构性：driver 120s 时通道 = 135s，绝不让通道先杀 driver。
+  assert.equal(DEFAULT_GOVERNANCE_JUDGE_CHANNEL_TIMEOUT_MS, 135_000);
   assert.equal(GOVERNANCE_JUDGE_CHANNEL_TIMEOUT_ENV, "ANS_GOVERNANCE_JUDGE_TIMEOUT_MS");
-  assert.equal(resolveChannelJudgeTimeoutMs(undefined, {}), 75_000, "缺省 75s");
-  assert.equal(resolveChannelJudgeTimeoutMs(undefined, { ANS_GOVERNANCE_JUDGE_TIMEOUT_MS: "60000" }), 75_000, "driver 60s ⇒ 通道 75s");
-  assert.equal(resolveChannelJudgeTimeoutMs(undefined, { ANS_GOVERNANCE_JUDGE_TIMEOUT_MS: "120000" }), 135_000, "env 覆盖 +15s");
+  assert.equal(resolveChannelJudgeTimeoutMs(undefined, {}), 135_000, "缺省 135s");
+  assert.equal(resolveChannelJudgeTimeoutMs(undefined, { ANS_GOVERNANCE_JUDGE_TIMEOUT_MS: "120000" }), 135_000, "driver 120s ⇒ 通道 135s");
+  assert.equal(resolveChannelJudgeTimeoutMs(undefined, { ANS_GOVERNANCE_JUDGE_TIMEOUT_MS: "60000" }), 75_000, "env 覆盖 +15s");
   assert.equal(resolveChannelJudgeTimeoutMs(undefined, { ANS_GOVERNANCE_JUDGE_TIMEOUT_MS: "20" }), 15_020, "余量恒为 15s");
   for (const bad of ["abc", "0", "-1", "1.5", "", " "]) {
     assert.equal(
       resolveChannelJudgeTimeoutMs(undefined, { ANS_GOVERNANCE_JUDGE_TIMEOUT_MS: bad }),
-      75_000,
-      `非法 env 回 75s：${JSON.stringify(bad)}`,
+      135_000,
+      `非法 env 回 135s：${JSON.stringify(bad)}`,
     );
   }
   assert.equal(resolveChannelJudgeTimeoutMs(20, {}), 20, "显式 timeoutMs 原样使用（测试/宿主）");
+  assert.equal(formatJudgeTimeoutMs(135_000), "135s");
   assert.equal(formatJudgeTimeoutMs(75_000), "75s");
   assert.equal(formatJudgeTimeoutMs(35), "35ms");
 });

@@ -39,11 +39,12 @@
 9. **acceptance 流程完成度（P6 验收观察）**：提示前读流程单 + 账本——所有步骤 `done`、每步都有 `dispatch.accepted`、无 `unclassified`/`none` 未结算决定、无未闭环澄清、账本可读；任一不满足直接 `manual`，不调用模型、不靠模型自报。
 10. **write 新文件（P6 真机缺陷）**：`write` 卡 artifacts/required-read 只收**已存在**的相关物证；新建目标不进入 required-read（读必失败），改由 `preview` 正文核对；`preview` 为空 ⇒ `manual/insufficient-evidence`。`appointment-write`/`schedule-write` 的 nomination/flow 要求不变。
 11. 双开关后 shell 出路句统一为 `如需执行，请关闭「替我审批」后重试。`（不再写「替我审」）。
-12. **治理 judge 超时（P6 真机修复）**：默认 `60_000ms`；`ANS_GOVERNANCE_JUDGE_TIMEOUT_MS`（正整数，非法回默认）覆盖；计时只从模型判断开始（不含排队/等卡），文案带时长（如「判断超时（>60s）」）；shell judge 保持 15s。
+12. **治理 judge 超时（P6 真机修复）**：默认 `120_000ms`；`ANS_GOVERNANCE_JUDGE_TIMEOUT_MS`（正整数，非法回默认）覆盖；计时只从模型判断开始（不含排队/等卡），文案带时长（如「判断超时（>120s）」）；shell judge 保持 15s。
 13. **物证命名容忍（P6 真机修复）**：`<flowId>-vN.md` 与 `<flowId>.proposal-vN.md` / `<flowId>.nomination-vN.md` 均解析，取最大版本；找不到才 `artifact-missing`。
-14. **pathProbes 声明路径（P6 真机修复）**：只取 preview 的「一行一个路径」声明；关键词后可直接跟路径（`将写入 docs/x.md`），关键词与冒号间允许修饰词（`写入路径仅一条：docs/x.md`），列表符/`路径：`标签/反引号容忍；不扫描散文；散文路径不进入候选；越界声明路径仍 `allowed:false` 并整卡回落。
+14. **pathProbes 声明路径（P6 真机修复）**：`computeJudgeContext` 优先用 `request_confirmation` 的显式 `req.paths`（非空时；空数组视为未给），否则回退 preview 的「一行一个路径」声明；`createConfirmedWriteIssuer` 同样优先显式 `paths` 发行写集；不扫描散文；越界声明路径仍 `allowed:false` 并整卡回落。
 15. **boundary.yaml 写前内容校验（P6 真机修复）**：`write_file`/`edit_file` 目标匹配 `角色卡/<id>/boundary.yaml` 时，用门禁引擎 Service 公共出口 `validateBoundaryYamlText` 校验最终内容；非法 ⇒ 拒绝写入、零文件副作用，回执「boundary.yaml 格式非法：<原因>；顶层只允许 role / entries / archived，请按模板重写」；`role-card.md` 与其他路径不校验内容。
-16. 测试：judge **38/38**、boundary 校验 **4/4**、`test/编排` **516 计/515 过**（symlink 环境红）、typecheck 0；全量仍受并行他域改动影响未能取得完成快照（此前完成快照 2900/16 红均他域/环境）。
+16. **schedule-write 新文件（P6 真机修复）**：目标 `docs/flows/<flow>.md` 不存在时不要求旧物证，改由 preview 正文核对（空 preview ⇒ manual）；文件已存在仍要求读取旧版；`appointment-write` 的 nomination 要求不变。
+17. 测试：judge **41/41**、boundary 校验 **4/4**、e2e 1a **2/2**、`test/编排` **519 计/518 过**（symlink 环境红）、typecheck 0；全量仍受并行他域改动影响未能取得完成快照（此前完成快照 2900/16 红均他域/环境）。
 
 ## 三、证据
 

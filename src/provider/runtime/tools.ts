@@ -992,6 +992,9 @@ function makeRequestConfirmationTool(
       }
       const governance = readGovernanceCardArgs(call.args, name, CONFIRM_CARD_KINDS);
       if (!governance.ok) return governance.result;
+      // 显式写入路径（可选）：非法 ⇒ 在触达客户通道之前失败，让模型修正；合法 ⇒ 原样并入卡片与 metadata。
+      const writePaths = readConfirmationPaths(call.args, name);
+      if (!writePaths.ok) return writePaths.result;
       const preview = readStringArg(call.args, ["preview"]);
       const detail = readStringArg(call.args, ["detail"]);
       const req: CustomerInputRequest = {
@@ -999,10 +1002,15 @@ function makeRequestConfirmationTool(
         title,
         ...(preview !== undefined ? { preview } : {}),
         ...(detail !== undefined ? { detail } : {}),
+        ...(writePaths.value !== undefined ? { paths: writePaths.value } : {}),
         ...governance.value,
       };
 
-      const out = await askCustomer(name, req, fn, timeoutMs, call.signal, gate, { ...metadata, ...governance.value });
+      const out = await askCustomer(name, req, fn, timeoutMs, call.signal, gate, {
+        ...metadata,
+        ...governance.value,
+        ...(writePaths.value !== undefined ? { paths: writePaths.value } : {}),
+      });
       if ("ok" in out) return out; // 通道故障 / 超时 / 中止 → 未获同意
       if (out.outcome === "declined") {
         return notConsented(name, `客户拒绝${out.reason !== undefined ? `（${out.reason}）` : ""}`);
@@ -1048,6 +1056,45 @@ function readOptions(args: Record<string, unknown>): CustomerInputOption[] | und
     options.push({ id, label, ...(description !== undefined ? { description } : {}) });
   }
   return options;
+}
+
+/** 确认卡显式写入路径上限（2026-10-18 真机修复：预览引用路径与写入目标混在一起，文本提取歧义）。 */
+const MAX_CONFIRMATION_PATHS = 64;
+
+type ConfirmationPathsResult = { ok: true; value?: string[] } | { ok: false; result: ToolResult };
+
+/**
+ * 读取确认卡的显式写入路径（可选）。缺席 ⇒ `{ok:true}`（旧卡零变化）。
+ * 每项必须是非空、项目相对、无 `..`/NUL、非绝对/盘符、非目录（不以 `/` 结尾）的文件路径；
+ * 合法项 posix 化（`\`→`/`）后原样返回。非法 ⇒ 工具错误且**不向客户发卡**（让模型修正）。
+ */
+function readConfirmationPaths(args: Record<string, unknown>, toolName: string): ConfirmationPathsResult {
+  const raw = args["paths"];
+  if (raw === undefined) return { ok: true };
+  const fail = (reason: string): ConfirmationPathsResult => ({
+    ok: false,
+    result: {
+      ok: false,
+      message:
+        `${toolName}: 参数 paths ${reason}——未向客户发卡；paths 应逐文件给出确认后将实际写入的项目相对路径` +
+        `（≤${MAX_CONFIRMATION_PATHS} 项，不得含仅引用的文件），请更正后重试`,
+    },
+  });
+  if (!Array.isArray(raw)) return fail("必须是字符串数组");
+  if (raw.length === 0) return fail("不能为空数组（不需要请省略该参数）");
+  if (raw.length > MAX_CONFIRMATION_PATHS) return fail(`最多 ${MAX_CONFIRMATION_PATHS} 项（当前 ${raw.length} 项）`);
+  const out: string[] = [];
+  for (let index = 0; index < raw.length; index++) {
+    const item = raw[index];
+    if (typeof item !== "string" || item.trim() === "") return fail(`[${index}] 必须是非空字符串`);
+    if (item.includes("\u0000")) return fail(`[${index}] 含 NUL 字符`);
+    const normalized = item.replace(/\\/g, "/");
+    if (isAbsolute(item) || /^[A-Za-z]:/.test(normalized)) return fail(`[${index}] 必须是项目相对路径（不得为绝对路径/盘符路径）`);
+    if (normalized.split("/").some((segment) => segment === "..")) return fail(`[${index}] 不得包含 .. 路径段`);
+    if (normalized.endsWith("/")) return fail(`[${index}] 必须是文件路径（不得以 / 结尾或指向目录）`);
+    out.push(normalized);
+  }
+  return { ok: true, value: out };
 }
 
 /**

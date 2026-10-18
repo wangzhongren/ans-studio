@@ -30,9 +30,36 @@ import { resolveWrite } from "../../service/gate/resolve-write.ts";
 import { isAbsoluteAny, normalizeLexical } from "../shared/path-primitives.ts";
 
 /**
+ * `request_confirmation` 的**显式声明写入路径**（2026-10-18 运行时核心新增 `paths?: string[]`）：
+ * - 非空且含合法项 ⇒ 返回规范化路径（**优先于 preview 解析**）；
+ * - **空数组视为未给** ⇒ `undefined`（调用方回退 preview 解析，旧行为）；
+ * - 非空但全部非法 ⇒ `[]`（给过但无效 ⇒ 不发行任何路径，fail-closed，不回退散文猜）。
+ */
+export function explicitConfirmPaths(req: CustomerInputRequest): string[] | undefined {
+  if (req.kind !== "confirm") return undefined;
+  const raw = (req as { paths?: unknown }).paths;
+  if (!Array.isArray(raw) || raw.length === 0) return undefined;
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const entry of raw) {
+    if (typeof entry !== "string") continue;
+    const trimmed = entry.trim();
+    if (trimmed === "" || isAbsoluteAny(trimmed)) continue;
+    const norm = normalizeLexical(trimmed);
+    if (norm === "" || norm === "." || norm.startsWith("../")) continue;
+    if (norm.split("/").some((segment) => segment === "" || segment === "..")) continue;
+    if (seen.has(norm)) continue;
+    seen.add(norm);
+    out.push(norm);
+  }
+  return out;
+}
+
+/**
  * 构造「确认 → 发行」器：包装在前端给的原始客户通道之外（`run-role.ts` 装配）。
  * 每次调用把**裁决结果如实返回**（不改答案），仅在「确认通过」（`confirm` 且 `confirmed:true`）时
  * **追加**合法路径进 `issued`。抛错/拒绝/不可用/choice 回答 → 不发行任何东西（fail-closed）。
+ * 路径来源：显式 `req.paths` 优先；未给/空数组回退 preview 提取（旧行为）。
  * 【内容漂移】从呈现文本（title/preview/detail）提取路径 ⇒ 只保证「路径已预览且已确认」；
  * 「预览内容 ≠ 写出内容」关不住（O-A1 未采纳，见文件头）。
  */
@@ -55,8 +82,11 @@ export function createConfirmedWriteIssuer(opts: {
       return [];
     }
     const text = [req.title, req.preview ?? "", req.detail ?? ""].join("\n");
+    // 显式 paths 优先；空数组视为未给并回退 preview 解析（旧行为）。
+    const explicit = explicitConfirmPaths(req);
+    const candidates = explicit ?? extractPathCandidates(text);
     const added: string[] = [];
-    for (const candidate of extractPathCandidates(text)) {
+    for (const candidate of candidates) {
       if (issued.has(candidate)) continue;
       // 探测：把候选当作唯一的 writeSet 项与边界一起求值——只问「它在边界内吗」，
       // 与当前已发行集合无关（resolveWrite 的 scope 语义 = 精确 writeSet，见 resolve-write.ts）。

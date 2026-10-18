@@ -1,8 +1,8 @@
 // test/测试/governance-e2e-auto/g-judge-timeout.test.ts
-// 场景 7（离线端到端）：**判断超时**——默认 60s、环境变量覆盖、超时回落该组原卡（manual + judgeNotice）。
+// 场景 7（离线端到端）：**判断超时**——默认 120s、环境变量覆盖、超时回落该组原卡（manual + judgeNotice）。
 //
 // 超时硬门槛由真实 `createGovernanceJudge` driver 产生（假判断会话沉默不交回结论）；
-// 为避免真等 60s，覆盖用例把环境变量设为几十毫秒（解析函数本身另行逐值核对）。
+// 为避免真等 120s，覆盖用例把环境变量设为几十毫秒（解析函数本身另行逐值核对）。
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -45,15 +45,15 @@ async function waitFor(predicate: () => boolean, timeoutMs = 3000): Promise<void
   }
 }
 
-test("场景7a：超时解析——默认 60s；环境变量覆盖；非法值回默认；显式选项优先", () => {
-  assert.equal(DEFAULT_GOVERNANCE_JUDGE_TIMEOUT_MS, 60_000);
-  assert.equal(resolveGovernanceJudgeTimeoutMs(undefined, {}), 60_000, "默认 60s");
+test("场景7a：超时解析——默认 120s；环境变量覆盖；非法值回默认；显式选项优先", () => {
+  assert.equal(DEFAULT_GOVERNANCE_JUDGE_TIMEOUT_MS, 120_000);
+  assert.equal(resolveGovernanceJudgeTimeoutMs(undefined, {}), 120_000, "默认 120s");
   assert.equal(resolveGovernanceJudgeTimeoutMs(undefined, { [GOVERNANCE_JUDGE_TIMEOUT_ENV]: "1234" }), 1234, "环境变量覆盖");
   assert.equal(resolveGovernanceJudgeTimeoutMs(undefined, { [GOVERNANCE_JUDGE_TIMEOUT_ENV]: " 4321 " }), 4321, "trim 后合法");
   for (const bad of ["0", "-5", "1.5", "abc", "", "1e3"]) {
     assert.equal(
       resolveGovernanceJudgeTimeoutMs(undefined, { [GOVERNANCE_JUDGE_TIMEOUT_ENV]: bad }),
-      60_000,
+      120_000,
       `非法值回默认：${JSON.stringify(bad)}`,
     );
   }
@@ -131,8 +131,8 @@ test("场景7b：环境变量覆盖生效——审批组（write）超时回落�
     assert.match(h.presented[0]!.judgeNotice ?? "", /已转你手动确认/);
     assert.equal(h.rows.length, 0, "超时不产生 judge 结果行");
     assert.equal(outcome.outcome, "declined", "客户手动拒绝（fallback 后手动作答）");
-    assert.ok(elapsed >= 35, `应按环境变量的 40ms 超时，而不是默认 60s（实际 ${elapsed}ms）`);
-    assert.ok(elapsed < 5000, `不得等待默认 60s（实际 ${elapsed}ms）`);
+    assert.ok(elapsed >= 35, `应按环境变量的 40ms 超时，而不是默认 120s（实际 ${elapsed}ms）`);
+    assert.ok(elapsed < 5000, `不得等待默认 120s（实际 ${elapsed}ms）`);
   } finally {
     if (previous === undefined) delete process.env[GOVERNANCE_JUDGE_TIMEOUT_ENV];
     else process.env[GOVERNANCE_JUDGE_TIMEOUT_ENV] = previous;

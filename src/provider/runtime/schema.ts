@@ -52,6 +52,15 @@ export function describeTool(name: string): ToolDescription {
               "Optional full content shown to the customer (e.g. the complete role card + boundary summary) so they can review before agreeing",
           },
           detail: { type: "string", description: "Optional extra detail shown with the request" },
+          paths: {
+            type: "array",
+            maxItems: 64,
+            items: { type: "string", description: "One project-relative file path (file, not directory; no merely referenced files)" },
+            description:
+              "Optional **exact write targets**: the project-relative file paths that will actually be written after the customer confirms. " +
+              "One entry per file (max 64, no directories). Must NOT include files that are only referenced/quoted in the preview. " +
+              "When provided, this list is authoritative for the write approval; omit = legacy behavior (paths are extracted from the preview text).",
+          },
           flowId: {
             type: "string",
             pattern: GOVERNANCE_SLUG_PATTERN,
@@ -93,6 +102,10 @@ export function describeTool(name: string): ToolDescription {
         "request_confirmation 的 preview **必须列出将要写出的具体路径**（每个待写文件一行，相对项目根、含目录，如 " +
           "`角色卡/示例/role-card.md`）——系统只对 preview 中**列出过**的路径发行写盘许可；**未列出的路径会被门禁拒绝**。" +
           "列出路径只是「已让客户看到要写什么」，**不等于获准**——是否获准**只看**返回的 `confirmed:true`。",
+        "确认卡会写盘时，**优先**用 `paths` 逐文件列出「确认后将实际写入」的精确项目相对路径（如 " +
+          "`角色卡/示例/boundary.yaml`，最多 64 项，路径须相对、不得含 `..`/NUL，不得是目录）。" +
+          "preview 可以引用大量参考文件；`paths` **只放真正要写的目标**，不得包含仅在 preview 中引用/展示的文件——" +
+          "系统据此发行写盘许可，避免把引用文件误当写入目标。",
       ],
       executionMode: "sequential",
     };

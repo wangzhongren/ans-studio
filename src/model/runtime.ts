@@ -264,6 +264,13 @@ export type CustomerInputRequest = (
       preview?: string;
 
       detail?: string;
+
+      /**
+       * 确认后将**实际写入**的精确项目相对文件路径（2026-10-18 真机修复：预览里既引用大量路径又声明写入目标时，
+       * 文本提取无法区分 ⇒ 判断回落）。给出时是写入目标的权威清单（逐文件、≤64 项、posix 化、不得含仅引用的文件）；
+       * 缺席＝旧卡（沿用预览文本提取），零行为变化。
+       */
+      paths?: string[];
     }
   | {
       kind: "choice";
@@ -303,6 +310,11 @@ export interface CustomerInputMetadata {
   flowId?: GovernanceFlowId;
   stepId?: GovernanceStepId;
   cardKind?: GovernanceCardKind;
+  /**
+   * 确认卡显式给出的**实际写入路径**（2026-10-18 真机修复）：仅当工具入参 `paths` 合法时透传；
+   * 项目相对、逐文件、posix 化、≤64 项。缺席＝旧卡（由预览文本提取，零行为变化）。
+   */
+  paths?: string[];
   /**
    * 治理卡判断上下文（2026-10-18 双开关评审 §5.2）：**唯一计算点**是编排 `run-role.ts::governedInput`
    * （paths/写根/禁写/物证/推荐集/账本事实）；桌面只消费、不重算、不读 `.ans`。

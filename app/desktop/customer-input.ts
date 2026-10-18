@@ -13,9 +13,9 @@
 // （无 setTimeout/setInterval，测试有钉子）。历史遗留的工具层 `withTimeout`（若仍启用）不属本模块——
 // 去时限是 **Pi适配器** 的职责（见 change 文档的跨角色建议）。
 // **判断 agent（2026-10-18 双开关评审 §四/§八；同日真机修正超时）**：卡片即将呈现前的**只读代批判断**在这里发生；
-// 判断本身的硬超时由注入的 `GovernanceJudgeFn`（编排 driver，默认 60s，可经
+// 判断本身的硬超时由注入的 `GovernanceJudgeFn`（编排 driver，默认 **120s**，可经
 // `ANS_GOVERNANCE_JUDGE_TIMEOUT_MS` 覆盖）负责；本模块的通道层防御超时 = driver 超时 + 15s 余量
-// （缺省 75s），用 `AbortSignal.timeout` 实现（**不引入 self 计时器**，卡片等待语义逐字不变）。
+// （缺省 **135s**），用 `AbortSignal.timeout` 实现（**不引入 self 计时器**，卡片等待语义逐字不变）。
 // **shell judge 的通道超时不变（15s）**，两套互不影响。
 //
 // —— 本模块不做任何判定（硬约束：不得出现第二份判定实现）——
@@ -195,8 +195,8 @@ export interface CreateCustomerInputChannelOptions {
     /** 主进程权威：所属组是否开启（approval/decision 互不影响）。 */
     isGroupEnabled: (group: GovernanceJudgeGroup) => boolean;
     /**
-     * 通道层防御超时；缺省由 `ANS_GOVERNANCE_JUDGE_TIMEOUT_MS`（driver 超时，默认 60s）+ 15s 余量派生
-     * ⇒ **75s**（driver 内还有一层硬超时，绝不让通道先杀 driver）。shell judge 的通道超时仍为 15s，互不影响。
+     * 通道层防御超时；缺省由 `ANS_GOVERNANCE_JUDGE_TIMEOUT_MS`（driver 超时，默认 120s）+ 15s 余量派生
+     * ⇒ **135s**（driver 内还有一层硬超时，绝不让通道先杀 driver）。shell judge 的通道超时仍为 15s，互不影响。
      */
     timeoutMs?: number;
     /** 环境变量来源（缺省 `process.env`；测试注入用——不修改全局环境）。 */
@@ -271,16 +271,16 @@ export type DesktopCustomerInputFn = (
 export const GOVERNANCE_JUDGE_CHANNEL_TIMEOUT_ENV = "ANS_GOVERNANCE_JUDGE_TIMEOUT_MS";
 /** 通道层比 driver 多留的余量（避免通道先触发、杀掉 driver 的合法判断）。 */
 export const GOVERNANCE_JUDGE_CHANNEL_TIMEOUT_MARGIN_MS = 15_000;
-/** driver 缺省超时（与编排 `DEFAULT_GOVERNANCE_JUDGE_TIMEOUT_MS` 同值；通道据此派生 75s）。 */
-export const DEFAULT_GOVERNANCE_JUDGE_CHANNEL_BASE_MS = 60_000;
-/** 治理 judge 通道层缺省防御超时：driver 60s + 15s 余量 = 75s。**shell judge 仍 15s。** */
+/** driver 缺省超时（与编排 `DEFAULT_GOVERNANCE_JUDGE_TIMEOUT_MS` 同值；通道据此派生 135s）。 */
+export const DEFAULT_GOVERNANCE_JUDGE_CHANNEL_BASE_MS = 120_000;
+/** 治理 judge 通道层缺省防御超时：driver 120s + 15s 余量 = 135s。**shell judge 仍 15s。** */
 export const DEFAULT_GOVERNANCE_JUDGE_CHANNEL_TIMEOUT_MS =
   DEFAULT_GOVERNANCE_JUDGE_CHANNEL_BASE_MS + GOVERNANCE_JUDGE_CHANNEL_TIMEOUT_MARGIN_MS;
 
 /**
  * 解析治理 judge 通道层超时（导出供测试钉住）：
  * 显式 `timeoutMs`（测试/宿主）优先；否则环境变量 `ANS_GOVERNANCE_JUDGE_TIMEOUT_MS`（正整数）＋15s 余量；
- * 非法/缺失 ⇒ 75_000。driver 自己的超时由编排单独解析（同名 env）。
+ * 非法/缺失 ⇒ 135_000。driver 自己的超时由编排单独解析（同名 env）。
  */
 export function resolveChannelJudgeTimeoutMs(
   option: unknown,
@@ -456,7 +456,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
 
   /**
    * 治理 judge 通道层防御超时：显式 `timeoutMs` 优先；否则由 `ANS_GOVERNANCE_JUDGE_TIMEOUT_MS`
-   * （driver 超时）+ 15s 余量派生；缺省 driver 60s ⇒ 通道 75s。**shell judge 不受影响（仍 15s）**。
+   * （driver 超时）+ 15s 余量派生；缺省 driver 120s ⇒ 通道 135s。**shell judge 不受影响（仍 15s）**。
    */
   const judgeTimeoutMs = resolveChannelJudgeTimeoutMs(opts.judge?.timeoutMs, opts.judge?.env);
 

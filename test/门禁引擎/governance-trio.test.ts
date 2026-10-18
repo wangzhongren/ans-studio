@@ -243,14 +243,30 @@ test("卡文本：四人均写明职能/不拥有最终批准权/可写与禁写
     assert.match(t, /judge 代批/, `${spec.id} 须写明回执标 judge 代批`);
     assert.match(t, /不得声称是客户本人点击或亲自批准/, `${spec.id} 须禁止声称客户本人点击/批准`);
     assert.match(t, /不得把代批当作扩权/, `${spec.id} 须禁止把代批当作扩权`);
+    // 真机 2026-10-18：治理卡缺 flowId/cardKind 会被当旧卡、判断 agent 不介入 ⇒ 四张卡写死参数纪律。
+    assert.match(t, /每次 `request_confirmation` 必须带 `flowId` \+ `cardKind`/, `${spec.id} 须写死确认卡参数`);
+    assert.match(t, /每次 `request_choice` 必须带 `flowId` \+ `cardKind`/, `${spec.id} 须写死选择卡参数`);
+    assert.match(t, /`write` \/ `appointment-write` \/ `schedule-write`/, `${spec.id} 须列确认卡 cardKind`);
+    assert.match(t, /`proposal` \/ `appointment` \/ `acceptance`/, `${spec.id} 须列选择卡 cardKind`);
+    assert.match(t, /无效治理调用/, `${spec.id} 须点名无效治理调用`);
+    assert.match(t, /当作旧卡/, `${spec.id} 须说明缺项被当旧卡`);
+    assert.match(t, /回落手动/, `${spec.id} 须说明缺项回落手动`);
+    assert.match(t, /补齐两项重发/, `${spec.id} 须要求补齐两项重发`);
+    // 真机 2026-10-18：文件名去 `-v1` 推导 flowId；多写 `-nomination` 会被当独立流程拒绝。
+    assert.match(t, /`docs\/proposals\/<flowId>-v1\.md`/, `${spec.id} 须写死提案命名`);
+    assert.match(t, /`docs\/nominations\/<flowId>-v1\.md`/, `${spec.id} 须写死提名命名`);
+    assert.match(t, /不得在文件名里加 `-nomination` 等额外后缀/, `${spec.id} 须禁止提名额外后缀`);
+    assert.match(t, /`docs\/flows\/<flowId>\.md`/, `${spec.id} 须写死流程命名`);
+    assert.match(t, /`docs\/intents\/<flowId>\.md`/, `${spec.id} 须写死意图命名`);
+    assert.match(t, /按文件名推导 flowId/, `${spec.id} 须说明 flowId 推导规则`);
+    assert.match(t, /当作独立流程/, `${spec.id} 须说明命名不符的后果`);
   }
-  // Liaison：沟通权 + 交接约定；没有 customerInput，故不写 cardKind。
+  // Liaison：沟通权 + 交接约定；无 customerInput（能力矩阵钉死），卡参数纪律按四卡统一写死。
   const l = governanceRoleOf("liaison")!.cardText;
   assert.match(l, /客户沟通/);
   assert.match(l, /客户沟通 · 不拥有最终批准权/);
   assert.match(l, /hand_off_intent/);
   assert.match(l, /docs\/intents\//);
-  assert.doesNotMatch(l, /cardKind/, "Liaison 不发确认/选择卡");
   // Rapporteur：不再自称客户沟通主入口；改读意图 + 澄清工具。
   const r = governanceRoleOf("rapporteur")!.cardText;
   assert.match(r, /提案权/);
@@ -265,6 +281,22 @@ test("卡文本：四人均写明职能/不拥有最终批准权/可写与禁写
   assert.match(governanceRoleOf("convener")!.cardText, /只读档/);
   assert.match(governanceRoleOf("convener")!.cardText, /schedule-write/);
   assert.match(governanceRoleOf("convener")!.cardText, /应用后台派发/, "提名步骤由应用后台派发");
+  // 真机 2026-10-18：flowStepExists 只认表格第一列/列表首 token 的 stepId——Convener 卡写死模板。
+  const convenerCard = governanceRoleOf("convener")!.cardText;
+  const stepTable = [
+    "| stepId | 步骤 | 状态 |",
+    "| --- | --- | --- |",
+    "| nomination | 提名 | done |",
+    "| delivery-server | 服务端交付 | pending |",
+  ].join("\n");
+  assert.ok(convenerCard.includes(stepTable), "Convener 卡须含逐字步骤表模板");
+  assert.match(convenerCard, /stepId 必须在表格第一列/);
+  assert.match(convenerCard, /每行以 stepId 开头/);
+  assert.match(convenerCard, /`dispatch_task` 的 stepId 必须与表中完全一致/);
+  assert.match(convenerCard, /派发会被拒/);
+  for (const id of ["liaison", "rapporteur", "nominator"] as const) {
+    assert.doesNotMatch(governanceRoleOf(id)!.cardText, /\| stepId \|/, `${id} 不写流程单步骤表`);
+  }
   assert.doesNotMatch(
     governanceRoleOf("convener")!.cardText,
     /客户点击入口打开 Nominator/,

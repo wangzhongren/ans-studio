@@ -172,6 +172,44 @@ function fakeQuietHandle(roleId: string, disposed: string[]): RoleSessionHandle 
   };
 }
 
+test("open 旧缓存缺角色：强制刷新一次 listing 后找到即成功；仍缺则如实报错、不循环", async () => {
+  const stale = fakeListing(["A"], "A");
+  const fresh = fakeListing(["A", "convener"], "A");
+  let current = stale;
+  let refreshCalls = 0;
+  const disposed: string[] = [];
+  const mgr = new SessionManager({
+    openRoleSession: async (input) => fakeQuietHandle(input.roleId, disposed),
+    createPiAdapterFactory: () => { throw new Error("本用例不应构造 pi 适配器"); },
+    createDemoAdapter: () => { throw new Error("本用例不应构造 demo 适配器"); },
+    buildProjectConfig,
+    getListing: (root) => (root === "/proj" ? current : undefined),
+    refreshListing: async () => { refreshCalls += 1; current = fresh; },
+    emitEvent: () => {},
+  });
+  const opened = await mgr.open({ projectRoot: "/proj", roleId: "convener", runtime: "demo" });
+  assert.equal(opened.ok, true, opened.error ?? "");
+  assert.equal(refreshCalls, 1, "旧缓存缺角色 ⇒ 刷新恰好一次");
+  await mgr.stop(null);
+
+  // 刷新后仍缺：如实报错，只刷新一次、不循环（同一查找路径也覆盖陈旧重建重开）。
+  let missingRefreshCalls = 0;
+  const mgr2 = new SessionManager({
+    openRoleSession: async (input) => fakeQuietHandle(input.roleId, disposed),
+    createPiAdapterFactory: () => { throw new Error("本用例不应构造 pi 适配器"); },
+    createDemoAdapter: () => { throw new Error("本用例不应构造 demo 适配器"); },
+    buildProjectConfig,
+    getListing: (root) => (root === "/proj" ? stale : undefined),
+    refreshListing: async () => { missingRefreshCalls += 1; },
+    emitEvent: () => {},
+  });
+  const failed = await mgr2.open({ projectRoot: "/proj", roleId: "convener", runtime: "demo" });
+  assert.equal(failed.ok, false);
+  assert.match(failed.error ?? "", /未找到角色：convener/);
+  assert.equal(missingRefreshCalls, 1, "只刷新一次、不循环");
+  await mgr2.stop(null);
+});
+
 test("B-2 切换并存：A→B→A 不 dispose 旧会话，切回直接续（open 计数=2）", async () => {
   const listing = fakeListing(["A", "B"], "A");
   const disposed: string[] = [];

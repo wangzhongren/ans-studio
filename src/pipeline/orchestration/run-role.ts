@@ -110,7 +110,7 @@ import { withHandback, type OrchestrationEvent, type TaskReport, type HandbackIn
 import { EXIT_OK, EXIT_USAGE, EXIT_FAILURE } from "../../common/编排/exit-codes.ts";
 import type { ShellVerdictFn } from "../../common/编排/shell-gate.ts";
 import { repinIfBootstrapped, DEFAULT_GOVERNANCE_BOUNDARY_REL } from "../../common/编排/finalize.ts";
-import { conditionSlugsOf, createConfirmedWriteIssuer } from "../../common/编排/confirmed-writes.ts";
+import { conditionSlugsOf, createConfirmedWriteIssuer, explicitConfirmPaths } from "../../common/编排/confirmed-writes.ts";
 import {
   appendGovernanceLedger,
   readGovernanceLedger,
@@ -2023,9 +2023,10 @@ async function computeJudgeContext(args: {
   context.forbiddenPaths = [...args.trioSpec.forbiddenWritePaths];
 
   if (args.req.kind === "confirm") {
-    // 2026-10-18 真机修复：候选路径只来自 preview 的「一行一个路径」声明，**不从散文扫描**——
-    // 预览里提到的 src/**、test/**、data/ledger.json 等不是本次写入目标，不应变成越界 probe。
-    const candidates = declaredWritePathsFromPreview(args.req.preview ?? "");
+    // 2026-10-18 真机修复：候选路径**优先取显式 `req.paths`**（运行时核心新增；空数组视为未给）；
+    // 未给时回退 preview 的「一行一个路径」声明，**不从散文扫描**——预览里提到的 src/**、test/**、
+    // data/ledger.json 等不是本次写入目标，不应变成越界 probe。
+    const candidates = explicitConfirmPaths(args.req) ?? declaredWritePathsFromPreview(args.req.preview ?? "");
     context.paths = candidates;
     context.pathProbes = candidates.map((candidate) => {
       let allowed = false;

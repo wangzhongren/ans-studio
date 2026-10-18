@@ -1,5 +1,15 @@
 # 运行时核心变更记录
 
+## 2026-10-18 确认卡显式写入路径 `paths`（复杂项目真机修复，已实施待验证）
+
+真机复杂项目中，`request_confirmation` 的预览既引用大量路径又声明 2 个写入目标，文本提取无法区分，判断回落。修复：
+
+①`src/provider/runtime/schema.ts`：`request_confirmation` schema 增可选 `paths`（array of string、`maxItems: 64`；description 明确「确认后将实际写入的精确项目相对路径，逐文件，不得含仅引用的文件」）；promptGuidelines 增「preview 可引用参考文件；`paths` 只放真正写入目标」。
+②`src/model/runtime.ts`：`CustomerInputRequest` 的 confirm 分支增可选 `paths?: string[]`；`CustomerInputMetadata` 增可选 `paths?: string[]`（未给＝旧卡零变化）。
+③`src/provider/runtime/tools.ts`：`readConfirmationPaths` 在触达客户通道**之前**校验——必须是字符串数组、非空、≤64 项；每项非空、项目相对（拒绝绝对/盘符路径）、无 `..` 段、无 NUL、非目录（不以 `/` 结尾）；非法 ⇒ `ok:false` 点名字段与修正方式且**不向客户发卡**；合法 ⇒ posix 化（`\`→`/`）后原样并入卡片请求与 metadata。
+
+**测试**：新增 `test/runtime-core/confirmation-paths.test.ts` 5 例（schema 可选/≤64、合法透传与 posix 化、11 类非法输入拒发卡、缺省不回归、64 边界）。`node --test "test/runtime-core/**/*.test.ts"`：**200 计 / 197 过 / 3 红**（3 红均为既有 Windows `symlink EPERM`：session-store ×2、tools ×1）。`npx tsc --noEmit`：**0 错**。全量三层 glob `node --test --test-timeout=60000 --test-force-exit "test/**/*.test.ts"`：**2970 计 / 2950 过 / 17 红 / 3 跳过**——9 条 Windows `symlink EPERM` 环境红、1 条 runtime-core shell abort 并发时序（单独复跑通过）、6 条桌面应用在飞面（renderer×4、runtime-ui、vendor 哈希）、1 条治理在飞验证（judge timeout 用例）；**本批无新增红**。未跑真实模型/凭据/网络；未 git 提交。
+
 ## 2026-10-18 角色 `boundary.yaml` 写前内容校验（接管编排实现＋验收，已实施待验证）
 
 真机缺陷：Nominator 写出顶层含 `version`/`roleId`/`root` 的非法 `角色卡/<id>/boundary.yaml`，应用照单写入后新角色无法枚举。编排为修复在运行时核心文件 `src/provider/runtime/tools.ts` 中加入写前校验，本角色接管验收：

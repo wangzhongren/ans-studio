@@ -1511,13 +1511,27 @@ export class SessionManager {
       await this.disposeEntry(key, existing);
     }
 
-    const listing = this.deps.getListing(req.projectRoot);
+    let listing = this.deps.getListing(req.projectRoot);
     if (!listing) {
       return { ok: false, error: "尚未枚举该项目；请先导入项目（app:list-project）。" };
     }
-    const role = listing.roles.find((r) => r.roleId === req.roleId);
+    let role = listing.roles.find((r) => r.roleId === req.roleId);
     if (!role) {
-      return { ok: false, error: `项目 ${req.projectRoot} 下未找到角色：${req.roleId}` };
+      // **2026-10-18 真机竞态**：任命写卡后 `.ans`/角色表刷新期间，旧 listing 缓存可能还没有目标内置角色
+      // （Convener 按新边界重建时 `open()` 报「未找到角色：convener」）。这里**强制刷新一次**共享缓存
+      // （与界面 `listProject` 同一 `listProjectFn`）再查；仍找不到才如实报错。**只刷新一次、不循环**。
+      const refreshed = await this.refreshListingNow(req.projectRoot);
+      if (refreshed) {
+        listing = this.deps.getListing(req.projectRoot);
+        role = listing?.roles.find((r) => r.roleId === req.roleId);
+      }
+      if (!role || !listing) {
+        return { ok: false, error: `项目 ${req.projectRoot} 下未找到角色：${req.roleId}` };
+      }
+      createDiagnosticLogger({ component: "desktop.session", projectRoot: req.projectRoot, roleId: req.roleId }).record(
+        "session.open.stale-listing-refreshed",
+        { refreshed },
+      );
     }
 
     // ——— 授权模型：**有 `.ans` 优先用它（pin 生效）；无 `.ans` 才回退运行期同意** ———
