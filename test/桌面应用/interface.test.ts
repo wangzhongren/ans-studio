@@ -17,6 +17,8 @@ import type { ProjectConfig } from "../../src/model/role.ts";
 import type { RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
 import type { OrchestrationEvent, TaskHandback } from "../../src/common/编排/handback.ts";
 import type { RuntimeAdapter, SessionEvent, WriteGate, CustomerInputFn } from "../../src/provider/pi/session.ts";
+import type { DispatchTaskFn } from "../../src/model/runtime.ts";
+import type { RoleStatusFn } from "../../src/common/编排/watchdog.ts";
 import type {
   EstablishGovernanceResult,
   GovernancePreview,
@@ -2051,4 +2053,200 @@ test("W6-B 自动推进账本：single 模型不写 dispatch.accepted（旧项�
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+// ————— W6-B 真机阻塞修复（2026-10-18）：治理角色 settle 后刷新 listing / 目标查找重试 / 任命派发时序 —————
+//
+// 真机现象：Nominator 任命并写入 3 个角色卡后，Convener 的 role_status/dispatch_task 仍报「角色不在本项目」。
+// 根因：listing 缓存未在治理角色写入后刷新；任命决定后的自动派发可能早于 Nominator 本轮写入完成。
+
+function listingWithProjectRoles(base: ProjectListing, roleIds: string[]): ProjectListing {
+  return {
+    ...base,
+    hasRoles: true,
+    roles: [
+      ...base.roles,
+      ...roleIds.map((roleId) => ({
+        roleId,
+        cardPath: `角色卡/${roleId}/role-card.md`,
+        boundaryPath: `角色卡/${roleId}/boundary.yaml`,
+        cardText: `# ${roleId}`,
+        boundary: {
+          entries: [],
+          boundarySource: `角色卡/${roleId}/boundary.yaml`,
+          acceptance: { accepted: false, source: "" },
+        },
+      })),
+    ],
+  };
+}
+
+test("W6-B 真机修复：治理角色 settle 后异步刷新 listing 缓存并 emitProjectChanged（新角色立即可见）", async () => {
+  const base = trioListing();
+  const fresh = listingWithProjectRoles(base, ["role-a", "role-b", "role-c"]);
+  let listCalls = 0;
+  let projectChanged = 0;
+  const settles = new Map<string, () => void>();
+  const iface = createDesktopInterface({
+    pickDirectory: async () => "/proj",
+    emitEvent: () => {},
+    listProjectFn: async () => {
+      listCalls += 1;
+      return listCalls === 1 ? base : fresh;
+    },
+    openRoleSessionFn: async (input) => {
+      const made = settleableGovernanceHandle([]);
+      settles.set(input.roleId, made.settle);
+      return made.handle;
+    },
+    buildProjectConfigFn: buildProjectConfig,
+    emitProjectChanged: () => { projectChanged += 1; },
+  });
+  await iface.listProject({ projectRoot: "/proj" });
+  assert.equal((await iface.openSession({ projectRoot: "/proj", roleId: "nominator", runtime: "demo" })).ok, true);
+  const before = await iface.openSession({ projectRoot: "/proj", roleId: "role-a", runtime: "demo" });
+  assert.equal(before.ok, false, "刷新前旧缓存看不到新角色（复现真机）");
+
+  settles.get("nominator")!();
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  assert.ok(listCalls >= 2, "治理角色 settled 后重新 listProject");
+  assert.ok(projectChanged >= 1, "刷新后 emitProjectChanged（渲染侧重取左树）");
+  const after = await iface.openSession({ projectRoot: "/proj", roleId: "role-a", runtime: "demo" });
+  assert.equal(after.ok, true, "刷新后新角色可开会话");
+  await iface.stopSession();
+});
+
+test("W6-B 真机修复：role_status / dispatch_task 目标 miss 时强制刷新一次（仍缺才如实拒绝）", async () => {
+  const base = trioListing();
+  const fresh = listingWithProjectRoles(base, ["role-a"]);
+  let freshEnabled = false;
+  type DispatchFn = (payload: { roleId: string; task: string; reason?: string }) => Promise<{ ok: boolean; message?: string }>;
+  let roleStatusFn: RoleStatusFn | undefined;
+  let dispatchTaskFn: DispatchFn | undefined;
+  const iface = createDesktopInterface({
+    pickDirectory: async () => "/proj",
+    emitEvent: () => {},
+    listProjectFn: async () => (freshEnabled ? fresh : base),
+    openRoleSessionFn: async (input) => {
+      if (input.roleId === "convener") {
+        roleStatusFn = input.roleStatus as RoleStatusFn | undefined;
+        dispatchTaskFn = input.dispatchTask as unknown as DispatchFn | undefined;
+      }
+      return quietGovernanceHandle([]);
+    },
+    buildProjectConfigFn: buildProjectConfig,
+  });
+  await iface.listProject({ projectRoot: "/proj" });
+  assert.equal((await iface.openSession({ projectRoot: "/proj", roleId: "convener", runtime: "demo" })).ok, true);
+  assert.ok(roleStatusFn, "Convener 应注入 role_status");
+  assert.ok(dispatchTaskFn, "Convener 应注入 dispatch_task");
+
+  // 模拟 Nominator 刚写入 role-a：缓存仍是旧的；目标 miss ⇒ 强制刷新一次后可见。
+  freshEnabled = true;
+  const status = (await roleStatusFn!({ roleId: "role-a" })) ?? { ok: false };
+  assert.equal(status.ok, true);
+  assert.match(status.text ?? "", /角色 role-a：/, "刷新后 role_status 可见新角色");
+  assert.doesNotMatch(status.text ?? "", /role-a：不在本项目/, "不再误报未枚举到");
+
+  // dispatch 目标 miss ⇒ 刷新一次后进入治理门禁（而不是「不在本项目」）。
+  const dispatch = await dispatchTaskFn!({ roleId: "role-a", task: "执行已批准步骤" });
+  assert.equal(dispatch.ok, false, "无客户决定时门禁拒绝（预期）");
+  assert.match(dispatch.message ?? "", /治理门禁/, "目标已找到，失败原因是治理门禁");
+  assert.doesNotMatch(dispatch.message ?? "", /不在本项目/, "不再误报未枚举到");
+
+  // 仍找不到 ⇒ 如实拒绝（只重试一次，不循环）。
+  const missing = await dispatchTaskFn!({ roleId: "role-missing", task: "x" });
+  assert.equal(missing.ok, false);
+  assert.match(missing.message ?? "", /不在本项目/);
+  await iface.stopSession();
+});
+
+test("W6-B 真机修复：任命决定后等 Nominator 本轮 settle 再派 Convener（写入前不派）", async () => {
+  const listing = trioListing();
+  const settles = new Map<string, () => void>();
+  const openRoles: string[] = [];
+  const sendsByRole = new Map<string, string[]>();
+  const iface = createDesktopInterface({
+    pickDirectory: async () => "/proj",
+    emitEvent: () => {},
+    listProjectFn: async () => listing,
+    openRoleSessionFn: async (input) => {
+      openRoles.push(input.roleId);
+      const sends: string[] = [];
+      sendsByRole.set(input.roleId, sends);
+      const made = settleableGovernanceHandle(sends);
+      settles.set(input.roleId, made.settle);
+      return made.handle;
+    },
+    buildProjectConfigFn: buildProjectConfig,
+  });
+  await iface.listProject({ projectRoot: "/proj" });
+  assert.equal((await iface.openSession({ projectRoot: "/proj", roleId: "nominator", runtime: "demo" })).ok, true);
+  assert.equal((await iface.sendSession({
+    text: "任命已确认，请写角色卡",
+    target: { projectRoot: "/proj", roleId: "nominator", runtime: "demo" },
+  })).ok, true, "Nominator 本轮开跑（写入尚未完成）");
+
+  const advancing = iface.advanceGovernanceFlow({
+    payload: {
+      version: 1,
+      flowId: "flow-c",
+      cardKind: "appointment",
+      nextFunction: "schedule",
+      roleId: "convener",
+    },
+    context: { sourceRoleId: "nominator", projectRoot: "/proj", runtime: "demo", targetRoleIds: ["role-a"] },
+  });
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  assert.ok(!openRoles.includes("convener"), "Nominator 未 settle 前不得派 Convener（写入未完成）");
+  assert.equal(sendsByRole.get("convener")?.length ?? 0, 0);
+
+  settles.get("nominator")!();
+  const result = await advancing;
+  assert.equal(result.ok, true, "settle 后派发成功");
+  assert.equal(result.dispatched, true);
+  assert.ok(openRoles.includes("convener"), "settle 后后台开 Convener");
+  assert.deepEqual(sendsByRole.get("convener"), [
+    "流程 flow-c：客户已完成任命 role-a。请写流程单并派发已批准步骤。",
+  ], "settle 后恰一条任务");
+  await iface.stopSession();
+});
+
+test("W6-B 真机修复：listing 刷新失败不崩、不打断会话/派发（只记诊断）", async () => {
+  const base = trioListing();
+  let listCalls = 0;
+  let projectChanged = 0;
+  const settles = new Map<string, () => void>();
+  const openRoles: string[] = [];
+  const iface = createDesktopInterface({
+    pickDirectory: async () => "/proj",
+    emitEvent: () => {},
+    listProjectFn: async () => {
+      listCalls += 1;
+      if (listCalls === 1) return base;
+      throw new Error("模拟读盘失败");
+    },
+    openRoleSessionFn: async (input) => {
+      openRoles.push(input.roleId);
+      const made = settleableGovernanceHandle([]);
+      settles.set(input.roleId, made.settle);
+      return made.handle;
+    },
+    buildProjectConfigFn: buildProjectConfig,
+    emitProjectChanged: () => { projectChanged += 1; },
+  });
+  await iface.listProject({ projectRoot: "/proj" });
+  assert.equal((await iface.openSession({ projectRoot: "/proj", roleId: "nominator", runtime: "demo" })).ok, true);
+  settles.get("nominator")!();
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  assert.equal(projectChanged, 0, "刷新失败不 emitProjectChanged");
+
+  // 刷新失败后仍可按旧缓存推进（目标 Convener 是内置、旧缓存里就有）；不抛、不循环。
+  const result = await iface.advanceGovernanceFlow({
+    payload: { version: 1, flowId: "flow-c", cardKind: "appointment", nextFunction: "schedule", roleId: "convener" },
+    context: { sourceRoleId: "nominator", projectRoot: "/proj", runtime: "demo", targetRoleIds: ["role-a"] },
+  });
+  assert.equal(result.ok, true);
+  assert.ok(openRoles.includes("convener"));
+  await iface.stopSession();
 });

@@ -671,17 +671,69 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   /** 某角色是否为主入口角色（据门禁引擎给的 `primaryRoleId`，**不硬编码 "su"**）。 */
   const isPrimaryRole = (projectRoot: string, roleId: string): boolean => listingCache.get(projectRoot)?.primaryRoleId === roleId;
 
+  /**
+   * **内置治理角色 settle 后刷新 listing 缓存**（W6-B 真机阻塞修复）：Nominator 任命/写角色卡、
+   * Rapporteur 写提案、Convener 写流程、Liaison 写意图——都可能让**同一轮内**的角色表变化；界面/
+   * 会话缓存的旧 listing 会误报「角色不在本项目」。settled 后异步 `listProjectFn` → `listingCache.set`
+   * → `emitProjectChanged`（渲染侧重取左树）。
+   * 纪律：**同项目串行 + 突发合并**（运行中再来的 settled 只标 dirty，结束后补跑一次）；失败只记诊断，
+   * 绝不打断会话/事件外推；不自动开会话、不判定写入是否发生。
+   */
+  const governanceListingRefresh = new Map<string, { running: boolean; dirty: boolean }>();
+  const scheduleGovernanceListingRefresh = (projectRoot: string): void => {
+    if (typeof projectRoot !== "string" || projectRoot === "") return;
+    const state = governanceListingRefresh.get(projectRoot) ?? { running: false, dirty: false };
+    if (state.running) {
+      state.dirty = true; // 合并本窗口内的后续 settled：结束后只补跑一次
+      return;
+    }
+    state.running = true;
+    governanceListingRefresh.set(projectRoot, state);
+    void (async () => {
+      do {
+        state.dirty = false;
+        try {
+          const fresh = await listProjectFn(projectRoot);
+          listingCache.set(fresh.projectRoot, fresh);
+          createDiagnosticLogger({ component: "desktop.interface", projectRoot }).record("project.listing.refreshed", {
+            reason: "governance-settle",
+          });
+          try {
+            deps.emitProjectChanged?.();
+          } catch (error) {
+            createDiagnosticLogger({ component: "desktop.interface", projectRoot }).error("project.changed.emit.failed", error);
+          }
+        } catch (error) {
+          // 刷新失败：保留旧缓存，如实记诊断；下一次 settled/显式刷新再试。绝不打断会话。
+          createDiagnosticLogger({ component: "desktop.interface", projectRoot }).error("project.listing.refresh.failed", error);
+        }
+      } while (state.dirty);
+      state.running = false;
+      governanceListingRefresh.delete(projectRoot);
+    })();
+  };
+
   // 会话事件外推：先原样转发（主进程推 `session:event`；B-2 起为**带 `roleId` 信封**的 `SessionEventEnvelope`）；
   // 再在「**主入口角色**一轮结束（`settled`）」时触发「项目可能已变」信号（→ 主进程推 `project:changed` →
   // 渲染侧重取枚举，左树随 su 建角色而长出，§10.3）。判据取**信封里的角色**（多会话并存后不能再看
   // 「默认活动的那个是谁」）。本层只转达信号，**不判定**写入是否发生（判定唯一来自门禁引擎）。
+  // W6-B：**任一内置治理角色**（liaison/rapporteur/nominator/convener）settle 也要刷新 listing——
+  // 否则任命后新写的角色卡在同一轮内不可见（`role_status`/`dispatch_task` 误报「未枚举到」）。
   const emitSessionEvent = (envelope: SessionEventEnvelope): void => {
     deps.emitEvent(envelope);
-    if (envelope.event.kind === "settled" && isPrimaryRole(envelope.projectRoot, envelope.roleId)) {
-      deps.emitProjectChanged?.();
-      // O-1（2026-10-12）：su 一轮结束 = 「边界可能刚被 su 改过」的**可信时机**——扫一遍活会话的边界快照，
-      // 陈旧者作废重建（内部逐会话隔离、绝不上抛；在跑的轮次跳过）。fire-and-forget，不阻塞事件外推。
-      void manager.refreshStaleBoundaries();
+    if (envelope.event.kind === "settled") {
+      const settledRole = listingCache
+        .get(envelope.projectRoot)
+        ?.roles.find((role) => role.roleId === envelope.roleId);
+      if (settledRole?.builtIn === true && settledRole.governanceFunction !== undefined) {
+        scheduleGovernanceListingRefresh(envelope.projectRoot);
+      }
+      if (isPrimaryRole(envelope.projectRoot, envelope.roleId)) {
+        deps.emitProjectChanged?.();
+        // O-1（2026-10-12）：su 一轮结束 = 「边界可能刚被 su 改过」的**可信时机**——扫一遍活会话的边界快照，
+        // 陈旧者作废重建（内部逐会话隔离、绝不上抛；在跑的轮次跳过）。fire-and-forget，不阻塞事件外推。
+        void manager.refreshStaleBoundaries();
+      }
     }
   };
 
@@ -1124,6 +1176,15 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       };
       if (projectRoot === undefined) return fail("缺少项目根，无法后台派发");
       if (runtime === undefined) return fail("缺少运行时，无法后台派发");
+      // W6-B 真机阻塞修复（任命后的派发时序）：客户决定卡是在来源角色本轮**中途**作答的——Nominator
+      // 可能还在写角色卡。先等来源本轮 settle（`waitForRoleSettle`：只等一次、有上限；无会话/不忙立即
+      // 返回；超时或会话释放只记诊断后继续），再强制刷新 listing，然后才派发。**绝不循环重试**。
+      if (sourceRoleId !== "" && manager.isRoleBusy(projectRoot, sourceRoleId, runtime)) {
+        const settled = await manager.waitForRoleSettle(projectRoot, sourceRoleId, runtime);
+        diagnostic.record("advance.source-settle", { sourceRoleId, settled });
+      }
+      const listingFresh = await manager.refreshListingNow(projectRoot);
+      if (!listingFresh) diagnostic.record("advance.listing-refresh.failed", { projectRoot });
       const message = buildGovernanceAdvanceMessage(payload, context.targetRoleIds);
       if (message === null) return fail("缺少流程信息（flowId/任命名单），未自动派发");
       const opened = await manager.openBackground({ projectRoot, roleId: targetRoleId, runtime });

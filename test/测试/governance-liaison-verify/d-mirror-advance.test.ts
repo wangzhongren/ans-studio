@@ -131,6 +131,34 @@ test("镜像排队：第二张不呈现可操作卡、只进聚合；第一张�
   await second;
 });
 
+test("write 卡镜像：同一请求 id 带镜像面、只答一次（第二次 expired）、下一步回调不重复", async () => {
+  const pushed: OperatorRequestPayload[] = [];
+  let nextSteps = 0;
+  const channel = createCustomerInputChannel({
+    operatorId: "test:op",
+    presenter: (payload) => pushed.push(payload),
+    onNextStep: () => {
+      nextSteps += 1;
+    },
+    nextId: (() => {
+      let i = 0;
+      return () => `w-${++i}`;
+    })(),
+  });
+  const ctx = { roleId: "rapporteur", projectRoot: "/p", runtime: "demo" as const, mirrorRoleId: "liaison" };
+  const pending = channel.customerInput(choiceRequest("write", "普通写盘确认"), ctx);
+  assert.equal(pushed.length, 1);
+  assert.equal(pushed[0].id, "w-1");
+  assert.equal(pushed[0].mirrorRoleId, "liaison", "普通 write 卡也镜像到主入口");
+  assert.equal(channel.respond({ id: "w-1", decision: { kind: "choice", selected: ["accept"] } }).ok, true);
+  await pending;
+  assert.equal(nextSteps, 1, "write 卡无下一步，但回调恰一次（明确无下一步）");
+  const second = channel.respond({ id: "w-1", decision: { kind: "choice", selected: ["accept"] } });
+  assert.equal(second.ok, false);
+  assert.equal(second.expired, true, "同一 id 第二次按终态拒绝");
+  assert.equal(nextSteps, 1, "第二次不得触发第二次回调");
+});
+
 // —————————————————————— 2) 桌面窗口计算镜像面（三类治理卡 + single 不镜像） ——————————————————————
 
 const EMPTY_BOUNDARY = {
@@ -201,7 +229,7 @@ function fakeQuietHandle(): RoleSessionHandle {
   };
 }
 
-test("桌面镜像面：proposal/appointment/acceptance 带 mirrorRoleId=liaison；write/无 cardKind/single 不镜像", async () => {
+test("桌面镜像面：proposal/appointment/acceptance/write 带 mirrorRoleId=liaison；无 cardKind/single 不镜像", async () => {
   const root = "/proj-mirror";
   const listing = listingOf(root, "trio");
   const pushed: OperatorRequestPayload[] = [];
@@ -237,7 +265,7 @@ test("桌面镜像面：proposal/appointment/acceptance 带 mirrorRoleId=liaison
     { roleId: "nominator", cardKind: "appointment-write", expected: "liaison" },
     { roleId: "convener", cardKind: "schedule-write", expected: "liaison" },
     { roleId: "rapporteur", cardKind: "acceptance", expected: "liaison" },
-    { roleId: "rapporteur", cardKind: "write", expected: undefined },
+    { roleId: "rapporteur", cardKind: "write", expected: "liaison" },
     { roleId: "rapporteur", cardKind: undefined, expected: undefined },
   ];
   for (const [index, c] of cases.entries()) {
@@ -401,11 +429,10 @@ test("下一步推导：accept→Nominator、accept-quick→Convener、任命→
   });
   assert.equal(noKind, null, "旧调用（无 cardKind）零行为变化");
 
-  // 镜像范围（评审 §6.1）：仅五类治理决定卡；write/未给 cardKind 不镜像。
-  for (const kind of ["proposal", "appointment", "appointment-write", "schedule-write", "acceptance"] as const) {
+  // 镜像范围（2026-10-18 契约更新）：五类治理决定卡 + 普通 `write` 均镜像；未给 cardKind 不镜像。
+  for (const kind of ["proposal", "appointment", "appointment-write", "schedule-write", "acceptance", "write"] as const) {
     assert.equal(isMirroredGovernanceCard(kind), true, `${kind} 应镜像`);
   }
-  assert.equal(isMirroredGovernanceCard("write"), false);
   assert.equal(isMirroredGovernanceCard(undefined), false);
 
   // 任务消息：三类都有；任命缺名单 ⇒ 不裸发。

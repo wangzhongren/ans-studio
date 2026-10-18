@@ -540,6 +540,11 @@ interface LiveSession {
    * 每次真实投递（直发/出队/派发/回交）写入；**不展示、不入审计**；会话销毁即清。
    */
   lastUserText?: string;
+  /**
+   * **W6-B 真机阻塞修复**：等待「本会话下一轮 settle」的解析器（`waitForRoleSettle` 登记）。
+   * settled 到达或会话被 dispose 时逐个结算（true/false）并清空；不跨轮残留。
+   */
+  settleWaiters?: Set<(settled: boolean) => void>;
   /** **每会话判断闭包**（编排 `createShellJudge`；同一份 `runtimeOptions`/`createAdapter` 工厂）。
    *  会话 dispose 即清（PM 评审 §十一）。 */
   shellJudge?: ShellJudgeFn;
@@ -866,6 +871,10 @@ export class SessionManager {
       state.owner = undefined;
     }
     this.sessions.delete(roleId);
+    // W6-B：会话被释放 ⇒ 等待者按「未等到 settle」结算（不悬挂、不误判为写入完成）。
+    const settleWaiters = entry.settleWaiters;
+    entry.settleWaiters = undefined;
+    for (const finish of settleWaiters ?? []) finish(false);
     if (this.activeRoleId === roleId) this.activeRoleId = null;
     this.activeDeliveries.delete(this.queueKey(entry.projectRoot, entry.roleId, entry.runtime)); // 会话没了，「进行中」不再成立
     // 状态准确性：dispose 即真实信号（会话已移出保活表，busy 判据随之恒 false）——外推快照，
@@ -1139,6 +1148,57 @@ export class SessionManager {
       { projectRoot: input.projectRoot, roleId: input.roleId, runtime: input.runtime },
       { background: true },
     );
+  }
+
+  /** 某角色当前是否有轮次在跑（纯读；W6-B 时序修复用）。 */
+  isRoleBusy(projectRoot: string, roleId: string, runtime: RuntimeKind): boolean {
+    return this.sessions.get(this.sessionKey(projectRoot, roleId, runtime))?.busy === true;
+  }
+
+  /**
+   * **强制刷新一次 listing 缓存**（W6-B 真机阻塞修复）：调注入的 `refreshListing`（Interface 用
+   * 与界面 `listProject` 同一路径读盘枚举并更新**同一份**共享缓存）。只尝试一次、不循环；失败只记
+   * 诊断并返回 false（调用方按原口径如实拒绝/降级，不崩、不假装已刷新）。
+   */
+  async refreshListingNow(projectRoot: string): Promise<boolean> {
+    if (this.deps.refreshListing === undefined) return false;
+    try {
+      await this.deps.refreshListing(projectRoot);
+      return true;
+    } catch (error) {
+      createDiagnosticLogger({ component: "desktop.session", projectRoot }).error("project.listing.refresh.failed", error);
+      return false;
+    }
+  }
+
+  /**
+   * **等待某角色下一轮 settle**（W6-B 真机阻塞修复；只等一次、有上限）：客户决定卡是在来源角色
+   * **本轮中途**作答的，来源本轮可能还在写角色卡/提案——先等它收尾（settle），再让应用推进下一步。
+   * · 无会话 / 当前不忙 ⇒ 立即 true（无需等）；
+   * · 超时（缺省 60s）⇒ false（调用方记诊断后**照常继续**，绝不循环重试）；
+   * · 会话被 dispose ⇒ false（解析，不悬挂）。
+   */
+  waitForRoleSettle(
+    projectRoot: string,
+    roleId: string,
+    runtime: RuntimeKind,
+    timeoutMs = 60_000,
+  ): Promise<boolean> {
+    const entry = this.sessions.get(this.sessionKey(projectRoot, roleId, runtime));
+    if (!entry || entry.busy !== true) return Promise.resolve(true);
+    return new Promise<boolean>((resolve) => {
+      let done = false;
+      const finish = (settled: boolean): void => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        entry.settleWaiters?.delete(finish);
+        if (entry.settleWaiters !== undefined && entry.settleWaiters.size === 0) entry.settleWaiters = undefined;
+        resolve(settled);
+      };
+      const timer = setTimeout(() => finish(false), Math.max(1, timeoutMs));
+      (entry.settleWaiters ??= new Set()).add(finish);
+    });
   }
 
   /**
@@ -1774,6 +1834,11 @@ export class SessionManager {
               const wasBusy = en.busy; // G-2：只有真实「忙→闲」翻转才产生看护观察（重复/迟到的 settled 不重复计数）
               en.busy = false;
               en.busySince = undefined;
+              // W6-B 真机阻塞修复：settle = 来源本轮写入完成——结算所有「等这一轮收尾」的等待者
+              // （`advanceGovernanceFlow` 的 appointment 时序），再放行队列。
+              const settleWaiters = en.settleWaiters;
+              en.settleWaiters = undefined;
+              for (const finish of settleWaiters ?? []) finish(true);
               // G-2/W1+W3：先读「进行中」条目再撤销——本轮是否由 `kind:"system"` 投递持有（看护自身的告警/
               // 收束/恢复回执）决定该 settle 是否算**真实活动**（刻意排除 ⇒ 防「总结完→又被立即催」的骚扰
               // 回路；静默阈值默认 30s＝一个 tick 的最小防抖——客户 2026-10-16 run-5 裁定，隔离更须严格）。
@@ -2355,13 +2420,10 @@ export class SessionManager {
       return current ? current.roles.find((r) => r.roleId === targetRoleId) : undefined;
     };
     let target = findTarget();
-    if (!target && this.deps.refreshListing) {
-      // 缓存 miss ⇒ 实时重枚举一次（bootstrap 首轮：新角色刚落盘、缓存来自导入时点——见方法注释）。
-      try {
-        await this.deps.refreshListing(projectRoot);
-      } catch {
-        // 重枚举失败（读盘竞态等）：按原 miss 口径如实拒绝，不上抛。
-      }
+    if (!target) {
+      // 缓存 miss ⇒ 实时重枚举**一次**再重试（bootstrap 首轮 / Nominator 刚写出的角色卡：缓存来自
+      // 导入时点或上一轮——W6-B 真机阻塞修复）。仍 miss ⇒ 按原口径如实拒绝，不循环、不上抛。
+      await this.refreshListingNow(projectRoot);
       target = findTarget();
     }
     if (!target) {
@@ -3129,9 +3191,15 @@ export class SessionManager {
         ? `看护：活跃告警 ${stats.activeAlerts}，最近触发 ${stats.lastAlertAt !== null ? new Date(stats.lastAlertAt).toISOString() : "null"}，已抑制 ${stats.suppressedTotal}`
         : "看护：未接线";
       lines.push(`${governanceRoleId ?? "（未枚举）"}：busy=${governanceBusy} ｜ 待确认卡 ${governanceRoleId !== null ? pendingFor(governanceRoleId) : 0} ｜ ${watchdogLine}`);
-      const listing = this.deps.getListing(projectRoot);
-      const knownRoles = listing ? listing.roles.map((r) => r.roleId) : [...new Set([...snapshot.roles.map((r) => r.roleId), ...snapshot.queues.map((q) => q.targetRoleId)])].filter((r) => r !== "");
       const wantedRoleId = typeof query?.roleId === "string" ? query.roleId.trim() : "";
+      let listing = this.deps.getListing(projectRoot);
+      // W6-B 真机阻塞修复：治理角色刚写入的新角色可能尚未进缓存——指定角色 miss 时强制刷新**一次**
+      // 再判定（只一次；刷新失败只记诊断，仍按 miss 如实报告）。
+      if (wantedRoleId !== "" && (!listing || !listing.roles.some((r) => r.roleId === wantedRoleId))) {
+        await this.refreshListingNow(projectRoot);
+        listing = this.deps.getListing(projectRoot);
+      }
+      const knownRoles = listing ? listing.roles.map((r) => r.roleId) : [...new Set([...snapshot.roles.map((r) => r.roleId), ...snapshot.queues.map((q) => q.targetRoleId)])].filter((r) => r !== "");
       const includeDiagnostics = query?.includeDiagnostics === true;
       const wanted = wantedRoleId !== "" ? [wantedRoleId] : knownRoles;
       for (const rid of wanted) {

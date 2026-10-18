@@ -609,7 +609,7 @@ function trioMirrorListing(): ProjectListing {
   };
 }
 
-test("W6-B 镜像判据（SessionManager）：trio 治理卡带主入口、write/无 cardKind 不镜像；single 不镜像", async () => {  const contexts: { roleId: string; mirrorRoleId?: string }[] = [];
+test("W6-B 镜像判据（SessionManager）：trio 的 proposal/write 都带主入口、无 cardKind 不镜像；single 不镜像", async () => {  const contexts: { roleId: string; mirrorRoleId?: string }[] = [];
   const listing = trioMirrorListing();
   let rapporteurInput: { customerInput?: CustomerInputFn } | undefined;
   const mgr = new SessionManager({
@@ -648,8 +648,8 @@ test("W6-B 镜像判据（SessionManager）：trio 治理卡带主入口、write
   await rapporteurInput!.customerInput!(legacy);
   assert.deepEqual(
     contexts.map((ctx) => ctx.mirrorRoleId),
-    ["liaison", undefined, undefined],
-    "trio：proposal 镜像到主入口；write/无 cardKind 不镜像",
+    ["liaison", "liaison", undefined],
+    "trio：proposal 与 write 都镜像到主入口；无 cardKind 不镜像",
   );
   await mgr.stop(null);
 
@@ -694,8 +694,14 @@ test("W6-B 镜像判据（SessionManager）：trio 治理卡带主入口、write
   });
   assert.equal((await singleMgr.open({ projectRoot: "/single-proj", roleId: "su", runtime: "demo" })).ok, true);
   await suInput!.customerInput!(proposal, { cardKind: "proposal", flowId: "flow-a" });
-  assert.equal(singleContexts.length, 1);
-  assert.equal(singleContexts[0].mirrorRoleId, undefined, "single 不镜像（无 Liaison 主入口）");
+  const singleWrite: CustomerInputRequest = { kind: "confirm", title: "写盘", cardKind: "write" };
+  await suInput!.customerInput!(singleWrite, { cardKind: "write" });
+  assert.equal(singleContexts.length, 2);
+  assert.deepEqual(
+    singleContexts.map((ctx) => ctx.mirrorRoleId),
+    [undefined, undefined],
+    "single：proposal/write 均不镜像（无 Liaison 主入口）",
+  );
   await singleMgr.stop(null);
 });
 
@@ -714,4 +720,35 @@ test("W6-B 步骤审计：request.stepId 原样进 next-step context（不进 IP
   assert.equal(channel.respond({ id: "op-2", decision: { kind: "choice", selected: ["accept"] } }).ok, true);
   await withoutStep;
   assert.equal(next[1].context.stepId, undefined, "请求未给 stepId 时不伪造");
+});
+
+test("W6-B 报告员 write 卡镜像：mirrorRoleId=liaison、同一请求只答一次（第二次 expired）", async () => {
+  const pushed: OperatorRequestPayload[] = [];
+  const channel = createCustomerInputChannel({
+    presenter: (p) => pushed.push(p),
+    operatorId: "tester",
+    nextId: () => "op-write-1",
+  });
+  const req: CustomerInputRequest = {
+    kind: "confirm",
+    title: "写提案文件",
+    cardKind: "write",
+    preview: "docs/proposals/flow-a-v1.md",
+  };
+  const pending = channel.customerInput(
+    req,
+    { roleId: "rapporteur", projectRoot: "/p", runtime: "demo", mirrorRoleId: "liaison" },
+    { cardKind: "write" },
+  );
+  assert.equal(pushed.length, 1, "write 卡仍只有一个请求（镜像不是第二张 pending）");
+  assert.equal(pushed[0].mirrorRoleId, "liaison", "报告员 write 确认卡镜像到联络官");
+  assert.equal(pushed[0].roleId, "rapporteur", "来源角色不变");
+  assert.equal(pushed[0].request, req, "卡片内容/选项原样透传");
+
+  assert.equal(channel.respond({ id: "op-write-1", decision: { kind: "confirm", confirmed: true } }).ok, true);
+  const second = channel.respond({ id: "op-write-1", decision: { kind: "confirm", confirmed: true } });
+  assert.equal(second.ok, false, "同一请求只答一次");
+  assert.equal(second.expired, true, "两侧冻结：第二次按终态拒绝");
+  assert.equal((await pending)!.outcome, "answered");
+  assert.equal(channel.pendingCount(), 0);
 });

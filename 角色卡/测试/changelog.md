@@ -1,5 +1,14 @@
 # 测试 变更记录
 
+## 2026-10-18（复审 2）— 桌面契约更新（write 卡镜像等）后 reverified：本批 35/35；全量 2780/2761/16红/3skip（新增红 0）；typecheck 0
+
+**契约更新**：桌面侧治理角色 settle 后刷新 listing；`routeDispatch`/`role_status` miss 时强制刷新一次；任命后等 Nominator 写完再派 Convener；**镜像白名单新增普通 `write` 卡**（报告员写入确认也镜像到联络官）。
+
+**本角色同步**：`d-mirror-advance` 两条旧契约断言由「write 不镜像」改为「write 镜像到 liaison」；`isMirroredGovernanceCard` 范围由五类改为六类（含 write）；新增「write 卡镜像：同一 id 只答一次（第二次 expired）、下一步回调不重复」用例。
+
+**复审结果**：本批 **35/35**；全量 `node --test "test/**/*.test.ts"` → **2780 / 2761 pass / 16 fail / 3 skip**（复审 1 为 2772/2753/16/3；+8 tests＝桌面属主契约测试 7＋本角色 write 用例 1；**新增红 0**；剩余 16 红全为既有）；`npm run typecheck` → **0 错**。报告追加 reverified 事件并更新第二/三/五/六/八节；未发现新的实现缺陷。未 commit/push。
+
+
 ## 2026-10-18（复审）— 四角色三处缺陷修复后 reverified：本批 34/34；全量 2772/2753/16红/3skip（新增红 0）；typecheck 0
 
 **修复复审**：① 编排：`power` 统一 `"liaison"`；CLI `--function liaison`（参数解析）与 `--role liaison`（govern）显式拒绝；新增 `governanceWriteOwnerHint` 使 Liaison 越界写文案指回报告员/提名官/召集人/应用。② 桌面：交接成功补写 `dispatch.accepted{actorRoleId:"app", power:"app", trigger:"intent-handoff", targetRoleId:"rapporteur", intentId, flowId?, messageSummary, runtime}`（失败不写、账本失败只诊断）；`advanceGovernanceFlow` 支持卡片/上下文显式 `stepId`，缺席记 `advance.ledger.step-missing` 且**不伪造字段**。③ 门禁：Liaison 越界写文案按归属分流（应用/报告员/提名官/召集人）。
@@ -15,7 +24,7 @@
 
 **方法**：自建 `test/测试/governance-liaison-verify/`（`fixture.ts` + 6 文件 **34 例**），全部离线。实施方 `createFakeRuntimeAdapter` 未转发 W6-A 的 `handOffIntent`/`requestClarification`，故夹具用运行时核心 `buildGovernedTools` **自建等价适配器**（逐能力位透传），使两个新工具真实注册并执行到编排包装器；桌面链＝真实 `SessionManager` + 真实 `openRoleSession`；UI＝真 `ui-labels.js` 纯函数 + renderer 源码钉。不读 `.env`、不跑真实模型/凭据/网络。
 
-**逐项结论**：① 四角色枚举（liaison→rapporteur→nominator→convener）/`primary=liaison`/旧 trio 零迁移（文件树逐字节）/single 不变/保留 id 全通过；② Liaison 写权（仅 `docs/intents/**`）与能力（仅 `handOffIntent`；无 customerInput/dispatch/install/status/shell）通过；③ `hand_off_intent` 合法交接账本字段完整、八类守卫、去重/initial 一次性/修订引用、每轮一次、非 Liaison 无工具、账本坏 fail-closed、投递失败不重试、交接不是批准、`docs/intents` settle 观察均通过；桌面后台投递恰一条任务、不切 pane、失败零账本；④ `request_clarification` 两轮上限（flow/intent）、账本、主入口系统行、不弹决定卡均通过；⑤ 镜像：同一请求 id/一面登记两面物化/第一次结算第二次 expired/`onNextStep` 恰一次/排队聚合/proposal+appointment+appointment-write+schedule-write+acceptance 镜像、write/无 cardKind/single 不镜像均通过；⑥ 自动推进 accept→Nominator、quick/任命→Convener，`dispatch.accepted{app, trigger=customer-decision}` 三次逐条、不写客户决定；⑦ 审计还原（意图→提案→任命→派程→验收）通过。
+**逐项结论**：① 四角色枚举（liaison→rapporteur→nominator→convener）/`primary=liaison`/旧 trio 零迁移（文件树逐字节）/single 不变/保留 id 全通过；② Liaison 写权（仅 `docs/intents/**`）与能力（仅 `handOffIntent`；无 customerInput/dispatch/install/status/shell）通过；③ `hand_off_intent` 合法交接账本字段完整、八类守卫、去重/initial 一次性/修订引用、每轮一次、非 Liaison 无工具、账本坏 fail-closed、投递失败不重试、交接不是批准、`docs/intents` settle 观察均通过；桌面后台投递恰一条任务、不切 pane、失败零账本；④ `request_clarification` 两轮上限（flow/intent）、账本、主入口系统行、不弹决定卡均通过；⑤ 镜像：同一请求 id/一面登记两面物化/第一次结算第二次 expired/`onNextStep` 恰一次/排队聚合/proposal+appointment+appointment-write+schedule-write+acceptance+**普通 write** 镜像、无 cardKind/single 不镜像均通过；⑥ 自动推进 accept→Nominator、quick/任命→Convener，`dispatch.accepted{app, trigger=customer-decision}` 三次逐条、不写客户决定；⑦ 审计还原（意图→提案→任命→派程→验收）通过。
 
 **缺陷/偏差（未改实现）**：① **AC5 红**——交接成功后缺 `dispatch.accepted{trigger:"intent-handoff", targetRoleId:"rapporteur"}`（评审 §5.3/§7.2；属主桌面窗口/编排）；② **AC21 红**——CLI `--function liaison`/`--role liaison` 仍被接受，评审 §4.6 要求明确拒绝（实现注释称后续任务书放开，需 PM 裁定）；③ **AC3 红**——Liaison 越界写 proposals/contracts/nominations/flows 的拒绝文案统一「应用治理记录/其他治理角色」，未指回报告员/提名官/召集人；④ 口径偏差——`intent.handed-off`/Liaison `artifact.observed` 写 `power:"communication"`，评审写 `"liaison"`（类型兼容、门禁不读）；⑤ 口径偏差——`dispatch.accepted(customer-decision)` 无 `stepId`（评审 AC19 要求，实现注明载荷不携带）。
 

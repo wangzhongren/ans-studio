@@ -106,7 +106,9 @@ function readProposalPath(request: CustomerInputRequest, selected: readonly stri
  * 决定卡镜像判据（四角色评审 §6.1）：**同一个请求 id 的第二处呈现，不是第二个请求**。
  * 仅治理决定卡镜像到主入口（Liaison）；其余一律保持原生位置：
  *  - `proposal` / `appointment` / `appointment-write` / `schedule-write` / `acceptance` → 镜像；
- *  - `write`（普通写盘确认）→ 不镜像（角色工作会话的操作确认，不是治理决定）；
+ *  - `write`（普通写盘确认）→ **镜像**（2026-10-18 真机反馈：报告员的写入确认卡必须在联络官可作答；
+ *    本条覆盖评审 §6.1 原表「write 不镜像」；仅 trio 治理角色会走该通道——项目角色从不注入 customerInput，
+ *    single/su 也不镜像）；
  *  - 无 `cardKind`（旧调用）→ 不镜像（零行为变化）；
  *  - shell 审批卡 / 恢复确认卡不经过本判据（运维面，保持原生位置）。
  *
@@ -119,6 +121,7 @@ const MIRRORED_GOVERNANCE_CARD_KINDS: ReadonlySet<GovernanceCardKind> = new Set(
   "appointment-write",
   "schedule-write",
   "acceptance",
+  "write",
 ]);
 
 export function isMirroredGovernanceCard(cardKind: GovernanceCardKind | undefined): boolean {
