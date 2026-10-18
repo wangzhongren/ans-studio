@@ -23,6 +23,7 @@ import {
   intentDoc,
   makeRoot,
   proposalDoc,
+  seedIntentConfirm,
   toolAdapterFactory,
   waitForLedger,
   write,
@@ -94,6 +95,8 @@ test("审计还原：意图→提案→任命→派程→验收，账本可还�
       }),
     );
     write(root, "角色卡/A/role-card.md", "# 角色：A\n\n由 Nominator 写出。\n");
+    // 2026-10-18 客户拍板：initial 交接前须有客户对需求（intent-confirm）的确认决定。
+    await seedIntentConfirm(root, { flowId: FLOW });
     // 提案/提名/流程单故意**不预写**：由对应会话真实写出，settle 后才有 artifact.observed
     // （会话 open 时已存在的同内容文件会进基线，重写相同字节不会产生新观察）。
 
@@ -224,11 +227,11 @@ test("审计还原：意图→提案→任命→派程→验收，账本可还�
     assert.equal(dispatched!.ok, true, dispatched!.message ?? "");
     await waitForLedger(root, (list) => list.some((e) => e.kind === "dispatch.accepted"));
 
-    // ⑤ 验收（客户级决定收口）：真实 Rapporteur 会话 + 验收卡。
+    // ⑤ 验收（客户级决定收口）：真实 Proof / 验收（verifier）会话 + 验收卡（Draft 不再发 acceptance）。
     const acceptanceCapture = capture();
     const acceptance = await openRoleSession(
       {
-        roleId: "rapporteur",
+        roleId: "verifier",
         project: buildConfig(listing, { accepted: true, source: "test:audit" }),
         taskId: "T-audit-acceptance",
         customerInput: customerChannel({ selected: ["accept"] }),
@@ -294,7 +297,11 @@ test("审计还原：意图→提案→任命→派程→验收，账本可还�
     assert.equal(entries.filter((e) => e.kind === "intent.handed-off").length, 1, "同一意图只交接一次");
     const approvals = entries.filter((e) => e.kind === "customer.decision");
     assert.ok(
-      approvals.every((e) => e.decisionEvidence?.kind === "customer-input"),
+      approvals.every((e) =>
+        e.decisionKind === "intent-confirm"
+          ? e.decisionEvidence === undefined // 夹具种入的需求确认（真实路径由客户通道写证据）
+          : e.decisionEvidence?.kind === "customer-input",
+      ),
       "客户决定一律带应用签发的证据（不是角色自述）",
     );
   } finally {

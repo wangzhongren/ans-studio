@@ -765,7 +765,7 @@ export async function openRoleSession(
           const out = await raw(req, judgeMetadata);
           const issuedPaths = issue(req, out ?? null, originalMetadata);
           if (isTrio) {
-            recordCustomerDecision({
+            const recorded = recordCustomerDecision({
               state: ledgerState,
               projectRoot: input.project.projectRoot,
               roleId: setup.role.id,
@@ -778,6 +778,13 @@ export async function openRoleSession(
               runtime: input.runtime ?? boundSessionForEvidence?.runtime,
               log,
             });
+            if (cardKind === "intent-confirm") {
+              // 2026-10-18 真机竞态：客户刚确认，Lead 紧接着 hand_off_intent；校验器读磁盘必须能看到
+              // 该决定 ⇒ intent-confirm 卡等追加完成再返回。其余卡保持非阻塞（既有语义不变）。
+              await recorded;
+            } else {
+              void recorded;
+            }
           }
           return out;
         };
@@ -1528,6 +1535,10 @@ function governanceWriteOwnerHint(rel: string): string {
       prefixes: ["docs/flows/", "docs/workflow.md", "docs/governance/convener/"],
       guidance: "该路径属召集人 Convener 的写区（流程/编排）；请交给召集人。",
     },
+    {
+      prefixes: ["docs/verification/", "docs/governance/verifier/"],
+      guidance: "该路径属 Proof / 验收（Verifier）的写区（核对报告）；请交给验收角色。",
+    },
   ];
   for (const hint of hints) {
     const hit = hint.prefixes.some((prefix) => {
@@ -1618,12 +1629,14 @@ function serializeGovernanceTask<T>(
 
 /** 每角色允许的 `cardKind` 白名单（评审 §5.8 表；越权不弹卡，由 customerInput 包装器直接拒绝）。 */
 const TRIO_CARD_KINDS: Record<BuiltInGovernanceRoleSpec["id"], readonly GovernanceCardKind[]> = {
-  // W6-A：Liaison 的 `customerInput=false`（只用聊天与 hand_off_intent）——空白名单是结构性兜底：
-  // 即便调用方误给客户通道，任何治理卡也会被包装器拒绝。
-  liaison: [],
-  rapporteur: ["proposal", "acceptance", "write"],
+  // 2026-10-18 客户拍板：Liaison（Lead/主理）开通客户通道，只用于 hand_off_intent 前的
+  // `intent-confirm` 需求确认卡（判断 agent 永不介入）；其它治理卡仍结构性拒绝。
+  liaison: ["intent-confirm"],
+  rapporteur: ["proposal", "write"],
   nominator: ["appointment", "appointment-write", "write"],
   convener: ["schedule-write", "write"],
+  // 验收权归 Proof / 验收（verifier）；Draft / 提案不再发 acceptance。
+  verifier: ["acceptance", "write"],
 };
 
 /** 账本条目签名（本会话内存合并去重用；只比较能唯一识别一次决定/事件的字段）。 */
@@ -1695,6 +1708,13 @@ function classifyCustomerDecision(
         customerDecision: selected[0] === "accept" ? "accepted" : "rejected",
       };
     }
+    case "intent-confirm": {
+      // 需求确认卡（客户专属；选项 id 固定 confirm/revise）：恰好一项才分类，其余 fail-closed。
+      if (selected.length !== 1) return { decisionKind: "unclassified", customerDecision: "none" };
+      if (selected[0] === "confirm") return { decisionKind: "intent-confirm", customerDecision: "accepted" };
+      if (selected[0] === "revise") return { decisionKind: "intent-confirm", customerDecision: "changes-requested" };
+      return { decisionKind: "unclassified", customerDecision: "none" };
+    }
     case "appointment-write":
     case "schedule-write":
       return {
@@ -1714,7 +1734,7 @@ function classifyCustomerDecision(
  * 同步更新内存快照（本会话后续写入立即受该决定约束），异步补 artifact 哈希并落盘；
  * 账本失败只记诊断，**不改变客户决定、不放宽门禁、不阻断写盘**（§九-16）。
  */
-function recordCustomerDecision(args: {
+async function recordCustomerDecision(args: {
   state: { snapshot: GovernanceLedgerSnapshot; local: GovernanceLedgerEntry[] };
   projectRoot: string;
   roleId: string;
@@ -1726,10 +1746,13 @@ function recordCustomerDecision(args: {
   sessionId?: string;
   runtime?: RuntimeKind;
   log: ReturnType<typeof createDiagnosticLogger>;
-}): void {
+}): Promise<void> {
   const flowId = args.req.flowId ?? args.metadata?.flowId;
   if (!isGovernanceFlowId(flowId)) return; // 无治理流程上下文的普通交互：不写账本
   const cardKind = args.req.cardKind ?? args.metadata?.cardKind;
+  // 2026-10-18 真机：只有**治理卡**（显式 cardKind）才写 `customer.decision`。Lead/Crew 的普通
+  // 选择/确认（无 cardKind）若也写，会以 unclassified/none 污染账本并覆盖真正的提案决定。
+  if (cardKind === undefined) return;
   const classification = classifyCustomerDecision(cardKind, args.out);
   if (classification === undefined) return;
 
@@ -1800,25 +1823,23 @@ function recordCustomerDecision(args: {
     errors: args.state.snapshot.errors,
   };
 
-  void (async () => {
-    try {
-      const artifact = await findDecisionArtifact(args.projectRoot, entry, args.issuedPaths);
-      if (artifact !== undefined) Object.assign(entry, artifact);
-      const result = await appendGovernanceLedger(args.projectRoot, entry);
-      if (!result.ok) {
-        args.log.record("governance.decision.append.failed", { message: result.message });
-        if (entry.decisionEvidence?.kind === "judge") {
-          // 账本失败不翻转决定（结果行/诊断兜底；评审 §7.4）。
-          args.log.record("governance-judge.audit.failed", {
-            toolCallId: args.metadata?.toolCallId,
-            reason: truncateText(result.message, 512),
-          });
-        }
+  try {
+    const artifact = await findDecisionArtifact(args.projectRoot, entry, args.issuedPaths);
+    if (artifact !== undefined) Object.assign(entry, artifact);
+    const result = await appendGovernanceLedger(args.projectRoot, entry);
+    if (!result.ok) {
+      args.log.record("governance.decision.append.failed", { message: result.message });
+      if (entry.decisionEvidence?.kind === "judge") {
+        // 账本失败不翻转决定（结果行/诊断兜底；评审 §7.4）。
+        args.log.record("governance-judge.audit.failed", {
+          toolCallId: args.metadata?.toolCallId,
+          reason: truncateText(result.message, 512),
+        });
       }
-    } catch (err) {
-      args.log.error("governance.decision.append.failed", err);
     }
-  })();
+  } catch (err) {
+    args.log.error("governance.decision.append.failed", err);
+  }
 }
 
 function truncateText(text: string, max: number): string {

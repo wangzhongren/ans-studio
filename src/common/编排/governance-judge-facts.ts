@@ -326,8 +326,9 @@ export function parseFlowSteps(markdown: string): { wellFormed: boolean; steps: 
 
 /**
  * 验收机械门槛（P6 验收观察，安全项）：**不靠模型自报**，只用流程单 + 账本事实。
- * 所有步骤 `done`、每个步骤都有 `dispatch.accepted`、无未结算（`unclassified`/`none`）决定、
- * 无未闭环澄清、账本可读——任一不满足即 `manual`（原卡 + 说明）。
+ * 所有步骤 `done`、每个步骤都有 `dispatch.accepted`、无未结算的**治理**决定、无未闭环澄清、
+ * 账本可读——任一不满足即 `manual`（原卡 + 说明）。旧账本里无 cardKind 的普通选择
+ * （`unclassified`/`none`）按 decisionKind 过滤，不算未结算。
  */
 export function evaluateAcceptanceCompletion(input: {
   flowMarkdown: string;
@@ -364,10 +365,14 @@ export function evaluateAcceptanceCompletion(input: {
   if (input.facts.unresolvedClarificationCount > 0) {
     return { ok: false, reasonCode: "insufficient-evidence", reason: "仍有未闭环的澄清，不能代批验收，已转手动确认。" };
   }
+  // 2026-10-18 真机：旧账本里无 cardKind 的普通选择曾写入 unclassified/none——按 decisionKind 过滤，
+  // 不把它当作「未结算的治理决定」（否则会挡住验收）。
   const unresolved = input.ledgerEntries.filter((entry) =>
     entry.kind === "customer.decision"
     && entry.flowId === input.facts.flowId
-    && (entry.decisionKind === "unclassified" || entry.customerDecision === "none" || entry.customerDecision === undefined)
+    && entry.decisionKind !== undefined
+    && entry.decisionKind !== "unclassified"
+    && (entry.customerDecision === "none" || entry.customerDecision === undefined)
   );
   if (unresolved.length > 0) {
     return { ok: false, reasonCode: "insufficient-evidence", reason: "该流程仍有未结算的决定，不能代批验收，已转手动确认。" };

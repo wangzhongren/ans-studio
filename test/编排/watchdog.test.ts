@@ -1,6 +1,7 @@
 // test/编排/watchdog.test.ts
-// 编排角色自测：G-2/O1——看护与收束的**文案单一来源**（`src/common/编排/watchdog.ts`）＋看护三能力的
+// 编排角色自测：G-2/O1——看护**文案单一来源**（`src/common/编排/watchdog.ts`）＋看护三能力的
 // **承载契约**（`openRoleSession` 只 su 注入 roleStatus/sessionTail/proposeRecovery，端到端注册三工具）。
+// 2026-10-18 客户要求移除完成态「收束」提示（验收通过即收束）——本套件不再钉收束文案。
 // 桩适配器/演示替身，不触网；临时目录用后清理。
 
 import { test } from "node:test";
@@ -17,12 +18,9 @@ import type { AdapterCapabilities } from "../../src/pipeline/orchestration/run-r
 import {
   RECOVERY_ACTIONS,
   WATCHDOG_ALERT_PREFIX,
-  WATCHDOG_CLOSURE_PREFIX,
-  WATCHDOG_DEFAULT_SILENT_MINUTES,
   WATCHDOG_DISCIPLINE_LINE,
   WATCHDOG_PROMPT_GUIDELINES,
   WATCHDOG_RECOVERY_PREFIX,
-  renderClosurePrompt,
   renderRecoveryReceipt,
   renderWatchdogAlert,
   renderWatchdogRecovery,
@@ -139,27 +137,25 @@ async function callTool(options: RuntimeProviderOptions, name: string, args: Rec
 
 // —— 文首标记契约（与桌面UI U1 的 tool-rows.js::SYSTEM_HEAD 归类判据对齐） ——
 
-test("文首标记契约（U1 对齐）：三前缀与全部渲染输出满足 `[系统·<子类>] `+空白；中点为 U+00B7", () => {
+test("文首标记契约（U1 对齐）：告警/恢复两前缀与全部渲染输出满足 `[系统·<子类>] `+空白；中点为 U+00B7", () => {
   const marker = /^\[系统·[^[\]\r\n]{1,12}\](?:\s|$)/;
   const outputs = [
     WATCHDOG_ALERT_PREFIX,
-    WATCHDOG_CLOSURE_PREFIX,
     WATCHDOG_RECOVERY_PREFIX,
     renderWatchdogAlert({ signal: "queue-stuck", roleId: "X", facts: ["f"] }),
     renderWatchdogRecovery({ signal: "queue-stuck", roleId: "X", hits: 1, suppressed: 0 }),
     renderWatchdogStormGuard(1),
-    renderClosurePrompt(30_000),
     renderRecoveryReceipt({ action: "abort-turn", targetRoleId: "X", outcome: "executed" }),
   ];
   for (const text of outputs) {
     assert.ok(marker.test(text), `标记形态必须闭合于 ] 且其后为空白/文末（改形态 = system 类静默回落）：${JSON.stringify(text.slice(0, 12))}`);
   }
-  for (const prefix of [WATCHDOG_ALERT_PREFIX, WATCHDOG_CLOSURE_PREFIX, WATCHDOG_RECOVERY_PREFIX]) {
+  for (const prefix of [WATCHDOG_ALERT_PREFIX, WATCHDOG_RECOVERY_PREFIX]) {
     assert.equal(prefix[0], "["); assert.equal(prefix[1], "系"); assert.equal(prefix[2], "统");
     assert.equal(prefix.charCodeAt(3), 0xb7, "第 4 个码点必须是中点 U+00B7（与渲染侧 SYSTEM_HEAD 逐字节一致）");
     assert.equal(prefix[prefix.length - 1], "]");
   }
-  for (const text of outputs.slice(3)) assert.ok(text.startsWith("[系统·"), "渲染输出恒以标记起始");
+  for (const text of outputs.slice(2)) assert.ok(text.startsWith("[系统·"), "渲染输出恒以标记起始");
 });
 
 // —— 文案单一来源：告警（设计 §3.3） ——
@@ -244,44 +240,6 @@ test("renderWatchdogAlert：事实为空 → 如实标注（不编造）；rende
   assert.equal(renderWatchdogStormGuard(-1), "[系统·看护] 看护告警已抑制 0 条（风暴护栏）。", "负数归零");
 });
 
-// —— 文案单一来源：收束提示（设计 §7.3；客户 2026-10-16 复裁：默认 30 秒、接口毫秒） ——
-
-test("renderClosurePrompt(silentMs)：两档自适应逐字金文本（300s＝5 分钟；30s＝30 秒）；60s 恰跨档；不强迫断言「完成」", () => {
-  const five = renderClosurePrompt(300_000);
-  assert.equal(
-    five,
-    [
-      "[系统·收束] 已无进行中任务：全部角色空闲、投递队列为空、无待确认，已持续 5 分钟。",
-      "请核对是否达到收尾条件：",
-      "· 若确认完成——请给客户最终总结（交付物／验证结论／遗留项）；",
-      "· 若还有未了事项（含你正在等待的客户答复之外的口头承诺）——继续处理或派发。",
-      "本提示仅为系统侧静默判定，不代表任何验收结论；是否收尾由你判断。",
-    ].join("\n"),
-  );
-  assert.ok(five.startsWith(`${WATCHDOG_CLOSURE_PREFIX} `), "文首统一 [系统·收束] + 空格");
-  assert.ok(five.includes("不代表任何验收结论"), "不强迫 su 断言「完成」");
-
-  assert.ok(renderClosurePrompt(30_000).includes("已持续 30 秒"), "复裁默认 30 s → 「30 秒」（< 60 s 秒档）");
-  assert.ok(renderClosurePrompt(45_000).includes("已持续 45 秒"), "N 参数化（秒档）");
-  assert.ok(renderClosurePrompt(59_999).includes("已持续 59 秒"), "60 s 边界内侧一点仍为秒档");
-  assert.ok(renderClosurePrompt(60_000).includes("已持续 1 分钟"), "60 s 边界：恰跨入分钟档");
-  assert.ok(renderClosurePrompt(300_000).includes("已持续 5 分钟"), "300 s → 「5 分钟」");
-  assert.ok(renderClosurePrompt(600_000).includes("已持续 10 分钟"), "分钟档无上限（V1 恰两档：秒/分钟）");
-});
-
-test("renderClosurePrompt(silentMs)：floor 下界口径（90500→1 分钟；亚秒→0 秒）；非法输入回退默认 30 秒；常量自洽", () => {
-  assert.ok(renderClosurePrompt(90_500).includes("已持续 1 分钟"), "分钟档 floor：显示值为时长下界，绝不夸大（90500 ms 不渲染「2 分钟」）");
-  assert.ok(renderClosurePrompt(500).includes("已持续 0 秒"), "秒档 floor：亚秒渲染「0 秒」（不编造、不上抛）");
-
-  const fallback = renderClosurePrompt(WATCHDOG_DEFAULT_SILENT_MINUTES * 60_000);
-  assert.ok(fallback.includes("已持续 30 秒"), "默认常量 × 60000 ≡ 30000 ms → 渲染「30 秒」");
-  assert.equal(WATCHDOG_DEFAULT_SILENT_MINUTES, 0.5, "复裁默认值：0.5 分钟（＝30 秒）——保名改值（外部按名导入面不破坏）");
-  assert.equal(WATCHDOG_DEFAULT_SILENT_MINUTES * 60_000, 30_000, "常量自洽：0.5 分钟恰 30 000 ms（精确、无浮点尾差）");
-  for (const bad of [0, -1, -0.5, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
-    assert.equal(renderClosurePrompt(bad), fallback, `非法输入 ${String(bad)} → 回退默认 30 秒渲染`);
-  }
-});
-
 // —— 文案单一来源：恢复回执（设计 §六） ——
 
 test("renderRecoveryReceipt：executed 逐行金文本；确认者 operator:<id>；时间可注入", () => {
@@ -348,6 +306,7 @@ test("WATCHDOG_PROMPT_GUIDELINES：三条纪律钉住（可自查／只提议不
   assert.ok(joined.includes("未获确认一律零执行"), "未获客户确认零执行");
   assert.ok(joined.includes("不得据此假设任何写权"), "不得据此假设写权");
   assert.ok(joined.includes("不构成任何授权或验收结论"), "看护提示 ≠ 授权/验收结论");
+  assert.ok(!joined.includes("收束"), "看护纪律不再提收束（2026-10-18 客户要求移除）");
   for (const line of WATCHDOG_PROMPT_GUIDELINES) assert.ok(!line.includes("\n"), "每条为单行准则条目");
 });
 

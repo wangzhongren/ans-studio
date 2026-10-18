@@ -35,6 +35,7 @@ export type GovernancePower =
   | "nomination"
   | "schedule"
   | "acceptance"
+  | "verification"
   | "app"
   | "customer"
   | "liaison";
@@ -49,6 +50,8 @@ export type GovernanceDecisionKind =
   | "appointment-write"
   | "schedule-write"
   | "acceptance"
+  /** 需求确认（Liaison 在 hand_off_intent 前的客户专属卡；判断 agent 永不代批）。 */
+  | "intent-confirm"
   | "migration"
   | "unclassified"; // 缺 cardKind 或选项 id 非标准：门禁一律拒绝，提示重发
 

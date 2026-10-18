@@ -21,6 +21,7 @@ import { join } from "node:path";
 
 import { resolveBoundarySection } from "../../src/common/门禁引擎/boundary-core.ts";
 import {
+  BUILT_IN_GOVERNANCE_ROLES,
   governanceCapabilitiesOf,
   governanceRoleOf,
 } from "../../src/common/门禁引擎/governance-roles.ts";
@@ -53,7 +54,7 @@ function allows(
 
 // —————————————————————— 1) 旧 trio 项目：自动获得 Liaison、零迁移 ——————————————————————
 
-test("旧 trio 项目：listProject 自动返回四内置（liaison 首位）、primaryRoleId=liaison、`.ans` 逐字节不变", async () => {
+test("旧 trio 项目：listProject 自动返回五内置（liaison 首位）、primaryRoleId=liaison、`.ans` 逐字节不变", async () => {
   const proj = join(ROOT, "old-trio");
   const ansDir = join(proj, ".ans");
   mkdirSync(ansDir, { recursive: true });
@@ -73,7 +74,7 @@ test("旧 trio 项目：listProject 自动返回四内置（liaison 首位）、
   assert.equal(listing.primaryRoleId, "liaison", "旧 trio 项目升级后默认入口为 Liaison");
   assert.deepEqual(
     listing.roles.map((r) => r.roleId),
-    ["liaison", "rapporteur", "nominator", "convener", "实现者"],
+    ["liaison", "rapporteur", "nominator", "convener", "verifier", "实现者"],
     "旧项目自动获得 Liaison，无需迁移目录或角色卡",
   );
   assert.deepEqual(listing.warnings, []);
@@ -155,6 +156,7 @@ test("Liaison 写权：docs/intents/** 放行；角色卡//.ans//proposals/契�
     "docs/flows/f.md",
     "docs/skills/s/SKILL.md",
     "docs/mcp/m.md",
+    "docs/verification/r-v1.md",
     "docs/governance/liaison/notes.md",
     "docs/workflow.md",
     "src/x.ts",
@@ -163,7 +165,7 @@ test("Liaison 写权：docs/intents/** 放行；角色卡//.ans//proposals/契�
   }
 });
 
-test("Liaison 越界拒绝文案（AC3）：指回正确归属——提案找报告员、角色卡/提名找提名官、流程找召集人、应用路径点名应用", async () => {
+test("Liaison 越界拒绝文案（AC3）：指回正确归属——提案找 Draft、角色卡/提名找 Crew、流程找 Steward、验收找 Proof、应用路径点名应用", async () => {
   const b = await resolveBoundarySection(
     "liaison",
     project({
@@ -175,13 +177,15 @@ test("Liaison 越界拒绝文案（AC3）：指回正确归属——提案找报
   );
   const ctx = { projectRoot: ROOT, skillRoot: SKILL };
   const cases: Array<[string, RegExp]> = [
-    ["docs/proposals/p-v1.md", /报告员 Rapporteur/],
-    ["docs/contracts/c-v1.md", /报告员 Rapporteur/],
-    ["角色卡/实现者/boundary.yaml", /提名官 Nominator/],
-    ["docs/nominations/n-v1.md", /提名官 Nominator/],
-    ["docs/skills/s/SKILL.md", /提名官 Nominator/],
-    ["docs/flows/f.md", /召集人 Convener/],
-    ["docs/workflow.md", /召集人 Convener/],
+    ["docs/proposals/p-v1.md", /Draft \/ 提案/],
+    ["docs/contracts/c-v1.md", /Draft \/ 提案/],
+    ["角色卡/实现者/boundary.yaml", /Crew \/ 组队/],
+    ["docs/nominations/n-v1.md", /Crew \/ 组队/],
+    ["docs/skills/s/SKILL.md", /Crew \/ 组队/],
+    ["docs/flows/f.md", /Steward \/ 统筹/],
+    ["docs/workflow.md", /Steward \/ 统筹/],
+    ["docs/verification/r-v1.md", /Proof \/ 验收/],
+    ["docs/governance/verifier/notes.md", /Proof \/ 验收/],
     [".ans/project.json", /只能由应用写/],
     ["docs/bootstrap-manifest.md", /只能由应用写/],
     ["角色卡/governance-boundary.yaml", /只能由应用写/],
@@ -212,12 +216,12 @@ test("Liaison 越界拒绝文案（AC3）：指回正确归属——提案找报
 
 // —————————————————————— 4) 能力矩阵：只有沟通/交接 ——————————————————————
 
-test("Liaison 能力：customerInput=false、handOffIntent=true；无 dispatch/install/roleStatus/recovery/shell", () => {
+test("Liaison 能力：customerInput=true（仅 intent-confirm）、handOffIntent=true；无 dispatch/install/roleStatus/recovery/shell", () => {
   const spec = governanceRoleOf("liaison");
   assert.ok(spec);
   assert.equal(governanceCapabilitiesOf("liaison"), spec!.capabilities, "能力矩阵单点来自注册表");
   assert.deepEqual(spec!.capabilities, {
-    customerInput: false,
+    customerInput: true,
     handOffIntent: true,
     requestClarification: false,
     dispatchTask: false,
@@ -230,6 +234,25 @@ test("Liaison 能力：customerInput=false、handOffIntent=true；无 dispatch/i
   });
   assert.equal(spec!.preauthorizedDirs.includes("docs/intents/"), true);
   assert.equal(spec!.preauthorizedDirs.some((d) => d.startsWith("docs/governance/")), false);
+});
+
+test("Lead 卡文本：需求确认——先发 intent-confirm 复述目标/范围/验收，confirm 后才交接", () => {
+  const t = governanceRoleOf("liaison")!.cardText;
+  assert.match(t, /`cardKind=intent-confirm`/);
+  assert.match(t, /`flowId=<intentId>`/);
+  assert.match(t, /选项固定为 `confirm` \/ `revise`/);
+  assert.match(t, /客户选 `confirm` 后才能调用 `hand_off_intent`/);
+  assert.match(t, /选 `revise` 时先按反馈修改意图文件/);
+  assert.match(t, /确认前不得交接/);
+  // 真机 2026-10-18：意图 frontmatter 只支持字符串值；YAML 列表会让 hand_off_intent 解析失败。
+  assert.match(t, /goal \/ scope \/ acceptance 必须是\*\*字符串值\*\*/);
+  assert.match(t, /不要用 YAML 列表（`-` 项）或嵌套映射/);
+  assert.match(t, /列表项会让 `hand_off_intent` 解析失败/);
+  // 其他角色的卡不得写 intent-confirm（卡片白名单不扩散）。
+  for (const spec of BUILT_IN_GOVERNANCE_ROLES) {
+    if (spec.id === "liaison") continue;
+    assert.doesNotMatch(spec.cardText, /intent-confirm/, `${spec.id} 不写 intent-confirm`);
+  }
 });
 
 // —————————————————————— 5) 保留 id 守卫 ——————————————————————

@@ -75,6 +75,11 @@
   var SYSTEM_HEAD = "[系统·";
   var SYSTEM_SUB_MAX = 12;
 
+  // 客户要求（2026-10-18）：「内部报告不要直接转述给客户」——`[系统·治理反馈]` 的原文只留在 `body`/
+  // 会话记录里（模型提示不受影响），展示面固定为一句短提示（不显示内部原文）。
+  var GOVERNANCE_FEEDBACK_SUB = "治理反馈";
+  var GOVERNANCE_FEEDBACK_DISPLAY = "内部反馈已交给主理，稍后由主理汇总告知你。";
+
   function classifySystemMessage(body) {
     if (body.indexOf(SYSTEM_HEAD) !== 0) return null;
     var rest = body.slice(SYSTEM_HEAD.length);
@@ -87,6 +92,7 @@
     // W6b（2026-10-16 客户批准）：正文**展示**去掉文首标记（chip「系统消息 · <子类>」已承载）——`displayBody`
     // 仅供呈现层取用；`body` 保持投递原文（归类判据/身份不因此改变：判据仍在原文上）。
     var displayBody = after.replace(/^\s+/, "");
+    if (sub === GOVERNANCE_FEEDBACK_SUB) displayBody = GOVERNANCE_FEEDBACK_DISPLAY;
     return { kind: "system", label: "系统消息 · " + sub, sourceRoleId: "", body: body, displayBody: displayBody };
   }
 

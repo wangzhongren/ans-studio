@@ -1,5 +1,17 @@
 # 运行时核心变更记录
 
+## 2026-10-18 客户需求确认卡 `intent-confirm`（共享契约层，已实施待验证）
+
+客户「都按推荐的来」：trio 增加第五个内置治理角色，并给主理加「需求确认卡」。本角色只落共享契约层，不改角色注册表/UI/桌面。
+
+①`src/model/runtime.ts`：`GovernanceChoiceCardKind` 增 `"intent-confirm"`（`GovernanceCardKind` 随之包含）；`GOVERNANCE_CARD_GROUP` 键类型改为 `Readonly<Partial<Record<GovernanceCardKind, GovernanceJudgeGroup>>>`，**故意不添加 `intent-confirm` 键**——该卡是主理（Lead/liaison）在 `hand_off_intent` 前发给客户的**需求确认卡**（选项固定 `confirm`/`revise`），属客户本人专属，`governanceCardGroup("intent-confirm") === undefined` ⇒ 即使两个开关都开，判断 agent 也永不介入/不代批；注释写明理由。既有六个卡种映射不变。
+②`src/provider/runtime/schema.ts`：`request_choice` 的 `cardKind` enum 增 `"intent-confirm"`；描述补「仅主理（Lead/liaison）在 `hand_off_intent` 前发出，选项 id 固定 `confirm`/`revise`，由客户本人确认，判断 agent 不代批」。
+③`src/provider/runtime/tools.ts`（运行时核心边界内的必要一行）：`CHOICE_CARD_KINDS` 同步加入 `intent-confirm`——否则 handler 白名单会在触达客户通道前拒绝 schema 已允许的卡种。
+
+**第五个内置角色 `verifier`（Proof/验收）：本批不改注册表。** `GovernanceFunction` 定义在 `src/model/role.ts`、`Record<GovernanceFunction,…>` 标签映射在编排 `govern-session.ts`、显示名/注册表在门禁引擎 `governance-roles.ts`——均**不在本角色边界**。需其属主增 `"verification"` 与 Lead/Draft/Crew/Steward/Proof 显示名。本角色共享契约层不引用 `GovernanceFunction`，类型层无需改动。
+
+**测试**：`test/runtime-core/governance-judge.test.ts` 映射用例增 `governanceCardGroup("intent-confirm")===undefined` 且映射无该键；`test/runtime-core/governance-flow-metadata.test.ts` schema enum 断言更新并新增 intent-confirm 透传用例（`confirm`/`revise` 选项、请求/metadata cardKind）。`node --test "test/runtime-core/**/*.test.ts"`：**204 计 / 201 过 / 3 红**（3 红均为既有 Windows `symlink EPERM`：session-store ×2、tools ×1）。`npx tsc --noEmit`：**0 错**。未跑真实模型/凭据/网络；未 git 提交。
+
 ## 2026-10-18 信息性读取结果（not-found / not-a-file / not-a-directory）不计入 `deniedReads`（真机修复，已实施待验证）
 
 真机误判（live-fix-check，schedule-write 首建 `docs/flows/<flow>.md`）：判断 agent 尝试读/列**尚不存在**的 `docs/flows`，`resolveJudgeRead` 记 `not-found` 并 `deniedReads += 1` ⇒ 驱动 `damageCode` 判 `read-denied` ⇒ 自动代批被降级为手动卡。路径不存在是正常探测，不是策略拒绝。

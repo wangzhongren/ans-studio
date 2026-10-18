@@ -148,7 +148,7 @@ export function describeTool(name: string): ToolDescription {
           },
           cardKind: {
             type: "string",
-            enum: ["proposal", "appointment", "acceptance"],
+            enum: ["proposal", "appointment", "acceptance", "intent-confirm"],
             description:
               "Optional governance card kind for this choice; a missing or foreign kind cannot unlock any governance gate",
           },
@@ -161,8 +161,10 @@ export function describeTool(name: string): ToolDescription {
         "返回客户已选中的选项 id。**未获明确选择（拒绝/超时/通道不可用）→ 不要据此写盘，也不得擅自代选**；如实告知客户。" +
         "若 preview 里展示将要写出的内容，**必须列出具体路径**（相对项目根、含目录）——但注意：" +
         "**选择≠写盘同意**或扩张写权。已接受项目边界内的已授权任务无需重复确认；真正新建或扩张角色边界、治理写集仍由 su 请求客户确认，仅 confirmed:true 才执行该治理变更。" +
-        "治理会话可附可选 `flowId`/`stepId`/`cardKind`（cardKind 仅 `proposal` / `appointment` / `acceptance`）；" +
-        "这些字段只用于卡片显示与账本分类，**字段本身不构成任何授权**——治理门禁只认应用签发的客户决定。",
+        "治理会话可附可选 `flowId`/`stepId`/`cardKind`（cardKind 仅 `proposal` / `appointment` / `acceptance` / `intent-confirm`）；" +
+        "这些字段只用于卡片显示与账本分类，**字段本身不构成任何授权**——治理门禁只认应用签发的客户决定。" +
+        "`intent-confirm`（需求确认）**仅主理（Lead/liaison）在 `hand_off_intent` 前发出**：选项 id 固定 `confirm` / `revise`，" +
+        "由**客户本人**确认；判断 agent 永不代批（该卡不属于任何代批分组）。",
       promptGuidelines: [
         "需要客户在若干选项中做选择时用 request_choice；未获明确回答 → 不要据此写盘，也不得假设客户的选择。",
         "request_choice 的回答**不构成写盘同意**或扩张写权；已接受边界内的已授权任务无需重复确认，新建或扩张角色边界、治理写集仍由 su 经 request_confirmation 请求确认。",

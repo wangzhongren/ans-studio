@@ -58,6 +58,9 @@ test("cardKind → group 单一映射：六个卡种全覆盖；未知/缺席永
   assert.equal(governanceCardGroup("acceptance"), "decision");
   assert.equal(governanceCardGroup(undefined), undefined);
   assert.equal(governanceCardGroup("unknown-kind" as never), undefined, "运行时未知值也必须返回 undefined");
+  // 2026-10-18 客户拍板：intent-confirm 是客户本人专属的需求确认卡，判断 agent 永不介入。
+  assert.equal(governanceCardGroup("intent-confirm"), undefined, "需求确认卡不得代批");
+  assert.equal(Object.prototype.hasOwnProperty.call(GOVERNANCE_CARD_GROUP, "intent-confirm"), false, "映射故意不包含 intent-confirm 键");
   assert.equal(Object.isFrozen(GOVERNANCE_CARD_GROUP), true, "映射冻结，禁止第二份/就地改写");
 });
 

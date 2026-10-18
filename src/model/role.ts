@@ -11,8 +11,8 @@ export type RoleKind = "project" | "built-in-governance";
  * 冻结契约：`角色卡/项目管理/docs/design/2026-10-17_design_governance-trio-review.md` §5.1）。
  *
  * - `"single"`：旧治理模型（内置角色 `su`）——**缺省值**，任何未显式声明 trio 的调用方行为逐字不变。
- * - `"trio"`：三权治理模型（**三权不变、角色四名**：`liaison` / `rapporteur` / `nominator` /
- *   `convener` 四个内置治理角色；`trio` 命名的是权力模型而不是角色数量）。
+ * - `"trio"`：三权治理模型（**三权不变、五个内置治理角色**：`liaison` / `rapporteur` /
+ *   `nominator` / `convener` / `verifier` 五个内置治理角色；`trio` 命名的是权力模型而不是角色数量）。
  *
  * 模型来源：`src/common/shared/config-loader.ts::readGovernanceModel`（PM 属主，只读消费）；
  * `listProject` 按本模型枚举内置角色，`resolveBoundarySection` 按本模型选择边界来源。
@@ -21,11 +21,11 @@ export type GovernanceModel = "single" | "trio";
 
 /**
  * 内置治理角色的治理职能：沟通权 `liaison` / 提案权 `proposal` / 提名权 `nomination` /
- * 编排权 `schedule`（2026-10-18 客户拍板「三权不变、角色四名」：客户沟通从 Rapporteur 拆给
- * Liaison，作为默认主入口；最终批准权归属不变）。
- * 仅 trio 的四个内置治理角色携带；`su`（single）与项目角色为 `undefined`。
+ * 编排权 `schedule` / 验收权 `verification`（2026-10-18 客户拍板「都按推荐的来」：新增第五个
+ * 内置治理角色 Proof / 验收 `verifier`；最终批准权归属不变）。
+ * 仅 trio 的五个内置治理角色携带；`su`（single）与项目角色为 `undefined`。
  */
-export type GovernanceFunction = "liaison" | "proposal" | "nomination" | "schedule";
+export type GovernanceFunction = "liaison" | "proposal" | "nomination" | "schedule" | "verification";
 
 /** 角色卡声明的协作信息，仅供展示；不授予权限或改变角色身份。 */
 export interface RoleGroupMetadata {
@@ -46,7 +46,7 @@ export interface ResolvedRole extends RoleGroupMetadata {
   boundary: BoundarySection1;
   boundarySource: string;
   location: RoleLocation;
-  /** 仅 trio 的四个内置治理角色携带（liaison/proposal/nomination/schedule）；su 与项目角色不出现。 */
+  /** 仅 trio 的五个内置治理角色携带（liaison/proposal/nomination/schedule/verification）；su 与项目角色不出现。 */
   governanceFunction?: GovernanceFunction;
 }
 

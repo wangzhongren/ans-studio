@@ -96,9 +96,30 @@ function handoffEntry(over: Partial<GovernanceLedgerEntry> = {}): GovernanceLedg
   };
 }
 
+/** 客户需求确认决定（initial 交接的前置机械门槛；2026-10-18 客户拍板）。 */
+function intentConfirmEntry(over: Partial<GovernanceLedgerEntry> = {}): GovernanceLedgerEntry {
+  return {
+    at: new Date().toISOString(),
+    kind: "customer.decision",
+    actorRoleId: "liaison",
+    power: "liaison",
+    flowId: FLOW_ID,
+    decisionKind: "intent-confirm",
+    customerDecision: "accepted",
+    messageSummary: "需求确认",
+    ...over,
+  };
+}
+
+async function seedIntentConfirm(root: string, over: Partial<GovernanceLedgerEntry> = {}): Promise<void> {
+  await appendGovernanceLedger(root, intentConfirmEntry(over));
+  await flushGovernanceLedger(root);
+}
+
 test("合法 initial：返回路径/文件哈希；dedupe key 稳定", async () => {
   await withRoot(async (root) => {
     writeIntent(root);
+    await seedIntentConfirm(root);
     const validation = await validateIntentHandoff(baseInput(root), {
       governanceModel: "trio",
       governanceFunction: "liaison",
@@ -121,6 +142,58 @@ test("合法 initial：返回路径/文件哈希；dedupe key 稳定", async () 
       key,
       intentHandoffDedupeKey({ intentId: INTENT_ID, handoffKind: "clarification", sha256: validation.artifactSha256 }),
     );
+  });
+});
+
+test("交接门禁：initial 需客户 intent-confirm accepted（缺失/revise/flowId 不符均拒绝）", async () => {
+  await withRoot(async (root) => {
+    writeIntent(root);
+
+    // ① 无确认决定 → 拒绝。
+    const noConfirm = await validateIntentHandoff(baseInput(root));
+    assert.equal(noConfirm.ok, false);
+    if (!noConfirm.ok) {
+      assert.equal(noConfirm.code, "intent-not-confirmed");
+      assert.match(noConfirm.message, /意图「intent-a」尚未经客户确认/);
+      assert.match(noConfirm.message, /cardKind=intent-confirm/);
+    }
+
+    // ② 客户选择 revise → changes-requested，不算确认。
+    await seedIntentConfirm(root, { customerDecision: "changes-requested" });
+    const revised = await validateIntentHandoff(baseInput(root));
+    assert.equal(revised.ok, false);
+    if (!revised.ok) assert.equal(revised.code, "intent-not-confirmed");
+
+    // ③ confirm 但 flowId 与 (flowId ?? intentId) 不符 → 拒绝。
+    await seedIntentConfirm(root, { flowId: "flow-b" });
+    const mismatched = await validateIntentHandoff(baseInput(root));
+    assert.equal(mismatched.ok, false);
+    if (!mismatched.ok) assert.equal(mismatched.code, "intent-not-confirmed");
+
+    // ④ 正确的 confirm（flow-a，accepted）→ 放行。
+    await seedIntentConfirm(root, { flowId: FLOW_ID });
+    const confirmed = await validateIntentHandoff(baseInput(root));
+    assert.equal(confirmed.ok, true);
+
+    // ⑤ 客户随后改口 revise：最后一条 intent-confirm 是 changes-requested ⇒ 旧 accepted 不得放行。
+    await seedIntentConfirm(root, { flowId: FLOW_ID, customerDecision: "changes-requested" });
+    const retracted = await validateIntentHandoff(baseInput(root));
+    assert.equal(retracted.ok, false);
+    if (!retracted.ok) {
+      assert.equal(retracted.code, "intent-not-confirmed");
+      assert.match(retracted.message, /尚未经客户确认/);
+    }
+  });
+});
+
+test("交接门禁：revision 不受需求确认门槛约束（无需新的 intent-confirm）", async () => {
+  await withRoot(async (root) => {
+    writeIntent(root, { handoffKind: "revision" }, "客户原话：补充验收口径。\n");
+    await appendGovernanceLedger(root, handoffEntry({ handoffKind: "initial" }));
+    await flushGovernanceLedger(root);
+    // 账本里没有 intent-confirm，但 revision 只需既有同 intent 交接。
+    const revision = await validateIntentHandoff(baseInput(root, { handoffKind: "revision" }));
+    assert.equal(revision.ok, true);
   });
 });
 
@@ -179,6 +252,7 @@ test("文件是权威：入参与文件不一致/文件 handoffKind/flowId 不�
     if (!flowMismatch.ok) assert.equal(flowMismatch.code, "flow-id-mismatch");
 
     // 入参缺 flowId 但文件给出 → 采用文件值（不猜测、不拒绝）。
+    await seedIntentConfirm(root);
     const adopted = await validateIntentHandoff(baseInput(root, { flowId: undefined }));
     assert.equal(adopted.ok, true);
     if (adopted.ok) assert.equal(adopted.flowId, FLOW_ID);
@@ -293,6 +367,7 @@ test("validateIntentHandoff：块标量意图文件（customerQuote: |）成功�
       join(root, "docs", "intents", `${INTENT_ID}.md`),
       `---\n${fm}\n---\n客户原话：做一个受治理的提案流程。\n`,
     );
+    await seedIntentConfirm(root);
     const validation = await validateIntentHandoff(baseInput(root, {
       goal: "让客户能接受 一份提案",
       scope: "只读分析，\n不改代码",
@@ -307,6 +382,7 @@ test("validateIntentHandoff：块标量意图文件（customerQuote: |）成功�
 test("去重 / initial 一次性 / clarification 需既有交接", async () => {
   await withRoot(async (root) => {
     writeIntent(root);
+    await seedIntentConfirm(root);
     const first = await validateIntentHandoff(baseInput(root));
     assert.equal(first.ok, true);
     if (!first.ok) return;
@@ -351,6 +427,7 @@ test("clarification/revision 没有既有成功交接 → 拒绝", async () => {
 test("每轮一次：同会话同轮第二次 → turn-limit；缺 turnId → 降级并 warning", async () => {
   await withRoot(async (root) => {
     writeIntent(root);
+    await seedIntentConfirm(root);
     const first = await validateIntentHandoff(baseInput(root));
     assert.equal(first.ok, true);
     if (!first.ok) return;

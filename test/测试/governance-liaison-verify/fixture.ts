@@ -1,5 +1,5 @@
 // test/测试/governance-liaison-verify/fixture.ts
-// 测试角色：治理四角色（Liaison 联络官）独立端到端验收夹具（2026-10-18）。
+// 测试角色：治理五角色（Lead / 主理）独立端到端验收夹具（2026-10-18）。
 //
 // 纪律（沿用本角色先例）：
 //   · **独立构造**：只读导入产品公开面（`listProject`/`openRoleSession`/`openGovernanceSession`/
@@ -34,6 +34,7 @@ import type { AdapterCapabilities } from "../../../src/pipeline/orchestration/ru
 import { buildGovernedTools, type ToolDefinition } from "../../../src/provider/runtime/tools.ts";
 import { listProject } from "../../../src/service/role/resolve-role.ts";
 import {
+  appendGovernanceLedger,
   flushGovernanceLedger,
   readGovernanceLedger,
   type GovernanceLedgerEntry,
@@ -64,7 +65,7 @@ export const SINGLE_GOV_YAML = [
   "",
 ].join("\n");
 
-export const FOUR_ROLE_IDS = ["liaison", "rapporteur", "nominator", "convener"] as const;
+export const FIVE_ROLE_IDS = ["liaison", "rapporteur", "nominator", "convener", "verifier"] as const;
 
 export function sha256(data: Buffer | string): string {
   return createHash("sha256").update(data).digest("hex");
@@ -116,7 +117,7 @@ export function trioProject(root: string, overrides: Partial<ProjectConfig> = {}
     skillRoot: root,
     roles: {},
     governanceModel: "trio",
-    builtInRoles: [...FOUR_ROLE_IDS],
+    builtInRoles: [...FIVE_ROLE_IDS],
     governanceBoundary: {
       path: GOV_REL,
       acceptance: { accepted: true, source: "test:liaison-trio-accepted" },
@@ -324,6 +325,27 @@ export async function waitForLedger(
     if (Date.now() - start > timeoutMs) return snapshot;
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
+}
+
+/**
+ * 种入客户对需求（intent-confirm）的决定（2026-10-18 客户拍板：initial hand_off 前必须有）。
+ * `decision` 默认 accepted；传 `changes-requested` 可模拟「客户最后一条改成 revise」。
+ */
+export async function seedIntentConfirm(
+  root: string,
+  options: { flowId?: string; intentId?: string; decision?: "accepted" | "changes-requested" } = {},
+): Promise<void> {
+  const result = await appendGovernanceLedger(root, {
+    at: new Date().toISOString(),
+    kind: "customer.decision",
+    ...(options.flowId !== undefined ? { flowId: options.flowId } : {}),
+    ...(options.intentId !== undefined ? { intentId: options.intentId } : {}),
+    actorRoleId: "liaison",
+    power: "liaison",
+    decisionKind: "intent-confirm",
+    customerDecision: options.decision ?? "accepted",
+  });
+  if (!result.ok) throw new Error(`需求确认种子失败：${result.message}`);
 }
 
 /** 客户通道：choice 返回给定选项；confirm 返回给定布尔值；并记录被问到的请求。 */

@@ -27,6 +27,7 @@ import {
 import { openGovernanceSession, runGovernSession } from "../../src/pipeline/orchestration/govern-session.ts";
 import { classifyShell, defaultShellRules } from "../../src/common/门禁引擎/classify-shell.ts";
 import {
+  appendGovernanceLedger,
   flushGovernanceLedger,
   governanceLedgerPath,
   readGovernanceLedger,
@@ -136,8 +137,22 @@ function writeIntentFile(root: string, intentId = "intent-a", handoffKind = "ini
   );
 }
 
-function handoffPayload(over: Partial<HandOffIntentPayload> = {}): HandOffIntentPayload {
-  return {
+/** 需求确认前置（2026-10-18）：客户对 flow-a 的 intent-confirm accepted 决定。 */
+async function seedIntentConfirm(root: string): Promise<void> {
+  await appendGovernanceLedger(root, {
+    at: new Date().toISOString(),
+    kind: "customer.decision",
+    actorRoleId: "liaison",
+    power: "liaison",
+    flowId: "flow-a",
+    decisionKind: "intent-confirm",
+    customerDecision: "accepted",
+    messageSummary: "需求确认",
+  });
+  await flushGovernanceLedger(root);
+}
+
+function handoffPayload(over: Partial<HandOffIntentPayload> = {}): HandOffIntentPayload {  return {
     intentId: "intent-a",
     handoffKind: "initial",
     goal: "让客户能接受一份提案",
@@ -268,7 +283,8 @@ test("能力矩阵：Liaison/Rapporteur/Nominator/Convener/su 按注册表注入
     );
     await lh.dispose();
     assert.ok(l.caps?.handOffIntent, "Liaison 应注入 handOffIntent");
-    for (const key of GOVERNANCE_KEYS.filter((k) => k !== "handOffIntent")) {
+    assert.ok(l.caps?.customerInput, "Liaison 有客户需求确认通道（intent-confirm）");
+    for (const key of GOVERNANCE_KEYS.filter((k) => k !== "handOffIntent" && k !== "customerInput")) {
       assert.equal(l.caps?.[key], undefined, `Liaison 不应注入 ${key}`);
     }
 
@@ -347,6 +363,7 @@ test("能力矩阵：Liaison/Rapporteur/Nominator/Convener/su 按注册表注入
 test("hand_off_intent：校验通过 → 投递回调 + 账本 intent.handed-off（power=liaison）", async () => {
   await withRoot(async (root) => {
     writeIntentFile(root);
+    await seedIntentConfirm(root);
     const project = withBuiltIn(trioProject(root), "liaison");
     const delivered: HandOffIntentPayload[] = [];
     const captured = {} as Captured;
@@ -396,6 +413,7 @@ test("hand_off_intent：校验通过 → 投递回调 + 账本 intent.handed-off
 test("hand_off_intent：投递失败 → 如实回执、不重试、零账本", async () => {
   await withRoot(async (root) => {
     writeIntentFile(root);
+    await seedIntentConfirm(root);
     const project = withBuiltIn(trioProject(root), "liaison");
     let calls = 0;
     const captured = {} as Captured;
@@ -462,6 +480,7 @@ test("hand_off_intent：校验失败（意图文件缺失）→ 不投递、零�
 test("hand_off_intent：每轮一次 + 去重（成功一次后不再投递）", async () => {
   await withRoot(async (root) => {
     writeIntentFile(root);
+    await seedIntentConfirm(root);
     const project = withBuiltIn(trioProject(root), "liaison");
     let calls = 0;
     const captured = {} as Captured;
@@ -502,6 +521,7 @@ async function consume(handle: { events(): AsyncIterable<{ kind: string }> }): P
 test("hand_off_intent：同轮并发两次 → 串行化后仅一次成功（每轮一次机械成立）", async () => {
   await withRoot(async (root) => {
     writeIntentFile(root);
+    await seedIntentConfirm(root);
     const project = withBuiltIn(trioProject(root), "liaison");
     let calls = 0;
     const captured = {} as Captured;
@@ -767,13 +787,13 @@ test("提示词：Liaison 沟通权纪律（数据驱动名称），不写「已
     );
     assert.equal(result.code, EXIT_OK);
     assert.ok(captured.prompt !== undefined);
-    assert.match(captured.prompt!, /沟通权纪律（联络官 Liaison/);
+    assert.match(captured.prompt!, /沟通权纪律（Lead \/ 主理/);
     assert.match(captured.prompt!, /docs\/intents\//);
     assert.match(captured.prompt!, /hand_off_intent/);
     assert.match(captured.prompt!, /交接 ≠ 客户批准/);
     assert.doesNotMatch(captured.prompt!, /已批准|已授权/);
     // 数据驱动：标题必须来自注册表 displayName，而不是写死英文角色名。
-    assert.match(captured.prompt!, /联络官 Liaison/);
+    assert.match(captured.prompt!, /Lead \/ 主理/);
   });
 });
 

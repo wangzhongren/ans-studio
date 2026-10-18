@@ -13,9 +13,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  WATCHDOG_SILENCE_MS,
   WATCHDOG_TICK_MS,
-  WATCHDOG_SILENCE_ENV,
   WATCHDOG_TICK_ENV,
   TURN_DEADLINE_RATIO,
   QUEUE_HEAD_AGE_MS,
@@ -31,8 +29,6 @@ import {
 } from "../../../app/desktop/watchdog.ts";
 import {
   RECOVERY_ACTIONS as O1_ACTIONS,
-  WATCHDOG_DEFAULT_SILENT_MINUTES,
-  renderClosurePrompt,
   renderRecoveryReceipt,
   renderWatchdogAlert,
   renderWatchdogRecovery,
@@ -48,27 +44,19 @@ const read = (rel: string): string => fs.readFileSync(path.join(REPO, rel), "utf
 
 // ————————————————— ① 9 项裁定逐条 —————————————————
 
-test("裁定 1（2026-10-16 复裁）：静默 30s / tick 30s——缺省常量恰批准值；**仅 env 可调**（覆盖名唯一、未设/非法回落）；UI/设置面板零暴露", () => {
-  assert.equal(WATCHDOG_SILENCE_MS, 30_000, "静默缺省 30s（复裁修订：5min → 30s＝一个 tick 最小防抖）");
+test("裁定 1（2026-10-18 修订）：完成态静默收束已移除——无 silenceMs/静默阈值；tick 30s 且仅 env 可调", () => {
   assert.equal(WATCHDOG_TICK_MS, 30 * 1000, "tick 缺省 30s");
-  assert.equal(WATCHDOG_SILENCE_ENV, "ANS_DESKTOP_WATCHDOG_SILENCE_MS");
   assert.equal(WATCHDOG_TICK_ENV, "ANS_DESKTOP_WATCHDOG_TICK_MS");
-  assert.equal(WATCHDOG_DEFAULT_SILENT_MINUTES, 0.5, "批准默认值（保名改值：0.5 分钟＝30 秒——文案回退单一来源）");
-  assert.equal(
-    WATCHDOG_DEFAULT_SILENT_MINUTES * 60_000,
-    WATCHDOG_SILENCE_MS,
-    "两模块默认一致：0.5 分钟 × 60 000 ＝ 30 000 ms（桌面判定与编排文案回退＝同一复裁值，不许单侧漂移）",
-  );
-  // env 覆盖生效 + 未设/非法回落默认（不静默改口径）
-  assert.equal(resolveWatchdogConfig({}).silenceMs, 30_000, "未设 env ⇒ 默认 30 000（复裁值）");
-  assert.equal(resolveWatchdogConfig({ [WATCHDOG_SILENCE_ENV]: "60000", [WATCHDOG_TICK_ENV]: "5000" }).silenceMs, 60000);
-  assert.equal(resolveWatchdogConfig({ [WATCHDOG_SILENCE_ENV]: "5000" }).tickMs, WATCHDOG_TICK_MS, "未设 tick ⇒ 默认");
-  for (const bad of ["0", "-1", "abc", "NaN", " "]) {
-    assert.equal(resolveWatchdogConfig({ [WATCHDOG_SILENCE_ENV]: bad }).silenceMs, WATCHDOG_SILENCE_MS, `非法 ${bad} 回落默认`);
-  }
-  // start() 使用配置 tick（源码钉）；env 名仅出现在看护器文件
+  const defaults = resolveWatchdogConfig({});
+  assert.equal(defaults.tickMs, WATCHDOG_TICK_MS, "未设 env ⇒ 默认 tick");
+  assert.equal("silenceMs" in defaults, false, "看护配置不再有静默阈值（客户 2026-10-18 移除收束）");
+  assert.equal(resolveWatchdogConfig({ [WATCHDOG_TICK_ENV]: "5000" }).tickMs, 5000, "tick 可由 env 覆盖");
+  // 源码钉：看护不再引用完成态收束实现；env 名仅出现在看护器文件
   const wd = read("app/desktop/watchdog.ts");
   assert.ok(wd.includes("setInterval(tick, config.tickMs)"), "start() 使用生效 tick");
+  assert.equal(wd.includes("WATCHDOG_CLOSURE_PREFIX"), false, "看护不得再投 [系统·收束]");
+  assert.equal(wd.includes("renderClosurePrompt"), false, "看护不得再调用收束渲染");
+  assert.equal(wd.includes("silenceMs"), false, "看护配置不再有静默阈值");
   for (const f of ["app/renderer/renderer.js", "app/renderer/index.html", "app/renderer/styles.css", "app/main.ts", "app/desktop/interface.ts"]) {
     assert.ok(!read(f).includes("ANS_DESKTOP_WATCHDOG"), `${f} 不得暴露看护阈值 env（仅 env 可调，无设置项）`);
   }
@@ -130,15 +118,14 @@ test("裁定 6：工具名 role_status / session_tail / propose_recovery——sc
   for (const name of ["role_status", "session_tail", "propose_recovery"]) assert.ok(card.includes(name), `su 卡引用 ${name}`);
 });
 
-test("裁定 8：完成态判定**不排除客户活跃**——静默谓词项恰六项、无客户活跃项", () => {
+test("裁定 8（2026-10-18 修订）：完成态静默收束已移除——看护无 silent 谓词/完成态状态机；四信号仍在", () => {
   const wd = read("app/desktop/watchdog.ts");
-  const m = /const silent =\n([\s\S]*?);\n/.exec(wd);
-  assert.ok(m, "找得到静默谓词");
-  const expr = m![1];
-  for (const term of ["roles.every((r) => !r.busy)", "queues.every((q) => q.items.length === 0)", "activeDeliveries === 0", "pendingConfirmationsTotal === 0", "!snapshot.chainsActive", "!govBusy"]) {
-    assert.ok(expr.includes(term), `谓词含：${term}`);
+  assert.equal(/const silent =/.test(wd), false, "不再有静默谓词（验收通过即结束）");
+  assert.equal(wd.includes("closureStates"), false, "不再有完成态收束状态机");
+  assert.equal(wd.includes("silenceMs"), false, "不再有静默阈值");
+  for (const term of ["turn-deadline", "queue-stuck", "cmd-timeout", "repeat-fail"]) {
+    assert.ok(wd.includes(term), `告警信号仍保留：${term}`);
   }
-  assert.ok(!/customer|clientActivity|recentInput/.test(expr), "谓词不含「客户活跃」排除项（裁定：不排除）");
 });
 
 test("裁定 9：V1 无界面级告警——无 OS 通知/托盘/新角标；watchdog 不进入渲染侧代码；告警只进 su 会话与聊天流系统行", () => {
@@ -190,7 +177,6 @@ test("看护永不改判定：四类渲染输出的正文零授权语义（行�
     renderWatchdogAlert({ signal: "cmd-timeout", roleId: "X", facts: ["02:10:03（结构化事实 display.process.timedOut=true）"] }),
     renderWatchdogRecovery({ signal: "queue-stuck", roleId: "X", hits: 3, suppressed: 2 }),
     renderWatchdogStormGuard(4),
-    renderClosurePrompt(30_000),
     renderRecoveryReceipt({ outcome: "executed", action: "abort-turn", targetRoleId: "X", operatorId: "op", at: "2026-10-16T00:00:00.000Z" }),
     renderRecoveryReceipt({ outcome: "declined", action: "redeliver", targetRoleId: "X", operatorId: "op" }),
   ];
@@ -244,7 +230,6 @@ test("范围落点：W1-W5/R1/R2/O1/G/U1 逐项文件与关键符号在位（存
     ["W1", "app/desktop/session.ts", "observeWatchdog"],
     ["W2", "app/desktop/session.ts", 'kind: "handback" | "dispatch" | "message" | "system"'],
     ["W2", "app/desktop/session.ts", "watchdogDeliver(projectRoot: string"],
-    ["W3", "app/desktop/watchdog.ts", "closureStates"],
     ["W4", "app/desktop/session.ts", "async rebuildSession(target: string | SessionTarget)"],
     ["W4", "app/desktop/session.ts", "async redeliverNudge(target: string | SessionTarget, itemId?: string)"],
     ["W5", "app/desktop/session.ts", "private async proposeRecovery("],
@@ -258,7 +243,6 @@ test("范围落点：W1-W5/R1/R2/O1/G/U1 逐项文件与关键符号在位（存
     ["R2", "src/provider/runtime/schema.ts", 'if (name === "propose_recovery")'],
     ["O1", "src/pipeline/orchestration/run-role.ts", "const roleStatus = cap?.roleStatus === true ? input.roleStatus : undefined;"],
     ["O1", "src/common/编排/watchdog.ts", "export function renderWatchdogAlert"],
-    ["O1", "src/common/编排/watchdog.ts", "export function renderClosurePrompt"],
     ["O1", "src/common/编排/watchdog.ts", "export function renderRecoveryReceipt"],
     ["G", "src/common/门禁引擎/boundary-core.ts", "看护职责："],
     ["U1", "app/renderer/tool-rows.js", "SYSTEM_HEAD"],

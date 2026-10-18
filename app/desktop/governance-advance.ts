@@ -123,17 +123,20 @@ export interface FlowCompletionLedgerEntryLike {
   customerDecision?: string;
 }
 
+/** 验收步骤的流程单写法（2026-10-18 真机：nomination/delivery/**verification**；旧版用 `acceptance`）。 */
+const VERIFICATION_STEP_IDS: ReadonlySet<string> = new Set(["acceptance", "verification"]);
+
 /**
  * 「流程全部完成」的**触发门**（2026-10-18 收尾推进）：**执行步骤**全部 `done`、每步都有
- * `dispatch.accepted`、无未结算决定、尚无验收决定。返回 `undefined` = 可以派 Rapporteur 出验收；
+ * `dispatch.accepted`、无未结算决定、尚无验收决定。返回 `undefined` = 可以派 Proof / 验收 出验收；
  * 否则返回人话原因（调用方只记诊断、**不派、不循环**）。本函数**不是**验收判定——验收卡仍由
  * 决策开关/判断 agent/客户手批。
  *
- * **验收步骤单列（2026-10-18 真机修正——验收鸡生蛋）**：`acceptance` 是验收步骤本身，不能算进
- * 「执行步骤必须 done + 必须有 dispatch.accepted」：它本就 pending，且应用用 `sendBackground` 派
- * Rapporteur 不写 `dispatch.accepted`——若把它算进去，验收任务永远派不出去。现只对**执行步骤**
- * （`id !== "acceptance"`）做完成判定；验收步骤自身：缺失 ⇒ fail-closed 不派；已 `done` ⇒ 不重复派；
- * 已有 `customer.decision acceptance` ⇒ 不重复派；其余（pending/in-progress）⇒ 允许派。
+ * **验收步骤单列（2026-10-18 真机修正——验收鸡生蛋）**：验收步骤（`acceptance` 或 `verification`）
+ * 是验收步骤本身，不能算进「执行步骤必须 done + 必须有 dispatch.accepted」：它本就 pending，且应用用
+ * `sendBackground` 派 Proof / 验收 不写 `dispatch.accepted`——若把它算进去，验收任务永远派不出去。
+ * 现只对**执行步骤**（排除 `VERIFICATION_STEP_IDS`）做完成判定；验收步骤自身：缺失 ⇒ fail-closed 不派；
+ * 已 `done` ⇒ 不重复派；已有 `customer.decision acceptance` ⇒ 不重复派；其余（pending/in-progress）⇒ 允许派。
  */
 export function flowCompletionIssue(
   flowId: string,
@@ -144,8 +147,8 @@ export function flowCompletionIssue(
   const parsed = parseFlowStepStatuses(markdown);
   if (!parsed.wellFormed || parsed.steps.length === 0) return "流程单缺少可解析的步骤表";
   // 验收步骤是派发目标本身，不参与「执行完成」判定（见函数注释）。
-  const executionSteps = parsed.steps.filter((step) => step.id !== "acceptance");
-  const acceptanceStep = parsed.steps.find((step) => step.id === "acceptance");
+  const executionSteps = parsed.steps.filter((step) => !VERIFICATION_STEP_IDS.has(step.id));
+  const acceptanceStep = parsed.steps.find((step) => VERIFICATION_STEP_IDS.has(step.id));
   const notDone = executionSteps.filter((step) => step.status.toLowerCase() !== "done");
   if (notDone.length > 0) {
     const detail = notDone.slice(0, 10).map((step) => `${step.id}=${step.status || "（空）"}`).join("、");
@@ -191,7 +194,7 @@ export function buildAcceptanceTaskMessage(flowId: string, evidence: readonly st
 
 /** 收尾推进成功的系统行。 */
 export function governanceAcceptanceAdvanceNote(flowId: string): string {
-  return `流程 ${flowId} 步骤已全部完成，已派发验收汇总任务给 Rapporteur（工作中）`;
+  return `流程 ${flowId} 步骤已全部完成，已派发验收汇总任务给 Proof / 验收（工作中）`;
 }
 
 /**
@@ -304,6 +307,8 @@ export function buildIntentHandoffMessage(payload: HandOffIntentPayload): string
  * - `proposal` + `revise|reject`→ null（无下一步，等客户改稿或放弃）；
  * - `appointment`（任命成功）    → schedule / convener（排程，既有逻辑不变）；
  * - `acceptance`（验收成功）     → null（流程收口）；
+ * - `intent-confirm`（需求确认） → null（2026-10-18 客户拍板：客户确认后由 Lead 自己调 `hand_off_intent`，
+ *                                 应用不推进）；
  * - `write`/`appointment-write`/`schedule-write` → null（写盘确认不解锁任何下一步；appointment-write
  *                                 的后续由既有 appointment 链路负责：写卡 → settle → 刷新 → 角色出现后派 Convener）；
  * - 未答（declined/unavailable/取消/expired）或卡上无 `cardKind` → 不产生事件（返回 null）。
@@ -341,10 +346,11 @@ export function deriveGovernanceNextStep(
       roleId = "convener";
       break;
     case "acceptance":
+    case "intent-confirm":
     case "write":
     case "appointment-write":
     case "schedule-write":
-      break; // 流程收口 / 普通写盘 / 写卡确认（后续由既有 appointment 链路负责）：无下一步。
+      break; // 流程收口 / 客户需求确认（Lead 自行交接）/ 普通写盘 / 写卡确认：无下一步。
     default:
       return null; // 未知种类：不猜、不发假事件。
   }
@@ -384,8 +390,8 @@ export function buildGovernanceAdvanceMessage(
     const proposalPath = payload.proposalPath ?? `docs/proposals/${flowId}-v1.md`;
     return (
       `流程 ${flowId}：客户已接受提案 ${proposalPath}。` +
-      `请先写流程单 ${flowPath}（步骤表；首个步骤为提名：由 Nominator 读取提案并给出候选角色）。` +
-      `写完后本轮即可结束；提名任务会在流程单落盘后由应用派给 Nominator。不要把步骤说成已派发。`
+      `请先写流程单 ${flowPath}（步骤表；首个步骤为提名：由 Crew / 组队 读取提案并给出候选角色）。` +
+      `写完后本轮即可结束；提名任务会在流程单落盘后由应用派给 Crew / 组队。不要把步骤说成已派发。`
     );
   }
   if (payload.cardKind === "proposal" && payload.nextFunction === "schedule" && payload.roleId === "convener") {
@@ -405,13 +411,13 @@ export function buildGovernanceAdvanceMessage(
 /** 成功派发的系统行文案（客户给定首例；其余按同一句式如实说明职能）。 */
 export function governanceAdvanceSuccessNote(payload: GovernanceNextStepPayload): string {
   return payload.nextFunction === "nomination"
-    ? "已派发提名任务给 Nominator（工作中）"
-    : "已派发流程任务给 Convener（工作中）";
+    ? "已派发提名任务给 Crew / 组队（工作中）"
+    : "已派发流程任务给 Steward / 统筹（工作中）";
 }
 
-/** accept 两段式第二段的系统行：流程单已落盘、Nominator 已派。 */
+/** accept 两段式第二段的系统行：流程单已落盘、Crew / 组队 已派。 */
 export function governanceNominationFollowUpNote(): string {
-  return "流程单已落盘，已派发提名任务给 Nominator（工作中）";
+  return "流程单已落盘，已派发提名任务给 Crew / 组队（工作中）";
 }
 
 /**
@@ -423,11 +429,11 @@ export function buildAppointmentWriteReminderMessage(flowId: string, targetRoleI
   const ids = targetRoleIds.filter((id): id is string => nonEmptyString(id));
   return (
     `流程 ${flowId}：客户已完成任命 ${ids.join("、")}，但角色卡/边界尚未写出（项目中尚未枚举到这些角色）。` +
-    `请用 appointment-write 确认卡逐路径完成写卡与边界写入；写完后本轮结束，不要自行任命、不要派发。`
+    `请 Crew / 组队 用 appointment-write 确认卡逐路径完成写卡与边界写入；写完后本轮结束，不要自行任命、不要派发。`
   );
 }
 
 /** 任命后先派写卡任务的系统行。 */
 export function governanceAppointmentWriteNote(): string {
-  return "已派发写卡任务给 Nominator（工作中）";
+  return "已派发写卡任务给 Crew / 组队（工作中）";
 }

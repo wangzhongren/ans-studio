@@ -1373,6 +1373,34 @@ test("结果行人话摘要：四类卡的代批行含「judge 代批 · 代审�
   assert.match(judgeResultSummary({ ...base, group: "approval", cardKind: "write", paths: ["p1", "p2", "p3", "p4"] }), /代审批：确认写入 4 个路径/);
 });
 
+test("intent-confirm：客户专属需求确认卡不调用判断 agent、不发结果行，正常呈现并作答", async () => {
+  let judgeCalls = 0;
+  const { channel, pushed, results } = makeJudgeChannel({
+    enabled: () => true,
+    judge: async (request) => {
+      judgeCalls += 1;
+      return { verdict: "manual", group: request.group, cardKind: request.cardKind, reasonCode: "model-manual", engine: request.runtime };
+    },
+  });
+  const card: CustomerInputRequest = {
+    kind: "choice",
+    title: "需求确认",
+    cardKind: "intent-confirm",
+    flowId: "flow-i",
+    options: [{ id: "confirm", label: "确认" }, { id: "revise", label: "修改" }],
+  };
+  const p = channel.customerInput(card, { roleId: "liaison", projectRoot: "/p", runtime: "claude" });
+  await flushJudge();
+  assert.equal(judgeCalls, 0, "intent-confirm 无判断分组：绝不调用判断 agent");
+  assert.equal(pushed.length, 1, "卡片正常呈现（不因无分组而拒绝）");
+  assert.equal(pushed[0].judgeNotice, undefined, "无 judge 提示");
+  assert.equal(results.length, 0, "不产生 judge 结果行");
+  assert.equal(channel.respond({ id: "op-1", decision: { kind: "choice", selected: ["confirm"] } }).ok, true);
+  const outcome = await p;
+  assert.equal(outcome!.outcome, "answered");
+  assert.deepEqual(outcome!.value, { selected: ["confirm"] }, "客户手答原样结算");
+});
+
 test("SessionManager：trio 会话注入 governanceJudge 上下文；single/su 不构造", async () => {
   const listing = trioMirrorListing();
   const judge: GovernanceJudgeFn = async (request) => ({
@@ -1533,7 +1561,39 @@ test("收尾触发门：执行步骤全 done 才放行；验收步骤单列（pe
     flowCompletionIssue("flow-a", "没有步骤表", { errors: [], entries: [DISPATCHED_IMPL] }) ?? "",
     /缺少可解析的步骤表/,
   );
-  assert.match(flowCompletionIssue("flow-a", flowMarkdown([["impl", "done"]]), { errors: ["bad line"], entries: [] }) ?? "", /账本不可读/);
+  assert.match(
+    flowCompletionIssue("flow-a", flowMarkdown([["impl", "done"]]), { errors: ["bad line"], entries: [] }) ?? "",
+    /账本不可读/,
+  );
+
+  // 2026-10-18 真机流程单：nomination/delivery 是执行步骤，verification 是验收步骤（旧版写 acceptance）。
+  const realLedger = {
+    errors: [],
+    entries: [
+      { kind: "dispatch.accepted", flowId: "flow-a", stepId: "nomination" },
+      { kind: "dispatch.accepted", flowId: "flow-a", stepId: "delivery" },
+    ],
+  };
+  const realFlow = (verificationStatus: string | null) =>
+    flowMarkdown([
+      ["nomination", "done"],
+      ["delivery", "done"],
+      ...(verificationStatus === null ? [] : [["verification", verificationStatus] as [string, string]]),
+    ]);
+  assert.equal(flowCompletionIssue("flow-a", realFlow("pending"), realLedger), undefined, "verification pending ⇒ 可派 Proof");
+  assert.equal(flowCompletionIssue("flow-a", realFlow("in-progress"), realLedger), undefined, "verification 未 done 也允许派");
+  assert.match(flowCompletionIssue("flow-a", realFlow("done"), realLedger) ?? "", /验收步骤已完成/, "verification done：不重复派");
+  assert.match(flowCompletionIssue("flow-a", realFlow(null), realLedger) ?? "", /流程单缺少验收步骤/, "缺验收步骤：不派");
+  assert.match(
+    flowCompletionIssue("flow-a", flowMarkdown([["nomination", "done"], ["delivery", "pending"], ["verification", "pending"]]), realLedger) ?? "",
+    /delivery=pending/,
+    "执行步骤未完成：不派",
+  );
+  assert.match(
+    flowCompletionIssue("flow-a", realFlow("pending"), { errors: [], entries: [realLedger.entries[0]!] }) ?? "",
+    /缺少 dispatch\.accepted 记录（delivery）/,
+    "执行步骤缺派发：不派",
+  );
 });
 
 test("收尾任务消息：带流程单与回交/报告路径，要求汇总并出验收卡、不自行验收", () => {

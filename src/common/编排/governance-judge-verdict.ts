@@ -37,12 +37,13 @@ export const GOVERNANCE_JUDGE_SELECTED_LIMIT = 50;
 /** 选项 id / reasonCode 等短标识上限。 */
 const GOVERNANCE_JUDGE_FACT_ID_BYTES = 128;
 
-/** 治理内置角色 id（任命卡不得选；评审 §7.3）。 */
+/** 治理内置角色 id（任命卡不得选；评审 §7.3；2026-10-18 增 verifier）。 */
 const BUILT_IN_GOVERNANCE_ROLE_IDS: ReadonlySet<string> = new Set([
   "liaison",
   "rapporteur",
   "nominator",
   "convener",
+  "verifier",
   "su",
 ]);
 
@@ -51,6 +52,8 @@ const SOURCE_WRITE_ROOTS: Readonly<Record<string, readonly string[]>> = {
   rapporteur: ["docs/proposals/", "docs/contracts/", "docs/governance/rapporteur/"],
   nominator: ["docs/nominations/", "docs/skills/", "docs/mcp/", "docs/governance/nominator/"],
   convener: ["docs/flows/", "docs/workflow.md", "docs/governance/convener/"],
+  // 验收角色（verification）：普通写盘只写核对报告与本角色治理记录（不是 acceptance 决定的来源假定）。
+  verifier: ["docs/verification/", "docs/governance/verifier/"],
 };
 
 function writeSourceMatches(roleId: string, path: string): boolean {
@@ -78,6 +81,7 @@ const HARD_FORBIDDEN_PREFIXES: readonly string[] = [
   "角色卡/rapporteur/",
   "角色卡/nominator/",
   "角色卡/convener/",
+  "角色卡/verifier/",
   "角色卡/su/",
 ];
 

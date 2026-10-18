@@ -203,6 +203,29 @@ test('W6b：system 展示正文剥离文首标记（displayBody）——判据/�
   assert.equal(tools.classifyInjectedMessage('[回交] 来自 A 的报告')?.displayBody, undefined);
 });
 
+test('内部治理反馈展示收敛：displayBody 固定短提示（不转述原文），body 保留原文；其他系统子类不变', () => {
+  const raw = '[系统·治理反馈] 来自 Draft 的内部报告：完成度 80%。\nRAW_SENTINEL';
+  const fb = tools.classifyInjectedMessage(raw);
+  assert.equal(fb?.kind, 'system', '归类仍是 system');
+  assert.equal(fb?.label, '系统消息 · 治理反馈', '子类仍是治理反馈');
+  assert.equal(fb?.displayBody, '内部反馈已交给主理，稍后由主理汇总告知你。', '展示面固定短提示');
+  assert.ok(String(fb?.displayBody).includes('主理汇总'));
+  assert.ok(!String(fb?.displayBody).includes('RAW_SENTINEL'), '展示面不含内部原文');
+  assert.ok(!String(fb?.displayBody).includes('完成度'), '不转述内部报告内容');
+  assert.equal(fb?.body, raw, '原文保留在 body（会话记录/模型提示不受影响）');
+  assert.equal(fb?.sourceRoleId, '', '来源=系统');
+  // 回显路径（`用户指令：` 前缀）同解；body 去前缀后仍是投递原文。
+  const echo = tools.classifyInjectedMessage('用户指令：' + raw);
+  assert.equal(echo?.displayBody, '内部反馈已交给主理，稍后由主理汇总告知你。');
+  assert.equal(echo?.body, raw, 'body 仍是投递原文（仅剥回显前缀）');
+  // 仅标记无正文同样收敛（不摆空正文）。
+  assert.equal(tools.classifyInjectedMessage('[系统·治理反馈]')?.displayBody, '内部反馈已交给主理，稍后由主理汇总告知你。');
+  // 其他系统子类展示不变（仍去标记后显示正文）。
+  assert.equal(tools.classifyInjectedMessage('[系统·看护] 队列积压：3 条。')?.displayBody, '队列积压：3 条。');
+  assert.equal(tools.classifyInjectedMessage('[系统·安装] 技能「t」已安装。')?.displayBody, '技能「t」已安装。');
+  assert.equal(tools.classifyInjectedMessage('[系统·收束] 已无进行中任务。')?.displayBody, '已无进行中任务。');
+});
+
 // S1/S4：工具调用相位合并（同一 toolCallId 的「调用发起 + 结果」并一行；不折叠重复调用）与组摘要口径「N 个调用」。
 
 test('S1：mergePhases——同一 toolCallId 两相位并入一行（首相位定位，相位按到达序）；不同调用/无 callId 不并', () => {
@@ -966,22 +989,26 @@ test('D1：governanceReacceptFailureView——phase≠write 可声明零写入�
 // —————— W4 治理三权（2026-10-17 评审 §8）：左树/空态/状态行/决定卡文案单一来源 ——————
 // 全部按接口事实（governanceFunction / cardKind / governanceModel / flowId）纯转写；未知值不显示、不猜。
 
-test('W4/W6-C：治理角色文案——四角色中文名+英文名/权力副标题/内置标识（按 governanceFunction 派生，未知不猜）', () => {
+test('W4/W6-C：治理角色文案——五角色中文名+英文名/权力副标题/内置标识（按 governanceFunction 派生，未知不猜）', () => {
   const l = labels.governanceRoleView('liaison');
-  assert.equal(l.name, '联络官 Liaison', '四角色主入口＝联络官 Liaison');
-  assert.equal(l.power, '客户沟通 · 不拥有最终批准权', 'Liaison 权力副标题逐字');
-  assert.equal(l.primaryEntrance, true, 'Liaison 标记为客户默认入口');
+  assert.equal(l.name, '主理 Lead', '五角色主入口＝主理 Lead');
+  assert.equal(l.power, '客户沟通 · 不拥有最终批准权', 'Lead 权力副标题逐字');
+  assert.equal(l.primaryEntrance, true, 'Lead 标记为客户默认入口');
   const p = labels.governanceRoleView('proposal');
-  assert.equal(p.name, '报告员 Rapporteur', '提案职能＝报告员 Rapporteur');
+  assert.equal(p.name, '提案 Draft', '提案职能＝提案 Draft');
   assert.equal(p.power, '提案权 · 不拥有最终批准权');
   assert.equal(p.primaryEntrance, false);
   const n = labels.governanceRoleView('nomination');
-  assert.equal(n.name, '提名官 Nominator');
-  assert.equal(n.power, '提名权 · 不拥有最终批准权');
+  assert.equal(n.name, '组队 Crew');
+  assert.equal(n.power, '组队权 · 不拥有最终批准权');
   const s = labels.governanceRoleView('schedule');
-  assert.equal(s.name, '召集人 Convener');
-  assert.equal(s.power, '编排权 · 不拥有最终批准权');
-  for (const v of [l, p, n, s]) assert.equal(v.builtinNote, '内置角色：随应用发布，无角色目录', '内置标识逐字');
+  assert.equal(s.name, '统筹 Steward');
+  assert.equal(s.power, '统筹权 · 不拥有最终批准权');
+  const v = labels.governanceRoleView('verification');
+  assert.equal(v.name, '验收 Proof', '第五个内置角色＝验收 Proof（显示在 Steward 之后，顺序由注册表数据驱动）');
+  assert.equal(v.power, '验收权 · 不拥有最终批准权');
+  assert.equal(v.primaryEntrance, false);
+  for (const view of [l, p, n, s, v]) assert.equal(view.builtinNote, '内置角色：随应用发布，无角色目录', '内置标识逐字');
   assert.equal(labels.GOVERNANCE_ROLE_BUILTIN_NOTE, '内置角色：随应用发布，无角色目录');
   assert.equal(labels.GOVERNANCE_GROUP_LABEL, '治理职能（内置）');
   for (const bad of ['su', 'Rapporteur', '', null, undefined, 1]) {
@@ -989,30 +1016,33 @@ test('W4/W6-C：治理角色文案——四角色中文名+英文名/权力副�
   }
 });
 
-test('W4/W6-C：治理角色空态——四角色说明逐字（Liaison 客户入口/提案交接；提名编排既有）', () => {
+test('W4/W6-C：治理角色空态——五角色说明逐字（Lead 客户入口/提案交接；组队/统筹/验收）', () => {
   const l = labels.governanceRoleEmptyState('liaison');
-  assert.equal(l.title, '联络官 Liaison');
-  assert.equal(l.sub, '客户默认入口：你说要做什么，我先确认目标、范围与验收，再交给报告员形成提案。我不写提案、不批准。本版起默认入口为联络官；报告员与历史提案不变。');
+  assert.equal(l.title, '主理 Lead');
+  assert.equal(l.sub, '客户默认入口：你说要做什么，我先确认目标、范围与验收，再交给提案 Draft 形成提案。我不写提案、不批准。本版起默认入口为主理 Lead；提案 Draft 与历史提案不变。');
   const p = labels.governanceRoleEmptyState('proposal');
-  assert.equal(p.title, '报告员 Rapporteur');
-  assert.equal(p.sub, '通常由联络官交接打开；客户也可以直接找我。我只写提案，不批准。');
+  assert.equal(p.title, '提案 Draft');
+  assert.equal(p.sub, '通常由主理 Lead 交接打开；客户也可以直接找我。我只写提案，不批准。');
   const n = labels.governanceRoleEmptyState('nomination');
-  assert.equal(n.title, '提名官 Nominator');
+  assert.equal(n.title, '组队 Crew');
   assert.equal(n.sub, '通常由流程单提名步骤打开；仅在客户明确要求时直接使用');
   const s = labels.governanceRoleEmptyState('schedule');
-  assert.equal(s.title, '召集人 Convener');
+  assert.equal(s.title, '统筹 Steward');
   assert.equal(s.sub, '通常由已接受提案开启流程；只负责排步骤与派发，不批准方案');
+  const v = labels.governanceRoleEmptyState('verification');
+  assert.equal(v.title, '验收 Proof');
+  assert.equal(v.sub, '通常由交付回交后的验收步骤打开；只核对证据、出验收卡，不批准。');
   assert.equal(labels.governanceRoleEmptyState('su'), null, '未知职能不编空态');
 });
 
-test('W4/W6-C：状态行——三权显示四角色；当前流程/四态逐字；未知不猜', () => {
-  assert.equal(labels.governanceStatusText('trio', '', ''), '治理模型：三权 · 四角色');
+test('W4/W6-C：状态行——三权显示五角色；当前流程/四态逐字；未知不猜', () => {
+  assert.equal(labels.governanceStatusText('trio', '', ''), '治理模型：三权 · 五角色');
   assert.equal(labels.governanceStatusText('single', '', ''), '治理模型：旧模型（su）');
-  assert.equal(labels.governanceStatusText('trio', 'flow-1', 'awaiting-customer'), '治理模型：三权 · 四角色 · 当前流程：flow-1 · 等待客户决定');
-  assert.equal(labels.governanceStatusText('trio', '', 'in-progress'), '治理模型：三权 · 四角色 · 进行中');
-  assert.equal(labels.governanceStatusText('trio', '', 'blocked'), '治理模型：三权 · 四角色 · 阻塞');
-  assert.equal(labels.governanceStatusText('trio', '', 'escalated-to-customer'), '治理模型：三权 · 四角色 · 已升级客户');
-  assert.equal(labels.governanceStatusText('trio', '', 'paused'), '治理模型：三权 · 四角色', '未知/不承诺状态不显示（不猜）');
+  assert.equal(labels.governanceStatusText('trio', 'flow-1', 'awaiting-customer'), '治理模型：三权 · 五角色 · 当前流程：flow-1 · 等待客户决定');
+  assert.equal(labels.governanceStatusText('trio', '', 'in-progress'), '治理模型：三权 · 五角色 · 进行中');
+  assert.equal(labels.governanceStatusText('trio', '', 'blocked'), '治理模型：三权 · 五角色 · 阻塞');
+  assert.equal(labels.governanceStatusText('trio', '', 'escalated-to-customer'), '治理模型：三权 · 五角色 · 已升级客户');
+  assert.equal(labels.governanceStatusText('trio', '', 'paused'), '治理模型：三权 · 五角色', '未知/不承诺状态不显示（不猜）');
   assert.equal(labels.governanceStatusText('', 'flow-1', ''), '当前流程：flow-1', '模型未知仍可如实显示接口给的流程 id');
   assert.equal(labels.governanceStatusText(undefined, '', 'blocked'), '阻塞');
   assert.equal(labels.governanceFlowStatusText('awaiting-customer'), '等待客户决定');
@@ -1020,7 +1050,7 @@ test('W4/W6-C：状态行——三权显示四角色；当前流程/四态逐字
 });
 
 test('W6-C：镜像卡来源标签与主入口排队聚合文案逐字（同一请求的第二呈现，不是第二张审批）', () => {
-  assert.equal(labels.governanceMirrorSourceLabel('报告员 Rapporteur'), '来自 报告员 Rapporteur 的治理决定 · 客户最终批准');
+  assert.equal(labels.governanceMirrorSourceLabel('提案 Draft'), '来自 提案 Draft 的治理决定 · 客户最终批准');
   assert.equal(labels.governanceMirrorSourceLabel(''), '来自 发起角色 的治理决定 · 客户最终批准', '缺名不编角色，如实用兜底');
   assert.equal(labels.governanceQueueAggregateText(1), '还有 1 个决定等待前一个决定');
   assert.equal(labels.governanceQueueAggregateText(3), '还有 3 个决定等待前一个决定');
@@ -1106,6 +1136,15 @@ test('W4：决定卡元信息——cardKind→权力类型、flowId/stepId/路�
   assert.equal(labels.governanceCardMetaView({ cardKind: 'appointment-write' }).power, '提名');
   assert.equal(labels.governanceCardMetaView({ cardKind: 'schedule-write' }).power, '编排');
   assert.equal(labels.governanceCardMetaView({ cardKind: 'acceptance' }).power, '验收');
+  // 客户需求确认卡（intent-confirm；仅 Lead 发、客户本人确认）：权力行「需求确认」+ 专属徽标，不是最终批准。
+  const intent = labels.governanceCardMetaView({ cardKind: 'intent-confirm', flowId: 'flow-i' });
+  assert.equal(intent.governance, true);
+  assert.equal(intent.power, '需求确认');
+  assert.equal(intent.badge, '需求确认 · 客户', 'intent-confirm 用「需求确认 · 客户」徽标');
+  assert.ok(!intent.badge.includes('最终批准'), '需求确认卡不得出现「最终批准」徽标');
+  assert.deepEqual(intent.lines, ['流程：flow-i', '权力类型：需求确认']);
+  assert.equal(labels.GOVERNANCE_INTENT_BADGE, '需求确认 · 客户');
+  assert.equal(labels.governanceCardMetaView({ cardKind: 'proposal' }).badge, '治理决定 · 客户最终批准', '其余卡种徽标不变');
   const full = labels.governanceCardMetaView({
     cardKind: 'appointment-write', flowId: 'f1', stepId: 's1',
     paths: ['角色卡/实现者/role-card.md', '角色卡/实现者/boundary.yaml'], summary: '任命 1 个角色', artifactSha256: 'a'.repeat(64),

@@ -45,8 +45,8 @@ function makeRig(configOver: Partial<WatchdogConfig> = {}): Rig {
       deliveries.push(message);
     },
     now: () => T.v,
-    // 默认把 W3 静默阈值拔高（隔离支柱一）——本文件只测四信号；W3 由 w3-closure.test.ts 专测。
-    config: { env: {}, silenceMs: 365 * 24 * 3600 * 1000, ...configOver },
+    // 本文件只测四信号；完成态收束已移除（2026-10-18），无需隔离静默阈值。
+    config: { env: {}, ...configOver },
   });
   return {
     svc,

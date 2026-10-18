@@ -138,7 +138,7 @@ test("W1 集成：busySince 同源快照；lastTurn 落表（role_status 文本�
   }
 });
 
-test("W3 集成：静默满 N ⇒ su 真收到收束提示恰一条；su 回复不重武装；真实活动重武装后再投", async () => {
+test("W3 已移除（2026-10-18）：静默满多个窗口也不投 [系统·收束]；活动/回复同样不产生收束项", async () => {
   const SILENCE = 60_000;
   let service: ReturnType<typeof createWatchdogService> | undefined;
   const h = await makeG2Harness({
@@ -150,7 +150,7 @@ test("W3 集成：静默满 N ⇒ su 真收到收束提示恰一条；su 回复�
       snapshot: (root) => h.mgr.watchdogSnapshot(root),
       deliver: (root, message) => h.mgr.watchdogDeliver(root, message),
       now: () => h.clock.now(),
-      config: { env: {}, silenceMs: SILENCE },
+      config: { env: {} },
     });
     await h.mgr.open({ projectRoot: h.root, roleId: "su", runtime: "demo" });
     await flush(40);
@@ -161,31 +161,36 @@ test("W3 集成：静默满 N ⇒ su 真收到收束提示恰一条；su 回复�
     await flush(60);
     const closures = (): string[] => h.ctl("su").sent.filter((t) => t.startsWith(WATCHDOG_CLOSURE_PREFIX));
 
-    service.tick(); // 静默起点
-    h.clock.advance(SILENCE - 1);
-    service.tick();
-    assert.equal(closures().length, 0, "差 1ms：不投");
-    h.clock.advance(1);
-    service.tick(); // 命中 ⇒ 经真投递机投 su
-    await flush(120);
-    assert.equal(closures().length, 1, "静默满 N：su 收到恰一条收束提示（真投递）");
-    // su 处理收束的回复轮（system 持有）settle ⇒ 不重武装
-    h.ctl("su").streams.push(settledEvent("completed"));
-    await flush(60);
-    h.clock.advance(SILENCE + 5000);
-    service.tick();
-    await flush(120);
-    assert.equal(closures().length, 1, "su 的收束回复不重武装（不催第二条）");
-    // 真实活动（新客户消息）重武装 ⇒ 新静默窗口满 N ⇒ 第二条
+    // 连续跨过多个「旧静默阈值」：差 1ms、恰值、以及远超阈值——均不得投收束。
+    for (const advanceMs of [SILENCE - 1, 1, SILENCE * 10]) {
+      service.tick();
+      h.clock.advance(advanceMs);
+      service.tick();
+      await flush(60);
+      assert.equal(closures().length, 0, `静默 +${advanceMs}ms：不得投完成态收束`);
+    }
+    assert.equal(
+      h.ctl("su").sent.some((text) => text.startsWith(WATCHDOG_CLOSURE_PREFIX)),
+      false,
+      "完成态收束已移除：真投递机零 [系统·收束]",
+    );
+    // 真实活动（新客户消息）仍正常，但同样不产生收束。
     await h.mgr.send("客户追问", undefined, { projectRoot: h.root, roleId: "su", runtime: "demo" });
     await flush(40);
     h.ctl("su").streams.push(settledEvent("completed"));
     await flush(60);
-    service.tick(); // 新静默起点
-    h.clock.advance(SILENCE);
+    service.tick();
+    h.clock.advance(SILENCE * 2);
     service.tick();
     await flush(120);
-    assert.equal(closures().length, 2, "真实活动后新静默窗口 ⇒ 新一条收束提示");
+    assert.equal(closures().length, 0, "活动后仍不投收束");
+    const snapshot = h.mgr.watchdogSnapshot(h.root);
+    const queuedSummaries = (snapshot?.queues ?? []).flatMap((queue) => queue.items.map((item) => item.summary));
+    assert.equal(
+      queuedSummaries.some((summary) => summary.startsWith(WATCHDOG_CLOSURE_PREFIX)),
+      false,
+      "投递队列不得出现收束项（验收通过即结束）",
+    );
   } finally {
     await h.mgr.stop(null).catch(() => undefined);
     h.cleanup();

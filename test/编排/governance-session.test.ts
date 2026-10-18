@@ -298,11 +298,12 @@ test("默认提示词：trio 按 function 追加各自纪律（不写「已批�
     };
 
     const trio = trioProject(root);
-    const expectations: Array<["liaison" | "proposal" | "nomination" | "schedule", RegExp[]]> = [
-      ["liaison", [/沟通权纪律（联络官 Liaison/, /docs\/intents\//, /hand_off_intent/, /交接 ≠ 客户批准/]],
-      ["proposal", [/提案权纪律（报告员 Rapporteur/, /docs\/proposals\//, /cardKind=proposal/, /不拥有最终批准权/]],
-      ["nomination", [/提名权纪律（提名官 Nominator/, /docs\/nominations\//, /appointment/, /提名 ≠ 任命/]],
-      ["schedule", [/编排权纪律（召集人 Convener/, /docs\/flows\//, /dispatch_task/, /flowId.*stepId/]],
+    const expectations: Array<["liaison" | "proposal" | "nomination" | "schedule" | "verification", RegExp[]]> = [
+      ["liaison", [/沟通权纪律（Lead \/ 主理/, /docs\/intents\//, /hand_off_intent/, /交接 ≠ 客户批准/, /intent-confirm/]],
+      ["proposal", [/提案权纪律（Draft \/ 提案/, /docs\/proposals\//, /cardKind=proposal/, /不拥有最终批准权/]],
+      ["nomination", [/提名权纪律（Crew \/ 组队/, /docs\/nominations\//, /appointment/, /提名 ≠ 任命/]],
+      ["schedule", [/编排权纪律（Steward \/ 统筹/, /docs\/flows\//, /dispatch_task/, /flowId.*stepId/]],
+      ["verification", [/验收权纪律（Proof \/ 验收/, /docs\/verification\//, /cardKind=acceptance/, /验收 ≠ 批准/]],
     ];
     for (const [fn, patterns] of expectations) {
       const { captured, factory } = promptCapturing();
@@ -641,6 +642,220 @@ test("customerInput 白名单：Rapporteur 发 appointment 卡 → 不弹卡、�
     await flushGovernanceLedger(root);
     const { entries } = await readGovernanceLedger(root);
     assert.equal(entries.length, 0, "未向客户发卡 → 无客户决定");
+  });
+});
+
+test("customerInput 白名单（五人）：Liaison 拒 proposal；Draft 拒 acceptance", async () => {
+  await withRoot(async (root) => {
+    // Liaison（Lead / 主理）只能发 intent-confirm；发 proposal 越权。
+    let liaisonCalled = 0;
+    const liaisonInput: CustomerInputFn = () => {
+      liaisonCalled += 1;
+      return { outcome: "answered", value: { selected: ["accept"] } };
+    };
+    const liaisonScript: ToolCall[] = [{
+      name: "request_choice",
+      args: {
+        title: "越权提案卡",
+        flowId: "flow-a",
+        cardKind: "proposal",
+        options: [{ id: "accept", label: "接受" }, { id: "revise", label: "要求修改" }],
+      },
+    }];
+    const liaison = await openRoleSession(
+      { roleId: "liaison", project: withBuiltIn(trioProject(root), "liaison"), customerInput: liaisonInput, autoRepin: false },
+      { createAdapter: (gate, caps) => createFakeRuntimeAdapter({ gate, script: liaisonScript, projectRoot: root, customerInput: caps?.customerInput }) },
+    );
+    try {
+      await liaison.send("发卡");
+      await consume(liaison);
+    } finally {
+      await liaison.dispose();
+    }
+    assert.equal(liaisonCalled, 0, "Liaison 越权 cardKind 不得弹卡");
+
+    // Rapporteur（Draft / 提案）不再发 acceptance（已移交 verifier）。
+    let draftCalled = 0;
+    const draftInput: CustomerInputFn = () => {
+      draftCalled += 1;
+      return { outcome: "answered", value: { selected: ["accept"] } };
+    };
+    const draftScript: ToolCall[] = [{
+      name: "request_choice",
+      args: {
+        title: "越权验收卡",
+        flowId: "flow-a",
+        cardKind: "acceptance",
+        options: [{ id: "accept", label: "接受" }, { id: "reject", label: "拒绝" }],
+      },
+    }];
+    const draft = await openRoleSession(
+      { roleId: "rapporteur", project: withBuiltIn(trioProject(root), "rapporteur"), customerInput: draftInput, autoRepin: false },
+      { createAdapter: (gate, caps) => createFakeRuntimeAdapter({ gate, script: draftScript, projectRoot: root, customerInput: caps?.customerInput }) },
+    );
+    try {
+      await draft.send("发卡");
+      await consume(draft);
+    } finally {
+      await draft.dispose();
+    }
+    assert.equal(draftCalled, 0, "Draft 发 acceptance 不得弹卡");
+
+    await flushGovernanceLedger(root);
+    const { entries } = await readGovernanceLedger(root);
+    assert.equal(entries.length, 0, "越权卡不产生客户决定");
+  });
+});
+
+test("customer.decision：intent-confirm 四分类（confirm/revise/未知/多选）", async () => {
+  await withRoot(async (root) => {
+    const cases: Array<{ selected: string[]; decisionKind: string; customerDecision: string }> = [
+      { selected: ["confirm"], decisionKind: "intent-confirm", customerDecision: "accepted" },
+      { selected: ["revise"], decisionKind: "intent-confirm", customerDecision: "changes-requested" },
+      { selected: ["other"], decisionKind: "unclassified", customerDecision: "none" },
+      { selected: ["confirm", "revise"], decisionKind: "unclassified", customerDecision: "none" },
+    ];
+    for (const [index, item] of cases.entries()) {
+      const flowId = `flow-${index}`;
+      const customerInput: CustomerInputFn = () => ({
+        outcome: "answered",
+        value: { selected: item.selected },
+        operatorId: "客户",
+      });
+      const script: ToolCall[] = [{
+        name: "request_choice",
+        args: {
+          title: `需求确认-${index}`,
+          flowId,
+          cardKind: "intent-confirm",
+          options: [{ id: "confirm", label: "确认" }, { id: "revise", label: "需修改" }],
+        },
+      }];
+      const handle = await openRoleSession(
+        { roleId: "liaison", project: withBuiltIn(trioProject(root), "liaison"), customerInput, autoRepin: false },
+        { createAdapter: (gate, caps) => createFakeRuntimeAdapter({ gate, script, projectRoot: root, customerInput: caps?.customerInput }) },
+      );
+      try {
+        await handle.send("确认需求");
+        await consume(handle);
+      } finally {
+        await handle.dispose();
+      }
+      await flushGovernanceLedger(root);
+      const { entries } = await readGovernanceLedger(root);
+      const entry = entries[entries.length - 1]!;
+      assert.equal(entry.flowId, flowId, `case ${index}`);
+      assert.equal(entry.decisionKind, item.decisionKind, `case ${index}`);
+      assert.equal(entry.customerDecision, item.customerDecision, `case ${index}`);
+      assert.equal(entry.power, "liaison", `case ${index}`);
+      assert.equal(entry.actorRoleId, "liaison", `case ${index}`);
+    }
+  });
+});
+
+test("intent-confirm 结算：customerInput 返回时账本已落盘（hand_off_intent 紧随其后的竞态）", async () => {
+  await withRoot(async (root) => {
+    const captured = {} as Captured;
+    const customerInput: CustomerInputFn = () => ({
+      outcome: "answered",
+      value: { selected: ["confirm"] },
+      operatorId: "客户",
+    });
+    const handle = await openRoleSession(
+      { roleId: "liaison", project: withBuiltIn(trioProject(root), "liaison"), customerInput, autoRepin: false },
+      { createAdapter: capturingFactory(captured) },
+    );
+    try {
+      const out = await captured.caps!.customerInput!({
+        kind: "choice",
+        title: "需求确认",
+        options: [{ id: "confirm", label: "确认" }, { id: "revise", label: "需修改" }],
+        flowId: "flow-a",
+        cardKind: "intent-confirm",
+      });
+      assert.equal(out?.outcome, "answered");
+      // **不调用 flush**：返回时追加已完成，校验器紧接着读磁盘即可看到该决定。
+      const { entries, errors } = await readGovernanceLedger(root);
+      assert.deepEqual(errors, []);
+      const confirm = entries.find((entry) => entry.kind === "customer.decision");
+      assert.ok(confirm, "customerInput 返回时账本已有 intent-confirm 决定");
+      assert.equal(confirm.decisionKind, "intent-confirm");
+      assert.equal(confirm.customerDecision, "accepted");
+    } finally {
+      await handle.dispose();
+    }
+  });
+});
+
+test("无 cardKind 的普通客户选择/确认不写治理账本（真机账本污染回归）", async () => {
+  await withRoot(async (root) => {
+    const captured = {} as Captured;
+    const customerInput: CustomerInputFn = (req) =>
+      req.kind === "confirm"
+        ? { outcome: "answered", value: { confirmed: true }, operatorId: "客户" }
+        : { outcome: "answered", value: { selected: ["A"] }, operatorId: "客户" };
+    const handle = await openRoleSession(
+      { roleId: "liaison", project: withBuiltIn(trioProject(root), "liaison"), customerInput, autoRepin: false },
+      { createAdapter: capturingFactory(captured) },
+    );
+    try {
+      // 普通选择卡（无 cardKind）：Lead 问「怎么调整」。
+      await captured.caps!.customerInput!({
+        kind: "choice",
+        title: "怎么调整",
+        options: [{ id: "A", label: "方案 A" }],
+        flowId: "flow-a",
+      });
+      // 普通确认卡（无 cardKind）：写意图文件前的确认。
+      await captured.caps!.customerInput!({
+        kind: "confirm",
+        title: "写意图文件",
+        preview: "docs/intents/intent-a.md",
+        flowId: "flow-a",
+      });
+    } finally {
+      await handle.dispose();
+    }
+    await flushGovernanceLedger(root);
+    const { entries } = await readGovernanceLedger(root);
+    assert.equal(entries.length, 0, "无 cardKind ⇒ 不写 customer.decision（避免 unclassified 污染）");
+  });
+});
+
+test("customer.decision：Proof / 验收（verifier）可发 acceptance，power=acceptance", async () => {
+  await withRoot(async (root) => {
+    const script: ToolCall[] = [{
+      name: "request_choice",
+      args: {
+        title: "验收决定",
+        flowId: "flow-a",
+        cardKind: "acceptance",
+        options: [{ id: "accept", label: "接受" }, { id: "reject", label: "拒绝" }],
+      },
+    }];
+    let called = 0;
+    const customerInput: CustomerInputFn = () => {
+      called += 1;
+      return { outcome: "answered", value: { selected: ["accept"] }, operatorId: "客户" };
+    };
+    const handle = await openRoleSession(
+      { roleId: "verifier", project: withBuiltIn(trioProject(root), "verifier"), customerInput, autoRepin: false },
+      { createAdapter: (gate, caps) => createFakeRuntimeAdapter({ gate, script, projectRoot: root, customerInput: caps?.customerInput }) },
+    );
+    try {
+      await handle.send("验收");
+      await consume(handle);
+    } finally {
+      await handle.dispose();
+    }
+    assert.equal(called, 1, "verifier 的 acceptance 卡允许弹给客户");
+    await flushGovernanceLedger(root);
+    const { entries } = await readGovernanceLedger(root);
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0]!.actorRoleId, "verifier");
+    assert.equal(entries[0]!.power, "acceptance");
+    assert.equal(entries[0]!.decisionKind, "acceptance");
+    assert.equal(entries[0]!.customerDecision, "accepted");
   });
 });
 

@@ -4,16 +4,16 @@
 // 不依赖 electron、不依赖 Pi SDK——可在 node 下单测（沿 `app/desktop/*.ts` 全部模块先例）。
 //
 // —— 看护是什么（与「永不改判定」纪律）——
-// 本模块**只**做三件事：① 以 tick（默认 30s）同步读一遍**同源快照**（SessionManager 的 busy/队列/在途/
+// 本模块**只**做两件事：① 以 tick（默认 30s）同步读一遍**同源快照**（SessionManager 的 busy/队列/在途/
 // 待确认——不造第二数据源）；② 命中异常信号（轮次到点检查 / 投递排队积压 / 命令超时 / 重复失败）时，
 // 经**注入的投递端**把一条 `kind:"system"` 的系统消息交给**既有投递机**（忙排队/未开自动开/失败保留重试
-// 全部复用）；③ 在项目完成静默态（全角色空闲＋队列全空＋无在途＋无待确认）经**滞回状态机**投一条收束提示。
+// 全部复用）。
 // **绝不**：写项目文件、放行任何命令/写入、停任何轮次、改任何 gate/队列语义、替 su 决策、自动做任何恢复。
 // 一切失败路径 fail-closed：看护自身故障 ⇒ 记录诊断（`watchdog.failed`）＋暂停本 tick 并等下个 tick 重试，
 // 核心治理零依赖（最坏情形退化为「没有看护时的现状」）。
 //
 // —— 文案：**单一来源在编排**（G-2/O1）——
-// 告警/恢复行/风暴护栏/收束提示四类文案一律经 `src/common/编排/watchdog.ts` 的 renderer 生成（只读导入，
+// 告警/恢复行/风暴护栏三类文案一律经 `src/common/编排/watchdog.ts` 的 renderer 生成（只读导入，
 // 不复制第二份——与门禁引擎 su 卡文本、R1/R2 的 promptGuidelines 同口径）；本模块**只如实产出事实行**
 // （时间/来源/摘要/计数——设计 §3.3「事实行由检测侧如实产出」）与队列行摘要（呈现面）。
 //
@@ -27,22 +27,16 @@
 // 带挂起确认卡的角色（su 交互卡 / shell 卡 / 恢复卡——经注入的按角色 pending 视图）**不计入信号 #1**；
 // su 自身忙（正在处理）时，**关于 su 的**任何信号都不触发（它本来就在做工）。
 //
-// —— 完成态收束（W3，§七）——
-// 静默谓词（每 tick 评估）＋滞回：静默连续 ≥ N（默认 30 s＝**一个 tick 的最小防抖**，仅 env 可调）投
-// **一条**收束提示（恰一次；客户 2026-10-16 run-5 裁定 5 min → 30 s：静默谓词成立时已不可能再有自动
-// 活动，5 min 纯属延迟——原文与推理见 `角色卡/项目管理/docs/change/2026-10-15_change_kanban-fixes-pm-review.md`
-// 「客户裁定修订」及本角色 `docs/fix/2026-10-16_fix_closure-silence-30s.md`）；
-// 此后**只有真实活动**才重新武装——**刻意排除**看护自身的告警/收束/回执投递，以及 su 对收束提示的那一轮
-// 回复（防「总结完 → 又被立即催」的骚扰回路；由 SessionManager 按「该轮由 system 投递持有」判定并过滤）。
-// 收束提示**不强迫 su 断言「完成」**：仅供 su 自行判断是否收尾。
+// —— 完成态收束（W3）：已移除（2026-10-18 客户新要求）——
+// **验收通过即收束**：不再在项目静默 30s 后投 `[系统·收束]`，也不再维护滞回状态/静默阈值参数。
 
 import { resolveRuntimeTimeouts } from "../../src/common/runtime-core/timeout.ts";
 import { createDiagnosticLogger } from "../../src/common/shared/diagnostics.ts";
 import type { RuntimeKind } from "../../src/common/shared/runtime-shared.ts";
-// G-2/O1（2026-10-16 客户批准）：看护文案的**编排单一来源**（只读导入、不复制第二份）——三类文案的文首
-// 定格标记（`[系统·看护]`/`[系统·收束]`/`[系统·恢复]`，U1 的 tool-rows.js 归类判据）与纪律句全在彼处。
+// G-2/O1（2026-10-16 客户批准）：看护文案的**编排单一来源**（只读导入、不复制第二份）——两类文案的文首
+// 定格标记（`[系统·看护]`/`[系统·恢复]`，U1 的 tool-rows.js 归类判据）与纪律句全在彼处。
+// 2026-10-18 客户新要求：**移除完成态「收束」提示**（验收通过即收束；看护不再静默 30s 后投 `[系统·收束]`）。
 import {
-  renderClosurePrompt,
   renderWatchdogAlert,
   renderWatchdogRecovery,
   renderWatchdogStormGuard,
@@ -51,23 +45,10 @@ import {
 
 // —————————————————————— 阈值表（提案 §3.2；PM 已按默认采纳——全部常量集中于此，便于后续调参与评审） ——————————————————————
 
-/** tick 周期（毫秒；默认 30s）。PM 裁定（2026-10-16）：静默阈值与 tick **仅 env 可调**（不暴露设置项）。 */
+/** tick 周期（毫秒；默认 30s）。PM 裁定（2026-10-16）：tick **仅 env 可调**（不暴露设置项）。 */
 export const WATCHDOG_TICK_MS = 30000;
 /** tick 周期覆盖 env。 */
 export const WATCHDOG_TICK_ENV = "ANS_DESKTOP_WATCHDOG_TICK_MS";
-/**
- * 完成静默阈值 N（毫秒；默认 30 s）。
- * 客户裁定（2026-10-16，run-5 真机观察后；原文与 PM 记档见
- * `角色卡/项目管理/docs/change/2026-10-15_change_kanban-fixes-pm-review.md`「客户裁定修订」）：
- * 「没有任务就应该直接收束——还等 5 分钟是尬，应该 su 自动收束」——默认值 5 min → **30 s**。
- * 推理：静默谓词成立时（全角色空闲＋投递队列全空＋无在途＋无待确认＋无链在跑）系统已**不可能**再产生
- * 新的自动活动——5 min 纯属延迟；30 s ＝ **一个 tick 的最小防抖**，足以防同一事件簇（如收束前最后一轮
- * settled 与 tick 同刻到达）竞态。env `ANS_DESKTOP_WATCHDOG_SILENCE_MS` 可调保留（裁定明确）；
- * 其余收束语义（滞回、反骚扰重武装、不强迫 su 断言）不变。
- */
-export const WATCHDOG_SILENCE_MS = 30_000;
-/** 静默阈值覆盖 env。 */
-export const WATCHDOG_SILENCE_ENV = "ANS_DESKTOP_WATCHDOG_SILENCE_MS";
 /** #1 轮次**到点检查**：有效已耗 ≥ 100% × 检查时限（默认 120s → 120s；放宽 900s → 900s）。
  *  客户裁定 2026-10-17：到点**只提示、不中止本轮**；整轮最后兜底固定 1 小时（`turnLastResortMs`）。 */
 export const TURN_DEADLINE_RATIO = 1.0;
@@ -125,7 +106,7 @@ export interface WatchdogProjectSnapshot {
   activeDeliveries: number;
   /** 本项目的 open/rebuild 链是否有在跑（「无在途」判据之一）。 */
   chainsActive: boolean;
-  /** 三确认通道的本项目挂起确认总数（静默谓词用）。 */
+  /** 三确认通道的本项目挂起确认总数（快照事实；本模块只读）。 */
   pendingConfirmationsTotal: number;
   /** 按角色的挂起确认数（#1「正确等待不报」排除用）。 */
   pendingConfirmationsByRole: Map<string, number>;
@@ -141,7 +122,7 @@ export type WatchdogObservation =
       /** 轮次终局（四值之一；旧来源缺事实时 undefined——**不猜**，仅不计入 #4）。 */
       outcome?: string;
       at: number;
-      /** 该轮由 `kind:"system"` 投递持有（看护自身的告警/收束/回执）——**不算真实活动**（防骚扰回路）。 */
+      /** 该轮由 `kind:"system"` 投递持有（看护自身的告警/回执）——**不算真实活动**（防骚扰回路）。 */
       fromSystemDelivery: boolean;
     }
   | { kind: "command-timed-out"; roleId: string; at: number }
@@ -214,7 +195,6 @@ export interface WatchdogOutboundMessage {
 
 export interface WatchdogConfig {
   tickMs: number;
-  silenceMs: number;
   turnDeadlineRatio: number;
   queueHeadAgeMs: number;
   queueDepth: number;
@@ -233,7 +213,7 @@ export interface WatchdogConfig {
   env?: Record<string, string | undefined>;
 }
 
-/** 从 env 解析看护配置（tick / 静默阈值仅 env 可调；阈值表取 §3.2 默认常量）。 */
+/** 从 env 解析看护配置（tick 仅 env 可调；阈值表取 §3.2 默认常量）。 */
 export function resolveWatchdogConfig(env: Record<string, string | undefined> = process.env, overrides?: Partial<WatchdogConfig>): WatchdogConfig {
   const readPositive = (raw: string | undefined): number | undefined => {
     if (raw === undefined || raw.trim() === "") return undefined;
@@ -243,7 +223,6 @@ export function resolveWatchdogConfig(env: Record<string, string | undefined> = 
   };
   return {
     tickMs: readPositive(env[WATCHDOG_TICK_ENV]) ?? WATCHDOG_TICK_MS,
-    silenceMs: readPositive(env[WATCHDOG_SILENCE_ENV]) ?? WATCHDOG_SILENCE_MS,
     turnDeadlineRatio: TURN_DEADLINE_RATIO,
     queueHeadAgeMs: QUEUE_HEAD_AGE_MS,
     queueDepth: QUEUE_DEPTH,
@@ -309,12 +288,6 @@ interface SignalState {
   lastDeliveredAt?: number;
 }
 
-interface ClosureState {
-  sawSettled: boolean;
-  silenceSince?: number;
-  fired: boolean;
-}
-
 interface StormState {
   times: number[];
   suppressed: number;
@@ -331,7 +304,6 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
   const config = resolveWatchdogConfig(deps.config?.env ?? process.env, deps.config);
   const now = deps.now ?? (() => Date.now());
   const states = new Map<string, SignalState>();
-  const closureStates = new Map<string, ClosureState>();
   const stormStates = new Map<string, StormState>();
   const failures = new Map<string, { at: number; outcome: string }[]>();
   const instantStates = new Map<string, InstantState>();
@@ -600,38 +572,8 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
       if (st.lastDeliveredAt !== undefined && at - st.lastDeliveredAt > config.cmdTimeoutCooldownMs * 4 && st.suppressedSinceDelivered === 0) instantStates.delete(full);
     }
 
-    // —————— 完成态收束（W3）：静默谓词 + 滞回状态机 ——————
-    let closure = closureStates.get(projectRoot);
-    if (!closure) {
-      closure = { sawSettled: false, fired: false };
-      closureStates.set(projectRoot, closure);
-    }
-    if (!closure.sawSettled) return; // 预热：本项目自导入以来至少一轮 settled（防空项目一进来就触发）
-    const silent =
-      snapshot.roles.every((r) => !r.busy) &&
-      snapshot.queues.every((q) => q.items.length === 0) &&
-      snapshot.activeDeliveries === 0 &&
-      snapshot.pendingConfirmationsTotal === 0 &&
-      !snapshot.chainsActive &&
-      !govBusy; // 「治理主人 busy=false」显式一列（全角色空闲已蕴含，保留为独立口径）
-    if (closure.fired) return; // 已投（恰一次）：只等**真实活动**重新武装（observe 的 activity / 非 system 轮的 settled）
-    if (!silent) {
-      closure.silenceSince = undefined;
-      return;
-    }
-    closure.silenceSince ??= at;
-    const silentMs = at - closure.silenceSince;
-    if (silentMs >= config.silenceMs) {
-      // 冻结接口（PM 2026-10-16，随客户 5 min → 30 s 裁定）：文案渲染器改收**静默毫秒数**——
-      // `renderClosurePrompt(silentMs)`，自适应「N 秒/N 分钟」（编排单一来源）。此处**直接**传毫秒，
-      // 不再做分钟取整（旧的 `Math.max(1, …)` 会把 30 s 静默谎报成「已持续 1 分钟」）。
-      // summary 为呈现面（本模块自持）：同口径自适应时长；行文本不逐字抄编排文案。
-      if (outbound(projectRoot, { text: renderClosurePrompt(silentMs), summary: `系统·收束 · 已无进行中任务（静默 ${formatDurationMs(silentMs)}）` }, "closure")) {
-        closure.fired = true;
-        loggerFor(projectRoot).record("watchdog.closure", { durationMs: silentMs });
-      }
-      // 投不出去（投递端异常）：silenceSince 保持不变——下个 tick 重试（投递机失败保留待重试的另一层已覆盖网络式失败）。
-    }
+    // 2026-10-18 客户新要求：**验收通过即收束**——看护不再在静默 30s 后投 `[系统·收束]`；
+    // 本 tick 只负责告警/恢复行（完成态收束状态机已整体移除）。
   };
 
   const tick = (): void => {
@@ -653,9 +595,6 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
     observe(projectRoot, observation) {
       try {
         if (observation.kind === "settled") {
-          const closure = closureStates.get(projectRoot) ?? { sawSettled: false, fired: false };
-          closure.sawSettled = true;
-          closureStates.set(projectRoot, closure);
           // #4 计数：只认四值终局里的 failed / timed_out（aborted 是人工停止、completed 是成功——都不算）。
           if (observation.outcome === "failed" || observation.outcome === "timed_out") {
             const full = `${projectRoot}\u0000${observation.roleId}`;
@@ -663,23 +602,9 @@ export function createWatchdogService(deps: WatchdogServiceDeps): WatchdogServic
             list.push({ at: observation.at, outcome: observation.outcome });
             failures.set(full, list);
           }
-          // 滞回重武装：真实活动 = 项目角色 settled（**排除**由 system 投递持有的轮次——看护自身投递与
-          // su 对收束提示的回复都不算，防骚扰回路）。
-          if (!observation.fromSystemDelivery) {
-            const closure2 = closureStates.get(projectRoot);
-            if (closure2) {
-              closure2.fired = false;
-              closure2.silenceSince = undefined;
-            }
-          }
           return;
         }
         if (observation.kind === "activity") {
-          const closure = closureStates.get(projectRoot);
-          if (closure) {
-            closure.fired = false;
-            closure.silenceSince = undefined;
-          }
           return;
         }
         // 命令超时（#3）：单次即报（低频高信号）；冷却期内只累计抑制；**无恢复行**（瞬时事件，无所谓「解除」）。

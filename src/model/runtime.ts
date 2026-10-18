@@ -147,8 +147,12 @@ export interface GovernanceFlowMetadata {
   stepId?: GovernanceStepId;
 }
 
-/** `request_choice` 允许的治理卡片种类（评审 §5.8）。 */
-export type GovernanceChoiceCardKind = "proposal" | "appointment" | "acceptance";
+/**
+ * `request_choice` 允许的治理卡片种类（评审 §5.8）。
+ * `intent-confirm`（2026-10-18 客户拍板）：主理（Lead/liaison）在 `hand_off_intent` 前发给客户的
+ * **需求确认卡**，选项 id 固定 `confirm`/`revise`；**客户本人专属**，判断 agent 永不代批。
+ */
+export type GovernanceChoiceCardKind = "proposal" | "appointment" | "acceptance" | "intent-confirm";
 
 /** `request_confirmation` 允许的治理卡片种类（评审 §5.8）。 */
 export type GovernanceConfirmCardKind = "write" | "appointment-write" | "schedule-write";
@@ -165,8 +169,14 @@ export type GovernanceCardKind = GovernanceChoiceCardKind | GovernanceConfirmCar
 /** 治理卡判断开关分组：`approval`＝shell＋写盘族；`decision`＝提案/任命/验收。 */
 export type GovernanceJudgeGroup = "approval" | "decision";
 
-/** 卡片种类 → 开关分组（冻结；新增卡种必须回到评审更新本表）。 */
-export const GOVERNANCE_CARD_GROUP: Readonly<Record<GovernanceCardKind, GovernanceJudgeGroup>> = Object.freeze({
+/**
+ * 卡片种类 → 开关分组（冻结；新增卡种必须回到评审更新本表）。
+ *
+ * **`intent-confirm` 故意缺席**（2026-10-18 客户拍板）：需求确认卡由客户本人回答，
+ * 是判断 agent **永不介入**的客户专属卡；缺席 ⇒ `governanceCardGroup` 返回 `undefined` ⇒
+ * 即使两个开关都开也不判断、不代批。**不要**为它补键。
+ */
+export const GOVERNANCE_CARD_GROUP: Readonly<Partial<Record<GovernanceCardKind, GovernanceJudgeGroup>>> = Object.freeze({
   write: "approval",
   "appointment-write": "approval",
   "schedule-write": "approval",
@@ -176,7 +186,7 @@ export const GOVERNANCE_CARD_GROUP: Readonly<Record<GovernanceCardKind, Governan
 });
 
 /**
- * 卡片种类所属开关分组。`undefined`/未知 kind ⇒ `undefined` ⇒ **永不判断**（旧卡零变化）。
+ * 卡片种类所属开关分组。`undefined`/未知/`intent-confirm`（客户专属需求确认）⇒ `undefined` ⇒ **永不判断**。
  * 运行时入参可能来自不可信调用方，故除类型外再做一次自有键检查。
  */
 export function governanceCardGroup(kind: GovernanceCardKind | undefined): GovernanceJudgeGroup | undefined {

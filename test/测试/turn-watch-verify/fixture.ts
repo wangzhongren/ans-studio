@@ -41,8 +41,8 @@ export function makeWatchdogRig(configOver: Partial<WatchdogConfig> = {}): Watch
       deliveries.push(message);
     },
     now: () => T.v,
-    // 隔离收束（W3）——本套件只测 #1 到点检查。
-    config: { env: {}, silenceMs: 365 * 24 * 3600 * 1000, ...configOver },
+    // 完成态收束已移除（2026-10-18）——本套件只测 #1 到点检查。
+    config: { env: {}, ...configOver },
   });
   return {
     svc,

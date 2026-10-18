@@ -1,5 +1,5 @@
 // test/测试/governance-e2e-auto/fixture.ts
-// 测试角色：四角色治理全自动链路的**独立端到端验收夹具**（2026-10-18）。
+// 测试角色：五角色治理全自动链路的**独立端到端验收夹具**（2026-10-18）。
 //
 // 纪律（沿用本角色先例）：
 //   · **独立构造**：只读导入产品公开面（`openRoleSession`/`listProject`/桌面 `createDesktopInterface`/
@@ -128,7 +128,7 @@ export function writeProjectRole(root: string, roleId: string): void {
 
 /**
  * trio 项目种子：真实 `.ans/project.json`（pin-backed 接受证据）+ 治理边界文档。
- * `listProject` 会枚举内置四角色；项目角色由 `角色卡/<id>/` 目录决定。
+ * `listProject` 会枚举内置五角色；项目角色由 `角色卡/<id>/` 目录决定。
  */
 export function seedTrioProject(root: string, roles: string[] = []): void {
   write(root, GOV_REL, GOV_YAML);

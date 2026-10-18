@@ -386,6 +386,26 @@ export async function validateIntentHandoff(
         "请检查 .ans/governance/ledger.jsonl。",
     };
   }
+  // 5.1) 交接前需求确认（2026-10-18 客户拍板）：initial 必须已有客户对 (flowId ?? intentId) 的
+  // `intent-confirm` accepted 决定；clarification/revision 不受此门槛约束（需求已在首轮确认）。
+  // 取**最后一条** intent-confirm（账本顺序）：客户先确认后改口 revise ⇒ 旧 accepted 不得放行。
+  if (input.handoffKind === "initial") {
+    const confirmedFlowId = flowId ?? input.intentId;
+    const lastConfirm = [...ledger.entries].reverse().find(
+      (entry) =>
+        entry.kind === "customer.decision" &&
+        entry.decisionKind === "intent-confirm" &&
+        entry.flowId === confirmedFlowId,
+    );
+    if (lastConfirm?.customerDecision !== "accepted") {
+      return {
+        ok: false,
+        code: "intent-not-confirmed",
+        message:
+          `意图「${input.intentId}」尚未经客户确认（请先发 cardKind=intent-confirm 的需求确认卡并选择「确认」）；未交接。`,
+      };
+    }
+  }
   const handoffs = ledger.entries.filter((entry) => entry.kind === "intent.handed-off");
 
   // 6) 去重：同一 intentId + handoffKind + 文件哈希已成功交接 → 拒绝。

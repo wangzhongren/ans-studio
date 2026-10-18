@@ -1722,13 +1722,14 @@ test("回交/看护路由（trio）：项目角色回交与系统消息改投 Co
   await h.mgr.stop(null);
 });
 
-test("治理收尾反馈镜像（trio）：内置角色 settle 正文投主入口 pane；不重复、不镜像项目角色/Liaison/系统行；single 不产生", async () => {
+test("治理收尾反馈（trio）：内部角色 settle ⇒ Lead 收到汇总任务；不重复、不投项目角色/Lead/系统行；single 不产生", async () => {
   const dir = await makeTrioRoot([]);
   const h = makeHarness({ projectRoot: dir, customListing: trioListing(dir) });
-  const feedback = (roleId: string) => h.envelopes.filter((e) =>
-    e.roleId === roleId && e.event.kind === "message" &&
-    (e.event.detail as { source?: string } | undefined)?.source === "delivery-note" &&
-    /^治理反馈 · /.test(e.event.summary));
+  const feedbackTask = (displayName: string, body: string) => [
+    `[系统·治理反馈] 来自 ${displayName} 的内部反馈（内部材料，请汇总后告知客户，不要逐字转述）：`,
+    body,
+    "请用 1-3 句话向客户汇总：完成了什么、是否有风险/阻塞、下一步或需要客户决定什么。不要逐字转述内部报告，不要使用内部行话，不要声称客户已批准。",
+  ].join("\n");
 
   await h.mgr.open({ projectRoot: dir, roleId: "convener", runtime: "demo" });
   await tick(30);
@@ -1756,12 +1757,23 @@ test("治理收尾反馈镜像（trio）：内置角色 settle 正文投主入�
   } as OrchestrationEvent);
   (h.streams.convener ??= []).push({ kind: "settled", summary: "convener 一轮结束" } as OrchestrationEvent);
   await tick(180);
-  assert.equal(feedback("rapporteur").length, 1, "内置 convener 收尾正文镜像到主入口（Liaison）pane");
-  assert.equal(
-    feedback("rapporteur")[0].event.summary,
-    "治理反馈 · convener：治理收尾：提案已归档\n补充：证据见 docs/x.md",
-    "同一 turnId 的多个 text block 按序累积（不丢前半段）",
+  assert.deepEqual(
+    h.sent.rapporteur,
+    [feedbackTask("convener", "治理收尾：提案已归档\n补充：证据见 docs/x.md")],
+    "内部角色收尾 ⇒ 经投递机给 Lead 一条汇总任务（多 block 累积、display 照记、工具/推理不记）",
   );
+  assert.equal(
+    h.envelopes.filter((e) =>
+      e.event.kind === "message" &&
+      (e.event.detail as { source?: string } | undefined)?.source === "delivery-note" &&
+      /治理反馈|\[系统·治理反馈\]/.test(e.event.summary)).length,
+    0,
+    "不再把内部报告原文当 delivery-note 贴到 pane",
+  );
+
+  // Lead 结束自己的汇总轮，后续任务才能再投。
+  (h.streams.rapporteur ??= []).push({ kind: "settled", summary: "Lead 一轮结束" } as OrchestrationEvent);
+  await tick(120);
 
   // 再次 busy→idle 但没有新 assistant 正文 ⇒ 不重复（取出即删）；迟到 settled 同样不重复。
   await h.mgr.send("再干", undefined, { roleId: "convener" });
@@ -1769,7 +1781,7 @@ test("治理收尾反馈镜像（trio）：内置角色 settle 正文投主入�
   await tick(120);
   (h.streams.convener ??= []).push({ kind: "settled", summary: "迟到 settled" } as OrchestrationEvent);
   await tick(120);
-  assert.equal(feedback("rapporteur").length, 1, "重复 settle / 无新正文不重复镜像");
+  assert.equal(h.sent.rapporteur.length, 1, "重复 settle / 无新正文不重复投递");
 
   // turnId 变化 ⇒ 重置，不把上一轮正文混进本轮。
   await h.mgr.send("换轮", undefined, { roleId: "convener" });
@@ -1777,27 +1789,23 @@ test("治理收尾反馈镜像（trio）：内置角色 settle 正文投主入�
   (h.streams.convener ??= []).push({ kind: "message", summary: "新的本轮正文", turnId: "t3" } as OrchestrationEvent);
   (h.streams.convener ??= []).push({ kind: "settled", summary: "convener 换轮结束" } as OrchestrationEvent);
   await tick(150);
-  const switched = feedback("rapporteur").filter((e) => e.event.summary.startsWith("治理反馈 · convener："));
-  assert.equal(switched.length, 2, "换轮后再镜像一条");
-  assert.equal(switched[1].event.summary, "治理反馈 · convener：新的本轮正文", "turnId 变化即重置");
+  assert.equal(h.sent.rapporteur.length, 2, "换轮后再投一条");
+  assert.deepEqual(h.sent.rapporteur[1], feedbackTask("convener", "新的本轮正文"), "turnId 变化即重置");
 
-  // 项目角色不镜像（其回交仍走 Convener）。
+  // 项目角色不投（其回交仍走 Convener）。
   await h.mgr.open({ projectRoot: dir, roleId: "A", runtime: "demo" });
   await tick(30);
   await h.mgr.send("项目活", undefined, { roleId: "A" });
   (h.streams.A ??= []).push({ kind: "message", summary: "项目角色收尾" } as OrchestrationEvent);
   (h.streams.A ??= []).push({ kind: "settled", summary: "A 一轮结束" } as OrchestrationEvent);
   await tick(150);
-  assert.equal(feedback("rapporteur").filter((e) => e.event.summary.includes("治理反馈 · A")).length, 0, "项目角色 settle 不镜像");
+  assert.equal(h.sent.rapporteur.length, 2, "项目角色 settle 不产生反馈任务");
 
-  // 主入口（Liaison）自己 settle 不镜像。
-  await h.mgr.open({ projectRoot: dir, roleId: "rapporteur", runtime: "demo" });
-  await tick(30);
-  await h.mgr.send("联络官活", undefined, { roleId: "rapporteur" });
+  // Lead 自己 settle 不投（防循环）——第 2 条任务的轮次此时在跑。
   (h.streams.rapporteur ??= []).push({ kind: "message", summary: "联络官自己的收尾" } as OrchestrationEvent);
   (h.streams.rapporteur ??= []).push({ kind: "settled", summary: "rapporteur 一轮结束" } as OrchestrationEvent);
   await tick(150);
-  assert.equal(feedback("rapporteur").filter((e) => e.event.summary.includes("治理反馈 · rapporteur")).length, 0, "主入口自己 settle 不镜像");
+  assert.equal(h.sent.rapporteur.length, 2, "Lead 自己 settle 不产生反馈任务");
 
   // 带结构化 detail 的系统行不当作助手正文（delivery-note / prompt-input / receipt 等）。
   await h.mgr.open({ projectRoot: dir, roleId: "nominator", runtime: "demo" });
@@ -1806,12 +1814,36 @@ test("治理收尾反馈镜像（trio）：内置角色 settle 正文投主入�
   (h.streams.nominator ??= []).push({ kind: "message", summary: "系统行不该被记", detail: { source: "delivery-note" } } as OrchestrationEvent);
   (h.streams.nominator ??= []).push({ kind: "settled", summary: "nominator 一轮结束" } as OrchestrationEvent);
   await tick(150);
-  assert.equal(feedback("rapporteur").filter((e) => e.event.summary.includes("治理反馈 · nominator")).length, 0, "系统行不当作助手正文");
+  assert.equal(h.sent.rapporteur.length, 2, "系统行不当作助手正文");
 
   await h.mgr.stop(null);
 });
 
-test("治理收尾反馈镜像：本轮累积上限 4000（保留最新加 …）、展示 ≤2000；single 模型不产生", async () => {
+test("治理收尾反馈：Lead 忙时按投递机排队，settle 后送达", async () => {
+  const dir = await makeTrioRoot([]);
+  const h = makeHarness({ projectRoot: dir, customListing: trioListing(dir) });
+  await h.mgr.open({ projectRoot: dir, roleId: "rapporteur", runtime: "demo" });
+  await tick(30);
+  await h.mgr.send("Lead 先忙", undefined, { roleId: "rapporteur" });
+  assert.equal(h.sent.rapporteur.length, 1, "Lead 当前轮在跑");
+
+  await h.mgr.open({ projectRoot: dir, roleId: "convener", runtime: "demo" });
+  await tick(30);
+  await h.mgr.send("干活", undefined, { roleId: "convener" });
+  (h.streams.convener ??= []).push({ kind: "message", summary: "内部报告", turnId: "t1" } as OrchestrationEvent);
+  (h.streams.convener ??= []).push({ kind: "settled", summary: "convener 一轮结束" } as OrchestrationEvent);
+  await tick(180);
+  assert.equal(h.sent.rapporteur.length, 1, "Lead 忙 ⇒ 汇总任务排队，不打断当前轮");
+
+  (h.streams.rapporteur ??= []).push({ kind: "settled", summary: "Lead 一轮结束" } as OrchestrationEvent);
+  await tick(200);
+  assert.equal(h.sent.rapporteur.length, 2, "Lead 空闲后按序送达");
+  assert.ok(h.sent.rapporteur[1].startsWith("[系统·治理反馈] 来自 convener 的内部反馈"));
+  assert.ok(h.sent.rapporteur[1].includes("内部报告"));
+  await h.mgr.stop(null);
+});
+
+test("治理收尾反馈：本轮累积上限 4000（保留最新加 …）；任务正文 ≤4000；single 模型不产生", async () => {
   const dir = await makeTrioRoot([]);
   const h = makeHarness({ projectRoot: dir, customListing: trioListing(dir) });
   await h.mgr.open({ projectRoot: dir, roleId: "convener", runtime: "demo" });
@@ -1821,16 +1853,17 @@ test("治理收尾反馈镜像：本轮累积上限 4000（保留最新加 …�
   (h.streams.convener ??= []).push({ kind: "message", summary: "下".repeat(3000), turnId: "long" } as OrchestrationEvent);
   (h.streams.convener ??= []).push({ kind: "settled", summary: "convener 长一轮结束" } as OrchestrationEvent);
   await tick(180);
-  const longNote = h.envelopes.find((e) =>
-    e.roleId === "rapporteur" && e.event.kind === "message" &&
-    (e.event.detail as { source?: string } | undefined)?.source === "delivery-note" &&
-    e.event.summary.startsWith("治理反馈 · convener：…"));
-  assert.ok(longNote, "累积超 4000 ⇒ 保留最新并以 … 标记");
+  assert.equal(h.sent.rapporteur.length, 1, "累积超 4000 仍投一条汇总任务");
+  const lines = h.sent.rapporteur[0].split("\n");
+  assert.equal(lines[0], "[系统·治理反馈] 来自 convener 的内部反馈（内部材料，请汇总后告知客户，不要逐字转述）：", "任务前缀");
   assert.equal(
-    Array.from(longNote!.event.summary).length,
-    "治理反馈 · convener：".length + 2000 + 1,
-    "展示仍限 2000 码点（超出加 …）",
+    lines[lines.length - 1],
+    "请用 1-3 句话向客户汇总：完成了什么、是否有风险/阻塞、下一步或需要客户决定什么。不要逐字转述内部报告，不要使用内部行话，不要声称客户已批准。",
+    "汇总指令在末尾",
   );
+  const body = lines.slice(1, -1).join("\n");
+  assert.equal(Array.from(body).length, 4000, "任务正文 ≤4000 码点");
+  assert.ok(body.startsWith("…"), "超限保留最新（前置 …）");
   await h.mgr.stop(null);
 
   // single 模型：su（内置主入口）settle 不产生。
@@ -1842,7 +1875,8 @@ test("治理收尾反馈镜像：本轮累积上限 4000（保留最新加 …�
   (hs.streams.su ??= []).push({ kind: "message", summary: "su 的收尾" } as OrchestrationEvent);
   (hs.streams.su ??= []).push({ kind: "settled", summary: "su 一轮结束" } as OrchestrationEvent);
   await tick(150);
-  assert.equal(hs.envelopes.filter((e) => e.event.kind === "message" && /^治理反馈 · /.test(e.event.summary)).length, 0, "single 模型不产生治理反馈镜像");
+  assert.equal(hs.sent.su.length, 1, "single 模型不产生治理反馈任务");
+  assert.ok(!hs.sent.su[0].startsWith("[系统·治理反馈]"));
   await hs.mgr.stop(null);
 });
 
@@ -1866,6 +1900,7 @@ test("治理收尾反馈镜像：listing key 正斜杠、会话 root 反斜杠 �
   });
   try {
     await h.mgr.open({ projectRoot: backslash, roleId: "convener", runtime: "demo" });
+    await h.mgr.open({ projectRoot: backslash, roleId: "rapporteur", runtime: "demo" });
     await tick(30);
     allowEntryRoot = false; // 此后枚举缓存只认正斜杠 key（真机斜杠变体）
     await h.mgr.send("干活", undefined, { roleId: "convener" });
@@ -1873,13 +1908,9 @@ test("治理收尾反馈镜像：listing key 正斜杠、会话 root 反斜杠 �
     (h.streams.convener ??= []).push({ kind: "settled", summary: "convener 一轮结束" } as OrchestrationEvent);
     await tick(180);
     assert.ok(normalizedHits > 0, "精确 key miss 后按斜杠归一命中");
-    assert.ok(
-      h.envelopes.some((e) =>
-        e.roleId === "rapporteur" && e.event.kind === "message" &&
-        (e.event.detail as { source?: string } | undefined)?.source === "delivery-note" &&
-        e.event.summary === "治理反馈 · convener：斜杠归一后的收尾"),
-      "会话 entry root 与 listing key 斜杠变体不同仍镜像到主入口",
-    );
+    assert.equal(h.sent.rapporteur.length, 1, "会话 entry root 与 listing key 斜杠变体不同仍投 Lead");
+    assert.ok(h.sent.rapporteur[0].startsWith("[系统·治理反馈] 来自 convener 的内部反馈"), "任务前缀");
+    assert.ok(h.sent.rapporteur[0].includes("斜杠归一后的收尾"), "正文随任务送达");
 
     // 再一轮无正文 ⇒ skip 诊断（no-text）。
     await h.mgr.send("再干", undefined, { roleId: "convener" });
@@ -1896,7 +1927,7 @@ test("治理收尾反馈镜像：listing key 正斜杠、会话 root 反斜杠 �
     assert.equal(skip!.reasonCode, "no-text", "skip 原因可查（白名单落 reasonCode 同义字段）");
     const mirrored = rows.find((r) => r.component === "desktop.governance-feedback" && r.event === "governance.feedback.mirrored");
     assert.ok(mirrored, "成功镜像诊断存在");
-    assert.equal(mirrored!.targetRoleId, "convener", "镜像诊断标明角色");
+    assert.equal(mirrored!.targetRoleId, "rapporteur", "镜像诊断 targetRoleId 记 Lead 的真实 roleId");
     assert.equal(mirrored!.count, Array.from("斜杠归一后的收尾").length, "镜像诊断记录字符数（不记正文）");
     assert.ok(!text.includes("斜杠归一后的收尾"), "诊断不落正文");
   } finally {

@@ -22,6 +22,7 @@ import {
   handoffPayload,
   intentDoc,
   makeRoot,
+  seedIntentConfirm,
   sha256,
   toolAdapterFactory,
   trioProject,
@@ -94,6 +95,7 @@ test("合法交接：工具调用成功 → 账本 intent.handed-off 字段完�
   try {
     writeProjectRole(root, "A");
     const { sha } = seedIntent(root);
+    await seedIntentConfirm(root, { flowId: FLOW });
     const cap = capture();
     const calls: unknown[] = [];
     const handle = await openRoleSession(
@@ -135,7 +137,9 @@ test("合法交接：工具调用成功 → 账本 intent.handed-off 字段完�
     assert.equal(entry!.artifactPath, `docs/intents/${INTENT}.md`);
     assert.equal(entry!.artifactSha256, sha, "哈希由应用按原始字节计算");
     assert.ok((entry!.messageSummary ?? "").length <= 200);
-    assert.equal(entries.some((e) => e.kind === "customer.decision"), false, "交接不是客户批准");
+    const decisions = entries.filter((e) => e.kind === "customer.decision");
+    assert.equal(decisions.length, 1, "交接本身不写客户决定（仅种入的需求确认）");
+    assert.equal(decisions[0]!.decisionKind, "intent-confirm");
     assert.equal(
       entries.some((e) => e.decisionEvidence !== undefined),
       false,
@@ -152,6 +156,7 @@ test("AC5 双事件：成功交接同时写 intent.handed-off 与 dispatch.accep
     writeProjectRole(root, "A");
     write(root, ".ans/project.json", JSON.stringify({ projectRoot: root, roles: {}, governanceModel: "trio" }) + "\n");
     seedIntent(root);
+    await seedIntentConfirm(root, { flowId: FLOW });
     const listing = await listProject(root);
     const harness = makeDesktop(root, listing, {
       scriptForRole: (roleId) =>
@@ -182,6 +187,44 @@ test("AC5 双事件：成功交接同时写 intent.handed-off 与 dispatch.accep
       1,
       "应用投递账本不重复",
     );
+  } finally {
+    cleanup();
+  }
+});
+
+test("需求确认门槛：未确认/最后一条 revise ⇒ hand_off 拒；客户再次确认后 ⇒ 成功", async () => {
+  const { root, cleanup } = makeRoot("handoff-intent-confirm-gate");
+  try {
+    writeProjectRole(root, "A");
+    seedIntent(root);
+
+    // 1) 完全未确认 ⇒ 拒、不投递、不写账本。
+    let h = await openLiaison(root);
+    let receipt = await h.caps!.handOffIntent!(handoffPayload() as never, { turnId: "turn-1" });
+    await h.dispose();
+    assert.equal(receipt.ok, false);
+    assert.match(receipt.message ?? "", /尚未经客户确认/);
+    assert.equal(h.calls.length, 0, "未确认不得触达投递端");
+    assert.equal(handoffs((await ledgerOf(root)).entries).length, 0);
+
+    // 2) 最后一条是 revise（此前即便有 accepted 也不得放行）⇒ 拒。
+    await seedIntentConfirm(root, { flowId: FLOW });
+    await seedIntentConfirm(root, { flowId: FLOW, decision: "changes-requested" });
+    h = await openLiaison(root);
+    receipt = await h.caps!.handOffIntent!(handoffPayload() as never, { turnId: "turn-1" });
+    await h.dispose();
+    assert.equal(receipt.ok, false);
+    assert.match(receipt.message ?? "", /尚未经客户确认/);
+    assert.equal(h.calls.length, 0, "revise 不得触达投递端");
+
+    // 3) 客户再次确认（最后一条 accepted）⇒ 成功交接。
+    await seedIntentConfirm(root, { flowId: FLOW });
+    h = await openLiaison(root);
+    receipt = await h.caps!.handOffIntent!(handoffPayload() as never, { turnId: "turn-1" });
+    await h.dispose();
+    assert.equal(receipt.ok, true, receipt.message ?? "");
+    assert.equal(h.calls.length, 1);
+    assert.equal(handoffs((await ledgerOf(root)).entries).length, 1);
   } finally {
     cleanup();
   }
@@ -268,6 +311,7 @@ test("去重/initial 一次性/修订引用：重复 hash 拒、initial 第二�
   try {
     writeProjectRole(root, "A");
     seedIntent(root);
+    await seedIntentConfirm(root, { flowId: FLOW });
     const h = await openLiaison(root);
     const first = await h.caps!.handOffIntent!(handoffPayload() as never, { turnId: "turn-1" });
     assert.equal(first.ok, true, first.message ?? "");
@@ -308,6 +352,8 @@ test("每轮一次：同一会话同一轮第二次成功交接被拒；下一�
   try {
     writeProjectRole(root, "A");
     seedIntent(root);
+    await seedIntentConfirm(root, { flowId: FLOW });
+    await seedIntentConfirm(root, { flowId: "intent-b" });
     write(
       root,
       "docs/intents/intent-b.md",
@@ -371,6 +417,7 @@ test("投递失败：如实回执、不重试、不写成功账本（下一次�
     try {
       writeProjectRole(root, "A");
       seedIntent(root);
+      await seedIntentConfirm(root, { flowId: FLOW });
       const h = await openLiaison(root, delivery);
       const receipt = await h.caps!.handOffIntent!(handoffPayload() as never, { turnId: "turn-1" });
       await h.dispose();
@@ -390,6 +437,7 @@ test("交接不是批准：交接成功后 Convener 无客户接受仍不能写�
   try {
     writeProjectRole(root, "A");
     seedIntent(root);
+    await seedIntentConfirm(root, { flowId: FLOW });
     const h = await openLiaison(root);
     const receipt = await h.caps!.handOffIntent!(handoffPayload() as never, { turnId: "turn-1" });
     assert.equal(receipt.ok, true, receipt.message ?? "");
@@ -413,6 +461,7 @@ test("Liaison 每轮 settle 观察 docs/intents：artifact.observed（谁写了�
   const { root, cleanup } = makeRoot("handoff-artifact");
   try {
     writeProjectRole(root, "A");
+    await seedIntentConfirm(root, { flowId: FLOW });
     const cap = capture();
     const handle = await openRoleSession(
       {
@@ -519,6 +568,7 @@ test("桌面交接闭环：后台开 Rapporteur + 恰一条任务；不切换 pa
     writeProjectRole(root, "A");
     write(root, ".ans/project.json", JSON.stringify({ projectRoot: root, roles: {}, governanceModel: "trio" }) + "\n");
     seedIntent(root);
+    await seedIntentConfirm(root, { flowId: FLOW });
     const listing = await listProject(root);
     const harness = makeDesktop(root, listing, {
       scriptForRole: (roleId) =>
@@ -532,34 +582,38 @@ test("桌面交接闭环：后台开 Rapporteur + 恰一条任务；不切换 pa
     const { entries } = await waitForLedger(root, (list) => list.some((e) => e.kind === "intent.handed-off"));
     assert.equal(handoffs(entries).length, 1, "恰一条成功交接账本");
 
-    assert.deepEqual(openAttempts, ["liaison", "rapporteur"], "后台只多开 Rapporteur（不额外开会话）");
+    assert.deepEqual(openAttempts.slice(0, 2), ["liaison", "rapporteur"], "客户打开 Lead、后台投递 Rapporteur");
+    assert.ok(
+      openAttempts.slice(2).every((roleId) => roleId === "liaison"),
+      `其余打开只能是治理反馈对 Lead 的（重）打开；实得：${openAttempts.join(" → ")}`,
+    );
     assert.deepEqual(
       prompted.get("rapporteur"),
       [buildIntentHandoffMessage(handoffPayload() as never)],
       "Rapporteur 恰收到一条任务消息（模板逐字）",
     );
-    assert.equal(manager.openForRoleId(), "liaison", "后台投递不抢 activeRoleId、不切当前 pane");
+    // 后台投递（含治理反馈对 Lead 的后台重开）不得把 activeRoleId 切到别的角色；
+    // 会话若因边界刷新被重建，active 可能暂为 null（用户重开前不冒充仍在）。
+    const activeAfterHandoff = manager.openForRoleId();
+    assert.ok(
+      activeAfterHandoff === "liaison" || activeAfterHandoff === null,
+      `后台投递不得抢 activeRoleId（实得：${String(activeAfterHandoff)}）`,
+    );
     const notes = events.filter(
       (envelope) =>
         envelope.roleId === "liaison" &&
         envelope.event.kind === "message" &&
         (envelope.event.detail as { source?: string } | undefined)?.source === "delivery-note",
     );
-    // 2026-10-18 客户反馈：trio 内置治理角色轮末会把正文镜像到主入口（Liaison）——也是 delivery-note。
-    // 本用例只钉「交接成功系统行」恰一条；镜像行不属于交接（且夹具的「用户指令」回显无结构化 detail，
-    // 真实适配器会标 prompt-input，故不在此断言其条数）。
-    const handoffNotes = notes.filter(
-      (envelope) =>
-        typeof envelope.event.summary === "string" &&
-        /已交给报告员|报告员工作中，已排队/.test(envelope.event.summary),
-    );
-    assert.equal(
-      handoffNotes.length,
-      1,
-      `成功系统行恰一条，落 Liaison 聊天流（实得：${notes.map((envelope) => envelope.event.summary ?? "").join(" | ")}）`,
-    );
-    assert.equal(handoffNotes[0]?.event.summary, "已交给报告员（工作中）");
+    // 2026-10-18 五角色收口：内部角色 settle 改投 `[系统·治理反馈]` 汇总任务（不是原文 delivery-note）；
+    // 因此 Liaison 流里的 delivery-note 只剩交接成功这一条。
+    assert.equal(notes.length, 1, `成功系统行恰一条，落 Lead 聊天流（实得：${notes.map((envelope) => envelope.event.summary ?? "").join(" | ")}）`);
+    assert.equal(notes[0]?.event.summary, "已交给 Draft（提案）（工作中）");
     // 当前 pane 仍可对 Liaison 发言（投递可能异步入队，轮询到真实 prompt 发生）。
+    if (manager.openForRoleId() !== "liaison") {
+      const reopened = await manager.open({ projectRoot: root, roleId: "liaison", runtime: "demo" });
+      assert.equal(reopened.ok, true, reopened.error ?? "");
+    }
     prompted.get("liaison")!.length = 0;
     await manager.send("客户继续说话");
     for (let i = 0; i < 100 && !prompted.get("liaison")!.includes("客户继续说话"); i += 1) {
@@ -578,6 +632,7 @@ test("桌面交接失败：只落失败系统行、无成功账本、不循环�
     writeProjectRole(root, "A");
     write(root, ".ans/project.json", JSON.stringify({ projectRoot: root, roles: {}, governanceModel: "trio" }) + "\n");
     seedIntent(root);
+    await seedIntentConfirm(root, { flowId: FLOW });
     const listing = await listProject(root);
     const harness = makeDesktop(root, listing, {
       failRapporteurOpen: true,
@@ -599,7 +654,7 @@ test("桌面交接失败：只落失败系统行、无成功账本、不循环�
         (envelope.event.detail as { source?: string } | undefined)?.source === "delivery-note",
     );
     assert.equal(notes.length, 1, "失败恰一条系统行（不循环重试）");
-    assert.match(notes[0].event.summary ?? "", /应用无法把意图交给报告员：.*；未重试/);
+    assert.match(notes[0]?.event.summary ?? "", /应用无法把意图交给 Draft（提案）：.*；未重试/);
     await manager.stop(null);
   } finally {
     cleanup();

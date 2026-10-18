@@ -821,26 +821,28 @@
   // `cardKind`，状态行按 `governanceModel` 与接口给的流程事实。**不按角色 id 分叉**（渲染侧亦不出现
   // 三权 id 字面量）；未知值一律返回空/兜底，不猜、不编。
 
-  // 四角色（2026-10-18 客户拍板「三权不变、角色四名」）：顺序/名称以注册表为准，此处只做展示转写。
-  // `primaryEntrance` 只标记客户默认入口（Liaison）；渲染侧据此附加职责提示，不按角色 id 分叉。
+  // 五角色（2026-10-18 客户批准新增验收 Proof 并统一显示名）：顺序/名称以注册表为准，此处只做展示转写。
+  // `primaryEntrance` 只标记客户默认入口（Lead）；渲染侧据此附加职责提示，不按角色 id 分叉。
   var GOVERNANCE_ROLE_TEXT = {
-    liaison: { cn: "联络官", en: "Liaison", power: "客户沟通 · 不拥有最终批准权", primaryEntrance: true },
-    proposal: { cn: "报告员", en: "Rapporteur", power: "提案权 · 不拥有最终批准权" },
-    nomination: { cn: "提名官", en: "Nominator", power: "提名权 · 不拥有最终批准权" },
-    schedule: { cn: "召集人", en: "Convener", power: "编排权 · 不拥有最终批准权" },
+    liaison: { cn: "主理", en: "Lead", power: "客户沟通 · 不拥有最终批准权", primaryEntrance: true },
+    proposal: { cn: "提案", en: "Draft", power: "提案权 · 不拥有最终批准权" },
+    nomination: { cn: "组队", en: "Crew", power: "组队权 · 不拥有最终批准权" },
+    schedule: { cn: "统筹", en: "Steward", power: "统筹权 · 不拥有最终批准权" },
+    verification: { cn: "验收", en: "Proof", power: "验收权 · 不拥有最终批准权" },
   };
   var GOVERNANCE_ROLE_BUILTIN_NOTE = "内置角色：随应用发布，无角色目录";
   var GOVERNANCE_GROUP_LABEL = "治理职能（内置）";
-  // 结论性空态说明（四角色各自一句；评审 §9.2 逐字）。Liaison 的说明在其它空态分支里作附加提示。
+  // 结论性空态说明（五角色各自一句；评审 §9.2 逐字）。Lead 的说明在其它空态分支里作附加提示。
   var GOVERNANCE_ROLE_EMPTY_HINT = {
-    liaison: "客户默认入口：你说要做什么，我先确认目标、范围与验收，再交给报告员形成提案。我不写提案、不批准。本版起默认入口为联络官；报告员与历史提案不变。",
-    proposal: "通常由联络官交接打开；客户也可以直接找我。我只写提案，不批准。",
+    liaison: "客户默认入口：你说要做什么，我先确认目标、范围与验收，再交给提案 Draft 形成提案。我不写提案、不批准。本版起默认入口为主理 Lead；提案 Draft 与历史提案不变。",
+    proposal: "通常由主理 Lead 交接打开；客户也可以直接找我。我只写提案，不批准。",
     nomination: "通常由流程单提名步骤打开；仅在客户明确要求时直接使用",
     schedule: "通常由已接受提案开启流程；只负责排步骤与派发，不批准方案",
+    verification: "通常由交付回交后的验收步骤打开；只核对证据、出验收卡，不批准。",
   };
   var GOVERNANCE_MODEL_TEXT = { single: "旧模型（su）", trio: "三权" };
-  // 状态行专用（任务 W6-C：治理模型显示「三权 · 四角色」）；迁移预览等仍用 `GOVERNANCE_MODEL_TEXT`。
-  var GOVERNANCE_MODEL_STATUS_TEXT = { single: "旧模型（su）", trio: "三权 · 四角色" };
+  // 状态行专用（任务 W6-C：治理模型显示「三权 · 五角色」）；迁移预览等仍用 `GOVERNANCE_MODEL_TEXT`。
+  var GOVERNANCE_MODEL_STATUS_TEXT = { single: "旧模型（su）", trio: "三权 · 五角色" };
   // 状态行只认这四个接口状态值；未知值不显示（不猜「进行中」）。
   var GOVERNANCE_FLOW_STATUS_TEXT = {
     "awaiting-customer": "等待客户决定",
@@ -852,6 +854,8 @@
   var GOVERNANCE_MIGRATION_LABEL = "查看差异 / 升级";
   var GOVERNANCE_MIGRATION_LABEL_PENDING = "升级入口待本版后续";
   var GOVERNANCE_DECISION_BADGE = "治理决定 · 客户最终批准";
+  // 客户需求确认卡（intent-confirm；仅 Lead 发、客户本人确认）——不是「治理决定」，不用最终批准徽标。
+  var GOVERNANCE_INTENT_BADGE = "需求确认 · 客户";
   var GOVERNANCE_QUEUE_NOTE = "等待前一个决定";
   var GOVERNANCE_MIRROR_BADGE = "镜像 · 主入口";
   var GOVERNANCE_MODEL_OPTION_TEXT = { single: "单模型（single）", trio: "三权（trio）" };
@@ -863,6 +867,7 @@
     "appointment-write": "提名",
     "schedule-write": "编排",
     acceptance: "验收",
+    "intent-confirm": "需求确认",
   };
 
   /** 治理角色显示视图（按 function；未知/缺失 ⇒ null——不当成治理角色，也不编名字）。 */
@@ -1032,7 +1037,8 @@
 
   /**
    * 治理决定卡元信息（纯映射；`CustomerInputRequest` 的可选治理字段）：
-   *  · `cardKind` ⇒ 权力类型（提案/提名/编排/验收）+「治理决定 · 客户最终批准」徽标；
+   *  · `cardKind` ⇒ 权力类型（提案/提名/编排/验收/需求确认）+「治理决定 · 客户最终批准」徽标；
+   *    `intent-confirm` 是客户需求确认卡（仅 Lead 发、客户本人确认）⇒ 徽标「需求确认 · 客户」；
    *    普通 `write` 与缺席 ⇒ 不是治理决定（无徽标、无权力行——旧卡零变化）；
    *  · `flowId`/`stepId` 原样显示；
    *  · `paths`（可选，写盘确认逐路径）、`summary`（可选）、`artifactSha256`（可选）——接口未给就不显示，
@@ -1056,7 +1062,7 @@
     if (typeof req.artifactSha256 === "string" && req.artifactSha256 !== "") lines.push("哈希：" + req.artifactSha256);
     return {
       governance: power !== "",
-      badge: power !== "" ? GOVERNANCE_DECISION_BADGE : "",
+      badge: power === "" ? "" : cardKind === "intent-confirm" ? GOVERNANCE_INTENT_BADGE : GOVERNANCE_DECISION_BADGE,
       power: power,
       flowId: flowId,
       stepId: stepId,
@@ -1185,6 +1191,7 @@
     GOVERNANCE_ROLE_BUILTIN_NOTE: GOVERNANCE_ROLE_BUILTIN_NOTE,
     GOVERNANCE_MIGRATION_TEXT: GOVERNANCE_MIGRATION_TEXT,
     GOVERNANCE_DECISION_BADGE: GOVERNANCE_DECISION_BADGE,
+    GOVERNANCE_INTENT_BADGE: GOVERNANCE_INTENT_BADGE,
     GOVERNANCE_QUEUE_NOTE: GOVERNANCE_QUEUE_NOTE,
     GOVERNANCE_MIRROR_BADGE: GOVERNANCE_MIRROR_BADGE,
     GOVERNANCE_MODEL_SUGGEST: GOVERNANCE_MODEL_SUGGEST,

@@ -1,5 +1,5 @@
 // test/测试/governance-liaison-verify/a-roles-writes-caps.test.ts
-// 独立端到端验收（测试角色，2026-10-18）：四角色枚举/主入口、旧 trio 自动获得 Liaison、
+// 独立端到端验收（测试角色，2026-10-18）：五角色枚举/主入口、旧 trio 自动获得 Liaison、
 // single 逐字不变、Liaison 写权矩阵、能力矩阵与工具注册面。
 //
 // 依据：`角色卡/项目管理/docs/design/2026-10-18_design_governance-liaison-review.md`
@@ -14,7 +14,7 @@ import { defaultShellRules } from "../../../src/common/门禁引擎/classify-she
 import { buildGovernedTools } from "../../../src/provider/runtime/tools.ts";
 import { resolveGovernanceRole } from "../../../src/service/role/resolve-role.ts";
 import {
-  FOUR_ROLE_IDS,
+  FIVE_ROLE_IDS,
   capture,
   consume,
   customerChannel,
@@ -28,21 +28,21 @@ import {
   writeProjectRole,
 } from "./fixture.ts";
 
-// —————————————————————— 1) 四角色枚举与主入口 ——————————————————————
+// —————————————————————— 1) 五角色枚举与主入口 ——————————————————————
 
-test("四角色枚举：新空项目恰 4 个 builtIn（liaison→rapporteur→nominator→convener）、primary=liaison、governanceModel=trio", async () => {
-  const { root, cleanup } = makeRoot("listing-four");
+test("五角色枚举：新空项目恰 5 个 builtIn（liaison→rapporteur→nominator→convener→verifier）、primary=liaison、governanceModel=trio", async () => {
+  const { root, cleanup } = makeRoot("listing-five");
   try {
     const listing = await listOf(root);
     const builtIns = listing.roles.filter((r) => r.builtIn === true);
-    assert.deepEqual(builtIns.map((r) => r.roleId), [...FOUR_ROLE_IDS], "恰 4 个内置、顺序固定");
+    assert.deepEqual(builtIns.map((r) => r.roleId), [...FIVE_ROLE_IDS], "恰 5 个内置、顺序固定");
     assert.deepEqual(
       builtIns.map((r) => r.governanceFunction),
-      ["liaison", "proposal", "nomination", "schedule"],
-      "职能与角色一一对应",
+      ["liaison", "proposal", "nomination", "schedule", "verification"],
+      "职能与角色一一对应（含验收权 verification）",
     );
-    assert.equal(listing.primaryRoleId, "liaison", "主入口 = 联络官 Liaison");
-    assert.equal(listing.governanceModel, "trio", "治理模型仍叫 trio（三权不变、角色四名）");
+    assert.equal(listing.primaryRoleId, "liaison", "主入口 = Lead / 主理");
+    assert.equal(listing.governanceModel, "trio", "治理模型仍叫 trio（三权 · 五角色）");
     assert.equal(listing.hasRoles, false);
     assert.equal(listing.roles.some((r) => r.roleId === "su"), false, "trio 下不枚举 su");
     assert.deepEqual(listing.warnings, [], "空项目是正常态：不报警");
@@ -59,7 +59,7 @@ test("四角色枚举：新空项目恰 4 个 builtIn（liaison→rapporteur→n
     assert.match(liaison.cardText, /不拥有最终批准权/);
     assert.match(liaison.cardText, /docs\/intents\//);
     assert.match(liaison.cardText, /hand_off_intent/);
-    assert.match(liaison.cardText, /不得创建第五个治理角色/);
+    assert.match(liaison.cardText, /不得创建额外的治理角色/);
     const rapporteur = builtIns.find((r) => r.roleId === "rapporteur")!;
     assert.match(rapporteur.cardText, /request_clarification/, "Rapporteur 有澄清通道");
     assert.doesNotMatch(rapporteur.cardText, /客户沟通主入口/, "Rapporteur 不再自称客户沟通主入口");
@@ -82,8 +82,8 @@ test("旧 trio 项目：自动获得 Liaison 主入口、零迁移（`.ans`/文�
     assert.equal(listing.primaryRoleId, "liaison", "旧 trio 项目升级后默认入口 = Liaison");
     assert.deepEqual(
       listing.roles.map((r) => r.roleId),
-      ["liaison", "rapporteur", "nominator", "convener", "A"],
-      "四内置在前、项目角色保留",
+      ["liaison", "rapporteur", "nominator", "convener", "verifier", "A"],
+      "五内置在前、项目角色保留",
     );
   } finally {
     cleanup();
@@ -218,8 +218,8 @@ test("AC3 文案归属：越界写拒绝文案应指回正确归属（提案→�
 
 // —————————————————————— 4) 能力矩阵（真实会话装配） ——————————————————————
 
-test("能力矩阵：Liaison 仅 handOffIntent；Rapporteur 提案+澄清；Nominator 安装；Convener 派发/看护/只读 shell；su 不变", async () => {
-  const { root, cleanup } = makeRoot("caps-four");
+test("能力矩阵：Liaison 客户通道（仅 intent-confirm）+ handOffIntent；Rapporteur 提案+澄清；Nominator 安装；Convener 派发/看护/只读 shell；Verifier 验收；su 不变", async () => {
+  const { root, cleanup } = makeRoot("caps-five");
   try {
     writeProjectRole(root, "A");
     const project = trioProject(root);
@@ -250,12 +250,12 @@ test("能力矩阵：Liaison 仅 handOffIntent；Rapporteur 提案+澄清；Nomi
       await consume(handle, "（验收空脚本）");
       await handle.dispose();
     };
-    for (const id of FOUR_ROLE_IDS) await open(id);
+    for (const id of FIVE_ROLE_IDS) await open(id);
 
     const l = captured.get("liaison")!.caps!;
     assert.equal(typeof l.handOffIntent, "function", "Liaison 独享 hand_off_intent");
     assert.equal(l.requestClarification, undefined, "Liaison 无 request_clarification");
-    assert.equal(l.customerInput, undefined, "Liaison 不注入 customerInput（误给也不注入）");
+    assert.equal(typeof l.customerInput, "function", "Liaison 有客户通道（编排白名单仅 intent-confirm）");
     assert.equal(l.dispatchTask, undefined);
     assert.equal(l.roleStatus, undefined);
     assert.equal(l.sessionTail, undefined);
@@ -290,11 +290,18 @@ test("能力矩阵：Liaison 仅 handOffIntent；Rapporteur 提案+澄清；Nomi
     assert.equal(c.requestClarification, undefined);
     assert.equal(c.installSkill, undefined);
 
+    const v = captured.get("verifier")!.caps!;
+    assert.equal(typeof v.customerInput, "function", "Verifier 发验收卡");
+    assert.equal(v.handOffIntent, undefined);
+    assert.equal(v.requestClarification, undefined);
+    assert.equal(v.dispatchTask, undefined);
+    assert.equal(v.installSkill, undefined);
+
     // 注册表是唯一数据来源（不散落硬编码）。
     const spec = governanceRoleOf("liaison")!;
     assert.equal(governanceCapabilitiesOf("liaison"), spec.capabilities);
     assert.deepEqual(spec.capabilities, {
-      customerInput: false,
+      customerInput: true,
       handOffIntent: true,
       requestClarification: false,
       dispatchTask: false,

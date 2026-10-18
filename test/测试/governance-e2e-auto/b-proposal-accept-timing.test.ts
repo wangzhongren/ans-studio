@@ -85,9 +85,14 @@ test("场景2a：接受提案 ⇒ 先 Convener 写流程单，落盘后才派 No
     assert.deepEqual(nominatorPromptedWhen, [{ flowExists: true }], "派 Nominator 时流程单必须已在盘上");
     assert.deepEqual(convenerPromptedWhen, [{ flowExists: false }], "第一段派 Convener 时流程单尚不存在（由它写）");
 
-    // 打开顺序：先 Convener，后 Nominator（Rapporteur 是客户打开的）。
-    const order = h.openRoles.filter((roleId) => roleId !== "rapporteur");
-    assert.deepEqual(order, ["convener", "nominator"], `后台打开顺序：${order.join(" → ")}`);
+    // 打开顺序：先 Convener，后 Nominator（Rapporteur 是客户打开的）。Lead 的打开来自
+    // 2026-10-18 治理反馈镜像（内部角色 settle ⇒ 给主入口投 [系统·治理反馈]），不属于推进链。
+    const order = h.openRoles.filter((roleId) => roleId !== "rapporteur" && roleId !== "liaison");
+    assert.deepEqual(order, ["convener", "nominator"], `后台推进顺序：${order.join(" → ")}`);
+    assert.ok(
+      (h.prompts.get("liaison") ?? []).some((prompt) => prompt.startsWith("[系统·治理反馈]")),
+      "内部角色 settle 后应向 Lead 投 [系统·治理反馈] 汇总任务",
+    );
 
     const ledger = await h.waitForLedger((entries) => entries.filter((entry) => entry.kind === "dispatch.accepted").length >= 2);
     const accepted = ledger.entries.filter((entry) => entry.kind === "dispatch.accepted");
@@ -156,7 +161,7 @@ test("场景2b：Convener 未写出流程单 ⇒ 不派 Nominator、如实报错
       )
       .map((envelope) => envelope.event.summary);
     assert.equal(notes.length, 2, "成功一段 + 停住一段各一条系统行");
-    assert.match(notes[1] ?? "", /自动推进停住：Convener 未写出流程单/);
+    assert.match(notes[1] ?? "", /自动推进停住：Steward \/ 统筹 未写出流程单/);
 
     // 不循环：再等一拍，Convener 不再收到第二条任务。
     await new Promise((resolve) => setTimeout(resolve, 150));

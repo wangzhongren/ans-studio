@@ -405,9 +405,11 @@ test("acceptance 机械门槛（P6 补强）：流程未完成/缺 dispatch/阻�
       at: new Date().toISOString(),
       kind: "customer.decision",
       flowId: "flow-a",
-      actorRoleId: "rapporteur",
-      power: "proposal",
-      decisionKind: "unclassified",
+      actorRoleId: "nominator",
+      power: "nomination",
+      // 2026-10-18 新口径：旧账本无 cardKind 的 unclassified/none 不算未结算；用真实的
+      // 治理决定但缺最终决定（none）制造「未结算」。
+      decisionKind: "appointment",
       customerDecision: "none",
     }) + "\n");
     const unsettled = await run(root, requestFor("acceptance"), script);

@@ -178,7 +178,9 @@ function customerMetadata(signal: AbortSignal | undefined, turnId: string | unde
 // 本层只把合法字段原样并入卡片请求与 metadata / 派发载荷；是否构成治理决定由编排按账本判定。
 
 const GOVERNANCE_SLUG = new RegExp(GOVERNANCE_SLUG_PATTERN);
-const CHOICE_CARD_KINDS: readonly GovernanceChoiceCardKind[] = ["proposal", "appointment", "acceptance"];
+// 2026-10-18：`intent-confirm`（客户需求确认卡，主理在 hand_off_intent 前发出）加入 choice 白名单；
+// 它不进入 `GOVERNANCE_CARD_GROUP`（判断 agent 永不代批）。
+const CHOICE_CARD_KINDS: readonly GovernanceChoiceCardKind[] = ["proposal", "appointment", "acceptance", "intent-confirm"];
 const CONFIRM_CARD_KINDS: readonly GovernanceConfirmCardKind[] = ["write", "appointment-write", "schedule-write"];
 
 type GovernanceArgs<T> = { ok: true; value: T } | { ok: false; result: ToolResult };

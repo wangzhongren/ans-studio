@@ -559,22 +559,6 @@ test("acceptance：机械门槛——未完成/阻塞/缺 dispatch/未结算决�
       code: "insufficient-evidence",
     },
     {
-      name: "未结算决定",
-      flow: flowMarkdown([{ id: "s1", status: "done" }]),
-      facts: facts({ proposalDecision: "accepted", dispatchedStepIds: ["s1"] }),
-      ledger: JSON.stringify({
-        at: "2026-10-18T00:00:00.000Z",
-        kind: "customer.decision",
-        flowId: "flow-a",
-        actorRoleId: "rapporteur",
-        power: "proposal",
-        decisionKind: "unclassified",
-        customerDecision: "none",
-        decisionEvidence: { kind: "customer-input" },
-      }) + "\n",
-      code: "insufficient-evidence",
-    },
-    {
       name: "流程单缺失",
       flow: undefined,
       facts: facts({ proposalDecision: "accepted", dispatchedStepIds: ["s1"] }),
@@ -592,6 +576,41 @@ test("acceptance：机械门槛——未完成/阻塞/缺 dispatch/未结算决�
       assert.equal(out.reasonCode, scenario.code, scenario.name);
     });
   }
+});
+
+test("acceptance：旧账本 unclassified/none 不算未结算（不挡真正的提案接受）", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, "docs/flows/flow-a.md", flowMarkdown([{ id: "s1", status: "done" }]));
+    writeFile(root, "docs/proposals/flow-a-v1.md");
+    writeFile(root, ".ans/governance/ledger.jsonl", [
+      JSON.stringify({
+        at: "2026-10-18T00:00:00.000Z",
+        kind: "customer.decision",
+        flowId: "flow-a",
+        actorRoleId: "rapporteur",
+        power: "proposal",
+        decisionKind: "proposal-accept",
+        customerDecision: "accepted",
+        decisionEvidence: { kind: "customer-input" },
+      }),
+      JSON.stringify({
+        at: "2026-10-18T00:00:01.000Z",
+        kind: "customer.decision",
+        flowId: "flow-a",
+        actorRoleId: "liaison",
+        power: "liaison",
+        decisionKind: "unclassified",
+        customerDecision: "none",
+        decisionEvidence: { kind: "customer-input" },
+      }),
+    ].join("\n") + "\n");
+    const { judge } = makeJudge({ report: readThenReport(ACCEPTANCE_READS, APPROVE_ACCEPTANCE) });
+    const out = await judge(acceptanceRequest(root, {
+      facts: facts({ proposalDecision: "accepted", dispatchedStepIds: ["s1"] }),
+    }));
+    assert.equal(out.verdict, "approve");
+    assert.equal(out.reasonCode, "sufficient");
+  });
 });
 
 test("acceptance：ledgerErrors / 未接受 / 未闭环澄清 → manual", async () => {

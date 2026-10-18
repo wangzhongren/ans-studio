@@ -2,8 +2,8 @@
 // 场景 6（离线端到端）：**验收门槛**——步骤未全 done / 缺 dispatch.accepted / 有阻塞步骤 /
 // 有未结算决定 ⇒ 验收不代批（原卡 + judgeNotice）；全部满足 ⇒ 代批。
 //
-// 走真实 Rapporteur 会话 + 真实判断 driver：机械门槛读流程单与账本，假判断会话只是交回 approve。
-// 「负向仍 manual」由产品门槛产生，不是桩函数伪造。
+// 走真实 Proof / 验收（verifier）会话 + 真实判断 driver：机械门槛读流程单与账本，假判断会话只是交回 approve。
+// 「负向仍 manual」由产品门槛产生，不是桩函数伪造。Draft / 提案 不再发 acceptance（结构性拒绝）。
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -57,9 +57,9 @@ async function runCase(opts: {
     root: temp.root,
     approval: true,
     decision: true,
-    scriptForRole: (ctx) => (ctx.roleId === "rapporteur" ? [ACCEPTANCE_CARD] : []),
+    scriptForRole: (ctx) => (ctx.roleId === "verifier" ? [ACCEPTANCE_CARD] : []),
   });
-  await h.open("rapporteur");
+  await h.open("verifier");
   return {
     harness: h,
     async cleanup() {
@@ -94,7 +94,7 @@ test("场景6a：步骤未全 done ⇒ 验收不代批（manual + 原卡）", as
     ledger: { entries: [ACCEPTED, DISPATCHED] },
   });
   try {
-    const sending = c.harness.send("rapporteur", "请请客户验收。");
+    const sending = c.harness.send("verifier", "请请客户验收。");
     await c.harness.waitFor(() => c.harness.presented.length === 1, 5000);
     const card = c.harness.presented[0]!;
     assert.match(card.judgeNotice ?? "", /未代批/);
@@ -115,7 +115,7 @@ test("场景6b：步骤全 done 但缺 dispatch.accepted ⇒ 验收不代批", a
     ledger: { entries: [ACCEPTED] },
   });
   try {
-    const sending = c.harness.send("rapporteur", "请请客户验收。");
+    const sending = c.harness.send("verifier", "请请客户验收。");
     await c.harness.waitFor(() => c.harness.presented.length === 1, 5000);
     const card = c.harness.presented[0]!;
     assert.match(card.judgeNotice ?? "", /dispatch\.accepted|未代批/);
@@ -135,7 +135,7 @@ test("场景6c：有阻塞步骤 ⇒ 验收不代批", async () => {
     ledger: { entries: [ACCEPTED, DISPATCHED] },
   });
   try {
-    const sending = c.harness.send("rapporteur", "请请客户验收。");
+    const sending = c.harness.send("verifier", "请请客户验收。");
     await c.harness.waitFor(() => c.harness.presented.length === 1, 5000);
     const card = c.harness.presented[0]!;
     assert.match(card.judgeNotice ?? "", /未代批/);
@@ -156,12 +156,14 @@ test("场景6d：有未结算决定 ⇒ 验收不代批", async () => {
       entries: [
         ACCEPTED,
         DISPATCHED,
-        { decisionKind: "unclassified", customerDecision: "none", actorRoleId: "rapporteur", power: "proposal" },
+        // 2026-10-18 新口径：旧账本无 cardKind 的 unclassified/none 不算未结算；这里用真实的
+        // 治理决定但缺最终决定（none）来制造「未结算」。
+        { decisionKind: "appointment", customerDecision: "none", actorRoleId: "nominator", power: "nomination" },
       ],
     },
   });
   try {
-    const sending = c.harness.send("rapporteur", "请请客户验收。");
+    const sending = c.harness.send("verifier", "请请客户验收。");
     await c.harness.waitFor(() => c.harness.presented.length === 1, 5000);
     const card = c.harness.presented[0]!;
     assert.match(card.judgeNotice ?? "", /未结算|未代批/);
@@ -181,7 +183,7 @@ test("场景6e：全部满足（全 done + 每步 dispatch.accepted + 未结算�
     ledger: { entries: [ACCEPTED, DISPATCHED] },
   });
   try {
-    const sent = await c.harness.send("rapporteur", "请请客户验收。");
+    const sent = await c.harness.send("verifier", "请请客户验收。");
     assert.equal(sent.ok, true, sent.error ?? "");
     assert.equal(c.harness.presented.length, 0, "满足门槛 ⇒ 0 张手动卡");
     assert.equal(c.harness.judgeRows.length, 1);
@@ -196,5 +198,35 @@ test("场景6e：全部满足（全 done + 每步 dispatch.accepted + 未结算�
   } finally {
     await c.cleanup();
     c.cleanupRoot();
+  }
+});
+
+test("Draft 不能发 acceptance：rapporteur 的 request_choice(acceptance) 被结构性拒绝", async () => {
+  const temp = makeRoot("acceptance-wrong-role");
+  seedTrioProject(temp.root);
+  write(temp.root, PROPOSAL_REL, proposalDoc(FLOW));
+  write(temp.root, FLOW_REL, flowDoc(FLOW, [{ id: "impl", status: "done" }]));
+  await seedLedger(temp.root, [ACCEPTED, DISPATCHED]);
+  const h = await makeHarness({
+    tag: "acceptance-wrong-role",
+    root: temp.root,
+    approval: true,
+    decision: true,
+    scriptForRole: (ctx) => (ctx.roleId === "rapporteur" ? [ACCEPTANCE_CARD] : []),
+  });
+  try {
+    await h.open("rapporteur");
+    const sent = await h.send("rapporteur", "请发起验收。");
+    assert.equal(sent.ok, true, sent.error ?? "");
+    const receipt = h.results.find((entry) => entry.name === "request_choice");
+    assert.ok(receipt, "应有 request_choice 工具回执");
+    assert.equal(receipt!.ok, false, "Draft 不得发 acceptance（角色卡种白名单结构性拒绝）");
+    assert.match(receipt!.message, /acceptance|不允许|拒绝/);
+    assert.equal(h.presented.length, 0, "不得弹验收卡");
+    assert.equal(h.judgeRows.length, 0, "判断 agent 不得介入");
+  } finally {
+    await h.stop();
+    h.cleanup();
+    temp.cleanup();
   }
 });

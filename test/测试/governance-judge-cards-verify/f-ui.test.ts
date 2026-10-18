@@ -125,6 +125,38 @@ test("结果行：标题「judge 代批 · 代决策/代审批」、引擎/opera
   assert.equal(UL.governanceJudgeResultView(null), null);
 });
 
+test("五角色显示名与需求确认卡：verifier=验收 Proof 可见；intent-confirm 用「需求确认 · 客户」徽标", async () => {
+  const UL = await loadUiLabels();
+  const roleView = (UL as unknown as {
+    governanceRoleView(fn: string): { name: string; power: string; primaryEntrance: boolean } | null;
+  }).governanceRoleView;
+  // 顺序由主进程角色注册表数据驱动（Steward 之后紧跟 Proof）；渲染层只按 governanceFunction 派生文案。
+  const expected = [
+    ["liaison", "主理 Lead", "客户沟通 · 不拥有最终批准权"],
+    ["proposal", "提案 Draft", "提案权 · 不拥有最终批准权"],
+    ["nomination", "组队 Crew", "组队权 · 不拥有最终批准权"],
+    ["schedule", "统筹 Steward", "统筹权 · 不拥有最终批准权"],
+    ["verification", "验收 Proof", "验收权 · 不拥有最终批准权"],
+  ] as const;
+  for (const [fn, name, power] of expected) {
+    const view = roleView(fn);
+    assert.ok(view !== null, `${fn} 必须能显示（树按 governanceFunction 数据驱动）`);
+    assert.equal(view!.name, name);
+    assert.equal(view!.power, power);
+  }
+  assert.equal(roleView("verification")!.primaryEntrance, false);
+
+  const cardMeta = (UL as unknown as {
+    governanceCardMetaView(req: unknown): { power: string; badge: string; governance: boolean };
+  }).governanceCardMetaView;
+  const intent = cardMeta({ cardKind: "intent-confirm", flowId: "flow-i" });
+  assert.equal(intent.governance, true);
+  assert.equal(intent.power, "需求确认");
+  assert.equal(intent.badge, "需求确认 · 客户");
+  assert.ok(!intent.badge.includes("最终批准"), "需求确认卡不得出现「最终批准」徽标");
+  assert.equal(cardMeta({ cardKind: "proposal" }).badge, "治理决定 · 客户最终批准", "其余卡种徽标不变");
+});
+
 test("回落提示：代审批/代决策人话原因；row-failed 单列「判断已完成」", async () => {
   const UL = await loadUiLabels();
   assert.equal(

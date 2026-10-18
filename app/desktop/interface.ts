@@ -805,9 +805,9 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     watchdogService = undefined;
   }
 
-  // —————— 收尾推进（2026-10-18 真机缺口）：回交送达 Convener 且其 settle 后，流程全部完成则派 Rapporteur ——————
+  // —————— 收尾推进（2026-10-18 真机缺口）：回交送达 Convener 且其 settle 后，流程全部完成则派 Proof / 验收 ——————
   // 触发事实来自 `SessionManager.onHandbackSettled`（回交轮 origin 的 flowId/证据）；本层只读流程单与账本做
-  // **触发门**检查，全部完成才后台派 Rapporteur 一条汇总任务；不自动验收、不代批（验收卡仍走决策开关/客户手批）。
+  // **触发门**检查，全部完成才后台派 Proof / 验收（verifier）一条汇总任务；不自动验收、不代批（验收卡仍走决策开关/客户手批）。
   // 每 flow 只派一次（运行期 Set）；不循环重试；失败如实落 Convener 系统行。
   const acceptanceDispatchedFlows = new Set<string>();
   const dispatchAcceptanceAfterHandback = async (info: {
@@ -848,18 +848,18 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         return;
       }
       const message = buildAcceptanceTaskMessage(info.flowId, info.evidence);
-      const opened = await manager.openBackground({ projectRoot: info.projectRoot, roleId: "rapporteur", runtime: info.runtime });
+      const opened = await manager.openBackground({ projectRoot: info.projectRoot, roleId: "verifier", runtime: info.runtime });
       if (!opened.ok) {
         acceptanceDispatchedFlows.delete(key);
         diagnostic.error("acceptance.open.failed", new Error(opened.error ?? "unknown"), { flowId: info.flowId });
-        note(`收尾推进失败：无法开启 Rapporteur 会话：${opened.error ?? "未知原因"}；未自动重试。`);
+        note(`收尾推进失败：无法开启 Proof / 验收 会话：${opened.error ?? "未知原因"}；未自动重试。`);
         return;
       }
-      const sent = await manager.sendBackground({ projectRoot: info.projectRoot, roleId: "rapporteur", runtime: info.runtime, text: message });
+      const sent = await manager.sendBackground({ projectRoot: info.projectRoot, roleId: "verifier", runtime: info.runtime, text: message });
       if (!sent.ok) {
         acceptanceDispatchedFlows.delete(key);
         diagnostic.error("acceptance.send.failed", new Error(sent.error ?? "unknown"), { flowId: info.flowId });
-        note(`收尾推进失败：发送验收任务给 Rapporteur 失败：${sent.error ?? "未知原因"}；未自动重试。`);
+        note(`收尾推进失败：发送验收任务给 Proof / 验收 失败：${sent.error ?? "未知原因"}；未自动重试。`);
         return;
       }
       note(governanceAcceptanceAdvanceNote(info.flowId));
@@ -891,7 +891,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     loadEffectiveConfig: loadEffectiveConfigFn,
     getListing: (root) => listingCache.get(root),
     emitEvent: emitSessionEvent,
-    // 收尾推进（2026-10-18）：回交送达 Convener 且其本轮 settle 后，检查流程完成度并（仅全部完成时）派 Rapporteur。
+    // 收尾推进（2026-10-18）：回交送达 Steward / 统筹 且其本轮 settle 后，检查流程完成度并（仅全部完成时）派 Proof / 验收。
     onHandbackSettled: (info) => { void dispatchAcceptanceAfterHandback(info); },
     emitPersistenceChange: update => { if (update.scope.projectRoot === importedProjectRoot) deps.emitPersistenceChange?.(update); },
     // L-1 + 状态准确性：真实状态快照外推（变化时；缺省 ⇒ 界面无队列行/忙态——入队本身不受影响）。
@@ -1316,7 +1316,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         runtime = manager.liveSessionViews().find((view) => view.projectRoot === projectRoot && view.roleId === sourceRoleId)?.runtime;
       }
       const diagnostic = createDiagnosticLogger({ component: "desktop.governance-advance", projectRoot, roleId: payload.roleId });
-      const targetLabel = targetRoleId === "nominator" ? "Nominator" : "Convener";
+      const targetLabel = targetRoleId === "nominator" ? "Crew / 组队" : "Steward / 统筹";
       const note = (summary: string): void => {
         if (projectRoot === undefined || runtime === undefined || sourceRoleId === "") return;
         try {
@@ -1343,7 +1343,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         target: "nominator" | "convener",
         text: string,
       ): Promise<{ ok: true; queued?: boolean } | { ok: false; error: string }> => {
-        const label = target === "nominator" ? "Nominator" : "Convener";
+        const label = target === "nominator" ? "Crew / 组队" : "Steward / 统筹";
         const opened = await manager.openBackground({ projectRoot, roleId: target, runtime });
         if (!opened.ok) return { ok: false, error: `无法开启 ${label} 会话：${opened.error ?? "未知原因"}` };
         const sent = await manager.sendBackground({ projectRoot, roleId: target, runtime, text });
@@ -1411,14 +1411,14 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         const nominatorIdle = await manager.waitForRoleIdle(projectRoot, "nominator", runtime);
         if (!nominatorIdle) {
           return chainFail(
-            `Nominator 本轮未在时限内结束，角色（${missingAppointmentRoles.join("、")}）未确认；未派 Convener`,
+            `Crew / 组队 本轮未在时限内结束，角色（${missingAppointmentRoles.join("、")}）未确认；未派 Steward / 统筹`,
             "nominator",
           );
         }
         await manager.refreshListingNow(projectRoot);
         const stillMissing = appointmentTargets.filter((roleId) => !roleExists(roleId));
         if (stillMissing.length > 0) {
-          return chainFail(`角色卡/边界仍未写出（${stillMissing.join("、")} 未枚举到）；未派 Convener`, "nominator");
+          return chainFail(`角色卡/边界仍未写出（${stillMissing.join("、")} 未枚举到）；未派 Steward / 统筹`, "nominator");
         }
         const convenerDispatch = await dispatchTo("convener", message);
         if (!convenerDispatch.ok) return chainFail(convenerDispatch.error, "nominator");
@@ -1471,10 +1471,10 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         const idle = await manager.waitForRoleIdle(projectRoot, targetRoleId, runtime);
         diagnostic.record("advance.chain.convener-idle", { flowId, idle });
         if (!idle) {
-          return chainFail(`Convener 本轮未在时限内结束，流程单 ${flowPath} 未确认；未派发提名任务`);
+          return chainFail(`Steward / 统筹 本轮未在时限内结束，流程单 ${flowPath} 未确认；未派发提名任务`);
         }
         if (!existsSync(`${projectRoot}/${flowPath}`)) {
-          return chainFail(`Convener 未写出流程单 ${flowPath}；未派发提名任务`);
+          return chainFail(`Steward / 统筹 未写出流程单 ${flowPath}；未派发提名任务`);
         }
         const nominationPayload: GovernanceNextStepPayload = {
           version: 1,
@@ -1488,11 +1488,11 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         if (nominationMessage === null) return chainFail("缺少流程信息，未派发提名任务");
         const openedNomination = await manager.openBackground({ projectRoot, roleId: "nominator", runtime });
         if (!openedNomination.ok) {
-          return chainFail(`无法开启 Nominator 会话：${openedNomination.error ?? "未知原因"}`);
+          return chainFail(`无法开启 Crew / 组队 会话：${openedNomination.error ?? "未知原因"}`);
         }
         const sentNomination = await manager.sendBackground({ projectRoot, roleId: "nominator", runtime, text: nominationMessage });
         if (!sentNomination.ok) {
-          return chainFail(`发送提名任务给 Nominator 失败：${sentNomination.error ?? "未知原因"}`);
+          return chainFail(`发送提名任务给 Crew / 组队 失败：${sentNomination.error ?? "未知原因"}`);
         }
         note(governanceNominationFollowUpNote());
         diagnostic.record("advance.chain.nomination-dispatched", { flowId, queued: sentNomination.queued === true });

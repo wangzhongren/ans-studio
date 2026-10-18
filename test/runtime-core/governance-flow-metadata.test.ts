@@ -74,6 +74,31 @@ test("request_choice：flowId/stepId/cardKind 原样进入卡片请求与回调 
   }
 });
 
+test("request_choice：intent-confirm（客户需求确认）合法透传（confirm/revise）；判断分组无该卡种", async () => {
+  let request!: CustomerInputRequest;
+  let metadata!: CustomerInputMetadata;
+  const byName = tools({
+    roleId: "liaison",
+    runtime: "claude",
+    currentTurnId: () => "turn-intent",
+    customerInput: (req, meta) => {
+      request = req;
+      metadata = meta!;
+      return { outcome: "answered", value: { selected: ["confirm"] } };
+    },
+  });
+  const result = await byName.get("request_choice")!.handler(toolArgs("request_choice", {
+    title: "确认需求？",
+    options: [{ id: "confirm", label: "确认" }, { id: "revise", label: "修改" }],
+    flowId: "flow-alpha",
+    cardKind: "intent-confirm",
+  }));
+  assert.equal(result.ok, true);
+  assert.equal(request.cardKind, "intent-confirm");
+  assert.equal(metadata.cardKind, "intent-confirm");
+  assert.equal(metadata.roleId, "liaison");
+});
+
 test("request_confirmation：合法 appointment-write 透传；非法 slug/种类在触达客户通道前拒绝", async () => {
   let request!: CustomerInputRequest;
   let metadata!: CustomerInputMetadata;
@@ -148,7 +173,7 @@ test("schema：三个治理元数据字段可选、slug pattern 单点、cardKin
     assert.equal(properties.stepId.pattern, GOVERNANCE_SLUG_PATTERN);
   }
   assert.deepEqual(confirm.cardKind.enum, ["write", "appointment-write", "schedule-write"]);
-  assert.deepEqual(choice.cardKind.enum, ["proposal", "appointment", "acceptance"]);
+  assert.deepEqual(choice.cardKind.enum, ["proposal", "appointment", "acceptance", "intent-confirm"]);
   for (const name of ["request_confirmation", "request_choice", "dispatch_task"]) {
     const required = (describeTool(name).parameters as { required?: string[] }).required ?? [];
     for (const field of ["flowId", "stepId", "cardKind"]) assert.equal(required.includes(field), false, `${name}.${field} 必须可选`);

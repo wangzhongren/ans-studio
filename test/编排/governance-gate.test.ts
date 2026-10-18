@@ -83,16 +83,25 @@ const APPOINT_A = decision({
 
 // —————————————————————— ① 提案接受门 ——————————————————————
 
-test("write-flow：无决定 / revise / reject / unclassified 拒；accept / accept-quick 放行", () => {
+test("write-flow：无决定 / revise / reject 拒；accept / accept-quick 放行", () => {
   const base = input({ roleId: "convener", action: "write-flow", flowId: "flow-a" });
   assert.equal(blocked(evaluateGovernanceGate(base, snapshot([]))), "proposal-not-accepted");
 
-  for (const kind of ["proposal-revise", "proposal-reject", "unclassified"] as const) {
+  for (const kind of ["proposal-revise", "proposal-reject"] as const) {
     const result = evaluateGovernanceGate(base, snapshot([decision({ decisionKind: kind })]));
     assert.equal(blocked(result), "proposal-not-accepted", kind);
   }
   assert.deepEqual(evaluateGovernanceGate(base, snapshot([ACCEPT])), { allowed: true });
   assert.deepEqual(evaluateGovernanceGate(base, snapshot([ACCEPT_QUICK])), { allowed: true });
+});
+
+test("旧账本兼容：accept 后的 unclassified/none（无 cardKind 污染）不覆盖真正决定", () => {
+  const base = input({ roleId: "convener", action: "write-flow", flowId: "flow-a" });
+  const polluted = decision({ decisionKind: "unclassified", customerDecision: "none" });
+  assert.deepEqual(evaluateGovernanceGate(base, snapshot([ACCEPT, polluted])), { allowed: true });
+  // Crew（Nominator）提名门禁同样可用。
+  const nomination = input({ roleId: "nominator", action: "write-nomination", flowId: "flow-a" });
+  assert.deepEqual(evaluateGovernanceGate(nomination, snapshot([ACCEPT, polluted])), { allowed: true });
 });
 
 test("write-flow：最新提案决定生效——后一次 revise 覆盖此前 accept；普通写盘确认不覆盖", () => {

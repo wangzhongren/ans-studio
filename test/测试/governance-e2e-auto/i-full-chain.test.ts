@@ -1,7 +1,7 @@
 // test/测试/governance-e2e-auto/i-full-chain.test.ts
-// 四角色**全自动闭环**（离线端到端）：Liaison 交接意图 → Rapporteur 写提案并请客户接受 →
-// 应用派 Convener 写流程单 → 应用派 Nominator 提名 → 客户任命 executor → 应用派 Nominator 写卡 →
-// listing 刷新后应用派 Convener 排程 → Convener dispatch_task 派发给 executor。
+// 五角色**全自动闭环**（离线端到端）：Lead 交接意图 → Draft 写提案并请客户接受 →
+// 应用派 Steward 写流程单 → 应用派 Crew 提名 → 客户任命 executor → 应用派 Crew 写卡 →
+// listing 刷新后应用派 Steward 排程 → Steward dispatch_task 派发给 executor。
 //
 // 唯一非产品件是模型会话（脚本化桩）与判断会话（假模型交回 approve）；其余走真实桌面 Interface、
 // 真实 run-role/gate/issuer/账本/客户通道/判断 driver/listing 刷新。
@@ -31,7 +31,7 @@ const ROLE_CARD_REL = "角色卡/executor/role-card.md";
 const ROLE_BOUNDARY_REL = "角色卡/executor/boundary.yaml";
 const INTENT_REL = "docs/intents/intent-a.md";
 
-test("四角色全自动链路：意图→提案→接受→流程→提名→任命→写卡→排程→派发 executor", async () => {
+test("五角色全自动链路：意图→提案→接受→流程→提名→任命→写卡→排程→派发 executor", async () => {
   const temp = makeRoot("full-chain");
   seedTrioProject(temp.root);
   const h = await makeHarness({
@@ -40,9 +40,27 @@ test("四角色全自动链路：意图→提案→接受→流程→提名→�
     approval: true,
     decision: true,
     scriptForRole: (ctx: ScriptContext) => {
-      if (ctx.roleId === "liaison" && !/已交给报告员|客户意图已交接/.test(ctx.prompt)) {
+      if (
+        ctx.roleId === "liaison" &&
+        !ctx.prompt.includes("[系统·治理反馈]") &&
+        !/已交给报告员|客户意图已交接/.test(ctx.prompt)
+      ) {
         return [
           { name: "write_file", args: { path: INTENT_REL, content: intentDoc("intent-a") } },
+          {
+            name: "request_choice",
+            toolCallId: "tc-intent-confirm",
+            args: {
+              title: "需求确认 intent-a",
+              question: "请确认目标、范围与验收标准。",
+              flowId: FLOW,
+              cardKind: "intent-confirm",
+              options: [
+                { id: "confirm", label: "确认" },
+                { id: "revise", label: "修改" },
+              ],
+            },
+          },
           { name: "hand_off_intent", toolCallId: "tc-handoff", args: intentHandoffArgs("intent-a") },
         ];
       }
@@ -136,7 +154,17 @@ test("四角色全自动链路：意图→提案→接受→流程→提名→�
   });
   try {
     await h.open("liaison");
-    const sent = await h.send("liaison", "请把客户意图交给报告员。");
+    // 卡片作答发生在 send 的等待期内 ⇒ 不 await send，先等卡、手答，再等本轮结束。
+    const sending = h.send("liaison", "请把客户意图交给报告员。");
+
+    // 2026-10-18 客户拍板：Lead 先发 intent-confirm 卡，客户手答（判断 agent 不介入）；
+    // 确认后 hand_off_intent 才被放行。
+    await h.waitFor(() => h.presented.length === 1, 5000);
+    const confirmCard = h.presented[0]!;
+    assert.equal(confirmCard.request.cardKind, "intent-confirm", "Lead 先发需求确认卡");
+    assert.equal(h.judgeRows.length, 0, "需求确认卡由客户手答，判断 agent 不得代批");
+    h.answer(confirmCard.id, { kind: "choice", selected: ["confirm"] });
+    const sent = await sending;
     assert.equal(sent.ok, true, sent.error ?? "");
 
     // 等整条链路收口：executor 角色卡落盘 + Convener 派发入账。
@@ -144,7 +172,7 @@ test("四角色全自动链路：意图→提案→接受→流程→提名→�
       () =>
         exists(temp.root, ROLE_CARD_REL) &&
         (h.prompts.get("executor")?.length ?? 0) > 0,
-      20000,
+      8000,
     );
     await h.waitForLedger(
       (entries) =>
@@ -216,21 +244,25 @@ test("四角色全自动链路：意图→提案→接受→流程→提名→�
     assert.equal(convenerDispatch!.stepId, "impl");
     assert.equal(convenerDispatch!.power, "schedule");
 
-    // —— 界面：0 张手动卡、listing 刷新、当前 pane 不切换 ——
-    assert.equal(h.presented.length, 0, "全自动链路 0 张手动卡");
+    // —— 界面：仅需求确认卡 1 张（客户手答）；其余治理卡由判断代批（0 手动卡）、listing 刷新、当前 pane 不切换 ——
+    assert.equal(h.presented.length, 1, "仅 intent-confirm 由客户手答；其余治理卡 0 张手动卡");
+    assert.equal(h.presented[0]!.request.cardKind, "intent-confirm");
     const listing = await h.iface.listProject({ projectRoot: temp.root });
     assert.equal(listing.roles.some((role) => role.roleId === "executor"), true);
     assert.ok(h.projectChanged > 0, "listing 刷新触发 project:changed");
     assert.deepEqual(h.userOpened, ["liaison"], "全程只有 Liaison 由客户打开（后台派发不抢活动角色）");
 
-    // LRU 上限（3）可能已回收 Liaison；客户点回 Liaison 后，不带 target 的消息仍落它。
-    if (!(await h.iface.listLiveSessions()).includes("liaison")) await h.open("liaison");
-    const liaisonPrompts = h.prompts.get("liaison")!.length;
+    // LRU/边界重建可能已回收或清空 Liaison 的 active 焦点；客户点回 Liaison 后，消息仍落它。
+    await h.open("liaison");
+    const liaisonPrompts = (h.prompts.get("liaison") ?? []).filter((prompt) => prompt.endsWith("客户继续说话")).length;
     h.iface.sendSession({ text: "客户继续说话" }).catch(() => {});
-    await h.waitFor(() => (h.prompts.get("liaison")?.length ?? 0) > liaisonPrompts, 3000);
+    await h.waitFor(
+      () => (h.prompts.get("liaison") ?? []).filter((prompt) => prompt.endsWith("客户继续说话")).length > liaisonPrompts,
+      6000,
+    );
     assert.ok(
-      h.prompts.get("liaison")!.at(-1)!.endsWith("客户继续说话"),
-      "当前 pane 仍是 Liaison（后台派发不抢活动角色）",
+      (h.prompts.get("liaison") ?? []).some((prompt) => prompt.endsWith("客户继续说话")),
+      "当前 pane 仍是 Lead（后台派发/治理反馈不抢活动角色）",
     );
   } finally {
     await h.stop();

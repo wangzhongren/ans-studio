@@ -186,6 +186,7 @@ const GOVERNANCE_FUNCTION_LABEL: Record<GovernanceFunction, string> = {
   proposal: "提案权",
   nomination: "提名权",
   schedule: "编排权",
+  verification: "验收权",
 };
 
 /**
@@ -612,11 +613,24 @@ function governanceFunctionDiscipline(spec: BuiltInGovernanceRoleSpec): string {
         `**沟通权纪律（${spec.displayName}，不拥有最终批准权）**：` +
         "客户意图写入 `docs/intents/<intentId>.md`（frontmatter: intentId/handoffKind/goal/scope/" +
         "acceptance/customerWords；四要素必须非空，`customerWords` 只摘录客户原话，**不得写入凭据/密钥**）。\n" +
-        "需要报告员形成提案时，用 `hand_off_intent` 把意图交给应用（intentId/handoffKind/goal/scope/" +
-        "acceptance/summary，须与意图文件逐项一致）；应用在后台投递给报告员，不打开/不切换客户会话。" +
+        "**交接前必须先做需求确认**：写完意图文件后，先 `request_choice`（`cardKind=intent-confirm`，`flowId`，" +
+        "选项 id 固定 `confirm` / `revise`）请客户确认需求；只有客户选择「确认」（账本 `intent-confirm` 决定）后，" +
+        "才用 `hand_off_intent` 把意图交给应用（intentId/handoffKind/goal/scope/acceptance/summary，须与意图文件逐项一致）；" +
+        "应用在后台投递给报告员，不打开/不切换客户会话。\n" +
         "**交接 ≠ 客户批准**，也不解锁任何门禁；同一意图不要重复交接。\n" +
         "信息不足就先向客户问清；客户回答后更新意图文件，再用 `handoffKind=clarification` 交接。\n" +
         "你不写提案、不任命、不排程、不派发、不安装、不写账本；不得批准或声称已获客户批准。"
+      );
+    case "verification":
+      // 验收权——独立核对，不是批准权。
+      return (
+        `**验收权纪律（${spec.displayName}，不拥有最终批准权）**：` +
+        "核对报告写入 `docs/verification/`，本角色的治理工作记录写入 `docs/governance/verifier/`；" +
+        "读取流程单（`docs/flows/<flowId>.md`）、提案/契约、交付与回交证据，独立逐项核对。\n" +
+        "向客户请求验收决定用 `request_choice`，`cardKind=acceptance`，`flowId` 必填，选项 id 固定为 " +
+        "`accept` / `reject`；普通写盘（核对报告）用 `request_confirmation`，`cardKind=write`。\n" +
+        "**验收 ≠ 批准**：不得自行验收、不得代替客户批准，不得把核对报告里的 `status` 当作客户决定；" +
+        "不改原交付、不改提案/契约/流程单。"
       );
   }
 }

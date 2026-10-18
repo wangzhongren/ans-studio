@@ -1359,26 +1359,26 @@ export class SessionManager {
         runtime,
         liaisonRoleId,
         liaisonRoleId,
-        `应用无法把意图交给报告员：${reason}；未重试`,
+        `应用无法把意图交给 Draft（提案）：${reason}；未重试`,
       );
       return { ok: false, message: reason };
     };
     try {
       const opened = await this.openBackground({ projectRoot, roleId: "rapporteur", runtime });
-      if (!opened.ok) return fail(`无法开启报告员会话（${opened.error ?? "未知原因"}）`);
+      if (!opened.ok) return fail(`无法开启 Draft（提案）会话（${opened.error ?? "未知原因"}）`);
       const sent = await this.sendBackground({
         projectRoot,
         roleId: "rapporteur",
         runtime,
         text: buildIntentHandoffMessage(payload),
       });
-      if (!sent.ok) return fail(`发送任务给报告员失败（${sent.error ?? "未知原因"}）`);
+      if (!sent.ok) return fail(`发送任务给 Draft（提案）失败（${sent.error ?? "未知原因"}）`);
       this.emitDeliveryNote(
         projectRoot,
         runtime,
         liaisonRoleId,
         liaisonRoleId,
-        sent.queued === true ? "报告员工作中，已排队" : "已交给报告员（工作中）",
+        sent.queued === true ? "Draft（提案）工作中，已排队" : "已交给 Draft（提案）（工作中）",
       );
       // 审计（四角色评审 §7.2）：投递成功后写 `dispatch.accepted{actorRoleId:"app", power:"app",
       // trigger:"intent-handoff"}`——应用投递 ≠ 客户批准，**不写 customerDecision/decisionEvidence**。
@@ -1417,7 +1417,7 @@ export class SessionManager {
       });
       return {
         ok: true,
-        message: `已把意图「${payload.intentId}」交给报告员（handoffKind=${payload.handoffKind}）——交接 ≠ 客户批准。`,
+        message: `已把意图「${payload.intentId}」交给 Draft（提案）（handoffKind=${payload.handoffKind}）——交接 ≠ 客户批准。`,
       };
     } catch (error) {
       // 防御：任何意外都如实回执 + 系统行，绝不产生未捕获拒绝、绝不重试。
@@ -1451,7 +1451,7 @@ export class SessionManager {
         ? listing.primaryRoleId
         : rapporteurRoleId;
     try {
-      this.emitDeliveryNote(projectRoot, runtime, primaryRoleId, rapporteurRoleId, `报告员需要澄清：${question}`);
+      this.emitDeliveryNote(projectRoot, runtime, primaryRoleId, rapporteurRoleId, `Draft（提案）需要澄清：${question}`);
     } catch (error) {
       diagnostic.error("governance.clarification.note.failed", error, {
         ...(payload.flowId !== undefined ? { flowId: payload.flowId } : {}),
@@ -1464,7 +1464,7 @@ export class SessionManager {
       ...(payload.intentId !== undefined ? { intentId: payload.intentId } : {}),
       primaryRoleId,
     });
-    return { ok: true, message: `已在主入口（${primaryRoleId}）显示；客户回答后由联络官更新意图并交接。` };
+    return { ok: true, message: `已在主入口（${primaryRoleId}）显示；客户回答后由 Lead（主理）更新意图并交接。` };
   }
 
   /**
@@ -1625,18 +1625,19 @@ export class SessionManager {
     const canLiaise = governanceFunction === "liaison";
     const canClarify = governanceFunction === "proposal";
 
-    // ——— 客户确认制交互（A-1/A-3/A-5）：**仅内置治理角色（su 或 trio 三人）**的会话注入客户交互通道 ———
+    // ——— 客户确认制交互（A-1/A-3/A-5）：**仅内置治理角色（su 或 trio 五人）**的会话注入客户交互通道 ———
     //
     // 判据 = 「本角色是内置治理角色」（`role.builtIn`，数据驱动、**不硬编码 "su"**）。注入 ⇒ 编排把本会话
     // 置为**确认制**（`request_confirmation`/`request_choice` 注册；gate 走「客户确认才发行 writeSet」）——
     // 「客户确定了才加、才落盘」。**普通角色的会话一律不注入**（无客户通道：工具不注册、gate 旧语义逐字
     // 不变）。通道未接（deps.customerInput 缺省）⇒ 不注入——**绝不**出现「没人问就放行」。
-    // 四角色评审 §4.3：Liaison **不注入** customerInput——它只用聊天问问题，不占「一项目一卡」决定队列；
-    // `request_confirmation`/`request_choice` 在 Liaison 会话里结构性不存在。其余内置角色与 single/su 不变。
+    // 2026-10-18 Lead 需求确认：Liaison（Lead / 主理）**需要** customerInput 发 `intent-confirm` 需求确认卡
+    // （客户本人回答；判断 agent 永不介入）。隔离由编排 `TRIO_CARD_KINDS.liaison = ["intent-confirm"]` 保证：
+    // 其他治理卡在 Liaison 会话里**结构性拒绝**（不弹卡、declined），不占「一项目一卡」决定队列。
+    // `intent-confirm` 不镜像（由 Lead 本人发）；single/su 旧行为不变。
     // trio 下客户作出决定后的 `customer.decision` 账本写入在编排的 `customerInput` 包装器内（评审 §5.7，
     // 桌面只接线、不另写一份）。
-    const customerInput =
-      role.builtIn === true && governanceFunction !== "liaison" ? this.deps.customerInput : undefined;
+    const customerInput = role.builtIn === true ? this.deps.customerInput : undefined;
 
     // W6-B（四角色评审 §6.1）：**决定卡镜像面** = 主入口（`primaryRoleId`，trio 下恒为 liaison）。
     // 仅 trio、仅治理决定卡（`isMirroredGovernanceCard`）且来源角色 ≠ 主入口时给出；single/普通写盘/
@@ -2041,11 +2042,11 @@ export class SessionManager {
               this.notifyRoleState(en.projectRoot, roleId, runtime);
               // G-2/W1：转发放行前的结构化事实（lastTurn 落表 + 看护观察；outcome 只认四值终局——缺事实不猜）。
               if (wasBusy) {
-                // 2026-10-18 客户反馈：trio 内置治理角色本轮收尾正文镜像到主入口（Liaison），
-                // UI-only 系统行；不 prompt、不触发新轮。取出即删 ⇒ 重复 settle 不重复镜像。
+                // 2026-10-18 客户反馈：trio 内部内置角色的收尾正文经投递机转成**[系统·治理反馈] 汇总任务**
+                // 投给主入口（Lead）——由 Lead 向客户汇总，不再原文贴到 pane。取出即删 ⇒ 同一轮只投一次。
                 // 用**事件循环的 projectRoot**（与 lastAssistantText 的 queueKey 同源）——不要用 en.projectRoot
                 // （会话 entry 的 root 可能是斜杠变体，getListing 精确匹配会静默 miss）。
-                this.mirrorGovernanceFeedback(projectRoot, runtime, roleId);
+                void this.mirrorGovernanceFeedback(projectRoot, runtime, roleId);
                 const settledOutcomeRaw = origin?.outcome ?? (ev.detail as { outcome?: unknown } | undefined)?.outcome;
                 const settledOutcome =
                   settledOutcomeRaw === "completed" || settledOutcomeRaw === "failed" || settledOutcomeRaw === "aborted" || settledOutcomeRaw === "timed_out"
@@ -2337,18 +2338,21 @@ export class SessionManager {
   }
 
   /**
-   * **收尾反馈镜像**（2026-10-18 客户反馈「内部治理角色，应该都向联络官反馈」）：
-   * trio 的内置治理角色（Rapporteur/Nominator/Convener）一轮结束后，把本轮 assistant 正文作为
-   * **UI-only 系统行**投到主入口（`primaryRoleId`，Liaison）的 pane——不 prompt 主入口、不触发新轮。
-   *  · 仅 trio；`roleId === primaryRoleId` ⇒ 不镜像（Liaison 自己）；
-   *  · 仅内置治理角色（`builtIn === true` 且有 `governanceFunction`）——项目角色不镜像（其回交仍走 Convener）；
-   *  · 文本**取出即删**（防重复 settle 重复镜像）；trim 后非空、≤2000 码点（超出加 `…`）。
+   * **收尾反馈 → 主入口汇总任务**（2026-10-18 客户反馈：原文镜像 = 「直接转述」，不对）。
+   * trio 的内部内置角色（Rapporteur/Nominator/Convener——改名后即 Draft/Crew/Steward/Proof）一轮结束后，
+   * **不再把正文原样贴到主入口 pane**，而是经**既有投递机**给主入口（`primaryRoleId`，Lead/Liaison）
+   * 投一条任务：`[系统·治理反馈]` 前缀 + 本轮正文（≤4000 码点）+「汇总后告知客户、不要逐字转述」指令。
+   *  · 仅 trio；`roleId === primaryRoleId` ⇒ 不投（Lead 自己；防循环）；
+   *  · 仅内置治理角色（`builtIn === true` 且有 `governanceFunction`）——项目角色不投（其回交仍走 Convener）；
+   *  · 文本**取出即删**（同一轮只投一次）；trim 后非空；`displayName` 取 listing 角色显示名（无则 roleId）。
+   *  · Lead 忙 ⇒ 按 `sendBackground`/投递机既有语义排队；未开 ⇒ `openBackground` 后台开启（不抢活动角色）；
+   *    失败只诊断、**绝不打断 settle**。
    *  · `getListing` 在精确 miss 时做**斜杠归一兜底**（真机：事件循环 root 与枚举缓存 key 可能正/反斜杠
    *    不一致）；仅查找变体，**不改变**调用方 key。
-   *  · 每个 early-return 记一条 `governance.feedback.skip`（不记正文）；成功记 `governance.feedback.mirrored`。
-   *    **诊断/镜像任何失败都吞掉**——绝不打断 settle。
+   *  · 每个 early-return 记一条 `governance.feedback.skip`（不记正文）；成功记 `governance.feedback.mirrored`
+   *    （`targetRoleId` = Lead 的真实 roleId，不记来源）。
    */
-  private mirrorGovernanceFeedback(projectRoot: string, runtime: RuntimeKind, roleId: string): void {
+  private async mirrorGovernanceFeedback(projectRoot: string, runtime: RuntimeKind, roleId: string): Promise<void> {
     const diagnostic = createDiagnosticLogger({ component: "desktop.governance-feedback", projectRoot, roleId });
     const skip = (reason: "no-listing" | "non-trio" | "primary" | "not-builtin" | "no-text"): void => {
       // 共享白名单只落允许字段名 ⇒ 同时带 `reasonCode`（机器可读）；绝不带正文。
@@ -2365,17 +2369,39 @@ export class SessionManager {
       const key = this.queueKey(projectRoot, roleId, runtime);
       const last = this.lastAssistantText.get(key);
       if (last === undefined) return skip("no-text");
-      this.lastAssistantText.delete(key); // 取出即删：重复 settle 不重复镜像
+      this.lastAssistantText.delete(key); // 取出即删：同一轮只投一次
       const text = last.text.trim();
       if (text === "") return skip("no-text");
       const chars = Array.from(text);
-      const bounded = chars.length > 2000 ? `${chars.slice(0, 2000).join("")}…` : text;
-      const mirroredChars = Array.from(bounded).length;
-      this.emitDeliveryNote(projectRoot, runtime, primaryRoleId, roleId, `治理反馈 · ${roleId}：${bounded}`);
-      // `targetRoleId`/`count` 是共享白名单里的同义允许名（roleId/chars 本身不在白名单）。
-      diagnostic.record("governance.feedback.mirrored", { roleId, targetRoleId: roleId, chars: mirroredChars, count: mirroredChars });
-    } catch {
-      // 镜像/诊断失败绝不打断 settle（静默降级为「没有这条系统行」）。
+      const body = chars.length > 4000 ? chars.slice(0, 4000).join("") : text;
+      // 显示名：listing 的 `displayName`（Lead / Draft / Crew / Steward / Proof），否则回退 roleId。
+      const displayName = this.roleDisplayName(projectRoot, roleId);
+      const task = [
+        `[系统·治理反馈] 来自 ${displayName} 的内部反馈（内部材料，请汇总后告知客户，不要逐字转述）：`,
+        body,
+        "请用 1-3 句话向客户汇总：完成了什么、是否有风险/阻塞、下一步或需要客户决定什么。不要逐字转述内部报告，不要使用内部行话，不要声称客户已批准。",
+      ].join("\n");
+      const opened = await this.openBackground({ projectRoot, roleId: primaryRoleId, runtime });
+      if (!opened.ok) {
+        diagnostic.error("governance.feedback.open.failed", new Error(opened.error ?? "无法开启主入口会话"), { targetRoleId: primaryRoleId });
+        return;
+      }
+      const sent = await this.sendBackground({ projectRoot, roleId: primaryRoleId, runtime, text: task });
+      if (!sent.ok) {
+        diagnostic.error("governance.feedback.dispatch.failed", new Error(sent.error ?? "治理反馈投递失败"), { targetRoleId: primaryRoleId });
+        return;
+      }
+      const mirroredChars = Array.from(body).length;
+      // `targetRoleId`/`count`/`busy` 是共享白名单里的允许名（chars/roleId 本身不在白名单）。
+      diagnostic.record("governance.feedback.mirrored", {
+        targetRoleId: primaryRoleId,
+        chars: mirroredChars,
+        count: mirroredChars,
+        ...(sent.queued === true ? { busy: true } : {}),
+      });
+    } catch (error) {
+      // 镜像/诊断失败绝不打断 settle。
+      diagnostic.error("governance.feedback.failed", error);
     }
   }
 
@@ -2389,6 +2415,14 @@ export class SessionManager {
       if (found !== undefined) return found;
     }
     return undefined;
+  }
+
+  /** 角色显示名（listing 的 `displayName`；无则 roleId）——用于派发正文来源与治理反馈文案。 */
+  private roleDisplayName(projectRoot: string, roleId: string): string {
+    const listing = this.findListingForFeedback(projectRoot);
+    const role = listing?.roles.find((r) => r.roleId === roleId);
+    const name = (role as { displayName?: unknown } | undefined)?.displayName;
+    return typeof name === "string" && name.trim() !== "" ? name.trim() : roleId;
   }
 
   /** 队列键：项目 × 目标角色（一套机对多个目标；空目标=主入口暂未枚举到——每次尝试时重解析）。 */
@@ -2684,13 +2718,13 @@ export class SessionManager {
     const dispatcherRoleId = this.dispatcherRoleIdOf(projectRoot);
     if (dispatcherRoleId === null) {
       return fail(
-        "派发未受理：未枚举到本项目治理模型下的派发主人（trio=Convener / single=主入口）——**未投递**。",
+        "派发未受理：未枚举到本项目治理模型下的派发主人（trio=Steward（统筹） / single=主入口）——**未投递**。",
         "派发未受理：未枚举到派发主人——**未投递**（不静默）。",
       );
     }
     if (fromRoleId !== dispatcherRoleId) {
       return fail(
-        `派发未受理：来源角色 ${fromRoleId} 不是本项目派发主人 ${dispatcherRoleId}（${model === "trio" ? "Convener" : "主入口"}）。`,
+        `派发未受理：来源角色 ${this.roleDisplayName(projectRoot, fromRoleId)} 不是本项目派发主人 ${this.roleDisplayName(projectRoot, dispatcherRoleId)}（${model === "trio" ? "Steward（统筹）" : "主入口"}）。`,
         `派发未受理：来源角色 ${fromRoleId} 不是派发主人 ${dispatcherRoleId}——**未投递**（不静默）。`,
       );
     }
@@ -2756,7 +2790,7 @@ export class SessionManager {
       probes.set(readPath, await filePrint(path.join(projectRoot, readPath)));
     }
     // 判据必须**紧挨去重登记之前**（见方法注释：拒投不登记——防「键在送达才释放」被拒投项拖成残留误去重）。
-    const plan = planDispatchDelivery({ roleId: targetRoleId, task, reason }, probes, { sourceRoleId: fromRoleId });
+    const plan = planDispatchDelivery({ roleId: targetRoleId, task, reason }, probes, { sourceRoleId: this.roleDisplayName(projectRoot, fromRoleId) });
     if (plan.action === "reject") {
       // fail-closed 拒投：不入队、不登记去重键、不开目标会话；如实回执（工具）+ 系统行（主人聊天流）。
       return fail(plan.message, plan.systemRow);
@@ -2777,7 +2811,7 @@ export class SessionManager {
       // 文本：编排 `planDispatchDelivery` 产出的定格文本（必读块已由**同一单一来源** `renderDispatchPrompt`
       // 注入；无引用 = 旧格式逐字）——本层不另写渲染（本地副本 `renderDispatchPromptLocal` 已删除）。
       text: plan.text,
-      summary: `派发 · 来自 ${fromRoleId}：${shortenText(task, 40)}`,
+      summary: `派发 · 来自 ${this.roleDisplayName(projectRoot, fromRoleId)}：${shortenText(task, 40)}`,
       dedupKey,
     });
     // 账本 `dispatch.accepted`（评审 §5.6/§5.7）：**成功入队后**写；门禁/投递失败不写。
@@ -2806,9 +2840,9 @@ export class SessionManager {
     return {
       ok: true,
       message:
-        `已受理：任务将投递给角色 ${targetRoleId} 的会话` +
+        `已受理：任务将投递给角色 ${this.roleDisplayName(projectRoot, targetRoleId)} 的会话` +
         (this.sessions.get(this.sessionKey(projectRoot, targetRoleId, runtime)) ? "" : "（其会话未开——将自动开启）") +
-        `；投递结果/失败会在其聊天流与 ${model === "trio" ? `Convener（${fromRoleId}）` : "su"} 的聊天流如实显示（受理≠已完成）。`,
+        `；投递结果/失败会在其聊天流与 ${model === "trio" ? this.roleDisplayName(projectRoot, fromRoleId) : "su"} 的聊天流如实显示（受理≠已完成）。`,
     };
   }
 
@@ -3833,8 +3867,8 @@ export class SessionManager {
         this.emitDeliveryNote(projectRoot, runtime, resolvedTarget, sent.sourceRoleId, `已自动投递 ${sentItems.map((queued) => queued.sourceRoleId).join("、")} 的回交给 ${resolvedTarget}（等待验收与汇总）。`);
       } else if (sent.kind === "dispatch") {
         // 派发成功：目标 pane 看得见"任务到货"，派发主人的 pane 有一条受理回执行（受理≠已完成，如实）。
-        this.emitDeliveryNote(projectRoot, runtime, resolvedTarget, sent.sourceRoleId, `已接收来自 ${sent.sourceRoleId} 的派发任务——请按任务文本执行，完成后交回报告。`);
-        this.emitDeliveryNote(projectRoot, runtime, sent.sourceRoleId, sent.sourceRoleId, `已派发任务给 ${resolvedTarget}（已投递到其会话；其结果/回交会回到本会话）。`);
+        this.emitDeliveryNote(projectRoot, runtime, resolvedTarget, sent.sourceRoleId, `已接收来自 ${this.roleDisplayName(projectRoot, sent.sourceRoleId)} 的派发任务——请按任务文本执行，完成后交回报告。`);
+        this.emitDeliveryNote(projectRoot, runtime, sent.sourceRoleId, sent.sourceRoleId, `已派发任务给 ${this.roleDisplayName(projectRoot, resolvedTarget)}（已投递到其会话；其结果/回交会回到本会话）。`);
       }
       // message 类（排队后的客户消息投递）：**不加额外文案**——消息本体随会话事件出现（真实 pi 的
       // 「用户指令：」回显走注入样式行），此前误落进派发分支（「已接收…派发任务」对消息是错口径，已修）。

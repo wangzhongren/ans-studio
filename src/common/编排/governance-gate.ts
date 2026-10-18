@@ -51,13 +51,16 @@ export type GovernanceGateDecision =
 /** 治理 slug 形状（与运行时核心 `GOVERNANCE_SLUG_PATTERN` 同值；此处只做本地判定，不导运行时实现）。 */
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,63}$/;
 
-/** 提案类决定集合（顺序即「最新决定」的候选集合；普通写盘确认没有 decisionKind，不参与）。 */
+/**
+ * 提案类决定集合（顺序即「最新决定」的候选集合；普通写盘确认没有 decisionKind，不参与）。
+ * **不含 `unclassified`**（2026-10-18 真机）：旧账本里无 cardKind 的普通选择曾写入 unclassified，
+ * 若参与「最新决定」会覆盖真正的 proposal-accept；提案接受只看 proposal-* 四类。
+ */
 const PROPOSAL_DECISION_KINDS: ReadonlySet<GovernanceDecisionKind> = new Set([
   "proposal-accept",
   "proposal-accept-quick",
   "proposal-revise",
   "proposal-reject",
-  "unclassified",
 ]);
 
 /** 允许解锁写门禁的提案决定。 */

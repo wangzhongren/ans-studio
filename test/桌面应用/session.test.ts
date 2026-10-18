@@ -12,6 +12,7 @@ import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 
 import type { SessionEvent } from "../../src/provider/pi/session.ts";
+import { createFakeRuntimeAdapter } from "../../src/provider/pi/session.ts";
 import type { RuntimeAdapter, OperatorChannelFn } from "../../src/provider/pi/session.ts";
 import type { OrchestrationEvent, TaskHandback } from "../../src/common/编排/handback.ts";
 import type { ProjectConfig } from "../../src/model/role.ts";
@@ -20,25 +21,22 @@ import { listProject, type ProjectListing } from "../../src/service/role/resolve
 import { buildProjectConfig } from "../../app/desktop/project.ts";
 import { createChatDemoAdapter, firstProjectFilePath } from "../../app/desktop/chat-adapter.ts";
 import { SessionManager, MAX_LIVE_SESSIONS, type SessionEventEnvelope } from "../../app/desktop/session.ts";
+import { createCustomerInputChannel } from "../../app/desktop/customer-input.ts";
+import type { CustomerInputFn } from "../../src/model/runtime.ts";
 // W6-B（2026-10-18）：四角色能力矩阵与意图交接/澄清的桌面投递端。
 import { buildIntentHandoffMessage } from "../../app/desktop/governance-advance.ts";
 import type { HandOffIntentPayload } from "../../src/model/runtime.ts";
 import { readGovernanceLedger } from "../../src/pipeline/orchestration/govern-session.ts";
-// G-2（2026-10-16 客户批准）：看护器纯逻辑（W1 信号/去重/冷却/风暴护栏 + W3 滞回收束）——**假快照＋注入
-// 时钟**，不起真实会话（集成面在 message-queue/dispatch-delivery 的 G-2 块）。
+// G-2（2026-10-16 客户批准）：看护器纯逻辑（W1 信号/去重/冷却/风暴护栏；W3 收束已于 2026-10-18 移除）
+// ——**假快照＋注入时钟**，不起真实会话（集成面在 message-queue/dispatch-delivery 的 G-2 块）。
 import {
   createWatchdogService,
   resolveWatchdogConfig,
-  WATCHDOG_SILENCE_ENV,
   WATCHDOG_TICK_ENV,
   type WatchdogProjectSnapshot,
   type WatchdogRoleView,
   type WatchdogService,
 } from "../../app/desktop/watchdog.ts";
-// W3 冻结接口钉（PM 2026-10-16，随客户 5min→30s 裁定）：`renderClosurePrompt(silentMs)`——桌面把**静默
-// 毫秒数直接**传入（不取整到分钟）。断言以「与同一渲染器同参直调逐字相等」钉 wiring，不抄文案
-// （文案逐字金文本归编排测试；编排并行切换 ms 口径后本钉自动升级为「30 秒」sub-minute 文案核对）。
-import { renderClosurePrompt } from "../../src/common/编排/watchdog.ts";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "..", "..");
@@ -537,7 +535,7 @@ function makeWatchdogHarness(): WatchdogHarness {
     // 与生产默认同值（客户 2026-10-16 裁定：静默 30s＝一个 tick 的最小防抖）。
     // 2026-10-17 起检查时限默认改为 5 分钟（`resolveRuntimeTimeouts().promptTimeoutMs`）——本夹具**显式注入**
     // 120s 检查时限与 1 小时最后兜底，避免依赖默认值（阈值边界断言保持可读、稳定）。
-    config: { env: {}, silenceMs: 30 * 1000, tickMs: 30 * 1000, promptTimeoutOverrideMs: 120_000, turnLastResortOverrideMs: 3_600_000 },
+    config: { env: {}, tickMs: 30 * 1000, promptTimeoutOverrideMs: 120_000, turnLastResortOverrideMs: 3_600_000 },
   });
   return {
     service,
@@ -570,43 +568,17 @@ function wdSnapshot(over: Partial<WatchdogProjectSnapshot> = {}): WatchdogProjec
   };
 }
 
-test("G-2 配置：tick/静默仅 env 可调（非法/缺失回退默认 30s/30s）；阈值表取 §3.2 默认", () => {
+test("G-2 配置：tick 仅 env 可调（非法/缺失回退默认 30s）；阈值表取 §3.2 默认", () => {
   const defaults = resolveWatchdogConfig({});
   assert.equal(defaults.tickMs, 30000, "默认 tick 30s");
-  assert.equal(defaults.silenceMs, 30_000, "默认静默 30s（客户 2026-10-16 run-5 裁定：5min → 30s）");
   assert.equal(defaults.turnDeadlineRatio, 1.0, "阈值 #1：到点检查（100% 检查时限，客户 2026-10-17 裁定）");
   assert.equal(defaults.queueHeadAgeMs, 10 * 60 * 1000, "阈值 #2：队首 age 10min");
   assert.equal(defaults.queueDepth, 5, "阈值 #2 辅判：深度 5");
   assert.equal(defaults.repeatFailCount, 3, "阈值 #4：15min ≥3");
-  const overridden = resolveWatchdogConfig({ [WATCHDOG_TICK_ENV]: "5000", [WATCHDOG_SILENCE_ENV]: "180000" });
+  assert.equal("silenceMs" in defaults, false, "W3 收束已移除：配置不再含静默阈值");
+  const overridden = resolveWatchdogConfig({ [WATCHDOG_TICK_ENV]: "5000" });
   assert.equal(overridden.tickMs, 5000, "env 覆盖 tick");
-  assert.equal(overridden.silenceMs, 180000, "env 覆盖静默（ANS_DESKTOP_WATCHDOG_SILENCE_MS 按裁定保留）");
-  assert.equal(resolveWatchdogConfig({ [WATCHDOG_TICK_ENV]: "5000", [WATCHDOG_SILENCE_ENV]: "5000" }).silenceMs, 5000, "env 毫秒口径：sub-minute（5s）同样合法");
-  assert.equal(resolveWatchdogConfig({ [WATCHDOG_TICK_ENV]: "0", [WATCHDOG_SILENCE_ENV]: "abc" }).tickMs, 30000, "非法值回退默认（不炸）");
-  assert.equal(resolveWatchdogConfig({ [WATCHDOG_TICK_ENV]: "0", [WATCHDOG_SILENCE_ENV]: "abc" }).silenceMs, 30_000, "非法静默值回退默认 30s（不炸）");
-});
-
-test("G-2/W3 env 覆盖经服务生效：ANS_DESKTOP_WATCHDOG_SILENCE_MS=5000 ⇒ 满 5s 即投（sub-minute 自适应；不改默认常量）", () => {
-  let ms = 1_700_000_000_000;
-  const delivered: { text: string; summary: string }[] = [];
-  const service = createWatchdogService({
-    projects: () => ["/p"],
-    snapshot: () => wdSnapshot({ roles: [wdRole("A")] }),
-    deliver: (_root, message) => { delivered.push({ text: message.text, summary: message.summary }); },
-    now: () => ms,
-    // 沿生产口径：只经 env 注入（不传 silenceMs 覆盖）——覆盖链路 env → resolveWatchdogConfig → 判定。
-    config: { env: { [WATCHDOG_SILENCE_ENV]: "5000" }, tickMs: 30 * 1000 },
-  });
-  service.observe("/p", { kind: "settled", roleId: "A", outcome: "completed", at: ms, fromSystemDelivery: false });
-  service.tick(); // 静默起点
-  ms += 4_999;
-  service.tick();
-  assert.equal(delivered.length, 0, "未满 env 覆盖值（4.999s）不投");
-  ms += 1;
-  service.tick();
-  assert.equal(delivered.length, 1, "env 覆盖（5s）经服务生效：恰满即投");
-  assert.equal(delivered[0].text, renderClosurePrompt(5_000), "ms 直传（5_000）");
-  assert.equal(delivered[0].summary, "系统·收束 · 已无进行中任务（静默 5 秒）", "sub-minute env 值同口径自适应（5 秒）");
+  assert.equal(resolveWatchdogConfig({ [WATCHDOG_TICK_ENV]: "0" }).tickMs, 30000, "非法值回退默认（不炸）");
 });
 
 test("G-2/W1 #1：轮次**到点检查**（demo 检查时限 120s → 120s 边界，只提示不中止）；每轮一次；正常完成自动解除", () => {
@@ -779,83 +751,17 @@ test("G-2/W1 看护器自身故障：快照抛错 ⇒ 只记诊断、不炸、�
   assert.equal(healed.delivered.length, 1, "下个 tick 重试即恢复工作");
 });
 
-test("G-2/W3 收束滞回：静默恰 30s 触发恰一条；两 tick 内不重复；su 回复（system 投递持有的 settled）不重武装；真实活动重置", () => {
+test("G-2/W3 已移除：完成静默不再投 `[系统·收束]`（验收通过即收束）", () => {
   const h = makeWatchdogHarness();
   h.setSnapshot("/p", wdSnapshot({ roles: [wdRole("A")] }));
-  // 预热未满足（从未 settled）⇒ 静默再久也不触发。
-  h.advance(30 * 60 * 1000);
-  h.service.tick();
-  assert.equal(h.delivered.length, 0, "预热：自导入以来至少一轮 settled（防空项目一进来就触发）");
   h.service.observe("/p", { kind: "settled", roleId: "A", outcome: "completed", at: h.nowMs(), fromSystemDelivery: false });
-  h.service.tick(); // 静默起点 = 本 tick（30s 阈值下首个静默 tick 只记起点，不投）
-  h.advance(30_000 - 1_000);
-  h.service.tick();
-  assert.equal(h.delivered.length, 0, "未满 N（29s）不触发");
-  h.advance(1_000);
-  h.service.tick();
-  assert.equal(h.delivered.length, 1, "静默恰 30s（含边界）→ 满 N 恰一条收束提示");
-  assert.ok(h.delivered[0].text.startsWith("[系统·收束]"), "文首＝编排单一来源（U1 归类判据）");
-  // 冻结接口钉（PM 2026-10-16）：桌面把**静默毫秒数直接**传入 renderClosurePrompt——与同参直调逐字相等
-  // （旧的「Math.max(1, …) 分钟取整」在此不成立：那会得到 renderClosurePrompt(1)，与 30_000 不等）。
-  assert.equal(h.delivered[0].text, renderClosurePrompt(30_000), "text ＝ renderClosurePrompt(静默毫秒数 30_000)——ms 口径不取整");
-  assert.ok(h.delivered[0].text.includes("30 秒") && !h.delivered[0].text.includes("1 分钟"), "sub-minute 文案＝「30 秒」（冻结接口自适应；旧 Math.max(1,…) 取整会谎报「1 分钟」）");
-  // summary＝本模块自持呈现面：自适应时长（sub-minute 说「30 秒」，不得再出现「1 分钟」式取整谎报）。
-  assert.equal(h.delivered[0].summary, "系统·收束 · 已无进行中任务（静默 30 秒）", "summary 自适应 sub-minute 表述");
-  // 两 tick 内不重复（fired 滞回：此后只等真实活动重武装）。
-  h.advance(30_000);
-  h.service.tick();
-  h.advance(30_000);
-  h.service.tick();
-  assert.equal(h.delivered.length, 1, "已投后两个 tick 内不重复（恰一次）");
-  // su 对收束提示的那一轮回复：settled 由 system 投递持有 ⇒ **不算真实活动**（防骚扰回路）。
-  h.service.observe("/p", { kind: "settled", roleId: "su", outcome: "completed", at: h.nowMs(), fromSystemDelivery: true });
-  h.service.tick();
-  h.advance(30 * 60 * 1000);
-  h.service.tick();
-  assert.equal(h.delivered.length, 1, "静默窗口内至多一条：su 的收束回复不重新武装（30 秒过去也不再催）");
-  // 真实活动（客户消息/派发等）⇒ 重置（重新武装）；随后再次静默满 N ⇒ 第二条。
-  h.service.observe("/p", { kind: "activity", reason: "customer-send" });
-  h.service.tick(); // 起点重记
-  h.advance(30_000 + 2_000);
-  h.service.tick();
-  assert.equal(h.delivered.length, 2, "真实活动重置 ⇒ 新静默窗口满 N ⇒ 新一条收束提示");
-  assert.equal(h.delivered[1].text, renderClosurePrompt(32_000), "第二条按新窗口实际静默毫秒数（32s）渲染");
-  assert.equal(h.delivered[1].summary, "系统·收束 · 已无进行中任务（静默 32 秒）", "summary 同口径自适应");
-});
-
-test("G-2/W3 静默谓词：任一非静默事实都拦（busy/队列/在途/待确认/链在跑）", () => {
-  const cases: Partial<WatchdogProjectSnapshot>[] = [
-    { roles: [wdRole("A", { busy: true, turnStartedAt: 0 })] },
-    { queues: [{ targetRoleId: "A", runtime: "demo", items: [{ kind: "dispatch", dedupKey: "k", sourceRoleId: "su", summary: "s", enqueuedAtMs: 0 }] }] },
-    { activeDeliveries: 1 },
-    { pendingConfirmationsTotal: 1 },
-    { chainsActive: true },
-    { roles: [wdRole("su", { busy: true, turnStartedAt: 0 })] },
-  ];
-  for (const extra of cases) {
-    const h = makeWatchdogHarness();
-    h.service.observe("/p", { kind: "settled", roleId: "A", outcome: "completed", at: h.nowMs(), fromSystemDelivery: false });
-    h.setSnapshot("/p", wdSnapshot(extra));
+  // 各种「旧静默谓词成立」的形态（全空闲 / 队列空 / 无在途 / 无待确认 / 链停）——都不再产生收束消息。
+  for (let i = 0; i < 5; i += 1) {
     h.advance(30 * 60 * 1000);
     h.service.tick();
-    assert.equal(h.delivered.filter((d) => d.text.includes("收束")).length, 0, `非静默事实拦下收束：${JSON.stringify(Object.keys(extra))}`);
   }
-});
-
-test("G-2/W3 投递端异常：收束投不出去 ⇒ 不标已投——下个 tick 重试成功后才恰一条", () => {
-  const h = makeWatchdogHarness();
-  h.setSnapshot("/p", wdSnapshot());
-  h.service.observe("/p", { kind: "settled", roleId: "A", outcome: "completed", at: h.nowMs(), fromSystemDelivery: false });
-  h.service.tick();
-  h.advance(30_000 + 2_000);
-  h.failNextDeliver();
-  h.service.tick();
-  assert.equal(h.delivered.length, 0, "投递端异常：未投出（不假装已投）");
-  h.service.tick();
-  assert.equal(h.delivered.filter((d) => d.text.includes("收束")).length, 1, "下个 tick 重试成功——恰一条（32s 静默毫秒数原样重渲染）");
-  assert.equal(h.delivered[0].text, renderClosurePrompt(32_000), "重试复用同一静默毫秒数（32_000）");
-  h.service.tick();
-  assert.equal(h.delivered.filter((d) => d.text.includes("收束")).length, 1, "此后不重发");
+  assert.equal(h.delivered.some((d) => d.text.startsWith("[系统·收束]")), false, "不再投收束提示");
+  assert.equal(h.delivered.length, 0, "完成静默态不产生任何看护消息（告警/恢复正常保留）");
 });
 
 // ———————————————— su 审批档（客户裁定 2026-10-17）：会话管理器注入判据 ————————————————
@@ -1029,7 +935,7 @@ test("W6-B 能力路由：liaison=handOffIntent；rapporteur=提案+clarificatio
   const liaison = captured.get("liaison")!;
   assert.equal(typeof liaison.handOffIntent, "function", "Liaison 独享 hand_off_intent 投递端");
   assert.equal(liaison.requestClarification, undefined, "Liaison 无 request_clarification");
-  assert.equal(liaison.customerInput, undefined, "Liaison 不注入客户确认/选择卡通道（§4.3）");
+  assert.equal(typeof liaison.customerInput, "function", "Lead 注入客户通道（仅 intent-confirm 可用；其余卡由编排白名单拒绝）");
   assert.equal(liaison.dispatchTask, undefined);
   assert.equal(liaison.installSkill, undefined);
   assert.equal(liaison.roleStatus, undefined);
@@ -1077,6 +983,83 @@ test("W6-B 能力路由：liaison=handOffIntent；rapporteur=提案+clarificatio
     "single 回交主人=primaryRoleId（su）",
   );
   await singleMgr.stop(null);
+});
+
+test("Liaison 客户通道：intent-confirm 正常呈现/手答；proposal 被编排白名单拒绝且不弹卡", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "ans-liaison-input-"));
+  try {
+    const project: ProjectConfig = {
+      projectRoot: root,
+      skillRoot: root,
+      roles: {},
+      governanceModel: "trio",
+      builtInRoles: ["liaison", "rapporteur", "nominator", "convener", "verifier"],
+      governanceBoundary: { path: "角色卡/governance-boundary.yaml", acceptance: { accepted: true, source: "test:liaison-input" } },
+    };
+    const waitFor = async (check: () => boolean): Promise<void> => {
+      for (let i = 0; i < 200 && !check(); i += 1) await new Promise((resolve) => setTimeout(resolve, 5));
+      assert.ok(check(), "等待条件超时");
+    };
+    const run = async (args: Record<string, unknown>) => {
+      const pushed: { id: string; request: { kind: string; title: string } }[] = [];
+      const channel = createCustomerInputChannel({
+        presenter: (payload) => pushed.push({ id: payload.id, request: payload.request }),
+        operatorId: "tester",
+        nextId: () => "op-1",
+      });
+      const events: OrchestrationEvent[] = [];
+      // 桌面通道的 ctx 由会话提供；集成契约 `CustomerInputFn` 只有 (req, metadata)——桥接时固定 Lead 上下文。
+      const customerInput: CustomerInputFn = (req) =>
+        channel.customerInput(req, { roleId: "liaison", projectRoot: root, runtime: "demo" });
+      const handle = await openRoleSession(
+        { roleId: "liaison", project, taskId: "T-liaison-input", customerInput },
+        {
+          createAdapter: (gate, caps) =>
+            createFakeRuntimeAdapter({
+              gate,
+              script: [{ name: "request_choice", args }],
+              ...(caps?.customerInput !== undefined ? { customerInput: caps.customerInput } : {}),
+            }),
+        },
+      );
+      const consuming = (async () => { for await (const ev of handle.events()) events.push(ev); })();
+      const sending = handle.send("发起需求确认");
+      return { pushed, channel, events, sending, consuming, handle };
+    };
+
+    // ① intent-confirm：Lead 发卡 → 卡片正常呈现 → 客户手答 → 工具受理。
+    const confirmed = await run({
+      title: "确认需求",
+      cardKind: "intent-confirm",
+      flowId: "flow-a",
+      options: [{ id: "confirm", label: "确认" }, { id: "revise", label: "修改" }],
+    });
+    await waitFor(() => confirmed.pushed.length > 0);
+    assert.equal(confirmed.pushed[0].request.kind, "choice", "intent-confirm 卡片正常呈现");
+    assert.equal(confirmed.channel.respond({ id: confirmed.pushed[0].id, decision: { kind: "choice", selected: ["confirm"] } }).ok, true);
+    await confirmed.sending;
+    await confirmed.consuming;
+    assert.ok(confirmed.events.some((ev) => ev.kind === "accepted" && /确认|confirm/.test(ev.summary)), "客户手答后工具受理");
+    await confirmed.handle.dispose();
+
+    // ② proposal：编排 `TRIO_CARD_KINDS.liaison` 只允许 intent-confirm——不弹卡、如实拒绝。
+    const rejected = await run({
+      title: "提案",
+      cardKind: "proposal",
+      flowId: "flow-a",
+      options: [{ id: "accept", label: "接受" }, { id: "reject", label: "拒绝" }],
+    });
+    await rejected.sending;
+    await rejected.consuming;
+    assert.equal(rejected.pushed.length, 0, "Liaison 发 proposal 不弹卡");
+    assert.ok(
+      rejected.events.some((ev) => /不允许 cardKind=proposal|未向客户发卡/.test(ev.summary)),
+      "编排白名单结构性拒绝（如实原因）",
+    );
+    await rejected.handle.dispose();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("W6-B 意图交接：后台开 Rapporteur、当前 pane 不变、只投一条任务、系统行如实", async () => {
@@ -1153,7 +1136,7 @@ test("W6-B 意图交接：后台开 Rapporteur、当前 pane 不变、只投一�
       (envelope.event.detail as { source?: string } | undefined)?.source === "delivery-note",
   );
   assert.equal(notes.length, 1, "成功系统行恰一条，落 Liaison 聊天流");
-  assert.equal(notes[0].event.summary, "已交给报告员（工作中）");
+  assert.equal(notes[0].event.summary, "已交给 Draft（提案）（工作中）");
 
   // 当前 pane 仍可正常对 Liaison 发言（活动角色没有被改）。
   await mgr.send("客户继续说话");
@@ -1217,7 +1200,7 @@ test("W6-B 意图交接失败：不重试、只落失败系统行、当前 pane 
   };
   const receipt = await liaisonInput!.handOffIntent!(payload, { turnId: "turn-2" });
   assert.equal(receipt.ok, false, "投递失败如实回执（不假装成功）");
-  assert.match(receipt.message ?? "", /发送任务给报告员失败/);
+  assert.match(receipt.message ?? "", /发送任务给 Draft（提案）失败/);
   assert.equal(rapporteurSendCalls, 1, "失败不重试（恰好一次投递尝试）");
   const notes = events.filter(
     (envelope) =>
@@ -1226,7 +1209,7 @@ test("W6-B 意图交接失败：不重试、只落失败系统行、当前 pane 
       (envelope.event.detail as { source?: string } | undefined)?.source === "delivery-note",
   );
   assert.equal(notes.length, 1, "失败恰一条系统行（不循环重试）");
-  assert.match(notes[0].event.summary ?? "", /应用无法把意图交给报告员：.*；未重试/);
+  assert.match(notes[0].event.summary ?? "", /应用无法把意图交给 Draft（提案）：.*；未重试/);
   assert.equal(mgr.openForRoleId(), "liaison", "失败不切 pane");
   await mgr.stop(null);
 });
@@ -1276,7 +1259,7 @@ test("W6-B 澄清送达：主入口 Liaison 系统行；不弹决定卡（客户
       (envelope.event.detail as { source?: string } | undefined)?.source === "delivery-note",
   );
   assert.equal(notes.length, 1, "系统行落主入口 Liaison");
-  assert.equal(notes[0].event.summary, "报告员需要澄清：验收标准是否包含离线场景？");
+  assert.equal(notes[0].event.summary, "Draft（提案）需要澄清：验收标准是否包含离线场景？");
   assert.equal(customerInputCalls, 0, "澄清不弹客户决定卡、不占「一项目一卡」队列");
   await mgr.stop(null);
 });

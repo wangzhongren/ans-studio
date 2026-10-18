@@ -59,12 +59,13 @@ const renderer = fs.readFileSync(path.join(REPO, "app/renderer/renderer.js"), "u
 
 // —————————————————————— 1) 权力副标题 / 空态 ——————————————————————
 
-test("UI：四角色副标题——联络官客户沟通 / 报告员提案权 / 提名官提名权 / 召集人编排权，且都写明「不拥有最终批准权」", () => {
+test("UI：五角色副标题——主理 Lead 客户沟通 / 提案 Draft / 组队 Crew / 统筹 Steward / 验收 Proof，且都写明「不拥有最终批准权」", () => {
   const expected = [
-    ["liaison", "联络官", "Liaison", "客户沟通"],
-    ["proposal", "报告员", "Rapporteur", "提案权"],
-    ["nomination", "提名官", "Nominator", "提名权"],
-    ["schedule", "召集人", "Convener", "编排权"],
+    ["liaison", "主理", "Lead", "客户沟通"],
+    ["proposal", "提案", "Draft", "提案权"],
+    ["nomination", "组队", "Crew", "组队权"],
+    ["schedule", "统筹", "Steward", "统筹权"],
+    ["verification", "验收", "Proof", "验收权"],
   ] as const;
   for (const [fn, cn, en, power] of expected) {
     const v = Labels.governanceRoleView(fn);
@@ -79,61 +80,64 @@ test("UI：四角色副标题——联络官客户沟通 / 报告员提案权 / 
   assert.equal(
     Labels.governanceRoleView("liaison")!.primaryEntrance,
     true,
-    "Liaison 是客户默认入口（primaryEntrance）",
+    "Lead 是客户默认入口（primaryEntrance）",
   );
   assert.match(
     Labels.governanceRoleView("liaison")!.emptyHint,
     /客户默认入口/,
-    "Liaison 空态说明客户默认入口",
+    "Lead 空态说明客户默认入口",
   );
   assert.match(
     Labels.governanceRoleView("proposal")!.emptyHint,
-    /联络官/,
-    "Rapporteur 空态说明通常由联络官交接打开（2026-10-18 起不再是空串）",
+    /主理 Lead/,
+    "Draft 空态说明通常由主理 Lead 交接打开（2026-10-18 起不再是空串）",
   );
   assert.equal(Labels.governanceRoleView(undefined), null, "未知/缺失 function ⇒ null（不当成治理角色）");
   assert.equal(Labels.governanceRoleView("other"), null);
 });
 
-test("UI：Liaison/Rapporteur/Nominator/Convener 专属空态逐字；未知 function ⇒ null", () => {
+test("UI：五角色专属空态逐字；未知 function ⇒ null", () => {
   const l = Labels.governanceRoleEmptyState("liaison");
   const r = Labels.governanceRoleEmptyState("proposal");
   const n = Labels.governanceRoleEmptyState("nomination");
   const c = Labels.governanceRoleEmptyState("schedule");
-  assert.ok(l && r && n && c);
-  assert.equal(l!.title, "联络官 Liaison");
+  const v = Labels.governanceRoleEmptyState("verification");
+  assert.ok(l && r && n && c && v);
+  assert.equal(l!.title, "主理 Lead");
   assert.equal(
     l!.sub,
-    "客户默认入口：你说要做什么，我先确认目标、范围与验收，再交给报告员形成提案。我不写提案、不批准。本版起默认入口为联络官；报告员与历史提案不变。",
+    "客户默认入口：你说要做什么，我先确认目标、范围与验收，再交给提案 Draft 形成提案。我不写提案、不批准。本版起默认入口为主理 Lead；提案 Draft 与历史提案不变。",
   );
-  assert.equal(r!.title, "报告员 Rapporteur");
-  assert.equal(r!.sub, "通常由联络官交接打开；客户也可以直接找我。我只写提案，不批准。");
-  assert.equal(n!.title, "提名官 Nominator");
+  assert.equal(r!.title, "提案 Draft");
+  assert.equal(r!.sub, "通常由主理 Lead 交接打开；客户也可以直接找我。我只写提案，不批准。");
+  assert.equal(n!.title, "组队 Crew");
   assert.equal(n!.sub, "通常由流程单提名步骤打开；仅在客户明确要求时直接使用");
-  assert.equal(c!.title, "召集人 Convener");
+  assert.equal(c!.title, "统筹 Steward");
   assert.equal(c!.sub, "通常由已接受提案开启流程；只负责排步骤与派发，不批准方案");
+  assert.equal(v!.title, "验收 Proof");
+  assert.equal(v!.sub, "通常由交付回交后的验收步骤打开；只核对证据、出验收卡，不批准。");
   assert.equal(Labels.governanceRoleEmptyState(undefined), null);
 });
 
 // —————————————————————— 2) 状态行 / 旧模型提示 ——————————————————————
 
-test("UI：状态行——治理模型（三权 · 四角色/旧模型）· 当前流程 · 四态；接口未给模型不猜", () => {
+test("UI：状态行——治理模型（三权 · 五角色/旧模型）· 当前流程 · 四态；接口未给模型不猜", () => {
   assert.equal(
     Labels.governanceStatusText("trio", "flow-a", "awaiting-customer"),
-    "治理模型：三权 · 四角色 · 当前流程：flow-a · 等待客户决定",
+    "治理模型：三权 · 五角色 · 当前流程：flow-a · 等待客户决定",
   );
   assert.equal(Labels.governanceStatusText("single", "", ""), "治理模型：旧模型（su）");
   assert.equal(
     Labels.governanceStatusText("trio", "flow-a", "in-progress"),
-    "治理模型：三权 · 四角色 · 当前流程：flow-a · 进行中",
+    "治理模型：三权 · 五角色 · 当前流程：flow-a · 进行中",
   );
-  assert.equal(Labels.governanceStatusText("trio", "", "blocked"), "治理模型：三权 · 四角色 · 阻塞");
+  assert.equal(Labels.governanceStatusText("trio", "", "blocked"), "治理模型：三权 · 五角色 · 阻塞");
   assert.equal(
     Labels.governanceStatusText("trio", "", "escalated-to-customer"),
-    "治理模型：三权 · 四角色 · 已升级客户",
+    "治理模型：三权 · 五角色 · 已升级客户",
   );
   assert.equal(Labels.governanceStatusText(undefined, "flow-a", "awaiting-customer"), "当前流程：flow-a · 等待客户决定", "未知模型不显示、不猜");
-  assert.equal(Labels.governanceStatusText("trio", "", "made-up"), "治理模型：三权 · 四角色", "未知状态不显示、不猜");
+  assert.equal(Labels.governanceStatusText("trio", "", "made-up"), "治理模型：三权 · 五角色", "未知状态不显示、不猜");
   assert.equal(Labels.GOVERNANCE_MIGRATION_TEXT, "本项目使用旧治理模型（su）。可升级为三权模型。");
   assert.equal(Labels.GOVERNANCE_DECISION_BADGE, "治理决定 · 客户最终批准");
   assert.equal(Labels.GOVERNANCE_QUEUE_NOTE, "等待前一个决定");
