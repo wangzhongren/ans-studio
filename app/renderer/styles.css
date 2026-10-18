@@ -379,6 +379,21 @@ body { display: flex; flex-direction: column; }
 .tree-group { padding: 12px 10px 4px; font-size: 11px; font-weight: 500; color: var(--text-2); }
 .tree-group:first-child { padding-top: 6px; }
 
+/* 折叠分组（2026-10-18 客户要求：治理职能/其他角色收进折叠卡）。
+   与 .tree-group 同字号/颜色；原生 details ⇒ summary 可点击、有展开标记、键盘可达。 */
+.tree-group-fold { padding: 6px 0 0; }
+.tree-group-fold > summary {
+  padding: 6px 10px 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-2);
+  cursor: pointer;
+  user-select: none;
+}
+.tree-group-fold > summary:hover { color: var(--text); }
+.tree-group-fold > summary:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: 4px; }
+.tree-group-fold .tree-group { padding: 6px 10px 4px; }
+
 /* 列表项 = 交互元素：v2 对齐——12px 竖向内边距、圆角 7、选中底 #E8EBE4。 */
 .tree-item {
   display: flex;
@@ -1584,6 +1599,8 @@ button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus
 .tree-label { margin:0 0 -16px; padding:0; font-size:11px; }
 .tree { padding:0; margin:0 -6px; }
 .tree-group { padding:8px 6px 4px; }
+.tree-group-fold > summary { padding:8px 6px 4px; }
+.tree-group-fold .tree-group { padding:6px 6px 4px; }
 .sidebar-foot { margin-top:auto; padding-top:14px; border-top:1px solid #d8dfd5; }
 .sidebar-foot .btn { text-align:left; justify-content:flex-start; background:transparent; border:0; font-weight:400; margin:0; }
 .sidebar-role-count { font-size:11px; color:var(--text-2); padding:10px 12px 0; }

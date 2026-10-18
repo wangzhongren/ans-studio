@@ -5293,10 +5293,32 @@
     return d;
   }
 
+  // 左树折叠状态（2026-10-18 客户要求：内置治理角色与项目角色收进折叠卡，点击展开）。
+  // 仅模块内记忆：同一次会话内重渲染保持；**不写 localStorage**（重启恢复默认 collapsed）。
+  var governanceFoldOpen = false;
+  var othersFoldOpen = false;
+
+  /**
+   * 折叠分组（原生 `<details>`：summary 可点击、有展开标记、键盘可达）。
+   * 展开/收起经 `toggle` 回写模块级布尔；重渲染时据此恢复 open（不持久化）。
+   */
+  function treeGroupFold(text, open, onToggle) {
+    var details = document.createElement("details");
+    details.className = "tree-group-fold";
+    details.open = open === true;
+    var summary = document.createElement("summary");
+    summary.textContent = text;
+    details.appendChild(summary);
+    details.addEventListener("toggle", function () { onToggle(details.open === true); });
+    return details;
+  }
+
   /**
    * 角色树：**主入口角色（`primaryRoleId`）置顶为「主入口」分组**；治理职能角色（按 `governanceFunction`
    * 派生）归入「治理职能（内置）」；其余项目角色沿用 `group`/`groupDuty` 分组（§10.7 / 三权评审 §8.1）。
    * 主入口 id 取门禁引擎给的字段，**不硬编码 "su"**；single 旧树（仅 su + 项目角色）逐字不变。
+   * 2026-10-18 客户要求：trio 新树把治理职能与项目角色各收进一个 `<details class="tree-group-fold">`
+   * （默认 collapsed；主入口常显；展开状态按模块级布尔在重渲染后保持；角色数/分组仍由 listing 驱动）。
    */
   function renderRoleTree() {
     if (backgroundDelivery) return;
@@ -5318,17 +5340,38 @@
       el.appendChild(treeGroupLabel("主入口"));
       el.appendChild(roleTreeItem(primary, true));
     }
+    // 折叠只用于 trio 新树；single / 模型未知的旧树保持原有的平铺分组（逐字不变）。
+    var folded = state.governanceModelKnown === true && state.governanceModel === "trio";
     if (governanceRoles.length) {
-      el.appendChild(treeGroupLabel(UiLabels.GOVERNANCE_GROUP_LABEL));
-      governanceRoles.forEach(function (r) { el.appendChild(roleTreeItem(r, false)); });
+      if (!folded) {
+        el.appendChild(treeGroupLabel(UiLabels.GOVERNANCE_GROUP_LABEL));
+        governanceRoles.forEach(function (r) { el.appendChild(roleTreeItem(r, false)); });
+      } else {
+        var govFold = treeGroupFold(UiLabels.GOVERNANCE_GROUP_LABEL, governanceFoldOpen, function (open) {
+          governanceFoldOpen = open;
+        });
+        governanceRoles.forEach(function (r) { govFold.appendChild(roleTreeItem(r, false)); });
+        el.appendChild(govFold);
+      }
     }
     if (others.length) {
-      el.appendChild(treeGroupLabel("其他角色（查看/调试）"));
-      el.lastChild.remove();
-      Rt.roleGroups(others).forEach(function (group) {
-        el.appendChild(treeGroupLabel(group.name));
-        group.roles.forEach(function (r) { el.appendChild(roleTreeItem(r, false)); });
-      });
+      if (!folded) {
+        el.appendChild(treeGroupLabel("其他角色（查看/调试）"));
+        el.lastChild.remove();
+        Rt.roleGroups(others).forEach(function (group) {
+          el.appendChild(treeGroupLabel(group.name));
+          group.roles.forEach(function (r) { el.appendChild(roleTreeItem(r, false)); });
+        });
+      } else {
+        var othersFold = treeGroupFold("其他角色（查看/调试）", othersFoldOpen, function (open) {
+          othersFoldOpen = open;
+        });
+        Rt.roleGroups(others).forEach(function (group) {
+          othersFold.appendChild(treeGroupLabel(group.name));
+          group.roles.forEach(function (r) { othersFold.appendChild(roleTreeItem(r, false)); });
+        });
+        el.appendChild(othersFold);
+      }
     }
   }
 

@@ -2656,6 +2656,53 @@ test("W6-C：四角色左树——主入口仍由 primaryRoleId 驱动；治理�
   assert.ok(RENDERER.includes('if (role.builtIn) return "内置治理角色（定义见 SKILL.md）";'), "旧 su 副标题逐字保留");
 });
 
+// —————— 2026-10-18 客户要求：左树折叠卡（治理职能 / 其他角色各一 details；主入口常显）——————
+// renderer.test.ts 的口径是源码不变式（DOM 行为由 e2e 覆盖）：默认 collapsed、toggle 回写、重渲染保持、
+// 不写 localStorage、single 旧树平铺不变——全部钉在 renderRoleTree/treeGroupFold 源码上。
+
+test("2026-10-18：左树折叠卡——两个 details 默认 collapsed、主入口在外；toggle 记忆重渲染保持；single 旧树不变", () => {
+  const fold = RENDERER.slice(RENDERER.indexOf("function treeGroupFold("), RENDERER.indexOf("function renderRoleTree("));
+  assert.ok(fold.length > 0, "treeGroupFold 存在");
+  assert.ok(fold.includes('details.className = "tree-group-fold"'), "折叠卡类名 tree-group-fold");
+  assert.ok(fold.includes('document.createElement("details")'), "原生 details（键盘可达、自带展开标记）");
+  assert.ok(fold.includes('document.createElement("summary")'), "summary 可点击");
+  assert.ok(fold.includes("details.open = open === true;"), "open 由记忆布尔恢复（默认 false=collapsed）");
+  assert.ok(fold.includes('details.addEventListener("toggle"'), "toggle 回写展开状态");
+  assert.ok(fold.includes("onToggle(details.open === true)"), "回写的是真实展开状态");
+  assert.ok(!fold.includes("localStorage"), "折叠状态不得写 localStorage");
+
+  // 两个模块级布尔（各自独立记忆；初始 collapsed）。
+  assert.ok(/var governanceFoldOpen = false;/.test(RENDERER), "治理职能折叠初始 collapsed");
+  assert.ok(/var othersFoldOpen = false;/.test(RENDERER), "其他角色折叠初始 collapsed");
+
+  const tree = RENDERER.slice(RENDERER.indexOf("function renderRoleTree("), RENDERER.indexOf("function selectedRole("));
+  // 主入口常显：主入口项在第一个折叠卡之前追加，且不在 details 内。
+  const primaryPos = tree.indexOf('treeGroupLabel("主入口")');
+  const govFoldPos = tree.indexOf("treeGroupFold(UiLabels.GOVERNANCE_GROUP_LABEL");
+  const othersFoldPos = tree.indexOf('treeGroupFold("其他角色（查看/调试）"');
+  assert.ok(primaryPos >= 0, "主入口组保留");
+  assert.ok(govFoldPos > primaryPos, "治理职能折叠卡在主入口之后");
+  assert.ok(othersFoldPos > govFoldPos, "其他角色折叠卡在治理职能之后");
+  assert.ok(tree.includes("governanceFoldOpen"), "治理折叠状态接入");
+  assert.ok(tree.includes("othersFoldOpen"), "其他角色折叠状态接入");
+  assert.ok(tree.includes("govFold.appendChild(roleTreeItem(r, false))"), "四个内置治理角色挂进 details");
+  // 项目角色仍由 listing 的 group/groupDuty 驱动（数据/分组不变），只是收进 details。
+  assert.ok(tree.includes("Rt.roleGroups(others)"), "项目角色分组仍由 Rt.roleGroups 驱动");
+  assert.ok(tree.includes("othersFold.appendChild(treeGroupLabel(group.name))"), "分组标题挂在其他角色 details 内");
+  assert.ok(tree.includes("othersFold.appendChild(roleTreeItem(r, false))"), "项目角色项挂在其他角色 details 内");
+  // single 旧树（su + 项目角色）不折叠：原平铺分支逐字保留，仅 trio 走折叠。
+  assert.ok(tree.includes('state.governanceModelKnown === true && state.governanceModel === "trio"'), "仅 trio 折叠（模型未知/single 走旧树）");
+  assert.ok(tree.includes('el.appendChild(treeGroupLabel("其他角色（查看/调试）"));'), "single 旧树平铺分组逐字保留");
+  assert.ok(tree.includes("el.lastChild.remove();"), "single 旧树原样保留（分组标题行为不变）");
+
+  // 样式与 .tree-group 对齐：summary 可点击、有展开标记（原生）、键盘焦点可见。
+  assert.ok(STYLES.includes(".tree-group-fold"), "styles.css 有折叠卡样式");
+  assert.ok(STYLES.includes(".tree-group-fold > summary"), "summary 样式");
+  assert.ok(/\.tree-group-fold > summary \{[^}]*cursor: pointer;/.test(STYLES), "summary 可点击（cursor: pointer）");
+  assert.ok(/\.tree-group-fold > summary:focus-visible \{[^}]*outline:/.test(STYLES), "summary 键盘焦点可见");
+  assert.ok(STYLES.includes(".tree-group-fold .tree-group"), "折叠内分组标题样式对齐");
+});
+
 test("W6-C：空态优先级——S0 → 治理记录动作 → 治理角色专属 → 默认；Liaison 提示仅附加不替换，专属空态无重复 CTA", () => {
   const fn = RENDERER.slice(RENDERER.indexOf("function emptyStateHtml("), RENDERER.indexOf("// —————— I4 治理记录"));
   const s0 = fn.indexOf('state.projectRoot && state.hasRoles === false');
