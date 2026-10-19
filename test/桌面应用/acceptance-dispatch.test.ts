@@ -18,8 +18,9 @@ import path from "node:path";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 
-import { createDesktopInterface } from "../../app/desktop/interface.ts";
+import { createDesktopInterface, type DesktopDeps } from "../../app/desktop/interface.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
+import { RUNTIME_UNRESOLVED_MESSAGE } from "../../app/desktop/runtime-resolution.ts";
 import {
   acceptanceDispatchRecorded,
   flowCompletionIssue,
@@ -184,7 +185,11 @@ interface Harness {
   controls: Map<string, ReturnType<typeof scriptedHandle>>;
 }
 
-async function makeHarness(projectRoot: string, listing: ProjectListing): Promise<Harness> {
+async function makeHarness(
+  projectRoot: string,
+  listing: ProjectListing,
+  options: { resolveRuntime?: DesktopDeps["resolveRuntimeFn"] } = {},
+): Promise<Harness> {
   const sendsByRole = new Map<string, string[]>();
   const events: SessionEventEnvelope[] = [];
   const controls = new Map<string, ReturnType<typeof scriptedHandle>>();
@@ -204,7 +209,8 @@ async function makeHarness(projectRoot: string, listing: ProjectListing): Promis
     buildProjectConfigFn: buildProjectConfig,
     // 2026-10-19：自动派发改走统一引擎解析器。本文件聚焦证据门/去重语义，注入固定解析结果（pi），
     // 不依赖开发机真实 `.env`；解析器自身的优先级另见 `runtime-resolution.test.ts`。
-    resolveRuntimeFn: async () => ({ ok: true, runtime: "pi", source: "credentials", skipped: [] }),
+    resolveRuntimeFn:
+      options.resolveRuntime ?? (async () => ({ ok: true, runtime: "pi", source: "credentials", skipped: [] })),
   });
   await iface.listProject({ projectRoot });
   return { iface, sendsByRole, events, controls };
@@ -219,6 +225,11 @@ function deliveryNotes(events: SessionEventEnvelope[], roleId: string): string[]
         (envelope.event as { detail?: { source?: string } }).detail?.source === "delivery-note",
     )
     .map((envelope) => String((envelope.event as { summary?: string }).summary));
+}
+
+/** 收尾门阻塞的可见性系统行（2026-10-19 客户反馈：原因不能只进诊断日志）。 */
+function blockerNotes(events: SessionEventEnvelope[], roleId: string): string[] {
+  return deliveryNotes(events, roleId).filter((note) => note.includes("自动验收未派发"));
 }
 
 async function verifierDispatches(projectRoot: string, flowId: string): Promise<GovernanceLedgerEntry[]> {
@@ -567,6 +578,157 @@ test("自动验收（重启去重）：账本已有上一次的 verifier 派发�
       await sleep(300);
       assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "settle 触发也不重复派");
       assert.equal((await verifierDispatches(root, flowId)).length, 1, "账本仍只有上一次那一条记录");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// ————————————————— ③ 收尾门阻塞的可见性（2026-10-19 客户反馈「这个难道不是bug吗」） —————————————————
+//
+// 客户现场：R2 所有 retake 已 done，但自动验收派发一直不触发；`flowCompletionIssue` 的具体原因
+// （旧步骤 aborted/failed 未标 superseded）只写进诊断日志，Steward/客户看不到，只能由操作者手动复算
+// 再转告。门本身 fail-closed 正确；**静默**是缺陷。本组钉住：阻塞原因 + 可操作建议作为治理主人
+// （Convener；无法确定则 Lead）的系统行如实可见；同一原因只发一次、原因变化/解决后再次阻塞才再发；
+// 门通过时不发；派发成功路径不变；不自动改流程单、不自动派 Proof。
+
+test("自动验收阻塞可见性：门未通过 ⇒ 治理主人恰一条系统行（具体原因 + 建议）；重复 settle 不刷屏；原因变化再发；门通过不再发", async () => {
+  const root = makeTempProjectRoot("ans-acceptance-blocked-visible-");
+  try {
+    const flowId = "flow-blocked";
+    const contractLine = `contract: docs/contracts/${flowId}-api-v1.md`;
+    const withDeliveryStatus = (status: string): string =>
+      flowMarkdown(flowId, acceptanceSteps().map(([id, stepStatus]) => [id, id === "delivery-server" ? status : stepStatus]), [contractLine]);
+    writeFlowFile(root, flowId, withDeliveryStatus("pending"));
+    await seedGovernanceEvidence(root, flowId, []);
+    const listing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };
+    const harness = await makeHarness(root, listing);
+    try {
+      // 导入补齐检查即被 pending 挡下：Convener 应看到具体原因，而不是只有诊断日志。
+      await waitFor(() => blockerNotes(harness.events, "convener").length > 0);
+      assert.equal(blockerNotes(harness.events, "convener").length, 1, "门 blocked ⇒ 恰一条阻塞系统行");
+      const first = blockerNotes(harness.events, "convener")[0]!;
+      assert.ok(first.includes("delivery-server=pending"), "系统行含 flowCompletionIssue 的具体原因");
+      assert.match(first, /aborted\/failed/, "建议覆盖真机场景：被 retake 取代的 aborted/failed 步骤");
+      assert.match(first, /superseded/, "建议给出 superseded 的出路");
+      assert.match(first, /stepId/, "建议给出用新 stepId 重派的出路");
+      assert.ok(first.includes(`docs/flows/${flowId}.md`), "给治理主人可操作的流程单路径");
+      assert.ok(!/已自动派发验收复核/.test(first), "阻塞行不得冒充已派发");
+      assert.ok(blockerNotes(harness.events, "rapporteur").length === 0, "原因落在治理主人流，不散落给其他角色");
+
+      // 重复 settle（同一原因）：不重复发（不刷屏），也不派 Proof。
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "executor", runtime: "demo" })).ok, true);
+      const control = harness.controls.get("executor")!;
+      control.settle();
+      control.settle();
+      control.settle();
+      await sleep(250);
+      assert.equal(blockerNotes(harness.events, "convener").length, 1, "同一 flow + 同一原因只发一次");
+      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "门未通过：不派 Proof");
+
+      // 原因变化（pending → aborted）：再发一条，仍到治理主人。
+      writeFlowFile(root, flowId, withDeliveryStatus("aborted"));
+      control.settle();
+      await waitFor(() => blockerNotes(harness.events, "convener").length >= 2);
+      await sleep(150);
+      const changed = blockerNotes(harness.events, "convener");
+      assert.equal(changed.length, 2, "原因变化才再发（不是每 settle 刷屏）");
+      assert.ok(changed[1]!.includes("delivery-server=aborted"), "新系统行如实带新原因");
+      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "仍不派 Proof");
+
+      // 门通过：修正流程单 + 补派发证据 ⇒ 自动派发路径不变，且不再发阻塞行。
+      writeFlowFile(root, flowId, withDeliveryStatus("done"));
+      await appendLedger(root, [
+        { kind: "dispatch.accepted", flowId, stepId: "delivery-server", actorRoleId: "convener", power: "schedule", targetRoleId: "executor" },
+      ]);
+      control.settle();
+      await waitFor(() => (harness.sendsByRole.get("verifier")?.length ?? 0) > 0);
+      await sleep(150);
+      assert.equal(harness.sendsByRole.get("verifier")!.length, 1, "门通过后仍按原路径恰派一条验收任务");
+      assert.equal(blockerNotes(harness.events, "convener").length, 2, "门通过：不发新的阻塞行");
+      assert.ok(
+        deliveryNotes(harness.events, "convener").some((note) => /已自动派发验收复核给 Proof/.test(note)),
+        "成功路径的既有系统行不变",
+      );
+      assert.equal((await verifierDispatches(root, flowId)).length, 1, "派发审计记录不变");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("自动验收阻塞可见性：已解决（门通过）后再次阻塞同一原因 ⇒ 重新告知一次", async () => {
+  const root = makeTempProjectRoot("ans-acceptance-reblocked-");
+  try {
+    const flowId = "flow-reblocked";
+    const contractLine = `contract: docs/contracts/${flowId}-api-v1.md`;
+    const withDeliveryStatus = (status: string): string =>
+      flowMarkdown(flowId, acceptanceSteps().map(([id, stepStatus]) => [id, id === "delivery-server" ? status : stepStatus]), [contractLine]);
+    writeFlowFile(root, flowId, withDeliveryStatus("pending"));
+    await seedGovernanceEvidence(root, flowId, []);
+    const listing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };
+    // 引擎无法确定 ⇒ 门通过也不会真正派发、运行期占位释放——用来观察「解决后再次阻塞」的去重清除。
+    const harness = await makeHarness(root, listing, {
+      resolveRuntime: async () => ({ ok: false, message: RUNTIME_UNRESOLVED_MESSAGE, skipped: [] }),
+    });
+    try {
+      await waitFor(() => blockerNotes(harness.events, "convener").length === 1);
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "executor", runtime: "demo" })).ok, true);
+      const control = harness.controls.get("executor")!;
+
+      // 第一次放行：流程修正 + 补证据 ⇒ 收尾门通过（引擎解析失败只落既有失败行，不派发）。
+      writeFlowFile(root, flowId, withDeliveryStatus("done"));
+      await appendLedger(root, [
+        { kind: "dispatch.accepted", flowId, stepId: "delivery-server", actorRoleId: "convener", power: "schedule", targetRoleId: "executor" },
+      ]);
+      control.settle();
+      await waitFor(() => deliveryNotes(harness.events, "convener").some((note) => note.includes(RUNTIME_UNRESOLVED_MESSAGE)));
+      assert.equal(blockerNotes(harness.events, "convener").length, 1, "门通过本身不发阻塞行");
+
+      // 再次阻塞（原因文本与第一次相同）：门通过时已清去重记忆 ⇒ 重新告知。
+      writeFlowFile(root, flowId, withDeliveryStatus("pending"));
+      control.settle();
+      await waitFor(() => blockerNotes(harness.events, "convener").length >= 2);
+      await sleep(150);
+      const notes = blockerNotes(harness.events, "convener");
+      assert.equal(notes.length, 2, "解决后再次阻塞（同一原因）重新告知一次");
+      assert.ok(notes[1]!.includes("delivery-server=pending"), "重新告知带当前原因");
+      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "引擎无法确定/门未通过：始终不派 Proof");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("自动验收阻塞可见性：listing 无法确定 Convener ⇒ 系统行退回 Lead（主入口 primaryRoleId）", async () => {
+  const root = makeTempProjectRoot("ans-acceptance-lead-fallback-");
+  try {
+    const flowId = "flow-lead-fallback";
+    writeFlowFile(
+      root,
+      flowId,
+      flowMarkdown(flowId, acceptanceSteps().map(([id, status]) => [id, id === "delivery-server" ? "pending" : status]), [
+        `contract: docs/contracts/${flowId}-api-v1.md`,
+      ]),
+    );
+    await seedGovernanceEvidence(root, flowId, []);
+    // trio 但 listing 中没有 schedule 职能角色 ⇒ governanceOwnerRoleId 无法确定 ⇒ 退回主入口（Lead）。
+    const listing: ProjectListing = {
+      ...trioListing(["rapporteur"]),
+      projectRoot: root,
+      primaryRoleId: "liaison",
+    };
+    const harness = await makeHarness(root, listing);
+    try {
+      await waitFor(() => blockerNotes(harness.events, "liaison").length === 1);
+      assert.ok(blockerNotes(harness.events, "liaison")[0]!.includes("delivery-server=pending"), "Lead 收到具体原因");
+      assert.equal(blockerNotes(harness.events, "rapporteur").length, 0, "不落在触发事件的角色流");
     } finally {
       await harness.iface.stopSession();
     }

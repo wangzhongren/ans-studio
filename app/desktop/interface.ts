@@ -108,6 +108,7 @@ import {
   buildGovernanceAdvanceMessage,
   flowCompletionIssue,
   governanceAcceptanceAdvanceNote,
+  governanceAcceptanceBlockedNote,
   governanceAdvanceSuccessNote,
   governanceAppointmentWriteNote,
   governanceFlowPath,
@@ -801,6 +802,12 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   const acceptanceEvidenceByFlow = new Map<string, string[]>();
   /** 每 flow 只派一次（运行期）；持久化去重另见账本 `acceptanceDispatchRecorded`。 */
   const acceptanceDispatchedFlows = new Set<string>();
+  /**
+   * 每 flow 最近一次**已告知**的收尾门阻塞原因（`flowCompletionIssue` 原文）。同一 flow + 同一原因只发
+   * 一次（见 `governanceAcceptanceBlockedNote`），避免每个 settle 刷屏；原因变化才再发。门通过时清除 ⇒
+   * 「已解决后再次阻塞」（即使原因文本相同）也会重新告知。运行期记忆：不写账本、不改门禁判定。
+   */
+  const acceptanceBlockedNotified = new Map<string, string>();
   /** 每项目最多一条「无法确定项目引擎」系统行（后续真实事件只记诊断；不循环重试、不刷屏）。 */
   const acceptanceRuntimeUnresolvedNotified = new Set<string>();
   let runAcceptanceCheck: ((projectRoot: string, trigger: "settle" | "ledger" | "import") => Promise<void>) | undefined;
@@ -933,15 +940,19 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     const key = acceptanceFlowKey(info.projectRoot, info.flowId);
     if (acceptanceDispatchedFlows.has(key)) return; // 每 flow 只派一次（运行期）
     acceptanceDispatchedFlows.add(key); // 先占位：防同一 settle 批次/并发重复派
+    const governanceOwnerRoleId = manager.governanceOwnerRoleId(info.projectRoot);
     const noteRoleId =
-      manager.governanceOwnerRoleId(info.projectRoot) ?? info.roleId ?? listing.primaryRoleId;
+      governanceOwnerRoleId ?? info.roleId ?? listing.primaryRoleId;
+    // 收尾门阻塞的系统行只发给治理主人：trio=Convener；无法确定（listing 缺 schedule 职能）则退回
+    // Lead（主入口 `primaryRoleId`）。不发给触发 settle 的任意项目角色——原因应落在主人流里，避免散落。
+    const blockerNoteRoleId = governanceOwnerRoleId ?? listing.primaryRoleId;
     const diagnostic = createDiagnosticLogger({ component: "desktop.governance-acceptance", projectRoot: info.projectRoot, roleId: noteRoleId });
     // 系统行的呈现路由：冷启动解析出引擎后改用**实际引擎**（否则 Pi 视图会过滤掉落给默认 claude 的行）；
     // 解析失败时仍用已知提示或桌面默认（保证「无法确定项目引擎」这条行可见）。
     let noteRuntime: RuntimeKind | undefined = info.runtime ?? acceptanceRuntimeHints.get(info.projectRoot);
-    const note = (summary: string): void => {
+    const note = (summary: string, roleId: string = noteRoleId): void => {
       try {
-        emitSessionEvent({ roleId: noteRoleId, projectRoot: info.projectRoot, runtime: noteRuntime ?? "claude", event: { kind: "message", summary, detail: { source: "delivery-note" } } });
+        emitSessionEvent({ roleId, projectRoot: info.projectRoot, runtime: noteRuntime ?? "claude", event: { kind: "message", summary, detail: { source: "delivery-note" } } });
       } catch (error) {
         diagnostic.error("acceptance.note.failed", error);
       }
@@ -971,9 +982,20 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       const issue = flowCompletionIssue(info.flowId, markdown, ledger);
       if (issue !== undefined) {
         diagnostic.record("acceptance.flow.incomplete", { flowId: info.flowId, reason: issue });
+        // 2026-10-19 客户反馈「这个难道不是bug吗」：门 fail-closed 正确，但原因只进诊断日志 ⇒
+        // Steward/客户看不到，只能由操作者手动复算转告——**静默本身是缺陷**。把具体原因 + 可操作建议
+        // 作为系统行发给治理主人（Convener；无法确定则 Lead）。去重：同一 flow + 同一原因只发一次；
+        // 原因变化再发；不循环重试、不改门禁判定（不自动把 failed/aborted 当 superseded、不自动派 Proof）。
+        if (acceptanceBlockedNotified.get(key) !== issue) {
+          acceptanceBlockedNotified.set(key, issue);
+          note(governanceAcceptanceBlockedNote(info.flowId, issue), blockerNoteRoleId);
+          diagnostic.record("acceptance.flow.incomplete.notified", { flowId: info.flowId, reason: issue, roleId: blockerNoteRoleId });
+        }
         acceptanceDispatchedFlows.delete(key); // 未完成/证据不足：不派；后续事件可再检查（不是循环）
         return;
       }
+      // 门已通过（本次判定）：清除阻塞告知记忆——若之后再次被挡（即使原因文本相同）会重新告知。
+      acceptanceBlockedNotified.delete(key);
       const evidence =
         info.evidence.length > 0 ? info.evidence : acceptanceEvidenceByFlow.get(key) ?? [];
       // 引擎选择（2026-10-19 真机缺陷修复）：活跃会话/真实事件 → 应用内已选/持久化 → `.ans/sessions`

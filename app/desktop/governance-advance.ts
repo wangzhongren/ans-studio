@@ -163,6 +163,18 @@ const VERIFICATION_STEP_IDS: ReadonlySet<string> = new Set(["acceptance", "verif
  */
 const VOIDED_FLOW_STEP_STATUSES: ReadonlySet<string> = new Set(["superseded", "cancelled"]);
 
+/**
+ * `flowCompletionIssue` 的**终态原因**（2026-10-19 客户反馈「这个难道不是bug吗」的可见性修复）：
+ * 这两条表示流程已经收口（验收步骤已完成 / 已有验收决定），自动派发本就不该再发生——不是需要
+ * 修复的阻塞。文案与 `flowCompletionIssue` 返回**同源**（常量唯一），供阻塞系统行区分建议措辞。
+ */
+const FLOW_COMPLETION_TERMINAL_ACCEPTANCE_DONE = "验收步骤已完成";
+const FLOW_COMPLETION_TERMINAL_ACCEPTANCE_DECIDED = "该流程已有验收决定";
+const FLOW_COMPLETION_TERMINAL_REASONS: ReadonlySet<string> = new Set([
+  FLOW_COMPLETION_TERMINAL_ACCEPTANCE_DONE,
+  FLOW_COMPLETION_TERMINAL_ACCEPTANCE_DECIDED,
+]);
+
 // ————————————————— 2026-10-19 客户反馈：「独立核准应该是标准流程」 —————————————————
 //
 // 真机现象：交付全部 done、测试 155/155、e2e 104/104 后验收派发门没有自动打开——旧门要求**每个执行步骤**
@@ -363,11 +375,11 @@ export function flowCompletionIssue(
     return `流程步骤${parts.join("；")}${skippedNote}`;
   }
   if (acceptanceStep === undefined) return "流程单缺少验收步骤";
-  if (normalizeFlowStepStatus(acceptanceStep.status) === "done") return "验收步骤已完成";
+  if (normalizeFlowStepStatus(acceptanceStep.status) === "done") return FLOW_COMPLETION_TERMINAL_ACCEPTANCE_DONE;
   const acceptance = ledger.entries.find(
     (entry) => entry.kind === "customer.decision" && entry.flowId === flowId && entry.decisionKind === "acceptance",
   );
-  if (acceptance !== undefined) return "该流程已有验收决定";
+  if (acceptance !== undefined) return FLOW_COMPLETION_TERMINAL_ACCEPTANCE_DECIDED;
   const unresolved = ledger.entries.filter(
     (entry) =>
       entry.kind === "customer.decision" &&
@@ -411,6 +423,26 @@ export function buildAcceptanceTaskMessage(flowId: string, evidence: readonly st
 /** 收尾推进成功的系统行（2026-10-19 客户反馈：验收复核是标准流程，由应用自动派发；**不是客户批准**）。 */
 export function governanceAcceptanceAdvanceNote(flowId: string): string {
   return `流程 ${flowId} 步骤已全部完成，已自动派发验收复核给 Proof（工作中）`;
+}
+
+/**
+ * 自动验收被收尾门挡住时的**系统行**（2026-10-19 客户反馈「这个难道不是bug吗」）。
+ *
+ * 门本身 fail-closed 正确，但原因原先只写诊断日志（`acceptance.flow.incomplete`）——Steward/客户
+ * 看不到，只能由操作者手动复算再转告，**静默本身就是缺陷**。本函数把具体原因 + 可操作建议变成
+ * 治理主人（Convener；无法确定则 Lead）聊天的系统行：
+ *  - 未完成/阻塞/证据不足：建议把已被 retake 取代的 aborted/failed 步骤标为 `superseded`（或
+ *    `cancelled`），或用新 `stepId` 重派并更新流程单；应用**不会自动改写流程单，也不会自动派 Proof**；
+ *  - 终态（验收步骤已完成 / 已有验收决定）：无需操作，如实说明不会重复派发。
+ *
+ * 本函数只产出文案：**不改变 `flowCompletionIssue` 门禁判定**、不把 failed/aborted 自动当 superseded、
+ * 不写账本。去重（同一 flow + 同一原因只发一次）由调用方（Interface）负责。
+ */
+export function governanceAcceptanceBlockedNote(flowId: string, issue: string): string {
+  const advice = FLOW_COMPLETION_TERMINAL_REASONS.has(issue)
+    ? "无需操作：流程已收口，应用不会重复派发验收复核。"
+    : `建议：若旧步骤已被 retake 取代，请把对应的 aborted/failed 步骤在流程单 ${governanceFlowPath(flowId)} 中标为 superseded（或 cancelled）；或用新的 stepId 重新派发任务并在流程单中更新状态与证据。修正后下一次事件会自动重新检查；应用不会自动改写流程单，也不会自动派 Proof。`;
+  return `自动验收未派发：流程 ${flowId} 未通过收尾门。原因：${issue}。${advice}`;
 }
 
 /**
