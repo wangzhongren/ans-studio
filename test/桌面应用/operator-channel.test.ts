@@ -27,6 +27,7 @@ import { SessionManager } from "../../app/desktop/session.ts";
 import { openRoleSession, type RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
 import { configureDiagnostics, flushDiagnostics, disposeDiagnostics } from "../../src/common/shared/diagnostics.ts";
 import {
+  approvalRoleDisplayName,
   buildDesktopShellArming,
   buildShellConfirmRequest,
   createDesktopOperatorChannel,
@@ -525,6 +526,89 @@ test("M-1 数据面：白话摘要只取命令首词（不编意图）；升级�
     assert.equal(suPayload.reasonRaw, suReason, "原文只进折叠详情（逐字）");
     assert.ok(suPayload.reasonPlain.includes(tier === "deny" ? "硬拒类（deny）" : tier === "risky" ? "风险命令（risky）" : "未自动判定（review）"));
   }
+});
+
+// ————— 2026-10-19 客户反馈：审批档展示文案按实际内置治理角色显示（不再一律「SU」） —————
+
+test("审批档角色化（纯映射）：五内置治理角色显示其注册名；su/缺省保持 SU；项目角色不显示治理角色名", () => {
+  const reason = "su-审批档[risky]：命中规则（ruleset:x）；批准后命令以当前 OS 用户权限执行，可能绕过 ANS 文件写边界。";
+  const builtInNames: [string, string][] = [
+    ["liaison", "Lead / 主理"],
+    ["rapporteur", "Draft / 提案"],
+    ["nominator", "Crew / 组队"],
+    ["convener", "Steward / 统筹"],
+    ["verifier", "Proof / 验收"],
+  ];
+  for (const [roleId, name] of builtInNames) {
+    assert.equal(approvalRoleDisplayName(roleId), name, `${roleId} 的展示名来自内置注册表`);
+    const plain = plainReasonFor(reason, approvalRoleDisplayName(roleId));
+    assert.ok(plain.startsWith(`${name} 审批档：风险命令（risky）——须逐条客户批准才执行`), `${name} 卡片按实际角色显示`);
+    assert.equal(plain.includes("SU 审批档"), false, `${roleId} 不再显示「SU 审批档」`);
+    assert.ok(plain.includes("批准后可能绕过 ANS 文件写边界"), "三条必备披露仍在");
+    assert.ok(plain.includes("拒绝/超时/通道不可用 = 拒绝"), "fail-closed 披露仍在");
+  }
+  // single/su 与缺省（无角色上下文）保持旧文案逐字不变。
+  assert.equal(approvalRoleDisplayName("su"), "SU");
+  assert.equal(approvalRoleDisplayName(undefined), "SU");
+  assert.equal(approvalRoleDisplayName(""), "SU");
+  assert.ok(plainReasonFor(reason).startsWith("SU 审批档："), "缺省沿用旧文案（兼容既有调用方）");
+  assert.ok(plainReasonFor(reason, "SU").startsWith("SU 审批档："));
+
+  // 项目角色：不蹭治理角色名（其 reason 不带审批档前缀 ⇒ policy=project，走既有映射）。
+  const projectPlain = plainReasonFor("risky：自动审核判定有风险", approvalRoleDisplayName("X"));
+  for (const [, name] of builtInNames) {
+    assert.equal(projectPlain.includes(name), false, `项目角色不显示治理角色名：${name}`);
+  }
+  assert.equal(projectPlain.includes("SU 审批档"), false, "项目角色不走审批档文案");
+
+  // 数据面：reasonPlain 角色化；reasonRaw 的内部前缀逐字保留（解析兼容）。
+  const built = buildShellConfirmRequest(
+    "sc-verifier",
+    describeShellCommand(req("rm -rf build", ["rm", "-rf", "build"], "/proj", reason)),
+    approvalRoleDisplayName("verifier"),
+  );
+  assert.equal(built.tier, "risky", "内部档位解析不变");
+  assert.equal(built.policy, "su-approval", "内部策略名不变");
+  assert.ok(built.reasonPlain.startsWith("Proof / 验收 审批档：风险命令（risky）"), "verifier 数据面按实际角色显示");
+  assert.equal(built.reasonPlain.includes("SU 审批档"), false, "verifier 数据面不再出现「SU 审批档」");
+  assert.equal(built.reasonRaw, reason, "内部 su-审批档[tier] 前缀保留不改（解析兼容）");
+  assert.equal(parseSuApprovalTier(built.reasonRaw), "risky", "内部前缀仍可解析");
+});
+
+test("审批档角色化（presenter 接线）：metadata.roleId=verifier ⇒ 卡片「Proof / 验收 审批档」；su ⇒ SU；项目角色不显示治理名", async () => {
+  const sent: ShellConfirmRequest[] = [];
+  const p = createShellConfirmPresenter({ present: (r) => sent.push(r), cleanupAfterMs: 60000, env: {} });
+  const reason = "su-审批档[risky]：命中规则（ruleset:x）；批准后命令以当前 OS 用户权限执行，可能绕过 ANS 文件写边界。";
+  const suPrompt = req("rm -rf build", ["rm", "-rf", "build"], "/proj", reason);
+  const signal = new AbortController().signal;
+
+  const verifier = p.presenter.present(suPrompt, describeShellCommand(suPrompt), { roleId: "verifier", projectRoot: "/proj", runtime: "pi", signal });
+  assert.equal(sent.length, 1, "卡片已推达");
+  assert.ok(sent[0].reasonPlain.startsWith("Proof / 验收 审批档：风险命令（risky）"), "verifier 卡片按实际角色显示");
+  assert.equal(sent[0].reasonPlain.includes("SU 审批档"), false, "verifier 卡片不再出现「SU 审批档」");
+  assert.equal(sent[0].reasonRaw, reason, "折叠详情仍是内部原文（解析兼容）");
+  assert.equal(sent[0].tier, "risky");
+  assert.equal(sent[0].policy, "su-approval");
+  assert.equal(sent[0].roleId, "verifier", "payload 角色 id 照旧");
+  assert.equal(p.respond({ id: sent[0].id, allow: false }).ok, true);
+  await verifier;
+
+  const su = p.presenter.present(suPrompt, describeShellCommand(suPrompt), { roleId: "su", projectRoot: "/proj", runtime: "pi", signal });
+  assert.ok(sent[1].reasonPlain.startsWith("SU 审批档："), "single/su 保持「SU 审批档」");
+  assert.equal(p.respond({ id: sent[1].id, allow: false }).ok, true);
+  await su;
+
+  // 项目角色（policy=project）：既有映射逐字不变，不出现任何治理角色名。
+  const projectPrompt = req("npm test", ["npm", "test"], "/proj", "risky：自动审核判定有风险");
+  const project = p.presenter.present(projectPrompt, describeShellCommand(projectPrompt), { roleId: "X", projectRoot: "/proj", runtime: "pi", signal });
+  assert.equal(sent[2].policy, "project");
+  assert.equal(sent[2].tier, null);
+  for (const name of ["Lead / 主理", "Draft / 提案", "Crew / 组队", "Steward / 统筹", "Proof / 验收"]) {
+    assert.equal(sent[2].reasonPlain.includes(name), false, `项目角色卡片不显示治理角色名：${name}`);
+  }
+  assert.equal(sent[2].reasonPlain.includes("SU 审批档"), false);
+  assert.equal(p.respond({ id: sent[2].id, allow: false }).ok, true);
+  await project;
 });
 
 test("M-1 presenter：恰 allow:true 才放行；拒绝/缺字段 → 不放行；未知 id → expired；关窗 ⇒ 全部不放行", async () => {

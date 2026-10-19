@@ -78,17 +78,22 @@ function splitFlowRow(line: string): string[] | undefined {
 }
 
 /**
- * 流程步骤状态的**首词规范化**（2026-10-19 真机：状态列写作「状态 + 说明」）。
+ * 流程步骤状态的**首词规范化**（2026-10-19 真机：状态列写作「状态 + 说明」或 Markdown 强调）。
  *
  * 流程单由 Steward 按模板自然写出，状态单元格常见 `done（有落盘/回交证据；…）`、
- * `pending（不由统筹派发）`、`done：xxx` 这类「引导状态词 + 说明」写法。判定只看引导 token
- * （大小写不敏感；后接空白、`（`、`(`、`：`、`:` 或结束），说明文字不参与比较；空/纯空白 ⇒ `""`。
+ * `pending（不由统筹派发）`、`done：xxx` 这类「引导状态词 + 说明」写法，也常见
+ * `**done**（…）`、`__done__`、`` `done` `` 这类 Markdown 强调/代码标记写法。判定只看引导 token：
+ * 先剥掉首尾空白与标记字符（`*`、`_`、反引号），再取首词，并剥掉紧贴状态词尾的闭合标记
+ * （`**done**（…）` 的闭合 `**` 位于说明文字之前，不在单元格末尾）；大小写不敏感。
+ * 后接空白、`（`、`(`、`：`、`:` 或结束即截止，说明文字不参与比较；空/纯标记 ⇒ `""`。
  * **不修改** `parseFlowStepStatuses` 输出的原始 `status`（展示仍用原文），只在判定处调用本函数。
  */
 export function normalizeFlowStepStatus(status: string): string {
   if (typeof status !== "string") return "";
-  const match = /^[^\s（(：:]+/.exec(status.trim());
-  return match === null ? "" : match[0].toLowerCase();
+  const trimmed = status.replace(/^[\s`*_]+/, "").replace(/[\s`*_]+$/, "");
+  const match = /^[^\s（(：:]+/.exec(trimmed);
+  if (match === null) return "";
+  return match[0].replace(/[`*_]+$/, "").toLowerCase();
 }
 
 /**
@@ -141,26 +146,186 @@ export interface FlowCompletionLedgerEntryLike {
   stepId?: string;
   decisionKind?: string;
   customerDecision?: string;
+  /** 仅 dispatch.accepted / customer.decision：目标角色（验收派发去重与客户决定证据用）。 */
+  targetRoleId?: string;
+  actorRoleId?: string;
+  /** 仅 artifact.observed：项目相对产物路径。 */
+  artifactPath?: string;
 }
 
 /** 验收步骤的流程单写法（2026-10-18 真机：nomination/delivery/**verification**；旧版用 `acceptance`）。 */
 const VERIFICATION_STEP_IDS: ReadonlySet<string> = new Set(["acceptance", "verification"]);
 
 /**
- * 「流程全部完成」的**触发门**（2026-10-18 收尾推进）：**执行步骤**全部 `done`、每步都有
- * `dispatch.accepted`、无未结算决定、尚无验收决定。返回 `undefined` = 可以派 Proof / 验收 出验收；
- * 否则返回人话原因（调用方只记诊断、**不派、不循环**）。本函数**不是**验收判定——验收卡仍由
- * 决策开关/判断 agent/客户手批。
+ * **已作废**的步骤状态（`normalizeFlowStepStatus` 归一化后）：步骤被替代（`superseded`）或取消
+ * （`cancelled`），按约定视为非执行步骤——不参与**执行步骤**的「未完成」判定，也不要求 dispatch
+ * 证据。它们**不算 done**（验收步骤的 done 判定仍只认 `done`）；未知状态一律不在此列、照旧阻塞。
+ */
+const VOIDED_FLOW_STEP_STATUSES: ReadonlySet<string> = new Set(["superseded", "cancelled"]);
+
+// ————————————————— 2026-10-19 客户反馈：「独立核准应该是标准流程」 —————————————————
+//
+// 真机现象：交付全部 done、测试 155/155、e2e 104/104 后验收派发门没有自动打开——旧门要求**每个执行步骤**
+// 都有 `dispatch.accepted`，而 nomination / roles-ready / contract-freeze 这类治理步骤由客户决定或产物
+// 完成、从不经应用派发，门永远打不开。修正：按步骤类型认证据（映射表显式、可测试、不猜）。
+
+/** 完成证据的类型（按 stepId 词形显式映射；默认派发型＝旧口径）。 */
+export type FlowStepEvidenceKind = "dispatch" | "decision" | "artifact";
+
+interface FlowStepEvidenceRule {
+  readonly kind: FlowStepEvidenceKind;
+  readonly test: (stepId: string) => boolean;
+}
+
+/**
+ * 步骤 id → 证据类型的**显式映射表**（顺序即优先级；未命中 ⇒ 派发型，行为与 2026-10-18 旧口径一致）。
+ * 只按 stepId 词形匹配，**绝不**从状态文本或自然语言推测；新增步骤种类只能改这张表并补测试。
+ *
+ * · 产物型：契约冻结（`contract-freeze*`）、提案/流程单写入（`proposal*`/`flow*`/`schedule*`）；
+ * · 客户决定型：提名/角色就绪（`nomination*`、`role-readiness`、`roles-ready`、`role-ready`）；
+ * · 派发型：`delivery-*`、`*e2e*`、`cleanup*`、`rework-*`、`integration-*`、`verify-*` 及所有未知 id。
+ */
+const FLOW_STEP_EVIDENCE_RULES: readonly FlowStepEvidenceRule[] = [
+  { kind: "artifact", test: (id) => /^contract-freeze(?:$|[-_.])/i.test(id) },
+  { kind: "artifact", test: (id) => /^(?:proposal|flow|schedule)(?:$|[-_.])/i.test(id) },
+  { kind: "decision", test: (id) => /^(?:nomination|nominations|role-readiness|roles-ready|role-ready)(?:$|[-_.])/i.test(id) },
+];
+
+/** 步骤类型（纯函数；映射表是唯一来源，供测试与诊断使用）。 */
+export function flowStepEvidenceKind(stepId: string): FlowStepEvidenceKind {
+  for (const rule of FLOW_STEP_EVIDENCE_RULES) {
+    if (rule.test(stepId)) return rule.kind;
+  }
+  return "dispatch";
+}
+
+/** 可计为「已完成」的客户决定结果（rejected/changes-requested/none 一律不算完成证据）。 */
+const RESOLVED_CUSTOMER_DECISIONS: ReadonlySet<string> = new Set(["accepted", "accepted-quick", "appointed"]);
+
+function normalizeRelativePath(value: string): string {
+  return value.replace(/\\/g, "/").replace(/^\.\//, "");
+}
+
+/** 流程单里**显式声明**的产物路径（docs/contracts/**、docs/proposals/**）——路径映射只认声明，不猜。 */
+function declaredArtifactPaths(markdown: string, directory: "contracts" | "proposals"): ReadonlySet<string> {
+  const pattern = new RegExp(`docs/${directory}/[^\\s\`"'()（）\\[\\]]+\\.md`, "g");
+  const found = markdown.match(pattern) ?? [];
+  return new Set(found.map(normalizeRelativePath));
+}
+
+function artifactEvidenceMatches(
+  stepId: string,
+  flowId: string,
+  markdown: string,
+  entries: readonly FlowCompletionLedgerEntryLike[],
+): boolean {
+  const observed = entries.filter(
+    (entry): entry is FlowCompletionLedgerEntryLike & { artifactPath: string } =>
+      entry.kind === "artifact.observed" && typeof entry.artifactPath === "string" && entry.artifactPath.trim() !== "",
+  );
+  if (observed.length === 0) return false;
+  const pathOf = (entry: FlowCompletionLedgerEntryLike & { artifactPath: string }): string => normalizeRelativePath(entry.artifactPath);
+  if (/^contract-freeze(?:$|[-_.])/i.test(stepId)) {
+    const declared = declaredArtifactPaths(markdown, "contracts");
+    return observed.some(
+      (entry) => declared.has(pathOf(entry)) || (entry.flowId === flowId && pathOf(entry).startsWith("docs/contracts/")),
+    );
+  }
+  if (/^proposal(?:$|[-_.])/i.test(stepId)) {
+    const declared = declaredArtifactPaths(markdown, "proposals");
+    return observed.some(
+      (entry) => declared.has(pathOf(entry)) || (entry.flowId === flowId && pathOf(entry).startsWith("docs/proposals/")),
+    );
+  }
+  // flow/schedule 写入：流程单自身被观测，或任一携带同 flowId 的产物。
+  const flowPath = `docs/flows/${flowId}.md`;
+  return observed.some((entry) => pathOf(entry) === flowPath || entry.flowId === flowId);
+}
+
+function decisionEvidenceMatches(
+  stepId: string,
+  flowId: string,
+  entries: readonly FlowCompletionLedgerEntryLike[],
+): boolean {
+  const personnelStep = /^(?:nomination|nominations|role-readiness|roles-ready|role-ready)(?:$|[-_.])/i.test(stepId);
+  return entries.some((entry) => {
+    if (entry.kind !== "customer.decision" || entry.flowId !== flowId) return false;
+    if (!RESOLVED_CUSTOMER_DECISIONS.has(entry.customerDecision ?? "")) return false;
+    return entry.stepId === stepId || (personnelStep && entry.decisionKind === "appointment");
+  });
+}
+
+function dispatchEvidenceMatches(
+  stepId: string,
+  flowId: string,
+  entries: readonly FlowCompletionLedgerEntryLike[],
+): boolean {
+  return entries.some(
+    (entry) => entry.kind === "dispatch.accepted" && entry.flowId === flowId && entry.stepId === stepId,
+  );
+}
+
+/**
+ * 某执行步骤是否有**可机械核对**的完成证据。`dispatch.accepted` 对任何步骤都是有效记录（应用在案动作）；
+ * 其余按步骤类型：客户决定型认 `customer.decision`（stepId 匹配，人事步骤另认 appointment 决定），
+ * 产物型认 `artifact.observed`（flowId 匹配，或流程单显式声明的契约/提案路径匹配）。**不看 done 文本。**
+ */
+export function flowStepHasEvidence(
+  stepId: string,
+  flowId: string,
+  markdown: string,
+  entries: readonly FlowCompletionLedgerEntryLike[],
+): boolean {
+  if (dispatchEvidenceMatches(stepId, flowId, entries)) return true;
+  const kind = flowStepEvidenceKind(stepId);
+  if (kind === "decision") return decisionEvidenceMatches(stepId, flowId, entries);
+  if (kind === "artifact") return artifactEvidenceMatches(stepId, flowId, markdown, entries);
+  return false;
+}
+
+/**
+ * 验收复核是否**已派发过**（持久化去重）：账本已有 targetRoleId=verifier 的 `dispatch.accepted`
+ * （或 app 写的 stepId=verification 记录）。重启后据此不再重复派。
+ */
+export function acceptanceDispatchRecorded(
+  flowId: string,
+  ledger: { entries: readonly FlowCompletionLedgerEntryLike[] },
+): boolean {
+  return ledger.entries.some(
+    (entry) =>
+      entry.kind === "dispatch.accepted" &&
+      entry.flowId === flowId &&
+      (entry.targetRoleId === "verifier" || (entry.stepId === "verification" && entry.actorRoleId === "app")),
+  );
+}
+
+/**
+ * 「流程全部完成」的**触发门**（2026-10-18 收尾推进；2026-10-19 客户反馈修正证据模型）：**执行步骤**全部
+ * `done` 且每步都有**与步骤类型匹配**的机械证据、无未结算决定、尚无验收决定。返回 `undefined` = 可以派
+ * Proof / 验收 出验收；否则返回人话原因（调用方只记诊断、**不派、不循环**）。本函数**不是**验收判定——
+ * 验收卡仍由决策开关/判断 agent/客户手批。
  *
  * **验收步骤单列（2026-10-18 真机修正——验收鸡生蛋）**：验收步骤（`acceptance` 或 `verification`）
- * 是验收步骤本身，不能算进「执行步骤必须 done + 必须有 dispatch.accepted」：它本就 pending，且应用用
+ * 是验收步骤本身，不能算进「执行步骤必须 done + 必须有证据」：它本就 pending，且应用用
  * `sendBackground` 派 Proof / 验收 不写 `dispatch.accepted`——若把它算进去，验收任务永远派不出去。
  * 现只对**执行步骤**（排除 `VERIFICATION_STEP_IDS`）做完成判定；验收步骤自身：缺失 ⇒ fail-closed 不派；
  * 已 `done` ⇒ 不重复派；已有 `customer.decision acceptance` ⇒ 不重复派；其余（pending/in-progress）⇒ 允许派。
  *
+ * **按步骤类型认证据（2026-10-19 客户反馈「独立核准应该是标准流程」）**：不再要求每个执行步骤都有
+ * `dispatch.accepted`——治理步骤（提名/角色就绪/契约冻结）由客户决定或产物完成、从不经应用派发，旧口径
+ * 会让门永远打不开。证据类型映射见 `FLOW_STEP_EVIDENCE_RULES`/`flowStepEvidenceKind`，匹配规则见
+ * `flowStepHasEvidence`：派发型认 `dispatch.accepted`；客户决定型认 stepId 匹配的 `customer.decision`；
+ * 产物型认 `artifact.observed`（flowId 匹配或流程单显式声明的路径匹配）。任何一步既无完成状态也无匹配
+ * 证据 ⇒ 仍 fail-closed 不派；**绝不放宽到只看 done 文本**。
+ *
  * **状态按首词判定（2026-10-19 真机）**：流程单状态单元格是「状态 + 说明」写法
  * （`done（有落盘/回交证据；…）`、`pending（不由统筹派发）`），精确比较会把已完成的步骤误判为未完成。
- * 执行步骤与验收步骤的比较统一走 `normalizeFlowStepStatus`（只认引导 token，大小写不敏感）。
+ * 执行步骤与验收步骤的比较统一走 `normalizeFlowStepStatus`（只认引导 token，大小写不敏感，且剥离
+ * Markdown 强调/代码标记：`**done**（…）`、`__done__`、`` `done` `` 均视为 `done`）。
+ *
+ * **作废步骤不阻塞（2026-10-19 真机）**：执行步骤归一化为 `superseded`/`cancelled` 表示该步骤已被
+ * 替代或取消（如前端证据补充并入集成 e2e）——视为非执行步骤，不参与「未完成」与证据要求；错误详情
+ * 会注明跳过。它们**不算 done**：其他未知状态照旧阻塞，验收步骤的完成判定仍只认 `done`。
  */
 export function flowCompletionIssue(
   flowId: string,
@@ -173,19 +338,29 @@ export function flowCompletionIssue(
   // 验收步骤是派发目标本身，不参与「执行完成」判定（见函数注释）。
   const executionSteps = parsed.steps.filter((step) => !VERIFICATION_STEP_IDS.has(step.id));
   const acceptanceStep = parsed.steps.find((step) => VERIFICATION_STEP_IDS.has(step.id));
-  const notDone = executionSteps.filter((step) => normalizeFlowStepStatus(step.status) !== "done");
+  // 已作废（superseded/cancelled）的执行步骤视为非执行步骤；未知状态不在此列，照旧按未完成处理。
+  const voidedSteps = executionSteps.filter((step) => VOIDED_FLOW_STEP_STATUSES.has(normalizeFlowStepStatus(step.status)));
+  const activeSteps = executionSteps.filter((step) => !VOIDED_FLOW_STEP_STATUSES.has(normalizeFlowStepStatus(step.status)));
+  const skippedNote =
+    voidedSteps.length > 0
+      ? `；已跳过作废步骤（${voidedSteps.slice(0, 10).map((step) => `${step.id}=${step.status || "（空）"}`).join("、")}）`
+      : "";
+  const notDone = activeSteps.filter((step) => normalizeFlowStepStatus(step.status) !== "done");
   if (notDone.length > 0) {
     const detail = notDone.slice(0, 10).map((step) => `${step.id}=${step.status || "（空）"}`).join("、");
-    return `流程仍有未完成/阻塞/待派发步骤（${detail}）`;
+    return `流程仍有未完成/阻塞/待派发步骤（${detail}）${skippedNote}`;
   }
-  const dispatched = new Set(
-    ledger.entries
-      .filter((entry) => entry.kind === "dispatch.accepted" && entry.flowId === flowId && typeof entry.stepId === "string")
-      .map((entry) => entry.stepId as string),
+  const missing = activeSteps.filter(
+    (step) => !flowStepHasEvidence(step.id, flowId, markdown, ledger.entries),
   );
-  const missingDispatch = executionSteps.filter((step) => !dispatched.has(step.id));
-  if (missingDispatch.length > 0) {
-    return `流程步骤缺少 dispatch.accepted 记录（${missingDispatch.slice(0, 10).map((step) => step.id).join("、")}）`;
+  if (missing.length > 0) {
+    const byKind: Record<FlowStepEvidenceKind, string[]> = { dispatch: [], decision: [], artifact: [] };
+    for (const step of missing) byKind[flowStepEvidenceKind(step.id)].push(step.id);
+    const parts: string[] = [];
+    if (byKind.dispatch.length > 0) parts.push(`缺少 dispatch.accepted 记录（${byKind.dispatch.slice(0, 10).join("、")}）`);
+    if (byKind.decision.length > 0) parts.push(`缺少客户决定证据（${byKind.decision.slice(0, 10).join("、")}）`);
+    if (byKind.artifact.length > 0) parts.push(`缺少产物证据（${byKind.artifact.slice(0, 10).join("、")}）`);
+    return `流程步骤${parts.join("；")}${skippedNote}`;
   }
   if (acceptanceStep === undefined) return "流程单缺少验收步骤";
   if (normalizeFlowStepStatus(acceptanceStep.status) === "done") return "验收步骤已完成";
@@ -233,9 +408,9 @@ export function buildAcceptanceTaskMessage(flowId: string, evidence: readonly st
   );
 }
 
-/** 收尾推进成功的系统行。 */
+/** 收尾推进成功的系统行（2026-10-19 客户反馈：验收复核是标准流程，由应用自动派发；**不是客户批准**）。 */
 export function governanceAcceptanceAdvanceNote(flowId: string): string {
-  return `流程 ${flowId} 步骤已全部完成，已派发验收汇总任务给 Proof / 验收（工作中）`;
+  return `流程 ${flowId} 步骤已全部完成，已自动派发验收复核给 Proof（工作中）`;
 }
 
 /**

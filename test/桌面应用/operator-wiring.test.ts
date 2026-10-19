@@ -27,6 +27,7 @@ import {
   flowCompletionIssue,
   normalizeFlowStepStatus,
   parseFlowStepStatuses,
+  type FlowCompletionLedgerEntryLike,
 } from "../../app/desktop/governance-advance.ts";
 import { interactionAnchorKey } from "../../app/desktop/request-anchor.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
@@ -1599,13 +1600,33 @@ test("收尾触发门：执行步骤全 done 才放行；验收步骤单列（pe
 
 // ————— ⑥-补 2026-10-19 真机：流程单状态写作「状态 + 说明」（done（证据）/pending（不由统筹派发）） —————
 
-test("流程步骤状态首词规范化：done 变体视为完成；pending/delivered/空不视为完成", () => {
-  for (const status of ["done", "done（证据）", "done(evidence)", "Done", "DONE", "done：xxx", "done 有落盘/回交证据"]) {
+test("流程步骤状态首词规范化：done 变体（含 Markdown 强调/代码标记）视为完成；pending/delivered/空不视为完成", () => {
+  for (const status of [
+    "done",
+    "done（证据）",
+    "done(evidence)",
+    "Done",
+    "DONE",
+    "done：xxx",
+    "done 有落盘/回交证据",
+    // 2026-10-19 真机：状态列写成 Markdown 强调/代码标记（R2 流程单实际写法 `**done**（…）`）。
+    "**done**（证据）",
+    "**done**（有落盘/回交证据；125/125 为角色自报）",
+    "**done**",
+    "**Done**（…）",
+    "__done__",
+    "_done_",
+    "`done`",
+    "`done`（证据）",
+    "** done **",
+  ]) {
     assert.equal(normalizeFlowStepStatus(status), "done", `${status} 应规范化为 done`);
   }
-  for (const status of ["pending（…）", "pending（不由统筹派发）", "delivered（…）", "in-progress（…）", "blocked", "", "   "]) {
+  for (const status of ["pending（…）", "pending（不由统筹派发）", "delivered（…）", "in-progress（…）", "blocked", "", "   ", "**", "``", "__"]) {
     assert.notEqual(normalizeFlowStepStatus(status), "done", `${status === "" || status.trim() === "" ? "（空）" : status} 不应视为 done`);
   }
+  assert.equal(normalizeFlowStepStatus("**pending**（等待回交）"), "pending", "强调标记不改变 pending 的判定");
+  assert.equal(normalizeFlowStepStatus("**superseded**：并入 `integration-e2e-v2`"), "superseded", "标记须剥离后才能识别 superseded");
 });
 
 test("收尾触发门：状态按首词判定（done（…）/Done/done：xxx 均可派；pending/delivered/空不放行）", () => {
@@ -1647,6 +1668,216 @@ test("收尾触发门：状态按首词判定（done（…）/Done/done：xxx �
     /验收步骤已完成/,
     "验收步骤 done（…）视为已完成，不重复派",
   );
+});
+
+// ————— ⑥-补2 2026-10-19 真机：Markdown 强调状态 + superseded 作废步骤（R2 自动派发被卡） —————
+// 流程单实际写成 `| **done**（证据…） |`；旧解析取首词得到 `**done**`，所有 done 步骤被判未完成，
+// 自动验收派发门永远打不开。另有 `delivery-frontend-v2-evidence` 状态 `**superseded**：…`（并入
+// integration-e2e-v2），旧逻辑把它当执行步骤，同样挡门。
+
+test("收尾触发门：Markdown 强调/代码标记状态（**done**/__done__/`done`）按 done 放行", () => {
+  const ledger = {
+    errors: [],
+    entries: [DISPATCHED_IMPL, { kind: "dispatch.accepted", flowId: "flow-a", stepId: "verify" }],
+  };
+  assert.equal(
+    flowCompletionIssue(
+      "flow-a",
+      flowMarkdown([["impl", "**done**（有落盘/回交证据）"], ["verify", "__done__"], ["acceptance", "pending（不由统筹批）"]]),
+      ledger,
+    ),
+    undefined,
+    "**done**（…）/__done__ ⇒ 可派验收（旧解析会得到 **done**/__done__ 而全判未完成）",
+  );
+  assert.equal(
+    flowCompletionIssue(
+      "flow-a",
+      flowMarkdown([["impl", "`done`"], ["verify", "**Done**：回交报告已读"], ["acceptance", "pending"]]),
+      ledger,
+    ),
+    undefined,
+    "反引号 done / **Done** + 说明同样放行",
+  );
+  assert.match(
+    flowCompletionIssue(
+      "flow-a",
+      flowMarkdown([["impl", "done"], ["verify", "done"], ["acceptance", "**done**（客户已在验收卡选择 accept）"]]),
+      ledger,
+    ) ?? "",
+    /验收步骤已完成/,
+    "验收步骤 **done**（…）视为已完成，不重复派",
+  );
+});
+
+test("收尾触发门：superseded/cancelled 执行步骤不阻塞、不要求证据，但不算 done", () => {
+  const ledger = { errors: [], entries: [DISPATCHED_IMPL] };
+  assert.equal(
+    flowCompletionIssue(
+      "flow-a",
+      flowMarkdown([
+        ["impl", "**done**（有落盘/回交证据）"],
+        ["frontend-evidence", "**superseded**：并入 integration-e2e-v2"],
+        ["acceptance", "pending（不由统筹批）"],
+      ]),
+      ledger,
+    ),
+    undefined,
+    "superseded 步骤没有 dispatch 证据也不阻塞验收派发",
+  );
+  assert.equal(
+    flowCompletionIssue(
+      "flow-a",
+      flowMarkdown([["impl", "done"], ["alt", "cancelled（客户取消）"], ["acceptance", "pending"]]),
+      ledger,
+    ),
+    undefined,
+    "cancelled 步骤同样视为非执行步骤",
+  );
+  // 作废步骤不算 done：pending/dispatched 仍阻塞；错误详情注明跳过。
+  const blocked =
+    flowCompletionIssue(
+      "flow-a",
+      flowMarkdown([
+        ["impl", "**pending**（等待回交）"],
+        ["frontend-evidence", "**superseded**：并入 integration-e2e-v2"],
+        ["acceptance", "pending"],
+      ]),
+      ledger,
+    ) ?? "";
+  assert.match(blocked, /未完成\/阻塞\/待派发步骤（impl=pending\*\*（等待回交））/, "pending（含标记）仍阻塞");
+  assert.match(
+    blocked,
+    /已跳过作废步骤（frontend-evidence=superseded\*\*：并入 integration-e2e-v2）/,
+    "错误详情注明跳过的作废步骤",
+  );
+  assert.match(
+    flowCompletionIssue(
+      "flow-a",
+      flowMarkdown([["impl", "done"], ["verify", "dispatched（已派发，未见回交）"], ["acceptance", "pending"]]),
+      ledger,
+    ) ?? "",
+    /verify=dispatched（已派发，未见回交）/,
+    "dispatched 仍视为未完成（派发 ≠ 完成）",
+  );
+});
+
+// 真实 R2 流程单（/Users/wangzhongren/code/vibeingcode/ans-testbed/library-lending-live/docs/flows/
+// library-lending-v2.md 的步骤表，2026-10-19 缺陷现场原文）：状态全部是 `**done**（…）` 强调写法，
+// 且 `delivery-frontend-v2-evidence` 已 `**superseded**：…`（并入 integration-e2e-v2）。旧解析把
+// `**done**` 原样比较，所有 done 步骤都被判未完成，自动验收派发门永远打不开。
+const LIBRARY_V2_FLOW_ID = "library-lending-v2";
+
+const LIBRARY_V2_STEP_TABLE: ReadonlyArray<readonly [id: string, description: string, executor: string, status: string]> = [
+  ["nomination", "提名：Crew 读提案给出候选角色 → 客户任命", "Crew / 组队（应用派发）＋ 客户", "**done**（客户已任命 backend / frontend / test）"],
+  [
+    "contract-freeze-v2",
+    "契约冻结 `docs/contracts/library-lending-api-v2.md`",
+    "Draft / 提案（治理角色）",
+    "**done**（`contractVersion: 2` · `schemaVersion: 2` · `status: frozen-v2`，含 §1 schema、§2 预约、§3 续借、§4 搜索分页、§5 CSV、§7 错误码 30、§9 迁移/回滚、§11 并发、§12 负例清单）",
+  ],
+  [
+    "delivery-server-v2",
+    "服务端（M2）：模块/迁移/配置/路由/日志/README",
+    "backend",
+    "**done**（回执齐备：6 新增 + 14 修订；迁移 v1→v2 含 `.bak.1.<ts>`；真实启动 18092/18093；预约队列/续借/搜索分页/CSV/并发/负例实测；**既有 155 用例 151 pass / 4 fail，4 项均为 test 侧 v1 版本断言，非行为回归**）",
+  ],
+  [
+    "delivery-frontend-v2",
+    "前端（M3）：预约/续借/搜索分页/导出 UI",
+    "frontend",
+    "**done**（回执：`public/assets/{api,app,styles}` + `index.html` 全在 `public/**`，无根路径文件；四段浏览器实测 17/17、16/17、30/32、17/17，**3 处 FAIL 均为其自身断言写法错误并已打印实际值**；静态门 8/8、6/6；截图在 `/tmp`，不可久留）",
+  ],
+  [
+    "delivery-tests-v2",
+    "测试（M4）：矩阵/负例/并发/回滚演练；既有 155 保持全绿",
+    "test",
+    "**done**（回执 + 我方核对新增文件在盘：**308 tests / 308 pass / fail 0 / exit 0**，新增 153 条；4 处版本断言改为派生 `CURRENT_SCHEMA_VERSION`；TEST-MATRIX 增 §10–§13）",
+  ],
+  [
+    "docs-note-error-code-count",
+    "文档登记：README 记「契约 §7 写 30、逐码核对 29、行为无误」（客户方案 b）",
+    "backend",
+    "**done**（README 4 处 30/22 → 29/21；新增差异登记引用块 + §9 第 13 条二次索引；未改代码/测试/契约）",
+  ],
+  [
+    "delivery-frontend-v2-evidence",
+    "（不派）前端落盘证据补充",
+    "frontend",
+    "**superseded**：并入 `integration-e2e-v2`，由 test 在 `test/tools/` 产落盘脚本 + 持久截图",
+  ],
+  [
+    "integration-e2e-v2",
+    "集成与端到端（M5 证据）：真实启动 + v2 新链路 + 旧行为回归 + 落盘截图",
+    "test",
+    "**done**（回执 + 我方核对产物在盘：live-e2e-v2 **238/238 PASS**、浏览器演示 **88/88 PASS**、全量套件仍 **308/308 exit 0**；证据全部在 `test/**`）",
+  ],
+  ["verification", "验收前验证（M6）：Proof 复核 + 亲自真实启动演示", "Proof / `verifier`（治理角色）", "pending"],
+  ["acceptance", "验收卡：Proof 发起，客户决定", "Proof ＋ 客户", "pending"],
+];
+
+function libraryV2FlowMarkdown(): string {
+  return [
+    "---",
+    `flowId: ${LIBRARY_V2_FLOW_ID}`,
+    "contract: docs/contracts/library-lending-api-v2.md       # frozen-v2（已冻结）",
+    "---",
+    "",
+    "# 流程单：library-lending-v2（变更需求 1：预约 / 续借 / 目录搜索分页 / 借阅 CSV 导出）",
+    "",
+    "| stepId | 步骤 | 执行方 | 状态 |",
+    "| --- | --- | --- | --- |",
+    ...LIBRARY_V2_STEP_TABLE.map(([id, description, executor, status]) => `| ${id} | ${description} | ${executor} | ${status} |`),
+  ].join("\n");
+}
+
+/** 同形账本：治理步骤按客户决定/产物证据，交付步骤按 dispatch.accepted；作废步骤不要求任何证据。 */
+function libraryV2Ledger(omitDispatchStepId?: string): { errors: string[]; entries: FlowCompletionLedgerEntryLike[] } {
+  const dispatchSteps = ["delivery-server-v2", "delivery-frontend-v2", "delivery-tests-v2", "docs-note-error-code-count", "integration-e2e-v2"].filter(
+    (stepId) => stepId !== omitDispatchStepId,
+  );
+  return {
+    errors: [],
+    entries: [
+      ...dispatchSteps.map((stepId) => ({ kind: "dispatch.accepted", flowId: LIBRARY_V2_FLOW_ID, stepId, actorRoleId: "app" })),
+      {
+        kind: "customer.decision",
+        flowId: LIBRARY_V2_FLOW_ID,
+        stepId: "nomination",
+        decisionKind: "appointment",
+        customerDecision: "appointed",
+      },
+      { kind: "artifact.observed", flowId: LIBRARY_V2_FLOW_ID, artifactPath: "docs/contracts/library-lending-api-v2.md" },
+    ],
+  };
+}
+
+test("真实 R2 流程单（**done**（…）+ superseded）：新解析下可派验收，不再把所有 done 判未完成", () => {
+  const markdown = libraryV2FlowMarkdown();
+  const parsed = parseFlowStepStatuses(markdown);
+  assert.equal(parsed.wellFormed, true);
+  assert.deepEqual(
+    parsed.steps.map((step) => step.id),
+    LIBRARY_V2_STEP_TABLE.map(([id]) => id),
+    "四列表头（stepId|步骤|执行方|状态）下仍取 stepId 作 id",
+  );
+  for (const [id, , , status] of LIBRARY_V2_STEP_TABLE) {
+    if (status.startsWith("**done**")) {
+      assert.equal(normalizeFlowStepStatus(status), "done", `${id} 的 **done**（…）应归一化为 done`);
+    }
+  }
+  assert.equal(normalizeFlowStepStatus("**superseded**：并入 `integration-e2e-v2`"), "superseded");
+  assert.equal(
+    flowCompletionIssue(LIBRARY_V2_FLOW_ID, markdown, libraryV2Ledger()),
+    undefined,
+    "执行步骤全部 **done**（…）+ superseded 作废步骤 + verification/acceptance pending ⇒ 可派验收（缺陷现场应放行）",
+  );
+  const withoutFrontendDispatch = flowCompletionIssue(LIBRARY_V2_FLOW_ID, markdown, libraryV2Ledger("delivery-frontend-v2")) ?? "";
+  assert.match(
+    withoutFrontendDispatch,
+    /缺少 dispatch\.accepted 记录（delivery-frontend-v2）/,
+    "只缺真实证据时如实报证据缺口",
+  );
+  assert.doesNotMatch(withoutFrontendDispatch, /流程仍有未完成\/阻塞\/待派发步骤/, "不得再把 **done**（…）判成未完成");
 });
 
 // 真实 R2 流程单（/Users/wangzhongren/code/vibeingcode/ans-testbed/ticket-desk-live/docs/flows/ticket-desk-r2.md

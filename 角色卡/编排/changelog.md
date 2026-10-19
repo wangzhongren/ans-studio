@@ -1,5 +1,79 @@
 # 编排 变更记录
 
+## 2026-10-19 — 决策判断收敛为「意图漂移」判断（不再做架构/质量/证据充分性审查）
+
+**来源**：客户新反馈原话「决策审批也改一下，就是判断意图是否偏离了客户的出发点就行了。」这是对「替我决策」（proposal / appointment / acceptance）判断 agent 的定位修正：只判断决策是否偏离客户已确认的意图；工程质量、架构章节、测试覆盖、证据充分性、实现细节由 Draft/Proof 的工作流与验收负责。
+
+**改了什么**
+
+- **新增** `src/common/编排/governance-judge-intent.ts`：意图基准的确定性解析——从账本 `intent.handed-off`（同 flow）、提案 frontmatter `intentId`、`docs/intents/<flowId>.md` 三级定位意图文件；复用 `parseIntentFrontmatter` 解析 goal/scope/acceptance/非目标/客户原话；账本最后一条 `intent-confirm` 必须 `accepted`（先确认后 revise ⇒ 不放行）；缺失/歧义/未确认分别返回 `intent-missing`/`intent-ambiguous`/`intent-unconfirmed`。
+- **改** `governance-judge-evidence.ts`：证据包版本升 2，decision 组新增 `intent` 段（唯一意图基准）；提案摘要只取目标/范围/验收/非目标/约束/契约章节，**删除架构片段提取**；定点抽查集改为「意图 + 提案/提名」（≤2 条，验收不再要求读流程单）；意图 fail-closed 时不调用模型；approve 前哈希基线包含意图文件。
+- **改** `governance-judge-prompt.ts`：新增【decision 组只判意图漂移】与【不判断：由 Draft/Proof 负责】；删除旧「架构门槛」；逐卡 rubric 改为范围/约束/已接受决定核对；请求提示渲染「客户已确认的意图摘要」；写盘族 rubric 与只读纪律逐字保留。
+- **改** `governance-judge-verdict.ts`：安全 reasonCode 增加 `intent-drift/intent-missing/intent-ambiguous/intent-unconfirmed`；机械门槛零放宽（accept-quick 不代批、任命恰等推荐集、验收完成度、required-read、逐路径复核均保留）。
+- **改** `governance-judge.ts`：诊断增加 `intentId/intentConfirmed`；驱动顺序不变。
+
+**测试**：新增 `test/编排/decision-intent-drift.test.ts`（5 例：缺架构仍 allow、提案超范围/非目标/已接受决定冲突、任命扩张、验收冲突、rubric 排除项）；`test/编排/decision-evidence-packet.test.ts` 更新夹具并新增意图缺失/未确认/歧义 4 场景；`test/编排/governance-judge.test.ts` 全部 decision 夹具补意图与 intent-confirm 账本，旧架构正反例替换为意图正例。`node --test "test/编排/**/*.test.ts"` → **619 计 / 619 过 / 0 红 / 0 skipped**（上一基线 612，+7）；`npm run typecheck` → **exit 0**。
+
+**边界与残余**：只写 `src/common/编排/**`、`test/编排/**` 与本角色文档；未改 `src/model/runtime.ts`/桌面/运行时核心/其他角色，未 git 提交。旧项目无意图文件时 decision 卡一律 `intent-missing` 回落手动（客户新定位的直接结果）；意图偏离仍是模型语义判断，builder 只做缺失/歧义/未确认的确定性兜底。跨角色测试夹具（`test/测试/governance-judge-cards-verify`、`governance-e2e-auto`）需测试属主补意图文件 + intent-confirm/handoff 账本。详见 [变更记录](docs/change/2026-10-19_change_decision-judge-intent-drift.md)。
+
+## 2026-10-19 — shell 判断提示加入读取纪律（定点抽查 / 不重复读 / 预算耗尽如实 manual）
+
+**来源**：真机 Proof 复核连续跑 shell 时，判断 agent 报「读取预算已用尽」回落手动。运行时核心正在把预算做成可配置（`ANS_SHELL_JUDGE_MAX_*`），编排侧提示词需引导判断 agent 节省读取。本批只改提示。
+
+**改了什么**
+
+- `src/common/编排/shell-judge-prompt.ts`：`judge_read_file` 工具描述注明 `offset/limit`（字节）或 `startLine/endLine`（行）范围参数（二选一）。系统提示新增【读取纪律——先判命令，再定点取证】：先 `judge_list_dir` 了解结构、只读与命令必要性直接相关的文件、不做全项目扫描；大文件用范围参数**定点抽查**、不整文件反复读；**不读 `data/**`、`*.log` 日志、构建产物、会话/审计目录**（除非命令本身直接操作且必须核对）；**同一文件不重复读取**；本地服务 curl/测试脚本优先看命令、cwd、argv 与角色任务上下文，不通读源码；**读取预算耗尽如实交回 manual、不猜测、不得据此 allow**。
+- 既有 rubric、deny 档规则、不可信数据警告、输出契约、读取损伤降级与工具面逐字未动。
+
+**测试**：新增 `test/编排/shell-judge-read-discipline.test.ts` 6 例（提示词关键字与稳定性、既有工具面/契约仍在）；既有断言零放宽。`node --test "test/编排/**/*.test.ts"` → **599 计 / 599 过 / 0 红 / 0 skipped**（上一基线 593，+6 即本批新增）；`npm run typecheck` → **exit 0**（仅 npm 镜像配置既有 warning）。
+
+**边界与残余**：只写 `src/common/编排/shell-judge-prompt.ts`、`test/编排/` 与本角色文档；未碰运行时核心/适配器/桌面/其他角色。提示只引导不强制，真正兜底仍是运行时核心读取预算与「读取损伤 → allow 降 manual」；提示不写预算具体数值，避免与可配置默认值漂移。详见 [变更记录](docs/change/2026-10-19_change_shell-judge-read-discipline.md)。
+
+## 2026-10-19 — 流程步骤状态：Markdown 强调符归一化 + superseded/cancelled 作废语义（真机 R2）
+
+**来源**：真机 R2 流程单 `/Users/wangzhongren/code/vibeingcode/ans-testbed/library-lending-live/docs/flows/library-lending-v2.md`（2026-10-19 快照）：状态列写成 `**done**（证据…）`，另有一个 `**superseded**：并入 integration-e2e-v2` 的不派步骤。判断侧与桌面窗口角色 `app/desktop/governance-advance.ts#normalizeFlowStepStatus` 同源缺陷。本批只改编排边界。
+
+**改了什么**
+
+- `src/common/编排/governance-judge-facts.ts#normalizeFlowStepStatus`：先剥首部 `*`/`_`/反引号/空白，取引导 token 后再剥 token 尾部强调符。`**done**（…）`/`__done__`/`` `done` ``/`**Done**：xxx` 均归一化为 `done`；`**superseded**：…` ⇒ `superseded`；空/纯强调符 ⇒ `""`。`parseFlowSteps` 输出的原始 `status` 不变（错误详情仍展示原文）。
+- `evaluateAcceptanceCompletion`：新增 `VOID_FLOW_STEP_STATUSES = {superseded, cancelled}`；作废步骤不参与未完成判定与 `dispatch.accepted` 对账，其他未知状态（`completed`/`已完成` 等）仍 fail-closed。其余门槛（步骤表可解析、账本可读、无未结算决定/未闭环澄清）逐字不变。
+- 测试 `test/编排/governance-judge.test.ts` +4（既有断言零放宽）：强调式 done 变体与归一化；`**dispatched**` 仍失败；`superseded`/`cancelled` 无 dispatch 不挡验收且不掩盖 `pending`；真实 R2 流程单只读拷贝（四列 `stepId|步骤|执行方|状态`）解析后 7 个 `**done**` 行不再判未完成、失败详情只点名 `verification`/`acceptance`，补齐后 `{ ok: true }`。
+
+**验证**：定向 `governance-judge.test.ts` **56/56**；`node --test "test/编排/**/*.test.ts"` → **593 计 / 593 过 / 0 红 / 0 skipped**（上一基线 589，+4 即本次新增）；`npm run typecheck` → **exit 0**（仅 npm 镜像配置既有 warning）。工作树含其他角色未提交改动，本批零新增红。
+
+**跨角色（未越界）**：桌面窗口角色 `app/desktop/governance-advance.ts#normalizeFlowStepStatus` 与 `flowCompletionIssue` 需属主同批对齐（剥强调符 + `superseded`/`cancelled` 作废），否则「桌面仍挡、编排放行」口径漂移；两侧注释互指、规则成对契约。详见 [变更记录](docs/change/2026-10-19_change_flow-status-markdown-superseded.md)。
+
+## 2026-10-19 — 决策证据包：请求方陈述 + 系统结构化证据包 + 定点抽查（客户新反馈）
+
+**来源**：客户原话「决策agent 应该是别人给摘要，他再去判断吧，不是说要所有文件给他。」真机：判断 agent 被要求自己读取提案/提名/流程/6 个角色文件等全部物证；大文件撞 64KiB 单文件/192KiB 总量/8 次读取预算，6 文件写卡 preview 6.9KB 覆盖不了实际 11.5KB 内容，频繁 `read-truncated` / `insufficient-evidence` 回落手动。本批只改编排边界。
+
+**改了什么**
+
+- **新增** `src/common/编排/governance-judge-evidence.ts`：`buildDecisionEvidencePacket`（**确定性函数**）从实际盘面生成有界 `DecisionEvidencePacket`——决策/来源、请求方陈述（untrusted）、写盘卡逐路径待写正文（显式 `paths` + preview 标题/围栏锚点；新文件完整正文、改文件旧 sha256 + 行级变更摘要）、物证路径 + sha256 + 关键片段（架构/验收标准/候选角色/流程步骤/角色卡写区/契约章节）、机械事实（路径探测/目标文件哈希/账本记录/角色枚举）、冲突与完整性；`verifyEvidenceHashes` 在 approve 前复核判断期间漂移；证据采集不跟随符号链接、不读敏感路径（realpath 包含性 + O_NOFOLLOW + 敏感类别排除）。
+- **改** `confirmed-writes.ts`：抽出 `declaredPathBodies`（与呈现前完整性闸共用同一份锚点/正文判定；闸本身行为逐字不变）。
+- **改** `governance-judge.ts`：删除全量物证 required-read（`requiredReadPathsFor`/`verifyConfirmPreview`）；调用模型前先构建证据包，缺失/不可读/探测失败/冲突/正文不完整 ⇒ 直接 manual **不调用模型**；required-read 收窄为 0–2 条定点抽查；approve 前哈希复核（`evidence-hash-mismatch`）。
+- **改** `governance-judge-prompt.ts`：系统提示改为「基于证据包判断 + judge_read_file 仅定点抽查」；请求提示渲染 packet，卡片明确标注请求方陈述。
+- **改** `governance-judge-verdict.ts`：第 5 步改用 driver 传入的最小抽查集（未传时旧口径兼容）；导出 `isHardForbiddenPath` 与证据包共用硬禁写前缀。
+- `run-role.ts`/`govern-session.ts`/桌面/运行时核心**无需改动**：`judgeContext` 形状不变，证据包由 driver 从 request + 盘面生成。
+
+**验证**：`node --test "test/编排/**/*.test.ts"` → **589 计 / 589 过 / 0 红 / 0 skipped**（新增 `decision-evidence-packet.test.ts` 14 例；既有 judge 夹具按新契约补真实物证/逐路径正文/账本事实，断言未放宽）；`npm run typecheck` → **exit 0**。
+
+**跨角色请求**（未越界）：`test/测试/governance-judge-cards-verify` 5 例夹具需属主更新（提名推荐集与 request 不一致、写盘 preview 无逐路径正文、acceptance 缺账本事实）；`test/测试/governance-e2e-auto` 同类旧式夹具预计需同批补正文/账本。详见 [变更记录](docs/change/2026-10-19_change_decision-evidence-packet.md)。
+
+## 2026-10-19 — 标准工作流与 Proof 自动派发提示（独立核准是标准流程）
+
+**来源**：客户 2026-10-19 反馈（原话「这个独立核准应该是标准流程，而不是我在发给他。」「内置角色应该有自己的工作流。」）。本批只改编排边界。
+
+**改了什么**
+
+- `src/pipeline/orchestration/govern-session.ts`：新增 `STANDARD_WORKFLOW_PROMPT`——阶段流转由应用负责、内置角色按标准工作流执行、客户不做内部调度；Proof 标准复核流程为「读证据 → 审批档 shell 跑测试 → 真实启动演示 → 质量/架构核对 → 验收卡」；流程齐备后应用自动派发 Proof / 验收、不需要客户手动触发，且自动派发不是验收决定。single/su 与 trio 两类治理提示均追加；`verification` 角色纪律同步加「独立核准是标准流程」。与门禁引擎角色卡「标准工作流」章节成对同步（注释互指；分层禁止导入私有 common，本层复制并注明单一来源）。
+- `src/common/编排/governance-ledger.ts`：核查确认现有 `dispatch.accepted` 已含 `targetRoleId`/`stepId`/`trigger`，可直接记录 `targetRoleId:"verifier", stepId:"verification"` 用于自动派发去重——**不新增 kind/字段**；仅补字段注释（去重键 flowId+stepId；`settle` 也用于自动派发）。未改桌面触发逻辑。
+- 测试：`governance-session.test.ts` +1（trio 五角色与 single/su 均含标准工作流/自动派发/Proof 复核顺序关键字）；`governance-ledger.test.ts` +1（自动派发条目记录/读回、旧条目缺 trigger 兼容、去重谓词）；既有断言零放宽。
+
+**验证**：基线 `test/编排` 585/585 → 改动后 **587 计 / 587 过 / 0 红 / 0 skipped**；定向两文件 32/32；`npm run typecheck` **exit 0**（仅 npm 镜像配置告警）。工作树含其他角色未提交改动，本批零新增红。
+
+**跨角色**：门禁引擎需在五张内置角色卡同批加入「标准工作流」章节并与本块逐字对齐（注释互指）；桌面自动派发若补账本记录/去重，字段已就绪（`dispatch.accepted{targetRoleId:"verifier", stepId:"verification", trigger:"settle"}`）；桌面 su 聊天不经本提示，依赖角色卡覆盖。详见 [变更记录](docs/change/2026-10-19_change_standard-workflows-prompt.md)。
+
 ## 2026-10-19 — 提案架构门槛与治理提示架构要求（Draft/Steward/Proof）
 
 **来源**：客户 2026-10-19 新批评（原话「这个感觉也没有啥架构的啊，提案角色应该也要考虑到扩展性，给出一个架构方案啊。」）。真机 R1/R3 提案均无模块分解、依赖方向、扩展点、数据/契约版本与迁移策略。门禁引擎把「架构与可扩展性」加入工程质量基线；编排侧让提案判断 agent 与治理会话提示强制要求架构章节。本批只改编排边界。
@@ -1049,3 +1123,18 @@
 **测试**：新增 `governance-ledger.test.ts`（6）、`governance-gate.test.ts`（13）、`governance-session.test.ts`（18）、`governance-record-ledger.test.ts`（1）共 38 例离线全绿；`test/编排/**` 434 计 433 过 1 红（既有 Windows symlink EPERM，与本批零交集）。全量三层 glob `node --test "test/**/*.test.ts"` **2580 计 2526 过 51 红 / 3 skipped**；其中他域红 50 条（W1 基线 46 条 + W2 有意变更的 4 条源码钉/旧能力字面断言，归测试/桌面/装配属主更新），本角色新增用例零红。typecheck 全仓 0 错。
 
 **已知取舍（如实登记）**：① 派发去重按 `flowId+stepId` 硬拒；「流程单已出新版本」的放行需带版本键（V2，本版 fail-closed）；② 账本 `artifact.observed` 仅 trio 内置角色（su/single 不写，保持旧项目零新副作用）；③ 内容漂移仍不在本机制范围（O-A1 未采纳，沿 A-3 登记）。
+
+## 2026-10-19 — shell 判断改为「系统风险审查」并注入实际读取预算
+
+**来源**：客户原话「判断应该告诉他预算限制。还有就是判断主要是对于系统其他的有没有风险，卡死风险，电脑其他的风险，项目内，不是随他吗，他不关心业务。」本批只改编排私有 common（`src/common/编排/shell-judge{,-prompt,-verdict}.ts`）、`test/编排/**` 与本角色文档；**未碰** `app/**`、运行时核心、适配器、门禁引擎与 git 历史。
+
+**改了什么**
+- **rubric 重写为系统风险审查**（`shell-judge-prompt.ts`）：五类风险——系统/机器（破坏性删除/覆盖、权限/系统配置、sudo/提权、装包、杀他人进程、资源耗尽）、卡死（驻留服务、阻塞/交互式、`tail -f`、无超时 sleep/脚本、无限循环、等 stdin）、越界（写项目外、路径穿越、读密钥/凭据、外发敏感数据）、并发/数据完整性（并行写同一文件）、端口/资源冲突。新增【不判断（明确排除）】：业务正确性、命令是否「必要」、测试是否合理、是否理解业务均不判断，项目内非破坏性读写/测试/本地 curl/带超时脚本由发起角色决定，不得因「看不懂业务」拦截。fail-closed 保留：有风险 deny、缺关键证据 manual、无风险 allow。deny 档特殊规则改为「风险已核对可控」口径。
+- **预算明确告知**：`buildShellJudgePrompt(input, budget?)` 新增「本次读取预算（运行时解析值）」块；`createShellJudge` 每次判断调用运行时核心既有导出 `resolveShellJudgeBudget(opts.budget)` 解析一次（显式注入 > env > 缺省），同一份值注入 `ShellJudgeToolOptions.budget` 与请求提示，避免提示与实际限制分叉。`CreateShellJudgeOptions` 增可选 `budget`；新增 `formatShellJudgeBudgetBytes`（整 KiB / 精确字节）。提示要求预算耗尽时 manual 并写明缺哪项具体证据。
+- **文案去「业务不必要」**：`reasonCode:"necessary"` 保留兼容，语义改为「风险审查通过（无系统风险）」；deny 兜底 / 防循环 / 默认客户说明均改为系统风险口径（不再出现「不必要」）。工具面、规则层 (c)、verdict 结构与读取损伤降级逐字未动。
+
+**测试**：新增 `test/编排/shell-judge-risk-scope.test.ts` 13 例（rubric 五类风险；排除业务必要性；预算来自注入与 env 解析且同时进入提示/工具；无风险 allow / 有风险 deny / 缺证据 manual；客户文案无「不必要」）。更新 `shell-judge-read-discipline.test.ts` 一处语义断言（「是否必要」→「是否存在系统风险」），覆盖强度不降。`test/编排/**` **612 计 612 过 0 红 0 skipped**（基线 599，+13）；`npm run typecheck` **exit 0**。
+
+**跨角色请求**：① 运行时核心将 `resolveShellJudgeBudget`/`ShellJudgeBudget` 登记为跨角色只读契约或收敛到 `common/shared/`（本批只读使用既有导出，未改 runtime-core；policy.ts 头注释仍写「不跨角色导出」）；② `src/provider/runtime/schema.ts` 的 `report_shell_judgement` 工具说明仍是「allow = necessary / deny = not necessary」旧口径，需属主同步为系统风险口径，避免与编排系统提示冲突。
+
+**边界与残余**：提示只能引导，硬约束仍是运行时核心只读工具/预算与编排读取损伤降级；项目内命令若实际触及五类风险仍会 deny/manual（风险审查本职）。未 git 提交；未读 `.env`、未跑真实模型。详见[变更记录](docs/change/2026-10-19_change_shell-judge-risk-scope.md)。

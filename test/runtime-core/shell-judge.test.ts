@@ -160,11 +160,11 @@ test("敏感文件/目录拒绝：.env、私钥、凭据/令牌、.git、审计�
   }
 });
 
-test("二进制拒绝、64KB 截断标记、8 次调用与 192KB 总预算", async () => {
+test("二进制拒绝、128KB 截断标记、12 次调用与 512KB 总预算", async () => {
   const root = await temp();
   try {
     await writeFile(path.join(root, "image.bin"), Buffer.from([0x61, 0x00, 0x62, 0x63]));
-    await writeFile(path.join(root, "big.txt"), "a".repeat(70 * 1024), "utf8");
+    await writeFile(path.join(root, "big.txt"), "a".repeat(130 * 1024), "utf8");
     await writeFile(path.join(root, "small.txt"), "hello", "utf8");
 
     const binary = fixture(root);
@@ -177,35 +177,35 @@ test("二进制拒绝、64KB 截断标记、8 次调用与 192KB 总预算", asy
     assert.equal(bigResult.ok, true);
     assert.match(bigResult.message, /\[已截断/);
     assert.equal(big.stats.truncatedReads, 1);
-    assert.equal(big.stats.readBytes, 64 * 1024);
+    assert.equal(big.stats.readBytes, 128 * 1024);
 
     const calls = fixture(root);
-    for (let index = 0; index < 8; index++) {
+    for (let index = 0; index < 12; index++) {
       const result = await calls.byName.get(SHELL_JUDGE_READ_TOOL)!.handler(call(SHELL_JUDGE_READ_TOOL, { path: "small.txt" }));
       assert.equal(result.ok, true, `第 ${index + 1} 次读取应仍可用`);
     }
-    const ninth = await calls.byName.get(SHELL_JUDGE_READ_TOOL)!.handler(call(SHELL_JUDGE_READ_TOOL, { path: "small.txt" }));
-    assert.equal(ninth.ok, false);
-    assert.match(ninth.message, /预算/);
+    const thirteenth = await calls.byName.get(SHELL_JUDGE_READ_TOOL)!.handler(call(SHELL_JUDGE_READ_TOOL, { path: "small.txt" }));
+    assert.equal(thirteenth.ok, false);
+    assert.match(thirteenth.message, /预算/);
     assert.equal(calls.stats.budgetExceeded, true);
-    assert.equal(calls.stats.readCalls, 9);
+    assert.equal(calls.stats.readCalls, 13);
 
-    // 总读取 192KB：3×60KB=180KB，第 4 次只余 12KB → 截断；第 5 次预算拒绝。
-    for (let index = 0; index < 4; index++) await writeFile(path.join(root, `chunk-${index}.txt`), "b".repeat(60 * 1024), "utf8");
+    // 总读取 512KB：4×120KB=480KB，第 5 次只余 32KB → 截断；第 6 次预算拒绝。
+    for (let index = 0; index < 5; index++) await writeFile(path.join(root, `chunk-${index}.txt`), "b".repeat(120 * 1024), "utf8");
     const total = fixture(root);
-    for (let index = 0; index < 3; index++) {
+    for (let index = 0; index < 4; index++) {
       const result = await total.byName.get(SHELL_JUDGE_READ_TOOL)!.handler(call(SHELL_JUDGE_READ_TOOL, { path: `chunk-${index}.txt` }));
       assert.equal(result.ok, true);
       assert.equal(result.message.includes("[已截断"), false);
     }
-    const fourth = await total.byName.get(SHELL_JUDGE_READ_TOOL)!.handler(call(SHELL_JUDGE_READ_TOOL, { path: "chunk-3.txt" }));
-    assert.equal(fourth.ok, true);
-    assert.match(fourth.message, /\[已截断/);
-    assert.equal(total.stats.readBytes, 192 * 1024);
+    const fifth = await total.byName.get(SHELL_JUDGE_READ_TOOL)!.handler(call(SHELL_JUDGE_READ_TOOL, { path: "chunk-4.txt" }));
+    assert.equal(fifth.ok, true);
+    assert.match(fifth.message, /\[已截断/);
+    assert.equal(total.stats.readBytes, 512 * 1024);
     assert.equal(total.stats.budgetExceeded, true);
-    const fifth = await total.byName.get(SHELL_JUDGE_READ_TOOL)!.handler(call(SHELL_JUDGE_READ_TOOL, { path: "chunk-3.txt" }));
-    assert.equal(fifth.ok, false);
-    assert.match(fifth.message, /预算/);
+    const sixth = await total.byName.get(SHELL_JUDGE_READ_TOOL)!.handler(call(SHELL_JUDGE_READ_TOOL, { path: "chunk-4.txt" }));
+    assert.equal(sixth.ok, false);
+    assert.match(sixth.message, /预算/);
 
     // 预算参数可注入（测试/宿主）：单文件上限收紧后立即截断。
     const custom = buildShellJudgeTools({ projectRoot: root, report: () => {}, stats: freshStats(), budget: { maxFileBytes: 2, maxCalls: 1, maxBytes: 100 } });
@@ -217,22 +217,22 @@ test("二进制拒绝、64KB 截断标记、8 次调用与 192KB 总预算", asy
   }
 });
 
-test("第 9 次读取返回独立 budget 码且不计入 deniedReads；敏感/越界仍 read-denied、截断仍 read-truncated", async () => {
+test("第 13 次读取返回独立 budget 码且不计入 deniedReads；敏感/越界仍 read-denied、截断仍 read-truncated", async () => {
   const root = await temp();
   try {
     await writeFile(path.join(root, "small.txt"), "hello", "utf8");
-    await writeFile(path.join(root, "big.txt"), "a".repeat(70 * 1024), "utf8");
+    await writeFile(path.join(root, "big.txt"), "a".repeat(130 * 1024), "utf8");
 
     const stats = freshStats();
-    for (let index = 0; index < 8; index++) {
+    for (let index = 0; index < 12; index++) {
       const result = await resolveJudgeRead({ projectRoot: root, path: "small.txt", stats });
       assert.equal(result.ok, true, `第 ${index + 1} 次读取应仍可用`);
     }
-    const ninth = await resolveJudgeRead({ projectRoot: root, path: "small.txt", stats });
-    assert.equal(ninth.ok, false);
-    if (!ninth.ok) { assert.equal(ninth.code, "budget"); assert.equal(ninth.pathClass, "budget"); }
+    const thirteenth = await resolveJudgeRead({ projectRoot: root, path: "small.txt", stats });
+    assert.equal(thirteenth.ok, false);
+    if (!thirteenth.ok) { assert.equal(thirteenth.code, "budget"); assert.equal(thirteenth.pathClass, "budget"); }
     assert.equal(stats.budgetExceeded, true);
-    assert.equal(stats.readCalls, 9);
+    assert.equal(stats.readCalls, 13);
     assert.equal(stats.deniedReads, 0, "预算耗尽是独立原因码，不得计入 deniedReads/read-denied");
 
     const sensitive = freshStats();

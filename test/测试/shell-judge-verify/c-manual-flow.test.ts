@@ -138,6 +138,9 @@ test("allow + 读取预算耗尽：真实驱动降级 manual/budget", async () =
     const { judge } = makeJudge({
       project: project.project,
       runtime: "pi",
+      // 2026-10-19 运行时核心默认预算放宽为 12 次 / 128KiB / 512KiB；本用例验证「预算耗尽 ⇒
+      // manual/budget」的语义，显式注入小预算（8 次）保持原判定面，不依赖进程级 env。
+      budget: { maxCalls: 8 },
       script: {
         beforeReport: async (tools) => {
           const read = tools.get(SHELL_JUDGE_READ_TOOL)!;
@@ -169,6 +172,9 @@ test("allow + 读取截断：真实驱动降级 manual/read-truncated", async ()
     const { judge } = makeJudge({
       project: project.project,
       runtime: "codex",
+      // 单文件上限显式注入 64KiB（旧缺省值）：70KiB 文件仍必然截断，验证「截断 ⇒
+      // manual/read-truncated」语义（不依赖新默认 128KiB）。
+      budget: { maxFileBytes: 64 * 1024 },
       script: {
         beforeReport: async (tools) => {
           const read = tools.get(SHELL_JUDGE_READ_TOOL)!;

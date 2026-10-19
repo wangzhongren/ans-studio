@@ -290,3 +290,27 @@
 - **回包三路径收起**：`respondShellConfirm` 的受理、`expired:true`、通道失败都收起卡片；过期/失败用 `setHint` 如实说明「未获放行」。删除 `markShellConfirmExpired` 与 shell 卡的 `is-expired` 终态（恢复卡保留自己的失效态）。
 - **文案同步（2026-10-18 收尾）**：`ui-labels.shellJudgeNoticeText` 与桌面通道 `manualJudgeNotice` 对齐——一般 manual 增「规则判定仅作参考；判断 agent 未完成时才由你手批。」，`row-failed` 改为「…；规则判定仅作参考，本卡已转你手动确认。」；`tool-rows.test.ts` 相关逐字断言同步。`test/测试/shell-judge-verify/c-manual-flow.test.ts` 的 retry-capped 旧期望仍待测试角色更新（本角色不改他域测试）。
 - **测试**：`renderer.test.ts` +1 源码守卫（settled 清理、role/runtime/project 校验、失效回执收起、三路径收起、迟到回包不重建）；`ANS_TERMINAL_UI_ONLY=1` 新增 7 项 DOM 断言（等待中的卡保持、其它角色 settled 不影响、settled 收起、新卡恢复可操作、旧 id 失效不误收、失效回执收起并提示原因、重复失效不重建）→ **TERMINAL_PASS 22**；`ANS_JUDGE_UI_ONLY=1` **JUDGE_UI_PASS 33** 不回归。全量三层 glob **2972 计 / 2953 过 / 16 红 / 3 skip**（本域仅 4 条既有 CRLF 基线，无新增红）。`test/桌面应用/e2e/main.mjs`（桌面窗口自检台）仍断言 Esc 后保留 `is-expired` 可见卡，需其属主按新 UX 更新（本角色不改其文件）。
+
+## 2026-10-19：shell 审批卡标题按实际角色显示（客户截图反馈）
+
+客户真机截图：Proof / 验收 发起的 shell 审批卡标题仍显示「SU 命令审批」。五个内置治理角色现统一走审批档（内部 policy 仍叫 `su-approval`），但 UI 不应再显示 SU，应按实际角色显示（客户示例「命令审批 · Proof / 验收」）；单模型 su 仍可显示「SU 命令审批」。
+
+- **ui-labels.js**：`shellConfirmTitle(policy, roleId)`——内置治理角色（liaison/rapporteur/nominator/convener/verifier）⇒「命令审批 · <显示名>」；否则 `su-approval` ⇒「SU 命令审批」（逐字保留）；其余（project/旧请求）⇒「shell 命令请求」（既有兜底逐字保留）。新增 `GOVERNANCE_ROLE_FUNCTION_BY_ID` + `governanceRoleDisplayNameById`：显示名由既有 `GOVERNANCE_ROLE_TEXT` 的 en/cn 派生（英文 / 中文，与注册表 `displayName` 同序）；非内置治理 id/坏值 ⇒ 空串，不编名字。roleId 优先于 policy（统一审批档不再显示 SU）。
+- **renderer.js**：`renderShellConfirm` 仅在标题调用处传入 `confirmRoleId`（`payload.roleId` 非空优先，回退 `cur.roleId`）；卡片行为、按钮、默认焦点、放行判据、警告、HTML/CSS 零改动。
+- **影响面**：仅标题文案。su（roleId=`su` 或无 roleId 的旧请求）与项目角色卡逐字不变；左树显示名（中文 英文）未动，本卡按客户示例用注册表同序（英文 / 中文）。
+- **测试**：`renderer.test.ts` 新增 8 条标题映射断言（verifier→Proof / 验收、五角色、su、project 兜底、未知/坏值、roleId 优先）并更新接线守卫 → **104/104**；`node --test "test/桌面应用/*.test.ts"` **605 计 / 604 过 / 1 红**（唯一红＝`runtime-ui.test.ts:69` localStorage 源码守卫，HEAD 即红、与本批无关）；`npx tsc --noEmit` 本侧零错误（全仓现存报错在他角色在飞的 `shell-judge/policy.ts`）。
+- **跨域待同步**：`test/测试/su-shell-approval-verify/d-card-data.test.ts:107` 的源码子串守卫 `UiLabels.shellConfirmTitle(payload.policy)` 会因第二实参失配，需测试角色更新（本角色不改他域测试）；e2e su 卡夹具不带 roleId，仍为「SU 命令审批」，无需改。
+- Doc: [docs/change/2026-10-19_change_shell-confirm-role-title.md](docs/change/2026-10-19_change_shell-confirm-role-title.md)
+
+## 2026-10-19：深色石墨主题（客户「色调不够沉稳」→ 选择深色石墨）
+
+客户看过 ANS Studio 主界面后反馈「整体页面风格这种色调不够沉稳」，选择**深色石墨**方向；本批只换视觉，布局/尺寸/文案/交互/无障碍语义零改动。
+
+- **色板**：`--bg #14171A`、`--bg-side #1A1E22`、`--bg-drawer #171B1F`、`--bg-soft #1E2328`、`--bg-hover #252A30`、`--bg-selected #2A3037`；`--border #2C3238`、`--border-strong #3A4148`、`--border-control #6B757E`（控件边界 ≥3:1）；`--text #E7E9EB`、`--text-2 #A7ADB5`、`--text-3 #949BA4`；主强调/焦点/成功 `#6FA08B`、danger `#C97A6D`、amber `#C4A15F`，并补 `--danger-bg/--danger-border/--amber-bg/--amber-border/--success-hover` 等深色语义底；`color-scheme: dark`。
+- **对比度（纯函数实测）**：正文/主底 **14.78:1**、次级 7.96:1、三级在次级表面 5.64:1、danger 5.56/4.75:1、success 6.06/4.64:1、amber 7.38/6.59:1、焦点环 5.34:1、控件边框 3.37:1；主按钮改用深色文字（6.06:1），避免白字在 `#6FA08B` 上仅 2.97:1。
+- **审计**：`styles.css` 148 处颜色字面量逐条替换——旧浅色表面/深绿文字/浅语义底/浅边框清零，组件层改走令牌（不只改 `:root`）；滚动条、选中文本、hover/active/focus、浮层阴影全部深色适配。`index.html` 与全部渲染 JS **零颜色字面量**（图标均 `currentColor`，无需改）。
+- **测试**：`renderer.test.ts` A1/A2 输入区与 token/对比度断言改深色口径（阈值不放宽：正文 ≥7、次级 ≥5、三级 ≥4.5、控件/focus ≥3），新增「深色石墨主题」用例（color-scheme、首层令牌、滚动条/选中文本、旧浅色清零）→ **105/105**；`tool-rows` 52/52、`markdown` 5/5；`runtime-ui` 12 计/11 过/1 红（`localStorage` 源码守卫，HEAD 即红，与本次无关）；`npx tsc --noEmit` **0 错**。
+- **真实 Electron 夹具**：`ANS_VISUAL_V2_UI_ONLY=1 uiux-v2.mjs` → **VISUAL_V2_PASS 54**（改前基线 50；新增 4 条真实渲染树「无可见亮底元素」扫描，1360/960 主视图 + 抽屉，按计算样式相对亮度判定）；`.report-top` 计算背景断言 244,248,242 → 34,48,43。全量交互套件前 100 项通过，最后一项 `expired old shell shown disabled in its own runtime` 失败——**A/B 证**换回 HEAD `styles.css` 同点同败（他角色在飞/夹具既有红，非本批引入，未改断言）。
+- **证据**：`docs/change/2026-10-19-dark-graphite-evidence/`（改前/改后 1360·960·抽屉·折叠截图 + report.json；改前 = HEAD 浅色主题，同一夹具同一状态）；原始运行目录 `/private/tmp/ans-dark-theme-before|after`（已删 user-data）。
+- Doc: [docs/change/2026-10-19_change_dark-graphite-theme.md](docs/change/2026-10-19_change_dark-graphite-theme.md)
+- 指纹：本轮工作树未提交，以 `git diff` 为准（`app/renderer/styles.css`、`test/桌面应用/renderer.test.ts`、`test/桌面应用/e2e/uiux-v2.mjs`、本文件与 `docs/change/2026-10-19_change_dark-graphite-theme.md` + 证据目录）。

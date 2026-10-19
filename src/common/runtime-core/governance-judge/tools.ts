@@ -19,6 +19,7 @@ import type { GovernanceJudgeToolOptions, ToolDefinition, ToolResult } from "../
 import { describeTool } from "../../../provider/runtime/schema.ts";
 import { resolveJudgeList, resolveJudgeRead } from "../shell-judge/policy.ts";
 import {
+  judgeReadSuccess,
   judgeToolAborted,
   judgeToolFailure,
   SHELL_JUDGE_LIST_TOOL,
@@ -67,12 +68,21 @@ export function buildGovernanceJudgeTools(options: GovernanceJudgeToolOptions): 
   const read: ToolDefinition = definition(SHELL_JUDGE_READ_TOOL, async (call) => {
     if (call.signal?.aborted) return judgeToolAborted(SHELL_JUDGE_READ_TOOL);
     const input = stringArg(call.args?.path);
-    const result = await resolveJudgeRead({ projectRoot: options.projectRoot, path: input ?? "", stats: options.stats, budget: options.budget });
+    const result = await resolveJudgeRead({
+      projectRoot: options.projectRoot,
+      path: input ?? "",
+      stats: options.stats,
+      budget: options.budget,
+      // 范围参数原始值交给策略层硬校验（与 shell judge 共用同一实现）。
+      range: {
+        offset: call.args?.offset,
+        limit: call.args?.limit,
+        startLine: call.args?.startLine,
+        endLine: call.args?.endLine,
+      },
+    });
     if (!result.ok) return judgeToolFailure(SHELL_JUDGE_READ_TOOL, result.code, result.pathClass);
-    return {
-      ok: true,
-      message: `${SHELL_JUDGE_READ_TOOL}: ${result.rel}\n\n${result.text}${result.truncated ? "\n\n[已截断：文件超过单文件/总读取预算]" : ""}`,
-    };
+    return judgeReadSuccess(result);
   });
 
   const list: ToolDefinition = definition(SHELL_JUDGE_LIST_TOOL, async (call) => {

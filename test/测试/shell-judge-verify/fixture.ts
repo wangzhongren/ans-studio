@@ -207,6 +207,11 @@ export interface MakeJudgeOptions {
   timeoutMs?: number;
   maxDenyPerCommand?: number;
   logger?: ReturnType<typeof recordingLogger>;
+  /**
+   * 判断读取预算（显式注入；2026-10-19 运行时核心默认放宽为 12 次 / 128KiB / 512KiB）。
+   * 旧用例需要「小预算 / 小单文件上限」时显式注入，避免依赖进程级 env 或旧缺省值。
+   */
+  budget?: { maxCalls?: number; maxBytes?: number; maxFileBytes?: number; maxScanBytes?: number };
 }
 
 export interface MadeJudge {
@@ -223,6 +228,7 @@ export function makeJudge(options: MakeJudgeOptions): MadeJudge {
     createAdapter: fake.factory,
     ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
     ...(options.maxDenyPerCommand !== undefined ? { maxDenyPerCommand: options.maxDenyPerCommand } : {}),
+    ...(options.budget !== undefined ? { budget: options.budget } : {}),
     ...(options.logger !== undefined ? { logger: options.logger } : {}),
   });
   return { judge, fake };

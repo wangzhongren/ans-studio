@@ -159,3 +159,48 @@ test("非法条目形状：拒写、零副作用（不建 .ans）", async () => 
     assert.equal(existsSync(join(root, ".ans")), false);
   });
 });
+
+test("自动派发去重兼容：dispatch.accepted(targetRoleId=verifier, stepId=verification) 可记录/读回；旧条目缺 trigger 仍合法", async () => {
+  await withRoot(async (root) => {
+    // 2026-10-19：应用在流程齐备后自动派发 Proof / 验收——账本记录形状（不新增 kind/字段）。
+    const autoDispatch: GovernanceLedgerEntry = {
+      at: "2026-10-19T00:00:02.000Z",
+      kind: "dispatch.accepted",
+      actorRoleId: "app",
+      power: "app",
+      trigger: "settle",
+      flowId: "flow-a",
+      stepId: "verification",
+      targetRoleId: "verifier",
+      messageSummary: "流程齐备，自动派发 Proof / 验收",
+    };
+    // 旧条目（2026-10-18 前）：无 trigger、actorRoleId=convener——读回必须原样保留、不得报错。
+    const legacyDispatch: GovernanceLedgerEntry = {
+      at: "2026-10-18T00:00:01.000Z",
+      kind: "dispatch.accepted",
+      actorRoleId: "convener",
+      power: "schedule",
+      flowId: "flow-a",
+      stepId: "impl",
+      targetRoleId: "A",
+    };
+    assert.deepEqual(await appendGovernanceLedger(root, legacyDispatch), { ok: true });
+    assert.deepEqual(await appendGovernanceLedger(root, autoDispatch), { ok: true });
+
+    const read = await readGovernanceLedger(root);
+    assert.deepEqual(read.errors, [], "新旧条目都必须可读（向后兼容）");
+    assert.deepEqual(read.entries[0], legacyDispatch);
+    assert.deepEqual(read.entries[1], autoDispatch);
+
+    // 与桌面自动派发同一去重谓词：同一 flowId+stepId 已有 dispatch.accepted ⇒ 不重复派发。
+    const alreadyDispatched = (
+      entries: readonly GovernanceLedgerEntry[],
+      flowId: string,
+      stepId: string,
+    ): boolean =>
+      entries.some((e) => e.kind === "dispatch.accepted" && e.flowId === flowId && e.stepId === stepId);
+    assert.equal(alreadyDispatched(read.entries, "flow-a", "verification"), true, "自动派发记录可用于去重");
+    assert.equal(alreadyDispatched(read.entries, "flow-b", "verification"), false, "不同 flow 不受影响");
+    assert.equal(alreadyDispatched(read.entries, "flow-a", "impl"), true, "执行步骤派发照旧");
+  });
+});

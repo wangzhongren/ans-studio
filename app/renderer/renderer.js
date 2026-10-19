@@ -2609,7 +2609,10 @@
     var payload = cur.payload;
     // su 审批卡与项目角色三层链卡：同组件、不同标题/档位/披露；project/旧请求逐字保持既有行为。
     var suApproval = payload.policy === "su-approval";
-    $("sc-title").textContent = UiLabels.shellConfirmTitle(payload.policy);
+    // 标题按**实际角色**显示（2026-10-19 客户截图反馈）：五个内置治理角色与 su 同走审批档，
+    // 但内置治理角色不再显示「SU」；roleId 取载荷、回退当前卡记录，均缺失时保持既有兜底文案。
+    var confirmRoleId = typeof payload.roleId === "string" && payload.roleId !== "" ? payload.roleId : cur.roleId;
+    $("sc-title").textContent = UiLabels.shellConfirmTitle(payload.policy, confirmRoleId);
     // 命令**逐字原文**：textContent 落入（无 HTML 注入口——不美化、不改写、不截断）。
     $("sc-command").textContent = typeof payload.command === "string" ? payload.command : "";
     var summary = typeof payload.summary === "string" && payload.summary !== "" ? payload.summary : "";

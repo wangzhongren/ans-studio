@@ -66,7 +66,10 @@ test("五角色全自动链路：意图→提案→接受→流程→提名→�
       }
       if (ctx.roleId === "rapporteur" && /客户意图已交接|请形成提案/.test(ctx.prompt)) {
         return [
-          { name: "write_file", args: { path: PROPOSAL_REL, content: proposalDoc(FLOW) } },
+          // 提案 frontmatter 带 intentId：意图定位的兼容来源。真实交接账本（intent.handed-off）在
+          // 投递完成后才写（run-role 的「先投递成功、后写账本」），首次提案卡判断时账本里还没有它；
+          // 用 frontmatter intentId 可稳定定位意图，避免把夹具测点变成投递/判断的时序竞态。
+          { name: "write_file", args: { path: PROPOSAL_REL, content: proposalDoc(FLOW, 1, "intent-a") } },
           {
             name: "request_choice",
             toolCallId: "tc-proposal",

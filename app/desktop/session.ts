@@ -409,6 +409,27 @@ export interface SessionManagerDeps {
     flowId: string;
     evidence: string[];
   }) => void;
+  /**
+   * **回交到达**（2026-10-19 客户反馈「独立核准应该是标准流程」）：回交事件一到就登记——通用 settle
+   * 触发没有回交载荷，`flowId`/报告路径在这里先记住；是否派 Proof 仍由 Interface 读流程单/账本决定。
+   */
+  onHandbackReceived?: (info: {
+    projectRoot: string;
+    runtime: RuntimeKind;
+    roleId: string;
+    flowId?: string;
+    evidence: string[];
+  }) => void;
+  /**
+   * **桌面侧治理账本追加成功**（2026-10-19）：`dispatch.accepted` 等落盘后通知 Interface 做一次有界
+   * 验收检查（流程可能刚好齐备）。只报事实（kind/flowId/stepId），不读正文、不改变追加结果。
+   */
+  onGovernanceLedgerAppended?: (info: {
+    projectRoot: string;
+    kind: string;
+    flowId?: string;
+    stepId?: string;
+  }) => void;
   emitPersistenceChange?: (update: PersistenceUpdated) => void;
   /**
    * **队列变化外推**（L-1 可见性）：某角色队列的**摘要快照**——主进程据此推渲染侧（该角色的队列行 +
@@ -1245,6 +1266,46 @@ export class SessionManager {
     return this.sessions.get(this.sessionKey(projectRoot, roleId, runtime))?.busy === true;
   }
 
+  /** 治理主人（回交/系统行落位；2026-10-19 验收自动派发用）：trio=Convener；single=主入口（su）；未枚举 ⇒ null。 */
+  governanceOwnerRoleId(projectRoot: string): string | null {
+    return this.handbackOwnerRoleId(projectRoot);
+  }
+
+  /** 派发主人最近一次开会话所用 runtime（验收检查后台开 Proof 会话时择路；无记录 ⇒ undefined）。 */
+  governanceRuntimeFor(projectRoot: string): RuntimeKind | undefined {
+    return this.lastGovernanceRuntime.get(projectRoot);
+  }
+
+  /**
+   * **当前活动会话的 runtime**（客户正在看的那个；仅当它属于该项目）：自动验收派发/冷启动补齐的
+   * 优先级 1 只读视图。无活动会话 / 活动会话属于别的项目 ⇒ undefined（调用方按解析器继续降级）。
+   */
+  activeRuntimeFor(projectRoot: string): RuntimeKind | undefined {
+    if (typeof projectRoot !== "string" || projectRoot === "" || this.activeRoleId === null) return undefined;
+    const entry = this.sessions.get(this.activeRoleId);
+    return entry !== undefined && entry.projectRoot === projectRoot ? entry.runtime : undefined;
+  }
+
+  /**
+   * 该 flow 是否仍有**在途**派发/回交/运行轮次（纯读；2026-10-19 验收自动派发用）。
+   * 有 ⇒ 验收检查推迟到下一次事件，避免在交付完成前抢跑派 Proof；不制造第二份状态。
+   */
+  hasActiveWorkForFlow(projectRoot: string, flowId: string): boolean {
+    if (typeof projectRoot !== "string" || projectRoot === "" || typeof flowId !== "string" || flowId === "") return false;
+    for (const [key, items] of this.deliveryQueues) {
+      if (items.length === 0 || !key.startsWith(`${projectRoot}\u0000`)) continue;
+      if (items.some((item) => item.flowId === flowId)) return true;
+    }
+    for (const item of this.activeDeliveries.values()) {
+      if (item.flowId === flowId) return true;
+    }
+    for (const entry of this.sessions.values()) {
+      if (entry.projectRoot !== projectRoot) continue;
+      if (entry.origins.running?.flowIds?.includes(flowId) === true) return true;
+    }
+    return false;
+  }
+
   /**
    * **强制刷新一次 listing 缓存**（W6-B 真机阻塞修复）：调注入的 `refreshListing`（Interface 用
    * 与界面 `listProject` 同一路径读盘枚举并更新**同一份**共享缓存）。只尝试一次、不循环；失败只记
@@ -1414,6 +1475,17 @@ export class SessionManager {
           diagnostic.error("governance.handoff.append.failed", new Error(appended.message), {
             intentId: payload.intentId,
           });
+        } else {
+          // 2026-10-19：账本变更通知（与 routeDispatch 同口径；异常不影响交接投递）。
+          try {
+            this.deps.onGovernanceLedgerAppended?.({
+              projectRoot,
+              kind: "dispatch.accepted",
+              ...(payload.flowId !== undefined ? { flowId: payload.flowId } : {}),
+            });
+          } catch (error) {
+            diagnostic.error("governance.ledger.notify.failed", error);
+          }
         }
       } else {
         diagnostic.record("governance.handoff.append.skipped", {
@@ -2074,6 +2146,23 @@ export class SessionManager {
           }
           // E-1：回交到达 ⇒ 自动投递交 su 验收（去重 + 排队 + 失败如实/保留；见 handleHandback）。
           if (ev.kind === "handback") {
+            // 2026-10-19：先把回交事实（flowId/证据路径）交给 Interface——通用 settle 触发据此补齐任务文本；
+            // 是否派 Proof 仍由 Interface 的门决定（本层不判断、不写账本）。失败绝不影响回交投递。
+            try {
+              const handbackEvidence = Array.isArray(ev.handback?.evidence)
+                ? ev.handback.evidence.filter((item): item is string => typeof item === "string" && item !== "").slice(0, 10)
+                : [];
+              const handbackFlowId = this.handbackFlowId(entry, ev.handback);
+              this.deps.onHandbackReceived?.({
+                projectRoot,
+                runtime,
+                roleId,
+                ...(handbackFlowId !== undefined ? { flowId: handbackFlowId } : {}),
+                evidence: handbackEvidence,
+              });
+            } catch (error) {
+              createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId }).error("acceptance.handback-received.failed", error);
+            }
             this.mergeReportState(entry, ev);
           }
           // 2026-10-18 客户反馈「内部治理角色，应该都向联络官反馈」：只记**普通 assistant 正文**
@@ -2836,6 +2925,18 @@ export class SessionManager {
           "governance.ledger.dispatch.failed",
           new Error(appended.message),
         );
+      } else {
+        // 2026-10-19：账本变更（dispatch.accepted 追加）通知 Interface 做一次有界验收检查；异常绝不影响派发。
+        try {
+          this.deps.onGovernanceLedgerAppended?.({
+            projectRoot,
+            kind: "dispatch.accepted",
+            ...(flowId !== undefined ? { flowId } : {}),
+            ...(stepId !== undefined ? { stepId } : {}),
+          });
+        } catch (error) {
+          createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId: fromRoleId }).error("governance.ledger.notify.failed", error);
+        }
       }
     }
     void this.drainQueue(projectRoot, targetRoleId, runtime);

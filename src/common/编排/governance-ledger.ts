@@ -59,6 +59,11 @@ export type GovernanceDecisionKind =
  * `dispatch.accepted` 的触发来源（四角色评审 §7.1）：区分「客户决定后推进」「意图交接后投递」
  * 「settle 后推进」；三者都仍是 `actorRoleId:"app"`, `power:"app"`，**都不是客户批准**。
  * 旧条目缺 `trigger` 仍合法（不追改历史）。
+ *
+ * 2026-10-19：`"settle"` 也用于**应用自动派发**——流程齐备（执行步骤全部 done 且均有
+ * `dispatch.accepted`、无未结算决定、验收步骤 pending）后自动派发 Proof / 验收时，写
+ * `dispatch.accepted{targetRoleId:"verifier", stepId:"verification", trigger:"settle"}`；
+ * 该条同时是**自动派发去重键**（同一 flowId+stepId 已存在即不重复派发）。自动派发不是验收决定。
  */
 export type GovernanceLedgerTrigger = "customer-decision" | "intent-handoff" | "settle";
 
@@ -76,6 +81,7 @@ export interface GovernanceLedgerEntry {
     | "intent.handed-off"
     | "clarification.requested";
   flowId?: string;
+  /** 流程步骤 id。`dispatch.accepted` 的去重键是 flowId+stepId（与 targetRoleId 无关）。 */
   stepId?: string;
   /** 本事件的动作人（角色 id，或 "app"/"customer"）。 */
   actorRoleId: string;
@@ -87,6 +93,7 @@ export interface GovernanceLedgerEntry {
   artifactSha256?: string; // 应用算，角色不自算
   /** 仅写盘确认：本次客户确认/发行的具体路径（逐条）。 */
   paths?: string[];
+  /** 本次事件的目标角色（派发/写卡/验收）。应用自动派发 Proof / 验收时 = `"verifier"`。 */
   targetRoleId?: string;
   targetRoleIds?: string[];
   /** W6-A：意图交接/澄清所引用的意图记录（`docs/intents/<intentId>.md` 的 slug）。 */

@@ -10,12 +10,17 @@ import assert from "node:assert/strict";
 
 import {
   approveOutcome,
+  clearLedger,
   makeJudge,
   makeRoot,
+  intentLedgerEntries,
+  nominationDoc,
   requestFor,
   seedProject,
   write,
+  writeLedger,
   FLOW_REL,
+  INTENT_REL,
   NOMINATION_REL,
   PROPOSAL_REL,
   type JudgeScript,
@@ -42,7 +47,7 @@ test("proposal：读规范提案后仅 accept 可代批；审计含 group/cardKi
     seedProject(root);
     const request = requestFor("proposal");
     const { outcome, fake } = await run(root, request, {
-      reads: [PROPOSAL_REL],
+      reads: [INTENT_REL, PROPOSAL_REL],
       report: report({ group: "decision", cardKind: "proposal", selected: ["accept"] }),
     });
     assert.equal(outcome.verdict, "approve", outcome.reason ?? "");
@@ -83,28 +88,28 @@ test("accept-quick 不代批：只选 accept-quick / 多选含快捷路径 / 卡
         options: [{ id: "accept-quick", label: "快捷接受" }],
       },
     }), {
-      reads: [PROPOSAL_REL],
+      reads: [INTENT_REL, PROPOSAL_REL],
       report: report({ group: "decision", cardKind: "proposal", selected: ["accept-quick"] }),
     });
     assert.equal(quickOnly.outcome.verdict, "manual", "只有 accept-quick 的卡不得代批");
     assert.equal(quickOnly.outcome.reasonCode, "not-recommended");
 
     const choseQuick = await run(root, requestFor("proposal"), {
-      reads: [PROPOSAL_REL],
+      reads: [INTENT_REL, PROPOSAL_REL],
       report: report({ group: "decision", cardKind: "proposal", selected: ["accept-quick"] }),
     });
     assert.equal(choseQuick.outcome.verdict, "manual");
     assert.equal(choseQuick.outcome.reasonCode, "not-recommended");
 
     const both = await run(root, requestFor("proposal"), {
-      reads: [PROPOSAL_REL],
+      reads: [INTENT_REL, PROPOSAL_REL],
       report: report({ group: "decision", cardKind: "proposal", selected: ["accept", "accept-quick"] }),
     });
     assert.equal(both.outcome.verdict, "manual");
 
     // 同一张卡只选 accept 仍可代批（不扩大为快捷路径）。
     const acceptOnly = await run(root, requestFor("proposal"), {
-      reads: [PROPOSAL_REL],
+      reads: [INTENT_REL, PROPOSAL_REL],
       report: report({ group: "decision", cardKind: "proposal", selected: ["accept"] }),
     });
     assert.equal(acceptOnly.outcome.verdict, "approve");
@@ -120,31 +125,34 @@ test("appointment：按推荐集多选代批；选多/选少/重复/内置 id/�
     seedProject(root);
     const base = requestFor("appointment", { recommendedRoleIds: ["role-x", "role-y"] });
     const ok = await run(root, base, {
-      reads: [NOMINATION_REL],
+      reads: [INTENT_REL, NOMINATION_REL],
       report: report({ group: "decision", cardKind: "appointment", selected: ["role-y", "role-x"] }),
     });
     assert.equal(ok.outcome.verdict, "approve", ok.outcome.reason ?? "");
     assert.deepEqual([...(ok.outcome.value?.selected ?? [])].sort(), ["role-x", "role-y"]);
 
     const fewer = await run(root, base, {
-      reads: [NOMINATION_REL],
+      reads: [INTENT_REL, NOMINATION_REL],
       report: report({ group: "decision", cardKind: "appointment", selected: ["role-x"] }),
     });
     assert.equal(fewer.outcome.verdict, "manual");
     assert.equal(fewer.outcome.reasonCode, "not-recommended");
 
     const more = await run(root, base, {
-      reads: [NOMINATION_REL],
+      reads: [INTENT_REL, NOMINATION_REL],
       report: report({ group: "decision", cardKind: "appointment", selected: ["role-x", "role-y", "role-z"] }),
     });
     assert.equal(more.outcome.verdict, "manual");
 
     const duplicate = await run(root, base, {
-      reads: [NOMINATION_REL],
+      reads: [INTENT_REL, NOMINATION_REL],
       report: report({ group: "decision", cardKind: "appointment", selected: ["role-x", "role-x"] }),
     });
     assert.equal(duplicate.outcome.verdict, "manual");
 
+    // 证据包对账口径（2026-10-19）：提名文件的机器可读推荐集必须与 request/recommendedRoleIds 一致；
+    // 下面的负向子场景各自把提名文件改成与 request 一致的内容，确保测的是目标规则本身。
+    write(root, NOMINATION_REL, nominationDoc(["liaison"]));
     const builtIn = await run(root, requestFor("appointment", {
       recommendedRoleIds: ["liaison"],
       card: {
@@ -153,26 +161,30 @@ test("appointment：按推荐集多选代批；选多/选少/重复/内置 id/�
         options: [{ id: "liaison", label: "联络官" }, { id: "role-x", label: "X" }],
       },
     }), {
-      reads: [NOMINATION_REL],
+      reads: [INTENT_REL, NOMINATION_REL],
       report: report({ group: "decision", cardKind: "appointment", selected: ["liaison"] }),
     });
     assert.equal(builtIn.outcome.verdict, "manual", "内置治理角色不得被代批任命");
     assert.equal(builtIn.outcome.reasonCode, "not-recommended");
 
+    // 提名文件没有机器可读推荐集 ⇒ 证据包直接 insufficient-evidence（不启动模型）。
+    write(root, NOMINATION_REL, nominationDoc([]));
     const missingRecommendation = await run(root, requestFor("appointment", { recommendedRoleIds: [] }), {
-      reads: [NOMINATION_REL],
+      reads: [INTENT_REL, NOMINATION_REL],
       report: report({ group: "decision", cardKind: "appointment", selected: ["role-x"] }),
     });
     assert.equal(missingRecommendation.outcome.verdict, "manual");
     assert.equal(missingRecommendation.outcome.reasonCode, "insufficient-evidence");
 
+    write(root, NOMINATION_REL, nominationDoc(["role-zzz"]));
     const notInOptions = await run(root, requestFor("appointment", { recommendedRoleIds: ["role-zzz"] }), {
-      reads: [NOMINATION_REL],
+      reads: [INTENT_REL, NOMINATION_REL],
       report: report({ group: "decision", cardKind: "appointment", selected: ["role-zzz"] }),
     });
     assert.equal(notInOptions.outcome.verdict, "manual");
     assert.equal(notInOptions.outcome.reasonCode, "insufficient-evidence");
 
+    write(root, NOMINATION_REL, nominationDoc());
     const singleSelect = await run(root, requestFor("appointment", {
       recommendedRoleIds: ["role-x", "role-y"],
       card: {
@@ -181,7 +193,7 @@ test("appointment：按推荐集多选代批；选多/选少/重复/内置 id/�
         options: [{ id: "role-x", label: "X" }, { id: "role-y", label: "Y" }],
       },
     }), {
-      reads: [NOMINATION_REL],
+      reads: [INTENT_REL, NOMINATION_REL],
       report: report({ group: "decision", cardKind: "appointment", selected: ["role-x", "role-y"] }),
     });
     assert.equal(singleSelect.outcome.verdict, "manual");
@@ -197,7 +209,7 @@ test("写盘三卡：逐路径机械复核 + 来源匹配；模型自报 ok 不�
     seedProject(root);
 
     const write = await run(root, requestFor("write"), {
-      reads: [PROPOSAL_REL],
+      reads: [INTENT_REL, PROPOSAL_REL],
       report: report({
         group: "approval", cardKind: "write", confirmed: true,
         pathDecisions: [{ path: PROPOSAL_REL, ok: true, reason: "预览与提案一致" }],
@@ -207,8 +219,19 @@ test("写盘三卡：逐路径机械复核 + 来源匹配；模型自报 ok 不�
     assert.equal(write.outcome.value?.confirmed, true);
     assert.deepEqual(write.outcome.paths, [PROPOSAL_REL]);
 
+    // appointment-write 的 facts.appointmentTargetRoleIds 必须与账本里的任命决定一致
+    // （证据包会重读账本对账；夹具补齐真实账本事实）。
+    const appointmentLedger = {
+      kind: "customer.decision",
+      decisionKind: "appointment",
+      customerDecision: "appointed",
+      actorRoleId: "nominator",
+      power: "nomination",
+      targetRoleIds: ["project-a"],
+    };
+    writeLedger(root, [appointmentLedger]);
     const appointmentWrite = await run(root, requestFor("appointment-write"), {
-      reads: [NOMINATION_REL, FLOW_REL, "角色卡/project-a/boundary.yaml"],
+      reads: [INTENT_REL, NOMINATION_REL, FLOW_REL, "角色卡/project-a/boundary.yaml"],
       report: report({
         group: "approval", cardKind: "appointment-write", confirmed: true,
         pathDecisions: [{ path: "角色卡/project-a/boundary.yaml", ok: true }],
@@ -216,6 +239,7 @@ test("写盘三卡：逐路径机械复核 + 来源匹配；模型自报 ok 不�
     });
     assert.equal(appointmentWrite.outcome.verdict, "approve", appointmentWrite.outcome.reason ?? "");
     assert.deepEqual(appointmentWrite.outcome.paths, ["角色卡/project-a/boundary.yaml"]);
+    clearLedger(root);
 
     const scheduleWrite = await run(root, requestFor("schedule-write"), {
       reads: [FLOW_REL],
@@ -231,7 +255,7 @@ test("写盘三卡：逐路径机械复核 + 来源匹配；模型自报 ok 不�
     const claimedOk = await run(root, requestFor("write", {
       pathProbes: [{ path: PROPOSAL_REL, allowed: false, reason: "越界" }],
     }), {
-      reads: [PROPOSAL_REL],
+      reads: [INTENT_REL, PROPOSAL_REL],
       report: report({
         group: "approval", cardKind: "write", confirmed: true,
         pathDecisions: [{ path: PROPOSAL_REL, ok: true }],
@@ -241,14 +265,14 @@ test("写盘三卡：逐路径机械复核 + 来源匹配；模型自报 ok 不�
     assert.equal(claimedOk.outcome.reasonCode, "path-outside-boundary");
 
     const missingDecision = await run(root, requestFor("write"), {
-      reads: [PROPOSAL_REL],
+      reads: [INTENT_REL, PROPOSAL_REL],
       report: report({ group: "approval", cardKind: "write", confirmed: true, pathDecisions: [] }),
     });
     assert.equal(missingDecision.outcome.verdict, "manual");
     assert.equal(missingDecision.outcome.reasonCode, "path-unverified");
 
     const emptyPaths = await run(root, requestFor("write", { paths: [], pathProbes: [] }), {
-      reads: [PROPOSAL_REL],
+      reads: [INTENT_REL, PROPOSAL_REL],
       report: report({ group: "approval", cardKind: "write", confirmed: true, pathDecisions: [] }),
     });
     assert.equal(emptyPaths.outcome.verdict, "manual");
@@ -259,7 +283,7 @@ test("写盘三卡：逐路径机械复核 + 来源匹配；模型自报 ok 不�
       pathProbes: [{ path: FLOW_REL, allowed: true }],
       allowedPathRoots: ["docs/flows/"],
     }), {
-      reads: [PROPOSAL_REL, FLOW_REL],
+      reads: [INTENT_REL, PROPOSAL_REL, FLOW_REL],
       report: report({
         group: "approval", cardKind: "write", confirmed: true,
         pathDecisions: [{ path: FLOW_REL, ok: true }],
@@ -268,13 +292,14 @@ test("写盘三卡：逐路径机械复核 + 来源匹配；模型自报 ok 不�
     assert.equal(wrongSource.outcome.verdict, "manual", "Rapporteur 的 write 不得越过来源写区");
     assert.equal(wrongSource.outcome.reasonCode, "path-outside-boundary");
 
+    writeLedger(root, [appointmentLedger]);
     const wrongAppointee = await run(root, requestFor("appointment-write", {
       paths: ["角色卡/role-z/boundary.yaml"],
       pathProbes: [{ path: "角色卡/role-z/boundary.yaml", allowed: true }],
       allowedPathRoots: ["角色卡/"],
       facts: { appointmentTargetRoleIds: ["project-a"] },
     }), {
-      reads: [NOMINATION_REL],
+      reads: [INTENT_REL, NOMINATION_REL],
       report: report({
         group: "approval", cardKind: "appointment-write", confirmed: true,
         pathDecisions: [{ path: "角色卡/role-z/boundary.yaml", ok: true }],
@@ -282,6 +307,7 @@ test("写盘三卡：逐路径机械复核 + 来源匹配；模型自报 ok 不�
     });
     assert.equal(wrongAppointee.outcome.verdict, "manual", "未任命的目标角色不得写角色卡");
     assert.equal(wrongAppointee.outcome.reasonCode, "path-outside-boundary");
+    clearLedger(root);
 
     const wrongFlow = await run(root, requestFor("schedule-write", {
       paths: ["docs/flows/flow-b.md"],
@@ -305,39 +331,65 @@ test("acceptance：最高门槛——提案已接受、无账本错误、无未�
   const { root, cleanup } = makeRoot("acceptance");
   try {
     seedProject(root);
+    // 证据包会重读账本对账（2026-10-19）：facts 声称的 proposalDecision/dispatchedStepIds
+    // 必须在账本里有对应记录；每个子场景按声称的事实种账本。
+    const proposalAccept = {
+      kind: "customer.decision",
+      decisionKind: "proposal-accept",
+      customerDecision: "accepted",
+    };
+    const dispatchImpl = { kind: "dispatch.accepted", actorRoleId: "app", power: "app", stepId: "impl" };
+    writeLedger(root, [proposalAccept, dispatchImpl]);
     const script: JudgeScript = {
-      reads: [PROPOSAL_REL, FLOW_REL],
+      reads: [INTENT_REL, PROPOSAL_REL, FLOW_REL],
       report: report({ group: "decision", cardKind: "acceptance", selected: ["accept"] }),
     };
     const ok = await run(root, requestFor("acceptance"), script);
     assert.equal(ok.outcome.verdict, "approve", ok.outcome.reason ?? "");
     assert.deepEqual(ok.outcome.value?.selected, ["accept"]);
 
+    writeLedger(root, [
+      { kind: "customer.decision", decisionKind: "proposal-revise", customerDecision: "changes-requested" },
+      dispatchImpl,
+    ]);
     const notAccepted = await run(root, requestFor("acceptance", {
       facts: { proposalDecision: "revise" },
     }), script);
     assert.equal(notAccepted.outcome.verdict, "manual");
     assert.equal(notAccepted.outcome.reasonCode, "insufficient-evidence");
 
+    writeLedger(root, [dispatchImpl]);
     const noProposalDecision = await run(root, requestFor("acceptance", {
       facts: { proposalDecision: undefined },
     }), script);
     assert.equal(noProposalDecision.outcome.verdict, "manual");
 
+    writeLedger(root, [
+      proposalAccept,
+      dispatchImpl,
+      { kind: "clarification.requested", actorRoleId: "liaison", power: "liaison" },
+    ]);
     const clarification = await run(root, requestFor("acceptance", {
       facts: { unresolvedClarificationCount: 1 },
     }), script);
     assert.equal(clarification.outcome.verdict, "manual");
     assert.equal(clarification.outcome.reasonCode, "insufficient-evidence");
 
+    // 账本坏行：facts.ledgerErrors 必须与真实账本一致（证据包对账），验收机械门槛随即回落。
+    // 意图基准两行保持合法：坏行场景测的是 ledger-unavailable，不是意图缺失（否则会先命中 intent-* 优先级）。
+    write(root, ".ans/governance/ledger.jsonl", [
+      ...intentLedgerEntries().map((entry) => JSON.stringify(entry)),
+      "{\"kind\":\"customer.decision\"}",
+    ].join("\n") + "\n");
     const ledgerBroken = await run(root, requestFor("acceptance", {
-      facts: { ledgerErrors: 1 },
+      facts: { ledgerErrors: 1, proposalDecision: undefined, dispatchedStepIds: [] },
     }), script);
     assert.equal(ledgerBroken.outcome.verdict, "manual");
     assert.equal(ledgerBroken.outcome.reasonCode, "ledger-unavailable");
 
+    writeLedger(root, [proposalAccept, dispatchImpl]);
     const rejectChoice = await run(root, requestFor("acceptance"), {
-      reads: [PROPOSAL_REL, FLOW_REL],
+      reads: [INTENT_REL, PROPOSAL_REL, FLOW_REL],
       report: report({ group: "decision", cardKind: "acceptance", selected: ["reject"] }),
     });
     assert.equal(rejectChoice.outcome.verdict, "manual", "judge 不得代拒绝");
@@ -352,7 +404,7 @@ test("acceptance 机械门槛（P6 补强）：流程未完成/缺 dispatch/阻�
   try {
     seedProject(root);
     const script: JudgeScript = {
-      reads: [PROPOSAL_REL, FLOW_REL],
+      reads: [INTENT_REL, PROPOSAL_REL, FLOW_REL],
       report: report({ group: "decision", cardKind: "acceptance", selected: ["accept"] }),
     };
     const flow = (steps: string[]) => [
@@ -363,9 +415,22 @@ test("acceptance 机械门槛（P6 补强）：流程未完成/缺 dispatch/阻�
       ...steps,
       "",
     ].join("\n");
+    // 证据包对账口径（2026-10-19）：每个子场景按 request.facts 声称的事实种账本。
+    const proposalAccept = {
+      kind: "customer.decision",
+      decisionKind: "proposal-accept",
+      customerDecision: "accepted",
+    };
+    const dispatch = (stepId: string) => ({
+      kind: "dispatch.accepted",
+      actorRoleId: "app",
+      power: "app",
+      stepId,
+    });
 
     // 流程仍有 pending 步骤。
     write(root, FLOW_REL, flow(["| impl | A | done |", "| verify | A | pending |"]));
+    writeLedger(root, [proposalAccept, dispatch("impl"), dispatch("verify")]);
     const pending = await run(root, requestFor("acceptance", {
       facts: { dispatchedStepIds: ["impl", "verify"] },
     }), script);
@@ -375,6 +440,7 @@ test("acceptance 机械门槛（P6 补强）：流程未完成/缺 dispatch/阻�
 
     // 步骤都 done，但缺 dispatch.accepted。
     write(root, FLOW_REL, flow(["| impl | A | done |"]));
+    writeLedger(root, [proposalAccept]);
     const missingDispatch = await run(root, requestFor("acceptance", {
       facts: { dispatchedStepIds: [] },
     }), script);
@@ -384,6 +450,7 @@ test("acceptance 机械门槛（P6 补强）：流程未完成/缺 dispatch/阻�
 
     // blocked/escalated 均不是 done（fail-closed）。
     write(root, FLOW_REL, flow(["| impl | A | blocked |"]));
+    writeLedger(root, [proposalAccept, dispatch("impl")]);
     const blocked = await run(root, requestFor("acceptance", {
       facts: { dispatchedStepIds: ["impl"] },
     }), script);
@@ -392,8 +459,9 @@ test("acceptance 机械门槛（P6 补强）：流程未完成/缺 dispatch/阻�
 
     // 流程单无可解析步骤表。
     write(root, FLOW_REL, "# 流程 flow-a\n\n没有步骤表。\n");
+    writeLedger(root, [proposalAccept, dispatch("impl")]);
     const malformed = await run(root, requestFor("acceptance"), {
-      reads: [PROPOSAL_REL, FLOW_REL],
+      reads: [INTENT_REL, PROPOSAL_REL, FLOW_REL],
       report: report({ group: "decision", cardKind: "acceptance", selected: ["accept"] }),
     });
     assert.equal(malformed.outcome.verdict, "manual");
@@ -401,17 +469,19 @@ test("acceptance 机械门槛（P6 补强）：流程未完成/缺 dispatch/阻�
 
     // 该流程仍有未结算决定（unclassified）。
     write(root, FLOW_REL, flow(["| impl | A | done |"]));
-    write(root, ".ans/governance/ledger.jsonl", JSON.stringify({
-      at: new Date().toISOString(),
-      kind: "customer.decision",
-      flowId: "flow-a",
-      actorRoleId: "nominator",
-      power: "nomination",
-      // 2026-10-18 新口径：旧账本无 cardKind 的 unclassified/none 不算未结算；用真实的
-      // 治理决定但缺最终决定（none）制造「未结算」。
-      decisionKind: "appointment",
-      customerDecision: "none",
-    }) + "\n");
+    writeLedger(root, [
+      proposalAccept,
+      dispatch("impl"),
+      {
+        kind: "customer.decision",
+        actorRoleId: "nominator",
+        power: "nomination",
+        // 2026-10-18 新口径：旧账本无 cardKind 的 unclassified/none 不算未结算；用真实的
+        // 治理决定但缺最终决定（none）制造「未结算」。
+        decisionKind: "appointment",
+        customerDecision: "none",
+      },
+    ]);
     const unsettled = await run(root, requestFor("acceptance"), script);
     assert.equal(unsettled.outcome.verdict, "manual");
     assert.equal(unsettled.outcome.reasonCode, "insufficient-evidence");
@@ -427,7 +497,11 @@ test("required-read：未读必读物证 ⇒ artifact-not-read；读敏感文件
     seedProject(root);
     const ENV_SENTINEL = "DO_NOT_LEAK";
     const SESSION_SENTINEL = "DO_NOT_LEAK_SESSION";
-    write(root, ".ans/governance/ledger.jsonl", "{\"kind\":\"fixture\",\"note\":\"ledger-readable\"}\n");
+    // 有效账本行（at/kind/actorRoleId/power 齐全）：证据包会重读账本对账，坏行会被计为
+    // ledgerErrors 并与 facts 漂移冲突（2026-10-19 证据包契约）。
+    writeLedger(root, [
+      { kind: "artifact.observed", actorRoleId: "rapporteur", power: "proposal", messageSummary: "ledger-readable" },
+    ]);
     write(root, ".ans/sessions/private.jsonl", `{\"secret\":\"${SESSION_SENTINEL}\"}\n`);
     const notRead = await run(root, requestFor("proposal"), {
       report: report({ group: "decision", cardKind: "proposal", selected: ["accept"] }),
@@ -442,7 +516,7 @@ test("required-read：未读必读物证 ⇒ artifact-not-read；读敏感文件
         const result = await tools.get("judge_read_file")!.handler({ name: "judge_read_file", args: { path: ".ans/governance/ledger.jsonl" } });
         ledgerReadable = result.ok === true && result.message.includes("ledger-readable");
       },
-      reads: [PROPOSAL_REL],
+      reads: [INTENT_REL, PROPOSAL_REL],
       report: report({ group: "decision", cardKind: "proposal", selected: ["accept"] }),
     });
     assert.equal(ledgerReadable, true, "账本只读开放，判断可读");
@@ -457,7 +531,7 @@ test("required-read：未读必读物证 ⇒ artifact-not-read；读敏感文件
           && /应用私有数据/.test(result.message)
           && !result.message.includes(SESSION_SENTINEL);
       },
-      reads: [PROPOSAL_REL],
+      reads: [INTENT_REL, PROPOSAL_REL],
       report: report({ group: "decision", cardKind: "proposal", selected: ["accept"] }),
     });
     assert.equal(sessionDenied, true, "会话数据仍 app-private 拒绝且不泄露内容");
@@ -470,7 +544,7 @@ test("required-read：未读必读物证 ⇒ artifact-not-read；读敏感文件
         assert.equal(result.ok, false, ".env 必须被拒绝");
         assert.equal(result.message.includes(ENV_SENTINEL), false, "拒绝回执不得泄露 .env 内容");
       },
-      reads: [PROPOSAL_REL],
+      reads: [INTENT_REL, PROPOSAL_REL],
       report: report({ group: "decision", cardKind: "proposal", selected: ["accept"] }),
     });
     assert.equal(denied.outcome.verdict, "manual");
@@ -495,7 +569,7 @@ test("负向与失败路径：revise/reject/空选择/未知 id 一律 manual；
     seedProject(root);
     for (const selected of [["revise"], ["reject"], [], ["accept", "unknown-id"]]) {
       const { outcome } = await run(root, requestFor("proposal"), {
-        reads: [PROPOSAL_REL],
+        reads: [INTENT_REL, PROPOSAL_REL],
         report: report({ group: "decision", cardKind: "proposal", selected }),
       });
       assert.equal(outcome.verdict, "manual", `selected=${JSON.stringify(selected)} 不得代批`);
@@ -510,7 +584,7 @@ test("负向与失败路径：revise/reject/空选择/未知 id 一律 manual；
     assert.equal(timeoutOutcome.reasonCode, "timeout");
 
     const parseFailed = await run(root, requestFor("proposal"), {
-      reads: [PROPOSAL_REL],
+      reads: [INTENT_REL, PROPOSAL_REL],
       message: "看起来可以接受。",
     });
     assert.equal(parseFailed.outcome.verdict, "manual");
@@ -524,7 +598,7 @@ test("负向与失败路径：revise/reject/空选择/未知 id 一律 manual；
     assert.equal(demo.fake.seen.binds, 0, "不支持的引擎不得启动判断会话");
 
     const mismatch = await run(root, requestFor("proposal", { group: "approval" }), {
-      reads: [PROPOSAL_REL],
+      reads: [INTENT_REL, PROPOSAL_REL],
       report: report({ group: "approval", cardKind: "proposal", selected: ["accept"] }),
     });
     assert.equal(mismatch.outcome.verdict, "manual");
@@ -540,7 +614,7 @@ test("纯 JSON message 降级路径可用；approve 缺 reason 视为解析失�
   try {
     seedProject(root);
     const approveViaMessage = await run(root, requestFor("proposal"), {
-      reads: [PROPOSAL_REL],
+      reads: [INTENT_REL, PROPOSAL_REL],
       message: JSON.stringify({
         verdict: "approve",
         reason: "提案与物证一致",
@@ -552,14 +626,14 @@ test("纯 JSON message 降级路径可用；approve 缺 reason 视为解析失�
     assert.deepEqual(approveViaMessage.outcome.value?.selected, ["accept"]);
 
     const noReason = await run(root, requestFor("proposal"), {
-      reads: [PROPOSAL_REL],
+      reads: [INTENT_REL, PROPOSAL_REL],
       report: { verdict: "approve", evidence: [PROPOSAL_REL], selected: ["accept"] },
     });
     assert.equal(noReason.outcome.verdict, "manual");
     assert.equal(noReason.outcome.reasonCode, "parse-failed", "approve 缺 reason 不得放行");
 
     const missingEvidence = await run(root, requestFor("proposal"), {
-      reads: [PROPOSAL_REL],
+      reads: [INTENT_REL, PROPOSAL_REL],
       report: { verdict: "approve", reason: "看起来没问题", selected: ["accept"] },
     });
     assert.equal(missingEvidence.outcome.verdict, "manual");
@@ -575,7 +649,7 @@ test("三引擎同期：claude/pi/codex 都能走同一 driver 与只读工具�
     seedProject(root);
     for (const runtime of ["claude", "pi", "codex"] as const) {
       const { outcome } = await run(root, requestFor("proposal", { runtime }), {
-        reads: [PROPOSAL_REL],
+        reads: [INTENT_REL, PROPOSAL_REL],
         report: report({ group: "decision", cardKind: "proposal", selected: ["accept"] }),
       });
       assert.equal(outcome.verdict, "approve", `${runtime}: ${outcome.reason}`);

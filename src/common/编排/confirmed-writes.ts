@@ -165,6 +165,47 @@ function hasSubstantiveBodyLine(lines: readonly string[], start: number, end: nu
   return false;
 }
 
+/** 单条声明路径的可核对正文（`declaredPathBodies` 输出项）。 */
+export interface DeclaredPathBody {
+  /** 已归一化的项目相对路径。 */
+  path: string;
+  /** 锚点之后到下一个声明路径锚点（或 preview 末尾）之间的正文（保留内部空行，去掉首尾空行）。 */
+  body: string;
+  /** 区间内是否至少有一行非空正文/代码行（与呈现前完整性闸同一口径）。 */
+  hasBody: boolean;
+}
+
+/**
+ * **逐路径正文提取**（2026-10-19 证据包）：与 `validateConfirmPreviewCompleteness` 共用同一份
+ * 锚点/正文判定，返回每条声明路径关联的正文。多条锚点时优先取**第一条有正文**的锚点区间；
+ * 都没有正文时返回第一条锚点区间（body 可能为空）——调用方据此 fail-closed。
+ */
+export function declaredPathBodies(preview: string | undefined, declaredPaths: readonly string[]): DeclaredPathBody[] {
+  const text = typeof preview === "string" ? preview : "";
+  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  const anchors = anchorLinesOf(text, declaredPaths);
+  const anchorAt = new Set<number>();
+  for (const list of anchors.values()) for (const index of list) anchorAt.add(index);
+  return declaredPaths.map((path) => {
+    const own = anchors.get(path) ?? [];
+    let first: { body: string; hasBody: boolean } | undefined;
+    for (const start of own) {
+      let end = lines.length;
+      for (let index = start + 1; index < lines.length; index += 1) {
+        if (anchorAt.has(index)) {
+          end = index;
+          break;
+        }
+      }
+      const hasBody = hasSubstantiveBodyLine(lines, start + 1, end);
+      const body = lines.slice(start + 1, end).join("\n").replace(/^\n+/, "").replace(/\n+$/, "");
+      first ??= { body, hasBody };
+      if (hasBody) return { path, body, hasBody: true };
+    }
+    return { path, body: first?.body ?? "", hasBody: first?.hasBody ?? false };
+  });
+}
+
 /**
  * **写盘类确认卡的呈现前完整性校验**（2026-10-19 真机 op-2，fail-closed）：
  * 声明了 ≥1 条写入路径时，preview 必须对**每一条**路径给出可核对的正文字节——
@@ -177,25 +218,9 @@ export function validateConfirmPreviewCompleteness(req: CustomerInputRequest): C
     return { ok: true, declaredPaths, missingPaths: [] };
   }
   const preview = typeof req.preview === "string" ? req.preview : "";
-  const lines = preview.replace(/\r\n/g, "\n").split("\n");
-  const anchors = anchorLinesOf(preview, declaredPaths);
-  const anchorAt = new Set<number>();
-  for (const list of anchors.values()) for (const index of list) anchorAt.add(index);
-  const missingPaths: string[] = [];
-  for (const path of declaredPaths) {
-    const own = anchors.get(path) ?? [];
-    const hasBody = own.some((start) => {
-      let end = lines.length;
-      for (let index = start + 1; index < lines.length; index += 1) {
-        if (anchorAt.has(index)) {
-          end = index;
-          break;
-        }
-      }
-      return hasSubstantiveBodyLine(lines, start + 1, end);
-    });
-    if (!hasBody) missingPaths.push(path);
-  }
+  // 与证据包共用同一份「逐路径正文」实现：判定口径只有一处。
+  const bodies = declaredPathBodies(preview, declaredPaths);
+  const missingPaths = bodies.filter((entry) => !entry.hasBody).map((entry) => entry.path);
   return { ok: missingPaths.length === 0, declaredPaths, missingPaths };
 }
 

@@ -54,6 +54,12 @@ export const FLOW = "flow-a";
 export const PROPOSAL_REL = `docs/proposals/${FLOW}-v1.md`;
 export const NOMINATION_REL = `docs/nominations/${FLOW}-v1.md`;
 export const FLOW_REL = `docs/flows/${FLOW}.md`;
+/**
+ * 意图基准路径（2026-10-19 决策判断定位修正：decision 组只判意图漂移）。
+ * 与 `governance-judge-intent.ts` 的第三级回退同形（`docs/intents/<flowId>.md`）：
+ * 夹具不依赖真实交接时序，意图文件按 flowId 命名即可被确定性定位。
+ */
+export const INTENT_REL = `docs/intents/${FLOW}.md`;
 
 export function makeRoot(tag: string): { root: string; cleanup(): void } {
   const root = mkdtempSync(path.join(tmpdir(), `ans-governance-judge-${tag}-`));
@@ -75,11 +81,16 @@ export function write(root: string, rel: string, content: string): void {
   writeFileSync(abs, content, "utf8");
 }
 
-/** 标准临时项目：规范物证齐全 + 一个项目角色 + 敏感哨兵（证明 judge 读不到）。 */
+/** 标准临时项目：规范物证齐全 + 已确认的客户意图 + 一个项目角色 + 敏感哨兵（证明 judge 读不到）。 */
 export function seedProject(root: string): void {
   write(root, PROPOSAL_REL, proposalDoc());
   write(root, NOMINATION_REL, nominationDoc());
   write(root, FLOW_REL, flowDoc());
+  // 2026-10-19 决策判断定位修正：decision 组（proposal/appointment/acceptance）以客户已确认的
+  // 意图为唯一基准。种子 = 意图文件（goal/scope/acceptance 齐全）+ 账本 intent-confirm accepted
+  // + intent.handed-off（与真实交接同为 power:"liaison"，不是客户批准）。
+  write(root, INTENT_REL, intentDoc());
+  writeLedger(root, []);
   write(root, "角色卡/project-a/role-card.md", "# 角色：project-a\n\n验收夹具。\n");
   write(root, "角色卡/project-a/boundary.yaml", "role: project-a\nentries:\n  - kind: directory\n    path: src/\n    purpose: code\n");
   write(root, "src/app.ts", "export const answer = 42;\n");
@@ -104,7 +115,7 @@ export function proposalDoc(): string {
   ].join("\n");
 }
 
-export function nominationDoc(recommended: string[] = ["project-a"]): string {
+export function nominationDoc(recommended: string[] = ["role-x", "role-y"]): string {
   return [
     "---",
     `flowId: ${FLOW}`,
@@ -120,6 +131,29 @@ export function nominationDoc(recommended: string[] = ["project-a"]): string {
 
 export function flowDoc(): string {
   return [`# 流程 ${FLOW}`, "", "| 步骤 | 角色 | 状态 |", "| --- | --- | --- |", "| impl | project-a | done |", ""].join("\n");
+}
+
+/**
+ * 客户已确认的意图记录（decision 组的唯一意图基准）。
+ * frontmatter 四要素（intentId/handoffKind/goal/scope/acceptance）与 flowId 齐备；
+ * intentId 与 flowId 同值 ⇒ `governance-judge-intent.ts` 的 flow-id 回退可直接定位。
+ */
+export function intentDoc(): string {
+  return [
+    "---",
+    `intentId: ${FLOW}`,
+    "handoffKind: initial",
+    "goal: 离线验收判断 agent。",
+    "scope: 只读验证。",
+    "acceptance: 六类卡均可机械复核。",
+    `flowId: ${FLOW}`,
+    "---",
+    "",
+    `# 意图 ${FLOW}`,
+    "",
+    "客户原话摘录：「按提案与验收口径判断，不要越界。」",
+    "",
+  ].join("\n");
 }
 
 // —————————————————————— 判断请求构造 ——————————————————————
@@ -140,7 +174,7 @@ export interface RequestOverrides {
   facts?: Partial<GovernanceJudgeRequest["facts"]>;
 }
 
-function cardFor(kind: GovernanceJudgeRequest["cardKind"]): CustomerInputRequest {
+function cardFor(kind: GovernanceJudgeRequest["cardKind"], writePaths: readonly string[] = []): CustomerInputRequest {
   switch (kind) {
     case "proposal":
       return {
@@ -185,9 +219,90 @@ function cardFor(kind: GovernanceJudgeRequest["cardKind"]): CustomerInputRequest
         title: `写盘确认 ${FLOW}`,
         cardKind: kind,
         flowId: FLOW,
-        preview: "将写入以下文件：\n- docs/proposals/flow-a-v1.md",
+        // 2026-10-19 证据包契约：写盘卡必须对**每条**声明路径给出可核对正文
+        // （`## <路径>` 锚点 + 非空正文；与呈现前完整性闸同一口径）。
+        preview: confirmPreview(writePaths.length > 0 ? writePaths : defaultWritePaths(kind)),
       };
   }
+}
+
+/** 写盘类卡种的默认声明路径（fixture 与应用侧 `judgeContext.paths` 同形）。 */
+export function defaultWritePaths(kind: GovernanceJudgeRequest["cardKind"]): string[] {
+  switch (kind) {
+    case "write":
+      return [PROPOSAL_REL];
+    case "appointment-write":
+      return ["角色卡/project-a/boundary.yaml"];
+    case "schedule-write":
+      return [FLOW_REL];
+    default:
+      return [];
+  }
+}
+
+/** 逐路径正文的确认卡 preview（`## <路径>` 标题锚点 + 正文；新契约的标准形态）。 */
+export function confirmPreview(paths: readonly string[]): string {
+  const lines = ["将写入以下文件（逐路径正文）：", ""];
+  for (const entry of paths) {
+    lines.push(`## ${entry}`, "", `待写正文（${entry}）：夹具声明的完整内容。`, "");
+  }
+  return lines.join("\n");
+}
+
+/**
+ * 意图基准的账本种子（decision 组必需）：
+ *   · `customer.decision{decisionKind:"intent-confirm", customerDecision:"accepted"}`——客户确认态；
+ *   · `intent.handed-off`——与真实交接同口径（Liaison 沟通权，不是客户批准）。
+ * 两条对所有账户本写入都保留（决策卡需要；写盘卡不读，多这两行不影响机械事实对账）。
+ */
+const INTENT_LEDGER_ENTRIES: ReadonlyArray<Record<string, unknown>> = [
+  {
+    kind: "customer.decision",
+    decisionKind: "intent-confirm",
+    customerDecision: "accepted",
+    actorRoleId: "liaison",
+    power: "liaison",
+  },
+  {
+    kind: "intent.handed-off",
+    actorRoleId: "liaison",
+    power: "liaison",
+    intentId: FLOW,
+    handoffKind: "initial",
+    targetRoleId: "rapporteur",
+  },
+];
+
+/** 意图基准的账本行（完整形状；供需要自定义账本文件形状的用例复用，如坏行场景）。 */
+export function intentLedgerEntries(): Array<Record<string, unknown>> {
+  const at = new Date().toISOString();
+  return INTENT_LEDGER_ENTRIES.map((entry) => ({
+    at,
+    flowId: FLOW,
+    actorRoleId: "rapporteur",
+    power: "proposal",
+    ...entry,
+  }));
+}
+
+/** 写盘确认账本种子（有效形状：`at/kind/actorRoleId/power` 齐全，避免误计坏行）。 */
+export function writeLedger(root: string, entries: Array<Record<string, unknown>>): void {
+  const base = {
+    at: new Date().toISOString(),
+    flowId: FLOW,
+    actorRoleId: "rapporteur",
+    power: "proposal",
+  };
+  write(
+    root,
+    ".ans/governance/ledger.jsonl",
+    [...INTENT_LEDGER_ENTRIES, ...entries].map((entry) => JSON.stringify({ ...base, ...entry })).join("\n") + "\n",
+  );
+}
+
+/** 清空账本（同一临时项目内多个子场景各自从空账本开始；保留意图基准两行）。 */
+export function clearLedger(root: string): void {
+  writeLedger(root, []);
 }
 
 /** 按卡种给出默认请求（driver/桌面通道共用）；所有事实都是应用侧形状。 */
@@ -199,7 +314,11 @@ export function requestFor(kind: GovernanceJudgeRequest["cardKind"], overrides: 
       : kind === "schedule-write"
         ? "convener"
         : "nominator");
-  const card = overrides.card ?? cardFor(kind);
+  const writeKind = kind === "write" || kind === "appointment-write" || kind === "schedule-write";
+  // 写盘卡的声明路径先于卡片构造：preview 的逐路径正文必须与实际 `paths` 对齐
+  // （新证据包契约要求每条声明路径都有可核对正文）。
+  const effectivePaths = writeKind ? (overrides.paths ?? defaultWritePaths(kind)) : [];
+  const card = overrides.card ?? cardFor(kind, effectivePaths);
   const artifacts =
     overrides.artifacts ??
     (kind === "proposal"
@@ -242,16 +361,9 @@ export function requestFor(kind: GovernanceJudgeRequest["cardKind"], overrides: 
   if (overrides.pathProbes !== undefined) request.pathProbes = overrides.pathProbes;
   if (overrides.allowedPathRoots !== undefined) request.allowedPathRoots = overrides.allowedPathRoots;
   if (overrides.forbiddenPaths !== undefined) request.forbiddenPaths = overrides.forbiddenPaths;
-  if (kind === "write" || kind === "appointment-write" || kind === "schedule-write") {
-    const paths =
-      overrides.paths ??
-      (kind === "write"
-        ? [PROPOSAL_REL]
-        : kind === "appointment-write"
-          ? ["角色卡/project-a/boundary.yaml"]
-          : [FLOW_REL]);
-    request.paths = paths;
-    request.pathProbes = overrides.pathProbes ?? paths.map((entry) => ({ path: entry, allowed: true }));
+  if (writeKind) {
+    request.paths = effectivePaths;
+    request.pathProbes = overrides.pathProbes ?? effectivePaths.map((entry) => ({ path: entry, allowed: true }));
     request.allowedPathRoots =
       overrides.allowedPathRoots ??
       (kind === "write" ? ["docs/proposals/"] : kind === "appointment-write" ? ["角色卡/project-a/"] : ["docs/flows/"]);

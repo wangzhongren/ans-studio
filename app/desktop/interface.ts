@@ -1,6 +1,6 @@
 import type { PersistenceReply, PersistenceValues, PersistenceUpdated, PersistenceScope } from "./session.ts";
 import { existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { createProjectDocumentReader } from "../../src/pipeline/project-document/read-project-document.ts";
 import type { ProjectDocumentRef, ProjectDocumentScope, DocumentReadErrorCode, ReadProjectDocumentResult } from "../../src/model/project-document.ts";
 // app/desktop/interface.ts
@@ -102,6 +102,7 @@ import { judgeResultSummary, type DesktopCustomerInputFn, type OperatorJudgeResu
 // 治理下一步（2026-10-18 客户修正）：客户决定成功后的**后台派发**。推导/文案纯逻辑在 governance-advance.ts；
 // 本层负责打开目标治理角色会话、投递**唯一一条**任务，并把成功/失败经既有 delivery-note 系统行如实落流。
 import {
+  acceptanceDispatchRecorded,
   buildAcceptanceTaskMessage,
   buildAppointmentWriteReminderMessage,
   buildGovernanceAdvanceMessage,
@@ -140,6 +141,14 @@ import {
 } from "./pi-config.ts";
 
 import { isRuntimeKind, getRuntimeConfig, saveRuntimeConfig, applyRuntimeConfig, type RuntimeConfigView, type RuntimeConfigSaveResult, type ProfileApplication } from "./runtime-config.ts";
+import {
+  RUNTIME_UNRESOLVED_MESSAGE,
+  persistProjectRuntime,
+  readPersistedProjectRuntime,
+  resolveProjectRuntime,
+  type RuntimeResolution,
+  type RuntimeResolutionRequest,
+} from "./runtime-resolution.ts";
 import { getSessionHistory, type SessionHistoryView } from "./runtime-history.ts";
 import type { RuntimeKind } from "../../src/model/runtime.ts";
 
@@ -284,6 +293,8 @@ export interface DesktopDeps {
   openRoleSessionFn?: (
     input: {
       roleId: string;
+      /** 会话引擎（`SessionManager` 按请求 runtime 传入；与编排 `openRoleSession` 同名字段，缺省＝未指定）。 */
+      runtime?: RuntimeKind;
       project: ProjectConfig;
       taskId?: string;
       scope?: undefined;
@@ -456,6 +467,18 @@ export interface DesktopDeps {
   savePiConfigFn?: (opts: { envPath: string; updates: Record<string, string>; env?: PiConfigEnv }) => Promise<PiConfigSaveResult>;
   /** 保存后重载所用的环境目标（缺省 `process.env`；注入以便单测不污染真实进程环境）。 */
   piConfigEnv?: PiConfigEnv;
+  /**
+   * **自动验收派发 / 冷启动补齐的 per-project 引擎选择持久化文件**（2026-10-19 真机缺陷修复）：
+   * 主进程传 user-data 下的独立 JSON（如 `<userData>/ans/runtime-selection.json`）——**不写项目 `.ans`、
+   * 不碰治理账本**。缺省 ⇒ 持久化关闭（解析器仍按活跃会话/磁盘证据/凭据解析；只是不跨重启记住选择）。
+   */
+  runtimeStatePath?: string;
+  /**
+   * **引擎解析器（可注入）**：缺省＝本层用 `envFilePath`/`piConfigEnv` 调用真实
+   * `resolveProjectRuntime`（活跃会话 → 已选/持久化 → `.ans/sessions` 磁盘证据 → 凭据可用性）。
+   * 注入以便单测隔离真实 `.env`；缺省实现绝不回退 "claude"（无凭据 ⇒ 不派发 + 系统行）。
+   */
+  resolveRuntimeFn?: (request: RuntimeResolutionRequest) => Promise<RuntimeResolution>;
   /**
    * **恢复确认卡通道（G-2/W5，2026-10-16 客户批准）**：主进程用 `recovery-channel.ts` 构造后注入
    * （`present` 推 `recovery:confirm-request`、回包 `recovery:confirm-response` 走 `respond`）。
@@ -764,6 +787,81 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     })();
   };
 
+  // —————— 验收完成检查调度（2026-10-19 客户反馈：「独立核准应该是标准流程」）——————
+  // 触发面：任一角色 settle（含 Convener 的流程单/账本更新轮）、回交到达、桌面侧治理账本追加
+  // （dispatch.accepted）、导入项目/应用启动后的一次性补齐。调度是**事件 + 有界 tick**：同一项目在
+  // 一个 40ms 窗口内最多跑一次检查（后续事件合并不顺延），不是无界轮询。
+  const ACCEPTANCE_CHECK_DELAY_MS = 40;
+  const acceptanceCheckTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  /** 合并窗口内首个触发来源（只用于诊断；先到者为准，后续事件不覆盖）。 */
+  const acceptanceCheckReasons = new Map<string, "settle" | "ledger" | "import">();
+  /** 最近一次真实会话事件的运行时（自动派发时作为优先级 1 候选；重启无记录 ⇒ 交给解析器按后续优先级判定）。 */
+  const acceptanceRuntimeHints = new Map<string, RuntimeKind>();
+  /** 每 flow 的已知回交证据路径（通用 settle 触发没有回交载荷，用先到的回交事件补齐任务文本）。 */
+  const acceptanceEvidenceByFlow = new Map<string, string[]>();
+  /** 每 flow 只派一次（运行期）；持久化去重另见账本 `acceptanceDispatchRecorded`。 */
+  const acceptanceDispatchedFlows = new Set<string>();
+  /** 每项目最多一条「无法确定项目引擎」系统行（后续真实事件只记诊断；不循环重试、不刷屏）。 */
+  const acceptanceRuntimeUnresolvedNotified = new Set<string>();
+  let runAcceptanceCheck: ((projectRoot: string, trigger: "settle" | "ledger" | "import") => Promise<void>) | undefined;
+
+  /**
+   * **解析自动派发/冷启动补齐要用的引擎**（2026-10-19 真机缺陷修复）。优先级全部在
+   * `runtime-resolution.ts`：活跃会话 → 应用内已选/持久化 → `.ans/sessions/<role>/<runtime>` 磁盘证据 →
+   * 配置凭据可用性 → 无法确定（明确失败，**绝不**回退桌面默认 "claude"）。只读；失败不猜。
+   */
+  const resolveAcceptanceRuntime = async (
+    projectRoot: string,
+    activeRuntime?: RuntimeKind,
+  ): Promise<RuntimeResolution> => {
+    const persistedRuntime = await readPersistedProjectRuntime(deps.runtimeStatePath, projectRoot);
+    const selectedRuntime = manager.governanceRuntimeFor(projectRoot);
+    const request: RuntimeResolutionRequest = {
+      projectRoot,
+      ...(activeRuntime !== undefined ? { activeRuntime } : {}),
+      ...(selectedRuntime !== undefined ? { selectedRuntime } : {}),
+      ...(persistedRuntime !== undefined ? { persistedRuntime } : {}),
+    };
+    if (deps.resolveRuntimeFn !== undefined) return deps.resolveRuntimeFn(request);
+    return resolveProjectRuntime({
+      ...request,
+      envPath: envFilePath,
+      env: deps.piConfigEnv ?? process.env,
+    });
+  };
+
+  const acceptanceFlowKey = (projectRoot: string, flowId: string): string => `${projectRoot}\u0000${flowId}`;
+
+  const rememberAcceptanceEvidence = (projectRoot: string, flowId: string, evidence: readonly string[]): void => {
+    const key = acceptanceFlowKey(projectRoot, flowId);
+    const merged = [...(acceptanceEvidenceByFlow.get(key) ?? []), ...evidence.filter((item) => typeof item === "string" && item.trim() !== "")];
+    acceptanceEvidenceByFlow.set(key, [...new Set(merged)].slice(0, 10));
+  };
+
+  function scheduleAcceptanceCheck(projectRoot: string, reason: "settle" | "ledger" | "import" = "settle"): void {
+    if (typeof projectRoot !== "string" || projectRoot.trim() === "") return;
+    if (acceptanceCheckTimers.has(projectRoot)) return; // 有界：一个窗口至多一次（后到事件合并不顺延）
+    acceptanceCheckReasons.set(projectRoot, reason);
+    const timer = setTimeout(() => {
+      acceptanceCheckTimers.delete(projectRoot);
+      const trigger = acceptanceCheckReasons.get(projectRoot) ?? "settle";
+      acceptanceCheckReasons.delete(projectRoot);
+      void (runAcceptanceCheck?.(projectRoot, trigger) ?? Promise.resolve());
+    }, ACCEPTANCE_CHECK_DELAY_MS);
+    (timer as { unref?: () => void }).unref?.();
+    acceptanceCheckTimers.set(projectRoot, timer);
+  }
+
+  /** 项目内可检查的流程：`docs/flows/*.md`（唯一流程单位；流程单缺失的 flowId 无从机械核对）。 */
+  async function listGovernanceFlowIds(projectRoot: string): Promise<string[]> {
+    try {
+      const names = await readdir(`${projectRoot}/docs/flows`);
+      return [...new Set(names.filter((name) => name.endsWith(".md")).map((name) => name.slice(0, -3)).filter((id) => id !== ""))];
+    } catch {
+      return [];
+    }
+  }
+
   // 会话事件外推：先原样转发（主进程推 `session:event`；B-2 起为**带 `roleId` 信封**的 `SessionEventEnvelope`）；
   // 再在「**主入口角色**一轮结束（`settled`）」时触发「项目可能已变」信号（→ 主进程推 `project:changed` →
   // 渲染侧重取枚举，左树随 su 建角色而长出，§10.3）。判据取**信封里的角色**（多会话并存后不能再看
@@ -772,7 +870,12 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   // 否则任命后新写的角色卡在同一轮内不可见（`role_status`/`dispatch_task` 误报「未枚举到」）。
   const emitSessionEvent = (envelope: SessionEventEnvelope): void => {
     deps.emitEvent(envelope);
+    if (typeof envelope.projectRoot === "string" && envelope.projectRoot !== "") {
+      acceptanceRuntimeHints.set(envelope.projectRoot, envelope.runtime);
+    }
     if (envelope.event.kind === "settled") {
+      // 2026-10-19：任意角色 settle 都是流程可能推进的真实时机（治理步骤不产生回交，旧挂点永远等不到）。
+      scheduleAcceptanceCheck(envelope.projectRoot);
       const settledRole = listingCache
         .get(envelope.projectRoot)
         ?.roles.find((role) => role.roleId === envelope.roleId);
@@ -808,65 +911,134 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     watchdogService = undefined;
   }
 
-  // —————— 收尾推进（2026-10-18 真机缺口）：回交送达 Convener 且其 settle 后，流程全部完成则派 Proof / 验收 ——————
-  // 触发事实来自 `SessionManager.onHandbackSettled`（回交轮 origin 的 flowId/证据）；本层只读流程单与账本做
-  // **触发门**检查，全部完成才后台派 Proof / 验收（verifier）一条汇总任务；不自动验收、不代批（验收卡仍走决策开关/客户手批）。
-  // 每 flow 只派一次（运行期 Set）；不循环重试；失败如实落 Convener 系统行。
-  const acceptanceDispatchedFlows = new Set<string>();
-  const dispatchAcceptanceAfterHandback = async (info: {
+  // —————— 收尾推进（2026-10-18 真机缺口；2026-10-19 客户反馈「独立核准应该是标准流程」）——————
+  // 触发面：**任意角色 settle**、回交到达/settle、桌面侧治理账本追加（dispatch.accepted）、导入项目/启动
+  // 后的补齐检查。本层只读流程单与账本做**触发门**检查，全部完成且证据按步骤类型齐备才后台派 Proof /
+  // 验收（verifier）一条复核任务；不自动验收、不代批（验收卡仍走决策开关/客户手批）。
+  // 去重：运行期每 flow 一次 + 账本 `dispatch.accepted{targetRoleId:verifier}` 持久化（重启不重派）；
+  // 失败如实落 Convener / Lead 系统行，不循环重试。
+  const dispatchAcceptanceForFlow = async (info: {
     projectRoot: string;
-    runtime: RuntimeKind;
-    roleId: string;
     flowId: string;
-    evidence: string[];
+    runtime?: RuntimeKind;
+    /** 系统行落位角色（trio=Convener；single=主入口）；缺省由 SessionManager 从 listing 推导。 */
+    roleId?: string;
+    evidence: readonly string[];
+    /** 回交 settle 是确定性完成信号：不因该回交自身仍在 `activeDeliveries` 而推迟。 */
+    force?: boolean;
+    trigger: "handback" | "settle" | "ledger" | "import";
   }): Promise<void> => {
     const listing = listingCache.get(info.projectRoot);
     if (listing?.governanceModel !== "trio") return; // single/旧项目不产生验收推进
-    const key = `${info.projectRoot}\u0000${info.flowId}`;
-    if (acceptanceDispatchedFlows.has(key)) return; // 每 flow 只派一次
+    const key = acceptanceFlowKey(info.projectRoot, info.flowId);
+    if (acceptanceDispatchedFlows.has(key)) return; // 每 flow 只派一次（运行期）
     acceptanceDispatchedFlows.add(key); // 先占位：防同一 settle 批次/并发重复派
-    const diagnostic = createDiagnosticLogger({ component: "desktop.governance-acceptance", projectRoot: info.projectRoot, roleId: info.roleId });
+    const noteRoleId =
+      manager.governanceOwnerRoleId(info.projectRoot) ?? info.roleId ?? listing.primaryRoleId;
+    const diagnostic = createDiagnosticLogger({ component: "desktop.governance-acceptance", projectRoot: info.projectRoot, roleId: noteRoleId });
+    // 系统行的呈现路由：冷启动解析出引擎后改用**实际引擎**（否则 Pi 视图会过滤掉落给默认 claude 的行）；
+    // 解析失败时仍用已知提示或桌面默认（保证「无法确定项目引擎」这条行可见）。
+    let noteRuntime: RuntimeKind | undefined = info.runtime ?? acceptanceRuntimeHints.get(info.projectRoot);
     const note = (summary: string): void => {
       try {
-        emitSessionEvent({ roleId: info.roleId, projectRoot: info.projectRoot, runtime: info.runtime, event: { kind: "message", summary, detail: { source: "delivery-note" } } });
+        emitSessionEvent({ roleId: noteRoleId, projectRoot: info.projectRoot, runtime: noteRuntime ?? "claude", event: { kind: "message", summary, detail: { source: "delivery-note" } } });
       } catch (error) {
         diagnostic.error("acceptance.note.failed", error);
       }
     };
     try {
+      const ledger = await readGovernanceLedger(info.projectRoot);
+      // 持久化去重（2026-10-19 客户反馈）：账本已有验收复核派发记录 ⇒ 重启/重复事件都不再派。
+      if (acceptanceDispatchRecorded(info.flowId, ledger)) {
+        diagnostic.record("acceptance.ledger.dedup", { flowId: info.flowId });
+        return; // 保留运行期占位（本进程也不再检查）
+      }
+      // 该 flow 仍有在途派发/回交/运行轮次 ⇒ 推迟到下一次事件（避免在交付完成前抢跑派 Proof）。
+      if (info.force !== true && manager.hasActiveWorkForFlow(info.projectRoot, info.flowId)) {
+        acceptanceDispatchedFlows.delete(key);
+        diagnostic.record("acceptance.deferred.active-work", { flowId: info.flowId });
+        return;
+      }
       const flowRel = governanceFlowPath(info.flowId);
       let markdown: string;
       try {
         markdown = await readFile(`${info.projectRoot}/${flowRel}`, "utf8");
       } catch (error) {
         diagnostic.record("acceptance.flow.unreadable", { flowId: info.flowId });
-        acceptanceDispatchedFlows.delete(key); // 流程单未落盘：保持现状，后续回交可再检查
+        acceptanceDispatchedFlows.delete(key); // 流程单未落盘：保持现状，后续事件可再检查
         return;
       }
-      const ledger = await readGovernanceLedger(info.projectRoot);
       const issue = flowCompletionIssue(info.flowId, markdown, ledger);
       if (issue !== undefined) {
         diagnostic.record("acceptance.flow.incomplete", { flowId: info.flowId, reason: issue });
-        acceptanceDispatchedFlows.delete(key); // 未完成/阻塞：不派；后续回交可再检查（不是循环）
+        acceptanceDispatchedFlows.delete(key); // 未完成/证据不足：不派；后续事件可再检查（不是循环）
         return;
       }
-      const message = buildAcceptanceTaskMessage(info.flowId, info.evidence);
-      const opened = await manager.openBackground({ projectRoot: info.projectRoot, roleId: "verifier", runtime: info.runtime });
+      const evidence =
+        info.evidence.length > 0 ? info.evidence : acceptanceEvidenceByFlow.get(key) ?? [];
+      // 引擎选择（2026-10-19 真机缺陷修复）：活跃会话/真实事件 → 应用内已选/持久化 → `.ans/sessions`
+      // 磁盘证据 → 凭据可用性。无法确定 ⇒ **不派发**、落一条明确系统行 + 诊断（不循环重试）；
+      // 绝不回退桌面默认 "claude"（项目实际用 Pi 时会在无 ANTHROPIC_API_KEY 下失败）。
+      const activeRuntime =
+        info.runtime ?? acceptanceRuntimeHints.get(info.projectRoot) ?? manager.activeRuntimeFor(info.projectRoot);
+      let resolution: RuntimeResolution;
+      try {
+        resolution = await resolveAcceptanceRuntime(info.projectRoot, activeRuntime);
+      } catch (error) {
+        diagnostic.error("acceptance.runtime.resolve.failed", error, { flowId: info.flowId });
+        resolution = { ok: false, message: RUNTIME_UNRESOLVED_MESSAGE, skipped: [] };
+      }
+      if (!resolution.ok) {
+        // 释放运行期占位：客户选定引擎后的真实事件可以再检查一次；没有事件就不会重试（非循环）。
+        acceptanceDispatchedFlows.delete(key);
+        diagnostic.error("acceptance.runtime.unresolved", new Error(resolution.message), { flowId: info.flowId });
+        if (!acceptanceRuntimeUnresolvedNotified.has(info.projectRoot)) {
+          acceptanceRuntimeUnresolvedNotified.add(info.projectRoot);
+          note(resolution.message);
+        }
+        return;
+      }
+      const runtime = resolution.runtime;
+      noteRuntime = runtime; // 之后的开/发/系统行都按实际引擎路由（Pi 视图可见）
+      const message = buildAcceptanceTaskMessage(info.flowId, evidence);
+      const opened = await manager.openBackground({ projectRoot: info.projectRoot, roleId: "verifier", runtime });
       if (!opened.ok) {
         acceptanceDispatchedFlows.delete(key);
         diagnostic.error("acceptance.open.failed", new Error(opened.error ?? "unknown"), { flowId: info.flowId });
         note(`收尾推进失败：无法开启 Proof / 验收 会话：${opened.error ?? "未知原因"}；未自动重试。`);
         return;
       }
-      const sent = await manager.sendBackground({ projectRoot: info.projectRoot, roleId: "verifier", runtime: info.runtime, text: message });
+      const sent = await manager.sendBackground({ projectRoot: info.projectRoot, roleId: "verifier", runtime, text: message });
       if (!sent.ok) {
         acceptanceDispatchedFlows.delete(key);
         diagnostic.error("acceptance.send.failed", new Error(sent.error ?? "unknown"), { flowId: info.flowId });
         note(`收尾推进失败：发送验收任务给 Proof / 验收 失败：${sent.error ?? "未知原因"}；未自动重试。`);
         return;
       }
+      // 成功派发后记住该项目实际使用的引擎（user-data 独立 JSON）——下次冷启动补齐检查据此选路；
+      // 写失败只记诊断，不影响已完成的派发/审计。
+      const persisted = await persistProjectRuntime(deps.runtimeStatePath, info.projectRoot, runtime);
+      if (!persisted.ok) {
+        diagnostic.error("acceptance.runtime.persist.failed", new Error(persisted.error ?? "unknown"), { flowId: info.flowId });
+      }
+      // 持久化去重 + 审计：应用自动派发 ≠ 客户批准（不写 customerDecision/decisionEvidence）。
+      const appended = await appendGovernanceLedger(info.projectRoot, {
+        at: new Date().toISOString(),
+        kind: "dispatch.accepted",
+        flowId: info.flowId,
+        stepId: "verification",
+        actorRoleId: "app",
+        power: "app",
+        trigger: "settle",
+        targetRoleId: "verifier",
+        messageSummary: ledgerSummary(message),
+        runtime,
+      });
+      if (!appended.ok) {
+        diagnostic.error("acceptance.ledger.failed", new Error(appended.message), { flowId: info.flowId });
+      }
       note(governanceAcceptanceAdvanceNote(info.flowId));
-      diagnostic.record("acceptance.dispatched", { flowId: info.flowId, queued: sent.queued === true });
+      diagnostic.record("acceptance.dispatched", { flowId: info.flowId, queued: sent.queued === true, trigger: info.trigger });
     } catch (error) {
       acceptanceDispatchedFlows.delete(key);
       diagnostic.error("acceptance.advance.failed", error, { flowId: info.flowId });
@@ -894,8 +1066,19 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     loadEffectiveConfig: loadEffectiveConfigFn,
     getListing: (root) => listingCache.get(root),
     emitEvent: emitSessionEvent,
-    // 收尾推进（2026-10-18）：回交送达 Steward / 统筹 且其本轮 settle 后，检查流程完成度并（仅全部完成时）派 Proof / 验收。
-    onHandbackSettled: (info) => { void dispatchAcceptanceAfterHandback(info); },
+    // 收尾推进（2026-10-18；2026-10-19 扩展）：回交送达 Steward / 统筹 且其本轮 settle 后，检查流程完成度
+    // 并（仅全部完成时）派 Proof / 验收。回交 settle 是确定性信号 ⇒ `force` 跳过在途守卫。
+    onHandbackSettled: (info) => {
+      rememberAcceptanceEvidence(info.projectRoot, info.flowId, info.evidence);
+      void dispatchAcceptanceForFlow({ ...info, evidence: info.evidence, force: true, trigger: "handback" });
+    },
+    // 回交到达（尚未 settle）：先记住证据路径并登记一次检查——通用 settle 触发也能带上报告路径。
+    onHandbackReceived: (info) => {
+      if (info.flowId !== undefined) rememberAcceptanceEvidence(info.projectRoot, info.flowId, info.evidence);
+      scheduleAcceptanceCheck(info.projectRoot);
+    },
+    // 桌面侧治理账本追加（dispatch.accepted 等）：账本变更后重新检查（有界合并）。
+    onGovernanceLedgerAppended: (info) => { scheduleAcceptanceCheck(info.projectRoot, "ledger"); },
     emitPersistenceChange: update => { if (update.scope.projectRoot === importedProjectRoot) deps.emitPersistenceChange?.(update); },
     // L-1 + 状态准确性：真实状态快照外推（变化时；缺省 ⇒ 界面无队列行/忙态——入队本身不受影响）。
     emitRoleState: deps.emitRoleState,
@@ -921,6 +1104,20 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       listingCache.set(fresh.projectRoot, fresh);
     },
   });
+
+  // 验收检查的执行体（由 `scheduleAcceptanceCheck` 的有界 tick 调用）：枚举项目流程单 → 逐 flow 过同一道
+  // 触发门。`dispatch.accepted` 的账本去重保证导入/重启后的补齐检查不会重复派 Proof。
+  runAcceptanceCheck = async (projectRoot: string, trigger: "settle" | "ledger" | "import"): Promise<void> => {
+    const listing = listingCache.get(projectRoot);
+    if (listing?.governanceModel !== "trio") return;
+    const flowIds = await listGovernanceFlowIds(projectRoot);
+    if (flowIds.length === 0) return;
+    // 引擎在 `dispatchAcceptanceForFlow` 内按统一解析器选择（冷启动时没有活跃会话 ⇒ 走持久化/磁盘证据/凭据；
+    // 无法确定则该 flow 不派并落系统行）。
+    for (const flowId of flowIds) {
+      await dispatchAcceptanceForFlow({ projectRoot, flowId, evidence: [], trigger });
+    }
+  };
 
   async function persistenceCall<K extends keyof PersistenceValues>(operation: K, input: unknown): Promise<PersistenceReply<PersistenceValues[K]>> {
     const invalid = (code: 'INVALID_REQUEST' | 'PROJECT_NOT_ACTIVE'): PersistenceReply<PersistenceValues[K]> => ({ ok: false, version: 1, code, message: code === 'INVALID_REQUEST' ? '保存请求无效。' : '该项目不是当前导入项目。' });
@@ -1023,6 +1220,11 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       if (generation === importSequence) importedProjectRoot = listing.projectRoot;
       const documentListing = documentReader.updateListing(documentSequence, listing.projectRoot, roles.map(projectDocumentCandidates));
       for (const role of roles) role.documents = documentListing.documents[role.roleId] ?? [];
+      // 2026-10-19 客户反馈：导入项目 / 应用启动后做一次**补齐检查**——流程已齐备但尚未派 Proof 时自动补派。
+      // 走同一道门 + 账本持久化去重；事件驱动（40ms 合并窗口），不是轮询。
+      if (generation === importSequence && (listing.governanceModel ?? "single") === "trio") {
+        scheduleAcceptanceCheck(listing.projectRoot, "import");
+      }
       return {
         ...(documentListing.documentScope ? { documentScope: documentListing.documentScope } : {}),
         ...(documentListing.documentReadUnavailable ? { documentReadUnavailable: documentListing.documentReadUnavailable } : {}),
@@ -1258,7 +1460,12 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
 
     async openSession(input): Promise<OpenResult> {
       if (!input || typeof input.projectRoot !== "string" || typeof input.roleId !== "string" || !isRuntimeKind(input.runtime)) return { ok: false, error: "会话请求须指定项目、角色与运行时。" };
-      return manager.open(input);
+      const result = await manager.open(input);
+      // 客户在界面上选定的引擎也是「应用内已选」的事实：成功开会话后记住（per-project；demo 不参与自动派发）。
+      if (result.ok) {
+        void persistProjectRuntime(deps.runtimeStatePath, input.projectRoot, input.runtime).catch(() => undefined);
+      }
+      return result;
     },
 
     async sendSession(input: { text: string; images?: unknown; target?: SessionTarget; metadata?: SessionMessageMetadata }): Promise<SendResult> {
@@ -1375,6 +1582,9 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         });
         if (!appended.ok) {
           diagnostic.error("advance.ledger.failed", new Error(appended.message), { flowId: payload.flowId, targetRoleId: ledgerTarget });
+        } else {
+          // 账本发生变更（dispatch.accepted 追加）⇒ 触发一次有界验收检查（在途工作由检查器自行推迟）。
+          scheduleAcceptanceCheck(projectRoot, "ledger");
         }
       };
       // W6-B 真机阻塞修复（任命后的派发时序）：客户决定卡是在来源角色本轮**中途**作答的——Nominator
@@ -1514,6 +1724,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           });
           if (!appendedNomination.ok) {
             diagnostic.error("advance.ledger.failed", new Error(appendedNomination.message), { flowId, targetRoleId: "nominator" });
+          } else {
+            scheduleAcceptanceCheck(projectRoot, "ledger");
           }
         }
         return {
