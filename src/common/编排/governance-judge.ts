@@ -46,6 +46,7 @@ import { buildGovernanceJudgePrompt, buildGovernanceJudgeSystemPrompt } from "./
 import { evaluateAcceptanceCompletion, requiredArtifactPaths, isGovernanceJudgeFlowId } from "./governance-judge-facts.ts";
 import { buildDecisionEvidencePacket, safeProjectRelativePath, verifyEvidenceHashes } from "./governance-judge-evidence.ts";
 import { readGovernanceLedger } from "./governance-ledger.ts";
+import { evaluateFlowCompletion, parseFlowStateYaml } from "./flow-state.ts";
 import {
   boundedGovernanceJudgeAudit,
   evaluateGovernanceJudgeVerdict,
@@ -186,9 +187,12 @@ function contextProblem(request: GovernanceJudgeRequest): { reasonCode: string; 
 }
 
 /**
- * 验收机械门槛（P6 验收观察，安全项）：只读流程单 + 账本，**不采信模型自报**。
- * 所有步骤 `done`、每个步骤都有 `dispatch.accepted`、无未结算决定/未闭环澄清、账本可读；
- * 任一不满足 ⇒ `manual`（原卡 + 说明），绝不自动验收未完成的 flow。
+ * 验收机械门槛（P6 验收观察，安全项）：只读流程状态 + 账本，**不采信模型自报**。
+ *
+ * 2026-10-19 Flow YAML 契约（客户「这些全部改成yaml」）：流程物证是 `docs/flows/<flowId>.yaml` 时，
+ * 用 **YAML 契约**判定——`parseFlowStateYaml` 校验文档，`evaluateFlowCompletion` 按显式 `kind`
+ * 对账账本证据（不再按 stepId 前缀猜）。YAML 不合法 / 未通过收尾门 ⇒ `manual`。
+ * 旧版 `.md` 流程单保留原 Markdown 判定（迁移兼容）。
  */
 async function verifyAcceptanceMechanics(
   request: GovernanceJudgeRequest,
@@ -199,9 +203,9 @@ async function verifyAcceptanceMechanics(
   if (rel === undefined) {
     return { ok: false, reasonCode: "artifact-missing", reason: "验收卡缺少流程单物证路径，已转手动确认。" };
   }
-  let flowMarkdown: string;
+  let flowText: string;
   try {
-    flowMarkdown = await readFile(path.join(projectRoot, ...rel.split("/")), "utf8");
+    flowText = await readFile(path.join(projectRoot, ...rel.split("/")), "utf8");
   } catch {
     return { ok: false, reasonCode: "artifact-missing", reason: "流程单不可读，无法核对验收完成度，已转手动确认。" };
   }
@@ -211,8 +215,43 @@ async function verifyAcceptanceMechanics(
   } catch {
     return { ok: false, reasonCode: "ledger-unavailable", reason: "治理账本不可读，无法核对验收完成度，已转手动确认。" };
   }
+
+  if (/\.ya?ml$/i.test(rel)) {
+    // flowId 以**文件名**为准（契约规则 1）；并核对卡片 flowId，防止用别的流程状态验收本流程。
+    const fileName = rel.split("/").pop() ?? "";
+    const fileFlowId = fileName.replace(/\.ya?ml$/i, "");
+    if (!isGovernanceJudgeFlowId(fileFlowId) || fileFlowId !== request.flowId) {
+      return {
+        ok: false,
+        reasonCode: "insufficient-evidence",
+        reason: `流程 YAML 路径与卡片 flowId 不一致（文件 ${rel}，卡片 ${request.flowId}）。已转手动确认。`,
+      };
+    }
+    const parsed = parseFlowStateYaml(flowText, fileFlowId);
+    if (!parsed.ok) {
+      const detail = parsed.errors.slice(0, 8).map((error) => `${error.path}: ${error.message}`).join("；");
+      return {
+        ok: false,
+        reasonCode: "insufficient-evidence",
+        reason: `流程 YAML 校验失败（${rel}）：${detail}。已转手动确认。`,
+      };
+    }
+    if (ledger.errors.length > 0) {
+      return { ok: false, reasonCode: "ledger-unavailable", reason: "治理账本不可读或存在坏行，无法核对验收完成度，已转手动确认。" };
+    }
+    const completion = evaluateFlowCompletion(parsed.flow, ledger.entries);
+    if (!completion.ready) {
+      return {
+        ok: false,
+        reasonCode: "insufficient-evidence",
+        reason: `流程未通过收尾门（${rel}）：${completion.issues.slice(0, 8).join("；")}。已转手动确认。`,
+      };
+    }
+    return { ok: true };
+  }
+
   return evaluateAcceptanceCompletion({
-    flowMarkdown,
+    flowMarkdown: flowText,
     facts: request.facts,
     ledgerEntries: ledger.entries,
     ledgerErrors: ledger.errors.length,

@@ -62,7 +62,9 @@ import type { GovernanceAdvanceResult } from "../../../app/desktop/governance-ad
 export const FLOW = "flow-a";
 export const PROPOSAL_REL = `docs/proposals/${FLOW}-v1.md`;
 export const NOMINATION_REL = `docs/nominations/${FLOW}-v1.md`;
-export const FLOW_REL = `docs/flows/${FLOW}.md`;
+// 2026-10-19 Flow YAML 契约（客户「这些全部改成yaml」）：`docs/flows/<flowId>.yaml` 是唯一机器状态；
+// 同名 `.md` 仅人读视图，产品门禁不再解析它做判定。
+export const FLOW_REL = `docs/flows/${FLOW}.yaml`;
 export const GOV_REL = "角色卡/governance-boundary.yaml";
 export const ANS_REL = ".ans/project.json";
 /** 意图记录路径（decision 组判断的唯一意图基准；`docs/intents/<intentId>.md`）。 */
@@ -187,15 +189,49 @@ export function nominationDoc(flowId = FLOW, recommended = ["executor"]): string
   ].join("\n");
 }
 
-export function flowDoc(flowId = FLOW, steps: Array<{ id: string; status?: string }> = [{ id: "impl", status: "pending" }]): string {
-  return [
-    `# 流程 ${flowId}`,
-    "",
-    "| 步骤 | 角色 | 状态 |",
-    "| --- | --- | --- |",
-    ...steps.map((step) => `| ${step.id} | executor | ${step.status ?? "pending"} |`),
-    "",
-  ].join("\n");
+export interface FlowDocStep {
+  id: string;
+  status?: string;
+  /** 默认按保留验收 id（verification/acceptance）推断 acceptance，其余 dispatch。 */
+  kind?: string;
+  owner?: string;
+  title?: string;
+  /** done 步骤的证据；缺省时 dispatch→{kind:"dispatch",ref:id}、acceptance→{kind:"acceptance",ref:"acceptance"}。 */
+  evidence?: { kind: string; ref: string };
+}
+
+/**
+ * 生成合法 Flow YAML（`docs/flows/<flowId>.yaml` 唯一机器状态；契约见 `src/common/编排/flow-state.ts`）。
+ * 顶层 flowId/version/qualityTier/steps；每步 id/title/owner/kind/status；done 必须带同 kind 的 evidence
+ * （dispatch 的 ref=账本 stepId；acceptance 的 ref 固定 "acceptance"）。pending 等状态不要求 evidence。
+ */
+export function flowDoc(flowId = FLOW, steps: FlowDocStep[] = [{ id: "impl", status: "pending" }]): string {
+  const lines = [`flowId: ${flowId}`, "version: 1", "qualityTier: production", "steps:"];
+  for (const step of steps) {
+    const status = step.status ?? "pending";
+    const kind = step.kind ?? (step.id === "verification" || step.id === "acceptance" ? "acceptance" : "dispatch");
+    const owner = step.owner ?? (kind === "acceptance" ? "verifier" : "executor");
+    const title = step.title ?? step.id;
+    lines.push(
+      `  - id: ${step.id}`,
+      `    title: ${title}`,
+      `    owner: ${owner}`,
+      `    kind: ${kind}`,
+      `    status: ${status}`,
+    );
+    if (status === "done") {
+      const evidence =
+        step.evidence ??
+        (kind === "acceptance"
+          ? { kind: "acceptance", ref: "acceptance" }
+          : kind === "dispatch"
+            ? { kind: "dispatch", ref: step.id }
+            : undefined);
+      if (evidence === undefined) throw new Error(`flowDoc：${step.id} 为 done，kind=${kind} 必须显式给 evidence`);
+      lines.push("    evidence:", `      kind: ${evidence.kind}`, `      ref: ${evidence.ref}`);
+    }
+  }
+  return lines.join("\n") + "\n";
 }
 
 export function intentDoc(intentId = "intent-a", flowId = FLOW): string {

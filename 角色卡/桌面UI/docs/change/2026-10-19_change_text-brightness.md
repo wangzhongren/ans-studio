@@ -30,7 +30,7 @@
 | `node --test test/桌面应用/renderer.test.ts test/桌面应用/tool-rows.test.ts` | **159 计 / 159 过 / 0 红**（A2 对比度断言改用 `#F2F4F6`，并新增「正文亮于次级文字」层次断言；阈值未放宽） |
 | `ANS_VISUAL_V2_UI_ONLY=1`（改前，`#E7E9EB`） | **VISUAL_V2_PASS 54** |
 | `ANS_VISUAL_V2_UI_ONLY=1`（改后，`#F2F4F6`） | **VISUAL_V2_PASS 54**（暗色表面扫描无回归） |
-| `ANS_NOTICE_UI_ONLY=1`（证据刷新） | **SYSTEM_NOTICE_UI_PASS 5** |
+| `ANS_NOTICE_UI_ONLY=1`（证据刷新） | **SYSTEM_NOTICE_UI_PASS 6**（含同期「无文件目标」工具行检查；截图按新文本色刷新） |
 | `node --test test/桌面应用/runtime-ui.test.ts` | 12 计 / 11 过 / 1 红＝既有基线（`localStorage` 源码守卫，HEAD 即红） |
 | `npm run typecheck` | 0 错 |
 

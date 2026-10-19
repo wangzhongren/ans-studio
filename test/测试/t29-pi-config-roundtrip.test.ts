@@ -281,11 +281,22 @@ test("T29 G-5：choices 元数据透传（注册表读取链）＋值域校验�
     assert.equal(field!.required, false, "推理强度为可选（留空＝维持平台默认）");
 
     // ② 注册表保存链拒非法值（单一来源）：不落盘、错误不回显提交值原文。
+    //    2026-10-19：错误文案本地化（`runtime-config.ts` 用注册表 `choiceLabels`，与 raw `choices` 等长时），
+    //    校验仍以 raw choices 为准。断言与注册表**同源**拼出期望文本，不另写第二份值域。
     const bad = await saveRuntimeConfig({ runtime: "pi", updates: { ANS_PI_REASONING_EFFORT: "bogus" } }, { envPath: t.envPath });
     assert.equal(bad.ok, false, "非法档位由注册表保存链如实拒绝");
+    const reasoningField = RUNTIME_SETTINGS.pi.fields.find((f) => f.key === "ANS_PI_REASONING_EFFORT");
+    assert.ok(reasoningField, "注册表须含推理强度字段（断言不依赖硬编码标签）");
+    const acceptedText = (reasoningField!.choiceLabels ?? reasoningField!.choices ?? []).join(" / ");
     assert.ok(
-      bad.error?.includes("取值无效") === true && bad.error.includes("off / low / medium / high / xhigh"),
-      `错误须列出合法值域：${bad.error}`,
+      bad.error?.includes(`${reasoningField!.label}取值无效：仅接受 ${acceptedText}`) === true &&
+        bad.error.includes("或留空维持平台默认"),
+      `错误须与注册表单一来源一致（本地化标签 + 留空语义）：${bad.error}`,
+    );
+    assert.deepEqual(
+      reasoningField!.choices,
+      ["off", "low", "medium", "high", "xhigh"],
+      "choices 仍逐字透传英文值域（本地化只换展示标签，不改校验/提交值域）",
     );
     assert.equal((bad.error ?? "").includes("bogus"), false, "拒绝错误不得回显提交值原文");
     assert.equal((await readEnvFile(t.envPath))["ANS_PI_REASONING_EFFORT"], undefined, "被拒 ⇒ 不落盘（零副作用）");

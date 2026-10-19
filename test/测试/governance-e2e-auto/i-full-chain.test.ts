@@ -1,6 +1,6 @@
 // test/测试/governance-e2e-auto/i-full-chain.test.ts
 // 五角色**全自动闭环**（离线端到端）：Lead 交接意图 → Draft 写提案并请客户接受 →
-// 应用派 Steward 写流程单 → 应用派 Crew 提名 → 客户任命 executor → 应用派 Crew 写卡 →
+// 应用派 Steward 写流程状态 YAML → 应用派 Crew 提名 → 客户任命 executor → 应用派 Crew 写卡 →
 // listing 刷新后应用派 Steward 排程 → Steward dispatch_task 派发给 executor。
 //
 // 唯一非产品件是模型会话（脚本化桩）与判断会话（假模型交回 approve）；其余走真实桌面 Interface、
@@ -100,7 +100,7 @@ test("五角色全自动链路：意图→提案→接受→流程→提名→�
             },
           ];
         }
-        if (/请先写流程单/.test(ctx.prompt)) {
+        if (/请先写流程状态 YAML/.test(ctx.prompt)) {
           return [{ name: "write_file", args: { path: FLOW_REL, content: flowDoc(FLOW, [{ id: "impl", status: "pending" }]) } }];
         }
         return [];
@@ -189,12 +189,12 @@ test("五角色全自动链路：意图→提案→接受→流程→提名→�
     assert.ok(first("liaison") >= 0, "Liaison 由客户打开");
     assert.ok(first("rapporteur") > first("liaison"), "交接后后台开 Rapporteur");
     assert.ok(first("convener") > first("rapporteur"), "接受提案后先开 Convener");
-    assert.ok(first("nominator") > first("convener"), "流程单落盘后才开 Nominator");
+    assert.ok(first("nominator") > first("convener"), "流程状态 YAML 落盘后才开 Nominator");
     assert.ok(first("executor") > first("nominator"), "派发后开 executor");
 
     // —— 四个治理角色各收到正确的任务模板 ——
     assert.match(h.prompts.get("rapporteur")![0]!, /客户意图已交接/);
-    assert.match(h.prompts.get("convener")![0]!, /请先写流程单 docs\/flows\/flow-a\.md/);
+    assert.match(h.prompts.get("convener")![0]!, /请先写流程状态 YAML docs\/flows\/flow-a\.yaml/);
     assert.match(h.prompts.get("nominator")![0]!, /请执行提名/);
     assert.match(h.prompts.get("nominator")!.at(-1)!, /appointment-write/);
     assert.ok(
@@ -208,7 +208,8 @@ test("五角色全自动链路：意图→提案→接受→流程→提名→�
       assert.equal(exists(temp.root, rel), true, `应落盘：${rel}`);
     }
     const flowText = (await import("node:fs")).readFileSync(`${temp.root}/${FLOW_REL}`, "utf8");
-    assert.match(flowText, /\| impl \|.*\| done \|/, "Convener 第二段把步骤更新为 done");
+    assert.match(flowText, /^\s+- id: impl$/m, "流程 YAML 含 impl 步骤");
+    assert.match(flowText, /^\s+status: done$/m, "Convener 第二段把 impl 更新为 done");
 
     // —— 账本可还原：交接、三个 judge 决定、三段 app 派发、Convener 派发 ——
     const ledger = await h.waitForLedger(() => true);

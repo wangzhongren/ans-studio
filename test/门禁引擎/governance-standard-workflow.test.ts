@@ -9,6 +9,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { parse as parseYaml } from "yaml";
 
 import {
   BUILT_IN_GOVERNANCE_ROLES,
@@ -136,6 +137,154 @@ test("标准工作流：Steward / 统筹——流程单→派发项目角色→�
       "全部步骤齐备后",
     ],
     "Steward 标准工作流",
+  );
+});
+
+test("标准工作流：Steward / 统筹——流程机器状态改为 docs/flows/<flowId>.yaml（schema/保留 ID/evidence/superseded）", () => {
+  // 客户 2026-10-19 决定（原文：「这些全部改成yaml。」）：流程状态唯一机器来源是 YAML，
+  // Markdown 仅人读视图；Steward 必须按 schema 写 YAML，显式 kind/evidence/supersedes，
+  // 保留 id verification/acceptance 归应用自动派 Proof，被 retake 取代的步骤标 superseded。
+  const t = cardTextOf("convener");
+  assertIncludesAll(
+    t,
+    [
+      "docs/flows/<flowId>.yaml",
+      "唯一机器状态",
+      "人读视图",
+      "不得承载门禁状态",
+      "flowId: <flowId>",
+      "version: 1",
+      "qualityTier: production",
+      "steps:",
+      "`id` / `title` / `owner` / `kind` / `status` / `evidence` / `supersedes` / `supersededBy`",
+      "`dispatch` / `customer-decision` / `artifact` / `acceptance`",
+      "`pending` / `dispatched` / `delivered` / `done` / `superseded` / `failed` / `blocked`",
+      "`aborted` 会被识别并挡门",
+      "`evidence` 是对象 `{ kind, ref }`",
+      "`kind` 必须与步骤 `kind` 一致",
+      "`status: done` 的步骤必须有 `evidence`",
+      "无证据不得标 `done`",
+      "**保留 ID**",
+      "`verification` / `acceptance`",
+      "唯一的验收步骤",
+      "`kind: acceptance`",
+      "初始 `status: pending`",
+      "你不占用、不派发、不标 `done`",
+      "`verification-evidence`",
+      "`status: superseded`",
+      "`supersededBy: <新步骤 id>`",
+      "`supersedes: [<旧步骤 id>]`",
+      "不要保留 `aborted` / `failed` 行挡收尾门",
+      "非法 `id`（含占用保留 id）",
+      "非法枚举值",
+      "未知字段",
+      "`done` 缺 `evidence` 都会被拒绝",
+      "不得改用 Markdown 表格",
+      "stepId 不一致时派发会被拒",
+    ],
+    "Steward 流程 YAML 契约",
+  );
+  // YAML 模板必须逐字可见（含顶层必填、done + evidence 与非保留执行步骤 id）。
+  assert.ok(t.includes("  - id: verification-evidence"), "模板须含非保留的执行/证据步骤 id");
+  assert.ok(t.includes("      ref: docs/contracts/<name>-v1.md"), "模板须显式给出 evidence.ref");
+  // 旧 Markdown 步骤表模板必须消失：不得回退到 Markdown 承载机器状态。
+  assert.doesNotMatch(t, /\| stepId \|/, "Steward 卡不得再用 Markdown 步骤表模板");
+  assert.doesNotMatch(t, /stepId 必须在表格第一列/, "旧表格约束必须删除");
+});
+
+test("标准工作流：Steward 卡中的 YAML 模板可被 yaml 解析，顶层/字段/枚举/evidence 合法且保留 id 只用于验收步骤", () => {
+  const t = cardTextOf("convener");
+  const match = /```yaml\n([\s\S]*?)```/.exec(t);
+  assert.ok(match, "Convener 卡须含 ```yaml 模板块");
+  const doc = parseYaml(match![1]) as {
+    flowId?: unknown;
+    version?: unknown;
+    qualityTier?: unknown;
+    steps?: Array<Record<string, unknown>>;
+  };
+  assert.equal(doc.flowId, "<flowId>", "模板须含顶层 flowId（与文件名一致）");
+  assert.equal(doc.version, 1, "模板须含正整数 version");
+  assert.equal(doc.qualityTier, "production", "模板须含 qualityTier（prototype / production）");
+  assert.ok(Array.isArray(doc.steps) && doc.steps.length > 0, "模板须解析出 steps 数组");
+  const kinds = new Set(["dispatch", "customer-decision", "artifact", "acceptance"]);
+  const statuses = new Set([
+    "pending",
+    "dispatched",
+    "delivered",
+    "done",
+    "superseded",
+    "failed",
+    "blocked",
+    "aborted",
+  ]);
+  const ids = new Set<string>();
+  let acceptanceSteps = 0;
+  for (const step of doc.steps!) {
+    assert.equal(typeof step.id, "string", "步骤须有 id");
+    assert.equal(typeof step.title, "string", "步骤须有 title");
+    assert.equal(typeof step.owner, "string", "步骤须有 owner");
+    const id = String(step.id);
+    assert.match(id, /^[a-z0-9][a-z0-9-]{1,63}$/, `步骤 id 须为小写 slug：${id}`);
+    assert.equal(ids.has(id), false, `步骤 id 不得重复：${id}`);
+    ids.add(id);
+    assert.ok(kinds.has(String(step.kind)), `kind 非法：${String(step.kind)}`);
+    assert.ok(statuses.has(String(step.status)), `status 非法：${String(step.status)}`);
+    if (id === "verification" || id === "acceptance") {
+      assert.equal(step.kind, "acceptance", "保留 id 只能用于验收步骤（kind: acceptance）");
+      assert.equal(step.status, "pending", "验收步骤初始状态必须 pending");
+    }
+    if (step.kind === "acceptance") {
+      acceptanceSteps += 1;
+      assert.ok(step.id === "verification" || step.id === "acceptance", "验收步骤必须使用保留 id");
+    }
+    if (step.status === "done") {
+      const evidence = step.evidence;
+      assert.ok(
+        typeof evidence === "object" && evidence !== null && !Array.isArray(evidence),
+        "done 的步骤须有 evidence 对象 { kind, ref }",
+      );
+      const record = evidence as Record<string, unknown>;
+      assert.equal(record.kind, step.kind, "evidence.kind 必须与步骤 kind 一致");
+      assert.equal(typeof record.ref, "string", "evidence.ref 必填");
+      assert.notEqual(record.ref, "", "evidence.ref 不得为空");
+    }
+  }
+  assert.equal(acceptanceSteps, 1, "模板须恰有一个验收步骤（保留 id）");
+  assert.ok(
+    doc.steps!.some((step) => step.id === "verification-evidence"),
+    "模板须给出非保留的执行/证据步骤示例（verification-evidence）",
+  );
+  assert.ok(doc.steps!.some((step) => step.kind === "dispatch"), "模板须给出 dispatch 步骤示例");
+});
+
+test("标准工作流：五卡流程状态引用统一为 YAML（唯一机器状态），Markdown 仅人读视图；Crew/Proof 按 YAML 读取", () => {
+  // 客户 2026-10-19 决定「这些全部改成yaml」：不只是 Steward 写 YAML，其余四张卡的治理文件命名与
+  // 流程读取也必须统一为 YAML 机器状态；Markdown 只在人读视图出现。
+  for (const spec of BUILT_IN_GOVERNANCE_ROLES) {
+    const t = spec.cardText;
+    assert.ok(t.includes("`docs/flows/<flowId>.yaml`"), `${spec.id} 须引用 YAML 机器状态路径`);
+    assert.ok(t.includes("唯一机器状态"), `${spec.id} 须写明 YAML 是唯一机器状态`);
+    assert.ok(t.includes("`docs/flows/<flowId>.md`"), `${spec.id} 须保留 Markdown 人读视图路径`);
+    assert.ok(t.includes("仅人读视图"), `${spec.id} 须写明 Markdown 仅人读视图`);
+  }
+  // Crew 读流程必须读 YAML 机器状态，不得只写泛化的 docs/flows/**。
+  const n = cardTextOf("nominator");
+  assert.match(
+    n,
+    /`docs\/flows\/<flowId>\.yaml`（唯一机器状态；同名 `\.md` 仅人读视图）的流程单/,
+    "Crew 须按 YAML 读取流程单",
+  );
+  // Proof 标准复核按 YAML 读取流程状态（Markdown 仅人读）。
+  const v = cardTextOf("verifier");
+  assert.match(
+    v,
+    /读 `docs\/flows\/<flowId>\.yaml`（唯一机器状态；同名 `\.md` 仅人读视图）/,
+    "Proof 须按 YAML 读取流程状态",
+  );
+  assert.doesNotMatch(
+    v,
+    /读流程单\/提案\/契约\/架构影响分析：读 `docs\/flows\/<flowId>\.md`/,
+    "Proof 不得再把 Markdown 当流程状态来源",
   );
 });
 

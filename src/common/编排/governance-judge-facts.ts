@@ -222,7 +222,10 @@ export function requiredArtifactPaths(request: GovernanceJudgeRequest): {
   // 约定路径（flowId 缺失 ⇒ 文字，不编造路径）。
   const expectedProposal = flowId !== undefined ? `docs/proposals/${flowId}-v1.md` : "提案";
   const expectedNomination = flowId !== undefined ? `docs/nominations/${flowId}-v1.md` : "提名";
-  const expectedFlow = flowId !== undefined ? `docs/flows/${flowId}.md` : "流程单文件";
+  // 2026-10-19 Flow YAML 契约：机器状态 = docs/flows/<flowId>.yaml；旧版 .md 仅人读视图。
+  const expectedFlow = flowId !== undefined
+    ? `docs/flows/${flowId}.yaml（旧版人读视图：docs/flows/${flowId}.md）`
+    : "流程单文件";
 
   switch (request.cardKind) {
     case "proposal":

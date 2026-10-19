@@ -1167,3 +1167,21 @@
 **跨角色请求**：① 运行时核心将 `resolveShellJudgeBudget`/`ShellJudgeBudget` 登记为跨角色只读契约或收敛到 `common/shared/`（本批只读使用既有导出，未改 runtime-core；policy.ts 头注释仍写「不跨角色导出」）；② `src/provider/runtime/schema.ts` 的 `report_shell_judgement` 工具说明仍是「allow = necessary / deny = not necessary」旧口径，需属主同步为系统风险口径，避免与编排系统提示冲突。
 
 **边界与残余**：提示只能引导，硬约束仍是运行时核心只读工具/预算与编排读取损伤降级；项目内命令若实际触及五类风险仍会 deny/manual（风险审查本职）。未 git 提交；未读 `.env`、未跑真实模型。详见[变更记录](docs/change/2026-10-19_change_shell-judge-risk-scope.md)。
+
+## 2026-10-19 — Flow YAML：`docs/flows/<flowId>.yaml` 成为唯一机器状态
+
+**来源**：客户原话「这些全部改成yaml。」真机反复出现流程单 Markdown 表问题（`verification` 保留字被占、`verification-evidence` 缺 dispatch 记录、aborted/failed 行挡收尾门）。本批只写 `src/common/编排/**`、`src/pipeline/orchestration/**`、`test/编排/**`、本角色文档；未碰 `app/**`、其他角色文件、git 历史。
+
+**改了什么**
+- 新增 `src/common/编排/flow-state.ts`：`parseFlowStateYaml(text, flowId)`（严格 schema：flowId/version/qualityTier/steps；kind/status/evidence.kind 枚举；保留 id；done 证据；supersede 存在性/无环；未知字段/缺必填逐条 `{path,message}`）、`validateFlowEvidence(flow, ledger)`（dispatch.accepted / customer.decision / artifact.observed 与显式 `evidence.ref` 对账；只认已结算客户决定）、`evaluateFlowCompletion(flow, ledger)`（收尾门：执行步骤 done+证据、failed/blocked/aborted 未 supersede fail-closed、验收步骤 pending、无未结算决定）、`flowCompletionIssue`（旧桌面 string|undefined 薄适配）、`flowStatePath`。复用 `yaml@2.9.0`，未加依赖。**替代关系双写**：`supersededBy`（旧→新）与 `supersedes`（新→旧）归一化为「旧→新」一条边并去重，门禁 Steward 卡要求的双写不再误报环；只写一侧合法，真环与两侧矛盾仍具体 path 拒绝。
+- 新增 `src/pipeline/orchestration/flow-state.ts` 薄再导出；`govern-session.ts` 同源再导出（桌面只经 Pipeline 公共出口）。
+- `governance-gate.ts`：派发门禁 YAML 优先（YAML 存在即唯一机器状态，非法 fail-closed 不回落 `.md`；缺失才回落旧 `.md`）。
+- `run-role.ts`：确认卡声明 `docs/flows/<flowId>.yaml|yml` 时做写前 `parseFlowStateYaml` 校验（preview 逐路径正文提取，与 `declaredPathBodies` 同源；不合法不发卡/不发行/不写账本）；`docs/flows/*.yaml` 纳入 `write-flow` 门禁路由；判断物证/`schedule-write` artifact 优先 YAML；`artifactFlowMetadata` 识别 YAML。
+- `governance-judge.ts`：验收机械门槛遇 `.yaml` 走 `parseFlowStateYaml` + `evaluateFlowCompletion`（账本 errors 先行 fail-closed），旧 `.md` 保留原判定。
+- `governance-judge-evidence.ts`：决策证据包的 flow 物证为 `.yaml|.yml` 时按文件名 flowId 复用 `parseFlowStateYaml`——合法 ⇒ `entry.steps = [{id,status}]`；非法/文件名 flowId 与卡片不一致 ⇒ `flow-state-invalid` + 前 8 条 `path: message`（acceptor 底线不再泛化报「缺少可解析的步骤表」）；`extractFlowExcerpts` 给「流程状态 YAML」有界摘要（flowId/version/qualityTier + steps id/kind/status/evidence），不再标「未解析」。`.md` legacy 分支逐字不变；证据包版本 v2/上限/哈希语义未变。
+- `governance-judge-facts.ts` / `governance-judge-verdict.ts` / `governance-judge-prompt.ts`：缺失物证提示、schedule-write 路径匹配与 rubric 改为 YAML 口径（`.md` 迁移兼容）。
+- `govern-session.ts`：`STANDARD_WORKFLOW_PROMPT` 与 Convener/verifier 纪律改为 YAML 口径（唯一机器状态 `docs/flows/<flowId>.yaml`、同名 `.md` 仅人读视图、保留 `verification`/`acceptance`、显式 `kind`/`evidence`/`supersedes`）；`governance-session.test.ts` 补断言与反向断言（不得再指示写 `.md`）。
+
+**测试**：新增 `test/编排/flow-state.test.ts` 32 例（含替代关系双写/单侧/真环/矛盾）；`test/编排/decision-evidence-packet.test.ts` 新增 3 例（YAML-only 验收包、非法 YAML flow-state-invalid、legacy Markdown 不变）；`node --test "test/编排/flow-state.test.ts"` **32/32**；`node --test "test/编排/decision-evidence-packet.test.ts"` **19/19**；`node --test "test/编排/**/*.test.ts"` **670 计 670 过 0 红 0 skipped**（基线 635，+35）；`npm run typecheck` **exit 0**。
+
+**跨角色**：桌面自动验收门已并发接线（调用口径见变更记录 §7）；Steward/门禁卡文本改用 YAML；运行时核心 `write_file` 对 `docs/flows/*.yaml` 的落盘前二次校验（内容漂移）归其属主；新增 pipeline 文件需在编排 boundary Section 1 补登。**残余**：O-A1 内容漂移未采纳；YAML 缺失时仍回落旧 `.md`（迁移窗口）。详见[变更记录](docs/change/2026-10-19_change_flow-yaml-state.md)。

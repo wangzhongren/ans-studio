@@ -81,6 +81,38 @@ export type {
   GovernanceGateInput,
 } from "../../common/编排/governance-gate.ts";
 
+// ── 2026-10-19：Flow YAML 契约（`docs/flows/<flowId>.yaml` 唯一机器状态）的 Pipeline 公共出口 ──
+// 桌面只依赖 Pipeline 公共出口，**不直接导入**编排私有 `common/`。单一实现仍在
+// `src/common/编排/flow-state.ts`；此处为薄再导出（与 `src/pipeline/orchestration/flow-state.ts` 同源）。
+export {
+  parseFlowStateYaml,
+  evaluateFlowCompletion,
+  flowCompletionIssue,
+  validateFlowEvidence,
+  flowStatePath,
+  isReservedAcceptanceStepId,
+  FLOW_QUALITY_TIERS,
+  FLOW_STEP_KINDS,
+  FLOW_STEP_STATUSES,
+  FLOW_EVIDENCE_KINDS,
+  RESERVED_ACCEPTANCE_STEP_IDS,
+} from "../../common/编排/flow-state.ts";
+export type {
+  FlowState,
+  FlowStateStep,
+  FlowStepEvidence,
+  FlowStepKind,
+  FlowStepStatus,
+  FlowEvidenceKind,
+  FlowQualityTier,
+  FlowStateError,
+  FlowEvidenceIssue,
+  FlowLedgerInput,
+  ParseFlowStateResult,
+  ValidateFlowEvidenceResult,
+  EvaluateFlowCompletionResult,
+} from "../../common/编排/flow-state.ts";
+
 // ── W6-A（2026-10-18）：意图交接/澄清的 Pipeline 公共出口 ──────────────────────────────────
 // 四角色评审 §5.2：桌面窗口只依赖 Pipeline 公共出口，**不直接导入**编排私有 `common/`。
 // 薄再导出：`validateIntentHandoff`/`intentHandoffDedupeKey`/澄清轮次计数与上限。
@@ -574,14 +606,15 @@ const ARCHITECTURE_EXTENSIBILITY_REQUIREMENTS = [
 const STANDARD_WORKFLOW_PROMPT = [
   "**标准工作流（阶段流转由应用负责）**：内置角色按标准工作流执行——意图确认 → 提案与契约 → 任命与角色卡 → 流程与派发 → 独立验收；",
   "trio 依次由 Lead / 主理、Draft / 提案、Crew / 组队、Steward / 统筹、Proof / 验收承担，single/su 由同一治理角色按同一顺序推进。",
+  "**流程状态唯一机器状态**：`docs/flows/<flowId>.yaml`（同名 `.md` 仅人读视图，不得承载门禁状态）；步骤必须显式写 `kind` / `evidence` / `supersedes`；保留 id `verification` / `acceptance`（`kind: acceptance`，初始 `status: pending`，由应用自动派 Proof，不得占用、不得标 `done`）。",
   "**客户不做内部调度**：阶段流转由应用负责，客户不需要逐阶段手动转交或触发；只有需要客户决定的事项（提案接受、任命、写盘确认、验收）才经治理卡呈给客户。",
   "**Proof 的标准复核流程（独立核准是标准流程，不是客户手动转交）**：收到验收任务后按序执行：",
-  "① 读证据（流程单、提案/契约、交付与回交报告、演示证据路径）；",
+  "① 读证据（流程状态 YAML `docs/flows/<flowId>.yaml`、提案/契约、交付与回交报告、演示证据路径）；",
   "② 用审批档 shell 跑测试（逐条执行提案声明的单元/集成/端到端测试，命令逐条提交审批并记录输出）；",
   "③ 真实启动演示（执行启动命令、确认可访问，形成截图/录屏证据）；",
   "④ 质量/架构核对（按工程质量基线逐项核对，并核对实现与架构方案/影响分析一致：模块边界、依赖方向、扩展点、schema/API 版本迁移）；",
   "⑤ 验收卡（核对结论与证据写入 docs/verification/<flowId>-v1.md，再发 request_choice：cardKind=acceptance、选项 accept/reject）。",
-  "**自动派发**：应用会在流程齐备（执行步骤全部 done 且均有 dispatch.accepted、无未结算决定、验收步骤 pending）后自动派发 Proof / 验收，不需要客户手动触发；",
+  "**自动派发**：应用会在流程齐备（执行步骤全部 done 且按显式 `kind` 与账本证据对账、无未结算决定、验收步骤 pending）后自动派发 Proof / 验收，不需要客户手动触发；",
   "自动派发不是验收决定——验收卡仍由 Proof 核对后发出，由客户/判断 agent 决定。",
 ].join("\n");
 
@@ -726,8 +759,10 @@ function governanceFunctionDiscipline(spec: BuiltInGovernanceRoleSpec): string {
     case "schedule":
       return (
         `**编排权纪律（${spec.displayName}，不拥有最终批准权）**：` +
-        "流程单写入 `docs/flows/<flowId>.md`（步骤表；首步标「提名」），项目工作流写入 `docs/workflow.md`，" +
-        "工作记录写入 `docs/governance/convener/**`。\n" +
+        "流程状态写入 `docs/flows/<flowId>.yaml`（**唯一机器状态**；同名 `.md` 仅人读视图），" +
+        "步骤必须显式写 `kind` / `evidence` / `supersedes`；保留 id `verification` / `acceptance` " +
+        "（`kind: acceptance`，初始 pending，由应用自动派 Proof，你不占用、不派发、不标 done）；" +
+        "首步标「提名」；项目工作流写入 `docs/workflow.md`，工作记录写入 `docs/governance/convener/**`。\n" +
         "**质量与演示**：流程单与派发任务必须携带质量与演示要求——每个交付步骤写明按工程质量基线执行，" +
         "验收步骤写明必须真实启动应用并演示（启动命令、访问地址或截图/录屏）；未真实运行的交付不得写" +
         "「已完成」或「可验收」。\n" +
@@ -759,7 +794,7 @@ function governanceFunctionDiscipline(spec: BuiltInGovernanceRoleSpec): string {
       return (
         `**验收权纪律（${spec.displayName}，不拥有最终批准权）**：` +
         "核对报告写入 `docs/verification/`，本角色的治理工作记录写入 `docs/governance/verifier/`；" +
-        "读取流程单（`docs/flows/<flowId>.md`）、提案/契约、交付与回交证据，独立逐项核对。\n" +
+        "读取流程状态 `docs/flows/<flowId>.yaml`（唯一机器状态；同名 `.md` 仅人读视图）、提案/契约、交付与回交证据，独立逐项核对。\n" +
         "**独立核准是标准流程**：收到验收任务即按标准复核流程执行——读证据 → 审批档 shell 跑测试 → " +
         "真实启动演示 → 质量/架构核对 → 验收卡；不得等待客户手动转交，不得要求客户触发验收。\n" +
         "**质量与演示核对**：逐项核对工程质量基线并给出证据；交付未被真实启动并演示" +

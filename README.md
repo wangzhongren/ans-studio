@@ -80,6 +80,44 @@ Codex 与 Claude 使用 API key，不使用订阅或 OAuth 登录回退。更多
 
 技术结构与跨角色接口见[项目架构](角色卡/项目管理/docs/architecture.md)。
 
+## 流程状态 YAML
+
+流程状态以 `docs/flows/<flowId>.yaml` 为唯一机器状态，应用只解析它做派发与验收判定。同名的 `docs/flows/<flowId>.md` 仅是人读视图，应用不解析它做判定；Markdown 流程文档仍可保留给人阅读。
+
+顶层字段为 `flowId` / `version` / `qualityTier` / `steps`；步骤字段为 `id` / `title` / `owner` / `kind` / `status` / `evidence` / `supersedes` / `supersededBy`。
+
+```yaml
+flowId: todo-list-v1          # 必填；与文件名一致
+version: 1                    # 必填；正整数
+qualityTier: production       # 必填；prototype | production
+steps:                        # 必填；非空
+  - id: delivery-server-old   # 被 retake 取代的旧步骤
+    title: 服务端交付（旧）
+    owner: <项目角色 id>
+    kind: dispatch
+    status: superseded
+    supersededBy: delivery-server
+  - id: delivery-server       # 必填；小写 slug；verification / acceptance 为保留 id
+    title: 服务端交付
+    owner: <项目角色 id>
+    kind: dispatch            # dispatch | customer-decision | artifact | acceptance
+    status: done              # pending | dispatched | delivered | done | superseded | failed | blocked | aborted
+    evidence:                 # done 必填；kind 与步骤 kind 对应，ref 为账本匹配键
+      kind: dispatch
+      ref: delivery-server
+    supersedes: [delivery-server-old]  # 与旧步骤的 supersededBy 双写，同一条关系
+  - id: verification
+    title: 验收
+    owner: app
+    kind: acceptance
+    status: pending
+```
+
+- **`done` 必须有对应证据。** `dispatch` 对账账本 `dispatch.accepted`；`customer-decision` 对账已结算的客户决定；`artifact` 对账 `artifact.observed`；`acceptance` 对账客户验收决定。
+- **验收步骤归应用。** `verification` / `acceptance` 是应用自动派 Proof 的验收步骤（`kind: acceptance`，初始 `status: pending`）；Steward 不占用这两个 id、不派发、不标 `done`，执行与证据步骤改用其他 id（如 `verification-evidence`）。
+- **取代关系显式记录。** 推荐双写：被 retake 取代的旧步骤标 `status: superseded` 并写 `supersededBy`，新步骤写 `supersedes`；只写一侧也合法。真环（步骤互指或闭环）与两侧矛盾会被拒绝。`failed` / `blocked` / `aborted` 未标 `superseded` 时仍阻塞收尾。
+- **非法 YAML 不回退。** YAML 存在但校验失败（未知字段、未知枚举、缺必填、`done` 缺证据等）时，应用 fail-closed 并给出具体路径与原因；仅在 YAML 不存在时，迁移期兼容旧的 Markdown 流程。
+
 ## 工程质量基线与验收演示
 
 默认按生产级质量推进；客户在意图阶段明确选择原型档时，才可放宽其中不适用的条目。提案、角色卡、流程派发与验收都携带同一份质量基线，不在最后验收时才补。

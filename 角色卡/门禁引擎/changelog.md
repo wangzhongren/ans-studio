@@ -1,5 +1,57 @@
 # 门禁引擎 变更记录
 
+## 2026-10-19 — 五张内置卡流程状态统一为 YAML（唯一机器状态），Steward 标准工作流改写 YAML（客户决定）
+
+客户原话：「这些全部改成yaml。」客户决定：流程状态改为 `docs/flows/<flowId>.yaml` 作为**唯一机器
+状态**，`docs/flows/<flowId>.md` 仅人读视图；Steward 标准工作流必须写 YAML，用显式
+`kind` / `evidence` / `supersedes`，避免再用 Markdown 表撞收尾门。协调方追加：Lead / Draft / Crew /
+Proof 四张卡的流程状态引用也统一为该口径，Proof 标准复核按 YAML 读取。本批只做**门禁引擎**属主部分：
+五张内置卡文本、测试与文档；权力、Section 1、预授权、禁写、能力位与判定逻辑零变化。
+完整记录见[变更记录](docs/change/2026-10-19_change_steward-flow-yaml.md)。
+
+- **边界**：`src/common/门禁引擎/governance-roles.ts`、
+  `test/门禁引擎/governance-trio.test.ts`、`test/门禁引擎/governance-standard-workflow.test.ts`、
+  本文件、`memo.md`、`docs/change/2026-10-19_change_steward-flow-yaml.md`（新）。未碰 `app/**`、
+  `src/pipeline/**`、`src/common/编排/**`、`src/service/**`、其他角色文件/测试、真实项目；
+  不读 `.env`、不跑真实模型/凭据/网络；未 commit。
+- **Steward 卡文本（与真实 Flow YAML 契约对齐）**：顶层 `flowId/version/qualityTier/steps`（可选
+  `status` 仅人读）；步骤字段 `id/title/owner/kind/status/evidence/supersedes/supersededBy`；
+  `kind ∈ dispatch|customer-decision|artifact|acceptance`；
+  `status ∈ pending|dispatched|delivered|done|superseded|failed|blocked`（迁移兼容 `aborted`
+  会被识别并挡门）；`evidence` 为 `{kind,ref}` 且 `kind` 与步骤 `kind` 一致（dispatch→账本
+  `dispatch.accepted.stepId`、customer-decision→账本 `decisionKind`、artifact→项目相对产物路径、
+  acceptance→固定 `acceptance`）；`done` 步骤必须有 `evidence`；保留 id
+  `verification`/`acceptance` 只能用于唯一验收步骤（`kind: acceptance`、初始 `pending`、
+  `owner: app`），Steward 不占用/不派发/不标 done，执行/证据步骤用 `verification-evidence` 等 id；
+  被 retake 取代的旧步骤标 `superseded` + `supersededBy`，新步骤写 `supersedes: [...]`，
+  不留 `aborted/failed` 挡门；非法 id/枚举/未知字段/缺 evidence 被应用拒绝后按提示修正 YAML，
+  **不得改回 Markdown 表格**。旧 Markdown 步骤表模板删除；真实演示要求改挂执行/证据步骤。
+- **其余四张卡（协调方追加）**：Lead / Draft / Crew / Proof 的治理文件命名统一为
+  `docs/flows/<flowId>.yaml`（唯一机器状态；同名 `.md` 仅人读视图）；Crew 标准工作流读流程单改为
+  读 YAML，Proof 标准复核改为按 YAML 读取流程状态；各自写权/禁写/能力位/纪律逐字不变。
+- **逐字保留**：不拥有最终批准权、派发只依据客户已接受提案/已任命名单/流程单步骤、不派发治理角色、
+  不写角色卡/不创建角色、治理角色之间不 dispatch、提名由应用后台派发、判断代批纪律、治理卡参数、
+  可写目录/禁写、shell 审批档、工程质量基线、contract-freeze/集成端到端/架构模块引用、
+  不自动推进/不催办。
+- **测试**：`node --test "test/门禁引擎/**/*.test.ts"` ⇒ **283 计 / 282 过 / 0 红 / 1 skip**
+  （基线 280/279/0/1；新增 3 例：YAML schema/保留 ID/evidence/superseded 关键字断言；
+  用 `yaml` 实际解析卡内模板块校验顶层/字段/枚举/done evidence/保留 id；五卡统一口径与
+  Crew/Proof 按 YAML 读取）。卡内 YAML 模板另用编排 `parseFlowStateYaml` 实测通过
+  （`template-flow`）。既有断言按新契约更新、未放宽；`npm run typecheck` ⇒ **exit 0**。
+- **跨角色事实/依赖（只读核读，未越界修改）**：① 编排已落盘 Flow YAML 契约
+  `src/common/编排/flow-state.ts`（`parseFlowStateYaml`/`evaluateFlowCompletion`；
+  `governance-gate.ts` YAML 优先、坏 YAML fail-closed；`run-role.ts` 写前校验；`governance-judge*`
+  与 `governance-judge-facts.ts` 改 YAML）——五卡 schema 与其一致；② **桌面
+  `app/desktop/flow-state.ts` 仍是临时实现且形状不同**（`stepId`/`kind: decision`/evidence 数组/
+  无 version·qualityTier），`interface.ts` 现导入它；桌面注释与跨角色请求均写明应改导入
+  `src/pipeline/orchestration/flow-state.ts` 并删除临时文件——**未完成前真机自动验收门会拒合法
+  YAML**；③ 编排 `govern-session.ts` 的 `STANDARD_WORKFLOW_PROMPT`（与卡文本成对同步）仍写
+  `docs/flows/<flowId>.md`，须同批更新；④ 桌面 `governance-advance.ts` 的
+  `governanceFlowPath` 仍返回 `.md`（新增 `governanceFlowStatePath` 返回 `.yaml`，interface 已
+  YAML 优先）；⑤ 五张卡口径已统一，代码侧文案（②③④）仍待各自属主同步。
+- **残余风险**：桌面/编排两套解析形状过渡期不一致；`evidence` 无内容哈希；Markdown 人读视图可
+  漂移；真机端到端与独立复验未进行。来源：客户决定原话「这些全部改成yaml。」（经任务派发转达）。
+
 ## 2026-10-19 — 五张内置治理角色卡加入「标准工作流」，阶段流转由应用负责（客户反馈）
 
 客户原话：「这个独立核准应该是标准流程，而不是我在发给他。」「内置角色应该有自己的工作流。」

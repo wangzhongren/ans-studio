@@ -69,7 +69,13 @@ function appointmentWriteTarget(path: string): string | undefined {
 
 function scheduleWriteMatches(flowId: string, path: string): boolean {
   const normalized = normalizeRel(path);
-  return normalized === "docs/workflow.md" || normalized === `docs/flows/${flowId}.md`;
+  return (
+    normalized === "docs/workflow.md" ||
+    // 2026-10-19 Flow YAML 契约：`.yaml` 是唯一机器状态；`.md` 旧版人读视图迁移兼容。
+    normalized === `docs/flows/${flowId}.yaml` ||
+    normalized === `docs/flows/${flowId}.yml` ||
+    normalized === `docs/flows/${flowId}.md`
+  );
 }
 
 /** 任何卡都不得确认的危险写路径（评审 §十一-7；应用探测之外的第二道机械复核）。 */

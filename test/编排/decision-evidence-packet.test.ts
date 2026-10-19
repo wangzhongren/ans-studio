@@ -108,6 +108,72 @@ function seedIntentLedger(root: string, input: { flowId?: string; intentId?: str
   writeFile(root, ".ans/governance/ledger.jsonl", `${lines.join("\n")}\n`);
 }
 
+/** 验收卡账本：意图确认 + 交接 + 提案接受 + 逐步骤 dispatch.accepted。 */
+function seedAcceptanceLedger(root: string, stepIds: readonly string[] = ["impl"]): void {
+  seedIntentLedger(root, {
+    extraLines: [
+      JSON.stringify({
+        at: "2026-10-19T00:00:02.000Z",
+        kind: "customer.decision",
+        flowId: "flow-a",
+        actorRoleId: "rapporteur",
+        power: "proposal",
+        decisionKind: "proposal-accept",
+        customerDecision: "accepted",
+        decisionEvidence: { kind: "customer-input" },
+      }),
+      ...stepIds.map((stepId, index) => JSON.stringify({
+        at: new Date(Date.UTC(2026, 9, 19, 0, 0, 3 + index)).toISOString(),
+        kind: "dispatch.accepted",
+        flowId: "flow-a",
+        stepId,
+        actorRoleId: "app",
+        power: "app",
+      })),
+    ],
+  });
+}
+
+/** 验收卡判断请求（flow 物证路径可切换 YAML / legacy Markdown）。 */
+function acceptanceRequest(root: string, flowPath: string): GovernanceJudgeRequest {
+  return {
+    group: "decision",
+    cardKind: "acceptance",
+    roleId: "verifier",
+    projectRoot: root,
+    runtime: "claude",
+    governanceModel: "trio",
+    flowId: "flow-a",
+    card: {
+      kind: "choice",
+      title: "验收 flow-a",
+      options: [{ id: "accept", label: "验收" }],
+      cardKind: "acceptance",
+      flowId: "flow-a",
+    },
+    artifacts: { proposalPath: "docs/proposals/flow-a-v1.md", flowPath },
+    facts: facts({ proposalDecision: "accepted", dispatchedStepIds: ["impl"] }),
+    at: new Date().toISOString(),
+  };
+}
+
+const FLOW_STATE_YAML = `flowId: flow-a
+version: 1
+qualityTier: production
+steps:
+  - id: impl
+    title: 实现
+    owner: backend
+    kind: dispatch
+    status: done
+    evidence: { kind: dispatch, ref: impl }
+  - id: verification
+    title: 验收
+    owner: verifier
+    kind: acceptance
+    status: pending
+`;
+
 function facts(over: Partial<GovernanceJudgeFacts> = {}): GovernanceJudgeFacts {
   return {
     governanceModel: "trio",
@@ -426,6 +492,92 @@ test("验收证据：流程步骤 + 账本记录；facts 与重读账本不一�
     if (drift.ok) return;
     assert.equal(drift.reasonCode, "evidence-conflict");
     assert.match(drift.reason, /proposalDecision/);
+  });
+});
+
+// —————————————— 2026-10-19：Flow YAML 证据包（YAML-only 验收不再误判） ——————————————
+
+test("验收证据（YAML-only）：流程状态解析出步骤，不报『缺少可解析的步骤表』", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, "docs/proposals/flow-a-v1.md", PROPOSAL_MARKDOWN);
+    writeFile(root, "docs/flows/flow-a.yaml", FLOW_STATE_YAML);
+    seedIntent(root);
+    seedAcceptanceLedger(root, ["impl"]);
+
+    const built = await buildDecisionEvidencePacket({
+      request: acceptanceRequest(root, "docs/flows/flow-a.yaml"),
+      projectRoot: root,
+    });
+    assert.equal(built.ok, true, built.ok ? "" : built.reason);
+    if (!built.ok) return;
+
+    const flow = built.packet.evidence.find((entry) => entry.kind === "flow")!;
+    assert.deepEqual(flow.steps, [
+      { id: "impl", status: "done" },
+      { id: "verification", status: "pending" },
+    ]);
+    assert.ok(
+      !built.packet.integrity.problems.some((problem) => /流程单缺少可解析的步骤表/.test(problem)),
+      "YAML-only 流程不得被误报为缺少步骤表",
+    );
+    assert.ok(
+      flow.excerpts.some((excerpt) => excerpt.label === "流程状态 YAML" && excerpt.text.includes("flowId: flow-a")),
+      "YAML 应给出结构化摘要片段",
+    );
+    assert.ok(!flow.excerpts.some((excerpt) => /未解析/.test(excerpt.label)), "YAML 不应标为未解析");
+  });
+});
+
+test("验收证据（YAML 非法）：flow-state-invalid 带具体 path/message，仍 fail-closed", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, "docs/proposals/flow-a-v1.md", PROPOSAL_MARKDOWN);
+    writeFile(
+      root,
+      "docs/flows/flow-a.yaml",
+      FLOW_STATE_YAML.replace("    status: done", "    status: in-progress"),
+    );
+    seedIntent(root);
+    seedAcceptanceLedger(root, ["impl"]);
+
+    const built = await buildDecisionEvidencePacket({
+      request: acceptanceRequest(root, "docs/flows/flow-a.yaml"),
+      projectRoot: root,
+    });
+    assert.equal(built.ok, false);
+    if (built.ok) return;
+    assert.equal(built.reasonCode, "flow-state-invalid");
+    assert.match(built.reason, /steps\[0\]\.status/);
+    assert.match(built.reason, /in-progress/);
+    assert.doesNotMatch(built.reason, /流程单缺少可解析的步骤表/);
+  });
+});
+
+test("验收证据（legacy Markdown）：仍走原步骤表解析与旧失败文案", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, "docs/proposals/flow-a-v1.md", PROPOSAL_MARKDOWN);
+    writeFile(root, "docs/flows/flow-a.md", "# 流程\n\n| stepId | 步骤 | 状态 |\n| --- | --- | --- |\n| impl | 实现 | done |\n");
+    seedIntent(root);
+    seedAcceptanceLedger(root, ["impl"]);
+
+    const built = await buildDecisionEvidencePacket({
+      request: acceptanceRequest(root, "docs/flows/flow-a.md"),
+      projectRoot: root,
+    });
+    assert.equal(built.ok, true, built.ok ? "" : built.reason);
+    if (!built.ok) return;
+    const flow = built.packet.evidence.find((entry) => entry.kind === "flow")!;
+    assert.deepEqual(flow.steps, [{ id: "impl", status: "done" }]);
+
+    // 不可解析的 legacy Markdown 仍保留旧文案。
+    writeFile(root, "docs/flows/flow-a.md", "# 流程\n\n没有步骤表。\n");
+    const legacy = await buildDecisionEvidencePacket({
+      request: acceptanceRequest(root, "docs/flows/flow-a.md"),
+      projectRoot: root,
+    });
+    assert.equal(legacy.ok, false);
+    if (legacy.ok) return;
+    assert.equal(legacy.reasonCode, "insufficient-evidence");
+    assert.match(legacy.reason, /流程单缺少可解析的步骤表/);
   });
 });
 

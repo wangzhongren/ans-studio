@@ -114,7 +114,8 @@ import { withHandback, type OrchestrationEvent, type TaskReport, type HandbackIn
 import { EXIT_OK, EXIT_USAGE, EXIT_FAILURE } from "../../common/编排/exit-codes.ts";
 import type { ShellVerdictFn } from "../../common/编排/shell-gate.ts";
 import { repinIfBootstrapped, DEFAULT_GOVERNANCE_BOUNDARY_REL } from "../../common/编排/finalize.ts";
-import { conditionSlugsOf, createConfirmedWriteIssuer, explicitConfirmPaths, validateConfirmPreviewCompleteness } from "../../common/编排/confirmed-writes.ts";
+import { conditionSlugsOf, declaredPathBodies, createConfirmedWriteIssuer, explicitConfirmPaths, validateConfirmPreviewCompleteness } from "../../common/编排/confirmed-writes.ts";
+import { parseFlowStateYaml } from "../../common/编排/flow-state.ts";
 import {
   appendGovernanceLedger,
   readGovernanceLedger,
@@ -760,6 +761,22 @@ export async function openRoleSession(
                 `请把每条路径的完整正文或明确结构放进同一个 preview 后重试，并继续在 paths 参数中逐条列出这些路径；` +
                 `本次未向客户发卡，也未发行任何写入路径。`,
             };
+          }
+          // 2026-10-19 Flow YAML 契约（客户「这些全部改成yaml」）：确认卡若声明写
+          // `docs/flows/<flowId>.yaml`（唯一机器状态），preview 中的 YAML 必须先通过确定性校验；
+          // 不合法 ⇒ 拒绝该卡（不发卡、不发行、不写账本），把具体 path + reason 交回 Steward 修正。
+          // `schedule-write` 与普通 `write` 走同一闸；未声明 YAML 的旧版 .md 卡保持迁移兼容。
+          const flowYamlError = validateFlowYamlCard(
+            req,
+            completeness.declaredPaths,
+            req.flowId ?? originalMetadata?.flowId,
+          );
+          if (flowYamlError !== undefined) {
+            log.record("flow.yaml.invalid", {
+              roleId: setup.role.id,
+              declaredPaths: completeness.declaredPaths,
+            });
+            return { outcome: "declined", reason: flowYamlError };
           }
           // 2026-10-18 双开关评审 §5.2：judgeContext 的**唯一计算点**。只在 trio 角色、允许的
           // cardKind、且 flowId 合法时计算；并入传给客户通道的 metadata（桌面只消费）。
@@ -1616,8 +1633,9 @@ function governanceActionForPath(rel: string | undefined): RoutedGovernanceActio
   if (rel === undefined) return undefined;
   const parts = rel.split("/");
   if (parts[0] === "docs" && parts[1] === "flows") {
-    if (parts.length === 3 && parts[2].endsWith(".md")) {
-      const flowId = parts[2].slice(0, -".md".length);
+    // 2026-10-19 Flow YAML 契约：`.yaml` 是唯一机器状态；`.md` 为旧版人读视图（迁移兼容）。
+    if (parts.length === 3 && /\.(?:md|ya?ml)$/i.test(parts[2]!)) {
+      const flowId = parts[2]!.replace(/\.(?:md|ya?ml)$/i, "");
       return { action: "write-flow", ...(isGovernanceFlowId(flowId) ? { flowId } : {}) };
     }
     if (parts.length > 3) return { action: "write-flow" }; // 非标准子路径：无 flowId → 拒
@@ -1645,6 +1663,107 @@ const GOVERNANCE_FLOW_ID_RE = /^[a-z0-9][a-z0-9-]{1,63}$/;
 
 function isGovernanceFlowId(value: unknown): value is string {
   return typeof value === "string" && GOVERNANCE_FLOW_ID_RE.test(value);
+}
+
+// —————————————————————— Flow YAML 写前校验（2026-10-19） ——————————————————————
+
+/** 确认卡声明的 Flow YAML 路径形状（唯一机器状态）。 */
+const FLOW_YAML_PATH_RE = /^docs\/flows\/([a-z0-9][a-z0-9-]{1,63})\.(?:yaml|yml)$/;
+
+function flowYamlTargetsOf(paths: readonly string[]): Array<{ rel: string; flowId: string }> {
+  const targets: Array<{ rel: string; flowId: string }> = [];
+  const seen = new Set<string>();
+  for (const rel of paths) {
+    const match = FLOW_YAML_PATH_RE.exec(rel);
+    if (match === null || seen.has(rel)) continue;
+    seen.add(rel);
+    targets.push({ rel, flowId: match[1]! });
+  }
+  return targets;
+}
+
+/** 去掉包住 YAML 正文的一层代码围栏（```yaml … ``` / ~~~yaml … ~~~；容忍围栏后还有说明文字）。 */
+function stripYamlFence(body: string): string {
+  const lines = body.replace(/\r\n/g, "\n").split("\n");
+  let start = 0;
+  while (start < lines.length && lines[start]!.trim() === "") start += 1;
+  const opener = start < lines.length ? /^(`{3,}|~{3,})\s*([A-Za-z0-9_-]*)\s*$/.exec(lines[start]!.trim()) : null;
+  if (opener !== null && (opener[2] === "" || /^ya?ml$/i.test(opener[2]!))) {
+    const fence = opener[1]!;
+    const fenceChar = fence[0]!;
+    for (let end = start + 1; end < lines.length; end += 1) {
+      const trimmed = lines[end]!.trim();
+      if (trimmed.length >= fence.length && [...trimmed].every((char) => char === fenceChar)) {
+        return lines.slice(start + 1, end).join("\n");
+      }
+    }
+  }
+  return body;
+}
+
+/**
+ * 从确认卡 preview 提取 `docs/flows/<flowId>.yaml` 的 YAML 正文：
+ *   1. 优先取该路径锚点之后的逐路径正文（与证据包/完整性闸共用 `declaredPathBodies`）；
+ *   2. 回退 preview 中第一个含 `flowId:` 的 YAML 围栏；
+ *   3. 再回退「整个 preview 就是 YAML」。
+ * 取不到 ⇒ undefined（调用方 fail-closed 拒绝该卡）。
+ */
+function flowYamlBodyFromPreview(preview: string | undefined, rel: string): string | undefined {
+  const text = typeof preview === "string" ? preview : "";
+  const body = declaredPathBodies(text, [rel]).find((entry) => entry.path === rel);
+  if (body !== undefined && body.hasBody) {
+    const stripped = stripYamlFence(body.body).trim();
+    if (stripped !== "") return stripped;
+  }
+  const fenced = /(`{3,}|~{3,})\s*(?:ya?ml)?\s*\n([\s\S]*?)\n\1/.exec(text);
+  if (fenced !== null && /^\s*flowId\s*:/m.test(fenced[2]!)) return fenced[2]!.trim();
+  const trimmed = text.trim();
+  if (/^\s*flowId\s*:/m.test(trimmed)) return trimmed;
+  return undefined;
+}
+
+/**
+ * 确认卡的 Flow YAML 写前校验（**确定性**，不调用模型）：
+ *   · 仅当声明路径含 `docs/flows/<flowId>.yaml`（或 `.yml`）时生效；
+ *   · 卡片 flowId（若有）必须与文件名一致；
+ *   · preview 必须能提取出 YAML 正文，且 `parseFlowStateYaml` 全部通过。
+ * 返回 `undefined` = 通过；否则返回给模型/Steward 的具体错误文案（含每条 path + reason）。
+ */
+function validateFlowYamlCard(
+  req: CustomerInputRequest,
+  declaredPaths: readonly string[],
+  cardFlowId: string | undefined,
+): string | undefined {
+  if (req.kind !== "confirm") return undefined;
+  const targets = flowYamlTargetsOf(declaredPaths);
+  if (targets.length === 0) return undefined;
+
+  const failures: string[] = [];
+  for (const target of targets) {
+    if (cardFlowId !== undefined && cardFlowId !== target.flowId) {
+      failures.push(`${target.rel}: 卡片 flowId="${cardFlowId}" 与文件名 flowId="${target.flowId}" 不一致`);
+      continue;
+    }
+    const yamlText = flowYamlBodyFromPreview(req.preview, target.rel);
+    if (yamlText === undefined) {
+      failures.push(
+        `${target.rel}: 无法从 preview 提取 YAML 正文；请以标题（如 \`## ${target.rel}\`）或代码围栏说明锚定该路径，并给出完整 YAML`,
+      );
+      continue;
+    }
+    const parsed = parseFlowStateYaml(yamlText, target.flowId);
+    if (parsed.ok) continue;
+    for (const error of parsed.errors.slice(0, 50)) {
+      failures.push(`${target.rel} ${error.path}: ${error.message}`);
+    }
+  }
+
+  if (failures.length === 0) return undefined;
+  return (
+    `流程 YAML 未通过校验：\n- ${failures.join("\n- ")}\n` +
+    "本次未向客户发卡，也未发行任何写入路径。" +
+    "请按上述路径与原因修正 docs/flows/<flowId>.yaml（唯一机器状态；.md 仅人读视图）后重试。"
+  );
 }
 
 /**
@@ -1899,7 +2018,13 @@ async function findDecisionArtifact(
     candidate = latest?.relPath;
     version = latest?.version;
   } else if (entry.decisionKind === "schedule-write") {
-    candidate = entry.flowId !== undefined ? `docs/flows/${entry.flowId}.md` : undefined;
+    // 2026-10-19 Flow YAML 契约：机器状态 = docs/flows/<flowId>.yaml；旧版 .md 仅迁移兼容。
+    if (entry.flowId !== undefined) {
+      const yamlRel = `docs/flows/${entry.flowId}.yaml`;
+      candidate = (await isRegularFileForJudge(projectRoot, yamlRel))
+        ? yamlRel
+        : `docs/flows/${entry.flowId}.md`;
+    }
   } else if (entry.decisionKind === "appointment-write" || entry.decisionKind === undefined) {
     candidate = issuedPaths.find((p) => p.endsWith(".md")) ?? issuedPaths[0];
   } else if (
@@ -1976,12 +2101,18 @@ async function judgeArtifactsForCard(args: {
 }): Promise<NonNullable<GovernanceJudgeContext["artifacts"]>> {
   const proposal = await latestVersionedArtifact(args.projectRoot, "docs/proposals", args.flowId);
   const nomination = await latestVersionedArtifact(args.projectRoot, "docs/nominations", args.flowId);
-  const flowRel = `docs/flows/${args.flowId}.md`;
-  const flowExists = await isRegularFileForJudge(args.projectRoot, flowRel);
+  // 2026-10-19 Flow YAML 契约：优先机器状态 `.yaml`；旧版 `.md` 仅人读视图/迁移兼容。
+  const flowYamlRel = `docs/flows/${args.flowId}.yaml`;
+  const flowMdRel = `docs/flows/${args.flowId}.md`;
+  const flowRel = (await isRegularFileForJudge(args.projectRoot, flowYamlRel))
+    ? flowYamlRel
+    : (await isRegularFileForJudge(args.projectRoot, flowMdRel))
+      ? flowMdRel
+      : undefined;
 
   const proposalPath = proposal?.relPath;
   const nominationPath = nomination?.relPath;
-  const flowPath = flowExists ? flowRel : undefined;
+  const flowPath = flowRel;
 
   const only = (pathValue: string | undefined): NonNullable<GovernanceJudgeContext["artifacts"]> =>
     pathValue !== undefined ? { proposalPath: pathValue } : {};
@@ -2169,7 +2300,7 @@ function artifactFlowMetadata(relPath: string): Pick<GovernanceLedgerEntry, "flo
   if (proposal !== null && isGovernanceFlowId(proposal[1])) {
     return { flowId: proposal[1], artifactVersion: Number(proposal[2]) };
   }
-  const flow = /^docs\/flows\/(.+)\.md$/.exec(relPath);
+  const flow = /^docs\/flows\/(.+)\.(?:md|ya?ml)$/.exec(relPath);
   if (flow !== null && isGovernanceFlowId(flow[1])) return { flowId: flow[1] };
   return {};
 }

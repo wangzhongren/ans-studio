@@ -15,6 +15,10 @@
       "value": true
     },
     {
+      "name": "tool row without file target is neutral in summary and details",
+      "value": true
+    },
+    {
       "name": "replay system notice same rule: sys row + user body",
       "value": true
     },

@@ -124,7 +124,7 @@ export function buildGovernanceJudgeSystemPrompt(): string {
     "- write（convener）：docs/flows/**、docs/workflow.md、docs/governance/convener/**；",
     "- write（verifier）：docs/verification/**、docs/governance/verifier/**；",
     "- appointment-write：角色卡/<targetRoleId>/**，且 <targetRoleId> 在 facts.appointmentTargetRoleIds 内、非内置；",
-    "- schedule-write：docs/flows/<flowId>.md（允许 docs/workflow.md），flowId 与卡片一致。",
+    "- schedule-write：docs/flows/<flowId>.yaml（唯一机器状态；旧版 .md 仅人读视图，允许 docs/workflow.md），flowId 与卡片一致。",
     "pathDecisions 必须恰好覆盖全部 paths 且全 ok:true。新文件不要求读取（读不存在的目标没有意义）；",
     "只有**已存在**的相关物证才可能在 requiredReadPaths 中（最小抽查集）。",
     "",

@@ -112,11 +112,21 @@ import {
   governanceAdvanceSuccessNote,
   governanceAppointmentWriteNote,
   governanceFlowPath,
+  governanceFlowStatePath,
   governanceNominationFollowUpNote,
   type GovernanceAdvanceResult,
   type GovernanceNextStepContext,
   type GovernanceNextStepPayload,
 } from "./governance-advance.ts";
+// 流程**机器状态**（2026-10-19 客户决定「这些全部改成yaml。」）：自动验收门读 `docs/flows/<flowId>.yaml`，
+// 用编排的 `parseFlowStateYaml` + `evaluateFlowCompletion` 判定；Markdown 仅人读视图（YAML 缺失时才
+// legacy 回退）。**只经 Pipeline 公共出口**消费（`src/pipeline/orchestration/flow-state.ts` 薄再导出），
+// 不直接 import 编排私有 `src/common/编排/`；单一实现与 schema 由编排拥有。
+import {
+  evaluateFlowCompletion,
+  flowStatePath,
+  parseFlowStateYaml,
+} from "../../src/pipeline/orchestration/flow-state.ts";
 // G-2（2026-10-16 客户批准）：恢复确认卡通道（W5——presenter/回包/关窗清帐在 main 接线，本层只透传）与
 // 看护服务（W1+W3——同源快照/系统投递/观察转发都在 SessionManager，本层装配并起停 tick）。
 import type { RecoveryConfirmPresenter } from "./recovery-channel.ts";
@@ -594,9 +604,9 @@ export interface DesktopInterface {
   /**
    * **应用代客户推进治理流程（2026-10-18 客户修正；同日真机修正为四角色闭环）**：客户决定成功后
    * （`governance:next-step` 回调），在**后台**打开目标治理角色（Nominator/Convener）会话并投递**唯一一条**任务——
-   * `proposal accept` → **先** Convener 写 `docs/flows/<flowId>.md`（步骤表，首步提名）；等 Convener 本轮真正
-   * 空闲后检查流程单：落盘 ⇒ 再派 Nominator（消息带流程路径），缺失/超时 ⇒ 系统行如实报错、**不循环**；
-   * `accept-quick`/`appointment` → Convener 写流程单/排程（既有逻辑）。
+   * `proposal accept` → **先** Convener 写 `docs/flows/<flowId>.yaml`（唯一机器状态，首步提名）；等 Convener
+   * 本轮真正空闲后读取并校验 YAML：合法 ⇒ 再派 Nominator（消息带 YAML 路径），缺失/非法/超时 ⇒ 系统行如实报错、**不循环**；
+   * `accept-quick`/`appointment` → Convener 写流程状态 YAML/排程（既有逻辑）。
    * **不抢 `activeRoleId`、不切当前 pane、不自动批准/写盘、不写客户决定**；成功/失败都经既有
    * `delivery-note` 系统行落在发起卡片的角色聊天流（失败如实、不重试循环）。
    * 仅由主进程 `governance:next-step` 回调调用——**不挂 IPC、不暴露给渲染侧**。
@@ -789,7 +799,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   };
 
   // —————— 验收完成检查调度（2026-10-19 客户反馈：「独立核准应该是标准流程」）——————
-  // 触发面：任一角色 settle（含 Convener 的流程单/账本更新轮）、回交到达、桌面侧治理账本追加
+  // 触发面：任一角色 settle（含 Convener 的流程状态 YAML/账本更新轮）、回交到达、桌面侧治理账本追加
   // （dispatch.accepted）、导入项目/应用启动后的一次性补齐。调度是**事件 + 有界 tick**：同一项目在
   // 一个 40ms 窗口内最多跑一次检查（后续事件合并不顺延），不是无界轮询。
   const ACCEPTANCE_CHECK_DELAY_MS = 40;
@@ -859,11 +869,19 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     acceptanceCheckTimers.set(projectRoot, timer);
   }
 
-  /** 项目内可检查的流程：`docs/flows/*.md`（唯一流程单位；流程单缺失的 flowId 无从机械核对）。 */
+  /**
+   * 项目内可检查的流程：`docs/flows/*.yaml`（机器状态，2026-10-19 客户决定）∪ `docs/flows/*.md`
+   * （legacy 回退与人读视图）。YAML 是唯一机器状态；Markdown 仅用于发现「尚无 YAML」的 legacy 流程。
+   * 两者都没有的 flowId 无从机械核对。
+   */
   async function listGovernanceFlowIds(projectRoot: string): Promise<string[]> {
     try {
       const names = await readdir(`${projectRoot}/docs/flows`);
-      return [...new Set(names.filter((name) => name.endsWith(".md")).map((name) => name.slice(0, -3)).filter((id) => id !== ""))];
+      const ids = names
+        .filter((name) => name.endsWith(".yaml") || name.endsWith(".md"))
+        .map((name) => name.replace(/\.(?:yaml|md)$/, ""))
+        .filter((id) => id !== "");
+      return [...new Set(ids)];
     } catch {
       return [];
     }
@@ -920,16 +938,17 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
 
   // —————— 收尾推进（2026-10-18 真机缺口；2026-10-19 客户反馈「独立核准应该是标准流程」）——————
   // 触发面：**任意角色 settle**、回交到达/settle、桌面侧治理账本追加（dispatch.accepted）、导入项目/启动
-  // 后的补齐检查。本层只读流程单与账本做**触发门**检查，全部完成且证据按步骤类型齐备才后台派 Proof /
+  // 后的补齐检查。本层只读流程状态与账本做**触发门**检查，全部完成且证据按步骤类型齐备才后台派 Proof /
   // 验收（verifier）一条复核任务；不自动验收、不代批（验收卡仍走决策开关/客户手批）。
+  // 机器状态（2026-10-19 客户决定「这些全部改成yaml。」）：优先 `docs/flows/<flowId>.yaml`
+  // （`parseFlowStateYaml` + `evaluateFlowCompletion`，证据按显式 kind 对账）；同名 `.md` 只是人读视图，
+  // 不参与判定。仅 YAML **不存在**时回退 legacy Markdown `flowCompletionIssue`（诊断标注 legacy）。
   // 去重：运行期每 flow 一次 + 账本 `dispatch.accepted{targetRoleId:verifier}` 持久化（重启不重派）；
-  // 失败如实落 Convener / Lead 系统行，不循环重试。
+  // 失败如实落 Lead（主入口）系统行，不循环重试。
   const dispatchAcceptanceForFlow = async (info: {
     projectRoot: string;
     flowId: string;
     runtime?: RuntimeKind;
-    /** 系统行落位角色（trio=Convener；single=主入口）；缺省由 SessionManager 从 listing 推导。 */
-    roleId?: string;
     evidence: readonly string[];
     /** 回交 settle 是确定性完成信号：不因该回交自身仍在 `activeDeliveries` 而推迟。 */
     force?: boolean;
@@ -940,19 +959,18 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     const key = acceptanceFlowKey(info.projectRoot, info.flowId);
     if (acceptanceDispatchedFlows.has(key)) return; // 每 flow 只派一次（运行期）
     acceptanceDispatchedFlows.add(key); // 先占位：防同一 settle 批次/并发重复派
-    const governanceOwnerRoleId = manager.governanceOwnerRoleId(info.projectRoot);
-    const noteRoleId =
-      governanceOwnerRoleId ?? info.roleId ?? listing.primaryRoleId;
-    // 收尾门阻塞的系统行只发给治理主人：trio=Convener；无法确定（listing 缺 schedule 职能）则退回
-    // Lead（主入口 `primaryRoleId`）。不发给触发 settle 的任意项目角色——原因应落在主人流里，避免散落。
-    const blockerNoteRoleId = governanceOwnerRoleId ?? listing.primaryRoleId;
+    // 2026-10-19 客户决定（经项目管理转达）：自动验收门的反馈**统一发给 Lead（主入口）**，不再发
+    // Convener——包括「未派发 + 具体原因 + superseded/新 stepId 建议」「已自动派发验收复核给 Proof」
+    // 以及既有失败/引擎无法确定行。落位只取 `listProject` 的 `primaryRoleId`（真实 trio = liaison），
+    // 不硬编码角色 id、不按 `governanceFunction` 另行推导。
+    const noteRoleId = listing.primaryRoleId;
     const diagnostic = createDiagnosticLogger({ component: "desktop.governance-acceptance", projectRoot: info.projectRoot, roleId: noteRoleId });
     // 系统行的呈现路由：冷启动解析出引擎后改用**实际引擎**（否则 Pi 视图会过滤掉落给默认 claude 的行）；
     // 解析失败时仍用已知提示或桌面默认（保证「无法确定项目引擎」这条行可见）。
     let noteRuntime: RuntimeKind | undefined = info.runtime ?? acceptanceRuntimeHints.get(info.projectRoot);
-    const note = (summary: string, roleId: string = noteRoleId): void => {
+    const note = (summary: string): void => {
       try {
-        emitSessionEvent({ roleId, projectRoot: info.projectRoot, runtime: noteRuntime ?? "claude", event: { kind: "message", summary, detail: { source: "delivery-note" } } });
+        emitSessionEvent({ roleId: noteRoleId, projectRoot: info.projectRoot, runtime: noteRuntime ?? "claude", event: { kind: "message", summary, detail: { source: "delivery-note" } } });
       } catch (error) {
         diagnostic.error("acceptance.note.failed", error);
       }
@@ -970,26 +988,67 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         diagnostic.record("acceptance.deferred.active-work", { flowId: info.flowId });
         return;
       }
+      // —————— 机器状态判定：YAML 优先，Markdown 仅 legacy 回退 ——————
+      // `docs/flows/<flowId>.yaml` 存在 ⇒ 它是**唯一机器状态**：语法/形状/保留 id 校验失败、或证据不足，
+      // 一律不派并把**具体错误**作为 Lead 系统行（去重）——绝不因 Markdown 表好看而放行。
+      // 仅 YAML **不存在**（ENOENT）时回退既有 Markdown 门，并标注 legacy 诊断（迁移提示，不改变行为）。
+      const flowStateRel = flowStatePath(info.flowId);
       const flowRel = governanceFlowPath(info.flowId);
-      let markdown: string;
+      let flowStateText: string | undefined;
       try {
-        markdown = await readFile(`${info.projectRoot}/${flowRel}`, "utf8");
+        flowStateText = await readFile(`${info.projectRoot}/${flowStateRel}`, "utf8");
       } catch (error) {
-        diagnostic.record("acceptance.flow.unreadable", { flowId: info.flowId });
-        acceptanceDispatchedFlows.delete(key); // 流程单未落盘：保持现状，后续事件可再检查
-        return;
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+          // 存在但不可读（权限/IO）：按不可读处理，不落 legacy 猜测；后续事件可再检查。
+          diagnostic.error("acceptance.flow-state.unreadable", error, { path: flowStateRel });
+          acceptanceDispatchedFlows.delete(key);
+          return;
+        }
       }
-      const issue = flowCompletionIssue(info.flowId, markdown, ledger);
+      let issue: string | undefined;
+      let issueMode: "yaml" | "legacy" = "yaml";
+      let issuePath = flowStateRel;
+      if (flowStateText !== undefined) {
+        const parsed = parseFlowStateYaml(flowStateText, info.flowId);
+        if (!parsed.ok) {
+          // 校验错误逐条带 YAML 文档路径（如 steps[2].status），系统行/诊断里给具体错误。
+          const detail = parsed.errors.slice(0, 10).map((item) => `${item.path}: ${item.message}`).join("；");
+          issue = `流程状态 YAML 校验失败：${detail}`;
+          diagnostic.record("acceptance.flow-state.invalid", {
+            path: flowStateRel,
+            count: parsed.errors.length,
+            mode: "yaml",
+          });
+        } else {
+          // 账本坏行/不可读由编排判定同一实现 fail-closed（`FlowLedgerInput` 接受 {entries, errors}）。
+          const evaluation = evaluateFlowCompletion(parsed.flow, ledger);
+          if (!evaluation.ready) issue = evaluation.issues.slice(0, 10).join("；");
+        }
+      } else {
+        issueMode = "legacy";
+        issuePath = flowRel;
+        diagnostic.record("acceptance.flow-state.missing", { path: flowRel, mode: "legacy" });
+        let markdown: string;
+        try {
+          markdown = await readFile(`${info.projectRoot}/${flowRel}`, "utf8");
+        } catch (error) {
+          diagnostic.record("acceptance.flow.unreadable", { path: flowRel, mode: "legacy" });
+          acceptanceDispatchedFlows.delete(key); // 流程单未落盘：保持现状，后续事件可再检查
+          return;
+        }
+        issue = flowCompletionIssue(info.flowId, markdown, ledger);
+      }
       if (issue !== undefined) {
-        diagnostic.record("acceptance.flow.incomplete", { flowId: info.flowId, reason: issue });
+        diagnostic.record("acceptance.flow.incomplete", { flowId: info.flowId, reason: issue, mode: issueMode });
         // 2026-10-19 客户反馈「这个难道不是bug吗」：门 fail-closed 正确，但原因只进诊断日志 ⇒
         // Steward/客户看不到，只能由操作者手动复算转告——**静默本身是缺陷**。把具体原因 + 可操作建议
-        // 作为系统行发给治理主人（Convener；无法确定则 Lead）。去重：同一 flow + 同一原因只发一次；
-        // 原因变化再发；不循环重试、不改门禁判定（不自动把 failed/aborted 当 superseded、不自动派 Proof）。
+        // 作为系统行发给 Lead（主入口；2026-10-19 客户决定：统一发 Lead，不再发 Convener）。
+        // 去重：同一 flow + 同一原因只发一次；原因变化再发；不循环重试、不改门禁判定
+        // （不自动把 failed/aborted 当 superseded、不自动派 Proof）。建议路径随模式指向 YAML/legacy MD。
         if (acceptanceBlockedNotified.get(key) !== issue) {
           acceptanceBlockedNotified.set(key, issue);
-          note(governanceAcceptanceBlockedNote(info.flowId, issue), blockerNoteRoleId);
-          diagnostic.record("acceptance.flow.incomplete.notified", { flowId: info.flowId, reason: issue, roleId: blockerNoteRoleId });
+          note(governanceAcceptanceBlockedNote(info.flowId, issue, issuePath));
+          diagnostic.record("acceptance.flow.incomplete.notified", { flowId: info.flowId, reason: issue, mode: issueMode, roleId: noteRoleId });
         }
         acceptanceDispatchedFlows.delete(key); // 未完成/证据不足：不派；后续事件可再检查（不是循环）
         return;
@@ -1037,6 +1096,9 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         note(`收尾推进失败：发送验收任务给 Proof / 验收 失败：${sent.error ?? "未知原因"}；未自动重试。`);
         return;
       }
+      // 系统行在**投递成功即发**（不等审计落盘）：可见性不依赖持久化 I/O 的完成时序；账本写失败只记诊断，
+      // 不翻转「已派发」这个事实（既有语义不变，只是更早呈现）。
+      note(governanceAcceptanceAdvanceNote(info.flowId));
       // 成功派发后记住该项目实际使用的引擎（user-data 独立 JSON）——下次冷启动补齐检查据此选路；
       // 写失败只记诊断，不影响已完成的派发/审计。
       const persisted = await persistProjectRuntime(deps.runtimeStatePath, info.projectRoot, runtime);
@@ -1059,8 +1121,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       if (!appended.ok) {
         diagnostic.error("acceptance.ledger.failed", new Error(appended.message), { flowId: info.flowId });
       }
-      note(governanceAcceptanceAdvanceNote(info.flowId));
-      diagnostic.record("acceptance.dispatched", { flowId: info.flowId, queued: sent.queued === true, trigger: info.trigger });
+      diagnostic.record("acceptance.dispatched", { flowId: info.flowId, queued: sent.queued === true, trigger: info.trigger, mode: issueMode });
     } catch (error) {
       acceptanceDispatchedFlows.delete(key);
       diagnostic.error("acceptance.advance.failed", error, { flowId: info.flowId });
@@ -1127,7 +1188,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     },
   });
 
-  // 验收检查的执行体（由 `scheduleAcceptanceCheck` 的有界 tick 调用）：枚举项目流程单 → 逐 flow 过同一道
+  // 验收检查的执行体（由 `scheduleAcceptanceCheck` 的有界 tick 调用）：枚举项目流程状态文件 → 逐 flow 过同一道
   // 触发门。`dispatch.accepted` 的账本去重保证导入/重启后的补齐检查不会重复派 Proof。
   runAcceptanceCheck = async (projectRoot: string, trigger: "settle" | "ledger" | "import"): Promise<void> => {
     const listing = listingCache.get(projectRoot);
@@ -1562,7 +1623,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         note(`自动推进失败：${error}`);
         return { ok: false, dispatched: false, targetRoleId, error };
       };
-      /** 两段式第一段已投递、但第二段无法继续（流程单缺失/角色未写出等）：如实报错、**不重试**。 */
+      /** 两段式第一段已投递、但第二段无法继续（流程状态 YAML 缺失/非法/角色未写出等）：如实报错、**不重试**。 */
       const chainFail = (error: string, dispatchedTarget: "nominator" | "convener" = targetRoleId): GovernanceAdvanceResult => {
         diagnostic.error("advance.chain.failed", new Error(error), { flowId: payload.flowId, cardKind: payload.cardKind, targetRoleId: dispatchedTarget });
         note(`自动推进停住：${error}`);
@@ -1695,21 +1756,37 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       // 不翻转已完成的投递结果、不重试。`stepId` 不在 `governance:next-step` 契约里（payload 未携带），
       // 故不臆造。根不存在（测试/异常调用）时不创建目录：按账本失败处理（记诊断、结果不变）。
       await appendDispatchAccepted(targetRoleId, message, stepId);
-      // —— 2026-10-18 真机修正：proposal accept 两段式闭环 ——
-      // 客户接受提案时 `docs/flows/<flowId>.md` 可能尚不存在（应由 Convener 先写）；直接派 Nominator
-      // 只会让它反复猜路径、大量读失败。第一段已派 Convener 写流程单；等它本轮真正空闲后检查流程单：
-      // 存在 ⇒ 再派 Nominator（任务消息带流程路径）；缺失/超时 ⇒ 系统行如实报错，**不循环重试**。
+      // —— 2026-10-18 真机修正；2026-10-19 客户决定「这些全部改成yaml。」 ——
+      // 两段式闭环：客户接受提案后先派 Convener 写 `docs/flows/<flowId>.yaml`（唯一机器状态）。
+      // 等它本轮真正空闲后检查 YAML：存在且通过 `parseFlowStateYaml` 校验 ⇒ 再派 Nominator；
+      // 缺失/不可读/校验失败/超时 ⇒ 系统行如实报**具体原因**，**不循环重试**。
+      // 同名 `.md` 人读视图**不是**放行条件（只认 YAML；只有 .md 视为未落盘）。
       if (payload.followUp === "nomination-after-flow") {
         const flowId = payload.flowId;
         if (flowId === undefined) return chainFail("缺少流程信息（flowId），未派发提名任务");
-        const flowPath = governanceFlowPath(flowId);
+        const flowStatePath = governanceFlowStatePath(flowId);
         const idle = await manager.waitForRoleIdle(projectRoot, targetRoleId, runtime);
         diagnostic.record("advance.chain.convener-idle", { flowId, idle });
         if (!idle) {
-          return chainFail(`Steward / 统筹 本轮未在时限内结束，流程单 ${flowPath} 未确认；未派发提名任务`);
+          return chainFail(`Steward / 统筹 本轮未在时限内结束，流程状态 YAML ${flowStatePath} 未确认；未派发提名任务`);
         }
-        if (!existsSync(`${projectRoot}/${flowPath}`)) {
-          return chainFail(`Steward / 统筹 未写出流程单 ${flowPath}；未派发提名任务`);
+        let flowStateText: string;
+        try {
+          flowStateText = await readFile(`${projectRoot}/${flowStatePath}`, "utf8");
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+            return chainFail(
+              `Steward / 统筹 未写出流程状态 YAML ${flowStatePath}；未派发提名任务（同名 .md 人读视图不算落盘）`,
+            );
+          }
+          return chainFail(
+            `流程状态 YAML ${flowStatePath} 不可读：${error instanceof Error ? error.message : String(error)}；未派发提名任务`,
+          );
+        }
+        const parsedFlowState = parseFlowStateYaml(flowStateText, flowId);
+        if (!parsedFlowState.ok) {
+          const detail = parsedFlowState.errors.slice(0, 10).map((item) => `${item.path}: ${item.message}`).join("；");
+          return chainFail(`流程状态 YAML 校验失败（${flowStatePath}）：${detail}；未派发提名任务`);
         }
         const nominationPayload: GovernanceNextStepPayload = {
           version: 1,

@@ -65,8 +65,17 @@ test("G2 可展开性（真实执行）：仅 complete 且正文非空才给开�
 test("G3 choices⇒select 控件：首项留空＝未设态；值域即选项；域外现值如实附选项；自由文本字段逐字现状", () => {
   assert.ok(RENDERER.includes('var choices = Array.isArray(f.choices) && f.choices.length > 0 ? f.choices : null;'), "choices 判定在场");
   assert.ok(RENDERER.includes('<option value="">留空（平台默认）</option>'), "首项留空＝未设态（保存空串＝清除）");
-  // 值域即选项且转义。
-  assert.ok(RENDERER.includes('choices.map(function (c) { return \'<option value="\' + esc(String(c)) + \'">\' + esc(String(c)) + "</option>"; })'), "值域逐项成选项（esc）");
+  // 值域即选项且转义（2026-10-19 本地化标签：`value` 仍逐字 raw choices，option 文本用 choiceLabels/回退 raw）。
+  // 不逐字绑死旧单行实现：断言当前结构——choices.map(c,index) ⇒ option value=esc(String(c))、
+  // 文本=esc(optionText)，且 optionText 的来源是「choiceLabels[index]（非空）否则 String(c)」。
+  assert.ok(
+    /choices\.map\(function \(c, index\) \{[\s\S]{0,260}?return '<option value="' \+ esc\(String\(c\)\) \+ '">' \+ esc\(optionText\) \+ "<\/option>";/.test(RENDERER),
+    "值域逐项成选项（value=esc(raw choices)，文本=esc(optionText)）",
+  );
+  assert.ok(
+    RENDERER.includes('var optionText = typeof choiceLabels[index] === "string" && choiceLabels[index] !== "" ? choiceLabels[index] : String(c);'),
+    "选项文本优先 choiceLabels，缺标签回退 raw（本地化不改变提交值域）",
+  );
   // 域外现值（手编坏值）如实显示为一条原值选项，不静默改写。
   assert.ok(RENDERER.includes('if (typeof f.value === "string" && f.value !== "" && choices.indexOf(f.value) < 0) opts.push'), "域外现值如实附选项");
   assert.ok(RENDERER.includes('<select id="pi-inp-'), "select 控件（复用 pi-input 盒形）");

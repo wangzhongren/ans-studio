@@ -796,6 +796,23 @@ test("2026-10-19：`【系统通知…】` 归类为 system-notice——带「�
   assert.ok(/\.sys-notice \.sys-text \{[^}]*color: var\(--text\);/.test(STYLES), "通知正文用主文字色（对比度）");
 });
 
+// —————— 2026-10-19 客户：tool 行「目标未保存」易被误读为流程被挡——无文件目标应为中性事实 ——————
+
+test("2026-10-19：无文件目标的工具行——占位为中性「无文件目标」（不暗示未保存/失败）", () => {
+  assert.ok(!RENDERER_CODE.includes("目标未保存"), "旧占位「目标未保存」已清除（详情行 + 摘要行两处，注释不计）");
+  const details = RENDERER.slice(RENDERER.indexOf("function toolDetails("), RENDERER.indexOf("function refreshToolLifecycle("));
+  const detailsCode = details.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+  assert.ok(detailsCode.includes("本次调用无文件目标（交互/派发类工具）"), "详情占位＝中性事实文案（工具名由同一行摘要显示）");
+  assert.ok(!detailsCode.includes("未保存") && !detailsCode.includes("失败"), "详情占位不出现「未保存/失败」字样");
+  assert.ok(!detailsCode.includes("toolName"), "详情面仍 display 驱动、不按工具名分支（既有守卫）");
+  const targetAt = RENDERER.indexOf("var target = activity.fullTarget");
+  assert.ok(targetAt > 0, "摘要行目标兜底存在");
+  assert.ok(RENDERER.slice(targetAt, targetAt + 260).includes('|| "无文件目标"'), "摘要行兜底＝「无文件目标」（工具名已在行首显示）");
+  // 仅呈现文案：不新增工具名特判/第二份特殊工具名单，工具行为不变。
+  assert.ok(!RENDERER_CODE.includes("request_confirmation") && !RENDERER_CODE.includes("dispatch_task"), "渲染侧不按工具名特判");
+  assert.ok(RENDERER.includes("refreshToolLifecycle") && RENDERER.includes("appendActivity"), "工具生命周期/行为接线未动");
+});
+
 // ————————————————— K-1（2026-10-12）：圆角胶囊输入框 + 内嵌发送箭头 —————————————————
 
 test("K-1：输入区为**圆角胶囊**、发送箭头**内嵌框内**；快捷键与状态位保持可达（旧行结构退役）", () => {

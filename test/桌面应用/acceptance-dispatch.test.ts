@@ -26,8 +26,11 @@ import {
   flowCompletionIssue,
   flowStepEvidenceKind,
   flowStepHasEvidence,
+  governanceAcceptanceBlockedNote,
+  governanceFlowStatePath,
   type FlowCompletionLedgerEntryLike,
 } from "../../app/desktop/governance-advance.ts";
+import { evaluateFlowCompletion, flowStatePath, parseFlowStateYaml } from "../../src/pipeline/orchestration/flow-state.ts";
 import {
   appendGovernanceLedger,
   readGovernanceLedger,
@@ -65,7 +68,8 @@ function trioListing(roleIds: string[] = ["rapporteur", "nominator", "convener",
     roles: roleIds.map(role),
     warnings: [],
     hasRoles: false,
-    primaryRoleId: "rapporteur",
+    // 2026-10-19 客户决定：自动验收门反馈统一发给 Lead（主入口）；真实 trio 的 primaryRoleId=liaison。
+    primaryRoleId: "liaison",
     governanceModel: "trio",
   };
 }
@@ -169,6 +173,15 @@ function scriptedHandle(sends: string[]): {
 async function waitFor(check: () => boolean, timeoutMs = 3000): Promise<void> {
   const started = Date.now();
   while (!check()) {
+    if (Date.now() - started > timeoutMs) throw new Error("等待测试条件超时");
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+
+/** 异步条件版（如等待账本 append 落盘——投递与审计是两段 I/O，断言需要有界等待而非改动语义）。 */
+async function waitForAsync(check: () => Promise<boolean>, timeoutMs = 3000): Promise<void> {
+  const started = Date.now();
+  while (!(await check())) {
     if (Date.now() - started > timeoutMs) throw new Error("等待测试条件超时");
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
@@ -453,7 +466,7 @@ test("自动验收（导入补齐）：门通过 ⇒ 自动派 Proof 一条复�
       const sends = harness.sendsByRole.get("verifier")!;
       assert.equal(sends.length, 1, "导入补齐检查 ⇒ 恰一条验收复核任务");
       assert.match(sends[0]!, new RegExp(`流程 ${flowId} 步骤已全部完成`));
-      assert.match(sends[0]!, /docs\/flows\/flow-auto\.md/);
+      assert.match(sends[0]!, /docs\/flows\/flow-auto\.yaml/);
       assert.match(sends[0]!, /请汇总证据并出验收卡/);
       assert.match(sends[0]!, /不要自行验收或代替客户决定/);
       // 客户批准的硬要求（质量基线 / 真实启动演示 / 架构核对）必须随自动任务发出。
@@ -470,12 +483,15 @@ test("自动验收（导入补齐）：门通过 ⇒ 自动派 Proof 一条复�
       assert.match(sends[0]!, /扩展点/);
       assert.match(sends[0]!, new RegExp(`docs/verification/${flowId}-v1\\.md`));
 
-      // 可见性：Convener 系统行说明「自动派发」，不冒充客户批准。
-      const notes = deliveryNotes(harness.events, "convener");
-      assert.ok(notes.some((note) => /已自动派发验收复核给 Proof（工作中）/.test(note)), "Convener 系统行如实告知自动派发");
+      // 可见性：Lead（主入口）系统行说明「自动派发」，不冒充客户批准；客户决定不再发 Convener。
+      const notes = deliveryNotes(harness.events, "liaison");
+      assert.ok(notes.some((note) => /已自动派发验收复核给 Proof（工作中）/.test(note)), "Lead 系统行如实告知自动派发");
+      assert.equal(deliveryNotes(harness.events, "convener").length, 0, "自动验收反馈不再发 Convener");
       assert.ok(notes.every((note) => !/客户已批准|验收通过/.test(note)), "不得冒充客户批准");
 
       // 持久化审计与去重：dispatch.accepted(targetRoleId=verifier, stepId=verification, actor=app)。
+      // 投递与账本 append 是两段异步 I/O：有界等待落盘后再断言（语义不变）。
+      await waitForAsync(async () => (await verifierDispatches(root, flowId)).length > 0);
       const recorded = await verifierDispatches(root, flowId);
       assert.equal(recorded.length, 1, "账本恰一条验收派发记录");
       assert.equal(recorded[0]!.actorRoleId, "app");
@@ -590,11 +606,12 @@ test("自动验收（重启去重）：账本已有上一次的 verifier 派发�
 //
 // 客户现场：R2 所有 retake 已 done，但自动验收派发一直不触发；`flowCompletionIssue` 的具体原因
 // （旧步骤 aborted/failed 未标 superseded）只写进诊断日志，Steward/客户看不到，只能由操作者手动复算
-// 再转告。门本身 fail-closed 正确；**静默**是缺陷。本组钉住：阻塞原因 + 可操作建议作为治理主人
-// （Convener；无法确定则 Lead）的系统行如实可见；同一原因只发一次、原因变化/解决后再次阻塞才再发；
-// 门通过时不发；派发成功路径不变；不自动改流程单、不自动派 Proof。
+// 再转告。门本身 fail-closed 正确；**静默**是缺陷。本组钉住：阻塞原因 + 可操作建议作为系统行对
+// **Lead（主入口 primaryRoleId）**如实可见（2026-10-19 客户决定：统一发 Lead，不再发 Convener）；
+// 同一原因只发一次、原因变化/解决后再次阻塞才再发；门通过时不发；派发成功路径不变；不自动改流程单、
+// 不自动派 Proof。
 
-test("自动验收阻塞可见性：门未通过 ⇒ 治理主人恰一条系统行（具体原因 + 建议）；重复 settle 不刷屏；原因变化再发；门通过不再发", async () => {
+test("自动验收阻塞可见性：门未通过 ⇒ Lead 恰一条系统行（具体原因 + 建议）；重复 settle 不刷屏；原因变化再发；门通过不再发", async () => {
   const root = makeTempProjectRoot("ans-acceptance-blocked-visible-");
   try {
     const flowId = "flow-blocked";
@@ -606,17 +623,18 @@ test("自动验收阻塞可见性：门未通过 ⇒ 治理主人恰一条系统
     const listing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };
     const harness = await makeHarness(root, listing);
     try {
-      // 导入补齐检查即被 pending 挡下：Convener 应看到具体原因，而不是只有诊断日志。
-      await waitFor(() => blockerNotes(harness.events, "convener").length > 0);
-      assert.equal(blockerNotes(harness.events, "convener").length, 1, "门 blocked ⇒ 恰一条阻塞系统行");
-      const first = blockerNotes(harness.events, "convener")[0]!;
+      // 导入补齐检查即被 pending 挡下：Lead 应看到具体原因，而不是只有诊断日志。
+      await waitFor(() => blockerNotes(harness.events, "liaison").length > 0);
+      assert.equal(blockerNotes(harness.events, "liaison").length, 1, "门 blocked ⇒ Lead 恰一条阻塞系统行");
+      const first = blockerNotes(harness.events, "liaison")[0]!;
       assert.ok(first.includes("delivery-server=pending"), "系统行含 flowCompletionIssue 的具体原因");
       assert.match(first, /aborted\/failed/, "建议覆盖真机场景：被 retake 取代的 aborted/failed 步骤");
       assert.match(first, /superseded/, "建议给出 superseded 的出路");
       assert.match(first, /stepId/, "建议给出用新 stepId 重派的出路");
-      assert.ok(first.includes(`docs/flows/${flowId}.md`), "给治理主人可操作的流程单路径");
+      assert.ok(first.includes(`docs/flows/${flowId}.md`), "给 Lead 可操作的流程单路径");
       assert.ok(!/已自动派发验收复核/.test(first), "阻塞行不得冒充已派发");
-      assert.ok(blockerNotes(harness.events, "rapporteur").length === 0, "原因落在治理主人流，不散落给其他角色");
+      assert.equal(blockerNotes(harness.events, "convener").length, 0, "客户决定：不再发 Convener");
+      assert.equal(blockerNotes(harness.events, "rapporteur").length, 0, "不散落给其他角色");
 
       // 重复 settle（同一原因）：不重复发（不刷屏），也不派 Proof。
       assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "executor", runtime: "demo" })).ok, true);
@@ -625,15 +643,15 @@ test("自动验收阻塞可见性：门未通过 ⇒ 治理主人恰一条系统
       control.settle();
       control.settle();
       await sleep(250);
-      assert.equal(blockerNotes(harness.events, "convener").length, 1, "同一 flow + 同一原因只发一次");
+      assert.equal(blockerNotes(harness.events, "liaison").length, 1, "同一 flow + 同一原因只发一次");
       assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "门未通过：不派 Proof");
 
-      // 原因变化（pending → aborted）：再发一条，仍到治理主人。
+      // 原因变化（pending → aborted）：再发一条，仍到 Lead。
       writeFlowFile(root, flowId, withDeliveryStatus("aborted"));
       control.settle();
-      await waitFor(() => blockerNotes(harness.events, "convener").length >= 2);
+      await waitFor(() => blockerNotes(harness.events, "liaison").length >= 2);
       await sleep(150);
-      const changed = blockerNotes(harness.events, "convener");
+      const changed = blockerNotes(harness.events, "liaison");
       assert.equal(changed.length, 2, "原因变化才再发（不是每 settle 刷屏）");
       assert.ok(changed[1]!.includes("delivery-server=aborted"), "新系统行如实带新原因");
       assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "仍不派 Proof");
@@ -647,11 +665,12 @@ test("自动验收阻塞可见性：门未通过 ⇒ 治理主人恰一条系统
       await waitFor(() => (harness.sendsByRole.get("verifier")?.length ?? 0) > 0);
       await sleep(150);
       assert.equal(harness.sendsByRole.get("verifier")!.length, 1, "门通过后仍按原路径恰派一条验收任务");
-      assert.equal(blockerNotes(harness.events, "convener").length, 2, "门通过：不发新的阻塞行");
+      assert.equal(blockerNotes(harness.events, "liaison").length, 2, "门通过：不发新的阻塞行");
       assert.ok(
-        deliveryNotes(harness.events, "convener").some((note) => /已自动派发验收复核给 Proof/.test(note)),
-        "成功路径的既有系统行不变",
+        deliveryNotes(harness.events, "liaison").some((note) => /已自动派发验收复核给 Proof/.test(note)),
+        "成功路径的既有系统行（发给 Lead）不变",
       );
+      assert.equal(deliveryNotes(harness.events, "convener").length, 0, "成功行也不发 Convener");
       assert.equal((await verifierDispatches(root, flowId)).length, 1, "派发审计记录不变");
     } finally {
       await harness.iface.stopSession();
@@ -676,7 +695,7 @@ test("自动验收阻塞可见性：已解决（门通过）后再次阻塞同�
       resolveRuntime: async () => ({ ok: false, message: RUNTIME_UNRESOLVED_MESSAGE, skipped: [] }),
     });
     try {
-      await waitFor(() => blockerNotes(harness.events, "convener").length === 1);
+      await waitFor(() => blockerNotes(harness.events, "liaison").length === 1);
       assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "executor", runtime: "demo" })).ok, true);
       const control = harness.controls.get("executor")!;
 
@@ -686,15 +705,15 @@ test("自动验收阻塞可见性：已解决（门通过）后再次阻塞同�
         { kind: "dispatch.accepted", flowId, stepId: "delivery-server", actorRoleId: "convener", power: "schedule", targetRoleId: "executor" },
       ]);
       control.settle();
-      await waitFor(() => deliveryNotes(harness.events, "convener").some((note) => note.includes(RUNTIME_UNRESOLVED_MESSAGE)));
-      assert.equal(blockerNotes(harness.events, "convener").length, 1, "门通过本身不发阻塞行");
+      await waitFor(() => deliveryNotes(harness.events, "liaison").some((note) => note.includes(RUNTIME_UNRESOLVED_MESSAGE)));
+      assert.equal(blockerNotes(harness.events, "liaison").length, 1, "门通过本身不发阻塞行");
 
       // 再次阻塞（原因文本与第一次相同）：门通过时已清去重记忆 ⇒ 重新告知。
       writeFlowFile(root, flowId, withDeliveryStatus("pending"));
       control.settle();
-      await waitFor(() => blockerNotes(harness.events, "convener").length >= 2);
+      await waitFor(() => blockerNotes(harness.events, "liaison").length >= 2);
       await sleep(150);
-      const notes = blockerNotes(harness.events, "convener");
+      const notes = blockerNotes(harness.events, "liaison");
       assert.equal(notes.length, 2, "解决后再次阻塞（同一原因）重新告知一次");
       assert.ok(notes[1]!.includes("delivery-server=pending"), "重新告知带当前原因");
       assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "引擎无法确定/门未通过：始终不派 Proof");
@@ -706,10 +725,10 @@ test("自动验收阻塞可见性：已解决（门通过）后再次阻塞同�
   }
 });
 
-test("自动验收阻塞可见性：listing 无法确定 Convener ⇒ 系统行退回 Lead（主入口 primaryRoleId）", async () => {
-  const root = makeTempProjectRoot("ans-acceptance-lead-fallback-");
+test("自动验收反馈统一落 Lead：listing 有 Convener 也不发 Convener（客户 2026-10-19 决定）", async () => {
+  const root = makeTempProjectRoot("ans-acceptance-lead-only-");
   try {
-    const flowId = "flow-lead-fallback";
+    const flowId = "flow-lead-only";
     writeFlowFile(
       root,
       flowId,
@@ -718,17 +737,391 @@ test("自动验收阻塞可见性：listing 无法确定 Convener ⇒ 系统行�
       ]),
     );
     await seedGovernanceEvidence(root, flowId, []);
-    // trio 但 listing 中没有 schedule 职能角色 ⇒ governanceOwnerRoleId 无法确定 ⇒ 退回主入口（Lead）。
-    const listing: ProjectListing = {
-      ...trioListing(["rapporteur"]),
-      projectRoot: root,
-      primaryRoleId: "liaison",
-    };
+    // trio 完整内置角色（含 schedule 职能的 Convener）——阻塞行仍只发 Lead（primaryRoleId=liaison）。
+    const listing: ProjectListing = { ...trioListing(), projectRoot: root };
     const harness = await makeHarness(root, listing);
     try {
       await waitFor(() => blockerNotes(harness.events, "liaison").length === 1);
       assert.ok(blockerNotes(harness.events, "liaison")[0]!.includes("delivery-server=pending"), "Lead 收到具体原因");
+      assert.equal(blockerNotes(harness.events, "convener").length, 0, "不再发 Convener");
       assert.equal(blockerNotes(harness.events, "rapporteur").length, 0, "不落在触发事件的角色流");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// ————————————————— ④ 流程机器状态 YAML（2026-10-19 客户决定「这些全部改成yaml。」） —————————————————
+//
+// 机器状态实现由编排拥有（`src/pipeline/orchestration/flow-state.ts` 薄再导出
+// `src/common/编排/flow-state.ts`）；桌面只经 Pipeline 公共出口消费。契约要点：
+//   · YAML 必填 `flowId`/`version`/`qualityTier`；步骤必填 `id`/`title`/`owner`/`kind`/`status`；
+//   · `kind`：dispatch | customer-decision | artifact | acceptance（证据类型由显式 kind 决定）；
+//   · `done` 必须有 evidence `{kind, ref}`；`superseded` 不参与完成判定；
+//   · 验收步骤（保留 id verification/acceptance）必须 kind=acceptance 且初始 pending。
+// 本组钉住桌面接线：YAML 存在 ⇒ 只按 YAML 判定（不解析 Markdown 表）；校验失败/证据不足 ⇒ 不派 +
+// Lead 系统行含具体错误（去重）；YAML 不存在 ⇒ legacy Markdown 回退行为不变。
+
+interface FlowYamlEvidenceInput {
+  kind: string;
+  ref: string;
+}
+
+interface FlowYamlStepInput {
+  id: string;
+  kind: string;
+  status: string;
+  title?: string;
+  owner?: string;
+  evidence?: FlowYamlEvidenceInput;
+  supersedes?: readonly string[];
+  supersededBy?: string;
+}
+
+/** 构造块状 YAML（机器状态；手写而非 JSON，覆盖真实文件形状）。 */
+function flowStateYaml(flowId: string, steps: readonly FlowYamlStepInput[]): string {
+  const lines = [`flowId: ${flowId}`, "version: 1", "qualityTier: production", "steps:"];
+  for (const step of steps) {
+    lines.push(`  - id: ${step.id}`);
+    lines.push(`    title: ${step.title ?? `步骤 ${step.id}`}`);
+    lines.push(`    owner: ${step.owner ?? "executor"}`);
+    lines.push(`    kind: ${step.kind}`);
+    lines.push(`    status: ${step.status}`);
+    if (step.evidence !== undefined) {
+      lines.push("    evidence:");
+      lines.push(`      kind: ${step.evidence.kind}`);
+      lines.push(`      ref: ${step.evidence.ref}`);
+    }
+    if (step.supersedes !== undefined && step.supersedes.length > 0) {
+      lines.push(`    supersedes: [${step.supersedes.join(", ")}]`);
+    }
+    if (step.supersededBy !== undefined) lines.push(`    supersededBy: ${step.supersededBy}`);
+  }
+  return `${lines.join("\n")}\n`;
+}
+
+function writeFlowStateFile(projectRoot: string, flowId: string, yaml: string): void {
+  mkdirSync(path.join(projectRoot, "docs", "flows"), { recursive: true });
+  writeFileSync(path.join(projectRoot, "docs", "flows", `${flowId}.yaml`), yaml);
+}
+
+/** 与 `seedGovernanceEvidence` 一致的 YAML 步骤（nomination / contract-freeze / delivery / verification）。 */
+function yamlAcceptanceSteps(flowId: string): FlowYamlStepInput[] {
+  return [
+    {
+      id: "nomination",
+      kind: "customer-decision",
+      status: "done",
+      evidence: { kind: "customer-decision", ref: "appointment" },
+    },
+    {
+      id: "contract-freeze",
+      kind: "artifact",
+      status: "done",
+      evidence: { kind: "artifact", ref: `docs/contracts/${flowId}-api-v1.md` },
+    },
+    { id: "delivery-server", kind: "dispatch", status: "done", evidence: { kind: "dispatch", ref: "delivery-server" } },
+    { id: "verification", kind: "acceptance", status: "pending" },
+  ];
+}
+
+function yamlLedgerEntries(flowId: string, options: { includeDelivery?: boolean } = {}): GovernanceLedgerEntry[] {
+  const base = { at: "2026-10-19T00:00:00.000Z", actorRoleId: "test", power: "app" as const };
+  return [
+    {
+      ...base,
+      kind: "customer.decision",
+      flowId,
+      stepId: "nomination",
+      decisionKind: "appointment",
+      customerDecision: "appointed",
+    },
+    { ...base, kind: "artifact.observed", artifactPath: `docs/contracts/${flowId}-api-v1.md` },
+    ...(options.includeDelivery === false
+      ? []
+      : [{ ...base, kind: "dispatch.accepted" as const, flowId, stepId: "delivery-server" }]),
+  ];
+}
+
+function parseErrorText(result: ReturnType<typeof parseFlowStateYaml>): string {
+  return result.ok ? "" : result.errors.map((error) => `${error.path}: ${error.message}`).join("；");
+}
+
+test("流程状态路径单一来源：桌面 governanceFlowStatePath 与编排 flowStatePath 一致", () => {
+  for (const flowId of ["todo-list-v1", "flow-yaml-unit"]) {
+    assert.equal(governanceFlowStatePath(flowId), flowStatePath(flowId), "路径字面量不得两处漂移");
+    assert.equal(governanceFlowStatePath(flowId), `docs/flows/${flowId}.yaml`);
+  }
+});
+
+test("流程状态 YAML：合法机器状态解析 + 显式 kind 证据对账 ⇒ ready", () => {
+  const flowId = "flow-yaml-unit";
+  const parsed = parseFlowStateYaml(flowStateYaml(flowId, yamlAcceptanceSteps(flowId)), flowId);
+  assert.equal(parsed.ok, true, parseErrorText(parsed));
+  if (!parsed.ok) return;
+  assert.deepEqual(
+    parsed.flow.steps.map((step) => [step.id, step.kind, step.status]),
+    [
+      ["nomination", "customer-decision", "done"],
+      ["contract-freeze", "artifact", "done"],
+      ["delivery-server", "dispatch", "done"],
+      ["verification", "acceptance", "pending"],
+    ],
+  );
+  assert.deepEqual(evaluateFlowCompletion(parsed.flow, yamlLedgerEntries(flowId)), { ready: true });
+});
+
+test("流程状态 YAML 校验 fail-closed：保留 id 误用 / status 非法 / 缺 evidence / supersedes 引用不存在", () => {
+  const flowId = "flow-yaml-bad";
+  const reserved = parseFlowStateYaml(
+    flowStateYaml(flowId, [{ id: "verification", kind: "dispatch", status: "pending" }]),
+    flowId,
+  );
+  assert.equal(reserved.ok, false);
+  assert.match(parseErrorText(reserved), /保留 id/, "verification 不得当执行步骤");
+
+  const badStatus = parseFlowStateYaml(
+    flowStateYaml(flowId, [
+      {
+        id: "delivery",
+        kind: "dispatch",
+        status: "done（有证据）",
+        evidence: { kind: "dispatch", ref: "delivery" },
+      },
+    ]),
+    flowId,
+  );
+  assert.equal(badStatus.ok, false);
+  assert.match(parseErrorText(badStatus), /status 必须是/, "YAML 是机器状态，不收人读写法的状态");
+
+  const missingEvidence = parseFlowStateYaml(
+    flowStateYaml(flowId, [{ id: "delivery", kind: "dispatch", status: "done" }]),
+    flowId,
+  );
+  assert.equal(missingEvidence.ok, false);
+  assert.match(parseErrorText(missingEvidence), /必须提供 evidence/);
+
+  const badSupersedes = parseFlowStateYaml(
+    flowStateYaml(flowId, [
+      { id: "delivery", kind: "dispatch", status: "pending", supersedes: ["ghost"] },
+      { id: "verification", kind: "acceptance", status: "pending" },
+    ]),
+    flowId,
+  );
+  assert.equal(badSupersedes.ok, false);
+  assert.match(parseErrorText(badSupersedes), /supersedes 指向不存在的步骤 "ghost"/);
+});
+
+test("流程状态 YAML：证据不足列出具体账本缺口；superseded 旧步骤不阻塞（未标则 fail-closed）", () => {
+  const flowId = "flow-yaml-eval";
+  const parsed = parseFlowStateYaml(flowStateYaml(flowId, yamlAcceptanceSteps(flowId)), flowId);
+  assert.equal(parsed.ok, true, parseErrorText(parsed));
+  if (!parsed.ok) return;
+  const missing = evaluateFlowCompletion(parsed.flow, yamlLedgerEntries(flowId, { includeDelivery: false }));
+  assert.equal(missing.ready, false);
+  if (missing.ready) return;
+  const text = missing.issues.join("；");
+  assert.match(text, /账本缺少 dispatch\.accepted/, "按显式 kind 对账后报缺证据");
+  assert.match(text, /delivery-server/, "具体到步骤");
+
+  const base = { at: "2026-10-19T00:00:00.000Z", actorRoleId: "test", power: "app" as const };
+  const newDispatch: GovernanceLedgerEntry = {
+    ...base,
+    kind: "dispatch.accepted",
+    flowId,
+    stepId: "delivery-new",
+  };
+
+  // 旧步骤 failed（未标 superseded）⇒ fail-closed。
+  const failedOld = parseFlowStateYaml(
+    flowStateYaml(flowId, [
+      { id: "delivery-old", kind: "dispatch", status: "failed" },
+      { id: "delivery-new", kind: "dispatch", status: "done", evidence: { kind: "dispatch", ref: "delivery-new" } },
+      { id: "verification", kind: "acceptance", status: "pending" },
+    ]),
+    flowId,
+  );
+  assert.equal(failedOld.ok, true, parseErrorText(failedOld));
+  if (!failedOld.ok) return;
+  const blocked = evaluateFlowCompletion(failedOld.flow, [newDispatch]);
+  assert.equal(blocked.ready, false);
+  if (!blocked.ready) assert.match(blocked.issues.join("；"), /delivery-old 状态为 failed/);
+
+  // 旧步骤 status=superseded 且新步骤显式 supersedes ⇒ 不阻塞、不算 done。
+  const supersededOld = parseFlowStateYaml(
+    flowStateYaml(flowId, [
+      { id: "delivery-old", kind: "dispatch", status: "superseded" },
+      {
+        id: "delivery-new",
+        kind: "dispatch",
+        status: "done",
+        evidence: { kind: "dispatch", ref: "delivery-new" },
+        supersedes: ["delivery-old"],
+      },
+      { id: "verification", kind: "acceptance", status: "pending" },
+    ]),
+    flowId,
+  );
+  assert.equal(supersededOld.ok, true, parseErrorText(supersededOld));
+  if (!supersededOld.ok) return;
+  assert.deepEqual(evaluateFlowCompletion(supersededOld.flow, [newDispatch]), { ready: true });
+
+  // 验收步骤 done ⇒ 终态文案；阻塞系统行应给「无需操作」而非改流程单建议。
+  const acceptanceDone = parseFlowStateYaml(
+    flowStateYaml(flowId, [
+      ...yamlAcceptanceSteps(flowId).map((step) =>
+        step.id === "verification"
+          ? { ...step, status: "done", evidence: { kind: "acceptance", ref: "acceptance" } }
+          : step,
+      ),
+    ]),
+    flowId,
+  );
+  assert.equal(acceptanceDone.ok, true, parseErrorText(acceptanceDone));
+  if (!acceptanceDone.ok) return;
+  const acceptanceLedger = [
+    ...yamlLedgerEntries(flowId),
+    { ...base, kind: "customer.decision" as const, flowId, decisionKind: "acceptance" as const, customerDecision: "accepted" as const },
+  ];
+  const terminal = evaluateFlowCompletion(acceptanceDone.flow, acceptanceLedger);
+  assert.equal(terminal.ready, false);
+  if (!terminal.ready) {
+    const terminalText = terminal.issues.join("；");
+    assert.match(terminalText, /验收步骤已完成/);
+    assert.match(governanceAcceptanceBlockedNote(flowId, terminalText), /无需操作/);
+  }
+});
+
+test("自动验收 YAML：机器状态齐备 ⇒ 自动派 Proof；Markdown 人读视图写 pending 也不参与判定", async () => {
+  const root = makeTempProjectRoot("ans-acceptance-yaml-auto-");
+  try {
+    const flowId = "flow-yaml-auto";
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId)));
+    // 人读视图故意全写 pending：若门还在解析 Markdown 表，本测试会失败。
+    writeFlowFile(
+      root,
+      flowId,
+      flowMarkdown(flowId, acceptanceSteps().map(([id]): [string, string] => [id, "pending"])),
+    );
+    await seedGovernanceEvidence(root, flowId, ["delivery-server"]);
+    const listing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };
+    const harness = await makeHarness(root, listing);
+    try {
+      await waitFor(() => (harness.sendsByRole.get("verifier")?.length ?? 0) > 0);
+      await waitFor(() =>
+        deliveryNotes(harness.events, "liaison").some((note) => /已自动派发验收复核给 Proof（工作中）/.test(note)),
+      );
+      assert.equal(harness.sendsByRole.get("verifier")!.length, 1, "YAML 齐备 ⇒ 恰一条验收复核任务");
+      await waitForAsync(async () => (await verifierDispatches(root, flowId)).length > 0);
+      assert.equal((await verifierDispatches(root, flowId)).length, 1, "账本派发记录不变");
+      assert.equal(blockerNotes(harness.events, "liaison").length, 0, "门通过不发阻塞行");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("自动验收 YAML 校验失败（保留 id 误用）⇒ 不派 + Lead 系统行含具体错误；重复 settle 不刷屏；Markdown 合法也不回退", async () => {
+  const root = makeTempProjectRoot("ans-acceptance-yaml-invalid-");
+  try {
+    const flowId = "flow-yaml-invalid";
+    // YAML 只有机器状态文件（无 Markdown）：同时钉住流程发现包含 *.yaml。
+    writeFlowStateFile(
+      root,
+      flowId,
+      flowStateYaml(
+        flowId,
+        yamlAcceptanceSteps(flowId).map((step) =>
+          step.id === "verification"
+            ? { ...step, kind: "dispatch", evidence: { kind: "dispatch", ref: "verification" } }
+            : step,
+        ),
+      ),
+    );
+    // 即便存在一份「能过 legacy 门」的 Markdown，也不得回退。
+    writeFlowFile(root, flowId, flowMarkdown(flowId, acceptanceSteps(), [`contract: docs/contracts/${flowId}-api-v1.md`]));
+    await seedGovernanceEvidence(root, flowId, ["delivery-server"]);
+    const listing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };
+    const harness = await makeHarness(root, listing);
+    try {
+      await waitFor(() => blockerNotes(harness.events, "liaison").length > 0);
+      const first = blockerNotes(harness.events, "liaison")[0]!;
+      assert.match(first, /流程状态 YAML 校验失败/, "系统行如实给出 YAML 校验错误");
+      assert.match(first, /保留 id/, "系统行含具体错误（reserved id 误用）");
+      assert.ok(first.includes(`docs/flows/${flowId}.yaml`), "建议路径指向要修的 YAML");
+      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "YAML 校验失败：不派 Proof");
+
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "executor", runtime: "demo" })).ok, true);
+      const control = harness.controls.get("executor")!;
+      control.settle();
+      control.settle();
+      control.settle();
+      await sleep(250);
+      assert.equal(blockerNotes(harness.events, "liaison").length, 1, "同一 flow + 同一原因只发一次");
+      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "重复事件也不派");
+      assert.equal((await verifierDispatches(root, flowId)).length, 0, "不写验收派发记录");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("自动验收 YAML 证据不足 ⇒ 不派 + 系统行列出具体账本缺口；Markdown 全 done 也不能救", async () => {
+  const root = makeTempProjectRoot("ans-acceptance-yaml-missing-");
+  try {
+    const flowId = "flow-yaml-missing";
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId)));
+    // 人读视图全 done（若错误回退 legacy，障碍文案是「缺少 dispatch.accepted 记录」而非账本缺口细节）。
+    writeFlowFile(root, flowId, flowMarkdown(flowId, acceptanceSteps()));
+    // 治理证据齐备、但 delivery-server 没有 dispatch.accepted。
+    await seedGovernanceEvidence(root, flowId, []);
+    const listing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };
+    const harness = await makeHarness(root, listing);
+    try {
+      await waitFor(() => blockerNotes(harness.events, "liaison").length > 0);
+      const first = blockerNotes(harness.events, "liaison")[0]!;
+      assert.match(first, /账本缺少 dispatch\.accepted/, "按显式 kind 对账后报缺证据");
+      assert.match(first, /delivery-server/, "具体到步骤");
+      assert.ok(!/缺少 dispatch\.accepted 记录/.test(first), "不是 legacy Markdown 门文案");
+      assert.ok(first.includes(`docs/flows/${flowId}.yaml`), "建议路径指向 YAML");
+      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "证据不足：不派 Proof");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("无 YAML ⇒ legacy Markdown 回退行为不变：阻塞行仍指 .md，不出现 YAML 诊断", async () => {
+  const root = makeTempProjectRoot("ans-acceptance-legacy-fallback-");
+  try {
+    const flowId = "flow-legacy-fallback";
+    writeFlowFile(
+      root,
+      flowId,
+      flowMarkdown(
+        flowId,
+        acceptanceSteps().map(([id, status]): [string, string] => [id, id === "delivery-server" ? "pending" : status]),
+        [`contract: docs/contracts/${flowId}-api-v1.md`],
+      ),
+    );
+    await seedGovernanceEvidence(root, flowId, []);
+    const listing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };
+    const harness = await makeHarness(root, listing);
+    try {
+      await waitFor(() => blockerNotes(harness.events, "liaison").length > 0);
+      const first = blockerNotes(harness.events, "liaison")[0]!;
+      assert.ok(first.includes("delivery-server=pending"), "legacy 门仍按 Markdown 表判定");
+      assert.ok(first.includes(`docs/flows/${flowId}.md`), "建议路径仍指 Markdown");
+      assert.ok(!first.includes(".yaml"), "无 YAML 时不应出现 YAML 路径/诊断");
+      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "legacy 门未过：不派");
     } finally {
       await harness.iface.stopSession();
     }

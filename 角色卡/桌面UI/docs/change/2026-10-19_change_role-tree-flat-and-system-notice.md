@@ -79,7 +79,7 @@
 | `node --test test/桌面应用/runtime-ui.test.ts` | 12 计 / 11 过 / **1 红 = 既有基线**（`renderer 仅消费 IPC…` 的 `localStorage` 源码守卫，HEAD 即红；分组名断言已改为「工作角色」并通过） |
 | `npm run typecheck` | 0 错 |
 | 跨角色只读回归 `node --test test/测试/governance-trio-verify/e-ui.test.ts` | 10/10 过（保留不可见旧字面量锚点的原因） |
-| Electron 离线夹具 `ANS_NOTICE_UI_ONLY=1 ANS_UIUX_OUTDIR=/private/tmp/ans-notice-flat-ui-final4 node_modules/.bin/electron test/桌面应用/e2e/uiux-v2.mjs` | **SYSTEM_NOTICE_UI_PASS 5**，exit 0 |
+| Electron 离线夹具 `ANS_NOTICE_UI_ONLY=1 ANS_UIUX_OUTDIR=/private/tmp/ans-notice-flat-ui-final5 node_modules/.bin/electron test/桌面应用/e2e/uiux-v2.mjs` | **SYSTEM_NOTICE_UI_PASS 6**，exit 0（含无文件目标工具行检查） |
 | Electron 夹具 `ANS_RUNTIME_UI_ONLY=1`（验证既有分组断言同步为「工作角色」） | 16 条报告后于**既有基线** `expired old shell shown disabled in its own runtime` 中止；分组名检查通过（该红与默认套件 A/B 同点同败） |
 
 生产常量交叉验证（真实 `REBUILT_SESSION_WRITE_PERMITS_NOTICE` + `\n\n` 前缀）：归类为
@@ -108,6 +108,8 @@
   ——960 档无横向溢出，通知换行后徽标仍清晰。
 - [role-tree-work-roles-1360.png](2026-10-19-notice-flat-evidence/role-tree-work-roles-1360.png)
   ——左树底部项目分组（平台组）与默认分组「工作角色」（角色 C），无折叠控件。
+- [tool-row-no-file-target-1360.png](2026-10-19-notice-flat-evidence/tool-row-no-file-target-1360.png)
+  ——`request_confirmation` 工具行：摘要「无文件目标」+ 详情「本次调用无文件目标（交互/派发类工具）」，不暗示失败。
 - [report.json](2026-10-19-notice-flat-evidence/report.json)。
 
 ### 默认 e2e 的 A/B（既有基线红，非本批引入）

@@ -1947,10 +1947,10 @@ test("真实 R2 流程单（状态带说明）+ 同形账本：可派验收；�
   );
 });
 
-test("收尾任务消息：带流程单与回交/报告路径，要求汇总并出验收卡、不自行验收", () => {
+test("收尾任务消息：带流程状态 YAML 与回交/报告路径，要求汇总并出验收卡、不自行验收", () => {
   const message = buildAcceptanceTaskMessage("flow-a", ["docs/reports/impl.md", "docs/reports/impl.md", ""]);
   assert.match(message, /流程 flow-a 步骤已全部完成/);
-  assert.match(message, /流程单：docs\/flows\/flow-a\.md/);
+  assert.match(message, /流程状态 YAML：docs\/flows\/flow-a\.yaml/);
   assert.match(message, /回交\/核对报告路径：docs\/reports\/impl\.md/);
   assert.match(message, /请汇总证据并出验收卡/);
   assert.match(message, /不要自行验收或代替客户决定/);
@@ -1983,7 +1983,7 @@ test("收尾任务消息（客户批准）：必须真实启动应用向客户�
   const other = buildAcceptanceTaskMessage("ticket-desk-r2", []);
   assert.match(other, /docs\/verification\/ticket-desk-r2-v1\.md/);
   assert.doesNotMatch(other, /docs\/verification\/flow-a-v1\.md/);
-  assert.match(other, /回交\/核对报告路径：见回交报告与流程单/);
+  assert.match(other, /回交\/核对报告路径：见回交报告与流程状态 YAML/);
   assert.match(other, /不得建议 accept/);
 });
 

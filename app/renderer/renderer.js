@@ -2170,7 +2170,10 @@
     var notes = [statusSource, targetSource, Rt.metadataLabel(activity.metadataOmissions)].filter(Boolean).join("；");
     var metadata = notes ? '<p class="projection-flags">' + esc(notes) + '</p>' : "";
     if (!display) return metadata + '<p class="muted">' + (activity.displayUnsupported ? "不支持此详情版本。" : "这条历史没有保存更多目标和错误详情。") + '</p>';
-    var html = display.target ? displayField(display.target.kind === "command" ? "实际命令" : "目标文件", display.target.value) : '<p class="muted">目标未保存</p>';
+    // 2026-10-19 客户：交互/派发类工具（request_confirmation/dispatch_task 等）没有文件目标——旧占位
+    // 「目标未保存」易被误读为「未保存导致流程被挡」。改为中性事实文案（不暗示失败/保存动作）；
+    // 工具名已在同一行的摘要 `<strong>` 显示，详情面保持 display 驱动、不按工具名分支。
+    var html = display.target ? displayField(display.target.kind === "command" ? "实际命令" : "目标文件", display.target.value) : '<p class="muted">本次调用无文件目标（交互/派发类工具）</p>';
     // F-8-b（2026-10-16 批准）：非零退出中性类里 display.error 实为工具消息（投影回填），按「消息」如实标注——不叫「错误」。
     html += displayField(activity.status === "exited-nonzero" ? "消息" : "错误", display.error) + displayField("结果", display.resultText);
     var process = display.process;
@@ -2193,7 +2196,8 @@
     }
     var old = record.el.querySelector("details"), open = old && old.open;
     var focus = old && old.contains(document.activeElement);
-    var target = activity.fullTarget || stages.start && stages.start.fullTarget || "目标未保存";
+    // 2026-10-19 客户：无文件目标 ≠ 未保存/失败——摘要行用中性「无文件目标」（工具名已在行首显示）。
+    var target = activity.fullTarget || stages.start && stages.start.fullTarget || "无文件目标";
     var timestamp = Rt.shortTime(activity.at);
     var label = all.map(function (phase) { return stages[phase].label; }).join(" → ");
     // F-8-b（2026-10-16 批准）：非零退出中性类不摆红色错误预览——进程正常跑完，退出码已在状态标签如实给出；

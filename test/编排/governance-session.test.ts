@@ -396,6 +396,10 @@ test("标准工作流（2026-10-19 客户反馈）：trio 与 single/su 提示�
     const required: Array<[RegExp, string]> = [
       [/标准工作流（阶段流转由应用负责）/, "标准工作流标题"],
       [/内置角色按标准工作流执行/, "内置角色按标准工作流执行"],
+      [/流程状态唯一机器状态/, "流程状态唯一机器状态（YAML）"],
+      [/docs\/flows\/<flowId>\.yaml`（同名 `\.md` 仅人读视图/, "YAML 唯一机器状态 + .md 仅人读视图"],
+      [/显式写 `kind` \/ `evidence` \/ `supersedes`/, "显式 kind/evidence/supersedes"],
+      [/保留 id `verification` \/ `acceptance`/, "保留验收 id"],
       [/客户不做内部调度/, "客户不做内部调度"],
       [/应用会在流程齐备[^\n]*后自动派发 Proof \/ 验收/, "流程齐备后自动派发 Proof"],
       [/不需要客户手动触发/, "不需要客户手动触发"],
@@ -420,6 +424,11 @@ test("标准工作流（2026-10-19 客户反馈）：trio 与 single/su 提示�
       for (const [pattern, label] of required) {
         assert.match(captured.prompt!, pattern, `${fn} 提示词：${label}`);
       }
+      assert.doesNotMatch(
+        captured.prompt!,
+        /流程单写入 `docs\/flows\/<flowId>\.md`/,
+        `${fn} 提示词不得再指示把流程单写入 .md（YAML 才是唯一机器状态）`,
+      );
     }
 
     const { captured, factory } = promptCapturing();
@@ -432,6 +441,11 @@ test("标准工作流（2026-10-19 客户反馈）：trio 与 single/su 提示�
     for (const [pattern, label] of required) {
       assert.match(captured.prompt!, pattern, `single/su 提示词：${label}`);
     }
+    assert.doesNotMatch(
+      captured.prompt!,
+      /流程单写入 `docs\/flows\/<flowId>\.md`/,
+      "single/su 提示词不得再指示把流程单写入 .md（YAML 才是唯一机器状态）",
+    );
   });
 });
 

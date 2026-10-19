@@ -14,13 +14,16 @@
 //   · 流程文件不存在/不可读/步骤缺失 → 拒投（不猜）；
 //   · 只服务 trio；`model !== "trio"` 时不分流三权门禁（旧 single 行为逐字不变）。
 //
-// 边界：本模块**纯判定**——不写盘、不追加账本、不改变任何客户决定。流程文件只用于「步骤是否存在」
-// （评审 §6.2 派发第 4 条），**不解析其 status**；`status: accepted` 写在 Markdown 里不改变任何判定。
+// 边界：本模块**纯判定**——不写盘、不追加账本、不改变任何客户决定。流程状态只用于「步骤是否存在」
+// （评审 §6.2 派发第 4 条），**不解析其 status**；2026-10-19 起 `docs/flows/<flowId>.yaml` 是唯一机器
+// 状态（YAML 存在即只认 YAML，校验失败 fail-closed；仅在 YAML 缺失时回落旧版 `.md`）；`status: accepted`
+// 写在 Markdown 里不改变任何判定。
 
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import type { GovernanceModel } from "../../model/role.ts";
 import { isBuiltInGovernanceRoleId } from "../../service/boundary/resolve-boundary.ts";
+import { parseFlowStateYaml } from "./flow-state.ts";
 import type {
   GovernanceDecisionKind,
   GovernanceLedgerEntry,
@@ -262,7 +265,7 @@ function evaluateDispatchGate(
   if (!flowStepExists(input.projectRoot, input.flowId, input.stepId)) {
     return deny(
       "flow-step-missing",
-      `治理门禁：流程单 docs/flows/${input.flowId}.md 中没有步骤 ${input.stepId}；` +
+      `治理门禁：流程 docs/flows/${input.flowId}.yaml（或旧版 .md）中没有步骤 ${input.stepId}；` +
         "请先在 Convener 会话按已接受提案写出流程步骤。",
     );
   }
@@ -348,8 +351,30 @@ function isExistingProjectRole(projectRoot: string, roleId: string): boolean {
   );
 }
 
-/** 流程文件存在且含该步骤 id。文件缺失/不可读 → false（fail-closed）。 */
+/**
+ * 流程步骤存在性（派发门禁第 4 条；**只看步骤是否存在，不读 status**）。
+ *
+ * 2026-10-19 Flow YAML 契约（客户「这些全部改成yaml」）：`docs/flows/<flowId>.yaml` 是**唯一机器状态**。
+ *   · YAML 存在 ⇒ 只认 YAML；YAML 校验失败 ⇒ false（fail-closed，**不回落 Markdown**，避免坏 YAML
+ *     被旧人读视图掩盖）；
+ *   · YAML 不存在 ⇒ 回落旧版 `docs/flows/<flowId>.md`（迁移兼容；新流程应写 YAML）。
+ */
 function flowStepExists(projectRoot: string, flowId: string, stepId: string): boolean {
+  const yamlAbs = path.join(projectRoot, "docs", "flows", `${flowId}.yaml`);
+  let yamlText: string | undefined;
+  try {
+    yamlText = readFileSync(yamlAbs, "utf8");
+  } catch (err) {
+    // 只有「不存在」才允许回落旧 .md；存在但不可读（权限/IO）⇒ fail-closed，不猜。
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT") return false;
+    yamlText = undefined;
+  }
+  if (yamlText !== undefined) {
+    const parsed = parseFlowStateYaml(yamlText, flowId);
+    return parsed.ok && parsed.flow.steps.some((step) => step.id === stepId);
+  }
+
+  // 旧版人读视图（仅迁移期兼容；应用不再把它作为新流程的判定来源）。
   const abs = path.join(projectRoot, "docs", "flows", `${flowId}.md`);
   let text: string;
   try {

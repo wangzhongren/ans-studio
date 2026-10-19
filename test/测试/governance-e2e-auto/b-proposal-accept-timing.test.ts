@@ -1,6 +1,6 @@
 // test/测试/governance-e2e-auto/b-proposal-accept-timing.test.ts
 // 场景 2（离线端到端）：**接受提案后的时序**——`proposal accept` ⇒ 先派 Convener 写
-// `docs/flows/<flow>.md`；flow 落盘后才派 Nominator；flow 缺失时不得派 Nominator、如实报错。
+// `docs/flows/<flow>.yaml`（唯一机器状态）；YAML 落盘后才派 Nominator；YAML 缺失时不得派 Nominator、如实报错。
 //
 // 客户决定由真实客户通道 + 判断 driver（假判断会话交回 accept）产生；`onNextStep` 与主进程同款接到
 // `advanceGovernanceFlow`。断言打开顺序、任务文案、当前 pane 不切换、失败系统行。
@@ -50,7 +50,7 @@ function rapporteurProposalScript(): (ctx: ScriptContext) => ToolCall[] {
   };
 }
 
-test("场景2a：接受提案 ⇒ 先 Convener 写流程单，落盘后才派 Nominator；当前 pane 不变", async () => {
+test("场景2a：接受提案 ⇒ 先 Convener 写流程状态 YAML，落盘后才派 Nominator；当前 pane 不变", async () => {
   const convenerPromptedWhen: Array<{ flowExists: boolean }> = [];
   const nominatorPromptedWhen: Array<{ flowExists: boolean }> = [];
   const script = rapporteurProposalScript();
@@ -81,12 +81,12 @@ test("场景2a：接受提案 ⇒ 先 Convener 写流程单，落盘后才派 No
 
     await h.waitFor(() => (h.prompts.get("nominator")?.length ?? 0) > 0, 5000);
     assert.equal(h.prompts.get("convener")?.length, 1, "Convener 恰收到一条流程任务");
-    assert.match(h.prompts.get("convener")![0]!, /请先写流程单 docs\/flows\/flow-a\.md/);
+    assert.match(h.prompts.get("convener")![0]!, /请先写流程状态 YAML docs\/flows\/flow-a\.yaml/);
     assert.match(h.prompts.get("convener")![0]!, /不要把步骤说成已派发/);
-    assert.equal(h.prompts.get("nominator")?.length, 1, "流程单落盘后恰派一条提名任务");
-    assert.match(h.prompts.get("nominator")![0]!, /流程单已落盘于 docs\/flows\/flow-a\.md/);
-    assert.deepEqual(nominatorPromptedWhen, [{ flowExists: true }], "派 Nominator 时流程单必须已在盘上");
-    assert.deepEqual(convenerPromptedWhen, [{ flowExists: false }], "第一段派 Convener 时流程单尚不存在（由它写）");
+    assert.equal(h.prompts.get("nominator")?.length, 1, "流程状态 YAML 落盘后恰派一条提名任务");
+    assert.match(h.prompts.get("nominator")![0]!, /流程状态 YAML 已落盘于 docs\/flows\/flow-a\.yaml/);
+    assert.deepEqual(nominatorPromptedWhen, [{ flowExists: true }], "派 Nominator 时流程状态 YAML 必须已在盘上");
+    assert.deepEqual(convenerPromptedWhen, [{ flowExists: false }], "第一段派 Convener 时流程状态 YAML 尚不存在（由它写）");
 
     // 打开顺序：先 Convener，后 Nominator（Rapporteur 是客户打开的）。Lead 的打开来自
     // 2026-10-18 治理反馈镜像（内部角色 settle ⇒ 给主入口投 [系统·治理反馈]），不属于推进链。
@@ -127,7 +127,7 @@ test("场景2a：接受提案 ⇒ 先 Convener 写流程单，落盘后才派 No
   }
 });
 
-test("场景2b：Convener 未写出流程单 ⇒ 不派 Nominator、如实报错、不循环", async () => {
+test("场景2b：Convener 未写出流程状态 YAML ⇒ 不派 Nominator、如实报错、不循环", async () => {
   const script = rapporteurProposalScript();
   const temp = makeRoot("proposal-accept-missing-flow");
   seedTrioProject(temp.root);
@@ -138,7 +138,7 @@ test("场景2b：Convener 未写出流程单 ⇒ 不派 Nominator、如实报错
     approval: true,
     decision: true,
     scriptForRole: (ctx) => {
-      if (ctx.roleId === "convener") return []; // 模拟写流程单失败/未写
+      if (ctx.roleId === "convener") return []; // 模拟写流程状态 YAML 失败/未写
       return script(ctx);
     },
   });
@@ -148,11 +148,11 @@ test("场景2b：Convener 未写出流程单 ⇒ 不派 Nominator、如实报错
 
     await h.waitFor(() => h.advanceResults.length === 1, 5000);
     const result = await h.advanceResults[0]!;
-    assert.equal(result.ok, false, "流程单缺失 ⇒ 整体如实失败");
+    assert.equal(result.ok, false, "流程状态 YAML 缺失 ⇒ 整体如实失败");
     assert.equal(result.dispatched, true, "第一段 Convener 已投递");
     assert.equal(result.targetRoleId, "convener");
-    assert.match(result.error ?? "", /未写出流程单 docs\/flows\/flow-a\.md/);
-    assert.equal(h.prompts.get("nominator")?.length ?? 0, 0, "流程单缺失时绝不派 Nominator");
+    assert.match(result.error ?? "", /未写出流程状态 YAML docs\/flows\/flow-a\.yaml/);
+    assert.equal(h.prompts.get("nominator")?.length ?? 0, 0, "流程状态 YAML 缺失时绝不派 Nominator");
     assert.equal(h.openRoles.includes("nominator"), false, "绝不为 Nominator 开会话");
     assert.equal(exists(h.root, FLOW_REL), false);
 
@@ -165,7 +165,7 @@ test("场景2b：Convener 未写出流程单 ⇒ 不派 Nominator、如实报错
       )
       .map((envelope) => envelope.event.summary);
     assert.equal(notes.length, 2, "成功一段 + 停住一段各一条系统行");
-    assert.match(notes[1] ?? "", /自动推进停住：Steward \/ 统筹 未写出流程单/);
+    assert.match(notes[1] ?? "", /自动推进停住：Steward \/ 统筹 未写出流程状态 YAML/);
 
     // 不循环：再等一拍，Convener 不再收到第二条任务。
     await new Promise((resolve) => setTimeout(resolve, 150));
