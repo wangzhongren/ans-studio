@@ -154,7 +154,7 @@ test("O1 original confirmation waits → abort → old yes → next turn actual 
   let metadata: CustomerInputMetadata | undefined;
   const results: ToolResult[] = [];
   const provider = fakeProvider(async (options, text, signal) => {
-    results.push(await call(options, text === "confirm" ? "request_confirmation" : "write_file", text === "confirm" ? { title: "允许写入", preview: "src/a.ts" } : { path: "src/a.ts", content: "late permission must fail" }, signal));
+    results.push(await call(options, text === "confirm" ? "request_confirmation" : "write_file", text === "confirm" ? { title: "允许写入", preview: "src/a.ts\n\n## src/a.ts\n// 预览正文\n" } : { path: "src/a.ts", content: "late permission must fail" }, signal));
   });
   const handle = await openRoleSession({ roleId: "X", project, runtime: "codex", persistSession: false,
     customerInput: (_req, context) => { metadata = context; entered(); return new Promise<CustomerInputOutcome>((resolve) => { answer = resolve; }); },

@@ -102,7 +102,8 @@ test("su 预授权矩阵：docs/skills 与 docs/mcp 树内免确认直写；树�
     assert.equal(before.allowed, false, "树外未确认仍拒");
     const capsInput = sink.caps?.customerInput;
     assert.ok(capsInput, "su 会话应拿到（包装后的）客户通道");
-    await capsInput({ kind: "confirm", title: "写 docs/其他.md", preview: "docs/其他.md" }, { turnId: "T-1" });
+    // 2026-10-19 呈现前完整性闸：声明路径后须有可核对正文，卡片才呈现/发行。
+    await capsInput({ kind: "confirm", title: "写 docs/其他.md", preview: "docs/其他.md\n\n确认正文：树外写入的真实正文。\n" }, { turnId: "T-1" });
     assert.equal(asked.length, 1, "树外写盘走确认通道（恰好一次）");
     assert.equal(gate("docs/其他.md").allowed, true, "经确认发行后放行");
     assert.equal(gate("角色卡/Y/role-card.md").allowed, false, "同一确认不含的其它路径仍拒（精确集合）");

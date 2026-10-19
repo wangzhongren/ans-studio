@@ -1,9 +1,11 @@
 // test/测试/governance-liaison-verify/a-roles-writes-caps.test.ts
-// 独立端到端验收（测试角色，2026-10-18）：五角色枚举/主入口、旧 trio 自动获得 Liaison、
-// single 逐字不变、Liaison 写权矩阵、能力矩阵与工具注册面。
+// 独立端到端验收（测试角色，2026-10-18；2026-10-19 客户 shell 新规则同步）：五角色枚举/主入口、
+// 旧 trio 自动获得 Liaison、single 逐字不变、Liaison 写权矩阵、能力矩阵与工具注册面。
 //
 // 依据：`角色卡/项目管理/docs/design/2026-10-18_design_governance-liaison-review.md`
-// §4.1–§4.7、§十 AC1–AC4/AC14/AC16。全部离线（临时目录 + 自建假适配器），不读 `.env`、不跑真实模型。
+// §4.1–§4.7、§十 AC1–AC4/AC14/AC16；客户 2026-10-19 新规则（所有角色都有 shell 权限，包括读写与
+// 任何需要命令的权限，但一律提交审批、按原有流程审批）——五个内置治理角色均 `shell: "operator-approve"`。
+// 全部离线（临时目录 + 自建假适配器），不读 `.env`、不跑真实模型。
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -218,15 +220,22 @@ test("AC3 文案归属：越界写拒绝文案应指回正确归属（提案→�
 
 // —————————————————————— 4) 能力矩阵（真实会话装配） ——————————————————————
 
-test("能力矩阵：Liaison 客户通道（仅 intent-confirm）+ handOffIntent；Rapporteur 提案+澄清；Nominator 安装；Convener 派发/看护/只读 shell；Verifier 验收；su 不变", async () => {
+test("能力矩阵：Liaison 客户通道（仅 intent-confirm）+ handOffIntent；Rapporteur 提案+澄清；Nominator 安装；Convener 派发/看护；五角色审批档 shell；Verifier 验收；su 不变", async () => {
   const { root, cleanup } = makeRoot("caps-five");
   try {
     writeProjectRole(root, "A");
     const project = trioProject(root);
     const captured = new Map<string, ReturnType<typeof capture>>();
+    const operatorCalls = new Map<string, string[]>();
     const open = async (id: string): Promise<void> => {
       const cap = capture();
       captured.set(id, cap);
+      const calls: string[] = [];
+      operatorCalls.set(id, calls);
+      const operator = async (prompt: { command: string }): Promise<{ outcome: "allow"; operatorId: string }> => {
+        calls.push(prompt.command);
+        return { outcome: "allow", operatorId: "op" };
+      };
       const handle = await openRoleSession(
         {
           roleId: id,
@@ -243,7 +252,13 @@ test("能力矩阵：Liaison 客户通道（仅 intent-confirm）+ handOffIntent
           uninstallSkill: async () => ({ ok: false, reason: "stub", message: "stub" }),
           installMcp: async () => ({ ok: false, reason: "stub", message: "stub" }),
           uninstallMcp: async () => ({ ok: false, reason: "stub", message: "stub" }),
-          shellReadonly: { classifyShell: () => "allow" as const, rules: defaultShellRules() },
+          // 客户 2026-10-19 新规则：五个内置治理角色均 `shell: "operator-approve"`——
+          // 传审批档选项（含操作者通道）时应 arm 审批档；allow 直放、risky/review/deny 逐条审批。
+          shellOperatorOnly: {
+            classifyShell: (argv: string[]) => (argv[0] === "ls" ? ("allow" as const) : ("risky" as const)),
+            rules: defaultShellRules(),
+            operatorChannel: operator,
+          },
         },
         { createAdapter: toolAdapterFactory(cap, { root }) },
       );
@@ -251,6 +266,24 @@ test("能力矩阵：Liaison 客户通道（仅 intent-confirm）+ handOffIntent
       await handle.dispose();
     };
     for (const id of FIVE_ROLE_IDS) await open(id);
+
+    // 五角色统一审批档（客户 2026-10-19）：均 arm；allow 0 卡直放；risky 逐条交审批、批准后放行。
+    for (const id of FIVE_ROLE_IDS) {
+      const caps = captured.get(id)!.caps!;
+      assert.equal(typeof caps.shellGate, "function", `${id}（operator-approve）应 arm 审批档 shell`);
+      const calls = operatorCalls.get(id)!;
+      const allow = await caps.shellGate!({ command: "ls", argv: ["ls"], cwd: root, toolCallId: `t-${id}-allow` });
+      assert.equal(allow.allow, true, `${id}：只读白名单（allow）直接放行`);
+      assert.equal(calls.length, 0, `${id}：allow 档不弹审批卡`);
+      const risky = await caps.shellGate!({
+        command: "rm",
+        argv: ["rm", "-rf", "x"],
+        cwd: root,
+        toolCallId: `t-${id}-risky`,
+      });
+      assert.equal(risky.allow, true, `${id}：risky 经审批批准后放行`);
+      assert.equal(calls.length, 1, `${id}：risky 逐条提交审批（一次调用恰一张）`);
+    }
 
     const l = captured.get("liaison")!.caps!;
     assert.equal(typeof l.handOffIntent, "function", "Liaison 独享 hand_off_intent");
@@ -262,7 +295,7 @@ test("能力矩阵：Liaison 客户通道（仅 intent-confirm）+ handOffIntent
     assert.equal(l.proposeRecovery, undefined);
     assert.equal(l.installSkill, undefined);
     assert.equal(l.installMcp, undefined);
-    assert.equal(l.shellGate, undefined, "Liaison 无 shell 面（误传审批档也不 arm）");
+    assert.equal(typeof l.shellGate, "function", "Liaison 有审批档 shell（客户 2026-10-19：所有角色均有 shell 面）");
 
     const r = captured.get("rapporteur")!.caps!;
     assert.equal(typeof r.customerInput, "function", "Rapporteur 保留客户确认/选择卡");
@@ -285,7 +318,7 @@ test("能力矩阵：Liaison 客户通道（仅 intent-confirm）+ handOffIntent
     assert.equal(typeof c.roleStatus, "function");
     assert.equal(typeof c.sessionTail, "function");
     assert.equal(typeof c.proposeRecovery, "function");
-    assert.equal(typeof c.shellGate, "function", "Convener 只读 shell 档");
+    assert.equal(typeof c.shellGate, "function", "Convener 审批档 shell（operator-approve）");
     assert.equal(c.handOffIntent, undefined);
     assert.equal(c.requestClarification, undefined);
     assert.equal(c.installSkill, undefined);
@@ -296,6 +329,7 @@ test("能力矩阵：Liaison 客户通道（仅 intent-confirm）+ handOffIntent
     assert.equal(v.requestClarification, undefined);
     assert.equal(v.dispatchTask, undefined);
     assert.equal(v.installSkill, undefined);
+    assert.equal(typeof v.shellGate, "function", "Verifier 审批档 shell（operator-approve）");
 
     // 注册表是唯一数据来源（不散落硬编码）。
     const spec = governanceRoleOf("liaison")!;
@@ -310,7 +344,7 @@ test("能力矩阵：Liaison 客户通道（仅 intent-confirm）+ handOffIntent
       proposeRecovery: false,
       installSkill: false,
       installMcp: false,
-      shell: "none",
+      shell: "operator-approve",
     });
     assert.equal(spec.preauthorizedDirs.includes("docs/intents/"), true, "Liaison 预授权只有意图目录");
     assert.equal(spec.preauthorizedDirs.length, 1);

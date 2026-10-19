@@ -40,13 +40,18 @@ import type { SessionEvent, RuntimeTurnOutcome, RuntimePersistenceChangeV1, Repo
 //    （发行在编排 `common/编排/confirmed-writes.ts`，本层不复制）；**「客户确定了才加、才落盘」取代了旧收口**
 //    ——收口提议/确认/手动 finalize 已删，产物收尾由编排在 settle 后**自动**完成（本层不再有 finalize 面）。
 //    普通角色会话**不注入**（无客户通道：两工具不注册、gate 旧语义逐字不变）。
-//  - **su 审批档（客户裁定 2026-10-17：「只读的免审批，其他的要客户审批」＋「deny 也走客户审批」）**：
-//    内置治理角色（su）会话把 **(c) 规则集实件**（与项目角色**同一份** `deps.shellArming`——单一来源、永不漂移）
+//  - **内置治理角色审批档（客户裁定 2026-10-17「只读的免审批，其他的要客户审批」＋「deny 也走客户审批」；
+//    客户新规则 2026-10-19「所有的角色，都应该有运行 shell 的权限，包括读写，以及任何的需要命令的权限，
+//    只不过都要提交审批，按照原有的流程审批。」）**：
+//    **全部内置治理角色**（`role.builtIn === true`——single 的 su 与 trio 五人 liaison/rapporteur/nominator/
+//    convener/verifier）会话把 **(c) 规则集实件**（与项目角色**同一份** `deps.shellArming`——单一来源、永不漂移）
 //    与 **(a) 操作者确认通道**（与项目角色同一份 `deps.shellOperatorChannel`）经 `shellOperatorOnly` 交给编排
-//    `assembleOperatorShellGate` 装配**审批档** ShellGate ⇒ su 的 `run_shell` **注册**：(c) 只读白名单直接放行
-//    **0 卡**；`risky`/`review`/`deny` 一律交客户**逐条批准**（deny 也可被批准）。**su 不接 (b)**（不自审）；
-//    拒绝/超时/通道不可用 = 拒绝（fail-closed）。旧只读档（`shellReadonly`）桌面**不再使用**（类型保留兼容）。
-//    缺省/构造失败（`deps.shellArming` 或 `deps.shellOperatorChannel` 为 undefined）⇒ **不传** ⇒ su 不 arm
+//    `assembleOperatorShellGate` 装配**审批档** ShellGate ⇒ 内置治理角色的 `run_shell` **注册**：
+//    (c) 只读白名单直接放行 **0 卡**；`risky`/`review`/`deny` 一律交客户/判断 agent **逐条审批**
+//    （deny 也可被批准）。**不接 (b)**（不自审）；拒绝/超时/通道不可用 = 拒绝（fail-closed）。
+//    shell 可读写、可执行任意命令，但其副作用**不受文件写门禁约束**——审批链是**唯一控制**。
+//    旧只读档（`shellReadonly`）桌面**不再使用**（类型保留兼容；内置治理角色**绝不**注入只读档）。
+//    缺件（`deps.shellArming` 或 `deps.shellOperatorChannel` 为 undefined）⇒ **不传** ⇒ 不 arm
 //    （能力缺席 = fail-closed，绝不放宽）。
 
 import type { Acceptance } from "../../src/model/boundary.ts";
@@ -143,9 +148,10 @@ import { readMcpDeclaration } from "../../src/common/runtime-core/mcp-declaratio
 // I-1 补丁（2026-10-12 客户重发授权）：(c) 规则集实件的形状（**只读转自** operator-channel.ts——它 `Omit`
 // 自编排的 `AssembleShellGateOptions`；同一契约只许一个形状，本模块不另立第二份）。
 import type { DesktopOperatorChannelFn, DesktopShellArming } from "./operator-channel.ts";
-// su 只读档（客户裁定 2026-10-12：「su 也要有 shell，但是只读」）：只读档装配选项形状的**单一来源**在编排
-// （`shell-arming.ts::AssembleReadonlyShellGateOptions`）——只读导入其类型（运行期擦除），据它取「只读档
-// 该注入哪几件」。**不另立第二形状**（与 `DesktopShellArming` 同法，见 operator-channel.ts 注释）。
+// 审批档/旧只读档的装配选项形状：**单一来源**在编排（`shell-arming.ts::AssembleOperatorShellGateOptions` /
+// `AssembleReadonlyShellGateOptions`）——只读导入其类型（运行期擦除）。审批档自 2026-10-19 起适用于**全部内置
+// 治理角色**；旧只读档**桌面不再注入**（类型保留以兼容其他调用方/测试，见 `openRoleSession` 入参注释）。
+// **不另立第二形状**（与 `DesktopShellArming` 同法，见 operator-channel.ts 注释）。
 import type { AssembleOperatorShellGateOptions, AssembleReadonlyShellGateOptions, RoutineShellPolicy } from "../../src/pipeline/orchestration/shell-arming.ts";
 // 桌面客户交互通道（A-5）：请求/裁决的冻结形状在 §4 冻结契约家（model/runtime.ts），
 // 本模块只读导入转出；`DesktopCustomerInputFn` 是本层对「带角色上下文」的窄扩展（请求本体不带 roleId）。
@@ -321,18 +327,21 @@ export interface SessionManagerDeps {
       installMcp?: InstallMcpFn;
       /** **外来 MCP 卸载能力**（G-4 V2，仅 su 注入；形状＝契约家 `UninstallMcpFn`）。 */
       uninstallMcp?: UninstallMcpFn;
-      /** **(a) 操作者确认通道（I-1 arm；2026-10-17 起 su 也构造）**：**项目角色** ⇒ 编排装配 (c)/(b)/(a)
-       *  三层链；**内置治理角色（su）** ⇒ 经下方 `shellOperatorOnly` 装配审批档。角色判据见 `open()`。 */
+      /** **(a) 操作者确认通道（I-1 arm）**：**项目角色** ⇒ 编排装配 (c)/(b)/(a) 三层链；
+       *  **全部内置治理角色（`role.builtIn === true`，含 trio 五人）** ⇒ 经下方 `shellOperatorOnly` 装配审批档
+       *  （客户 2026-10-19 新规则：所有角色都有 shell 权限（含读写与任意命令），一律提交审批）。判据见 `open()`。 */
       shellOperatorChannel?: OperatorChannelFn;
-      /** **(c) 规则集实件（I-1 补丁，2026-10-12）**：仅**项目角色**会话注入（与 (a) 同判据走三层链）。 */
+      /** **(c) 规则集实件（I-1 补丁，2026-10-12）**：仅**项目角色**会话注入（同判据走三层链）。 */
       shellArming?: DesktopShellArming;
-      /** **su 审批档（客户裁定 2026-10-17）**：仅**内置治理角色（su）**会话注入——(c) 只读白名单免审批，
-       *  `risky`/`review`/`deny` 一律交客户逐条批准（deny 也可批准）；**不接 (b)**（su 不自审）。
+      /** **内置治理角色审批档（客户 2026-10-17 裁定，2026-10-19 新规则扩至全部内置治理角色）**：
+       *  仅 `role.builtIn === true` 的会话注入——(c) 只读白名单免审批，`risky`/`review`/`deny` 一律交客户/
+       *  判断 agent 逐条批准（deny 也可批准）；**不接 (b)**（不自审）。shell 可读写、可执行任意命令，审批链是
+       *  唯一控制（命令副作用不受文件写门禁约束）。
        *  形状＝编排 `AssembleOperatorShellGateOptions`（`Omit<…, "project">`，只读导入、不另立第二形状）。
-       *  缺省/缺件 ⇒ 不传 ⇒ su 不 arm（能力缺席 = fail-closed，绝不放宽）。 */
+       *  缺省/缺件 ⇒ 不传 ⇒ 不 arm（能力缺席 = fail-closed，绝不放宽）。 */
       shellOperatorOnly?: Omit<AssembleOperatorShellGateOptions, "project">;
-      /** **su 只读档（旧路径，客户裁定 2026-10-12）**：类型保留以兼容其他调用方/测试；**桌面自 2026-10-17
-       *  起不再使用**（su 改走审批档）。与 `shellOperatorOnly` 同时出现 ⇒ 编排不 arm（互斥守卫）。 */
+      /** **旧只读档（客户裁定 2026-10-12）**：类型保留以兼容其他调用方/测试；**桌面自 2026-10-17 起不再注入**
+       *  （全部内置治理角色改走审批档）。与 `shellOperatorOnly` 同时出现 ⇒ 编排不 arm（互斥守卫）。 */
       shellReadonly?: Omit<AssembleReadonlyShellGateOptions, "project">;
     },
     deps: { createAdapter: RuntimeAdapterFactory },
@@ -430,22 +439,24 @@ export interface SessionManagerDeps {
    */
   shellGate?: ShellGate;
   /**
-   * **(a) 操作者确认通道**（I-1，2026-10-12；客户裁定「现在开放 shell…如果 su 觉得危险可以让客户决定」）——
-   * 桌面把既有「看命令原文 + 放行/拒绝」对话框（`createDesktopOperatorChannel`；拒绝为默认与取消项）作为
-   * (a) 层交给**编排**装配 (c)/(b)/(a) `ShellGate`（`buildShellGate` 的 `operatorChannel` 即本通道）。
-   * **只对项目角色注入**（su **不接 (b)/(a)**——审读者不给自己开闸：不自审、不弹框；su 的 shell 走
-   * `shellReadonly` 只读档，见下；判据 `role.builtIn`，见 `open()`）。
+   * **(a) 操作者确认通道**（I-1，2026-10-12；客户裁定「现在开放 shell…如果 su 觉得危险可以让客户决定」；
+   * 客户新规则 2026-10-19：所有角色都有 shell 权限（含读写与任意命令），一律提交审批）——
+   * 桌面把既有「看命令原文 + 放行/拒绝」对话框（`createDesktopOperatorChannel`；拒绝为默认与取消项）交给
+   * **编排**：**项目角色** ⇒ (c)/(b)/(a) 三层 `ShellGate`（`buildShellGate` 的 `operatorChannel` 即本通道）；
+   * **全部内置治理角色** ⇒ 本通道作为 `shellOperatorOnly.operatorChannel` 装配**审批档**（见下）。
+   * 判据 `role.builtIn`，见 `open()`。
    */
   shellOperatorChannel?: DesktopOperatorChannelFn;
   /**
    * **(c) 规则集实件（I-1 补丁，2026-10-12 客户重发授权）**——与 `shellOperatorChannel` **同一接线面**
    * 透传：编排 `openRoleSession({ shellArming })` 用它装配 (c) 层（`classifyShell` + `rules`；缺省 ⇒ 编排
-   * 对「规则集未注入」一律拒绝）。**只对项目角色**传（三层链；su 不接 (b)/(a)）。主进程用
-   * `operator-channel.ts::buildDesktopShellArming()` 构造，**两件同备才 arm**（加载失败 ⇒ 连 (a) 也不注入）。
+   * 对「规则集未注入」一律拒绝）。**只对项目角色**传三层链字段（内置治理角色不接 (b)/(a) 三层链）。
+   * 主进程用 `operator-channel.ts::buildDesktopShellArming()` 构造，**两件同备才 arm**（加载失败 ⇒ 连 (a)
+   * 也不注入）。
    *
-   * **同一份实件也供 su 只读档**（客户裁定 2026-10-12：「su 也要有 shell，但是只读」）：`open()` 对内置治理
-   * 角色会话经 `shellReadonly` **复用本对象**交给编排装配只读档——单一来源、与项目角色永不漂移；缺省 ⇒
-   * su 也不 arm（能力缺席 = fail-closed）。
+   * **同一份实件也供全部内置治理角色审批档**（客户 2026-10-17 裁定、2026-10-19 新规则扩展）：`open()` 对
+   * `role.builtIn === true` 的会话经 `shellOperatorOnly` **复用本对象**交给编排装配审批档——单一来源、与
+   * 项目角色永不漂移；缺省 ⇒ 内置治理角色也不 arm（能力缺席 = fail-closed）。
    */
   shellArming?: DesktopShellArming;
   /**
@@ -1612,10 +1623,12 @@ export class SessionManager {
     // ——— 三权（评审 §5.6）：能力按 `governanceFunction` 路由；single/su 旧行为逐字不变 ———
     //
     // 唯一数据来源＝门禁引擎注册表（经 `role.governanceFunction`/`builtIn` 表达，**不硬编码角色 id**）。
-    // · legacyBuiltIn：single 模型下的内置治理角色（su）——保持旧能力集（派发/看护/安装/审批档）；
-    // · schedule：trio 的 Convener——派发/看护/恢复提议 + 只读 shell；
+    // · legacyBuiltIn：single 模型下的内置治理角色（su）——保持旧能力集（派发/看护/安装）；
+    // · schedule：trio 的 Convener——派发/看护/恢复提议；
     // · nomination：trio 的 Nominator——技能/MCP 安装；
-    // · rapporteur：只有客户确认通道（不派发、不看护、不安装、无 shell）。
+    // · liaison：trio 的 Liaison——意图交接；proposal：Rapporteur——澄清；
+    // · verification：trio 的 Verifier——无附加能力。
+    // **shell 不再按职能分档**（客户 2026-10-19 新规则）：全部内置治理角色统一审批档，见下方 `shellOperatorOnly`。
     const governanceModel: GovernanceModel = project.governanceModel ?? "single";
     const governanceFunction = role.governanceFunction;
     const legacyBuiltIn = role.builtIn === true && governanceFunction === undefined && governanceModel === "single";
@@ -1702,9 +1715,9 @@ export class SessionManager {
         ? (d: InstallMcpPayload, _metadata?: ReportHandbackMetadata) => this.applyMcpChange("uninstalled", req.projectRoot, req.runtime, req.roleId, d)
         : undefined;
 
-    // (a) 操作者确认通道（I-1 arm；**2026-10-17 起 su 也构造**）：项目角色 → 编排装配 (c)/(b)/(a) 三层链；
-    // 内置治理角色（su）→ 经下方 `shellOperatorOnly` 装配**审批档**。通道**每会话闭包绑定** roleId/
-    // projectRoot/runtime 与本轮 signal（裁决与卡片都按该会话归档）。
+    // (a) 操作者确认通道（I-1 arm）：项目角色 → 编排装配 (c)/(b)/(a) 三层链；
+    // **全部内置治理角色**（`role.builtIn === true`）→ 经下方 `shellOperatorOnly` 装配**审批档**。
+    // 通道**每会话闭包绑定** roleId/projectRoot/runtime 与本轮 signal（裁决与卡片都按该会话归档）。
     const interactionState = { lifetime: new AbortController(), turn: new AbortController() };
     let shellOperatorChannel: OperatorChannelFn | undefined;
     if (this.deps.shellOperatorChannel) {
@@ -1725,33 +1738,23 @@ export class SessionManager {
     }
 
     // I-1 补丁（2026-10-12，客户重发授权）：**(c) 规则集实件**（`classifyShell` + `rules`）——仅**项目角色**
-    // 走三层链（su 不自审）。缺省 ⇒ 编排对「规则集未注入」一律拒绝（fail-closed，绝不放宽）。
+    // 走三层链（内置治理角色不自审）。缺省 ⇒ 编排对「规则集未注入」一律拒绝（fail-closed，绝不放宽）。
     const shellArming = role.builtIn === true ? undefined : this.deps.shellArming;
 
-    // **su 审批档（客户裁定 2026-10-17）**：仅 **single 模型下的内置治理角色（su）** 把 **(c) 实件 +
-    // (a) 通道**（均与项目角色同一份 deps 引用——单一来源、永不漂移）经 `shellOperatorOnly` 交给编排装配审批档：
+    // **内置治理角色审批档（客户裁定 2026-10-17；2026-10-19 新规则「所有角色都有 shell 权限，包括读写，
+    // 以及任何需要命令的权限，只不过都要提交审批」扩至全部内置治理角色）**：**全部 `role.builtIn === true`
+    // 的会话**（single 的 su 与 trio 五人）把 **(c) 实件 + (a) 通道**（均与项目角色同一份 deps 引用——单一
+    // 来源、永不漂移）经 `shellOperatorOnly` 交给编排装配审批档：
     //   · (c)=allow（只读白名单）⇒ 直接放行、**0 卡**；
-    //   · `risky`/`review`/`deny` ⇒ 客户逐条批准（deny 也可被批准）；拒绝/超时/不可用 = 拒绝。
+    //   · `risky`/`review`/`deny` ⇒ 客户/判断 agent 逐条审批（deny 也可被批准）；拒绝/超时/不可用 = 拒绝。
     // **缺件（deps.shellArming 或 deps.shellOperatorChannel 缺省）⇒ 不传 ⇒ 不 arm**（能力缺席 = fail-closed）。
-    // 评审 §5.6：trio 三人**都不接**该审批档（治理决定与命令放行分离）；`governanceModel === "single"` 是硬条件。
+    // 内置治理角色**绝不**同时注入旧只读档（`shellReadonly`）——编排对两档并存互斥拒绝；只读档桌面不再注入。
     const shellOperatorOnly =
-      legacyBuiltIn && this.deps.shellArming && shellOperatorChannel
+      role.builtIn === true && this.deps.shellArming && shellOperatorChannel
         ? {
             classifyShell: this.deps.shellArming.classifyShell,
             rules: this.deps.shellArming.rules,
             operatorChannel: shellOperatorChannel,
-          }
-        : undefined;
-
-    // **trio Convener 只读档（评审 §5.6）**：`governanceFunction === "schedule"` 时从**同一份**
-    // `deps.shellArming`（(c) 实件）构造 `{ classifyShell, rules }`——**不带 operator channel**：
-    // `(c)=allow` 直接执行；`risky`/`review`/`deny` 一律拒绝，不出客户审批卡。Rapporteur/Nominator 无 shell。
-    // single/su 不传（su 走上面的审批档——旧行为逐字不变）。
-    const shellReadonly =
-      governanceFunction === "schedule" && this.deps.shellArming
-        ? {
-            classifyShell: this.deps.shellArming.classifyShell,
-            rules: this.deps.shellArming.rules,
           }
         : undefined;
 
@@ -1882,16 +1885,15 @@ export class SessionManager {
           ...(installMcp ? { installMcp } : {}),
           ...(uninstallMcp ? { uninstallMcp } : {}),
           // I-1：(a) 操作者确认通道——**项目角色**走 (c)/(b)/(a) 三层链（与下方 `shellArming` 同备）。
-          // su 不走此字段（其 (a) 通道在 `shellOperatorOnly` 内，见下）。
+          // 内置治理角色不走此字段（其 (a) 通道在 `shellOperatorOnly` 内，见下）。
           ...(role.builtIn !== true && shellOperatorChannel ? { shellOperatorChannel } : {}),
           // I-1 补丁（2026-10-12，客户重发授权）：(c) 实件（classifyShell + defaultShellRules）——与 (a)
           // 同处装配（缺它 ⇒ 编排对「规则集未注入」一律拒绝——真机曾据此如实报「环境无 shell」）。
           ...(shellArming ? { shellArming } : {}),
-          // **su 审批档（客户裁定 2026-10-17）**：仅 single/su 且 (c)+(a) 同备时给出；缺件不传 ⇒ 不 arm。
+          // **内置治理角色审批档（客户 2026-10-17 裁定、2026-10-19 扩至全部内置治理角色）**：
+          // `role.builtIn === true` 且 (c)+(a) 同备时给出；缺件不传 ⇒ 不 arm（fail-closed，绝不放宽）。
           ...(shellOperatorOnly ? { shellOperatorOnly } : {}),
-          // **trio Convener 只读档（评审 §5.6）**：同一份 (c) 实件、不含 operator channel；
-          // `(c)=allow` 直接执行，risky/review/deny 一律拒绝（不出客户审批卡）。
-          ...(shellReadonly ? { shellReadonly } : {}),
+          // **旧只读档（`shellReadonly`）桌面不再注入**：内置治理角色统一走上方审批档，两档并存编排互斥拒绝。
         },
         { createAdapter },
       );

@@ -110,7 +110,8 @@ test("五角色全自动链路：意图→提案→接受→流程→提名→�
               toolCallId: "tc-appointment-write",
               args: {
                 title: `写盘确认 ${FLOW}`,
-                preview: `将写入：\n- ${ROLE_CARD_REL}\n- ${ROLE_BOUNDARY_REL}\n\n# 角色：executor\n`,
+                // 2026-10-19 呈现前完整性闸：每条声明路径后都给出可核对正文。
+                preview: `将写入：\n- ${ROLE_CARD_REL}\n\n角色卡正文：角色名 executor、职责与工作立场。\n\n- ${ROLE_BOUNDARY_REL}\n\n边界正文：可写目录与目的条目。\n`,
                 flowId: FLOW,
                 cardKind: "appointment-write",
               },

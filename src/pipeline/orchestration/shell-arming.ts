@@ -256,8 +256,8 @@ export async function assembleReadonlyShellGate(opts: AssembleReadonlyShellGateO
 
 /**
  * `assembleOperatorShellGate` 的选项（**契约钉死**：编排/桌面/测试按此接，不许改名）。
- * **选项面没有** `pmAsk`/`pmRoleId`/`openSession`/`sessionDeps`/`routineShellPolicy`——su 不自审，
- * 客户审批不得被 pm 审读或委托常规检查绕过；type 层面即接不上。
+ * **选项面没有** `pmAsk`/`pmRoleId`/`openSession`/`sessionDeps`/`routineShellPolicy`——审批档不自审，
+ * 客户审批不得被模型审读或委托常规检查绕过；type 层面即接不上。
  * `operatorChannel` **必填**（无通道即不 arm；`shell-gate.ts` 构造期亦有守卫）。
  */
 export interface AssembleOperatorShellGateOptions {
@@ -282,15 +282,16 @@ export interface AssembleOperatorShellGateOptions {
 }
 
 /**
- * 装配 **su 审批档** `ShellGate`（客户裁定 2026-10-17：「只读的免审批，其他的要客户审批」＋
- * 「deny 也走客户审批」）。语义（判定全部在 `shell-gate.ts`，本函数只装配）：
+ * 装配**审批档** `ShellGate`（客户裁定 2026-10-17；客户 2026-10-19 新规则扩展到五个内置治理角色：
+ * 所有角色都有 shell 权限，含读写与任意命令，但一律经审批链）。语义（判定全部在 `shell-gate.ts`，
+ * 本函数只装配）：
  * - `(c)=allow` → 直接放行（`c-allow`），**不弹卡**（0 次 operator 调用）；
  * - `(c)=risky` / `review` → 交 (a)（`c-risky→a-*` / `c-review→a-*`）；
  * - `(c)=deny` → 也交 (a)（`c-deny→a-*`；`approveDeny: true`）——原硬拒可被客户逐条批准；
- * - **不接 (b)**（su 不自审）；拒绝/超时/通道不可用 = 拒绝（fail-closed）。
+ * - **不接 (b)**（交付审批的角色不自审）；拒绝/超时/通道不可用 = 拒绝（fail-closed）。
  *
  * 审计边界 = 治理角色边界（与三层链/只读档**同一解析**，共用 `resolveGovernanceBoundary`；
- * 本档只服务 single/su，`auditBoundaryOf` 原样返回，逐字不变）；
+ * trio 经 `auditBoundaryOf` 映射为应用专用边界（含 `docs/audit/`），single/su 原样返回）；
  * 审计仍落 `docs/audit/shell-gate.jsonl`，`conditions`/`execution` 既有语义不变。
  * 装配失败 / 缺件 ⇒ 构造抛错或闸一律拒绝；调用方（`openRoleSession`）捕获 ⇒ **不 arm**。
  */
@@ -298,7 +299,8 @@ export async function assembleOperatorShellGate(
   opts: AssembleOperatorShellGateOptions,
 ): Promise<ShellGate> {
   // 审计边界 = 内置治理角色边界（与三层链/只读档共用同一 helper，不造第二份解析）。
-  // W6-A：本档只服务 single/su；沿用既有治理角色边界（`auditBoundaryOf` 原样返回）。
+  // 本档不按角色 id 区分：`openRoleSession` 按能力位 `shell: "operator-approve"` 为内置治理角色装配；
+  // trio 经 `auditBoundaryOf` 映射为应用专用边界，single/su 原样返回。
   const { roleId: auditRoleId, boundary: govBoundary } = await resolveGovernanceBoundary(opts.project);
   const auditBoundary = auditBoundaryOf(opts.project, govBoundary, auditRoleId);
 
@@ -322,7 +324,7 @@ export async function assembleOperatorShellGate(
         throw new Error("(c) shell 规则集未注入——本闸一律拒绝（fail-closed）");
       }),
     operatorChannel: opts.operatorChannel,
-    // su 审批档：不接 (b)；risky/review/deny 一律交 (a) 客户逐条批准。
+    // 审批档：不接 (b)；risky/review/deny 一律交 (a) 客户/判断 agent 逐条批准。
     operatorOnly: true,
     approveDeny: true,
     ...(opts.operatorTimeoutMs !== undefined ? { operatorTimeoutMs: opts.operatorTimeoutMs } : {}),

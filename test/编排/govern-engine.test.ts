@@ -174,7 +174,7 @@ test("runGovernSession：CLI 前端复用同一引擎（同一边界来源/scope
     const script: ToolCall[] = [
       {
         name: "request_confirmation",
-        args: { title: "建角色 X", preview: "将写出：`角色卡/X/role-card.md`" },
+        args: { title: "建角色 X", preview: "将写出：`角色卡/X/role-card.md`\n\n## 角色卡/X/role-card.md\n# 角色：X\n" },
       },
       { name: "write_file", args: { path: "角色卡/X/role-card.md", content: "# 角色：X\n" } },
     ];

@@ -219,7 +219,8 @@ test("写盘代批：账本 kind=judge、group=approval、judge.paths 逐路径�
       name: "request_confirmation",
       args: {
         title: "写盘确认 flow-a",
-        preview: "将写入 docs/proposals/flow-a-v1.md",
+        // 2026-10-19 呈现前完整性闸：声明路径后须有可核对正文。
+        preview: "将写入 docs/proposals/flow-a-v1.md\n\n提案正文：目标、范围与验收标准。\n",
         flowId: FLOW,
         cardKind: "write",
       },

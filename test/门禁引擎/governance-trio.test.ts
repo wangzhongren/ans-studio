@@ -7,6 +7,16 @@
 // 默认主入口；旧 trio 项目自动获得 Liaison，`governanceModel` 仍为 `"trio"`，single/su 不变。
 // 2026-10-18 客户拍板「都按推荐的来」：新增第五个内置治理角色 `verifier`（Proof / 验收，
 // 验收权不是批准权），并统一显示名（Lead 主理 / Draft 提案 / Crew 组队 / Steward 统筹 / Proof 验收）。
+// 2026-10-19 客户新规则：所有角色都有 shell 权限（含读写与任意命令），但一律提交审批、按原有流程
+// 审批 ⇒ 五个内置治理角色统一 `shell: "operator-approve"`（只读白名单直接执行、其余逐条审批）。
+// 2026-10-19 客户批准工程质量基线（原话「可以，按你说的改」）：五张卡逐字复用
+// `ENGINEERING_QUALITY_BASELINE`，各带角色专属质量职责；验收前必须真实启动应用并演示，未演示不得
+// 建议验收通过。
+// 2026-10-19 客户架构批评（原话「这个感觉也没有啥架构的啊，提案角色应该也要考虑到扩展性，给出一个
+// 架构方案啊。」）：基线新增「架构与可扩展性」，五卡各带架构职责——Draft 缺「架构方案」/「架构影响
+// 分析」不得建议 accept、不得进入实现；Lead 把演进诉求写进 acceptance 但不替客户决定架构；Crew 写区
+// 与架构模块一一对应且禁止重叠；Steward 流程/派发引用架构模块并含 contract-freeze 与集成/端到端
+// 步骤；Proof 核对实现与架构声明一致、缺章节或偏离声明不得建议 accept。
 // 实施口径：`角色卡/项目管理/docs/design/2026-10-17_design_governance-trio-review.md`
 // §5.1–§5.6、§九-1/3/4/12/15；`2026-10-18_design_governance-liaison-review.md` §4.1–§4.7。
 //
@@ -37,6 +47,7 @@ import {
 import {
   APP_GOVERNANCE_SOURCE,
   BUILT_IN_GOVERNANCE_ROLES,
+  ENGINEERING_QUALITY_BASELINE,
   LEGACY_GOVERNANCE_ROLE_ID,
   LEGACY_SU_CAPABILITIES,
   LEGACY_SU_CARD_TEXT,
@@ -197,7 +208,7 @@ test("注册表：能力矩阵——Lead 只沟通+交接+intent-confirm；Stewa
     [l.dispatchTask, l.roleStatus, l.sessionTail, l.proposeRecovery, l.installSkill, l.installMcp],
     [false, false, false, false, false, false],
   );
-  assert.equal(l.shell, "none");
+  assert.equal(l.shell, "operator-approve", "Lead 也接审批档（客户 2026-10-19：所有角色 shell 均经审批）");
   // 其余四人保留客户确认通道；仅 Draft 有澄清工具；Proof 只验收。
   for (const cap of [r, n, c, v]) assert.equal(cap.customerInput, true, "四人都保留客户确认通道");
   assert.deepEqual(
@@ -220,7 +231,11 @@ test("注册表：能力矩阵——Lead 只沟通+交接+intent-confirm；Stewa
   );
   assert.deepEqual([r.installSkill, n.installSkill, c.installSkill, v.installSkill], [false, true, false, false]);
   assert.deepEqual([r.installMcp, n.installMcp, c.installMcp, v.installMcp], [false, true, false, false]);
-  assert.deepEqual([r.shell, n.shell, c.shell, v.shell], ["none", "none", "readonly", "none"]);
+  assert.deepEqual(
+    [r.shell, n.shell, c.shell, v.shell],
+    ["operator-approve", "operator-approve", "operator-approve", "operator-approve"],
+    "客户 2026-10-19：五个内置治理角色统一审批档（Convener 不再只读档）",
+  );
   // su 单点：能力集来自注册表，不在调用方另写一份。
   assert.equal(governanceCapabilitiesOf("su"), LEGACY_SU_CAPABILITIES);
   // 旧 su 的卡文本/id 仍以 boundary-core 为单一来源（注册表只做 live binding 再导出）。
@@ -240,6 +255,158 @@ test("注册表：能力矩阵——Lead 只沟通+交接+intent-confirm；Stewa
     shell: "operator-approve",
   });
   assert.deepEqual(LEGACY_SU_PREAUTHORIZED_DIRS, ["docs/su", "docs/contracts", "docs/skills", "docs/mcp"]);
+});
+
+test("客户 2026-10-19：五内置角色统一 shell 审批档（operator-approve），卡文本含审批与读写语义", () => {
+  // 客户原文：「所有的角色，都应该有有运行shell 的权限，包括读写，以及任何的需要命令的权限，
+  // 只不过都要提交审批，按照原有的流程审批。」⇒ 不再有 `none`/`readonly`，su 保持审批档。
+  for (const spec of BUILT_IN_GOVERNANCE_ROLES) {
+    assert.equal(spec.capabilities.shell, "operator-approve", `${spec.id} 须为审批档`);
+    assert.match(spec.cardText, /shell 审批档——只读白名单直接执行/, `${spec.id} 卡文本须写明只读白名单直接执行`);
+    assert.match(spec.cardText, /逐条提交客户\/判断 agent 审批/, `${spec.id} 卡文本须写明逐条审批`);
+    assert.match(spec.cardText, /含读写与任意命令/, `${spec.id} 卡文本须含读写语义`);
+    assert.match(spec.cardText, /审批不改变你的职责与写边界/, `${spec.id} 卡文本须写明审批不改变职责与写边界`);
+    assert.match(spec.cardText, /写文件仍优先用 write_file 并经写盘确认/, `${spec.id} 卡文本须保留写盘确认纪律`);
+    assert.match(spec.cardText, /拒绝、超时、通道不可用一律不放行/, `${spec.id} 卡文本须写明 fail-closed`);
+    // 旧表述不得残留（特别防 Convener 的「只读档」与其余角色的「不接 shell」）。
+    assert.doesNotMatch(spec.cardText, /shell 面 `none`/, `${spec.id} 不得残留无 shell 表述`);
+    assert.doesNotMatch(spec.cardText, /执行类 shell 留给项目角色/, `${spec.id} 不得残留「执行类 shell 留给项目角色」`);
+    assert.doesNotMatch(spec.cardText, /shell 面：\*\*只读档\*\*/, `${spec.id} 不得残留只读档表述`);
+  }
+  assert.equal(LEGACY_SU_CAPABILITIES.shell, "operator-approve", "su 保持审批档（既有行为不变）");
+});
+
+test("客户 2026-10-19：五张卡逐字复用工程质量基线，并各带角色专属质量职责（含真实启动演示硬要求）", () => {
+  // 客户批准原话：「可以，按你说的改」。基线是单一来源常量 `ENGINEERING_QUALITY_BASELINE`，五卡逐字
+  // 复用；「验收前必须真实启动应用并演示」是硬要求：没有真实启动/演示证据不得建议验收通过。
+  for (const spec of BUILT_IN_GOVERNANCE_ROLES) {
+    const t = spec.cardText;
+    assert.ok(t.includes(ENGINEERING_QUALITY_BASELINE), `${spec.id} 卡须逐字包含工程质量基线`);
+    for (const keyword of [
+      "正确性",
+      "健壮性",
+      "安全",
+      "可维护性",
+      "测试",
+      "演示",
+      // 客户 2026-10-19 架构批评：基线新增条目的关键字也必须在每张卡上可见。
+      "架构与可扩展性",
+      "模块分解",
+      "依赖方向",
+      "扩展点",
+      "版本/迁移/兼容/弃用策略",
+      "架构影响分析",
+    ]) {
+      assert.ok(t.includes(keyword), `${spec.id} 卡须含质量基线关键字「${keyword}」`);
+    }
+    assert.match(t, /你的质量职责/, `${spec.id} 卡须写明角色专属质量职责`);
+    assert.match(t, /验收前必须真实启动应用并演示/, `${spec.id} 卡须含真实启动并演示的硬要求`);
+    assert.match(t, /客户明确选原型档才可放宽/, `${spec.id} 卡须写明默认生产档、仅客户可放宽`);
+    assert.match(t, /不得为保绿弱化断言/, `${spec.id} 卡须禁止为保绿弱化测试断言`);
+  }
+  // Lead / 主理：意图阶段确认质量档位（未指定默认生产），并把基线写进意图 acceptance。
+  const l = governanceRoleOf("liaison")!.cardText;
+  assert.match(l, /意图阶段必须与客户确认质量档位/, "Lead 须在意图阶段确认质量档位");
+  assert.match(l, /客户未指定时默认生产档/, "Lead 未指定时默认生产档");
+  assert.match(l, /写入意图文件的 acceptance/, "Lead 须把质量基线写入意图 acceptance");
+  // Draft / 提案：提案必须有「质量基线与证据计划」一节，验收标准覆盖基线，不得只写功能验收。
+  const r = governanceRoleOf("rapporteur")!.cardText;
+  assert.match(r, /「质量基线与证据计划」一节/, "Draft 提案须含「质量基线与证据计划」一节");
+  assert.match(r, /逐项对应上面的基线/, "Draft 证据计划须逐项对应基线");
+  assert.match(r, /不得只写功能验收/, "Draft 验收标准不得只写功能验收");
+  // Crew / 组队：项目角色卡继承基线并逐角色写明质量职责；测试角色卡须负例/边界/重启/权限用例。
+  const n = governanceRoleOf("nominator")!.cardText;
+  assert.match(n, /项目角色卡必须继承工程质量基线/, "Crew 角色卡须继承质量基线");
+  assert.match(n, /为每个角色写明其质量职责/, "Crew 须为每个角色写明质量职责");
+  assert.match(n, /负例、边界、重启恢复与权限用例/, "测试角色卡须要求负例/边界/重启/权限用例");
+  // Steward / 统筹：流程与派发带基线与真实演示；verification 步骤必须含「真实启动应用并演示」。
+  const c = governanceRoleOf("convener")!.cardText;
+  assert.match(c, /`dispatch_task` 的任务描述必须带工程质量基线/, "Steward 派发任务须带质量基线");
+  assert.match(c, /verification 步骤必须包含「真实启动应用并演示」/, "Steward 须把真实演示写进 verification 步骤");
+  assert.match(c, /未演示不得进入验收/, "Steward 未演示不得进入验收");
+  // Proof / 验收：逐项核对基线；无真实启动/演示证据不得建议 accept；不得以「工具无 shell」跳过核对。
+  const v = governanceRoleOf("verifier")!.cardText;
+  assert.match(v, /验收必须逐项核对工程质量基线/, "Proof 须逐项核对质量基线");
+  assert.match(v, /没有真实启动\/演示证据/, "Proof 须要求真实启动/演示证据");
+  assert.match(v, /不得建议 accept/, "Proof 无证据不得建议 accept");
+  assert.match(v, /明确退回或要求补做/, "Proof 无证据须退回或要求补做");
+  assert.match(v, /不得以「工具无 shell」为由跳过可执行的核对/, "Proof 不得以「工具无 shell」为由跳过核对");
+});
+
+test("客户 2026-10-19 架构批评：基线新增「架构与可扩展性」，五卡各带架构职责（Draft 缺章节不得 accept/进入实现）", () => {
+  // 客户原话：「这个感觉也没有啥架构的啊，提案角色应该也要考虑到扩展性，给出一个架构方案啊。」
+  // 真机证据：R1 提案只有意图/交付物/数据模型/API/权限/状态机/分页/前端/测试/README/验收/分工/风险；
+  // R3 提案只有状态机/权限/统计/契约/测试/分工/风险——两者都没有模块分解、依赖方向、扩展点、
+  // 数据/契约版本与迁移策略。基线为单一来源常量，五卡逐字复用；角色专属职责按卡逐条钉死。
+  const baseline = ENGINEERING_QUALITY_BASELINE;
+  assert.ok(baseline.includes("- 架构与可扩展性："), "基线须含「架构与可扩展性」条");
+  for (const keyword of [
+    "模块分解",
+    "依赖方向（无环）",
+    "扩展点明确",
+    "版本/迁移/兼容/弃用策略",
+    "横切关注点",
+    "架构影响分析",
+  ]) {
+    assert.ok(baseline.includes(keyword), `基线「架构与可扩展性」须含关键字「${keyword}」`);
+  }
+
+  // Draft / 提案：必须含「架构方案」（新项目）或「架构影响分析」（变更），覆盖五项；缺失不得建议
+  // accept、不得进入实现；给客户看的提案卡内容必须包含该章节。
+  const r = governanceRoleOf("rapporteur")!.cardText;
+  assert.ok(
+    r.includes("「架构方案」（新项目）或「架构影响分析」（变更）一节"),
+    "Draft 提案须含「架构方案」/「架构影响分析」一节",
+  );
+  assert.ok(
+    r.includes("模块分解与职责、依赖方向（无环）、扩展点（改哪里/不改哪里）"),
+    "Draft 架构章节须覆盖模块分解/依赖方向/扩展点",
+  );
+  assert.ok(
+    r.includes("数据 schema 与 API 契约的版本/迁移/兼容/弃用策略"),
+    "Draft 架构章节须覆盖 schema 与契约的版本/迁移/兼容/弃用策略",
+  );
+  assert.ok(r.includes("横切关注点归属"), "Draft 架构章节须覆盖横切关注点归属");
+  assert.ok(
+    r.includes("缺少「架构方案」/「架构影响分析」或未覆盖上述各项时，不得建议 accept，也不得进入实现"),
+    "Draft 缺架构章节不得建议 accept、不得进入实现",
+  );
+  assert.ok(r.includes("客户在提案卡上看到的内容必须包含它"), "Draft 提案卡给客户看的内容须含架构章节");
+
+  // Lead / 主理：客户提到演进/规模/未来需求时写入 acceptance；不得替客户决定架构。
+  const l = governanceRoleOf("liaison")!.cardText;
+  assert.ok(l.includes("客户提到演进/规模/未来需求"), "Lead 须识别演进/规模/未来需求");
+  assert.ok(l.includes("必须把可扩展性诉求写入 acceptance"), "Lead 须把可扩展性诉求写入意图 acceptance");
+  assert.ok(l.includes("不自行替客户决定架构"), "Lead 不得自行替客户决定架构");
+
+  // Crew / 组队：写区与角色卡同架构模块一一对应，禁止重叠；每个模块有明确属主。
+  const n = governanceRoleOf("nominator")!.cardText;
+  assert.ok(
+    n.includes("写区（boundary.yaml）与角色卡必须与提案中的架构模块一一对应"),
+    "Crew 写区与角色卡须与架构模块一一对应",
+  );
+  assert.ok(n.includes("禁止写区重叠"), "Crew 禁止写区重叠");
+  assert.ok(n.includes("每个模块必须有明确属主"), "Crew 每个模块须有明确属主");
+
+  // Steward / 统筹：流程与派发引用架构模块/边界；contract-freeze 与集成/端到端步骤必须存在。
+  const c = governanceRoleOf("convener")!.cardText;
+  assert.ok(c.includes("必须引用提案中的架构模块/边界"), "Steward 流程与派发须引用架构模块/边界");
+  assert.ok(c.includes("contract-freeze 步骤"), "Steward 流程须含 contract-freeze 步骤");
+  assert.ok(c.includes("集成/端到端步骤"), "Steward 流程须含集成/端到端步骤");
+  assert.ok(c.includes("两者缺一不得进入验收"), "Steward 缺 contract-freeze 或集成/端到端不得进入验收");
+
+  // Proof / 验收：核对实现与架构声明一致；缺章节或实现偏离声明不得建议 accept。
+  const v = governanceRoleOf("verifier")!.cardText;
+  assert.ok(v.includes("验收必须核对实现与提案的架构声明一致"), "Proof 须核对实现与架构声明一致");
+  assert.ok(
+    v.includes("模块边界、依赖方向（无环）、扩展点位置、数据/契约版本与迁移策略"),
+    "Proof 核对范围须含模块边界/依赖方向/扩展点/版本迁移策略",
+  );
+  assert.ok(v.includes("偏离声明须在核对报告中列为不通过"), "Proof 须把偏离声明列为不通过");
+  assert.ok(
+    v.includes("缺少「架构方案」或「架构影响分析」章节，或实现偏离架构声明时，不得建议 accept"),
+    "Proof 缺架构章节或实现偏离声明时不得建议 accept",
+  );
 });
 
 test("卡文本：五人均写明职能/不拥有最终批准权/可写与禁写/应用独占路径/不得建额外治理角色", () => {
@@ -317,7 +484,7 @@ test("卡文本：五人均写明职能/不拥有最终批准权/可写与禁写
   assert.match(n, /实现交付通常只需任命项目角色/);
   assert.match(n, /只列\*\*项目角色\*\* id/);
   assert.match(governanceRoleOf("convener")!.cardText, /编排权/);
-  assert.match(governanceRoleOf("convener")!.cardText, /只读档/);
+  assert.match(governanceRoleOf("convener")!.cardText, /shell 审批档——只读白名单直接执行/);
   assert.match(governanceRoleOf("convener")!.cardText, /schedule-write/);
   assert.match(governanceRoleOf("convener")!.cardText, /应用后台派发/, "提名步骤由应用后台派发");
   // Steward：只出 schedule-write / write 确认卡；无 request_choice 治理卡。
@@ -336,7 +503,7 @@ test("卡文本：五人均写明职能/不拥有最终批准权/可写与禁写
   assert.match(v, /docs\/verification\//);
   assert.match(v, /docs\/governance\/verifier\//);
   assert.match(v, /不派发、不任命、不交接、不安装技能\/MCP/);
-  assert.match(v, /shell 面 `none`/);
+  assert.match(v, /shell 审批档——只读白名单直接执行/);
   // Proof：只出 acceptance 选择卡与 write 写盘卡。
   assert.match(v, /只用 `acceptance`/);
   assert.match(v, /只用 `write`/);

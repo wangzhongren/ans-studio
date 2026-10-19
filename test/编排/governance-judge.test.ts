@@ -45,6 +45,9 @@ import { DEFAULT_SHELL_JUDGE_TIMEOUT_MS } from "../../src/common/编排/shell-ju
 import {
   buildGovernanceJudgeFacts,
   declaredWritePathsFromPreview,
+  evaluateAcceptanceCompletion,
+  normalizeFlowStepStatus,
+  parseFlowSteps,
   parseRecommendedRoleIds,
   requiredArtifactPaths,
 } from "../../src/common/编排/governance-judge-facts.ts";
@@ -247,6 +250,45 @@ test("proposal：证据齐全 + required-read 满足 → approve（selected=acce
     assert.match(seen.prompts[0]!, /docs\/proposals\/flow-a-v1\.md/, "提示词列出必读物证");
     assert.match(seen.role?.cardText ?? "", /accept-quick 不代批/);
     assert.equal(governanceJudgeAuditOf(out)?.group, "decision");
+  });
+});
+
+test("proposal rubric：架构方案/影响分析缺失或空洞 ⇒ manual/insufficient-evidence（读全文核对，不机械匹配 preview）", () => {
+  const cardText = buildGovernanceJudgeSystemPrompt();
+  assert.match(cardText, /架构门槛（客户 2026-10-19 新要求，不得跳过）/, "rubric 必须有架构门槛段");
+  assert.match(cardText, /「架构方案」/, "新项目要求架构方案");
+  assert.match(cardText, /「架构影响分析」/, "变更提案要求架构影响分析");
+  assert.match(cardText, /模块分解与职责/);
+  assert.match(cardText, /依赖方向（无环）/);
+  assert.match(cardText, /扩展点/, "必须覆盖扩展点");
+  assert.match(cardText, /数据 schema 与 API\/契约的版本\/迁移\/兼容\/弃用策略/);
+  assert.match(cardText, /横切关注点归属/);
+  assert.match(cardText, /权衡与备选/);
+  assert.match(cardText, /章节缺失、只有标题\/空话、或与提案范围自相矛盾 ⇒ 不得 approve/);
+  assert.match(cardText, /"insufficient-evidence"/, "架构不合格必须用 insufficient-evidence");
+  assert.match(cardText, /不得仅凭 preview 判断章节存在/, "禁止只凭卡片 preview 判断");
+  assert.match(cardText, /必须以读到的 proposalPath 全文为准/, "要求实际读取提案全文");
+});
+
+test("proposal：判断 agent 因架构章节缺失自报 manual/insufficient-evidence → 保持 manual（不放行）", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, "docs/proposals/flow-a-v1.md", "# 提案\n\n## 目标\n做点事\n");
+    const req = request({
+      projectRoot: root,
+      artifacts: { proposalPath: "docs/proposals/flow-a-v1.md" },
+    });
+    const { judge } = makeJudge({
+      report: readThenReport(["docs/proposals/flow-a-v1.md"], {
+        verdict: "manual",
+        reasonCode: "insufficient-evidence",
+        reason: "提案缺少「架构方案」章节：无模块分解、依赖方向与扩展点，无法核对。",
+        evidence: ["docs/proposals/flow-a-v1.md"],
+      }),
+    });
+    const out = await judge(req);
+    assert.equal(out.verdict, "manual");
+    assert.equal(out.reasonCode, "insufficient-evidence");
+    assert.match(out.reason ?? "", /架构方案/);
   });
 });
 
@@ -630,6 +672,100 @@ test("acceptance：ledgerErrors / 未接受 / 未闭环澄清 → manual", async
       assert.equal(out.reasonCode, scenario.code);
     });
   }
+});
+
+// ————— ③-补 2026-10-19 真机：状态「引导词 + 说明」与 canonical stepId 列（验收机械门槛） —————
+
+test("流程步骤状态首词规范化：done 变体视为完成；pending/delivered/空不视为完成", () => {
+  for (const status of ["done", "done（证据）", "done(evidence)", "Done", "DONE", "done：xxx", "done 有落盘/回交证据"]) {
+    assert.equal(normalizeFlowStepStatus(status), "done", `${status} 应规范化为 done`);
+  }
+  for (const status of ["pending（…）", "pending（不由统筹派发）", "delivered（…）", "in-progress（…）", "blocked", "", "   "]) {
+    assert.notEqual(
+      normalizeFlowStepStatus(status),
+      "done",
+      `${status === "" || status.trim() === "" ? "（空）" : status} 不应视为 done`,
+    );
+  }
+});
+
+// 真实 R2 流程单（/Users/wangzhongren/code/vibeingcode/ans-testbed/ticket-desk-live/docs/flows/ticket-desk-r2.md
+// 的步骤表，2026-10-19 v8 收口快照：10 步全部是 `done（…）` 写法）。此前编排 `parseFlowSteps` 取「步骤」
+// 描述列当 id、精确比较状态，会把本表解析成描述文本 id 且全部判为未完成。
+const REAL_R2_STEP_TABLE: ReadonlyArray<readonly [id: string, description: string, status: string]> = [
+  ["nomination", "提名：Crew / 组队 读取提案并给出候选角色", "done（`docs/nominations/ticket-desk-r2-v1.md`；推荐集 = 既有三角色，不新增角色）"],
+  ["role-readiness", "角色就绪：客户任命决定 + 角色卡就绪确认", "done（客户经任命卡确认沿用 backend / frontend / test；本轮不新增角色、不改卡）"],
+  ["contract-freeze-v2", "冻结 API 契约 v2 到 `docs/contracts/ticket-desk-api-v2.md`", "done（frozen-v2 / supersedes v1）"],
+  ["delivery-backend", "服务端增量：`sort`/`order`/`assignee`、`deadline`、`overdue`、`GET /api/tickets/export`（CSV+BOM）、`canExport`、store 补全、README 同步（backend-engineer）", "done（有落盘/回交证据；125/125 + 自检 73 项为角色自报，独立复核仍待 `verification`）"],
+  ["delivery-frontend", "前端增量：排序/负责人筛选控件、截止时间列与逾期高亮、创建与 PATCH deadline 表单、导出按钮（`fetch`+`Blob`）（frontend-engineer）", "done（有落盘/回交证据；e2e 后 0 处修正）"],
+  ["delivery-test", "测试增量：`sorting-filtering` / `overdue` / `export` 三文件 + `persistence` 增补；既有 75 用例不得弱化（test-engineer）", "done（有落盘/回交证据；125/125 为角色自报，独立复核仍待 `verification`）"],
+  ["cleanup-selfcheck", "清理 `data/selfcheck-r2.mjs` 临时自检脚本（backend-engineer 自己的写区）", "done（已删；`data/` 仅剩 `tickets.json`，统筹 `list_dir` 复核）"],
+  ["r2-e2e", "R2 端到端联调：真起服务核对前端查询串/静态托管/导出链路（frontend-engineer）", "done（真起服 curl 实测 37 个请求；浏览器渲染未验证）"],
+  ["verification", "独立复核：按提案 §11 八条逐条出结论（内置 Proof / verifier）", "done（报告 `docs/verification/ticket-desk-r2-v1.md`；§11 八条均有证据，建议 accept）"],
+  ["acceptance", "客户验收", "done（客户在验收卡选择 **accept**；决定登记于 `docs/governance/verifier/ticket-desk-r2.md`）"],
+];
+
+const REAL_R2_STEP_IDS = REAL_R2_STEP_TABLE.map(([id]) => id);
+
+function realR2FlowMarkdown(overrides: Readonly<Record<string, string>> = {}): string {
+  return [
+    "# 流程：ticket-desk-r2（第二轮迭代：排序/筛选/deadline/overdue/CSV 导出）",
+    "",
+    "## 步骤表",
+    "",
+    "| stepId | 步骤 | 状态 |",
+    "| --- | --- | --- |",
+    ...REAL_R2_STEP_TABLE.map(([id, description, status]) => `| ${id} | ${description} | ${overrides[id] ?? status} |`),
+  ].join("\n");
+}
+
+test("parseFlowSteps：canonical stepId|步骤|状态 三列取 stepId 作 id（非描述文本），status 保留原文", () => {
+  const parsed = parseFlowSteps(realR2FlowMarkdown());
+  assert.equal(parsed.wellFormed, true);
+  assert.deepEqual(parsed.steps.map((step) => step.id), REAL_R2_STEP_IDS);
+  assert.equal(parsed.steps[0]!.status, REAL_R2_STEP_TABLE[0]![2], "status 仍保留单元格原文（说明不丢）");
+  assert.ok(parsed.steps.every((step) => normalizeFlowStepStatus(step.status) === "done"));
+});
+
+test("parseFlowSteps：无显式 id 列时沿用「步骤」列；`步骤id`/`id` 列同样优先", () => {
+  const legacy = parseFlowSteps(flowMarkdown([{ id: "s1", status: "done（证据）" }]));
+  assert.equal(legacy.wellFormed, true);
+  assert.deepEqual(legacy.steps, [{ id: "s1", status: "done（证据）" }]);
+
+  for (const header of ["| 步骤id | 步骤 | 状态 |", "| id | 步骤 | 状态 |", "| step-id | step | status |"]) {
+    const parsed = parseFlowSteps(["# 流程", "", header, "| --- | --- | --- |", "| s9 | 实现 | done |", ""].join("\n"));
+    assert.equal(parsed.wellFormed, true, header);
+    assert.deepEqual(parsed.steps, [{ id: "s9", status: "done" }], header);
+  }
+});
+
+test("验收完成判定：标注式 done（…）全部完成 ⇒ ok；改一个执行步骤为 pending（…）⇒ 不成立", () => {
+  const completedFacts = facts({
+    flowId: "ticket-desk-r2",
+    proposalDecision: "accepted",
+    dispatchedStepIds: [...REAL_R2_STEP_IDS],
+  });
+  assert.deepEqual(
+    evaluateAcceptanceCompletion({
+      flowMarkdown: realR2FlowMarkdown(),
+      facts: completedFacts,
+      ledgerEntries: [],
+      ledgerErrors: 0,
+    }),
+    { ok: true },
+    "done（…）/Done/done：xxx 均为完成；id 用 stepId 才能对上 dispatchedStepIds",
+  );
+
+  const blocked = evaluateAcceptanceCompletion({
+    flowMarkdown: realR2FlowMarkdown({ "delivery-backend": "pending（等待回交）" }),
+    facts: completedFacts,
+    ledgerEntries: [],
+    ledgerErrors: 0,
+  });
+  assert.equal(blocked.ok, false);
+  if (blocked.ok) return;
+  assert.equal(blocked.reasonCode, "insufficient-evidence");
+  assert.match(blocked.reason, /流程仍有未完成\/阻塞\/待派发步骤（delivery-backend=pending（等待回交））/);
 });
 
 // —————————————————————— ④ write 族 ——————————————————————
@@ -1625,7 +1761,8 @@ test("run-role：pathProbes 只取 preview 声明路径，散文路径不进 pro
           title: "新建本地账本 CLI",
           preview:
             `将写入以下文件：\n- ${targetA}\n- ${targetB}\n\n` +
-            "说明：不会修改 src/**、test/**，也不改 data/ledger.json、bin/ledger.js。",
+            "说明：不会修改 src/**、test/**，也不改 data/ledger.json、bin/ledger.js。\n\n" +
+            `## ${targetA}\n提案正文（测试用）。\n\n## ${targetB}\n契约正文（测试用）。`,
           cardKind: "write",
           flowId: "local-ledger-cli",
         },
@@ -1643,7 +1780,8 @@ test("run-role：pathProbes 只取 preview 声明路径，散文路径不进 pro
           title: "新建本地账本 CLI",
           preview:
             "说明：不会修改 docs/proposals/other-1.md、docs/proposals/other-2.md、docs/contracts/other-3.md、" +
-            "src/**、test/**、data/ledger.json 等 10 个文件。",
+            "src/**、test/**、data/ledger.json 等 10 个文件。\n\n" +
+            `## ${targetA}\n提案正文（测试用）。\n\n## ${targetB}\n契约正文（测试用）。`,
           cardKind: "write",
           flowId: "local-ledger-cli",
           paths: [targetA, targetB],
@@ -1658,7 +1796,9 @@ test("run-role：pathProbes 只取 preview 声明路径，散文路径不进 pro
         {
           kind: "confirm",
           title: "新建本地账本 CLI",
-          preview: `将写入以下文件：\n- ${targetA}\n- ${targetB}`,
+          preview:
+            `将写入以下文件：\n- ${targetA}\n- ${targetB}\n\n` +
+            `## ${targetA}\n提案正文（测试用）。\n\n## ${targetB}\n契约正文（测试用）。`,
           cardKind: "write",
           flowId: "local-ledger-cli",
           paths: [],
@@ -1672,7 +1812,9 @@ test("run-role：pathProbes 只取 preview 声明路径，散文路径不进 pro
         {
           kind: "confirm",
           title: "新建本地账本 CLI",
-          preview: `将写入以下文件：\n- ${targetA}\n- src/evil.ts`,
+          preview:
+            `将写入以下文件：\n- ${targetA}\n- src/evil.ts\n\n` +
+            `## ${targetA}\n提案正文（测试用）。\n\n## src/evil.ts\n// 越界（测试用）。`,
           cardKind: "write",
           flowId: "local-ledger-cli",
         },
@@ -1808,7 +1950,7 @@ test("账本：judge.group 与卡种交叉校验——不翻转决定、不改�
         {
           kind: "confirm",
           title: "写入",
-          preview: "docs/proposals/flow-a-v1.md",
+          preview: "docs/proposals/flow-a-v1.md\n\n## docs/proposals/flow-a-v1.md\n提案正文（测试用）。",
           cardKind: "write",
           flowId: "flow-a",
         },

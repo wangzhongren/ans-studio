@@ -475,7 +475,8 @@ test("账本契约：customer.decision / artifact.observed / dispatch.accepted �
               name: "request_confirmation",
               args: {
                 title: `写盘确认 ${FLOW}`,
-                preview: "角色卡/A/role-card.md\n角色卡/A/boundary.yaml",
+                // 2026-10-19 呈现前完整性闸：每条声明路径后都给出可核对正文。
+                preview: "角色卡/A/role-card.md\n\n角色卡正文：角色名 A、职责与工作立场。\n\n角色卡/A/boundary.yaml\n\n边界正文：可写目录与目的条目。\n",
                 flowId: FLOW,
                 cardKind: "appointment-write",
               },

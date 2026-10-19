@@ -80,7 +80,8 @@ test("D1 第四棵树矩阵：docs/mcp 树内免确认直写（相对/子路径/
     assert.equal(gate("docs/其他.md").allowed, false, "树外未确认仍拒");
     const customerInput = sink.caps?.customerInput;
     assert.ok(customerInput, "su 会话应有（包装后的）客户通道");
-    await customerInput({ kind: "confirm", title: "写 docs/其他.md", preview: "docs/其他.md" }, { turnId: "T-1" });
+    // 2026-10-19 呈现前完整性闸：声明路径后须有可核对正文，卡片才呈现/发行。
+    await customerInput({ kind: "confirm", title: "写 docs/其他.md", preview: "docs/其他.md\n\n确认正文：树外写入的真实正文。\n" }, { turnId: "T-1" });
     assert.equal(asked.length, 1, "树外写盘恰一次确认请求");
     assert.equal(gate("docs/其他.md").allowed, true, "经确认发行后放行");
     assert.equal(gate("docs/其他2.md").allowed, false, "确认集精确：未列入的路径仍拒");

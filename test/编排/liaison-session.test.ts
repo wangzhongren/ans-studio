@@ -249,7 +249,7 @@ function capabilityStubs() {
     customerInput: (() => ({ outcome: "declined" as const })) as CustomerInputFn,
     handOffIntent: () => ({ ok: true }),
     requestClarification: () => ({ ok: true }),
-    shellReadonly: { classifyShell, rules: defaultShellRules() },
+    shellOperatorOnly: { classifyShell, rules: defaultShellRules(), operatorChannel: () => ({ outcome: "deny" as const }) },
   };
 }
 
@@ -284,7 +284,8 @@ test("能力矩阵：Liaison/Rapporteur/Nominator/Convener/su 按注册表注入
     await lh.dispose();
     assert.ok(l.caps?.handOffIntent, "Liaison 应注入 handOffIntent");
     assert.ok(l.caps?.customerInput, "Liaison 有客户需求确认通道（intent-confirm）");
-    for (const key of GOVERNANCE_KEYS.filter((k) => k !== "handOffIntent" && k !== "customerInput")) {
+    assert.equal(typeof l.caps?.shellGate, "function", "Liaison（operator-approve）应 arm 审批档 shellGate");
+    for (const key of GOVERNANCE_KEYS.filter((k) => k !== "handOffIntent" && k !== "customerInput" && k !== "shellGate")) {
       assert.equal(l.caps?.[key], undefined, `Liaison 不应注入 ${key}`);
     }
 
@@ -296,7 +297,8 @@ test("能力矩阵：Liaison/Rapporteur/Nominator/Convener/su 按注册表注入
     await rh.dispose();
     assert.ok(r.caps?.customerInput, "Rapporteur 有客户确认通道");
     assert.ok(r.caps?.requestClarification, "Rapporteur 应注入 requestClarification");
-    for (const key of GOVERNANCE_KEYS.filter((k) => k !== "customerInput" && k !== "requestClarification")) {
+    assert.equal(typeof r.caps?.shellGate, "function", "Rapporteur（operator-approve）应 arm 审批档 shellGate");
+    for (const key of GOVERNANCE_KEYS.filter((k) => k !== "customerInput" && k !== "requestClarification" && k !== "shellGate")) {
       assert.equal(r.caps?.[key], undefined, `Rapporteur 不应注入 ${key}`);
     }
 
@@ -309,8 +311,9 @@ test("能力矩阵：Liaison/Rapporteur/Nominator/Convener/su 按注册表注入
     for (const key of ["installSkill", "uninstallSkill", "installMcp", "uninstallMcp"] as const) {
       assert.ok(n.caps?.[key], `Nominator 应注入 ${key}`);
     }
+    assert.equal(typeof n.caps?.shellGate, "function", "Nominator（operator-approve）应 arm 审批档 shellGate");
     for (const key of GOVERNANCE_KEYS.filter(
-      (k) => !["customerInput", "installSkill", "uninstallSkill", "installMcp", "uninstallMcp"].includes(k),
+      (k) => !["customerInput", "installSkill", "uninstallSkill", "installMcp", "uninstallMcp", "shellGate"].includes(k),
     )) {
       assert.equal(n.caps?.[key], undefined, `Nominator 不应注入 ${key}`);
     }

@@ -30,6 +30,12 @@ test("schema：request_confirmation 增可选 paths（项目相对、逐文件�
   const guidelines = (schema.promptGuidelines ?? []).join("\n");
   assert.match(guidelines, /paths/);
   assert.match(guidelines, /不得包含仅在 preview 中引用\/展示的文件/);
+  // 2026-10-19 编排侧「呈现前 preview 完整性闸」（真机 op-2）配套：description/指引须写明
+  // 写盘卡逐路径正文要求与「呈现前拒绝、不给客户看半张卡」的后果。
+  const text = [schema.description, guidelines].join("\n");
+  assert.match(text, /为\*\*每一条\*\*声明路径给出可核对正文/, "写盘卡 preview 须逐路径给出可核对正文/结构");
+  assert.match(text, /呈现前拒绝该卡并要求补全/, "缺失逐路径正文时系统在呈现前拒绝该卡");
+  assert.match(text, /不会先给客户看半张卡/, "不得把半张卡先给客户看");
 });
 
 test("合法 paths：posix 化后原样透传到卡片请求与 metadata", async () => {

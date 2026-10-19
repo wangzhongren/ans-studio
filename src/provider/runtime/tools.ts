@@ -972,6 +972,11 @@ async function askCustomer(
  * request_confirmation：**请求客户确认**（设计 A-1）。调用即向客户呈现 `title`（+可选 `preview`/`detail`）
  * 并**挂起**等其裁决；本层不写盘、不做治理判定，只把裁决**如实**转达模型。
  *
+ * 写盘类卡片的呈现前完整性闸（2026-10-19 编排侧）：声明了写入路径（显式 `paths` 或 preview 声明）时，
+ * preview 必须为**每一条**路径给出可核对正文/结构（路径作为标题/围栏说明，锚点后跟非空正文/代码）。
+ * 缺失时编排在**呈现前**拒绝该卡（`common/编排/confirmed-writes.ts::validateConfirmPreviewCompleteness`），
+ * 本层收到 `declined` 并把原因如实转达——不会先给客户看半张卡。组卡指引见 `describeTool` 的文案。
+ *
  * 返回给模型的语义（关键，同 `run_shell` 如实转达审核结果的纪律——**绝不谎报**）：
  * - `ok:true` 且措辞「客户已确认」＝**拿到明确同意**（`confirmed:true`）——模型此时才可据此继续（如落盘）；
  * - `ok:false` 且措辞「未获客户同意」＝ 拒绝 / 明确选「否」/ 超时 / 通道不可用 / 出错——**不要写盘**。

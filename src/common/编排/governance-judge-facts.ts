@@ -267,11 +267,29 @@ export function requiredArtifactPaths(request: GovernanceJudgeRequest): {
 
 /**
  * 流程单步骤行（`docs/flows/<flowId>.md` 的 Markdown 表格）：
- * 表头须同时含「步骤/step」与「状态/status」列；状态只认 `done`（fail-closed）。
+ * 表头须同时含「步骤/step」与「状态/status」列；显式 id 列优先（见 `parseFlowSteps`）。
+ * `status` 保留单元格原文；判定处一律经 `normalizeFlowStepStatus` 取引导 token（fail-closed）。
  */
 export interface FlowStepRecord {
   id: string;
   status: string;
+}
+
+/**
+ * 流程步骤状态的**首词规范化**（2026-10-19 真机：状态列写作「状态 + 说明」）。
+ *
+ * 流程单由 Steward 按模板自然写出，状态单元格常见 `done（有落盘/回交证据；…）`、
+ * `pending（不由统筹派发）`、`done：xxx` 这类「引导状态词 + 说明」写法。判定只看引导 token
+ * （大小写不敏感；后接空白、`（`、`(`、`：`、`:` 或结束），说明文字不参与比较；空/纯空白 ⇒ `""`。
+ * **不修改** `parseFlowSteps` 输出的原始 `status`（错误详情仍展示原文），只在判定处调用本函数。
+ *
+ * 与桌面窗口角色的 `app/desktop/governance-advance.ts#normalizeFlowStepStatus` 同源同规则：
+ * 两侧分层（桌面不得依赖编排私有 common，编排不得写 shared）而各自实现，改动须成对同步。
+ */
+export function normalizeFlowStepStatus(status: string): string {
+  if (typeof status !== "string") return "";
+  const match = /^[^\s（(：:]+/.exec(status.trim());
+  return match === null ? "" : match[0].toLowerCase();
 }
 
 function stripTableMarkup(value: string): string {
@@ -288,7 +306,15 @@ function isSeparatorRow(cells: readonly string[]): boolean {
   return cells.length > 0 && cells.every((cell) => /^:?-{2,}:?$/.test(cell.trim()));
 }
 
-/** 解析流程单的步骤表；找不到表头/无数据行 ⇒ `wellFormed:false`（调用方 fail-closed）。 */
+/**
+ * 解析流程单的步骤表；找不到表头/无数据行 ⇒ `wellFormed:false`（调用方 fail-closed）。
+ *
+ * 列选择（2026-10-19 真机，与桌面 `parseFlowStepStatuses` 同规则）：canonical 流程单是
+ * `| stepId | 步骤 | 状态 |` 三列。表头同时含「步骤/step」与「状态/status」时，若还存在显式 id 列
+ * （`stepId`/`step-id`/`步骤id`/`id`）则**优先**用它作为步骤 id（供 `dispatch.accepted.stepId` 与
+ * `facts.dispatchedStepIds` 对账）；没有显式 id 列时才沿用「步骤/step」列（旧两列表形状不变）。
+ * 输出形状仍是 `{ id, status }`，`status` 保留单元格原文。
+ */
 export function parseFlowSteps(markdown: string): { wellFormed: boolean; steps: FlowStepRecord[] } {
   if (typeof markdown !== "string" || markdown.trim() === "") return { wellFormed: false, steps: [] };
   const lines = markdown.replace(/\r\n/g, "\n").split("\n");
@@ -303,7 +329,9 @@ export function parseFlowSteps(markdown: string): { wellFormed: boolean; steps: 
     const status = cells.findIndex((cell) => /^(状态|status)$/i.test(stripTableMarkup(cell)));
     if (step !== -1 && status !== -1) {
       headerIndex = index;
-      stepColumn = step;
+      // 显式 id 列优先；否则沿用「步骤/step」描述列（旧行为）。
+      const explicitId = cells.findIndex((cell) => /^(stepid|step-id|步骤id|id)$/i.test(stripTableMarkup(cell)));
+      stepColumn = explicitId !== -1 ? explicitId : step;
       statusColumn = status;
       break;
     }
@@ -326,7 +354,8 @@ export function parseFlowSteps(markdown: string): { wellFormed: boolean; steps: 
 
 /**
  * 验收机械门槛（P6 验收观察，安全项）：**不靠模型自报**，只用流程单 + 账本事实。
- * 所有步骤 `done`、每个步骤都有 `dispatch.accepted`、无未结算的**治理**决定、无未闭环澄清、
+ * 所有步骤 `done`（状态按 `normalizeFlowStepStatus` 取引导 token——`done（证据…）`/`Done`/
+ * `done：xxx` 均视为 done）、每个步骤都有 `dispatch.accepted`、无未结算的**治理**决定、无未闭环澄清、
  * 账本可读——任一不满足即 `manual`（原卡 + 说明）。旧账本里无 cardKind 的普通选择
  * （`unclassified`/`none`）按 decisionKind 过滤，不算未结算。
  */
@@ -343,7 +372,7 @@ export function evaluateAcceptanceCompletion(input: {
   if (!parsed.wellFormed || parsed.steps.length === 0) {
     return { ok: false, reasonCode: "insufficient-evidence", reason: "流程单缺少可解析的步骤表，无法核对验收完成度，已转手动确认。" };
   }
-  const notDone = parsed.steps.filter((step) => step.status.toLowerCase() !== "done");
+  const notDone = parsed.steps.filter((step) => normalizeFlowStepStatus(step.status) !== "done");
   if (notDone.length > 0) {
     const detail = notDone.slice(0, 10).map((step) => `${step.id}=${step.status || "（空）"}`).join("、");
     return {
@@ -381,6 +410,29 @@ export function evaluateAcceptanceCompletion(input: {
 }
 
 /**
+ * 单行「声明写入路径」解析（`declaredWritePathsFromPreview` 的逐行原语；2026-10-19 抽出供
+ * preview 完整性校验复用同一口径，行为逐字不变）。命中 ⇒ 规范化路径；否则 `undefined`。
+ * 只认「一行一个路径」的声明行，**不扫描散文**。
+ */
+export function declaredWritePathOfLine(rawLine: string): string | undefined {
+  let line = rawLine.trim();
+  line = line.replace(/^(?:[-*+]|\d+[.)])\s+/, "");
+  // 关键词后可直接跟路径（`将写入 docs/x.md`），也可带修饰词+冒号
+  // （`写入路径仅一条：docs/x.md`）；`路径：` / 反引号 / 列表符同样容忍。
+  line = line.replace(/^(?:写入路径|将写入|写入|新建|创建|修改|更新|路径)\s*/, "");
+  line = line.replace(/^(?:[^：:\s]+\s*)?[:：]\s*/, "");
+  line = line.replace(/^[`"'“”‘’*_]+/, "").replace(/[`"'“”‘’*_]+$/, "").trim();
+  line = line.replace(/[（(][^（）()]*[）)]$/, "").replace(/[。；;，,]+$/, "").trim();
+  if (line === "" || /\s/.test(line) || !line.includes("/")) return undefined;
+  if (/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(line)) return undefined; // URL
+  if (isAbsoluteAny(line)) return undefined; // 绝对路径
+  const norm = normalizeLexical(line);
+  if (norm === "" || norm === "." || norm.startsWith("../")) return undefined;
+  if (norm.split("/").some((segment) => segment === "" || segment === "..")) return undefined;
+  return norm;
+}
+
+/**
  * **声明写入路径**（2026-10-18 真机修复）：只从 preview 的「一行一个路径」声明中提取，
  * **不扫描散文**（散文里的 `src/**`、`test/**`、`data/ledger.json` 等不是本次写入目标）。
  * 约定来源：`request_confirmation` 的 promptGuidelines「preview 必须列出将要写出的具体路径
@@ -391,21 +443,8 @@ export function declaredWritePathsFromPreview(preview: string | undefined): stri
   const out: string[] = [];
   const seen = new Set<string>();
   for (const rawLine of preview.replace(/\r\n/g, "\n").split("\n")) {
-    let line = rawLine.trim();
-    line = line.replace(/^(?:[-*+]|\d+[.)])\s+/, "");
-    // 关键词后可直接跟路径（`将写入 docs/x.md`），也可带修饰词+冒号
-    // （`写入路径仅一条：docs/x.md`）；`路径：` / 反引号 / 列表符同样容忍。
-    line = line.replace(/^(?:写入路径|将写入|写入|新建|创建|修改|更新|路径)\s*/, "");
-    line = line.replace(/^(?:[^：:\s]+\s*)?[:：]\s*/, "");
-    line = line.replace(/^[`"'“”‘’*_]+/, "").replace(/[`"'“”‘’*_]+$/, "").trim();
-    line = line.replace(/[（(][^（）()]*[）)]$/, "").replace(/[。；;，,]+$/, "").trim();
-    if (line === "" || /\s/.test(line) || !line.includes("/")) continue;
-    if (/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(line)) continue; // URL
-    if (isAbsoluteAny(line)) continue; // 绝对路径
-    const norm = normalizeLexical(line);
-    if (norm === "" || norm === "." || norm.startsWith("../")) continue;
-    if (norm.split("/").some((segment) => segment === "" || segment === "..")) continue;
-    if (seen.has(norm)) continue;
+    const norm = declaredWritePathOfLine(rawLine);
+    if (norm === undefined || seen.has(norm)) continue;
     seen.add(norm);
     out.push(norm);
   }

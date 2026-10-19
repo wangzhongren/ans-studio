@@ -10,6 +10,8 @@
 //     `shellJudge` 能力（运行时核心据此走 `buildShellJudgeTools`）、deny-all 写门禁；
 //   · 合成判断角色（空边界、系统提示来自 `shell-judge-prompt.ts`）、提示一次、等 settled；
 //   · 独立 120s 硬超时（`AbortSignal.any`；2026-10-18 客户要求与治理判断一致）、中止、迟到 bindRole 的 dispose；
+//   · 会话内**有界并发池**（默认 3、env 可调、夹 1..8；FIFO 等待队列 + 排队总时限；2026-10-19 真机：
+//     同一轮并行 4 条 shell，单飞使 2 条立即回落手动）；
 //   · 防循环（同命令连续 deny 上限，allow 清零、manual 不递增）；
 //   · 裁决规范化（`shell-judge-verdict.ts`）、`allow` 必须无损、`deny` 始终有效、客户说明合成；
 //   · **客户 D1**：`tier:"deny"` 且模型 allow → 照常 `allow`，置 `hardDenyOverride:true` 与
@@ -77,6 +79,59 @@ export function resolveShellJudgeTimeoutMs(
 export function formatShellJudgeTimeout(timeoutMs: number): string {
   return timeoutMs >= 1000 && timeoutMs % 1000 === 0 ? `${timeoutMs / 1000}s` : `${timeoutMs}ms`;
 }
+
+/**
+ * 每个会话（每个 `createShellJudge` 闭包）内的判断并发上限。
+ * 2026-10-19 真机：前端同一轮并行发出 4 条 shell，单飞使后 3 条中 2 条立即回落手动；
+ * 客户倾向并发/多线程处理。环境变量 `ANS_SHELL_JUDGE_CONCURRENCY` 可覆盖；缺省 3，最终夹在 1..8。
+ */
+export const DEFAULT_SHELL_JUDGE_CONCURRENCY = 3;
+export const SHELL_JUDGE_CONCURRENCY_ENV = "ANS_SHELL_JUDGE_CONCURRENCY";
+export const SHELL_JUDGE_CONCURRENCY_MIN = 1;
+export const SHELL_JUDGE_CONCURRENCY_MAX = 8;
+
+/** 解析判断并发上限：显式选项 > 环境变量 > 默认 3；合法值夹在 1..8，非法回落默认。 */
+export function resolveShellJudgeConcurrency(
+  option: unknown,
+  env: Record<string, string | undefined> = process.env,
+): number {
+  const clamp = (value: number): number =>
+    Math.min(SHELL_JUDGE_CONCURRENCY_MAX, Math.max(SHELL_JUDGE_CONCURRENCY_MIN, Math.floor(value)));
+  if (typeof option === "number" && Number.isFinite(option) && option >= SHELL_JUDGE_CONCURRENCY_MIN) {
+    return clamp(option);
+  }
+  const raw = env[SHELL_JUDGE_CONCURRENCY_ENV];
+  if (typeof raw === "string" && /^[1-9]\d*$/.test(raw.trim())) {
+    const parsed = Number(raw.trim());
+    if (Number.isSafeInteger(parsed)) return clamp(parsed);
+  }
+  return DEFAULT_SHELL_JUDGE_CONCURRENCY;
+}
+
+/**
+ * 排队总时限：达到并发上限的请求在 FIFO 队列里最多等待这么久，超时按 manual 返回具体原因。
+ * 环境变量 `ANS_SHELL_JUDGE_QUEUE_TIMEOUT_MS`（正整数，非法回默认）可覆盖；默认 60s。
+ */
+export const DEFAULT_SHELL_JUDGE_QUEUE_TIMEOUT_MS = 60_000;
+export const SHELL_JUDGE_QUEUE_TIMEOUT_ENV = "ANS_SHELL_JUDGE_QUEUE_TIMEOUT_MS";
+
+/** 解析排队总时限：显式选项 > 环境变量 > 默认 60s；非法回默认。 */
+export function resolveShellJudgeQueueTimeoutMs(
+  option: unknown,
+  env: Record<string, string | undefined> = process.env,
+): number {
+  if (typeof option === "number" && Number.isFinite(option) && option > 0) return Math.floor(option);
+  const raw = env[SHELL_JUDGE_QUEUE_TIMEOUT_ENV];
+  if (typeof raw === "string" && /^[1-9]\d*$/.test(raw.trim())) {
+    const parsed = Number(raw.trim());
+    if (Number.isSafeInteger(parsed) && parsed > 0) return parsed;
+  }
+  return DEFAULT_SHELL_JUDGE_QUEUE_TIMEOUT_MS;
+}
+
+/** 有界等待队列上限（防无界堆积）；超出即按 manual/queue-full 回落，不静默滞后。 */
+export const DEFAULT_SHELL_JUDGE_MAX_QUEUE = 32;
+
 /** 默认同一命令连续 deny 上限（PM 评审 §8.5）。 */
 export const DEFAULT_SHELL_JUDGE_MAX_DENY_PER_COMMAND = 2;
 
@@ -111,6 +166,12 @@ export interface CreateShellJudgeOptions {
   now?: () => number;
   /** 判断硬超时；缺省 120000ms（env `ANS_SHELL_JUDGE_TIMEOUT_MS` 可覆盖）。 */
   timeoutMs?: number;
+  /** 本会话内判断并发上限；缺省 3（env `ANS_SHELL_JUDGE_CONCURRENCY`，夹 1..8）。 */
+  concurrency?: number;
+  /** 排队总时限；缺省 60000ms（env `ANS_SHELL_JUDGE_QUEUE_TIMEOUT_MS` 可覆盖）。 */
+  queueTimeoutMs?: number;
+  /** 有界等待队列上限；缺省 32。 */
+  maxQueue?: number;
   /** 同一命令连续 deny 上限；缺省 2。 */
   maxDenyPerCommand?: number;
   logger?: DiagnosticLog;
@@ -119,6 +180,24 @@ export interface CreateShellJudgeOptions {
 type JudgeRunResult =
   | { kind: "settled" }
   | { kind: "error"; error: unknown };
+
+/** 会话内并发池的排队结果（granted 之外的三种都必须按 manual 回落，且带具体原因）。 */
+type SlotWaitResult =
+  | { kind: "granted" }
+  | { kind: "aborted" }
+  | { kind: "queue-timeout"; activeCount: number; queueDepth: number }
+  | { kind: "queue-full"; activeCount: number; queueDepth: number };
+
+/** FIFO 等待队列项；一旦 settle 即从队列移除，保证队列长度只计真正在等的人。 */
+interface QueueWaiter {
+  settled: boolean;
+  queuedAt: number;
+  toolCallId?: string;
+  resolve: (result: SlotWaitResult) => void;
+  timer: ReturnType<typeof setTimeout>;
+  signal?: AbortSignal;
+  onAbort?: () => void;
+}
 
 const DENY_ALL_GATE: WriteGate = () => ({
   allowed: false,
@@ -283,7 +362,95 @@ export function createShellJudge(opts: CreateShellJudgeOptions): ShellJudgeFn {
   const model = modelFromOptions(opts.runtimeOptions);
   // 防循环计数：会话级 Map；deny +1、allow 删除、manual 不增不减（PM 评审 §8.5）。
   const denyCounts = new Map<string, number>();
-  let busy = false;
+  // 会话内并发池（**每个 createShellJudge 闭包各一份**，不跨角色共享）：
+  // `active` 为正在判断的请求数；`waiters` 为有界 FIFO 等待队列。
+  const concurrency = resolveShellJudgeConcurrency(opts.concurrency);
+  const queueTimeoutMs = resolveShellJudgeQueueTimeoutMs(opts.queueTimeoutMs);
+  const maxQueue = typeof opts.maxQueue === "number" && Number.isFinite(opts.maxQueue) && opts.maxQueue >= 1
+    ? Math.floor(opts.maxQueue)
+    : DEFAULT_SHELL_JUDGE_MAX_QUEUE;
+  let active = 0;
+  const waiters: QueueWaiter[] = [];
+
+  function removeWaiter(waiter: QueueWaiter): void {
+    const index = waiters.indexOf(waiter);
+    if (index >= 0) waiters.splice(index, 1);
+  }
+
+  function settleWaiter(waiter: QueueWaiter, result: SlotWaitResult): void {
+    if (waiter.settled) return;
+    waiter.settled = true;
+    clearTimeout(waiter.timer);
+    if (waiter.signal !== undefined && waiter.onAbort !== undefined) {
+      waiter.signal.removeEventListener("abort", waiter.onAbort);
+    }
+    removeWaiter(waiter);
+    waiter.resolve(result);
+  }
+
+  /** 判断结束：空出的槽直接移交给队首（FIFO，`active` 不变），否则归还。 */
+  function releaseSlot(): void {
+    while (waiters.length > 0) {
+      const waiter = waiters.shift()!;
+      if (waiter.settled) continue;
+      waiter.settled = true;
+      clearTimeout(waiter.timer);
+      if (waiter.signal !== undefined && waiter.onAbort !== undefined) {
+        waiter.signal.removeEventListener("abort", waiter.onAbort);
+      }
+      log.record("shell-judge.queue.granted", {
+        toolCallId: waiter.toolCallId,
+        queueDepth: waiters.length,
+        durationMs: now() - waiter.queuedAt,
+      });
+      waiter.resolve({ kind: "granted" });
+      return;
+    }
+    active = Math.max(0, active - 1);
+  }
+
+  /** 取槽：未达上限立即放行；达到上限进入有界 FIFO 队列；排队超时/中止返回具体原因。 */
+  function acquireSlot(toolCallId: string | undefined, signal: AbortSignal | undefined): Promise<SlotWaitResult> {
+    if (signal?.aborted === true) return Promise.resolve({ kind: "aborted" });
+    if (active < concurrency) {
+      active += 1;
+      return Promise.resolve({ kind: "granted" });
+    }
+    if (waiters.length >= maxQueue) {
+      log.record("shell-judge.queue.full", { toolCallId, queueDepth: waiters.length, count: active });
+      return Promise.resolve({ kind: "queue-full", activeCount: active, queueDepth: waiters.length });
+    }
+    return new Promise((resolve) => {
+      const queuedAt = now();
+      const waiter: QueueWaiter = {
+        settled: false,
+        queuedAt,
+        toolCallId,
+        resolve,
+        timer: setTimeout(() => {
+          const queueDepth = Math.max(0, waiters.indexOf(waiter));
+          log.record("shell-judge.queue.timeout", {
+            toolCallId,
+            queueDepth,
+            count: active,
+            timeoutMs: queueTimeoutMs,
+            durationMs: now() - queuedAt,
+          });
+          settleWaiter(waiter, { kind: "queue-timeout", activeCount: active, queueDepth });
+        }, queueTimeoutMs),
+      };
+      waiters.push(waiter);
+      log.record("shell-judge.queued", { toolCallId, queueDepth: waiters.length, count: active });
+      if (signal !== undefined) {
+        waiter.signal = signal;
+        waiter.onAbort = (): void => {
+          settleWaiter(waiter, { kind: "aborted" });
+        };
+        signal.addEventListener("abort", waiter.onAbort, { once: true });
+        if (signal.aborted) waiter.onAbort();
+      }
+    });
+  }
 
   async function defaultFactory(runtime: RuntimeKind): Promise<RuntimeAdapterFactory> {
     const module = await import("../../pipeline/orchestration/run-role.ts");
@@ -547,17 +714,29 @@ export function createShellJudge(opts: CreateShellJudgeOptions): ShellJudgeFn {
       log.record("shell-judge.retry.capped", { toolCallId: request.toolCallId, count: denied });
       return manualOutcome("retry-capped", "同一命令连续被判断为不必要，已达重试上限；已转手动确认。");
     }
-    if (busy) {
-      return manualOutcome("unavailable", "判断 agent 正忙（已有一次判断在进行），本次已转手动确认。");
+    // 并发池：未达上限立即判断；达到上限排队（有界 FIFO + 排队总时限），不再直接回落。
+    const slot = await acquireSlot(request.toolCallId, signal);
+    if (slot.kind === "aborted") {
+      log.record("shell-judge.manual", { toolCallId: request.toolCallId, reasonCode: "aborted" });
+      return manualOutcome("aborted", "本轮已中止，判断未开始（排队中）。");
     }
-    busy = true;
+    if (slot.kind === "queue-timeout") {
+      const reason = `判断排队超时（已等待 >${formatShellJudgeTimeout(queueTimeoutMs)}，仍有 ${slot.activeCount} 条判断在跑），本次已转手动确认。`;
+      log.record("shell-judge.manual", { toolCallId: request.toolCallId, reasonCode: "queue-timeout", reason: redactJudgeText(reason) });
+      return manualOutcome("queue-timeout", reason);
+    }
+    if (slot.kind === "queue-full") {
+      const reason = `判断排队已满（${slot.activeCount} 条在跑、${slot.queueDepth} 条等待），本次已转手动确认。`;
+      log.record("shell-judge.manual", { toolCallId: request.toolCallId, reasonCode: "queue-full", reason: redactJudgeText(reason) });
+      return manualOutcome("queue-full", reason);
+    }
     try {
       return await runJudgement({ ...request, runtime: requestRuntime, projectRoot }, signal);
     } catch (error) {
       // 驱动层兜底：任何意外都不外抛。
       return manualOutcome("unavailable", `判断异常：${errText(error)}。已转手动确认。`);
     } finally {
-      busy = false;
+      releaseSlot();
     }
   };
 }

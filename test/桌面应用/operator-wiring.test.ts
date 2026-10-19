@@ -25,6 +25,7 @@ import {
 import {
   buildAcceptanceTaskMessage,
   flowCompletionIssue,
+  normalizeFlowStepStatus,
   parseFlowStepStatuses,
 } from "../../app/desktop/governance-advance.ts";
 import { interactionAnchorKey } from "../../app/desktop/request-anchor.ts";
@@ -1596,6 +1597,125 @@ test("收尾触发门：执行步骤全 done 才放行；验收步骤单列（pe
   );
 });
 
+// ————— ⑥-补 2026-10-19 真机：流程单状态写作「状态 + 说明」（done（证据）/pending（不由统筹派发）） —————
+
+test("流程步骤状态首词规范化：done 变体视为完成；pending/delivered/空不视为完成", () => {
+  for (const status of ["done", "done（证据）", "done(evidence)", "Done", "DONE", "done：xxx", "done 有落盘/回交证据"]) {
+    assert.equal(normalizeFlowStepStatus(status), "done", `${status} 应规范化为 done`);
+  }
+  for (const status of ["pending（…）", "pending（不由统筹派发）", "delivered（…）", "in-progress（…）", "blocked", "", "   "]) {
+    assert.notEqual(normalizeFlowStepStatus(status), "done", `${status === "" || status.trim() === "" ? "（空）" : status} 不应视为 done`);
+  }
+});
+
+test("收尾触发门：状态按首词判定（done（…）/Done/done：xxx 均可派；pending/delivered/空不放行）", () => {
+  const ledger = {
+    errors: [],
+    entries: [DISPATCHED_IMPL, { kind: "dispatch.accepted", flowId: "flow-a", stepId: "verify" }],
+  };
+  assert.equal(
+    flowCompletionIssue(
+      "flow-a",
+      flowMarkdown([["impl", "done（有落盘/回交证据）"], ["verify", "Done"], ["acceptance", "pending（不由统筹批）"]]),
+      ledger,
+    ),
+    undefined,
+    "执行步骤写 done（…）/Done + 验收 pending（…）⇒ 可派验收",
+  );
+  assert.equal(
+    flowCompletionIssue(
+      "flow-a",
+      flowMarkdown([["impl", "done(evidence)"], ["verify", "done：回交报告已读"], ["acceptance", "pending(awaiting)"]]),
+      ledger,
+    ),
+    undefined,
+    "半角括号/冒号说明同样可派",
+  );
+  for (const status of ["pending（…）", "delivered（…）", ""]) {
+    assert.match(
+      flowCompletionIssue("flow-a", flowMarkdown([["impl", status], ["verify", "done"], ["acceptance", "pending（…）"]]), ledger) ?? "",
+      /流程仍有未完成\/阻塞\/待派发步骤（impl=/,
+      `${status === "" ? "（空）" : status} 不放行`,
+    );
+  }
+  assert.match(
+    flowCompletionIssue(
+      "flow-a",
+      flowMarkdown([["impl", "done"], ["verify", "done"], ["acceptance", "done（客户已在验收卡选择 accept）"]]),
+      ledger,
+    ) ?? "",
+    /验收步骤已完成/,
+    "验收步骤 done（…）视为已完成，不重复派",
+  );
+});
+
+// 真实 R2 流程单（/Users/wangzhongren/code/vibeingcode/ans-testbed/ticket-desk-live/docs/flows/ticket-desk-r2.md
+// 的步骤表，2026-10-19 10:54 缺陷现场原文：verification/acceptance 仍为 pending；此后真机流程单已推进为
+// done，本夹具保留缺陷现场快照以覆盖「状态带说明 + 待派验收」这一回归面）。
+// 状态列全部是「状态 + 说明」写法。
+const REAL_R2_STEP_TABLE: ReadonlyArray<readonly [id: string, description: string, status: string]> = [
+  ["nomination", "提名：Crew / 组队 读取提案并给出候选角色", "done（`docs/nominations/ticket-desk-r2-v1.md`；推荐集 = 既有三角色，不新增角色）"],
+  ["role-readiness", "角色就绪：客户任命决定 + 角色卡就绪确认", "done（客户经任命卡确认沿用 backend / frontend / test；本轮不新增角色、不改卡）"],
+  ["contract-freeze-v2", "冻结 API 契约 v2 到 `docs/contracts/ticket-desk-api-v2.md`", "done（frozen-v2 / supersedes v1）"],
+  ["delivery-backend", "服务端增量：`sort`/`order`/`assignee`、`deadline`、`overdue`、`GET /api/tickets/export`（CSV+BOM）、`canExport`、store 补全、README 同步（backend-engineer）", "done（有落盘/回交证据；125/125 + 自检 73 项为角色自报，独立复核仍待 `verification`）"],
+  ["delivery-frontend", "前端增量：排序/负责人筛选控件、截止时间列与逾期高亮、创建与 PATCH deadline 表单、导出按钮（`fetch`+`Blob`）（frontend-engineer）", "done（有落盘/回交证据；e2e 后 0 处修正）"],
+  ["delivery-test", "测试增量：`sorting-filtering` / `overdue` / `export` 三文件 + `persistence` 增补；既有 75 用例不得弱化（test-engineer）", "done（有落盘/回交证据；125/125 为角色自报，独立复核仍待 `verification`）"],
+  ["cleanup-selfcheck", "清理 `data/selfcheck-r2.mjs` 临时自检脚本（backend-engineer 自己的写区）", "done（已删；`data/` 仅剩 `tickets.json`，统筹 `list_dir` 复核）"],
+  ["r2-e2e", "R2 端到端联调：真起服务核对前端查询串/静态托管/导出链路（frontend-engineer）", "done（真起服 curl 实测 37 个请求；浏览器渲染未验证）"],
+  ["verification", "独立复核：按提案 §11 八条逐条出结论（内置 Proof / verifier）", "pending（不由统筹派发）"],
+  ["acceptance", "客户验收", "pending（不由统筹批）"],
+];
+
+function realR2FlowMarkdown(overrides: Readonly<Record<string, string>> = {}): string {
+  return [
+    "# 流程：ticket-desk-r2（第二轮迭代：排序/筛选/deadline/overdue/CSV 导出）",
+    "",
+    "## 步骤表",
+    "",
+    "| stepId | 步骤 | 状态 |",
+    "| --- | --- | --- |",
+    ...REAL_R2_STEP_TABLE.map(([id, description, status]) => `| ${id} | ${description} | ${overrides[id] ?? status} |`),
+  ].join("\n");
+}
+
+// 同形账本（字段形状取自真实 `.ans/governance/ledger.jsonl` 的 R2 条目）。真实账本中 6 个执行步骤
+// 有 dispatch.accepted；`role-readiness` / `contract-freeze-v2` 由客户任命/写盘决定完成、未走应用派发，
+// 本夹具按「每步都有 dispatch.accepted」的同形补齐（真实账本复算仍会在这两处拦下，见变更记录残余风险）。
+const REAL_R2_LEDGER = {
+  errors: [],
+  entries: [
+    ...["proposal-v1", "nomination", "delivery-backend", "delivery-frontend", "delivery-test", "cleanup-selfcheck", "r2-e2e", "role-readiness", "contract-freeze-v2"].map(
+      (stepId) => ({ kind: "dispatch.accepted", flowId: "ticket-desk-r2", stepId, actorRoleId: "app" }),
+    ),
+    { kind: "customer.decision", flowId: "ticket-desk-r2", decisionKind: "intent-confirm", customerDecision: "accepted" },
+    { kind: "customer.decision", flowId: "ticket-desk-r2", stepId: "proposal-v1", decisionKind: "proposal-accept", customerDecision: "accepted" },
+    { kind: "customer.decision", flowId: "ticket-desk-r2", stepId: "nomination", decisionKind: "appointment", customerDecision: "appointed" },
+    { kind: "customer.decision", flowId: "ticket-desk-r2", decisionKind: "schedule-write", customerDecision: "accepted" },
+  ],
+};
+
+test("真实 R2 流程单（状态带说明）+ 同形账本：可派验收；改一个执行步骤为 pending（…）则不放行", () => {
+  const parsed = parseFlowStepStatuses(realR2FlowMarkdown());
+  assert.equal(parsed.wellFormed, true);
+  assert.deepEqual(
+    parsed.steps.map((step) => step.id),
+    REAL_R2_STEP_TABLE.map(([id]) => id),
+    "canonical 三列 stepId|步骤|状态：取 stepId 作 id（与原输出形状一致）",
+  );
+  assert.equal(parsed.steps[0]!.status, REAL_R2_STEP_TABLE[0]![2], "status 仍保留单元格原文（说明不丢）");
+
+  assert.equal(
+    flowCompletionIssue("ticket-desk-r2", realR2FlowMarkdown(), REAL_R2_LEDGER),
+    undefined,
+    "执行步骤全部 done（…）+ 验收 pending（…）⇒ 可派验收",
+  );
+  assert.match(
+    flowCompletionIssue("ticket-desk-r2", realR2FlowMarkdown({ "delivery-backend": "pending（等待回交）" }), REAL_R2_LEDGER) ?? "",
+    /流程仍有未完成\/阻塞\/待派发步骤（delivery-backend=pending（等待回交））/,
+    "任一执行步骤 pending（…）⇒ 不放行",
+  );
+});
+
 test("收尾任务消息：带流程单与回交/报告路径，要求汇总并出验收卡、不自行验收", () => {
   const message = buildAcceptanceTaskMessage("flow-a", ["docs/reports/impl.md", "docs/reports/impl.md", ""]);
   assert.match(message, /流程 flow-a 步骤已全部完成/);
@@ -1603,4 +1723,63 @@ test("收尾任务消息：带流程单与回交/报告路径，要求汇总并�
   assert.match(message, /回交\/核对报告路径：docs\/reports\/impl\.md/);
   assert.match(message, /请汇总证据并出验收卡/);
   assert.match(message, /不要自行验收或代替客户决定/);
+});
+
+// ————— 2026-10-19 客户批准（原话「可以，按你说的改」）：验收任务硬要求 —————
+// 验收前最起码要真实启动应用并向客户演示；未演示或质量基线某项无证据不得建议 accept。
+
+test("收尾任务消息（客户批准）：工程质量基线八项逐项核对，缺证据不得建议 accept", () => {
+  const message = buildAcceptanceTaskMessage("flow-a", ["docs/reports/impl.md"]);
+  assert.match(message, /按工程质量基线逐项核对/);
+  for (const item of ["正确性", "健壮性", "安全", "可维护性", "可观测性", "性能", "前端可访问性", "测试矩阵"]) {
+    assert.ok(message.includes(item), `质量基线「${item}」须逐项核对并给出结论与证据`);
+  }
+  assert.match(message, /某项无证据/);
+  assert.match(message, /不得建议 accept/);
+});
+
+test("收尾任务消息（客户批准）：必须真实启动应用向客户演示，证据写入 docs/verification/<flowId>-v1.md", () => {
+  const message = buildAcceptanceTaskMessage("flow-a", ["docs/reports/impl.md"]);
+  assert.match(message, /必须真实启动应用并向客户演示/);
+  assert.match(message, /启动命令/);
+  assert.match(message, /访问地址/);
+  assert.match(message, /截图或录屏/);
+  assert.match(message, /审批档 shell/);
+  assert.match(message, /未真实启动\/演示/);
+  assert.match(message, /docs\/verification\/flow-a-v1\.md/);
+  assert.match(message, /验收卡中引用/);
+  // 证据路径按 flowId 生成（不写死 flow-a）；无回交路径时也保留硬要求。
+  const other = buildAcceptanceTaskMessage("ticket-desk-r2", []);
+  assert.match(other, /docs\/verification\/ticket-desk-r2-v1\.md/);
+  assert.doesNotMatch(other, /docs\/verification\/flow-a-v1\.md/);
+  assert.match(other, /回交\/核对报告路径：见回交报告与流程单/);
+  assert.match(other, /不得建议 accept/);
+});
+
+// ————— 2026-10-19 客户批评（原话「这个感觉也没有啥架构的啊，提案角色应该也要考虑到扩展性，
+// 给出一个架构方案啊」）：验收须按提案/变更的「架构方案或架构影响分析」核对实现；
+// 缺失架构章节或实现偏离声明不得建议 accept；既有四条硬要求逐字不变。
+
+test("收尾任务消息（客户批评）：按架构方案/架构影响分析核对实现，缺失架构章节或偏离声明不得建议 accept", () => {
+  const message = buildAcceptanceTaskMessage("flow-a", ["docs/reports/impl.md"]);
+  assert.match(message, /架构方案或架构影响分析/);
+  for (const item of ["模块边界", "依赖方向", "扩展点", "数据 schema/API 版本迁移"]) {
+    assert.ok(message.includes(item), `架构核对项「${item}」须出现在验收任务中并与声明一致`);
+  }
+  assert.match(message, /与声明一致/);
+  assert.match(message, /缺失架构章节/);
+  assert.match(message, /实现偏离声明/);
+  assert.match(message, /不得建议 accept/);
+  assert.match(message, /只能建议退回或补充证据/);
+  // 既有四条硬要求（质量基线 + 真实启动演示）逐字保留——本批只新增第⑤条，不改写前四条。
+  for (const requirement of [
+    "① 按工程质量基线逐项核对并给出结论与证据：正确性、健壮性、安全、可维护性、可观测性、性能、前端可访问性、测试矩阵；",
+    "② 必须真实启动应用并向客户演示：给出启动命令与访问地址，附截图或录屏（你已有审批档 shell，可执行启动命令，命令逐条提交审批）；",
+    "③ 未真实启动/演示、或质量基线某项无证据，不得建议 accept（只能建议退回或补充证据）；",
+    "④ 演示证据与逐项核对结论写入 docs/verification/flow-a-v1.md，并在验收卡中引用。",
+  ]) {
+    assert.ok(message.includes(requirement), `既有硬要求须逐字保留：${requirement}`);
+  }
+  // 无回交路径时架构核对要求同样保留（固定硬要求，不依赖 evidence）。
+  assert.match(buildAcceptanceTaskMessage("ticket-desk-r2", []), /架构方案或架构影响分析/);
 });

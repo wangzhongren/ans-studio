@@ -117,11 +117,17 @@ const confirmAllow: CustomerInputFn = (req) =>
     ? { outcome: "answered", value: { confirmed: true }, operatorId: "test-客户" }
     : { outcome: "answered", value: { selected: [] }, operatorId: "test-客户" };
 
-/** 确认脚本：预览列出「将要写出的具体路径」（发行从呈现文本提取）。 */
+/** 确认脚本：预览列出「将要写出的具体路径」并给每条路径一段可核对正文。
+ *  2026-10-19 起：写盘类卡片的 preview 必须对每条声明路径给正文/结构，否则编排在呈现前拒绝发卡。 */
 function confirmScript(paths: string[]): ToolCall {
   return {
     name: "request_confirmation",
-    args: { title: "预览并请求确认", preview: `将写出：${paths.map((p) => `\`${p}\``).join("、")}` },
+    args: {
+      title: "预览并请求确认",
+      preview:
+        `将写出：\n${paths.map((p) => `- ${p}`).join("\n")}\n\n` +
+        paths.map((p) => `## ${p}\n# 预览正文\n（测试用正文，内容略。）`).join("\n\n"),
+    },
   };
 }
 
