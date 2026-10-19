@@ -354,11 +354,13 @@ export interface RoleSessionAbortResult {
 /**
  * **F-5-opt1 推荐注记文案**（2026-10-16 客户批准；会话因边界更新重建后写权清零的**如实告知**，
  * **单一来源**）——由重建路径（桌面窗口 O-1）经 `RoleSessionHandle.queueModelNotice` 排入模型可见输入。
- * 措辞要点：如实说明「重建」与「写权不自动保留」，指向**可行恢复路径**（`request_confirmation`）；
+ * 措辞要点：以 `【系统通知·会话重建】` 标记开头——这是**系统注入的 notice，不是角色/客户发言**
+ * （2026-10-19 客户反馈「这个应该加一个标记啊，不然谁知道啊」），避免模型把它误当用户消息；
+ * 如实说明「重建」与「写权不自动保留」，指向**可行恢复路径**（`request_confirmation`）；
  * **不夹带任何授权语义**（不是授权、不承诺放行——写入仍须逐条确认后发行）。
  */
 export const REBUILT_SESSION_WRITE_PERMITS_NOTICE =
-  "会话已因边界更新重建；此前经确认发行的写权不会自动保留，如需写入请重新经 request_confirmation 确认。";
+  "【系统通知·会话重建】此前经确认发行的写权不会自动保留，如需写入请重新经 request_confirmation 确认。";
 
 /** Pipeline-only prompt intent; never forwarded as a Runtime option or write authorization. */
 export interface RoleSessionSendOptions extends PromptOptions {

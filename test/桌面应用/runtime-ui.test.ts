@@ -25,7 +25,7 @@ test("只按 IPC 组摘要分组：组长置前、未知职责原文保留、缺
   const groups = Rt.roleGroups(roles);
   assert.deepEqual(groups[0].roles.map((r: any) => r.roleId), ["lead", "member", "unknown"]);
   assert.equal(groups[0].roles[2].groupDuty, "<script>x</script>");
-  assert.equal(groups[1].name, "其他角色（查看/调试）");
+  assert.equal(groups[1].name, "工作角色");
   assert.deepEqual(groups[1].roles, [roles[3]]);
   assert.deepEqual(roles.map(r => r.roleId), ["member", "unknown", "lead", "loose"]);
 });

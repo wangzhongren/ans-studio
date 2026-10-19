@@ -314,3 +314,22 @@
 - **证据**：`docs/change/2026-10-19-dark-graphite-evidence/`（改前/改后 1360·960·抽屉·折叠截图 + report.json；改前 = HEAD 浅色主题，同一夹具同一状态）；原始运行目录 `/private/tmp/ans-dark-theme-before|after`（已删 user-data）。
 - Doc: [docs/change/2026-10-19_change_dark-graphite-theme.md](docs/change/2026-10-19_change_dark-graphite-theme.md)
 - 指纹：本轮工作树未提交，以 `git diff` 为准（`app/renderer/styles.css`、`test/桌面应用/renderer.test.ts`、`test/桌面应用/e2e/uiux-v2.mjs`、本文件与 `docs/change/2026-10-19_change_dark-graphite-theme.md` + 证据目录）。
+
+## 2026-10-19：左树取消角色折叠 + 系统通知独立成行（客户两句反馈）
+
+客户：「这个左侧这个角色，还是去除这个展开收缩吧，看不到谁在工作，也是尬的。」＋「这个应该加一个标记啊，不然谁知道啊。」
+
+- **A. 取消角色分组折叠**：`renderer.js::renderRoleTree` 删除 `treeGroupFold`/`governanceFoldOpen`/`othersFoldOpen` 与 trio 折叠分支——single/trio/模型未知**一律平铺**；主入口仍置顶，治理职能与项目角色沿用 `treeGroupLabel` + `roleTreeItem`（项目分组仍由 `Rt.roleGroups` 驱动），角色状态徽标/忙态沿用既有唯一状态源。`styles.css` 清理全部 `.tree-group-fold` 样式。整栏收起（`is-sidebar-collapsed`）未动。**补充（同日协调转达）**：无分组角色的默认可见标签由「其他角色（查看/调试）」改为**「工作角色」**（`runtime-ui.js::roleGroups` 单一来源，`renderer.js` 不硬编码）；旧字面量仅保留在不可见 `append+remove` 兼容锚点（跨角色 `e-ui.test.ts` 源码定位，无可见节点）。
+- **B. 系统通知独立成行**：`tool-rows.js` 新增单一分类点 `classifySystemNotice`（`classifyInjectedMessage` 最先调用）：文首 `【系统通知】`/`【系统通知·<子类>】`（严格闭合判据，不逐子类登记）⇒ `{kind:"system-notice", displayBody, remainder}`；`renderer.js` 实时（`appendInjectedMessage`→`appendSystemNotice`）与回放（`appendReplayRow`）同规则渲染 `.sys sys-notice` 独立系统行 + 「系统通知 · <子类>」徽标，`\n\n` 之后的用户正文仍按普通 `.msg-user` 呈现（回放 token 只落身份行，防 `tokenRows` 覆盖）。通知文本、模型可见内容与消息顺序不变；`styles.css` 新增 `.sys-notice`/徽标（深色石墨令牌）。
+- **测试**：`renderer.test.ts` 折叠用例改写 + 新增系统通知用例（106/106）、`tool-rows.test.ts` 新增归类真值表（53/53）→ 合跑 **159/159**；`markdown` 5/5；`runtime-ui` 12 计/11 过/**1 红＝既有基线**（`localStorage` 源码守卫，HEAD 即红，未改；分组名断言已同步「工作角色」并通过）；`npm run typecheck` 0 错；跨角色 `e-ui.test.ts` 10/10。Electron 离线夹具新增 `ANS_NOTICE_UI_ONLY=1` → **SYSTEM_NOTICE_UI_PASS 5**（实时/回放系统通知 + 平铺角色树 + 1360/960 截图，含「工作角色」分组截图）；既有 `ANS_RUNTIME_UI_ONLY=1` 的分组名期望同步后，分组检查通过，仍止于既有基线红 `expired old shell…`。默认 e2e A/B（HEAD vs 本批）：101 条报告后同点同败集合逐条一致，本批零新增失败。
+- **证据**：`docs/change/2026-10-19-notice-flat-evidence/`（4 张截图 + report.json；运行目录 `/private/tmp/ans-notice-flat-ui-final4`，已隔离 user-data；截图已按正文提亮后的 `--text` 刷新）。跨域待同步：`test/桌面应用/e2e/main.mjs` 仍断言子串「其他角色」（非本角色写入面，需其属主改为「工作角色」）。
+- Doc: [docs/change/2026-10-19_change_role-tree-flat-and-system-notice.md](docs/change/2026-10-19_change_role-tree-flat-and-system-notice.md)
+- 指纹：本轮工作树未提交，以 `git diff` 为准（`app/renderer/renderer.js`、`app/renderer/tool-rows.js`、`app/renderer/runtime-ui.js`、`app/renderer/styles.css`、`test/桌面应用/renderer.test.ts`、`test/桌面应用/tool-rows.test.ts`、`test/桌面应用/runtime-ui.test.ts`、`test/桌面应用/e2e/uiux-v2.mjs`、本文件 + Doc + 证据目录）。
+
+## 2026-10-19：深色主题正文提亮（客户「白的有点发灰」）
+
+客户补充：深色主题下正文「白的有点发灰」。只改 `--text` 一个令牌：`#E7E9EB` → **`#F2F4F6`**（近白、非纯白）；`styles.css` 三处 `:root --text` 覆盖块同步更新（避免后层覆盖回旧值）。`--text-2 #A7ADB5` / `--text-3 #949BA4` 与其他令牌、布局、字号零改动。对比度（主底 `#14171A`）：14.78:1 → **16.32:1**；侧栏/抽屉/次级表面 15.20/15.70/14.36:1；参考纯白 17.99:1（未采用）。
+- **测试**：`renderer.test.ts` A2 对比度断言改用 `#F2F4F6`（阈值未放宽）并新增「正文亮于次级文字」层次断言 → 边界内合跑 **159/159**；`ANS_VISUAL_V2_UI_ONLY=1` 改前/改后各 **VISUAL_V2_PASS 54**（暗色表面扫描零回归）；`ANS_NOTICE_UI_ONLY=1` **SYSTEM_NOTICE_UI_PASS 5**（证据已按新文本色刷新）；`runtime-ui` 12 计/11 过/1 红＝既有基线；`npm run typecheck` 0 错。
+- **证据**：`docs/change/2026-10-19-text-brightness-evidence/`（改前/改后 1360·960 截图 + report.json；运行目录 `/private/tmp/ans-text-brightness-before|after`，隔离 user-data）。
+- Doc: [docs/change/2026-10-19_change_text-brightness.md](docs/change/2026-10-19_change_text-brightness.md)
+- 指纹：工作树未提交，以 `git diff` 为准（`app/renderer/styles.css`、`test/桌面应用/renderer.test.ts`、本文件 + Doc + 证据目录）。

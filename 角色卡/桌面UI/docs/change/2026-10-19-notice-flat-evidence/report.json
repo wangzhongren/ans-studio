@@ -1,0 +1,27 @@
+{
+  "electron": "44.7.0",
+  "node": "24.21.0",
+  "reports": [
+    {
+      "name": "role tree flat: all roles visible without details/fold",
+      "value": true
+    },
+    {
+      "name": "role status badges remain visible for every role",
+      "value": true
+    },
+    {
+      "name": "live system notice is its own sys row with 系统 badge, not a user bubble",
+      "value": true
+    },
+    {
+      "name": "replay system notice same rule: sys row + user body",
+      "value": true
+    },
+    {
+      "name": "notice view no horizontal overflow at 960",
+      "value": true
+    }
+  ],
+  "errors": []
+}

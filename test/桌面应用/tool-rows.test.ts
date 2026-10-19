@@ -186,6 +186,44 @@ test('G-2：system 归类不误伤——行内提及 / 未闭合 / 空子类 / �
   assert.equal(tools.classifyInjectedMessage('[派发] 来自 su 的任务：x')?.kind, 'dispatch');
 });
 
+// ————— 2026-10-19 客户要求：「这个应该加一个标记啊」——系统通知（会话重建等）独立归类 —————
+// 编排以 `【系统通知·<子类>】<通知正文>` 为文首标记 prepend 到下一轮用户消息；用户正文在空行之后。
+// 判据只依赖标记形态（不逐子类登记）；只改呈现，body/模型可见内容与顺序不变。
+
+test('2026-10-19：系统通知归类——`【系统通知…】` 文首标记；通知与用户正文分离；原文不变', () => {
+  const notice = '此前经确认发行的写权不会自动保留，如需写入请重新经 request_confirmation 确认。';
+  const raw = '【系统通知·会话重建】' + notice + '\n\n请继续处理任务。';
+  const live = tools.classifyInjectedMessage('用户指令：' + raw);
+  assert.equal(live?.kind, 'system-notice', '实时回显（剥「用户指令：」前缀后）归类为系统通知');
+  assert.equal(live?.label, '系统通知 · 会话重建', '标签带「系统通知」与子类原文（徽标用）');
+  assert.equal(live?.sourceRoleId, '', '来源=系统（非角色）');
+  assert.equal(live?.displayBody, notice, 'displayBody=标记后的通知正文（标记由徽标承载）');
+  assert.equal(live?.remainder, '请继续处理任务。', '空行之后的用户正文独立取出');
+  assert.equal(live?.body, raw, 'body 保持投递原文（仅剥回显前缀）——模型可见内容不变');
+  // 回放（无「用户指令：」前缀）同解。
+  const replay = tools.classifyInjectedMessage(raw);
+  assert.equal(replay?.kind, 'system-notice');
+  assert.equal(replay?.remainder, '请继续处理任务。');
+  // 仅通知（无用户正文）与无子类标记。
+  const only = tools.classifyInjectedMessage('【系统通知·会话重建】' + notice);
+  assert.equal(only?.kind, 'system-notice');
+  assert.equal(only?.remainder, '', '无空行分隔 ⇒ 没有用户正文');
+  assert.equal(tools.classifyInjectedMessage('【系统通知】纯通知正文')?.label, '系统通知', '无子类 ⇒ 标签只有「系统通知」');
+  assert.equal(tools.classifyInjectedMessage('【系统通知·会话重建】a\r\n\r\nb')?.remainder, 'b', 'CRLF 空行同样分离');
+  // 不误伤（「看起来像」不算）。
+  assert.equal(tools.classifyInjectedMessage('帮我看下【系统通知】这个词'), null, '行内提及不算（标记必须在行首）');
+  assert.equal(tools.classifyInjectedMessage('【系统通知·未闭合 普通消息'), null, '未闭合标记不算');
+  assert.equal(tools.classifyInjectedMessage('【系统通知·会话重建】'), null, '仅标记无正文不归类（不摆空通知）');
+  assert.equal(tools.classifyInjectedMessage('【系统通知·】x'), null, '空子类不算');
+  assert.equal(tools.classifyInjectedMessage('【系统通知·' + '长'.repeat(17) + '】x'), null, '子类长度有界');
+  assert.equal(tools.classifyInjectedMessage('【系统通知会话重建】x'), null, '标记后须为「】」或「·<子类>】」');
+  assert.equal(tools.classifyInjectedMessage('普通一句话'), null);
+  // 既有归类回归。
+  assert.equal(tools.classifyInjectedMessage('[派发] 来自 su 的任务：x')?.kind, 'dispatch');
+  assert.equal(tools.classifyInjectedMessage('[回交] 来自 A 的报告')?.kind, 'handback');
+  assert.equal(tools.classifyInjectedMessage('[系统·看护] 队列积压')?.kind, 'system');
+});
+
 // ————— 视觉收敛 v3（2026-10-16 客户批准：「按推荐批准，开始实施」）—————
 // W6b：system 行正文去重复前缀（chip「系统消息 · <子类>」已承载）；分类判据仍在投递原文，不改判据。
 

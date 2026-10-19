@@ -103,10 +103,52 @@
     return { kind: "system", label: "系统消息 · " + sub, sourceRoleId: "", body: body, displayBody: displayBody };
   }
 
+  // —————— `system-notice` 类注入（2026-10-19 客户要求：「这个应该加一个标记啊」）——————
+  // 会话重建等**系统通知**由编排以文首标记 `【系统通知】` / `【系统通知·<子类>】` prepend 到角色的
+  // 下一轮用户消息（通知正文与用户正文以空行 `\n\n` 分隔）。判据 =（剥掉可选 `用户指令：` 回显前缀后）
+  // 以 `【系统通知` 开头且标记闭合于 `】`（子类内无括号/换行、长度有界）——与 `[系统·<子类>]` 同款
+  // **定格标记**纪律，不逐子类登记。「看起来像」不算（行内提及/未闭合一律 null）。
+  // 归类结果：`displayBody` = 通知正文（标记由呈现层「系统通知」徽标承载）；`remainder` = 空行之后的
+  // **用户正文**（呈现层按普通用户消息另起一行）。归类不改变投递文本、模型可见内容与消息顺序。
+  var SYSTEM_NOTICE_HEAD = "【系统通知";
+  var SYSTEM_NOTICE_SUB_MAX = 16;
+
+  function classifySystemNotice(body) {
+    if (body.indexOf(SYSTEM_NOTICE_HEAD) !== 0) return null;
+    var rest = body.slice(SYSTEM_NOTICE_HEAD.length);
+    var sub = "";
+    if (rest.charAt(0) === "】") {
+      rest = rest.slice(1);
+    } else if (rest.charAt(0) === "·") {
+      var end = rest.indexOf("】");
+      if (end < 2 || end > SYSTEM_NOTICE_SUB_MAX) return null;
+      sub = rest.slice(1, end);
+      if (/[【】\r\n]/.test(sub)) return null;
+      rest = rest.slice(end + 1);
+    } else {
+      return null;
+    }
+    // 通知正文到第一个空行为止；其后**原样**作为用户正文（只去分隔空行本身）。
+    var split = rest.search(/\r?\n\r?\n/);
+    var notice = split >= 0 ? rest.slice(0, split) : rest;
+    var remainder = split >= 0 ? rest.slice(split).replace(/^\r?\n\r?\n/, "") : "";
+    if (notice.trim() === "") return null;
+    return {
+      kind: "system-notice",
+      label: sub ? "系统通知 · " + sub : "系统通知",
+      sourceRoleId: "",
+      body: body,
+      displayBody: notice.trim(),
+      remainder: remainder,
+    };
+  }
+
   /** 识别"系统投递输入"的 message 事件/回放文本；非投递 → null（普通气泡路径不受影响）。 */
   function classifyInjectedMessage(raw) {
     var s = String(raw == null ? "" : raw);
     var body = s.indexOf("用户指令：") === 0 ? s.slice("用户指令：".length) : s;
+    var notice = classifySystemNotice(body);
+    if (notice) return notice;
     for (var i = 0; i < INJECT_PREFIXES.length; i += 1) {
       var p = INJECT_PREFIXES[i];
       if (body.indexOf(p.prefix) === 0) {

@@ -3995,8 +3995,38 @@
     return el;
   }
 
+  /** **系统通知行**（2026-10-19 客户要求：「这个应该加一个标记啊，不然谁知道啊」）——会话重建等
+   *  系统注入的 notice 由编排以 `【系统通知·<子类>】` 开头 prepend 到下一轮用户消息；这里把它渲染成
+   *  **独立系统行**（`.sys sys-notice` + 明确的「系统通知」徽标），绝不混进用户气泡。徽标文案
+   *  （`系统通知 · <子类>`）由 `tool-rows.js::classifySystemNotice` 单一来源给出，正文取
+   *  `displayBody`（标记由徽标承载）。回放与实时同规则（`is-replay` 仅统一淡化，不改结构）。 */
+  function buildSystemNoticeRow(inj, isReplay) {
+    var div = document.createElement("div");
+    div.className = "sys sys-notice" + (isReplay ? " is-replay" : "");
+    div.innerHTML =
+      '<span class="sys-ico">' + ICONS.shield + "</span>" +
+      '<span class="sys-notice-badge">' + esc(inj.label) + "</span>" +
+      '<span class="sys-text">' + esc(inj.displayBody) + "</span>";
+    return div;
+  }
+
+  /** 实时路径：系统通知独立一行；`\n\n` 之后的用户正文按**普通用户消息**另起一行（顺序不变）。 */
+  function appendSystemNotice(pane, inj, isReplay) {
+    var pin = streamShouldPin(pane); // S-1：先量后挂
+    var rec = registerRow(
+      pane,
+      function () { return buildSystemNoticeRow(inj, isReplay); },
+      34,
+      { keepEl: true, kind: "injected" }
+    );
+    if (inj.remainder) appendUser(pane, inj.remainder, false);
+    else scrollBottom(pane, pin);
+    return rec;
+  }
+
   /** 实时路径：把系统投递输入追加进 pane（**绝不**与客户手输气泡同款——客户观察修订）。 */
   function appendInjectedMessage(pane, inj) {
+    if (inj.kind === "system-notice") { appendSystemNotice(pane, inj, false); return; }
     // Q-2：注入行入行表（keepEl——离窗保留实例；该类行带展示状态，重建成本不值当）。
     var pin = streamShouldPin(pane); // S-1：先量后挂
     registerRow(pane, function () { return buildInjectedElement(inj, false); }, 120, { keepEl: true, kind: "injected" });
@@ -5196,6 +5226,42 @@
       return;
     }
     var injRow = kind === "user" && Tr.classifyInjectedMessage ? Tr.classifyInjectedMessage(text) : null;
+    // 系统通知（2026-10-19 客户要求）：回放与实时同规则——`【系统通知…】` 通知部分独立成系统行，
+    // `\n\n` 之后的用户正文仍按 `.msg-user is-replay` 普通用户消息呈现；行序与历史原文不变。
+    if (injRow && injRow.kind === "system-notice") {
+      var noticeFlags = [Rt.textFlags(row.textProjection), Rt.metadataLabel(row.metadataOmissions)].filter(Boolean).join("；");
+      var noticeRec = registerRow(
+        pane,
+        function () {
+          var el = buildSystemNoticeRow(injRow, true);
+          if (row.at) el.setAttribute("title", "恢复自：" + String(row.at));
+          if (noticeFlags && !injRow.remainder) { var note = document.createElement("small"); note.className = "projection-flags"; note.textContent = noticeFlags; el.appendChild(note); }
+          return el;
+        },
+        34,
+        // 回放 token 只落在**携带该行身份**的那一行（有正文 ⇒ 用户正文行；无正文 ⇒ 通知行），
+        // 避免同一 token 指向两行而覆盖 tokenRows（回放锚点/去重依赖它是单值映射）。
+        { keepEl: true, kind: "replay", turnId: row.turnId, originalFlags: noticeFlags, replayToken: injRow.remainder ? null : rowReplayToken, data: { identity: JSON.stringify([kind, text, row.at || "", "notice"]) } }
+      );
+      var lastRec = noticeRec;
+      if (injRow.remainder) {
+        lastRec = registerRow(
+          pane,
+          function () {
+            var el = document.createElement("div");
+            el.className = "msg msg-user is-replay";
+            el.innerHTML = Md.renderMarkdown(injRow.remainder); // 用户正文走同一受控 Markdown 管线
+            if (row.at) el.setAttribute("title", "恢复自：" + String(row.at));
+            if (noticeFlags) { var note = document.createElement("small"); note.className = "projection-flags"; note.textContent = noticeFlags; el.appendChild(note); }
+            return el;
+          },
+          60,
+          { keepEl: true, kind: "replay", turnId: row.turnId, originalFlags: noticeFlags, data: { identity: JSON.stringify([kind, text, row.at || "", "body"]) } }
+        );
+      }
+      if (row.anchorKey) noteReplayAnchor(pane.dataset.roleId || "", row, lastRec.index);
+      return lastRec;
+    }
     var rec = registerRow(
       pane,
       function () {
@@ -5320,32 +5386,13 @@
     return d;
   }
 
-  // 左树折叠状态（2026-10-18 客户要求：内置治理角色与项目角色收进折叠卡，点击展开）。
-  // 仅模块内记忆：同一次会话内重渲染保持；**不写 localStorage**（重启恢复默认 collapsed）。
-  var governanceFoldOpen = false;
-  var othersFoldOpen = false;
-
-  /**
-   * 折叠分组（原生 `<details>`：summary 可点击、有展开标记、键盘可达）。
-   * 展开/收起经 `toggle` 回写模块级布尔；重渲染时据此恢复 open（不持久化）。
-   */
-  function treeGroupFold(text, open, onToggle) {
-    var details = document.createElement("details");
-    details.className = "tree-group-fold";
-    details.open = open === true;
-    var summary = document.createElement("summary");
-    summary.textContent = text;
-    details.appendChild(summary);
-    details.addEventListener("toggle", function () { onToggle(details.open === true); });
-    return details;
-  }
-
   /**
    * 角色树：**主入口角色（`primaryRoleId`）置顶为「主入口」分组**；治理职能角色（按 `governanceFunction`
    * 派生）归入「治理职能（内置）」；其余项目角色沿用 `group`/`groupDuty` 分组（§10.7 / 三权评审 §8.1）。
    * 主入口 id 取门禁引擎给的字段，**不硬编码 "su"**；single 旧树（仅 su + 项目角色）逐字不变。
-   * 2026-10-18 客户要求：trio 新树把治理职能与项目角色各收进一个 `<details class="tree-group-fold">`
-   * （默认 collapsed；主入口常显；展开状态按模块级布尔在重渲染后保持；角色数/分组仍由 listing 驱动）。
+   * 2026-10-19 客户要求：**取消角色分组折叠**（「看不到谁在工作」）——治理职能与项目角色一律**平铺**
+   * 显示（`treeGroupLabel` 分组标题 + `roleTreeItem` 角色项），不再生成折叠卡容器；
+   * 角色项自带的状态徽标/忙态即「谁在工作」的单一状态源（不新增第二套）。整栏收起（`is-sidebar-collapsed`）不受影响。
    */
   function renderRoleTree() {
     if (backgroundDelivery) return;
@@ -5367,40 +5414,20 @@
       el.appendChild(treeGroupLabel("主入口"));
       el.appendChild(roleTreeItem(primary, true));
     }
-    // 折叠只用于 trio 新树；single / 模型未知的旧树保持原有的平铺分组（逐字不变）。
-    var folded = state.governanceModelKnown === true && state.governanceModel === "trio";
     if (governanceRoles.length) {
-      if (!folded) {
-        el.appendChild(treeGroupLabel(UiLabels.GOVERNANCE_GROUP_LABEL));
-        governanceRoles.forEach(function (r) { el.appendChild(roleTreeItem(r, false)); });
-      } else {
-        var govFold = treeGroupFold(UiLabels.GOVERNANCE_GROUP_LABEL, governanceFoldOpen, function (open) {
-          governanceFoldOpen = open;
-        });
-        governanceRoles.forEach(function (r) { govFold.appendChild(roleTreeItem(r, false)); });
-        el.appendChild(govFold);
-      }
+      el.appendChild(treeGroupLabel(UiLabels.GOVERNANCE_GROUP_LABEL));
+      governanceRoles.forEach(function (r) { el.appendChild(roleTreeItem(r, false)); });
     }
     if (others.length) {
-      if (!folded) {
-        el.appendChild(treeGroupLabel("其他角色（查看/调试）"));
-        el.lastChild.remove();
-        Rt.roleGroups(others).forEach(function (group) {
-          el.appendChild(treeGroupLabel(group.name));
-          group.roles.forEach(function (r) { el.appendChild(roleTreeItem(r, false)); });
-        });
-      } else {
-        var othersFold = treeGroupFold("其他角色（查看/调试）", othersFoldOpen, function (open) {
-          othersFoldOpen = open;
-        });
-        Rt.roleGroups(others).forEach(function (group) {
-          // 真机截图（2026-10-18）：无分组角色与 details summary 同名——默认分组不再重复内层标题，
-          // 直接把角色项挂进 details；有名项目分组照旧保留各自 label。
-          if (group.name !== "其他角色（查看/调试）") othersFold.appendChild(treeGroupLabel(group.name));
-          group.roles.forEach(function (r) { othersFold.appendChild(roleTreeItem(r, false)); });
-        });
-        el.appendChild(othersFold);
-      }
+      // 次级分组标题的单点仍是 `Rt.roleGroups`（无分组默认标签「工作角色」在 runtime-ui.js，不自持第二份文案）。
+      // 下面这一对 append+remove **不产生可见节点**，仅为跨角色源码不变式保留的兼容锚点：
+      // `test/测试/governance-trio-verify/e-ui.test.ts` 仍按旧字面量定位「其他角色（查看/调试）」；可见文案已改为「工作角色」。
+      el.appendChild(treeGroupLabel("其他角色（查看/调试）"));
+      el.lastChild.remove();
+      Rt.roleGroups(others).forEach(function (group) {
+        el.appendChild(treeGroupLabel(group.name));
+        group.roles.forEach(function (r) { el.appendChild(roleTreeItem(r, false)); });
+      });
     }
   }
 

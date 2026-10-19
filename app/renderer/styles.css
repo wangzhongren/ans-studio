@@ -18,7 +18,7 @@
   --border: #2C3238;      /* 分隔线 */
   --border-strong: #3A4148;
 
-  --text: #E7E9EB;        /* 主文字 */
+  --text: #F2F4F6;        /* 主文字（近白；2026-10-19 客户「白的有点发灰」提亮，非纯白） */
   --text-2: #A7ADB5;      /* 次级文字 */
   --text-3: #949BA4;      /* 更淡的灰（占位 / 计数；抬高以在深底保持 4.5:1） */
 
@@ -381,20 +381,8 @@ body { display: flex; flex-direction: column; }
 .tree-group { padding: 12px 10px 4px; font-size: 11px; font-weight: 500; color: var(--text-2); }
 .tree-group:first-child { padding-top: 6px; }
 
-/* 折叠分组（2026-10-18 客户要求：治理职能/其他角色收进折叠卡）。
-   与 .tree-group 同字号/颜色；原生 details ⇒ summary 可点击、有展开标记、键盘可达。 */
-.tree-group-fold { padding: 6px 0 0; }
-.tree-group-fold > summary {
-  padding: 6px 10px 4px;
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--text-2);
-  cursor: pointer;
-  user-select: none;
-}
-.tree-group-fold > summary:hover { color: var(--text); }
-.tree-group-fold > summary:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: 4px; }
-.tree-group-fold .tree-group { padding: 6px 10px 4px; }
+/* 角色分组一律平铺（2026-10-19 客户要求：取消展开/收起——「看不到谁在工作」）。
+   原 2026-10-18 折叠卡样式已随折叠分支删除；分组标题复用 `.tree-group`。 */
 
 /* 列表项 = 交互元素：v2 对齐——12px 竖向内边距、圆角 7、选中底 var(--bg-selected)。 */
 .tree-item {
@@ -718,6 +706,25 @@ body { display: flex; flex-direction: column; }
 }
 .sys-queue .sys-text { color: var(--text-2); }
 .sys-queue .sys-ico { color: var(--text-3); }
+/* 系统通知（2026-10-19 客户要求）：会话重建等系统注入 notice 独立成行——图标 + 明确的「系统通知」
+   徽标 + 通知正文；**绝不**与用户气泡（.msg-user）同款。徽标承载来源（系统通知 · <子类>），
+   正文沿用系统行文字但改用正文色；令牌全部取自深色石墨主题（--bg-soft / --border-strong / --text）。 */
+.sys-notice { align-items: center; padding: 2px 0; }
+.sys-notice .sys-ico { color: var(--text-2); }
+.sys-notice .sys-notice-badge {
+  flex: 0 0 auto;
+  padding: 0 7px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--bg-soft);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 18px;
+  white-space: nowrap;
+}
+.sys-notice .sys-text { font-family: var(--sans); color: var(--text); }
 
 /* P-1（2026-10-12 真机：待确认卡被 288 行活动淹掉、客户以为卡丢了）：
    「待确认」**常驻 chip**——#chat 底部的悬浮药丸（sticky 尾元素；同一时刻只有一个 pane 挂载）。
@@ -1502,7 +1509,7 @@ textarea:focus-visible,
 /* 已接受 UI-VISUAL-V2-1：正式布局与阅读层级，不改变执行事实。 */
 :root { --bg:#14171A; --bg-side:#1A1E22; --bg-drawer:#171B1F; --bg-soft:#1E2328;
   --bg-hover:#252A30; --bg-selected:#2A3037; --border:#2C3238; --border-strong:#3A4148;
-  --text:#E7E9EB; --text-2:#A7ADB5; --text-3:#949BA4; --success:#6FA08B; --success-bg:#22302B;
+  --text:#F2F4F6; --text-2:#A7ADB5; --text-3:#949BA4; --success:#6FA08B; --success-bg:#22302B;
   --danger:#C97A6D; --danger-bg:#2E2220; --amber:#C4A15F; --focus-ring:#6FA08B; --radius:10px; --radius-sm:7px; }
 .app { grid-template-columns:var(--sidebar-width) minmax(0,1fr); }
 .col-left .side-head { padding-left:16px; padding-right:16px; }
@@ -1601,8 +1608,6 @@ button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus
 .tree-label { margin:0 0 -16px; padding:0; font-size:11px; }
 .tree { padding:0; margin:0 -6px; }
 .tree-group { padding:8px 6px 4px; }
-.tree-group-fold > summary { padding:8px 6px 4px; }
-.tree-group-fold .tree-group { padding:6px 6px 4px; }
 .sidebar-foot { margin-top:auto; padding-top:14px; border-top:1px solid var(--border); }
 .sidebar-foot .btn { text-align:left; justify-content:flex-start; background:transparent; border:0; font-weight:400; margin:0; }
 .sidebar-role-count { font-size:11px; color:var(--text-2); padding:10px 12px 0; }
@@ -1773,7 +1778,7 @@ button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus
   --border: #2C3238;
   --border-strong: #3A4148;
   --border-control: #6B757E;
-  --text: #E7E9EB;
+  --text: #F2F4F6;
   --text-2: #A7ADB5;
   --text-3: #949BA4;
   --success: #6FA08B;

@@ -221,6 +221,7 @@ test("F-5-opt1：queueModelNotice 的注记作为**下一轮输入前缀**送达
     assert.equal(typeof handle.queueModelNotice, "function", "openRoleSession 句柄恒实现本方法（同 abort? 先例）");
 
     const notice = REBUILT_SESSION_WRITE_PERMITS_NOTICE;
+    assert.match(notice, /^【系统通知·会话重建】/, "notice 以系统标记开头——系统注入的 notice，不是角色/客户发言");
     assert.match(notice, /写权不会自动保留/, "文案如实说明写权清零");
     assert.match(notice, /request_confirmation/, "指向可行恢复路径");
 

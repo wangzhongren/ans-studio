@@ -1,5 +1,34 @@
 # 编排 变更记录
 
+## 2026-10-19 — 判断路径确定性前置封堵：长内联命令与无界递归搜索
+
+**来源**：客户原话「grep/长内联命令 这个应该让判断AI 做好封堵。」真机：test-engineer 超长内联 `node -e` 报 `manual/context-too-large`；大目录/挂住的 grep 卡 17 分钟。本批只改编排（`src/common/编排/`、`test/编排/`、本角色文档），未碰 `app/**`、其他角色文件、运行时核心与 git 历史。
+
+**改了什么**
+- 新增 `src/common/编排/shell-command-guard.ts`（纯函数）：长内联命令（`node -e`/`python -c`/`bash -c` 等；命令 >2048B、代码 >10 行或单行 >1024B）→ `inline-too-large`；无界递归搜索（`grep -r` 无受限路径、`.`/项目根/`/`/`~`、`find /`、`rg` 全项目、包装器后同类形态）→ `unbounded-search`。具体文件/小目录、`find … -maxdepth`、管道喂入的 rg 放行。
+- 接线两处、均在模型/客户通道之前：`shell-gate.ts` 的 `decide()` 在 **(c) 分类之前**封堵（classify/pm/operator 零调用；审计 branch/by=`preblock:*`）；`shell-judge.ts` 入口在建判断会话之前封堵（模型零调用、不排队、不计防循环；写 `shell-judge.preblock` 诊断）。拒绝理由逐字给出「落盘脚本」出路。
+- `shell-judge-prompt.ts` 新增【长内联与无界搜索——必须 deny】小节（含「有界搜索不拦」）。
+
+**测试**：新增 `test/编排/shell-command-guard.test.ts` 16 例；既有 risk-scope/read-discipline/读取预算/manual/并发/审计断言未改动未放宽。
+
+**验证**：`node --test "test/编排/**/*.test.ts"` → 635 计 / 635 过 / 0 红 / 0 skipped；`npm run typecheck` → exit 0。全量 3190 计 / 3185 过 / 3 红，均为其他角色在改的渲染/推理强度用例（与本批无关）。
+
+详见[变更记录](docs/change/2026-10-19_change_block-inline-and-unbounded-search.md)。
+
+## 2026-10-19 — 会话重建写权注记加系统标记（系统通知，不是角色发言）
+
+**来源**：客户反馈截图中的「会话已因边界更新重建；此前经确认发行的写权不会自动保留……」。客户原话「这个应该加一个标记啊，不然谁知道啊。」本批只改编排边界（`src/pipeline/orchestration/run-role.ts`、`test/编排/`、本角色文档），**未碰** `app/**`、门禁/写权逻辑、其他角色文件与 git 历史。
+
+**改了什么**
+- `REBUILT_SESSION_WRITE_PERMITS_NOTICE` 正文前加系统标记，改为：`【系统通知·会话重建】此前经确认发行的写权不会自动保留，如需写入请重新经 request_confirmation 确认。`——明确这是**系统注入的 notice，不是角色/客户发言**；原语义（重建 / 写权不会自动保留 / 可行恢复路径 `request_confirmation`）逐项保留，仍**不夹带任何授权语义**。常量文档注释同步说明标记来源与客户反馈。
+- 注入路径**未变**：notice 仍经 `queueModelNotice` 排入下一次 `send()` 的输入前缀（`run-role.ts:1271-1272`，`${notice}\n\n${text}`），送达一次即消费、不单独开轮、不触任何判定；写权/门禁语义不变。
+
+**测试**：`test/编排/session-handle.test.ts` F-5-opt1 例新增断言「notice 以 `【系统通知·会话重建】` 开头」；既有 `/写权不会自动保留/`、`/request_confirmation/` 与注入前缀/消费/保留断言继续满足，未放宽。跨角色只读核对 `test/桌面应用/boundary-refresh.test.ts`（按常量引用 + `includes("重建"/"不会自动保留"/"request_confirmation")`）不受影响，未改该文件。
+
+**验证**：`node --test "test/编排/**/*.test.ts"` → **619 计 / 619 过 / 0 红 / 0 skipped**；`npm run typecheck` → **exit 0**。
+
+**已知呈现差异（如实登记）**：桌面渲染层系统消息归类只认 `[系统·<子类>] ` 形态；本 notice 是客户消息的前缀、不是独立系统投递，改用该形态会把同一条回显里的客户正文整条归成系统 chip，故采用**正文内可见标记**（人/模型可见，不改 UI 归类）。若客户要求 UI 系统样式，需桌面角色扩展归类契约（跨角色，本批不越界）。详见[变更记录](docs/change/2026-10-19_change_rebuilt-session-notice-marker.md)。
+
 ## 2026-10-19 — 决策判断收敛为「意图漂移」判断（不再做架构/质量/证据充分性审查）
 
 **来源**：客户新反馈原话「决策审批也改一下，就是判断意图是否偏离了客户的出发点就行了。」这是对「替我决策」（proposal / appointment / acceptance）判断 agent 的定位修正：只判断决策是否偏离客户已确认的意图；工程质量、架构章节、测试覆盖、证据充分性、实现细节由 Draft/Proof 的工作流与验收负责。
