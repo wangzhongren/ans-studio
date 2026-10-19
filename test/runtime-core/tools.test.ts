@@ -56,6 +56,17 @@ test("schema 文案（客户 2026-10-16 su 预置裁定配套）：request_confi
   assert.match(text, /获准的唯一凭据是 `confirmed:true`/);
   assert.match(text, /未获同意/);
   assert.match(text, /不等于/);
+  // 2026-10-19 编排侧「呈现前 preview 完整性闸」（真机 op-2）配套：写盘卡应给显式 paths，
+  // preview 为**每一条**路径给出可核对正文/结构（标题/围栏说明作锚点 + 非空正文）；缺失时
+  // 系统在呈现前拒绝、不给客户看半张卡——正向钉住组卡指引，防描述回退。
+  assert.match(text, /显式 `paths`/, "写盘卡应提供显式 paths");
+  assert.match(text, /每一条/, "须要求逐路径（每一条）给出正文/结构");
+  assert.match(text, /### <路径>/, "须给出 Markdown 标题锚点示例");
+  assert.match(text, /代码围栏说明/, "须说明代码围栏说明也可作锚点");
+  assert.match(text, /锚点后紧跟.*非空正文\/代码/, "锚点后须紧跟非空正文/代码");
+  assert.match(text, /写入内容须与.*一致/, "写入内容须与预览正文一致");
+  assert.match(text, /呈现前拒绝该卡/, "缺失逐路径正文须在呈现前拒绝该卡");
+  assert.match(text, /不会先给客户看半张卡/, "不得把半张卡先给客户看");
 });
 
 test("schema 文案（G-1/A4）：dispatch_task 钉住「先落盘再派发」与「必读（按序）」按地址引用；必备语义逐字保留", () => {

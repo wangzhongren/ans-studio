@@ -209,23 +209,24 @@ test("arm 决策（I-1 + 补丁）：DESKTOP_SHELL_GATE_ARMED === true——(c) 
     /role\.builtIn === true \? undefined : this\.deps\.shellArming/.test(sessSrc),
     "session.ts：(c) 实件仍只给项目角色三层链（su 不自审）"
   );
-  // ——— su 审批档（客户裁定 2026-10-17：「只读的免审批，其他的要客户审批」＋「deny 也走客户审批」）———
+  // ——— 内置治理角色审批档（客户裁定 2026-10-17；2026-10-19 新规则扩至全部内置治理角色）———
   assert.ok(
-    /const shellOperatorOnly =\s*legacyBuiltIn && this\.deps\.shellArming && shellOperatorChannel/.test(sessSrc),
-    "session.ts：su 审批档 = single 内置角色（legacyBuiltIn）&& (c) 实件 && (a) 通道（缺件不 arm，fail-closed）"
+    /const shellOperatorOnly =\s*role\.builtIn === true && this\.deps\.shellArming && shellOperatorChannel/.test(sessSrc),
+    "session.ts：审批档 = 全部内置治理角色（role.builtIn === true）&& (c) 实件 && (a) 通道（缺件不 arm，fail-closed）"
   );
   assert.ok(
     /\.\.\.\(shellOperatorOnly \? \{ shellOperatorOnly \} : \{\}\)/.test(sessSrc),
     "session.ts：`shellOperatorOnly` 经 openRoleSession 透传"
   );
-  // 三权（评审 §5.6）：trio Convener 只读档——同一份 (c) 实件、不带 operator channel；single/su 不传。
+  // 2026-10-19：内置治理角色（尤其 Convener）不再走只读档——桌面既不构造也不注入 `shellReadonly`
+  // （两档并存会被编排互斥拒绝；只读档只剩其他调用方的类型兼容面）。
   assert.ok(
-    /const shellReadonly =\s*governanceFunction === "schedule" && this\.deps\.shellArming/.test(sessSrc),
-    "session.ts：只有 governanceFunction===\"schedule\"（Convener）构造只读档"
+    !/const shellReadonly =/.test(sessSrc),
+    "session.ts：不再构造只读档（全部内置治理角色统一审批档——convener 也不例外）"
   );
   assert.ok(
-    /\.\.\.\(shellReadonly \? \{ shellReadonly \} : \{\}\)/.test(sessSrc),
-    "session.ts：trio Convener 的只读档经 openRoleSession 透传"
+    !/\.\.\.\(shellReadonly \? \{ shellReadonly \} : \{\}\)/.test(sessSrc),
+    "session.ts：不再透传 shellReadonly（内置治理角色统一走 shellOperatorOnly）"
   );
   assert.ok(
     /import type \{ AssembleOperatorShellGateOptions, AssembleReadonlyShellGateOptions, RoutineShellPolicy \} from "\.\.\/\.\.\/src\/pipeline\/orchestration\/shell-arming\.ts"/.test(sessSrc),

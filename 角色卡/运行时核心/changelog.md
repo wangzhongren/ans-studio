@@ -1,5 +1,13 @@
 # 运行时核心变更记录
 
+## 2026-10-19 `request_confirmation` 组卡指引同步「preview 逐路径正文」呈现前完整性闸（已实施待验证）
+
+编排在 `run-role.ts` 接入 2026-10-19 真机 op-2 的**呈现前完整性闸**：写盘类确认卡声明了写入路径（显式 `paths` 优先，否则 preview 声明）时，preview 必须为**每一条**路径给出可核对正文/结构，否则卡片不呈现、工具返回失败。为避免模型反复试错，本角色同步工具文案（描述只在 `schema.ts`，`tools.ts` 经 `describeTool` 装配、本身无文案）：
+
+①`src/provider/runtime/schema.ts`：`request_confirmation` 的 `description` 补「写盘卡应提供显式 `paths`；preview 为每一条路径给出可核对正文/结构——路径作为 Markdown 标题（如 `### <路径>`）或代码围栏说明（如 ```md <路径>```），锚点后紧跟非空正文/代码；**缺失任一路径正文时系统在呈现前拒绝该卡并要求补全，不会先给客户看半张卡**」；`preview`/`paths` 参数说明同步补逐路径要求（`paths` 仍**可选**、`required` 仍只有 `title`，未改参数语义）；`promptGuidelines` 原「优先用 paths」改为「**应**提供显式 `paths: string[]`」（保留「只放真正要写目标、不得含仅引用文件」），新增一条：逐路径锚点 + 非空正文（到下一锚点或 preview 末尾）、**写入内容须与 preview 正文一致且范围不得超出所预览内容**、缺失时呈现前拒绝/工具返回失败并要求补全、一次组卡完整不要反复试错；既有指引（仅 su 四棵预置目录、写盘一律先确认、`confirmed:true` 唯一凭据、列出路径≠获准、未获同意不写盘）逐字保留。②`src/provider/runtime/tools.ts`：只更新 `makeRequestConfirmationTool` JSDoc 记录编排侧闸与 `declined` 如实转达，无行为/参数变化。
+
+**测试**：`test/runtime-core/tools.test.ts` schema 文案用例补 8 条断言（显式 paths、每一条、`### <路径>`、代码围栏说明、锚点后非空正文/代码、写入一致、呈现前拒绝、半张卡禁令）；`test/runtime-core/confirmation-paths.test.ts` 补 3 条描述级断言。`node --test "test/runtime-core/**/*.test.ts"`：**204 计 / 203 过 / 0 红 / 1 跳过**（跳过＝`boundary-write-guard` 的 Windows 平台条件用例，darwin 按设计 skip）。`npm run typecheck`：**exit 0（0 错）**。跨角色抽查 `node --test test/pi-adapter/interactive-execution-mode.test.ts`：**5/5 过**（其文案断言仍满足）。编排侧文件未改；未跑真实模型/凭据/网络；未 git 提交。变更记录见 [docs/change/2026-10-19_change_request-confirmation-guidelines.md](docs/change/2026-10-19_change_request-confirmation-guidelines.md)。
+
 ## 2026-10-18 客户需求确认卡 `intent-confirm`（共享契约层，已实施待验证）
 
 客户「都按推荐的来」：trio 增加第五个内置治理角色，并给主理加「需求确认卡」。本角色只落共享契约层，不改角色注册表/UI/桌面。

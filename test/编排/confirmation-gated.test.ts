@@ -60,10 +60,13 @@ const ANS_REL = ".ans/project.json";
 const MANIFEST_REL = "docs/bootstrap-manifest.md";
 const GENESIS_SOURCE =
   "cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/）";
-/** 预览文本：把**将要写出的具体路径**列出（发行从呈现文本里提取——粗体/反引号包裹都能提取）。 */
+/** 预览文本：把**将要写出的具体路径**列出（发行从呈现文本里提取——粗体/反引号包裹都能提取）。
+ *  2026-10-19 起：每条声明路径还要带可核对正文（标题锚点 + 正文行），否则编排在呈现前拒绝发卡。 */
 const PREVIEW_X =
-  "# 角色：边界守门员 X\n\n职责：……\n\n" +
-  "**将写出**：`角色卡/X/role-card.md`、`角色卡/X/boundary.yaml`、`角色卡/X/memo.md`";
+  "将写出：\n- 角色卡/X/role-card.md\n- 角色卡/X/boundary.yaml\n- 角色卡/X/memo.md\n\n" +
+  "## 角色卡/X/role-card.md\n# 角色：边界守门员 X\n\n职责：……\n\n" +
+  "## 角色卡/X/boundary.yaml\nrole: X\nentries: []\n\n" +
+  "## 角色卡/X/memo.md\n# X 备忘录\n";
 
 /** 新建临时根，用后清理。 */
 async function withTarget<T>(fn: (ctx: { root: string; target: string }) => Promise<T>): Promise<T> {
@@ -228,7 +231,7 @@ test("发行精确性：预览只列出 role-card.md → boundary.yaml 仍被拒
     const script: ToolCall[] = [
       {
         name: "request_confirmation",
-        args: { title: "创建角色 X", preview: "将写出：`角色卡/X/role-card.md`（仅此一个文件）" },
+        args: { title: "创建角色 X", preview: "将写出：`角色卡/X/role-card.md`（仅此一个文件）\n\n## 角色卡/X/role-card.md\n# 角色：X\n" },
       },
       ...WRITE_SCRIPT,
     ];
@@ -253,7 +256,9 @@ test("越界不发行：预览里的 src/ 路径被校验拒绝（写集有界�
         name: "request_confirmation",
         args: {
           title: "创建角色 X（另附一份草稿文件）",
-          preview: "将写出：`角色卡/X/role-card.md`；另：`src/evil.ts`",
+          preview:
+            "将写出：\n- 角色卡/X/role-card.md\n- src/evil.ts\n\n" +
+            "## 角色卡/X/role-card.md\n# 角色：X\n\n## src/evil.ts\n// 越界\n",
         },
       },
       { name: "write_file", args: { path: "角色卡/X/role-card.md", content: "# 角色：X\n" } },

@@ -112,6 +112,8 @@ export function establishGovernanceRecord(input: GovernanceRecordInput): Promise
 
 **来源**：PM 评审 `2026-10-17_design_su-shell-approval-review.md`（approved）。客户裁定：只读白名单免审批，其余（含原硬拒 deny）逐条客户批准。
 
+> **2026-10-19 起适用范围扩大**：客户新规则要求所有角色都可运行 shell（含读写与任意命令）但一律提交审批。五个内置治理角色（`liaison`/`rapporteur`/`nominator`/`convener`/`verifier`）与 `su` 的能力位统一为 `shell: "operator-approve"`，均由本档装配（能力位驱动，不按角色 id）。接口形状不变；`SU_APPROVAL_REASON_PREFIX = "su-审批档"` 与 `by` 后缀 `（su 审批档）` 为历史命名，现也用于其余四个角色。详见 [变更记录](docs/change/2026-10-19_change_all-roles-shell-approval-sync.md)。
+
 **`src/common/编排/shell-gate.ts` 公开面**：
 
 ```ts

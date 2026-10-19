@@ -5,7 +5,8 @@
 //   · 三态 allow / deny / manual 与 §6.4 reasonCode（含 deny 有/无替代方案、model-manual）；
 //   · 读取损伤（read-denied / budget / read-truncated）→ allow 降 manual，deny 不变；
 //   · 客户 D1：tier=deny 且 allow → hardDenyOverride + label，不转换；
-//   · 超时/中止、超时前已捕获结论保留、迟到 bindRole dispose、防循环（allow 清零/manual 不递增）、busy；
+//   · 超时/中止、超时前已捕获结论保留、迟到 bindRole dispose、防循环（allow 清零/manual 不递增）；
+//     并发池（有界 FIFO 排队/排队超时/排队中止/队列有界/闭包隔离）见 shell-judge-concurrency.test.ts；
 //   · 合成角色边界为空、工具集恰三项（无写/shell/交互/派发）、deny-all 写门禁；
 //   · 审计 `OperatorOutcome.judge` 透传（含 tier/hardDenyOverride）。
 //
@@ -506,7 +507,7 @@ test("迟到 bindRole：超时后会话才返回 → 立即 dispose（不泄漏�
   assert.ok(seen.disposed >= 1, "迟到 bindRole 返回的会话必须被 dispose");
 });
 
-// —————————————————————— 5. 防循环 / busy ——————————————————————
+// —————————————————————— 5. 防循环 ——————————————————————
 
 test("防循环：同一命令连续 deny 达上限 → manual/retry-capped（不调用模型）", async () => {
   const { judge, seen } = makeJudge({ report: { verdict: "deny", reason: "不必要" } }, { maxDeny: 2 });
@@ -541,16 +542,6 @@ test("防循环：allow 清零计数、manual 不递增", async () => {
   mode = "deny";
   assert.equal((await judge2(request())).verdict, "deny"); // 2
   assert.equal((await judge2(request())).reasonCode, "retry-capped");
-});
-
-test("busy：已有一次判断在进行时，第二次直接 manual/unavailable", async () => {
-  const { judge } = makeJudge({ report: { verdict: "allow", reason: "任务需要" }, settle: false }, { timeoutMs: 40 });
-  const first = judge(request({ toolCallId: "call-1" }));
-  const second = await judge(request({ toolCallId: "call-2" }));
-  assert.equal(second.verdict, "manual");
-  assert.equal(second.reasonCode, "unavailable");
-  assert.match(second.reason ?? "", /正忙/);
-  await first; // 等超时收口，避免悬挂
 });
 
 // —————————————————————— 6. 支持矩阵 / 不可用 / 上下文 ——————————————————————

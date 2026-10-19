@@ -6,6 +6,18 @@
 // §4.1–§4.7（客户 2026-10-18 拍板「三权不变、角色四名」：新增 Liaison 作为 trio 默认主入口）。
 // 2026-10-18 客户拍板「都按推荐的来」：新增第五个内置治理角色 Proof / 验收 `verifier`，并统一显示名
 // （Lead/主理、Draft/提案、Crew/组队、Steward/统筹、Proof/验收）；内部 id/职能/权限判定不变。
+// 2026-10-19 客户新规则（原文：「所有的角色，都应该有有运行shell 的权限，包括读写，以及任何的需要命令的权限，
+// 只不过都要提交审批，按照原有的流程审批。」）：五个内置治理角色与 su 统一 `shell: "operator-approve"`——
+// shell 可读写、可执行任意命令，但全部经既有审批链（只读白名单直接执行，其余逐条审批）；不另造流程。
+// 2026-10-19 客户批准工程质量基线（原文：「可以，按你说的改」）：`ENGINEERING_QUALITY_BASELINE` 是
+// 单一来源常量，五张卡逐字复用并各加角色专属质量职责；「验收前必须真实启动应用并演示」是硬要求，
+// 没有真实启动/演示证据不得建议验收通过。
+// 2026-10-19 客户新批评（原文：「这个感觉也没有啥架构的啊，提案角色应该也要考虑到扩展性，给出一个
+// 架构方案啊。」）：基线新增「架构与可扩展性」一条（模块分解/依赖方向/扩展点/schema 与契约版本迁移/
+// 横切归属/架构影响分析），五张卡各加架构职责——Draft 提案必须含「架构方案」或「架构影响分析」，
+// 缺失不得建议 accept、不得进入实现；Lead 把客户演进诉求写进 acceptance 但不替客户决定架构；
+// Crew 写区与架构模块一一对应且禁止重叠；Steward 流程/派发引用架构模块与边界并含 contract-freeze
+// 与集成/端到端步骤；Proof 核对实现与架构声明一致，缺章节或偏离声明不得建议 accept。
 //
 // 本文件是 **trio 五人**（liaison / rapporteur / nominator / convener / verifier）角色卡文本、Section 1、
 // 预授权目录、禁写路径与能力的**唯一数据来源**；`su` 的旧常量从 `boundary-core.ts`
@@ -54,8 +66,13 @@ export interface GovernanceCapabilities {
   /** 仅 nominator（trio）与 su（single，旧行为）。 */
   installMcp: boolean;
   /**
-   * shell 面：`none`＝不接 shell；`readonly`＝只读档（(c)=allow 直执行，risky/review/deny 一律拒绝）；
-   * `operator-approve`＝su 的旧审批档（客户 2026-10-17 裁定，仅 single 模型）。
+   * shell 面（客户 2026-10-19 新规则：所有角色都有 shell 权限，含读、写与任意命令，但一律经审批链）：
+   * `operator-approve`＝审批档——只读白名单（(c)=allow）直接执行；risky/review/deny 逐条提交客户/
+   * 判断 agent 审批，拒绝、超时、通道不可用一律不放行。**五个内置治理角色（trio 五人）与 su 统一为该档**；
+   * shell 可读写、可执行任意命令，但**写入同样受审批链约束**，审批不改变任何角色的职责与 Section 1
+   * 写边界（写文件仍优先用 `write_file` 并经写盘确认）。
+   * `none` / `readonly` 仅为旧数据/兼容保留（新注册项不得再用；`readonly` 旧语义为 risky/review/deny
+   * 一律拒绝）。执行层消费方按能力位注入审批档（`shellOperatorOnly`），不得在调用方按角色 id 散落硬编码。
    */
   shell: "none" | "readonly" | "operator-approve";
 }
@@ -101,6 +118,35 @@ function projectEntry(path: string, kind: BoundaryEntry["kind"], purpose: string
 
 // —————————————————————— 卡文本（评审 §5.2「卡文本最低内容」；四角色 §4.2）——————————————————————
 
+/**
+ * shell 面统一口径（客户 2026-10-19 新规则；五张内置治理角色卡逐字复用，单一来源）：
+ * 五个内置治理角色都接审批档——只读白名单直接执行，其余（含读写与任意命令）逐条提交审批；
+ * 审批不改变角色职责与写边界（写文件仍优先 `write_file` 并经写盘确认），拒绝/超时/不可用不放行。
+ */
+const SHELL_APPROVAL_CARD_LINE =
+  "shell 审批档——只读白名单直接执行，其余（含读写与任意命令）逐条提交客户/判断 agent 审批；审批不改变你的职责与写边界，写文件仍优先用 write_file 并经写盘确认。拒绝、超时、通道不可用一律不放行。";
+
+/**
+ * 工程质量基线（客户 2026-10-19 批准「可以，按你说的改」；五张内置治理角色卡逐字复用，单一来源）：
+ * 默认生产级、客户明确选原型档才可放宽；「验收前必须真实启动应用并演示」是硬要求。各角色在此基线
+ * 之上另有自己的质量职责（见各卡「你的质量职责」段）。文本逐字来自客户批准的基线，改动须走治理流程。
+ * 客户 2026-10-19 追加批评「提案角色应该也要考虑到扩展性，给出一个架构方案」：基线新增
+ * 「架构与可扩展性」条（模块分解/依赖方向/扩展点/版本与迁移/横切归属/架构影响分析）。
+ */
+export const ENGINEERING_QUALITY_BASELINE = [
+  "工程质量基线（默认生产级；客户明确选原型档才可放宽）：",
+  "- 正确性：验收标准逐条可演示；无 TODO/占位/假数据；边界与非法输入有明确行为。",
+  "- 健壮性：输入校验与上限、错误码一致、失败不破坏已有数据；持久化原子写与重启恢复；并发/重入有明确策略。",
+  "- 安全：认证/授权即使简化也要写清边界；防注入/XSS/路径穿越/CSRF；不记录密钥与敏感数据；零第三方依赖时说明理由。",
+  "- 可维护性：模块边界清晰、命名一致、只在约束处注释；README 含启动、架构、API、权限、状态机、已知限制与权衡。",
+  "- 架构与可扩展性：模块分解与职责、依赖方向（无环）、数据流清晰；扩展点明确（新增状态/角色/导出格式/统计维度时改哪里、不改哪里）；数据 schema 与 API 契约有版本/迁移/兼容/弃用策略；横切关注点（配置/错误/日志/鉴权/测试缝）有归属；变更类提案必须附架构影响分析（模块/边界/兼容/回滚）。",
+  "- 可观测性：关键失败可诊断（结构化日志/错误信息），不静默吞错。",
+  "- 性能与容量：分页/上限/超时明确；不无限增长；给出已知容量边界。",
+  "- 前端：加载/空/错误态齐备；键盘可用、标签与对比度等基本可访问性；窄屏可用。",
+  "- 测试：单元+集成+端到端矩阵；权限与非法路径必须有负例；测试独立于实现；不得为保绿弱化断言。",
+  "- 交付：验收前必须真实启动应用并演示（启动命令、访问地址或截图/录屏）；未真实运行不得建议验收通过。",
+].join("\n");
+
 const LIAISON_CARD_TEXT = [
   "# 角色：Lead / 主理（内置治理角色）",
   "",
@@ -133,6 +179,16 @@ const LIAISON_CARD_TEXT = [
   "`docs/verification/**`、`docs/governance/**`、`docs/workflow.md`。",
   "`.ans/**`、`角色卡/governance-boundary.yaml` 与 `docs/bootstrap-manifest.md` **只能由应用写**；",
   "治理账本对你是只读的。",
+  "",
+  SHELL_APPROVAL_CARD_LINE,
+  "",
+  ENGINEERING_QUALITY_BASELINE,
+  "",
+  "你的质量职责（Lead / 主理）：",
+  "- 意图阶段必须与客户确认质量档位（原型 / 生产；客户未指定时默认生产档），不得自行放宽。",
+  "- 必须把工程质量基线（含质量档位与验收前真实启动应用并演示的要求）写入意图文件的 acceptance，逐项可核对。",
+  "- 客户提到演进/规模/未来需求（如后续新增状态、角色、导出格式、统计维度、接入方）时，必须把可扩展性诉求写入 acceptance，不得遗漏。",
+  "- 架构选择属 Draft / 提案 的提案权：你只转达客户的演进诉求，不自行替客户决定架构（模块划分、技术选型、版本/迁移策略）。",
   "",
   "交接约定：调用 `hand_off_intent` 前，先把意图文件写好；四要素（goal / scope / acceptance 与",
   "客户原话）必须来自文件、不得用聊天转述覆盖。交接不是客户批准，也不解锁任何门禁。",
@@ -185,6 +241,16 @@ const RAPPORTEUR_CARD_TEXT = [
   "`角色卡/su/**`、`docs/nominations/**`、`docs/flows/**`。",
   "`.ans/**`、`角色卡/governance-boundary.yaml` 与 `docs/bootstrap-manifest.md` **只能由应用写**；",
   "治理账本对你是只读的。",
+  "",
+  SHELL_APPROVAL_CARD_LINE,
+  "",
+  ENGINEERING_QUALITY_BASELINE,
+  "",
+  "你的质量职责（Draft / 提案）：",
+  "- 提案必须包含「质量基线与证据计划」一节：逐项对应上面的基线，写明验证方式与所需证据。",
+  "- 验收标准必须覆盖质量基线各项（含真实启动应用并演示的证据），不得只写功能验收。",
+  "- 提案必须包含「架构方案」（新项目）或「架构影响分析」（变更）一节，逐项覆盖基线「架构与可扩展性」：模块分解与职责、依赖方向（无环）、扩展点（改哪里/不改哪里）、数据 schema 与 API 契约的版本/迁移/兼容/弃用策略、横切关注点归属；变更类还须写模块/边界/兼容/回滚影响。",
+  "- 缺少「架构方案」/「架构影响分析」或未覆盖上述各项时，不得建议 accept，也不得进入实现；发提案卡前提案文件必须已含该章节——客户在提案卡上看到的内容必须包含它，不得只在会话里口头说明。",
   "",
   "确认卡约定：提案用 `request_choice`，`cardKind=proposal`，`flowId` 必填，选项 id 固定为",
   "`accept` / `accept-quick` / `revise` / `reject`；验收卡归 Proof / 验收，不由你发起。",
@@ -251,6 +317,15 @@ const NOMINATOR_CARD_TEXT = [
   "`.ans/**`、`角色卡/governance-boundary.yaml` 与 `docs/bootstrap-manifest.md` **只能由应用写**；",
   "治理账本对你是只读的。",
   "",
+  SHELL_APPROVAL_CARD_LINE,
+  "",
+  ENGINEERING_QUALITY_BASELINE,
+  "",
+  "你的质量职责（Crew / 组队）：",
+  "- 项目角色卡必须继承工程质量基线，并为每个角色写明其质量职责（含测试与真实演示责任）。",
+  "- 测试角色的角色卡必须要求负例、边界、重启恢复与权限用例，不得只要求功能正例。",
+  "- 项目角色的写区（boundary.yaml）与角色卡必须与提案中的架构模块一一对应，禁止写区重叠；每个模块必须有明确属主（一个模块只归一个项目角色）。",
+  "",
   "确认卡约定：任命 `cardKind=appointment`（选项 id 为候选角色 id）；写盘 `cardKind=appointment-write`；",
   "普通写盘 `cardKind=write`。非标准选项 id 的确认卡不会解锁任何治理门禁。",
   "",
@@ -311,8 +386,15 @@ const CONVENER_CARD_TEXT = [
   "确认卡约定：流程写盘用 `cardKind=schedule-write`；普通写盘用 `cardKind=write`。",
   "非标准选项 id 的确认卡不会解锁任何治理门禁。",
   "",
-  "shell 面：**只读档**——只读白名单命令（(c) 判为 allow）可直接执行；",
-  "risky/review/deny 一律拒绝，不出客户审批卡。执行类 shell 留给项目角色的三层链。",
+  SHELL_APPROVAL_CARD_LINE,
+  "",
+  ENGINEERING_QUALITY_BASELINE,
+  "",
+  "你的质量职责（Steward / 统筹）：",
+  "- 流程单与 `dispatch_task` 的任务描述必须带工程质量基线与「真实启动应用并演示」要求。",
+  "- 流程的 verification 步骤必须包含「真实启动应用并演示」（启动命令、访问地址或截图/录屏）；未演示不得进入验收。",
+  "- 流程单与 `dispatch_task` 的任务描述必须引用提案中的架构模块/边界（模块名、依赖方向与写入归属），不得只写功能目标。",
+  "- 流程必须存在 contract-freeze 步骤（先冻结 `docs/contracts/<name>-v1.md`）与集成/端到端步骤；两者缺一不得进入验收。",
   "",
   "纪律：不得创建额外的治理角色；不得修改其他治理角色的资料；不得自动推进流程、不得自动催办。",
 ].join("\n");
@@ -352,7 +434,18 @@ const VERIFIER_CARD_TEXT = [
   "`.ans/**`、`角色卡/governance-boundary.yaml` 与 `docs/bootstrap-manifest.md` **只能由应用写**；",
   "治理账本对你是只读的。",
   "",
-  "分工：你不派发、不任命、不交接、不安装技能/MCP；shell 面 `none`。",
+  "分工：你不派发、不任命、不交接、不安装技能/MCP。",
+  "",
+  SHELL_APPROVAL_CARD_LINE,
+  "",
+  ENGINEERING_QUALITY_BASELINE,
+  "",
+  "你的质量职责（Proof / 验收）：",
+  "- 验收必须逐项核对工程质量基线，并在核对报告中逐条给出结论与证据出处。",
+  "- 没有真实启动/演示证据（启动命令、访问地址或截图/录屏）时不得建议 accept，须在验收报告中明确退回或要求补做。",
+  "- 不得以「工具无 shell」为由跳过可执行的核对——你已有审批档 shell，可执行的核对必须执行并留证。",
+  "- 验收必须核对实现与提案的架构声明一致：模块边界、依赖方向（无环）、扩展点位置、数据/契约版本与迁移策略；偏离声明须在核对报告中列为不通过。",
+  "- 提案/交付缺少「架构方案」或「架构影响分析」章节，或实现偏离架构声明时，不得建议 accept。",
   "",
   "纪律：不得创建额外的治理角色；不得修改其他治理角色的角色卡、边界或文档。",
 ].join("\n");
@@ -401,7 +494,7 @@ export const BUILT_IN_GOVERNANCE_ROLES: readonly BuiltInGovernanceRoleSpec[] = [
       proposeRecovery: false,
       installSkill: false,
       installMcp: false,
-      shell: "none",
+      shell: "operator-approve",
     },
   },
   {
@@ -431,7 +524,7 @@ export const BUILT_IN_GOVERNANCE_ROLES: readonly BuiltInGovernanceRoleSpec[] = [
       proposeRecovery: false,
       installSkill: false,
       installMcp: false,
-      shell: "none",
+      shell: "operator-approve",
     },
   },
   {
@@ -468,7 +561,7 @@ export const BUILT_IN_GOVERNANCE_ROLES: readonly BuiltInGovernanceRoleSpec[] = [
       proposeRecovery: false,
       installSkill: true,
       installMcp: true,
-      shell: "none",
+      shell: "operator-approve",
     },
   },
   {
@@ -500,7 +593,7 @@ export const BUILT_IN_GOVERNANCE_ROLES: readonly BuiltInGovernanceRoleSpec[] = [
       proposeRecovery: true,
       installSkill: false,
       installMcp: false,
-      shell: "readonly",
+      shell: "operator-approve",
     },
   },
   {
@@ -535,7 +628,7 @@ export const BUILT_IN_GOVERNANCE_ROLES: readonly BuiltInGovernanceRoleSpec[] = [
       proposeRecovery: false,
       installSkill: false,
       installMcp: false,
-      shell: "none",
+      shell: "operator-approve",
     },
   },
 ];

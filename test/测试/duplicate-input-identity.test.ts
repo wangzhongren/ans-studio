@@ -39,7 +39,8 @@ for (const runtime of ["pi", "codex", "claude"] as const) {
             const definition = options.tools.find(tool => tool.name === "request_confirmation");
             assert.ok(definition);
             const result = await definition.handler({ name: definition.name,
-              args: { title: "identity fixture", preview: "docs/X/fixture.md" },
+              // 2026-10-19 呈现前完整性闸：声明路径后须有可核对正文，卡片才会呈现到客户通道。
+              args: { title: "identity fixture", preview: "docs/X/fixture.md\n\n夹具正文：用于身份合并测试的确认内容。\n" },
               signal: new AbortController().signal, toolCallId });
             assert.equal(result.ok, false, "a real declined confirmation must remain declined");
             // This is an actual assistant output with an old echo-like prefix.

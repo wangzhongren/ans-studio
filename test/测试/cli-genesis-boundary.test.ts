@@ -107,7 +107,18 @@ test("创世链路面（确认制）：governCommand + 假适配器 + 确认桩�
   const inj = await loadInjection(dir);
   // 旧 single 创世链（新空目录默认 trio；CLI 的 trio 注入见独立套件与已知缺陷报告）。
   const singleInj = { ...inj, project: { ...inj.project, governanceModel: "single" as const } };
-  const preview = ["将创建角色 X，写出：", "角色卡/X/role-card.md", "角色卡/X/boundary.yaml"].join("\n");
+  // 2026-10-19 呈现前完整性闸：每条声明写入路径后须紧跟可核对正文（否则卡片不呈现、路径不发行）。
+  const preview = [
+    "将创建角色 X，写出：",
+    "角色卡/X/role-card.md",
+    "",
+    "# 角色：X",
+    "",
+    "角色卡/X/boundary.yaml",
+    "",
+    "role: X",
+    "entries: []",
+  ].join("\n");
   const script: ToolCall[] = [
     // 未确认先试写：越界（src/）——应在写入之前被拒。
     { name: "write_file", args: { path: "src/evil.ts", content: "// 越界\n" } },

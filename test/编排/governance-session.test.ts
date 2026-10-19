@@ -272,7 +272,7 @@ test("openGovernanceSession：single 传 --function / 三权角色 → 明确拒
   });
 });
 
-test("默认提示词：trio 按 function 追加各自纪律（不写「已批准」）；single 保留旧文案", async () => {
+test("默认提示词：trio 按 function 追加各自纪律（不写「已批准」）；single 保留旧文案；两套均含工程质量基线", async () => {
   await withRoot(async (root) => {
     const promptCapturing = () => {
       const captured: { prompt?: string } = {};
@@ -299,11 +299,11 @@ test("默认提示词：trio 按 function 追加各自纪律（不写「已批�
 
     const trio = trioProject(root);
     const expectations: Array<["liaison" | "proposal" | "nomination" | "schedule" | "verification", RegExp[]]> = [
-      ["liaison", [/沟通权纪律（Lead \/ 主理/, /docs\/intents\//, /hand_off_intent/, /交接 ≠ 客户批准/, /intent-confirm/]],
-      ["proposal", [/提案权纪律（Draft \/ 提案/, /docs\/proposals\//, /cardKind=proposal/, /不拥有最终批准权/]],
+      ["liaison", [/沟通权纪律（Lead \/ 主理/, /docs\/intents\//, /hand_off_intent/, /交接 ≠ 客户批准/, /intent-confirm/, /质量档位/, /原型档/]],
+      ["proposal", [/提案权纪律（Draft \/ 提案/, /docs\/proposals\//, /cardKind=proposal/, /不拥有最终批准权/, /证据计划/, /工程质量基线/, /架构方案/, /架构影响分析/, /扩展点/, /模块分解与职责/]],
       ["nomination", [/提名权纪律（Crew \/ 组队/, /docs\/nominations\//, /appointment/, /提名 ≠ 任命/]],
-      ["schedule", [/编排权纪律（Steward \/ 统筹/, /docs\/flows\//, /dispatch_task/, /flowId.*stepId/]],
-      ["verification", [/验收权纪律（Proof \/ 验收/, /docs\/verification\//, /cardKind=acceptance/, /验收 ≠ 批准/]],
+      ["schedule", [/编排权纪律（Steward \/ 统筹/, /docs\/flows\//, /dispatch_task/, /flowId.*stepId/, /真实启动/, /演示/, /架构与边界/, /契约冻结/, /扩展点必须有覆盖步骤/]],
+      ["verification", [/验收权纪律（Proof \/ 验收/, /docs\/verification\//, /cardKind=acceptance/, /验收 ≠ 批准/, /未被真实启动.*不得建议 accept/, /架构核对/, /模块边界与依赖方向未被破坏/, /schema\/API 版本与/]],
     ];
     for (const [fn, patterns] of expectations) {
       const { captured, factory } = promptCapturing();
@@ -314,6 +314,25 @@ test("默认提示词：trio 按 function 追加各自纪律（不写「已批�
       assert.equal(result.code, EXIT_OK, fn);
       assert.ok(captured.prompt !== undefined);
       for (const pattern of patterns) assert.match(captured.prompt!, pattern, `${fn} 提示词`);
+      assert.match(
+        captured.prompt!,
+        /工程质量基线（默认生产级；客户明确选原型档才可放宽）/,
+        `${fn} 提示词必须含质量基线关键字`,
+      );
+      assert.match(
+        captured.prompt!,
+        /未真实运行不得建议验收通过/,
+        `${fn} 提示词必须含「未真实运行不得建议验收通过」`,
+      );
+      assert.match(captured.prompt!, /架构与可扩展性：/, `${fn} 提示词基线必须含架构与可扩展性条`);
+      assert.match(
+        captured.prompt!,
+        /架构与可扩展性要求（提案 \/ 流程 \/ 验收三阶段）/,
+        `${fn} 提示词必须含架构与扩展性要求段`,
+      );
+      assert.match(captured.prompt!, /Draft（提案）[^\n]*「架构方案」/, `${fn} 提示词必须含 Draft 架构职责`);
+      assert.match(captured.prompt!, /Steward（流程 \/ 派发）/, `${fn} 提示词必须含 Steward 架构职责`);
+      assert.match(captured.prompt!, /Proof（验收）/, `${fn} 提示词必须含 Proof 架构职责`);
       assert.doesNotMatch(captured.prompt!, /已批准|已授权/, `${fn} 提示词不得写「已批准/已授权」`);
     }
 
@@ -325,12 +344,32 @@ test("默认提示词：trio 按 function 追加各自纪律（不写「已批�
     assert.equal(single.code, EXIT_OK);
     assert.match(captured.prompt!, /以治理身份在\*\*项目治理边界\*\*内工作/, "single/su 旧文案逐字保留");
     assert.match(captured.prompt!, /docs\/su\/.*为预授权目录/, "su 预授权文案不变");
+    assert.match(
+      captured.prompt!,
+      /工程质量基线（默认生产级；客户明确选原型档才可放宽）/,
+      "single/su 提示词必须含质量基线关键字",
+    );
+    assert.match(
+      captured.prompt!,
+      /未真实运行不得建议验收通过/,
+      "single/su 提示词必须含「未真实运行不得建议验收通过」",
+    );
+    assert.match(captured.prompt!, /意图阶段先与客户确认质量档位/, "single/su 阶段要求覆盖意图档位");
+    assert.match(captured.prompt!, /架构与可扩展性：/, "single/su 基线必须含架构与可扩展性条");
+    assert.match(
+      captured.prompt!,
+      /架构与可扩展性要求（提案 \/ 流程 \/ 验收三阶段）/,
+      "single/su 提示词必须含架构与扩展性要求段",
+    );
+    assert.match(captured.prompt!, /Draft（提案）[^\n]*「架构方案」/, "single/su 必须含 Draft 架构职责");
+    assert.match(captured.prompt!, /Steward（流程 \/ 派发）/, "single/su 必须含 Steward 架构职责");
+    assert.match(captured.prompt!, /Proof（验收）/, "single/su 必须含 Proof 架构职责");
   });
 });
 
 // —————————————————————— ② 能力矩阵 ——————————————————————
 
-test("能力矩阵（注册表）：Rapporteur/Nominator/Convener/su 的工具能力与 shell 面", async () => {
+test("能力矩阵（注册表）：Rapporteur/Nominator/Convener/su 的工具能力与 shell 审批档", async () => {
   await withRoot(async (root) => {
     const project = trioProject(root);
     const provide = {
@@ -375,7 +414,7 @@ test("能力矩阵（注册表）：Rapporteur/Nominator/Convener/su 的工具�
         effective: "next-session" as const,
       }),
       customerInput: (() => ({ outcome: "declined" as const })) as CustomerInputFn,
-      shellReadonly: { classifyShell, rules: defaultShellRules() },
+      shellOperatorOnly: { classifyShell, rules: defaultShellRules(), operatorChannel: () => ({ outcome: "deny" as const }) },
     };
 
     const r = {} as Captured;
@@ -385,7 +424,8 @@ test("能力矩阵（注册表）：Rapporteur/Nominator/Convener/su 的工具�
     );
     await rh.dispose();
     assert.ok(r.caps?.customerInput, "三人都有客户确认通道");
-    for (const key of ["dispatchTask", "roleStatus", "sessionTail", "proposeRecovery", "installSkill", "installMcp", "shellGate", "reportHandback"] as const) {
+    assert.equal(typeof r.caps?.shellGate, "function", "rapporteur（operator-approve）应 arm 审批档 shellGate");
+    for (const key of ["dispatchTask", "roleStatus", "sessionTail", "proposeRecovery", "installSkill", "installMcp", "reportHandback"] as const) {
       assert.equal(r.caps?.[key], undefined, `rapporteur 不应注入 ${key}`);
     }
 
@@ -398,7 +438,8 @@ test("能力矩阵（注册表）：Rapporteur/Nominator/Convener/su 的工具�
     for (const key of ["installSkill", "uninstallSkill", "installMcp", "uninstallMcp"] as const) {
       assert.ok(n.caps?.[key], `nominator 应注入 ${key}`);
     }
-    for (const key of ["dispatchTask", "roleStatus", "sessionTail", "proposeRecovery", "shellGate"] as const) {
+    assert.equal(typeof n.caps?.shellGate, "function", "nominator（operator-approve）应 arm 审批档 shellGate");
+    for (const key of ["dispatchTask", "roleStatus", "sessionTail", "proposeRecovery"] as const) {
       assert.equal(n.caps?.[key], undefined, `nominator 不应注入 ${key}`);
     }
 
@@ -434,6 +475,65 @@ test("能力矩阵（注册表）：Rapporteur/Nominator/Convener/su 的工具�
     for (const key of ["dispatchTask", "roleStatus", "sessionTail", "proposeRecovery", "installSkill", "installMcp", "shellGate"] as const) {
       assert.ok(s.caps?.[key], `su（single）应注入 ${key}（旧行为）`);
     }
+  });
+});
+
+// 客户 2026-10-19 新规则：「所有的角色，都应该有有运行shell 的权限，包括读写，以及任何的需要命令的
+// 权限，只不过都要提交审批，按照原有的流程审批。」——注册表把五个内置治理角色与 su 统一为
+// `shell: "operator-approve"`。本用例钉住执行层：审批档按**能力位**（而非角色 id）装配；能力位缺席
+// （项目角色）时误传仍不 arm（既有守卫不放宽）。
+test("shell 审批档（2026-10-19）：五个内置治理角色 operator-approve ⇒ 均 arm；项目角色误传 ⇒ 不 arm", async () => {
+  await withRoot(async (root) => {
+    const trio = trioProject(root);
+    const shellOperatorOnly = {
+      classifyShell,
+      rules: defaultShellRules(),
+      operatorChannel: () => ({ outcome: "deny" as const }),
+    };
+
+    for (const roleId of ["liaison", "rapporteur", "nominator", "convener", "verifier"] as const) {
+      const captured = {} as Captured;
+      const handle = await openRoleSession(
+        { roleId, project: withBuiltIn(trio, roleId), shellOperatorOnly },
+        { createAdapter: capturingFactory(captured) },
+      );
+      await handle.dispose();
+      assert.equal(
+        typeof captured.caps?.shellGate,
+        "function",
+        `${roleId}（operator-approve）应 arm 审批档 shellGate`,
+      );
+    }
+
+    const suCaptured = {} as Captured;
+    const suHandle = await openRoleSession(
+      { roleId: "su", project: singleProject(root), shellOperatorOnly },
+      { createAdapter: capturingFactory(suCaptured) },
+    );
+    await suHandle.dispose();
+    assert.equal(typeof suCaptured.caps?.shellGate, "function", "su（operator-approve）应 arm 审批档 shellGate");
+
+    // 项目角色（capabilities 缺席）误传审批档 ⇒ capability-denied，不 arm（防三层链被绕过，既有守卫）。
+    mkdirSync(join(root, "角色卡", "X"), { recursive: true });
+    writeFileSync(join(root, "角色卡", "X", "role-card.md"), "# 角色 X\n");
+    writeFileSync(
+      join(root, "角色卡", "X", "boundary.yaml"),
+      "role: X\nentries:\n  - kind: file\n    path: src/x.ts\n    purpose: 测试条目\n",
+    );
+    const projectRoleProject: ProjectConfig = {
+      projectRoot: root,
+      skillRoot: root,
+      roles: { X: { card: "角色卡/X/role-card.md", boundary: "角色卡/X/boundary.yaml" } },
+      builtInRoles: [],
+      governanceBoundary: { path: "角色卡/X/boundary.yaml", acceptance: { accepted: true, source: "test:project-role" } },
+    };
+    const projectCaptured = {} as Captured;
+    const projectHandle = await openRoleSession(
+      { roleId: "X", project: projectRoleProject, shellOperatorOnly },
+      { createAdapter: capturingFactory(projectCaptured) },
+    );
+    await projectHandle.dispose();
+    assert.equal(projectCaptured.caps?.shellGate, undefined, "项目角色（能力位缺席）不得 arm 审批档");
   });
 });
 
@@ -874,7 +974,7 @@ test("跨会话：账本中提案已接受 → Convener 写 docs/flows/<flowId>.
           title: "写流程单",
           flowId: "flow-a",
           cardKind: "schedule-write",
-          preview: "将写出：`docs/flows/flow-a.md`",
+          preview: "将写出：`docs/flows/flow-a.md`\n\n## docs/flows/flow-a.md\n# 流程 flow-a\n\n| 步骤 | 主人 | 状态 |\n| --- | --- | --- |\n| impl | 实现者 | pending |\n",
         },
       },
       {
@@ -909,7 +1009,7 @@ test("账本快照在 send 开始时刷新：open 后新落账的提案接受在
           title: "写流程单",
           flowId: "flow-a",
           cardKind: "schedule-write",
-          preview: "将写出：`docs/flows/flow-a.md`",
+          preview: "将写出：`docs/flows/flow-a.md`\n\n## docs/flows/flow-a.md\n# 流程 flow-a\n\n| 步骤 | 主人 | 状态 |\n| --- | --- | --- |\n| impl | 实现者 | pending |\n",
         },
       },
       {
@@ -1082,7 +1182,7 @@ test("旧 single：su 预授权四棵、确认后写角色卡、能力不变；�
     const script: ToolCall[] = [
       {
         name: "request_confirmation",
-        args: { title: "建角色 X", preview: "将写出：`角色卡/X/role-card.md`" },
+        args: { title: "建角色 X", preview: "将写出：`角色卡/X/role-card.md`\n\n## 角色卡/X/role-card.md\n# 角色：X\n" },
       },
       { name: "write_file", args: { path: "角色卡/X/role-card.md", content: "# 角色：X\n" } },
     ];

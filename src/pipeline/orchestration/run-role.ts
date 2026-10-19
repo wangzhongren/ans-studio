@@ -16,6 +16,10 @@
 //     发行进本会话的 writeSet（`common/编排/confirmed-writes.ts`）；
 //   · 写入照旧经 gate——**F4 拒掉一切未确认路径**（writeSet 外 = 拒）。
 //   · 通道**不可用/拒绝/未确认** → 不发行 → 该路径写入被拒（fail-closed）。
+//   · **呈现前完整性闸（2026-10-19 真机 op-2）**：写盘类确认卡声明了写入路径时，preview 必须对
+//     每一条路径给出可核对正文/结构；不完整 ⇒ **不发卡**、不发行任何路径，`request_confirmation`
+//     直接返回失败并列出缺正文的路径（`common/编排/confirmed-writes.ts::validateConfirmPreviewCompleteness`）。
+//     非写盘确认（无路径）与选择卡行为不变。
 //   · **例外（客户裁定 2026-10-16）**：内置治理角色（su）的**初始** writeSet 恒含 `docs/su/**`、
 //     `docs/contracts/**`、`docs/skills/**` 与 `docs/mcp/**`（预授权写目录，不经发行器、随会话初始化
 //     计算；见 scopeWithBuiltInPreauthorization）——对其余一切路径以上四条逐字适用。
@@ -110,7 +114,7 @@ import { withHandback, type OrchestrationEvent, type TaskReport, type HandbackIn
 import { EXIT_OK, EXIT_USAGE, EXIT_FAILURE } from "../../common/编排/exit-codes.ts";
 import type { ShellVerdictFn } from "../../common/编排/shell-gate.ts";
 import { repinIfBootstrapped, DEFAULT_GOVERNANCE_BOUNDARY_REL } from "../../common/编排/finalize.ts";
-import { conditionSlugsOf, createConfirmedWriteIssuer, explicitConfirmPaths } from "../../common/编排/confirmed-writes.ts";
+import { conditionSlugsOf, createConfirmedWriteIssuer, explicitConfirmPaths, validateConfirmPreviewCompleteness } from "../../common/编排/confirmed-writes.ts";
 import {
   appendGovernanceLedger,
   readGovernanceLedger,
@@ -158,10 +162,11 @@ import { absRel, isAbsoluteAny, isUnderOrEqual, normalizeLexical } from "../../c
  * · `handOffIntent` / `requestClarification`（W6-A 意图交接/澄清；未注入 ⇒ 对应工具不注册）——
  *   **只给** Liaison / Rapporteur（能力矩阵 `handOffIntent`/`requestClarification`）。编排先做文件/
  *   去重/每轮一次/两轮澄清上限与账本；能力实现方只负责投递/呈现。**交接 ≠ 客户批准；澄清 ≠ 客户已回答**。
- * · `shellGate`（I-1 开放 shell + su 审批档/只读档；未注入 ⇒ `run_shell` 不注册）——**项目角色**经三层链注入
- *   （`openRoleSession` 收到 `shellOperatorChannel` 时经 `assembleProjectShellGate` 装配）；**su** 经
- *   **审批档**（`shellOperatorOnly`，客户裁定 2026-10-17：只读白名单免审批、其余含 deny 逐条客户批准；
- *   经 `assembleOperatorShellGate` 装配）或**只读档**（`shellReadonly`，旧路径）注入。
+ * · `shellGate`（I-1 开放 shell + 审批档/只读档；未注入 ⇒ `run_shell` 不注册）——**项目角色**经三层链注入
+ *   （`openRoleSession` 收到 `shellOperatorChannel` 时经 `assembleProjectShellGate` 装配）；**内置治理角色**
+ *   （客户 2026-10-19 新规则：五个角色＋su 的能力位统一 `shell: "operator-approve"`）经 **审批档**
+ *   （`shellOperatorOnly`：只读白名单免审批、其余含 deny 逐条客户/判断 agent 批准；经
+ *   `assembleOperatorShellGate` 装配）注入；旧**只读档**（`shellReadonly`）仅保留为兼容路径。
  *   比工厂第二参优先（`capabilities?.shellGate ?? shellGate`）。
  * · `shellVerdict`（R-1 shell 审读结论工具；未注入 ⇒ `report_shell_verdict` 不注册）——**审读会话专用**
  *   （由 `pm-reviewer` 注入；形状单一来源 `common/编排/shell-gate.ts`）。
@@ -523,9 +528,10 @@ export async function openRoleSession(
     uninstallMcp?: UninstallMcpFn;
     /**
      * **I-1 开放 shell —— (a) 前端操作者确认通道（兼 arm 开关语义）**：给出 ⇒ 本会话（**仅项目角色**；
-     * su 自身不接三层链——su 的 `run_shell` 走只读档 `shellReadonly`）由编排装配三层链（(c) 确定性硬地板
-     * → (b) su 模型审读 → (a) 本通道；关窗/不答/超时 = **不放行**）并注入 `ShellGate` ⇒ `run_shell` 注册
-     * （「注入才注册」语义未改）。不给 ⇒ 不 arm（`run_shell` 不存在）。CLI 一次性前端无确认框 ⇒ 不接。
+     * 内置治理角色自身不接三层链——其 `run_shell` 走审批档 `shellOperatorOnly`）由编排装配三层链
+     * （(c) 确定性硬地板 → (b) 内置治理角色模型审读 → (a) 本通道；关窗/不答/超时 = **不放行**）并注入
+     * `ShellGate` ⇒ `run_shell` 注册（「注入才注册」语义未改）。不给 ⇒ 不 arm（`run_shell` 不存在）。
+     * CLI 一次性前端无确认框 ⇒ 不接。
      */
     shellOperatorChannel?: OperatorChannelFn;
     /**
@@ -535,23 +541,26 @@ export async function openRoleSession(
      */
     shellArming?: Omit<AssembleShellGateOptions, "project" | "operatorChannel" | "sessionDeps" | "runtime">;
     /**
-     * **su 只读档（客户裁定 2026-10-12：「su 也要有 shell，但是只读」）**：给出 ⇒ 本会话装配**只读档**
-     * `ShellGate`（`assembleReadonlyShellGate`——只接 (c)：命中只读白名单放行；`risky`/`review`/`deny`
-     * 一律拒；**不接 (b) su 模型审读**——su 自己就是审读者，不自审；**不接 (a) 客户确认**——只读外的
+     * **只读档（旧兼容路径；客户裁定 2026-10-12「su 也要有 shell，但是只读」）**：给出 ⇒ 本会话装配
+     * **只读档** `ShellGate`（`assembleReadonlyShellGate`——只接 (c)：命中只读白名单放行；
+     * `risky`/`review`/`deny` 一律拒；**不接 (b) 模型审读**——不自审；**不接 (a) 客户确认**——只读外的
      * 命令直接拒，不打扰客户、不弹任何对话框）并注入 `capabilities.shellGate` ⇒ `run_shell` 注册
-     * （「注入才注册」语义未改）。设计指向的用途是**内置治理角色 su**（su 自身不接三层链）；对项目角色
-     * 给出时按**更严的一档**处理（只读档执行集严格 ⊆ 三层链执行集）。与 `shellOperatorChannel`/
-     * `shellArming` 同时出现时 **readonly 优先**（见下方 arm 块注释）。装配失败 ⇒ **不 arm**
-     * （`run_shell` 不注册，fail-closed 不变）。**不得为此弹任何对话框**（选项面没有 (a) 通道即是结构保证）。
+     * （「注入才注册」语义未改）。**2026-10-19 起内置治理角色统一走审批档**（`shellOperatorOnly`）；
+     * 本选项保留给旧调用方/测试（只读档执行集严格 ⊆ 审批档，仍更严、不放宽）。对项目角色给出时
+     * 同样按**更严的一档**处理。与 `shellOperatorChannel`/`shellArming` 同时出现时 **readonly 优先**
+     * （见下方 arm 块注释）。装配失败 ⇒ **不 arm**（`run_shell` 不注册，fail-closed 不变）。
+     * **不得为此弹任何对话框**（选项面没有 (a) 通道即是结构保证）。
      */
     shellReadonly?: Omit<AssembleReadonlyShellGateOptions, "project">;
     /**
-     * **su 审批档（客户裁定 2026-10-17：「只读的免审批，其他的要客户审批」＋「deny 也走客户审批」）**：
-     * 给出 ⇒ 内置治理角色 su 装配 `assembleOperatorShellGate`（只接 (c)+(a)：allow 直放 0 卡；
-     * risky/review/deny 一律交客户逐条批准；**不接 (b)**——su 不自审）。选项面没有 pmAsk/
-     * routineShellPolicy（type 层面保证）。
-     * **su-only 守卫**：仅 `suppressHandback === true`（内置治理角色）时生效；项目角色误传 ⇒ **不 arm**
-     * 并记录诊断（防止三层链被绕过）。**与 `shellReadonly` 同时给出 ⇒ 不 arm**（诊断记录，不择一静默生效）。
+     * **审批档（客户裁定 2026-10-17：「只读的免审批，其他的要客户审批」＋「deny 也走客户审批」；
+     * 客户 2026-10-19 新规则扩展到五个内置治理角色）**：给出 ⇒ 能力位 `shell: "operator-approve"`
+     * 的内置治理角色装配 `assembleOperatorShellGate`（只接 (c)+(a)：allow 直放 0 卡；
+     * risky/review/deny 一律交客户/判断 agent 逐条批准；**不接 (b)**——交付审批的角色不自审）。
+     * 选项面没有 pmAsk/routineShellPolicy（type 层面保证）。
+     * **能力位守卫**：`cap?.shell !== "operator-approve"`（含项目角色 cap undefined、旧能力位
+     * none/readonly）时误传 ⇒ **不 arm** 并记录诊断 `shell.operatorOnly.rejected`（防止三层链被绕过）。
+     * **与 `shellReadonly` 同时给出 ⇒ 不 arm**（诊断记录，不择一静默生效）。
      * 装配失败/缺件 ⇒ 不 arm（`run_shell` 不注册，fail-closed）。优先级：operatorOnly → readonly → 三层链。
      */
     shellOperatorOnly?: Omit<AssembleOperatorShellGateOptions, "project">;
@@ -728,6 +737,27 @@ export async function openRoleSession(
             }
             const flowId = req.flowId ?? originalMetadata?.flowId;
             if (isGovernanceFlowId(flowId)) currentFlowId = flowId;
+          }
+          // 2026-10-19 真机 op-2 修复（呈现前 fail-closed）：写盘类确认卡声明了写入路径时，preview
+          // 必须对**每一条**路径给出可核对正文/结构。不完整 ⇒ **不发卡**、不发行任何写入路径，直接
+          // 把缺正文的路径与重试要求如实交回模型（不让「证据完整性」依赖判断 agent/模型自觉）。
+          // 非写盘确认（无路径）与 choice 卡：declaredPaths 为空 ⇒ 旧行为逐字不变。
+          const completeness = validateConfirmPreviewCompleteness(req);
+          if (!completeness.ok) {
+            log.record("confirmation.preview.incomplete", {
+              roleId: setup.role.id,
+              declaredPaths: completeness.declaredPaths,
+              missingPaths: completeness.missingPaths,
+            });
+            return {
+              outcome: "declined",
+              reason:
+                `确认卡未呈现：preview 未包含以下声明写入路径的可核对正文/结构：${completeness.missingPaths.join("、")}。` +
+                `每条声明路径都必须以标题（如 \`## <路径>\`）或代码围栏说明（如 \`\`\`md <路径>\`\`\`）出现，` +
+                `且其后紧跟该路径的完整正文/代码块（至少一行非空内容）。` +
+                `请把每条路径的完整正文或明确结构放进同一个 preview 后重试，并继续在 paths 参数中逐条列出这些路径；` +
+                `本次未向客户发卡，也未发行任何写入路径。`,
+            };
           }
           // 2026-10-18 双开关评审 §5.2：judgeContext 的**唯一计算点**。只在 trio 角色、允许的
           // cardKind、且 flowId 合法时计算；并入传给客户通道的 metadata（桌面只消费）。
@@ -1012,11 +1042,14 @@ export async function openRoleSession(
 
   // I-1 开放 shell（项目角色三层链）+ 审批档/只读档——共用同一个 `shellGate` 能力位
   // （「注入才注册」：注入了 ⇒ 适配器注册 `run_shell`；未注入/装配失败 ⇒ **不 arm**，fail-closed）。
-  // 能力矩阵（评审 §5.6）：
-  //   · `shell: "none"`（trio Rapporteur/Nominator）→ 不 arm（即使调用方误传选项也拒绝并记诊断）；
-  //   · `shell: "readonly"`（trio Convener）→ 仅只读档；
-  //   · `shell: "operator-approve"`（su single）→ 审批档；保留旧 `shellReadonly` 注入作为 su 的
-  //     兼容路径（桌面自 2026-10-17 起用审批档，但旧调用方/测试仍可使用；两档同时给出 ⇒ 不 arm）；
+  // 能力位按角色数据驱动（客户 2026-10-19 新规则：所有角色都有 shell 权限，含读写与任意命令，
+  // 但一律经审批链；不按角色 id 硬编码）：
+  //   · `shell: "operator-approve"`（五个内置治理角色 liaison/rapporteur/nominator/convener/verifier
+  //     ＋ su 统一为该档）→ 审批档：只读白名单直接执行，其余（含读写与任意命令）逐条提交客户/
+  //     判断 agent 审批；保留旧 `shellReadonly` 注入作为兼容路径（旧调用方/测试仍可使用；两档同时
+  //     给出 ⇒ 不 arm）；
+  //   · `shell: "none"` / `"readonly"` → **仅为旧数据/兼容保留**（新注册项不得再用）；`none` 即使
+  //     调用方误传选项也拒绝并记诊断，`readonly` 仍可走只读档（更严，不放宽）；
   //   · 项目角色（cap undefined）→ 既有三层链/只读路径**逐字不变**。
   let shellGate: ShellGate | undefined;
   if (input.shellOperatorOnly !== undefined) {
@@ -1024,7 +1057,8 @@ export async function openRoleSession(
       // 互斥：不择一静默生效（PM 评审 §3.4）。
       log.record("shell.operatorOnly.rejected", { mode: "shellOperatorOnly", outcome: "not-armed", reasonCode: "conflicts-with-shellReadonly" });
     } else if (cap?.shell !== "operator-approve") {
-      // 审批档只属于 single/su（能力矩阵）；项目角色/trio 误传不得把三层链绕成「客户全权审批」。
+      // 审批档只属于能力位声明 `operator-approve` 的角色（2026-10-19 起＝五个内置治理角色＋su）；
+      // 项目角色（cap undefined）/旧能力位误传不得把三层链绕成「客户全权审批」。
       log.record("shell.operatorOnly.rejected", { mode: "shellOperatorOnly", outcome: "not-armed", reasonCode: "capability-denied" });
     } else {
       try {
@@ -1036,7 +1070,7 @@ export async function openRoleSession(
     }
   } else if (input.shellReadonly !== undefined) {
     if (cap !== undefined && cap.shell === "none") {
-      // trio Rapporteur/Nominator：没有 shell 面（评审 §5.6）。
+      // 旧能力位 `shell: "none"`（历史数据/兼容）：没有 shell 面；新注册项不得再用（2026-10-19）。
       log.record("shell.readonly.rejected", { outcome: "not-armed", reasonCode: "capability-denied" });
     } else {
       try {

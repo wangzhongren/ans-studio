@@ -230,10 +230,21 @@ test("ans govern <空目录>（经 governCommand + 假适配器）→ EXIT_OK，
   // `request_confirmation` 把**将写出的具体路径**摆给客户；客户确认后**编排**才把这些路径发行进
   // 本次会话的 writeSet（未确认路径被 F4 拒）。故脚本先确认、再写，且预览里列出目标路径。
   const proposalPath = "docs/proposals/demo-v1.md";
-  const preview = `将写出以下文件（均已预览）：\n${proposalPath}`;
+  const proposalContent = "# 提案\n";
+  // 2026-10-19 呈现前完整性闸（编排 `validateConfirmPreviewCompleteness`）：写盘类确认卡的 preview
+  // 须对**每条声明路径**给出可核对正文——保留原「一行一个路径」声明行（原测试意图：把将写出的
+  // 具体路径摆给客户），并为该路径补 `## <路径>` 标题 + 将写出的正文（与实际 write_file 内容一致）。
+  const preview = [
+    "将写出以下文件（均已预览）：",
+    proposalPath,
+    "",
+    `## ${proposalPath}`,
+    "",
+    proposalContent.trimEnd(),
+  ].join("\n");
   const script: ToolCall[] = [
     { name: "request_confirmation", args: { title: "确认写出提案", preview } },
-    { name: "write_file", args: { path: proposalPath, content: "# 提案\n" } },
+    { name: "write_file", args: { path: proposalPath, content: proposalContent } },
   ];
   // 放行桩：确定性同意；同时计次——断言确认通道被请求**恰好一次**（加强，非放宽）。
   const confirmRequests: CustomerInputRequest[] = [];

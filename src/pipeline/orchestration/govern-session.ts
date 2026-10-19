@@ -499,6 +499,76 @@ function withGovernanceRole(project: ProjectConfig, govId: string): ProjectConfi
   return { ...project, builtInRoles };
 }
 
+/**
+ * shell 面统一口径（客户 2026-10-19 新规则：所有角色都有运行 shell 的权限，包括读写与任意需要
+ * 命令的权限，但一律提交审批、按原有流程审批）。与门禁引擎角色卡 `SHELL_APPROVAL_CARD_LINE` 同义，
+ * 此处按**治理会话提示词**单独表述（不导入角色卡文案；措辞侧重行为约束：审批 ≠ 写边界扩张）。
+ */
+const SHELL_APPROVAL_PROMPT_LINE =
+  "**shell 审批档（所有内置治理角色统一）**：你的 shell 可读取、写入并执行任意命令；" +
+  "只读白名单命令直接执行，其余命令（含读写与任何需要命令的权限）逐条提交客户/判断 agent 审批。" +
+  "拒绝、超时、通道不可用一律不放行。**审批不等于写边界扩张**：审批只针对当次命令，不改变你的职责与 " +
+  "Section 1 写边界；写文件仍优先用 `write_file` 并经写盘确认（shell 命令的文件副作用不经写入门禁，" +
+  "审批卡是唯一控制）。";
+
+/**
+ * 工程质量基线（客户 2026-10-19 批准，原话「可以，按你说的改」）。
+ *
+ * 与门禁引擎五张内置治理角色卡里的同一基线**逐字一致**——其单一来源在
+ * `src/common/门禁引擎/governance-roles.ts` 的角色卡文案常量。编排不得导入其他角色的私有 common，
+ * 故在本层**逐字复制**一份；**改文案时两处必须同步**（门禁引擎角色卡 / 本治理会话提示词）。
+ *
+ * 默认生产级；客户明确选择原型档才可放宽。治理会话在**意图、提案、流程、验收**各阶段都受同一
+ * 基线约束——single/su 由 `ENGINEERING_QUALITY_STAGE_REQUIREMENTS` 覆盖，trio 由
+ * `governanceFunctionDiscipline` 分角色承载。
+ *
+ * 客户 2026-10-19 新批评（原话「这个感觉也没有啥架构的啊，提案角色应该也要考虑到扩展性，给出一个
+ * 架构方案啊。」）：基线新增「架构与可扩展性」一条；本层与门禁引擎基线**同批同步**。
+ */
+const ENGINEERING_QUALITY_BASELINE = [
+  "工程质量基线（默认生产级；客户明确选原型档才可放宽）：",
+  "- 正确性：验收标准逐条可演示；无 TODO/占位/假数据；边界与非法输入有明确行为。",
+  "- 健壮性：输入校验与上限、错误码一致、失败不破坏已有数据；持久化原子写与重启恢复；并发/重入有明确策略。",
+  "- 安全：认证/授权即使简化也要写清边界；防注入/XSS/路径穿越/CSRF；不记录密钥与敏感数据；零第三方依赖时说明理由。",
+  "- 可维护性：模块边界清晰、命名一致、只在约束处注释；README 含启动、架构、API、权限、状态机、已知限制与权衡。",
+  "- 架构与可扩展性：模块分解与职责、依赖方向（无环）、数据流清晰；扩展点明确（新增状态/角色/导出格式/统计维度时改哪里、不改哪里）；数据 schema 与 API 契约有版本/迁移/兼容/弃用策略；横切关注点（配置/错误/日志/鉴权/测试缝）有归属；变更类提案必须附架构影响分析（模块/边界/兼容/回滚）。",
+  "- 可观测性：关键失败可诊断（结构化日志/错误信息），不静默吞错。",
+  "- 性能与容量：分页/上限/超时明确；不无限增长；给出已知容量边界。",
+  "- 前端：加载/空/错误态齐备；键盘可用、标签与对比度等基本可访问性；窄屏可用。",
+  "- 测试：单元+集成+端到端矩阵；权限与非法路径必须有负例；测试独立于实现；不得为保绿弱化断言。",
+  "- 交付：验收前必须真实启动应用并演示（启动命令、访问地址或截图/录屏）；未真实运行不得建议验收通过。",
+].join("\n");
+
+/**
+ * 架构与可扩展性阶段要求（客户 2026-10-19 新批评原文：「这个感觉也没有啥架构的啊，提案角色应该也要
+ * 考虑到扩展性，给出一个架构方案啊。」）。
+ *
+ * 与门禁引擎 `src/common/门禁引擎/governance-roles.ts` 的「架构与可扩展性」基线条及五张内置治理
+ * 角色卡的架构职责**成对同步**：同一份口径的两份物理副本（分层禁止导入其他角色私有 common），
+ * 任一侧改文案必须同批同步。single/su 一份提示覆盖全部治理阶段，故在本块给出 Draft/Steward/Proof
+ * 各阶段职责；trio 同样追加本块（与质量基线并列），角色纪律再补充各自工序。
+ */
+const ARCHITECTURE_EXTENSIBILITY_REQUIREMENTS = [
+  "**架构与可扩展性要求（提案 / 流程 / 验收三阶段）**：",
+  "- Draft（提案）：新项目提案必须含「架构方案」章节，既有项目的变更提案必须含「架构影响分析」章节；",
+  "  内容覆盖模块分解与职责、依赖方向（无环）、数据流、扩展点（新增状态/角色/导出格式/统计维度时改哪里、",
+  "  不改哪里）、数据 schema 与 API 契约的版本/迁移/兼容/弃用策略、横切关注点（配置/错误/日志/鉴权/",
+  "  测试缝）归属、权衡与备选；章节缺失或只有标题/空话 ⇒ 不得建议 accept。",
+  "- Steward（流程 / 派发）：流程单与派发任务必须引用架构方案或架构影响分析中的模块与边界；",
+  "  跨模块/改契约的步骤须安排契约冻结与集成/端到端验证；扩展点必须有覆盖步骤。",
+  "- Proof（验收）：逐项核对实现与架构声明一致——模块边界与依赖方向未被破坏、schema/API 版本与迁移",
+  "  按声明落地、扩展点可用；提案缺架构章节或实现偏离声明 ⇒ 不得建议 accept，只能退回或要求补充证据。",
+].join("\n");
+
+/**
+ * single/su 的阶段要求（su 一份提示覆盖全部治理阶段；trio 由 `governanceFunctionDiscipline` 分角色
+ * 承载同一约束）。与基线一起追加，确保模型在意图/提案/流程/验收各阶段都受约束。
+ */
+const ENGINEERING_QUALITY_STAGE_REQUIREMENTS =
+  "**质量阶段要求（同一基线贯穿全程）**：意图阶段先与客户确认质量档位（默认生产级；只有客户明确选择" +
+  "原型档才可放宽，并写明放宽项）；提案须含质量基线与证据计划；派发/流程须写清质量与演示要求；" +
+  "验收未真实启动并演示时不得建议 accept。";
+
 /** 默认任务提示：给出明确、可判定的变更要求（在治理边界内创建目标角色）。
  *  `canWrite`：本次会话是否**真能写**（`scope` 未声明 = 创世/普通目录边界，命中治理产物目录即放行）。
  *  创世下 su 需**据对话决定**建哪些角色，故给出「可直接写治理产物」的指引——**不**误报「不写盘」。
@@ -506,7 +576,15 @@ function withGovernanceRole(project: ProjectConfig, govId: string): ProjectConfi
  *  具体路径**）经 request_confirmation 请客户确认，拿到 confirmed:true 后才写；未确认路径会被门禁拒」。
  *
  *  trio（评审 §5.6）：按 `governanceFunction` 追加提案/提名/编排各自纪律；文案**不写「已批准/已授权」**，
- *  只说「等待客户决定」。single/su 的提示逐字保持旧文案（旧项目行为不变）。 */
+ *  只说「等待客户决定」。single/su 的旧文案逐字保留（旧项目行为不变），仅按客户 2026-10-19 新规则
+ *  在两类提示后统一追加 `SHELL_APPROVAL_PROMPT_LINE`（所有内置治理角色 shell 审批档）。
+ *  客户 2026-10-19 批准（「可以，按你说的改」）：两类提示同时追加 `ENGINEERING_QUALITY_BASELINE`
+ *  （与门禁引擎角色卡逐字一致）；single/su 另加 `ENGINEERING_QUALITY_STAGE_REQUIREMENTS`，trio 由各
+ *  角色纪律分别给出意图档位 / 提案证据计划 / 流程演示要求 / 验收不得未演示建议 accept。
+ *  客户 2026-10-19 新批评（「提案角色应该也要考虑到扩展性，给出一个架构方案」）：两类提示在基线之后
+ *  追加 `ARCHITECTURE_EXTENSIBILITY_REQUIREMENTS`（与门禁引擎基线「架构与可扩展性」条成对同步），
+ *  明确 Draft（架构方案/影响分析）、Steward（流程/派发引用架构边界）、Proof（验收核对实现与声明一致）
+ *  各阶段职责；提案缺架构章节或空洞时不得建议 accept。 */
 function buildGovernPrompt(
   taskId: string,
   roleIds: string[],
@@ -517,7 +595,7 @@ function buildGovernPrompt(
     preauthorizedDirs: readonly string[];
   },
 ): string {
-  // —— single/su：旧文案逐字保留（旧项目行为不变）——
+  // —— single/su：旧文案逐字保留（旧项目行为不变；末行追加 2026-10-19 shell 审批档口径）——
   if (opts.spec === undefined) {
     const confirmRule = opts.confirmFirst
       ? "\n**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（角色卡全文 + 边界摘要，" +
@@ -527,21 +605,28 @@ function buildGovernPrompt(
       : "";
     const head =
       `任务 ${taskId}：以治理身份在**项目治理边界**内工作。` +
-      "越出治理边界（`角色卡/`、`docs/`、`.ans/` 之外，如项目的 `src/`，或项目根以外）的写入会在写入之前被门禁拒绝。";
+      "越出治理边界（`角色卡/`、`docs/`、`.ans/` 之外，如项目的 `src/`，或项目根以外）的写入会在写入之前被门禁拒绝。" +
+      "\n" + SHELL_APPROVAL_PROMPT_LINE;
+    // 客户 2026-10-19 批准：同一工程质量基线贯穿单/三权治理会话；single/su 另附阶段要求与架构要求。
+    const quality =
+      "\n" + ENGINEERING_QUALITY_BASELINE + "\n" + ENGINEERING_QUALITY_STAGE_REQUIREMENTS +
+      "\n" + ARCHITECTURE_EXTENSIBILITY_REQUIREMENTS;
     if (roleIds.length === 0) {
       return opts.canWrite
         ? head + confirmRule +
             "\n未指定目标角色：请**据对话决定要建哪些角色**，逐一向客户确认后写出治理产物——" +
             "`角色卡/<角色>/role-card.md`、`角色卡/<角色>/boundary.yaml`、`角色卡/<角色>/memo.md`。" +
-            "项目治理边界文档 `角色卡/governance-boundary.yaml` 由编排的自动收尾写出，无需你写。"
-        : head + "\n本次未指定目标角色（--role）：可写集为空，会话只做调查/规划，不写盘。";
+            "项目治理边界文档 `角色卡/governance-boundary.yaml` 由编排的自动收尾写出，无需你写。" +
+            quality
+        : head + "\n本次未指定目标角色（--role）：可写集为空，会话只做调查/规划，不写盘。" + quality;
     }
     const targets = roleIds.map((id) => `角色卡/${id}/（role-card.md / boundary.yaml / memo.md）`).join("；");
     return (
       `${head}${confirmRule}\n具体改动要求：请为角色 ${roleIds.join("、")} 建出标准骨架文件：${targets}。` +
       (opts.confirmFirst
         ? "先经 request_confirmation 预览（含这些路径）获客户确认，再写；未确认路径会被拒。"
-        : "用 write_file 写出上述文件（越界或可写集外的写入会被拒）。")
+        : "用 write_file 写出上述文件（越界或可写集外的写入会被拒）。") +
+      quality
     );
   }
 
@@ -564,11 +649,14 @@ function buildGovernPrompt(
     roleIds.length > 0
       ? `\n本次指定目标角色：${roleIds.join("、")}；写这些角色的任何路径仍须先取得客户决定（见下）。`
       : "";
-  return `${head}${confirmRule}${targets}\n${governanceFunctionDiscipline(spec)}`;
+  return (
+    `${head}${confirmRule}${targets}\n${governanceFunctionDiscipline(spec)}\n` +
+    `${ENGINEERING_QUALITY_BASELINE}\n${ARCHITECTURE_EXTENSIBILITY_REQUIREMENTS}\n${SHELL_APPROVAL_PROMPT_LINE}`
+  );
 }
 
 /**
- * 四角色各自纪律（评审 §5.6/§6.1 + 四角色评审 §4.3）：只描述「怎么产出候选物、需要哪张客户决定卡、
+ * 五角色各自纪律（评审 §5.6/§6.1 + 四角色评审 §4.3）：只描述「怎么产出候选物、需要哪张客户决定卡、
  * 不能做什么」，**绝不写成「已批准/已授权」**——客户决定只由应用签发的确认卡 + 账本表达。
  * 角色名称/职能来自注册表 spec（**不写死 su/rapporteur**）。
  */
@@ -579,6 +667,12 @@ function governanceFunctionDiscipline(spec: BuiltInGovernanceRoleSpec): string {
         `**提案权纪律（${spec.displayName}，不拥有最终批准权）**：` +
         "提案写入 `docs/proposals/<flowId>-v1.md`（frontmatter: flowId/version/author/status: draft），" +
         "契约写入 `docs/contracts/**`，工作记录写入 `docs/governance/rapporteur/**`。\n" +
+        "**质量与证据**：提案必须含「工程质量基线」与「证据计划」——逐条说明基线如何落实、如何验证" +
+        "（单元+集成+端到端与真实启动演示），不得只写功能描述；证据计划缺失的提案不得建议 accept。\n" +
+        "**架构方案/影响分析**：新项目提案必须含「架构方案」，既有项目的变更提案必须含「架构影响分析」；" +
+        "覆盖模块分解与职责、依赖方向（无环）、数据流、扩展点（新增状态/角色/导出格式/统计维度时改哪里、" +
+        "不改哪里）、数据 schema 与 API 契约的版本/迁移/兼容/弃用策略、横切关注点归属、权衡与备选；" +
+        "章节缺失或只有标题/空话的提案不得建议 accept。\n" +
         "若由联络官交接了客户意图（`docs/intents/<intentId>.md`），以文件为准形成提案；信息不足用 " +
         "`request_clarification` 把问题送到主入口（同一 flow 最多 2 轮），不反复追问客户。\n" +
         "向客户请求决定用 `request_choice`，`cardKind=proposal`，`flowId` 必填，选项 id 固定为 " +
@@ -602,9 +696,14 @@ function governanceFunctionDiscipline(spec: BuiltInGovernanceRoleSpec): string {
         `**编排权纪律（${spec.displayName}，不拥有最终批准权）**：` +
         "流程单写入 `docs/flows/<flowId>.md`（步骤表；首步标「提名」），项目工作流写入 `docs/workflow.md`，" +
         "工作记录写入 `docs/governance/convener/**`。\n" +
+        "**质量与演示**：流程单与派发任务必须携带质量与演示要求——每个交付步骤写明按工程质量基线执行，" +
+        "验收步骤写明必须真实启动应用并演示（启动命令、访问地址或截图/录屏）；未真实运行的交付不得写" +
+        "「已完成」或「可验收」。\n" +
+        "**架构与边界**：流程单与派发任务必须引用架构方案/影响分析中的模块与边界；跨模块或改契约的" +
+        "步骤须安排契约冻结与集成/端到端验证；扩展点必须有覆盖步骤。\n" +
         "只有账本中已有客户接受的提案（accept / accept-quick）＋已任命名单（或 accept-quick 复用既有项目角色）" +
         "＋流程单对应步骤时，才能 `dispatch_task`；`flowId`/`stepId` 必填，目标只能是项目角色" +
-        "（四个内置治理角色一律拒绝）。shell 面仅只读档。\n" +
+        "（内置治理角色一律拒绝；shell 审批档不改变派发对象限制）。\n" +
         "你不批准方案、不任命、不验收；不得把「已派发」写成「已完成」。"
       );
     case "liaison":
@@ -613,6 +712,8 @@ function governanceFunctionDiscipline(spec: BuiltInGovernanceRoleSpec): string {
         `**沟通权纪律（${spec.displayName}，不拥有最终批准权）**：` +
         "客户意图写入 `docs/intents/<intentId>.md`（frontmatter: intentId/handoffKind/goal/scope/" +
         "acceptance/customerWords；四要素必须非空，`customerWords` 只摘录客户原话，**不得写入凭据/密钥**）。\n" +
+        "**质量档位（意图阶段）**：与客户确认质量档位——默认生产级（工程质量基线全部适用）；只有客户明确" +
+        "选择原型档才可放宽，且须在意图文件的 `acceptance` 中写明档位与放宽项；不得自行降档。\n" +
         "**交接前必须先做需求确认**：写完意图文件后，先 `request_choice`（`cardKind=intent-confirm`，`flowId`，" +
         "选项 id 固定 `confirm` / `revise`）请客户确认需求；只有客户选择「确认」（账本 `intent-confirm` 决定）后，" +
         "才用 `hand_off_intent` 把意图交给应用（intentId/handoffKind/goal/scope/acceptance/summary，须与意图文件逐项一致）；" +
@@ -627,6 +728,11 @@ function governanceFunctionDiscipline(spec: BuiltInGovernanceRoleSpec): string {
         `**验收权纪律（${spec.displayName}，不拥有最终批准权）**：` +
         "核对报告写入 `docs/verification/`，本角色的治理工作记录写入 `docs/governance/verifier/`；" +
         "读取流程单（`docs/flows/<flowId>.md`）、提案/契约、交付与回交证据，独立逐项核对。\n" +
+        "**质量与演示核对**：逐项核对工程质量基线并给出证据；交付未被真实启动并演示" +
+        "（无启动命令/访问地址/截图/录屏）时，不得建议 accept——只能建议退回或补充证据；" +
+        "仅有测试输出或代码阅读不算演示。\n" +
+        "**架构核对**：逐项核对实现与提案架构声明一致——模块边界与依赖方向未被破坏、schema/API 版本与" +
+        "迁移按声明落地、扩展点可用；提案缺架构章节或实现偏离声明时不得建议 accept，只能退回或要求补充证据。\n" +
         "向客户请求验收决定用 `request_choice`，`cardKind=acceptance`，`flowId` 必填，选项 id 固定为 " +
         "`accept` / `reject`；普通写盘（核对报告）用 `request_confirmation`，`cardKind=write`。\n" +
         "**验收 ≠ 批准**：不得自行验收、不得代替客户批准，不得把核对报告里的 `status` 当作客户决定；" +

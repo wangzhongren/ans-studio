@@ -193,8 +193,9 @@ APP_GOVERNANCE_SOURCE                // "<built-in:app-governance>"
 
 - **Liaison 逐项**：Section 1 与预授权只有 `docs/intents/`；禁写 `.ans/**`、manifest、
   `角色卡/**`、`docs/proposals|contracts|nominations|skills|mcp|flows|governance/**`、
-  `docs/workflow.md`；能力只有 `handOffIntent`（沟通/交接），**无** `customerInput`/派发/看护/
-  安装/恢复/shell。卡文本写明「客户沟通 · 不拥有最终批准权」「不实现、不跑代码、不写测试」。
+  `docs/workflow.md`；能力为 `customerInput: true`（仅 intent-confirm）与 `handOffIntent`（沟通/交接），
+  **无**派发/看护/安装/恢复；shell 按 2026-10-19 新规则统一审批档（见下）。
+  卡文本写明「客户沟通 · 不拥有最终批准权」「不实现、不跑代码、不写测试」。
 - **条目/预授权/禁写**按评审 §5.2/§4.2 表逐项落表；禁写路径展开为**具体前缀**（`.ans/`、
   `docs/bootstrap-manifest.md`、`角色卡/governance-boundary.yaml`、`角色卡/<五 id>/` 等），
   按段比较、不实现 glob。
@@ -257,7 +258,10 @@ APP_GOVERNANCE_SOURCE                // "<built-in:app-governance>"
 
 `角色卡/` 内的 `角色卡/governance-boundary.yaml` 与 `角色卡/<内置治理 id>/` 属**禁写路径**，
 由编排 gate 包装在 `resolveWrite` **之前**判定（本角色只提供数据；提名写卡的客户确认同样在编排
-confirmed-writes，不在门禁层实现）。shell：convener 只读档，liaison/rapporteur/nominator 不接 shell。
+confirmed-writes，不在门禁层实现）。shell：五个内置治理角色统一 `operator-approve` 审批档
+（客户 2026-10-19 新规则）——只读白名单直接执行，其余（含读写与任意命令）逐条提交客户/判断 agent
+审批；拒绝、超时、通道不可用一律不放行。机制侧（桌面 `shellOperatorOnly` 注入、编排提示词）待
+各自属主切换，见[变更记录](docs/change/2026-10-19_change_all-roles-shell-approval.md)。
 
 ### 验证（2026-10-18 四角色批）
 

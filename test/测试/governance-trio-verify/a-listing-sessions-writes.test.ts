@@ -1,8 +1,11 @@
 // test/测试/governance-trio-verify/a-listing-sessions-writes.test.ts
-// 独立端到端验收（测试角色，2026-10-17；2026-10-18 四角色同步）：新空项目默认、治理会话、能力矩阵、写权矩阵。
+// 独立端到端验收（测试角色，2026-10-17；2026-10-18 四角色同步；2026-10-19 客户 shell 新规则同步）：
+// 新空项目默认、治理会话、能力矩阵、写权矩阵。
 //
 // 依据：`角色卡/项目管理/docs/design/2026-10-17_design_governance-trio-review.md`
-// §5.2/§5.3/§5.4/§5.6/§6.2/§九-1/2/3/4/7/9；全部离线（临时目录 + 假适配器），不读 `.env`、不跑真实模型。
+// §5.2/§5.3/§5.4/§5.6/§6.2/§九-1/2/3/4/7/9；客户 2026-10-19 新规则（所有角色都有 shell 权限，
+// 包括读写与任何需要命令的权限，但一律提交审批）——三权角色 `shell` 均 `"operator-approve"`。
+// 全部离线（临时目录 + 假适配器），不读 `.env`、不跑真实模型。
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -102,16 +105,22 @@ test("治理会话可开：openGovernanceSession 按 function 选择角色；显
 
 // —————————————————————— 3) 能力矩阵逐项 ——————————————————————
 
-test("能力矩阵：dispatch/status/sessionTail/recovery 仅 Convener；install 仅 Nominator；三个三权角色不自我回交；shell 档逐人", async () => {
+test("能力矩阵：dispatch/status/sessionTail/recovery 仅 Convener；install 仅 Nominator；三个三权角色不自我回交；三角色审批档 shell（2026-10-19）", async () => {
   const { root, cleanup } = makeRoot("cap-matrix");
   try {
     writeProjectRole(root, "A");
     const project = trioProject(root);
-    const operator = async (): Promise<{ outcome: "allow"; operatorId: string }> => ({ outcome: "allow", operatorId: "op" });
+    const operatorCalls = new Map<string, string[]>();
     const captured = new Map<string, ReturnType<typeof capture>>();
     for (const id of ["rapporteur", "nominator", "convener"]) {
       const cap = capture();
       captured.set(id, cap);
+      const calls: string[] = [];
+      operatorCalls.set(id, calls);
+      const operator = async (prompt: { command: string }): Promise<{ outcome: "allow"; operatorId: string }> => {
+        calls.push(prompt.command);
+        return { outcome: "allow", operatorId: "op" };
+      };
       const handle = await openRoleSession(
         {
           roleId: id,
@@ -126,13 +135,13 @@ test("能力矩阵：dispatch/status/sessionTail/recovery 仅 Convener；install
           uninstallSkill: async () => ({ ok: false, reason: "stub", message: "stub" }),
           installMcp: async () => ({ ok: false, reason: "stub", message: "stub" }),
           uninstallMcp: async () => ({ ok: false, reason: "stub", message: "stub" }),
+          // 客户 2026-10-19 新规则：三个三权角色的能力位都是 `shell: "operator-approve"`——
+          // 传审批档选项（含操作者通道）时应 arm 审批档。
           shellOperatorOnly: {
-            classifyShell: () => "risky" as const,
+            classifyShell: (argv: string[]) => (argv[0] === "ls" ? ("allow" as const) : ("risky" as const)),
             rules: defaultShellRules(),
             operatorChannel: operator,
           },
-          shellReadonly:
-            id === "convener" ? { classifyShell: () => "allow" as const, rules: defaultShellRules() } : undefined,
         },
         { createAdapter: capturingFactory(cap) },
       );
@@ -172,12 +181,80 @@ test("能力矩阵：dispatch/status/sessionTail/recovery 仅 Convener；install
       assert.equal(cap.reportHandback, undefined, `${label} 不注入 reportHandback（不自我回交）`);
     }
 
-    // shell 面：rapporteur/nominator 未 arm（cap.shell=none）；本轮同时传了 operator 档，编排按
-    // 「cap 不允许审批档 ⇒ 不 arm」处理（互斥/能力守卫），故 convener 在**这一轮**也未 arm。
-    assert.equal(r.shellGate, undefined, "rapporteur 无 shell 面（误传 approval 也不 arm）");
-    assert.equal(n.shellGate, undefined, "nominator 无 shell 面");
-    assert.equal(c.shellGate, undefined, "convener 误传审批档 ⇒ 不 arm（能力矩阵：只读档）");
-    // 真实桌面形态：trio Convener 只传 shellReadonly（同一份 (c) 实件、不带 operator 通道）。
+    // shell 面（客户 2026-10-19 新规则：所有角色都有 shell 权限，含读写与任意命令，但一律经审批链）：
+    // 三个三权角色的能力位统一 `shell: "operator-approve"` ⇒ 传审批档选项时均 arm（不再有「无 shell 面」角色）。
+    for (const [label, cap] of [["rapporteur", r], ["nominator", n], ["convener", c]] as const) {
+      assert.equal(typeof cap.shellGate, "function", `${label}（operator-approve）应 arm 审批档 shell`);
+    }
+    // 审批档语义：allow 直放 0 卡；risky 逐条交操作者，批准后放行。
+    for (const [label, cap] of [["rapporteur", r], ["nominator", n], ["convener", c]] as const) {
+      const calls = operatorCalls.get(label)!;
+      const allowed: ShellReviewResult = await cap.shellGate!({
+        command: "ls",
+        argv: ["ls"],
+        cwd: root,
+        toolCallId: `t-${label}-allow`,
+      });
+      assert.equal(allowed.allow, true, `${label} 审批档：allow 命令直接放行`);
+      assert.equal(calls.length, 0, `${label} 审批档：allow 不弹审批卡`);
+      const approved: ShellReviewResult = await cap.shellGate!({
+        command: "rm",
+        argv: ["rm", "-rf", "x"],
+        cwd: root,
+        toolCallId: `t-${label}-risky`,
+      });
+      assert.equal(approved.allow, true, `${label} 审批档：risky 经审批批准后放行`);
+      assert.equal(calls.length, 1, `${label} 审批档：risky 逐条提交审批`);
+    }
+    // 审批链是唯一控制：操作者拒绝 / 通道不可用 ⇒ 不放行（fail-closed）。
+    const denyFactory = capture();
+    const denyHandle = await openRoleSession(
+      {
+        roleId: "rapporteur",
+        project,
+        taskId: "T-shell-deny",
+        shellOperatorOnly: {
+          classifyShell: () => "risky" as const,
+          rules: defaultShellRules(),
+          operatorChannel: async () => ({ outcome: "deny" as const, operatorId: "op", reason: "测试拒绝" }),
+        },
+      },
+      { createAdapter: capturingFactory(denyFactory) },
+    );
+    await consume(denyHandle, "（验收空脚本）");
+    await denyHandle.dispose();
+    const denied: ShellReviewResult = await denyFactory.caps!.shellGate!({
+      command: "rm",
+      argv: ["rm", "-rf", "x"],
+      cwd: root,
+      toolCallId: "t-deny",
+    });
+    assert.equal(denied.allow, false, "审批拒绝 ⇒ 不放行");
+    const unavailableFactory = capture();
+    const unavailableHandle = await openRoleSession(
+      {
+        roleId: "nominator",
+        project,
+        taskId: "T-shell-unavailable",
+        shellOperatorOnly: {
+          classifyShell: () => "risky" as const,
+          rules: defaultShellRules(),
+          operatorChannel: async () => ({ outcome: "unavailable" as const, reason: "测试通道不可用" }),
+        },
+      },
+      { createAdapter: capturingFactory(unavailableFactory) },
+    );
+    await consume(unavailableHandle, "（验收空脚本）");
+    await unavailableHandle.dispose();
+    const unavailable: ShellReviewResult = await unavailableFactory.caps!.shellGate!({
+      command: "rm",
+      argv: ["rm", "-rf", "x"],
+      cwd: root,
+      toolCallId: "t-unavailable",
+    });
+    assert.equal(unavailable.allow, false, "通道不可用 ⇒ 不放行（fail-closed）");
+    // 旧只读档兼容路径（2026-10-19 起桌面不再注入；产品保留，执行集更严、不放宽）：
+    // trio Convener 只传 shellReadonly（同一份 (c) 实件、不带 operator 通道）。
     const cap2 = capture();
     const handle2 = await openRoleSession(
       { roleId: "convener", project, taskId: "T-shell", shellReadonly: { classifyShell: () => "allow" as const, rules: defaultShellRules() } },

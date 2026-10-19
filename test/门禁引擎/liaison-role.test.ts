@@ -216,7 +216,7 @@ test("Liaison 越界拒绝文案（AC3）：指回正确归属——提案找 Dr
 
 // —————————————————————— 4) 能力矩阵：只有沟通/交接 ——————————————————————
 
-test("Liaison 能力：customerInput=true（仅 intent-confirm）、handOffIntent=true；无 dispatch/install/roleStatus/recovery/shell", () => {
+test("Liaison 能力：customerInput=true（仅 intent-confirm）、handOffIntent=true；无 dispatch/install/roleStatus/recovery；shell=审批档", () => {
   const spec = governanceRoleOf("liaison");
   assert.ok(spec);
   assert.equal(governanceCapabilitiesOf("liaison"), spec!.capabilities, "能力矩阵单点来自注册表");
@@ -230,7 +230,8 @@ test("Liaison 能力：customerInput=true（仅 intent-confirm）、handOffInten
     proposeRecovery: false,
     installSkill: false,
     installMcp: false,
-    shell: "none",
+    // 客户 2026-10-19：所有角色 shell 均接审批档（只读白名单直接执行、其余逐条审批）。
+    shell: "operator-approve",
   });
   assert.equal(spec!.preauthorizedDirs.includes("docs/intents/"), true);
   assert.equal(spec!.preauthorizedDirs.some((d) => d.startsWith("docs/governance/")), false);

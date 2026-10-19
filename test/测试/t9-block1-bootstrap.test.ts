@@ -393,13 +393,22 @@ function independentSha256(absPath: string): string {
   return createHash("sha256").update(readFileSync(absPath)).digest("hex");
 }
 
-/** 确认预览文本：列出将写出的具体路径（A-3 的路径发行以预览文本为准）。 */
+/** 确认预览文本：列出将写出的具体路径（A-3 的路径发行以预览文本为准）。
+ *  2026-10-19 呈现前完整性闸：每条声明路径后须紧跟可核对正文（否则卡片不呈现、路径不发行）。 */
 function confirmPreview(): string {
   return [
     "将创建角色 新角色，写出以下文件：",
     "角色卡/新角色/role-card.md",
+    "",
+    "角色卡正文：角色名、职责与工作立场。",
+    "",
     "角色卡/新角色/boundary.yaml",
+    "",
+    "边界正文：一条可写文件条目。",
+    "",
     "角色卡/新角色/memo.md",
+    "",
+    "备忘正文：工作事实与续接线索。",
   ].join("\n");
 }
 

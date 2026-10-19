@@ -50,10 +50,10 @@ flowchart LR
 | 一次性路径 | `src/pipeline/orchestration/run-role.ts` — `runRole()`（`ans role run`；启动提示含 P1-4 定位指路行） |
 | CLI 定位指路文案单一来源（P1-4） | `src/common/编排/cli-positioning.ts` — `CLI_POSITIONING`（`ans role run` 帮助与一次性会话启动行共用同一句；桌面 = 主工作台、CLI = 一次性执行器） |
 | 治理会话引擎（CLI 与桌面收敛为同一份） | `src/pipeline/orchestration/govern-session.ts` — `openGovernanceSession()` |
-| shell 闸**判定映射**（三层链 + su 只读档） | `src/common/编排/shell-gate.ts` — `createShellGate()` / `buildShellGate()`；只读档选项 `readonlyOnly`、离异分支常量 `BRANCH_READONLY_DENY` |
+| shell 闸**判定映射**（三层链 + 审批档/只读档） | `src/common/编排/shell-gate.ts` — `createShellGate()` / `buildShellGate()`；审批档 `operatorOnly`/`approveDeny`、只读档选项 `readonlyOnly`、离异分支常量 `BRANCH_READONLY_DENY` |
 | shell 闸**装配**（三层链） | `src/pipeline/orchestration/shell-arming.ts` — `assembleProjectShellGate()` |
-| shell 闸**装配**（su 只读档） | `src/pipeline/orchestration/shell-arming.ts` — `assembleReadonlyShellGate()`（审计边界解析共用私有 `resolveGovernanceBoundary`） |
-| su arm 位（只读档/三层链两档分流） | `src/pipeline/orchestration/run-role.ts` — `openRoleSession` 输入 `shellReadonly`（优先）/ `shellOperatorChannel` + `shellArming` |
+| shell 闸**装配**（审批档/只读档） | `src/pipeline/orchestration/shell-arming.ts` — `assembleOperatorShellGate()`（内置治理角色；只接 (c)+(a)）、`assembleReadonlyShellGate()`（旧兼容；只接 (c)）；审计边界解析共用私有 `resolveGovernanceBoundary` |
+| 内置治理角色 arm 位（审批档/只读档/三层链分流） | `src/pipeline/orchestration/run-role.ts` — `openRoleSession` 输入 `shellOperatorOnly`（审批档，能力位 `shell:"operator-approve"`）/ `shellReadonly`（旧兼容，优先）/ `shellOperatorChannel` + `shellArming`（项目角色三层链） |
 | (b) 审读会话 | `src/pipeline/orchestration/pm-reviewer.ts` — `createPmReviewer()`（经 `openRoleSession(内置治理角色)`；结论走 `report_shell_verdict` 工具） |
 | shell 审计留痕 | `src/common/编排/shell-audit.ts` — 落 `docs/audit/shell-gate.jsonl`（`execution` 恒「未执行」；写前经门禁 + 声明 `shell-gate` 条件） |
 | shell 审计边界（W6-A 补丁） | `src/pipeline/orchestration/shell-arming.ts` — `auditBoundaryOf()`：trio 用应用专用边界 `appGovernanceBoundary`（含 `docs/audit/`）；single/su 沿用既有治理角色边界（`docs/audit/` 条件目录），逐字不变 |
@@ -73,7 +73,7 @@ flowchart LR
 ### 模块如何拼起来
 
 - **一次会话的装配顺序**（`openRoleSession`）：角色/边界解析（`setupRole`，会话式入口允许内置治理角色）→ 写门禁（确认制则动态 writeSet，见 `confirmed-writes.ts`；W6-A 起按注册表能力矩阵收窄：`customerInput=false` 的 Liaison 即使误给通道也不进确认制）→ 能力面组装（`customerInput` / `reportHandback` / `sessionDir` / `dispatchTask` / `handOffIntent` / `requestClarification` / `shellGate` / `shellVerdict`，均「注入才注册」且按 `governanceCapabilitiesOf` 过滤）→ `deps.createAdapter(gate, capabilities)` → 绑定角色 → 事件流包装（回交 + 每轮 settle 后自动收尾/重 pin）。
-- **shell 闸两档**：**项目角色**走三层链 (c)→(b)→(a)（`assembleProjectShellGate`，需前端给 (a) 通道）；**su** 走**只读档**（`assembleReadonlyShellGate`，只接 (c) 白名单，risky/review/deny 一律拒，不接 (b)/(a)）。两档共用同一个 `shellGate` 能力位与同一审计边界解析；`run_shell` 仅在能力位被注入时注册（未 arm / 装配失败 ⇒ 不注册，fail-closed 结构性保证）。
+- **shell 闸三路**：**项目角色**走三层链 (c)→(b)→(a)（`assembleProjectShellGate`，需前端给 (a) 通道）；**内置治理角色**（2026-10-19 起五个角色＋su，能力位 `shell: "operator-approve"`）走**审批档**（`assembleOperatorShellGate`，只接 (c)+(a)：只读白名单直放 0 卡，risky/review/deny 逐条客户/判断 agent 审批，不接 (b)）；**旧只读档**（`assembleReadonlyShellGate`，只接 (c) 白名单，risky/review/deny 一律拒）仅为兼容路径保留（执行集严格 ⊆ 审批档）。各路共用同一个 `shellGate` 能力位与同一审计边界解析；`run_shell` 仅在能力位被注入时注册（未 arm / 装配失败 ⇒ 不注册，fail-closed 结构性保证）。
 - **判定源与执行点分离**：`shell-gate.ts` 不含任何规则集——`classifyShell` 与规则集由调用方注入（实件属门禁引擎，生产经 `src/service/gate/` 公开再导出，**该出口尚不存在**——既有跨角色待办，缺注入 ⇒ 闸一律拒）；执行（spawn）只在 Pi 适配器 `run_shell` 一处，审核与 spawn 同址。
 - **审计口径**：一切 shell 判定都落 `docs/audit/shell-gate.jsonl`（命令逐字原文、argv、cwd、conclusion、branch、by、conditions、`execution` 恒「未执行」）；落盘本身经门禁（治理边界 + 声明 `shell-gate` 条件），审计失败不翻转判定、如实 stderr。
 
@@ -92,7 +92,7 @@ flowchart LR
 
 - **门禁引擎**：`classifyShell`/`defaultShellRules`（实件）在门禁引擎私有 common——生产不导入，经注入；`resolveWrite`/`resolveBoundary`/`listProject` 经 Service 公开出口。
 - **Pi 适配器**：`ShellGate`/`ShellReviewResult`/`OperatorPrompt`/`CustomerInputFn`/`DispatchTaskFn` 等形状的单一来源在 `src/model/runtime.ts`；`run_shell`/交互工具的注册条件 = 编排是否注入对应能力（「注入才注册」）；spawn 前剥离凭据、cwd 钉项目根均为其既有职责。
-- **桌面应用**：经 `openRoleSession` 注入 `customerInput`（确认制）、`shellOperatorChannel` 或 `shellReadonly`（su 只读档）、`dispatchTask` 路由等；桌面持有派发队列与去重（编排不造第二套）。
+- **桌面应用**：经 `openRoleSession` 注入 `customerInput`（确认制）、`shellOperatorOnly`（内置治理角色审批档）或旧 `shellReadonly`、`shellOperatorChannel`（项目角色三层链）、`dispatchTask` 路由等；桌面持有派发队列与去重（编排不造第二套）。
 - **跨角色待办（如实登记）**：(c) 合法注入源（门禁引擎经 `src/service/gate/` 再导出 `classifyShell`/`defaultShellRules`）尚不存在——在此之前一切 arm 路径的闸一律拒绝（fail-closed），接口已按契约留好注入缝。
 
 ## 2026-10-14 运行时迁移

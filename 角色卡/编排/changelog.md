@@ -1,5 +1,91 @@
 # 编排 变更记录
 
+## 2026-10-19 — 提案架构门槛与治理提示架构要求（Draft/Steward/Proof）
+
+**来源**：客户 2026-10-19 新批评（原话「这个感觉也没有啥架构的啊，提案角色应该也要考虑到扩展性，给出一个架构方案啊。」）。真机 R1/R3 提案均无模块分解、依赖方向、扩展点、数据/契约版本与迁移策略。门禁引擎把「架构与可扩展性」加入工程质量基线；编排侧让提案判断 agent 与治理会话提示强制要求架构章节。本批只改编排边界。
+
+**改了什么**
+
+- `src/common/编排/governance-judge-prompt.ts`：proposal rubric 新增「架构门槛」——新项目须含「架构方案」、变更须含「架构影响分析」，覆盖模块分解/职责、依赖方向（无环）、数据流、扩展点、schema 与 API/契约版本/迁移/兼容/弃用、横切关注点、权衡；缺失/空洞/自相矛盾 ⇒ 不得 approve，manual 且 reasonCode 用 `insufficient-evidence`；必须实际读取 proposalPath 全文，不得仅凭 preview。通用门槛加第 6 条。
+- `src/common/编排/governance-judge-verdict.ts`：proposal 分支加注释说明**有意不做**标题/关键词机械匹配（preview 有界会误伤），确定性底线是 required-read（proposalPath 必读）；判定逻辑零改动。
+- `src/pipeline/orchestration/govern-session.ts`：`ENGINEERING_QUALITY_BASELINE` 与门禁引擎逐字同步新增「架构与可扩展性」条；新增 `ARCHITECTURE_EXTENSIBILITY_REQUIREMENTS`（与质量基线并列）明确 Draft/Steward/Proof 阶段职责；single/su 与 trio 均追加；Draft/Steward/Proof 角色纪律各加一段。
+- 测试：`governance-judge.test.ts` +2（rubric 内容、架构缺失 manual/insufficient-evidence 保真）；`governance-session.test.ts` 扩既有断言（架构与扩展性关键字、三阶段职责）；既有断言零放宽。
+
+**验证**：基线 `test/编排` 571/571、typecheck 0 → 改动后 `test/编排` **573 计 / 573 过 / 0 红 / 0 skipped**；定向两文件 76/76；`npm run typecheck` **exit 0**。工作树含其他角色未提交改动，本角色零新增红。
+
+**跨角色**：门禁引擎基线「架构与可扩展性」条与五张角色卡架构职责须与本批常量同批同步（注释互指）；桌面 su 聊天不经本提示，依赖角色卡覆盖；测试角色可后续加跨文件逐字比对。详见 [变更记录](docs/change/2026-10-19_change_architecture-gate.md)。
+
+## 2026-10-19 — 治理会话提示词注入工程质量基线（single/su 与 trio 两套）
+
+**来源**：客户 2026-10-19 批准（原话「可以，按你说的改」）：在治理会话提示词中加入工程质量基线，并要求验收前真实启动应用演示；门禁引擎把同一基线写进五张内置治理角色卡，编排侧把基线注入治理会话提示（single/su 与 trio），使模型在意图、提案、流程、验收各阶段都受约束。本批只改编排边界。
+
+**改了什么**
+
+- `src/pipeline/orchestration/govern-session.ts`：新增 `ENGINEERING_QUALITY_BASELINE`（与门禁引擎角色卡常量逐字一致；编排不得跨层导入其私有 common，故在本层复制并在注释互指，改文案须两处同步）与 `ENGINEERING_QUALITY_STAGE_REQUIREMENTS`（single/su 阶段要求）。`buildGovernPrompt` 的 single/su 三个返回分支与 trio 返回均追加基线；trio 在角色纪律后、shell 审批档前追加。各角色纪律新增阶段约束：Lead 意图阶段确认质量档位（默认生产级，客户明确选原型档才可放宽并写入 `acceptance`）；Draft 提案含质量基线与证据计划；Steward 流程/派发含质量与演示要求（未真实运行不得写「已完成/可验收」）；Proof 未真实启动演示不得建议 accept（仅有测试输出或代码阅读不算演示）。**未改任何工具注册、写入门禁、派发/验收判定**。
+- `test/编排/governance-session.test.ts`：钉提示词断言补充阶段关键字；循环内新增「每个 trio 提示含基线标题 + `未真实运行不得建议验收通过`」与 single/su 同样的两条断言（另加阶段要求断言）；既有断言零放宽。
+- 核查 `src/pipeline/orchestration/run-role.ts`：治理会话提示**不在**此处组装（默认提示唯一组装点是 `buildGovernPrompt`），本批未改。
+
+**验证**：基线 `node --test "test/编排/**/*.test.ts"` → 571/571；改动后同命令 → **571 计 / 571 过 / 0 红 / 0 skipped**；定向 `governance-session.test.ts` 24/24；`npm run typecheck` → **exit 0**。工作树含其他角色未提交改动，本角色零新增红。
+
+**跨角色请求**（未越界）：① 桌面 `buildAcceptanceTaskMessage` 的「真实启动与演示」要求核查为**已由桌面属主落下**（四条硬要求），请保持与基线口径一致；② 门禁引擎五张角色卡写入同一基线时须与本文件常量逐字同步；③ 桌面 su 聊天不经本提示（走 `openRoleSession`），其基线覆盖依赖门禁引擎角色卡。详见 [变更记录](docs/change/2026-10-19_change_engineering-quality-baseline-prompt.md)。
+
+## 2026-10-19 — 判断 agent 验收机械门槛：流程步骤 id/状态解析与桌面侧对齐（真机 R2）
+
+**来源**：桌面窗口角色已修 `app/desktop/governance-advance.ts`（状态引导 token 规范化 + 显式 `stepId` 列优先），编排侧 `src/common/编排/governance-judge-facts.ts` 的 `parseFlowSteps` / `evaluateAcceptanceCompletion` 仍是旧口径（取「步骤」描述列当 id + `status.toLowerCase() !== "done"` 精确比较），对 canonical `| stepId | 步骤 | 状态 |` 且状态写 `done（…）` 的流程单（真机 R2：`ans-testbed/ticket-desk-live/docs/flows/ticket-desk-r2.md`）会恒定误判。本批只改编排边界。
+
+**改了什么**
+
+- `src/common/编排/governance-judge-facts.ts`：新增导出纯函数 `normalizeFlowStepStatus`（取引导 token，大小写不敏感；后接空白/`（`/`(`/`：`/`:`/结束；空 ⇒ `""`；原始 `status` 不动）；`parseFlowSteps` 在表头含显式 id 列（`stepId`/`step-id`/`步骤id`/`id`）时优先取该列，否则沿用「步骤/step」列（旧两列表行为不变）；`evaluateAcceptanceCompletion` 的未完成判定统一走 `normalizeFlowStepStatus`。规则与桌面侧逐字一致；分层不允许跨角色复用，两侧各自实现并在注释互相指向。验收门槛语义（全部 done、每步有 dispatch、无未结算决定/澄清、账本可读）未放宽。
+- `test/编排/governance-judge.test.ts`：新增 4 例——状态引导词正反例；真实 R2 步骤表解析出 `nomination`/`role-readiness`/…/`acceptance` 十个 stepId（非描述文本）；旧两列表回退 + `步骤id`/`id`/`step-id` 列优先；验收判定在全部 `done（…）` + 全量 dispatchedStepIds 下 `{ ok: true }`，改一个执行步骤为 `pending（…）` 后 `insufficient-evidence`。既有断言零放宽。
+
+**验证**：定向 `test/编排/governance-judge.test.ts` → **50/50 pass**；`node --test "test/编排/**/*.test.ts"` → **571 计 / 571 过 / 0 红 / 0 skipped**（上一批 567，+4 即本批新增）；`npm run typecheck` → **exit 0**。工作树含其他角色未提交改动，本角色零新增红。
+
+**残余风险**（详见变更记录）：① 桌面/编排两份纯函数为成对契约，需同批同步；② 判断 agent 门槛仍要求**每个**步骤有 `dispatch.accepted`，真实 R2 账本中 `role-readiness`/`contract-freeze-v2`/`verification`/`acceptance` 无派发记录，复算仍会 manual（既有语义，本批未改）；③ 状态只认 `done` 引导词，`completed`/`已完成` 等仍 fail-closed。详见 [变更记录](docs/change/2026-10-19_change_judge-flow-step-parsing.md)。
+
+## 2026-10-19 — 编排侧同步：五个内置治理角色统一 shell 审批档
+
+**来源**：客户新规则「所有的角色，都应该有有运行shell 的权限，包括读写，以及任何的需要命令的权限，只不过都要提交审批，按照原有的流程审批。」门禁引擎已把五角色 `capabilities.shell` 统一改为 `"operator-approve"`（su 保持）；本批按其实施记录「跨角色依赖」第 2 条同步编排侧注释、治理会话提示词与测试。**判定代码零改动**（`cap.shell !== "operator-approve"` 拒绝、审批档/只读档互斥、装配失败不 arm 全部保留）。
+
+**改了什么**
+
+- `src/pipeline/orchestration/run-role.ts`（仅注释）：`shellGate`/`shellOperatorChannel`/`shellReadonly`/`shellOperatorOnly` 选项说明与 I-1 arm 块注释改为能力位驱动的五角色统一审批档口径；`shellOperatorOnly` 守卫说明由过时的「仅 `suppressHandback`」改为真实判据 `cap?.shell !== "operator-approve"`；旧 `none`/`readonly` 标注为历史兼容、新注册项不得再用。
+- `src/pipeline/orchestration/shell-arming.ts`（仅注释）：去掉「su 不自审」「本档只服务 single/su」的旧描述，改为「审批档不自审、按能力位装配、trio 审计边界经 `auditBoundaryOf` 映射」。
+- `src/pipeline/orchestration/govern-session.ts`：新增 `SHELL_APPROVAL_PROMPT_LINE`（所有内置治理角色统一审批档；只读白名单直接执行，其余含读写/任意命令逐条提交客户/判断 agent 审批；拒绝/超时/不可用不放行；**审批不等于写边界扩张，写文件仍优先 `write_file` 并经写盘确认**），single/su 与 trio 两类提示均追加；Convener 纪律删「shell 面仅只读档」，改为「内置治理角色一律拒绝；shell 审批档不改变派发对象限制」。
+- `test/编排/governance-session.test.ts`：能力矩阵夹具 `shellReadonly` → `shellOperatorOnly`；rapporteur/nominator 旧「不应注入 shellGate」翻转为「应 arm 审批档」；新增专项用例——五角色（liaison/rapporteur/nominator/convener/verifier）与 su 均为 `operator-approve` ⇒ 均 arm；项目角色（能力位缺席）误传 ⇒ 仍不 arm。
+- `test/编排/liaison-session.test.ts`：同一夹具与断言翻转（Liaison/Rapporteur/Nominator 应 arm 审批档）；其余能力断言逐条保留未放宽。
+
+**验证**：基线 `test/编排` 566 计 / 564 过 / 2 红（两红均为本批预期旧断言）；改动后 `node --test "test/编排/**/*.test.ts"` → **567 计 / 567 过 / 0 红 / 0 skipped**（+1 新增用例）；定向两文件 36/36；`npm run typecheck` → **exit 0**。工作树含其他角色未提交改动，本角色零新增红。
+
+**跨角色请求**（未越界）：① 桌面 `session.ts`/`interface.ts` 须把 `shellOperatorOnly` 从 su-only 扩到全部 `role.builtIn`，并退役 convener 只读档（其源码扫描测试同批更新）；此前真机只有 su 有审批档，convener 仍被只读档限制（更严非放宽），其余四角色仍无 `run_shell`。② 测试角色两处旧断言按新规则翻转。③ README/历史设计文档口径更新。④ 审计/卡片固定文案仍带「su-审批档」字样，改名需编排＋桌面同批（桌面按前缀解析）。详见 [变更记录](docs/change/2026-10-19_change_all-roles-shell-approval-sync.md)。
+
+## 2026-10-19 — shell 判断：单飞 → 会话内有界并发池（真机：同轮 4 条 shell 并行）
+
+**来源**：客户真机——前端角色同一轮并行发出 4 条 shell（`/`、`app.js`、`styles.css`、`wc`）；编排判断器单飞 `busy`，后 3 条中 2 条立即回落手动（诊断 `shell-confirm.presented requestId=sc-8 pendingCount=3`）。客户意见原文：「每条等待5s 我觉得不够吧，或者开启几个线程变形处理呢。一个角色一个呢。」本批只改编排边界。
+
+**改了什么**
+
+- `src/common/编排/shell-judge.ts`：删除 `let busy`，改为**每个 `createShellJudge` 闭包内**的有界并发池——默认上限 3（`ANS_SHELL_JUDGE_CONCURRENCY`，夹 1..8）；达到上限进入有界 FIFO 等待队列（默认 32，队满 `manual/queue-full`）；排队总时限 `ANS_SHELL_JUDGE_QUEUE_TIMEOUT_MS`（默认 60s，超时 `manual/queue-timeout`，reason 含「排队超时」与在跑条数）；排队中外部中止 `manual/aborted`。槽位释放直接移交队首；每请求独立计时/独立结果，某条失败不影响其他条。判断语义、规则层、`denyCounts`、失败转手动策略不变。新增诊断 `shell-judge.queued` / `shell-judge.queue.timeout` / `shell-judge.queue.full` / `shell-judge.queue.granted`（字段在落盘白名单内）。
+- `test/编排/shell-judge.test.ts`：删除旧 busy 用例（其断言已被并发语义取代）。新增 `test/编排/shell-judge-concurrency.test.ts` 11 例（4 并发上限 3 全 allow、超限 FIFO、排队超时、排队中止、队满、失败隔离、独立计时、闭包隔离、并发 denyCounts、env/解析矩阵）。
+
+**验证**：`node --test "test/编排/**/*.test.ts"` → **566/566 pass**；定向两文件 **45/45**；`npm run typecheck` → **0 错误**。
+
+**跨角色请求**（未越界）：① 桌面 shell judge 通道超时 135s 需覆盖「排队 60s + 判断 120s」的新最坏墙钟（建议按 `ANS_SHELL_JUDGE_QUEUE_TIMEOUT_MS` 派生）；② 桌面 `judgeManualHumanReason` 可为 `queue-timeout`/`queue-full` 加显式短文案（当前走 default 会原样展示编排 reason）。详见 [变更记录](docs/change/2026-10-19_change_shell-judge-concurrency.md)。
+
+## 2026-10-19 — 写盘确认卡「呈现前 preview 完整性闸」（真机 op-2）
+
+**来源**：真机 op-2——一张写盘确认卡在 `paths` 声明两条新建路径（`docs/proposals/ticket-desk-collab-v1.md`、`docs/governance/rapporteur/ticket-desk-collab.md`），preview 只有提案正文；判断 agent 依 rubric 回落 manual。客户确认「可以按照你说的修改」：在出卡前拒绝不完整证据，让角色补全后重发。本批只改编排边界：`src/common/编排/{confirmed-writes.ts,governance-judge-facts.ts}`、`src/pipeline/orchestration/run-role.ts`、`test/编排/**` 与本角色文档。
+
+**改了什么**
+
+- `confirmed-writes.ts` 新增 `declaredConfirmPaths`（显式 `paths` 优先，未给回退 preview 一行一路径声明）与 `validateConfirmPreviewCompleteness`（确定性判定：路径须以标题/围栏说明/声明行作锚点，且其后有至少一行非空正文；围栏内路径行不算锚点）。choice 卡与无路径确认直接通过。
+- `run-role.ts` 的 `governedInput` 在**调用原始客户通道之前**执行校验：不通过 ⇒ 诊断 `confirmation.preview.incomplete`、返回 `declined`（不呈现卡片、不调判断 agent、不发行写入路径、不写 `customer.decision`），错误文案列出缺正文的路径并要求补全后重试。
+- `governance-judge-facts.ts` 仅纯重构：抽出 `declaredWritePathOfLine`（`declaredWritePathsFromPreview` 行为逐字不变），完整性闸与判断 agent 共用同一路径口径；判断规则本身未改。
+- 测试：新增 `test/编排/confirm-preview-completeness.test.ts`（含真机 op-2 卡原文 fixture `test/编排/fixtures/op2-write-confirm-card.json`）；既有写盘卡夹具按新格式补逐路径正文，断言未放宽。
+
+**验证**：`node --test "test/编排/**/*.test.ts"` → 556/556 pass；`npm run typecheck` → 0 错误。
+
+**跨角色请求**（未越界）：运行时核心同步 `request_confirmation` 指引（写盘卡必须带显式 `paths` + 逐路径正文，或结构化 `writes:[{path,content}]`）；`test/测试/**`、`test/装配/**` 中 11 个文件 / 16 个旧夹具需属主补正文（实测失败原因均为「确认卡未呈现」，另有 3 个与本改动无关的既有 UI/源码钉失败）。详见 `docs/change/2026-10-19_change_write-confirm-preview-completeness.md`。
+
 ## 2026-10-18 — P2 编排：治理卡判断 agent（「替我审批」/「替我决策」）
 
 **来源**：PM 评审 `角色卡/项目管理/docs/design/2026-10-18_design_judge-governance-cards-review.md`（status approved）§五–§七、§十、§十二；P1 运行时核心契约已冻结。本批只改编排边界：`src/common/编排/{governance-judge.ts,governance-judge-prompt.ts,governance-judge-verdict.ts,governance-judge-facts.ts,governance-ledger.ts}`（前四新增）、`src/pipeline/orchestration/{run-role.ts,govern-session.ts}`、`src/provider/runtime/tools.ts`（仅 judge 回执）、`test/编排/governance-judge.test.ts`（新增）、本角色文档；**未碰**门禁引擎、运行时核心、适配器、桌面、UI。

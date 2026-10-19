@@ -1541,7 +1541,7 @@ async function makeTrioRoot(ledgerEntries: Record<string, unknown>[] = []): Prom
   return dir;
 }
 
-test("三权能力矩阵：rapporteur 仅客户通道；nominator 加安装；convener 加派发/看护与只读 shell；项目角色三层链不变", async () => {
+test("三权能力矩阵：rapporteur 仅客户通道；nominator 加安装；convener 加派发/看护；三者均获审批档 shell（2026-10-19 新规则），项目角色三层链不变", async () => {
   const dir = await makeTrioRoot();
   const customerInput: DesktopCustomerInputFn = async () => ({ outcome: "declined", reason: "测试替身" });
   const arming = {
@@ -1564,8 +1564,8 @@ test("三权能力矩阵：rapporteur 仅客户通道；nominator 加安装；co
   assert.equal(rapporteur.sessionTail, undefined, "rapporteur 无 session_tail");
   assert.equal(rapporteur.installSkill, undefined, "rapporteur 不安装技能");
   assert.equal(rapporteur.installMcp, undefined, "rapporteur 不安装 MCP");
-  assert.equal(rapporteur.shellOperatorOnly, undefined, "trio 不接 su 审批档");
-  assert.equal(rapporteur.shellReadonly, undefined, "rapporteur 无 shell");
+  assert.ok(rapporteur.shellOperatorOnly, "rapporteur：内置治理角色统一审批档（2026-10-19 新规则）");
+  assert.equal(rapporteur.shellReadonly, undefined, "rapporteur 不再走只读档（统一审批档）");
   assert.equal(rapporteur.shellArming, undefined, "内置角色不走项目三层链");
 
   const nominator = h.capabilitiesOf("nominator")!;
@@ -1576,7 +1576,8 @@ test("三权能力矩阵：rapporteur 仅客户通道；nominator 加安装；co
   assert.equal(typeof nominator.uninstallMcp, "function", "nominator：MCP 卸载");
   assert.equal(nominator.dispatchTask, undefined, "nominator 不派发");
   assert.equal(nominator.proposeRecovery, undefined, "nominator 无恢复提议");
-  assert.equal(nominator.shellReadonly, undefined, "nominator 无 shell");
+  assert.ok(nominator.shellOperatorOnly, "nominator：内置治理角色统一审批档");
+  assert.equal(nominator.shellReadonly, undefined, "nominator 不再走只读档（统一审批档）");
 
   const convener = h.capabilitiesOf("convener")!;
   assert.equal(typeof convener.customerInput, "function", "convener：客户确认通道");
@@ -1586,13 +1587,12 @@ test("三权能力矩阵：rapporteur 仅客户通道；nominator 加安装；co
   assert.equal(typeof convener.sessionTail, "function", "convener：session_tail");
   assert.equal(convener.installSkill, undefined, "convener 不安装技能");
   assert.equal(convener.installMcp, undefined, "convener 不安装 MCP");
-  assert.equal(convener.shellOperatorOnly, undefined, "trio 不接 su 审批档");
-  assert.deepEqual(
-    convener.shellReadonly,
-    { classifyShell: arming.classifyShell, rules: arming.rules },
-    "convener 只读档：同一份 (c) 实件、不带 operator channel",
-  );
-  assert.equal((convener.shellReadonly as { operatorChannel?: unknown }).operatorChannel, undefined, "只读档不带 (a) 通道");
+  const convenerOnly = convener.shellOperatorOnly as { classifyShell?: unknown; rules?: unknown; operatorChannel?: unknown } | undefined;
+  assert.ok(convenerOnly, "convener：内置治理角色统一审批档（2026-10-19 新规则）");
+  assert.equal(convenerOnly!.classifyShell, arming.classifyShell, "convener 审批档：(c) classifyShell 同一函数引用");
+  assert.equal(convenerOnly!.rules, arming.rules, "convener 审批档：(c) rules 同一引用");
+  assert.equal(typeof convenerOnly!.operatorChannel, "function", "convener 审批档：(a) 操作者通道已装配（不再是不带通道的只读档）");
+  assert.equal(convener.shellReadonly, undefined, "convener 不再走只读档（2026-10-19：统一审批档）");
 
   const projectRole = h.capabilitiesOf("A")!;
   assert.equal(projectRole.customerInput, undefined, "项目角色无客户确认通道");
@@ -1600,6 +1600,64 @@ test("三权能力矩阵：rapporteur 仅客户通道；nominator 加安装；co
   assert.equal(projectRole.shellReadonly, undefined, "项目角色不带只读档");
   assert.equal(projectRole.shellArming, arming, "项目角色三层链：(c) 实件逐字不变");
   assert.equal(typeof projectRole.shellOperatorChannel, "function", "项目角色三层链：(a) 通道逐字不变");
+  await h.mgr.stop(null);
+});
+
+test("2026-10-19 新规则：trio 五个内置治理角色全部经 shellOperatorOnly 获得审批档（convener 不再走只读档）", async () => {
+  const dir = await makeTrioRoot();
+  type RoleFn = ProjectListing["roles"][number]["governanceFunction"];
+  const mkBuiltIn = (roleId: string, governanceFunction: RoleFn): ProjectListing["roles"][number] => ({
+    roleId,
+    cardPath: "",
+    boundaryPath: "",
+    cardText: roleId,
+    boundary: { entries: [], boundarySource: `<built-in:trio/${roleId}>`, acceptance: { accepted: false, source: "" } },
+    builtIn: true,
+    governanceFunction,
+  });
+  const fiveRoles = [
+    mkBuiltIn("liaison", "liaison"),
+    mkBuiltIn("rapporteur", "proposal"),
+    mkBuiltIn("nominator", "nomination"),
+    mkBuiltIn("convener", "schedule"),
+    mkBuiltIn("verifier", "verification"),
+  ];
+  const fiveListing: ProjectListing = {
+    projectRoot: dir,
+    roles: fiveRoles,
+    warnings: [],
+    hasRoles: true,
+    primaryRoleId: "liaison",
+    governanceModel: "trio",
+  };
+  const arming = {
+    classifyShell: (_command: string) => "allow",
+    rules: { allow: [], review: [], deny: [] },
+  } as unknown as DesktopShellArming;
+  const operatorChannel: DesktopOperatorChannelFn = async () => ({ outcome: "deny", reason: "测试替身" });
+  const h = makeHarness({ projectRoot: dir, customListing: fiveListing, shellArming: arming, shellOperatorChannel: operatorChannel });
+
+  for (const role of fiveRoles) {
+    await h.mgr.open({ projectRoot: dir, roleId: role.roleId, runtime: "demo" });
+    await tick(30);
+  }
+
+  for (const role of fiveRoles) {
+    const caps = h.capabilitiesOf(role.roleId);
+    assert.ok(caps, `${role.roleId}：应成功开启会话并捕获能力面`);
+    const only = caps.shellOperatorOnly as { classifyShell?: unknown; rules?: unknown; operatorChannel?: unknown } | undefined;
+    assert.ok(only, `${role.roleId}：内置治理角色应经 shellOperatorOnly 拿到审批档`);
+    assert.equal(only!.classifyShell, arming.classifyShell, `${role.roleId}：审批档 (c) classifyShell 为同一函数引用（单一来源）`);
+    assert.equal(only!.rules, arming.rules, `${role.roleId}：审批档 rules 为同一引用（单一来源）`);
+    assert.equal(typeof only!.operatorChannel, "function", `${role.roleId}：审批档 (a) 操作者通道已装配`);
+    assert.equal(caps.shellReadonly, undefined, `${role.roleId}：不再注入只读档（与审批档互斥）`);
+    assert.equal(caps.shellArming, undefined, `${role.roleId}：内置治理角色不走项目三层链 (c) 字段`);
+    assert.equal(caps.shellOperatorChannel, undefined, `${role.roleId}：不直接收 shellOperatorChannel（(a) 在审批档内）`);
+  }
+  // convener 专项（旧只读档的唯一持有者）：必须走审批档，绝无只读档残留。
+  const convener = h.capabilitiesOf("convener")!;
+  assert.ok(convener.shellOperatorOnly, "convener：走审批档");
+  assert.equal(convener.shellReadonly, undefined, "convener：只读档已退役（2026-10-19 统一审批档）");
   await h.mgr.stop(null);
 });
 

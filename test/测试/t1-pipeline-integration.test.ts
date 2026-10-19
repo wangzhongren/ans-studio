@@ -56,10 +56,10 @@ for (const runtime of ["pi", "codex", "claude"] as const) {
     const project = fixture(), receipts: ToolResult[] = [], events: OrchestrationEvent[] = [];
     let answer: ((value: CustomerInputOutcome) => void) | undefined, metadata: CustomerInputMetadata | undefined, phase = 0;
     const provider = engine(async (options, text, signal) => {
-      if (text === "confirm") receipts.push(await tool(options, "request_confirmation", { title: "T1 exact write", preview: "src/X/current.txt" }, signal));
+      if (text === "confirm") receipts.push(await tool(options, "request_confirmation", { title: "T1 exact write", preview: "src/X/current.txt\n\n确认正文：本轮写出的有效内容。\n" }, signal));
       else if (text === "write") receipts.push(await tool(options, "write_file", { path: "src/X/current.txt", content: "must be refused after stale yes" }, signal));
       else {
-        receipts.push(await tool(options, "request_confirmation", { title: "T1 current write", preview: "src/X/current.txt" }, signal));
+        receipts.push(await tool(options, "request_confirmation", { title: "T1 current write", preview: "src/X/current.txt\n\n确认正文：本轮写出的有效内容。\n" }, signal));
         receipts.push(await tool(options, "write_file", { path: "src/X/current.txt", content: runtime + " valid current consent" }, signal));
         receipts.push(await tool(options, "write_file", { path: "src/X/unlisted.txt", content: "not previewed" }, signal));
         receipts.push(await tool(options, "submit_report", { status: "completed", summary: "T1 current report", evidence: ["src/X/current.txt"] }, signal));

@@ -1,5 +1,120 @@
 # 门禁引擎 变更记录
 
+## 2026-10-19 — 工程质量基线新增「架构与可扩展性」，五张内置治理角色卡补架构职责（客户新批评）
+
+客户原话：「这个感觉也没有啥架构的啊，提案角色应该也要考虑到扩展性，给出一个架构方案啊。」
+真机证据：R1/R3 两份提案只有意图/交付物/数据模型/API/权限/状态机/统计/契约/测试/分工/风险，均无
+模块分解、依赖方向、扩展点、数据/契约版本与迁移策略。本批只做**门禁引擎**属主部分：基线常量与
+五张卡文本、测试与文档；判定逻辑、写权、禁写、预授权、能力位与流程零变化。完整记录见
+[变更记录](docs/change/2026-10-19_change_architecture-requirement.md)。
+
+- **边界**：`src/common/门禁引擎/governance-roles.ts`、`test/门禁引擎/governance-trio.test.ts`、
+  本文件、`memo.md`、`docs/change/2026-10-19_change_architecture-requirement.md`（新）。
+  未碰 `app/**`、`src/pipeline/**`、`src/common/编排/**`、其他角色文件/测试、真实项目；
+  不读 `.env`、不跑真实模型/凭据/网络；未 commit。
+- **基线**：`ENGINEERING_QUALITY_BASELINE` 新增「架构与可扩展性」一条——模块分解与职责、依赖
+  方向（无环）、数据流清晰；扩展点明确（新增状态/角色/导出格式/统计维度时改哪里、不改哪里）；
+  数据 schema 与 API 契约有版本/迁移/兼容/弃用策略；横切关注点（配置/错误/日志/鉴权/测试缝）
+  有归属；变更类提案必须附架构影响分析（模块/边界/兼容/回滚）。五卡逐字复用（原断言自动覆盖）。
+- **角色专属职责**：Lead 把客户演进/规模/未来需求写入 acceptance、不替客户决定架构；Draft 提案
+  必须含「架构方案」（新项目）或「架构影响分析」（变更）章节并覆盖五项，缺失不得建议 accept、
+  不得进入实现，提案卡给客户看的内容必须包含该章节；Crew 项目角色写区与角色卡同架构模块一一
+  对应、禁止重叠、每个模块有明确属主；Steward 流程与 `dispatch_task` 引用架构模块/边界，
+  contract-freeze 与集成/端到端步骤必须存在、缺一不得进入验收；Proof 核对实现与架构声明一致
+  （模块边界/依赖方向/扩展点/版本迁移），缺章节或偏离声明不得建议 accept。
+- **测试**：`governance-trio.test.ts` 基线关键字循环追加六个架构关键字（架构与可扩展性/模块分解/
+  依赖方向/扩展点/版本迁移/架构影响分析），新增 1 条专项用例（L336-410）逐条断言五角色架构职责。
+  **门禁引擎 272 计 / 271 过 / 0 红 / 1 skip**（本批新增 1 例，基线 271/270/1）；
+  `npm run typecheck` exit 0。既有断言未放宽、未改动。
+- **跨角色依赖（未越界修改，如实登记）**：① 编排 `govern-session.ts` 逐字复制了一份
+  `ENGINEERING_QUALITY_BASELINE`（其注释明记改文案须两处同步）——本批后两份副本**已不一致**，
+  须编排属主补「架构与可扩展性」行；同文件 `ENGINEERING_QUALITY_STAGE_REQUIREMENTS` 与 trio
+  Draft 纪律也应补架构章节要求。② 判断 agent（`governance-judge.ts`）不解析提案章节，机械门槛
+  未覆盖「缺章节不得 accept」。③ 桌面提案卡呈现需确认客户能看到架构章节。④ 运行时/装配不校验
+  角色卡与架构模块的对应关系。⑤ README/产品文档由文档属主同步。
+- **残余风险**：架构要求是行为约束、门禁层不解析 Markdown；「模块—写区一一对应」无机械检查；
+  架构声明可形式化；卡片变长增加提示词成本；编排副本同步前提示词与角色卡存在文案漂移。真机
+  端到端与独立复验未进行。来源：客户新批评原话（经 PM 转达）。
+
+## 2026-10-19 — 五张内置治理角色卡加入工程质量基线（客户批准「可以，按你说的改」）
+
+客户批评：五个内置治理角色卡缺少统一的工程质量基线，验收可以只覆盖功能、缺少健壮性/安全/
+可维护性/测试等硬约束，且存在未真实启动应用、未演示就建议验收通过的空间。客户批准原话：
+「可以，按你说的改」。本批只做**门禁引擎**属主部分：注册表卡文本与测试；判定逻辑、写权、
+禁写、预授权零变化。完整记录见[变更记录](docs/change/2026-10-19_change_engineering-quality-baseline.md)。
+
+- **边界**：`src/common/门禁引擎/governance-roles.ts`、`test/门禁引擎/governance-trio.test.ts`、
+  本文件、`memo.md`、`docs/change/2026-10-19_change_engineering-quality-baseline.md`（新）。
+  未碰 `app/**`、`src/pipeline/**`、`src/common/编排/**`、其他角色文件/测试、真实项目；
+  不读 `.env`、不跑真实模型/凭据/网络；未 commit。
+- **单一来源常量**：`governance-roles.ts` 新增导出 `ENGINEERING_QUALITY_BASELINE`（逐字包含
+  正确性/健壮性/安全/可维护性/可观测性/性能与容量/前端/测试/交付九条；默认生产级，客户明确选
+  原型档才可放宽；「验收前必须真实启动应用并演示」为硬要求）；五张卡逐字复用。
+- **角色专属职责**：Lead 意图阶段确认质量档位（未指定默认生产）并写入 acceptance；Draft 提案
+  必须含「质量基线与证据计划」一节、验收标准覆盖基线；Crew 项目角色卡继承基线并逐角色写质量
+  职责、测试角色须负例/边界/重启/权限用例；Steward 流程与 `dispatch_task` 带基线与真实演示、
+  verification 步骤必须含「真实启动应用并演示」、未演示不得进入验收；Proof 逐项核对基线、
+  无真实启动/演示证据不得建议 accept、不得以「工具无 shell」跳过可核对项（Proof 已有审批档 shell）。
+- **测试**：`governance-trio.test.ts` 导入新常量并新增 1 条专项用例——五卡逐字包含基线、
+  六关键字（正确性/健壮性/安全/可维护性/测试/演示）、默认生产档、禁止弱化断言、五角色专属
+  要求逐条断言。**门禁引擎 271 计 / 270 过 / 0 红 / 1 skip**（本批新增 1 例，基线 270/269/1）；
+  `npm run typecheck` exit 0。既有断言（shell 审批档、能力矩阵、写权/禁写、确认卡纪律等）
+  未放宽、未改动。
+- **跨角色依赖（未越界修改，如实登记）**：① 编排 `governance-judge.ts` 验收机械门槛只核对流程
+  完成度，不核对演示证据；要让「未演示不得进入验收」成为机械硬门槛需编排属主扩展。② 编排
+  `govern-session.ts` 的 `dispatch_task` 任务描述不注入基线，靠 Steward 卡片纪律执行。③ 桌面
+  `session.ts` 的 `shellOperatorOnly` 仍 su-only（上一批已登记），Proof 卡的 shell 表述要等桌面
+  接线后才完整成立。④ 运行时/装配写 `role-card.md` 时不校验是否继承基线（只校验 `boundary.yaml`）。
+  ⑤ README/产品文档如逐项列角色质量职责，由文档属主同步。
+- **残余风险**：基线主要是行为约束，门禁层不解析 Markdown；演示证据可伪造/不机验；质量档位无
+  代码级字段；卡片变长增加提示词成本；`api-spec.md` 注册表代码块存在与本批无因果的旧口径
+  （缺 verifier、shell 注释旧），建议另开文档校正批次。真机端到端与独立复验未进行。
+  来源：客户批准原话「可以，按你说的改」（经 PM 转达）。
+
+## 2026-10-19 — 五个内置治理角色统一 shell 审批档（客户新规则：所有角色可运行 shell，含读写与任意命令，但一律提交审批）
+
+客户 2026-10-19 原文：「所有的角色，都应该有有运行shell 的权限，包括读写，以及任何的需要命令的权限，
+只不过都要提交审批，按照原有的流程审批。」本批只做**门禁引擎**属主部分：注册表能力位与五张角色卡
+文本；机制（桌面注入/编排守卫/README）属各自属主，见下「跨角色依赖」。完整记录见
+[变更记录](docs/change/2026-10-19_change_all-roles-shell-approval.md)。
+
+- **边界**：`src/common/门禁引擎/governance-roles.ts`、`test/门禁引擎/governance-trio.test.ts`、
+  `test/门禁引擎/liaison-role.test.ts`、`api-spec.md`、本文件、`memo.md`、
+  `docs/change/2026-10-19_change_all-roles-shell-approval.md`（新）。未碰 `src/pipeline/**`、`app/**`、
+  其他角色文件/测试、真实项目；不读 `.env`、不跑真实模型/凭据/网络；未 commit。
+- **注册表**：五角色 `capabilities.shell` 由 `none`（liaison/rapporteur/nominator/verifier）与
+  `readonly`（convener）统一改 `"operator-approve"`；su 保持 `"operator-approve"`。
+  `GovernanceCapabilities.shell` 注释重写：审批档＝只读白名单直接执行、risky/review/deny 逐条提交
+  客户/判断 agent 审批、拒绝/超时/不可用不放行；shell 可读写但**写入同样受审批链约束**；
+  `none`/`readonly` 仅为旧数据/兼容保留。**其余能力位、边界、预授权、禁写、判定逻辑零变化。**
+- **卡文本**：新增单一来源 `SHELL_APPROVAL_CARD_LINE`，五张卡逐字复用——「shell 审批档——只读白名单
+  直接执行，其余（含读写与任意命令）逐条提交客户/判断 agent 审批；审批不改变你的职责与写边界，
+  写文件仍优先用 write_file 并经写盘确认。拒绝、超时、通道不可用一律不放行。」Convener 旧「只读档
+  …执行类 shell 留给项目角色」段、Verifier 旧「shell 面 `none`」句删除；Liaison/Rapporteur/Nominator
+  各新增该段（此前无 shell 表述）。
+- **测试**：`governance-trio.test.ts` 能力矩阵与两张卡的 shell 断言改审批档，新增专项用例 1 例
+  （五角色 operator-approve ＋卡文本「审批」「读写」语义＋旧表述反向断言）；`liaison-role.test.ts`
+  能力 deepEqual 改 `operator-approve`。**门禁引擎 270 计 / 269 过 / 0 红 / 1 skip**
+  （本批新增 1 例专项用例；2026-10-18 四角色批记录基线 255 计，期间五角色批次另有增例）；
+  `npm run typecheck` exit 0。
+- **跨角色依赖（未越界修改，如实登记）**：① 桌面窗口 `app/desktop/session.ts` 的 `shellOperatorOnly`
+  仍为 su-only（`legacyBuiltIn`），convener 仍走 `shellReadonly` 只读档——须扩到全部内置治理角色
+  （`role.builtIn`）并切换 convener 档位；桌面源码扫描测试（`operator-channel.test.ts`）与注入测试
+  （`dispatch-delivery.test.ts`）随其更新。② 编排 `run-role.ts` 守卫 `cap.shell !== "operator-approve"`
+  行为上已自然接纳五角色，但注释仍写「审批档只属于 single/su」「trio Rapporteur/Nominator 没有 shell
+  面」，与 `govern-session.ts` 提示词「shell 面仅只读档」须同批更新；`test/编排/governance-session.test.ts`
+  的「rapporteur/nominator 不应注入 shellGate」断言转红待更新。③ 测试角色
+  `governance-liaison-verify/a-roles-writes-caps`（L265/L313）与
+  `governance-trio-verify/a-listing-sessions-writes`（L175-179）旧断言转红待更新。
+  ④ `README.md` L75 治理角色只读表述须同步。
+  受影响跨角色 4 文件实测 40 计 / 37 过 / 3 红（恰为上述旧断言；`d-single-compat` 全绿，su 不变）。
+- **安全边界**：shell 可写、可执行任意命令，命令副作用**不受** ANS 文件写入门禁约束（可写到项目外）；
+  客户/判断 agent 的逐条审批是唯一控制，拒绝/超时/不可用一律不放行；审批不改变 Section 1 写边界；
+  每次判定仍落 `docs/audit/shell-gate.jsonl`（应用专用边界，角色仍不可写）。
+- **残余风险**：审批疲劳与间接副作用不可见；判断 agent 代批依赖其模型质量与可用性；桌面未同步前
+  convener 仍被只读档限制（更严非放宽）、其余四角色仍无 shell（能力位已放开但桌面未注入）；
+  真机端到端与独立复验未进行。来源：客户 2026-10-19 新规则原文（经 PM 转达）。
+
 ## 2026-10-18 — 治理四角色 W6-A（门禁引擎）：Liaison 注册表/枚举/写权/能力 + 旧 trio 兼容
 
 客户 2026-10-18 拍板「**三权不变、角色四名**」：新增 `liaison`（联络官，客户沟通权，主入口），

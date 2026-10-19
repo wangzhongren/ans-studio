@@ -330,6 +330,11 @@ export function evaluateGovernanceJudgeVerdict(args: EvaluateGovernanceJudgeVerd
   // 4) 逐卡种门槛。
   switch (request.cardKind) {
     case "proposal": {
+      // 架构与可扩展性（客户 2026-10-19 批评「提案角色应该也要考虑到扩展性，给出一个架构方案」）由
+      // 系统提示 rubric 要求判断 agent 实际读取 proposalPath 全文核对；缺章节/空洞时模型自报
+      // manual/insufficient-evidence。此处**不做**标题/关键词的机械文本匹配：preview 有界（8KB），
+      // 提案长文可能把架构章节放在片段之后，机械匹配会误伤。确定性底线是第 5 步 required-read：
+      // proposalPath 必在 requiredReadPaths 中且必须实际读过，未读全文不可能 approve。
       const selected = verdict.selected ?? [];
       if (request.card.kind !== "choice" || !request.card.options.some((option) => option.id === "accept")) {
         return manualOutcome(args, "not-recommended", "卡片没有可代批的 accept 选项，已转手动确认。");

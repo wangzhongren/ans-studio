@@ -49,7 +49,9 @@ export function describeTool(name: string): ToolDescription {
           preview: {
             type: "string",
             description:
-              "Optional full content shown to the customer (e.g. the complete role card + boundary summary) so they can review before agreeing",
+              "Optional full content shown to the customer (e.g. the complete role card + boundary summary) so they can review before agreeing. " +
+              "Write cards: every declared write path needs its own checkable body — put the path in a Markdown heading (e.g. `### <path>`) or a fenced-code info line, " +
+              "followed by that path's non-empty body/code; a declared path without its own body is rejected before the card is shown",
           },
           detail: { type: "string", description: "Optional extra detail shown with the request" },
           paths: {
@@ -59,7 +61,9 @@ export function describeTool(name: string): ToolDescription {
             description:
               "Optional **exact write targets**: the project-relative file paths that will actually be written after the customer confirms. " +
               "One entry per file (max 64, no directories). Must NOT include files that are only referenced/quoted in the preview. " +
-              "When provided, this list is authoritative for the write approval; omit = legacy behavior (paths are extracted from the preview text).",
+              "When provided, this list is authoritative for the write approval; omit = legacy behavior (paths are extracted from the preview text). " +
+              "Write cards should provide this list, and `preview` must give every listed path its own heading or fenced-code info line " +
+              "followed by that path's non-empty body/code — otherwise the card is rejected before it is shown to the customer.",
           },
           flowId: {
             type: "string",
@@ -90,7 +94,11 @@ export function describeTool(name: string): ToolDescription {
         "真正新建或扩张角色边界、治理写集时，须由 su 把变更呈给客户确认（角色卡全文与边界摘要放进 preview），" +
         "仅当返回「客户已确认」时才落盘。未获同意（拒绝/超时/通道不可用）→ **不要写盘**，如实告知客户，不得假设同意。" +
         "**preview 必须列出将要写出的具体路径**（项目内相对路径，如 `角色卡/示例/role-card.md`）——写盘许可依 preview 所列路径发行；" +
-        "**未列出的路径不会获得许可，写入会被门禁拒绝**。注意：列出路径**不等于**获准——获准的唯一凭据是 `confirmed:true`。" +
+        "**未列出的路径不会获得许可，写入会被门禁拒绝**。" +
+        "写盘类卡片应提供**显式 `paths`**，并在 preview 中为**每一条**声明路径给出可核对正文/结构：" +
+        "路径作为 Markdown 标题（如 `### <路径>`）或代码围栏说明（如 ```md <路径>```）出现，锚点后紧跟该路径的非空正文/代码。" +
+        "**缺失任一路径正文时，系统会在呈现前拒绝该卡并要求补全——不会先给客户看半张卡。**" +
+        "注意：列出路径**不等于**获准——获准的唯一凭据是 `confirmed:true`。" +
         "治理会话可附可选 `flowId`/`stepId`/`cardKind`（cardKind 仅 `write` / `appointment-write` / `schedule-write`）；" +
         "这些字段只用于卡片显示与账本分类，**字段本身不构成任何授权**——治理门禁只认应用签发的客户决定。",
       promptGuidelines: [
@@ -102,10 +110,15 @@ export function describeTool(name: string): ToolDescription {
         "request_confirmation 的 preview **必须列出将要写出的具体路径**（每个待写文件一行，相对项目根、含目录，如 " +
           "`角色卡/示例/role-card.md`）——系统只对 preview 中**列出过**的路径发行写盘许可；**未列出的路径会被门禁拒绝**。" +
           "列出路径只是「已让客户看到要写什么」，**不等于获准**——是否获准**只看**返回的 `confirmed:true`。",
-        "确认卡会写盘时，**优先**用 `paths` 逐文件列出「确认后将实际写入」的精确项目相对路径（如 " +
+        "确认卡会写盘时，**应**提供显式 `paths: string[]` 逐文件列出「确认后将实际写入」的精确项目相对路径（如 " +
           "`角色卡/示例/boundary.yaml`，最多 64 项，路径须相对、不得含 `..`/NUL，不得是目录）。" +
           "preview 可以引用大量参考文件；`paths` **只放真正要写的目标**，不得包含仅在 preview 中引用/展示的文件——" +
           "系统据此发行写盘许可，避免把引用文件误当写入目标。",
+        "写盘类确认卡的 preview 必须为**每一条**声明路径（`paths` 中的每一项；未给 `paths` 时为 preview 声明的每条路径）" +
+          "给出可核对正文/结构：路径作为 Markdown 标题（如 `### <路径>`）或代码围栏说明（如 ```md <路径>```）出现，" +
+          "锚点后紧跟该路径的非空正文/代码（直到下一条路径锚点或 preview 末尾），**写入内容须与这里的正文一致、范围不得超出所预览的内容**。" +
+          "**缺失任一路径的逐路径正文/结构时，系统会在呈现前拒绝该卡、工具返回失败并要求补全——不会先给客户看半张卡**；" +
+          "请一次把卡组完整（逐路径正文齐全后再调用），不要靠反复试错。",
       ],
       executionMode: "sequential",
     };

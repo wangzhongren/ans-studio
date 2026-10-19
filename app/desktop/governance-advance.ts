@@ -78,8 +78,27 @@ function splitFlowRow(line: string): string[] | undefined {
 }
 
 /**
+ * 流程步骤状态的**首词规范化**（2026-10-19 真机：状态列写作「状态 + 说明」）。
+ *
+ * 流程单由 Steward 按模板自然写出，状态单元格常见 `done（有落盘/回交证据；…）`、
+ * `pending（不由统筹派发）`、`done：xxx` 这类「引导状态词 + 说明」写法。判定只看引导 token
+ * （大小写不敏感；后接空白、`（`、`(`、`：`、`:` 或结束），说明文字不参与比较；空/纯空白 ⇒ `""`。
+ * **不修改** `parseFlowStepStatuses` 输出的原始 `status`（展示仍用原文），只在判定处调用本函数。
+ */
+export function normalizeFlowStepStatus(status: string): string {
+  if (typeof status !== "string") return "";
+  const match = /^[^\s（(：:]+/.exec(status.trim());
+  return match === null ? "" : match[0].toLowerCase();
+}
+
+/**
  * 解析流程单的「步骤/状态」表（**触发门**，不是验收判定）：表头须同时含「步骤/step」与「状态/status」；
- * 解析口径与编排 `parseFlowSteps` 对齐；缺表头/无数据行 ⇒ `wellFormed:false`（调用方 fail-closed 不派）。
+ * 缺表头/无数据行 ⇒ `wellFormed:false`（调用方 fail-closed 不派）。
+ *
+ * 列选择（2026-10-19 真机）：canonical 流程单是 `| stepId | 步骤 | 状态 |` 三列（见
+ * `governance-gate.parseFlowStepIds` 以首列为步骤 id 的同一约定）。表头含显式 id 列
+ * （`stepId`/`step-id`/`步骤id`/`id`）时**优先**用它作为步骤 id；否则沿用「步骤/step」列。
+ * 输出形状保持 `{ id, status }` 不变，`status` 仍是单元格原文。
  */
 export function parseFlowStepStatuses(markdown: string): { wellFormed: boolean; steps: FlowStepStatus[] } {
   if (typeof markdown !== "string" || markdown.trim() === "") return { wellFormed: false, steps: [] };
@@ -94,7 +113,8 @@ export function parseFlowStepStatuses(markdown: string): { wellFormed: boolean; 
     const status = cells.findIndex((cell) => /^(状态|status)$/i.test(stripFlowCell(cell)));
     if (step !== -1 && status !== -1) {
       headerIndex = index;
-      stepColumn = step;
+      const explicitId = cells.findIndex((cell) => /^(stepid|step-id|步骤id|id)$/i.test(stripFlowCell(cell)));
+      stepColumn = explicitId !== -1 ? explicitId : step;
       statusColumn = status;
       break;
     }
@@ -137,6 +157,10 @@ const VERIFICATION_STEP_IDS: ReadonlySet<string> = new Set(["acceptance", "verif
  * `sendBackground` 派 Proof / 验收 不写 `dispatch.accepted`——若把它算进去，验收任务永远派不出去。
  * 现只对**执行步骤**（排除 `VERIFICATION_STEP_IDS`）做完成判定；验收步骤自身：缺失 ⇒ fail-closed 不派；
  * 已 `done` ⇒ 不重复派；已有 `customer.decision acceptance` ⇒ 不重复派；其余（pending/in-progress）⇒ 允许派。
+ *
+ * **状态按首词判定（2026-10-19 真机）**：流程单状态单元格是「状态 + 说明」写法
+ * （`done（有落盘/回交证据；…）`、`pending（不由统筹派发）`），精确比较会把已完成的步骤误判为未完成。
+ * 执行步骤与验收步骤的比较统一走 `normalizeFlowStepStatus`（只认引导 token，大小写不敏感）。
  */
 export function flowCompletionIssue(
   flowId: string,
@@ -149,7 +173,7 @@ export function flowCompletionIssue(
   // 验收步骤是派发目标本身，不参与「执行完成」判定（见函数注释）。
   const executionSteps = parsed.steps.filter((step) => !VERIFICATION_STEP_IDS.has(step.id));
   const acceptanceStep = parsed.steps.find((step) => VERIFICATION_STEP_IDS.has(step.id));
-  const notDone = executionSteps.filter((step) => step.status.toLowerCase() !== "done");
+  const notDone = executionSteps.filter((step) => normalizeFlowStepStatus(step.status) !== "done");
   if (notDone.length > 0) {
     const detail = notDone.slice(0, 10).map((step) => `${step.id}=${step.status || "（空）"}`).join("、");
     return `流程仍有未完成/阻塞/待派发步骤（${detail}）`;
@@ -164,7 +188,7 @@ export function flowCompletionIssue(
     return `流程步骤缺少 dispatch.accepted 记录（${missingDispatch.slice(0, 10).map((step) => step.id).join("、")}）`;
   }
   if (acceptanceStep === undefined) return "流程单缺少验收步骤";
-  if (acceptanceStep.status.toLowerCase() === "done") return "验收步骤已完成";
+  if (normalizeFlowStepStatus(acceptanceStep.status) === "done") return "验收步骤已完成";
   const acceptance = ledger.entries.find(
     (entry) => entry.kind === "customer.decision" && entry.flowId === flowId && entry.decisionKind === "acceptance",
   );
@@ -182,13 +206,30 @@ export function flowCompletionIssue(
 /**
  * 收尾推进的唯一一条任务（Rapporteur）：只引用流程单与回交/报告路径，要求汇总证据并**出验收卡**；
  * 不预先决定通过/退回（验收卡仍走决策开关/判断 agent 或客户手批）。
+ *
+ * 2026-10-19 客户批准（原话「可以，按你说的改」）：验收前最起码要**真实启动应用并向客户演示**，
+ * 且按工程质量基线逐项核对——任务文本追加四条硬要求（①八项基线逐项核对 ②真实启动/演示
+ * ③未演示或某项无证据不得建议 accept ④演示证据写入 `docs/verification/<flowId>-v1.md`）。
+ *
+ * 2026-10-19 客户批评（原话「这个感觉也没有啥架构的啊，提案角色应该也要考虑到扩展性，给出一个
+ * 架构方案啊」）：追加第⑤条硬要求——按提案/变更的「架构方案或架构影响分析」核对实现（模块边界、
+ * 依赖方向、扩展点、数据 schema/API 版本迁移须与声明一致）；缺失架构章节或实现偏离声明时不得
+ * 建议 accept。原四条逐字不变。本函数只产出任务文本，**不是验收判定**：不改变
+ * `flowCompletionIssue` 触发门、不自动批准；演示证据存在与否仍由 Proof 核对、验收卡仍由
+ * 客户/判断 agent 决定。
  */
 export function buildAcceptanceTaskMessage(flowId: string, evidence: readonly string[]): string {
   const paths = [...new Set(evidence.filter((item): item is string => nonEmptyString(item)))].slice(0, 10);
   const evidenceText = paths.length > 0 ? paths.join("、") : "见回交报告与流程单";
   return (
     `流程 ${flowId} 步骤已全部完成（流程单：${governanceFlowPath(flowId)}；回交/核对报告路径：${evidenceText}）。` +
-    `请汇总证据并出验收卡（不要自行验收或代替客户决定）。`
+    `请汇总证据并出验收卡（不要自行验收或代替客户决定）。` +
+    `验收前必须满足以下硬要求：` +
+    `① 按工程质量基线逐项核对并给出结论与证据：正确性、健壮性、安全、可维护性、可观测性、性能、前端可访问性、测试矩阵；` +
+    `② 必须真实启动应用并向客户演示：给出启动命令与访问地址，附截图或录屏（你已有审批档 shell，可执行启动命令，命令逐条提交审批）；` +
+    `③ 未真实启动/演示、或质量基线某项无证据，不得建议 accept（只能建议退回或补充证据）；` +
+    `④ 演示证据与逐项核对结论写入 docs/verification/${flowId}-v1.md，并在验收卡中引用。` +
+    `⑤ 按提案/变更的「架构方案或架构影响分析」核对实现：模块边界、依赖方向、扩展点、数据 schema/API 版本迁移与声明一致；缺失架构章节或实现偏离声明时不得建议 accept（只能建议退回或补充证据）。`
   );
 }
 
