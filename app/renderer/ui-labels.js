@@ -192,8 +192,16 @@
     return value === "1";
   }
 
-  /** shell 确认卡标题：su 审批卡与项目角色三层链卡区分（缺省/旧请求 ⇒ 保持原文）。 */
-  function shellConfirmTitle(policy) {
+  /**
+   * shell 确认卡标题（纯映射；2026-10-19 客户截图反馈：五个内置治理角色走同一审批档，但不应再显示「SU」）：
+   *  · 载荷 `roleId` 是五个内置治理角色之一 ⇒「命令审批 · <显示名>」（如「命令审批 · Proof / 验收」）；
+   *  · 否则审批档（`su-approval`：单模型 su / 旧请求无 roleId）⇒「SU 命令审批」（逐字保留）；
+   *  · 其余（项目角色三层链 / 缺 policy 的旧请求）⇒「shell 命令请求」（既有兜底，逐字保留）。
+   * 判据只看载荷事实（policy/roleId），不改变卡片行为、按钮或放行判据。
+   */
+  function shellConfirmTitle(policy, roleId) {
+    var roleName = governanceRoleDisplayNameById(roleId);
+    if (roleName !== "") return "命令审批 · " + roleName;
     return policy === "su-approval" ? "SU 命令审批" : "shell 命令请求";
   }
 
@@ -885,6 +893,26 @@
       builtinNote: GOVERNANCE_ROLE_BUILTIN_NOTE,
       emptyHint: GOVERNANCE_ROLE_EMPTY_HINT[governanceFunction] || "",
     };
+  }
+
+  // —————— shell 确认卡按实际角色显示（2026-10-19 客户截图反馈）——————
+  // shell 确认载荷只带 `roleId`（不带 `governanceFunction`）；下面按注册表同一职能表补出**展示名**，
+  // 顺序与注册表 `displayName` 一致（英文 / 中文，如「Proof / 验收」）。只做展示转写，不参与任何判定；
+  // 非内置治理角色 id（含 su、项目角色、未知）⇒ 空串，由 `shellConfirmTitle` 走既有兜底文案。
+  var GOVERNANCE_ROLE_FUNCTION_BY_ID = {
+    liaison: "liaison",
+    rapporteur: "proposal",
+    nominator: "nomination",
+    convener: "schedule",
+    verifier: "verification",
+  };
+
+  /** 内置治理角色 id 的展示名（英文 / 中文）；非内置治理 id ⇒ 空串（不编名字、不猜角色）。 */
+  function governanceRoleDisplayNameById(roleId) {
+    if (typeof roleId !== "string" || roleId === "") return "";
+    var fn = GOVERNANCE_ROLE_FUNCTION_BY_ID[roleId];
+    var t = fn ? GOVERNANCE_ROLE_TEXT[fn] : null;
+    return t ? t.en + " / " + t.cn : "";
   }
 
   /** 治理决定卡的**镜像来源标签**（评审 §6.1：镜像面标明来源，不是第二张审批）。 */

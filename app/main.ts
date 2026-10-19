@@ -438,6 +438,9 @@ function registerIpc(win: BrowserWindow): void {
   if (!desktopEnvPath) throw new Error("运行时配置路径尚未初始化。");
   const desktop = createDesktopInterface({
     envFilePath: desktopEnvPath,
+    // 自动验收派发/冷启动补齐的 per-project 引擎选择：user-data 下的独立文件（不写项目 `.ans`、
+    // 不碰治理账本）——下次冷启动据此选对引擎（2026-10-19 真机缺陷：无活跃会话时曾回退 claude）。
+    runtimeStatePath: path.join(app.getPath("userData"), "ans", "runtime-selection.json"),
     pickDirectory: async () => {
       const result = await dialog.showOpenDialog(win, {
         title: "导入项目（选择项目根文件夹）",

@@ -16,6 +16,7 @@ import {
   makeHarness,
   makeRoot,
   proposalDoc,
+  seedConfirmedIntent,
   seedLedger,
   seedTrioProject,
   write,
@@ -52,6 +53,8 @@ async function runCase(opts: {
   write(temp.root, PROPOSAL_REL, proposalDoc(FLOW));
   write(temp.root, FLOW_REL, flowDoc(FLOW, opts.steps));
   await seedLedger(temp.root, opts.ledger.entries);
+  // 前置：客户已确认意图（decision 组判断的意图基准）；否则验收卡在意图定位处 fail-closed。
+  await seedConfirmedIntent(temp.root);
   const h = await makeHarness({
     tag: opts.tag,
     root: temp.root,
@@ -207,6 +210,7 @@ test("Draft 不能发 acceptance：rapporteur 的 request_choice(acceptance) 被
   write(temp.root, PROPOSAL_REL, proposalDoc(FLOW));
   write(temp.root, FLOW_REL, flowDoc(FLOW, [{ id: "impl", status: "done" }]));
   await seedLedger(temp.root, [ACCEPTED, DISPATCHED]);
+  await seedConfirmedIntent(temp.root);
   const h = await makeHarness({
     tag: "acceptance-wrong-role",
     root: temp.root,

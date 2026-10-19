@@ -921,7 +921,17 @@ export type JudgeReadCode =
   | "not-a-directory"
   | "binary"
   | "budget"
-  | "read-failed";
+  | "read-failed"
+  /**
+   * 范围参数非法（2026-10-19 定点抽查）：负数/非整数/limit=0/字节与行参数混用/endLine<startLine。
+   * 与 `empty`/`invalid-path` 同口径：不消耗调用预算，**不计入** `deniedReads`（调用错误，不是读取受损）。
+   */
+  | "range-invalid"
+  /**
+   * 请求范围越过文件（2026-10-19 定点抽查）：offset/startLine 超出文件末尾，或行扫描超过上限。
+   * 信息性结果（同 `not-found`）：**不计入** `deniedReads`，只记 `deniedPaths` 诊断。
+   */
+  | "out-of-range";
 
 /** 判断读取路径类别（诊断/文案用；**不携带原路径**）。 */
 export type JudgePathClass =
@@ -981,6 +991,27 @@ export interface ShellJudgeReadStats {
   deniedPaths?: ShellJudgeDeniedPath[];
 }
 
+/**
+ * shell 判断会话的读取预算（**跨角色只读契约**，2026-10-19 登记）。
+ *
+ * 所有权＝运行时核心；`src/common/runtime-core/shell-judge/policy.ts` **re-export 同一符号**并实现
+ * `resolveShellJudgeBudget`，既有导入路径（`.../shell-judge/policy.ts`）不变、不保留第二份定义。
+ * 编排 `src/common/编排/shell-judge.ts` 只读导入本类型与 `resolveShellJudgeBudget`，把**本次实际生效**
+ * 的预算注入判断提示——提示数值必须与只读工具实际生效值同源，编排不得复制第二份 env/默认值解析。
+ *
+ * 只读语义：读取方只消费，不写入、不扩展判定；新增字段须可选（旧读者忽略）。
+ */
+export interface ShellJudgeBudget {
+  /** 读取/列举调用上限（`judge_read_file` 与 `judge_list_dir` 合计）。 */
+  maxCalls: number;
+  /** 单次判断会话的总读取字节上限。 */
+  maxBytes: number;
+  /** 单文件读取字节上限。 */
+  maxFileBytes: number;
+  /** 行范围定位的扫描上限（字节）；只约束「找行号」的 I/O，不计入 `readBytes`。 */
+  maxScanBytes: number;
+}
+
 /** 判断会话的只读工具选项（`GovernedToolsOptions.shellJudge`；能力注入，非工具注入）。 */
 export interface ShellJudgeToolOptions {
   /** 请求会话的 projectRoot——读取根与越界判定基准。 */
@@ -989,8 +1020,13 @@ export interface ShellJudgeToolOptions {
   report: (raw: unknown) => void;
   /** 工具累加；驱动创建（`allow` 必须无损）。 */
   stats: ShellJudgeReadStats;
-  /** 缺省：maxCalls 8、maxBytes 192KB、maxFileBytes 64KB。 */
-  budget?: { maxCalls?: number; maxBytes?: number; maxFileBytes?: number };
+  /**
+   * 缺省：maxCalls 12、maxBytes 512KB、maxFileBytes 128KB；maxScanBytes（行范围定位扫描上限）8MiB。
+   * `buildShellJudgeTools` 还会读取 `ANS_SHELL_JUDGE_MAX_CALLS`/`ANS_SHELL_JUDGE_MAX_BYTES`/
+   * `ANS_SHELL_JUDGE_MAX_FILE_BYTES`（正整数、受上下限约束，非法回落缺省）；显式字段优先于 env。
+   * env 只在构造判断会话时读取，不进入模型可见能力。
+   */
+  budget?: Partial<ShellJudgeBudget>;
 }
 
 // —————————————— 治理卡判断 agent（「替我审批」/「替我决策」）中立契约（2026-10-18，PM 评审 §六） ——————————————
@@ -1083,8 +1119,8 @@ export interface GovernanceJudgeToolOptions {
   /** `report_governance_judgement` 回调：只收模型原始参数，**不在运行时核心做规范化**。 */
   report: (raw: unknown) => void;
   stats: ShellJudgeReadStats;
-  /** 缺省：maxCalls 8、maxBytes 192KB、maxFileBytes 64KB。 */
-  budget?: { maxCalls?: number; maxBytes?: number; maxFileBytes?: number };
+  /** 缺省：maxCalls 12、maxBytes 512KB、maxFileBytes 128KB；maxScanBytes（行范围定位扫描上限）8MiB。 */
+  budget?: { maxCalls?: number; maxBytes?: number; maxFileBytes?: number; maxScanBytes?: number };
 }
 
 /**

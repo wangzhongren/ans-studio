@@ -71,6 +71,9 @@ import { classifyShell, defaultShellRules } from "../../src/service/gate/shell-r
 // 「前端该注入哪几件」——`Omit` 掉 project/operatorChannel/sessionDeps（那三件由编排按本次会话装配）。
 import { SU_APPROVAL_REASON_PREFIX } from "../../src/pipeline/orchestration/shell-arming.ts";
 import type { AssembleShellGateOptions, SuApprovalTier } from "../../src/pipeline/orchestration/shell-arming.ts";
+// 内置治理角色的统一显示名（2026-10-19 客户反馈：审批档卡片按实际角色显示，不再一律写「SU」）。
+// 单一来源仍是门禁引擎注册表；本层经 Service 公共出口只读消费（同 `shell-rules.ts` 先例，不复制数据）。
+import { governanceRoleOf } from "../../src/service/boundary/resolve-boundary.ts";
 
 // argv 规范化原语的**单一来源**（pm，T23，`src/common/shared/argv-primitives.ts`）：**只读导入**——
 // 与编排侧（写审计）同源，故「操作者所见」与「审计所记」不可能漂移。此前本模块的**本地副本（逐字镜像）
@@ -633,13 +636,31 @@ export function parseSuApprovalTier(reason: unknown): SuApprovalTier | null {
   return match === null ? null : (match[1] as SuApprovalTier);
 }
 
+/**
+ * **审批档展示用的角色名**（2026-10-19 客户反馈：五个内置治理角色都走同一审批档，卡片不应再一律写「SU」）。
+ * 纯展示映射；**内部解析前缀 `su-审批档[tier]` 保持原样**（兼容旧驱动/编排，解析见 `parseSuApprovalTier`）。
+ *  · single/su、缺省（无角色上下文）或非内置治理 id（项目角色）⇒ `"SU"`——旧文案逐字保留；
+ *    项目角色的 reason 本就不带审批档前缀，正常不会走到本分支；
+ *  · trio 内置治理角色（liaison/rapporteur/nominator/convener/verifier）⇒ 注册表统一显示名
+ *    （`Lead / 主理`、`Proof / 验收` 等）；调用方显式给出的 displayName 优先。
+ */
+export function approvalRoleDisplayName(roleId?: string, displayName?: string): string {
+  const id = typeof roleId === "string" ? roleId.trim() : "";
+  const spec = id === "" || id === "su" ? undefined : governanceRoleOf(id);
+  if (spec === undefined) return "SU";
+  const explicit = typeof displayName === "string" ? displayName.trim() : "";
+  return explicit !== "" ? explicit : spec.displayName;
+}
+
 /** su 审批档的人话（单一来源在本模块；含三条必备披露：逐条客户批准 / 拒绝超时通道不可用＝拒绝 /
- *  批准后可能绕过 ANS 文件写边界）。档位名：deny＝硬拒类、risky/review 各用其档位名。 */
-function suApprovalPlainReason(tier: SuApprovalTier): string {
+ *  批准后可能绕过 ANS 文件写边界）。档位名：deny＝硬拒类、risky/review 各用其档位名。
+ *  `roleDisplayName` 为展示用角色名（内置治理角色⇒其显示名；single/su/缺省⇒`SU`，旧文案逐字保留）。 */
+function suApprovalPlainReason(tier: SuApprovalTier, roleDisplayName?: string): string {
+  const role = typeof roleDisplayName === "string" && roleDisplayName.trim() !== "" ? roleDisplayName.trim() : "SU";
   const tierText =
     tier === "deny" ? "硬拒类（deny）" : tier === "risky" ? "风险命令（risky）" : "未自动判定（review）";
   return (
-    `SU 审批档：${tierText}——须逐条客户批准才执行；` +
+    `${role} 审批档：${tierText}——须逐条客户批准才执行；` +
     "批准后可能绕过 ANS 文件写边界（命令以当前 OS 用户权限运行）。" +
     "拒绝/超时/通道不可用 = 拒绝；默认拒绝、无「记住」，不自动通过。"
   );
@@ -647,11 +668,12 @@ function suApprovalPlainReason(tier: SuApprovalTier): string {
 
 /** 升级原因 → **人话**（(b) 判读的内部用语**不得**原样示人；未识别一律给 fail-closed 通用句——
  *  既不泄行话、也**不替审核编造结论**；原始措辞只进渲染侧折叠详情供核查）。
- *  **su 审批档前缀优先**（2026-10-17）——先按行首前缀解析，再走既有项目角色映射（逐字不变）。 */
-export function plainReasonFor(reason: unknown): string {
+ *  **su 审批档前缀优先**（2026-10-17）——先按行首前缀解析，再走既有项目角色映射（逐字不变）。
+ *  `roleDisplayName` 仅影响审批档文案的角色名（2026-10-19：内置治理角色按实际角色显示；缺省仍为 `SU`）。 */
+export function plainReasonFor(reason: unknown, roleDisplayName?: string): string {
   const raw = typeof reason === "string" ? reason : "";
   const suTier = parseSuApprovalTier(raw);
-  if (suTier !== null) return suApprovalPlainReason(suTier);
+  if (suTier !== null) return suApprovalPlainReason(suTier, roleDisplayName);
   if (/risky/i.test(raw)) return "自动审核判定这条命令有风险——按治理规则，有风险的命令必须由你亲自确认才能执行。";
   if (/超时|timeout/i.test(raw)) return "自动审核超时，未给出结论——按 fail-closed 交你确认。";
   if (/json|解析|parse/i.test(raw)) return "自动审核给出的结论无法解析，未能形成明确意见——按 fail-closed 交你确认。";
@@ -671,7 +693,8 @@ export interface ShellConfirmRequest {
   command: string;
   /** 白话摘要（`shellIntentSummary`；无从概括为 null——渲染侧隐藏该行）。 */
   summary: string | null;
-  /** 「为什么问你」——人话（`plainReasonFor`；内部行话不外露）。 */
+  /** 「为什么问你」——人话（`plainReasonFor`；内部行话不外露）。审批档文案按实际内置治理角色显示
+   *  （如「Proof / 验收 审批档：…」；single/su/缺省仍为「SU 审批档」——2026-10-19 客户反馈）。 */
   reasonPlain: string;
   /** 升级原因的**原文**（仅供折叠详情里的核查；可为 null）。 */
   reasonRaw: string | null;
@@ -688,15 +711,21 @@ export interface ShellConfirmRequest {
   judgeNotice?: string;
 }
 
-/** 由既有呈现（`describeShellCommand` 的产物）构建确认卡数据面（纯函数；命令原文逐字转抄）。 */
-export function buildShellConfirmRequest(id: string, display: ShellCommandDisplay): ShellConfirmRequest {
+/** 由既有呈现（`describeShellCommand` 的产物）构建确认卡数据面（纯函数；命令原文逐字转抄）。
+ *  `roleDisplayName` 为展示用角色名（`approvalRoleDisplayName` 的产物）——只影响审批档的
+ *  `reasonPlain` 文案；`reasonRaw`/`tier`/`policy` 与内部前缀解析**逐字不变**（解析兼容）。 */
+export function buildShellConfirmRequest(
+  id: string,
+  display: ShellCommandDisplay,
+  roleDisplayName?: string,
+): ShellConfirmRequest {
   const reasonRaw = typeof display.reason === "string" && display.reason !== "" ? display.reason : null;
   const tier = parseSuApprovalTier(reasonRaw);
   return {
     id,
     command: display.command,
     summary: shellIntentSummary(display.command),
-    reasonPlain: plainReasonFor(reasonRaw),
+    reasonPlain: plainReasonFor(reasonRaw, roleDisplayName),
     reasonRaw,
     argvLines: display.argvLines,
     cwd: display.cwd,
@@ -763,9 +792,12 @@ export function createShellConfirmPresenter(opts: CreateShellConfirmPresenterOpt
   return {
     presenter: {
       async present(_prompt: OperatorPrompt, display: ShellCommandDisplay, metadata?: DesktopOperatorMetadata): Promise<OperatorDecision> {
+        // 2026-10-19 客户反馈：审批档文案按**实际内置治理角色**显示（verifier ⇒「Proof / 验收 审批档」）；
+        // 只映射展示名，内部 `su-审批档[tier]` 前缀与 tier/policy 解析不变。缺省/su ⇒「SU」旧文案。
+        const roleDisplayName = approvalRoleDisplayName(metadata?.roleId);
         const allowed = await core.mount(
           (id) => {
-            const request = buildShellConfirmRequest(id, display);
+            const request = buildShellConfirmRequest(id, display, roleDisplayName);
             if (metadata) {
               request.roleId = metadata.roleId;
               request.projectRoot = metadata.projectRoot;

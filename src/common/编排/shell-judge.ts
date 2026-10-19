@@ -21,6 +21,12 @@
 // `createRuntimeAdapterFactory`（与请求会话同一份 runtimeOptions），测试注入假 `createAdapter`。
 // 判断会话**不写盘、不写聊天、不写角色状态**；所有失败一律归 `ShellJudgeOutcome{verdict:"manual"}`，
 // 本函数**不抛错**。
+//
+// 定位（客户 2026-10-19 修正）：判断 agent 是**系统风险审查**，不是业务必要性审查。提示词只让它
+// 判断机器/卡死/越界/并发/端口五类系统风险；业务正确性与「命令是否必要」由发起角色负责。内部
+// `reasonCode:"necessary"` 保留以兼容既有消费方，语义为「风险审查通过（无系统风险）」。
+// 本次实际解析的读取预算（显式注入 > env > 缺省）同时注入只读工具与请求提示，避免「预算用尽」
+// 时判断 agent 不知道具体限制。
 
 import type {
   DiagnosticLog,
@@ -40,6 +46,11 @@ import type {
 } from "../../model/runtime.ts";
 import type { ProjectConfig, ResolvedRole } from "../../model/role.ts";
 import type { RuntimeAdapterFactory, RuntimeAdapterFactoryOptions } from "../../pipeline/orchestration/run-role.ts";
+// 只读导入运行时核心**既有导出**：读取预算的实际解析值（显式注入 > env > 缺省）。
+// 2026-10-19 客户要求「判断应该告诉他预算限制」：提示词里的预算必须与工具实际生效值同源，
+// 不得在编排侧复制第二份 env 解析（policy.ts 注释称本模块不跨角色导出为公共契约——已在
+// 本批报告中作为跨角色依赖提出，待运行时核心登记/收敛到 shared；本角色不改 runtime-core）。
+import { resolveShellJudgeBudget, type ShellJudgeBudget } from "../runtime-core/shell-judge/policy.ts";
 import { RUNTIME_KINDS } from "../shared/runtime-shared.ts";
 import { createDiagnosticLogger } from "../shared/diagnostics.ts";
 import { buildShellJudgePrompt, buildShellJudgeSystemPrompt, SHELL_JUDGE_ARGV_LIMIT, SHELL_JUDGE_COMMAND_LIMIT_BYTES } from "./shell-judge-prompt.ts";
@@ -174,6 +185,12 @@ export interface CreateShellJudgeOptions {
   maxQueue?: number;
   /** 同一命令连续 deny 上限；缺省 2。 */
   maxDenyPerCommand?: number;
+  /**
+   * 判断读取预算（可选；显式字段 > `ANS_SHELL_JUDGE_MAX_*` env > 运行时核心缺省）。
+   * 驱动把**解析后的实际值**同时注入工具（`ShellJudgeToolOptions.budget`）与请求提示，
+   * 保证判断 agent 看到的数字就是本次真正生效的预算。
+   */
+  budget?: Partial<ShellJudgeBudget>;
   logger?: DiagnosticLog;
 }
 
@@ -464,10 +481,14 @@ export function createShellJudge(opts: CreateShellJudgeOptions): ShellJudgeFn {
     const projectRoot = (typeof request.projectRoot === "string" && request.projectRoot.trim() !== ""
       ? request.projectRoot
       : opts.project.projectRoot).trim();
+    // 预算在**本次判断**解析一次：同一份解析结果既交给只读工具（显式字段优先，工具层不会再被
+    // env 分叉），也写进请求提示——判断 agent 看到的就是实际会被执行的限制。
+    const budget = resolveShellJudgeBudget(opts.budget);
     const toolOptions: ShellJudgeToolOptions = {
       projectRoot,
       report: (raw: unknown) => { reports.push(raw); },
       stats,
+      budget,
     };
     const role = judgeRole();
     let lastMessage = "";
@@ -533,7 +554,7 @@ export function createShellJudge(opts: CreateShellJudgeOptions): ShellJudgeFn {
           return { kind: "settled" };
         }
         try {
-          await bound.prompt(buildShellJudgePrompt(request));
+          await bound.prompt(buildShellJudgePrompt(request, budget));
           if (stopped) return { kind: "settled" };
           for await (const event of bound.events()) {
             if (event.kind === "message" && !event.summary.startsWith("用户指令：")) lastMessage = event.summary;
@@ -584,7 +605,7 @@ export function createShellJudge(opts: CreateShellJudgeOptions): ShellJudgeFn {
           // 人话按 reasonCode 分派：预算耗尽 ≠ 文件不可读（独立验收缺陷回归）。
           const damageReason =
             damage === "budget"
-              ? "判断预算耗尽（读取次数/总读取字节达上限），无法保证无损判断，已转手动确认。"
+              ? "判断预算耗尽（读取次数/总读取字节达上限），无法保证无损判断且无法补全缺失证据，已转手动确认。"
               : damage === "read-truncated"
                 ? "判断所需文件被截断，无法保证无损判断，已转手动确认。"
                 : readDeniedReason(stats);
@@ -632,7 +653,7 @@ export function createShellJudge(opts: CreateShellJudgeOptions): ShellJudgeFn {
       // deny：始终有效（拒绝是安全方向），不受读取损伤影响。
       const key = normalizeCommandKey(request.command);
       denyCounts.set(key, (denyCounts.get(key) ?? 0) + 1);
-      const reason = safe.reason ?? "判断为不必要或未确认必要性。";
+      const reason = safe.reason ?? "判断未能确认该命令无系统风险。";
       const original = safe.customerMessage;
       const customerMessage = synthesizeCustomerMessage({ ...safe, reason });
       const synthesized = original === undefined || synthesizeCustomerMessage({ verdict: "deny", customerMessage: original }) !== original;
@@ -712,7 +733,7 @@ export function createShellJudge(opts: CreateShellJudgeOptions): ShellJudgeFn {
     const denied = denyCounts.get(key) ?? 0;
     if (denied >= maxDenyPerCommand) {
       log.record("shell-judge.retry.capped", { toolCallId: request.toolCallId, count: denied });
-      return manualOutcome("retry-capped", "同一命令连续被判断为不必要，已达重试上限；已转手动确认。");
+      return manualOutcome("retry-capped", "同一命令连续未通过系统风险审查，已达重试上限；已转手动确认。");
     }
     // 并发池：未达上限立即判断；达到上限排队（有界 FIFO + 排队总时限），不再直接回落。
     const slot = await acquireSlot(request.toolCallId, signal);

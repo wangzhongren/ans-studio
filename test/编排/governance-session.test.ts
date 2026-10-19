@@ -367,6 +367,74 @@ test("默认提示词：trio 按 function 追加各自纪律（不写「已批�
   });
 });
 
+test("标准工作流（2026-10-19 客户反馈）：trio 与 single/su 提示均含阶段流转/自动派发/Proof 标准复核流程", async () => {
+  await withRoot(async (root) => {
+    const promptCapturing = () => {
+      const captured: { prompt?: string } = {};
+      const factory = (): RuntimeAdapter => ({
+        async composeContext() {
+          return { systemPrompt: "" };
+        },
+        async bindRole(): Promise<RoleSession> {
+          return {
+            async prompt(text: string): Promise<void> {
+              captured.prompt = text;
+            },
+            events(): AsyncIterable<SessionEvent> {
+              return (async function* () {
+                yield { kind: "settled", summary: "完成" } as SessionEvent;
+              })();
+            },
+            async dispose(): Promise<void> {},
+          };
+        },
+      });
+      return { captured, factory };
+    };
+
+    // 客户原话：「这个独立核准应该是标准流程，而不是我在发给他。」「内置角色应该有自己的工作流。」
+    const required: Array<[RegExp, string]> = [
+      [/标准工作流（阶段流转由应用负责）/, "标准工作流标题"],
+      [/内置角色按标准工作流执行/, "内置角色按标准工作流执行"],
+      [/客户不做内部调度/, "客户不做内部调度"],
+      [/应用会在流程齐备[^\n]*后自动派发 Proof \/ 验收/, "流程齐备后自动派发 Proof"],
+      [/不需要客户手动触发/, "不需要客户手动触发"],
+      [/自动派发不是验收决定/, "自动派发不是验收决定"],
+      [/Proof 的标准复核流程（独立核准是标准流程，不是客户手动转交）/, "Proof 标准复核流程标题"],
+      [/用审批档 shell 跑测试/, "用审批档 shell 跑测试"],
+      [
+        /读证据[\s\S]*跑测试[\s\S]*真实启动演示[\s\S]*质量\/架构核对[\s\S]*验收卡/,
+        "Proof 复核顺序（读证据 → 跑测试 → 真实启动演示 → 质量/架构核对 → 验收卡）",
+      ],
+    ];
+
+    const trio = trioProject(root);
+    for (const fn of ["liaison", "proposal", "nomination", "schedule", "verification"] as const) {
+      const { captured, factory } = promptCapturing();
+      const result = await runGovernSession(
+        { taskId: "T-WORKFLOW", project: trio, governanceFunction: fn, customerInput: confirmAllow },
+        { createAdapter: factory },
+      );
+      assert.equal(result.code, EXIT_OK, fn);
+      assert.ok(captured.prompt !== undefined);
+      for (const [pattern, label] of required) {
+        assert.match(captured.prompt!, pattern, `${fn} 提示词：${label}`);
+      }
+    }
+
+    const { captured, factory } = promptCapturing();
+    const single = await runGovernSession(
+      { taskId: "T-WORKFLOW", project: singleProject(root), customerInput: confirmAllow },
+      { createAdapter: factory },
+    );
+    assert.equal(single.code, EXIT_OK);
+    assert.ok(captured.prompt !== undefined);
+    for (const [pattern, label] of required) {
+      assert.match(captured.prompt!, pattern, `single/su 提示词：${label}`);
+    }
+  });
+});
+
 // —————————————————————— ② 能力矩阵 ——————————————————————
 
 test("能力矩阵（注册表）：Rapporteur/Nominator/Convener/su 的工具能力与 shell 审批档", async () => {

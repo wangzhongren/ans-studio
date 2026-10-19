@@ -561,6 +561,31 @@ const ARCHITECTURE_EXTENSIBILITY_REQUIREMENTS = [
 ].join("\n");
 
 /**
+ * 标准工作流（客户 2026-10-19 反馈，原话：「这个独立核准应该是标准流程，而不是我在发给他。」
+ * 「内置角色应该有自己的工作流。」）——阶段流转与独立核准都属于应用的**标准流程**，不是客户
+ * 逐次手动转交/触发的动作。
+ *
+ * 与门禁引擎五张内置治理角色卡（Lead / Draft / Crew / Steward / Proof）的「标准工作流」章节
+ * **成对同步**：单一来源在 `src/common/门禁引擎/governance-roles.ts` 的角色卡文案。分层规则禁止
+ * 导入其他角色的私有 common，故在本层**复制**一份并注明来源；任一侧改文案必须同批同步。
+ * 本块是治理会话提示（CLI `ans govern` 与经 `runGovernSession` 的前端）的行为约束，不改变任何
+ * 门禁判定：自动派发仍由应用在流程齐备后执行，验收仍由 Proof 核对 + 客户/判断 agent 决定。
+ */
+const STANDARD_WORKFLOW_PROMPT = [
+  "**标准工作流（阶段流转由应用负责）**：内置角色按标准工作流执行——意图确认 → 提案与契约 → 任命与角色卡 → 流程与派发 → 独立验收；",
+  "trio 依次由 Lead / 主理、Draft / 提案、Crew / 组队、Steward / 统筹、Proof / 验收承担，single/su 由同一治理角色按同一顺序推进。",
+  "**客户不做内部调度**：阶段流转由应用负责，客户不需要逐阶段手动转交或触发；只有需要客户决定的事项（提案接受、任命、写盘确认、验收）才经治理卡呈给客户。",
+  "**Proof 的标准复核流程（独立核准是标准流程，不是客户手动转交）**：收到验收任务后按序执行：",
+  "① 读证据（流程单、提案/契约、交付与回交报告、演示证据路径）；",
+  "② 用审批档 shell 跑测试（逐条执行提案声明的单元/集成/端到端测试，命令逐条提交审批并记录输出）；",
+  "③ 真实启动演示（执行启动命令、确认可访问，形成截图/录屏证据）；",
+  "④ 质量/架构核对（按工程质量基线逐项核对，并核对实现与架构方案/影响分析一致：模块边界、依赖方向、扩展点、schema/API 版本迁移）；",
+  "⑤ 验收卡（核对结论与证据写入 docs/verification/<flowId>-v1.md，再发 request_choice：cardKind=acceptance、选项 accept/reject）。",
+  "**自动派发**：应用会在流程齐备（执行步骤全部 done 且均有 dispatch.accepted、无未结算决定、验收步骤 pending）后自动派发 Proof / 验收，不需要客户手动触发；",
+  "自动派发不是验收决定——验收卡仍由 Proof 核对后发出，由客户/判断 agent 决定。",
+].join("\n");
+
+/**
  * single/su 的阶段要求（su 一份提示覆盖全部治理阶段；trio 由 `governanceFunctionDiscipline` 分角色
  * 承载同一约束）。与基线一起追加，确保模型在意图/提案/流程/验收各阶段都受约束。
  */
@@ -584,7 +609,12 @@ const ENGINEERING_QUALITY_STAGE_REQUIREMENTS =
  *  客户 2026-10-19 新批评（「提案角色应该也要考虑到扩展性，给出一个架构方案」）：两类提示在基线之后
  *  追加 `ARCHITECTURE_EXTENSIBILITY_REQUIREMENTS`（与门禁引擎基线「架构与可扩展性」条成对同步），
  *  明确 Draft（架构方案/影响分析）、Steward（流程/派发引用架构边界）、Proof（验收核对实现与声明一致）
- *  各阶段职责；提案缺架构章节或空洞时不得建议 accept。 */
+ *  各阶段职责；提案缺架构章节或空洞时不得建议 accept。
+ *  客户 2026-10-19 新反馈（「这个独立核准应该是标准流程，而不是我在发给他。」「内置角色应该有自己的
+ *  工作流。」）：两类提示在角色纪律/任务要求之前追加 `STANDARD_WORKFLOW_PROMPT`——阶段流转由应用负责、
+ *  内置角色按标准工作流执行、客户不做内部调度；Proof 按「读证据 → 审批档 shell 跑测试 → 真实启动演示
+ *  → 质量/架构核对 → 验收卡」标准复核；流程齐备后应用自动派发 Proof，不需要客户手动触发。
+ *  该块与门禁引擎角色卡「标准工作流」章节成对同步（单一来源在其注册表卡文本）。 */
 function buildGovernPrompt(
   taskId: string,
   roleIds: string[],
@@ -611,18 +641,20 @@ function buildGovernPrompt(
     const quality =
       "\n" + ENGINEERING_QUALITY_BASELINE + "\n" + ENGINEERING_QUALITY_STAGE_REQUIREMENTS +
       "\n" + ARCHITECTURE_EXTENSIBILITY_REQUIREMENTS;
+    // 客户 2026-10-19 反馈：标准工作流与自动派发同样是应用的标准流程，不是客户逐阶段手动调度。
+    const workflow = "\n" + STANDARD_WORKFLOW_PROMPT;
     if (roleIds.length === 0) {
       return opts.canWrite
-        ? head + confirmRule +
+        ? head + confirmRule + workflow +
             "\n未指定目标角色：请**据对话决定要建哪些角色**，逐一向客户确认后写出治理产物——" +
             "`角色卡/<角色>/role-card.md`、`角色卡/<角色>/boundary.yaml`、`角色卡/<角色>/memo.md`。" +
             "项目治理边界文档 `角色卡/governance-boundary.yaml` 由编排的自动收尾写出，无需你写。" +
             quality
-        : head + "\n本次未指定目标角色（--role）：可写集为空，会话只做调查/规划，不写盘。" + quality;
+        : head + workflow + "\n本次未指定目标角色（--role）：可写集为空，会话只做调查/规划，不写盘。" + quality;
     }
     const targets = roleIds.map((id) => `角色卡/${id}/（role-card.md / boundary.yaml / memo.md）`).join("；");
     return (
-      `${head}${confirmRule}\n具体改动要求：请为角色 ${roleIds.join("、")} 建出标准骨架文件：${targets}。` +
+      `${head}${confirmRule}${workflow}\n具体改动要求：请为角色 ${roleIds.join("、")} 建出标准骨架文件：${targets}。` +
       (opts.confirmFirst
         ? "先经 request_confirmation 预览（含这些路径）获客户确认，再写；未确认路径会被拒。"
         : "用 write_file 写出上述文件（越界或可写集外的写入会被拒）。") +
@@ -650,7 +682,7 @@ function buildGovernPrompt(
       ? `\n本次指定目标角色：${roleIds.join("、")}；写这些角色的任何路径仍须先取得客户决定（见下）。`
       : "";
   return (
-    `${head}${confirmRule}${targets}\n${governanceFunctionDiscipline(spec)}\n` +
+    `${head}${confirmRule}${targets}\n${STANDARD_WORKFLOW_PROMPT}\n${governanceFunctionDiscipline(spec)}\n` +
     `${ENGINEERING_QUALITY_BASELINE}\n${ARCHITECTURE_EXTENSIBILITY_REQUIREMENTS}\n${SHELL_APPROVAL_PROMPT_LINE}`
   );
 }
@@ -728,6 +760,8 @@ function governanceFunctionDiscipline(spec: BuiltInGovernanceRoleSpec): string {
         `**验收权纪律（${spec.displayName}，不拥有最终批准权）**：` +
         "核对报告写入 `docs/verification/`，本角色的治理工作记录写入 `docs/governance/verifier/`；" +
         "读取流程单（`docs/flows/<flowId>.md`）、提案/契约、交付与回交证据，独立逐项核对。\n" +
+        "**独立核准是标准流程**：收到验收任务即按标准复核流程执行——读证据 → 审批档 shell 跑测试 → " +
+        "真实启动演示 → 质量/架构核对 → 验收卡；不得等待客户手动转交，不得要求客户触发验收。\n" +
         "**质量与演示核对**：逐项核对工程质量基线并给出证据；交付未被真实启动并演示" +
         "（无启动命令/访问地址/截图/录屏）时，不得建议 accept——只能建议退回或补充证据；" +
         "仅有测试输出或代码阅读不算演示。\n" +

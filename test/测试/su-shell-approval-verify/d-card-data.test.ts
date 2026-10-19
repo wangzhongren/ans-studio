@@ -104,7 +104,14 @@ test("D4 渲染源码：SU 警告/默认拒绝焦点/标题档位原因接线；
     "必备警告逐字在位",
   );
   assert.ok(src.includes('$("sc-deny").focus();'), "拒绝为默认焦点");
-  assert.ok(src.includes('UiLabels.shellConfirmTitle(payload.policy)'), "标题按 policy");
+  assert.ok(
+    src.includes('var confirmRoleId = typeof payload.roleId === "string" && payload.roleId !== "" ? payload.roleId : cur.roleId;'),
+    "标题角色优先取载荷 roleId，缺省回退当前角色",
+  );
+  assert.ok(
+    src.includes("UiLabels.shellConfirmTitle(payload.policy, confirmRoleId)"),
+    "标题按 policy + 实际角色（roleId）",
+  );
   assert.ok(src.includes("UiLabels.suApprovalTierLabel(payload.tier)"), "档位标签");
   assert.ok(src.includes('"命中原因：" + payload.reasonRaw'), "su 卡把 reasonRaw 作为可见原因行");
   assert.ok(src.includes('overlay.classList.toggle("is-su-approval", suApproval)'), "SU 卡样式钩子");

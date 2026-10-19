@@ -23,6 +23,7 @@ import {
   judgeContextFor,
   PROPOSAL_REL,
   proposalDoc,
+  seedConfirmedIntent,
   write,
 } from "./fixture.ts";
 import {
@@ -146,6 +147,8 @@ test("场景7c：决策组（proposal）超时同样回落该组原卡", async (
   process.env[GOVERNANCE_JUDGE_TIMEOUT_ENV] = "40";
   try {
     write(root, PROPOSAL_REL, proposalDoc(FLOW));
+    // 前置：客户已确认意图；否则决策组在证据包构建处直接 intent-missing，测不到「判断超时」。
+    await seedConfirmedIntent(root);
     const h = makeTimeoutHarness(root);
     const outcome = await h.ask(cardFor("proposal"), {
       judgeContext: { artifacts: { proposalPath: PROPOSAL_REL } },

@@ -2357,7 +2357,9 @@ test("收尾推进：回交送达 Convener 且流程全部完成 ⇒ 派 Proof /
     const notes = scenario.events
       .filter((envelope) => envelope.roleId === "convener" && envelope.event.kind === "message" && (envelope.event as { detail?: { source?: string } }).detail?.source === "delivery-note")
       .map((envelope) => String((envelope.event as { summary?: string }).summary));
-    assert.ok(notes.some((note) => /已派发验收汇总任务给 Proof \/ 验收/.test(note)), "系统行如实告知已派发");
+    // 2026-10-19 客户反馈：验收复核是标准流程——系统行须说明「自动派发」且不冒充客户批准。
+    assert.ok(notes.some((note) => /已自动派发验收复核给 Proof（工作中）/.test(note)), "系统行如实告知已自动派发");
+    assert.ok(notes.every((note) => !/客户已批准|验收通过/.test(note)), "系统行不得冒充客户批准");
     scenario.repeatConvenerSettle();
     await new Promise((resolve) => setTimeout(resolve, 150));
     assert.equal(verifierSends.length, 1, "重复 settle 不重复派");

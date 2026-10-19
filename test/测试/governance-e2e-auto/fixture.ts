@@ -65,6 +65,8 @@ export const NOMINATION_REL = `docs/nominations/${FLOW}-v1.md`;
 export const FLOW_REL = `docs/flows/${FLOW}.md`;
 export const GOV_REL = "角色卡/governance-boundary.yaml";
 export const ANS_REL = ".ans/project.json";
+/** 意图记录路径（decision 组判断的唯一意图基准；`docs/intents/<intentId>.md`）。 */
+export const INTENT_REL = "docs/intents/intent-a.md";
 
 /** 治理边界文档（应用记录；内容只用于 pin 接受证据）。 */
 export const GOV_YAML = [
@@ -151,13 +153,15 @@ export function seedTrioProject(root: string, roles: string[] = []): void {
   for (const roleId of roles) writeProjectRole(root, roleId);
 }
 
-export function proposalDoc(flowId = FLOW, version = 1): string {
+export function proposalDoc(flowId = FLOW, version = 1, intentId?: string): string {
   return [
     "---",
     `flowId: ${flowId}`,
     `version: ${version}`,
     "author: rapporteur",
     "status: draft",
+    // 2026-10-19 意图漂移契约：提案可携带 intentId（`governance-judge-intent.ts` 的兼容定位来源）。
+    ...(intentId !== undefined ? [`intentId: ${intentId}`] : []),
     "---",
     "",
     `# 提案 ${flowId} v${version}`,
@@ -194,7 +198,7 @@ export function flowDoc(flowId = FLOW, steps: Array<{ id: string; status?: strin
   ].join("\n");
 }
 
-export function intentDoc(intentId = "intent-a"): string {
+export function intentDoc(intentId = "intent-a", flowId = FLOW): string {
   return [
     "---",
     `intentId: ${intentId}`,
@@ -202,7 +206,7 @@ export function intentDoc(intentId = "intent-a"): string {
     "goal: 离线验收全自动治理链路",
     "scope: 临时目录、假模型",
     "acceptance: 四角色闭环",
-    `flowId: ${FLOW}`,
+    `flowId: ${flowId}`,
     "---",
     "",
     `# 意图 ${intentId}`,
@@ -222,6 +226,49 @@ export function intentHandoffArgs(intentId = "intent-a"): Record<string, unknown
     summary: "为客户形成离线验收提案",
     flowId: FLOW,
   };
+}
+
+/**
+ * 决策组判断的**前置意图种子**（2026-10-19 决策判断定位修正）：
+ * 写 `docs/intents/<intentId>.md`（goal/scope/acceptance 齐全）并向账本追加
+ * `customer.decision{decisionKind:"intent-confirm", accepted}` 与 `intent.handed-off`。
+ *
+ * 用于**从中段开始**的场景（提案/任命/验收卡直接出现，之前没有 Liaison 交接）。
+ * 完整链路（i-full-chain）不调用本函数——那里由真实 `hand_off_intent` 产生交接账本。
+ */
+export async function seedConfirmedIntent(
+  root: string,
+  options: { intentId?: string; flowId?: string } = {},
+): Promise<{ intentId: string; path: string }> {
+  const intentId = options.intentId ?? "intent-a";
+  const flowId = options.flowId ?? FLOW;
+  const rel = `docs/intents/${intentId}.md`;
+  write(root, rel, intentDoc(intentId, flowId));
+  const at = new Date().toISOString();
+  const confirmed = await appendGovernanceLedger(root, {
+    at,
+    kind: "customer.decision",
+    flowId,
+    actorRoleId: "liaison",
+    power: "liaison",
+    decisionKind: "intent-confirm",
+    customerDecision: "accepted",
+    decisionEvidence: { kind: "customer-input" },
+    messageSummary: `需求确认 ${intentId}`,
+  });
+  if (!confirmed.ok) throw new Error(`意图确认账本种子失败：${confirmed.message}`);
+  const handedOff = await appendGovernanceLedger(root, {
+    at,
+    kind: "intent.handed-off",
+    flowId,
+    actorRoleId: "liaison",
+    power: "liaison",
+    intentId,
+    handoffKind: "initial",
+    targetRoleId: "rapporteur",
+  });
+  if (!handedOff.ok) throw new Error(`意图交接账本种子失败：${handedOff.message}`);
+  return { intentId, path: rel };
 }
 
 // —————————————————————— 脚本化角色适配器（跨多轮事件流） ——————————————————————
@@ -803,7 +850,13 @@ export function cardFor(kind: "write" | "appointment-write" | "schedule-write" |
     title: `写盘确认 ${FLOW}`,
     cardKind: kind,
     flowId,
-    preview: `将写入：\n${paths.map((entry) => `- ${entry}`).join("\n")}\n\n# 正文\n`,
+    // 2026-10-19 证据包/呈现前完整性闸契约：每条声明路径都要有可核对正文
+    // （`## <路径>` 锚点 + 非空正文），不能多路径共用一段 `# 正文`。
+    preview: [
+      "将写入以下文件（逐路径正文）：",
+      "",
+      ...paths.flatMap((entry) => [`## ${entry}`, "", "正文：夹具声明的完整内容。", ""]),
+    ].join("\n"),
   };
 }
 

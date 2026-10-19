@@ -10,8 +10,8 @@
 
 import type { ShellJudgeToolOptions, ToolDefinition, ToolResult } from "../../../model/runtime.ts";
 import { describeTool } from "../../../provider/runtime/schema.ts";
-import type { JudgeReadCode } from "./policy.ts";
-import { resolveJudgeList, resolveJudgeRead } from "./policy.ts";
+import type { JudgeReadCode, JudgeReadResolution } from "./policy.ts";
+import { createJudgeReadCache, resolveJudgeList, resolveJudgeRead, resolveShellJudgeBudget } from "./policy.ts";
 
 /** 结构化结论工具名（PM 评审 §6.2 冻结）。 */
 export const SHELL_JUDGE_REPORT_TOOL = "report_shell_judgement";
@@ -35,6 +35,8 @@ const REASON_TEXT: Record<JudgeReadCode, string> = {
   budget: "读取预算已耗尽（调用次数/总读取上限）",
   "read-failed": "读取失败",
   "app-private": "该路径属于应用私有数据（账本/会话）（已拒绝）",
+  "range-invalid": "范围参数非法（offset≥0、limit≥1、startLine/endLine≥1 且 endLine≥startLine；字节与行参数不可混用）",
+  "out-of-range": "请求范围超出文件末尾或扫描上限（已拒绝）",
 };
 
 /**
@@ -49,6 +51,39 @@ export function judgeToolFailure(name: string, code: JudgeReadCode, pathClass: s
 /** 判断工具统一的中止回执（导出供治理 judge 复用）。 */
 export function judgeToolAborted(name: string): ToolResult {
   return { ok: false, message: `${name}：本轮已中止，未执行` };
+}
+
+/**
+ * 读取成功的统一回执（导出供治理 judge 复用）：**如实标注实际返回范围与截断**。
+ * 不带范围时与历史回执逐字一致；带范围时标出字节/行范围，被预算截断时明确提示。
+ */
+export function judgeReadSuccess(result: Extract<JudgeReadResolution, { ok: true }>): ToolResult {
+  const range = result.range;
+  let annotation = "";
+  if (range?.kind === "bytes") {
+    annotation = range.end > range.offset
+      ? `（字节 ${range.offset}–${range.end - 1} / 共 ${range.totalBytes} 字节）`
+      : "（空文件）";
+  } else if (range?.kind === "lines") {
+    if (range.clampedToEof && range.requestedEndLine !== undefined && range.totalLines !== undefined) {
+      const actual = range.startLine === range.totalLines
+        ? `第 ${range.totalLines} 行`
+        : `第 ${range.startLine}–${range.totalLines} 行`;
+      annotation = `（请求第 ${range.startLine}–${range.requestedEndLine} 行；文件止于第 ${range.totalLines} 行，实际 ${actual}）`;
+    } else if (range.endLine !== undefined) {
+      const span = range.endLine === range.startLine ? `第 ${range.startLine} 行` : `第 ${range.startLine}–${range.endLine} 行`;
+      annotation = `（${span}${range.totalLines !== undefined ? ` / 共 ${range.totalLines} 行` : ""}）`;
+    } else {
+      // 被预算截断：实际末行不完整，不猜测。
+      annotation = `（第 ${range.startLine} 行起）`;
+    }
+  }
+  const suffix = result.truncated
+    ? range === undefined
+      ? "\n\n[已截断：文件超过单文件/总读取预算]"
+      : "\n\n[已截断：请求范围超过单文件/总读取预算]"
+    : "";
+  return { ok: true, message: `${SHELL_JUDGE_READ_TOOL}: ${result.rel}${annotation}\n\n${result.text}${suffix}` };
 }
 
 function stringArg(value: unknown): string | undefined {
@@ -73,21 +108,37 @@ function definition(name: string, handler: ToolDefinition["handler"]): ToolDefin
  * **不得**再走 `buildGovernedTools`。
  */
 export function buildShellJudgeTools(options: ShellJudgeToolOptions): ToolDefinition[] {
+  // 预算在**构造判断会话时**解析一次：显式 options.budget > env（`ANS_SHELL_JUDGE_MAX_*`，
+  // 正整数且受上下限约束）> 缺省。env 不进入工具 schema/模型可见能力。
+  const budget = resolveShellJudgeBudget(options.budget);
+  // 单次判断会话内的读取缓存（随本闭包销毁，不跨请求）：同一路径＋同一范围只读一次盘；
+  // 命中仍按原口径计预算，拒绝结果不缓存。
+  const cache = createJudgeReadCache();
   const read: ToolDefinition = definition(SHELL_JUDGE_READ_TOOL, async (call) => {
     if (call.signal?.aborted) return judgeToolAborted(SHELL_JUDGE_READ_TOOL);
     const input = stringArg(call.args?.path);
-    const result = await resolveJudgeRead({ projectRoot: options.projectRoot, path: input ?? "", stats: options.stats, budget: options.budget });
+    const result = await resolveJudgeRead({
+      projectRoot: options.projectRoot,
+      path: input ?? "",
+      stats: options.stats,
+      budget,
+      cache,
+      // 范围参数原始值交给策略层硬校验（工具层不做第二份解析）。
+      range: {
+        offset: call.args?.offset,
+        limit: call.args?.limit,
+        startLine: call.args?.startLine,
+        endLine: call.args?.endLine,
+      },
+    });
     if (!result.ok) return judgeToolFailure(SHELL_JUDGE_READ_TOOL, result.code, result.pathClass);
-    return {
-      ok: true,
-      message: `${SHELL_JUDGE_READ_TOOL}: ${result.rel}\n\n${result.text}${result.truncated ? "\n\n[已截断：文件超过单文件/总读取预算]" : ""}`,
-    };
+    return judgeReadSuccess(result);
   });
 
   const list: ToolDefinition = definition(SHELL_JUDGE_LIST_TOOL, async (call) => {
     if (call.signal?.aborted) return judgeToolAborted(SHELL_JUDGE_LIST_TOOL);
     const input = stringArg(call.args?.path);
-    const result = await resolveJudgeList({ projectRoot: options.projectRoot, ...(input !== undefined ? { path: input } : {}), stats: options.stats, budget: options.budget });
+    const result = await resolveJudgeList({ projectRoot: options.projectRoot, ...(input !== undefined ? { path: input } : {}), stats: options.stats, budget });
     if (!result.ok) return judgeToolFailure(SHELL_JUDGE_LIST_TOOL, result.code, result.pathClass);
     const body = result.entries.length > 0 ? result.entries.join("\n") : "（空目录或无可列条目）";
     return {

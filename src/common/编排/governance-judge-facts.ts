@@ -276,11 +276,13 @@ export interface FlowStepRecord {
 }
 
 /**
- * 流程步骤状态的**首词规范化**（2026-10-19 真机：状态列写作「状态 + 说明」）。
+ * 流程步骤状态的**首词规范化**（2026-10-19 真机：状态列写作「状态 + 说明」，且常带 Markdown 强调）。
  *
  * 流程单由 Steward 按模板自然写出，状态单元格常见 `done（有落盘/回交证据；…）`、
- * `pending（不由统筹派发）`、`done：xxx` 这类「引导状态词 + 说明」写法。判定只看引导 token
- * （大小写不敏感；后接空白、`（`、`(`、`：`、`:` 或结束），说明文字不参与比较；空/纯空白 ⇒ `""`。
+ * `pending（不由统筹派发）`、`done：xxx`，以及 `**done**（证据…）`/`__done__`/`` `done` ``
+ * 这类强调写法。规范化先去掉首尾空白与 Markdown 强调符（`*`/`_`/反引号），取引导 token
+ * （大小写不敏感；后接空白、`（`、`(`、`：`、`:` 或结束），再剥掉 token 尾部的强调符
+ * （`**done**（…）` 的收尾 `**` 夹在 token 与说明之间）；说明文字不参与比较；空/纯空白 ⇒ `""`。
  * **不修改** `parseFlowSteps` 输出的原始 `status`（错误详情仍展示原文），只在判定处调用本函数。
  *
  * 与桌面窗口角色的 `app/desktop/governance-advance.ts#normalizeFlowStepStatus` 同源同规则：
@@ -288,8 +290,10 @@ export interface FlowStepRecord {
  */
 export function normalizeFlowStepStatus(status: string): string {
   if (typeof status !== "string") return "";
-  const match = /^[^\s（(：:]+/.exec(status.trim());
-  return match === null ? "" : match[0].toLowerCase();
+  const stripped = status.trim().replace(/^[*_`\s]+/, "");
+  const match = /^[^\s（(：:]+/.exec(stripped);
+  if (match === null) return "";
+  return match[0].replace(/[*_`]+$/, "").toLowerCase();
 }
 
 function stripTableMarkup(value: string): string {
@@ -353,11 +357,20 @@ export function parseFlowSteps(markdown: string): { wellFormed: boolean; steps: 
 }
 
 /**
+ * 已作废的步骤状态（归一化后比较）：2026-10-19 真机流程单把被并入其他步骤的「不派」步骤
+ * 留在表里写作 `**superseded**：并入 …`；`cancelled` 同义。作废步骤无需 dispatch，也不判未完成。
+ */
+const VOID_FLOW_STEP_STATUSES: ReadonlySet<string> = new Set(["superseded", "cancelled"]);
+
+/**
  * 验收机械门槛（P6 验收观察，安全项）：**不靠模型自报**，只用流程单 + 账本事实。
- * 所有步骤 `done`（状态按 `normalizeFlowStepStatus` 取引导 token——`done（证据…）`/`Done`/
- * `done：xxx` 均视为 done）、每个步骤都有 `dispatch.accepted`、无未结算的**治理**决定、无未闭环澄清、
- * 账本可读——任一不满足即 `manual`（原卡 + 说明）。旧账本里无 cardKind 的普通选择
- * （`unclassified`/`none`）按 decisionKind 过滤，不算未结算。
+ * 所有**执行步骤** `done`（状态按 `normalizeFlowStepStatus` 取引导 token——`done（证据…）`/`Done`/
+ * `done：xxx`/`**done**（…）` 均视为 done）、每个执行步骤都有 `dispatch.accepted`、无未结算的**治理**决定、
+ * 无未闭环澄清、账本可读——任一不满足即 `manual`（原卡 + 说明）。
+ * 归一化为 `superseded`/`cancelled` 的步骤视为**已作废**（2026-10-19 真机：被并入其他步骤的
+ * 「不派」步骤仍留在流程单里）：不参与未完成判定，也不要求 `dispatch.accepted`；
+ * 其他未知状态仍按未完成 fail-closed。
+ * 旧账本里无 cardKind 的普通选择（`unclassified`/`none`）按 decisionKind 过滤，不算未结算。
  */
 export function evaluateAcceptanceCompletion(input: {
   flowMarkdown: string;
@@ -372,7 +385,8 @@ export function evaluateAcceptanceCompletion(input: {
   if (!parsed.wellFormed || parsed.steps.length === 0) {
     return { ok: false, reasonCode: "insufficient-evidence", reason: "流程单缺少可解析的步骤表，无法核对验收完成度，已转手动确认。" };
   }
-  const notDone = parsed.steps.filter((step) => normalizeFlowStepStatus(step.status) !== "done");
+  const activeSteps = parsed.steps.filter((step) => !VOID_FLOW_STEP_STATUSES.has(normalizeFlowStepStatus(step.status)));
+  const notDone = activeSteps.filter((step) => normalizeFlowStepStatus(step.status) !== "done");
   if (notDone.length > 0) {
     const detail = notDone.slice(0, 10).map((step) => `${step.id}=${step.status || "（空）"}`).join("、");
     return {
@@ -382,7 +396,7 @@ export function evaluateAcceptanceCompletion(input: {
     };
   }
   const dispatched = new Set(input.facts.dispatchedStepIds ?? []);
-  const missingDispatch = parsed.steps.filter((step) => !dispatched.has(step.id));
+  const missingDispatch = activeSteps.filter((step) => !dispatched.has(step.id));
   if (missingDispatch.length > 0) {
     const detail = missingDispatch.slice(0, 10).map((step) => step.id).join("、");
     return {

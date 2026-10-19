@@ -123,7 +123,10 @@ test("judge deny 无替代方案：0 卡、合成 customerMessage + 标准出路
     assert.equal(result.allow, false);
     assert.equal(chain.displays.length, 0, "无替代方案也必须 0 卡");
     assert.match(result.reason, /判断 agent 未放行该命令。/);
-    assert.match(result.reason, /请向客户说明：判断 agent 认为该命令当前不必要或不安全/);
+    // 2026-10-19 编排把 shell 判断定位为「系统风险审查」（客户修正：不审业务必要性），
+    // 合成 customerMessage 的前缀随之改为「存在系统风险或无法确认安全」；仍要求同一句话
+    // 说明风险来源并给出下一步（语义与强度不变）。
+    assert.match(result.reason, /请向客户说明：判断 agent 认为该命令存在系统风险或无法确认安全/);
     assert.match(result.reason, EXIT_LINE);
 
     assert.equal(chain.rows.length, 1);

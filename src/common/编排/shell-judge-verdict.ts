@@ -97,7 +97,7 @@ function normalizeEvidence(value: unknown): string[] | undefined {
  * - `verdict` 必须恰为 `allow`/`deny`/`manual`；否则 `undefined`；
  * - `allow` 必须有非空 `reason`；否则 `undefined`（→ `manual/parse-failed`）；
  * - 可选文本按字节上限截断；`alternative` 形状不合法即**忽略**（不否决整个裁决）；
- * - `manual` 原样保留（rubric 约束模型不得用 manual 逃避「不必要」判断；本层不改变模型语义）。
+ * - `manual` 原样保留（rubric 约束模型不得用 manual 逃避「有风险」判断；本层不改变模型语义）。
  */
 export function normalizeShellJudgeVerdict(input: unknown): ShellJudgeVerdict | undefined {
   if (!isRecord(input)) return undefined;
@@ -142,8 +142,8 @@ export function synthesizeCustomerMessage(verdict: ShellJudgeVerdict): string {
   }
   const reason = verdict.reason?.trim();
   const core = reason !== undefined && reason !== "" && !hasInternalJargon(reason)
-    ? `判断 agent 认为该命令当前不必要或不安全：${reason}`
-    : "判断 agent 认为该命令当前不必要或不安全。";
+    ? `判断 agent 认为该命令存在系统风险或无法确认安全：${reason}`
+    : "判断 agent 认为该命令存在系统风险或无法确认安全。";
   return withSynthesizedExitLine(core);
 }
 

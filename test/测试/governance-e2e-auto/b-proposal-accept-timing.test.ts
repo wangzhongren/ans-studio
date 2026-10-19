@@ -18,6 +18,7 @@ import {
   makeHarness,
   makeRoot,
   proposalDoc,
+  seedConfirmedIntent,
   seedTrioProject,
   type ScriptContext,
 } from "./fixture.ts";
@@ -55,6 +56,8 @@ test("场景2a：接受提案 ⇒ 先 Convener 写流程单，落盘后才派 No
   const script = rapporteurProposalScript();
   const temp = makeRoot("proposal-accept-chain");
   seedTrioProject(temp.root);
+  // 前置：客户已确认意图并完成交接（decision 组判断的意图基准，见 fixture.seedConfirmedIntent）。
+  await seedConfirmedIntent(temp.root);
   const h = await makeHarness({
     tag: "proposal-accept-chain",
     root: temp.root,
@@ -128,6 +131,7 @@ test("场景2b：Convener 未写出流程单 ⇒ 不派 Nominator、如实报错
   const script = rapporteurProposalScript();
   const temp = makeRoot("proposal-accept-missing-flow");
   seedTrioProject(temp.root);
+  await seedConfirmedIntent(temp.root);
   const h = await makeHarness({
     tag: "proposal-accept-missing-flow",
     root: temp.root,

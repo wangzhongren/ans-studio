@@ -19,6 +19,7 @@ import {
   makeHarness,
   makeRoot,
   nominationDoc,
+  seedConfirmedIntent,
   seedLedger,
   seedTrioProject,
   write,
@@ -37,6 +38,8 @@ test("场景3：任命后角色未写出 ⇒ 先派 Nominator 写卡；写卡后
   await seedLedger(temp.root, [
     { decisionKind: "proposal-accept", customerDecision: "accepted", actorRoleId: "rapporteur", power: "proposal" },
   ]);
+  // 前置：客户已确认意图（decision 组判断的意图基准）。
+  await seedConfirmedIntent(temp.root);
 
   const convenerSnapshots: Array<{ filesExist: boolean; listed: boolean }> = [];
   const h = await makeHarness({
@@ -166,6 +169,7 @@ test("场景3b：写卡始终未写出 ⇒ 不派 Convener、如实报错、不�
   await seedLedger(temp.root, [
     { decisionKind: "proposal-accept", customerDecision: "accepted", actorRoleId: "rapporteur", power: "proposal" },
   ]);
+  await seedConfirmedIntent(temp.root);
   const h = await makeHarness({
     tag: "appointment-timing-missing",
     root: temp.root,

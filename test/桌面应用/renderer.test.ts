@@ -959,13 +959,26 @@ test("SU 命令审批卡：标题/档位/可见原因/绕过写边界警告/拒�
   assert.equal(UL.shellConfirmTitle("su-approval"), "SU 命令审批");
   assert.equal(UL.shellConfirmTitle("project"), "shell 命令请求");
   assert.equal(UL.shellConfirmTitle(undefined), "shell 命令请求", "旧请求/缺 policy 保持原文");
+  // 2026-10-19 客户截图反馈：五个内置治理角色与 su 同走审批档（policy 仍为 su-approval），
+  // 但标题必须按实际角色显示，不再显示「SU」；显示名与注册表 displayName 同序（英文 / 中文）。
+  assert.equal(UL.shellConfirmTitle("su-approval", "verifier"), "命令审批 · Proof / 验收");
+  assert.equal(UL.shellConfirmTitle("su-approval", "liaison"), "命令审批 · Lead / 主理");
+  assert.equal(UL.shellConfirmTitle("su-approval", "rapporteur"), "命令审批 · Draft / 提案");
+  assert.equal(UL.shellConfirmTitle("su-approval", "nominator"), "命令审批 · Crew / 组队");
+  assert.equal(UL.shellConfirmTitle("su-approval", "convener"), "命令审批 · Steward / 统筹");
+  assert.equal(UL.shellConfirmTitle("su-approval", "su"), "SU 命令审批", "单模型 su 仍显示 SU");
+  assert.equal(UL.shellConfirmTitle("project", "implementer"), "shell 命令请求", "项目角色保持既有兜底");
+  assert.equal(UL.shellConfirmTitle("su-approval", "unknown-role"), "SU 命令审批", "未知角色不编名字，按审批档兜底");
+  assert.equal(UL.shellConfirmTitle("su-approval", 42), "SU 命令审批", "坏 roleId 不当成角色");
+  assert.equal(UL.shellConfirmTitle("project", "verifier"), "命令审批 · Proof / 验收", "roleId 优先于 policy");
   assert.equal(UL.suApprovalTierLabel("risky"), "风险命令（risky）");
   assert.equal(UL.suApprovalTierLabel("review"), "未自动判定（review）");
   assert.equal(UL.suApprovalTierLabel("deny"), "硬拒类（deny）");
   assert.equal(UL.suApprovalTierLabel(null), "", "未知档位不编标签（只呈原因/警告）");
   // 渲染接线（复用既有 sc-title/sc-summary/sc-reason/sc-hint，零 HTML 改动）。
   assert.ok(RENDERER.includes('var suApproval = payload.policy === "su-approval";'), "su 分支显式（缺省=project 原行为）");
-  assert.ok(RENDERER.includes('$("sc-title").textContent = UiLabels.shellConfirmTitle(payload.policy)'), "标题按 policy 动态设置");
+  assert.ok(RENDERER.includes('var confirmRoleId = typeof payload.roleId === "string" && payload.roleId !== "" ? payload.roleId : cur.roleId;'), "标题角色 id 优先取载荷、回退当前卡记录");
+  assert.ok(RENDERER.includes('$("sc-title").textContent = UiLabels.shellConfirmTitle(payload.policy, confirmRoleId)'), "标题按 policy + 实际角色动态设置");
   assert.ok(RENDERER.includes("UiLabels.suApprovalTierLabel(payload.tier)"), "档位标签按 tier 呈现");
   assert.ok(RENDERER.includes("批准后命令以当前 OS 用户权限执行，可能绕过 ANS 文件写边界；请逐字核对命令原文。"), "必备绕过写边界警告逐字");
   assert.ok(/suApproval && typeof payload\.reasonRaw === "string"[\s\S]{0,180}"命中原因：" \+ payload\.reasonRaw/.test(RENDERER), "su 卡可见命中原因（reasonRaw 单独一行）");
@@ -1721,10 +1734,10 @@ test("v3/W1–W6/W6b/S2：样式数值按批准默认档落位（实测口径见
   assert.ok(STYLES.includes(".msg-user { border-radius: 8px 8px 3px 8px; }"), "A2：用户气泡圆角 8（右下 3px 保持）");
   assert.ok(STYLES.includes("padding:9px 14px; line-height:24px;"), "W3：气泡 pad 9/14、行高 24（单行 42px 口径）");
   assert.ok(STYLES.includes(".composer { padding:14px 32px 12px; min-height:0; border-top:0; }"), "W4：输入区 pad 14/32/12（旧层保留）");
-  assert.ok(/\.composer \{[^}]*border-top: 1px solid var\(--border\);[^}]*background: #FAFBF8;/s.test(STYLES), "A1：输入区上边线 + 浅底（D5）");
+  assert.ok(/\.composer \{[^}]*border-top: 1px solid var\(--border\);[^}]*background: var\(--bg-soft\);/.test(STYLES), "A1：输入区上边线 + 次级暗底（D5 深色版）");
   assert.ok(STYLES.includes(".capsule { display:flex; flex-direction:column; align-items:stretch; padding:10px 14px;"), "W4：胶囊 pad 10/14");
   assert.ok(STYLES.includes(".capsule { border-color: var(--border-control); }"), "A2：胶囊控件边框 --border-control（D4）");
-  assert.ok(STYLES.includes("background:#fff; border-color:#ccd6cb; gap:6px; }"), "W4：胶囊 gap 6（旧层保留）");
+  assert.ok(STYLES.includes("background:var(--bg-soft); border-color:var(--border-control); gap:6px; }"), "W4：胶囊 gap 6（深色层）");
   assert.ok(STYLES.includes(".capsule textarea { display:block; width:100%; min-height:28px;"), "W4：空输入框 min-height 28");
   assert.ok(STYLES.includes(".capsule, .attach-row, .compose-note { max-width: var(--content-max); }"), "A1：胶囊/附件/脚注同列 900");
   assert.ok(STYLES.includes("margin:6px auto 0;"), "W4：脚注上距 6");
@@ -1937,7 +1950,7 @@ type GovernanceUiLabels = {
   rangeChoiceIndex: (choices: unknown, value: unknown) => number;
   rangeChoiceValue: (choices: unknown, index: unknown) => string;
   rangeChoiceLabel: (choices: unknown, labels: unknown, index: unknown) => string;
-  shellConfirmTitle: (policy: unknown) => string;
+  shellConfirmTitle: (policy: unknown, roleId?: unknown) => string;
   suApprovalTierLabel: (tier: unknown) => string;
   sidebarCollapsedFromStorage: (value: unknown) => boolean;
   clampSidebarWidth: (value: unknown) => number;
@@ -2172,15 +2185,18 @@ test("D2：重新接受成功/失败路径——成功文案单点、主进程�
 // ————— A1+A2 企业级稳定感（2026-10-17 客户批准「按推荐来，A1+A2 实施」；PM 评审 §3.1/§3.2）—————
 // 生产代码只改 `styles.css`；下面按 A1（结构）/A2（重量）两块分别钉住 token 与有效规则。
 
-/** WCAG 相对亮度对比度（测试用纯函数；白底口径与设计稿 §七一致）。 */
-function contrastOnWhite(hex: string): number {
+/** WCAG 相对亮度与两色对比度（测试用纯函数；2026-10-19 深色石墨主题按前景/背景两色计算）。 */
+function relativeLuminance(hex: string): number {
   const channel = (v: number) => {
     const c = v / 255;
     return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
   };
   const n = parseInt(hex.replace("#", ""), 16);
-  const lum = 0.2126 * channel((n >> 16) & 255) + 0.7152 * channel((n >> 8) & 255) + 0.0722 * channel(n & 255);
-  return (1.05) / (lum + 0.05);
+  return 0.2126 * channel((n >> 16) & 255) + 0.7152 * channel((n >> 8) & 255) + 0.0722 * channel(n & 255);
+}
+function contrast(a: string, b: string): number {
+  const la = relativeLuminance(a), lb = relativeLuminance(b);
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
 }
 
 test("A1：结构——框线、900 内容列、同列 padding、贴底输入区（HTML/JS 零改动）", () => {
@@ -2199,28 +2215,32 @@ test("A1：结构——框线、900 内容列、同列 padding、贴底输入区
   assert.ok(a1.includes(".chat-pane { max-width: var(--content-max); gap: 16px; }"), "正文列 900 + 行距 16（v3 保持）");
   assert.ok(a1.includes(".capsule, .attach-row, .compose-note { max-width: var(--content-max); }"), "胶囊/附件/脚注同列 900");
   assert.ok(a1.includes("#chat > .op-chip { margin-left: calc((100% - min(var(--content-max), 100%)) / 2); }"), "chip 定位随 900 列");
-  assert.ok(/\.composer \{[^}]*border-top: 1px solid var\(--border\);[^}]*background: #FAFBF8;[^}]*box-shadow: 0 -6px 18px rgba\(21,31,26,\.035\);/.test(a1), "输入区上边线 + D5 浅底 + 贴底上阴影");
+  assert.ok(/\.composer \{[^}]*border-top: 1px solid var\(--border\);[^}]*background: var\(--bg-soft\);[^}]*box-shadow: 0 -6px 18px rgba\(0,0,0,\.35\);/.test(a1), "输入区上边线 + 次级暗底 + 贴底上阴影");
   assert.ok(!/\.chat-head \{[^}]*position:\s*(?:sticky|fixed)/.test(a1) && !/\.composer \{[^}]*position:\s*(?:sticky|fixed)/.test(a1), "不引入 sticky/fixed（保持 flex 固定、仅 .chat 滚动）");
 });
 
 test("A2：重量——token/对比度、控件边框、圆角收敛、表格、浮层阴影、选中竖条", () => {
   const a2 = STYLES.slice(STYLES.indexOf("A2 重量"));
   const tokens: Array<[string, string]> = [
-    ["--chrome", "#EDF0EA"], ["--bg-side", "var(--chrome)"], ["--border", "#D7DDD4"], ["--border-strong", "#C4CEC2"],
-    ["--border-control", "#8A968B"], ["--text", "#232C29"], ["--text-2", "#55625B"], ["--text-3", "#6A756E"],
-    ["--success", "#2D634E"], ["--success-hover", "#244F3E"], ["--success-bg", "#E5EEE7"],
-    ["--danger", "#A1433C"], ["--danger-bg", "#FBEFED"], ["--amber", "#8A5B23"], ["--focus-ring", "#2D634E"],
+    ["--chrome", "#1A1E22"], ["--bg-side", "var(--chrome)"], ["--border", "#2C3238"], ["--border-strong", "#3A4148"],
+    ["--border-control", "#6B757E"], ["--text", "#E7E9EB"], ["--text-2", "#A7ADB5"], ["--text-3", "#949BA4"],
+    ["--success", "#6FA08B"], ["--success-hover", "#7FB29B"], ["--success-bg", "#22302B"],
+    ["--danger", "#C97A6D"], ["--danger-bg", "#2E2220"], ["--amber", "#C4A15F"], ["--focus-ring", "#6FA08B"],
     ["--radius", "8px"], ["--radius-sm", "6px"],
   ];
   for (const [token, value] of tokens) assert.ok(a2.includes(token + ": " + value), `A2 token ${token} = ${value}`);
-  assert.ok(a2.includes("--shadow-card: 0 1px 2px rgba(21,31,26,.05), 0 1px 3px rgba(21,31,26,.04);"), "浮层阴影 token");
-  assert.ok(a2.includes("--shadow-dock: 0 -6px 18px rgba(21,31,26,.035);"), "输入区贴底阴影 token");
-  // 对比度（白底）：正文 ≥7、次级 ≥5、三级 ≥4.5、控件边框/focus ≥3。
-  assert.ok(contrastOnWhite("#232C29") >= 7, "正文对比度 ≥7:1");
-  assert.ok(contrastOnWhite("#55625B") >= 5, "次级文字 ≥5:1");
-  assert.ok(contrastOnWhite("#6A756E") >= 4.5, "三级文字 ≥4.5:1");
-  assert.ok(contrastOnWhite("#8A968B") >= 3, "控件边框 ≥3:1（D4）");
-  assert.ok(contrastOnWhite("#2D634E") >= 3, "焦点环 ≥3:1（实际 7:1）");
+  assert.ok(a2.includes("--shadow-card: 0 1px 2px rgba(0,0,0,.45), 0 2px 6px rgba(0,0,0,.32);"), "浮层阴影 token（深色）");
+  assert.ok(a2.includes("--shadow-dock: 0 -6px 18px rgba(0,0,0,.35);"), "输入区贴底阴影 token（深色）");
+  // 对比度（深色石墨底）：正文 ≥7、次级 ≥5、三级 ≥4.5、控件边框/focus ≥3、语义色 ≥4.5。
+  const BG = "#14171A";
+  assert.ok(contrast("#E7E9EB", BG) >= 7, "正文对比度 ≥7:1（深色石墨）");
+  assert.ok(contrast("#A7ADB5", BG) >= 5, "次级文字 ≥5:1");
+  assert.ok(contrast("#949BA4", "#1E2328") >= 4.5, "三级文字在次级表面 ≥4.5:1");
+  assert.ok(contrast("#6B757E", "#1E2328") >= 3, "控件边框 ≥3:1（D4 深色版）");
+  assert.ok(contrast("#6FA08B", BG) >= 3, "焦点环 ≥3:1");
+  assert.ok(contrast("#C97A6D", BG) >= 4.5 && contrast("#C97A6D", "#2E2220") >= 4.5, "danger 语义色 ≥4.5:1（主底/危险底）");
+  assert.ok(contrast("#6FA08B", "#22302B") >= 4.5, "success 语义色在成功底 ≥4.5:1");
+  assert.ok(contrast("#C4A15F", BG) >= 4.5 && contrast("#C4A15F", "#24211A") >= 4.5, "amber 语义色 ≥4.5:1（主底/未决底）");
   // 控件边框与焦点语义。
   assert.ok(a2.includes(".capsule { border-color: var(--border-control); }") && a2.includes("#runtime-select { border-color: var(--border-control); }"), "输入胶囊/引擎选择器走 --border-control");
   assert.ok(a2.includes(".btn-primary:hover:not(:disabled), .report-source-button:hover:not(:disabled) { background: var(--success-hover); border-color: var(--success-hover); }"), "主按钮 hover 走 --success-hover");
@@ -2241,6 +2261,46 @@ test("A2：重量——token/对比度、控件边框、圆角收敛、表格、
   // D7：正文 15/27 不动（A2 不得改写 .msg 字号/行高）。
   assert.ok(!a2.includes(".msg { font-size") && !a2.includes(".msg {font-size"), "A2 不改正文 15/27（D7）");
   assert.ok(STYLES.includes(".msg { font-size:15px; line-height:1.8; }") && 15 * 1.8 === 27, "正文 15px × 1.8 = 27px");
+});
+
+// ————— 深色石墨主题（2026-10-19 客户决定「整体页面风格这种色调不够沉稳」→ 选择深色石墨）—————
+// 只换视觉：布局/尺寸/交互不动；本组钉住暗色令牌、滚动条/选中文本适配与「硬编码浅色不得残留」。
+
+test("深色石墨主题：color-scheme/令牌/滚动条与选中文本/硬编码浅色残留守卫", () => {
+  const cssCode = STYLES.replace(/\/\*[\s\S]*?\*\//g, "");
+  assert.ok(/:root \{\s*color-scheme: dark;/.test(STYLES), "color-scheme: dark（原生控件/滚动条走深色）");
+  const rootTokens: Array<[string, string]> = [
+    ["--bg", "#14171A"], ["--bg-side", "#1A1E22"], ["--bg-drawer", "#171B1F"], ["--bg-soft", "#1E2328"],
+    ["--bg-hover", "#252A30"], ["--bg-selected", "#2A3037"], ["--border", "#2C3238"], ["--border-strong", "#3A4148"],
+    ["--text", "#E7E9EB"], ["--text-2", "#A7ADB5"], ["--text-3", "#949BA4"],
+    ["--danger", "#C97A6D"], ["--success", "#6FA08B"], ["--amber", "#C4A15F"], ["--focus-ring", "#6FA08B"],
+  ];
+  for (const [token, value] of rootTokens) assert.ok(STYLES.includes(token + ": " + value + ";"), `暗色令牌 ${token} = ${value}`);
+  assert.ok(cssCode.includes("::-webkit-scrollbar-thumb { background: #4A525A;"), "滚动条拇指深色适配");
+  assert.ok(cssCode.includes("::-webkit-scrollbar-thumb:hover { background: #5F6870;"), "滚动条 hover 深色适配");
+  assert.ok(cssCode.includes("::selection { background: #3A4A44; color: var(--text); }"), "选中文本深色底 + 可读前景");
+  // 审计：旧的浅色表面不得残留（局部留亮色=本批失败）。
+  const lightLeftovers = [
+    "#FFFFFF", "#FFF", "#FAFBF8", "#FAFBF9", "#FCFCFB", "#FCFCFA", "#FBFCF8", "#FBFAF5", "#F7F8F5", "#F5F6F2",
+    "#F4F8F2", "#F4F5F1", "#F4F4F2", "#F3F5EF", "#F1F4EE", "#F1F3EE", "#F0F3ED", "#F0F3EC", "#F0F2ED", "#F0F2EB",
+    "#EFF1EB", "#EEF1EB", "#ECEFE6", "#EDF2EB", "#EDF0EA", "#E8EBE4", "#E5EEE7", "#E5E7E3", "#E3E7DF", "#E3E3E0",
+    "#E2E5DE", "#E1E6DD", "#DFE8DF", "#DDE2DC", "#DCE6D9", "#DCE1D5", "#D8DFD5", "#D8DCD2", "#D7DDD4", "#D7DAD3",
+    "#D6DFD5", "#D4D4D1", "#CDD7CE", "#CCD6CB", "#CAD8CD", "#C4CEC2", "#BEBEBA", "#E8D0C9", "#FCF5F2", "#FBEFED",
+    "#B42318", "#A99060", "#DDD6C5",
+  ];
+  for (const light of lightLeftovers) {
+    assert.ok(!new RegExp(light + "(?![0-9a-fA-F])", "i").test(cssCode), `不得残留硬编码浅色 ${light}`);
+  }
+  // 旧的浅色主题文字/语义色同样不得残留（深底上不可读）。
+  const oldTextLeftovers = [
+    "#242624", "#232C29", "#333", "#000", "#47513F", "#3F4B3C", "#5D6862", "#606B56", "#5F6859", "#6A756E",
+    "#6B7069", "#717B68", "#737773", "#737C68", "#73625D", "#747E78", "#767D73", "#768966", "#7F8878", "#888F80",
+    "#8B9382", "#8D9387", "#8F9B82", "#91978B", "#92988C", "#A2A895", "#8A968B",
+    "#2D634E", "#244F3E", "#A1433C", "#8A5B23", "#32735B", "#87602B", "#42745E", "#964035", "#B16452",
+  ];
+  for (const old of oldTextLeftovers) {
+    assert.ok(!new RegExp(old + "(?![0-9a-fA-F])", "i").test(cssCode), `不得残留旧主题色 ${old}`);
+  }
 });
 
 test("字体：整页等宽（2026-10-17 客户裁定）——--sans 与 --mono 同一等宽栈，无 system-ui/Segoe 主字体", () => {

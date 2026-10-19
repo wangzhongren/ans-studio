@@ -107,6 +107,8 @@ Customer callback 第二参保留 O1 的原 CustomerInputMetadata.signal；sessi
 
 判断请求由会话闭包给出：`roleId/projectRoot/runtime/turnText/judge`；`policy/tier` 由 `OperatorPrompt.reason` 行首 `su-审批档[tier]` 解析（否则 `project`/`null`）。`ShellCommandDisplay`/`ShellConfirmRequest` 增可选 `judgeNotice`（`buildShellConfirmRequest` **原样拷贝**，不进入 `reasonRaw`）。
 
+**审批档展示角色化（2026-10-19 客户反馈）**：新增导出 `approvalRoleDisplayName(roleId?, displayName?)`——single/su、缺省、非内置 id ⇒ `"SU"`；trio 内置治理角色（liaison/rapporteur/nominator/convener/verifier）⇒ 门禁引擎注册表显示名（`Lead / 主理` … `Proof / 验收`；经 Service 公共出口 `resolve-boundary.ts::governanceRoleOf` 只读消费）。`plainReasonFor(reason, roleDisplayName?)` 与 `buildShellConfirmRequest(id, display, roleDisplayName?)` 把审批档人话改为「<角色名> 审批档：<tier 人话>——…」（三条必备披露不变）；`createShellConfirmPresenter` 按 `metadata.roleId` 解析后构建卡片。**内部 `reasonRaw` 的 `su-审批档[tier]` 前缀、`tier`/`policy` 值与解析语义逐字不变**（解析兼容）；项目角色 `policy=project`，不显示治理角色名。
+
 **2026-10-18 客户裁定（第一层规则不拒绝任何请求）**：c 规则只快速放行/作参考，**所有拒绝由判断 agent 做出**；risky/review/deny 均交给 (a)。桌面 (a) 通道对 deny 档**同样调用 judge**（无 tier 短路）；结果行/审计保留 c 规则判定（`policy/tier`）与 judge 结论（`verdict/reasonCode`）；诊断 `shell-judge.decision` 以 `decision:"<policy>:<tier 或 null>:<verdict>"` + `outcome` + `reasonCode` 同时保留两者。single/su 旧路径（开关关/无 judge）逐字不变。
 
 **会话装配（`app/desktop/session.ts`）**：每会话用**同一份** `runtimeOptions` 与已构造的 `createAdapter` 工厂经编排 `createShellJudge` 生成闭包（`SessionManagerDeps.createShellJudge`；Interface 缺省注入真实实现，经 `govern-session.ts` 薄再导出，**不直接导入私有 `common/编排/`**）；构造失败 ⇒ 不注入（回原 present）。`LiveSession.lastUserText` 在**真实投递**（直发/出队/派发/回交）时写入，UTF-8 ≤4096 字节（超出截断、不据此 manual）；`metadata` 在调用当刻从活会话读取 `turnText`/`judge`；会话 `dispose` 即清两项。三人（su/项目角色）共用；不改既有 shell 审批档/三层链。

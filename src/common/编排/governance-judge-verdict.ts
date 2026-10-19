@@ -85,6 +85,14 @@ const HARD_FORBIDDEN_PREFIXES: readonly string[] = [
   "角色卡/su/",
 ];
 
+/**
+ * 危险写路径的**单一来源**（证据包生成与裁决复核共用）：`path` 落在任一硬禁写前缀下。
+ * 只做路径段比较，不做文件系统访问。
+ */
+export function isHardForbiddenPath(path: string): boolean {
+  return HARD_FORBIDDEN_PREFIXES.some((prefix) => pathCovers(prefix, path));
+}
+
 /** 模型自报 manual reasonCode 的安全名单（其余一律 `model-manual`，防审计污染）。 */
 const SAFE_MANUAL_REASON_CODES: ReadonlySet<string> = new Set([
   "insufficient-evidence",
@@ -95,6 +103,11 @@ const SAFE_MANUAL_REASON_CODES: ReadonlySet<string> = new Set([
   "path-outside-boundary",
   "group-mismatch",
   "ledger-unavailable",
+  // 2026-10-19 客户定位修正：decision 组只判意图漂移。
+  "intent-drift",
+  "intent-missing",
+  "intent-ambiguous",
+  "intent-unconfirmed",
 ]);
 
 const DEFAULT_MANUAL_REASON = "判断 agent 自报无法完成判断，已转手动确认。";
@@ -330,11 +343,10 @@ export function evaluateGovernanceJudgeVerdict(args: EvaluateGovernanceJudgeVerd
   // 4) 逐卡种门槛。
   switch (request.cardKind) {
     case "proposal": {
-      // 架构与可扩展性（客户 2026-10-19 批评「提案角色应该也要考虑到扩展性，给出一个架构方案」）由
-      // 系统提示 rubric 要求判断 agent 实际读取 proposalPath 全文核对；缺章节/空洞时模型自报
-      // manual/insufficient-evidence。此处**不做**标题/关键词的机械文本匹配：preview 有界（8KB），
-      // 提案长文可能把架构章节放在片段之后，机械匹配会误伤。确定性底线是第 5 步 required-read：
-      // proposalPath 必在 requiredReadPaths 中且必须实际读过，未读全文不可能 approve。
+      // 2026-10-19 客户定位修正：decision 组只判**意图漂移**。架构章节/工程质量/测试覆盖/证据充分性
+      // 由 Draft/Proof 的工作流与验收负责，driver 不在这里做机械门槛（也不做架构标题匹配）。
+      // 确定性底线保留：只能代批 accept（accept-quick/revise/reject 一律交回客户）；意图文件的存在、
+      // 可解析与客户确认态由证据包 builder 在调用模型前 fail-closed 校验。
       const selected = verdict.selected ?? [];
       if (request.card.kind !== "choice" || !request.card.options.some((option) => option.id === "accept")) {
         return manualOutcome(args, "not-recommended", "卡片没有可代批的 accept 选项，已转手动确认。");
@@ -483,10 +495,10 @@ export function evaluateGovernanceJudgeVerdict(args: EvaluateGovernanceJudgeVerd
     return manualOutcome(args, "artifact-missing", artifactMissingReason(requiredArtifacts.missingPaths));
   }
   const readPaths = new Set((stats?.readPaths ?? []).map(normalizeRel));
-  const requiredReadPaths = uniquePaths([
-    ...requiredArtifacts.paths,
-    ...(args.requiredReadPaths ?? []),
-  ]);
+  // 2026-10-19 证据包：driver 给出**收窄后的定点抽查集**（证据包完整性/哈希核对所需的最小集合）。
+  // 不再把全部规范物证并入 required-read——物证的完整性由系统证据包（sha256 + 关键片段）承担。
+  // 直接调用者未给该参数时保持旧口径（全部规范物证），向后兼容。
+  const requiredReadPaths = uniquePaths(args.requiredReadPaths ?? requiredArtifacts.paths);
   if (requiredReadPaths.some((path) => !readPaths.has(path))) {
     return manualOutcome(args, "artifact-not-read", "判断 agent 未实际读取全部必读物证，已转手动确认。");
   }

@@ -3,7 +3,9 @@
 // 公开入口经 `govern-session.ts` 薄再导出）。
 //
 // 依据：PM 评审 `角色卡/项目管理/docs/design/2026-10-18_design_judge-governance-cards-review.md`
-// §7.1–§7.6（approved）。
+// §7.1–§7.6（approved）；2026-10-19 客户定位修正：**decision 组（proposal/appointment/acceptance）
+// 只判断决策是否偏离客户已确认的意图**，工程质量/架构章节/测试覆盖/证据充分性由 Draft/Proof 的工作流
+// 与验收负责（见 `governance-judge-intent.ts` 与证据包 `intent` 段）。
 //
 // 职责（**只有驱动**）：
 //   · 三引擎支持矩阵（Claude / Pi / Codex 同期；demo 或未配置 → manual/unsupported-engine）；
@@ -20,7 +22,7 @@
 // `createRuntimeAdapterFactory`（与请求会话同一份 runtimeOptions），测试注入假 `createAdapter`。
 // 判断会话**不写盘、不写聊天、不写角色状态**。
 
-import { readFile, stat } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type {
   DiagnosticLog,
@@ -42,9 +44,9 @@ import { RUNTIME_KINDS } from "../shared/runtime-shared.ts";
 import { createDiagnosticLogger } from "../shared/diagnostics.ts";
 import { buildGovernanceJudgePrompt, buildGovernanceJudgeSystemPrompt } from "./governance-judge-prompt.ts";
 import { evaluateAcceptanceCompletion, requiredArtifactPaths, isGovernanceJudgeFlowId } from "./governance-judge-facts.ts";
+import { buildDecisionEvidencePacket, safeProjectRelativePath, verifyEvidenceHashes } from "./governance-judge-evidence.ts";
 import { readGovernanceLedger } from "./governance-ledger.ts";
 import {
-  artifactMissingReason,
   boundedGovernanceJudgeAudit,
   evaluateGovernanceJudgeVerdict,
   governanceJudgeAuditFromOutcome,
@@ -81,9 +83,6 @@ export function resolveGovernanceJudgeTimeoutMs(
 export function formatGovernanceJudgeTimeout(timeoutMs: number): string {
   return timeoutMs >= 1000 && timeoutMs % 1000 === 0 ? `${timeoutMs / 1000}s` : `${timeoutMs}ms`;
 }
-/** 默认读取预算的调用次数上限（与运行时核心 `SHELL_JUDGE_DEFAULT_BUDGET.maxCalls` 同值）。 */
-const GOVERNANCE_JUDGE_MAX_REQUIRED_READS = 8;
-
 /** 支持判断的引擎（三引擎同期；demo 不在内）。 */
 export const GOVERNANCE_JUDGE_SUPPORTED_RUNTIMES: ReadonlySet<RuntimeKind> = new Set<RuntimeKind>([
   "claude",
@@ -186,65 +185,6 @@ function contextProblem(request: GovernanceJudgeRequest): { reasonCode: string; 
   return undefined;
 }
 
-function safeRelativePath(value: string): string | undefined {
-  const normalized = value.replace(/\\/g, "/");
-  if (normalized === "" || normalized.startsWith("/") || /^[A-Za-z]:/.test(normalized)) return undefined;
-  const segments = normalized.split("/");
-  if (segments.some((segment) => segment === "" || segment === "." || segment === "..")) return undefined;
-  return normalized;
-}
-
-async function isRegularFile(projectRoot: string, rel: string): Promise<boolean> {
-  try {
-    const info = await stat(path.join(projectRoot, ...rel.split("/")));
-    return info.isFile();
-  } catch {
-    return false;
-  }
-}
-
-/**
- * 计算 approve 前必须实际读取的路径（评审 §5.4）：
- * 规范物证 + confirm 卡中**已存在**的目标文件（新文件不要求读，由 rubric 要求 preview 含正文）。
- * 物证缺失 ⇒ `artifact-missing`；必读超过读取预算 ⇒ `budget`（不降低门槛）。
- */
-async function requiredReadPathsFor(request: GovernanceJudgeRequest): Promise<
-  { ok: true; paths: string[] } | { ok: false; reasonCode: string; reason: string }
-> {
-  const required = requiredArtifactPaths(request);
-  if (required.missing) {
-    return { ok: false, reasonCode: "artifact-missing", reason: artifactMissingReason(required.missingPaths) };
-  }
-  const paths: string[] = [];
-  const seen = new Set<string>();
-  const add = (value: string): void => {
-    const rel = safeRelativePath(value);
-    if (rel === undefined || seen.has(rel)) return;
-    seen.add(rel);
-    paths.push(rel);
-  };
-  if (request.card.kind === "confirm" && Array.isArray(request.paths) && request.paths.length > 50) {
-    // 不截断后猜：候选超过逐路径复核上限 ⇒ 整卡回落（评审 §7.2 pathDecisions ≤50）。
-    return { ok: false, reasonCode: "path-unverified", reason: "写盘卡候选路径超过逐路径复核上限，已转手动确认。" };
-  }
-  for (const artifact of required.paths) add(artifact);
-  if (request.card.kind === "confirm") {
-    const projectRoot = request.projectRoot;
-    for (const candidate of Array.isArray(request.paths) ? request.paths : []) {
-      const rel = safeRelativePath(candidate);
-      if (rel !== undefined && await isRegularFile(projectRoot, rel)) add(rel);
-    }
-  }
-  if (paths.length > GOVERNANCE_JUDGE_MAX_REQUIRED_READS) {
-    return {
-      ok: false,
-      reasonCode: "budget",
-      reason: `必读物证数量（${paths.length}）超出判断读取预算（${GOVERNANCE_JUDGE_MAX_REQUIRED_READS} 次），已转手动确认。`,
-    };
-  }
-  return { ok: true, paths };
-}
-
 /**
  * 验收机械门槛（P6 验收观察，安全项）：只读流程单 + 账本，**不采信模型自报**。
  * 所有步骤 `done`、每个步骤都有 `dispatch.accepted`、无未结算决定/未闭环澄清、账本可读；
@@ -255,7 +195,7 @@ async function verifyAcceptanceMechanics(
   projectRoot: string,
 ): Promise<{ ok: true } | { ok: false; reasonCode: string; reason: string }> {
   const flowPath = request.artifacts?.flowPath;
-  const rel = typeof flowPath === "string" ? safeRelativePath(flowPath) : undefined;
+  const rel = typeof flowPath === "string" ? safeProjectRelativePath(flowPath) : undefined;
   if (rel === undefined) {
     return { ok: false, reasonCode: "artifact-missing", reason: "验收卡缺少流程单物证路径，已转手动确认。" };
   }
@@ -277,38 +217,6 @@ async function verifyAcceptanceMechanics(
     ledgerEntries: ledger.entries,
     ledgerErrors: ledger.errors.length,
   });
-}
-
-/**
- * 新建目标文件的 preview 门槛（评审 §5.4）：confirm 卡中**尚不存在**的目标文件不进入
- * required-read（读它必然失败），改由 preview 正文核对内容；preview 为空 ⇒ manual。
- * 「内容是否足够」由 rubric 判断，本层只机械拦截空 preview。
- */
-async function verifyConfirmPreview(
-  request: GovernanceJudgeRequest,
-  projectRoot: string,
-): Promise<{ ok: true } | { ok: false; reasonCode: string; reason: string }> {
-  if (request.card.kind !== "confirm") return { ok: true };
-  const paths = Array.isArray(request.paths) ? request.paths : [];
-  let createsNewFile = false;
-  for (const candidate of paths) {
-    const rel = safeRelativePath(candidate);
-    if (rel === undefined) continue; // 非法路径由逐路径复核处理
-    if (!(await isRegularFile(projectRoot, rel))) {
-      createsNewFile = true;
-      break;
-    }
-  }
-  if (!createsNewFile) return { ok: true };
-  const preview = typeof request.card.preview === "string" ? request.card.preview.trim() : "";
-  if (preview === "") {
-    return {
-      ok: false,
-      reasonCode: "insufficient-evidence",
-      reason: "新建文件的写盘确认缺少 preview 正文，无法核对将写入的内容，已转手动确认。",
-    };
-  }
-  return { ok: true };
 }
 
 /** 解析降级路径：最后一条 message 必须是**纯 JSON 对象**（可去代码围栏）；夹带解释/多个 JSON → undefined。 */
@@ -395,43 +303,37 @@ export function createGovernanceJudge(opts: CreateGovernanceJudgeOptions): Gover
       flowId: request.flowId,
     });
 
-    // 必读物证在**提示之前**算好：模型必须先读它们才可能 approve（评审 §5.4）。
-    const requiredRead = await requiredReadPathsFor({ ...request, projectRoot });
-    if (!requiredRead.ok) {
+    // 2026-10-19 证据包（客户：「决策agent 应该是别人给摘要，他再去判断，不是所有文件给他」）：
+    // 调用模型前由**确定性函数**从实际物证生成结构化、有界的 DecisionEvidencePacket。
+    // 证据包缺失/关键物证不可读/路径探测失败/请求方陈述与系统事实冲突/待写正文不完整 ⇒ 直接 manual，
+    // **不调用模型**（fail-closed）。模型的 required-read 收窄为证据包完整性/哈希核对所需的
+    // 最小定点抽查集（0–2 条）。
+    const evidence = await buildDecisionEvidencePacket({ request, projectRoot });
+    if (!evidence.ok) {
       log.record("governance-judge.manual", {
         toolCallId: request.toolCallId,
-        reasonCode: requiredRead.reasonCode,
-        reason: requiredRead.reason,
+        reasonCode: evidence.reasonCode,
+        reason: evidence.reason,
         group: request.group,
         cardKind: request.cardKind,
       });
       return {
-        ...manualOutcome(requiredRead.reasonCode, requiredRead.reason),
+        ...manualOutcome(evidence.reasonCode, evidence.reason),
         group: request.group,
         cardKind: request.cardKind,
         engine: request.runtime,
       };
     }
-
-    // 写盘卡：新建目标文件必须带 preview 正文（读不存在的目标没有意义，评审 §5.4）。
-    if (request.card.kind === "confirm") {
-      const preview = await verifyConfirmPreview(request, projectRoot);
-      if (!preview.ok) {
-        log.record("governance-judge.manual", {
-          toolCallId: request.toolCallId,
-          reasonCode: preview.reasonCode,
-          reason: preview.reason,
-          group: request.group,
-          cardKind: request.cardKind,
-        });
-        return {
-          ...manualOutcome(preview.reasonCode, preview.reason),
-          group: request.group,
-          cardKind: request.cardKind,
-          engine: request.runtime,
-        };
-      }
-    }
+    const requiredReadPaths = evidence.requiredReadPaths;
+    // 诊断只写白名单字段（`common/shared/diagnostics.ts`）：工具调用/证据条数/完整性。
+    log.record("governance-judge.evidence", {
+      toolCallId: request.toolCallId,
+      count: evidence.packet.evidence.length,
+      ok: evidence.packet.integrity.complete,
+      ...(evidence.packet.intent !== undefined
+        ? { intentId: evidence.packet.intent.intentId, intentConfirmed: evidence.packet.intent.confirmed }
+        : {}),
+    });
 
     // 验收卡：先机械核对流程完成度（不靠模型自报），未完成/阻塞/待派发/未结算 ⇒ 直接 manual。
     if (request.cardKind === "acceptance") {
@@ -481,7 +383,7 @@ export function createGovernanceJudge(opts: CreateGovernanceJudgeOptions): Gover
           return { kind: "settled" };
         }
         try {
-          const prompt = buildGovernanceJudgePrompt(request, requiredRead.paths);
+          const prompt = buildGovernanceJudgePrompt(request, requiredReadPaths, evidence.packet);
           await bound.prompt(prompt);
           if (stopped) return { kind: "settled" };
           for await (const event of bound.events()) {
@@ -537,12 +439,33 @@ export function createGovernanceJudge(opts: CreateGovernanceJudgeOptions): Gover
           engine: request.runtime,
         };
       }
+      // approve 前复核证据哈希：判断期间任一物证/已存在目标发生变化或消失 ⇒ manual。
+      // （证据包描述的是「判断时刻」的盘面；判断后再核对一次，避免拿过期证据放行。）
+      if (verdict.verdict === "approve") {
+        const hashCheck = await verifyEvidenceHashes(evidence.hashBaseline, projectRoot);
+        if (!hashCheck.ok) {
+          const reason = `证据哈希核对失败：${hashCheck.reason}，已转手动确认。`;
+          log.record("governance-judge.manual", {
+            toolCallId: request.toolCallId,
+            reasonCode: "evidence-hash-mismatch",
+            reason: redactJudgeText(reason),
+            group: request.group,
+            cardKind: request.cardKind,
+          });
+          return {
+            ...manualOutcome("evidence-hash-mismatch", reason),
+            group: request.group,
+            cardKind: request.cardKind,
+            engine: request.runtime,
+          };
+        }
+      }
       const requiredArtifacts = requiredArtifactPaths(request);
       const outcome = evaluateGovernanceJudgeVerdict({
         request,
         verdict,
         stats,
-        requiredReadPaths: requiredRead.paths,
+        requiredReadPaths,
         engine: request.runtime,
         model,
         durationMs: now() - startedAt,
