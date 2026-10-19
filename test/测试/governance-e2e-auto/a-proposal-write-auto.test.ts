@@ -1,7 +1,8 @@
 // test/测试/governance-e2e-auto/a-proposal-write-auto.test.ts
 // 场景 1（离线端到端）：**首次新建提案 write 卡**——Rapporteur 写尚不存在的
 // `docs/proposals/<flow>-v1.md`；双开关全开 + 判断桩 allow ⇒ 0 张手动卡、账本
-// `decisionEvidence.kind:"judge"`；空 preview ⇒ 真实 driver 回落手动卡。
+// `decisionEvidence.kind:"judge"`；空 preview ⇒ 真实 driver 机械门槛 manual ⇒ **自动退回发起角色**
+//（declined + 可操作原因，不呈现客户卡；2026-10-19 客户总原则）。
 //
 // 走真实桌面 Interface + 真实项目目录 + 真实 run-role/gate/issuer/客户通道/判断 driver；
 // 只有模型会话是脚本化桩。
@@ -74,7 +75,7 @@ test("场景1a：首次新建提案 write 卡——双开关开 + 判断 allow �
   }
 });
 
-test("场景1b：空 preview 的新建文件写盘卡——判断桩仍交回 approve，但真实 driver 机械门槛回落手动卡", async () => {
+test("场景1b：空 preview 的写盘卡 manual ⇒ 自动退回发起角色（declined + 原因），不呈现客户卡", async () => {
   const h = await makeHarness({
     tag: "proposal-write-empty-preview",
     approval: true,
@@ -100,23 +101,26 @@ test("场景1b：空 preview 的新建文件写盘卡——判断桩仍交回 ap
   });
   try {
     await h.open("rapporteur");
-    const sending = h.send("rapporteur", "写提案（空 preview 对照）");
-    await h.waitFor(() => h.presented.length === 1, 5000);
-    const card = h.presented[0]!;
-    assert.ok(card.judgeNotice, "回落卡必须带 judgeNotice（如实说明未代批）");
-    assert.match(card.judgeNotice!, /未代批|手动/);
-
-    // 客户手动拒绝，让本轮收尾。注意：Rapporteur 的 Section 1（docs/proposals/）是**预授权目录**，
-    // 因此 write_file 本身不依赖这张卡——本用例只钉「判断回落手动」这一事实，不把预授权当门禁。
-    h.answer(card.id, { kind: "confirm", confirmed: false });
-    const sent = await sending;
+    const sent = await h.send("rapporteur", "写提案（空 preview 对照）");
     assert.equal(sent.ok, true, sent.error ?? "");
 
-    const ledger = await h.waitForLedger((entries) => entries.some((entry) => entry.kind === "customer.decision"));
+    // 2026-10-19 客户总原则：开关开启且判断实际运行后，manual/deny 不再呈现客户卡，
+    // 直接 declined + 可操作原因回投发起角色（operatorId=judge:<engine>）；角色同轮可修正重发。
+    assert.equal(h.presented.length, 0, "manual 自动退回，不呈现客户卡");
+    assert.equal(h.judgeRows.length, 0, "manual 不产生 approve 结果行");
+    const receipt = h.results.find((result) => result.name === "request_confirmation");
+    assert.ok(receipt, "发起角色应收到 request_confirmation 的 declined 回执");
+    assert.equal(receipt!.ok, false, "回执必须是拒绝，不得伪造同意");
+    assert.match(receipt!.message, /自动审批未通过|自动审批拒绝/, "回执须说明自动审批未通过/拒绝");
+    assert.match(receipt!.message, /重新提交/, "回执须给出可操作的修正后重试指引");
+    assert.doesNotMatch(receipt!.message, /客户已选择|客户已确认/, "不得伪装客户同意");
+
+    // judge declined 不是客户决定：不写 customer.decision 账本（避免 unclassified/none 挡收尾门）。
+    const ledger = await h.waitForLedger(() => true);
     assert.equal(
-      ledger.entries.some((entry) => entry.decisionEvidence?.kind === "judge" && entry.customerDecision === "accepted"),
+      ledger.entries.some((entry) => entry.kind === "customer.decision"),
       false,
-      "空 preview 不得产生 judge 代批的 accepted 决定",
+      "judge declined 不得写客户决定账本",
     );
   } finally {
     await h.stop();

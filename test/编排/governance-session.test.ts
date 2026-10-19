@@ -1309,3 +1309,44 @@ test("旧 single：runRole 一次性路径的失败码不受影响（非项目�
   );
   assert.notEqual(result.code, EXIT_OK);
 });
+
+test("judge deny 以 declined 回投：不写 customer.decision（不污染账本/不挡收尾门）", async () => {
+  await withRoot(async (root) => {
+    const captured = {} as Captured;
+    const judgeDeny: CustomerInputFn = () => ({
+      outcome: "declined",
+      operatorId: "judge:claude",
+      reason: "自动审批拒绝：角色卡混入无关散文，请修正后重试。",
+    });
+    const handle = await openRoleSession(
+      {
+        roleId: "nominator",
+        project: withBuiltIn(trioProject(root), "nominator"),
+        customerInput: judgeDeny,
+        autoRepin: false,
+      },
+      { createAdapter: capturingFactory(captured) },
+    );
+    try {
+      const out = await captured.caps!.customerInput!({
+        kind: "confirm",
+        title: "写角色卡 alpha",
+        preview: "## 角色卡/alpha/role-card.md\n# alpha\n",
+        paths: ["角色卡/alpha/role-card.md"],
+        flowId: "flow-a",
+        cardKind: "appointment-write",
+      });
+      assert.equal(out?.outcome, "declined");
+      await flushGovernanceLedger(root);
+      const ledger = await readGovernanceLedger(root);
+      assert.equal(
+        ledger.entries.filter((entry) => entry.kind === "customer.decision").length,
+        0,
+        "judge deny 不是客户决定，不得写 customer.decision",
+      );
+      assert.equal(ledger.errors.length, 0);
+    } finally {
+      await handle.dispose();
+    }
+  });
+});

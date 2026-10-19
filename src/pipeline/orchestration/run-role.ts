@@ -1908,6 +1908,15 @@ async function recordCustomerDecision(args: {
   // 2026-10-18 真机：只有**治理卡**（显式 cardKind）才写 `customer.decision`。Lead/Crew 的普通
   // 选择/确认（无 cardKind）若也写，会以 unclassified/none 污染账本并覆盖真正的提案决定。
   if (cardKind === undefined) return;
+  // 2026-10-19：判断 agent 的 approval deny 由桌面以 `declined`（operatorId=`judge:<engine>`）回投角色，
+  // 它不是客户决定——不写 `customer.decision`（否则 unclassified/none 会污染账本并挡住收尾门）。
+  if (
+    args.out?.outcome === "declined" &&
+    typeof args.out.operatorId === "string" &&
+    args.out.operatorId.startsWith("judge:")
+  ) {
+    return;
+  }
   const classification = classifyCustomerDecision(cardKind, args.out);
   if (classification === undefined) return;
 

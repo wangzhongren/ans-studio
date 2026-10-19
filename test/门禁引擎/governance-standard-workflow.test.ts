@@ -288,6 +288,61 @@ test("标准工作流：五卡流程状态引用统一为 YAML（唯一机器状
   );
 });
 
+test("标准工作流：写卡被 declined——Crew/Steward 按 reason 修正后重发确认卡；judge deny 是系统审批拒绝不是客户决定", () => {
+  // 真机 2026-10-19：Crew 的 appointment-write 写卡内容不合规（README 归属未定案、tester boundary
+  // 混入 Markdown 散文），判断 agent 只能 manual、客户被迫手批。客户要求判断 agent 拒绝并把原因退回
+  // Crew 重做；编排增加 approval `deny`，桌面把 deny 转成 declined + 原因回投发起角色。
+  const crew = cardTextOf("nominator");
+  assertIncludesAll(
+    crew,
+    [
+      "写卡被拒（declined）时（必须）",
+      "`request_confirmation` 返回 `declined`（含自动审批 deny 的原因）",
+      "按 `reason` 修正",
+      "重新发确认卡",
+      "不得绕过确认",
+      "不得直接 `write_file`",
+      "不得把原因当客户已同意",
+      "不循环空转",
+    ],
+    "Crew declined 纪律",
+  );
+  assert.match(
+    crew,
+    /appointment-write[\s\S]{0,220}declined[\s\S]{0,120}重新发确认卡/,
+    "Crew 的 appointment-write 工作流须写死 declined 后重发确认卡",
+  );
+
+  const steward = cardTextOf("convener");
+  assertIncludesAll(
+    steward,
+    [
+      "写卡被拒（declined）时（必须）",
+      "`request_confirmation` 返回 `declined`（含自动审批 deny 的原因）",
+      "修正流程状态 YAML 或排程内容",
+      "重新发确认卡",
+      "不得绕过确认",
+      "不得直接 `write_file`",
+      "不得把原因当客户已同意",
+      "不循环空转",
+      "写卡完成/角色枚举出现后，按流程 YAML 继续下一步（派发/回交/登记），不要等客户催办",
+    ],
+    "Steward declined 纪律",
+  );
+
+  // 五卡统一：judge deny 是系统审批拒绝，不是客户决定，不写入客户决定账本。
+  for (const spec of BUILT_IN_GOVERNANCE_ROLES) {
+    assertIncludesAll(
+      spec.cardText,
+      [
+        "判断 agent 的 `deny` 是系统审批拒绝（拒绝本次写盘/命令），不是客户决定，不写入客户决定账本",
+        "不得把它当作客户意见或同意",
+      ],
+      `${spec.id} judge deny 纪律`,
+    );
+  }
+});
+
 test("标准工作流：Proof / 验收——标准复核（真实跑测试/真实启动/演示/逐条核对）→验收卡；不依赖客户催办", () => {
   const t = cardTextOf("verifier");
   assertIncludesAll(

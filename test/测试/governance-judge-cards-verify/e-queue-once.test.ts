@@ -133,7 +133,7 @@ test("replayPending 不重新判断；已代批卡不在重放集合；结果行
   }
 });
 
-test("manual 回落卡 replay：只重呈现、不重新判断、不重复提示", async () => {
+test("manual 自动退回卡 replay：已结算不重放、不重新判断、不重复投递", async () => {
   const { root, cleanup } = makeRoot("replay-manual");
   try {
     seedProject(root);
@@ -153,19 +153,18 @@ test("manual 回落卡 replay：只重呈现、不重新判断、不重复提示
         };
       }),
     });
-    const pending = h.ask(card("提案一"));
-    await tick(10);
-    assert.equal(h.presented.length, 1);
-    const firstNotice = h.presented[0]!.judgeNotice;
-    assert.equal(typeof firstNotice, "string");
+    const out = await h.ask(card("提案一"));
+    // 2026-10-19：manual 自动退回（declined），不呈现客户卡；拒绝原因回投发起角色。
+    assert.equal(out.outcome, "declined");
+    assert.equal((out as Extract<typeof out, { outcome: "declined" }>).operatorId, "judge:claude");
+    assert.match((out as Extract<typeof out, { outcome: "declined" }>).reason ?? "", /自动决策未通过|重新提交/);
+    assert.equal(h.presented.length, 0, "manual 不呈现客户卡");
+    assert.equal(judgeCalls.length, 1, "只判断一次");
     const replayed = h.channel.replayPending();
-    assert.equal(replayed, 1, "已呈现的回落卡可重呈现");
-    assert.equal(h.presented.length, 2);
-    assert.equal(h.presented[1]!.judgeNotice, firstNotice, "提示原样保留");
+    assert.equal(replayed, 0, "declined 卡已结算，不在重放集合");
+    assert.equal(h.presented.length, 0, "replay 不得重新呈现");
     assert.equal(judgeCalls.length, 1, "replay 不得再次判断");
-    h.answer(h.presented[1]!.id, { kind: "choice", selected: ["accept"] });
-    await pending;
-    assert.equal(h.nextSteps.length, 1);
+    assert.equal(h.nextSteps.length, 0, "declined 不触发应用下一步，更不得重复投递");
   } finally {
     cleanup();
   }

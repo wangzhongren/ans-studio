@@ -164,7 +164,8 @@ export type GovernanceCardKind = GovernanceChoiceCardKind | GovernanceConfirmCar
 //
 // 依据：PM 评审《「替我审批」/「替我决策」双开关——项目管理评审与 V1 拆发》§3.1/§六。
 // `cardKind → group` **只允许这一份实现**（桌面包、编排、测试、UI 全部读这里；不得再写第二张映射表）。
-// 组只表达「哪一类卡由哪个开关代批」，不表达任何权限；判断本身仍只做正向代批（见 `GovernanceJudgeOutcome`）。
+// 组只表达「哪一类卡由哪个开关代批」，不表达任何权限；approval 组可 `deny`（写卡不合规退回重做），
+// decision 组正向代批，`manual` 由桌面作为返工原因回投发起角色（见 `GovernanceJudgeOutcome`）。
 
 /** 治理卡判断开关分组：`approval`＝shell＋写盘族；`decision`＝提案/任命/验收。 */
 export type GovernanceJudgeGroup = "approval" | "decision";
@@ -1033,7 +1034,8 @@ export interface ShellJudgeToolOptions {
 //
 // 分层与 shell judge 一致：中立类型＝本模块；只读工具/读取策略＝`src/common/runtime-core/governance-judge/`
 // （读/列复用 `shell-judge/policy.ts`，并整体排除 `.ans/**`）；规范化/驱动/账本证据＝编排（P2）。
-// 判断**只做正向代批**：`revise`/`reject`/`false`/空选择/未知 id 一律由编排归一化 `manual`；
+// 判断可 `approve`；**approval 组**可 `deny` 退回发起角色重做；**decision 组正向代批，不得 deny**，
+// `manual` 由桌面作为返工原因回投发起角色。`revise`/`reject`/`false`/空选择/未知 id 一律由编排归一化 `manual`；
 // 本层不实现任何判定、不读写账本、不改变任何写权。分组映射＝上方 `GOVERNANCE_CARD_GROUP`（单一来源）。
 
 /** 判断卡范围（desktop/orchestration 与驱动共用；字段逐字按评审 §6.1）。 */
@@ -1092,7 +1094,12 @@ export interface GovernanceJudgeAudit {
 
 /** 驱动补全后的判断结果（模型只能经 `report_governance_judgement` 交回原始参数）。 */
 export interface GovernanceJudgeOutcome {
-  verdict: "approve" | "manual";
+  /**
+   * `approve` = 正向代批；`deny` = **仅 approval 组**（写卡内容/路径/完整性/一致性可由发起角色修正时
+   * 退回重做）；`manual` = 判断无法完成，由桌面转成退回发起角色重做的原因（不呈现客户卡）。
+   * decision 组不得 deny。
+   */
+  verdict: "approve" | "deny" | "manual";
   group: GovernanceJudgeGroup;
   cardKind: GovernanceCardKind;
   reasonCode: string;

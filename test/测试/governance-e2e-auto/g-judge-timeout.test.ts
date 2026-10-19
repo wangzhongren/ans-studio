@@ -1,5 +1,6 @@
 // test/测试/governance-e2e-auto/g-judge-timeout.test.ts
-// 场景 7（离线端到端）：**判断超时**——默认 120s、环境变量覆盖、超时回落该组原卡（manual + judgeNotice）。
+// 场景 7（离线端到端）：**判断超时**——默认 120s、环境变量覆盖；超时属 manual，
+// 2026-10-19 客户总原则后**自动退回发起角色**（declined + 可操作原因，不呈现客户卡）。
 //
 // 超时硬门槛由真实 `createGovernanceJudge` driver 产生（假判断会话沉默不交回结论）；
 // 为避免真等 120s，覆盖用例把环境变量设为几十毫秒（解析函数本身另行逐值核对）。
@@ -93,7 +94,8 @@ function makeTimeoutHarness(root: string): TimeoutHarness {
     presented,
     rows,
     async ask(req, ctx) {
-      const pending = channel.customerInput(req, {
+      // 2026-10-19：manual（含超时）不再呈现客户卡，直接 declined 结算；无需等待/作答。
+      return (await channel.customerInput(req, {
         roleId: "rapporteur",
         runtime: "claude",
         projectRoot: root,
@@ -105,20 +107,12 @@ function makeTimeoutHarness(root: string): TimeoutHarness {
         flowId: FLOW,
         cardKind: req.cardKind,
         judgeContext: judgeContextFor(req, (ctx.judgeContext as Record<string, unknown> | undefined) ?? {}) as unknown as GovernanceJudgeContext,
-      });
-      await waitFor(() => presented.length > 0);
-      const card = presented[presented.length - 1]!;
-      const decision =
-        req.kind === "confirm"
-          ? ({ kind: "confirm", confirmed: false } as const)
-          : ({ kind: "choice", selected: [req.options[0]!.id] } as const);
-      channel.respond({ id: card.id, decision });
-      return (await pending) as CustomerInputOutcome;
+      })) as CustomerInputOutcome;
     },
   };
 }
 
-test("场景7b：环境变量覆盖生效——审批组（write）超时回落原卡", async () => {
+test("场景7b：环境变量覆盖生效——审批组（write）超时自动退回（declined + 原因），不呈现客户卡", async () => {
   const root = mkdtempSync(path.join(tmpdir(), "ans-judge-timeout-approval-"));
   const previous = process.env[GOVERNANCE_JUDGE_TIMEOUT_ENV];
   process.env[GOVERNANCE_JUDGE_TIMEOUT_ENV] = "40";
@@ -127,11 +121,13 @@ test("场景7b：环境变量覆盖生效——审批组（write）超时回落�
     const started = Date.now();
     const outcome = await h.ask(cardFor("write"), {});
     const elapsed = Date.now() - started;
-    assert.equal(h.presented.length, 1, "超时必须呈现该组原卡");
-    assert.match(h.presented[0]!.judgeNotice ?? "", /判断超时/);
-    assert.match(h.presented[0]!.judgeNotice ?? "", /已转你手动确认/);
+    assert.equal(h.presented.length, 0, "超时属 manual ⇒ 自动退回，不呈现原卡");
     assert.equal(h.rows.length, 0, "超时不产生 judge 结果行");
-    assert.equal(outcome.outcome, "declined", "客户手动拒绝（fallback 后手动作答）");
+    assert.equal(outcome.outcome, "declined", "超时以 declined 结算（非客户作答）");
+    const declined = outcome as Extract<CustomerInputOutcome, { outcome: "declined" }>;
+    assert.equal(declined.operatorId, "judge:claude", "退回归因为 judge，而非客户");
+    assert.match(declined.reason ?? "", /自动审批未通过|判断超时/, "须说明超时未代批");
+    assert.match(declined.reason ?? "", /重新提交/, "须给出可操作的修正后重试指引");
     assert.ok(elapsed >= 35, `应按环境变量的 40ms 超时，而不是默认 120s（实际 ${elapsed}ms）`);
     assert.ok(elapsed < 5000, `不得等待默认 120s（实际 ${elapsed}ms）`);
   } finally {
@@ -141,7 +137,7 @@ test("场景7b：环境变量覆盖生效——审批组（write）超时回落�
   }
 });
 
-test("场景7c：决策组（proposal）超时同样回落该组原卡", async () => {
+test("场景7c：决策组（proposal）超时同样自动退回（declined + 原因）", async () => {
   const root = mkdtempSync(path.join(tmpdir(), "ans-judge-timeout-decision-"));
   const previous = process.env[GOVERNANCE_JUDGE_TIMEOUT_ENV];
   process.env[GOVERNANCE_JUDGE_TIMEOUT_ENV] = "40";
@@ -153,13 +149,14 @@ test("场景7c：决策组（proposal）超时同样回落该组原卡", async (
     const outcome = await h.ask(cardFor("proposal"), {
       judgeContext: { artifacts: { proposalPath: PROPOSAL_REL } },
     });
-    assert.equal(h.presented.length, 1, "决策组超时也呈现原卡");
-    const notice = h.presented[0]!.judgeNotice ?? "";
-    assert.match(notice, /判断超时/);
-    assert.match(notice, /代决策/);
+    assert.equal(h.presented.length, 0, "决策组超时也不呈现原卡");
     assert.equal(h.rows.length, 0);
-    assert.equal(outcome.outcome, "answered", "客户本人可继续作答");
-    assert.equal(outcome.operatorId, "test:op", "不是 judge 代批");
+    assert.equal(outcome.outcome, "declined");
+    const declined = outcome as Extract<CustomerInputOutcome, { outcome: "declined" }>;
+    assert.equal(declined.operatorId, "judge:claude");
+    assert.match(declined.reason ?? "", /自动决策未通过/, "须说明自动决策未通过");
+    assert.match(declined.reason ?? "", /判断超时/, "须保留超时事实");
+    assert.match(declined.reason ?? "", /重新提交/, "须给出可操作的修正后重试指引");
   } finally {
     if (previous === undefined) delete process.env[GOVERNANCE_JUDGE_TIMEOUT_ENV];
     else process.env[GOVERNANCE_JUDGE_TIMEOUT_ENV] = previous;

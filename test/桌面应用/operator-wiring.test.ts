@@ -788,9 +788,10 @@ test("W6-B 报告员 write 卡镜像：mirrorRoleId=liaison、同一请求只答
 
 // ————— ⑤ 2026-10-18 双开关：judging 状态机 / 正向代批 / 按组回落 / 审计 —————
 //
-// 依据：PM 评审《「替我审批」/「替我决策」双开关——项目管理评审与 V1 拆发》§3.2/§4/§8。
-// 本通道只在 **presentEntry 调用 presenter 之前**判断；代批成功 0 卡、1 行、`onNextStep` 恰一次；
-// manual/负向/证据不足/读取失败/超时/引擎不可用/开关关闭 ⇒ 原卡 + `judgeNotice`；另一组不受影响。
+// 依据：PM 评审《「替我审批」/「替我决策」双开关——项目管理评审与 V1 拆发》§3.2/§4/§8；
+// 2026-10-19 客户总原则「我勾选了替我决策就不用我来管了」：判断实际运行后，approve ⇒ 代批；
+// deny/manual（负向/证据不足/读取失败/超时/引擎不可用/事实不可读…）⇒ **自动退回发起角色重做**
+// （declined + 可操作原因，不呈现客户卡）；唯一例外＝判断期间客户关闭开关（switch-off）⇒ 原卡 + 提示。
 
 const flushJudge = () => new Promise((resolve) => setTimeout(resolve, 5));
 
@@ -941,7 +942,7 @@ test("双开关矩阵：仅所属组开启才判断；两开关互不影响；�
   await legacy;
 });
 
-test("judging 状态机：不呈现/不计 pending、占住一项目一卡；respond 返回 expired；manual 后原卡+notice", async () => {
+test("judging 状态机：不呈现/不计 pending、占住一项目一卡；respond 返回 expired；manual ⇒ 自动退回重做", async () => {
   let release: ((outcome: GovernanceJudgeOutcome) => void) | undefined;
   const judge: GovernanceJudgeFn = (request) =>
     new Promise((resolve) => {
@@ -981,21 +982,18 @@ test("judging 状态机：不呈现/不计 pending、占住一项目一卡；res
     engine: "claude",
   });
   await flushJudge();
-  assert.equal(pushed.length, 1, "manual 呈现原卡（且仅一次）");
-  assert.equal(pushed[0].id, "op-1");
-  assert.match(String(pushed[0].judgeNotice), /未代批（代决策）/, "提示标明分组，不把降级说成未发生");
-  assert.match(String(pushed[0].judgeNotice), /已转你手动确认/);
+  const o1 = (await p1)!;
+  assert.equal(o1.outcome, "declined", "manual ⇒ 自动退回重做（不呈现客户卡）");
+  assert.equal(o1.operatorId, "judge:claude", "归因判断引擎");
+  assert.match(o1.reason ?? "", /自动决策未通过：证据不足（提案证据不足）/, "原因含映射后的人话与具体理由");
+  assert.match(o1.reason ?? "", /本次自动判断未通过\/未完成，已拒绝；请按上述原因修正后重新提交确认/);
   assert.equal(results.length, 0, "manual 不发结果行");
   assert.equal(channel.judgingCount(), 0);
-  assert.equal(channel.pendingCount(), 2, "manual 后：active 1 + 排队 1（pendingCount 含排队）");
+  assert.equal(pushed.length, 1, "队列中的第二张照常呈现（被退回的 op-1 不呈现）");
+  assert.equal(pushed[0].id, "op-2");
+  assert.equal(channel.pendingCount(), 1, "op-2 active");
+  assert.equal(next.length, 0, "declined 不产生下一步");
 
-  assert.equal(channel.respond({ id: "op-1", decision: { kind: "choice", selected: ["accept"] } }).ok, true);
-  const o1 = (await p1)!;
-  assert.equal(o1.outcome, "answered");
-  assert.equal(o1.judge, undefined, "客户手答不写 judge 审计（decisionEvidence 仍是 customer-input）");
-  assert.equal(next.length, 1, "客户手答后下一步恰一次");
-  assert.equal(pushed.length, 2, "第一张结算后第二张才呈现");
-  assert.equal(pushed[1].id, "op-2");
   assert.equal(channel.respond({ id: "op-2", decision: { kind: "confirm", confirmed: true } }).ok, true);
   await p2;
 });
@@ -1086,30 +1084,48 @@ test("allow 代批合成结果：proposal/appointment/acceptance 选项、write 
   assert.deepEqual(o3.judge?.evidence, ["docs/flows/flow-a.md"]);
 });
 
-test("manual/负向结果回落：原卡 + judgeNotice，不写 judge 审计、不发结果行；下一张不受影响", async () => {
-  let release: ((outcome: GovernanceJudgeOutcome) => void) | undefined;
-  const { channel, pushed, results } = makeJudgeChannel({
-    enabled: () => true,
-    judge: () => new Promise((resolve) => { release = resolve; }),
-  });
-  const p = channel.customerInput(proposalRequest("flow-a"), JUDGE_CTX, {
-    cardKind: "proposal",
-    flowId: "flow-a",
-    judgeContext: judgeContextOf("flow-a"),
-  });
-  // 负向输出（judge 归一化为 manual）：仍回落手动
-  release!({ verdict: "manual", group: "decision", cardKind: "proposal", reasonCode: "not-recommended", reason: "应拒绝", engine: "claude" });
-  await flushJudge();
-  assert.equal(pushed.length, 1);
-  assert.match(String(pushed[0].judgeNotice), /未代批（代决策）/);
-  assert.match(String(pushed[0].judgeNotice), /已转你手动确认/);
-  assert.equal(results.length, 0);
-  assert.equal(channel.respond({ id: "op-1", decision: { kind: "choice", cancelled: true } }).ok, true);
-  const outcome = (await p)!;
-  assert.equal(outcome.outcome, "declined", "客户取消仍是 declined（不代拒绝也不代批准）");
+test("manual 负向结果（decision/approval 两组）⇒ 自动退回重做：无客户卡、无结果行、原因可操作", async () => {
+  for (const group of ["decision", "approval"] as const) {
+    const { channel, pushed, results, next } = makeJudgeChannel({
+      enabled: () => true,
+      judge: async (request) => ({
+        verdict: "manual",
+        group: request.group,
+        cardKind: request.cardKind,
+        reasonCode: "not-recommended",
+        reason: "应拒绝",
+        engine: "claude",
+      }),
+    });
+    const request = group === "decision" ? proposalRequest("flow-a") : writeRequest();
+    const meta = {
+      cardKind: group === "decision" ? ("proposal" as const) : ("write" as const),
+      flowId: "flow-a",
+      judgeContext: judgeContextOf("flow-a"),
+    };
+    const outcome = (await channel.customerInput(request, JUDGE_CTX, meta))!;
+    assert.equal(outcome.outcome, "declined", `${group}：manual ⇒ declined（退回发起角色）`);
+    assert.equal(outcome.operatorId, "judge:claude", `${group}：归因判断引擎`);
+    assert.match(
+      outcome.reason ?? "",
+      new RegExp(`自动${group === "decision" ? "决策" : "审批"}未通过：候选与推荐/选项不一致（应拒绝）`),
+      `${group}：原因含映射后的人话与具体理由`,
+    );
+    assert.match(outcome.reason ?? "", /本次自动判断未通过\/未完成，已拒绝；请按上述原因修正后重新提交确认/);
+    assert.equal(pushed.length, 0, `${group}：不呈现客户卡`);
+    assert.equal(results.length, 0, `${group}：不发结果行`);
+    assert.equal(next.length, 0, `${group}：declined 不产生下一步`);
+    assert.equal(channel.pendingCount(), 0);
+    assert.equal(channel.judgingCount(), 0);
+    assert.equal(
+      channel.respond({ id: "op-1", decision: { kind: "confirm", confirmed: true } }).expired,
+      true,
+      `${group}：重复结算不重复回投（同一请求只结算一次）`,
+    );
+  }
 });
 
-test("治理·read-denied 回落带出具体路径；无记录如实说明；超长仍限 200（客户反馈 2026-10-18）", async () => {
+test("治理·read-denied 退回原因带出具体路径；无记录如实说明；超长仍限 200（客户反馈 2026-10-18）", async () => {
   const run = async (reason?: string): Promise<string> => {
     const { channel, pushed, results } = makeJudgeChannel({
       enabled: () => true,
@@ -1122,29 +1138,30 @@ test("治理·read-denied 回落带出具体路径；无记录如实说明；超
         ...(reason !== undefined ? { reason } : {}),
       }),
     });
-    const p = channel.customerInput(proposalRequest("flow-a"), JUDGE_CTX, {
+    const outcome = (await channel.customerInput(proposalRequest("flow-a"), JUDGE_CTX, {
       cardKind: "proposal",
       flowId: "flow-a",
       judgeContext: judgeContextOf("flow-a"),
-    });
-    await flushJudge();
-    assert.equal(pushed.length, 1, "回落必须呈现原卡");
+    }))!;
+    assert.equal(pushed.length, 0, "manual ⇒ 自动退回重做（不呈现客户卡）");
     assert.equal(results.length, 0, "manual 不得发结果行");
-    const notice = String(pushed[0].judgeNotice);
-    assert.equal(channel.respond({ id: "op-1", decision: { kind: "choice", selected: ["accept"] } }).ok, true);
-    await p;
-    return notice;
+    assert.equal(outcome.outcome, "declined");
+    const text = outcome.reason ?? "";
+    const prefix = "自动决策未通过：";
+    const suffix = "。本次自动判断未通过/未完成，已拒绝；请按上述原因修正后重新提交确认。";
+    assert.ok(text.startsWith(prefix) && text.endsWith(suffix), "统一退回文案");
+    return text.slice(prefix.length, text.length - suffix.length);
   };
 
   // ①带具体路径：与 shell 通道同解，原样带出冒号后的内容（去尾）。
   const concrete = "判断读取被拒：.ans/sessions/x.json（应用私有数据，判断侧不开放）、src/foo.txt（敏感文件），无法保证无损判断，已转手动确认。";
   assert.equal(
     await run(concrete),
-    "判断 agent 未代批（代决策）：读取被拒：.ans/sessions/x.json（应用私有数据，判断侧不开放）、src/foo.txt（敏感文件），无法保证无损判断；已转你手动确认。",
+    "读取被拒：.ans/sessions/x.json（应用私有数据，判断侧不开放）、src/foo.txt（敏感文件），无法保证无损判断",
   );
 
   // ②无 reason / 不符合约定前缀：如实说明「未记录具体路径」。
-  const fallback = "判断 agent 未代批（代决策）：所需项目文件无法读取（未记录具体路径）；已转你手动确认。";
+  const fallback = "所需项目文件无法读取（未记录具体路径）";
   assert.equal(await run(undefined), fallback, "无 reason 不再只说笼统一句");
   assert.equal(
     await run("判断读取被拒（敏感文件/越界/二进制），无法保证无损判断，已转手动确认。"),
@@ -1153,15 +1170,13 @@ test("治理·read-denied 回落带出具体路径；无记录如实说明；超
   );
 
   // ③超长：映射输出仍限 200 码点，前缀保留、尾部截断。
-  const notice = await run(`判断读取被拒：${"长".repeat(300)}，无法保证无损判断，已转手动确认。`);
-  const head = "判断 agent 未代批（代决策）：";
-  const mapped = notice.slice(head.length, notice.indexOf("；已转你手动确认"));
+  const mapped = await run(`判断读取被拒：${"长".repeat(300)}，无法保证无损判断，已转手动确认。`);
   assert.equal(Array.from(mapped).length, 200, "映射输出限 200 码点");
   assert.equal(mapped, `读取被拒：${"长".repeat(195)}`, "超长截断且保留前缀");
 });
 
-test("判断回落文案：人话 reason 以句末标点结尾时不出现「。；」", async () => {
-  const { channel, pushed } = makeJudgeChannel({
+test("自动退回文案：人话 reason 以句末标点结尾时不出现「。。」/「。；」", async () => {
+  const { channel, pushed, results } = makeJudgeChannel({
     enabled: () => true,
     judge: async (request) => ({
       verdict: "manual",
@@ -1172,37 +1187,42 @@ test("判断回落文案：人话 reason 以句末标点结尾时不出现「。
       engine: request.runtime,
     }),
   });
-  const p = channel.customerInput(proposalRequest("flow-a"), JUDGE_CTX, {
+  const outcome = (await channel.customerInput(proposalRequest("flow-a"), JUDGE_CTX, {
     cardKind: "proposal",
     flowId: "flow-a",
     judgeContext: judgeContextOf("flow-a"),
-  });
-  await flushJudge();
-  assert.equal(String(pushed[0].judgeNotice), "判断 agent 未代批（代决策）：按 fail-closed 回落客户；已转你手动确认。", "尾部句号去掉一个再接分号");
-  assert.ok(!String(pushed[0].judgeNotice).includes("。；"), "不出现「。；」");
-  assert.equal(channel.respond({ id: "op-1", decision: { kind: "choice", selected: ["accept"] } }).ok, true);
-  await p;
+  }))!;
+  assert.equal(outcome.outcome, "declined");
+  if (outcome.outcome !== "declined") return;
+  assert.equal(
+    outcome.reason,
+    "自动决策未通过：按 fail-closed 回落客户。本次自动判断未通过/未完成，已拒绝；请按上述原因修正后重新提交确认。",
+    "尾部句号去掉一个再接正文",
+  );
+  assert.ok(!String(outcome.reason).includes("。；"), "不出现「。；」");
+  assert.ok(!String(outcome.reason).includes("。。"), "不出现「。。」");
+  assert.equal(pushed.length, 0, "不呈现客户卡");
+  assert.equal(results.length, 0);
 });
 
-test("结果行投达失败 ⇒ manual/row-failed 原卡；不自动结算", async () => {
+test("结果行投达失败（row-failed）⇒ 自动退回重做：无客户卡、无结果行、原因可操作", async () => {
   const { channel, pushed, results } = makeJudgeChannel({
     enabled: () => true,
     judge: approveJudge([]),
     emit: () => { throw new Error("窗口已关闭"); },
   });
-  const p = channel.customerInput(writeRequest(), JUDGE_CTX, {
+  const outcome = (await channel.customerInput(writeRequest(), JUDGE_CTX, {
     cardKind: "write",
     flowId: "flow-a",
     judgeContext: judgeContextOf("flow-a"),
-  });
-  await flushJudge();
-  assert.equal(pushed.length, 1, "结果行失败必须回落原卡");
-  assert.match(String(pushed[0].judgeNotice), /判断已完成，但结果无法在聊天中显示/);
-  assert.equal(results.length, 0);
-  assert.equal(channel.respond({ id: "op-1", decision: { kind: "confirm", confirmed: true } }).ok, true);
-  const outcome = (await p)!;
-  assert.equal(outcome.outcome, "answered");
-  assert.equal((outcome as { judge?: unknown }).judge, undefined, "客户手批不是 judge 代批");
+  }))!;
+  assert.equal(outcome.outcome, "declined", "结果行投达失败：不再甩回客户，自动退回重做");
+  assert.equal(outcome.operatorId, "judge:claude");
+  assert.match(outcome.reason ?? "", /自动审批未通过：判断结果无法在聊天中显示/);
+  assert.match(outcome.reason ?? "", /本次自动判断未通过\/未完成，已拒绝；请按上述原因修正后重新提交确认/);
+  assert.equal(pushed.length, 0, "不呈现客户卡");
+  assert.equal(results.length, 0, "结果行未投达（0 行）");
+  assert.equal((outcome as { judge?: unknown }).judge, undefined, "不是客户/代批 answered");
 });
 
 test("判断中关闭开关 ⇒ 再查一次：原卡 + switch-off 提示，不发结果行", async () => {
@@ -1228,7 +1248,7 @@ test("判断中关闭开关 ⇒ 再查一次：原卡 + switch-off 提示，不�
   await p;
 });
 
-test("按组回落互不影响：approval 组 manual 时 decision 组仍可代批", async () => {
+test("按组退回互不影响：approval 组 manual 自动退回，decision 组仍可代批", async () => {
   const requests: GovernanceJudgeRequest[] = [];
   const judge: GovernanceJudgeFn = async (request) => {
     requests.push(request);
@@ -1250,13 +1270,14 @@ test("按组回落互不影响：approval 组 manual 时 decision 组仍可代�
     judgeContext: judgeContextOf("flow-a"),
   });
   await flushJudge();
-  assert.equal(pushed.length, 1, "只有 approval 组回落呈现原卡");
-  assert.equal(pushed[0].request.cardKind, "write");
-  assert.equal(results.length, 1, "decision 组仍代批");
+  assert.equal(pushed.length, 0, "approval 组 manual 也不呈现客户卡");
+  assert.equal(results.length, 1, "decision 组仍代批（1 行）");
   assert.equal(results[0].group, "decision");
   assert.equal((await pProposal)!.outcome, "answered");
-  assert.equal(channel.respond({ id: "op-1", decision: { kind: "confirm", confirmed: true } }).ok, true);
-  await pWrite;
+  const writeOutcome = (await pWrite)!;
+  assert.equal(writeOutcome.outcome, "declined", "approval 组 manual ⇒ 自动退回重做");
+  assert.match(writeOutcome.reason ?? "", /自动审批未通过：判断未读取必需的项目文件（未读物证）/);
+  assert.equal(channel.respond({ id: "op-1", decision: { kind: "confirm", confirmed: true } }).expired, true, "退回的卡从未呈现");
 });
 
 test("replayPending 不重新判断；rejectAllPending 结算 judging 为 declined，迟到结果丢弃", async () => {
@@ -1288,22 +1309,22 @@ test("replayPending 不重新判断；rejectAllPending 结算 judging 为 declin
   assert.equal(channel.judgingCount(), 0);
 });
 
-test("通道层防御超时：判断超时 ⇒ 原卡 + 超时提示（含实际时长，fail-closed）", async () => {
-  const { channel, pushed } = makeJudgeChannel({
+test("通道层防御超时：判断超时 ⇒ 自动退回重做（无客户卡、原因含实际时长，fail-closed）", async () => {
+  const { channel, pushed, results } = makeJudgeChannel({
     enabled: () => true,
     judge: () => new Promise(() => {}),
     timeoutMs: 20,
   });
-  const p = channel.customerInput(proposalRequest("flow-a"), JUDGE_CTX, {
+  const outcome = (await channel.customerInput(proposalRequest("flow-a"), JUDGE_CTX, {
     cardKind: "proposal",
     flowId: "flow-a",
     judgeContext: judgeContextOf("flow-a"),
-  });
-  await new Promise((resolve) => setTimeout(resolve, 60));
-  assert.equal(pushed.length, 1);
-  assert.match(String(pushed[0].judgeNotice), /判断超时（>20ms）/);
-  assert.equal(channel.respond({ id: "op-1", decision: { kind: "choice", cancelled: true } }).ok, true);
-  await p;
+  }))!;
+  assert.equal(outcome.outcome, "declined");
+  assert.match(outcome.reason ?? "", /自动决策未通过：判断超时（>20ms）/);
+  assert.match(outcome.reason ?? "", /本次自动判断未通过\/未完成，已拒绝；请按上述原因修正后重新提交确认/);
+  assert.equal(pushed.length, 0, "超时也不呈现客户卡（勾选后不用客户管）");
+  assert.equal(results.length, 0);
 });
 
 test("治理 judge 通道超时：默认 135s（driver 120s+15s）；由 ANS_GOVERNANCE_JUDGE_TIMEOUT_MS 派生；非法回 135s", async () => {
@@ -1327,7 +1348,7 @@ test("治理 judge 通道超时：默认 135s（driver 120s+15s）；由 ANS_GOV
   assert.equal(formatJudgeTimeoutMs(35), "35ms");
 });
 
-test("single/su、缺 judgeContext、事实不可用：都不调用 judge（旧路径零变化/fail-closed）", async () => {
+test("single/su、缺 judgeContext、事实不可用：前二者旧路径零变化；事实不可用自动退回重做", async () => {
   let calls = 0;
   const judge: GovernanceJudgeFn = async (request) => {
     calls += 1;
@@ -1354,17 +1375,18 @@ test("single/su、缺 judgeContext、事实不可用：都不调用 judge（旧�
   assert.equal(channel.respond({ id: "op-2", decision: { kind: "choice", selected: ["accept"] } }).ok, true);
   await missing;
 
-  // 事实不可用（run-role 计算失败）：不调用模型，原卡 + 提示
-  const unavailable = channel.customerInput(proposalRequest("flow-a"), JUDGE_CTX, {
+  // 事实不可用（run-role 计算失败）：不调用模型；勾选后自动退回重做（不再呈现客户卡）。
+  const unavailable = (await channel.customerInput(proposalRequest("flow-a"), JUDGE_CTX, {
     cardKind: "proposal",
     flowId: "flow-a",
     judgeContext: { ...judgeContextOf("flow-a"), unavailableReason: "ledger unreadable" },
-  });
+  }))!;
   assert.equal(calls, 0, "事实不可用时不浪费模型调用");
-  assert.equal(pushed.length, 3);
-  assert.match(String(pushed[2].judgeNotice), /治理事实不可读/);
-  assert.equal(channel.respond({ id: "op-3", decision: { kind: "choice", selected: ["accept"] } }).ok, true);
-  await unavailable;
+  assert.equal(pushed.length, 2, "事实不可用不再呈现第三张卡");
+  assert.equal(unavailable.outcome, "declined");
+  assert.match(unavailable.reason ?? "", /自动决策未通过：治理事实不可读（ledger unreadable）/);
+  assert.match(unavailable.reason ?? "", /本次自动判断未通过\/未完成，已拒绝；请按上述原因修正后重新提交确认/);
+  assert.equal(channel.pendingCount(), 0);
 });
 
 test("结果行人话摘要：四类卡的代批行含「judge 代批 · 代审批/代决策」", () => {
@@ -2013,4 +2035,78 @@ test("收尾任务消息（客户批评）：按架构方案/架构影响分析�
   }
   // 无回交路径时架构核对要求同样保留（固定硬要求，不依赖 evidence）。
   assert.match(buildAcceptanceTaskMessage("ticket-desk-r2", []), /架构方案或架构影响分析/);
+});
+
+// ————— 2026-10-19 客户要求：判断 agent 拒绝（deny）+ 退回发起角色重做 —————
+//
+// 真机：写卡判断的 manual 回落把可修正问题甩给客户。新语义：approval 组允许 `deny` ⇒ **不呈现客户卡**，
+// 以 `declined` + 具体原因结算（发起角色的 `request_confirmation` 收到原因并重做）；不发 approve 结果行、
+// 不写客户决定账本。decision 组 deny（编排会回落 manual）防御性按 manual 处理。
+
+test("judge deny（审批组）：不呈现客户卡、不发结果行，发起角色收到 declined+具体原因", async () => {
+  const judge: GovernanceJudgeFn = async (request) =>
+    ({
+      verdict: "deny",
+      group: request.group,
+      cardKind: request.cardKind,
+      reasonCode: "insufficient-evidence",
+      reason: "写卡缺少边界声明",
+      engine: "pi",
+    }) as unknown as GovernanceJudgeOutcome;
+  const { channel, pushed, results, next } = makeJudgeChannel({ enabled: () => true, judge });
+  const request: CustomerInputRequest = {
+    kind: "confirm",
+    title: "写角色卡",
+    cardKind: "appointment-write",
+    flowId: "flow-a",
+    preview: "角色卡/backend/role-card.md",
+  };
+  const outcome = (await channel.customerInput(request, { ...JUDGE_CTX, roleId: "nominator" }, {
+    cardKind: "appointment-write",
+    flowId: "flow-a",
+    judgeContext: judgeContextOf("flow-a"),
+  }))!;
+
+  assert.equal(outcome.outcome, "declined", "deny ⇒ declined（退回发起角色），不是 answered");
+  assert.equal(outcome.operatorId, "judge:pi", "归因判断引擎");
+  assert.equal(
+    outcome.reason,
+    "自动审批拒绝：证据不足（写卡缺少边界声明）。本次自动判断未通过/未完成，已拒绝；请按上述原因修正后重新提交确认。",
+    "具体原因随 declined 回给发起角色，指示修正后重新提交",
+  );
+  assert.equal(pushed.length, 0, "deny 不呈现客户卡（不把可修正问题甩给客户）");
+  assert.equal(results.length, 0, "deny 不发 approve 结果行");
+  assert.equal(next.length, 0, "declined 不产生下一步");
+  assert.equal(channel.pendingCount(), 0);
+  assert.equal(channel.judgingCount(), 0);
+  assert.equal(
+    channel.respond({ id: "op-1", decision: { kind: "confirm", confirmed: true } }).expired,
+    true,
+    "客户事后作答按终态拒绝（卡从未呈现）",
+  );
+});
+
+test("judge deny（decision 组，防御）：不再回落客户卡，按 manual 语义自动退回重做", async () => {
+  const judge: GovernanceJudgeFn = async (request) =>
+    ({
+      verdict: "deny",
+      group: "decision",
+      cardKind: request.cardKind,
+      reasonCode: "insufficient-evidence",
+      reason: "证据不足",
+      engine: "claude",
+    }) as unknown as GovernanceJudgeOutcome;
+  const { channel, pushed, results, next } = makeJudgeChannel({ enabled: () => true, judge });
+  const outcome = (await channel.customerInput(proposalRequest("flow-a"), JUDGE_CTX, {
+    cardKind: "proposal",
+    flowId: "flow-a",
+    judgeContext: judgeContextOf("flow-a"),
+  }))!;
+  assert.equal(outcome.outcome, "declined", "decision 组 deny 防御性回落 manual ⇒ 自动退回重做");
+  assert.equal(outcome.operatorId, "judge:claude");
+  assert.match(outcome.reason ?? "", /自动决策未通过：拒绝仅适用于审批组/);
+  assert.match(outcome.reason ?? "", /本次自动判断未通过\/未完成，已拒绝；请按上述原因修正后重新提交确认/);
+  assert.equal(pushed.length, 0, "不呈现客户卡");
+  assert.equal(results.length, 0, "manual 不发结果行");
+  assert.equal(next.length, 0, "declined 不产生下一步");
 });

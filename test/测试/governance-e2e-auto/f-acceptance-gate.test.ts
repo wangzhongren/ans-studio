@@ -8,8 +8,11 @@
 // 2026-10-19 Flow YAML 契约：本文件走 **YAML-only**（`docs/flows/flow-a.yaml`，**不写同名 .md**）。
 // 历史：证据包曾只按 Markdown 解析 flow 物证，YAML 流程的验收卡恒回落 manual（「流程单缺少可解析的步骤表」）；
 // 编排已修复为 `.yaml|.yml` 用 `parseFlowStateYaml` 提取 steps、非法给 `flow-state-invalid`（具体 path+message）。
-// 本文件同时守住该修复：正向必须自动代批（证据包完整）；非法 YAML 必须手动并给出具体路径错误，
+// 本文件同时守住该修复：正向必须自动代批（证据包完整）；非法 YAML 必须自动退回并给出具体路径错误，
 // 而不是旧的笼统「缺少可解析的步骤表」。
+//
+// 2026-10-19 客户总原则：验收 manual 不再呈现客户卡，直接 declined + 可操作原因回投 Proof/发起角色重做；
+// 负向用例据此断言「无客户卡、无 approve 结果行、不写验收客户决定、原因可操作」。门槛未放宽。
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -97,7 +100,35 @@ const DISPATCHED: Partial<GovernanceLedgerEntry> = {
   targetRoleId: "executor",
 };
 
-test("场景6a：步骤未全 done ⇒ 验收不代批（manual + 原卡）", async () => {
+/**
+ * 2026-10-19 客户总原则：开关开启且 judge 实际运行后，manual/deny 不呈现客户卡，
+ * 直接 declined + 可操作原因回投发起角色（operatorId=judge:<engine>），角色同轮修正重发。
+ * 验收负向用例统一走这里收口；门槛本身仍由产品机械核对产生，未放宽。
+ */
+async function expectAcceptanceDeclined(
+  c: { harness: Harness },
+  sending: Promise<{ ok: boolean; error?: string }>,
+  expected: RegExp,
+): Promise<void> {
+  const sent = await sending;
+  assert.equal(sent.ok, true, sent.error ?? "");
+  assert.equal(c.harness.presented.length, 0, "验收 manual ⇒ 不呈现客户卡（自动退回发起角色重做）");
+  assert.equal(c.harness.judgeRows.length, 0, "manual 不产生 approve 结果行");
+  const receipt = c.harness.results.find((result) => result.name === "request_choice");
+  assert.ok(receipt, "verifier 应收到 request_choice 的 declined 回执");
+  assert.equal(receipt!.ok, false, "回执必须是拒绝，不得伪造验收通过");
+  assert.match(receipt!.message, /自动决策未通过|自动决策拒绝/, "回执须说明自动决策未通过/拒绝");
+  assert.match(receipt!.message, expected, "回执须保留具体可操作原因");
+  assert.match(receipt!.message, /重新提交/, "回执须给出修正后重试指引");
+  const ledger = await c.harness.waitForLedger(() => true);
+  assert.equal(
+    ledger.entries.some((entry) => entry.kind === "customer.decision" && entry.decisionKind === "acceptance"),
+    false,
+    "judge declined 不得写验收客户决定",
+  );
+}
+
+test("场景6a：步骤未全 done ⇒ 验收 manual 自动退回（无客户卡）", async () => {
   const c = await runCase({
     tag: "acceptance-pending",
     steps: [
@@ -108,61 +139,42 @@ test("场景6a：步骤未全 done ⇒ 验收不代批（manual + 原卡）", as
     ledger: { entries: [ACCEPTED, DISPATCHED] },
   });
   try {
-    const sending = c.harness.send("verifier", "请请客户验收。");
-    await c.harness.waitFor(() => c.harness.presented.length === 1, 5000);
-    const card = c.harness.presented[0]!;
-    assert.match(card.judgeNotice ?? "", /未代批/);
-    assert.match(card.judgeNotice ?? "", /证据不足|未完成|待派发|阻塞/);
-    c.harness.answer(card.id, { kind: "choice", selected: ["reject"] });
-    await sending;
-    assert.equal(c.harness.judgeRows.length, 0, "manual 不产生 judge 结果行");
+    await expectAcceptanceDeclined(c, c.harness.send("verifier", "请请客户验收。"), /证据不足|未完成|待派发|阻塞/);
   } finally {
     await c.cleanup();
     c.cleanupRoot();
   }
 });
 
-test("场景6b：步骤全 done 但缺 dispatch.accepted ⇒ 验收不代批", async () => {
+test("场景6b：步骤全 done 但缺 dispatch.accepted ⇒ 验收 manual 自动退回", async () => {
   const c = await runCase({
     tag: "acceptance-missing-dispatch",
     steps: [{ id: "impl", status: "done" }, { id: "verification", status: "pending" }],
     ledger: { entries: [ACCEPTED] },
   });
   try {
-    const sending = c.harness.send("verifier", "请请客户验收。");
-    await c.harness.waitFor(() => c.harness.presented.length === 1, 5000);
-    const card = c.harness.presented[0]!;
-    assert.match(card.judgeNotice ?? "", /dispatch\.accepted|未代批/);
-    c.harness.answer(card.id, { kind: "choice", selected: ["reject"] });
-    await sending;
-    assert.equal(c.harness.judgeRows.length, 0);
+    await expectAcceptanceDeclined(c, c.harness.send("verifier", "请请客户验收。"), /dispatch\.accepted/);
   } finally {
     await c.cleanup();
     c.cleanupRoot();
   }
 });
 
-test("场景6c：有阻塞步骤 ⇒ 验收不代批", async () => {
+test("场景6c：有阻塞步骤 ⇒ 验收 manual 自动退回", async () => {
   const c = await runCase({
     tag: "acceptance-blocked",
     steps: [{ id: "impl", status: "blocked" }, { id: "verification", status: "pending" }],
     ledger: { entries: [ACCEPTED, DISPATCHED] },
   });
   try {
-    const sending = c.harness.send("verifier", "请请客户验收。");
-    await c.harness.waitFor(() => c.harness.presented.length === 1, 5000);
-    const card = c.harness.presented[0]!;
-    assert.match(card.judgeNotice ?? "", /未代批/);
-    c.harness.answer(card.id, { kind: "choice", selected: ["reject"] });
-    await sending;
-    assert.equal(c.harness.judgeRows.length, 0);
+    await expectAcceptanceDeclined(c, c.harness.send("verifier", "请请客户验收。"), /阻塞|blocked/);
   } finally {
     await c.cleanup();
     c.cleanupRoot();
   }
 });
 
-test("场景6d：有未结算决定 ⇒ 验收不代批", async () => {
+test("场景6d：有未结算决定 ⇒ 验收 manual 自动退回", async () => {
   const c = await runCase({
     tag: "acceptance-unresolved",
     steps: [{ id: "impl", status: "done" }, { id: "verification", status: "pending" }],
@@ -177,13 +189,7 @@ test("场景6d：有未结算决定 ⇒ 验收不代批", async () => {
     },
   });
   try {
-    const sending = c.harness.send("verifier", "请请客户验收。");
-    await c.harness.waitFor(() => c.harness.presented.length === 1, 5000);
-    const card = c.harness.presented[0]!;
-    assert.match(card.judgeNotice ?? "", /未结算|未代批/);
-    c.harness.answer(card.id, { kind: "choice", selected: ["reject"] });
-    await sending;
-    assert.equal(c.harness.judgeRows.length, 0);
+    await expectAcceptanceDeclined(c, c.harness.send("verifier", "请请客户验收。"), /未结算/);
   } finally {
     await c.cleanup();
     c.cleanupRoot();
@@ -224,7 +230,7 @@ test("场景6e：全部满足（全 done + 每步 dispatch.accepted + 未结算�
   }
 });
 
-test("场景6f：Flow YAML 非法 ⇒ 验收不代批，证据包给具体 path（flow-state-invalid），不再报旧 Markdown 缺口", async () => {
+test("场景6f：Flow YAML 非法 ⇒ 验收自动退回，证据包给具体 path（flow-state-invalid），不再报旧 Markdown 缺口", async () => {
   const temp = makeRoot("acceptance-invalid-flow");
   seedTrioProject(temp.root);
   write(temp.root, PROPOSAL_REL, proposalDoc(FLOW));
@@ -257,16 +263,12 @@ test("场景6f：Flow YAML 非法 ⇒ 验收不代批，证据包给具体 path�
   });
   try {
     await h.open("verifier");
-    const sending = h.send("verifier", "请请客户验收。");
-    await h.waitFor(() => h.presented.length === 1, 5000);
-    const card = h.presented[0]!;
-    assert.match(card.judgeNotice ?? "", /flow-a\.yaml/, "错误须点名具体流程 YAML 路径");
-    assert.match(card.judgeNotice ?? "", /steps\[0\]\.evidence/, "错误须含具体 YAML 文档路径");
-    assert.match(card.judgeNotice ?? "", /必须提供 evidence/, "错误须说明具体原因");
-    assert.doesNotMatch(card.judgeNotice ?? "", /缺少可解析的步骤表/, "不得再出现旧 Markdown 证据缺口文案");
-    assert.equal(h.judgeRows.length, 0, "manual 不产生 judge 结果行");
-    h.answer(card.id, { kind: "choice", selected: ["reject"] });
-    await sending;
+    await expectAcceptanceDeclined({ harness: h }, h.send("verifier", "请请客户验收。"), /flow-a\.yaml/);
+    const receipt = h.results.find((entry) => entry.name === "request_choice");
+    assert.ok(receipt, "应有 request_choice 回执");
+    assert.match(receipt!.message, /steps\[0\]\.evidence/, "错误须含具体 YAML 文档路径");
+    assert.match(receipt!.message, /必须提供 evidence/, "错误须说明具体原因");
+    assert.doesNotMatch(receipt!.message, /缺少可解析的步骤表/, "不得再出现旧 Markdown 证据缺口文案");
   } finally {
     await h.stop();
     h.cleanup();

@@ -1185,3 +1185,19 @@
 **测试**：新增 `test/编排/flow-state.test.ts` 32 例（含替代关系双写/单侧/真环/矛盾）；`test/编排/decision-evidence-packet.test.ts` 新增 3 例（YAML-only 验收包、非法 YAML flow-state-invalid、legacy Markdown 不变）；`node --test "test/编排/flow-state.test.ts"` **32/32**；`node --test "test/编排/decision-evidence-packet.test.ts"` **19/19**；`node --test "test/编排/**/*.test.ts"` **670 计 670 过 0 红 0 skipped**（基线 635，+35）；`npm run typecheck` **exit 0**。
 
 **跨角色**：桌面自动验收门已并发接线（调用口径见变更记录 §7）；Steward/门禁卡文本改用 YAML；运行时核心 `write_file` 对 `docs/flows/*.yaml` 的落盘前二次校验（内容漂移）归其属主；新增 pipeline 文件需在编排 boundary Section 1 补登。**残余**：O-A1 内容漂移未采纳；YAML 缺失时仍回落旧 `.md`（迁移窗口）。详见[变更记录](docs/change/2026-10-19_change_flow-yaml-state.md)。
+
+## 2026-10-19 — 判断新增 `deny`（approval 组写卡退回重做）
+
+**来源**：真机 Crew 的 appointment-write 写卡内容不合规（README 归属未定、tester boundary 混入 Markdown 散文），判断 agent 只能 manual，客户被迫手批。客户原话「这个按理说不是应该替我决策的会让他重新搞吗」。本批未改 `app/**`、`test/测试/**`、运行时核心 schema。
+
+**改了什么**
+- `src/model/runtime.ts`：`GovernanceJudgeOutcome.verdict` 扩为 `approve | deny | manual`。
+- `governance-judge-verdict.ts`：三值规范化（approve/deny 必须有非空 reason）；deny 仅 approval 组，返回 reasonCode（默认 `model-deny`；允许安全名单具体码）/reason/evidence/读取统计，无 value/paths/pathDecisions；decision 组 deny ⇒ manual（不代客户拒绝）；`governanceJudgeAuditFromOutcome`/有界审计保持可用。
+- `governance-judge.ts`：deny 走 `governance-judge.deny` 日志（不记 manual）；证据哈希复核仅 approve。
+- `governance-judge-prompt.ts`：输出契约三值；approval rubric 明确「内容/路径/完整性/一致性不合规且可修 ⇒ deny，reason 写清哪条不合规 + 应怎么改」；decision 组 manual reason 必须是可操作返工说明（哪条偏离意图/应怎么改/重发给谁）；manual 只留给判断无法完成；删除全局「从不替客户拒绝」表述（decision 组保留）。
+- `run-role.ts`：桌面以 `declined`（operatorId=`judge:<engine>`）回投 deny 时，`recordCustomerDecision` 跳过写 `customer.decision`（不污染账本/不挡收尾门）。
+- 治理判断的 manual 文案统一改为中性可操作表述（「请修正/补齐/缩小…后重新提交」），不再出现「已转手动确认」；读取被拒保留逐路径摘要并改为「请补齐判断所需证据（或缩小读取范围）后重新提交」。shell judge 文案未改。
+
+**测试**：`governance-judge.test.ts` **60/60**（+4：deny 规范化/approval 合法/decision 回落 manual/审计字段；prompt 三值；driver deny 日志不记 manual；decision manual 返工原因原样保留 + approval manual 可操作修正）；`governance-session.test.ts` **26/26**（+1：judge deny 回投不写客户决定账本）；`test/编排/**` **675 计 675 过 0 红 0 skipped**；`npm run typecheck` **exit 0**（全仓）。
+
+**跨角色**：运行时核心 `report_governance_judgement` schema 加 `deny`（已由协调者单独排）；桌面 deny/manual 映射（开关开启时一律 declined+原因回投）由桌面属主收口（本批只读核对，未改 `app/**`）；测试角色旧双值断言按需更新。详见[变更记录](docs/change/2026-10-19_change_judge-deny-approval.md)。

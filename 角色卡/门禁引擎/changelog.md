@@ -1,5 +1,39 @@
 # 门禁引擎 变更记录
 
+## 2026-10-19 — 写卡被 declined 时按 reason 修正后重发确认卡；judge deny 不是客户决定（真机反馈）
+
+真机：Crew 的 `appointment-write` 写卡内容不合规（README 归属未在提名写区表定案、tester
+`boundary.yaml` 混入 Markdown 散文），判断 agent 只能 manual，客户被迫手批。客户要求判断 agent
+拒绝并把原因退回 Crew 重做；编排给 approval 组增加 `deny`，桌面把 deny 转成 `declined` + 原因回投
+发起角色。本批只在**门禁引擎**边界内补角色卡纪律，不改产品判定逻辑。完整记录见
+[变更记录](docs/change/2026-10-19_change_declined-rewrite-discipline.md)。
+
+- **边界**：`src/common/门禁引擎/governance-roles.ts`、
+  `test/门禁引擎/governance-standard-workflow.test.ts`、本文件、`memo.md`、
+  `docs/change/2026-10-19_change_declined-rewrite-discipline.md`（新）。未碰
+  `src/common/编排/**`、`app/**`、`test/测试/**`、`src/service/**`、其他角色文件/测试、
+  真实项目；不读 `.env`、不跑真实模型/凭据/网络；未 commit。
+- **Crew / 组队**：标准工作流 appointment-write 第 4 步增补 declined 处理；新增「**写卡被拒
+  （declined）时（必须）**」段——按 `reason` 修正待写内容后**重新发确认卡**；不得绕过确认、
+  不得直接 `write_file`、不得把原因当客户已同意；仍被拒则继续修正/如实报告，不循环空转、
+  不重复提交同一份未修正内容。
+- **Steward / 统筹**：确认卡约定后新增同款段——写流程状态 YAML 或排程写卡被 `declined` 时按
+  `reason` 修正后重发确认卡；写卡完成/角色枚举出现后，按流程 YAML 继续下一步
+  （派发/回交/登记），不要等客户催办。
+- **五卡共同**：判断代批纪律段后新增——judge `deny` 是系统审批拒绝（拒绝本次写盘/命令），
+  不是客户决定，不写入客户决定账本；不得把它当作客户意见或同意。
+- **逐字保留**：五卡权力/职责/Section 1/预授权/禁写/能力位、shell 审批档、工程质量基线、
+  治理卡参数、既有判断代批纪律与 flow YAML 契约均未改；未改任何判定逻辑。
+- **测试**：`node --test "test/门禁引擎/**/*.test.ts"` ⇒ **284 计 / 283 过 / 0 红 / 1 skip**
+  （基线 280/279/0/1；新增 1 例，覆盖 Crew/Steward declined 关键字与顺序、五卡 judge deny 定性）。
+  既有断言未放宽、未删除；`npm run typecheck` ⇒ **exit 0**。
+- **跨角色依赖（未越界）**：① 编排 approval 组需实现 `deny` 与 declined+原因回投；若运行时结果名
+  不是 `declined`，须同批对齐卡文本；② 桌面需把 deny 转成 declined+原因回投，且不得记成客户决定/
+  写入客户决定账本；③ 判断 agent 需真的能对不合规写卡内容返回 `deny` 与可操作 `reason`；
+  ④ 在该通道落地前，卡文本纪律是行为约束，真机仍可能 manual。
+- **残余风险**：重发/空转防护只有文本纪律，无机械次数上限；`deny` 不入账本需编排/桌面实现；
+  真机端到端与独立复验未进行。来源：真机反馈与客户要求（经协调方转达）。
+
 ## 2026-10-19 — 五张内置卡流程状态统一为 YAML（唯一机器状态），Steward 标准工作流改写 YAML（客户决定）
 
 客户原话：「这些全部改成yaml。」客户决定：流程状态改为 `docs/flows/<flowId>.yaml` 作为**唯一机器

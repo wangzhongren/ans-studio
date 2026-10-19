@@ -1,8 +1,11 @@
 // test/测试/governance-judge-cards-verify/c-fallback.test.ts
-// 独立验收（测试角色，2026-10-18）：回落矩阵——按组、按卡、整卡；失败一律原卡 + judgeNotice，
-// 不伪造 approve，另一组不受影响。
+// 独立验收（测试角色，2026-10-18；2026-10-19 语义更新）：回落矩阵——按组、按卡、整卡。
+// **2026-10-19 客户总原则**：开关开启且判断实际运行后，manual/deny 不再呈现客户卡，
+// 直接 declined + 可操作原因回投发起角色；仅 switch-off（判断期间客户关闭开关）呈现原卡 + judgeNotice，
+// aborted 走既有丢弃语义。不伪造 approve，另一组不受影响。
 //
-// 依据：PM 评审 §四（状态机/回落粒度）、§6.3、§十三 AC6/AC9/AC11/AC13/AC14/AC15/AC17/AC20/AC21。
+// 依据：PM 评审 §四（状态机/回落粒度）、§6.3、§十三 AC6/AC9/AC11/AC13/AC14/AC15/AC17/AC20/AC21；
+// 2026-10-19 客户总原则（manual/deny 自动退回重做）。
 // 全部离线：真实桌面客户交互通道 + 真开关状态机 + 假判断函数/假 driver。
 
 import { test } from "node:test";
@@ -62,7 +65,7 @@ function noticeOf(entry: { judgeNotice?: string }): string {
   return entry.judgeNotice!;
 }
 
-test("证据不足/读取失败/超时/引擎不可用/解析失败：原卡 + 提示，不 produce 结果行", async () => {
+test("证据不足/读取失败/超时/引擎不可用/解析失败：自动退回（declined + 原因），不呈现客户卡、不 produce 结果行", async () => {
   const { root, cleanup } = makeRoot("fallback-reasons");
   try {
     seedProject(root);
@@ -72,17 +75,15 @@ test("证据不足/读取失败/超时/引擎不可用/解析失败：原卡 + �
         decision: true,
         fn: async (request) => manual(request, reasonCode),
       });
-      const pending = h.ask(proposalCard());
-      await tick(10);
-      assert.equal(h.presented.length, 1, `${reasonCode}：必须回落原卡`);
+      const out = await h.ask(proposalCard());
+      assert.equal(h.presented.length, 0, `${reasonCode}：manual 自动退回，不呈现客户卡`);
       assert.equal(h.rows.length, 0, `${reasonCode}：manual 不得产生结果行`);
-      const notice = noticeOf(h.presented[0]!);
-      assert.match(notice, /判断 agent 未代批（代决策）/);
-      assert.match(notice, /已转你手动确认/);
-      h.answer(h.presented[0]!.id, { kind: "choice", selected: ["accept"] });
-      const out = await pending;
-      assert.equal(out.outcome, "answered");
-      assert.equal(out.judge, undefined, "客户手答不得伪造 judge 审计");
+      assert.equal(out.outcome, "declined", `${reasonCode}：自动退回（非客户作答）`);
+      const declined = out as Extract<typeof out, { outcome: "declined" }>;
+      assert.equal(declined.operatorId, "judge:claude", `${reasonCode}：退回归因为 judge，而非客户`);
+      assert.match(declined.reason ?? "", /自动决策未通过/, `${reasonCode}：原因须说明自动判断未通过`);
+      assert.match(declined.reason ?? "", /重新提交/, `${reasonCode}：原因须可操作（修正后重试）`);
+      assert.equal((out as { judge?: unknown }).judge, undefined, "自动退回不得伪造客户手答的 judge 审计");
     }
   } finally {
     cleanup();
@@ -138,7 +139,7 @@ test("single/su：decision 不启用、写盘族不代批；原卡且无判断�
   }
 });
 
-test("按组回落：decision 证据不足只回落 decision；approval 仍代批（反向同理）", async () => {
+test("按组回落：decision 证据不足只退回 decision；approval 仍代批（反向同理）", async () => {
   const { root, cleanup } = makeRoot("group-isolation");
   try {
     seedProject(root);
@@ -156,17 +157,15 @@ test("按组回落：decision 证据不足只回落 decision；approval 仍代�
         };
       },
     });
-    const decisionPending = h.ask(proposalCard());
-    await tick(10);
-    assert.equal(h.presented.length, 1, "decision 回落原卡");
-    assert.match(noticeOf(h.presented[0]!), /代决策/);
-    h.answer(h.presented[0]!.id, { kind: "choice", selected: ["accept"] });
-    await decisionPending;
+    const decisionOut = await h.ask(proposalCard());
+    assert.equal(h.presented.length, 0, "decision 自动退回，不呈现客户卡");
+    assert.equal(decisionOut.outcome, "declined");
+    assert.match((decisionOut as Extract<typeof decisionOut, { outcome: "declined" }>).reason ?? "", /自动决策未通过/);
 
     const writeOut = await h.ask(writeCard());
     assert.equal(writeOut.outcome, "answered", "另一组不受影响：写盘仍代批");
     assert.equal(writeOut.outcome === "answered" ? writeOut.judge?.group : undefined, "approval");
-    assert.equal(h.presented.length, 1);
+    assert.equal(h.presented.length, 0);
     assert.equal(h.rows.length, 1);
 
     // 反向：approval 回落，decision 代批。
@@ -183,38 +182,38 @@ test("按组回落：decision 证据不足只回落 decision；approval 仍代�
         };
       },
     });
-    const writePending = h2.ask(writeCard());
-    await tick(10);
-    assert.equal(h2.presented.length, 1);
-    assert.match(noticeOf(h2.presented[0]!), /代审批/);
-    h2.answer(h2.presented[0]!.id, { kind: "confirm", confirmed: false });
-    await writePending;
+    const writeOut2 = await h2.ask(writeCard());
+    assert.equal(h2.presented.length, 0, "approval 自动退回，不呈现客户卡");
+    assert.equal(writeOut2.outcome, "declined");
+    assert.match((writeOut2 as Extract<typeof writeOut2, { outcome: "declined" }>).reason ?? "", /自动审批未通过/);
     const proposalOut = await h2.ask(proposalCard());
     assert.equal(proposalOut.outcome === "answered" ? proposalOut.judge?.group : undefined, "decision");
     assert.equal(h2.rows.length, 1);
+    assert.equal(h2.presented.length, 0);
   } finally {
     cleanup();
   }
 });
 
-test("通道层超时：判断挂起超过通道超时 ⇒ 原卡 + 超时提示", async () => {
+test("通道层超时：判断挂起超过通道超时 ⇒ 自动退回（declined + 超时原因）", async () => {
   const { root, cleanup } = makeRoot("channel-timeout");
   try {
     seedProject(root);
     const h = makeChannel({ root, decision: true, timeoutMs: 30, fn: () => new Promise(() => {}) });
-    const pending = h.ask(proposalCard());
-    await tick(60);
-    assert.equal(h.presented.length, 1);
-    assert.match(noticeOf(h.presented[0]!), /判断超时/);
-    h.answer(h.presented[0]!.id, { kind: "choice", selected: ["reject"] });
-    const out = await pending;
-    assert.equal(out.outcome, "answered");
+    const out = await h.ask(proposalCard());
+    assert.equal(h.presented.length, 0, "通道超时属 manual ⇒ 自动退回，不呈现原卡");
+    assert.equal(h.rows.length, 0);
+    assert.equal(out.outcome, "declined");
+    const declined = out as Extract<typeof out, { outcome: "declined" }>;
+    assert.equal(declined.operatorId, "judge:claude");
+    assert.match(declined.reason ?? "", /判断超时/);
+    assert.match(declined.reason ?? "", /重新提交/);
   } finally {
     cleanup();
   }
 });
 
-test("结果行投达失败：approve 降级手动（row-failed 单列），不自动结算", async () => {
+test("结果行投达失败：approve 降级 manual（row-failed）⇒ 自动退回，不呈现原卡、不按代批结算", async () => {
   const { root, cleanup } = makeRoot("row-failed");
   try {
     seedProject(root);
@@ -223,16 +222,14 @@ test("结果行投达失败：approve 降级手动（row-failed 单列），不�
       decision: true,
       emitJudgeResult: () => { throw new Error("窗口已关闭"); },
     });
-    const pending = h.ask(proposalCard());
-    await tick(10);
-    assert.equal(h.presented.length, 1, "结果行失败必须呈现原卡");
-    const notice = noticeOf(h.presented[0]!);
-    assert.match(notice, /判断已完成，但结果无法在聊天中显示/);
-    assert.doesNotMatch(notice, /未代批/, "不得把已完成判断说成未发生");
-    h.answer(h.presented[0]!.id, { kind: "choice", selected: ["accept"] });
-    const out = await pending;
-    assert.equal(out.outcome, "answered");
-    assert.equal(out.judge, undefined, "结果行失败不得按代批结算");
+    const out = await h.ask(proposalCard());
+    assert.equal(h.presented.length, 0, "row-failed 自动退回，不呈现原卡");
+    assert.equal(out.outcome, "declined");
+    const declined = out as Extract<typeof out, { outcome: "declined" }>;
+    assert.equal(declined.operatorId, "judge:claude");
+    assert.match(declined.reason ?? "", /结果无法在聊天中显示/, "须如实说明结果行投达失败");
+    assert.match(declined.reason ?? "", /重新提交/, "须给出可操作的重试指引");
+    assert.equal((out as { judge?: unknown }).judge, undefined, "结果行失败不得按代批结算");
   } finally {
     cleanup();
   }

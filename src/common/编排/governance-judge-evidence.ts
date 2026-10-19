@@ -726,11 +726,11 @@ const PROBLEM_PRIORITY: readonly string[] = [
 function chooseReason(conflicts: readonly Conflict[], problems: readonly Problem[]): { reasonCode: string; reason: string } {
   if (conflicts.length > 0) {
     const detail = conflicts.map((conflict) => `${conflict.code}：${conflict.detail}`).join("；");
-    return { reasonCode: "evidence-conflict", reason: `请求方陈述与系统事实冲突（${detail}），已转手动确认。` };
+    return { reasonCode: "evidence-conflict", reason: `请求方陈述与系统事实冲突（${detail}）；请按系统事实修正后重新提交。` };
   }
   const code = PROBLEM_PRIORITY.find((candidate) => problems.some((problem) => problem.code === candidate)) ?? "evidence-packet-missing";
   const details = problems.filter((problem) => problem.code === code).map((problem) => problem.detail);
-  return { reasonCode: code, reason: `${details.join("；")}，已转手动确认。` };
+  return { reasonCode: code, reason: `${details.join("；")}；请按上述原因修正后重新提交。` };
 }
 
 function requesterOptions(card: CustomerInputRequest): Array<{ id: string; label: string; description?: string }> | undefined {
@@ -953,7 +953,7 @@ export async function buildDecisionEvidencePacket(input: {
     return {
       ok: false,
       reasonCode: "evidence-packet-missing",
-      reason: `证据包生成失败：${err instanceof Error ? err.message : String(err)}，已转手动确认。`,
+      reason: `证据包生成失败：${err instanceof Error ? err.message : String(err)}；请修正物证后重新提交。`,
     };
   }
 }
@@ -967,7 +967,7 @@ async function buildInner(input: {
   const conflicts: Conflict[] = [];
 
   if (typeof request.flowId !== "string" || !isGovernanceJudgeFlowId(request.flowId)) {
-    return { ok: false, reasonCode: "context-missing", reason: "证据包缺少合法的 flowId，已转手动确认。" };
+    return { ok: false, reasonCode: "context-missing", reason: "证据包缺少合法的 flowId；请修正卡片后重新提交。" };
   }
 
   const cardFlowId = typeof (request.card as { flowId?: unknown }).flowId === "string"
@@ -993,7 +993,7 @@ async function buildInner(input: {
       ? request.paths
       : declaredWritePathsFromPreview(request.card.preview);
     if (raw.length > 50) {
-      return { ok: false, reasonCode: "path-unverified", reason: "写盘卡候选路径超过逐路径复核上限，已转手动确认。" };
+      return { ok: false, reasonCode: "path-unverified", reason: "写盘卡候选路径超过逐路径复核上限；请减少路径后重新提交。" };
     }
     const seen = new Set<string>();
     for (const candidate of raw) {

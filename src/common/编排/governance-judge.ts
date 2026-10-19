@@ -160,28 +160,28 @@ function manualOutcome(reasonCode: string, reason: string): GovernanceJudgeOutco
 
 /** 上下文校验：缺 flowId/卡片形状 → manual（评审 §5.1：flowId 必须合法，否则 manual）。 */
 function contextProblem(request: GovernanceJudgeRequest): { reasonCode: string; reason: string } | undefined {
-  if (!isRecord(request)) return { reasonCode: "context-missing", reason: "判断请求形状非法，已转手动确认。" };
+  if (!isRecord(request)) return { reasonCode: "context-missing", reason: "判断请求形状非法；请修正后重新提交。" };
   if (!isGovernanceJudgeFlowId(request.flowId)) {
-    return { reasonCode: "context-missing", reason: "判断请求缺少合法的 flowId，已转手动确认。" };
+    return { reasonCode: "context-missing", reason: "判断请求缺少合法的 flowId；请修正后重新提交。" };
   }
   const derivedGroup = governanceCardGroup(request.cardKind);
   if (derivedGroup === undefined) {
-    return { reasonCode: "group-mismatch", reason: "判断请求的卡种未知，已转手动确认。" };
+    return { reasonCode: "group-mismatch", reason: "判断请求的卡种未知；请修正后重新提交。" };
   }
   if (request.group !== derivedGroup) {
-    return { reasonCode: "group-mismatch", reason: "判断请求的分组与卡种不一致，已转手动确认。" };
+    return { reasonCode: "group-mismatch", reason: "判断请求的分组与卡种不一致；请修正后重新提交。" };
   }
   if (!isRecord(request.card) || typeof request.card.title !== "string" || request.card.title.trim() === "") {
-    return { reasonCode: "context-missing", reason: "判断请求缺少合法的卡片标题，已转手动确认。" };
+    return { reasonCode: "context-missing", reason: "判断请求缺少合法的卡片标题；请修正后重新提交。" };
   }
   if (request.card.kind !== "confirm" && request.card.kind !== "choice") {
-    return { reasonCode: "context-missing", reason: "判断请求缺少合法的卡片种类，已转手动确认。" };
+    return { reasonCode: "context-missing", reason: "判断请求缺少合法的卡片种类；请修正后重新提交。" };
   }
   if (request.card.kind === "choice" && (!Array.isArray(request.card.options) || request.card.options.length === 0)) {
-    return { reasonCode: "context-missing", reason: "判断请求的选择卡缺少 options，已转手动确认。" };
+    return { reasonCode: "context-missing", reason: "判断请求的选择卡缺少 options；请修正后重新提交。" };
   }
   if (!isRecord(request.facts)) {
-    return { reasonCode: "context-missing", reason: "判断请求缺少治理事实，已转手动确认。" };
+    return { reasonCode: "context-missing", reason: "判断请求缺少治理事实；请修正后重新提交。" };
   }
   return undefined;
 }
@@ -201,19 +201,19 @@ async function verifyAcceptanceMechanics(
   const flowPath = request.artifacts?.flowPath;
   const rel = typeof flowPath === "string" ? safeProjectRelativePath(flowPath) : undefined;
   if (rel === undefined) {
-    return { ok: false, reasonCode: "artifact-missing", reason: "验收卡缺少流程单物证路径，已转手动确认。" };
+    return { ok: false, reasonCode: "artifact-missing", reason: "验收卡缺少流程状态物证路径；请补齐流程状态路径后重新提交验收。" };
   }
   let flowText: string;
   try {
     flowText = await readFile(path.join(projectRoot, ...rel.split("/")), "utf8");
   } catch {
-    return { ok: false, reasonCode: "artifact-missing", reason: "流程单不可读，无法核对验收完成度，已转手动确认。" };
+    return { ok: false, reasonCode: "artifact-missing", reason: "流程状态不可读，无法核对验收完成度；请补齐可读流程状态后重新提交验收。" };
   }
   let ledger;
   try {
     ledger = await readGovernanceLedger(projectRoot);
   } catch {
-    return { ok: false, reasonCode: "ledger-unavailable", reason: "治理账本不可读，无法核对验收完成度，已转手动确认。" };
+    return { ok: false, reasonCode: "ledger-unavailable", reason: "治理账本不可读，无法核对验收完成度；请修复账本后重新提交验收。" };
   }
 
   if (/\.ya?ml$/i.test(rel)) {
@@ -224,7 +224,7 @@ async function verifyAcceptanceMechanics(
       return {
         ok: false,
         reasonCode: "insufficient-evidence",
-        reason: `流程 YAML 路径与卡片 flowId 不一致（文件 ${rel}，卡片 ${request.flowId}）。已转手动确认。`,
+        reason: `流程 YAML 路径与卡片 flowId 不一致（文件 ${rel}，卡片 ${request.flowId}）；请修正流程状态路径后重新提交验收。`,
       };
     }
     const parsed = parseFlowStateYaml(flowText, fileFlowId);
@@ -233,18 +233,18 @@ async function verifyAcceptanceMechanics(
       return {
         ok: false,
         reasonCode: "insufficient-evidence",
-        reason: `流程 YAML 校验失败（${rel}）：${detail}。已转手动确认。`,
+        reason: `流程 YAML 校验失败（${rel}）：${detail}；请修正流程状态 YAML 后重新提交验收。`,
       };
     }
     if (ledger.errors.length > 0) {
-      return { ok: false, reasonCode: "ledger-unavailable", reason: "治理账本不可读或存在坏行，无法核对验收完成度，已转手动确认。" };
+      return { ok: false, reasonCode: "ledger-unavailable", reason: "治理账本不可读或存在坏行，无法核对验收完成度；请修复账本后重新提交验收。" };
     }
     const completion = evaluateFlowCompletion(parsed.flow, ledger.entries);
     if (!completion.ready) {
       return {
         ok: false,
         reasonCode: "insufficient-evidence",
-        reason: `流程未通过收尾门（${rel}）：${completion.issues.slice(0, 8).join("；")}。已转手动确认。`,
+        reason: `流程未通过收尾门（${rel}）：${completion.issues.slice(0, 8).join("；")}；请补齐流程步骤/证据后重新提交验收。`,
       };
     }
     return { ok: true };
@@ -463,7 +463,7 @@ export function createGovernanceJudge(opts: CreateGovernanceJudgeOptions): Gover
       if (aborted && verdict === undefined) {
         log.record("governance-judge.manual", { toolCallId: request.toolCallId, reasonCode: "timeout", group: request.group, cardKind: request.cardKind });
         return {
-          ...manualOutcome("timeout", `判断超时（>${formatGovernanceJudgeTimeout(timeoutMs)}），已转手动确认。`),
+          ...manualOutcome("timeout", `判断超时（>${formatGovernanceJudgeTimeout(timeoutMs)}）；请稍后重试或缩小提卡范围。`),
           group: request.group,
           cardKind: request.cardKind,
           engine: request.runtime,
@@ -472,18 +472,18 @@ export function createGovernanceJudge(opts: CreateGovernanceJudgeOptions): Gover
       if (verdict === undefined) {
         log.record("governance-judge.parse.failed", { requestId: request.toolCallId, toolCallId: request.toolCallId, cardKind: request.cardKind });
         return {
-          ...manualOutcome("parse-failed", "判断输出无法解析（缺少合法的 report_governance_judgement 结论），已转手动确认。"),
+          ...manualOutcome("parse-failed", "判断输出无法解析（缺少合法的 report_governance_judgement 结论）；请重试。"),
           group: request.group,
           cardKind: request.cardKind,
           engine: request.runtime,
         };
       }
-      // approve 前复核证据哈希：判断期间任一物证/已存在目标发生变化或消失 ⇒ manual。
-      // （证据包描述的是「判断时刻」的盘面；判断后再核对一次，避免拿过期证据放行。）
+      // 仅 approve 前复核证据哈希：判断期间任一物证/已存在目标发生变化或消失 ⇒ manual。
+      // （证据包描述的是「判断时刻」的盘面；判断后再核对一次，避免拿过期证据放行。deny/manual 不需要。）
       if (verdict.verdict === "approve") {
         const hashCheck = await verifyEvidenceHashes(evidence.hashBaseline, projectRoot);
         if (!hashCheck.ok) {
-          const reason = `证据哈希核对失败：${hashCheck.reason}，已转手动确认。`;
+          const reason = `证据哈希核对失败：${hashCheck.reason}；请重新提交确认。`;
           log.record("governance-judge.manual", {
             toolCallId: request.toolCallId,
             reasonCode: "evidence-hash-mismatch",
@@ -523,6 +523,21 @@ export function createGovernanceJudge(opts: CreateGovernanceJudgeOptions): Gover
           readCalls: stats.readCalls,
           readBytes: stats.readBytes,
         });
+      } else if (outcome.verdict === "deny") {
+        // 2026-10-19：approval 组写卡不合规且可修正 ⇒ deny 退回发起角色重做；**不记成 manual**。
+        log.record("governance-judge.deny", {
+          toolCallId: request.toolCallId,
+          engine: request.runtime,
+          model,
+          reasonCode: outcome.reasonCode,
+          reason: outcome.reason,
+          group: outcome.group,
+          cardKind: outcome.cardKind,
+          evidenceCount: outcome.evidence?.length ?? 0,
+          durationMs: outcome.durationMs,
+          readCalls: stats.readCalls,
+          readBytes: stats.readBytes,
+        });
       } else {
         if (outcome.reasonCode === "group-mismatch") {
           log.record("governance-judge.group.mismatch", {
@@ -557,7 +572,7 @@ export function createGovernanceJudge(opts: CreateGovernanceJudgeOptions): Gover
       return finish(pickVerdict(), true);
     }
     if (result.kind === "error") {
-      const reason = `判断会话不可用：${errText(result.error)}。已转手动确认。`;
+      const reason = `判断会话不可用：${errText(result.error)}；请稍后重试。`;
       log.record("governance-judge.manual", { toolCallId: request.toolCallId, reasonCode: "unavailable", reason: redactJudgeText(reason), group: request.group, cardKind: request.cardKind });
       return {
         ...manualOutcome("unavailable", reason),
@@ -601,7 +616,7 @@ export function createGovernanceJudge(opts: CreateGovernanceJudgeOptions): Gover
     }
     if (busy) {
       return {
-        ...manualOutcome("unavailable", "判断 agent 正忙（已有一次判断在进行），本次已转手动确认。"),
+        ...manualOutcome("unavailable", "判断 agent 正忙（已有一次判断在进行）；请稍后重试。"),
         group: request.group,
         cardKind: request.cardKind,
         engine: requestRuntime,
@@ -616,7 +631,7 @@ export function createGovernanceJudge(opts: CreateGovernanceJudgeOptions): Gover
     } catch (error) {
       // 驱动层兜底：任何意外都不外抛。
       return {
-        ...manualOutcome("unavailable", `判断异常：${errText(error)}。已转手动确认。`),
+        ...manualOutcome("unavailable", `判断异常：${errText(error)}；请稍后重试。`),
         group: request.group,
         cardKind: request.cardKind,
         engine: requestRuntime,

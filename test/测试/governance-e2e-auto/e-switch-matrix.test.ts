@@ -170,7 +170,7 @@ test("场景5e：single/su 不启用——即使双开关都开、判断可用�
   assert.equal(m.rows.length, 0);
 });
 
-test("场景5f：accept-quick 不代批——真实 driver 只接受 selected 恰为 [\"accept\"]", async () => {
+test("场景5f：accept-quick 不代批——真实 driver 只接受 selected 恰为 [\"accept\"]（manual ⇒ 自动退回）", async () => {
   const root = mkdtempSync(path.join(tmpdir(), "ans-matrix-accept-quick-"));
   try {
     write(root, PROPOSAL_REL, proposalDoc(FLOW));
@@ -214,18 +214,16 @@ test("场景5f：accept-quick 不代批——真实 driver 只接受 selected �
       judgeContext: judgeContextFor(req) as unknown as GovernanceJudgeContext,
     });
     assert.equal(channel.judgingCount(), 1, "判断进行中（不呈现、不计 pending）");
-    for (let i = 0; i < 200 && presented.length === 0; i += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 5));
-    }
-    assert.equal(presented.length, 1, "accept-quick 必须回落原卡");
-    assert.match(presented[0]!.judgeNotice ?? "", /未代批/);
-    assert.equal(rows.length, 0, "manual 不产生结果行");
-    assert.equal(channel.respond({ id: presented[0]!.id, decision: { kind: "choice", selected: ["accept-quick"] } }).ok, true);
+    // 2026-10-19 客户总原则：manual 不再呈现客户卡，直接 declined + 可操作原因回投发起角色。
     const outcome = await pending;
-    assert.ok(outcome !== null && outcome !== undefined, "客户本人作答后应有结果");
-    assert.equal(outcome.outcome, "answered", "客户本人仍可选 accept-quick");
-    const answered = outcome as Extract<CustomerInputOutcome, { outcome: "answered" }>;
-    assert.equal(answered.operatorId, "test:op", "不是 judge 代批");
+    assert.equal(presented.length, 0, "accept-quick 不得代批，也不得呈现客户卡（自动退回）");
+    assert.equal(rows.length, 0, "manual 不产生结果行");
+    assert.ok(outcome !== null && outcome !== undefined, "判断运行后应有结算结果");
+    assert.equal(outcome.outcome, "declined", "自动退回（非客户作答）");
+    const declined = outcome as Extract<CustomerInputOutcome, { outcome: "declined" }>;
+    assert.equal(declined.operatorId, "judge:claude", "退回归因为 judge，而非客户");
+    assert.match(declined.reason ?? "", /自动决策未通过|自动决策拒绝/, "须说明自动决策未通过/拒绝");
+    assert.match(declined.reason ?? "", /重新提交/, "须给出可操作的修正后重试指引");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

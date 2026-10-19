@@ -23,6 +23,7 @@ import type {
   CustomerInputFn,
   CustomerInputMetadata,
   CustomerInputRequest,
+  DiagnosticLog,
   GovernanceJudgeAudit,
   GovernanceJudgeFacts,
   GovernanceJudgeRequest,
@@ -57,6 +58,7 @@ import {
 import {
   boundedGovernanceJudgeAudit,
   evaluateGovernanceJudgeVerdict,
+  governanceJudgeAuditFromOutcome,
   normalizeGovernanceJudgeVerdict,
 } from "../../src/common/编排/governance-judge-verdict.ts";
 import { flushGovernanceLedger, readGovernanceLedger } from "../../src/common/编排/governance-ledger.ts";
@@ -351,7 +353,7 @@ function fakeFactory(script: FakeScript = {}): { factory: RuntimeAdapterFactory;
 
 function makeJudge(
   script: FakeScript,
-  options: { runtime?: RuntimeKind; timeoutMs?: number; projectRoot?: string } = {},
+  options: { runtime?: RuntimeKind; timeoutMs?: number; projectRoot?: string; logger?: DiagnosticLog } = {},
 ): { judge: ReturnType<typeof createGovernanceJudge>; seen: Seen } {
   const { factory, seen } = fakeFactory(script);
   const judge = createGovernanceJudge({
@@ -359,6 +361,7 @@ function makeJudge(
     runtime: options.runtime ?? "claude",
     createAdapter: factory,
     timeoutMs: options.timeoutMs ?? 300,
+    ...(options.logger !== undefined ? { logger: options.logger } : {}),
   });
   return { judge, seen };
 }
@@ -505,7 +508,7 @@ test("artifact-missing reason：proposal/appointment/acceptance 列出约定物�
   // proposal：缺 docs/proposals/<flowId>-v1.md
   const proposal = await makeJudge({ report: APPROVE_PROPOSAL }).judge(request());
   assert.equal(proposal.reasonCode, "artifact-missing");
-  assert.match(proposal.reason ?? "", /规范物证缺失：docs\/proposals\/flow-a-v1\.md（判断无法核对），已转手动确认。/);
+  assert.match(proposal.reason ?? "", /规范物证缺失：docs\/proposals\/flow-a-v1\.md（判断无法核对）；请按上述原因修正后重新提交。/);
 
   // appointment：无提名文件 ⇒ 明确点名 docs/nominations/<flowId>-v1.md
   const appointmentReq = request({
@@ -523,7 +526,7 @@ test("artifact-missing reason：proposal/appointment/acceptance 列出约定物�
   const appointment = await makeJudge({}).judge(appointmentReq);
   assert.equal(appointment.verdict, "manual");
   assert.equal(appointment.reasonCode, "artifact-missing");
-  assert.match(appointment.reason ?? "", /规范物证缺失：docs\/nominations\/flow-a-v1\.md（判断无法核对），已转手动确认。/);
+  assert.match(appointment.reason ?? "", /规范物证缺失：docs\/nominations\/flow-a-v1\.md（判断无法核对）；请按上述原因修正后重新提交。/);
 
   // acceptance：proposal 与 flow 两个物证都缺 ⇒ 两条路径都列出
   const acceptanceReq = request({
@@ -622,7 +625,7 @@ test("proposal：read-denied 摘要列出相对路径与类别（治理与 shell
     assert.match(reason, /判断读取被拒：/);
     assert.match(reason, /\.ans\/sessions\/a\.json（应用私有数据）/);
     assert.match(reason, /src\/foo\.txt（凭据文件）/);
-    assert.match(reason, /无法保证无损判断，已转手动确认。/);
+    assert.match(reason, /无法保证无损判断；请/);
     assert.doesNotMatch(reason, /[A-Za-z]:[\\/]|\/(?:home|Users|tmp)\//, "摘要不含绝对路径");
   });
 });
@@ -647,7 +650,7 @@ test("proposal：read-denied 且 deniedPaths 为空 ⇒ 保留原泛化文案", 
     }));
     assert.equal(out.verdict, "manual");
     assert.equal(out.reasonCode, "read-denied");
-    assert.match(out.reason ?? "", /判断读取被拒（敏感文件\/越界\/二进制），无法保证无损判断，已转手动确认。/);
+    assert.match(out.reason ?? "", /判断读取被拒（敏感文件\/越界\/二进制），无法保证无损判断；请补齐判断所需证据（或缩小读取范围）后重新提交。/);
   });
 });
 
@@ -2588,4 +2591,203 @@ test("normalize/evaluate：approve 无 reason → parse-failed；审计字段有
   for (const item of audit.evidence ?? []) assert.ok(Buffer.byteLength(item, "utf8") <= 512 + 3);
   assert.ok(Buffer.byteLength(buildGovernanceJudgeSystemPrompt(), "utf8") > 1000);
   assert.match(buildGovernanceJudgeSystemPrompt(), /\.ans/);
+});
+
+// —————————————————————— ⑩ deny：approval 组退回重做（2026-10-19 客户反馈） ——————————————————————
+
+test("deny：approval 组合法；缺 reason 规范化失败；decision 组回落 manual", () => {
+  // 规范化：deny 必须有非空 reason。
+  assert.deepEqual(
+    normalizeGovernanceJudgeVerdict({ verdict: "deny", reason: "角色卡混入无关散文，请删去并重写职责段。" }),
+    { verdict: "deny", reason: "角色卡混入无关散文，请删去并重写职责段。" },
+  );
+  assert.equal(normalizeGovernanceJudgeVerdict({ verdict: "deny" }), undefined);
+  assert.equal(normalizeGovernanceJudgeVerdict({ verdict: "deny", reason: "   " }), undefined);
+
+  const approvalRequest = request({
+    group: "approval",
+    cardKind: "write",
+    roleId: "nominator",
+    card: {
+      kind: "confirm",
+      title: "写入提名",
+      preview: "## docs/nominations/flow-a-v1.md\n# 提名\n",
+      cardKind: "write",
+      flowId: "flow-a",
+    },
+    paths: ["docs/nominations/flow-a-v1.md"],
+    pathProbes: [{ path: "docs/nominations/flow-a-v1.md", allowed: true }],
+    allowedPathRoots: ["docs/nominations/"],
+    forbiddenPaths: [".ans/"],
+    artifacts: undefined,
+  });
+
+  const deny = evaluateGovernanceJudgeVerdict({
+    request: approvalRequest,
+    verdict: {
+      verdict: "deny",
+      reason: "提名文件混入无关散文，请删去后重试。",
+      reasonCode: "insufficient-evidence",
+      evidence: ["docs/nominations/flow-a-v1.md"],
+    },
+    stats: { readCalls: 1, readBytes: 10, deniedReads: 0, truncatedReads: 0, budgetExceeded: false, readPaths: [] },
+    engine: "claude",
+    model: "test-model",
+    durationMs: 12,
+  });
+  assert.equal(deny.verdict, "deny");
+  assert.equal(deny.reasonCode, "insufficient-evidence");
+  assert.equal(deny.reason, "提名文件混入无关散文，请删去后重试。");
+  assert.deepEqual(deny.evidence, ["docs/nominations/flow-a-v1.md"]);
+  assert.equal(deny.model, "test-model");
+  assert.equal(deny.durationMs, 12);
+  assert.equal(deny.readCalls, 1);
+  assert.equal(deny.value, undefined);
+  assert.equal(deny.paths, undefined);
+  assert.equal(deny.pathDecisions, undefined);
+
+  const defaultDeny = evaluateGovernanceJudgeVerdict({
+    request: approvalRequest,
+    verdict: { verdict: "deny", reason: "内容不合规，请修正。" },
+    engine: "claude",
+  });
+  assert.equal(defaultDeny.verdict, "deny");
+  assert.equal(defaultDeny.reasonCode, "model-deny");
+
+  // decision 组不得替客户拒绝 ⇒ manual。
+  const decisionDeny = evaluateGovernanceJudgeVerdict({
+    request: request(),
+    verdict: { verdict: "deny", reason: "提案偏离意图。" },
+    engine: "claude",
+  });
+  assert.equal(decisionDeny.verdict, "manual");
+  assert.match(decisionDeny.reason ?? "", /决策卡不能由判断 agent 拒绝/);
+
+  // 审计字段：deny 无 value/paths，但保留原因/证据/读取统计。
+  const audit = governanceJudgeAuditFromOutcome(deny);
+  assert.equal(audit.group, "approval");
+  assert.equal(audit.cardKind, "write");
+  assert.equal(audit.reasonCode, "insufficient-evidence");
+  assert.equal(audit.reason, "提名文件混入无关散文，请删去后重试。");
+  assert.deepEqual(audit.evidence, ["docs/nominations/flow-a-v1.md"]);
+  assert.equal(audit.selected, undefined);
+  assert.equal(audit.confirmed, undefined);
+  assert.equal(audit.paths, undefined);
+  assert.equal(audit.readCalls, 1);
+  assert.equal(audit.durationMs, 12);
+});
+
+test("prompt：三值输出契约；approval deny 退回重做；decision 不得 deny", () => {
+  const prompt = buildGovernanceJudgeSystemPrompt();
+  assert.match(prompt, /"verdict":"approve\|deny\|manual"/);
+  assert.match(prompt, /deny：\*\*仅 approval 组可用\*\*/);
+  assert.match(prompt, /decision 组不得 deny/);
+  assert.match(prompt, /哪条不合规 \+ 应怎么改/);
+  assert.match(prompt, /approval 组的「内容不合规\/不建议」用 deny 退回发起角色重做/);
+  assert.match(prompt, /reason 必须是可操作的返工说明/);
+  assert.match(prompt, /不得把结果推回客户等待/);
+  assert.doesNotMatch(prompt, /已转手动确认|等客户决定/);
+  assert.doesNotMatch(prompt, /从不替客户拒绝/);
+});
+
+test("manual：decision 组返工原因原样保留；approval 组 manual 给可操作修正说明", () => {
+  const decisionManual = evaluateGovernanceJudgeVerdict({
+    request: request(),
+    verdict: {
+      verdict: "manual",
+      reason: "提案范围超出意图 §范围，请缩小到『只含导出』后重发。",
+      reasonCode: "intent-drift",
+    },
+    engine: "claude",
+  });
+  assert.equal(decisionManual.verdict, "manual");
+  assert.equal(decisionManual.reasonCode, "intent-drift");
+  assert.match(decisionManual.reason ?? "", /请缩小到/);
+  assert.doesNotMatch(decisionManual.reason ?? "", /已转手动确认|等客户决定/);
+
+  const approvalManual = evaluateGovernanceJudgeVerdict({
+    request: request({
+      group: "approval",
+      cardKind: "write",
+      roleId: "nominator",
+      card: {
+        kind: "confirm",
+        title: "写入提名",
+        preview: "## docs/nominations/flow-a-v1.md\n# 提名\n",
+        cardKind: "write",
+        flowId: "flow-a",
+      },
+      paths: ["docs/other/x.md"],
+      pathProbes: [{ path: "docs/other/x.md", allowed: true }],
+      allowedPathRoots: ["docs/nominations/"],
+      forbiddenPaths: [".ans/"],
+      artifacts: undefined,
+    }),
+    verdict: {
+      verdict: "approve",
+      reason: "看起来没问题。",
+      evidence: ["docs/nominations/flow-a-v1.md"],
+      confirmed: true,
+      pathDecisions: [{ path: "docs/other/x.md", ok: true }],
+    },
+    engine: "claude",
+  });
+  assert.equal(approvalManual.verdict, "manual");
+  assert.equal(approvalManual.reasonCode, "path-outside-boundary");
+  assert.match(approvalManual.reason ?? "", /请改为角色可写根内的路径后重新提交/);
+  assert.doesNotMatch(approvalManual.reason ?? "", /已转手动确认|等客户决定/);
+});
+
+test("driver：approval deny 走 governance-judge.deny 日志（不记 manual），跳过 approve 哈希复核", async () => {
+  await withRoot(async (root) => {
+    const target = "docs/flows/flow-a.md";
+    writeFile(root, target, flowMarkdown([{ id: "s1", status: "done" }]));
+    const records: Array<{ event: string; fields?: Record<string, unknown> }> = [];
+    const logger: DiagnosticLog = {
+      record(event, fields) {
+        records.push({ event, ...(fields !== undefined ? { fields } : {}) });
+      },
+      error(event, error, fields) {
+        records.push({ event, fields: { ...(fields ?? {}), error: String(error) } });
+      },
+    };
+    const scheduleWrite = request({
+      projectRoot: root,
+      group: "approval",
+      cardKind: "schedule-write",
+      roleId: "convener",
+      card: {
+        kind: "confirm",
+        title: "写入流程单",
+        preview: writePreview([target]),
+        cardKind: "schedule-write",
+        flowId: "flow-a",
+      },
+      paths: [target],
+      pathProbes: [{ path: target, allowed: true }],
+      allowedPathRoots: ["docs/flows/", "docs/workflow.md", "docs/governance/convener/"],
+      forbiddenPaths: [".ans/", "角色卡/", "docs/proposals/", "docs/nominations/"],
+      artifacts: { flowPath: target },
+    });
+    const { judge } = makeJudge(
+      {
+        report: readThenReport([target], {
+          verdict: "deny",
+          reason: "流程步骤缺 evidence，请补齐 evidence 后重试。",
+        }),
+      },
+      { logger },
+    );
+    const out = await judge(scheduleWrite);
+    assert.equal(out.verdict, "deny");
+    assert.equal(out.reasonCode, "model-deny");
+    assert.ok(
+      records.some((entry) => entry.event === "governance-judge.deny" && entry.fields?.reasonCode === "model-deny"),
+      `应记录 governance-judge.deny；实际事件：${records.map((entry) => entry.event).join(", ")}`,
+    );
+    assert.ok(
+      !records.some((entry) => entry.event === "governance-judge.manual"),
+      "deny 不得记成 manual",
+    );
+  });
 });

@@ -2983,3 +2983,178 @@ test("W6-B 真机修复：listing 刷新失败不崩、不打断会话/派发（
   assert.ok(openRoles.includes("convener"));
   await iface.stopSession();
 });
+
+// ————— 2026-10-19 真机第二缺陷：写卡后自动推进（强制刷新枚举 + 兜底派 Convener） —————
+//
+// 真机：Crew 已写出 6 个角色卡/边界，但应用没有重新枚举角色、也没有自动派下一步，流程停住；
+// 且 `advanceGovernanceFlow` 的 appointment 路径在 appointment-write 卡等待期间 `waitForRoleIdle`
+// 会超时/早退，审批通过后无人继续。本组钉住兜底检查：appointment-write answered 后（以及内置治理角色
+// settle 后）先强制刷新 listing（并 emitProjectChanged），目标角色齐备且账本尚无 appointment 之后的
+// convener dispatch.accepted ⇒ 复用既有任务文本派 Convener 恰一次；角色仍缺只记诊断、不刷屏。
+
+async function seedAppointmentDecision(root: string, flowId: string, targets: string[]): Promise<void> {
+  const appended = await appendGovernanceLedger(root, {
+    at: new Date().toISOString(),
+    kind: "customer.decision",
+    flowId,
+    stepId: "appointment",
+    decisionKind: "appointment",
+    customerDecision: "appointed",
+    actorRoleId: "nominator",
+    power: "nomination",
+    targetRoleIds: targets,
+  });
+  assert.equal(appended.ok, true, appended.ok ? "" : appended.message);
+}
+
+interface PostWriteHarness {
+  iface: ReturnType<typeof createDesktopInterface>;
+  sendsByRole: Map<string, string[]>;
+  events: SessionEventEnvelope[];
+  settles: Map<string, () => void>;
+  projectChanged: () => number;
+}
+
+async function makePostWriteHarness(root: string, targets: string[], rolesPresent: () => boolean): Promise<PostWriteHarness> {
+  const sendsByRole = new Map<string, string[]>();
+  const events: SessionEventEnvelope[] = [];
+  const settles = new Map<string, () => void>();
+  let projectChanged = 0;
+  const iface = createDesktopInterface({
+    pickDirectory: async () => root,
+    emitEvent: (envelope) => { events.push(envelope); },
+    listProjectFn: async () => ({
+      ...listingWithProjectRoles(trioListing(), rolesPresent() ? targets : []),
+      projectRoot: root,
+    }),
+    openRoleSessionFn: async (input) => {
+      const sends: string[] = [];
+      sendsByRole.set(input.roleId, sends);
+      const made = settleableGovernanceHandle(sends);
+      settles.set(input.roleId, made.settle);
+      return made.handle;
+    },
+    buildProjectConfigFn: buildProjectConfig,
+    emitProjectChanged: () => { projectChanged += 1; },
+    resolveRuntimeFn: async () => ({ ok: true, runtime: "pi", source: "credentials", skipped: [] }),
+  });
+  await iface.listProject({ projectRoot: root });
+  return { iface, sendsByRole, events, settles, projectChanged: () => projectChanged };
+}
+
+function appointmentWritePayload(flowId: string) {
+  return { version: 1 as const, flowId, cardKind: "appointment-write" as const, nextFunction: null, roleId: null };
+}
+
+async function ledgersConvenerDispatches(root: string, flowId: string): Promise<number> {
+  const ledger = await readGovernanceLedger(root);
+  return ledger.entries.filter(
+    (entry) => entry.kind === "dispatch.accepted" && entry.flowId === flowId && entry.targetRoleId === "convener",
+  ).length;
+}
+
+test("写卡后推进：appointment-write answered 后 listing 出现目标角色 ⇒ 自动派 Convener 恰一次、账本同形审计、左树刷新", async () => {
+  const root = makeTempProjectRoot("ans-post-write-advance-");
+  let harness: PostWriteHarness | undefined;
+  try {
+    const flowId = "flow-post-write";
+    const targets = ["backend", "frontend", "tester"];
+    await seedAppointmentDecision(root, flowId, targets);
+    let rolesPresent = false;
+    const made = await makePostWriteHarness(root, targets, () => rolesPresent);
+    harness = made;
+    // 真机场景：Crew 写卡期间 listing 缓存仍是旧的；写完后应用没有重新枚举。
+    rolesPresent = true;
+
+    const early = await made.iface.advanceGovernanceFlow({
+      payload: appointmentWritePayload(flowId),
+      context: { sourceRoleId: "nominator", projectRoot: root, runtime: "demo" },
+    });
+    assert.deepEqual(early, { ok: true, dispatched: false }, "appointment-write 推导为无下一步，但触发写卡后检查");
+
+    await waitForTest(() => (made.sendsByRole.get("convener")?.length ?? 0) > 0, 3000);
+    assert.equal(made.sendsByRole.get("convener")!.length, 1, "自动派 Convener 恰一次");
+    assert.equal(
+      made.sendsByRole.get("convener")![0],
+      `流程 ${flowId}：客户已完成任命 backend、frontend、tester。请写流程状态 YAML docs/flows/${flowId}.yaml 并派发已批准步骤。`,
+      "复用既有 appointment 任务文本（不造第二套消息）",
+    );
+    assert.ok(made.projectChanged() >= 1, "强制刷新后 emitProjectChanged（左树立即可见新角色卡）");
+
+    // 审计：appointment 之后恰一条 convener dispatch.accepted（actor=app / power=app）。
+    let count = 0;
+    for (let i = 0; i < 100 && count === 0; i += 1) {
+      count = await ledgersConvenerDispatches(root, flowId);
+      if (count === 0) await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    assert.equal(count, 1, "账本恰一条 convener 派发记录");
+    const ledger = await readGovernanceLedger(root);
+    const appointmentIndex = ledger.entries.findIndex(
+      (entry) => entry.kind === "customer.decision" && entry.flowId === flowId && entry.decisionKind === "appointment",
+    );
+    const audit = ledger.entries
+      .slice(appointmentIndex + 1)
+      .find((entry) => entry.kind === "dispatch.accepted" && entry.flowId === flowId && entry.targetRoleId === "convener");
+    assert.equal(audit?.actorRoleId, "app");
+    assert.equal(audit?.power, "app", "应用自动推进 ≠ 客户批准");
+
+    // 成功系统行落主入口（fixture 的 primaryRoleId=rapporteur），不冒充客户批准。
+    const notes = made.events
+      .filter((envelope) => envelope.roleId === "rapporteur" && envelope.event.kind === "message" && (envelope.event.detail as { source?: string } | undefined)?.source === "delivery-note")
+      .map((envelope) => envelope.event.summary);
+    assert.ok(notes.includes("已派发流程任务给 Steward / 统筹（工作中）"), "Lead 看到自动推进系统行");
+
+    // 去重：重复 appointment-write 触发 + 治理角色 settle 都不重派。
+    await made.iface.advanceGovernanceFlow({
+      payload: appointmentWritePayload(flowId),
+      context: { sourceRoleId: "nominator", projectRoot: root, runtime: "demo" },
+    });
+    assert.equal((await made.iface.openSession({ projectRoot: root, roleId: "nominator", runtime: "demo" })).ok, true);
+    made.settles.get("nominator")!();
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    assert.equal(made.sendsByRole.get("convener")!.length, 1, "同 flow+convener 不重派");
+    assert.equal(await ledgersConvenerDispatches(root, flowId), 1, "账本仍恰一条");
+    await made.iface.stopSession();
+  } finally {
+    // 异常路径兜底停止（正常路径已在用例末尾 stop）。
+    try { await harness?.iface.stopSession(); } catch { /* 忽略 */ }
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("写卡后推进：目标角色仍缺 ⇒ 不派 Convener、不发系统行（只诊断），重复 settle 不刷屏", async () => {
+  const root = makeTempProjectRoot("ans-post-write-missing-");
+  try {
+    const flowId = "flow-post-write-missing";
+    const targets = ["backend", "frontend", "tester"];
+    await seedAppointmentDecision(root, flowId, targets);
+    const harness = await makePostWriteHarness(root, targets, () => false);
+    try {
+      await harness.iface.advanceGovernanceFlow({
+        payload: appointmentWritePayload(flowId),
+        context: { sourceRoleId: "nominator", projectRoot: root, runtime: "demo" },
+      });
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      assert.equal(harness.sendsByRole.get("convener")?.length ?? 0, 0, "角色仍缺：不派 Convener");
+
+      // 重复触发（appointment-write + 内置治理角色 settle）：仍不派、不发系统行。
+      await harness.iface.advanceGovernanceFlow({
+        payload: appointmentWritePayload(flowId),
+        context: { sourceRoleId: "nominator", projectRoot: root, runtime: "demo" },
+      });
+      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "nominator", runtime: "demo" })).ok, true);
+      harness.settles.get("nominator")!();
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      assert.equal(harness.sendsByRole.get("convener")?.length ?? 0, 0, "重复 settle 仍不派");
+      const notes = harness.events.filter(
+        (envelope) => envelope.event.kind === "message" && (envelope.event.detail as { source?: string } | undefined)?.source === "delivery-note",
+      );
+      assert.equal(notes.length, 0, "角色仍缺：不发系统行（只记诊断，不刷屏）");
+      assert.equal(await ledgersConvenerDispatches(root, flowId), 0, "不写派发账本");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
