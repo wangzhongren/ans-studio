@@ -182,6 +182,7 @@ status: approved-implementation-dispatched
 - **overlay-2 重跑 run `38927621909`（headSha ef4a7fb）：7 红 → 1 红**（mac 双平台 ✅；Windows 剩 G1d win32 断言——首轮「无信号面」表述过强，CI 实测顶层回传 `signal:'SIGTERM'`）。**overlay-3（单文件，白名单已覆盖）**：G1d 按两层真值逐值钉准（顶层 `(code null, signal 'SIGTERM')`＝libuv `exit_signal` 记账语义、`code=null` 由 node v24 互斥规则定钉；stub 自毙层 `(1, null)` 原样；「无信号面」正确落点＝启动器→真命令转发不可达）。提交后重跑。
 - **overlay-3 重跑 run `38929587975`：仍剩 G1d（:164 已过、推进至 :177「stub 存续」）**——判定为**环境面（不确定）**：①Windows 父死不杀子（确定性）；②本地 SIGKILL 对照实验（同步模拟 TerminateProcess）证明 stub 孤儿存活且 close 挂起、夹具与启动器均非死因；③CI 观察与其语义互证⇒最可能为 runner/环境树清理，仓库侧不可判定。**overlay-4（单文件）**：win32 分支逐行三分（确定性真值 exact-match[含 :147-148/:191-192 源钉]、环境面登记不钉任一状态、新增 close 有界自愈与 POSIX 分支原样）；产品零改。
 - **overlay-4 重跑 run `38931760696`：G1d 过（三分钉法生效）；新红＝`test/桌面应用/session-rebuild-race.test.ts:357`**（前三跑皆绿的既有用例）——桌面窗口判定**时序脆弱**：夹具等长重写（`v: 1\n`→`v: 2\n` 均 5B）×filePath 缓存 (mtimeMs,size) 命中×Windows 时间戳粒度合并 ⇒ 陈旧漏检；受控实验（stat mtime 钉回）精确复现＋免疫证明；**产品零改**（Q-1 缓存边界如实登记为残余：等长编辑+同粒度双写、生产影响可忽略）。**overlay-5（单测试文件）**：夹具尺寸可判化（初始值加长）＋守卫用例＋免疫回归钉；原用例本体未动。提交后重跑（第五轮）。
+- **v1.3.0 发布完成（2026-10-17）**：run `38934012586`（overlay-5）**四 job 全绿** → draft 12 资产独立验收全过（存证摘要逐项一致、mac-arm64 ZIP 三方摘要一致、三 manifest 同源 smoke 全过、provenance overlayPaths 恰 14）→ 公开（发布说明＝四大能力＋修复加固）→ 未登录核验全 200（发布页/三平台 ZIP/SUMS；README 指向 v1.3.0）。验收记录：`角色卡/测试/docs/change/2026-10-17_change_v1.3-release-verification.md`。发布页 https://github.com/wangzhongren/ans-studio/releases/tag/v1.3.0 。**冻结解除**：此后 main 可接收新批次，下版发布换新 SOURCE_REF。
 
 ## 候选 G-4「角色能力安装（技能＋MCP）」（2026-10-16 客户讨论提出，已派细化）
 
