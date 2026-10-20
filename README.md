@@ -34,17 +34,31 @@ ANS Studio 面向希望在真实项目中使用多个 AI 角色协作的开发�
 
 ## 下载与运行
 
-当前版本：[v1.4.0](https://github.com/wangzhongren/ans-studio/releases/tag/v1.4.0)。运行包自带运行环境，启动应用无需另装 Node.js；执行项目的 `npm test`、Git 等命令，仍需安装该项目所需的开发工具链。
+当前版本：**v1.4.0**（2026-10-20 发布）。运行包自带运行环境，启动应用无需另装 Node.js；执行项目的 `npm test`、Git 等命令，仍需安装该项目所需的开发工具链。
 
-| 系统 | 下载 | 启动方式 |
-| --- | --- | --- |
-| macOS 13+ · Apple Silicon | [mac-arm64.zip](https://github.com/wangzhongren/ans-studio/releases/download/v1.4.0/ANS-Studio-1.4.0-mac-arm64.zip) | 完整解压，打开 `ANS Studio.app` |
-| macOS 13+ · Intel | [mac-x64.zip](https://github.com/wangzhongren/ans-studio/releases/download/v1.4.0/ANS-Studio-1.4.0-mac-x64.zip) | 完整解压，打开 `ANS Studio.app` |
-| Windows 10/11 · x64 | [win-x64.zip](https://github.com/wangzhongren/ans-studio/releases/download/v1.4.0/ANS-Studio-1.4.0-win-x64.zip) | 完整解压，打开 `ANS Studio.exe`，保留同目录资源文件 |
+| 系统 | 下载 | 校验文件 | 启动方式 |
+| --- | --- | --- | --- |
+| macOS 13+ · Apple Silicon | [mac-arm64.zip](https://github.com/wangzhongren/ans-studio/releases/download/v1.4.0/ANS-Studio-1.4.0-mac-arm64.zip) | [SHA256SUMS-darwin-arm64.txt](https://github.com/wangzhongren/ans-studio/releases/download/v1.4.0/SHA256SUMS-darwin-arm64.txt) | 完整解压，打开 `ANS Studio.app` |
+| macOS 13+ · Intel | [mac-x64.zip](https://github.com/wangzhongren/ans-studio/releases/download/v1.4.0/ANS-Studio-1.4.0-mac-x64.zip) | [SHA256SUMS-darwin-x64.txt](https://github.com/wangzhongren/ans-studio/releases/download/v1.4.0/SHA256SUMS-darwin-x64.txt) | 完整解压，打开 `ANS Studio.app` |
+| Windows 10/11 · x64 | [win-x64.zip](https://github.com/wangzhongren/ans-studio/releases/download/v1.4.0/ANS-Studio-1.4.0-win-x64.zip) | [SHA256SUMS-win32-x64.txt](https://github.com/wangzhongren/ans-studio/releases/download/v1.4.0/SHA256SUMS-win32-x64.txt) | 完整解压，打开 `ANS Studio.exe`，保留同目录资源文件 |
+
+下载后先核对 SHA256：macOS 在下载目录执行 `shasum -a 256 -c SHA256SUMS-darwin-arm64.txt`（Intel 用 `SHA256SUMS-darwin-x64.txt`）；Windows PowerShell 执行 `Get-FileHash .\ANS-Studio-1.4.0-win-x64.zip -Algorithm SHA256`，与 `SHA256SUMS-win32-x64.txt` 对照。[SHA256SUMS-overlay.txt](https://github.com/wangzhongren/ans-studio/releases/download/v1.4.0/SHA256SUMS-overlay.txt)、[release-provenance.json](https://github.com/wangzhongren/ans-studio/releases/download/v1.4.0/release-provenance.json) 与 [overlay.patch](https://github.com/wangzhongren/ans-studio/releases/download/v1.4.0/overlay.patch) 记录固定源码与打包适配，来源核验见[发布验收记录](角色卡/测试/docs/change/2026-10-20_change_v1.4-release-verification.md)。
+
+<details>
+<summary>v1.4.0 SHA256</summary>
+
+| 产物 | SHA256 |
+| --- | --- |
+| `ANS-Studio-1.4.0-mac-arm64.zip` | `bc0c5bdd892ad24630c0040ba0d3675e70345ef18ab0f0762c52e743dc4f48e7` |
+| `ANS-Studio-1.4.0-mac-x64.zip` | `554a0ad69feabc093fdf850d9e442b331ddd6072563605d6e879cd4ea9f21df9` |
+| `ANS-Studio-1.4.0-win-x64.zip` | `cfb1f673c599f0cea89cd5f6ea3fec53cf597e6cd4dc6492b9d69e7fe33a1779` |
+| `overlay.patch` | `2f6d6f765e13c2f43aa33e038198ff691bd7e38696d4f7818a7ad80da6776c11` |
+
+</details>
 
 v1.4.0 要点：流程文件方法化（`flow_get` / `flow_step_update` / `flow_step_supersede`，Lead 兼任工作流管理者）；重启后自动续跑；聊天 pane 加载占位；验收重派与通过后自动收口；角色卡写后门控；artifact 补登；排队决定处理后清理 UI 聚合；若干 shell/UI 修复。
 
-运行包尚未签名或公证，系统可能提示来源未验证。请从上述 Release 下载，并核对页面中的 `SHA256SUMS-*.txt`。
+运行包尚未签名或公证：macOS Gatekeeper 或 Windows SmartScreen 可能提示来源未验证。请从上述 Release 下载，先核对 SHA256 再运行。
 
 ## 第一次使用
 
