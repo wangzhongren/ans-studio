@@ -544,6 +544,40 @@ test("B-2：selectRole 不得无条件 clearChat；每角色一个 pane；事件
   assert.ok(STYLES.includes(".chat-pane"), "styles.css 应有 .chat-pane");
 });
 
+test("空白兜底（2026-10-20）：loading 只看 transcript 行；回放/开会话后无 transcript 显示中性占位", () => {
+  const start = RENDERER.indexOf("async function selectRole(");
+  assert.ok(start >= 0, "应有 selectRole");
+  const body = RENDERER.slice(start, RENDERER.indexOf("function hasTranscript(", start));
+  // 旧判据 `.chat-empty` 必须退役：后台队列/「正在工作」行会先移除空态，旧判据误判「已有历史」
+  // ⇒ 不建 loading ⇒ 历史未返回时聊天区空白（2026-10-20 真机）。
+  assert.ok(!body.includes('pane.querySelector(".chat-empty")'), "selectRole 不得再用 .chat-empty 判历史");
+  assert.ok(/var loading = hasTranscript\(roleId\)/.test(body), "loading 判据 = hasTranscript（transcript 行）");
+  assert.ok(body.includes('"正在载入会话历史…"') && body.includes("正在开启与角色"), "有队列/状态行与全新会话两种 loading 文案");
+  assert.ok(body.includes("renderEmptyNote(roleId)"), "开会话成功后刷新中性占位");
+  // 回放两处（空历史早退 + 收尾）都要刷新占位。
+  const replayStart = RENDERER.indexOf("function replayHistory(");
+  const replay = RENDERER.slice(replayStart, RENDERER.indexOf("function appendReplayRow(", replayStart));
+  assert.equal((replay.match(/renderEmptyNote\(roleId\)/g) || []).length, 2, "空历史早退与回放收尾均刷新占位");
+  // 占位是 pane 直属 DOM（不进行表）：不参与回放去重/虚拟窗口/未决卡锚定；忙碌/空闲文案区分；错误态不占位。
+  const noteStart = RENDERER.indexOf("function renderEmptyNote(");
+  const note = RENDERER.slice(noteStart, RENDERER.indexOf("// —————— 会话记录恢复", noteStart));
+  assert.ok(note.includes("empty-note") && note.includes("document.createElement"), "占位为 pane 直属 DOM");
+  assert.ok(!note.includes("registerRow(") && !note.includes("sysRow("), "占位不进行表（不参与回放去重/虚拟窗口）");
+  assert.ok(note.includes("后台正在工作，暂无可见消息") && note.includes("可直接输入消息"), "忙碌/空闲文案区分");
+  assert.ok(note.includes("history.error") && note.includes("sys-replay-divider"), "错误态不显示空白占位");
+  assert.ok(note.includes('"sys sys-note empty-note"'), "占位为中性 sys-note（非错误样式）");
+  // transcript 分类单点：system（队列/状态）行不计入。
+  const kindsStart = RENDERER.indexOf("var TRANSCRIPT_ROW_KINDS");
+  const kinds = RENDERER.slice(kindsStart, RENDERER.indexOf(";", kindsStart));
+  assert.ok(kinds.includes('"user"') && kinds.includes('"assistant"') && kinds.includes('"operator"'), "用户/助手/交互行算 transcript");
+  assert.ok(!kinds.includes('"system"'), "队列/状态（system）行不得算作 transcript");
+  // 占位清除接线：真实 transcript 行登记时移除，防占位过期。
+  assert.ok(RENDERER.includes('pane.dataset.emptyNote === "1"'), "transcript 行到达即清占位");
+  const appendUserStart = RENDERER.indexOf("function appendUser(");
+  const appendUserBody = RENDERER.slice(appendUserStart, RENDERER.indexOf("function appendAssistant(", appendUserStart));
+  assert.ok(appendUserBody.includes('{ kind: "user" }'), "实时用户气泡登记为 user transcript 行");
+});
+
 // ————————————————— B-3（2026-10-12）：左树角色状态徽标（纯函数映射） —————————————————
 
 test("B-3 + 状态准确性（2026-10-12 客户裁定）：状态→徽标纯函数（**图标 + 短标签**）；working 只由**真实信号**（busy/队列深度）派生", async () => {

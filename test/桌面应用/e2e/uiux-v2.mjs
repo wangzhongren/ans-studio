@@ -38,6 +38,8 @@ const G2_ONLY=process.env.ANS_G2_RECOVERY_UI_ONLY==='1';
 const TOOLFOLD_ONLY=process.env.ANS_TOOLFOLD_UI_ONLY==='1';
 // 2026-10-19 客户要求：左树取消角色分组折叠 + 系统通知独立成行——独立离线模式（真实 renderer/Electron）。
 const NOTICE_ONLY=process.env.ANS_NOTICE_UI_ONLY==='1';
+// 2026-10-20 真机空白修复：后台在跑角色（有队列/状态行、无 transcript）切过去不得空白。
+const BLANK_ONLY=process.env.ANS_BLANK_PANE_UI_ONLY==='1';
 const GOVREACCEPT_ONLY=process.env.ANS_GOVERNANCE_REACCEPT_UI_ONLY==='1';
 const JUDGE_ONLY=process.env.ANS_JUDGE_UI_ONLY==='1';
 const MIRROR_ONLY=process.env.ANS_MIRROR_UI_ONLY==='1';
@@ -48,6 +50,7 @@ let decisionJudgeEnabled=false, decisionSetFailure=false; // P5：第二个开�
 let judgeGovernanceModel='trio'; // JUDGE_ONLY：listing 的治理模型（trio 启用 decision；single 演示禁用）
 let configMissing={}, configPending=[], savePending=[];
 let mergeReplayAfterList=false, sendQueued=false; const mergeHistories=new Map();
+let blankDefer=false, blankResolve=null; // BLANK_ONLY：把 B 的 getSessionHistory 挂起，观察 loading 窗口
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 const js=code=>win.webContents.executeJavaScript(code.includes('await ')?'(async()=>{'+code+'})()':code);
 async function check(name, code){const value=await js(code);reports.push({name,value});if(!value)reports.push({name:name+' observed',value:await js(`(()=>({chat:document.getElementById('chat').textContent,assistant:[...document.querySelectorAll('#chat .msg-assistant')].map(x=>x.textContent),denied:[...document.querySelectorAll('#chat .sys-denied')].map(x=>x.textContent),model:window.__ansRenderer.rowModelDebug(window.__ansRenderer.state.selectedRoleId)}))()`)});assert.equal(value,true,name);}
@@ -86,7 +89,7 @@ const handlers={
  'window:minimize':()=>{windowCalls.push('minimize');return {ok:true};},'window:toggle-maximize':()=>{windowCalls.push('maximize');return {ok:true};},'window:close':()=>{windowCalls.push('close');return {ok:true};},
  'window:is-maximized':()=>false,'app:list-project':(_e,projectRoot)=>{if(listFailure)throw new Error('fixture listing failed');if(NOTICE_ONLY)return {...noticeListing,projectRoot:projectRoot?.projectRoot||ROOT};if(mergeReplayAfterList)for(const h of mergeHistories.values())win.webContents.send('session:history',h);return {...listing,projectRoot:projectRoot?.projectRoot||ROOT,...(GOVREACCEPT_ONLY?{governanceRecord:governanceRecordFixture}:{}),...(JUDGE_ONLY?{governanceModel:judgeGovernanceModel}:{}),...(FLOW_ONLY?{documentScope:{version:1,projectViewId:'epoch-one',projectRoot:projectRoot?.projectRoot||ROOT},roles:listing.roles.map(role=>({...role,documents:role.roleId==='A'?documentRefs:role.roleId==='B'?documentRefs.map(ref=>({...ref,roleId:'B',documentId:ref.documentId+'-b',relativePath:ref.relativePath.replace('/A/','/B/')})):[],...(flowLongRoleDocs?{changelog:{path:'changelog.md',text:'# 真实长变更\n\n'+('保留变更阅读位置。\n\n'.repeat(100))}}:{}),docs:flowLongRoleDocs?Array.from({length:100},(_,n)=>({kind:'file',path:'docs/record-'+n+'.md'})):[{kind:'directory',path:'docs/change'},{kind:'file',path:'docs/one.md'}]}))}:{})};},'app:pick-project':()=>pickResult,
  'session:open':(_e,input)=>{opens.push(input);return {ok:true,resumed:true,contextSource:'resumed',runtime:input.runtime,projectRoot:input.projectRoot,profileRevision:0,...(flowOpenResult||{})};},'session:live':()=>['A','B'],'session:stop':(_e,input)=>{stops.push(input);return {ok:true};},
- 'session:history-get':(_e,input)=>{histories.push(input);return mergeHistories.get(input.runtime+'|'+input.roleId)||{...input,rows:[],error:null,skipped:0};},
+ 'session:history-get':(_e,input)=>{histories.push(input);const h=mergeHistories.get(input.runtime+'|'+input.roleId)||{...input,rows:[],error:null,skipped:0};if(BLANK_ONLY&&input.roleId==='B'&&blankDefer){blankDefer=false;return new Promise(resolve=>{blankResolve=()=>resolve(h);});}return h;},
  'session:live-views':()=>[{projectRoot:ROOT,roleId:'A',runtime:'pi'},{projectRoot:ROOT,roleId:'B',runtime:'pi'},...opens.map(x=>({projectRoot:x.projectRoot,roleId:x.roleId,runtime:x.runtime}))],
  'session:abort':(_e,input)=>{aborts.push(input);win.webContents.send('session:role-state',{...snapshot(false),...input}); return {ok:true,supported:true};},
  'session:operator-response':(_e,input)=>{responses.push(input);return operatorMode==='expired'?({ok:false,expired:true,error:'离线受控请求已失效'}):({ok:true});},
@@ -1259,6 +1262,40 @@ async function noticeChecks(){
   await check('notice view no horizontal overflow at 960',`document.body.scrollWidth===innerWidth`);
 }
 
+async function blankPaneChecks(){
+  // 真机场景（2026-10-20）：B 正在后台跑（有队列/「正在工作」状态行，但 pane 里没有任何 transcript）。
+  // 旧实现用 `.chat-empty` 判历史 ⇒ 误判已有历史、不建 loading ⇒ getSessionHistory 未返回时整片空白。
+  const bugRoot=ROOT+'-blank-bug';
+  await js(`await window.__ansRenderer.loadProject(${JSON.stringify(bugRoot)});await window.__ansRenderer.selectRuntime('pi');await window.__ansRenderer.selectRole('A')`);
+  await push('session:role-state',{projectRoot:bugRoot,roleId:'B',runtime:'pi',busy:true,summaries:['后台排队任务'],queue:[{id:'blank-q',kind:'message',summary:'后台排队任务',full:'',at:'2026-10-20T00:00:00Z'}],running:{id:'blank-r',kind:'message',summary:'正在进行',full:'',at:'2026-10-20T00:00:00Z'},contextSource:'fresh'});
+  await check('fixture: background pane has queue/status rows but no transcript',`(()=>{const m=window.__ansRenderer.paneDebug('B');return !!m&&m.queue&&m.currentWork&&m.assistant===0&&!m.empty&&!m.inChat;})()`);
+  blankDefer=true;
+  await js(`window.__blankSelect=window.__ansRenderer.selectRole('B');true`);
+  await pause(40);
+  await check('selecting background role shows history loading instead of blank',`(()=>{const m=window.__ansRenderer.paneDebug('B');return m.inChat&&m.loading&&m.loadingText.includes('正在载入会话历史…');})()`);
+  blankResolve();
+  await js(`await window.__blankSelect`);
+  await pause(40);
+  await check('empty history removes loading and shows neutral busy placeholder',`(()=>{const m=window.__ansRenderer.paneDebug('B');return m.inChat&&!m.loading&&m.note&&m.noteText.includes('后台正在工作，暂无可见消息')&&m.text.includes('后台排队任务');})()`);
+  // 历史（有 transcript）到达：loading/占位移除，真实内容出现。
+  const rows=[{kind:'user',turnId:'blank-t',text:'后台输入'},{kind:'assistant',turnId:'blank-t',text:'后台历史答复',eventKind:'message'}];
+  mergeHistories.set('pi|B',{projectRoot:bugRoot,roleId:'B',runtime:'pi',rows,error:null,skipped:0});
+  await push('session:history',{projectRoot:bugRoot,roleId:'B',runtime:'pi',rows});
+  await check('history replay removes placeholder and renders content',`(()=>{const m=window.__ansRenderer.paneDebug('B');return !m.loading&&!m.note&&m.text.includes('后台历史答复');})()`);
+  await js(`await window.__ansRenderer.selectRole('A')`);
+  await js(`await window.__ansRenderer.selectRole('B')`);
+  await pause(40);
+  await check('role with transcript shows neither loading nor placeholder',`(()=>{const m=window.__ansRenderer.paneDebug('B');return m.inChat&&!m.loading&&!m.note&&m.text.includes('后台历史答复');})()`);
+  // 无历史、无错误、空闲：显示可输入的中性占位，而不是空白或错误。
+  mergeHistories.delete('pi|B');
+  const idleRoot=ROOT+'-blank-idle';
+  await js(`await window.__ansRenderer.loadProject(${JSON.stringify(idleRoot)});await window.__ansRenderer.selectRuntime('pi')`);
+  await push('session:role-state',{projectRoot:idleRoot,roleId:'B',runtime:'pi',busy:false,summaries:[],queue:[],contextSource:'fresh'});
+  await js(`await window.__ansRenderer.selectRole('B')`);
+  await pause(40);
+  await check('idle no-history role shows neutral placeholder instead of blank',`(()=>{const m=window.__ansRenderer.paneDebug('B');const p=document.querySelector('#chat .chat-pane[data-role-id="B"]');return m.inChat&&m.note&&m.noteText.includes('可直接输入消息')&&!p.querySelector('.sys-replay-divider')&&!p.querySelector('.sys-config');})()`);
+}
+
 app.whenReady().then(async()=>{
  const watchdog=setTimeout(()=>{fs.writeFileSync(path.join(OUT,'watchdog.txt'),'timeout');app.exit(1);},60000);
  try {
@@ -1278,6 +1315,7 @@ app.whenReady().then(async()=>{
   if(G2_ONLY){await g2RecoveryChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports},null,2));console.log('G2_RECOVERY_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(TOOLFOLD_ONLY){await toolFoldChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports},null,2));console.log('TOOLFOLD_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(NOTICE_ONLY){await noticeChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports,errors},null,2));console.log('SYSTEM_NOTICE_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
+  if(BLANK_ONLY){await blankPaneChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports,errors},null,2));console.log('BLANK_PANE_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(CONFIG_ONLY){await configChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports},null,2));console.log('CONFIG_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(process.env.ANS_MERGE_UI_ONLY==='1'){await mergeChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports,sends:sends.map(x=>({text:x.text,target:x.target,clientMessageId:x.metadata&&x.metadata.clientMessageId}))},null,2));console.log('MERGE_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(process.env.ANS_RUNTIME_UI_ONLY==='1'){await runtimeChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports,sends},null,2));console.log('RUNTIME_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}

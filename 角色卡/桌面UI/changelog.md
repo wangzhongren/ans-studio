@@ -353,3 +353,16 @@
 - **测试**：`node --test "test/桌面应用/runtime-ui.test.ts"` **12/12 / exit 0**（改前 12/11/1）；`node --test "test/桌面应用/**/*.test.ts"` **636 计 / 636 过 / 0 红 / exit 0**；`npm run typecheck` **exit 0**。此前测试角色快照的 11 红在本轮已由对应属主推进后全部消失，当前无剩余红。
 - Doc: [docs/fix/2026-10-19_fix_runtime-ui-persistence-whitelist.md](docs/fix/2026-10-19_fix_runtime-ui-persistence-whitelist.md)
 - 指纹：工作树未提交，以 `git diff` 为准（`test/桌面应用/runtime-ui.test.ts`、本文件 + Doc）。
+
+## 2026-10-20：切到后台在跑的角色聊天区空白——transcript 判据 + loading + 中性占位
+
+真机：切到正在后台跑的角色，聊天区空白数秒，只剩底部队列/「正在工作」。根因：`selectRole` 用 `!pane.querySelector(".chat-empty")` 判「已有历史」；后台 `session:role-state` 快照先建队列/状态行并移除 `.chat-empty`，于是误判已有历史、不建 loading，而 `getSessionHistory` 尚未返回 ⇒ 无 transcript 的 pane 全空。
+
+- **判据**：`selectRole` 改用既有 `hasTranscript(roleId)`；新增单点 `TRANSCRIPT_ROW_KINDS`（user/assistant/activities/injected/replay/handback/operator/tool-lifecycle），队列/状态（system）行不计入；`appendUser` 登记 `{kind:"user"}`。
+- **loading**：无 transcript ⇒ 建 `sys-loading`；pane 已有队列/状态行时文案「正在载入会话历史…」，全新 pane 保留「正在开启与角色 X 的会话…」；回放 full 重建或 `openSession` 返回时移除，选择版本变化早退也显式移除。
+- **占位**：新增 `renderEmptyNote`——会话已开启、仍无 transcript 且无错误/报告时显示中性 `sys sys-note empty-note`：忙碌「会话已开启；后台正在工作，暂无可见消息」/空闲「会话已开启，可直接输入消息」。占位是 pane 直属 DOM，**不进行表**（不参与回放去重/虚拟窗口/未决卡锚定）；真实 transcript 行登记即清除。刷新点为 `replayHistory` 空历史早退与收尾、`selectRole` 开会话成功尾部。
+- **未动**：回放去重/增量/全量策略、滚动贴底、未决卡锚定、队列/状态行语义；`styles.css` 仅加 `.sys-note` 中性样式；新增只读探针 `paneDebug(roleId)` 供 e2e 读游离 pane。
+- **测试**：`renderer.test.ts` +1 源码守卫 → **108/108**；`tool-rows` **53/53**；`runtime-ui` **12/12**；`node --test "test/桌面应用/**/*.test.ts"` **662/662 / exit 0**；`npm run typecheck` **exit 0**。Electron 离线夹具新增 `ANS_BLANK_PANE_UI_ONLY=1` → **BLANK_PANE_UI_PASS 6**（含后台 pane 前提、loading、空历史占位、历史到达清除、已有 transcript 不再 loading、空闲占位）；负向对照：临时还原旧 `.chat-empty` 判据 ⇒ 夹具在 loading 检查处 exit 1，恢复后全绿。既有夹具回归：TERMINAL_MERGE 12、MERGE 12、TERMINAL 22、DUP 32 全过。
+- **证据**：`docs/change/2026-10-20-blank-pane-evidence/report.json`（运行目录 `/tmp/ans-blank-pane-final2`，隔离 user-data）。
+- Doc: [docs/change/2026-10-20_change_blank-pane-loading-placeholder.md](docs/change/2026-10-20_change_blank-pane-loading-placeholder.md)
+- 指纹：工作树未提交，以 `git diff` 为准（`app/renderer/renderer.js`、`app/renderer/styles.css`、`test/桌面应用/renderer.test.ts`、`test/桌面应用/e2e/uiux-v2.mjs`、本文件 + Doc + 证据）。
