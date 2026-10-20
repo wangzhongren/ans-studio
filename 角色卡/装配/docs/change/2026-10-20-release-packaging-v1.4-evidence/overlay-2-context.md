@@ -8,4 +8,4 @@
   4. `test/桌面应用/interface.test.ts` —— 三平台共同失败「收尾推进」测试竞态修复（先等 verifier 会话/任务、再取当前数组；负面断言用有界稳定窗口；pending/blocked 同类假绿修正），产品零改。
   5. `test/桌面应用/runtime-resolution.test.ts` —— mac arm64 teardown `ENOTEMPTY`，临时目录清理有界重试，产品零改。
 - 属主记录：`角色卡/编排/docs/change/2026-10-20_change_v1.4.0-ci-windows-guard-atomic-write.md`、`角色卡/桌面应用/docs/change/2026-10-20_change_ci-test-races.md`（文档面，overlay excluded）。
-- **未声称 CI 已复跑通过**：本目录只含本地 typecheck、装配测试、overlay 复算与临时 clone 预演；三平台复跑与发布由 root 触发。
+- **后续已复跑通过**：最终 CI run `39393657089` 三平台 build + release 全绿（2026-10-20T08:41:32Z 发布）；本文件记录的是当时的本地验证与临时 clone 预演。

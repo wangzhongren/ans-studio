@@ -207,6 +207,7 @@ npm run typecheck
 
 ## 深入了解
 
+- [v1.4.0 发布验收与公开下载](角色卡/测试/docs/change/2026-10-20_change_v1.4-release-verification.md)：实际产物、来源与测试证据。
 - [v1.3.0 发布验收与公开下载](角色卡/测试/docs/change/2026-10-17_change_v1.3-release-verification.md)：实际产物、来源与测试证据。
 - [v1.2.0 发布验收与公开下载](角色卡/测试/docs/change/2026-10-16_change_v1.2-release-verification.md)：实际产物、来源与测试证据。
 - [v1.1.0 发布验收与公开下载](角色卡/测试/docs/change/2026-10-16_change_v1.1-release-verification.md)：实际产物、来源与测试证据。
