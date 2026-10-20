@@ -3013,7 +3013,22 @@ test("W6-C：排队与一项目一卡——排队事件只出聚合行、不物�
   assert.ok(aggregate.includes("paneFor(primary)"), "聚合行落在主入口 pane（primaryRoleId）");
   assert.ok(RENDERER.includes("if (queuedRequests[requestId]) {"), "同一请求被呈现后从排队聚合移除");
   assert.ok(RENDERER.includes("delete queuedRequests[queuedId];"), "失效/取消也从聚合移除");
+  assert.ok(aggregate.includes("if (n === 0)") && aggregate.includes("el.remove()"), "n=0 移除聚合行（不显示旧计数）");
   assert.ok(STYLES.includes(".op-queue-aggregate"), "styles.css 应有 .op-queue-aggregate");
+  // 2026-10-20 真机「还有 7 个决定等待前一个决定」残留：queuedRequests 是运行期事实，不得进入
+  // runtime view 快照；视图恢复/切引擎后由主进程 replayPending（onOperatorQueued）重建。
+  const stripComments = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+  const capture = stripComments(RENDERER.slice(RENDERER.indexOf("function captureRuntimeView("), RENDERER.indexOf("function installRuntimeView(")));
+  assert.ok(!capture.includes("queuedRequests"), "runtime view 快照不得写入 queuedRequests（旧计数会复活）");
+  const install = stripComments(RENDERER.slice(RENDERER.indexOf("function installRuntimeView("), RENDERER.indexOf("// 异引擎信封仅进入自己的游离视图")));
+  assert.ok(!/queuedRequests\s*=\s*v\./.test(install), "恢复视图不得从快照复活旧 queuedRequests");
+  const selectRuntime = RENDERER.slice(RENDERER.indexOf("async function selectRuntime("), RENDERER.indexOf("function captureChatReading("));
+  assert.ok(selectRuntime.includes("queuedRequests = Object.create(null)"), "切引擎清空运行期排队事实（由主进程重推重建）");
+  assert.ok(selectRuntime.includes("renderQueueAggregate()"), "切引擎恢复完成按当前排队事实清掉残留聚合行");
+  const applyListing = RENDERER.slice(RENDERER.indexOf("function applyListing("), RENDERER.indexOf("async function refreshLiveRoles("));
+  assert.ok(applyListing.includes("renderQueueAggregate()"), "列举/恢复完成按当前排队事实清掉残留聚合行");
+  const resetPanes = RENDERER.slice(RENDERER.indexOf("function resetPanes("), RENDERER.indexOf("function scrollBottomForced("));
+  assert.ok(resetPanes.includes("queuedRequests = Object.create(null)"), "换项目清空排队事实（旧项目队列不跨项目）");
 });
 
 test("W6-C：冻结/排队状态在两侧一致——refreshEntryAwaiting 按 surfaces 刷新；排队启停遍历全部卡", () => {

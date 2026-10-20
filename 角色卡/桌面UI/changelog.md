@@ -366,3 +366,15 @@
 - **证据**：`docs/change/2026-10-20-blank-pane-evidence/report.json`（运行目录 `/tmp/ans-blank-pane-final2`，隔离 user-data）。
 - Doc: [docs/change/2026-10-20_change_blank-pane-loading-placeholder.md](docs/change/2026-10-20_change_blank-pane-loading-placeholder.md)
 - 指纹：工作树未提交，以 `git diff` 为准（`app/renderer/renderer.js`、`app/renderer/styles.css`、`test/桌面应用/renderer.test.ts`、`test/桌面应用/e2e/uiux-v2.mjs`、本文件 + Doc + 证据）。
+
+## 2026-10-20：排队聚合残留「还有 7 个决定」——queuedRequests 移出 runtime view 快照
+
+真机：主进程队列已 0，界面仍显示「还有 7 个决定等待前一个决定」。根因：渲染侧 `queuedRequests` 被写进 `captureRuntimeView()`/`installRuntimeView()`（约 1240/1255），切引擎/视图恢复时把已不存在的旧排队计数复活；`replayPending` 只增不减，不会清旧 id。
+
+- **快照**：`queuedRequests` 不再进入 runtime view 快照，恢复时也不从 `v.queuedRequests` 赋值（后台投递的 install/restore 不打断当前运行期事实）；`opRequests`/`replayState` 等照旧保留。
+- **清理**：`selectRuntime` 安装目标视图后清空 `queuedRequests` 并调 `renderQueueAggregate()`（n=0 移除残留聚合行）；`applyListing` 恢复/列举完成同样按当前排队事实清理；`resetPanes` 既有清空保留。计数只由主进程 `session:operator-queued`（重载后 `replayPending`）重建。
+- **测试**：`renderer.test.ts` W6-C 扩展源码守卫（快照不得含 queuedRequests / 恢复不得赋值 / 切引擎与列举完成清理）→ **108/108**；Electron 离线夹具新增 `ANS_QUEUE_VIEW_UI_ONLY=1` → **QUEUE_VIEW_UI_PASS 4**（2 条旧排队 → 切引擎往返后聚合与旧 id 均消失 → 主进程重推按新 count 1 显示 → expired 清空移除）；负向对照：临时去掉清理 ⇒ 夹具在恢复检查处 exit 1，恢复后全绿。`node --test "test/桌面应用/**/*.test.ts"` **679/679 / exit 0**；`npm run typecheck` **exit 0**；空白兜底夹具复核 **BLANK_PANE_UI_PASS 6** 无回归。
+- **已知环境红（非本批）**：`ANS_MIRROR_UI_ONLY=1` 首个断言因其他角色在途的治理角色显示名变更（联络官 Liaison → 主理 Lead 等）而失败，与本批无关，未改其断言。
+- **证据**：`docs/change/2026-10-20-queued-view-evidence/report.json`（运行目录 `/tmp/ans-queue-view-final`，隔离 user-data）。
+- Doc: [docs/change/2026-10-20_change_queued-view-restore.md](docs/change/2026-10-20_change_queued-view-restore.md)
+- 指纹：工作树未提交，以 `git diff` 为准（`app/renderer/renderer.js`、`test/桌面应用/renderer.test.ts`、`test/桌面应用/e2e/uiux-v2.mjs`、本文件 + Doc + 证据）。

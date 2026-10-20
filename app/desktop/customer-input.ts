@@ -345,6 +345,16 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     };
     /** `run-role` 计算的应用事实（`judgeContext`）与卡片元数据；原样透传、不重算。 */
     metadata?: CustomerInputMetadata;
+    /**
+     * 2026-10-20 真机（UI 残留「还有 7 个决定等待前一个决定」）：该请求**曾进入等待队列并已通知界面**
+     * （`onQueued` 成功发出）。若它之后被判断 agent 直接代批/自动退回而**从未 presenter 呈现**，
+     * 结算时必须经 `onExpired` 通知界面删除排队行（`session:operator-expired` 渲染侧已有删除处理）。
+     */
+    queuedNotified?: boolean;
+    /** 是否**已经 presenter 呈现**过（呈现过 ⇒ 界面按呈现态处理，结算不再补发「排队移除」）。 */
+    presented?: boolean;
+    /** 已发过 `onExpired`（rejectAllPending / cancel / 结算补发共用；防重复通知）。 */
+    expiredNotified?: boolean;
   }
   const pending = new Map<string, ChannelEntry>();
   /** 判断中的卡（不呈现、不计入 pending/queued/pendingRoles；中止时一并结算）。 */
@@ -359,6 +369,8 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     typeof ctx?.projectRoot === "string" && ctx.projectRoot !== "" ? ctx.projectRoot : "";
 
   const notifyExpired = (entry: ChannelEntry, reason: string): void => {
+    if (entry.expiredNotified === true) return; // 2026-10-20：已通知过（rejectAllPending/cancel/结算补发）不重复
+    entry.expiredNotified = true;
     try {
       opts.onExpired?.({ id: entry.payload.id, roleId: entry.payload.roleId, runtime: entry.payload.runtime, projectRoot: entry.payload.projectRoot, reason });
     } catch (error) {
@@ -421,6 +433,11 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     else judging.delete(entry.payload.id);
     if (activeByProject.get(entry.projectKey) === entry.payload.id) activeByProject.delete(entry.projectKey);
     entry.state = "done";
+    // 2026-10-20 真机：排队请求被判断 agent 直接代批/自动退回（从未 presenter 呈现）⇒ 界面必须删掉
+    // 「等待前一个决定」排队行（onExpired 复用 session:operator-expired 的既有删除处理）。
+    if (entry.queuedNotified === true && entry.presented !== true) {
+      notifyExpired(entry, "排队决定已自动处理（未呈现客户卡）");
+    }
     entry.cleanup();
     entry.resolve(outcome);
     notifyNextStep(entry, outcome);
@@ -439,6 +456,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     entry.state = "active";
     try {
       opts.presenter!(entry.payload);
+      entry.presented = true; // 2026-10-20：真正呈现成功后才算「呈现过」（推达失败按未呈现处理）
       diagnostic.record("interaction.presented", { requestId: entry.payload.id, pendingCount: pending.size, queuedCount: queuedCount() });
     } catch (err) {
       diagnostic.error("interaction.present.failed", err, { requestId: entry.payload.id });
@@ -919,6 +937,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
         const queue = waiting.get(projectKey) ?? [];
         queue.push(entry);
         waiting.set(projectKey, queue);
+        entry.queuedNotified = true; // 2026-10-20：界面将出现排队行；未呈现即结算时必须补发 onExpired
         for (const signal of signals) signal.addEventListener("abort", cancel, { once: true });
         if (signals.some((signal) => signal.aborted)) {
           cancel();
@@ -1023,6 +1042,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     let count = 0;
     for (const entry of pending.values()) {
       try {
+        entry.presented = true; // 重推后界面仍有呈现态卡片
         opts.presenter?.(entry.payload);
         count += 1;
       } catch (error) {
@@ -1033,6 +1053,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     for (const [projectKey, queue] of waiting) {
       const waitingFor = activeByProject.get(projectKey) ?? "";
       for (const entry of queue) {
+        entry.queuedNotified = true; // 重推即界面有排队行（未呈现结算时须补发 onExpired）
         try {
           opts.onQueued?.(entry.payload, waitingFor);
           count += 1;

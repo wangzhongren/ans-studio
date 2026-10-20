@@ -818,6 +818,8 @@ function makeJudgeChannel(opts: {
   timeoutMs?: number;
   env?: Record<string, string | undefined>;
   queued?: (payload: OperatorRequestPayload, waitingFor: string) => void;
+  /** 2026-10-20：排队项未呈现即结算 ⇒ onExpired（渲染侧删排队行）的收集器。 */
+  expired?: (payload: { id: string; roleId: string; reason: string }) => void;
 }) {
   const pushed: OperatorRequestPayload[] = [];
   const results: OperatorJudgeResultPayload[] = [];
@@ -836,6 +838,7 @@ function makeJudgeChannel(opts: {
     emitJudgeResult: opts.emit ?? ((payload) => results.push(payload)),
     onNextStep: (payload, context) => next.push({ payload, context }),
     ...(opts.queued !== undefined ? { onQueued: opts.queued } : {}),
+    ...(opts.expired !== undefined ? { onExpired: opts.expired } : {}),
   });
   return { channel, pushed, results, next };
 }
@@ -2178,4 +2181,90 @@ test("judge deny（decision 组，防御）：不再回落客户卡，按 manual
   assert.equal(pushed.length, 0, "不呈现客户卡");
   assert.equal(results.length, 0, "manual 不发结果行");
   assert.equal(next.length, 0, "declined 不产生下一步");
+});
+
+// —————— 2026-10-20 真机：UI「还有 7 个决定等待前一个决定」但主进程 queuedCount=0 ——————
+//
+// 根因：排队请求被判断 agent 直接代批/自动退回（从未 presenter 呈现）时，customer-input 没有通知渲染侧
+// 减项；`queuedRequests` 只在 presented/onExpired 时删除。修复：曾排队（onQueued 已发）且从未呈现的
+// entry 在结算时补发 onExpired（复用 session:operator-expired 的既有删除处理），且全程不呈现客户卡。
+
+test("2026-10-20 排队请求被判断代批（从未呈现）⇒ 每个排队 id 恰一条 onExpired、queuedCount=0、无客户卡、结算语义不变", async () => {
+  const queuedIds: string[] = [];
+  const expired: { id: string; roleId: string; reason: string }[] = [];
+  const judgeCalls: string[] = [];
+  const { channel, pushed, results } = makeJudgeChannel({
+    enabled: (group) => group === "decision",
+    judge: async (request) => {
+      judgeCalls.push(request.cardKind ?? "");
+      return {
+        verdict: "approve",
+        group: request.group,
+        cardKind: request.cardKind,
+        reasonCode: "sufficient",
+        engine: request.runtime,
+        value: { selected: ["accept"] },
+        durationMs: 1,
+      };
+    },
+    queued: (payload) => queuedIds.push(payload.id),
+    expired: (payload) => expired.push(payload),
+  });
+  const meta = { cardKind: "proposal" as const, flowId: "flow-a", judgeContext: judgeContextOf("flow-a") };
+  const waitForLocal = async (predicate: () => boolean, timeoutMs = 3000): Promise<void> => {
+    const started = Date.now();
+    while (!predicate()) {
+      if (Date.now() - started > timeoutMs) throw new Error("等待测试条件超时");
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+  };
+  // 第一张直接进入判断（占住一项目一卡）；第二、三张排队。
+  const p1 = channel.customerInput(proposalRequest("flow-a"), JUDGE_CTX, meta);
+  const p2 = channel.customerInput(proposalRequest("flow-a"), JUDGE_CTX, meta);
+  const p3 = channel.customerInput(proposalRequest("flow-a"), JUDGE_CTX, meta);
+  assert.equal(channel.queuedCount(), 2, "两张进入排队");
+  assert.equal(queuedIds.length, 2, "onQueued 只在入队时调用（两张）");
+  assert.equal(pushed.length, 0, "判断中/排队中都不呈现客户卡");
+  await waitForLocal(() => expired.length >= 2 && channel.queuedCount() === 0);
+  const outcomes = [await p1, await p2, await p3];
+  for (const outcome of outcomes) assert.equal(outcome!.outcome, "answered", "判断代批成功（结算语义不变）");
+  assert.equal(pushed.length, 0, "全程零客户卡（判断代批）");
+  assert.equal(judgeCalls.length, 3, "每张卡各判断一次");
+  assert.equal(expired.length, 2, "恰为两个排队 id 补发 onExpired");
+  assert.deepEqual(
+    [...expired.map((item) => item.id)].sort(),
+    [...queuedIds].sort(),
+    "每个排队 id 都收到 onExpired（渲染侧据此删除排队行）",
+  );
+  assert.ok(expired.every((item) => item.reason === "排队决定已自动处理（未呈现客户卡）"), "原因如实");
+  assert.equal(new Set(expired.map((item) => item.id)).size, 2, "不双通知");
+  assert.equal(channel.queuedCount(), 0, "drain 后 queuedCount 归零");
+  assert.equal(channel.pendingCount(), 0, "无挂起");
+  assert.equal(results.length, 3, "approve 结果行仍按既有路径（每张一条）");
+});
+
+test("2026-10-20 已呈现路径不补发排队 onExpired：第一张呈现、第二张排队后呈现并手答 ⇒ 零 onExpired", async () => {
+  const queuedIds: string[] = [];
+  const expired: { id: string; roleId: string; reason: string }[] = [];
+  const { channel, pushed } = makeJudgeChannel({
+    enabled: () => false, // 开关关：正常呈现客户卡
+    queued: (payload) => queuedIds.push(payload.id),
+    expired: (payload) => expired.push(payload),
+  });
+  const meta = { cardKind: "proposal" as const, flowId: "flow-a" };
+  const p1 = channel.customerInput(proposalRequest("flow-a"), JUDGE_CTX, meta);
+  assert.equal(pushed.length, 1, "第一张正常呈现");
+  const p2 = channel.customerInput(proposalRequest("flow-a"), JUDGE_CTX, meta);
+  assert.equal(channel.queuedCount(), 1, "第二张排队");
+  assert.equal(queuedIds.length, 1, "第二张经 onQueued 通知");
+  // 第一张手答 ⇒ 第二张被 drain 呈现（不是自动结算）。
+  assert.equal(channel.respond({ id: pushed[0]!.id, decision: { kind: "choice", selected: ["revise"] } }).ok, true);
+  await p1;
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  assert.equal(pushed.length, 2, "第二张随后被呈现");
+  assert.equal(channel.queuedCount(), 0, "排空");
+  assert.equal(channel.respond({ id: pushed[1]!.id, decision: { kind: "choice", selected: ["accept"] } }).ok, true);
+  const outcome = await p2;
+  assert.equal(outcome!.outcome, "answered");
+  assert.equal(expired.length, 0, "呈现过的卡不补发「排队移除」通知（不双通知）");
 });

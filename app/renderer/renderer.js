@@ -1234,10 +1234,13 @@
   }
 
   function captureRuntimeView() {
+    // `queuedRequests` **不进入**视图快照（2026-10-20 真机「还有 7 个决定等待前一个决定」残留）：
+    // 它是运行期事实，只由主进程 `session:operator-queued`（重载后 `replayPending`）重建；
+    // 写进快照会在切引擎/恢复时把已不存在的旧排队计数复活。`opRequests`/`replayState` 等仍按原样保留。
     return { liveRoles: state.liveRoles, roleMeta: state.roleMeta, roleBusy: state.roleBusy,
       queueByRole: state.queueByRole, queueItemsByRole: state.queueItemsByRole, runningByRole: state.runningByRole,
       sessionOpenRoleId: state.sessionOpenRoleId, shellConfirm: state.shellConfirm, recoveryConfirm: state.recoveryConfirm, chatPanes: chatPanes, paneRowLists: paneRowLists, paneAnchors: paneAnchors,
-      opRequests: opRequests, queuedRequests: queuedRequests, replayState: replayState, activityOpen: activityOpen, groupSeqByRole: groupSeqByRole,
+      opRequests: opRequests, replayState: replayState, activityOpen: activityOpen, groupSeqByRole: groupSeqByRole,
       groupIdentitiesByRole: groupIdentitiesByRole, drawerReading: drawerReading, composerDrafts: composerDrafts,
       withdrawPending: withdrawPending, withdrawFeedback: withdrawFeedback, lastManualSend: lastManualSend,
       liveReplayCounts: liveReplayCounts, manualMessages: manualMessages, reportCards: reportCards, deliveryCards: deliveryCards, persistenceCache: persistenceCache };
@@ -1252,7 +1255,7 @@
     state.recoveryConfirm = v.recoveryConfirm || null;
     chatPanes = v.chatPanes || Object.create(null); paneRowLists = v.paneRowLists || Object.create(null);
     paneAnchors = v.paneAnchors || Object.create(null); opRequests = v.opRequests || Object.create(null);
-    queuedRequests = v.queuedRequests || Object.create(null);
+    // 视图快照不含 `queuedRequests`：恢复时不赋值（也不清空——后台投递的 install/restore 不打断当前运行期事实）。
     replayState = v.replayState || Object.create(null); activityOpen = v.activityOpen || Object.create(null);
     groupSeqByRole = v.groupSeqByRole || Object.create(null); groupIdentitiesByRole = v.groupIdentitiesByRole || Object.create(null);
     drawerReading = v.drawerReading || Object.create(null); composerDrafts = v.composerDrafts || Object.create(null);
@@ -1301,6 +1304,9 @@
     $("pi-panel").querySelector(".pi-advanced").hidden = true;
     setPiStatus("正在读取 " + Rt.runtimeLabel(runtime) + " 配置…", "");
     installRuntimeView(runtimeViews[Rt.viewKey(state.projectRoot, runtime)]);
+    // 2026-10-20 真机：排队聚合是运行期事实，**不跨引擎视图继承**（快照已不含 queuedRequests）。
+    // 目标视图的旧聚合行按「当前无排队」清掉；若主进程仍有排队，会经 replayPending 重推重建。
+    queuedRequests = Object.create(null);
     renderedDrawerRole = null; state.sessionOpenRoleId = null;
     engineSelector.sync(runtime, !state.projectRoot);
     $("shell-confirm").hidden = true;
@@ -1309,6 +1315,7 @@
     if (state.recoveryConfirm) renderRecoveryConfirm(state.recoveryConfirm);
     restoreComposerDraft(state.selectedRoleId);
     showPane(state.selectedRoleId); renderRoleTree(); renderRight(); renderTabs(); updateControls(); setChatHeader(selectedRole());
+    renderQueueAggregate(); // 目标视图不继承旧排队计数：n=0 ⇒ 移除 pane 里可能残留的聚合行（恢复完成口径）
     void loadPiConfig();
     if (state.selectedRoleId) await selectRole(state.selectedRoleId);
   }
@@ -4813,6 +4820,8 @@
     updateControls();
     renderGovernanceUi(); // I4：状态行随列举结果刷新（S1/invalid/隐藏）
     refreshEmptyStates(); // I4：空态文案同步（S1 引导 / 建立成功后回到常态）
+    // 恢复/列举完成：排队计数只来自主进程重推（replayPending/onOperatorQueued）；当前无排队 ⇒ 移除残留聚合行。
+    renderQueueAggregate();
   }
 
   /** 取主进程的保活会话列表（B-2）→ 「有活动会话」与状态派生的数据源。失败如实清空（不假装有）。 */
@@ -6784,6 +6793,12 @@
       // rowGap：行占位口径中的 pane 行距缓存（2026-10-14 锚点漂移修复）——e2e 断言
       // 「未挂载期建行表的角色挂载后读到与已挂载角色相同的行距」用（防脱离文档读样式表落 0 缓存）。
       return { count: rl.rows.length, lastIndex: rl.rows.length - 1, operators: ops, rowGap: rl.rowGap };
+    },
+    // 2026-10-20 真机：排队聚合残留探针（只读）——e2e 断言「视图恢复不复活旧 queuedRequests」用。
+    queuedDebug: function () {
+      var ids = [];
+      for (var id in queuedRequests) ids.push(id);
+      return ids;
     },
     // 空白兜底（2026-10-20）探针：读某角色 pane 的可见构成（**只读**；游离 pane 也可读——
     // 后台角色的 pane 未挂到 #chat 时 DOM query 不可达，e2e 用本探针核对队列/状态/占位/loading）。
