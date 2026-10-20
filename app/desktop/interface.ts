@@ -3,7 +3,7 @@ import { existsSync, realpathSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { parse as parseYaml } from "yaml";
 import path from "node:path";
-import { readFile, readdir } from "node:fs/promises";
+import { readFile, readdir, stat } from "node:fs/promises";
 import { createProjectDocumentReader } from "../../src/pipeline/project-document/read-project-document.ts";
 import type { ProjectDocumentRef, ProjectDocumentScope, DocumentReadErrorCode, ReadProjectDocumentResult } from "../../src/model/project-document.ts";
 // app/desktop/interface.ts
@@ -108,6 +108,7 @@ import { judgeResultSummary, type DesktopCustomerInputFn, type OperatorJudgeResu
 // 本层负责打开目标治理角色会话、投递**唯一一条**任务，并把成功/失败经既有 delivery-note 系统行如实落流。
 import {
   acceptanceDispatchRecorded,
+  acceptanceLastDispatchAtMs,
   buildAcceptanceTaskMessage,
   buildAppointmentWriteReminderMessage,
   buildGovernanceAdvanceMessage,
@@ -130,6 +131,7 @@ import {
 // legacy 回退）。**只经 Pipeline 公共出口**消费（`src/pipeline/orchestration/flow-state.ts` 薄再导出），
 // 不直接 import 编排私有 `src/common/编排/`；单一实现与 schema 由编排拥有。
 import {
+  completeAcceptanceStep as realCompleteAcceptanceStep,
   evaluateFlowCompletion,
   flowStatePath,
   parseFlowStateYaml,
@@ -506,6 +508,17 @@ export interface DesktopDeps {
    */
   resolveRuntimeFn?: (request: RuntimeResolutionRequest) => Promise<RuntimeResolution>;
   /**
+   * **验收通过后的流程收口**（2026-10-20 真机：验收卡代批 accept 后 flow 的 verification 仍 pending，
+   * 且又多派了一次 verifier）：缺省经 Pipeline 公共出口 `flow-state.ts::completeAcceptanceStep` 调用；
+   * 测试可注入。语义：accepted ⇒ 把保留验收步骤标 done + `evidence:{kind:"acceptance",ref:"acceptance"}`
+   * （幂等、原子写、未 accepted 拒绝）。桌面**不写客户决定账本**、不伪造批准。
+   */
+  completeAcceptanceStepFn?: (input: { projectRoot: string; flowId: string }) => Promise<{
+    ok?: boolean;
+    error?: string;
+    message?: string;
+  }>;
+  /**
    * **恢复确认卡通道（G-2/W5，2026-10-16 客户批准）**：主进程用 `recovery-channel.ts` 构造后注入
    * （`present` 推 `recovery:confirm-request`、回包 `recovery:confirm-response` 走 `respond`）。
    * **缺省 ⇒ 恢复提议一律「未接线、未获执行」如实回执（fail-closed）**。
@@ -861,8 +874,12 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   const acceptanceRuntimeHints = new Map<string, RuntimeKind>();
   /** 每 flow 的已知回交证据路径（通用 settle 触发没有回交载荷，用先到的回交事件补齐任务文本）。 */
   const acceptanceEvidenceByFlow = new Map<string, string[]>();
-  /** 每 flow 只派一次（运行期）；持久化去重另见账本 `acceptanceDispatchRecorded`。 */
-  const acceptanceDispatchedFlows = new Set<string>();
+  /**
+   * 每 flow 每个 **flow YAML 版本（mtime）** 只派一次（运行期）；持久化去重见账本 `acceptanceLastDispatchAtMs`
+   * 与 flow mtime 的比较（2026-10-20 真机：flow 更新后旧永久去重会挡住重派）。值 `-1`＝无 YAML/不可读
+   * （legacy 语义：每进程一次）。
+   */
+  const acceptanceDispatchedFlows = new Map<string, number>();
   /**
    * 每 flow 最近一次**已告知**的收尾门阻塞原因（`flowCompletionIssue` 原文）。同一 flow + 同一原因只发
    * 一次（见 `governanceAcceptanceBlockedNote`），避免每个 settle 刷屏；原因变化才再发。门通过时清除 ⇒
@@ -1062,6 +1079,66 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     }
   }
 
+  /**
+   * **verifier settle ⇒ Lead 可见性**（2026-10-20 真机：验收结果没回 Lead——verifier 会话空闲、旧报告停在
+   * 盘上，客户看不到复核已结束）。只要该 flow 有**最近一次验收派发**（账本 verifier dispatch），就向 Lead
+   * （主入口）落一条去重系统行：报告路径 + 「验收卡/客户决定由应用继续」。**不伪造结论**、不把报告当客户
+   * 批准。去重：同 flow + 报告文件 mtime（版本）只提示一次；报告未落盘也提示一次（版本记 missing）。
+   */
+  const verifierSettleNotified = new Map<string, string>();
+  const noteVerifierSettle = async (projectRoot: string, runtime: RuntimeKind): Promise<void> => {
+    const diagnostic = createDiagnosticLogger({ component: "desktop.governance-acceptance", projectRoot, roleId: "verifier" });
+    try {
+      const listing = listingCache.get(projectRoot);
+      if (listing?.governanceModel !== "trio") return;
+      const primaryRoleId = listing.primaryRoleId;
+      if (typeof primaryRoleId !== "string" || primaryRoleId === "") return;
+      const ledger = await readGovernanceLedger(projectRoot);
+      if (ledger.errors.length > 0) return;
+      const flowIds = [
+        ...new Set(
+          ledger.entries
+            .map((entry) => entry.flowId)
+            .filter((id): id is string => typeof id === "string" && id !== ""),
+        ),
+      ];
+      for (const flowId of flowIds) {
+        if (acceptanceLastDispatchAtMs(flowId, ledger) === undefined) continue; // 该 flow 没有验收派发记录
+        const reportRel = `docs/verification/${flowId}-v1.md`;
+        const governanceRel = `docs/governance/verifier/${flowId}.md`;
+        let reportVersion = "missing";
+        try {
+          reportVersion = String((await stat(path.join(projectRoot, reportRel))).mtimeMs);
+        } catch {
+          // 报告尚未落盘：仍提示一次（版本记 missing），不猜结论。
+        }
+        const dedupeKey = `${projectRoot}\u0000${flowId}`;
+        if (verifierSettleNotified.get(dedupeKey) === reportVersion) continue; // 同 flow+报告版本不刷屏
+        try {
+          emitSessionEvent({
+            roleId: primaryRoleId,
+            projectRoot,
+            runtime,
+            event: {
+              kind: "message",
+              summary:
+                `Proof / 验收复核已结束（flowId=${flowId}）；报告见 ${reportRel} 与 ${governanceRel}；` +
+                `验收卡/客户决定由应用继续（本行不构成验收结论或客户批准）。`,
+              detail: { source: "delivery-note" },
+            },
+          });
+        } catch (error) {
+          diagnostic.error("acceptance.verifier-settle.note.failed", error, { flowId });
+          continue; // 未投出：不记去重，下次 settle 可再试
+        }
+        verifierSettleNotified.set(dedupeKey, reportVersion);
+        diagnostic.record("acceptance.verifier-settle.noted", { flowId });
+      }
+    } catch (error) {
+      diagnostic.error("acceptance.verifier-settle.failed", error);
+    }
+  };
+
   // 会话事件外推：先原样转发（主进程推 `session:event`；B-2 起为**带 `roleId` 信封**的 `SessionEventEnvelope`）；
   // 再在「**主入口角色**一轮结束（`settled`）」时触发「项目可能已变」信号（→ 主进程推 `project:changed` →
   // 渲染侧重取枚举，左树随 su 建角色而长出，§10.3）。判据取**信封里的角色**（多会话并存后不能再看
@@ -1084,6 +1161,10 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         // 2026-10-19 真机第二缺陷：治理角色（尤其 Crew 写完角色卡）settle 后先强制刷新枚举，再由
         // 写卡后推进检查兜底派 Convener（有界、去重；与既有 appointment 链路共用同一任务文本）。
         schedulePostWriteAdvanceCheck(envelope.projectRoot, envelope.runtime);
+      }
+      // 2026-10-20 真机：Proof / 验收 settle 后把「复核已结束 + 报告路径」如实给 Lead（去重、不伪造结论）。
+      if (settledRole?.builtIn === true && settledRole.governanceFunction === "verification") {
+        void noteVerifierSettle(envelope.projectRoot, envelope.runtime);
       }
       if (isPrimaryRole(envelope.projectRoot, envelope.roleId)) {
         deps.emitProjectChanged?.();
@@ -1140,6 +1221,92 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     watchdogService = undefined;
   }
 
+  // —————— 2026-10-20 真机：验收通过（accepted）⇒ 调编排 `completeAcceptanceStep` 收口，绝不再派 verifier ——————
+  //
+  // 现场：verifier 第二轮复核完成、验收卡被判断 agent 代批 accept（账本 04:56:18
+  // `customer.decision{decisionKind:"acceptance",customerDecision:"accepted",flowId:"bookmark-manager"}`），
+  // flow YAML 的 `verification` 仍 pending；`evaluateFlowCompletion` 已判「已有验收决定，流程已收口」，
+  // 但 04:56:55 又多派了一次 verifier。收口动作由编排落地（`completeAcceptanceStep`：标 done +
+  // `evidence:{kind:"acceptance",ref:"acceptance"}`，幂等、原子写、未 accepted 拒绝）；桌面只消费。
+  /** 验收收口提示去重：`projectRoot\0flowId` → 验收决定身份（at）/失败原因。 */
+  const acceptanceClosedNotified = new Map<string, string>();
+  const acceptanceCloseFailureNotified = new Map<string, string>();
+
+  /** 账本里该 flow **最近一条验收通过**决定（customer.decision{decisionKind:"acceptance", accepted}）。 */
+  const latestAcceptedAcceptanceDecision = (
+    ledger: { entries: ReadonlyArray<{ kind?: string; flowId?: string; decisionKind?: string; customerDecision?: string; at?: string }> },
+    flowId: string,
+  ): { at?: string } | undefined => {
+    let latest: { at?: string } | undefined;
+    for (const entry of ledger.entries) {
+      if (entry.kind !== "customer.decision" || entry.flowId !== flowId || entry.decisionKind !== "acceptance") continue;
+      if (entry.customerDecision !== "accepted") continue;
+      latest = entry; // 账本按 append 顺序：取最后一条（先拒绝后接受也能正确收口）
+    }
+    return latest;
+  };
+
+  /**
+   * 调编排的流程收口（经 Pipeline 公共出口 `flow-state.ts::completeAcceptanceStep`；测试可注入）。
+   * 编排契约：幂等（已 done ⇒ ok:true,idempotent）、原子写、未 accepted ⇒ `acceptance-not-accepted`、
+   * 账本坏行 ⇒ `ledger-unavailable`。任何失败都返回 `{ok:false,error}`，由调用方如实提示、不循环。
+   */
+  const callCompleteAcceptanceStep = async (
+    projectRoot: string,
+    flowId: string,
+  ): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      const result: { ok?: boolean; error?: string; message?: string } =
+        deps.completeAcceptanceStepFn !== undefined
+          ? await deps.completeAcceptanceStepFn({ projectRoot, flowId })
+          : await realCompleteAcceptanceStep({ projectRoot, flowId });
+      return result.ok === true ? { ok: true } : { ok: false, error: result.error ?? result.message ?? "未知原因" };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  };
+
+  /** 验收已通过 ⇒ 收口（幂等）+ Lead 去重系统行；失败只诊断/一条系统行，不派 verifier、不循环。 */
+  const closeAcceptedFlow = async (
+    projectRoot: string,
+    flowId: string,
+    decision: { at?: string },
+    note: (summary: string) => void,
+    diagnostic: ReturnType<typeof createDiagnosticLogger>,
+  ): Promise<void> => {
+    const key = acceptanceFlowKey(projectRoot, flowId);
+    const identity = typeof decision.at === "string" && decision.at !== "" ? decision.at : "accepted";
+    // 验收步骤已 done ⇒ 幂等：不重复调用收口，只按决定去重提示。
+    let alreadyDone = false;
+    try {
+      const text = await readFile(path.join(projectRoot, governanceFlowStatePath(flowId)), "utf8");
+      const parsed = parseFlowStateYaml(text, flowId);
+      if (parsed.ok) alreadyDone = parsed.flow.steps.some((step) => step.kind === "acceptance" && step.status === "done");
+    } catch {
+      // YAML 缺失/不可读：交给 completeAcceptanceStep 判断（失败则如实提示）；不派 verifier。
+    }
+    if (!alreadyDone) {
+      const result = await callCompleteAcceptanceStep(projectRoot, flowId);
+      if (!result.ok) {
+        const message = result.error ?? "未知原因";
+        diagnostic.record("acceptance.close.failed", { flowId });
+        if (acceptanceCloseFailureNotified.get(key) !== message) {
+          acceptanceCloseFailureNotified.set(key, message);
+          note(`验收已通过但流程收口失败（流程 ${flowId}）：${message}；未派 verifier，流程保持待收口（请核对 flow YAML）。`);
+        }
+        return; // 失败不循环；仍不派 verifier（验收已由客户/判断决定）
+      }
+      acceptanceCloseFailureNotified.delete(key);
+      diagnostic.record("acceptance.close.completed", { flowId });
+    }
+    acceptanceBlockedNotified.delete(key);
+    if (acceptanceClosedNotified.get(key) !== identity) {
+      acceptanceClosedNotified.set(key, identity);
+      // 不伪造客户批准：以账本 customer.decision 为准；本层不写客户决定账本。
+      note(`验收已通过（判断代批或客户手批，以账本 customer.decision 为准），流程 ${flowId} 已收口（保留验收步骤已标 done）。`);
+    }
+  };
+
   // —————— 收尾推进（2026-10-18 真机缺口；2026-10-19 客户反馈「独立核准应该是标准流程」）——————
   // 触发面：**任意角色 settle**、回交到达/settle、桌面侧治理账本追加（dispatch.accepted）、导入项目/启动
   // 后的补齐检查。本层只读流程状态与账本做**触发门**检查，全部完成且证据按步骤类型齐备才后台派 Proof /
@@ -1161,8 +1328,6 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     const listing = listingCache.get(info.projectRoot);
     if (listing?.governanceModel !== "trio") return; // single/旧项目不产生验收推进
     const key = acceptanceFlowKey(info.projectRoot, info.flowId);
-    if (acceptanceDispatchedFlows.has(key)) return; // 每 flow 只派一次（运行期）
-    acceptanceDispatchedFlows.add(key); // 先占位：防同一 settle 批次/并发重复派
     // 2026-10-19 客户决定（经项目管理转达）：自动验收门的反馈**统一发给 Lead（主入口）**，不再发
     // Convener——包括「未派发 + 具体原因 + superseded/新 stepId 建议」「已自动派发验收复核给 Proof」
     // 以及既有失败/引擎无法确定行。落位只取 `listProject` 的 `primaryRoleId`（真实 trio = liaison），
@@ -1180,11 +1345,48 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       }
     };
     try {
+      // 2026-10-20 真机（验收卡代批 accept 后 flow 仍 pending，且 04:56:55 又多派一次 verifier）：
+      // **先把账本读进来**——「已有验收决定 ⇒ 收口/不再派」不能被运行期 mtime 去重提前 return 挡住。
       const ledger = await readGovernanceLedger(info.projectRoot);
-      // 持久化去重（2026-10-19 客户反馈）：账本已有验收复核派发记录 ⇒ 重启/重复事件都不再派。
-      if (acceptanceDispatchRecorded(info.flowId, ledger)) {
-        diagnostic.record("acceptance.ledger.dedup", { flowId: info.flowId });
-        return; // 保留运行期占位（本进程也不再检查）
+      const acceptedDecision = ledger.errors.length === 0 ? latestAcceptedAcceptanceDecision(ledger, info.flowId) : undefined;
+      if (acceptedDecision !== undefined) {
+        // 验收已通过（客户手批或判断代批）：调编排 `completeAcceptanceStep` 收口（标 done + acceptance
+        // 证据；幂等、原子、未 accepted 拒绝），随后**直接 return**，不再派 verifier。
+        await closeAcceptedFlow(info.projectRoot, info.flowId, acceptedDecision, note, diagnostic);
+        return;
+      }
+      // 2026-10-20 真机（04:06 派过 verifier；12:11 flow YAML 更新后仍被旧去重挡住、验收结果没回 Lead）：
+      // 运行期去重带 **flow YAML 版本（mtime）**——每 flow 同版本只派一次；flow 更新 ⇒ 旧占位作废、允许重派。
+      // 无 YAML（legacy/不可读）维持旧「每进程一次」语义。
+      let flowStateMtimeMs: number | undefined;
+      try {
+        flowStateMtimeMs = (await stat(path.join(info.projectRoot, governanceFlowStatePath(info.flowId)))).mtimeMs;
+      } catch {
+        flowStateMtimeMs = undefined;
+      }
+      let flowUpdatedSinceReview = false;
+      const recordedMtime = acceptanceDispatchedFlows.get(key);
+      if (recordedMtime !== undefined) {
+        if (flowStateMtimeMs === undefined || recordedMtime === flowStateMtimeMs) return; // 同版本已派
+        acceptanceDispatchedFlows.delete(key);
+        flowUpdatedSinceReview = true; // flow 在上次复核后有更新：本次为重派，任务文案注明
+      }
+      acceptanceDispatchedFlows.set(key, flowStateMtimeMs ?? -1); // 先占位：防同一 settle 批次/并发重复派
+      // 2026-10-20 真机修复：账本不再「一旦有 verifier 派发就永久去重」——与 flow YAML mtime 比较：
+      // 最后一次 verifier 派发 >= flow 更新时间 ⇒ 同版本已派（重启后同样成立）；flow 比派发新 ⇒ stale，
+      // 允许再派一次。无 YAML/不可读 ⇒ 维持旧行为（有记录即不派）。
+      const lastVerifierAtMs = acceptanceLastDispatchAtMs(info.flowId, ledger);
+      if (lastVerifierAtMs !== undefined) {
+        if (flowStateMtimeMs === undefined || lastVerifierAtMs >= flowStateMtimeMs) {
+          diagnostic.record("acceptance.ledger.dedup", { flowId: info.flowId });
+          return; // 保留运行期占位（本进程同版本也不再检查）
+        }
+        flowUpdatedSinceReview = true;
+        diagnostic.record("acceptance.ledger.stale", { flowId: info.flowId, lastVerifierAtMs });
+      } else if (acceptanceDispatchRecorded(info.flowId, ledger)) {
+        // 旧记录缺 `at`/不可解析：无法做版本比较 ⇒ 维持旧行为（有记录即不派），不猜、不重派。
+        diagnostic.record("acceptance.ledger.dedup-legacy", { flowId: info.flowId });
+        return;
       }
       // 该 flow 仍有在途派发/回交/运行轮次 ⇒ 推迟到下一次事件（避免在交付完成前抢跑派 Proof）。
       if (info.force !== true && manager.hasActiveWorkForFlow(info.projectRoot, info.flowId)) {
@@ -1285,7 +1487,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       }
       const runtime = resolution.runtime;
       noteRuntime = runtime; // 之后的开/发/系统行都按实际引擎路由（Pi 视图可见）
-      const message = buildAcceptanceTaskMessage(info.flowId, evidence);
+      const message = buildAcceptanceTaskMessage(info.flowId, evidence, { flowUpdatedSinceReview });
       const opened = await manager.openBackground({ projectRoot: info.projectRoot, roleId: "verifier", runtime });
       if (!opened.ok) {
         acceptanceDispatchedFlows.delete(key);

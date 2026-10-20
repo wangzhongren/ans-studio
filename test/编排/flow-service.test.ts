@@ -7,11 +7,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { createFlowService, type FlowService } from "../../src/common/编排/flow-service.ts";
+import { completeAcceptanceStep } from "../../src/pipeline/orchestration/flow-state.ts";
 import { parseFlowStateYaml, type FlowState } from "../../src/common/编排/flow-state.ts";
 import type { GovernanceLedgerEntry } from "../../src/common/编排/governance-ledger.ts";
 
@@ -519,5 +520,120 @@ test("并发：两个同 revision 更新经串行队列 ⇒ 恰一成功、一 r
     const loser = results.find((result) => !result.ok)!;
     assert.equal(loser.revision, winner.revision, "冲突方看到胜者的 revision");
     assert.equal(stepOf(readFlow(root).flow, "impl").status, "dispatched");
+  });
+});
+
+// —————————————————————— 应用专用：completeAcceptanceStep ——————————————————————
+
+const ACCEPTED_LEDGER = [
+  ledgerEntry({
+    kind: "customer.decision",
+    flowId: "flow-a",
+    actorRoleId: "verifier",
+    power: "acceptance",
+    decisionKind: "acceptance",
+    customerDecision: "accepted",
+  }),
+];
+
+test("completeAcceptanceStep：accepted + pending ⇒ done + acceptance 证据；重复调用幂等", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, FLOW_REL, flowYaml());
+    writeLedger(root, ACCEPTED_LEDGER);
+    const beforeRevision = (await steward(root).get({ flowId: "flow-a" })).revision!;
+
+    const completed = await completeAcceptanceStep({ projectRoot: root, flowId: "flow-a" });
+    assert.equal(completed.ok, true, completed.error ?? "");
+    assert.notEqual(completed.revision, beforeRevision);
+    const flow = readFlow(root).flow;
+    const verification = stepOf(flow, "verification");
+    assert.equal(verification.status, "done");
+    assert.deepEqual(verification.evidence, { kind: "acceptance", ref: "acceptance" });
+    assert.equal(stepOf(flow, "impl").status, "pending", "其他步骤保持不变");
+    assert.equal(stepOf(flow, "delivery").status, "dispatched");
+    assert.equal(stepOf(flow, "contract-freeze").status, "delivered");
+
+    const again = await completeAcceptanceStep({ projectRoot: root, flowId: "flow-a" });
+    assert.equal(again.ok, true);
+    assert.equal(again.idempotent, true);
+    assert.equal(again.revision, completed.revision);
+  });
+});
+
+test("completeAcceptanceStep：无 accepted / rejected ⇒ acceptance-not-accepted，文件不变", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, FLOW_REL, flowYaml());
+    const before = readFileSync(join(root, ...FLOW_REL.split("/")), "utf8");
+    writeLedger(root, [ledgerEntry({
+      kind: "customer.decision",
+      flowId: "flow-a",
+      actorRoleId: "verifier",
+      power: "acceptance",
+      decisionKind: "acceptance",
+      customerDecision: "rejected",
+    })]);
+    const rejected = await completeAcceptanceStep({ projectRoot: root, flowId: "flow-a" });
+    assert.equal(rejected.ok, false);
+    assert.equal(rejected.code, "acceptance-not-accepted");
+    assert.equal(readFileSync(join(root, ...FLOW_REL.split("/")), "utf8"), before);
+
+    rmSync(join(root, ".ans"), { recursive: true, force: true });
+    const missing = await completeAcceptanceStep({ projectRoot: root, flowId: "flow-a" });
+    assert.equal(missing.ok, false);
+    assert.equal(missing.code, "acceptance-not-accepted");
+    assert.equal(readFileSync(join(root, ...FLOW_REL.split("/")), "utf8"), before);
+  });
+});
+
+test("completeAcceptanceStep：账本坏行 ⇒ ledger-unavailable；无效 flow ⇒ invalid-flow，均不写盘", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, FLOW_REL, flowYaml());
+    const before = readFileSync(join(root, ...FLOW_REL.split("/")), "utf8");
+    writeFile(root, ".ans/governance/ledger.jsonl", "{bad json\n");
+    const badLedger = await completeAcceptanceStep({ projectRoot: root, flowId: "flow-a" });
+    assert.equal(badLedger.ok, false);
+    assert.equal(badLedger.code, "ledger-unavailable");
+    assert.equal(readFileSync(join(root, ...FLOW_REL.split("/")), "utf8"), before);
+
+    writeFile(root, FLOW_REL, "flowId: flow-a\nversion: 1\nqualityTier: production\nsteps: []\n");
+    const invalidBefore = readFileSync(join(root, ...FLOW_REL.split("/")), "utf8");
+    const invalid = await completeAcceptanceStep({ projectRoot: root, flowId: "flow-a" });
+    assert.equal(invalid.ok, false);
+    assert.equal(invalid.code, "invalid-flow");
+    assert.equal(readFileSync(join(root, ...FLOW_REL.split("/")), "utf8"), invalidBefore);
+  });
+});
+
+test("completeAcceptanceStep：原子写失败 ⇒ write-failed，原文件不变", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, FLOW_REL, flowYaml());
+    writeLedger(root, ACCEPTED_LEDGER);
+    const before = readFileSync(join(root, ...FLOW_REL.split("/")), "utf8");
+    const flowsDir = join(root, "docs", "flows");
+    chmodSync(flowsDir, 0o500);
+    try {
+      const result = await completeAcceptanceStep({ projectRoot: root, flowId: "flow-a" });
+      assert.equal(result.ok, false);
+      assert.equal(result.code, "write-failed");
+      assert.equal(readFileSync(join(root, ...FLOW_REL.split("/")), "utf8"), before);
+    } finally {
+      chmodSync(flowsDir, 0o700);
+    }
+  });
+});
+
+test("completeAcceptanceStep：并发两调用经串行队列 ⇒ 一完成一幂等，最终 revision 一致", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, FLOW_REL, flowYaml());
+    writeLedger(root, ACCEPTED_LEDGER);
+    const [first, second] = await Promise.all([
+      completeAcceptanceStep({ projectRoot: root, flowId: "flow-a" }),
+      completeAcceptanceStep({ projectRoot: root, flowId: "flow-a" }),
+    ]);
+    assert.equal(first.ok, true, first.error ?? "");
+    assert.equal(second.ok, true, second.error ?? "");
+    assert.equal([first, second].filter((result) => result.idempotent === true).length, 1, "恰一幂等");
+    assert.equal(first.revision, second.revision);
+    assert.equal(stepOf(readFlow(root).flow, "verification").status, "done");
   });
 });

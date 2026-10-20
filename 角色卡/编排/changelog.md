@@ -1256,3 +1256,19 @@
 - **Liaison 通用 choice 门控**（同日真机补充）：Lead 的 `request_choice` 无 confirm 选项（keep-v1/do-v2/lead-decide）⇒ `declined` + 指导（内部协调/工程决策，Lead 自行决定或 dispatch_task/flow_step_update），不发卡、不调判断、不写账本；显式 intent-confirm 缺 confirm 同样 declined；选项含 confirm 仍走默认+判断；其他角色零变化；诊断 `governance.choice.rejected`。
 
 **测试**：新增 choice 默认全角色 + intent-confirm 裁决正反例 + Liaison 通用 choice/intent-confirm 缺 confirm 拒绝；既有「无 cardKind 普通选择不写账本」回归保持（选项形状守卫）；`test/编排/**` **699 计 699 过 0 红 0 skipped**；`npm run typecheck` **exit 0**（全仓）。**跨角色**：`test/runtime-core/governance-judge.test.ts:48-64` 仍钉旧映射会红（需其属主更新）；`src/provider/runtime/tools.ts:200` 注释与门禁引擎 Lead 卡文案需同步。详见[变更记录](docs/change/2026-10-20_change_choice-cardKind-intent-confirm.md)。
+
+## 2026-10-20 — 验收 accepted 后补收口：`completeAcceptanceStep`
+
+**来源**：真机 bookmark-manager——verifier 第二轮复核完成，验收卡被判断 agent 代批 accept，账本已有 `customer.decision{decisionKind:"acceptance",customerDecision:"accepted"}`（04:56:18），但 flow YAML 的 `verification` 仍 pending；`evaluateFlowCompletion` 已判定「已有验收决定，流程已收口」，04:56:55 又重复派了一次 verifier。本批只写编排边界，未改 `app/**`、`src/provider/**`、`test/测试/**`。
+
+**改了什么**
+- `src/common/编排/flow-service.ts` 新增并导出 `completeAcceptanceStep({projectRoot, flowId})`（**应用专用，不注册为角色工具**）：
+  - 读 flow YAML；找保留验收步骤（`verification`/`acceptance`，kind acceptance）；已 done ⇒ `{ok:true,idempotent:true,revision,flow}`；
+  - 读账本；必须存在该 flowId 的 `customer.decision{decisionKind:"acceptance",customerDecision:"accepted"}`；缺失（含 rejected）⇒ `acceptance-not-accepted`；账本坏行 ⇒ `ledger-unavailable`；缺保留验收步骤 ⇒ `acceptance-step-missing`；
+  - 把验收步骤设为 `status:"done"`、`evidence:{kind:"acceptance",ref:"acceptance"}`（保留其他步骤/supersedes/顺序）；候选 YAML 复核通过后原子写；并发/revision 沿用 per-project 串行队列；诊断 `flow.acceptance.completed`；
+  - **不写客户决定账本、不伪造客户批准**。
+- `src/pipeline/orchestration/flow-state.ts` 公共出口再导出（桌面只消费公共出口）。
+
+**测试**：`flow-service.test.ts` **17/17**（+5：accepted+pending ⇒ done+acceptance 证据/幂等；无 accepted/rejected ⇒ acceptance-not-accepted 文件不变；坏账本/非法 flow 不写盘；只读目录原子写失败原文件不变；并发两调用一完成一幂等）；`test/编排/**` **704 计 704 过 0 红 0 skipped**；`npm run typecheck` **exit 0**（全仓）。
+
+**跨角色**：桌面在 acceptance check / verifier settle 检测到 accepted 时调用 `completeAcceptanceStep`，并在同处跳过/去重 verifier 重派。详见[变更记录](docs/change/2026-10-20_change_flow-service.md) §3.6。

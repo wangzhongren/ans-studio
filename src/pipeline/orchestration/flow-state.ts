@@ -18,6 +18,10 @@ export {
   RESERVED_ACCEPTANCE_STEP_IDS,
 } from "../../common/编排/flow-state.ts";
 
+// 2026-10-20 应用专用：客户验收 accepted 后把 flow YAML 的保留验收步骤置 done。
+// 桌面只经本公共出口消费；不注册为角色工具。
+export { completeAcceptanceStep } from "../../common/编排/flow-service.ts";
+
 export type {
   FlowState,
   FlowStateStep,

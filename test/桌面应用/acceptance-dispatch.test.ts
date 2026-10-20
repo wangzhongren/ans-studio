@@ -15,7 +15,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 
 import { createDesktopInterface, type DesktopDeps } from "../../app/desktop/interface.ts";
@@ -23,6 +23,7 @@ import { buildProjectConfig } from "../../app/desktop/project.ts";
 import { RUNTIME_UNRESOLVED_MESSAGE } from "../../app/desktop/runtime-resolution.ts";
 import {
   acceptanceDispatchRecorded,
+  acceptanceLastDispatchAtMs,
   flowCompletionIssue,
   flowStepEvidenceKind,
   flowStepHasEvidence,
@@ -201,7 +202,7 @@ interface Harness {
 async function makeHarness(
   projectRoot: string,
   listing: ProjectListing,
-  options: { resolveRuntime?: DesktopDeps["resolveRuntimeFn"] } = {},
+  options: { resolveRuntime?: DesktopDeps["resolveRuntimeFn"]; completeAcceptanceStep?: DesktopDeps["completeAcceptanceStepFn"] } = {},
 ): Promise<Harness> {
   const sendsByRole = new Map<string, string[]>();
   const events: SessionEventEnvelope[] = [];
@@ -224,6 +225,8 @@ async function makeHarness(
     // 不依赖开发机真实 `.env`；解析器自身的优先级另见 `runtime-resolution.test.ts`。
     resolveRuntimeFn:
       options.resolveRuntime ?? (async () => ({ ok: true, runtime: "pi", source: "credentials", skipped: [] })),
+    // 2026-10-20：验收通过后的流程收口（编排 completeAcceptanceStep 的桌面注入面；测试用桩验证消费语义）。
+    ...(options.completeAcceptanceStep !== undefined ? { completeAcceptanceStepFn: options.completeAcceptanceStep } : {}),
   });
   await iface.listProject({ projectRoot });
   return { iface, sendsByRole, events, controls };
@@ -398,7 +401,7 @@ test("证据模型 fail-closed：缺客户决定/产物/派发证据各自拦下
   );
 });
 
-test("验收派发持久化去重：账本已有 targetRoleId=verifier / stepId=verification 记录 ⇒ 已派发", () => {
+test("验收派发持久化去重：旧布尔口径保留；2026-10-20 新口径返回最近一次 verifier 派发时刻（ms）", () => {
   const ledger = {
     errors: [],
     entries: [
@@ -411,9 +414,25 @@ test("验收派发持久化去重：账本已有 targetRoleId=verifier / stepId=
       },
     ],
   };
-  assert.equal(acceptanceDispatchRecorded(LIBRARY_FLOW_ID, ledger), true);
+  assert.equal(acceptanceDispatchRecorded(LIBRARY_FLOW_ID, ledger), true, "旧记录（无 at）：布尔口径仍视为已派");
   assert.equal(acceptanceDispatchRecorded("other-flow", ledger), false);
   assert.equal(acceptanceDispatchRecorded(LIBRARY_FLOW_ID, { entries: [] }), false);
+  assert.equal(acceptanceLastDispatchAtMs(LIBRARY_FLOW_ID, ledger), undefined, "无 at/不可解析 ⇒ 时间口径 unavailable（调用方走旧行为）");
+
+  const timed = {
+    errors: [],
+    entries: [
+      { kind: "dispatch.accepted", flowId: LIBRARY_FLOW_ID, stepId: "verification", targetRoleId: "verifier", actorRoleId: "app", at: "2026-10-20T04:06:53.000Z" },
+      { kind: "dispatch.accepted", flowId: LIBRARY_FLOW_ID, stepId: "verification", targetRoleId: "verifier", actorRoleId: "app", at: "2026-10-20T12:11:58.000Z" },
+      { kind: "dispatch.accepted", flowId: LIBRARY_FLOW_ID, stepId: "impl", targetRoleId: "executor", actorRoleId: "convener", at: "2026-10-20T13:00:00.000Z" },
+      { kind: "dispatch.accepted", flowId: "other-flow", stepId: "verification", targetRoleId: "verifier", actorRoleId: "app", at: "2026-10-20T14:00:00.000Z" },
+    ],
+  };
+  assert.equal(
+    acceptanceLastDispatchAtMs(LIBRARY_FLOW_ID, timed),
+    Date.parse("2026-10-20T12:11:58.000Z"),
+    "取该 flow 最近一次 verifier 派发时刻（其它步骤/其它 flow 不参与）",
+  );
 });
 
 // ————————————————— ② 端到端：自动派 Proof —————————————————
@@ -1122,6 +1141,376 @@ test("无 YAML ⇒ legacy Markdown 回退行为不变：阻塞行仍指 .md，�
       assert.ok(first.includes(`docs/flows/${flowId}.md`), "建议路径仍指 Markdown");
       assert.ok(!first.includes(".yaml"), "无 YAML 时不应出现 YAML 路径/诊断");
       assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "legacy 门未过：不派");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// —————— 2026-10-20 真机：flow 在验收派发后更新 ⇒ 必须能重派（旧去重永久 true 导致结果没回 Lead） ——————
+
+/** 在既有 YAML 上改一处内容并把 mtime 显式设为给定时刻（保证与首次派发不同的版本）。 */
+function touchFlowStateVersion(projectRoot: string, flowId: string, at: Date): void {
+  writeFlowStateFile(projectRoot, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId).map((step) =>
+    step.id === "delivery-server" ? { ...step, title: `交付（v2 @ ${at.toISOString()}）` } : step,
+  )));
+  utimesSync(path.join(projectRoot, "docs", "flows", `${flowId}.yaml`), at, at);
+}
+
+test("2026-10-20 验收重派：flow YAML 派发后更新 ⇒ 重派 verifier 恰一次（文案注明更新、新账本时间晚于 flow）；未更新不重派", async () => {
+  const root = makeTempProjectRoot("ans-acceptance-flow-version-");
+  try {
+    const flowId = "flow-version";
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId)));
+    await seedGovernanceEvidence(root, flowId, ["delivery-server"]);
+    const listing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };
+    const harness = await makeHarness(root, listing);
+    try {
+      await waitFor(() => (harness.sendsByRole.get("verifier")?.length ?? 0) > 0);
+      assert.equal(harness.sendsByRole.get("verifier")!.length, 1, "首次导入 ⇒ 派一次");
+      await waitForAsync(async () => (await verifierDispatches(root, flowId)).length === 1);
+
+      // flow 未更新：verifier settle 触发检查 ⇒ 同版本去重，不重派。
+      harness.controls.get("verifier")!.settle();
+      await sleep(300);
+      assert.equal(harness.sendsByRole.get("verifier")!.length, 1, "flow 未更新 ⇒ 不重派");
+
+      // flow 在派发后更新（mtime 晚于首次 verifier 派发）⇒ 允许重派恰一次。
+      await sleep(40);
+      const updatedAt = new Date();
+      touchFlowStateVersion(root, flowId, updatedAt);
+      harness.controls.get("verifier")!.settle();
+      await waitFor(() => (harness.sendsByRole.get("verifier")?.length ?? 0) > 1);
+      const sends = harness.sendsByRole.get("verifier")!;
+      assert.equal(sends.length, 2, "flow 更新后重派恰一次");
+      assert.match(sends[1]!, /流程在上次验收复核后有更新，请复核最新版本/, "重派任务注明流程已更新");
+      await waitForAsync(async () => (await verifierDispatches(root, flowId)).length === 2);
+      const dispatches = await verifierDispatches(root, flowId);
+      const lastAt = Date.parse(dispatches[1]!.at);
+      const flowMtime = statSync(path.join(root, "docs", "flows", `${flowId}.yaml`)).mtimeMs;
+      assert.ok(lastAt >= flowMtime, `新 dispatch.accepted 时间(${lastAt}) 必须晚于 flow mtime(${flowMtime})`);
+      // 更新后的同版本：再 settle 不再重派（新账本时间保证后续去重成立）。
+      harness.controls.get("verifier")!.settle();
+      await sleep(300);
+      assert.equal(harness.sendsByRole.get("verifier")!.length, 2, "同版本不再重派（新记录时间 >= flow mtime）");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-20 验收重派（重启）：新 Interface + 旧 verifier 记录 + flow 已更新 ⇒ 重派；flow 未更新 ⇒ 不重派", async () => {
+  const updatedRoot = makeTempProjectRoot("ans-acceptance-restart-updated-");
+  const sameRoot = makeTempProjectRoot("ans-acceptance-restart-same-");
+  try {
+    const flowId = "flow-restart";
+    // ① flow 在重启前被更新 ⇒ 新 Interface 的补齐检查应重派一次。
+    writeFlowStateFile(updatedRoot, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId)));
+    await seedGovernanceEvidence(updatedRoot, flowId, ["delivery-server"]);
+    const updatedListing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: updatedRoot };
+    const h1 = await makeHarness(updatedRoot, updatedListing);
+    await waitFor(() => (h1.sendsByRole.get("verifier")?.length ?? 0) > 0);
+    await waitForAsync(async () => (await verifierDispatches(updatedRoot, flowId)).length === 1);
+    await h1.iface.stopSession();
+    await sleep(40);
+    touchFlowStateVersion(updatedRoot, flowId, new Date()); // 重启前 flow 已更新
+    const h2 = await makeHarness(updatedRoot, updatedListing); // 新 Interface（新进程）
+    try {
+      await waitFor(() => (h2.sendsByRole.get("verifier")?.length ?? 0) > 0);
+      assert.equal(h2.sendsByRole.get("verifier")!.length, 1, "重启后 flow 更新 ⇒ 重派恰一次");
+      assert.match(h2.sendsByRole.get("verifier")![0]!, /流程在上次验收复核后有更新/);
+      await waitForAsync(async () => (await verifierDispatches(updatedRoot, flowId)).length === 2);
+      await h2.iface.listProject({ projectRoot: updatedRoot });
+      await sleep(300);
+      assert.equal(h2.sendsByRole.get("verifier")!.length, 1, "同一新版本不再重复派");
+    } finally {
+      await h2.iface.stopSession();
+    }
+
+    // ② flow 未更新 ⇒ 重启后旧 verifier 记录仍然去重（不重派）。
+    writeFlowStateFile(sameRoot, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId)));
+    await seedGovernanceEvidence(sameRoot, flowId, ["delivery-server"]);
+    const sameListing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: sameRoot };
+    const s1 = await makeHarness(sameRoot, sameListing);
+    await waitFor(() => (s1.sendsByRole.get("verifier")?.length ?? 0) > 0);
+    await waitForAsync(async () => (await verifierDispatches(sameRoot, flowId)).length === 1);
+    await s1.iface.stopSession();
+    const s2 = await makeHarness(sameRoot, sameListing);
+    try {
+      await sleep(400);
+      assert.equal(s2.sendsByRole.get("verifier")?.length ?? 0, 0, "重启后 flow 未更新 ⇒ 不重派");
+      assert.equal((await verifierDispatches(sameRoot, flowId)).length, 1, "账本仍恰一条");
+    } finally {
+      await s2.iface.stopSession();
+    }
+  } finally {
+    rmSync(updatedRoot, { recursive: true, force: true });
+    rmSync(sameRoot, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-20 verifier settle ⇒ Lead 系统行含报告路径（同 flow+报告版本去重；不伪造结论；不重派 verifier）", async () => {
+  const root = makeTempProjectRoot("ans-acceptance-verifier-note-");
+  try {
+    const flowId = "flow-proof-note";
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId)));
+    await seedGovernanceEvidence(root, flowId, ["delivery-server"]);
+    const listing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };
+    const harness = await makeHarness(root, listing);
+    try {
+      await waitFor(() => (harness.sendsByRole.get("verifier")?.length ?? 0) > 0);
+      const reportRel = `docs/verification/${flowId}-v1.md`;
+      const reportAbs = path.join(root, reportRel);
+      mkdirSync(path.dirname(reportAbs), { recursive: true });
+      writeFileSync(reportAbs, "# 验收复核\n\n结论：未给出（示例报告）。\n", "utf8");
+      const proofNotes = () =>
+        deliveryNotes(harness.events, "liaison").filter((note) => note.includes("Proof / 验收复核已结束"));
+      harness.controls.get("verifier")!.settle();
+      await waitFor(() => proofNotes().length > 0);
+      assert.equal(proofNotes().length, 1, "verifier settle ⇒ Lead 恰一条复核结束系统行");
+      assert.ok(proofNotes()[0]!.includes(reportRel), "含报告路径 docs/verification/<flow>-v1.md");
+      assert.ok(proofNotes()[0]!.includes(`docs/governance/verifier/${flowId}.md`), "含治理工作记录路径");
+      assert.ok(!/通过|不通过|已批准|客户同意/.test(proofNotes()[0]!), "不伪造结论、不把报告当客户批准");
+      // 同 flow+报告版本：再 settle 不刷屏。
+      harness.controls.get("verifier")!.settle();
+      await sleep(300);
+      assert.equal(proofNotes().length, 1, "同报告版本不重复提示");
+      // 报告版本更新（mtime 变化）⇒ 可再提示一次；flow 未更新 ⇒ verifier 不重派。
+      await sleep(30);
+      writeFileSync(reportAbs, "# 验收复核\n\n结论：未给出（示例报告 v2）。\n", "utf8");
+      utimesSync(reportAbs, new Date(), new Date());
+      harness.controls.get("verifier")!.settle();
+      await waitFor(() => proofNotes().length > 1);
+      assert.equal(proofNotes().length, 2, "报告新版本可再提示一次");
+      assert.equal(harness.sendsByRole.get("verifier")!.length, 1, "flow 未更新 ⇒ 不重派 verifier");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// —————— 2026-10-20 真机：验收卡代批 accept 后 flow 仍 pending，且又多派了一次 verifier ——————
+//
+// 消费编排的 `completeAcceptanceStep`（桌面经 Pipeline 公共出口/注入）：accepted ⇒ 收口（标 done）并
+// 直接 return，不再派 verifier；已 done ⇒ 幂等；rejected/无决定 ⇒ 不收口、不误派；失败只诊断/一条系统行。
+
+function acceptedAcceptanceSteps(flowId: string): FlowYamlStepInput[] {
+  return yamlAcceptanceSteps(flowId).map((step) =>
+    step.id === "verification"
+      ? { ...step, status: "done", evidence: { kind: "acceptance", ref: "acceptance" } }
+      : step,
+  );
+}
+
+const acceptanceDecisionEntry = (flowId: string, decision: "accepted" | "rejected"): Omit<GovernanceLedgerEntry, "at"> => ({
+  kind: "customer.decision",
+  flowId,
+  actorRoleId: "liaison",
+  power: "app",
+  decisionKind: "acceptance",
+  customerDecision: decision,
+});
+
+test("2026-10-20 验收收口：accepted + verification pending ⇒ 调 completeAcceptanceStep、步骤 done、不派 verifier、Lead 恰一条；已 done ⇒ 幂等", async () => {
+  const root = makeTempProjectRoot("ans-acceptance-close-");
+  try {
+    const flowId = "flow-close";
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId)));
+    await seedGovernanceEvidence(root, flowId, ["delivery-server"]);
+    await appendLedger(root, [acceptanceDecisionEntry(flowId, "accepted")]);
+    const beforeLedger = await readGovernanceLedger(root);
+    const listing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };
+    const completeCalls: string[] = [];
+    const harness = await makeHarness(root, listing, {
+      completeAcceptanceStep: async ({ projectRoot, flowId: id }) => {
+        completeCalls.push(id);
+        // 模拟编排语义：把保留验收步骤标 done + acceptance 证据（幂等、原子写）。
+        writeFlowStateFile(projectRoot, id, flowStateYaml(id, acceptedAcceptanceSteps(id)));
+        return { ok: true };
+      },
+    });
+    try {
+      const closeNotes = () => deliveryNotes(harness.events, "liaison").filter((note) => note.includes("验收已通过（判断代批或客户手批"));
+      await waitFor(() => completeCalls.length > 0);
+      assert.equal(completeCalls.length, 1, "accepted ⇒ 恰调一次 completeAcceptanceStep");
+      assert.equal(completeCalls[0], flowId);
+      const parsed = parseFlowStateYaml(
+        readFileSync(path.join(root, "docs", "flows", `${flowId}.yaml`), "utf8"),
+        flowId,
+      );
+      assert.equal(parsed.ok, true);
+      if (parsed.ok) {
+        const verification = parsed.flow.steps.find((step) => step.kind === "acceptance");
+        assert.equal(verification?.status, "done", "收口后验收步骤 done");
+        assert.deepEqual(verification?.evidence, { kind: "acceptance", ref: "acceptance" }, "done 带 acceptance 证据");
+      }
+      await waitFor(() => closeNotes().length > 0);
+      assert.equal(closeNotes().length, 1, "Lead 恰一条「验收已通过…已收口」系统行");
+      assert.ok(closeNotes()[0]!.includes(flowId), "系统行含 flowId");
+      assert.ok(!/客户已批准|判断已批准/.test(closeNotes()[0]!), "不伪造客户批准（以账本为准）");
+      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "验收已 accepted ⇒ 不再派 verifier");
+      const afterLedger = await readGovernanceLedger(root);
+      assert.equal(
+        afterLedger.entries.filter((entry) => entry.kind === "customer.decision").length,
+        beforeLedger.entries.filter((entry) => entry.kind === "customer.decision").length,
+        "桌面不写客户决定账本",
+      );
+
+      // 再次触发检查（listProject 导入补齐）：已 done ⇒ 幂等，不重复调用、不重复系统行、不派 verifier。
+      await harness.iface.listProject({ projectRoot: root });
+      await sleep(300);
+      assert.equal(completeCalls.length, 1, "已 done ⇒ 不重复调用收口");
+      assert.equal(closeNotes().length, 1, "同决定不重复系统行");
+      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "仍不派 verifier");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-20 验收收口：accepted + verification 已 done ⇒ 不收口调用、不派 verifier、Lead 一条（幂等）", async () => {
+  const root = makeTempProjectRoot("ans-acceptance-close-done-");
+  try {
+    const flowId = "flow-close-done";
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, acceptedAcceptanceSteps(flowId)));
+    await seedGovernanceEvidence(root, flowId, ["delivery-server"]);
+    await appendLedger(root, [acceptanceDecisionEntry(flowId, "accepted")]);
+    const listing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };
+    const completeCalls: string[] = [];
+    const harness = await makeHarness(root, listing, {
+      completeAcceptanceStep: async ({ flowId: id }) => {
+        completeCalls.push(id);
+        return { ok: true };
+      },
+    });
+    try {
+      const closeNotes = () => deliveryNotes(harness.events, "liaison").filter((note) => note.includes("验收已通过（判断代批或客户手批"));
+      await waitFor(() => closeNotes().length > 0);
+      assert.equal(completeCalls.length, 0, "步骤已 done ⇒ 不再调用收口（幂等）");
+      assert.equal(closeNotes().length, 1, "Lead 恰一条收口系统行");
+      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "已 done/已有决定 ⇒ 不派 verifier");
+      await harness.iface.listProject({ projectRoot: root });
+      await sleep(250);
+      assert.equal(closeNotes().length, 1, "重复检查不刷屏");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-20 验收收口：rejected / 无验收决定 ⇒ 不收口、不误派；无决定且门通过 ⇒ 仍正常派 verifier", async () => {
+  const rejectedRoot = makeTempProjectRoot("ans-acceptance-close-rejected-");
+  const noDecisionRoot = makeTempProjectRoot("ans-acceptance-close-none-");
+  try {
+    const flowId = "flow-close-state";
+    // ① rejected：不收口、不派 verifier（已有验收决定 ⇒ 流程已收口，交给客户/Steward）。
+    writeFlowStateFile(rejectedRoot, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId)));
+    await seedGovernanceEvidence(rejectedRoot, flowId, ["delivery-server"]);
+    await appendLedger(rejectedRoot, [acceptanceDecisionEntry(flowId, "rejected")]);
+    const rejectedListing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: rejectedRoot };
+    const rejectedCalls: string[] = [];
+    const rejected = await makeHarness(rejectedRoot, rejectedListing, {
+      completeAcceptanceStep: async ({ flowId: id }) => { rejectedCalls.push(id); return { ok: true }; },
+    });
+    try {
+      await sleep(400);
+      assert.equal(rejectedCalls.length, 0, "rejected ⇒ 不调收口");
+      assert.equal(rejected.sendsByRole.get("verifier")?.length ?? 0, 0, "已有验收决定 ⇒ 不派 verifier");
+      assert.equal(deliveryNotes(rejected.events, "liaison").filter((note) => note.includes("验收已通过（判断代批或客户手批")).length, 0, "不冒充收口");
+    } finally {
+      await rejected.iface.stopSession();
+    }
+
+    // ② 无验收决定：走既有门 ⇒ 正常派 verifier（收口不介入）。
+    writeFlowStateFile(noDecisionRoot, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId)));
+    await seedGovernanceEvidence(noDecisionRoot, flowId, ["delivery-server"]);
+    const noneListing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: noDecisionRoot };
+    const noneCalls: string[] = [];
+    const none = await makeHarness(noDecisionRoot, noneListing, {
+      completeAcceptanceStep: async ({ flowId: id }) => { noneCalls.push(id); return { ok: true }; },
+    });
+    try {
+      await waitFor(() => (none.sendsByRole.get("verifier")?.length ?? 0) > 0);
+      assert.equal(none.sendsByRole.get("verifier")!.length, 1, "无验收决定 ⇒ 门通过照常派 verifier");
+      assert.equal(noneCalls.length, 0, "无 accepted 决定 ⇒ 不调收口");
+    } finally {
+      await none.iface.stopSession();
+    }
+  } finally {
+    rmSync(rejectedRoot, { recursive: true, force: true });
+    rmSync(noDecisionRoot, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-20 验收收口失败：只诊断/Lead 一条系统行、不循环、不派 verifier", async () => {
+  const root = makeTempProjectRoot("ans-acceptance-close-fail-");
+  try {
+    const flowId = "flow-close-fail";
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId)));
+    await seedGovernanceEvidence(root, flowId, ["delivery-server"]);
+    await appendLedger(root, [acceptanceDecisionEntry(flowId, "accepted")]);
+    const listing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };
+    const completeCalls: string[] = [];
+    const harness = await makeHarness(root, listing, {
+      completeAcceptanceStep: async ({ flowId: id }) => {
+        completeCalls.push(id);
+        return { ok: false, error: "模拟收口失败：flow 不可写" };
+      },
+    });
+    try {
+      const failureNotes = () => deliveryNotes(harness.events, "liaison").filter((note) => note.includes("流程收口失败"));
+      await waitFor(() => failureNotes().length > 0);
+      assert.ok(failureNotes()[0]!.includes("模拟收口失败"), "系统行含具体失败原因");
+      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "收口失败也不派 verifier（验收已决定）");
+      // 再次触发：同一失败原因不刷屏（不循环）；收口调用可被真实事件再次尝试，但不产生第二条系统行。
+      await harness.iface.listProject({ projectRoot: root });
+      await sleep(300);
+      assert.equal(failureNotes().length, 1, "同失败原因不重复刷屏");
+      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "仍不派 verifier");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-20 验收收口（真实编排出口）：accepted + verification pending ⇒ completeAcceptanceStep 真写 done、不派 verifier", async () => {
+  const root = makeTempProjectRoot("ans-acceptance-close-real-");
+  try {
+    const flowId = "flow-close-real";
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId)));
+    await seedGovernanceEvidence(root, flowId, ["delivery-server"]);
+    await appendLedger(root, [acceptanceDecisionEntry(flowId, "accepted")]);
+    const listing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };
+    // 不注入 completeAcceptanceStepFn：走 Pipeline 公共出口的真实实现。
+    const harness = await makeHarness(root, listing);
+    try {
+      const closeNotes = () =>
+        deliveryNotes(harness.events, "liaison").filter((note) => note.includes("验收已通过（判断代批或客户手批"));
+      await waitFor(() => closeNotes().length > 0);
+      const parsed = parseFlowStateYaml(
+        readFileSync(path.join(root, "docs", "flows", `${flowId}.yaml`), "utf8"),
+        flowId,
+      );
+      assert.equal(parsed.ok, true, parseErrorText(parsed));
+      if (parsed.ok) {
+        const verification = parsed.flow.steps.find((step) => step.kind === "acceptance");
+        assert.equal(verification?.status, "done", "真实 completeAcceptanceStep 已把验收步骤标 done");
+        assert.deepEqual(verification?.evidence, { kind: "acceptance", ref: "acceptance" });
+      }
+      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "收口后不派 verifier");
+      assert.equal(closeNotes().length, 1, "Lead 恰一条收口系统行");
     } finally {
       await harness.iface.stopSession();
     }

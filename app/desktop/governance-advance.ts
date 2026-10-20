@@ -165,6 +165,8 @@ export interface FlowCompletionLedgerEntryLike {
   actorRoleId?: string;
   /** 仅 artifact.observed：项目相对产物路径。 */
   artifactPath?: string;
+  /** 2026-10-20：账本时间（ISO；验收派发时间比较用——flow 更新后允许重派）。 */
+  at?: string;
 }
 
 /** 验收步骤的流程单写法（2026-10-18 真机：nomination/delivery/**verification**；旧版用 `acceptance`）。 */
@@ -335,8 +337,9 @@ export function flowStepHasEvidence(
 }
 
 /**
- * 验收复核是否**已派发过**（持久化去重）：账本已有 targetRoleId=verifier 的 `dispatch.accepted`
- * （或 app 写的 stepId=verification 记录）。重启后据此不再重复派。
+ * 验收复核是否**已派发过**（旧布尔口径；2026-10-20 起仅用于**无 `at` 的旧记录**兜底）：账本已有
+ * targetRoleId=verifier 的 `dispatch.accepted`（或 app 写的 stepId=verification 记录）。
+ * 新旧记录的版本比较请用 `acceptanceLastDispatchAtMs` + flow YAML mtime。
  */
 export function acceptanceDispatchRecorded(
   flowId: string,
@@ -348,6 +351,30 @@ export function acceptanceDispatchRecorded(
       entry.flowId === flowId &&
       (entry.targetRoleId === "verifier" || (entry.stepId === "verification" && entry.actorRoleId === "app")),
   );
+}
+
+/**
+ * **最近一次验收复核（verifier）派发时刻（毫秒）**（2026-10-20 真机修复）。
+ *
+ * 真机 04:06:53 派过 verifier；之后 Lead/Steward 又加 D7 修复并更新 flow YAML（12:11:58），旧布尔去重
+ * （「账本只要有过 verifier dispatch 就永久 true」）导致不再派、验收结果没回 Lead。新语义由调用方把本值
+ * 与 flow YAML 的 mtime 比较：**最后一次 verifier 派发 >= flow 更新时间**才算已派；flow 比派发新 ⇒ stale，
+ * 允许再派一次。`at` 不可解析的旧条目忽略；无记录 ⇒ undefined（走旧「无 verifier 记录」路径）。
+ */
+export function acceptanceLastDispatchAtMs(
+  flowId: string,
+  ledger: { entries: readonly FlowCompletionLedgerEntryLike[] },
+): number | undefined {
+  let latest: number | undefined;
+  for (const entry of ledger.entries) {
+    if (entry.kind !== "dispatch.accepted" || entry.flowId !== flowId) continue;
+    if (!(entry.targetRoleId === "verifier" || (entry.stepId === "verification" && entry.actorRoleId === "app"))) continue;
+    if (typeof entry.at !== "string" || entry.at === "") continue;
+    const at = Date.parse(entry.at);
+    if (!Number.isFinite(at)) continue;
+    if (latest === undefined || at > latest) latest = at;
+  }
+  return latest;
 }
 
 /**
@@ -444,10 +471,19 @@ export function flowCompletionIssue(
  * `flowCompletionIssue` 触发门、不自动批准；演示证据存在与否仍由 Proof 核对、验收卡仍由
  * 客户/判断 agent 决定。
  */
-export function buildAcceptanceTaskMessage(flowId: string, evidence: readonly string[]): string {
+export function buildAcceptanceTaskMessage(
+  flowId: string,
+  evidence: readonly string[],
+  options: { flowUpdatedSinceReview?: boolean } = {},
+): string {
   const paths = [...new Set(evidence.filter((item): item is string => nonEmptyString(item)))].slice(0, 10);
   const evidenceText = paths.length > 0 ? paths.join("、") : "见回交报告与流程状态 YAML";
+  const stalePrefix =
+    options.flowUpdatedSinceReview === true
+      ? "流程在上次验收复核后有更新，请复核最新版本。"
+      : "";
   return (
+    `${stalePrefix}` +
     `流程 ${flowId} 步骤已全部完成（流程状态 YAML：${governanceFlowStatePath(flowId)}；回交/核对报告路径：${evidenceText}）。` +
     `请汇总证据并出验收卡（不要自行验收或代替客户决定）。` +
     `验收前必须满足以下硬要求：` +
