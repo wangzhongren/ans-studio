@@ -3,7 +3,7 @@
 // （intent-confirm）——
 //   · **decision 开关开** ⇒ 卡进入判断、判断代批 confirm（0 客户卡），hand_off_intent 直接放行；
 //   · **decision 开关关** ⇒ 不进判断、客户本人回答（confirm 放行 / revise 拒绝交接）；
-//   · 缺 confirm 选项 ⇒ 判断 manual 自动退回（0 客户卡、可操作原因），hand_off 被拒；
+//   · 缺 confirm 选项 ⇒ 判断前直接 declined（0 客户卡、按提示补齐选项），hand_off 被拒；
 //   · 客户确认后 hand_off_intent 才放行、Rapporteur 收到任务；revise ⇒ hand_off 被拒、不投递、无交接账本。
 //
 // 全部离线：真实桌面 Interface / 客户通道 / 编排 hand_off 门禁 / 账本；模型为脚本桩。
@@ -174,7 +174,7 @@ test("Lead 需求确认：decision 关 + 客户选 revise ⇒ hand_off 被拒、
   }
 });
 
-test("Lead 需求确认：decision 开 + 卡缺 confirm 选项 ⇒ 判断 manual 自动退回（0 客户卡）、hand_off 被拒", async () => {
+test("Lead 需求确认：decision 开 + 卡缺 confirm 选项 ⇒ 判断前直接 declined（0 客户卡）、hand_off 被拒", async () => {
   const temp = makeRoot("intent-confirm-missing-option");
   const h = await harnessAt(temp.root, "intent-confirm-missing-option", {
     decision: true,
@@ -185,12 +185,16 @@ test("Lead 需求确认：decision 开 + 卡缺 confirm 选项 ⇒ 判断 manual
     const sent = await h.send("liaison", "请确认需求后交给报告员。");
     assert.equal(sent.ok, true, sent.error ?? "");
 
-    assert.equal(h.presented.length, 0, "缺 confirm 选项 ⇒ 判断 manual 自动退回，0 张客户卡");
-    assert.equal(h.judgeRows.length, 0, "manual 不产生 approve 结果行");
+    // 2026-10-20：显式 intent-confirm 缺 confirm 选项由 run-role 包装器**判断前直接退回**
+    // （不进判断、不弹客户卡、不写客户决定账本）。
+    assert.equal(h.presented.length, 0, "缺 confirm 选项 ⇒ 0 张客户卡");
+    assert.equal(h.judgeRows.length, 0, "缺 confirm 选项不进入判断");
     const requestReceipt = h.results.find((entry) => entry.name === "request_choice");
     assert.ok(requestReceipt, "应有 request_choice 回执");
     assert.equal(requestReceipt!.ok, false, "缺 confirm 选项不得代批");
-    assert.match(requestReceipt!.message, /没有 confirm 选项|重新提交/);
+    assert.match(requestReceipt!.message, /intent-confirm 必须有 confirm/);
+    assert.match(requestReceipt!.message, /未向客户呈现/);
+    assert.match(requestReceipt!.message, /请补齐选项后重试/);
 
     const handoff = h.results.find((entry) => entry.name === "hand_off_intent");
     assert.ok(handoff, "应有 hand_off_intent 回执");

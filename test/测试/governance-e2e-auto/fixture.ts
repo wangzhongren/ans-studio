@@ -393,6 +393,11 @@ export function scriptedAdapterFactory(options: AdapterOptions): (gate: WriteGat
           ...(caps?.installMcp !== undefined ? { installMcp: caps.installMcp } : {}),
           ...(caps?.uninstallMcp !== undefined ? { uninstallMcp: caps.uninstallMcp } : {}),
           ...(caps?.shellGate !== undefined ? { shellGate: caps.shellGate } : {}),
+          // 2026-10-20：Flow YAML 方法化后，内置治理角色经能力面获得 flow_get / flow_step_update /
+          // flow_step_supersede；脚本适配器必须原样透传，否则工具不注册（测试假阴性）。
+          ...(caps?.flowGet !== undefined ? { flowGet: caps.flowGet } : {}),
+          ...(caps?.flowStepUpdate !== undefined ? { flowStepUpdate: caps.flowStepUpdate } : {}),
+          ...(caps?.flowStepSupersede !== undefined ? { flowStepSupersede: caps.flowStepSupersede } : {}),
         });
         const byName = new Map(tools.map((tool) => [tool.name, tool]));
         const queue = createEventQueue<SessionEvent>();

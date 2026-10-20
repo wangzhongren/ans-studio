@@ -2491,7 +2491,11 @@ test("治理自动推进（真机修正）：任命后角色未写出 ⇒ 先派
           handle.send = async (text: string) => {
             await originalSend(text);
             // 写卡落盘/枚举有延迟：链式推进轮询到 listing 事实前绝不派 Convener。
-            setTimeout(() => { rolesPresent = true; }, 30);
+            // 2026-10-20 确定性门控：模拟写卡时同时落盘真实 role-card/boundary（否则门控会正确拒投）。
+            setTimeout(() => {
+              writeRoleArtifactFiles(root, "executor");
+              rolesPresent = true;
+            }, 30);
           };
         }
         return made.handle;
@@ -2866,6 +2870,8 @@ test("任命写卡→Convener（真机 idle 竞态）：写卡派发后会话立
       emitEvent: (envelope) => { events.push(envelope); },
       listProjectFn: async () => {
         listingCalls += 1;
+        // 2026-10-20 确定性门控：角色「出现」时必须有真实且合格的 role-card/boundary 文件。
+        if (listingCalls >= 3) writeRoleArtifactFiles(root, "executor");
         return listingNow();
       },
       openRoleSessionFn: async (input) => {
@@ -3569,12 +3575,31 @@ interface PostWriteHarness {
   events: SessionEventEnvelope[];
   settles: Map<string, () => void>;
   projectChanged: () => number;
+  /** 2026-10-20：客户卡调用记录（写卡产物门控必须全程零客户卡）。 */
+  customerCalls: unknown[];
+}
+
+/** 2026-10-20 写卡产物门控：写出一个角色的 role-card.md / boundary.yaml（可按需注入坏内容）。 */
+function writeRoleArtifactFiles(
+  root: string,
+  roleId: string,
+  opts: { card?: string; boundary?: string } = {},
+): void {
+  const dir = path.join(root, "角色卡", roleId);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(path.join(dir, "role-card.md"), opts.card ?? `# 角色 ${roleId}\n\n职责说明。\n`);
+  writeFileSync(
+    path.join(dir, "boundary.yaml"),
+    opts.boundary ??
+      [`role: ${roleId}`, "entries:", "  - kind: file", "    path: src/a.ts", "    purpose: p", ""].join("\n"),
+  );
 }
 
 async function makePostWriteHarness(root: string, targets: string[], rolesPresent: () => boolean): Promise<PostWriteHarness> {
   const sendsByRole = new Map<string, string[]>();
   const events: SessionEventEnvelope[] = [];
   const settles = new Map<string, () => void>();
+  const customerCalls: unknown[] = [];
   let projectChanged = 0;
   const iface = createDesktopInterface({
     pickDirectory: async () => root,
@@ -3593,9 +3618,14 @@ async function makePostWriteHarness(root: string, targets: string[], rolesPresen
     buildProjectConfigFn: buildProjectConfig,
     emitProjectChanged: () => { projectChanged += 1; },
     resolveRuntimeFn: async () => ({ ok: true, runtime: "pi", source: "credentials", skipped: [] }),
+    // 2026-10-20：写卡产物门控不得弹客户卡——记录任何调用（期望恒为空）。
+    customerInput: async (request) => {
+      customerCalls.push(request);
+      return { outcome: "declined", reason: "测试替身：写卡门控不应弹卡" };
+    },
   });
   await iface.listProject({ projectRoot: root });
-  return { iface, sendsByRole, events, settles, projectChanged: () => projectChanged };
+  return { iface, sendsByRole, events, settles, projectChanged: () => projectChanged, customerCalls };
 }
 
 function appointmentWritePayload(flowId: string) {
@@ -3621,6 +3651,8 @@ test("写卡后推进：appointment-write answered 后 listing 出现目标角�
     harness = made;
     // 真机场景：Crew 写卡期间 listing 缓存仍是旧的；写完后应用没有重新枚举。
     rolesPresent = true;
+    // 2026-10-20 确定性门控：角色文件必须真实存在且格式合格，否则不派 Convener。
+    for (const roleId of targets) writeRoleArtifactFiles(root, roleId);
 
     const early = await made.iface.advanceGovernanceFlow({
       payload: appointmentWritePayload(flowId),
@@ -3678,11 +3710,11 @@ test("写卡后推进：appointment-write answered 后 listing 出现目标角�
   }
 });
 
-test("写卡后推进：目标角色仍缺 ⇒ 不派 Convener、不发系统行（只诊断），重复 settle 不刷屏", async () => {
+test("2026-10-20 写卡产物门控：重试耗尽仍缺文件 ⇒ 反馈 Crew 修正、不派 Convener、无客户卡；重复 settle/触发不刷屏", async () => {
   const root = makeTempProjectRoot("ans-post-write-missing-");
   try {
     const flowId = "flow-post-write-missing";
-    const targets = ["backend", "frontend", "tester"];
+    const targets = ["backend", "frontend"];
     await seedAppointmentDecision(root, flowId, targets);
     const harness = await makePostWriteHarness(root, targets, () => false);
     try {
@@ -3690,27 +3722,101 @@ test("写卡后推进：目标角色仍缺 ⇒ 不派 Convener、不发系统行
         payload: appointmentWritePayload(flowId),
         context: { sourceRoleId: "nominator", projectRoot: root, runtime: "demo" },
       });
-      await new Promise((resolve) => setTimeout(resolve, 250));
-      assert.equal(harness.sendsByRole.get("convener")?.length ?? 0, 0, "角色仍缺：不派 Convener");
+      // 有界重试（100/300/600ms）耗尽后才反馈 Crew。
+      await waitForTest(() => (harness.sendsByRole.get("nominator")?.length ?? 0) > 0, 5000);
+      const taskText = harness.sendsByRole.get("nominator")![0];
+      for (const rel of [
+        "角色卡/backend/role-card.md",
+        "角色卡/backend/boundary.yaml",
+        "角色卡/frontend/role-card.md",
+        "角色卡/frontend/boundary.yaml",
+      ]) {
+        assert.ok(taskText.includes(rel), `修正任务逐文件列出：${rel}`);
+      }
+      assert.match(taskText, /文件不存在/, "具体问题：文件不存在");
+      assert.match(taskText, /重新发 appointment-write 确认卡/, "要求重发 appointment-write 卡完成写卡");
+      assert.equal(harness.sendsByRole.get("convener")?.length ?? 0, 0, "不派 Convener（不能继续推进）");
+      assert.equal(await ledgersConvenerDispatches(root, flowId), 0, "不写派发账本（不把 appointment 步骤标 done）");
+      assert.equal(harness.customerCalls.length, 0, "不弹客户卡");
+      const notes = harness.events.filter(
+        (envelope) => envelope.event.kind === "message" && (envelope.event.detail as { source?: string } | undefined)?.source === "delivery-note",
+      );
+      assert.equal(notes.length, 1, "Lead 恰一条系统行（写卡产物未通过校验）");
+      assert.equal(notes[0].roleId, "rapporteur", "系统行落 Lead（主入口）");
+      assert.match(notes[0].event.summary ?? "", /写卡产物未通过校验/);
+      assert.match(notes[0].event.summary ?? "", /未派 Steward/);
 
-      // 重复触发（appointment-write + 内置治理角色 settle）：仍不派、不发系统行。
+      // 重复 settle + 再次 appointment-write answered：同 flow+问题哈希不重复反馈、仍不派 Convener。
+      harness.settles.get("nominator")?.();
       await harness.iface.advanceGovernanceFlow({
         payload: appointmentWritePayload(flowId),
         context: { sourceRoleId: "nominator", projectRoot: root, runtime: "demo" },
       });
-      assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "nominator", runtime: "demo" })).ok, true);
-      harness.settles.get("nominator")!();
-      await new Promise((resolve) => setTimeout(resolve, 250));
-      assert.equal(harness.sendsByRole.get("convener")?.length ?? 0, 0, "重复 settle 仍不派");
-      const notes = harness.events.filter(
-        (envelope) => envelope.event.kind === "message" && (envelope.event.detail as { source?: string } | undefined)?.source === "delivery-note",
-      );
-      assert.equal(notes.length, 0, "角色仍缺：不发系统行（只记诊断，不刷屏）");
-      assert.equal(await ledgersConvenerDispatches(root, flowId), 0, "不写派发账本");
+      await new Promise((resolve) => setTimeout(resolve, 1600));
+      assert.equal(harness.sendsByRole.get("nominator")?.length ?? 0, 1, "同问题不重复反馈（issuesHash 去重）");
+      assert.equal(harness.sendsByRole.get("convener")?.length ?? 0, 0, "仍不派 Convener");
     } finally {
       await harness.iface.stopSession();
     }
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-20 写卡产物门控：缺/空/坏格式逐项反馈 Crew（role-card 空、boundary 混 Markdown、role 与目录不一致），不派 Convener、无客户卡", async () => {
+  const cases: {
+    name: string;
+    card?: string;
+    boundary?: string;
+    expect: RegExp;
+  }[] = [
+    { name: "empty-card", card: "", expect: /文件为空（需要角色卡正文）/ },
+    { name: "prose-boundary", boundary: "# 边界说明\n\n这是散文式 Markdown，不是 YAML。\n", expect: /边界 YAML 解析失败/ },
+    {
+      name: "role-mismatch",
+      boundary: ["role: someone-else", "entries:", "  - kind: file", "    path: src/a.ts", "    purpose: p", ""].join("\n"),
+      expect: /顶层 role 与目录 id 不一致/,
+    },
+    {
+      name: "empty-entries",
+      boundary: ["role: A", "entries: []", ""].join("\n"),
+      expect: /entries 为空/,
+    },
+    {
+      name: "no-heading",
+      card: "这是一段没有标题的角色说明。\n",
+      expect: /缺少 Markdown 标题/,
+    },
+  ];
+  for (const artifactCase of cases) {
+    const root = makeTempProjectRoot(`ans-artifact-${artifactCase.name}-`);
+    try {
+      const flowId = "flow-artifact";
+      await seedAppointmentDecision(root, flowId, ["A"]);
+      // listing 已枚举到 A（真实 listProject 对空卡也会枚举；坏 boundary 会跳过——两者都在门控覆盖内）。
+      const harness = await makePostWriteHarness(root, ["A"], () => true);
+      try {
+        writeRoleArtifactFiles(root, "A", {
+          ...(artifactCase.card !== undefined ? { card: artifactCase.card } : {}),
+          ...(artifactCase.boundary !== undefined ? { boundary: artifactCase.boundary } : {}),
+        });
+        await harness.iface.advanceGovernanceFlow({
+          payload: appointmentWritePayload(flowId),
+          context: { sourceRoleId: "nominator", projectRoot: root, runtime: "demo" },
+        });
+        await waitForTest(() => (harness.sendsByRole.get("nominator")?.length ?? 0) > 0, 3000);
+        const text = harness.sendsByRole.get("nominator")![0];
+        assert.match(text, artifactCase.expect, `[${artifactCase.name}] 具体问题如实反馈`);
+        assert.ok(text.includes("角色卡/A/"), `[${artifactCase.name}] 指明文件路径`);
+        assert.match(text, /重新发 appointment-write 确认卡/, `[${artifactCase.name}] 要求重发写卡卡`);
+        assert.equal(harness.sendsByRole.get("convener")?.length ?? 0, 0, `[${artifactCase.name}] 不派 Convener`);
+        assert.equal(await ledgersConvenerDispatches(root, flowId), 0, `[${artifactCase.name}] 不写派发账本`);
+        assert.equal(harness.customerCalls.length, 0, `[${artifactCase.name}] 不弹客户卡`);
+      } finally {
+        await harness.iface.stopSession();
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   }
 });

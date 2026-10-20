@@ -774,6 +774,23 @@ export async function openRoleSession(
               });
             }
           }
+          // 2026-10-20 真机：Lead 的通用 choice（如 keep-v1/do-v2/lead-decide）没有 confirm 选项，属于
+          // **内部协调/工程决策**，不应呈现客户；显式 intent-confirm 缺 confirm 也同样拒绝。
+          // 不发卡、不发行、不调判断、不写 customer.decision（客户只处理 intent-confirm 需求确认）。
+          if (isTrio && req.kind === "choice" && setup.role.id === "liaison") {
+            const optionIds = req.options.map((option) => option.id);
+            if (!optionIds.includes("confirm") && (cardKind === undefined || cardKind === "intent-confirm")) {
+              const reason = cardKind === "intent-confirm"
+                ? "intent-confirm 必须有 confirm/revise 选项；本卡缺少 confirm 选项，未向客户呈现。请补齐选项后重试。"
+                : "这是内部协调/工程决策，不应要求客户选择；请 Lead 自行决定，或用 dispatch_task 派给 Steward/项目角色，并用 flow_step_update 记录。客户只处理 intent-confirm 需求确认。";
+              log.record("governance.choice.rejected", {
+                roleId: setup.role.id,
+                reason,
+                optionIds,
+              });
+              return { outcome: "declined", reason };
+            }
+          }
           if (isTrio) {
             const allowed = TRIO_CARD_KINDS[trioSpec!.id];
             if (cardKind !== undefined && !allowed.includes(cardKind)) {

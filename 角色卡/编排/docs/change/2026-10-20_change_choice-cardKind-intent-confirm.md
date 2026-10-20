@@ -22,6 +22,16 @@
 - 兜底值同时写入传给桌面的 request 与 metadata；继续走 `TRIO_CARD_KINDS` 白名单、preview 完整性、`computeJudgeContext`、judge、账本。
 - 诊断 `governance.cardKind.defaulted`（`kind:"choice"`；confirm 默认补 `kind:"confirm"`）。显式 cardKind 优先；显式非法仍拒绝。
 
+### 1.1 Liaison 通用 choice 门控（2026-10-20 真机新增）
+
+真机又出现 Lead 的 `request_choice`「小决定：契约与提案的 3 处措辞差异如何收口」（keep-v1/do-v2/lead-decide，无 confirm）直接呈现客户。客户要求「内部工程/协调选择不要问我」。在 choice 默认之后、白名单/发卡之前增加确定性门控：
+
+- `isTrio && req.kind === "choice" && roleId === "liaison"`：
+  - `cardKind === undefined` 且选项不含 `confirm` ⇒ `{outcome:"declined", reason:"这是内部协调/工程决策，不应要求客户选择；请 Lead 自行决定，或用 dispatch_task 派给 Steward/项目角色，并用 flow_step_update 记录。客户只处理 intent-confirm 需求确认。"}`；
+  - 显式 `cardKind === "intent-confirm"` 但选项缺 `confirm` ⇒ `{outcome:"declined", reason:"intent-confirm 必须有 confirm/revise 选项；本卡缺少 confirm 选项，未向客户呈现。请补齐选项后重试。"}`；
+  - 不发卡、不调判断、不写 `customer.decision`；诊断 `governance.choice.rejected{roleId,reason,optionIds}`。
+- 选项含 `confirm` 的 Liaison choice 仍按现有默认 `intent-confirm` + 判断；显式非法 cardKind 仍走白名单拒绝；其他角色/项目角色零变化。
+
 ## 2. `intent-confirm` 纳入 decision 组（`src/model/runtime.ts`）
 
 - `GOVERNANCE_CARD_GROUP` 增加 `"intent-confirm": "decision"`。
@@ -43,7 +53,9 @@
 - 新增 `run-role：治理 choice 卡缺 cardKind ⇒ 按角色兜底并生成 judgeContext（Lead=intent-confirm）`：Liaison/Rapporteur/Nominator/Verifier 各自默认；Convener/项目角色不兜底；request/metadata 都带 cardKind，judgeContext 生成。
 - 新增 `intent-confirm：decision 组可代批 confirm；选 revise/缺 confirm 回落 manual`：`governanceCardGroup("intent-confirm")="decision"`；approve selected ["confirm"]；revise ⇒ not-recommended；缺 confirm 选项 ⇒ insufficient-evidence。
 - 既有「无 cardKind 的普通客户选择/确认不写治理账本」回归保持：Lead 的普通 choice（选项 A）因选项形状守卫不兜底，仍不写账本。
-- `node --test "test/编排/**/*.test.ts"` → **697 tests / 697 pass / 0 fail / 0 skipped**
+- 新增 Liaison 通用 choice（keep-v1/do-v2/lead-decide，无 confirm）⇒ declined、客户通道零调用、reason 含「内部协调/工程决策」+ dispatch_task + flow_step_update、无 customer.decision。
+- 新增显式 intent-confirm 缺 confirm ⇒ declined（reason 含「intent-confirm 必须有 confirm/revise 选项」）；其他角色通用 choice（无匹配选项）仍直接到客户通道、无 judgeContext。
+- `node --test "test/编排/**/*.test.ts"` → **699 tests / 699 pass / 0 fail / 0 skipped**
 - `npm run typecheck` → **exit 0**（全仓）
 
 ## 5. 跨角色（重要）

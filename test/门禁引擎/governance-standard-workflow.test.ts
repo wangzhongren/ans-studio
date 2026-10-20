@@ -346,6 +346,38 @@ test("标准工作流：写卡被 declined——Crew/Steward 按 reason 修正�
   }
 });
 
+test("标准工作流：Crew appointment-write 后应用校验——role-card 非空/标题、boundary role 与目录一致、entries 非空纯 YAML；失败修正重发", () => {
+  // 客户 2026-10-20：appointment-write 写完后应用做确定性门控；失败把具体路径/错误退回 Crew，
+  // 不派 Convener、不弹客户卡。
+  const crew = cardTextOf("nominator");
+  assertIncludesAll(
+    crew,
+    [
+      "appointment-write 后应用校验（必须）",
+      "等待/接受应用的确定性校验",
+      "`role-card.md` 存在、非空且有 Markdown 标题",
+      "`boundary.yaml` 可解析、顶层 `role` 与目录 id 一致",
+      "`entries` 非空且为纯 YAML",
+      "不得混入 Markdown 散文",
+      "「角色卡/边界校验未通过」反馈任务",
+      "按所列文件与错误修正后**重新发 appointment-write 确认卡**",
+      "不得绕过校验",
+      "不得直接 `write_file`",
+      "不得把校验问题当客户同意",
+      "不派 Convener、不弹客户卡",
+      "`boundary.yaml` 顶层 `role` 必须等于目录 id",
+      "`entries` 必须非空",
+    ],
+    "Crew 写卡校验纪律",
+  );
+  // 反向断言：校验失败不得被写成「直接写文件绕过」或「客户同意」。
+  assert.doesNotMatch(
+    crew,
+    /校验未通过[^。]{0,60}(直接 `write_file` 绕过|当客户同意)/,
+    "Crew 不得把校验失败当同意或直接写文件绕过",
+  );
+});
+
 test("标准工作流：流程工具——Steward 初始创建例外 + flow_get/flow_step_update/flow_step_supersede；Crew/Draft/Proof 只读流程并用工具记录状态", () => {
   // 客户 2026-10-20 拍板「按这个方案做吧」：流程文件改为方法化工具。初始创建仍走
   // request_confirmation(schedule-write)；创建后步骤状态推进用 flow_get + flow_step_update，
@@ -423,6 +455,14 @@ test("标准工作流：Lead 工作流管理者——flow_get/flow_step_update/f
       "不得直接写 `docs/flows/**`",
       "`revision-conflict`（版本冲突）",
       "`insufficient-evidence`",
+      "内部决策纪律（必须）",
+      "契约措辞、实现细节、排期等内部工程/协调选择",
+      "不得发 `request_choice` 问客户",
+      "Lead 只能发 `intent-confirm` 需求确认卡",
+      "内部决策由你自行决定",
+      "`dispatch_task` 派给 Steward / 项目角色",
+      "并用 flow 工具记录",
+      "不得把内部选择包装成客户决定或另发 `request_choice`",
     ],
     "Lead 工作流管理",
   );

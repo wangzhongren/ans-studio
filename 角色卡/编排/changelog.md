@@ -1253,5 +1253,6 @@
 - `governance-judge-facts.ts`：`requiredArtifactPaths` 对 intent-confirm 不强制物证。
 - `governance-judge-verdict.ts`：intent-confirm 仅代批 confirm（revise/多选 manual、缺 confirm 选项 manual）；`isConfirm` 收窄为 write/appointment-write/schedule-write（修复 intent-confirm 被误返回 confirmed:true）。
 - `governance-judge-prompt.ts`：新增 intent-confirm rubric（意图摘要与客户要求一致 ⇒ confirm；偏离/无法核对 ⇒ manual 可操作返工）；通用 intent 门槛只对 proposal/appointment/acceptance。
+- **Liaison 通用 choice 门控**（同日真机补充）：Lead 的 `request_choice` 无 confirm 选项（keep-v1/do-v2/lead-decide）⇒ `declined` + 指导（内部协调/工程决策，Lead 自行决定或 dispatch_task/flow_step_update），不发卡、不调判断、不写账本；显式 intent-confirm 缺 confirm 同样 declined；选项含 confirm 仍走默认+判断；其他角色零变化；诊断 `governance.choice.rejected`。
 
-**测试**：新增 choice 默认全角色 + intent-confirm 裁决正反例；既有「无 cardKind 普通选择不写账本」回归保持（选项形状守卫）；`test/编排/**` **697 计 697 过 0 红 0 skipped**；`npm run typecheck` **exit 0**（全仓）。**跨角色**：`test/runtime-core/governance-judge.test.ts:48-64` 仍钉旧映射会红（需其属主更新）；`src/provider/runtime/tools.ts:200` 注释与门禁引擎 Lead 卡文案需同步。详见[变更记录](docs/change/2026-10-20_change_choice-cardKind-intent-confirm.md)。
+**测试**：新增 choice 默认全角色 + intent-confirm 裁决正反例 + Liaison 通用 choice/intent-confirm 缺 confirm 拒绝；既有「无 cardKind 普通选择不写账本」回归保持（选项形状守卫）；`test/编排/**` **699 计 699 过 0 红 0 skipped**；`npm run typecheck` **exit 0**（全仓）。**跨角色**：`test/runtime-core/governance-judge.test.ts:48-64` 仍钉旧映射会红（需其属主更新）；`src/provider/runtime/tools.ts:200` 注释与门禁引擎 Lead 卡文案需同步。详见[变更记录](docs/change/2026-10-20_change_choice-cardKind-intent-confirm.md)。

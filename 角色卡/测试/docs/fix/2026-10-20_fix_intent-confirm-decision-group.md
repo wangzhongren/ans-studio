@@ -45,9 +45,10 @@ events:
 | decision 开 + confirm 卡 | `decision:true` | 进判断并代批 confirm；**0 客户卡**；judge 结果行 `selected=["confirm"]`；账本 `intent-confirm accepted` + `decisionEvidence.kind="judge"`；hand_off 成功、Rapporteur 收到任务 |
 | decision 关 + confirm 卡 | `decision:false` | 不进判断、客户卡手答 confirm；`judgeRows=0`；账本 `customer-input` 证据；hand_off 成功 |
 | decision 关 + revise | `decision:false` | 客户卡选 revise；hand_off 被拒（`尚未经客户确认`）、不投递、无交接账本 |
-| decision 开 + 缺 confirm 选项 | `decision:true` | 判断 mechanical 门槛 manual ⇒ **自动退回（0 客户卡）**、`request_choice` 回执拒绝且原因可操作、hand_off 被拒、无交接账本 |
+| decision 开 + 缺 confirm 选项 | `decision:true` | **判断前直接 declined（0 客户卡）**、`request_choice` 回执拒绝且提示补齐选项、hand_off 被拒、无交接账本（2026-10-20 晚由 run-role 包装器前置拒绝；此前为 judge manual 自动退回） |
 
 - 保留 revise 负例与新增缺 confirm 选项负例，expected 0 卡/1 卡按开关区分。
+- 后续（同日）Lead 通用 choice 门控上线：缺 confirm 的显式 intent-confirm 改为 **run-role 包装器判断前直接 declined**（文案「intent-confirm 必须有 confirm/revise 选项…未向客户呈现…请补齐选项后重试」），j 用例已同步；通用 choice 见 `2026-10-20_fix_lead-internal-choice-e2e.md`。
 - 其余旧的 intent-confirm 断言（liaison 审计/种子账本/UI 徽标）均为数据种子或展示，不受本次语义影响，未改。
 
 ## 改动与纪律

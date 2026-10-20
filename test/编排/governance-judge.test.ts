@@ -2344,6 +2344,113 @@ test("run-role：治理 choice 卡缺 cardKind ⇒ 按角色兜底并生成 judg
   }
 });
 
+test("run-role：Liaison 通用 choice（无 confirm）⇒ declined，不发客户卡/不写账本", async () => {
+  await withRoot(async (root) => {
+    const captured: { caps?: AdapterCapabilities; gate?: WriteGate } = {};
+    let rawCalls = 0;
+    const customerInput: CustomerInputFn = () => {
+      rawCalls += 1;
+      return { outcome: "answered", value: { selected: ["keep-v1"] } };
+    };
+    const handle = await openRoleSession(
+      { roleId: "liaison", project: trioProject(root, "liaison"), customerInput, autoRepin: false },
+      { createAdapter: capturingFactory(captured) },
+    );
+    try {
+      const out = await captured.caps!.customerInput!({
+        kind: "choice",
+        title: "小决定：契约与提案的 3 处措辞差异如何收口",
+        options: [
+          { id: "keep-v1", label: "保持 v1" },
+          { id: "do-v2", label: "做 v2" },
+          { id: "lead-decide", label: "Lead 决定" },
+        ],
+        flowId: "flow-a",
+      });
+      assert.equal(out?.outcome, "declined");
+      const reason = (out as { reason?: string }).reason ?? "";
+      assert.match(reason, /内部协调\/工程决策/);
+      assert.match(reason, /dispatch_task/);
+      assert.match(reason, /flow_step_update/);
+      assert.match(reason, /intent-confirm 需求确认/);
+      assert.equal(rawCalls, 0, "不得调用客户通道");
+      await flushGovernanceLedger(root);
+      const ledger = await readGovernanceLedger(root);
+      assert.equal(ledger.entries.filter((entry) => entry.kind === "customer.decision").length, 0, "不写 customer.decision");
+    } finally {
+      await handle.dispose();
+    }
+  });
+});
+
+test("run-role：显式 intent-confirm 缺 confirm ⇒ declined（不发卡）；其他角色通用 choice 零变化", async () => {
+  await withRoot(async (root) => {
+    const captured: { caps?: AdapterCapabilities; gate?: WriteGate } = {};
+    let rawCalls = 0;
+    const handle = await openRoleSession(
+      {
+        roleId: "liaison",
+        project: trioProject(root, "liaison"),
+        autoRepin: false,
+        customerInput: (() => {
+          rawCalls += 1;
+          return { outcome: "answered" as const, value: { selected: ["revise"] } };
+        }) as CustomerInputFn,
+      },
+      { createAdapter: capturingFactory(captured) },
+    );
+    try {
+      const out = await captured.caps!.customerInput!({
+        kind: "choice",
+        title: "确认需求",
+        options: [{ id: "revise", label: "修改" }],
+        cardKind: "intent-confirm",
+        flowId: "flow-a",
+      });
+      assert.equal(out?.outcome, "declined");
+      assert.match((out as { reason?: string }).reason ?? "", /intent-confirm 必须有 confirm\/revise 选项/);
+      assert.equal(rawCalls, 0);
+    } finally {
+      await handle.dispose();
+    }
+  });
+
+  // 其他角色的通用 choice（无 cardKind、无匹配选项）保持旧行为：直接到客户通道，不注入 judgeContext。
+  await withRoot(async (root) => {
+    const captured: { caps?: AdapterCapabilities; gate?: WriteGate } = {};
+    const seen: CapturedInput = {};
+    let rawCalls = 0;
+    const handle = await openRoleSession(
+      {
+        roleId: "rapporteur",
+        project: trioProject(root, "rapporteur"),
+        autoRepin: false,
+        customerInput: ((req, metadata) => {
+          rawCalls += 1;
+          seen.req = req;
+          seen.metadata = metadata;
+          return { outcome: "answered" as const, value: { selected: ["x"] } };
+        }) as CustomerInputFn,
+      },
+      { createAdapter: capturingFactory(captured) },
+    );
+    try {
+      const out = await captured.caps!.customerInput!({
+        kind: "choice",
+        title: "普通选择",
+        options: [{ id: "x", label: "X" }],
+        flowId: "flow-a",
+      });
+      assert.equal(out?.outcome, "answered");
+      assert.equal(rawCalls, 1);
+      assert.equal(seen.req?.cardKind, undefined);
+      assert.equal(seen.metadata?.judgeContext, undefined);
+    } finally {
+      await handle.dispose();
+    }
+  });
+});
+
 test("intent-confirm：decision 组可代批 confirm；选 revise/缺 confirm 回落 manual", () => {
   assert.equal(governanceCardGroup("intent-confirm"), "decision", "2026-10-20 客户要求：需求确认纳入 decision 组");
   const request = (options: Array<{ id: string; label: string }>) => ({
