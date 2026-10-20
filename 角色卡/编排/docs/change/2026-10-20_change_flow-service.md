@@ -70,6 +70,18 @@ createFlowService({ projectRoot, actorRoleId, actorPower, defaultFlowId?, writeF
 - **启用范围**：`governanceModel === "trio"`（项目角色）或内置 trio 角色；single/su 项目保持零账本副作用。
 - 测试：tester 在 `test/evidence/foo.md` 写文件并 settle ⇒ `artifact.observed{artifactPath, actorRoleId:"tester", power:"project"}`；内容变更再记一条、未变更不重复；`docs/secret.md`/`.ans/secret.md`/`角色卡/tester/secret.md` 不观察；flow YAML 的 artifact 步骤 `evidence.ref` 指向该路径时 `validateFlowEvidence` 通过。
 
+### 3.6 应用专用：`completeAcceptanceStep`（2026-10-20 真机补收口）
+
+真机：verifier 第二轮复核完成，验收卡被判断 agent 代批 accept，账本已有 `customer.decision{decisionKind:"acceptance",customerDecision:"accepted",flowId:"bookmark-manager"}`，但 flow YAML 的 `verification` 仍 pending——`evaluateFlowCompletion` 已返回「已有验收决定，流程已收口」，且又重复派了一次 verifier。补应用专用收口（**不注册为角色工具**）：
+
+- 新增并导出 `completeAcceptanceStep({ projectRoot, flowId })`（`flow-service.ts`），经 `src/pipeline/orchestration/flow-state.ts` 公共出口再导出（桌面只消费公共出口）。
+- 行为：
+  - 读 flow YAML；找保留验收步骤（`verification`/`acceptance`，`kind: acceptance`）；已是 `done` ⇒ `{ok:true,idempotent:true,revision,flow}`（不写盘）；
+  - 读账本；必须存在该 flowId 的 `customer.decision{decisionKind:"acceptance",customerDecision:"accepted"}`；缺失（含 rejected）⇒ `{ok:false,code:"acceptance-not-accepted"}`；账本坏行 ⇒ `ledger-unavailable`；
+  - 把验收步骤设为 `status:"done"`、`evidence:{kind:"acceptance",ref:"acceptance"}`（保留其他步骤/supersedes/顺序）；候选 YAML 复核通过后原子写；并发/revision 沿用现有 per-project 串行队列与 `atomic-write`；诊断 `flow.acceptance.completed`；
+  - **不写客户决定账本、不伪造客户批准**；缺保留验收步骤 ⇒ `acceptance-step-missing`。
+- 测试：accepted+pending ⇒ done+acceptance 证据；重复调用幂等；无 accepted/rejected ⇒ `acceptance-not-accepted` 且文件不变；坏账本 ⇒ `ledger-unavailable`、非法 flow ⇒ `invalid-flow` 均不写盘；只读目录原子写失败 ⇒ `write-failed` 原文件不变；并发两调用 ⇒ 一完成一幂等、revision 一致。
+
 ## 4. 注入（`run-role.ts`）
 
 - 每个 `openRoleSession` 创建一个 `createFlowService({ projectRoot, actorRoleId: setup.role.id, actorPower: trioSpec?.function ?? "project" })`。
@@ -79,22 +91,24 @@ createFlowService({ projectRoot, actorRoleId, actorPower, defaultFlowId?, writeF
 
 ## 5. 测试与验证（真实输出）
 
-- `test/编排/flow-service.test.ts` 新增 **11 例**：
+- `test/编排/flow-service.test.ts` **17 例**（11 + Lead manager + 5 completeAcceptanceStep）：
   - get revision=文件 sha256 / Steward/owner/stranger 的 canUpdate；
   - defaultFlowId / 缺失 flowId / not-found / invalid-flow；
   - revision-conflict（带当前 revision/flow，不写盘）；
   - Steward pending→dispatched→delivered→done（dispatch 证据对账；缺 evidence / kind 不匹配 / 账本无记录均 insufficient-evidence）；
   - owner 权限与迁移限制（pending→dispatched 拒、他人步骤 forbidden、delivered→done 拒、dispatched→delivered/failed 允许）；
+  - Lead（liaison）manager：canUpdate 全部未终态、可更新他人 owner、可 supersede；证据/revision 校验不变；
   - 非法迁移（pending→done / dispatched→done / superseded 经 update）；
   - 幂等（同 status/evidence 重放 ok/idempotent，不写盘）；
   - artifact 证据对账（artifact.observed）；
   - supersede（旧/新关系、重复幂等、验收保留 id、已存在 id、非 Steward forbidden）；
   - 原子写失败 ⇒ write-failed 且原文件字节不变；
-  - 并发两个同 revision 更新 ⇒ 恰一成功、一 revision-conflict（串行队列）。
-- `test/编排/governance-judge.test.ts` 新增 1 例：项目角色只有 `flowGet`；内置治理角色有 `flowGet`+`flowStepUpdate`+`flowStepSupersede`。
-- `test/编排/governance-session.test.ts` 新增 1 例：项目角色（tester）settle 后观察 boundary directory 内新增/变更的 `.md`（tester `test/evidence/foo.md`）；内容变更/未变更、禁写路径、`validateFlowEvidence` 对账。
-- `node --test "test/编排/flow-service.test.ts"` → **11/11**
-- `node --test "test/编排/**/*.test.ts"` → **691 tests / 691 pass / 0 fail / 0 skipped**
+  - 并发两个同 revision 更新 ⇒ 恰一成功、一 revision-conflict（串行队列）；
+  - `completeAcceptanceStep`：accepted+pending ⇒ done+acceptance 证据/幂等/未 accepted/rejected/坏账本/非法 flow/原子写失败/并发。
+- `test/编排/governance-judge.test.ts` 新增：项目角色只有 `flowGet`；内置治理角色有 `flowGet`+`flowStepUpdate`+`flowStepSupersede`。
+- `test/编排/governance-session.test.ts` 新增：项目角色（tester）settle 后观察 boundary directory 内新增/变更的 `.md`（tester `test/evidence/foo.md`）；内容变更/未变更、禁写路径、`validateFlowEvidence` 对账。
+- `node --test "test/编排/flow-service.test.ts"` → **17/17**
+- `node --test "test/编排/**/*.test.ts"` → **704 tests / 704 pass / 0 fail / 0 skipped**
 - `npm run typecheck` → **exit 0**（全仓）
 
 ## 6. 跨角色待办
@@ -104,10 +118,13 @@ createFlowService({ projectRoot, actorRoleId, actorPower, defaultFlowId?, writeF
 3. **角色提示/门禁卡文本**：Steward/Convener 的提示仍写「流程状态写入 docs/flows/...yaml」；应改为「用 flow_get/flow_step_update/flow_step_supersede，不直接写 flow 文件」。门禁引擎卡文本归其属主。
 4. **`idempotencyKey` 跨进程重放**：本轮仅靠 status/evidence 相等做幂等；若需要跨进程/重启重放，需账本或持久化 LRU（未做）。
 5. **项目角色 artifact 观察**：已随本批修复（§3.5）；项目角色仍只给 `flowGet`，写 flow 仍由工具化路径/后续批次收口。
+6. **桌面窗口（本批跨角色）**：在 acceptance check / verifier settle 检测到账本已有 accepted 时调用 `completeAcceptanceStep({projectRoot, flowId})`（经 `src/pipeline/orchestration/flow-state.ts`），并在同处跳过/去重 verifier 重派；该函数是应用专用，不注册为角色工具。
 
 ## 7. 残余风险
 
 - 串行队列是**进程内**按项目；跨进程并发写同一 YAML 仍可能 last-writer-wins（原子写保证不损坏，但不做跨进程锁）。
 - YAML 注释/原始格式不保真（数据字段与步骤顺序保留）。
 - `done` 只过滤目标 stepId 的证据 issue（按任务书）；其他既有 done 步骤的账本漂移不会阻断本次更新。
+- `completeAcceptanceStep` 是**应用专用**：只读账本确认 accepted、只写 YAML；没有 accepted 决定时拒绝（含 rejected），不伪造客户批准；幂等只以验收步骤 `done` 为准（不重复读账本）。
+- 桌面重复派 verifier 的去重需桌面侧在调用该函数后同处收口（本批只提供收口函数）。
 - 直接 `write_file` 路径仍在（见 §6.2），「唯一写者」目前是流程约定 + 工具化，不是硬门禁。

@@ -15,7 +15,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
-import { mkdtempSync, mkdirSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 
 import { createDesktopInterface, type DesktopDeps } from "../../app/desktop/interface.ts";
@@ -202,7 +202,7 @@ interface Harness {
 async function makeHarness(
   projectRoot: string,
   listing: ProjectListing,
-  options: { resolveRuntime?: DesktopDeps["resolveRuntimeFn"] } = {},
+  options: { resolveRuntime?: DesktopDeps["resolveRuntimeFn"]; completeAcceptanceStep?: DesktopDeps["completeAcceptanceStepFn"] } = {},
 ): Promise<Harness> {
   const sendsByRole = new Map<string, string[]>();
   const events: SessionEventEnvelope[] = [];
@@ -225,6 +225,8 @@ async function makeHarness(
     // 不依赖开发机真实 `.env`；解析器自身的优先级另见 `runtime-resolution.test.ts`。
     resolveRuntimeFn:
       options.resolveRuntime ?? (async () => ({ ok: true, runtime: "pi", source: "credentials", skipped: [] })),
+    // 2026-10-20：验收通过后的流程收口（编排 completeAcceptanceStep 的桌面注入面；测试用桩验证消费语义）。
+    ...(options.completeAcceptanceStep !== undefined ? { completeAcceptanceStepFn: options.completeAcceptanceStep } : {}),
   });
   await iface.listProject({ projectRoot });
   return { iface, sendsByRole, events, controls };
@@ -1285,6 +1287,230 @@ test("2026-10-20 verifier settle ⇒ Lead 系统行含报告路径（同 flow+�
       await waitFor(() => proofNotes().length > 1);
       assert.equal(proofNotes().length, 2, "报告新版本可再提示一次");
       assert.equal(harness.sendsByRole.get("verifier")!.length, 1, "flow 未更新 ⇒ 不重派 verifier");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// —————— 2026-10-20 真机：验收卡代批 accept 后 flow 仍 pending，且又多派了一次 verifier ——————
+//
+// 消费编排的 `completeAcceptanceStep`（桌面经 Pipeline 公共出口/注入）：accepted ⇒ 收口（标 done）并
+// 直接 return，不再派 verifier；已 done ⇒ 幂等；rejected/无决定 ⇒ 不收口、不误派；失败只诊断/一条系统行。
+
+function acceptedAcceptanceSteps(flowId: string): FlowYamlStepInput[] {
+  return yamlAcceptanceSteps(flowId).map((step) =>
+    step.id === "verification"
+      ? { ...step, status: "done", evidence: { kind: "acceptance", ref: "acceptance" } }
+      : step,
+  );
+}
+
+const acceptanceDecisionEntry = (flowId: string, decision: "accepted" | "rejected"): Omit<GovernanceLedgerEntry, "at"> => ({
+  kind: "customer.decision",
+  flowId,
+  actorRoleId: "liaison",
+  power: "app",
+  decisionKind: "acceptance",
+  customerDecision: decision,
+});
+
+test("2026-10-20 验收收口：accepted + verification pending ⇒ 调 completeAcceptanceStep、步骤 done、不派 verifier、Lead 恰一条；已 done ⇒ 幂等", async () => {
+  const root = makeTempProjectRoot("ans-acceptance-close-");
+  try {
+    const flowId = "flow-close";
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId)));
+    await seedGovernanceEvidence(root, flowId, ["delivery-server"]);
+    await appendLedger(root, [acceptanceDecisionEntry(flowId, "accepted")]);
+    const beforeLedger = await readGovernanceLedger(root);
+    const listing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };
+    const completeCalls: string[] = [];
+    const harness = await makeHarness(root, listing, {
+      completeAcceptanceStep: async ({ projectRoot, flowId: id }) => {
+        completeCalls.push(id);
+        // 模拟编排语义：把保留验收步骤标 done + acceptance 证据（幂等、原子写）。
+        writeFlowStateFile(projectRoot, id, flowStateYaml(id, acceptedAcceptanceSteps(id)));
+        return { ok: true };
+      },
+    });
+    try {
+      const closeNotes = () => deliveryNotes(harness.events, "liaison").filter((note) => note.includes("验收已通过（判断代批或客户手批"));
+      await waitFor(() => completeCalls.length > 0);
+      assert.equal(completeCalls.length, 1, "accepted ⇒ 恰调一次 completeAcceptanceStep");
+      assert.equal(completeCalls[0], flowId);
+      const parsed = parseFlowStateYaml(
+        readFileSync(path.join(root, "docs", "flows", `${flowId}.yaml`), "utf8"),
+        flowId,
+      );
+      assert.equal(parsed.ok, true);
+      if (parsed.ok) {
+        const verification = parsed.flow.steps.find((step) => step.kind === "acceptance");
+        assert.equal(verification?.status, "done", "收口后验收步骤 done");
+        assert.deepEqual(verification?.evidence, { kind: "acceptance", ref: "acceptance" }, "done 带 acceptance 证据");
+      }
+      await waitFor(() => closeNotes().length > 0);
+      assert.equal(closeNotes().length, 1, "Lead 恰一条「验收已通过…已收口」系统行");
+      assert.ok(closeNotes()[0]!.includes(flowId), "系统行含 flowId");
+      assert.ok(!/客户已批准|判断已批准/.test(closeNotes()[0]!), "不伪造客户批准（以账本为准）");
+      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "验收已 accepted ⇒ 不再派 verifier");
+      const afterLedger = await readGovernanceLedger(root);
+      assert.equal(
+        afterLedger.entries.filter((entry) => entry.kind === "customer.decision").length,
+        beforeLedger.entries.filter((entry) => entry.kind === "customer.decision").length,
+        "桌面不写客户决定账本",
+      );
+
+      // 再次触发检查（listProject 导入补齐）：已 done ⇒ 幂等，不重复调用、不重复系统行、不派 verifier。
+      await harness.iface.listProject({ projectRoot: root });
+      await sleep(300);
+      assert.equal(completeCalls.length, 1, "已 done ⇒ 不重复调用收口");
+      assert.equal(closeNotes().length, 1, "同决定不重复系统行");
+      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "仍不派 verifier");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-20 验收收口：accepted + verification 已 done ⇒ 不收口调用、不派 verifier、Lead 一条（幂等）", async () => {
+  const root = makeTempProjectRoot("ans-acceptance-close-done-");
+  try {
+    const flowId = "flow-close-done";
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, acceptedAcceptanceSteps(flowId)));
+    await seedGovernanceEvidence(root, flowId, ["delivery-server"]);
+    await appendLedger(root, [acceptanceDecisionEntry(flowId, "accepted")]);
+    const listing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };
+    const completeCalls: string[] = [];
+    const harness = await makeHarness(root, listing, {
+      completeAcceptanceStep: async ({ flowId: id }) => {
+        completeCalls.push(id);
+        return { ok: true };
+      },
+    });
+    try {
+      const closeNotes = () => deliveryNotes(harness.events, "liaison").filter((note) => note.includes("验收已通过（判断代批或客户手批"));
+      await waitFor(() => closeNotes().length > 0);
+      assert.equal(completeCalls.length, 0, "步骤已 done ⇒ 不再调用收口（幂等）");
+      assert.equal(closeNotes().length, 1, "Lead 恰一条收口系统行");
+      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "已 done/已有决定 ⇒ 不派 verifier");
+      await harness.iface.listProject({ projectRoot: root });
+      await sleep(250);
+      assert.equal(closeNotes().length, 1, "重复检查不刷屏");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-20 验收收口：rejected / 无验收决定 ⇒ 不收口、不误派；无决定且门通过 ⇒ 仍正常派 verifier", async () => {
+  const rejectedRoot = makeTempProjectRoot("ans-acceptance-close-rejected-");
+  const noDecisionRoot = makeTempProjectRoot("ans-acceptance-close-none-");
+  try {
+    const flowId = "flow-close-state";
+    // ① rejected：不收口、不派 verifier（已有验收决定 ⇒ 流程已收口，交给客户/Steward）。
+    writeFlowStateFile(rejectedRoot, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId)));
+    await seedGovernanceEvidence(rejectedRoot, flowId, ["delivery-server"]);
+    await appendLedger(rejectedRoot, [acceptanceDecisionEntry(flowId, "rejected")]);
+    const rejectedListing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: rejectedRoot };
+    const rejectedCalls: string[] = [];
+    const rejected = await makeHarness(rejectedRoot, rejectedListing, {
+      completeAcceptanceStep: async ({ flowId: id }) => { rejectedCalls.push(id); return { ok: true }; },
+    });
+    try {
+      await sleep(400);
+      assert.equal(rejectedCalls.length, 0, "rejected ⇒ 不调收口");
+      assert.equal(rejected.sendsByRole.get("verifier")?.length ?? 0, 0, "已有验收决定 ⇒ 不派 verifier");
+      assert.equal(deliveryNotes(rejected.events, "liaison").filter((note) => note.includes("验收已通过（判断代批或客户手批")).length, 0, "不冒充收口");
+    } finally {
+      await rejected.iface.stopSession();
+    }
+
+    // ② 无验收决定：走既有门 ⇒ 正常派 verifier（收口不介入）。
+    writeFlowStateFile(noDecisionRoot, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId)));
+    await seedGovernanceEvidence(noDecisionRoot, flowId, ["delivery-server"]);
+    const noneListing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: noDecisionRoot };
+    const noneCalls: string[] = [];
+    const none = await makeHarness(noDecisionRoot, noneListing, {
+      completeAcceptanceStep: async ({ flowId: id }) => { noneCalls.push(id); return { ok: true }; },
+    });
+    try {
+      await waitFor(() => (none.sendsByRole.get("verifier")?.length ?? 0) > 0);
+      assert.equal(none.sendsByRole.get("verifier")!.length, 1, "无验收决定 ⇒ 门通过照常派 verifier");
+      assert.equal(noneCalls.length, 0, "无 accepted 决定 ⇒ 不调收口");
+    } finally {
+      await none.iface.stopSession();
+    }
+  } finally {
+    rmSync(rejectedRoot, { recursive: true, force: true });
+    rmSync(noDecisionRoot, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-20 验收收口失败：只诊断/Lead 一条系统行、不循环、不派 verifier", async () => {
+  const root = makeTempProjectRoot("ans-acceptance-close-fail-");
+  try {
+    const flowId = "flow-close-fail";
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId)));
+    await seedGovernanceEvidence(root, flowId, ["delivery-server"]);
+    await appendLedger(root, [acceptanceDecisionEntry(flowId, "accepted")]);
+    const listing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };
+    const completeCalls: string[] = [];
+    const harness = await makeHarness(root, listing, {
+      completeAcceptanceStep: async ({ flowId: id }) => {
+        completeCalls.push(id);
+        return { ok: false, error: "模拟收口失败：flow 不可写" };
+      },
+    });
+    try {
+      const failureNotes = () => deliveryNotes(harness.events, "liaison").filter((note) => note.includes("流程收口失败"));
+      await waitFor(() => failureNotes().length > 0);
+      assert.ok(failureNotes()[0]!.includes("模拟收口失败"), "系统行含具体失败原因");
+      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "收口失败也不派 verifier（验收已决定）");
+      // 再次触发：同一失败原因不刷屏（不循环）；收口调用可被真实事件再次尝试，但不产生第二条系统行。
+      await harness.iface.listProject({ projectRoot: root });
+      await sleep(300);
+      assert.equal(failureNotes().length, 1, "同失败原因不重复刷屏");
+      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "仍不派 verifier");
+    } finally {
+      await harness.iface.stopSession();
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-20 验收收口（真实编排出口）：accepted + verification pending ⇒ completeAcceptanceStep 真写 done、不派 verifier", async () => {
+  const root = makeTempProjectRoot("ans-acceptance-close-real-");
+  try {
+    const flowId = "flow-close-real";
+    writeFlowStateFile(root, flowId, flowStateYaml(flowId, yamlAcceptanceSteps(flowId)));
+    await seedGovernanceEvidence(root, flowId, ["delivery-server"]);
+    await appendLedger(root, [acceptanceDecisionEntry(flowId, "accepted")]);
+    const listing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };
+    // 不注入 completeAcceptanceStepFn：走 Pipeline 公共出口的真实实现。
+    const harness = await makeHarness(root, listing);
+    try {
+      const closeNotes = () =>
+        deliveryNotes(harness.events, "liaison").filter((note) => note.includes("验收已通过（判断代批或客户手批"));
+      await waitFor(() => closeNotes().length > 0);
+      const parsed = parseFlowStateYaml(
+        readFileSync(path.join(root, "docs", "flows", `${flowId}.yaml`), "utf8"),
+        flowId,
+      );
+      assert.equal(parsed.ok, true, parseErrorText(parsed));
+      if (parsed.ok) {
+        const verification = parsed.flow.steps.find((step) => step.kind === "acceptance");
+        assert.equal(verification?.status, "done", "真实 completeAcceptanceStep 已把验收步骤标 done");
+        assert.deepEqual(verification?.evidence, { kind: "acceptance", ref: "acceptance" });
+      }
+      assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "收口后不派 verifier");
+      assert.equal(closeNotes().length, 1, "Lead 恰一条收口系统行");
     } finally {
       await harness.iface.stopSession();
     }

@@ -211,6 +211,77 @@ function serialize<T>(projectRoot: string, task: () => Promise<T>): Promise<T> {
   });
 }
 
+// —————————————————————— 读/写原语（工厂与 completeAcceptanceStep 共用） ——————————————————————
+
+async function readFlowState(
+  projectRoot: string,
+  flowId: string,
+): Promise<
+  | { ok: true; flow: FlowState; revision: string }
+  | { ok: false; result: FlowToolResult }
+> {
+  const abs = flowAbsPath(projectRoot, flowId);
+  let bytes: Buffer;
+  try {
+    bytes = await readFile(abs);
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "ENOENT") {
+      return { ok: false, result: { ok: false, code: "not-found", error: `流程状态不存在：${flowStatePath(flowId)}` } };
+    }
+    return {
+      ok: false,
+      result: { ok: false, code: "read-failed", error: `流程状态不可读：${err instanceof Error ? err.message : String(err)}` },
+    };
+  }
+  const text = bytes.toString("utf8");
+  const parsed = parseFlowStateYaml(text, flowId);
+  if (!parsed.ok) {
+    return {
+      ok: false,
+      result: { ok: false, code: "invalid-flow", error: `流程 YAML 校验失败：${parsed.error}` },
+    };
+  }
+  return { ok: true, flow: parsed.flow, revision: sha256(bytes) };
+}
+
+async function writeFlowState(args: {
+  projectRoot: string;
+  flowId: string;
+  flow: FlowState;
+  event: string;
+  fields: Record<string, unknown>;
+  writeFile: (absPath: string, data: string) => Promise<void>;
+  log: ReturnType<typeof createDiagnosticLogger>;
+  viewActorRoleId: string;
+  viewActorPower: string;
+}): Promise<FlowToolResult> {
+  // 写前重新 parse 候选（防御：形状/保留 id/evidence 对应/supersede 一致性）。
+  const serialized = serializeFlow(args.flow);
+  const parsed = parseFlowStateYaml(serialized, args.flowId);
+  if (!parsed.ok) {
+    return { ok: false, code: "invalid-flow", error: `候选流程 YAML 校验失败：${parsed.error}` };
+  }
+  const abs = flowAbsPath(args.projectRoot, args.flowId);
+  try {
+    await args.writeFile(abs, serialized);
+  } catch (err) {
+    args.log.error(`${args.event}.write.failed`, err, args.fields);
+    return {
+      ok: false,
+      code: "write-failed",
+      error: `流程写盘失败（原文件未被替换）：${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+  const revision = sha256(serialized);
+  args.log.record(args.event, { ...args.fields, revision });
+  return {
+    ok: true,
+    revision,
+    flow: viewOf(parsed.flow, revision, args.viewActorRoleId, args.viewActorPower),
+  };
+}
+
 // —————————————————————— 工厂 ——————————————————————
 
 export function createFlowService(options: CreateFlowServiceOptions): FlowService {
@@ -232,63 +303,27 @@ export function createFlowService(options: CreateFlowServiceOptions): FlowServic
     return { ok: true, flowId };
   }
 
-  async function readFlow(
-    flowId: string,
-  ): Promise<
-    | { ok: true; flow: FlowState; revision: string }
-    | { ok: false; result: FlowToolResult }
-  > {
-    const abs = flowAbsPath(projectRoot, flowId);
-    let bytes: Buffer;
-    try {
-      bytes = await readFile(abs);
-    } catch (err) {
-      const code = (err as NodeJS.ErrnoException).code;
-      if (code === "ENOENT") {
-        return { ok: false, result: { ok: false, code: "not-found", error: `流程状态不存在：${flowStatePath(flowId)}` } };
-      }
-      return {
-        ok: false,
-        result: { ok: false, code: "read-failed", error: `流程状态不可读：${err instanceof Error ? err.message : String(err)}` },
-      };
-    }
-    const text = bytes.toString("utf8");
-    const parsed = parseFlowStateYaml(text, flowId);
-    if (!parsed.ok) {
-      return {
-        ok: false,
-        result: { ok: false, code: "invalid-flow", error: `流程 YAML 校验失败：${parsed.error}` },
-      };
-    }
-    return { ok: true, flow: parsed.flow, revision: sha256(bytes) };
+  function readFlow(flowId: string): ReturnType<typeof readFlowState> {
+    return readFlowState(projectRoot, flowId);
   }
 
-  async function writeFlow(
+  function writeFlow(
     flowId: string,
     flow: FlowState,
     event: string,
     fields: Record<string, unknown>,
   ): Promise<FlowToolResult> {
-    // 写前重新 parse 候选（防御：形状/保留 id/evidence 对应/supersede 一致性）。
-    const serialized = serializeFlow(flow);
-    const parsed = parseFlowStateYaml(serialized, flowId);
-    if (!parsed.ok) {
-      return { ok: false, code: "invalid-flow", error: `候选流程 YAML 校验失败：${parsed.error}` };
-    }
-    const abs = flowAbsPath(projectRoot, flowId);
-    try {
-      await writeFile(abs, serialized);
-    } catch (err) {
-      log.error(`${event}.write.failed`, err, fields);
-      return {
-        ok: false,
-        code: "write-failed",
-        error: `流程写盘失败（原文件未被替换）：${err instanceof Error ? err.message : String(err)}`,
-      };
-    }
-    const revision = sha256(serialized);
-    log.record(event, { ...fields, revision });
-    return { ok: true, revision, flow: viewOf(parsed.flow, revision, actorRoleId, actorPower) };
+    return writeFlowState({
+      projectRoot,
+      flowId,
+      flow,
+      event,
+      fields,
+      writeFile,
+      log,
+      viewActorRoleId: actorRoleId,
+      viewActorPower: actorPower,
+    });
   }
 
   return {
@@ -567,4 +602,106 @@ export function createFlowService(options: CreateFlowServiceOptions): FlowServic
       }).catch(internalError);
     },
   };
+}
+
+/**
+ * **应用专用**：客户已接受验收（账本 `customer.decision{decisionKind:"acceptance",
+ * customerDecision:"accepted"}`）后，把 flow YAML 的保留验收步骤置为
+ * `status:"done"` + `evidence:{kind:"acceptance",ref:"acceptance"}`。
+ *
+ * - **不注册为角色工具**（不进入 AdapterCapabilities / 三 flow 工具）；桌面在 acceptance check /
+ *   verifier settle 检测到 accepted 时直接调用。
+ * - **不写客户决定账本、不伪造客户批准**：只读账本确认已接受，只写 YAML。
+ * - 幂等：验收步骤已是 `done` ⇒ `{ok:true,idempotent:true,revision,flow}`，不写盘。
+ * - 账本坏行 ⇒ `ledger-unavailable`；无 accepted 决定（含 rejected）⇒ `acceptance-not-accepted`；
+ *   缺保留验收步骤 ⇒ `acceptance-step-missing`。
+ * - 与 `createFlowService` 共用 per-project 串行队列、候选 YAML 复核与原子写；写失败不破坏原文件。
+ */
+export async function completeAcceptanceStep(input: {
+  projectRoot: string;
+  flowId: string;
+}): Promise<FlowToolResult> {
+  const projectRoot = path.resolve(input.projectRoot);
+  const flowId = input.flowId;
+  if (typeof flowId !== "string" || !FLOW_ID_RE.test(flowId)) {
+    return { ok: false, code: "missing-flow-id", error: "缺少合法 flowId（应形如 todo-list-v1）。" };
+  }
+  const log = createDiagnosticLogger({ component: "orchestration.flow-service", projectRoot });
+  return serialize(projectRoot, async () => {
+    const read = await readFlowState(projectRoot, flowId);
+    if (!read.ok) return read.result;
+    const view = viewOf(read.flow, read.revision, "app", "app");
+    const index = read.flow.steps.findIndex(
+      (step) => isReservedAcceptanceStepId(step.id) && step.kind === "acceptance",
+    );
+    if (index === -1) {
+      return {
+        ok: false,
+        code: "acceptance-step-missing",
+        revision: read.revision,
+        flow: view,
+        error: "流程缺少保留验收步骤（verification/acceptance，kind: acceptance）。",
+      };
+    }
+    const step = read.flow.steps[index]!;
+    if (step.status === "done") {
+      return { ok: true, idempotent: true, revision: read.revision, flow: view };
+    }
+
+    let ledger;
+    try {
+      ledger = await readGovernanceLedger(projectRoot);
+    } catch (err) {
+      return {
+        ok: false,
+        code: "ledger-unavailable",
+        revision: read.revision,
+        flow: view,
+        error: `治理账本不可读：${err instanceof Error ? err.message : String(err)}`,
+      };
+    }
+    if (ledger.errors.length > 0) {
+      return {
+        ok: false,
+        code: "ledger-unavailable",
+        revision: read.revision,
+        flow: view,
+        error: `治理账本不可读或存在坏行：${ledger.errors[0]}`,
+      };
+    }
+    const accepted = ledger.entries.some(
+      (entry) =>
+        entry.kind === "customer.decision" &&
+        entry.flowId === flowId &&
+        entry.decisionKind === "acceptance" &&
+        entry.customerDecision === "accepted",
+    );
+    if (!accepted) {
+      return {
+        ok: false,
+        code: "acceptance-not-accepted",
+        revision: read.revision,
+        flow: view,
+        error: "该流程尚无客户验收接受决定（decisionKind=acceptance，customerDecision=accepted）；未完成验收步骤。",
+      };
+    }
+
+    const nextSteps = read.flow.steps.map((item, itemIndex) =>
+      itemIndex === index
+        ? { ...item, status: "done" as const, evidence: { kind: "acceptance" as const, ref: "acceptance" } }
+        : item,
+    );
+    const candidate: FlowState = { ...read.flow, steps: nextSteps };
+    return writeFlowState({
+      projectRoot,
+      flowId,
+      flow: candidate,
+      event: "flow.acceptance.completed",
+      fields: { flowId, stepId: step.id },
+      writeFile: (absPath, data) => atomicWrite(absPath, data),
+      log,
+      viewActorRoleId: "app",
+      viewActorPower: "app",
+    });
+  }).catch(internalError);
 }
