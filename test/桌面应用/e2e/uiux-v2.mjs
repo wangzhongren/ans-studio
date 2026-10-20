@@ -40,6 +40,8 @@ const TOOLFOLD_ONLY=process.env.ANS_TOOLFOLD_UI_ONLY==='1';
 const NOTICE_ONLY=process.env.ANS_NOTICE_UI_ONLY==='1';
 // 2026-10-20 真机空白修复：后台在跑角色（有队列/状态行、无 transcript）切过去不得空白。
 const BLANK_ONLY=process.env.ANS_BLANK_PANE_UI_ONLY==='1';
+// 2026-10-20 真机：排队聚合不得随 runtime view 恢复复活旧 queuedRequests。
+const QUEUE_VIEW_ONLY=process.env.ANS_QUEUE_VIEW_UI_ONLY==='1';
 const GOVREACCEPT_ONLY=process.env.ANS_GOVERNANCE_REACCEPT_UI_ONLY==='1';
 const JUDGE_ONLY=process.env.ANS_JUDGE_UI_ONLY==='1';
 const MIRROR_ONLY=process.env.ANS_MIRROR_UI_ONLY==='1';
@@ -1296,6 +1298,31 @@ async function blankPaneChecks(){
   await check('idle no-history role shows neutral placeholder instead of blank',`(()=>{const m=window.__ansRenderer.paneDebug('B');const p=document.querySelector('#chat .chat-pane[data-role-id="B"]');return m.inChat&&m.note&&m.noteText.includes('可直接输入消息')&&!p.querySelector('.sys-replay-divider')&&!p.querySelector('.sys-config');})()`);
 }
 
+async function queueViewChecks(){
+  // 2026-10-20 真机：主进程队列已 0，但切引擎/恢复后旧 queuedRequests 从 runtime view 快照复活，
+  // 界面残留「还有 N 个决定等待前一个决定」。口径：排队事实不跨视图保留，只由主进程重推重建。
+  const saved={roles:listing.roles,primary:listing.primaryRoleId,model:listing.governanceModel,record:listing.governanceRecord,warnings:listing.warnings};
+  const govRole=(roleId,fn)=>({roleId,cardText:'# '+roleId,cardPath:'',boundary:{entries:[]},boundaryPath:'',builtIn:true,governanceFunction:fn,changelog:null,docs:[]});
+  listing.roles=[govRole('liaison','liaison'),govRole('rapporteur','proposal'),{roleId:'A',cardText:'# A',cardPath:'',boundary:{entries:[]},changelog:null,docs:[]}];
+  listing.primaryRoleId='liaison';listing.governanceModel='trio';listing.governanceRecord={state:'present'};listing.warnings=[];
+  await js(`await window.__ansRenderer.selectRuntime('pi');await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)})`);
+  await js(`await window.__ansRenderer.selectRole('liaison')`);await pause(80);
+  const queued=(id,title)=>({id,roleId:'rapporteur',projectRoot:ROOT,runtime:'pi',mirrorRoleId:'liaison',waitingFor:'mirror-1',request:{kind:'confirm',title,cardKind:'proposal'}});
+  await push('session:operator-queued',queued('stale-q1','旧排队一'));
+  await push('session:operator-queued',queued('stale-q2','旧排队二'));
+  await check('queued baseline shows two', `(()=>{const a=document.querySelector('#chat .chat-pane[data-role-id="liaison"] .op-queue-aggregate');return !!a&&a.textContent.includes('还有 2 个决定等待前一个决定')&&window.__ansRenderer.queuedDebug().join(',')==='stale-q1,stale-q2';})()`);
+  await js(`await window.__ansRenderer.selectRuntime('codex')`);
+  await js(`await window.__ansRenderer.selectRuntime('pi')`);
+  await pause(80);
+  await check('runtime view restore does not revive old queued requests or aggregate', `(()=>{const a=document.querySelector('#chat .chat-pane[data-role-id="liaison"] .op-queue-aggregate');return !a&&window.__ansRenderer.queuedDebug().length===0;})()`);
+  await push('session:operator-queued',queued('fresh-q1','新排队'));
+  await check('main-process repush rebuilds aggregate with new count only', `(()=>{const a=document.querySelector('#chat .chat-pane[data-role-id="liaison"] .op-queue-aggregate');return !!a&&a.textContent.includes('还有 1 个决定等待前一个决定')&&!a.textContent.includes('2 个')&&window.__ansRenderer.queuedDebug().join(',')==='fresh-q1';})()`);
+  await push('session:operator-expired',{id:'fresh-q1',roleId:'rapporteur',projectRoot:ROOT,runtime:'pi',reason:'离线清理'});
+  await check('clearing queue removes aggregate', `(()=>{const a=document.querySelector('#chat .chat-pane[data-role-id="liaison"] .op-queue-aggregate');return !a&&window.__ansRenderer.queuedDebug().length===0;})()`);
+  listing.roles=saved.roles;listing.primaryRoleId=saved.primary;listing.governanceModel=saved.model;listing.governanceRecord=saved.record;listing.warnings=saved.warnings;
+  await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRuntime('pi')`);
+}
+
 app.whenReady().then(async()=>{
  const watchdog=setTimeout(()=>{fs.writeFileSync(path.join(OUT,'watchdog.txt'),'timeout');app.exit(1);},60000);
  try {
@@ -1316,6 +1343,7 @@ app.whenReady().then(async()=>{
   if(TOOLFOLD_ONLY){await toolFoldChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports},null,2));console.log('TOOLFOLD_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(NOTICE_ONLY){await noticeChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports,errors},null,2));console.log('SYSTEM_NOTICE_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(BLANK_ONLY){await blankPaneChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports,errors},null,2));console.log('BLANK_PANE_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
+  if(QUEUE_VIEW_ONLY){await queueViewChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports,errors},null,2));console.log('QUEUE_VIEW_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(CONFIG_ONLY){await configChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports},null,2));console.log('CONFIG_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(process.env.ANS_MERGE_UI_ONLY==='1'){await mergeChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports,sends:sends.map(x=>({text:x.text,target:x.target,clientMessageId:x.metadata&&x.metadata.clientMessageId}))},null,2));console.log('MERGE_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(process.env.ANS_RUNTIME_UI_ONLY==='1'){await runtimeChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports,sends},null,2));console.log('RUNTIME_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
