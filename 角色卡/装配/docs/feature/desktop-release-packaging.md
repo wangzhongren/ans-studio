@@ -1,6 +1,6 @@
 # 桌面运行包构建与发布
 
-维护者需要从已确认的版本生成能直接启动的 macOS/Windows ZIP，同时明确包内源码和本地凭据的边界。客户已授权基于 v1.0.0 增加必要打包适配，既有 tag 保持不变；v1.0.0～v1.3.0 沿用同一机制：冻结 tag（v1.1.0＝`e4556cc`、v1.2.0＝`ecca2d3`、v1.3.0＝`16963ee`）＋后置打包 overlay，此前各 tag 与证据均保持不动。
+维护者需要从已确认的版本生成能直接启动的 macOS/Windows ZIP，同时明确包内源码和本地凭据的边界。客户已授权基于 v1.0.0 增加必要打包适配，既有 tag 保持不变；v1.0.0～v1.4.0 沿用同一机制：冻结 tag（v1.1.0＝`e4556cc`、v1.2.0＝`ecca2d3`、v1.3.0＝`16963ee`、v1.4.0＝`83eec7e`）＋后置打包 overlay，此前各 tag 与证据均保持不动。
 
 ```mermaid
 flowchart TD
@@ -43,3 +43,7 @@ flowchart TD
 Windows 内置受限来源文档阅读依照 r2 保持不支持；摘要和执行记录仍可查看，可由操作者使用系统编辑器查看文件，不增加不存在的一键打开入口。
 
 [下载页面](https://github.com/wangzhongren/ans-studio/releases/tag/v1.3.0)与三平台 CI/Release 的实际状态见[本次变更](../change/2026-10-16_change_v1.3-release-packaging.md)（历史版本见[装配 v1.2.0 记录](../change/2026-10-16_change_v1.2-release-packaging.md)、[装配 v1.1.0 记录](../change/2026-10-16_change_v1.1-release-packaging.md)与[测试角色 v1.1.0 发布验收](../../../测试/docs/change/2026-10-16_change_v1.1-release-verification.md)），不得将本机 arm64 构建或 owner 冒烟代替 Windows/x64 实测。
+
+## v1.4.0 配方（2026-10-20，待构建/未发布）
+
+客户指示「发布吧」；机制原样沿用（冻结 tag ＋ 精确 overlay，默认 draft、独立验收后公开）。冻结源＝`83eec7e`（当前 main，`v1.3.0-45`；**源内已含全部产品代码**：`flow_get` / `flow_step_update` / `flow_step_supersede` 流程文件方法化、Lead / 主理 兼任工作流管理者、重启自动续跑、聊天 pane 加载占位、验收重派/收口、角色卡写后门控、artifact 补登、排队 UI 清理、shell/UI 修复），tag `v1.4.0` 由 root 创建后指向该提交。后置 overlay **重置回基础打包面**——policy 指 v1.4.0，白名单＝`package.json`/`package-lock.json`/`release.yml` ＋ `src/common/装配/`、`test/装配/`；v1.3.0 的 8 条一次性条目（`src/provider/codex/session.ts`、6 个平台真值测试文件与 `test/桌面应用/session-rebuild-race.test.ts`）随冻结源吸收**整批移除**，回到 fail-closed/excluded；`app/`·`src/` 未知变更 fail-closed 不变。版本 1.3.0→1.4.0（工件名随之 `ANS-Studio-1.4.0-*`；lock 仅根两处版本字段、零依赖变动）、workflow `source_ref` 默认/concurrency `release-v1.4.0`/发布段 → v1.4.0、README 下载表 → v1.4.0（补 v1.3.0 发布验收链接、保留 v1.2.0/v1.1.0/v1.0.0）。本地验证：typecheck 0 错（ans-cli@1.4.0）、`test/装配/` 81/81；复算 tag→工作区落盘形态 selected 恰为基础集 6 文件（`package.json`、`package-lock.json`、`.github/workflows/release.yml`、`src/common/装配/release-policy.mjs`、`src/common/装配/release-policy.d.mts`、`test/装配/release-packaging.test.ts`）、零 `app/`·`src/` 未列名触发；机制在临时 clone 预演通过（tag 解析 `83eec7e`→模拟 overlay 提交→prepare 退出 0、`overlayPaths` 恰 6、`actualTree 8a85dec7885f5ee565df50903927036ed9a59e33`；真实仓库未污染）。**本机 arm64 打包冒烟未做（不在本次派发清单）；macOS x64 与 Windows x64 必须由 CI 原生 runner 实测；overlay 提交、CI 触发与发布尚未执行。**详见[本次变更](../change/2026-10-20_change_v1.4-release-packaging.md)（含[证据目录](../change/2026-10-20-release-packaging-v1.4-evidence/)）。

@@ -1,5 +1,7 @@
 # 装配备忘录
 
+- 2026-10-20（v1.4.0 发布配方）：客户「发布吧」。冻结源＝main `83eec7ed…`（v1.3.0-45，全部产品代码已含：flow 工具方法化、Lead 工作流管理者、重启续跑、聊天 pane 占位、验收重派/收口、角色卡写后门控、artifact 补登、排队 UI 清理、shell/UI 修复）；package/lock 根版本 1.4.0（lock 仅根两处、零依赖）；release-policy `SOURCE_REF='v1.4.0'`/`SOURCE_SHA='83eec7e…'`，白名单重置基础集（package/lock/release.yml＋src/common/装配/、test/装配/），v1.3.0 一次性条目整批移除（codex session、6 平台真值测试、session-rebuild-race）；release.yml → v1.4.0（默认/并发/发布段/标题/notes 首句）；test/装配 断言同步（81/81）、README 下载表 1.4.0＋本版要点＋v1.3.0 验收链接；打包说明新增 v1.4.0 配方段。复算 tag→工作区 selected 恰 6 文件、零 app/·src/ 未列名触发；临时 clone 预演 prepare exit 0（overlayPaths 6、actualTree `8a85dec…`、excludedChanges 文档面）；typecheck 0（ans-cli@1.4.0）。**未打 tag/未提交/未推送；CI 三平台实测与发布待 root。**证据见 docs/change/2026-10-20-release-packaging-v1.4-evidence/ 与 change 记录。
+
 - 2026-10-14 B1D仅文档：README开头/桌面步骤5、6/设置入口/存储与等待措辞已按实际3desktop/4CLI、通用masked设置、role/runtime ans/native和Pi legacy、适配器实际context修正。ANS层等待无限不代表原生上游无限；Claude24.8d/Codex期限未知保留。21own source/config/tests与写前逐项SHA一致；.env.example已有准确信息未改，actual.env未读。只链接/格式/矛盾/scope检查，无新fullsuite/nativeproof；history/live及Window/T1仍原属主门槛。证据docs/change/2026-10-14_change_readme-multi-runtime-desktop.md。
 
 - 2026-10-14 ANS-RUNTIME-V2 B1：固定本角色已完成Interface-only root接线。flag/env全四运行时贯穿两命令，role默认demo/govern默认Pi，demo原替身和单文件writeSet保持；新增已接受3角色fallback。实际Service+handlers/Nodebin/SDK懒加载/缺配置与SDK错误验证，装配67项+窗口受影响11项78/78、全仓tsc0。原全仓1165/1168两窗口红：边界顺序由Governance修后已精确通过，目录名ans-cli断言交D1。Codex显式空base语义交X1，本示例省略此可选键。A1V最终no-bare+disableAllHooks已同步README。SHA38f896...，原记录/api-spec/稳定feature已补；无实际.env、账号、模型或Git写。

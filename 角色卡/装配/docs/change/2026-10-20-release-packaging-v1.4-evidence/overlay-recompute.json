@@ -1,0 +1,39 @@
+{
+  "sourceSha": "83eec7ed1966b215d81035cac33d7dda80013f05",
+  "changedPaths": [
+    ".github/workflows/release.yml",
+    "README.md",
+    "package-lock.json",
+    "package.json",
+    "src/common/装配/release-policy.d.mts",
+    "src/common/装配/release-policy.mjs",
+    "test/装配/release-packaging.test.ts",
+    "角色卡/装配/changelog.md",
+    "角色卡/装配/docs/feature/desktop-release-packaging.md",
+    "角色卡/装配/memo.md",
+    "角色卡/装配/docs/change/2026-10-20-release-packaging-v1.4-evidence/overlay-recompute.json",
+    "角色卡/装配/docs/change/2026-10-20-release-packaging-v1.4-evidence/sim-provenance.json",
+    "角色卡/装配/docs/change/2026-10-20-release-packaging-v1.4-evidence/test-assembly.txt",
+    "角色卡/装配/docs/change/2026-10-20-release-packaging-v1.4-evidence/typecheck.txt",
+    "角色卡/装配/docs/change/2026-10-20_change_v1.4-release-packaging.md"
+  ],
+  "selected": [
+    ".github/workflows/release.yml",
+    "package-lock.json",
+    "package.json",
+    "src/common/装配/release-policy.d.mts",
+    "src/common/装配/release-policy.mjs",
+    "test/装配/release-packaging.test.ts"
+  ],
+  "excluded": [
+    "README.md",
+    "角色卡/装配/changelog.md",
+    "角色卡/装配/docs/feature/desktop-release-packaging.md",
+    "角色卡/装配/memo.md",
+    "角色卡/装配/docs/change/2026-10-20-release-packaging-v1.4-evidence/overlay-recompute.json",
+    "角色卡/装配/docs/change/2026-10-20-release-packaging-v1.4-evidence/sim-provenance.json",
+    "角色卡/装配/docs/change/2026-10-20-release-packaging-v1.4-evidence/test-assembly.txt",
+    "角色卡/装配/docs/change/2026-10-20-release-packaging-v1.4-evidence/typecheck.txt",
+    "角色卡/装配/docs/change/2026-10-20_change_v1.4-release-packaging.md"
+  ]
+}

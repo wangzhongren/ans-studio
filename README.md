@@ -34,13 +34,15 @@ ANS Studio 面向希望在真实项目中使用多个 AI 角色协作的开发�
 
 ## 下载与运行
 
-当前版本：[v1.3.0](https://github.com/wangzhongren/ans-studio/releases/tag/v1.3.0)。运行包自带运行环境，启动应用无需另装 Node.js；执行项目的 `npm test`、Git 等命令，仍需安装该项目所需的开发工具链。
+当前版本：[v1.4.0](https://github.com/wangzhongren/ans-studio/releases/tag/v1.4.0)。运行包自带运行环境，启动应用无需另装 Node.js；执行项目的 `npm test`、Git 等命令，仍需安装该项目所需的开发工具链。
 
 | 系统 | 下载 | 启动方式 |
 | --- | --- | --- |
-| macOS 13+ · Apple Silicon | [mac-arm64.zip](https://github.com/wangzhongren/ans-studio/releases/download/v1.3.0/ANS-Studio-1.3.0-mac-arm64.zip) | 完整解压，打开 `ANS Studio.app` |
-| macOS 13+ · Intel | [mac-x64.zip](https://github.com/wangzhongren/ans-studio/releases/download/v1.3.0/ANS-Studio-1.3.0-mac-x64.zip) | 完整解压，打开 `ANS Studio.app` |
-| Windows 10/11 · x64 | [win-x64.zip](https://github.com/wangzhongren/ans-studio/releases/download/v1.3.0/ANS-Studio-1.3.0-win-x64.zip) | 完整解压，打开 `ANS Studio.exe`，保留同目录资源文件 |
+| macOS 13+ · Apple Silicon | [mac-arm64.zip](https://github.com/wangzhongren/ans-studio/releases/download/v1.4.0/ANS-Studio-1.4.0-mac-arm64.zip) | 完整解压，打开 `ANS Studio.app` |
+| macOS 13+ · Intel | [mac-x64.zip](https://github.com/wangzhongren/ans-studio/releases/download/v1.4.0/ANS-Studio-1.4.0-mac-x64.zip) | 完整解压，打开 `ANS Studio.app` |
+| Windows 10/11 · x64 | [win-x64.zip](https://github.com/wangzhongren/ans-studio/releases/download/v1.4.0/ANS-Studio-1.4.0-win-x64.zip) | 完整解压，打开 `ANS Studio.exe`，保留同目录资源文件 |
+
+v1.4.0 要点：流程文件方法化（`flow_get` / `flow_step_update` / `flow_step_supersede`，Lead 兼任工作流管理者）；重启后自动续跑；聊天 pane 加载占位；验收重派与通过后自动收口；角色卡写后门控；artifact 补登；排队决定处理后清理 UI 聚合；若干 shell/UI 修复。
 
 运行包尚未签名或公证，系统可能提示来源未验证。请从上述 Release 下载，并核对页面中的 `SHA256SUMS-*.txt`。
 
@@ -205,6 +207,7 @@ npm run typecheck
 
 ## 深入了解
 
+- [v1.3.0 发布验收与公开下载](角色卡/测试/docs/change/2026-10-17_change_v1.3-release-verification.md)：实际产物、来源与测试证据。
 - [v1.2.0 发布验收与公开下载](角色卡/测试/docs/change/2026-10-16_change_v1.2-release-verification.md)：实际产物、来源与测试证据。
 - [v1.1.0 发布验收与公开下载](角色卡/测试/docs/change/2026-10-16_change_v1.1-release-verification.md)：实际产物、来源与测试证据。
 - [v1.0.0 发布与三平台验收](角色卡/测试/docs/change/2026-10-15_change_v1-release-verification.md)：实际产物、来源与测试证据。

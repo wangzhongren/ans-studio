@@ -7,8 +7,8 @@ test('release overlay preserves Chinese build paths and excludes private data an
     'package.json', '.env', '.ans/sessions/private.jsonl', 'README.md', '角色卡/装配/docs/change/release.md']);
   assert.deepEqual(result.selected, ['src/common/装配/release-prepare.mjs', 'test/装配/release-packaging.test.ts', 'package.json']);
   assert.deepEqual(result.excluded, ['.env', '.ans/sessions/private.jsonl', 'README.md', '角色卡/装配/docs/change/release.md']);
-  assert.equal(SOURCE_REF, 'v1.3.0');
-  assert.equal(SOURCE_SHA, '16963ee3f59acc1f812141709858690f1a24501b');
+  assert.equal(SOURCE_REF, 'v1.4.0');
+  assert.equal(SOURCE_SHA, '83eec7ed1966b215d81035cac33d7dda80013f05');
 });
 
 test('release refuses unreviewed production changes and similarly named private directories', () => {
@@ -21,11 +21,11 @@ test('release refuses unreviewed production changes and similarly named private 
     ['package.json', 'test/装配/release-packaging.test.ts']);
 });
 
-// v1.3.0：白名单**重置为基础集**（打包/版本/发布面——冻结源 tag v1.3.0 已含全部产品代码）。
-// v1.2.0 曾按精确路径一次性纳入的两项均已随冻结源吸收、整批移除（src/provider/codex/session.ts 随后因
-// overlay-2 平台修复**再次**精确列入——见下用例）；test/测试/kanban-fixes-verify/f1-timeout.test.ts 及其余
-// 未列名 test/ 文件（test/runtime-core/** 硬化对等、test/codex-adapter/**）一律 excluded、不随构建树分发。
-// 本用例锁死 test/ 排除面总边界（overlay-2 增列 7 条为精确白名单，不影响未列名文件）。
+// v1.4.0：白名单**重置为基础集**（打包/版本/发布面——冻结源 tag v1.4.0 已含全部产品代码）。
+// v1.3.0 曾按精确路径一次性纳入的 8 条（src/provider/codex/session.ts、6 个平台真值测试文件与
+// test/桌面应用/session-rebuild-race.test.ts）均已随冻结源吸收、整批移除，回到 fail-closed/excluded。
+// 未列名 test/ 文件（test/runtime-core/**、test/codex-adapter/** 等）一律 excluded、不随构建树分发。
+// 本用例锁死 test/ 排除面总边界。
 test('release overlay keeps the packaging surface exact: unreviewed test files stay excluded', () => {
   const result = selectOverlay(['package.json', 'test/测试/kanban-fixes-verify/f1-timeout.test.ts',
     'test/runtime-core/shell-exec-timeout.test.ts', 'test/runtime-core/fixtures.ts', 'test/codex-adapter/session.test.ts']);
@@ -34,34 +34,23 @@ test('release overlay keeps the packaging surface exact: unreviewed test files s
     'test/runtime-core/shell-exec-timeout.test.ts', 'test/runtime-core/fixtures.ts', 'test/codex-adapter/session.test.ts']);
 });
 
-// overlay-2（首跑 Windows CI run 38924209553 的 8 红处置）：仅 1 处产品修复——src/provider/codex/session.ts
-// （win32 taskkill 清收上界 120ms→2000ms，仍为有界；姊妹用例峰值负载 212ms 通过为证）；其余 6 条为验证套件
-// 平台真值分支（Windows libuv 十键豁免/路径分隔符原生形/POSIX 信号无面/控制字符名不可建盘；断言本体零放宽）。
-// 7 条均按精确路径列入、不开目录——本用例同时锁死入选面与**同目录排除面**（未列名的同目录文件仍 excluded）。
-test('release overlay includes exactly the reviewed Windows-platform fix batch by exact path', () => {
-  const result = selectOverlay(['package.json', 'src/provider/codex/session.ts',
-    'test/pi-adapter/installed-mcp-servers.test.ts', 'test/pi-adapter/installed-skills-injection.test.ts',
-    'test/测试/g4-skill-verify/b-render-double-check.test.ts', 'test/测试/g4-skill-verify/c-preauth.test.ts',
+// v1.4.0 白名单重置后，v1.3.0 的一次性条目回到基础规则：生产修复落 src/ 即 fail-closed，
+// 7 个测试文件（6 个平台真值分支 + session-rebuild-race 夹具修复）落 test/ excluded，不随构建树。
+test('release overlay returns v1.3.0 one-off entries to fail-closed or excluded', () => {
+  assert.throws(() => selectOverlay(['src/provider/codex/session.ts']), /Unreviewed production overlay/);
+  const result = selectOverlay(['test/pi-adapter/installed-mcp-servers.test.ts',
+    'test/测试/g4-skill-verify/b-render-double-check.test.ts',
     'test/测试/g4-skill-verify/f-fingerprint.test.ts',
     'test/测试/g4v2-mcp-verify/g-claude-launcher.test.ts', 'test/测试/g4v2-mcp-verify/j-pi.test.ts',
-    'test/测试/g5-reasoning-verify/h-scope-audit.test.ts', 'test/测试/g5-reasoning-verify/a-contract.test.ts']);
-  assert.deepEqual(result.selected, ['package.json', 'src/provider/codex/session.ts',
-    'test/pi-adapter/installed-mcp-servers.test.ts',
-    'test/测试/g4-skill-verify/b-render-double-check.test.ts', 'test/测试/g4-skill-verify/f-fingerprint.test.ts',
+    'test/测试/g5-reasoning-verify/h-scope-audit.test.ts',
+    'test/桌面应用/session-rebuild-race.test.ts']);
+  assert.deepEqual(result.selected, []);
+  assert.deepEqual(result.excluded, ['test/pi-adapter/installed-mcp-servers.test.ts',
+    'test/测试/g4-skill-verify/b-render-double-check.test.ts',
+    'test/测试/g4-skill-verify/f-fingerprint.test.ts',
     'test/测试/g4v2-mcp-verify/g-claude-launcher.test.ts', 'test/测试/g4v2-mcp-verify/j-pi.test.ts',
-    'test/测试/g5-reasoning-verify/h-scope-audit.test.ts']);
-  assert.deepEqual(result.excluded, ['test/pi-adapter/installed-skills-injection.test.ts',
-    'test/测试/g4-skill-verify/c-preauth.test.ts', 'test/测试/g5-reasoning-verify/a-contract.test.ts']);
-});
-
-// overlay-5（第四跑 run 38931760696 Windows 新红；桌面窗口修复、产品零改）：test/桌面应用/session-rebuild-race.test.ts
-// 的首曝期夹具时序脆性（等长重写 × filePath 缓存 (mtimeMs,size) 命中 × 平台时间戳粒度合并；原用例本体未动，
-// 修复＝夹具尺寸可判化＋守卫＋免疫回归钉）。按精确路径列入（单文件、不开目录——同目录未列文件仍 excluded）。
-test('release overlay includes exactly the reviewed session-rebuild-race fixture fix by exact path', () => {
-  const result = selectOverlay(['package.json', 'test/桌面应用/session-rebuild-race.test.ts',
-    'test/桌面应用/renderer.test.ts']);
-  assert.deepEqual(result.selected, ['package.json', 'test/桌面应用/session-rebuild-race.test.ts']);
-  assert.deepEqual(result.excluded, ['test/桌面应用/renderer.test.ts']);
+    'test/测试/g5-reasoning-verify/h-scope-audit.test.ts',
+    'test/桌面应用/session-rebuild-race.test.ts']);
 });
 
 import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';

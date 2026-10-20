@@ -1,0 +1,26 @@
+{
+  "sourceRef": "v1.4.0",
+  "sourceSha": "83eec7ed1966b215d81035cac33d7dda80013f05",
+  "overlaySha": "ab1ed9d6f1abb3953fabde6c039b0882e5ee871e",
+  "actualTree": "8a85dec7885f5ee565df50903927036ed9a59e33",
+  "overlayPaths": [
+    ".github/workflows/release.yml",
+    "package-lock.json",
+    "package.json",
+    "src/common/装配/release-policy.d.mts",
+    "src/common/装配/release-policy.mjs",
+    "test/装配/release-packaging.test.ts"
+  ],
+  "overlayPatchSha256": "9c7a18590f948c45157981dd477ba22061e29d8debc730922fa123e3ad2c50b0",
+  "excludedChanges": [
+    "README.md",
+    "角色卡/装配/changelog.md",
+    "角色卡/装配/docs/change/2026-10-20-release-packaging-v1.4-evidence/overlay-recompute.json",
+    "角色卡/装配/docs/change/2026-10-20-release-packaging-v1.4-evidence/sim-provenance.json",
+    "角色卡/装配/docs/change/2026-10-20-release-packaging-v1.4-evidence/test-assembly.txt",
+    "角色卡/装配/docs/change/2026-10-20-release-packaging-v1.4-evidence/typecheck.txt",
+    "角色卡/装配/docs/change/2026-10-20_change_v1.4-release-packaging.md",
+    "角色卡/装配/docs/feature/desktop-release-packaging.md",
+    "角色卡/装配/memo.md"
+  ]
+}
