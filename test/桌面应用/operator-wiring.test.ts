@@ -1397,32 +1397,101 @@ test("结果行人话摘要：四类卡的代批行含「judge 代批 · 代审�
   assert.match(judgeResultSummary({ ...base, group: "approval", cardKind: "write", paths: ["p1", "p2", "p3", "p4"] }), /代审批：确认写入 4 个路径/);
 });
 
-test("intent-confirm：客户专属需求确认卡不调用判断 agent、不发结果行，正常呈现并作答", async () => {
-  let judgeCalls = 0;
-  const { channel, pushed, results } = makeJudgeChannel({
-    enabled: () => true,
-    judge: async (request) => {
-      judgeCalls += 1;
-      return { verdict: "manual", group: request.group, cardKind: request.cardKind, reasonCode: "model-manual", engine: request.runtime };
-    },
-  });
-  const card: CustomerInputRequest = {
+test("intent-confirm（2026-10-20 纳入 decision 组）：开关开启 ⇒ 判断调用、approve confirm 自动作答（零客户卡/结果行/审计）；开关关闭 ⇒ 原卡手答（confirm/revise/取消）；manual ⇒ 自动退回不伪造同意", async () => {
+  const card = (): CustomerInputRequest => ({
     kind: "choice",
     title: "需求确认",
     cardKind: "intent-confirm",
     flowId: "flow-i",
     options: [{ id: "confirm", label: "确认" }, { id: "revise", label: "修改" }],
-  };
-  const p = channel.customerInput(card, { roleId: "liaison", projectRoot: "/p", runtime: "claude" });
+  });
+  const ctx = { roleId: "liaison", projectRoot: "/p", runtime: "claude" as const, governanceModel: "trio" as const };
+  const meta = { cardKind: "intent-confirm" as const, flowId: "flow-i", judgeContext: judgeContextOf("flow-i") };
+
+  // ① 开关开启（decision）：判断调用；approve confirm ⇒ 自动作答（无客户卡、结果行/审计按既有 approve 路径）。
+  const requests: GovernanceJudgeRequest[] = [];
+  const on = makeJudgeChannel({
+    enabled: (group) => group === "decision",
+    judge: async (request) => {
+      requests.push(request);
+      return {
+        verdict: "approve",
+        group: request.group,
+        cardKind: request.cardKind,
+        reasonCode: "sufficient",
+        engine: request.runtime,
+        value: { selected: ["confirm"] },
+        durationMs: 7,
+      };
+    },
+  });
+  const answered = on.channel.customerInput(card(), ctx, meta);
   await flushJudge();
-  assert.equal(judgeCalls, 0, "intent-confirm 无判断分组：绝不调用判断 agent");
-  assert.equal(pushed.length, 1, "卡片正常呈现（不因无分组而拒绝）");
-  assert.equal(pushed[0].judgeNotice, undefined, "无 judge 提示");
-  assert.equal(results.length, 0, "不产生 judge 结果行");
-  assert.equal(channel.respond({ id: "op-1", decision: { kind: "choice", selected: ["confirm"] } }).ok, true);
-  const outcome = await p;
-  assert.equal(outcome!.outcome, "answered");
-  assert.deepEqual(outcome!.value, { selected: ["confirm"] }, "客户手答原样结算");
+  assert.equal(requests.length, 1, "intent-confirm 已纳入 decision 组：开关开启即调用判断 agent");
+  assert.equal(requests[0].group, "decision", "分组＝decision（客户 2026-10-20「勾了替我决策就不用我管」）");
+  assert.equal(requests[0].cardKind, "intent-confirm", "卡片种类如实传给判断");
+  assert.equal(on.pushed.length, 0, "代批成功 ⇒ 不呈现客户卡");
+  const auto = (await answered)!;
+  assert.equal(auto.outcome, "answered", "approve confirm ⇒ 自动作答");
+  assert.deepEqual(auto.value, { selected: ["confirm"] }, "自动作答 confirm");
+  assert.equal(auto.operatorId, "judge:claude", "审计标明由 judge 代作（不是客户手答）");
+  assert.equal(auto.judge?.cardKind, "intent-confirm");
+  assert.deepEqual(auto.judge?.selected, ["confirm"]);
+  assert.equal(on.results.length, 1, "结果行按既有 judge approve 路径恰一条");
+  assert.deepEqual(on.results[0].selected, ["confirm"]);
+  assert.equal(on.results[0].group, "decision");
+  assert.equal(on.channel.pendingCount(), 0, "无挂起卡");
+
+  // ② 开关关闭：不判断、原卡照旧；confirm / revise / 取消三条路径都交回客户原样结算。
+  let offCalls = 0;
+  const off = makeJudgeChannel({
+    enabled: () => false,
+    judge: async () => { offCalls += 1; throw new Error("开关关闭时不应调用判断"); },
+  });
+  const p1 = off.channel.customerInput(card(), ctx, meta);
+  await flushJudge();
+  assert.equal(offCalls, 0, "开关关闭 ⇒ 不判断");
+  assert.equal(off.pushed.length, 1, "开关关闭 ⇒ 客户卡照旧呈现");
+  assert.equal(off.results.length, 0, "无 judge 结果行");
+  assert.equal(off.channel.respond({ id: "op-1", decision: { kind: "choice", selected: ["confirm"] } }).ok, true);
+  const firstOutcome = (await p1)!;
+  assert.equal(firstOutcome.outcome, "answered");
+  assert.deepEqual((firstOutcome as { value?: unknown }).value, { selected: ["confirm"] }, "客户手答 confirm 原样结算");
+  const p2 = off.channel.customerInput(card(), ctx, meta);
+  await flushJudge();
+  assert.equal(off.pushed.length, 2);
+  assert.equal(off.channel.respond({ id: "op-2", decision: { kind: "choice", selected: ["revise"] } }).ok, true);
+  const revised = (await p2)!;
+  assert.equal(revised.outcome, "answered");
+  assert.deepEqual((revised as { value?: unknown }).value, { selected: ["revise"] }, "revise 仍交回客户（判断不代选）");
+  assert.equal((revised as { judge?: unknown }).judge, undefined, "手答无 judge 审计");
+  const p3 = off.channel.customerInput(card(), ctx, meta);
+  await flushJudge();
+  assert.equal(off.pushed.length, 3);
+  assert.equal(off.channel.respond({ id: "op-3", decision: { kind: "choice", cancelled: true } }).ok, true);
+  assert.equal((await p3)!.outcome, "declined", "取消 = 未获同意（不伪造客户同意）");
+
+  // ③ 判断 manual（无法核对/偏离）：不呈现客户卡、自动退回发起角色重做（2026-10-19 总原则），
+  //    绝不伪造客户同意或选项。
+  const manual = makeJudgeChannel({
+    enabled: (group) => group === "decision",
+    judge: async (request) => ({
+      verdict: "manual",
+      group: request.group,
+      cardKind: request.cardKind,
+      reasonCode: "insufficient-evidence",
+      reason: "意图摘要与客户当前要求不一致",
+      engine: request.runtime,
+    }),
+  });
+  const rework = (await manual.channel.customerInput(card(), ctx, meta))!;
+  await flushJudge();
+  assert.equal(manual.pushed.length, 0, "manual ⇒ 不呈现客户卡（自动退回重做）");
+  assert.equal(rework.outcome, "declined", "未获客户同意 ⇒ declined（不伪造 answered）");
+  assert.match(rework.reason ?? "", /本次自动判断未通过\/未完成，已拒绝/, "可操作原因如实回投发起角色");
+  assert.equal((rework as { value?: unknown }).value, undefined, "绝不伪造客户同意/选项");
+  assert.equal((rework as { judge?: unknown }).judge, undefined, "manual 不产生代批审计");
+  assert.equal(manual.results.length, 0, "manual 不发 approve 结果行");
 });
 
 test("SessionManager：trio 会话注入 governanceJudge 上下文；single/su 不构造", async () => {

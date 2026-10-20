@@ -752,7 +752,25 @@ export async function openRoleSession(
               log.record("governance.cardKind.defaulted", {
                 roleId: setup.role.id,
                 cardKind: defaulted,
+                kind: "confirm",
                 declaredPaths,
+              });
+            }
+          }
+          // 2026-10-20：choice 卡同样按内置治理角色默认（Lead 的 intent-confirm 等）；显式 cardKind 优先。
+          if (isTrio && cardKind === undefined && req.kind === "choice") {
+            const defaulted = defaultGovernanceChoiceCardKind(
+              trioSpec!.id,
+              req.options.map((option) => option.id),
+            );
+            if (defaulted !== undefined && TRIO_CARD_KINDS[trioSpec!.id].includes(defaulted)) {
+              cardKind = defaulted;
+              effectiveReq = { ...req, cardKind: defaulted };
+              effectiveMetadata = { ...(originalMetadata ?? {}), cardKind: defaulted };
+              log.record("governance.cardKind.defaulted", {
+                roleId: setup.role.id,
+                cardKind: defaulted,
+                kind: "choice",
               });
             }
           }
@@ -1775,6 +1793,33 @@ function defaultGovernanceConfirmCardKind(
       return "write";
     case "nominator":
       return declaredPaths.every((rel) => /^角色卡\/[^/]+\//.test(rel)) ? "appointment-write" : "write";
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * 2026-10-20 真机 bookmank op-1：Lead 的 `request_choice`（intent-confirm）漏带 cardKind ⇒ 无 judge 事件。
+ * choice 卡的**角色默认**（仅当该 kind 在该角色 `TRIO_CARD_KINDS` 白名单内才生效）：
+ *   liaison → intent-confirm（选项须含 confirm）；rapporteur → proposal（须含 accept）；
+ *   nominator → appointment（选项为角色 id，不额外限定）；verifier → acceptance（须含 accept）；
+ *   convener 不默认（choice 卡类型不明确）；其他/项目角色不猜。
+ * 选项形状守卫避免把「普通选择卡」误判为治理决定卡（沿用旧行为）。
+ */
+function defaultGovernanceChoiceCardKind(
+  roleId: BuiltInGovernanceRoleSpec["id"],
+  optionIds: readonly string[],
+): GovernanceCardKind | undefined {
+  const has = (id: string): boolean => optionIds.includes(id);
+  switch (roleId) {
+    case "liaison":
+      return has("confirm") ? "intent-confirm" : undefined;
+    case "rapporteur":
+      return has("accept") ? "proposal" : undefined;
+    case "nominator":
+      return "appointment";
+    case "verifier":
+      return has("accept") ? "acceptance" : undefined;
     default:
       return undefined;
   }

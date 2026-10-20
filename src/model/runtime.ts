@@ -150,7 +150,8 @@ export interface GovernanceFlowMetadata {
 /**
  * `request_choice` 允许的治理卡片种类（评审 §5.8）。
  * `intent-confirm`（2026-10-18 客户拍板）：主理（Lead/liaison）在 `hand_off_intent` 前发给客户的
- * **需求确认卡**，选项 id 固定 `confirm`/`revise`；**客户本人专属**，判断 agent 永不代批。
+ * **需求确认卡**，选项 id 固定 `confirm`/`revise`。**2026-10-20 客户新要求「勾了替我决策就不用我管」**：
+ * 该卡纳入 `decision` 组，判断 agent 可代批 `confirm`；`revise` 仍交回客户/发起角色（不替客户修改）。
  */
 export type GovernanceChoiceCardKind = "proposal" | "appointment" | "acceptance" | "intent-confirm";
 
@@ -173,9 +174,9 @@ export type GovernanceJudgeGroup = "approval" | "decision";
 /**
  * 卡片种类 → 开关分组（冻结；新增卡种必须回到评审更新本表）。
  *
- * **`intent-confirm` 故意缺席**（2026-10-18 客户拍板）：需求确认卡由客户本人回答，
- * 是判断 agent **永不介入**的客户专属卡；缺席 ⇒ `governanceCardGroup` 返回 `undefined` ⇒
- * 即使两个开关都开也不判断、不代批。**不要**为它补键。
+ * **`intent-confirm`**：2026-10-18 客户曾拍板「需求确认卡由客户本人回答、判断 agent 永不介入」；
+ * **2026-10-20 客户新要求「勾了替我决策就不用我管」**推翻该口径——需求确认卡纳入 `decision` 组，
+ * 判断 agent 可在开关开启时代批 `confirm`（`revise` 仍交回客户/发起角色）。此处是唯一映射来源。
  */
 export const GOVERNANCE_CARD_GROUP: Readonly<Partial<Record<GovernanceCardKind, GovernanceJudgeGroup>>> = Object.freeze({
   write: "approval",
@@ -184,10 +185,12 @@ export const GOVERNANCE_CARD_GROUP: Readonly<Partial<Record<GovernanceCardKind, 
   proposal: "decision",
   appointment: "decision",
   acceptance: "decision",
+  "intent-confirm": "decision",
 });
 
 /**
- * 卡片种类所属开关分组。`undefined`/未知/`intent-confirm`（客户专属需求确认）⇒ `undefined` ⇒ **永不判断**。
+ * 卡片种类所属开关分组。`undefined`/未知 ⇒ `undefined` ⇒ **永不判断**。
+ * `intent-confirm` 自 2026-10-20 起纳入 `decision` 组（客户「勾了替我决策就不用我管」）。
  * 运行时入参可能来自不可信调用方，故除类型外再做一次自有键检查。
  */
 export function governanceCardGroup(kind: GovernanceCardKind | undefined): GovernanceJudgeGroup | undefined {

@@ -1751,8 +1751,9 @@ export class SessionManager {
     // 置为**确认制**（`request_confirmation`/`request_choice` 注册；gate 走「客户确认才发行 writeSet」）——
     // 「客户确定了才加、才落盘」。**普通角色的会话一律不注入**（无客户通道：工具不注册、gate 旧语义逐字
     // 不变）。通道未接（deps.customerInput 缺省）⇒ 不注入——**绝不**出现「没人问就放行」。
-    // 2026-10-18 Lead 需求确认：Liaison（Lead / 主理）**需要** customerInput 发 `intent-confirm` 需求确认卡
-    // （客户本人回答；判断 agent 永不介入）。隔离由编排 `TRIO_CARD_KINDS.liaison = ["intent-confirm"]` 保证：
+    // 2026-10-18 Lead 需求确认，2026-10-20 客户修正：Liaison（Lead / 主理）**需要** customerInput 发
+    // `intent-confirm` 需求确认卡——**客户决策卡**；「替我决策」开关开启时判断 agent 可代批 `confirm`，
+    // `revise` 仍交回客户。隔离由编排 `TRIO_CARD_KINDS.liaison = ["intent-confirm"]` 保证：
     // 其他治理卡在 Liaison 会话里**结构性拒绝**（不弹卡、declined），不占「一项目一卡」决定队列。
     // `intent-confirm` 不镜像（由 Lead 本人发）；single/su 旧行为不变。
     // trio 下客户作出决定后的 `customer.decision` 账本写入在编排的 `customerInput` 包装器内（评审 §5.7，

@@ -530,6 +530,18 @@ export function approveReport(parsed: ParsedJudgePrompt): Record<string, unknown
       selected: ["accept"],
     };
   }
+  if (parsed.cardKind === "intent-confirm") {
+    // 2026-10-20 客户「勾了替我决策就不用我管」：需求确认卡纳入 decision 组；
+    // 判断只代批 confirm（revise 交回客户/发起角色）。
+    return {
+      verdict: "approve",
+      group: parsed.group,
+      cardKind: parsed.cardKind,
+      reason: "离线判断夹具：需求确认卡可代批 confirm。",
+      evidence,
+      selected: ["confirm"],
+    };
+  }
   return {
     verdict: "approve",
     group: parsed.group,

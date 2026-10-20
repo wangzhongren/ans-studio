@@ -1,5 +1,34 @@
 # 门禁引擎 变更记录
 
+## 2026-10-20 — intent-confirm 在替我决策开启时可由判断 agent 代批 confirm；revise 永不代选（客户新口径）
+
+客户 2026-10-20 新口径：勾了「替我决策」就不用客户管——`intent-confirm` 需求确认卡在 decision 开关
+开启时可由判断 agent 代批 `confirm`；`revise` 仍交回客户/发起角色。编排/运行时已把 intent-confirm
+纳入 decision 组。本批只在**门禁引擎**边界内同步 Lead 卡文本与测试。完整记录见
+[变更记录](docs/change/2026-10-20_change_intent-confirm-auto-confirm.md)。
+
+- **边界**：`src/common/门禁引擎/governance-roles.ts`、
+  `test/门禁引擎/governance-standard-workflow.test.ts`、`test/门禁引擎/governance-trio.test.ts`、
+  `test/门禁引擎/liaison-role.test.ts`、本文件、`memo.md`、
+  `docs/change/2026-10-20_change_intent-confirm-auto-confirm.md`（新）。未碰
+  `src/common/编排/**`、`app/**`、`test/测试/**`、`src/provider/**`、`src/service/**`、
+  其他角色文件/测试、真实项目；不读 `.env`、不跑真实模型/凭据/网络；未 commit。
+- **Lead 卡**：标准工作流第 4/5 步与「需求确认（必须）」段补——开关开启时判断 agent 可代批
+  `confirm`（仅当复述与客户当轮要求一致）；`revise` 永远不由判断代选、仍交回客户/发起角色；
+  客户或判断 agent 代批 `confirm` 后才能 `hand_off_intent`；`revise` 先改意图文件、重新发确认卡、
+  确认前不得交接；代批不是客户逐项批准、不改写客户意图，只是确认复述与客户当轮要求一致。
+- **保留**：`cardKind=intent-confirm`、`flowId=<intentId>`、`confirm` / `revise` 选项、
+  `revise` 重发纪律、判断代批既有纪律全部不变；卡文本不存在「客户本人专属/判断永不介入」旧口径。
+- **测试**：门禁引擎 **286 计 / 285 过 / 0 红 / 1 skip**；更新 Lead 标准工作流、五卡卡文本与
+  Liaison 需求确认三处断言，新增代批 confirm / revise 永不代选 / 代批性质；既有断言未放宽。
+- **typecheck**：本批改动文件 0 错；整仓 exit 1，错误全部在边界外——`test/桌面应用/operator-wiring.test.ts`
+  （`value`/`judge` 属性）与 `test/测试/governance-e2e-auto/j-intent-confirm.test.ts`（`toolCallId`），
+  属桌面/测试角色在飞改动，待其属主修复。
+- **跨角色待办（未越界）**：编排/运行时需保证 decision 开关开启时 intent-confirm 可代批 confirm、
+  `revise` 永不自动选择；代批不得改写客户意图；判断回执仍标 `judge 代批`。
+- **残余风险**：代批条件（复述与客户当轮要求一致）与 revise 永不代选依赖运行时/判断实现，卡文本是
+  行为约束；真机端到端与独立复验未进行。来源：客户 2026-10-20 新口径（经协调方转达）。
+
 ## 2026-10-20 — Lead / 主理 设为工作流管理者（dispatch_task + flow 工具纪律）（客户拍板）
 
 客户拍板：把主理 Lead 设为**工作流管理者**，可和所有职能角色沟通。本批只在**门禁引擎**边界内改

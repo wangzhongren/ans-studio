@@ -1242,3 +1242,16 @@
 - `flow-service.ts`：管理者判定扩为 `schedule`（Steward/Convener）或 `liaison`（Lead）；Lead 的 `canUpdate`=全部未终态，可 update/supersede；证据/revision/串行/原子写校验不变；错误文案「Steward/Lead」。
 
 **测试**：governance-gate 新增 coordinate 正反例；governance-judge 新增 action 选择 + Liaison 端到端 coordinate/dispatch；flow-service 新增 Lead manager；liaison-session 能力矩阵更新；`test/编排/**` **695 计 695 过 0 红 0 skipped**；`npm run typecheck` **exit 0**（全仓）。详见[变更记录](docs/change/2026-10-20_change_lead-workflow-manager.md)。
+
+## 2026-10-20 — choice 卡缺 `cardKind` 按角色兜底（Lead intent-confirm 可代批）
+
+**来源**：真机 bookmank op-1 需求确认卡没有 judge 事件——Lead 的 `request_choice`（intent-confirm）没带 `cardKind`，`governedInput` 只对 confirm 卡默认。客户要求「勾了替我决策就不用我管」。本批未改 `app/**`、`src/provider/**`、门禁卡。
+
+**改了什么**
+- `run-role.ts`：choice 卡缺 cardKind 时按角色默认（Liaison=intent-confirm、Rapporteur=proposal、Nominator=appointment、Verifier=acceptance；Convener/项目角色不默认），仅当在 `TRIO_CARD_KINDS` 白名单内且选项形状匹配（Liaison 含 confirm、Rapporteur/Verifier 含 accept）；兜底值写入 request/metadata，继续 `computeJudgeContext` 与判断；诊断 `governance.cardKind.defaulted{kind:"choice"}`。
+- `src/model/runtime.ts`：`GOVERNANCE_CARD_GROUP` 增加 `"intent-confirm": "decision"`（推翻 2026-10-18「永不介入」旧口径）。
+- `governance-judge-facts.ts`：`requiredArtifactPaths` 对 intent-confirm 不强制物证。
+- `governance-judge-verdict.ts`：intent-confirm 仅代批 confirm（revise/多选 manual、缺 confirm 选项 manual）；`isConfirm` 收窄为 write/appointment-write/schedule-write（修复 intent-confirm 被误返回 confirmed:true）。
+- `governance-judge-prompt.ts`：新增 intent-confirm rubric（意图摘要与客户要求一致 ⇒ confirm；偏离/无法核对 ⇒ manual 可操作返工）；通用 intent 门槛只对 proposal/appointment/acceptance。
+
+**测试**：新增 choice 默认全角色 + intent-confirm 裁决正反例；既有「无 cardKind 普通选择不写账本」回归保持（选项形状守卫）；`test/编排/**` **697 计 697 过 0 红 0 skipped**；`npm run typecheck` **exit 0**（全仓）。**跨角色**：`test/runtime-core/governance-judge.test.ts:48-64` 仍钉旧映射会红（需其属主更新）；`src/provider/runtime/tools.ts:200` 注释与门禁引擎 Lead 卡文案需同步。详见[变更记录](docs/change/2026-10-20_change_choice-cardKind-intent-confirm.md)。

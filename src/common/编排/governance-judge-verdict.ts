@@ -441,6 +441,17 @@ export function evaluateGovernanceJudgeVerdict(args: EvaluateGovernanceJudgeVerd
       }
       break;
     }
+    case "intent-confirm": {
+      // 2026-10-20 客户「勾了替我决策就不用我管」：需求确认卡纳入 decision 组，判断 agent 可代批 confirm。
+      // 只代批 confirm（revise 交回客户/发起角色）；卡片形状/选项不合法 ⇒ manual（可操作返工）。
+      if (request.card.kind !== "choice" || !request.card.options.some((option) => option.id === "confirm")) {
+        return manualOutcome(args, "insufficient-evidence", "需求确认卡没有 confirm 选项；请修正卡片后重新提交。");
+      }
+      if (!sameSet(verdict.selected ?? [], ["confirm"])) {
+        return manualOutcome(args, "not-recommended", "需求确认卡只能代批 confirm（revise 交回客户）；请按意图修正后重新提交。");
+      }
+      break;
+    }
     case "appointment": {
       const recommended = request.recommendedRoleIds;
       if (request.card.kind !== "choice") {
@@ -591,9 +602,10 @@ export function evaluateGovernanceJudgeVerdict(args: EvaluateGovernanceJudgeVerd
     return manualOutcome(args, "insufficient-evidence", "代批结论缺少可核对证据；请修正后重新提交。");
   }
 
-  const isConfirm = request.cardKind !== "proposal"
-    && request.cardKind !== "appointment"
-    && request.cardKind !== "acceptance";
+  // 只有真正的写盘确认卡才返回 confirmed:true；proposal/appointment/acceptance/intent-confirm 返回 selected。
+  const isConfirm = request.cardKind === "write"
+    || request.cardKind === "appointment-write"
+    || request.cardKind === "schedule-write";
   const paths = isConfirm ? uniquePaths(Array.isArray(request.paths) ? request.paths : []) : [];
   const pathDecisions = isConfirm
     ? (verdict.pathDecisions ?? []).map((decision) => {

@@ -158,18 +158,15 @@ test("五角色全自动链路：意图→提案→接受→流程→提名→�
   });
   try {
     await h.open("liaison");
-    // 卡片作答发生在 send 的等待期内 ⇒ 不 await send，先等卡、手答，再等本轮结束。
-    const sending = h.send("liaison", "请把客户意图交给报告员。");
-
-    // 2026-10-18 客户拍板：Lead 先发 intent-confirm 卡，客户手答（判断 agent 不介入）；
-    // 确认后 hand_off_intent 才被放行。
-    await h.waitFor(() => h.presented.length === 1, 5000);
-    const confirmCard = h.presented[0]!;
-    assert.equal(confirmCard.request.cardKind, "intent-confirm", "Lead 先发需求确认卡");
-    assert.equal(h.judgeRows.length, 0, "需求确认卡由客户手答，判断 agent 不得代批");
-    h.answer(confirmCard.id, { kind: "choice", selected: ["confirm"] });
-    const sent = await sending;
+    // 2026-10-20 客户「勾了替我决策就不用我管」：intent-confirm 纳入 decision 组——
+    // decision 开关开 ⇒ 判断代批 confirm（0 客户卡），hand_off_intent 直接放行。
+    const sent = await h.send("liaison", "请把客户意图交给报告员。");
     assert.equal(sent.ok, true, sent.error ?? "");
+    assert.equal(h.presented.length, 0, "intent-confirm 由判断代批，0 张客户卡");
+    const intentRow = h.judgeRows.find((row) => row.cardKind === "intent-confirm");
+    assert.ok(intentRow, "应有 intent-confirm 判断结果行");
+    assert.equal(intentRow!.group, "decision", "需求确认卡属 decision 组");
+    assert.deepEqual(intentRow!.selected, ["confirm"], "判断只代批 confirm");
 
     // 等整条链路收口：executor 角色卡落盘 + Convener 派发入账。
     await h.waitFor(
@@ -221,6 +218,11 @@ test("五角色全自动链路：意图→提案→接受→流程→提名→�
       assert.ok(decision, `应有 ${kind} 决定`);
       assert.equal(decision!.decisionEvidence?.kind, "judge", `${kind} 应由判断代批并留 judge 证据`);
     }
+    // 2026-10-20：需求确认卡也由判断代批（decision 组），账本证据 kind=judge。
+    const intentConfirm = decisions.find((entry) => entry.decisionKind === "intent-confirm");
+    assert.ok(intentConfirm, "应有 intent-confirm 决定");
+    assert.equal(intentConfirm!.customerDecision, "accepted");
+    assert.equal(intentConfirm!.decisionEvidence?.kind, "judge", "需求确认由判断代批并留 judge 证据");
     const appDispatches = ledger.entries.filter(
       (entry) => entry.kind === "dispatch.accepted" && entry.actorRoleId === "app",
     );
@@ -249,9 +251,8 @@ test("五角色全自动链路：意图→提案→接受→流程→提名→�
     assert.equal(convenerDispatch!.stepId, "impl");
     assert.equal(convenerDispatch!.power, "schedule");
 
-    // —— 界面：仅需求确认卡 1 张（客户手答）；其余治理卡由判断代批（0 手动卡）、listing 刷新、当前 pane 不切换 ——
-    assert.equal(h.presented.length, 1, "仅 intent-confirm 由客户手答；其余治理卡 0 张手动卡");
-    assert.equal(h.presented[0]!.request.cardKind, "intent-confirm");
+    // —— 界面：全部治理卡由判断代批（含 intent-confirm），0 张手动卡；listing 刷新、当前 pane 不切换 ——
+    assert.equal(h.presented.length, 0, "decision 开：intent-confirm 与其余治理卡全部自动代批，0 张手动卡");
     const listing = await h.iface.listProject({ projectRoot: temp.root });
     assert.equal(listing.roles.some((role) => role.roleId === "executor"), true);
     assert.ok(h.projectChanged > 0, "listing 刷新触发 project:changed");

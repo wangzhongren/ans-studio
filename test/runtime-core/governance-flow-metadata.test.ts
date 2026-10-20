@@ -6,7 +6,7 @@ import path from "node:path";
 import { buildGovernedTools } from "../../src/provider/runtime/tools.ts";
 import { describeTool } from "../../src/provider/runtime/schema.ts";
 import { createRuntimeAdapter } from "../../src/service/runtime/session.ts";
-import { GOVERNANCE_SLUG_PATTERN } from "../../src/model/runtime.ts";
+import { GOVERNANCE_SLUG_PATTERN, governanceCardGroup } from "../../src/model/runtime.ts";
 import type {
   CustomerInputMetadata,
   CustomerInputRequest,
@@ -74,7 +74,7 @@ test("request_choice：flowId/stepId/cardKind 原样进入卡片请求与回调 
   }
 });
 
-test("request_choice：intent-confirm（客户需求确认）合法透传（confirm/revise）；判断分组无该卡种", async () => {
+test("request_choice：intent-confirm（客户需求确认）合法透传（confirm/revise）；判断分组为 decision", async () => {
   let request!: CustomerInputRequest;
   let metadata!: CustomerInputMetadata;
   const byName = tools({
@@ -97,6 +97,9 @@ test("request_choice：intent-confirm（客户需求确认）合法透传（conf
   assert.equal(request.cardKind, "intent-confirm");
   assert.equal(metadata.cardKind, "intent-confirm");
   assert.equal(metadata.roleId, "liaison");
+  // 2026-10-20 客户拍板「勾了替我决策就不用我管」：intent-confirm 由 decision 开关代批 confirm；
+  // revise 仍交回客户/发起角色（归一化在编排，运行时核心只提供映射）。
+  assert.equal(governanceCardGroup("intent-confirm"), "decision");
 });
 
 test("request_confirmation：合法 appointment-write 透传；非法 slug/种类在触达客户通道前拒绝", async () => {
