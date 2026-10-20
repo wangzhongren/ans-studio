@@ -523,6 +523,13 @@ export interface SessionManagerDeps {
   /** **看护只读统计**（G-2/W1；role_status 的「看护」行数据面——`watchdog.ts` 的 `stats`）。缺省 ⇒ 该行
    *  如实记「未接线」。 */
   watchdogStats?: (projectRoot: string) => import("./watchdog.ts").WatchdogStats | undefined;
+  /**
+   * **投递队列持久化文件路径**（2026-10-20 客户要求：应用重启后任务自动续跑，不是只给 Lead 提示）。
+   * 由 Interface 提供（`<userData>/ans/delivery-queue.json`）——**绝不写项目文件、不写 `.env`**。
+   * 缺省 ⇒ 不持久化（旧行为零变化）。enqueue/claim/delivery.end/drain 时原子写（tmp+rename，失败只诊断）；
+   * 启动/项目导入时用 `restorePersistedDeliveries()` 重新入队并按既有 drain 路径自动重投。
+   */
+  deliveryQueueStorePath?: string;
   /** **时钟（G-2；注入以便单测）**；缺省 `Date.now`。 */
   now?: () => number;
 }
@@ -670,6 +677,47 @@ interface DeliveryItem {
   opts?: PromptOptions;
   handback?: TaskHandback;
   batchItems?: readonly DeliveryItem[];
+}
+
+/**
+ * **持久化投递队列的磁盘形状**（2026-10-20 客户要求：重启后任务自动续跑）。
+ * 只存 **JSON 安全字段**：`opts`（含图片/回调）、活动 `batchItems`、attempt 标识不落盘——恢复时按原文本
+ * 重新投递（任务文本自足，允许模型续做/重做）。`state:"in-flight"` 表示崩溃/退出时正在投递的条目，
+ * 重启后按 queued 重投一次。
+ */
+export interface PersistedDeliveryItemV1 {
+  key: { projectRoot: string; roleId: string; runtime: RuntimeKind };
+  item: {
+    kind: DeliveryItem["kind"];
+    runtime: RuntimeKind;
+    targetRoleId: string;
+    sourceRoleId: string;
+    text: string;
+    summary: string;
+    dedupKey: string;
+    enqueuedAt: string;
+    flowId?: string;
+    deliveryId?: string;
+    handback?: TaskHandback;
+    report?: RuntimeReportSnapshotV1;
+    liveReport?: RuntimeLiveReportViewV1;
+    liveDurability?: "memory-only" | "unknown-live";
+  };
+  state: "queued" | "in-flight";
+  enqueuedAt: string;
+}
+
+/** `restorePersistedDeliveries()` 的如实报告（Interface 据此落 Lead 系统行「已恢复 N 条并重投」）。 */
+export interface DeliveryQueueRestoreReport {
+  restored: number;
+  skipped: number;
+  items: {
+    projectRoot: string;
+    roleId: string;
+    runtime: RuntimeKind;
+    kind: DeliveryItem["kind"];
+    summary: string;
+  }[];
 }
 
 /** 队列摘要用的一句短句（L-1 可见性；仅呈现，不参与任何判定）。 */
@@ -844,10 +892,25 @@ export class SessionManager {
    * ——优先活会话，其次本记录，最后 `"pi"`（真实产品默认；demo 是开发替身）。仅为投递择路，不改任何判定。
    */
   private readonly lastGovernanceRuntime = new Map<string, RuntimeKind>();
+  /**
+   * **投递队列持久化（2026-10-20 客户要求：重启后任务自动续跑）**：存储路径（缺省 ⇒ 不持久化）、
+   * 串行原子写链、以及「delivery.end 已完成」键（`queueKey\0dedupKey`——in-flight 快照据此排除，
+   * 崩溃重启只重投**未完成**的投递）。
+   */
+  private readonly deliveryQueueStorePath: string | undefined;
+  private deliveryPersistChain: Promise<void> = Promise.resolve();
+  private deliveryPersistSeq = 0;
+  private readonly deliveredDeliveryKeys = new Set<string>();
+  /**
+   * 持久化**武装**标志：只有在 `restorePersistedDeliveries()` 读过磁盘（或确认文件不存在）后才允许写——
+   * 防止启动早期（恢复之前）的一次入队用空内存快照覆盖磁盘上的待恢复条目。
+   */
+  private deliveryStoreArmed = false;
 
   constructor(deps: SessionManagerDeps) {
     this.deps = deps;
     this.loadEffectiveConfig = deps.loadEffectiveConfig ?? defaultLoadEffectiveConfig;
+    this.deliveryQueueStorePath = deps.deliveryQueueStorePath;
   }
 
   // —————————————— G-2（W1）：看护的观察/活动转发与时钟 ——————————————
@@ -1000,6 +1063,8 @@ export class SessionManager {
     for (const finish of settleWaiters ?? []) finish(false);
     if (this.activeRoleId === roleId) this.activeRoleId = null;
     this.activeDeliveries.delete(this.queueKey(entry.projectRoot, entry.roleId, entry.runtime)); // 会话没了，「进行中」不再成立
+    // 2026-10-20 重启续跑：会话释放后内存态变化同步落盘（未投的队列项仍如实保留）。
+    this.persistDeliveryQueues();
     // 状态准确性：dispose 即真实信号（会话已移出保活表，busy 判据随之恒 false）——外推快照，
     // 徽标/队列行随之转「已停止」；**不删其投递队列**（未投的待办仍如实保留可见）。
     this.notifyRoleState(entry.projectRoot, entry.roleId, entry.runtime);
@@ -2148,6 +2213,11 @@ export class SessionManager {
               }
               const finishedDelivery = this.activeDeliveries.get(this.queueKey(en.projectRoot, roleId, runtime));
               this.activeDeliveries.delete(this.queueKey(en.projectRoot, roleId, runtime)); // 「进行中」随本轮结束撤销
+              // 2026-10-20 重启续跑：本轮结束 ⇒ 清理已完成标记并落盘（持久项已在 delivery.end 移除）。
+              if (finishedDelivery !== undefined) {
+                this.deliveredDeliveryKeys.delete(`${this.queueKey(en.projectRoot, roleId, runtime)}\u0000${finishedDelivery.dedupKey}`);
+              }
+              this.persistDeliveryQueues();
               // 状态准确性：settled = 「本角色离开工作中」的**真实信号**（B-2 下切走的后台轮次结束也走这里）
               // ——先外推再放行队列（放行时 busy 复位已可见）。
               this.notifyRoleState(en.projectRoot, roleId, runtime);
@@ -2570,6 +2640,243 @@ export class SessionManager {
     // 否则「告警/收束投递本身」会把静默窗口反复重置或反过来触发骚扰回路。
     if (item.kind !== "system") this.noteWatchdogActivity(projectRoot, `enqueue-${item.kind}`);
     this.notifyRoleState(projectRoot, targetRoleId, item.runtime); // L-1：入队即外推（队列行/徽标如实可见）
+    // 2026-10-20 重启续跑：入队即持久化（原子写；失败只诊断，不影响内存投递）。
+    this.deliveredDeliveryKeys.delete(`${this.queueKey(projectRoot, targetRoleId, item.runtime)}\u0000${item.dedupKey}`);
+    this.persistDeliveryQueues();
+  }
+
+  // —————— 2026-10-20 客户要求：投递队列持久化 + 重启自动续跑（不写项目文件；路径由 Interface 提供） ——————
+
+  /** 一条投递条目的 JSON 安全快照；不可序列化（含用户载荷里塞了怪对象）⇒ undefined（该条不落盘）。 */
+  private persistableDeliveryItem(item: DeliveryItem): PersistedDeliveryItemV1["item"] | undefined {
+    try {
+      const snapshot: PersistedDeliveryItemV1["item"] = {
+        kind: item.kind,
+        runtime: item.runtime,
+        targetRoleId: item.targetRoleId,
+        sourceRoleId: item.sourceRoleId,
+        text: item.text,
+        summary: item.summary,
+        dedupKey: item.dedupKey,
+        enqueuedAt: item.enqueuedAt,
+        ...(typeof item.flowId === "string" && item.flowId !== "" ? { flowId: item.flowId } : {}),
+        ...(typeof item.deliveryId === "string" ? { deliveryId: item.deliveryId } : {}),
+        ...(item.handback !== undefined ? { handback: item.handback } : {}),
+        ...(item.report !== undefined ? { report: item.report } : {}),
+        ...(item.liveReport !== undefined ? { liveReport: item.liveReport } : {}),
+        ...(item.liveDurability !== undefined ? { liveDurability: item.liveDurability } : {}),
+      };
+      JSON.stringify(snapshot); // 验证可序列化（坏载荷 ⇒ 该条不落盘，绝不拖垮其余条目）
+      return snapshot;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** 当前内存态的持久化快照：排队项（queued）＋ 未完成在途项（in-flight；delivery.end 已完成的排除）。 */
+  private deliveryStoreItems(): PersistedDeliveryItemV1[] {
+    const items: PersistedDeliveryItemV1[] = [];
+    for (const [key, queue] of this.deliveryQueues) {
+      const [projectRoot = "", roleId = "", runtimeRaw = ""] = key.split("\u0000");
+      const runtime = runtimeRaw as RuntimeKind;
+      for (const item of queue) {
+        const snapshot = this.persistableDeliveryItem(item);
+        if (snapshot === undefined) continue;
+        items.push({ key: { projectRoot, roleId, runtime }, item: snapshot, state: "queued", enqueuedAt: item.enqueuedAt });
+      }
+    }
+    for (const [key, item] of this.activeDeliveries) {
+      if (this.deliveredDeliveryKeys.has(`${key}\u0000${item.dedupKey}`)) continue; // delivery.end 已完成：不重投
+      const snapshot = this.persistableDeliveryItem(item);
+      if (snapshot === undefined) continue;
+      const [projectRoot = "", roleId = "", runtimeRaw = ""] = key.split("\u0000");
+      items.push({ key: { projectRoot, roleId, runtime: runtimeRaw as RuntimeKind }, item: snapshot, state: "in-flight", enqueuedAt: item.enqueuedAt });
+    }
+    return items;
+  }
+
+  /** 原子写（tmp+rename，串行链）；失败只记诊断——绝不阻塞/翻转内存投递。 */
+  private persistDeliveryQueues(): void {
+    const storePath = this.deliveryQueueStorePath;
+    if (storePath === undefined || !this.deliveryStoreArmed) return; // 恢复前禁止写（防覆盖磁盘待恢复项）
+    let items: PersistedDeliveryItemV1[];
+    try {
+      items = this.deliveryStoreItems();
+    } catch (error) {
+      createDiagnosticLogger({ component: "desktop.delivery" }).error("delivery.queue.persist.snapshot.failed", error);
+      return;
+    }
+    const seq = ++this.deliveryPersistSeq;
+    this.deliveryPersistChain = this.deliveryPersistChain
+      .then(async () => {
+        const tmp = `${storePath}.tmp-${process.pid}-${seq}`;
+        try {
+          await fs.promises.mkdir(path.dirname(storePath), { recursive: true, mode: 0o700 });
+          await fs.promises.writeFile(tmp, JSON.stringify({ version: 1, items }), "utf8");
+          await fs.promises.rename(tmp, storePath);
+        } catch (error) {
+          createDiagnosticLogger({ component: "desktop.delivery" }).error("delivery.queue.persist.failed", error);
+          try { await fs.promises.rm(tmp, { force: true }); } catch { /* tmp 清理失败不阻断 */ }
+        }
+      })
+      .catch(() => undefined); // 链永不 reject（前后写互不影响）
+  }
+
+  /** 读回一条持久条目（模型输入一律不可信：全量重校验；坏条 ⇒ undefined）。 */
+  private parsePersistedDeliveryItem(raw: unknown): { projectRoot: string; roleId: string; runtime: RuntimeKind; item: DeliveryItem } | undefined {
+    if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+    const record = raw as Record<string, unknown>;
+    const keyRaw = record.key;
+    if (keyRaw === null || typeof keyRaw !== "object" || Array.isArray(keyRaw)) return undefined;
+    const key = keyRaw as Record<string, unknown>;
+    if (typeof key.projectRoot !== "string" || key.projectRoot === "") return undefined;
+    if (typeof key.roleId !== "string") return undefined;
+    if (typeof key.runtime !== "string" || !(RUNTIME_KINDS as readonly string[]).includes(key.runtime)) return undefined;
+    const itemRaw = record.item;
+    if (itemRaw === null || typeof itemRaw !== "object" || Array.isArray(itemRaw)) return undefined;
+    const rawItem = itemRaw as Record<string, unknown>;
+    const kind = rawItem.kind;
+    if (kind !== "handback" && kind !== "dispatch" && kind !== "message" && kind !== "system") return undefined;
+    if (typeof rawItem.text !== "string" || rawItem.text === "") return undefined;
+    if (typeof rawItem.dedupKey !== "string" || rawItem.dedupKey === "") return undefined;
+    const runtime = key.runtime as RuntimeKind;
+    const targetRoleId =
+      key.roleId !== "" ? key.roleId : typeof rawItem.targetRoleId === "string" ? rawItem.targetRoleId : "";
+    const item: DeliveryItem = {
+      kind,
+      runtime,
+      targetRoleId,
+      sourceRoleId: typeof rawItem.sourceRoleId === "string" ? rawItem.sourceRoleId : "",
+      text: rawItem.text,
+      summary: typeof rawItem.summary === "string" ? rawItem.summary : "",
+      dedupKey: rawItem.dedupKey,
+      enqueuedAt:
+        typeof rawItem.enqueuedAt === "string" && rawItem.enqueuedAt !== ""
+          ? rawItem.enqueuedAt
+          : new Date(this.now()).toISOString(),
+      ...(typeof rawItem.flowId === "string" && rawItem.flowId !== "" ? { flowId: rawItem.flowId } : {}),
+      ...(typeof rawItem.deliveryId === "string" ? { deliveryId: rawItem.deliveryId } : {}),
+      ...(rawItem.handback !== undefined && rawItem.handback !== null && typeof rawItem.handback === "object"
+        ? { handback: rawItem.handback as TaskHandback }
+        : {}),
+      ...(rawItem.report !== undefined && rawItem.report !== null && typeof rawItem.report === "object"
+        ? { report: rawItem.report as RuntimeReportSnapshotV1 }
+        : {}),
+      ...(rawItem.liveReport !== undefined && rawItem.liveReport !== null && typeof rawItem.liveReport === "object"
+        ? { liveReport: rawItem.liveReport as RuntimeLiveReportViewV1 }
+        : {}),
+      ...(rawItem.liveDurability === "memory-only" || rawItem.liveDurability === "unknown-live"
+        ? { liveDurability: rawItem.liveDurability }
+        : {}),
+    };
+    return { projectRoot: key.projectRoot, roleId: key.roleId, runtime, item };
+  }
+
+  /**
+   * **启动/项目导入时恢复上次运行的投递队列并自动重投**（2026-10-20 客户要求「重启后任务自动续跑」）。
+   * - `queued` 与 `in-flight` 一律按 queued 重新入内存队列（崩溃时在途回合会重新开始；任务文本自足，
+   *   允许模型续做/重做）；
+   * - 同一 `dedupKey` 已在内存队列/在途/已投递成功 ⇒ 跳过（重启后至多重投一次）；
+   * - 复用既有 `enqueueDelivery` + `drainQueue`（不新造投递逻辑）；投递成功后由既有成功路径移除持久项；
+   * - 损坏/不可读的存储文件 ⇒ 只记诊断、返回 0，不阻塞启动、不猜内容。
+   */
+  async restorePersistedDeliveries(): Promise<DeliveryQueueRestoreReport> {
+    const storePath = this.deliveryQueueStorePath;
+    const report: DeliveryQueueRestoreReport = { restored: 0, skipped: 0, items: [] };
+    if (storePath === undefined) return report;
+    const diagnostic = createDiagnosticLogger({ component: "desktop.delivery" });
+    let text: string;
+    try {
+      text = await fs.promises.readFile(storePath, "utf8");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        this.deliveryStoreArmed = true; // 无历史文件：从现在起正常持久化
+      } else {
+        diagnostic.error("delivery.queue.restore.failed", error); // 读失败：本次不武装（不覆盖可能仍可读的文件）
+      }
+      return report;
+    }
+    // 已读到磁盘内容（无论是否合法）：此后允许写——坏文件会被新状态替换（不阻塞启动，不猜内容）。
+    this.deliveryStoreArmed = true;
+    let doc: unknown;
+    try {
+      doc = JSON.parse(text);
+    } catch (error) {
+      diagnostic.error("delivery.queue.restore.failed", error);
+      return report;
+    }
+    const rawItems =
+      doc !== null && typeof doc === "object" && !Array.isArray(doc)
+        ? (doc as Record<string, unknown>).items
+        : undefined;
+    if (
+      doc === null ||
+      typeof doc !== "object" ||
+      (doc as Record<string, unknown>).version !== 1 ||
+      !Array.isArray(rawItems)
+    ) {
+      diagnostic.record("delivery.queue.restore.invalid-shape");
+      return report;
+    }
+    const seen = new Set<string>();
+    const drainKeys = new Set<string>();
+    for (const raw of rawItems as unknown[]) {
+      const parsed = this.parsePersistedDeliveryItem(raw);
+      if (parsed === undefined) {
+        report.skipped += 1;
+        continue;
+      }
+      const { projectRoot, roleId, runtime, item } = parsed;
+      const queueKey = this.queueKey(projectRoot, roleId, runtime);
+      const identity = `${queueKey}\u0000${item.dedupKey}`;
+      if (seen.has(identity)) {
+        report.skipped += 1;
+        continue;
+      }
+      seen.add(identity);
+      if (this.deliveredDeliveryKeys.has(identity)) {
+        report.skipped += 1; // 本次运行已投递成功（防御：同 manager 重复恢复）
+        continue;
+      }
+      if (this.activeDeliveries.get(queueKey)?.dedupKey === item.dedupKey) {
+        report.skipped += 1;
+        continue;
+      }
+      if ((this.deliveryQueues.get(queueKey) ?? []).some((queued) => queued.dedupKey === item.dedupKey)) {
+        report.skipped += 1;
+        continue;
+      }
+      if (item.kind === "dispatch" && this.activeDispatchKeys.has(item.dedupKey)) {
+        report.skipped += 1;
+        continue;
+      }
+      if (item.kind === "handback") this.enqueuedHandbackKeys.add(item.dedupKey);
+      if (item.kind === "dispatch") this.activeDispatchKeys.add(item.dedupKey);
+      this.enqueueDelivery(projectRoot, roleId, {
+        kind: item.kind,
+        runtime,
+        targetRoleId: item.targetRoleId,
+        sourceRoleId: item.sourceRoleId,
+        text: item.text,
+        summary: item.summary || `恢复投递 · 来自 ${item.sourceRoleId}`,
+        dedupKey: item.dedupKey,
+        ...(item.flowId !== undefined ? { flowId: item.flowId } : {}),
+        ...(item.handback !== undefined ? { handback: item.handback } : {}),
+        ...(item.report !== undefined ? { report: item.report } : {}),
+        ...(item.liveReport !== undefined ? { liveReport: item.liveReport } : {}),
+        ...(item.liveDurability !== undefined ? { liveDurability: item.liveDurability } : {}),
+      });
+      drainKeys.add(queueKey);
+      report.restored += 1;
+      report.items.push({ projectRoot, roleId, runtime, kind: item.kind, summary: item.summary });
+    }
+    diagnostic.record("delivery.queue.restored", { count: report.restored });
+    // 自动重投（复用既有串行投递机；目标未开会自动开启，忙则排队——与正常运行完全同一条路径）。
+    for (const queueKey of drainKeys) {
+      const [projectRoot = "", roleId = "", runtimeRaw = ""] = queueKey.split("\u0000");
+      void this.drainQueue(projectRoot, roleId === "" ? null : roleId, runtimeRaw as RuntimeKind);
+    }
+    return report;
   }
 
   /**
@@ -2617,6 +2924,7 @@ export class SessionManager {
       q.splice(idx, 1);
       if (q.length === 0) this.deliveryQueues.delete(key);
       this.notifyRoleState(projectRoot, roleId, item.runtime); // 位次前移/角标随之（既有快照机制；不造第二套）
+      this.persistDeliveryQueues(); // 2026-10-20 重启续跑：撤回同步持久化
       return { ok: true, summary: item.summary };
     }
     return { ok: false, error: "该条不在排队中（可能已投递或已撤回）。" };
@@ -4009,6 +4317,7 @@ export class SessionManager {
         "投递条目形状不符（缺正文/来源）——已丢弃该条并如实记行（不崩）。"
       );
       diagnostic.record("delivery.claim.end", { state: item.kind, count: batchCount });
+      this.persistDeliveryQueues(); // 2026-10-20：坏条目已丢弃，持久态同步（不留幽灵 in-flight）
       return;
     }
     // 先置忙再 await（防「open 尾部放行」与本次调用竞态导致并发 send）；失败则复位。
@@ -4028,6 +4337,7 @@ export class SessionManager {
     entry.busySince = this.now(); // G-2/W1：本轮起点定格（看护信号 #1 的 elapsed 基准）
     entry.lastTurnAborted = undefined; // 新一轮开始：上一轮的中止标记不再适用于本轮
     this.activeDeliveries.set(key, sent); // 与 busy 同时登记；settled/失败/dispose 精确撤销。
+    this.persistDeliveryQueues(); // 2026-10-20：认领即记 in-flight（崩溃重启后重投；delivery.end 后移除）
     diagnostic.record("delivery.start", { count: batchCount, queueDepth: q.length, state: sent.kind });
     // G-2/W3：drain 出队投出 = 真实活动（重武装）；`kind:"system"`（看护自身投递）不记（同 enqueueDelivery 口径）。
     if (sent.kind !== "system") this.noteWatchdogActivity(projectRoot, "delivery-claim");
@@ -4055,6 +4365,9 @@ export class SessionManager {
       }
       await this.sendDelivery(entry, origin, sent.text, sendOptions, sent.kind === "dispatch");
       diagnostic.record("delivery.end", { ok: true, count: batchCount, state: sent.kind });
+      // 2026-10-20 重启续跑：投递成功（delivery.end）即从持久队列移除——崩溃重启不重投已完成项。
+      this.deliveredDeliveryKeys.add(`${key}\u0000${sent.dedupKey}`);
+      this.persistDeliveryQueues();
       this.notifyRoleState(projectRoot, resolvedTarget, runtime); // 立即外推（running 行即时可见）
       if (sent.kind === "dispatch") this.activeDispatchKeys.delete(sent.dedupKey); // 送达即释放窗口去重（返工可再派）
       if (sent.kind === "handback") {
@@ -4090,6 +4403,9 @@ export class SessionManager {
         this.deliveryQueues.set(key, waiting);
       }
       this.notifyRoleState(projectRoot, resolvedTarget, runtime); // 放回队首：队列快照恢复（如实）
+      // 2026-10-20 重启续跑：失败重试项保持 queued（下次重启可再重投）；清除可能残留的「已完成」标记。
+      if (canRetry) this.deliveredDeliveryKeys.delete(`${key}\u0000${sent.dedupKey}`);
+      this.persistDeliveryQueues();
       const base = sent.kind === "handback" && cAttempt ? !canRetry ? "可能已经处理或保存状态未知，未自动重发；可核对历史保存状态。" : "输入尚未交给模型，未丢弃，已保留同一批次待重试。" : err instanceof Error ? err.message : String(err);
       this.emitDeliveryNote(projectRoot, runtime,
         sent.kind === "handback" ? resolvedTarget : sent.sourceRoleId,

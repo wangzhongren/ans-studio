@@ -15,6 +15,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -91,7 +92,7 @@ interface Harness {
   hangNext: (roleId: string) => () => void;
 }
 
-function makeHarness(): Harness {
+function makeHarness(opts: { deliveryQueueStorePath?: string } = {}): Harness {
   const l = listing();
   const streams: Record<string, OrchestrationEvent[]> = { su: [], A: [] };
   const sent: Record<string, string[]> = { su: [], A: [] };
@@ -169,6 +170,8 @@ function makeHarness(): Harness {
         queue: (info.queue ?? []).map((i) => ({ ...i })),
         running: info.running ? { ...info.running } : null,
       }),
+    // 2026-10-20 客户要求：投递队列持久化（重启自动续跑）——测试注入临时 store（缺省 ⇒ 不持久化）。
+    ...(opts.deliveryQueueStorePath !== undefined ? { deliveryQueueStorePath: opts.deliveryQueueStorePath } : {}),
   });
   return {
     mgr,
@@ -640,4 +643,153 @@ test("G-2/W1 集成：同源快照（busy/busySince/队列/在途）＋观察转
   const settledObs = h.observations.find((o) => o.observation.kind === "settled" && o.observation.roleId === "A");
   assert.equal(settledObs && settledObs.observation.kind === "settled" ? settledObs.observation.fromSystemDelivery : undefined, false, "普通轮 settle：fromSystemDelivery=false（真实活动）");
   await h.mgr.stop(null);
+});
+
+// —————— 2026-10-20 客户要求：投递队列持久化 + 重启自动续跑（不是只给 Lead 提示） ——————
+
+/** 有界等待持久队列文件满足条件（原子写链是异步的）。 */
+async function waitForStore(
+  storePath: string,
+  predicate: (doc: { version?: number; items?: unknown[] }) => boolean,
+  timeoutMs = 4000,
+): Promise<{ version?: number; items?: unknown[] }> {
+  const started = Date.now();
+  let last: { version?: number; items?: unknown[] } = {};
+  while (Date.now() - started <= timeoutMs) {
+    try {
+      last = JSON.parse(fs.readFileSync(storePath, "utf8")) as { version?: number; items?: unknown[] };
+    } catch {
+      last = {};
+    }
+    if (predicate(last)) return last;
+    await tick(10);
+  }
+  assert.fail(`等待持久队列条件超时（最后：${JSON.stringify(last).slice(0, 300)}）`);
+}
+
+test("2026-10-20 重启续跑：enqueue 后重启（新 SessionManager + 同一 store）⇒ 自动重投到原角色/原 runtime", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ans-delivery-store-queued-"));
+  try {
+    const storePath = path.join(dir, "delivery-queue.json");
+    const h1 = makeHarness({ deliveryQueueStorePath: storePath });
+    // 启动契约：先恢复上一次运行的队列（无文件 ⇒ 武装持久化），再进入正常投递。
+    assert.equal((await h1.mgr.restorePersistedDeliveries()).restored, 0, "首次启动：无历史队列");
+    await h1.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+    await tick(30);
+    assert.equal((await h1.mgr.send("第一条")).ok, true);
+    const queued = await h1.mgr.send("第二条");
+    assert.equal(queued.queued, true, "A 忙：第二条入队");
+    const persisted = await waitForStore(storePath, (doc) => Array.isArray(doc.items) && doc.items.length === 1);
+    const entry = (persisted.items as Array<{ state?: string; key?: { roleId?: string; runtime?: string }; item?: { text?: string } }>)[0];
+    assert.equal(entry.state, "queued", "排队项以 queued 持久化");
+    assert.equal(entry.key?.roleId, "A", "键：原角色");
+    assert.equal(entry.key?.runtime, "demo", "键：原 runtime");
+    assert.equal(entry.item?.text, "第二条", "条目正文落盘");
+    // 模拟崩溃/退出：不 settle 直接丢弃 manager1（stop 会 dispose 会话，队列仍如实保留）。
+    await h1.mgr.stop(null);
+
+    const h2 = makeHarness({ deliveryQueueStorePath: storePath });
+    const report = await h2.mgr.restorePersistedDeliveries();
+    assert.equal(report.restored, 1, "重启恢复恰 1 条");
+    assert.deepEqual(
+      report.items.map((i) => [i.roleId, i.runtime, i.kind]),
+      [["A", "demo", "message"]],
+      "恢复到原角色/原 runtime/原类别",
+    );
+    await tick(250);
+    assert.ok(h2.sent.A.includes("第二条"), "自动重投到原角色（复用既有投递机；目标未开自动开启）");
+    await h2.mgr.stop(null);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-20 重启续跑：in-flight 未完成 ⇒ 重启后重投；delivery.end 成功后 ⇒ 移除且不重投", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ans-delivery-store-inflight-"));
+  try {
+    const storePath = path.join(dir, "delivery-queue.json");
+    const item = {
+      kind: "dispatch",
+      runtime: "demo",
+      targetRoleId: "A",
+      sourceRoleId: "su",
+      text: "续跑任务正文：实现 step impl",
+      summary: "派发 · 续跑",
+      dedupKey: "k-inflight",
+      enqueuedAt: new Date().toISOString(),
+      flowId: "flow-a",
+    };
+    fs.writeFileSync(
+      storePath,
+      JSON.stringify({ version: 1, items: [{ key: { projectRoot: "/proj", roleId: "A", runtime: "demo" }, item, state: "in-flight", enqueuedAt: item.enqueuedAt }] }),
+      "utf8",
+    );
+    const h = makeHarness({ deliveryQueueStorePath: storePath });
+    const restored = await h.mgr.restorePersistedDeliveries();
+    assert.equal(restored.restored, 1, "in-flight 条目也恢复");
+    await tick(250);
+    assert.ok(h.sent.A.some((text) => text.includes("续跑任务正文")), "in-flight 重启后按 queued 重投（模型回合重新开始）");
+    await waitForStore(storePath, (doc) => Array.isArray(doc.items) && doc.items.length === 0);
+    assert.deepEqual(JSON.parse(fs.readFileSync(storePath, "utf8")).items, [], "delivery.end 成功后移除持久项");
+    await h.mgr.stop(null);
+
+    const h2 = makeHarness({ deliveryQueueStorePath: storePath });
+    assert.equal((await h2.mgr.restorePersistedDeliveries()).restored, 0, "已投递成功的条目不再重投");
+    await h2.mgr.stop(null);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-20 重启续跑：重复 dedupKey 只重投一次；损坏条目/损坏 store 不崩；多项目/多角色键隔离", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ans-delivery-store-multi-"));
+  try {
+    const storePath = path.join(dir, "delivery-queue.json");
+    const itemOf = (targetRoleId: string, text: string, dedupKey: string) => ({
+      kind: "message",
+      runtime: "demo",
+      targetRoleId,
+      sourceRoleId: "客户",
+      text,
+      summary: `你：${text}`,
+      dedupKey,
+      enqueuedAt: new Date().toISOString(),
+    });
+    const entryOf = (projectRoot: string, roleId: string, item: ReturnType<typeof itemOf>) => ({
+      key: { projectRoot, roleId, runtime: "demo" },
+      item,
+      state: "queued",
+      enqueuedAt: item.enqueuedAt,
+    });
+    fs.writeFileSync(
+      storePath,
+      JSON.stringify({
+        version: 1,
+        items: [
+          entryOf("/proj", "A", itemOf("A", "A-任务", "dup-key")),
+          entryOf("/proj", "A", itemOf("A", "A-重复", "dup-key")),
+          { key: { projectRoot: "/proj" }, item: null, state: "queued" }, // 坏条目
+          entryOf("/proj2", "B", itemOf("B", "B-任务", "b-key")),
+        ],
+      }),
+      "utf8",
+    );
+    const h = makeHarness({ deliveryQueueStorePath: storePath });
+    const report = await h.mgr.restorePersistedDeliveries();
+    assert.equal(report.restored, 2, "A 一条（重复 dedupKey 去重）+ B 一条；坏条目跳过");
+    assert.ok(report.skipped >= 2, "重复与坏条目计入 skipped（如实）");
+    await tick(250);
+    assert.deepEqual(h.sent.A, ["A-任务"], "同 dedupKey 只重投一次");
+    const otherQueue = h.mgr.watchdogSnapshot("/proj2")?.queues.find((q) => q.targetRoleId === "B");
+    assert.equal(otherQueue?.items.length, 1, "另一项目的队列独立保留（按 project+role+runtime 键隔离，不并入 /proj）");
+    await h.mgr.stop(null);
+
+    fs.writeFileSync(storePath, "{ not json", "utf8");
+    const h2 = makeHarness({ deliveryQueueStorePath: storePath });
+    const broken = await h2.mgr.restorePersistedDeliveries();
+    assert.equal(broken.restored, 0, "损坏 store ⇒ 只记诊断、返回 0、不猜内容、不崩");
+    await h2.mgr.stop(null);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });

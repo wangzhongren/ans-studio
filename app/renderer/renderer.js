@@ -1530,6 +1530,9 @@
   // 交互行（待确认卡/回交卡/注入行）标 `keepEl`——离窗时**保留元素实例**（监听器/内部状态不丢），仅脱挂。
   var VIRT_MIN_ROWS = 150;
   var VIRT_BUFFER = 30;
+  // transcript 行（真实会话内容）的**单一分类点**：`hasTranscript` 与空白兜底共用。
+  // 队列/状态/系统行（kind "system"）不计入——它们存在不代表历史已载入（2026-10-20 真机空白根因）。
+  var TRANSCRIPT_ROW_KINDS = ["user", "assistant", "activities", "injected", "replay", "handback", "operator", "tool-lifecycle"];
   var paneRowLists = Object.create(null); // roleId → rowList
   var rowListSeq = 0; // 行表身份号（真机缺陷修复：锚点物化据此判断「同一张行表」——重建过的表 seq 不同）
 
@@ -1645,6 +1648,8 @@
       for (var x = at + 1; x < rl.rows.length; x += 1) rl.rows[x].index = x; // 右移重编号（插入极少数，O(n) 一次）
     }
     if (rec.replayToken) (rl.tokenRows || (rl.tokenRows = Object.create(null)))[Rt.tokenId(rec.replayToken)] = rec;
+    // 空白兜底占位是 pane 直属 DOM（不进行表）；一旦真实 transcript 行到达即移除，防占位过期。
+    if (pane.dataset.emptyNote === "1" && (TRANSCRIPT_ROW_KINDS.indexOf(rec.kind) >= 0 || rec.manualClientId)) clearEmptyNote(pane);
     rl.prefix = null;
     if (rl.rows.length < VIRT_MIN_ROWS) {
       attachRow(rl, rec); // 小 pane：立即挂载（**不**测量——热路径禁逐条强制布局）
@@ -1783,7 +1788,8 @@
         div.innerHTML = Md.renderMarkdown(text);
         return div;
       },
-      52
+      52,
+      { kind: "user" }
     );
     if (force === false) scrollBottom(pane, inputPin);
     else scrollBottomForced(pane); // 用户自己的动作：强制贴底
@@ -4988,6 +4994,42 @@
     pane.appendChild(el); // 移到流尾（状态行始终停在最新处）
   }
 
+  // —————— 空白兜底（2026-10-20 真机：切到后台在跑的角色，聊天区空白数秒）————————
+  // 根因：旧判据 `!pane.querySelector(".chat-empty")` 把**队列/状态行**误当历史（后台快照会先移除空态），
+  // 于是不建 loading；而 `getSessionHistory`/回放尚未返回 ⇒ 无 transcript 的 pane 全空。
+  // 现口径：**只看 transcript 行**（`hasTranscript`）；无 transcript ⇒ 先 loading，回放/开会话后仍无
+  // transcript 且无错误/报告 ⇒ 中性占位（繁忙/空闲文案区分）。占位是 pane 直属 DOM，**不进行表**，
+  // 因此不参与回放去重/虚拟窗口/未决卡锚定；真实 transcript 行一到即移除。
+  function clearEmptyNote(pane) {
+    if (!pane) return;
+    var note = pane.querySelector(".empty-note");
+    if (note) note.remove();
+    delete pane.dataset.emptyNote;
+  }
+
+  function renderEmptyNote(roleId) {
+    if (backgroundDelivery || roleId !== state.selectedRoleId) return; // 只处理当前可见 pane
+    var pane = paneFor(roleId);
+    var history = replayState[roleId];
+    var hasError = !!(history && history.error) || !!pane.querySelector(".sys-replay-divider");
+    if (hasTranscript(roleId) || hasError || state.sessionOpenRoleId !== roleId) { clearEmptyNote(pane); return; }
+    var text = state.roleBusy[roleId] === true
+      ? "会话已开启；后台正在工作，暂无可见消息"
+      : "会话已开启，可直接输入消息";
+    var note = pane.querySelector(".empty-note");
+    if (!note) {
+      note = document.createElement("div");
+      note.className = "sys sys-note empty-note";
+      note.innerHTML = '<span class="sys-ico">' + ICONS.call + '</span><span class="sys-text"></span>';
+      // 排在状态行（队列/正在工作）之前：占位属于转录区，状态行仍停在流尾。
+      var footer = pane.querySelector(".queue-row") || pane.querySelector(".tool-current");
+      if (footer) pane.insertBefore(note, footer); else pane.appendChild(note);
+      pane.dataset.emptyNote = "1";
+    }
+    var textEl = note.querySelector(".sys-text");
+    if (textEl) textEl.textContent = text;
+  }
+
   // —————— 会话记录恢复（D-1，2026-10-12）：主进程推来的规范化界面行 → 回放进该角色的 pane ——————
   // 渲染进程**不碰 Pi SDK/JSONL**（解析在主进程；本层只呈现）。回放行与实时行**视觉可区分**
   // （`.is-replay`）；助手文本同样走 `Md.renderMarkdown`（esc 单一来源）。
@@ -5112,7 +5154,10 @@
     if (payload.reportErrors && payload.reportErrors.length) projectionNote.push("有 " + payload.reportErrors.length + " 项报告记录不可读，不作为成果显示");
     metaFor(roleId).historyNotice = projectionNote.join("；");
     if (roleId === state.selectedRoleId) renderContextState(roleId);
-    if (rows.length === 0 && error === null && !(payload.reports && payload.reports.length)) return;
+    if (rows.length === 0 && error === null && !(payload.reports && payload.reports.length)) {
+      renderEmptyNote(roleId); // 历史为空：不留空白（无 transcript ⇒ 中性占位；有 transcript 则清占位）
+      return;
+    }
     var prev = replayState[roleId];
     if (prev && prev.projectRoot !== payload.projectRoot) prev = null;
     var plan = forceFull ? { action: "full", from: 0 } : UiLabels.replayPlan(prev, rows);
@@ -5198,6 +5243,7 @@
     orderedHistoryReports(payload.reports).forEach(function (report) { appendHandback(pane, report, { state: "saved", reportId: report.reportId, retryAvailable: false }); });
     Object.keys(rowListFor(pane).deliveryTurns || {}).forEach(function (turnId) { applyReportedTask(pane, turnId, true); });
     materializePendingFor(roleId); renderCurrentWork(roleId);
+    renderEmptyNote(roleId); // 回放完成后再核一次：有 transcript 清占位，仍无则补中性占位
   }
 
   /** 单条回放行（kind: user|assistant|tool|denied；助手/用户文本走 Markdown 渲染器，工具行 esc）。
@@ -5481,12 +5527,18 @@
     showPane(roleId);
     if (isSameRole) stickPaneToBottomOrCard(roleId);
     var pane = paneFor(roleId);
-    var hasHistory = !pane.querySelector(".chat-empty");
-    var loading = hasHistory
+    // 2026-10-20 真机空白修复：历史判据只看 **transcript 行**（hasTranscript），不再看 `.chat-empty`——
+    // 后台角色的队列/「正在工作」行会先移除空态，旧判据据此误判「已有历史」而不建 loading，
+    // 历史回放尚未返回时聊天区空白。已有队列/状态行但无 transcript ⇒ 显示「正在载入会话历史…」。
+    var hasStatusRows = !!(pane.querySelector(".queue-row") || pane.querySelector(".tool-current")) ||
+      !!(paneRowLists[roleId] && paneRowLists[roleId].rows.length > 0);
+    var loading = hasTranscript(roleId)
       ? null
       // W11（2026-10-16 客户批准）：开会话 loading 行改用**同一枚** SVG 弧线转轮（图源 = role-status.js
       // 的 SPINNER_SVG 单点；边框转轮 .spinner/`spin 0.8s` 已退役——全应用只有一种转轮）。
-      : sysRow(pane, "sys-loading", St.SPINNER_SVG, "正在开启与角色 " + (displayNameOf(roleById(roleId)) || roleId) + " 的会话…");
+      : sysRow(pane, "sys-loading", St.SPINNER_SVG, hasStatusRows
+        ? "正在载入会话历史…"
+        : "正在开启与角色 " + (displayNameOf(roleById(roleId)) || roleId) + " 的会话…");
     setHint("");
 
     try {
@@ -5495,9 +5547,11 @@
         try { history = await d.getSessionHistory({ projectRoot: projectRoot, roleId: roleId, runtime: runtime }); }
         catch (error) { history = { projectRoot: projectRoot, roleId: roleId, runtime: runtime, rows: [], error: "读取历史失败：" + String(error && error.message || error) }; }
         deliverRuntimePayload(history, onSessionHistory);
-        if (selectionVersion !== roleSelectionVersion || state.projectRoot !== projectRoot || state.runtime !== runtime) return;
+        if (selectionVersion !== roleSelectionVersion || state.projectRoot !== projectRoot || state.runtime !== runtime) {
+          if (loading) loading.remove(); // 选择版本变化/项目切换：本次 loading 按既有逻辑丢弃，不在旧 pane 残留
+          return;
+        }
         pane = paneFor(roleId);
-        hasHistory = hasHistory || Array.isArray(history.rows) && history.rows.length > 0;
       }
       // 每次开启捕获所选 runtime；不同引擎的后台会话继续保持原身份。
       // B-2：切换**不再先 stop 旧会话**——引擎侧并存（各自保活、切回直接续；LRU 上限见 session.ts）。
@@ -5538,6 +5592,7 @@
       if (res.config && (res.config.kind === "ans-invalid" || !res.config.accepted)) {
         appendConfigNote(pane, res.config);
       }
+      renderEmptyNote(roleId); // 2026-10-20：开会话后仍无 transcript 且无错误/报告 ⇒ 中性占位，不留空白
       // 会话欢迎消息经 session:event 推达，自动出现在该角色的聊天流中。
     } catch (err) {
       if (loading) loading.remove();
@@ -5556,7 +5611,7 @@
     var history = replayState[roleId];
     if (history && history.rows.some(function (row) { return row.kind === "user" || row.kind === "assistant" || row.kind === "tool" || row.kind === "denied"; })) return true;
     var rl = paneRowLists[roleId];
-    return !!rl && rl.rows.some(function (row) { return ["assistant", "activities", "injected", "replay", "handback", "operator", "tool-lifecycle"].indexOf(row.kind) >= 0 || row.manualClientId; });
+    return !!rl && rl.rows.some(function (row) { return TRANSCRIPT_ROW_KINDS.indexOf(row.kind) >= 0 || row.manualClientId; });
   }
   function renderContextState(roleId) {
     var el = $("context-state"); if (!el || backgroundDelivery) return;
@@ -6729,6 +6784,26 @@
       // rowGap：行占位口径中的 pane 行距缓存（2026-10-14 锚点漂移修复）——e2e 断言
       // 「未挂载期建行表的角色挂载后读到与已挂载角色相同的行距」用（防脱离文档读样式表落 0 缓存）。
       return { count: rl.rows.length, lastIndex: rl.rows.length - 1, operators: ops, rowGap: rl.rowGap };
+    },
+    // 空白兜底（2026-10-20）探针：读某角色 pane 的可见构成（**只读**；游离 pane 也可读——
+    // 后台角色的 pane 未挂到 #chat 时 DOM query 不可达，e2e 用本探针核对队列/状态/占位/loading）。
+    paneDebug: function (roleId) {
+      var key = String(roleId == null ? "" : roleId);
+      var pane = paneFor(key);
+      var loading = pane.querySelector(".sys-loading .sys-text");
+      var note = pane.querySelector(".empty-note .sys-text");
+      return {
+        inChat: pane.parentNode === $("chat"),
+        empty: !!pane.querySelector(".chat-empty"),
+        queue: !!pane.querySelector(".queue-row"),
+        currentWork: !!pane.querySelector(".tool-current"),
+        loading: !!loading,
+        loadingText: loading ? loading.textContent : "",
+        note: !!note,
+        noteText: note ? note.textContent : "",
+        assistant: pane.querySelectorAll(".msg-assistant").length,
+        text: pane.textContent,
+      };
     },
     replayAnchorDebug: function (roleId) {
       var table = paneAnchors[String(roleId == null ? "" : roleId)];

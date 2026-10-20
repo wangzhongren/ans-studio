@@ -695,6 +695,9 @@ body { display: flex; flex-direction: column; }
 .sys-settled { color: var(--text-3); }
 .sys-settled .sys-text { color: var(--text-3); }
 .sys-loading { color: var(--text-2); }
+/* 空白兜底中性占位（2026-10-20）：无 transcript 但会话已开启——不呈现为错误/警告。 */
+.sys-note { color: var(--text-2); }
+.sys-note .sys-text { font-family: var(--sans); color: var(--text-2); }
 .sys-config { color: var(--danger); }
 .sys-config .sys-text { color: var(--danger); }
 /* L-1（2026-10-12）：**队列行**——该角色聊天流里的真实队列快照（原地更新、常驻流尾）；左侧竖线作区分。 */

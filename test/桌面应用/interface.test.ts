@@ -3820,3 +3820,208 @@ test("2026-10-20 写卡产物门控：缺/空/坏格式逐项反馈 Crew（role-
     }
   }
 });
+
+// —————— 2026-10-20 客户要求：重启后任务自动续跑 + 僵尸步骤自检（兜底、去重、不自动派发） ——————
+
+function zombieFlowYaml(
+  flowId: string,
+  steps: Array<{ id: string; owner: string; status: string; title?: string }>,
+): string {
+  return [
+    `flowId: ${flowId}`,
+    "version: 1",
+    "qualityTier: production",
+    "steps:",
+    ...steps.flatMap((step) => [
+      `  - id: ${step.id}`,
+      `    title: ${step.title ?? step.id}`,
+      `    owner: ${step.owner}`,
+      "    kind: dispatch",
+      `    status: ${step.status}`,
+    ]),
+    "",
+  ].join("\n");
+}
+
+test("2026-10-20 重启续跑（Interface）：listProject 触发恢复并自动重投到原角色；Lead 恰一条系统行、无客户卡", async () => {
+  const root = makeTempProjectRoot("ans-restore-queue-");
+  const storeDir = makeTempProjectRoot("ans-restore-store-");
+  try {
+    const storePath = path.join(storeDir, "delivery-queue.json");
+    const item = {
+      kind: "message",
+      runtime: "demo",
+      targetRoleId: "A",
+      sourceRoleId: "客户",
+      text: "恢复消息正文",
+      summary: "你：恢复消息正文",
+      dedupKey: "restore-1",
+      enqueuedAt: new Date().toISOString(),
+    };
+    writeFileSync(
+      storePath,
+      JSON.stringify({
+        version: 1,
+        items: [{ key: { projectRoot: root, roleId: "A", runtime: "demo" }, item, state: "queued", enqueuedAt: item.enqueuedAt }],
+      }),
+      "utf8",
+    );
+    const listing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["A"]), projectRoot: root };
+    const sendsByRole = new Map<string, string[]>();
+    const events: SessionEventEnvelope[] = [];
+    const customerCalls: unknown[] = [];
+    const iface = createDesktopInterface({
+      pickDirectory: async () => root,
+      emitEvent: (envelope) => { events.push(envelope); },
+      listProjectFn: async () => listing,
+      openRoleSessionFn: async (input) => {
+        const sends: string[] = [];
+        sendsByRole.set(input.roleId, sends);
+        return quietGovernanceHandle(sends);
+      },
+      buildProjectConfigFn: buildProjectConfig,
+      deliveryQueueStorePath: storePath,
+      resolveRuntimeFn: async () => ({ ok: true, runtime: "pi", source: "credentials", skipped: [] }),
+      customerInput: async (request) => {
+        customerCalls.push(request);
+        return { outcome: "declined", reason: "恢复/自检不应弹卡" };
+      },
+    });
+    await iface.listProject({ projectRoot: root });
+    await waitForTest(() => (sendsByRole.get("A")?.length ?? 0) > 0, 4000);
+    assert.equal(sendsByRole.get("A")![0], "恢复消息正文", "自动重投到原角色（复用既有投递机）");
+    const restoreNotes = () =>
+      events.filter(
+        (envelope) =>
+          envelope.roleId === "rapporteur" &&
+          envelope.event.kind === "message" &&
+          (envelope.event.detail as { source?: string } | undefined)?.source === "delivery-note" &&
+          /已从上次运行恢复/.test(envelope.event.summary ?? ""),
+      );
+    assert.equal(restoreNotes().length, 1, "Lead 恰一条「已从上次运行恢复 N 条任务并重投」系统行");
+    assert.match(restoreNotes()[0].event.summary ?? "", /1 条任务/);
+    assert.equal(customerCalls.length, 0, "恢复全程零客户卡");
+    // 再次刷新：restore 每个进程只跑一次，不重复系统行。
+    await iface.listProject({ projectRoot: root });
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    assert.equal(restoreNotes().length, 1, "重复 listProject 不重复恢复系统行");
+    await iface.stopSession();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(storeDir, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-20 僵尸步骤自检：dispatched/delivered 且 owner 无会话/队列 ⇒ Lead 去重提示；revision 变化可再提示；pending 不提示", async () => {
+  const root = makeTempProjectRoot("ans-zombie-steps-");
+  try {
+    const flowId = "flow-z";
+    mkdirSync(path.join(root, "docs", "flows"), { recursive: true });
+    writeFileSync(
+      path.join(root, "docs", "flows", `${flowId}.yaml`),
+      zombieFlowYaml(flowId, [
+        { id: "impl", owner: "executor", status: "dispatched" },
+        { id: "verify-impl", owner: "helper", status: "delivered" },
+        { id: "later", owner: "executor", status: "pending" },
+      ]),
+      "utf8",
+    );
+    const listing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor", "helper"]), projectRoot: root };
+    const events: SessionEventEnvelope[] = [];
+    const openRoles: string[] = [];
+    const customerCalls: unknown[] = [];
+    const iface = createDesktopInterface({
+      pickDirectory: async () => root,
+      emitEvent: (envelope) => { events.push(envelope); },
+      listProjectFn: async () => listing,
+      openRoleSessionFn: async (input) => {
+        openRoles.push(input.roleId);
+        const sends: string[] = [];
+        return quietGovernanceHandle(sends);
+      },
+      buildProjectConfigFn: buildProjectConfig,
+      resolveRuntimeFn: async () => ({ ok: true, runtime: "pi", source: "credentials", skipped: [] }),
+      customerInput: async (request) => {
+        customerCalls.push(request);
+        return { outcome: "declined", reason: "自检不应弹卡" };
+      },
+    });
+    const zombieNotes = () =>
+      events.filter(
+        (envelope) =>
+          envelope.roleId === "rapporteur" &&
+          envelope.event.kind === "message" &&
+          (envelope.event.detail as { source?: string } | undefined)?.source === "delivery-note" &&
+          /可能因应用重启/.test(envelope.event.summary ?? ""),
+      );
+    await iface.listProject({ projectRoot: root });
+    await waitForTest(() => zombieNotes().length > 0, 4000);
+    const first = zombieNotes()[0].event.summary ?? "";
+    assert.ok(first.includes(flowId) && first.includes("impl") && first.includes("executor") && first.includes("dispatched"), "列出 flowId/stepId/owner/status");
+    assert.ok(first.includes("verify-impl") && first.includes("delivered"), "delivered 同样纳入");
+    assert.equal(first.includes("later"), false, "pending 不提示");
+    assert.match(first, /flow_get/, "提示用 flow_get 核对");
+    assert.match(first, /flow_step_supersede/, "提示必要时 supersede");
+    assert.match(first, /dispatch_task/, "提示重派");
+    assert.equal(openRoles.length, 0, "不自动派发（不开任何会话）");
+    assert.equal(customerCalls.length, 0, "不弹客户卡");
+    // 同一 revision+stale 集合：重复刷新不重复提示。
+    await iface.listProject({ projectRoot: root });
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    assert.equal(zombieNotes().length, 1, "同 revision+stale 集合只提示一次");
+    // revision 变化后仍 stale ⇒ 允许再提示一次。
+    writeFileSync(
+      path.join(root, "docs", "flows", `${flowId}.yaml`),
+      zombieFlowYaml(flowId, [
+        { id: "impl", title: "实施（v2）", owner: "executor", status: "dispatched" },
+        { id: "verify-impl", owner: "helper", status: "delivered" },
+      ]),
+      "utf8",
+    );
+    await iface.listProject({ projectRoot: root });
+    await waitForTest(() => zombieNotes().length > 1, 4000);
+    assert.equal(openRoles.length, 0, "再次提示仍不自动派发");
+    await iface.stopSession();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("2026-10-20 僵尸步骤自检：owner 有活会话/队列 ⇒ 不误报；无 flow YAML/解析失败 ⇒ 不提示", async () => {
+  const root = makeTempProjectRoot("ans-zombie-live-");
+  try {
+    const flowId = "flow-z2";
+    mkdirSync(path.join(root, "docs", "flows"), { recursive: true });
+    writeFileSync(
+      path.join(root, "docs", "flows", `${flowId}.yaml`),
+      zombieFlowYaml(flowId, [{ id: "impl", owner: "executor", status: "dispatched" }]),
+      "utf8",
+    );
+    // 另有一条解析失败的 flow YAML：只记诊断、不提示。
+    writeFileSync(path.join(root, "docs", "flows", "flow-broken.yaml"), "not: a valid flow\n", "utf8");
+    const listing: ProjectListing = { ...listingWithProjectRoles(trioListing(), ["executor"]), projectRoot: root };
+    const events: SessionEventEnvelope[] = [];
+    const iface = createDesktopInterface({
+      pickDirectory: async () => root,
+      emitEvent: (envelope) => { events.push(envelope); },
+      listProjectFn: async () => listing,
+      openRoleSessionFn: async () => {
+        const sends: string[] = [];
+        return quietGovernanceHandle(sends);
+      },
+      buildProjectConfigFn: buildProjectConfig,
+      resolveRuntimeFn: async () => ({ ok: true, runtime: "pi", source: "credentials", skipped: [] }),
+    });
+    const zombieNotes = () =>
+      events.filter((envelope) => envelope.event.kind === "message" && /可能因应用重启/.test(envelope.event.summary ?? ""));
+    await iface.listProject({ projectRoot: root });
+    // owner 有活会话 ⇒ 不提示。
+    assert.equal((await iface.openSession({ projectRoot: root, roleId: "executor", runtime: "demo" })).ok, true);
+    await iface.listProject({ projectRoot: root });
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    assert.equal(zombieNotes().length, 0, "owner 有活会话 ⇒ 不误报（解析失败的 flow 也不提示）");
+    await iface.stopSession();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
