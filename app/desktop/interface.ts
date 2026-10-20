@@ -134,6 +134,7 @@ import {
   completeAcceptanceStep as realCompleteAcceptanceStep,
   evaluateFlowCompletion,
   flowStatePath,
+  observeFlowArtifacts as realObserveFlowArtifacts,
   parseFlowStateYaml,
 } from "../../src/pipeline/orchestration/flow-state.ts";
 // G-2（2026-10-16 客户批准）：恢复确认卡通道（W5——presenter/回包/关窗清帐在 main 接线，本层只透传）与
@@ -515,6 +516,20 @@ export interface DesktopDeps {
    */
   completeAcceptanceStepFn?: (input: { projectRoot: string; flowId: string }) => Promise<{
     ok?: boolean;
+    error?: string;
+    message?: string;
+  }>;
+  /**
+   * **flow artifact 证据补登**（2026-10-20 真机：旧扫描规则写下的证据文件在重启后不会被补
+   * `artifact.observed`，Steward 无法把 delivered 步骤标 done）：缺省经 Pipeline 公共出口
+   * `flow-state.ts::observeFlowArtifacts` 调用（幂等补登 flow 里 `kind:"artifact"` 步骤的 evidence.ref
+   * 文件观察记录）；测试可注入。补登是应用观察文件（owner/power/sha），**不写客户决定账本、不伪造 done**。
+   */
+  observeFlowArtifactsFn?: (input: { projectRoot: string; flowId: string }) => Promise<{
+    ok?: boolean;
+    backfilled?: number;
+    observed?: number;
+    skipped?: number;
     error?: string;
     message?: string;
   }>;
@@ -1307,6 +1322,141 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     }
   };
 
+  // —————— 2026-10-20 真机：flow artifact 证据补登（旧扫描规则写下的 evidence.ref 文件）——————
+  //
+  // 现场：integration-e2e / verification-evidence 的 evidence.ref 文件（.js/README.md）是旧扫描规则下写的，
+  // 重启后新扫描当基线、不补 `artifact.observed`，Steward 的 flow_step_update done 会被 insufficient-evidence
+  // 挡住。编排新增 `observeFlowArtifacts({projectRoot,flowId})`（幂等补登 flow artifact 证据）；桌面在
+  // delivered 唤醒和验收判定**之前**调用。补登是应用观察文件（owner/power/sha），不写客户决定账本、不伪造 done。
+  type FlowArtifactBackfillOutcome = { ok: boolean; backfilled: number; skipped: number; error?: string };
+  /** 编排返回 `observed: string[]` / `skipped: {path,reason}[]`（旧桩可能是数字）——统一折算成数量。 */
+  const backfillCountOf = (value: unknown): number =>
+    Array.isArray(value) ? value.length : typeof value === "number" && Number.isFinite(value) ? value : 0;
+  const callObserveFlowArtifacts = async (projectRoot: string, flowId: string): Promise<FlowArtifactBackfillOutcome> => {
+    try {
+      const result: {
+        ok?: boolean;
+        observed?: unknown;
+        backfilled?: unknown;
+        skipped?: unknown;
+        error?: string;
+        message?: string;
+      } =
+        deps.observeFlowArtifactsFn !== undefined
+          ? await deps.observeFlowArtifactsFn({ projectRoot, flowId })
+          : await realObserveFlowArtifacts({ projectRoot, flowId });
+      if (result.ok === false) {
+        return { ok: false, backfilled: 0, skipped: 0, error: result.error ?? result.message ?? "未知原因" };
+      }
+      return {
+        ok: true,
+        backfilled: backfillCountOf(result.backfilled ?? result.observed),
+        skipped: backfillCountOf(result.skipped),
+      };
+    } catch (error) {
+      return { ok: false, backfilled: 0, skipped: 0, error: error instanceof Error ? error.message : String(error) };
+    }
+  };
+
+  /** 有 `kind:"artifact"` 且带 evidence.ref 的步骤 ⇒ 调补登；成功/部分成功只记诊断，失败不阻断后续判定。 */
+  const backfillFlowArtifacts = async (
+    projectRoot: string,
+    flowId: string,
+    diagnostic: ReturnType<typeof createDiagnosticLogger>,
+  ): Promise<void> => {
+    try {
+      const text = await readFile(path.join(projectRoot, governanceFlowStatePath(flowId)), "utf8");
+      const parsed = parseFlowStateYaml(text, flowId);
+      if (!parsed.ok) return;
+      const hasArtifactRef = parsed.flow.steps.some(
+        (step) => step.kind === "artifact" && typeof step.evidence?.ref === "string" && step.evidence.ref.trim() !== "",
+      );
+      if (!hasArtifactRef) return;
+      const outcome = await callObserveFlowArtifacts(projectRoot, flowId);
+      if (!outcome.ok) {
+        diagnostic.record("acceptance.artifacts.backfill-failed", { flowId, count: 0 });
+        return; // 不阻断 subsequent 判定（Steward/验收门会给出证据不足原因）
+      }
+      diagnostic.record("acceptance.artifacts.backfilled", { flowId, count: outcome.backfilled });
+      if (outcome.skipped > 0) diagnostic.record("acceptance.artifacts.backfill-skipped", { flowId, count: outcome.skipped });
+    } catch {
+      // flow 不可读/解析失败/补登异常：不阻断后续判定。
+    }
+  };
+
+  // —————— 2026-10-20 真机：步骤 `delivered` 后唤醒 Steward 核证（应用没有「delivered 后核证」触发器）——————
+  //
+  // 现场：flow 的 integration-e2e / verification-evidence 已 delivered，但 Steward 空闲——没人叫它核证。
+  // 本层在 acceptance check（settle/ledger/导入同一入口）里读 flow YAML：delivered 且 owner 无活会话/
+  // busy/队列/在途投递、且 flow 没有已接受的验收决定 ⇒ 向 Convener 后台投一条去重核证任务 + Lead 一条
+  // 去重系统行。**不伪造 done、不自动改 flow、不弹客户卡**；Steward 用 flow 工具自行核证。
+  /** 步骤 delivered 唤醒去重：`projectRoot\0flowId` → revision+delivered ids 排序哈希。 */
+  const deliveredWakeNotified = new Map<string, string>();
+  const wakeStewardForDeliveredSteps = async (
+    projectRoot: string,
+    flowId: string,
+    note: (summary: string) => void,
+    diagnostic: ReturnType<typeof createDiagnosticLogger>,
+  ): Promise<void> => {
+    const key = acceptanceFlowKey(projectRoot, flowId);
+    let bytes: Buffer;
+    try {
+      bytes = await readFile(path.join(projectRoot, governanceFlowStatePath(flowId)));
+    } catch {
+      return; // 无 YAML/不可读：不在此处理（验收门另有 reason）
+    }
+    const parsed = parseFlowStateYaml(bytes.toString("utf8"), flowId);
+    if (!parsed.ok) return; // 解析失败交给验收门，不猜
+    const delivered = parsed.flow.steps.filter(
+      (step) => step.status === "delivered" && typeof step.owner === "string" && step.owner.trim() !== "",
+    );
+    if (delivered.length === 0) {
+      deliveredWakeNotified.delete(key); // 状态已变化：清除，允许后续真实 delivered 再唤醒
+      return;
+    }
+    // owner 有活会话/busy/队列/在途投递 ⇒ 等下一次事件（不抢跑）。
+    const waitingForOwner = delivered.some((step) => {
+      const owner = step.owner.trim();
+      const liveViews = manager.liveSessionViews().filter((view) => view.projectRoot === projectRoot && view.roleId === owner);
+      if (liveViews.length > 0) return true;
+      for (const runtime of RUNTIME_KINDS) {
+        if (manager.hasPendingDelivery(projectRoot, owner, runtime)) return true;
+      }
+      return false;
+    });
+    if (waitingForOwner) return;
+    const revision = createHash("sha256").update(bytes).digest("hex");
+    const deliveredIds = delivered.map((step) => step.id).sort();
+    const notifyHash = createHash("sha256").update(`${revision}\u0000${deliveredIds.join("\u0000")}`).digest("hex");
+    if (deliveredWakeNotified.get(key) === notifyHash) return; // 同 revision+同一 delivered 集合只派/提示一次
+    const runtime = await resolveNoteRuntime(projectRoot);
+    if (runtime === undefined) {
+      diagnostic.record("acceptance.delivered-wake.runtime-unresolved", { flowId });
+      return;
+    }
+    const task = [
+      `流程 ${flowId}：以下步骤已 delivered，等待 Steward / 统筹 核证：`,
+      ...delivered.map(
+        (step) =>
+          `- 步骤 ${step.id} 已 delivered（owner=${step.owner}），请核对账本/产物证据，用 flow_step_update 标 done 或退回修正；不要直接写 flow YAML。`,
+      ),
+      "核证要求：先核对账本与产物证据再更新步骤状态；未达 done 条件请退回修正；不要直接 write_file 流程 YAML。",
+    ].join("\n");
+    const opened = await manager.openBackground({ projectRoot, roleId: "convener", runtime });
+    if (!opened.ok) {
+      diagnostic.error("acceptance.delivered-wake.open.failed", new Error(opened.error ?? "unknown"), { flowId });
+      return; // 失败只诊断（下一次真实事件可再试；不循环）
+    }
+    const sent = await manager.sendBackground({ projectRoot, roleId: "convener", runtime, text: task });
+    if (!sent.ok) {
+      diagnostic.error("acceptance.delivered-wake.send.failed", new Error(sent.error ?? "unknown"), { flowId });
+      return;
+    }
+    deliveredWakeNotified.set(key, notifyHash);
+    diagnostic.record("acceptance.delivered-wake.sent", { flowId, count: delivered.length });
+    note(`流程 ${flowId}：步骤 ${deliveredIds.join("、")} 已 delivered，等待 Steward / 统筹 核证（已投核证任务）。`);
+  };
+
   // —————— 收尾推进（2026-10-18 真机缺口；2026-10-19 客户反馈「独立核准应该是标准流程」）——————
   // 触发面：**任意角色 settle**、回交到达/settle、桌面侧治理账本追加（dispatch.accepted）、导入项目/启动
   // 后的补齐检查。本层只读流程状态与账本做**触发门**检查，全部完成且证据按步骤类型齐备才后台派 Proof /
@@ -1355,6 +1505,12 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         await closeAcceptedFlow(info.projectRoot, info.flowId, acceptedDecision, note, diagnostic);
         return;
       }
+      // 2026-10-20 真机：先把 flow artifact 证据补登（幂等；旧扫描规则写下的 evidence.ref 文件），
+      // 再唤醒 Steward / 跑验收判定——Steward 的 flow_step_update done 才能通过 insufficient-evidence。
+      await backfillFlowArtifacts(info.projectRoot, info.flowId, diagnostic);
+      // 2026-10-20 真机：步骤 delivered 后唤醒 Steward 核证（无活会话/队列才投；同 revision+集合去重）。
+      // 放在 verifier 去重之前——即使本次不派 verifier，也必须评估 delivered 核证。
+      await wakeStewardForDeliveredSteps(info.projectRoot, info.flowId, note, diagnostic);
       // 2026-10-20 真机（04:06 派过 verifier；12:11 flow YAML 更新后仍被旧去重挡住、验收结果没回 Lead）：
       // 运行期去重带 **flow YAML 版本（mtime）**——每 flow 同版本只派一次；flow 更新 ⇒ 旧占位作废、允许重派。
       // 无 YAML（legacy/不可读）维持旧「每进程一次」语义。

@@ -20,7 +20,7 @@
 // 本模块不 import 适配器/运行时核心；只读 `flow-state.ts` 与账本，写 YAML 经共享原子写原语。
 
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { lstat, readFile } from "node:fs/promises";
 import path from "node:path";
 import { stringify as stringifyYaml } from "yaml";
 import { atomicWrite } from "../shared/atomic-write.ts";
@@ -33,7 +33,7 @@ import {
   type FlowState,
   type FlowStateStep,
 } from "./flow-state.ts";
-import { readGovernanceLedger } from "./governance-ledger.ts";
+import { appendGovernanceLedger, readGovernanceLedger, type GovernanceLedgerEntry, type GovernancePower } from "./governance-ledger.ts";
 import type {
   FlowGetFn,
   FlowStepSupersedeFn,
@@ -704,4 +704,208 @@ export async function completeAcceptanceStep(input: {
       viewActorPower: "app",
     });
   }).catch(internalError);
+}
+
+// —————————————————————— 应用专用：observeFlowArtifacts ——————————————————————
+
+/** 观察路径排除的段（应用私有/治理产物/依赖/版本库）。 */
+const OBSERVE_SKIP_SEGMENTS: ReadonlySet<string> = new Set([".ans", "角色卡", ".git", "node_modules"]);
+/** 单文件观察上限（与项目角色 artifact 扫描一致）。 */
+const OBSERVE_ARTIFACT_MAX_BYTES = 2 * 1024 * 1024;
+/** 图片扩展不做 NUL 二进制探测。 */
+const OBSERVE_IMAGE_EXTENSIONS: ReadonlySet<string> = new Set([".png", ".jpg", ".jpeg", ".webp"]);
+
+function observeExtension(rel: string): string {
+  const base = rel.split("/").pop() ?? "";
+  const index = base.lastIndexOf(".");
+  return index === -1 ? "" : base.slice(index).toLowerCase();
+}
+
+/** 观察路径安全解析：拒绝绝对/URL/`..`/空段/排除段/项目外；返回规范化的项目相对路径。 */
+function observeRelPath(projectRoot: string, ref: string): string | undefined {
+  if (typeof ref !== "string") return undefined;
+  const normalized = ref.replace(/\\/g, "/").trim();
+  if (normalized === "") return undefined;
+  if (normalized.startsWith("/") || /^[A-Za-z]:[\\/]/.test(normalized)) return undefined;
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(normalized)) return undefined;
+  const rel = normalized.replace(/^\.\//, "");
+  if (rel === "" || rel.startsWith("../")) return undefined;
+  const segments = rel.split("/");
+  if (segments.some((segment) => segment === "" || segment === "." || segment === "..")) return undefined;
+  if (segments.some((segment) => OBSERVE_SKIP_SEGMENTS.has(segment))) return undefined;
+  const abs = path.resolve(projectRoot, ...segments);
+  if (abs !== projectRoot && !abs.startsWith(projectRoot + path.sep)) return undefined;
+  return rel;
+}
+
+function looksBinaryObserve(data: Buffer, rel: string): boolean {
+  if (OBSERVE_IMAGE_EXTENSIONS.has(observeExtension(rel))) return false;
+  return data.subarray(0, Math.min(data.length, 8192)).includes(0);
+}
+
+/** 步骤 owner → 账本 power：内置治理角色按 function；其他（项目角色/未知）记 `project`。 */
+function artifactPowerOf(owner: string): GovernancePower {
+  switch (owner) {
+    case "liaison":
+      return "liaison";
+    case "rapporteur":
+      return "proposal";
+    case "nominator":
+      return "nomination";
+    case "convener":
+      return "schedule";
+    case "verifier":
+      return "verification";
+    default:
+      return "project";
+  }
+}
+
+export interface ObserveFlowArtifactsResult {
+  ok: boolean;
+  /** 本次**新追加** `artifact.observed` 的路径（幂等命中/跳过的不在此列）。 */
+  observed: string[];
+  /** 未观察的路径及原因：`path-invalid` / `missing` / `too-large` / `binary` / `read-failed` / `append-failed`。 */
+  skipped: Array<{ path: string; reason: string }>;
+  error?: string;
+}
+
+/**
+ * **应用专用**：把 flow YAML 中 `kind:"artifact"` 且有 `evidence.ref` 的步骤对应的文件补记为
+ * `artifact.observed`（用于重启后新扫描把旧证据当基线、Steward/Lead 无法 done 的补偿）。
+ *
+ * - 状态不限（pending/dispatched/delivered/done 都可观察）；文件必须存在、常规文件、≤2MiB；
+ *   文本扩展名含 NUL 视为二进制跳过；路径拒绝绝对/URL/`..`/项目外/`.ans`/`角色卡`/`.git`/`node_modules`。
+ * - 账本已有**同 path+sha** 的 `artifact.observed` ⇒ 幂等跳过（不重复追加）。
+ * - 追加 `artifact.observed{actorRoleId: step.owner, power: 内置角色按 function / 否则 project,
+ *   artifactPath: ref, artifactSha256, flowId}`；**不写 customer.decision**、不伪造客户批准。
+ * - 失败只返回/诊断，不抛；`ok:false` 仅用于流程/账本不可读或 append 失败（missing/超大/二进制等只进 skipped）。
+ * - 与 flow-service 共用 per-project 串行队列；账本 append 自带 append-only/fsync 语义。
+ */
+export async function observeFlowArtifacts(input: {
+  projectRoot: string;
+  flowId: string;
+}): Promise<ObserveFlowArtifactsResult> {
+  const projectRoot = path.resolve(input.projectRoot);
+  const flowId = input.flowId;
+  if (typeof flowId !== "string" || !FLOW_ID_RE.test(flowId)) {
+    return { ok: false, observed: [], skipped: [], error: "缺少合法 flowId（应形如 todo-list-v1）。" };
+  }
+  const log = createDiagnosticLogger({ component: "orchestration.flow-service", projectRoot });
+  return serialize(projectRoot, async () => {
+    const read = await readFlowState(projectRoot, flowId);
+    if (!read.ok) {
+      return { ok: false, observed: [], skipped: [], error: read.result.error ?? "流程状态不可读。" };
+    }
+    let ledger;
+    try {
+      ledger = await readGovernanceLedger(projectRoot);
+    } catch (err) {
+      return {
+        ok: false,
+        observed: [],
+        skipped: [],
+        error: `治理账本不可读：${err instanceof Error ? err.message : String(err)}`,
+      };
+    }
+    if (ledger.errors.length > 0) {
+      return {
+        ok: false,
+        observed: [],
+        skipped: [],
+        error: `治理账本不可读或存在坏行：${ledger.errors[0]}`,
+      };
+    }
+
+    const observed: string[] = [];
+    const skipped: Array<{ path: string; reason: string }> = [];
+    const errors: string[] = [];
+    const existing = new Set(
+      ledger.entries
+        .filter(
+          (entry) =>
+            entry.kind === "artifact.observed" &&
+            typeof entry.artifactPath === "string" &&
+            typeof entry.artifactSha256 === "string",
+        )
+        .map((entry) => `${entry.artifactPath}\u0000${entry.artifactSha256}`),
+    );
+    const seen = new Set<string>();
+
+    for (const step of read.flow.steps) {
+      if (step.kind !== "artifact") continue;
+      const ref = step.evidence?.ref;
+      if (typeof ref !== "string" || ref.trim() === "") continue;
+      const rel = observeRelPath(projectRoot, ref);
+      if (rel === undefined) {
+        skipped.push({ path: ref, reason: "path-invalid" });
+        continue;
+      }
+      const abs = path.join(projectRoot, ...rel.split("/"));
+      let info;
+      try {
+        info = await lstat(abs);
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException).code;
+        skipped.push({ path: rel, reason: code === "ENOENT" ? "missing" : "read-failed" });
+        continue;
+      }
+      if (!info.isFile() || info.isSymbolicLink()) {
+        skipped.push({ path: rel, reason: "missing" });
+        continue;
+      }
+      if (info.size > OBSERVE_ARTIFACT_MAX_BYTES) {
+        skipped.push({ path: rel, reason: "too-large" });
+        continue;
+      }
+      let data: Buffer;
+      try {
+        data = await readFile(abs);
+      } catch {
+        skipped.push({ path: rel, reason: "read-failed" });
+        continue;
+      }
+      if (looksBinaryObserve(data, rel)) {
+        skipped.push({ path: rel, reason: "binary" });
+        continue;
+      }
+      const sha = sha256(data);
+      const key = `${rel}\u0000${sha}`;
+      if (seen.has(key) || existing.has(key)) continue; // 幂等：本次/账本已有同 path+sha
+      seen.add(key);
+      const entry: GovernanceLedgerEntry = {
+        at: new Date().toISOString(),
+        kind: "artifact.observed",
+        actorRoleId: step.owner,
+        power: artifactPowerOf(step.owner),
+        artifactPath: rel,
+        artifactSha256: sha,
+        flowId,
+      };
+      const appended = await appendGovernanceLedger(projectRoot, entry);
+      if (appended.ok) {
+        observed.push(rel);
+      } else {
+        skipped.push({ path: rel, reason: "append-failed" });
+        errors.push(appended.message);
+      }
+    }
+
+    log.record("flow.artifacts.observed", {
+      flowId,
+      observed: observed.length,
+      skipped: skipped.length,
+    });
+    return {
+      ok: errors.length === 0,
+      observed,
+      skipped,
+      ...(errors.length > 0 ? { error: errors.join("；") } : {}),
+    };
+  }).catch((err) => ({
+    ok: false,
+    observed: [],
+    skipped: [],
+    error: `流程 artifact 观察失败：${err instanceof Error ? err.message : String(err)}`,
+  }));
 }

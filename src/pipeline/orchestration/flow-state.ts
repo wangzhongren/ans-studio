@@ -20,7 +20,8 @@ export {
 
 // 2026-10-20 应用专用：客户验收 accepted 后把 flow YAML 的保留验收步骤置 done。
 // 桌面只经本公共出口消费；不注册为角色工具。
-export { completeAcceptanceStep } from "../../common/编排/flow-service.ts";
+export { completeAcceptanceStep, observeFlowArtifacts } from "../../common/编排/flow-service.ts";
+export type { ObserveFlowArtifactsResult } from "../../common/编排/flow-service.ts";
 
 export type {
   FlowState,

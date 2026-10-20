@@ -1258,7 +1258,7 @@ test("artifact.observed：内置角色 settle 后只记预授权目录内新增/
 
 // —————————————————————— ⑦ 项目角色 artifact 观察（2026-10-20） ——————————————————————
 
-test("artifact.observed：项目角色 settle 后观察 boundary directory 内新增/变更的 .md（tester test/evidence）", async () => {
+test("artifact.observed：项目角色 settle 后观察 boundary directory/file 内新增/变更物证（.md/.js；二进制/超大/私有路径跳过）", async () => {
   await withRoot(async (root) => {
     // tester 项目角色：boundary 允许 test/、scripts/、docs/reports/tester/。
     mkdirSync(join(root, "角色卡", "tester"), { recursive: true });
@@ -1295,7 +1295,10 @@ test("artifact.observed：项目角色 settle 后观察 boundary directory 内�
       async bindRole(): Promise<RoleSession> {
         return {
           async prompt(text: string): Promise<void> {
-            if (text === "first") writeFileSync(join(root, "test", "evidence", "foo.md"), "# 证据 v1\n");
+            if (text === "first") {
+              writeFileSync(join(root, "test", "evidence", "foo.md"), "# 证据 v1\n");
+              writeFileSync(join(root, "test", "e2e-fullstack.test.js"), "// e2e fullstack\n");
+            }
             pending.push({ kind: "settled", summary: "done", detail: { outcome: "completed" } } as SessionEvent);
           },
           events(): AsyncIterable<SessionEvent> {
@@ -1312,8 +1315,18 @@ test("artifact.observed：项目角色 settle 后观察 boundary directory 内�
     mkdirSync(join(root, "docs"), { recursive: true });
     mkdirSync(join(root, ".ans"), { recursive: true });
     writeFileSync(join(root, "docs", "secret.md"), "# 外部\n");
+    writeFileSync(join(root, "docs", "secret.js"), "// 外部\n");
     writeFileSync(join(root, ".ans", "secret.md"), "# 私有\n");
+    writeFileSync(join(root, ".ans", "secret.js"), "// 私有\n");
     writeFileSync(join(root, "角色卡", "tester", "secret.md"), "# 角色卡\n");
+    writeFileSync(join(root, "角色卡", "tester", "secret.js"), "// 角色卡\n");
+
+    // 明显二进制（文本扩展名含 NUL）与超大文件：跳过。
+    writeFileSync(join(root, "test", "evidence", "binary.md"), Buffer.from([0x23, 0x00, 0x01, 0x02]));
+    writeFileSync(join(root, "test", "evidence", "huge.js"), "x".repeat(2 * 1024 * 1024 + 1));
+    // 依赖目录：排除。
+    mkdirSync(join(root, "test", "node_modules", "dep"), { recursive: true });
+    writeFileSync(join(root, "test", "node_modules", "dep", "index.js"), "// dep\n");
 
     const handle = await openRoleSession(
       { roleId: "tester", project, autoRepin: false },
@@ -1325,14 +1338,31 @@ test("artifact.observed：项目角色 settle 后观察 boundary directory 内�
       await flushGovernanceLedger(root);
       const firstRead = await readGovernanceLedger(root);
       const firstObserved = firstRead.entries.filter((entry) => entry.kind === "artifact.observed");
-      assert.equal(firstObserved.length, 1, "首次 settle 只观察 test/evidence/foo.md");
-      assert.equal(firstObserved[0]!.actorRoleId, "tester");
-      assert.equal(firstObserved[0]!.power, "project");
-      assert.equal(firstObserved[0]!.artifactPath, "test/evidence/foo.md");
-      assert.match(firstObserved[0]!.artifactSha256 ?? "", /^[0-9a-f]{64}$/);
+      assert.equal(firstObserved.length, 2, "首次 settle 观察 test/evidence/foo.md 与 test/e2e-fullstack.test.js");
+      const observedByPath = new Map(firstObserved.map((entry) => [entry.artifactPath, entry]));
+      const observedMd = observedByPath.get("test/evidence/foo.md")!;
+      const observedJs = observedByPath.get("test/e2e-fullstack.test.js")!;
+      for (const observed of [observedMd, observedJs]) {
+        assert.equal(observed.actorRoleId, "tester");
+        assert.equal(observed.power, "project");
+        assert.match(observed.artifactSha256 ?? "", /^[0-9a-f]{64}$/);
+      }
       assert.ok(
-        !firstRead.entries.some((entry) => entry.kind === "artifact.observed" && ["docs/secret.md", ".ans/secret.md", "角色卡/tester/secret.md"].includes(entry.artifactPath ?? "")),
-        "项目外/禁写路径不得观察",
+        !firstRead.entries.some((entry) =>
+          entry.kind === "artifact.observed" &&
+          [
+            "docs/secret.md",
+            "docs/secret.js",
+            ".ans/secret.md",
+            ".ans/secret.js",
+            "角色卡/tester/secret.md",
+            "角色卡/tester/secret.js",
+            "test/evidence/binary.md",
+            "test/evidence/huge.js",
+            "test/node_modules/dep/index.js",
+          ].includes(entry.artifactPath ?? ""),
+        ),
+        "项目外/禁写路径/二进制/超大/依赖目录不得观察",
       );
 
       // 内容变更 ⇒ 新的一条 artifact.observed；未变更 ⇒ 不重复。
@@ -1346,6 +1376,13 @@ test("artifact.observed：项目角色 settle 后观察 boundary directory 内�
       );
       assert.equal(observedFoo.length, 2, "内容变更记一条新观察");
       assert.notEqual(observedFoo[0]!.artifactSha256, observedFoo[1]!.artifactSha256);
+      assert.equal(
+        secondRead.entries.filter(
+          (entry) => entry.kind === "artifact.observed" && entry.artifactPath === "test/e2e-fullstack.test.js",
+        ).length,
+        1,
+        ".js 未变更不重复记录",
+      );
 
       await handle.send("third");
       await consume(handle);
@@ -1356,8 +1393,13 @@ test("artifact.observed：项目角色 settle 后观察 boundary directory 内�
         2,
         "未变更不重复记录",
       );
+      assert.equal(
+        thirdRead.entries.filter((entry) => entry.kind === "artifact.observed" && entry.artifactPath === "test/e2e-fullstack.test.js").length,
+        1,
+        ".js 未变更不重复记录",
+      );
 
-      // flow YAML 的 artifact 步骤 evidence.ref 指向该路径 ⇒ validateFlowEvidence 通过。
+      // flow YAML 的 artifact 步骤 evidence.ref 指向这些路径 ⇒ validateFlowEvidence 通过。
       const flowYaml = [
         "flowId: flow-a",
         "version: 1",
@@ -1369,6 +1411,12 @@ test("artifact.observed：项目角色 settle 后观察 boundary directory 内�
         "    kind: artifact",
         "    status: done",
         "    evidence: { kind: artifact, ref: test/evidence/foo.md }",
+        "  - id: integration-e2e",
+        "    title: 全栈端到端",
+        "    owner: tester",
+        "    kind: artifact",
+        "    status: done",
+        "    evidence: { kind: artifact, ref: test/e2e-fullstack.test.js }",
         "  - id: verification",
         "    title: 验收",
         "    owner: verifier",
@@ -1380,6 +1428,115 @@ test("artifact.observed：项目角色 settle 后观察 boundary directory 内�
       assert.equal(parsedFlow.ok, true);
       if (!parsedFlow.ok) return;
       assert.deepEqual(validateFlowEvidence(parsedFlow.flow, thirdRead.entries), { ok: true });
+    } finally {
+      await handle.dispose();
+    }
+  });
+});
+
+test("artifact.observed：项目角色 boundary file 条目（backend README.md/package.json）settle 后观察", async () => {
+  await withRoot(async (root) => {
+    mkdirSync(join(root, "角色卡", "backend"), { recursive: true });
+    writeFileSync(join(root, "角色卡", "backend", "role-card.md"), "# backend\n");
+    writeFileSync(
+      join(root, "角色卡", "backend", "boundary.yaml"),
+      [
+        "role: backend",
+        "entries:",
+        "  - kind: file",
+        "    path: README.md",
+        "    purpose: 项目说明",
+        "  - kind: file",
+        "    path: package.json",
+        "    purpose: 包清单",
+        "",
+      ].join("\n"),
+    );
+    const base = trioProject(root);
+    const project: ProjectConfig = {
+      ...base,
+      roles: { backend: { card: "角色卡/backend/role-card.md", boundary: "角色卡/backend/boundary.yaml" } },
+    };
+
+    const pending: SessionEvent[] = [];
+    const adapter: RuntimeAdapter = {
+      async composeContext() {
+        return { systemPrompt: "" };
+      },
+      async bindRole(): Promise<RoleSession> {
+        return {
+          async prompt(text: string): Promise<void> {
+            if (text === "first") {
+              writeFileSync(join(root, "README.md"), "# 项目说明\n");
+              writeFileSync(join(root, "package.json"), JSON.stringify({ name: "demo", version: "1.0.0" }) + "\n");
+            }
+            pending.push({ kind: "settled", summary: "done", detail: { outcome: "completed" } } as SessionEvent);
+          },
+          events(): AsyncIterable<SessionEvent> {
+            return (async function* () {
+              while (pending.length > 0) yield pending.shift()!;
+            })();
+          },
+          async dispose(): Promise<void> {},
+        };
+      },
+    };
+
+    const handle = await openRoleSession(
+      { roleId: "backend", project, autoRepin: false },
+      { createAdapter: () => adapter },
+    );
+    try {
+      await handle.send("first");
+      await consume(handle);
+      await flushGovernanceLedger(root);
+      const firstRead = await readGovernanceLedger(root);
+      const observed = firstRead.entries.filter((entry) => entry.kind === "artifact.observed");
+      assert.deepEqual(
+        observed.map((entry) => entry.artifactPath).sort(),
+        ["README.md", "package.json"],
+        "boundary file 条目应收录",
+      );
+      for (const entry of observed) {
+        assert.equal(entry.actorRoleId, "backend");
+        assert.equal(entry.power, "project");
+        assert.match(entry.artifactSha256 ?? "", /^[0-9a-f]{64}$/);
+      }
+
+      // flow YAML 的 artifact 步骤 evidence.ref 指向 README.md ⇒ validateFlowEvidence 通过。
+      const flowYaml = [
+        "flowId: flow-a",
+        "version: 1",
+        "qualityTier: production",
+        "steps:",
+        "  - id: verification-evidence",
+        "    title: 证据整理",
+        "    owner: backend",
+        "    kind: artifact",
+        "    status: done",
+        "    evidence: { kind: artifact, ref: README.md }",
+        "  - id: verification",
+        "    title: 验收",
+        "    owner: verifier",
+        "    kind: acceptance",
+        "    status: pending",
+        "",
+      ].join("\n");
+      const parsedFlow = parseFlowStateYaml(flowYaml, "flow-a");
+      assert.equal(parsedFlow.ok, true);
+      if (!parsedFlow.ok) return;
+      assert.deepEqual(validateFlowEvidence(parsedFlow.flow, firstRead.entries), { ok: true });
+
+      // 未变更不重复。
+      await handle.send("second");
+      await consume(handle);
+      await flushGovernanceLedger(root);
+      const secondRead = await readGovernanceLedger(root);
+      assert.equal(
+        secondRead.entries.filter((entry) => entry.kind === "artifact.observed").length,
+        2,
+        "未变更不重复记录",
+      );
     } finally {
       await handle.dispose();
     }
