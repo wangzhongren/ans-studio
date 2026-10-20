@@ -30,7 +30,7 @@ ANS Studio 面向希望在真实项目中使用多个 AI 角色协作的开发�
 
 学术来源：Wang, Zhongren. 2026. *Role-First Software Governance: Asymmetric Authority Boundaries for AI-Native Agent Systems*. [DOI: 10.5281/zenodo.22824700](https://zenodo.org/records/22824700)。
 
-![ANS Studio 真实桌面：五角色导航与需求确认卡](角色卡/桌面UI/docs/change/2026-10-18_readme-five-roles/desktop-intent-confirm.png)
+![ANS Studio 真实桌面：石墨主题、五角色导航与需求确认卡](角色卡/桌面UI/docs/change/2026-10-20_readme-v1.4-screenshot/desktop-intent-confirm.png)
 
 ## 下载与运行
 
