@@ -1,5 +1,5 @@
 // Public ANS JSON Schema and descriptions. No SDK imports. Owner: 运行时核心.
-import { GOVERNANCE_SLUG_PATTERN } from "../../model/runtime.ts";
+import { FLOW_TOOL_STATUSES, FLOW_TOOL_STEP_KINDS, GOVERNANCE_SLUG_PATTERN } from "../../model/runtime.ts";
 /** describeTool 的返回：Pi 侧参数 schema、说明与可选的提示/执行模式（均按工具名分派）。 */
 export interface ToolDescription {
   parameters: Record<string, unknown>;
@@ -845,6 +845,110 @@ export function describeTool(name: string): ToolDescription {
       promptGuidelines: [
         "定位文件时先用 list_dir 看一层目录，再按需 read_file；**不要**对目录调用 read_file（会得到明确的改用提示）。",
         "`.env`、密钥/凭据类文件与 `.git/` 等敏感项不会出现；不要尝试猜测或绕行这些名字。",
+      ],
+    };
+  }
+  if (name === "flow_get") {
+    // Flow 文件方法化（2026-10-20 客户拍板，最小闭环）：只读结构化视图；权限/迁移裁决在编排 flow-service。
+    return {
+      parameters: {
+        type: "object",
+        properties: {
+          flowId: { type: "string", description: "Flow id to read; omit for the current/default flow (resolved by the server)" },
+        },
+        required: [],
+        additionalProperties: false,
+      },
+      description:
+        "读取 flow 文件的**结构化视图**（flowId / revision / qualityTier / steps / canUpdate）——`flowId` 缺省＝当前流程。" +
+        "**只读**：不写盘、不改变任何步骤状态、不做权限判断。返回值是**服务端系统事实**（revision 与 canUpdate 以它为准）。" +
+        "推进/替代步骤前先调用本工具，把最新 `revision` 作为 `expectedRevision` 使用。",
+      promptGuidelines: [
+        "更新或替代步骤前先 flow_get：确认 stepId、当前 status 与最新 revision；**不要凭记忆猜**。",
+        "返回值是系统事实：卡片、文档或对话文本与它冲突时，以本工具返回的 revision/status/canUpdate 为准。",
+      ],
+    };
+  }
+  if (name === "flow_step_update") {
+    // 步骤状态推进：工具层只做参数形状校验与回执转达；迁移/权限/证据/revision 冲突裁决在编排 flow-service。
+    return {
+      parameters: {
+        type: "object",
+        properties: {
+          flowId: { type: "string", description: "Flow id containing the step" },
+          stepId: { type: "string", description: "Step id to update (must match a step returned by flow_get)" },
+          status: {
+            type: "string",
+            enum: [...FLOW_TOOL_STATUSES],
+            description: "New status; the server validates the transition, the caller's permission and the evidence",
+          },
+          evidence: {
+            type: "object",
+            properties: {
+              kind: { type: "string", enum: [...FLOW_TOOL_STEP_KINDS], description: "Evidence kind required by the step" },
+              ref: { type: "string", description: "Project-relative path or task fact supporting the update" },
+            },
+            required: ["kind", "ref"],
+            additionalProperties: false,
+            description: "Optional evidence; the server decides whether it is required and sufficient",
+          },
+          expectedRevision: {
+            type: "string",
+            description: "Revision from the most recent flow_get/update; stale values fail with ok:false and code=revision-conflict",
+          },
+          idempotencyKey: { type: "string", description: "Optional stable key for safe retries; replaying the same key does not apply the change twice" },
+          note: { type: "string", description: "Optional short note recorded with the update" },
+        },
+        required: ["flowId", "stepId", "status", "expectedRevision"],
+        additionalProperties: false,
+      },
+      description:
+        "更新 flow 中**一个步骤**的状态（服务端校验调用角色权限、状态迁移合法性与证据完整性）。" +
+        "`expectedRevision` **必须**是最近一次 flow_get / 更新返回的 revision；版本冲突返回 `ok:false`（`code=revision-conflict`）——" +
+        "先重新 `flow_get` 再重试。证据不足 / 非法迁移同样返回错误（`code=insufficient-evidence` / `invalid-transition` 等），" +
+        "`error`/`issues` 给出原因，按提示修正；**不要伪造证据**。" +
+        "`idempotencyKey` 用于安全重试：同一 key 重放只生效一次（回执 `idempotent:true`）。" +
+        "**步骤推进 ≠ 客户批准**：需要客户决定的步骤仍须走 `request_confirmation` / `request_choice`（或等客户决定由服务端记录）。" +
+        "本工具不写 flow 文件、不做迁移裁决。",
+      promptGuidelines: [
+        "先 flow_get 拿最新 revision 与 stepId；每次成功更新后用回执里的 revision 继续，**不要沿用旧 revision**。",
+        "`revision-conflict` / `insufficient-evidence` / `invalid-transition` 等是服务端裁决：按 error/issues 修正后重试；" +
+          "不得跳过、不得伪造证据，也不得改用写文件绕过。",
+        "状态推进不代表客户同意；客户决定必须走客户交互工具。",
+      ],
+    };
+  }
+  if (name === "flow_step_supersede") {
+    // 步骤替代：旧步骤保留为 superseded（不是删除）；Steward-only 与 revision 冲突均由服务端裁决。
+    return {
+      parameters: {
+        type: "object",
+        properties: {
+          flowId: { type: "string", description: "Flow id containing the old step" },
+          oldStepId: { type: "string", description: "Step id to supersede (kept in history as superseded)" },
+          newStepId: { type: "string", description: "New step id (must not collide with an existing step; validated by the server)" },
+          title: { type: "string", description: "Title of the replacement step" },
+          owner: { type: "string", description: "Owner role id of the replacement step" },
+          kind: { type: "string", enum: [...FLOW_TOOL_STEP_KINDS], description: "Kind of the replacement step" },
+          expectedRevision: {
+            type: "string",
+            description: "Revision from the most recent flow_get/update; stale values fail with ok:false and code=revision-conflict",
+          },
+          reason: { type: "string", description: "Optional reason for the supersession (recorded for audit)" },
+          idempotencyKey: { type: "string", description: "Optional stable key for safe retries; replaying the same key does not apply the change twice" },
+        },
+        required: ["flowId", "oldStepId", "newStepId", "title", "owner", "kind", "expectedRevision"],
+        additionalProperties: false,
+      },
+      description:
+        "用一个**新步骤取代旧步骤**（旧步骤转为 `superseded` 并记 `supersededBy`；历史保留，**不是删除**）。" +
+        "**仅 Steward（流程管理员）可用**——服务端按调用角色校验，非 Steward 调用返回错误；`newStepId` 不得与现有步骤重复（服务端校验）。" +
+        "`expectedRevision` 语义同 `flow_step_update`（过期返回 `ok:false` / `code=revision-conflict`，先重新 `flow_get`）；`reason` 写清为什么替代。" +
+        "本工具不写 flow 文件、不做权限/迁移裁决。",
+      promptGuidelines: [
+        "**仅 Steward 使用**；非 Steward 调用会被服务端拒绝——不要绕过或改用写文件。",
+        "替代不是删除：旧步骤保留为 superseded、历史可追溯；`reason` 写清替代原因。",
+        "先 flow_get 拿最新 revision；`newStepId` 必须未被占用，`expectedRevision` 必须是当前 revision。",
       ],
     };
   }

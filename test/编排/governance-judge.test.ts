@@ -2313,6 +2313,38 @@ test("run-role：choice 卡缺 cardKind 不兜底（零变化）", async () => {
   });
 });
 
+test("run-role：flow 能力注入——项目角色只有 flowGet；内置治理角色有 get/update/supersede", async () => {
+  await withRoot(async (root) => {
+    const captured: { caps?: AdapterCapabilities; gate?: WriteGate } = {};
+    const handle = await openRoleSession(
+      { roleId: "X", project: singleProject(root), autoRepin: false },
+      { createAdapter: capturingFactory(captured) },
+    );
+    try {
+      assert.equal(typeof captured.caps?.flowGet, "function", "项目角色有 flowGet");
+      assert.equal(captured.caps?.flowStepUpdate, undefined, "项目角色本批不给 update");
+      assert.equal(captured.caps?.flowStepSupersede, undefined, "项目角色本批不给 supersede");
+    } finally {
+      await handle.dispose();
+    }
+  });
+
+  await withRoot(async (root) => {
+    const captured: { caps?: AdapterCapabilities; gate?: WriteGate } = {};
+    const handle = await openRoleSession(
+      { roleId: "convener", project: trioProject(root, "convener"), autoRepin: false },
+      { createAdapter: capturingFactory(captured) },
+    );
+    try {
+      assert.equal(typeof captured.caps?.flowGet, "function", "内置治理角色有 flowGet");
+      assert.equal(typeof captured.caps?.flowStepUpdate, "function", "内置治理角色有 flowStepUpdate");
+      assert.equal(typeof captured.caps?.flowStepSupersede, "function", "内置治理角色有 flowStepSupersede");
+    } finally {
+      await handle.dispose();
+    }
+  });
+});
+
 test("run-role：物证容忍 `<flowId>.proposal-vN` / `.nomination-vN` 并取最新", async () => {
   // 1) 两种提案命名共存：取版本号最高的（跨命名比较）。
   await withRoot(async (root) => {

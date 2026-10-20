@@ -38,7 +38,12 @@ export type GovernancePower =
   | "verification"
   | "app"
   | "customer"
-  | "liaison";
+  | "liaison"
+  /**
+   * 项目角色（非内置治理角色）的 `artifact.observed`（2026-10-20 Flow 文件方法化配套：
+   * 项目角色 boundary directory 内的新增/变更 `.md` 也观察）。门禁不读 `power`，仅审计标记。
+   */
+  | "project";
 
 /** 客户决定的细分类型（门禁按它判定，不靠自然语言；评审 §5.7/§5.8）。 */
 export type GovernanceDecisionKind =

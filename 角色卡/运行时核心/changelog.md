@@ -1,5 +1,11 @@
 # 运行时核心变更记录
 
+## 2026-10-20 Flow 文件方法化工具层：`flow_get` / `flow_step_update` / `flow_step_supersede`（已实施待验证）
+
+客户拍板「按这个方案做吧」：flow 文件方法化最小闭环，应用是 `docs/flows/<flowId>.yaml` 唯一写者，角色改用三工具推进步骤。本角色只落运行时核心工具层；权限/迁移/证据/revision 冲突/Steward-only 裁决在编排 flow-service。
+
+①`src/model/runtime.ts`：新增 `FlowToolStatus`（8 值）/`FLOW_TOOL_STATUSES`、`FlowToolStepKind`（4 值）/`FLOW_TOOL_STEP_KINDS`、`FlowToolEvidence`、`FlowToolStepView`、`FlowToolView`、`FlowToolResult`（ok/revision/flow/idempotent/error/code/issues）、`FlowGetFn`/`FlowStepUpdateFn`/`FlowStepSupersedeFn`；`GovernedToolsOptions` 增可选 `flowGet`/`flowStepUpdate`/`flowStepSupersede`，每项未注入 ⇒ 对应工具不注册。②`src/provider/runtime/tools.ts`：三 handler 只做参数形状校验＋调用注入能力＋如实转达回执（ok/code/revision/idempotent/error/issues/flow 视图）；能力抛错/契约外回执 fail-closed；成功文案明示「步骤推进 ≠ 客户批准」；中止文案不假设已读/已变更。③`src/provider/runtime/schema.ts`：三工具 JSON Schema/描述/指引（`additionalProperties:false`；status/kind 枚举引用 model 单一来源；revision-conflict/insufficient-evidence/invalid-transition、idempotencyKey 幂等、supersede 仅 Steward/不是删除）。④`src/service/runtime/session.ts` 无需改代码：`RuntimeSessionOptions` 继承 `GovernedToolsOptions` 且装配处 `...options` 已透传，Service 级测试证明。⑤测试新增 `test/runtime-core/flow-tools.test.ts` 11 例；governance-judge forbidden 列表补三只。验证：`node --test "test/runtime-core/**/*.test.ts"` **240 计 / 239 过 / 0 红 / 1 跳过**；flow 单文件 **11/11**；`npm run typecheck` **exit 0（0 错）**；只读复跑编排 `test/编排/flow-service.test.ts` **11/11 过**。**跨角色**：编排 `src/common/编排/flow-service.ts` 已按本契约实现并对齐类型（其测试一度有 strict-null 错误，属主已修正）；`src/provider/pi/session.ts`（Pi适配器边界）legacy/假适配器路径需其属主透传三能力（生产 Service 路径已由 `...options` 覆盖并有测试为证）。未跑真实模型/凭据/网络；未 git 提交。变更记录见 [docs/change/2026-10-20_change_flow-tools.md](docs/change/2026-10-20_change_flow-tools.md)。
+
 ## 2026-10-19 `report_governance_judgement` schema 支持 approval 组写卡 `deny`（已实施待验证）
 
 客户要求：治理卡判断 agent 对 approval 组写卡（write/appointment-write/schedule-write）判断可以 `deny`，应用把 deny 原因退回发起角色重做（此前只允许 `approve|manual`，写卡不合规只能回落客户手动确认）；decision 组（proposal/appointment/acceptance）仍不得 deny、判断 agent 不替客户拒绝。编排正在扩展 `GovernanceJudgeOutcome`/规范化/prompt，本角色只落运行时核心工具 schema 与只读工具层。

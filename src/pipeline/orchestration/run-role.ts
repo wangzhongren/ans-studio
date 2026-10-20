@@ -137,6 +137,12 @@ import {
   validateIntentHandoff,
 } from "../../common/编排/governance-handoff.ts";
 import { CLI_POSITIONING } from "../../common/编排/cli-positioning.ts";
+import {
+  createFlowService,
+  type FlowGetFn,
+  type FlowStepSupersedeFn,
+  type FlowStepUpdateFn,
+} from "../../common/编排/flow-service.ts";
 import { createDiagnosticLogger } from "../../common/shared/diagnostics.ts";
 // 跨角色共享路径原语（**单一来源** = pm 属主 `src/common/shared/path-primitives.ts`；工程法案 §一.5
 // 消费方名单已含编排；同 `confirmed-writes.ts` 先例）——用于 su 预授权目录的**词法**归属判定：
@@ -232,6 +238,14 @@ export interface AdapterCapabilities {
    * （未注入 ⇒ 对应工具不注册，逐字现状）。运行时核心据此走 `buildGovernanceJudgeTools`。
    */
   governanceJudge?: GovernanceJudgeToolOptions;
+  /**
+   * 2026-10-20 Flow 文件方法化（客户拍板「按这个方案做吧」）：应用是 `docs/flows/<flowId>.yaml`
+   * 的**唯一写者**。`flowGet` 给所有角色；`flowStepUpdate`/`flowStepSupersede` 只给内置治理角色
+   * （权限由 `common/编排/flow-service.ts` 校验）。未注入 ⇒ 对应工具不注册。
+   */
+  flowGet?: FlowGetFn;
+  flowStepUpdate?: FlowStepUpdateFn;
+  flowStepSupersede?: FlowStepSupersedeFn;
 }
 
 export interface RunRoleInput {
@@ -1134,6 +1148,25 @@ export async function openRoleSession(
     }
   }
 
+  // 2026-10-20 Flow 文件方法化：应用是 `docs/flows/<flowId>.yaml` 唯一写者。
+  // `flow_get` 给所有角色；`flow_step_update` / `flow_step_supersede` 只给内置治理角色（service 再校验权限）。
+  // `flowGet` 缺省 flowId 用**调用时**的 currentFlowId（会话中途切 flow 也能取对）。
+  const flowService = createFlowService({
+    projectRoot: input.project.projectRoot,
+    actorRoleId: setup.role.id,
+    actorPower: trioSpec?.function ?? "project",
+  });
+  const flowGet: FlowGetFn = (payload) => {
+    const flowId = payload.flowId ?? currentFlowId;
+    return flowService.get(flowId !== undefined ? { flowId } : {});
+  };
+  const flowStepUpdate: FlowStepUpdateFn | undefined = builtInGovernance
+    ? (payload) => flowService.update(payload)
+    : undefined;
+  const flowStepSupersede: FlowStepSupersedeFn | undefined = builtInGovernance
+    ? (payload) => flowService.supersede(payload)
+    : undefined;
+
   const capabilities: AdapterCapabilities = {
     ...(governedInput !== undefined ? { customerInput: governedInput } : {}),
     ...(reportHandback !== undefined ? { reportHandback } : {}),
@@ -1152,6 +1185,9 @@ export async function openRoleSession(
     ...(uninstallMcp !== undefined ? { uninstallMcp } : {}),
     ...(shellGate !== undefined ? { shellGate } : {}),
     ...(input.shellVerdict !== undefined ? { shellVerdict: input.shellVerdict } : {}),
+    flowGet,
+    ...(flowStepUpdate !== undefined ? { flowStepUpdate } : {}),
+    ...(flowStepSupersede !== undefined ? { flowStepSupersede } : {}),
   };
   const createAdapter = deps.createAdapter ?? createRuntimeAdapterFactory(input.project, input.runtime ?? "pi", deps.runtimeOptions);
   const adapter = createAdapter(
@@ -1168,14 +1204,17 @@ export async function openRoleSession(
   boundSessionForEvidence = session;
   log.record("session.open.ready");
 
-  // §5.7 `artifact.observed`：trio 内置角色在会话 open 时扫一次预授权目录作为基线（只记哈希、不写账本），
-  // 每轮 settle 后只对「新增/变更」的 `.md` 追加 `artifact.observed`。su（single）不参与治理账本——旧项目
-  // 行为逐字不变（不因开会话/每轮 settle 凭空写 `.ans`）。
+  // §5.7 `artifact.observed`：会话 open 时扫一次观察目录作为基线（只记哈希、不写账本），每轮 settle 后
+  // 只对「新增/变更」的 `.md` 追加 `artifact.observed`。
+  // 2026-10-20：**项目角色也参与观察**（boundary 的 directory 条目，如 tester test/、backend src/、
+  // frontend public/）；内置治理角色沿用 preauthorizedDirs（既有行为逐字不变）。
+  // single/su 项目不参与治理账本——旧项目行为不变（不因开会话/每轮 settle 凭空写 `.ans`）。
+  const artifactDirs = artifactScanDirsFor(setup.role, preauthorizedDirs, builtInGovernance);
   const artifactHashes = new Map<string, string>();
-  const artifactScanEnabled = isTrio && preauthorizedDirs.length > 0;
+  const artifactScanEnabled = (isTrio || governanceModel === "trio") && artifactDirs.length > 0;
   if (artifactScanEnabled) {
     try {
-      for (const artifact of await scanPreauthorizedArtifacts(input.project.projectRoot, preauthorizedDirs)) {
+      for (const artifact of await scanPreauthorizedArtifacts(input.project.projectRoot, artifactDirs)) {
         artifactHashes.set(artifact.relPath, artifact.sha256);
       }
     } catch (err) {
@@ -1425,11 +1464,11 @@ export async function openRoleSession(
                 /* 自动收尾/重 pin 是 best-effort；失败不打断会话事件流 */
               }
             }
-            // §5.7 `artifact.observed`（仅 trio 内置角色、仅预授权目录、仅新增/变更的 `.md`）：
-            // 应用算 sha256；账本失败只记诊断，不打断事件流、不回滚角色产物。
+            // §5.7 `artifact.observed`（trio 项目：内置角色预授权目录 / 项目角色 boundary directory，
+            // 仅新增/变更的 `.md`）：应用算 sha256；账本失败只记诊断，不打断事件流、不回滚角色产物。
             if (artifactScanEnabled) {
               try {
-                const artifacts = await scanPreauthorizedArtifacts(input.project.projectRoot, preauthorizedDirs);
+                const artifacts = await scanPreauthorizedArtifacts(input.project.projectRoot, artifactDirs);
                 for (const artifact of artifacts) {
                   if (artifactHashes.get(artifact.relPath) === artifact.sha256) continue;
                   artifactHashes.set(artifact.relPath, artifact.sha256);
@@ -1437,7 +1476,7 @@ export async function openRoleSession(
                     at: new Date().toISOString(),
                     kind: "artifact.observed",
                     actorRoleId: setup.role.id,
-                    power: trioSpec!.function,
+                    power: trioSpec?.function ?? "project",
                     artifactPath: artifact.relPath,
                     artifactSha256: artifact.sha256,
                     ...artifactFlowMetadata(artifact.relPath),
@@ -2300,7 +2339,38 @@ interface ObservedArtifact {
 }
 
 /**
- * 扫描预授权目录内的 `.md`（评审 §5.7：`artifact.observed` 只扫角色预授权目录，不扫 `角色卡/` 全树）。
+ * 2026-10-20：artifact 观察目录。
+ * - 内置治理角色：沿用注册表 `preauthorizedDirs`（既有行为逐字不变）；
+ * - 项目角色：boundary Section 1 中 `kind:"directory"` 且 `root:"project"` 的目录（tester 的 `test/`、
+ *   `scripts/`，backend 的 `src/`，frontend 的 `public/` 等）；与 `preauthorizedDirs` 去重合并。
+ * 安全排除：`.ans/`、`角色卡/` 全树、空/绝对/`..` 路径；仅收 `.md`（扫描器既有规则）。
+ */
+function artifactScanDirsFor(
+  role: ResolvedRole,
+  preauthorizedDirs: readonly string[],
+  builtInGovernance: boolean,
+): string[] {
+  const dirs = new Set<string>();
+  const add = (raw: string): void => {
+    const rel = raw.replace(/\\/g, "/").replace(/\/+$/, "").trim();
+    if (rel === "" || rel === "." || rel.startsWith("/") || rel.startsWith("../")) return;
+    if (rel === ".ans" || rel.startsWith(".ans/")) return;
+    if (rel === "角色卡" || rel.startsWith("角色卡/")) return;
+    if (rel.split("/").some((segment) => segment === "" || segment === "." || segment === "..")) return;
+    dirs.add(rel);
+  };
+  for (const dir of preauthorizedDirs) add(dir);
+  if (!builtInGovernance) {
+    for (const entry of role.boundary.entries) {
+      if (entry.kind !== "directory" || entry.root !== "project") continue;
+      add(entry.path);
+    }
+  }
+  return [...dirs];
+}
+
+/**
+ * 扫描预授权/角色边界目录内的 `.md`（评审 §5.7：`artifact.observed` 只扫角色可写目录，不扫 `角色卡/` 全树）。
  * 跳过符号链接（防经链接逃逸），按路径排序保证顺序稳定。
  */
 async function scanPreauthorizedArtifacts(
@@ -2450,6 +2520,11 @@ export function createRuntimeAdapterFactory(
     governanceJudge: capabilities?.governanceJudge ?? options.governanceJudge,
     shellGate: capabilities?.shellGate ?? options.shellGate,
     shellVerdict: capabilities?.shellVerdict,
+    // 2026-10-20 Flow 文件方法化：运行时核心 `GovernedToolsOptions` 同名能力位（未注入 ⇒ 对应工具不注册）。
+    // 以 spread 并入，运行时核心补齐类型前后均可透传（buildGovernedTools 读 options 同名键）。
+    ...(capabilities?.flowGet !== undefined ? { flowGet: capabilities.flowGet } : {}),
+    ...(capabilities?.flowStepUpdate !== undefined ? { flowStepUpdate: capabilities.flowStepUpdate } : {}),
+    ...(capabilities?.flowStepSupersede !== undefined ? { flowStepSupersede: capabilities.flowStepSupersede } : {}),
   });
 }
 

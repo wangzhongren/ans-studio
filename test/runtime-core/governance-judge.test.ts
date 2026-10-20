@@ -177,6 +177,7 @@ test("工具集恰为 judge_read_file / judge_list_dir / report_governance_judge
     "write_file", "edit_file", "read_file", "run_shell", "request_confirmation", "request_choice",
     "submit_report", "dispatch_task", "role_status", "session_tail", "propose_recovery",
     "install_skill", "uninstall_skill", "install_mcp", "uninstall_mcp",
+    "flow_get", "flow_step_update", "flow_step_supersede",
   ]) {
     assert.equal(names.has(forbidden), false, `治理判断会话不得构造 ${forbidden}`);
   }

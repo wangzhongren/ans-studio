@@ -271,15 +271,15 @@ test("标准工作流：五卡流程状态引用统一为 YAML（唯一机器状
   const n = cardTextOf("nominator");
   assert.match(
     n,
-    /`docs\/flows\/<flowId>\.yaml`（唯一机器状态；同名 `\.md` 仅人读视图）的流程单/,
-    "Crew 须按 YAML 读取流程单",
+    /用 `flow_get` 读取流程摘要与你负责的步骤（`docs\/flows\/<flowId>\.yaml` 是唯一机器状态；同名 `\.md` 仅人读视图）/,
+    "Crew 须用 flow_get 按 YAML 读取流程单",
   );
   // Proof 标准复核按 YAML 读取流程状态（Markdown 仅人读）。
   const v = cardTextOf("verifier");
   assert.match(
     v,
-    /读 `docs\/flows\/<flowId>\.yaml`（唯一机器状态；同名 `\.md` 仅人读视图）/,
-    "Proof 须按 YAML 读取流程状态",
+    /用 `flow_get` 读取流程摘要与你负责的步骤（`docs\/flows\/<flowId>\.yaml` 是唯一机器状态；同名 `\.md` 仅人读视图）/,
+    "Proof 须用 flow_get 按 YAML 读取流程状态",
   );
   assert.doesNotMatch(
     v,
@@ -319,7 +319,7 @@ test("标准工作流：写卡被 declined——Crew/Steward 按 reason 修正�
     [
       "写卡被拒（declined）时（必须）",
       "`request_confirmation` 返回 `declined`（含自动审批 deny 的原因）",
-      "修正流程状态 YAML 或排程内容",
+      "修正流程状态 YAML（初始创建）或排程内容",
       "重新发确认卡",
       "不得绕过确认",
       "不得直接 `write_file`",
@@ -341,6 +341,61 @@ test("标准工作流：写卡被 declined——Crew/Steward 按 reason 修正�
       `${spec.id} judge deny 纪律`,
     );
   }
+});
+
+test("标准工作流：流程工具——Steward 初始创建例外 + flow_get/flow_step_update/flow_step_supersede；Crew/Draft/Proof 只读流程并用工具记录状态", () => {
+  // 客户 2026-10-20 拍板「按这个方案做吧」：流程文件改为方法化工具。初始创建仍走
+  // request_confirmation(schedule-write)；创建后步骤状态推进用 flow_get + flow_step_update，
+  // 返工用 flow_step_supersede；所有角色不得直接写 docs/flows/**。
+  const steward = cardTextOf("convener");
+  assertIncludesAll(
+    steward,
+    [
+      "flow_get",
+      "flow_step_update",
+      "flow_step_supersede",
+      "`expectedRevision` 必须来自最近一次 `flow_get`（或更新回执）的 revision",
+      "`revision-conflict`（版本冲突）",
+      "不盲目重试",
+      "初始创建",
+      "`request_confirmation`（`cardKind=schedule-write`）",
+      "不要直接 `write_file` 流程 YAML",
+      "不再为每次状态更新写文件/发写卡",
+      "`done` 前必须已有账本可对账的 `evidence`",
+      "旧步骤标 `superseded`、新步骤 `pending`",
+      "既有验收卡规则",
+      "步骤推进 ≠ 客户批准",
+      "Steward 可更新全部步骤，其他角色只能更新自己的步骤",
+    ],
+    "Steward 流程工具纪律",
+  );
+  // 初始创建仍走既有写卡门；创建后的步骤推进走工具。
+  assert.match(steward, /写流程单（仅初始创建）[\s\S]{0,220}schedule-write/, "Steward 初始创建须保留 schedule-write");
+  assert.match(steward, /登记完成：先用 `flow_get`[\s\S]{0,160}flow_step_update/, "Steward 登记完成须先 get 再 update");
+
+  for (const id of ["nominator", "rapporteur", "verifier"] as const) {
+    const t = cardTextOf(id);
+    assertIncludesAll(
+      t,
+      [
+        "flow_get",
+        "flow_step_update",
+        "不得直接写 `docs/flows/**`",
+        "`expectedRevision` 必须来自最近一次 `flow_get`（或更新回执）的 revision",
+        "`revision-conflict`（版本冲突）",
+        "证据不足",
+        "insufficient-evidence",
+        "不把步骤标 `done`",
+        "步骤推进不等于客户决定/同意",
+        "你只能更新自己负责的步骤",
+      ],
+      `${id} 流程工具纪律`,
+    );
+  }
+  // 交付/回交后由步骤 owner 或 Steward 记录状态；三张卡各有落点。
+  assert.match(cardTextOf("rapporteur"), /contract-freeze[\s\S]{0,160}flow_step_update/, "Draft 契约冻结后须用工具记录");
+  assert.match(cardTextOf("nominator"), /nomination \/ role-readiness[\s\S]{0,160}flow_step_update/, "Crew 角色就绪后须用工具记录");
+  assert.match(cardTextOf("verifier"), /不用 `flow_step_update` 代替客户验收决定/, "Proof 不得用工具代替验收决定");
 });
 
 test("标准工作流：Proof / 验收——标准复核（真实跑测试/真实启动/演示/逐条核对）→验收卡；不依赖客户催办", () => {

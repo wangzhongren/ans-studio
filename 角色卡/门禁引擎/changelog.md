@@ -1,5 +1,44 @@
 # 门禁引擎 变更记录
 
+## 2026-10-20 — 流程文件方法化工具（flow_get / flow_step_update / flow_step_supersede）角色卡纪律（客户拍板）
+
+客户已拍板：「按这个方案做吧。」流程文件改为方法化工具：`flow_get`（所有角色读取）、
+`flow_step_update`（更新步骤状态，`expectedRevision` 必填；Steward 可更新全部、步骤 owner 只更新
+自己的步骤；`done` 必须带账本可对账 evidence）、`flow_step_supersede`（仅 Steward，旧步骤
+superseded + 新步骤 pending）。本批只在**门禁引擎**边界内更新卡文本，不改判定逻辑、不实现工具。
+完整记录见[变更记录](docs/change/2026-10-20_change_flow-tools-card-discipline.md)。
+
+- **边界**：`src/common/门禁引擎/governance-roles.ts`、
+  `test/门禁引擎/governance-standard-workflow.test.ts`、本文件、`memo.md`、
+  `docs/change/2026-10-20_change_flow-tools-card-discipline.md`（新）。未碰
+  `src/common/编排/**`、`src/provider/**`、`app/**`、`test/测试/**`、`src/service/**`、
+  其他角色文件/测试、真实项目；不读 `.env`、不跑真实模型/凭据/网络；未 commit。
+- **Steward / 统筹**：流程 YAML **初始创建**仍用 `request_confirmation`（`cardKind=schedule-write`）；
+  创建后步骤状态推进优先用 `flow_get` + `flow_step_update`（`dispatched` / `delivered` / `done` /
+  `failed` / `blocked`），返工用 `flow_step_supersede`；不再为每次状态更新写文件/发写卡；
+  不直接 `write_file` 流程 YAML（初始创建除外，且按现有写卡门）；`done` 前必须有账本可对账
+  evidence；`expectedRevision` 来自最近一次 `flow_get`（或更新回执）的 revision，`revision-conflict`
+  重读后再改、不盲目重试；步骤推进 ≠ 客户批准，需要客户决定的步骤仍走客户交互工具。
+- **Crew / Draft / Proof**：用 `flow_get` 读取流程与自己负责的步骤；**不得直接写 `docs/flows/**`**；
+  你只能更新自己负责的步骤：交付/回交后按账本证据用 `flow_step_update` 记录状态；证据不足
+  （`insufficient-evidence`）如实报告、不把步骤标 `done`；四卡统一 expectedRevision/`revision-conflict`
+  纪律；保留 id `verification` / `acceptance` 仍按既有验收卡流程。Draft 契约冻结、Crew 角色就绪、
+  Proof 核对完成各有落点。
+- **保留**：现有 `request_confirmation` / `cardKind` / `schedule-write` 作为初始创建与迁移兼容保留，
+  未删除旧路径；五卡权力/职责/Section 1/预授权/禁写/能力位、shell 审批档、质量基线、治理卡参数、
+  判断代批/deny 纪律与 flow YAML schema 契约逐字未改；Lead 本批未改。
+- **测试**：`node --test "test/门禁引擎/**/*.test.ts"` ⇒ **285 计 / 284 过 / 0 红 / 1 skip**
+  （基线 280/279/0/1；新增 1 例：三工具关键字、Steward 初始创建例外、禁止直接写 docs/flows、
+  expectedRevision/`revision-conflict` 重读、证据不足不标 done）。既有断言按新契约更新、未放宽；
+  `npm run typecheck` ⇒ **exit 0**。
+- **跨角色待办（未越界）**：① 编排/运行时核心实现三工具，工具名/参数名须与卡文本一致；② 权限
+  （Steward 全部 / owner 自己）与 `done` 账本证据对账必须机械执行；③ `flow_get` 的 revision 需可
+  原样回传 `expectedRevision`，`revision-conflict` 结果名/形状须对齐；④ 初始创建 `schedule-write`
+  旧路径保留；⑤ `verification` / `acceptance` 既有验收规则不变；⑥ 若后续要求 Lead 读取流程，
+  另批更新。
+- **残余风险**：卡文本是行为约束，是否先 get 再 update、冲突后是否重读无机械检查；`idempotencyKey`
+  可选；旧写卡路径仍保留；真机端到端与独立复验未进行。来源：客户拍板「按这个方案做吧」（经协调方转达）。
+
 ## 2026-10-19 — 写卡被 declined 时按 reason 修正后重发确认卡；judge deny 不是客户决定（真机反馈）
 
 真机：Crew 的 `appointment-write` 写卡内容不合规（README 归属未在提名写区表定案、tester

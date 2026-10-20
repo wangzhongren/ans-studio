@@ -1219,3 +1219,15 @@
 - 兜底值同时写入传给桌面的 request 与 metadata，并继续走既有 `TRIO_CARD_KINDS` 白名单、preview 完整性闸、Flow YAML 写前校验、`computeJudgeContext` 与 `recordCustomerDecision`；诊断 `governance.cardKind.defaulted`。显式 `cardKind` 永远优先，显式非法值仍拒绝。
 
 **测试**：新增 3 例（Convener flow YAML ⇒ schedule-write + judgeContext；Convener 治理记录 ⇒ write；Rapporteur ⇒ write；Nominator 角色卡 ⇒ appointment-write；显式非法 cardKind 仍拒；choice 不兜底）+ 扩展 single/su/项目角色零变化；`governance-judge.test.ts` **63/63**、`test/编排/**` **678 计 678 过 0 红 0 skipped**、`npm run typecheck` **exit 0**（全仓）。详见[变更记录](docs/change/2026-10-20_change_governance-cardKind-default.md)。
+
+## 2026-10-20 — Flow 文件方法化（编排侧核心）+ 项目角色 artifact 观察
+
+**来源**：客户拍板「按这个方案做吧」。应用是 `docs/flows/<flowId>.yaml` 唯一写者；角色改用 `flow_get` / `flow_step_update` / `flow_step_supersede`。本批只写编排边界，未改 `src/model/runtime.ts`、`src/provider/**`、`app/**`、`test/测试/**`。
+
+**改了什么**
+- 新增 `src/common/编排/flow-service.ts`：`createFlowService({projectRoot, actorRoleId, actorPower, defaultFlowId?, writeFile?})`，实现 `get`/`update`/`supersede`；类型单一来源＝运行时 `FlowTool*` 契约（再导出，不复制）。per-project 串行队列；`revision=sha256(file bytes)`；`expectedRevision` 不符 ⇒ `revision-conflict`；Steward/owner 权限与迁移表；`done` 证据 kind 对应 + `validateFlowEvidence` 对账（目标 stepId 过滤）⇒ `insufficient-evidence`；幂等（同 status/evidence 不写盘）；原子写（共享 `atomic-write`，失败 `write-failed` 不破坏原文件）；`supersede` 旧→superseded/new→pending 且非验收保留 id；诊断 `flow.update`/`flow.supersede`/`flow.conflict`。
+- `run-role.ts`：每会话创建 flow service；`flowGet` 注入所有角色，`flowStepUpdate`/`flowStepSupersede` 只注入内置治理角色；缺省 flowId 用调用时 `currentFlowId`；能力经 `createRuntimeAdapterFactory` spread 透传到运行时核心三工具。
+- **项目角色 artifact 观察**（真机证据缺口）：`scanPreauthorizedArtifacts` 的观察目录，内置角色仍用 `preauthorizedDirs`；项目角色用 boundary `kind:"directory"` + `root:"project"` 的目录（tester `test/`、`scripts/`，backend `src/`，frontend `public/` 等），去重合并；排除 `.ans/`、`角色卡/`、空/绝对/`..`。settle 后对新增/变更 `.md` 追加 `artifact.observed`，项目角色 `power="project"`（`GovernancePower` 新增该值）。single/su 项目零账本副作用。
+- 错误码按运行时/角色卡统一：`revision-conflict`、`insufficient-evidence`；其余 `forbidden`/`invalid-transition`/`invalid-flow`/`step-not-found`/`step-exists`/`invalid-supersede`/`ledger-unavailable` 不变。
+
+**测试**：`flow-service.test.ts` **11/11**；`governance-judge.test.ts` **64/64**（+1 注入断言）；`governance-session.test.ts` **27/27**（+1 项目角色 artifact 观察/对账）；`test/编排/**` **691 计 691 过 0 红 0 skipped**；`npm run typecheck` **exit 0**（全仓）。详见[变更记录](docs/change/2026-10-20_change_flow-service.md)。
