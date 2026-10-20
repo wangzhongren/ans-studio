@@ -131,7 +131,7 @@ interface Harness {
   capabilitiesOf: (roleId: string) => OpenCapabilities | undefined;
 }
 
-function makeHarness(opts: { failSends?: Record<string, number>; openDelayMs?: number; projectRoot?: string; recoveryConfirm?: ReturnType<typeof createRecoveryConfirmPresenter>; unsupportedAbort?: string[]; failOpensAfter?: Record<string, number>; customListing?: ProjectListing; customerInput?: DesktopCustomerInputFn; shellArming?: DesktopShellArming; shellOperatorChannel?: DesktopOperatorChannelFn; getListing?: (projectRoot: string) => ProjectListing | undefined } = {}): Harness {
+function makeHarness(opts: { failSends?: Record<string, number>; openDelayMs?: number; projectRoot?: string; recoveryConfirm?: ReturnType<typeof createRecoveryConfirmPresenter>; autoDecisionEnabled?: (projectRoot: string, proposerRoleId: string) => boolean; unsupportedAbort?: string[]; failOpensAfter?: Record<string, number>; customListing?: ProjectListing; customerInput?: DesktopCustomerInputFn; shellArming?: DesktopShellArming; shellOperatorChannel?: DesktopOperatorChannelFn; getListing?: (projectRoot: string) => ProjectListing | undefined } = {}): Harness {
   const root = opts.projectRoot ?? "/proj";
   const l = opts.customListing ?? listing(root);
   const streams: Record<string, OrchestrationEvent[]> = { su: [], A: [], B: [] };
@@ -248,6 +248,8 @@ function makeHarness(opts: { failSends?: Record<string, number>; openDelayMs?: n
     emitRoleState: (info) => roleStates.push(info),
     // G-2/W5：恢复确认卡通道（缺省 ⇒ 恢复桥「未接线、未获执行」fail-closed——本组两条路径都钉）。
     recoveryConfirm: opts.recoveryConfirm,
+    // 2026-10-20：「替我决策」开关（开启 ⇒ propose_recovery 不弹卡、直接执行）。
+    ...(opts.autoDecisionEnabled !== undefined ? { autoDecisionEnabled: opts.autoDecisionEnabled } : {}),
     // 三权（评审 §5.6）：能力矩阵用例注入客户通道与 shell 两件（缺省 ⇒ 不注入，保持旧用例逐字不变）。
     ...(opts.customerInput !== undefined ? { customerInput: opts.customerInput } : {}),
     ...(opts.shellArming !== undefined ? { shellArming: opts.shellArming } : {}),
@@ -810,6 +812,58 @@ test("G-2/W5 恢复桥：恰 allow:true 才执行（abort-turn 恰一次）；�
   const receipt2 = (await pending2)!;
   assert.equal(receipt2.outcome, "declined", "拒绝 ⇒ declined（未获执行）");
   assert.equal(h.aborts.A, 1, "未获执行：动作**没有**发生");
+  await h.mgr.stop(null);
+});
+
+// 2026-10-20（客户总原则「我勾选了替我决策就不用我来管了」）：决策开关开启 ⇒ 恢复提议**不呈现客户卡**、
+// 直接执行并如实回执＋Lead 系统行（自动执行 ≠ 客户逐项批准）；校验不过 ⇒ 自动拒绝、不弹卡。
+// 开关关闭 ⇒ 旧行为逐字不变（卡仍在、未确认零执行）。
+test("2026-10-20 proposeRecovery 自动决策：开关开 ⇒ 不弹卡、直接执行、receipt 如实；开关关 ⇒ 卡仍在、未确认零执行", async () => {
+  const stub = makeRecoveryStub();
+  let auto = true;
+  const h = makeHarness({ recoveryConfirm: stub.presenter, autoDecisionEnabled: () => auto });
+  await h.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
+  await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  await tick(30);
+  const propose = h.proposeRecoveryOf("su")!;
+
+  // —— 开关开：直接执行，零客户卡 ——
+  const receipt = (await propose({ roleId: "A", action: "abort-turn", evidence: "role_status：A 583s 无 settled", reason: "疑似卡死" }))!;
+  assert.equal(receipt.outcome, "executed", "开关开 ⇒ 直接执行（receipt 如实）");
+  assert.equal(h.aborts.A, 1, "abort 恰一次");
+  assert.equal(stub.cards.length, 0, "**不呈现** recovery-confirm 客户卡");
+  await tick(150);
+  assert.ok(
+    h.sent.su.some((t) => t.startsWith("[系统·恢复]") && t.includes("自动执行") && t.includes("≠ 客户逐项批准")),
+    "Lead 系统行：自动执行 ≠ 客户批准",
+  );
+  // 第一条 system 投出即把 su 带入一轮；settle 后回执照既有投递机如实投出（排队不丢）。
+  h.streams.su.push({ kind: "settled", summary: "su 一轮结束" });
+  await tick(150);
+  assert.ok(
+    h.sent.su.some((t) => t.startsWith("[系统·恢复]") && t.includes("abort-turn")),
+    "回执照既有投递机如实投回",
+  );
+
+  // —— 判断不可用/证据不足：自动拒绝回投提议角色，不弹卡、零执行 ——
+  const bad = (await propose({ roleId: "A", action: "abort-turn", evidence: "   " }))!;
+  assert.equal(bad.outcome, "error", "证据不足 ⇒ error（如实）");
+  assert.equal(stub.cards.length, 0, "证据不足 ⇒ 不弹卡");
+  assert.equal(h.aborts.A, 1, "零执行");
+  assert.ok(
+    h.envelopes.some((e) => e.roleId === "su" && e.event.kind === "message" && /未受理/.test(e.event.summary)),
+    "自动拒绝回投提议角色（系统行）",
+  );
+
+  // —— 开关关：卡仍在、未确认零执行（旧行为逐字不变） ——
+  auto = false;
+  const pending = propose({ roleId: "A", action: "abort-turn", evidence: "证据二" });
+  await tick(20);
+  assert.equal(stub.cards.length, 1, "开关关 ⇒ 卡照旧呈现");
+  stub.presenter.respond({ id: stub.cards[0].id, allow: false });
+  const declined = (await pending)!;
+  assert.equal(declined.outcome, "declined", "未确认 ⇒ 零执行（fail-closed）");
+  assert.equal(h.aborts.A, 1, "动作没有发生");
   await h.mgr.stop(null);
 });
 

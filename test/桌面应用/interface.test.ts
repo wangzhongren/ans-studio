@@ -193,6 +193,90 @@ test("openSession 点角色即开：scope undefined、导入即授权；多轮 s
   assert.equal(disposed(), 1);
 });
 
+// 2026-10-20 真机（Convener 卡 1h）：看护自动中止的 **Interface 接线**——决策开关开启时，内置治理角色
+// （Convener）超时 ⇒ 真的调用会话 abort（恰一次），Lead 系统行经既有投递机在 settle 后投出。
+test("2026-10-20 看护自动中止接线：内置 Convener 超时 + 决策开关开 ⇒ abort 恰一次 ＋ Lead 系统行（自动中止 ≠ 客户批准）", async () => {
+  const listing: ProjectListing = {
+    projectRoot: "/proj",
+    roles: [
+      {
+        roleId: "Convener",
+        cardPath: "",
+        boundaryPath: "",
+        cardText: "# Convener",
+        boundary: { entries: [], boundarySource: "<built-in>", acceptance: { accepted: false, source: "" } },
+        builtIn: true,
+        governanceFunction: "schedule",
+      },
+    ],
+    warnings: [],
+    hasRoles: true,
+    primaryRoleId: "Convener",
+    governanceModel: "trio",
+  };
+  const sent: string[] = [];
+  const aborts: string[] = [];
+  const events: SessionEvent[] = [];
+  const handle: RoleSessionHandle = {
+    async send(text: string): Promise<void> { sent.push(text); },
+    events(): AsyncIterable<SessionEvent> {
+      return {
+        [Symbol.asyncIterator]() {
+          return {
+            async next(): Promise<IteratorResult<SessionEvent>> {
+              for (let i = 0; i < 200; i += 1) {
+                if (events.length > 0) return { value: events.shift() as SessionEvent, done: false };
+                await new Promise((r) => setTimeout(r, 5));
+              }
+              return { value: undefined as unknown as SessionEvent, done: true };
+            },
+          };
+        },
+      };
+    },
+    async dispose(): Promise<void> {},
+    async abort() {
+      aborts.push("Convener");
+      return { ok: true, supported: true };
+    },
+  };
+  const decisionSwitch = createShellJudgeSwitch();
+  decisionSwitch.set({ enabled: true });
+  let nowMs = 1_700_000_000_000;
+  const iface = createDesktopInterface({
+    pickDirectory: async () => "/proj",
+    emitEvent: () => {},
+    listProjectFn: async () => listing,
+    openRoleSessionFn: async () => handle,
+    createDemoAdapterFn: (_opts: { gate: WriteGate }) => ({}) as unknown as RuntimeAdapter,
+    buildProjectConfigFn: buildProjectConfig,
+    decisionJudgeSwitch: decisionSwitch,
+    // 注入时钟与短时限：tick 20ms；中止时限（promptTimeoutOverrideMs）1s；1min 最后兜底。
+    watchdogOptions: { now: () => nowMs, config: { tickMs: 20, promptTimeoutOverrideMs: 1_000, turnLastResortOverrideMs: 60_000 } },
+  });
+  try {
+    await iface.listProject({ projectRoot: "/proj" });
+    const open = await iface.openSession({ projectRoot: "/proj", roleId: "Convener", runtime: "demo" });
+    assert.equal(open.ok, true);
+    // 让 Convener busy（busySince = 注入时钟）；不推 settled ⇒ 回合持续。
+    assert.equal((await iface.sendSession({ text: "统筹推进" })).ok, true);
+    nowMs += 1_500; // 超过中止时限 1s
+    iface.startWatchdog();
+    await new Promise((r) => setTimeout(r, 120));
+    assert.equal(aborts.length, 1, "看护真的调用了 abort（内置治理角色不被排除），且同一回合恰一次");
+    // Lead 系统行：Convener 忙时排队；settle 后经既有投递机投出。
+    events.push({ kind: "settled", summary: "一轮结束" } as SessionEvent);
+    await new Promise((r) => setTimeout(r, 150));
+    assert.ok(
+      sent.some((t) => t.startsWith("[系统·看护]") && t.includes("回合自动中止") && t.includes("自动中止 ≠ 客户批准")),
+      "Lead 系统行如实投出（自动中止 ≠ 客户批准）",
+    );
+  } finally {
+    iface.stopWatchdog();
+    await iface.stopSession();
+  }
+});
+
 test("切换角色（B-2）：open 新角色**不** dispose 旧会话（并存）；定向 stop 只关指定角色", async () => {
   const disposed: string[] = [];
   let created = 0;

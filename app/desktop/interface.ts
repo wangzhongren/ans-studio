@@ -60,7 +60,8 @@ import {
 } from "../../src/pipeline/orchestration/govern-session.ts";
 export type { GovernanceMigrationPreviewResult, GovernanceMigrationResult } from "../../src/pipeline/orchestration/govern-session.ts";
 // 只读 pin 证据检查：**唯一实现**在门禁引擎私有模块，只经 Service 公开出口消费（跨角色边界纪律）。
-import { inspectPinnedBoundaries } from "../../src/service/boundary/resolve-boundary.ts";
+// 2026-10-20：内置治理角色判定同样经该 Service 公开出口（看护自动中止按角色映射开关用；不复制 id 列表）。
+import { inspectPinnedBoundaries, isBuiltInGovernanceRoleId } from "../../src/service/boundary/resolve-boundary.ts";
 import { createChatDemoAdapter } from "./chat-adapter.ts";
 
 import {
@@ -1058,6 +1059,32 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       projects: () => [...new Set([...listingCache.keys(), ...manager.projectRootsWithActivity()])],
       snapshot: (root) => manager.watchdogSnapshot(root),
       deliver: (root, message) => manager.watchdogDeliver(root, message),
+      // 2026-10-20 真机（Convener 卡 1h、队列 24）：看护覆盖**所有角色**（含内置治理角色）——
+      // 自动开关按角色映射：内置治理角色 ↑「替我决策」、项目角色 ↑「替我审批」；关闭 ⇒ 旧语义（只告警、1h 兜底）。
+      autoRecoveryEnabled: (root, roleId) => {
+        const builtIn =
+          listingCache.get(root)?.roles.find((role) => role.roleId === roleId)?.builtIn === true ||
+          isBuiltInGovernanceRoleId(roleId);
+        return builtIn ? decisionJudgeSwitch.isEnabled() : shellJudgeSwitch.isEnabled();
+      },
+      // 自动中止：请求停止该回合，成功后按既有投递机再 drain 一次（settled 前 drain 自判忙并保留；
+      // settled 后由既有路径放行）。失败只记诊断、不循环（同一 role+turnId 已由看护去重）。
+      onTurnDeadline: (root, roleId, runtime) => {
+        const diagnostic = createDiagnosticLogger({ component: "desktop.watchdog", projectRoot: root, roleId });
+        void manager
+          .abort({ projectRoot: root, roleId, runtime })
+          .then((res) => {
+            if (!res.ok) {
+              diagnostic.record("watchdog.auto-abort.failed", { reasonCode: res.supported === false ? "unsupported" : "abort-error" });
+              return;
+            }
+            diagnostic.record("watchdog.auto-abort.executed", { state: "requested" });
+            return manager.redeliverNudge({ projectRoot: root, roleId, runtime }).catch((err) => {
+              diagnostic.error("watchdog.auto-abort.nudge.failed", err);
+            });
+          })
+          .catch((err) => diagnostic.error("watchdog.auto-abort.failed", err));
+      },
       ...(deps.watchdogOptions ?? {}),
     });
   } catch (error) {
@@ -1303,6 +1330,9 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     customerInput: deps.customerInput,
     // G-2/W5：恢复确认卡通道（缺省 ⇒ 恢复提议「未接线、未获执行」如实回执——fail-closed）。
     recoveryConfirm: deps.recoveryConfirm,
+    // 2026-10-20（客户总原则「我勾选了替我决策就不用我来管了」）：决策开关开启 ⇒ 恢复提议不弹客户卡、
+    // 直接执行并如实回执；关闭 ⇒ 旧行为逐字不变（推卡、未确认零执行）。
+    autoDecisionEnabled: () => decisionJudgeSwitch.isEnabled(),
     // G-2/W1：看护的观察转发（settled/命令超时/真实活动）与只读统计；看护缺席 ⇒ 不转发（一切照旧）。
     watchdogObserver: watchdogService !== undefined ? (root, observation) => watchdogService!.observe(root, observation) : undefined,
     watchdogPendingConfirmations: deps.watchdogPendingSnapshot,

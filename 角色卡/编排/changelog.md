@@ -1201,3 +1201,11 @@
 **测试**：`governance-judge.test.ts` **60/60**（+4：deny 规范化/approval 合法/decision 回落 manual/审计字段；prompt 三值；driver deny 日志不记 manual；decision manual 返工原因原样保留 + approval manual 可操作修正）；`governance-session.test.ts` **26/26**（+1：judge deny 回投不写客户决定账本）；`test/编排/**` **675 计 675 过 0 红 0 skipped**；`npm run typecheck` **exit 0**（全仓）。
 
 **跨角色**：运行时核心 `report_governance_judgement` schema 加 `deny`（已由协调者单独排）；桌面 deny/manual 映射（开关开启时一律 declined+原因回投）由桌面属主收口（本批只读核对，未改 `app/**`）；测试角色旧双值断言按需更新。详见[变更记录](docs/change/2026-10-19_change_judge-deny-approval.md)。
+
+## 2026-10-20 — 看护文案同步：开关开启自动中止 / 自动执行恢复
+
+桌面已实现 watchdog 自动中止（开关开启时，内置治理角色/Convener 超过 15min 自动 abort；开关关闭才保持只检查 + 1h 兜底）与恢复提议自动执行。本批只改 `src/common/编排/watchdog.ts::SIGNAL_SUGGESTIONS` 文案与 `test/编排/watchdog.test.ts` 断言，**不改检测/执行逻辑，不改 `app/**`**：
+- `turn-deadline`：「开关开启且超过自动中止时限 ⇒ 桌面自动中止本轮；开关关闭 ⇒ 只检查、不中止（1 小时最后兜底）。开关开启时 propose_recovery 由桌面自动执行，关闭时需客户确认。」
+- `queue-stuck` / `repeat-fail`：「需客户一键确认后由应用执行」→「开关开启时桌面自动执行，关闭时需客户一键确认」。
+
+**证据**：`watchdog.test.ts` **11/11**；`test/编排/**` **675 计 675 过 0 红 0 skipped**；`npm run typecheck` **exit 0**（全仓）。

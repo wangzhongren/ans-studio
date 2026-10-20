@@ -503,6 +503,13 @@ export interface SessionManagerDeps {
    */
   recoveryConfirm?: RecoveryConfirmPresenter;
   /**
+   * **自动决策开关读取**（2026-10-20 客户总原则「我勾选了替我决策就不用我来管了」）：开启时
+   * `proposeRecovery` **不再呈现 `recovery-confirm` 客户卡**，直接执行恢复动作并如实回执（不写客户
+   * 决定账本）；关闭/缺省 ⇒ 旧行为逐字不变（推卡、未确认零执行）。校验不过 ⇒ 自动拒绝回投提议角色、
+   * 不弹卡。
+   */
+  autoDecisionEnabled?: (projectRoot: string, proposerRoleId: string) => boolean;
+  /**
    * **看护观察转发（G-2/W1）**：事件消费循环里的结构化事实（settled 终局 / 命令超时限 F-1 事实 / 真实活动）
    * 同步转发给看护器（`watchdog.ts` 的 `observe`）。**缺省 ⇒ 无看护**（核心治理零依赖——一切照旧）。
    * 本层绝不因看护回调抛错而影响会话/投递（调用点自带隔离）。
@@ -3145,6 +3152,9 @@ export class SessionManager {
    * 回执（契约 `RecoveryReceipt`：四值中**恰 `executed` 为已执行**）如实回拒工具侧 ＋ UI 系统行 ＋
    * **回执经既有投递机投回 su**（kind:"system"）＋ 诊断。取消/关窗/通道失效 = **未获执行**（declined，
    * fail-closed——绝不「没人问就执行」）。
+   * **2026-10-20（客户总原则「我勾选了替我决策就不用我来管了」）**：`autoDecisionEnabled` 开启时**不推卡**、
+   * 直接复用同一执行语义（`runAction`）并如实回执＋Lead 系统行（自动执行 ≠ 客户逐项批准）；关闭 ⇒ 旧路径
+   * 逐字不变。
    */
   private async proposeRecovery(projectRoot: string, runtime: RuntimeKind, proposerRoleId: string, d: ProposeRecoveryPayload): Promise<RecoveryReceipt> {
     const diagnostic = createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId: proposerRoleId });
@@ -3191,60 +3201,80 @@ export class SessionManager {
       return refuse(`${targetRoleId} 是内置治理角色——恢复动作只针对项目角色（未推送任何确认卡）。`, "target-builtin");
     }
 
-    const presenter = this.deps.recoveryConfirm;
-    if (presenter === undefined) {
-      diagnostic.record("recovery.refused", { reasonCode: "channel-unavailable" });
-      return receiptOf("declined", "恢复确认通道未接线——未获执行（fail-closed），没有任何动作发生。");
-    }
-    const suEntry = this.sessions.get(this.sessionKey(projectRoot, proposerRoleId, runtime));
-    const signal = suEntry?.interactionState.turn.signal;
-    let allowed = false;
-    try {
-      allowed = await presenter.present(
-        {
-          // 渲染侧（U1 已落树）消费面：`{id, projectRoot?, runtime?, roleId, action, evidence, reason?, requestedBy?, requestedAt?, itemId?}`。
-          projectRoot,
-          runtime,
-          roleId: targetRoleId,
-          action,
-          evidence: evidenceRaw, // 逐字（校验按 trim，呈现按原文——不加工、不截断）
-          ...(reason !== undefined ? { reason } : {}),
-          requestedBy: proposerRoleId,
-          requestedAt: new Date(this.now()).toISOString(),
-          ...(itemId !== undefined ? { itemId } : {}),
-        },
-        { roleId: proposerRoleId, projectRoot, runtime, ...(signal !== undefined ? { signal } : {}) },
-      );
-    } catch (err) {
-      // 推达失败（窗口已关等）⇒ 未获执行（fail-closed；presenter 已记诊断）。
-      diagnostic.error("recovery.present.failed", err);
-      allowed = false;
-    }
-
-    let receipt: RecoveryReceipt;
-    if (!allowed) {
-      receipt = receiptOf("declined", `客户未确认（拒绝/取消，或确认通道失效）——「${recoveryActionLabel(action)}」没有执行，也没有任何动作发生。`);
-    } else if (action === "abort-turn") {
-      const res = await this.abort({ projectRoot, roleId: targetRoleId, runtime });
-      receipt = res.ok
-        ? receiptOf("executed", `已请求停止角色「${targetRoleId}」的当前轮次——轮次仍以既有 settled 收尾（不制造「已停止」假象）。`)
-        : res.supported
-          ? receiptOf("error", res.error ?? "停止失败（未知原因）——未假装已执行。")
-          : receiptOf("unsupported", res.error ?? "当前运行时不支持停止。");
-    } else if (action === "rebuild-session") {
-      const res = await this.rebuildSession({ projectRoot, roleId: targetRoleId, runtime });
-      receipt = res.ok
-        ? receiptOf("executed", `角色「${targetRoleId}」的会话已重建（保留历史回放；上下文恢复结果以引擎实际返回为准）。`)
-        : receiptOf("error", res.error ?? "重建失败（未知原因）——没有任何动作发生。");
-    } else {
+    // —— 动作执行（客户卡路径与自动决策路径**复用同一执行语义**——不另造第二套）——
+    const runAction = async (): Promise<RecoveryReceipt> => {
+      if (action === "abort-turn") {
+        const res = await this.abort({ projectRoot, roleId: targetRoleId, runtime });
+        return res.ok
+          ? receiptOf("executed", `已请求停止角色「${targetRoleId}」的当前轮次——轮次仍以既有 settled 收尾（不制造「已停止」假象）。`)
+          : res.supported
+            ? receiptOf("error", res.error ?? "停止失败（未知原因）——未假装已执行。")
+            : receiptOf("unsupported", res.error ?? "当前运行时不支持停止。");
+      }
+      if (action === "rebuild-session") {
+        const res = await this.rebuildSession({ projectRoot, roleId: targetRoleId, runtime });
+        return res.ok
+          ? receiptOf("executed", `角色「${targetRoleId}」的会话已重建（保留历史回放；上下文恢复结果以引擎实际返回为准）。`)
+          : receiptOf("error", res.error ?? "重建失败（未知原因）——没有任何动作发生。");
+      }
       const res = await this.redeliverNudge({ projectRoot, roleId: targetRoleId, runtime }, itemId);
-      receipt = res.ok ? receiptOf("executed", res.message) : receiptOf("error", res.message);
+      return res.ok ? receiptOf("executed", res.message) : receiptOf("error", res.message);
+    };
+
+    // 2026-10-20（客户总原则「我勾选了替我决策就不用我来管了」）：决策开关开启 ⇒ **不呈现客户卡**、
+    // 直接执行；关闭/缺省 ⇒ 下方旧路径逐字不变（推卡、恰 allow:true 才执行、未确认零执行）。
+    const autoDecision = this.deps.autoDecisionEnabled?.(projectRoot, proposerRoleId) === true;
+    let receipt: RecoveryReceipt;
+    if (autoDecision) {
+      diagnostic.record("recovery.auto", { targetRoleId, action, reasonCode: "decision-switch-on" });
+      receipt = await runAction();
+    } else {
+      const presenter = this.deps.recoveryConfirm;
+      if (presenter === undefined) {
+        diagnostic.record("recovery.refused", { reasonCode: "channel-unavailable" });
+        return receiptOf("declined", "恢复确认通道未接线——未获执行（fail-closed），没有任何动作发生。");
+      }
+      const suEntry = this.sessions.get(this.sessionKey(projectRoot, proposerRoleId, runtime));
+      const signal = suEntry?.interactionState.turn.signal;
+      let allowed = false;
+      try {
+        allowed = await presenter.present(
+          {
+            // 渲染侧（U1 已落树）消费面：`{id, projectRoot?, runtime?, roleId, action, evidence, reason?, requestedBy?, requestedAt?, itemId?}`。
+            projectRoot,
+            runtime,
+            roleId: targetRoleId,
+            action,
+            evidence: evidenceRaw, // 逐字（校验按 trim，呈现按原文——不加工、不截断）
+            ...(reason !== undefined ? { reason } : {}),
+            requestedBy: proposerRoleId,
+            requestedAt: new Date(this.now()).toISOString(),
+            ...(itemId !== undefined ? { itemId } : {}),
+          },
+          { roleId: proposerRoleId, projectRoot, runtime, ...(signal !== undefined ? { signal } : {}) },
+        );
+      } catch (err) {
+        // 推达失败（窗口已关等）⇒ 未获执行（fail-closed；presenter 已记诊断）。
+        diagnostic.error("recovery.present.failed", err);
+        allowed = false;
+      }
+      receipt = allowed
+        ? await runAction()
+        : receiptOf("declined", `客户未确认（拒绝/取消，或确认通道失效）——「${recoveryActionLabel(action)}」没有执行，也没有任何动作发生。`);
     }
 
     // —— 回执三路如实落地（设计 §6.2）：工具返回（上方 return）＋ UI 系统行 ＋ **经既有投递机投回 su** ＋ 诊断 ——
     const executed = receipt.outcome === "executed";
     diagnostic.record("recovery.receipt", { targetRoleId, outcome: receipt.outcome, ok: executed, state: receipt.outcome });
     this.emitDeliveryNote(projectRoot, runtime, proposerRoleId, proposerRoleId, `恢复回执（${recoveryActionLabel(action)} · 角色 ${targetRoleId}）：${receipt.message ?? ""}`);
+    if (autoDecision) {
+      // Lead 系统行：自动执行 ≠ 客户逐项批准（不写客户决定账本——回执与动作已如实落诊断/交付回执）。
+      this.watchdogDeliver(projectRoot, {
+        text: `[系统·恢复] 恢复提议由桌面**自动执行**（「替我决策」开关开启——自动执行 ≠ 客户逐项批准）：${recoveryActionLabel(action)} · 角色 ${targetRoleId} · ${executed ? "已执行" : "未执行"}。`,
+        summary: `系统·恢复 · 自动执行 · ${recoveryActionLabel(action)} · 角色 ${targetRoleId} · ${executed ? "已执行" : "未执行"}`,
+        dedupKey: `watchdog\u0000${projectRoot}\u0000recovery-auto\u0000${receipt.at ?? this.now()}`,
+      });
+    }
     this.watchdogDeliver(projectRoot, {
       text: renderRecoveryReceipt({ ...receipt, action, targetRoleId }), // 回执文案＝编排单一来源（O1）
       summary: recoveryReceiptSummary(targetRoleId, action, executed),
@@ -3845,7 +3875,12 @@ export class SessionManager {
     const key = this.queueKey(projectRoot, resolvedTarget, runtime);
     const q = this.deliveryQueues.get(key);
     if (!q || q.length === 0) return;
-    const item = q[0];
+    // 2026-10-20 真机（Convener 卡 1h、队列 24 条回交被 system 看护项堵住）：**回交/派发优先于 system**。
+    // 认领时跳过 system 看护项、取第一个非 system 条目（回交/派发/客户消息的相对顺序不变——客户消息屏障
+    // 语义保留；同类仍按到达序）。只有在队列全是 system 时才投 system。
+    const priorityIndex = q.findIndex((i) => i.kind !== "system");
+    const headIndex = priorityIndex >= 0 ? priorityIndex : 0;
+    const item = q[headIndex];
     const diagnostic = createDiagnosticLogger({ component: "desktop.delivery", projectRoot, roleId: resolvedTarget });
 
     if (resolvedTarget === "") {
@@ -3897,7 +3932,7 @@ export class SessionManager {
     diagnostic.record("delivery.claim.start", { state: item.kind, queueDepth: q.length });
     // 仅回交主人队首连续回交合批；客户消息/派发是屏障，正文仍由编排唯一生成。
     let batchCount = 1;
-    if (resolvedTarget === this.handbackOwnerRoleId(projectRoot) && item.kind === "handback" && item.handback && !item.deliveryId) {
+    if (headIndex === 0 && resolvedTarget === this.handbackOwnerRoleId(projectRoot) && item.kind === "handback" && item.handback && !item.deliveryId) {
       while (batchCount < q.length && q[batchCount].kind === "handback" && q[batchCount].handback) batchCount += 1;
     }
     let text = item.text;
@@ -3906,7 +3941,7 @@ export class SessionManager {
       text = renderHandbackBatchPrompt(q.slice(0, batchCount).map((queued) => queued.handback as TaskHandback));
       summary = `回交批次 · ${batchCount} 份报告 · 来自 ${q.slice(0, batchCount).map((queued) => queued.sourceRoleId).join("、")}`;
     }
-    const removedItems = q.splice(0, batchCount);
+    const removedItems = q.splice(headIndex, batchCount);
     const sentItems = item.deliveryId && item.batchItems ? [...item.batchItems] : removedItems;
     const sent: DeliveryItem = item.deliveryId ? item : { ...sentItems[0], text, summary, batchItems: sentItems, ...(item.kind === 'handback' ? { deliveryId: randomUUID() } : {}) };
     if (q.length === 0) this.deliveryQueues.delete(key);

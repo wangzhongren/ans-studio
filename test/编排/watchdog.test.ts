@@ -171,7 +171,7 @@ test("renderWatchdogAlert：投递排队积压逐行金文本（文首/信号/�
     [
       "[系统·看护] 投递排队积压：角色「实现者」。",
       "事实：队首任务已排队 12 分钟（深度 3）；- [dispatch] 来自 su：补上校验（入队 02:10:03）",
-      "建议：先用 role_status（必要时 session_tail）核对；若确认卡死，可 propose_recovery（需客户一键确认后由应用执行）。",
+      "建议：先用 role_status（必要时 session_tail）核对；若确认卡死，可 propose_recovery（开关开启时桌面自动执行，关闭时需客户一键确认）。",
       "纪律：看护仅如实告知——是否处理由你判断；不得据此假设任何写权。",
     ].join("\n"),
   );
@@ -201,21 +201,18 @@ test("renderWatchdogAlert：四信号各有信号名与建议；#3 明确「通�
   assert.ok(cmd.includes("轮次继续"), "#3 注明 F-1 自愈语义（轮次继续）");
 });
 
-test("turn-deadline：到点检查文案——不中止本轮、没卡死不动作、卡死才提议、1 小时兜底；无「逼近超时」", () => {
+test("turn-deadline：开关开启超时自动中止；关闭只检查不中止（1 小时兜底）；恢复提议按开关自动/确认", () => {
   const text = renderWatchdogAlert({
     signal: "turn-deadline",
     roleId: "实现者",
     facts: ["本轮已运行约 5 分钟（看护检查时限 5 分钟，到点检查）"],
   });
   assert.ok(text.includes("轮次到点检查：角色「实现者」。"), "标签＝轮次到点检查");
-  assert.ok(text.includes("到点检查不中止本轮"), "明确不中止本轮");
-  assert.ok(text.includes("请用 role_status 核对是否卡死"), "指向 role_status 核对");
-  assert.ok(text.includes("仍在推进则不动作"), "没卡死不动作");
-  assert.ok(text.includes("只有卡死才 propose_recovery"), "只有卡死才提议恢复");
-  assert.ok(text.includes("客户确认后应用执行"), "提议需客户确认、应用执行");
-  assert.ok(text.includes("1 小时为最后兜底"), "1 小时最后兜底在场");
-  for (const forbidden of ["逼近超时", "已超时", "硬超时", "剩余量"]) {
-    assert.equal(text.includes(forbidden), false, `不得出现旧超时措辞：${forbidden}`);
+  assert.ok(text.includes("开关开启且超过自动中止时限 ⇒ 桌面自动中止本轮"), "开关开启：超时自动中止");
+  assert.ok(text.includes("开关关闭 ⇒ 只检查、不中止（1 小时最后兜底）"), "开关关闭：只检查不中止 + 1 小时兜底");
+  assert.ok(text.includes("开关开启时 propose_recovery 由桌面自动执行，关闭时需客户确认"), "恢复提议按开关自动/确认");
+  for (const forbidden of ["到点检查不中止本轮", "逼近超时", "已超时", "硬超时", "剩余量"]) {
+    assert.equal(text.includes(forbidden), false, `不得出现旧措辞：${forbidden}`);
   }
 
   // 恢复行随 label 自动变化（kind 未变），仍不得写成「逼近超时」。

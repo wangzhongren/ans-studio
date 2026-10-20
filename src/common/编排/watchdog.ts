@@ -61,8 +61,9 @@ export const WATCHDOG_DEFAULT_SILENT_MINUTES = 0.5;
 export type WatchdogSignalKind = "turn-deadline" | "queue-stuck" | "cmd-timeout" | "repeat-fail";
 
 const SIGNAL_LABELS: Record<WatchdogSignalKind, string> = {
-  // PM 评审 `2026-10-17_design_turn-watch-and-recover-review.md`（approved）：到点检查**不是超时**，
-  // 不中止本轮；信号 kind 仍为 `turn-deadline`（契约不变）。不得再出现「逼近超时」。
+  // PM 评审 `2026-10-17_design_turn-watch-and-recover-review.md`（approved）：信号 kind 仍为
+  // `turn-deadline`（契约不变）。桌面看护器按开关处置：开启且超过自动中止时限 ⇒ 自动中止本轮；
+  // 关闭 ⇒ 只检查、不中止。不得再出现「逼近超时」。
   "turn-deadline": "轮次到点检查",
   "queue-stuck": "投递排队积压",
   "cmd-timeout": "命令超时",
@@ -71,11 +72,12 @@ const SIGNAL_LABELS: Record<WatchdogSignalKind, string> = {
 
 /** 每信号的建议动作（单一来源；与设计 §3.2 告警口径一致——#3 明确「通常无需动作」）。 */
 const SIGNAL_SUGGESTIONS: Record<WatchdogSignalKind, string> = {
-  // 到点检查：只告知、不中止；仍在推进不动作；只有确认卡死才提议恢复（客户确认后应用执行）；1 小时为最后兜底。
-  "turn-deadline": "到点检查不中止本轮；请用 role_status 核对是否卡死；仍在推进则不动作；只有卡死才 propose_recovery（客户确认后应用执行）；1 小时为最后兜底。",
-  "queue-stuck": "先用 role_status（必要时 session_tail）核对；若确认卡死，可 propose_recovery（需客户一键确认后由应用执行）。",
+  // 到点检查：开关开启且超过自动中止时限 ⇒ 桌面自动中止本轮；开关关闭 ⇒ 只检查、不中止（1 小时兜底）。
+  // 恢复提议：开关开启时桌面自动执行，关闭时需客户确认。
+  "turn-deadline": "开关开启且超过自动中止时限 ⇒ 桌面自动中止本轮；开关关闭 ⇒ 只检查、不中止（1 小时最后兜底）。开关开启时 propose_recovery 由桌面自动执行，关闭时需客户确认。",
+  "queue-stuck": "先用 role_status（必要时 session_tail）核对；若确认卡死，可 propose_recovery（开关开启时桌面自动执行，关闭时需客户一键确认）。",
   "cmd-timeout": "F-1 已自动终止该命令、轮次继续——通常无需动作，本告警仅告知。",
-  "repeat-fail": "先用 role_status（必要时 session_tail）排查失败原因；确认卡死可 propose_recovery（需客户一键确认后由应用执行）。",
+  "repeat-fail": "先用 role_status（必要时 session_tail）排查失败原因；确认卡死可 propose_recovery（开关开启时桌面自动执行，关闭时需客户一键确认）。",
 };
 
 export interface WatchdogAlertInput {

@@ -36,6 +36,7 @@ import {
   type WatchdogProjectSnapshot,
   type WatchdogRoleView,
   type WatchdogService,
+  type WatchdogServiceDeps,
 } from "../../app/desktop/watchdog.ts";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -516,7 +517,7 @@ interface WatchdogHarness {
   failNextDeliver: () => void;
 }
 
-function makeWatchdogHarness(): WatchdogHarness {
+function makeWatchdogHarness(extra: Partial<WatchdogServiceDeps> = {}): WatchdogHarness {
   let ms = 1_700_000_000_000;
   const delivered: WatchdogHarness["delivered"] = [];
   const snapshots = new Map<string, WatchdogProjectSnapshot>();
@@ -536,6 +537,7 @@ function makeWatchdogHarness(): WatchdogHarness {
     // 2026-10-17 起检查时限默认改为 5 分钟（`resolveRuntimeTimeouts().promptTimeoutMs`）——本夹具**显式注入**
     // 120s 检查时限与 1 小时最后兜底，避免依赖默认值（阈值边界断言保持可读、稳定）。
     config: { env: {}, tickMs: 30 * 1000, promptTimeoutOverrideMs: 120_000, turnLastResortOverrideMs: 3_600_000 },
+    ...extra,
   });
   return {
     service,
@@ -618,6 +620,57 @@ test("G-2/W1 #1：轮次**到点检查**（demo 检查时限 120s → 120s 边�
   h.advance(120_000);
   h.service.tick();
   assert.equal(h.delivered.length, 2, "新一轮到点再次告警（t2 独立去重身份；无恢复行插入）");
+});
+
+// ——————————————————————————————————————————————————————————————————————————————————————
+// 2026-10-20 真机（Convener 卡 1h、24 条回交被 target-busy 堵住）：**回合自动中止**——
+// 看护覆盖所有角色（含内置治理角色），开关开启时到点调用注入回调（同一 role+turnId 恰一次），
+// 并投 Lead 系统行（自动中止 ≠ 客户批准）；开关关闭 ⇒ 旧语义（只告警、1h 最后兜底）零变化。
+// ——————————————————————————————————————————————————————————————————————————————————————
+
+test("2026-10-20 看护自动中止：内置 Convener 超时 + 开关开 ⇒ onTurnDeadline 恰一次（同一 role+turnId 去重）＋ Lead 系统行", () => {
+  const calls: { root: string; roleId: string; runtime: string; turnId: string }[] = [];
+  const h = makeWatchdogHarness({
+    autoRecoveryEnabled: (_root, roleId) => roleId === "Convener",
+    onTurnDeadline: (root, roleId, runtime, turnId) => { calls.push({ root, roleId, runtime, turnId }); },
+  });
+  const started = h.nowMs();
+  // 内置治理角色（governanceRoleId 的会话）自身忙——旧告警会因「治理主人自身忙」抑制，但自动中止不受该排除。
+  h.setSnapshot("/p", wdSnapshot({
+    governanceRoleId: "Convener",
+    roles: [wdRole("Convener", { busy: true, turnStartedAt: started, turnId: "ct1" })],
+  }));
+  h.advance(119_999);
+  h.service.tick();
+  assert.equal(calls.length, 0, "未到中止时限（120s）不触发");
+  h.advance(1);
+  h.service.tick();
+  assert.equal(calls.length, 1, "到点 ⇒ onTurnDeadline 恰一次（内置治理角色不被 builtIn/governanceFunction 排除）");
+  assert.deepEqual(calls[0], { root: "/p", roleId: "Convener", runtime: "demo", turnId: "ct1" }, "回调参数如实（projectRoot/roleId/runtime/turnId）");
+  assert.ok(
+    h.delivered.some((d) => d.text.startsWith("[系统·看护]") && d.text.includes("回合自动中止") && d.text.includes("自动中止 ≠ 客户批准")),
+    "Lead 系统行：自动中止 ≠ 客户批准",
+  );
+  h.advance(60_000);
+  h.service.tick();
+  assert.equal(calls.length, 1, "同一 role+turnId 只触发一次（abort 生效前的后续 tick 不重复）");
+});
+
+test("2026-10-20 看护自动中止：开关关闭 ⇒ 不调用 onTurnDeadline（旧语义：只告警、1h 最后兜底，不中止）", () => {
+  const calls: string[] = [];
+  const h = makeWatchdogHarness({
+    autoRecoveryEnabled: () => false,
+    onTurnDeadline: (_root, roleId) => { calls.push(roleId); },
+  });
+  const started = h.nowMs();
+  h.setSnapshot("/p", wdSnapshot({ roles: [wdRole("A", { busy: true, turnStartedAt: started, turnId: "t1" })] }));
+  h.advance(15 * 60 * 1000); // 远超检查/中止时限、仍低于 1h
+  h.service.tick();
+  assert.equal(calls.length, 0, "开关关 ⇒ 看护绝不中止");
+  assert.ok(h.delivered.some((d) => d.text.includes("轮次到点检查")), "旧告警语义保留（到点检查只提示）");
+  h.advance(60 * 60 * 1000);
+  h.service.tick();
+  assert.equal(calls.length, 0, "开关关：到 1h 也不由看护中止（旧语义由运行时最后兜底）");
 });
 
 test("G-2/W1 「正确等待不报」：#1 对带挂起确认卡的角色排除；su 自身忙不触发任何告警", () => {
