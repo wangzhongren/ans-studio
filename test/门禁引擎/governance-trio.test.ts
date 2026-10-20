@@ -194,19 +194,21 @@ test("注册表：预授权目录与评审一致（Liaison 仅 docs/intents/；n
   ]);
 });
 
-test("注册表：能力矩阵——Lead 只沟通+交接+intent-confirm；Steward 独享派发/看护/恢复；Crew 独享技能/MCP；Proof 只验收", () => {
+test("注册表：能力矩阵——Lead 沟通+交接+intent-confirm+派发协调；Steward 派发/看护/恢复；Crew 独享技能/MCP；Proof 只验收", () => {
   const l = governanceRoleOf("liaison")!.capabilities;
   const r = governanceRoleOf("rapporteur")!.capabilities;
   const n = governanceRoleOf("nominator")!.capabilities;
   const c = governanceRoleOf("convener")!.capabilities;
   const v = governanceRoleOf("verifier")!.capabilities;
-  // Lead：客户卡通道只用于 intent-confirm（白名单由编排限制）；其余能力全关。
+  // Lead：客户卡通道只用于 intent-confirm（白名单由编排限制）；2026-10-20 客户拍板兼任工作流管理者，
+  // 获得 dispatch_task（协调任务）能力；其余能力仍关。
   assert.equal(l.customerInput, true, "Lead 仅用于 intent-confirm 卡");
   assert.equal(l.handOffIntent, true, "Lead 独享 hand_off_intent");
   assert.equal(l.requestClarification, false);
+  assert.equal(l.dispatchTask, true, "Lead 作为工作流管理者可派发协调任务（客户 2026-10-20）");
   assert.deepEqual(
-    [l.dispatchTask, l.roleStatus, l.sessionTail, l.proposeRecovery, l.installSkill, l.installMcp],
-    [false, false, false, false, false, false],
+    [l.roleStatus, l.sessionTail, l.proposeRecovery, l.installSkill, l.installMcp],
+    [false, false, false, false, false],
   );
   assert.equal(l.shell, "operator-approve", "Lead 也接审批档（客户 2026-10-19：所有角色 shell 均经审批）");
   // 其余四人保留客户确认通道；仅 Draft 有澄清工具；Proof 只验收。

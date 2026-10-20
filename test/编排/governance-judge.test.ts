@@ -32,6 +32,7 @@ import type {
 } from "../../src/model/runtime.ts";
 import type { AdapterCapabilities, RuntimeAdapterFactory } from "../../src/pipeline/orchestration/run-role.ts";
 import { openRoleSession } from "../../src/pipeline/orchestration/run-role.ts";
+import { governanceDispatchActionFor } from "../../src/pipeline/orchestration/run-role.ts";
 import {
   createGovernanceJudge,
   DEFAULT_GOVERNANCE_JUDGE_TIMEOUT_MS,
@@ -2339,6 +2340,50 @@ test("run-role：flow 能力注入——项目角色只有 flowGet；内置治�
       assert.equal(typeof captured.caps?.flowGet, "function", "内置治理角色有 flowGet");
       assert.equal(typeof captured.caps?.flowStepUpdate, "function", "内置治理角色有 flowStepUpdate");
       assert.equal(typeof captured.caps?.flowStepSupersede, "function", "内置治理角色有 flowStepSupersede");
+    } finally {
+      await handle.dispose();
+    }
+  });
+});
+
+test("governanceDispatchActionFor：Liaison→Convener=coordinate；其余=dispatch", () => {
+  assert.equal(governanceDispatchActionFor("liaison", "convener"), "coordinate");
+  assert.equal(governanceDispatchActionFor("liaison", "backend"), "dispatch");
+  assert.equal(governanceDispatchActionFor("convener", "backend"), "dispatch");
+  assert.equal(governanceDispatchActionFor("backend", "convener"), "dispatch");
+});
+
+test("run-role：Liaison→Convener 走 coordinate（无需提案/任命）；Liaison→项目角色仍 dispatch", async () => {
+  await withRoot(async (root) => {
+    const captured: { caps?: AdapterCapabilities; gate?: WriteGate } = {};
+    let forwarded = 0;
+    const handle = await openRoleSession(
+      {
+        roleId: "liaison",
+        project: trioProject(root, "liaison"),
+        autoRepin: false,
+        dispatchTask: (payload) => {
+          forwarded += 1;
+          return { ok: true, message: `forwarded:${payload.roleId}` };
+        },
+      },
+      { createAdapter: capturingFactory(captured) },
+    );
+    try {
+      const coordinate = await captured.caps!.dispatchTask!(
+        { roleId: "convener", task: "协调：请确认流程步骤", flowId: "flow-a", stepId: "delivery-backend" },
+        undefined,
+      );
+      assert.deepEqual(coordinate, { ok: true, message: "forwarded:convener" });
+      assert.equal(forwarded, 1, "coordinate 应放行到前端路由");
+
+      const dispatch = await captured.caps!.dispatchTask!(
+        { roleId: "backend", task: "实现", flowId: "flow-a", stepId: "impl" },
+        undefined,
+      );
+      assert.equal(dispatch?.ok, false);
+      assert.match(dispatch?.message ?? "", /派发被治理门禁拒绝/);
+      assert.equal(forwarded, 1, "Liaison→项目角色不是 coordinate，空账本应被 dispatch 门拒");
     } finally {
       await handle.dispose();
     }

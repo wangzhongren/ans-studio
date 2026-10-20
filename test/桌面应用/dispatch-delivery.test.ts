@@ -1565,6 +1565,26 @@ test("G-4 V2 卸载成功（先改声明再卸载 ⇒ rebuilt）：系统行如�
 // 派发/看护 + 只读 shell）；`routeDispatch` 的派发范围门正反例与 `dispatch.accepted` 账本；
 // 项目角色回交/看护系统消息改投 Convener（Rapporteur 只镜像、不接投递）；旧 single 不写账本。
 
+/** 2026-10-20 客户拍板：主理 Lead 也是工作流管理者——含 `liaison` 的 trio 列表（Lead→Steward 协调）。 */
+function liaisonTrioListing(projectRoot = "/proj"): ProjectListing {
+  const base = trioListing(projectRoot);
+  return {
+    ...base,
+    roles: [
+      {
+        roleId: "liaison",
+        cardPath: "",
+        boundaryPath: "",
+        cardText: "liaison",
+        boundary: { entries: [], boundarySource: "<built-in:trio/liaison>", acceptance: { accepted: false, source: "" } },
+        builtIn: true,
+        governanceFunction: "liaison",
+      },
+      ...base.roles,
+    ],
+  };
+}
+
 const trioEntry = (over: Record<string, unknown>) => ({
   at: new Date().toISOString(),
   kind: "customer.decision",
@@ -1802,6 +1822,87 @@ test("routeDispatch 反例（trio）：无客户接受/无任命/目标内置/�
   const ledger4 = await readGovernanceLedger(dupRoot);
   assert.equal(ledger4.entries.filter((entry) => entry.kind === "dispatch.accepted").length, 1, "被拒的重复派发不新增账本");
   await h4.mgr.stop(null);
+});
+
+// ——————————————————————————————————————————————————————————————————————————————————————
+// 2026-10-20 客户拍板：**主理 Lead 成为工作流管理者**——`dispatchTask` 扩展到 Liaison；
+// Lead→Steward 走 coordinate 门（不要求提案接受/任命/步骤去重、不弹客户卡），其余来源/目标照旧。
+// ——————————————————————————————————————————————————————————————————————————————————————
+
+test("2026-10-20 Lead→Steward 协调：Liaison 受理并投递、零客户卡、同文可再发；账本 power=liaison（不是客户批准）", async () => {
+  // coordinate 门不要求提案接受/任命（flow-a 步骤无关）——空账本即可。
+  const dir = await makeTrioRoot();
+  const customerCalls: unknown[] = [];
+  const customerInput: DesktopCustomerInputFn = async (request) => {
+    customerCalls.push(request);
+    return { outcome: "declined", reason: "测试替身：不应被调用" };
+  };
+  const h = makeHarness({ projectRoot: dir, customListing: liaisonTrioListing(dir), customerInput });
+  await h.mgr.open({ projectRoot: dir, roleId: "liaison", runtime: "demo" });
+  await tick(30);
+  const dispatch = h.capabilitiesOf("liaison")!.dispatchTask;
+  assert.equal(typeof dispatch, "function", "Lead 获得 dispatch_task（工作流管理者）");
+  assert.equal(h.capabilitiesOf("A")?.dispatchTask, undefined, "项目角色不获得 dispatch_task（fail-closed）");
+  const task = "请用 flow_get 读取 flow-a 的当前 revision，并用 flow_step_update 推进 impl；不要直接 write_file 流程 YAML。";
+  const first = (await dispatch!({ roleId: "convener", task, flowId: "flow-a" }))!;
+  assert.equal(first.ok, true, `协调消息应受理：${first.message}`);
+  assert.match(first.message ?? "", /协调消息/, "回执标明是协调消息");
+  assert.match(first.message ?? "", /≠ 客户批准/, "协调 ≠ 客户批准");
+  await tick(200);
+  assert.equal(h.sent.convener?.length, 1, "Steward 会话被自动开启并收到协调任务");
+  assert.ok(h.sent.convener[0].includes(task), "任务正文送达");
+  assert.match(h.sent.convener[0], /^\[派发\] 来自 liaison 的任务/, "正文来源是 Lead（不伪装 Convener）");
+  assert.equal(customerCalls.length, 0, "Lead→Steward 全程零客户卡");
+  // 账本：来源 Lead、目标 Steward、power=liaison；不是客户决定、不写 stepId（防 dispatch 门误去重）。
+  const { readGovernanceLedger } = await import("../../src/pipeline/orchestration/govern-session.ts");
+  const ledger = await readGovernanceLedger(dir);
+  assert.deepEqual(ledger.errors, [], "账本可读");
+  const written = ledger.entries.filter((entry) => entry.kind === "dispatch.accepted");
+  assert.equal(written.length, 1, "成功入队后恰一条 dispatch.accepted");
+  assert.deepEqual(
+    [written[0].actorRoleId, written[0].power, written[0].targetRoleId, written[0].flowId],
+    ["liaison", "liaison", "convener", "flow-a"],
+    "账本标明来源 Lead → 目标 Steward",
+  );
+  assert.equal(written[0].stepId, undefined, "协调不是步骤派发：不写 stepId");
+  assert.equal(written[0].trigger, undefined, "非客户决定触发（trigger 缺席）");
+  assert.ok((written[0].messageSummary ?? "").startsWith("[协调] "), "账本摘要标明协调");
+  assert.equal(ledger.entries.some((entry) => entry.kind === "customer.decision"), false, "不写客户决定账本（不是客户批准）");
+  // 重复协调：同文送达后再发一次 ⇒ 仍受理（不套用项目步骤的 duplicate-dispatch 去重）。
+  if (!h.streams.convener) h.streams.convener = [];
+  h.streams.convener.push({ kind: "settled", summary: "结束" });
+  await tick(200);
+  const second = (await dispatch!({ roleId: "convener", task, flowId: "flow-a" }))!;
+  assert.equal(second.ok, true, "同文协调消息可再次发送（不受步骤派发去重约束）");
+  await tick(200);
+  assert.equal(h.sent.convener.filter((text) => text.includes(task)).length, 2, "第二次协调也真实投递");
+  await h.mgr.stop(null);
+});
+
+test("2026-10-20 Lead→项目角色仍走 dispatch 门禁（wrong-role 拒）；Convener→Convener 仍拒（内置目标）", async () => {
+  // 账本给足（提案接受 + 任命）：Liaison→项目角色仍必须被 dispatch 门的来源规则拒绝。
+  const dir = await makeTrioRoot([
+    trioEntry({ decisionKind: "proposal-accept" }),
+    trioEntry({ decisionKind: "appointment", power: "nomination", actorRoleId: "nominator", targetRoleIds: ["A"] }),
+  ]);
+  const h = makeHarness({ projectRoot: dir, customListing: liaisonTrioListing(dir) });
+  await h.mgr.open({ projectRoot: dir, roleId: "liaison", runtime: "demo" });
+  await h.mgr.open({ projectRoot: dir, roleId: "convener", runtime: "demo" });
+  await tick(30);
+  const liaisonDispatch = h.capabilitiesOf("liaison")!.dispatchTask!;
+  const toProject = (await liaisonDispatch({ roleId: "A", task: "派活给项目角色", flowId: "flow-a", stepId: "impl" }))!;
+  assert.equal(toProject.ok, false, "Liaison→项目角色不是协调：仍走 dispatch 门禁（来源只允许 Steward）");
+  assert.match(toProject.message ?? "", /治理门禁/, "回执点明治理门禁");
+  assert.match(toProject.message ?? "", /convener/, "原因指明来源必须是 Steward");
+  await tick(120);
+  assert.equal(h.sent.A?.length ?? 0, 0, "拒投不投递");
+  const convenerDispatch = h.capabilitiesOf("convener")!.dispatchTask!;
+  const toConvener = (await convenerDispatch({ roleId: "convener", task: "自派", flowId: "flow-a", stepId: "impl" }))!;
+  assert.equal(toConvener.ok, false, "Convener→Convener 仍拒（内置治理角色默认不可被派发）");
+  assert.match(toConvener.message ?? "", /内置治理角色/, "如实原因");
+  // 项目角色→Convener：dispatch_task 能力缺席（fail-closed，无入口）。
+  assert.equal(h.capabilitiesOf("A")?.dispatchTask, undefined, "项目角色→Convener 无入口");
+  await h.mgr.stop(null);
 });
 
 test("回交/看护路由（trio）：项目角色回交与系统消息改投 Convener；Rapporteur 不接收", async () => {

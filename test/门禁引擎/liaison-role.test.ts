@@ -216,7 +216,7 @@ test("Liaison 越界拒绝文案（AC3）：指回正确归属——提案找 Dr
 
 // —————————————————————— 4) 能力矩阵：只有沟通/交接 ——————————————————————
 
-test("Liaison 能力：customerInput=true（仅 intent-confirm）、handOffIntent=true；无 dispatch/install/roleStatus/recovery；shell=审批档", () => {
+test("Liaison 能力：customerInput=true（仅 intent-confirm）、handOffIntent=true、dispatchTask=true（工作流管理者）；无 install/roleStatus/recovery；shell=审批档", () => {
   const spec = governanceRoleOf("liaison");
   assert.ok(spec);
   assert.equal(governanceCapabilitiesOf("liaison"), spec!.capabilities, "能力矩阵单点来自注册表");
@@ -224,7 +224,8 @@ test("Liaison 能力：customerInput=true（仅 intent-confirm）、handOffInten
     customerInput: true,
     handOffIntent: true,
     requestClarification: false,
-    dispatchTask: false,
+    // 客户 2026-10-20：Lead / 主理 兼任工作流管理者，可向 Steward / 项目角色派发协调任务。
+    dispatchTask: true,
     roleStatus: false,
     sessionTail: false,
     proposeRecovery: false,

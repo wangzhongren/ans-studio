@@ -46,12 +46,16 @@ related: [flow-tools]
 ## 跨角色状态与待办
 
 1. **编排（本工作树内在飞，未提交）**：`src/common/编排/flow-service.ts` 已按本契约导入 `FlowGetFn`/`FlowStepUpdateFn`/`FlowStepSupersedeFn`/`FlowToolResult`/`FlowToolStatus`/`FlowToolStepKind`/`FlowToolView` 并实现串行/版本校验/证据对账/原子写/幂等/权限；其 `test/编排/flow-service.test.ts` 只读复跑 **11/11 过**，全仓 typecheck **exit 0**。类型契约已对齐，无需运行时核心再改。
-2. **Pi适配器（边界外，`角色卡/Pi适配器/boundary.yaml` 拥有 `src/provider/pi/session.ts`）**：生产 Service 路径已通过 `tools` 预装配覆盖（无需改）；legacy 直连/假适配器路径需其属主透传三能力：
-   - `createFakeRuntimeAdapter(opts)` 类型与 `buildGovernedTools` 调用（约 177 行）加 `flowGet/flowStepUpdate/flowStepSupersede`；
-   - `PiRuntimeAdapterOptions`（约 256 行）加同三可选字段（393 行 `...adapterInput` 展开即可在运行期透传，类型需声明）；
-   - 类型从 `model/runtime.ts` 导入 `FlowGetFn/FlowStepUpdateFn/FlowStepSupersedeFn`。
-   本角色未越界修改该文件。
+2. **Pi适配器（已落地，commit ea793cc，属主＝Pi适配器）**：`src/provider/pi/session.ts` 已增 `flowGet/flowStepUpdate/flowStepSupersede`（假适配器 opts 与调用、`PiRuntimeAdapterOptions`），只读复跑 `test/pi-adapter/flow-tools.test.ts` **4/4 过**。生产 Service 路径本就不需改（`tools` 预装配 + `...options` 透传）。
 3. **编排注入端**：`createFlowService({ projectRoot, actorRoleId, actorPower, defaultFlowId? })` 的三个方法可直接作为 `flowGet/flowStepUpdate/flowStepSupersede` 注入 `RuntimeSessionOptions`（签名已由 typecheck 对齐）；按角色/流程注入判据属编排。
+
+## 2026-10-20 追加：`flow_step_supersede` 权限文案同步 Steward/Lead
+
+装配核对发现编排 `flow-service.ts` 的工作流管理者已含 `schedule`（Steward/Convener）**与 `liaison`（Lead）**（`isFlowManager`；supersede 拒绝文案为「只有 Steward/Lead（工作流管理者）可以 supersede 步骤。」），但 schema 仍写「仅 Steward（流程管理员）可用」。已同步（纯文案，handler/服务端权限未动）：
+
+- `src/provider/runtime/schema.ts`：`flow_step_supersede` description 改为「**仅 Steward（流程管理员）或 Lead（Liaison，工作流管理者）可用**——服务端按调用角色校验，其他角色调用返回错误」；promptGuidelines 改为「**仅 Steward 或 Lead（工作流管理者）使用**」；`oldStepId` 字段说明补「supersede requires Steward (Convener) or Lead (Liaison) — validated by the server」；块注释同步。
+- `test/runtime-core/flow-tools.test.ts`：schema 断言改为新口径，并反向钉住不得残留「仅 Steward（流程管理员）可用 / 仅 Steward 使用 / 非 Steward 调用」；服务端拒绝夹具由 `not-steward` 改为 `forbidden`（文案对齐 flow-service 现状），仍验证工具层不按角色预拦、原样转达回执。
+- 验证：`node --test test/runtime-core/flow-tools.test.ts` **11/11 过**；`node --test "test/runtime-core/**/*.test.ts"` **240 计 / 239 过 / 0 红 / 1 跳过**；`npm run typecheck` **exit 0**。未改 handler/服务端权限/编排文件。
 
 ## 残余风险
 

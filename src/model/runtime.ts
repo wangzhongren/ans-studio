@@ -733,7 +733,7 @@ export type UninstallMcpFn = (
 // 客户批准「按这个方案做」：把 flow 文件从「只能整文件读写」升级为**方法化**——模型经三只工具
 // （`flow_get` / `flow_step_update` / `flow_step_supersede`）读取结构化视图并推进步骤状态。
 // 本模块只承载**中立类型**；三工具只调用注入能力并如实转达回执，**权限/状态迁移/证据完整性/
-// revision 冲突/Steward-only 等全部裁决在编排 flow-service**（`src/common/编排/**` 属编排角色）。
+// revision 冲突/Steward/Lead 权限等全部裁决在编排 flow-service**（`src/common/编排/**` 属编排角色）。
 // 未注入对应能力 ⇒ 工具不注册（结构性 fail-closed，沿 dispatch_task 先例）。
 // 诚实面：flow 步骤推进 ≠ 客户批准——需要客户决定的步骤仍须走 request_confirmation/request_choice。
 
@@ -785,7 +785,7 @@ export interface FlowToolView {
  * - `ok:true`：`revision` 为本次操作后的新 revision；`flow` 为服务端视图（可选）；`idempotent:true`
  *   表示同一 `idempotencyKey` 重放、未重复变更；
  * - `ok:false`：`code` 机读原因（如 `revision-conflict`/`invalid-transition`/`insufficient-evidence`/
- *   `not-steward`），`error` 一句人话，`issues` 供修正的逐条问题。
+ *   `forbidden`），`error` 一句人话，`issues` 供修正的逐条问题。
  */
 export interface FlowToolResult {
   ok: boolean;
@@ -811,7 +811,7 @@ export type FlowStepUpdateFn = (input: {
   note?: string;
 }) => Promise<FlowToolResult>;
 
-/** `flow_step_supersede` 注入能力：用新步骤取代旧步骤（旧步骤转 superseded；**仅 Steward**，服务端校验）。 */
+/** `flow_step_supersede` 注入能力：用新步骤取代旧步骤（旧步骤转 superseded；**仅 Steward/Lead（工作流管理者）**，服务端校验）。 */
 export type FlowStepSupersedeFn = (input: {
   flowId: string;
   oldStepId: string;
@@ -1357,13 +1357,13 @@ export interface GovernedToolsOptions {
   /**
    * Flow 文件方法化（2026-10-20 客户拍板，最小闭环）：`flow_get` / `flow_step_update` /
    * `flow_step_supersede` 三能力的注入面。能力实现＝编排 flow-service（权限/状态迁移/证据/
-   * revision 冲突/Steward-only 全部在服务端裁决）；本层只调用并如实转达回执。
+   * revision 冲突/Steward/Lead 权限全部在服务端裁决）；本层只调用并如实转达回执。
    * 每项**未注入 ⇒ 对应工具不注册**（结构性 fail-closed，沿 dispatch_task 先例）。
    */
   flowGet?: FlowGetFn;
   /** `flow_step_update` 能力；未注入 ⇒ 工具不注册。 */
   flowStepUpdate?: FlowStepUpdateFn;
-  /** `flow_step_supersede` 能力（仅 Steward 可成功，服务端校验）；未注入 ⇒ 工具不注册。 */
+  /** `flow_step_supersede` 能力（仅 Steward/Lead 可成功，服务端校验）；未注入 ⇒ 工具不注册。 */
   flowStepSupersede?: FlowStepSupersedeFn;
   /**
    * 判断 agent（「替我审」）只读能力注入。**这是能力注入，不是工具注入**：注入后 Service 必须走

@@ -1,5 +1,44 @@
 # 门禁引擎 变更记录
 
+## 2026-10-20 — Lead / 主理 设为工作流管理者（dispatch_task + flow 工具纪律）（客户拍板）
+
+客户拍板：把主理 Lead 设为**工作流管理者**，可和所有职能角色沟通。本批只在**门禁引擎**边界内改
+能力位与卡文本。完整记录见[变更记录](docs/change/2026-10-20_change_lead-workflow-manager.md)。
+
+- **边界**：`src/common/门禁引擎/governance-roles.ts`、
+  `test/门禁引擎/governance-standard-workflow.test.ts`、`test/门禁引擎/governance-trio.test.ts`、
+  `test/门禁引擎/liaison-role.test.ts`、本文件、`memo.md`、
+  `docs/change/2026-10-20_change_lead-workflow-manager.md`（新）。未碰
+  `src/common/编排/**`、`src/provider/**`、`app/**`、`test/测试/**`、`src/service/**`、
+  其他角色文件/测试、真实项目；不读 `.env`、不跑真实模型/凭据/网络；未 commit。
+- **能力位**：`liaison.capabilities.dispatchTask` 由 `false` 改为 `true`；其余能力位不变
+  （`customerInput/handOffIntent=true`，`roleStatus/sessionTail/proposeRecovery/installSkill/installMcp=false`，
+  `shell=operator-approve`）。`GovernanceCapabilities.dispatchTask` 注释同步。
+- **Lead 卡**：职能与权力改为「客户沟通权 + 工作流管理」；保留逐字样「客户沟通 · 不拥有最终批准权」；
+  标准工作流第 5 步明确阶段流转仍由应用负责；新增「## 工作流管理（Lead / 主理）」——`flow_get` +
+  `flow_step_update` / `flow_step_supersede`、`dispatch_task` 向 Steward/项目角色派发协调任务；
+  任务自足并带 `flowId`（Steward 协调可省 `stepId`）；`expectedRevision`/`revision-conflict`/
+  `insufficient-evidence` 纪律；派发/推进 ≠ 客户批准；不得伪造 done 证据；不得直接写 `docs/flows/**`。
+- **Steward 卡**：Lead 也是工作流管理者；收到 Lead 协调任务按任务文本执行，不因来源是 Lead 就跳过
+  证据/门禁；Steward 仍是流程/排程执行者；Steward 自己的派发目标仍只能是项目角色，除 Lead 的协调
+  任务外治理角色之间不 dispatch。
+- **Crew/Draft/Proof 卡**：可向 Lead / 主理 回交/协调；不得直接写 `docs/flows/**`；步骤更新仍按
+  flow 工具与账本证据——只能把 owner=自己的步骤更新到 `delivered`（或 failed/blocked），不要自己标
+  done；done 由 Steward / Lead 核对账本证据后标记，证据不足不标 done。
+- **测试**：`node --test "test/门禁引擎/**/*.test.ts"` ⇒ **286 计 / 285 过 / 0 红 / 1 skip**
+  （基线 280/279/0/1；新增 1 例：Lead 三工具 + dispatch_task、Steward 接受 Lead 协调任务、
+  Crew/Draft/Proof 向 Lead 回交；能力矩阵两处既有断言按新契约更新）。既有断言未放宽；
+  `npm run typecheck` ⇒ **exit 0**。
+- **跨角色待办（未越界）**：① 编排/桌面按能力矩阵给 Liaison 注入 `dispatch_task`；
+  `test/桌面应用/session.test.ts:992` 仍断言 `liaison.dispatchTask === undefined`，属预期红，需桌面
+  属主更新；② 派发目标校验需允许 Lead→Steward，Steward 自身目标仍只限项目角色；③ Lead 的 flow
+  工具需由编排/运行时核心注入（与 Steward 同权限、服务端校验证据/revision），
+  `GovernanceCapabilities` 未新增 flow 工具位；④ `dispatch-delivery.test.ts` 的「convener 派发（唯一）」
+  文案过时，建议属主同步。
+- **残余风险**：`dispatchTask=true` 可能被误用于其他治理角色目标；Lead 可能把派发/推进误当客户
+  批准（卡文本已禁，无机械检查）；flow 工具与 revision/证据校验依赖运行时实现；真机端到端与独立
+  复验未进行。来源：客户拍板（经协调方转达）。
+
 ## 2026-10-20 — 流程文件方法化工具（flow_get / flow_step_update / flow_step_supersede）角色卡纪律（客户拍板）
 
 客户已拍板：「按这个方案做吧。」流程文件改为方法化工具：`flow_get`（所有角色读取）、
@@ -20,8 +59,9 @@ superseded + 新步骤 pending）。本批只在**门禁引擎**边界内更新�
   evidence；`expectedRevision` 来自最近一次 `flow_get`（或更新回执）的 revision，`revision-conflict`
   重读后再改、不盲目重试；步骤推进 ≠ 客户批准，需要客户决定的步骤仍走客户交互工具。
 - **Crew / Draft / Proof**：用 `flow_get` 读取流程与自己负责的步骤；**不得直接写 `docs/flows/**`**；
-  你只能更新自己负责的步骤：交付/回交后按账本证据用 `flow_step_update` 记录状态；证据不足
-  （`insufficient-evidence`）如实报告、不把步骤标 `done`；四卡统一 expectedRevision/`revision-conflict`
+  项目角色/步骤 owner 只能把 owner=自己的步骤更新到 `delivered`（或 `failed` / `blocked`），
+  **不要自己标 `done`**；`done` 由 Steward / Lead 核对账本证据后标记；证据不足
+  （`insufficient-evidence`）如实报告、不标 done；四卡统一 expectedRevision/`revision-conflict`
   纪律；保留 id `verification` / `acceptance` 仍按既有验收卡流程。Draft 契约冻结、Crew 角色就绪、
   Proof 核对完成各有落点。
 - **保留**：现有 `request_confirmation` / `cardKind` / `schedule-write` 作为初始创建与迁移兼容保留，

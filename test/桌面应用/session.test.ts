@@ -978,7 +978,7 @@ function makeCapabilityManager(
   });
 }
 
-test("W6-B 能力路由：liaison=handOffIntent；rapporteur=提案+clarification；nominator=install；convener=dispatch/看护；single/su 不变", async () => {
+test("W6-B 能力路由：liaison=handOffIntent+协调派发；rapporteur=提案+clarification；nominator=install；convener=dispatch/看护；single/su 不变", async () => {
   const captured = new Map<string, CapturedCapabilityInput>();
   const trio = governanceListing();
   const mgr = makeCapabilityManager(trio, captured);
@@ -989,7 +989,7 @@ test("W6-B 能力路由：liaison=handOffIntent；rapporteur=提案+clarificatio
   assert.equal(typeof liaison.handOffIntent, "function", "Liaison 独享 hand_off_intent 投递端");
   assert.equal(liaison.requestClarification, undefined, "Liaison 无 request_clarification");
   assert.equal(typeof liaison.customerInput, "function", "Lead 注入客户通道（仅 intent-confirm 可用；其余卡由编排白名单拒绝）");
-  assert.equal(liaison.dispatchTask, undefined);
+  assert.equal(typeof liaison.dispatchTask, "function", "Lead 是工作流管理者（2026-10-20 客户拍板）：可向 Steward 派协调消息");
   assert.equal(liaison.installSkill, undefined);
   assert.equal(liaison.roleStatus, undefined);
 

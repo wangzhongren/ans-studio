@@ -32,6 +32,8 @@ import type {
 } from "../../src/pipeline/orchestration/govern-session.ts";
 import { readGovernanceLedger, appendGovernanceLedger } from "../../src/pipeline/orchestration/govern-session.ts";
 import type { PinEvidenceResult } from "../../src/model/boundary.ts";
+// 2026-10-20：流程推进任务文案的 YAML 存在性分支（真机：flow 工具已注册但 Steward 未被要求使用）。
+import { buildGovernanceAdvanceMessage, type GovernanceNextStepPayload } from "../../app/desktop/governance-advance.ts";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -2109,6 +2111,140 @@ test("治理自动推进（真机修正）：accept 先派 Convener 写流程状
       "已派发流程任务给 Steward / 统筹（工作中）",
       "流程状态 YAML 已落盘，已派发提名任务给 Crew / 组队（工作中）",
     ]);
+    await iface.stopSession();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// ——————————————————————————————————————————————————————————————————————————————————————
+// 2026-10-20 真机：flow 工具已注册但 Steward 没调用——应用派给 Convener 的任务文案仍要求「先写流程状态
+// YAML」，它照旧 write_file。修正：YAML 已存在 ⇒ 文案改用 flow_get / flow_step_update / flow_step_supersede；
+// 提名步骤已 done ⇒ 不重复派 Nominator，改请 Steward 继续下一步。
+// ——————————————————————————————————————————————————————————————————————————————————————
+
+test("2026-10-20 flow 工具文案：YAML 不存在 ⇒ 旧初始创建文案；已存在 ⇒ flow_get/flow_step_update/flow_step_supersede 且不要求直接写 YAML", () => {
+  const accept: GovernanceNextStepPayload = {
+    version: 1,
+    flowId: "flow-x",
+    cardKind: "proposal",
+    nextFunction: "schedule",
+    roleId: "convener",
+    proposalPath: "docs/proposals/flow-x-v1.md",
+    followUp: "nomination-after-flow",
+  };
+  const missing = buildGovernanceAdvanceMessage(accept)!;
+  assert.ok(missing.includes("请先写流程状态 YAML docs/flows/flow-x.yaml"), "YAML 不存在 ⇒ 保留初始创建文案（schedule-write 路径）");
+  assert.equal(missing.includes("flow_get"), false, "初始创建路径不要求 flow 工具");
+  const exists = buildGovernanceAdvanceMessage(accept, undefined, { flowStateExists: true })!;
+  assert.ok(
+    exists.includes("flow_get") && exists.includes("flow_step_update") && exists.includes("flow_step_supersede"),
+    "YAML 已存在 ⇒ 明确要求用 flow 工具推进",
+  );
+  assert.equal(exists.includes("请先写流程状态 YAML"), false, "不得再要求先写 YAML");
+  assert.ok(exists.includes("不要直接 write_file 流程 YAML") && exists.includes("不要把步骤说成已派发"), "禁止直接写文件/谎称已派发");
+  // appointment 同口径。
+  const appointment: GovernanceNextStepPayload = {
+    version: 1,
+    flowId: "flow-y",
+    cardKind: "appointment",
+    nextFunction: "schedule",
+    roleId: "convener",
+  };
+  const appointmentMissing = buildGovernanceAdvanceMessage(appointment, ["role-a"])!;
+  assert.equal(appointmentMissing, "流程 flow-y：客户已完成任命 role-a。请写流程状态 YAML docs/flows/flow-y.yaml 并派发已批准步骤。", "YAML 不存在 ⇒ 旧 appointment 文案逐字不变");
+  const appointmentExists = buildGovernanceAdvanceMessage(appointment, ["role-a"], { flowStateExists: true })!;
+  assert.ok(appointmentExists.includes("flow_step_update") && appointmentExists.includes("推进已批准步骤"), "appointment 已存在 ⇒ flow 工具推进");
+  assert.equal(appointmentExists.includes("并派发已批准步骤"), false, "不再让 Convener 直接写 YAML");
+});
+
+test("2026-10-20 flow 工具推进（真机修正）：YAML 已存在且提名已 done ⇒ Convener 拿 flow 工具文案、Nominator 零派发、系统行如实", async () => {
+  const root = makeTempProjectRoot("ans-advance-flow-tools-");
+  try {
+    const flowId = "flow-n";
+    mkdirSync(path.join(root, "docs", "flows"), { recursive: true });
+    writeFileSync(
+      path.join(root, "docs", "flows", `${flowId}.yaml`),
+      [
+        `flowId: ${flowId}`,
+        "version: 1",
+        "qualityTier: production",
+        "steps:",
+        "  - id: nomination",
+        "    title: 提名",
+        "    owner: nominator",
+        "    kind: customer-decision",
+        "    status: done",
+        "    evidence:",
+        "      kind: customer-decision",
+        "      ref: appointment",
+        "  - id: delivery",
+        "    title: 交付",
+        "    owner: executor",
+        "    kind: dispatch",
+        "    status: pending",
+        "",
+      ].join("\n"),
+    );
+    const listing: ProjectListing = { ...trioListing(), projectRoot: root };
+    const sendsByRole = new Map<string, string[]>();
+    const settles = new Map<string, () => void>();
+    const openRoles: string[] = [];
+    const events: SessionEventEnvelope[] = [];
+    const iface = createDesktopInterface({
+      pickDirectory: async () => root,
+      emitEvent: (envelope) => { events.push(envelope); },
+      listProjectFn: async () => listing,
+      openRoleSessionFn: async (input) => {
+        openRoles.push(input.roleId);
+        const sends: string[] = [];
+        sendsByRole.set(input.roleId, sends);
+        const made = settleableGovernanceHandle(sends);
+        settles.set(input.roleId, made.settle);
+        return made.handle;
+      },
+      buildProjectConfigFn: buildProjectConfig,
+      governanceChainOptions: { pollIntervalMs: 10, timeoutMs: 1_000 },
+    });
+    await iface.listProject({ projectRoot: root });
+    const result = await iface.advanceGovernanceFlow({
+      payload: {
+        version: 1,
+        flowId,
+        cardKind: "proposal",
+        nextFunction: "schedule",
+        roleId: "convener",
+        proposalPath: `docs/proposals/${flowId}-v1.md`,
+        followUp: "nomination-after-flow",
+      },
+      context: { sourceRoleId: "rapporteur", projectRoot: root, runtime: "demo" },
+    });
+    // 第一段：Convener 拿到的必须是 flow 工具文案（YAML 已存在）。
+    const convenerSends = sendsByRole.get("convener") ?? [];
+    assert.ok(convenerSends.length >= 1, "Convener 收到第一段任务");
+    assert.ok(
+      convenerSends[0].includes("flow_get") && convenerSends[0].includes("flow_step_update") && convenerSends[0].includes("flow_step_supersede"),
+      "YAML 已存在 ⇒ 要求用 flow 工具推进",
+    );
+    assert.equal(convenerSends[0].includes("请先写流程状态 YAML"), false, "不得再要求直接写 YAML");
+    // 第二段：提名已 done ⇒ 不重复派 Nominator，改请 Steward 继续（排队后随 settle 投出）。
+    assert.equal(sendsByRole.get("nominator")?.length ?? 0, 0, "提名已 done ⇒ Nominator 零派发");
+    assert.equal(openRoles.includes("nominator"), false, "Nominator 会话不被打开");
+    assert.equal(result.ok, true);
+    assert.equal(result.dispatched, true);
+    assert.equal(result.targetRoleId, "convener");
+    assert.equal(result.followUpRoleId, "convener", "第二段收口为「继续下一步」（不是重复提名）");
+    settles.get("convener")?.();
+    await waitForTest(() => (sendsByRole.get("convener")?.length ?? 0) >= 2);
+    assert.ok(
+      sendsByRole.get("convener")!.some((text) => text.includes("提名已完成") && text.includes("未重复派发") && text.includes("flow_step_update")),
+      "已请 Steward 继续下一步（flow 工具）",
+    );
+    const notes = events
+      .filter((e) => e.roleId === "rapporteur" && e.event.kind === "message" && (e.event.detail as { source?: string } | undefined)?.source === "delivery-note")
+      .map((e) => e.event.summary);
+    assert.ok(notes.includes("提名已完成，未重复派发；已请 Steward / 统筹 继续下一步"), "系统行说明提名已完成、未重复派发");
+    assert.ok(!notes.some((summary) => summary.includes("已派发提名任务给 Crew / 组队")), "不刷「已派发提名任务」的系统行");
     await iface.stopSession();
   } finally {
     rmSync(root, { recursive: true, force: true });

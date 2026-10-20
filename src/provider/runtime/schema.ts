@@ -231,7 +231,9 @@ export function describeTool(name: string): ToolDescription {
     };
   }
   if (name === "dispatch_task") {
-    // 派发任务工具（设计 H-1，只给 su）：无 path、无写权。文案写死三条——派发≠授权 / 任务自足 / 返工带证据。
+    // 派发任务工具（设计 H-1；注入给 su/主理 Lead——注入端决定）：无 path、无写权。文案写死三条——派发≠授权 / 任务自足 / 返工带证据。
+    // 2026-10-20 客户拍板：主理 Lead 成为工作流管理者，可向 Steward（convener）/项目角色派发；Lead→Steward 属**内部协调**、
+    // 不是客户批准；仅 convener 这一个内置治理角色可作为目标，不得写成「可派发给任意内置角色」。
     // G-1/A4（设计 2026-10-16_design_contract-workflow-dispatch.md §四；PM 派发 V1 最小闭环 2026-10-16）：
     // 增两条——多角色/跨角色协作「先落盘再派发」（契约 docs/contracts/<name>-v<N>.md、工作流 docs/workflow.md）、
     // 任务文本「按地址引用」（不内嵌契约全文；「必读（按序）」块由投递系统附上、sha256 投递时算，su 不手算/不转抄）。
@@ -241,7 +243,12 @@ export function describeTool(name: string): ToolDescription {
       parameters: {
         type: "object",
         properties: {
-          roleId: { type: "string", description: "Target project role id (must be a project role, not a built-in governance role)" },
+          roleId: {
+            type: "string",
+            description:
+              "Target role id: usually a project role; when the caller is Lead (Liaison), `convener` (Steward) is also allowed as a coordination target. " +
+              "Other built-in governance roles are never valid targets, and you cannot dispatch to yourself",
+          },
           task: {
             type: "string",
             description:
@@ -255,13 +262,13 @@ export function describeTool(name: string): ToolDescription {
             type: "string",
             pattern: GOVERNANCE_SLUG_PATTERN,
             description:
-              "Optional governance flow id (slug). Governance roles must dispatch with flowId + stepId; legacy su calls may omit both (old behavior)",
+              "Optional governance flow id (slug). Governance roles must dispatch with flowId (+ stepId for task dispatch; Lead-to-Steward coordination may omit stepId); legacy su calls may omit both (old behavior)",
           },
           stepId: {
             type: "string",
             pattern: GOVERNANCE_SLUG_PATTERN,
             description:
-              "Optional governance flow step id (slug); with flowId it becomes the dispatch dedup key. Missing = legacy behavior; the fields grant nothing by themselves",
+              "Optional governance flow step id (slug); with flowId it becomes the dispatch dedup key. Missing = legacy behavior; Lead-to-Steward coordination may omit stepId while still carrying flowId; the fields grant nothing by themselves",
           },
         },
         required: ["roleId", "task"],
@@ -271,19 +278,24 @@ export function describeTool(name: string): ToolDescription {
         "向目标角色**派发任务**（经编排路由成对方会话的一条输入；前端负责自动开会话/排队/去重）。" +
         "**派发 ≠ 授权**——你只能转移「任务与上下文」，**不能**授予或改变对方的写权：对方写入仍只来自它自己的" +
         "已接受边界和已授权任务；普通操作无需逐次确认，新建或扩张边界、治理写集仍由 su 请求客户确认。任务文本必须**自足**（对方看不到你的上下文）：" +
-        "写清要做什么、依据哪份文档、完成标准；**返工**时把要求与证据一并写进任务文本。" +
+        "写清要做什么、依据哪份文档、完成标准（治理派发带 `flowId`；主理向 Steward 协调时可省 `stepId`）；**返工**时把要求与证据一并写进任务文本。" +
         "多角色/跨角色协作时**先落盘再派发**：先把冻结契约落盘到 `docs/contracts/<name>-v<N>.md`" +
         "（写盘许可已预置、直接写即可），工作流落盘到 `docs/workflow.md`（写盘经确认制：把路径列入规划确认的 preview），**再**派发任务。" +
         "任务文本**按地址引用**契约与工作流——「依据哪份文档」给项目内路径即可（如 `docs/contracts/<name>-v1.md`），**不内嵌契约全文**；" +
         "投递时系统会据此自动附上「**必读（按序）**」块（先读完再动手），其中的 sha256 由投递系统在投递当刻计算——**不要自己算或转抄哈希**。" +
         "引用的契约文件不存在时投递会被**拒绝**（回执如实报错；补落盘后重派）；`docs/workflow.md` 缺失（旧项目过渡期）不拒投、必读块如实标注「未提供」。" +
-        "roleId 必须是本项目角色（不能是你 su 自己）；本工具**不写盘、不做治理判定、不改变任何角色的写权**。" +
-        "治理会话可附可选 `flowId`/`stepId`：治理角色派发须同时给出（用于派发范围门与去重）；旧 su 调用可缺席＝旧行为——" +
+        "roleId 通常是本项目角色；**主理（Lead/Liaison）还可把 `convener`（Steward）作为协调目标**——其余内置治理角色不可作为目标，也不能派发给调用者自己。" +
+        "主理向 Steward 派发属**内部协调**，**不是客户批准**；Steward/项目角色仍按自己的已接受边界与门禁执行。" +
+        "本工具**不写盘、不做治理判定、不改变任何角色的写权**。" +
+        "治理会话可附可选 `flowId`/`stepId`：治理角色派发须同时给出（用于派发范围门与去重）；**主理向 Steward 协调时带 `flowId`、`stepId` 可省**；旧 su 调用可缺席＝旧行为——" +
         "**字段本身不构成任何授权**，派发范围门只认应用签发的客户决定与已任命名单。",
       promptGuidelines: [
         "派发的是**任务与上下文**；**派发 ≠ 授权**——目标角色只在自己的已接受边界内执行已授权任务，普通操作无需逐次确认；" +
           "不得在任务文本里代授写权；真正新建或扩张边界、治理写集仍由 su 请求客户确认。",
-        "dispatch_task 的任务文本要**自足**：目标角色看不到你的上下文——写清要做什么、依据哪份文档、完成标准。",
+        "主理（Lead/Liaison）可向 Steward（`convener`）派发任务做**内部协调**——**不是客户批准**，也不代表 Steward 已同意；" +
+          "Steward/项目角色仍按自己的边界与门禁执行。**不要**把这条理解为可向任意内置治理角色派发。",
+        "dispatch_task 的任务文本要**自足**：目标角色看不到你的上下文——写清要做什么、依据哪份文档、完成标准；" +
+          "治理派发带 `flowId`（主理向 Steward 协调时可省 `stepId`）。",
         "**多角色/跨角色协作先落盘再派发**：契约落盘到 `docs/contracts/<name>-v<N>.md`（预置写盘目录、直接写即可）、" +
           "工作流落盘到 `docs/workflow.md`（路径列入规划确认的 preview），**再**派发。" +
           "任务文本**按地址引用**契约与工作流（给项目内路径），**不内嵌契约全文**——投递时系统会自动附上「**必读（按序）**」块并计算其中的 sha256；" +
@@ -919,13 +931,17 @@ export function describeTool(name: string): ToolDescription {
     };
   }
   if (name === "flow_step_supersede") {
-    // 步骤替代：旧步骤保留为 superseded（不是删除）；Steward-only 与 revision 冲突均由服务端裁决。
+    // 步骤替代：旧步骤保留为 superseded（不是删除）；Steward/Lead（工作流管理者）权限与 revision 冲突均由服务端裁决。
     return {
       parameters: {
         type: "object",
         properties: {
           flowId: { type: "string", description: "Flow id containing the old step" },
-          oldStepId: { type: "string", description: "Step id to supersede (kept in history as superseded)" },
+          oldStepId: {
+            type: "string",
+            description:
+              "Step id to supersede (kept in history as superseded); supersede requires Steward (Convener) or Lead (Liaison) — validated by the server",
+          },
           newStepId: { type: "string", description: "New step id (must not collide with an existing step; validated by the server)" },
           title: { type: "string", description: "Title of the replacement step" },
           owner: { type: "string", description: "Owner role id of the replacement step" },
@@ -942,11 +958,11 @@ export function describeTool(name: string): ToolDescription {
       },
       description:
         "用一个**新步骤取代旧步骤**（旧步骤转为 `superseded` 并记 `supersededBy`；历史保留，**不是删除**）。" +
-        "**仅 Steward（流程管理员）可用**——服务端按调用角色校验，非 Steward 调用返回错误；`newStepId` 不得与现有步骤重复（服务端校验）。" +
+        "**仅 Steward（流程管理员）或 Lead（Liaison，工作流管理者）可用**——服务端按调用角色校验，其他角色调用返回错误；`newStepId` 不得与现有步骤重复（服务端校验）。" +
         "`expectedRevision` 语义同 `flow_step_update`（过期返回 `ok:false` / `code=revision-conflict`，先重新 `flow_get`）；`reason` 写清为什么替代。" +
         "本工具不写 flow 文件、不做权限/迁移裁决。",
       promptGuidelines: [
-        "**仅 Steward 使用**；非 Steward 调用会被服务端拒绝——不要绕过或改用写文件。",
+        "**仅 Steward 或 Lead（工作流管理者）使用**；其他角色调用会被服务端拒绝——不要绕过或改用写文件。",
         "替代不是删除：旧步骤保留为 superseded、历史可追溯；`reason` 写清替代原因。",
         "先 flow_get 拿最新 revision；`newStepId` 必须未被占用，`expectedRevision` 必须是当前 revision。",
       ],

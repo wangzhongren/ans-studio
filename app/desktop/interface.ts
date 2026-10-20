@@ -109,6 +109,7 @@ import {
   buildAcceptanceTaskMessage,
   buildAppointmentWriteReminderMessage,
   buildGovernanceAdvanceMessage,
+  buildNominationAlreadyDoneMessage,
   flowCompletionIssue,
   governanceAcceptanceAdvanceNote,
   governanceAcceptanceBlockedNote,
@@ -116,6 +117,7 @@ import {
   governanceAppointmentWriteNote,
   governanceFlowPath,
   governanceFlowStatePath,
+  governanceNominationAlreadyDoneNote,
   governanceNominationFollowUpNote,
   type GovernanceAdvanceResult,
   type GovernanceNextStepContext,
@@ -1468,7 +1470,13 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         const afterwards = ledger.entries.slice(index + 1);
         if (
           afterwards.some(
-            (entry) => entry.kind === "dispatch.accepted" && entry.flowId === flowId && entry.targetRoleId === "convener",
+            (entry) =>
+              entry.kind === "dispatch.accepted" &&
+              entry.flowId === flowId &&
+              entry.targetRoleId === "convener" &&
+              // 2026-10-20：Lead→Steward 协调消息也记 dispatch.accepted（power:"liaison"），
+              // 但它不是步骤派发——不得据此跳过 appointment → Convener 的补齐推进。
+              entry.power !== "liaison",
           )
         ) {
           continue; // 既有 appointment 链路已派过 Convener（含重启前）
@@ -1489,7 +1497,11 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           nextFunction: "schedule",
           roleId: "convener",
         };
-        const message = buildGovernanceAdvanceMessage(payload, targets);
+        // 2026-10-20 真机：YAML 已存在时派给 Convener 的必须是「用 flow_get / flow_step_update /
+        // flow_step_supersede 推进」，不是「请先写流程状态 YAML」——否则它照旧去写文件、不调 flow 工具。
+        const message = buildGovernanceAdvanceMessage(payload, targets, {
+          flowStateExists: existsSync(path.join(projectRoot, governanceFlowStatePath(flowId))),
+        });
         if (message === null) continue;
         // **先占位，再跨 await**（2026-10-19 全仓回归：原链路与新检查在引擎解析 await 窗口内互相
         // 看不到对方的登记，各派一次）。占位后任何失败都释放，允许下一次真实事件重试。
@@ -2183,7 +2195,13 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       }
       const listingFresh = await manager.refreshListingNow(projectRoot);
       if (!listingFresh) diagnostic.record("advance.listing-refresh.failed", { projectRoot });
-      const message = buildGovernanceAdvanceMessage(payload, context.targetRoleIds);
+      const message = buildGovernanceAdvanceMessage(payload, context.targetRoleIds, {
+        // 2026-10-20 真机：流程状态 YAML 已存在 ⇒ Convener 任务改用 flow 工具推进（不直接写 YAML）。
+        flowStateExists:
+          typeof payload.flowId === "string" &&
+          payload.flowId !== "" &&
+          existsSync(path.join(projectRoot, governanceFlowStatePath(payload.flowId))),
+      });
       if (message === null) return fail("缺少流程信息（flowId/任命名单），未自动派发");
       // —— 2026-10-18 真机修正：任命后先确认目标角色**真的写出来了** ——
       // 账本已有 appointment 决定、但目标角色不在刷新后的 listing（角色卡/边界未写）时，直接派 Convener
@@ -2325,6 +2343,23 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           return chainFail(
             `流程状态 YAML ${flowStatePath} 不可读：${flowWait.last.message}；未派发提名任务`,
           );
+        }
+        // 2026-10-20 真机（flow 工具已注册但 Steward 没调用）：若流程状态 YAML 的**提名步骤已是 done**，
+        // **不再重复派 Nominator**（那只会重复劳动）；改为让 Steward / 统筹 继续下一步。两段式契约不破坏：
+        // 第一段已投、第二段在这里有据可查地收口。
+        if (flowWait.last.nominationDone === true) {
+          diagnostic.record("advance.nomination.already-done", { flowId });
+          const continueMessage = buildNominationAlreadyDoneMessage(flowId);
+          const continued = await dispatchTo("convener", continueMessage);
+          if (!continued.ok) return chainFail(continued.error);
+          note(governanceNominationAlreadyDoneNote());
+          return {
+            ok: true,
+            dispatched: true,
+            targetRoleId,
+            followUpRoleId: "convener",
+            ...(continued.queued === true ? { queued: true } : {}),
+          };
         }
         const nominationPayload: GovernanceNextStepPayload = {
           version: 1,

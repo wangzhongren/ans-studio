@@ -12,9 +12,10 @@
 //     与账本对账（只过滤目标 stepId 的 issue）；
 //   · **原子写**：复用 `common/shared/atomic-write.ts`（tmp + fsync + rename）；失败不破坏原文件；
 //   · **幂等**：目标步骤当前 status/evidence 与请求一致 ⇒ `idempotent:true`，不写盘；
-//   · **权限**：Steward/Convener（actorPower="schedule"）可更新全部未终态步骤；其他角色只能更新
-//     owner=自己的步骤，且只允许 `dispatched→delivered`、`dispatched|delivered→failed|blocked`；
-//     `pending→dispatched`、`delivered→done`、supersede 仅 Steward。
+//   · **权限**：工作流管理者 = Steward/Convener（actorPower="schedule"）或 Lead/Liaison
+//     （actorPower="liaison"，2026-10-20 客户拍板「把主理 Lead 设为工作流管理者」）——可更新全部未终态步骤；
+//     其他角色只能更新 owner=自己的步骤，且只允许 `dispatched→delivered`、
+//     `dispatched|delivered→failed|blocked`；`pending→dispatched`、`delivered→done`、supersede 仅管理者。
 //
 // 本模块不 import 适配器/运行时核心；只读 `flow-state.ts` 与账本，写 YAML 经共享原子写原语。
 
@@ -86,7 +87,7 @@ export interface FlowService {
 export interface CreateFlowServiceOptions {
   projectRoot: string;
   actorRoleId: string;
-  /** `schedule`（Steward/Convener）或 `proposal`/`nomination`/`verification`/`liaison`/`project`。 */
+  /** `schedule`（Steward/Convener）、`liaison`（Lead/工作流管理者）或 `proposal`/`nomination`/`verification`/`project`。 */
   actorPower: string;
   /** `get` 缺省 flowId（通常为会话当前 flow）。 */
   defaultFlowId?: string;
@@ -115,11 +116,15 @@ function flowAbsPath(projectRoot: string, flowId: string): string {
   return path.join(projectRoot, ...flowStatePath(flowId).split("/"));
 }
 
+function isManagerPower(power: string): boolean {
+  return power === "schedule" || power === "liaison";
+}
+
 function viewOf(flow: FlowState, revision: string, actorRoleId: string, actorPower: string): FlowToolView {
-  const isSteward = actorPower === "schedule";
+  const isManager = isManagerPower(actorPower);
   const canUpdate = flow.steps
     .filter((step) => !TERMINAL_STATUSES.has(step.status))
-    .filter((step) => isSteward || step.owner === actorRoleId)
+    .filter((step) => isManager || step.owner === actorRoleId)
     .map((step) => step.id);
   return {
     flowId: flow.flowId,
@@ -167,23 +172,23 @@ function sameEvidence(left: FlowStateStep["evidence"], right: FlowToolEvidence |
 }
 
 /**
- * 合法状态迁移（Steward/owner 共用；owner 另有额外限制在调用处）：
- *   pending → dispatched（仅 Steward）
+ * 合法状态迁移（管理者/owner 共用；owner 另有额外限制在调用处）：
+ *   pending → dispatched（仅管理者）
  *   dispatched → delivered | failed | blocked
- *   delivered → done（仅 Steward） | failed | blocked
- *   failed | blocked | aborted → dispatched（仅 Steward：重派）
+ *   delivered → done（仅管理者） | failed | blocked
+ *   failed | blocked | aborted → dispatched（仅管理者：重派）
  * `superseded` 只能走 `supersede`，不能经 update 设置。
  */
-function isTransitionAllowed(from: FlowToolStatus, to: FlowToolStatus, isSteward: boolean): boolean {
+function isTransitionAllowed(from: FlowToolStatus, to: FlowToolStatus, isManager: boolean): boolean {
   if (to === "superseded") return false;
-  if (from === "pending") return isSteward && to === "dispatched";
+  if (from === "pending") return isManager && to === "dispatched";
   if (from === "dispatched") return to === "delivered" || to === "failed" || to === "blocked";
   if (from === "delivered") {
-    if (to === "done") return isSteward;
+    if (to === "done") return isManager;
     return to === "failed" || to === "blocked";
   }
   if (from === "failed" || from === "blocked" || from === "aborted") {
-    return isSteward && to === "dispatched";
+    return isManager && to === "dispatched";
   }
   return false;
 }
@@ -337,10 +342,10 @@ export function createFlowService(options: CreateFlowServiceOptions): FlowServic
           return { ok: false, code: "step-not-found", revision, flow: flowView, error: `流程中没有步骤 ${input.stepId}。` };
         }
         const step = flow.steps[index]!;
-        const isSteward = actorPower === "schedule";
+        const isManager = isManagerPower(actorPower);
 
-        // 权限：Steward 全部；其他仅 owner=自己。
-        if (!isSteward && step.owner !== actorRoleId) {
+        // 权限：管理者全部；其他仅 owner=自己。
+        if (!isManager && step.owner !== actorRoleId) {
           return { ok: false, code: "forbidden", revision, flow: flowView, error: `步骤 ${step.id} 的 owner 是 ${step.owner}，当前角色 ${actorRoleId} 无权更新。` };
         }
         if (input.status === "superseded") {
@@ -359,13 +364,13 @@ export function createFlowService(options: CreateFlowServiceOptions): FlowServic
         }
 
         // 状态变化时校验迁移；仅 evidence 变化（status 不变）允许（非终态）。
-        if (step.status !== input.status && !isTransitionAllowed(step.status, input.status, isSteward)) {
+        if (step.status !== input.status && !isTransitionAllowed(step.status, input.status, isManager)) {
           return {
             ok: false,
             code: "invalid-transition",
             revision,
             flow: flowView,
-            error: `不允许从 ${step.status} 迁移到 ${input.status}（${isSteward ? "Steward" : `owner ${actorRoleId}`}）。`,
+            error: `不允许从 ${step.status} 迁移到 ${input.status}（${isManager ? "Steward/Lead" : `owner ${actorRoleId}`}）。`,
           };
         }
 
@@ -453,8 +458,8 @@ export function createFlowService(options: CreateFlowServiceOptions): FlowServic
       const resolved = resolveFlowId(input.flowId);
       if (!resolved.ok) return resolved.result;
       const flowId = resolved.flowId;
-      if (actorPower !== "schedule") {
-        return { ok: false, code: "forbidden", error: "只有 Steward/Convener（schedule）可以 supersede 步骤。" };
+      if (!isManagerPower(actorPower)) {
+        return { ok: false, code: "forbidden", error: "只有 Steward/Lead（工作流管理者）可以 supersede 步骤。" };
       }
       if (typeof input.oldStepId !== "string" || !FLOW_ID_RE.test(input.oldStepId)) {
         return { ok: false, code: "missing-step-id", error: "缺少合法 oldStepId。" };

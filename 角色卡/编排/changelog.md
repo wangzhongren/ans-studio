@@ -1231,3 +1231,14 @@
 - 错误码按运行时/角色卡统一：`revision-conflict`、`insufficient-evidence`；其余 `forbidden`/`invalid-transition`/`invalid-flow`/`step-not-found`/`step-exists`/`invalid-supersede`/`ledger-unavailable` 不变。
 
 **测试**：`flow-service.test.ts` **11/11**；`governance-judge.test.ts` **64/64**（+1 注入断言）；`governance-session.test.ts` **27/27**（+1 项目角色 artifact 观察/对账）；`test/编排/**` **691 计 691 过 0 红 0 skipped**；`npm run typecheck` **exit 0**（全仓）。详见[变更记录](docs/change/2026-10-20_change_flow-service.md)。
+
+## 2026-10-20 — Lead（Liaison）设为工作流管理者
+
+**来源**：客户拍板「按这个做吧」——把主理 Lead 设为工作流管理者，可和所有职能角色沟通。本批未改 `app/**`、`src/provider/**`、门禁卡；未 git 提交。
+
+**改了什么**
+- `governance-gate.ts`：`GovernanceGateAction` 增加 `coordinate`；新增 `evaluateCoordinateGate`——仅 Liaison→Convener，`flowId` 必填、`stepId` 可选；不要求提案接受/任命/流程步骤/未派发去重；其他来源/目标 `forbidden`、缺 flowId `missing-flow-id`。`dispatch` 五条零放宽。
+- `run-role.ts`：新增导出 `governanceDispatchActionFor(roleId,targetRoleId)`——Liaison→Convener 选 `coordinate`，其余 `dispatch`；`dispatchTask` 能力注入不变（门禁引擎已给 Liaison 打开）；`flowGet`/`flowStepUpdate`/`flowStepSupersede` 注入不变。
+- `flow-service.ts`：管理者判定扩为 `schedule`（Steward/Convener）或 `liaison`（Lead）；Lead 的 `canUpdate`=全部未终态，可 update/supersede；证据/revision/串行/原子写校验不变；错误文案「Steward/Lead」。
+
+**测试**：governance-gate 新增 coordinate 正反例；governance-judge 新增 action 选择 + Liaison 端到端 coordinate/dispatch；flow-service 新增 Lead manager；liaison-session 能力矩阵更新；`test/编排/**` **695 计 695 过 0 红 0 skipped**；`npm run typecheck` **exit 0**（全仓）。详见[变更记录](docs/change/2026-10-20_change_lead-workflow-manager.md)。

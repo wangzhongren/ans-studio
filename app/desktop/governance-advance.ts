@@ -656,6 +656,16 @@ export function deriveGovernanceNextStep(
   return payload;
 }
 
+/** `buildGovernanceAdvanceMessage` 的可选事实输入（调用方传入；缺省 ⇒ 旧文案逐字不变）。 */
+export interface BuildGovernanceAdvanceMessageOptions {
+  /**
+   * 流程状态 YAML 是否**已存在**（调用方 `existsSync(projectRoot/docs/flows/<flowId>.yaml)` 的读数）。
+   * `false`/缺省 ⇒ 初始创建路径（旧文案：请先写流程状态 YAML）；`true` ⇒ 改走 flow 工具推进，
+   * **不再让 Convener 直接 write_file 流程 YAML**（2026-10-20 真机：flow 工具已注册但 Steward 未被要求使用）。
+   */
+  flowStateExists?: boolean;
+}
+
 /**
  * 生成**唯一一条**后台派发任务消息。
  * 返回 null = 信息不足（无 flowId、appointment 无任命名单）——调用方应如实报失败，不猜测、不裸发。
@@ -663,14 +673,24 @@ export function deriveGovernanceNextStep(
  * 2026-10-19 客户决定「这些全部改成yaml。」：所有指向**机器状态**的路径/要求一律用
  * `docs/flows/<flowId>.yaml`（`governanceFlowStatePath`）；同名 `.md` 只作为可选人读视图，
  * **不得承载门禁状态**。文案语义（谁做什么、不越权）不变，只把流程状态载体从 Markdown 表改为 YAML。
+ *
+ * 2026-10-20 真机（flow 工具已注册但 Steward 没调用）：`options.flowStateExists === true` 时，proposal
+ * accept / appointment 的 Convener 任务改为「用 flow_get 读当前 revision，再用 flow_step_update /
+ * flow_step_supersede 推进步骤；不要直接 write_file 流程 YAML」；YAML 不存在时保留初始创建文案。
  */
 export function buildGovernanceAdvanceMessage(
   payload: GovernanceNextStepPayload,
   targetRoleIds?: readonly string[],
+  options?: BuildGovernanceAdvanceMessageOptions,
 ): string | null {
   if (!nonEmptyString(payload.flowId)) return null;
   const flowId = payload.flowId;
   const flowStatePath = governanceFlowStatePath(flowId);
+  const flowStateExists = options?.flowStateExists === true;
+  /** YAML 已存在时的统一推进指引（flow 工具；不直接写文件、不谎称已派发）。 */
+  const flowToolInstruction = (stepNoun: string): string =>
+    `流程状态 YAML 已存在（${flowStatePath}）；请用 flow_get 读取当前 revision，再用 flow_step_update / ` +
+    `flow_step_supersede 推进${stepNoun}；不要直接 write_file 流程 YAML；不要把步骤说成已派发。`;
   if (payload.cardKind === "proposal" && payload.nextFunction === "nomination" && payload.roleId === "nominator") {
     const proposalPath = payload.proposalPath ?? `docs/proposals/${flowId}-v1.md`;
     return (
@@ -684,8 +704,11 @@ export function buildGovernanceAdvanceMessage(
     payload.roleId === "convener" &&
     payload.followUp === "nomination-after-flow"
   ) {
-    // accept 两段式第一段：先写流程状态 YAML；Nominator 由应用在 YAML 落盘且可解析后派发。
     const proposalPath = payload.proposalPath ?? `docs/proposals/${flowId}-v1.md`;
+    if (flowStateExists) {
+      return `流程 ${flowId}：客户已接受提案 ${proposalPath}。${flowToolInstruction("步骤")}`;
+    }
+    // accept 两段式第一段：先写流程状态 YAML；Nominator 由应用在 YAML 落盘且可解析后派发。
     return (
       `流程 ${flowId}：客户已接受提案 ${proposalPath}。` +
       `请先写流程状态 YAML ${flowStatePath}（唯一机器状态，字段/枚举按门禁卡的流程 YAML schema；` +
@@ -694,6 +717,12 @@ export function buildGovernanceAdvanceMessage(
     );
   }
   if (payload.cardKind === "proposal" && payload.nextFunction === "schedule" && payload.roleId === "convener") {
+    if (flowStateExists) {
+      return (
+        `流程 ${flowId}：客户已接受提案（快捷路径）。${flowToolInstruction("步骤")}` +
+        `涉及新建/改边界仍须任命卡与写盘确认。`
+      );
+    }
     return (
       `流程 ${flowId}：客户已接受提案（快捷路径）。` +
       `请写流程状态 YAML ${flowStatePath} 并排步骤（无提名；同名 .md 仅可选人读视图，不得承载门禁状态）；` +
@@ -703,9 +732,26 @@ export function buildGovernanceAdvanceMessage(
   if (payload.cardKind === "appointment" && payload.nextFunction === "schedule" && payload.roleId === "convener") {
     const ids = (targetRoleIds ?? []).filter((id): id is string => nonEmptyString(id));
     if (ids.length === 0) return null; // 任命名单缺失：不猜、不裸发。
+    if (flowStateExists) {
+      return `流程 ${flowId}：客户已完成任命 ${ids.join("、")}。${flowToolInstruction("已批准步骤")}`;
+    }
     return `流程 ${flowId}：客户已完成任命 ${ids.join("、")}。请写流程状态 YAML ${flowStatePath} 并派发已批准步骤。`;
   }
   return null;
+}
+
+/** accept 两段式第二段的「提名已完成」续推任务（2026-10-20：不重复派 Nominator，让 Steward 继续）。 */
+export function buildNominationAlreadyDoneMessage(flowId: string): string {
+  const flowStatePath = governanceFlowStatePath(flowId);
+  return (
+    `流程 ${flowId}：提名已完成（流程状态 YAML ${flowStatePath} 的 nomination 步骤已是 done），应用未重复派发提名任务。` +
+    `请用 flow_get 读取当前 revision，再用 flow_step_update / flow_step_supersede 推进后续步骤；不要直接 write_file 流程 YAML；不要把步骤说成已派发。`
+  );
+}
+
+/** 「提名已完成、未重复派发」的系统行。 */
+export function governanceNominationAlreadyDoneNote(): string {
+  return "提名已完成，未重复派发；已请 Steward / 统筹 继续下一步";
 }
 
 /** 成功派发的系统行文案（客户给定首例；其余按同一句式如实说明职能）。 */

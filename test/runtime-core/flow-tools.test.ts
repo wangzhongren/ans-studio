@@ -97,10 +97,19 @@ test("注入后出现三工具；schema 必填/枚举/附加属性正确（裁�
   const supersede = describeTool("flow_step_supersede");
   assert.deepEqual(supersede.parameters.required, ["flowId", "oldStepId", "newStepId", "title", "owner", "kind", "expectedRevision"]);
   assert.equal(supersede.parameters.additionalProperties, false);
-  const supersedeProps = supersede.parameters.properties as Record<string, { enum?: string[] }>;
+  const supersedeProps = supersede.parameters.properties as Record<string, { enum?: string[]; description?: string }>;
   assert.deepEqual(supersedeProps.kind.enum, [...FLOW_TOOL_STEP_KINDS]);
-  for (const need of [/仅 Steward/, /不是删除/, /revision-conflict/]) assert.match(supersede.description, need);
-  assert.match((supersede.promptGuidelines ?? []).join("\n"), /仅 Steward/);
+  // 2026-10-20 编排 flow-service 已允许 Steward（schedule）与 Lead（liaison）——schema 不得再写「仅 Steward」。
+  assert.match(supersede.description, /仅 Steward（流程管理员）或 Lead（Liaison，工作流管理者）可用/);
+  for (const need of [/不是删除/, /revision-conflict/]) assert.match(supersede.description, need);
+  const supersedeGuidelines = (supersede.promptGuidelines ?? []).join("\n");
+  assert.match(supersedeGuidelines, /仅 Steward 或 Lead（工作流管理者）使用/);
+  assert.match(supersedeProps.oldStepId.description ?? "", /Steward \(Convener\) or Lead \(Liaison\)/, "字段说明同步 Steward/Lead 权限");
+  assert.equal(
+    /仅 Steward（流程管理员）可用|仅 Steward 使用|非 Steward 调用/.test([supersede.description, supersedeGuidelines].join("\n")),
+    false,
+    "不得残留「仅 Steward」独占口径",
+  );
 });
 
 test("flow_get：flowId 可选（缺省传 {}、给出原样透传）并转达 ok/revision/flow 视图", async () => {
@@ -150,9 +159,9 @@ test("flow_step_update：完整载荷原样交给注入能力（含 evidence/ide
   }
 });
 
-test("flow_step_supersede：完整载荷原样交给注入能力；Steward-only 由服务端裁决（工具层不拦）", async () => {
+test("flow_step_supersede：完整载荷原样交给注入能力；Steward/Lead 权限由服务端裁决（工具层不拦）", async () => {
   const received: Parameters<FlowStepSupersedeFn>[0][] = [];
-  const fn: FlowStepSupersedeFn = async (input) => { received.push(input); return { ok: false, code: "not-steward", error: "仅 Steward 可替代步骤", issues: ["请由 Steward 发起"] }; };
+  const fn: FlowStepSupersedeFn = async (input) => { received.push(input); return { ok: false, code: "forbidden", error: "只有 Steward/Lead（工作流管理者）可以 supersede 步骤。", issues: ["请由 Steward 或 Lead 发起"] }; };
   const tool = toolMap({ flowStepSupersede: fn }).get(FLOW_STEP_SUPERSEDE_TOOL_NAME)!;
 
   const result = await tool.handler(call(FLOW_STEP_SUPERSEDE_TOOL_NAME, {
@@ -161,9 +170,9 @@ test("flow_step_supersede：完整载荷原样交给注入能力；Steward-only 
   }));
   assert.equal(result.ok, false, "服务端拒绝必须如实转达为 ok:false");
   assert.match(result.message, /ok=false/);
-  assert.match(result.message, /code=not-steward/);
-  assert.match(result.message, /error=仅 Steward 可替代步骤/);
-  assert.match(result.message, /issues=请由 Steward 发起/);
+  assert.match(result.message, /code=forbidden/);
+  assert.match(result.message, /error=只有 Steward\/Lead（工作流管理者）可以 supersede 步骤。/);
+  assert.match(result.message, /issues=请由 Steward 或 Lead 发起/);
   assert.deepEqual(received, [{
     flowId: "flow-a", oldStepId: "s2", newStepId: "s2b", title: "重新派发", owner: "steward", kind: "dispatch",
     expectedRevision: "r2", reason: "负责人变更", idempotencyKey: "k-2",

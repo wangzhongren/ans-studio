@@ -293,6 +293,46 @@ test("owner：只能更新自己的步骤、只能 dispatched→delivered 或 di
   });
 });
 
+test("Lead（liaison）作为工作流管理者：canUpdate 全部未终态，可 update/supersede；证据/revision 校验不变", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, FLOW_REL, flowYaml());
+    const lead = createFlowService({ projectRoot: root, actorRoleId: "liaison", actorPower: "liaison" });
+    const view = await lead.get({ flowId: "flow-a" });
+    assert.equal(view.ok, true);
+    assert.deepEqual(view.flow?.canUpdate, ["impl", "delivery", "contract-freeze", "verification"], "Lead=全部未终态");
+
+    let revision = view.revision!;
+    // Lead 可更新他人 owner 的步骤（管理者）。
+    const delivered = await lead.update({ flowId: "flow-a", stepId: "delivery", status: "delivered", expectedRevision: revision });
+    assert.equal(delivered.ok, true, delivered.error ?? "");
+    revision = delivered.revision!;
+
+    // Lead 可 supersede。
+    const superseded = await lead.supersede({
+      flowId: "flow-a",
+      oldStepId: "impl",
+      newStepId: "impl-2",
+      title: "重做实现",
+      owner: "backend",
+      kind: "dispatch",
+      expectedRevision: revision,
+    });
+    assert.equal(superseded.ok, true, superseded.error ?? "");
+    revision = superseded.revision!;
+
+    // 证据/revision 校验不因管理者身份放宽。
+    const insufficient = await lead.update({
+      flowId: "flow-a",
+      stepId: "contract-freeze",
+      status: "done",
+      evidence: { kind: "artifact", ref: "docs/x.md" },
+      expectedRevision: revision,
+    });
+    assert.equal(insufficient.ok, false);
+    assert.equal(insufficient.code, "insufficient-evidence");
+  });
+});
+
 test("非法迁移：pending→done / dispatched→done / superseded 经 update 设置", async () => {
   await withRoot(async (root) => {
     writeFile(root, FLOW_REL, flowYaml());

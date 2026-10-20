@@ -1,5 +1,13 @@
 # 运行时核心变更记录
 
+## 2026-10-20 `flow_step_supersede` 权限文案同步「Steward 或 Lead」（已实施待验证）
+
+装配核对发现编排 `flow-service.ts` 的工作流管理者已含 `schedule`（Steward/Convener）与 `liaison`（Lead），但 schema 仍写「仅 Steward（流程管理员）可用」。已同步纯文案（handler/服务端权限未动）：`src/provider/runtime/schema.ts` 的 `flow_step_supersede` description 改为「**仅 Steward（流程管理员）或 Lead（Liaison，工作流管理者）可用**」、promptGuidelines 改为「**仅 Steward 或 Lead（工作流管理者）使用**」、`oldStepId` 字段说明补「Steward (Convener) or Lead (Liaison) — validated by the server」、块注释同步；`test/runtime-core/flow-tools.test.ts` 断言改为新口径并反向钉住不得残留「仅 Steward」独占表述，服务端拒绝夹具改为 `forbidden`（与 flow-service 现状对齐），仍验证工具层不按角色预拦、原样转达回执。验证：flow 单文件 **11/11**；`node --test "test/runtime-core/**/*.test.ts"` **240 计 / 239 过 / 0 红 / 1 跳过**；`npm run typecheck` **exit 0**。未改 handler/服务端权限/编排文件；未 git 提交。记录见 [docs/change/2026-10-20_change_flow-tools.md](docs/change/2026-10-20_change_flow-tools.md)「2026-10-20 追加」。
+
+## 2026-10-20 `dispatch_task` 文案：主理 Lead 可向 Steward（convener）派发做内部协调（已实施待验证）
+
+客户拍板：主理 Lead（Liaison）成为工作流管理者，可向 Steward/项目角色派发。本角色只改运行时核心 `dispatch_task` schema 文案（未 commit）：①`roleId` 描述改为「通常是项目角色；**调用者为 Lead（Liaison）时 `convener`（Steward）也可作为协调目标**；其余内置治理角色永不可作为目标，不能派给自己」；参数/枚举/必填不变。②`flowId`/`stepId` 描述：治理派发仍须 flowId，**Lead→Steward 协调可省 stepId**（仍带 flowId），旧 su 调用可皆缺。③工具 description/promptGuidelines 补：Lead→Steward 属**内部协调、不是客户批准**；Steward/项目角色仍按自己的边界与门禁执行；任务文本自足、治理派发带 flowId（协调可省 stepId）；明确「不要理解为可向任意内置治理角色派发」。既有「派发 ≠ 授权 / 先落盘再派发 / 按地址引用 / 必读（按序）」逐字保留；handler/注入/门禁未改。测试：`test/runtime-core/tools.test.ts` 既有 dispatch schema 用例新增 12 条文案断言（含反向「不得写成可派发给任意内置角色」）＋参数形状不变，既有断言未放宽。验证：`node --test "test/runtime-core/**/*.test.ts"` **240 计 / 239 过 / 0 红 / 1 跳过**；`npm run typecheck` **exit 0**；只读复跑 `test/pi-adapter/dispatch-task.test.ts` **11/11**。**跨角色待办**：编排/门禁需①把 dispatch_task 注入 Lead 会话；②目标校验放行「Lead→convener」、其余内置角色仍拒；③Lead→Steward 协调可省 stepId。未跑真实模型/凭据/网络；未 git 提交。变更记录见 [docs/change/2026-10-20_change_dispatch-task-lead-steward.md](docs/change/2026-10-20_change_dispatch-task-lead-steward.md)。
+
 ## 2026-10-20 Flow 文件方法化工具层：`flow_get` / `flow_step_update` / `flow_step_supersede`（已实施待验证）
 
 客户拍板「按这个方案做吧」：flow 文件方法化最小闭环，应用是 `docs/flows/<flowId>.yaml` 唯一写者，角色改用三工具推进步骤。本角色只落运行时核心工具层；权限/迁移/证据/revision 冲突/Steward-only 裁决在编排 flow-service。

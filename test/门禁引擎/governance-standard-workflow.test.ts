@@ -366,12 +366,14 @@ test("标准工作流：流程工具——Steward 初始创建例外 + flow_get/
       "既有验收卡规则",
       "步骤推进 ≠ 客户批准",
       "Steward 可更新全部步骤，其他角色只能更新自己的步骤",
+      "`flow_step_supersede`（Steward/Lead 工作流管理者）做返工",
     ],
     "Steward 流程工具纪律",
   );
   // 初始创建仍走既有写卡门；创建后的步骤推进走工具。
   assert.match(steward, /写流程单（仅初始创建）[\s\S]{0,220}schedule-write/, "Steward 初始创建须保留 schedule-write");
   assert.match(steward, /登记完成：先用 `flow_get`[\s\S]{0,160}flow_step_update/, "Steward 登记完成须先 get 再 update");
+  assert.doesNotMatch(steward, /`flow_step_supersede`（仅 Steward）/, "supersede 归 Steward/Lead 工作流管理者，不得再写仅 Steward");
 
   for (const id of ["nominator", "rapporteur", "verifier"] as const) {
     const t = cardTextOf(id);
@@ -385,9 +387,10 @@ test("标准工作流：流程工具——Steward 初始创建例外 + flow_get/
         "`revision-conflict`（版本冲突）",
         "证据不足",
         "insufficient-evidence",
-        "不把步骤标 `done`",
+        "你只能把 owner=自己的步骤更新到 `delivered`",
+        "不要自己标 `done`",
+        "`done` 由 Steward / Lead 核对账本证据后标记",
         "步骤推进不等于客户决定/同意",
-        "你只能更新自己负责的步骤",
       ],
       `${id} 流程工具纪律`,
     );
@@ -396,6 +399,66 @@ test("标准工作流：流程工具——Steward 初始创建例外 + flow_get/
   assert.match(cardTextOf("rapporteur"), /contract-freeze[\s\S]{0,160}flow_step_update/, "Draft 契约冻结后须用工具记录");
   assert.match(cardTextOf("nominator"), /nomination \/ role-readiness[\s\S]{0,160}flow_step_update/, "Crew 角色就绪后须用工具记录");
   assert.match(cardTextOf("verifier"), /不用 `flow_step_update` 代替客户验收决定/, "Proof 不得用工具代替验收决定");
+});
+
+test("标准工作流：Lead 工作流管理者——flow_get/flow_step_update/flow_step_supersede + dispatch_task；Steward 接受 Lead 协调任务；Crew/Draft/Proof 向 Lead 回交", () => {
+  // 客户 2026-10-20 拍板：Lead / 主理 设为工作流管理者，可与所有职能角色沟通/派发协调任务。
+  const lead = cardTextOf("liaison");
+  assertIncludesAll(
+    lead,
+    [
+      "工作流管理者",
+      "flow_get",
+      "flow_step_update",
+      "flow_step_supersede",
+      "dispatch_task",
+      "向 Steward / 统筹 与项目角色派发协调任务",
+      "自足并带 `flowId`",
+      "向 Steward 派协调任务可省 `stepId`",
+      "派发/推进 ≠ 客户批准",
+      "不得伪造 `done` 证据",
+      "不得直接写 `docs/flows/**`",
+      "`revision-conflict`（版本冲突）",
+      "`insufficient-evidence`",
+    ],
+    "Lead 工作流管理",
+  );
+  // 能力位：dispatchTask=true；其余能力不变。
+  const leadCaps = governanceRoleOf("liaison")!.capabilities;
+  assert.equal(leadCaps.dispatchTask, true, "Lead 具备 dispatch_task");
+  assert.equal(leadCaps.handOffIntent, true, "Lead 仍保留 hand_off_intent");
+  assert.equal(leadCaps.roleStatus, false, "Lead 不获得看护能力");
+  assert.equal(leadCaps.installSkill, false, "Lead 不获得技能安装能力");
+  // Steward：承认 Lead 工作流管理者身份；收到 Lead 任务不跳过证据/门禁。
+  const steward = cardTextOf("convener");
+  assertIncludesAll(
+    steward,
+    [
+      "Lead / 主理 也是工作流管理者",
+      "不因来源是 Lead 就跳过证据/门禁",
+      "你仍是流程/排程执行者",
+    ],
+    "Steward 接受 Lead 协调",
+  );
+  // Crew/Draft/Proof：可向 Lead 回交/协调；不得直接写 docs/flows；步骤更新仍按工具与证据。
+  for (const id of ["nominator", "rapporteur", "verifier"] as const) {
+    assertIncludesAll(
+      cardTextOf(id),
+      [
+        "可向 Lead / 主理 回交/协调",
+        "不得直接写 `docs/flows/**`",
+        "flow_step_update",
+        "证据不足",
+      ],
+      `${id} 向 Lead 回交`,
+    );
+    // 非管理者不得自己标 done：delivered 由 owner，done 由 Steward/Lead。
+    assert.doesNotMatch(
+      cardTextOf(id),
+      /记录 `delivered` \/ `done`/,
+      `${id} 不得写「记录 delivered / done」式越权指令`,
+    );
+  }
 });
 
 test("标准工作流：Proof / 验收——标准复核（真实跑测试/真实启动/演示/逐条核对）→验收卡；不依赖客户催办", () => {

@@ -8,6 +8,10 @@
 //      `targetRoleIds` 必须含目标角色；否则拒（「请先取得客户任命」）。
 //   3. 派发范围门：`dispatch` —— 目标不是内置治理角色、提案已接受、目标在任命名单内**或**快捷路径
 //      复用既有项目角色、`flowId`/`stepId` 必填且流程文件存在对应步骤、同一 `flowId+stepId` 未派发过。
+//   4. 协调消息门：`coordinate`（2026-10-20 客户拍板「把主理 Lead 设为工作流管理者，可和所有职能角色
+//      沟通」）——仅 Liaison（Lead）→ Convener（Steward）；`flowId` 必填、`stepId` 可选；
+//      **不是**项目步骤派发，不要求提案接受/任命名单/流程步骤存在/未派发去重。
+//      `dispatch`（Convener → 项目角色）逐字不变。
 //
 // **fail-closed**（评审 §6.2/§九-16）：
 //   · 账本快照 `errors` 非空 → 拒一切门禁动作，文案提示检查 `.ans/governance/ledger.jsonl`；
@@ -30,8 +34,8 @@ import type {
   GovernanceLedgerSnapshot,
 } from "./governance-ledger.ts";
 
-/** 门禁动作（评审 §6.2 逐字）。 */
-export type GovernanceGateAction = "write-flow" | "write-nomination" | "write-role-card" | "dispatch";
+/** 门禁动作（评审 §6.2 + 2026-10-20 `coordinate`）。 */
+export type GovernanceGateAction = "write-flow" | "write-nomination" | "write-role-card" | "dispatch" | "coordinate";
 
 /** 门禁输入（评审 §6.2 逐字形状）。 */
 export interface GovernanceGateInput {
@@ -78,6 +82,9 @@ const ACTION_ROLE: Record<GovernanceGateAction, string> = {
   "write-nomination": "nominator",
   "write-role-card": "nominator",
   dispatch: "convener",
+  // coordinate 在 switch 内由 `evaluateCoordinateGate` 自己判角色/目标（错误码要 `forbidden`，
+  // 不是通用 `wrong-role`）；此值只用于满足 Record 形状。
+  coordinate: "liaison",
 };
 
 /**
@@ -98,7 +105,8 @@ export function evaluateGovernanceGate(
   }
 
   const expectedRole = ACTION_ROLE[input.action];
-  if (input.roleId !== expectedRole) {
+  // coordinate 由自己的门判定来源/目标（要求 `forbidden` 而非通用 `wrong-role`）。
+  if (input.action !== "coordinate" && input.roleId !== expectedRole) {
     return deny(
       "wrong-role",
       `治理门禁：动作 ${input.action} 只能由 ${expectedRole} 发起（当前角色 ${input.roleId}）。`,
@@ -113,7 +121,31 @@ export function evaluateGovernanceGate(
       return evaluateRoleCardGate(input, snapshot);
     case "dispatch":
       return evaluateDispatchGate(input, snapshot);
+    case "coordinate":
+      return evaluateCoordinateGate(input);
   }
+}
+
+/**
+ * 协调消息门（2026-10-20 客户拍板）：Lead（Liaison）可以给 Steward（Convener）发协调消息。
+ *
+ * **不是项目步骤派发**：不要求提案已接受、目标在任命名单、流程步骤存在、`flowId+stepId` 未派发；
+ * 只校验来源/目标/flowId（stepId 可选，给出时必须是 slug）。`dispatch` 门逐字不变。
+ */
+export function evaluateCoordinateGate(input: GovernanceGateInput): GovernanceGateDecision {
+  if (input.roleId !== "liaison") {
+    return deny("forbidden", "治理门禁：协调消息（coordinate）只能由主理 Lead 发起。");
+  }
+  if (input.targetRoleId !== "convener") {
+    return deny("forbidden", "治理门禁：Lead 的协调消息目标只能是 Steward/Convener。");
+  }
+  if (!isSlug(input.flowId)) {
+    return deny("missing-flow-id", "治理门禁：协调消息必须带合法 flowId（`^[a-z0-9][a-z0-9-]{1,63}$`）。");
+  }
+  if (input.stepId !== undefined && !isSlug(input.stepId)) {
+    return deny("missing-step-id", "治理门禁：协调消息给出 stepId 时必须是合法 slug（`^[a-z0-9][a-z0-9-]{1,63}$`）。");
+  }
+  return { allowed: true };
 }
 
 /**

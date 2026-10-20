@@ -132,7 +132,7 @@ export const FLOW_GET_TOOL_NAME = "flow_get";
 /** flow_step_update 工具名（2026-10-20；推进单个步骤状态——迁移/权限/证据裁决在编排 flow-service）。 */
 export const FLOW_STEP_UPDATE_TOOL_NAME = "flow_step_update";
 
-/** flow_step_supersede 工具名（2026-10-20；新步骤取代旧步骤，仅 Steward——服务端校验）。 */
+/** flow_step_supersede 工具名（2026-10-20；新步骤取代旧步骤，Steward/Lead（工作流管理者）——服务端校验）。 */
 export const FLOW_STEP_SUPERSEDE_TOOL_NAME = "flow_step_supersede";
 
 /** 扩展层对 run_shell 的能力级判定结果：非 undefined 即阻断（默认拒绝）。 */
@@ -2019,7 +2019,7 @@ function makeUninstallMcpTool(fn: UninstallMcpFn, currentTurnId?: () => string |
 // —————————————— Flow 文件方法化（2026-10-20 客户拍板；最小闭环） ——————————————
 //
 // 三工具只做两件事：**参数形状校验**（非法在触达能力前拒绝，不猜测、不静默丢弃）＋**调用注入能力
-// 并如实转达回执**。权限/状态迁移合法性/证据完整性/revision 冲突/Steward-only 等**一律由编排
+// 并如实转达回执**。权限/状态迁移合法性/证据完整性/revision 冲突/Steward/Lead 权限等**一律由编排
 // flow-service 裁决**——本层不读写 flow 文件、不写账本、不做第二份裁决。
 // 未注入对应能力 ⇒ 工具不注册（沿 dispatch_task 先例，能力缺席＝最强 fail-closed）。
 //
@@ -2215,7 +2215,7 @@ function makeFlowStepUpdateTool(fn: FlowStepUpdateFn): ExecutableTool {
   };
 }
 
-/** flow_step_supersede：新步骤取代旧步骤（仅 Steward——服务端按调用角色校验）。 */
+/** flow_step_supersede：新步骤取代旧步骤（Steward/Lead——服务端按调用角色校验）。 */
 function makeFlowStepSupersedeTool(fn: FlowStepSupersedeFn): ExecutableTool {
   const name = FLOW_STEP_SUPERSEDE_TOOL_NAME;
   return {
@@ -2380,7 +2380,7 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
     tools.push(makeUninstallMcpTool(uninstallMcp, options?.currentTurnId, { roleId: options?.roleId, runtime: options?.runtime }));
   }
   // 结构性保证（2026-10-20 flow 文件方法化，同 dispatch_task 先例）：**未注入对应能力时三工具不存在**。
-  // 三能力各自独立「注入才注册」；权限/迁移/证据/revision 冲突/Steward-only 裁决在编排 flow-service，
+  // 三能力各自独立「注入才注册」；权限/迁移/证据/revision 冲突/Steward/Lead 权限裁决在编排 flow-service，
   // 本层只做参数形状校验并如实转达回执（不做第二份裁决）。
   const flowGet = options?.flowGet;
   if (flowGet !== undefined) tools.push(makeFlowGetTool(flowGet));

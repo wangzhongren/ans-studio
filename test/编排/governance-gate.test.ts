@@ -280,6 +280,37 @@ test("dispatch：流程文件/步骤缺失拒；同一 flowId+stepId 重复派�
   });
 });
 
+test("coordinate：仅 Liaison→Convener；flowId 必填、stepId 可选；不要求提案/任命/流程步骤/去重", () => {
+  withRoot((root) => {
+    const coordinate = (over: Partial<GovernanceGateInput> = {}): GovernanceGateInput =>
+      input({
+        projectRoot: root,
+        action: "coordinate",
+        roleId: "liaison",
+        targetRoleId: "convener",
+        flowId: "flow-a",
+        ...over,
+      });
+
+    // 空账本 + 没有流程文件/步骤 ⇒ 仍允许（协调消息不是项目步骤派发）。
+    assert.deepEqual(evaluateGovernanceGate(coordinate(), snapshot([])), { allowed: true });
+    assert.deepEqual(evaluateGovernanceGate(coordinate({ stepId: "delivery-backend" }), snapshot([])), { allowed: true });
+
+    assert.equal(blocked(evaluateGovernanceGate(coordinate({ flowId: undefined }), snapshot([]))), "missing-flow-id");
+    assert.equal(blocked(evaluateGovernanceGate(coordinate({ stepId: "Bad_ID" }), snapshot([]))), "missing-step-id");
+    assert.equal(blocked(evaluateGovernanceGate(coordinate({ roleId: "convener" }), snapshot([]))), "forbidden");
+    assert.equal(blocked(evaluateGovernanceGate(coordinate({ roleId: "backend" }), snapshot([]))), "forbidden");
+    assert.equal(blocked(evaluateGovernanceGate(coordinate({ targetRoleId: "backend" }), snapshot([]))), "forbidden");
+    assert.equal(blocked(evaluateGovernanceGate(coordinate(), snapshot([], ["坏行"]))), "ledger-corrupt");
+
+    // 既有 dispatch 零放宽：空账本 Convener→项目角色仍 proposal-not-accepted。
+    assert.equal(
+      blocked(evaluateGovernanceGate(input({ projectRoot: root, action: "dispatch", roleId: "convener", stepId: "impl", targetRoleId: "A" }), snapshot([]))),
+      "proposal-not-accepted",
+    );
+  });
+});
+
 // —————————————————————— ④ fail-closed / 旧模型 ——————————————————————
 
 test("账本快照 errors 非空 → 一切门禁动作 fail-closed（文案指向 ledger.jsonl）", () => {

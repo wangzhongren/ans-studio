@@ -31,6 +31,11 @@ events:
   `oldStepId` / `newStepId` / `title` / `owner` / `kind` / `expectedRevision` / `reason?` /
   `idempotencyKey?`。
 
+**权限口径（2026-10-20 装配核对修正）**：`flow-service.ts::isTransitionAllowed` 对非管理者只允许
+`dispatched→delivered`、`dispatched|delivered→failed|blocked`；`delivered→done` 仅 Steward / Lead
+（管理者）。因此项目角色/步骤 owner 只能把 owner=自己的步骤更新到 `delivered`（或 `failed` /
+`blocked`），**不要自己标 `done`**；`done` 由 Steward / Lead 核对账本证据后标记，证据不足不标 done。
+
 本批只在**门禁引擎**边界内更新角色卡文本（不改判定逻辑，不实现工具）。
 
 ## 2. 卡文本变更（`src/common/门禁引擎/governance-roles.ts`）
@@ -61,26 +66,29 @@ events:
 - 标准工作流第 1 步改为用 `flow_get` 读取流程摘要与自己负责的步骤（YAML 仍是唯一机器状态，
   `.md` 仅人读视图）。
 - 第 5 步角色就绪后：若自己负责的步骤（如 nomination / role-readiness）已有账本证据，用
-  `flow_get` 读取最新 revision 后用 `flow_step_update` 记录 `delivered` / `done`；证据不足不标 `done`。
+  `flow_get` 读取最新 revision 后用 `flow_step_update` 记录 `delivered`；`done` 由 Steward / Lead
+  核对账本证据后标记；证据不足（`insufficient-evidence`）不标 `done`。
 - 新增「流程工具纪律」：用 `flow_get` 读取流程与自己负责的步骤；**不得直接写 `docs/flows/**`**；
-  你只能更新自己负责的步骤：交付/回交后按账本证据用 `flow_step_update` 记录状态；证据不足
-  （`insufficient-evidence`）如实报告、不标 `done`；`expectedRevision` 来自最近一次 `flow_get`
-  （或更新回执）的 revision，`revision-conflict` 重读后改、不盲目重试；保留 id
+  你只能把 owner=自己的步骤更新到 `delivered`（或 `failed` / `blocked`）；**不要自己标 `done`**；
+  交付/回交后按账本证据用 `flow_step_update` 记录 `delivered`，`done` 由 Steward / Lead 核对账本
+  证据后标记；证据不足（`insufficient-evidence`）如实报告、不标 `done`；`expectedRevision` 来自
+  最近一次 `flow_get`（或更新回执）的 revision，`revision-conflict` 重读后改、不盲目重试；保留 id
   `verification` / `acceptance` 仍按既有验收卡流程；步骤推进不等于客户决定/同意。
 
 ### Draft / 提案（`rapporteur`）
 
 - 标准工作流第 4 步契约冻结后：若 contract-freeze 步骤归自己，按账本 `artifact.observed` 证据用
-  `flow_step_update` 记录 `done`。
-- 新增同款「流程工具纪律」段（flow_get / 不得直接写 docs/flows / 只能更新自己的步骤并用
-  flow_step_update / 证据不足（`insufficient-evidence`）不标 done / expectedRevision / 
-  `revision-conflict` / 保留 id）。
+  `flow_step_update` 记录 `delivered`；`done` 由 Steward / Lead 核对账本证据后标记。
+- 新增同款「流程工具纪律」段（flow_get / 不得直接写 docs/flows / 只能把 owner=自己的步骤更新到
+  delivered（或 failed/blocked）、不要自己标 done / done 由 Steward/Lead 核对账本证据后标记 /
+  证据不足（`insufficient-evidence`）不标 done / expectedRevision / `revision-conflict` / 保留 id）。
 
 ### Proof / 验收（`verifier`）
 
 - 标准工作流第 1 步改为用 `flow_get` 读取流程摘要与自己负责的步骤，再读提案/契约/交付证据。
-- 新增同款「流程工具纪律」段，并明确「保留 id `verification` / `acceptance` 仍按既有验收卡流程，
-  不用 `flow_step_update` 代替客户验收决定」。
+- 新增同款「流程工具纪律」段（只能把 owner=自己的步骤更新到 delivered（或 failed/blocked）、
+  不要自己标 done；done 由 Steward/Lead 核对账本证据后标记），并明确「保留 id
+  `verification` / `acceptance` 仍按既有验收卡流程，不用 `flow_step_update` 代替客户验收决定」。
 
 ### Lead / 主理（`liaison`）
 

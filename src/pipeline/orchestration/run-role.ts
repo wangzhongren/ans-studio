@@ -913,12 +913,15 @@ export async function openRoleSession(
     cap?.dispatchTask === true && input.dispatchTask !== undefined
       ? isTrio
         ? async (dispatch, metadata) => {
+            // 2026-10-20 客户拍板：Lead 可给 Steward 发协调消息——Liaison→Convener 走 coordinate 门
+            // （不需要提案接受/任命/流程步骤/去重）；其余仍走既有 dispatch 门（Convener→项目角色）。
+            const action = governanceDispatchActionFor(setup.role.id, dispatch.roleId);
             const decision = evaluateGovernanceGate(
               {
                 projectRoot: input.project.projectRoot,
                 model: governanceModel,
                 roleId: setup.role.id,
-                action: "dispatch",
+                action,
                 flowId: dispatch.flowId,
                 stepId: dispatch.stepId,
                 targetRoleId: dispatch.roleId,
@@ -930,9 +933,11 @@ export async function openRoleSession(
                 flowId: dispatch.flowId,
                 stepId: dispatch.stepId,
                 targetRoleId: dispatch.roleId,
+                action,
                 code: decision.code,
               });
-              return { ok: false, message: `派发被治理门禁拒绝：${decision.message}` };
+              const label = action === "coordinate" ? "协调消息" : "派发";
+              return { ok: false, message: `${label}被治理门禁拒绝：${decision.message}` };
             }
             return input.dispatchTask!(dispatch as DispatchTaskPayload, metadata);
           }
@@ -1714,6 +1719,14 @@ function governanceActionForPath(rel: string | undefined): RoutedGovernanceActio
     return { action: "write-role-card", targetRoleId: parts[1] };
   }
   return undefined;
+}
+
+/**
+ * 2026-10-20 客户拍板：Lead（Liaison）可给 Steward（Convener）发协调消息。该 `dispatch_task`
+ * 走 `coordinate` 门（不是项目步骤派发）；其余角色/目标仍走既有 `dispatch` 门，逐字不变。
+ */
+export function governanceDispatchActionFor(roleId: string, targetRoleId: string): GovernanceGateAction {
+  return roleId === "liaison" && targetRoleId === "convener" ? "coordinate" : "dispatch";
 }
 
 /** 治理 flowId 形状（与运行时核心 `GOVERNANCE_SLUG_PATTERN` 同值；本地再判一次，不导入运行时实现）。 */
