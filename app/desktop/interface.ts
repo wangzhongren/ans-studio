@@ -169,6 +169,8 @@ import {
 } from "./runtime-resolution.ts";
 import { getSessionHistory, type SessionHistoryView } from "./runtime-history.ts";
 import type { RuntimeKind } from "../../src/model/runtime.ts";
+// 2026-10-20 僵尸步骤自检：跨运行时检查 owner 是否有队列/在途投递（runtime 的单一来源）。
+import { RUNTIME_KINDS } from "../../src/common/shared/runtime-shared.ts";
 
 export interface RoleView {
   readonly group?: string;
@@ -492,6 +494,12 @@ export interface DesktopDeps {
    */
   runtimeStatePath?: string;
   /**
+   * **投递队列持久化文件**（2026-10-20 客户要求：应用重启后任务自动续跑）：缺省从 `runtimeStatePath`
+   * 同目录派生 `<...>/ans/delivery-queue.json`（仍是 user-data，**不写项目文件、不写 `.env`**）；
+   * 测试可显式注入临时路径。未提供 `runtimeStatePath` 时缺省 ⇒ 不持久化（旧行为）。
+   */
+  deliveryQueueStorePath?: string;
+  /**
    * **引擎解析器（可注入）**：缺省＝本层用 `envFilePath`/`piConfigEnv` 调用真实
    * `resolveProjectRuntime`（活跃会话 → 已选/持久化 → `.ans/sessions` 磁盘证据 → 凭据可用性）。
    * 注入以便单测隔离真实 `.env`；缺省实现绝不回退 "claude"（无凭据 ⇒ 不派发 + 系统行）。
@@ -775,6 +783,13 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   const getPiConfigFn = deps.getPiConfigFn ?? realGetPiConfig;
   const savePiConfigFn = deps.savePiConfigFn ?? realSavePiConfig;
   const envFilePath = deps.envFilePath ?? resolveRepoEnvPath();
+  // 2026-10-20 客户要求（重启后任务自动续跑）：投递队列持久化文件——user-data 下的独立 JSON；
+  // 缺省与引擎选择文件同目录（`<userData>/ans/delivery-queue.json`）；测试可显式注入。
+  const deliveryQueueStorePath =
+    deps.deliveryQueueStorePath ??
+    (typeof deps.runtimeStatePath === "string" && deps.runtimeStatePath !== ""
+      ? path.join(path.dirname(deps.runtimeStatePath), "delivery-queue.json")
+      : undefined);
 
   const pendingProfiles = new Set<RuntimeKind>();
   const application = (runtime: RuntimeKind): ProfileApplication => {
@@ -1370,6 +1385,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     watchdogObserver: watchdogService !== undefined ? (root, observation) => watchdogService!.observe(root, observation) : undefined,
     watchdogPendingConfirmations: deps.watchdogPendingSnapshot,
     watchdogStats: watchdogService !== undefined ? (root) => watchdogService!.stats(root) : undefined,
+    // 2026-10-20 客户要求：投递队列持久化（重启自动续跑；userData，不写项目文件）。缺省 undefined ⇒ 旧行为。
+    ...(deliveryQueueStorePath !== undefined ? { deliveryQueueStorePath } : {}),
     now: deps.watchdogOptions?.now,
     // 首轮寻址修复（2026-10-13 真机 bootstrap J-1 缺陷）：派发路由缓存 miss 时**实时重枚举一次**——
     // 与界面 listProject 同一路径（同一 listProjectFn）、刷**同一份**共享缓存（后续 openInternal 自动
@@ -1557,6 +1574,168 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         diagnostic.error("advance.appointment.artifacts.note.failed", error, { flowId });
       }
     }
+  };
+
+  // —————— 2026-10-20 客户要求：重启后任务自动续跑（持久队列重投）＋ 僵尸步骤自检（兜底提示） ——————
+  //
+  // 真机：重启把在途回合与内存队列丢掉，但 flow YAML 仍标 dispatched ⇒ 应用以为任务在途、静默卡住。
+  // 主路径：投递队列持久化（session.ts），启动/项目导入时恢复并**自动重投**（复用既有 delivery/drain）；
+  // 兜底：持久队列无对应项、flow YAML 标 dispatched/delivered 且 owner 无会话/队列/在途时，给 Lead 一条
+  // 去重系统行（不自动派发、不弹客户卡、不把步骤标 done）。
+  let deliveryRestorePromise: Promise<void> | undefined;
+  /** 僵尸步骤提示去重：`projectRoot\0flowId` → revision+stale ids 哈希（同集合只提示一次；不再 stale 清除）。 */
+  const zombieCheckNotified = new Map<string, string>();
+  const zombieCheckTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+  /** 系统行落 Lead（主入口；listing 未知/无 primaryRoleId ⇒ 不落——不猜角色）。 */
+  const emitLeadDeliveryNote = (projectRoot: string, runtime: RuntimeKind, summary: string): void => {
+    const primaryRoleId = listingCache.get(projectRoot)?.primaryRoleId;
+    if (typeof primaryRoleId !== "string" || primaryRoleId === "") return;
+    try {
+      emitSessionEvent({
+        roleId: primaryRoleId,
+        projectRoot,
+        runtime,
+        event: { kind: "message", summary, detail: { source: "delivery-note" } },
+      });
+    } catch (error) {
+      createDiagnosticLogger({ component: "desktop.governance-advance", projectRoot }).error("advance.note.failed", error);
+    }
+  };
+
+  /** 系统行择路 runtime：提示/活跃/治理会话 → 持久化/磁盘/凭据解析；无法确定 ⇒ undefined（不猜）。 */
+  const resolveNoteRuntime = async (projectRoot: string, preferred?: RuntimeKind): Promise<RuntimeKind | undefined> => {
+    if (preferred !== undefined) return preferred;
+    const hinted =
+      acceptanceRuntimeHints.get(projectRoot) ?? manager.activeRuntimeFor(projectRoot) ?? manager.governanceRuntimeFor(projectRoot);
+    if (hinted !== undefined) return hinted;
+    try {
+      const resolution = await resolveAcceptanceRuntime(projectRoot);
+      return resolution.ok ? resolution.runtime : undefined;
+    } catch {
+      return undefined;
+    }
+  };
+
+  /** 启动/项目导入时恢复上次运行的投递队列并自动重投（幂等：每个进程只跑一次）。 */
+  const restoreDeliveryQueuesOnce = (): Promise<void> => {
+    if (deliveryRestorePromise !== undefined) return deliveryRestorePromise;
+    if (deliveryQueueStorePath === undefined) {
+      deliveryRestorePromise = Promise.resolve();
+      return deliveryRestorePromise;
+    }
+    deliveryRestorePromise = (async () => {
+      try {
+        const report = await manager.restorePersistedDeliveries();
+        if (report.restored === 0) return;
+        const byProject = new Map<string, { runtime: RuntimeKind; lines: string[] }>();
+        for (const item of report.items) {
+          const group = byProject.get(item.projectRoot) ?? { runtime: item.runtime, lines: [] };
+          const kindLabel =
+            item.kind === "handback" ? "回交" : item.kind === "dispatch" ? "派发" : item.kind === "system" ? "系统" : "消息";
+          group.lines.push(`- [${kindLabel}] ${item.summary}（角色 ${item.roleId} · ${item.runtime}）`);
+          byProject.set(item.projectRoot, group);
+        }
+        for (const [projectRoot, group] of byProject) {
+          const runtime = await resolveNoteRuntime(projectRoot, group.runtime);
+          if (runtime === undefined) continue;
+          emitLeadDeliveryNote(
+            projectRoot,
+            runtime,
+            `已从上次运行恢复 ${group.lines.length} 条任务并重投（应用重启/崩溃后续跑；不弹客户卡、不把步骤标 done）：\n${group.lines.join("\n")}`,
+          );
+        }
+      } catch (error) {
+        createDiagnosticLogger({ component: "desktop.delivery" }).error("delivery.queue.restore.failed", error);
+      }
+    })();
+    return deliveryRestorePromise;
+  };
+
+  /** 僵尸步骤自检（有界、fire-and-forget；等待持久队列恢复完成后再判定，避免把「待恢复」误报为僵尸）。 */
+  const runZombieStepCheck = async (projectRoot: string): Promise<void> => {
+    const diagnostic = createDiagnosticLogger({ component: "desktop.governance-advance", projectRoot });
+    try {
+      await restoreDeliveryQueuesOnce();
+      const listing = listingCache.get(projectRoot);
+      if (listing?.governanceModel !== "trio") return; // 旧 single 不做 flow 僵尸检查
+      const flowsDir = path.join(projectRoot, "docs", "flows");
+      let names: string[];
+      try {
+        names = await readdir(flowsDir);
+      } catch {
+        return; // 没有 flow 目录 ⇒ 不提示（另有验收门处理）
+      }
+      const flowIds = [
+        ...new Set(
+          names
+            .filter((name) => /\.ya?ml$/i.test(name))
+            .map((name) => name.replace(/\.ya?ml$/i, ""))
+            .filter((id) => id !== ""),
+        ),
+      ];
+      for (const flowId of flowIds) {
+        let bytes: Buffer;
+        try {
+          bytes = await readFile(path.join(flowsDir, `${flowId}.yaml`));
+        } catch {
+          continue; // 无 YAML/读失败 ⇒ 不提示
+        }
+        const parsed = parseFlowStateYaml(bytes.toString("utf8"), flowId);
+        if (!parsed.ok) {
+          diagnostic.record("advance.zombie.invalid-flow", { flowId }); // 解析失败交给验收门，不在此猜
+          continue;
+        }
+        const staleSteps = parsed.flow.steps.filter((step) => {
+          if (step.status !== "dispatched" && step.status !== "delivered") return false;
+          const owner = typeof step.owner === "string" ? step.owner.trim() : "";
+          if (owner === "") return false;
+          // owner 有活会话 / busy / 队列 / 在途投递 ⇒ 不提示（可能只是在跑或待投）。
+          const liveViews = manager.liveSessionViews().filter((view) => view.projectRoot === projectRoot && view.roleId === owner);
+          if (liveViews.length > 0) return false;
+          for (const runtime of RUNTIME_KINDS) {
+            if (manager.hasPendingDelivery(projectRoot, owner, runtime)) return false;
+          }
+          return true;
+        });
+        const dedupeKey = `${projectRoot}\u0000${flowId}`;
+        if (staleSteps.length === 0) {
+          zombieCheckNotified.delete(dedupeKey); // 不再 stale ⇒ 清除，允许下次真实丢失再提示
+          continue;
+        }
+        const revision = createHash("sha256").update(bytes).digest("hex");
+        const staleIds = staleSteps.map((step) => step.id).sort();
+        const notifyHash = createHash("sha256").update(`${revision}\u0000${staleIds.join("\u0000")}`).digest("hex");
+        if (zombieCheckNotified.get(dedupeKey) === notifyHash) continue; // 同 flow+revision+stale 集合只提示一次
+        const runtime = await resolveNoteRuntime(projectRoot);
+        if (runtime === undefined) {
+          diagnostic.record("advance.zombie.runtime-unresolved", { flowId });
+          continue;
+        }
+        const facts = staleSteps.map((step) => `- 步骤 ${step.id}（owner: ${step.owner}，status: ${step.status}）`).join("\n");
+        emitLeadDeliveryNote(
+          projectRoot,
+          runtime,
+          `流程 ${flowId}：检测到 ${staleSteps.length} 个步骤可能因应用重启/崩溃丢失（flow YAML 标记为已派发，但 owner 无会话/队列/在途投递）：\n${facts}\n` +
+            `请用 flow_get 核对当前 revision，必要时用 flow_step_supersede 换新步骤并 dispatch_task 重派；不要重复使用已派 stepId。`,
+        );
+        zombieCheckNotified.set(dedupeKey, notifyHash);
+        diagnostic.record("advance.zombie.reported", { flowId, count: staleSteps.length });
+      }
+    } catch (error) {
+      diagnostic.error("advance.zombie.failed", error);
+    }
+  };
+
+  const scheduleZombieStepCheck = (projectRoot: string, delayMs = 40): void => {
+    if (typeof projectRoot !== "string" || projectRoot === "") return;
+    if (zombieCheckTimers.has(projectRoot)) return; // 合并窗口：有界、fire-and-forget，不阻塞导入
+    const timer = setTimeout(() => {
+      zombieCheckTimers.delete(projectRoot);
+      void runZombieStepCheck(projectRoot);
+    }, delayMs);
+    (timer as { unref?: () => void }).unref?.();
+    zombieCheckTimers.set(projectRoot, timer);
   };
 
   /**
@@ -1822,6 +2001,10 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       const documentSequence = documentReader.beginListing(projectRoot);
       const listing = await listProjectFn(projectRoot);
       listingCache.set(listing.projectRoot, listing);
+      // 2026-10-20 客户要求（重启后任务自动续跑）：启动/项目导入恢复持久投递队列并自动重投；
+      // listProject 刷新后做一次**僵尸步骤自检**（有界、fire-and-forget、去重；不阻塞导入）。
+      void restoreDeliveryQueuesOnce();
+      scheduleZombieStepCheck(listing.projectRoot);
 
       // ——— I1 治理记录状态（PM 评审 §四.1）———
       // **只读**：走**既有单一授权链** `buildEffectiveProjectConfig`（`.ans` 优先、无则运行期同意回退、
