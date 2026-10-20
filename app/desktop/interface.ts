@@ -510,6 +510,15 @@ export interface DesktopDeps {
    * 项目 ∪ 有会话语/队列的项目。
    */
   watchdogOptions?: { now?: () => number; config?: Partial<WatchdogConfig> };
+  /**
+   * **链式治理推进的目标事实轮询（2026-10-20 真机假错误修复；测试可缩短）**：
+   * `advanceGovernanceFlow` 的 followUp 链不再用「角色当前是否 idle」判完成（刚投递/会话被释放时会立即
+   * 假失败——真机 5ms 误报），改为**有界轮询目标事实**：流程状态 YAML 落盘且可解析 / 任命目标角色卡出现。
+   * 缺省 500ms 轮询、最长 15min（与看护回合自动中止时限同量级）；`settledGraceMs` 是「角色已 settled」
+   * 的短宽限（会话活着、不忙、无后续投递、未被中止——期间仍持续探测事实；会话被释放或被中止不算 settled，
+   * 继续等下一次投递/重试）。生产不传，走默认常量。
+   */
+  governanceChainOptions?: { pollIntervalMs?: number; timeoutMs?: number; settledGraceMs?: number };
 }
 
 export interface DesktopInterface {
@@ -607,8 +616,9 @@ export interface DesktopInterface {
   /**
    * **应用代客户推进治理流程（2026-10-18 客户修正；同日真机修正为四角色闭环）**：客户决定成功后
    * （`governance:next-step` 回调），在**后台**打开目标治理角色（Nominator/Convener）会话并投递**唯一一条**任务——
-   * `proposal accept` → **先** Convener 写 `docs/flows/<flowId>.yaml`（唯一机器状态，首步提名）；等 Convener
-   * 本轮真正空闲后读取并校验 YAML：合法 ⇒ 再派 Nominator（消息带 YAML 路径），缺失/非法/超时 ⇒ 系统行如实报错、**不循环**；
+   * `proposal accept` → **先** Convener 写 `docs/flows/<flowId>.yaml`（唯一机器状态，首步提名）；应用**有界轮询**
+   * 该 YAML 事实（存在且通过校验才放行；角色瞬时忙闲不作判据），合法 ⇒ 再派 Nominator（消息带 YAML 路径），
+   * 缺失/非法/超时 ⇒ 系统行如实报错一次、**不循环**；
    * `accept-quick`/`appointment` → Convener 写流程状态 YAML/排程（既有逻辑）。
    * **不抢 `activeRoleId`、不切当前 pane、不自动批准/写盘、不写客户决定**；成功/失败都经既有
    * `delivery-note` 系统行落在发起卡片的角色聊天流（失败如实、不重试循环）。
@@ -698,6 +708,25 @@ function reacceptGuardResult(message: string): ReacceptGovernancePinsResult {
 
 /** 预览摘要形状：非空 64 位十六进制（`GovernanceReacceptPreview.previewDigest`）。 */
 const PREVIEW_DIGEST_HEX_64 = /^[0-9a-fA-F]{64}$/;
+
+/**
+ * 链式治理推进（`advanceGovernanceFlow` 两段式）的**目标事实轮询**参数（2026-10-20 真机修复）。
+ * 旧实现用 `waitForRoleIdle` 判「Convener 本轮结束」：刚投递时会话可能尚未标记 busy、也可能被并发重建/
+ * 释放——真机在 `advance.dispatched` 后 5ms 就误报「本轮未在时限内结束」。完成条件是**目标事实**
+ * （`docs/flows/<flowId>.yaml` 落盘且通过 `parseFlowStateYaml`），不是角色的瞬时忙闲。
+ */
+const GOVERNANCE_CHAIN_POLL_INTERVAL_MS = 500;
+/** 目标事实的最长等待：15min（与看护回合自动中止时限同量级，留出一次重试/修复落盘的时间）。 */
+const GOVERNANCE_CHAIN_TIMEOUT_MS = 15 * 60 * 1000;
+/** 角色 settled（会话仍活着、不忙、无排队投递、未被中止）后的短宽限：期间继续探测事实，仍不落定才如实失败。 */
+const GOVERNANCE_CHAIN_SETTLED_GRACE_MS = 2_000;
+
+/** 流程状态 YAML 的一次探测结果（链式推进的事实轮询用；只读）。 */
+type FlowStateProbe =
+  | { state: "valid"; nominationDone: boolean }
+  | { state: "missing" }
+  | { state: "invalid"; error: string }
+  | { state: "unreadable"; message: string };
 
 /** 治理模型封闭值域（评审 §5.1/§5.5；缺省 `single`）。 */
 function isGovernanceModelValue(value: unknown): value is GovernanceModel {
@@ -2033,6 +2062,118 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           trigger: "customer-decision",
         });
       };
+      // —— 2026-10-20 真机假错误修复：链式推进的完成判据＝**目标事实**（有界轮询），不是角色瞬时忙闲 ——
+      // 真机证据：`advance.dispatched` 后 5ms 就 `advance.chain.convener-idle` + `chain.failed`
+      // （`waitForRoleIdle` 在会话刚被释放/尚未标记 busy 时立即 false），而 Convener 随后正常写出 YAML。
+      // 新判据：每 `chainPollIntervalMs` 读一次 `docs/flows/<flowId>.yaml`（存在且 `parseFlowStateYaml`
+      // 通过＝放行；首步 nomination 已 done 时记诊断），或每轮强制刷新 listing 直到任命目标角色全部出现。
+      // 角色忙/队列变化**不打断**轮询；会话被释放/被看护中止时**不**断言 settled（继续等下一次投递/重试）；
+      // 只有「会话仍活着、已 settled 且无后续投递」再给一次短宽限仍不落定，或到 15min 时限，才如实失败（一次）。
+      const chainPollIntervalMs = Math.max(1, deps.governanceChainOptions?.pollIntervalMs ?? GOVERNANCE_CHAIN_POLL_INTERVAL_MS);
+      const chainTimeoutMs = Math.max(1, deps.governanceChainOptions?.timeoutMs ?? GOVERNANCE_CHAIN_TIMEOUT_MS);
+      const chainSettledGraceMs = Math.max(0, deps.governanceChainOptions?.settledGraceMs ?? GOVERNANCE_CHAIN_SETTLED_GRACE_MS);
+      // 轮询定时器 unref：主进程常驻不受影响；测试子进程在用例结束/失败后不会被 15min 定时器拖住不退。
+      const chainSleep = (ms: number): Promise<void> => new Promise((resolve) => {
+        const timer = setTimeout(resolve, Math.max(1, ms));
+        (timer as { unref?: () => void }).unref?.();
+      });
+      /**
+       * 流程状态 YAML 的一次探测（只读；不写、不猜）：
+       * `valid`（解析通过；顺带给出首步 nomination 是否 done）/ `missing` / `invalid`（带具体 path+message）/
+       * `unreadable`（ENOENT 以外的读错——可能瞬时，轮询期间不立即判死）。
+       */
+      const probeFlowStateYaml = async (flowId: string): Promise<FlowStateProbe> => {
+        const flowStatePath = governanceFlowStatePath(flowId);
+        let flowStateText: string;
+        try {
+          flowStateText = await readFile(`${projectRoot}/${flowStatePath}`, "utf8");
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === "ENOENT") return { state: "missing" };
+          return { state: "unreadable", message: error instanceof Error ? error.message : String(error) };
+        }
+        const parsedFlowState = parseFlowStateYaml(flowStateText, flowId);
+        if (!parsedFlowState.ok) {
+          const detail = parsedFlowState.errors.slice(0, 10).map((item) => `${item.path}: ${item.message}`).join("；");
+          return { state: "invalid", error: detail };
+        }
+        // 首步提名（`nomination*`；无同名步骤时退回第一步）：done 是「可继续」的强信号，但**不**作为放行前提——
+        // 合法 YAML + 可解析步骤表即可继续（与旧行为一致，避免把状态字面值当成第二道门）。
+        const nominationStep =
+          parsedFlowState.flow.steps.find((step) => /^nomination(?:$|[-_.])/i.test(step.id)) ?? parsedFlowState.flow.steps[0];
+        return { state: "valid", nominationDone: nominationStep?.status === "done" };
+      };
+      /**
+       * **角色已 settled 的肯定证据**（早失败护栏，2026-10-20）：
+       * 会话仍活着 + 不在跑 + 无排队/进行中的投递 + 上一轮不是被请求中止（客户停止/看护自动中止）。
+       * 会话缺失（真机 5ms 误报：会话被 LRU/并发重建释放）**不算** settled——继续等目标事实，绝不提前判死；
+       * 被中止的回合也不算正常结束——继续等下一次投递/重试（有界）。
+       */
+      const settledEvidence = (roleId: string): boolean =>
+        manager.hasLiveSession(projectRoot, roleId, runtime) &&
+        !manager.isRoleBusy(projectRoot, roleId, runtime) &&
+        !manager.hasPendingDelivery(projectRoot, roleId, runtime) &&
+        !manager.wasLastTurnAborted(projectRoot, roleId, runtime);
+      /** 有界轮询流程状态 YAML 落盘；角色 settled 后给一次短宽限（再探），仍不落定才允许提前如实失败。 */
+      const waitForFlowStateYamlFact = async (
+        flowId: string,
+      ): Promise<{ last: FlowStateProbe; outcome: "valid" | "settled" | "timeout"; waitedMs: number }> => {
+        const startedAt = Date.now();
+        const deadline = startedAt + chainTimeoutMs;
+        let last: FlowStateProbe = { state: "missing" };
+        let settledSince: number | undefined;
+        for (;;) {
+          last = await probeFlowStateYaml(flowId);
+          if (last.state === "valid") return { last, outcome: "valid", waitedMs: Date.now() - startedAt };
+          if (settledEvidence(targetRoleId)) {
+            settledSince ??= Date.now();
+            if (Date.now() - settledSince >= chainSettledGraceMs) {
+              return { last, outcome: "settled", waitedMs: Date.now() - startedAt };
+            }
+          } else {
+            settledSince = undefined;
+          }
+          const remaining = deadline - Date.now();
+          if (remaining <= 0) return { last, outcome: "timeout", waitedMs: Date.now() - startedAt };
+          await chainSleep(Math.min(chainPollIntervalMs, remaining));
+        }
+      };
+      /**
+       * 有界轮询任命目标角色卡出现（每轮强制刷新 listing）：替代旧的 `waitForRoleIdle`——
+       * 刚投递写卡任务时会话可能立即被释放/尚未标记 busy，瞬时 idle 不能代表「角色卡已写完」。
+       * 角色 settled（且无后续投递）后给一次短宽限；仍缺 ⇒ 调用方**不派 Convener**（既有语义逐字保留）。
+       */
+      const waitForAppointmentRoles = async (): Promise<{
+        missing: string[];
+        polls: number;
+        waitedMs: number;
+        refreshFailures: number;
+      }> => {
+        const startedAt = Date.now();
+        const deadline = startedAt + chainTimeoutMs;
+        let polls = 0;
+        let refreshFailures = 0;
+        let settledSince: number | undefined;
+        const refreshAndMissing = async (): Promise<string[]> => {
+          polls += 1;
+          if (!(await manager.refreshListingNow(projectRoot))) refreshFailures += 1;
+          return appointmentTargets.filter((roleId) => !roleExists(roleId));
+        };
+        let missing = await refreshAndMissing();
+        for (;;) {
+          if (missing.length === 0) break;
+          if (settledEvidence("nominator")) {
+            settledSince ??= Date.now();
+            if (Date.now() - settledSince >= chainSettledGraceMs) break;
+          } else {
+            settledSince = undefined;
+          }
+          const remaining = deadline - Date.now();
+          if (remaining <= 0) break;
+          await chainSleep(Math.min(chainPollIntervalMs, remaining));
+          missing = await refreshAndMissing();
+        }
+        return { missing, polls, waitedMs: Date.now() - startedAt, refreshFailures };
+      };
       // W6-B 真机阻塞修复（任命后的派发时序）：客户决定卡是在来源角色本轮**中途**作答的——Nominator
       // 可能还在写角色卡。先等来源本轮 settle（`waitForRoleSettle`：只等一次、有上限；无会话/不忙立即
       // 返回；超时或会话释放只记诊断后继续），再强制刷新 listing，然后才派发。**绝不循环重试**。
@@ -2067,17 +2208,25 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           missing: missingAppointmentRoles,
           queued: writeDispatch.queued === true,
         });
-        const nominatorIdle = await manager.waitForRoleIdle(projectRoot, "nominator", runtime);
-        if (!nominatorIdle) {
+        // 2026-10-20 修复：不再用 `waitForRoleIdle` 判「写卡本轮结束」（刚投递/会话被释放会立即假失败）；
+        // 改为有界轮询 listing 事实——目标角色全部出现才继续，仍缺则如实失败、**不派 Convener**。
+        const rolesWait = await waitForAppointmentRoles();
+        diagnostic.record("advance.appointment.roles-wait", {
+          flowId: payload.flowId,
+          polls: rolesWait.polls,
+          waitedMs: rolesWait.waitedMs,
+          refreshFailures: rolesWait.refreshFailures,
+          missing: rolesWait.missing,
+        });
+        const stillMissing = rolesWait.missing;
+        if (stillMissing.length > 0) {
+          const nominatorBusy = manager.isRoleBusy(projectRoot, "nominator", runtime);
           return chainFail(
-            `Crew / 组队 本轮未在时限内结束，角色（${missingAppointmentRoles.join("、")}）未确认；未派 Steward / 统筹`,
+            nominatorBusy
+              ? `Crew / 组队 本轮未在时限内结束，角色（${missingAppointmentRoles.join("、")}）未确认；未派 Steward / 统筹`
+              : `角色卡/边界仍未写出（${stillMissing.join("、")} 未枚举到）；未派 Steward / 统筹`,
             "nominator",
           );
-        }
-        await manager.refreshListingNow(projectRoot);
-        const stillMissing = appointmentTargets.filter((roleId) => !roleExists(roleId));
-        if (stillMissing.length > 0) {
-          return chainFail(`角色卡/边界仍未写出（${stillMissing.join("、")} 未枚举到）；未派 Steward / 统筹`, "nominator");
         }
         // 共享运行期去重：写卡后检查可能已先派 Convener（或本链路已派过）⇒ 不再重复；
         // 结果仍如实告知「写卡段已完成、后续 Convener 已派」（由共享检查完成，不是第二派）。
@@ -2144,35 +2293,38 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       await appendDispatchAccepted(targetRoleId, message, stepId, appointmentConvenerKey);
       // —— 2026-10-18 真机修正；2026-10-19 客户决定「这些全部改成yaml。」 ——
       // 两段式闭环：客户接受提案后先派 Convener 写 `docs/flows/<flowId>.yaml`（唯一机器状态）。
-      // 等它本轮真正空闲后检查 YAML：存在且通过 `parseFlowStateYaml` 校验 ⇒ 再派 Nominator；
-      // 缺失/不可读/校验失败/超时 ⇒ 系统行如实报**具体原因**，**不循环重试**。
+      // **有界轮询 YAML 事实**（2026-10-20 真机假错误修复）：存在且通过 `parseFlowStateYaml` 校验 ⇒ 再派
+      // Nominator；角色忙/队列变化不打断轮询，会话释放/被看护中止不算 settled（继续等下一次投递/重试）；
+      // 只有角色**确实 settled**（会话活着、不忙、无后续投递、未被中止）再给一次短宽限仍不落定，或到 15min
+      // 时限，才如实报**具体原因**（系统行只发一次），**不循环重试**。
       // 同名 `.md` 人读视图**不是**放行条件（只认 YAML；只有 .md 视为未落盘）。
       if (payload.followUp === "nomination-after-flow") {
         const flowId = payload.flowId;
         if (flowId === undefined) return chainFail("缺少流程信息（flowId），未派发提名任务");
         const flowStatePath = governanceFlowStatePath(flowId);
-        const idle = await manager.waitForRoleIdle(projectRoot, targetRoleId, runtime);
-        diagnostic.record("advance.chain.convener-idle", { flowId, idle });
-        if (!idle) {
-          return chainFail(`Steward / 统筹 本轮未在时限内结束，流程状态 YAML ${flowStatePath} 未确认；未派发提名任务`);
-        }
-        let flowStateText: string;
-        try {
-          flowStateText = await readFile(`${projectRoot}/${flowStatePath}`, "utf8");
-        } catch (error) {
-          if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        const flowWait = await waitForFlowStateYamlFact(flowId);
+        diagnostic.record("advance.chain.flow-state-wait", {
+          flowId,
+          state: flowWait.last.state,
+          outcome: flowWait.outcome,
+          waitedMs: flowWait.waitedMs,
+          ...(flowWait.last.state === "valid" ? { nominationDone: flowWait.last.nominationDone } : {}),
+          roleBusy: manager.isRoleBusy(projectRoot, targetRoleId, runtime),
+        });
+        if (flowWait.last.state !== "valid") {
+          if (flowWait.last.state === "missing") {
             return chainFail(
-              `Steward / 统筹 未写出流程状态 YAML ${flowStatePath}；未派发提名任务（同名 .md 人读视图不算落盘）`,
+              manager.isRoleBusy(projectRoot, targetRoleId, runtime)
+                ? `Steward / 统筹 本轮未在时限内结束，流程状态 YAML ${flowStatePath} 未确认；未派发提名任务`
+                : `Steward / 统筹 未写出流程状态 YAML ${flowStatePath}；未派发提名任务（同名 .md 人读视图不算落盘）`,
             );
           }
+          if (flowWait.last.state === "invalid") {
+            return chainFail(`流程状态 YAML 校验失败（${flowStatePath}）：${flowWait.last.error}；未派发提名任务`);
+          }
           return chainFail(
-            `流程状态 YAML ${flowStatePath} 不可读：${error instanceof Error ? error.message : String(error)}；未派发提名任务`,
+            `流程状态 YAML ${flowStatePath} 不可读：${flowWait.last.message}；未派发提名任务`,
           );
-        }
-        const parsedFlowState = parseFlowStateYaml(flowStateText, flowId);
-        if (!parsedFlowState.ok) {
-          const detail = parsedFlowState.errors.slice(0, 10).map((item) => `${item.path}: ${item.message}`).join("；");
-          return chainFail(`流程状态 YAML 校验失败（${flowStatePath}）：${detail}；未派发提名任务`);
         }
         const nominationPayload: GovernanceNextStepPayload = {
           version: 1,

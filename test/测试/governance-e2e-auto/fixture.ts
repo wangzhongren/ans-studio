@@ -634,6 +634,13 @@ export interface HarnessOptions {
   /** 已有的项目目录（省去新建）；缺省新建并 seed trio。 */
   root?: string;
   seedRoles?: string[];
+  /**
+   * 链式治理推进的目标事实轮询（2026-10-20 桌面 `governanceChainOptions` 的测试注入）。
+   * 缺省短轮询（10ms / 3s / 10ms）：离线夹具的脚本轮次在毫秒级完成，短时限足够；
+   * 若沿用产品默认（500ms / 15min）会在用例结束后仍持有轮询、把测试文件挂住。
+   * 特殊场景可按需覆盖（如等待较慢的脚本轮次）。
+   */
+  governanceChain?: { pollIntervalMs?: number; timeoutMs?: number; settledGraceMs?: number };
 }
 
 export async function makeHarness(options: HarnessOptions): Promise<Harness> {
@@ -729,6 +736,8 @@ export async function makeHarness(options: HarnessOptions): Promise<Harness> {
     runtimeOptions: { modelId: "fixture-model" },
     customerInput: channel.customerInput,
     createGovernanceJudgeFn: judgeFactory(options.judge ?? {}, options.judgeTimeoutMs),
+    // 2026-10-20：链式推进改为有界轮询目标事实；测试注入短轮询，避免 15min 默认定时器拖住测试文件。
+    governanceChainOptions: options.governanceChain ?? { pollIntervalMs: 10, timeoutMs: 3000, settledGraceMs: 10 },
   });
 
   const runtime = options.runtime ?? "claude";

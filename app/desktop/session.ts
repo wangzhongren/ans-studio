@@ -591,6 +591,12 @@ interface LiveSession {
    */
   busySince?: number;
   /**
+   * **上一轮是否被「请求中止」**（2026-10-20 链式治理推进的早失败护栏）：`abort()`（客户停止 / 看护
+   * 自动中止）置真，下一轮开始置空。链式推进在「会话仍活着、不在跑、无排队投递」时允许短宽限后如实失败；
+   * 但被中止的回合**不算正常结束**——继续有界轮询等下一次投递/重试（真机：看护中止后由后续投递写出 YAML）。
+   */
+  lastTurnAborted?: boolean;
+  /**
    * **O-1（2026-10-12）：本会话持有的边界快照**——开会话时定格的参与文件（绝对路径）与各自**内容哈希**。
    * 任一处变了 ⇒ 本会话的规则集已陈旧（真机：su 改好 boundary.yaml 后，活会话仍按开会话时解析的旧边界
    * 拒写）——`boundaryDiff` 检出后**作废重建**。信号只来自读盘哈希（**不得**靠界面推测）。
@@ -1273,6 +1279,23 @@ export class SessionManager {
     return this.sessions.get(this.sessionKey(projectRoot, roleId, runtime))?.busy === true;
   }
 
+  /** 该角色当前是否有**活会话**（纯读；链式推进的事实轮询护栏——会话被释放时不能断言「已 settled」）。 */
+  hasLiveSession(projectRoot: string, roleId: string, runtime: RuntimeKind): boolean {
+    return this.sessions.has(this.sessionKey(projectRoot, roleId, runtime));
+  }
+
+  /** 上一轮是否被请求中止（纯读；链式推进的早失败护栏——中止 ≠ 正常结束，继续等下一次投递/重试）。 */
+  wasLastTurnAborted(projectRoot: string, roleId: string, runtime: RuntimeKind): boolean {
+    return this.sessions.get(this.sessionKey(projectRoot, roleId, runtime))?.lastTurnAborted === true;
+  }
+
+  /** 该角色是否仍有排队/进行中的投递（纯读；链式推进的早失败护栏——有后续投递就不能断言「本轮即终局」）。 */
+  hasPendingDelivery(projectRoot: string, roleId: string, runtime: RuntimeKind): boolean {
+    const key = this.queueKey(projectRoot, roleId, runtime);
+    const queue = this.deliveryQueues.get(key);
+    return (queue !== undefined && queue.length > 0) || this.activeDeliveries.has(key);
+  }
+
   /** 治理主人（回交/系统行落位；2026-10-19 验收自动派发用）：trio=Convener；single=主入口（su）；未枚举 ⇒ null。 */
   governanceOwnerRoleId(projectRoot: string): string | null {
     return this.handbackOwnerRoleId(projectRoot);
@@ -1365,6 +1388,11 @@ export class SessionManager {
    * 与 `waitForRoleSettle` 的差别：后者只等「下一轮 settle」——若目标在收到任务前正忙、任务经既有投递机
    * 排队，第一次 settle 只结束**上一轮**，本次任务尚未跑完。链式检查「Convener 是否写出了流程单」必须等
    * 本次任务真正结束。**只等待、不重投、不重试**；超时或会话释放 ⇒ false（调用方如实报错、不循环）。
+   *
+   * **注意（2026-10-20 真机）**：本方法以「会话条目存在 + 不忙 + 队列空」判空闲——刚投递（会话可能被
+   * 并发重建/释放）时会立即返回 false，真机因此产生 5ms 假错误。**链式治理推进已改用目标事实轮询**
+   * （`interface.ts::advanceGovernanceFlow`，读流程 YAML / 角色卡枚举）；新调用方不要再用它断定
+   * 「某个任务是否完成」。保留仅为既有 API 兼容。
    */
   waitForRoleIdle(
     projectRoot: string,
@@ -2286,6 +2314,7 @@ export class SessionManager {
     entry.interactionState.turn = new AbortController();
     entry.busy = true;
     entry.busySince = this.now(); // G-2/W1：本轮起点定格（看护信号 #1 的 elapsed 基准；busy 期间才被读取）
+    entry.lastTurnAborted = undefined; // 新一轮开始：上一轮的中止标记不再适用于本轮
     // P0-2 前置修正（2026-10-13，随停止入口同批）：**开跑即外推 busy=true**——与投递机同款
     //（先置忙即推快照）。旧版只在 round 结束后推：长轮次（真实 pi 一轮数分钟）期间界面根本收不到
     // 「工作中」快照——停止钮与左树徽标都无从在轮次**进行中**出现（快适配器掩盖了这条缝；停止入口
@@ -2334,6 +2363,8 @@ export class SessionManager {
       return { ok: false, supported: false, error: "当前运行时不支持停止" };
     }
     try {
+      // 中止标记（链式治理推进的早失败护栏）：被请求中止 ≠ 正常结束——链路继续轮询等下一次投递/重试。
+      entry.lastTurnAborted = true;
       entry.interactionState.turn.abort();
       return await entry.handle.abort();
     } catch (err) {
@@ -3971,6 +4002,7 @@ export class SessionManager {
     entry.interactionState.turn = new AbortController();
     entry.busy = true;
     entry.busySince = this.now(); // G-2/W1：本轮起点定格（看护信号 #1 的 elapsed 基准）
+    entry.lastTurnAborted = undefined; // 新一轮开始：上一轮的中止标记不再适用于本轮
     this.activeDeliveries.set(key, sent); // 与 busy 同时登记；settled/失败/dispose 精确撤销。
     diagnostic.record("delivery.start", { count: batchCount, queueDepth: q.length, state: sent.kind });
     // G-2/W3：drain 出队投出 = 真实活动（重武装）；`kind:"system"`（看护自身投递）不记（同 enqueueDelivery 口径）。

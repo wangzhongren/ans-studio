@@ -2154,6 +2154,165 @@ test("run-role：trio 判断上下文（paths/pathProbes/写根/禁写/物证/�
   });
 });
 
+test("run-role：治理 confirm 卡缺 cardKind ⇒ 按角色/路径兜底并生成 judgeContext", async () => {
+  const flowYaml = [
+    "flowId: flow-a",
+    "version: 1",
+    "qualityTier: production",
+    "steps:",
+    "  - id: impl",
+    "    title: 实现",
+    "    owner: backend",
+    "    kind: dispatch",
+    "    status: pending",
+    "  - id: acceptance",
+    "    title: 验收",
+    "    owner: verifier",
+    "    kind: acceptance",
+    "    status: pending",
+    "",
+  ].join("\n");
+  const cases = [
+    {
+      roleId: "convener" as const,
+      paths: ["docs/flows/flow-a.yaml"] as const,
+      preview: `## docs/flows/flow-a.yaml\n${flowYaml}`,
+      expected: "schedule-write" as const,
+    },
+    {
+      roleId: "convener" as const,
+      paths: ["docs/governance/convener/notes.md"] as const,
+      preview: "## docs/governance/convener/notes.md\n# 治理记录\n",
+      expected: "write" as const,
+    },
+    {
+      roleId: "rapporteur" as const,
+      paths: ["docs/proposals/flow-a-v2.md"] as const,
+      preview: "## docs/proposals/flow-a-v2.md\n# 提案 v2\n",
+      expected: "write" as const,
+    },
+    {
+      roleId: "nominator" as const,
+      paths: ["角色卡/alpha/role-card.md"] as const,
+      preview: "## 角色卡/alpha/role-card.md\n# alpha\n",
+      expected: "appointment-write" as const,
+    },
+  ];
+
+  for (const testCase of cases) {
+    await withRoot(async (root) => {
+      const captured: { caps?: AdapterCapabilities; gate?: WriteGate } = {};
+      const seen: CapturedInput = {};
+      let rawCalls = 0;
+      const handle = await openRoleSession(
+        {
+          roleId: testCase.roleId,
+          project: trioProject(root, testCase.roleId),
+          autoRepin: false,
+          customerInput: ((req, metadata) => {
+            rawCalls += 1;
+            seen.req = req;
+            seen.metadata = metadata;
+            return { outcome: "declined" as const };
+          }) as CustomerInputFn,
+        },
+        { createAdapter: capturingFactory(captured) },
+      );
+      try {
+        const out = await captured.caps!.customerInput!(
+          {
+            kind: "confirm",
+            title: "确认写入",
+            preview: testCase.preview,
+            paths: [...testCase.paths],
+            flowId: "flow-a",
+          },
+          { toolCallId: "call-default", turnId: "turn-default" },
+        );
+        assert.equal(out?.outcome, "declined");
+        assert.equal(rawCalls, 1, `${testCase.roleId}/${testCase.expected} 应到达客户通道`);
+        assert.equal(seen.req?.cardKind, testCase.expected, `${testCase.roleId} 默认 cardKind`);
+        assert.equal(seen.metadata?.cardKind, testCase.expected, `${testCase.roleId} metadata cardKind`);
+        assert.ok(seen.metadata?.judgeContext, `${testCase.roleId}/${testCase.expected} 应生成 judgeContext`);
+        assert.equal(seen.metadata?.judgeContext?.flowId, "flow-a");
+        assert.equal(seen.metadata?.judgeContext?.toolCallId, "call-default");
+      } finally {
+        await handle.dispose();
+      }
+    });
+  }
+});
+
+test("run-role：显式非法 cardKind 仍拒绝（不因兜底而放宽）", async () => {
+  await withRoot(async (root) => {
+    const captured: { caps?: AdapterCapabilities; gate?: WriteGate } = {};
+    let rawCalls = 0;
+    const handle = await openRoleSession(
+      {
+        roleId: "convener",
+        project: trioProject(root, "convener"),
+        autoRepin: false,
+        customerInput: (() => {
+          rawCalls += 1;
+          return { outcome: "declined" as const };
+        }) as CustomerInputFn,
+      },
+      { createAdapter: capturingFactory(captured) },
+    );
+    try {
+      const out = await captured.caps!.customerInput!({
+        kind: "confirm",
+        title: "确认写入",
+        preview: "## docs/flows/flow-a.yaml\nflowId: flow-a\n",
+        paths: ["docs/flows/flow-a.yaml"],
+        cardKind: "proposal",
+        flowId: "flow-a",
+      });
+      assert.equal(out?.outcome, "declined");
+      assert.match((out as { reason?: string }).reason ?? "", /不允许 cardKind=proposal/);
+      assert.equal(rawCalls, 0, "显式非法 cardKind 不得调用客户通道");
+    } finally {
+      await handle.dispose();
+    }
+  });
+});
+
+test("run-role：choice 卡缺 cardKind 不兜底（零变化）", async () => {
+  await withRoot(async (root) => {
+    const captured: { caps?: AdapterCapabilities; gate?: WriteGate } = {};
+    const seen: CapturedInput = {};
+    let rawCalls = 0;
+    const handle = await openRoleSession(
+      {
+        roleId: "convener",
+        project: trioProject(root, "convener"),
+        autoRepin: false,
+        customerInput: ((req, metadata) => {
+          rawCalls += 1;
+          seen.req = req;
+          seen.metadata = metadata;
+          return { outcome: "answered" as const, value: { selected: ["a"] } };
+        }) as CustomerInputFn,
+      },
+      { createAdapter: capturingFactory(captured) },
+    );
+    try {
+      const out = await captured.caps!.customerInput!({
+        kind: "choice",
+        title: "选择",
+        options: [{ id: "a", label: "A" }],
+        flowId: "flow-a",
+      });
+      assert.equal(out?.outcome, "answered");
+      assert.equal(rawCalls, 1);
+      assert.equal(seen.req?.cardKind, undefined, "choice 卡不得被兜底成写卡");
+      assert.equal(seen.metadata?.judgeContext, undefined, "choice 卡不计算 judgeContext");
+    } finally {
+      await handle.dispose();
+    }
+  });
+});
+
 test("run-role：物证容忍 `<flowId>.proposal-vN` / `.nomination-vN` 并取最新", async () => {
   // 1) 两种提案命名共存：取版本号最高的（跨命名比较）。
   await withRoot(async (root) => {
@@ -2376,7 +2535,8 @@ test("run-role：single/su 与项目角色不计算 judgeContext（能力矩阵�
           roleId: setup.roleId,
           project: setup.project(root),
           autoRepin: false,
-          customerInput: ((_req, metadata) => {
+          customerInput: ((req, metadata) => {
+            capturedInput.req = req;
             capturedInput.metadata = metadata;
             return { outcome: "declined" as const };
           }) as CustomerInputFn,
@@ -2391,6 +2551,20 @@ test("run-role：single/su 与项目角色不计算 judgeContext（能力矩阵�
         );
         assert.equal(capturedInput.metadata?.judgeContext, undefined, `${setup.roleId} 不注入 judgeContext`);
         assert.equal(captured.caps?.governanceJudge, undefined);
+
+        // 2026-10-20：非治理角色/非 trio 的 confirm 卡缺 cardKind ⇒ 不兜底（零变化）。
+        await captured.caps!.customerInput!(
+          {
+            kind: "confirm",
+            title: "写入",
+            preview: "## docs/proposals/flow-a-v1.md\n# 内容\n",
+            paths: ["docs/proposals/flow-a-v1.md"],
+            flowId: "flow-a",
+          },
+          { toolCallId: "call-2" },
+        );
+        assert.equal(capturedInput.req?.cardKind, undefined, `${setup.roleId} 不兜底 cardKind`);
+        assert.equal(capturedInput.metadata?.judgeContext, undefined, `${setup.roleId} 兜底后仍不注入 judgeContext`);
       } finally {
         await handle.dispose();
       }

@@ -1209,3 +1209,13 @@
 - `queue-stuck` / `repeat-fail`：「需客户一键确认后由应用执行」→「开关开启时桌面自动执行，关闭时需客户一键确认」。
 
 **证据**：`watchdog.test.ts` **11/11**；`test/编排/**` **675 计 675 过 0 红 0 skipped**；`npm run typecheck` **exit 0**（全仓）。
+
+## 2026-10-20 — 治理 confirm 卡缺 `cardKind` 按角色/路径兜底
+
+**来源**：真机 Convener 的写治理记录卡 `request_confirmation` 未带 `cardKind` ⇒ `governedInput` 不计算 `judgeContext` ⇒ 桌面 `planJudge` 返回 undefined，卡片直接呈现客户；客户问「这个为啥还需要我审核呢」。本批只改 `src/pipeline/orchestration/run-role.ts` 与 `test/编排/**`，未改 `app/**`。
+
+**改了什么**
+- `governedInput` 在 trio + confirm + 缺 `cardKind` + 声明路径可提取时按角色兜底：Convener 全部路径为 `docs/flows/<id>.yaml|yml` ⇒ `schedule-write`，否则 `write`；Rapporteur/Verifier ⇒ `write`；Nominator 全部路径在 `角色卡/<id>/` 下 ⇒ `appointment-write`，否则 `write`；Liaison/其他不猜；choice 卡与无路径卡不兜底。
+- 兜底值同时写入传给桌面的 request 与 metadata，并继续走既有 `TRIO_CARD_KINDS` 白名单、preview 完整性闸、Flow YAML 写前校验、`computeJudgeContext` 与 `recordCustomerDecision`；诊断 `governance.cardKind.defaulted`。显式 `cardKind` 永远优先，显式非法值仍拒绝。
+
+**测试**：新增 3 例（Convener flow YAML ⇒ schedule-write + judgeContext；Convener 治理记录 ⇒ write；Rapporteur ⇒ write；Nominator 角色卡 ⇒ appointment-write；显式非法 cardKind 仍拒；choice 不兜底）+ 扩展 single/su/项目角色零变化；`governance-judge.test.ts` **63/63**、`test/编排/**` **678 计 678 过 0 红 0 skipped**、`npm run typecheck` **exit 0**（全仓）。详见[变更记录](docs/change/2026-10-20_change_governance-cardKind-default.md)。

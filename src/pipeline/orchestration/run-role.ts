@@ -114,7 +114,7 @@ import { withHandback, type OrchestrationEvent, type TaskReport, type HandbackIn
 import { EXIT_OK, EXIT_USAGE, EXIT_FAILURE } from "../../common/编排/exit-codes.ts";
 import type { ShellVerdictFn } from "../../common/编排/shell-gate.ts";
 import { repinIfBootstrapped, DEFAULT_GOVERNANCE_BOUNDARY_REL } from "../../common/编排/finalize.ts";
-import { conditionSlugsOf, declaredPathBodies, createConfirmedWriteIssuer, explicitConfirmPaths, validateConfirmPreviewCompleteness } from "../../common/编排/confirmed-writes.ts";
+import { conditionSlugsOf, declaredConfirmPaths, declaredPathBodies, createConfirmedWriteIssuer, explicitConfirmPaths, validateConfirmPreviewCompleteness } from "../../common/编排/confirmed-writes.ts";
 import { parseFlowStateYaml } from "../../common/编排/flow-state.ts";
 import {
   appendGovernanceLedger,
@@ -722,7 +722,26 @@ export async function openRoleSession(
         const raw = input.customerInput!;
         return async (req, metadata) => {
           const originalMetadata = metadata === undefined ? undefined : { ...metadata };
-          const cardKind = req.cardKind ?? originalMetadata?.cardKind;
+          let cardKind = req.cardKind ?? originalMetadata?.cardKind;
+          let effectiveReq = req;
+          let effectiveMetadata = originalMetadata;
+          // 2026-10-20 真机：写卡确认漏带 cardKind ⇒ judgeContext 不计算、客户被要求手批。
+          // 只对 trio 的 **confirm** 卡、且声明路径可由 preview/req.paths 核对时，按角色保守兜底；
+          // 显式 cardKind 优先，choice 卡与无路径卡零变化。
+          if (isTrio && cardKind === undefined && req.kind === "confirm") {
+            const declaredPaths = declaredConfirmPaths(req);
+            const defaulted = defaultGovernanceConfirmCardKind(trioSpec!.id, declaredPaths);
+            if (defaulted !== undefined) {
+              cardKind = defaulted;
+              effectiveReq = { ...req, cardKind: defaulted };
+              effectiveMetadata = { ...(originalMetadata ?? {}), cardKind: defaulted };
+              log.record("governance.cardKind.defaulted", {
+                roleId: setup.role.id,
+                cardKind: defaulted,
+                declaredPaths,
+              });
+            }
+          }
           if (isTrio) {
             const allowed = TRIO_CARD_KINDS[trioSpec!.id];
             if (cardKind !== undefined && !allowed.includes(cardKind)) {
@@ -738,14 +757,14 @@ export async function openRoleSession(
                   `允许：${allowed.join(" / ")}。本次未向客户发卡。`,
               };
             }
-            const flowId = req.flowId ?? originalMetadata?.flowId;
+            const flowId = effectiveReq.flowId ?? effectiveMetadata?.flowId;
             if (isGovernanceFlowId(flowId)) currentFlowId = flowId;
           }
           // 2026-10-19 真机 op-2 修复（呈现前 fail-closed）：写盘类确认卡声明了写入路径时，preview
           // 必须对**每一条**路径给出可核对正文/结构。不完整 ⇒ **不发卡**、不发行任何写入路径，直接
           // 把缺正文的路径与重试要求如实交回模型（不让「证据完整性」依赖判断 agent/模型自觉）。
           // 非写盘确认（无路径）与 choice 卡：declaredPaths 为空 ⇒ 旧行为逐字不变。
-          const completeness = validateConfirmPreviewCompleteness(req);
+          const completeness = validateConfirmPreviewCompleteness(effectiveReq);
           if (!completeness.ok) {
             log.record("confirmation.preview.incomplete", {
               roleId: setup.role.id,
@@ -767,9 +786,9 @@ export async function openRoleSession(
           // 不合法 ⇒ 拒绝该卡（不发卡、不发行、不写账本），把具体 path + reason 交回 Steward 修正。
           // `schedule-write` 与普通 `write` 走同一闸；未声明 YAML 的旧版 .md 卡保持迁移兼容。
           const flowYamlError = validateFlowYamlCard(
-            req,
+            effectiveReq,
             completeness.declaredPaths,
-            req.flowId ?? originalMetadata?.flowId,
+            effectiveReq.flowId ?? effectiveMetadata?.flowId,
           );
           if (flowYamlError !== undefined) {
             log.record("flow.yaml.invalid", {
@@ -782,9 +801,9 @@ export async function openRoleSession(
           // cardKind、且 flowId 合法时计算；并入传给客户通道的 metadata（桌面只消费）。
           // 账本先刷新，确保事实不是陈旧快照；recordCustomerDecision 仍用 originalMetadata 的
           // toolCallId/turnId。事实计算失败 ⇒ `unavailableReason` + `ledgerErrors>0`（禁止 approve）。
-          let judgeMetadata = metadata;
+          let judgeMetadata = effectiveMetadata;
           if (isTrio && cardKind !== undefined && TRIO_CARD_KINDS[trioSpec!.id].includes(cardKind)) {
-            const flowId = req.flowId ?? originalMetadata?.flowId;
+            const flowId = effectiveReq.flowId ?? effectiveMetadata?.flowId;
             if (isGovernanceFlowId(flowId)) {
               let judgeContext: GovernanceJudgeContext;
               try {
@@ -795,8 +814,8 @@ export async function openRoleSession(
                   boundary: setup.role.boundary,
                   trioSpec: trioSpec!,
                   flowId,
-                  req,
-                  metadata: originalMetadata,
+                  req: effectiveReq,
+                  metadata: effectiveMetadata,
                   snapshot: ledgerState.snapshot,
                   conditions,
                 });
@@ -808,19 +827,19 @@ export async function openRoleSession(
                   unavailableReason: truncateText(errText(err), 512),
                 };
               }
-              judgeMetadata = { ...(metadata ?? {}), judgeContext };
+              judgeMetadata = { ...(effectiveMetadata ?? {}), judgeContext };
             }
           }
-          const out = await raw(req, judgeMetadata);
-          const issuedPaths = issue(req, out ?? null, originalMetadata);
+          const out = await raw(effectiveReq, judgeMetadata);
+          const issuedPaths = issue(effectiveReq, out ?? null, effectiveMetadata);
           if (isTrio) {
             const recorded = recordCustomerDecision({
               state: ledgerState,
               projectRoot: input.project.projectRoot,
               roleId: setup.role.id,
               function: trioSpec!.function,
-              req,
-              metadata: originalMetadata,
+              req: effectiveReq,
+              metadata: effectiveMetadata,
               out,
               issuedPaths,
               sessionId: boundSessionForEvidence?.nativeSessionId,
@@ -1680,6 +1699,33 @@ function flowYamlTargetsOf(paths: readonly string[]): Array<{ rel: string; flowI
     targets.push({ rel, flowId: match[1]! });
   }
   return targets;
+}
+
+/**
+ * 2026-10-20 真机：治理角色的写卡确认可能漏带 `cardKind`（Convener 写治理记录卡），导致
+ * `judgeContext` 不计算、桌面直接呈现客户卡。这里按角色 + **已声明路径**做保守兜底：
+ *   · Convener：**全部**声明路径都是 `docs/flows/<flowId>.yaml|yml` ⇒ `schedule-write`；否则 `write`；
+ *   · Rapporteur / Verifier ⇒ `write`；
+ *   · Nominator：**全部**声明路径都在 `角色卡/<id>/` 下 ⇒ `appointment-write`；否则 `write`；
+ *   · 其他内置角色（Liaison 等）不猜；choice 卡不兜底。
+ * 显式 `cardKind` 永远优先；无声明路径（preview/req.paths 都提取不到）也不兜底。
+ */
+function defaultGovernanceConfirmCardKind(
+  roleId: BuiltInGovernanceRoleSpec["id"],
+  declaredPaths: readonly string[],
+): GovernanceCardKind | undefined {
+  if (declaredPaths.length === 0) return undefined;
+  switch (roleId) {
+    case "convener":
+      return declaredPaths.every((rel) => FLOW_YAML_PATH_RE.test(rel)) ? "schedule-write" : "write";
+    case "rapporteur":
+    case "verifier":
+      return "write";
+    case "nominator":
+      return declaredPaths.every((rel) => /^角色卡\/[^/]+\//.test(rel)) ? "appointment-write" : "write";
+    default:
+      return undefined;
+  }
 }
 
 /** 去掉包住 YAML 正文的一层代码围栏（```yaml … ``` / ~~~yaml … ~~~；容忍围栏后还有说明文字）。 */
