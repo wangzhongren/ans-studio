@@ -64,11 +64,12 @@ createFlowService({ projectRoot, actorRoleId, actorPower, defaultFlowId?, writeF
 
 `run-role.ts::scanPreauthorizedArtifacts` 原先只扫**内置治理角色**的 `preauthorizedDirs`，项目角色（tester）写在 `test/evidence/...md` 的产物永远不会产生 `artifact.observed`，导致 `kind: artifact` 步骤即使写了文件也无法 `done`。本批修复：
 
-- **观察目录**：内置治理角色沿用 `preauthorizedDirs`（既有行为逐字不变）；项目角色扫描其 boundary Section 1 中 `kind:"directory"` 且 `root:"project"` 的目录（tester 的 `test/`、`scripts/`，backend 的 `src/`，frontend 的 `public/` 等）；两套集合按角色去重合并。
-- **安全排除**：`.ans/`、`角色卡/` 全树、空/绝对/`..` 路径；扫描器沿用「只收 `.md`、跳过符号链接、按路径排序」。
-- **写账本**：角色 settle 后对新增/变更的 `.md` 追加 `artifact.observed`；项目角色 `actorRoleId=该角色`、`power="project"`（`GovernancePower` 为此新增 `"project"`），内置角色仍为 `power=function`；应用算 sha256；未变更不重复记录。
+- **观察目录**：内置治理角色沿用 `preauthorizedDirs`（既有行为逐字不变，仍只 `.md`）；项目角色扫描其 boundary Section 1 中 `kind:"directory"` 且 `root:"project"` 的目录（tester 的 `test/`、`scripts/`，backend 的 `src/`，frontend 的 `public/` 等）**以及 `kind:"file"` 且 `root:"project"` 的文件条目**（README.md、package.json 等）；两套集合按角色去重合并。
+- **文件类型**（2026-10-20 真机短链接补充）：项目角色不再只收 `.md`，收录 `.md/.js/.mjs/.cjs/.json/.html/.css/.txt/.yaml/.yml/.png/.jpg/.jpeg/.webp/.svg`；boundary file 条目按路径收录（不额外限扩展名）。单文件上限 **2MiB**；文本扩展名含 NUL 的明显二进制跳过；均记诊断 `governance.artifact.skipped{path,reason}`。内置角色仍只 `.md`。
+- **安全排除**：`.ans/`、`角色卡/`、`node_modules/`、`.git/`、`docs/audit/` 全树、空/绝对/`..` 路径；扫描器跳过符号链接；项目外路径不观察。
+- **写账本**：角色 settle 后对新增/变更的文件追加 `artifact.observed`；项目角色 `actorRoleId=该角色`、`power="project"`（`GovernancePower` 为此新增 `"project"`），内置角色仍为 `power=function`；应用算 sha256；未变更不重复记录。
 - **启用范围**：`governanceModel === "trio"`（项目角色）或内置 trio 角色；single/su 项目保持零账本副作用。
-- 测试：tester 在 `test/evidence/foo.md` 写文件并 settle ⇒ `artifact.observed{artifactPath, actorRoleId:"tester", power:"project"}`；内容变更再记一条、未变更不重复；`docs/secret.md`/`.ans/secret.md`/`角色卡/tester/secret.md` 不观察；flow YAML 的 artifact 步骤 `evidence.ref` 指向该路径时 `validateFlowEvidence` 通过。
+- 测试：tester 写 `test/evidence/foo.md` + `test/e2e-fullstack.test.js` ⇒ 两条 `artifact.observed{actorRoleId:"tester", power:"project"}`；内容变更再记一条、未变更不重复；`.md` 文本含 NUL / `.js` >2MiB / `test/node_modules/**` / `docs/secret.*` / `.ans/secret.*` / `角色卡/tester/secret.*` 不观察；flow YAML 两个 artifact 步骤 `evidence.ref` 指向 `.md`/`.js` 时 `validateFlowEvidence` 通过。backend 的 boundary `kind:file` 条目 `README.md`/`package.json` 在 settle 后各记一条，`README.md` 的 `validateFlowEvidence` 通过；未变更不重复。
 
 ### 3.6 应用专用：`completeAcceptanceStep`（2026-10-20 真机补收口）
 
@@ -82,6 +83,27 @@ createFlowService({ projectRoot, actorRoleId, actorPower, defaultFlowId?, writeF
   - **不写客户决定账本、不伪造客户批准**；缺保留验收步骤 ⇒ `acceptance-step-missing`。
 - 测试：accepted+pending ⇒ done+acceptance 证据；重复调用幂等；无 accepted/rejected ⇒ `acceptance-not-accepted` 且文件不变；坏账本 ⇒ `ledger-unavailable`、非法 flow ⇒ `invalid-flow` 均不写盘；只读目录原子写失败 ⇒ `write-failed` 原文件不变；并发两调用 ⇒ 一完成一幂等、revision 一致。
 
+### 3.7 应用专用：`observeFlowArtifacts`（2026-10-20 真机旧证据补偿）
+
+真机：短链接项目 flow 的 `integration-e2e`（`test/e2e-fullstack.test.js`）与 `verification-evidence`（`README.md`）是旧扫描规则下写的；重启后新扫描把它们当基线，不会补 `artifact.observed`，Steward 仍 `insufficient-evidence`。新增并导出（经 `src/pipeline/orchestration/flow-state.ts` 公共出口）：
+
+```ts
+observeFlowArtifacts({ projectRoot, flowId }): Promise<{
+  ok: boolean;
+  observed: string[];
+  skipped: Array<{ path: string; reason: string }>;
+  error?: string;
+}>
+```
+
+- 读 flow YAML；遍历 `kind:"artifact"` 且有 `evidence.ref` 的步骤（status 不限）。
+- 路径安全：拒绝绝对/URL/`..`/空段/项目外/`.ans`/`角色卡`/`.git`/`node_modules`；常规文件、≤2MiB；文本扩展名含 NUL ⇒ `binary` 跳过。
+- 账本已有**同 path+sha** 的 `artifact.observed` ⇒ 幂等跳过（`observed` 不含它、不重复追加）。
+- 追加 `artifact.observed{actorRoleId: step.owner, power: 内置角色按 function / 否则 project, artifactPath: ref, artifactSha256, flowId}`；**不写 customer.decision**、不伪造客户批准。
+- 失败只返回/诊断、不抛；`ok:false` 仅流程/账本不可读或 append 失败；missing/超大/二进制/路径越界只进 `skipped`。
+- 与 flow-service 共用 per-project 串行队列；账本 append 沿用 append-only/fsync 语义。
+- 测试：`.js`/README/契约（owner tester/backend/convener）分别补记（power project/project/schedule、flowId、sha）；账本已有同 path+sha 不重复、重复调用幂等、内容变化再记；missing/too-large/binary/path-invalid（`.ans`/`角色卡`/`.git`/`node_modules`）进 skipped 且不写 customer.decision；`../outside.md` 在 flow YAML 校验阶段 fail-closed。
+
 ## 4. 注入（`run-role.ts`）
 
 - 每个 `openRoleSession` 创建一个 `createFlowService({ projectRoot, actorRoleId: setup.role.id, actorPower: trioSpec?.function ?? "project" })`。
@@ -91,7 +113,7 @@ createFlowService({ projectRoot, actorRoleId, actorPower, defaultFlowId?, writeF
 
 ## 5. 测试与验证（真实输出）
 
-- `test/编排/flow-service.test.ts` **17 例**（11 + Lead manager + 5 completeAcceptanceStep）：
+- `test/编排/flow-service.test.ts` **20 例**（11 + Lead manager + 5 completeAcceptanceStep + 3 observeFlowArtifacts）：
   - get revision=文件 sha256 / Steward/owner/stranger 的 canUpdate；
   - defaultFlowId / 缺失 flowId / not-found / invalid-flow；
   - revision-conflict（带当前 revision/flow，不写盘）；
@@ -104,11 +126,12 @@ createFlowService({ projectRoot, actorRoleId, actorPower, defaultFlowId?, writeF
   - supersede（旧/新关系、重复幂等、验收保留 id、已存在 id、非 Steward forbidden）；
   - 原子写失败 ⇒ write-failed 且原文件字节不变；
   - 并发两个同 revision 更新 ⇒ 恰一成功、一 revision-conflict（串行队列）；
-  - `completeAcceptanceStep`：accepted+pending ⇒ done+acceptance 证据/幂等/未 accepted/rejected/坏账本/非法 flow/原子写失败/并发。
+  - `completeAcceptanceStep`：accepted+pending ⇒ done+acceptance 证据/幂等/未 accepted/rejected/坏账本/非法 flow/原子写失败/并发；
+  - `observeFlowArtifacts`：`.js`/README/契约补记（owner/power/sha/flowId）、同 path+sha 幂等、内容变化再记；missing/超限/二进制/路径越界 skipped；`..` fail-closed。
 - `test/编排/governance-judge.test.ts` 新增：项目角色只有 `flowGet`；内置治理角色有 `flowGet`+`flowStepUpdate`+`flowStepSupersede`。
-- `test/编排/governance-session.test.ts` 新增：项目角色（tester）settle 后观察 boundary directory 内新增/变更的 `.md`（tester `test/evidence/foo.md`）；内容变更/未变更、禁写路径、`validateFlowEvidence` 对账。
-- `node --test "test/编排/flow-service.test.ts"` → **17/17**
-- `node --test "test/编排/**/*.test.ts"` → **704 tests / 704 pass / 0 fail / 0 skipped**
+- `test/编排/governance-session.test.ts` **28 例**：项目角色（tester）settle 后观察 boundary directory 内新增/变更物证（`test/evidence/foo.md` + `test/e2e-fullstack.test.js`）；二进制/超大/依赖目录/私有路径跳过；内容变更/未变更、`validateFlowEvidence` 对账；backend boundary file 条目（README.md/package.json）观察与对账。
+- `node --test "test/编排/flow-service.test.ts"` → **20/20**
+- `node --test "test/编排/**/*.test.ts"` → **708 tests / 708 pass / 0 fail / 0 skipped**
 - `npm run typecheck` → **exit 0**（全仓）
 
 ## 6. 跨角色待办
@@ -119,6 +142,7 @@ createFlowService({ projectRoot, actorRoleId, actorPower, defaultFlowId?, writeF
 4. **`idempotencyKey` 跨进程重放**：本轮仅靠 status/evidence 相等做幂等；若需要跨进程/重启重放，需账本或持久化 LRU（未做）。
 5. **项目角色 artifact 观察**：已随本批修复（§3.5）；项目角色仍只给 `flowGet`，写 flow 仍由工具化路径/后续批次收口。
 6. **桌面窗口（本批跨角色）**：在 acceptance check / verifier settle 检测到账本已有 accepted 时调用 `completeAcceptanceStep({projectRoot, flowId})`（经 `src/pipeline/orchestration/flow-state.ts`），并在同处跳过/去重 verifier 重派；该函数是应用专用，不注册为角色工具。
+7. **桌面窗口（本批跨角色）**：delivered → Steward/Lead 唤醒前调用 `observeFlowArtifacts({projectRoot, flowId})`（同一公共出口），让旧规则下已落盘的 `.js`/README 等补记 `artifact.observed`，再唤醒 Steward/Lead；该函数也是应用专用，不注册为角色工具。
 
 ## 7. 残余风险
 

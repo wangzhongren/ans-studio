@@ -41,7 +41,7 @@
 import type { GovernanceFunction, ProjectConfig, ResolvedRole } from "../../model/role.ts";
 import type { TaskScope, WriteDecision } from "../../model/decision.ts";
 import { createHash } from "node:crypto";
-import { readdir, readFile, stat } from "node:fs/promises";
+import { lstat, readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { resolveRole } from "../../service/role/resolve-role.ts";
 import { resolveBoundary } from "../../service/boundary/resolve-boundary.ts";
@@ -1245,16 +1245,22 @@ export async function openRoleSession(
   log.record("session.open.ready");
 
   // §5.7 `artifact.observed`：会话 open 时扫一次观察目录作为基线（只记哈希、不写账本），每轮 settle 后
-  // 只对「新增/变更」的 `.md` 追加 `artifact.observed`。
-  // 2026-10-20：**项目角色也参与观察**（boundary 的 directory 条目，如 tester test/、backend src/、
-  // frontend public/）；内置治理角色沿用 preauthorizedDirs（既有行为逐字不变）。
+  // 只对「新增/变更」的物证追加 `artifact.observed`。
+  // 2026-10-20：**项目角色也参与观察**（boundary directory 的代码/文档/图片等 + boundary file 条目）；
+  // 内置治理角色沿用 preauthorizedDirs（仅 `.md`，既有行为逐字不变）。
   // single/su 项目不参与治理账本——旧项目行为不变（不因开会话/每轮 settle 凭空写 `.ans`）。
   const artifactDirs = artifactScanDirsFor(setup.role, preauthorizedDirs, builtInGovernance);
+  const artifactFiles = builtInGovernance ? [] : artifactScanFilesFor(setup.role);
   const artifactHashes = new Map<string, string>();
-  const artifactScanEnabled = (isTrio || governanceModel === "trio") && artifactDirs.length > 0;
+  const artifactScanEnabled =
+    (isTrio || governanceModel === "trio") && (artifactDirs.length > 0 || artifactFiles.length > 0);
+  const scanArtifacts = (): Promise<ObservedArtifact[]> =>
+    builtInGovernance
+      ? scanPreauthorizedArtifacts(input.project.projectRoot, artifactDirs)
+      : scanProjectRoleArtifacts(input.project.projectRoot, artifactDirs, artifactFiles, log);
   if (artifactScanEnabled) {
     try {
-      for (const artifact of await scanPreauthorizedArtifacts(input.project.projectRoot, artifactDirs)) {
+      for (const artifact of await scanArtifacts()) {
         artifactHashes.set(artifact.relPath, artifact.sha256);
       }
     } catch (err) {
@@ -1508,7 +1514,7 @@ export async function openRoleSession(
             // 仅新增/变更的 `.md`）：应用算 sha256；账本失败只记诊断，不打断事件流、不回滚角色产物。
             if (artifactScanEnabled) {
               try {
-                const artifacts = await scanPreauthorizedArtifacts(input.project.projectRoot, artifactDirs);
+                const artifacts = await scanArtifacts();
                 for (const artifact of artifacts) {
                   if (artifactHashes.get(artifact.relPath) === artifact.sha256) continue;
                   artifactHashes.set(artifact.relPath, artifact.sha256);
@@ -2407,10 +2413,48 @@ async function computeJudgeContext(args: {
   return context;
 }
 
-/** 预授权目录下 `.md` 的递归扫描结果（项目相对 posix 路径 + 应用算的 sha256）。 */
+/** 预授权/角色边界目录下的 artifact 扫描结果（项目相对 posix 路径 + 应用算的 sha256）。 */
 interface ObservedArtifact {
   relPath: string;
   sha256: string;
+}
+
+/** 项目角色 artifact 观察允许的扩展名（代码/文档/样式/图片；至少覆盖链路证据常见文件）。 */
+const PROJECT_ARTIFACT_EXTENSIONS: ReadonlySet<string> = new Set([
+  ".md", ".js", ".mjs", ".cjs", ".json", ".html", ".css", ".txt", ".yaml", ".yml",
+  ".png", ".jpg", ".jpeg", ".webp", ".svg",
+]);
+/** 项目角色单文件观察上限（超过只记诊断、不读不记 sha）。 */
+const PROJECT_ARTIFACT_MAX_BYTES = 2 * 1024 * 1024;
+/** 项目角色 artifact 观察排除的路径段（应用私有/治理产物/依赖/版本库）。 */
+const PROJECT_ARTIFACT_SKIP_SEGMENTS: ReadonlySet<string> = new Set([".ans", "角色卡", "node_modules", ".git"]);
+/** 图片类扩展不做 NUL 二进制探测（它们本来就是二进制，但属于合法物证）。 */
+const PROJECT_ARTIFACT_IMAGE_EXTENSIONS: ReadonlySet<string> = new Set([".png", ".jpg", ".jpeg", ".webp", ".svg"]);
+
+/** 规范化项目相对路径；空/绝对/`..`/含空段 ⇒ undefined。 */
+function normalizeArtifactRel(raw: string): string | undefined {
+  const rel = raw.replace(/\\/g, "/").replace(/\/+$/, "").trim();
+  if (rel === "" || rel === "." || rel.startsWith("/") || rel.startsWith("../")) return undefined;
+  if (rel.split("/").some((segment) => segment === "" || segment === "." || segment === "..")) return undefined;
+  return rel;
+}
+
+/** 排除应用私有/治理产物/依赖/版本库路径（任一路径段命中即排除）+ `docs/audit/`。 */
+function isSkippedArtifactRel(rel: string): boolean {
+  if (rel === "docs/audit" || rel.startsWith("docs/audit/")) return true;
+  return rel.split("/").some((segment) => PROJECT_ARTIFACT_SKIP_SEGMENTS.has(segment));
+}
+
+function artifactExtension(rel: string): string {
+  const base = rel.split("/").pop() ?? "";
+  const index = base.lastIndexOf(".");
+  return index === -1 ? "" : base.slice(index).toLowerCase();
+}
+
+/** 明显二进制探测（前 8KiB 含 NUL）；图片扩展豁免。 */
+function looksBinaryArtifact(data: Buffer, rel: string): boolean {
+  if (PROJECT_ARTIFACT_IMAGE_EXTENSIONS.has(artifactExtension(rel))) return false;
+  return data.subarray(0, Math.min(data.length, 8192)).includes(0);
 }
 
 /**
@@ -2418,7 +2462,7 @@ interface ObservedArtifact {
  * - 内置治理角色：沿用注册表 `preauthorizedDirs`（既有行为逐字不变）；
  * - 项目角色：boundary Section 1 中 `kind:"directory"` 且 `root:"project"` 的目录（tester 的 `test/`、
  *   `scripts/`，backend 的 `src/`，frontend 的 `public/` 等）；与 `preauthorizedDirs` 去重合并。
- * 安全排除：`.ans/`、`角色卡/` 全树、空/绝对/`..` 路径；仅收 `.md`（扫描器既有规则）。
+ * 安全排除：`.ans/`、`角色卡/`、`node_modules/`、`.git/`、`docs/audit/`、空/绝对/`..` 路径。
  */
 function artifactScanDirsFor(
   role: ResolvedRole,
@@ -2427,11 +2471,8 @@ function artifactScanDirsFor(
 ): string[] {
   const dirs = new Set<string>();
   const add = (raw: string): void => {
-    const rel = raw.replace(/\\/g, "/").replace(/\/+$/, "").trim();
-    if (rel === "" || rel === "." || rel.startsWith("/") || rel.startsWith("../")) return;
-    if (rel === ".ans" || rel.startsWith(".ans/")) return;
-    if (rel === "角色卡" || rel.startsWith("角色卡/")) return;
-    if (rel.split("/").some((segment) => segment === "" || segment === "." || segment === "..")) return;
+    const rel = normalizeArtifactRel(raw);
+    if (rel === undefined || isSkippedArtifactRel(rel)) return;
     dirs.add(rel);
   };
   for (const dir of preauthorizedDirs) add(dir);
@@ -2442,6 +2483,98 @@ function artifactScanDirsFor(
     }
   }
   return [...dirs];
+}
+
+/** 项目角色 boundary 显式 `kind:"file"` 条目（如 README.md、package.json）；排除私有/治理路径。 */
+function artifactScanFilesFor(role: ResolvedRole): string[] {
+  const files = new Set<string>();
+  for (const entry of role.boundary.entries) {
+    if (entry.kind !== "file" || entry.root !== "project") continue;
+    const rel = normalizeArtifactRel(entry.path);
+    if (rel !== undefined && !isSkippedArtifactRel(rel)) files.add(rel);
+  }
+  return [...files];
+}
+
+/**
+ * 2026-10-20 项目角色 artifact 扫描：
+ *   · boundary directory 递归（扩展名白名单；不再只 `.md`）；
+ *   · boundary file 条目按路径收录（如 README.md / package.json）；
+ *   · 跳过符号链接、`.ans/`/`角色卡/`/`node_modules/`/`.git/`/`docs/audit/`；
+ *   · 单文件 >2MiB 或明显二进制（文本扩展名含 NUL）跳过并记诊断；
+ *   · 按路径排序、去重；应用算 sha256。
+ */
+async function scanProjectRoleArtifacts(
+  projectRoot: string,
+  dirs: readonly string[],
+  files: readonly string[],
+  log: ReturnType<typeof createDiagnosticLogger>,
+): Promise<ObservedArtifact[]> {
+  const out: ObservedArtifact[] = [];
+  const seen = new Set<string>();
+
+  const record = async (rel: string, allowAnyExtension: boolean): Promise<void> => {
+    if (seen.has(rel) || isSkippedArtifactRel(rel)) return;
+    if (!allowAnyExtension && !PROJECT_ARTIFACT_EXTENSIONS.has(artifactExtension(rel))) return;
+    const abs = path.join(projectRoot, ...rel.split("/"));
+    let info;
+    try {
+      info = await lstat(abs);
+    } catch {
+      return;
+    }
+    if (!info.isFile() || info.isSymbolicLink()) return;
+    if (info.size > PROJECT_ARTIFACT_MAX_BYTES) {
+      log.record("governance.artifact.skipped", { path: rel, reason: "too-large", size: info.size });
+      return;
+    }
+    let data: Buffer;
+    try {
+      data = await readFile(abs);
+    } catch {
+      return;
+    }
+    if (looksBinaryArtifact(data, rel)) {
+      log.record("governance.artifact.skipped", { path: rel, reason: "binary" });
+      return;
+    }
+    seen.add(rel);
+    out.push({ relPath: rel, sha256: createHash("sha256").update(data).digest("hex") });
+  };
+
+  const walk = async (absDir: string, relDir: string): Promise<void> => {
+    let entries;
+    try {
+      entries = await readdir(absDir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const rel = relDir === "" ? entry.name : `${relDir}/${entry.name}`;
+      if (entry.isSymbolicLink() || isSkippedArtifactRel(rel)) continue;
+      if (entry.isDirectory()) {
+        await walk(path.join(absDir, entry.name), rel);
+        continue;
+      }
+      if (!entry.isFile()) continue;
+      await record(rel, false);
+    }
+  };
+
+  for (const dir of dirs) {
+    const relDir = normalizeArtifactRel(dir);
+    if (relDir === undefined) continue;
+    const abs = path.join(projectRoot, ...relDir.split("/"));
+    try {
+      const info = await stat(abs);
+      if (!info.isDirectory()) continue;
+    } catch {
+      continue;
+    }
+    await walk(abs, relDir);
+  }
+  for (const rel of files) await record(rel, true);
+  return out.sort((a, b) => a.relPath.localeCompare(b.relPath));
 }
 
 /**

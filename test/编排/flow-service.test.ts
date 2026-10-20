@@ -12,9 +12,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { createFlowService, type FlowService } from "../../src/common/编排/flow-service.ts";
-import { completeAcceptanceStep } from "../../src/pipeline/orchestration/flow-state.ts";
+import { completeAcceptanceStep, observeFlowArtifacts } from "../../src/pipeline/orchestration/flow-state.ts";
 import { parseFlowStateYaml, type FlowState } from "../../src/common/编排/flow-state.ts";
-import type { GovernanceLedgerEntry } from "../../src/common/编排/governance-ledger.ts";
+import { readGovernanceLedger, type GovernanceLedgerEntry } from "../../src/common/编排/governance-ledger.ts";
 
 function withRoot<T>(fn: (root: string) => Promise<T>): Promise<T> {
   const root = mkdtempSync(join(tmpdir(), "ans-flow-service-"));
@@ -27,10 +27,10 @@ function withRoot<T>(fn: (root: string) => Promise<T>): Promise<T> {
   });
 }
 
-function writeFile(root: string, rel: string, content: string): void {
+function writeFile(root: string, rel: string, content: string | Buffer): void {
   const abs = join(root, ...rel.split("/"));
   mkdirSync(join(abs, ".."), { recursive: true });
-  writeFileSync(abs, content, "utf8");
+  writeFileSync(abs, content);
 }
 
 const FLOW_REL = "docs/flows/flow-a.yaml";
@@ -635,5 +635,195 @@ test("completeAcceptanceStep：并发两调用经串行队列 ⇒ 一完成一�
     assert.equal([first, second].filter((result) => result.idempotent === true).length, 1, "恰一幂等");
     assert.equal(first.revision, second.revision);
     assert.equal(stepOf(readFlow(root).flow, "verification").status, "done");
+  });
+});
+
+// —————————————————————— 应用专用：observeFlowArtifacts ——————————————————————
+
+function observeFlowYaml(): string {
+  return [
+    "flowId: flow-a",
+    "version: 1",
+    "qualityTier: production",
+    "steps:",
+    "  - id: integration-e2e",
+    "    title: 全栈端到端",
+    "    owner: tester",
+    "    kind: artifact",
+    "    status: delivered",
+    "    evidence: { kind: artifact, ref: test/e2e-fullstack.test.js }",
+    "  - id: verification-evidence",
+    "    title: 证据整理",
+    "    owner: backend",
+    "    kind: artifact",
+    "    status: delivered",
+    "    evidence: { kind: artifact, ref: README.md }",
+    "  - id: contract-freeze",
+    "    title: 契约冻结",
+    "    owner: convener",
+    "    kind: artifact",
+    "    status: delivered",
+    "    evidence: { kind: artifact, ref: docs/contracts/c-v1.md }",
+    "  - id: verification",
+    "    title: 验收",
+    "    owner: verifier",
+    "    kind: acceptance",
+    "    status: pending",
+    "",
+  ].join("\n");
+}
+
+test("observeFlowArtifacts：.js/README/契约补记 artifact.observed；owner/power/sha/flowId；幂等", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, FLOW_REL, observeFlowYaml());
+    writeFile(root, "test/e2e-fullstack.test.js", "// e2e fullstack\n");
+    writeFile(root, "README.md", "# readme\n");
+    writeFile(root, "docs/contracts/c-v1.md", "# contract\n");
+
+    // 账本已有 .js 的同 path+sha 观察 ⇒ 本次不重复追加。
+    const jsSha = sha256(readFileSync(join(root, "test", "e2e-fullstack.test.js")));
+    writeLedger(root, [ledgerEntry({
+      kind: "artifact.observed",
+      actorRoleId: "tester",
+      power: "project",
+      artifactPath: "test/e2e-fullstack.test.js",
+      artifactSha256: jsSha,
+      flowId: "flow-a",
+    })]);
+
+    const first = await observeFlowArtifacts({ projectRoot: root, flowId: "flow-a" });
+    assert.equal(first.ok, true, first.error ?? "");
+    assert.deepEqual(first.observed.sort(), ["README.md", "docs/contracts/c-v1.md"], "已有同 path+sha 的 .js 不重复");
+    assert.deepEqual(first.skipped, []);
+
+    const ledger = await readGovernanceLedger(root);
+    const observed = ledger.entries.filter((entry) => entry.kind === "artifact.observed");
+    assert.equal(observed.length, 3, "js 原有 1 + 本次 README/契约 2");
+    const byPath = new Map(observed.map((entry) => [entry.artifactPath, entry]));
+    assert.equal(byPath.get("README.md")?.actorRoleId, "backend");
+    assert.equal(byPath.get("README.md")?.power, "project");
+    assert.equal(byPath.get("README.md")?.flowId, "flow-a");
+    assert.equal(byPath.get("README.md")?.artifactSha256, sha256(readFileSync(join(root, "README.md"))));
+    assert.equal(byPath.get("docs/contracts/c-v1.md")?.actorRoleId, "convener");
+    assert.equal(byPath.get("docs/contracts/c-v1.md")?.power, "schedule", "内置角色按 function");
+    assert.equal(byPath.get("test/e2e-fullstack.test.js")?.artifactSha256, jsSha);
+
+    // 重复调用幂等。
+    const second = await observeFlowArtifacts({ projectRoot: root, flowId: "flow-a" });
+    assert.deepEqual(second.observed, []);
+    assert.equal((await readGovernanceLedger(root)).entries.filter((entry) => entry.kind === "artifact.observed").length, 3);
+
+    // 内容变化 ⇒ 新观察。
+    writeFile(root, "README.md", "# readme v2\n");
+    const third = await observeFlowArtifacts({ projectRoot: root, flowId: "flow-a" });
+    assert.deepEqual(third.observed, ["README.md"]);
+    assert.equal((await readGovernanceLedger(root)).entries.filter((entry) => entry.kind === "artifact.observed").length, 4);
+
+    // 不写客户决定账本。
+    assert.equal((await readGovernanceLedger(root)).entries.filter((entry) => entry.kind === "customer.decision").length, 0);
+  });
+});
+
+test("observeFlowArtifacts：缺失/超限/二进制/路径越界 ⇒ skipped；不写客户决定", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, FLOW_REL, [
+      "flowId: flow-a",
+      "version: 1",
+      "qualityTier: production",
+      "steps:",
+      "  - id: missing",
+      "    title: 缺失",
+      "    owner: tester",
+      "    kind: artifact",
+      "    status: delivered",
+      "    evidence: { kind: artifact, ref: missing.md }",
+      "  - id: huge",
+      "    title: 超大",
+      "    owner: tester",
+      "    kind: artifact",
+      "    status: delivered",
+      "    evidence: { kind: artifact, ref: test/huge.js }",
+      "  - id: binary",
+      "    title: 二进制",
+      "    owner: tester",
+      "    kind: artifact",
+      "    status: delivered",
+      "    evidence: { kind: artifact, ref: test/binary.md }",
+      "  - id: private-ans",
+      "    title: 私有",
+      "    owner: tester",
+      "    kind: artifact",
+      "    status: delivered",
+      "    evidence: { kind: artifact, ref: .ans/secret.md }",
+      "  - id: private-role",
+      "    title: 角色卡",
+      "    owner: tester",
+      "    kind: artifact",
+      "    status: delivered",
+      "    evidence: { kind: artifact, ref: 角色卡/x.md }",
+      "  - id: private-git",
+      "    title: git",
+      "    owner: tester",
+      "    kind: artifact",
+      "    status: delivered",
+      "    evidence: { kind: artifact, ref: .git/config }",
+      "  - id: private-node",
+      "    title: node_modules",
+      "    owner: tester",
+      "    kind: artifact",
+      "    status: delivered",
+      "    evidence: { kind: artifact, ref: node_modules/dep/index.js }",
+      "  - id: verification",
+      "    title: 验收",
+      "    owner: verifier",
+      "    kind: acceptance",
+      "    status: pending",
+      "",
+    ].join("\n"));
+    writeFile(root, "test/huge.js", "x".repeat(2 * 1024 * 1024 + 1));
+    writeFile(root, "test/binary.md", Buffer.from([0x23, 0x00, 0x01]));
+
+    const result = await observeFlowArtifacts({ projectRoot: root, flowId: "flow-a" });
+    assert.equal(result.ok, true, result.error ?? "");
+    assert.deepEqual(result.observed, []);
+    const reasons = new Map(result.skipped.map((item) => [item.path, item.reason]));
+    assert.equal(reasons.get("missing.md"), "missing");
+    assert.equal(reasons.get("test/huge.js"), "too-large");
+    assert.equal(reasons.get("test/binary.md"), "binary");
+    assert.equal(reasons.get(".ans/secret.md"), "path-invalid");
+    assert.equal(reasons.get("角色卡/x.md"), "path-invalid");
+    assert.equal(reasons.get(".git/config"), "path-invalid");
+    assert.equal(reasons.get("node_modules/dep/index.js"), "path-invalid");
+
+    const ledger = await readGovernanceLedger(root);
+    assert.equal(ledger.entries.filter((entry) => entry.kind === "artifact.observed").length, 0);
+    assert.equal(ledger.entries.filter((entry) => entry.kind === "customer.decision").length, 0);
+  });
+});
+
+test("observeFlowArtifacts：`..`/绝对路径在 flow YAML 校验阶段 fail-closed", async () => {
+  await withRoot(async (root) => {
+    writeFile(root, FLOW_REL, [
+      "flowId: flow-a",
+      "version: 1",
+      "qualityTier: production",
+      "steps:",
+      "  - id: outside",
+      "    title: 项目外",
+      "    owner: tester",
+      "    kind: artifact",
+      "    status: delivered",
+      "    evidence: { kind: artifact, ref: ../outside.md }",
+      "  - id: verification",
+      "    title: 验收",
+      "    owner: verifier",
+      "    kind: acceptance",
+      "    status: pending",
+      "",
+    ].join("\n"));
+    const result = await observeFlowArtifacts({ projectRoot: root, flowId: "flow-a" });
+    assert.equal(result.ok, false);
+    assert.match(result.error ?? "", /evidence\.ref|项目相对路径/);
+    assert.deepEqual(result.observed, []);
   });
 });

@@ -3963,7 +3963,9 @@ test("2026-10-20 僵尸步骤自检：dispatched/delivered 且 owner 无会话/�
     assert.match(first, /flow_get/, "提示用 flow_get 核对");
     assert.match(first, /flow_step_supersede/, "提示必要时 supersede");
     assert.match(first, /dispatch_task/, "提示重派");
-    assert.equal(openRoles.length, 0, "不自动派发（不开任何会话）");
+    // 2026-10-20：delivered 步骤现在会另行走「唤醒 Steward 核证」路径（可能开 Convener 会话），
+    // 僵尸自检本身**不派发、不写派发账本**——以账本为准断言（不按 openRoles 计数）。
+    assert.equal(await ledgersConvenerDispatches(root, flowId), 0, "僵尸自检不写派发账本（不自动派发）");
     assert.equal(customerCalls.length, 0, "不弹客户卡");
     // 同一 revision+stale 集合：重复刷新不重复提示。
     await iface.listProject({ projectRoot: root });
@@ -3980,7 +3982,7 @@ test("2026-10-20 僵尸步骤自检：dispatched/delivered 且 owner 无会话/�
     );
     await iface.listProject({ projectRoot: root });
     await waitForTest(() => zombieNotes().length > 1, 4000);
-    assert.equal(openRoles.length, 0, "再次提示仍不自动派发");
+    assert.equal(await ledgersConvenerDispatches(root, flowId), 0, "再次提示仍不写派发账本（不自动派发）");
     await iface.stopSession();
   } finally {
     rmSync(root, { recursive: true, force: true });

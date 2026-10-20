@@ -1272,3 +1272,29 @@
 **测试**：`flow-service.test.ts` **17/17**（+5：accepted+pending ⇒ done+acceptance 证据/幂等；无 accepted/rejected ⇒ acceptance-not-accepted 文件不变；坏账本/非法 flow 不写盘；只读目录原子写失败原文件不变；并发两调用一完成一幂等）；`test/编排/**` **704 计 704 过 0 红 0 skipped**；`npm run typecheck` **exit 0**（全仓）。
 
 **跨角色**：桌面在 acceptance check / verifier settle 检测到 accepted 时调用 `completeAcceptanceStep`，并在同处跳过/去重 verifier 重派。详见[变更记录](docs/change/2026-10-20_change_flow-service.md) §3.6。
+
+## 2026-10-20 — 项目角色 artifact 观察扩展（非 `.md` + boundary file 条目）
+
+**来源**：真机短链接项目 flow 的 `integration-e2e`（owner test，artifact，`test/e2e-fullstack.test.js`）与 `verification-evidence`（owner backend，artifact，`README.md`）已 delivered，但账本无对应 `artifact.observed`——项目角色观察仍只扫 boundary directory 的 `.md`，`.js` 与 boundary `kind:file` 条目不观察，Steward/Lead 标 done 被 `insufficient-evidence` 拒。
+
+**改了什么**
+- `run-role.ts` 项目角色扫描扩展：boundary directory 递归不再只收 `.md`，收录 `.md/.js/.mjs/.cjs/.json/.html/.css/.txt/.yaml/.yml/.png/.jpg/.jpeg/.webp/.svg`；同时收录 boundary `kind:"file"` 且 `root:"project"` 的文件（README.md、package.json 等）；单文件上限 2MiB，文本扩展名含 NUL 的明显二进制跳过并记诊断 `governance.artifact.skipped`。
+- 排除 `.ans/`、`角色卡/`、`node_modules/`、`.git/`、`docs/audit/`、符号链接、项目外；去重；未变更不重复。
+- 内置治理角色继续用 `preauthorizedDirs`（仍只 `.md`）；single/su 零账本副作用不变。
+
+**测试**：tester 写 `test/evidence/foo.md` + `test/e2e-fullstack.test.js` ⇒ 两条 observed；二进制/超大/`node_modules`/私有路径跳过；`.md`/`.js` 两个 artifact 步骤 `validateFlowEvidence` 通过；backend boundary file 条目 README.md/package.json 观察与对账；未变更不重复；`governance-session.test.ts` **28/28**、`test/编排/**` **705 计 705 过 0 红 0 skipped**、`npm run typecheck` **exit 0**（全仓）。详见[变更记录](docs/change/2026-10-20_change_flow-service.md) §3.5。
+
+## 2026-10-20 — 旧证据补偿：`observeFlowArtifacts`
+
+**来源**：短链接项目的 `integration-e2e`（`test/e2e-fullstack.test.js`）与 `verification-evidence`（`README.md`）是旧扫描规则下写的；重启后新扫描把它们当基线，不会补 `artifact.observed`，Steward 仍被 `insufficient-evidence` 拒。
+
+**改了什么**
+- `flow-service.ts` 新增并导出 `observeFlowArtifacts({projectRoot, flowId})`（应用专用，非角色工具；经 `pipeline/orchestration/flow-state.ts` 公共出口导出）：
+  - 读 flow YAML，遍历 `kind:"artifact"` 且有 `evidence.ref` 的步骤（status 不限）；
+  - 路径安全（绝对/URL/`..`/项目外/`.ans`/`角色卡`/`.git`/`node_modules` 拒绝）、常规文件、≤2MiB、文本 NUL 探测；
+  - 账本已有同 path+sha 的 `artifact.observed` ⇒ 幂等跳过；否则追加 `artifact.observed{actorRoleId: step.owner, power: 内置角色按 function/否则 project, artifactPath, artifactSha256, flowId}`；
+  - 不写 `customer.decision`；missing/超限/二进制/路径越界进 `skipped`；流程/账本不可读或 append 失败返回 `ok:false`，不抛；共享 per-project 串行队列。
+
+**测试**：`flow-service.test.ts` **20/20**（+3：`.js`/README/契约补记与幂等；missing/超限/二进制/路径越界 skipped 且不写客户决定；`..` fail-closed）；`test/编排/**` **708 计 708 过 0 红 0 skipped**；`npm run typecheck` **exit 0**（全仓）。
+
+**跨角色**：桌面在 delivered → Steward/Lead 唤醒前调用 `observeFlowArtifacts`，再唤醒 Steward/Lead。详见[变更记录](docs/change/2026-10-20_change_flow-service.md) §3.7。
