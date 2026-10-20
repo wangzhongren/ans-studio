@@ -1,12 +1,13 @@
 # 桌面应用 变更记录
 
-## 2026-10-20 — v1.4.0 首跑 CI 两处测试竞态修复（验收派发 / macOS 临时目录清理）
+## 2026-10-20 — v1.4.0 CI 两处测试竞态修复（验收派发 / macOS 临时目录清理；含第二轮夹具凭据隔离）
 
-**来源**：v1.4.0 发布 CI 首跑 `run 39389502551`（提交 `0210e2b`）失败，两处均属桌面应用测试。
+**来源**：v1.4.0 发布 CI 首跑 `run 39389502551`（提交 `0210e2b`）两处失败均属桌面应用测试；第二轮 `run 39391972925`（提交 `567d3bd`）同一验收派发用例转为 5s 超时，补修夹具环境依赖。
 
 - **三平台共同红（interface.test.ts:3035）**：`runHandbackAcceptanceScenario` 只在 verifier 会话真正打开时才写入 `sendsByRole`；用例在场景返回后立即 `?? []` 取数组，CI 并行负载下 verifier 尚未打开，捕获到与后续派发无关的空数组 ⇒ `actual 0 / expected 1`。修复：先 `waitForTest(..., 5000)` 等首条任务落位再取当前数组；系统行同样有界等待；「重复 settle 不重派」改为 400ms **有界稳定窗口**（重开新会话=map 值被替换、追加=长度变化，两者都抓），不再只靠 150ms 固定 sleep；相邻 pending/blocked 用例先等「自动验收未派发」阻塞系统行再断言 0 派发，堵住同类假绿。
+- **第二轮补充（run 39391972925）**：同一用例三平台仍红但错误变为 `waitForTest` 5s 超时（verifier 始终无 send）。根因：`runHandbackAcceptanceScenario` 未注入 `resolveRuntimeFn`，CI runner 无任何模型凭据（也无仓库 `.env`），真实引擎解析如实拦住自动验收派发（本机 `.env` 有 Pi 凭据故通过）——**夹具环境依赖，不是产品慢**。修复：在该夹具 deps 注入确定性解析 `resolveRuntimeFn: async () => ({ ok: true, runtime: "pi", source: "credentials", skipped: [] })`（与本文件既有用例一致），不放宽断言、不改产品代码；此前的等待/稳定窗口修复保留。
 - **macOS arm64 红（runtime-resolution.test.ts:624 teardown）**：`stopSession()` 后仍有异步写入落盘，`rmSync` 撞 `ENOTEMPTY`。修复：新增 `removeTempDirEventually`（异步 rm，仅对 ENOTEMPTY/EBUSY/EPERM 最多重试 10 次、间隔 75ms，末次仍失败才抛；其它错误直抛），该文件全部 teardown 统一使用；语义性删除仍保留 `rmSync`。
-- **验证**：`node --test test/桌面应用/interface.test.ts` **74/74** 连续 3 次全绿；`node --test test/桌面应用/runtime-resolution.test.ts` **13/13** 连续 3 次全绿；`npm run typecheck` 0 错；从测试文件抽取真实清理 helper 做故障注入，确认 ENOTEMPTY 重试 / EACCES 直抛 / 10 次耗尽后抛错三条路径；无临时目录遗留。**未跑全量与 Electron e2e**；真实 CI 并行负载仍需原生 runner 复验。详见[变更记录](docs/change/2026-10-20_change_ci-test-races.md)。未提交、未推送。
+- **验证**：`node --test test/桌面应用/interface.test.ts` **74/74** 连续 3 次全绿；无凭据临时副本（排除 `.env`、清空相关环境变量）**74/74**，同副本删除注入的控制组以 `等待测试条件超时` 复现（2 用例：1 pass / 1 fail）；`node --test test/桌面应用/runtime-resolution.test.ts` **13/13** 连续 3 次全绿；两文件合并 87/87；`npm run typecheck` 0 错；清理 helper 故障注入确认 ENOTEMPTY 重试 / EACCES 直抛 / 10 次耗尽后抛错三条路径；无临时目录遗留。**第二轮 CI 仍是红的，不声称 CI 已通过**；未跑全量与 Electron e2e，最终仍需原生 CI runner 复验。详见[变更记录](docs/change/2026-10-20_change_ci-test-races.md)。未提交、未推送。
 
 ## 2026-10-13 — 按 UI/UX v2 设计对齐桌面视觉与骨架（客户「按照 UI设计来改」授权）
 

@@ -12,12 +12,16 @@
     "test/桌面应用/runtime-resolution.test.ts",
     "test/编排/flow-service.test.ts",
     "test/编排/shell-command-guard.test.ts",
+    "test/装配/multi-runtime.test.ts",
     "test/装配/release-packaging.test.ts",
     "角色卡/桌面应用/changelog.md",
+    "角色卡/桌面应用/docs/change/2026-10-20_change_ci-test-races.md",
     "角色卡/桌面应用/memo.md",
     "角色卡/编排/changelog.md",
+    "角色卡/编排/docs/change/2026-10-20_change_v1.4.0-ci-windows-guard-atomic-write.md",
     "角色卡/编排/memo.md",
     "角色卡/装配/changelog.md",
+    "角色卡/装配/docs/change/2026-10-20-release-packaging-v1.4-evidence/overlay-2-context.md",
     "角色卡/装配/docs/change/2026-10-20-release-packaging-v1.4-evidence/overlay-recompute.json",
     "角色卡/装配/docs/change/2026-10-20-release-packaging-v1.4-evidence/sim-provenance.json",
     "角色卡/装配/docs/change/2026-10-20-release-packaging-v1.4-evidence/test-assembly.txt",
@@ -25,9 +29,8 @@
     "角色卡/装配/docs/change/2026-10-20_change_v1.4-release-packaging.md",
     "角色卡/装配/docs/feature/desktop-release-packaging.md",
     "角色卡/装配/memo.md",
-    "角色卡/桌面应用/docs/change/2026-10-20_change_ci-test-races.md",
-    "角色卡/编排/docs/change/2026-10-20_change_v1.4.0-ci-windows-guard-atomic-write.md",
-    "角色卡/装配/docs/change/2026-10-20-release-packaging-v1.4-evidence/overlay-2-context.md"
+    "角色卡/装配/docs/change/2026-10-20-release-packaging-v1.4-evidence/multi-runtime-test.txt",
+    "角色卡/装配/docs/change/2026-10-20-release-packaging-v1.4-evidence/overlay-3-context.md"
   ],
   "selected": [
     ".github/workflows/release.yml",
@@ -40,15 +43,19 @@
     "test/桌面应用/runtime-resolution.test.ts",
     "test/编排/flow-service.test.ts",
     "test/编排/shell-command-guard.test.ts",
+    "test/装配/multi-runtime.test.ts",
     "test/装配/release-packaging.test.ts"
   ],
   "excluded": [
     "README.md",
     "角色卡/桌面应用/changelog.md",
+    "角色卡/桌面应用/docs/change/2026-10-20_change_ci-test-races.md",
     "角色卡/桌面应用/memo.md",
     "角色卡/编排/changelog.md",
+    "角色卡/编排/docs/change/2026-10-20_change_v1.4.0-ci-windows-guard-atomic-write.md",
     "角色卡/编排/memo.md",
     "角色卡/装配/changelog.md",
+    "角色卡/装配/docs/change/2026-10-20-release-packaging-v1.4-evidence/overlay-2-context.md",
     "角色卡/装配/docs/change/2026-10-20-release-packaging-v1.4-evidence/overlay-recompute.json",
     "角色卡/装配/docs/change/2026-10-20-release-packaging-v1.4-evidence/sim-provenance.json",
     "角色卡/装配/docs/change/2026-10-20-release-packaging-v1.4-evidence/test-assembly.txt",
@@ -56,8 +63,7 @@
     "角色卡/装配/docs/change/2026-10-20_change_v1.4-release-packaging.md",
     "角色卡/装配/docs/feature/desktop-release-packaging.md",
     "角色卡/装配/memo.md",
-    "角色卡/桌面应用/docs/change/2026-10-20_change_ci-test-races.md",
-    "角色卡/编排/docs/change/2026-10-20_change_v1.4.0-ci-windows-guard-atomic-write.md",
-    "角色卡/装配/docs/change/2026-10-20-release-packaging-v1.4-evidence/overlay-2-context.md"
+    "角色卡/装配/docs/change/2026-10-20-release-packaging-v1.4-evidence/multi-runtime-test.txt",
+    "角色卡/装配/docs/change/2026-10-20-release-packaging-v1.4-evidence/overlay-3-context.md"
   ]
 }

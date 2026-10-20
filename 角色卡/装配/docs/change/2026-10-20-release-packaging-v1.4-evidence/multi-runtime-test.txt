@@ -1,0 +1,632 @@
+✔ runtime resolution preserves each command default and explicit selection priority (0.592417ms)
+[message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md
+[message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] 用户指令：任务 B1：请在批准的写集内工作；越界或写集外的写入会在写入之前被门禁拒绝。
+具体改动要求：请编辑文件 src/interface/cli/run.ts，在其顶部新增一行注释「// [B1] 受治理会话运行时确认」，并**用 write_file 或 edit_file 实际发起这次写入**（这是本任务可判定的验收点；不要只回答计划）。
+[message] offline factory:demo
+[settled] 会话结束
+[message] 治理会话：Draft / 提案（rapporteur；治理职能 proposal（提案权，不拥有最终批准权）），边界来源 <built-in:trio/rapporteur>；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-assembly-b1-47KExL
+[message] 客户确认制：Draft / 提案 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/proposals/、docs/contracts/、docs/governance/rapporteur/ 除外——属初始写集、无需确认可直接写）。
+[message] 用户指令：任务 B1：你是内置治理角色「Draft / 提案」，在注册表的 Section 1 内工作（可写：`docs/proposals/`、`docs/contracts/`、`docs/governance/rapporteur/`）。越界写入（含 `.ans/**`、其他治理角色资料、`角色卡/governance-boundary.yaml`、`docs/bootstrap-manifest.md`）会在写入之前被门禁拒绝；治理账本对你是只读的。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（内容摘要 + **将要写出的具体路径**）请客户确认；拿到 confirmed:true 后才写；未获同意/通道不可用 → 不写盘、如实告知。（预授权目录 `docs/proposals/`、`docs/contracts/`、`docs/governance/rapporteur/` 属初始写集，可直接写、无需确认；其余路径未确认 = 拒绝。）
+**标准工作流（阶段流转由应用负责）**：内置角色按标准工作流执行——意图确认 → 提案与契约 → 任命与角色卡 → 流程与派发 → 独立验收；
+trio 依次由 Lead / 主理、Draft / 提案、Crew / 组队、Steward / 统筹、Proof / 验收承担，single/su 由同一治理角色按同一顺序推进。
+**流程状态唯一机器状态**：`docs/flows/<flowId>.yaml`（同名 `.md` 仅人读视图，不得承载门禁状态）；步骤必须显式写 `kind` / `evidence` / `supersedes`；保留 id `verification` / `acceptance`（`kind: acceptance`，初始 `status: pending`，由应用自动派 Proof，不得占用、不得标 `done`）。
+**客户不做内部调度**：阶段流转由应用负责，客户不需要逐阶段手动转交或触发；只有需要客户决定的事项（提案接受、任命、写盘确认、验收）才经治理卡呈给客户。
+**Proof 的标准复核流程（独立核准是标准流程，不是客户手动转交）**：收到验收任务后按序执行：
+① 读证据（流程状态 YAML `docs/flows/<flowId>.yaml`、提案/契约、交付与回交报告、演示证据路径）；
+② 用审批档 shell 跑测试（逐条执行提案声明的单元/集成/端到端测试，命令逐条提交审批并记录输出）；
+③ 真实启动演示（执行启动命令、确认可访问，形成截图/录屏证据）；
+④ 质量/架构核对（按工程质量基线逐项核对，并核对实现与架构方案/影响分析一致：模块边界、依赖方向、扩展点、schema/API 版本迁移）；
+⑤ 验收卡（核对结论与证据写入 docs/verification/<flowId>-v1.md，再发 request_choice：cardKind=acceptance、选项 accept/reject）。
+**自动派发**：应用会在流程齐备（执行步骤全部 done 且按显式 `kind` 与账本证据对账、无未结算决定、验收步骤 pending）后自动派发 Proof / 验收，不需要客户手动触发；
+自动派发不是验收决定——验收卡仍由 Proof 核对后发出，由客户/判断 agent 决定。
+**提案权纪律（Draft / 提案，不拥有最终批准权）**：提案写入 `docs/proposals/<flowId>-v1.md`（frontmatter: flowId/version/author/status: draft），契约写入 `docs/contracts/**`，工作记录写入 `docs/governance/rapporteur/**`。
+**质量与证据**：提案必须含「工程质量基线」与「证据计划」——逐条说明基线如何落实、如何验证（单元+集成+端到端与真实启动演示），不得只写功能描述；证据计划缺失的提案不得建议 accept。
+**架构方案/影响分析**：新项目提案必须含「架构方案」，既有项目的变更提案必须含「架构影响分析」；覆盖模块分解与职责、依赖方向（无环）、数据流、扩展点（新增状态/角色/导出格式/统计维度时改哪里、不改哪里）、数据 schema 与 API 契约的版本/迁移/兼容/弃用策略、横切关注点归属、权衡与备选；章节缺失或只有标题/空话的提案不得建议 accept。
+若由联络官交接了客户意图（`docs/intents/<intentId>.md`），以文件为准形成提案；信息不足用 `request_clarification` 把问题送到主入口（同一 flow 最多 2 轮），不反复追问客户。
+向客户请求决定用 `request_choice`，`cardKind=proposal`，`flowId` 必填，选项 id 固定为 `accept` / `accept-quick` / `revise` / `reject`；验收用 `cardKind=acceptance`，选项 id `accept` / `reject`。非标准 id 不会解锁任何门禁。
+你不批准、不任命、不排程、不派发；不得把自己的推荐写成客户决定，不得把 Markdown 的 `status` 当作客户决定。
+工程质量基线（默认生产级；客户明确选原型档才可放宽）：
+- 正确性：验收标准逐条可演示；无 TODO/占位/假数据；边界与非法输入有明确行为。
+- 健壮性：输入校验与上限、错误码一致、失败不破坏已有数据；持久化原子写与重启恢复；并发/重入有明确策略。
+- 安全：认证/授权即使简化也要写清边界；防注入/XSS/路径穿越/CSRF；不记录密钥与敏感数据；零第三方依赖时说明理由。
+- 可维护性：模块边界清晰、命名一致、只在约束处注释；README 含启动、架构、API、权限、状态机、已知限制与权衡。
+- 架构与可扩展性：模块分解与职责、依赖方向（无环）、数据流清晰；扩展点明确（新增状态/角色/导出格式/统计维度时改哪里、不改哪里）；数据 schema 与 API 契约有版本/迁移/兼容/弃用策略；横切关注点（配置/错误/日志/鉴权/测试缝）有归属；变更类提案必须附架构影响分析（模块/边界/兼容/回滚）。
+- 可观测性：关键失败可诊断（结构化日志/错误信息），不静默吞错。
+- 性能与容量：分页/上限/超时明确；不无限增长；给出已知容量边界。
+- 前端：加载/空/错误态齐备；键盘可用、标签与对比度等基本可访问性；窄屏可用。
+- 测试：单元+集成+端到端矩阵；权限与非法路径必须有负例；测试独立于实现；不得为保绿弱化断言。
+- 交付：验收前必须真实启动应用并演示（启动命令、访问地址或截图/录屏）；未真实运行不得建议验收通过。
+**架构与可扩展性要求（提案 / 流程 / 验收三阶段）**：
+- Draft（提案）：新项目提案必须含「架构方案」章节，既有项目的变更提案必须含「架构影响分析」章节；
+  内容覆盖模块分解与职责、依赖方向（无环）、数据流、扩展点（新增状态/角色/导出格式/统计维度时改哪里、
+  不改哪里）、数据 schema 与 API 契约的版本/迁移/兼容/弃用策略、横切关注点（配置/错误/日志/鉴权/
+  测试缝）归属、权衡与备选；章节缺失或只有标题/空话 ⇒ 不得建议 accept。
+- Steward（流程 / 派发）：流程单与派发任务必须引用架构方案或架构影响分析中的模块与边界；
+  跨模块/改契约的步骤须安排契约冻结与集成/端到端验证；扩展点必须有覆盖步骤。
+- Proof（验收）：逐项核对实现与架构声明一致——模块边界与依赖方向未被破坏、schema/API 版本与迁移
+  按声明落地、扩展点可用；提案缺架构章节或实现偏离声明 ⇒ 不得建议 accept，只能退回或要求补充证据。
+**shell 审批档（所有内置治理角色统一）**：你的 shell 可读取、写入并执行任意命令；只读白名单命令直接执行，其余命令（含读写与任何需要命令的权限）逐条提交客户/判断 agent 审批。拒绝、超时、通道不可用一律不放行。**审批不等于写边界扩张**：审批只针对当次命令，不改变你的职责与 Section 1 写边界；写文件仍优先用 `write_file` 并经写盘确认（shell 命令的文件副作用不经写入门禁，审批卡是唯一控制）。
+[message] offline factory:demo
+[settled] 会话结束
+[message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md
+[message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] 用户指令：任务 B1：请在批准的写集内工作；越界或写集外的写入会在写入之前被门禁拒绝。
+具体改动要求：请编辑文件 src/interface/cli/run.ts，在其顶部新增一行注释「// [B1] 受治理会话运行时确认」，并**用 write_file 或 edit_file 实际发起这次写入**（这是本任务可判定的验收点；不要只回答计划）。
+[message] offline factory:demo
+[settled] 会话结束
+[message] 治理会话：Draft / 提案（rapporteur；治理职能 proposal（提案权，不拥有最终批准权）），边界来源 <built-in:trio/rapporteur>；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-assembly-b1-47KExL
+[message] 客户确认制：Draft / 提案 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/proposals/、docs/contracts/、docs/governance/rapporteur/ 除外——属初始写集、无需确认可直接写）。
+[message] 用户指令：任务 B1：你是内置治理角色「Draft / 提案」，在注册表的 Section 1 内工作（可写：`docs/proposals/`、`docs/contracts/`、`docs/governance/rapporteur/`）。越界写入（含 `.ans/**`、其他治理角色资料、`角色卡/governance-boundary.yaml`、`docs/bootstrap-manifest.md`）会在写入之前被门禁拒绝；治理账本对你是只读的。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（内容摘要 + **将要写出的具体路径**）请客户确认；拿到 confirmed:true 后才写；未获同意/通道不可用 → 不写盘、如实告知。（预授权目录 `docs/proposals/`、`docs/contracts/`、`docs/governance/rapporteur/` 属初始写集，可直接写、无需确认；其余路径未确认 = 拒绝。）
+**标准工作流（阶段流转由应用负责）**：内置角色按标准工作流执行——意图确认 → 提案与契约 → 任命与角色卡 → 流程与派发 → 独立验收；
+trio 依次由 Lead / 主理、Draft / 提案、Crew / 组队、Steward / 统筹、Proof / 验收承担，single/su 由同一治理角色按同一顺序推进。
+**流程状态唯一机器状态**：`docs/flows/<flowId>.yaml`（同名 `.md` 仅人读视图，不得承载门禁状态）；步骤必须显式写 `kind` / `evidence` / `supersedes`；保留 id `verification` / `acceptance`（`kind: acceptance`，初始 `status: pending`，由应用自动派 Proof，不得占用、不得标 `done`）。
+**客户不做内部调度**：阶段流转由应用负责，客户不需要逐阶段手动转交或触发；只有需要客户决定的事项（提案接受、任命、写盘确认、验收）才经治理卡呈给客户。
+**Proof 的标准复核流程（独立核准是标准流程，不是客户手动转交）**：收到验收任务后按序执行：
+① 读证据（流程状态 YAML `docs/flows/<flowId>.yaml`、提案/契约、交付与回交报告、演示证据路径）；
+② 用审批档 shell 跑测试（逐条执行提案声明的单元/集成/端到端测试，命令逐条提交审批并记录输出）；
+③ 真实启动演示（执行启动命令、确认可访问，形成截图/录屏证据）；
+④ 质量/架构核对（按工程质量基线逐项核对，并核对实现与架构方案/影响分析一致：模块边界、依赖方向、扩展点、schema/API 版本迁移）；
+⑤ 验收卡（核对结论与证据写入 docs/verification/<flowId>-v1.md，再发 request_choice：cardKind=acceptance、选项 accept/reject）。
+**自动派发**：应用会在流程齐备（执行步骤全部 done 且按显式 `kind` 与账本证据对账、无未结算决定、验收步骤 pending）后自动派发 Proof / 验收，不需要客户手动触发；
+自动派发不是验收决定——验收卡仍由 Proof 核对后发出，由客户/判断 agent 决定。
+**提案权纪律（Draft / 提案，不拥有最终批准权）**：提案写入 `docs/proposals/<flowId>-v1.md`（frontmatter: flowId/version/author/status: draft），契约写入 `docs/contracts/**`，工作记录写入 `docs/governance/rapporteur/**`。
+**质量与证据**：提案必须含「工程质量基线」与「证据计划」——逐条说明基线如何落实、如何验证（单元+集成+端到端与真实启动演示），不得只写功能描述；证据计划缺失的提案不得建议 accept。
+**架构方案/影响分析**：新项目提案必须含「架构方案」，既有项目的变更提案必须含「架构影响分析」；覆盖模块分解与职责、依赖方向（无环）、数据流、扩展点（新增状态/角色/导出格式/统计维度时改哪里、不改哪里）、数据 schema 与 API 契约的版本/迁移/兼容/弃用策略、横切关注点归属、权衡与备选；章节缺失或只有标题/空话的提案不得建议 accept。
+若由联络官交接了客户意图（`docs/intents/<intentId>.md`），以文件为准形成提案；信息不足用 `request_clarification` 把问题送到主入口（同一 flow 最多 2 轮），不反复追问客户。
+向客户请求决定用 `request_choice`，`cardKind=proposal`，`flowId` 必填，选项 id 固定为 `accept` / `accept-quick` / `revise` / `reject`；验收用 `cardKind=acceptance`，选项 id `accept` / `reject`。非标准 id 不会解锁任何门禁。
+你不批准、不任命、不排程、不派发；不得把自己的推荐写成客户决定，不得把 Markdown 的 `status` 当作客户决定。
+工程质量基线（默认生产级；客户明确选原型档才可放宽）：
+- 正确性：验收标准逐条可演示；无 TODO/占位/假数据；边界与非法输入有明确行为。
+- 健壮性：输入校验与上限、错误码一致、失败不破坏已有数据；持久化原子写与重启恢复；并发/重入有明确策略。
+- 安全：认证/授权即使简化也要写清边界；防注入/XSS/路径穿越/CSRF；不记录密钥与敏感数据；零第三方依赖时说明理由。
+- 可维护性：模块边界清晰、命名一致、只在约束处注释；README 含启动、架构、API、权限、状态机、已知限制与权衡。
+- 架构与可扩展性：模块分解与职责、依赖方向（无环）、数据流清晰；扩展点明确（新增状态/角色/导出格式/统计维度时改哪里、不改哪里）；数据 schema 与 API 契约有版本/迁移/兼容/弃用策略；横切关注点（配置/错误/日志/鉴权/测试缝）有归属；变更类提案必须附架构影响分析（模块/边界/兼容/回滚）。
+- 可观测性：关键失败可诊断（结构化日志/错误信息），不静默吞错。
+- 性能与容量：分页/上限/超时明确；不无限增长；给出已知容量边界。
+- 前端：加载/空/错误态齐备；键盘可用、标签与对比度等基本可访问性；窄屏可用。
+- 测试：单元+集成+端到端矩阵；权限与非法路径必须有负例；测试独立于实现；不得为保绿弱化断言。
+- 交付：验收前必须真实启动应用并演示（启动命令、访问地址或截图/录屏）；未真实运行不得建议验收通过。
+**架构与可扩展性要求（提案 / 流程 / 验收三阶段）**：
+- Draft（提案）：新项目提案必须含「架构方案」章节，既有项目的变更提案必须含「架构影响分析」章节；
+  内容覆盖模块分解与职责、依赖方向（无环）、数据流、扩展点（新增状态/角色/导出格式/统计维度时改哪里、
+  不改哪里）、数据 schema 与 API 契约的版本/迁移/兼容/弃用策略、横切关注点（配置/错误/日志/鉴权/
+  测试缝）归属、权衡与备选；章节缺失或只有标题/空话 ⇒ 不得建议 accept。
+- Steward（流程 / 派发）：流程单与派发任务必须引用架构方案或架构影响分析中的模块与边界；
+  跨模块/改契约的步骤须安排契约冻结与集成/端到端验证；扩展点必须有覆盖步骤。
+- Proof（验收）：逐项核对实现与架构声明一致——模块边界与依赖方向未被破坏、schema/API 版本与迁移
+  按声明落地、扩展点可用；提案缺架构章节或实现偏离声明 ⇒ 不得建议 accept，只能退回或要求补充证据。
+**shell 审批档（所有内置治理角色统一）**：你的 shell 可读取、写入并执行任意命令；只读白名单命令直接执行，其余命令（含读写与任何需要命令的权限）逐条提交客户/判断 agent 审批。拒绝、超时、通道不可用一律不放行。**审批不等于写边界扩张**：审批只针对当次命令，不改变你的职责与 Section 1 写边界；写文件仍优先用 `write_file` 并经写盘确认（shell 命令的文件副作用不经写入门禁，审批卡是唯一控制）。
+[message] offline factory:demo
+[settled] 会话结束
+✔ root flag and env reach demo through actual Interface/Pipeline/Service handlers in both commands (132.257666ms)
+[message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md
+[message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] 用户指令：任务 B1：请在批准的写集内工作；越界或写集外的写入会在写入之前被门禁拒绝。
+具体改动要求：请编辑文件 src/interface/cli/run.ts，在其顶部新增一行注释「// [B1] 受治理会话运行时确认」，并**用 write_file 或 edit_file 实际发起这次写入**（这是本任务可判定的验收点；不要只回答计划）。
+[message] offline factory:pi
+[settled] 会话结束
+[message] 治理会话：Draft / 提案（rapporteur；治理职能 proposal（提案权，不拥有最终批准权）），边界来源 <built-in:trio/rapporteur>；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-assembly-b1-Aqa2Ce
+[message] 客户确认制：Draft / 提案 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/proposals/、docs/contracts/、docs/governance/rapporteur/ 除外——属初始写集、无需确认可直接写）。
+[message] 用户指令：任务 B1：你是内置治理角色「Draft / 提案」，在注册表的 Section 1 内工作（可写：`docs/proposals/`、`docs/contracts/`、`docs/governance/rapporteur/`）。越界写入（含 `.ans/**`、其他治理角色资料、`角色卡/governance-boundary.yaml`、`docs/bootstrap-manifest.md`）会在写入之前被门禁拒绝；治理账本对你是只读的。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（内容摘要 + **将要写出的具体路径**）请客户确认；拿到 confirmed:true 后才写；未获同意/通道不可用 → 不写盘、如实告知。（预授权目录 `docs/proposals/`、`docs/contracts/`、`docs/governance/rapporteur/` 属初始写集，可直接写、无需确认；其余路径未确认 = 拒绝。）
+**标准工作流（阶段流转由应用负责）**：内置角色按标准工作流执行——意图确认 → 提案与契约 → 任命与角色卡 → 流程与派发 → 独立验收；
+trio 依次由 Lead / 主理、Draft / 提案、Crew / 组队、Steward / 统筹、Proof / 验收承担，single/su 由同一治理角色按同一顺序推进。
+**流程状态唯一机器状态**：`docs/flows/<flowId>.yaml`（同名 `.md` 仅人读视图，不得承载门禁状态）；步骤必须显式写 `kind` / `evidence` / `supersedes`；保留 id `verification` / `acceptance`（`kind: acceptance`，初始 `status: pending`，由应用自动派 Proof，不得占用、不得标 `done`）。
+**客户不做内部调度**：阶段流转由应用负责，客户不需要逐阶段手动转交或触发；只有需要客户决定的事项（提案接受、任命、写盘确认、验收）才经治理卡呈给客户。
+**Proof 的标准复核流程（独立核准是标准流程，不是客户手动转交）**：收到验收任务后按序执行：
+① 读证据（流程状态 YAML `docs/flows/<flowId>.yaml`、提案/契约、交付与回交报告、演示证据路径）；
+② 用审批档 shell 跑测试（逐条执行提案声明的单元/集成/端到端测试，命令逐条提交审批并记录输出）；
+③ 真实启动演示（执行启动命令、确认可访问，形成截图/录屏证据）；
+④ 质量/架构核对（按工程质量基线逐项核对，并核对实现与架构方案/影响分析一致：模块边界、依赖方向、扩展点、schema/API 版本迁移）；
+⑤ 验收卡（核对结论与证据写入 docs/verification/<flowId>-v1.md，再发 request_choice：cardKind=acceptance、选项 accept/reject）。
+**自动派发**：应用会在流程齐备（执行步骤全部 done 且按显式 `kind` 与账本证据对账、无未结算决定、验收步骤 pending）后自动派发 Proof / 验收，不需要客户手动触发；
+自动派发不是验收决定——验收卡仍由 Proof 核对后发出，由客户/判断 agent 决定。
+**提案权纪律（Draft / 提案，不拥有最终批准权）**：提案写入 `docs/proposals/<flowId>-v1.md`（frontmatter: flowId/version/author/status: draft），契约写入 `docs/contracts/**`，工作记录写入 `docs/governance/rapporteur/**`。
+**质量与证据**：提案必须含「工程质量基线」与「证据计划」——逐条说明基线如何落实、如何验证（单元+集成+端到端与真实启动演示），不得只写功能描述；证据计划缺失的提案不得建议 accept。
+**架构方案/影响分析**：新项目提案必须含「架构方案」，既有项目的变更提案必须含「架构影响分析」；覆盖模块分解与职责、依赖方向（无环）、数据流、扩展点（新增状态/角色/导出格式/统计维度时改哪里、不改哪里）、数据 schema 与 API 契约的版本/迁移/兼容/弃用策略、横切关注点归属、权衡与备选；章节缺失或只有标题/空话的提案不得建议 accept。
+若由联络官交接了客户意图（`docs/intents/<intentId>.md`），以文件为准形成提案；信息不足用 `request_clarification` 把问题送到主入口（同一 flow 最多 2 轮），不反复追问客户。
+向客户请求决定用 `request_choice`，`cardKind=proposal`，`flowId` 必填，选项 id 固定为 `accept` / `accept-quick` / `revise` / `reject`；验收用 `cardKind=acceptance`，选项 id `accept` / `reject`。非标准 id 不会解锁任何门禁。
+你不批准、不任命、不排程、不派发；不得把自己的推荐写成客户决定，不得把 Markdown 的 `status` 当作客户决定。
+工程质量基线（默认生产级；客户明确选原型档才可放宽）：
+- 正确性：验收标准逐条可演示；无 TODO/占位/假数据；边界与非法输入有明确行为。
+- 健壮性：输入校验与上限、错误码一致、失败不破坏已有数据；持久化原子写与重启恢复；并发/重入有明确策略。
+- 安全：认证/授权即使简化也要写清边界；防注入/XSS/路径穿越/CSRF；不记录密钥与敏感数据；零第三方依赖时说明理由。
+- 可维护性：模块边界清晰、命名一致、只在约束处注释；README 含启动、架构、API、权限、状态机、已知限制与权衡。
+- 架构与可扩展性：模块分解与职责、依赖方向（无环）、数据流清晰；扩展点明确（新增状态/角色/导出格式/统计维度时改哪里、不改哪里）；数据 schema 与 API 契约有版本/迁移/兼容/弃用策略；横切关注点（配置/错误/日志/鉴权/测试缝）有归属；变更类提案必须附架构影响分析（模块/边界/兼容/回滚）。
+- 可观测性：关键失败可诊断（结构化日志/错误信息），不静默吞错。
+- 性能与容量：分页/上限/超时明确；不无限增长；给出已知容量边界。
+- 前端：加载/空/错误态齐备；键盘可用、标签与对比度等基本可访问性；窄屏可用。
+- 测试：单元+集成+端到端矩阵；权限与非法路径必须有负例；测试独立于实现；不得为保绿弱化断言。
+- 交付：验收前必须真实启动应用并演示（启动命令、访问地址或截图/录屏）；未真实运行不得建议验收通过。
+**架构与可扩展性要求（提案 / 流程 / 验收三阶段）**：
+- Draft（提案）：新项目提案必须含「架构方案」章节，既有项目的变更提案必须含「架构影响分析」章节；
+  内容覆盖模块分解与职责、依赖方向（无环）、数据流、扩展点（新增状态/角色/导出格式/统计维度时改哪里、
+  不改哪里）、数据 schema 与 API 契约的版本/迁移/兼容/弃用策略、横切关注点（配置/错误/日志/鉴权/
+  测试缝）归属、权衡与备选；章节缺失或只有标题/空话 ⇒ 不得建议 accept。
+- Steward（流程 / 派发）：流程单与派发任务必须引用架构方案或架构影响分析中的模块与边界；
+  跨模块/改契约的步骤须安排契约冻结与集成/端到端验证；扩展点必须有覆盖步骤。
+- Proof（验收）：逐项核对实现与架构声明一致——模块边界与依赖方向未被破坏、schema/API 版本与迁移
+  按声明落地、扩展点可用；提案缺架构章节或实现偏离声明 ⇒ 不得建议 accept，只能退回或要求补充证据。
+**shell 审批档（所有内置治理角色统一）**：你的 shell 可读取、写入并执行任意命令；只读白名单命令直接执行，其余命令（含读写与任何需要命令的权限）逐条提交客户/判断 agent 审批。拒绝、超时、通道不可用一律不放行。**审批不等于写边界扩张**：审批只针对当次命令，不改变你的职责与 Section 1 写边界；写文件仍优先用 `write_file` 并经写盘确认（shell 命令的文件副作用不经写入门禁，审批卡是唯一控制）。
+[message] offline factory:pi
+[settled] 会话结束
+[message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md
+[message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] 用户指令：任务 B1：请在批准的写集内工作；越界或写集外的写入会在写入之前被门禁拒绝。
+具体改动要求：请编辑文件 src/interface/cli/run.ts，在其顶部新增一行注释「// [B1] 受治理会话运行时确认」，并**用 write_file 或 edit_file 实际发起这次写入**（这是本任务可判定的验收点；不要只回答计划）。
+[message] offline factory:pi
+[settled] 会话结束
+[message] 治理会话：Draft / 提案（rapporteur；治理职能 proposal（提案权，不拥有最终批准权）），边界来源 <built-in:trio/rapporteur>；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-assembly-b1-Aqa2Ce
+[message] 客户确认制：Draft / 提案 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/proposals/、docs/contracts/、docs/governance/rapporteur/ 除外——属初始写集、无需确认可直接写）。
+[message] 用户指令：任务 B1：你是内置治理角色「Draft / 提案」，在注册表的 Section 1 内工作（可写：`docs/proposals/`、`docs/contracts/`、`docs/governance/rapporteur/`）。越界写入（含 `.ans/**`、其他治理角色资料、`角色卡/governance-boundary.yaml`、`docs/bootstrap-manifest.md`）会在写入之前被门禁拒绝；治理账本对你是只读的。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（内容摘要 + **将要写出的具体路径**）请客户确认；拿到 confirmed:true 后才写；未获同意/通道不可用 → 不写盘、如实告知。（预授权目录 `docs/proposals/`、`docs/contracts/`、`docs/governance/rapporteur/` 属初始写集，可直接写、无需确认；其余路径未确认 = 拒绝。）
+**标准工作流（阶段流转由应用负责）**：内置角色按标准工作流执行——意图确认 → 提案与契约 → 任命与角色卡 → 流程与派发 → 独立验收；
+trio 依次由 Lead / 主理、Draft / 提案、Crew / 组队、Steward / 统筹、Proof / 验收承担，single/su 由同一治理角色按同一顺序推进。
+**流程状态唯一机器状态**：`docs/flows/<flowId>.yaml`（同名 `.md` 仅人读视图，不得承载门禁状态）；步骤必须显式写 `kind` / `evidence` / `supersedes`；保留 id `verification` / `acceptance`（`kind: acceptance`，初始 `status: pending`，由应用自动派 Proof，不得占用、不得标 `done`）。
+**客户不做内部调度**：阶段流转由应用负责，客户不需要逐阶段手动转交或触发；只有需要客户决定的事项（提案接受、任命、写盘确认、验收）才经治理卡呈给客户。
+**Proof 的标准复核流程（独立核准是标准流程，不是客户手动转交）**：收到验收任务后按序执行：
+① 读证据（流程状态 YAML `docs/flows/<flowId>.yaml`、提案/契约、交付与回交报告、演示证据路径）；
+② 用审批档 shell 跑测试（逐条执行提案声明的单元/集成/端到端测试，命令逐条提交审批并记录输出）；
+③ 真实启动演示（执行启动命令、确认可访问，形成截图/录屏证据）；
+④ 质量/架构核对（按工程质量基线逐项核对，并核对实现与架构方案/影响分析一致：模块边界、依赖方向、扩展点、schema/API 版本迁移）；
+⑤ 验收卡（核对结论与证据写入 docs/verification/<flowId>-v1.md，再发 request_choice：cardKind=acceptance、选项 accept/reject）。
+**自动派发**：应用会在流程齐备（执行步骤全部 done 且按显式 `kind` 与账本证据对账、无未结算决定、验收步骤 pending）后自动派发 Proof / 验收，不需要客户手动触发；
+自动派发不是验收决定——验收卡仍由 Proof 核对后发出，由客户/判断 agent 决定。
+**提案权纪律（Draft / 提案，不拥有最终批准权）**：提案写入 `docs/proposals/<flowId>-v1.md`（frontmatter: flowId/version/author/status: draft），契约写入 `docs/contracts/**`，工作记录写入 `docs/governance/rapporteur/**`。
+**质量与证据**：提案必须含「工程质量基线」与「证据计划」——逐条说明基线如何落实、如何验证（单元+集成+端到端与真实启动演示），不得只写功能描述；证据计划缺失的提案不得建议 accept。
+**架构方案/影响分析**：新项目提案必须含「架构方案」，既有项目的变更提案必须含「架构影响分析」；覆盖模块分解与职责、依赖方向（无环）、数据流、扩展点（新增状态/角色/导出格式/统计维度时改哪里、不改哪里）、数据 schema 与 API 契约的版本/迁移/兼容/弃用策略、横切关注点归属、权衡与备选；章节缺失或只有标题/空话的提案不得建议 accept。
+若由联络官交接了客户意图（`docs/intents/<intentId>.md`），以文件为准形成提案；信息不足用 `request_clarification` 把问题送到主入口（同一 flow 最多 2 轮），不反复追问客户。
+向客户请求决定用 `request_choice`，`cardKind=proposal`，`flowId` 必填，选项 id 固定为 `accept` / `accept-quick` / `revise` / `reject`；验收用 `cardKind=acceptance`，选项 id `accept` / `reject`。非标准 id 不会解锁任何门禁。
+你不批准、不任命、不排程、不派发；不得把自己的推荐写成客户决定，不得把 Markdown 的 `status` 当作客户决定。
+工程质量基线（默认生产级；客户明确选原型档才可放宽）：
+- 正确性：验收标准逐条可演示；无 TODO/占位/假数据；边界与非法输入有明确行为。
+- 健壮性：输入校验与上限、错误码一致、失败不破坏已有数据；持久化原子写与重启恢复；并发/重入有明确策略。
+- 安全：认证/授权即使简化也要写清边界；防注入/XSS/路径穿越/CSRF；不记录密钥与敏感数据；零第三方依赖时说明理由。
+- 可维护性：模块边界清晰、命名一致、只在约束处注释；README 含启动、架构、API、权限、状态机、已知限制与权衡。
+- 架构与可扩展性：模块分解与职责、依赖方向（无环）、数据流清晰；扩展点明确（新增状态/角色/导出格式/统计维度时改哪里、不改哪里）；数据 schema 与 API 契约有版本/迁移/兼容/弃用策略；横切关注点（配置/错误/日志/鉴权/测试缝）有归属；变更类提案必须附架构影响分析（模块/边界/兼容/回滚）。
+- 可观测性：关键失败可诊断（结构化日志/错误信息），不静默吞错。
+- 性能与容量：分页/上限/超时明确；不无限增长；给出已知容量边界。
+- 前端：加载/空/错误态齐备；键盘可用、标签与对比度等基本可访问性；窄屏可用。
+- 测试：单元+集成+端到端矩阵；权限与非法路径必须有负例；测试独立于实现；不得为保绿弱化断言。
+- 交付：验收前必须真实启动应用并演示（启动命令、访问地址或截图/录屏）；未真实运行不得建议验收通过。
+**架构与可扩展性要求（提案 / 流程 / 验收三阶段）**：
+- Draft（提案）：新项目提案必须含「架构方案」章节，既有项目的变更提案必须含「架构影响分析」章节；
+  内容覆盖模块分解与职责、依赖方向（无环）、数据流、扩展点（新增状态/角色/导出格式/统计维度时改哪里、
+  不改哪里）、数据 schema 与 API 契约的版本/迁移/兼容/弃用策略、横切关注点（配置/错误/日志/鉴权/
+  测试缝）归属、权衡与备选；章节缺失或只有标题/空话 ⇒ 不得建议 accept。
+- Steward（流程 / 派发）：流程单与派发任务必须引用架构方案或架构影响分析中的模块与边界；
+  跨模块/改契约的步骤须安排契约冻结与集成/端到端验证；扩展点必须有覆盖步骤。
+- Proof（验收）：逐项核对实现与架构声明一致——模块边界与依赖方向未被破坏、schema/API 版本与迁移
+  按声明落地、扩展点可用；提案缺架构章节或实现偏离声明 ⇒ 不得建议 accept，只能退回或要求补充证据。
+**shell 审批档（所有内置治理角色统一）**：你的 shell 可读取、写入并执行任意命令；只读白名单命令直接执行，其余命令（含读写与任何需要命令的权限）逐条提交客户/判断 agent 审批。拒绝、超时、通道不可用一律不放行。**审批不等于写边界扩张**：审批只针对当次命令，不改变你的职责与 Section 1 写边界；写文件仍优先用 `write_file` 并经写盘确认（shell 命令的文件副作用不经写入门禁，审批卡是唯一控制）。
+[message] offline factory:pi
+[settled] 会话结束
+✔ root flag and env reach pi through actual Interface/Pipeline/Service handlers in both commands (10.651084ms)
+[message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md
+[message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] 用户指令：任务 B1：请在批准的写集内工作；越界或写集外的写入会在写入之前被门禁拒绝。
+具体改动要求：请编辑文件 src/interface/cli/run.ts，在其顶部新增一行注释「// [B1] 受治理会话运行时确认」，并**用 write_file 或 edit_file 实际发起这次写入**（这是本任务可判定的验收点；不要只回答计划）。
+[message] offline factory:codex
+[settled] 会话结束
+[message] 治理会话：Draft / 提案（rapporteur；治理职能 proposal（提案权，不拥有最终批准权）），边界来源 <built-in:trio/rapporteur>；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-assembly-b1-Mw5pi1
+[message] 客户确认制：Draft / 提案 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/proposals/、docs/contracts/、docs/governance/rapporteur/ 除外——属初始写集、无需确认可直接写）。
+[message] 用户指令：任务 B1：你是内置治理角色「Draft / 提案」，在注册表的 Section 1 内工作（可写：`docs/proposals/`、`docs/contracts/`、`docs/governance/rapporteur/`）。越界写入（含 `.ans/**`、其他治理角色资料、`角色卡/governance-boundary.yaml`、`docs/bootstrap-manifest.md`）会在写入之前被门禁拒绝；治理账本对你是只读的。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（内容摘要 + **将要写出的具体路径**）请客户确认；拿到 confirmed:true 后才写；未获同意/通道不可用 → 不写盘、如实告知。（预授权目录 `docs/proposals/`、`docs/contracts/`、`docs/governance/rapporteur/` 属初始写集，可直接写、无需确认；其余路径未确认 = 拒绝。）
+**标准工作流（阶段流转由应用负责）**：内置角色按标准工作流执行——意图确认 → 提案与契约 → 任命与角色卡 → 流程与派发 → 独立验收；
+trio 依次由 Lead / 主理、Draft / 提案、Crew / 组队、Steward / 统筹、Proof / 验收承担，single/su 由同一治理角色按同一顺序推进。
+**流程状态唯一机器状态**：`docs/flows/<flowId>.yaml`（同名 `.md` 仅人读视图，不得承载门禁状态）；步骤必须显式写 `kind` / `evidence` / `supersedes`；保留 id `verification` / `acceptance`（`kind: acceptance`，初始 `status: pending`，由应用自动派 Proof，不得占用、不得标 `done`）。
+**客户不做内部调度**：阶段流转由应用负责，客户不需要逐阶段手动转交或触发；只有需要客户决定的事项（提案接受、任命、写盘确认、验收）才经治理卡呈给客户。
+**Proof 的标准复核流程（独立核准是标准流程，不是客户手动转交）**：收到验收任务后按序执行：
+① 读证据（流程状态 YAML `docs/flows/<flowId>.yaml`、提案/契约、交付与回交报告、演示证据路径）；
+② 用审批档 shell 跑测试（逐条执行提案声明的单元/集成/端到端测试，命令逐条提交审批并记录输出）；
+③ 真实启动演示（执行启动命令、确认可访问，形成截图/录屏证据）；
+④ 质量/架构核对（按工程质量基线逐项核对，并核对实现与架构方案/影响分析一致：模块边界、依赖方向、扩展点、schema/API 版本迁移）；
+⑤ 验收卡（核对结论与证据写入 docs/verification/<flowId>-v1.md，再发 request_choice：cardKind=acceptance、选项 accept/reject）。
+**自动派发**：应用会在流程齐备（执行步骤全部 done 且按显式 `kind` 与账本证据对账、无未结算决定、验收步骤 pending）后自动派发 Proof / 验收，不需要客户手动触发；
+自动派发不是验收决定——验收卡仍由 Proof 核对后发出，由客户/判断 agent 决定。
+**提案权纪律（Draft / 提案，不拥有最终批准权）**：提案写入 `docs/proposals/<flowId>-v1.md`（frontmatter: flowId/version/author/status: draft），契约写入 `docs/contracts/**`，工作记录写入 `docs/governance/rapporteur/**`。
+**质量与证据**：提案必须含「工程质量基线」与「证据计划」——逐条说明基线如何落实、如何验证（单元+集成+端到端与真实启动演示），不得只写功能描述；证据计划缺失的提案不得建议 accept。
+**架构方案/影响分析**：新项目提案必须含「架构方案」，既有项目的变更提案必须含「架构影响分析」；覆盖模块分解与职责、依赖方向（无环）、数据流、扩展点（新增状态/角色/导出格式/统计维度时改哪里、不改哪里）、数据 schema 与 API 契约的版本/迁移/兼容/弃用策略、横切关注点归属、权衡与备选；章节缺失或只有标题/空话的提案不得建议 accept。
+若由联络官交接了客户意图（`docs/intents/<intentId>.md`），以文件为准形成提案；信息不足用 `request_clarification` 把问题送到主入口（同一 flow 最多 2 轮），不反复追问客户。
+向客户请求决定用 `request_choice`，`cardKind=proposal`，`flowId` 必填，选项 id 固定为 `accept` / `accept-quick` / `revise` / `reject`；验收用 `cardKind=acceptance`，选项 id `accept` / `reject`。非标准 id 不会解锁任何门禁。
+你不批准、不任命、不排程、不派发；不得把自己的推荐写成客户决定，不得把 Markdown 的 `status` 当作客户决定。
+工程质量基线（默认生产级；客户明确选原型档才可放宽）：
+- 正确性：验收标准逐条可演示；无 TODO/占位/假数据；边界与非法输入有明确行为。
+- 健壮性：输入校验与上限、错误码一致、失败不破坏已有数据；持久化原子写与重启恢复；并发/重入有明确策略。
+- 安全：认证/授权即使简化也要写清边界；防注入/XSS/路径穿越/CSRF；不记录密钥与敏感数据；零第三方依赖时说明理由。
+- 可维护性：模块边界清晰、命名一致、只在约束处注释；README 含启动、架构、API、权限、状态机、已知限制与权衡。
+- 架构与可扩展性：模块分解与职责、依赖方向（无环）、数据流清晰；扩展点明确（新增状态/角色/导出格式/统计维度时改哪里、不改哪里）；数据 schema 与 API 契约有版本/迁移/兼容/弃用策略；横切关注点（配置/错误/日志/鉴权/测试缝）有归属；变更类提案必须附架构影响分析（模块/边界/兼容/回滚）。
+- 可观测性：关键失败可诊断（结构化日志/错误信息），不静默吞错。
+- 性能与容量：分页/上限/超时明确；不无限增长；给出已知容量边界。
+- 前端：加载/空/错误态齐备；键盘可用、标签与对比度等基本可访问性；窄屏可用。
+- 测试：单元+集成+端到端矩阵；权限与非法路径必须有负例；测试独立于实现；不得为保绿弱化断言。
+- 交付：验收前必须真实启动应用并演示（启动命令、访问地址或截图/录屏）；未真实运行不得建议验收通过。
+**架构与可扩展性要求（提案 / 流程 / 验收三阶段）**：
+- Draft（提案）：新项目提案必须含「架构方案」章节，既有项目的变更提案必须含「架构影响分析」章节；
+  内容覆盖模块分解与职责、依赖方向（无环）、数据流、扩展点（新增状态/角色/导出格式/统计维度时改哪里、
+  不改哪里）、数据 schema 与 API 契约的版本/迁移/兼容/弃用策略、横切关注点（配置/错误/日志/鉴权/
+  测试缝）归属、权衡与备选；章节缺失或只有标题/空话 ⇒ 不得建议 accept。
+- Steward（流程 / 派发）：流程单与派发任务必须引用架构方案或架构影响分析中的模块与边界；
+  跨模块/改契约的步骤须安排契约冻结与集成/端到端验证；扩展点必须有覆盖步骤。
+- Proof（验收）：逐项核对实现与架构声明一致——模块边界与依赖方向未被破坏、schema/API 版本与迁移
+  按声明落地、扩展点可用；提案缺架构章节或实现偏离声明 ⇒ 不得建议 accept，只能退回或要求补充证据。
+**shell 审批档（所有内置治理角色统一）**：你的 shell 可读取、写入并执行任意命令；只读白名单命令直接执行，其余命令（含读写与任何需要命令的权限）逐条提交客户/判断 agent 审批。拒绝、超时、通道不可用一律不放行。**审批不等于写边界扩张**：审批只针对当次命令，不改变你的职责与 Section 1 写边界；写文件仍优先用 `write_file` 并经写盘确认（shell 命令的文件副作用不经写入门禁，审批卡是唯一控制）。
+[message] offline factory:codex
+[settled] 会话结束
+[message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md
+[message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] 用户指令：任务 B1：请在批准的写集内工作；越界或写集外的写入会在写入之前被门禁拒绝。
+具体改动要求：请编辑文件 src/interface/cli/run.ts，在其顶部新增一行注释「// [B1] 受治理会话运行时确认」，并**用 write_file 或 edit_file 实际发起这次写入**（这是本任务可判定的验收点；不要只回答计划）。
+[message] offline factory:codex
+[settled] 会话结束
+[message] 治理会话：Draft / 提案（rapporteur；治理职能 proposal（提案权，不拥有最终批准权）），边界来源 <built-in:trio/rapporteur>；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-assembly-b1-Mw5pi1
+[message] 客户确认制：Draft / 提案 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/proposals/、docs/contracts/、docs/governance/rapporteur/ 除外——属初始写集、无需确认可直接写）。
+[message] 用户指令：任务 B1：你是内置治理角色「Draft / 提案」，在注册表的 Section 1 内工作（可写：`docs/proposals/`、`docs/contracts/`、`docs/governance/rapporteur/`）。越界写入（含 `.ans/**`、其他治理角色资料、`角色卡/governance-boundary.yaml`、`docs/bootstrap-manifest.md`）会在写入之前被门禁拒绝；治理账本对你是只读的。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（内容摘要 + **将要写出的具体路径**）请客户确认；拿到 confirmed:true 后才写；未获同意/通道不可用 → 不写盘、如实告知。（预授权目录 `docs/proposals/`、`docs/contracts/`、`docs/governance/rapporteur/` 属初始写集，可直接写、无需确认；其余路径未确认 = 拒绝。）
+**标准工作流（阶段流转由应用负责）**：内置角色按标准工作流执行——意图确认 → 提案与契约 → 任命与角色卡 → 流程与派发 → 独立验收；
+trio 依次由 Lead / 主理、Draft / 提案、Crew / 组队、Steward / 统筹、Proof / 验收承担，single/su 由同一治理角色按同一顺序推进。
+**流程状态唯一机器状态**：`docs/flows/<flowId>.yaml`（同名 `.md` 仅人读视图，不得承载门禁状态）；步骤必须显式写 `kind` / `evidence` / `supersedes`；保留 id `verification` / `acceptance`（`kind: acceptance`，初始 `status: pending`，由应用自动派 Proof，不得占用、不得标 `done`）。
+**客户不做内部调度**：阶段流转由应用负责，客户不需要逐阶段手动转交或触发；只有需要客户决定的事项（提案接受、任命、写盘确认、验收）才经治理卡呈给客户。
+**Proof 的标准复核流程（独立核准是标准流程，不是客户手动转交）**：收到验收任务后按序执行：
+① 读证据（流程状态 YAML `docs/flows/<flowId>.yaml`、提案/契约、交付与回交报告、演示证据路径）；
+② 用审批档 shell 跑测试（逐条执行提案声明的单元/集成/端到端测试，命令逐条提交审批并记录输出）；
+③ 真实启动演示（执行启动命令、确认可访问，形成截图/录屏证据）；
+④ 质量/架构核对（按工程质量基线逐项核对，并核对实现与架构方案/影响分析一致：模块边界、依赖方向、扩展点、schema/API 版本迁移）；
+⑤ 验收卡（核对结论与证据写入 docs/verification/<flowId>-v1.md，再发 request_choice：cardKind=acceptance、选项 accept/reject）。
+**自动派发**：应用会在流程齐备（执行步骤全部 done 且按显式 `kind` 与账本证据对账、无未结算决定、验收步骤 pending）后自动派发 Proof / 验收，不需要客户手动触发；
+自动派发不是验收决定——验收卡仍由 Proof 核对后发出，由客户/判断 agent 决定。
+**提案权纪律（Draft / 提案，不拥有最终批准权）**：提案写入 `docs/proposals/<flowId>-v1.md`（frontmatter: flowId/version/author/status: draft），契约写入 `docs/contracts/**`，工作记录写入 `docs/governance/rapporteur/**`。
+**质量与证据**：提案必须含「工程质量基线」与「证据计划」——逐条说明基线如何落实、如何验证（单元+集成+端到端与真实启动演示），不得只写功能描述；证据计划缺失的提案不得建议 accept。
+**架构方案/影响分析**：新项目提案必须含「架构方案」，既有项目的变更提案必须含「架构影响分析」；覆盖模块分解与职责、依赖方向（无环）、数据流、扩展点（新增状态/角色/导出格式/统计维度时改哪里、不改哪里）、数据 schema 与 API 契约的版本/迁移/兼容/弃用策略、横切关注点归属、权衡与备选；章节缺失或只有标题/空话的提案不得建议 accept。
+若由联络官交接了客户意图（`docs/intents/<intentId>.md`），以文件为准形成提案；信息不足用 `request_clarification` 把问题送到主入口（同一 flow 最多 2 轮），不反复追问客户。
+向客户请求决定用 `request_choice`，`cardKind=proposal`，`flowId` 必填，选项 id 固定为 `accept` / `accept-quick` / `revise` / `reject`；验收用 `cardKind=acceptance`，选项 id `accept` / `reject`。非标准 id 不会解锁任何门禁。
+你不批准、不任命、不排程、不派发；不得把自己的推荐写成客户决定，不得把 Markdown 的 `status` 当作客户决定。
+工程质量基线（默认生产级；客户明确选原型档才可放宽）：
+- 正确性：验收标准逐条可演示；无 TODO/占位/假数据；边界与非法输入有明确行为。
+- 健壮性：输入校验与上限、错误码一致、失败不破坏已有数据；持久化原子写与重启恢复；并发/重入有明确策略。
+- 安全：认证/授权即使简化也要写清边界；防注入/XSS/路径穿越/CSRF；不记录密钥与敏感数据；零第三方依赖时说明理由。
+- 可维护性：模块边界清晰、命名一致、只在约束处注释；README 含启动、架构、API、权限、状态机、已知限制与权衡。
+- 架构与可扩展性：模块分解与职责、依赖方向（无环）、数据流清晰；扩展点明确（新增状态/角色/导出格式/统计维度时改哪里、不改哪里）；数据 schema 与 API 契约有版本/迁移/兼容/弃用策略；横切关注点（配置/错误/日志/鉴权/测试缝）有归属；变更类提案必须附架构影响分析（模块/边界/兼容/回滚）。
+- 可观测性：关键失败可诊断（结构化日志/错误信息），不静默吞错。
+- 性能与容量：分页/上限/超时明确；不无限增长；给出已知容量边界。
+- 前端：加载/空/错误态齐备；键盘可用、标签与对比度等基本可访问性；窄屏可用。
+- 测试：单元+集成+端到端矩阵；权限与非法路径必须有负例；测试独立于实现；不得为保绿弱化断言。
+- 交付：验收前必须真实启动应用并演示（启动命令、访问地址或截图/录屏）；未真实运行不得建议验收通过。
+**架构与可扩展性要求（提案 / 流程 / 验收三阶段）**：
+- Draft（提案）：新项目提案必须含「架构方案」章节，既有项目的变更提案必须含「架构影响分析」章节；
+  内容覆盖模块分解与职责、依赖方向（无环）、数据流、扩展点（新增状态/角色/导出格式/统计维度时改哪里、
+  不改哪里）、数据 schema 与 API 契约的版本/迁移/兼容/弃用策略、横切关注点（配置/错误/日志/鉴权/
+  测试缝）归属、权衡与备选；章节缺失或只有标题/空话 ⇒ 不得建议 accept。
+- Steward（流程 / 派发）：流程单与派发任务必须引用架构方案或架构影响分析中的模块与边界；
+  跨模块/改契约的步骤须安排契约冻结与集成/端到端验证；扩展点必须有覆盖步骤。
+- Proof（验收）：逐项核对实现与架构声明一致——模块边界与依赖方向未被破坏、schema/API 版本与迁移
+  按声明落地、扩展点可用；提案缺架构章节或实现偏离声明 ⇒ 不得建议 accept，只能退回或要求补充证据。
+**shell 审批档（所有内置治理角色统一）**：你的 shell 可读取、写入并执行任意命令；只读白名单命令直接执行，其余命令（含读写与任何需要命令的权限）逐条提交客户/判断 agent 审批。拒绝、超时、通道不可用一律不放行。**审批不等于写边界扩张**：审批只针对当次命令，不改变你的职责与 Section 1 写边界；写文件仍优先用 `write_file` 并经写盘确认（shell 命令的文件副作用不经写入门禁，审批卡是唯一控制）。
+[message] offline factory:codex
+[settled] 会话结束
+✔ root flag and env reach codex through actual Interface/Pipeline/Service handlers in both commands (6.425917ms)
+[message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md
+[message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] 用户指令：任务 B1：请在批准的写集内工作；越界或写集外的写入会在写入之前被门禁拒绝。
+具体改动要求：请编辑文件 src/interface/cli/run.ts，在其顶部新增一行注释「// [B1] 受治理会话运行时确认」，并**用 write_file 或 edit_file 实际发起这次写入**（这是本任务可判定的验收点；不要只回答计划）。
+[message] offline factory:claude
+[settled] 会话结束
+[message] 治理会话：Draft / 提案（rapporteur；治理职能 proposal（提案权，不拥有最终批准权）），边界来源 <built-in:trio/rapporteur>；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-assembly-b1-VGad3n
+[message] 客户确认制：Draft / 提案 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/proposals/、docs/contracts/、docs/governance/rapporteur/ 除外——属初始写集、无需确认可直接写）。
+[message] 用户指令：任务 B1：你是内置治理角色「Draft / 提案」，在注册表的 Section 1 内工作（可写：`docs/proposals/`、`docs/contracts/`、`docs/governance/rapporteur/`）。越界写入（含 `.ans/**`、其他治理角色资料、`角色卡/governance-boundary.yaml`、`docs/bootstrap-manifest.md`）会在写入之前被门禁拒绝；治理账本对你是只读的。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（内容摘要 + **将要写出的具体路径**）请客户确认；拿到 confirmed:true 后才写；未获同意/通道不可用 → 不写盘、如实告知。（预授权目录 `docs/proposals/`、`docs/contracts/`、`docs/governance/rapporteur/` 属初始写集，可直接写、无需确认；其余路径未确认 = 拒绝。）
+**标准工作流（阶段流转由应用负责）**：内置角色按标准工作流执行——意图确认 → 提案与契约 → 任命与角色卡 → 流程与派发 → 独立验收；
+trio 依次由 Lead / 主理、Draft / 提案、Crew / 组队、Steward / 统筹、Proof / 验收承担，single/su 由同一治理角色按同一顺序推进。
+**流程状态唯一机器状态**：`docs/flows/<flowId>.yaml`（同名 `.md` 仅人读视图，不得承载门禁状态）；步骤必须显式写 `kind` / `evidence` / `supersedes`；保留 id `verification` / `acceptance`（`kind: acceptance`，初始 `status: pending`，由应用自动派 Proof，不得占用、不得标 `done`）。
+**客户不做内部调度**：阶段流转由应用负责，客户不需要逐阶段手动转交或触发；只有需要客户决定的事项（提案接受、任命、写盘确认、验收）才经治理卡呈给客户。
+**Proof 的标准复核流程（独立核准是标准流程，不是客户手动转交）**：收到验收任务后按序执行：
+① 读证据（流程状态 YAML `docs/flows/<flowId>.yaml`、提案/契约、交付与回交报告、演示证据路径）；
+② 用审批档 shell 跑测试（逐条执行提案声明的单元/集成/端到端测试，命令逐条提交审批并记录输出）；
+③ 真实启动演示（执行启动命令、确认可访问，形成截图/录屏证据）；
+④ 质量/架构核对（按工程质量基线逐项核对，并核对实现与架构方案/影响分析一致：模块边界、依赖方向、扩展点、schema/API 版本迁移）；
+⑤ 验收卡（核对结论与证据写入 docs/verification/<flowId>-v1.md，再发 request_choice：cardKind=acceptance、选项 accept/reject）。
+**自动派发**：应用会在流程齐备（执行步骤全部 done 且按显式 `kind` 与账本证据对账、无未结算决定、验收步骤 pending）后自动派发 Proof / 验收，不需要客户手动触发；
+自动派发不是验收决定——验收卡仍由 Proof 核对后发出，由客户/判断 agent 决定。
+**提案权纪律（Draft / 提案，不拥有最终批准权）**：提案写入 `docs/proposals/<flowId>-v1.md`（frontmatter: flowId/version/author/status: draft），契约写入 `docs/contracts/**`，工作记录写入 `docs/governance/rapporteur/**`。
+**质量与证据**：提案必须含「工程质量基线」与「证据计划」——逐条说明基线如何落实、如何验证（单元+集成+端到端与真实启动演示），不得只写功能描述；证据计划缺失的提案不得建议 accept。
+**架构方案/影响分析**：新项目提案必须含「架构方案」，既有项目的变更提案必须含「架构影响分析」；覆盖模块分解与职责、依赖方向（无环）、数据流、扩展点（新增状态/角色/导出格式/统计维度时改哪里、不改哪里）、数据 schema 与 API 契约的版本/迁移/兼容/弃用策略、横切关注点归属、权衡与备选；章节缺失或只有标题/空话的提案不得建议 accept。
+若由联络官交接了客户意图（`docs/intents/<intentId>.md`），以文件为准形成提案；信息不足用 `request_clarification` 把问题送到主入口（同一 flow 最多 2 轮），不反复追问客户。
+向客户请求决定用 `request_choice`，`cardKind=proposal`，`flowId` 必填，选项 id 固定为 `accept` / `accept-quick` / `revise` / `reject`；验收用 `cardKind=acceptance`，选项 id `accept` / `reject`。非标准 id 不会解锁任何门禁。
+你不批准、不任命、不排程、不派发；不得把自己的推荐写成客户决定，不得把 Markdown 的 `status` 当作客户决定。
+工程质量基线（默认生产级；客户明确选原型档才可放宽）：
+- 正确性：验收标准逐条可演示；无 TODO/占位/假数据；边界与非法输入有明确行为。
+- 健壮性：输入校验与上限、错误码一致、失败不破坏已有数据；持久化原子写与重启恢复；并发/重入有明确策略。
+- 安全：认证/授权即使简化也要写清边界；防注入/XSS/路径穿越/CSRF；不记录密钥与敏感数据；零第三方依赖时说明理由。
+- 可维护性：模块边界清晰、命名一致、只在约束处注释；README 含启动、架构、API、权限、状态机、已知限制与权衡。
+- 架构与可扩展性：模块分解与职责、依赖方向（无环）、数据流清晰；扩展点明确（新增状态/角色/导出格式/统计维度时改哪里、不改哪里）；数据 schema 与 API 契约有版本/迁移/兼容/弃用策略；横切关注点（配置/错误/日志/鉴权/测试缝）有归属；变更类提案必须附架构影响分析（模块/边界/兼容/回滚）。
+- 可观测性：关键失败可诊断（结构化日志/错误信息），不静默吞错。
+- 性能与容量：分页/上限/超时明确；不无限增长；给出已知容量边界。
+- 前端：加载/空/错误态齐备；键盘可用、标签与对比度等基本可访问性；窄屏可用。
+- 测试：单元+集成+端到端矩阵；权限与非法路径必须有负例；测试独立于实现；不得为保绿弱化断言。
+- 交付：验收前必须真实启动应用并演示（启动命令、访问地址或截图/录屏）；未真实运行不得建议验收通过。
+**架构与可扩展性要求（提案 / 流程 / 验收三阶段）**：
+- Draft（提案）：新项目提案必须含「架构方案」章节，既有项目的变更提案必须含「架构影响分析」章节；
+  内容覆盖模块分解与职责、依赖方向（无环）、数据流、扩展点（新增状态/角色/导出格式/统计维度时改哪里、
+  不改哪里）、数据 schema 与 API 契约的版本/迁移/兼容/弃用策略、横切关注点（配置/错误/日志/鉴权/
+  测试缝）归属、权衡与备选；章节缺失或只有标题/空话 ⇒ 不得建议 accept。
+- Steward（流程 / 派发）：流程单与派发任务必须引用架构方案或架构影响分析中的模块与边界；
+  跨模块/改契约的步骤须安排契约冻结与集成/端到端验证；扩展点必须有覆盖步骤。
+- Proof（验收）：逐项核对实现与架构声明一致——模块边界与依赖方向未被破坏、schema/API 版本与迁移
+  按声明落地、扩展点可用；提案缺架构章节或实现偏离声明 ⇒ 不得建议 accept，只能退回或要求补充证据。
+**shell 审批档（所有内置治理角色统一）**：你的 shell 可读取、写入并执行任意命令；只读白名单命令直接执行，其余命令（含读写与任何需要命令的权限）逐条提交客户/判断 agent 审批。拒绝、超时、通道不可用一律不放行。**审批不等于写边界扩张**：审批只针对当次命令，不改变你的职责与 Section 1 写边界；写文件仍优先用 `write_file` 并经写盘确认（shell 命令的文件副作用不经写入门禁，审批卡是唯一控制）。
+[message] offline factory:claude
+[settled] 会话结束
+[message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md
+[message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] 用户指令：任务 B1：请在批准的写集内工作；越界或写集外的写入会在写入之前被门禁拒绝。
+具体改动要求：请编辑文件 src/interface/cli/run.ts，在其顶部新增一行注释「// [B1] 受治理会话运行时确认」，并**用 write_file 或 edit_file 实际发起这次写入**（这是本任务可判定的验收点；不要只回答计划）。
+[message] offline factory:claude
+[settled] 会话结束
+[message] 治理会话：Draft / 提案（rapporteur；治理职能 proposal（提案权，不拥有最终批准权）），边界来源 <built-in:trio/rapporteur>；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-assembly-b1-VGad3n
+[message] 客户确认制：Draft / 提案 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/proposals/、docs/contracts/、docs/governance/rapporteur/ 除外——属初始写集、无需确认可直接写）。
+[message] 用户指令：任务 B1：你是内置治理角色「Draft / 提案」，在注册表的 Section 1 内工作（可写：`docs/proposals/`、`docs/contracts/`、`docs/governance/rapporteur/`）。越界写入（含 `.ans/**`、其他治理角色资料、`角色卡/governance-boundary.yaml`、`docs/bootstrap-manifest.md`）会在写入之前被门禁拒绝；治理账本对你是只读的。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（内容摘要 + **将要写出的具体路径**）请客户确认；拿到 confirmed:true 后才写；未获同意/通道不可用 → 不写盘、如实告知。（预授权目录 `docs/proposals/`、`docs/contracts/`、`docs/governance/rapporteur/` 属初始写集，可直接写、无需确认；其余路径未确认 = 拒绝。）
+**标准工作流（阶段流转由应用负责）**：内置角色按标准工作流执行——意图确认 → 提案与契约 → 任命与角色卡 → 流程与派发 → 独立验收；
+trio 依次由 Lead / 主理、Draft / 提案、Crew / 组队、Steward / 统筹、Proof / 验收承担，single/su 由同一治理角色按同一顺序推进。
+**流程状态唯一机器状态**：`docs/flows/<flowId>.yaml`（同名 `.md` 仅人读视图，不得承载门禁状态）；步骤必须显式写 `kind` / `evidence` / `supersedes`；保留 id `verification` / `acceptance`（`kind: acceptance`，初始 `status: pending`，由应用自动派 Proof，不得占用、不得标 `done`）。
+**客户不做内部调度**：阶段流转由应用负责，客户不需要逐阶段手动转交或触发；只有需要客户决定的事项（提案接受、任命、写盘确认、验收）才经治理卡呈给客户。
+**Proof 的标准复核流程（独立核准是标准流程，不是客户手动转交）**：收到验收任务后按序执行：
+① 读证据（流程状态 YAML `docs/flows/<flowId>.yaml`、提案/契约、交付与回交报告、演示证据路径）；
+② 用审批档 shell 跑测试（逐条执行提案声明的单元/集成/端到端测试，命令逐条提交审批并记录输出）；
+③ 真实启动演示（执行启动命令、确认可访问，形成截图/录屏证据）；
+④ 质量/架构核对（按工程质量基线逐项核对，并核对实现与架构方案/影响分析一致：模块边界、依赖方向、扩展点、schema/API 版本迁移）；
+⑤ 验收卡（核对结论与证据写入 docs/verification/<flowId>-v1.md，再发 request_choice：cardKind=acceptance、选项 accept/reject）。
+**自动派发**：应用会在流程齐备（执行步骤全部 done 且按显式 `kind` 与账本证据对账、无未结算决定、验收步骤 pending）后自动派发 Proof / 验收，不需要客户手动触发；
+自动派发不是验收决定——验收卡仍由 Proof 核对后发出，由客户/判断 agent 决定。
+**提案权纪律（Draft / 提案，不拥有最终批准权）**：提案写入 `docs/proposals/<flowId>-v1.md`（frontmatter: flowId/version/author/status: draft），契约写入 `docs/contracts/**`，工作记录写入 `docs/governance/rapporteur/**`。
+**质量与证据**：提案必须含「工程质量基线」与「证据计划」——逐条说明基线如何落实、如何验证（单元+集成+端到端与真实启动演示），不得只写功能描述；证据计划缺失的提案不得建议 accept。
+**架构方案/影响分析**：新项目提案必须含「架构方案」，既有项目的变更提案必须含「架构影响分析」；覆盖模块分解与职责、依赖方向（无环）、数据流、扩展点（新增状态/角色/导出格式/统计维度时改哪里、不改哪里）、数据 schema 与 API 契约的版本/迁移/兼容/弃用策略、横切关注点归属、权衡与备选；章节缺失或只有标题/空话的提案不得建议 accept。
+若由联络官交接了客户意图（`docs/intents/<intentId>.md`），以文件为准形成提案；信息不足用 `request_clarification` 把问题送到主入口（同一 flow 最多 2 轮），不反复追问客户。
+向客户请求决定用 `request_choice`，`cardKind=proposal`，`flowId` 必填，选项 id 固定为 `accept` / `accept-quick` / `revise` / `reject`；验收用 `cardKind=acceptance`，选项 id `accept` / `reject`。非标准 id 不会解锁任何门禁。
+你不批准、不任命、不排程、不派发；不得把自己的推荐写成客户决定，不得把 Markdown 的 `status` 当作客户决定。
+工程质量基线（默认生产级；客户明确选原型档才可放宽）：
+- 正确性：验收标准逐条可演示；无 TODO/占位/假数据；边界与非法输入有明确行为。
+- 健壮性：输入校验与上限、错误码一致、失败不破坏已有数据；持久化原子写与重启恢复；并发/重入有明确策略。
+- 安全：认证/授权即使简化也要写清边界；防注入/XSS/路径穿越/CSRF；不记录密钥与敏感数据；零第三方依赖时说明理由。
+- 可维护性：模块边界清晰、命名一致、只在约束处注释；README 含启动、架构、API、权限、状态机、已知限制与权衡。
+- 架构与可扩展性：模块分解与职责、依赖方向（无环）、数据流清晰；扩展点明确（新增状态/角色/导出格式/统计维度时改哪里、不改哪里）；数据 schema 与 API 契约有版本/迁移/兼容/弃用策略；横切关注点（配置/错误/日志/鉴权/测试缝）有归属；变更类提案必须附架构影响分析（模块/边界/兼容/回滚）。
+- 可观测性：关键失败可诊断（结构化日志/错误信息），不静默吞错。
+- 性能与容量：分页/上限/超时明确；不无限增长；给出已知容量边界。
+- 前端：加载/空/错误态齐备；键盘可用、标签与对比度等基本可访问性；窄屏可用。
+- 测试：单元+集成+端到端矩阵；权限与非法路径必须有负例；测试独立于实现；不得为保绿弱化断言。
+- 交付：验收前必须真实启动应用并演示（启动命令、访问地址或截图/录屏）；未真实运行不得建议验收通过。
+**架构与可扩展性要求（提案 / 流程 / 验收三阶段）**：
+- Draft（提案）：新项目提案必须含「架构方案」章节，既有项目的变更提案必须含「架构影响分析」章节；
+  内容覆盖模块分解与职责、依赖方向（无环）、数据流、扩展点（新增状态/角色/导出格式/统计维度时改哪里、
+  不改哪里）、数据 schema 与 API 契约的版本/迁移/兼容/弃用策略、横切关注点（配置/错误/日志/鉴权/
+  测试缝）归属、权衡与备选；章节缺失或只有标题/空话 ⇒ 不得建议 accept。
+- Steward（流程 / 派发）：流程单与派发任务必须引用架构方案或架构影响分析中的模块与边界；
+  跨模块/改契约的步骤须安排契约冻结与集成/端到端验证；扩展点必须有覆盖步骤。
+- Proof（验收）：逐项核对实现与架构声明一致——模块边界与依赖方向未被破坏、schema/API 版本与迁移
+  按声明落地、扩展点可用；提案缺架构章节或实现偏离声明 ⇒ 不得建议 accept，只能退回或要求补充证据。
+**shell 审批档（所有内置治理角色统一）**：你的 shell 可读取、写入并执行任意命令；只读白名单命令直接执行，其余命令（含读写与任何需要命令的权限）逐条提交客户/判断 agent 审批。拒绝、超时、通道不可用一律不放行。**审批不等于写边界扩张**：审批只针对当次命令，不改变你的职责与 Section 1 写边界；写文件仍优先用 `write_file` 并经写盘确认（shell 命令的文件副作用不经写入门禁，审批卡是唯一控制）。
+[message] offline factory:claude
+[settled] 会话结束
+✔ root flag and env reach claude through actual Interface/Pipeline/Service handlers in both commands (7.22625ms)
+[message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md
+[message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] 用户指令：任务 B1：请在批准的写集内工作；越界或写集外的写入会在写入之前被门禁拒绝。
+具体改动要求：请编辑文件 src/interface/cli/run.ts，在其顶部新增一行注释「// [B1] 受治理会话运行时确认」，并**用 write_file 或 edit_file 实际发起这次写入**（这是本任务可判定的验收点；不要只回答计划）。
+[message] offline factory:demo
+[settled] 会话结束
+[message] 治理会话：Draft / 提案（rapporteur；治理职能 proposal（提案权，不拥有最终批准权）），边界来源 <built-in:trio/rapporteur>；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 /var/folders/6z/2ldr5l1s37vglv_ctdsgmf5h0000gn/T/ans-assembly-default-UU5M0u
+[message] 客户确认制：Draft / 提案 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 docs/proposals/、docs/contracts/、docs/governance/rapporteur/ 除外——属初始写集、无需确认可直接写）。
+[message] 用户指令：任务 T-GOV-1：你是内置治理角色「Draft / 提案」，在注册表的 Section 1 内工作（可写：`docs/proposals/`、`docs/contracts/`、`docs/governance/rapporteur/`）。越界写入（含 `.ans/**`、其他治理角色资料、`角色卡/governance-boundary.yaml`、`docs/bootstrap-manifest.md`）会在写入之前被门禁拒绝；治理账本对你是只读的。
+**客户确认制**：写盘前必须先用 `request_confirmation` 把预览（内容摘要 + **将要写出的具体路径**）请客户确认；拿到 confirmed:true 后才写；未获同意/通道不可用 → 不写盘、如实告知。（预授权目录 `docs/proposals/`、`docs/contracts/`、`docs/governance/rapporteur/` 属初始写集，可直接写、无需确认；其余路径未确认 = 拒绝。）
+**标准工作流（阶段流转由应用负责）**：内置角色按标准工作流执行——意图确认 → 提案与契约 → 任命与角色卡 → 流程与派发 → 独立验收；
+trio 依次由 Lead / 主理、Draft / 提案、Crew / 组队、Steward / 统筹、Proof / 验收承担，single/su 由同一治理角色按同一顺序推进。
+**流程状态唯一机器状态**：`docs/flows/<flowId>.yaml`（同名 `.md` 仅人读视图，不得承载门禁状态）；步骤必须显式写 `kind` / `evidence` / `supersedes`；保留 id `verification` / `acceptance`（`kind: acceptance`，初始 `status: pending`，由应用自动派 Proof，不得占用、不得标 `done`）。
+**客户不做内部调度**：阶段流转由应用负责，客户不需要逐阶段手动转交或触发；只有需要客户决定的事项（提案接受、任命、写盘确认、验收）才经治理卡呈给客户。
+**Proof 的标准复核流程（独立核准是标准流程，不是客户手动转交）**：收到验收任务后按序执行：
+① 读证据（流程状态 YAML `docs/flows/<flowId>.yaml`、提案/契约、交付与回交报告、演示证据路径）；
+② 用审批档 shell 跑测试（逐条执行提案声明的单元/集成/端到端测试，命令逐条提交审批并记录输出）；
+③ 真实启动演示（执行启动命令、确认可访问，形成截图/录屏证据）；
+④ 质量/架构核对（按工程质量基线逐项核对，并核对实现与架构方案/影响分析一致：模块边界、依赖方向、扩展点、schema/API 版本迁移）；
+⑤ 验收卡（核对结论与证据写入 docs/verification/<flowId>-v1.md，再发 request_choice：cardKind=acceptance、选项 accept/reject）。
+**自动派发**：应用会在流程齐备（执行步骤全部 done 且按显式 `kind` 与账本证据对账、无未结算决定、验收步骤 pending）后自动派发 Proof / 验收，不需要客户手动触发；
+自动派发不是验收决定——验收卡仍由 Proof 核对后发出，由客户/判断 agent 决定。
+**提案权纪律（Draft / 提案，不拥有最终批准权）**：提案写入 `docs/proposals/<flowId>-v1.md`（frontmatter: flowId/version/author/status: draft），契约写入 `docs/contracts/**`，工作记录写入 `docs/governance/rapporteur/**`。
+**质量与证据**：提案必须含「工程质量基线」与「证据计划」——逐条说明基线如何落实、如何验证（单元+集成+端到端与真实启动演示），不得只写功能描述；证据计划缺失的提案不得建议 accept。
+**架构方案/影响分析**：新项目提案必须含「架构方案」，既有项目的变更提案必须含「架构影响分析」；覆盖模块分解与职责、依赖方向（无环）、数据流、扩展点（新增状态/角色/导出格式/统计维度时改哪里、不改哪里）、数据 schema 与 API 契约的版本/迁移/兼容/弃用策略、横切关注点归属、权衡与备选；章节缺失或只有标题/空话的提案不得建议 accept。
+若由联络官交接了客户意图（`docs/intents/<intentId>.md`），以文件为准形成提案；信息不足用 `request_clarification` 把问题送到主入口（同一 flow 最多 2 轮），不反复追问客户。
+向客户请求决定用 `request_choice`，`cardKind=proposal`，`flowId` 必填，选项 id 固定为 `accept` / `accept-quick` / `revise` / `reject`；验收用 `cardKind=acceptance`，选项 id `accept` / `reject`。非标准 id 不会解锁任何门禁。
+你不批准、不任命、不排程、不派发；不得把自己的推荐写成客户决定，不得把 Markdown 的 `status` 当作客户决定。
+工程质量基线（默认生产级；客户明确选原型档才可放宽）：
+- 正确性：验收标准逐条可演示；无 TODO/占位/假数据；边界与非法输入有明确行为。
+- 健壮性：输入校验与上限、错误码一致、失败不破坏已有数据；持久化原子写与重启恢复；并发/重入有明确策略。
+- 安全：认证/授权即使简化也要写清边界；防注入/XSS/路径穿越/CSRF；不记录密钥与敏感数据；零第三方依赖时说明理由。
+- 可维护性：模块边界清晰、命名一致、只在约束处注释；README 含启动、架构、API、权限、状态机、已知限制与权衡。
+- 架构与可扩展性：模块分解与职责、依赖方向（无环）、数据流清晰；扩展点明确（新增状态/角色/导出格式/统计维度时改哪里、不改哪里）；数据 schema 与 API 契约有版本/迁移/兼容/弃用策略；横切关注点（配置/错误/日志/鉴权/测试缝）有归属；变更类提案必须附架构影响分析（模块/边界/兼容/回滚）。
+- 可观测性：关键失败可诊断（结构化日志/错误信息），不静默吞错。
+- 性能与容量：分页/上限/超时明确；不无限增长；给出已知容量边界。
+- 前端：加载/空/错误态齐备；键盘可用、标签与对比度等基本可访问性；窄屏可用。
+- 测试：单元+集成+端到端矩阵；权限与非法路径必须有负例；测试独立于实现；不得为保绿弱化断言。
+- 交付：验收前必须真实启动应用并演示（启动命令、访问地址或截图/录屏）；未真实运行不得建议验收通过。
+**架构与可扩展性要求（提案 / 流程 / 验收三阶段）**：
+- Draft（提案）：新项目提案必须含「架构方案」章节，既有项目的变更提案必须含「架构影响分析」章节；
+  内容覆盖模块分解与职责、依赖方向（无环）、数据流、扩展点（新增状态/角色/导出格式/统计维度时改哪里、
+  不改哪里）、数据 schema 与 API 契约的版本/迁移/兼容/弃用策略、横切关注点（配置/错误/日志/鉴权/
+  测试缝）归属、权衡与备选；章节缺失或只有标题/空话 ⇒ 不得建议 accept。
+- Steward（流程 / 派发）：流程单与派发任务必须引用架构方案或架构影响分析中的模块与边界；
+  跨模块/改契约的步骤须安排契约冻结与集成/端到端验证；扩展点必须有覆盖步骤。
+- Proof（验收）：逐项核对实现与架构声明一致——模块边界与依赖方向未被破坏、schema/API 版本与迁移
+  按声明落地、扩展点可用；提案缺架构章节或实现偏离声明 ⇒ 不得建议 accept，只能退回或要求补充证据。
+**shell 审批档（所有内置治理角色统一）**：你的 shell 可读取、写入并执行任意命令；只读白名单命令直接执行，其余命令（含读写与任何需要命令的权限）逐条提交客户/判断 agent 审批。拒绝、超时、通道不可用一律不放行。**审批不等于写边界扩张**：审批只针对当次命令，不改变你的职责与 Section 1 写边界；写文件仍优先用 `write_file` 并经写盘确认（shell 命令的文件副作用不经写入门禁，审批卡是唯一控制）。
+[message] offline factory:pi
+[settled] 会话结束
+✔ root command defaults reach demo and Pi respectively through actual Service injection (5.915625ms)
+[message] 已解析角色 运行时核心（kind=project），角色卡：角色卡/运行时核心/role-card.md
+[message] 已解析边界，来源：角色卡/运行时核心/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] [装配演示假 runtime] 角色=运行时核心，脚本化发起 2 次写入（不经真实 Pi SDK，每次写入前经 gate 判定）。
+[tool_call] runtime 请求 write_file -> src/evil.ts
+[denied] 拒绝写入 src/evil.ts：目标路径未匹配任何边界条目（根：project）：src/evil.ts
+允许路径（按根分组）：
+  skill:
+    (无)
+  project:
+    - src/model/runtime.ts
+    - src/service/runtime/session.ts
+    - src/provider/runtime/tools.ts
+    - src/provider/runtime/schema.ts
+    - src/provider/runtime/session-store.ts
+    - src/common/runtime-core
+    - test/runtime-core
+    - 角色卡/运行时核心/feature-map.md
+    - 角色卡/运行时核心/memo.md
+    - 角色卡/运行时核心/changelog.md
+    - 角色卡/运行时核心/functional-description.md
+    - 角色卡/运行时核心/api-spec.md
+    - 角色卡/运行时核心/docs/design
+    - 角色卡/运行时核心/docs/feature
+    - 角色卡/运行时核心/docs/change
+    - 角色卡/运行时核心/docs/fix
+[tool_call] runtime 请求 write_file -> src/common/编排/output.ts
+[denied] 拒绝写入 src/common/编排/output.ts：目标路径未匹配任何边界条目（根：project）：src/common/编排/output.ts
+允许路径（按根分组）：
+  skill:
+    (无)
+  project:
+    - src/model/runtime.ts
+    - src/service/runtime/session.ts
+    - src/provider/runtime/tools.ts
+    - src/provider/runtime/schema.ts
+    - src/provider/runtime/session-store.ts
+    - src/common/runtime-core
+    - test/runtime-core
+    - 角色卡/运行时核心/feature-map.md
+    - 角色卡/运行时核心/memo.md
+    - 角色卡/运行时核心/changelog.md
+    - 角色卡/运行时核心/functional-description.md
+    - 角色卡/运行时核心/api-spec.md
+    - 角色卡/运行时核心/docs/design
+    - 角色卡/运行时核心/docs/feature
+    - 角色卡/运行时核心/docs/change
+    - 角色卡/运行时核心/docs/fix
+[settled] 会话结束（settled）
+[message] 已解析角色 Codex适配器（kind=project），角色卡：角色卡/Codex适配器/role-card.md
+[message] 已解析边界，来源：角色卡/Codex适配器/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] [装配演示假 runtime] 角色=Codex适配器，脚本化发起 2 次写入（不经真实 Pi SDK，每次写入前经 gate 判定）。
+[tool_call] runtime 请求 write_file -> src/evil.ts
+[denied] 拒绝写入 src/evil.ts：目标路径未匹配任何边界条目（根：project）：src/evil.ts
+允许路径（按根分组）：
+  skill:
+    (无)
+  project:
+    - src/provider/codex/session.ts
+    - src/common/codex-adapter
+    - test/codex-adapter
+    - 角色卡/Codex适配器/feature-map.md
+    - 角色卡/Codex适配器/memo.md
+    - 角色卡/Codex适配器/changelog.md
+    - 角色卡/Codex适配器/functional-description.md
+    - 角色卡/Codex适配器/api-spec.md
+    - 角色卡/Codex适配器/docs/design
+    - 角色卡/Codex适配器/docs/feature
+    - 角色卡/Codex适配器/docs/change
+    - 角色卡/Codex适配器/docs/fix
+[tool_call] runtime 请求 write_file -> src/common/编排/output.ts
+[denied] 拒绝写入 src/common/编排/output.ts：目标路径未匹配任何边界条目（根：project）：src/common/编排/output.ts
+允许路径（按根分组）：
+  skill:
+    (无)
+  project:
+    - src/provider/codex/session.ts
+    - src/common/codex-adapter
+    - test/codex-adapter
+    - 角色卡/Codex适配器/feature-map.md
+    - 角色卡/Codex适配器/memo.md
+    - 角色卡/Codex适配器/changelog.md
+    - 角色卡/Codex适配器/functional-description.md
+    - 角色卡/Codex适配器/api-spec.md
+    - 角色卡/Codex适配器/docs/design
+    - 角色卡/Codex适配器/docs/feature
+    - 角色卡/Codex适配器/docs/change
+    - 角色卡/Codex适配器/docs/fix
+[settled] 会话结束（settled）
+[message] 已解析角色 Claude适配器（kind=project），角色卡：角色卡/Claude适配器/role-card.md
+[message] 已解析边界，来源：角色卡/Claude适配器/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 B1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+[message] [装配演示假 runtime] 角色=Claude适配器，脚本化发起 2 次写入（不经真实 Pi SDK，每次写入前经 gate 判定）。
+[tool_call] runtime 请求 write_file -> src/evil.ts
+[denied] 拒绝写入 src/evil.ts：目标路径未匹配任何边界条目（根：project）：src/evil.ts
+允许路径（按根分组）：
+  skill:
+    (无)
+  project:
+    - src/provider/claude/session.ts
+    - src/common/claude-adapter
+    - test/claude-adapter
+    - 角色卡/Claude适配器/feature-map.md
+    - 角色卡/Claude适配器/memo.md
+    - 角色卡/Claude适配器/changelog.md
+    - 角色卡/Claude适配器/functional-description.md
+    - 角色卡/Claude适配器/api-spec.md
+    - 角色卡/Claude适配器/docs/design
+    - 角色卡/Claude适配器/docs/feature
+    - 角色卡/Claude适配器/docs/change
+    - 角色卡/Claude适配器/docs/fix
+[tool_call] runtime 请求 write_file -> src/common/编排/output.ts
+[denied] 拒绝写入 src/common/编排/output.ts：目标路径未匹配任何边界条目（根：project）：src/common/编排/output.ts
+允许路径（按根分组）：
+  skill:
+    (无)
+  project:
+    - src/provider/claude/session.ts
+    - src/common/claude-adapter
+    - test/claude-adapter
+    - 角色卡/Claude适配器/feature-map.md
+    - 角色卡/Claude适配器/memo.md
+    - 角色卡/Claude适配器/changelog.md
+    - 角色卡/Claude适配器/functional-description.md
+    - 角色卡/Claude适配器/api-spec.md
+    - 角色卡/Claude适配器/docs/design
+    - 角色卡/Claude适配器/docs/feature
+    - 角色卡/Claude适配器/docs/change
+    - 角色卡/Claude适配器/docs/fix
+[settled] 会话结束（settled）
+✔ new accepted runtime role cards can be reached from root fallback without adding task writes (9.522709ms)
+✔ actual bin default pi Provider fails honestly for missing configuration in role and govern (544.459833ms)
+✔ actual bin default codex Provider fails honestly for missing configuration in role and govern (489.0705ms)
+✔ actual bin default claude Provider fails honestly for missing configuration in role and govern (763.675583ms)
+✔ SDK loading is lazy for module import, help and doctor, including command help (801.062625ms)
+✔ root source depends only on Interface entry, Model and support modules (0.250875ms)
+✔ actual bin missing SDK errors are honest and masked without starting model requests (597.0555ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3440.513625

@@ -3020,6 +3020,10 @@ async function runHandbackAcceptanceScenario(status: string) {
       return made.handle;
     },
     buildProjectConfigFn: buildProjectConfig,
+    // 2026-10-20 CI 第二轮（run 39391972925）：夹具不得依赖宿主模型凭据——CI runner 没有任何 key 时，
+    // 真实引擎解析会如实拦住自动验收派发（verifier 永远不 send）。这里注入确定性解析，只测派发时序/文案
+    // （与本文件其余用例的用法一致）；不放宽任何断言。
+    resolveRuntimeFn: async () => ({ ok: true, runtime: "pi", source: "credentials", skipped: [] }),
   });
   await iface.listProject({ projectRoot: root });
   assert.equal((await iface.openSession({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);

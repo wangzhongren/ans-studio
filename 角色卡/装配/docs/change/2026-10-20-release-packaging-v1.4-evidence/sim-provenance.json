@@ -1,8 +1,8 @@
 {
   "sourceRef": "v1.4.0",
   "sourceSha": "83eec7ed1966b215d81035cac33d7dda80013f05",
-  "overlaySha": "03252070a4e96cb36930e9d2b09433db9fcc581e",
-  "actualTree": "12953c86ead7b69dd209ac3cf8e841e2a529a433",
+  "overlaySha": "53c50a0ea6f6dd60b03920cf0f59cdf78dd5721c",
+  "actualTree": "07d210ee800c4f19a279b2bc0f3cb3d4dd9e8463",
   "overlayPaths": [
     ".github/workflows/release.yml",
     "package-lock.json",
@@ -14,9 +14,10 @@
     "test/桌面应用/runtime-resolution.test.ts",
     "test/编排/flow-service.test.ts",
     "test/编排/shell-command-guard.test.ts",
+    "test/装配/multi-runtime.test.ts",
     "test/装配/release-packaging.test.ts"
   ],
-  "overlayPatchSha256": "5a06ed043b6db0caf62eee91bfe3bd1fe76ebb3f7f010f45597daa30de4b3c5d",
+  "overlayPatchSha256": "2f6d6f765e13c2f43aa33e038198ff691bd7e38696d4f7818a7ad80da6776c11",
   "excludedChanges": [
     "README.md",
     "角色卡/桌面应用/changelog.md",
@@ -26,7 +27,9 @@
     "角色卡/编排/docs/change/2026-10-20_change_v1.4.0-ci-windows-guard-atomic-write.md",
     "角色卡/编排/memo.md",
     "角色卡/装配/changelog.md",
+    "角色卡/装配/docs/change/2026-10-20-release-packaging-v1.4-evidence/multi-runtime-test.txt",
     "角色卡/装配/docs/change/2026-10-20-release-packaging-v1.4-evidence/overlay-2-context.md",
+    "角色卡/装配/docs/change/2026-10-20-release-packaging-v1.4-evidence/overlay-3-context.md",
     "角色卡/装配/docs/change/2026-10-20-release-packaging-v1.4-evidence/overlay-recompute.json",
     "角色卡/装配/docs/change/2026-10-20-release-packaging-v1.4-evidence/sim-provenance.json",
     "角色卡/装配/docs/change/2026-10-20-release-packaging-v1.4-evidence/test-assembly.txt",

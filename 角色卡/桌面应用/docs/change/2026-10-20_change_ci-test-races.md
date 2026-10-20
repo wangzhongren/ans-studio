@@ -1,7 +1,7 @@
 ---
 id: ci-test-races-v140
 type: change
-title: v1.4.0 首跑 CI 两处测试竞态修复（验收派发提前取数组 / macOS 临时目录清理 ENOTEMPTY）
+title: v1.4.0 CI 两处测试竞态修复（验收派发 / macOS 临时目录清理；含第二轮夹具凭据隔离）
 created: "2026-10-20"
 updated: "2026-10-20"
 timezone: Asia/Shanghai
@@ -13,15 +13,19 @@ events:
     summary: 修复 test/桌面应用/interface.test.ts 验收派发用例的「场景返回后提前取 verifier 数组」竞态；重复 settle 改为 400ms 有界稳定窗口观察；pending/blocked 用例改为先等收尾门阻塞系统行再断言不派
   - date: "2026-10-20"
     kind: fixed
+    summary: 第二轮 CI run 39391972925 同用例转为 waitForTest 5s 超时——夹具未注入 resolveRuntimeFn，CI 无模型凭据时真实解析器如实拦住派发；在 runHandbackAcceptanceScenario 注入确定性解析（pi/credentials），不放宽断言
+  - date: "2026-10-20"
+    kind: fixed
     summary: test/桌面应用/runtime-resolution.test.ts 全部临时目录 teardown 改用 removeTempDirEventually（ENOTEMPTY/EBUSY/EPERM 最多 10 次、75ms 间隔的异步重试），不再直接 rmSync
   - date: "2026-10-20"
     kind: verified
-    summary: 本地定向 74/74 与 13/13 连续各跑 3 次全绿；typecheck 0 错；从测试文件抽取真实 helper 源码做故障注入，确认 ENOTEMPTY 重试、非重试错误直抛、重试耗尽后抛错三条路径
+    summary: 本地定向 74/74 与 13/13 连续各跑 3 次全绿；无凭据副本（排除 .env、清空相关环境变量）74/74，删除注入的控制组复现 5s 超时；typecheck 0 错；从测试文件抽取真实 helper 源码做故障注入，确认 ENOTEMPTY 重试、非重试错误直抛、重试耗尽后抛错三条路径
 ---
 
-# v1.4.0 首跑 CI 两处测试竞态修复
+# v1.4.0 CI 两处测试竞态修复（含第二轮夹具凭据隔离）
 
-**来源**：v1.4.0 发布 CI 首跑 `run 39389502551`（提交 `0210e2b`）两处失败，均判为桌面应用测试问题，由桌面应用属主上下文修复。
+**来源**：v1.4.0 发布 CI 首跑 `run 39389502551`（提交 `0210e2b`）两处失败，均判为桌面应用测试问题，由桌面应用属主上下文修复；
+第二轮复跑 `run 39391972925`（提交 `567d3bd`，已含首轮修复）同一验收派发用例转为 5s 超时，补修夹具对宿主模型凭据的依赖。
 **范围**：只改 `test/桌面应用/interface.test.ts`、`test/桌面应用/runtime-resolution.test.ts` 与本角色记录；不改产品代码、打包/编排文件，不 commit/tag/push。
 
 ## 1. 三平台共同失败：验收派发测试竞态
@@ -46,6 +50,27 @@ events:
 - **精确文件**：`test/桌面应用/interface.test.ts`（新增 `assertNoChangeFor`、`deliveryNoteSummaries` 两个测试辅助；
   修改上述两个用例；未改 `runHandbackAcceptanceScenario` 产品路径）。
 
+### 第二轮 CI（run 39391972925）补充：夹具未隔离引擎解析
+
+- **CI 事实**：提交 `567d3bd` 的三平台复跑中，同一用例仍红，但错误变为
+  `Error: 等待测试条件超时`（约 5.2–5.4s，verifier 始终没有 send），不再是数组引用问题。
+- **根因（一句话）**：`runHandbackAcceptanceScenario` 的 `createDesktopInterface` 没有注入 `resolveRuntimeFn`，
+  夹具依赖宿主真实引擎解析；CI runner 没有任何模型凭据（也没有仓库根 `.env`），自动验收派发在引擎解析处
+  被如实拦住、根本到不了 verifier 会话（本机仓库 `.env` 有 Pi 凭据，所以本地一直通过）。这是**夹具环境依赖**，
+  不是产品变慢。
+- **修复**：在该夹具的 deps 中注入确定性解析
+  `resolveRuntimeFn: async () => ({ ok: true, runtime: "pi", source: "credentials", skipped: [] })`
+  （与本文件其余用例的既有用法一致）；不放宽任何断言、不改产品代码。此前的等待/稳定窗口修复全部保留。
+- **验证（红→绿）**：
+  - 主工作树 `node --test test/桌面应用/interface.test.ts`：**74/74**，连续 3 次全绿。
+  - 无凭据副本（复制 `app/`、`src/`、`test/`、`package.json`、`tsconfig.json`，**排除 `.env`**，
+    `node_modules` 软链，并 `env -u` 清空 `ANTHROPIC_API_KEY`/`ANTHROPIC_AUTH_TOKEN`/`ANTHROPIC_BASE_URL`/
+    `CODEX_API_KEY`/`OPENAI_API_KEY`/`ANS_PI_BASE_URL`/`ANS_PI_MODEL`/`ANS_PI_API_KEY`）：
+    **74/74** 全绿，收尾推进用例 665ms / 518ms。
+  - 同一副本删除注入行后的控制组（`--test-name-pattern="收尾推进"`）：
+    `tests 2 / pass 1 / fail 1`，done 用例以 `等待测试条件超时`（5275.98ms）复现第二轮 CI 现象。
+  - 临时副本已删除，无遗留。
+
 ## 2. macOS arm64：临时目录清理 ENOTEMPTY
 
 - **CI 事实**：`build (macos-15, mac, arm64)` 红在 `test/桌面应用/runtime-resolution.test.ts:624` 用例
@@ -65,21 +90,26 @@ events:
 ## 本地验证（真实输出）
 
 - `node --test test/桌面应用/interface.test.ts`：`tests 74 / pass 74 / fail 0 / skipped 0 / todo 0`；
-  连续 **3 次**均为 74/74。
+  第二轮修复（注入 `resolveRuntimeFn`）后连续 **3 次**均为 74/74。
+- 无凭据环境模拟（详见 §1「第二轮 CI 补充」）：排除 `.env` 的临时副本 + 清空相关环境变量 ⇒ **74/74**；
+  删除注入的控制组复现 `等待测试条件超时`（2 用例：1 pass / 1 fail）。
 - `node --test test/桌面应用/runtime-resolution.test.ts`：`tests 13 / pass 13 / fail 0 / skipped 0 / todo 0`；
   连续 **3 次**均为 13/13。
+- 两文件合并跑一次：`tests 87 / pass 87 / fail 0`。
 - `npm run typecheck`：0 错（exit 0）。
 - 清理重试机制（darwin arm64）：从本测试文件**抽取真实 `removeTempDirEventually` 源码**做故障注入——
   ① 首次 ENOTEMPTY、第二次成功 ⇒ 2 次调用后成功；
   ② 非重试错误 `EACCES` ⇒ 1 次调用后立即上抛；
   ③ 持续 ENOTEMPTY ⇒ 恰好 10 次调用后抛出带 `cause.code=ENOTEMPTY` 的错误。
   另做 8 轮真实「边写边删」竞态，本机未自然复现 ENOTEMPTY（与 CI 偶发一致），故以注入验证重试路径。
-- 测试后检查 `$TMPDIR`：无 `ans-acceptance-*` / `ans-runtime-*` 遗留目录。
+- 测试后检查 `$TMPDIR`：无 `ans-acceptance-*` / `ans-runtime-*` 遗留目录；无凭据临时副本已删除。
 
 ## 残余风险
 
-- 本地无法复现 CI 的原生并行负载：macOS/Windows runner 上的真实并发时序仍需下一次 CI 原生 runner 复验；
+- **第二轮 CI（run 39391972925，提交 `567d3bd`）仍是红的**；本记录只说明两轮根因与本地红→绿证据，
+  **不声称 CI 已通过**。最终仍需下一次 CI 原生 runner 复验（无凭据 runner 上的真实行为）。
+- 本地无法复现 CI 的原生并行负载：macOS/Windows runner 上的真实并发时序仍需 CI 复验；
   本次只证明定向文件在串行本地负载下稳定、且重试/等待逻辑在注入条件下按预期工作。
 - 未跑全量 `node --test`（任务范围限定两个定向文件）；未跑 Electron e2e（本次为测试时序修复，不涉产品行为）。
-- 工作树中另有其他角色上下文的未提交改动（`src/common/编排/shell-command-guard.ts`、
-  `test/编排/flow-service.test.ts`、`test/编排/shell-command-guard.test.ts`），本次未触碰。
+- 本仓库工作树由多个角色上下文并行使用，可能同时存在其他角色/发布上下文的改动；本次只改上述桌面应用
+  测试与本角色记录，未触碰其他角色文件（首轮修复已随发布提交 `567d3bd` 进入 CI）。
