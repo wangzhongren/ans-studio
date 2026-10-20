@@ -608,17 +608,31 @@ test("completeAcceptanceStep：原子写失败 ⇒ write-failed，原文件不�
   await withRoot(async (root) => {
     writeFile(root, FLOW_REL, flowYaml());
     writeLedger(root, ACCEPTED_LEDGER);
-    const before = readFileSync(join(root, ...FLOW_REL.split("/")), "utf8");
+    const flowAbs = join(root, ...FLOW_REL.split("/"));
+    const before = readFileSync(flowAbs, "utf8");
     const flowsDir = join(root, "docs", "flows");
-    chmodSync(flowsDir, 0o500);
+    // 平台真值（Windows CI 实测：目录 chmod 0o500 不阻止写入，用例在 windows-2025 上得到 ok=true）：
+    //  · POSIX：rename 只要求**目录**可写（文件自身权限不阻止替换）⇒ 用目录 0o500 让同目录建临时文件失败；
+    //  · win32：目录 mode 不阻止写入 ⇒ 把目标 flow-a.yaml 设为只读（0o444）。atomic-write 先在同目录
+    //    建临时文件再 rename 覆盖目标，MoveFileExW 覆盖只读目标返回 ERROR_ACCESS_DENIED ⇒ Node EACCES/EPERM
+    //    （均在 atomic-write 的瞬时重试集合内，只读属性持续存在 ⇒ 重试上界耗尽后抛错）⇒ write-failed，
+    //    目标文件未被触碰。finally 恢复 0o644。
+    const readonlyTarget = process.platform === "win32";
+    if (readonlyTarget) chmodSync(flowAbs, 0o444);
+    else chmodSync(flowsDir, 0o500);
     try {
       const result = await completeAcceptanceStep({ projectRoot: root, flowId: "flow-a" });
       assert.equal(result.ok, false);
       assert.equal(result.code, "write-failed");
-      assert.equal(readFileSync(join(root, ...FLOW_REL.split("/")), "utf8"), before);
+      assert.equal(readFileSync(flowAbs, "utf8"), before);
     } finally {
-      chmodSync(flowsDir, 0o700);
+      if (readonlyTarget) chmodSync(flowAbs, 0o644);
+      else chmodSync(flowsDir, 0o700);
     }
+    // 恢复权限后可正常再写一次：失败路径未留下半写/坏状态（断言不放宽）。
+    const retry = await completeAcceptanceStep({ projectRoot: root, flowId: "flow-a" });
+    assert.equal(retry.ok, true, retry.error ?? "");
+    assert.equal(stepOf(readFlow(root).flow, "verification").status, "done");
   });
 });
 

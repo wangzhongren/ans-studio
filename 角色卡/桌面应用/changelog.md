@@ -1,5 +1,13 @@
 # 桌面应用 变更记录
 
+## 2026-10-20 — v1.4.0 首跑 CI 两处测试竞态修复（验收派发 / macOS 临时目录清理）
+
+**来源**：v1.4.0 发布 CI 首跑 `run 39389502551`（提交 `0210e2b`）失败，两处均属桌面应用测试。
+
+- **三平台共同红（interface.test.ts:3035）**：`runHandbackAcceptanceScenario` 只在 verifier 会话真正打开时才写入 `sendsByRole`；用例在场景返回后立即 `?? []` 取数组，CI 并行负载下 verifier 尚未打开，捕获到与后续派发无关的空数组 ⇒ `actual 0 / expected 1`。修复：先 `waitForTest(..., 5000)` 等首条任务落位再取当前数组；系统行同样有界等待；「重复 settle 不重派」改为 400ms **有界稳定窗口**（重开新会话=map 值被替换、追加=长度变化，两者都抓），不再只靠 150ms 固定 sleep；相邻 pending/blocked 用例先等「自动验收未派发」阻塞系统行再断言 0 派发，堵住同类假绿。
+- **macOS arm64 红（runtime-resolution.test.ts:624 teardown）**：`stopSession()` 后仍有异步写入落盘，`rmSync` 撞 `ENOTEMPTY`。修复：新增 `removeTempDirEventually`（异步 rm，仅对 ENOTEMPTY/EBUSY/EPERM 最多重试 10 次、间隔 75ms，末次仍失败才抛；其它错误直抛），该文件全部 teardown 统一使用；语义性删除仍保留 `rmSync`。
+- **验证**：`node --test test/桌面应用/interface.test.ts` **74/74** 连续 3 次全绿；`node --test test/桌面应用/runtime-resolution.test.ts` **13/13** 连续 3 次全绿；`npm run typecheck` 0 错；从测试文件抽取真实清理 helper 做故障注入，确认 ENOTEMPTY 重试 / EACCES 直抛 / 10 次耗尽后抛错三条路径；无临时目录遗留。**未跑全量与 Electron e2e**；真实 CI 并行负载仍需原生 runner 复验。详见[变更记录](docs/change/2026-10-20_change_ci-test-races.md)。未提交、未推送。
+
 ## 2026-10-13 — 按 UI/UX v2 设计对齐桌面视觉与骨架（客户「按照 UI设计来改」授权）
 
 客户看过实现与设计后原话「这个和设计还是有差别啊，你让桌面按照 UI设计来改，改完了让UI，和产品复核」——本派发即实施授权。**只读差异调查先行**：用离线夹具把当前实现（1360×860 / 960×620 两档实测 rect 与计算样式）与 v2 设计规范＋原型（原型 HTML 同法载入 Electron 实测）逐项对照，列 40 项差异（V1–V40），全部对齐（保留/交回 PM 项除外）：

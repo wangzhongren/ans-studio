@@ -210,6 +210,45 @@ test("有界 grep 放行：具体目录 + --include / 具体文件（不因本�
   }
 });
 
+test("Windows 路径回归：盘符/UNC 的反斜杠按分隔符保留 ⇒ 项目根仍判无界；具体子目录/文件放行", () => {
+  // 不依赖宿主平台：直接以 Windows 路径作为 cwd/projectRoot 调用（CI Windows 真机漏判的同一形态：
+  // `grep -r foo D:\a\ans-studio\ans-studio\.release\source` 曾因 `\` 被当转义符拼成 `D:aans-studio…` 而 allow）。
+  const winRoot = "D:\\a\\ans-studio\\ans-studio\\.release\\source";
+  const winSpaceRoot = "D:\\a\\ans studio\\source";
+  const uncRoot = "\\\\server\\share\\ans-studio";
+  const win = (
+    command: string,
+    argv: string[],
+    cwd: string = winRoot,
+    projectRoot: string = cwd,
+  ): ReturnType<typeof guardShellCommand> => guardShellCommand({ command, argv, cwd, projectRoot });
+
+  const denyCases: Array<[string, string[], string, string]> = [
+    [`grep -r foo ${winRoot}`, ["grep", "-r", "foo", winRoot], winRoot, winRoot], // 未加引号盘符路径
+    [`grep -r foo "${winRoot}"`, ["grep", "-r", "foo", winRoot], winRoot, winRoot], // 双引号包裹的同一路径
+    [
+      "grep -r foo D:\\a\\ans\\ studio\\source", // 空白经 POSIX 转义仍是同一 token（不切词）
+      ["grep", "-r", "foo", winSpaceRoot],
+      winSpaceRoot,
+      winSpaceRoot,
+    ],
+    [`grep -r foo ${uncRoot}`, ["grep", "-r", "foo", uncRoot], uncRoot, uncRoot], // UNC 项目根
+    ["grep -r foo \\\\server\\share", ["grep", "-r", "foo", "\\\\server\\share"], uncRoot, uncRoot], // UNC 共享根
+  ];
+  for (const [command, argv, cwd, projectRoot] of denyCases) {
+    assertDeny(win(command, argv, cwd, projectRoot), "unbounded-search", command);
+  }
+
+  // 对照：Windows 具体子目录/文件同样是窄范围（不因平台一刀切拒绝）。
+  const allowCases: Array<[string, string[]]> = [
+    [`grep -r foo ${winRoot}\\src`, ["grep", "-r", "foo", `${winRoot}\\src`]],
+    [`grep -r foo ${winRoot}\\src\\index.ts`, ["grep", "-r", "foo", `${winRoot}\\src\\index.ts`]],
+  ];
+  for (const [command, argv] of allowCases) {
+    assert.equal(win(command, argv).verdict, "allow", command);
+  }
+});
+
 test("find：/ 与 . → deny；具体目录与 -maxdepth 有界 → 放行", () => {
   assertDeny(guard("find / -name x", ["find", "/", "-name", "x"]), "unbounded-search", "find /");
   assertDeny(guard("find . -name x", ["find", ".", "-name", "x"]), "unbounded-search", "find .");

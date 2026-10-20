@@ -17,6 +17,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
 import { mkdtempSync, mkdirSync, readdirSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { rm as removeAsync } from "node:fs/promises";
 import { tmpdir } from "node:os";
 
 import {
@@ -40,6 +41,32 @@ import type { SessionEvent } from "../../src/provider/pi/session.ts";
 
 function makeTempDir(prefix: string): string {
   return mkdtempSync(path.join(tmpdir(), prefix));
+}
+
+/**
+ * 删除测试临时目录，带**有界重试**：`stopSession()` 返回后仍可能有异步写入终于落盘，
+ * 2026-10-20 CI run 39389502551（macOS arm64）因此在 teardown 的 `rmSync` 抛 ENOTEMPTY。
+ * 只对 ENOTEMPTY/EBUSY/EPERM（目录仍在写/被占用）重试，最多 10 次、间隔 75ms，末次仍失败才抛；
+ * 其它错误立即上抛，不掩盖产品错误。用异步 rm + 异步退避（不阻塞事件循环），让待完成的写入有机会收尾。
+ */
+async function removeTempDirEventually(dir: string, attempts = 10, delayMs = 75): Promise<void> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      await removeAsync(dir, { recursive: true, force: true });
+      return;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === "ENOENT") return; // force 已吞掉，兜底并发删除
+      if (code !== "ENOTEMPTY" && code !== "EBUSY" && code !== "EPERM") throw error;
+      lastError = error;
+      if (attempt < attempts) await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  throw new Error(
+    `清理临时目录失败（已重试 ${attempts} 次）：${dir}${lastError instanceof Error ? `：${lastError.message}` : ""}`,
+    { cause: lastError },
+  );
 }
 
 const PI_KEYS = {
@@ -334,7 +361,7 @@ test("解析优先级 1：活跃会话的 runtime 优先（高于已选/持久�
     });
     assert.deepEqual(result, { ok: true, runtime: "codex", source: "active-session", skipped: [] });
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    await removeTempDirEventually(root);
   }
 });
 
@@ -355,7 +382,7 @@ test("解析优先级 2：应用内已选（本进程）先于持久化", async 
       assert.equal(result.source, "selected");
     }
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    await removeTempDirEventually(root);
   }
 });
 
@@ -376,7 +403,7 @@ test("解析优先级 2：无活跃/已选时用持久化的 per-project runtime
       assert.equal(result.source, "persisted");
     }
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    await removeTempDirEventually(root);
   }
 });
 
@@ -406,7 +433,7 @@ test("解析优先级 3：`.ans/sessions/<role>/<runtime>/` 取最近使用；�
       assert.equal(onlyPi.source, "session-history");
     }
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    await removeTempDirEventually(root);
   }
 });
 
@@ -437,7 +464,7 @@ test("解析优先级 4：仅 Pi 配置 ⇒ pi；仅 Codex 配置 ⇒ codex；�
       assert.equal(claudeResult.source, "credentials");
     }
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    await removeTempDirEventually(root);
   }
 });
 
@@ -470,10 +497,10 @@ test("无 Claude key 时不选 Claude：活跃会话/磁盘证据指向 claude �
       assert.equal(unresolved.ok, false);
       if (!unresolved.ok) assert.equal(unresolved.message, RUNTIME_UNRESOLVED_MESSAGE);
     } finally {
-      rmSync(emptyDir, { recursive: true, force: true });
+      await removeTempDirEventually(emptyDir);
     }
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    await removeTempDirEventually(root);
   }
 });
 
@@ -488,7 +515,7 @@ test("解析优先级 5：无任何候选/凭据 ⇒ 明确失败（文案含「
       assert.deepEqual(result.skipped.map((item) => item.runtime), ["pi", "codex", "claude"]);
     }
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    await removeTempDirEventually(root);
   }
 });
 
@@ -513,7 +540,7 @@ test("持久化：往返读写、坏件重建、缺省关闭、demo 不落盘", 
     assert.equal(await readPersistedProjectRuntime(undefined, root), undefined, "持久化关闭 ⇒ 不读");
     assert.equal((await persistProjectRuntime(undefined, root, "pi")).ok, true, "持久化关闭 ⇒ 写入 no-op");
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    await removeTempDirEventually(root);
   }
 });
 
@@ -549,7 +576,7 @@ test("冷启动无法确定引擎：不派发、Lead 恰一条明确系统行、
       await harness.iface.stopSession();
     }
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    await removeTempDirEventually(root);
   }
 });
 
@@ -584,7 +611,7 @@ test("解析失败后客户选定引擎：下一次真实 settle 可再检查并
       await harness.iface.stopSession();
     }
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    await removeTempDirEventually(root);
   }
 });
 
@@ -617,7 +644,7 @@ test("持久化选择被传给解析器；成功派发后用实际 runtime 覆�
       await harness.iface.stopSession();
     }
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    await removeTempDirEventually(root);
   }
 });
 
@@ -647,7 +674,7 @@ test("端到端（真实解析器）：冷启动仅 Pi 配置 ⇒ 自动派发�
       await harness.iface.stopSession();
     }
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    await removeTempDirEventually(root);
   }
 });
 
@@ -666,6 +693,6 @@ test("客户 openSession 成功即记住 per-project 引擎选择（供下次冷
       await harness.iface.stopSession();
     }
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    await removeTempDirEventually(root);
   }
 });

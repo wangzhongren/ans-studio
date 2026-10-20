@@ -521,24 +521,55 @@ function isWidePath(token: string, ctx: GuardContext): boolean {
 
   let resolved: string;
   try {
-    resolved = path.resolve(ctx.base, value);
+    // Windows 绝对路径（盘符/UNC）按 win32 语义解析：大小写不敏感、`\` 与 `/` 等价；且不依赖
+    // 宿主平台——macOS 单测直接传 Windows cwd/projectRoot 时也能得到与 Windows 真机一致的判定。
+    resolved = isWindowsAbsolutePath(value) ? path.win32.resolve(value) : path.resolve(ctx.base, value);
   } catch {
     return false;
   }
-  if (resolved === path.parse(resolved).root) return true;
+  const resolvedWin = isWindowsAbsolutePath(resolved);
+  if (resolvedWin) {
+    if (stripTrailingSeparator(path.win32.parse(resolved).root, true) === stripTrailingSeparator(resolved, true)) {
+      return true;
+    }
+  } else if (resolved === path.parse(resolved).root) {
+    return true;
+  }
   for (const root of [...ctx.roots, ...(ctx.home !== "" ? [ctx.home] : [])]) {
     let normalized: string;
     try {
-      normalized = path.resolve(root);
+      normalized = isWindowsAbsolutePath(root) ? path.win32.resolve(root) : path.resolve(root);
     } catch {
       continue;
     }
     if (normalized === "") continue;
-    if (resolved === normalized) return true;
-    // resolved 是根的祖先（如 /Users 之于 /Users/me/project）⇒ 扫描范围比项目大。
-    if (normalized.startsWith(resolved + path.sep)) return true;
+    // 不同形态（Windows 绝对路径 vs 宿主的 POSIX 路径）不可能互相包含。
+    if (isWindowsAbsolutePath(normalized) !== resolvedWin) continue;
+    if (sameOrAncestorPath(resolved, normalized, resolvedWin)) return true;
   }
   return false;
+}
+
+/** Windows 绝对路径形态：盘符（`D:\`/`D:/`）或 UNC（`\\server\share`）。 */
+function isWindowsAbsolutePath(value: string): boolean {
+  return /^[A-Za-z]:[\\/]/.test(value) || value.startsWith("\\\\");
+}
+
+/** 去掉尾部路径分隔符（Windows 键在比较前统一：大小写不敏感、分隔符为 `\`）。 */
+function stripTrailingSeparator(value: string, windows: boolean): string {
+  const sep = windows ? "\\" : path.sep;
+  const lower = windows ? value.toLowerCase() : value;
+  return lower.length > 1 && lower.endsWith(sep) ? lower.slice(0, -1) : lower;
+}
+
+/** `parent` 是否等于/祖先于 `child`（`child` 被 `parent` 覆盖，扫描 = 宽范围）。 */
+function sameOrAncestorPath(parent: string, child: string, windows: boolean): boolean {
+  if (windows) {
+    const p = stripTrailingSeparator(parent, true);
+    const c = stripTrailingSeparator(child, true);
+    return c === p || c.startsWith(`${p}\\`);
+  }
+  return child === parent || child.startsWith(parent + path.sep);
 }
 
 // —————————————————————— 命令切分 / 包装器剥离 ——————————————————————
@@ -692,8 +723,19 @@ function splitSimpleCommands(text: string): SimpleCommand[] {
       }
       if (ch === "\\" && index + 1 < text.length) {
         const next = text[index + 1]!;
-        if (next !== "\n") current += next;
-        index += 2;
+        // POSIX 双引号内 `\` 只对 `$`、反引号、`"`、`\`、换行有转义意义；对其余字符是字面
+        // 反斜杠。Windows 路径 `"D:\a\b"` 若一律吃掉反斜杠会拼成 `D:ab`，导致宽范围漏判。
+        if (next === "\n") {
+          index += 2;
+          continue;
+        }
+        if (next === "$" || next === "`" || next === "\"" || next === "\\") {
+          current += next;
+          index += 2;
+          continue;
+        }
+        current += ch;
+        index += 1;
         continue;
       }
       current += ch;
@@ -703,6 +745,23 @@ function splitSimpleCommands(text: string): SimpleCommand[] {
     if (ch === "\\") {
       if (index + 1 < text.length) {
         const next = text[index + 1]!;
+        // Windows 盘符/UNC 路径里的 `\` 是分隔符，不是 POSIX 转义符（Windows CI 实测漏判的根因）。
+        if (windowsPathSeparator(current, next)) {
+          if (next === " " || next === "\t" || next === "\r" || next === "\n" ||
+              next === "|" || next === "&" || next === ";" || next === "(" || next === ")" ||
+              next === "'" || next === "\"") {
+            // 但空白/元字符前的 `\` 仍是 POSIX 转义：不能让路径切词（`D:\a\my\ dir`）
+            // 或把 `\;`/`\|` 当成命令分隔符。
+            if (next !== "\n") current += next;
+            index += 2;
+            hasToken = true;
+            continue;
+          }
+          current += ch;
+          index += 1;
+          hasToken = true;
+          continue;
+        }
         if (next !== "\n") current += next;
         index += 2;
       } else {
@@ -769,6 +828,19 @@ function splitSimpleCommands(text: string): SimpleCommand[] {
   }
   endSegment(false);
   return segments;
+}
+
+/**
+ * 未引用 token 是否处于 **Windows 路径形态**（此时 `\` 必须按路径分隔符保留，不能当 POSIX 转义符消费）：
+ *  · 盘符绝对路径 `^[A-Za-z]:[\\/]`：token 是 `D:`（本字符即首个分隔符）或已是 `D:\…` / `D:/…`；
+ *  · UNC `^\\\\`：token 已有一个/两个以上前导反斜杠，或正看到首个 `\` 且下一个也是 `\`。
+ * 其余形态（`\ `、`\;`、`\|` 等 POSIX 转义）保持原语义。
+ */
+function windowsPathSeparator(current: string, next: string): boolean {
+  if (/^[A-Za-z]:([\\/]|$)/.test(current)) return true;
+  if (current.startsWith("\\\\")) return true; // 两个及以上前导反斜杠（UNC）
+  if (current === "\\") return true; // 首个 UNC 反斜杠已保留、正在消费第二个
+  return current === "" && next === "\\"; // 首个 UNC 反斜杠
 }
 
 /** 包装器（前缀程序）：剥离后按真实程序判定。 */

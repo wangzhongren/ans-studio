@@ -1971,6 +1971,31 @@ async function waitForTest(check: () => boolean, timeoutMs = 2000): Promise<void
   }
 }
 
+/**
+ * 有界稳定窗口：每 10ms 观察一次，窗口内一旦 `changed()` 为真即失败。
+ * 用于「重复 settle 不得再派 / 不得再开新会话」这类**负面**断言的确定性等待（不再只靠一个固定 sleep）。
+ */
+async function assertNoChangeFor(changed: () => boolean, windowMs: number, message: string): Promise<void> {
+  const started = Date.now();
+  while (Date.now() - started < windowMs) {
+    if (changed()) assert.fail(message);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  if (changed()) assert.fail(message);
+}
+
+/** 某角色收到的系统行摘要（delivery-note）。 */
+function deliveryNoteSummaries(events: SessionEventEnvelope[], roleId: string): string[] {
+  return events
+    .filter(
+      (envelope) =>
+        envelope.roleId === roleId &&
+        envelope.event.kind === "message" &&
+        (envelope.event as { detail?: { source?: string } }).detail?.source === "delivery-note",
+    )
+    .map((envelope) => String((envelope.event as { summary?: string }).summary));
+}
+
 test("治理自动推进：接受提案 → 后台派发提名任务给 Nominator，当前 pane 不变、只发一条任务", async () => {
   const sendsByRole = new Map<string, string[]>();
   const openRoles: string[] = [];
@@ -3035,30 +3060,43 @@ async function runHandbackAcceptanceScenario(status: string) {
 test("收尾推进：回交送达 Convener 且流程全部完成 ⇒ 派 Proof / 验收 恰一次；重复 settle 不重派", async () => {
   const scenario = await runHandbackAcceptanceScenario("done");
   try {
-    const verifierSends = scenario.sendsByRole.get("verifier") ?? [];
+    // 2026-10-20 CI run 39389502551（三平台）：并发负载下 verifier 会话可能晚于夹具返回才打开；
+    // 若此时 `?? []` 取数组，捕获的是与后续派发无关的空数组。先有界等待首条任务真正发出，再取当前数组。
+    await waitForTest(() => (scenario.sendsByRole.get("verifier")?.length ?? 0) >= 1, 5000);
+    const verifierSends = scenario.sendsByRole.get("verifier")!;
     assert.equal(verifierSends.length, 1, "全部完成 ⇒ 恰一条验收汇总任务");
     assert.match(verifierSends[0] ?? "", /流程 flow-a 步骤已全部完成/);
     assert.match(verifierSends[0] ?? "", /流程状态 YAML：docs\/flows\/flow-a\.yaml/);
     assert.match(verifierSends[0] ?? "", /docs\/reports\/impl\.md/, "任务带回交/核对报告路径");
     assert.match(verifierSends[0] ?? "", /请汇总证据并出验收卡/);
     assert.match(verifierSends[0] ?? "", /不要自行验收或代替客户决定/);
-    const notes = scenario.events
-      .filter((envelope) => envelope.roleId === scenario.primaryRoleId && envelope.event.kind === "message" && (envelope.event as { detail?: { source?: string } }).detail?.source === "delivery-note")
-      .map((envelope) => String((envelope.event as { summary?: string }).summary));
+    // 系统行在投递成功的同一异步链里 emit；CI 负载下仍可能晚于 send 可见一拍——有界等待，不改文案断言。
+    await waitForTest(
+      () => deliveryNoteSummaries(scenario.events, scenario.primaryRoleId).some((note) => /已自动派发验收复核给 Proof（工作中）/.test(note)),
+      2000,
+    );
+    const notes = deliveryNoteSummaries(scenario.events, scenario.primaryRoleId);
     // 2026-10-19 客户反馈：验收复核是标准流程——系统行须说明「自动派发」且不冒充客户批准。
     // 2026-10-19 客户决定：自动验收门反馈统一发给 Lead（主入口 primaryRoleId），不再发 Convener。
     assert.ok(notes.some((note) => /已自动派发验收复核给 Proof（工作中）/.test(note)), "Lead 系统行如实告知已自动派发");
     // 2026-10-19 客户决定：自动验收门反馈统一发给 Lead（主入口 primaryRoleId），不再发 Convener。
     // 该场景中 Convener 仍会收到回交/派发类系统行；这里只钉「自动验收反馈」不落 Convener。
-    const acceptanceNoteOnConvener = scenario.events
-      .filter((envelope) => envelope.roleId === "convener" && envelope.event.kind === "message" && (envelope.event as { detail?: { source?: string } }).detail?.source === "delivery-note")
-      .map((envelope) => String((envelope.event as { summary?: string }).summary))
+    const acceptanceNoteOnConvener = deliveryNoteSummaries(scenario.events, "convener")
       .filter((note) => /自动验收未派发|已自动派发验收复核|无法确定项目引擎/.test(note));
     assert.deepEqual(acceptanceNoteOnConvener, [], "自动验收反馈不再发 Convener");
     assert.ok(notes.every((note) => !/客户已批准|验收通过/.test(note)), "系统行不得冒充客户批准");
+    const dispatchCountBeforeRepeat = scenario.sendsByRole.get("verifier")!.length;
     scenario.repeatConvenerSettle();
-    await new Promise((resolve) => setTimeout(resolve, 150));
-    assert.equal(verifierSends.length, 1, "重复 settle 不重复派");
+    // 有界稳定窗口：重复 settle 若再开 verifier 会话，map 值会被替换成新数组（即使只发一条也会被下方的
+    // 同一性检查抓住）；若在原数组上追加，则长度变化。窗口内任一变化都失败，不再只靠 150ms 固定等待。
+    await assertNoChangeFor(
+      () =>
+        scenario.sendsByRole.get("verifier") !== verifierSends ||
+        scenario.sendsByRole.get("verifier")!.length !== dispatchCountBeforeRepeat,
+      400,
+      "重复 settle 不重复派",
+    );
+    assert.equal(scenario.sendsByRole.get("verifier")!.length, 1, "重复 settle 不重复派");
   } finally {
     await scenario.close();
   }
@@ -3067,12 +3105,22 @@ test("收尾推进：回交送达 Convener 且流程全部完成 ⇒ 派 Proof /
 test("收尾推进：步骤未完成/阻塞 ⇒ 不派 Proof / 验收（保持现状）", async () => {
   const pending = await runHandbackAcceptanceScenario("pending");
   try {
+    // 同类竞态（2026-10-20 CI）：先有界等待本轮收尾门的阻塞系统行——它证明检查已执行完毕；
+    // 之后再取派发记录，避免「提前取到不存在的数组 ⇒ 假绿」。断言语义不变（仍为 0）。
+    await waitForTest(
+      () => deliveryNoteSummaries(pending.events, pending.primaryRoleId).some((note) => note.includes("自动验收未派发")),
+      5000,
+    );
     assert.equal((pending.sendsByRole.get("verifier") ?? []).length, 0, "pending 步骤：不派");
   } finally {
     await pending.close();
   }
   const blocked = await runHandbackAcceptanceScenario("blocked");
   try {
+    await waitForTest(
+      () => deliveryNoteSummaries(blocked.events, blocked.primaryRoleId).some((note) => note.includes("自动验收未派发")),
+      5000,
+    );
     assert.equal((blocked.sendsByRole.get("verifier") ?? []).length, 0, "blocked 步骤：不派");
   } finally {
     await blocked.close();

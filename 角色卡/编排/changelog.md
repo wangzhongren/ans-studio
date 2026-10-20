@@ -1298,3 +1298,16 @@
 **测试**：`flow-service.test.ts` **20/20**（+3：`.js`/README/契约补记与幂等；missing/超限/二进制/路径越界 skipped 且不写客户决定；`..` fail-closed）；`test/编排/**` **708 计 708 过 0 红 0 skipped**；`npm run typecheck` **exit 0**（全仓）。
 
 **跨角色**：桌面在 delivered → Steward/Lead 唤醒前调用 `observeFlowArtifacts`，再唤醒 Steward/Lead。详见[变更记录](docs/change/2026-10-20_change_flow-service.md) §3.7。
+
+## 2026-10-20 — v1.4.0 发布 CI 首跑：Windows 无界 grep 漏判 + 原子写用例平台真值
+
+**来源**：v1.4.0 发布 CI 首跑 **run 39389502551**（`0210e2b`，windows-2025「Regression tests」3357 计/3351 过/3 红/3 skipped）。两处属编排：① `shell-command-guard.test.ts:176` 的 `grep -r foo D:\a\ans-studio\ans-studio\.release\source` 得到 `allow`（应 `deny`）——真实产品缺陷；② `flow-service.test.ts:607` 原子写失败用例 `actual true`（应 `false`）——Windows 上目录 chmod 不阻止写入的测试平台真值问题。另两处红（收尾推进 settle、Pi 配置派发）不属本批，未碰。
+
+**改了什么**
+- `src/common/编排/shell-command-guard.ts`：① 非引号切分对 Windows 盘符绝对路径（`^[A-Za-z]:[\\/]`）与 UNC（`^\\\\`）保留 `\` 作路径分隔符（空白/元字符前仍走 POSIX 转义，不切词/不切命令）；② 双引号内 `\` 只对 `$`、反引号、`"`、`\`、换行转义，其余保留字面反斜杠；③ `isWidePath` 对 Windows 绝对路径用 `path.win32` 归一比较（大小写不敏感、分隔符统一、去尾分隔符），判定不依赖宿主平台。POSIX 转义/引号/管道/命令替换与无界搜索判定未放宽。
+- `test/编排/shell-command-guard.test.ts`：新增平台无关回归 1 例：未加引号/双引号包裹的 `D:\…\.release\source`、含空格的 Windows 根（`\ ` 转义）、UNC 项目根、UNC 共享根 ⇒ deny；具体子目录/文件 ⇒ allow 对照。
+- `test/编排/flow-service.test.ts`：`completeAcceptanceStep：原子写失败` 保留 POSIX 目录 `0o500`；`win32` 分支改为把目标 `docs/flows/flow-a.yaml` 设 `0o444`（rename 覆盖只读目标 ⇒ ERROR_ACCESS_DENIED/EACCES·EPERM，重试上界耗尽 ⇒ write-failed），finally 恢复 `0o644`；断言不放宽，并补「恢复后可正常再写一次」。
+
+**测试**：`shell-command-guard.test.ts` **17/17**；`flow-service.test.ts` **20/20**；`test/编排/**` **709 计 709 过 0 红 0 skipped**；`npm run typecheck` **exit 0**（全仓）。
+
+**残余**：Windows 结论仅由 CI 原生 runner 实测（本机 macOS）；win32 原子写分支依赖「rename 覆盖只读目标 ⇒ ERROR_ACCESS_DENIED/EACCES·EPERM」语义，若不符该用例会在 CI 红而非静默放宽；未重跑发布 CI。详见[变更记录](docs/change/2026-10-20_change_v1.4.0-ci-windows-guard-atomic-write.md)。

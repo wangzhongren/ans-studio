@@ -53,6 +53,27 @@ test('release overlay returns v1.3.0 one-off entries to fail-closed or excluded'
     'test/桌面应用/session-rebuild-race.test.ts']);
 });
 
+// overlay-2（首跑 run 39389502551 三平台 Regression tests 失败）：1 项产品修复 + 4 项测试/夹具修复，
+// 均按精确路径列入、不开目录——同目录未列名 test/ 文件仍 excluded，未列名 src/ 文件仍 fail-closed。
+test('release overlay includes exactly the reviewed overlay-2 fix batch by exact path', () => {
+  const result = selectOverlay(['package.json',
+    'src/common/编排/shell-command-guard.ts',
+    'test/编排/shell-command-guard.test.ts',
+    'test/编排/flow-service.test.ts',
+    'test/桌面应用/interface.test.ts',
+    'test/桌面应用/runtime-resolution.test.ts',
+    'test/桌面应用/renderer.test.ts',
+    'test/编排/flow-state.test.ts']);
+  assert.deepEqual(result.selected, ['package.json',
+    'src/common/编排/shell-command-guard.ts',
+    'test/编排/shell-command-guard.test.ts',
+    'test/编排/flow-service.test.ts',
+    'test/桌面应用/interface.test.ts',
+    'test/桌面应用/runtime-resolution.test.ts']);
+  assert.deepEqual(result.excluded, ['test/桌面应用/renderer.test.ts', 'test/编排/flow-state.test.ts']);
+  assert.throws(() => selectOverlay(['src/common/编排/flow-state.ts']), /Unreviewed production overlay/);
+});
+
 import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
