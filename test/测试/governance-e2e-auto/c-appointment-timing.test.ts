@@ -114,6 +114,8 @@ test("场景3：任命后角色未写出 ⇒ 先派 Nominator 写卡；写卡后
     assert.equal(result.followUpRoleId, "convener", "写卡完成后才派 Convener");
 
     // 写卡期间绝不派 Convener：Convener 第一次收到任务时角色卡已存在且已可枚举。
+    // 2026-10-19 疑似产品去重 bug（如实红、未放宽）：既有 appointment followUp 与新增「写卡后推进检查」
+    // 各派一次 Convener（实测 2 条 prompt、账本 2 条 app dispatch.accepted{targetRoleId:"convener"}）。
     assert.equal(h.prompts.get("convener")?.length, 1, "Convener 最终恰收到一条排程任务");
     assert.match(h.prompts.get("convener")![0]!, /客户已完成任命 executor/);
     assert.deepEqual(convenerSnapshots, [{ filesExist: true, listed: true }], "派 Convener 时 executor 必须已写出且已枚举");

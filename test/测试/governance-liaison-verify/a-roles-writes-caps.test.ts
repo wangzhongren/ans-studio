@@ -62,6 +62,13 @@ test("五角色枚举：新空项目恰 5 个 builtIn（liaison→rapporteur→n
     assert.match(liaison.cardText, /docs\/intents\//);
     assert.match(liaison.cardText, /hand_off_intent/);
     assert.match(liaison.cardText, /不得创建额外的治理角色/);
+    // 2026-10-20 客户拍板：Lead / 主理 兼任**工作流管理者**——dispatchTask/flow 三工具用于协调
+    // Steward 与项目角色，**不是客户批准**（派发/推进 ≠ 客户决定；不改变任何写边界）。
+    assert.match(liaison.cardText, /工作流管理者/);
+    assert.match(liaison.cardText, /dispatch_task/);
+    assert.match(liaison.cardText, /flow_get.*flow_step_update.*flow_step_supersede/);
+    assert.match(liaison.cardText, /派发\/推进 ≠ 客户批准/);
+    assert.match(liaison.cardText, /不改变任何角色的写边界/);
     const rapporteur = builtIns.find((r) => r.roleId === "rapporteur")!;
     assert.match(rapporteur.cardText, /request_clarification/, "Rapporteur 有澄清通道");
     assert.doesNotMatch(rapporteur.cardText, /客户沟通主入口/, "Rapporteur 不再自称客户沟通主入口");
@@ -220,7 +227,7 @@ test("AC3 文案归属：越界写拒绝文案应指回正确归属（提案→�
 
 // —————————————————————— 4) 能力矩阵（真实会话装配） ——————————————————————
 
-test("能力矩阵：Liaison 客户通道（仅 intent-confirm）+ handOffIntent；Rapporteur 提案+澄清；Nominator 安装；Convener 派发/看护；五角色审批档 shell；Verifier 验收；su 不变", async () => {
+test("能力矩阵：Liaison 客户通道（仅 intent-confirm）+ handOffIntent + 工作流管理（dispatchTask/flow 三工具）；Rapporteur 提案+澄清；Nominator 安装；Convener 派发/看护；五角色审批档 shell；Verifier 验收；su 不变", async () => {
   const { root, cleanup } = makeRoot("caps-five");
   try {
     writeProjectRole(root, "A");
@@ -289,7 +296,18 @@ test("能力矩阵：Liaison 客户通道（仅 intent-confirm）+ handOffIntent
     assert.equal(typeof l.handOffIntent, "function", "Liaison 独享 hand_off_intent");
     assert.equal(l.requestClarification, undefined, "Liaison 无 request_clarification");
     assert.equal(typeof l.customerInput, "function", "Liaison 有客户通道（编排白名单仅 intent-confirm）");
-    assert.equal(l.dispatchTask, undefined);
+    // 2026-10-20 客户拍板：主理 Lead 成为**工作流管理者**——注入 dispatchTask，用于协调 Steward/
+    // 项目角色推进工作流，不是客户批准面（真实投递路由由桌面接线测试覆盖，此处只钉能力注入）。
+    assert.equal(
+      typeof l.dispatchTask,
+      "function",
+      "Liaison 注入 dispatchTask（工作流协调用；不是客户批准；不得据此伪造客户同意）",
+    );
+    // 内置治理角色的 flow 三工具（Flow YAML 唯一机器状态）：flowGet 给所有角色，
+    // flowStepUpdate/flowStepSupersede 给内置治理角色（本矩阵覆盖五个 trio 内置角色）。
+    assert.equal(typeof l.flowGet, "function", "Liaison 注入 flowGet（读流程状态 YAML）");
+    assert.equal(typeof l.flowStepUpdate, "function", "Liaison 注入 flowStepUpdate（更新流程步骤）");
+    assert.equal(typeof l.flowStepSupersede, "function", "Liaison 注入 flowStepSupersede（替代旧步骤）");
     assert.equal(l.roleStatus, undefined);
     assert.equal(l.sessionTail, undefined);
     assert.equal(l.proposeRecovery, undefined);
@@ -303,6 +321,9 @@ test("能力矩阵：Liaison 客户通道（仅 intent-confirm）+ handOffIntent
     assert.equal(r.handOffIntent, undefined);
     assert.equal(r.dispatchTask, undefined);
     assert.equal(r.installSkill, undefined);
+    assert.equal(typeof r.flowGet, "function", "Rapporteur 注入 flowGet");
+    assert.equal(typeof r.flowStepUpdate, "function", "Rapporteur 注入 flowStepUpdate");
+    assert.equal(typeof r.flowStepSupersede, "function", "Rapporteur 注入 flowStepSupersede");
 
     const n = captured.get("nominator")!.caps!;
     assert.equal(typeof n.customerInput, "function");
@@ -311,6 +332,9 @@ test("能力矩阵：Liaison 客户通道（仅 intent-confirm）+ handOffIntent
     assert.equal(n.handOffIntent, undefined);
     assert.equal(n.requestClarification, undefined);
     assert.equal(n.dispatchTask, undefined);
+    assert.equal(typeof n.flowGet, "function", "Nominator 注入 flowGet");
+    assert.equal(typeof n.flowStepUpdate, "function", "Nominator 注入 flowStepUpdate");
+    assert.equal(typeof n.flowStepSupersede, "function", "Nominator 注入 flowStepSupersede");
 
     const c = captured.get("convener")!.caps!;
     assert.equal(typeof c.customerInput, "function");
@@ -322,6 +346,9 @@ test("能力矩阵：Liaison 客户通道（仅 intent-confirm）+ handOffIntent
     assert.equal(c.handOffIntent, undefined);
     assert.equal(c.requestClarification, undefined);
     assert.equal(c.installSkill, undefined);
+    assert.equal(typeof c.flowGet, "function", "Convener 注入 flowGet");
+    assert.equal(typeof c.flowStepUpdate, "function", "Convener 注入 flowStepUpdate");
+    assert.equal(typeof c.flowStepSupersede, "function", "Convener 注入 flowStepSupersede");
 
     const v = captured.get("verifier")!.caps!;
     assert.equal(typeof v.customerInput, "function", "Verifier 发验收卡");
@@ -330,6 +357,9 @@ test("能力矩阵：Liaison 客户通道（仅 intent-confirm）+ handOffIntent
     assert.equal(v.dispatchTask, undefined);
     assert.equal(v.installSkill, undefined);
     assert.equal(typeof v.shellGate, "function", "Verifier 审批档 shell（operator-approve）");
+    assert.equal(typeof v.flowGet, "function", "Verifier 注入 flowGet");
+    assert.equal(typeof v.flowStepUpdate, "function", "Verifier 注入 flowStepUpdate");
+    assert.equal(typeof v.flowStepSupersede, "function", "Verifier 注入 flowStepSupersede");
 
     // 注册表是唯一数据来源（不散落硬编码）。
     const spec = governanceRoleOf("liaison")!;
@@ -338,7 +368,9 @@ test("能力矩阵：Liaison 客户通道（仅 intent-confirm）+ handOffIntent
       customerInput: true,
       handOffIntent: true,
       requestClarification: false,
-      dispatchTask: false,
+      // 2026-10-20 客户拍板：主理 Lead 是工作流管理者（协调 Steward/项目角色），注入 dispatchTask；
+      // 这不是客户批准权——批准仍只来自客户/判断代批。
+      dispatchTask: true,
       roleStatus: false,
       sessionTail: false,
       proposeRecovery: false,

@@ -5,8 +5,10 @@
 // §7.2/§7.3/§7.4（approved）。
 //
 // 硬口径：
-//   1. **只做正向代批**：`approve` 只表示「可以替客户接受/任命/确认/验收」；`revise`/`reject`/`false`/
-//      空选择/未知 id/多选冲突一律 `manual`（绝不代拒绝/修改/取消）；
+//   1. **正向代批 + approval 组 deny 退回**：`approve` 表示「可以替客户接受/任命/确认/验收」；
+//      approval 组发现写卡内容/路径/完整性/一致性不合规且可由发起角色修正时，归一化为 `deny`
+//      （reason 必须写清哪条不合规 + 应怎么改）；decision 组不得 deny；`revise`/`reject`/`false`/
+//      空选择/未知 id/多选冲突一律 `manual`（绝不代客户拒绝决策卡）；
 //   2. **不采信模型自报的机械事实**：`pathProbes`/`recommendedRoleIds`/`facts` 来自应用；
 //      模型 `pathDecisions` 必须覆盖全部候选路径且全 `ok:true`，任一不满足整卡回落；
 //   3. **approve 必须无损且 required-read 满足**：读取被拒/截断/预算耗尽、物证缺失、必读路径未读
@@ -69,7 +71,13 @@ function appointmentWriteTarget(path: string): string | undefined {
 
 function scheduleWriteMatches(flowId: string, path: string): boolean {
   const normalized = normalizeRel(path);
-  return normalized === "docs/workflow.md" || normalized === `docs/flows/${flowId}.md`;
+  return (
+    normalized === "docs/workflow.md" ||
+    // 2026-10-19 Flow YAML 契约：`.yaml` 是唯一机器状态；`.md` 旧版人读视图迁移兼容。
+    normalized === `docs/flows/${flowId}.yaml` ||
+    normalized === `docs/flows/${flowId}.yml` ||
+    normalized === `docs/flows/${flowId}.md`
+  );
 }
 
 /** 任何卡都不得确认的危险写路径（评审 §十一-7；应用探测之外的第二道机械复核）。 */
@@ -110,11 +118,12 @@ const SAFE_MANUAL_REASON_CODES: ReadonlySet<string> = new Set([
   "intent-unconfirmed",
 ]);
 
-const DEFAULT_MANUAL_REASON = "判断 agent 自报无法完成判断，已转手动确认。";
+const DEFAULT_MANUAL_REASON = "判断无法完成；请补齐判断所需证据或缩小范围后重新提交。";
 
 /** 规范化后的模型原始结论（只保留白名单字段；未知字段丢弃）。 */
 export interface NormalizedGovernanceJudgeVerdict {
-  verdict: "approve" | "manual";
+  /** `deny` 仅 approval 组可用（写卡可由发起角色修正时退回重做）；decision 组不得 deny。 */
+  verdict: "approve" | "deny" | "manual";
   group?: string;
   cardKind?: string;
   reasonCode?: string;
@@ -174,17 +183,17 @@ function normalizePathDecisions(value: unknown): GovernanceJudgePathDecision[] |
 
 /**
  * 严格规范化 `report_governance_judgement` 的原始参数（评审 §7.2）：
- * - `verdict` 必须恰为 `approve`/`manual`；否则 `undefined`（调用方落 `manual/parse-failed`）；
- * - `approve` 必须有非空 `reason`；缺失 ⇒ `undefined`（不完整判断不得放行）；
+ * - `verdict` 必须恰为 `approve`/`deny`/`manual`；否则 `undefined`（调用方落 `manual/parse-failed`）；
+ * - `approve` 与 `deny` 都必须有非空 `reason`；缺失 ⇒ `undefined`（不完整判断不得放行/退回）；
  * - 其余字段按上限截断；`pathDecisions` 的非法项丢弃（覆盖检查会把它变成 `path-unverified`）。
  */
 export function normalizeGovernanceJudgeVerdict(input: unknown): NormalizedGovernanceJudgeVerdict | undefined {
   if (!isRecord(input)) return undefined;
   const verdict = input.verdict;
-  if (verdict !== "approve" && verdict !== "manual") return undefined;
+  if (verdict !== "approve" && verdict !== "deny" && verdict !== "manual") return undefined;
 
   const reason = normalizeText(input.reason, GOVERNANCE_JUDGE_REASON_LIMIT_BYTES);
-  if (verdict === "approve" && reason === undefined) return undefined;
+  if ((verdict === "approve" || verdict === "deny") && reason === undefined) return undefined;
 
   const normalized: NormalizedGovernanceJudgeVerdict = { verdict };
   const group = normalizeText(input.group, 32);
@@ -271,8 +280,8 @@ export interface EvaluateGovernanceJudgeVerdictArgs {
 export function artifactMissingReason(missingPaths?: readonly string[]): string {
   const paths = [...new Set((missingPaths ?? []).map((path) => path.trim()).filter((path) => path !== ""))];
   return paths.length === 0
-    ? "规范物证缺失，无法核对判断，已转手动确认。"
-    : `规范物证缺失：${paths.join("、")}（判断无法核对），已转手动确认。`;
+    ? "规范物证缺失，无法核对判断；请补齐物证后重新提交。"
+    : `规范物证缺失：${paths.join("、")}（判断无法核对）；请补齐物证后重新提交。`;
 }
 
 function manualOutcome(
@@ -294,13 +303,26 @@ function manualOutcome(
 }
 
 /**
+ * 读取被拒的**治理卡**文案：复用 shell judge 的逐路径摘要口径，但把「已转手动确认」换成
+ * 可操作返工说明（桌面会把 manual 作为 declined 原因回投发起角色，不再呈现客户卡）。
+ */
+function governanceReadDeniedReason(stats: ShellJudgeReadStats | undefined): string {
+  return readDeniedReason(stats).replace(
+    /，已转手动确认。$/,
+    "；请补齐判断所需证据（或缩小读取范围）后重新提交。",
+  );
+}
+
+/**
  * 把模型结论 + 应用事实归一化为最终 `GovernanceJudgeOutcome`（评审 §7.2 表逐行）：
- * 不抛错；所有不确定都回落 `manual`（fail-closed）。
+ * - `approve` 走逐卡机械门槛；
+ * - `deny` 仅 approval 组可用（写卡不合规退回发起角色重做；不执行 approve 门槛）；
+ * - decision 组收到 deny ⇒ manual（不代客户拒绝）；所有不确定回落 `manual`（fail-closed）。
  */
 export function evaluateGovernanceJudgeVerdict(args: EvaluateGovernanceJudgeVerdictArgs): GovernanceJudgeOutcome {
   const { request, verdict, stats } = args;
   if (verdict === undefined) {
-    return manualOutcome(args, "parse-failed", "判断输出无法解析（缺少合法的 report_governance_judgement 结论），已转手动确认。");
+    return manualOutcome(args, "parse-failed", "判断输出无法解析（缺少合法的 report_governance_judgement 结论）；请修正后重新提交。");
   }
 
   if (verdict.verdict === "manual") {
@@ -310,33 +332,80 @@ export function evaluateGovernanceJudgeVerdict(args: EvaluateGovernanceJudgeVerd
     return manualOutcome(args, reasonCode, verdict.reason ?? DEFAULT_MANUAL_REASON);
   }
 
+  if (verdict.verdict === "deny") {
+    // 2026-10-19 客户反馈：写卡内容不合规属于**可修正**问题，应退回发起角色重做，而不是让客户手批。
+    // 但 decision 组不得由判断 agent 拒绝（那等于替客户拒绝），一律回落 manual。
+    if (request.group !== "approval") {
+      return manualOutcome(
+        args,
+        "model-manual",
+        "决策卡不能由判断 agent 拒绝（decision 组只判断意图漂移）；请修正后重新提交。",
+      );
+    }
+    // 防御性一致性（与 approve 同口径）；**不执行** approve 的逐路径/读取/证据机械门槛。
+    const derivedGroup = governanceCardGroup(request.cardKind);
+    if (derivedGroup === undefined || request.group !== derivedGroup) {
+      return manualOutcome(args, "group-mismatch", "判断请求的分组与卡种不一致；请修正后重新提交。");
+    }
+    if (verdict.group !== undefined && verdict.group !== request.group) {
+      return manualOutcome(args, "group-mismatch", "判断结论的分组与请求不一致；请修正后重新提交。");
+    }
+    if (verdict.cardKind !== undefined && verdict.cardKind !== request.cardKind) {
+      return manualOutcome(args, "group-mismatch", "判断结论的卡种与请求不一致；请修正后重新提交。");
+    }
+
+    const reasonCode = verdict.reasonCode !== undefined && SAFE_MANUAL_REASON_CODES.has(verdict.reasonCode)
+      ? verdict.reasonCode
+      : "model-deny";
+    const reason = redactJudgeText(verdict.reason ?? "");
+    if (reason === "") {
+      return manualOutcome(args, "insufficient-evidence", "拒绝结论缺少可核对理由；请修正后重新提交。");
+    }
+    const evidence = (verdict.evidence ?? [])
+      .map((item) => redactJudgeText(item))
+      .filter((item) => item !== "")
+      .slice(0, GOVERNANCE_JUDGE_EVIDENCE_LIMIT);
+    return {
+      verdict: "deny",
+      group: request.group,
+      cardKind: request.cardKind,
+      reasonCode,
+      reason,
+      engine: args.engine,
+      ...(args.model !== undefined ? { model: args.model } : {}),
+      ...(evidence.length > 0 ? { evidence } : {}),
+      ...(args.durationMs !== undefined ? { durationMs: args.durationMs } : {}),
+      ...(stats !== undefined ? { readCalls: stats.readCalls, readBytes: stats.readBytes } : {}),
+    };
+  }
+
   // —— approve 的机械门槛（顺序固定，便于测试与审计）——
 
   // 1) 分组/卡种必须与请求一致（防御；channel 已从 cardKind 派生）。
   const derivedGroup = governanceCardGroup(request.cardKind);
   if (derivedGroup === undefined || request.group !== derivedGroup) {
-    return manualOutcome(args, "group-mismatch", "判断请求的分组与卡种不一致，已转手动确认。");
+    return manualOutcome(args, "group-mismatch", "判断请求的分组与卡种不一致；请修正后重新提交。");
   }
   if (verdict.group !== undefined && verdict.group !== request.group) {
-    return manualOutcome(args, "group-mismatch", "判断结论的分组与请求不一致，已转手动确认。");
+    return manualOutcome(args, "group-mismatch", "判断结论的分组与请求不一致；请修正后重新提交。");
   }
   if (verdict.cardKind !== undefined && verdict.cardKind !== request.cardKind) {
-    return manualOutcome(args, "group-mismatch", "判断结论的卡种与请求不一致，已转手动确认。");
+    return manualOutcome(args, "group-mismatch", "判断结论的卡种与请求不一致；请修正后重新提交。");
   }
 
   // 2) 账本事实不可读/有坏行 ⇒ 禁止 approve（fail-closed）。
   if (request.facts === undefined || request.facts.ledgerErrors !== 0) {
-    return manualOutcome(args, "ledger-unavailable", "治理账本不可读或存在坏行，无法保证判断无损，已转手动确认。");
+    return manualOutcome(args, "ledger-unavailable", "治理账本不可读或存在坏行，无法保证判断无损；请修复 .ans/governance/ledger.jsonl 后重新提交。");
   }
 
   // 3) 读取损伤：approve 必须无损（与 shell judge 同口径；预算优先）。
   const damage = damageCode(stats);
   if (damage !== undefined) {
     const reason = damage === "budget"
-      ? "判断预算耗尽（读取次数/总读取字节达上限），无法保证无损判断，已转手动确认。"
+      ? "判断预算耗尽（读取次数/总读取字节达上限），无法保证无损判断；请缩小提卡范围或减少路径后重新提交。"
       : damage === "read-truncated"
-        ? "判断所需文件被截断，无法保证无损判断，已转手动确认。"
-        : readDeniedReason(stats);
+        ? "判断所需文件被截断，无法保证无损判断；请缩小文件或提供可核对摘要后重新提交。"
+        : governanceReadDeniedReason(stats);
     return manualOutcome(args, damage, reason);
   }
 
@@ -349,56 +418,56 @@ export function evaluateGovernanceJudgeVerdict(args: EvaluateGovernanceJudgeVerd
       // 可解析与客户确认态由证据包 builder 在调用模型前 fail-closed 校验。
       const selected = verdict.selected ?? [];
       if (request.card.kind !== "choice" || !request.card.options.some((option) => option.id === "accept")) {
-        return manualOutcome(args, "not-recommended", "卡片没有可代批的 accept 选项，已转手动确认。");
+        return manualOutcome(args, "not-recommended", "卡片没有可代批的 accept 选项；请修正后重新提交。");
       }
       if (!sameSet(selected, ["accept"])) {
-        return manualOutcome(args, "not-recommended", "提案卡只能代批 accept（accept-quick/revise/reject 一律交回客户），已转手动确认。");
+        return manualOutcome(args, "not-recommended", "提案卡只能代批 accept（accept-quick/revise/reject 一律交回客户）；请按意图修正提案或改为单选项 accept 卡后重新提交。");
       }
       break;
     }
     case "acceptance": {
       const selected = verdict.selected ?? [];
       if (request.card.kind !== "choice" || !request.card.options.some((option) => option.id === "accept")) {
-        return manualOutcome(args, "not-recommended", "卡片没有可代批的 accept 选项，已转手动确认。");
+        return manualOutcome(args, "not-recommended", "卡片没有可代批的 accept 选项；请修正后重新提交。");
       }
       if (!sameSet(selected, ["accept"])) {
-        return manualOutcome(args, "not-recommended", "验收卡只能代批 accept，已转手动确认。");
+        return manualOutcome(args, "not-recommended", "验收卡只能代批 accept；请修正后重新提交。");
       }
       if (request.facts.proposalDecision !== "accepted" && request.facts.proposalDecision !== "accepted-quick") {
-        return manualOutcome(args, "insufficient-evidence", "提案尚未被客户接受，不能代批验收，已转手动确认。");
+        return manualOutcome(args, "insufficient-evidence", "提案尚未被客户接受，不能代批验收；请先取得客户提案接受后重新提交验收。");
       }
       if (request.facts.unresolvedClarificationCount !== 0) {
-        return manualOutcome(args, "insufficient-evidence", "仍有未闭环的澄清，不能代批验收，已转手动确认。");
+        return manualOutcome(args, "insufficient-evidence", "仍有未闭环的澄清，不能代批验收；请先闭环澄清后重新提交验收。");
       }
       break;
     }
     case "appointment": {
       const recommended = request.recommendedRoleIds;
       if (request.card.kind !== "choice") {
-        return manualOutcome(args, "insufficient-evidence", "任命卡形状非法，已转手动确认。");
+        return manualOutcome(args, "insufficient-evidence", "任命卡形状非法；请修正后重新提交。");
       }
       if (!Array.isArray(recommended) || recommended.length === 0 || new Set(recommended).size !== recommended.length) {
-        return manualOutcome(args, "insufficient-evidence", "提名文件缺少唯一的机器可读推荐集，已转手动确认。");
+        return manualOutcome(args, "insufficient-evidence", "提名文件缺少唯一的机器可读推荐集；请补齐推荐集后重新提交。");
       }
       const optionIds = new Set(request.card.options.map((option) => option.id));
       if (!recommended.every((id) => optionIds.has(id))) {
-        return manualOutcome(args, "insufficient-evidence", "推荐集不在任命卡选项中，已转手动确认。");
+        return manualOutcome(args, "insufficient-evidence", "推荐集不在任命卡选项中；请让任命卡选项与推荐集一致后重新提交。");
       }
       if (recommended.some((id) => BUILT_IN_GOVERNANCE_ROLE_IDS.has(id))) {
-        return manualOutcome(args, "not-recommended", "推荐集含内置治理角色，已转手动确认。");
+        return manualOutcome(args, "not-recommended", "推荐集含内置治理角色；请修正后重新提交。");
       }
       if (recommended.length > 1 && request.card.multiple !== true) {
-        return manualOutcome(args, "not-recommended", "推荐多个角色但卡片不是多选，已转手动确认。");
+        return manualOutcome(args, "not-recommended", "推荐多个角色但卡片不是多选；请修正后重新提交。");
       }
       const selected = verdict.selected ?? [];
       if (selected.length === 0 || new Set(selected).size !== selected.length) {
-        return manualOutcome(args, "not-recommended", "任命选择为空或含重复项，已转手动确认。");
+        return manualOutcome(args, "not-recommended", "任命选择为空或含重复项；请修正后重新提交。");
       }
       if (selected.some((id) => BUILT_IN_GOVERNANCE_ROLE_IDS.has(id))) {
-        return manualOutcome(args, "not-recommended", "任命选择含内置治理角色，已转手动确认。");
+        return manualOutcome(args, "not-recommended", "任命选择含内置治理角色；请修正后重新提交。");
       }
       if (!sameSet(selected, recommended)) {
-        return manualOutcome(args, "not-recommended", "任命选择必须恰等于应用解析的推荐集，已转手动确认。");
+        return manualOutcome(args, "not-recommended", "任命选择必须恰等于应用解析的推荐集；请按推荐集修正选择后重新提交。");
       }
       break;
     }
@@ -406,18 +475,18 @@ export function evaluateGovernanceJudgeVerdict(args: EvaluateGovernanceJudgeVerd
     case "appointment-write":
     case "schedule-write": {
       if (verdict.confirmed !== true) {
-        return manualOutcome(args, "not-recommended", "写盘卡未给出 confirmed:true，已转手动确认。");
+        return manualOutcome(args, "not-recommended", "写盘卡未给出 confirmed:true；请修正后重新提交。");
       }
       if (request.card.kind !== "confirm") {
-        return manualOutcome(args, "path-unverified", "写盘卡形状非法，已转手动确认。");
+        return manualOutcome(args, "path-unverified", "写盘卡形状非法；请修正后重新提交。");
       }
       const paths = uniquePaths(Array.isArray(request.paths) ? request.paths : []);
       if (paths.length === 0) {
-        return manualOutcome(args, "path-unverified", "写盘卡没有可复核的具体路径，已转手动确认。");
+        return manualOutcome(args, "path-unverified", "写盘卡没有可复核的具体路径；请修正后重新提交。");
       }
       if (paths.length > GOVERNANCE_JUDGE_PATH_LIMIT) {
         // 不截断后猜：候选超过逐路径复核上限 ⇒ 整卡回落（评审 §7.2 pathDecisions ≤50）。
-        return manualOutcome(args, "path-unverified", "写盘卡候选路径超过逐路径复核上限，已转手动确认。");
+        return manualOutcome(args, "path-unverified", "写盘卡候选路径超过逐路径复核上限；请修正后重新提交。");
       }
 
       // 应用机械探测：每个候选路径必须有 allowed:true 的 probe。
@@ -425,14 +494,14 @@ export function evaluateGovernanceJudgeVerdict(args: EvaluateGovernanceJudgeVerd
       for (const path of paths) {
         const probe = probes.find((entry) => normalizeRel(entry.path) === path);
         if (probe === undefined || probe.allowed !== true) {
-          return manualOutcome(args, "path-outside-boundary", `路径 ${path} 未通过应用机械探测（越界/敏感/不可写），已转手动确认。`);
+          return manualOutcome(args, "path-outside-boundary", `路径 ${path} 未通过应用机械探测（越界/敏感/不可写）；请改为可写根内、非敏感、可写的路径后重新提交。`);
         }
       }
 
       // 写根/禁写：第二道机械复核（不依赖模型自报）。
       const roots = Array.isArray(request.allowedPathRoots) ? request.allowedPathRoots : [];
       if (roots.length === 0) {
-        return manualOutcome(args, "path-outside-boundary", "缺少角色可写根事实，无法复核路径，已转手动确认。");
+        return manualOutcome(args, "path-outside-boundary", "缺少角色可写根事实，无法复核路径；请修正后重新提交。");
       }
       const forbidden = [
         ...HARD_FORBIDDEN_PREFIXES,
@@ -440,10 +509,10 @@ export function evaluateGovernanceJudgeVerdict(args: EvaluateGovernanceJudgeVerd
       ];
       for (const path of paths) {
         if (!roots.some((root) => pathCovers(root, path))) {
-          return manualOutcome(args, "path-outside-boundary", `路径 ${path} 不在角色可写根内，已转手动确认。`);
+          return manualOutcome(args, "path-outside-boundary", `路径 ${path} 不在角色可写根内；请改为角色可写根内的路径后重新提交。`);
         }
         if (forbidden.some((prefix) => pathCovers(prefix, path))) {
-          return manualOutcome(args, "path-outside-boundary", `路径 ${path} 属于禁写路径，已转手动确认。`);
+          return manualOutcome(args, "path-outside-boundary", `路径 ${path} 属于禁写路径；请改到允许的写区后重新提交。`);
         }
       }
 
@@ -451,42 +520,42 @@ export function evaluateGovernanceJudgeVerdict(args: EvaluateGovernanceJudgeVerd
       // 且非内置；schedule-write 必须匹配 flowId。
       if (request.cardKind === "write") {
         if (!paths.every((path) => writeSourceMatches(request.roleId, path))) {
-          return manualOutcome(args, "path-outside-boundary", "写盘路径与来源角色的写区不匹配，已转手动确认。");
+          return manualOutcome(args, "path-outside-boundary", "写盘路径与来源角色的写区不匹配；请改为来源角色写区内的路径后重新提交。");
         }
       } else if (request.cardKind === "appointment-write") {
         const appointed = new Set(request.facts.appointmentTargetRoleIds ?? []);
         for (const path of paths) {
           const target = appointmentWriteTarget(path);
           if (target === undefined || BUILT_IN_GOVERNANCE_ROLE_IDS.has(target) || !appointed.has(target)) {
-            return manualOutcome(args, "path-outside-boundary", `路径 ${path} 不在最新任命名单内或指向内置治理角色，已转手动确认。`);
+            return manualOutcome(args, "path-outside-boundary", `路径 ${path} 不在最新任命名单内或指向内置治理角色；请改为已任命项目角色的角色卡路径后重新提交。`);
           }
         }
       } else if (request.cardKind === "schedule-write") {
         if (!paths.every((path) => scheduleWriteMatches(request.flowId, path))) {
-          return manualOutcome(args, "path-outside-boundary", "流程写盘路径与 flowId 不一致，已转手动确认。");
+          return manualOutcome(args, "path-outside-boundary", "流程写盘路径与 flowId 不一致；请改为 docs/flows/<flowId>.yaml 后重新提交。");
         }
       }
 
       // 模型逐路径结论必须**恰好**覆盖全部候选且全 ok:true。
       const decisions = verdict.pathDecisions;
       if (decisions === undefined || decisions.length !== paths.length) {
-        return manualOutcome(args, "path-unverified", "判断结论的逐路径结论未覆盖全部候选路径，已转手动确认。");
+        return manualOutcome(args, "path-unverified", "判断结论的逐路径结论未覆盖全部候选路径；请修正后重新提交。");
       }
       const seen = new Set<string>();
       for (const decision of decisions) {
         const path = normalizeRel(decision.path);
         if (seen.has(path) || !paths.includes(path)) {
-          return manualOutcome(args, "path-unverified", "判断结论的逐路径结论含重复或额外路径，已转手动确认。");
+          return manualOutcome(args, "path-unverified", "判断结论的逐路径结论含重复或额外路径；请修正后重新提交。");
         }
         seen.add(path);
         if (decision.ok !== true) {
-          return manualOutcome(args, "path-unverified", `路径 ${path} 被判断为不可确认，已转手动确认。`);
+          return manualOutcome(args, "path-unverified", `路径 ${path} 被判断为不可确认；请修正后重新提交。`);
         }
       }
       break;
     }
     default:
-      return manualOutcome(args, "group-mismatch", "未知治理卡种，已转手动确认。");
+      return manualOutcome(args, "group-mismatch", "未知治理卡种；请修正后重新提交。");
   }
 
   // 5) 规范物证必须存在且真的被读过（required-read 门槛）。
@@ -500,17 +569,17 @@ export function evaluateGovernanceJudgeVerdict(args: EvaluateGovernanceJudgeVerd
   // 直接调用者未给该参数时保持旧口径（全部规范物证），向后兼容。
   const requiredReadPaths = uniquePaths(args.requiredReadPaths ?? requiredArtifacts.paths);
   if (requiredReadPaths.some((path) => !readPaths.has(path))) {
-    return manualOutcome(args, "artifact-not-read", "判断 agent 未实际读取全部必读物证，已转手动确认。");
+    return manualOutcome(args, "artifact-not-read", "判断 agent 未实际读取全部必读物证；请缩小物证范围或补齐可读正文后重新提交。");
   }
   // required-read 超预算：不降低门槛（评审 §5.4）。
   const maxCalls = 8;
   if (requiredReadPaths.length > maxCalls) {
-    return manualOutcome(args, "budget", "必读物证数量超出判断读取预算，已转手动确认。");
+    return manualOutcome(args, "budget", "必读物证数量超出判断读取预算；请缩小提卡范围后重新提交。");
   }
 
   // 6) approve 必须有可核对证据。
   if (verdict.evidence === undefined || verdict.evidence.length === 0) {
-    return manualOutcome(args, "insufficient-evidence", "代批结论缺少可核对证据，已转手动确认。");
+    return manualOutcome(args, "insufficient-evidence", "代批结论缺少可核对证据；请修正后重新提交。");
   }
 
   const reason = redactJudgeText(verdict.reason ?? "");
@@ -519,7 +588,7 @@ export function evaluateGovernanceJudgeVerdict(args: EvaluateGovernanceJudgeVerd
     .filter((item) => item !== "")
     .slice(0, GOVERNANCE_JUDGE_EVIDENCE_LIMIT);
   if (reason === "" || evidence.length === 0) {
-    return manualOutcome(args, "insufficient-evidence", "代批结论缺少可核对证据，已转手动确认。");
+    return manualOutcome(args, "insufficient-evidence", "代批结论缺少可核对证据；请修正后重新提交。");
   }
 
   const isConfirm = request.cardKind !== "proposal"

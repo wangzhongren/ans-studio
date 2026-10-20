@@ -10,10 +10,11 @@
 //   2. `buildGovernanceAdvanceMessage`：按推导结果生成**唯一一条**任务消息（客户给定文案）。
 //
 // 2026-10-18 真机修正（四角色闭环）：`proposal` 被**接受**时不再直接派 Nominator——此时
-// `docs/flows/<flowId>.md` 还不存在（应由 Convener 先写），直接派只会让它反复猜路径、大量读失败。
-// 现改为两段式：先派 Convener 写流程单（步骤表，首步提名；`followUp:"nomination-after-flow"`），
-// 应用在 Convener 本轮真正空闲后检查流程单是否落盘；落盘 ⇒ 再派 Nominator（消息带流程路径），
-// 缺失/超时 ⇒ 系统行如实报错、**不循环重试**。`accept-quick`/`appointment` 仍单段派 Convener。
+// `docs/flows/<flowId>.yaml`（唯一机器状态；2026-10-19 客户决定「这些全部改成yaml。」）还不存在
+// （应由 Convener 先写），直接派只会让它反复猜路径、大量读失败。
+// 现改为两段式：先派 Convener 写流程状态 YAML（首步提名；`followUp:"nomination-after-flow"`），
+// 应用在 Convener 本轮真正空闲后检查 YAML 是否落盘且可解析；落盘 ⇒ 再派 Nominator（消息带 YAML 路径），
+// 缺失/非法/超时 ⇒ 系统行如实报错、**不循环重试**。`accept-quick`/`appointment` 仍单段派 Convener。
 //
 // 纪律（沿 customer-input.ts 的同一套）：
 //  - 只认 `CustomerInputOutcome` 里**客户实际作出**的决定，不采信角色自述；取消/拒绝/expired 不推导；
@@ -50,15 +51,28 @@ export interface GovernanceNextStepPayload {
   proposalPath?: string;
   /**
    * **两段式闭环标记（2026-10-18 真机修正）**：`proposal` 被**接受**时先由 Convener 写
-   * `docs/flows/<flowId>.md`（步骤表，首步提名）；流程单落盘后应用再派 Nominator。
+   * `docs/flows/<flowId>.yaml`（唯一机器状态，首步提名）；YAML 落盘且可解析后应用再派 Nominator。
    * `accept-quick`/`appointment` 没有本字段（直接由 Convener 排程）。
    */
   followUp?: "nomination-after-flow";
 }
 
-/** 治理流程单的项目相对路径（唯一写法；Convener 写、应用检查、Nominator 任务引用均用它）。 */
+/**
+ * 治理流程**人读视图**的项目相对路径。2026-10-19 客户决定「这些全部改成yaml。」后，机器状态在
+ * `docs/flows/<flowId>.yaml`（`governanceFlowStatePath`）；本函数只用于：人读视图文案、legacy Markdown
+ * 回退门与迁移提示。**不得**再用于要求角色写机器状态或门禁核对（那些一律用 YAML 路径）。
+ */
 export function governanceFlowPath(flowId: string): string {
   return `docs/flows/${flowId}.md`;
+}
+
+/**
+ * 治理流程**机器状态**的项目相对路径（2026-10-19 客户决定：`docs/flows/<flowId>.yaml` 是唯一机器状态，
+ * stepId/kind/status/evidence/supersedes；同名 `.md` 仅可选人读视图、不承载门禁状态）。
+ * 任务文案、落盘检查与验收门建议一律用它；实现/校验归编排 `src/common/编排/flow-state.ts`。
+ */
+export function governanceFlowStatePath(flowId: string): string {
+  return `docs/flows/${flowId}.yaml`;
 }
 
 /** 流程单的步骤状态（触发「收尾推进」用的保守解析；最终验收仍由编排 driver 机械核对）。 */
@@ -162,6 +176,43 @@ const VERIFICATION_STEP_IDS: ReadonlySet<string> = new Set(["acceptance", "verif
  * 证据。它们**不算 done**（验收步骤的 done 判定仍只认 `done`）；未知状态一律不在此列、照旧阻塞。
  */
 const VOIDED_FLOW_STEP_STATUSES: ReadonlySet<string> = new Set(["superseded", "cancelled"]);
+
+/**
+ * `flowCompletionIssue` 的**终态原因**（2026-10-19 客户反馈「这个难道不是bug吗」的可见性修复）：
+ * 这两条表示流程已经收口（验收步骤已完成 / 已有验收决定），自动派发本就不该再发生——不是需要
+ * 修复的阻塞。文案与 `flowCompletionIssue` 返回**同源**（常量唯一），供阻塞系统行区分建议措辞。
+ */
+const FLOW_COMPLETION_TERMINAL_ACCEPTANCE_DONE = "验收步骤已完成";
+const FLOW_COMPLETION_TERMINAL_ACCEPTANCE_DECIDED = "该流程已有验收决定";
+const FLOW_COMPLETION_TERMINAL_REASONS: ReadonlySet<string> = new Set([
+  FLOW_COMPLETION_TERMINAL_ACCEPTANCE_DONE,
+  FLOW_COMPLETION_TERMINAL_ACCEPTANCE_DECIDED,
+]);
+
+/**
+ * 机器状态 YAML（编排 `evaluateFlowCompletion`）的终态原因**前缀**：已收口/验收已派发的固定文案
+ * （`验收步骤已完成，流程已收口…` / `该流程已有验收决定…` / `验收步骤状态为 dispatched…`）。
+ * 与 legacy 精确集合并列使用；原因片段可能被 `；` 拼接，判定按片段逐条进行。
+ */
+const FLOW_COMPLETION_TERMINAL_PREFIXES: readonly string[] = [
+  FLOW_COMPLETION_TERMINAL_ACCEPTANCE_DONE,
+  FLOW_COMPLETION_TERMINAL_ACCEPTANCE_DECIDED,
+  "验收步骤状态为",
+];
+
+/** 所有原因片段都是终态 ⇒ 无需操作（混合原因仍给可操作建议，避免把可修复项误报为收口）。 */
+function isTerminalFlowCompletionIssue(issue: string): boolean {
+  const segments = issue
+    .split("；")
+    .map((segment) => segment.trim())
+    .filter((segment) => segment !== "");
+  if (segments.length === 0) return false;
+  return segments.every(
+    (segment) =>
+      FLOW_COMPLETION_TERMINAL_REASONS.has(segment) ||
+      FLOW_COMPLETION_TERMINAL_PREFIXES.some((prefix) => segment.startsWith(prefix) || segment.includes(prefix)),
+  );
+}
 
 // ————————————————— 2026-10-19 客户反馈：「独立核准应该是标准流程」 —————————————————
 //
@@ -363,11 +414,11 @@ export function flowCompletionIssue(
     return `流程步骤${parts.join("；")}${skippedNote}`;
   }
   if (acceptanceStep === undefined) return "流程单缺少验收步骤";
-  if (normalizeFlowStepStatus(acceptanceStep.status) === "done") return "验收步骤已完成";
+  if (normalizeFlowStepStatus(acceptanceStep.status) === "done") return FLOW_COMPLETION_TERMINAL_ACCEPTANCE_DONE;
   const acceptance = ledger.entries.find(
     (entry) => entry.kind === "customer.decision" && entry.flowId === flowId && entry.decisionKind === "acceptance",
   );
-  if (acceptance !== undefined) return "该流程已有验收决定";
+  if (acceptance !== undefined) return FLOW_COMPLETION_TERMINAL_ACCEPTANCE_DECIDED;
   const unresolved = ledger.entries.filter(
     (entry) =>
       entry.kind === "customer.decision" &&
@@ -379,7 +430,7 @@ export function flowCompletionIssue(
 }
 
 /**
- * 收尾推进的唯一一条任务（Rapporteur）：只引用流程单与回交/报告路径，要求汇总证据并**出验收卡**；
+ * 收尾推进的唯一一条任务（Rapporteur）：只引用流程状态 YAML 与回交/报告路径，要求汇总证据并**出验收卡**；
  * 不预先决定通过/退回（验收卡仍走决策开关/判断 agent 或客户手批）。
  *
  * 2026-10-19 客户批准（原话「可以，按你说的改」）：验收前最起码要**真实启动应用并向客户演示**，
@@ -395,9 +446,9 @@ export function flowCompletionIssue(
  */
 export function buildAcceptanceTaskMessage(flowId: string, evidence: readonly string[]): string {
   const paths = [...new Set(evidence.filter((item): item is string => nonEmptyString(item)))].slice(0, 10);
-  const evidenceText = paths.length > 0 ? paths.join("、") : "见回交报告与流程单";
+  const evidenceText = paths.length > 0 ? paths.join("、") : "见回交报告与流程状态 YAML";
   return (
-    `流程 ${flowId} 步骤已全部完成（流程单：${governanceFlowPath(flowId)}；回交/核对报告路径：${evidenceText}）。` +
+    `流程 ${flowId} 步骤已全部完成（流程状态 YAML：${governanceFlowStatePath(flowId)}；回交/核对报告路径：${evidenceText}）。` +
     `请汇总证据并出验收卡（不要自行验收或代替客户决定）。` +
     `验收前必须满足以下硬要求：` +
     `① 按工程质量基线逐项核对并给出结论与证据：正确性、健壮性、安全、可维护性、可观测性、性能、前端可访问性、测试矩阵；` +
@@ -411,6 +462,33 @@ export function buildAcceptanceTaskMessage(flowId: string, evidence: readonly st
 /** 收尾推进成功的系统行（2026-10-19 客户反馈：验收复核是标准流程，由应用自动派发；**不是客户批准**）。 */
 export function governanceAcceptanceAdvanceNote(flowId: string): string {
   return `流程 ${flowId} 步骤已全部完成，已自动派发验收复核给 Proof（工作中）`;
+}
+
+/**
+ * 自动验收被收尾门挡住时的**系统行**（2026-10-19 客户反馈「这个难道不是bug吗」）。
+ *
+ * 门本身 fail-closed 正确，但原因原先只写诊断日志（`acceptance.flow.incomplete`）——Steward/客户
+ * 看不到，只能由操作者手动复算再转告，**静默本身就是缺陷**。本函数把具体原因 + 可操作建议变成
+ * **Lead（主入口）**聊天的系统行（2026-10-19 客户决定：自动验收门反馈统一发 Lead，不再发 Convener）：
+ *  - 未完成/阻塞/证据不足：建议把已被 retake 取代的 aborted/failed 步骤标为 `superseded`（或
+ *    `cancelled`），或用新 `stepId` 重派并更新流程单；应用**不会自动改写流程单，也不会自动派 Proof**；
+ *  - 终态（验收步骤已完成 / 已有验收决定）：无需操作，如实说明不会重复派发。
+ *
+ * 本函数只产出文案：**不改变 `flowCompletionIssue` 门禁判定**、不把 failed/aborted 自动当 superseded、
+ * 不写账本。去重（同一 flow + 同一原因只发一次）由调用方（Interface）负责。
+ *
+ * `flowPath`：建议要落的流程状态文件路径。缺省为 legacy Markdown（`docs/flows/<flowId>.md`，既有调用零变化）；
+ * 机器状态 YAML 生效时调用方传 `governanceFlowStatePath(flowId)`，建议直接指向要改的 YAML。
+ */
+export function governanceAcceptanceBlockedNote(
+  flowId: string,
+  issue: string,
+  flowPath: string = governanceFlowPath(flowId),
+): string {
+  const advice = isTerminalFlowCompletionIssue(issue)
+    ? "无需操作：流程已收口，应用不会重复派发验收复核。"
+    : `建议：若旧步骤已被 retake 取代，请把对应的 aborted/failed 步骤在流程状态文件 ${flowPath} 中标为 superseded（或 cancelled）；或用新的 stepId 重新派发任务并在流程状态文件中更新状态与证据。修正后下一次事件会自动重新检查；应用不会自动改写流程状态文件，也不会自动派 Proof。`;
+  return `自动验收未派发：流程 ${flowId} 未通过收尾门。原因：${issue}。${advice}`;
 }
 
 /**
@@ -437,7 +515,7 @@ export interface GovernanceAdvanceResult {
   /** 是否真的投递了任务（`nextFunction=null` 时为 false——无需派发）。 */
   dispatched: boolean;
   targetRoleId?: GovernanceNextRoleId;
-  /** `proposal accept` 两段式：第二段真正派发到的目标（流程单落盘后才会有）。 */
+  /** `proposal accept` 两段式：第二段真正派发到的目标（流程状态 YAML 落盘后才会有）。 */
   followUpRoleId?: GovernanceNextRoleId;
   /** 目标角色忙时经既有投递机入队（`send` 的同一语义）。 */
   queued?: boolean;
@@ -517,9 +595,9 @@ export function buildIntentHandoffMessage(payload: HandOffIntentPayload): string
 /**
  * 按「卡片种类 + 客户实际选择」推导下一步（客户已定契约的推导表；2026-10-18 真机修正后）：
  * - `proposal` + `accept`       → schedule / convener，`followUp:"nomination-after-flow"`：
- *                                 **先**由 Convener 写 `docs/flows/<flowId>.md`（步骤表，首步提名），
- *                                 流程单落盘后应用再派 Nominator（**不再直接派 Nominator**）；
- * - `proposal` + `accept-quick` → schedule / convener（写流程单并排步骤，无提名）；
+ *                                 **先**由 Convener 写 `docs/flows/<flowId>.yaml`（唯一机器状态，首步提名），
+ *                                 YAML 落盘且可解析后应用再派 Nominator（**不再直接派 Nominator**）；
+ * - `proposal` + `accept-quick` → schedule / convener（写流程状态 YAML 并排步骤，无提名）；
  * - `proposal` + `revise|reject`→ null（无下一步，等客户改稿或放弃）；
  * - `appointment`（任命成功）    → schedule / convener（排程，既有逻辑不变）；
  * - `acceptance`（验收成功）     → null（流程收口）；
@@ -545,7 +623,7 @@ export function deriveGovernanceNextStep(
   switch (cardKind) {
     case "proposal": {
       if (selected.includes("accept")) {
-        // 真机闭环：流程单不存在时不能直接派 Nominator（否则只能反复猜路径、大量读失败）。
+        // 真机闭环：流程状态 YAML 不存在时不能直接派 Nominator（否则只能反复猜路径、大量读失败）。
         nextFunction = "schedule";
         roleId = "convener";
         followUp = "nomination-after-flow";
@@ -557,7 +635,7 @@ export function deriveGovernanceNextStep(
       break;
     }
     case "appointment":
-      // 任命决定成功（客户实际选中了候选角色）→ 由 Convener 写流程单并派发。
+      // 任命决定成功（客户实际选中了候选角色）→ 由 Convener 写流程状态 YAML 并派发。
       nextFunction = "schedule";
       roleId = "convener";
       break;
@@ -578,22 +656,46 @@ export function deriveGovernanceNextStep(
   return payload;
 }
 
+/** `buildGovernanceAdvanceMessage` 的可选事实输入（调用方传入；缺省 ⇒ 旧文案逐字不变）。 */
+export interface BuildGovernanceAdvanceMessageOptions {
+  /**
+   * 流程状态 YAML 是否**已存在**（调用方 `existsSync(projectRoot/docs/flows/<flowId>.yaml)` 的读数）。
+   * `false`/缺省 ⇒ 初始创建路径（旧文案：请先写流程状态 YAML）；`true` ⇒ 改走 flow 工具推进，
+   * **不再让 Convener 直接 write_file 流程 YAML**（2026-10-20 真机：flow 工具已注册但 Steward 未被要求使用）。
+   */
+  flowStateExists?: boolean;
+}
+
 /**
- * 生成**唯一一条**后台派发任务消息（客户给定文案；不增不减语义）。
+ * 生成**唯一一条**后台派发任务消息。
  * 返回 null = 信息不足（无 flowId、appointment 无任命名单）——调用方应如实报失败，不猜测、不裸发。
+ *
+ * 2026-10-19 客户决定「这些全部改成yaml。」：所有指向**机器状态**的路径/要求一律用
+ * `docs/flows/<flowId>.yaml`（`governanceFlowStatePath`）；同名 `.md` 只作为可选人读视图，
+ * **不得承载门禁状态**。文案语义（谁做什么、不越权）不变，只把流程状态载体从 Markdown 表改为 YAML。
+ *
+ * 2026-10-20 真机（flow 工具已注册但 Steward 没调用）：`options.flowStateExists === true` 时，proposal
+ * accept / appointment 的 Convener 任务改为「用 flow_get 读当前 revision，再用 flow_step_update /
+ * flow_step_supersede 推进步骤；不要直接 write_file 流程 YAML」；YAML 不存在时保留初始创建文案。
  */
 export function buildGovernanceAdvanceMessage(
   payload: GovernanceNextStepPayload,
   targetRoleIds?: readonly string[],
+  options?: BuildGovernanceAdvanceMessageOptions,
 ): string | null {
   if (!nonEmptyString(payload.flowId)) return null;
   const flowId = payload.flowId;
-  const flowPath = governanceFlowPath(flowId);
+  const flowStatePath = governanceFlowStatePath(flowId);
+  const flowStateExists = options?.flowStateExists === true;
+  /** YAML 已存在时的统一推进指引（flow 工具；不直接写文件、不谎称已派发）。 */
+  const flowToolInstruction = (stepNoun: string): string =>
+    `流程状态 YAML 已存在（${flowStatePath}）；请用 flow_get 读取当前 revision，再用 flow_step_update / ` +
+    `flow_step_supersede 推进${stepNoun}；不要直接 write_file 流程 YAML；不要把步骤说成已派发。`;
   if (payload.cardKind === "proposal" && payload.nextFunction === "nomination" && payload.roleId === "nominator") {
     const proposalPath = payload.proposalPath ?? `docs/proposals/${flowId}-v1.md`;
     return (
-      `流程 ${flowId}：客户已接受提案 ${proposalPath}；流程单已落盘于 ${flowPath}。` +
-      `请执行提名：按流程单的首个提名步骤，读取提案与流程单，给出候选角色与理由，并通过任命卡请客户确认；不要自行任命或写角色卡。`
+      `流程 ${flowId}：客户已接受提案 ${proposalPath}；流程状态 YAML 已落盘于 ${flowStatePath}。` +
+      `请执行提名：按流程状态 YAML 的首个提名步骤，读取提案与流程状态 YAML，给出候选角色与理由，并通过任命卡请客户确认；不要自行任命或写角色卡。`
     );
   }
   if (
@@ -602,26 +704,54 @@ export function buildGovernanceAdvanceMessage(
     payload.roleId === "convener" &&
     payload.followUp === "nomination-after-flow"
   ) {
-    // accept 两段式第一段：先写流程单；Nominator 由应用在流程单落盘后派发。
     const proposalPath = payload.proposalPath ?? `docs/proposals/${flowId}-v1.md`;
+    if (flowStateExists) {
+      return `流程 ${flowId}：客户已接受提案 ${proposalPath}。${flowToolInstruction("步骤")}`;
+    }
+    // accept 两段式第一段：先写流程状态 YAML；Nominator 由应用在 YAML 落盘且可解析后派发。
     return (
       `流程 ${flowId}：客户已接受提案 ${proposalPath}。` +
-      `请先写流程单 ${flowPath}（步骤表；首个步骤为提名：由 Crew / 组队 读取提案并给出候选角色）。` +
-      `写完后本轮即可结束；提名任务会在流程单落盘后由应用派给 Crew / 组队。不要把步骤说成已派发。`
+      `请先写流程状态 YAML ${flowStatePath}（唯一机器状态，字段/枚举按门禁卡的流程 YAML schema；` +
+      `首个步骤为提名：由 Crew / 组队 读取提案并给出候选角色）。同名 .md 仅可选人读视图，不得承载门禁状态。` +
+      `写完后本轮即可结束；提名任务会在流程状态 YAML 落盘后由应用派给 Crew / 组队。不要把步骤说成已派发。`
     );
   }
   if (payload.cardKind === "proposal" && payload.nextFunction === "schedule" && payload.roleId === "convener") {
+    if (flowStateExists) {
+      return (
+        `流程 ${flowId}：客户已接受提案（快捷路径）。${flowToolInstruction("步骤")}` +
+        `涉及新建/改边界仍须任命卡与写盘确认。`
+      );
+    }
     return (
       `流程 ${flowId}：客户已接受提案（快捷路径）。` +
-      `请写流程单 ${flowPath} 并排步骤（无提名）；涉及新建/改边界仍须任命卡与写盘确认。`
+      `请写流程状态 YAML ${flowStatePath} 并排步骤（无提名；同名 .md 仅可选人读视图，不得承载门禁状态）；` +
+      `涉及新建/改边界仍须任命卡与写盘确认。`
     );
   }
   if (payload.cardKind === "appointment" && payload.nextFunction === "schedule" && payload.roleId === "convener") {
     const ids = (targetRoleIds ?? []).filter((id): id is string => nonEmptyString(id));
     if (ids.length === 0) return null; // 任命名单缺失：不猜、不裸发。
-    return `流程 ${flowId}：客户已完成任命 ${ids.join("、")}。请写流程单并派发已批准步骤。`;
+    if (flowStateExists) {
+      return `流程 ${flowId}：客户已完成任命 ${ids.join("、")}。${flowToolInstruction("已批准步骤")}`;
+    }
+    return `流程 ${flowId}：客户已完成任命 ${ids.join("、")}。请写流程状态 YAML ${flowStatePath} 并派发已批准步骤。`;
   }
   return null;
+}
+
+/** accept 两段式第二段的「提名已完成」续推任务（2026-10-20：不重复派 Nominator，让 Steward 继续）。 */
+export function buildNominationAlreadyDoneMessage(flowId: string): string {
+  const flowStatePath = governanceFlowStatePath(flowId);
+  return (
+    `流程 ${flowId}：提名已完成（流程状态 YAML ${flowStatePath} 的 nomination 步骤已是 done），应用未重复派发提名任务。` +
+    `请用 flow_get 读取当前 revision，再用 flow_step_update / flow_step_supersede 推进后续步骤；不要直接 write_file 流程 YAML；不要把步骤说成已派发。`
+  );
+}
+
+/** 「提名已完成、未重复派发」的系统行。 */
+export function governanceNominationAlreadyDoneNote(): string {
+  return "提名已完成，未重复派发；已请 Steward / 统筹 继续下一步";
 }
 
 /** 成功派发的系统行文案（客户给定首例；其余按同一句式如实说明职能）。 */
@@ -631,9 +761,9 @@ export function governanceAdvanceSuccessNote(payload: GovernanceNextStepPayload)
     : "已派发流程任务给 Steward / 统筹（工作中）";
 }
 
-/** accept 两段式第二段的系统行：流程单已落盘、Crew / 组队 已派。 */
+/** accept 两段式第二段的系统行：流程状态 YAML 已落盘且通过校验、Crew / 组队 已派。 */
 export function governanceNominationFollowUpNote(): string {
-  return "流程单已落盘，已派发提名任务给 Crew / 组队（工作中）";
+  return "流程状态 YAML 已落盘，已派发提名任务给 Crew / 组队（工作中）";
 }
 
 /**

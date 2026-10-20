@@ -1,5 +1,170 @@
 # 门禁引擎 变更记录
 
+## 2026-10-20 — Lead / 主理 设为工作流管理者（dispatch_task + flow 工具纪律）（客户拍板）
+
+客户拍板：把主理 Lead 设为**工作流管理者**，可和所有职能角色沟通。本批只在**门禁引擎**边界内改
+能力位与卡文本。完整记录见[变更记录](docs/change/2026-10-20_change_lead-workflow-manager.md)。
+
+- **边界**：`src/common/门禁引擎/governance-roles.ts`、
+  `test/门禁引擎/governance-standard-workflow.test.ts`、`test/门禁引擎/governance-trio.test.ts`、
+  `test/门禁引擎/liaison-role.test.ts`、本文件、`memo.md`、
+  `docs/change/2026-10-20_change_lead-workflow-manager.md`（新）。未碰
+  `src/common/编排/**`、`src/provider/**`、`app/**`、`test/测试/**`、`src/service/**`、
+  其他角色文件/测试、真实项目；不读 `.env`、不跑真实模型/凭据/网络；未 commit。
+- **能力位**：`liaison.capabilities.dispatchTask` 由 `false` 改为 `true`；其余能力位不变
+  （`customerInput/handOffIntent=true`，`roleStatus/sessionTail/proposeRecovery/installSkill/installMcp=false`，
+  `shell=operator-approve`）。`GovernanceCapabilities.dispatchTask` 注释同步。
+- **Lead 卡**：职能与权力改为「客户沟通权 + 工作流管理」；保留逐字样「客户沟通 · 不拥有最终批准权」；
+  标准工作流第 5 步明确阶段流转仍由应用负责；新增「## 工作流管理（Lead / 主理）」——`flow_get` +
+  `flow_step_update` / `flow_step_supersede`、`dispatch_task` 向 Steward/项目角色派发协调任务；
+  任务自足并带 `flowId`（Steward 协调可省 `stepId`）；`expectedRevision`/`revision-conflict`/
+  `insufficient-evidence` 纪律；派发/推进 ≠ 客户批准；不得伪造 done 证据；不得直接写 `docs/flows/**`。
+- **Steward 卡**：Lead 也是工作流管理者；收到 Lead 协调任务按任务文本执行，不因来源是 Lead 就跳过
+  证据/门禁；Steward 仍是流程/排程执行者；Steward 自己的派发目标仍只能是项目角色，除 Lead 的协调
+  任务外治理角色之间不 dispatch。
+- **Crew/Draft/Proof 卡**：可向 Lead / 主理 回交/协调；不得直接写 `docs/flows/**`；步骤更新仍按
+  flow 工具与账本证据——只能把 owner=自己的步骤更新到 `delivered`（或 failed/blocked），不要自己标
+  done；done 由 Steward / Lead 核对账本证据后标记，证据不足不标 done。
+- **测试**：`node --test "test/门禁引擎/**/*.test.ts"` ⇒ **286 计 / 285 过 / 0 红 / 1 skip**
+  （基线 280/279/0/1；新增 1 例：Lead 三工具 + dispatch_task、Steward 接受 Lead 协调任务、
+  Crew/Draft/Proof 向 Lead 回交；能力矩阵两处既有断言按新契约更新）。既有断言未放宽；
+  `npm run typecheck` ⇒ **exit 0**。
+- **跨角色待办（未越界）**：① 编排/桌面按能力矩阵给 Liaison 注入 `dispatch_task`；
+  `test/桌面应用/session.test.ts:992` 仍断言 `liaison.dispatchTask === undefined`，属预期红，需桌面
+  属主更新；② 派发目标校验需允许 Lead→Steward，Steward 自身目标仍只限项目角色；③ Lead 的 flow
+  工具需由编排/运行时核心注入（与 Steward 同权限、服务端校验证据/revision），
+  `GovernanceCapabilities` 未新增 flow 工具位；④ `dispatch-delivery.test.ts` 的「convener 派发（唯一）」
+  文案过时，建议属主同步。
+- **残余风险**：`dispatchTask=true` 可能被误用于其他治理角色目标；Lead 可能把派发/推进误当客户
+  批准（卡文本已禁，无机械检查）；flow 工具与 revision/证据校验依赖运行时实现；真机端到端与独立
+  复验未进行。来源：客户拍板（经协调方转达）。
+
+## 2026-10-20 — 流程文件方法化工具（flow_get / flow_step_update / flow_step_supersede）角色卡纪律（客户拍板）
+
+客户已拍板：「按这个方案做吧。」流程文件改为方法化工具：`flow_get`（所有角色读取）、
+`flow_step_update`（更新步骤状态，`expectedRevision` 必填；Steward 可更新全部、步骤 owner 只更新
+自己的步骤；`done` 必须带账本可对账 evidence）、`flow_step_supersede`（仅 Steward，旧步骤
+superseded + 新步骤 pending）。本批只在**门禁引擎**边界内更新卡文本，不改判定逻辑、不实现工具。
+完整记录见[变更记录](docs/change/2026-10-20_change_flow-tools-card-discipline.md)。
+
+- **边界**：`src/common/门禁引擎/governance-roles.ts`、
+  `test/门禁引擎/governance-standard-workflow.test.ts`、本文件、`memo.md`、
+  `docs/change/2026-10-20_change_flow-tools-card-discipline.md`（新）。未碰
+  `src/common/编排/**`、`src/provider/**`、`app/**`、`test/测试/**`、`src/service/**`、
+  其他角色文件/测试、真实项目；不读 `.env`、不跑真实模型/凭据/网络；未 commit。
+- **Steward / 统筹**：流程 YAML **初始创建**仍用 `request_confirmation`（`cardKind=schedule-write`）；
+  创建后步骤状态推进优先用 `flow_get` + `flow_step_update`（`dispatched` / `delivered` / `done` /
+  `failed` / `blocked`），返工用 `flow_step_supersede`；不再为每次状态更新写文件/发写卡；
+  不直接 `write_file` 流程 YAML（初始创建除外，且按现有写卡门）；`done` 前必须有账本可对账
+  evidence；`expectedRevision` 来自最近一次 `flow_get`（或更新回执）的 revision，`revision-conflict`
+  重读后再改、不盲目重试；步骤推进 ≠ 客户批准，需要客户决定的步骤仍走客户交互工具。
+- **Crew / Draft / Proof**：用 `flow_get` 读取流程与自己负责的步骤；**不得直接写 `docs/flows/**`**；
+  项目角色/步骤 owner 只能把 owner=自己的步骤更新到 `delivered`（或 `failed` / `blocked`），
+  **不要自己标 `done`**；`done` 由 Steward / Lead 核对账本证据后标记；证据不足
+  （`insufficient-evidence`）如实报告、不标 done；四卡统一 expectedRevision/`revision-conflict`
+  纪律；保留 id `verification` / `acceptance` 仍按既有验收卡流程。Draft 契约冻结、Crew 角色就绪、
+  Proof 核对完成各有落点。
+- **保留**：现有 `request_confirmation` / `cardKind` / `schedule-write` 作为初始创建与迁移兼容保留，
+  未删除旧路径；五卡权力/职责/Section 1/预授权/禁写/能力位、shell 审批档、质量基线、治理卡参数、
+  判断代批/deny 纪律与 flow YAML schema 契约逐字未改；Lead 本批未改。
+- **测试**：`node --test "test/门禁引擎/**/*.test.ts"` ⇒ **285 计 / 284 过 / 0 红 / 1 skip**
+  （基线 280/279/0/1；新增 1 例：三工具关键字、Steward 初始创建例外、禁止直接写 docs/flows、
+  expectedRevision/`revision-conflict` 重读、证据不足不标 done）。既有断言按新契约更新、未放宽；
+  `npm run typecheck` ⇒ **exit 0**。
+- **跨角色待办（未越界）**：① 编排/运行时核心实现三工具，工具名/参数名须与卡文本一致；② 权限
+  （Steward 全部 / owner 自己）与 `done` 账本证据对账必须机械执行；③ `flow_get` 的 revision 需可
+  原样回传 `expectedRevision`，`revision-conflict` 结果名/形状须对齐；④ 初始创建 `schedule-write`
+  旧路径保留；⑤ `verification` / `acceptance` 既有验收规则不变；⑥ 若后续要求 Lead 读取流程，
+  另批更新。
+- **残余风险**：卡文本是行为约束，是否先 get 再 update、冲突后是否重读无机械检查；`idempotencyKey`
+  可选；旧写卡路径仍保留；真机端到端与独立复验未进行。来源：客户拍板「按这个方案做吧」（经协调方转达）。
+
+## 2026-10-19 — 写卡被 declined 时按 reason 修正后重发确认卡；judge deny 不是客户决定（真机反馈）
+
+真机：Crew 的 `appointment-write` 写卡内容不合规（README 归属未在提名写区表定案、tester
+`boundary.yaml` 混入 Markdown 散文），判断 agent 只能 manual，客户被迫手批。客户要求判断 agent
+拒绝并把原因退回 Crew 重做；编排给 approval 组增加 `deny`，桌面把 deny 转成 `declined` + 原因回投
+发起角色。本批只在**门禁引擎**边界内补角色卡纪律，不改产品判定逻辑。完整记录见
+[变更记录](docs/change/2026-10-19_change_declined-rewrite-discipline.md)。
+
+- **边界**：`src/common/门禁引擎/governance-roles.ts`、
+  `test/门禁引擎/governance-standard-workflow.test.ts`、本文件、`memo.md`、
+  `docs/change/2026-10-19_change_declined-rewrite-discipline.md`（新）。未碰
+  `src/common/编排/**`、`app/**`、`test/测试/**`、`src/service/**`、其他角色文件/测试、
+  真实项目；不读 `.env`、不跑真实模型/凭据/网络；未 commit。
+- **Crew / 组队**：标准工作流 appointment-write 第 4 步增补 declined 处理；新增「**写卡被拒
+  （declined）时（必须）**」段——按 `reason` 修正待写内容后**重新发确认卡**；不得绕过确认、
+  不得直接 `write_file`、不得把原因当客户已同意；仍被拒则继续修正/如实报告，不循环空转、
+  不重复提交同一份未修正内容。
+- **Steward / 统筹**：确认卡约定后新增同款段——写流程状态 YAML 或排程写卡被 `declined` 时按
+  `reason` 修正后重发确认卡；写卡完成/角色枚举出现后，按流程 YAML 继续下一步
+  （派发/回交/登记），不要等客户催办。
+- **五卡共同**：判断代批纪律段后新增——judge `deny` 是系统审批拒绝（拒绝本次写盘/命令），
+  不是客户决定，不写入客户决定账本；不得把它当作客户意见或同意。
+- **逐字保留**：五卡权力/职责/Section 1/预授权/禁写/能力位、shell 审批档、工程质量基线、
+  治理卡参数、既有判断代批纪律与 flow YAML 契约均未改；未改任何判定逻辑。
+- **测试**：`node --test "test/门禁引擎/**/*.test.ts"` ⇒ **284 计 / 283 过 / 0 红 / 1 skip**
+  （基线 280/279/0/1；新增 1 例，覆盖 Crew/Steward declined 关键字与顺序、五卡 judge deny 定性）。
+  既有断言未放宽、未删除；`npm run typecheck` ⇒ **exit 0**。
+- **跨角色依赖（未越界）**：① 编排 approval 组需实现 `deny` 与 declined+原因回投；若运行时结果名
+  不是 `declined`，须同批对齐卡文本；② 桌面需把 deny 转成 declined+原因回投，且不得记成客户决定/
+  写入客户决定账本；③ 判断 agent 需真的能对不合规写卡内容返回 `deny` 与可操作 `reason`；
+  ④ 在该通道落地前，卡文本纪律是行为约束，真机仍可能 manual。
+- **残余风险**：重发/空转防护只有文本纪律，无机械次数上限；`deny` 不入账本需编排/桌面实现；
+  真机端到端与独立复验未进行。来源：真机反馈与客户要求（经协调方转达）。
+
+## 2026-10-19 — 五张内置卡流程状态统一为 YAML（唯一机器状态），Steward 标准工作流改写 YAML（客户决定）
+
+客户原话：「这些全部改成yaml。」客户决定：流程状态改为 `docs/flows/<flowId>.yaml` 作为**唯一机器
+状态**，`docs/flows/<flowId>.md` 仅人读视图；Steward 标准工作流必须写 YAML，用显式
+`kind` / `evidence` / `supersedes`，避免再用 Markdown 表撞收尾门。协调方追加：Lead / Draft / Crew /
+Proof 四张卡的流程状态引用也统一为该口径，Proof 标准复核按 YAML 读取。本批只做**门禁引擎**属主部分：
+五张内置卡文本、测试与文档；权力、Section 1、预授权、禁写、能力位与判定逻辑零变化。
+完整记录见[变更记录](docs/change/2026-10-19_change_steward-flow-yaml.md)。
+
+- **边界**：`src/common/门禁引擎/governance-roles.ts`、
+  `test/门禁引擎/governance-trio.test.ts`、`test/门禁引擎/governance-standard-workflow.test.ts`、
+  本文件、`memo.md`、`docs/change/2026-10-19_change_steward-flow-yaml.md`（新）。未碰 `app/**`、
+  `src/pipeline/**`、`src/common/编排/**`、`src/service/**`、其他角色文件/测试、真实项目；
+  不读 `.env`、不跑真实模型/凭据/网络；未 commit。
+- **Steward 卡文本（与真实 Flow YAML 契约对齐）**：顶层 `flowId/version/qualityTier/steps`（可选
+  `status` 仅人读）；步骤字段 `id/title/owner/kind/status/evidence/supersedes/supersededBy`；
+  `kind ∈ dispatch|customer-decision|artifact|acceptance`；
+  `status ∈ pending|dispatched|delivered|done|superseded|failed|blocked`（迁移兼容 `aborted`
+  会被识别并挡门）；`evidence` 为 `{kind,ref}` 且 `kind` 与步骤 `kind` 一致（dispatch→账本
+  `dispatch.accepted.stepId`、customer-decision→账本 `decisionKind`、artifact→项目相对产物路径、
+  acceptance→固定 `acceptance`）；`done` 步骤必须有 `evidence`；保留 id
+  `verification`/`acceptance` 只能用于唯一验收步骤（`kind: acceptance`、初始 `pending`、
+  `owner: app`），Steward 不占用/不派发/不标 done，执行/证据步骤用 `verification-evidence` 等 id；
+  被 retake 取代的旧步骤标 `superseded` + `supersededBy`，新步骤写 `supersedes: [...]`，
+  不留 `aborted/failed` 挡门；非法 id/枚举/未知字段/缺 evidence 被应用拒绝后按提示修正 YAML，
+  **不得改回 Markdown 表格**。旧 Markdown 步骤表模板删除；真实演示要求改挂执行/证据步骤。
+- **其余四张卡（协调方追加）**：Lead / Draft / Crew / Proof 的治理文件命名统一为
+  `docs/flows/<flowId>.yaml`（唯一机器状态；同名 `.md` 仅人读视图）；Crew 标准工作流读流程单改为
+  读 YAML，Proof 标准复核改为按 YAML 读取流程状态；各自写权/禁写/能力位/纪律逐字不变。
+- **逐字保留**：不拥有最终批准权、派发只依据客户已接受提案/已任命名单/流程单步骤、不派发治理角色、
+  不写角色卡/不创建角色、治理角色之间不 dispatch、提名由应用后台派发、判断代批纪律、治理卡参数、
+  可写目录/禁写、shell 审批档、工程质量基线、contract-freeze/集成端到端/架构模块引用、
+  不自动推进/不催办。
+- **测试**：`node --test "test/门禁引擎/**/*.test.ts"` ⇒ **283 计 / 282 过 / 0 红 / 1 skip**
+  （基线 280/279/0/1；新增 3 例：YAML schema/保留 ID/evidence/superseded 关键字断言；
+  用 `yaml` 实际解析卡内模板块校验顶层/字段/枚举/done evidence/保留 id；五卡统一口径与
+  Crew/Proof 按 YAML 读取）。卡内 YAML 模板另用编排 `parseFlowStateYaml` 实测通过
+  （`template-flow`）。既有断言按新契约更新、未放宽；`npm run typecheck` ⇒ **exit 0**。
+- **跨角色事实/依赖（只读核读，未越界修改）**：① 编排已落盘 Flow YAML 契约
+  `src/common/编排/flow-state.ts`（`parseFlowStateYaml`/`evaluateFlowCompletion`；
+  `governance-gate.ts` YAML 优先、坏 YAML fail-closed；`run-role.ts` 写前校验；`governance-judge*`
+  与 `governance-judge-facts.ts` 改 YAML）——五卡 schema 与其一致；② **桌面
+  `app/desktop/flow-state.ts` 仍是临时实现且形状不同**（`stepId`/`kind: decision`/evidence 数组/
+  无 version·qualityTier），`interface.ts` 现导入它；桌面注释与跨角色请求均写明应改导入
+  `src/pipeline/orchestration/flow-state.ts` 并删除临时文件——**未完成前真机自动验收门会拒合法
+  YAML**；③ 编排 `govern-session.ts` 的 `STANDARD_WORKFLOW_PROMPT`（与卡文本成对同步）仍写
+  `docs/flows/<flowId>.md`，须同批更新；④ 桌面 `governance-advance.ts` 的
+  `governanceFlowPath` 仍返回 `.md`（新增 `governanceFlowStatePath` 返回 `.yaml`，interface 已
+  YAML 优先）；⑤ 五张卡口径已统一，代码侧文案（②③④）仍待各自属主同步。
+- **残余风险**：桌面/编排两套解析形状过渡期不一致；`evidence` 无内容哈希；Markdown 人读视图可
+  漂移；真机端到端与独立复验未进行。来源：客户决定原话「这些全部改成yaml。」（经任务派发转达）。
+
 ## 2026-10-19 — 五张内置治理角色卡加入「标准工作流」，阶段流转由应用负责（客户反馈）
 
 客户原话：「这个独立核准应该是标准流程，而不是我在发给他。」「内置角色应该有自己的工作流。」

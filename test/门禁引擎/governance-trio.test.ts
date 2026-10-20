@@ -194,19 +194,21 @@ test("注册表：预授权目录与评审一致（Liaison 仅 docs/intents/；n
   ]);
 });
 
-test("注册表：能力矩阵——Lead 只沟通+交接+intent-confirm；Steward 独享派发/看护/恢复；Crew 独享技能/MCP；Proof 只验收", () => {
+test("注册表：能力矩阵——Lead 沟通+交接+intent-confirm+派发协调；Steward 派发/看护/恢复；Crew 独享技能/MCP；Proof 只验收", () => {
   const l = governanceRoleOf("liaison")!.capabilities;
   const r = governanceRoleOf("rapporteur")!.capabilities;
   const n = governanceRoleOf("nominator")!.capabilities;
   const c = governanceRoleOf("convener")!.capabilities;
   const v = governanceRoleOf("verifier")!.capabilities;
-  // Lead：客户卡通道只用于 intent-confirm（白名单由编排限制）；其余能力全关。
+  // Lead：客户卡通道只用于 intent-confirm（白名单由编排限制）；2026-10-20 客户拍板兼任工作流管理者，
+  // 获得 dispatch_task（协调任务）能力；其余能力仍关。
   assert.equal(l.customerInput, true, "Lead 仅用于 intent-confirm 卡");
   assert.equal(l.handOffIntent, true, "Lead 独享 hand_off_intent");
   assert.equal(l.requestClarification, false);
+  assert.equal(l.dispatchTask, true, "Lead 作为工作流管理者可派发协调任务（客户 2026-10-20）");
   assert.deepEqual(
-    [l.dispatchTask, l.roleStatus, l.sessionTail, l.proposeRecovery, l.installSkill, l.installMcp],
-    [false, false, false, false, false, false],
+    [l.roleStatus, l.sessionTail, l.proposeRecovery, l.installSkill, l.installMcp],
+    [false, false, false, false, false],
   );
   assert.equal(l.shell, "operator-approve", "Lead 也接审批档（客户 2026-10-19：所有角色 shell 均经审批）");
   // 其余四人保留客户确认通道；仅 Draft 有澄清工具；Proof 只验收。
@@ -319,10 +321,14 @@ test("客户 2026-10-19：五张卡逐字复用工程质量基线，并各带角
   assert.match(n, /项目角色卡必须继承工程质量基线/, "Crew 角色卡须继承质量基线");
   assert.match(n, /为每个角色写明其质量职责/, "Crew 须为每个角色写明质量职责");
   assert.match(n, /负例、边界、重启恢复与权限用例/, "测试角色卡须要求负例/边界/重启/权限用例");
-  // Steward / 统筹：流程与派发带基线与真实演示；verification 步骤必须含「真实启动应用并演示」。
+  // Steward / 统筹：流程与派发带基线与真实演示；执行/证据步骤必须含「真实启动应用并演示」。
   const c = governanceRoleOf("convener")!.cardText;
   assert.match(c, /`dispatch_task` 的任务描述必须带工程质量基线/, "Steward 派发任务须带质量基线");
-  assert.match(c, /verification 步骤必须包含「真实启动应用并演示」/, "Steward 须把真实演示写进 verification 步骤");
+  assert.match(
+    c,
+    /执行与证据步骤（如 `verification-evidence`）必须包含「真实启动应用并演示」/,
+    "Steward 须把真实演示写进执行/证据步骤",
+  );
   assert.match(c, /未演示不得进入验收/, "Steward 未演示不得进入验收");
   // Proof / 验收：逐项核对基线；无真实启动/演示证据不得建议 accept；不得以「工具无 shell」跳过核对。
   const v = governanceRoleOf("verifier")!.cardText;
@@ -435,7 +441,10 @@ test("卡文本：五人均写明职能/不拥有最终批准权/可写与禁写
     assert.match(t, /`docs\/proposals\/<flowId>-v1\.md`/, `${spec.id} 须写死提案命名`);
     assert.match(t, /`docs\/nominations\/<flowId>-v1\.md`/, `${spec.id} 须写死提名命名`);
     assert.match(t, /不得在文件名里加 `-nomination` 等额外后缀/, `${spec.id} 须禁止提名额外后缀`);
-    assert.match(t, /`docs\/flows\/<flowId>\.md`/, `${spec.id} 须写死流程命名`);
+    assert.match(t, /`docs\/flows\/<flowId>\.yaml`/, `${spec.id} 须写死流程 YAML 机器状态命名`);
+    assert.match(t, /唯一机器状态/, `${spec.id} 须写明 YAML 是唯一机器状态`);
+    assert.match(t, /`docs\/flows\/<flowId>\.md`/, `${spec.id} 须写死流程 Markdown 人读视图命名`);
+    assert.match(t, /仅人读视图/, `${spec.id} 须写明 Markdown 仅人读视图`);
     assert.match(t, /`docs\/intents\/<flowId>\.md`/, `${spec.id} 须写死意图命名`);
     assert.match(t, /按文件名推导 flowId/, `${spec.id} 须说明 flowId 推导规则`);
     assert.match(t, /当作独立流程/, `${spec.id} 须说明命名不符的后果`);
@@ -507,19 +516,53 @@ test("卡文本：五人均写明职能/不拥有最终批准权/可写与禁写
   // Proof：只出 acceptance 选择卡与 write 写盘卡。
   assert.match(v, /只用 `acceptance`/);
   assert.match(v, /只用 `write`/);
-  // 真机 2026-10-18：flowStepExists 只认表格第一列/列表首 token 的 stepId——Convener 卡写死模板。
+  // 客户 2026-10-19 决定（原文「这些全部改成yaml。」）：流程状态唯一机器来源改为 YAML；
+  // Convener 卡写死 YAML 模板，Markdown 表格不再承载状态（旧模板必须消失）。
   const convenerCard = governanceRoleOf("convener")!.cardText;
-  const stepTable = [
-    "| stepId | 步骤 | 状态 |",
-    "| --- | --- | --- |",
-    "| nomination | 提名 | done |",
-    "| delivery-server | 服务端交付 | pending |",
+  const flowYaml = [
+    "```yaml",
+    "flowId: <flowId>",
+    "version: 1",
+    "qualityTier: production",
+    "steps:",
+    "  - id: contract-freeze",
+    "    title: 冻结跨角色契约",
+    "    owner: <项目角色 id>",
+    "    kind: artifact",
+    "    status: done",
+    "    evidence:",
+    "      kind: artifact",
+    "      ref: docs/contracts/<name>-v1.md",
+    "  - id: delivery-server",
+    "    title: 服务端交付",
+    "    owner: <项目角色 id>",
+    "    kind: dispatch",
+    "    status: dispatched",
+    "  - id: verification-evidence",
+    "    title: 真实启动应用并演示",
+    "    owner: <项目角色 id>",
+    "    kind: artifact",
+    "    status: pending",
+    "  - id: verification",
+    "    title: 验收",
+    "    owner: app",
+    "    kind: acceptance",
+    "    status: pending",
+    "```",
   ].join("\n");
-  assert.ok(convenerCard.includes(stepTable), "Convener 卡须含逐字步骤表模板");
-  assert.match(convenerCard, /stepId 必须在表格第一列/);
-  assert.match(convenerCard, /每行以 stepId 开头/);
-  assert.match(convenerCard, /`dispatch_task` 的 stepId 必须与表中完全一致/);
+  assert.ok(convenerCard.includes(flowYaml), "Convener 卡须含逐字 YAML 流程模板");
+  assert.match(convenerCard, /`docs\/flows\/<flowId>\.yaml`/, "Convener 卡须点明 YAML 机器状态路径");
+  assert.match(convenerCard, /唯一机器状态/, "Convener 卡须写明 YAML 是唯一机器状态");
+  assert.match(convenerCard, /仅人读视图/, "Convener 卡须写明 Markdown 仅人读视图");
+  assert.match(
+    convenerCard,
+    /stepId 必须与 YAML 中该步骤的 `id` 完全一致/,
+    "dispatch_task 的 stepId 须与 YAML 步骤 id 一致",
+  );
   assert.match(convenerCard, /派发会被拒/);
+  assert.doesNotMatch(convenerCard, /\| stepId \|/, "客户 2026-10-19：不得再用 Markdown 步骤表");
+  assert.doesNotMatch(convenerCard, /stepId 必须在表格第一列/, "旧表格约束必须删除");
+  assert.doesNotMatch(convenerCard, /每行以 stepId 开头/, "旧表格约束必须删除");
   for (const id of ["liaison", "rapporteur", "nominator", "verifier"] as const) {
     assert.doesNotMatch(governanceRoleOf(id)!.cardText, /\| stepId \|/, `${id} 不写流程单步骤表`);
   }

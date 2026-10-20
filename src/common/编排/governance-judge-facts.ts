@@ -222,7 +222,10 @@ export function requiredArtifactPaths(request: GovernanceJudgeRequest): {
   // 约定路径（flowId 缺失 ⇒ 文字，不编造路径）。
   const expectedProposal = flowId !== undefined ? `docs/proposals/${flowId}-v1.md` : "提案";
   const expectedNomination = flowId !== undefined ? `docs/nominations/${flowId}-v1.md` : "提名";
-  const expectedFlow = flowId !== undefined ? `docs/flows/${flowId}.md` : "流程单文件";
+  // 2026-10-19 Flow YAML 契约：机器状态 = docs/flows/<flowId>.yaml；旧版 .md 仅人读视图。
+  const expectedFlow = flowId !== undefined
+    ? `docs/flows/${flowId}.yaml（旧版人读视图：docs/flows/${flowId}.md）`
+    : "流程单文件";
 
   switch (request.cardKind) {
     case "proposal":
@@ -379,11 +382,11 @@ export function evaluateAcceptanceCompletion(input: {
   ledgerErrors: number;
 }): { ok: true } | { ok: false; reasonCode: string; reason: string } {
   if (input.ledgerErrors > 0) {
-    return { ok: false, reasonCode: "ledger-unavailable", reason: "治理账本不可读或存在坏行，无法核对验收完成度，已转手动确认。" };
+    return { ok: false, reasonCode: "ledger-unavailable", reason: "治理账本不可读或存在坏行，无法核对验收完成度；请修复账本后重新提交验收。" };
   }
   const parsed = parseFlowSteps(input.flowMarkdown);
   if (!parsed.wellFormed || parsed.steps.length === 0) {
-    return { ok: false, reasonCode: "insufficient-evidence", reason: "流程单缺少可解析的步骤表，无法核对验收完成度，已转手动确认。" };
+    return { ok: false, reasonCode: "insufficient-evidence", reason: "流程单缺少可解析的步骤表，无法核对验收完成度；请补齐流程状态后重新提交验收。" };
   }
   const activeSteps = parsed.steps.filter((step) => !VOID_FLOW_STEP_STATUSES.has(normalizeFlowStepStatus(step.status)));
   const notDone = activeSteps.filter((step) => normalizeFlowStepStatus(step.status) !== "done");
@@ -392,7 +395,7 @@ export function evaluateAcceptanceCompletion(input: {
     return {
       ok: false,
       reasonCode: "insufficient-evidence",
-      reason: `流程仍有未完成/阻塞/待派发步骤（${detail}），不能代批验收，已转手动确认。`,
+      reason: `流程仍有未完成/阻塞/待派发步骤（${detail}），不能代批验收；请完成这些步骤（或标 superseded）后重新提交验收。`,
     };
   }
   const dispatched = new Set(input.facts.dispatchedStepIds ?? []);
@@ -402,11 +405,11 @@ export function evaluateAcceptanceCompletion(input: {
     return {
       ok: false,
       reasonCode: "insufficient-evidence",
-      reason: `流程步骤缺少 dispatch.accepted 记录（${detail}），不能代批验收，已转手动确认。`,
+      reason: `流程步骤缺少 dispatch.accepted 记录（${detail}），不能代批验收；请补齐派发记录后重新提交验收。`,
     };
   }
   if (input.facts.unresolvedClarificationCount > 0) {
-    return { ok: false, reasonCode: "insufficient-evidence", reason: "仍有未闭环的澄清，不能代批验收，已转手动确认。" };
+    return { ok: false, reasonCode: "insufficient-evidence", reason: "仍有未闭环的澄清，不能代批验收；请先闭环澄清后重新提交验收。" };
   }
   // 2026-10-18 真机：旧账本里无 cardKind 的普通选择曾写入 unclassified/none——按 decisionKind 过滤，
   // 不把它当作「未结算的治理决定」（否则会挡住验收）。
@@ -418,7 +421,7 @@ export function evaluateAcceptanceCompletion(input: {
     && (entry.customerDecision === "none" || entry.customerDecision === undefined)
   );
   if (unresolved.length > 0) {
-    return { ok: false, reasonCode: "insufficient-evidence", reason: "该流程仍有未结算的决定，不能代批验收，已转手动确认。" };
+    return { ok: false, reasonCode: "insufficient-evidence", reason: "该流程仍有未结算的决定，不能代批验收；请先结算决定后重新提交验收。" };
   }
   return { ok: true };
 }

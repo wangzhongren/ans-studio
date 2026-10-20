@@ -177,16 +177,55 @@ test("工具集恰为 judge_read_file / judge_list_dir / report_governance_judge
     "write_file", "edit_file", "read_file", "run_shell", "request_confirmation", "request_choice",
     "submit_report", "dispatch_task", "role_status", "session_tail", "propose_recovery",
     "install_skill", "uninstall_skill", "install_mcp", "uninstall_mcp",
+    "flow_get", "flow_step_update", "flow_step_supersede",
   ]) {
     assert.equal(names.has(forbidden), false, `治理判断会话不得构造 ${forbidden}`);
   }
-  // schema 与工具定义同源；report 只有 approve/manual 两值（不做负向代批）。
+  // schema 与工具定义同源；report 三值：approve / deny（仅 approval 组写卡）/ manual。
   assert.deepEqual(describeTool("judge_read_file").parameters.required, ["path"]);
   assert.deepEqual(describeTool("judge_list_dir").parameters.required, []);
   assert.deepEqual(describeTool(GOVERNANCE_JUDGE_REPORT_TOOL).parameters.required, ["verdict"]);
   const verdict = (describeTool(GOVERNANCE_JUDGE_REPORT_TOOL).parameters.properties as Record<string, { enum?: string[] }>).verdict;
-  assert.deepEqual(verdict.enum, ["approve", "manual"]);
+  assert.deepEqual(verdict.enum, ["approve", "deny", "manual"]);
   for (const tool of tools) assert.equal(tool.inputSchema.type, "object");
+});
+
+test("approval 组写卡可 deny：schema 值域、字段口径与 decision 组禁令（shell schema 不动）", () => {
+  const tool = describeTool(GOVERNANCE_JUDGE_REPORT_TOOL);
+  const properties = tool.parameters.properties as Record<string, { enum?: string[]; description?: string }>;
+  const verdict = properties.verdict!;
+  // deny 必须被 schema 接受（approve/manual 既有值不缩水）。
+  assert.deepEqual(verdict.enum, ["approve", "deny", "manual"]);
+  assert.equal(verdict.enum!.includes("approve"), true);
+  assert.equal(verdict.enum!.includes("manual"), true);
+  assert.match(verdict.description ?? "", /deny = ONLY for approval-group write cards \(write\/appointment-write\/schedule-write\)/, "deny 仅限 approval 组写卡");
+  assert.match(verdict.description ?? "", /content, paths or completeness are non-compliant and must be fixed by the requesting role before resubmission/i, "deny 语义＝内容/路径/完整性不合规、发起角色修正后重做");
+  assert.match(verdict.description ?? "", /never for decision-group cards \(proposal\/appointment\/acceptance\)/, "decision 组不得 deny");
+  assert.match(verdict.description ?? "", /evidence unreadable, read budget exhausted or reads denied/, "manual 覆盖证据不可读/预算/读取被拒");
+  assert.match(verdict.description ?? "", /decision-group card cannot be confirmed/, "decision 组无法确认交回 manual");
+  assert.match(verdict.description ?? "", /never rejects on the customer's behalf/i, "判断 agent 不替客户拒绝");
+  assert.match(verdict.description ?? "", /pathDecisions\/selected\/confirmed are not needed for deny/, "deny 不需要逐路径/选择/确认字段");
+  // deny 与 approve 同口径：必须给出可核对的 reason（写明不合规点与修正方向）。
+  assert.match(properties.reason!.description ?? "", /required for approve and deny/i);
+  assert.match(properties.reason!.description ?? "", /name the non-compliance and how to fix it/i);
+
+  const description = tool.description ?? "";
+  const guidelines = (tool.promptGuidelines ?? []).join("\n");
+  for (const [label, text] of [["description", description], ["promptGuidelines", guidelines]] as const) {
+    assert.match(text, /approval 组写卡/, `${label} 需写明 deny 仅限 approval 组写卡`);
+    assert.match(text, /write\/appointment-write\/schedule-write/, `${label} 需列全 approval 组写卡卡种`);
+    assert.match(text, /`decision` 组[^。]*不得 `deny`/, `${label} 需写明 decision 组不得 deny`);
+    assert.match(text, /不替客户拒绝/, `${label} 需保留「判断 agent 不替客户拒绝」`);
+    assert.match(text, /不合规点/, `${label} 需要求 deny reason 写清不合规点`);
+    assert.match(text, /修正方向/, `${label} 需要求 deny reason 写清修正方向`);
+    assert.match(text, /不需要 `pathDecisions`\/`selected`\/`confirmed`/, `${label} 需写明 deny 不需要 pathDecisions/selected/confirmed`);
+  }
+  // decision 组负向结果仍一律 manual（既有 approve/manual 口径不放宽）。
+  assert.match(description, /`revise`\/`reject`\/`false`\/空选择\/未知 id 等负向结果一律交回 `manual`/);
+  assert.match(guidelines, /`revise`\/`reject`\/`false`\/空选择\/未知 id 一律交回 `manual`/);
+  // 本角色不得改 shell judge 的 schema 值域。
+  const shellVerdict = (describeTool("report_shell_judgement").parameters.properties as Record<string, { enum?: string[] }>).verdict;
+  assert.deepEqual(shellVerdict.enum, ["allow", "deny", "manual"], "shell judge schema 保持原样");
 });
 
 test("读取策略：.ans 只读开放 project.json 与 governance/ledger.jsonl；sessions 与其他 .ans 仍拒绝", async () => {
@@ -426,6 +465,27 @@ test("report_governance_judgement 原样回调模型参数，不做裁决规范�
     assert.equal(result.ok, true);
     assert.equal(received.length, 1);
     assert.equal(received[0], raw, "回调必须收到同一份原始参数对象（不做克隆/归一）");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("report_governance_judgement 原样接受 deny（approval 组写卡）；值域裁决仍只归编排", async () => {
+  const root = await temp();
+  try {
+    const received: unknown[] = [];
+    const { byName } = fixture(root, (raw) => { received.push(raw); });
+    const report = byName.get(GOVERNANCE_JUDGE_REPORT_TOOL)!;
+    const deny = { verdict: "deny", reason: "preview 缺少 docs/flows/a.md 正文；请补全后重新发起写卡", cardKind: "write" };
+    const result = await report.handler(call(GOVERNANCE_JUDGE_REPORT_TOOL, deny));
+    assert.equal(result.ok, true, "deny 必须能交回（工具层不做值域拒绝）");
+    assert.equal(received.length, 1);
+    assert.equal(received[0], deny, "回调收到同一份原始参数对象");
+    // 运行时核心不做第二份裁决：即使 decision 组 deny，也原样交编排按组归一化。
+    const decisionDeny = { verdict: "deny", reason: "提案范围不符", cardKind: "proposal" };
+    const second = await report.handler(call(GOVERNANCE_JUDGE_REPORT_TOOL, decisionDeny));
+    assert.equal(second.ok, true, "工具层不按组拒绝，交由编排裁决");
+    assert.equal(received[1], decisionDeny);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

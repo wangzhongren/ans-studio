@@ -44,6 +44,7 @@ import {
   type DesktopOperatorMetadata,
   type OperatorPresenter,
   type ShellConfirmRequest,
+  type ShellJudgeAuditWithManual,
   type ShellJudgeResultPayload,
 } from "../../app/desktop/operator-channel.ts";
 import type { ShellJudgeFn, ShellJudgeOutcome, ShellJudgeRequest } from "../../src/model/runtime.ts";
@@ -1294,14 +1295,12 @@ test("替我审·allow：请求字段完整、先发结果行，返回 allow + o
   assert.equal(presented, 0, "allow 不弹卡");
 });
 
-test("替我审·allow 但结果行投达失败 ⇒ manual/row-failed（结果行是放行条件），回落原卡且带 judgeNotice", async () => {
+test("替我审·allow 但结果行投达失败 ⇒ 按拒绝处理（row-failed），不弹卡；审计保留 row-failed 与模型 allow 事实", async () => {
   let presented = 0;
-  let notice = "";
   const ch = createDesktopOperatorChannel({
     presenter: {
-      async present(_p, display) {
+      async present() {
         presented += 1;
-        notice = display.judgeNotice ?? "";
         return { allow: true };
       },
     },
@@ -1310,12 +1309,18 @@ test("替我审·allow 但结果行投达失败 ⇒ manual/row-failed（结果�
     emitJudgeResult: () => { throw new Error("窗口已关闭"); },
   });
   const res = await ch(req("ls", ["ls"]), judgeMetadata({ judge: judgeStub({ verdict: "allow", reason: "必要", reasonCode: "necessary" }) }));
-  assert.equal(presented, 1, "回落人工确认");
-  assert.ok(notice.includes("结果无法在聊天中显示"), "row-failed 文案：判断已完成但结果无法显示");
-  assert.ok(notice.includes("已转你手动确认"));
-  assert.equal(res.outcome, "allow", "人工确认后可放行（归因人工）");
-  assert.equal((res as { operatorId?: string }).operatorId, "alice", "审计归人工，not judge");
-  assert.equal((res as { judge?: unknown }).judge, undefined, "人工手批不写 judge 字段");
+  assert.equal(presented, 0, "结果行投达失败不再回落人工确认卡（2026-10-19 客户裁定）");
+  assert.equal(res.outcome, "deny", "结果行是放行条件 ⇒ 投达失败按拒绝处理（fail-closed）");
+  assert.equal((res as { operatorId?: string }).operatorId, "judge:claude", "拒绝归因判断通道（不是人工手批）");
+  const reason = (res as { reason?: string }).reason ?? "";
+  assert.match(reason, /审查结果投达失败/, "理由明确「审查结果投达失败」");
+  assert.ok(reason.includes("窗口已关闭"), "理由带投达失败详情");
+  assert.equal(reason.includes("已转你手动确认"), false, "不再说「已转你手动确认」");
+  const audit = (res as { judge?: ShellJudgeAuditWithManual }).judge;
+  assert.equal(audit?.verdict, "deny", "通道最终处置是拒绝");
+  assert.equal(audit?.modelVerdict, "allow", "保留模型原始裁决 allow（不伪装成模型主动 deny）");
+  assert.equal(audit?.reasonCode, "row-failed", "审计保留 row-failed 原因码");
+  assert.equal(audit?.manualAsDeny, true, "带 manualAsDeny 标记");
 });
 
 test("替我审·deny：不调用 presenter；结果行投达 + 格式化原因（说明/原因/替代方案/出路）", async () => {
@@ -1368,37 +1373,107 @@ test("替我审·deny 结果行投达失败 ⇒ 仍 deny（拒绝是安全方向
   assert.equal(presented, 0, "仍不弹卡");
 });
 
-test("替我审·manual 回落：设置 display.judgeNotice 后走原 present；审计归人工（不写 judge）", async () => {
-  let notice = "";
-  let presented = 0;
-  const ch = createDesktopOperatorChannel({
-    presenter: {
-      async present(_p, display) {
-        presented += 1;
-        notice = display.judgeNotice ?? "";
-        return { allow: false, note: "人工先拒" };
-      },
+test("替我审·manual（context-too-large/budget/timeout）⇒ presenter 零调用、按 deny 处理；理由含具体人话，审计保留 manual 事实", async () => {
+  // 2026-10-19 客户裁定：「审查只有同意和拒绝，不需要我来同意，拒绝要给理由。」判断 agent 是唯一审查者，
+  // manual 不再弹客户确认卡；按拒绝处理（fail-closed），理由复用既有 reasonCode → 人话映射。
+  const cases = [
+    {
+      reasonCode: "context-too-large",
+      raw: "命令或参数超出判断上限（命令 >16KB 或 argv >256 项），已转手动确认。",
+      expect: ["命令或上下文过大", "无法完成自动审查", "已拒绝", "落盘脚本或拆分命令"],
     },
-    operatorId: "dora",
-    judge: { isEnabled: () => true },
-    emitJudgeResult: () => { throw new Error("manual 不该发结果行"); },
-  });
-  const res = await ch(req("ls", ["ls"]), judgeMetadata({ judge: judgeStub({ verdict: "manual", reasonCode: "unavailable", reason: "会话不可用" }) }));
-  assert.equal(presented, 1);
-  assert.match(notice, /判断 agent 未能完成判断/);
-  assert.match(notice, /判断服务不可用/);
-  assert.match(notice, /规则判定仅作参考；判断 agent 未完成时才由你手批/);
-  assert.match(notice, /已转你手动确认/);
-  assert.equal(res.outcome, "deny");
-  assert.equal((res as { operatorId?: string }).operatorId, "dora");
-  assert.equal((res as { judge?: unknown }).judge, undefined, "manual 后人工手批不写 judge");
+    {
+      reasonCode: "budget",
+      raw: "读取预算已用尽，已转手动确认。",
+      expect: ["读取预算已用尽", "无法完成自动审查", "已拒绝"],
+    },
+    {
+      reasonCode: "timeout",
+      raw: "判断超时（>135s），已转手动确认。",
+      expect: ["判断超时", "无法完成自动审查", "已拒绝"],
+    },
+  ] as const;
+  for (const c of cases) {
+    let presented = 0;
+    let emitted = 0;
+    const ch = createDesktopOperatorChannel({
+      presenter: {
+        async present() {
+          presented += 1;
+          return { allow: true };
+        },
+      },
+      operatorId: "alice",
+      judge: { isEnabled: () => true },
+      emitJudgeResult: () => {
+        emitted += 1;
+        throw new Error("manual 不该发结果行");
+      },
+    });
+    const res = await ch(
+      req("node -e x", ["node", "-e", "x"]),
+      judgeMetadata({ runtime: "claude", judge: judgeStub({ verdict: "manual", reasonCode: c.reasonCode, reason: c.raw }) }),
+    );
+    assert.equal(presented, 0, `${c.reasonCode}: 不弹客户确认卡（presenter 零调用）`);
+    assert.equal(emitted, 0, `${c.reasonCode}: manual 不产生结果行`);
+    assert.equal(res.outcome, "deny", `${c.reasonCode}: 按拒绝处理`);
+    assert.equal((res as { operatorId?: string }).operatorId, "judge:claude", `${c.reasonCode}: 归因 judge:<engine>`);
+    const reason = (res as { reason?: string }).reason ?? "";
+    for (const part of c.expect) {
+      assert.ok(reason.includes(part), `${c.reasonCode}: 理由含「${part}」（实际：${reason}）`);
+    }
+    assert.equal(reason.includes("已转你手动确认"), false, `${c.reasonCode}: 不再说「已转你手动确认」`);
+    const audit = (res as { judge?: ShellJudgeAuditWithManual }).judge;
+    assert.equal(audit?.verdict, "deny", `${c.reasonCode}: 通道最终处置是拒绝`);
+    assert.equal(audit?.modelVerdict, "manual", `${c.reasonCode}: 保留 manual 事实（不伪装成模型主动 deny）`);
+    assert.equal(audit?.reasonCode, c.reasonCode, `${c.reasonCode}: 审计保留原 reasonCode`);
+    assert.equal(audit?.manualAsDeny, true, `${c.reasonCode}: 带 manualAsDeny 标记`);
+  }
 });
 
-test("替我审·read-denied 回落带出具体路径；无记录如实说明；超长仍限 200（客户反馈 2026-10-18）", async () => {
-  const run = async (reason?: string): Promise<string> => {
-    let notice = "";
+test("替我审·manual ⇒ deny 诊断保留原 reasonCode 与 manual 事实（不写模型主动 allow/deny 的 decision 诊断）", async () => {
+  const dir = await fsp.mkdtemp(path.join(os.tmpdir(), "ans-shell-judge-manual-"));
+  configureDiagnostics({ directory: dir });
+  try {
     const ch = createDesktopOperatorChannel({
-      presenter: { async present(_p, display) { notice = display.judgeNotice ?? ""; return { allow: false }; } },
+      presenter: { async present() { throw new Error("manual 不该弹卡"); } },
+      operatorId: "alice",
+      judge: { isEnabled: () => true },
+      emitJudgeResult: () => { throw new Error("manual 不该发结果行"); },
+    });
+    const res = await ch(
+      req("node -e x", ["node", "-e", "x"]),
+      judgeMetadata({ runtime: "claude", judge: judgeStub({ verdict: "manual", reasonCode: "context-too-large", reason: "命令或参数超出判断上限…" }) }),
+    );
+    assert.equal(res.outcome, "deny");
+    await flushDiagnostics();
+    const files = await fsp.readdir(dir);
+    const records = (await Promise.all(files.map((f) => fsp.readFile(path.join(dir, f), "utf8"))))
+      .join("")
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line) as Record<string, unknown>);
+    const denied = records.find((record) => record.event === "shell-judge.manual.denied");
+    assert.ok(denied, "manual→deny 写 shell-judge.manual.denied 诊断");
+    assert.equal(denied?.outcome, "manual", "诊断保留 manual 事实");
+    assert.equal(denied?.reasonCode, "context-too-large", "诊断保留原 reasonCode");
+    assert.equal(denied?.decision, "project:null:manual", "诊断保留 policy/tier 与 manual 裁决");
+    assert.equal(
+      records.some((record) => record.event === "shell-judge.decision"),
+      false,
+      "不伪装成模型主动 allow/deny 的 decision 诊断",
+    );
+  } finally {
+    await disposeDiagnostics();
+    await fsp.rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("替我审·read-denied ⇒ 拒绝理由带出具体路径；无记录如实说明；超长仍限 200（客户反馈 2026-10-18 口径保留）", async () => {
+  const run = async (reason?: string): Promise<string> => {
+    let presented = 0;
+    const ch = createDesktopOperatorChannel({
+      presenter: { async present() { presented += 1; return { allow: true }; } },
       operatorId: "frank",
       judge: { isEnabled: () => true },
       emitJudgeResult: () => { throw new Error("manual 不该发结果行"); },
@@ -1407,19 +1482,20 @@ test("替我审·read-denied 回落带出具体路径；无记录如实说明；
       ? { verdict: "manual", reasonCode: "read-denied" }
       : { verdict: "manual", reasonCode: "read-denied", reason };
     const res = await ch(req("ls", ["ls"]), judgeMetadata({ judge: judgeStub(outcome) }));
-    assert.equal(res.outcome, "deny", "回落人工后按人工决定");
-    return notice;
+    assert.equal(presented, 0, "read-denied 不弹卡");
+    assert.equal(res.outcome, "deny", "read-denied 按拒绝处理");
+    return (res as { reason?: string }).reason ?? "";
   };
 
   // ①带具体路径：原样带出冒号后的内容（去尾），不再丢成笼统一句。
   const concrete = "判断读取被拒：.ans/sessions/x.json（应用私有数据，判断侧不开放）、src/foo.txt（敏感文件），无法保证无损判断，已转手动确认。";
   assert.equal(
     await run(concrete),
-    "判断 agent 未能完成判断：读取被拒：.ans/sessions/x.json（应用私有数据，判断侧不开放）、src/foo.txt（敏感文件），无法保证无损判断。规则判定仅作参考；判断 agent 未完成时才由你手批。已转你手动确认。",
+    "读取被拒：.ans/sessions/x.json（应用私有数据，判断侧不开放）、src/foo.txt（敏感文件），无法保证无损判断，无法完成自动审查，已拒绝；请缩小读取范围或改用落盘脚本后重试。",
   );
 
   // ②无 reason / 不符合约定前缀：如实说明「未记录具体路径」。
-  const fallback = "判断 agent 未能完成判断：所需项目文件无法读取（未记录具体路径）。规则判定仅作参考；判断 agent 未完成时才由你手批。已转你手动确认。";
+  const fallback = "所需项目文件无法读取（未记录具体路径），无法完成自动审查，已拒绝；请缩小读取范围或改用落盘脚本后重试。";
   assert.equal(await run(undefined), fallback, "无 reason 不再只说笼统一句");
   assert.equal(
     await run("判断读取被拒（敏感文件/越界/二进制），无法保证无损判断，已转手动确认。"),
@@ -1428,18 +1504,18 @@ test("替我审·read-denied 回落带出具体路径；无记录如实说明；
   );
 
   // ③超长：映射输出仍限 200 码点，前缀保留、尾部截断。
-  const notice = await run(`判断读取被拒：${"长".repeat(300)}，无法保证无损判断，已转手动确认。`);
-  const head = "判断 agent 未能完成判断：";
-  const mapped = notice.slice(head.length, notice.indexOf("。规则判定仅作参考"));
-  assert.equal(Array.from(mapped).length, 200, "映射输出限 200 码点");
-  assert.equal(mapped, `读取被拒：${"长".repeat(195)}`, "超长截断且保留前缀");
+  const reason = await run(`判断读取被拒：${"长".repeat(300)}，无法保证无损判断，已转手动确认。`);
+  const head = "读取被拒：";
+  const mapped = reason.slice(head.length, reason.indexOf("，无法完成自动审查"));
+  assert.equal(Array.from(mapped).length, 195, "映射输出限 200 码点（含「读取被拒：」前缀）");
+  assert.equal(mapped, "长".repeat(195), "超长截断且保留前缀");
 });
 
-test("替我审·manual 回落：人话 reason 尾部标点归一（不出现「。；」/「。。」）", async () => {
+test("替我审·manual ⇒ deny 理由尾部标点归一（不出现「。；」/「。。」）", async () => {
   for (const suffix of ["。", "；", "."]) {
-    let notice = "";
+    let presented = 0;
     const ch = createDesktopOperatorChannel({
-      presenter: { async present(_p, display) { notice = display.judgeNotice ?? ""; return { allow: false }; } },
+      presenter: { async present() { presented += 1; return { allow: true }; } },
       operatorId: "gina",
       judge: { isEnabled: () => true },
       emitJudgeResult: () => { throw new Error("manual 不该发结果行"); },
@@ -1448,20 +1524,22 @@ test("替我审·manual 回落：人话 reason 尾部标点归一（不出现「
       req("ls", ["ls"]),
       judgeMetadata({ judge: judgeStub({ verdict: "manual", reasonCode: "driver-manual", reason: `按 fail-closed 回落客户${suffix}` }) }),
     );
+    assert.equal(presented, 0, "manual 不弹卡");
     assert.equal(res.outcome, "deny");
+    const reason = (res as { reason?: string }).reason ?? "";
     assert.equal(
-      notice,
-      "判断 agent 未能完成判断：按 fail-closed 回落客户。规则判定仅作参考；判断 agent 未完成时才由你手批。已转你手动确认。",
+      reason,
+      "按 fail-closed 回落客户，无法完成自动审查，已拒绝；请重试，如持续失败请关闭「替我审批」后手动确认。",
       `尾部 ${suffix} 归一（只去一个标点）`,
     );
-    assert.ok(!notice.includes("。；") && !notice.includes("。。"), "不出现重复标点");
+    assert.ok(!reason.includes("。；") && !reason.includes("。。"), "不出现重复标点");
   }
 });
 
-test("替我审·独立超时：judge 不返回 ⇒ manual/timeout 回落原卡（不占用确认超时）", async () => {
-  let notice = "";
+test("替我审·独立超时：judge 不返回 ⇒ manual/timeout 按拒绝处理（不占用确认超时、不弹卡）", async () => {
+  let presented = 0;
   const ch = createDesktopOperatorChannel({
-    presenter: { async present(_p, display) { notice = display.judgeNotice ?? ""; return { allow: false }; } },
+    presenter: { async present() { presented += 1; return { allow: true }; } },
     operatorId: "eve",
     judge: { isEnabled: () => true, timeoutMs: 25 },
   });
@@ -1471,8 +1549,14 @@ test("替我审·独立超时：judge 不返回 ⇒ manual/timeout 回落原卡�
   const startedAt = Date.now();
   const res = await ch(req("ls", ["ls"]), judgeMetadata({ judge: hangingJudge }));
   assert.ok(Date.now() - startedAt < 2000, "判断超时应独立生效（不等确认超时）");
-  assert.equal(res.outcome, "deny", "回落人工后按人工决定");
-  assert.match(notice, /判断超时/);
+  assert.equal(presented, 0, "判断超时不弹卡");
+  assert.equal(res.outcome, "deny", "超时 = 拒绝（fail-closed）");
+  const reason = (res as { reason?: string }).reason ?? "";
+  assert.match(reason, /判断超时/);
+  assert.match(reason, /无法完成自动审查，已拒绝/);
+  const audit = (res as { judge?: ShellJudgeAuditWithManual }).judge;
+  assert.equal(audit?.modelVerdict, "manual", "保留 manual 事实");
+  assert.equal(audit?.reasonCode, "timeout", "审计保留 timeout reasonCode");
 });
 
 test("替我审·通道超时同步：默认 135s（driver 120s+15s），env 派生/非法回 135s；确认超时仍 120s", () => {

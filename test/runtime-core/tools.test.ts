@@ -99,6 +99,25 @@ test("schema 文案（G-1/A4）：dispatch_task 钉住「先落盘再派发」�
     false,
     `不得暗示派发携带授权：${text}`,
   );
+  // 2026-10-20 客户拍板：主理 Lead 成为工作流管理者，可向 Steward（convener）派发做内部协调。
+  // 只放开 convener 这一个内置治理角色；不得写成「可派发给任意内置角色」。
+  const roleIdDescription = (dispatch.parameters.properties as Record<string, { description?: string }>).roleId.description ?? "";
+  assert.match(roleIdDescription, /usually a project role/, "roleId 目标通常是项目角色");
+  assert.match(roleIdDescription, /when the caller is Lead \(Liaison\)/, "须写明调用者为 Lead（Liaison）时例外");
+  assert.match(roleIdDescription, /`convener` \(Steward\)/, "Lead 可把 convener（Steward）作为协调目标");
+  assert.match(roleIdDescription, /Other built-in governance roles are never valid targets/, "其余内置治理角色不可作为目标");
+  assert.match(roleIdDescription, /cannot dispatch to yourself/, "不得派发给调用者自己");
+  assert.match(text, /主理（Lead\/Liaison）/, "description/guideline 须写明主理 Lead");
+  assert.match(text, /内部协调/, "Lead→Steward 须写明是内部协调");
+  assert.match(text, /不是客户批准/, "Lead 派发不是客户批准");
+  assert.match(text, /Steward\/项目角色仍按自己的.*边界与门禁执行/, "目标角色仍按自己的边界与门禁执行");
+  assert.match(text, /带 `flowId`/, "治理派发须带 flowId");
+  assert.match(text, /可省 `stepId`/, "Steward 协调可省 stepId");
+  assert.equal(
+    /可派发给任意内置角色/.test(text),
+    false,
+    "不得写成「可派发给任意内置角色」",
+  );
   // 参数形状与执行模式不变（只动文案，不动判定/权限）。
   assert.deepEqual(dispatch.parameters.required, ["roleId", "task"]);
   assert.equal(dispatch.executionMode, undefined);

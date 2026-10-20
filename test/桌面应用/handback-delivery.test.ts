@@ -244,6 +244,49 @@ test("E-1 排队：su 忙时保留，settle 后连续回交按原序合成一次
   await h.mgr.stop(null);
 });
 
+// 2026-10-20 真机（Convener 卡 1h、队列 24 条回交被 system 看护项堵住）：**回交/派发优先于 system**。
+test("2026-10-20 队列优先级：system 先入队时，回交仍先投递（看护项不堵治理流）；随后队列按序下降", async () => {
+  const h = makeHarness();
+  await h.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
+  await tick(30);
+  await h.mgr.send("先给 su 的活"); // su busy=true
+  await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" }); // 切到 A（su 仍忙）
+  await tick(30);
+
+  // 对抗前提：system（看护项）**先**入队——纯到达序会让它排在回交前面。
+  h.mgr.watchdogDeliver("/proj", {
+    text: "[系统·看护] 测试告警",
+    summary: "系统·看护 · 测试",
+    dedupKey: "watchdog\u0000/proj\u0000test\u0000priority",
+  });
+  await tick(80);
+  h.streams.A.push({ kind: "handback", summary: "回交1", handback: HANDBACK_A1 });
+  await tick(120);
+  assert.deepEqual(h.sent.su, ["先给 su 的活"], "su 忙：system 与回交都排队，不并发投递");
+  const q1 = h.mgr.watchdogSnapshot("/proj")?.queues.find((q) => q.targetRoleId === "su");
+  assert.equal(q1?.items.length, 2, "队列含 system + 回交两条");
+  assert.equal(q1?.items[0]?.kind, "system", "system 先入队（本用例的对抗前提）");
+
+  h.streams.su.push({ kind: "settled", summary: "su 一轮结束" });
+  await tick(150);
+  assert.equal(h.sent.su.length, 2, "settle 后恰投一条");
+  assert.equal(h.sent.su[1], renderHandbackPrompt(HANDBACK_A1), "**回交优先于 system**（治理流不被看护项堵住）");
+  const q2 = h.mgr.watchdogSnapshot("/proj")?.queues.find((q) => q.targetRoleId === "su");
+  assert.equal(q2?.items.length, 1, "队列下降：回交出队（system 保留待下一时机）");
+  assert.equal(q2?.items[0]?.kind, "system", "留下的恰是 system");
+
+  h.streams.su.push({ kind: "settled", summary: "su 二轮结束" });
+  await tick(150);
+  assert.equal(h.sent.su.length, 3, "下一时机 system 投出（不静默丢）");
+  assert.ok(h.sent.su[2].startsWith("[系统·看护]"), "system 项随后如实投递");
+  assert.equal(
+    h.mgr.watchdogSnapshot("/proj")?.queues.find((q) => q.targetRoleId === "su"),
+    undefined,
+    "队列清空（abort/settle 后回交已全部投出）",
+  );
+  await h.mgr.stop(null);
+});
+
 test("连续回交投递失败：整批保留同序，重试送达一次，原报告键不丢", async () => {
   const harness = makeHarness({ failReportSendTimes: 1 });
   try {

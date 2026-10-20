@@ -22,7 +22,7 @@
     groups.forEach(function (group) {
       group.roles.sort(function (a, b) { return Number(b.groupDuty === "组长") - Number(a.groupDuty === "组长"); });
     });
-    if (ungrouped.length) groups.push({ name: "其他角色（查看/调试）", roles: ungrouped });
+    if (ungrouped.length) groups.push({ name: "工作角色", roles: ungrouped });
     return groups;
   }
   function sourceLabel(field) {

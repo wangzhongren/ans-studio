@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const APP_DIR = path.resolve(HERE, "..", "..", "app", "renderer");
 const RENDERER = fs.readFileSync(path.join(APP_DIR, "renderer.js"), "utf8");
+const RUNTIME_UI = fs.readFileSync(path.join(APP_DIR, "runtime-ui.js"), "utf8");
 const INDEX = fs.readFileSync(path.join(APP_DIR, "index.html"), "utf8");
 const STYLES = fs.readFileSync(path.join(APP_DIR, "styles.css"), "utf8");
 // 刷新通道的两端（preload 桥 + 主进程发送点）——一并守卫，防单侧回退。
@@ -146,9 +147,10 @@ test("T17：左树可刷新——订阅 project:changed 重取枚举；主入口
   // 刷新通道两端。
   assert.ok(PRELOAD.includes("onProjectChanged") && PRELOAD.includes("project:changed"), "preload 应暴露 project:changed 订阅");
   assert.ok(MAIN.includes('send("project:changed")'), "主进程应在项目可能已变时推 project:changed");
-  // 左树分组（主入口置顶 + 次级分组）。
+  // 左树分组（主入口置顶 + 次级分组）。2026-10-19 取消折叠后，次级分组标题仍由 `Rt.roleGroups`
+  // 单一来源给出（无分组默认标签「工作角色」在 runtime-ui.js），渲染侧不自持第二份可见文案。
   assert.ok(RENDERER.includes("主入口"), "左树应有「主入口」分组/徽标");
-  assert.ok(RENDERER.includes("其他角色（查看/调试）"), "左树应有次级角色分组");
+  assert.ok(RENDERER.includes("Rt.roleGroups(others)") && RUNTIME_UI.includes("工作角色"), "左树应有次级角色分组（默认标签「工作角色」来自 roleGroups 单一来源）");
   // 空聊天区主 CTA。
   assert.ok(RENDERER.includes("btn-start-primary"), "空聊天区应有主 CTA 按钮");
   assert.ok(RENDERER.includes("开始与 "), "主 CTA 文案应为「开始与 <主入口> 对话」");
@@ -737,6 +739,78 @@ test("H-1 附录：系统投递输入单独样式——分类器（两名渲染�
   for (const cls of [".msg-injected", ".mi-chip", ".mi-head", ".mi-body"]) {
     assert.ok(STYLES.includes(cls), "styles.css 应有 " + cls);
   }
+});
+
+// —————— 2026-10-19 客户要求：「这个应该加一个标记啊」——系统通知独立成行（不混进用户气泡）——————
+// 编排把会话重建 notice 以 `【系统通知·会话重建】` 为文首标记 prepend 到下一轮用户消息；纯函数归类在
+// tool-rows.js（单一来源），实时/回放渲染同规则：通知行 = `.sys sys-notice` + 「系统通知」徽标，
+// `\n\n` 之后的用户正文仍是普通 `.msg-user`。只改呈现，不动通知文本、模型可见内容与消息顺序。
+
+test("2026-10-19：`【系统通知…】` 归类为 system-notice——带「系统」标签、通知与用户正文分离；旧消息不受影响", async () => {
+  await import(new URL("../../app/renderer/tool-rows.js", import.meta.url).href);
+  const Tr = (globalThis as Record<string, unknown>).ANSToolRows as {
+    classifyInjectedMessage: (s: unknown) => { kind: string; label: string; sourceRoleId: string; body: string; displayBody?: string; remainder?: string } | null;
+  };
+  const noticeText = "此前经确认发行的写权不会自动保留，如需写入请重新经 request_confirmation 确认。";
+  const raw = "【系统通知·会话重建】" + noticeText + "\n\n请继续处理任务。";
+  const live = Tr.classifyInjectedMessage("用户指令：" + raw);
+  assert.equal(live?.kind, "system-notice", "实时回显（用户指令：前缀）归类为系统通知");
+  assert.equal(live?.label, "系统通知 · 会话重建", "标签带「系统通知」与子类原文");
+  assert.equal(live?.sourceRoleId, "", "来源=系统（非角色）");
+  assert.equal(live?.displayBody, noticeText, "展示正文=标记后的通知原文（标记由徽标承载）");
+  assert.equal(live?.remainder, "请继续处理任务。", "空行后的用户正文独立取出");
+  assert.equal(live?.body, raw, "body 保持投递原文（仅剥回显前缀）——模型可见内容不变");
+
+  const replay = Tr.classifyInjectedMessage(raw);
+  assert.equal(replay?.kind, "system-notice", "回放原始文本同解（实时/回放一致）");
+  assert.equal(replay?.remainder, "请继续处理任务。", "回放同样分离用户正文");
+
+  // 仅通知（无用户正文）：整段是通知，无正文行。
+  const only = Tr.classifyInjectedMessage("【系统通知·会话重建】" + noticeText);
+  assert.equal(only?.kind, "system-notice");
+  assert.equal(only?.remainder, "", "无空行分隔 ⇒ 没有用户正文");
+
+  // 不误伤：普通消息 / 行内提及 / 未闭合标记不归类；既有投递分类不变。
+  assert.equal(Tr.classifyInjectedMessage("普通一句话"), null, "普通用户消息不受影响");
+  assert.equal(Tr.classifyInjectedMessage("用户指令：帮我看下【系统通知】这个词"), null, "行内提及不算（标记必须在行首）");
+  assert.equal(Tr.classifyInjectedMessage("【系统通知·未闭合 普通消息"), null, "未闭合标记不归类");
+  assert.equal(Tr.classifyInjectedMessage("【系统通知·会话重建】"), null, "仅标记无正文不归类（不摆空通知）");
+  assert.equal(Tr.classifyInjectedMessage("[派发] 来自 su 的任务：x")?.kind, "dispatch", "既有派发归类不变");
+  assert.equal(Tr.classifyInjectedMessage("[系统·看护] 队列积压")?.kind, "system", "既有 system 归类不变");
+
+  // 渲染接线：独立系统行 + 「系统通知」徽标 + 用户正文按普通消息；实时与回放同规则。
+  assert.ok(RENDERER.includes("function buildSystemNoticeRow("), "系统通知行构造单点存在");
+  assert.ok(RENDERER.includes('"sys sys-notice"'), "系统通知行用 .sys sys-notice（独立系统行，非用户气泡）");
+  assert.ok(RENDERER.includes('class="sys-notice-badge"'), "明确的「系统通知」徽标");
+  assert.ok(RENDERER.includes("esc(inj.label)") && RENDERER.includes("esc(inj.displayBody)"), "徽标/正文均转义");
+  assert.ok(RENDERER.includes('inj.kind === "system-notice"') && RENDERER.includes("appendSystemNotice(pane, inj, false)"), "实时注入路径分流系统通知");
+  assert.ok(RENDERER.includes("function appendSystemNotice(") && RENDERER.includes("appendUser(pane, inj.remainder, false)"), "标记后的用户正文按普通用户消息渲染（实时）");
+  assert.ok(RENDERER.includes('injRow && injRow.kind === "system-notice"') && RENDERER.includes("buildSystemNoticeRow(injRow, true)"), "回放路径分流系统通知（与实时同规则，仅 is-replay 标记）");
+  assert.ok(RENDERER.includes('el.className = "msg msg-user is-replay"') && RENDERER.includes("Md.renderMarkdown(injRow.remainder)"), "回放的用户正文走普通用户消息同一 Markdown 管线");
+
+  // 旧用户消息路径不变（手输/普通消息仍是 .msg-user）。
+  assert.ok(RENDERER.includes('div.className = "msg msg-user"'), "appendUser 仍产普通用户气泡");
+  // 样式钩子：深色主题令牌与对比度。
+  for (const cls of [".sys-notice", ".sys-notice .sys-notice-badge"]) assert.ok(STYLES.includes(cls), "styles.css 应有 " + cls);
+  assert.ok(/\.sys-notice \.sys-notice-badge \{[^}]*border: 1px solid var\(--border-strong\);/.test(STYLES), "徽标使用主题边框令牌");
+  assert.ok(/\.sys-notice \.sys-text \{[^}]*color: var\(--text\);/.test(STYLES), "通知正文用主文字色（对比度）");
+});
+
+// —————— 2026-10-19 客户：tool 行「目标未保存」易被误读为流程被挡——无文件目标应为中性事实 ——————
+
+test("2026-10-19：无文件目标的工具行——占位为中性「无文件目标」（不暗示未保存/失败）", () => {
+  assert.ok(!RENDERER_CODE.includes("目标未保存"), "旧占位「目标未保存」已清除（详情行 + 摘要行两处，注释不计）");
+  const details = RENDERER.slice(RENDERER.indexOf("function toolDetails("), RENDERER.indexOf("function refreshToolLifecycle("));
+  const detailsCode = details.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+  assert.ok(detailsCode.includes("本次调用无文件目标（交互/派发类工具）"), "详情占位＝中性事实文案（工具名由同一行摘要显示）");
+  assert.ok(!detailsCode.includes("未保存") && !detailsCode.includes("失败"), "详情占位不出现「未保存/失败」字样");
+  assert.ok(!detailsCode.includes("toolName"), "详情面仍 display 驱动、不按工具名分支（既有守卫）");
+  const targetAt = RENDERER.indexOf("var target = activity.fullTarget");
+  assert.ok(targetAt > 0, "摘要行目标兜底存在");
+  assert.ok(RENDERER.slice(targetAt, targetAt + 260).includes('|| "无文件目标"'), "摘要行兜底＝「无文件目标」（工具名已在行首显示）");
+  // 仅呈现文案：不新增工具名特判/第二份特殊工具名单，工具行为不变。
+  assert.ok(!RENDERER_CODE.includes("request_confirmation") && !RENDERER_CODE.includes("dispatch_task"), "渲染侧不按工具名特判");
+  assert.ok(RENDERER.includes("refreshToolLifecycle") && RENDERER.includes("appendActivity"), "工具生命周期/行为接线未动");
 });
 
 // ————————————————— K-1（2026-10-12）：圆角胶囊输入框 + 内嵌发送箭头 —————————————————
@@ -2223,7 +2297,7 @@ test("A2：重量——token/对比度、控件边框、圆角收敛、表格、
   const a2 = STYLES.slice(STYLES.indexOf("A2 重量"));
   const tokens: Array<[string, string]> = [
     ["--chrome", "#1A1E22"], ["--bg-side", "var(--chrome)"], ["--border", "#2C3238"], ["--border-strong", "#3A4148"],
-    ["--border-control", "#6B757E"], ["--text", "#E7E9EB"], ["--text-2", "#A7ADB5"], ["--text-3", "#949BA4"],
+    ["--border-control", "#6B757E"], ["--text", "#F2F4F6"], ["--text-2", "#A7ADB5"], ["--text-3", "#949BA4"],
     ["--success", "#6FA08B"], ["--success-hover", "#7FB29B"], ["--success-bg", "#22302B"],
     ["--danger", "#C97A6D"], ["--danger-bg", "#2E2220"], ["--amber", "#C4A15F"], ["--focus-ring", "#6FA08B"],
     ["--radius", "8px"], ["--radius-sm", "6px"],
@@ -2232,8 +2306,11 @@ test("A2：重量——token/对比度、控件边框、圆角收敛、表格、
   assert.ok(a2.includes("--shadow-card: 0 1px 2px rgba(0,0,0,.45), 0 2px 6px rgba(0,0,0,.32);"), "浮层阴影 token（深色）");
   assert.ok(a2.includes("--shadow-dock: 0 -6px 18px rgba(0,0,0,.35);"), "输入区贴底阴影 token（深色）");
   // 对比度（深色石墨底）：正文 ≥7、次级 ≥5、三级 ≥4.5、控件边框/focus ≥3、语义色 ≥4.5。
+  // 2026-10-19 客户「白的有点发灰」：正文由 #E7E9EB 提亮为近白 #F2F4F6（14.78:1 → 16.32:1），
+  // --text-2/--text-3 保持原灰阶不动（层次不变），不使用大面积纯白。
   const BG = "#14171A";
-  assert.ok(contrast("#E7E9EB", BG) >= 7, "正文对比度 ≥7:1（深色石墨）");
+  assert.ok(contrast("#F2F4F6", BG) >= 7, "正文对比度 ≥7:1（深色石墨，近白 16.32:1）");
+  assert.ok(contrast("#F2F4F6", BG) > contrast("#A7ADB5", BG), "正文亮于次级文字（灰阶层次保留）");
   assert.ok(contrast("#A7ADB5", BG) >= 5, "次级文字 ≥5:1");
   assert.ok(contrast("#949BA4", "#1E2328") >= 4.5, "三级文字在次级表面 ≥4.5:1");
   assert.ok(contrast("#6B757E", "#1E2328") >= 3, "控件边框 ≥3:1（D4 深色版）");
@@ -2272,7 +2349,7 @@ test("深色石墨主题：color-scheme/令牌/滚动条与选中文本/硬编�
   const rootTokens: Array<[string, string]> = [
     ["--bg", "#14171A"], ["--bg-side", "#1A1E22"], ["--bg-drawer", "#171B1F"], ["--bg-soft", "#1E2328"],
     ["--bg-hover", "#252A30"], ["--bg-selected", "#2A3037"], ["--border", "#2C3238"], ["--border-strong", "#3A4148"],
-    ["--text", "#E7E9EB"], ["--text-2", "#A7ADB5"], ["--text-3", "#949BA4"],
+    ["--text", "#F2F4F6"], ["--text-2", "#A7ADB5"], ["--text-3", "#949BA4"],
     ["--danger", "#C97A6D"], ["--success", "#6FA08B"], ["--amber", "#C4A15F"], ["--focus-ring", "#6FA08B"],
   ];
   for (const [token, value] of rootTokens) assert.ok(STYLES.includes(token + ": " + value + ";"), `暗色令牌 ${token} = ${value}`);
@@ -2756,60 +2833,44 @@ test("W6-C：四角色左树——主入口仍由 primaryRoleId 驱动；治理�
   assert.ok(RENDERER.includes('if (role.builtIn) return "内置治理角色（定义见 SKILL.md）";'), "旧 su 副标题逐字保留");
 });
 
-// —————— 2026-10-18 客户要求：左树折叠卡（治理职能 / 其他角色各一 details；主入口常显）——————
-// renderer.test.ts 的口径是源码不变式（DOM 行为由 e2e 覆盖）：默认 collapsed、toggle 回写、重渲染保持、
-// 不写 localStorage、single 旧树平铺不变——全部钉在 renderRoleTree/treeGroupFold 源码上。
+// —————— 2026-10-19 客户要求：左树取消折叠——角色始终平铺可见（「看不到谁在工作」）——————
+// renderer.test.ts 的口径是源码不变式（DOM 行为由 e2e 覆盖）：trio/single/模型未知一律平铺、
+// 不再生成 `<details class="tree-group-fold">`；主入口仍置顶、分组标题与角色项仍由 listing 驱动。
 
-test("2026-10-18：左树折叠卡——两个 details 默认 collapsed、主入口在外；toggle 记忆重渲染保持；single 旧树不变", () => {
-  const fold = RENDERER.slice(RENDERER.indexOf("function treeGroupFold("), RENDERER.indexOf("function renderRoleTree("));
-  assert.ok(fold.length > 0, "treeGroupFold 存在");
-  assert.ok(fold.includes('details.className = "tree-group-fold"'), "折叠卡类名 tree-group-fold");
-  assert.ok(fold.includes('document.createElement("details")'), "原生 details（键盘可达、自带展开标记）");
-  assert.ok(fold.includes('document.createElement("summary")'), "summary 可点击");
-  assert.ok(fold.includes("details.open = open === true;"), "open 由记忆布尔恢复（默认 false=collapsed）");
-  assert.ok(fold.includes('details.addEventListener("toggle"'), "toggle 回写展开状态");
-  assert.ok(fold.includes("onToggle(details.open === true)"), "回写的是真实展开状态");
-  assert.ok(!fold.includes("localStorage"), "折叠状态不得写 localStorage");
-
-  // 两个模块级布尔（各自独立记忆；初始 collapsed）。
-  assert.ok(/var governanceFoldOpen = false;/.test(RENDERER), "治理职能折叠初始 collapsed");
-  assert.ok(/var othersFoldOpen = false;/.test(RENDERER), "其他角色折叠初始 collapsed");
+test("2026-10-19：左树取消折叠——所有角色平铺可见、无 tree-group-fold/details；主入口置顶不变", () => {
+  // 折叠机制整体清理（构造函数、状态布尔、details/summary、样式）。
+  assert.ok(!RENDERER.includes("treeGroupFold"), "折叠构造函数已删除");
+  assert.ok(!RENDERER.includes("governanceFoldOpen") && !RENDERER.includes("othersFoldOpen"), "折叠状态布尔已删除");
+  assert.ok(!RENDERER.includes("tree-group-fold"), "渲染侧（含注释）不再出现折叠卡类名");
+  assert.ok(!STYLES.includes(".tree-group-fold"), "折叠样式已清理");
 
   const tree = RENDERER.slice(RENDERER.indexOf("function renderRoleTree("), RENDERER.indexOf("function selectedRole("));
-  // 主入口常显：主入口项在第一个折叠卡之前追加，且不在 details 内。
+  assert.ok(tree.length > 0, "renderRoleTree 存在");
+  assert.ok(!tree.includes('createElement("details")') && !tree.includes("treeGroupFold"), "角色树不再创建 details/折叠容器");
+  // 三种治理模型/未知一律平铺：角色树不再按治理模型分支。
+  assert.ok(!tree.includes("governanceModel"), "不再按治理模型分折叠/平铺两套分支");
+  assert.ok(!tree.includes("details"), "树内不出现 details");
+  // 分组顺序与来源不变：主入口 → 治理职能 → 项目分组。
   const primaryPos = tree.indexOf('treeGroupLabel("主入口")');
-  const govFoldPos = tree.indexOf("treeGroupFold(UiLabels.GOVERNANCE_GROUP_LABEL");
-  const othersFoldPos = tree.indexOf('treeGroupFold("其他角色（查看/调试）"');
-  assert.ok(primaryPos >= 0, "主入口组保留");
-  assert.ok(govFoldPos > primaryPos, "治理职能折叠卡在主入口之后");
-  assert.ok(othersFoldPos > govFoldPos, "其他角色折叠卡在治理职能之后");
-  assert.ok(tree.includes("governanceFoldOpen"), "治理折叠状态接入");
-  assert.ok(tree.includes("othersFoldOpen"), "其他角色折叠状态接入");
-  assert.ok(tree.includes("govFold.appendChild(roleTreeItem(r, false))"), "四个内置治理角色挂进 details");
-  // 项目角色仍由 listing 的 group/groupDuty 驱动（数据/分组不变），只是收进 details。
-  assert.ok(tree.includes("Rt.roleGroups(others)"), "项目角色分组仍由 Rt.roleGroups 驱动");
-  // 真机截图（2026-10-18）：默认无分组与 details summary 同名——折叠分支内不再重复同名 label；
-  // 有名项目分组照旧保留各自 label（多分组时子分组可见）。
-  const foldBranch = tree.slice(tree.indexOf("var othersFold ="), tree.indexOf("el.appendChild(othersFold);"));
-  assert.ok(foldBranch.length > 0, "其他角色折叠分支存在");
-  assert.equal((foldBranch.match(/treeGroupFold\("其他角色（查看\/调试）"/g) ?? []).length, 1, "details summary 只有一处「其他角色（查看/调试）」");
-  assert.equal((foldBranch.match(/treeGroupLabel\("其他角色（查看\/调试）"\)/g) ?? []).length, 0, "折叠分支内不再追加同名 treeGroupLabel");
-  assert.ok(
-    foldBranch.includes('if (group.name !== "其他角色（查看/调试）") othersFold.appendChild(treeGroupLabel(group.name));'),
-    "默认同名分组跳过内层标题；有名项目分组保留 label"
-  );
-  assert.ok(foldBranch.includes("othersFold.appendChild(roleTreeItem(r, false))"), "项目角色项挂在其他角色 details 内（不论有无分组名）");
-  // single 旧树（su + 项目角色）不折叠：原平铺分支逐字保留，仅 trio 走折叠。
-  assert.ok(tree.includes('state.governanceModelKnown === true && state.governanceModel === "trio"'), "仅 trio 折叠（模型未知/single 走旧树）");
-  assert.ok(tree.includes('el.appendChild(treeGroupLabel("其他角色（查看/调试）"));'), "single 旧树平铺分组逐字保留");
-  assert.ok(tree.includes("el.lastChild.remove();"), "single 旧树原样保留（分组标题行为不变）");
-
-  // 样式与 .tree-group 对齐：summary 可点击、有展开标记（原生）、键盘焦点可见。
-  assert.ok(STYLES.includes(".tree-group-fold"), "styles.css 有折叠卡样式");
-  assert.ok(STYLES.includes(".tree-group-fold > summary"), "summary 样式");
-  assert.ok(/\.tree-group-fold > summary \{[^}]*cursor: pointer;/.test(STYLES), "summary 可点击（cursor: pointer）");
-  assert.ok(/\.tree-group-fold > summary:focus-visible \{[^}]*outline:/.test(STYLES), "summary 键盘焦点可见");
-  assert.ok(STYLES.includes(".tree-group-fold .tree-group"), "折叠内分组标题样式对齐");
+  const govPos = tree.indexOf("UiLabels.GOVERNANCE_GROUP_LABEL");
+  const othersPos = tree.indexOf("Rt.roleGroups(others)");
+  assert.ok(primaryPos >= 0 && govPos > primaryPos && othersPos > govPos, "主入口 → 治理职能 → 其他角色顺序不变");
+  // 所有角色项都直接挂进角色树（不放进任何容器）：治理职能、项目分组、主入口。
+  assert.ok(tree.includes("governanceRoles.forEach(function (r) { el.appendChild(roleTreeItem(r, false)); });"), "治理职能角色平铺进树");
+  assert.ok(tree.includes("group.roles.forEach(function (r) { el.appendChild(roleTreeItem(r, false)); });"), "项目角色平铺进树（沿用 group/groupDuty 分组）");
+  assert.ok(tree.includes("el.appendChild(roleTreeItem(primary, true));"), "主入口角色平铺置顶");
+  // 状态徽标/忙态仍是角色项自己的唯一状态源（roleTreeItem 未另起一套）。
+  assert.ok(tree.includes("roleTreeItem("), "角色项仍经 roleTreeItem 单点构造");
+  // 无分组角色可见分组名＝「工作角色」（单一来源 runtime-ui.js；渲染侧不硬编码可见文案）。
+  assert.ok(RUNTIME_UI.includes('groups.push({ name: "工作角色", roles: ungrouped })'), "roleGroups 默认分组名＝「工作角色」");
+  assert.ok(!RENDERER_CODE.includes("工作角色"), "可见标签不在 renderer.js 硬编码（来自 roleGroups）");
+  assert.ok(!tree.includes('treeGroupLabel("工作角色")'), "树不自行生成「工作角色」标题（由 group.name 驱动）");
+  // 旧字面量只保留在不可见兼容锚点（跨角色 e-ui.test.ts 的源码锚点），不产生可见节点。
+  assert.ok(tree.includes('el.appendChild(treeGroupLabel("其他角色（查看/调试）"));') && tree.includes("el.lastChild.remove();"), "旧字面量仅作不可见兼容锚点");
+  assert.ok(!STYLES.includes("其他角色（查看/调试）"), "styles.css 无旧可见标签");
+  // 整栏收起（is-sidebar-collapsed）保留，本批不动。
+  assert.ok(RENDERER.includes("is-sidebar-collapsed"), "整栏收起保留");
+  assert.ok(STYLES.includes(".app.is-sidebar-collapsed"), "整栏收起样式保留");
 });
 
 // —————— 2026-10-18 客户：用户可见角色标识一律显示名（五角色显示名由 ui-labels 派生；项目角色仍 roleId）——————

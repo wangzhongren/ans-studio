@@ -284,8 +284,12 @@ test("能力矩阵：Liaison/Rapporteur/Nominator/Convener/su 按注册表注入
     await lh.dispose();
     assert.ok(l.caps?.handOffIntent, "Liaison 应注入 handOffIntent");
     assert.ok(l.caps?.customerInput, "Liaison 有客户需求确认通道（intent-confirm）");
+    assert.ok(l.caps?.dispatchTask, "Liaison 应注入 dispatchTask（2026-10-20 Lead→Steward coordinate）");
+    assert.equal(typeof l.caps?.flowGet, "function", "Liaison 有 flowGet");
     assert.equal(typeof l.caps?.shellGate, "function", "Liaison（operator-approve）应 arm 审批档 shellGate");
-    for (const key of GOVERNANCE_KEYS.filter((k) => k !== "handOffIntent" && k !== "customerInput" && k !== "shellGate")) {
+    for (const key of GOVERNANCE_KEYS.filter(
+      (k) => !["handOffIntent", "customerInput", "dispatchTask", "shellGate"].includes(k),
+    )) {
       assert.equal(l.caps?.[key], undefined, `Liaison 不应注入 ${key}`);
     }
 

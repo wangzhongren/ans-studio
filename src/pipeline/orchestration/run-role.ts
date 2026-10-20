@@ -114,7 +114,8 @@ import { withHandback, type OrchestrationEvent, type TaskReport, type HandbackIn
 import { EXIT_OK, EXIT_USAGE, EXIT_FAILURE } from "../../common/编排/exit-codes.ts";
 import type { ShellVerdictFn } from "../../common/编排/shell-gate.ts";
 import { repinIfBootstrapped, DEFAULT_GOVERNANCE_BOUNDARY_REL } from "../../common/编排/finalize.ts";
-import { conditionSlugsOf, createConfirmedWriteIssuer, explicitConfirmPaths, validateConfirmPreviewCompleteness } from "../../common/编排/confirmed-writes.ts";
+import { conditionSlugsOf, declaredConfirmPaths, declaredPathBodies, createConfirmedWriteIssuer, explicitConfirmPaths, validateConfirmPreviewCompleteness } from "../../common/编排/confirmed-writes.ts";
+import { parseFlowStateYaml } from "../../common/编排/flow-state.ts";
 import {
   appendGovernanceLedger,
   readGovernanceLedger,
@@ -136,6 +137,12 @@ import {
   validateIntentHandoff,
 } from "../../common/编排/governance-handoff.ts";
 import { CLI_POSITIONING } from "../../common/编排/cli-positioning.ts";
+import {
+  createFlowService,
+  type FlowGetFn,
+  type FlowStepSupersedeFn,
+  type FlowStepUpdateFn,
+} from "../../common/编排/flow-service.ts";
 import { createDiagnosticLogger } from "../../common/shared/diagnostics.ts";
 // 跨角色共享路径原语（**单一来源** = pm 属主 `src/common/shared/path-primitives.ts`；工程法案 §一.5
 // 消费方名单已含编排；同 `confirmed-writes.ts` 先例）——用于 su 预授权目录的**词法**归属判定：
@@ -231,6 +238,14 @@ export interface AdapterCapabilities {
    * （未注入 ⇒ 对应工具不注册，逐字现状）。运行时核心据此走 `buildGovernanceJudgeTools`。
    */
   governanceJudge?: GovernanceJudgeToolOptions;
+  /**
+   * 2026-10-20 Flow 文件方法化（客户拍板「按这个方案做吧」）：应用是 `docs/flows/<flowId>.yaml`
+   * 的**唯一写者**。`flowGet` 给所有角色；`flowStepUpdate`/`flowStepSupersede` 只给内置治理角色
+   * （权限由 `common/编排/flow-service.ts` 校验）。未注入 ⇒ 对应工具不注册。
+   */
+  flowGet?: FlowGetFn;
+  flowStepUpdate?: FlowStepUpdateFn;
+  flowStepSupersede?: FlowStepSupersedeFn;
 }
 
 export interface RunRoleInput {
@@ -354,11 +369,13 @@ export interface RoleSessionAbortResult {
 /**
  * **F-5-opt1 推荐注记文案**（2026-10-16 客户批准；会话因边界更新重建后写权清零的**如实告知**，
  * **单一来源**）——由重建路径（桌面窗口 O-1）经 `RoleSessionHandle.queueModelNotice` 排入模型可见输入。
- * 措辞要点：如实说明「重建」与「写权不自动保留」，指向**可行恢复路径**（`request_confirmation`）；
+ * 措辞要点：以 `【系统通知·会话重建】` 标记开头——这是**系统注入的 notice，不是角色/客户发言**
+ * （2026-10-19 客户反馈「这个应该加一个标记啊，不然谁知道啊」），避免模型把它误当用户消息；
+ * 如实说明「重建」与「写权不自动保留」，指向**可行恢复路径**（`request_confirmation`）；
  * **不夹带任何授权语义**（不是授权、不承诺放行——写入仍须逐条确认后发行）。
  */
 export const REBUILT_SESSION_WRITE_PERMITS_NOTICE =
-  "会话已因边界更新重建；此前经确认发行的写权不会自动保留，如需写入请重新经 request_confirmation 确认。";
+  "【系统通知·会话重建】此前经确认发行的写权不会自动保留，如需写入请重新经 request_confirmation 确认。";
 
 /** Pipeline-only prompt intent; never forwarded as a Runtime option or write authorization. */
 export interface RoleSessionSendOptions extends PromptOptions {
@@ -719,7 +736,26 @@ export async function openRoleSession(
         const raw = input.customerInput!;
         return async (req, metadata) => {
           const originalMetadata = metadata === undefined ? undefined : { ...metadata };
-          const cardKind = req.cardKind ?? originalMetadata?.cardKind;
+          let cardKind = req.cardKind ?? originalMetadata?.cardKind;
+          let effectiveReq = req;
+          let effectiveMetadata = originalMetadata;
+          // 2026-10-20 真机：写卡确认漏带 cardKind ⇒ judgeContext 不计算、客户被要求手批。
+          // 只对 trio 的 **confirm** 卡、且声明路径可由 preview/req.paths 核对时，按角色保守兜底；
+          // 显式 cardKind 优先，choice 卡与无路径卡零变化。
+          if (isTrio && cardKind === undefined && req.kind === "confirm") {
+            const declaredPaths = declaredConfirmPaths(req);
+            const defaulted = defaultGovernanceConfirmCardKind(trioSpec!.id, declaredPaths);
+            if (defaulted !== undefined) {
+              cardKind = defaulted;
+              effectiveReq = { ...req, cardKind: defaulted };
+              effectiveMetadata = { ...(originalMetadata ?? {}), cardKind: defaulted };
+              log.record("governance.cardKind.defaulted", {
+                roleId: setup.role.id,
+                cardKind: defaulted,
+                declaredPaths,
+              });
+            }
+          }
           if (isTrio) {
             const allowed = TRIO_CARD_KINDS[trioSpec!.id];
             if (cardKind !== undefined && !allowed.includes(cardKind)) {
@@ -735,14 +771,14 @@ export async function openRoleSession(
                   `允许：${allowed.join(" / ")}。本次未向客户发卡。`,
               };
             }
-            const flowId = req.flowId ?? originalMetadata?.flowId;
+            const flowId = effectiveReq.flowId ?? effectiveMetadata?.flowId;
             if (isGovernanceFlowId(flowId)) currentFlowId = flowId;
           }
           // 2026-10-19 真机 op-2 修复（呈现前 fail-closed）：写盘类确认卡声明了写入路径时，preview
           // 必须对**每一条**路径给出可核对正文/结构。不完整 ⇒ **不发卡**、不发行任何写入路径，直接
           // 把缺正文的路径与重试要求如实交回模型（不让「证据完整性」依赖判断 agent/模型自觉）。
           // 非写盘确认（无路径）与 choice 卡：declaredPaths 为空 ⇒ 旧行为逐字不变。
-          const completeness = validateConfirmPreviewCompleteness(req);
+          const completeness = validateConfirmPreviewCompleteness(effectiveReq);
           if (!completeness.ok) {
             log.record("confirmation.preview.incomplete", {
               roleId: setup.role.id,
@@ -759,13 +795,29 @@ export async function openRoleSession(
                 `本次未向客户发卡，也未发行任何写入路径。`,
             };
           }
+          // 2026-10-19 Flow YAML 契约（客户「这些全部改成yaml」）：确认卡若声明写
+          // `docs/flows/<flowId>.yaml`（唯一机器状态），preview 中的 YAML 必须先通过确定性校验；
+          // 不合法 ⇒ 拒绝该卡（不发卡、不发行、不写账本），把具体 path + reason 交回 Steward 修正。
+          // `schedule-write` 与普通 `write` 走同一闸；未声明 YAML 的旧版 .md 卡保持迁移兼容。
+          const flowYamlError = validateFlowYamlCard(
+            effectiveReq,
+            completeness.declaredPaths,
+            effectiveReq.flowId ?? effectiveMetadata?.flowId,
+          );
+          if (flowYamlError !== undefined) {
+            log.record("flow.yaml.invalid", {
+              roleId: setup.role.id,
+              declaredPaths: completeness.declaredPaths,
+            });
+            return { outcome: "declined", reason: flowYamlError };
+          }
           // 2026-10-18 双开关评审 §5.2：judgeContext 的**唯一计算点**。只在 trio 角色、允许的
           // cardKind、且 flowId 合法时计算；并入传给客户通道的 metadata（桌面只消费）。
           // 账本先刷新，确保事实不是陈旧快照；recordCustomerDecision 仍用 originalMetadata 的
           // toolCallId/turnId。事实计算失败 ⇒ `unavailableReason` + `ledgerErrors>0`（禁止 approve）。
-          let judgeMetadata = metadata;
+          let judgeMetadata = effectiveMetadata;
           if (isTrio && cardKind !== undefined && TRIO_CARD_KINDS[trioSpec!.id].includes(cardKind)) {
-            const flowId = req.flowId ?? originalMetadata?.flowId;
+            const flowId = effectiveReq.flowId ?? effectiveMetadata?.flowId;
             if (isGovernanceFlowId(flowId)) {
               let judgeContext: GovernanceJudgeContext;
               try {
@@ -776,8 +828,8 @@ export async function openRoleSession(
                   boundary: setup.role.boundary,
                   trioSpec: trioSpec!,
                   flowId,
-                  req,
-                  metadata: originalMetadata,
+                  req: effectiveReq,
+                  metadata: effectiveMetadata,
                   snapshot: ledgerState.snapshot,
                   conditions,
                 });
@@ -789,19 +841,19 @@ export async function openRoleSession(
                   unavailableReason: truncateText(errText(err), 512),
                 };
               }
-              judgeMetadata = { ...(metadata ?? {}), judgeContext };
+              judgeMetadata = { ...(effectiveMetadata ?? {}), judgeContext };
             }
           }
-          const out = await raw(req, judgeMetadata);
-          const issuedPaths = issue(req, out ?? null, originalMetadata);
+          const out = await raw(effectiveReq, judgeMetadata);
+          const issuedPaths = issue(effectiveReq, out ?? null, effectiveMetadata);
           if (isTrio) {
             const recorded = recordCustomerDecision({
               state: ledgerState,
               projectRoot: input.project.projectRoot,
               roleId: setup.role.id,
               function: trioSpec!.function,
-              req,
-              metadata: originalMetadata,
+              req: effectiveReq,
+              metadata: effectiveMetadata,
               out,
               issuedPaths,
               sessionId: boundSessionForEvidence?.nativeSessionId,
@@ -861,12 +913,15 @@ export async function openRoleSession(
     cap?.dispatchTask === true && input.dispatchTask !== undefined
       ? isTrio
         ? async (dispatch, metadata) => {
+            // 2026-10-20 客户拍板：Lead 可给 Steward 发协调消息——Liaison→Convener 走 coordinate 门
+            // （不需要提案接受/任命/流程步骤/去重）；其余仍走既有 dispatch 门（Convener→项目角色）。
+            const action = governanceDispatchActionFor(setup.role.id, dispatch.roleId);
             const decision = evaluateGovernanceGate(
               {
                 projectRoot: input.project.projectRoot,
                 model: governanceModel,
                 roleId: setup.role.id,
-                action: "dispatch",
+                action,
                 flowId: dispatch.flowId,
                 stepId: dispatch.stepId,
                 targetRoleId: dispatch.roleId,
@@ -878,9 +933,11 @@ export async function openRoleSession(
                 flowId: dispatch.flowId,
                 stepId: dispatch.stepId,
                 targetRoleId: dispatch.roleId,
+                action,
                 code: decision.code,
               });
-              return { ok: false, message: `派发被治理门禁拒绝：${decision.message}` };
+              const label = action === "coordinate" ? "协调消息" : "派发";
+              return { ok: false, message: `${label}被治理门禁拒绝：${decision.message}` };
             }
             return input.dispatchTask!(dispatch as DispatchTaskPayload, metadata);
           }
@@ -1096,6 +1153,25 @@ export async function openRoleSession(
     }
   }
 
+  // 2026-10-20 Flow 文件方法化：应用是 `docs/flows/<flowId>.yaml` 唯一写者。
+  // `flow_get` 给所有角色；`flow_step_update` / `flow_step_supersede` 只给内置治理角色（service 再校验权限）。
+  // `flowGet` 缺省 flowId 用**调用时**的 currentFlowId（会话中途切 flow 也能取对）。
+  const flowService = createFlowService({
+    projectRoot: input.project.projectRoot,
+    actorRoleId: setup.role.id,
+    actorPower: trioSpec?.function ?? "project",
+  });
+  const flowGet: FlowGetFn = (payload) => {
+    const flowId = payload.flowId ?? currentFlowId;
+    return flowService.get(flowId !== undefined ? { flowId } : {});
+  };
+  const flowStepUpdate: FlowStepUpdateFn | undefined = builtInGovernance
+    ? (payload) => flowService.update(payload)
+    : undefined;
+  const flowStepSupersede: FlowStepSupersedeFn | undefined = builtInGovernance
+    ? (payload) => flowService.supersede(payload)
+    : undefined;
+
   const capabilities: AdapterCapabilities = {
     ...(governedInput !== undefined ? { customerInput: governedInput } : {}),
     ...(reportHandback !== undefined ? { reportHandback } : {}),
@@ -1114,6 +1190,9 @@ export async function openRoleSession(
     ...(uninstallMcp !== undefined ? { uninstallMcp } : {}),
     ...(shellGate !== undefined ? { shellGate } : {}),
     ...(input.shellVerdict !== undefined ? { shellVerdict: input.shellVerdict } : {}),
+    flowGet,
+    ...(flowStepUpdate !== undefined ? { flowStepUpdate } : {}),
+    ...(flowStepSupersede !== undefined ? { flowStepSupersede } : {}),
   };
   const createAdapter = deps.createAdapter ?? createRuntimeAdapterFactory(input.project, input.runtime ?? "pi", deps.runtimeOptions);
   const adapter = createAdapter(
@@ -1130,14 +1209,17 @@ export async function openRoleSession(
   boundSessionForEvidence = session;
   log.record("session.open.ready");
 
-  // §5.7 `artifact.observed`：trio 内置角色在会话 open 时扫一次预授权目录作为基线（只记哈希、不写账本），
-  // 每轮 settle 后只对「新增/变更」的 `.md` 追加 `artifact.observed`。su（single）不参与治理账本——旧项目
-  // 行为逐字不变（不因开会话/每轮 settle 凭空写 `.ans`）。
+  // §5.7 `artifact.observed`：会话 open 时扫一次观察目录作为基线（只记哈希、不写账本），每轮 settle 后
+  // 只对「新增/变更」的 `.md` 追加 `artifact.observed`。
+  // 2026-10-20：**项目角色也参与观察**（boundary 的 directory 条目，如 tester test/、backend src/、
+  // frontend public/）；内置治理角色沿用 preauthorizedDirs（既有行为逐字不变）。
+  // single/su 项目不参与治理账本——旧项目行为不变（不因开会话/每轮 settle 凭空写 `.ans`）。
+  const artifactDirs = artifactScanDirsFor(setup.role, preauthorizedDirs, builtInGovernance);
   const artifactHashes = new Map<string, string>();
-  const artifactScanEnabled = isTrio && preauthorizedDirs.length > 0;
+  const artifactScanEnabled = (isTrio || governanceModel === "trio") && artifactDirs.length > 0;
   if (artifactScanEnabled) {
     try {
-      for (const artifact of await scanPreauthorizedArtifacts(input.project.projectRoot, preauthorizedDirs)) {
+      for (const artifact of await scanPreauthorizedArtifacts(input.project.projectRoot, artifactDirs)) {
         artifactHashes.set(artifact.relPath, artifact.sha256);
       }
     } catch (err) {
@@ -1387,11 +1469,11 @@ export async function openRoleSession(
                 /* 自动收尾/重 pin 是 best-effort；失败不打断会话事件流 */
               }
             }
-            // §5.7 `artifact.observed`（仅 trio 内置角色、仅预授权目录、仅新增/变更的 `.md`）：
-            // 应用算 sha256；账本失败只记诊断，不打断事件流、不回滚角色产物。
+            // §5.7 `artifact.observed`（trio 项目：内置角色预授权目录 / 项目角色 boundary directory，
+            // 仅新增/变更的 `.md`）：应用算 sha256；账本失败只记诊断，不打断事件流、不回滚角色产物。
             if (artifactScanEnabled) {
               try {
-                const artifacts = await scanPreauthorizedArtifacts(input.project.projectRoot, preauthorizedDirs);
+                const artifacts = await scanPreauthorizedArtifacts(input.project.projectRoot, artifactDirs);
                 for (const artifact of artifacts) {
                   if (artifactHashes.get(artifact.relPath) === artifact.sha256) continue;
                   artifactHashes.set(artifact.relPath, artifact.sha256);
@@ -1399,7 +1481,7 @@ export async function openRoleSession(
                     at: new Date().toISOString(),
                     kind: "artifact.observed",
                     actorRoleId: setup.role.id,
-                    power: trioSpec!.function,
+                    power: trioSpec?.function ?? "project",
                     artifactPath: artifact.relPath,
                     artifactSha256: artifact.sha256,
                     ...artifactFlowMetadata(artifact.relPath),
@@ -1614,8 +1696,9 @@ function governanceActionForPath(rel: string | undefined): RoutedGovernanceActio
   if (rel === undefined) return undefined;
   const parts = rel.split("/");
   if (parts[0] === "docs" && parts[1] === "flows") {
-    if (parts.length === 3 && parts[2].endsWith(".md")) {
-      const flowId = parts[2].slice(0, -".md".length);
+    // 2026-10-19 Flow YAML 契约：`.yaml` 是唯一机器状态；`.md` 为旧版人读视图（迁移兼容）。
+    if (parts.length === 3 && /\.(?:md|ya?ml)$/i.test(parts[2]!)) {
+      const flowId = parts[2]!.replace(/\.(?:md|ya?ml)$/i, "");
       return { action: "write-flow", ...(isGovernanceFlowId(flowId) ? { flowId } : {}) };
     }
     if (parts.length > 3) return { action: "write-flow" }; // 非标准子路径：无 flowId → 拒
@@ -1638,11 +1721,147 @@ function governanceActionForPath(rel: string | undefined): RoutedGovernanceActio
   return undefined;
 }
 
+/**
+ * 2026-10-20 客户拍板：Lead（Liaison）可给 Steward（Convener）发协调消息。该 `dispatch_task`
+ * 走 `coordinate` 门（不是项目步骤派发）；其余角色/目标仍走既有 `dispatch` 门，逐字不变。
+ */
+export function governanceDispatchActionFor(roleId: string, targetRoleId: string): GovernanceGateAction {
+  return roleId === "liaison" && targetRoleId === "convener" ? "coordinate" : "dispatch";
+}
+
 /** 治理 flowId 形状（与运行时核心 `GOVERNANCE_SLUG_PATTERN` 同值；本地再判一次，不导入运行时实现）。 */
 const GOVERNANCE_FLOW_ID_RE = /^[a-z0-9][a-z0-9-]{1,63}$/;
 
 function isGovernanceFlowId(value: unknown): value is string {
   return typeof value === "string" && GOVERNANCE_FLOW_ID_RE.test(value);
+}
+
+// —————————————————————— Flow YAML 写前校验（2026-10-19） ——————————————————————
+
+/** 确认卡声明的 Flow YAML 路径形状（唯一机器状态）。 */
+const FLOW_YAML_PATH_RE = /^docs\/flows\/([a-z0-9][a-z0-9-]{1,63})\.(?:yaml|yml)$/;
+
+function flowYamlTargetsOf(paths: readonly string[]): Array<{ rel: string; flowId: string }> {
+  const targets: Array<{ rel: string; flowId: string }> = [];
+  const seen = new Set<string>();
+  for (const rel of paths) {
+    const match = FLOW_YAML_PATH_RE.exec(rel);
+    if (match === null || seen.has(rel)) continue;
+    seen.add(rel);
+    targets.push({ rel, flowId: match[1]! });
+  }
+  return targets;
+}
+
+/**
+ * 2026-10-20 真机：治理角色的写卡确认可能漏带 `cardKind`（Convener 写治理记录卡），导致
+ * `judgeContext` 不计算、桌面直接呈现客户卡。这里按角色 + **已声明路径**做保守兜底：
+ *   · Convener：**全部**声明路径都是 `docs/flows/<flowId>.yaml|yml` ⇒ `schedule-write`；否则 `write`；
+ *   · Rapporteur / Verifier ⇒ `write`；
+ *   · Nominator：**全部**声明路径都在 `角色卡/<id>/` 下 ⇒ `appointment-write`；否则 `write`；
+ *   · 其他内置角色（Liaison 等）不猜；choice 卡不兜底。
+ * 显式 `cardKind` 永远优先；无声明路径（preview/req.paths 都提取不到）也不兜底。
+ */
+function defaultGovernanceConfirmCardKind(
+  roleId: BuiltInGovernanceRoleSpec["id"],
+  declaredPaths: readonly string[],
+): GovernanceCardKind | undefined {
+  if (declaredPaths.length === 0) return undefined;
+  switch (roleId) {
+    case "convener":
+      return declaredPaths.every((rel) => FLOW_YAML_PATH_RE.test(rel)) ? "schedule-write" : "write";
+    case "rapporteur":
+    case "verifier":
+      return "write";
+    case "nominator":
+      return declaredPaths.every((rel) => /^角色卡\/[^/]+\//.test(rel)) ? "appointment-write" : "write";
+    default:
+      return undefined;
+  }
+}
+
+/** 去掉包住 YAML 正文的一层代码围栏（```yaml … ``` / ~~~yaml … ~~~；容忍围栏后还有说明文字）。 */
+function stripYamlFence(body: string): string {
+  const lines = body.replace(/\r\n/g, "\n").split("\n");
+  let start = 0;
+  while (start < lines.length && lines[start]!.trim() === "") start += 1;
+  const opener = start < lines.length ? /^(`{3,}|~{3,})\s*([A-Za-z0-9_-]*)\s*$/.exec(lines[start]!.trim()) : null;
+  if (opener !== null && (opener[2] === "" || /^ya?ml$/i.test(opener[2]!))) {
+    const fence = opener[1]!;
+    const fenceChar = fence[0]!;
+    for (let end = start + 1; end < lines.length; end += 1) {
+      const trimmed = lines[end]!.trim();
+      if (trimmed.length >= fence.length && [...trimmed].every((char) => char === fenceChar)) {
+        return lines.slice(start + 1, end).join("\n");
+      }
+    }
+  }
+  return body;
+}
+
+/**
+ * 从确认卡 preview 提取 `docs/flows/<flowId>.yaml` 的 YAML 正文：
+ *   1. 优先取该路径锚点之后的逐路径正文（与证据包/完整性闸共用 `declaredPathBodies`）；
+ *   2. 回退 preview 中第一个含 `flowId:` 的 YAML 围栏；
+ *   3. 再回退「整个 preview 就是 YAML」。
+ * 取不到 ⇒ undefined（调用方 fail-closed 拒绝该卡）。
+ */
+function flowYamlBodyFromPreview(preview: string | undefined, rel: string): string | undefined {
+  const text = typeof preview === "string" ? preview : "";
+  const body = declaredPathBodies(text, [rel]).find((entry) => entry.path === rel);
+  if (body !== undefined && body.hasBody) {
+    const stripped = stripYamlFence(body.body).trim();
+    if (stripped !== "") return stripped;
+  }
+  const fenced = /(`{3,}|~{3,})\s*(?:ya?ml)?\s*\n([\s\S]*?)\n\1/.exec(text);
+  if (fenced !== null && /^\s*flowId\s*:/m.test(fenced[2]!)) return fenced[2]!.trim();
+  const trimmed = text.trim();
+  if (/^\s*flowId\s*:/m.test(trimmed)) return trimmed;
+  return undefined;
+}
+
+/**
+ * 确认卡的 Flow YAML 写前校验（**确定性**，不调用模型）：
+ *   · 仅当声明路径含 `docs/flows/<flowId>.yaml`（或 `.yml`）时生效；
+ *   · 卡片 flowId（若有）必须与文件名一致；
+ *   · preview 必须能提取出 YAML 正文，且 `parseFlowStateYaml` 全部通过。
+ * 返回 `undefined` = 通过；否则返回给模型/Steward 的具体错误文案（含每条 path + reason）。
+ */
+function validateFlowYamlCard(
+  req: CustomerInputRequest,
+  declaredPaths: readonly string[],
+  cardFlowId: string | undefined,
+): string | undefined {
+  if (req.kind !== "confirm") return undefined;
+  const targets = flowYamlTargetsOf(declaredPaths);
+  if (targets.length === 0) return undefined;
+
+  const failures: string[] = [];
+  for (const target of targets) {
+    if (cardFlowId !== undefined && cardFlowId !== target.flowId) {
+      failures.push(`${target.rel}: 卡片 flowId="${cardFlowId}" 与文件名 flowId="${target.flowId}" 不一致`);
+      continue;
+    }
+    const yamlText = flowYamlBodyFromPreview(req.preview, target.rel);
+    if (yamlText === undefined) {
+      failures.push(
+        `${target.rel}: 无法从 preview 提取 YAML 正文；请以标题（如 \`## ${target.rel}\`）或代码围栏说明锚定该路径，并给出完整 YAML`,
+      );
+      continue;
+    }
+    const parsed = parseFlowStateYaml(yamlText, target.flowId);
+    if (parsed.ok) continue;
+    for (const error of parsed.errors.slice(0, 50)) {
+      failures.push(`${target.rel} ${error.path}: ${error.message}`);
+    }
+  }
+
+  if (failures.length === 0) return undefined;
+  return (
+    `流程 YAML 未通过校验：\n- ${failures.join("\n- ")}\n` +
+    "本次未向客户发卡，也未发行任何写入路径。" +
+    "请按上述路径与原因修正 docs/flows/<flowId>.yaml（唯一机器状态；.md 仅人读视图）后重试。"
+  );
 }
 
 /**
@@ -1787,6 +2006,15 @@ async function recordCustomerDecision(args: {
   // 2026-10-18 真机：只有**治理卡**（显式 cardKind）才写 `customer.decision`。Lead/Crew 的普通
   // 选择/确认（无 cardKind）若也写，会以 unclassified/none 污染账本并覆盖真正的提案决定。
   if (cardKind === undefined) return;
+  // 2026-10-19：判断 agent 的 approval deny 由桌面以 `declined`（operatorId=`judge:<engine>`）回投角色，
+  // 它不是客户决定——不写 `customer.decision`（否则 unclassified/none 会污染账本并挡住收尾门）。
+  if (
+    args.out?.outcome === "declined" &&
+    typeof args.out.operatorId === "string" &&
+    args.out.operatorId.startsWith("judge:")
+  ) {
+    return;
+  }
   const classification = classifyCustomerDecision(cardKind, args.out);
   if (classification === undefined) return;
 
@@ -1897,7 +2125,13 @@ async function findDecisionArtifact(
     candidate = latest?.relPath;
     version = latest?.version;
   } else if (entry.decisionKind === "schedule-write") {
-    candidate = entry.flowId !== undefined ? `docs/flows/${entry.flowId}.md` : undefined;
+    // 2026-10-19 Flow YAML 契约：机器状态 = docs/flows/<flowId>.yaml；旧版 .md 仅迁移兼容。
+    if (entry.flowId !== undefined) {
+      const yamlRel = `docs/flows/${entry.flowId}.yaml`;
+      candidate = (await isRegularFileForJudge(projectRoot, yamlRel))
+        ? yamlRel
+        : `docs/flows/${entry.flowId}.md`;
+    }
   } else if (entry.decisionKind === "appointment-write" || entry.decisionKind === undefined) {
     candidate = issuedPaths.find((p) => p.endsWith(".md")) ?? issuedPaths[0];
   } else if (
@@ -1974,12 +2208,18 @@ async function judgeArtifactsForCard(args: {
 }): Promise<NonNullable<GovernanceJudgeContext["artifacts"]>> {
   const proposal = await latestVersionedArtifact(args.projectRoot, "docs/proposals", args.flowId);
   const nomination = await latestVersionedArtifact(args.projectRoot, "docs/nominations", args.flowId);
-  const flowRel = `docs/flows/${args.flowId}.md`;
-  const flowExists = await isRegularFileForJudge(args.projectRoot, flowRel);
+  // 2026-10-19 Flow YAML 契约：优先机器状态 `.yaml`；旧版 `.md` 仅人读视图/迁移兼容。
+  const flowYamlRel = `docs/flows/${args.flowId}.yaml`;
+  const flowMdRel = `docs/flows/${args.flowId}.md`;
+  const flowRel = (await isRegularFileForJudge(args.projectRoot, flowYamlRel))
+    ? flowYamlRel
+    : (await isRegularFileForJudge(args.projectRoot, flowMdRel))
+      ? flowMdRel
+      : undefined;
 
   const proposalPath = proposal?.relPath;
   const nominationPath = nomination?.relPath;
-  const flowPath = flowExists ? flowRel : undefined;
+  const flowPath = flowRel;
 
   const only = (pathValue: string | undefined): NonNullable<GovernanceJudgeContext["artifacts"]> =>
     pathValue !== undefined ? { proposalPath: pathValue } : {};
@@ -2112,7 +2352,38 @@ interface ObservedArtifact {
 }
 
 /**
- * 扫描预授权目录内的 `.md`（评审 §5.7：`artifact.observed` 只扫角色预授权目录，不扫 `角色卡/` 全树）。
+ * 2026-10-20：artifact 观察目录。
+ * - 内置治理角色：沿用注册表 `preauthorizedDirs`（既有行为逐字不变）；
+ * - 项目角色：boundary Section 1 中 `kind:"directory"` 且 `root:"project"` 的目录（tester 的 `test/`、
+ *   `scripts/`，backend 的 `src/`，frontend 的 `public/` 等）；与 `preauthorizedDirs` 去重合并。
+ * 安全排除：`.ans/`、`角色卡/` 全树、空/绝对/`..` 路径；仅收 `.md`（扫描器既有规则）。
+ */
+function artifactScanDirsFor(
+  role: ResolvedRole,
+  preauthorizedDirs: readonly string[],
+  builtInGovernance: boolean,
+): string[] {
+  const dirs = new Set<string>();
+  const add = (raw: string): void => {
+    const rel = raw.replace(/\\/g, "/").replace(/\/+$/, "").trim();
+    if (rel === "" || rel === "." || rel.startsWith("/") || rel.startsWith("../")) return;
+    if (rel === ".ans" || rel.startsWith(".ans/")) return;
+    if (rel === "角色卡" || rel.startsWith("角色卡/")) return;
+    if (rel.split("/").some((segment) => segment === "" || segment === "." || segment === "..")) return;
+    dirs.add(rel);
+  };
+  for (const dir of preauthorizedDirs) add(dir);
+  if (!builtInGovernance) {
+    for (const entry of role.boundary.entries) {
+      if (entry.kind !== "directory" || entry.root !== "project") continue;
+      add(entry.path);
+    }
+  }
+  return [...dirs];
+}
+
+/**
+ * 扫描预授权/角色边界目录内的 `.md`（评审 §5.7：`artifact.observed` 只扫角色可写目录，不扫 `角色卡/` 全树）。
  * 跳过符号链接（防经链接逃逸），按路径排序保证顺序稳定。
  */
 async function scanPreauthorizedArtifacts(
@@ -2167,7 +2438,7 @@ function artifactFlowMetadata(relPath: string): Pick<GovernanceLedgerEntry, "flo
   if (proposal !== null && isGovernanceFlowId(proposal[1])) {
     return { flowId: proposal[1], artifactVersion: Number(proposal[2]) };
   }
-  const flow = /^docs\/flows\/(.+)\.md$/.exec(relPath);
+  const flow = /^docs\/flows\/(.+)\.(?:md|ya?ml)$/.exec(relPath);
   if (flow !== null && isGovernanceFlowId(flow[1])) return { flowId: flow[1] };
   return {};
 }
@@ -2262,6 +2533,11 @@ export function createRuntimeAdapterFactory(
     governanceJudge: capabilities?.governanceJudge ?? options.governanceJudge,
     shellGate: capabilities?.shellGate ?? options.shellGate,
     shellVerdict: capabilities?.shellVerdict,
+    // 2026-10-20 Flow 文件方法化：运行时核心 `GovernedToolsOptions` 同名能力位（未注入 ⇒ 对应工具不注册）。
+    // 以 spread 并入，运行时核心补齐类型前后均可透传（buildGovernedTools 读 options 同名键）。
+    ...(capabilities?.flowGet !== undefined ? { flowGet: capabilities.flowGet } : {}),
+    ...(capabilities?.flowStepUpdate !== undefined ? { flowStepUpdate: capabilities.flowStepUpdate } : {}),
+    ...(capabilities?.flowStepSupersede !== undefined ? { flowStepSupersede: capabilities.flowStepSupersede } : {}),
   });
 }
 

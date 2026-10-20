@@ -8,7 +8,9 @@
 //     取消/Esc/关闭（×）一律 false；失效/通道异常如实终态「未获执行/fail-closed 不执行」绝不呈已执行；
 //     **恢复卡零计时器**（唯一豁免＝2026-10-18 一次性开启警告的 9 秒自动收起，位置/数量/用途锁定）；取消为默认焦点；证据逐字 textContent；
 //     Esc 优先答恢复卡（DOM 声明在 shell 卡之后）；
-//   · system 消息行：is-system 类＋shield 图标＋标签（分类器单一来源）＋样式钩子存在。
+//   · system 消息行：is-system 类＋shield 图标＋标签（分类器单一来源）＋样式钩子存在；
+//   · 系统通知行（2026-10-19）：`classifySystemNotice` 单一来源、`.sys sys-notice` 独立成行、
+//     徽标/正文取自分类器结果；实时/回放同解；通知后的用户正文仍按普通消息另起一行。
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -22,7 +24,18 @@ const read = (rel: string): string => fs.readFileSync(path.join(REPO, rel), "utf
 
 await import(new URL("../../../app/renderer/tool-rows.js", import.meta.url).href);
 await import(new URL("../../../app/renderer/ui-labels.js", import.meta.url).href);
-const ToolRows = (globalThis as unknown as { ANSToolRows: { classifyInjectedMessage(raw: unknown): { kind: string; label: string; sourceRoleId: string } | null } }).ANSToolRows;
+const ToolRows = (globalThis as unknown as {
+  ANSToolRows: {
+    classifyInjectedMessage(raw: unknown): {
+      kind: string;
+      label: string;
+      sourceRoleId: string;
+      displayBody?: string;
+      remainder?: string;
+      body?: string;
+    } | null;
+  };
+}).ANSToolRows;
 const UiLabels = (globalThis as unknown as {
   ANSUiLabels: {
     queueSourceLabel(kind: string): string;
@@ -93,14 +106,48 @@ test("U1 恢复卡源码钉：恰 allow:true 才作为执行请求回传；取�
   assert.ok(r.includes("等待不设限"), "「等待不设限」纪律在注释/实现处");
 });
 
-test("U1 系统消息行源码钉：is-system 类＋shield 图标＋标签分类器单一来源＋样式钩子；撤回判据只认 message", () => {
+test("U1 系统消息/系统通知行源码钉：分类器单一来源＋is-system/.sys-notice 行钩子＋shield 图标＋撤回判据只认 message", () => {
   const r = read("app/renderer/renderer.js");
+  // 普通系统投递行（`[系统·<子类>]` 等）：行类由**分类器结果** kind 派生；system 取 shield 图标。
   assert.ok(r.includes('el.className = "msg msg-injected is-" + inj.kind'), "is-system 类由归类 kind 派生");
   assert.ok(r.includes('inj.kind === "system" ? ICONS.shield'), "system 取 shield 图标（如实区分来源）");
-  assert.ok(r.includes('inj.label + (inj.sourceRoleId ? " · 来自 " + inj.sourceRoleId : "")'), "来源恒空 ⇒ 无「来自 X」");
-  assert.ok(r.includes("var canWithdraw = v.kind === \"message\" && !running;"), "撤回判据只认 message（system 无撤回钮）");
+  // 标签/来源都取自分类器结果：来源名只在分类器给出 sourceRoleId 时呈现——
+  // system / system-notice 的 sourceRoleId 恒空 ⇒ 不会出现「来自 X」；renderer 不另造来源。
+  assert.ok(
+    r.includes('var sourceName = inj.sourceRoleId ? (displayNameOf(roleById(inj.sourceRoleId)) || inj.sourceRoleId) : "";'),
+    "来源名只认分类器的 sourceRoleId（空 ⇒ 无来源）",
+  );
+  assert.ok(
+    r.includes('inj.label + (sourceName ? " · 来自 " + sourceName : "")'),
+    "标签取自分类器 label；来源恒空 ⇒ 无「来自 X」",
+  );
+  // 系统通知（2026-10-19）：分类单一来源在 tool-rows.js::classifySystemNotice；实时/回放同解。
+  const tr = read("app/renderer/tool-rows.js");
+  assert.ok(tr.includes("function classifySystemNotice(body) {"), "系统通知分类器单一来源在 tool-rows.js");
+  assert.ok(
+    /var notice = classifySystemNotice\(body\);\r?\n\s*if \(notice\) return notice;/.test(tr),
+    "classifyInjectedMessage 先走 classifySystemNotice（不复制第二份判据）",
+  );
+  assert.ok(tr.includes('label: sub ? "系统通知 · " + sub : "系统通知",'), "徽标文案由分类器构造（renderer 不另写）");
+  assert.ok(r.includes('if (inj.kind === "system-notice") { appendSystemNotice(pane, inj, false); return; }'), "实时路径：system-notice 独立成行");
+  assert.ok(r.includes('if (injRow && injRow.kind === "system-notice") {'), "回放路径：同一分类器结果独立成行（实时/回放同解）");
+  assert.ok(r.includes('div.className = "sys sys-notice" + (isReplay ? " is-replay" : "");'), "系统通知行用 .sys sys-notice（绝不混进用户气泡）");
+  assert.ok(r.includes(`'<span class="sys-ico">' + ICONS.shield + "</span>" +`), "系统通知取 shield 图标");
+  assert.ok(
+    r.includes(`'<span class="sys-notice-badge">' + esc(inj.label) + "</span>" +`),
+    "徽标文案取分类器 label（esc）",
+  );
+  assert.ok(
+    r.includes(`'<span class="sys-text">' + esc(inj.displayBody) + "</span>";`),
+    "正文取分类器 displayBody（标记由徽标承载；esc）",
+  );
+  assert.ok(r.includes("if (inj.remainder) appendUser(pane, inj.remainder, false);"), "通知后的用户正文仍按普通消息另起一行");
   const css = read("app/renderer/styles.css");
   assert.ok(css.includes(".msg-injected.is-system"), "行样式钩子存在");
+  assert.ok(css.includes(".sys-notice {"), "系统通知行样式钩子存在");
+  assert.ok(css.includes(".sys-notice .sys-notice-badge {"), "系统通知徽标样式钩子存在");
+  assert.ok(css.includes(".sys-notice .sys-text {"), "系统通知正文样式钩子存在");
+  assert.ok(r.includes('var canWithdraw = v.kind === "message" && !running;'), "撤回判据只认 message（system/system-notice 无撤回钮）");
   const html = read("app/renderer/index.html");
   const shellAt = html.indexOf('id="shell-confirm"');
   const recoveryAt = html.indexOf('id="recovery-confirm"');
@@ -110,6 +157,37 @@ test("U1 系统消息行源码钉：is-system 类＋shield 图标＋标签分类
     assert.ok(html.includes(`id="${id}"`), `卡面元素 #${id} 在 markup 中`);
   }
   assert.ok(html.includes('id="rc-evidence"') && /<pre[^>]*id="rc-evidence"/.test(html), "证据为 <pre>（逐字、可滚）");
+});
+
+test("U1 系统通知分类（真实执行）：【系统通知】/【系统通知·<子类>】⇒ system-notice；正文/用户正文分离；近似文本不误伤", () => {
+  // 单一来源的纯函数行为：标记闭合、子类有界；通知正文到首个空行为止，其后原样作为用户正文。
+  const plain = ToolRows.classifyInjectedMessage("【系统通知】会话已因边界更新重建。");
+  assert.ok(plain !== null, "【系统通知】必须归类");
+  assert.equal(plain!.kind, "system-notice");
+  assert.equal(plain!.label, "系统通知");
+  assert.equal(plain!.sourceRoleId, "", "来源恒空（系统通知不是角色发言）");
+  assert.equal(plain!.displayBody, "会话已因边界更新重建。", "displayBody 去掉标记");
+  assert.equal(plain!.remainder, "", "无空行 ⇒ 无用户正文");
+
+  const withSub = ToolRows.classifyInjectedMessage(
+    "【系统通知·会话重建】此前经确认发行的写权不会自动保留。\n\n请继续修复失败用例。",
+  );
+  assert.ok(withSub !== null, "带子类的系统通知必须归类");
+  assert.equal(withSub!.kind, "system-notice");
+  assert.equal(withSub!.label, "系统通知 · 会话重建", "子类进入徽标（分类器单一来源）");
+  assert.equal(withSub!.displayBody, "此前经确认发行的写权不会自动保留。", "通知正文到首个空行为止");
+  assert.equal(withSub!.remainder, "请继续修复失败用例。", "空行后的用户正文原样保留（另起普通消息行）");
+  assert.equal(withSub!.sourceRoleId, "");
+
+  // 「看起来像」不算：行内提及 / 未闭合 / 子类为空 / 子类含标记字符 一律 null（不误伤普通气泡）。
+  for (const bad of [
+    "请阅读【系统通知】的说明。",
+    "【系统通知·会话重建",
+    "【系统通知·】正文",
+    "【系统通知·会话【重建】正文",
+  ]) {
+    assert.equal(ToolRows.classifyInjectedMessage(bad), null, `近似文本不得归类：${JSON.stringify(bad)}`);
+  }
 });
 
 test("U1 归类与编排契约一致性（独立复核）：三真实前缀回放/回显均归 system；既有两类仍归原类", () => {

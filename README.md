@@ -10,7 +10,7 @@ ANS Studio 面向希望在真实项目中使用多个 AI 角色协作的开发�
 
 | 界面名称 | roleId | 职责 | 权力 |
 | --- | --- | --- | --- |
-| Lead / 主理 | `liaison` | 客户沟通与默认主入口；把客户意图写入 `docs/intents/` | 客户沟通 · 不拥有最终批准权 |
+| Lead / 主理 | `liaison` | 客户沟通与默认主入口；把客户意图写入 `docs/intents/`；兼任工作流管理者 | 客户沟通 · 工作流管理 · 不拥有最终批准权 |
 | Draft / 提案 | `rapporteur` | 形成提案与跨角色契约 | 提案权 · 不拥有最终批准权 |
 | Crew / 组队 | `nominator` | 提名项目角色、写角色卡与边界 | 组队权 · 不拥有最终批准权 |
 | Steward / 统筹 | `convener` | 编排流程、派发任务 | 统筹权 · 不拥有最终批准权 |
@@ -71,6 +71,7 @@ Codex 与 Claude 使用 API key，不使用订阅或 OAuth 登录回退。更多
 ## 角色协作怎样约束修改
 
 - **先分工，再授权。** 角色卡说明职责，`boundary.yaml` 的 Section 1 列出可修改路径；存在已生效的任务写集时，再按任务范围收窄。五个治理角色的边界来自内置注册表，不建角色目录。
+- **主理 Lead 是工作流管理者。** Lead 可用 `flow_get` / `flow_step_update` / `flow_step_supersede` 推进或返工流程，也可用 `dispatch_task` 向 Steward 与项目角色派发协调任务。协调与推进不等于客户批准：客户决定仍走判断 agent / 客户卡，Lead 仍不拥有最终批准权。
 - **治理写入门禁。** 角色卡/`boundary.yaml`、提案、流程、验收与写盘等在写入前有预览或确认卡；越界写入在产生副作用前被拒绝，并指回正确归属：提案→Draft / 提案，角色卡与提名→Crew / 组队，流程→Steward / 统筹，验收→Proof / 验收，应用治理记录→应用。
 - **所有角色都具备 shell 能力。** 五个治理角色与项目角色一样可执行读写与任意 shell 命令，全部走既有审批流程：只读白名单直接执行；risky/review/deny 逐条由客户或判断 agent 审批；拒绝、超时、通道不可用一律不放行。shell 的副作用不受文件写入门禁约束，审批链是唯一控制；文件写入仍优先 `write_file` 并经写盘确认。shell 裁决审计仍落 `docs/audit/shell-gate.jsonl`。
 - **需求确认卡是客户专属。** 桌面「替我审批」只代批 shell 命令与写盘/写卡确认；「替我决策」只代批提案接受、任命与验收。需求确认卡不代批。代批会标明「judge 代批」，不冒充你本人点击，也不改变任何门槛；证据不足、读取被拒或判断失败时回落手动确认。
@@ -79,6 +80,53 @@ Codex 与 Claude 使用 API key，不使用订阅或 OAuth 登录回退。更多
 - **派发与验收分开。** 派发任务不会增加目标角色的写权限。任务报告、历史保存、回交投递和接收方处理分别显示实际状态；报告声明「已完成」不等于独立验收通过。
 
 技术结构与跨角色接口见[项目架构](角色卡/项目管理/docs/architecture.md)。
+
+## 流程状态 YAML
+
+流程状态以 `docs/flows/<flowId>.yaml` 为唯一机器状态，应用只解析它做派发与验收判定。同名的 `docs/flows/<flowId>.md` 仅是人读视图，应用不解析它做判定；Markdown 流程文档仍可保留给人阅读。
+
+顶层字段为 `flowId` / `version` / `qualityTier` / `steps`；步骤字段为 `id` / `title` / `owner` / `kind` / `status` / `evidence` / `supersedes` / `supersededBy`。
+
+```yaml
+flowId: todo-list-v1          # 必填；与文件名一致
+version: 1                    # 必填；正整数
+qualityTier: production       # 必填；prototype | production
+steps:                        # 必填；非空
+  - id: delivery-server-old   # 被 retake 取代的旧步骤
+    title: 服务端交付（旧）
+    owner: <项目角色 id>
+    kind: dispatch
+    status: superseded
+    supersededBy: delivery-server
+  - id: delivery-server       # 必填；小写 slug；verification / acceptance 为保留 id
+    title: 服务端交付
+    owner: <项目角色 id>
+    kind: dispatch            # dispatch | customer-decision | artifact | acceptance
+    status: done              # pending | dispatched | delivered | done | superseded | failed | blocked | aborted
+    evidence:                 # done 必填；kind 与步骤 kind 对应，ref 为账本匹配键
+      kind: dispatch
+      ref: delivery-server
+    supersedes: [delivery-server-old]  # 与旧步骤的 supersededBy 双写，同一条关系
+  - id: verification
+    title: 验收
+    owner: app
+    kind: acceptance
+    status: pending
+```
+
+- **`done` 必须有对应证据。** `dispatch` 对账账本 `dispatch.accepted`；`customer-decision` 对账已结算的客户决定；`artifact` 对账 `artifact.observed`；`acceptance` 对账客户验收决定。
+- **验收步骤归应用。** `verification` / `acceptance` 是应用自动派 Proof 的验收步骤（`kind: acceptance`，初始 `status: pending`）；Steward 不占用这两个 id、不派发、不标 `done`，执行与证据步骤改用其他 id（如 `verification-evidence`）。
+- **取代关系显式记录。** 推荐双写：被 retake 取代的旧步骤标 `status: superseded` 并写 `supersededBy`，新步骤写 `supersedes`；只写一侧也合法。真环（步骤互指或闭环）与两侧矛盾会被拒绝。`failed` / `blocked` / `aborted` 未标 `superseded` 时仍阻塞收尾。
+- **非法 YAML 不回退。** YAML 存在但校验失败（未知字段、未知枚举、缺必填、`done` 缺证据等）时，应用 fail-closed 并给出具体路径与原因；仅在 YAML 不存在时，迁移期兼容旧的 Markdown 流程。
+
+## 流程工具（方法化）
+
+应用是 `docs/flows/<flowId>.yaml` 的唯一写者，角色不再直接写流程文件，改用以下工具；初始创建仍走 `schedule-write` 写卡，创建后不再为每次状态更新写文件或发写卡。
+
+- **`flow_get`**：读取流程摘要、步骤与当前角色可更新的步骤，返回 `revision` 与 `canUpdate`；更新前先取最新 `revision`。
+- **`flow_step_update`**：按 `expectedRevision` 更新步骤状态。Steward / Lead 可更新全部未终态步骤；其他角色只能更新 owner 为自己的步骤（仅限交付、失败、阻塞等有限迁移）。`done` 必须带账本可对账的 `evidence`；版本冲突返回 `revision-conflict`，证据不足返回 `insufficient-evidence`，按提示重新 `flow_get` 或补证后重试，不伪造证据。
+- **`flow_step_supersede`**：Steward / Lead 返工用；旧步骤标 `superseded` 并记 `supersededBy`，新步骤为 `pending`，历史保留不删除。
+- **推进不等于批准。** 流程工具推进或返工不代表客户同意；需要客户决定的步骤仍走 `request_choice` / `request_confirmation` 等客户卡或判断 agent。
 
 ## 工程质量基线与验收演示
 

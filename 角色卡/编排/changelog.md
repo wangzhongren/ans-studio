@@ -1,5 +1,34 @@
 # 编排 变更记录
 
+## 2026-10-19 — 判断路径确定性前置封堵：长内联命令与无界递归搜索
+
+**来源**：客户原话「grep/长内联命令 这个应该让判断AI 做好封堵。」真机：test-engineer 超长内联 `node -e` 报 `manual/context-too-large`；大目录/挂住的 grep 卡 17 分钟。本批只改编排（`src/common/编排/`、`test/编排/`、本角色文档），未碰 `app/**`、其他角色文件、运行时核心与 git 历史。
+
+**改了什么**
+- 新增 `src/common/编排/shell-command-guard.ts`（纯函数）：长内联命令（`node -e`/`python -c`/`bash -c` 等；命令 >2048B、代码 >10 行或单行 >1024B）→ `inline-too-large`；无界递归搜索（`grep -r` 无受限路径、`.`/项目根/`/`/`~`、`find /`、`rg` 全项目、包装器后同类形态）→ `unbounded-search`。具体文件/小目录、`find … -maxdepth`、管道喂入的 rg 放行。
+- 接线两处、均在模型/客户通道之前：`shell-gate.ts` 的 `decide()` 在 **(c) 分类之前**封堵（classify/pm/operator 零调用；审计 branch/by=`preblock:*`）；`shell-judge.ts` 入口在建判断会话之前封堵（模型零调用、不排队、不计防循环；写 `shell-judge.preblock` 诊断）。拒绝理由逐字给出「落盘脚本」出路。
+- `shell-judge-prompt.ts` 新增【长内联与无界搜索——必须 deny】小节（含「有界搜索不拦」）。
+
+**测试**：新增 `test/编排/shell-command-guard.test.ts` 16 例；既有 risk-scope/read-discipline/读取预算/manual/并发/审计断言未改动未放宽。
+
+**验证**：`node --test "test/编排/**/*.test.ts"` → 635 计 / 635 过 / 0 红 / 0 skipped；`npm run typecheck` → exit 0。全量 3190 计 / 3185 过 / 3 红，均为其他角色在改的渲染/推理强度用例（与本批无关）。
+
+详见[变更记录](docs/change/2026-10-19_change_block-inline-and-unbounded-search.md)。
+
+## 2026-10-19 — 会话重建写权注记加系统标记（系统通知，不是角色发言）
+
+**来源**：客户反馈截图中的「会话已因边界更新重建；此前经确认发行的写权不会自动保留……」。客户原话「这个应该加一个标记啊，不然谁知道啊。」本批只改编排边界（`src/pipeline/orchestration/run-role.ts`、`test/编排/`、本角色文档），**未碰** `app/**`、门禁/写权逻辑、其他角色文件与 git 历史。
+
+**改了什么**
+- `REBUILT_SESSION_WRITE_PERMITS_NOTICE` 正文前加系统标记，改为：`【系统通知·会话重建】此前经确认发行的写权不会自动保留，如需写入请重新经 request_confirmation 确认。`——明确这是**系统注入的 notice，不是角色/客户发言**；原语义（重建 / 写权不会自动保留 / 可行恢复路径 `request_confirmation`）逐项保留，仍**不夹带任何授权语义**。常量文档注释同步说明标记来源与客户反馈。
+- 注入路径**未变**：notice 仍经 `queueModelNotice` 排入下一次 `send()` 的输入前缀（`run-role.ts:1271-1272`，`${notice}\n\n${text}`），送达一次即消费、不单独开轮、不触任何判定；写权/门禁语义不变。
+
+**测试**：`test/编排/session-handle.test.ts` F-5-opt1 例新增断言「notice 以 `【系统通知·会话重建】` 开头」；既有 `/写权不会自动保留/`、`/request_confirmation/` 与注入前缀/消费/保留断言继续满足，未放宽。跨角色只读核对 `test/桌面应用/boundary-refresh.test.ts`（按常量引用 + `includes("重建"/"不会自动保留"/"request_confirmation")`）不受影响，未改该文件。
+
+**验证**：`node --test "test/编排/**/*.test.ts"` → **619 计 / 619 过 / 0 红 / 0 skipped**；`npm run typecheck` → **exit 0**。
+
+**已知呈现差异（如实登记）**：桌面渲染层系统消息归类只认 `[系统·<子类>] ` 形态；本 notice 是客户消息的前缀、不是独立系统投递，改用该形态会把同一条回显里的客户正文整条归成系统 chip，故采用**正文内可见标记**（人/模型可见，不改 UI 归类）。若客户要求 UI 系统样式，需桌面角色扩展归类契约（跨角色，本批不越界）。详见[变更记录](docs/change/2026-10-19_change_rebuilt-session-notice-marker.md)。
+
 ## 2026-10-19 — 决策判断收敛为「意图漂移」判断（不再做架构/质量/证据充分性审查）
 
 **来源**：客户新反馈原话「决策审批也改一下，就是判断意图是否偏离了客户的出发点就行了。」这是对「替我决策」（proposal / appointment / acceptance）判断 agent 的定位修正：只判断决策是否偏离客户已确认的意图；工程质量、架构章节、测试覆盖、证据充分性、实现细节由 Draft/Proof 的工作流与验收负责。
@@ -1138,3 +1167,78 @@
 **跨角色请求**：① 运行时核心将 `resolveShellJudgeBudget`/`ShellJudgeBudget` 登记为跨角色只读契约或收敛到 `common/shared/`（本批只读使用既有导出，未改 runtime-core；policy.ts 头注释仍写「不跨角色导出」）；② `src/provider/runtime/schema.ts` 的 `report_shell_judgement` 工具说明仍是「allow = necessary / deny = not necessary」旧口径，需属主同步为系统风险口径，避免与编排系统提示冲突。
 
 **边界与残余**：提示只能引导，硬约束仍是运行时核心只读工具/预算与编排读取损伤降级；项目内命令若实际触及五类风险仍会 deny/manual（风险审查本职）。未 git 提交；未读 `.env`、未跑真实模型。详见[变更记录](docs/change/2026-10-19_change_shell-judge-risk-scope.md)。
+
+## 2026-10-19 — Flow YAML：`docs/flows/<flowId>.yaml` 成为唯一机器状态
+
+**来源**：客户原话「这些全部改成yaml。」真机反复出现流程单 Markdown 表问题（`verification` 保留字被占、`verification-evidence` 缺 dispatch 记录、aborted/failed 行挡收尾门）。本批只写 `src/common/编排/**`、`src/pipeline/orchestration/**`、`test/编排/**`、本角色文档；未碰 `app/**`、其他角色文件、git 历史。
+
+**改了什么**
+- 新增 `src/common/编排/flow-state.ts`：`parseFlowStateYaml(text, flowId)`（严格 schema：flowId/version/qualityTier/steps；kind/status/evidence.kind 枚举；保留 id；done 证据；supersede 存在性/无环；未知字段/缺必填逐条 `{path,message}`）、`validateFlowEvidence(flow, ledger)`（dispatch.accepted / customer.decision / artifact.observed 与显式 `evidence.ref` 对账；只认已结算客户决定）、`evaluateFlowCompletion(flow, ledger)`（收尾门：执行步骤 done+证据、failed/blocked/aborted 未 supersede fail-closed、验收步骤 pending、无未结算决定）、`flowCompletionIssue`（旧桌面 string|undefined 薄适配）、`flowStatePath`。复用 `yaml@2.9.0`，未加依赖。**替代关系双写**：`supersededBy`（旧→新）与 `supersedes`（新→旧）归一化为「旧→新」一条边并去重，门禁 Steward 卡要求的双写不再误报环；只写一侧合法，真环与两侧矛盾仍具体 path 拒绝。
+- 新增 `src/pipeline/orchestration/flow-state.ts` 薄再导出；`govern-session.ts` 同源再导出（桌面只经 Pipeline 公共出口）。
+- `governance-gate.ts`：派发门禁 YAML 优先（YAML 存在即唯一机器状态，非法 fail-closed 不回落 `.md`；缺失才回落旧 `.md`）。
+- `run-role.ts`：确认卡声明 `docs/flows/<flowId>.yaml|yml` 时做写前 `parseFlowStateYaml` 校验（preview 逐路径正文提取，与 `declaredPathBodies` 同源；不合法不发卡/不发行/不写账本）；`docs/flows/*.yaml` 纳入 `write-flow` 门禁路由；判断物证/`schedule-write` artifact 优先 YAML；`artifactFlowMetadata` 识别 YAML。
+- `governance-judge.ts`：验收机械门槛遇 `.yaml` 走 `parseFlowStateYaml` + `evaluateFlowCompletion`（账本 errors 先行 fail-closed），旧 `.md` 保留原判定。
+- `governance-judge-evidence.ts`：决策证据包的 flow 物证为 `.yaml|.yml` 时按文件名 flowId 复用 `parseFlowStateYaml`——合法 ⇒ `entry.steps = [{id,status}]`；非法/文件名 flowId 与卡片不一致 ⇒ `flow-state-invalid` + 前 8 条 `path: message`（acceptor 底线不再泛化报「缺少可解析的步骤表」）；`extractFlowExcerpts` 给「流程状态 YAML」有界摘要（flowId/version/qualityTier + steps id/kind/status/evidence），不再标「未解析」。`.md` legacy 分支逐字不变；证据包版本 v2/上限/哈希语义未变。
+- `governance-judge-facts.ts` / `governance-judge-verdict.ts` / `governance-judge-prompt.ts`：缺失物证提示、schedule-write 路径匹配与 rubric 改为 YAML 口径（`.md` 迁移兼容）。
+- `govern-session.ts`：`STANDARD_WORKFLOW_PROMPT` 与 Convener/verifier 纪律改为 YAML 口径（唯一机器状态 `docs/flows/<flowId>.yaml`、同名 `.md` 仅人读视图、保留 `verification`/`acceptance`、显式 `kind`/`evidence`/`supersedes`）；`governance-session.test.ts` 补断言与反向断言（不得再指示写 `.md`）。
+
+**测试**：新增 `test/编排/flow-state.test.ts` 32 例（含替代关系双写/单侧/真环/矛盾）；`test/编排/decision-evidence-packet.test.ts` 新增 3 例（YAML-only 验收包、非法 YAML flow-state-invalid、legacy Markdown 不变）；`node --test "test/编排/flow-state.test.ts"` **32/32**；`node --test "test/编排/decision-evidence-packet.test.ts"` **19/19**；`node --test "test/编排/**/*.test.ts"` **670 计 670 过 0 红 0 skipped**（基线 635，+35）；`npm run typecheck` **exit 0**。
+
+**跨角色**：桌面自动验收门已并发接线（调用口径见变更记录 §7）；Steward/门禁卡文本改用 YAML；运行时核心 `write_file` 对 `docs/flows/*.yaml` 的落盘前二次校验（内容漂移）归其属主；新增 pipeline 文件需在编排 boundary Section 1 补登。**残余**：O-A1 内容漂移未采纳；YAML 缺失时仍回落旧 `.md`（迁移窗口）。详见[变更记录](docs/change/2026-10-19_change_flow-yaml-state.md)。
+
+## 2026-10-19 — 判断新增 `deny`（approval 组写卡退回重做）
+
+**来源**：真机 Crew 的 appointment-write 写卡内容不合规（README 归属未定、tester boundary 混入 Markdown 散文），判断 agent 只能 manual，客户被迫手批。客户原话「这个按理说不是应该替我决策的会让他重新搞吗」。本批未改 `app/**`、`test/测试/**`、运行时核心 schema。
+
+**改了什么**
+- `src/model/runtime.ts`：`GovernanceJudgeOutcome.verdict` 扩为 `approve | deny | manual`。
+- `governance-judge-verdict.ts`：三值规范化（approve/deny 必须有非空 reason）；deny 仅 approval 组，返回 reasonCode（默认 `model-deny`；允许安全名单具体码）/reason/evidence/读取统计，无 value/paths/pathDecisions；decision 组 deny ⇒ manual（不代客户拒绝）；`governanceJudgeAuditFromOutcome`/有界审计保持可用。
+- `governance-judge.ts`：deny 走 `governance-judge.deny` 日志（不记 manual）；证据哈希复核仅 approve。
+- `governance-judge-prompt.ts`：输出契约三值；approval rubric 明确「内容/路径/完整性/一致性不合规且可修 ⇒ deny，reason 写清哪条不合规 + 应怎么改」；decision 组 manual reason 必须是可操作返工说明（哪条偏离意图/应怎么改/重发给谁）；manual 只留给判断无法完成；删除全局「从不替客户拒绝」表述（decision 组保留）。
+- `run-role.ts`：桌面以 `declined`（operatorId=`judge:<engine>`）回投 deny 时，`recordCustomerDecision` 跳过写 `customer.decision`（不污染账本/不挡收尾门）。
+- 治理判断的 manual 文案统一改为中性可操作表述（「请修正/补齐/缩小…后重新提交」），不再出现「已转手动确认」；读取被拒保留逐路径摘要并改为「请补齐判断所需证据（或缩小读取范围）后重新提交」。shell judge 文案未改。
+
+**测试**：`governance-judge.test.ts` **60/60**（+4：deny 规范化/approval 合法/decision 回落 manual/审计字段；prompt 三值；driver deny 日志不记 manual；decision manual 返工原因原样保留 + approval manual 可操作修正）；`governance-session.test.ts` **26/26**（+1：judge deny 回投不写客户决定账本）；`test/编排/**` **675 计 675 过 0 红 0 skipped**；`npm run typecheck` **exit 0**（全仓）。
+
+**跨角色**：运行时核心 `report_governance_judgement` schema 加 `deny`（已由协调者单独排）；桌面 deny/manual 映射（开关开启时一律 declined+原因回投）由桌面属主收口（本批只读核对，未改 `app/**`）；测试角色旧双值断言按需更新。详见[变更记录](docs/change/2026-10-19_change_judge-deny-approval.md)。
+
+## 2026-10-20 — 看护文案同步：开关开启自动中止 / 自动执行恢复
+
+桌面已实现 watchdog 自动中止（开关开启时，内置治理角色/Convener 超过 15min 自动 abort；开关关闭才保持只检查 + 1h 兜底）与恢复提议自动执行。本批只改 `src/common/编排/watchdog.ts::SIGNAL_SUGGESTIONS` 文案与 `test/编排/watchdog.test.ts` 断言，**不改检测/执行逻辑，不改 `app/**`**：
+- `turn-deadline`：「开关开启且超过自动中止时限 ⇒ 桌面自动中止本轮；开关关闭 ⇒ 只检查、不中止（1 小时最后兜底）。开关开启时 propose_recovery 由桌面自动执行，关闭时需客户确认。」
+- `queue-stuck` / `repeat-fail`：「需客户一键确认后由应用执行」→「开关开启时桌面自动执行，关闭时需客户一键确认」。
+
+**证据**：`watchdog.test.ts` **11/11**；`test/编排/**` **675 计 675 过 0 红 0 skipped**；`npm run typecheck` **exit 0**（全仓）。
+
+## 2026-10-20 — 治理 confirm 卡缺 `cardKind` 按角色/路径兜底
+
+**来源**：真机 Convener 的写治理记录卡 `request_confirmation` 未带 `cardKind` ⇒ `governedInput` 不计算 `judgeContext` ⇒ 桌面 `planJudge` 返回 undefined，卡片直接呈现客户；客户问「这个为啥还需要我审核呢」。本批只改 `src/pipeline/orchestration/run-role.ts` 与 `test/编排/**`，未改 `app/**`。
+
+**改了什么**
+- `governedInput` 在 trio + confirm + 缺 `cardKind` + 声明路径可提取时按角色兜底：Convener 全部路径为 `docs/flows/<id>.yaml|yml` ⇒ `schedule-write`，否则 `write`；Rapporteur/Verifier ⇒ `write`；Nominator 全部路径在 `角色卡/<id>/` 下 ⇒ `appointment-write`，否则 `write`；Liaison/其他不猜；choice 卡与无路径卡不兜底。
+- 兜底值同时写入传给桌面的 request 与 metadata，并继续走既有 `TRIO_CARD_KINDS` 白名单、preview 完整性闸、Flow YAML 写前校验、`computeJudgeContext` 与 `recordCustomerDecision`；诊断 `governance.cardKind.defaulted`。显式 `cardKind` 永远优先，显式非法值仍拒绝。
+
+**测试**：新增 3 例（Convener flow YAML ⇒ schedule-write + judgeContext；Convener 治理记录 ⇒ write；Rapporteur ⇒ write；Nominator 角色卡 ⇒ appointment-write；显式非法 cardKind 仍拒；choice 不兜底）+ 扩展 single/su/项目角色零变化；`governance-judge.test.ts` **63/63**、`test/编排/**` **678 计 678 过 0 红 0 skipped**、`npm run typecheck` **exit 0**（全仓）。详见[变更记录](docs/change/2026-10-20_change_governance-cardKind-default.md)。
+
+## 2026-10-20 — Flow 文件方法化（编排侧核心）+ 项目角色 artifact 观察
+
+**来源**：客户拍板「按这个方案做吧」。应用是 `docs/flows/<flowId>.yaml` 唯一写者；角色改用 `flow_get` / `flow_step_update` / `flow_step_supersede`。本批只写编排边界，未改 `src/model/runtime.ts`、`src/provider/**`、`app/**`、`test/测试/**`。
+
+**改了什么**
+- 新增 `src/common/编排/flow-service.ts`：`createFlowService({projectRoot, actorRoleId, actorPower, defaultFlowId?, writeFile?})`，实现 `get`/`update`/`supersede`；类型单一来源＝运行时 `FlowTool*` 契约（再导出，不复制）。per-project 串行队列；`revision=sha256(file bytes)`；`expectedRevision` 不符 ⇒ `revision-conflict`；Steward/owner 权限与迁移表；`done` 证据 kind 对应 + `validateFlowEvidence` 对账（目标 stepId 过滤）⇒ `insufficient-evidence`；幂等（同 status/evidence 不写盘）；原子写（共享 `atomic-write`，失败 `write-failed` 不破坏原文件）；`supersede` 旧→superseded/new→pending 且非验收保留 id；诊断 `flow.update`/`flow.supersede`/`flow.conflict`。
+- `run-role.ts`：每会话创建 flow service；`flowGet` 注入所有角色，`flowStepUpdate`/`flowStepSupersede` 只注入内置治理角色；缺省 flowId 用调用时 `currentFlowId`；能力经 `createRuntimeAdapterFactory` spread 透传到运行时核心三工具。
+- **项目角色 artifact 观察**（真机证据缺口）：`scanPreauthorizedArtifacts` 的观察目录，内置角色仍用 `preauthorizedDirs`；项目角色用 boundary `kind:"directory"` + `root:"project"` 的目录（tester `test/`、`scripts/`，backend `src/`，frontend `public/` 等），去重合并；排除 `.ans/`、`角色卡/`、空/绝对/`..`。settle 后对新增/变更 `.md` 追加 `artifact.observed`，项目角色 `power="project"`（`GovernancePower` 新增该值）。single/su 项目零账本副作用。
+- 错误码按运行时/角色卡统一：`revision-conflict`、`insufficient-evidence`；其余 `forbidden`/`invalid-transition`/`invalid-flow`/`step-not-found`/`step-exists`/`invalid-supersede`/`ledger-unavailable` 不变。
+
+**测试**：`flow-service.test.ts` **11/11**；`governance-judge.test.ts` **64/64**（+1 注入断言）；`governance-session.test.ts` **27/27**（+1 项目角色 artifact 观察/对账）；`test/编排/**` **691 计 691 过 0 红 0 skipped**；`npm run typecheck` **exit 0**（全仓）。详见[变更记录](docs/change/2026-10-20_change_flow-service.md)。
+
+## 2026-10-20 — Lead（Liaison）设为工作流管理者
+
+**来源**：客户拍板「按这个做吧」——把主理 Lead 设为工作流管理者，可和所有职能角色沟通。本批未改 `app/**`、`src/provider/**`、门禁卡；未 git 提交。
+
+**改了什么**
+- `governance-gate.ts`：`GovernanceGateAction` 增加 `coordinate`；新增 `evaluateCoordinateGate`——仅 Liaison→Convener，`flowId` 必填、`stepId` 可选；不要求提案接受/任命/流程步骤/未派发去重；其他来源/目标 `forbidden`、缺 flowId `missing-flow-id`。`dispatch` 五条零放宽。
+- `run-role.ts`：新增导出 `governanceDispatchActionFor(roleId,targetRoleId)`——Liaison→Convener 选 `coordinate`，其余 `dispatch`；`dispatchTask` 能力注入不变（门禁引擎已给 Liaison 打开）；`flowGet`/`flowStepUpdate`/`flowStepSupersede` 注入不变。
+- `flow-service.ts`：管理者判定扩为 `schedule`（Steward/Convener）或 `liaison`（Lead）；Lead 的 `canUpdate`=全部未终态，可 update/supersede；证据/revision/串行/原子写校验不变；错误文案「Steward/Lead」。
+
+**测试**：governance-gate 新增 coordinate 正反例；governance-judge 新增 action 选择 + Liaison 端到端 coordinate/dispatch；flow-service 新增 Lead manager；liaison-session 能力矩阵更新；`test/编排/**` **695 计 695 过 0 红 0 skipped**；`npm run typecheck` **exit 0**（全仓）。详见[变更记录](docs/change/2026-10-20_change_lead-workflow-manager.md)。

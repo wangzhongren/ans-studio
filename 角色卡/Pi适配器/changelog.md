@@ -1,5 +1,22 @@
 # Pi适配器 变更记录
 
+## 2026-10-20 — flow 文件方法化三工具（`flow_get` / `flow_step_update` / `flow_step_supersede`）能力透传
+
+**来源**：运行时核心新增 flow 工具注入面（`GovernedToolsOptions.flowGet?` / `flowStepUpdate?` / `flowStepSupersede?`，类型 `FlowGetFn` / `FlowStepUpdateFn` / `FlowStepSupersedeFn` 在 `src/model/runtime.ts`）；生产 Service 路径已透传，本角色补齐 legacy/假适配器路径，使真机 Pi 角色可见三工具。**只做能力透传**：权限/状态迁移/证据/revision 裁决归编排 flow-service，本层不实现；未注入 ⇒ 工具不注册（沿 `dispatch_task` / `shellGate` 先例）。
+
+**改动（全部本角色 Section 1 内）**
+- `src/provider/pi/session.ts`：
+  - `createFakeRuntimeAdapter` 选项增 `flowGet?` / `flowStepUpdate?` / `flowStepSupersede?`，并在 `buildGovernedTools(opts.gate, {...})` 调用处逐项透传；
+  - `PiRuntimeAdapterOptions` 增同三可选字段（类型自 `../../model/runtime.ts` 导入）；legacy 路径 393 行既有 `buildGovernedTools(adapterInput.gate, {...adapterInput})` 展开即运行期转发，类型声明补齐后无遗漏；
+  - 判断模式（`shellJudge` / `governanceJudge`）仍只构造 judge 工具集，不构造 flow 工具（行为逐字不变）。
+- `test/pi-adapter/flow-tools.test.ts`（新增 4 例）：未注入三工具均不注册（脚本调用＝未知工具，同时 `write_file` 仍在工具集内）；注入后三工具注册、参数逐字透传（`flow_get` 缺省传 `{}`）、回执 `ok/revision/flow` 原样转达；只注入 `flowGet` ⇒ 其余两工具不注册；`PiRuntimeAdapterOptions` 型接受三字段（编译期检查）。
+- 详细记录：[2026-10-20_change_flow-tools-passthrough.md](docs/change/2026-10-20_change_flow-tools-passthrough.md)。
+
+**验证（真实输出）**
+- `node --test "test/pi-adapter/**/*.test.ts"` → **309 项：309 pass / 0 fail**（新增 4 例全绿；既有工具面/判断工具集断言未放宽、未改）。
+- `npm run typecheck`（`tsc --noEmit`）→ 通过，无错误输出。
+- 未跑真实模型往返（本层只保证注入面与工具注册）；未 git 提交；未读 `.env`。
+
 ## 2026-10-18 — P3b 治理卡判断 agent（「替我审批」/「替我决策」）Pi 接入：judge allowlist 改并集、治理 judge 恰三工具
 
 **来源**：项目管理评审 `角色卡/项目管理/docs/design/2026-10-18_design_judge-governance-cards-review.md` §六/§十二 P3b。前置（P1 已冻结）：运行时核心 `buildGovernanceJudgeTools` 恰三只治理工具（`judge_read_file`/`judge_list_dir`/`report_governance_judgement`）、`GOVERNANCE_JUDGE_TOOL_NAMES`、`ALL_JUDGE_TOOL_NAMES`（四名并集）、`GovernedToolsOptions.governanceJudge`；Service 已在注入 `governanceJudge` 时走 `buildGovernanceJudgeTools`、置 `judgeMode:true` 与 `installedMcpServers:[]`。本角色只做 Pi 侧接入，不改运行时核心/编排/桌面/其他适配器。

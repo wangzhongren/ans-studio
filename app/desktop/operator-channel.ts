@@ -30,9 +30,13 @@
 // 「命令是否危险」由 (c) 判、「语义是否放行」由 (b) 判。本模块**只**：把命令**原文**如实呈现给人、取回人的
 // 放行/拒绝、并在**通道不可用/超时**时给出**非放行**结论（fail-closed）。**不含任何命令分类/白名单/规则**逻辑。
 //
-// **「替我审」（2026-10-17 PM 评审 §5.2/§6.5）**：开关开启时，本模块在 present **之前**调用**注入的**
-// `ShellJudgeFn`（判断语义全部在编排 `createShellJudge`/只读工具），只做三态映射与结果行推送；它**不解析
-// 命令风险、不做 (c) 判定**。`row-failed` 只是 UI 可靠性映射；deny 档放行只按 `tier` 打标记（客户 D1），
+// **「替我审批」（2026-10-17 PM 评审 §5.2/§6.5；2026-10-19 客户裁定收紧为「判断 agent 是唯一审查者」）**：
+// 开关开启时，本模块在 present **之前**调用**注入的** `ShellJudgeFn`（判断语义全部在编排 `createShellJudge`/
+// 只读工具），只做裁决映射与结果行推送；它**不解析命令风险、不做 (c) 判定**。开关开启后**不再请客户手批**
+// （客户原话：「审查只有同意和拒绝，不需要我来同意，拒绝要给理由」）：`allow` ⇒ 放行、`deny` ⇒ 拒绝并带理由；
+// `manual`（命令/上下文过大、读取预算耗尽、超时、不可用、解析失败等）与 `row-failed`（判断结果行投达失败）
+// **一律按拒绝处理**（fail-closed，**不调用 presenter**），理由复用 `judgeManualHumanReason` 的具体人话，
+// 审计/诊断保留原 reasonCode 与「非模型主动 deny」事实。deny 档放行只按 `tier` 打标记（客户 D1），
 // **没有 hard-floor 转换**。开关关/无 judge/已中止时，原 present 路径**逐字不变**。
 //
 // —— fail-closed 三条（§7.5） ——
@@ -205,7 +209,8 @@ export interface ShellCommandDisplay {
   cwd: string;
   /** 为何升级到人（(b) 拿不准 / 不可用）；无则不展示。 */
   reason?: string;
-  /** **手动回落提示**（「替我审」判断未完成 / 结果行无法投达）——渲染侧新元素 `#sc-judge-notice`；
+  /** **手动回落提示**（历史字段）。**2026-10-19 客户裁定后**：开关开启时 manual/row-failed 按拒绝处理、
+   *  不再弹卡，本字段不再由 shell 通道设置；渲染侧 `#sc-judge-notice` 仍支持（兼容旧调用方/回放），
    *  无值时隐藏。**不进入 `reasonRaw`**、不改变 `plainReasonFor` 的映射（PM 评审 §10.4）。 */
   judgeNotice?: string;
   /** 人类可读的完整提示文本（presenter 可直接展示）。 */
@@ -215,7 +220,8 @@ export interface ShellCommandDisplay {
 /**
  * 「替我审」判断结果行载荷（桌面自有类型；PM 评审 §6.5，字段名钉死）。
  * 由 `createDesktopOperatorChannel` 在判断 agent 自己做出 allow/deny 后经 `emitJudgeResult` 推送；
- * `manual` 不产生结果行（原确认卡 + `judgeNotice` 替代）。`operator` 恒为 `judge:<引擎>`。
+ * `manual` / `row-failed` **不产生结果行**（2026-10-19 客户裁定：按拒绝处理，理由经既有 deny 工具结果送达
+ * 角色）。`operator` 恒为 `judge:<引擎>`。
  */
 export interface ShellJudgeResultPayload {
   version: 1;
@@ -242,6 +248,18 @@ export interface ShellJudgeResultPayload {
   alternative?: ShellJudgeAlternative;
   evidence?: string[];
   customerMessageSynthesized?: boolean;
+}
+
+/**
+ * 桌面通道的审计扩展（契约家 `ShellJudgeAudit` 未含本字段；同编排 `ShellJudgeAuditWithLabel` 先例，
+ * **不改 `src/model/runtime.ts`**）。
+ *
+ * 2026-10-19 客户裁定：判断 agent 是唯一审查者——`manual` / `row-failed` 一律按拒绝处理。此时 `judge`
+ * 审计字段的 `verdict` 记**通道最终处置** `deny`，`modelVerdict` 保留模型原始事实（`manual` / `allow`），
+ * 本标记明确「这不是模型主动 deny」；审计/诊断据此可辨，原 `reasonCode` 也原样保留。
+ */
+export interface ShellJudgeAuditWithManual extends ShellJudgeAudit {
+  manualAsDeny?: true;
 }
 
 /** 人对一次 shell 确认的选择。 */
@@ -334,14 +352,14 @@ export interface CreateOperatorChannelOptions {
   env?: Record<string, string | undefined>;
   /**
    * **「替我审」开关与判断超时**（PM 评审 §6.5）。`isEnabled()` 在主进程是权威状态（默认 false、重载复位）；
-   * 关 / 缺省 ⇒ 原 `present` 路径**逐字不变**。`timeoutMs` 缺省 135000（driver 120s + 15s 余量；
-   * 独立于确认卡超时）。
+   * 关 / 缺省 ⇒ 原 `present` 路径**逐字不变**（客户手批确认卡；客户显式关闭了自动审查）。`timeoutMs`
+   * 缺省 135000（driver 120s + 15s 余量；独立于确认卡超时）。
    */
   judge?: { isEnabled: () => boolean; timeoutMs?: number };
   /**
    * **判断结果行推送**（PM 评审 §6.5）：判断 agent 自己做出 allow/deny 时先推一行到请求角色的聊天流。
-   * **推达失败（抛错）⇒ allow 降级 `manual/row-failed`（结果行是放行条件）；deny 仍 deny，只记诊断**。
-   * 缺省 ⇒ 视为无法投达（allow ⇒ manual/row-failed）。
+   * **推达失败（抛错）⇒ 按拒绝处理（`row-failed`，不再弹确认卡）**；deny 推送失败仍 deny，只记诊断。
+   * 缺省 ⇒ 视为无法投达（allow ⇒ `row-failed` 拒绝）。
    */
   emitJudgeResult?: (payload: ShellJudgeResultPayload) => void;
 }
@@ -351,10 +369,12 @@ export interface CreateOperatorChannelOptions {
  * 一切不确定情形（未配置 / 抛错 / 超时）都落到**非放行**结论（fail-closed）——编排据此拒绝。
  * **只有操作者明确放行（恰为 `allow:true`）才返回 `{outcome:"allow"}`。**
  *
- * **「替我审」（2026-10-17 PM 评审 §5.2/§6.5）**：开关开且有 `metadata.judge` 时，在 `present` **之前**
- * 调判断闭包（独立超时），三态映射：allow ⇒ 先发结果行再放行；deny ⇒ 格式化原因、发结果行、**不调用
- * presenter**；manual ⇒ 写 `display.judgeNotice` 后走**原** `present` 路径。**本函数依旧不做命令分类**；
- * `row-failed` 只是 UI 可靠性映射；deny 档放行**不转换**，只按 `tier` 打 `hardDenyOverride` 标记。
+ * **「替我审批」（2026-10-17 PM 评审 §5.2/§6.5；2026-10-19 客户裁定）**：开关开且有 `metadata.judge` 时，
+ * 在 `present` **之前**调判断闭包（独立超时）。判断 agent 是**唯一审查者**：allow ⇒ 先发结果行再放行；
+ * deny ⇒ 格式化原因、发结果行、**不调用 presenter**；manual（命令/上下文过大、预算耗尽、超时、不可用、
+ * 解析失败等）⇒ **不调用 presenter，直接按拒绝处理**（理由含具体人话）；结果行投达失败（row-failed）同样
+ * **按拒绝处理**、不再弹卡。开关关 / 无 judge / 已中止 ⇒ 原 `present` 路径逐字不变。**本函数依旧不做命令分类**；
+ * deny 档放行**不转换**，只按 `tier` 打 `hardDenyOverride` 标记。
  *
  * 返回类型**经推断**为 `(prompt: OperatorPrompt) => Promise<OperatorOutcome>`——**恒返回确定的 `OperatorOutcome`**
  * （所有分支皆返回，绝不返回 `null`/`undefined`），是 §4 冻结契约家 `OperatorChannelFn` 的**结构子类型**。
@@ -375,7 +395,7 @@ export function createDesktopOperatorChannel(opts: CreateOperatorChannelOptions)
     let displayMetadata = metadata;
     if (metadata) displayMetadata = { ...metadata, signal: AbortSignal.any([metadata.signal, timeoutController.signal]) };
 
-    /** 原 `present` 路径（逐字保留）——开关关/无 judge/已中止/判断回落时走它。 */
+    /** 原 `present` 路径（逐字保留）——开关关/无 judge/已中止时走它（judge 开启后的 manual/row-failed 不再走这里）。 */
     const presentConfirmed = async (display: ShellCommandDisplay): Promise<OperatorOutcome> => {
       // 退路：通道未配置 → 不可用（能力缺席即 fail-closed；绝不当「没人问、那就放行」）。
       if (opts.presenter === undefined) {
@@ -468,15 +488,37 @@ export function createDesktopOperatorChannel(opts: CreateOperatorChannelOptions)
       if (timer !== undefined) clearTimeout(timer);
     }
 
-    if (outcome.verdict === "manual") {
-      // 手动回落：设 `judgeNotice` → **原 present 路径**；审计归人工（不写 `judge` 字段）。
-      const display = describeShellCommand(prompt);
-      display.judgeNotice = manualJudgeNotice(outcome.reasonCode, outcome.reason);
-      return presentConfirmed(display);
-    }
-
     const engine = metadata.runtime;
     const operator = `judge:${engine}` as `judge:${string}`;
+
+    if (outcome.verdict === "manual") {
+      // **2026-10-19 客户裁定：判断 agent 是唯一审查者——manual 不再弹客户确认卡，直接按拒绝处理。**
+      // 真机：test-engineer 的巨大内联 `node -e` ⇒ manual/context-too-large 仍弹「放行执行/拒绝」卡。
+      // 拒绝理由复用 `judgeManualHumanReason` 的具体人话；审计/诊断保留原 reasonCode 与
+      // `modelVerdict:"manual"`/`manualAsDeny` 事实，**不伪装成模型主动 deny**。
+      // 角色侧经既有 deny 工具结果（`run_shell 未执行：审核拒绝（<reason>…）`）看到理由；不产生结果行。
+      const reason = manualJudgeDenyReason(outcome.reasonCode, outcome.reason);
+      judgeLog.record("shell-judge.manual.denied", {
+        toolCallId: judgeRequest.toolCallId,
+        roleId: metadata.roleId,
+        runtime: metadata.runtime,
+        decision: `${policy}:${tier ?? "null"}:manual`,
+        outcome: "manual",
+        reasonCode: outcome.reasonCode,
+      });
+      const denyAudit: ShellJudgeAuditWithManual = {
+        engine,
+        verdict: "deny",
+        modelVerdict: outcome.modelVerdict ?? "manual",
+        reasonCode: outcome.reasonCode,
+        tier,
+        manualAsDeny: true,
+        reason,
+        ...(outcome.model !== undefined ? { model: outcome.model } : {}),
+      };
+      return { outcome: "deny", operatorId: operator, reason, judge: denyAudit };
+    }
+
     // 客户 D1：deny 档放行**只按 tier 置标记**，不转换、不拦截、不弹卡。
     const hardDenyOverride = outcome.verdict === "allow" && (tier === "deny" || outcome.hardDenyOverride === true);
     const label = hardDenyOverride ? ("deny 档 · judge 放行" as const) : undefined;
@@ -536,15 +578,32 @@ export function createDesktopOperatorChannel(opts: CreateOperatorChannelOptions)
     });
 
     if (outcome.verdict === "allow") {
-      // **结果行是放行条件**：投达失败 ⇒ `manual/row-failed` → 原确认卡（人重新决定）。
+      // **结果行是放行条件**：投达失败 ⇒ 按拒绝处理（row-failed），**不再弹客户确认卡**（2026-10-19 裁定）。
       try {
         if (opts.emitJudgeResult === undefined) throw new Error("判断结果行通道未配置");
         opts.emitJudgeResult(payload);
       } catch (err) {
-        judgeLog.record("shell-judge.row.failed", { requestId: payload.id, toolCallId: payload.toolCallId, verdict: payload.verdict });
-        const display = describeShellCommand(prompt);
-        display.judgeNotice = manualJudgeNotice("row-failed", reasonOf(err));
-        return presentConfirmed(display);
+        const detail = reasonOf(err);
+        judgeLog.record("shell-judge.row.failed", {
+          requestId: payload.id,
+          toolCallId: payload.toolCallId,
+          decision: `${policy}:${tier ?? "null"}:row-failed`,
+          outcome: "deny",
+          reasonCode: "row-failed",
+          errorMessage: detail,
+        });
+        const reason = rowFailedJudgeDenyReason(detail);
+        const denyAudit: ShellJudgeAuditWithManual = {
+          engine,
+          verdict: "deny",
+          modelVerdict: outcome.modelVerdict ?? "allow",
+          reasonCode: "row-failed",
+          tier,
+          manualAsDeny: true,
+          reason,
+          ...(outcome.model !== undefined ? { model: outcome.model } : {}),
+        };
+        return { outcome: "deny", operatorId: operator, reason, judge: denyAudit };
       }
       return { outcome: "allow", operatorId: operator, judge: audit };
     }
@@ -560,7 +619,49 @@ export function createDesktopOperatorChannel(opts: CreateOperatorChannelOptions)
   };
 }
 
-/** `manual` 的**卡片提示**（PM 评审 §10.4）——按 reasonCode 分两类，不把「判断发生但降级」说成「没发生」。 */
+/**
+ * `manual` → **拒绝**的返回理由（2026-10-19 客户裁定：「审查只有同意和拒绝，不需要我来同意，拒绝要给理由」）。
+ *
+ * 复用 `judgeManualHumanReason` 的**具体人话**（命令/上下文过大、读取预算耗尽、超时、不可用、解析失败、
+ * 读取被拒的具体路径……），明确「未完成自动审查 = 已拒绝」，并按 reasonCode 给出可行出路。
+ * **不含「已转你手动确认」**——开关开启时不再弹客户确认卡。该文本随 `OperatorOutcome.deny.reason` 进入
+ * 编排与既有 deny 工具结果（`run_shell 未执行：审核拒绝（<reason>…）`），角色因此能看到拒绝理由。
+ */
+export function manualJudgeDenyReason(reasonCode: string, reason?: string): string {
+  const human = stripTrailingSentencePunct(judgeManualHumanReason(reasonCode, reason));
+  return `${human}，无法完成自动审查，已拒绝；${manualDenyAdvice(reasonCode)}`;
+}
+
+/** `manual` → deny 的出路建议（按 reasonCode；未知码给通用句）。 */
+function manualDenyAdvice(reasonCode: string): string {
+  switch (reasonCode) {
+    case "context-too-large":
+      return "请改用落盘脚本或拆分命令后重试。";
+    case "budget":
+    case "read-truncated":
+      return "请缩小判断范围（改用落盘脚本或拆分命令）后重试。";
+    case "read-denied":
+      return "请缩小读取范围或改用落盘脚本后重试。";
+    case "aborted":
+      return "本轮已中止，命令未执行；如仍需执行请重新发起。";
+    case "unsupported-engine":
+    case "context-missing":
+      return "请关闭「替我审批」后手动确认。";
+    default:
+      return "请重试，如持续失败请关闭「替我审批」后手动确认。";
+  }
+}
+
+/** `row-failed`（判断结果行投达失败）→ 拒绝的返回理由：结果行是放行条件，投达失败即 fail-closed。 */
+export function rowFailedJudgeDenyReason(detail: string): string {
+  return `审查结果投达失败，无法在聊天中显示判断结论，已拒绝；${stripTrailingSentencePunct(detail)}。`;
+}
+
+/**
+ * `manual` 的**旧卡片提示**（PM 评审 §10.4）。**2026-10-19 客户裁定后**：开关开启的 shell 通道不再弹
+ * 确认卡，本函数**不再用于该路径**；保留导出仅为兼容既有调用方与渲染侧同名文案口径（`ui-labels.js`）。
+ * manual 现按拒绝处理，见 `manualJudgeDenyReason`。
+ */
 export function manualJudgeNotice(reasonCode: string, reason?: string): string {
   if (reasonCode === "row-failed") {
     return "判断 agent 已完成判断，但结果无法在聊天中显示；规则判定仅作参考，本卡已转你手动确认。";

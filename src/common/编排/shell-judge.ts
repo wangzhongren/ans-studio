@@ -13,6 +13,9 @@
 //   · 会话内**有界并发池**（默认 3、env 可调、夹 1..8；FIFO 等待队列 + 排队总时限；2026-10-19 真机：
 //     同一轮并行 4 条 shell，单飞使 2 条立即回落手动）；
 //   · 防循环（同命令连续 deny 上限，allow 清零、manual 不递增）；
+//   · **确定性前置封堵**（客户 2026-10-19：「grep/长内联命令 这个应该让判断AI 做好封堵」）：
+//     判断入口先跑 `shell-command-guard.ts`——长内联命令（`inline-too-large`）与无界递归搜索
+//     （`unbounded-search`）直接 `deny`，**不建判断会话、不调模型、不弹卡**，并写诊断；
 //   · 裁决规范化（`shell-judge-verdict.ts`）、`allow` 必须无损、`deny` 始终有效、客户说明合成；
 //   · **客户 D1**：`tier:"deny"` 且模型 allow → 照常 `allow`，置 `hardDenyOverride:true` 与
 //     `label:"deny 档 · judge 放行"`；不转换、不拦截、不弹卡。
@@ -54,6 +57,7 @@ import { resolveShellJudgeBudget, type ShellJudgeBudget } from "../runtime-core/
 import { RUNTIME_KINDS } from "../shared/runtime-shared.ts";
 import { createDiagnosticLogger } from "../shared/diagnostics.ts";
 import { buildShellJudgePrompt, buildShellJudgeSystemPrompt, SHELL_JUDGE_ARGV_LIMIT, SHELL_JUDGE_COMMAND_LIMIT_BYTES } from "./shell-judge-prompt.ts";
+import { guardShellCommand } from "./shell-command-guard.ts";
 import {
   normalizeShellJudgeVerdict,
   redactJudgeText,
@@ -720,6 +724,26 @@ export function createShellJudge(opts: CreateShellJudgeOptions): ShellJudgeFn {
       : opts.project.projectRoot;
     if (command.trim() === "" || typeof projectRoot !== "string" || projectRoot.trim() === "" || !Array.isArray(request?.argv)) {
       return manualOutcome("context-missing", "判断所需上下文缺失（命令/argv/项目根），已转手动确认。");
+    }
+    // **确定性前置封堵**（客户 2026-10-19）：「grep/长内联命令 这个应该让判断AI 做好封堵。」
+    // 长内联命令与无界递归搜索在**调用模型之前**直接 deny（不建判断会话、不排队、不计防循环），
+    // 与 2026-10-19「manual⇒deny」新语义同向但更强：这是确定性拒绝，不依赖模型/客户手批。
+    const preblock = guardShellCommand({
+      command,
+      argv: request.argv,
+      cwd: typeof request.cwd === "string" ? request.cwd : "",
+      projectRoot,
+    });
+    if (preblock.verdict === "deny") {
+      log.record("shell-judge.preblock", {
+        toolCallId: request.toolCallId,
+        reasonCode: preblock.reasonCode,
+      });
+      return {
+        verdict: "deny",
+        reasonCode: preblock.reasonCode,
+        reason: preblock.reason,
+      };
     }
     // 命令/参数超上限：不截断后猜（PM 评审 §8.1）。
     if (byteLength(command) > SHELL_JUDGE_COMMAND_LIMIT_BYTES || request.argv.length > SHELL_JUDGE_ARGV_LIMIT) {

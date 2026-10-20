@@ -503,6 +503,13 @@ export interface SessionManagerDeps {
    */
   recoveryConfirm?: RecoveryConfirmPresenter;
   /**
+   * **自动决策开关读取**（2026-10-20 客户总原则「我勾选了替我决策就不用我来管了」）：开启时
+   * `proposeRecovery` **不再呈现 `recovery-confirm` 客户卡**，直接执行恢复动作并如实回执（不写客户
+   * 决定账本）；关闭/缺省 ⇒ 旧行为逐字不变（推卡、未确认零执行）。校验不过 ⇒ 自动拒绝回投提议角色、
+   * 不弹卡。
+   */
+  autoDecisionEnabled?: (projectRoot: string, proposerRoleId: string) => boolean;
+  /**
    * **看护观察转发（G-2/W1）**：事件消费循环里的结构化事实（settled 终局 / 命令超时限 F-1 事实 / 真实活动）
    * 同步转发给看护器（`watchdog.ts` 的 `observe`）。**缺省 ⇒ 无看护**（核心治理零依赖——一切照旧）。
    * 本层绝不因看护回调抛错而影响会话/投递（调用点自带隔离）。
@@ -583,6 +590,12 @@ interface LiveSession {
    * 读取方一律以 `busy === true` 为先决条件（置假路径不强制清零——防漏改不引入误报）。
    */
   busySince?: number;
+  /**
+   * **上一轮是否被「请求中止」**（2026-10-20 链式治理推进的早失败护栏）：`abort()`（客户停止 / 看护
+   * 自动中止）置真，下一轮开始置空。链式推进在「会话仍活着、不在跑、无排队投递」时允许短宽限后如实失败；
+   * 但被中止的回合**不算正常结束**——继续有界轮询等下一次投递/重试（真机：看护中止后由后续投递写出 YAML）。
+   */
+  lastTurnAborted?: boolean;
   /**
    * **O-1（2026-10-12）：本会话持有的边界快照**——开会话时定格的参与文件（绝对路径）与各自**内容哈希**。
    * 任一处变了 ⇒ 本会话的规则集已陈旧（真机：su 改好 boundary.yaml 后，活会话仍按开会话时解析的旧边界
@@ -1266,6 +1279,23 @@ export class SessionManager {
     return this.sessions.get(this.sessionKey(projectRoot, roleId, runtime))?.busy === true;
   }
 
+  /** 该角色当前是否有**活会话**（纯读；链式推进的事实轮询护栏——会话被释放时不能断言「已 settled」）。 */
+  hasLiveSession(projectRoot: string, roleId: string, runtime: RuntimeKind): boolean {
+    return this.sessions.has(this.sessionKey(projectRoot, roleId, runtime));
+  }
+
+  /** 上一轮是否被请求中止（纯读；链式推进的早失败护栏——中止 ≠ 正常结束，继续等下一次投递/重试）。 */
+  wasLastTurnAborted(projectRoot: string, roleId: string, runtime: RuntimeKind): boolean {
+    return this.sessions.get(this.sessionKey(projectRoot, roleId, runtime))?.lastTurnAborted === true;
+  }
+
+  /** 该角色是否仍有排队/进行中的投递（纯读；链式推进的早失败护栏——有后续投递就不能断言「本轮即终局」）。 */
+  hasPendingDelivery(projectRoot: string, roleId: string, runtime: RuntimeKind): boolean {
+    const key = this.queueKey(projectRoot, roleId, runtime);
+    const queue = this.deliveryQueues.get(key);
+    return (queue !== undefined && queue.length > 0) || this.activeDeliveries.has(key);
+  }
+
   /** 治理主人（回交/系统行落位；2026-10-19 验收自动派发用）：trio=Convener；single=主入口（su）；未枚举 ⇒ null。 */
   governanceOwnerRoleId(projectRoot: string): string | null {
     return this.handbackOwnerRoleId(projectRoot);
@@ -1358,6 +1388,11 @@ export class SessionManager {
    * 与 `waitForRoleSettle` 的差别：后者只等「下一轮 settle」——若目标在收到任务前正忙、任务经既有投递机
    * 排队，第一次 settle 只结束**上一轮**，本次任务尚未跑完。链式检查「Convener 是否写出了流程单」必须等
    * 本次任务真正结束。**只等待、不重投、不重试**；超时或会话释放 ⇒ false（调用方如实报错、不循环）。
+   *
+   * **注意（2026-10-20 真机）**：本方法以「会话条目存在 + 不忙 + 队列空」判空闲——刚投递（会话可能被
+   * 并发重建/释放）时会立即返回 false，真机因此产生 5ms 假错误。**链式治理推进已改用目标事实轮询**
+   * （`interface.ts::advanceGovernanceFlow`，读流程 YAML / 角色卡枚举）；新调用方不要再用它断定
+   * 「某个任务是否完成」。保留仅为既有 API 兼容。
    */
   waitForRoleIdle(
     projectRoot: string,
@@ -1735,11 +1770,12 @@ export class SessionManager {
       return primaryRoleId;
     };
 
-    // H-1：**派发能力**（契约在 §4 冻结家 `model/runtime.ts`）——评审 §5.6：仅 `governanceFunction ===
-    // "schedule"`（Convener）；single/su 保留旧行为（`legacyBuiltIn`）。路由复用 E-1 投递机
-    // （`routeDispatch`）；「未注入即不注册」——项目角色与 Rapporteur/Nominator 都拿不到该工具。
+    // H-1：**派发能力**（契约在 §4 冻结家 `model/runtime.ts`）——2026-10-20 客户拍板：主理 Lead 成为
+    // 工作流管理者，`dispatchTask` 从「仅 schedule/legacy」扩展为 **schedule ∪ liaison**（Convener 派项目
+    // 角色；Lead→Steward 走协调门 `coordinate`，见 `routeDispatch`）。编排侧能力矩阵已把 liaison 标为
+    // `dispatchTask:true`；本层负责注入。「未注入即不注册」——Rapporteur/Nominator/Verifier 拿不到。
     const dispatchTask: DispatchTaskFn | undefined =
-      canSchedule
+      canSchedule || canLiaise
         ? (d: DispatchTaskPayload) => this.routeDispatch(req.projectRoot, req.runtime, req.roleId, d) // Promise<DispatchReceipt>——契约允许（工具侧 await）
         : undefined;
     // W6-B（四角色评审 §5.3）：**意图交接投递端**——仅 Liaison。编排已校验/去重/每轮一次并写
@@ -2279,6 +2315,7 @@ export class SessionManager {
     entry.interactionState.turn = new AbortController();
     entry.busy = true;
     entry.busySince = this.now(); // G-2/W1：本轮起点定格（看护信号 #1 的 elapsed 基准；busy 期间才被读取）
+    entry.lastTurnAborted = undefined; // 新一轮开始：上一轮的中止标记不再适用于本轮
     // P0-2 前置修正（2026-10-13，随停止入口同批）：**开跑即外推 busy=true**——与投递机同款
     //（先置忙即推快照）。旧版只在 round 结束后推：长轮次（真实 pi 一轮数分钟）期间界面根本收不到
     // 「工作中」快照——停止钮与左树徽标都无从在轮次**进行中**出现（快适配器掩盖了这条缝；停止入口
@@ -2327,6 +2364,8 @@ export class SessionManager {
       return { ok: false, supported: false, error: "当前运行时不支持停止" };
     }
     try {
+      // 中止标记（链式治理推进的早失败护栏）：被请求中止 ≠ 正常结束——链路继续轮询等下一次投递/重试。
+      entry.lastTurnAborted = true;
       entry.interactionState.turn.abort();
       return await entry.handle.abort();
     } catch (err) {
@@ -2801,9 +2840,10 @@ export class SessionManager {
     if (targetRoleId === "" || task.trim() === "") {
       return fail("派发未受理：roleId 与 task 都必须非空。", "派发未受理：roleId 与 task 都必须非空。");
     }
-    // —— 来源防御性校验（评审 §5.6）：trio 必须是 Convener；single 必须是主入口（su）——
-    // 正常路径由 `open()` 的能力注入保证（只有 schedule/legacy 注入 dispatchTask）；这里再拒一次，
-    // **绝不**把「谁调用」当授权（授权=账本中的客户决定，见下方门禁）。
+    // —— 来源防御性校验（评审 §5.6；2026-10-20 客户拍板扩展）——
+    // trio：派发主人 Steward（Convener）**或**主理 Lead（Liaison，仅用于 Lead→Steward 协调消息）；
+    // single：主入口（su）。正常路径由 `open()` 的能力注入保证；这里再拒一次，
+    // **绝不**把「谁调用」当授权（授权=账本中的客户决定 / coordinate 自己的门，见下方门禁）。
     const listing = this.deps.getListing(projectRoot);
     const model: GovernanceModel = listing?.governanceModel ?? "single";
     const dispatcherRoleId = this.dispatcherRoleIdOf(projectRoot);
@@ -2813,9 +2853,14 @@ export class SessionManager {
         "派发未受理：未枚举到派发主人——**未投递**（不静默）。",
       );
     }
-    if (fromRoleId !== dispatcherRoleId) {
+    // Lead→Steward = 协调消息（coordinate 门；字面 id 与编排 `evaluateCoordinateGate` 同口径）：
+    // 不走项目步骤的 dispatch 门（不要求提案接受/任命/步骤存在/未派发），也不弹客户卡。
+    const isCoordinate = model === "trio" && fromRoleId === "liaison" && targetRoleId === "convener";
+    const liaisonRoleId =
+      model === "trio" ? (listing?.roles.find((role) => role.governanceFunction === "liaison")?.roleId ?? null) : null;
+    if (fromRoleId !== dispatcherRoleId && (liaisonRoleId === null || fromRoleId !== liaisonRoleId)) {
       return fail(
-        `派发未受理：来源角色 ${this.roleDisplayName(projectRoot, fromRoleId)} 不是本项目派发主人 ${this.roleDisplayName(projectRoot, dispatcherRoleId)}（${model === "trio" ? "Steward（统筹）" : "主入口"}）。`,
+        `派发未受理：来源角色 ${this.roleDisplayName(projectRoot, fromRoleId)} 不是本项目派发主人 ${this.roleDisplayName(projectRoot, dispatcherRoleId)}${model === "trio" ? "（trio：Steward（统筹）或主理 Lead）" : ""}。`,
         `派发未受理：来源角色 ${fromRoleId} 不是派发主人 ${dispatcherRoleId}——**未投递**（不静默）。`,
       );
     }
@@ -2836,7 +2881,9 @@ export class SessionManager {
         `派发未受理：角色 ${targetRoleId} 不在本项目——**未投递**（不静默）。`
       );
     }
-    if (target.builtIn === true || isBuiltInGovernanceRoleId(targetRoleId)) {
+    // 内置治理角色默认拒绝；**唯一例外**：Lead→Steward 协调消息（2026-10-20 客户拍板）——
+    // 目标是 Steward 的协调任务不是「派发给项目角色」，由 coordinate 门单独校验来源/目标/flowId。
+    if (!isCoordinate && (target.builtIn === true || isBuiltInGovernanceRoleId(targetRoleId))) {
       return fail(
         `派发未受理：${targetRoleId} 是内置治理角色（trio 三人与 su 均不可被派发）——派发对象应是项目角色。`,
         `派发未受理：${targetRoleId} 是内置治理角色——**未投递**（不静默）。`
@@ -2860,7 +2907,9 @@ export class SessionManager {
         projectRoot,
         model,
         roleId: fromRoleId,
-        action: "dispatch",
+        // 2026-10-20：Lead→Steward 走 coordinate 门（要求 flowId，stepId 可选）；
+        // 其余（Convener→项目角色 / single 旧行为）仍走既有 dispatch 门，逐字不变。
+        action: isCoordinate ? "coordinate" : "dispatch",
         ...(flowId !== undefined ? { flowId } : {}),
         ...(stepId !== undefined ? { stepId } : {}),
         targetRoleId,
@@ -2887,10 +2936,16 @@ export class SessionManager {
       return fail(plan.message, plan.systemRow);
     }
     // 去重键（评审 §5.6/§6.3-5）：既有 `roleId\0task\0reason` 之外增 `flowId\0stepId`（缺失为空串——
-    // single 旧行为不变）。
+    // single 旧行为不变）。2026-10-20：Lead→Steward 协调消息**不套用项目步骤的 duplicate-dispatch 去重**
+    // （coordinate 门已跳过该规则），这里仍按内容/在途窗口正常去重（送达即释放，同文可再次协调）。
     const dedupKey = `${projectRoot}\u0000${runtime}\u0000${targetRoleId}\u0000${task}\u0000${reason ?? ""}\u0000${flowId ?? ""}\u0000${stepId ?? ""}`;
     if (this.activeDispatchKeys.has(dedupKey)) {
-      return { ok: true, message: `该派发（目标 ${targetRoleId}，同任务文本/流程步骤）已在投递队列中——已去重，不重复投递。` };
+      return {
+        ok: true,
+        message: isCoordinate
+          ? `该协调消息（目标 ${targetRoleId}，同内容/流程）已在投递队列中——已去重，不重复投递。`
+          : `该派发（目标 ${targetRoleId}，同任务文本/流程步骤）已在投递队列中——已去重，不重复投递。`,
+      };
     }
     this.activeDispatchKeys.add(dedupKey);
     this.enqueueDelivery(projectRoot, targetRoleId, {
@@ -2902,22 +2957,27 @@ export class SessionManager {
       // 文本：编排 `planDispatchDelivery` 产出的定格文本（必读块已由**同一单一来源** `renderDispatchPrompt`
       // 注入；无引用 = 旧格式逐字）——本层不另写渲染（本地副本 `renderDispatchPromptLocal` 已删除）。
       text: plan.text,
-      summary: `派发 · 来自 ${this.roleDisplayName(projectRoot, fromRoleId)}：${shortenText(task, 40)}`,
+      summary: isCoordinate
+        ? `协调 · 来自 ${this.roleDisplayName(projectRoot, fromRoleId)} → ${this.roleDisplayName(projectRoot, targetRoleId)}：${shortenText(task, 40)}`
+        : `派发 · 来自 ${this.roleDisplayName(projectRoot, fromRoleId)}：${shortenText(task, 40)}`,
       dedupKey,
     });
     // 账本 `dispatch.accepted`（评审 §5.6/§5.7）：**成功入队后**写；门禁/投递失败不写。
     // 仅 trio（single 旧项目不产生 `.ans/governance` 记录——行为逐字不变）。账本失败**不翻转**派发
     // （只记诊断；客户决定与队列照旧）；`messageSummary` 截断 ≤200 字。
+    // 2026-10-20：Lead→Steward 协调消息以 `power:"liaison"`、`actorRoleId:"liaison"`、`targetRoleId:"convener"`
+    // 入账——**不是客户批准**（不写 customer.decision、不解锁任何门禁）；不写 trigger（非客户决定触发）。
+    // 不带 stepId：协调不是步骤派发，避免被 dispatch 门的 flowId+stepId 去重误当成已派发。
     if (model === "trio") {
       const appended = await appendGovernanceLedger(projectRoot, {
         at: new Date(this.now()).toISOString(),
         kind: "dispatch.accepted",
         ...(flowId !== undefined ? { flowId } : {}),
-        ...(stepId !== undefined ? { stepId } : {}),
+        ...(!isCoordinate && stepId !== undefined ? { stepId } : {}),
         actorRoleId: fromRoleId,
-        power: "schedule",
+        power: isCoordinate ? "liaison" : "schedule",
         targetRoleId,
-        messageSummary: shortenText(task, 200),
+        messageSummary: shortenText(isCoordinate ? `[协调] ${task}` : task, 200),
         runtime,
       });
       if (!appended.ok) {
@@ -2940,12 +3000,13 @@ export class SessionManager {
       }
     }
     void this.drainQueue(projectRoot, targetRoleId, runtime);
+    const openNote = this.sessions.get(this.sessionKey(projectRoot, targetRoleId, runtime)) ? "" : "（其会话未开——将自动开启）";
     return {
       ok: true,
-      message:
-        `已受理：任务将投递给角色 ${this.roleDisplayName(projectRoot, targetRoleId)} 的会话` +
-        (this.sessions.get(this.sessionKey(projectRoot, targetRoleId, runtime)) ? "" : "（其会话未开——将自动开启）") +
-        `；投递结果/失败会在其聊天流与 ${model === "trio" ? this.roleDisplayName(projectRoot, fromRoleId) : "su"} 的聊天流如实显示（受理≠已完成）。`,
+      message: isCoordinate
+        ? `已受理：协调消息将投递给 ${this.roleDisplayName(projectRoot, targetRoleId)}${openNote}（来源 ${this.roleDisplayName(projectRoot, fromRoleId)} → Steward；协调 ≠ 客户批准，不解除任何派发/验收门禁；受理≠已完成）。`
+        : `已受理：任务将投递给角色 ${this.roleDisplayName(projectRoot, targetRoleId)} 的会话${openNote}` +
+          `；投递结果/失败会在其聊天流与 ${model === "trio" ? this.roleDisplayName(projectRoot, fromRoleId) : "su"} 的聊天流如实显示（受理≠已完成）。`,
     };
   }
 
@@ -3145,6 +3206,9 @@ export class SessionManager {
    * 回执（契约 `RecoveryReceipt`：四值中**恰 `executed` 为已执行**）如实回拒工具侧 ＋ UI 系统行 ＋
    * **回执经既有投递机投回 su**（kind:"system"）＋ 诊断。取消/关窗/通道失效 = **未获执行**（declined，
    * fail-closed——绝不「没人问就执行」）。
+   * **2026-10-20（客户总原则「我勾选了替我决策就不用我来管了」）**：`autoDecisionEnabled` 开启时**不推卡**、
+   * 直接复用同一执行语义（`runAction`）并如实回执＋Lead 系统行（自动执行 ≠ 客户逐项批准）；关闭 ⇒ 旧路径
+   * 逐字不变。
    */
   private async proposeRecovery(projectRoot: string, runtime: RuntimeKind, proposerRoleId: string, d: ProposeRecoveryPayload): Promise<RecoveryReceipt> {
     const diagnostic = createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId: proposerRoleId });
@@ -3191,60 +3255,80 @@ export class SessionManager {
       return refuse(`${targetRoleId} 是内置治理角色——恢复动作只针对项目角色（未推送任何确认卡）。`, "target-builtin");
     }
 
-    const presenter = this.deps.recoveryConfirm;
-    if (presenter === undefined) {
-      diagnostic.record("recovery.refused", { reasonCode: "channel-unavailable" });
-      return receiptOf("declined", "恢复确认通道未接线——未获执行（fail-closed），没有任何动作发生。");
-    }
-    const suEntry = this.sessions.get(this.sessionKey(projectRoot, proposerRoleId, runtime));
-    const signal = suEntry?.interactionState.turn.signal;
-    let allowed = false;
-    try {
-      allowed = await presenter.present(
-        {
-          // 渲染侧（U1 已落树）消费面：`{id, projectRoot?, runtime?, roleId, action, evidence, reason?, requestedBy?, requestedAt?, itemId?}`。
-          projectRoot,
-          runtime,
-          roleId: targetRoleId,
-          action,
-          evidence: evidenceRaw, // 逐字（校验按 trim，呈现按原文——不加工、不截断）
-          ...(reason !== undefined ? { reason } : {}),
-          requestedBy: proposerRoleId,
-          requestedAt: new Date(this.now()).toISOString(),
-          ...(itemId !== undefined ? { itemId } : {}),
-        },
-        { roleId: proposerRoleId, projectRoot, runtime, ...(signal !== undefined ? { signal } : {}) },
-      );
-    } catch (err) {
-      // 推达失败（窗口已关等）⇒ 未获执行（fail-closed；presenter 已记诊断）。
-      diagnostic.error("recovery.present.failed", err);
-      allowed = false;
-    }
-
-    let receipt: RecoveryReceipt;
-    if (!allowed) {
-      receipt = receiptOf("declined", `客户未确认（拒绝/取消，或确认通道失效）——「${recoveryActionLabel(action)}」没有执行，也没有任何动作发生。`);
-    } else if (action === "abort-turn") {
-      const res = await this.abort({ projectRoot, roleId: targetRoleId, runtime });
-      receipt = res.ok
-        ? receiptOf("executed", `已请求停止角色「${targetRoleId}」的当前轮次——轮次仍以既有 settled 收尾（不制造「已停止」假象）。`)
-        : res.supported
-          ? receiptOf("error", res.error ?? "停止失败（未知原因）——未假装已执行。")
-          : receiptOf("unsupported", res.error ?? "当前运行时不支持停止。");
-    } else if (action === "rebuild-session") {
-      const res = await this.rebuildSession({ projectRoot, roleId: targetRoleId, runtime });
-      receipt = res.ok
-        ? receiptOf("executed", `角色「${targetRoleId}」的会话已重建（保留历史回放；上下文恢复结果以引擎实际返回为准）。`)
-        : receiptOf("error", res.error ?? "重建失败（未知原因）——没有任何动作发生。");
-    } else {
+    // —— 动作执行（客户卡路径与自动决策路径**复用同一执行语义**——不另造第二套）——
+    const runAction = async (): Promise<RecoveryReceipt> => {
+      if (action === "abort-turn") {
+        const res = await this.abort({ projectRoot, roleId: targetRoleId, runtime });
+        return res.ok
+          ? receiptOf("executed", `已请求停止角色「${targetRoleId}」的当前轮次——轮次仍以既有 settled 收尾（不制造「已停止」假象）。`)
+          : res.supported
+            ? receiptOf("error", res.error ?? "停止失败（未知原因）——未假装已执行。")
+            : receiptOf("unsupported", res.error ?? "当前运行时不支持停止。");
+      }
+      if (action === "rebuild-session") {
+        const res = await this.rebuildSession({ projectRoot, roleId: targetRoleId, runtime });
+        return res.ok
+          ? receiptOf("executed", `角色「${targetRoleId}」的会话已重建（保留历史回放；上下文恢复结果以引擎实际返回为准）。`)
+          : receiptOf("error", res.error ?? "重建失败（未知原因）——没有任何动作发生。");
+      }
       const res = await this.redeliverNudge({ projectRoot, roleId: targetRoleId, runtime }, itemId);
-      receipt = res.ok ? receiptOf("executed", res.message) : receiptOf("error", res.message);
+      return res.ok ? receiptOf("executed", res.message) : receiptOf("error", res.message);
+    };
+
+    // 2026-10-20（客户总原则「我勾选了替我决策就不用我来管了」）：决策开关开启 ⇒ **不呈现客户卡**、
+    // 直接执行；关闭/缺省 ⇒ 下方旧路径逐字不变（推卡、恰 allow:true 才执行、未确认零执行）。
+    const autoDecision = this.deps.autoDecisionEnabled?.(projectRoot, proposerRoleId) === true;
+    let receipt: RecoveryReceipt;
+    if (autoDecision) {
+      diagnostic.record("recovery.auto", { targetRoleId, action, reasonCode: "decision-switch-on" });
+      receipt = await runAction();
+    } else {
+      const presenter = this.deps.recoveryConfirm;
+      if (presenter === undefined) {
+        diagnostic.record("recovery.refused", { reasonCode: "channel-unavailable" });
+        return receiptOf("declined", "恢复确认通道未接线——未获执行（fail-closed），没有任何动作发生。");
+      }
+      const suEntry = this.sessions.get(this.sessionKey(projectRoot, proposerRoleId, runtime));
+      const signal = suEntry?.interactionState.turn.signal;
+      let allowed = false;
+      try {
+        allowed = await presenter.present(
+          {
+            // 渲染侧（U1 已落树）消费面：`{id, projectRoot?, runtime?, roleId, action, evidence, reason?, requestedBy?, requestedAt?, itemId?}`。
+            projectRoot,
+            runtime,
+            roleId: targetRoleId,
+            action,
+            evidence: evidenceRaw, // 逐字（校验按 trim，呈现按原文——不加工、不截断）
+            ...(reason !== undefined ? { reason } : {}),
+            requestedBy: proposerRoleId,
+            requestedAt: new Date(this.now()).toISOString(),
+            ...(itemId !== undefined ? { itemId } : {}),
+          },
+          { roleId: proposerRoleId, projectRoot, runtime, ...(signal !== undefined ? { signal } : {}) },
+        );
+      } catch (err) {
+        // 推达失败（窗口已关等）⇒ 未获执行（fail-closed；presenter 已记诊断）。
+        diagnostic.error("recovery.present.failed", err);
+        allowed = false;
+      }
+      receipt = allowed
+        ? await runAction()
+        : receiptOf("declined", `客户未确认（拒绝/取消，或确认通道失效）——「${recoveryActionLabel(action)}」没有执行，也没有任何动作发生。`);
     }
 
     // —— 回执三路如实落地（设计 §6.2）：工具返回（上方 return）＋ UI 系统行 ＋ **经既有投递机投回 su** ＋ 诊断 ——
     const executed = receipt.outcome === "executed";
     diagnostic.record("recovery.receipt", { targetRoleId, outcome: receipt.outcome, ok: executed, state: receipt.outcome });
     this.emitDeliveryNote(projectRoot, runtime, proposerRoleId, proposerRoleId, `恢复回执（${recoveryActionLabel(action)} · 角色 ${targetRoleId}）：${receipt.message ?? ""}`);
+    if (autoDecision) {
+      // Lead 系统行：自动执行 ≠ 客户逐项批准（不写客户决定账本——回执与动作已如实落诊断/交付回执）。
+      this.watchdogDeliver(projectRoot, {
+        text: `[系统·恢复] 恢复提议由桌面**自动执行**（「替我决策」开关开启——自动执行 ≠ 客户逐项批准）：${recoveryActionLabel(action)} · 角色 ${targetRoleId} · ${executed ? "已执行" : "未执行"}。`,
+        summary: `系统·恢复 · 自动执行 · ${recoveryActionLabel(action)} · 角色 ${targetRoleId} · ${executed ? "已执行" : "未执行"}`,
+        dedupKey: `watchdog\u0000${projectRoot}\u0000recovery-auto\u0000${receipt.at ?? this.now()}`,
+      });
+    }
     this.watchdogDeliver(projectRoot, {
       text: renderRecoveryReceipt({ ...receipt, action, targetRoleId }), // 回执文案＝编排单一来源（O1）
       summary: recoveryReceiptSummary(targetRoleId, action, executed),
@@ -3845,7 +3929,12 @@ export class SessionManager {
     const key = this.queueKey(projectRoot, resolvedTarget, runtime);
     const q = this.deliveryQueues.get(key);
     if (!q || q.length === 0) return;
-    const item = q[0];
+    // 2026-10-20 真机（Convener 卡 1h、队列 24 条回交被 system 看护项堵住）：**回交/派发优先于 system**。
+    // 认领时跳过 system 看护项、取第一个非 system 条目（回交/派发/客户消息的相对顺序不变——客户消息屏障
+    // 语义保留；同类仍按到达序）。只有在队列全是 system 时才投 system。
+    const priorityIndex = q.findIndex((i) => i.kind !== "system");
+    const headIndex = priorityIndex >= 0 ? priorityIndex : 0;
+    const item = q[headIndex];
     const diagnostic = createDiagnosticLogger({ component: "desktop.delivery", projectRoot, roleId: resolvedTarget });
 
     if (resolvedTarget === "") {
@@ -3897,7 +3986,7 @@ export class SessionManager {
     diagnostic.record("delivery.claim.start", { state: item.kind, queueDepth: q.length });
     // 仅回交主人队首连续回交合批；客户消息/派发是屏障，正文仍由编排唯一生成。
     let batchCount = 1;
-    if (resolvedTarget === this.handbackOwnerRoleId(projectRoot) && item.kind === "handback" && item.handback && !item.deliveryId) {
+    if (headIndex === 0 && resolvedTarget === this.handbackOwnerRoleId(projectRoot) && item.kind === "handback" && item.handback && !item.deliveryId) {
       while (batchCount < q.length && q[batchCount].kind === "handback" && q[batchCount].handback) batchCount += 1;
     }
     let text = item.text;
@@ -3906,7 +3995,7 @@ export class SessionManager {
       text = renderHandbackBatchPrompt(q.slice(0, batchCount).map((queued) => queued.handback as TaskHandback));
       summary = `回交批次 · ${batchCount} 份报告 · 来自 ${q.slice(0, batchCount).map((queued) => queued.sourceRoleId).join("、")}`;
     }
-    const removedItems = q.splice(0, batchCount);
+    const removedItems = q.splice(headIndex, batchCount);
     const sentItems = item.deliveryId && item.batchItems ? [...item.batchItems] : removedItems;
     const sent: DeliveryItem = item.deliveryId ? item : { ...sentItems[0], text, summary, batchItems: sentItems, ...(item.kind === 'handback' ? { deliveryId: randomUUID() } : {}) };
     if (q.length === 0) this.deliveryQueues.delete(key);
@@ -3936,6 +4025,7 @@ export class SessionManager {
     entry.interactionState.turn = new AbortController();
     entry.busy = true;
     entry.busySince = this.now(); // G-2/W1：本轮起点定格（看护信号 #1 的 elapsed 基准）
+    entry.lastTurnAborted = undefined; // 新一轮开始：上一轮的中止标记不再适用于本轮
     this.activeDeliveries.set(key, sent); // 与 busy 同时登记；settled/失败/dispose 精确撤销。
     diagnostic.record("delivery.start", { count: batchCount, queueDepth: q.length, state: sent.kind });
     // G-2/W3：drain 出队投出 = 真实活动（重武装）；`kind:"system"`（看护自身投递）不记（同 enqueueDelivery 口径）。

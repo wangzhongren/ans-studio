@@ -54,6 +54,7 @@ import {
 import type { GovernanceLedgerEntry } from "./governance-ledger.ts";
 import { readGovernanceLedger } from "./governance-ledger.ts";
 import { isHardForbiddenPath } from "./governance-judge-verdict.ts";
+import { parseFlowStateYaml } from "./flow-state.ts";
 
 // —————————————————————— 有界常量 ——————————————————————
 
@@ -501,8 +502,43 @@ function extractNominationExcerpts(text: string): EvidenceExcerpt[] {
   return collector.excerpts;
 }
 
-function extractFlowExcerpts(text: string): EvidenceExcerpt[] {
+/** 流程物证是否 Flow YAML（机器状态）；`.md` 仅 legacy 人读视图。 */
+function isFlowYamlPath(relPath: string): boolean {
+  return /\.ya?ml$/i.test(relPath);
+}
+
+/** 文件名推导 flowId（与 `parseFlowStateYaml` 的契约规则 1 一致）。 */
+function flowIdFromPath(relPath: string): string {
+  const name = relPath.split("/").pop() ?? "";
+  return name.replace(/\.ya?ml$/i, "");
+}
+
+function extractFlowExcerpts(text: string, relPath: string): EvidenceExcerpt[] {
   const collector = createExcerptCollector(2 * 1024);
+  if (isFlowYamlPath(relPath)) {
+    // 2026-10-19 Flow YAML 契约：机器状态按 `parseFlowStateYaml` 解析，给出有界结构化摘要；
+    // 不再把 YAML 当 Markdown 表塞进「流程单（未解析）」。
+    const parsed = parseFlowStateYaml(text, flowIdFromPath(relPath));
+    if (parsed.ok) {
+      const summary = [
+        `flowId: ${parsed.flow.flowId}`,
+        `version: ${parsed.flow.version}`,
+        `qualityTier: ${parsed.flow.qualityTier}`,
+        ...parsed.flow.steps.slice(0, 50).map((step) =>
+          `- ${step.id} | ${step.kind} | ${step.status}` +
+          (step.evidence !== undefined ? ` | evidence: ${step.evidence.kind}:${step.evidence.ref}` : ""),
+        ),
+      ].join("\n");
+      collector.push(excerptOf("流程状态 YAML", summary, DECISION_EVIDENCE_EXCERPT_MAX_BYTES));
+    } else {
+      const detail = parsed.errors.slice(0, 8).map((error) => `${error.path}: ${error.message}`).join("\n");
+      collector.push(
+        excerptOf("流程状态 YAML（校验失败）", `${detail}\n\n${text}`, DECISION_EVIDENCE_EXCERPT_MAX_BYTES),
+      );
+    }
+    return collector.excerpts;
+  }
+  // legacy Markdown 流程单：行为逐字不变。
   const frontmatter = frontmatterExcerpt(text);
   if (frontmatter !== undefined) collector.push(frontmatter);
   const parsed = parseFlowSteps(text);
@@ -676,6 +712,7 @@ function artifactRequired(cardKind: string, kind: "proposal" | "nomination" | "f
 
 const PROBLEM_PRIORITY: readonly string[] = [
   "artifact-missing",
+  "flow-state-invalid",
   "intent-missing",
   "intent-ambiguous",
   "intent-unconfirmed",
@@ -689,11 +726,11 @@ const PROBLEM_PRIORITY: readonly string[] = [
 function chooseReason(conflicts: readonly Conflict[], problems: readonly Problem[]): { reasonCode: string; reason: string } {
   if (conflicts.length > 0) {
     const detail = conflicts.map((conflict) => `${conflict.code}：${conflict.detail}`).join("；");
-    return { reasonCode: "evidence-conflict", reason: `请求方陈述与系统事实冲突（${detail}），已转手动确认。` };
+    return { reasonCode: "evidence-conflict", reason: `请求方陈述与系统事实冲突（${detail}）；请按系统事实修正后重新提交。` };
   }
   const code = PROBLEM_PRIORITY.find((candidate) => problems.some((problem) => problem.code === candidate)) ?? "evidence-packet-missing";
   const details = problems.filter((problem) => problem.code === code).map((problem) => problem.detail);
-  return { reasonCode: code, reason: `${details.join("；")}，已转手动确认。` };
+  return { reasonCode: code, reason: `${details.join("；")}；请按上述原因修正后重新提交。` };
 }
 
 function requesterOptions(card: CustomerInputRequest): Array<{ id: string; label: string; description?: string }> | undefined {
@@ -885,14 +922,14 @@ function selectSpotChecks(
   return out;
 }
 
-function artifactExcerpts(kind: EvidenceArtifactKind, text: string): EvidenceExcerpt[] {
+function artifactExcerpts(kind: EvidenceArtifactKind, text: string, relPath: string): EvidenceExcerpt[] {
   switch (kind) {
     case "proposal":
       return extractProposalExcerpts(text);
     case "nomination":
       return extractNominationExcerpts(text);
     case "flow":
-      return extractFlowExcerpts(text);
+      return extractFlowExcerpts(text, relPath);
     case "role-card":
       return extractRoleCardExcerpts(text);
     case "contract":
@@ -916,7 +953,7 @@ export async function buildDecisionEvidencePacket(input: {
     return {
       ok: false,
       reasonCode: "evidence-packet-missing",
-      reason: `证据包生成失败：${err instanceof Error ? err.message : String(err)}，已转手动确认。`,
+      reason: `证据包生成失败：${err instanceof Error ? err.message : String(err)}；请修正物证后重新提交。`,
     };
   }
 }
@@ -930,7 +967,7 @@ async function buildInner(input: {
   const conflicts: Conflict[] = [];
 
   if (typeof request.flowId !== "string" || !isGovernanceJudgeFlowId(request.flowId)) {
-    return { ok: false, reasonCode: "context-missing", reason: "证据包缺少合法的 flowId，已转手动确认。" };
+    return { ok: false, reasonCode: "context-missing", reason: "证据包缺少合法的 flowId；请修正卡片后重新提交。" };
   }
 
   const cardFlowId = typeof (request.card as { flowId?: unknown }).flowId === "string"
@@ -956,7 +993,7 @@ async function buildInner(input: {
       ? request.paths
       : declaredWritePathsFromPreview(request.card.preview);
     if (raw.length > 50) {
-      return { ok: false, reasonCode: "path-unverified", reason: "写盘卡候选路径超过逐路径复核上限，已转手动确认。" };
+      return { ok: false, reasonCode: "path-unverified", reason: "写盘卡候选路径超过逐路径复核上限；请减少路径后重新提交。" };
     }
     const seen = new Set<string>();
     for (const candidate of raw) {
@@ -1060,18 +1097,45 @@ async function buildInner(input: {
       path: spec.path,
       sha256: fact.sha256,
       bytes: fact.bytes,
-      excerpts: artifactExcerpts(spec.kind, fact.text),
+      excerpts: artifactExcerpts(spec.kind, fact.text, spec.path),
     };
     if (spec.kind === "nomination") {
       const recommended = parseRecommendedRoleIds(fact.text);
       if (recommended !== undefined) entry.recommendedRoleIds = recommended;
     }
     if (spec.kind === "flow") {
-      const parsed = parseFlowSteps(fact.text);
-      if (parsed.wellFormed) entry.steps = parsed.steps.slice(0, 50).map((step) => ({
-        id: truncateUtf8(step.id, 128),
-        status: truncateUtf8(step.status, 256),
-      }));
+      // 2026-10-19 Flow YAML 契约：`.yaml|.yml` 是唯一机器状态——按文件名 flowId 复用
+      // `parseFlowStateYaml`（不复制第二份解析器）；非法时给具体 path+message（flow-state-invalid），
+      // 不再笼统报「缺少可解析的步骤表」。`.md` legacy 分支逐字不变。
+      if (isFlowYamlPath(spec.path)) {
+        const fileFlowId = flowIdFromPath(spec.path);
+        if (fileFlowId !== request.flowId) {
+          problems.push({
+            code: "flow-state-invalid",
+            detail: `流程 YAML 文件名 flowId=${fileFlowId} 与卡片 flowId=${request.flowId} 不一致：${spec.path}`,
+          });
+        } else {
+          const parsed = parseFlowStateYaml(fact.text, fileFlowId);
+          if (parsed.ok) {
+            entry.steps = parsed.flow.steps.slice(0, 50).map((step) => ({
+              id: truncateUtf8(step.id, 128),
+              status: truncateUtf8(step.status, 256),
+            }));
+          } else {
+            const detail = parsed.errors.slice(0, 8).map((error) => `${error.path}: ${error.message}`).join("；");
+            problems.push({
+              code: "flow-state-invalid",
+              detail: `流程 YAML 校验失败（${spec.path}）：${detail}`,
+            });
+          }
+        }
+      } else {
+        const parsed = parseFlowSteps(fact.text);
+        if (parsed.wellFormed) entry.steps = parsed.steps.slice(0, 50).map((step) => ({
+          id: truncateUtf8(step.id, 128),
+          status: truncateUtf8(step.status, 256),
+        }));
+      }
     }
     if (spec.kind === "boundary") {
       entry.boundaryEntries = extractBoundaryEntries(fact.text);
@@ -1201,7 +1265,11 @@ async function buildInner(input: {
   if (request.cardKind === "acceptance") {
     const flow = evidence.find((entry) => entry.kind === "flow");
     if (flow !== undefined && (flow.steps === undefined || flow.steps.length === 0)) {
-      problems.push({ code: "insufficient-evidence", detail: "流程单缺少可解析的步骤表" });
+      // YAML 的失败原因已由物证循环以 flow-state-invalid 具体登记（path+message）；此处只为 legacy
+      // Markdown 保留旧文案，避免 YAML-only 流程被误报成「缺少可解析的步骤表」。
+      if (!isFlowYamlPath(flow.path)) {
+        problems.push({ code: "insufficient-evidence", detail: "流程单缺少可解析的步骤表" });
+      }
     }
   }
 

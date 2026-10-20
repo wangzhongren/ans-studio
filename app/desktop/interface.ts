@@ -1,5 +1,6 @@
 import type { PersistenceReply, PersistenceValues, PersistenceUpdated, PersistenceScope } from "./session.ts";
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
+import path from "node:path";
 import { readFile, readdir } from "node:fs/promises";
 import { createProjectDocumentReader } from "../../src/pipeline/project-document/read-project-document.ts";
 import type { ProjectDocumentRef, ProjectDocumentScope, DocumentReadErrorCode, ReadProjectDocumentResult } from "../../src/model/project-document.ts";
@@ -55,10 +56,12 @@ import {
   type GovernanceMigrationPreviewResult,
   type GovernanceMigrationResult,
   type GovernanceMigrationWriteInput,
+  type GovernanceLedgerEntry,
 } from "../../src/pipeline/orchestration/govern-session.ts";
 export type { GovernanceMigrationPreviewResult, GovernanceMigrationResult } from "../../src/pipeline/orchestration/govern-session.ts";
 // 只读 pin 证据检查：**唯一实现**在门禁引擎私有模块，只经 Service 公开出口消费（跨角色边界纪律）。
-import { inspectPinnedBoundaries } from "../../src/service/boundary/resolve-boundary.ts";
+// 2026-10-20：内置治理角色判定同样经该 Service 公开出口（看护自动中止按角色映射开关用；不复制 id 列表）。
+import { inspectPinnedBoundaries, isBuiltInGovernanceRoleId } from "../../src/service/boundary/resolve-boundary.ts";
 import { createChatDemoAdapter } from "./chat-adapter.ts";
 
 import {
@@ -106,16 +109,29 @@ import {
   buildAcceptanceTaskMessage,
   buildAppointmentWriteReminderMessage,
   buildGovernanceAdvanceMessage,
+  buildNominationAlreadyDoneMessage,
   flowCompletionIssue,
   governanceAcceptanceAdvanceNote,
+  governanceAcceptanceBlockedNote,
   governanceAdvanceSuccessNote,
   governanceAppointmentWriteNote,
   governanceFlowPath,
+  governanceFlowStatePath,
+  governanceNominationAlreadyDoneNote,
   governanceNominationFollowUpNote,
   type GovernanceAdvanceResult,
   type GovernanceNextStepContext,
   type GovernanceNextStepPayload,
 } from "./governance-advance.ts";
+// 流程**机器状态**（2026-10-19 客户决定「这些全部改成yaml。」）：自动验收门读 `docs/flows/<flowId>.yaml`，
+// 用编排的 `parseFlowStateYaml` + `evaluateFlowCompletion` 判定；Markdown 仅人读视图（YAML 缺失时才
+// legacy 回退）。**只经 Pipeline 公共出口**消费（`src/pipeline/orchestration/flow-state.ts` 薄再导出），
+// 不直接 import 编排私有 `src/common/编排/`；单一实现与 schema 由编排拥有。
+import {
+  evaluateFlowCompletion,
+  flowStatePath,
+  parseFlowStateYaml,
+} from "../../src/pipeline/orchestration/flow-state.ts";
 // G-2（2026-10-16 客户批准）：恢复确认卡通道（W5——presenter/回包/关窗清帐在 main 接线，本层只透传）与
 // 看护服务（W1+W3——同源快照/系统投递/观察转发都在 SessionManager，本层装配并起停 tick）。
 import type { RecoveryConfirmPresenter } from "./recovery-channel.ts";
@@ -496,6 +512,15 @@ export interface DesktopDeps {
    * 项目 ∪ 有会话语/队列的项目。
    */
   watchdogOptions?: { now?: () => number; config?: Partial<WatchdogConfig> };
+  /**
+   * **链式治理推进的目标事实轮询（2026-10-20 真机假错误修复；测试可缩短）**：
+   * `advanceGovernanceFlow` 的 followUp 链不再用「角色当前是否 idle」判完成（刚投递/会话被释放时会立即
+   * 假失败——真机 5ms 误报），改为**有界轮询目标事实**：流程状态 YAML 落盘且可解析 / 任命目标角色卡出现。
+   * 缺省 500ms 轮询、最长 15min（与看护回合自动中止时限同量级）；`settledGraceMs` 是「角色已 settled」
+   * 的短宽限（会话活着、不忙、无后续投递、未被中止——期间仍持续探测事实；会话被释放或被中止不算 settled，
+   * 继续等下一次投递/重试）。生产不传，走默认常量。
+   */
+  governanceChainOptions?: { pollIntervalMs?: number; timeoutMs?: number; settledGraceMs?: number };
 }
 
 export interface DesktopInterface {
@@ -593,9 +618,10 @@ export interface DesktopInterface {
   /**
    * **应用代客户推进治理流程（2026-10-18 客户修正；同日真机修正为四角色闭环）**：客户决定成功后
    * （`governance:next-step` 回调），在**后台**打开目标治理角色（Nominator/Convener）会话并投递**唯一一条**任务——
-   * `proposal accept` → **先** Convener 写 `docs/flows/<flowId>.md`（步骤表，首步提名）；等 Convener 本轮真正
-   * 空闲后检查流程单：落盘 ⇒ 再派 Nominator（消息带流程路径），缺失/超时 ⇒ 系统行如实报错、**不循环**；
-   * `accept-quick`/`appointment` → Convener 写流程单/排程（既有逻辑）。
+   * `proposal accept` → **先** Convener 写 `docs/flows/<flowId>.yaml`（唯一机器状态，首步提名）；应用**有界轮询**
+   * 该 YAML 事实（存在且通过校验才放行；角色瞬时忙闲不作判据），合法 ⇒ 再派 Nominator（消息带 YAML 路径），
+   * 缺失/非法/超时 ⇒ 系统行如实报错一次、**不循环**；
+   * `accept-quick`/`appointment` → Convener 写流程状态 YAML/排程（既有逻辑）。
    * **不抢 `activeRoleId`、不切当前 pane、不自动批准/写盘、不写客户决定**；成功/失败都经既有
    * `delivery-note` 系统行落在发起卡片的角色聊天流（失败如实、不重试循环）。
    * 仅由主进程 `governance:next-step` 回调调用——**不挂 IPC、不暴露给渲染侧**。
@@ -684,6 +710,25 @@ function reacceptGuardResult(message: string): ReacceptGovernancePinsResult {
 
 /** 预览摘要形状：非空 64 位十六进制（`GovernanceReacceptPreview.previewDigest`）。 */
 const PREVIEW_DIGEST_HEX_64 = /^[0-9a-fA-F]{64}$/;
+
+/**
+ * 链式治理推进（`advanceGovernanceFlow` 两段式）的**目标事实轮询**参数（2026-10-20 真机修复）。
+ * 旧实现用 `waitForRoleIdle` 判「Convener 本轮结束」：刚投递时会话可能尚未标记 busy、也可能被并发重建/
+ * 释放——真机在 `advance.dispatched` 后 5ms 就误报「本轮未在时限内结束」。完成条件是**目标事实**
+ * （`docs/flows/<flowId>.yaml` 落盘且通过 `parseFlowStateYaml`），不是角色的瞬时忙闲。
+ */
+const GOVERNANCE_CHAIN_POLL_INTERVAL_MS = 500;
+/** 目标事实的最长等待：15min（与看护回合自动中止时限同量级，留出一次重试/修复落盘的时间）。 */
+const GOVERNANCE_CHAIN_TIMEOUT_MS = 15 * 60 * 1000;
+/** 角色 settled（会话仍活着、不忙、无排队投递、未被中止）后的短宽限：期间继续探测事实，仍不落定才如实失败。 */
+const GOVERNANCE_CHAIN_SETTLED_GRACE_MS = 2_000;
+
+/** 流程状态 YAML 的一次探测结果（链式推进的事实轮询用；只读）。 */
+type FlowStateProbe =
+  | { state: "valid"; nominationDone: boolean }
+  | { state: "missing" }
+  | { state: "invalid"; error: string }
+  | { state: "unreadable"; message: string };
 
 /** 治理模型封闭值域（评审 §5.1/§5.5；缺省 `single`）。 */
 function isGovernanceModelValue(value: unknown): value is GovernanceModel {
@@ -788,7 +833,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   };
 
   // —————— 验收完成检查调度（2026-10-19 客户反馈：「独立核准应该是标准流程」）——————
-  // 触发面：任一角色 settle（含 Convener 的流程单/账本更新轮）、回交到达、桌面侧治理账本追加
+  // 触发面：任一角色 settle（含 Convener 的流程状态 YAML/账本更新轮）、回交到达、桌面侧治理账本追加
   // （dispatch.accepted）、导入项目/应用启动后的一次性补齐。调度是**事件 + 有界 tick**：同一项目在
   // 一个 40ms 窗口内最多跑一次检查（后续事件合并不顺延），不是无界轮询。
   const ACCEPTANCE_CHECK_DELAY_MS = 40;
@@ -801,9 +846,82 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   const acceptanceEvidenceByFlow = new Map<string, string[]>();
   /** 每 flow 只派一次（运行期）；持久化去重另见账本 `acceptanceDispatchRecorded`。 */
   const acceptanceDispatchedFlows = new Set<string>();
+  /**
+   * 每 flow 最近一次**已告知**的收尾门阻塞原因（`flowCompletionIssue` 原文）。同一 flow + 同一原因只发
+   * 一次（见 `governanceAcceptanceBlockedNote`），避免每个 settle 刷屏；原因变化才再发。门通过时清除 ⇒
+   * 「已解决后再次阻塞」（即使原因文本相同）也会重新告知。运行期记忆：不写账本、不改门禁判定。
+   */
+  const acceptanceBlockedNotified = new Map<string, string>();
   /** 每项目最多一条「无法确定项目引擎」系统行（后续真实事件只记诊断；不循环重试、不刷屏）。 */
   const acceptanceRuntimeUnresolvedNotified = new Set<string>();
   let runAcceptanceCheck: ((projectRoot: string, trigger: "settle" | "ledger" | "import") => Promise<void>) | undefined;
+
+  // —————— 写卡后推进检查（2026-10-19 真机第二缺陷：Crew 已写出角色卡但应用不重新枚举/不自动推进）——————
+  // 触发：`appointment-write` answered（含判断代批确认）后、任意内置治理角色 settle 后。先强制刷新 listing，
+  // 再按账本 appointment 决定核对目标角色是否全部枚举；齐备且尚无 appointment 之后的 convener
+  // dispatch.accepted ⇒ 复用既有 appointment 任务自动派 Convener（每 flow+convener 运行期一次；
+  // 持久化去重看账本）。刷新失败/角色仍缺/派发失败**只记诊断**，不发系统行、不循环。
+  let runPostWriteAdvanceCheck: ((projectRoot: string) => Promise<void>) | undefined;
+  /** 事件突发合并窗口；`roles-missing` 的**有界**重试延迟（写卡落盘/枚举可能滞后）。 */
+  const POST_WRITE_ADVANCE_DELAY_MS = 40;
+  const POST_WRITE_ADVANCE_RETRY_DELAYS = [100, 300, 600] as const;
+  const postWriteAdvanceTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  /**
+   * **appointment → Convener 的共享运行期去重键**（2026-10-19 真机：新检查与原 appointment 链路
+   * 都派了 Convener）。两条链路共用同一 Set：投递前先占位、成功保留、失败释放；账本是跨重启的
+   * best-effort 持久化去重（append 异步，不能作为进程内唯一判据）。
+   *
+   * 键的 projectRoot 先**规范化**：`path.resolve` 去相对路径/尾斜杠，`realpath` 解析 `/var`→`/private/var`
+   * 等符号链接（best-effort，失败保留 resolve 结果；按输入字符串缓存，项目根在进程内不变）。
+   */
+  const canonicalProjectRootCache = new Map<string, string>();
+  const canonicalProjectRoot = (projectRoot: string): string => {
+    const cached = canonicalProjectRootCache.get(projectRoot);
+    if (cached !== undefined) return cached;
+    let canonical = path.resolve(projectRoot);
+    try {
+      canonical = realpathSync.native(canonical);
+    } catch {
+      /* 根不存在/权限不足：保留 path.resolve 结果（键仍可退化为同一字面量比较） */
+    }
+    canonicalProjectRootCache.set(projectRoot, canonical);
+    return canonical;
+  };
+  const postWriteAdvanceDispatched = new Set<string>();
+  /** 账本写入侧的**第二道去重**（同 project+flow+target）：即使两条链路都走到发送，也只产生一条 app 审计。 */
+  const applicationDispatchCommitted = new Set<string>();
+  const applicationConvenerDispatchKey = (projectRoot: string, flowId: string): string =>
+    `${canonicalProjectRoot(projectRoot)}\u0000${flowId}\u0000convener`;
+  /** 同一项目串行检查；运行中到达的事件/重试记入 pending——结束后按更早的延迟补跑，不吞信号。 */
+  const postWriteAdvanceRunning = new Set<string>();
+  const postWriteAdvancePending = new Map<string, { delayMs: number; mode: "event" | "retry" }>();
+  /** `roles-missing` 的有界重试计数（外部真实事件重置；成功/无需推进时清除）。 */
+  const postWriteAdvanceRetries = new Map<string, number>();
+  const schedulePostWriteAdvanceCheck = (
+    projectRoot: string,
+    runtime?: RuntimeKind,
+    delayMs: number = POST_WRITE_ADVANCE_DELAY_MS,
+    mode: "event" | "retry" = "event",
+  ): void => {
+    if (typeof projectRoot !== "string" || projectRoot === "") return;
+    if (runtime !== undefined) acceptanceRuntimeHints.set(projectRoot, runtime);
+    if (mode === "event") postWriteAdvanceRetries.delete(projectRoot); // 真实事件 = 新一轮有界重试
+    if (postWriteAdvanceRunning.has(projectRoot)) {
+      // 运行中到达：不丢信号；保留更早的一次补跑（事件 40ms 优先于重试延迟）。
+      const pending = postWriteAdvancePending.get(projectRoot);
+      if (pending === undefined || delayMs < pending.delayMs) {
+        postWriteAdvancePending.set(projectRoot, { delayMs, mode });
+      }
+      return;
+    }
+    if (postWriteAdvanceTimers.has(projectRoot)) return; // 已有窗口：合并，窗口后的检查会看到最新状态
+    const timer = setTimeout(() => {
+      postWriteAdvanceTimers.delete(projectRoot);
+      void (runPostWriteAdvanceCheck?.(projectRoot) ?? Promise.resolve());
+    }, delayMs);
+    (timer as { unref?: () => void }).unref?.();
+    postWriteAdvanceTimers.set(projectRoot, timer);
+  };
 
   /**
    * **解析自动派发/冷启动补齐要用的引擎**（2026-10-19 真机缺陷修复）。优先级全部在
@@ -852,11 +970,76 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     acceptanceCheckTimers.set(projectRoot, timer);
   }
 
-  /** 项目内可检查的流程：`docs/flows/*.md`（唯一流程单位；流程单缺失的 flowId 无从机械核对）。 */
+  /**
+   * 应用动作审计的**唯一写入口**：`dispatch.accepted{actorRoleId:"app",power:"app"}`——应用推进
+   * **不是客户批准**（不写 customerDecision/decisionEvidence）。仅 trio 且项目根存在时写；失败只记诊断、
+   * 不翻转已完成的投递、不重试。`advanceGovernanceFlow` 与「写卡后推进检查」共用，不造第二套写法。
+   */
+  const appendApplicationDispatch = async (input: {
+    projectRoot: string;
+    flowId?: string;
+    targetRoleId: "nominator" | "convener";
+    text: string;
+    stepId?: string;
+    runtime: RuntimeKind;
+    trigger?: "customer-decision" | "settle";
+    /**
+     * 账本写入侧去重键（同 project+flow+target）。发送侧已占位的链路也传同一键：
+     * 即使两条链路都走到发送，也只产生一条 app 审计；append 失败释放，允许后续事件补写。
+     */
+    dedupeKey?: string;
+  }): Promise<boolean> => {
+    const diagnostic = createDiagnosticLogger({
+      component: "desktop.governance-advance",
+      projectRoot: input.projectRoot,
+      roleId: input.targetRoleId,
+    });
+    if (input.dedupeKey !== undefined && applicationDispatchCommitted.has(input.dedupeKey)) return true;
+    const ledgerModel = listingCache.get(input.projectRoot)?.governanceModel ?? "single";
+    if (ledgerModel !== "trio") return false;
+    if (!existsSync(input.projectRoot)) {
+      diagnostic.record("advance.ledger.skipped", { reason: "project-root-missing", targetRoleId: input.targetRoleId });
+      return false;
+    }
+    if (input.dedupeKey !== undefined) applicationDispatchCommitted.add(input.dedupeKey);
+    const appended = await appendGovernanceLedger(input.projectRoot, {
+      at: new Date().toISOString(),
+      kind: "dispatch.accepted",
+      ...(input.flowId !== undefined ? { flowId: input.flowId } : {}),
+      actorRoleId: "app",
+      power: "app",
+      trigger: input.trigger ?? "customer-decision",
+      targetRoleId: input.targetRoleId,
+      ...(input.stepId !== undefined ? { stepId: input.stepId } : {}),
+      messageSummary: ledgerSummary(input.text),
+      runtime: input.runtime,
+    });
+    if (!appended.ok) {
+      if (input.dedupeKey !== undefined) applicationDispatchCommitted.delete(input.dedupeKey);
+      diagnostic.error("advance.ledger.failed", new Error(appended.message), {
+        flowId: input.flowId,
+        targetRoleId: input.targetRoleId,
+      });
+      return false;
+    }
+    // 账本发生变更（dispatch.accepted 追加）⇒ 触发一次有界验收检查（在途工作由检查器自行推迟）。
+    scheduleAcceptanceCheck(input.projectRoot, "ledger");
+    return true;
+  };
+
+  /**
+   * 项目内可检查的流程：`docs/flows/*.yaml`（机器状态，2026-10-19 客户决定）∪ `docs/flows/*.md`
+   * （legacy 回退与人读视图）。YAML 是唯一机器状态；Markdown 仅用于发现「尚无 YAML」的 legacy 流程。
+   * 两者都没有的 flowId 无从机械核对。
+   */
   async function listGovernanceFlowIds(projectRoot: string): Promise<string[]> {
     try {
       const names = await readdir(`${projectRoot}/docs/flows`);
-      return [...new Set(names.filter((name) => name.endsWith(".md")).map((name) => name.slice(0, -3)).filter((id) => id !== ""))];
+      const ids = names
+        .filter((name) => name.endsWith(".yaml") || name.endsWith(".md"))
+        .map((name) => name.replace(/\.(?:yaml|md)$/, ""))
+        .filter((id) => id !== "");
+      return [...new Set(ids)];
     } catch {
       return [];
     }
@@ -881,6 +1064,9 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         ?.roles.find((role) => role.roleId === envelope.roleId);
       if (settledRole?.builtIn === true && settledRole.governanceFunction !== undefined) {
         scheduleGovernanceListingRefresh(envelope.projectRoot);
+        // 2026-10-19 真机第二缺陷：治理角色（尤其 Crew 写完角色卡）settle 后先强制刷新枚举，再由
+        // 写卡后推进检查兜底派 Convener（有界、去重；与既有 appointment 链路共用同一任务文本）。
+        schedulePostWriteAdvanceCheck(envelope.projectRoot, envelope.runtime);
       }
       if (isPrimaryRole(envelope.projectRoot, envelope.roleId)) {
         deps.emitProjectChanged?.();
@@ -904,6 +1090,32 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       projects: () => [...new Set([...listingCache.keys(), ...manager.projectRootsWithActivity()])],
       snapshot: (root) => manager.watchdogSnapshot(root),
       deliver: (root, message) => manager.watchdogDeliver(root, message),
+      // 2026-10-20 真机（Convener 卡 1h、队列 24）：看护覆盖**所有角色**（含内置治理角色）——
+      // 自动开关按角色映射：内置治理角色 ↑「替我决策」、项目角色 ↑「替我审批」；关闭 ⇒ 旧语义（只告警、1h 兜底）。
+      autoRecoveryEnabled: (root, roleId) => {
+        const builtIn =
+          listingCache.get(root)?.roles.find((role) => role.roleId === roleId)?.builtIn === true ||
+          isBuiltInGovernanceRoleId(roleId);
+        return builtIn ? decisionJudgeSwitch.isEnabled() : shellJudgeSwitch.isEnabled();
+      },
+      // 自动中止：请求停止该回合，成功后按既有投递机再 drain 一次（settled 前 drain 自判忙并保留；
+      // settled 后由既有路径放行）。失败只记诊断、不循环（同一 role+turnId 已由看护去重）。
+      onTurnDeadline: (root, roleId, runtime) => {
+        const diagnostic = createDiagnosticLogger({ component: "desktop.watchdog", projectRoot: root, roleId });
+        void manager
+          .abort({ projectRoot: root, roleId, runtime })
+          .then((res) => {
+            if (!res.ok) {
+              diagnostic.record("watchdog.auto-abort.failed", { reasonCode: res.supported === false ? "unsupported" : "abort-error" });
+              return;
+            }
+            diagnostic.record("watchdog.auto-abort.executed", { state: "requested" });
+            return manager.redeliverNudge({ projectRoot: root, roleId, runtime }).catch((err) => {
+              diagnostic.error("watchdog.auto-abort.nudge.failed", err);
+            });
+          })
+          .catch((err) => diagnostic.error("watchdog.auto-abort.failed", err));
+      },
       ...(deps.watchdogOptions ?? {}),
     });
   } catch (error) {
@@ -913,16 +1125,17 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
 
   // —————— 收尾推进（2026-10-18 真机缺口；2026-10-19 客户反馈「独立核准应该是标准流程」）——————
   // 触发面：**任意角色 settle**、回交到达/settle、桌面侧治理账本追加（dispatch.accepted）、导入项目/启动
-  // 后的补齐检查。本层只读流程单与账本做**触发门**检查，全部完成且证据按步骤类型齐备才后台派 Proof /
+  // 后的补齐检查。本层只读流程状态与账本做**触发门**检查，全部完成且证据按步骤类型齐备才后台派 Proof /
   // 验收（verifier）一条复核任务；不自动验收、不代批（验收卡仍走决策开关/客户手批）。
+  // 机器状态（2026-10-19 客户决定「这些全部改成yaml。」）：优先 `docs/flows/<flowId>.yaml`
+  // （`parseFlowStateYaml` + `evaluateFlowCompletion`，证据按显式 kind 对账）；同名 `.md` 只是人读视图，
+  // 不参与判定。仅 YAML **不存在**时回退 legacy Markdown `flowCompletionIssue`（诊断标注 legacy）。
   // 去重：运行期每 flow 一次 + 账本 `dispatch.accepted{targetRoleId:verifier}` 持久化（重启不重派）；
-  // 失败如实落 Convener / Lead 系统行，不循环重试。
+  // 失败如实落 Lead（主入口）系统行，不循环重试。
   const dispatchAcceptanceForFlow = async (info: {
     projectRoot: string;
     flowId: string;
     runtime?: RuntimeKind;
-    /** 系统行落位角色（trio=Convener；single=主入口）；缺省由 SessionManager 从 listing 推导。 */
-    roleId?: string;
     evidence: readonly string[];
     /** 回交 settle 是确定性完成信号：不因该回交自身仍在 `activeDeliveries` 而推迟。 */
     force?: boolean;
@@ -933,8 +1146,11 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     const key = acceptanceFlowKey(info.projectRoot, info.flowId);
     if (acceptanceDispatchedFlows.has(key)) return; // 每 flow 只派一次（运行期）
     acceptanceDispatchedFlows.add(key); // 先占位：防同一 settle 批次/并发重复派
-    const noteRoleId =
-      manager.governanceOwnerRoleId(info.projectRoot) ?? info.roleId ?? listing.primaryRoleId;
+    // 2026-10-19 客户决定（经项目管理转达）：自动验收门的反馈**统一发给 Lead（主入口）**，不再发
+    // Convener——包括「未派发 + 具体原因 + superseded/新 stepId 建议」「已自动派发验收复核给 Proof」
+    // 以及既有失败/引擎无法确定行。落位只取 `listProject` 的 `primaryRoleId`（真实 trio = liaison），
+    // 不硬编码角色 id、不按 `governanceFunction` 另行推导。
+    const noteRoleId = listing.primaryRoleId;
     const diagnostic = createDiagnosticLogger({ component: "desktop.governance-acceptance", projectRoot: info.projectRoot, roleId: noteRoleId });
     // 系统行的呈现路由：冷启动解析出引擎后改用**实际引擎**（否则 Pi 视图会过滤掉落给默认 claude 的行）；
     // 解析失败时仍用已知提示或桌面默认（保证「无法确定项目引擎」这条行可见）。
@@ -959,21 +1175,73 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         diagnostic.record("acceptance.deferred.active-work", { flowId: info.flowId });
         return;
       }
+      // —————— 机器状态判定：YAML 优先，Markdown 仅 legacy 回退 ——————
+      // `docs/flows/<flowId>.yaml` 存在 ⇒ 它是**唯一机器状态**：语法/形状/保留 id 校验失败、或证据不足，
+      // 一律不派并把**具体错误**作为 Lead 系统行（去重）——绝不因 Markdown 表好看而放行。
+      // 仅 YAML **不存在**（ENOENT）时回退既有 Markdown 门，并标注 legacy 诊断（迁移提示，不改变行为）。
+      const flowStateRel = flowStatePath(info.flowId);
       const flowRel = governanceFlowPath(info.flowId);
-      let markdown: string;
+      let flowStateText: string | undefined;
       try {
-        markdown = await readFile(`${info.projectRoot}/${flowRel}`, "utf8");
+        flowStateText = await readFile(`${info.projectRoot}/${flowStateRel}`, "utf8");
       } catch (error) {
-        diagnostic.record("acceptance.flow.unreadable", { flowId: info.flowId });
-        acceptanceDispatchedFlows.delete(key); // 流程单未落盘：保持现状，后续事件可再检查
-        return;
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+          // 存在但不可读（权限/IO）：按不可读处理，不落 legacy 猜测；后续事件可再检查。
+          diagnostic.error("acceptance.flow-state.unreadable", error, { path: flowStateRel });
+          acceptanceDispatchedFlows.delete(key);
+          return;
+        }
       }
-      const issue = flowCompletionIssue(info.flowId, markdown, ledger);
+      let issue: string | undefined;
+      let issueMode: "yaml" | "legacy" = "yaml";
+      let issuePath = flowStateRel;
+      if (flowStateText !== undefined) {
+        const parsed = parseFlowStateYaml(flowStateText, info.flowId);
+        if (!parsed.ok) {
+          // 校验错误逐条带 YAML 文档路径（如 steps[2].status），系统行/诊断里给具体错误。
+          const detail = parsed.errors.slice(0, 10).map((item) => `${item.path}: ${item.message}`).join("；");
+          issue = `流程状态 YAML 校验失败：${detail}`;
+          diagnostic.record("acceptance.flow-state.invalid", {
+            path: flowStateRel,
+            count: parsed.errors.length,
+            mode: "yaml",
+          });
+        } else {
+          // 账本坏行/不可读由编排判定同一实现 fail-closed（`FlowLedgerInput` 接受 {entries, errors}）。
+          const evaluation = evaluateFlowCompletion(parsed.flow, ledger);
+          if (!evaluation.ready) issue = evaluation.issues.slice(0, 10).join("；");
+        }
+      } else {
+        issueMode = "legacy";
+        issuePath = flowRel;
+        diagnostic.record("acceptance.flow-state.missing", { path: flowRel, mode: "legacy" });
+        let markdown: string;
+        try {
+          markdown = await readFile(`${info.projectRoot}/${flowRel}`, "utf8");
+        } catch (error) {
+          diagnostic.record("acceptance.flow.unreadable", { path: flowRel, mode: "legacy" });
+          acceptanceDispatchedFlows.delete(key); // 流程单未落盘：保持现状，后续事件可再检查
+          return;
+        }
+        issue = flowCompletionIssue(info.flowId, markdown, ledger);
+      }
       if (issue !== undefined) {
-        diagnostic.record("acceptance.flow.incomplete", { flowId: info.flowId, reason: issue });
+        diagnostic.record("acceptance.flow.incomplete", { flowId: info.flowId, reason: issue, mode: issueMode });
+        // 2026-10-19 客户反馈「这个难道不是bug吗」：门 fail-closed 正确，但原因只进诊断日志 ⇒
+        // Steward/客户看不到，只能由操作者手动复算转告——**静默本身是缺陷**。把具体原因 + 可操作建议
+        // 作为系统行发给 Lead（主入口；2026-10-19 客户决定：统一发 Lead，不再发 Convener）。
+        // 去重：同一 flow + 同一原因只发一次；原因变化再发；不循环重试、不改门禁判定
+        // （不自动把 failed/aborted 当 superseded、不自动派 Proof）。建议路径随模式指向 YAML/legacy MD。
+        if (acceptanceBlockedNotified.get(key) !== issue) {
+          acceptanceBlockedNotified.set(key, issue);
+          note(governanceAcceptanceBlockedNote(info.flowId, issue, issuePath));
+          diagnostic.record("acceptance.flow.incomplete.notified", { flowId: info.flowId, reason: issue, mode: issueMode, roleId: noteRoleId });
+        }
         acceptanceDispatchedFlows.delete(key); // 未完成/证据不足：不派；后续事件可再检查（不是循环）
         return;
       }
+      // 门已通过（本次判定）：清除阻塞告知记忆——若之后再次被挡（即使原因文本相同）会重新告知。
+      acceptanceBlockedNotified.delete(key);
       const evidence =
         info.evidence.length > 0 ? info.evidence : acceptanceEvidenceByFlow.get(key) ?? [];
       // 引擎选择（2026-10-19 真机缺陷修复）：活跃会话/真实事件 → 应用内已选/持久化 → `.ans/sessions`
@@ -1015,6 +1283,9 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         note(`收尾推进失败：发送验收任务给 Proof / 验收 失败：${sent.error ?? "未知原因"}；未自动重试。`);
         return;
       }
+      // 系统行在**投递成功即发**（不等审计落盘）：可见性不依赖持久化 I/O 的完成时序；账本写失败只记诊断，
+      // 不翻转「已派发」这个事实（既有语义不变，只是更早呈现）。
+      note(governanceAcceptanceAdvanceNote(info.flowId));
       // 成功派发后记住该项目实际使用的引擎（user-data 独立 JSON）——下次冷启动补齐检查据此选路；
       // 写失败只记诊断，不影响已完成的派发/审计。
       const persisted = await persistProjectRuntime(deps.runtimeStatePath, info.projectRoot, runtime);
@@ -1037,8 +1308,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       if (!appended.ok) {
         diagnostic.error("acceptance.ledger.failed", new Error(appended.message), { flowId: info.flowId });
       }
-      note(governanceAcceptanceAdvanceNote(info.flowId));
-      diagnostic.record("acceptance.dispatched", { flowId: info.flowId, queued: sent.queued === true, trigger: info.trigger });
+      diagnostic.record("acceptance.dispatched", { flowId: info.flowId, queued: sent.queued === true, trigger: info.trigger, mode: issueMode });
     } catch (error) {
       acceptanceDispatchedFlows.delete(key);
       diagnostic.error("acceptance.advance.failed", error, { flowId: info.flowId });
@@ -1091,6 +1361,9 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     customerInput: deps.customerInput,
     // G-2/W5：恢复确认卡通道（缺省 ⇒ 恢复提议「未接线、未获执行」如实回执——fail-closed）。
     recoveryConfirm: deps.recoveryConfirm,
+    // 2026-10-20（客户总原则「我勾选了替我决策就不用我来管了」）：决策开关开启 ⇒ 恢复提议不弹客户卡、
+    // 直接执行并如实回执；关闭 ⇒ 旧行为逐字不变（推卡、未确认零执行）。
+    autoDecisionEnabled: () => decisionJudgeSwitch.isEnabled(),
     // G-2/W1：看护的观察转发（settled/命令超时/真实活动）与只读统计；看护缺席 ⇒ 不转发（一切照旧）。
     watchdogObserver: watchdogService !== undefined ? (root, observation) => watchdogService!.observe(root, observation) : undefined,
     watchdogPendingConfirmations: deps.watchdogPendingSnapshot,
@@ -1105,7 +1378,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     },
   });
 
-  // 验收检查的执行体（由 `scheduleAcceptanceCheck` 的有界 tick 调用）：枚举项目流程单 → 逐 flow 过同一道
+  // 验收检查的执行体（由 `scheduleAcceptanceCheck` 的有界 tick 调用）：枚举项目流程状态文件 → 逐 flow 过同一道
   // 触发门。`dispatch.accepted` 的账本去重保证导入/重启后的补齐检查不会重复派 Proof。
   runAcceptanceCheck = async (projectRoot: string, trigger: "settle" | "ledger" | "import"): Promise<void> => {
     const listing = listingCache.get(projectRoot);
@@ -1116,6 +1389,204 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     // 无法确定则该 flow 不派并落系统行）。
     for (const flowId of flowIds) {
       await dispatchAcceptanceForFlow({ projectRoot, flowId, evidence: [], trigger });
+    }
+  };
+
+  /**
+   * **写卡后推进检查**（2026-10-19 真机第二缺陷）：Crew 已写出角色卡/边界，但应用没有重新枚举角色、
+   * 也没有自动派下一步，流程停住（真机需重新导入项目才看到 backend/frontend/tester）。
+   *
+   * 判定（仅 trio；纯读 + 一次强制刷新）：
+   *  1. 写卡来源（Nominator）仍忙 ⇒ 先等其本轮 settle（有界 8s），避免在角色卡落盘前抢跑；
+   *  2. `manager.refreshListingNow` 强制刷新**共享** listing，并 `emitProjectChanged`（左树立即可见）；
+   *  3. 读账本；对每个 flow 的**最新 appointment 决定**取 `targetRoleIds`；
+   *  4. 目标角色必须**全部**出现在最新 listing；缺 ⇒ 只记诊断，并按 100/300/600ms **有界重试**（最多 3 次）；
+   *  5. appointment 之后已有到 convener 的 `dispatch.accepted`、或已有验收决定 ⇒ 既有链路已推进/已收口，不派；
+   *  6. 否则复用既有 appointment 任务文本（`buildGovernanceAdvanceMessage`）派 Convener，并写同形
+   *     `dispatch.accepted{actorRoleId:"app",power:"app",trigger:"customer-decision"}`。
+   *
+   * 去重：运行期 Set（同 project+flow+convener 一次，canonical root）+ 账本持久化；失败只记诊断并释放
+   * 占位（下一次真实事件可再试，不循环）。运行中到达的事件/重试记入 pending，结束后补跑一次（不吞信号）。
+   * **不伪造客户决定、不绕过门禁**。
+   */
+  runPostWriteAdvanceCheck = async (projectRoot: string): Promise<void> => {
+    if (postWriteAdvanceRunning.has(projectRoot)) return;
+    postWriteAdvanceRunning.add(projectRoot);
+    const diagnostic = createDiagnosticLogger({ component: "desktop.governance-advance", projectRoot });
+    try {
+      if ((listingCache.get(projectRoot)?.governanceModel ?? "single") !== "trio") return;
+      // 写卡来源可能仍在跑（appointment-write 刚作答）：先等 Nominator 本轮 settle（有界 8s）。
+      // 角色卡通常在同一轮内写出；超时也继续（由 roles-missing 有界重试兜底）。
+      const nominatorRuntime =
+        manager.liveSessionViews().find((view) => view.projectRoot === projectRoot && view.roleId === "nominator")?.runtime ??
+        acceptanceRuntimeHints.get(projectRoot) ??
+        manager.activeRuntimeFor(projectRoot);
+      if (nominatorRuntime !== undefined && manager.isRoleBusy(projectRoot, "nominator", nominatorRuntime)) {
+        const settled = await manager.waitForRoleSettle(projectRoot, "nominator", nominatorRuntime, 8000);
+        diagnostic.record("advance.post-write.source-settle", { busy: true, settled, count: settled ? 1 : 0 });
+      }
+      const refreshed = await manager.refreshListingNow(projectRoot);
+      if (!refreshed) {
+        diagnostic.record("advance.post-write.refresh-failed", { projectRoot });
+        return;
+      }
+      // 左树立即可见新写出的角色卡（真机：不重新导入看不到 backend/frontend/tester）。
+      try {
+        deps.emitProjectChanged?.();
+      } catch (error) {
+        diagnostic.error("project.changed.emit.failed", error);
+      }
+      const listing = listingCache.get(projectRoot);
+      if (listing?.governanceModel !== "trio") return;
+      const ledger = await readGovernanceLedger(projectRoot);
+      if (ledger.errors.length > 0) {
+        diagnostic.record("advance.post-write.ledger-unreadable", { count: ledger.errors.length });
+        return;
+      }
+      const latestAppointment = new Map<string, { entry: GovernanceLedgerEntry; index: number }>();
+      ledger.entries.forEach((entry, index) => {
+        if (
+          entry.kind === "customer.decision" &&
+          entry.decisionKind === "appointment" &&
+          typeof entry.flowId === "string" &&
+          entry.flowId !== ""
+        ) {
+          latestAppointment.set(entry.flowId, { entry, index });
+        }
+      });
+      let missingSeen = false;
+      for (const [flowId, { entry: appointment, index }] of latestAppointment) {
+        const targets = (appointment.targetRoleIds ?? []).filter(
+          (id): id is string => typeof id === "string" && id.trim() !== "",
+        );
+        if (targets.length === 0) continue;
+        const missing = targets.filter((roleId) => !listing.roles.some((role) => role.roleId === roleId));
+        if (missing.length > 0) {
+          // 角色仍缺：只记诊断；本轮结束后统一按 100/300/600ms 有界重试（不派、不发系统行）。
+          diagnostic.record("advance.post-write.roles-missing", { flowId, count: missing.length });
+          missingSeen = true;
+          continue;
+        }
+        const afterwards = ledger.entries.slice(index + 1);
+        if (
+          afterwards.some(
+            (entry) =>
+              entry.kind === "dispatch.accepted" &&
+              entry.flowId === flowId &&
+              entry.targetRoleId === "convener" &&
+              // 2026-10-20：Lead→Steward 协调消息也记 dispatch.accepted（power:"liaison"），
+              // 但它不是步骤派发——不得据此跳过 appointment → Convener 的补齐推进。
+              entry.power !== "liaison",
+          )
+        ) {
+          continue; // 既有 appointment 链路已派过 Convener（含重启前）
+        }
+        if (
+          afterwards.some(
+            (entry) => entry.kind === "customer.decision" && entry.flowId === flowId && entry.decisionKind === "acceptance",
+          )
+        ) {
+          continue; // 流程已收口，不再补派
+        }
+        const key = applicationConvenerDispatchKey(projectRoot, flowId);
+        if (postWriteAdvanceDispatched.has(key)) continue;
+        const payload: GovernanceNextStepPayload = {
+          version: 1,
+          flowId,
+          cardKind: "appointment",
+          nextFunction: "schedule",
+          roleId: "convener",
+        };
+        // 2026-10-20 真机：YAML 已存在时派给 Convener 的必须是「用 flow_get / flow_step_update /
+        // flow_step_supersede 推进」，不是「请先写流程状态 YAML」——否则它照旧去写文件、不调 flow 工具。
+        const message = buildGovernanceAdvanceMessage(payload, targets, {
+          flowStateExists: existsSync(path.join(projectRoot, governanceFlowStatePath(flowId))),
+        });
+        if (message === null) continue;
+        // **先占位，再跨 await**（2026-10-19 全仓回归：原链路与新检查在引擎解析 await 窗口内互相
+        // 看不到对方的登记，各派一次）。占位后任何失败都释放，允许下一次真实事件重试。
+        postWriteAdvanceDispatched.add(key);
+        // 引擎：**优先真实会话提示/活跃会话**（与既有链路同一 runtime，避免为同项目另开第二 runtime
+        // 会话——那会触发 LRU 驱逐正在等待的角色会话，造成原链路误判超时）；两者都缺失（冷启动）才用
+        // 凭据感知解析器；无法确定 ⇒ 不派（绝不默认 claude）。
+        let runtime: RuntimeKind | undefined =
+          acceptanceRuntimeHints.get(projectRoot) ?? manager.activeRuntimeFor(projectRoot);
+        if (runtime === undefined) {
+          let resolution: RuntimeResolution;
+          try {
+            resolution = await resolveAcceptanceRuntime(projectRoot);
+          } catch (error) {
+            postWriteAdvanceDispatched.delete(key);
+            diagnostic.error("advance.post-write.runtime.failed", error, { flowId });
+            continue;
+          }
+          if (!resolution.ok) {
+            postWriteAdvanceDispatched.delete(key);
+            diagnostic.record("advance.post-write.runtime-unresolved", { flowId });
+            continue;
+          }
+          runtime = resolution.runtime;
+        }
+        const opened = await manager.openBackground({ projectRoot, roleId: "convener", runtime });
+        if (!opened.ok) {
+          postWriteAdvanceDispatched.delete(key);
+          diagnostic.error("advance.post-write.open.failed", new Error(opened.error ?? "unknown"), { flowId });
+          continue;
+        }
+        const sent = await manager.sendBackground({ projectRoot, roleId: "convener", runtime, text: message });
+        if (!sent.ok) {
+          postWriteAdvanceDispatched.delete(key);
+          diagnostic.error("advance.post-write.send.failed", new Error(sent.error ?? "unknown"), { flowId });
+          continue;
+        }
+        // 成功系统行落 Lead（主入口）：自动推进 ≠ 客户批准（与既有推进系统行同文案）。
+        try {
+          emitSessionEvent({
+            roleId: listing.primaryRoleId,
+            projectRoot,
+            runtime,
+            event: { kind: "message", summary: governanceAdvanceSuccessNote(payload), detail: { source: "delivery-note" } },
+          });
+        } catch (error) {
+          diagnostic.error("advance.post-write.note.failed", error, { flowId });
+        }
+        await appendApplicationDispatch({
+          projectRoot,
+          flowId,
+          targetRoleId: "convener",
+          text: message,
+          runtime,
+          trigger: "customer-decision",
+          dedupeKey: key,
+        });
+        diagnostic.record("advance.post-write.dispatched", { flowId, queued: sent.queued === true });
+        postWriteAdvanceRetries.delete(projectRoot); // 已推进：重试计数归零
+      }
+      // roles-missing：**有界重试**（100/300/600ms，最多 3 次）——写卡落盘与 listing 缓存可能滞后；
+      // 仍缺则停止并记诊断（下一次真实事件会重置计数）。不依赖下一条 settle 才继续。
+      if (missingSeen) {
+        const attempt = postWriteAdvanceRetries.get(projectRoot) ?? 0;
+        if (attempt < POST_WRITE_ADVANCE_RETRY_DELAYS.length) {
+          postWriteAdvanceRetries.set(projectRoot, attempt + 1);
+          diagnostic.record("advance.post-write.roles-missing.retry", { count: attempt + 1 });
+          schedulePostWriteAdvanceCheck(projectRoot, undefined, POST_WRITE_ADVANCE_RETRY_DELAYS[attempt]!, "retry");
+        } else {
+          postWriteAdvanceRetries.delete(projectRoot);
+          diagnostic.record("advance.post-write.roles-missing.final", { count: attempt });
+        }
+      } else {
+        postWriteAdvanceRetries.delete(projectRoot);
+      }
+    } catch (error) {
+      diagnostic.error("advance.post-write.failed", error);
+    } finally {
+      postWriteAdvanceRunning.delete(projectRoot);
+      // 运行中到达的事件/重试：**不吞信号**；按 pending 的最早延迟补跑一次。
+      const pending = postWriteAdvancePending.get(projectRoot);
+      if (pending !== undefined) {
+        postWriteAdvancePending.delete(projectRoot);
+        schedulePostWriteAdvanceCheck(projectRoot, undefined, pending.delayMs, pending.mode);
+      }
     }
   };
 
@@ -1507,6 +1978,22 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     // 不自动批准、不写 `.ans`/账本（只记诊断）；失败不重试循环，也绝不影响当前会话。
     async advanceGovernanceFlow(input): Promise<GovernanceAdvanceResult> {
       const payload = input?.payload;
+      // 写卡确认（客户手批或判断代批）answered 后：先登记一次有界的「写卡后推进检查」——
+      // 即使本卡片推导出的 nextFunction=null（appointment-write 在推导表中就是无下一步），
+      // 也要在角色卡真正写出后刷新枚举并兜底派 Convener。检查去重、不循环。
+      if (payload?.cardKind === "appointment-write") {
+        const earlyContext = input?.context ?? {};
+        const earlyRoot =
+          typeof earlyContext.projectRoot === "string" && earlyContext.projectRoot !== ""
+            ? earlyContext.projectRoot
+            : importedProjectRoot;
+        if (earlyRoot !== undefined) {
+          schedulePostWriteAdvanceCheck(
+            earlyRoot,
+            isRuntimeKind(earlyContext.runtime) ? earlyContext.runtime : undefined,
+          );
+        }
+      }
       if (!payload || payload.nextFunction === null || payload.roleId === null) {
         return { ok: true, dispatched: false }; // 明确无下一步（验收收口/写盘/修订/拒绝）：不发任务。
       }
@@ -1540,7 +2027,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         note(`自动推进失败：${error}`);
         return { ok: false, dispatched: false, targetRoleId, error };
       };
-      /** 两段式第一段已投递、但第二段无法继续（流程单缺失/角色未写出等）：如实报错、**不重试**。 */
+      /** 两段式第一段已投递、但第二段无法继续（流程状态 YAML 缺失/非法/角色未写出等）：如实报错、**不重试**。 */
       const chainFail = (error: string, dispatchedTarget: "nominator" | "convener" = targetRoleId): GovernanceAdvanceResult => {
         diagnostic.error("advance.chain.failed", new Error(error), { flowId: payload.flowId, cardKind: payload.cardKind, targetRoleId: dispatchedTarget });
         note(`自动推进停住：${error}`);
@@ -1548,6 +2035,15 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       };
       if (projectRoot === undefined) return fail("缺少项目根，无法后台派发");
       if (runtime === undefined) return fail("缺少运行时，无法后台派发");
+      /**
+       * **appointment → Convener 的共享去重键**（与「写卡后推进检查」同一 Set）：
+       * 投递前先占位、成功保留、失败释放。账本 append 是异步的，不能作为进程内唯一判据；
+       * 非 appointment / 无 flowId 时为 undefined（不参与该去重）。
+       */
+      const appointmentConvenerKey =
+        payload.cardKind === "appointment" && payload.flowId !== undefined
+          ? applicationConvenerDispatchKey(projectRoot, payload.flowId)
+          : undefined;
       /** 后台开目标会话并投递一条任务；成功/失败都如实（不重试）。 */
       const dispatchTo = async (
         target: "nominator" | "convener",
@@ -1560,32 +2056,135 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         if (!sent.ok) return { ok: false, error: `发送任务给 ${label} 失败：${sent.error ?? "未知原因"}` };
         return { ok: true, ...(sent.queued === true ? { queued: true } : {}) };
       };
-      /** 投递成功后的应用动作审计（trio；失败只诊断、不翻转）。 */
-      const appendDispatchAccepted = async (ledgerTarget: "nominator" | "convener", text: string, ledgerStepId?: string): Promise<void> => {
-        const ledgerModel = listingCache.get(projectRoot)?.governanceModel ?? "single";
-        if (ledgerModel !== "trio") return;
-        if (!existsSync(projectRoot)) {
-          diagnostic.record("advance.ledger.skipped", { reason: "project-root-missing", targetRoleId: ledgerTarget });
-          return;
-        }
-        const appended = await appendGovernanceLedger(projectRoot, {
-          at: new Date().toISOString(),
-          kind: "dispatch.accepted",
+      /** 投递成功后的应用动作审计（trio；失败只诊断、不翻转）——复用唯一写入口 `appendApplicationDispatch`。 */
+      const appendDispatchAccepted = async (
+        ledgerTarget: "nominator" | "convener",
+        text: string,
+        ledgerStepId?: string,
+        dedupeKey?: string,
+      ): Promise<void> => {
+        await appendApplicationDispatch({
+          projectRoot,
           ...(payload.flowId !== undefined ? { flowId: payload.flowId } : {}),
-          actorRoleId: "app",
-          power: "app",
-          trigger: "customer-decision",
           targetRoleId: ledgerTarget,
+          text,
           ...(ledgerStepId !== undefined ? { stepId: ledgerStepId } : {}),
-          messageSummary: ledgerSummary(text),
+          ...(dedupeKey !== undefined ? { dedupeKey } : {}),
           runtime,
+          trigger: "customer-decision",
         });
-        if (!appended.ok) {
-          diagnostic.error("advance.ledger.failed", new Error(appended.message), { flowId: payload.flowId, targetRoleId: ledgerTarget });
-        } else {
-          // 账本发生变更（dispatch.accepted 追加）⇒ 触发一次有界验收检查（在途工作由检查器自行推迟）。
-          scheduleAcceptanceCheck(projectRoot, "ledger");
+      };
+      // —— 2026-10-20 真机假错误修复：链式推进的完成判据＝**目标事实**（有界轮询），不是角色瞬时忙闲 ——
+      // 真机证据：`advance.dispatched` 后 5ms 就 `advance.chain.convener-idle` + `chain.failed`
+      // （`waitForRoleIdle` 在会话刚被释放/尚未标记 busy 时立即 false），而 Convener 随后正常写出 YAML。
+      // 新判据：每 `chainPollIntervalMs` 读一次 `docs/flows/<flowId>.yaml`（存在且 `parseFlowStateYaml`
+      // 通过＝放行；首步 nomination 已 done 时记诊断），或每轮强制刷新 listing 直到任命目标角色全部出现。
+      // 角色忙/队列变化**不打断**轮询；会话被释放/被看护中止时**不**断言 settled（继续等下一次投递/重试）；
+      // 只有「会话仍活着、已 settled 且无后续投递」再给一次短宽限仍不落定，或到 15min 时限，才如实失败（一次）。
+      const chainPollIntervalMs = Math.max(1, deps.governanceChainOptions?.pollIntervalMs ?? GOVERNANCE_CHAIN_POLL_INTERVAL_MS);
+      const chainTimeoutMs = Math.max(1, deps.governanceChainOptions?.timeoutMs ?? GOVERNANCE_CHAIN_TIMEOUT_MS);
+      const chainSettledGraceMs = Math.max(0, deps.governanceChainOptions?.settledGraceMs ?? GOVERNANCE_CHAIN_SETTLED_GRACE_MS);
+      // 轮询定时器 unref：主进程常驻不受影响；测试子进程在用例结束/失败后不会被 15min 定时器拖住不退。
+      const chainSleep = (ms: number): Promise<void> => new Promise((resolve) => {
+        const timer = setTimeout(resolve, Math.max(1, ms));
+        (timer as { unref?: () => void }).unref?.();
+      });
+      /**
+       * 流程状态 YAML 的一次探测（只读；不写、不猜）：
+       * `valid`（解析通过；顺带给出首步 nomination 是否 done）/ `missing` / `invalid`（带具体 path+message）/
+       * `unreadable`（ENOENT 以外的读错——可能瞬时，轮询期间不立即判死）。
+       */
+      const probeFlowStateYaml = async (flowId: string): Promise<FlowStateProbe> => {
+        const flowStatePath = governanceFlowStatePath(flowId);
+        let flowStateText: string;
+        try {
+          flowStateText = await readFile(`${projectRoot}/${flowStatePath}`, "utf8");
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === "ENOENT") return { state: "missing" };
+          return { state: "unreadable", message: error instanceof Error ? error.message : String(error) };
         }
+        const parsedFlowState = parseFlowStateYaml(flowStateText, flowId);
+        if (!parsedFlowState.ok) {
+          const detail = parsedFlowState.errors.slice(0, 10).map((item) => `${item.path}: ${item.message}`).join("；");
+          return { state: "invalid", error: detail };
+        }
+        // 首步提名（`nomination*`；无同名步骤时退回第一步）：done 是「可继续」的强信号，但**不**作为放行前提——
+        // 合法 YAML + 可解析步骤表即可继续（与旧行为一致，避免把状态字面值当成第二道门）。
+        const nominationStep =
+          parsedFlowState.flow.steps.find((step) => /^nomination(?:$|[-_.])/i.test(step.id)) ?? parsedFlowState.flow.steps[0];
+        return { state: "valid", nominationDone: nominationStep?.status === "done" };
+      };
+      /**
+       * **角色已 settled 的肯定证据**（早失败护栏，2026-10-20）：
+       * 会话仍活着 + 不在跑 + 无排队/进行中的投递 + 上一轮不是被请求中止（客户停止/看护自动中止）。
+       * 会话缺失（真机 5ms 误报：会话被 LRU/并发重建释放）**不算** settled——继续等目标事实，绝不提前判死；
+       * 被中止的回合也不算正常结束——继续等下一次投递/重试（有界）。
+       */
+      const settledEvidence = (roleId: string): boolean =>
+        manager.hasLiveSession(projectRoot, roleId, runtime) &&
+        !manager.isRoleBusy(projectRoot, roleId, runtime) &&
+        !manager.hasPendingDelivery(projectRoot, roleId, runtime) &&
+        !manager.wasLastTurnAborted(projectRoot, roleId, runtime);
+      /** 有界轮询流程状态 YAML 落盘；角色 settled 后给一次短宽限（再探），仍不落定才允许提前如实失败。 */
+      const waitForFlowStateYamlFact = async (
+        flowId: string,
+      ): Promise<{ last: FlowStateProbe; outcome: "valid" | "settled" | "timeout"; waitedMs: number }> => {
+        const startedAt = Date.now();
+        const deadline = startedAt + chainTimeoutMs;
+        let last: FlowStateProbe = { state: "missing" };
+        let settledSince: number | undefined;
+        for (;;) {
+          last = await probeFlowStateYaml(flowId);
+          if (last.state === "valid") return { last, outcome: "valid", waitedMs: Date.now() - startedAt };
+          if (settledEvidence(targetRoleId)) {
+            settledSince ??= Date.now();
+            if (Date.now() - settledSince >= chainSettledGraceMs) {
+              return { last, outcome: "settled", waitedMs: Date.now() - startedAt };
+            }
+          } else {
+            settledSince = undefined;
+          }
+          const remaining = deadline - Date.now();
+          if (remaining <= 0) return { last, outcome: "timeout", waitedMs: Date.now() - startedAt };
+          await chainSleep(Math.min(chainPollIntervalMs, remaining));
+        }
+      };
+      /**
+       * 有界轮询任命目标角色卡出现（每轮强制刷新 listing）：替代旧的 `waitForRoleIdle`——
+       * 刚投递写卡任务时会话可能立即被释放/尚未标记 busy，瞬时 idle 不能代表「角色卡已写完」。
+       * 角色 settled（且无后续投递）后给一次短宽限；仍缺 ⇒ 调用方**不派 Convener**（既有语义逐字保留）。
+       */
+      const waitForAppointmentRoles = async (): Promise<{
+        missing: string[];
+        polls: number;
+        waitedMs: number;
+        refreshFailures: number;
+      }> => {
+        const startedAt = Date.now();
+        const deadline = startedAt + chainTimeoutMs;
+        let polls = 0;
+        let refreshFailures = 0;
+        let settledSince: number | undefined;
+        const refreshAndMissing = async (): Promise<string[]> => {
+          polls += 1;
+          if (!(await manager.refreshListingNow(projectRoot))) refreshFailures += 1;
+          return appointmentTargets.filter((roleId) => !roleExists(roleId));
+        };
+        let missing = await refreshAndMissing();
+        for (;;) {
+          if (missing.length === 0) break;
+          if (settledEvidence("nominator")) {
+            settledSince ??= Date.now();
+            if (Date.now() - settledSince >= chainSettledGraceMs) break;
+          } else {
+            settledSince = undefined;
+          }
+          const remaining = deadline - Date.now();
+          if (remaining <= 0) break;
+          await chainSleep(Math.min(chainPollIntervalMs, remaining));
+          missing = await refreshAndMissing();
+        }
+        return { missing, polls, waitedMs: Date.now() - startedAt, refreshFailures };
       };
       // W6-B 真机阻塞修复（任命后的派发时序）：客户决定卡是在来源角色本轮**中途**作答的——Nominator
       // 可能还在写角色卡。先等来源本轮 settle（`waitForRoleSettle`：只等一次、有上限；无会话/不忙立即
@@ -1596,7 +2195,13 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       }
       const listingFresh = await manager.refreshListingNow(projectRoot);
       if (!listingFresh) diagnostic.record("advance.listing-refresh.failed", { projectRoot });
-      const message = buildGovernanceAdvanceMessage(payload, context.targetRoleIds);
+      const message = buildGovernanceAdvanceMessage(payload, context.targetRoleIds, {
+        // 2026-10-20 真机：流程状态 YAML 已存在 ⇒ Convener 任务改用 flow 工具推进（不直接写 YAML）。
+        flowStateExists:
+          typeof payload.flowId === "string" &&
+          payload.flowId !== "" &&
+          existsSync(path.join(projectRoot, governanceFlowStatePath(payload.flowId))),
+      });
       if (message === null) return fail("缺少流程信息（flowId/任命名单），未自动派发");
       // —— 2026-10-18 真机修正：任命后先确认目标角色**真的写出来了** ——
       // 账本已有 appointment 决定、但目标角色不在刷新后的 listing（角色卡/边界未写）时，直接派 Convener
@@ -1621,25 +2226,44 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           missing: missingAppointmentRoles,
           queued: writeDispatch.queued === true,
         });
-        const nominatorIdle = await manager.waitForRoleIdle(projectRoot, "nominator", runtime);
-        if (!nominatorIdle) {
+        // 2026-10-20 修复：不再用 `waitForRoleIdle` 判「写卡本轮结束」（刚投递/会话被释放会立即假失败）；
+        // 改为有界轮询 listing 事实——目标角色全部出现才继续，仍缺则如实失败、**不派 Convener**。
+        const rolesWait = await waitForAppointmentRoles();
+        diagnostic.record("advance.appointment.roles-wait", {
+          flowId: payload.flowId,
+          polls: rolesWait.polls,
+          waitedMs: rolesWait.waitedMs,
+          refreshFailures: rolesWait.refreshFailures,
+          missing: rolesWait.missing,
+        });
+        const stillMissing = rolesWait.missing;
+        if (stillMissing.length > 0) {
+          const nominatorBusy = manager.isRoleBusy(projectRoot, "nominator", runtime);
           return chainFail(
-            `Crew / 组队 本轮未在时限内结束，角色（${missingAppointmentRoles.join("、")}）未确认；未派 Steward / 统筹`,
+            nominatorBusy
+              ? `Crew / 组队 本轮未在时限内结束，角色（${missingAppointmentRoles.join("、")}）未确认；未派 Steward / 统筹`
+              : `角色卡/边界仍未写出（${stillMissing.join("、")} 未枚举到）；未派 Steward / 统筹`,
             "nominator",
           );
         }
-        await manager.refreshListingNow(projectRoot);
-        const stillMissing = appointmentTargets.filter((roleId) => !roleExists(roleId));
-        if (stillMissing.length > 0) {
-          return chainFail(`角色卡/边界仍未写出（${stillMissing.join("、")} 未枚举到）；未派 Steward / 统筹`, "nominator");
+        // 共享运行期去重：写卡后检查可能已先派 Convener（或本链路已派过）⇒ 不再重复；
+        // 结果仍如实告知「写卡段已完成、后续 Convener 已派」（由共享检查完成，不是第二派）。
+        if (appointmentConvenerKey !== undefined && postWriteAdvanceDispatched.has(appointmentConvenerKey)) {
+          diagnostic.record("advance.appointment.dedup", { flowId: payload.flowId, targetRoleId: "convener" });
+          return { ok: true, dispatched: true, targetRoleId: "nominator", followUpRoleId: "convener" };
         }
+        if (appointmentConvenerKey !== undefined) postWriteAdvanceDispatched.add(appointmentConvenerKey); // 先占位
         const convenerDispatch = await dispatchTo("convener", message);
-        if (!convenerDispatch.ok) return chainFail(convenerDispatch.error, "nominator");
+        if (!convenerDispatch.ok) {
+          if (appointmentConvenerKey !== undefined) postWriteAdvanceDispatched.delete(appointmentConvenerKey);
+          return chainFail(convenerDispatch.error, "nominator");
+        }
         note(governanceAdvanceSuccessNote(payload));
         await appendDispatchAccepted(
           "convener",
           message,
           typeof context.stepId === "string" && context.stepId !== "" ? context.stepId : undefined,
+          appointmentConvenerKey,
         );
         diagnostic.record("advance.appointment.dispatched", { flowId: payload.flowId, targetRoleId: "convener" });
         return {
@@ -1650,10 +2274,22 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           ...(convenerDispatch.queued === true ? { queued: true } : {}),
         };
       }
+      // 共享运行期去重：写卡后检查可能已先派 Convener ⇒ 不再重复（账本 append 异步，不能只看账本）。
+      if (appointmentConvenerKey !== undefined && postWriteAdvanceDispatched.has(appointmentConvenerKey)) {
+        diagnostic.record("advance.appointment.dedup", { flowId: payload.flowId, targetRoleId: "convener" });
+        return { ok: true, dispatched: false };
+      }
+      if (appointmentConvenerKey !== undefined) postWriteAdvanceDispatched.add(appointmentConvenerKey); // 先占位
       const opened = await manager.openBackground({ projectRoot, roleId: targetRoleId, runtime });
-      if (!opened.ok) return fail(`无法开启 ${targetLabel} 会话：${opened.error ?? "未知原因"}`);
+      if (!opened.ok) {
+        if (appointmentConvenerKey !== undefined) postWriteAdvanceDispatched.delete(appointmentConvenerKey);
+        return fail(`无法开启 ${targetLabel} 会话：${opened.error ?? "未知原因"}`);
+      }
       const sent = await manager.sendBackground({ projectRoot, roleId: targetRoleId, runtime, text: message });
-      if (!sent.ok) return fail(`发送任务给 ${targetLabel} 失败：${sent.error ?? "未知原因"}`);
+      if (!sent.ok) {
+        if (appointmentConvenerKey !== undefined) postWriteAdvanceDispatched.delete(appointmentConvenerKey);
+        return fail(`发送任务给 ${targetLabel} 失败：${sent.error ?? "未知原因"}`);
+      }
       note(governanceAdvanceSuccessNote(payload));
       // 审计步骤 id（AC19）：只认卡片/上下文**显式给出**的 stepId；拿不到就如实记诊断，不伪造。
       const stepId = typeof context.stepId === "string" && context.stepId !== "" ? context.stepId : undefined;
@@ -1672,22 +2308,58 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       // decisionEvidence**。仅 trio（single 旧项目不产生 `.ans/governance` 记录）；账本失败只记诊断，
       // 不翻转已完成的投递结果、不重试。`stepId` 不在 `governance:next-step` 契约里（payload 未携带），
       // 故不臆造。根不存在（测试/异常调用）时不创建目录：按账本失败处理（记诊断、结果不变）。
-      await appendDispatchAccepted(targetRoleId, message, stepId);
-      // —— 2026-10-18 真机修正：proposal accept 两段式闭环 ——
-      // 客户接受提案时 `docs/flows/<flowId>.md` 可能尚不存在（应由 Convener 先写）；直接派 Nominator
-      // 只会让它反复猜路径、大量读失败。第一段已派 Convener 写流程单；等它本轮真正空闲后检查流程单：
-      // 存在 ⇒ 再派 Nominator（任务消息带流程路径）；缺失/超时 ⇒ 系统行如实报错，**不循环重试**。
+      await appendDispatchAccepted(targetRoleId, message, stepId, appointmentConvenerKey);
+      // —— 2026-10-18 真机修正；2026-10-19 客户决定「这些全部改成yaml。」 ——
+      // 两段式闭环：客户接受提案后先派 Convener 写 `docs/flows/<flowId>.yaml`（唯一机器状态）。
+      // **有界轮询 YAML 事实**（2026-10-20 真机假错误修复）：存在且通过 `parseFlowStateYaml` 校验 ⇒ 再派
+      // Nominator；角色忙/队列变化不打断轮询，会话释放/被看护中止不算 settled（继续等下一次投递/重试）；
+      // 只有角色**确实 settled**（会话活着、不忙、无后续投递、未被中止）再给一次短宽限仍不落定，或到 15min
+      // 时限，才如实报**具体原因**（系统行只发一次），**不循环重试**。
+      // 同名 `.md` 人读视图**不是**放行条件（只认 YAML；只有 .md 视为未落盘）。
       if (payload.followUp === "nomination-after-flow") {
         const flowId = payload.flowId;
         if (flowId === undefined) return chainFail("缺少流程信息（flowId），未派发提名任务");
-        const flowPath = governanceFlowPath(flowId);
-        const idle = await manager.waitForRoleIdle(projectRoot, targetRoleId, runtime);
-        diagnostic.record("advance.chain.convener-idle", { flowId, idle });
-        if (!idle) {
-          return chainFail(`Steward / 统筹 本轮未在时限内结束，流程单 ${flowPath} 未确认；未派发提名任务`);
+        const flowStatePath = governanceFlowStatePath(flowId);
+        const flowWait = await waitForFlowStateYamlFact(flowId);
+        diagnostic.record("advance.chain.flow-state-wait", {
+          flowId,
+          state: flowWait.last.state,
+          outcome: flowWait.outcome,
+          waitedMs: flowWait.waitedMs,
+          ...(flowWait.last.state === "valid" ? { nominationDone: flowWait.last.nominationDone } : {}),
+          roleBusy: manager.isRoleBusy(projectRoot, targetRoleId, runtime),
+        });
+        if (flowWait.last.state !== "valid") {
+          if (flowWait.last.state === "missing") {
+            return chainFail(
+              manager.isRoleBusy(projectRoot, targetRoleId, runtime)
+                ? `Steward / 统筹 本轮未在时限内结束，流程状态 YAML ${flowStatePath} 未确认；未派发提名任务`
+                : `Steward / 统筹 未写出流程状态 YAML ${flowStatePath}；未派发提名任务（同名 .md 人读视图不算落盘）`,
+            );
+          }
+          if (flowWait.last.state === "invalid") {
+            return chainFail(`流程状态 YAML 校验失败（${flowStatePath}）：${flowWait.last.error}；未派发提名任务`);
+          }
+          return chainFail(
+            `流程状态 YAML ${flowStatePath} 不可读：${flowWait.last.message}；未派发提名任务`,
+          );
         }
-        if (!existsSync(`${projectRoot}/${flowPath}`)) {
-          return chainFail(`Steward / 统筹 未写出流程单 ${flowPath}；未派发提名任务`);
+        // 2026-10-20 真机（flow 工具已注册但 Steward 没调用）：若流程状态 YAML 的**提名步骤已是 done**，
+        // **不再重复派 Nominator**（那只会重复劳动）；改为让 Steward / 统筹 继续下一步。两段式契约不破坏：
+        // 第一段已投、第二段在这里有据可查地收口。
+        if (flowWait.last.nominationDone === true) {
+          diagnostic.record("advance.nomination.already-done", { flowId });
+          const continueMessage = buildNominationAlreadyDoneMessage(flowId);
+          const continued = await dispatchTo("convener", continueMessage);
+          if (!continued.ok) return chainFail(continued.error);
+          note(governanceNominationAlreadyDoneNote());
+          return {
+            ok: true,
+            dispatched: true,
+            targetRoleId,
+            followUpRoleId: "convener",
+            ...(continued.queued === true ? { queued: true } : {}),
+          };
         }
         const nominationPayload: GovernanceNextStepPayload = {
           version: 1,

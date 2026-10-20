@@ -32,6 +32,7 @@ import {
   readGovernanceLedger,
   type GovernanceLedgerEntry,
 } from "../../src/common/编排/governance-ledger.ts";
+import { parseFlowStateYaml, validateFlowEvidence } from "../../src/common/编排/flow-state.ts";
 import { EXIT_OK, EXIT_USAGE } from "../../src/common/编排/exit-codes.ts";
 import { parseGovernArgs } from "../../src/common/编排/args.ts";
 import { governCommand } from "../../src/interface/cli/govern.ts";
@@ -396,6 +397,10 @@ test("标准工作流（2026-10-19 客户反馈）：trio 与 single/su 提示�
     const required: Array<[RegExp, string]> = [
       [/标准工作流（阶段流转由应用负责）/, "标准工作流标题"],
       [/内置角色按标准工作流执行/, "内置角色按标准工作流执行"],
+      [/流程状态唯一机器状态/, "流程状态唯一机器状态（YAML）"],
+      [/docs\/flows\/<flowId>\.yaml`（同名 `\.md` 仅人读视图/, "YAML 唯一机器状态 + .md 仅人读视图"],
+      [/显式写 `kind` \/ `evidence` \/ `supersedes`/, "显式 kind/evidence/supersedes"],
+      [/保留 id `verification` \/ `acceptance`/, "保留验收 id"],
       [/客户不做内部调度/, "客户不做内部调度"],
       [/应用会在流程齐备[^\n]*后自动派发 Proof \/ 验收/, "流程齐备后自动派发 Proof"],
       [/不需要客户手动触发/, "不需要客户手动触发"],
@@ -420,6 +425,11 @@ test("标准工作流（2026-10-19 客户反馈）：trio 与 single/su 提示�
       for (const [pattern, label] of required) {
         assert.match(captured.prompt!, pattern, `${fn} 提示词：${label}`);
       }
+      assert.doesNotMatch(
+        captured.prompt!,
+        /流程单写入 `docs\/flows\/<flowId>\.md`/,
+        `${fn} 提示词不得再指示把流程单写入 .md（YAML 才是唯一机器状态）`,
+      );
     }
 
     const { captured, factory } = promptCapturing();
@@ -432,6 +442,11 @@ test("标准工作流（2026-10-19 客户反馈）：trio 与 single/su 提示�
     for (const [pattern, label] of required) {
       assert.match(captured.prompt!, pattern, `single/su 提示词：${label}`);
     }
+    assert.doesNotMatch(
+      captured.prompt!,
+      /流程单写入 `docs\/flows\/<flowId>\.md`/,
+      "single/su 提示词不得再指示把流程单写入 .md（YAML 才是唯一机器状态）",
+    );
   });
 });
 
@@ -1241,7 +1256,137 @@ test("artifact.observed：内置角色 settle 后只记预授权目录内新增/
   });
 });
 
-// —————————————————————— ⑦ 旧 single 行为 ——————————————————————
+// —————————————————————— ⑦ 项目角色 artifact 观察（2026-10-20） ——————————————————————
+
+test("artifact.observed：项目角色 settle 后观察 boundary directory 内新增/变更的 .md（tester test/evidence）", async () => {
+  await withRoot(async (root) => {
+    // tester 项目角色：boundary 允许 test/、scripts/、docs/reports/tester/。
+    mkdirSync(join(root, "角色卡", "tester"), { recursive: true });
+    writeFileSync(join(root, "角色卡", "tester", "role-card.md"), "# tester\n");
+    writeFileSync(
+      join(root, "角色卡", "tester", "boundary.yaml"),
+      [
+        "role: tester",
+        "entries:",
+        "  - kind: directory",
+        "    path: test/",
+        "    purpose: 测试与证据",
+        "  - kind: directory",
+        "    path: scripts/",
+        "    purpose: 脚本",
+        "  - kind: directory",
+        "    path: docs/reports/tester/",
+        "    purpose: 测试报告",
+        "",
+      ].join("\n"),
+    );
+    const base = trioProject(root);
+    const project: ProjectConfig = {
+      ...base,
+      roles: { tester: { card: "角色卡/tester/role-card.md", boundary: "角色卡/tester/boundary.yaml" } },
+    };
+    mkdirSync(join(root, "test", "evidence"), { recursive: true });
+
+    const pending: SessionEvent[] = [];
+    const adapter: RuntimeAdapter = {
+      async composeContext() {
+        return { systemPrompt: "" };
+      },
+      async bindRole(): Promise<RoleSession> {
+        return {
+          async prompt(text: string): Promise<void> {
+            if (text === "first") writeFileSync(join(root, "test", "evidence", "foo.md"), "# 证据 v1\n");
+            pending.push({ kind: "settled", summary: "done", detail: { outcome: "completed" } } as SessionEvent);
+          },
+          events(): AsyncIterable<SessionEvent> {
+            return (async function* () {
+              while (pending.length > 0) yield pending.shift()!;
+            })();
+          },
+          async dispose(): Promise<void> {},
+        };
+      },
+    };
+
+    // 项目外/禁写路径：不应被观察。
+    mkdirSync(join(root, "docs"), { recursive: true });
+    mkdirSync(join(root, ".ans"), { recursive: true });
+    writeFileSync(join(root, "docs", "secret.md"), "# 外部\n");
+    writeFileSync(join(root, ".ans", "secret.md"), "# 私有\n");
+    writeFileSync(join(root, "角色卡", "tester", "secret.md"), "# 角色卡\n");
+
+    const handle = await openRoleSession(
+      { roleId: "tester", project, autoRepin: false },
+      { createAdapter: () => adapter },
+    );
+    try {
+      await handle.send("first");
+      await consume(handle);
+      await flushGovernanceLedger(root);
+      const firstRead = await readGovernanceLedger(root);
+      const firstObserved = firstRead.entries.filter((entry) => entry.kind === "artifact.observed");
+      assert.equal(firstObserved.length, 1, "首次 settle 只观察 test/evidence/foo.md");
+      assert.equal(firstObserved[0]!.actorRoleId, "tester");
+      assert.equal(firstObserved[0]!.power, "project");
+      assert.equal(firstObserved[0]!.artifactPath, "test/evidence/foo.md");
+      assert.match(firstObserved[0]!.artifactSha256 ?? "", /^[0-9a-f]{64}$/);
+      assert.ok(
+        !firstRead.entries.some((entry) => entry.kind === "artifact.observed" && ["docs/secret.md", ".ans/secret.md", "角色卡/tester/secret.md"].includes(entry.artifactPath ?? "")),
+        "项目外/禁写路径不得观察",
+      );
+
+      // 内容变更 ⇒ 新的一条 artifact.observed；未变更 ⇒ 不重复。
+      writeFileSync(join(root, "test", "evidence", "foo.md"), "# 证据 v2\n");
+      await handle.send("second");
+      await consume(handle);
+      await flushGovernanceLedger(root);
+      const secondRead = await readGovernanceLedger(root);
+      const observedFoo = secondRead.entries.filter(
+        (entry) => entry.kind === "artifact.observed" && entry.artifactPath === "test/evidence/foo.md",
+      );
+      assert.equal(observedFoo.length, 2, "内容变更记一条新观察");
+      assert.notEqual(observedFoo[0]!.artifactSha256, observedFoo[1]!.artifactSha256);
+
+      await handle.send("third");
+      await consume(handle);
+      await flushGovernanceLedger(root);
+      const thirdRead = await readGovernanceLedger(root);
+      assert.equal(
+        thirdRead.entries.filter((entry) => entry.kind === "artifact.observed" && entry.artifactPath === "test/evidence/foo.md").length,
+        2,
+        "未变更不重复记录",
+      );
+
+      // flow YAML 的 artifact 步骤 evidence.ref 指向该路径 ⇒ validateFlowEvidence 通过。
+      const flowYaml = [
+        "flowId: flow-a",
+        "version: 1",
+        "qualityTier: production",
+        "steps:",
+        "  - id: verification-evidence",
+        "    title: 证据整理",
+        "    owner: tester",
+        "    kind: artifact",
+        "    status: done",
+        "    evidence: { kind: artifact, ref: test/evidence/foo.md }",
+        "  - id: verification",
+        "    title: 验收",
+        "    owner: verifier",
+        "    kind: acceptance",
+        "    status: pending",
+        "",
+      ].join("\n");
+      const parsedFlow = parseFlowStateYaml(flowYaml, "flow-a");
+      assert.equal(parsedFlow.ok, true);
+      if (!parsedFlow.ok) return;
+      assert.deepEqual(validateFlowEvidence(parsedFlow.flow, thirdRead.entries), { ok: true });
+    } finally {
+      await handle.dispose();
+    }
+  });
+});
+
+// —————————————————————— ⑧ 旧 single 行为 ——————————————————————
 
 test("旧 single：su 预授权四棵、确认后写角色卡、能力不变；不写治理账本", async () => {
   await withRoot(async (root) => {
@@ -1294,4 +1439,45 @@ test("旧 single：runRole 一次性路径的失败码不受影响（非项目�
     { createAdapter: () => okAdapter() },
   );
   assert.notEqual(result.code, EXIT_OK);
+});
+
+test("judge deny 以 declined 回投：不写 customer.decision（不污染账本/不挡收尾门）", async () => {
+  await withRoot(async (root) => {
+    const captured = {} as Captured;
+    const judgeDeny: CustomerInputFn = () => ({
+      outcome: "declined",
+      operatorId: "judge:claude",
+      reason: "自动审批拒绝：角色卡混入无关散文，请修正后重试。",
+    });
+    const handle = await openRoleSession(
+      {
+        roleId: "nominator",
+        project: withBuiltIn(trioProject(root), "nominator"),
+        customerInput: judgeDeny,
+        autoRepin: false,
+      },
+      { createAdapter: capturingFactory(captured) },
+    );
+    try {
+      const out = await captured.caps!.customerInput!({
+        kind: "confirm",
+        title: "写角色卡 alpha",
+        preview: "## 角色卡/alpha/role-card.md\n# alpha\n",
+        paths: ["角色卡/alpha/role-card.md"],
+        flowId: "flow-a",
+        cardKind: "appointment-write",
+      });
+      assert.equal(out?.outcome, "declined");
+      await flushGovernanceLedger(root);
+      const ledger = await readGovernanceLedger(root);
+      assert.equal(
+        ledger.entries.filter((entry) => entry.kind === "customer.decision").length,
+        0,
+        "judge deny 不是客户决定，不得写 customer.decision",
+      );
+      assert.equal(ledger.errors.length, 0);
+    } finally {
+      await handle.dispose();
+    }
+  });
 });

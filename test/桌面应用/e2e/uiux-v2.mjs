@@ -36,6 +36,8 @@ const DUP_ONLY=process.env.ANS_DUP_UI_ONLY==='1';
 const SELECTOR_ONLY=process.env.ANS_SELECTOR_UI_ONLY==='1';
 const G2_ONLY=process.env.ANS_G2_RECOVERY_UI_ONLY==='1';
 const TOOLFOLD_ONLY=process.env.ANS_TOOLFOLD_UI_ONLY==='1';
+// 2026-10-19 客户要求：左树取消角色分组折叠 + 系统通知独立成行——独立离线模式（真实 renderer/Electron）。
+const NOTICE_ONLY=process.env.ANS_NOTICE_UI_ONLY==='1';
 const GOVREACCEPT_ONLY=process.env.ANS_GOVERNANCE_REACCEPT_UI_ONLY==='1';
 const JUDGE_ONLY=process.env.ANS_JUDGE_UI_ONLY==='1';
 const MIRROR_ONLY=process.env.ANS_MIRROR_UI_ONLY==='1';
@@ -51,6 +53,19 @@ const js=code=>win.webContents.executeJavaScript(code.includes('await ')?'(async
 async function check(name, code){const value=await js(code);reports.push({name,value});if(!value)reports.push({name:name+' observed',value:await js(`(()=>({chat:document.getElementById('chat').textContent,assistant:[...document.querySelectorAll('#chat .msg-assistant')].map(x=>x.textContent),denied:[...document.querySelectorAll('#chat .sys-denied')].map(x=>x.textContent),model:window.__ansRenderer.rowModelDebug(window.__ansRenderer.state.selectedRoleId)}))()`)});assert.equal(value,true,name);}
 const roles=['A','B'].map(roleId=>({roleId,cardPath:ROOT+'/角色卡/'+roleId+'/role-card.md',cardText:'# '+roleId+'\n\n完整角色职责。\n\n'+('资料内容用于检查阅读态。\n\n'.repeat(80)),boundary:{entries:[]},boundaryPath:'',changelog:null,docs:[]}));
 const listing={projectRoot:ROOT,primaryRoleId:'A',hasRoles:true,warnings:[],roles};
+// NOTICE_ONLY 夹具：主入口 liaison + 四个治理职能 + 两个项目分组角色 + 一个无分组角色——
+// 用于真实渲染「左树全平铺可见（无 details/折叠）」与「系统通知独立系统行」。
+const noticeRole=(roleId,extra={})=>({roleId,cardPath:ROOT+'/角色卡/'+roleId+'/role-card.md',cardText:'# '+roleId+'\n\n角色职责。',boundary:{entries:[]},boundaryPath:'',changelog:null,docs:[],...extra});
+const noticeListing={projectRoot:ROOT,primaryRoleId:'liaison',hasRoles:true,warnings:[],governanceModel:'trio',roles:[
+  noticeRole('liaison',{governanceFunction:'liaison',builtIn:true}),
+  noticeRole('rapporteur',{governanceFunction:'proposal',builtIn:true}),
+  noticeRole('nominator',{governanceFunction:'nomination',builtIn:true}),
+  noticeRole('convener',{governanceFunction:'schedule',builtIn:true}),
+  noticeRole('verifier',{governanceFunction:'verification',builtIn:true}),
+  noticeRole('A',{group:'平台组',groupDuty:'组长'}),
+  noticeRole('B',{group:'平台组'}),
+  noticeRole('C')
+]};
 const longFull='全文 '+ '排队消息详细内容与来源。\n'.repeat(40)+'长连续文本 '+ 'ordinaryword'.repeat(120);
 const queue=[{id:'msg\u0000long',kind:'message',summary:'客户长消息：'+ '超过80字的队列摘要用于核对换行、时间与操作归属。'.repeat(6),full:longFull,at:'2026-10-13T10:01:00Z'},{id:'dispatch',kind:'dispatch',sourceRoleId:'B',summary:'派发任务',full:'',at:'2026-10-13T10:02:00Z'},{id:'handback',kind:'handback',sourceRoleId:'B',summary:'回交报告',full:'',at:'2026-10-13T10:03:00Z'}];
 let activeQueue=queue.slice();
@@ -69,7 +84,7 @@ const handlers={
  'report:retry-save':(_e,input)=>{persistenceCalls.push({operation:'report-save',input});if(saveModeDeferred)return new Promise(resolve=>flowSavePending.push({resolve,input}));if(flowSaveFailure)return outer(input,{ok:false,state:flowSaveFailure==='SNAPSHOT_EXPIRED'?'expired':'failed',reportId:input.reportId,code:flowSaveFailure,retryAvailable:false,message:'固定安全失败'});const value={ok:true,state:'saved',report:flowReports[input.reportId].report,retryAvailable:false};flowReports[input.reportId]={...value,reportId:input.reportId};return outer(input,value);},
  'delivery:retry-history-save':(_e,input)=>{persistenceCalls.push({operation:'history-save',input});const receipt={...flowReceipts[input.attemptId],history:'saved',retryHistoryAvailable:false};flowReceipts[input.attemptId]=receipt;return outer(input,{ok:true,state:'saved',receipt});},
  'window:minimize':()=>{windowCalls.push('minimize');return {ok:true};},'window:toggle-maximize':()=>{windowCalls.push('maximize');return {ok:true};},'window:close':()=>{windowCalls.push('close');return {ok:true};},
- 'window:is-maximized':()=>false,'app:list-project':(_e,projectRoot)=>{if(listFailure)throw new Error('fixture listing failed');if(mergeReplayAfterList)for(const h of mergeHistories.values())win.webContents.send('session:history',h);return {...listing,projectRoot:projectRoot?.projectRoot||ROOT,...(GOVREACCEPT_ONLY?{governanceRecord:governanceRecordFixture}:{}),...(JUDGE_ONLY?{governanceModel:judgeGovernanceModel}:{}),...(FLOW_ONLY?{documentScope:{version:1,projectViewId:'epoch-one',projectRoot:projectRoot?.projectRoot||ROOT},roles:listing.roles.map(role=>({...role,documents:role.roleId==='A'?documentRefs:role.roleId==='B'?documentRefs.map(ref=>({...ref,roleId:'B',documentId:ref.documentId+'-b',relativePath:ref.relativePath.replace('/A/','/B/')})):[],...(flowLongRoleDocs?{changelog:{path:'changelog.md',text:'# 真实长变更\n\n'+('保留变更阅读位置。\n\n'.repeat(100))}}:{}),docs:flowLongRoleDocs?Array.from({length:100},(_,n)=>({kind:'file',path:'docs/record-'+n+'.md'})):[{kind:'directory',path:'docs/change'},{kind:'file',path:'docs/one.md'}]}))}:{})};},'app:pick-project':()=>pickResult,
+ 'window:is-maximized':()=>false,'app:list-project':(_e,projectRoot)=>{if(listFailure)throw new Error('fixture listing failed');if(NOTICE_ONLY)return {...noticeListing,projectRoot:projectRoot?.projectRoot||ROOT};if(mergeReplayAfterList)for(const h of mergeHistories.values())win.webContents.send('session:history',h);return {...listing,projectRoot:projectRoot?.projectRoot||ROOT,...(GOVREACCEPT_ONLY?{governanceRecord:governanceRecordFixture}:{}),...(JUDGE_ONLY?{governanceModel:judgeGovernanceModel}:{}),...(FLOW_ONLY?{documentScope:{version:1,projectViewId:'epoch-one',projectRoot:projectRoot?.projectRoot||ROOT},roles:listing.roles.map(role=>({...role,documents:role.roleId==='A'?documentRefs:role.roleId==='B'?documentRefs.map(ref=>({...ref,roleId:'B',documentId:ref.documentId+'-b',relativePath:ref.relativePath.replace('/A/','/B/')})):[],...(flowLongRoleDocs?{changelog:{path:'changelog.md',text:'# 真实长变更\n\n'+('保留变更阅读位置。\n\n'.repeat(100))}}:{}),docs:flowLongRoleDocs?Array.from({length:100},(_,n)=>({kind:'file',path:'docs/record-'+n+'.md'})):[{kind:'directory',path:'docs/change'},{kind:'file',path:'docs/one.md'}]}))}:{})};},'app:pick-project':()=>pickResult,
  'session:open':(_e,input)=>{opens.push(input);return {ok:true,resumed:true,contextSource:'resumed',runtime:input.runtime,projectRoot:input.projectRoot,profileRevision:0,...(flowOpenResult||{})};},'session:live':()=>['A','B'],'session:stop':(_e,input)=>{stops.push(input);return {ok:true};},
  'session:history-get':(_e,input)=>{histories.push(input);return mergeHistories.get(input.runtime+'|'+input.roleId)||{...input,rows:[],error:null,skipped:0};},
  'session:live-views':()=>[{projectRoot:ROOT,roleId:'A',runtime:'pi'},{projectRoot:ROOT,roleId:'B',runtime:'pi'},...opens.map(x=>({projectRoot:x.projectRoot,roleId:x.roleId,runtime:x.runtime}))],
@@ -876,7 +891,7 @@ async function runtimeChecks() {
   const runtimeRoles=[{roleId:'A'}, {roleId:'Pi适配器',group:'运行时接入组',groupDuty:'组员'}, {roleId:'Codex适配器',group:'运行时接入组',groupDuty:'组员'}, {roleId:'Claude适配器',group:'运行时接入组',groupDuty:'组员'}, {roleId:'运行时核心',group:'运行时接入组',groupDuty:'组长'}, {roleId:'项目管理',group:'项目协调组',groupDuty:'组长'}, {roleId:'未知职责',group:'测试 <script>window.INJECTED=1</script>',groupDuty:'<img src=x onerror=window.INJECTED=2>'}, {roleId:'B'}];
   listing.roles=runtimeRoles.map(r=>({...r,cardText:'# '+r.roleId,cardPath:'',boundary:{entries:[]},changelog:null,docs:[]}));
   await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRuntime('pi');await window.__ansRenderer.selectRole('运行时核心')`);
-  await check('runtime groups lead first and unknown metadata escaped',`(()=>{let e=document.getElementById('role-tree'),labels=[...e.querySelectorAll('.tree-group')].map(x=>x.textContent),lead=e.querySelector('.tree-group:nth-child(3)');return labels.includes('运行时接入组')&&labels.includes('项目协调组')&&labels.includes('其他角色（查看/调试）')&&[...e.querySelectorAll('.ti-name')].indexOf([...e.querySelectorAll('.ti-name')].find(x=>x.textContent==='运行时核心'))<[...e.querySelectorAll('.ti-name')].indexOf([...e.querySelectorAll('.ti-name')].find(x=>x.textContent==='Pi适配器'))&&!e.querySelector('script,img')&&!window.INJECTED;})()`);
+  await check('runtime groups lead first and unknown metadata escaped',`(()=>{let e=document.getElementById('role-tree'),labels=[...e.querySelectorAll('.tree-group')].map(x=>x.textContent),lead=e.querySelector('.tree-group:nth-child(3)');return labels.includes('运行时接入组')&&labels.includes('项目协调组')&&labels.includes('工作角色')&&[...e.querySelectorAll('.ti-name')].indexOf([...e.querySelectorAll('.ti-name')].find(x=>x.textContent==='运行时核心'))<[...e.querySelectorAll('.ti-name')].indexOf([...e.querySelectorAll('.ti-name')].find(x=>x.textContent==='Pi适配器'))&&!e.querySelector('script,img')&&!window.INJECTED;})()`);
   const roleId='运行时核心';
   const payload=(runtime,extra={})=>({projectRoot:ROOT,roleId,runtime,...extra});
   await push('session:history',payload('pi',{rows:[{kind:'assistant',text:'Pi专属历史'}]}));
@@ -1209,6 +1224,41 @@ async function governanceReacceptChecks(){
   fs.writeFileSync(path.join(OUT,'governance-reaccept-success-1360.png'),(await win.webContents.capturePage()).toPNG());
 }
 
+// 2026-10-19 客户要求：①左树取消角色分组折叠（所有治理/项目角色始终展开可见）；
+// ②系统通知（会话重建等）独立系统行 + 「系统通知」徽标，用户正文仍按普通消息渲染。
+async function noticeChecks(){
+  const notice='此前经确认发行的写权不会自动保留，如需写入请重新经 request_confirmation 确认。';
+  const liveText='【系统通知·会话重建】'+notice+'\n\n请继续处理任务。';
+  await js(`await window.__ansRenderer.loadProject(${JSON.stringify(ROOT)});await window.__ansRenderer.selectRuntime('pi');await window.__ansRenderer.selectRole('liaison')`);
+  await pause(140);
+  // A. 左树全平铺：无 details/折叠卡；主入口/治理职能/项目分组/无分组角色全部直接可见。
+  await check('role tree flat: all roles visible without details/fold',`(()=>{const tree=document.getElementById('role-tree');const ids=[...tree.querySelectorAll('.tree-item[data-role-id]')].map(x=>x.getAttribute('data-role-id'));const groups=[...tree.querySelectorAll('.tree-group')].map(x=>x.textContent);return !tree.querySelector('details')&&!tree.querySelector('.tree-group-fold')&&['liaison','rapporteur','nominator','convener','verifier','A','B','C'].every(id=>ids.includes(id))&&groups.includes('主入口')&&groups.some(g=>g.includes('治理职能'))&&groups.includes('平台组')&&groups.includes('工作角色')&&!groups.includes('其他角色（查看/调试）');})()`);
+  await check('role status badges remain visible for every role',`document.querySelectorAll('#role-tree .tree-item .ti-sub').length>=8`);
+  // 左树底部：项目分组与无分组默认标签「工作角色」（客户 2026-10-19 补充文案）。
+  await js(`document.getElementById('role-tree').scrollTop=document.getElementById('role-tree').scrollHeight`);
+  await pause(80);
+  fs.writeFileSync(path.join(OUT,'role-tree-work-roles-1360.png'),(await win.webContents.capturePage()).toPNG());
+  await js(`document.getElementById('role-tree').scrollTop=0`);
+  // B. 实时：系统通知独立系统行 + 「系统通知」徽标；用户正文按普通用户消息。
+  await push('session:events',[{projectRoot:ROOT,roleId:'liaison',runtime:'pi',event:{kind:'message',runtime:'pi',roleId:'liaison',turnId:'notice-turn',summary:'用户指令：'+liveText,detail:{source:'prompt-input',text:liveText}}}]);
+  await check('live system notice is its own sys row with 系统 badge, not a user bubble',`(()=>{const pane=document.querySelector('.chat-pane[data-role-id="liaison"]');if(!pane)return false;const notice=pane.querySelector('.sys-notice:not(.is-replay)');const badge=notice&&notice.querySelector('.sys-notice-badge');const users=[...pane.querySelectorAll('.msg-user')];return !!notice&&!!badge&&badge.textContent.includes('系统通知')&&badge.textContent.includes('会话重建')&&notice.textContent.includes('写权不会自动保留')&&users.some(u=>u.textContent.trim()==='请继续处理任务。')&&users.every(u=>!u.textContent.includes('系统通知'))&&users.every(u=>!u.textContent.includes('写权不会自动保留'));})()`);
+  fs.writeFileSync(path.join(OUT,'system-notice-live-and-flat-role-tree-1360.png'),(await win.webContents.capturePage()).toPNG());
+  // D. 无文件目标的工具行（客户 2026-10-19：交互/派发类工具不应像「未保存/失败」）。
+  await push('session:events',[{projectRoot:ROOT,roleId:'liaison',runtime:'pi',event:{kind:'tool_call',runtime:'pi',roleId:'liaison',turnId:'notice-turn',summary:'调用工具 request_confirmation',detail:{toolName:'request_confirmation',toolCallId:'notice-confirm-call',phase:'start',display:{version:1,resultText:{text:'等待客户确认。'}}}}}]);
+  await js(`(()=>{const pane=document.querySelector('.chat-pane[data-role-id="liaison"]');const row=pane&&pane.querySelector('details.tool-call-record');if(row)row.open=true;})()`);
+  await pause(140);
+  await check('tool row without file target is neutral in summary and details',`(()=>{const pane=document.querySelector('.chat-pane[data-role-id="liaison"]');const row=pane&&pane.querySelector('details.tool-call-record');if(!row)return false;const sum=row.querySelector('summary').textContent;const body=row.querySelector('.tool-call-details').textContent;return sum.includes('request_confirmation')&&sum.includes('无文件目标')&&!sum.includes('目标未保存')&&body.includes('本次调用无文件目标（交互/派发类工具）')&&!body.includes('未保存')&&!body.includes('失败');})()`);
+  fs.writeFileSync(path.join(OUT,'tool-row-no-file-target-1360.png'),(await win.webContents.capturePage()).toPNG());
+  // C. 回放同规则：历史行里的通知同样独立成行，正文仍是普通用户消息。
+  await push('session:history',{projectRoot:ROOT,roleId:'liaison',runtime:'pi',rows:[{kind:'user',text:'【系统通知·会话重建】'+notice+'\n\n历史里的用户正文。',turnId:'hist-notice'},{kind:'assistant',text:'收到。',turnId:'hist-notice'}]});
+  await pause(140);
+  await check('replay system notice same rule: sys row + user body',`(()=>{const pane=document.querySelector('.chat-pane[data-role-id="liaison"]');if(!pane)return false;const notice=pane.querySelector('.sys-notice.is-replay');const badge=notice&&notice.querySelector('.sys-notice-badge');const body=[...pane.querySelectorAll('.msg-user.is-replay')].some(u=>u.textContent.trim()==='历史里的用户正文。');return !!notice&&!!badge&&badge.textContent.includes('系统通知')&&notice.textContent.includes('写权不会自动保留')&&body;})()`);
+  fs.writeFileSync(path.join(OUT,'system-notice-replay-and-flat-role-tree-1360.png'),(await win.webContents.capturePage()).toPNG());
+  win.setContentSize(960,620);await pause(140);
+  fs.writeFileSync(path.join(OUT,'system-notice-and-flat-role-tree-960.png'),(await win.webContents.capturePage()).toPNG());
+  await check('notice view no horizontal overflow at 960',`document.body.scrollWidth===innerWidth`);
+}
+
 app.whenReady().then(async()=>{
  const watchdog=setTimeout(()=>{fs.writeFileSync(path.join(OUT,'watchdog.txt'),'timeout');app.exit(1);},60000);
  try {
@@ -1227,6 +1277,7 @@ app.whenReady().then(async()=>{
   if(SELECTOR_ONLY){await selectorChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports,configReads},null,2));console.log('SELECTOR_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(G2_ONLY){await g2RecoveryChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports},null,2));console.log('G2_RECOVERY_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(TOOLFOLD_ONLY){await toolFoldChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports},null,2));console.log('TOOLFOLD_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
+  if(NOTICE_ONLY){await noticeChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports,errors},null,2));console.log('SYSTEM_NOTICE_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(CONFIG_ONLY){await configChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports},null,2));console.log('CONFIG_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(process.env.ANS_MERGE_UI_ONLY==='1'){await mergeChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports,sends:sends.map(x=>({text:x.text,target:x.target,clientMessageId:x.metadata&&x.metadata.clientMessageId}))},null,2));console.log('MERGE_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}
   if(process.env.ANS_RUNTIME_UI_ONLY==='1'){await runtimeChecks();assert.equal(errors.length,0,errors.join('\n'));fs.writeFileSync(path.join(OUT,'report.json'),JSON.stringify({electron:process.versions.electron,node:process.versions.node,reports,sends},null,2));console.log('RUNTIME_UI_PASS '+reports.length+' '+OUT);clearTimeout(watchdog);app.quit();return;}

@@ -20,6 +20,9 @@ entries:
   - kind: file
     path: src/pipeline/orchestration/shell-arming.ts
     purpose: shell 闸装配（I-1 三层链 + su 只读档）——补登记（该件系 I-1 建设期新建、此前漏登）
+  - kind: file
+    path: src/pipeline/orchestration/flow-state.ts
+    purpose: 流程状态 YAML 契约的 Pipeline 公共出口（桌面自动验收门消费；实现同源于 src/common/编排/flow-state.ts）
   - kind: directory
     path: src/common/编排/
     purpose: 本角色私有辅助代码

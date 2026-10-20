@@ -164,7 +164,8 @@ export type GovernanceCardKind = GovernanceChoiceCardKind | GovernanceConfirmCar
 //
 // 依据：PM 评审《「替我审批」/「替我决策」双开关——项目管理评审与 V1 拆发》§3.1/§六。
 // `cardKind → group` **只允许这一份实现**（桌面包、编排、测试、UI 全部读这里；不得再写第二张映射表）。
-// 组只表达「哪一类卡由哪个开关代批」，不表达任何权限；判断本身仍只做正向代批（见 `GovernanceJudgeOutcome`）。
+// 组只表达「哪一类卡由哪个开关代批」，不表达任何权限；approval 组可 `deny`（写卡不合规退回重做），
+// decision 组正向代批，`manual` 由桌面作为返工原因回投发起角色（见 `GovernanceJudgeOutcome`）。
 
 /** 治理卡判断开关分组：`approval`＝shell＋写盘族；`decision`＝提案/任命/验收。 */
 export type GovernanceJudgeGroup = "approval" | "decision";
@@ -727,6 +728,102 @@ export type UninstallMcpFn = (
   metadata?: ReportHandbackMetadata,
 ) => Promise<InstallMcpReceipt>;
 
+// —————————————— Flow 文件方法化（2026-10-20 客户拍板；最小闭环） ——————————————
+//
+// 客户批准「按这个方案做」：把 flow 文件从「只能整文件读写」升级为**方法化**——模型经三只工具
+// （`flow_get` / `flow_step_update` / `flow_step_supersede`）读取结构化视图并推进步骤状态。
+// 本模块只承载**中立类型**；三工具只调用注入能力并如实转达回执，**权限/状态迁移/证据完整性/
+// revision 冲突/Steward/Lead 权限等全部裁决在编排 flow-service**（`src/common/编排/**` 属编排角色）。
+// 未注入对应能力 ⇒ 工具不注册（结构性 fail-closed，沿 dispatch_task 先例）。
+// 诚实面：flow 步骤推进 ≠ 客户批准——需要客户决定的步骤仍须走 request_confirmation/request_choice。
+
+/** flow 步骤状态（合法取值；状态迁移合法性由编排 flow-service 裁决，本层不判）。 */
+export type FlowToolStatus = "pending" | "dispatched" | "delivered" | "done" | "superseded" | "failed" | "blocked" | "aborted";
+
+/** flow 步骤状态枚举的运行时单一来源（schema 与工具层参数校验共用，避免两处漂移）。 */
+export const FLOW_TOOL_STATUSES: readonly FlowToolStatus[] = Object.freeze([
+  "pending", "dispatched", "delivered", "done", "superseded", "failed", "blocked", "aborted",
+]);
+
+/** flow 步骤种类（dispatch＝派发型；customer-decision＝客户决定型；artifact＝产物型；acceptance＝验收型）。 */
+export type FlowToolStepKind = "dispatch" | "customer-decision" | "artifact" | "acceptance";
+
+/** flow 步骤种类枚举的运行时单一来源（schema 与工具层参数校验共用）。 */
+export const FLOW_TOOL_STEP_KINDS: readonly FlowToolStepKind[] = Object.freeze([
+  "dispatch", "customer-decision", "artifact", "acceptance",
+]);
+
+/** 步骤证据：kind＝证据类别，ref＝项目相对路径或任务事实（合法性/存在性由编排 flow-service 校验）。 */
+export interface FlowToolEvidence {
+  kind: FlowToolStepKind;
+  ref: string;
+}
+
+/** `flow_get` 返回的步骤视图（服务端投影；工具层原样转达，不重算）。 */
+export interface FlowToolStepView {
+  id: string;
+  title: string;
+  owner: string;
+  kind: FlowToolStepKind;
+  status: FlowToolStatus;
+  evidence?: FlowToolEvidence;
+  supersedes?: string[];
+  supersededBy?: string;
+}
+
+/** `flow_get` 返回的流程视图。`canUpdate` 是服务端按调用角色计算的**可更新步骤 id**（权限裁决在服务端）。 */
+export interface FlowToolView {
+  flowId: string;
+  revision: string;
+  qualityTier: string;
+  steps: FlowToolStepView[];
+  canUpdate: string[];
+}
+
+/**
+ * 三只 flow 工具的统一回执（形状冻结；工具层**原样**转达，不解释为批准/不重算状态）。
+ * - `ok:true`：`revision` 为本次操作后的新 revision；`flow` 为服务端视图（可选）；`idempotent:true`
+ *   表示同一 `idempotencyKey` 重放、未重复变更；
+ * - `ok:false`：`code` 机读原因（如 `revision-conflict`/`invalid-transition`/`insufficient-evidence`/
+ *   `forbidden`），`error` 一句人话，`issues` 供修正的逐条问题。
+ */
+export interface FlowToolResult {
+  ok: boolean;
+  revision?: string;
+  flow?: FlowToolView;
+  idempotent?: boolean;
+  error?: string;
+  code?: string;
+  issues?: string[];
+}
+
+/** `flow_get` 注入能力：读 flow 结构化视图；`flowId` 缺席＝当前/默认 flow（由服务端归一）。 */
+export type FlowGetFn = (input: { flowId?: string }) => Promise<FlowToolResult>;
+
+/** `flow_step_update` 注入能力：更新单个步骤状态（迁移/权限/证据/revision 裁决在服务端）。 */
+export type FlowStepUpdateFn = (input: {
+  flowId: string;
+  stepId: string;
+  status: FlowToolStatus;
+  evidence?: FlowToolEvidence;
+  expectedRevision: string;
+  idempotencyKey?: string;
+  note?: string;
+}) => Promise<FlowToolResult>;
+
+/** `flow_step_supersede` 注入能力：用新步骤取代旧步骤（旧步骤转 superseded；**仅 Steward/Lead（工作流管理者）**，服务端校验）。 */
+export type FlowStepSupersedeFn = (input: {
+  flowId: string;
+  oldStepId: string;
+  newStepId: string;
+  title: string;
+  owner: string;
+  kind: FlowToolStepKind;
+  expectedRevision: string;
+  reason?: string;
+  idempotencyKey?: string;
+}) => Promise<FlowToolResult>;
+
 // —————————————— 推理与推理强度（G-5 wave 1 契约层；冻结符号，单一来源＝本模块） ——————————————
 //
 // 依据：客户 2026-10-16「按推荐批准，开始实施」＝ G-5（推理与推理强度）；评估
@@ -1033,7 +1130,8 @@ export interface ShellJudgeToolOptions {
 //
 // 分层与 shell judge 一致：中立类型＝本模块；只读工具/读取策略＝`src/common/runtime-core/governance-judge/`
 // （读/列复用 `shell-judge/policy.ts`，并整体排除 `.ans/**`）；规范化/驱动/账本证据＝编排（P2）。
-// 判断**只做正向代批**：`revise`/`reject`/`false`/空选择/未知 id 一律由编排归一化 `manual`；
+// 判断可 `approve`；**approval 组**可 `deny` 退回发起角色重做；**decision 组正向代批，不得 deny**，
+// `manual` 由桌面作为返工原因回投发起角色。`revise`/`reject`/`false`/空选择/未知 id 一律由编排归一化 `manual`；
 // 本层不实现任何判定、不读写账本、不改变任何写权。分组映射＝上方 `GOVERNANCE_CARD_GROUP`（单一来源）。
 
 /** 判断卡范围（desktop/orchestration 与驱动共用；字段逐字按评审 §6.1）。 */
@@ -1092,7 +1190,12 @@ export interface GovernanceJudgeAudit {
 
 /** 驱动补全后的判断结果（模型只能经 `report_governance_judgement` 交回原始参数）。 */
 export interface GovernanceJudgeOutcome {
-  verdict: "approve" | "manual";
+  /**
+   * `approve` = 正向代批；`deny` = **仅 approval 组**（写卡内容/路径/完整性/一致性可由发起角色修正时
+   * 退回重做）；`manual` = 判断无法完成，由桌面转成退回发起角色重做的原因（不呈现客户卡）。
+   * decision 组不得 deny。
+   */
+  verdict: "approve" | "deny" | "manual";
   group: GovernanceJudgeGroup;
   cardKind: GovernanceCardKind;
   reasonCode: string;
@@ -1251,6 +1354,17 @@ export interface GovernedToolsOptions {
   installMcp?: InstallMcpFn;
   /** G-4 V2：`uninstall_mcp` 能力（校验＋激活＋回执，不写盘）。只给内置治理角色 注入；未注入 ⇒ 工具不注册。 */
   uninstallMcp?: UninstallMcpFn;
+  /**
+   * Flow 文件方法化（2026-10-20 客户拍板，最小闭环）：`flow_get` / `flow_step_update` /
+   * `flow_step_supersede` 三能力的注入面。能力实现＝编排 flow-service（权限/状态迁移/证据/
+   * revision 冲突/Steward/Lead 权限全部在服务端裁决）；本层只调用并如实转达回执。
+   * 每项**未注入 ⇒ 对应工具不注册**（结构性 fail-closed，沿 dispatch_task 先例）。
+   */
+  flowGet?: FlowGetFn;
+  /** `flow_step_update` 能力；未注入 ⇒ 工具不注册。 */
+  flowStepUpdate?: FlowStepUpdateFn;
+  /** `flow_step_supersede` 能力（仅 Steward/Lead 可成功，服务端校验）；未注入 ⇒ 工具不注册。 */
+  flowStepSupersede?: FlowStepSupersedeFn;
   /**
    * 判断 agent（「替我审」）只读能力注入。**这是能力注入，不是工具注入**：注入后 Service 必须走
    * `buildShellJudgeTools`（`src/common/runtime-core/shell-judge/`），**不得**走 `buildGovernedTools`——

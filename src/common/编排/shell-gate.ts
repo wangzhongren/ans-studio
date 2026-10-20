@@ -30,6 +30,12 @@
 //   看原文看得懂**」（§14.4）——「命令藏在字符串里」的 re-shell/内联求值（`sh -c`/`eval`/`node -e`/`awk`）
 //   **根本不会到本层**，门禁引擎 (c) 已把它们硬拒。
 //
+// —— 确定性前置封堵（客户 2026-10-19：「grep/长内联命令 这个应该让判断AI 做好封堵」） ——
+// 在 (c) 分类之前先跑 `shell-command-guard.ts`（纯函数）：**长内联命令**（`node -e`/`python -c`/
+// `bash -c` 等超过阈值）与**无界递归搜索**（`grep -r` 无受限路径、`find /`、`rg` 全项目扫描）直接
+// `deny`——不调 (b)/(a)、不弹卡；审计 `branch`/`by` 记为 `preblock:inline-too-large` /
+// `preblock:unbounded-search`。限定到具体文件/小目录的有界命令不受影响。
+//
 // **fail-closed：只往更严的层退**（§7.5）——(c) 规则集加载失败 → **整条拒绝**；(b) 不可用 → **升级到 (a)**；
 // (a) 不可用 → **拒绝**。任何一层都**绝不**因不可用而放行。仅在**既未接 (b) 也未接 (a)** 的 (c)-only 装配下，
 // review 保留第一步行为——**默认拒绝**（`review-default-deny`）；接上任一层即走完整链。
@@ -175,6 +181,10 @@ export type PmAskFn = (
 export type { OperatorPrompt, OperatorOutcome, OperatorChannelFn };
 import { matchesDelegatedRoutineCheck, type RoutineShellPolicy } from "./routine-shell-policy.ts";
 import { createDiagnosticLogger } from "../shared/diagnostics.ts";
+// **确定性前置封堵**（客户 2026-10-19：「grep/长内联命令 这个应该让判断AI 做好封堵」）：
+// 在 (c) 分类、模型判断与客户通道**之前**拒绝长内联命令与无界递归搜索（不调模型、不弹卡）。
+// 纯函数、不读盘；规则与理由的单一来源在 `shell-command-guard.ts`。
+import { guardShellCommand } from "./shell-command-guard.ts";
 
 
 // —— 常量 ——
@@ -225,6 +235,13 @@ export const BRANCH_RULESET_LOAD_FAILED = "ruleset-load-failed"; // 规则集加
 export const BRANCH_NO_CLASSIFIER = "no-classifier"; // 未注入分类函数
 export const BRANCH_CLASSIFY_ERROR = "classify-error"; // 分类函数抛错
 export const BRANCH_TIMEOUT = "review-timeout"; // 整体审核超时
+
+// —— 确定性前置封堵（客户 2026-10-19）：在 (c)/(b)/(a) 之前终结，不调模型、不弹卡。
+// 归因码与 `shell-command-guard.ts` 的 reasonCode 同名，审计/诊断可据此对号。
+/** 长内联命令（`node -e`/`python -c`/`bash -c` 等超过阈值）→ 直接拒绝。 */
+export const BRANCH_PREBLOCK_INLINE_TOO_LARGE = "preblock:inline-too-large";
+/** 无界/递归搜索（`grep -r` 无受限路径、`find /`、`rg` 全项目扫描）→ 直接拒绝。 */
+export const BRANCH_PREBLOCK_UNBOUNDED_SEARCH = "preblock:unbounded-search";
 
 // —— 第二闸 (b) —— 触发分支。
 export const BRANCH_B_ALLOW = "b-allow"; // pm 判读为放行
@@ -451,6 +468,30 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
 
     const argv = normalizeArgv(req.argv);
     const rulesId = opts.rulesId ?? "default";
+
+    // **确定性前置封堵**（客户 2026-10-19）：长内联命令 / 无界递归搜索在 (c) 分类之前终结。
+    // - 先于模型与客户通道：不调 pmAsk、不调 operatorChannel、不弹卡；
+    // - 先于 (c) 白名单：`grep -r` 这类在规则集里本属只读放行的命令也在这里被拦下（真机卡死来源）；
+    // - 命中即 deny（fail-closed），写诊断并走既有审计（branch/by 均可辨识）。
+    const preblock = guardShellCommand({
+      command: typeof req.command === "string" ? req.command : "",
+      argv,
+      cwd: typeof req.cwd === "string" ? req.cwd : "",
+      ...(opts.projectRoot !== undefined ? { projectRoot: opts.projectRoot } : {}),
+    });
+    if (preblock.verdict === "deny") {
+      log.record("shell.preblock", {
+        toolCallId: req.toolCallId,
+        reasonCode: preblock.reasonCode,
+      });
+      return {
+        result: { allow: false, reason: preblock.reason, by: `preblock:${preblock.reasonCode}` },
+        conclusion: "deny",
+        branch: preblock.reasonCode === "inline-too-large"
+          ? BRANCH_PREBLOCK_INLINE_TOO_LARGE
+          : BRANCH_PREBLOCK_UNBOUNDED_SEARCH,
+      };
+    }
 
     // 分类：门禁引擎的纯函数。抛错 → 拒绝（保守）。
     let detail: ShellClassifyDetail;

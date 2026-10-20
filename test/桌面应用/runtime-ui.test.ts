@@ -25,7 +25,7 @@ test("只按 IPC 组摘要分组：组长置前、未知职责原文保留、缺
   const groups = Rt.roleGroups(roles);
   assert.deepEqual(groups[0].roles.map((r: any) => r.roleId), ["lead", "member", "unknown"]);
   assert.equal(groups[0].roles[2].groupDuty, "<script>x</script>");
-  assert.equal(groups[1].name, "其他角色（查看/调试）");
+  assert.equal(groups[1].name, "工作角色");
   assert.deepEqual(groups[1].roles, [roles[3]]);
   assert.deepEqual(roles.map(r => r.roleId), ["member", "unknown", "lead", "loose"]);
 });
@@ -66,7 +66,33 @@ test("renderer 仅消费 IPC，机密为空且无持久化，切引擎不停止�
   const switchBody = renderer.slice(renderer.indexOf("  async function selectRuntime("), renderer.indexOf("  function captureChatReading("));
   assert.doesNotMatch(switchBody, /d\.(?:stopSession|abortSession)/);
   assert.match(renderer, /inp\.value = ""; \/\/ 绝不回显值/);
-  assert.doesNotMatch(renderer, /localStorage|sessionStorage|node:fs|require\("fs"\)|import\(/);
+  // 持久化白名单（2026-10-19 契约更新）：只允许侧栏宽度/收起两项界面偏好写 localStorage
+  // （`ans.sidebar.width` / `ans.sidebar.collapsed`，2026-10-17 客户反馈引入）；其余持久化面
+  // sessionStorage / Node fs / 动态 import 仍全禁，凭据、Pi 配置与审批/判断状态不得进入 localStorage。
+  // 不简单删除旧断言：localStorage 从「整文件禁用」收紧为「恰好 4 处且每处只允许白名单形态」。
+  assert.doesNotMatch(renderer, /sessionStorage|node:fs|require\("fs"\)|import\(/);
+  // 去块注释/行注释后再数实现，避免注释里提到 localStorage 造成误判。
+  const rendererCodeLines = renderer.replace(/\/\*[\s\S]*?\*\//g, "").split("\n").map((raw) => raw.replace(/\/\/.*$/, ""));
+  const storageLineIndexes = rendererCodeLines.map((line, i) => (line.includes("localStorage") ? i : -1)).filter((i) => i >= 0);
+  assert.equal(storageLineIndexes.length, 4, "localStorage 只允许两项侧栏偏好的读/写共 4 处");
+  const storageCall = /window\.localStorage\.(getItem|setItem)\((SIDEBAR_WIDTH_STORAGE_KEY|SIDEBAR_STORAGE_KEY)\b/;
+  assert.equal(
+    storageLineIndexes.reduce((n, i) => n + (rendererCodeLines[i].match(/localStorage/g) || []).length, 0),
+    4,
+    "localStorage 出现次数恰为 4 次",
+  );
+  for (const i of storageLineIndexes) {
+    const line = rendererCodeLines[i];
+    assert.match(line, storageCall, "localStorage 只允许侧栏 UI 键的 getItem/setItem");
+    assert.ok(!line.replace(new RegExp(storageCall.source, "g"), "").includes("localStorage"), "同一行不得夹带白名单之外的 localStorage 调用");
+    const near = rendererCodeLines.slice(Math.max(0, i - 1), i + 2).join("\n");
+    assert.doesNotMatch(near, /api[_-]?key|token|secret|password|credential|shellConfirm|recoveryConfirm|shellJudge|decisionJudge|piConfig/i, "localStorage 邻近不得出现凭据、Pi 配置或审批/判断状态");
+  }
+  assert.deepEqual(
+    [...renderer.matchAll(/\b(?:var|let|const)\s+(SIDEBAR_WIDTH_STORAGE_KEY|SIDEBAR_STORAGE_KEY)\s*=\s*"([^"]+)";/g)].map((m) => [m[1], m[2]]).sort(),
+    [["SIDEBAR_STORAGE_KEY", "ans.sidebar.collapsed"], ["SIDEBAR_WIDTH_STORAGE_KEY", "ans.sidebar.width"]],
+    "localStorage 仅两项侧栏 UI 键",
+  );
   assert.match(renderer, /onOperatorExpired/);
   assert.match(renderer, /entry\.runtime !== state\.runtime/);
 });

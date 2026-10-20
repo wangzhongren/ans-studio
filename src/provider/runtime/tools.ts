@@ -36,6 +36,15 @@ import type {
   InstallMcpFn,
   InstallMcpPayload,
   UninstallMcpFn,
+  FlowGetFn,
+  FlowStepUpdateFn,
+  FlowStepSupersedeFn,
+  FlowToolEvidence,
+  FlowToolResult,
+  FlowToolStatus,
+  FlowToolStepKind,
+  FlowToolView,
+  FlowToolStepView,
   ShellVerdictFn,
   ShellVerdictPayload,
   InteractionGate,
@@ -43,7 +52,7 @@ import type {
   ToolDefinition, ToolResult, GovernedToolsOptions,
   GovernanceCardKind, GovernanceCardMetadata, GovernanceChoiceCardKind, GovernanceConfirmCardKind, GovernanceFlowMetadata,
 } from "../../model/runtime.ts";
-import { GOVERNANCE_SLUG_PATTERN } from "../../model/runtime.ts";
+import { GOVERNANCE_SLUG_PATTERN, FLOW_TOOL_STATUSES, FLOW_TOOL_STEP_KINDS } from "../../model/runtime.ts";
 import type { WriteDecision } from "../../model/decision.ts";
 import type { DiagnosticLog } from "../../model/runtime.ts";
 import { describeTool } from "./schema.ts";
@@ -116,6 +125,15 @@ export const INSTALL_MCP_TOOL_NAME = "install_mcp";
 
 /** uninstall_mcp 工具名（G-4 V2；su 外来 MCP 卸载——校验＋激活＋回执，工具不写盘）。 */
 export const UNINSTALL_MCP_TOOL_NAME = "uninstall_mcp";
+
+/** flow_get 工具名（2026-10-20 flow 文件方法化；只读流程结构化视图）。 */
+export const FLOW_GET_TOOL_NAME = "flow_get";
+
+/** flow_step_update 工具名（2026-10-20；推进单个步骤状态——迁移/权限/证据裁决在编排 flow-service）。 */
+export const FLOW_STEP_UPDATE_TOOL_NAME = "flow_step_update";
+
+/** flow_step_supersede 工具名（2026-10-20；新步骤取代旧步骤，Steward/Lead（工作流管理者）——服务端校验）。 */
+export const FLOW_STEP_SUPERSEDE_TOOL_NAME = "flow_step_supersede";
 
 /** 扩展层对 run_shell 的能力级判定结果：非 undefined 即阻断（默认拒绝）。 */
 export interface ShellKillSwitchDecision {
@@ -908,6 +926,11 @@ function abortedToolResult(name: string): ToolResult {
   // G-4 V2：中止时**不假设已安装/已卸载**（同技能版口径；零副作用面如实）。
   if (name === INSTALL_MCP_TOOL_NAME) return { ok: false, message: `${name}：MCP**未能安装**（原因：会话已中止）——**不要当它已安装**；如实告知客户。` };
   if (name === UNINSTALL_MCP_TOOL_NAME) return { ok: false, message: `${name}：MCP**未能卸载**（原因：会话已中止）——**不要当它已卸载**；如实告知客户。` };
+  // flow 方法化：中止时**不假设已读/已变更**（以服务端 revision 为准）。
+  if (name === FLOW_GET_TOOL_NAME) return { ok: false, message: `${name}：流程读取**未完成**（原因：会话已中止）——不要据此推断流程状态。` };
+  if (name === FLOW_STEP_UPDATE_TOOL_NAME || name === FLOW_STEP_SUPERSEDE_TOOL_NAME) {
+    return { ok: false, message: `${name}：变更**未完成**（原因：会话已中止）——**不要当它已生效**；如确需，先 flow_get 看最新 revision 再重试。` };
+  }
   return { ok: false, message: `${name}：会话已中止，未执行` };
 }
 
@@ -1993,6 +2016,257 @@ function makeUninstallMcpTool(fn: UninstallMcpFn, currentTurnId?: () => string |
   return makeMcpReceiptTool("uninstall", fn, currentTurnId, scope);
 }
 
+// —————————————— Flow 文件方法化（2026-10-20 客户拍板；最小闭环） ——————————————
+//
+// 三工具只做两件事：**参数形状校验**（非法在触达能力前拒绝，不猜测、不静默丢弃）＋**调用注入能力
+// 并如实转达回执**。权限/状态迁移合法性/证据完整性/revision 冲突/Steward/Lead 权限等**一律由编排
+// flow-service 裁决**——本层不读写 flow 文件、不写账本、不做第二份裁决。
+// 未注入对应能力 ⇒ 工具不注册（沿 dispatch_task 先例，能力缺席＝最强 fail-closed）。
+//
+// 诚实面：步骤推进 ≠ 客户批准——需要客户决定的步骤仍须走 request_confirmation/request_choice；
+// 回执 `ok:true` 只表示服务端接受了变更（`idempotent:true`＝同一 idempotencyKey 重放、未重复变更）。
+
+const FLOW_TOOL_STATUS_SET: ReadonlySet<string> = new Set(FLOW_TOOL_STATUSES);
+const FLOW_TOOL_STEP_KIND_SET: ReadonlySet<string> = new Set(FLOW_TOOL_STEP_KINDS);
+
+/** 参数形状错误：触达能力前拒绝，明确「未执行」。 */
+function flowArgumentError(name: string, detail: string): ToolResult {
+  return { ok: false, message: `${name}: ${detail}——未执行；请更正后重试（不要猜测参数）` };
+}
+
+/** 必填非空字符串（不改写载荷值）。 */
+function readFlowRequiredText(args: Record<string, unknown>, key: string, name: string): { ok: true; value: string } | { ok: false; result: ToolResult } {
+  const value = args[key];
+  if (typeof value !== "string" || value.trim() === "") {
+    return { ok: false, result: flowArgumentError(name, `缺少或非法的 ${key} 参数（须为非空字符串）`) };
+  }
+  return { ok: true, value };
+}
+
+/** 可选非空字符串：缺席保持缺席（不造键）；给出时必须是字符串。 */
+function readFlowOptionalText(args: Record<string, unknown>, key: string, name: string): { ok: true; value: string | undefined } | { ok: false; result: ToolResult } {
+  const value = args[key];
+  if (value === undefined || value === null) return { ok: true, value: undefined };
+  if (typeof value !== "string" || value.trim() === "") {
+    return { ok: false, result: flowArgumentError(name, `${key} 参数非法（须为非空字符串；可省略）`) };
+  }
+  return { ok: true, value };
+}
+
+/** 可选证据 `{kind, ref}`：形状校验（枚举/非空 ref）在工具层；存在性与完整性在 flow-service。 */
+function readFlowEvidence(args: Record<string, unknown>, name: string): { ok: true; value: FlowToolEvidence | undefined } | { ok: false; result: ToolResult } {
+  const raw = args["evidence"];
+  if (raw === undefined || raw === null) return { ok: true, value: undefined };
+  if (typeof raw !== "object" || Array.isArray(raw)) {
+    return { ok: false, result: flowArgumentError(name, "evidence 参数非法（须为 {kind, ref} 对象）") };
+  }
+  const record = raw as Record<string, unknown>;
+  if (typeof record["kind"] !== "string" || !FLOW_TOOL_STEP_KIND_SET.has(record["kind"])) {
+    return { ok: false, result: flowArgumentError(name, `evidence.kind 非法（须为 ${FLOW_TOOL_STEP_KINDS.join("/")} 之一）`) };
+  }
+  if (typeof record["ref"] !== "string" || record["ref"].trim() === "") {
+    return { ok: false, result: flowArgumentError(name, "evidence.ref 非法（须为非空字符串）") };
+  }
+  return { ok: true, value: { kind: record["kind"] as FlowToolStepKind, ref: record["ref"] } };
+}
+
+/** 服务端回执里的 issues：只转达非空字符串项（其它类型忽略，不猜）。 */
+function flowIssuesOf(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const issues = value.filter((item): item is string => typeof item === "string" && item.trim() !== "");
+  return issues.length > 0 ? issues : undefined;
+}
+
+/** 结构化流程视图 → 可读文本（原样投影字段，不重算状态；格式异常只跳过，不抛）。 */
+function renderFlowView(flow: unknown): string {
+  if (flow === null || typeof flow !== "object" || Array.isArray(flow)) return "";
+  const record = flow as Partial<FlowToolView>;
+  const lines: string[] = [];
+  const header: string[] = [];
+  if (typeof record.flowId === "string") header.push(`flowId=${record.flowId}`);
+  if (typeof record.revision === "string") header.push(`revision=${record.revision}`);
+  if (typeof record.qualityTier === "string") header.push(`qualityTier=${record.qualityTier}`);
+  if (header.length > 0) lines.push(`流程：${header.join("；")}`);
+  const canUpdate = Array.isArray(record.canUpdate) ? record.canUpdate.filter((id): id is string => typeof id === "string") : [];
+  lines.push(`当前角色可更新步骤：${canUpdate.length > 0 ? canUpdate.join(", ") : "（无）"}`);
+  const steps = Array.isArray(record.steps) ? record.steps : [];
+  if (steps.length > 0) {
+    lines.push("步骤：");
+    for (const rawStep of steps) {
+      if (rawStep === null || typeof rawStep !== "object") continue;
+      const step = rawStep as Partial<FlowToolStepView>;
+      const text = `- ${String(step.id ?? "?")}：${String(step.title ?? "")}（owner=${String(step.owner ?? "?")}；kind=${String(step.kind ?? "?")}；status=${String(step.status ?? "?")}）`;
+      const extras: string[] = [];
+      const evidence = step.evidence as Partial<FlowToolEvidence> | undefined;
+      if (evidence !== undefined && typeof evidence.kind === "string" && typeof evidence.ref === "string") {
+        extras.push(`evidence=${evidence.kind}:${evidence.ref}`);
+      }
+      if (Array.isArray(step.supersedes) && step.supersedes.length > 0) {
+        extras.push(`supersedes=${step.supersedes.filter((id): id is string => typeof id === "string").join(",")}`);
+      }
+      if (typeof step.supersededBy === "string") extras.push(`supersededBy=${step.supersededBy}`);
+      lines.push(extras.length > 0 ? `${text} ${extras.join(" ")}` : text);
+    }
+  }
+  return `\n${lines.join("\n")}`;
+}
+
+/**
+ * flow 回执 → 工具结果：**原样**转达 `ok/code/revision/error/issues`（含 idempotent 与 flow 视图）。
+ * 契约外回执（缺失/非对象/ok 非布尔）⇒ fail-closed「未获明确结果」，绝不当成功。
+ */
+function flowResultMessage(name: string, value: unknown): ToolResult {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return { ok: false, message: `${name}：flow 服务未返回明确结果（回执缺失或非法）——不要据此推断流程状态。` };
+  }
+  const receipt = value as Partial<FlowToolResult>;
+  if (typeof receipt.ok !== "boolean") {
+    return { ok: false, message: `${name}：flow 服务未返回明确结果（缺少 ok 布尔）——不要据此推断流程状态。` };
+  }
+  const parts: string[] = [`ok=${receipt.ok}`];
+  if (typeof receipt.code === "string" && receipt.code !== "") parts.push(`code=${receipt.code}`);
+  if (typeof receipt.revision === "string" && receipt.revision !== "") parts.push(`revision=${receipt.revision}`);
+  if (receipt.idempotent === true) parts.push("idempotent=true");
+  if (typeof receipt.error === "string" && receipt.error !== "") parts.push(`error=${receipt.error}`);
+  const issues = flowIssuesOf(receipt.issues);
+  if (issues !== undefined) parts.push(`issues=${issues.join("；")}`);
+  const detail = `（${parts.join("；")}）`;
+  if (!receipt.ok) {
+    return {
+      ok: false,
+      message: `${name}：操作**未完成**${detail}——请如实向客户说明；按 code/error/issues 修正后重试，最新状态以服务端 revision 为准。`,
+    };
+  }
+  return {
+    ok: true,
+    message: `${name}：操作成功${detail}${renderFlowView(receipt.flow)}\n注意：步骤推进 ≠ 客户批准；需要客户决定的步骤仍须走客户交互工具。`,
+  };
+}
+
+/** flow_get：只读流程结构化视图（`flowId` 可选；缺省＝当前/默认 flow，由服务端归一）。 */
+function makeFlowGetTool(fn: FlowGetFn): ExecutableTool {
+  const name = FLOW_GET_TOOL_NAME;
+  return {
+    name,
+    async handler(call) {
+      const raw = call.args["flowId"];
+      if (raw !== undefined && raw !== null && typeof raw !== "string") {
+        return flowArgumentError(name, "flowId 参数非法（应为字符串；可省略＝当前流程）");
+      }
+      const flowId = typeof raw === "string" && raw.trim() !== "" ? raw : undefined;
+      let result: unknown;
+      try {
+        result = await raceAbort(
+          Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return fn(flowId !== undefined ? { flowId } : {}); }),
+          call.signal,
+          `${name} 读取流程`,
+        );
+      } catch (err) {
+        return { ok: false, message: `${name}：流程读取**未完成**（原因：${reasonOf(err)}）——没有拿到视图就**不要推断流程状态**；如确需，可稍后重试。` };
+      }
+      return flowResultMessage(name, result);
+    },
+  };
+}
+
+/** flow_step_update：推进单个步骤状态（迁移/权限/证据/revision 裁决在 flow-service）。 */
+function makeFlowStepUpdateTool(fn: FlowStepUpdateFn): ExecutableTool {
+  const name = FLOW_STEP_UPDATE_TOOL_NAME;
+  return {
+    name,
+    async handler(call) {
+      const flowId = readFlowRequiredText(call.args, "flowId", name);
+      if (!flowId.ok) return flowId.result;
+      const stepId = readFlowRequiredText(call.args, "stepId", name);
+      if (!stepId.ok) return stepId.result;
+      const statusRaw = call.args["status"];
+      if (typeof statusRaw !== "string" || !FLOW_TOOL_STATUS_SET.has(statusRaw)) {
+        return flowArgumentError(name, `status 参数非法（须为 ${FLOW_TOOL_STATUSES.join("/")} 之一）`);
+      }
+      const expectedRevision = readFlowRequiredText(call.args, "expectedRevision", name);
+      if (!expectedRevision.ok) return expectedRevision.result;
+      const evidence = readFlowEvidence(call.args, name);
+      if (!evidence.ok) return evidence.result;
+      const idempotencyKey = readFlowOptionalText(call.args, "idempotencyKey", name);
+      if (!idempotencyKey.ok) return idempotencyKey.result;
+      const note = readFlowOptionalText(call.args, "note", name);
+      if (!note.ok) return note.result;
+      const input: Parameters<FlowStepUpdateFn>[0] = {
+        flowId: flowId.value,
+        stepId: stepId.value,
+        status: statusRaw as FlowToolStatus,
+        expectedRevision: expectedRevision.value,
+        ...(evidence.value !== undefined ? { evidence: evidence.value } : {}),
+        ...(idempotencyKey.value !== undefined ? { idempotencyKey: idempotencyKey.value } : {}),
+        ...(note.value !== undefined ? { note: note.value } : {}),
+      };
+      let result: unknown;
+      try {
+        result = await raceAbort(
+          Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return fn(input); }),
+          call.signal,
+          `${name} 更新步骤`,
+        );
+      } catch (err) {
+        return { ok: false, message: `${name}：步骤更新**未完成**（原因：${reasonOf(err)}）——**不要当它已生效**；如确需，先 flow_get 看最新 revision 再重试。` };
+      }
+      return flowResultMessage(name, result);
+    },
+  };
+}
+
+/** flow_step_supersede：新步骤取代旧步骤（Steward/Lead——服务端按调用角色校验）。 */
+function makeFlowStepSupersedeTool(fn: FlowStepSupersedeFn): ExecutableTool {
+  const name = FLOW_STEP_SUPERSEDE_TOOL_NAME;
+  return {
+    name,
+    async handler(call) {
+      const flowId = readFlowRequiredText(call.args, "flowId", name);
+      if (!flowId.ok) return flowId.result;
+      const oldStepId = readFlowRequiredText(call.args, "oldStepId", name);
+      if (!oldStepId.ok) return oldStepId.result;
+      const newStepId = readFlowRequiredText(call.args, "newStepId", name);
+      if (!newStepId.ok) return newStepId.result;
+      const title = readFlowRequiredText(call.args, "title", name);
+      if (!title.ok) return title.result;
+      const owner = readFlowRequiredText(call.args, "owner", name);
+      if (!owner.ok) return owner.result;
+      const kindRaw = call.args["kind"];
+      if (typeof kindRaw !== "string" || !FLOW_TOOL_STEP_KIND_SET.has(kindRaw)) {
+        return flowArgumentError(name, `kind 参数非法（须为 ${FLOW_TOOL_STEP_KINDS.join("/")} 之一）`);
+      }
+      const expectedRevision = readFlowRequiredText(call.args, "expectedRevision", name);
+      if (!expectedRevision.ok) return expectedRevision.result;
+      const reason = readFlowOptionalText(call.args, "reason", name);
+      if (!reason.ok) return reason.result;
+      const idempotencyKey = readFlowOptionalText(call.args, "idempotencyKey", name);
+      if (!idempotencyKey.ok) return idempotencyKey.result;
+      const input: Parameters<FlowStepSupersedeFn>[0] = {
+        flowId: flowId.value,
+        oldStepId: oldStepId.value,
+        newStepId: newStepId.value,
+        title: title.value,
+        owner: owner.value,
+        kind: kindRaw as FlowToolStepKind,
+        expectedRevision: expectedRevision.value,
+        ...(reason.value !== undefined ? { reason: reason.value } : {}),
+        ...(idempotencyKey.value !== undefined ? { idempotencyKey: idempotencyKey.value } : {}),
+      };
+      let result: unknown;
+      try {
+        result = await raceAbort(
+          Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return fn(input); }),
+          call.signal,
+          `${name} 替代步骤`,
+        );
+      } catch (err) {
+        return { ok: false, message: `${name}：步骤替代**未完成**（原因：${reasonOf(err)}）——**不要当它已生效**；如确需，先 flow_get 看最新 revision 再重试。` };
+      }
+      return flowResultMessage(name, result);
+    },
+  };
+}
+
 /**
  * 构造受治理工具集：
  * - 写入类 write_file / edit_file（先 gate，获准且配置了 writeRoot 时落盘）；
@@ -2105,6 +2379,15 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
   if (uninstallMcp !== undefined) {
     tools.push(makeUninstallMcpTool(uninstallMcp, options?.currentTurnId, { roleId: options?.roleId, runtime: options?.runtime }));
   }
+  // 结构性保证（2026-10-20 flow 文件方法化，同 dispatch_task 先例）：**未注入对应能力时三工具不存在**。
+  // 三能力各自独立「注入才注册」；权限/迁移/证据/revision 冲突/Steward/Lead 权限裁决在编排 flow-service，
+  // 本层只做参数形状校验并如实转达回执（不做第二份裁决）。
+  const flowGet = options?.flowGet;
+  if (flowGet !== undefined) tools.push(makeFlowGetTool(flowGet));
+  const flowStepUpdate = options?.flowStepUpdate;
+  if (flowStepUpdate !== undefined) tools.push(makeFlowStepUpdateTool(flowStepUpdate));
+  const flowStepSupersede = options?.flowStepSupersede;
+  if (flowStepSupersede !== undefined) tools.push(makeFlowStepSupersedeTool(flowStepSupersede));
   // Observe customer waits without storing titles, previews or selected values.
   return tools.map((tool) => {
     const { parameters, ...description } = describeTool(tool.name);

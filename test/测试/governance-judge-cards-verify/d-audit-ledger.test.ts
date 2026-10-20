@@ -151,7 +151,7 @@ test("proposal 代批：0 卡、1 行、账本 kind=judge（group/cardKind/engin
   }
 });
 
-test("回落 → 客户手答：原卡 + judgeNotice，账本仍是 customer-input，不写 judge 子字段", async () => {
+test("回落 → 自动退回：无客户卡、账本不写 customer.decision（更不写 judge）", async () => {
   const { root, cleanup } = makeRoot("audit-customer");
   try {
     seedProject(root);
@@ -168,26 +168,25 @@ test("回落 → 客户手答：原卡 + judgeNotice，账本仍是 customer-inp
       })),
     });
     const { handle, capture } = await openRapporteur(root, h, PROPOSAL_SCRIPT);
-    const running = drive(handle, "请形成提案并请客户决定");
-    await waitFor(() => h.presented.length === 1);
-    assert.match(h.presented[0]!.judgeNotice ?? "", /判断 agent 未代批（代决策）/, "回落卡必须带人话提示");
-    h.answer(h.presented[0]!.id, { kind: "choice", selected: ["accept"] });
-    await running;
+    await drive(handle, "请形成提案并请客户决定");
+    assert.equal(h.presented.length, 0, "manual 自动退回，不呈现客户卡");
+    assert.equal(h.rows.length, 0, "manual 不产生结果行");
+    const receipt = capture.results.find((result) => result.name === "request_choice");
+    assert.ok(receipt, "发起角色应收到 request_choice 的 declined 回执");
+    assert.equal(receipt!.ok, false, "回执必须是拒绝，不得伪造同意");
+    assert.match(receipt!.message, /自动决策未通过/, "回执须说明自动决策未通过");
+    assert.match(receipt!.message, /重新提交/, "回执须给出修正后重试指引");
+    assert.doesNotMatch(receipt!.message, /客户已选择/, "不得伪装客户作答");
     await handle.dispose();
 
-    const ledger = await waitForLedger(root, (entries) => entries.some((entry) => entry.decisionKind === "proposal-accept"));
-    const entry = ledger.entries.find((candidate) => candidate.decisionKind === "proposal-accept");
-    assert.ok(entry !== undefined);
-    assert.equal(entry.decisionEvidence?.kind, "customer-input", "客户手批必须保持 customer-input");
-    assert.equal(entry.decisionEvidence?.judge, undefined, "客户手批不得带 judge 子字段");
-    assert.equal(entry.actorRoleId, "rapporteur");
-    assert.equal(entry.power, "proposal");
-    assert.equal(h.rows.length, 0, "manual 不产生结果行");
-    assert.equal(h.nextSteps.length, 1, "客户手答后下一步仍恰一次");
-
-    const receipt = capture.results.find((result) => result.name === "request_choice");
-    assert.match(receipt!.message, /客户已选择/, "客户手答保持原文案");
-    assert.doesNotMatch(receipt!.message, /判断 agent/);
+    // judge declined 不是客户决定：不写 customer.decision（避免 unclassified/none 挡收尾门）。
+    const ledger = await waitForLedger(root, () => true);
+    assert.equal(
+      ledger.entries.some((entry) => entry.kind === "customer.decision" && entry.decisionKind === "proposal-accept"),
+      false,
+      "judge declined 不得写客户决定账本",
+    );
+    assert.equal(h.nextSteps.length, 0, "declined 不触发应用下一步（由发起角色同轮修正重发）");
   } finally {
     cleanup();
   }
@@ -256,7 +255,7 @@ test("写盘代批：账本 kind=judge、group=approval、judge.paths 逐路径�
   }
 });
 
-test("group 交叉校验：judge.group 与 cardKind 映射不一致只记诊断，不翻转决定、不改归因", async () => {
+test("group 交叉校验：judge.group 与 cardKind 映射不一致 ⇒ 自动退回（declined），不按 judge 结算、不改归因", async () => {
   const { root, cleanup } = makeRoot("audit-mismatch");
   try {
     seedProject(root);
@@ -274,17 +273,22 @@ test("group 交叉校验：judge.group 与 cardKind 映射不一致只记诊断�
         value: { selected: ["accept"] },
       })),
     });
-    // 通道本身会先按 group-mismatch 回落（§4.3-2 防御），因此这里只证明不会变成 customer-input。
-    const { handle } = await openRapporteur(root, h, PROPOSAL_SCRIPT);
-    const running = drive(handle, "请形成提案并请客户决定");
-    await waitFor(() => h.presented.length === 1);
-    h.answer(h.presented[0]!.id, { kind: "choice", selected: ["accept"] });
-    await running;
+    // 通道会按 group-mismatch 回落 manual ⇒ 自动退回（declined）；这里证明不会变成 customer-input。
+    const { handle, capture } = await openRapporteur(root, h, PROPOSAL_SCRIPT);
+    await drive(handle, "请形成提案并请客户决定");
+    assert.equal(h.presented.length, 0, "错组回落自动退回，不呈现客户卡");
+    const receipt = capture.results.find((result) => result.name === "request_choice");
+    assert.ok(receipt, "应有 request_choice 回执");
+    assert.equal(receipt!.ok, false, "错组判断必须拒绝");
+    assert.match(receipt!.message, /分组不一致|自动决策未通过/);
+    assert.match(receipt!.message, /重新提交/);
     await handle.dispose();
-    const ledger = await waitForLedger(root, (entries) => entries.some((entry) => entry.decisionKind === "proposal-accept"));
-    const entry = ledger.entries.find((candidate) => candidate.decisionKind === "proposal-accept");
-    assert.ok(entry !== undefined);
-    assert.equal(entry.decisionEvidence?.kind, "customer-input", "错组判断不得按 judge 结算");
+    const ledger = await waitForLedger(root, () => true);
+    assert.equal(
+      ledger.entries.some((entry) => entry.kind === "customer.decision" && entry.decisionKind === "proposal-accept"),
+      false,
+      "错组判断不得按 judge 结算，也不得写成客户决定",
+    );
   } finally {
     cleanup();
   }

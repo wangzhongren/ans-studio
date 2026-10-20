@@ -96,7 +96,8 @@ function trioListing(roleIds: string[] = ["rapporteur", "nominator", "convener",
     roles: roleIds.map(role),
     warnings: [],
     hasRoles: false,
-    primaryRoleId: "rapporteur",
+    // 2026-10-19 客户决定：自动验收门反馈统一发给 Lead（主入口）；真实 trio 的 primaryRoleId=liaison。
+    primaryRoleId: "liaison",
     governanceModel: "trio",
   };
 }
@@ -518,7 +519,7 @@ test("持久化：往返读写、坏件重建、缺省关闭、demo 不落盘", 
 
 // ————————————————— ② Interface 接线（自动验收派发/冷启动补齐） —————————————————
 
-test("冷启动无法确定引擎：不派发、Convener 恰一条明确系统行、不写派发记录", async () => {
+test("冷启动无法确定引擎：不派发、Lead 恰一条明确系统行、不写派发记录", async () => {
   const root = makeTempDir("ans-acceptance-runtime-unresolved-");
   try {
     const flowId = "flow-unresolved";
@@ -534,13 +535,13 @@ test("冷启动无法确定引擎：不派发、Convener 恰一条明确系统�
       },
     });
     try {
-      await waitFor(() => deliveryNotes(harness.events, "convener").some((note) => note.includes("无法确定项目引擎")));
+      await waitFor(() => deliveryNotes(harness.events, "liaison").some((note) => note.includes("无法确定项目引擎")));
       assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "引擎无法确定 ⇒ 不派 Proof");
       assert.equal((await verifierDispatches(root, flowId)).length, 0, "不写验收派发记录");
       assert.ok(requests.length >= 1);
       assert.equal(requests[0]!.activeRuntime, undefined, "冷启动没有活跃会话（优先级 1 为空）");
       assert.equal(requests[0]!.persistedRuntime, undefined, "没有持久化选择");
-      const notes = deliveryNotes(harness.events, "convener").filter((note) => note.includes("无法确定项目引擎"));
+      const notes = deliveryNotes(harness.events, "liaison").filter((note) => note.includes("无法确定项目引擎"));
       assert.equal(notes.length, 1, "同一项目只落一条系统行（不刷屏）");
       await sleep(150);
       assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0, "无事件 ⇒ 不循环重试");
@@ -570,7 +571,7 @@ test("解析失败后客户选定引擎：下一次真实 settle 可再检查并
       },
     });
     try {
-      await waitFor(() => deliveryNotes(harness.events, "convener").some((note) => note.includes("无法确定项目引擎")));
+      await waitFor(() => deliveryNotes(harness.events, "liaison").some((note) => note.includes("无法确定项目引擎")));
       assert.equal(harness.sendsByRole.get("verifier")?.length ?? 0, 0);
 
       assert.equal((await harness.iface.openSession({ projectRoot: root, roleId: "executor", runtime: "pi" })).ok, true);

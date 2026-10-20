@@ -89,9 +89,9 @@ export interface OperatorRequestPayload {
    */
   mirrorRoleId?: string;
   /**
-   * **判断回落提示**（2026-10-18 双开关评审 §4.3/§9.3）：判断 agent 未能代批（manual/负向/证据不足/
-   * 读取失败/超时/结果行投达失败/开关关闭）时附在人话卡上；`row-failed` 单列。只有回落卡带本字段，
-   * 正常卡片与代批成功（0 卡）都没有。
+   * **判断回落提示**（2026-10-18 双开关评审 §4.3/§9.3；2026-10-19 客户总原则后收窄）：
+   * 客户勾选对应开关后，`manual`/`deny` 都**自动退回发起角色重做**（不呈现客户卡）；本字段只在
+   * **判断期间客户关闭开关（switch-off）**这一例外（客户已选择手动）时附在原卡上。
    */
   judgeNotice?: string;
 }
@@ -528,6 +528,15 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     ...(reason !== undefined ? { reason } : {}),
   });
 
+  /**
+   * 判断裁决枚举的**防御读取**：编排契约扩为 `approve | deny | manual`；本模块按值读取，
+   * 既不依赖 `src/model` 的编译期枚举是否先落盘，也绝不把未知值当 approve。
+   */
+  const judgeVerdictOf = (outcome: { verdict?: unknown }): "approve" | "deny" | "manual" | undefined => {
+    const verdict = outcome.verdict;
+    return verdict === "approve" || verdict === "deny" || verdict === "manual" ? verdict : undefined;
+  };
+
   /** 判断结论的 `value` 必须与卡片形状/选项一致（防注入的防御复核；driver 已规范化）。 */
   const approvedValue = (
     request: CustomerInputRequest,
@@ -546,17 +555,60 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     return { selected };
   };
 
-  /** 判断回落的人话提示（§9.3；`row-failed` 单列；不把「判断发生但降级」说成「没发生」）。 */
+  /**
+   * 判断回落的人话提示（2026-10-19 总原则后**仅 switch-off 例外**使用：判断期间客户关闭开关，
+   * 客户已选择手动 → 原卡 + 本提示）。其余 manual/deny 自动退回重做，不再呈现客户卡。
+   */
   const judgeManualNotice = (group: GovernanceJudgeGroup, reasonCode: string, reason?: string): string => {
     const label = group === "approval" ? "代审批" : "代决策";
     if (reasonCode === "row-failed") return "判断已完成，但结果无法在聊天中显示；已转你手动确认。";
     return `判断 agent 未代批（${label}）：${stripTrailingSentencePunct(judgeHumanReason(reasonCode, reason))}；已转你手动确认。`;
   };
 
-  /** 结算判断结果：approve 先发结果行再走同一 `settleEntry`；manual 设 `judgeNotice` 后呈现原卡。 */
+  /**
+   * 结算判断结果：
+   *  · `approve`：先发结果行，再走同一 `settleEntry`（answered，judge 审计）；
+   *  · `deny`（仅 approval 组；2026-10-19 客户要求「判断 agent 拒绝 + 退回发起角色重做」）：**不呈现客户卡、
+   *    不发 approve 结果行、不写客户决定账本**，直接以 `declined` 结算（带具体原因）——发起角色的
+   *    `request_confirmation` 会收到该原因并重做；decision 组/开关关闭/分组不符防御性回落 manual；
+   *  · `manual`（判断已运行但未能代批）：按客户 2026-10-19 总原则同样**自动退回重做**
+   *    （declined + 可操作原因，不呈现客户卡）；仅 `switch-off`（判断期间关闭开关）例外呈现原卡+提示，
+   *    `aborted` 走既有取消/丢弃语义。
+   */
   const settleJudgeOutcome = (entry: ChannelEntry, plan: JudgePlan, rawOutcome: GovernanceJudgeOutcome): void => {
     const { group, cardKind } = plan;
     let outcome = rawOutcome;
+    if (judgeVerdictOf(outcome) === "deny") {
+      // 仅 approval 组允许 deny（编排对 decision 组会回落 manual；这里再防御一次）。
+      if (group !== "approval") {
+        outcome = manualOutcome(plan, "deny-not-approval", "拒绝仅适用于审批组");
+      } else if (opts.judge?.isGroupEnabled(group) !== true) {
+        // 判断期间开关被关/重载复位：拒绝结论也不再具有代批授权 ⇒ 回落客户手动。
+        diagnostic.record("governance-judge.switch.off", { requestId: entry.payload.id, group });
+        outcome = manualOutcome(plan, "switch-off", "你已关闭对应开关");
+      } else if (outcome.group !== group || outcome.cardKind !== cardKind) {
+        outcome = manualOutcome(plan, "group-mismatch", "判断结果分组与卡片不符");
+      } else {
+        if (entry.state !== "judging") return; // 已中止/已结算：丢弃结果
+        const reason = judgeReworkReasonText(group, outcome, "deny");
+        diagnostic.record("governance-judge.deny", {
+          requestId: entry.payload.id,
+          group,
+          cardKind,
+          reasonCode: outcome.reasonCode,
+          reason: outcome.reason,
+          // 审计保留「模型裁决=deny」事实；最终处置=自动拒绝退回（不是客户操作）。
+          decision: "deny",
+          outcome: "deny",
+        });
+        settleEntry(
+          entry,
+          { outcome: "declined", operatorId: `judge:${outcome.engine}`, reason },
+          "judging",
+        );
+        return;
+      }
+    }
     if (outcome.verdict === "approve") {
       // §4.3-1：判断期间开关可能被关/重载复位 ⇒ 再查一次（主进程权威）。
       if (opts.judge?.isGroupEnabled(group) !== true) {
@@ -600,7 +652,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
             if (opts.emitJudgeResult === undefined) throw new Error("判断结果行通道未配置");
             opts.emitJudgeResult(payload);
           } catch (error) {
-            // 结果行是 approve 的条件：投达失败 ⇒ 原卡手动（§4.3-3）。
+            // 结果行是 approve 的条件：投达失败 ⇒ manual（row-failed）⇒ 自动退回重做（不呈现客户卡）。
             diagnostic.error("governance-judge.row.failed", error, {
               requestId: entry.payload.id,
               toolCallId: entry.payload.toolCallId,
@@ -653,17 +705,41 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
         }
       }
     }
-    // manual（含全部回落）：原卡 + judgeNotice；不写账本决定；客户手答仍是 customer-input 证据。
+    // manual（判断已运行但未能代批）：按客户 2026-10-19 总原则「我勾选了替我决策就不用我来管了」——
+    // **不再呈现客户卡**；以 declined + 可操作原因退回发起角色重做。不写客户决定账本、不发结果行。
+    // 例外只有：
+    //  · switch-off（判断期间客户关闭对应开关）⇒ 客户已选择手动，呈现原卡 + judgeNotice；
+    //  · aborted（本轮已中止）⇒ 既有取消/丢弃语义（不结算、不呈现）。
     if (entry.state !== "judging") return; // 已中止/已结算：丢弃结果
-    diagnostic.record("governance-judge.manual", {
+    if (outcome.reasonCode === "aborted") return; // 取消监听会按既有语义结算 unavailable
+    if (outcome.reasonCode === "switch-off") {
+      diagnostic.record("governance-judge.manual", {
+        requestId: entry.payload.id,
+        group,
+        cardKind,
+        reasonCode: outcome.reasonCode,
+      });
+      judging.delete(entry.payload.id);
+      entry.payload.judgeNotice = judgeManualNotice(group, outcome.reasonCode, outcome.reason);
+      presentNow(entry);
+      return;
+    }
+    const reworkReason = judgeReworkReasonText(group, outcome, "manual");
+    diagnostic.record("governance-judge.manual-as-rework", {
       requestId: entry.payload.id,
       group,
       cardKind,
       reasonCode: outcome.reasonCode,
+      reason: outcome.reason,
+      // 审计保留「模型裁决=manual」事实；最终处置=自动退回重做（不是客户操作）。
+      decision: "manual-as-rework",
+      outcome: "manual",
     });
-    judging.delete(entry.payload.id);
-    entry.payload.judgeNotice = judgeManualNotice(group, outcome.reasonCode, outcome.reason);
-    presentNow(entry);
+    settleEntry(
+      entry,
+      { outcome: "declined", operatorId: `judge:${outcome.engine}`, reason: reworkReason },
+      "judging",
+    );
   };
 
   /** 启动一次判断（异步、不阻塞队列）；迟到/中止后的结果看到 `state !== "judging"` 一律丢弃。 */
@@ -702,9 +778,9 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     } else if (
       outcome === null ||
       typeof outcome !== "object" ||
-      (outcome.verdict !== "approve" && outcome.verdict !== "manual")
+      judgeVerdictOf(outcome as { verdict?: unknown }) === undefined
     ) {
-      // 注入的 fn 未按契约交回裁决：防御性 fail-closed，绝不默认放行。
+      // 注入的 fn 未按契约交回裁决（未知 verdict 含旧值）：防御性 fail-closed，绝不默认放行。
       outcome = manualOutcome(plan, "parse-failed", "判断结果形状非法");
     }
     settleJudgeOutcome(entry, plan, outcome);
@@ -717,10 +793,27 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
       presentNow(entry);
       return;
     }
-    // 应用事实不可用（账本不可读/计算失败）：不调用模型、直接原卡 + 提示（fail-closed，禁止 approve）。
+    // 应用事实不可用（账本不可读/计算失败）：不调用模型、**不呈现客户卡**——按客户 2026-10-19 总原则
+    // 自动退回重做（基础设施类原因也要可操作），fail-closed 且绝不伪造 approve。
     if (entry.metadata?.judgeContext?.unavailableReason !== undefined) {
-      entry.payload.judgeNotice = judgeManualNotice(plan.group, "ledger-unavailable");
-      presentNow(entry);
+      const unavailableReason = entry.metadata.judgeContext.unavailableReason;
+      const detail = stripTrailingSentencePunct(unavailableReason.trim());
+      const label = plan.group === "approval" ? "自动审批" : "自动决策";
+      const reason =
+        `${label}未通过：${judgeHumanReason("ledger-unavailable")}${detail !== "" ? `（${detail}）` : ""}。` +
+        `本次自动判断未通过/未完成，已拒绝；请按上述原因修正后重新提交确认。`;
+      diagnostic.record("governance-judge.manual-as-rework", {
+        requestId: entry.payload.id,
+        group: plan.group,
+        cardKind: plan.cardKind,
+        reasonCode: "ledger-unavailable",
+        reason: unavailableReason,
+        decision: "manual-as-rework",
+        outcome: "manual",
+      });
+      // 未呈现过（state 仍为 queued）：置 active 后走同一结算路径（resolve→drain），绝不调用 presenter。
+      entry.state = "active";
+      settleActive(entry, { outcome: "declined", operatorId: `judge:${plan.request.runtime}`, reason });
       return;
     }
     activeByProject.set(entry.projectKey, entry.payload.id); // 防下一张被 drain（一项目一卡）
@@ -1003,4 +1096,27 @@ function judgeHumanReason(reasonCode: string, reason?: string): string {
 
 function reasonOf(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
+}
+
+/**
+ * 自动判断未通过/未完成时的**可操作原因**（2026-10-19 客户总原则：「我勾选了替我决策就不用我来管了」）。
+ * `reasonCode` 映射成人话；driver 给出的具体 `reason` 以括注保留（read-denied 已含具体路径，不重复）。
+ */
+function judgeReworkHumanReason(outcome: GovernanceJudgeOutcome): string {
+  const mapped = stripTrailingSentencePunct(judgeHumanReason(outcome.reasonCode, outcome.reason));
+  if (outcome.reasonCode === "read-denied") return mapped;
+  const specific = typeof outcome.reason === "string" ? stripTrailingSentencePunct(outcome.reason.trim()) : "";
+  if (specific === "" || specific === mapped || mapped.includes(specific)) return mapped;
+  return `${mapped}（${specific}）`;
+}
+
+/** 自动拒批/未通过的统一客户可见文案（不伪造客户同意；指示修正后重新提交）。 */
+function judgeReworkReasonText(
+  group: GovernanceJudgeGroup,
+  outcome: GovernanceJudgeOutcome,
+  kind: "deny" | "manual",
+): string {
+  const label = group === "approval" ? "自动审批" : "自动决策";
+  const head = kind === "deny" ? `${label}拒绝` : `${label}未通过`;
+  return `${head}：${judgeReworkHumanReason(outcome)}。本次自动判断未通过/未完成，已拒绝；请按上述原因修正后重新提交确认。`;
 }
