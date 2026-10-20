@@ -30,6 +30,7 @@ import type {
   RuntimeKind,
   WriteGate,
 } from "../../src/model/runtime.ts";
+import { governanceCardGroup } from "../../src/model/runtime.ts";
 import type { AdapterCapabilities, RuntimeAdapterFactory } from "../../src/pipeline/orchestration/run-role.ts";
 import { openRoleSession } from "../../src/pipeline/orchestration/run-role.ts";
 import { governanceDispatchActionFor } from "../../src/pipeline/orchestration/run-role.ts";
@@ -2244,6 +2245,263 @@ test("run-role：治理 confirm 卡缺 cardKind ⇒ 按角色/路径兜底并生
   }
 });
 
+test("run-role：治理 choice 卡缺 cardKind ⇒ 按角色兜底并生成 judgeContext（Lead=intent-confirm）", async () => {
+  const cases = [
+    {
+      roleId: "liaison" as const,
+      expected: "intent-confirm" as const,
+      options: [{ id: "confirm", label: "确认" }, { id: "revise", label: "修改" }],
+    },
+    {
+      roleId: "rapporteur" as const,
+      expected: "proposal" as const,
+      options: [{ id: "accept", label: "接受" }, { id: "revise", label: "修改" }],
+    },
+    {
+      roleId: "nominator" as const,
+      expected: "appointment" as const,
+      options: [{ id: "alpha", label: "Alpha" }],
+    },
+    {
+      roleId: "verifier" as const,
+      expected: "acceptance" as const,
+      options: [{ id: "accept", label: "接受" }, { id: "reject", label: "拒绝" }],
+    },
+  ];
+  for (const testCase of cases) {
+    await withRoot(async (root) => {
+      const captured: { caps?: AdapterCapabilities; gate?: WriteGate } = {};
+      const seen: CapturedInput = {};
+      let rawCalls = 0;
+      const handle = await openRoleSession(
+        {
+          roleId: testCase.roleId,
+          project: trioProject(root, testCase.roleId),
+          autoRepin: false,
+          customerInput: ((req, metadata) => {
+            rawCalls += 1;
+            seen.req = req;
+            seen.metadata = metadata;
+            return { outcome: "answered" as const, value: { selected: [testCase.options[0]!.id] } };
+          }) as CustomerInputFn,
+        },
+        { createAdapter: capturingFactory(captured) },
+      );
+      try {
+        const out = await captured.caps!.customerInput!(
+          { kind: "choice", title: "选择", options: testCase.options, flowId: "flow-a" },
+          { toolCallId: "call-choice", turnId: "turn-choice" },
+        );
+        assert.equal(out?.outcome, "answered");
+        assert.equal(rawCalls, 1);
+        assert.equal(seen.req?.cardKind, testCase.expected, `${testCase.roleId} 默认 cardKind`);
+        assert.equal(seen.metadata?.cardKind, testCase.expected, `${testCase.roleId} metadata cardKind`);
+        assert.ok(seen.metadata?.judgeContext, `${testCase.roleId} 应生成 judgeContext`);
+        assert.equal(seen.metadata?.judgeContext?.flowId, "flow-a");
+      } finally {
+        await handle.dispose();
+      }
+    });
+  }
+
+  // Convener 不默认（choice 类型不明确）；项目角色不默认。
+  for (const [roleId, projectFactory] of [
+    ["convener", (root: string) => trioProject(root, "convener")],
+    ["X", (root: string) => singleProject(root)],
+  ] as const) {
+    await withRoot(async (root) => {
+      const captured: { caps?: AdapterCapabilities; gate?: WriteGate } = {};
+      const seen: CapturedInput = {};
+      let rawCalls = 0;
+      const handle = await openRoleSession(
+        {
+          roleId,
+          project: projectFactory(root),
+          autoRepin: false,
+          customerInput: ((req, metadata) => {
+            rawCalls += 1;
+            seen.req = req;
+            seen.metadata = metadata;
+            return { outcome: "answered" as const, value: { selected: ["a"] } };
+          }) as CustomerInputFn,
+        },
+        { createAdapter: capturingFactory(captured) },
+      );
+      try {
+        await captured.caps!.customerInput!({
+          kind: "choice",
+          title: "选择",
+          options: [{ id: "a", label: "A" }],
+          flowId: "flow-a",
+        });
+        assert.equal(rawCalls, 1);
+        assert.equal(seen.req?.cardKind, undefined, `${roleId} 不兜底 choice cardKind`);
+        assert.equal(seen.metadata?.judgeContext, undefined, `${roleId} 不注入 judgeContext`);
+      } finally {
+        await handle.dispose();
+      }
+    });
+  }
+});
+
+test("run-role：Liaison 通用 choice（无 confirm）⇒ declined，不发客户卡/不写账本", async () => {
+  await withRoot(async (root) => {
+    const captured: { caps?: AdapterCapabilities; gate?: WriteGate } = {};
+    let rawCalls = 0;
+    const customerInput: CustomerInputFn = () => {
+      rawCalls += 1;
+      return { outcome: "answered", value: { selected: ["keep-v1"] } };
+    };
+    const handle = await openRoleSession(
+      { roleId: "liaison", project: trioProject(root, "liaison"), customerInput, autoRepin: false },
+      { createAdapter: capturingFactory(captured) },
+    );
+    try {
+      const out = await captured.caps!.customerInput!({
+        kind: "choice",
+        title: "小决定：契约与提案的 3 处措辞差异如何收口",
+        options: [
+          { id: "keep-v1", label: "保持 v1" },
+          { id: "do-v2", label: "做 v2" },
+          { id: "lead-decide", label: "Lead 决定" },
+        ],
+        flowId: "flow-a",
+      });
+      assert.equal(out?.outcome, "declined");
+      const reason = (out as { reason?: string }).reason ?? "";
+      assert.match(reason, /内部协调\/工程决策/);
+      assert.match(reason, /dispatch_task/);
+      assert.match(reason, /flow_step_update/);
+      assert.match(reason, /intent-confirm 需求确认/);
+      assert.equal(rawCalls, 0, "不得调用客户通道");
+      await flushGovernanceLedger(root);
+      const ledger = await readGovernanceLedger(root);
+      assert.equal(ledger.entries.filter((entry) => entry.kind === "customer.decision").length, 0, "不写 customer.decision");
+    } finally {
+      await handle.dispose();
+    }
+  });
+});
+
+test("run-role：显式 intent-confirm 缺 confirm ⇒ declined（不发卡）；其他角色通用 choice 零变化", async () => {
+  await withRoot(async (root) => {
+    const captured: { caps?: AdapterCapabilities; gate?: WriteGate } = {};
+    let rawCalls = 0;
+    const handle = await openRoleSession(
+      {
+        roleId: "liaison",
+        project: trioProject(root, "liaison"),
+        autoRepin: false,
+        customerInput: (() => {
+          rawCalls += 1;
+          return { outcome: "answered" as const, value: { selected: ["revise"] } };
+        }) as CustomerInputFn,
+      },
+      { createAdapter: capturingFactory(captured) },
+    );
+    try {
+      const out = await captured.caps!.customerInput!({
+        kind: "choice",
+        title: "确认需求",
+        options: [{ id: "revise", label: "修改" }],
+        cardKind: "intent-confirm",
+        flowId: "flow-a",
+      });
+      assert.equal(out?.outcome, "declined");
+      assert.match((out as { reason?: string }).reason ?? "", /intent-confirm 必须有 confirm\/revise 选项/);
+      assert.equal(rawCalls, 0);
+    } finally {
+      await handle.dispose();
+    }
+  });
+
+  // 其他角色的通用 choice（无 cardKind、无匹配选项）保持旧行为：直接到客户通道，不注入 judgeContext。
+  await withRoot(async (root) => {
+    const captured: { caps?: AdapterCapabilities; gate?: WriteGate } = {};
+    const seen: CapturedInput = {};
+    let rawCalls = 0;
+    const handle = await openRoleSession(
+      {
+        roleId: "rapporteur",
+        project: trioProject(root, "rapporteur"),
+        autoRepin: false,
+        customerInput: ((req, metadata) => {
+          rawCalls += 1;
+          seen.req = req;
+          seen.metadata = metadata;
+          return { outcome: "answered" as const, value: { selected: ["x"] } };
+        }) as CustomerInputFn,
+      },
+      { createAdapter: capturingFactory(captured) },
+    );
+    try {
+      const out = await captured.caps!.customerInput!({
+        kind: "choice",
+        title: "普通选择",
+        options: [{ id: "x", label: "X" }],
+        flowId: "flow-a",
+      });
+      assert.equal(out?.outcome, "answered");
+      assert.equal(rawCalls, 1);
+      assert.equal(seen.req?.cardKind, undefined);
+      assert.equal(seen.metadata?.judgeContext, undefined);
+    } finally {
+      await handle.dispose();
+    }
+  });
+});
+
+test("intent-confirm：decision 组可代批 confirm；选 revise/缺 confirm 回落 manual", () => {
+  assert.equal(governanceCardGroup("intent-confirm"), "decision", "2026-10-20 客户要求：需求确认纳入 decision 组");
+  const request = (options: Array<{ id: string; label: string }>) => ({
+    group: "decision" as const,
+    cardKind: "intent-confirm" as const,
+    roleId: "liaison",
+    projectRoot: PROJECT.projectRoot,
+    runtime: "claude" as const,
+    governanceModel: "trio" as const,
+    flowId: "flow-a",
+    card: {
+      kind: "choice" as const,
+      title: "确认需求",
+      options,
+      cardKind: "intent-confirm" as const,
+      flowId: "flow-a",
+    },
+    facts: facts(),
+    at: new Date().toISOString(),
+  });
+
+  const approve = evaluateGovernanceJudgeVerdict({
+    request: request([{ id: "confirm", label: "确认" }, { id: "revise", label: "修改" }]),
+    verdict: {
+      verdict: "approve",
+      reason: "卡片意图与客户当前要求一致。",
+      evidence: ["card:确认需求"],
+      selected: ["confirm"],
+    },
+    engine: "claude",
+  });
+  assert.equal(approve.verdict, "approve");
+  assert.deepEqual(approve.value?.selected, ["confirm"]);
+
+  const revise = evaluateGovernanceJudgeVerdict({
+    request: request([{ id: "confirm", label: "确认" }, { id: "revise", label: "修改" }]),
+    verdict: { verdict: "approve", reason: "有偏离。", evidence: ["card:确认需求"], selected: ["revise"] },
+    engine: "claude",
+  });
+  assert.equal(revise.verdict, "manual");
+  assert.equal(revise.reasonCode, "not-recommended");
+
+  const missingConfirm = evaluateGovernanceJudgeVerdict({
+    request: request([{ id: "revise", label: "修改" }]),
+    verdict: { verdict: "approve", reason: "有偏离。", evidence: ["card:确认需求"], selected: ["confirm"] },
+    engine: "claude",
+  });
+  assert.equal(missingConfirm.verdict, "manual");
+  assert.equal(missingConfirm.reasonCode, "insufficient-evidence");
+});
+
 test("run-role：显式非法 cardKind 仍拒绝（不因兜底而放宽）", async () => {
   await withRoot(async (root) => {
     const captured: { caps?: AdapterCapabilities; gate?: WriteGate } = {};
@@ -2937,6 +3195,9 @@ test("prompt：三值输出契约；approval deny 退回重做；decision 不得
   assert.match(prompt, /approval 组的「内容不合规\/不建议」用 deny 退回发起角色重做/);
   assert.match(prompt, /reason 必须是可操作的返工说明/);
   assert.match(prompt, /不得把结果推回客户等待/);
+  assert.match(prompt, /intent-confirm（decision/);
+  assert.match(prompt, /这张卡本身就是意图基准/);
+  assert.match(prompt, /selected 恰为 \["confirm"\]/);
   assert.doesNotMatch(prompt, /已转手动确认|等客户决定/);
   assert.doesNotMatch(prompt, /从不替客户拒绝/);
 });

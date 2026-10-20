@@ -45,10 +45,10 @@ function fixture(root: string, report: (raw: unknown) => void = () => {}) {
 
 const call = (name: string, args: Record<string, unknown>) => ({ name, args });
 
-test("cardKind → group 单一映射：六个卡种全覆盖；未知/缺席永不判断", () => {
+test("cardKind → group 单一映射：七个卡种全覆盖；未知/缺席永不判断", () => {
   assert.deepEqual(
     [...Object.keys(GOVERNANCE_CARD_GROUP)].sort(),
-    ["acceptance", "appointment", "appointment-write", "proposal", "schedule-write", "write"],
+    ["acceptance", "appointment", "appointment-write", "intent-confirm", "proposal", "schedule-write", "write"],
   );
   assert.equal(governanceCardGroup("write"), "approval");
   assert.equal(governanceCardGroup("appointment-write"), "approval");
@@ -58,9 +58,10 @@ test("cardKind → group 单一映射：六个卡种全覆盖；未知/缺席永
   assert.equal(governanceCardGroup("acceptance"), "decision");
   assert.equal(governanceCardGroup(undefined), undefined);
   assert.equal(governanceCardGroup("unknown-kind" as never), undefined, "运行时未知值也必须返回 undefined");
-  // 2026-10-18 客户拍板：intent-confirm 是客户本人专属的需求确认卡，判断 agent 永不介入。
-  assert.equal(governanceCardGroup("intent-confirm"), undefined, "需求确认卡不得代批");
-  assert.equal(Object.prototype.hasOwnProperty.call(GOVERNANCE_CARD_GROUP, "intent-confirm"), false, "映射故意不包含 intent-confirm 键");
+  // 2026-10-20 客户拍板「勾了替我决策就不用我管」：intent-confirm 纳入 decision 组。
+  // 判断 agent 可代批 `confirm`；`revise` 仍交回客户/发起角色（不替客户修改）。
+  assert.equal(governanceCardGroup("intent-confirm"), "decision", "需求确认卡由 decision 开关代批");
+  assert.equal(Object.prototype.hasOwnProperty.call(GOVERNANCE_CARD_GROUP, "intent-confirm"), true, "映射必须包含 intent-confirm 键");
   assert.equal(Object.isFrozen(GOVERNANCE_CARD_GROUP), true, "映射冻结，禁止第二份/就地改写");
 });
 

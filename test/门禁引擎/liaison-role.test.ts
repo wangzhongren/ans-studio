@@ -238,12 +238,15 @@ test("Liaison 能力：customerInput=true（仅 intent-confirm）、handOffInten
   assert.equal(spec!.preauthorizedDirs.some((d) => d.startsWith("docs/governance/")), false);
 });
 
-test("Lead 卡文本：需求确认——先发 intent-confirm 复述目标/范围/验收，confirm 后才交接", () => {
+test("Lead 卡文本：需求确认——先发 intent-confirm 复述目标/范围/验收，confirm（客户或判断代批）后才交接；revise 永不由判断代选", () => {
   const t = governanceRoleOf("liaison")!.cardText;
   assert.match(t, /`cardKind=intent-confirm`/);
   assert.match(t, /`flowId=<intentId>`/);
   assert.match(t, /选项固定为 `confirm` \/ `revise`/);
-  assert.match(t, /客户选 `confirm` 后才能调用 `hand_off_intent`/);
+  assert.match(t, /客户或判断 agent 代批 `confirm` 后才能调用 `hand_off_intent`/);
+  assert.match(t, /客户开启「替我决策」时，判断 agent 可代批 `confirm`/);
+  assert.match(t, /`revise` 永远不由判断代选/);
+  assert.match(t, /代批不是客户逐项批准、不改写客户意图/);
   assert.match(t, /选 `revise` 时先按反馈修改意图文件/);
   assert.match(t, /确认前不得交接/);
   // 真机 2026-10-18：意图 frontmatter 只支持字符串值；YAML 列表会让 hand_off_intent 解析失败。

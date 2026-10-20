@@ -461,7 +461,10 @@ test("卡文本：五人均写明职能/不拥有最终批准权/可写与禁写
   // 客户 2026-10-18：意图确认卡——写完意图文件先复述目标/范围/验收，confirm 后才交接。
   assert.match(l, /`cardKind=intent-confirm`/, "Lead 须写死 intent-confirm 卡");
   assert.match(l, /选项固定为 `confirm` \/ `revise`/, "intent-confirm 选项固定 confirm/revise");
-  assert.match(l, /客户选 `confirm` 后才能调用 `hand_off_intent`/, "confirm 后才可交接");
+  assert.match(l, /客户或判断 agent 代批 `confirm` 后才能调用 `hand_off_intent`/, "confirm 后才可交接");
+  assert.match(l, /客户开启「替我决策」时，判断 agent 可代批 `confirm`/, "替我决策时 intent-confirm 可代批 confirm");
+  assert.match(l, /`revise` 永远不由判断代选/, "revise 永不由判断代选");
+  assert.match(l, /代批不是客户逐项批准、不改写客户意图/, "代批不是客户逐项批准");
   assert.match(l, /选 `revise` 时先按反馈修改意图文件/, "revise 先改意图、不得交接");
   // 客户 2026-10-18：`[系统·治理反馈]` 由 Lead 汇总后告知客户，不得逐字转述内部报告。
   assert.match(l, /收到 `\[系统·治理反馈\]` 时：用 1-3 句话向客户汇总/, "Lead 须汇总治理反馈");

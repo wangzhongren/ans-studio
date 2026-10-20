@@ -263,6 +263,9 @@ export function requiredArtifactPaths(request: GovernanceJudgeRequest): {
       const paths = [proposal, nomination, flow].filter((p): p is string => p !== undefined);
       return { paths, missing: false };
     }
+    case "intent-confirm":
+      // 2026-10-20：需求确认卡本身是意图基准（判断它与客户当前要求是否一致），不要求独立 intent 文件/物证。
+      return { paths: [], missing: false };
     default:
       return { paths: [], missing: true };
   }

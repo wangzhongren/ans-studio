@@ -1,5 +1,7 @@
 import type { PersistenceReply, PersistenceValues, PersistenceUpdated, PersistenceScope } from "./session.ts";
 import { existsSync, realpathSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { parse as parseYaml } from "yaml";
 import path from "node:path";
 import { readFile, readdir } from "node:fs/promises";
 import { createProjectDocumentReader } from "../../src/pipeline/project-document/read-project-document.ts";
@@ -61,7 +63,7 @@ import {
 export type { GovernanceMigrationPreviewResult, GovernanceMigrationResult } from "../../src/pipeline/orchestration/govern-session.ts";
 // 只读 pin 证据检查：**唯一实现**在门禁引擎私有模块，只经 Service 公开出口消费（跨角色边界纪律）。
 // 2026-10-20：内置治理角色判定同样经该 Service 公开出口（看护自动中止按角色映射开关用；不复制 id 列表）。
-import { inspectPinnedBoundaries, isBuiltInGovernanceRoleId } from "../../src/service/boundary/resolve-boundary.ts";
+import { inspectPinnedBoundaries, isBuiltInGovernanceRoleId, validateBoundaryYamlText } from "../../src/service/boundary/resolve-boundary.ts";
 import { createChatDemoAdapter } from "./chat-adapter.ts";
 
 import {
@@ -1392,6 +1394,171 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     }
   };
 
+  // —————— 2026-10-20 客户要求：写卡产物（appointment-write）的**确定性门控** ——————
+  //
+  // 客户原话：「写角色的角色写完角色卡/边界后要有一个确定性门控——核对卡的格式和文件是否都存在；
+  // 有问题把具体问题反馈给 Crew 修正，不能继续推进，也不弹客户卡。」
+  // 解析口径与 `listProject` 同一份：边界 YAML 走 Service 公开出口 `validateBoundaryYamlText`
+  // （与运行时加载器同一个 `parseBoundaryYamlDoc`），role/entries 形状与 `listProject` 的 warnings 互证；
+  // 本层**不另写第二份 boundary 解析器**（顶层 `role` 身份检查用同一 `yaml` 包的解析结果）。
+  /** 一条写卡产物问题（角色 / 项目相对路径 / 具体原因）。 */
+  type AppointmentArtifactIssue = { roleId: string; path: string; issue: string };
+  /** 反馈去重：`projectRoot\0flowId` → 最近一次已反馈的问题哈希（同哈希不刷屏；修正后重新校验再报）。 */
+  const appointmentArtifactFeedback = new Map<string, string>();
+
+  const validateAppointmentArtifacts = async (
+    projectRoot: string,
+    roleIds: readonly string[],
+    listing: ProjectListing | undefined,
+  ): Promise<AppointmentArtifactIssue[]> => {
+    const issues: AppointmentArtifactIssue[] = [];
+    const seen = new Set<string>();
+    const push = (roleId: string, relPath: string, issue: string): void => {
+      const key = `${roleId}\u0000${relPath}\u0000${issue}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      issues.push({ roleId, path: relPath, issue });
+    };
+    for (const roleId of roleIds) {
+      const dir = `角色卡/${roleId}`;
+      const cardRel = `${dir}/role-card.md`;
+      const boundaryRel = `${dir}/boundary.yaml`;
+      // ① role-card.md：存在、可读、非空、至少一个 Markdown 标题。
+      let cardText: string | undefined;
+      try {
+        cardText = await readFile(path.join(projectRoot, cardRel), "utf8");
+      } catch (error) {
+        push(roleId, cardRel, (error as NodeJS.ErrnoException).code === "ENOENT" ? "文件不存在" : `读取失败：${(error as Error).message}`);
+      }
+      if (cardText !== undefined) {
+        if (cardText.trim() === "") push(roleId, cardRel, "文件为空（需要角色卡正文）");
+        else if (!/^#{1,6}\s/m.test(cardText)) push(roleId, cardRel, "缺少 Markdown 标题（至少一行以 # 开头）");
+      }
+      // ② boundary.yaml：存在、可读、非空；与 listProject 同一解析器；顶层 role 与目录 id 一致；entries 非空。
+      let boundaryText: string | undefined;
+      try {
+        boundaryText = await readFile(path.join(projectRoot, boundaryRel), "utf8");
+      } catch (error) {
+        push(roleId, boundaryRel, (error as NodeJS.ErrnoException).code === "ENOENT" ? "文件不存在" : `读取失败：${(error as Error).message}`);
+      }
+      if (boundaryText !== undefined) {
+        if (boundaryText.trim() === "") {
+          push(roleId, boundaryRel, "文件为空（需要 role + entries 的边界 YAML）");
+        } else {
+          const validation = validateBoundaryYamlText(boundaryText); // 与运行时加载器同一实现
+          if (!validation.ok) {
+            push(roleId, boundaryRel, `边界 YAML 解析失败：${validation.message}`);
+          } else {
+            if (validation.entries.length === 0) push(roleId, boundaryRel, "entries 为空（Section 1 至少需要一条条目）");
+            let declaredRole: unknown;
+            try {
+              const doc = parseYaml(boundaryText) as unknown;
+              declaredRole =
+                doc !== null && typeof doc === "object" && !Array.isArray(doc)
+                  ? (doc as Record<string, unknown>).role
+                  : undefined;
+            } catch {
+              // YAML 语法错误已由 validateBoundaryYamlText 报出（此处只做身份检查）。
+            }
+            if (declaredRole !== roleId) {
+              push(
+                roleId,
+                boundaryRel,
+                `顶层 role 与目录 id 不一致（YAML role=${declaredRole === undefined ? "未提供" : JSON.stringify(declaredRole)}，目录=${roleId}）`,
+              );
+            }
+          }
+        }
+      }
+      // ③ listProject 刷新后的 warnings 辅助定位（缺文件/解析失败/重复/冲突等）——已由直接检查覆盖的
+      //    同类问题不再重复；warning 文本原样保留原因。
+      for (const warning of listing?.warnings ?? []) {
+        if (!warning.startsWith(`${dir}：`)) continue;
+        const relPath = warning.includes("role-card.md") ? cardRel : /boundary|边界/.test(warning) ? boundaryRel : dir;
+        if (issues.some((issue) => issue.roleId === roleId && issue.path === relPath)) continue;
+        push(roleId, relPath, `listProject 警告：${warning.slice(dir.length + 1)}`);
+      }
+    }
+    return issues;
+  };
+
+  /** Crew 修正任务文本（逐文件列出问题；要求重发 appointment-write 卡完成写卡）。 */
+  const buildAppointmentArtifactFeedback = (flowId: string, issues: readonly AppointmentArtifactIssue[]): string =>
+    [
+      `流程 ${flowId}：写卡产物未通过校验（appointment 步骤不能继续；未派 Steward / 统筹，也未把步骤标为 done）。`,
+      "具体问题：",
+      ...issues.map((issue) => `- ${issue.path}：${issue.issue}`),
+      "请修正上述文件后**重新发 appointment-write 确认卡**完成写卡（role-card.md 需有 # 标题与正文；boundary.yaml 需为合法 YAML，顶层 role 与目录 id 一致，entries 非空）。",
+    ].join("\n");
+
+  /**
+   * 把写卡产物问题反馈给 Crew/Nominator（后台投递，不弹客户卡），并落一条 Lead 系统行。
+   * 去重：同 flow+问题哈希只反馈一次（修正后问题哈希变化才再次反馈；通过后清除，回归可再报）。
+   * 运行时无法确定/开或发失败 ⇒ 只记诊断，下一次真实事件重试（不循环）。
+   */
+  const reportAppointmentArtifactIssues = async (
+    projectRoot: string,
+    flowId: string,
+    issues: readonly AppointmentArtifactIssue[],
+    listing: ProjectListing | undefined,
+    options: { runtime?: RuntimeKind } = {},
+  ): Promise<void> => {
+    if (issues.length === 0) return;
+    const hash = createHash("sha256")
+      .update(issues.map((issue) => `${issue.roleId}\u0000${issue.path}\u0000${issue.issue}`).sort().join("\n"))
+      .digest("hex");
+    const dedupeKey = `${projectRoot}\u0000${flowId}`;
+    if (appointmentArtifactFeedback.get(dedupeKey) === hash) return; // 同 flow+issuesHash：不刷屏
+    const diagnostic = createDiagnosticLogger({ component: "desktop.governance-advance", projectRoot, roleId: "nominator" });
+    let runtime: RuntimeKind | undefined =
+      options.runtime ?? acceptanceRuntimeHints.get(projectRoot) ?? manager.activeRuntimeFor(projectRoot);
+    if (runtime === undefined) {
+      try {
+        const resolution = await resolveAcceptanceRuntime(projectRoot);
+        if (resolution.ok) runtime = resolution.runtime;
+      } catch (error) {
+        diagnostic.error("advance.appointment.artifacts.runtime.failed", error, { flowId });
+      }
+    }
+    if (runtime === undefined) {
+      diagnostic.record("advance.appointment.artifacts.runtime-unresolved", { flowId });
+      return;
+    }
+    const text = buildAppointmentArtifactFeedback(flowId, issues);
+    const opened = await manager.openBackground({ projectRoot, roleId: "nominator", runtime });
+    if (!opened.ok) {
+      diagnostic.error("advance.appointment.artifacts.open.failed", new Error(opened.error ?? "unknown"), { flowId });
+      return;
+    }
+    const sent = await manager.sendBackground({ projectRoot, roleId: "nominator", runtime, text });
+    if (!sent.ok) {
+      diagnostic.error("advance.appointment.artifacts.send.failed", new Error(sent.error ?? "unknown"), { flowId });
+      return;
+    }
+    appointmentArtifactFeedback.set(dedupeKey, hash);
+    diagnostic.record("advance.appointment.artifacts-rejected", { flowId, count: issues.length });
+    // Lead 系统行（去重随哈希）：如实说明未推进、已退回 Crew。
+    const primaryRoleId = listing?.primaryRoleId;
+    if (typeof primaryRoleId === "string" && primaryRoleId !== "") {
+      try {
+        emitSessionEvent({
+          roleId: primaryRoleId,
+          projectRoot,
+          runtime,
+          event: {
+            kind: "message",
+            summary:
+              `写卡产物未通过校验（流程 ${flowId}）：${issues.length} 个问题——已反馈 Crew / 组队 修正；` +
+              `未派 Steward / 统筹、未把 appointment 步骤标为 done。首个问题：${issues[0]!.path}：${issues[0]!.issue}`,
+            detail: { source: "delivery-note" },
+          },
+        });
+      } catch (error) {
+        diagnostic.error("advance.appointment.artifacts.note.failed", error, { flowId });
+      }
+    }
+  };
+
   /**
    * **写卡后推进检查**（2026-10-19 真机第二缺陷）：Crew 已写出角色卡/边界，但应用没有重新枚举角色、
    * 也没有自动派下一步，流程停住（真机需重新导入项目才看到 backend/frontend/tester）。
@@ -1401,6 +1568,11 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
    *  2. `manager.refreshListingNow` 强制刷新**共享** listing，并 `emitProjectChanged`（左树立即可见）；
    *  3. 读账本；对每个 flow 的**最新 appointment 决定**取 `targetRoleIds`；
    *  4. 目标角色必须**全部**出现在最新 listing；缺 ⇒ 只记诊断，并按 100/300/600ms **有界重试**（最多 3 次）；
+   *     （2026-10-20）重试耗尽仍缺 ⇒ 把具体问题（缺文件/解析失败等）反馈 Crew 修正；
+   *  4b.（2026-10-20 客户要求）**写卡产物确定性门控**：role-card.md / boundary.yaml 存在、可读、非空；
+   *     role-card 至少一个 Markdown 标题；boundary 按与 `listProject` 同一解析器通过、顶层 role 与目录一致、
+   *     entries 非空。任一问题 ⇒ **不派 Convener、不把 appointment 步骤标 done、不弹客户卡**，把逐文件
+   *     问题反馈 Crew（同 flow+问题哈希去重；修正后重新校验）；
    *  5. appointment 之后已有到 convener 的 `dispatch.accepted`、或已有验收决定 ⇒ 既有链路已推进/已收口，不派；
    *  6. 否则复用既有 appointment 任务文本（`buildGovernanceAdvanceMessage`）派 Convener，并写同形
    *     `dispatch.accepted{actorRoleId:"app",power:"app",trigger:"customer-decision"}`。
@@ -1467,6 +1639,16 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
           missingSeen = true;
           continue;
         }
+        // 2026-10-20 客户要求：写卡产物的**确定性门控**——目标角色已在 listing，但 role-card/boundary
+        // 格式或内容不合格 ⇒ **不派 Convener、不把 appointment 步骤标 done、不弹客户卡**；把每个文件的
+        // 具体问题反馈 Crew/Nominator 修正（重发 appointment-write 卡），同 flow+问题哈希不刷屏。
+        const artifactIssues = await validateAppointmentArtifacts(projectRoot, targets, listing);
+        if (artifactIssues.length > 0) {
+          diagnostic.record("advance.appointment.artifacts-invalid", { flowId, count: artifactIssues.length });
+          await reportAppointmentArtifactIssues(projectRoot, flowId, artifactIssues, listing);
+          continue;
+        }
+        appointmentArtifactFeedback.delete(`${projectRoot}\u0000${flowId}`); // 已通过：后续回归可再报
         const afterwards = ledger.entries.slice(index + 1);
         if (
           afterwards.some(
@@ -1573,6 +1755,18 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         } else {
           postWriteAdvanceRetries.delete(projectRoot);
           diagnostic.record("advance.post-write.roles-missing.final", { count: attempt });
+          // 2026-10-20 确定性门控：有界重试耗尽仍有缺角色 ⇒ 把具体问题反馈 Crew 修正
+          // （不派 Convener、不把 appointment 步骤标 done、不弹客户卡）。
+          for (const [flowId, { entry: appointment }] of latestAppointment) {
+            const retryTargets = (appointment.targetRoleIds ?? []).filter(
+              (id): id is string => typeof id === "string" && id.trim() !== "",
+            );
+            if (retryTargets.length === 0) continue;
+            const issues = await validateAppointmentArtifacts(projectRoot, retryTargets, listing);
+            if (issues.length === 0) continue;
+            diagnostic.record("advance.appointment.artifacts-invalid", { flowId, count: issues.length });
+            await reportAppointmentArtifactIssues(projectRoot, flowId, issues, listing);
+          }
         }
       } else {
         postWriteAdvanceRetries.delete(projectRoot);
@@ -2246,6 +2440,31 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
             "nominator",
           );
         }
+        // 2026-10-20 客户要求：写卡产物的**确定性门控**——角色虽已枚举，但 role-card/boundary 格式或
+        // 内容不合格 ⇒ 不派 Convener、不把步骤标 done；逐文件问题反馈 Crew 修正、不弹客户卡。
+        const appointmentArtifactIssues = await validateAppointmentArtifacts(
+          projectRoot,
+          appointmentTargets,
+          listingCache.get(projectRoot),
+        );
+        if (appointmentArtifactIssues.length > 0) {
+          diagnostic.record("advance.appointment.artifacts-invalid", {
+            flowId: payload.flowId,
+            count: appointmentArtifactIssues.length,
+          });
+          await reportAppointmentArtifactIssues(
+            projectRoot,
+            payload.flowId ?? "",
+            appointmentArtifactIssues,
+            listingCache.get(projectRoot),
+            { runtime },
+          );
+          return chainFail(
+            `写卡产物未通过校验（${appointmentArtifactIssues.length} 个问题：${appointmentArtifactIssues[0]!.path}：${appointmentArtifactIssues[0]!.issue}）；未派 Steward / 统筹`,
+            "nominator",
+          );
+        }
+        appointmentArtifactFeedback.delete(`${projectRoot}\u0000${payload.flowId ?? ""}`); // 已通过：后续回归可再报
         // 共享运行期去重：写卡后检查可能已先派 Convener（或本链路已派过）⇒ 不再重复；
         // 结果仍如实告知「写卡段已完成、后续 Convener 已派」（由共享检查完成，不是第二派）。
         if (appointmentConvenerKey !== undefined && postWriteAdvanceDispatched.has(appointmentConvenerKey)) {
