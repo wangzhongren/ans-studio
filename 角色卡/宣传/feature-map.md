@@ -10,6 +10,7 @@
 | 英文官网（`/en/`） | 与中文页同结构的英文单页；共享样式、脚本与素材，双向语言切换、hreflang 与双语 sitemap | 已部署：<https://wangzhongren.github.io/ans-studio/en/>（2026-10-21，协调方提交 `b00bc74` 并发布） | [当前说明](docs/feature/project-site.md#双语与语言切换)、[变更记录](docs/change/2026-10-21_change_english-site.md)、[证据](docs/change/2026-10-21_english-site-evidence/) |
 | 官网视觉与信息架构 | 石墨账本式布局、Role-first 印章、真实截图、内容事实映射与验收口径 | 已定稿（随首轮实现） | [设计记录](docs/design/2026-10-21_design_project-site.md) |
 | Pages 发布工作流 | push main 的 `site/**` 变更时构建并部署 GitHub Pages，支持手动触发 | 已创建并成功运行（run `39541758607`，success，19 秒；由 push 触发） | [部署流程](docs/feature/project-site.md#部署流程) |
+| 品牌图标与 favicon | 薄荷绿/石墨几何 A、石墨底 favicon、apple-touch-icon；Role-first 印章与截图四角括号保持不变 | 已实现，本地验证通过；未推送、未部署（线上仍为旧图标） | [变更记录](docs/change/2026-10-21_change_logo-assets.md)、[证据](docs/change/2026-10-21_logo-evidence/) |
 | 首轮交付与验证证据 | 文件清单、定位更新、截图、链接/响应式/对比度检查、未做事项 | 已记录 | [变更记录](docs/change/2026-10-21_change_project-site.md)、[证据目录](docs/change/2026-10-21_project-site-evidence/) |
 | 职责与接口面 | 职责、输入/输出、文件位置；接口不适用及可核验理由 | 已建立 | [functional-description](functional-description.md)、[api-spec](api-spec.md) |
 

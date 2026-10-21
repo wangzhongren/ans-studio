@@ -129,9 +129,8 @@ img {
 
 .brand img {
   display: block;
-  width: 30px;
-  height: 30px;
-  border-radius: 7px;
+  width: 34px;
+  height: 34px;
 }
 
 .brand-word {
@@ -1014,9 +1013,8 @@ h3 {
 }
 
 .footer-brand img {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
+  width: 40px;
+  height: 40px;
 }
 
 .footer-name {
@@ -1086,9 +1084,8 @@ h3 {
   }
 
   .brand img {
-    width: 26px;
-    height: 26px;
-    border-radius: 6px;
+    width: 28px;
+    height: 28px;
   }
 
   .brand-word {
