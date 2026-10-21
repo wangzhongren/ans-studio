@@ -23,7 +23,7 @@ events:
 
 客户 2026-10-21 追加「这个应该还得有一份英文版本的吧」。本次在不动事实、链接与版本号的前提下，新增英文单页 `site/en/index.html`（路径 `/en/`），中文站保持 `site/index.html`（`/`）。两页共享同一套 `styles.css`、`app.js` 与 `assets/`，并互相提供语言切换。
 
-英文版已由协调方提交并部署上线：`https://wangzhongren.github.io/ans-studio/en/`。提交 `b00bc74a66abf4f37f3e6a55d4f5762bb97e8fc9`（main，`feat(site): add English site and bilingual navigation`）仅含 `site/index.html`、`site/styles.css`、`site/sitemap.xml`、`site/en/index.html`；**角色文档仍在工作树未提交**。本角色未执行任何 git 操作，未自行运行或触发部署。
+英文版已由协调方提交并部署上线：`https://wangzhongren.github.io/ans-studio/en/`。提交 `b00bc74a66abf4f37f3e6a55d4f5762bb97e8fc9`（main，`feat(site): add English site and bilingual navigation`）仅含 `site/index.html`、`site/styles.css`、`site/sitemap.xml`、`site/en/index.html`；角色文档已随提交 `2983402` 入库；品牌图标变更随 `77c5143` 入库。本角色未执行任何 git 操作，未自行运行或触发部署。
 
 ## 交付内容
 
@@ -109,14 +109,14 @@ curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/en/    # 200
 
 ## 发布记录（协调方执行）
 
-- **提交**：`b00bc74a66abf4f37f3e6a55d4f5762bb97e8fc9`（main，`feat(site): add English site and bilingual navigation`）。内容仅 `site/index.html`、`site/styles.css`、`site/sitemap.xml`、`site/en/index.html`（4 个文件）；角色文档仍留在工作树，未入库。
+- **提交**：`b00bc74a66abf4f37f3e6a55d4f5762bb97e8fc9`（main，`feat(site): add English site and bilingual navigation`）。内容仅 `site/index.html`、`site/styles.css`、`site/sitemap.xml`、`site/en/index.html`（4 个文件）；角色文档后已随提交 `2983402` 入库（品牌图标变更随 `77c5143`）。
 - **部署**：workflow run `39545903589`（job `119043890223`），结论 success，耗时 34 秒（2026-10-21 12:46 Asia/Shanghai，UTC 04:46:48 触发 → 04:47:26 完成），由 push 触发。
 - **线上核对（本角色 curl 复核）**：`/en/` 200，HTML SHA-256 `bc6739fa6b8e63eb62891ff3e353b5744610a249b50e4b9468f2cbc1be18ea93` 与本地 `site/en/index.html` 一致；`/` 200，HTML SHA-256 `dfd7786bfb1ea2b7419ea0539260093898875a9aa46c0f4b04af74b8c13f9369` 与本地 `site/index.html` 一致；`/styles.css`、`/app.js`、`/assets/ans-seal.png`、`/assets/favicon.png`、`/assets/desktop-intent-confirm.png`、`/sitemap.xml` 全部 200；线上英文页含 zh-CN / en / x-default 三条 hreflang，中文页已输出 `English` 切换链接。协调方 Chrome headless 实拍的英文首屏与本地一致。
 - 提交、run 与线上结果由本角色独立复核（curl + git + `gh api`）；本角色未执行 push、部署或任何仓库设置变更。
 
 ## 未做与限制
 
-- **站点已由协调方提交并部署**（`b00bc74`）；本角色不做 git 操作，未自行 push、运行工作流或改仓库设置。**角色文档仍在工作树未提交**，入库由协调方安排。
+- **站点已由协调方提交并部署**（`b00bc74`）；本角色不做 git 操作，未自行 push、运行工作流或改仓库设置。角色文档已随提交 `2983402` 入库；品牌图标变更随 `77c5143` 入库。
 - 未做浏览器语言自动跳转（按客户要求）；未新增任何事实或承诺。
 - 未在真实手机、Windows 浏览器与屏幕阅读器实测；同中文站，为 Chromium 视口模拟与键盘焦点样式检查。
 - 运行包未签名/未公证、未内嵌 SHA256 等限制同中文站，英文页已如实转述。

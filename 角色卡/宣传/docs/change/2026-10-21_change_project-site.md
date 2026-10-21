@@ -21,7 +21,7 @@ events:
 
 # 首轮交付：项目官网与 Pages 工作流
 
-官网已由协调方提交并部署上线：`https://wangzhongren.github.io/ans-studio/`。提交 `f87eb134`（main，`feat(site): add ANS Studio GitHub Pages site`）只含 `site/**` 与 `.github/workflows/pages.yml`；**角色文档仍在工作树未提交**。本角色未执行任何 git 操作，未自行运行或触发部署。运行包未签名/未公证的风险由站点如实提示，不改发布事实。
+官网已由协调方提交并部署上线：`https://wangzhongren.github.io/ans-studio/`。提交 `f87eb134`（main，`feat(site): add ANS Studio GitHub Pages site`）只含 `site/**` 与 `.github/workflows/pages.yml`；角色文档已随提交 `2983402` 入库；品牌图标变更随 `77c5143` 入库。本角色未执行任何 git 操作，未自行运行或触发部署。运行包未签名/未公证的风险由站点如实提示，不改发布事实。
 
 ## 交付内容
 
@@ -110,7 +110,7 @@ curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/          # 200
 
 ## 发布记录（协调方执行）
 
-- **提交**：`f87eb134ea441683d15cc85d4d855789d8ec7e59`（main，`feat(site): add ANS Studio GitHub Pages site`）。提交内容仅 `site/**` 与 `.github/workflows/pages.yml`；角色文档仍留在工作树，未入库。
+- **提交**：`f87eb134ea441683d15cc85d4d855789d8ec7e59`（main，`feat(site): add ANS Studio GitHub Pages site`）。提交内容仅 `site/**` 与 `.github/workflows/pages.yml`；角色文档后已随提交 `2983402` 入库（品牌图标变更随 `77c5143`）。
 - **部署**：workflow run `39541758607`（job `119030858968`），结论 success，耗时 19 秒（2026-10-21 12:01 Asia/Shanghai，UTC 04:01:36→04:01:55），由 push 触发。
 - **仓库设置**：Pages 已启用 `build_type=workflow`、`https_enforced=true`；仓库 homepage 已设为 `https://wangzhongren.github.io/ans-studio/`（本角色用 `gh api` 只读复核，未修改设置）。
 - **线上核对（本角色 curl 复核）**：`/` 返回 200（22988 bytes），且线上 `index.html` 的 SHA-256 与本地一致（`a6aaa5d30981158faa49afe5cfce90e9764cdbed12878b46e46369aa3e8aad17`）；`styles.css`、`app.js`、`desktop-intent-confirm.png`、`ans-seal.png`、`favicon.png`、`robots.txt`、`sitemap.xml` 全部 200 且字节数与本地一致。协调方 Chrome headless 1440×1000 实拍的首屏与本地截图一致。
@@ -118,7 +118,7 @@ curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/          # 200
 
 ## 未做与限制
 
-- **站点已由协调方提交并部署**；本角色不做 git 操作，未自行 push、运行工作流或改仓库设置。**角色文档仍在工作树未提交**，入库由协调方安排。
+- **站点已由协调方提交并部署**；本角色不做 git 操作，未自行 push、运行工作流或改仓库设置。角色文档已随提交 `2983402` 入库；品牌图标变更随 `77c5143` 入库。
 - 运行包本身仍未签名/公证（发布事实，非本次改动）；站点警示与 README 一致。
 - 未在真实手机、Windows 浏览器与屏幕阅读器上实测；首轮为 Chromium 桌面/移动视口模拟与键盘焦点样式检查。
 - 未内嵌 SHA256 明细；校验以 Release 的 `SHA256SUMS-*` 文件为准。

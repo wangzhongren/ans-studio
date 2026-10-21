@@ -5,7 +5,7 @@ title: 站点品牌图标替换为几何 A 标志
 created: "2026-10-21"
 updated: "2026-10-21"
 timezone: Asia/Shanghai
-status: implemented-unverified
+status: deployed
 related: [project-site]
 events:
   - date: "2026-10-21"
@@ -13,14 +13,17 @@ events:
     summary: 按客户提供的新 logo 替换站点品牌位、favicon 与 apple-touch-icon
   - date: "2026-10-21"
     kind: implemented
-    summary: 本地截图、资产与结构检查通过；未推送、未部署
+    summary: 本地截图、资产与结构检查通过
+  - date: "2026-10-21"
+    kind: deployed
+    summary: 协调方提交 77c5143 并部署成功，线上新图标生效、旧 ans-seal 404
 ---
 
 # 站点品牌图标替换为几何 A 标志
 
 客户 2026-10-21 提供两个新 logo 并要求替换站点现有图标。站点品牌位（账本栏与页脚）从旧的白底「括号-横杠」方块换成透明底的薄荷绿几何 A；favicon 改为石墨底 + 薄荷绿 A 的小方图标；新增 180×180 apple-touch-icon；不再被引用的 `ans-seal.png` 已删除。Role-first 印章里的括号符号与截图四角括号是“边界”的结构符号，未改动。
 
-**仅本地完成**：线上仍是 `b00bc74` 部署的版本（旧图标）；本次改动**未推送、未部署**，角色文档仍在工作树未提交。
+新 logo 已由协调方提交并部署上线（commit `77c5143`，run `39546983969`）；本角色未执行 git 操作、未运行部署。角色文档已随提交 `2983402` 入库，品牌图标变更随 `77c5143` 入库。
 
 ## 源文件与裁切
 
@@ -77,7 +80,7 @@ curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/assets/apple-touch
 | 引用清理 | 对照 `site/assets/` 与两页引用 | 仅 `ans-a-graphite.png` 未引用（有意保留）；`ans-seal.png` 已删除 |
 | 尺寸 | `sips -g pixelWidth -g pixelHeight` | 512/512、512/512、64、180，截图仍为 1360×980 |
 | 横向溢出 | CDP 1440/390/360 两页 | `scrollWidth == innerWidth`，越界元素 0 |
-| 线上状态 | curl 线上资源 | 线上 favicon 仍为旧文件（Content-Length 3623）、`ans-seal.png` 仍 200、`ans-a-mint.png` 404，证明本次未部署 |
+| 线上状态（发布前） | curl 线上资源 | 发布前 favicon 仍为旧文件（3623 bytes）、`ans-seal.png` 200、`ans-a-mint.png` 404；发布后旧 seal 已 404，见发布记录 |
 
 ## 自我批评与修正
 
@@ -86,9 +89,16 @@ curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/assets/apple-touch
 3. favicon 若用透明石墨 A，在深色标签栏会几乎不可见；改为自带 `#1b1b18` 底的合成图标，浅/深背景都有稳定对比，并用 16/32/64px 测试图确认 16px 仍可辨认。
 4. `ans-seal.png` 删除前先确认两页与 CSS 均无引用；`ans-a-graphite.png` 虽未引用但按客户意图保留，并在 feature 文档写明原因。
 
+## 发布记录（协调方执行）
+
+- **提交**：`77c5143ef90c7689ad7566920c8b5c6cebb018d8`（main，`feat(site): replace brand logo with geometric A mark`）。内容含 `site/**` 与 `角色卡/宣传/**`；角色文档此前已随提交 `2983402` 入库，品牌图标变更与配套文档随 `77c5143` 入库。
+- **部署**：workflow run `39546983969`（job `119047268376`），结论 success，19 秒（2026-10-21 12:59 Asia/Shanghai，UTC 04:58:54→04:59:14），由 push 触发。
+- **线上核对（本角色 curl 复核）**：`/assets/ans-a-mint.png` 200（33645 bytes）、`ans-a-graphite.png` 200（117834）、`favicon.png` 200（2406）、`apple-touch-icon.png` 200（7777）、旧 `ans-seal.png` 404；`/` HTML SHA-256 `0c83fd8a7f0d003fd5c25222a79666d36b4cc71d3009ad7ce922a3cde4e0f925`、`/en/` `81fadf15f3ef4bfc89caebb2ef25d4c89a47ccf480f1b1ccc2b14c78c45f366a`，均与本地一致。协调方 Chrome headless 实拍首屏，薄荷绿 A 已在账本栏品牌位显示。
+- 提交、run 与线上结果由本角色独立复核（curl + git + `gh api`）；本角色未执行 push、部署或任何仓库设置变更。
+
 ## 未做与限制
 
-- **未推送、未部署**：线上仍显示旧图标（curl 已核对）；角色文档未提交。部署由客户/协调方执行。
+- **站点已由协调方提交并部署**（`77c5143`）；本角色不做 git 操作，未自行 push/部署。角色文档已随 `2983402` 入库，品牌图标变更随 `77c5143` 入库。
 - 未在真实浏览器标签栏/桌面快捷方式上验证 favicon 的最终渲染，只有自建的浅/深底对比图与 16/32/64px 观感检查；未做 iOS 主屏书签实测。
 - 品牌位尺寸为视觉判断（34/28/40px），未做眼动或品牌测量；如需更精细的视觉平衡可再调 CSS。
 - 两页仍无横向溢出；外链、事实链接与版本号未动；Role-first 印章与截图角标未替换。
