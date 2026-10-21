@@ -1,0 +1,21 @@
+date=2026-10-21T22:53:55+08:00
+host=wangzhongrendeMacBook-Pro.local
+sw_vers=26.6.2 (25G83)
+node=v24.14.0
+electron=v44.7.0
+ans_head=34484f32327975552c0c9899c101285a09e71370
+ans_branch=feat/ui-platform-nova
+dist_html_sha256=f779ac60c39d341db7f10d76bde343cc1424c99935bf1859679602427ca1c88b
+dist_js=assets/index-CFjc0h-3.js
+dist_css=assets/index-BYYh-X8f.css
+dist_icon=ans-studio-ans-icon-DOpmqMAU.png
+demo_project=/Users/wangzhongren/code/vibeingcode/ans-testbed/ui-platform-intent-card-e2e
+demo_head=49df32d189028e55ddc5089f1b5e8f16948fa580
+genesis_project=/Users/wangzhongren/code/vibeingcode/ans-testbed/ui-platform-genesis-demo
+genesis_head=c5bf3547b9a25622d21fc3df3384761f18ee0945
+launch=./node_modules/.bin/electron app/main.ts --user-data-dir=/tmp/ans-fixed-userdata --remote-debugging-port=9340
+loaded_html_sha256_via_cdp=f779ac60c39d341db7f10d76bde343cc1424c99935bf1859679602427ca1c88b
+loaded_dom_js=./assets/index-CFjc0h-3.js
+loaded_dom_css=./assets/index-BYYh-X8f.css
+loaded_dom_icon=assets/ans-studio-ans-icon-DOpmqMAU.png
+genesis_restored_after_run=yes (verifier auto-recovery appends truncated back; all 61 files match pre-state)

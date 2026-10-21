@@ -1,0 +1,2 @@
+DEST=/tmp/ans-studio-real-20261021-220141
+APP=/tmp/ans-studio-real-20261021-220141/ANS Studio.app

@@ -1,5 +1,63 @@
 # 测试 变更记录
 
+## 2026-10-21（修复后构建 34484f3 真机复核）— 需求卡/角色名/品牌图标/派发去重全过；genesis 加载自动恢复 verifier 待办
+
+**触发**：PR 分支修复 `34484f3`（dedupe replayed dispatch rows、黑底绿 ANS 图标、watchdog 默认不再 15min 自动中止），用修复后构建做真机复核。
+
+**构建**：HEAD `34484f3`；新 dist HTML `f779ac60…`（CDP 取载入原文哈希一致，581 B）、JS `index-CFjc0h-3.js`、CSS `index-BYYh-X8f.css`、图标 `ans-studio-ans-icon-DOpmqMAU.png`。开发版独立 userData `/tmp/ans-fixed-userdata`、端口 9340；Pi 菜单「已配置」（Codex/Claude 缺配）；模型 `ans-gateway / deepseek-v4-flash[1m] / medium`。
+
+**需求卡**：空 intent-card demo 发送需求后 **22.62s** 卡片可见（`request_choice cardKind=intent-confirm flowId=todo-web-app`）。Lead pane、徽标「需求确认 · 客户」、`权力类型：需求确认`、confirm/revise 与提交/取消均可见未遮挡；卡片落尾（row 7/8，lifecycle「调用发起」）。计时：UI busy 0.46s、首模型活动 4.75s、写意图 17.58s、intent 调用 22.66s、卡片 22.62s、停止 27.30s、总计 29.32s。未回答，卡片 expired。**未出现写盘卡**（docs/intents 预授权，write_file 直接「已获准并落盘」5370 B）；README 哈希不变，仅 demo 内意图文件（`d819ea6f…` 与 ledger 一致）+ app 自动 `.ans/sessions`。
+
+**角色名/图标**：角色树 `主理 / Lead、Draft / 提案、Crew / 组队、Steward / 统筹、验收 / Proof`，旧称不存在；标题栏 `img[alt=ANS]` 20×20、左栏 `img[alt=ANS]` 30×30（自然 1024，黑底绿 ANS），旧 `span.titlebar-mark` 为 null，无文字 mark；1360/960 截图通过。
+
+**派发去重（genesis 只读回放）**：convener replay 355 行、去重前 8 个派发投影（4 user + 4 event）→ **UI 4 条**（行数 229），无重复；todo-app-dev 473 行、去重前 10（5+5）→ **UI 5 条**（行数 322），stepId 各一次：delivery-store、delivery-tests-docs、delivery-ui、integration-e2e、verification-evidence。任务预期 todo-app-dev 2 条为旧快照；点名两条各一次，另三条不同步骤也保留、无误删。零 console/CSP。
+
+**风险发现**：加载 genesis 项目会自动恢复一条 verifier 待办并启动真实模型回合（14:55:02 提示、14:55:13 `request_confirmation` 调用发起），向 verifier replay/native **追加 12,324 B / 10,770 B**；未发消息、未点卡。已停止并按原哈希前缀截断恢复（383,859 B / 443,904 B），genesis **61 文件 SHA-256 与事前完全一致**，追加副本留在 `genesis-post/changed/`。建议产品/PM 确认「加载即恢复待办」是否符合只读/静默预期。watchdog 15min 默认关闭仅按提交 diff 静态核对，未做 15min 实跑。
+
+**结论**：本复核范围内**可合并**（需求卡/角色名/图标/去重全过）；genesis 自动恢复为风险项待产品确认。**边界**：只写 `角色卡/测试/`；未改产品/构建/配置/断言；未读/打印 `.env`；未 commit/push。报告 [2026-10-21_change_fixed-build-real-machine.md](docs/change/2026-10-21_change_fixed-build-real-machine.md)，证据 [2026-10-21-fixed-build-real-machine-evidence/index.md](docs/change/2026-10-21-fixed-build-real-machine-evidence/index.md)。
+
+## 2026-10-21（需求确认卡 intent-confirm 真机 e2e）— 卡片弹出、断言全过、未作答
+
+**触发**：验证 Lead 在真实 Pi 模型流程中是否发出「需求确认卡」（intent-confirm），只验弹出、不点确认/修改。
+
+**环境**：macOS 26.6.2 arm64、Electron 44.7.0、HEAD `a18e9ef`、dist HTML `c8ad0e82…`/JS `index-Oqlp-kNL.js`；新空 demo `ans-testbed/ui-platform-intent-card-e2e`（git init、README 提交 `49df32d`）；开发版独立 userData `/tmp/ans-intent-card-userdata-run2`、端口 9338；Pi 菜单「已配置」（Codex/Claude 缺配）；模型 `ans-gateway / deepseek-v4-flash[1m] / medium`。
+
+**结果**：发送「我想做一个最简单的待办清单网页应用，请先确认需求。」后 **23.80s** 需求确认卡可见（`request_choice` `cardKind=intent-confirm` `flowId=todo-list-web`）。卡片在 Lead pane（`surfaceRoleId=liaison`、选中/会话均 liaison、状态「待选择」），徽标「需求确认 · 客户」、`权力类型：需求确认`、confirm/revise 两个选项与「提交/取消」均可见且 `unobstructed=true`；1360×860 与 960×620 截图完整（截图像素即两档尺寸；960 为视口级窄档、外层窗口保持 1360×860，卡片完整位于 composer 上方）。首个模型活动 5.46s、写意图 20.12s、卡片 23.80s、停止本轮 28.36s，驱动总耗时 30.43s。截图后仅点「停止本轮」，**未回答需求卡**；卡片转 `expired`（未获同意）。
+
+**写盘/项目**：本轮**未出现写盘确认卡**——trio 下 Lead 的 `docs/intents/**` 为预授权目录，`write_file` 直接回执「已获准并落盘」。demo README SHA-256 前后一致；仅 demo 内新增 `docs/intents/todo-list-web.md`（sha256 与 `.ans/governance/ledger.jsonl` 的 artifactSha256 一致）与 app 自动写的 `.ans/sessions`/账本；无 ANS 仓库或 demo 外写入；`git status` 仅 `?? .ans/`、`?? docs/`；console/CSP **0**。
+
+**观察**：① 模型先发过一张非治理 `request_choice`（质量档位三选一，无 cardKind），被编排结构性拒绝、未弹卡后自行定档并继续（符合 Liaison 只发 intent-confirm 的隔离）；② 需求卡实际工具是 `request_choice`（Lead 契约不用 `request_confirmation`），落尾锚定其自身尚未完成的调用（lifecycle「调用发起」）；③ 960 下「1 条待确认 · 定位」浮标与卡片动作区右下缘轻微视觉重叠，按钮中心未遮挡。run1 与 run2 均弹出，run1 因 960 未重滚仅作交叉印证（归档 `run1/`）。
+
+**边界**：只写 `角色卡/测试/`；未改产品代码/构建/配置/测试断言；未读取/打印 `.env`；未 commit/push。报告 [2026-10-21_change_intent-confirm-card-e2e.md](docs/change/2026-10-21_change_intent-confirm-card-e2e.md)，证据 [2026-10-21-intent-confirm-card-e2e-evidence/index.md](docs/change/2026-10-21-intent-confirm-card-e2e-evidence/index.md)。
+
+## 2026-10-21（角色显示名修复后真机重跑）— 新 dist / 新角色名 / MIRROR 8/8 / 真实 Pi 模型
+
+**触发**：客户补充——角色显示名修复（proposal→Draft/提案、nomination→Crew/组队、schedule→Steward/统筹）已落盘并由桌面UI `build:renderer` 重建 dist；要求重启开发版再完成真机模型测试。
+
+**dist**：HTML `c8ad0e82…`、JS `index-Oqlp-kNL.js` `050776ec…`、CSS `76fad7ce…`（22:11:42）；gzip9 289,080B、CSP 严格。旧 Electron 进程杀掉，新临时 userData `/tmp/ans-model-userdata-fix` 重启。
+
+**角色名**：角色树实测 主理/Lead、Draft/提案、Crew/组队、Steward/统筹、验收/Proof；旧称“报告员/提名官/召集人”均不存在。MIRROR 真机 **8/8**，含 `W6-C five-role tree: ...Draft/Crew/Steward/Proof`、`status line shows 三权 · 五角色`、`mirror card rendered...` 全 true。
+
+**真实模型**：Pi 菜单“已配置”（Codex/Claude 缺配）；`deepseek-v4-flash[1m]`（ans-gateway，context 262144）回复 563 字；working 467ms→idle 4,574ms，首模型活动 1.375s、最终正文 4.195s；工具仅 `list_dir`，无写盘/确认卡，无 console/CSP，960/1360 无横溢。
+
+**只读**：README 哈希不变；无源码/治理写入；app 自动写 `.ans/sessions/liaison/pi` 3 文件 42,249 B（git `?? .ans/`）。打包 zip 仍是修复前构建（旧称），若包内需新称须重新打包/冻结。main.mjs 新 dist 重跑 `E2E_PASS=true`/397 名/17 截图。
+
+**边界**：只写 `角色卡/测试/`；未改产品/测试/构建；未读/打印 `.env`；未 commit/push。详见[真机报告](docs/change/2026-10-21_change_real-machine-test.md)与[证据](docs/change/2026-10-21-real-machine-evidence/index.md)。
+
+## 2026-10-21（macOS 真机）— 整机 e2e、打包应用空项目、开发版 Pi 真实模型
+
+**环境**：macOS 26.6.2（25G83）arm64；Electron 44.7.0；Node 24.14.0；候选 HEAD `224cf83`，dist HTML `3c4da2a2…`/JS `f568e2aa…`/CSS `76fad7ce…`；包 `ANS-Studio-1.4.0-mac-arm64.zip` `8e760887…`/405,227,230 B（与既有验收 `edeeef…` 不同，待 PM 确认）。
+
+**整机 e2e**：`main.mjs` 真机 exit 0，`E2E_PASS=true`、`E2E_FAILURES=` 空，入口 repo `dist/index.html`，397 名、17 截图；stdout 的 repair 探针异常为夹具故意触发。
+
+**打包应用**：临时 userData 启动；入口包内 `dist/index.html`；preload 桥正常、console/CSP 0；空项目 5 内置角色（主理/报告员/提名官/召集人/验收）、`governanceModel=trio`、`governanceRecord=missing`、S0 标题/说明/CTA 正确且仅一次提及、无治理 CTA；设置如实缺 `ANTHROPIC_API_KEY`；工作概览/资料/队列空态；Esc/焦点正常；关闭重开保持；项目前后文件清单/git 完全一致（打包未写）；包内 `.icns` 与 Dock 均为黑底绿字 ANS。
+
+**真实模型**：开发版 + Pi（菜单“已配置”，Codex/Claude 缺配）；空项目点击 Lead 发送一条不写文件消息，真实 `deepseek-v4-flash[1m]`（provider ans-gateway）回复 510 字；working 464ms→idle 5376ms，首模型活动 1.713s、最终正文 5.163s；工具仅 `list_dir`/`read_file`，无写盘工具/确认卡；Markdown 正常、无 console/CSP、无白屏。**app 自动写项目 `.ans/sessions/liaison/pi` 3 文件 46,117 B**；README 未变、无源码/治理写入。
+
+**发现/待确认**：空项目状态行未显示「三权 · 五角色」（实际“尚无治理记录…”）；会话历史自动写 `.ans/sessions`；包哈希与既有验收不同。
+
+**边界**：只写 `角色卡/测试/`；未改产品/测试/构建；未读/打印 `.env`；未 commit/push。详见[真机报告](docs/change/2026-10-21_change_real-machine-test.md)与[证据](docs/change/2026-10-21-real-machine-evidence/summary.json)。
+
 ## 2026-10-21（独立验收 AC3/AC8 补正）— OPEN_CARD 台账、计数、探针、套件版本限制与候选分离
 
 **触发**：独立验收报告 `角色卡/独立验收/docs/change/2026-10-21_change_ui-platform-phase5-acceptance.md` 判 AC3/AC8 needs-work；产品门不重跑。

@@ -1,0 +1,8 @@
+date=2026-10-21T22:17:36+08:00
+demo_project=/Users/wangzhongren/code/vibeingcode/ans-testbed/ui-platform-genesis-demo
+ans_repo=/Users/wangzhongren/code/vibeingcode/解压/ans-runtime
+ans_head=a18e9ef22848e12b9811f9fe45e54c4539f67442
+dist_index_sha256=c8ad0e82b2740ef59329c77834f8e583a34f402654f238e073e8a35cc4fd79cd
+dist_js=index-Oqlp-kNL.js 
+dist_js_sha256=050776ece38dcd700fe34b6eee8499a2247610a90c88df96e49a2ce4b609f97b
+env_source=repo .env (not read/printed by test role)

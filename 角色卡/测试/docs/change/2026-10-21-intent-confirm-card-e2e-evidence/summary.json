@@ -1,0 +1,226 @@
+{
+  "date": "2026-10-21",
+  "role": "测试",
+  "purpose": "验证真实 Pi 模型流程中 Lead 的需求确认卡（intent-confirm）是否弹出；不回答确认/修改。",
+  "environment": {
+    "host": "wangzhongrendeMacBook-Pro.local",
+    "os": "macOS 26.6.2 (25G83) arm64",
+    "node": "v24.14.0",
+    "electron": "44.7.0",
+    "ansHead": "a18e9ef22848e12b9811f9fe45e54c4539f67442",
+    "branch": "feat/ui-platform-nova",
+    "dist": {
+      "htmlSha256": "c8ad0e82b2740ef59329c77834f8e583a34f402654f238e073e8a35cc4fd79cd",
+      "js": "index-Oqlp-kNL.js"
+    },
+    "demoProject": "/Users/wangzhongren/code/vibeingcode/ans-testbed/ui-platform-intent-card-e2e",
+    "demoHead": "49df32d189028e55ddc5089f1b5e8f16948fa580",
+    "launchRun2": "./node_modules/.bin/electron app/main.ts --user-data-dir=/tmp/ans-intent-card-userdata-run2 --remote-debugging-port=9338",
+    "engineMenu": "Pi 已配置；Codex 缺配置；Claude 缺配置",
+    "model": {
+      "provider": "ans-gateway",
+      "modelId": "deepseek-v4-flash[1m]",
+      "thinkingLevel": "medium"
+    }
+  },
+  "runs": [
+    {
+      "name": "run1",
+      "result": "card appeared",
+      "cardWallMs": 24255,
+      "intentCardAt": "2026-10-21T14:25:23.044Z",
+      "note": "960 截图时卡片下半部被 composer 遮挡；为截图质量重跑 run2"
+    },
+    {
+      "name": "run2",
+      "result": "card appeared (primary evidence)",
+      "cardWallMs": 23805,
+      "intentCardAt": "2026-10-21T14:27:43.752Z"
+    }
+  ],
+  "assertions": {
+    "intentCardAppeared": {
+      "pass": true,
+      "value": {
+        "requestId": "op-1",
+        "state": "open",
+        "wallMs": 23805
+      }
+    },
+    "inLeadPane": {
+      "pass": true,
+      "value": {
+        "surfaceRoleId": "liaison",
+        "selectedRoleId": "liaison",
+        "sessionOpenRoleId": "liaison",
+        "status": "待选择"
+      }
+    },
+    "badgeIntentConfirmCustomer": {
+      "pass": true,
+      "value": [
+        "需求确认 · 客户"
+      ]
+    },
+    "powerTypeIntentConfirm": {
+      "pass": true,
+      "value": [
+        "流程：todo-list-web",
+        "权力类型：需求确认"
+      ]
+    },
+    "confirmAndReviseVisible": {
+      "pass": true,
+      "value": [
+        {
+          "id": "confirm",
+          "label": "确认，就是这样",
+          "visible": true,
+          "unobstructed": true
+        },
+        {
+          "id": "revise",
+          "label": "要修改",
+          "visible": true,
+          "unobstructed": true
+        }
+      ]
+    },
+    "actionButtonsVisible": {
+      "pass": true,
+      "value": [
+        {
+          "text": "提交",
+          "visible": true,
+          "unobstructed": true,
+          "disabled": true
+        },
+        {
+          "text": "取消",
+          "visible": true,
+          "unobstructed": true,
+          "disabled": false
+        }
+      ]
+    },
+    "anchor": {
+      "pass": true,
+      "value": {
+        "position": "tail (last row)",
+        "cardRowIndex": 8,
+        "rowCount": 9,
+        "lifecycle": "调用发起",
+        "prevRow": {
+          "index": 7,
+          "kind": "tool-lifecycle",
+          "text": "write_file\ndocs/intents/todo-list-web.md\n调用发起 → 执行完成"
+        },
+        "note": "卡片落尾；卡片内 lifecycle=调用发起 表示其自身 request_choice 调用尚未完成（等待客户），故没有单独的 request_choice 完成行。工具名为 request_choice（不是 request_confirmation）；Lead 的治理契约只用 request_choice(intent-confirm)。"
+      }
+    },
+    "screenshots": {
+      "pass": true,
+      "value": {
+        "card1360": "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/角色卡/测试/docs/change/2026-10-21-intent-confirm-card-e2e-evidence/intent-card-1360x860.png",
+        "card960": "/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/角色卡/测试/docs/change/2026-10-21-intent-confirm-card-e2e-evidence/intent-card-960x620.png",
+        "sizes": {
+          "at1360": {
+            "innerWidth": 1360,
+            "innerHeight": 860,
+            "outerWidth": 1360,
+            "outerHeight": 860,
+            "dpr": 1
+          },
+          "at960": {
+            "innerWidth": 960,
+            "innerHeight": 620,
+            "outerWidth": 1360,
+            "outerHeight": 860,
+            "dpr": 1
+          }
+        },
+        "scroll960": {
+          "chatScrollTop": 500,
+          "cardRect": {
+            "x": 272,
+            "y": 178,
+            "w": 664,
+            "h": 291
+          },
+          "chatRect": {
+            "top": 149,
+            "bottom": 498
+          },
+          "composerTop": 498,
+          "fullyAboveComposer": true
+        },
+        "card960FullyAboveComposer": true,
+        "method": "window.resizeTo + CDP Emulation.setDeviceMetricsOverride；两档截图像素 1360×860 / 960×620；960 档外层窗口保持 1360×860（视口级窄档截图，非 OS 窗口缩放）"
+      }
+    },
+    "writeConfirmationCards": {
+      "pass": true,
+      "value": {
+        "count": 0,
+        "note": "未出现写盘确认卡：trio 下 Lead 的 docs/intents/** 为预授权目录，write_file 直接获准并落盘（toolResult: 已获准并落盘）"
+      }
+    },
+    "shellConfirmations": {
+      "pass": true,
+      "value": 0
+    },
+    "consoleAndCsp": {
+      "pass": true,
+      "value": {
+        "cdp": [],
+        "page": {
+          "errors": [],
+          "rejections": [],
+          "csp": []
+        }
+      }
+    },
+    "demoProjectWrites": {
+      "pass": true,
+      "value": {
+        "readmeUnchanged": true,
+        "newFiles": [
+          "docs/intents/todo-list-web.md",
+          ".ans/governance/ledger.jsonl",
+          ".ans/sessions/liaison/pi/ans/index.json",
+          ".ans/sessions/liaison/pi/ans/replay.jsonl",
+          ".ans/sessions/liaison/pi/native/*.jsonl"
+        ],
+        "gitStatus": [
+          "?? .ans/",
+          "?? docs/"
+        ],
+        "note": "README sha256 前后一致；意图文件哈希 e057fe58… 与 ledger artifactSha256 一致；无 ANS 仓库或 demo 外写入"
+      }
+    },
+    "didNotAnswerCard": {
+      "pass": true,
+      "value": {
+        "afterHaltState": [
+          {
+            "id": "op-1",
+            "state": "expired",
+            "note": "请求已失效，未获同意。原因：本轮已停止或会话已重建，旧确认失效。"
+          }
+        ],
+        "haltWaitIdleMs": 504
+      }
+    }
+  },
+  "observations": [
+    "run2 中模型先发了一张非治理 request_choice（质量档位三选一，cardKind 缺席），编排按 Liaison 卡种白名单结构性拒绝、未弹卡（toolResult 文案：这是内部协调/工程决策，不应要求客户选择…），模型随后自行定档并继续写意图、发 intent-confirm。该行为符合 W6-A 隔离（Liaison 只发 intent-confirm），不是需求卡失败。",
+    "需求确认卡实际由 request_choice(cardKind=intent-confirm) 发出，而非 request_confirmation；卡片锚定于其尚未完成的工具调用（生命周期『调用发起』），位于聊天流末尾。",
+    "960×620 下卡片完整位于 composer 上方（fullyAboveComposer=true），但右下角『1 条待确认 · 定位』浮标与卡片按钮区域边缘有轻微视觉重叠（按钮中心命中测试均未被遮挡）。"
+  ],
+  "evidence": {
+    "run1": "run1/",
+    "primary": "model-run.json / intent-card-1360x860.png / intent-card-960x620.png",
+    "timings": "timings.txt",
+    "probes": "probes/intent-card-e2e.mjs"
+  }
+}

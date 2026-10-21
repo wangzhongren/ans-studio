@@ -1,0 +1,5 @@
+/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/角色卡/测试/docs/change/2026-10-21-real-machine-evidence/icon/icon-1024.png
+  pixelWidth: 1024
+  pixelHeight: 1024
+843d9526c526de1b063599f4b4e75ae333905d0d9316cf2d84b98b3c3befb43e  /tmp/ans-studio-real-20261021-220141/ANS Studio.app/Contents/Resources/icon.icns
+c596bdcb11b1adaf209773f3ca6d84df1d7dbc71bbc17bcf1da319d24b0b7c0d  角色卡/测试/docs/change/2026-10-21-real-machine-evidence/icon/icon-1024.png

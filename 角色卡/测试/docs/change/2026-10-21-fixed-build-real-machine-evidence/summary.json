@@ -1,0 +1,413 @@
+{
+  "date": "2026-10-21",
+  "role": "测试",
+  "purpose": "修复后构建 34484f3 真机复核：新 dist、品牌图标、角色名、真实 Pi 需求确认卡；genesis 历史回放派发去重（只读）。",
+  "fixedCommit": "34484f32327975552c0c9899c101285a09e71370",
+  "environment": {
+    "host": "wangzhongrendeMacBook-Pro.local",
+    "os": "macOS 26.6.2 (25G83) arm64",
+    "node": "v24.14.0",
+    "electron": "44.7.0",
+    "launch": "./node_modules/.bin/electron app/main.ts --user-data-dir=/tmp/ans-fixed-userdata --remote-debugging-port=9340",
+    "demoProject": "/Users/wangzhongren/code/vibeingcode/ans-testbed/ui-platform-intent-card-e2e",
+    "genesisProject": "/Users/wangzhongren/code/vibeingcode/ans-testbed/ui-platform-genesis-demo",
+    "model": {
+      "provider": "ans-gateway",
+      "modelId": "deepseek-v4-flash[1m]",
+      "thinkingLevel": "medium"
+    },
+    "engineMenu": "Pi 已配置；Codex/Claude 缺配置"
+  },
+  "dist": {
+    "expectedHtmlSha256": "f779ac60c39d341db7f10d76bde343cc1424c99935bf1859679602427ca1c88b",
+    "loadedHtmlSha256": "f779ac60c39d341db7f10d76bde343cc1424c99935bf1859679602427ca1c88b",
+    "htmlHashMatches": true,
+    "htmlBytes": 581,
+    "js": "./assets/index-CFjc0h-3.js",
+    "css": "./assets/index-BYYh-X8f.css",
+    "icon": "assets/ans-studio-ans-icon-DOpmqMAU.png"
+  },
+  "assertions": {
+    "distLoadedNewBuild": {
+      "pass": true,
+      "value": {
+        "loaded": "f779ac60c39d341db7f10d76bde343cc1424c99935bf1859679602427ca1c88b",
+        "scripts": [
+          "./assets/index-CFjc0h-3.js"
+        ],
+        "links": [
+          "./assets/index-BYYh-X8f.css"
+        ]
+      }
+    },
+    "roleNames": {
+      "pass": true,
+      "value": {
+        "names": [
+          "主理 / Lead",
+          "Draft / 提案",
+          "Crew / 组队",
+          "Steward / 统筹",
+          "验收 / Proof"
+        ],
+        "expectedPresent": [
+          "Draft / 提案",
+          "Crew / 组队",
+          "Steward / 统筹"
+        ],
+        "oldNames": []
+      }
+    },
+    "brandIcon": {
+      "pass": true,
+      "value": {
+        "titleMark": {
+          "tagName": "IMG",
+          "className": "titlebar-mark",
+          "alt": "ANS",
+          "widthAttr": "20",
+          "heightAttr": "20",
+          "naturalWidth": 1024,
+          "naturalHeight": 1024,
+          "complete": true,
+          "src": "file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/app/renderer/dist/assets/ans-studio-ans-icon-DOpmqMAU.png",
+          "rect": {
+            "x": 624,
+            "y": 8,
+            "w": 20,
+            "h": 20
+          },
+          "display": "block",
+          "objectFit": "contain",
+          "borderRadius": "4px"
+        },
+        "sideMark": {
+          "tagName": "IMG",
+          "className": "workspace-brand-mark",
+          "alt": "ANS",
+          "widthAttr": "30",
+          "heightAttr": "30",
+          "naturalWidth": 1024,
+          "naturalHeight": 1024,
+          "complete": true,
+          "src": "file:///Users/wangzhongren/code/vibeingcode/%E8%A7%A3%E5%8E%8B/ans-runtime/app/renderer/dist/assets/ans-studio-ans-icon-DOpmqMAU.png",
+          "rect": {
+            "x": 16,
+            "y": 54,
+            "w": 30,
+            "h": 30
+          },
+          "display": "block",
+          "objectFit": "contain",
+          "borderRadius": "6px"
+        },
+        "oldTextMark": null,
+        "titlebarText": "治理会话工作台",
+        "workspaceText": "AGENT WORKSPACE"
+      }
+    },
+    "intentCard": {
+      "pass": true,
+      "value": {
+        "requestId": "op-1",
+        "state": "open",
+        "surfaceRoleId": "liaison",
+        "badge": [
+          "需求确认 · 客户"
+        ],
+        "meta": [
+          "流程：todo-web-app",
+          "权力类型：需求确认"
+        ],
+        "title": "需求确认：最简待办清单网页应用（生产档）",
+        "options": [
+          {
+            "id": "confirm",
+            "label": "确认：按此目标、范围与验收标准推进",
+            "visible": true,
+            "unobstructed": true
+          },
+          {
+            "id": "revise",
+            "label": "需要修改：我来说明要改的地方",
+            "visible": true,
+            "unobstructed": true
+          }
+        ],
+        "actions": [
+          {
+            "text": "提交",
+            "visible": true,
+            "unobstructed": true,
+            "disabled": true
+          },
+          {
+            "text": "取消",
+            "visible": true,
+            "unobstructed": true,
+            "disabled": false
+          }
+        ],
+        "anchor": {
+          "cardRowIndex": 7,
+          "requestId": "op-1",
+          "matchingActivityByCallId": null,
+          "requestActivityRows": [],
+          "distanceToNearestRequestActivity": null,
+          "prevRows": [
+            {
+              "index": 4,
+              "kind": "tool-lifecycle",
+              "text": "list_dir\n无文件目标\n调用发起 → 已拒绝"
+            },
+            {
+              "index": 5,
+              "kind": "tool-lifecycle",
+              "text": "read_file\nREADME.md\n调用发起 → 执行完成"
+            },
+            {
+              "index": 6,
+              "kind": "tool-lifecycle",
+              "text": "write_file\ndocs/intents/todo-web-app.md\n调用发起 → 执行完成"
+            }
+          ],
+          "nextRows": []
+        },
+        "wallMs": 22624
+      }
+    },
+    "card960AboveComposer": {
+      "pass": true,
+      "value": {
+        "scroll": {
+          "chatScrollTop": 458,
+          "cardRect": {
+            "x": 272,
+            "y": 178,
+            "w": 664,
+            "h": 291
+          },
+          "chatRect": {
+            "top": 149,
+            "bottom": 498
+          },
+          "composerTop": 498,
+          "fullyAboveComposer": true
+        },
+        "options": [
+          {
+            "id": "confirm",
+            "visible": true,
+            "unobstructed": true
+          },
+          {
+            "id": "revise",
+            "visible": true,
+            "unobstructed": true
+          }
+        ],
+        "actions": [
+          {
+            "text": "提交",
+            "visible": true,
+            "unobstructed": true
+          },
+          {
+            "text": "取消",
+            "visible": true,
+            "unobstructed": true
+          }
+        ]
+      }
+    },
+    "consoleAndCsp": {
+      "pass": true,
+      "value": {
+        "intent": 0,
+        "genesis": 0
+      }
+    },
+    "didNotAnswerIntentCard": {
+      "pass": true,
+      "value": [
+        {
+          "id": "op-1",
+          "state": "expired",
+          "note": "请求已失效，未获同意。原因：本轮已停止或会话已重建，旧确认失效。"
+        }
+      ]
+    },
+    "demoWrites": {
+      "pass": true,
+      "value": {
+        "readmeUnchanged": true,
+        "newFiles": [
+          "docs/intents/todo-web-app.md",
+          ".ans/governance/ledger.jsonl",
+          ".ans/sessions/liaison/pi/**"
+        ],
+        "intentSha256": "d819ea6f22ac87f6116b1ba8fc5ac025d53454b5517928f9cde66a0fadafadf5",
+        "ledgerMatches": true
+      }
+    },
+    "dispatchDedupe": {
+      "pass": true,
+      "value": {
+        "convener": {
+          "before": {
+            "rawDispatchProjections": 8,
+            "userDispatch": 4,
+            "eventDispatch": 4,
+            "replayLines": 355
+          },
+          "after": {
+            "dispatchRows": 4,
+            "rowCount": 229,
+            "textLen": 61153,
+            "duplicated": [],
+            "stepIdCounts": {}
+          },
+          "rows": [
+            {
+              "chip": "派发任务",
+              "first": "来自 Lead / 主理 的任务（原因：提案阶段已冻结契约，但流程状态文件缺失，导致无法记录步骤状态、实现与验收无法在流程账本上追踪；需 Steward 建立 flow 与步骤。）",
+              "steps": []
+            },
+            {
+              "chip": "派发任务",
+              "first": "来自 Lead / 主理 的任务（原因：人读视图与账本状态已不一致，需修正以免误导；属内部文档准确性事项，不需要客户决定。）",
+              "steps": []
+            },
+            {
+              "chip": "派发任务",
+              "first": "来自 Lead / 主理 的任务（原因：回答 Steward 提出的偏差确认请求，避免它对同一事项反复等待答复。）",
+              "steps": []
+            },
+            {
+              "chip": "派发任务",
+              "first": "来自 Lead / 主理 的任务（原因：重发协调任务：上一版因引用了尚不存在的契约路径被投递系统拒绝，本版去掉该引用。）",
+              "steps": []
+            }
+          ]
+        },
+        "todo-app-dev": {
+          "before": {
+            "rawDispatchProjections": 10,
+            "userDispatch": 5,
+            "eventDispatch": 5,
+            "replayLines": 473
+          },
+          "after": {
+            "dispatchRows": 5,
+            "rowCount": 322,
+            "textLen": 20057,
+            "duplicated": [],
+            "stepIdCounts": {
+              "delivery-store": 1,
+              "delivery-tests-docs": 1,
+              "delivery-ui": 1,
+              "integration-e2e": 1,
+              "verification-evidence": 1
+            }
+          },
+          "rows": [
+            {
+              "chip": "派发任务",
+              "first": "来自 Steward / 统筹 的任务（原因：客户已完成任命 todo-app-dev；提案（accept）与冻结契约 v1 已就绪，派发数据层交付步骤 delivery-store。）",
+              "steps": [
+                "delivery-store"
+              ]
+            },
+            {
+              "chip": "派发任务",
+              "first": "来自 Steward / 统筹 的任务（原因：派发零依赖测试与 README 交付步骤 delivery-tests-docs。）",
+              "steps": [
+                "delivery-tests-docs"
+              ]
+            },
+            {
+              "chip": "派发任务",
+              "first": "来自 Steward / 统筹 的任务（原因：派发视图层交付步骤 delivery-ui（依赖 store 的契约面，可与 store 并行准备，但不得自行在 app.js 内实现业务逻辑）。）",
+              "steps": [
+                "delivery-ui"
+              ]
+            },
+            {
+              "chip": "派发任务",
+              "first": "来自 Steward / 统筹 的任务（原因：派发集成/端到端联调步骤 integration-e2e（须在实现与测试就绪后执行）。）",
+              "steps": [
+                "integration-e2e"
+              ]
+            },
+            {
+              "chip": "派发任务",
+              "first": "来自 Steward / 统筹 的任务（原因：集成/端到端已核证 done；派发最后一个交付步骤 verification-evidence（真实启动 + 演示记录），为 Proof / 验收提供可核对证据。）",
+              "steps": [
+                "verification-evidence"
+              ]
+            }
+          ]
+        },
+        "countMethod": "去重前=replay 中同一投递的 user 行 + prompt-input message 事件两种投影（convener 4+4=8、todo 5+5=10）；去重后=UI .msg-injected.is-dispatch 行（convener 4、todo 5）；UI 总行数 229/322。replay 355/473 行含工具事件，不能直接等同去重前行数。"
+      }
+    },
+    "genesisRoleNames": {
+      "pass": true,
+      "value": [
+        "主理 / Lead",
+        "Draft / 提案",
+        "Crew / 组队",
+        "Steward / 统筹",
+        "验收 / Proof",
+        "todo-app-dev"
+      ]
+    },
+    "genesisReadOnlyRestored": {
+      "pass": true,
+      "value": {
+        "note": "加载 genesis 触发 app 自动恢复 verifier 待办（真实模型回合，写入 verifier 会话文件）；停止后按原哈希前缀截断恢复，61 个文件与 pre-state 完全一致。变更副本保存在 genesis-post/changed/。",
+        "changedBeforeRestore": [
+          "verifier/pi/ans/replay.jsonl (+12,324 B)",
+          ".ans/sessions/verifier/pi/native/*.jsonl (+10,770 B)"
+        ],
+        "restored": "all 61 files sha256 match pre-state"
+      }
+    }
+  },
+  "timings": {
+    "sendToBusyMs": 464,
+    "firstModelActivityMs": 4751,
+    "writeFileMs": 17583,
+    "intentRequestMs": 22655,
+    "cardVisibleMs": 22624,
+    "haltMs": 27304,
+    "totalMs": 29324
+  },
+  "observations": [
+    "需求卡实际工具为 request_choice(cardKind=intent-confirm, flowId=todo-web-app)；卡片落尾并锚定其未完成调用（lifecycle 调用发起）。",
+    "模型先 list_dir .（成功）与 list_dir docs（docs 尚不存在 → 路径不存在），随後 read_file README、写意图、发确认卡；不影响结论。",
+    "960×620 下卡片完整在 composer 上方；『1 条待确认 · 定位』浮标与卡片动作区右下缘仍有轻微视觉重叠，按钮中心未遮挡。",
+    "genesis 当前回放含 todo-app-dev 5 个不同派发（delivery-store、delivery-tests-docs、delivery-ui、integration-e2e、verification-evidence），coordinator 预期 2 条应为较早快照；两条点名派发各出现一次，另三条不同步骤也保留且各一次。",
+    "加载 genesis 项目并非无副作用：app 自动恢复 verifier 待办并开始真实模型回合（request_confirmation 调用发起），写入 verifier 会话；已停止并恢复原字节。建议产品确认该自动恢复是否符合只读/静默预期。"
+  ],
+  "mergeable": "本复核范围内可合并：需求卡、角色名、品牌图标、派发去重均通过；仅 genesis 加载自动恢复 verifier 待办属行为风险（已恢复项目状态），建议产品/PM 确认。",
+  "evidence": {
+    "modelRun": "model-run.json",
+    "genesisRun": "genesis-run.json",
+    "timings": "timings.txt",
+    "probes": [
+      "probes/fixed-intent-card.mjs",
+      "probes/genesis-replay.mjs"
+    ],
+    "screenshots": [
+      "brand-roles-1360x860.png",
+      "brand-roles-960x620.png",
+      "intent-card-1360x860.png",
+      "intent-card-960x620.png",
+      "convener-dispatch-1360x860.png",
+      "convener-dispatch-960x620.png",
+      "todo-app-dev-dispatch-1360x860.png",
+      "todo-app-dev-dispatch-960x620.png"
+    ]
+  }
+}

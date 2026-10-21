@@ -1,0 +1,7 @@
+ENTRY=/Users/wangzhongren/code/vibeingcode/解压/ans-runtime/app/renderer/dist/index.html
+HTML_BYTES=581
+ASSET ./assets/index-Oqlp-kNL.js raw=825965 gzip9=269227
+ASSET ./assets/index-DUBNk8-R.css raw=108501 gzip9=19468
+ASSET index.html raw=581 gzip9=385
+TOTAL_GZIP9=289080 <=307200?true
+CSP_STATIC_SCAN {"INLINE_SCRIPT_PRESENT":false,"STYLE_TAG_PRESENT":false,"STYLE_ATTR_PRESENT":false,"UNSAFE_INLINE":false,"UNSAFE_EVAL":false,"STRICT_CSP_META_PRESENT":true,"MODULEPRELOAD_LINK":false,"SCRIPT_COUNT":1,"SCRIPT_WITH_SRC_COUNT":1,"RELATIVE_ASSET_REFS":true}

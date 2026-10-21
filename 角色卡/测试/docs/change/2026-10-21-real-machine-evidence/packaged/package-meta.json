@@ -1,0 +1,5 @@
+{
+  "name": "ans-cli",
+  "version": "1.4.0",
+  "main": "app/main.ts"
+}

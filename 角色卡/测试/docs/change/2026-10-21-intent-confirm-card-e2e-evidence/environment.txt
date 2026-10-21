@@ -1,0 +1,18 @@
+date=2026-10-21T22:24:41+08:00
+host=wangzhongrendeMacBook-Pro.local
+sw_vers=26.6.2 (25G83)
+uname=Darwin wangzhongrendeMacBook-Pro.local 25.6.0 Darwin Kernel Version 25.6.0: Fri Jul 31 19:16:20 PDT 2026; root:xnu-12377.161.14~5/RELEASE_ARM64_T8142 arm64
+node=v24.14.0
+electron_dev=v44.7.0
+ans_head=a18e9ef22848e12b9811f9fe45e54c4539f67442
+ans_branch=feat/ui-platform-nova
+demo_project=/Users/wangzhongren/code/vibeingcode/ans-testbed/ui-platform-intent-card-e2e
+demo_head=49df32d189028e55ddc5089f1b5e8f16948fa580
+launch=./node_modules/.bin/electron app/main.ts --user-data-dir=/tmp/ans-intent-card-userdata --remote-debugging-port=9337
+dist_html_sha256=c8ad0e82b2740ef59329c77834f8e583a34f402654f238e073e8a35cc4fd79cd
+dist_js=index-Oqlp-kNL.js
+--- run2 (final) ---
+date=2026-10-21T22:27:04+08:00
+demo_project=/Users/wangzhongren/code/vibeingcode/ans-testbed/ui-platform-intent-card-e2e
+demo_head=49df32d189028e55ddc5089f1b5e8f16948fa580
+launch=./node_modules/.bin/electron app/main.ts --user-data-dir=/tmp/ans-intent-card-userdata-run2 --remote-debugging-port=9338
