@@ -5,7 +5,7 @@ title: 站点品牌位与 favicon 替换为 ANS Studio 字标
 created: "2026-10-21"
 updated: "2026-10-21"
 timezone: Asia/Shanghai
-status: implemented-unverified
+status: deployed
 related: [project-site]
 events:
   - date: "2026-10-21"
@@ -13,14 +13,17 @@ events:
     summary: 按客户 13:14 下发的字标替换品牌位、favicon 与 apple-touch-icon
   - date: "2026-10-21"
     kind: implemented
-    summary: 本地截图、资产、结构与视口检查通过；未推送、未部署
+    summary: 本地截图、资产、结构与视口检查通过（随后由协调方部署）
+  - date: "2026-10-21"
+    kind: deployed
+    summary: 协调方提交 977615e 并部署成功，线上新字标生效、旧 A 资产 404
 ---
 
 # 站点品牌位与 favicon 替换为 ANS Studio 字标
 
 客户 2026-10-21 再次更换图标（「图标又换了，重新换一下」）。站点品牌位从上一版几何 A 换成新的 **ANS STUDIO 字标**：桌面账本栏与页脚用 13:14 的完整横版字标，移动顶栏用 13:12 的紧凑 `ANS` 字标；favicon 与 apple-touch-icon 从紧凑字标中取 A 字形，继续「石墨底 + 薄荷 A」方案。上一版 `ans-a-mint.png` / `ans-a-graphite.png` 已删除；Role-first 印章括号与截图四角括号保持不变。
 
-**仅本地完成**：线上仍是 `77c5143` 部署的几何 A 版本；本次字标改动**未推送、未部署**。角色文档此前已随 `2983402` / `77c5143` 入库，本轮字标变更记录与站点改动尚未提交。
+新字标已由协调方提交并部署上线（commit `977615e`，run `39549193783`）；角色文档已随该提交入库。本角色未执行任何 git 操作，未自行运行或触发部署。
 
 ## 源文件
 
@@ -95,9 +98,16 @@ curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/assets/apple-touch
 3. 品牌位最初左缘比导航文字靠左 4px，补 `padding: 0 10px` 对齐；页脚去掉重复的“ANS Studio”文字，改为 MIT + 定位行，层级更干净。
 4. 新字标是横版，旧规则里的方形 `border-radius` 与固定 34/28/40px 尺寸全部移除，改为高度 + 等比宽度 + `object-fit: contain`。
 
+## 发布记录（协调方执行）
+
+- **提交**：`977615e3eb8a1fec408c91c171b634558b549802`（main，`feat(site): replace branding with ANS Studio lettermark`）。内容含 `site/**` 与 `角色卡/宣传/**`；本轮字标变更与角色文档随该提交入库。
+- **部署**：workflow run `39549193783`（job `119054236675`），结论 success，22 秒（2026-10-21 13:22 Asia/Shanghai，UTC 05:22:35→05:22:57），由 push 触发。
+- **线上核对（本角色 curl 复核）**：`/assets/ans-studio-lettermark-mint.png` 200（52500 bytes）、`ans-lettermark-mint.png` 200（37230）、`ans-studio-lettermark-graphite.png` 200（44855）、`ans-studio-lettermark-white.png` 200（32828）、`favicon.png` 200（2239）、`apple-touch-icon.png` 200（8311）；旧 `/assets/ans-a-mint.png` 404。`/` HTML SHA-256 `a95d85bd1b84e82ea4f2317c2e9506ddd827c3ae00e2371b76dc41ca0d590b49`、`/en/` `7bb32d5437072d88b88f9809a37020d3f1c2d176192295b593b7a0a087425bba`，均与本地一致。协调方 Chrome headless 实拍首屏：完整 ANS STUDIO 字标已在账本栏显示。
+- 提交、run 与线上结果由本角色独立复核（curl + git + `gh api`）；本角色未执行 push、部署或任何仓库设置变更。
+
 ## 未做与限制
 
-- **未推送、未部署**：线上仍为 `77c5143` 的几何 A 图标；本轮字标变更与文档未提交。部署由客户/协调方执行。
+- **站点已由协调方提交并部署**（`977615e`）；本角色不做 git 操作，未自行 push/部署。角色文档已随该提交入库。
 - favicon 未在真实浏览器标签栏/iOS 主屏实测；浅/深底与 16/32/64px 为本地模拟图检查。
 - 品牌位尺寸（38/26/42px）为视觉判断；STUDIO 在 1x 屏幕上较小但可辨，2x 屏幕更清晰。
 - favicon 的 A 是从 ANS 字标中裁出的字形（字标中 A/N 相连），不是独立提供的 A 图标；裁切范围与取舍已记录。
