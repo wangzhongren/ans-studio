@@ -26,6 +26,9 @@ events:
   - date: "2026-10-21"
     kind: deployed
     summary: 品牌图标随 77c5143 部署上线；角色文档随 2983402 入库
+  - date: "2026-10-21"
+    kind: implemented
+    summary: 品牌位与 favicon 替换为 ANS STUDIO 字标；本地验证，未部署
 ---
 
 # 项目官网（GitHub Pages）
@@ -36,7 +39,7 @@ events:
 
 提供两个语言版本，共享同一套样式、脚本与素材，可互相切换：中文 `site/index.html`（`/`）与英文 `site/en/index.html`（`/en/`）。
 
-当前状态：中文站已部署上线（2026-10-21，协调方提交 `f87eb134` 并 push 触发部署，run `39541758607` 成功，线上页面与本地字节一致；发布事实见[变更记录](../change/2026-10-21_change_project-site.md)）。英文版、双语切换、hreflang 与双语 sitemap 也已由协调方提交并部署（commit `b00bc74`，run `39545903589` 成功；线上 `/` 与 `/en/` 均与本地字节一致，见[英文版变更记录](../change/2026-10-21_change_english-site.md)）。品牌图标已按客户 2026-10-21 提供的新 logo 替换为几何 A 并随 commit `77c5143` 部署上线（run `39546983969` 成功；见[品牌图标变更记录](../change/2026-10-21_change_logo-assets.md)）。角色文档已随提交 `2983402` 入库，品牌图标变更随 `77c5143` 入库。
+当前状态：中文站已部署上线（2026-10-21，协调方提交 `f87eb134` 并 push 触发部署，run `39541758607` 成功，线上页面与本地字节一致；发布事实见[变更记录](../change/2026-10-21_change_project-site.md)）。英文版、双语切换、hreflang 与双语 sitemap 也已由协调方提交并部署（commit `b00bc74`，run `39545903589` 成功；线上 `/` 与 `/en/` 均与本地字节一致，见[英文版变更记录](../change/2026-10-21_change_english-site.md)）。品牌图标先按客户 2026-10-21 的几何 A 替换并随 commit `77c5143` 部署上线（run `39546983969` 成功；见[几何 A 变更记录](../change/2026-10-21_change_logo-assets.md)）；当日稍后客户再次更换图标，站点品牌位已改为 **ANS STUDIO 字标**（桌面完整字标、移动紧凑 ANS、favicon 取自字标 A；本地验证，尚未部署，线上仍为几何 A 版；见[字标变更记录](../change/2026-10-21_change_lettermark-logo.md)）。角色文档已随提交 `2983402` 入库，几何 A 变更随 `77c5143` 入库。
 
 ## 页面结构
 
@@ -72,17 +75,18 @@ flowchart TD
 | `site/styles.css` | 颜色/字体 token、账本布局、语言切换、响应式、加载编排、reduced-motion |
 | `site/app.js` | 仅导航高亮；异常捕获，不影响内容 |
 | `site/assets/desktop-intent-confirm.png` | 真实桌面截图（1360×980，原图复制） |
-| `site/assets/ans-a-mint.png` | 薄荷绿几何 A 品牌标识 512×512（账本栏与页脚） |
-| `site/assets/ans-a-graphite.png` | 石墨几何 A 512×512；站点未引用，保留给浅色场景/未来使用 |
-| `site/assets/favicon.png` / `apple-touch-icon.png` | 石墨底薄荷绿 A 的 64px favicon 与 180px 触屏图标（浅/深浏览器栏均可辨） |
+| `site/assets/ans-studio-lettermark-mint.png` | ANS STUDIO 完整薄荷字标 649×240（桌面账本栏 38px、页脚 42px） |
+| `site/assets/ans-lettermark-mint.png` | 紧凑 ANS 薄荷字标 572×160（移动顶栏 26px，`<picture>` 自动切换） |
+| `site/assets/ans-studio-lettermark-graphite.png` / `ans-studio-lettermark-white.png` | 同形石墨/白色字标 649×240；站点未引用，保留给浅色/未来场景 |
+| `site/assets/favicon.png` / `apple-touch-icon.png` | 石墨底 + 薄荷 A（取自字标）的 64px favicon 与 180px 触屏图标 |
 | `site/robots.txt` / `sitemap.xml` / `.nojekyll` | 抓取（双语 sitemap 含 xhtml alternate）与 Pages 约定 |
 
 ## 品牌资产与如何更换 logo
 
-- 源文件：`app/desktop/assets/ans-geometric-a-mint.png`（薄荷绿，透明底，1254×1254）与 `ans-geometric-a-graphite.png`（石墨版，与 `output/branding/ans-studio-icon-graphite.png` 字节相同）。两者只读引用，不复制回源目录。
-- 站点使用：深色界面用薄荷 A（`.brand img` 桌面 34px / 移动 28px，`.footer-brand img` 40px，均无 `border-radius`）；石墨 A 保留给浅色场景/未来使用，当前未被引用。
-- 生成方式：以图形中心裁 1100×1100（源图 offset x=77、y=110，alpha 边界 x110–1144 / y282–1039），等比缩放到 512×512；favicon 为 512 画布 `#1b1b18` 底 + 薄荷 A 420×420 居中（约 9% 内边距），再缩到 64 与 180。可用 Electron `nativeImage.crop/resize` 或 CoreGraphics 实现，**不要拉伸**。
-- 替换步骤：放入新源图 → 按上述参数生成 `ans-a-mint.png`、`ans-a-graphite.png`、`favicon.png`、`apple-touch-icon.png` → 两页的 `.brand img`、`.footer-brand img` 与 `<link rel="icon" / apple-touch-icon>` 保持指向同名文件即可 → 重新截图核对深浅底观感与 16px 可辨性。Role-first 印章的括号符号与截图四角括号是“边界”的结构符号，不是品牌图标，替换 logo 时不要动。
+- 当前品牌：**ANS STUDIO 字标**（2026-10-21 第二次替换）。源文件为 `app/desktop/assets/ans-studio-lettermark-mint.png`（完整横版，含 STUDIO 小字）、`ans-lettermark-mint.png`（仅 ANS 紧凑版），以及同形 graphite/white 版本。源文件只读，不复制回源目录。
+- 站点使用：桌面账本栏与页脚用完整薄荷字标（`.brand img` 高 38px、`.footer-brand img` 高 42px，宽度按比例），移动顶栏通过 `<picture><source media="(max-width: 1023px)">` 切换为紧凑 ANS（高 26px）；页脚文字只保留「MIT 许可证」与英文定位行，避免与字标重复。石墨/白色字标保留给浅色/未来场景，当前未被引用。
+- 生成方式：按 alpha 边界裁掉透明留白（完整字标 864×312，加 6px 内边距）等比缩放到高 240 → 649×240；紧凑字标缩放到高 160 → 572×160。favicon 从紧凑字标取 A 字形（字标中 A 与 N 相连，裁切右缘收到 A 本体 x≈381），石墨底 `#1b1b18` + A 420px 宽居中，输出 64 与 180。**不要拉伸**；可用 Electron `nativeImage.crop/resize` 或 CoreGraphics 实现。
+- 替换步骤：放入新源图 → 按上述参数生成 `ans-studio-lettermark-mint.png`、`ans-lettermark-mint.png`、`favicon.png`、`apple-touch-icon.png`（石墨/白色版按需）→ 两页 `.brand` 的 `<picture>`/`<img>`、`.footer-brand img` 与 `<link rel="icon" / apple-touch-icon>` 保持指向同名文件 → 重新截图核对桌面完整字标（STUDIO 可辨）、移动紧凑字标与 favicon 深浅底观感。Role-first 印章的括号符号与截图四角括号是“边界”的结构符号，不是品牌图标，替换 logo 时不要动。
 
 ## 如何本地预览
 
@@ -132,7 +136,8 @@ python3 -m http.server 8765 --directory site
 ## 已知限制
 
 - 发布由客户/协调方执行：本角色不自行 push、运行工作流或改仓库设置；角色文档已随 `2983402` 入库。
-- favicon 未在真实浏览器标签栏/iOS 主屏实测；品牌位尺寸（34/28/40px）为视觉判断，可按需微调。
+- 2026-10-21 字标替换尚未部署，线上仍为几何 A 版；部署后需复查字标与 favicon。
+- favicon 未在真实浏览器标签栏/iOS 主屏实测；字标品牌位尺寸（桌面 38px / 移动 26px / 页脚 42px）为视觉判断，可按需微调。
 - 双语站点已上线且与本地字节一致（zh `0c83fd8a…`、en `81fadf15…`）；后续改动仍由客户/协调方 push 触发部署。
 - 运行包尚未签名或公证；站点已如实警示，不代替 GitHub Release 的 SHA256 校验。
 - Google Fonts 走外链，被墙时回退系统字体（PingFang SC / 微软雅黑等），版面与可读性保持；无其他外部 JS。
@@ -150,3 +155,4 @@ python3 -m http.server 8765 --directory site
 | 2026-10-21 | 发布 | deployed | 协调方提交 `b00bc74` 并部署英文版与双语导航；线上 `/` 与 `/en/` SHA-256 与本地一致（run `39545903589`） | [英文版变更记录·发布记录](../change/2026-10-21_change_english-site.md) |
 | 2026-10-21 | 变更 | implemented-unverified | 品牌图标替换为几何 A（薄荷绿品牌位、石墨底 favicon、apple-touch-icon）；本地验证通过 | [品牌图标变更记录](../change/2026-10-21_change_logo-assets.md)、[证据](../change/2026-10-21_logo-evidence/) |
 | 2026-10-21 | 发布 | deployed | 协调方提交 `77c5143` 并部署新品牌图标；线上新资产 200、旧 `ans-seal.png` 404，两页 SHA-256 与本地一致（run `39546983969`） | [品牌图标变更记录·发布记录](../change/2026-10-21_change_logo-assets.md) |
+| 2026-10-21 | 变更 | implemented-unverified | 品牌位与 favicon 替换为 ANS STUDIO 字标（桌面完整字标、移动紧凑 ANS、石墨底 A favicon）；本地验证通过，未部署 | [字标变更记录](../change/2026-10-21_change_lettermark-logo.md)、[证据](../change/2026-10-21_lettermark-evidence/) |

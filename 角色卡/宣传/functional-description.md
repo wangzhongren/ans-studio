@@ -28,9 +28,10 @@ site/
   styles.css                     视觉 token、账本式布局、响应式与一次性加载编排
   app.js                         滚动监听（IntersectionObserver）为左侧导航加 aria-current；内容不依赖脚本
   assets/desktop-intent-confirm.png   真实桌面截图（原图 1360×980）
-  assets/ans-a-mint.png          品牌标识：薄荷绿几何 A 512×512（账本栏与页脚）
-  assets/ans-a-graphite.png      石墨版几何 A 512×512（站点未引用，保留给浅色场景/未来使用）
-  assets/favicon.png             石墨底薄荷绿 A 的 64px favicon
+  assets/ans-studio-lettermark-mint.png   ANS STUDIO 完整字标 649×240（桌面账本栏与页脚）
+  assets/ans-lettermark-mint.png          紧凑 ANS 字标 572×160（移动顶栏）
+  assets/ans-studio-lettermark-graphite.png / -white.png  同形石墨/白色字标（未引用，保留）
+  assets/favicon.png             石墨底 + 薄荷 A（取自字标）的 64px favicon
   assets/apple-touch-icon.png    180×180 触屏图标
   robots.txt / sitemap.xml / .nojekyll
 .github/workflows/pages.yml      Pages 发布工作流
