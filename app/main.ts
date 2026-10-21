@@ -71,7 +71,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PRODUCTION_RENDERER_ENTRY = resolveRendererEntry(HERE);
 // 仅 packaged smoke 可显式指定入口（见 packaged-smoke.ts 的校验）；普通启动/渲染进程不可达。
 let activeProductionRendererEntry = PRODUCTION_RENDERER_ENTRY;
-const APP_ICON_PATH = path.join(HERE, "desktop", "assets", "ans-bracket-seal.png");
+const APP_ICON_PATH = path.join(HERE, "desktop", "assets", "ans-studio-ans-icon.png");
 
 let mainWindow: BrowserWindow | null = null;
 let iface: DesktopInterface | null = null;

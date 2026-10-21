@@ -18,12 +18,12 @@ files:
   - '!**/tests{,/**/*}'
 artifactName: 'ANS-Studio-${version}-${os}-${arch}.${ext}'
 mac:
-  icon: app/desktop/assets/ans-bracket-seal.png
+  icon: app/desktop/assets/ans-studio-ans-icon.png
   target: zip
   category: public.app-category.developer-tools
   identity: null
   minimumSystemVersion: '13.0'
 win:
-  icon: app/desktop/assets/ans-bracket-seal.png
+  icon: app/desktop/assets/ans-studio-ans-icon.png
   target: zip
 publish: null
